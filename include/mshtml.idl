@@ -29547,7 +29547,11 @@ interface IElementBehaviorFactory : IUnknown
 
 } /* library MSHTML */
 
+#ifdef MSHTML_MARSHALING_HACK
+#define IOleCommandTarget IUnknown
+#else
 interface IOleCommandTarget;
+#endif
 
 /*****************************************************************************
  *    IHTMLPrivateWindow interface
@@ -29555,7 +29559,7 @@ interface IOleCommandTarget;
 [
     object,
     uuid(3050f6dc-98b5-11cf-bb82-00aa00bdce0b),
-    local
+ /* local, CXHACK 15579 */
 ]
 interface IHTMLPrivateWindow : IUnknown
 {
@@ -29564,7 +29568,7 @@ interface IHTMLPrivateWindow : IUnknown
     HRESULT SetPICSTarget(IOleCommandTarget *cmdtrg);
     HRESULT PICSComplete(int arg);
     HRESULT FindWindowByName(LPCWSTR name, IHTMLWindow2 **ret);
-    HRESULT GetAddressBarUrl(BSTR *url);
+    HRESULT GetAddressBarUrl([out, retval] BSTR *url);
 }
 
 /*****************************************************************************
@@ -29573,7 +29577,7 @@ interface IHTMLPrivateWindow : IUnknown
 [
     object,
     uuid(3050f804-98b5-11cf-bb82-00aa00bdce0b),
-    local
+ /* local, CXHACK 15579 */
 ]
 interface IWebBrowserPriv : IUnknown
 {
@@ -29588,7 +29592,7 @@ interface IWebBrowserPriv : IUnknown
 [
     object,
     uuid(3ed72303-6ffc-4214-ba90-faf1862dec8a),
-    local
+ /* local, CXHACK 15579 */
 ]
 interface IWebBrowserPriv2IE8 : IUnknown
 {
@@ -29610,7 +29614,7 @@ interface IWebBrowserPriv2IE8 : IUnknown
 [
     object,
     uuid(3ed72303-6ffc-4214-ba90-faf1862dec8a),
-    local
+ /* local, CXHACK 15579 */
 ]
 interface IWebBrowserPriv2IE9 : IUnknown
 {
@@ -29618,3 +29622,7 @@ interface IWebBrowserPriv2IE9 : IUnknown
             VARIANT *headers, IBindCtx *bind_ctx, LPOLESTR url_fragment, DWORD unused);
     /* Probably more */
 }
+
+#ifdef MSHTML_MARSHALING_HACK
+#undef IOleCommandTarget
+#endif
