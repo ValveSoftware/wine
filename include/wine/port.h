@@ -334,6 +334,15 @@ double rint(double x);
 float rintf(float x);
 #endif
 
+#ifndef RENAME_EXCHANGE
+#define RENAME_EXCHANGE (1 << 1)
+#endif /* RENAME_EXCHANGE */
+
+#ifndef HAVE_RENAMEAT2
+int renameat2( int olddirfd, const char *oldpath, int newdirfd, const char *newpath,
+               unsigned int flags );
+#endif /* HAVE_RENAMEAT2 */
+
 #ifndef HAVE_STATVFS
 int statvfs( const char *path, struct statvfs *buf );
 #endif

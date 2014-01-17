@@ -18012,6 +18012,8 @@ for ac_func in \
 	pwrite \
 	readdir \
 	readlink \
+	renameat \
+	renameat2 \
 	sched_yield \
 	select \
 	setproctitle \

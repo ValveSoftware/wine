@@ -737,6 +737,12 @@
 /* Define to 1 if you have the `remquof' function. */
 #undef HAVE_REMQUOF
 
+/* Define to 1 if you have the `renameat' function. */
+#undef HAVE_RENAMEAT
+
+/* Define to 1 if you have the `renameat2' function. */
+#undef HAVE_RENAMEAT2
+
 /* Define to 1 if the system has the type `request_sense'. */
 #undef HAVE_REQUEST_SENSE
 
