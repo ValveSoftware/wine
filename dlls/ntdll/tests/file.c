@@ -4938,7 +4938,7 @@ static void test_reparse_points(void)
     REPARSE_GUID_DATA_BUFFER guid_buffer;
     static const WCHAR dotW[] = {'.',0};
     REPARSE_DATA_BUFFER *buffer = NULL;
-    DWORD dwret, dwLen, dwFlags;
+    DWORD dwret, dwLen, dwFlags, err;
     INT buffer_len, string_len;
     IO_STATUS_BLOCK iosb;
     UNICODE_STRING nameW;
@@ -5026,6 +5026,38 @@ static void test_reparse_points(void)
     ok(old_attrib.LastAccessTime.QuadPart == new_attrib.LastAccessTime.QuadPart,
        "Junction point folder's access time does not match.\n");
     CloseHandle(handle);
+
+    /* Check deleting a junction point as if it were a directory */
+    HeapFree(GetProcessHeap(), 0, buffer);
+    handle = CreateFileW(reparse_path, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
+                            FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
+    buffer_len = build_reparse_buffer(nameW.Buffer, &buffer);
+    bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
+    ok(bret, "Failed to create junction point! (0x%x)\n", GetLastError());
+    CloseHandle(handle);
+    bret = RemoveDirectoryW(reparse_path);
+    ok(bret, "Failed to delete junction point as directory!\n");
+    dwret = GetFileAttributesW(reparse_path);
+    ok(dwret == (DWORD)~0, "Junction point still exists (attributes: 0x%x)!\n", dwret);
+
+    /* Check deleting a junction point as if it were a file */
+    HeapFree(GetProcessHeap(), 0, buffer);
+    bret = CreateDirectoryW(reparse_path, NULL);
+    ok(bret, "Failed to create junction point target directory.\n");
+    handle = CreateFileW(reparse_path, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
+                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
+    buffer_len = build_reparse_buffer(nameW.Buffer, &buffer);
+    bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
+    ok(bret, "Failed to create junction point! (0x%x)\n", GetLastError());
+    CloseHandle(handle);
+    bret = DeleteFileW(reparse_path);
+    ok(!bret, "Succeeded in deleting junction point as file!\n");
+    err = GetLastError();
+    ok(err == ERROR_ACCESS_DENIED, "Expected last error 0x%x for DeleteFile on junction point (actually 0x%x)!\n",
+                                   ERROR_ACCESS_DENIED, err);
+    dwret = GetFileAttributesW(reparse_path);
+    ok(dwret != (DWORD)~0, "Junction point doesn't exist (attributes: 0x%x)!\n", dwret);
+    ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a junction point! (attributes: 0x%x)\n", dwret);
 
 cleanup:
     /* Cleanup */
