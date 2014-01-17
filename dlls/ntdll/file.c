@@ -21,6 +21,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <libgen.h>
 #include <stdio.h>
 #include <errno.h>
 #include <assert.h>
@@ -108,6 +109,7 @@
 #include "winioctl.h"
 #include "ddk/ntddk.h"
 #include "ddk/ntddser.h"
+#include "ntifs.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ntdll);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
@@ -1640,6 +1642,104 @@ NTSTATUS WINAPI NtDeviceIoControlFile(HANDLE handle, HANDLE event,
 }
 
 
+/*
+ * Retrieve the unix name corresponding to a file handle, remove that directory, and then symlink the
+ * requested directory to the location of the old directory.
+ */
+NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
+{
+    BOOL src_allocated = FALSE, dest_allocated = FALSE, tempdir_created = FALSE;
+    int dest_len = buffer->MountPointReparseBuffer.SubstituteNameLength;
+    int offset = buffer->MountPointReparseBuffer.SubstituteNameOffset;
+    WCHAR *dest = &buffer->MountPointReparseBuffer.PathBuffer[offset];
+    char tmpdir[PATH_MAX], tmplink[PATH_MAX], *d;
+    ANSI_STRING unix_src, unix_dest;
+    char magic_dest[PATH_MAX];
+    int dest_fd, needs_close;
+    UNICODE_STRING nt_dest;
+    NTSTATUS status;
+    int i;
+
+    if ((status = server_get_unix_fd( handle, FILE_SPECIAL_ACCESS, &dest_fd, &needs_close, NULL, NULL )))
+        return status;
+
+    if ((status = server_get_unix_name( handle, &unix_src )))
+        goto cleanup;
+    src_allocated = TRUE;
+    nt_dest.Buffer = dest;
+    nt_dest.Length = dest_len;
+    status = wine_nt_to_unix_file_name( &nt_dest, &unix_dest, 0, FALSE );
+    if (status != STATUS_SUCCESS && status != STATUS_NO_SUCH_FILE)
+        goto cleanup;
+    dest_allocated = TRUE;
+
+    TRACE("Linking %s to %s\n", unix_src.Buffer, unix_dest.Buffer);
+
+    /* Encode the reparse tag into the symlink */
+    strcpy( magic_dest, "/" );
+    for (i = 0; i < sizeof(ULONG)*8; i++)
+    {
+        if ((buffer->ReparseTag >> i) & 1)
+            strcat( magic_dest, "." );
+        strcat( magic_dest, "/" );
+    }
+    strcat( magic_dest, unix_dest.Buffer );
+
+    /* Produce the link in a temporary location in the same folder */
+    strcpy( tmpdir, unix_src.Buffer );
+    d = dirname( tmpdir);
+    if (d != tmpdir) strcpy( tmpdir, d );
+    strcat( tmpdir, "/.winelink.XXXXXX" );
+    if (mkdtemp( tmpdir ) == NULL)
+    {
+        status = FILE_GetNtStatus();
+        goto cleanup;
+    }
+    tempdir_created = TRUE;
+    strcpy( tmplink, tmpdir );
+    strcat( tmplink, "/tmplink" );
+    if (symlink( magic_dest, tmplink ))
+    {
+        status = FILE_GetNtStatus();
+        goto cleanup;
+    }
+    /* Atomically move the link into position */
+    if (!renameat2( -1, tmplink, -1, unix_src.Buffer, RENAME_EXCHANGE ))
+    {
+        /* success: link and folder have switched locations */
+        rmdir( tmplink ); /* remove the folder (at link location) */
+    }
+    else if (errno == ENOSYS)
+    {
+        FIXME( "Atomic exchange of directory with symbolic link unsupported on this system, "
+               "using unsafe exchange instead.\n" );
+        if (rmdir( unix_src.Buffer ))
+        {
+            status = FILE_GetNtStatus();
+            goto cleanup;
+        }
+        if (rename( tmplink, unix_src.Buffer ))
+        {
+            status = FILE_GetNtStatus();
+            goto cleanup; /* not moved, orignal file/folder at destination is orphaned */
+        }
+    }
+    else
+    {
+        status = FILE_GetNtStatus();
+        goto cleanup;
+    }
+    status = STATUS_SUCCESS;
+
+cleanup:
+    if (tempdir_created) rmdir( tmpdir );
+    if (dest_allocated) RtlFreeAnsiString( &unix_dest );
+    if (src_allocated) RtlFreeAnsiString( &unix_src );
+    if (needs_close) close( dest_fd );
+    return status;
+}
+
+
 /**************************************************************************
  *              NtFsControlFile                 [NTDLL.@]
  *              ZwFsControlFile                 [NTDLL.@]
@@ -1724,6 +1824,24 @@ NTSTATUS WINAPI NtFsControlFile(HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc
         io->Information = 0;
         status = STATUS_SUCCESS;
         break;
+
+    case FSCTL_SET_REPARSE_POINT:
+    {
+        REPARSE_DATA_BUFFER *buffer = (REPARSE_DATA_BUFFER *)in_buffer;
+
+        switch(buffer->ReparseTag)
+        {
+        case IO_REPARSE_TAG_MOUNT_POINT:
+            status = FILE_CreateSymlink( handle, buffer );
+            break;
+        default:
+            FIXME("stub: FSCTL_SET_REPARSE_POINT(%x)\n", buffer->ReparseTag);
+            status = STATUS_NOT_IMPLEMENTED;
+            break;
+        }
+        break;
+    }
+
     default:
         return server_ioctl_file( handle, event, apc, apc_context, io, code,
                                   in_buffer, in_size, out_buffer, out_size );

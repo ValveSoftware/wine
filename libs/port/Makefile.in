@@ -98,6 +98,7 @@ C_SRCS = \
 	pread.c \
 	pwrite.c \
 	readlink.c \
+	renameat2.c \
 	rint.c \
 	sortkey.c \
 	spawn.c \

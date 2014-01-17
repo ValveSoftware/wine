@@ -761,6 +761,12 @@
 /* Define to 1 if you have the `remquof' function. */
 #undef HAVE_REMQUOF
 
+/* Define to 1 if you have the `renameat' function. */
+#undef HAVE_RENAMEAT
+
+/* Define to 1 if you have the `renameat2' function. */
+#undef HAVE_RENAMEAT2
+
 /* Define to 1 if the system has the type `request_sense'. */
 #undef HAVE_REQUEST_SENSE
 
@@ -1320,6 +1326,9 @@
 
 /* Define to 1 if you have the `_spawnvp' function. */
 #undef HAVE__SPAWNVP
+
+/* Define to 1 if you have the `__builtin_ctzl' built-in function. */
+#undef HAVE___BUILTIN_CTZL
 
 /* Define to 1 if you have the `__builtin_popcount' built-in function. */
 #undef HAVE___BUILTIN_POPCOUNT

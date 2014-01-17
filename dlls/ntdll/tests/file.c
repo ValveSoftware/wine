@@ -38,6 +38,7 @@
 #include "winuser.h"
 #include "winioctl.h"
 #include "winnls.h"
+#include "ntifs.h"
 
 #ifndef IO_COMPLETION_ALL_ACCESS
 #define IO_COMPLETION_ALL_ACCESS 0x001F0003
@@ -4900,6 +4901,105 @@ static void test_file_readonly_access(void)
     DeleteFileW(path);
 }
 
+static INT build_reparse_buffer(const WCHAR *filename, REPARSE_DATA_BUFFER **pbuffer)
+{
+    static INT header_size = offsetof(REPARSE_DATA_BUFFER, GenericReparseBuffer);
+    INT buffer_size, struct_size, data_size, string_len, prefix_len;
+    WCHAR *subst_dest, *print_dest;
+    REPARSE_DATA_BUFFER *buffer;
+
+    struct_size = offsetof(REPARSE_DATA_BUFFER, MountPointReparseBuffer.PathBuffer[0]);
+    prefix_len = strlen("\\??\\");
+    string_len = lstrlenW(&filename[prefix_len]);
+    data_size = (prefix_len + 2 * string_len + 2) * sizeof(WCHAR);
+    buffer_size = struct_size + data_size;
+    buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buffer_size);
+    buffer->ReparseTag = IO_REPARSE_TAG_MOUNT_POINT;
+    buffer->ReparseDataLength = struct_size - header_size + data_size;
+    buffer->MountPointReparseBuffer.SubstituteNameLength = (prefix_len + string_len) * sizeof(WCHAR);
+    buffer->MountPointReparseBuffer.PrintNameOffset = (prefix_len + string_len + 1) * sizeof(WCHAR);
+    buffer->MountPointReparseBuffer.PrintNameLength = string_len * sizeof(WCHAR);
+    subst_dest = &buffer->MountPointReparseBuffer.PathBuffer[0];
+    print_dest = &buffer->MountPointReparseBuffer.PathBuffer[prefix_len + string_len + 1];
+    lstrcpyW(subst_dest, filename);
+    lstrcpyW(print_dest, &filename[prefix_len]);
+    *pbuffer = buffer;
+    return buffer_size;
+}
+
+static void test_reparse_points(void)
+{
+    static const WCHAR reparseW[] = {'\\','r','e','p','a','r','s','e',0};
+    WCHAR path[MAX_PATH], reparse_path[MAX_PATH], target_path[MAX_PATH];
+    static const WCHAR targetW[] = {'\\','t','a','r','g','e','t',0};
+    static const WCHAR fooW[] = {'f','o','o',0};
+    static WCHAR volW[] = {'c',':','\\',0};
+    static const WCHAR dotW[] = {'.',0};
+    REPARSE_DATA_BUFFER *buffer = NULL;
+    DWORD dwret, dwLen, dwFlags;
+    UNICODE_STRING nameW;
+    INT buffer_len;
+    HANDLE handle;
+    BOOL bret;
+
+    /* Create a temporary folder for the junction point tests */
+    GetTempFileNameW(dotW, fooW, 0, path);
+    DeleteFileW(path);
+    if (!CreateDirectoryW(path, NULL))
+    {
+        win_skip("Unable to create a temporary junction point directory.\n");
+        return;
+    }
+
+    /* Check that the volume this folder is located on supports junction points */
+    pRtlDosPathNameToNtPathName_U(path, &nameW, NULL, NULL);
+    volW[0] = nameW.Buffer[4];
+    pRtlFreeUnicodeString( &nameW );
+    GetVolumeInformationW(volW, 0, 0, 0, &dwLen, &dwFlags, 0, 0);
+    if (!(dwFlags & FILE_SUPPORTS_REPARSE_POINTS))
+    {
+        skip("File system does not support reparse points.\n");
+        RemoveDirectoryW(path);
+        return;
+    }
+
+    /* Create the folder to be replaced by a junction point */
+    lstrcpyW(reparse_path, path);
+    lstrcatW(reparse_path, reparseW);
+    bret = CreateDirectoryW(reparse_path, NULL);
+    ok(bret, "Failed to create junction point directory.\n");
+
+    /* Create a destination folder for the junction point to target */
+    lstrcpyW(target_path, path);
+    lstrcatW(target_path, targetW);
+    bret = CreateDirectoryW(target_path, NULL);
+    ok(bret, "Failed to create junction point target directory.\n");
+    pRtlDosPathNameToNtPathName_U(target_path, &nameW, NULL, NULL);
+
+    /* Create the junction point */
+    handle = CreateFileW(reparse_path, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
+                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        win_skip("Failed to open junction point directory handle (0x%x).\n", GetLastError());
+        goto cleanup;
+    }
+    buffer_len = build_reparse_buffer(nameW.Buffer, &buffer);
+    bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
+    ok(bret, "Failed to create junction point! (0x%x)\n", GetLastError());
+    CloseHandle(handle);
+
+cleanup:
+    /* Cleanup */
+    pRtlFreeUnicodeString(&nameW);
+    HeapFree(GetProcessHeap(), 0, buffer);
+    bret = RemoveDirectoryW(reparse_path);
+    todo_wine ok(bret, "Failed to remove temporary reparse point directory!\n");
+    bret = RemoveDirectoryW(target_path);
+    ok(bret, "Failed to remove temporary target directory!\n");
+    RemoveDirectoryW(path);
+}
+
 START_TEST(file)
 {
     HMODULE hkernel32 = GetModuleHandleA("kernel32.dll");
@@ -4970,4 +5070,5 @@ START_TEST(file)
     test_query_attribute_information_file();
     test_ioctl();
     test_flush_buffers_file();
+    test_reparse_points();
 }
