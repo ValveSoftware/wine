@@ -1740,6 +1740,106 @@ cleanup:
 }
 
 
+/*
+ * Retrieve the unix name corresponding to a file handle and use that to find the destination of the
+ * symlink corresponding to that file handle.
+ */
+NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_size)
+{
+    ANSI_STRING unix_src, unix_dest;
+    VOID *subst_name, *print_name;
+    BOOL dest_allocated = FALSE;
+    int dest_fd, needs_close;
+    UNICODE_STRING nt_dest;
+    DWORD max_length;
+    NTSTATUS status;
+    INT prefix_len;
+    ssize_t ret;
+    char *p;
+    int i;
+
+    if ((status = server_get_unix_fd( handle, FILE_ANY_ACCESS, &dest_fd, &needs_close, NULL, NULL )))
+        return status;
+
+    if ((status = server_get_unix_name( handle, &unix_src )))
+        goto cleanup;
+
+    unix_dest.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, PATH_MAX );
+    unix_dest.MaximumLength = PATH_MAX;
+    dest_allocated = TRUE;
+    ret = readlink( unix_src.Buffer, unix_dest.Buffer, unix_dest.MaximumLength );
+    if (ret < 0)
+    {
+        status = FILE_GetNtStatus();
+        goto cleanup;
+    }
+    unix_dest.Length = ret;
+
+    /* Decode the reparse tag from the symlink */
+    p = unix_dest.Buffer;
+    if (*p++ != '/')
+    {
+        status = STATUS_NOT_IMPLEMENTED;
+        goto cleanup;
+    }
+    buffer->ReparseTag = 0;
+    for (i = 0; i < sizeof(ULONG)*8; i++)
+    {
+        char c = *p++;
+        int val;
+
+        if (c == '/')
+            val = 0;
+        else if (c == '.' && *p++ == '/')
+            val = 1;
+        else
+        {
+            status = STATUS_NOT_IMPLEMENTED;
+            goto cleanup;
+        }
+        buffer->ReparseTag |= (val << i);
+    }
+    unix_dest.Length -= (p - unix_dest.Buffer);
+    memmove(unix_dest.Buffer, p, unix_dest.Length);
+
+    if ((status = wine_unix_to_nt_file_name( &unix_dest, &nt_dest )))
+        goto cleanup;
+
+    prefix_len = strlen("\\??\\");
+    switch(buffer->ReparseTag)
+    {
+    case IO_REPARSE_TAG_MOUNT_POINT:
+        max_length = out_size-FIELD_OFFSET(typeof(*buffer), MountPointReparseBuffer.PathBuffer[1]);
+        buffer->MountPointReparseBuffer.SubstituteNameOffset = 0;
+        buffer->MountPointReparseBuffer.SubstituteNameLength = nt_dest.Length;
+        subst_name = &buffer->MountPointReparseBuffer.PathBuffer[buffer->MountPointReparseBuffer.SubstituteNameOffset/sizeof(WCHAR)];
+        buffer->MountPointReparseBuffer.PrintNameOffset = nt_dest.Length + sizeof(WCHAR);
+        buffer->MountPointReparseBuffer.PrintNameLength = nt_dest.Length - prefix_len*sizeof(WCHAR);
+        print_name = &buffer->MountPointReparseBuffer.PathBuffer[buffer->MountPointReparseBuffer.PrintNameOffset/sizeof(WCHAR)];
+        break;
+    default:
+        /* unrecognized (regular) files should probably be treated as symlinks */
+        WARN("unrecognized symbolic link\n");
+        status = STATUS_NOT_IMPLEMENTED;
+        goto cleanup;
+    }
+    if (nt_dest.Length > max_length)
+    {
+        status = STATUS_BUFFER_TOO_SMALL;
+        goto cleanup;
+    }
+
+    memcpy( subst_name, nt_dest.Buffer, nt_dest.Length );
+    memcpy( print_name, &nt_dest.Buffer[prefix_len], nt_dest.Length - prefix_len*sizeof(WCHAR) );
+    status = STATUS_SUCCESS;
+
+cleanup:
+    if (dest_allocated) RtlFreeAnsiString( &unix_dest );
+    if (needs_close) close( dest_fd );
+    return status;
+}
+
+
 /**************************************************************************
  *              NtFsControlFile                 [NTDLL.@]
  *              ZwFsControlFile                 [NTDLL.@]
@@ -1825,6 +1925,12 @@ NTSTATUS WINAPI NtFsControlFile(HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc
         status = STATUS_SUCCESS;
         break;
 
+    case FSCTL_GET_REPARSE_POINT:
+    {
+        REPARSE_DATA_BUFFER *buffer = (REPARSE_DATA_BUFFER *)out_buffer;
+        status = FILE_GetSymlink( handle, buffer, out_size );
+        break;
+    }
     case FSCTL_SET_REPARSE_POINT:
     {
         REPARSE_DATA_BUFFER *buffer = (REPARSE_DATA_BUFFER *)in_buffer;
