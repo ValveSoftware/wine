@@ -5712,6 +5712,119 @@ cleanup:
 }
 
 
+/*
+ * Retrieve the unix name corresponding to a file handle and use that to find the destination of the
+ * symlink corresponding to that file handle.
+ */
+NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_size)
+{
+    char *unix_src, unix_dest[PATH_MAX];
+    VOID *subst_name, *print_name;
+    SIZE_T nt_dest_len = PATH_MAX;
+    BOOL dest_allocated = FALSE;
+    int dest_fd, needs_close;
+    int unix_dest_len;
+    DWORD max_length;
+    NTSTATUS status;
+    WCHAR *nt_dest;
+    INT prefix_len;
+    ssize_t ret;
+    char *p;
+    int i;
+
+    if ((status = server_get_unix_fd( handle, FILE_ANY_ACCESS, &dest_fd, &needs_close, NULL, NULL )))
+        return status;
+
+    if ((status = server_get_unix_name( handle, &unix_src )))
+        goto cleanup;
+
+    ret = readlink( unix_src, unix_dest, sizeof(unix_dest) );
+    if (ret < 0)
+    {
+        status = errno_to_status( errno );
+        goto cleanup;
+    }
+    unix_dest_len = ret;
+
+    /* Decode the reparse tag from the symlink */
+    p = unix_dest;
+    if (*p++ != '/')
+    {
+        status = STATUS_NOT_IMPLEMENTED;
+        goto cleanup;
+    }
+    buffer->ReparseTag = 0;
+    for (i = 0; i < sizeof(ULONG)*8; i++)
+    {
+        char c = *p++;
+        int val;
+
+        if (c == '/')
+            val = 0;
+        else if (c == '.' && *p++ == '/')
+            val = 1;
+        else
+        {
+            status = STATUS_NOT_IMPLEMENTED;
+            goto cleanup;
+        }
+        buffer->ReparseTag |= (val << i);
+    }
+    unix_dest_len -= (p - unix_dest);
+    memmove(unix_dest, p, unix_dest_len);
+
+    for (;;)
+    {
+        nt_dest = malloc( nt_dest_len * sizeof(WCHAR) );
+        if (!nt_dest)
+        {
+            status = STATUS_NO_MEMORY;
+            goto cleanup;
+        }
+        status = wine_unix_to_nt_file_name( unix_dest, nt_dest, &nt_dest_len );
+        if (status != STATUS_BUFFER_TOO_SMALL) break;
+        free( nt_dest );
+    }
+    dest_allocated = TRUE;
+    if (status != STATUS_SUCCESS)
+        goto cleanup;
+    nt_dest_len *= sizeof(WCHAR);
+
+    prefix_len = strlen("\\??\\");
+    switch(buffer->ReparseTag)
+    {
+    case IO_REPARSE_TAG_MOUNT_POINT:
+        max_length = out_size-FIELD_OFFSET(typeof(*buffer), MountPointReparseBuffer.PathBuffer[1]);
+        buffer->MountPointReparseBuffer.SubstituteNameOffset = 0;
+        buffer->MountPointReparseBuffer.SubstituteNameLength = nt_dest_len;
+        subst_name = &buffer->MountPointReparseBuffer.PathBuffer[buffer->MountPointReparseBuffer.SubstituteNameOffset/sizeof(WCHAR)];
+        buffer->MountPointReparseBuffer.PrintNameOffset = nt_dest_len + sizeof(WCHAR);
+        buffer->MountPointReparseBuffer.PrintNameLength = nt_dest_len - prefix_len*sizeof(WCHAR);
+        print_name = &buffer->MountPointReparseBuffer.PathBuffer[buffer->MountPointReparseBuffer.PrintNameOffset/sizeof(WCHAR)];
+        break;
+    default:
+        /* unrecognized (regular) files should probably be treated as symlinks */
+        WARN("unrecognized symbolic link\n");
+        status = STATUS_NOT_IMPLEMENTED;
+        goto cleanup;
+    }
+    if (nt_dest_len > max_length)
+    {
+        status = STATUS_BUFFER_TOO_SMALL;
+        goto cleanup;
+    }
+
+    memcpy( subst_name, nt_dest, nt_dest_len );
+    memcpy( print_name, &nt_dest[prefix_len], nt_dest_len - prefix_len*sizeof(WCHAR) );
+    status = STATUS_SUCCESS;
+
+cleanup:
+    if (dest_allocated) free( nt_dest );
+    if (needs_close) close( dest_fd );
+    return status;
+}
+
+
 /******************************************************************************
  *              NtFsControlFile   (NTDLL.@)
  */
@@ -5794,6 +5907,12 @@ NTSTATUS WINAPI NtFsControlFile( HANDLE handle, HANDLE event, PIO_APC_ROUTINE ap
         break;
     }
 
+    case FSCTL_GET_REPARSE_POINT:
+    {
+        REPARSE_DATA_BUFFER *buffer = (REPARSE_DATA_BUFFER *)out_buffer;
+        status = FILE_GetSymlink( handle, buffer, out_size );
+        break;
+    }
     case FSCTL_SET_REPARSE_POINT:
     {
         REPARSE_DATA_BUFFER *buffer = (REPARSE_DATA_BUFFER *)in_buffer;
