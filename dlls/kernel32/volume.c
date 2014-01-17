@@ -44,6 +44,19 @@
 #include "wine/unicode.h"
 #include "wine/debug.h"
 
+#ifdef HAVE_SYS_MOUNT_H
+# include <sys/mount.h>
+#endif
+#ifdef HAVE_SYS_STATFS_H
+# include <sys/statfs.h>
+#endif
+#ifdef HAVE_SYS_SYSCALL_H
+# include <sys/syscall.h>
+#endif
+#ifdef HAVE_SYS_VFS_H
+# include <sys/vfs.h>
+#endif
+
 WINE_DEFAULT_DEBUG_CHANNEL(volume);
 
 #define BLOCK_SIZE 2048
@@ -675,6 +688,75 @@ static DWORD VOLUME_GetAudioCDSerial( const CDROM_TOC *toc )
 }
 
 
+static DWORD WINAPI get_fs_flags( UNICODE_STRING *nt_name )
+{
+#if defined(__NR_renameat2) || defined(RENAME_SWAP)
+    ANSI_STRING unix_name;
+#if defined(HAVE_FSTATFS)
+    struct statfs stfs;
+#elif defined(HAVE_FSTATVFS)
+    struct statvfs stfs;
+#endif
+    NTSTATUS status;
+    DWORD flags = 0;
+
+    status = wine_nt_to_unix_file_name( nt_name, &unix_name, FILE_OPEN, FALSE );
+    if (status != STATUS_SUCCESS)
+        return flags;
+#if defined(HAVE_FSTATFS)
+    if (statfs(unix_name.Buffer, &stfs))
+        return flags;
+#elif defined(HAVE_FSTATVFS)
+    if (statvfs(unix_name.Buffer, &stfs))
+        return flags;
+#endif
+#if defined(HAVE_FSTATFS) && defined(linux)
+    switch (stfs.f_type)
+    {
+    case 0x6969:      /* nfs */
+    case 0xff534d42:  /* cifs */
+    case 0x564c:      /* ncpfs */
+    case 0x01021994:  /* tmpfs */
+    case 0x28cd3d45:  /* cramfs */
+    case 0x1373:      /* devfs */
+    case 0x9fa0:      /* procfs */
+    case 0xef51:      /* old ext2 */
+    case 0xef53:      /* ext2/3/4 */
+    case 0x4244:      /* hfs */
+    case 0xf995e849:  /* hpfs */
+    case 0x5346544e:  /* ntfs */
+        flags |= FILE_SUPPORTS_REPARSE_POINTS;
+        break;
+    default:
+        break;
+    }
+#elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__OpenBSD__) || defined(__DragonFly__) || defined(__APPLE__) || defined(__NetBSD__)
+    if (!strcmp("apfs", stfs.f_fstypename) ||
+        !strcmp("nfs", stfs.f_fstypename) ||
+        !strcmp("cifs", stfs.f_fstypename) ||
+        !strcmp("ncpfs", stfs.f_fstypename) ||
+        !strcmp("tmpfs", stfs.f_fstypename) ||
+        !strcmp("cramfs", stfs.f_fstypename) ||
+        !strcmp("devfs", stfs.f_fstypename) ||
+        !strcmp("procfs", stfs.f_fstypename) ||
+        !strcmp("ext2", stfs.f_fstypename) ||
+        !strcmp("ext3", stfs.f_fstypename) ||
+        !strcmp("ext4", stfs.f_fstypename) ||
+        !strcmp("hfs", stfs.f_fstypename) ||
+        !strcmp("hpfs", stfs.f_fstypename) ||
+        !strcmp("ntfs", stfs.f_fstypename))
+    {
+        flags |= FILE_SUPPORTS_REPARSE_POINTS;
+    }
+#endif
+    RtlFreeAnsiString( &unix_name );
+    return flags;
+#else
+    return 0;
+#endif
+}
+
+
 /***********************************************************************
  *           GetVolumeInformationW   (KERNEL32.@)
  */
@@ -818,7 +900,8 @@ fill_fs_info:  /* now fill in the information that depends on the file system ty
     default:
         if (fsname) lstrcpynW( fsname, ntfsW, fsname_len );
         if (filename_len) *filename_len = 255;
-        if (flags) *flags = FILE_CASE_PRESERVED_NAMES | FILE_PERSISTENT_ACLS;
+        if (flags) *flags = FILE_CASE_PRESERVED_NAMES | FILE_PERSISTENT_ACLS
+                            | get_fs_flags( &nt_name );
         break;
     }
     ret = TRUE;
