@@ -4994,6 +4994,11 @@ static void test_reparse_points(void)
     bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
     ok(bret, "Failed to create junction point! (0x%x)\n", GetLastError());
 
+    /* Check the file attributes of the junction point */
+    dwret = GetFileAttributesW(reparse_path);
+    ok(dwret != (DWORD)~0, "Junction point doesn't exist (attributes: 0x%x)!\n", dwret);
+    ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a junction point! (attributes: %d)\n", dwret);
+
     /* Read back the junction point */
     HeapFree(GetProcessHeap(), 0, buffer);
     buffer_len = sizeof(*buffer) + MAX_PATH*sizeof(WCHAR);
