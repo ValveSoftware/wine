@@ -4901,26 +4901,50 @@ static void test_file_readonly_access(void)
     DeleteFileW(path);
 }
 
-static INT build_reparse_buffer(const WCHAR *filename, REPARSE_DATA_BUFFER **pbuffer)
+static INT build_reparse_buffer(const WCHAR *filename, ULONG tag, REPARSE_DATA_BUFFER **pbuffer)
 {
     static INT header_size = offsetof(REPARSE_DATA_BUFFER, GenericReparseBuffer);
     INT buffer_size, struct_size, data_size, string_len, prefix_len;
     WCHAR *subst_dest, *print_dest;
     REPARSE_DATA_BUFFER *buffer;
 
-    struct_size = offsetof(REPARSE_DATA_BUFFER, MountPointReparseBuffer.PathBuffer[0]);
+    switch(tag)
+    {
+    case IO_REPARSE_TAG_MOUNT_POINT:
+        struct_size = offsetof(REPARSE_DATA_BUFFER, MountPointReparseBuffer.PathBuffer[0]);
+        break;
+    case IO_REPARSE_TAG_SYMLINK:
+        struct_size = offsetof(REPARSE_DATA_BUFFER, SymbolicLinkReparseBuffer.PathBuffer[0]);
+        break;
+    default:
+        return 0;
+    }
     prefix_len = strlen("\\??\\");
     string_len = lstrlenW(&filename[prefix_len]);
     data_size = (prefix_len + 2 * string_len + 2) * sizeof(WCHAR);
     buffer_size = struct_size + data_size;
     buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buffer_size);
-    buffer->ReparseTag = IO_REPARSE_TAG_MOUNT_POINT;
+    buffer->ReparseTag = tag;
     buffer->ReparseDataLength = struct_size - header_size + data_size;
-    buffer->MountPointReparseBuffer.SubstituteNameLength = (prefix_len + string_len) * sizeof(WCHAR);
-    buffer->MountPointReparseBuffer.PrintNameOffset = (prefix_len + string_len + 1) * sizeof(WCHAR);
-    buffer->MountPointReparseBuffer.PrintNameLength = string_len * sizeof(WCHAR);
-    subst_dest = &buffer->MountPointReparseBuffer.PathBuffer[0];
-    print_dest = &buffer->MountPointReparseBuffer.PathBuffer[prefix_len + string_len + 1];
+    switch(tag)
+    {
+    case IO_REPARSE_TAG_MOUNT_POINT:
+        buffer->MountPointReparseBuffer.SubstituteNameLength = (prefix_len + string_len) * sizeof(WCHAR);
+        buffer->MountPointReparseBuffer.PrintNameOffset = (prefix_len + string_len + 1) * sizeof(WCHAR);
+        buffer->MountPointReparseBuffer.PrintNameLength = string_len * sizeof(WCHAR);
+        subst_dest = &buffer->MountPointReparseBuffer.PathBuffer[0];
+        print_dest = &buffer->MountPointReparseBuffer.PathBuffer[prefix_len + string_len + 1];
+        break;
+    case IO_REPARSE_TAG_SYMLINK:
+        buffer->SymbolicLinkReparseBuffer.SubstituteNameLength = (prefix_len + string_len) * sizeof(WCHAR);
+        buffer->SymbolicLinkReparseBuffer.PrintNameOffset = (prefix_len + string_len + 1) * sizeof(WCHAR);
+        buffer->SymbolicLinkReparseBuffer.PrintNameLength = string_len * sizeof(WCHAR);
+        subst_dest = &buffer->SymbolicLinkReparseBuffer.PathBuffer[0];
+        print_dest = &buffer->SymbolicLinkReparseBuffer.PathBuffer[prefix_len + string_len + 1];
+        break;
+    default:
+        return 0;
+    }
     lstrcpyW(subst_dest, filename);
     lstrcpyW(print_dest, &filename[prefix_len]);
     *pbuffer = buffer;
@@ -4940,10 +4964,12 @@ static void test_reparse_points(void)
     REPARSE_DATA_BUFFER *buffer = NULL;
     DWORD dwret, dwLen, dwFlags, err;
     INT buffer_len, string_len;
+    HANDLE handle, token;
     IO_STATUS_BLOCK iosb;
     UNICODE_STRING nameW;
-    HANDLE handle;
+    TOKEN_PRIVILEGES tp;
     WCHAR *dest;
+    LUID luid;
     BOOL bret;
 
     /* Create a temporary folder for the junction point tests */
@@ -4990,7 +5016,7 @@ static void test_reparse_points(void)
     }
     dwret = NtQueryInformationFile(handle, &iosb, &old_attrib, sizeof(old_attrib), FileBasicInformation);
     ok(dwret == STATUS_SUCCESS, "Failed to get junction point folder's attributes (0x%x).\n", dwret);
-    buffer_len = build_reparse_buffer(nameW.Buffer, &buffer);
+    buffer_len = build_reparse_buffer(nameW.Buffer, IO_REPARSE_TAG_MOUNT_POINT, &buffer);
     bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
     ok(bret, "Failed to create junction point! (0x%x)\n", GetLastError());
 
@@ -5031,7 +5057,7 @@ static void test_reparse_points(void)
     HeapFree(GetProcessHeap(), 0, buffer);
     handle = CreateFileW(reparse_path, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
                             FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
-    buffer_len = build_reparse_buffer(nameW.Buffer, &buffer);
+    buffer_len = build_reparse_buffer(nameW.Buffer, IO_REPARSE_TAG_MOUNT_POINT, &buffer);
     bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
     ok(bret, "Failed to create junction point! (0x%x)\n", GetLastError());
     CloseHandle(handle);
@@ -5046,7 +5072,7 @@ static void test_reparse_points(void)
     ok(bret, "Failed to create junction point target directory.\n");
     handle = CreateFileW(reparse_path, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
                          FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
-    buffer_len = build_reparse_buffer(nameW.Buffer, &buffer);
+    buffer_len = build_reparse_buffer(nameW.Buffer, IO_REPARSE_TAG_MOUNT_POINT, &buffer);
     bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
     ok(bret, "Failed to create junction point! (0x%x)\n", GetLastError());
     CloseHandle(handle);
@@ -5059,14 +5085,73 @@ static void test_reparse_points(void)
     ok(dwret != (DWORD)~0, "Junction point doesn't exist (attributes: 0x%x)!\n", dwret);
     ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a junction point! (attributes: 0x%x)\n", dwret);
 
+    /* Test deleting a junction point's target */
+    dwret = GetFileAttributesW(reparse_path);
+    ok(dwret == 0x410 || broken(dwret == 0x430) /* win2k */ || broken(dwret == 0xc10) /* vista */,
+       "Unexpected junction point attributes (0x%x != 0x410)!\n", dwret);
+    bret = RemoveDirectoryW(target_path);
+    ok(bret, "Failed to delete junction point target!\n");
+    bret = CreateDirectoryW(target_path, NULL);
+    ok(bret, "Failed to create junction point target directory.\n");
+
+    /* Establish permissions for symlink creation */
+    bret = OpenProcessToken(GetCurrentProcess(), TOKEN_ALL_ACCESS, &token);
+    ok(bret, "OpenProcessToken failed: %u\n", GetLastError());
+    bret = LookupPrivilegeValueA(NULL, "SeCreateSymbolicLinkPrivilege", &luid);
+    todo_wine ok(bret || broken(!bret && GetLastError() == ERROR_NO_SUCH_PRIVILEGE) /* winxp */,
+                 "LookupPrivilegeValue failed: %u\n", GetLastError());
+    if (bret)
+    {
+        tp.PrivilegeCount = 1;
+        tp.Privileges[0].Luid = luid;
+        tp.Privileges[0].Attributes = SE_PRIVILEGE_ENABLED;
+        bret = AdjustTokenPrivileges(token, FALSE, &tp, 0, NULL, NULL);
+        ok(bret, "AdjustTokenPrivileges failed: %u\n", GetLastError());
+        if (GetLastError() == ERROR_NOT_ALL_ASSIGNED)
+        {
+            win_skip("Insufficient permissions to perform symlink tests.\n");
+            goto cleanup;
+        }
+    }
+
+    /* Delete the junction point directory and create a blank slate for symlink tests */
+    bret = RemoveDirectoryW(reparse_path);
+    ok(bret, "Failed to delete junction point!\n");
+    bret = CreateDirectoryW(reparse_path, NULL);
+    ok(bret, "Failed to create junction point directory.\n");
+    dwret = GetFileAttributesW(reparse_path);
+    ok(dwret != (DWORD)~0, "Path doesn't exist (attributes: 0x%x)!\n", dwret);
+    ok(!(dwret & FILE_ATTRIBUTE_REPARSE_POINT), "File is already a reparse point! (attributes: %d)\n", dwret);
+
+    /* Create the directory symlink */
+    HeapFree(GetProcessHeap(), 0, buffer);
+    handle = CreateFileW(reparse_path, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING,
+                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
+    if (handle == INVALID_HANDLE_VALUE)
+    {
+        win_skip("Failed to open symlink directory handle (0x%x).\n", GetLastError());
+        goto cleanup;
+    }
+    dwret = NtQueryInformationFile(handle, &iosb, &old_attrib, sizeof(old_attrib), FileBasicInformation);
+    ok(dwret == STATUS_SUCCESS, "Failed to get symlink folder's attributes (0x%x).\n", dwret);
+    buffer_len = build_reparse_buffer(nameW.Buffer, IO_REPARSE_TAG_SYMLINK, &buffer);
+    bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
+    CloseHandle(handle);
+    ok(bret, "Failed to create symlink! (0x%x)\n", GetLastError());
+
+    /* Check the file attributes of the symlink */
+    dwret = GetFileAttributesW(reparse_path);
+    ok(dwret != (DWORD)~0, "Symlink doesn't exist (attributes: 0x%x)!\n", dwret);
+    ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a symlink! (attributes: %d)\n", dwret);
+
 cleanup:
     /* Cleanup */
     pRtlFreeUnicodeString(&nameW);
     HeapFree(GetProcessHeap(), 0, buffer);
-    bret = RemoveDirectoryW(reparse_path);
-    ok(bret, "Failed to remove temporary reparse point directory!\n");
-    bret = RemoveDirectoryW(target_path);
-    ok(bret, "Failed to remove temporary target directory!\n");
+    RemoveDirectoryW(reparse_path);
+    DeleteFileW(reparse_path);
+    RemoveDirectoryW(target_path);
+    DeleteFileW(target_path);
     RemoveDirectoryW(path);
 }
 

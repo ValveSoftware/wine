@@ -21,11 +21,20 @@
 #ifndef __WINE_NTIFS_H
 #define __WINE_NTIFS_H
 
+#include <pshpack2.h>
 typedef struct _REPARSE_DATA_BUFFER {
     ULONG  ReparseTag;
     USHORT ReparseDataLength;
     USHORT Reserved;
     union {
+        struct {
+            USHORT SubstituteNameOffset;
+            USHORT SubstituteNameLength;
+            USHORT PrintNameOffset;
+            USHORT PrintNameLength;
+            ULONG  Flags;
+            WCHAR  PathBuffer[1];
+        } SymbolicLinkReparseBuffer;
         struct {
             USHORT SubstituteNameOffset;
             USHORT SubstituteNameLength;
@@ -38,6 +47,7 @@ typedef struct _REPARSE_DATA_BUFFER {
         } GenericReparseBuffer;
     };
 } REPARSE_DATA_BUFFER, *PREPARSE_DATA_BUFFER;
+#include <poppack.h>
 
 typedef struct _REPARSE_GUID_DATA_BUFFER {
     DWORD ReparseTag;
