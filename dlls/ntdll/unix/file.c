@@ -5825,6 +5825,87 @@ cleanup:
 }
 
 
+/*
+ * Retrieve the unix name corresponding to a file handle, remove that symlink, and then recreate
+ * a directory at the location of the old filename.
+ */
+NTSTATUS FILE_RemoveSymlink(HANDLE handle, REPARSE_GUID_DATA_BUFFER *buffer)
+{
+    char tmpdir[PATH_MAX], tmpfile[PATH_MAX], *d;
+    BOOL tempdir_created = FALSE;
+    int dest_fd, needs_close;
+    NTSTATUS status;
+    char *unix_name;
+    struct stat st;
+
+    if ((status = server_get_unix_fd( handle, FILE_SPECIAL_ACCESS, &dest_fd, &needs_close, NULL, NULL )))
+        return status;
+
+    if ((status = server_get_unix_name( handle, &unix_name )))
+        goto cleanup;
+
+    TRACE( "Deleting symlink %s\n", unix_name );
+
+    /* Produce the directory in a temporary location in the same folder */
+    if (fstat( dest_fd, &st ) == -1)
+    {
+        status = errno_to_status( errno );
+        goto cleanup;
+    }
+    strcpy( tmpdir, unix_name );
+    d = dirname( tmpdir);
+    if (d != tmpdir) strcpy( tmpdir, d );
+    strcat( tmpdir, "/.winelink.XXXXXX" );
+    if (mkdtemp( tmpdir ) == NULL)
+    {
+        status = errno_to_status( errno );
+        goto cleanup;
+    }
+    tempdir_created = TRUE;
+    strcpy( tmpfile, tmpdir );
+    strcat( tmpfile, "/tmpfile" );
+    if (mkdir( tmpfile, st.st_mode ))
+    {
+        status = errno_to_status( errno );
+        goto cleanup;
+    }
+    /* attemp to retain the ownership (if possible) */
+    lchown( tmpfile, st.st_uid, st.st_gid );
+    /* Atomically move the directory into position */
+    if (!renameat2( -1, tmpfile, -1, unix_name, RENAME_EXCHANGE ))
+    {
+        /* success: link and folder have switched locations */
+        unlink( tmpfile ); /* remove the link (at folder location) */
+    }
+    else if (errno == ENOSYS)
+    {
+        FIXME( "Atomic exchange of directory with symbolic link unsupported on this system, "
+               "using unsafe exchange instead.\n" );
+        if (unlink( unix_name ))
+        {
+            status = errno_to_status( errno );
+            goto cleanup;
+        }
+        if (rename( tmpfile, unix_name ))
+        {
+            status = errno_to_status( errno );
+            goto cleanup; /* not moved, orignal file/folder at destination is orphaned */
+        }
+    }
+    else
+    {
+        status = errno_to_status( errno );
+        goto cleanup;
+    }
+    status = STATUS_SUCCESS;
+
+cleanup:
+    if (tempdir_created) rmdir( tmpdir );
+    if (needs_close) close( dest_fd );
+    return status;
+}
+
+
 /******************************************************************************
  *              NtFsControlFile   (NTDLL.@)
  */
@@ -5907,6 +5988,22 @@ NTSTATUS WINAPI NtFsControlFile( HANDLE handle, HANDLE event, PIO_APC_ROUTINE ap
         break;
     }
 
+    case FSCTL_DELETE_REPARSE_POINT:
+    {
+        REPARSE_GUID_DATA_BUFFER *buffer = (REPARSE_GUID_DATA_BUFFER *)in_buffer;
+
+        switch(buffer->ReparseTag)
+        {
+        case IO_REPARSE_TAG_MOUNT_POINT:
+            status = FILE_RemoveSymlink( handle, buffer );
+            break;
+        default:
+            FIXME("stub: FSCTL_DELETE_REPARSE_POINT(%x)\n", buffer->ReparseTag);
+            status = STATUS_NOT_IMPLEMENTED;
+            break;
+        }
+        break;
+    }
     case FSCTL_GET_REPARSE_POINT:
     {
         REPARSE_DATA_BUFFER *buffer = (REPARSE_DATA_BUFFER *)out_buffer;
