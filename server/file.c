@@ -390,23 +390,19 @@ struct security_descriptor *mode_to_sd( mode_t mode, const struct sid *user, con
     return sd;
 }
 
-static struct security_descriptor *file_get_sd( struct object *obj )
+struct security_descriptor *get_file_sd( struct object *obj, struct fd *fd, mode_t *mode,
+                                         uid_t *uid )
 {
-    struct file *file = (struct file *)obj;
+    int unix_fd = get_unix_fd( fd );
     struct stat st;
-    int unix_fd;
     struct security_descriptor *sd;
-
-    assert( obj->ops == &file_ops );
-
-    unix_fd = get_file_unix_fd( file );
 
     if (unix_fd == -1 || fstat( unix_fd, &st ) == -1)
         return obj->sd;
 
     /* mode and uid the same? if so, no need to re-generate security descriptor */
-    if (obj->sd && (st.st_mode & (S_IRWXU|S_IRWXO)) == (file->mode & (S_IRWXU|S_IRWXO)) &&
-        (st.st_uid == file->uid))
+    if (obj->sd && (st.st_mode & (S_IRWXU|S_IRWXO)) == (*mode & (S_IRWXU|S_IRWXO)) &&
+        (st.st_uid == *uid))
         return obj->sd;
 
     sd = mode_to_sd( st.st_mode,
@@ -414,10 +410,24 @@ static struct security_descriptor *file_get_sd( struct object *obj )
                      token_get_primary_group( current->process->token ));
     if (!sd) return obj->sd;
 
-    file->mode = st.st_mode;
-    file->uid = st.st_uid;
+    *mode = st.st_mode;
+    *uid = st.st_uid;
     free( obj->sd );
     obj->sd = sd;
+    return sd;
+}
+
+static struct security_descriptor *file_get_sd( struct object *obj )
+{
+    struct file *file = (struct file *)obj;
+    struct security_descriptor *sd;
+    struct fd *fd;
+
+    assert( obj->ops == &file_ops );
+
+    fd = file_get_fd( obj );
+    sd = get_file_sd( obj, fd, &file->mode, &file->uid );
+    release_object( fd );
     return sd;
 }
 
