@@ -178,6 +178,8 @@ extern void file_set_error(void);
 extern struct security_descriptor *mode_to_sd( mode_t mode, const struct sid *user, const struct sid *group );
 extern mode_t sd_to_mode( const struct security_descriptor *sd, const struct sid *owner );
 extern int is_file_executable( const char *name );
+extern int set_file_sd( struct object *obj, struct fd *fd, mode_t *mode, uid_t *uid,
+                        const struct security_descriptor *sd, unsigned int set_info );
 
 /* file mapping functions */
 
