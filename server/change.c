@@ -366,48 +366,15 @@ static int dir_set_sd( struct object *obj, const struct security_descriptor *sd,
                        unsigned int set_info )
 {
     struct dir *dir = (struct dir *)obj;
-    const struct sid *owner;
-    struct stat st;
-    mode_t mode;
-    int unix_fd;
+    struct fd *fd;
+    int ret;
 
     assert( obj->ops == &dir_ops );
 
-    unix_fd = get_dir_unix_fd( dir );
-
-    if (unix_fd == -1 || fstat( unix_fd, &st ) == -1) return 1;
-
-    if (set_info & OWNER_SECURITY_INFORMATION)
-    {
-        owner = sd_get_owner( sd );
-        if (!owner)
-        {
-            set_error( STATUS_INVALID_SECURITY_DESCR );
-            return 0;
-        }
-        if (!obj->sd || !equal_sid( owner, sd_get_owner( obj->sd ) ))
-        {
-            /* FIXME: get Unix uid and call fchown */
-        }
-    }
-    else if (obj->sd)
-        owner = sd_get_owner( obj->sd );
-    else
-        owner = token_get_owner( current->process->token );
-
-    if (set_info & DACL_SECURITY_INFORMATION)
-    {
-        /* keep the bits that we don't map to access rights in the ACL */
-        mode = st.st_mode & (S_ISUID|S_ISGID|S_ISVTX);
-        mode |= sd_to_mode( sd, owner );
-
-        if (((st.st_mode ^ mode) & (S_IRWXU|S_IRWXG|S_IRWXO)) && fchmod( unix_fd, mode ) == -1)
-        {
-            file_set_error();
-            return 0;
-        }
-    }
-    return 1;
+    fd = dir_get_fd( obj );
+    ret = set_file_sd( obj, fd, &dir->mode, &dir->uid, sd, set_info );
+    release_object( fd );
+    return ret;
 }
 
 static struct change_record *get_first_change_record( struct dir *dir )
