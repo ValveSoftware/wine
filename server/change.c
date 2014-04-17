@@ -326,39 +326,17 @@ static struct fd *dir_get_fd( struct object *obj )
     return (struct fd *)grab_object( dir->fd );
 }
 
-static int get_dir_unix_fd( struct dir *dir )
-{
-    return get_unix_fd( dir->fd );
-}
-
 static struct security_descriptor *dir_get_sd( struct object *obj )
 {
     struct dir *dir = (struct dir *)obj;
-    int unix_fd;
-    struct stat st;
     struct security_descriptor *sd;
+    struct fd *fd;
+
     assert( obj->ops == &dir_ops );
 
-    unix_fd = get_dir_unix_fd( dir );
-
-    if (unix_fd == -1 || fstat( unix_fd, &st ) == -1)
-        return obj->sd;
-
-    /* mode and uid the same? if so, no need to re-generate security descriptor */
-    if (obj->sd &&
-        (st.st_mode & (S_IRWXU|S_IRWXO)) == (dir->mode & (S_IRWXU|S_IRWXO)) &&
-        (st.st_uid == dir->uid))
-        return obj->sd;
-
-    sd = mode_to_sd( st.st_mode,
-                     security_unix_uid_to_sid( st.st_uid ),
-                     token_get_primary_group( current->process->token ));
-    if (!sd) return obj->sd;
-
-    dir->mode = st.st_mode;
-    dir->uid = st.st_uid;
-    free( obj->sd );
-    obj->sd = sd;
+    fd = dir_get_fd( obj );
+    sd = get_file_sd( obj, fd, &dir->mode, &dir->uid );
+    release_object( fd );
     return sd;
 }
 
