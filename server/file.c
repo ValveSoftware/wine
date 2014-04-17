@@ -500,18 +500,13 @@ mode_t sd_to_mode( const struct security_descriptor *sd, const struct sid *owner
     return new_mode;
 }
 
-static int file_set_sd( struct object *obj, const struct security_descriptor *sd,
-                        unsigned int set_info )
+int set_file_sd( struct object *obj, struct fd *fd, mode_t *mode, uid_t *uid,
+                 const struct security_descriptor *sd, unsigned int set_info )
 {
-    struct file *file = (struct file *)obj;
+    int unix_fd = get_unix_fd( fd );
     const struct sid *owner;
     struct stat st;
-    mode_t mode;
-    int unix_fd;
-
-    assert( obj->ops == &file_ops );
-
-    unix_fd = get_file_unix_fd( file );
+    mode_t new_mode;
 
     if (unix_fd == -1 || fstat( unix_fd, &st ) == -1) return 1;
 
@@ -538,10 +533,10 @@ static int file_set_sd( struct object *obj, const struct security_descriptor *sd
     if (set_info & DACL_SECURITY_INFORMATION)
     {
         /* keep the bits that we don't map to access rights in the ACL */
-        mode = st.st_mode & (S_ISUID|S_ISGID|S_ISVTX);
-        mode |= sd_to_mode( sd, owner );
+        new_mode = st.st_mode & (S_ISUID|S_ISGID|S_ISVTX);
+        new_mode |= sd_to_mode( sd, owner );
 
-        if (((st.st_mode ^ mode) & (S_IRWXU|S_IRWXG|S_IRWXO)) && fchmod( unix_fd, mode ) == -1)
+        if (((st.st_mode ^ new_mode) & (S_IRWXU|S_IRWXG|S_IRWXO)) && fchmod( unix_fd, new_mode ) == -1)
         {
             file_set_error();
             return 0;
@@ -584,6 +579,21 @@ static struct list *file_get_kernel_obj_list( struct object *obj )
 {
     struct file *file = (struct file *)obj;
     return &file->kernel_object;
+}
+
+static int file_set_sd( struct object *obj, const struct security_descriptor *sd,
+                        unsigned int set_info )
+{
+    struct file *file = (struct file *)obj;
+    struct fd *fd;
+    int ret;
+
+    assert( obj->ops == &file_ops );
+
+    fd = file_get_fd( obj );
+    ret = set_file_sd( obj, fd, &file->mode, &file->uid, sd, set_info );
+    release_object( fd );
+    return ret;
 }
 
 static void file_destroy( struct object *obj )
