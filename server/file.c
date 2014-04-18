@@ -472,6 +472,26 @@ struct security_descriptor *mode_to_sd( mode_t mode, const struct sid *user, con
     return sd;
 }
 
+/* Convert generic rights into standard access rights */
+static void convert_generic_sd( struct security_descriptor *sd )
+{
+    const struct acl *dacl;
+    int present;
+
+    dacl = sd_get_dacl( sd, &present );
+    if (present && dacl)
+    {
+        const struct ace *ace = (const struct ace *)(dacl + 1);
+        ULONG i;
+
+        for (i = 0; i < dacl->count; i++, ace = ace_next( ace ))
+        {
+            DWORD *mask = (DWORD *)(ace + 1);
+            *mask = map_access( *mask, &file_type.mapping );
+        }
+    }
+}
+
 struct security_descriptor *get_file_sd( struct object *obj, struct fd *fd, mode_t *mode,
                                          uid_t *uid )
 {
@@ -608,6 +628,9 @@ int set_file_sd( struct object *obj, struct fd *fd, mode_t *mode, uid_t *uid,
     new_sd = set_sd_from_token_internal( sd, obj->sd, set_info, current->process->token );
     if (new_sd)
      {
+        /* convert generic rights into standard access rights */
+        convert_generic_sd( new_sd );
+
         if (set_info & OWNER_SECURITY_INFORMATION)
          {
             owner = sd_get_owner( new_sd );
