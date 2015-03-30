@@ -189,7 +189,8 @@ struct file *create_file_for_fd_obj( struct fd *fd, unsigned int access, unsigne
     return file;
 }
 
-static struct object *create_file_obj( struct fd *fd, unsigned int access, mode_t mode )
+static struct object *create_file_obj( struct fd *fd, unsigned int access, mode_t mode,
+                                       const struct security_descriptor *sd )
 {
     struct file *file = alloc_object( &file_ops );
 
@@ -201,6 +202,12 @@ static struct object *create_file_obj( struct fd *fd, unsigned int access, mode_
     list_init( &file->kernel_object );
     grab_object( fd );
     set_fd_user( fd, &file_fd_ops, &file->obj );
+
+    if (sd) file_set_sd( &file->obj, sd, OWNER_SECURITY_INFORMATION |
+                                         GROUP_SECURITY_INFORMATION |
+                                         DACL_SECURITY_INFORMATION |
+                                         SACL_SECURITY_INFORMATION );
+
     return &file->obj;
 }
 
@@ -273,11 +280,11 @@ static struct object *create_file( struct fd *root, const char *nameptr, data_si
     if (!fd) goto done;
 
     if (S_ISDIR(mode))
-        obj = create_dir_obj( fd, access, mode );
+        obj = create_dir_obj( fd, access, mode, sd );
     else if (S_ISCHR(mode) && is_serial_fd( fd ))
         obj = create_serial( fd );
     else
-        obj = create_file_obj( fd, access, mode );
+        obj = create_file_obj( fd, access, mode, sd );
 
     release_object( fd );
 
@@ -513,46 +520,66 @@ mode_t sd_to_mode( const struct security_descriptor *sd, const struct sid *owner
 int set_file_sd( struct object *obj, struct fd *fd, mode_t *mode, uid_t *uid,
                  const struct security_descriptor *sd, unsigned int set_info )
 {
+    struct security_descriptor *new_sd;
     int unix_fd = get_unix_fd( fd );
-    const struct sid *owner;
+    const struct sid *owner, *group;
     struct stat st;
     mode_t new_mode;
 
-    if (unix_fd == -1 || fstat( unix_fd, &st ) == -1) return 1;
+    if (!set_info || unix_fd == -1 || fstat( unix_fd, &st ) == -1) return 1;
+    if (!obj->sd) get_file_sd( obj, fd, mode, uid );
 
-    if (set_info & OWNER_SECURITY_INFORMATION)
-    {
-        owner = sd_get_owner( sd );
-        if (!owner)
+    /* calculate the new sd, save to a temporary variable before assigning */
+    new_sd = set_sd_from_token_internal( sd, obj->sd, set_info, current->process->token );
+    if (new_sd)
+     {
+        if (set_info & OWNER_SECURITY_INFORMATION)
+         {
+            owner = sd_get_owner( new_sd );
+            assert( owner );
+
+            if (!obj->sd || !equal_sid( owner, sd_get_owner( obj->sd ) ))
+            {
+                /* FIXME: get Unix uid and call fchown */
+            }
+         }
+
+        if (set_info & GROUP_SECURITY_INFORMATION)
+         {
+            group = sd_get_group( new_sd );
+            assert( group );
+
+            if (!obj->sd || !equal_sid( group, sd_get_group( obj->sd ) ))
+            {
+                /* FIXME: get Unix uid and call fchown */
+            }
+         }
+
+        if (set_info & DACL_SECURITY_INFORMATION)
         {
-            set_error( STATUS_INVALID_SECURITY_DESCR );
-            return 0;
-        }
-        if (!obj->sd || !equal_sid( owner, sd_get_owner( obj->sd ) ))
-        {
-            /* FIXME: get Unix uid and call fchown */
-        }
-    }
-    else if (obj->sd)
-        owner = sd_get_owner( obj->sd );
-    else
-        owner = token_get_owner( current->process->token );
+            owner = sd_get_owner( new_sd );
+            assert( owner );
 
-    /* group and sacl not supported */
+            /* keep the bits that we don't map to access rights in the ACL */
+            new_mode = st.st_mode & (S_ISUID|S_ISGID|S_ISVTX);
+            new_mode |= sd_to_mode( new_sd, owner );
 
-    if (set_info & DACL_SECURITY_INFORMATION)
-    {
-        /* keep the bits that we don't map to access rights in the ACL */
-        new_mode = st.st_mode & (S_ISUID|S_ISGID|S_ISVTX);
-        new_mode |= sd_to_mode( sd, owner );
+            if (((st.st_mode ^ new_mode) & (S_IRWXU|S_IRWXG|S_IRWXO)) && fchmod( unix_fd, new_mode ) == -1)
+            {
+                free( new_sd );
+                file_set_error();
+                return 0;
+            }
 
-        if (((st.st_mode ^ new_mode) & (S_IRWXU|S_IRWXG|S_IRWXO)) && fchmod( unix_fd, new_mode ) == -1)
-        {
-            file_set_error();
-            return 0;
-        }
-    }
-    return 1;
+            *mode = (*mode & S_IFMT) | new_mode;
+         }
+
+        free( obj->sd );
+        obj->sd = new_sd;
+        return 1;
+     }
+
+    return 0;
 }
 
 static struct object *file_lookup_name( struct object *obj, struct unicode_str *name,
@@ -692,7 +719,10 @@ DECL_HANDLER(create_file)
     if ((file = create_file( root_fd, name, name_len, nt_name, req->access, req->sharing,
                              req->create, req->options, req->attrs, sd )))
     {
-        reply->handle = alloc_handle( current->process, file, req->access, objattr->attributes );
+        if (get_error() == STATUS_OBJECT_NAME_EXISTS)
+            reply->handle = alloc_handle( current->process, file, req->access, objattr->attributes );
+        else
+            reply->handle = alloc_handle_no_access_check( current->process, file, req->access, objattr->attributes );
         release_object( file );
     }
     if (root_fd) release_object( root_fd );
