@@ -31,11 +31,21 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <time.h>
+#include <limits.h>
 #include <unistd.h>
 #ifdef HAVE_UTIME_H
 #include <utime.h>
 #endif
 #include <poll.h>
+#ifdef HAVE_ATTR_XATTR_H
+#undef XATTR_ADDITIONAL_OPTIONS
+#include <attr/xattr.h>
+#elif defined(HAVE_SYS_XATTR_H)
+#include <sys/xattr.h>
+#endif
+#ifdef HAVE_SYS_EXTATTR_H
+#include <sys/extattr.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -62,6 +72,21 @@ struct type_descr file_type =
         FILE_ALL_ACCESS
     },
 };
+
+#ifndef XATTR_USER_PREFIX
+#define XATTR_USER_PREFIX "user."
+#endif
+#ifndef XATTR_SIZE_MAX
+#define XATTR_SIZE_MAX    65536
+#endif
+
+/* We intentionally do not match the Samba 4 extended attribute for NT security descriptors (SDs):
+ *  1) Samba stores this information using an internal data structure (we use a flat NT SD).
+ *  2) Samba uses the attribute "security.NTACL".  This attribute is within a namespace that only
+ *     the administrator has write access to, which prohibits the user from copying the attributes
+ *     when copying a file and would require Wine to run with adminstrative privileges.
+ */
+#define WINE_XATTR_SD  XATTR_USER_PREFIX "wine.sd"
 
 struct file
 {
@@ -215,6 +240,56 @@ int is_file_executable( const char *name )
 {
     int len = strlen( name );
     return len >= 4 && (!strcasecmp( name + len - 4, ".exe") || !strcasecmp( name + len - 4, ".com" ));
+}
+
+#ifdef HAVE_SYS_EXTATTR_H
+static inline int xattr_valid_namespace( const char *name )
+{
+    if (strncmp( XATTR_USER_PREFIX, name, XATTR_USER_PREFIX_LEN ) != 0)
+    {
+        errno = EPERM;
+        return 0;
+    }
+    return 1;
+}
+#endif
+
+static int xattr_fset( int filedes, const char *name, void *value, size_t size )
+{
+#if defined(XATTR_ADDITIONAL_OPTIONS)
+    return fsetxattr( filedes, name, value, size, 0, 0 );
+#elif defined(HAVE_SYS_XATTR_H) || defined(HAVE_ATTR_XATTR_H)
+    return fsetxattr( filedes, name, value, size, 0 );
+#elif defined(HAVE_SYS_EXTATTR_H)
+    if (!xattr_valid_namespace( name )) return -1;
+    return extattr_set_fd( filedes, EXTATTR_NAMESPACE_USER, &name[XATTR_USER_PREFIX_LEN],
+                           value, size );
+#else
+    errno = ENOSYS;
+    return -1;
+#endif
+}
+
+static void set_xattr_sd( int fd, const struct security_descriptor *sd )
+{
+    char buffer[XATTR_SIZE_MAX];
+    int present, len;
+    const struct acl *dacl;
+
+    /* there's no point in storing the security descriptor if there's no DACL */
+    if (!sd) return;
+    dacl = sd_get_dacl( sd, &present );
+    if (!present || !dacl) return;
+
+    len = 2 + sizeof(struct security_descriptor) + sd->owner_len +
+          sd->group_len + sd->sacl_len + sd->dacl_len;
+    if (len > XATTR_SIZE_MAX) return;
+
+    /* include the descriptor revision and resource manager control bits */
+    buffer[0] = SECURITY_DESCRIPTOR_REVISION;
+    buffer[1] = 0;
+    memcpy( &buffer[2], sd, len - 2 );
+    xattr_fset( fd, WINE_XATTR_SD, buffer, len );
 }
 
 static struct object *create_file( struct fd *root, const char *nameptr, data_size_t len,
@@ -573,6 +648,9 @@ int set_file_sd( struct object *obj, struct fd *fd, mode_t *mode, uid_t *uid,
 
             *mode = (*mode & S_IFMT) | new_mode;
          }
+
+        /* extended attributes are set after the file mode, to ensure it stays in sync */
+        set_xattr_sd( unix_fd, new_sd );
 
         free( obj->sd );
         obj->sd = new_sd;
