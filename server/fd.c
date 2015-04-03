@@ -1964,7 +1964,12 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     /* create the directory if needed */
     if ((options & FILE_DIRECTORY_FILE) && (flags & O_CREAT))
     {
-        if (mkdir( name, *mode ) == -1)
+        if (mkdir( name, *mode | S_IRUSR ) != -1)
+        {
+            /* remove S_IRUSR later, after we have opened the directory */
+            do_chmod = !(*mode & S_IRUSR);
+        }
+        else
         {
             if (errno != EEXIST || (flags & O_EXCL))
             {
