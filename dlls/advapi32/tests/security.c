@@ -3678,17 +3678,13 @@ static void test_CreateDirectoryA(void)
     error = pGetNamedSecurityInfoA(tmpfile, SE_FILE_OBJECT,
                                    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
                                    (PSID *)&owner, NULL, &pDacl, NULL, &pSD);
-    todo_wine
     ok(error == ERROR_SUCCESS, "GetNamedSecurityInfo failed with error %d\n", error);
-    if (error == ERROR_SUCCESS)
-    {
-        bret = GetAclInformation(pDacl, &acl_size, sizeof(acl_size), AclSizeInformation);
-        ok(bret, "GetAclInformation failed\n");
-        todo_wine
-        ok(acl_size.AceCount == 0, "GetAclInformation returned unexpected entry count (%d != 0).\n",
-                                   acl_size.AceCount);
-        LocalFree(pSD);
-    }
+    bret = GetAclInformation(pDacl, &acl_size, sizeof(acl_size), AclSizeInformation);
+    ok(bret, "GetAclInformation failed\n");
+    todo_wine
+    ok(acl_size.AceCount == 0, "GetAclInformation returned unexpected entry count (%d != 0).\n",
+                               acl_size.AceCount);
+    LocalFree(pSD);
     CloseHandle(hTemp);
 
     /* Test inheritance of ACLs in NtCreateFile without security descriptor */
@@ -3757,17 +3753,13 @@ static void test_CreateDirectoryA(void)
     error = pGetNamedSecurityInfoA(tmpfile, SE_FILE_OBJECT,
                                    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
                                    (PSID *)&owner, NULL, &pDacl, NULL, &pSD);
-    todo_wine
     ok(error == ERROR_SUCCESS, "GetNamedSecurityInfo failed with error %d\n", error);
-    if (error == ERROR_SUCCESS)
-    {
-        bret = GetAclInformation(pDacl, &acl_size, sizeof(acl_size), AclSizeInformation);
-        ok(bret, "GetAclInformation failed\n");
-        todo_wine
-        ok(acl_size.AceCount == 0, "GetAclInformation returned unexpected entry count (%d != 0).\n",
-                                   acl_size.AceCount);
-        LocalFree(pSD);
-    }
+    bret = GetAclInformation(pDacl, &acl_size, sizeof(acl_size), AclSizeInformation);
+    ok(bret, "GetAclInformation failed\n");
+    todo_wine
+    ok(acl_size.AceCount == 0, "GetAclInformation returned unexpected entry count (%d != 0).\n",
+                               acl_size.AceCount);
+    LocalFree(pSD);
     CloseHandle(hTemp);
 
 done:
