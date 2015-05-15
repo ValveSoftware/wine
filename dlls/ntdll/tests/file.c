@@ -4253,6 +4253,83 @@ static void test_NtCreateFile(void)
     DeleteFileW( path );
 }
 
+static void test_readonly(void)
+{
+    static const WCHAR fooW[] = {'f','o','o',0};
+    NTSTATUS status;
+    HANDLE handle;
+    WCHAR path[MAX_PATH];
+    OBJECT_ATTRIBUTES attr;
+    IO_STATUS_BLOCK io;
+    UNICODE_STRING nameW;
+
+    GetTempPathW(MAX_PATH, path);
+    GetTempFileNameW(path, fooW, 0, path);
+    DeleteFileW(path);
+    pRtlDosPathNameToNtPathName_U(path, &nameW, NULL, NULL);
+
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = NULL;
+    attr.ObjectName = &nameW;
+    attr.Attributes = OBJ_CASE_INSENSITIVE;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+
+    status = pNtCreateFile(&handle, GENERIC_READ, &attr, &io, NULL, FILE_ATTRIBUTE_READONLY,
+                           FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_CREATE, 0, NULL, 0);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, GENERIC_WRITE,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_ACCESS_DENIED, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, GENERIC_READ,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, FILE_READ_ATTRIBUTES,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, FILE_WRITE_ATTRIBUTES,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    todo_wine ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, DELETE,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, READ_CONTROL,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, WRITE_DAC,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, WRITE_OWNER,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle(handle);
+
+    status = pNtOpenFile(&handle, SYNCHRONIZE,  &attr, &io,
+                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    CloseHandle( handle );
+
+    pRtlFreeUnicodeString(&nameW);
+    SetFileAttributesW(path, FILE_ATTRIBUTE_ARCHIVE);
+    DeleteFileW(path);
+}
+
 static void test_read_write(void)
 {
     static const char contents[14] = "1234567890abcd";
@@ -5284,6 +5361,7 @@ START_TEST(file)
 
     test_read_write();
     test_NtCreateFile();
+    test_readonly();
     create_file_test();
     open_file_test();
     delete_file_test();
