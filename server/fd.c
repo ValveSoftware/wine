@@ -1999,7 +1999,7 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
         else if (errno == EACCES)
         {
             /* try to change permissions temporarily to open a file descriptor */
-            if (!(access & (FILE_UNIX_WRITE_ACCESS | FILE_UNIX_READ_ACCESS | DELETE)) &&
+            if (!(access & ((FILE_UNIX_WRITE_ACCESS | FILE_UNIX_READ_ACCESS | DELETE) & ~FILE_WRITE_ATTRIBUTES)) &&
                 !stat( name, &st ) && st.st_uid == getuid() &&
                 !chmod( name, st.st_mode | S_IRUSR ))
             {
