@@ -4297,7 +4297,7 @@ static void test_readonly(void)
 
     status = pNtOpenFile(&handle, FILE_WRITE_ATTRIBUTES,  &attr, &io,
                          FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE, FILE_OPEN_FOR_BACKUP_INTENT);
-    todo_wine ok(status == STATUS_SUCCESS, "got %#x\n", status);
+    ok(status == STATUS_SUCCESS, "got %#x\n", status);
     CloseHandle(handle);
 
     status = pNtOpenFile(&handle, DELETE,  &attr, &io,
