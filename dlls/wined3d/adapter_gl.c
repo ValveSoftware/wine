@@ -227,6 +227,7 @@ static const struct wined3d_extension_map gl_extension_map[] =
     {"GL_NV_vertex_program2",               NV_VERTEX_PROGRAM2            },
     {"GL_NV_vertex_program2_option",        NV_VERTEX_PROGRAM2_OPTION     },
     {"GL_NV_vertex_program3",               NV_VERTEX_PROGRAM3            },
+    {"GL_NVX_gpu_memory_info",              NVX_GPU_MEMORY_INFO           },
 };
 
 static const struct wined3d_extension_map wgl_extension_map[] =
@@ -1058,13 +1059,16 @@ static const struct wined3d_gpu_description *query_gpu_description(const struct 
 
         gpu_description = wined3d_get_gpu_description(vendor, device);
     }
-    else if(vendor == HW_VENDOR_NVIDIA)
+    else if (gl_info->supported[NVX_GPU_MEMORY_INFO])
     {
-        /* XXX: Fake having an AMD card in order to avoid games trying to load
-         * the Windows-only nvapi library. */
-        WARN("Nvidia card detected. Faking an AMD RX 480!\n");
-        vendor = HW_VENDOR_AMD;
-        device = CARD_AMD_RADEON_RX_480;
+        GLint vram_kb;
+        gl_info->gl_ops.gl.p_glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &vram_kb);
+
+        *vram_bytes = (UINT64)vram_kb * 1024;
+        TRACE("Got 0x%s as video memory from NVX_GPU_MEMORY_INFO extension.\n",
+                wine_dbgstr_longlong(*vram_bytes));
+
+        gpu_description = wined3d_get_gpu_description(vendor, device);
     }
 
     if ((gpu_description_override = wined3d_get_user_override_gpu_description(vendor, device)))

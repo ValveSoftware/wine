@@ -9579,10 +9579,13 @@ static void test_vidmem_accounting(void)
     }
     vidmem_end = IDirect3DDevice9_GetAvailableTextureMem(device);
 
-    ok(vidmem_start > vidmem_end, "Expected available texture memory to decrease during texture creation.\n");
-    diff = vidmem_start - vidmem_end;
-    ok(diff > 1024 * 1024 * 2 * i, "Expected a video memory difference of at least %u MB, got %u MB.\n",
-            2 * i, diff / 1024 / 1024);
+    todo_wine_if(vidmem_start == vidmem_end)
+    {
+        ok(vidmem_start > vidmem_end, "Expected available texture memory to decrease during texture creation.\n");
+        diff = vidmem_start - vidmem_end;
+        ok(diff > 1024 * 1024 * 2 * i, "Expected a video memory difference of at least %u MB, got %u MB.\n",
+                2 * i, diff / 1024 / 1024);
+    }
 
     for (i = 0; i < ARRAY_SIZE(textures); i++)
     {
