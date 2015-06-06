@@ -210,6 +210,7 @@ enum wined3d_gl_extension
     NV_VERTEX_PROGRAM2_OPTION,
     NV_VERTEX_PROGRAM3,
     NV_TEXTURE_BARRIER,
+    NVX_GPU_MEMORY_INFO,
     /* WGL extensions */
     WGL_ARB_PIXEL_FORMAT,
     WGL_EXT_SWAP_CONTROL,
