@@ -1836,6 +1836,7 @@ struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, 
     struct fd *fd;
     int root_fd = -1;
     int rw_mode;
+    int created = (flags & O_CREAT);
 
     if (((options & FILE_DELETE_ON_CLOSE) && !(access & DELETE)) ||
         ((options & FILE_DIRECTORY_FILE) && (flags & O_TRUNC)))
@@ -1874,6 +1875,7 @@ struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, 
                 file_set_error();
                 goto error;
             }
+            created = 0;
         }
         flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
     }
@@ -1961,7 +1963,7 @@ struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, 
         }
 
         /* can't unlink files if we don't have permission to access */
-        if ((options & FILE_DELETE_ON_CLOSE) && !(flags & O_CREAT) &&
+        if ((options & FILE_DELETE_ON_CLOSE) && !created &&
             !(st.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)))
         {
             set_error( STATUS_CANNOT_DELETE );
