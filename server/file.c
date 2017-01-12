@@ -494,7 +494,6 @@ mode_t sd_to_mode( const struct security_descriptor *sd, const SID *owner )
     mode_t mode;
     int present;
     const ACL *dacl = sd_get_dacl( sd, &present );
-    const SID *user = token_get_user( current->process->token );
     if (present && dacl)
     {
         const ACE_HEADER *ace = (const ACE_HEADER *)(dacl + 1);
@@ -515,16 +514,15 @@ mode_t sd_to_mode( const struct security_descriptor *sd, const SID *owner )
                     mode = file_access_to_mode( ad_ace->Mask );
                     if (security_equal_sid( sid, security_world_sid ))
                     {
-                        bits_to_set &= ~((mode << 6) | (mode << 3) | mode); /* all */
+                        bits_to_set &= ~(mode << 0); /* all */
                     }
-                    else if ((security_equal_sid( user, owner ) &&
-                              token_sid_present( current->process->token, sid, TRUE )))
+                    if (token_sid_present( current->process->token, sid, TRUE ))
                     {
-                        bits_to_set &= ~((mode << 6) | (mode << 3));  /* user + group */
+                        bits_to_set &= ~(mode << 3);  /* group */
                     }
-                    else if (security_equal_sid( sid, owner ))
+                    if (security_equal_sid( sid, owner ))
                     {
-                        bits_to_set &= ~(mode << 6);  /* user only */
+                        bits_to_set &= ~(mode << 6);  /* user */
                     }
                     break;
                 case ACCESS_ALLOWED_ACE_TYPE:
@@ -533,26 +531,24 @@ mode_t sd_to_mode( const struct security_descriptor *sd, const SID *owner )
                     mode = file_access_to_mode( aa_ace->Mask );
                     if (security_equal_sid( sid, security_world_sid ))
                     {
-                        mode = (mode << 6) | (mode << 3) | mode;  /* all */
-                        new_mode |= mode & bits_to_set;
-                        bits_to_set &= ~mode;
+                        new_mode |= (mode << 0) & bits_to_set; /* all */
+                        bits_to_set &= ~(mode << 0);
                     }
-                    else if ((security_equal_sid( user, owner ) &&
-                              token_sid_present( current->process->token, sid, FALSE )))
+                    if (token_sid_present( current->process->token, sid, FALSE ))
                     {
-                        mode = (mode << 6) | (mode << 3);  /* user + group */
-                        new_mode |= mode & bits_to_set;
-                        bits_to_set &= ~mode;
+                        new_mode |= (mode << 3) & bits_to_set; /* group */
+                        bits_to_set &= ~(mode << 3);
                     }
-                    else if (security_equal_sid( sid, owner ))
+                    if (security_equal_sid( sid, owner ))
                     {
-                        mode = (mode << 6);  /* user only */
-                        new_mode |= mode & bits_to_set;
-                        bits_to_set &= ~mode;
+                        new_mode |= (mode << 6) & bits_to_set; /* user */
+                        bits_to_set &= ~(mode << 6);
                     }
                     break;
             }
         }
+        new_mode |= (new_mode & S_IRWXO) << 3;
+        new_mode |= (new_mode & S_IRWXG) << 3;
     }
     else
         /* no ACL means full access rights to anyone */
