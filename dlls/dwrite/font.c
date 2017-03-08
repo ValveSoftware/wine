@@ -1218,7 +1218,8 @@ static HRESULT WINAPI dwritefontface_GetRecommendedRenderingMode(IDWriteFontFace
 
     ppem = emSize * ppdip;
 
-    if (ppem >= RECOMMENDED_OUTLINE_AA_THRESHOLD) {
+    /* HACK: disable outline rendering mode to workaround d2d issue */
+    if (0 && ppem >= RECOMMENDED_OUTLINE_AA_THRESHOLD) {
         *mode = DWRITE_RENDERING_MODE_OUTLINE;
         return S_OK;
     }
