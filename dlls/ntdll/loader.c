@@ -133,6 +133,9 @@ struct file_id
     BYTE ObjectId[16];
 };
 
+#define HASH_MAP_SIZE 32
+static LIST_ENTRY hash_table[HASH_MAP_SIZE];
+
 /* internal representation of loaded modules */
 typedef struct _wine_modref
 {
@@ -568,6 +571,33 @@ static void call_ldr_notifications( ULONG reason, LDR_DATA_TABLE_ENTRY *module )
         TRACE_(relay)("\1Ret  LDR notification callback (proc=%p,reason=%lu,data=%p,context=%p)\n",
                 notify->callback, reason, &data, notify->context );
     }
+}
+
+/*************************************************************************
+ *      hash_basename
+ *
+ * Calculates the bucket index of a dll using the basename.
+ */
+static ULONG hash_basename(const WCHAR *basename)
+{
+    WORD version = MAKEWORD(NtCurrentTeb()->Peb->OSMinorVersion,
+                            NtCurrentTeb()->Peb->OSMajorVersion);
+    ULONG hash = 0;
+
+    if (version >= 0x0602)
+    {
+        for (; *basename; basename++)
+            hash = hash * 65599 + towupper(*basename);
+    }
+    else if (version == 0x0601)
+    {
+        for (; *basename; basename++)
+            hash = hash + 65599 * towupper(*basename);
+    }
+    else
+        hash = towupper(basename[0]) - 'A';
+
+    return hash & (HASH_MAP_SIZE-1);
 }
 
 /*************************************************************************
@@ -1550,7 +1580,12 @@ static WINE_MODREF *alloc_module( HMODULE hModule, const UNICODE_STRING *nt_name
                    &wm->ldr.InLoadOrderLinks);
     InsertTailList(&NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList,
                    &wm->ldr.InMemoryOrderLinks);
+    InsertTailList(&hash_table[hash_basename(wm->ldr.BaseDllName.Buffer)],
+                   &wm->ldr.HashLinks);
+
     /* wait until init is called for inserting into InInitializationOrderModuleList */
+    wm->ldr.InInitializationOrderLinks.Flink = NULL;
+    wm->ldr.InInitializationOrderLinks.Blink = NULL;
 
     if (!(nt->OptionalHeader.DllCharacteristics & IMAGE_DLLCHARACTERISTICS_NX_COMPAT))
     {
@@ -2283,6 +2318,7 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
             /* the module has only be inserted in the load & memory order lists */
             RemoveEntryList(&wm->ldr.InLoadOrderLinks);
             RemoveEntryList(&wm->ldr.InMemoryOrderLinks);
+            RemoveEntryList(&wm->ldr.HashLinks);
 
             /* FIXME: there are several more dangling references
              * left. Including dlls loaded by this dll before the
@@ -4045,6 +4081,7 @@ static void free_modref( WINE_MODREF *wm )
 
     RemoveEntryList(&wm->ldr.InLoadOrderLinks);
     RemoveEntryList(&wm->ldr.InMemoryOrderLinks);
+    RemoveEntryList(&wm->ldr.HashLinks);
     if (wm->ldr.InInitializationOrderLinks.Flink)
         RemoveEntryList(&wm->ldr.InInitializationOrderLinks);
 
@@ -4457,6 +4494,7 @@ void loader_init( CONTEXT *context, void **entry )
         PEB *peb = NtCurrentTeb()->Peb;
         WCHAR env_str[16];
         ULONG heap_flags = HEAP_GROWABLE;
+        unsigned int i;
 
         NtQueryVirtualMemory( GetCurrentProcess(), LdrInitializeThunk, MemoryBasicInformation,
                               &meminfo, sizeof(meminfo), NULL );
@@ -4489,6 +4527,10 @@ void loader_init( CONTEXT *context, void **entry )
         /* TLS index 0 is always reserved, and wow64 reserves extra TLS entries */
         RtlSetBits( peb->TlsBitmap, 0, NtCurrentTeb()->WowTebOffset ? WOW64_TLS_MAX_NUMBER : 1 );
         RtlSetBits( peb->TlsBitmap, NTDLL_TLS_ERRNO, 1 );
+
+        /* initialize hash table */
+        for (i = 0; i < HASH_MAP_SIZE; i++)
+            InitializeListHead( &hash_table[i] );
 
         init_user_process_params();
         load_global_options();
