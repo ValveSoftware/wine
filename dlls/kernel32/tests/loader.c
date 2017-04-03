@@ -28,6 +28,7 @@
 #include "winbase.h"
 #include "winternl.h"
 #include "winnls.h"
+#include "winuser.h"
 #include "wine/test.h"
 #include "delayloadhandler.h"
 
@@ -4205,6 +4206,79 @@ static void test_Wow64Transition(void)
             debugstr_wn(name->SectionFileName.Buffer, name->SectionFileName.Length / sizeof(WCHAR)));
 }
 
+static inline WCHAR toupperW(WCHAR c)
+{
+    WCHAR tmp = c;
+    CharUpperBuffW(&tmp, 1);
+    return tmp;
+}
+
+static ULONG hash_basename(const WCHAR *basename)
+{
+    WORD version = MAKEWORD(NtCurrentTeb()->Peb->OSMinorVersion,
+                            NtCurrentTeb()->Peb->OSMajorVersion);
+    ULONG hash = 0;
+
+    if (version >= 0x0602)
+    {
+        for (; *basename; basename++)
+            hash = hash * 65599 + toupperW(*basename);
+    }
+    else if (version == 0x0601)
+    {
+        for (; *basename; basename++)
+            hash = hash + 65599 * toupperW(*basename);
+    }
+    else
+        hash = toupperW(basename[0]) - 'A';
+
+    return hash & 31;
+}
+
+static void test_HashLinks(void)
+{
+    static WCHAR ntdllW[] = {'n','t','d','l','l','.','d','l','l',0};
+    static WCHAR kernel32W[] = {'k','e','r','n','e','l','3','2','.','d','l','l',0};
+
+    LIST_ENTRY *hash_map, *entry, *mark;
+    LDR_DATA_TABLE_ENTRY *module;
+    BOOL found;
+
+    entry = &NtCurrentTeb()->Peb->LdrData->InLoadOrderModuleList;
+    entry = entry->Flink;
+
+    module = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, InLoadOrderLinks);
+    entry = module->HashLinks.Blink;
+
+    hash_map = entry - hash_basename(module->BaseDllName.Buffer);
+
+    mark = &hash_map[hash_basename(ntdllW)];
+    found = FALSE;
+    for (entry = mark->Flink; entry != mark; entry = entry->Flink)
+    {
+        module = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, HashLinks);
+        if (!lstrcmpiW(module->BaseDllName.Buffer, ntdllW))
+        {
+            found = TRUE;
+            break;
+        }
+    }
+    ok(found, "Could not find ntdll\n");
+
+    mark = &hash_map[hash_basename(kernel32W)];
+    found = FALSE;
+    for (entry = mark->Flink; entry != mark; entry = entry->Flink)
+    {
+        module = CONTAINING_RECORD(entry, LDR_DATA_TABLE_ENTRY, HashLinks);
+        if (!lstrcmpiW(module->BaseDllName.Buffer, kernel32W))
+        {
+            found = TRUE;
+            break;
+        }
+    }
+    ok(found, "Could not find kernel32\n");
+}
+
 START_TEST(loader)
 {
     int argc;
@@ -4286,6 +4360,7 @@ START_TEST(loader)
     test_InMemoryOrderModuleList();
     test_LoadPackagedLibrary();
     test_wow64_redirection();
+    test_HashLinks();
     test_dll_file( "ntdll.dll" );
     test_dll_file( "kernel32.dll" );
     test_dll_file( "advapi32.dll" );
