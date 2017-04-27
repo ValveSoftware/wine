@@ -1014,6 +1014,21 @@ HANDLE WINAPI DECLSPEC_HOTPATCH OpenProcess( DWORD access, BOOL inherit, DWORD i
     attr.SecurityDescriptor = NULL;
     attr.SecurityQualityOfService = NULL;
 
+    /* PROTON HACK:
+     * On Windows, the Steam client puts its process ID into the registry
+     * at:
+     *
+     *   [HKCU\Software\Valve\Steam\ActiveProcess]
+     *   PID=dword:00000008
+     *
+     * Games get that pid from the registry and then query it with
+     * OpenProcess to ensure Steam is running. Since we aren't running the
+     * Windows Steam in Wine, instead we hack this magic number into the
+     * registry and then substitute the game's process itself in its place
+     * so it can query a valid process.
+     */
+    if (id == 0xfffe) id = GetCurrentProcessId();
+
     cid.UniqueProcess = ULongToHandle(id);
     cid.UniqueThread  = 0;
 
