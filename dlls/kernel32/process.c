@@ -3384,6 +3384,22 @@ HANDLE WINAPI OpenProcess( DWORD access, BOOL inherit, DWORD id )
     OBJECT_ATTRIBUTES   attr;
     CLIENT_ID           cid;
 
+    if(id == 0xfffe)
+        /* STEAMOS HACK:
+         * On Windows, the Steam client puts its process ID into the registry
+         * at:
+         *
+         *   [HKCU\Software\Valve\Steam\ActiveProcess]
+         *   PID=dword:00000008
+         *
+         * Games get that pid from the registry and then query it with
+         * OpenProcess to ensure Steam is running. Since we aren't running the
+         * Windows Steam in Wine, instead we hack this magic number into the
+         * registry and then substitute the game's process itself in its place
+         * so it can query a valid process.
+         */
+        id = GetCurrentProcessId();
+
     cid.UniqueProcess = ULongToHandle(id);
     cid.UniqueThread = 0; /* FIXME ? */
 
