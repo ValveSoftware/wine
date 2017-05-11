@@ -375,6 +375,109 @@ static void output_relay_debug( DLLSPEC *spec )
 }
 
 /*******************************************************************
+ *         output_syscall_thunks
+ *
+ * Output entry points for system call functions
+ */
+static void output_syscall_thunks( DLLSPEC *spec )
+{
+    int i;
+
+    if (!spec->nb_syscalls)
+        return;
+
+    output( "\n/* syscall thunks */\n\n" );
+    output( "\t.text\n" );
+
+    for (i = 0; i < spec->nb_syscalls; i++)
+    {
+        ORDDEF *odp = spec->syscalls[i];
+        const char *name = odp->link_name;
+
+        /* Chromium attempts to hook system call thunks. It expects them to
+         * have a very specific form, or it will fail. The below matches what
+         * Chromium expects from 64-bit Windows 8. */
+
+        output( "\t.balign 16, 0\n" );
+        output( "\t%s\n", func_declaration(name) );
+        output( "%s\n", asm_globl(name) );
+        output_cfi( ".cfi_startproc" );
+        output( "\t.byte 0xb8\n" );                               /* mov eax, SYSCALL */
+        output( "\t.long %d\n", i );
+        output( "\t.byte 0x64,0xff,0x15,0xc0,0x00,0x00,0x00\n" ); /* call dword ptr fs:[0C0h] */
+        output( "\t.byte 0xc2\n" );                               /* ret X */
+        output( "\t.short %d\n", get_args_size(odp) );
+        output_cfi( ".cfi_endproc" );
+        output_function_size( name );
+    }
+
+    for (i = 0; i < 0x20; i++)
+        output( "\t.byte 0\n" );
+
+    output( "\n/* syscall table */\n\n" );
+    output( "\t.data\n" );
+    output( "%s\n", asm_globl("__wine_syscall_table") );
+    for (i = 0; i < spec->nb_syscalls; i++)
+    {
+        ORDDEF *odp = spec->syscalls[i];
+        output ("\t%s %s\n", get_asm_ptr_keyword(), asm_name(odp->impl_name) );
+    }
+
+    output( "\n/* syscall argument stack size table */\n\n" );
+    output( "\t.data\n" );
+    output( "%s\n", asm_globl("__wine_syscall_stack_size") );
+    for (i = 0; i < spec->nb_syscalls; i++)
+    {
+        ORDDEF *odp = spec->syscalls[i];
+        output( "\t.byte %d\n", get_args_size(odp) );
+    }
+
+    output( "\n/* syscall dispatcher */\n\n" );
+    output( "\t.text\n" );
+    output( "\t.align %d\n", get_alignment(16) );
+    output( "\t%s\n", func_declaration("__wine_syscall_dispatcher") );
+    output( "%s\n", asm_globl("__wine_syscall_dispatcher") );
+    output_cfi( ".cfi_startproc" );
+    output( "\tpushl %%ebp\n" );
+    output_cfi( ".cfi_adjust_cfa_offset 4\n" );
+    output_cfi( ".cfi_rel_offset %%ebp,0\n" );
+    output( "\tmovl %%esp,%%ebp\n" );
+    output_cfi( ".cfi_def_cfa_register %%ebp\n" );
+    output( "\tpushl %%esi\n" );
+    output_cfi( ".cfi_rel_offset %%esi,-4\n" );
+    output( "\tpushl %%edi\n" );
+    output_cfi( ".cfi_rel_offset %%edi,-8\n" );
+    output( "\tleal 12(%%ebp),%%esi\n" );
+    if (UsePIC)
+    {
+        output( "\tcall 1f\n" );
+        output( "1:\tpopl %%edx\n" );
+        output( "movzbl (%s-1b)(%%edx,%%eax,1),%%ecx\n", asm_name("__wine_syscall_stack_size") );
+    }
+    else
+        output( "movzbl %s(%%eax),%%ecx\n", asm_name("__wine_syscall_stack_size") );
+
+    output( "\tsubl %%ecx,%%esp\n" );
+    output( "\tshrl $2,%%ecx\n" );
+    output( "\tmovl %%esp,%%edi\n" );
+    output( "\trep; movsl\n" );
+    if (UsePIC)
+        output( "\tcall *(%s-1b)(%%edx,%%eax,%d)\n", asm_name("__wine_syscall_table"), get_ptr_size() );
+    else
+        output( "\tcall *%s(,%%eax,%d)\n", asm_name("__wine_syscall_table"), get_ptr_size() );
+    output( "\tpop %%edi\n" );
+    output_cfi( ".cfi_same_value %%edi\n" );
+    output( "\tpop %%esi\n" );
+    output_cfi( ".cfi_same_value %%esi\n" );
+    output( "\tleave\n" );
+    output_cfi( ".cfi_def_cfa %%esp,4\n" );
+    output_cfi( ".cfi_same_value %%ebp\n" );
+    output( "\tret\n" );
+    output_cfi( ".cfi_endproc" );
+    output_function_size( "__wine_syscall_dispatcher" );
+}
+
+/*******************************************************************
  *         output_exports
  *
  * Output the export table for a Win32 module.
@@ -770,6 +873,7 @@ void output_spec32_file( DLLSPEC *spec )
     open_output_file();
     output_standard_file_header();
     output_module( spec );
+    output_syscall_thunks( spec );
     output_stubs( spec );
     output_exports( spec );
     output_imports( spec );

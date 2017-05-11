@@ -105,6 +105,7 @@ typedef struct
     int         flags;
     char       *name;         /* public name of this function */
     char       *link_name;    /* name of the C symbol to link to */
+    char       *impl_name;    /* name of the C symbol of the real implementation (thunks only) */
     char       *export_name;  /* name exported under for noname exports */
     union
     {
@@ -131,6 +132,7 @@ typedef struct
     int              alloc_entry_points; /* number of allocated entry points */
     int              nb_names;           /* number of entry points with names */
     unsigned int     nb_resources;       /* number of resources */
+    int              nb_syscalls;        /* number of syscalls */
     int              characteristics;    /* characteristics for the PE header */
     int              dll_characteristics;/* DLL characteristics for the PE header */
     int              subsystem;          /* subsystem id */
@@ -140,6 +142,7 @@ typedef struct
     ORDDEF         **names;              /* array of entry point names (points into entry_points) */
     ORDDEF         **ordinals;           /* array of dll ordinals (points into entry_points) */
     struct resource *resources;          /* array of dll resources (format differs between Win16/Win32) */
+    ORDDEF         **syscalls;           /* array of syscalls (points into entry_points) */
 } DLLSPEC;
 
 enum target_cpu
@@ -182,8 +185,10 @@ struct strarray
 #define FLAG_FORWARD   0x1000  /* function is a forwarded name */
 #define FLAG_EXT_LINK  0x2000  /* function links to an external symbol */
 #define FLAG_EXPORT32  0x4000  /* 32-bit export in 16-bit spec file */
+#define FLAG_SYSCALL   0x8000  /* function should be called through a syscall thunk */
 
 #define FLAG_CPU(cpu)  (0x10000 << (cpu))
+
 #define FLAG_CPU_MASK  (FLAG_CPU(CPU_LAST + 1) - FLAG_CPU(0))
 #define FLAG_CPU_WIN64 (FLAG_CPU(CPU_x86_64) | FLAG_CPU(CPU_ARM64))
 #define FLAG_CPU_WIN32 (FLAG_CPU_MASK & ~FLAG_CPU_WIN64)
@@ -325,6 +330,8 @@ extern void make_builtin_files( char *argv[] );
 extern void add_16bit_exports( DLLSPEC *spec32, DLLSPEC *spec16 );
 extern int parse_spec_file( FILE *file, DLLSPEC *spec );
 extern int parse_def_file( FILE *file, DLLSPEC *spec );
+
+extern int sort_func_list( ORDDEF **list, int count, int (*compare)(const void *, const void *) );
 
 /* buffer management */
 

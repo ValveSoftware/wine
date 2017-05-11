@@ -853,6 +853,7 @@ void free_dll_spec( DLLSPEC *spec )
         free( odp->name );
         free( odp->export_name );
         free( odp->link_name );
+        free( odp->impl_name );
     }
     free( spec->file_name );
     free( spec->dll_name );
@@ -862,6 +863,7 @@ void free_dll_spec( DLLSPEC *spec )
     free( spec->names );
     free( spec->ordinals );
     free( spec->resources );
+    free( spec->syscalls );
     free( spec );
 }
 
@@ -1279,4 +1281,23 @@ const char *get_asm_string_section(void)
     case PLATFORM_APPLE: return ".cstring";
     default:             return ".section .rodata";
     }
+}
+
+/*******************************************************************
+ *         sort_func_list
+ *
+ * Sort a list of functions, removing duplicates.
+ */
+int sort_func_list( ORDDEF **list, int count, int (*compare)(const void *, const void *) )
+{
+    int i, j;
+
+    if (!count) return 0;
+    qsort( list, count, sizeof(*list), compare );
+
+    for (i = j = 0; i < count; i++)
+    {
+        if (compare( &list[j], &list[i] )) list[++j] = list[i];
+    }
+    return j + 1;
 }

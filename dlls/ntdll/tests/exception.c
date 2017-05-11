@@ -1643,6 +1643,8 @@ static void test_thread_context(void)
     ok( (char *)context.Eip >= (char *)pNtGetContextThread - 0x10000 &&
         (char *)context.Eip <= (char *)pNtGetContextThread + 0x10000,
         "wrong Eip %08x/%08x\n", context.Eip, (DWORD)pNtGetContextThread );
+    ok( *(WORD *)context.Eip == 0xc483 || *(WORD *)context.Eip == 0x08c2 || *(WORD *)context.Eip == 0x8dc3,
+        "expected 0xc483 or 0x08c2 or 0x8dc3, got %04x\n", *(WORD *)context.Eip );
     /* segment registers clear the high word */
     ok( context.SegCs == LOWORD(expect.SegCs), "wrong SegCs %08x/%08x\n", context.SegCs, expect.SegCs );
     ok( context.SegDs == LOWORD(expect.SegDs), "wrong SegDs %08x/%08x\n", context.SegDs, expect.SegDs );
