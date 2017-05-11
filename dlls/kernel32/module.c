@@ -76,6 +76,23 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 };
 static CRITICAL_SECTION dlldir_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
+static const WCHAR steamclientW[] = {'s','t','e','a','m','c','l','i','e','n','t',0};
+static const WCHAR steamclient_pathW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s','\\','S','t','e','a','m','\\','s','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};;
+static HMODULE steamclient_hmod = NULL;
+static HMODULE lsteamclient_hmod = NULL;
+
+static WCHAR *strcasestrW( const WCHAR *str, const WCHAR *sub )
+{
+    while (*str)
+    {
+        const WCHAR *p1 = str, *p2 = sub;
+        while (*p1 && *p2 && tolowerW(*p1) == tolowerW(*p2)) { p1++; p2++; }
+        if (!*p2) return (WCHAR *)str;
+        str++;
+    }
+    return NULL;
+}
+
 /****************************************************************************
  *              GetDllDirectoryA   (KERNEL32.@)
  */
@@ -448,6 +465,10 @@ BOOL WINAPI GetModuleHandleExW( DWORD flags, LPCWSTR name, HMODULE *module )
     else
     {
         UNICODE_STRING wstr;
+        if(steamclient_hmod != NULL && strcasestrW(name, steamclientW)){
+            *module = steamclient_hmod;
+            return TRUE;
+        }
         RtlInitUnicodeString( &wstr, name );
         status = LdrGetDllHandle( NULL, 0, &wstr, &ret );
     }
@@ -555,6 +576,11 @@ DWORD WINAPI GetModuleFileNameW( HMODULE hModule, LPWSTR lpFileName, DWORD size 
     LDR_MODULE *pldr;
     NTSTATUS nts;
     WIN16_SUBSYSTEM_TIB *win16_tib;
+
+    if(steamclient_hmod != NULL && hModule == steamclient_hmod){
+        memcpy(lpFileName, steamclient_pathW, sizeof(steamclient_pathW));
+        return sizeof(steamclient_pathW)/sizeof(WCHAR);
+    }
 
     if (!hModule && ((win16_tib = NtCurrentTeb()->Tib.SubSystemTib)) && win16_tib->exe_name)
     {
@@ -932,6 +958,7 @@ static HMODULE load_library( const UNICODE_STRING *libname, DWORD flags )
     NTSTATUS nts;
     HMODULE hModule;
     WCHAR *load_path;
+    const WCHAR *p;
     const DWORD load_library_search_flags = (LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR |
                                              LOAD_LIBRARY_SEARCH_APPLICATION_DIR |
                                              LOAD_LIBRARY_SEARCH_USER_DIRS |
@@ -944,6 +971,36 @@ static HMODULE load_library( const UNICODE_STRING *libname, DWORD flags )
 
     if( flags & unsupported_flags)
         FIXME("unsupported flag(s) used (flags: 0x%08x)\n", flags);
+
+    if((p = strcasestrW(libname->Buffer, steamclientW)) &&
+            (p == libname->Buffer ||
+             *(p - 1) != 'l')){
+
+        if(!lsteamclient_hmod)
+            lsteamclient_hmod = LoadLibraryA("lsteamclient.dll");
+
+        if(!steamclient_hmod){
+            HANDLE f = CreateFileW(steamclient_pathW,
+                    GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                    NULL, OPEN_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+            if(f != INVALID_HANDLE_VALUE){
+                DWORD sz, readed;
+
+                sz = GetFileSize(f, NULL);
+
+                steamclient_hmod = HeapAlloc(GetProcessHeap(), 0, sz);
+                ReadFile(f, steamclient_hmod, sz, &readed, NULL);
+
+                CloseHandle(f);
+            }else{
+                /* this will fail DRM checks, but otherwise should work */
+                ERR("somehow failed to load steamclient\n");
+                steamclient_hmod = lsteamclient_hmod;
+            }
+        }
+
+        return steamclient_hmod;
+    }
 
     if (flags & load_library_search_flags)
         load_path = get_dll_load_path_search_flags( libname->Buffer, flags );
@@ -1100,6 +1157,9 @@ BOOL WINAPI DECLSPEC_HOTPATCH FreeLibrary(HINSTANCE hLibModule)
         return FALSE;
     }
 
+    if(steamclient_hmod != NULL && hLibModule == steamclient_hmod)
+        return TRUE;
+
     if ((ULONG_PTR)hLibModule & 3) /* this is a datafile module */
     {
         if ((ULONG_PTR)hLibModule & 1)
@@ -1147,6 +1207,9 @@ FARPROC get_proc_address( HMODULE hModule, LPCSTR function )
     FARPROC     fp;
 
     if (!hModule) hModule = NtCurrentTeb()->Peb->ImageBaseAddress;
+
+    if(steamclient_hmod != NULL && hModule == steamclient_hmod)
+        hModule = lsteamclient_hmod;
 
     if ((ULONG_PTR)function >> 16)
     {
