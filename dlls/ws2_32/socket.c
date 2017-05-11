@@ -3374,6 +3374,13 @@ int WINAPI WS_bind(SOCKET s, const struct WS_sockaddr* name, int namelen)
                     else if (interface_bind(s, fd, &uaddr.addr))
                         in4->sin_addr.s_addr = htonl(INADDR_ANY);
                 }
+
+                if(name->sa_family ==  WS_AF_IPX){
+                    /* Quake (and similar family) fails if we can't bind to an IPX address. This often
+                     * doesn't work on Linux, so just fake success. */
+                    return 0;
+                }
+
                 if (bind(fd, &uaddr.addr, uaddrlen) < 0)
                 {
                     int loc_errno = errno;
