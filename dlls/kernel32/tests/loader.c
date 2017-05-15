@@ -1602,7 +1602,6 @@ static void test_FakeDLL(void)
 
         /* check function content */
         map_func = RVAToAddr(map_rva, ptr);
-    todo_wine
         ok(!memcmp(map_func, dll_func, 0x20), "%s: Function content does not match!\n", func_name);
 
         if (!strcmp(func_name, "NtSetEvent"))
