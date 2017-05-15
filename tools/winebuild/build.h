@@ -357,6 +357,7 @@ extern void put_word( unsigned short val );
 extern void put_dword( unsigned int val );
 extern void put_qword( unsigned int val );
 extern void put_pword( unsigned int val );
+extern void put_str( const char *str );
 extern void align_output( unsigned int align );
 extern void align_output_rva( unsigned int file_align, unsigned int rva_align );
 extern size_t label_pos( const char *name );

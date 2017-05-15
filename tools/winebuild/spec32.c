@@ -884,6 +884,163 @@ void output_spec32_file( DLLSPEC *spec )
 }
 
 
+static int needs_stub_exports( DLLSPEC *spec )
+{
+    if (target_cpu != CPU_x86)
+        return 0;
+    if (!(spec->characteristics & IMAGE_FILE_DLL))
+        return 0;
+    if (!spec->nb_entry_points)
+        return 0;
+    return 1;
+}
+
+
+static void create_stub_exports_text( DLLSPEC *spec )
+{
+    int i, nr_exports = spec->base <= spec->limit ? spec->limit - spec->base + 1 : 0;
+    size_t rva, thunk;
+
+    /* output stub code for exports */
+    for (i = 0; i < spec->nb_entry_points; i++)
+    {
+        ORDDEF *odp = &spec->entry_points[i];
+        const char *name = get_stub_name( odp, spec );
+
+        align_output_rva( 16, 16 );
+        put_label( name );
+        put_byte( 0x8b ); put_byte( 0xff );                           /* mov edi, edi */
+        put_byte( 0x55 );                                             /* push ebp */
+        put_byte( 0x8b ); put_byte( 0xec );                           /* mov ebp, esp */
+        put_byte( 0x68 ); put_dword( 0 );                             /* push dword 0 */
+        put_byte( 0x68 ); put_dword( odp->ordinal );                  /* push ORDINAL */
+        rva = output_buffer_rva + 5;
+        put_byte( 0xe8 ); put_dword( label_rva("_forward") - rva );   /* call _forward */
+        put_byte( 0x89 ); put_byte( 0xec );                           /* mov esp, ebp */
+        put_byte( 0x5d );                                             /* pop ebp */
+        if (odp->type == TYPE_STDCALL)
+        {
+            put_byte( 0xc2 ); put_word( get_args_size(odp) );         /* ret X */
+        }
+        else
+        {
+            put_byte( 0xc3 );                                         /* ret */
+        }
+    }
+
+    /* output entry point */
+    align_output_rva( 16, 16 );
+    put_label( "entrypoint" );
+    put_byte( 0xb8 ); put_dword( 1 );                                 /* mov eax, 1 */
+    put_byte( 0xc2 ); put_word( 12 );                                 /* ret 12 */
+
+    /* output forward function */
+    align_output_rva( 16, 16 );
+    put_label( "_forward" );
+    put_byte( 0x8b ); put_byte( 0x6d ); put_byte( 0x00 );             /* mov ebp, dword[ebp] */
+    put_byte( 0x89 ); put_byte( 0x44 );                               /* mov dword[esp+8], eax */
+    put_byte( 0x24 ); put_byte( 0x08 );
+    put_byte( 0x89 ); put_byte( 0x14 ); put_byte( 0x24 );             /* mov dword[esp], edx */
+    put_byte( 0x8b ); put_byte( 0x54 );                               /* mov edx, dword[esp+4] */
+    put_byte( 0x24 ); put_byte( 0x04 );
+    put_byte( 0x89 ); put_byte( 0x4c );                               /* mov dword[esp+4], ecx */
+    put_byte( 0x24 ); put_byte( 0x04 );
+    put_byte( 0xe8 ); put_dword( 0 );                                 /* call 1f */
+    thunk = output_buffer_rva;
+    put_byte( 0x59 );                                                 /* pop ecx */
+    put_byte( 0x8b ); put_byte( 0x84 ); put_byte( 0x91 );             /* mov eax, dword[_functions + 4 * (edx - BASE)] */
+    put_dword( label_rva("_functions") - thunk - 4 * spec->base );
+    put_byte( 0x09 ); put_byte( 0xc0 );                               /* or eax, eax */
+    rva = output_buffer_rva + 2;
+    put_byte( 0x74 ); put_byte( label_rva("_forward_load") - rva );   /* je _forward_load */
+
+    put_label( "_forward_done" );
+    put_byte( 0x89 ); put_byte( 0x44 );                               /* mov dword[esp+12], eax */
+    put_byte( 0x24 ); put_byte( 0x0c );
+    put_byte( 0x5a );                                                 /* pop edx */
+    put_byte( 0x59 );                                                 /* pop ecx */
+    put_byte( 0x58 );                                                 /* pop eax */
+    put_byte( 0xc3 );                                                 /* ret */
+
+    align_output_rva( 16, 16 );
+    put_label( "_forward_load" );
+    put_byte( 0x8d ); put_byte( 0x84 ); put_byte( 0x91 );             /* lea eax, [_functions + 4 * (edx - BASE)] */
+    put_dword( label_rva("_functions") - thunk - 4 * spec->base );
+    put_byte( 0x50 );                                                 /* push eax */
+    put_byte( 0x52 );                                                 /* push edx */
+    put_byte( 0x8d ); put_byte( 0x81 );                               /* lea eax, [dll_name] */
+    put_dword( label_rva("dll_name") - thunk );
+    put_byte( 0x50 );                                                 /* push eax */
+    put_byte( 0x64 ); put_byte( 0xff );                               /* call dword ptr fs:[0F74h] */
+    put_byte( 0x15 ); put_dword( 0xf74 );
+    put_byte( 0x5a );                                                 /* pop edx */
+    put_byte( 0x89 ); put_byte( 0x02 );                               /* mov dword[edx], eax */
+    rva = output_buffer_rva + 2;
+    put_byte( 0xeb ); put_byte( label_rva("_forward_done") - rva );   /* jmp _forward_done */
+
+    /* export directory */
+    align_output_rva( 16, 16 );
+    put_label( "export_start" );
+    put_dword( 0 );                             /* Characteristics */
+    put_dword( 0 );                             /* TimeDateStamp */
+    put_dword( 0 );                             /* MajorVersion/MinorVersion */
+    put_dword( label_rva("dll_name") );         /* Name */
+    put_dword( spec->base );                    /* Base */
+    put_dword( nr_exports );                    /* NumberOfFunctions */
+    put_dword( spec->nb_names );                /* NumberOfNames */
+    put_dword( label_rva("export_funcs") );     /* AddressOfFunctions */
+    put_dword( label_rva("export_names") );     /* AddressOfNames */
+    put_dword( label_rva("export_ordinals") );  /* AddressOfNameOrdinals */
+
+    put_label( "export_funcs" );
+    for (i = spec->base; i <= spec->limit; i++)
+    {
+        ORDDEF *odp = spec->ordinals[i];
+        if (odp)
+        {
+            const char *name = get_stub_name( odp, spec );
+            put_dword( label_rva( name ) );
+        }
+        else
+            put_dword( 0 );
+    }
+
+    if (spec->nb_names)
+    {
+        put_label( "export_names" );
+        for (i = 0; i < spec->nb_names; i++)
+            put_dword( label_rva(strmake("str_%s", get_stub_name(spec->names[i], spec))) );
+
+        put_label( "export_ordinals" );
+        for (i = 0; i < spec->nb_names; i++)
+            put_word( spec->names[i]->ordinal - spec->base );
+        if (spec->nb_names % 2)
+            put_word( 0 );
+    }
+
+    put_label( "dll_name" );
+    put_str( spec->file_name );
+
+    for (i = 0; i < spec->nb_names; i++)
+    {
+        put_label( strmake("str_%s", get_stub_name(spec->names[i], spec)) );
+        put_str( spec->names[i]->name );
+    }
+
+    put_label( "export_end" );
+}
+
+
+static void create_stub_exports_data( DLLSPEC *spec )
+{
+    int i;
+
+    put_label( "_functions" );
+    for (i = spec->base; i <= spec->limit; i++)
+        put_dword( 0 );
+}
+
+
 /*******************************************************************
  *         output_fake_module_pass
  *
@@ -902,7 +1059,7 @@ static void output_fake_module_pass( DLLSPEC *spec )
     const unsigned int file_align = 0x200;
     const unsigned int reloc_size = 8;
     const unsigned int lfanew = (0x40 + sizeof(fakedll_signature) + 15) & ~15;
-    const unsigned int nb_sections = 2 + (spec->nb_resources != 0);
+    const unsigned int nb_sections = 2 + (needs_stub_exports( spec ) != 0) + (spec->nb_resources != 0);
 
     put_word( 0x5a4d );       /* e_magic */
     put_word( 0x40 );         /* e_cblp */
@@ -959,7 +1116,7 @@ static void output_fake_module_pass( DLLSPEC *spec )
     put_dword( 0 );                                  /* SizeOfUninitializedData */
     put_dword( label_rva("entrypoint") );            /* AddressOfEntryPoint */
     put_dword( label_rva("text_start") );            /* BaseOfCode */
-    if (get_ptr_size() == 4) put_dword( 0 );         /* BaseOfData */
+    if (get_ptr_size() == 4) put_dword( label_rva("data_start") ); /* BaseOfData */
     put_pword( 0x10000000 );                         /* ImageBase */
     put_dword( section_align );                      /* SectionAlignment */
     put_dword( file_align );                         /* FileAlignment */
@@ -982,7 +1139,8 @@ static void output_fake_module_pass( DLLSPEC *spec )
     put_dword( 0 );                                  /* LoaderFlags */
     put_dword( 16 );                                 /* NumberOfRvaAndSizes */
 
-    put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT] */
+    put_dword( label_rva("export_start") ); /* DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT] */
+    put_dword( label_pos("export_end") - label_pos("export_start") );
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT] */
     if (spec->nb_resources)           /* DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE] */
     {
@@ -1022,6 +1180,21 @@ static void output_fake_module_pass( DLLSPEC *spec )
     put_word( 0 );                                                        /* NumberOfLinenumbers */
     put_dword( 0x60000020 /* CNT_CODE|MEM_EXECUTE|MEM_READ */ );          /* Characteristics  */
 
+    /* .data section */
+    if (needs_stub_exports( spec ))
+    {
+        put_data( ".data\0\0", 8 );                                       /* Name */
+        put_dword( label_rva_align("data_end") - label_rva("data_start") ); /* VirtualSize */
+        put_dword( label_rva("data_start") );                             /* VirtualAddress */
+        put_dword( label_pos("data_end") - label_pos("data_start") );     /* SizeOfRawData */
+        put_dword( label_pos("data_start") );                             /* PointerToRawData */
+        put_dword( 0 );                                                   /* PointerToRelocations */
+        put_dword( 0 );                                                   /* PointerToLinenumbers */
+        put_word( 0 );                                                    /* NumberOfRelocations */
+        put_word( 0 );                                                    /* NumberOfLinenumbers */
+        put_dword( 0xc0000040 /* CNT_INITIALIZED_DATA|MEM_READ|MEM_WRITE */ ); /* Characteristics  */
+    }
+
     /* .reloc section */
     put_data( ".reloc\0", 8 );                                            /* Name */
     put_dword( label_rva_align("reloc_end") - label_rva("reloc_start") ); /* VirtualSize */
@@ -1054,13 +1227,31 @@ static void output_fake_module_pass( DLLSPEC *spec )
 
     /* .text contents */
     align_output_rva( file_align, section_align );
-    put_label( "text_start" );
-    put_label( "entrypoint" );
-    if (spec->characteristics & IMAGE_FILE_DLL)
-        put_data( dll_code_section, sizeof(dll_code_section) );
+    if (needs_stub_exports( spec ))
+    {
+        put_label( "text_start" );
+        create_stub_exports_text( spec );
+        put_label( "text_end" );
+    }
     else
-        put_data( exe_code_section, sizeof(exe_code_section) );
-    put_label( "text_end" );
+    {
+        put_label( "text_start" );
+        put_label( "entrypoint" );
+        if (spec->characteristics & IMAGE_FILE_DLL)
+            put_data( dll_code_section, sizeof(dll_code_section) );
+        else
+            put_data( exe_code_section, sizeof(exe_code_section) );
+        put_label( "text_end" );
+    }
+
+    /* .data contents */
+    align_output_rva( file_align, section_align );
+    if (needs_stub_exports( spec ))
+    {
+        put_label( "data_start" );
+        create_stub_exports_data( spec );
+        put_label( "data_end" );
+    }
 
     /* .reloc contents */
     align_output_rva( file_align, section_align );
