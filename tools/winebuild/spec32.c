@@ -885,11 +885,11 @@ void output_spec32_file( DLLSPEC *spec )
 
 
 /*******************************************************************
- *         output_fake_module
+ *         output_fake_module_pass
  *
- * Build a fake binary module from a spec file.
+ * Helper to create a fake binary module from a spec file.
  */
-void output_fake_module( DLLSPEC *spec )
+static void output_fake_module_pass( DLLSPEC *spec )
 {
     static const unsigned char dll_code_section[] = { 0x31, 0xc0,          /* xor %eax,%eax */
                                                       0xc2, 0x0c, 0x00 };  /* ret $12 */
@@ -901,21 +901,8 @@ void output_fake_module( DLLSPEC *spec )
     const unsigned int section_align = page_size;
     const unsigned int file_align = 0x200;
     const unsigned int reloc_size = 8;
-    const unsigned int lfanew = 0x40 + sizeof(fakedll_signature);
+    const unsigned int lfanew = (0x40 + sizeof(fakedll_signature) + 15) & ~15;
     const unsigned int nb_sections = 2 + (spec->nb_resources != 0);
-    const unsigned int text_size = (spec->characteristics & IMAGE_FILE_DLL) ?
-                                    sizeof(dll_code_section) : sizeof(exe_code_section);
-    unsigned char *resources;
-    unsigned int resources_size;
-    unsigned int image_size = 3 * section_align;
-
-    resolve_imports( spec );
-    output_bin_resources( spec, 3 * section_align );
-    resources = output_buffer;
-    resources_size = output_buffer_pos;
-    if (resources_size) image_size += (resources_size + section_align - 1) & ~(section_align - 1);
-
-    init_output_buffer();
 
     put_word( 0x5a4d );       /* e_magic */
     put_word( 0x40 );         /* e_cblp */
@@ -943,6 +930,7 @@ void output_fake_module( DLLSPEC *spec )
     put_dword( lfanew );
 
     put_data( fakedll_signature, sizeof(fakedll_signature) );
+    align_output_rva( 16, 16 );
 
     put_dword( 0x4550 );                             /* Signature */
     switch(target_cpu)
@@ -966,11 +954,11 @@ void output_fake_module( DLLSPEC *spec )
               IMAGE_NT_OPTIONAL_HDR32_MAGIC );       /* Magic */
     put_byte(  7 );                                  /* MajorLinkerVersion */
     put_byte(  10 );                                 /* MinorLinkerVersion */
-    put_dword( text_size );                          /* SizeOfCode */
+    put_dword( label_pos("text_end") - label_pos("text_start") ); /* SizeOfCode */
     put_dword( 0 );                                  /* SizeOfInitializedData */
     put_dword( 0 );                                  /* SizeOfUninitializedData */
-    put_dword( section_align );                      /* AddressOfEntryPoint */
-    put_dword( section_align );                      /* BaseOfCode */
+    put_dword( label_rva("entrypoint") );            /* AddressOfEntryPoint */
+    put_dword( label_rva("text_start") );            /* BaseOfCode */
     if (get_ptr_size() == 4) put_dword( 0 );         /* BaseOfData */
     put_pword( 0x10000000 );                         /* ImageBase */
     put_dword( section_align );                      /* SectionAlignment */
@@ -982,8 +970,8 @@ void output_fake_module( DLLSPEC *spec )
     put_word( spec->subsystem_major );               /* MajorSubsystemVersion */
     put_word( spec->subsystem_minor );               /* MinorSubsystemVersion */
     put_dword( 0 );                                  /* Win32VersionValue */
-    put_dword( image_size );                         /* SizeOfImage */
-    put_dword( file_align );                         /* SizeOfHeaders */
+    put_dword( label_rva_align("file_end") );        /* SizeOfImage */
+    put_dword( label_pos("header_end") );            /* SizeOfHeaders */
     put_dword( 0 );                                  /* CheckSum */
     put_word( spec->subsystem );                     /* Subsystem */
     put_word( spec->dll_characteristics );           /* DllCharacteristics */
@@ -996,10 +984,10 @@ void output_fake_module( DLLSPEC *spec )
 
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_EXPORT] */
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT] */
-    if (resources_size)   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE] */
+    if (spec->nb_resources)           /* DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE] */
     {
-        put_dword( 3 * section_align );
-        put_dword( resources_size );
+        put_dword( label_rva("res_start") );
+        put_dword( label_pos("res_end") - label_pos("res_start") );
     }
     else
     {
@@ -1009,8 +997,8 @@ void output_fake_module( DLLSPEC *spec )
 
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_EXCEPTION] */
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_SECURITY] */
-    put_dword( 2 * section_align );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC] */
-    put_dword( reloc_size );
+    put_dword( label_rva("reloc_start") ); /* DataDirectory[IMAGE_DIRECTORY_ENTRY_BASERELOC] */
+    put_dword( label_pos("reloc_end") - label_pos("reloc_start") );
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_DEBUG] */
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_COPYRIGHT] */
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_GLOBALPTR] */
@@ -1023,62 +1011,95 @@ void output_fake_module( DLLSPEC *spec )
     put_dword( 0 ); put_dword( 0 );   /* DataDirectory[15] */
 
     /* .text section */
-    put_data( ".text\0\0", 8 );    /* Name */
-    put_dword( section_align );    /* VirtualSize */
-    put_dword( section_align );    /* VirtualAddress */
-    put_dword( text_size );        /* SizeOfRawData */
-    put_dword( file_align );       /* PointerToRawData */
-    put_dword( 0 );                /* PointerToRelocations */
-    put_dword( 0 );                /* PointerToLinenumbers */
-    put_word( 0 );                 /* NumberOfRelocations */
-    put_word( 0 );                 /* NumberOfLinenumbers */
-    put_dword( 0x60000020 /* CNT_CODE|MEM_EXECUTE|MEM_READ */ ); /* Characteristics  */
+    put_data( ".text\0\0", 8 );                                           /* Name */
+    put_dword( label_rva_align("text_end") - label_rva("text_start") );   /* VirtualSize */
+    put_dword( label_rva("text_start") );                                 /* VirtualAddress */
+    put_dword( label_pos("text_end") - label_pos("text_start") );         /* SizeOfRawData */
+    put_dword( label_pos("text_start") );                                 /* PointerToRawData */
+    put_dword( 0 );                                                       /* PointerToRelocations */
+    put_dword( 0 );                                                       /* PointerToLinenumbers */
+    put_word( 0 );                                                        /* NumberOfRelocations */
+    put_word( 0 );                                                        /* NumberOfLinenumbers */
+    put_dword( 0x60000020 /* CNT_CODE|MEM_EXECUTE|MEM_READ */ );          /* Characteristics  */
 
     /* .reloc section */
-    put_data( ".reloc\0", 8 );     /* Name */
-    put_dword( section_align );    /* VirtualSize */
-    put_dword( 2 * section_align );/* VirtualAddress */
-    put_dword( reloc_size );       /* SizeOfRawData */
-    put_dword( 2 * file_align );   /* PointerToRawData */
-    put_dword( 0 );                /* PointerToRelocations */
-    put_dword( 0 );                /* PointerToLinenumbers */
-    put_word( 0 );                 /* NumberOfRelocations */
-    put_word( 0 );                 /* NumberOfLinenumbers */
+    put_data( ".reloc\0", 8 );                                            /* Name */
+    put_dword( label_rva_align("reloc_end") - label_rva("reloc_start") ); /* VirtualSize */
+    put_dword( label_rva("reloc_start") );                                /* VirtualAddress */
+    put_dword( label_pos("reloc_end") - label_pos("reloc_start") );       /* SizeOfRawData */
+    put_dword( label_pos("reloc_start") );                                /* PointerToRawData */
+    put_dword( 0 );                                                       /* PointerToRelocations */
+    put_dword( 0 );                                                       /* PointerToLinenumbers */
+    put_word( 0 );                                                        /* NumberOfRelocations */
+    put_word( 0 );                                                        /* NumberOfLinenumbers */
     put_dword( 0x42000040 /* CNT_INITIALIZED_DATA|MEM_DISCARDABLE|MEM_READ */ ); /* Characteristics */
 
     /* .rsrc section */
-    if (resources_size)
+    if (spec->nb_resources)
     {
-        put_data( ".rsrc\0\0", 8 );    /* Name */
-        put_dword( (resources_size + section_align - 1) & ~(section_align - 1) ); /* VirtualSize */
-        put_dword( 3 * section_align );/* VirtualAddress */
-        put_dword( resources_size );   /* SizeOfRawData */
-        put_dword( 3 * file_align );   /* PointerToRawData */
-        put_dword( 0 );                /* PointerToRelocations */
-        put_dword( 0 );                /* PointerToLinenumbers */
-        put_word( 0 );                 /* NumberOfRelocations */
-        put_word( 0 );                 /* NumberOfLinenumbers */
-        put_dword( 0x40000040 /* CNT_INITIALIZED_DATA|MEM_READ */ ); /* Characteristics */
+        put_data( ".rsrc\0\0", 8 );                                       /* Name */
+        put_dword( label_rva_align("res_end") - label_rva("res_start") ); /* VirtualSize */
+        put_dword( label_rva("res_start") );                              /* VirtualAddress */
+        put_dword( label_pos("res_end") - label_pos("res_start") );       /* SizeOfRawData */
+        put_dword( label_pos("res_start") );                              /* PointerToRawData */
+        put_dword( 0 );                                                   /* PointerToRelocations */
+        put_dword( 0 );                                                   /* PointerToLinenumbers */
+        put_word( 0 );                                                    /* NumberOfRelocations */
+        put_word( 0 );                                                    /* NumberOfLinenumbers */
+        put_dword( 0x40000040 /* CNT_INITIALIZED_DATA|MEM_READ */ );      /* Characteristics */
     }
 
+    align_output_rva( file_align, file_align );
+    put_label( "header_end" );
+
     /* .text contents */
-    align_output( file_align );
+    align_output_rva( file_align, section_align );
+    put_label( "text_start" );
+    put_label( "entrypoint" );
     if (spec->characteristics & IMAGE_FILE_DLL)
         put_data( dll_code_section, sizeof(dll_code_section) );
     else
         put_data( exe_code_section, sizeof(exe_code_section) );
+    put_label( "text_end" );
 
     /* .reloc contents */
-    align_output( file_align );
+    align_output_rva( file_align, section_align );
+    put_label( "reloc_start" );
     put_dword( 0 );   /* VirtualAddress */
     put_dword( 0 );   /* SizeOfBlock */
+    put_label( "reloc_end" );
 
     /* .rsrc contents */
-    if (resources_size)
+    if (spec->nb_resources)
     {
-        align_output( file_align );
-        put_data( resources, resources_size );
+        align_output_rva( file_align, section_align );
+        put_label( "res_start" );
+        output_bin_resources( spec, label_rva("res_start") );
+        put_label( "res_end" );
     }
+
+    put_label( "file_end" );
+}
+
+
+/*******************************************************************
+ *         output_fake_module
+ *
+ * Build a fake binary module from a spec file.
+ */
+void output_fake_module( DLLSPEC *spec )
+{
+    resolve_imports( spec );
+
+    /* First pass */
+    init_output_buffer();
+    output_fake_module_pass( spec );
+
+    /* Second pass */
+    output_buffer_pos = 0;
+    output_buffer_rva = 0;
+    output_fake_module_pass( spec );
+
     flush_output_buffer();
 }
 

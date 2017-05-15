@@ -34,6 +34,7 @@
 # include <sys/stat.h>
 #endif
 
+#include "wine/list.h"
 #include "build.h"
 
 #if defined(_WIN32) && !defined(__CYGWIN__)
@@ -541,7 +542,85 @@ size_t input_buffer_pos;
 size_t input_buffer_size;
 unsigned char *output_buffer;
 size_t output_buffer_pos;
+size_t output_buffer_rva;
 size_t output_buffer_size;
+
+struct label
+{
+    struct list entry;
+    const char *name;
+    size_t pos;
+    size_t rva;
+};
+
+static struct list labels = LIST_INIT( labels );
+
+struct label *get_label( const char *name )
+{
+    struct label *label;
+
+    LIST_FOR_EACH_ENTRY( label, &labels, struct label, entry )
+    {
+        if (!strcmp(name, label->name))
+            return label;
+    }
+
+    label = xmalloc( sizeof(*label) );
+    label->name = name;
+    label->pos = 0;
+    label->rva = 0;
+
+    list_add_tail( &labels, &label->entry );
+
+    return label;
+}
+
+size_t label_pos( const char *name )
+{
+    struct label *label = get_label( name );
+    return label->pos;
+}
+
+size_t label_rva( const char *name )
+{
+    struct label *label = get_label( name );
+    return label->rva;
+}
+
+size_t label_rva_align( const char *name )
+{
+    const unsigned int page_size = get_page_size();
+    size_t rva = label_rva( name );
+    size_t size = page_size - (rva % page_size);
+
+    if (size != page_size) rva += size;
+    return rva;
+}
+
+void put_label( const char *name )
+{
+    struct label *label = get_label( name );
+
+    if (label->pos || label->rva)
+    {
+        assert( label->pos == output_buffer_pos );
+        assert( label->rva == output_buffer_rva );
+    }
+
+    label->pos = output_buffer_pos;
+    label->rva = output_buffer_rva;
+}
+
+void free_labels( void )
+{
+    struct label *label, *label2;
+
+    LIST_FOR_EACH_ENTRY_SAFE( label, label2, &labels, struct label, entry )
+    {
+        list_remove( &label->entry );
+        free( label );
+    }
+}
 
 static void check_output_buffer_space( size_t size )
 {
@@ -574,7 +653,9 @@ void init_output_buffer(void)
 {
     output_buffer_size = 1024;
     output_buffer_pos = 0;
+    output_buffer_rva = 0;
     output_buffer = xmalloc( output_buffer_size );
+    free_labels();
 }
 
 void flush_output_buffer(void)
@@ -584,6 +665,7 @@ void flush_output_buffer(void)
         fatal_error( "Error writing to %s\n", output_file_name );
     close_output_file();
     free( output_buffer );
+    free_labels();
 }
 
 unsigned char get_byte(void)
@@ -623,12 +705,14 @@ void put_data( const void *data, size_t size )
     check_output_buffer_space( size );
     memcpy( output_buffer + output_buffer_pos, data, size );
     output_buffer_pos += size;
+    output_buffer_rva += size;
 }
 
 void put_byte( unsigned char val )
 {
     check_output_buffer_space( 1 );
     output_buffer[output_buffer_pos++] = val;
+    output_buffer_rva++;
 }
 
 void put_word( unsigned short val )
@@ -673,6 +757,14 @@ void align_output( unsigned int align )
     check_output_buffer_space( size );
     memset( output_buffer + output_buffer_pos, 0, size );
     output_buffer_pos += size;
+}
+
+void align_output_rva( unsigned int file_align, unsigned int rva_align )
+{
+    size_t size = rva_align - (output_buffer_rva % rva_align);
+
+    if (size != rva_align) output_buffer_rva += size;
+    align_output( file_align );
 }
 
 /* output a standard header for generated files */
