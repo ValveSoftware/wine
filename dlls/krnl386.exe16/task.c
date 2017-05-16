@@ -630,7 +630,7 @@ void WINAPI InitTask16( CONTEXT *context )
 
     /* Initialize the INSTANCEDATA structure */
     pinstance = MapSL( MAKESEGPTR(CURRENT_DS, 0) );
-    pinstance->stackmin    = OFFSETOF(NtCurrentTeb()->WOW32Reserved) + sizeof( STACK16FRAME );
+    pinstance->stackmin    = OFFSETOF(NtCurrentTeb()->SystemReserved1[0]) + sizeof( STACK16FRAME );
     pinstance->stackbottom = pinstance->stackmin; /* yup, that's right. Confused me too. */
     pinstance->stacktop    = ( pinstance->stackmin > LOWORD(context->Ebx) ?
                                pinstance->stackmin - LOWORD(context->Ebx) : 0 ) + 150;
@@ -1101,14 +1101,14 @@ void WINAPI SwitchStackTo16( WORD seg, WORD ptr, WORD top )
 
     if (!(pData = GlobalLock16( seg ))) return;
     TRACE("old=%04x:%04x new=%04x:%04x\n",
-          SELECTOROF( NtCurrentTeb()->WOW32Reserved ),
-          OFFSETOF( NtCurrentTeb()->WOW32Reserved ), seg, ptr );
+          SELECTOROF( NtCurrentTeb()->SystemReserved1[0] ),
+          OFFSETOF( NtCurrentTeb()->SystemReserved1[0] ), seg, ptr );
 
     /* Save the old stack */
 
     oldFrame = CURRENT_STACK16;
     /* pop frame + args and push bp */
-    pData->old_ss_sp   = (SEGPTR)NtCurrentTeb()->WOW32Reserved + sizeof(STACK16FRAME)
+    pData->old_ss_sp   = (SEGPTR)NtCurrentTeb()->SystemReserved1[0] + sizeof(STACK16FRAME)
                            + 2 * sizeof(WORD);
     *(WORD *)MapSL(pData->old_ss_sp) = oldFrame->bp;
     pData->stacktop    = top;
@@ -1122,7 +1122,7 @@ void WINAPI SwitchStackTo16( WORD seg, WORD ptr, WORD top )
      */
     copySize = oldFrame->bp - OFFSETOF(pData->old_ss_sp);
     copySize += 3 * sizeof(WORD) + sizeof(STACK16FRAME);
-    NtCurrentTeb()->WOW32Reserved = (void *)MAKESEGPTR( seg, ptr - copySize );
+    NtCurrentTeb()->SystemReserved1[0] = (void *)MAKESEGPTR( seg, ptr - copySize );
     newFrame = CURRENT_STACK16;
 
     /* Copy the stack frame and the local variables to the new stack */
@@ -1141,7 +1141,7 @@ void WINAPI SwitchStackBack16( CONTEXT *context )
     STACK16FRAME *oldFrame, *newFrame;
     INSTANCEDATA *pData;
 
-    if (!(pData = GlobalLock16(SELECTOROF(NtCurrentTeb()->WOW32Reserved))))
+    if (!(pData = GlobalLock16(SELECTOROF(NtCurrentTeb()->SystemReserved1[0]))))
         return;
     if (!pData->old_ss_sp)
     {
@@ -1160,7 +1160,7 @@ void WINAPI SwitchStackBack16( CONTEXT *context )
 
     /* Switch back to the old stack */
 
-    NtCurrentTeb()->WOW32Reserved = (void *)(pData->old_ss_sp - sizeof(STACK16FRAME));
+    NtCurrentTeb()->SystemReserved1[0] = (void *)(pData->old_ss_sp - sizeof(STACK16FRAME));
     context->SegSs = SELECTOROF(pData->old_ss_sp);
     context->Esp   = OFFSETOF(pData->old_ss_sp) - sizeof(DWORD); /*ret addr*/
     pData->old_ss_sp = 0;

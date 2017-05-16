@@ -456,7 +456,7 @@ HWND16 WINAPI GetParent16( HWND16 hwnd )
  */
 BOOL16 WINAPI IsWindow16( HWND16 hwnd )
 {
-    STACK16FRAME *frame = MapSL( (SEGPTR)NtCurrentTeb()->WOW32Reserved );
+    STACK16FRAME *frame = MapSL( (SEGPTR)NtCurrentTeb()->SystemReserved1[0] );
     frame->es = USER_HeapSel;
     /* don't use WIN_Handle32 here, we don't care about the full handle */
     return IsWindow( HWND_32(hwnd) );

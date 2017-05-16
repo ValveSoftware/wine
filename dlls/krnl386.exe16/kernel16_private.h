@@ -170,7 +170,7 @@ extern THHOOK *pThhook DECLSPEC_HIDDEN;
     (((offset)+(size) <= pModule->mapping_size) ? \
      (memcpy( buffer, (const char *)pModule->mapping + (offset), (size) ), TRUE) : FALSE)
 
-#define CURRENT_STACK16 ((STACK16FRAME*)MapSL(PtrToUlong(NtCurrentTeb()->WOW32Reserved)))
+#define CURRENT_STACK16 ((STACK16FRAME*)MapSL(PtrToUlong(NtCurrentTeb()->SystemReserved1[0])))
 #define CURRENT_DS      (CURRENT_STACK16->ds)
 
 /* push bytes on the 16-bit stack of a thread; return a segptr to the first pushed byte */
@@ -178,8 +178,8 @@ static inline SEGPTR stack16_push( int size )
 {
     STACK16FRAME *frame = CURRENT_STACK16;
     memmove( (char*)frame - size, frame, sizeof(*frame) );
-    NtCurrentTeb()->WOW32Reserved = (char *)NtCurrentTeb()->WOW32Reserved - size;
-    return (SEGPTR)((char *)NtCurrentTeb()->WOW32Reserved + sizeof(*frame));
+    NtCurrentTeb()->SystemReserved1[0] = (char *)NtCurrentTeb()->SystemReserved1[0] - size;
+    return (SEGPTR)((char *)NtCurrentTeb()->SystemReserved1[0] + sizeof(*frame));
 }
 
 /* pop bytes from the 16-bit stack of a thread */
@@ -187,7 +187,7 @@ static inline void stack16_pop( int size )
 {
     STACK16FRAME *frame = CURRENT_STACK16;
     memmove( (char*)frame + size, frame, sizeof(*frame) );
-    NtCurrentTeb()->WOW32Reserved = (char *)NtCurrentTeb()->WOW32Reserved + size;
+    NtCurrentTeb()->SystemReserved1[0] = (char *)NtCurrentTeb()->SystemReserved1[0] + size;
 }
 
 /* dosmem.c */
@@ -273,11 +273,12 @@ struct tagSYSLEVEL;
 
 struct kernel_thread_data
 {
+    void               *reserved;       /* stack segment pointer */
     WORD                stack_sel;      /* 16-bit stack selector */
     WORD                htask16;        /* Win16 task handle */
     DWORD               sys_count[4];   /* syslevel mutex entry counters */
     struct tagSYSLEVEL *sys_mutex[4];   /* syslevel mutex pointers */
-    void               *pad[45];        /* change this if you add fields! */
+    void               *pad[44];        /* change this if you add fields! */
 };
 
 static inline struct kernel_thread_data *kernel_get_thread_data(void)

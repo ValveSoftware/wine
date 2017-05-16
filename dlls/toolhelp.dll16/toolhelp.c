@@ -455,8 +455,8 @@ BOOL16 WINAPI TaskNext16( TASKENTRY *lpte )
     lpte->hTaskParent   = pTask->hParent;
     lpte->hInst         = pTask->hInstance;
     lpte->hModule       = pTask->hModule;
-    lpte->wSS           = SELECTOROF( pTask->teb->WOW32Reserved );
-    lpte->wSP           = OFFSETOF( pTask->teb->WOW32Reserved );
+    lpte->wSS           = SELECTOROF( pTask->teb->SystemReserved1[0] );
+    lpte->wSP           = OFFSETOF( pTask->teb->SystemReserved1[0] );
     lpte->wStackTop     = pInstData->stacktop;
     lpte->wStackMinimum = pInstData->stackmin;
     lpte->wStackBottom  = pInstData->stackbottom;
@@ -682,7 +682,7 @@ BOOL16 WINAPI TimerCount16( TIMERINFO *pTimerInfo )
  */
 BOOL16 WINAPI SystemHeapInfo16( SYSHEAPINFO *pHeapInfo )
 {
-    STACK16FRAME* stack16 = MapSL((SEGPTR)NtCurrentTeb()->WOW32Reserved);
+    STACK16FRAME* stack16 = MapSL((SEGPTR)NtCurrentTeb()->SystemReserved1[0]);
     HANDLE16 oldDS = stack16->ds;
     WORD user = LoadLibrary16( "USER.EXE" );
     WORD gdi = LoadLibrary16( "GDI.EXE" );

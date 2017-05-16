@@ -1394,7 +1394,7 @@ DWORD WINAPI GetTabbedTextExtent16( HDC16 hdc, LPCSTR lpstr, INT16 count,
  */
 DWORD WINAPI UserSeeUserDo16(WORD wReqType, WORD wParam1, WORD wParam2, WORD wParam3)
 {
-    STACK16FRAME* stack16 = MapSL((SEGPTR)NtCurrentTeb()->WOW32Reserved);
+    STACK16FRAME* stack16 = MapSL((SEGPTR)NtCurrentTeb()->SystemReserved1[0]);
     HANDLE16 oldDS = stack16->ds;
     DWORD ret = (DWORD)-1;
 
@@ -1787,7 +1787,7 @@ UINT16 WINAPI RealizePalette16( HDC16 hdc )
  */
 WORD WINAPI GetFreeSystemResources16( WORD resType )
 {
-    STACK16FRAME* stack16 = MapSL((SEGPTR)NtCurrentTeb()->WOW32Reserved);
+    STACK16FRAME* stack16 = MapSL((SEGPTR)NtCurrentTeb()->SystemReserved1[0]);
     HANDLE16 oldDS = stack16->ds;
     int userPercent, gdiPercent;
 
