@@ -404,8 +404,12 @@ static void *map_dll( const IMAGE_NT_HEADERS *nt_descr )
     assert( size <= page_size );
 
     /* module address must be aligned on 64K boundary */
-    addr = (BYTE *)((nt_descr->OptionalHeader.ImageBase + 0xffff) & ~0xffff);
-    if (wine_anon_mmap( addr, page_size, PROT_READ|PROT_WRITE, MAP_FIXED ) != addr) return NULL;
+    addr = *(BYTE **)&nt_descr->OptionalHeader.DataDirectory[15];
+    if (!addr || ((ULONG_PTR)addr & 0xffff) || mprotect( addr, page_size, PROT_READ | PROT_WRITE ))
+    {
+        addr = (BYTE *)((nt_descr->OptionalHeader.ImageBase + 0xffff) & ~0xffff);
+        if (wine_anon_mmap( addr, page_size, PROT_READ|PROT_WRITE, MAP_FIXED ) != addr) return NULL;
+    }
 
     dos    = (IMAGE_DOS_HEADER *)addr;
     nt     = (IMAGE_NT_HEADERS *)(dos + 1);
@@ -451,6 +455,11 @@ static void *map_dll( const IMAGE_NT_HEADERS *nt_descr )
     nt->OptionalHeader.SizeOfUninitializedData     = 0;
     nt->OptionalHeader.SizeOfImage                 = data_end;
     nt->OptionalHeader.ImageBase                   = (ULONG_PTR)addr;
+
+    /* Clear DataDirectory[15] */
+
+    nt->OptionalHeader.DataDirectory[15].VirtualAddress = 0;
+    nt->OptionalHeader.DataDirectory[15].Size = 0;
 
     /* Build the code section */
 

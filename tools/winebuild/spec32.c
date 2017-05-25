@@ -381,14 +381,25 @@ static void output_relay_debug( DLLSPEC *spec )
  */
 static void output_syscall_thunks( DLLSPEC *spec )
 {
+    const unsigned int page_size = get_page_size();
     int i;
 
     if (!spec->nb_syscalls)
         return;
 
-    output( "\n/* syscall thunks */\n\n" );
-    output( "\t.text\n" );
+    /* Reserve space for PE header directly before syscalls. */
+    if (target_platform == PLATFORM_APPLE)
+        output( "\t.text\n" );
+    else
+        output( "\n\t.section \".text.startup\"\n" );
 
+    output( "\t.align %d\n", get_alignment(65536) );
+    output( "__wine_spec_pe_header_syscalls:\n" );
+    output( "__wine_spec_pe_header_syscalls_end:\n" );
+    output( "\t.byte 0\n" );
+    output( "\t.balign %d, 0\n", page_size );
+
+    output( "\n/* syscall thunks */\n\n" );
     for (i = 0; i < spec->nb_syscalls; i++)
     {
         ORDDEF *odp = spec->syscalls[i];
@@ -849,6 +860,8 @@ void output_module( DLLSPEC *spec )
         data_dirs[1] = ".L__wine_spec_imports";   /* DataDirectory[IMAGE_DIRECTORY_ENTRY_IMPORT] */
     if (spec->nb_resources)
         data_dirs[2] = ".L__wine_spec_resources"; /* DataDirectory[IMAGE_DIRECTORY_ENTRY_RESOURCE] */
+    if (spec->nb_syscalls)
+        data_dirs[15] = "__wine_spec_pe_header_syscalls";
 
     output_data_directories( data_dirs );
 

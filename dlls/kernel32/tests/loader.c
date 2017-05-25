@@ -1589,7 +1589,6 @@ static void test_FakeDLL(void)
         /* check position in memory */
         dll_rva = (DWORD_PTR)dll_func - (DWORD_PTR)module;
         map_rva = funcs[ordinals[i]];
-    todo_wine
         ok(map_rva == dll_rva, "%s: Rva of mapped function (0x%x) does not match dll (0x%x)\n",
            func_name, dll_rva, map_rva);
 
