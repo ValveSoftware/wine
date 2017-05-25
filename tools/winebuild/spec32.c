@@ -1279,8 +1279,8 @@ static void output_fake_module_pass( DLLSPEC *spec )
     /* .reloc contents */
     align_output_rva( file_align, section_align );
     put_label( "reloc_start" );
-    put_dword( 0 );   /* VirtualAddress */
-    put_dword( 0 );   /* SizeOfBlock */
+    put_dword( label_rva("text_start") );   /* VirtualAddress */
+    put_dword( 8 );                         /* SizeOfBlock */
     put_label( "reloc_end" );
 
     /* .rsrc contents */
