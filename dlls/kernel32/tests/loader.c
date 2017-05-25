@@ -1595,7 +1595,6 @@ static void test_FakeDLL(void)
         /* check position in file */
         map_offset = (DWORD_PTR)RtlImageRvaToVa(RtlImageNtHeader(ptr),    ptr,    map_rva, NULL) - (DWORD_PTR)ptr;
         dll_offset = (DWORD_PTR)RtlImageRvaToVa(RtlImageNtHeader(module), module, dll_rva, NULL) - (DWORD_PTR)module;
-    todo_wine
         ok(map_offset == dll_offset, "%s: File offset of mapped function (0x%x) does not match dll (0x%x)\n",
            func_name, map_offset, dll_offset);
 
