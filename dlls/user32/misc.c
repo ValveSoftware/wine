@@ -249,7 +249,12 @@ static const WCHAR adapter_device_deviceid[] = {'P','C','I','\\','V','E','N','_'
                                                 'D','E','V','_','0','0','0','0',0};
 static const WCHAR display_device_name[] = {'%','s','\\','M','o','n','i','t','o','r','0',0};
 static const WCHAR display_device_string[] = {'W','i','n','e',' ','D','i','s','p','l','a','y',0};
-static const WCHAR display_device_deviceid[] = {'M','O','N','I','T','O','R','\\','W','I','N','E','%','0','4','d',0};
+static const WCHAR display_device_deviceid[] = {'M','O','N','I','T','O','R','\\',
+                                                'D','e','f','a','u','l','t','_','M','o','n','i','t','o','r','\\',
+                                                '{','4','D','3','6','E','9','6','E','-','E','3','2','5','-',
+                                                '1','1','C','E','-','B','F','C','1','-',
+                                                '0','8','0','0','2','B','E','1','0','3','1','8','}','\\',
+                                                '%','0','4','d',0};
 
 struct display_devices_enum_info
 {
