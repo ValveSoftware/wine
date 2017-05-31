@@ -17,6 +17,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "config.h"
+
 #include <stdarg.h>
 
 #define NONAMELESSUNION
@@ -50,6 +52,11 @@ static HINSTANCE instance;
 #define COMPAT_E_DEVICE_INVALIDATED XAUDIO2_E_DEVICE_INVALIDATED
 #endif
 
+#define IS_WMA(tag) (tag == WAVE_FORMAT_MSAUDIO1 || \
+        tag == WAVE_FORMAT_WMAUDIO2 || \
+        tag == WAVE_FORMAT_WMAUDIO3 || \
+        tag == WAVE_FORMAT_WMAUDIO_LOSSLESS)
+
 static void dump_fmt(const WAVEFORMATEX *fmt)
 {
     TRACE("wFormatTag: 0x%x (", fmt->wFormatTag);
@@ -58,6 +65,11 @@ static void dump_fmt(const WAVEFORMATEX *fmt)
     DOCASE(WAVE_FORMAT_PCM)
     DOCASE(WAVE_FORMAT_IEEE_FLOAT)
     DOCASE(WAVE_FORMAT_EXTENSIBLE)
+    DOCASE(WAVE_FORMAT_ADPCM)
+    DOCASE(WAVE_FORMAT_MSAUDIO1)
+    DOCASE(WAVE_FORMAT_WMAUDIO2)
+    DOCASE(WAVE_FORMAT_WMAUDIO3)
+    DOCASE(WAVE_FORMAT_WMAUDIO_LOSSLESS)
 #undef DOCASE
     default:
         TRACE("Unknown");
@@ -106,6 +118,9 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, void *pReserved)
             return FALSE;
         }
 
+#if HAVE_FFMPEG
+        avcodec_register_all();
+#endif
         break;
     }
     return TRUE;
@@ -430,6 +445,10 @@ static void WINAPI XA2SRC_DestroyVoice(IXAudio2SourceVoice *iface)
     }
 
     HeapFree(GetProcessHeap(), 0, This->fmt);
+    HeapFree(GetProcessHeap(), 0, This->scratch_buf);
+    This->scratch_buf = NULL;
+    HeapFree(GetProcessHeap(), 0, This->convert_buf);
+    This->convert_buf = NULL;
 
     alDeleteBuffers(XAUDIO2_MAX_QUEUED_BUFFERS, This->al_bufs);
     alDeleteSources(1, &This->al_src);
@@ -441,6 +460,17 @@ static void WINAPI XA2SRC_DestroyVoice(IXAudio2SourceVoice *iface)
     This->first_buf = 0;
     This->cur_buf = 0;
     This->abandoned_albufs = 0;
+
+#if HAVE_FFMPEG
+    if(This->conv_ctx){
+        HeapFree(GetProcessHeap(), 0, This->conv_ctx->extradata);
+        av_frame_free(&This->conv_frame);
+        This->conv_frame = NULL;
+        avcodec_close(This->conv_ctx);
+        av_free(This->conv_ctx);
+        This->conv_ctx = NULL;
+    }
+#endif
 
     LeaveCriticalSection(&This->lock);
 }
@@ -547,6 +577,97 @@ static ALenum get_al_format(const WAVEFORMATEX *fmt)
     return 0;
 }
 
+#if HAVE_FFMPEG
+static enum AVCodecID get_ffmpeg_format(const WAVEFORMATEX *pSourceFormat)
+{
+    switch(pSourceFormat->wFormatTag){
+    case WAVE_FORMAT_MSAUDIO1:
+        return AV_CODEC_ID_WMAV1;
+    case WAVE_FORMAT_WMAUDIO2:
+        return AV_CODEC_ID_WMAV2;
+    case WAVE_FORMAT_WMAUDIO3:
+        return AV_CODEC_ID_WMAPRO;
+    case WAVE_FORMAT_WMAUDIO_LOSSLESS:
+        return AV_CODEC_ID_WMALOSSLESS;
+    case WAVE_FORMAT_ADPCM:
+        return AV_CODEC_ID_ADPCM_MS;
+    }
+    return 0;
+}
+
+static ALenum ffmpeg_to_al_fmt(enum AVSampleFormat fmt, int channels)
+{
+    switch(fmt){
+    case AV_SAMPLE_FMT_U8:
+    case AV_SAMPLE_FMT_U8P:
+        switch(channels){
+        case 1:
+            return AL_FORMAT_MONO8;
+        case 2:
+            return AL_FORMAT_STEREO8;
+        case 4:
+            return AL_FORMAT_QUAD8;
+        case 6:
+            return AL_FORMAT_51CHN8;
+        case 7:
+            return AL_FORMAT_61CHN8;
+        case 8:
+            return AL_FORMAT_71CHN8;
+        }
+        break;
+    case AV_SAMPLE_FMT_S16:
+    case AV_SAMPLE_FMT_S16P:
+        switch(channels){
+        case 1:
+            return AL_FORMAT_MONO16;
+        case 2:
+            return AL_FORMAT_STEREO16;
+        case 4:
+            return AL_FORMAT_QUAD16;
+        case 6:
+            return AL_FORMAT_51CHN16;
+        case 7:
+            return AL_FORMAT_61CHN16;
+        case 8:
+            return AL_FORMAT_71CHN16;
+        }
+        break;
+    case AV_SAMPLE_FMT_S32:
+    case AV_SAMPLE_FMT_S32P:
+        switch(channels){
+        /* TODO: mono/stereo? */
+        case 4:
+            return AL_FORMAT_QUAD32;
+        case 6:
+            return AL_FORMAT_51CHN32;
+        case 7:
+            return AL_FORMAT_61CHN32;
+        case 8:
+            return AL_FORMAT_71CHN32;
+        }
+    case AV_SAMPLE_FMT_FLT:
+    case AV_SAMPLE_FMT_FLTP:
+        switch(channels){
+        case 1:
+            return AL_FORMAT_MONO_FLOAT32;
+        case 2:
+            return AL_FORMAT_STEREO_FLOAT32;
+        }
+    case AV_SAMPLE_FMT_DBL:
+    case AV_SAMPLE_FMT_DBLP:
+        switch(channels){
+        case 1:
+            return AL_FORMAT_MONO_DOUBLE_EXT;
+        case 2:
+            return AL_FORMAT_STEREO_DOUBLE_EXT;
+        }
+    default:
+        break;
+    }
+    return 0;
+}
+#endif
+
 static HRESULT WINAPI XA2SRC_SubmitSourceBuffer(IXAudio2SourceVoice *iface,
         const XAUDIO2_BUFFER *pBuffer, const XAUDIO2_BUFFER_WMA *pBufferWMA)
 {
@@ -590,7 +711,10 @@ static HRESULT WINAPI XA2SRC_SubmitSourceBuffer(IXAudio2SourceVoice *iface,
 #endif
 
     /* convert samples offsets to bytes */
-    if(This->fmt->wFormatTag == WAVE_FORMAT_ADPCM){
+    if(IS_WMA(This->fmt->wFormatTag)){
+        /* Offsets for WMA appear to just be byte offsets, since it doesn't
+         * have the concept of "samples". */
+    }else if(This->fmt->wFormatTag == WAVE_FORMAT_ADPCM){
         /* ADPCM gives us a number of samples per block, so round down to
          * nearest block and convert to bytes */
         buf->xa2buffer.PlayBegin = buf->xa2buffer.PlayBegin / ((ADPCMWAVEFORMAT*)This->fmt)->wSamplesPerBlock * This->fmt->nBlockAlign;
@@ -1481,19 +1605,119 @@ static HRESULT WINAPI IXAudio2Impl_CreateSourceVoice(IXAudio2 *iface,
 
     src->al_fmt = get_al_format(pSourceFormat);
     if(!src->al_fmt){
-        src->in_use = FALSE;
-        LeaveCriticalSection(&src->lock);
-        WARN("OpenAL can't convert this format!\n");
-        return AUDCLNT_E_UNSUPPORTED_FORMAT;
-    }
+#if HAVE_FFMPEG
+        enum AVCodecID cid;
+        AVCodec *codec;
 
-    src->submit_blocksize = pSourceFormat->nBlockAlign;
+        TRACE("OpenAL can't use this format, so using FFmpeg\n");
+
+        cid = get_ffmpeg_format(pSourceFormat);
+        if(!cid){
+            WARN("Don't know how to convert this format to an FFmpeg codec\n");
+            src->in_use = FALSE;
+            LeaveCriticalSection(&src->lock);
+            return AUDCLNT_E_UNSUPPORTED_FORMAT;
+        }
+
+        codec = avcodec_find_decoder(cid);
+        if(!codec){
+            WARN("FFmpeg can't convert this format (0x%x), so failing\n", cid);
+            src->in_use = FALSE;
+            LeaveCriticalSection(&src->lock);
+            return AUDCLNT_E_UNSUPPORTED_FORMAT;
+        }
+
+        src->conv_ctx = avcodec_alloc_context3(codec);
+        if(!src->conv_ctx){
+            WARN("avcodec_alloc_context3 failed\n");
+            src->in_use = FALSE;
+            LeaveCriticalSection(&src->lock);
+            return AUDCLNT_E_UNSUPPORTED_FORMAT;
+        }
+
+        src->conv_ctx->bit_rate = pSourceFormat->nAvgBytesPerSec * 8;
+        src->conv_ctx->channels = pSourceFormat->nChannels;
+        src->conv_ctx->sample_rate = pSourceFormat->nSamplesPerSec;
+        src->conv_ctx->block_align = pSourceFormat->nBlockAlign;
+        src->conv_ctx->bits_per_coded_sample = pSourceFormat->wBitsPerSample;
+        src->conv_ctx->extradata_size = pSourceFormat->cbSize;
+        if(pSourceFormat->cbSize){
+            src->conv_ctx->extradata = HeapAlloc(GetProcessHeap(), 0, pSourceFormat->cbSize + FF_INPUT_BUFFER_PADDING_SIZE);
+            memcpy(src->conv_ctx->extradata, (&pSourceFormat->cbSize) + 1, pSourceFormat->cbSize);
+        }else if(IS_WMA(pSourceFormat->wFormatTag)){
+            /* xWMA doesn't provide the extradata info that FFmpeg needs to
+             * decode WMA data, so we create some fake extradata. This is taken
+             * from <ffmpeg/libavformat/xwma.c>. */
+            TRACE("synthesizing extradata for xWMA\n");
+            src->conv_ctx->extradata_size = 6;
+            src->conv_ctx->extradata = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, pSourceFormat->cbSize + FF_INPUT_BUFFER_PADDING_SIZE);
+            src->conv_ctx->extradata[4] = 31;
+        }
+
+        if(avcodec_open2(src->conv_ctx, codec, NULL) < 0){
+            WARN("avcodec_open2 failed\n");
+            HeapFree(GetProcessHeap(), 0, src->conv_ctx->extradata);
+            av_free(src->conv_ctx);
+            src->conv_ctx = NULL;
+            src->in_use = FALSE;
+            LeaveCriticalSection(&src->lock);
+            return AUDCLNT_E_UNSUPPORTED_FORMAT;
+        }
+
+        src->conv_frame = av_frame_alloc();
+        if(!src->conv_ctx){
+            WARN("av_frame_alloc failed\n");
+            avcodec_close(src->conv_ctx);
+            HeapFree(GetProcessHeap(), 0, src->conv_ctx->extradata);
+            av_free(src->conv_ctx);
+            src->conv_ctx = NULL;
+            src->in_use = FALSE;
+            LeaveCriticalSection(&src->lock);
+            return AUDCLNT_E_UNSUPPORTED_FORMAT;
+        }
+
+        src->al_fmt = ffmpeg_to_al_fmt(src->conv_ctx->sample_fmt, pSourceFormat->nChannels);
+        if(!src->al_fmt){
+            WARN("OpenAL can't use FFmpeg output format\n");
+            av_frame_free(&src->conv_frame);
+            src->conv_frame = NULL;
+            avcodec_close(src->conv_ctx);
+            HeapFree(GetProcessHeap(), 0, src->conv_ctx->extradata);
+            av_free(src->conv_ctx);
+            src->conv_ctx = NULL;
+            src->in_use = FALSE;
+            LeaveCriticalSection(&src->lock);
+            return AUDCLNT_E_UNSUPPORTED_FORMAT;
+        }
+
+        src->submit_blocksize = av_get_bytes_per_sample(src->conv_ctx->sample_fmt);
+
+        src->scratch_bytes = This->period_frames * 1.5 * src->submit_blocksize;
+        src->scratch_buf = HeapAlloc(GetProcessHeap(), 0, src->scratch_bytes);
+
+        src->convert_bytes = pSourceFormat->nBlockAlign + FF_INPUT_BUFFER_PADDING_SIZE;
+        src->convert_buf = HeapAlloc(GetProcessHeap(), 0, src->convert_bytes);
+#else
+        WARN("OpenAL can't use this format and no FFmpeg, so giving up\n");
+#endif
+    }else
+        src->submit_blocksize = pSourceFormat->nBlockAlign;
 
     src->fmt = copy_waveformat(pSourceFormat);
 
     hr = XA2SRC_SetOutputVoices(&src->IXAudio2SourceVoice_iface, pSendList);
     if(FAILED(hr)){
         HeapFree(GetProcessHeap(), 0, src->fmt);
+#if HAVE_FFMPEG
+        if(src->conv_ctx){
+            av_frame_free(&src->conv_frame);
+            src->conv_frame = NULL;
+            avcodec_close(src->conv_ctx);
+            HeapFree(GetProcessHeap(), 0, src->conv_ctx->extradata);
+            av_free(src->conv_ctx);
+            src->conv_ctx = NULL;
+        }
+#endif
         src->in_use = FALSE;
         LeaveCriticalSection(&src->lock);
         return hr;
@@ -2231,9 +2455,142 @@ static BOOL xa2buffer_queue_period(XA2SourceImpl *src, XA2Buffer *buf, ALuint al
         return FALSE;
     }
 
-    submit_bytes = min(src->xa2->period_frames * src->submit_blocksize, buf->cur_end_bytes - buf->offs_bytes);
-    submit_buf = buf->xa2buffer.pAudioData + buf->offs_bytes;
-    buf->offs_bytes += submit_bytes;
+#if HAVE_FFMPEG
+    if(src->conv_ctx){
+        DWORD scratch_offs_bytes = 0;
+        AVPacket avpkt = {0};
+        BOOL using_convert = FALSE;
+
+        avpkt.size = src->fmt->nBlockAlign;
+        avpkt.data = (unsigned char*)buf->xa2buffer.pAudioData + buf->offs_bytes;
+
+        /* convert at least a period into scratch_buf */
+        while(scratch_offs_bytes < src->xa2->period_frames * src->submit_blocksize){
+            int used_bytes, got_frame;
+
+            avpkt.pts = avpkt.dts = AV_NOPTS_VALUE;
+
+            if(buf->offs_bytes == buf->cur_end_bytes){
+                avpkt.size = 0;
+                avpkt.data = NULL;
+            }else if(buf->offs_bytes > buf->cur_end_bytes){
+                ERR("Shouldn't happen: Bad offset: %u > %u\n", buf->offs_bytes, buf->cur_end_bytes);
+                return FALSE;
+            }else if(!using_convert &&
+                    buf->offs_bytes + avpkt.size + FF_INPUT_BUFFER_PADDING_SIZE > buf->cur_end_bytes){
+                UINT32 remain = buf->cur_end_bytes - buf->offs_bytes;
+                /* Unfortunately, the FFmpeg API requires that a number of
+                 * extra bytes must be available past the end of the buffer.
+                 * The xaudio2 client probably hasn't done this, so we have to
+                 * perform a copy near the end of the buffer. */
+                TRACE("hitting end of buffer. copying %u + %u bytes into %u buffer\n",
+                        remain, FF_INPUT_BUFFER_PADDING_SIZE, src->convert_bytes);
+                if(src->convert_bytes < remain + FF_INPUT_BUFFER_PADDING_SIZE){
+                    src->convert_bytes = remain + FF_INPUT_BUFFER_PADDING_SIZE;
+                    TRACE("buffer too small, expanding to %u\n", src->convert_bytes);
+                    src->convert_buf = HeapReAlloc(GetProcessHeap(), 0, src->convert_buf, src->convert_bytes);
+                }
+                memcpy(src->convert_buf, buf->xa2buffer.pAudioData + buf->offs_bytes, remain);
+                memset(src->convert_buf + remain, 0, FF_INPUT_BUFFER_PADDING_SIZE);
+                avpkt.data = src->convert_buf;
+                using_convert = TRUE;
+            }
+
+            used_bytes = avcodec_decode_audio4(src->conv_ctx,
+                    src->conv_frame, &got_frame, &avpkt);
+
+            if(used_bytes < 0){
+                TRACE("an error occured\n");
+                return FALSE;
+            }
+
+            if(avpkt.size){
+                avpkt.data += used_bytes;
+                buf->offs_bytes += used_bytes;
+            }
+
+            if(got_frame){
+                DWORD to_copy_bytes = src->conv_frame->nb_samples * src->conv_ctx->channels * src->submit_blocksize;
+
+                if(!to_copy_bytes){
+                    if(!avpkt.size)
+                        break;
+                    continue;
+                }
+
+                while(scratch_offs_bytes + to_copy_bytes >= src->scratch_bytes){
+                    src->scratch_bytes *= 2;
+                    src->scratch_buf = HeapReAlloc(GetProcessHeap(), 0, src->scratch_buf, src->scratch_bytes);
+                }
+
+                if(av_sample_fmt_is_planar(src->conv_ctx->sample_fmt)){
+                    int s, c;
+                    uint8_t **source, *dst;
+                    uint16_t *dst16;
+                    uint32_t *dst32;
+                    uint64_t *dst64;
+
+                    /* one buffer per channel, but openal needs interleaved, so
+                     * interleave samples into scratch buf */
+                    dst = src->scratch_buf + scratch_offs_bytes;
+                    source = src->conv_frame->data;
+
+                    switch(src->submit_blocksize){
+                    case 1:
+                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                            for(c = 0; c < src->conv_ctx->channels; ++c)
+                                *(dst++) = source[c][s];
+                        break;
+                    case 2:
+                        dst16 = (uint16_t*)dst;
+                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                            for(c = 0; c < src->conv_ctx->channels; ++c)
+                                *(dst16++) = ((uint16_t*)(source[c]))[s];
+                        break;
+                    case 4:
+                        dst32 = (uint32_t*)dst;
+                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                            for(c = 0; c < src->conv_ctx->channels; ++c)
+                                *(dst32++) = ((uint32_t*)(source[c]))[s];
+                        break;
+                    case 8:
+                        dst64 = (uint64_t*)dst;
+                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                            for(c = 0; c < src->conv_ctx->channels; ++c)
+                                *(dst64++) = ((uint64_t*)(source[c]))[s];
+                        break;
+                    default:
+                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                            for(c = 0; c < src->conv_ctx->channels; ++c){
+                                memcpy(dst, &source[c][src->submit_blocksize * s], src->submit_blocksize);
+                                dst += src->submit_blocksize;
+                            }
+                        break;
+                    }
+
+                    scratch_offs_bytes += to_copy_bytes;
+                }else{
+                    /* copy into scratch buf */
+                    memcpy(src->scratch_buf + scratch_offs_bytes, src->conv_frame->data[0], to_copy_bytes);
+                    scratch_offs_bytes += to_copy_bytes;
+                }
+
+                if(src->conv_ctx->refcounted_frames)
+                    av_frame_unref(src->conv_frame);
+            }else if(!avpkt.size)
+                break;
+        }
+
+        submit_bytes = scratch_offs_bytes;
+        submit_buf = src->scratch_buf;
+    }else{
+#endif
+        submit_bytes = min(src->xa2->period_frames * src->submit_blocksize, buf->cur_end_bytes - buf->offs_bytes);
+        submit_buf = buf->xa2buffer.pAudioData + buf->offs_bytes;
+        buf->offs_bytes += submit_bytes;
+#if HAVE_FFMPEG
+    }
+#endif
 
     alBufferData(al_buf, src->al_fmt, submit_buf, submit_bytes,
             src->fmt->nSamplesPerSec);
@@ -2255,6 +2612,10 @@ static UINT32 get_underrun_warning(XA2SourceImpl *src)
 {
     UINT32 period_bytes = src->xa2->period_frames * src->submit_blocksize;
     UINT32 total = 0, i;
+
+    if(IS_WMA(src->fmt->wFormatTag))
+        /* PCM only */
+        return 0;
 
     for(i = 0; i < src->nbufs && total < IN_AL_PERIODS * period_bytes; ++i){
         XA2Buffer *buf = &src->buffers[(src->first_buf + i) % XAUDIO2_MAX_QUEUED_BUFFERS];
