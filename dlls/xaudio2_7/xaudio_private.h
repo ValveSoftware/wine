@@ -29,6 +29,10 @@
 #include "mmdeviceapi.h"
 #include "audioclient.h"
 
+#if HAVE_FFMPEG
+#include <libavcodec/avcodec.h>
+#endif
+
 #include <AL/al.h>
 #include <AL/alc.h>
 #include <AL/alext.h>
@@ -82,6 +86,11 @@ typedef struct _XA2SourceImpl {
      * could require up to MAX_QUEUED_BUFFERS */
     ALuint al_bufs[XAUDIO2_MAX_QUEUED_BUFFERS];
     DWORD first_al_buf, al_bufs_used, abandoned_albufs;
+
+#if HAVE_FFMPEG
+    AVCodecContext *conv_ctx;
+    AVFrame *conv_frame;
+#endif
 
     struct list entry;
 } XA2SourceImpl;

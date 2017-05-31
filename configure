@@ -642,6 +642,10 @@ NETAPI_LIBS
 NETAPI_CFLAGS
 PROCSTAT_LIBS
 KSTAT_LIBS
+LIBAVCODEC_LIBS
+LIBAVCODEC_CFLAGS
+LIBAVUTIL_LIBS
+LIBAVUTIL_CFLAGS
 MPG123_LIBS
 MPG123_CFLAGS
 TIFF_LIBS
@@ -839,6 +843,7 @@ with_coreaudio
 with_cups
 with_curses
 with_dbus
+with_ffmpeg
 with_float_abi
 with_fontconfig
 with_freetype
@@ -1830,6 +1835,10 @@ TIFF_CFLAGS
 TIFF_LIBS
 MPG123_CFLAGS
 MPG123_LIBS
+LIBAVUTIL_CFLAGS
+LIBAVUTIL_LIBS
+LIBAVCODEC_CFLAGS
+LIBAVCODEC_LIBS
 NETAPI_CFLAGS
 NETAPI_LIBS
 VKD3D_CFLAGS
@@ -2482,6 +2491,7 @@ Optional Packages:
   --without-cups          do not use CUPS
   --without-curses        do not use (n)curses
   --without-dbus          do not use DBus (dynamic device support)
+  --without-ffmpeg        do not use the FFmpeg library
   --with-float-abi=abi    specify the ABI (soft|softfp|hard) for ARM platforms
   --without-fontconfig    do not use fontconfig
   --without-freetype      do not use the FreeType library
@@ -2612,6 +2622,14 @@ Some influential environment variables:
   MPG123_CFLAGS
               C compiler flags for libmpg123, overriding pkg-config
   MPG123_LIBS Linker flags for libmpg123, overriding pkg-config
+  LIBAVUTIL_CFLAGS
+              C compiler flags for libavutil, overriding pkg-config
+  LIBAVUTIL_LIBS
+              Linker flags for libavutil, overriding pkg-config
+  LIBAVCODEC_CFLAGS
+              C compiler flags for libavcodec, overriding pkg-config
+  LIBAVCODEC_LIBS
+              Linker flags for libavcodec, overriding pkg-config
   NETAPI_CFLAGS
               C compiler flags for netapi, overriding pkg-config
   NETAPI_LIBS Linker flags for netapi, overriding pkg-config
@@ -3818,6 +3836,12 @@ fi
 # Check whether --with-dbus was given.
 if test "${with_dbus+set}" = set; then :
   withval=$with_dbus;
+fi
+
+
+# Check whether --with-ffmpeg was given.
+if test "${with_ffmpeg+set}" = set; then :
+  withval=$with_ffmpeg;
 fi
 
 
@@ -14853,6 +14877,187 @@ enable_l3codeca_acm=${enable_l3codeca_acm:-no}
 fi
 test "x$ac_cv_lib_mpg123_mpg123_feed" = xyes || enable_mp3dmod=${enable_mp3dmod:-no}
 
+if test "x$with_ffmpeg" != "xno"
+then
+    if ${LIBAVUTIL_CFLAGS:+false} :; then :
+  if ${PKG_CONFIG+:} false; then :
+  LIBAVUTIL_CFLAGS=`$PKG_CONFIG --cflags libavutil 2>/dev/null`
+fi
+fi
+
+if ${LIBAVUTIL_LIBS:+false} :; then :
+  if ${PKG_CONFIG+:} false; then :
+  LIBAVUTIL_LIBS=`$PKG_CONFIG --libs libavutil 2>/dev/null`
+fi
+fi
+
+LIBAVUTIL_LIBS=${LIBAVUTIL_LIBS:-"-llibavutil"}
+$as_echo "$as_me:${as_lineno-$LINENO}: libavutil cflags: $LIBAVUTIL_CFLAGS" >&5
+$as_echo "$as_me:${as_lineno-$LINENO}: libavutil libs: $LIBAVUTIL_LIBS" >&5
+ac_save_CPPFLAGS=$CPPFLAGS
+CPPFLAGS="$CPPFLAGS $LIBAVUTIL_CFLAGS"
+for ac_header in libavutil/avutil.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "libavutil/avutil.h" "ac_cv_header_libavutil_avutil_h" "$ac_includes_default"
+if test "x$ac_cv_header_libavutil_avutil_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBAVUTIL_AVUTIL_H 1
+_ACEOF
+
+fi
+
+done
+
+        if test "$ac_cv_header_libavutil_avutil_h" = "yes"
+        then
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for av_frame_alloc in -lavutil" >&5
+$as_echo_n "checking for av_frame_alloc in -lavutil... " >&6; }
+if ${ac_cv_lib_avutil_av_frame_alloc+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lavutil $LIBAVUTIL_LIBS $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char av_frame_alloc ();
+int
+main ()
+{
+return av_frame_alloc ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_avutil_av_frame_alloc=yes
+else
+  ac_cv_lib_avutil_av_frame_alloc=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_avutil_av_frame_alloc" >&5
+$as_echo "$ac_cv_lib_avutil_av_frame_alloc" >&6; }
+if test "x$ac_cv_lib_avutil_av_frame_alloc" = xyes; then :
+  :
+else
+  LIBAVUTIL_LIBS=""
+fi
+
+        else
+            LIBAVUTIL_CFLAGS=""
+            LIBAVUTIL_LIBS=""
+        fi
+CPPFLAGS=$ac_save_CPPFLAGS
+test -z "$LIBAVUTIL_CFLAGS" || LIBAVUTIL_CFLAGS=`echo " $LIBAVUTIL_CFLAGS" | sed 's/ -I\([^/]\)/ -I\$(top_builddir)\/\1/g'`
+test -z "$LIBAVUTIL_LIBS" || LIBAVUTIL_LIBS=`echo " $LIBAVUTIL_LIBS" | sed 's/ -L\([^/]\)/ -L\$(top_builddir)\/\1/g'`
+
+fi
+
+if test "x$with_ffmpeg" != "xno" -a "x$ac_cv_lib_avutil_av_frame_alloc" = "xyes"
+then
+    if ${LIBAVCODEC_CFLAGS:+false} :; then :
+  if ${PKG_CONFIG+:} false; then :
+  LIBAVCODEC_CFLAGS=`$PKG_CONFIG --cflags libavcodec 2>/dev/null`
+fi
+fi
+
+if ${LIBAVCODEC_LIBS:+false} :; then :
+  if ${PKG_CONFIG+:} false; then :
+  LIBAVCODEC_LIBS=`$PKG_CONFIG --libs libavcodec 2>/dev/null`
+fi
+fi
+
+LIBAVCODEC_LIBS=${LIBAVCODEC_LIBS:-"-llibavcodec"}
+$as_echo "$as_me:${as_lineno-$LINENO}: libavcodec cflags: $LIBAVCODEC_CFLAGS" >&5
+$as_echo "$as_me:${as_lineno-$LINENO}: libavcodec libs: $LIBAVCODEC_LIBS" >&5
+ac_save_CPPFLAGS=$CPPFLAGS
+CPPFLAGS="$CPPFLAGS $LIBAVCODEC_CFLAGS"
+for ac_header in libavcodec/avcodec.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "libavcodec/avcodec.h" "ac_cv_header_libavcodec_avcodec_h" "$ac_includes_default"
+if test "x$ac_cv_header_libavcodec_avcodec_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_LIBAVCODEC_AVCODEC_H 1
+_ACEOF
+
+fi
+
+done
+
+        if test "$ac_cv_header_libavcodec_avcodec_h" = "yes"
+        then
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for avcodec_send_packet in -lavcodec" >&5
+$as_echo_n "checking for avcodec_send_packet in -lavcodec... " >&6; }
+if ${ac_cv_lib_avcodec_avcodec_send_packet+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_lib_save_LIBS=$LIBS
+LIBS="-lavcodec $LIBAVUTIL_LIBS $LIBAVCODEC_LIBS $LIBS"
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char avcodec_send_packet ();
+int
+main ()
+{
+return avcodec_send_packet ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_lib_avcodec_avcodec_send_packet=yes
+else
+  ac_cv_lib_avcodec_avcodec_send_packet=no
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+LIBS=$ac_check_lib_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_avcodec_avcodec_send_packet" >&5
+$as_echo "$ac_cv_lib_avcodec_avcodec_send_packet" >&6; }
+if test "x$ac_cv_lib_avcodec_avcodec_send_packet" = xyes; then :
+
+$as_echo "#define HAVE_FFMPEG 1" >>confdefs.h
+
+else
+  LIBAVCODEC_LIBS=""
+fi
+
+        else
+            LIBAVCODEC_CFLAGS=""
+            LIBAVCODEC_LIBS=""
+        fi
+CPPFLAGS=$ac_save_CPPFLAGS
+test -z "$LIBAVCODEC_CFLAGS" || LIBAVCODEC_CFLAGS=`echo " $LIBAVCODEC_CFLAGS" | sed 's/ -I\([^/]\)/ -I\$(top_builddir)\/\1/g'`
+test -z "$LIBAVCODEC_LIBS" || LIBAVCODEC_LIBS=`echo " $LIBAVCODEC_LIBS" | sed 's/ -L\([^/]\)/ -L\$(top_builddir)\/\1/g'`
+
+fi
+if test "x$ac_cv_lib_avcodec_avcodec_send_packet" != xyes; then :
+  case "x$with_libavcodec" in
+  x)   as_fn_append wine_notices "|libavcodec ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported." ;;
+  xno) ;;
+  *)   as_fn_error $? "libavcodec ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported.
+This is an error since --with-libavcodec was requested." "$LINENO" 5 ;;
+esac
+
+fi
+
 if test "$ac_cv_header_AL_al_h" = "yes"
 then
     { $as_echo "$as_me:${as_lineno-$LINENO}: checking for -lopenal" >&5
@@ -18938,6 +19143,10 @@ TIFF_CFLAGS = $TIFF_CFLAGS
 TIFF_LIBS = $TIFF_LIBS
 MPG123_CFLAGS = $MPG123_CFLAGS
 MPG123_LIBS = $MPG123_LIBS
+LIBAVUTIL_CFLAGS = $LIBAVUTIL_CFLAGS
+LIBAVUTIL_LIBS = $LIBAVUTIL_LIBS
+LIBAVCODEC_CFLAGS = $LIBAVCODEC_CFLAGS
+LIBAVCODEC_LIBS = $LIBAVCODEC_LIBS
 KSTAT_LIBS = $KSTAT_LIBS
 PROCSTAT_LIBS = $PROCSTAT_LIBS
 NETAPI_CFLAGS = $NETAPI_CFLAGS

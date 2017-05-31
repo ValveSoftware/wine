@@ -43,6 +43,7 @@ AC_ARG_WITH(cups,      AS_HELP_STRING([--without-cups],[do not use CUPS]))
 AC_ARG_WITH(curses,    AS_HELP_STRING([--without-curses],[do not use (n)curses]),
             [if test "x$withval" = "xno"; then ac_cv_header_ncurses_h=no; ac_cv_header_curses_h=no; fi])
 AC_ARG_WITH(dbus,      AS_HELP_STRING([--without-dbus],[do not use DBus (dynamic device support)]))
+AC_ARG_WITH(ffmpeg,    AS_HELP_STRING([--without-ffmpeg],[do not use the FFmpeg library]))
 AC_ARG_WITH(float-abi, AS_HELP_STRING([--with-float-abi=abi],[specify the ABI (soft|softfp|hard) for ARM platforms]))
 AC_ARG_WITH(fontconfig,AS_HELP_STRING([--without-fontconfig],[do not use fontconfig]))
 AC_ARG_WITH(freetype,  AS_HELP_STRING([--without-freetype],[do not use the FreeType library]))
@@ -1771,6 +1772,38 @@ WINE_NOTICE_WITH(mpg123,[test "x$ac_cv_lib_mpg123_mpg123_feed" != xyes -a x"$ac_
                  [libmpg123 ${notice_platform}development files not found (or too old), mp3 codec won't be supported.],
                  [enable_l3codeca_acm])
 test "x$ac_cv_lib_mpg123_mpg123_feed" = xyes || enable_mp3dmod=${enable_mp3dmod:-no}
+
+dnl **** Check for FFmpeg's libavutil ****
+if test "x$with_ffmpeg" != "xno"
+then
+    WINE_PACKAGE_FLAGS(LIBAVUTIL,[libavutil],[-llibavutil],,,
+        [AC_CHECK_HEADERS([libavutil/avutil.h])
+        if test "$ac_cv_header_libavutil_avutil_h" = "yes"
+        then
+            AC_CHECK_LIB(avutil,av_frame_alloc,[:],[LIBAVUTIL_LIBS=""],[$LIBAVUTIL_LIBS])
+        else
+            LIBAVUTIL_CFLAGS=""
+            LIBAVUTIL_LIBS=""
+        fi])
+fi
+
+dnl **** Check for FFmpeg's libavcodec ****
+if test "x$with_ffmpeg" != "xno" -a "x$ac_cv_lib_avutil_av_frame_alloc" = "xyes"
+then
+    WINE_PACKAGE_FLAGS(LIBAVCODEC,[libavcodec],[-llibavcodec],,,
+        [AC_CHECK_HEADERS([libavcodec/avcodec.h])
+        if test "$ac_cv_header_libavcodec_avcodec_h" = "yes"
+        then
+            AC_CHECK_LIB(avcodec,avcodec_send_packet,
+                         [AC_DEFINE(HAVE_FFMPEG, 1, [Define to 1 if you have libavutil and libavcodec from ffmpeg.])],
+                         [LIBAVCODEC_LIBS=""], [$LIBAVUTIL_LIBS $LIBAVCODEC_LIBS])
+        else
+            LIBAVCODEC_CFLAGS=""
+            LIBAVCODEC_LIBS=""
+        fi])
+fi
+WINE_NOTICE_WITH(libavcodec,[test "x$ac_cv_lib_avcodec_avcodec_send_packet" != xyes],
+                 [libavcodec ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported.])
 
 dnl **** Check for OpenAL 1.1 ****
 if test "$ac_cv_header_AL_al_h" = "yes"

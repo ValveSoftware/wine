@@ -110,6 +110,11 @@ typedef struct _WAVEFORMATEX {
 #define  WAVE_FORMAT_MPEG			0x0050	/*  Microsoft Corporation  */
 #define  WAVE_FORMAT_MPEGLAYER3			0x0055
 #define  WAVE_FORMAT_MSRT24			0x0082  /*  Microsoft Corporation */
+#define  WAVE_FORMAT_MSAUDIO1			0x0160
+#define  WAVE_FORMAT_WMAUDIO2			0x0161
+#define  WAVE_FORMAT_WMAUDIO3			0x0162
+#define  WAVE_FORMAT_WMAUDIO_LOSSLESS		0x0163
+
 #define  WAVE_FORMAT_CREATIVE_ADPCM		0x0200	/*  Creative Labs, Inc  */
 #define  WAVE_FORMAT_CREATIVE_FASTSPEECH8	0x0202	/*  Creative Labs, Inc  */
 #define  WAVE_FORMAT_CREATIVE_FASTSPEECH10	0x0203	/*  Creative Labs, Inc  */
