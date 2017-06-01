@@ -195,6 +195,7 @@ todo_wine
 static void test_GetModuleInformation(void)
 {
     HMODULE hMod = GetModuleHandleA(NULL);
+    DWORD *tmp, counter = 0;
     MODULEINFO info;
     DWORD ret;
 
@@ -214,10 +215,21 @@ static void test_GetModuleInformation(void)
     GetModuleInformation(hpQV, hMod, &info, sizeof(info)-1);
     ok(GetLastError() == ERROR_INSUFFICIENT_BUFFER, "expected error=ERROR_INSUFFICIENT_BUFFER but got %d\n", GetLastError());
 
-    SetLastError(0xdeadbeef);
     ret = GetModuleInformation(hpQV, hMod, &info, sizeof(info));
     ok(ret == 1, "failed with %d\n", GetLastError());
     ok(info.lpBaseOfDll == hMod, "lpBaseOfDll=%p hMod=%p\n", info.lpBaseOfDll, hMod);
+
+    hMod = LoadLibraryA("shell32.dll");
+    ok(hMod != NULL, "Failed to load shell32.dll, error: %u\n", GetLastError());
+
+    ret = GetModuleInformation(hpQV, hMod, &info, sizeof(info));
+    ok(ret == 1, "failed with %d\n", GetLastError());
+    info.SizeOfImage /= sizeof(DWORD);
+    for (tmp = (DWORD *)hMod; info.SizeOfImage; info.SizeOfImage--)
+        counter ^= *tmp++;
+    trace("xor of shell32: %08x\n", counter);
+
+    FreeLibrary(hMod);
 }
 
 static BOOL check_with_margin(SIZE_T perf, SIZE_T sysperf, int margin)
