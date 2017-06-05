@@ -77,6 +77,8 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 static CRITICAL_SECTION dlldir_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
 static const WCHAR steamclientW[] = {'s','t','e','a','m','c','l','i','e','n','t',0};
+static const WCHAR steamdllW[] = {'S','t','e','a','m','.','d','l','l',0};
+static const WCHAR full_steamdllW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s','\\','S','t','e','a','m','\\','S','t','e','a','m','.','d','l','l',0};
 static const WCHAR steamclient_pathW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s','\\','S','t','e','a','m','\\','s','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};;
 static HMODULE steamclient_hmod = NULL;
 static HMODULE lsteamclient_hmod = NULL;
@@ -1040,6 +1042,12 @@ static HMODULE load_library( const UNICODE_STRING *libname, DWORD flags )
     }
 done:
     HeapFree( GetProcessHeap(), 0, load_path );
+
+    if(!hModule && !strcmpiW(libname->Buffer, steamdllW))
+        /* tried and failed to load Steam.dll from PATH. try again
+         * with known-good path */
+        return LoadLibraryW(full_steamdllW);
+
     return hModule;
 }
 
