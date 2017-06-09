@@ -463,6 +463,8 @@ BOOL WINAPI GetModuleHandleExW( DWORD flags, LPCWSTR name, HMODULE *module )
     {
         void *dummy;
         if (!(ret = RtlPcToFileHeader( (void *)name, &dummy ))) status = STATUS_DLL_NOT_FOUND;
+        if(steamclient_hmod != NULL && ret == lsteamclient_hmod)
+            ret = steamclient_hmod;
     }
     else
     {
