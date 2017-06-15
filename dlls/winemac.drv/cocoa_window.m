@@ -20,6 +20,8 @@
 
 #import <Carbon/Carbon.h>
 #import <CoreVideo/CoreVideo.h>
+#import <Metal/Metal.h>
+#import <QuartzCore/QuartzCore.h>
 
 #import "cocoa_window.h"
 
@@ -303,6 +305,16 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
 @end
 
 
+@interface WineMetalView : WineBaseView
+{
+    id<MTLDevice> _device;
+}
+
+    - (id) initWithFrame:(NSRect)frame device:(id<MTLDevice>)device;
+
+@end
+
+
 @interface WineContentView : WineBaseView <NSTextInputClient>
 {
     NSMutableArray* glContexts;
@@ -316,9 +328,12 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
     NSRange markedTextSelection;
 
     int backingSize[2];
+
+    WineMetalView *_metalView;
 }
 
 @property (readonly, nonatomic) BOOL everHadGLContext;
+@property (retain, nonatomic) WineMetalView* metalView;
 
     - (void) addGLContext:(WineOpenGLContext*)context;
     - (void) removeGLContext:(WineOpenGLContext*)context;
@@ -326,6 +341,8 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
 
     - (void) wine_getBackingSize:(int*)outBackingSize;
     - (void) wine_setBackingSize:(const int*)newBackingSize;
+
+    - (WineMetalView*) makeMetalViewWithDevice:(id<MTLDevice>)device;
 
 @end
 
@@ -410,12 +427,14 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
 @implementation WineContentView
 
 @synthesize everHadGLContext = _everHadGLContext;
+@synthesize metalView = _metalView;
 
     - (void) dealloc
     {
         [markedText release];
         [glContexts release];
         [pendingGlContexts release];
+        [_metalView release];
         [super dealloc];
     }
 
@@ -619,6 +638,21 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
         }
     }
 
+    - (WineMetalView*) makeMetalViewWithDevice:(id<MTLDevice>)device
+    {
+        if (_metalView) return _metalView;
+
+        WineMetalView* view = [[[WineMetalView alloc] initWithFrame:[self bounds] device:device] autorelease];
+        [view setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
+        [self setAutoresizesSubviews:YES];
+        [self addSubview:view positioned:NSWindowBelow relativeTo:nil];
+        self.metalView = view;
+
+        [(WineWindow*)self.window windowDidDrawContent];
+
+        return _metalView;
+    }
+
     - (void) setRetinaMode:(int)mode
     {
         double scale = mode ? 0.5 : 2.0;
@@ -688,6 +722,8 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
             if (!view->_cachedHasGLDescendantValid || view->_cachedHasGLDescendant)
                 [self invalidateHasGLDescendant];
         }
+        if (subview == _metalView)
+            self.metalView = nil;
         [super willRemoveSubview:subview];
     }
 
@@ -823,6 +859,49 @@ static CVReturn WineDisplayLinkCallback(CVDisplayLinkRef displayLink, const CVTi
     - (NSInteger) windowLevel
     {
         return [[self window] level];
+    }
+
+@end
+
+
+@implementation WineMetalView
+
+    - (id) initWithFrame:(NSRect)frame device:(id<MTLDevice>)device
+    {
+        self = [super initWithFrame:frame];
+        if (self)
+        {
+            _device = [device retain];
+            self.wantsLayer = YES;
+            self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawNever;
+        }
+        return self;
+    }
+
+    - (void) dealloc
+    {
+        [_device release];
+        [super dealloc];
+    }
+
+    - (CALayer*) makeBackingLayer
+    {
+        CAMetalLayer *layer = [CAMetalLayer layer];
+        layer.device = _device;
+        layer.framebufferOnly = YES;
+        layer.magnificationFilter = kCAFilterNearest;
+        layer.backgroundColor = CGColorGetConstantColor(kCGColorBlack);
+        return layer;
+    }
+
+    - (BOOL) isOpaque
+    {
+        return YES;
+    }
+
+    - (void) viewDidChangeBackingProperties
+    {
+        self.layer.contentsScale = self.window.backingScaleFactor;
     }
 
 @end
@@ -3484,6 +3563,7 @@ macdrv_view macdrv_create_view(CGRect rect)
 
         view = [[WineContentView alloc] initWithFrame:NSRectFromCGRect(cgrect_mac_from_win(rect))];
         [view setAutoresizesSubviews:NO];
+        [view setAutoresizingMask:NSViewNotSizable];
         [view setHidden:YES];
         [nc addObserver:view
                selector:@selector(updateGLContexts)
@@ -3669,6 +3749,40 @@ void macdrv_remove_view_opengl_context(macdrv_view v, macdrv_opengl_context c)
     });
 
     [pool release];
+}
+
+macdrv_metal_device macdrv_create_metal_device(void)
+{
+    return (macdrv_metal_device)MTLCreateSystemDefaultDevice();
+}
+
+void macdrv_release_metal_device(macdrv_metal_device d)
+{
+    [(id<MTLDevice>)d release];
+}
+
+macdrv_metal_view macdrv_view_get_metal_view(macdrv_view v, macdrv_metal_device d)
+{
+    id<MTLDevice> device = (id<MTLDevice>)d;
+    NSAutoreleasePool* pool = [[NSAutoreleasePool alloc] init];
+    WineContentView* view = (WineContentView*)v;
+    __block WineMetalView *metalView;
+
+    OnMainThread(^{
+        metalView = [view makeMetalViewWithDevice:device];
+    });
+
+    [pool release];
+
+    return (macdrv_metal_view)metalView;
+}
+
+void macdrv_view_remove_metal_view(macdrv_metal_view v)
+{
+    WineMetalView* view = (WineMetalView*)v;
+    OnMainThread(^{
+        [view removeFromSuperview];
+    });
 }
 
 int macdrv_get_view_backing_size(macdrv_view v, int backing_size[2])
