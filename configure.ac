@@ -2798,6 +2798,15 @@ then
     AC_DEFINE(HAVE___BUILTIN_CLZ, 1, [Define to 1 if you have the `__builtin_clz' built-in function.])
 fi
 
+dnl Check for __builtin_ctzl
+AC_CACHE_CHECK([for __builtin_ctzl], ac_cv_have___builtin_ctzl,
+               AC_LINK_IFELSE([AC_LANG_PROGRAM(,[[return __builtin_ctzl(1)]])],
+               [ac_cv_have___builtin_ctzl="yes"], [ac_cv_have___builtin_ctzl="no"]))
+if test "$ac_cv_have___builtin_ctzl" = "yes"
+then
+    AC_DEFINE(HAVE___BUILTIN_CTZL, 1, [Define to 1 if you have the `__builtin_ctzl' built-in function.])
+fi
+
 dnl Check for __builtin_popcount
 AC_CACHE_CHECK([for __builtin_popcount], ac_cv_have___builtin_popcount,
                AC_LINK_IFELSE([AC_LANG_PROGRAM(,[[return __builtin_popcount(1)]])],
