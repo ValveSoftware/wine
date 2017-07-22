@@ -1310,6 +1310,9 @@
 /* Define to 1 if you have the `__builtin_clz' built-in function. */
 #undef HAVE___BUILTIN_CLZ
 
+/* Define to 1 if you have the `__builtin_ctzl' built-in function. */
+#undef HAVE___BUILTIN_CTZL
+
 /* Define to 1 if you have the `__builtin_popcount' built-in function. */
 #undef HAVE___BUILTIN_POPCOUNT
 
