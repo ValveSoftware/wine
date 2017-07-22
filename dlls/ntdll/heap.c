@@ -495,6 +495,17 @@ static inline void HEAP_InsertFreeBlock( HEAP *heap, ARENA_FREE *pArena, BOOL la
 
 
 /***********************************************************************
+ *           HEAP_DeleteFreeBlock
+ *
+ * Delete a free block from the free list.
+ */
+static inline void HEAP_DeleteFreeBlock( HEAP *heap, ARENA_FREE *pArena )
+{
+    list_remove( &pArena->entry );
+}
+
+
+/***********************************************************************
  *           HEAP_FindSubHeap
  * Find the sub-heap containing a given address.
  *
@@ -602,7 +613,7 @@ static void HEAP_CreateFreeBlock( SUBHEAP *subheap, void *ptr, SIZE_T size )
     {
         /* Remove the next arena from the free list */
         ARENA_FREE *pNext = (ARENA_FREE *)((char *)ptr + size);
-        list_remove( &pNext->entry );
+        HEAP_DeleteFreeBlock( subheap->heap, pNext );
         size += (pNext->size & ARENA_SIZE_MASK) + sizeof(*pNext);
         mark_block_free( pNext, sizeof(ARENA_FREE), flags );
     }
@@ -657,7 +668,7 @@ static void HEAP_MakeInUseBlockFree( SUBHEAP *subheap, ARENA_INUSE *pArena )
         pFree = *((ARENA_FREE **)pArena - 1);
         size += (pFree->size & ARENA_SIZE_MASK) + sizeof(ARENA_FREE);
         /* Remove it from the free list */
-        list_remove( &pFree->entry );
+        HEAP_DeleteFreeBlock( heap, pFree );
     }
     else pFree = (ARENA_FREE *)pArena;
 
@@ -677,7 +688,7 @@ static void HEAP_MakeInUseBlockFree( SUBHEAP *subheap, ARENA_INUSE *pArena )
 
         size = 0;
         /* Remove the free block from the list */
-        list_remove( &pFree->entry );
+        HEAP_DeleteFreeBlock( heap, pFree );
         /* Remove the subheap from the list */
         list_remove( &subheap->entry );
         /* Free the memory */
@@ -1707,7 +1718,7 @@ void * WINAPI DECLSPEC_HOTPATCH RtlAllocateHeap( HANDLE heap, ULONG flags, SIZE_
 
     /* Remove the arena from the free list */
 
-    list_remove( &pArena->entry );
+    HEAP_DeleteFreeBlock( heapPtr, pArena );
 
     /* Build the in-use arena */
 
@@ -1864,7 +1875,7 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
         {
             /* The next block is free and large enough */
             ARENA_FREE *pFree = (ARENA_FREE *)pNext;
-            list_remove( &pFree->entry );
+            HEAP_DeleteFreeBlock( heapPtr, pFree );
             pArena->size += (pFree->size & ARENA_SIZE_MASK) + sizeof(*pFree);
             if (!HEAP_Commit( subheap, pArena, rounded_size )) goto oom;
             notify_realloc( pArena + 1, oldActualSize, size );
@@ -1882,7 +1893,7 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
 
             /* Build the in-use arena */
 
-            list_remove( &pNew->entry );
+            HEAP_DeleteFreeBlock( heapPtr, pNew );
             pInUse = (ARENA_INUSE *)pNew;
             pInUse->size = (pInUse->size & ~ARENA_FLAG_FREE)
                            + sizeof(ARENA_FREE) - sizeof(ARENA_INUSE);
