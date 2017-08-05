@@ -40,16 +40,6 @@
 WINE_DEFAULT_DEBUG_CHANNEL(ntdll);
 WINE_DECLARE_DEBUG_CHANNEL(relay);
 
-static inline LONG interlocked_inc( PLONG dest )
-{
-    return interlocked_xchg_add( dest, 1 ) + 1;
-}
-
-static inline LONG interlocked_dec( PLONG dest )
-{
-    return interlocked_xchg_add( dest, -1 ) - 1;
-}
-
 static inline void small_pause(void)
 {
 #ifdef __i386__
