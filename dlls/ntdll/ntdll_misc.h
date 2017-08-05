@@ -27,6 +27,7 @@
 #include "windef.h"
 #include "winnt.h"
 #include "winternl.h"
+#include "wine/debug.h"
 #include "wine/server.h"
 #include "wine/asm.h"
 
@@ -207,6 +208,43 @@ extern int ntdll_wcstoumbs(DWORD flags, const WCHAR* src, int srclen, char* dst,
 
 extern int CDECL NTDLL__vsnprintf( char *str, SIZE_T len, const char *format, __ms_va_list args ) DECLSPEC_HIDDEN;
 extern int CDECL NTDLL__vsnwprintf( WCHAR *str, SIZE_T len, const WCHAR *format, __ms_va_list args ) DECLSPEC_HIDDEN;
+
+#ifdef __WINE_WINE_PORT_H
+
+/* inline version of RtlEnterCriticalSection */
+static inline void enter_critical_section( RTL_CRITICAL_SECTION *crit )
+{
+    if (interlocked_inc( &crit->LockCount ))
+    {
+        if (crit->OwningThread == ULongToHandle(GetCurrentThreadId()))
+        {
+            crit->RecursionCount++;
+            return;
+        }
+        RtlpWaitForCriticalSection( crit );
+    }
+    crit->OwningThread   = ULongToHandle(GetCurrentThreadId());
+    crit->RecursionCount = 1;
+}
+
+/* inline version of RtlLeaveCriticalSection */
+static inline void leave_critical_section( RTL_CRITICAL_SECTION *crit )
+{
+    WINE_DECLARE_DEBUG_CHANNEL(ntdll);
+    if (--crit->RecursionCount)
+    {
+        if (crit->RecursionCount > 0) interlocked_dec( &crit->LockCount );
+        else ERR_(ntdll)( "section %p is not acquired\n", crit );
+    }
+    else
+    {
+        crit->OwningThread = 0;
+        if (interlocked_dec( &crit->LockCount ) >= 0)
+            RtlpUnWaitCriticalSection( crit );
+    }
+}
+
+#endif  /* __WINE_WINE_PORT_H */
 
 /* load order */
 
