@@ -545,7 +545,7 @@ static const char *parse_spec_flags( DLLSPEC *spec, ORDDEF *odp )
 
 static int needs_syscall( ORDDEF *odp, DLLSPEC *spec )
 {
-    if (target_cpu != CPU_x86)
+    if (target_cpu != CPU_x86 && target_cpu != CPU_x86_64)
         return 0;
     if (odp->flags & (FLAG_FORWARD | FLAG_REGISTER))
         return 0;

@@ -1537,7 +1537,7 @@ static void test_filenames(void)
 
 static void test_FakeDLL(void)
 {
-#ifdef __i386__
+#if defined(__i386__) || defined(__x86_64__)
     NTSTATUS (WINAPI *pNtSetEvent)(HANDLE, ULONG *) = NULL;
     IMAGE_EXPORT_DIRECTORY *dir;
     HMODULE module = GetModuleHandleA("ntdll.dll");
@@ -1579,8 +1579,13 @@ static void test_FakeDLL(void)
 
         dll_func = (BYTE *)GetProcAddress(module, func_name);
         ok(dll_func != NULL, "%s: GetProcAddress returned NULL\n", func_name);
+#if defined(__i386__)
         if (dll_func[0] == 0x90 && dll_func[1] == 0x90 &&
             dll_func[2] == 0x90 && dll_func[3] == 0x90)
+#elif defined(__x86_64__)
+        if (dll_func[0] == 0x48 && dll_func[1] == 0x83 &&
+            dll_func[2] == 0xec && dll_func[3] == 0x08)
+#endif
         {
             todo_wine ok(0, "%s: Export is a stub-function, skipping\n", func_name);
             continue;
