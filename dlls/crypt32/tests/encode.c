@@ -8646,8 +8646,8 @@ static void testECDSACert(void)
     ecc_curve = NULL;
     ret = pCryptDecodeObjectEx(X509_ASN_ENCODING, X509_OBJECT_IDENTIFIER, pubkey->Algorithm.Parameters.pbData,
                                pubkey->Algorithm.Parameters.cbData, decode_flags, NULL, &ecc_curve, &size);
-    todo_wine ok(ret || broken(GetLastError() == ERROR_FILE_NOT_FOUND /* < Vista */),
-                 "CryptDecodeObjectEx failed with %d\n", GetLastError());
+    ok(ret || broken(GetLastError() == ERROR_FILE_NOT_FOUND /* < Vista */),
+       "CryptDecodeObjectEx failed with %d\n", GetLastError());
     if (ret)
     {
         ok(!strcmp(*ecc_curve, szOID_ECC_CURVE_P256), "Expected 1.2.840.10045.3.1.7, got %s\n", *ecc_curve);
@@ -8657,8 +8657,8 @@ static void testECDSACert(void)
     ecc_curve = NULL;
     ret = pCryptDecodeObjectEx(X509_ASN_ENCODING, szOID_ECC_PUBLIC_KEY, pubkey->Algorithm.Parameters.pbData,
                                pubkey->Algorithm.Parameters.cbData, decode_flags, NULL, &ecc_curve, &size);
-    todo_wine ok(ret || broken(GetLastError() == ERROR_FILE_NOT_FOUND /* < Vista */),
-                 "CryptDecodeObjectEx failed with %d\n", GetLastError());
+    ok(ret || broken(GetLastError() == ERROR_FILE_NOT_FOUND /* < Vista */),
+       "CryptDecodeObjectEx failed with %d\n", GetLastError());
     if (ret)
     {
         ok(!strcmp(*ecc_curve, szOID_ECC_CURVE_P256), "Expected 1.2.840.10045.3.1.7, got %s\n", *ecc_curve);
