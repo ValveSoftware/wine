@@ -8591,7 +8591,7 @@ static void testECDSACert(void)
     ecc_sig = NULL;
     ret = pCryptDecodeObjectEx(X509_ASN_ENCODING, X509_ECC_SIGNATURE, info->Signature.pbData,
                                info->Signature.cbData, decode_flags, NULL, &ecc_sig, &size);
-    todo_wine ok(ret, "CryptDecodeObjectEx failed with %d\n", GetLastError());
+    ok(ret, "CryptDecodeObjectEx failed with %d\n", GetLastError());
     if (ret)
     {
         ok(ecc_sig->r.cbData == 32, "Expected 32 bytes, got %d\n", ecc_sig->r.cbData);
