@@ -1884,7 +1884,7 @@ PCCERT_CONTEXT WINAPI CertGetIssuerCertificateFromStore(HCERTSTORE hCertStore,
             CertFreeCertificateContext(ret);
             ret = NULL;
         }
-        if (CRYPT_IsCertificateSelfSigned(pSubjectContext))
+        if (CRYPT_IsCertificateSelfSigned(pSubjectContext, NULL))
         {
             CertFreeCertificateContext(ret);
             ret = NULL;
