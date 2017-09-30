@@ -3945,7 +3945,7 @@ static ChainCheck chainCheckECDSA = {
    { CERT_TRUST_IS_UNTRUSTED_ROOT, CERT_TRUST_HAS_PREFERRED_ISSUER },
    { CERT_TRUST_IS_UNTRUSTED_ROOT, 0 },
    1, simpleStatusECDSA
- }, TODO_ERROR
+ }, 0
 };
 
 #define test_name_blob(a,b) _test_name_blob(__LINE__,a,b)
@@ -4226,7 +4226,7 @@ static void testGetCertChain(void)
     chain = getChain(NULL, &chainCheckECDSA.certs, 0, TRUE, &nov2017, FALSE, 0);
     if (chain)
     {
-        todo_wine ok(chain->TrustStatus.dwErrorStatus == CERT_TRUST_IS_UNTRUSTED_ROOT,
+        ok(chain->TrustStatus.dwErrorStatus == CERT_TRUST_IS_UNTRUSTED_ROOT,
            "unexpected chain error status %08x\n", chain->TrustStatus.dwErrorStatus);
         checkChainStatus(chain, &chainCheckECDSA.status, chainCheckECDSA.todo, "chainCheckECDSA", 0);
         pCertFreeCertificateChain(chain);
