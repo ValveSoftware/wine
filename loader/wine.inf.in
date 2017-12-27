@@ -73,7 +73,8 @@ AddReg=\
     Tapi,\
     Timezones,\
     VersionInfo,\
-    LicenseInformation
+    LicenseInformation, \
+    SteamClient
 
 [DefaultInstall.ntamd64]
 RegisterDlls=RegisterDllsSection
@@ -100,7 +101,8 @@ AddReg=\
     Tapi,\
     Timezones,\
     VersionInfo.ntamd64,\
-    LicenseInformation
+    LicenseInformation, \
+    SteamClient.ntamd64
 
 [Wow64Install]
 RegisterDlls=RegisterDllsSection
@@ -115,7 +117,8 @@ AddReg=\
     Misc,\
     Tapi,\
     VersionInfo.ntamd64,\
-    LicenseInformation
+    LicenseInformation, \
+    SteamClient.ntamd64
 
 [DefaultInstall.Services]
 AddService=BITS,0,BITSService
@@ -3690,3 +3693,13 @@ l_intl.nls
 
 [inf_section]
 winehid.inf
+
+[SteamClient]
+HKCU,Software\Valve\Steam\ActiveProcess,"PID",0x10001,0x0000fffe
+HKCU,Software\Valve\Steam\ActiveProcess,"SteamClientDll",,"%16422%\Steam\steamclient.dll"
+HKCU,Software\Valve\Steam\ActiveProcess,"SteamPath",,"%16422%\Steam"
+
+[SteamClient.ntamd64]
+HKCU,Software\Valve\Steam\ActiveProcess,"PID",0x10001,0x0000fffe
+HKCU,Software\Valve\Steam\ActiveProcess,"SteamClientDll",,"%16426%\Steam\steamclient.dll"
+HKCU,Software\Valve\Steam\ActiveProcess,"SteamPath",,"%16426%\Steam"
