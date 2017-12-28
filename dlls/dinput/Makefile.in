@@ -2,7 +2,8 @@ MODULE    = dinput.dll
 IMPORTLIB = dinput
 IMPORTS   = dxguid uuid comctl32 ole32 user32 advapi32
 EXTRADEFS = -DDIRECTINPUT_VERSION=0x0700
-EXTRALIBS = $(IOKIT_LIBS) $(FORCEFEEDBACK_LIBS)
+EXTRALIBS = $(IOKIT_LIBS) $(FORCEFEEDBACK_LIBS) $(SDL2_LIBS)
+EXTRAINCL = $(SDL2_CFLAGS)
 
 C_SRCS = \
 	config.c \
@@ -14,6 +15,7 @@ C_SRCS = \
 	joystick_linux.c \
 	joystick_linuxinput.c \
 	joystick_osx.c \
+	joystick_sdl.c \
 	keyboard.c \
 	mouse.c
 

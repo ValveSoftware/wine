@@ -2,7 +2,8 @@ MODULE    = dinput8.dll
 IMPORTLIB = dinput8
 IMPORTS   = dxguid uuid comctl32 ole32 user32 advapi32
 EXTRADEFS = -DDIRECTINPUT_VERSION=0x0800
-EXTRALIBS = $(IOKIT_LIBS) $(FORCEFEEDBACK_LIBS)
+EXTRALIBS = $(IOKIT_LIBS) $(FORCEFEEDBACK_LIBS) $(SDL2_LIBS)
+EXTRAINCL = $(SDL2_CFLAGS)
 PARENTSRC = ../dinput
 
 C_SRCS = \
@@ -11,9 +12,11 @@ C_SRCS = \
 	device.c \
 	dinput_main.c \
 	effect_linuxinput.c \
+	effect_sdl.c \
 	joystick.c \
 	joystick_linux.c \
 	joystick_linuxinput.c \
+	joystick_sdl.c \
 	joystick_osx.c \
 	keyboard.c \
 	mouse.c
