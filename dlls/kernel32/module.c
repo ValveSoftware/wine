@@ -76,10 +76,17 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 };
 static CRITICAL_SECTION dlldir_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
+#if defined(__x86_64__)
+static const WCHAR steamclientW[] = {'s','t','e','a','m','c','l','i','e','n','t','6','4',0};
+static const WCHAR steamclient_pathW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s',' ','(','x','8','6',')','\\','S','t','e','a','m','\\','s','t','e','a','m','c','l','i','e','n','t','6','4','.','d','l','l',0};
+#else
 static const WCHAR steamclientW[] = {'s','t','e','a','m','c','l','i','e','n','t',0};
+static const WCHAR steamclient_pathW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s',' ','(','x','8','6',')','\\','S','t','e','a','m','\\','s','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};
+#endif
+static const WCHAR steamProgramPathW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s',' ','(','x','8','6',')','\\','S','t','e','a','m',0};
+static const DWORD steamProgramPathW_len = 28;
 static const WCHAR steamdllW[] = {'S','t','e','a','m','.','d','l','l',0};
 static const DWORD steamdllW_len = 9;
-static const WCHAR steamclient_pathW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s','\\','S','t','e','a','m','\\','s','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};;
 static HMODULE steamclient_hmod = NULL;
 static HMODULE lsteamclient_hmod = NULL;
 
@@ -628,8 +635,6 @@ static const WCHAR *get_dll_system_path(void)
 
     if (!cached_path)
     {
-        static const WCHAR steamProgramPathW[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s','\\','S','t','e','a','m',0};
-        static const DWORD steamProgramPathW_len = 22;
         WCHAR *p, *path;
         int len = 2;
 
