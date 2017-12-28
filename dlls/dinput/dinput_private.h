@@ -70,6 +70,7 @@ extern const struct dinput_device keyboard_device DECLSPEC_HIDDEN;
 extern const struct dinput_device joystick_linux_device DECLSPEC_HIDDEN;
 extern const struct dinput_device joystick_linuxinput_device DECLSPEC_HIDDEN;
 extern const struct dinput_device joystick_osx_device DECLSPEC_HIDDEN;
+extern const struct dinput_device joystick_sdl_device DECLSPEC_HIDDEN;
 
 extern void check_dinput_hooks(LPDIRECTINPUTDEVICE8W) DECLSPEC_HIDDEN;
 extern void check_dinput_events(void) DECLSPEC_HIDDEN;
