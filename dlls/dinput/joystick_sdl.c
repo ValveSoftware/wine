@@ -65,6 +65,8 @@ struct SDLDev {
     CHAR *name;
 
     BOOL has_ff;
+    int autocenter;
+    int gain;
 };
 
 struct JoystickImpl
@@ -73,6 +75,7 @@ struct JoystickImpl
     struct SDLDev              *sdldev;
 
     SDL_Joystick *device;
+    SDL_Haptic *haptic;
 };
 
 static inline JoystickImpl *impl_from_IDirectInputDevice8A(IDirectInputDevice8A *iface)
@@ -129,6 +132,17 @@ static void find_sdldevs(void)
         }
 
         TRACE("Found a joystick (%i) on %p: %s\n", have_sdldevs, device, sdldev.name);
+
+        if (SDL_JoystickIsHaptic(device))
+        {
+            SDL_Haptic *haptic = SDL_HapticOpenFromJoystick(device);
+            if (haptic)
+            {
+                TRACE(" ... with force feedback\n");
+                sdldev.has_ff = TRUE;
+                SDL_HapticClose(haptic);
+            }
+        }
 
         sdldev.vendor_id = SDL_JoystickGetVendor(device);
         sdldev.product_id = SDL_JoystickGetProduct(device);
@@ -352,6 +366,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
 
     /* Open Device */
     newDevice->device = SDL_JoystickOpen(newDevice->sdldev->id);
+    newDevice->haptic = SDL_HapticOpenFromJoystick(newDevice->device);
 
     /* Count number of available axes - supported Axis & POVs */
     newDevice->generic.devcaps.dwAxes = SDL_JoystickNumAxes(newDevice->device);
@@ -399,6 +414,8 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     {
         memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[idx], df->dwObjSize);
         df->rgodf[idx].dwType = DIDFT_MAKEINSTANCE(idx) | DIDFT_ABSAXIS;
+        if (newDevice->sdldev->has_ff && i < 2)
+             df->rgodf[idx].dwFlags |= DIDOI_FFACTUATOR;
         ++idx;
     }
 
@@ -414,6 +431,10 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
         df->rgodf[idx].pguid = &GUID_Button;
         df->rgodf[idx++].dwType = DIDFT_MAKEINSTANCE(i) | DIDFT_PSHBUTTON;
     }
+
+    if (newDevice->sdldev->has_ff)
+        newDevice->generic.devcaps.dwFlags |= DIDC_FORCEFEEDBACK;
+
     newDevice->generic.base.data_format.wine_df = df;
 
     /* Fill the caps */
@@ -528,6 +549,8 @@ static ULONG WINAPI JoystickWImpl_Release(LPDIRECTINPUTDEVICE8W iface)
     if (This->generic.base.ref == 1 && This->device >= 0)
     {
         TRACE("Closing Joystick: %p\n",This);
+        if (This->sdldev->has_ff)
+            SDL_HapticClose(This->haptic);
         SDL_JoystickClose(This->device);
         This->device = NULL;
     }
@@ -553,7 +576,22 @@ static HRESULT WINAPI JoystickWImpl_GetProperty(LPDIRECTINPUTDEVICE8W iface, REF
     if (!IS_DIPROP(rguid)) return DI_OK;
 
     switch (LOWORD(rguid)) {
+        case (DWORD_PTR) DIPROP_AUTOCENTER:
+        {
+            LPDIPROPDWORD pd = (LPDIPROPDWORD)pdiph;
 
+            pd->dwData = This->sdldev->autocenter ? DIPROPAUTOCENTER_ON : DIPROPAUTOCENTER_OFF;
+            TRACE("autocenter(%d)\n", pd->dwData);
+            break;
+        }
+        case (DWORD_PTR) DIPROP_FFGAIN:
+        {
+            LPDIPROPDWORD pd = (LPDIPROPDWORD)pdiph;
+
+            pd->dwData = This->sdldev->gain;
+            TRACE("DIPROP_FFGAIN(%d)\n", pd->dwData);
+            break;
+        }
         case (DWORD_PTR) DIPROP_VIDPID:
         {
             LPDIPROPDWORD pd = (LPDIPROPDWORD)pdiph;
@@ -584,6 +622,70 @@ static HRESULT WINAPI JoystickAImpl_GetProperty(LPDIRECTINPUTDEVICE8A iface, REF
 {
     JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
     return JoystickWImpl_GetProperty(IDirectInputDevice8W_from_impl(This), rguid, pdiph);
+}
+
+static BOOL _SetProperty(JoystickImpl *This, const GUID *prop, const DIPROPHEADER *header)
+{
+    int rc;
+
+    switch(LOWORD(prop))
+    {
+        case (DWORD_PTR)DIPROP_AUTOCENTER:
+        {
+            LPCDIPROPDWORD pd = (LPCDIPROPDWORD)header;
+
+            This->sdldev->autocenter = pd->dwData == DIPROPAUTOCENTER_ON;
+
+            rc = SDL_HapticSetAutocenter(This->haptic, This->sdldev->autocenter * 100);
+            if (rc != 0)
+                ERR("SDL_HapticSetAutocenter failed: %s\n", SDL_GetError());
+            break;
+        }
+        case (DWORD_PTR)DIPROP_FFGAIN:
+        {
+            LPCDIPROPDWORD pd = (LPCDIPROPDWORD)header;
+            int sdl_gain = MulDiv(This->sdldev->gain, 100, 10000);
+
+            TRACE("DIPROP_FFGAIN(%d)\n", pd->dwData);
+
+            This->sdldev->gain = pd->dwData;
+
+            rc = SDL_HapticSetGain(This->haptic, sdl_gain);
+            if (rc != 0)
+                ERR("SDL_HapticSetGain (%i -> %i) failed: %s\n", pd->dwData, sdl_gain, SDL_GetError());
+            break;
+        }
+        default:
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+static HRESULT WINAPI JoystickWImpl_SetProperty(IDirectInputDevice8W *iface,
+        const GUID *prop, const DIPROPHEADER *header)
+{
+    JoystickImpl *This = impl_from_IDirectInputDevice8W(iface);
+
+    TRACE("%p %s %p\n", This, debugstr_guid(prop), header);
+
+    if (_SetProperty(This, prop, header))
+        return DI_OK;
+    else
+        return JoystickWGenericImpl_SetProperty(iface, prop, header);
+}
+
+static HRESULT WINAPI JoystickAImpl_SetProperty(IDirectInputDevice8A *iface,
+        const GUID *prop, const DIPROPHEADER *header)
+{
+    JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
+
+    TRACE("%p %s %p\n", This, debugstr_guid(prop), header);
+
+    if (_SetProperty(This, prop, header))
+        return DI_OK;
+    else
+        return JoystickAGenericImpl_SetProperty(iface, prop, header);
 }
 
 /******************************************************************************
@@ -631,7 +733,7 @@ static const IDirectInputDevice8AVtbl JoystickAvt =
     JoystickAGenericImpl_GetCapabilities,
     IDirectInputDevice2AImpl_EnumObjects,
     JoystickAImpl_GetProperty,
-    JoystickAGenericImpl_SetProperty,
+    JoystickAImpl_SetProperty,
     IDirectInputDevice2AImpl_Acquire,
     IDirectInputDevice2AImpl_Unacquire,
     JoystickAGenericImpl_GetDeviceState,
@@ -667,7 +769,7 @@ static const IDirectInputDevice8WVtbl JoystickWvt =
     JoystickWGenericImpl_GetCapabilities,
     IDirectInputDevice2WImpl_EnumObjects,
     JoystickWImpl_GetProperty,
-    JoystickWGenericImpl_SetProperty,
+    JoystickWImpl_SetProperty,
     IDirectInputDevice2WImpl_Acquire,
     IDirectInputDevice2WImpl_Unacquire,
     JoystickWGenericImpl_GetDeviceState,
