@@ -90,6 +90,7 @@ static const struct dinput_device *dinput_devices[] =
 {
     &mouse_device,
     &keyboard_device,
+    &joystick_sdl_device,
     &joystick_linuxinput_device,
     &joystick_linux_device,
     &joystick_osx_device
@@ -483,6 +484,7 @@ static HRESULT WINAPI IDirectInputAImpl_EnumDevices(
     unsigned int i;
     int j;
     HRESULT r;
+    BOOL found_device = FALSE;
 
     TRACE("(this=%p,0x%04x '%s',%p,%p,0x%04x)\n",
 	  This, dwDevType, _dump_DIDEVTYPE_value(dwDevType, This->dwVersion),
@@ -505,9 +507,15 @@ static HRESULT WINAPI IDirectInputAImpl_EnumDevices(
             devInstance.dwSize = sizeof(devInstance);
             r = dinput_devices[i]->enum_deviceA(dwDevType, dwFlags, &devInstance, This->dwVersion, j);
             if (r == S_OK)
+            {
+                found_device = TRUE;
                 if (enum_callback_wrapper(lpCallback, &devInstance, pvRef) == DIENUM_STOP)
                     return S_OK;
+            }
         }
+        /* If we have found devices after SDL stop enumeration */
+        if (dinput_devices[i] == &joystick_sdl_device && found_device)
+            return S_OK;
     }
 
     return S_OK;
@@ -524,6 +532,7 @@ static HRESULT WINAPI IDirectInputWImpl_EnumDevices(
     unsigned int i;
     int j;
     HRESULT r;
+    BOOL found_device = FALSE;
 
     TRACE("(this=%p,0x%04x '%s',%p,%p,0x%04x)\n",
 	  This, dwDevType, _dump_DIDEVTYPE_value(dwDevType, This->dwVersion),
@@ -545,9 +554,15 @@ static HRESULT WINAPI IDirectInputWImpl_EnumDevices(
             TRACE("  - checking device %u ('%s')\n", i, dinput_devices[i]->name);
             r = dinput_devices[i]->enum_deviceW(dwDevType, dwFlags, &devInstance, This->dwVersion, j);
             if (r == S_OK)
+            {
+                found_device = TRUE;
                 if (enum_callback_wrapper(lpCallback, &devInstance, pvRef) == DIENUM_STOP)
                     return S_OK;
+            }
         }
+        /* If we have found devices after SDL stop enumeration */
+        if (dinput_devices[i] == &joystick_sdl_device && found_device)
+            return S_OK;
     }
 
     return S_OK;
@@ -1142,6 +1157,9 @@ static HRESULT WINAPI IDirectInput8AImpl_EnumDevicesBySemantics(
                 didevis[device_count-1] = didevi;
             }
         }
+        /* If we have found devices after SDL stop enumeration */
+        if (dinput_devices[i] == &joystick_sdl_device && device_count)
+            return S_OK;
     }
 
     remain = device_count;
@@ -1247,6 +1265,9 @@ static HRESULT WINAPI IDirectInput8WImpl_EnumDevicesBySemantics(
                 didevis[device_count-1] = didevi;
             }
         }
+        /* If we have found devices after SDL stop enumeration */
+        if (dinput_devices[i] == &joystick_sdl_device && device_count)
+            return S_OK;
     }
 
     remain = device_count;
