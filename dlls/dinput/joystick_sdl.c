@@ -58,6 +58,12 @@ typedef struct JoystickImpl JoystickImpl;
 static const IDirectInputDevice8AVtbl JoystickAvt;
 static const IDirectInputDevice8WVtbl JoystickWvt;
 
+/* implemented in effect_sdl.c */
+HRESULT sdl_create_effect(SDL_Haptic *haptic, REFGUID rguid, struct list *parent_list_entry, LPDIRECTINPUTEFFECT* peff);
+HRESULT sdl_input_get_info_A(SDL_Joystick *dev, REFGUID rguid, LPDIEFFECTINFOA info);
+HRESULT sdl_input_get_info_W(SDL_Joystick *dev, REFGUID rguid, LPDIEFFECTINFOW info);
+
+
 struct SDLDev {
     int id;
     WORD vendor_id;
@@ -729,6 +735,67 @@ static HRESULT WINAPI JoystickWImpl_GetDeviceInfo(LPDIRECTINPUTDEVICE8W iface,
     return DI_OK;
 }
 
+static HRESULT WINAPI JoystickWImpl_CreateEffect(IDirectInputDevice8W *iface,
+        const GUID *rguid, const DIEFFECT *lpeff, IDirectInputEffect **ppdef,
+        IUnknown *pUnkOuter)
+{
+    JoystickImpl *This = impl_from_IDirectInputDevice8W(iface);
+    HRESULT retval = DI_OK;
+    effect_list_item* new_effect = NULL;
+
+    TRACE("%p %s %p %p %p\n", iface, debugstr_guid(rguid), lpeff, ppdef, pUnkOuter);
+    dump_DIEFFECT(lpeff, rguid, 0);
+
+    if(!This->sdldev->has_ff){
+        TRACE("No force feedback support\n");
+        *ppdef = NULL;
+        return DIERR_UNSUPPORTED;
+    }
+
+    if (pUnkOuter)
+        WARN("aggregation not implemented\n");
+
+    if (!(new_effect = HeapAlloc(GetProcessHeap(), 0, sizeof(*new_effect))))
+    return DIERR_OUTOFMEMORY;
+
+    retval = sdl_create_effect(This->haptic, rguid, &new_effect->entry, &new_effect->ref);
+    if (retval != DI_OK)
+    {
+        HeapFree(GetProcessHeap(), 0, new_effect);
+        return retval;
+    }
+
+    if (lpeff != NULL)
+    {
+        retval = IDirectInputEffect_SetParameters(new_effect->ref, lpeff, 0);
+
+        if (retval != DI_OK && retval != DI_DOWNLOADSKIPPED)
+        {
+            HeapFree(GetProcessHeap(), 0, new_effect);
+            return retval;
+        }
+    }
+
+    list_add_tail(&This->sdldev->effects, &new_effect->entry);
+    *ppdef = new_effect->ref;
+
+    TRACE("allocated effect: %p\n", new_effect);
+
+    return DI_OK;
+}
+
+static HRESULT WINAPI JoystickAImpl_CreateEffect(IDirectInputDevice8A *iface,
+        const GUID *type, const DIEFFECT *params, IDirectInputEffect **out,
+        IUnknown *outer)
+{
+    JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
+
+    TRACE("%p %s %p %p %p\n", iface, debugstr_guid(type), params, out, outer);
+
+    return JoystickWImpl_CreateEffect(&This->generic.base.IDirectInputDevice8W_iface,
+            type, params, out, outer);
+}
+
 static HRESULT WINAPI JoystickWImpl_EnumEffects(LPDIRECTINPUTDEVICE8W iface,
                                                 LPDIENUMEFFECTSCALLBACKW lpCallback,
                                                 LPVOID pvRef,
@@ -891,6 +958,24 @@ static HRESULT WINAPI JoystickAImpl_EnumEffects(LPDIRECTINPUTDEVICE8A iface,
     return DI_OK;
 }
 
+static HRESULT WINAPI JoystickWImpl_GetEffectInfo(LPDIRECTINPUTDEVICE8W iface,
+                                                  LPDIEFFECTINFOW pdei,
+                                                  REFGUID guid)
+{
+    JoystickImpl* This = impl_from_IDirectInputDevice8W(iface);
+    TRACE("(this=%p,%p,%s)\n", This, pdei, _dump_dinput_GUID(guid));
+    return sdl_input_get_info_W(This->device, guid, pdei);
+}
+
+static HRESULT WINAPI JoystickAImpl_GetEffectInfo(LPDIRECTINPUTDEVICE8A iface,
+                          LPDIEFFECTINFOA pdei,
+                          REFGUID guid)
+{
+    JoystickImpl* This = impl_from_IDirectInputDevice8A(iface);
+    TRACE("(this=%p,%p,%s)\n", This, pdei, _dump_dinput_GUID(guid));
+    return sdl_input_get_info_A(This->device, guid, pdei);
+}
+
 static HRESULT WINAPI JoystickWImpl_SendForceFeedbackCommand(LPDIRECTINPUTDEVICE8W iface, DWORD dwFlags)
 {
     JoystickImpl* This = impl_from_IDirectInputDevice8W(iface);
@@ -992,9 +1077,9 @@ static const IDirectInputDevice8AVtbl JoystickAvt =
     JoystickAImpl_GetDeviceInfo,
     IDirectInputDevice2AImpl_RunControlPanel,
     IDirectInputDevice2AImpl_Initialize,
-    IDirectInputDevice2AImpl_CreateEffect,
+    JoystickAImpl_CreateEffect,
     JoystickAImpl_EnumEffects,
-    IDirectInputDevice2AImpl_GetEffectInfo,
+    JoystickAImpl_GetEffectInfo,
     IDirectInputDevice2AImpl_GetForceFeedbackState,
     JoystickAImpl_SendForceFeedbackCommand,
     JoystickAImpl_EnumCreatedEffectObjects,
@@ -1028,9 +1113,9 @@ static const IDirectInputDevice8WVtbl JoystickWvt =
     JoystickWImpl_GetDeviceInfo,
     IDirectInputDevice2WImpl_RunControlPanel,
     IDirectInputDevice2WImpl_Initialize,
-    IDirectInputDevice2WImpl_CreateEffect,
+    JoystickWImpl_CreateEffect,
     JoystickWImpl_EnumEffects,
-    IDirectInputDevice2WImpl_GetEffectInfo,
+    JoystickWImpl_GetEffectInfo,
     IDirectInputDevice2WImpl_GetForceFeedbackState,
     JoystickWImpl_SendForceFeedbackCommand,
     JoystickWImpl_EnumCreatedEffectObjects,
