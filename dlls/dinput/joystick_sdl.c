@@ -67,6 +67,7 @@ struct SDLDev {
     BOOL has_ff;
     int autocenter;
     int gain;
+    struct list effects;
 };
 
 struct JoystickImpl
@@ -360,6 +361,9 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->generic.base.dinput = dinput;
     newDevice->sdldev              = &sdldevs[index];
     newDevice->generic.name        = (char*)newDevice->sdldev->name;
+    list_init(&newDevice->sdldev->effects);
+    newDevice->sdldev->autocenter = 1;
+    newDevice->sdldev->gain = 100;
 
     InitializeCriticalSection(&newDevice->generic.base.crit);
     newDevice->generic.base.crit.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": JoystickImpl*->base.crit");
@@ -725,6 +729,249 @@ static HRESULT WINAPI JoystickWImpl_GetDeviceInfo(LPDIRECTINPUTDEVICE8W iface,
     return DI_OK;
 }
 
+static HRESULT WINAPI JoystickWImpl_EnumEffects(LPDIRECTINPUTDEVICE8W iface,
+                                                LPDIENUMEFFECTSCALLBACKW lpCallback,
+                                                LPVOID pvRef,
+                                                DWORD dwEffType)
+{
+    DIEFFECTINFOW dei;
+    DWORD type = DIEFT_GETTYPE(dwEffType);
+    JoystickImpl* This = impl_from_IDirectInputDevice8W(iface);
+    unsigned int query;
+
+    TRACE("(this=%p,%p,%d) type=%d\n", This, pvRef, dwEffType, type);
+
+    dei.dwSize = sizeof(DIEFFECTINFOW);
+    query = SDL_HapticQuery(This->haptic);
+    TRACE("Effects 0x%x\n",query);
+
+    if ((type == DIEFT_ALL || type == DIEFT_CONSTANTFORCE)
+        && (query & SDL_HAPTIC_CONSTANT))
+    {
+        IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_ConstantForce);
+        (*lpCallback)(&dei, pvRef);
+    }
+
+    if ((type == DIEFT_ALL || type == DIEFT_RAMPFORCE) &&
+        (query & SDL_HAPTIC_RAMP))
+    {
+        IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_RampForce);
+        (*lpCallback)(&dei, pvRef);
+    }
+
+    if (type == DIEFT_ALL || type == DIEFT_PERIODIC)
+    {
+        if (query & SDL_HAPTIC_SINE)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Sine);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_TRIANGLE)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Triangle);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_SAWTOOTHUP)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_SawtoothUp);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_SAWTOOTHDOWN)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_SawtoothDown);
+            (*lpCallback)(&dei, pvRef);
+        }
+    }
+
+    if (type == DIEFT_ALL || type == DIEFT_CONDITION)
+    {
+        if (query & SDL_HAPTIC_SPRING)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Spring);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_DAMPER)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Damper);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_INERTIA)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Inertia);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_FRICTION)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Friction);
+            (*lpCallback)(&dei, pvRef);
+        }
+    }
+
+    return DI_OK;
+}
+
+static HRESULT WINAPI JoystickAImpl_EnumEffects(LPDIRECTINPUTDEVICE8A iface,
+                                                LPDIENUMEFFECTSCALLBACKA lpCallback,
+                                                LPVOID pvRef,
+                                                DWORD dwEffType)
+{
+    DIEFFECTINFOA dei;
+    DWORD type = DIEFT_GETTYPE(dwEffType);
+    JoystickImpl* This = impl_from_IDirectInputDevice8A(iface);
+    unsigned int query;
+
+    TRACE("(this=%p,%p,%d) type=%d\n", This, pvRef, dwEffType, type);
+
+    dei.dwSize = sizeof(DIEFFECTINFOA);
+    query = SDL_HapticQuery(This->haptic);
+    TRACE("Effects 0x%x\n",query);
+
+    if ((type == DIEFT_ALL || type == DIEFT_CONSTANTFORCE)
+        && (query & SDL_HAPTIC_CONSTANT))
+    {
+        IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_ConstantForce);
+        (*lpCallback)(&dei, pvRef);
+    }
+
+    if ((type == DIEFT_ALL || type == DIEFT_RAMPFORCE) &&
+        (query & SDL_HAPTIC_RAMP))
+    {
+        IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_RampForce);
+        (*lpCallback)(&dei, pvRef);
+    }
+
+    if (type == DIEFT_ALL || type == DIEFT_PERIODIC)
+    {
+        if (query & SDL_HAPTIC_SINE)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Sine);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_TRIANGLE)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Triangle);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_SAWTOOTHUP)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_SawtoothUp);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_SAWTOOTHDOWN)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_SawtoothDown);
+            (*lpCallback)(&dei, pvRef);
+        }
+    }
+
+    if (type == DIEFT_ALL || type == DIEFT_CONDITION)
+    {
+        if (query & SDL_HAPTIC_SPRING)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Spring);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_DAMPER)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Damper);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_INERTIA)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Inertia);
+            (*lpCallback)(&dei, pvRef);
+        }
+        if (query & SDL_HAPTIC_FRICTION)
+        {
+            IDirectInputDevice8_GetEffectInfo(iface, &dei, &GUID_Friction);
+            (*lpCallback)(&dei, pvRef);
+        }
+    }
+
+    return DI_OK;
+}
+
+static HRESULT WINAPI JoystickWImpl_SendForceFeedbackCommand(LPDIRECTINPUTDEVICE8W iface, DWORD dwFlags)
+{
+    JoystickImpl* This = impl_from_IDirectInputDevice8W(iface);
+    TRACE("(this=%p,%d)\n", This, dwFlags);
+
+    switch (dwFlags)
+    {
+    case DISFFC_STOPALL:
+    {
+        effect_list_item *itr;
+
+        /* Stop all effects */
+        LIST_FOR_EACH_ENTRY(itr, &This->sdldev->effects, effect_list_item, entry)
+            IDirectInputEffect_Stop(itr->ref);
+        break;
+    }
+
+    case DISFFC_RESET:
+    {
+        effect_list_item *itr;
+
+        /* Stop and unload all effects. It is not true that effects are released */
+        LIST_FOR_EACH_ENTRY(itr, &This->sdldev->effects, effect_list_item, entry)
+        {
+            IDirectInputEffect_Stop(itr->ref);
+            IDirectInputEffect_Unload(itr->ref);
+        }
+        break;
+    }
+    case DISFFC_PAUSE:
+    case DISFFC_CONTINUE:
+        FIXME("No support for Pause or Continue in sdl\n");
+        break;
+
+    case DISFFC_SETACTUATORSOFF:
+    case DISFFC_SETACTUATORSON:
+        FIXME("No direct actuator control in sdl\n");
+        break;
+
+    default:
+        WARN("Unknown Force Feedback Command %u!\n", dwFlags);
+        return DIERR_INVALIDPARAM;
+    }
+    return DI_OK;
+}
+
+static HRESULT WINAPI JoystickAImpl_SendForceFeedbackCommand(LPDIRECTINPUTDEVICE8A iface, DWORD dwFlags)
+{
+    JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
+    return JoystickWImpl_SendForceFeedbackCommand(IDirectInputDevice8W_from_impl(This), dwFlags);
+}
+
+static HRESULT WINAPI JoystickWImpl_EnumCreatedEffectObjects(LPDIRECTINPUTDEVICE8W iface,
+                                                             LPDIENUMCREATEDEFFECTOBJECTSCALLBACK lpCallback,
+                                                             LPVOID pvRef, DWORD dwFlags)
+{
+    JoystickImpl* This = impl_from_IDirectInputDevice8W(iface);
+    effect_list_item *itr, *ptr;
+
+    TRACE("(this=%p,%p,%p,%d)\n", This, lpCallback, pvRef, dwFlags);
+
+    if (!lpCallback)
+        return DIERR_INVALIDPARAM;
+
+    if (dwFlags != 0)
+        FIXME("Flags specified, but no flags exist yet (DX9)!\n");
+
+    LIST_FOR_EACH_ENTRY_SAFE(itr, ptr, &This->sdldev->effects, effect_list_item, entry)
+        (*lpCallback)(itr->ref, pvRef);
+
+    return DI_OK;
+}
+
+static HRESULT WINAPI JoystickAImpl_EnumCreatedEffectObjects(LPDIRECTINPUTDEVICE8A iface,
+                                                             LPDIENUMCREATEDEFFECTOBJECTSCALLBACK lpCallback,
+                                                             LPVOID pvRef, DWORD dwFlags)
+{
+    JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
+    return JoystickWImpl_EnumCreatedEffectObjects(IDirectInputDevice8W_from_impl(This), lpCallback, pvRef, dwFlags);
+}
+
 static const IDirectInputDevice8AVtbl JoystickAvt =
 {
     IDirectInputDevice2AImpl_QueryInterface,
@@ -746,11 +993,11 @@ static const IDirectInputDevice8AVtbl JoystickAvt =
     IDirectInputDevice2AImpl_RunControlPanel,
     IDirectInputDevice2AImpl_Initialize,
     IDirectInputDevice2AImpl_CreateEffect,
-    IDirectInputDevice2AImpl_EnumEffects,
+    JoystickAImpl_EnumEffects,
     IDirectInputDevice2AImpl_GetEffectInfo,
     IDirectInputDevice2AImpl_GetForceFeedbackState,
-    IDirectInputDevice2AImpl_SendForceFeedbackCommand,
-    IDirectInputDevice2AImpl_EnumCreatedEffectObjects,
+    JoystickAImpl_SendForceFeedbackCommand,
+    JoystickAImpl_EnumCreatedEffectObjects,
     IDirectInputDevice2AImpl_Escape,
     JoystickAGenericImpl_Poll,
     IDirectInputDevice2AImpl_SendDeviceData,
@@ -782,11 +1029,11 @@ static const IDirectInputDevice8WVtbl JoystickWvt =
     IDirectInputDevice2WImpl_RunControlPanel,
     IDirectInputDevice2WImpl_Initialize,
     IDirectInputDevice2WImpl_CreateEffect,
-    IDirectInputDevice2WImpl_EnumEffects,
+    JoystickWImpl_EnumEffects,
     IDirectInputDevice2WImpl_GetEffectInfo,
     IDirectInputDevice2WImpl_GetForceFeedbackState,
-    IDirectInputDevice2WImpl_SendForceFeedbackCommand,
-    IDirectInputDevice2WImpl_EnumCreatedEffectObjects,
+    JoystickWImpl_SendForceFeedbackCommand,
+    JoystickWImpl_EnumCreatedEffectObjects,
     IDirectInputDevice2WImpl_Escape,
     JoystickWGenericImpl_Poll,
     IDirectInputDevice2WImpl_SendDeviceData,
