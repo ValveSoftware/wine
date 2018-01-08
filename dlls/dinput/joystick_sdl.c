@@ -83,6 +83,7 @@ struct JoystickImpl
 
     SDL_Joystick *device;
     SDL_Haptic *haptic;
+    BOOL ff_paused;
 };
 
 static inline JoystickImpl *impl_from_IDirectInputDevice8A(IDirectInputDevice8A *iface)
@@ -755,6 +756,12 @@ static HRESULT WINAPI JoystickWImpl_CreateEffect(IDirectInputDevice8W *iface,
     if (pUnkOuter)
         WARN("aggregation not implemented\n");
 
+    if (This->ff_paused)
+    {
+        FIXME("Cannot add new effects to a paused SDL device\n");
+        return DIERR_GENERIC;
+    }
+
     if (!(new_effect = HeapAlloc(GetProcessHeap(), 0, sizeof(*new_effect))))
     return DIERR_OUTOFMEMORY;
 
@@ -1006,8 +1013,14 @@ static HRESULT WINAPI JoystickWImpl_SendForceFeedbackCommand(LPDIRECTINPUTDEVICE
         break;
     }
     case DISFFC_PAUSE:
+        This->ff_paused = TRUE;
+        if (SDL_HapticPause(This->haptic) != 0)
+            ERR("SDL_HapticPause failed: %s\n",SDL_GetError());
+        break;
     case DISFFC_CONTINUE:
-        FIXME("No support for Pause or Continue in sdl\n");
+        This->ff_paused = FALSE;
+        if (SDL_HapticUnpause(This->haptic) != 0)
+            ERR("SDL_HapticUnpause failed: %s\n",SDL_GetError());
         break;
 
     case DISFFC_SETACTUATORSOFF:
