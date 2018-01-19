@@ -84,7 +84,7 @@ GetUserNameA( LPSTR lpszName, LPDWORD lpSize )
 BOOL WINAPI
 GetUserNameW( LPWSTR lpszName, LPDWORD lpSize )
 {
-    const char *name = wine_get_user_name();
+    const char *name = "steamuser"/*wine_get_user_name()*/;
     DWORD i, len = MultiByteToWideChar( CP_UNIXCP, 0, name, -1, NULL, 0 );
     LPWSTR backslash;
 
