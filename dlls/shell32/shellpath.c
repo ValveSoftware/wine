@@ -4120,6 +4120,7 @@ static void _SHCreateMyDocumentsSymbolicLink(const UINT * aidsMyStuff, const UIN
     pszPersonal = _SHGetFolderUnixPath(CSIDL_PERSONAL|CSIDL_FLAG_DONT_VERIFY);
     if (!pszPersonal) return;
 
+#if 0
     _SHGetXDGUserDirs(xdg_dirs, num, &xdg_results);
 
     pszHome = getenv("HOME");
@@ -4167,17 +4168,22 @@ static void _SHCreateMyDocumentsSymbolicLink(const UINT * aidsMyStuff, const UIN
     }
     else
     {
+#endif
         /* '$HOME' doesn't exist. Create subdirs for 'My Pictures', 'My Videos',
          * 'My Music' etc. in '%USERPROFILE%\My Documents' or fail silently if
          * they already exist. */
         pszHome = NULL;
         strcpy(szPersonalTarget, pszPersonal);
         _SHCreateMyDocumentsSubDirs(aidsMyStuff, aids_num, szPersonalTarget);
+#if 0
     }
+#endif
 
     heap_free(pszPersonal);
 
+#if 0
     _SHFreeXDGUserDirs(num, xdg_results);
+#endif
 }
 
 /******************************************************************************
@@ -4191,6 +4197,7 @@ static void _SHCreateMyDocumentsSymbolicLink(const UINT * aidsMyStuff, const UIN
  */
 static void _SHCreateMyStuffSymbolicLink(int nFolder)
 {
+#if 0
     static const UINT aidsMyStuff[] = {
         IDS_MYPICTURES, IDS_MYVIDEOS, IDS_MYMUSIC, IDS_DOWNLOADS, IDS_TEMPLATES
     };
@@ -4272,6 +4279,7 @@ static void _SHCreateMyStuffSymbolicLink(int nFolder)
     }
 
     _SHFreeXDGUserDirs(num, xdg_results);
+#endif
 }
 
 /******************************************************************************
@@ -4282,6 +4290,7 @@ static void _SHCreateMyStuffSymbolicLink(int nFolder)
  */
 static void _SHCreateDesktopSymbolicLink(void)
 {
+#if 0
     static const char * const xdg_dirs[] = { "DESKTOP" };
     static const unsigned int num = ARRAY_SIZE(xdg_dirs);
     char *pszPersonal;
@@ -4322,6 +4331,7 @@ static void _SHCreateDesktopSymbolicLink(void)
     }
 
     _SHFreeXDGUserDirs(num, xdg_results);
+#endif
 }
 
 /******************************************************************************
