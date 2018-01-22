@@ -922,6 +922,7 @@ static INT_PTR CALLBACK wait_dlgproc( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp 
     return 0;
 }
 
+/*
 static HWND show_wait_window(void)
 {
     const char *config_dir = wine_get_config_dir();
@@ -938,6 +939,7 @@ static HWND show_wait_window(void)
     HeapFree( GetProcessHeap(), 0, name );
     return hwnd;
 }
+*/
 
 static HANDLE start_rundll32( const char *inf_path, BOOL wow64 )
 {
@@ -1014,7 +1016,7 @@ static void update_wineprefix( BOOL force )
 
         if ((process = start_rundll32( inf_path, FALSE )))
         {
-            HWND hwnd = show_wait_window();
+/*            HWND hwnd = show_wait_window();*/
             for (;;)
             {
                 MSG msg;
@@ -1026,7 +1028,7 @@ static void update_wineprefix( BOOL force )
                 }
                 else while (PeekMessageW( &msg, 0, 0, 0, PM_REMOVE )) DispatchMessageW( &msg );
             }
-            DestroyWindow( hwnd );
+/*            DestroyWindow( hwnd );*/
         }
         WINE_MESSAGE( "wine: configuration in '%s' has been updated.\n", config_dir );
     }
