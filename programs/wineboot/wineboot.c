@@ -1458,64 +1458,6 @@ static BOOL start_services_process(void)
     return TRUE;
 }
 
-static void set_wait_dialog_text( HWND hwnd, HWND text, const WCHAR *string )
-{
-    RECT win_rect, old_rect, new_rect;
-    HDC hdc = GetDC( text );
-
-    GetClientRect( text, &old_rect );
-    new_rect = old_rect;
-    SelectObject( hdc, (HFONT)SendMessageW( text, WM_GETFONT, 0, 0 ));
-    DrawTextW( hdc, string, -1, &new_rect, DT_CALCRECT | DT_EDITCONTROL | DT_WORDBREAK | DT_NOPREFIX );
-    ReleaseDC( text, hdc );
-    if (new_rect.bottom > old_rect.bottom)
-    {
-        GetWindowRect( hwnd, &win_rect );
-        win_rect.bottom += new_rect.bottom - old_rect.bottom;
-        SetWindowPos( hwnd, 0, 0, 0, win_rect.right - win_rect.left, win_rect.bottom - win_rect.top,
-                      SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER );
-        SetWindowPos( text, 0, 0, 0, new_rect.right, new_rect.bottom,
-                      SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER );
-    }
-    SendMessageW( text, WM_SETTEXT, 0, (LPARAM)string );
-}
-
-static INT_PTR CALLBACK wait_dlgproc( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
-{
-    switch (msg)
-    {
-    case WM_INITDIALOG:
-        {
-            DWORD len, icon_size;
-            RECT rect;
-            WCHAR *buffer, text[1024];
-            const WCHAR *name = (WCHAR *)lp;
-            HICON icon;
-
-            GetClientRect( GetDlgItem( hwnd, IDC_WAITICON ), &rect );
-            icon_size = min( rect.right, rect.bottom );
-            icon = LoadImageW( 0, (LPCWSTR)IDI_WINLOGO, IMAGE_ICON, icon_size, icon_size, LR_SHARED );
-            SendDlgItemMessageW( hwnd, IDC_WAITICON, STM_SETICON, (WPARAM)icon, 0 );
-            SendDlgItemMessageW( hwnd, IDC_WAITTEXT, WM_GETTEXT, 1024, (LPARAM)text );
-            len = lstrlenW(text) + lstrlenW(name) + 1;
-            buffer = malloc( len * sizeof(WCHAR) );
-            swprintf( buffer, len, text, name );
-            set_wait_dialog_text( hwnd, GetDlgItem( hwnd, IDC_WAITTEXT ), buffer );
-            free( buffer );
-        }
-        break;
-    }
-    return 0;
-}
-
-static HWND show_wait_window(void)
-{
-    HWND hwnd = CreateDialogParamW( GetModuleHandleW(0), MAKEINTRESOURCEW(IDD_WAITDLG), 0,
-                                    wait_dlgproc, (LPARAM)prettyprint_configdir() );
-    ShowWindow( hwnd, SW_SHOWNORMAL );
-    return hwnd;
-}
-
 static HANDLE start_rundll32( const WCHAR *inf_path, const WCHAR *install, WORD machine )
 {
     WCHAR app[MAX_PATH + ARRAY_SIZE(L"\\rundll32.exe" )];
@@ -1663,7 +1605,6 @@ static void update_wineprefix( BOOL force )
 
         if ((process = start_rundll32( inf_path, L"PreInstall", IMAGE_FILE_MACHINE_TARGET_HOST )))
         {
-            HWND hwnd = show_wait_window();
             for (;;)
             {
                 if (process)
@@ -1684,7 +1625,6 @@ static void update_wineprefix( BOOL force )
                     process = start_rundll32( inf_path, L"Wow64Install", machines[count].Machine );
                 count++;
             }
-            DestroyWindow( hwnd );
         }
         install_root_pnp_devices();
         update_user_profile();
