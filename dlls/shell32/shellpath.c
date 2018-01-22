@@ -4502,6 +4502,7 @@ static void _SHCreateSymbolicLinks(void)
     pszPersonal = wine_get_unix_file_name(wszTempPath);
     if (!pszPersonal) return;
 
+#if 0
     hr = XDG_UserDirLookup(xdg_dirs, num, &xdg_results);
     if (FAILED(hr)) xdg_results = NULL;
 
@@ -4555,6 +4556,7 @@ static void _SHCreateSymbolicLinks(void)
     }
     else
     {
+#endif
         /* '$HOME' doesn't exist. Create subdirs for 'My Pictures', 'My Videos',
          * 'My Music' etc. in '%USERPROFILE%\My Documents' or fail silently if
          * they already exist. */
@@ -4565,8 +4567,11 @@ static void _SHCreateSymbolicLinks(void)
             if (_SHAppendToUnixPath(szMyStuffTarget, MAKEINTRESOURCEW(aidsMyStuff[i])))
                 mkdir(szMyStuffTarget, 0777);
         }
+#if 0
     }
+#endif
 
+#if 0
     /* Create symbolic links for 'My Pictures', 'My Videos', 'My Music' etc. */
     for (i=0; i < ARRAY_SIZE(aidsMyStuff); i++)
     {
@@ -4611,13 +4616,17 @@ static void _SHCreateSymbolicLinks(void)
         symlink(szMyStuffTarget, pszMyStuff);
         heap_free(pszMyStuff);
     }
+#endif
 
+#if 0
     /* Last but not least, the Desktop folder */
     if (pszHome)
         strcpy(szDesktopTarget, pszHome);
     else
         strcpy(szDesktopTarget, pszPersonal);
+#endif
     heap_free(pszPersonal);
+#if 0
 
     xdg_desktop_dir = xdg_results ? xdg_results[num - 1] : NULL;
     if (xdg_desktop_dir ||
@@ -4644,6 +4653,7 @@ static void _SHCreateSymbolicLinks(void)
             heap_free(xdg_results[i]);
         heap_free(xdg_results);
     }
+#endif
 }
 
 /******************************************************************************
