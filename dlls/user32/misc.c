@@ -363,12 +363,22 @@ BOOL WINAPI EnumDisplayDevicesW( LPCWSTR lpDevice, DWORD i, LPDISPLAY_DEVICEW lp
     if (lpDevice && i)
         return FALSE;
 
-    lpDisplayDevice->StateFlags =
-        DISPLAY_DEVICE_ATTACHED_TO_DESKTOP |
-        DISPLAY_DEVICE_VGA_COMPATIBLE;
-
-    if (!lpDevice && i == 0)
-        lpDisplayDevice->StateFlags |= DISPLAY_DEVICE_PRIMARY_DEVICE;
+    if (lpDevice)
+    {
+        /* monitor flags */
+        lpDisplayDevice->StateFlags =
+            DISPLAY_DEVICE_ACTIVE |
+            DISPLAY_DEVICE_ATTACHED;
+    }
+    else
+    {
+        /* adapter flags */
+        lpDisplayDevice->StateFlags =
+            DISPLAY_DEVICE_ATTACHED_TO_DESKTOP |
+            DISPLAY_DEVICE_VGA_COMPATIBLE;
+        if(i == 0)
+            lpDisplayDevice->StateFlags |= DISPLAY_DEVICE_PRIMARY_DEVICE;
+    }
 
     info.adapter = lpDevice;
     info.target = i;
