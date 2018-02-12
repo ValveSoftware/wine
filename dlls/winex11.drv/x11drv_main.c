@@ -281,6 +281,8 @@ static int error_handler( Display *display, XErrorEvent *error_evt )
              error_evt->serial, error_evt->request_code );
         DebugBreak();  /* force an entry in the debugger */
     }
+    TRACE("passing on error %d req %d\n",
+            error_evt->error_code, error_evt->request_code);
     old_error_handler( display, error_evt );
     return 0;
 }
