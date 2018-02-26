@@ -2143,8 +2143,13 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
     opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
 
-    pglDrawBuffer( draw_buffer );
+    //HACK
+    //pglDrawBuffer( draw_buffer );
+    pglDrawBuffer( GL_BACK );
     pglBlitFramebuffer( 0, 0, src.x, src.y, scaled_origin.x, scaled_origin.y, scaled_origin.x + scaled.x, scaled_origin.y + scaled.y, GL_COLOR_BUFFER_BIT, GL_LINEAR );
+    //HACK
+    if ( draw_buffer == GL_FRONT )
+        pglXSwapBuffers(gdi_display, gl->drawable);
     pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
     pglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
 }

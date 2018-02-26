@@ -3568,7 +3568,7 @@ HRESULT CDECL wined3d_device_end_scene(struct wined3d_device *device)
         return WINED3DERR_INVALIDCALL;
     }
 
-    wined3d_cs_emit_flush(device->cs);
+    //wined3d_cs_emit_flush(device->cs);
 
     device->inScene = FALSE;
     return WINED3D_OK;
