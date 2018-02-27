@@ -165,6 +165,14 @@ static int query_screens(void)
             snprintfW( monitors[i].szDevice, sizeof(monitors[i].szDevice) / sizeof(WCHAR),
                        monitor_deviceW, (monitors[i].dwFlags & MONITORINFOF_PRIMARY) ? 1 : device++ );
         }
+
+        if(fs_hack_enabled()){
+            POINT fs = fs_hack_current_mode();
+            MONITORINFOEXW *primary = get_primary();
+            primary->rcMonitor.right = primary->rcMonitor.left + fs.x;
+            primary->rcMonitor.bottom = primary->rcMonitor.top + fs.y;
+            primary->rcWork = primary->rcMonitor;
+        }
     }
     else count = 0;
 

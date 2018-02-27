@@ -1077,10 +1077,18 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
     }
     else pos = root_to_virtual_screen( x, y );
 
-    rect.left   = pos.x;
-    rect.top    = pos.y;
-    rect.right  = pos.x + event->width;
-    rect.bottom = pos.y + event->height;
+    if(data->fs_hack){
+        POINT p = fs_hack_current_mode();
+        rect.left = 0;
+        rect.top = 0;
+        rect.right = p.x;
+        rect.bottom = p.y;
+    }else{
+        rect.left   = pos.x;
+        rect.top    = pos.y;
+        rect.right  = pos.x + event->width;
+        rect.bottom = pos.y + event->height;
+    }
     TRACE( "win %p/%lx new X rect %d,%d,%dx%d (event %d,%d,%dx%d)\n",
            hwnd, data->whole_window, rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top,
            event->x, event->y, event->width, event->height );
@@ -1449,6 +1457,7 @@ static void EVENT_DropFromOffiX( HWND hWnd, XClientMessageEvent *event )
     Window		win, w_aux_root, w_aux_child;
 
     if (!(data = get_win_data( hWnd ))) return;
+    ERR("TODO: fs hack\n");
     cx = data->whole_rect.right - data->whole_rect.left;
     cy = data->whole_rect.bottom - data->whole_rect.top;
     win = data->whole_window;
