@@ -343,16 +343,48 @@ static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
     if (!(data = get_win_data(hwnd)))
         return TRUE;
 
-    /* update the full screen state */
-    update_net_wm_states(data);
+    if (fs_hack_enabled() &&
+            fs_hack_matches_current_mode(
+                data->whole_rect.right - data->whole_rect.left,
+                data->whole_rect.bottom - data->whole_rect.top)){
+        if (!data->fs_hack){
+            POINT p = fs_hack_real_mode();
+            POINT tl = virtual_screen_to_root(0, 0);
+            TRACE("Enabling fs hack, resizing the window to (%u,%u)-(%u,%u)\n", tl.x, tl.y, p.x, p.y);
+            data->fs_hack = TRUE;
+            XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, p.x, p.y);
+            if(data->client_window)
+                XMoveResizeWindow(data->display, data->client_window, 0, 0, p.x, p.y);
+            sync_gl_drawable(hwnd, FALSE);
+            update_net_wm_states( data );
+        }
+    } else {
+        /* update the full screen state */
+        update_net_wm_states(data);
 
-    if (mask && data->whole_window)
-    {
-        POINT pos = virtual_screen_to_root(data->whole_rect.left, data->whole_rect.top);
-        XWindowChanges changes;
-        changes.x = pos.x;
-        changes.y = pos.y;
-        XReconfigureWMWindow(data->display, data->whole_window, data->vis.screen, mask, &changes);
+        if (mask && data->whole_window)
+        {
+            POINT pos = virtual_screen_to_root(data->whole_rect.left, data->whole_rect.top);
+            XWindowChanges changes;
+            changes.x = pos.x;
+            changes.y = pos.y;
+            XReconfigureWMWindow(data->display, data->whole_window, data->vis.screen, mask, &changes);
+        }
+
+        if(data->fs_hack &&
+            !fs_hack_matches_current_mode(
+                data->whole_rect.right - data->whole_rect.left,
+                data->whole_rect.bottom - data->whole_rect.top)){
+            TRACE("Disabling fs hack\n");
+            data->fs_hack = FALSE;
+            if(data->client_window){
+                XMoveResizeWindow(data->display, data->client_window,
+                        data->client_rect.left, data->client_rect.top,
+                        data->client_rect.right - data->client_rect.left,
+                        data->client_rect.bottom - data->client_rect.top);
+            }
+            sync_gl_drawable(hwnd, FALSE);
+        }
     }
     release_win_data(data);
     if (hwnd == GetForegroundWindow())
