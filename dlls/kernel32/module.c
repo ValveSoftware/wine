@@ -1066,16 +1066,6 @@ static HMODULE load_library( const UNICODE_STRING *libname, DWORD flags )
 done:
     HeapFree( GetProcessHeap(), 0, load_path );
 
-    if(!hModule){
-        DWORD len = lstrlenW(libname->Buffer);
-        if(len > steamdllW_len &&
-                !strcmpiW(libname->Buffer + len - steamdllW_len, steamdllW)){
-            /* tried and failed to load some path ending in Steam.dll. try
-             * again without hard-coded path */
-            return LoadLibraryW(steamdllW);
-        }
-    }
-
     return hModule;
 }
 
