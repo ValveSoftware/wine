@@ -360,6 +360,8 @@ my @joining_table = ();
 my @direction_table = ();
 my @decomp_table = ();
 my @compose_table = ();
+my @comb_class_table = ();
+my @full_comp_table = ();
 my $default_char;
 my $default_wchar;
 
@@ -470,6 +472,11 @@ sub READ_DEFAULTS($)
             }
         }
 
+        if ($comb != 0)
+        {
+            $comb_class_table[$src] = (hex $comb);
+        }
+
         next if $decomp eq "";  # no decomposition, skip it
 
         # store decomposition table
@@ -562,6 +569,25 @@ sub READ_DEFAULTS($)
         my $flag = $ctype{$cat};
         foreach my $i (@{$special_categories{$cat}}) { $category_table[$i] |= $flag; }
     }
+
+    my $UNICODE_DERIVED = open_data_file( $UNIDATA, "DerivedNormalizationProps.txt" );
+    while (<$UNICODE_DERIVED>)
+    {
+        next unless (/^([0-9a-fA-F.]+)\s+;\s+Full_Composition_Exclusion/);
+        my ($first, $last) = split /\.\./,$1;
+        $first = hex $first;
+        if (defined $last)
+        {
+            $last = hex $last;
+            while ($last gt $first)
+            {
+                $full_comp_table[$last] = 1;
+                $last--;
+            }
+        }
+        $full_comp_table[$first] = 1;
+    }
+    close $UNICODE_DERIVED;
 }
 
 
@@ -2255,6 +2281,8 @@ sub dump_compose_table($)
     }
     print OUTPUT "\n};\n\n";
     print OUTPUT <<"EOF";
+#include "decompose.c"
+
 static inline int binary_search( WCHAR ch, int low, int high )
 {
     while (low <= high)
@@ -2277,6 +2305,59 @@ WCHAR DECLSPEC_HIDDEN wine_compose( const WCHAR *str )
         start = table[2 * pos + 1];
         count = table[2 * pos + 3];
     }
+}
+
+static inline int is_blocked(WCHAR *ptr1, WCHAR *ptr2)
+{
+    if (ptr1 >= ptr2) return -1;
+
+    while (++ptr1 < ptr2)
+    {
+        const WCHAR *map1, *map2;
+        map1 = unicode_table_lookup( *ptr1, 0, idx1_comb, 8, idx2_comb, 4,
+                                     offsets_comb, 4, data_comb, 0 );
+        map2 = unicode_table_lookup( *ptr2, 0, idx1_comb, 8, idx2_comb, 4,
+                                     offsets_comb, 4, data_comb, 0 );
+        if (*map1 == 0 || *map2 <= *map1) return 1;
+    }
+    return 0;
+}
+
+static inline int is_fullexcl(WCHAR ch)
+{
+    const WCHAR *map = unicode_table_lookup( ch, 0, idx1_fullcomp, 8, idx2_fullcomp,
+                                             4, offsets_fullcomp, 4, data_fullcomp, 0 );
+    return (int)*map;
+}
+
+int unicode_canonical_composition( WCHAR *str, int strlen )
+{
+    int i, j;
+    WCHAR dum[3] = {0};
+
+    if (strlen == 0) strlen = strlenW( str );
+
+    for (i = 1; i < strlen; i++)
+    {
+        WCHAR *ptr_comp = str+i-1, comp;
+        if (str[i] == 0) break;
+        while (ptr_comp - str > 0)
+        {
+            if (is_starter( *ptr_comp )) break;
+            --ptr_comp;
+        }
+        if (!is_starter( *ptr_comp ) || is_blocked( ptr_comp, str+i )) continue;
+        dum[0] = *ptr_comp;
+        dum[1] = str[i];
+        comp = wine_compose( dum );
+        if (!comp || is_fullexcl( comp )) continue;
+        *ptr_comp = comp;
+        for (j = i; j < strlen-1; j++) str[j] = str[j+1];
+        strlen--;
+        i--;
+    }
+
+    return strlen;
 }
 EOF
     close OUTPUT;
@@ -2346,13 +2427,21 @@ sub dump_decompose_table($)
     my %nfd_lookup = ();
     my %nfkd_lookup = ();
     my %decomp_lookup = ();
+    my %comb_lookup = ();
+    my %fullcomp_lookup = ();
     my @decomp_data = (0);
+    my @comb_data = (0);
+    my @full_comp_data = (0);
     my $pos = 1;
+    my $pos_comb = 1;
+    my $pos_fullcomp = 1;
     my $lastchar_decomp;
+    my $lastchar_comb;
+    my $lastchar_fullcomp;
 
     for (my $i = 0; $i < $utflim; $i++)
     {
-        next unless defined $decomp_table[$i];
+        next unless defined $decomp_table[$i] || defined $comb_class_table[$i] || defined $full_comp_table[$i];
 
         if (defined $decomp_table[$i])
         {
@@ -2405,6 +2494,20 @@ sub dump_decompose_table($)
                 $nfkd_lookup{$i} = $pos;
                 $pos += @nfkd;
             }
+        }
+        if (defined $comb_class_table[$i])
+        {
+            push @comb_data, $comb_class_table[$i];
+            $lastchar_comb = $i;
+            $comb_lookup{$i} = $pos_comb;
+            $pos_comb++;
+        }
+        if (defined $full_comp_table[$i])
+        {
+            push @full_comp_data, $full_comp_table[$i];
+            $lastchar_fullcomp = $i;
+            $fullcomp_lookup{$i} = $pos_fullcomp;
+            $pos_fullcomp++;
         }
     }
 
@@ -2497,6 +2600,154 @@ sub dump_decompose_table($)
     }
     print OUTPUT "\n};\n\n";
 
+    # now for Compatibility Class
+
+    printf OUTPUT "static const WCHAR data_comb[%d] =\n", $pos_comb;
+    print OUTPUT "{\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @comb_data );
+    print OUTPUT "\n};\n\n";
+
+    my $comb_pos = 1;
+    my $comb_lim = ($lastchar_comb >> 8) + 1;
+    my @comb_filled = (0) x $comb_lim;
+    for (my $i = 0; $i < $utflim; $i++)
+    {
+        last if $i > $lastchar_comb;
+        next unless defined $comb_class_table[$i];
+        $comb_filled[$i >> 8] = $comb_pos++;
+        $i |= 255;
+    }
+    printf OUTPUT "static const BYTE idx1_comb[%d] =\n", $comb_lim;
+    print OUTPUT "{\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%02x", 0, @comb_filled );
+    print OUTPUT "\n};\n\n";
+
+    my $sub_comb_filled_pos = 1;
+    my %sub_comb_filled = ();
+    for (my $i = 0; $i < $comb_lim; $i++)
+    {
+        next unless $comb_filled[$i];
+        for (my $j = 0; $j < 256; $j++)
+        {
+            my $idx = ($i << 8) | $j;
+            next unless defined $comb_class_table[$idx];
+            $sub_comb_filled{$idx >> 4} = $sub_comb_filled_pos++;
+            $j |= 15;
+        }
+    }
+
+    printf OUTPUT "static const USHORT idx2_comb[%d] =\n", $comb_pos * 16;
+    print OUTPUT "{\n";
+    @null_idx = (0) x 16;
+    print OUTPUT "    /* all-zero 256-char blocks get mapped to here */\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @null_idx );
+    for (my $i = 0; $i < $comb_lim; $i++)
+    {
+        next unless $comb_filled[$i];
+        printf OUTPUT ",\n    /* sub-index 0x%02x */\n", $comb_filled[$i];
+
+        my @sub_idx;
+        for (my $j = 0; $j < 16; $j++)
+        {
+            my $idx = ($i << 4) | $j;
+            $sub_idx[$j] = $sub_comb_filled{$idx} || 0;
+        }
+        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @sub_idx );
+    }
+    print OUTPUT "\n};\n\n";
+
+    printf OUTPUT "static const USHORT offsets_comb[%d] =\n", 16 * $sub_comb_filled_pos;
+    print OUTPUT "{\n";
+    @null_table = (0) x 16;
+    print OUTPUT "    /* all-zero 16-char blocks get mapped to here */\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @null_table );
+    for my $key (sort {$a <=> $b} keys %sub_comb_filled)
+    {
+        printf OUTPUT ",\n    /* 0x%03x0 .. 0x%03xf */\n", $key, $key;
+        my @sub_table;
+        for (my $j = 0; $j < 16; $j++)
+        {
+            my $idx = ($key << 4) | $j;
+            $sub_table[$j] = $comb_lookup{$idx} || 0;
+        }
+        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @sub_table );
+    }
+    print OUTPUT "\n};\n\n";
+
+    # now for Full Composition Exclusion
+
+    printf OUTPUT "const WCHAR data_fullcomp[%d] =\n", $pos_fullcomp;
+    print OUTPUT "{\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @full_comp_data );
+    print OUTPUT "\n};\n\n";
+
+    my $fullcomp_pos = 1;
+    my $fullcomp_lim = ($lastchar_fullcomp >> 8) + 1;
+    my @fullcomp_filled = (0) x $fullcomp_lim;
+    for (my $i = 0; $i < $utflim; $i++)
+    {
+        last if $i > $lastchar_fullcomp;
+        next unless defined $full_comp_table[$i];
+        $fullcomp_filled[$i >> 8] = $fullcomp_pos++;
+        $i |= 255;
+    }
+    printf OUTPUT "const BYTE idx1_fullcomp[%d] =\n", $fullcomp_lim;
+    print OUTPUT "{\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%02x", 0, @fullcomp_filled );
+    print OUTPUT "\n};\n\n";
+
+    my $sub_fullcomp_filled_pos = 1;
+    my %sub_fullcomp_filled = ();
+    for (my $i = 0; $i < $fullcomp_lim; $i++)
+    {
+        next unless $fullcomp_filled[$i];
+        for (my $j = 0; $j < 256; $j++)
+        {
+            my $idx = ($i << 8) | $j;
+            next unless defined $full_comp_table[$idx];
+            $sub_fullcomp_filled{$idx >> 4} = $sub_fullcomp_filled_pos++;
+            $j |= 15;
+        }
+    }
+
+    printf OUTPUT "const USHORT idx2_fullcomp[%d] =\n", $fullcomp_pos * 16;
+    print OUTPUT "{\n";
+    @null_idx = (0) x 16;
+    print OUTPUT "    /* all-zero 256-char blocks get mapped to here */\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @null_idx );
+    for (my $i = 0; $i < $fullcomp_lim; $i++)
+    {
+        next unless $fullcomp_filled[$i];
+        printf OUTPUT ",\n    /* sub-index 0x%02x */\n", $fullcomp_filled[$i];
+
+        my @sub_idx;
+        for (my $j = 0; $j < 16; $j++)
+        {
+            my $idx = ($i << 4) | $j;
+            $sub_idx[$j] = $sub_fullcomp_filled{$idx} || 0;
+        }
+        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @sub_idx );
+    }
+    print OUTPUT "\n};\n\n";
+
+    printf OUTPUT "const USHORT offsets_fullcomp[%d] =\n", 16 * $sub_fullcomp_filled_pos;
+    print OUTPUT "{\n";
+    @null_table = (0) x 16;
+    print OUTPUT "    /* all-zero 16-char blocks get mapped to here */\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @null_table );
+    for my $key (sort {$a <=> $b} keys %sub_fullcomp_filled)
+    {
+        printf OUTPUT ",\n    /* 0x%03x0 .. 0x%03xf */\n", $key, $key;
+        my @sub_table;
+        for (my $j = 0; $j < 16; $j++)
+        {
+            my $idx = ($key << 4) | $j;
+            $sub_table[$j] = $fullcomp_lookup{$idx} || 0;
+        }
+        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @sub_table );
+    }
+    print OUTPUT "\n};\n\n";
+
     print OUTPUT <<"EOF";
 static const WCHAR *unicode_table_lookup( UINT cp, int compat, const BYTE *idx1, UINT scale_idx1,
                                           const USHORT *idx2, UINT scale_idx2, const USHORT *offsets,
@@ -2511,6 +2762,20 @@ static const WCHAR *unicode_table_lookup( UINT cp, int compat, const BYTE *idx1,
     d = offsets[c];
 
     return &data[d];
+}
+
+static inline int reorderable_pair( WCHAR ch1, WCHAR ch2 )
+{
+    const WCHAR *cc1, *cc2;
+
+    if (ch1 == 0 || ch2 == 0) return 0;
+
+    cc1 = unicode_table_lookup( ch1, 0, idx1_comb, 8, idx2_comb, 4,
+                                offsets_comb, 4, data_comb, 0 );
+    cc2 = unicode_table_lookup( ch2, 0, idx1_comb, 8, idx2_comb, 4,
+                                offsets_comb, 4, data_comb, 0 );
+    if (*cc2 < *cc1) return 1;
+    else return 0;
 }
 
 static int decompose_char_recursive( int compat, UINT ch, WCHAR *dst, int dstlen )
@@ -2575,6 +2840,41 @@ int wine_unicode_decompose_string( int compat, const WCHAR *src,
     }
 
     return dstpos;
+}
+
+int is_starter( WCHAR ch )
+{
+    const WCHAR *map = unicode_table_lookup( ch, 0, idx1_comb, 8, idx2_comb, 4,
+                                             offsets_comb, 4, data_comb, 0 );
+    return (*map == 0) ? 1 : 0;
+}
+
+void unicode_canon_order( WCHAR *str, int strlen )
+{
+    int i, j, m;
+    int sublen = 0, tot_sublen = 0;
+    WCHAR *substr = str;
+
+    for (m = 1; m <= strlen; m++)
+    {
+        if (m == strlen || is_starter( str[m] )) sublen = m - tot_sublen;
+        else continue;
+
+        for (i = 0; i < sublen; i++)
+        {
+            for (j = 1; j < sublen; j++)
+            {
+                if (reorderable_pair( substr[j-1], substr[j] ))
+                {
+                    WCHAR swp = substr[j-1];
+                    substr[j-1] = substr[j];
+                    substr[j] = swp;
+                }
+            }
+        }
+        tot_sublen += m;
+        substr = str+m;
+    }
 }
 EOF
     close OUTPUT;
