@@ -1774,7 +1774,6 @@ enable_wineconsole
 enable_winedbg
 enable_winedevice
 enable_winefile
-enable_winemenubuilder
 enable_winemine
 enable_winemsibuilder
 enable_winepath
@@ -20976,7 +20975,6 @@ wine_fn_config_makefile programs/wineconsole enable_wineconsole
 wine_fn_config_makefile programs/winedbg enable_winedbg
 wine_fn_config_makefile programs/winedevice enable_winedevice
 wine_fn_config_makefile programs/winefile enable_winefile
-wine_fn_config_makefile programs/winemenubuilder enable_winemenubuilder
 wine_fn_config_makefile programs/winemine enable_winemine
 wine_fn_config_makefile programs/winemsibuilder enable_winemsibuilder
 wine_fn_config_makefile programs/winepath enable_winepath
