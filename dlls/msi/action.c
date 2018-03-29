@@ -7769,6 +7769,7 @@ static const struct
     const UINT template;
     UINT (*handler)(MSIPACKAGE *);
     const WCHAR *action_rollback;
+    BOOL disable_wow64_redir; /* workaround winehq bug 30713 */
 }
 StandardActions[] =
 {
@@ -7778,19 +7779,19 @@ StandardActions[] =
     { szCCPSearch, IDS_DESC_CCPSEARCH, 0, ACTION_CCPSearch, NULL },
     { szCostFinalize, IDS_DESC_COSTFINALIZE, 0, ACTION_CostFinalize, NULL },
     { szCostInitialize, IDS_DESC_COSTINITIALIZE, 0, ACTION_CostInitialize, NULL },
-    { szCreateFolders, IDS_DESC_CREATEFOLDERS, IDS_TEMP_CREATEFOLDERS, ACTION_CreateFolders, szRemoveFolders },
+    { szCreateFolders, IDS_DESC_CREATEFOLDERS, IDS_TEMP_CREATEFOLDERS, ACTION_CreateFolders, szRemoveFolders, TRUE },
     { szCreateShortcuts, IDS_DESC_CREATESHORTCUTS, IDS_TEMP_CREATESHORTCUTS, ACTION_CreateShortcuts, szRemoveShortcuts },
     { szDeleteServices, IDS_DESC_DELETESERVICES, IDS_TEMP_DELETESERVICES, ACTION_DeleteServices, szInstallServices },
     { szDisableRollback, 0, 0, ACTION_DisableRollback, NULL },
-    { szDuplicateFiles, IDS_DESC_DUPLICATEFILES, IDS_TEMP_DUPLICATEFILES, ACTION_DuplicateFiles, szRemoveDuplicateFiles },
+    { szDuplicateFiles, IDS_DESC_DUPLICATEFILES, IDS_TEMP_DUPLICATEFILES, ACTION_DuplicateFiles, szRemoveDuplicateFiles, TRUE },
     { szExecuteAction, 0, 0, ACTION_ExecuteAction, NULL },
-    { szFileCost, IDS_DESC_FILECOST, 0, ACTION_FileCost, NULL },
+    { szFileCost, IDS_DESC_FILECOST, 0, ACTION_FileCost, NULL, TRUE },
     { szFindRelatedProducts, IDS_DESC_FINDRELATEDPRODUCTS, IDS_TEMP_FINDRELATEDPRODUCTS, ACTION_FindRelatedProducts, NULL },
     { szForceReboot, 0, 0, ACTION_ForceReboot, NULL },
     { szInstallAdminPackage, IDS_DESC_INSTALLADMINPACKAGE, IDS_TEMP_INSTALLADMINPACKAGE, ACTION_InstallAdminPackage, NULL },
     { szInstallExecute, 0, 0, ACTION_InstallExecute, NULL },
     { szInstallExecuteAgain, 0, 0, ACTION_InstallExecute, NULL },
-    { szInstallFiles, IDS_DESC_INSTALLFILES, IDS_TEMP_INSTALLFILES, ACTION_InstallFiles, szRemoveFiles },
+    { szInstallFiles, IDS_DESC_INSTALLFILES, IDS_TEMP_INSTALLFILES, ACTION_InstallFiles, szRemoveFiles, TRUE },
     { szInstallFinalize, 0, 0, ACTION_InstallFinalize, NULL },
     { szInstallInitialize, 0, 0, ACTION_InstallInitialize, NULL },
     { szInstallODBC, IDS_DESC_INSTALLODBC, 0, ACTION_InstallODBC, szRemoveODBC },
@@ -7800,7 +7801,7 @@ StandardActions[] =
     { szIsolateComponents, 0, 0, ACTION_IsolateComponents, NULL },
     { szLaunchConditions, IDS_DESC_LAUNCHCONDITIONS, 0, ACTION_LaunchConditions, NULL },
     { szMigrateFeatureStates, IDS_DESC_MIGRATEFEATURESTATES, IDS_TEMP_MIGRATEFEATURESTATES, ACTION_MigrateFeatureStates, NULL },
-    { szMoveFiles, IDS_DESC_MOVEFILES, IDS_TEMP_MOVEFILES, ACTION_MoveFiles, NULL },
+    { szMoveFiles, IDS_DESC_MOVEFILES, IDS_TEMP_MOVEFILES, ACTION_MoveFiles, NULL, TRUE },
     { szMsiPublishAssemblies, IDS_DESC_MSIPUBLISHASSEMBLIES, IDS_TEMP_MSIPUBLISHASSEMBLIES, ACTION_MsiPublishAssemblies, szMsiUnpublishAssemblies },
     { szMsiUnpublishAssemblies, IDS_DESC_MSIUNPUBLISHASSEMBLIES, IDS_TEMP_MSIUNPUBLISHASSEMBLIES, ACTION_MsiUnpublishAssemblies, szMsiPublishAssemblies },
     { szPatchFiles, IDS_DESC_PATCHFILES, IDS_TEMP_PATCHFILES, ACTION_PatchFiles, NULL },
@@ -7817,12 +7818,12 @@ StandardActions[] =
     { szRegisterProgIdInfo, IDS_DESC_REGISTERPROGIDINFO, IDS_TEMP_REGISTERPROGIDINFO, ACTION_RegisterProgIdInfo, szUnregisterProgIdInfo },
     { szRegisterTypeLibraries, IDS_DESC_REGISTERTYPELIBRARIES, IDS_TEMP_REGISTERTYPELIBRARIES, ACTION_RegisterTypeLibraries, szUnregisterTypeLibraries },
     { szRegisterUser, IDS_DESC_REGISTERUSER, 0, ACTION_RegisterUser, NULL },
-    { szRemoveDuplicateFiles, IDS_DESC_REMOVEDUPLICATEFILES, IDS_TEMP_REMOVEDUPLICATEFILES, ACTION_RemoveDuplicateFiles, szDuplicateFiles },
+    { szRemoveDuplicateFiles, IDS_DESC_REMOVEDUPLICATEFILES, IDS_TEMP_REMOVEDUPLICATEFILES, ACTION_RemoveDuplicateFiles, szDuplicateFiles, TRUE },
     { szRemoveEnvironmentStrings, IDS_DESC_REMOVEENVIRONMENTSTRINGS, IDS_TEMP_REMOVEENVIRONMENTSTRINGS, ACTION_RemoveEnvironmentStrings, szWriteEnvironmentStrings },
     { szRemoveExistingProducts, IDS_DESC_REMOVEEXISTINGPRODUCTS, IDS_TEMP_REMOVEEXISTINGPRODUCTS, ACTION_RemoveExistingProducts, NULL },
-    { szRemoveFiles, IDS_DESC_REMOVEFILES, IDS_TEMP_REMOVEFILES, ACTION_RemoveFiles, szInstallFiles },
-    { szRemoveFolders, IDS_DESC_REMOVEFOLDERS, IDS_TEMP_REMOVEFOLDERS, ACTION_RemoveFolders, szCreateFolders },
-    { szRemoveIniValues, IDS_DESC_REMOVEINIVALUES, IDS_TEMP_REMOVEINIVALUES, ACTION_RemoveIniValues, szWriteIniValues },
+    { szRemoveFiles, IDS_DESC_REMOVEFILES, IDS_TEMP_REMOVEFILES, ACTION_RemoveFiles, szInstallFiles, TRUE },
+    { szRemoveFolders, IDS_DESC_REMOVEFOLDERS, IDS_TEMP_REMOVEFOLDERS, ACTION_RemoveFolders, szCreateFolders, TRUE },
+    { szRemoveIniValues, IDS_DESC_REMOVEINIVALUES, IDS_TEMP_REMOVEINIVALUES, ACTION_RemoveIniValues, szWriteIniValues, TRUE },
     { szRemoveODBC, IDS_DESC_REMOVEODBC, 0, ACTION_RemoveODBC, szInstallODBC },
     { szRemoveRegistryValues, IDS_DESC_REMOVEREGISTRYVALUES, IDS_TEMP_REMOVEREGISTRYVALUES, ACTION_RemoveRegistryValues, szWriteRegistryValues },
     { szRemoveShortcuts, IDS_DESC_REMOVESHORTCUTS, IDS_TEMP_REMOVESHORTCUTS, ACTION_RemoveShortcuts, szCreateShortcuts },
@@ -7857,6 +7858,15 @@ static UINT ACTION_HandleStandardAction(MSIPACKAGE *package, LPCWSTR action)
     UINT rc = ERROR_FUNCTION_NOT_CALLED;
     UINT i;
 
+/* workaround winehq bug 30713 - Disable wow64 redirection when working with files
+ * in 64-bit packages and 32-bit processes. */
+#if __i386__
+    BOOL disable_wow64_redir = (package->platform == PLATFORM_X64 || package->platform == PLATFORM_INTEL64);
+#else
+    BOOL disable_wow64_redir = FALSE;
+#endif
+    void *old_redir_value;
+
     i = 0;
     while (StandardActions[i].action != NULL)
     {
@@ -7873,7 +7883,15 @@ static UINT ACTION_HandleStandardAction(MSIPACKAGE *package, LPCWSTR action)
             if (StandardActions[i].handler)
             {
                 ui_actioninfo( package, action, TRUE, 0 );
+
+                if (disable_wow64_redir && StandardActions[i].disable_wow64_redir)
+                    Wow64DisableWow64FsRedirection( &old_redir_value );
+
                 rc = StandardActions[i].handler( package );
+
+                if (disable_wow64_redir && StandardActions[i].disable_wow64_redir)
+                    Wow64RevertWow64FsRedirection( old_redir_value );
+
                 ui_actioninfo( package, action, FALSE, !rc );
 
                 if (StandardActions[i].action_rollback && !package->need_rollback)
