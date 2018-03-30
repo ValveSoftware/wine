@@ -82,6 +82,7 @@ DWORD	                dbg_curr_pid = 0;
 dbg_ctx_t               dbg_context;
 BOOL    	        dbg_interactiveP = FALSE;
 HANDLE                  dbg_houtput = 0;
+BOOL                    dbg_use_wine_dbg_output = FALSE;
 
 static struct list      dbg_process_list = LIST_INIT(dbg_process_list);
 
@@ -93,6 +94,12 @@ static void dbg_outputA(const char* buffer, int len)
     static unsigned int line_pos;
 
     DWORD w, i;
+
+    if (dbg_use_wine_dbg_output)
+    {
+        __wine_dbg_output(buffer);
+        return;
+    }
 
     while (len > 0)
     {
