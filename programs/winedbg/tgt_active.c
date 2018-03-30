@@ -907,6 +907,9 @@ enum dbg_start dbg_active_auto(int argc, char* argv[])
         if (event) thread = display_crash_details( event );
         if (thread) dbg_houtput = output = create_temp_file();
         break;
+    case TRUE:
+        dbg_use_wine_dbg_output = TRUE;
+        break;
     }
 
     input = parser_generate_command_file("echo Modules:", "info share",
