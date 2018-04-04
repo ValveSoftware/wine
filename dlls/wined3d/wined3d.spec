@@ -316,3 +316,4 @@
 @ cdecl wined3d_vertex_declaration_incref(ptr)
 
 @ cdecl wined3d_access_gl_texture(ptr ptr ptr long)
+@ cdecl wined3d_device_run_cs_callback(ptr ptr ptr long)
