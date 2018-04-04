@@ -29,3 +29,15 @@ interface IWineD3D11Texture2D : ID3D11Texture2D
 {
     void access_gl_texture(gl_texture_callback callback, const void *data, unsigned int data_size);
 }
+
+typedef void (__cdecl *user_cs_callback)(const void *data, unsigned int data_size);
+
+[
+    object,
+    local,
+    uuid(8f02de7e-d55d-457b-9423-83456e49c58a)
+]
+interface IWineD3D11Device : IUnknown
+{
+    void run_on_command_stream(user_cs_callback callback, const void *data, unsigned int data_size);
+}
