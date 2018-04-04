@@ -2946,7 +2946,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_device_CreateTexture2D(ID3D11Device2 *ifa
     if (FAILED(hr = d3d_texture2d_create(device, desc, data, &object)))
         return hr;
 
-    *texture = &object->ID3D11Texture2D_iface;
+    *texture = (ID3D11Texture2D *)&object->ID3D11Texture2D_iface;
 
     return S_OK;
 }
@@ -6211,7 +6211,7 @@ static HRESULT CDECL device_parent_create_swapchain_texture(struct wined3d_devic
 
     *wined3d_texture = texture->wined3d_texture;
     wined3d_texture_incref(*wined3d_texture);
-    ID3D11Texture2D_Release(&texture->ID3D11Texture2D_iface);
+    IWineD3D11Texture2D_Release(&texture->ID3D11Texture2D_iface);
 
     return S_OK;
 }

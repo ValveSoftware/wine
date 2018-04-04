@@ -521,13 +521,20 @@ HRESULT d3d_texture1d_create(struct d3d_device *device, const D3D11_TEXTURE1D_DE
 
 /* ID3D11Texture2D methods */
 
-static HRESULT STDMETHODCALLTYPE d3d11_texture2d_QueryInterface(ID3D11Texture2D *iface, REFIID riid, void **object)
+static inline struct d3d_texture2d *impl_from_IWineD3D11Texture2D(IWineD3D11Texture2D *iface)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    return CONTAINING_RECORD(iface, struct d3d_texture2d, ID3D11Texture2D_iface);
+}
+
+static HRESULT STDMETHODCALLTYPE d3d11_texture2d_QueryInterface(IWineD3D11Texture2D *iface,
+        REFIID riid, void **object)
+{
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
 
     TRACE("iface %p, riid %s, object %p.\n", iface, debugstr_guid(riid), object);
 
-    if (IsEqualGUID(riid, &IID_ID3D11Texture2D)
+    if (IsEqualGUID(riid, &IID_IWineD3D11Texture2D)
+            || IsEqualGUID(riid, &IID_ID3D11Texture2D)
             || IsEqualGUID(riid, &IID_ID3D11Resource)
             || IsEqualGUID(riid, &IID_ID3D11DeviceChild)
             || IsEqualGUID(riid, &IID_IUnknown))
@@ -557,9 +564,9 @@ static HRESULT STDMETHODCALLTYPE d3d11_texture2d_QueryInterface(ID3D11Texture2D 
     return E_NOINTERFACE;
 }
 
-static ULONG STDMETHODCALLTYPE d3d11_texture2d_AddRef(ID3D11Texture2D *iface)
+static ULONG STDMETHODCALLTYPE d3d11_texture2d_AddRef(IWineD3D11Texture2D *iface)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
     ULONG refcount = InterlockedIncrement(&texture->refcount);
 
     TRACE("%p increasing refcount to %u.\n", texture, refcount);
@@ -575,9 +582,9 @@ static ULONG STDMETHODCALLTYPE d3d11_texture2d_AddRef(ID3D11Texture2D *iface)
     return refcount;
 }
 
-static ULONG STDMETHODCALLTYPE d3d11_texture2d_Release(ID3D11Texture2D *iface)
+static ULONG STDMETHODCALLTYPE d3d11_texture2d_Release(IWineD3D11Texture2D *iface)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
     ULONG refcount = InterlockedDecrement(&texture->refcount);
 
     TRACE("%p decreasing refcount to %u.\n", texture, refcount);
@@ -597,9 +604,9 @@ static ULONG STDMETHODCALLTYPE d3d11_texture2d_Release(ID3D11Texture2D *iface)
     return refcount;
 }
 
-static void STDMETHODCALLTYPE d3d11_texture2d_GetDevice(ID3D11Texture2D *iface, ID3D11Device **device)
+static void STDMETHODCALLTYPE d3d11_texture2d_GetDevice(IWineD3D11Texture2D *iface, ID3D11Device **device)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
 
     TRACE("iface %p, device %p.\n", iface, device);
 
@@ -607,10 +614,10 @@ static void STDMETHODCALLTYPE d3d11_texture2d_GetDevice(ID3D11Texture2D *iface, 
     ID3D11Device_AddRef(*device);
 }
 
-static HRESULT STDMETHODCALLTYPE d3d11_texture2d_GetPrivateData(ID3D11Texture2D *iface,
+static HRESULT STDMETHODCALLTYPE d3d11_texture2d_GetPrivateData(IWineD3D11Texture2D *iface,
         REFGUID guid, UINT *data_size, void *data)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
     IDXGISurface *dxgi_surface;
     HRESULT hr;
 
@@ -627,10 +634,10 @@ static HRESULT STDMETHODCALLTYPE d3d11_texture2d_GetPrivateData(ID3D11Texture2D 
     return d3d_get_private_data(&texture->private_store, guid, data_size, data);
 }
 
-static HRESULT STDMETHODCALLTYPE d3d11_texture2d_SetPrivateData(ID3D11Texture2D *iface,
+static HRESULT STDMETHODCALLTYPE d3d11_texture2d_SetPrivateData(IWineD3D11Texture2D *iface,
         REFGUID guid, UINT data_size, const void *data)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
     IDXGISurface *dxgi_surface;
     HRESULT hr;
 
@@ -647,10 +654,10 @@ static HRESULT STDMETHODCALLTYPE d3d11_texture2d_SetPrivateData(ID3D11Texture2D 
     return d3d_set_private_data(&texture->private_store, guid, data_size, data);
 }
 
-static HRESULT STDMETHODCALLTYPE d3d11_texture2d_SetPrivateDataInterface(ID3D11Texture2D *iface,
+static HRESULT STDMETHODCALLTYPE d3d11_texture2d_SetPrivateDataInterface(IWineD3D11Texture2D *iface,
         REFGUID guid, const IUnknown *data)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
     IDXGISurface *dxgi_surface;
     HRESULT hr;
 
@@ -667,7 +674,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_texture2d_SetPrivateDataInterface(ID3D11T
     return d3d_set_private_data_interface(&texture->private_store, guid, data);
 }
 
-static void STDMETHODCALLTYPE d3d11_texture2d_GetType(ID3D11Texture2D *iface,
+static void STDMETHODCALLTYPE d3d11_texture2d_GetType(IWineD3D11Texture2D *iface,
         D3D11_RESOURCE_DIMENSION *resource_dimension)
 {
     TRACE("iface %p, resource_dimension %p.\n", iface, resource_dimension);
@@ -675,21 +682,21 @@ static void STDMETHODCALLTYPE d3d11_texture2d_GetType(ID3D11Texture2D *iface,
     *resource_dimension = D3D11_RESOURCE_DIMENSION_TEXTURE2D;
 }
 
-static void STDMETHODCALLTYPE d3d11_texture2d_SetEvictionPriority(ID3D11Texture2D *iface, UINT eviction_priority)
+static void STDMETHODCALLTYPE d3d11_texture2d_SetEvictionPriority(IWineD3D11Texture2D *iface, UINT eviction_priority)
 {
     FIXME("iface %p, eviction_priority %#x stub!\n", iface, eviction_priority);
 }
 
-static UINT STDMETHODCALLTYPE d3d11_texture2d_GetEvictionPriority(ID3D11Texture2D *iface)
+static UINT STDMETHODCALLTYPE d3d11_texture2d_GetEvictionPriority(IWineD3D11Texture2D *iface)
 {
     FIXME("iface %p stub!\n", iface);
 
     return 0;
 }
 
-static void STDMETHODCALLTYPE d3d11_texture2d_GetDesc(ID3D11Texture2D *iface, D3D11_TEXTURE2D_DESC *desc)
+static void STDMETHODCALLTYPE d3d11_texture2d_GetDesc(IWineD3D11Texture2D *iface, D3D11_TEXTURE2D_DESC *desc)
 {
-    struct d3d_texture2d *texture = impl_from_ID3D11Texture2D(iface);
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
     struct wined3d_resource_desc wined3d_desc;
 
     TRACE("iface %p, desc %p.\n", iface, desc);
@@ -711,7 +718,19 @@ static void STDMETHODCALLTYPE d3d11_texture2d_GetDesc(ID3D11Texture2D *iface, D3
     desc->SampleDesc.Quality = wined3d_desc.multisample_quality;
 }
 
-static const struct ID3D11Texture2DVtbl d3d11_texture2d_vtbl =
+static void STDMETHODCALLTYPE d3d11_texture2d_access_gl_texture(IWineD3D11Texture2D *iface,
+        gl_texture_callback callback, const void *data, unsigned int size)
+{
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
+
+    TRACE("iface %p, callback %p, data %p, size %u.\n", iface, callback, data, size);
+
+    wined3d_mutex_lock();
+    wined3d_access_gl_texture(texture->wined3d_texture, callback, data, size);
+    wined3d_mutex_unlock();
+}
+
+static const struct IWineD3D11Texture2DVtbl d3d11_texture2d_vtbl =
 {
     /* IUnknown methods */
     d3d11_texture2d_QueryInterface,
@@ -728,13 +747,15 @@ static const struct ID3D11Texture2DVtbl d3d11_texture2d_vtbl =
     d3d11_texture2d_GetEvictionPriority,
     /* ID3D11Texture2D methods */
     d3d11_texture2d_GetDesc,
+    /* IWineD3D11Texture methods */
+    d3d11_texture2d_access_gl_texture,
 };
 
 struct d3d_texture2d *unsafe_impl_from_ID3D11Texture2D(ID3D11Texture2D *iface)
 {
     if (!iface)
         return NULL;
-    assert(iface->lpVtbl == &d3d11_texture2d_vtbl);
+    assert(iface->lpVtbl == (void *)&d3d11_texture2d_vtbl);
     return CONTAINING_RECORD(iface, struct d3d_texture2d, ID3D11Texture2D_iface);
 }
 
