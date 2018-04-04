@@ -3646,6 +3646,9 @@ HRESULT wined3d_cs_map(struct wined3d_cs *cs, struct wined3d_resource *resource,
 HRESULT wined3d_cs_unmap(struct wined3d_cs *cs, struct wined3d_resource *resource,
         unsigned int sub_resource_idx) DECLSPEC_HIDDEN;
 
+void wined3d_cs_emit_gl_texture_callback(struct wined3d_cs *cs, struct wined3d_texture *texture,
+        wined3d_gl_texture_callback callback, const void *data, unsigned int size) DECLSPEC_HIDDEN;
+
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)
 {
