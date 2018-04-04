@@ -22,7 +22,7 @@
 
 #include "wine/unicode.h"
 
-extern unsigned int wine_decompose( WCHAR ch, WCHAR *dst, unsigned int dstlen ) DECLSPEC_HIDDEN;
+extern int wine_unicode_decompose_string( int compat, const WCHAR *src, int srclen, WCHAR *dst, int dstlen );
 
 /* check the code whether it is in Unicode Private Use Area (PUA). */
 /* MB_ERR_INVALID_CHARS raises an error converting from 1-byte character to PUA. */
@@ -101,19 +101,19 @@ static int mbstowcs_sbcs_decompose( const struct sbcs_table *table, int flags,
                                     WCHAR *dst, unsigned int dstlen )
 {
     const WCHAR * const cp2uni = (flags & MB_USEGLYPHCHARS) ? table->cp2uni_glyphs : table->cp2uni;
-    unsigned int len;
+    int len;
 
     if (!dstlen)  /* compute length */
     {
         WCHAR dummy[4]; /* no decomposition is larger than 4 chars */
         for (len = 0; srclen; srclen--, src++)
-            len += wine_decompose( cp2uni[*src], dummy, 4 );
+            len += wine_unicode_decompose_string( 0, &cp2uni[*src], 1, dummy, 4 );
         return len;
     }
 
     for (len = dstlen; srclen && len; srclen--, src++)
     {
-        unsigned int res = wine_decompose( cp2uni[*src], dst, len );
+        int res = wine_unicode_decompose_string( 0, &cp2uni[*src], 1, dst, len );
         if (!res) break;
         len -= res;
         dst += res;
@@ -203,7 +203,7 @@ static int mbstowcs_dbcs_decompose( const struct dbcs_table *table,
 {
     const WCHAR * const cp2uni = table->cp2uni;
     const unsigned char * const cp2uni_lb = table->cp2uni_leadbytes;
-    unsigned int len, res;
+    int len, res;
     WCHAR ch;
 
     if (!dstlen)  /* compute length */
@@ -219,7 +219,7 @@ static int mbstowcs_dbcs_decompose( const struct dbcs_table *table,
                 ch = cp2uni[(off << 8) + *src];
             }
             else ch = cp2uni[*src];
-            len += wine_decompose( ch, dummy, 4 );
+            len += wine_unicode_decompose_string( 0, &ch, 1, dummy, 4 );
         }
         return len;
     }
@@ -234,7 +234,7 @@ static int mbstowcs_dbcs_decompose( const struct dbcs_table *table,
             ch = cp2uni[(off << 8) + *src];
         }
         else ch = cp2uni[*src];
-        if (!(res = wine_decompose( ch, dst, len ))) break;
+        if (!(res = wine_unicode_decompose_string( 0, &ch, 1, dst, len ))) break;
         dst += res;
         len -= res;
     }

@@ -472,6 +472,28 @@ sub READ_DEFAULTS($)
 
         next if $decomp eq "";  # no decomposition, skip it
 
+        # store decomposition table
+        if ($decomp =~ /^<([a-zA-Z]+)>(\s+[0-9a-fA-F]+)+$/)
+        {
+            my @seq = ();
+            for my $ch (split /\s+/, (split /\s+/, $decomp, 2)[1])
+            {
+                push @seq, (hex $ch);
+            }
+            $decomp_table[$src] = [1, \@seq];
+        }
+        elsif ($decomp =~ /^([0-9a-fA-F]+)(\s+([0-9a-fA-F]+))*$/)
+        {
+            my @seq = ();
+            for my $ch (split /\s+/, $decomp)
+            {
+                # we don't support surrogates at the moment
+                next if hex $ch > 0xffff;
+                push @seq, (hex $ch);
+            }
+            $decomp_table[$src] = [0, \@seq];
+        }
+
         if ($decomp =~ /^<([a-zA-Z]+)>\s+([0-9a-fA-F]+)$/)
         {
             # decomposition of the form "<foo> 1234" -> use char if type is known
@@ -506,16 +528,13 @@ sub READ_DEFAULTS($)
             # decomposition contains only char values without prefix -> use first char
             $dst = hex $1;
             $category_table[$src] |= $category_table[$dst] if defined $category_table[$dst];
-            # store decomposition if it contains two chars
             if ($decomp =~ /^([0-9a-fA-F]+)\s+([0-9a-fA-F]+)$/)
             {
-                $decomp_table[$src] = [ hex $1, hex $2 ];
                 push @compose_table, [ hex $1, hex $2, $src ];
             }
             elsif ($decomp =~ /^(<[a-z]+>\s)*([0-9a-fA-F]+)$/ &&
                    (($src >= 0xf900 && $src < 0xfb00) || ($src >= 0xfe30 && $src < 0xfffd)))
             {
-                # Single char decomposition in the compatibility range
                 $compatmap_table[$src] = hex $2;
             }
         }
@@ -2264,6 +2283,51 @@ EOF
     save_file($filename);
 }
 
+sub do_decomp
+{
+    my ($char, $table_ref, $compat) = @_;
+
+    return ($char) unless defined $table_ref->[$char];
+    my $data = $table_ref->[$char];
+    return ($char) if $data->[0] && !$compat;
+    my @mapping = ();
+    for my $ch (@{$data->[1]})
+    {
+        push @mapping, $ch;
+    }
+    return @mapping;
+}
+
+sub expand_pairs
+{
+    my @data = @_;
+    my @result = ();
+
+    for my $ch (@data)
+    {
+        if ($ch <= 0xFFFF)
+        {
+            push @result, $ch;
+        }
+        elsif ($ch >= 2097152) # 2**21
+        {
+            die sprintf "Invalid Unicode character %04x\n", $ch;
+        }
+        else
+        {
+            my $hx = $ch & 0xFFFF;
+            my $hu = ($ch >> 16) & ((1 << 5) - 1);
+            my $hw = ($hu - 1) & 0xFFFF;
+            my $hi = 0xD800 | ($hw << 6) | ($hx >> 10);
+            my $lx = $ch & 0xFFFF;
+            my $lo = (0xDC00 | ($lx & ((1 << 10) - 1))) & 0xFFFF;
+            push @result, $hi;
+            push @result, $lo;
+        }
+    }
+    return @result;
+}
+
 ################################################################
 # dump the char decomposition table
 sub dump_decompose_table($)
@@ -2272,98 +2336,245 @@ sub dump_decompose_table($)
 
     open OUTPUT,">$filename.new" or die "Cannot create $filename";
     print "Building $filename\n";
-    print OUTPUT "/* Unicode char composition */\n";
+    print OUTPUT "/* Unicode char decomposition */\n";
     print OUTPUT "/* generated from $UNIDATA/UnicodeData.txt */\n";
     print OUTPUT "/* DO NOT EDIT!! */\n\n";
     print OUTPUT "#include \"wine/unicode.h\"\n\n";
 
-    # first determine all the 16-char subsets that contain something
+    # limit code points to BMP
+    my $utflim = 65536;
+    my %nfd_lookup = ();
+    my %nfkd_lookup = ();
+    my %decomp_lookup = ();
+    my @decomp_data = (0);
+    my $pos = 1;
+    my $lastchar_decomp;
 
-    my @filled = (0) x 4096;
-    my $pos = 16*2;  # for the null subset
-    for (my $i = 0; $i < 65536; $i++)
+    for (my $i = 0; $i < $utflim; $i++)
     {
         next unless defined $decomp_table[$i];
-        $filled[$i >> 4] = $pos;
-        $pos += 16*2;
-        $i |= 15;
+
+        if (defined $decomp_table[$i])
+        {
+            $lastchar_decomp = $i;
+            # fully expand input and mappings
+
+            my @char;
+            push @char, $i;
+            push @char, 0;
+            my $char = pack "n*", @char;
+
+            my @nfd = do_decomp( $i, \@decomp_table, 0 );
+            push @nfd, 0;
+            my $nfd = pack "n*", @nfd;
+
+            my @nfkd = do_decomp( $i, \@decomp_table, 1 );
+            push @nfkd, 0;
+            my $nfkd = pack "n*", @nfkd;
+
+            # lookup or add mappings
+
+            if ($nfd eq $char)
+            {
+                $nfd = undef;
+            }
+            elsif (exists $decomp_lookup{$nfd})
+            {
+                $nfd_lookup{$i} = $decomp_lookup{$nfd};
+            }
+            else
+            {
+                push @decomp_data, @nfd;
+                $decomp_lookup{$nfd} = $pos;
+                $nfd_lookup{$i} = $pos;
+                $pos += @nfd;
+            }
+
+            if ($nfkd eq $char)
+            {
+                $nfkd = undef;
+            }
+            elsif (exists $decomp_lookup{$nfkd})
+            {
+                $nfkd_lookup{$i} = $decomp_lookup{$nfkd};
+            }
+            else
+            {
+                push @decomp_data, @nfkd;
+                $decomp_lookup{$nfkd} = $pos;
+                $nfkd_lookup{$i} = $pos;
+                $pos += @nfkd;
+            }
+        }
     }
-    my $total = $pos;
 
-    # now count the 256-char subsets that contain something
+    printf OUTPUT "static const UINT last_decomposable = 0x%x;\n\n", $lastchar_decomp;
 
-    my @filled_idx = (256) x 256;
-    $pos = 256 + 16;
-    for (my $i = 0; $i < 4096; $i++)
+    # dump decomposition data
+
+    printf OUTPUT "static const WCHAR data_decomp[%d] =\n", $pos;
+    print OUTPUT "{\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @decomp_data );
+    print OUTPUT "\n};\n\n";
+
+    # find 256-char subsets that contain something
+
+    my $filled_pos = 1;
+    my $filled_lim = ($lastchar_decomp >> 8) + 1;
+    my @filled = (0) x $filled_lim;
+    for (my $i = 0; $i < $utflim; $i++)
+    {
+        last if $i > $lastchar_decomp;
+        next unless exists $nfd_lookup{$i} || exists $nfkd_lookup{$i};
+        $filled[$i >> 8] = $filled_pos++;
+        $i |= 255;
+    }
+
+    # dump index of 256-char subsets
+
+    printf OUTPUT "static const BYTE idx1_decomp[%d] =\n", $filled_lim;
+    print OUTPUT "{\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%02x", 0, @filled );
+    print OUTPUT "\n};\n\n";
+
+    # for 256-char subsets, find non-empty 16-char subsets
+
+    my $sub_filled_pos = 1;
+    my %sub_filled = ();
+    for (my $i = 0; $i < $filled_lim; $i++)
     {
         next unless $filled[$i];
-        $filled_idx[$i >> 4] = $pos;
-        $pos += 16;
-        $i |= 15;
+        for (my $j = 0; $j < 256; $j++)
+        {
+            my $idx = ($i << 8) | $j;
+            next unless exists $nfd_lookup{$idx} || exists $nfkd_lookup{$idx};
+            $sub_filled{$idx >> 4} = $sub_filled_pos++;
+            $j |= 15;
+        }
     }
-    my $null_offset = $pos;  # null mapping
-    $total += $pos;
 
-    # add the index offsets to the subsets positions
+    # dump index of 16-char subsets
 
-    for (my $i = 0; $i < 4096; $i++)
+    printf OUTPUT "static const USHORT idx2_decomp[%d] =\n", $filled_pos * 16;
+    print OUTPUT "{\n";
+    my @null_idx = (0) x 16;
+    print OUTPUT "    /* null sub-index */\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @null_idx );
+    for (my $i = 0; $i < $filled_lim; $i++)
     {
         next unless $filled[$i];
-        $filled[$i] += $null_offset;
+        printf OUTPUT ",\n    /* sub-index 0x%02x */\n", $filled[$i];
+
+        my @sub_idx;
+        for (my $j = 0; $j < 16; $j++)
+        {
+            my $idx = ($i << 4) | $j;
+            $sub_idx[$j] = $sub_filled{$idx} || 0;
+        }
+        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @sub_idx );
     }
-
-    # dump the main index
-
-    printf OUTPUT "static const WCHAR table[%d] =\n", $total;
-    printf OUTPUT "{\n    /* index */\n";
-    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @filled_idx );
-    printf OUTPUT ",\n    /* null sub-index */\n%s", DUMP_ARRAY( "0x%04x", 0, ($null_offset) x 16 );
-
-    # dump the second-level indexes
-
-    for (my $i = 0; $i < 256; $i++)
-    {
-        next unless ($filled_idx[$i] > 256);
-        my @table = @filled[($i<<4)..($i<<4)+15];
-        for (my $j = 0; $j < 16; $j++) { $table[$j] ||= $null_offset; }
-        printf OUTPUT ",\n    /* sub-index %02x */\n", $i;
-        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @table );
-    }
+    print OUTPUT "\n};\n\n";
 
     # dump the 16-char subsets
 
-    printf OUTPUT ",\n    /* null mapping */\n";
-    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, (0) x 32 );
-
-    for (my $i = 0; $i < 4096; $i++)
+    printf OUTPUT "static const USHORT offsets_decomp[%d] =\n", 32 * $sub_filled_pos;
+    print OUTPUT "{\n";
+    print OUTPUT "    /* (nfd, nfkd) x 16 */\n";
+    my @null_table = (0) x 32;
+    print OUTPUT "    /* no decomposition */\n";
+    printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @null_table );
+    for my $key (sort {$a <=> $b} keys %sub_filled)
     {
-        next unless $filled[$i];
-        my @table = (0) x 32;
+        printf OUTPUT ",\n    /* 0x%03x0 .. 0x%03xf */\n", $key, $key;
+        my @sub_table;
         for (my $j = 0; $j < 16; $j++)
         {
-            if (defined $decomp_table[($i<<4) + $j])
+            my $idx = ($key << 4) | $j;
+            $sub_table[2 * $j] = $nfd_lookup{$idx} || 0;
+            $sub_table[2 * $j + 1] = $nfkd_lookup{$idx} || 0;
+        }
+        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @sub_table );
+    }
+    print OUTPUT "\n};\n\n";
+
+    print OUTPUT <<"EOF";
+static const WCHAR *unicode_table_lookup( UINT cp, int compat, const BYTE *idx1, UINT scale_idx1,
+                                          const USHORT *idx2, UINT scale_idx2, const USHORT *offsets,
+                                          UINT scale_off, const WCHAR *data, UINT scale_data )
+{
+    USHORT a, b, c, d;
+
+    a = idx1[cp >> scale_idx1];
+    b = idx2[(a << scale_idx2) + ((cp >> scale_idx2) & 0xf)];
+    c = (b << scale_off) + ((cp & 0xf) << scale_data);
+    if (compat) ++c;
+    d = offsets[c];
+
+    return &data[d];
+}
+
+static int decompose_char_recursive( int compat, UINT ch, WCHAR *dst, int dstlen )
+{
+    int total_decomp = 0;
+    int size_decomp;
+    const WCHAR *map;
+
+    if (ch < 0xa0) /* fast path */
+    {
+        if (dstlen) *dst = (WCHAR)ch;
+        return 1;
+    }
+    else if (ch > last_decomposable ||
+             !*(map = unicode_table_lookup( ch, compat, idx1_decomp, 8,
+                idx2_decomp, 4, offsets_decomp, 5, data_decomp, 1 )))
+    {
+        if (dstlen) *dst = (WCHAR)ch;
+        return 1;
+    }
+    else {
+        while (*map)
+        {
+            size_decomp = decompose_char_recursive( compat, *map, dst, dstlen );
+            dstlen -= size_decomp;
+            if (dstlen < 0) dstlen = 0;
+            dst += size_decomp;
+            map++;
+            total_decomp += size_decomp;
+        }
+        return total_decomp;
+    }
+}
+
+int wine_unicode_decompose_string( int compat, const WCHAR *src,
+                                   int srclen, WCHAR *dst, int dstlen )
+{
+    UINT ch;
+    int srcpos = 0, dstpos = 0;
+    int decomp_len;
+
+    if (dstlen < 0) dstlen = 0;
+
+    while (srcpos < srclen)
+    {
+        ch = src[srcpos];
+
+        decomp_len = decompose_char_recursive( compat, ch, dst+dstpos, dstlen );
+        dstpos += decomp_len;
+
+        if (dstlen > 0)
+        {
+            dstlen -= decomp_len;
+            while (dstlen < 0)
             {
-                $table[2 * $j] = ${$decomp_table[($i << 4) + $j]}[0];
-                $table[2 * $j + 1] = ${$decomp_table[($i << 4) + $j]}[1];
+                dstpos--;
+                dstlen++;
             }
         }
-        printf OUTPUT ",\n    /* 0x%03x0 .. 0x%03xf */\n", $i, $i;
-        printf OUTPUT "%s", DUMP_ARRAY( "0x%04x", 0, @table );
+
+        ++srcpos;
     }
 
-    printf OUTPUT "\n};\n\n";
-    print OUTPUT <<"EOF";
-unsigned int DECLSPEC_HIDDEN wine_decompose( WCHAR ch, WCHAR *dst, unsigned int dstlen )
-{
-    const WCHAR *ptr = table + table[table[ch >> 8] + ((ch >> 4) & 0x0f)] + 2 * (ch & 0xf);
-    unsigned int res;
-
-    *dst = ch;
-    if (!*ptr) return 1;
-    if (dstlen <= 1) return 0;
-    /* apply the decomposition recursively to the first char */
-    if ((res = wine_decompose( *ptr, dst, dstlen-1 ))) dst[res++] = ptr[1];
-    return res;
+    return dstpos;
 }
 EOF
     close OUTPUT;
