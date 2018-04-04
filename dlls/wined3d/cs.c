@@ -74,6 +74,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_COPY_UAV_COUNTER,
     WINED3D_CS_OP_GENERATE_MIPMAPS,
     WINED3D_CS_OP_GL_TEXTURE_CALLBACK,
+    WINED3D_CS_OP_USER_CALLBACK,
     WINED3D_CS_OP_STOP,
 };
 
@@ -445,6 +446,14 @@ struct wined3d_cs_gl_texture_callback
     enum wined3d_cs_op opcode;
     struct wined3d_texture *texture;
     wined3d_gl_texture_callback callback;
+    unsigned int data_size;
+    BYTE data[1];
+};
+
+struct wined3d_cs_user_callback
+{
+    enum wined3d_cs_op opcode;
+    wined3d_cs_callback callback;
     unsigned int data_size;
     BYTE data[1];
 };
@@ -2547,6 +2556,36 @@ void wined3d_cs_emit_gl_texture_callback(struct wined3d_cs *cs, struct wined3d_t
     cs->ops->submit(cs, WINED3D_CS_QUEUE_DEFAULT);
 }
 
+static void wined3d_cs_exec_user_callback(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_user_callback *op = data;
+    const struct wined3d_gl_info *gl_info;
+    struct wined3d_context *context;
+
+    context = context_acquire(cs->device, NULL, 0);
+    gl_info = context->gl_info;
+
+    op->callback(op->data, op->data_size);
+
+    checkGLcall("user callback\n");
+
+    context_release(context);
+}
+
+void wined3d_cs_emit_user_callback(struct wined3d_cs *cs,
+        wined3d_cs_callback callback, const void *data, unsigned int size)
+{
+    struct wined3d_cs_user_callback *op;
+
+    op = cs->ops->require_space(cs, sizeof(*op) + size, WINED3D_CS_QUEUE_DEFAULT);
+    op->opcode = WINED3D_CS_OP_USER_CALLBACK;
+    op->callback = callback;
+    op->data_size = size;
+    memcpy(op->data, data, size);
+
+    cs->ops->submit(cs, WINED3D_CS_QUEUE_DEFAULT);
+}
+
 static void wined3d_cs_emit_stop(struct wined3d_cs *cs)
 {
     struct wined3d_cs_stop *op;
@@ -2608,6 +2647,7 @@ static void (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_COPY_UAV_COUNTER            */ wined3d_cs_exec_copy_uav_counter,
     /* WINED3D_CS_OP_GENERATE_MIPMAPS            */ wined3d_cs_exec_generate_mipmaps,
     /* WINED3D_CS_OP_GL_TEXTURE_CALLBACK         */ wined3d_cs_exec_gl_texture_callback,
+    /* WINED3D_CS_OP_USER_CALLBACK               */ wined3d_cs_exec_user_callback,
 };
 
 static void *wined3d_cs_st_require_space(struct wined3d_cs *cs, size_t size, enum wined3d_cs_queue_id queue_id)
