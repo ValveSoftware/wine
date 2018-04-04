@@ -516,6 +516,7 @@ struct d3d_device
     ID3D10Multithread ID3D10Multithread_iface;
     IWineDXGIDeviceParent IWineDXGIDeviceParent_iface;
     IUnknown *outer_unk;
+    IWineD3D11Device IWineD3D11Device_iface;
     LONG refcount;
 
     D3D_FEATURE_LEVEL feature_level;
