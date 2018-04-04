@@ -666,6 +666,7 @@ SOURCES = \
 	wine/library.h \
 	wine/svcctl.idl \
 	wine/unicode.h \
+	wine/wined3d-interop.idl \
 	wine/winedxgi.idl \
 	winerror.h \
 	winevt.h \

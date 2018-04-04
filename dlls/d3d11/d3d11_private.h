@@ -38,6 +38,8 @@
 #include "wine/winedxgi.h"
 #include "wine/rbtree.h"
 
+#include "wine/wined3d-interop.h"
+
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 #endif
@@ -136,7 +138,7 @@ struct d3d_texture1d *unsafe_impl_from_ID3D10Texture1D(ID3D10Texture1D *iface) D
 /* ID3D11Texture2D, ID3D10Texture2D */
 struct d3d_texture2d
 {
-    ID3D11Texture2D ID3D11Texture2D_iface;
+    IWineD3D11Texture2D ID3D11Texture2D_iface;
     ID3D10Texture2D ID3D10Texture2D_iface;
     LONG refcount;
 
