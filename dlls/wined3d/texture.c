@@ -3566,3 +3566,13 @@ void wined3d_texture_upload_from_texture(struct wined3d_texture *dst_texture, un
     wined3d_texture_validate_location(dst_texture, dst_sub_resource_idx, WINED3D_LOCATION_TEXTURE_RGB);
     wined3d_texture_invalidate_location(dst_texture, dst_sub_resource_idx, ~WINED3D_LOCATION_TEXTURE_RGB);
 }
+
+void CDECL wined3d_access_gl_texture(struct wined3d_texture *texture,
+        wined3d_gl_texture_callback callback, const void *data, unsigned int size)
+{
+    struct wined3d_device *device = texture->resource.device;
+
+    TRACE("texture %p, callback %p, data %p, size %u.\n", texture, callback, data, size);
+
+    wined3d_cs_emit_gl_texture_callback(device->cs, texture, callback, data, size);
+}
