@@ -4284,3 +4284,13 @@ HRESULT wined3d_texture_vk_init(struct wined3d_texture_vk *texture_vk, struct wi
     return wined3d_texture_init(&texture_vk->t, desc, layer_count, level_count,
             flags, device, parent, parent_ops, &texture_vk[1], &wined3d_texture_vk_ops);
 }
+
+void CDECL wined3d_access_gl_texture(struct wined3d_texture *texture,
+        wined3d_gl_texture_callback callback, const void *data, unsigned int size)
+{
+    struct wined3d_device *device = texture->resource.device;
+
+    TRACE("texture %p, callback %p, data %p, size %u.\n", texture, callback, data, size);
+
+    wined3d_cs_emit_gl_texture_callback(device->cs, texture, callback, data, size);
+}
