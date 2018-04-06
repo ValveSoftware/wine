@@ -5350,15 +5350,93 @@ INT WINAPI GetUserDefaultLocaleName(LPWSTR localename, int buffersize)
     return LCIDToLocaleName(userlcid, localename, buffersize, 0);
 }
 
+static inline int is_valid_norm(NORM_FORM norm)
+{
+   if (norm == NormalizationC || norm == NormalizationD ||
+       norm == NormalizationKC || norm == NormalizationKD)
+       return 1;
+   else
+       return 0;
+}
+
 /******************************************************************************
  *           NormalizeString (KERNEL32.@)
+ *
+ * Normalizes a string according to a Unicode Normalization Form.
+ *
+ * PARAMS
+ *  norm       [I] Normalization Form
+ *  src        [I] Source string to normalize
+ *  srclen     [I] Length of source string (if -1, source string is null-terminated)
+ *  dst        [O] Buffer to write normalized source string (can be NULL)
+ *  dstlen     [I] Length of dst string (can be 0)
+ *
+ * RETURNS
+ *  Success: If dstlen is 0, return size needed, else return size of normalized string.
+ *  Failure: ret <= 0. Use GetLastError to determine error.
  */
-INT WINAPI NormalizeString(NORM_FORM NormForm, LPCWSTR lpSrcString, INT cwSrcLength,
-                           LPWSTR lpDstString, INT cwDstLength)
+INT WINAPI NormalizeString(NORM_FORM norm, LPCWSTR src, INT srclen,
+                           LPWSTR dst, INT dstlen)
 {
-    FIXME("%x %p %d %p %d\n", NormForm, lpSrcString, cwSrcLength, lpDstString, cwDstLength);
-    SetLastError(ERROR_CALL_NOT_IMPLEMENTED);
-    return 0;
+    extern int wine_unicode_decompose_string( int compat, const WCHAR *src,
+                                              int srclen, WCHAR *dst, int dstlen );
+    extern int unicode_canonical_composition( WCHAR *str, UINT strlen );
+    extern void unicode_canon_order( WCHAR *str, int strlen );
+
+    WCHAR *decomp = NULL;
+    INT compat = 0;
+    INT needed_len;
+
+    if (src == NULL || !is_valid_norm( norm ))
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return 0;
+    }
+
+    if (norm == NormalizationKC || norm == NormalizationKD) compat++;
+
+    if (srclen == -1) srclen = strlenW( src ) + 1;
+
+    needed_len = wine_unicode_decompose_string( compat, src, srclen, NULL, 0 );
+
+    if (needed_len < 0)
+    {
+        SetLastError(ERROR_NO_UNICODE_TRANSLATION);
+        return needed_len;
+    }
+
+    if (norm == NormalizationC || norm == NormalizationKC)
+    {
+        decomp = HeapAlloc( GetProcessHeap(), 0, needed_len * sizeof( WCHAR ) );
+        wine_unicode_decompose_string( compat, src, srclen, decomp, needed_len );
+        unicode_canon_order( decomp, needed_len );
+        needed_len = unicode_canonical_composition( decomp, needed_len );
+    }
+
+    if (dstlen < needed_len && dstlen > 0)
+    {
+        if (decomp) HeapFree(GetProcessHeap(), 0, decomp);
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return -1;
+    }
+    else if (dstlen <= 0)
+    {
+        if (decomp) HeapFree(GetProcessHeap(), 0, decomp);
+        return needed_len;
+    }
+
+    if (norm == NormalizationC || norm == NormalizationKC)
+    {
+        memcpy( dst, decomp, sizeof(WCHAR) * needed_len );
+        HeapFree(GetProcessHeap(), 0, decomp);
+        return needed_len;
+    }
+    else
+    {
+        int decomp_len = wine_unicode_decompose_string( compat, src, srclen, dst, needed_len );
+        unicode_canon_order( dst, needed_len );
+        return decomp_len;
+    }
 }
 
 /******************************************************************************

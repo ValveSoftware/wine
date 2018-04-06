@@ -5637,10 +5637,8 @@ static void test_NormalizeString(void)
         return;
     }
 
-    todo_wine {
-        dstlen = pNormalizeString( NormalizationD, ptest->str, -1, dst, 1 );
-        ok(GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Should have failed with ERROR_INSUFFICIENT_BUFFER\n");
-    }
+    dstlen = pNormalizeString( NormalizationD, ptest->str, -1, dst, 1 );
+    ok(GetLastError() == ERROR_INSUFFICIENT_BUFFER, "Should have failed with ERROR_INSUFFICIENT_BUFFER");
 
     /*
      * For each string, first test passing -1 as srclen to NormalizeString,
@@ -5654,26 +5652,24 @@ static void test_NormalizeString(void)
 
         for (i = 0; i < 4; i++)
         {
-            todo_wine {
-                dstlen = pNormalizeString( norm_forms[i], ptest->str, -1, NULL, 0 );
-                if (dstlen)
-                {
-                    dstlen = pNormalizeString( norm_forms[i], ptest->str, -1, dst, dstlen );
-                    ok(dstlen == strlenW( ptest->expected[i] )+1, "Copied length differed: was %d, should be %d\n",
-                       dstlen, strlenW( ptest->expected[i] )+1);
-                    str_cmp = strncmpW( ptest->expected[i], dst, dstlen+1 );
-                    ok( str_cmp == 0, "test failed: returned value was %d\n", str_cmp );
-                }
+            dstlen = pNormalizeString( norm_forms[i], ptest->str, -1, NULL, 0 );
+            if (dstlen)
+            {
+                dstlen = pNormalizeString( norm_forms[i], ptest->str, -1, dst, dstlen );
+                ok(dstlen == strlenW( ptest->expected[i] )+1, "Copied length differed: was %d, should be %d\n",
+                   dstlen, strlenW( ptest->expected[i] )+1);
+                str_cmp = strncmpW( ptest->expected[i], dst, dstlen+1 );
+                ok( str_cmp == 0, "test failed: returned value was %d\n", str_cmp );
+            }
 
-                dstlen = pNormalizeString( norm_forms[i], ptest->str, strlenW(ptest->str), NULL, 0 );
-                if (dstlen)
-                {
-                    dstlen = pNormalizeString( norm_forms[i], ptest->str, strlenW(ptest->str), dst, dstlen );
-                    ok(dstlen == strlenW( ptest->expected[i] ), "Copied length differed: was %d, should be %d\n",
-                       dstlen, strlenW( ptest->expected[i] ));
-                    str_cmp = strncmpW( ptest->expected[i], dst, dstlen );
-                    ok( str_cmp == 0, "test failed: returned value was %d\n", str_cmp );
-                }
+            dstlen = pNormalizeString( norm_forms[i], ptest->str, strlenW(ptest->str), NULL, 0 );
+            if (dstlen)
+            {
+                dstlen = pNormalizeString( norm_forms[i], ptest->str, strlenW(ptest->str), dst, dstlen );
+                ok(dstlen == strlenW( ptest->expected[i] ), "Copied length differed: was %d, should be %d\n",
+                   dstlen, strlenW( ptest->expected[i] ));
+                str_cmp = strncmpW( ptest->expected[i], dst, dstlen );
+                ok( str_cmp == 0, "test failed: returned value was %d\n", str_cmp );
             }
         }
         ptest++;
