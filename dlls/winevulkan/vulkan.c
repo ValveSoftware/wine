@@ -1274,3 +1274,34 @@ void *native_vkGetInstanceProcAddrWINE(VkInstance instance, const char *name)
 {
     return vk_funcs->p_vkGetInstanceProcAddr(instance, name);
 }
+
+VkDevice WINAPI __wine_get_native_VkDevice(VkDevice device)
+{
+    return device->device;
+}
+
+VkInstance WINAPI __wine_get_native_VkInstance(VkInstance instance)
+{
+    return instance->instance;
+}
+
+VkPhysicalDevice WINAPI __wine_get_native_VkPhysicalDevice(VkPhysicalDevice phys_dev)
+{
+    return phys_dev->phys_dev;
+}
+
+VkQueue WINAPI __wine_get_native_VkQueue(VkQueue queue)
+{
+    return queue->queue;
+}
+
+VkPhysicalDevice WINAPI __wine_get_wrapped_VkPhysicalDevice(VkInstance instance, VkPhysicalDevice native_phys_dev)
+{
+    uint32_t i;
+    for(i = 0; i < instance->phys_dev_count; ++i){
+        if(instance->phys_devs[i]->phys_dev == native_phys_dev)
+            return instance->phys_devs[i];
+    }
+    WARN("Unknown native physical device: %p\n", native_phys_dev);
+    return NULL;
+}
