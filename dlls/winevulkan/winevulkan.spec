@@ -2,6 +2,11 @@
 
 @ stdcall vk_icdGetInstanceProcAddr(ptr str) wine_vk_icdGetInstanceProcAddr
 @ stdcall vk_icdNegotiateLoaderICDInterfaceVersion(ptr) wine_vk_icdNegotiateLoaderICDInterfaceVersion
+@ stdcall __wine_get_native_VkDevice(ptr)
+@ stdcall __wine_get_native_VkInstance(ptr)
+@ stdcall __wine_get_native_VkPhysicalDevice(ptr)
+@ stdcall __wine_get_wrapped_VkPhysicalDevice(ptr)
+@ stdcall __wine_get_native_VkQueue(ptr)
 @ stdcall wine_vkAcquireNextImageKHR(ptr int64 int64 int64 int64 ptr)
 @ stdcall wine_vkAllocateCommandBuffers(ptr ptr ptr)
 @ stdcall wine_vkAllocateDescriptorSets(ptr ptr ptr)
