@@ -635,6 +635,7 @@ VkResult WINAPI wine_vkCreateInstance(const VkInstanceCreateInfo *create_info,
     if ((app_info = create_info->pApplicationInfo) && app_info->pApplicationName)
     {
         if (!strcmp(app_info->pApplicationName, "DOOM")
+                || !strcmp(app_info->pApplicationName, "DOOM_VFR")
                 || !strcmp(app_info->pApplicationName, "Wolfenstein II The New Colossus"))
             object->quirks |= WINEVULKAN_QUIRK_GET_DEVICE_PROC_ADDR;
     }
