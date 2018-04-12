@@ -113,6 +113,12 @@ struct VkQueue_T
     VkQueue queue; /* native queue */
 };
 
+struct VkSwapchainKHR_T
+{
+    struct wine_vk_base base;
+    VkSwapchainKHR swapchain; /* native swapchain */
+};
+
 void *wine_vk_get_device_proc_addr(const char *name) DECLSPEC_HIDDEN;
 void *wine_vk_get_instance_proc_addr(const char *name) DECLSPEC_HIDDEN;
 
