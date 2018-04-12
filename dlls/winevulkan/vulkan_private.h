@@ -131,6 +131,12 @@ static inline VkCommandPool wine_cmd_pool_to_handle(struct wine_cmd_pool *cmd_po
     return (VkCommandPool)(uintptr_t)cmd_pool;
 }
 
+struct VkSwapchainKHR_T
+{
+    struct wine_vk_base base;
+    VkSwapchainKHR swapchain; /* native swapchain */
+};
+
 void *wine_vk_get_device_proc_addr(const char *name) DECLSPEC_HIDDEN;
 void *wine_vk_get_instance_proc_addr(const char *name) DECLSPEC_HIDDEN;
 
