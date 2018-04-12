@@ -2157,11 +2157,16 @@ class VkGenerator(object):
         # Generate any conversion helper functions.
         f.write("#if defined(USE_STRUCT_CONVERSION)\n")
         for conv in self.conversions:
-            f.write(conv.definition())
+            if not conv.shared:
+                f.write(conv.definition())
         f.write("#endif /* USE_STRUCT_CONVERSION */\n\n")
 
         for conv in self.struct_chain_conversions:
             f.write(conv.definition())
+
+        for conv in self.conversions:
+            if conv.shared:
+                f.write(conv.definition())
 
         # Create thunks for instance and device functions.
         # Global functions don't go through the thunks.
@@ -2304,11 +2309,9 @@ class VkGenerator(object):
             f.write(func.prototype(postfix="DECLSPEC_HIDDEN") + ";\n")
         f.write("\n")
 
-        f.write("#if defined(USE_STRUCT_CONVERSION)\n")
         for conv in self.conversions:
             if conv.shared:
                 f.write(conv.prototype())
-        f.write("#endif /* USE_STRUCT_CONVERSION */\n\n")
 
         f.write("/* For use by vkDevice and children */\n")
         f.write("struct vulkan_device_funcs\n{\n")
@@ -2503,6 +2506,14 @@ class VkGenerator(object):
             # stuff in there. For simplicity substitute with "void *".
             pfn = pfn.replace("PFN_vkVoidFunction", "void *")
             f.write("    {0};\n".format(pfn))
+
+        f.write("\n    /* Optional. Returns TRUE if FS hack is active, otherwise returns FALSE. If\n")
+        f.write("     * it returns TRUE, then real_sz will contain the actual display\n")
+        f.write("     * resolution; user_sz will contain the app's requested mode; and dst_blit\n")
+        f.write("     * will contain the area to blit the user image to in real coordinates.\n")
+        f.write("     * All parameters are optional. */\n")
+        f.write("    VkBool32 (*query_fs_hack)(VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit);\n")
+
         f.write("};\n\n")
 
         f.write("extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver(HDC hdc, UINT version);\n\n")

@@ -81,6 +81,7 @@ struct VkDevice_T
 
     uint32_t num_swapchains;
     struct VkSwapchainKHR_T **swapchains;
+    VkQueueFamilyProperties *queue_props;
 
     CRITICAL_SECTION swapchain_lock;
 };
@@ -136,10 +137,37 @@ static inline VkCommandPool wine_cmd_pool_to_handle(struct wine_cmd_pool *cmd_po
     return (VkCommandPool)(uintptr_t)cmd_pool;
 }
 
+struct fs_hack_image
+{
+    uint32_t cmd_queue_idx;
+    VkCommandBuffer cmd;
+    VkImage swapchain_image;
+    VkImage blit_image;
+    VkImage user_image;
+    VkSemaphore blit_finished;
+    VkImageView user_view, blit_view;
+    VkDescriptorSet descriptor_set;
+    VkPipeline pipeline;
+};
+
 struct VkSwapchainKHR_T
 {
     struct wine_vk_base base;
     VkSwapchainKHR swapchain; /* native swapchain */
+
+    /* fs hack data below */
+    BOOL fs_hack_enabled;
+    VkExtent2D user_extent;
+    VkExtent2D real_extent;
+    VkRect2D blit_dst;
+    VkCommandPool *cmd_pools; /* VkCommandPool[device->max_queue_families] */
+    VkDeviceMemory user_image_memory, blit_image_memory;
+    uint32_t n_images;
+    struct fs_hack_image *fs_hack_images; /* struct fs_hack_image[n_images] */
+    VkSampler sampler;
+    VkDescriptorPool descriptor_pool;
+    VkDescriptorSetLayout descriptor_set_layout;
+    VkPipelineLayout pipeline_layout;
 };
 
 void *wine_vk_get_device_proc_addr(const char *name) DECLSPEC_HIDDEN;
