@@ -1285,11 +1285,16 @@ VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice 
 
 VkResult WINAPI wine_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
 {
+    struct VkSwapchainKHR_T *object = (struct VkSwapchainKHR_T *)(UINT_PTR)swapchain;
     TRACE("%p, 0x%s, 0x%s, 0x%s, 0x%s, %p\n", device, wine_dbgstr_longlong(swapchain), wine_dbgstr_longlong(timeout), wine_dbgstr_longlong(semaphore), wine_dbgstr_longlong(fence), pImageIndex);
-    return device->funcs.p_vkAcquireNextImageKHR(device->device, swapchain, timeout, semaphore, fence, pImageIndex);
+    return device->funcs.p_vkAcquireNextImageKHR(device->device, object->swapchain, timeout, semaphore, fence, pImageIndex);
 }
 
+#if defined(USE_STRUCT_CONVERSION)
 static inline void convert_VkSwapchainCreateInfoKHR_win_to_host(const VkSwapchainCreateInfoKHR *in, VkSwapchainCreateInfoKHR_host *out)
+#else
+static inline void convert_VkSwapchainCreateInfoKHR_win_to_host(const VkSwapchainCreateInfoKHR *in, VkSwapchainCreateInfoKHR *out)
+#endif
 {
     if (!in) return;
 
@@ -1315,37 +1320,83 @@ static inline void convert_VkSwapchainCreateInfoKHR_win_to_host(const VkSwapchai
 
 VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain)
 {
-#if defined(USE_STRUCT_CONVERSION)
     VkResult result;
-    VkSwapchainCreateInfoKHR_host pCreateInfo_host;
+#if defined(USE_STRUCT_CONVERSION)
+    VkSwapchainCreateInfoKHR_host our_createinfo;
+#else
+    VkSwapchainCreateInfoKHR our_createinfo;
+#endif
+    struct VkSwapchainKHR_T *object;
+
     TRACE("%p, %p, %p, %p\n", device, pCreateInfo, pAllocator, pSwapchain);
 
-    convert_VkSwapchainCreateInfoKHR_win_to_host(pCreateInfo, &pCreateInfo_host);
-    result = device->funcs.p_vkCreateSwapchainKHR(device->device, &pCreateInfo_host, NULL, pSwapchain);
+    if (!(object = heap_alloc_zero(sizeof(*object))))
+    {
+        ERR("Failed to allocate memory for swapchain\n");
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+    object->base.loader_magic = VULKAN_ICD_MAGIC_VALUE;
+
+    convert_VkSwapchainCreateInfoKHR_win_to_host(pCreateInfo, &our_createinfo);
+
+    if(our_createinfo.oldSwapchain)
+        our_createinfo.oldSwapchain = ((struct VkSwapchainKHR_T *)(UINT_PTR)our_createinfo.oldSwapchain)->swapchain;
+
+    result = device->funcs.p_vkCreateSwapchainKHR(device->device, &our_createinfo, NULL, &object->swapchain);
+
+    if(result != VK_SUCCESS){
+        heap_free(object);
+        return result;
+    }
+
+    *pSwapchain = (uint64_t)(UINT_PTR)object;
 
     return result;
-#else
-    TRACE("%p, %p, %p, %p\n", device, pCreateInfo, pAllocator, pSwapchain);
-    return device->funcs.p_vkCreateSwapchainKHR(device->device, pCreateInfo, NULL, pSwapchain);
-#endif
 }
 
 void WINAPI wine_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *pAllocator)
 {
+    struct VkSwapchainKHR_T *object = (struct VkSwapchainKHR_T *)(UINT_PTR)swapchain;
     TRACE("%p, 0x%s, %p\n", device, wine_dbgstr_longlong(swapchain), pAllocator);
-    device->funcs.p_vkDestroySwapchainKHR(device->device, swapchain, NULL);
+    device->funcs.p_vkDestroySwapchainKHR(device->device, object->swapchain, NULL);
+    heap_free(object);
 }
 
 VkResult WINAPI wine_vkGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t *pSwapchainImageCount, VkImage *pSwapchainImages)
 {
+    struct VkSwapchainKHR_T *object = (struct VkSwapchainKHR_T *)(UINT_PTR)swapchain;
     TRACE("%p, 0x%s, %p, %p\n", device, wine_dbgstr_longlong(swapchain), pSwapchainImageCount, pSwapchainImages);
-    return device->funcs.p_vkGetSwapchainImagesKHR(device->device, swapchain, pSwapchainImageCount, pSwapchainImages);
+    return device->funcs.p_vkGetSwapchainImagesKHR(device->device, object->swapchain, pSwapchainImageCount, pSwapchainImages);
 }
 
 VkResult WINAPI wine_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo)
 {
+    VkPresentInfoKHR our_presentInfo;
+    VkSwapchainKHR *arr;
+    uint32_t i;
+    VkResult res;
+
     TRACE("%p, %p\n", queue, pPresentInfo);
-    return queue->device->funcs.p_vkQueuePresentKHR(queue->queue, pPresentInfo);
+
+    our_presentInfo = *pPresentInfo;
+
+    arr = heap_alloc(our_presentInfo.swapchainCount * sizeof(VkSwapchainKHR));
+    if(!arr){
+        ERR("Failed to allocate memory for swapchain array\n");
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    for(i = 0; i < our_presentInfo.swapchainCount; ++i)
+        arr[i] = ((struct VkSwapchainKHR_T *)(UINT_PTR)our_presentInfo.pSwapchains[i])->swapchain;
+
+    our_presentInfo.pSwapchains = arr;
+
+    res = queue->device->funcs.p_vkQueuePresentKHR(queue->queue, &our_presentInfo);
+
+    heap_free(arr);
+
+    return res;
+
 }
 
 void WINAPI wine_vkCmdPipelineBarrier(VkCommandBuffer commandBuffer, VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask, VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount, const VkMemoryBarrier *pMemoryBarriers, uint32_t bufferMemoryBarrierCount, const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount, const VkImageMemoryBarrier *pImageMemoryBarriers)
