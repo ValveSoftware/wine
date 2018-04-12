@@ -753,13 +753,10 @@ typedef struct VkCopyDescriptorSet_host
 } VkCopyDescriptorSet_host;
 
 
-#if defined(USE_STRUCT_CONVERSION)
 VkBufferMemoryBarrier_host *convert_VkBufferMemoryBarrier_array_win_to_host(const VkBufferMemoryBarrier *in, uint32_t count);
 void free_VkBufferMemoryBarrier_array(VkBufferMemoryBarrier_host *in, uint32_t count);
 VkImageMemoryBarrier_host *convert_VkImageMemoryBarrier_array_win_to_host(const VkImageMemoryBarrier *in, uint32_t count);
 void free_VkImageMemoryBarrier_array(VkImageMemoryBarrier_host *in, uint32_t count);
-#endif /* USE_STRUCT_CONVERSION */
-
 /* For use by vkDevice and children */
 struct vulkan_device_funcs
 {

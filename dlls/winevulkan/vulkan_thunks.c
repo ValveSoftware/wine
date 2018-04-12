@@ -455,69 +455,6 @@ static inline void free_VkWriteDescriptorSet_array(VkWriteDescriptorSet_host *in
     heap_free(in);
 }
 
-VkBufferMemoryBarrier_host *convert_VkBufferMemoryBarrier_array_win_to_host(const VkBufferMemoryBarrier *in, uint32_t count)
-{
-    VkBufferMemoryBarrier_host *out;
-    unsigned int i;
-
-    if (!in) return NULL;
-
-    out = heap_alloc(count * sizeof(*out));
-    for (i = 0; i < count; i++)
-    {
-        out[i].sType = in[i].sType;
-        out[i].pNext = in[i].pNext;
-        out[i].srcAccessMask = in[i].srcAccessMask;
-        out[i].dstAccessMask = in[i].dstAccessMask;
-        out[i].srcQueueFamilyIndex = in[i].srcQueueFamilyIndex;
-        out[i].dstQueueFamilyIndex = in[i].dstQueueFamilyIndex;
-        out[i].buffer = in[i].buffer;
-        out[i].offset = in[i].offset;
-        out[i].size = in[i].size;
-    }
-
-    return out;
-}
-
-void free_VkBufferMemoryBarrier_array(VkBufferMemoryBarrier_host *in, uint32_t count)
-{
-    if (!in) return;
-
-    heap_free(in);
-}
-
-VkImageMemoryBarrier_host *convert_VkImageMemoryBarrier_array_win_to_host(const VkImageMemoryBarrier *in, uint32_t count)
-{
-    VkImageMemoryBarrier_host *out;
-    unsigned int i;
-
-    if (!in) return NULL;
-
-    out = heap_alloc(count * sizeof(*out));
-    for (i = 0; i < count; i++)
-    {
-        out[i].sType = in[i].sType;
-        out[i].pNext = in[i].pNext;
-        out[i].srcAccessMask = in[i].srcAccessMask;
-        out[i].dstAccessMask = in[i].dstAccessMask;
-        out[i].oldLayout = in[i].oldLayout;
-        out[i].newLayout = in[i].newLayout;
-        out[i].srcQueueFamilyIndex = in[i].srcQueueFamilyIndex;
-        out[i].dstQueueFamilyIndex = in[i].dstQueueFamilyIndex;
-        out[i].image = in[i].image;
-        out[i].subresourceRange = in[i].subresourceRange;
-    }
-
-    return out;
-}
-
-void free_VkImageMemoryBarrier_array(VkImageMemoryBarrier_host *in, uint32_t count)
-{
-    if (!in) return;
-
-    heap_free(in);
-}
-
 static inline void convert_VkAccelerationStructureCreateInfoNV_win_to_host(const VkAccelerationStructureCreateInfoNV *in, VkAccelerationStructureCreateInfoNV_host *out)
 {
     if (!in) return;
@@ -1309,6 +1246,69 @@ static inline void free_VkCopyDescriptorSet_array(VkCopyDescriptorSet_host *in, 
 }
 
 #endif /* USE_STRUCT_CONVERSION */
+
+VkBufferMemoryBarrier_host *convert_VkBufferMemoryBarrier_array_win_to_host(const VkBufferMemoryBarrier *in, uint32_t count)
+{
+    VkBufferMemoryBarrier_host *out;
+    unsigned int i;
+
+    if (!in) return NULL;
+
+    out = heap_alloc(count * sizeof(*out));
+    for (i = 0; i < count; i++)
+    {
+        out[i].sType = in[i].sType;
+        out[i].pNext = in[i].pNext;
+        out[i].srcAccessMask = in[i].srcAccessMask;
+        out[i].dstAccessMask = in[i].dstAccessMask;
+        out[i].srcQueueFamilyIndex = in[i].srcQueueFamilyIndex;
+        out[i].dstQueueFamilyIndex = in[i].dstQueueFamilyIndex;
+        out[i].buffer = in[i].buffer;
+        out[i].offset = in[i].offset;
+        out[i].size = in[i].size;
+    }
+
+    return out;
+}
+
+void free_VkBufferMemoryBarrier_array(VkBufferMemoryBarrier_host *in, uint32_t count)
+{
+    if (!in) return;
+
+    heap_free(in);
+}
+
+VkImageMemoryBarrier_host *convert_VkImageMemoryBarrier_array_win_to_host(const VkImageMemoryBarrier *in, uint32_t count)
+{
+    VkImageMemoryBarrier_host *out;
+    unsigned int i;
+
+    if (!in) return NULL;
+
+    out = heap_alloc(count * sizeof(*out));
+    for (i = 0; i < count; i++)
+    {
+        out[i].sType = in[i].sType;
+        out[i].pNext = in[i].pNext;
+        out[i].srcAccessMask = in[i].srcAccessMask;
+        out[i].dstAccessMask = in[i].dstAccessMask;
+        out[i].oldLayout = in[i].oldLayout;
+        out[i].newLayout = in[i].newLayout;
+        out[i].srcQueueFamilyIndex = in[i].srcQueueFamilyIndex;
+        out[i].dstQueueFamilyIndex = in[i].dstQueueFamilyIndex;
+        out[i].image = in[i].image;
+        out[i].subresourceRange = in[i].subresourceRange;
+    }
+
+    return out;
+}
+
+void free_VkImageMemoryBarrier_array(VkImageMemoryBarrier_host *in, uint32_t count)
+{
+    if (!in) return;
+
+    heap_free(in);
+}
 
 VkResult WINAPI wine_vkAcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR *pAcquireInfo, uint32_t *pImageIndex)
 {
