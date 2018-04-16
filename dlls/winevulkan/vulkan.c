@@ -330,6 +330,9 @@ static void wine_vk_device_free(struct VkDevice_T *device)
         device->funcs.p_vkDestroyDevice(device->device, NULL /* pAllocator */);
     }
 
+    heap_free(device->swapchains);
+    DeleteCriticalSection(&device->swapchain_lock);
+
     heap_free(device);
 }
 
@@ -691,6 +694,8 @@ VkResult WINAPI wine_vkCreateDevice(VkPhysicalDevice phys_dev,
     }
 
     object->quirks = phys_dev->instance->quirks;
+
+    InitializeCriticalSection(&object->swapchain_lock);
 
     *device = object;
     TRACE("Created device %p (native device %p).\n", object, object->device);
@@ -1327,6 +1332,7 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
     VkSwapchainCreateInfoKHR our_createinfo;
 #endif
     struct VkSwapchainKHR_T *object;
+    uint32_t i;
 
     TRACE("%p, %p, %p, %p\n", device, pCreateInfo, pAllocator, pSwapchain);
 
@@ -1349,6 +1355,27 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
         return result;
     }
 
+    EnterCriticalSection(&device->swapchain_lock);
+    for(i = 0; i < device->num_swapchains; ++i){
+        if(!device->swapchains[i]){
+            device->swapchains[i] = object;
+            break;
+        }
+    }
+    if(i == device->num_swapchains){
+        struct VkSwapchainKHR_T **swapchains;
+        swapchains = heap_realloc(device->swapchains, sizeof(struct VkSwapchainKHR_T *) * (device->num_swapchains + 1));
+        if(!swapchains){
+            device->funcs.p_vkDestroySwapchainKHR(device->device, object->swapchain, NULL);
+            heap_free(object);
+            return VK_ERROR_OUT_OF_HOST_MEMORY;
+        }
+        swapchains[i] = object;
+        device->swapchains = swapchains;
+        device->num_swapchains += 1;
+    }
+    LeaveCriticalSection(&device->swapchain_lock);
+
     *pSwapchain = (uint64_t)(UINT_PTR)object;
 
     return result;
@@ -1357,7 +1384,22 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
 void WINAPI wine_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks *pAllocator)
 {
     struct VkSwapchainKHR_T *object = (struct VkSwapchainKHR_T *)(UINT_PTR)swapchain;
+    uint32_t i;
+
     TRACE("%p, 0x%s, %p\n", device, wine_dbgstr_longlong(swapchain), pAllocator);
+
+    if(!object)
+        return;
+
+    EnterCriticalSection(&device->swapchain_lock);
+    for(i = 0; i < device->num_swapchains; ++i){
+        if(device->swapchains[i] == object){
+            device->swapchains[i] = NULL;
+            break;
+        }
+    }
+    LeaveCriticalSection(&device->swapchain_lock);
+
     device->funcs.p_vkDestroySwapchainKHR(device->device, object->swapchain, NULL);
     heap_free(object);
 }
