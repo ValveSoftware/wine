@@ -78,6 +78,11 @@ struct VkDevice_T
     uint32_t max_queue_families;
 
     unsigned int quirks;
+
+    uint32_t num_swapchains;
+    struct VkSwapchainKHR_T **swapchains;
+
+    CRITICAL_SECTION swapchain_lock;
 };
 
 struct VkInstance_T
