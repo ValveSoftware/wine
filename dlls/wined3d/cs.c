@@ -76,6 +76,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_GENERATE_MIPMAPS,
     WINED3D_CS_OP_GL_TEXTURE_CALLBACK,
     WINED3D_CS_OP_USER_CALLBACK,
+    WINED3D_CS_OP_WAIT_IDLE,
     WINED3D_CS_OP_STOP,
 };
 
@@ -459,6 +460,11 @@ struct wined3d_cs_user_callback
     BYTE data[1];
 };
 
+struct wined3d_cs_wait_idle
+{
+    enum wined3d_cs_op opcode;
+};
+
 struct wined3d_cs_stop
 {
     enum wined3d_cs_op opcode;
@@ -529,6 +535,7 @@ static const char *debug_cs_op(enum wined3d_cs_op op)
         WINED3D_TO_STR(WINED3D_CS_OP_GENERATE_MIPMAPS);
         WINED3D_TO_STR(WINED3D_CS_OP_GL_TEXTURE_CALLBACK);
         WINED3D_TO_STR(WINED3D_CS_OP_USER_CALLBACK);
+        WINED3D_TO_STR(WINED3D_CS_OP_FENCE);
         WINED3D_TO_STR(WINED3D_CS_OP_STOP);
 #undef WINED3D_TO_STR
         default:
@@ -2663,6 +2670,19 @@ void wined3d_cs_emit_user_callback(struct wined3d_cs *cs,
     cs->ops->submit(cs, WINED3D_CS_QUEUE_DEFAULT);
 }
 
+static void wined3d_cs_exec_wait_idle(struct wined3d_cs *cs, const void *data) {}
+
+void wined3d_cs_emit_wait_idle(struct wined3d_cs *cs)
+{
+    struct wined3d_cs_wait_idle *op;
+
+    op = cs->ops->require_space(cs, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
+    op->opcode = WINED3D_CS_OP_WAIT_IDLE;
+
+    cs->ops->submit(cs, WINED3D_CS_QUEUE_DEFAULT);
+    cs->ops->finish(cs, WINED3D_CS_QUEUE_DEFAULT);
+}
+
 static void wined3d_cs_emit_stop(struct wined3d_cs *cs)
 {
     struct wined3d_cs_stop *op;
@@ -2725,6 +2745,7 @@ static void (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_GENERATE_MIPMAPS            */ wined3d_cs_exec_generate_mipmaps,
     /* WINED3D_CS_OP_GL_TEXTURE_CALLBACK         */ wined3d_cs_exec_gl_texture_callback,
     /* WINED3D_CS_OP_USER_CALLBACK               */ wined3d_cs_exec_user_callback,
+    /* WINED3D_CS_OP_WAIT_IDLE                   */ wined3d_cs_exec_wait_idle,
 };
 
 static void *wined3d_cs_st_require_space(struct wined3d_cs *cs, size_t size, enum wined3d_cs_queue_id queue_id)
