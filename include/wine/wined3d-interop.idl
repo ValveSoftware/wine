@@ -40,4 +40,6 @@ typedef void (__cdecl *user_cs_callback)(const void *data, unsigned int data_siz
 interface IWineD3D11Device : IUnknown
 {
     void run_on_command_stream(user_cs_callback callback, const void *data, unsigned int data_size);
+
+    void wait_idle();
 }

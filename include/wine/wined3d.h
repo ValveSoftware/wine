@@ -2767,6 +2767,7 @@ typedef void (__cdecl *wined3d_cs_callback)(const void *data, unsigned int size)
 
 void __cdecl wined3d_device_run_cs_callback(struct wined3d_device *device,
         wined3d_cs_callback callback, const void *data, unsigned int size);
+void __cdecl wined3d_device_wait_idle(struct wined3d_device *device);
 
 /* Return the integer base-2 logarithm of x. Undefined for x == 0. */
 static inline unsigned int wined3d_log2i(unsigned int x)
