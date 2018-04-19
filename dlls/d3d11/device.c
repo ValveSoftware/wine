@@ -2850,6 +2850,17 @@ static void STDMETHODCALLTYPE wine_device_run_on_command_stream(IWineD3D11Device
     wined3d_mutex_unlock();
 }
 
+static void STDMETHODCALLTYPE wine_device_wait_idle(IWineD3D11Device *iface)
+{
+    struct d3d_device *device = impl_from_IWineD3D11Device(iface);
+
+    TRACE("iface %p.\n", iface);
+
+    wined3d_mutex_lock();
+    wined3d_device_wait_idle(device->wined3d_device);
+    wined3d_mutex_unlock();
+}
+
 static const struct IWineD3D11DeviceVtbl wine_device_vtbl =
 {
     /* IUnknown methods */
@@ -2858,6 +2869,7 @@ static const struct IWineD3D11DeviceVtbl wine_device_vtbl =
     wine_device_Release,
     /* IWineD3D11Device methods */
     wine_device_run_on_command_stream,
+    wine_device_wait_idle,
 };
 
 static HRESULT STDMETHODCALLTYPE d3d11_device_CreateBuffer(ID3D11Device2 *iface, const D3D11_BUFFER_DESC *desc,
