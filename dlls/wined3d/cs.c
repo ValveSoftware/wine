@@ -445,6 +445,7 @@ struct wined3d_cs_gl_texture_callback
 {
     enum wined3d_cs_op opcode;
     struct wined3d_texture *texture;
+    struct wined3d_texture *depth_texture;
     wined3d_gl_texture_callback callback;
     unsigned int data_size;
     BYTE data[1];
@@ -2427,6 +2428,7 @@ static void wined3d_cs_exec_gl_texture_callback(struct wined3d_cs *cs, const voi
 {
     const struct wined3d_cs_gl_texture_callback *op = data;
     struct wined3d_texture *texture = op->texture;
+    struct wined3d_texture *depth_texture = op->depth_texture;
     const struct wined3d_gl_info *gl_info;
     struct wined3d_context *context;
 
@@ -2434,8 +2436,12 @@ static void wined3d_cs_exec_gl_texture_callback(struct wined3d_cs *cs, const voi
     gl_info = context->gl_info;
 
     wined3d_texture_load_location(texture, 0, context, WINED3D_LOCATION_TEXTURE_RGB);
+    if (depth_texture)
+        wined3d_texture_load_location(depth_texture, 0, context, WINED3D_LOCATION_TEXTURE_RGB);
 
-    op->callback(texture->texture_rgb.name, op->data, op->data_size);
+    op->callback(texture->texture_rgb.name,
+            depth_texture ? depth_texture->texture_rgb.name : 0,
+            op->data, op->data_size);
 
     context_invalidate_compute_state(context, STATE_COMPUTE_SHADER_RESOURCE_BINDING);
     context_invalidate_state(context, STATE_GRAPHICS_SHADER_RESOURCE_BINDING);
@@ -2444,17 +2450,21 @@ static void wined3d_cs_exec_gl_texture_callback(struct wined3d_cs *cs, const voi
 
     context_release(context);
 
+    if (depth_texture)
+        wined3d_resource_release(&depth_texture->resource);
     wined3d_resource_release(&texture->resource);
 }
 
 void wined3d_cs_emit_gl_texture_callback(struct wined3d_cs *cs, struct wined3d_texture *texture,
-        wined3d_gl_texture_callback callback, const void *data, unsigned int size)
+        wined3d_gl_texture_callback callback, struct wined3d_texture *depth_texture,
+        const void *data, unsigned int size)
 {
     struct wined3d_cs_gl_texture_callback *op;
 
     op = cs->ops->require_space(cs, sizeof(*op) + size, WINED3D_CS_QUEUE_DEFAULT);
     op->opcode = WINED3D_CS_OP_GL_TEXTURE_CALLBACK;
     op->texture = texture;
+    op->depth_texture = depth_texture;
     op->callback = callback;
     op->data_size = size;
     memcpy(op->data, data, size);
