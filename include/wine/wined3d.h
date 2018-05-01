@@ -2752,10 +2752,10 @@ ULONG __cdecl wined3d_vertex_declaration_decref(struct wined3d_vertex_declaratio
 void * __cdecl wined3d_vertex_declaration_get_parent(const struct wined3d_vertex_declaration *declaration);
 ULONG __cdecl wined3d_vertex_declaration_incref(struct wined3d_vertex_declaration *declaration);
 
-typedef void (__cdecl *wined3d_gl_texture_callback)(unsigned int gl_texture, const void *data, unsigned int size);
+typedef void (__cdecl *wined3d_gl_texture_callback)(unsigned int gl_texture, unsigned int gl_depth_texture, const void *data, unsigned int size);
 
 void __cdecl wined3d_access_gl_texture(struct wined3d_texture *texture,
-        wined3d_gl_texture_callback callback, const void *data, unsigned int size);
+        wined3d_gl_texture_callback callback, struct wined3d_texture *depth_texture, const void *data, unsigned int size);
 
 typedef void (__cdecl *wined3d_cs_callback)(const void *data, unsigned int size);
 
