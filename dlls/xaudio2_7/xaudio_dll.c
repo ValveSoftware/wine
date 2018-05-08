@@ -872,72 +872,26 @@ static void WINAPI XA2SRC_GetState(IXAudio2SourceVoice *iface,
         XAUDIO2_VOICE_STATE *pVoiceState, UINT32 Flags)
 {
     XA2SourceImpl *This = impl_from_IXAudio2SourceVoice(iface);
-    LARGE_INTEGER now, diff, freq;
-    UINT32 interp_bytes = 0, total = 0, i;
 
     TRACE("%p, %p, 0x%x\n", This, pVoiceState, Flags);
 
-    QueryPerformanceFrequency(&freq);
-
     EnterCriticalSection(&This->lock);
-
-    if(This->nbufs > 0)
-        pVoiceState->pCurrentBufferContext = This->buffers[This->first_buf % XAUDIO2_MAX_QUEUED_BUFFERS].xa2buffer.pContext;
-    else
-        pVoiceState->pCurrentBufferContext = NULL;
-
-    pVoiceState->BuffersQueued = This->nbufs;
-
-    if(This->nbufs && This->played_frames && This->xa2->last_tick.QuadPart > 0){
-        QueryPerformanceCounter(&now);
-        diff.QuadPart = now.QuadPart - This->xa2->last_tick.QuadPart;
-
-        interp_bytes = MulDiv(diff.QuadPart, This->xa2->fmt.Format.nSamplesPerSec * This->submit_blocksize, freq.QuadPart);
-
-        if(interp_bytes > 0){
-            for(i = 0; i < This->nbufs && total < interp_bytes; ++i){
-                XA2Buffer *buf = &This->buffers[(This->first_buf + i) % XAUDIO2_MAX_QUEUED_BUFFERS];
-                if(buf->xa2buffer.LoopCount == XAUDIO2_LOOP_INFINITE){
-                    total = interp_bytes + 1;
-                    i++;
-                    break;
-                }
-                if(buf->offs_bytes == buf->cur_end_bytes){
-                    /* already queued */
-                    total += buf->xa2buffer.PlayLength;
-                    if(buf->xa2buffer.LoopCount > 0)
-                        total += buf->xa2buffer.LoopLength * (buf->xa2buffer.LoopCount - 1);
-                }else{
-                    total += buf->cur_end_bytes - buf->offs_bytes;
-                    if(buf->xa2buffer.LoopCount > 0){
-                        total += (buf->loop_end_bytes - buf->xa2buffer.LoopBegin) * (buf->xa2buffer.LoopCount - buf->looped);
-                        total += buf->play_end_bytes - buf->loop_end_bytes;
-                    }
-                }
-            }
-
-            if(interp_bytes < total){
-                /* didn't run out of data; i is one past target buffer */
-                XA2Buffer *buf = &This->buffers[(This->first_buf + i - 1) % XAUDIO2_MAX_QUEUED_BUFFERS];
-                TRACE("interpolating past %u bufs\n", i - 1);
-                pVoiceState->pCurrentBufferContext = buf->xa2buffer.pContext;
-                pVoiceState->BuffersQueued = This->nbufs - (i - 1);
-            }else{
-                /* ran out of data */
-                pVoiceState->BuffersQueued = 0;
-                pVoiceState->pCurrentBufferContext = NULL;
-            }
-        }
-    }
 
     if(!(Flags & XAUDIO2_VOICE_NOSAMPLESPLAYED))
         pVoiceState->SamplesPlayed = This->played_frames;
     else
         pVoiceState->SamplesPlayed = 0;
 
+    if(This->nbufs)
+        pVoiceState->pCurrentBufferContext = This->buffers[This->first_buf].xa2buffer.pContext;
+    else
+        pVoiceState->pCurrentBufferContext = NULL;
+
+    pVoiceState->BuffersQueued = This->nbufs;
+
     LeaveCriticalSection(&This->lock);
 
-    TRACE("for %p, returning %s, queued: %u\n", This, wine_dbgstr_longlong(pVoiceState->SamplesPlayed), pVoiceState->BuffersQueued);
+    TRACE("returning %s, queued: %u\n", wine_dbgstr_longlong(pVoiceState->SamplesPlayed), This->nbufs);
 }
 
 static HRESULT WINAPI XA2SRC_SetFrequencyRatio(IXAudio2SourceVoice *iface,
@@ -2160,7 +2114,6 @@ static void WINAPI IXAudio2Impl_StopEngine(IXAudio2 *iface)
     TRACE("(%p)->()\n", This);
 
     This->running = FALSE;
-    This->last_tick.QuadPart = 0;
 }
 
 static HRESULT WINAPI IXAudio2Impl_CommitChanges(IXAudio2 *iface,
@@ -2871,8 +2824,6 @@ static void do_engine_tick(IXAudio2Impl *This)
 
         LeaveCriticalSection(&src->lock);
     }
-
-    QueryPerformanceCounter(&This->last_tick);
 
     hr = IAudioRenderClient_GetBuffer(This->render, nframes, &buf);
     if(FAILED(hr))

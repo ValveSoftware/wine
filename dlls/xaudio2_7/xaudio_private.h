@@ -166,8 +166,6 @@ struct _IXAudio2Impl {
     IXAudio2EngineCallback **cbs;
 
     BOOL running;
-
-    LARGE_INTEGER last_tick;
 };
 
 #if XAUDIO2_VER == 0
