@@ -736,7 +736,7 @@ static void STDMETHODCALLTYPE d3d11_texture2d_access_gl_texture(IWineD3D11Textur
             depth_tex = impl_from_IWineD3D11Texture2D(depth_d3d11);
     }
 
-    wined3d_access_gl_texture(texture->wined3d_texture, callback, depth_tex->wined3d_texture, data, size);
+    wined3d_access_gl_texture(texture->wined3d_texture, callback, depth_tex ? depth_tex->wined3d_texture : NULL, data, size);
 
     if (depth_d3d11)
         IWineD3D11Texture2D_Release(depth_d3d11);
