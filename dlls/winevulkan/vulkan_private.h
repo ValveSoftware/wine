@@ -159,6 +159,7 @@ struct VkSwapchainKHR_T
     BOOL fs_hack_enabled;
     VkExtent2D user_extent;
     VkExtent2D real_extent;
+    VkImageUsageFlags surface_usage;
     VkRect2D blit_dst;
     VkCommandPool *cmd_pools; /* VkCommandPool[device->max_queue_families] */
     VkDeviceMemory user_image_memory, blit_image_memory;
