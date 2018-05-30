@@ -241,8 +241,9 @@ static BOOL CALLBACK update_windows_on_desktop_resize( HWND hwnd, LPARAM lparam 
         if(!data->fs_hack){
             POINT p = fs_hack_real_mode();
             POINT tl = virtual_screen_to_root(0, 0);
-            TRACE("Enabling fs hack, resizing the window to (%u,%u)-(%u,%u)\n", tl.x, tl.y, p.x, p.y);
+            TRACE("Enabling fs hack, resizing window %p to (%u,%u)-(%u,%u)\n", hwnd, tl.x, tl.y, p.x, p.y);
             data->fs_hack = TRUE;
+            set_wm_hints( data );
             XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, p.x, p.y);
             if(data->client_window)
                 XMoveResizeWindow(data->display, data->client_window, 0, 0, p.x, p.y);
