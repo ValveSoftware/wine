@@ -1901,9 +1901,6 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         pglDrawBuffer( GL_BACK );
         if(!gl->fs_hack_context_set_up)
             opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
-        pglDrawBuffer( GL_FRONT );
-        if(!gl->fs_hack_context_set_up)
-            opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
         opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
         pglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
