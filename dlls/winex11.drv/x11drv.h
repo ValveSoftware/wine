@@ -603,6 +603,7 @@ extern void update_systray_balloon_position(void) DECLSPEC_HIDDEN;
 extern HWND create_foreign_window( Display *display, Window window ) DECLSPEC_HIDDEN;
 extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
 
+extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_enabled(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_matches_current_mode(int w, int h) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_matches_real_mode(int w, int h) DECLSPEC_HIDDEN;
