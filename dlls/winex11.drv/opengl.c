@@ -254,6 +254,7 @@ struct gl_drawable
     BOOL                           fs_hack;
     BOOL                           fs_hack_did_swapbuf;
     BOOL                           fs_hack_context_set_up;
+    BOOL                           has_scissor_indexed;
 };
 
 enum glx_swap_control_method
@@ -1906,6 +1907,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         wglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
         wglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
 
+        gl->has_scissor_indexed = has_extension(glExtensions, "GL_ARB_viewport_array");
         gl->fs_hack_context_set_up = TRUE;
     }
     else
@@ -2122,7 +2124,9 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
     POINT scaled = fs_hack_get_scaled_screen_size();
     GLuint prev_draw_fbo, prev_read_fbo;
+    GLint prev_scissor[4];
     POINT src = fs_hack_current_mode();
+    POINT real = fs_hack_real_mode();
     POINT scaled_origin = {0, 0};
     float prev_clear_color[4];
 
@@ -2136,6 +2140,14 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
     pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_fbo );
 
+    if(gl->has_scissor_indexed){
+        opengl_funcs.ext.p_glGetIntegeri_v(GL_SCISSOR_BOX, 0, prev_scissor);
+        opengl_funcs.ext.p_glScissorIndexed(0, 0, 0, real.x, real.y);
+    }else{
+        opengl_funcs.gl.p_glGetIntegerv(GL_SCISSOR_BOX, prev_scissor);
+        opengl_funcs.gl.p_glScissor(0, 0, real.x, real.y);
+    }
+
     opengl_funcs.gl.p_glGetFloatv( GL_COLOR_CLEAR_VALUE, prev_clear_color );
     opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
     opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
@@ -2148,6 +2160,14 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     //HACK
     if ( draw_buffer == GL_FRONT )
         pglXSwapBuffers(gdi_display, gl->drawable);
+
+    if(gl->has_scissor_indexed){
+        opengl_funcs.ext.p_glScissorIndexedv(0, prev_scissor);
+    }else{
+        opengl_funcs.gl.p_glScissor(prev_scissor[0], prev_scissor[1],
+                prev_scissor[2], prev_scissor[3]);
+    }
+
     pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
     pglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
 }
