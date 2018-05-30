@@ -872,7 +872,7 @@ static void make_owner_managed( HWND hwnd )
  *
  * Set all the window manager hints for a window.
  */
-static void set_wm_hints( struct x11drv_win_data *data )
+void set_wm_hints( struct x11drv_win_data *data )
 {
     DWORD style, ex_style;
 
