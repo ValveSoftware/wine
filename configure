@@ -802,6 +802,7 @@ infodir
 docdir
 oldincludedir
 includedir
+runstatedir
 localstatedir
 sharedstatedir
 sysconfdir
@@ -1854,6 +1855,7 @@ datadir='${datarootdir}'
 sysconfdir='${prefix}/etc'
 sharedstatedir='${prefix}/com'
 localstatedir='${prefix}/var'
+runstatedir='${localstatedir}/run'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 docdir='${datarootdir}/doc/${PACKAGE_TARNAME}'
@@ -2106,6 +2108,15 @@ do
   | -silent | --silent | --silen | --sile | --sil)
     silent=yes ;;
 
+  -runstatedir | --runstatedir | --runstatedi | --runstated \
+  | --runstate | --runstat | --runsta | --runst | --runs \
+  | --run | --ru | --r)
+    ac_prev=runstatedir ;;
+  -runstatedir=* | --runstatedir=* | --runstatedi=* | --runstated=* \
+  | --runstate=* | --runstat=* | --runsta=* | --runst=* | --runs=* \
+  | --run=* | --ru=* | --r=*)
+    runstatedir=$ac_optarg ;;
+
   -sbindir | --sbindir | --sbindi | --sbind | --sbin | --sbi | --sb)
     ac_prev=sbindir ;;
   -sbindir=* | --sbindir=* | --sbindi=* | --sbind=* | --sbin=* \
@@ -2243,7 +2254,7 @@ fi
 for ac_var in	exec_prefix prefix bindir sbindir libexecdir datarootdir \
 		datadir sysconfdir sharedstatedir localstatedir includedir \
 		oldincludedir docdir infodir htmldir dvidir pdfdir psdir \
-		libdir localedir mandir
+		libdir localedir mandir runstatedir
 do
   eval ac_val=\$$ac_var
   # Remove trailing slashes.
@@ -2396,6 +2407,7 @@ Fine tuning of the installation directories:
   --sysconfdir=DIR        read-only single-machine data [PREFIX/etc]
   --sharedstatedir=DIR    modifiable architecture-independent data [PREFIX/com]
   --localstatedir=DIR     modifiable single-machine data [PREFIX/var]
+  --runstatedir=DIR       modifiable per-process data [LOCALSTATEDIR/run]
   --libdir=DIR            object code libraries [EPREFIX/lib]
   --includedir=DIR        C header files [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc [/usr/include]
@@ -6588,7 +6600,7 @@ else
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -6634,7 +6646,7 @@ else
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -6658,7 +6670,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -6703,7 +6715,7 @@ else
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -6727,7 +6739,7 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
     We can't simply define LARGE_OFF_T to be 9223372036854775807,
     since some C++ compilers masquerading as C compilers
     incorrectly reject 9223372036854775807.  */
-#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))
+#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))
   int off_t_is_large[(LARGE_OFF_T % 2147483629 == 721
 		       && LARGE_OFF_T % 2147483647 == 1)
 		      ? 1 : -1];
@@ -14301,15 +14313,6 @@ test -z "$LIBAVUTIL_CFLAGS" || LIBAVUTIL_CFLAGS=`echo " $LIBAVUTIL_CFLAGS" | sed
 test -z "$LIBAVUTIL_LIBS" || LIBAVUTIL_LIBS=`echo " $LIBAVUTIL_LIBS" | sed 's/ -L\([^/]\)/ -L\$(top_builddir)\/\1/g'`
 
 fi
-if test "x$ac_cv_lib_avcodec_avcodec_find_decoder" != xyes; then :
-  case "x$with_libavutil" in
-  x)   as_fn_append wine_notices "|libavutil ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported." ;;
-  xno) ;;
-  *)   as_fn_error $? "libavutil ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported.
-This is an error since --with-libavutil was requested." "$LINENO" 5 ;;
-esac
-
-fi
 
 if test "x$with_ffmpeg" != "xno" -a "x$ac_cv_lib_avutil_av_frame_alloc" = "xyes"
 then
@@ -14344,13 +14347,13 @@ done
 
         if test "$ac_cv_header_libavcodec_avcodec_h" = "yes"
         then
-            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for avcodec_find_decoder in -lavcodec" >&5
-$as_echo_n "checking for avcodec_find_decoder in -lavcodec... " >&6; }
-if ${ac_cv_lib_avcodec_avcodec_find_decoder+:} false; then :
+            { $as_echo "$as_me:${as_lineno-$LINENO}: checking for avcodec_send_packet in -lavcodec" >&5
+$as_echo_n "checking for avcodec_send_packet in -lavcodec... " >&6; }
+if ${ac_cv_lib_avcodec_avcodec_send_packet+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_check_lib_save_LIBS=$LIBS
-LIBS="-lavcodec $LIBAVCODEC_LIBS $LIBS"
+LIBS="-lavcodec $LIBAVUTIL_LIBS $LIBAVCODEC_LIBS $LIBS"
 cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 /* end confdefs.h.  */
 
@@ -14360,27 +14363,27 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char avcodec_find_decoder ();
+char avcodec_send_packet ();
 int
 main ()
 {
-return avcodec_find_decoder ();
+return avcodec_send_packet ();
   ;
   return 0;
 }
 _ACEOF
 if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_lib_avcodec_avcodec_find_decoder=yes
+  ac_cv_lib_avcodec_avcodec_send_packet=yes
 else
-  ac_cv_lib_avcodec_avcodec_find_decoder=no
+  ac_cv_lib_avcodec_avcodec_send_packet=no
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext conftest.$ac_ext
 LIBS=$ac_check_lib_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_avcodec_avcodec_find_decoder" >&5
-$as_echo "$ac_cv_lib_avcodec_avcodec_find_decoder" >&6; }
-if test "x$ac_cv_lib_avcodec_avcodec_find_decoder" = xyes; then :
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_avcodec_avcodec_send_packet" >&5
+$as_echo "$ac_cv_lib_avcodec_avcodec_send_packet" >&6; }
+if test "x$ac_cv_lib_avcodec_avcodec_send_packet" = xyes; then :
 
 $as_echo "#define HAVE_FFMPEG 1" >>confdefs.h
 
@@ -14397,7 +14400,7 @@ test -z "$LIBAVCODEC_CFLAGS" || LIBAVCODEC_CFLAGS=`echo " $LIBAVCODEC_CFLAGS" | 
 test -z "$LIBAVCODEC_LIBS" || LIBAVCODEC_LIBS=`echo " $LIBAVCODEC_LIBS" | sed 's/ -L\([^/]\)/ -L\$(top_builddir)\/\1/g'`
 
 fi
-if test "x$ac_cv_lib_avcodec_avcodec_find_decoder" != xyes; then :
+if test "x$ac_cv_lib_avcodec_avcodec_send_packet" != xyes; then :
   case "x$with_libavcodec" in
   x)   as_fn_append wine_notices "|libavcodec ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported." ;;
   xno) ;;

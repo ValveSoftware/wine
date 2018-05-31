@@ -1771,8 +1771,6 @@ then
             LIBAVUTIL_LIBS=""
         fi])
 fi
-WINE_NOTICE_WITH(libavutil,[test "x$ac_cv_lib_avcodec_avcodec_find_decoder" != xyes],
-                 [libavutil ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported.])
 
 dnl **** Check for FFmpeg's libavcodec ****
 if test "x$with_ffmpeg" != "xno" -a "x$ac_cv_lib_avutil_av_frame_alloc" = "xyes"
@@ -1781,15 +1779,15 @@ then
         [AC_CHECK_HEADERS([libavcodec/avcodec.h])
         if test "$ac_cv_header_libavcodec_avcodec_h" = "yes"
         then
-            AC_CHECK_LIB(avcodec,avcodec_find_decoder,
+            AC_CHECK_LIB(avcodec,avcodec_send_packet,
                          [AC_DEFINE(HAVE_FFMPEG, 1, [Define to 1 if you have libavutil and libavcodec from ffmpeg.])],
-                         [LIBAVCODEC_LIBS=""], [$LIBAVCODEC_LIBS])
+                         [LIBAVCODEC_LIBS=""], [$LIBAVUTIL_LIBS $LIBAVCODEC_LIBS])
         else
             LIBAVCODEC_CFLAGS=""
             LIBAVCODEC_LIBS=""
         fi])
 fi
-WINE_NOTICE_WITH(libavcodec,[test "x$ac_cv_lib_avcodec_avcodec_find_decoder" != xyes],
+WINE_NOTICE_WITH(libavcodec,[test "x$ac_cv_lib_avcodec_avcodec_send_packet" != xyes],
                  [libavcodec ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported.])
 
 dnl **** Check for OpenAL 1.1 ****
