@@ -122,9 +122,6 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, void *pReserved)
             return FALSE;
         }
 
-#if HAVE_FFMPEG
-        avcodec_register_all();
-#endif
         break;
     }
     return TRUE;
@@ -1646,7 +1643,7 @@ static HRESULT WINAPI IXAudio2Impl_CreateSourceVoice(IXAudio2 *iface,
         src->conv_ctx->bits_per_coded_sample = pSourceFormat->wBitsPerSample;
         src->conv_ctx->extradata_size = pSourceFormat->cbSize;
         if(pSourceFormat->cbSize){
-            src->conv_ctx->extradata = HeapAlloc(GetProcessHeap(), 0, pSourceFormat->cbSize + FF_INPUT_BUFFER_PADDING_SIZE);
+            src->conv_ctx->extradata = HeapAlloc(GetProcessHeap(), 0, pSourceFormat->cbSize + AV_INPUT_BUFFER_PADDING_SIZE);
             memcpy(src->conv_ctx->extradata, (&pSourceFormat->cbSize) + 1, pSourceFormat->cbSize);
         }else if(IS_WMA(pSourceFormat->wFormatTag)){
             /* xWMA doesn't provide the extradata info that FFmpeg needs to
@@ -1654,7 +1651,7 @@ static HRESULT WINAPI IXAudio2Impl_CreateSourceVoice(IXAudio2 *iface,
              * from <ffmpeg/libavformat/xwma.c>. */
             TRACE("synthesizing extradata for xWMA\n");
             src->conv_ctx->extradata_size = 6;
-            src->conv_ctx->extradata = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, pSourceFormat->cbSize + FF_INPUT_BUFFER_PADDING_SIZE);
+            src->conv_ctx->extradata = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, AV_INPUT_BUFFER_PADDING_SIZE);
             src->conv_ctx->extradata[4] = 31;
         }
 
@@ -1699,7 +1696,7 @@ static HRESULT WINAPI IXAudio2Impl_CreateSourceVoice(IXAudio2 *iface,
         src->scratch_bytes = This->period_frames * 1.5 * src->submit_blocksize;
         src->scratch_buf = HeapAlloc(GetProcessHeap(), 0, src->scratch_bytes);
 
-        src->convert_bytes = pSourceFormat->nBlockAlign + FF_INPUT_BUFFER_PADDING_SIZE;
+        src->convert_bytes = pSourceFormat->nBlockAlign + AV_INPUT_BUFFER_PADDING_SIZE;
         src->convert_buf = HeapAlloc(GetProcessHeap(), 0, src->convert_bytes);
 #else
         WARN("OpenAL can't use this format and no FFmpeg, so giving up\n");
@@ -2451,6 +2448,7 @@ HRESULT WINAPI XAudio2Create(IXAudio2 **ppxa2, UINT32 flags, XAUDIO2_PROCESSOR p
  * buffer's data has all been queued */
 static BOOL xa2buffer_queue_period(XA2SourceImpl *src, XA2Buffer *buf, ALuint al_buf)
 {
+    int averr;
     UINT32 submit_bytes;
     const BYTE *submit_buf = NULL;
 
@@ -2463,126 +2461,117 @@ static BOOL xa2buffer_queue_period(XA2SourceImpl *src, XA2Buffer *buf, ALuint al
     if(src->conv_ctx){
         DWORD scratch_offs_bytes = 0;
         AVPacket avpkt = {0};
-        BOOL using_convert = FALSE;
 
         avpkt.size = src->fmt->nBlockAlign;
         avpkt.data = (unsigned char*)buf->xa2buffer.pAudioData + buf->offs_bytes;
 
         /* convert at least a period into scratch_buf */
         while(scratch_offs_bytes < src->xa2->period_frames * src->submit_blocksize){
-            int used_bytes, got_frame;
+            DWORD to_copy_bytes;
 
-            avpkt.pts = avpkt.dts = AV_NOPTS_VALUE;
+            averr = avcodec_receive_frame(src->conv_ctx, src->conv_frame);
+            if(averr == AVERROR(EAGAIN)){
+                /* ffmpeg needs more data to decode */
+                avpkt.pts = avpkt.dts = AV_NOPTS_VALUE;
 
-            if(buf->offs_bytes == buf->cur_end_bytes){
-                avpkt.size = 0;
-                avpkt.data = NULL;
-            }else if(buf->offs_bytes > buf->cur_end_bytes){
-                ERR("Shouldn't happen: Bad offset: %u > %u\n", buf->offs_bytes, buf->cur_end_bytes);
-                return FALSE;
-            }else if(!using_convert &&
-                    buf->offs_bytes + avpkt.size + FF_INPUT_BUFFER_PADDING_SIZE > buf->cur_end_bytes){
-                UINT32 remain = buf->cur_end_bytes - buf->offs_bytes;
-                /* Unfortunately, the FFmpeg API requires that a number of
-                 * extra bytes must be available past the end of the buffer.
-                 * The xaudio2 client probably hasn't done this, so we have to
-                 * perform a copy near the end of the buffer. */
-                TRACE("hitting end of buffer. copying %u + %u bytes into %u buffer\n",
-                        remain, FF_INPUT_BUFFER_PADDING_SIZE, src->convert_bytes);
-                if(src->convert_bytes < remain + FF_INPUT_BUFFER_PADDING_SIZE){
-                    src->convert_bytes = remain + FF_INPUT_BUFFER_PADDING_SIZE;
-                    TRACE("buffer too small, expanding to %u\n", src->convert_bytes);
-                    src->convert_buf = HeapReAlloc(GetProcessHeap(), 0, src->convert_buf, src->convert_bytes);
-                }
-                memcpy(src->convert_buf, buf->xa2buffer.pAudioData + buf->offs_bytes, remain);
-                memset(src->convert_buf + remain, 0, FF_INPUT_BUFFER_PADDING_SIZE);
-                avpkt.data = src->convert_buf;
-                using_convert = TRUE;
-            }
+                if(buf->offs_bytes >= buf->cur_end_bytes)
+                    /* no more data in this buffer */
+                    break;
 
-            used_bytes = avcodec_decode_audio4(src->conv_ctx,
-                    src->conv_frame, &got_frame, &avpkt);
-
-            if(used_bytes < 0){
-                TRACE("an error occured\n");
-                return FALSE;
-            }
-
-            if(avpkt.size){
-                avpkt.data += used_bytes;
-                buf->offs_bytes += used_bytes;
-            }
-
-            if(got_frame){
-                DWORD to_copy_bytes = src->conv_frame->nb_samples * src->conv_ctx->channels * src->submit_blocksize;
-
-                if(!to_copy_bytes){
-                    if(!avpkt.size)
-                        break;
-                    continue;
-                }
-
-                while(scratch_offs_bytes + to_copy_bytes >= src->scratch_bytes){
-                    src->scratch_bytes *= 2;
-                    src->scratch_buf = HeapReAlloc(GetProcessHeap(), 0, src->scratch_buf, src->scratch_bytes);
-                }
-
-                if(av_sample_fmt_is_planar(src->conv_ctx->sample_fmt)){
-                    int s, c;
-                    uint8_t **source, *dst;
-                    uint16_t *dst16;
-                    uint32_t *dst32;
-                    uint64_t *dst64;
-
-                    /* one buffer per channel, but openal needs interleaved, so
-                     * interleave samples into scratch buf */
-                    dst = src->scratch_buf + scratch_offs_bytes;
-                    source = src->conv_frame->data;
-
-                    switch(src->submit_blocksize){
-                    case 1:
-                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
-                            for(c = 0; c < src->conv_ctx->channels; ++c)
-                                *(dst++) = source[c][s];
-                        break;
-                    case 2:
-                        dst16 = (uint16_t*)dst;
-                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
-                            for(c = 0; c < src->conv_ctx->channels; ++c)
-                                *(dst16++) = ((uint16_t*)(source[c]))[s];
-                        break;
-                    case 4:
-                        dst32 = (uint32_t*)dst;
-                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
-                            for(c = 0; c < src->conv_ctx->channels; ++c)
-                                *(dst32++) = ((uint32_t*)(source[c]))[s];
-                        break;
-                    case 8:
-                        dst64 = (uint64_t*)dst;
-                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
-                            for(c = 0; c < src->conv_ctx->channels; ++c)
-                                *(dst64++) = ((uint64_t*)(source[c]))[s];
-                        break;
-                    default:
-                        for(s = 0; s < src->conv_frame->nb_samples; ++s)
-                            for(c = 0; c < src->conv_ctx->channels; ++c){
-                                memcpy(dst, &source[c][src->submit_blocksize * s], src->submit_blocksize);
-                                dst += src->submit_blocksize;
-                            }
-                        break;
+                if(buf->offs_bytes + avpkt.size + AV_INPUT_BUFFER_PADDING_SIZE > buf->cur_end_bytes){
+                    UINT32 remain = buf->cur_end_bytes - buf->offs_bytes;
+                    /* Unfortunately, the FFmpeg API requires that a number of
+                     * extra bytes must be available past the end of the buffer.
+                     * The xaudio2 client probably hasn't done this, so we have to
+                     * perform a copy near the end of the buffer. */
+                    TRACE("hitting end of buffer. copying %u + %u bytes into %u buffer\n",
+                            remain, AV_INPUT_BUFFER_PADDING_SIZE, src->convert_bytes);
+                    if(src->convert_bytes < remain + AV_INPUT_BUFFER_PADDING_SIZE){
+                        src->convert_bytes = remain + AV_INPUT_BUFFER_PADDING_SIZE;
+                        TRACE("buffer too small, expanding to %u\n", src->convert_bytes);
+                        src->convert_buf = HeapReAlloc(GetProcessHeap(), 0, src->convert_buf, src->convert_bytes);
                     }
-
-                    scratch_offs_bytes += to_copy_bytes;
-                }else{
-                    /* copy into scratch buf */
-                    memcpy(src->scratch_buf + scratch_offs_bytes, src->conv_frame->data[0], to_copy_bytes);
-                    scratch_offs_bytes += to_copy_bytes;
+                    memcpy(src->convert_buf, buf->xa2buffer.pAudioData + buf->offs_bytes, remain);
+                    memset(src->convert_buf + remain, 0, AV_INPUT_BUFFER_PADDING_SIZE);
+                    avpkt.data = src->convert_buf;
                 }
 
-                if(src->conv_ctx->refcounted_frames)
-                    av_frame_unref(src->conv_frame);
-            }else if(!avpkt.size)
-                break;
+                averr = avcodec_send_packet(src->conv_ctx, &avpkt);
+                if(averr){
+                    WARN("avcodec_send_packet failed: %s\n", av_err2str(averr));
+                    break;
+                }
+
+                buf->offs_bytes += avpkt.size;
+                avpkt.data += avpkt.size;
+
+                /* data sent, try receive again */
+                continue;
+            }
+
+            if(averr){
+                WARN("avcodec_receive_frame failed: %s\n", av_err2str(averr));
+                return TRUE;
+            }
+
+            to_copy_bytes = src->conv_frame->nb_samples * src->conv_ctx->channels * src->submit_blocksize;
+
+            while(scratch_offs_bytes + to_copy_bytes >= src->scratch_bytes){
+                src->scratch_bytes *= 2;
+                src->scratch_buf = HeapReAlloc(GetProcessHeap(), 0, src->scratch_buf, src->scratch_bytes);
+            }
+
+            if(av_sample_fmt_is_planar(src->conv_ctx->sample_fmt)){
+                int s, c;
+                uint8_t **source, *dst;
+                uint16_t *dst16;
+                uint32_t *dst32;
+                uint64_t *dst64;
+
+                /* one buffer per channel, but openal needs interleaved, so
+                 * interleave samples into scratch buf */
+                dst = src->scratch_buf + scratch_offs_bytes;
+                source = src->conv_frame->data;
+
+                switch(src->submit_blocksize){
+                case 1:
+                    for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                        for(c = 0; c < src->conv_ctx->channels; ++c)
+                            *(dst++) = source[c][s];
+                    break;
+                case 2:
+                    dst16 = (uint16_t*)dst;
+                    for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                        for(c = 0; c < src->conv_ctx->channels; ++c)
+                            *(dst16++) = ((uint16_t*)(source[c]))[s];
+                    break;
+                case 4:
+                    dst32 = (uint32_t*)dst;
+                    for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                        for(c = 0; c < src->conv_ctx->channels; ++c)
+                            *(dst32++) = ((uint32_t*)(source[c]))[s];
+                    break;
+                case 8:
+                    dst64 = (uint64_t*)dst;
+                    for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                        for(c = 0; c < src->conv_ctx->channels; ++c)
+                            *(dst64++) = ((uint64_t*)(source[c]))[s];
+                    break;
+                default:
+                    for(s = 0; s < src->conv_frame->nb_samples; ++s)
+                        for(c = 0; c < src->conv_ctx->channels; ++c){
+                            memcpy(dst, &source[c][src->submit_blocksize * s], src->submit_blocksize);
+                            dst += src->submit_blocksize;
+                        }
+                    break;
+                }
+
+                scratch_offs_bytes += to_copy_bytes;
+            }else{
+                /* copy into scratch buf */
+                memcpy(src->scratch_buf + scratch_offs_bytes, src->conv_frame->data[0], to_copy_bytes);
+                scratch_offs_bytes += to_copy_bytes;
+            }
         }
 
         submit_bytes = scratch_offs_bytes;
