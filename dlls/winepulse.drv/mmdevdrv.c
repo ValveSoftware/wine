@@ -169,18 +169,13 @@ struct ACImpl {
     EDataFlow dataflow;
     DWORD flags;
     AUDCLNT_SHAREMODE share;
-    HANDLE event, timer;
-    BOOL please_quit;
+    HANDLE event;
 
     INT32 locked;
     UINT32 bufsize_frames, bufsize_bytes, capture_period, pad, started, peek_ofs, wri_offs_bytes, lcl_offs_bytes;
-    UINT32 tmp_buffer_bytes, held_bytes, peek_len, peek_buffer_len, period_bytes, cb_delay, complete_accum;
+    UINT32 tmp_buffer_bytes, held_bytes, peek_len, peek_buffer_len;
     BYTE *local_buffer, *tmp_buffer, *peek_buffer;
-    BOOL first_tick, adjusted;
     void *locked_ptr;
-    pa_usec_t last_time, mmdev_period_usec;
-    int skip_periods;
-    int was_early;
 
     pa_stream *stream;
     pa_sample_spec ss;
@@ -659,22 +654,19 @@ static void pulse_attr_update(pa_stream *s, void *user) {
  *
  * GetCurrentPadding is pad
  *
- * During pulse_write, we decrement pad, fill Pulse buffer, and move
+ * During pulse_wr_callback, we decrement pad, fill Pulse buffer, and move
  *   lcl_offs forward
  *
  * During Stop, we flush the Pulse buffer
  */
-static UINT32 pulse_write(ACImpl *This)
+static void pulse_wr_callback(pa_stream *s, size_t bytes, void *userdata)
 {
-    UINT32 ret;
+    ACImpl *This = userdata;
+    UINT32 oldpad = This->pad;
 
     if(This->local_buffer){
         UINT32 to_write;
         BYTE *buf = This->local_buffer + This->lcl_offs_bytes;
-        DWORD bytes = pa_stream_writable_size(This->stream);
-
-        if(!This->started)
-            return 0;
 
         if(This->pad > bytes){
             This->clock_written += bytes;
@@ -684,14 +676,11 @@ static UINT32 pulse_write(ACImpl *This)
             This->pad = 0;
         }
 
-        TRACE("held: %u, avail: %u\n",
-                (int)(This->held_bytes / pa_frame_size(&This->ss)),
-                (int)(bytes / pa_frame_size(&This->ss)));
         bytes = min(bytes, This->held_bytes);
 
         if(This->lcl_offs_bytes + bytes > This->bufsize_bytes){
             to_write = This->bufsize_bytes - This->lcl_offs_bytes;
-            TRACE("%p writing small chunk of %u bytes\n", This, to_write);
+            TRACE("writing small chunk of %u bytes\n", to_write);
             pa_stream_write(This->stream, buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
             This->held_bytes -= to_write;
             to_write = bytes - to_write;
@@ -700,46 +689,54 @@ static UINT32 pulse_write(ACImpl *This)
         }else
             to_write = bytes;
 
-        TRACE("%p writing main chunk of %u bytes\n", This, to_write);
+        TRACE("writing main chunk of %u bytes\n", to_write);
         pa_stream_write(This->stream, buf, to_write, NULL, 0, PA_SEEK_RELATIVE);
         This->lcl_offs_bytes += to_write;
         This->lcl_offs_bytes %= This->bufsize_bytes;
         This->held_bytes -= to_write;
-        ret = bytes;
     }else{
-        UINT32 adv_bytes = This->period_bytes;
-        if(This->pad > adv_bytes){
-            This->clock_written += adv_bytes;
-            This->pad -= adv_bytes;
-            ret = adv_bytes;
-        }else{
-            This->clock_written += This->pad;
+        if (bytes < This->bufsize_bytes)
+            This->pad = This->bufsize_bytes - bytes;
+        else
             This->pad = 0;
-            ret = This->pad;
-        }
-        TRACE("advanced by %u frames\n", (int)(ret / pa_frame_size(&This->ss)));
+
+        if (oldpad == This->pad)
+            return;
+
+        assert(oldpad > This->pad);
+
+        This->clock_written += oldpad - This->pad;
+        TRACE("New pad: %zu (-%zu)\n", This->pad / pa_frame_size(&This->ss), (oldpad - This->pad) / pa_frame_size(&This->ss));
     }
 
-    return ret;
+    if (This->event)
+        SetEvent(This->event);
 }
 
 static void pulse_underflow_callback(pa_stream *s, void *userdata)
 {
+    WARN("Underflow\n");
+}
+
+/* Latency is periodically updated even when nothing is played,
+ * because of PA_STREAM_AUTO_TIMING_UPDATE so use it as timer
+ *
+ * Perfect for passing all tests :)
+ */
+static void pulse_latency_callback(pa_stream *s, void *userdata)
+{
     ACImpl *This = userdata;
-    WARN("Underflow: %p\n", This);
-    This->skip_periods = 0;
+    if (!This->pad && This->event)
+        SetEvent(This->event);
 }
 
 static void pulse_started_callback(pa_stream *s, void *userdata)
 {
-    ACImpl *This = userdata;
-    TRACE("(Re)started playing: %p\n", userdata);
-    This->first_tick = TRUE;
+    TRACE("(Re)started playing\n");
 }
 
-static int pulse_rd_loop(ACImpl *This, size_t bytes)
+static void pulse_rd_loop(ACImpl *This, size_t bytes)
 {
-    int ret = 0;
     while (bytes >= This->capture_period) {
         ACPacket *p, *next;
         LARGE_INTEGER stamp, freq;
@@ -804,10 +801,7 @@ static int pulse_rd_loop(ACImpl *This, size_t bytes)
         }
 
         bytes -= This->capture_period;
-        ret += This->capture_period;
     }
-
-    return ret;
 }
 
 static void pulse_rd_drop(ACImpl *This, size_t bytes)
@@ -839,103 +833,23 @@ static void pulse_rd_drop(ACImpl *This, size_t bytes)
     }
 }
 
-static int pulse_read(ACImpl *This)
+static void pulse_rd_callback(pa_stream *s, size_t bytes, void *userdata)
 {
-    size_t bytes = pa_stream_readable_size(This->stream);
+    ACImpl *This = userdata;
 
-    TRACE("Readable total: %zu, fragsize: %u\n", bytes, pa_stream_get_buffer_attr(This->stream)->fragsize);
+    TRACE("Readable total: %zu, fragsize: %u\n", bytes, pa_stream_get_buffer_attr(s)->fragsize);
     assert(bytes >= This->peek_ofs);
     bytes -= This->peek_ofs;
     if (bytes < This->capture_period)
-        return 0;
+        return;
 
     if (This->started)
-        return pulse_rd_loop(This, bytes);
+        pulse_rd_loop(This, bytes);
+    else
+        pulse_rd_drop(This, bytes);
 
-    pulse_rd_drop(This, bytes);
-    return 0;
-}
-
-static DWORD WINAPI pulse_timer_cb(void *user)
-{
-    DWORD delay;
-    ACImpl *This = user;
-
-    pthread_mutex_lock(&pulse_lock);
-    delay = This->mmdev_period_usec / 1000;
-    pthread_mutex_unlock(&pulse_lock);
-
-    while(!This->please_quit){
-        pa_usec_t now, adv_usec = 0;
-        int err, complete_bytes = 0, complete_periods;
-
-        Sleep(delay);
-
-        pthread_mutex_lock(&pulse_lock);
-
-        delay = This->mmdev_period_usec / 1000;
-
-        if(This->started){
-            err = pa_stream_get_time(This->stream, &now);
-            if(err == 0 && now > 0){
-                if(This->last_time)
-                    adv_usec = now - This->last_time;
-                else
-                    adv_usec = now;
-
-                while(adv_usec > This->mmdev_period_usec && This->was_early > 0){
-                    adv_usec -= This->mmdev_period_usec;
-                    This->was_early--;
-                }
-
-                if(adv_usec >= This->mmdev_period_usec){
-                    if(adv_usec % This->mmdev_period_usec > This->mmdev_period_usec / 10){
-                        TRACE("late\n");
-                        delay = (This->mmdev_period_usec / 1000) - 1;
-                    }
-                }else if(This->pad){
-                    This->was_early++;
-                    if(This->mmdev_period_usec - adv_usec > This->mmdev_period_usec / 10){
-                        TRACE("early\n");
-                        delay = (This->mmdev_period_usec / 1000) + 1;
-                    }
-                }
-
-                This->last_time = now - (adv_usec % This->mmdev_period_usec);
-            }
-
-            if(This->pad)
-                This->skip_periods++;
-
-            if(This->dataflow == eRender)
-                complete_bytes = pulse_write(This);
-            else if(This->dataflow == eCapture)
-                complete_bytes = pulse_read(This);
-
-            This->complete_accum += complete_bytes;
-            complete_periods = This->complete_accum / This->period_bytes;
-            This->complete_accum -= complete_periods * This->period_bytes;
-
-            if(This->skip_periods > complete_periods)
-                This->skip_periods -= complete_periods;
-            else
-                This->skip_periods = 0;
-        }
-
-        if (This->event)
-            SetEvent(This->event);
-
-        TRACE("%p after update, adv usec: %u, pad: %u, skip periods: %d, clock: %u\n",
-                This, (int)adv_usec,
-                (int)(This->pad / pa_frame_size(&This->ss)), This->skip_periods,
-                (int)(This->clock_written / pa_frame_size(&This->ss)));
-
-        This->first_tick = FALSE;
-
-        pthread_mutex_unlock(&pulse_lock);
-    }
-
-    return 0;
+    if (This->event)
+        SetEvent(This->event);
 }
 
 static HRESULT pulse_stream_connect(ACImpl *This, UINT32 period_bytes) {
@@ -964,16 +878,15 @@ static HRESULT pulse_stream_connect(ACImpl *This, UINT32 period_bytes) {
 
     /* PulseAudio will fill in correct values */
     attr.minreq = attr.fragsize = period_bytes;
-    attr.maxlength = This->bufsize_bytes;
-    attr.tlength = period_bytes;
+    attr.maxlength = attr.tlength = This->bufsize_bytes;
     attr.prebuf = pa_frame_size(&This->ss);
     dump_attr(&attr);
     if (This->dataflow == eRender)
         ret = pa_stream_connect_playback(This->stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_INTERPOLATE_TIMING|PA_STREAM_ADJUST_LATENCY, NULL, NULL);
+        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_INTERPOLATE_TIMING|PA_STREAM_EARLY_REQUESTS, NULL, NULL);
     else
         ret = pa_stream_connect_record(This->stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_INTERPOLATE_TIMING|PA_STREAM_ADJUST_LATENCY);
+        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_INTERPOLATE_TIMING|PA_STREAM_EARLY_REQUESTS);
     if (ret < 0) {
         WARN("Returns %i\n", ret);
         return AUDCLNT_E_ENDPOINT_CREATE_FAILED;
@@ -984,10 +897,11 @@ static HRESULT pulse_stream_connect(ACImpl *This, UINT32 period_bytes) {
         return AUDCLNT_E_ENDPOINT_CREATE_FAILED;
 
     if (This->dataflow == eRender) {
+        pa_stream_set_write_callback(This->stream, pulse_wr_callback, This);
         pa_stream_set_underflow_callback(This->stream, pulse_underflow_callback, This);
         pa_stream_set_started_callback(This->stream, pulse_started_callback, This);
-    }
-
+    } else
+        pa_stream_set_read_callback(This->stream, pulse_rd_callback, This);
     return S_OK;
 }
 
@@ -1121,10 +1035,6 @@ static ULONG WINAPI AudioClient_Release(IAudioClient *iface)
     ref = InterlockedDecrement(&This->ref);
     TRACE("(%p) Refcount now %u\n", This, ref);
     if (!ref) {
-        if(This->timer){
-            This->please_quit = TRUE;
-            WaitForSingleObject(This->timer, INFINITE);
-        }
         if (This->stream) {
             pthread_mutex_lock(&pulse_lock);
             if (PA_STREAM_IS_GOOD(pa_stream_get_state(This->stream))) {
@@ -1421,6 +1331,7 @@ static HRESULT WINAPI AudioClient_Initialize(IAudioClient *iface,
 {
     ACImpl *This = impl_from_IAudioClient(iface);
     HRESULT hr = S_OK;
+    UINT period_bytes;
 
     TRACE("(%p)->(%x, %x, %s, %s, %p, %s)\n", This, mode, flags,
           wine_dbgstr_longlong(duration), wine_dbgstr_longlong(period), fmt, debugstr_guid(sessionguid));
@@ -1486,9 +1397,7 @@ static HRESULT WINAPI AudioClient_Initialize(IAudioClient *iface,
         if (duration <= 2 * period)
             period /= 2;
     }
-    This->cb_delay = period / 10000;
-    This->mmdev_period_usec = period / 10;
-    This->period_bytes = pa_frame_size(&This->ss) * MulDiv(period, This->ss.rate, 10000000);
+    period_bytes = pa_frame_size(&This->ss) * MulDiv(period, This->ss.rate, 10000000);
 
     if (duration < 20000000)
         This->bufsize_frames = ceil((duration / 10000000.) * fmt->nSamplesPerSec);
@@ -1498,7 +1407,7 @@ static HRESULT WINAPI AudioClient_Initialize(IAudioClient *iface,
 
     This->share = mode;
     This->flags = flags;
-    hr = pulse_stream_connect(This, This->period_bytes);
+    hr = pulse_stream_connect(This, period_bytes);
     if (SUCCEEDED(hr)) {
         UINT32 unalign;
         const pa_buffer_attr *attr = pa_stream_get_buffer_attr(This->stream);
@@ -1509,7 +1418,6 @@ static HRESULT WINAPI AudioClient_Initialize(IAudioClient *iface,
             if (attr->tlength < This->bufsize_bytes) {
                 TRACE("PulseAudio buffer too small (%u < %u), using tmp buffer\n", attr->tlength, This->bufsize_bytes);
 
-                This->bufsize_bytes += This->period_bytes;
                 This->local_buffer = HeapAlloc(GetProcessHeap(), 0, This->bufsize_bytes);
                 if(!This->local_buffer)
                     hr = E_OUTOFMEMORY;
@@ -1517,9 +1425,9 @@ static HRESULT WINAPI AudioClient_Initialize(IAudioClient *iface,
         } else {
             UINT32 i, capture_packets;
 
-            This->capture_period = This->period_bytes = attr->fragsize;
-            if ((unalign = This->bufsize_bytes % This->period_bytes))
-                This->bufsize_bytes += This->period_bytes - unalign;
+            This->capture_period = period_bytes = attr->fragsize;
+            if ((unalign = This->bufsize_bytes % period_bytes))
+                This->bufsize_bytes += period_bytes - unalign;
             This->bufsize_frames = This->bufsize_bytes / pa_frame_size(&This->ss);
 
             capture_packets = This->bufsize_bytes / This->capture_period;
@@ -1586,6 +1494,8 @@ static HRESULT WINAPI AudioClient_GetStreamLatency(IAudioClient *iface,
         REFERENCE_TIME *latency)
 {
     ACImpl *This = impl_from_IAudioClient(iface);
+    const pa_buffer_attr *attr;
+    REFERENCE_TIME lat;
     HRESULT hr;
 
     TRACE("(%p)->(%p)\n", This, latency);
@@ -1599,9 +1509,15 @@ static HRESULT WINAPI AudioClient_GetStreamLatency(IAudioClient *iface,
         pthread_mutex_unlock(&pulse_lock);
         return hr;
     }
-    *latency = This->mmdev_period_usec * 10;
-    if(This->local_buffer)
-        *latency += This->mmdev_period_usec * 10;
+    attr = pa_stream_get_buffer_attr(This->stream);
+    if (This->dataflow == eRender){
+        lat = attr->minreq / pa_frame_size(&This->ss);
+        lat += pulse_def_period[0];
+    }else
+        lat = attr->fragsize / pa_frame_size(&This->ss);
+    *latency = 10000000;
+    *latency *= lat;
+    *latency /= This->ss.rate;
     pthread_mutex_unlock(&pulse_lock);
     TRACE("Latency: %u ms\n", (DWORD)(*latency / 10000));
     return S_OK;
@@ -1609,12 +1525,7 @@ static HRESULT WINAPI AudioClient_GetStreamLatency(IAudioClient *iface,
 
 static void ACImpl_GetRenderPad(ACImpl *This, UINT32 *out)
 {
-    UINT32 skip = This->skip_periods > 0 ? This->skip_periods * This->period_bytes : 0;
-    if(This->pad > skip){
-        *out = This->pad - skip;
-        *out /= pa_frame_size(&This->ss);
-    }else
-        *out = 0;
+    *out = This->pad / pa_frame_size(&This->ss);
 }
 
 static void ACImpl_GetCapturePad(ACImpl *This, UINT32 *out)
@@ -1886,9 +1797,8 @@ static HRESULT WINAPI AudioClient_Start(IAudioClient *iface)
 
     if (SUCCEEDED(hr)) {
         This->started = TRUE;
-
-        if(!This->timer)
-            This->timer = CreateThread(NULL, 0, pulse_timer_cb, This, 0, NULL);
+        if (This->dataflow == eRender && This->event)
+            pa_stream_set_latency_update_callback(This->stream, pulse_latency_callback, This);
     }
     pthread_mutex_unlock(&pulse_lock);
     return hr;
@@ -1983,9 +1893,6 @@ static HRESULT WINAPI AudioClient_Reset(IAudioClient *iface)
         }
         list_move_tail(&This->packet_free_head, &This->packet_filled_head);
     }
-
-    This->complete_accum = This->skip_periods = 0;
-
     pthread_mutex_unlock(&pulse_lock);
 
     return hr;
@@ -2281,7 +2188,6 @@ static HRESULT WINAPI AudioRenderClient_ReleaseBuffer(
             This->lcl_offs_bytes += to_write;
             This->lcl_offs_bytes %= This->bufsize_bytes;
             This->held_bytes -= to_write;
-            This->skip_periods = 0;
         }
 
     }else{
@@ -2311,6 +2217,7 @@ static HRESULT WINAPI AudioRenderClient_ReleaseBuffer(
     This->locked = 0;
     This->locked_ptr = NULL;
     TRACE("Released %u, pad %zu\n", written_frames, This->pad / pa_frame_size(&This->ss));
+    assert(This->pad <= This->bufsize_bytes);
 
     pthread_mutex_unlock(&pulse_lock);
     return S_OK;
@@ -2541,7 +2448,6 @@ static HRESULT WINAPI AudioClock_GetPosition(IAudioClock *iface, UINT64 *pos,
     }
 
     *pos = This->clock_written;
-    *pos += min(This->skip_periods > 0 ? This->skip_periods * This->period_bytes : 0, This->pad);
 
     if (This->share == AUDCLNT_SHAREMODE_EXCLUSIVE)
         *pos /= pa_frame_size(&This->ss);
