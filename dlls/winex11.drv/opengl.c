@@ -379,6 +379,10 @@ static int   (*pglXSwapIntervalSGI)(int);
 static void* (*pglXAllocateMemoryNV)(GLsizei size, GLfloat readfreq, GLfloat writefreq, GLfloat priority);
 static void  (*pglXFreeMemoryNV)(GLvoid *pointer);
 
+static void (*pglScissorIndexed)(GLuint, GLint, GLint, GLsizei, GLsizei);
+static void (*pglScissorIndexedv)(GLuint, const GLint *);
+static void (*pglGetIntegeri_v)(GLenum, GLuint, GLint *);
+
 /* MESA GLX Extensions */
 static void (*pglXCopySubBufferMESA)(Display *dpy, GLXDrawable drawable, int x, int y, int width, int height);
 static int (*pglXSwapIntervalMESA)(unsigned int interval);
@@ -660,6 +664,10 @@ static BOOL WINAPI init_opengl( INIT_ONCE *once, void *param, void **context )
     /* NV GLX Extension */
     LOAD_FUNCPTR(glXAllocateMemoryNV);
     LOAD_FUNCPTR(glXFreeMemoryNV);
+
+    LOAD_FUNCPTR(glScissorIndexed);
+    LOAD_FUNCPTR(glScissorIndexedv);
+    LOAD_FUNCPTR(glGetIntegeri_v);
 #undef LOAD_FUNCPTR
 
     if(!X11DRV_WineGL_InitOpenglInfo()) goto failed;
@@ -747,6 +755,13 @@ static BOOL WINAPI init_opengl( INIT_ONCE *once, void *param, void **context )
     {
         pglXWaitForSbcOML = pglXGetProcAddressARB( (const GLubyte *)"glXWaitForSbcOML" );
         pglXSwapBuffersMscOML = pglXGetProcAddressARB( (const GLubyte *)"glXSwapBuffersMscOML" );
+    }
+
+    if (has_extension( glExtensions, "GL_ARB_viewport_array"))
+    {
+        opengl_funcs.ext.p_glGetIntegeri_v = pglGetIntegeri_v;
+        opengl_funcs.ext.p_glScissorIndexed = pglScissorIndexed;
+        opengl_funcs.ext.p_glScissorIndexedv = pglScissorIndexedv;
     }
 
     X11DRV_WineGL_LoadExtensions();
