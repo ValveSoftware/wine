@@ -296,6 +296,21 @@ NTSTATUS esync_set_event( HANDLE handle )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_reset_event( HANDLE handle )
+{
+    struct event *event = esync_get_object( handle );
+    static uint64_t value;
+
+    TRACE("%p.\n", handle);
+
+    if (!event) return STATUS_INVALID_HANDLE;
+
+    /* we don't care about the return value */
+    read( event->obj.fd, &value, sizeof(value) );
+
+    return STATUS_SUCCESS;
+}
+
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
 
