@@ -311,6 +311,25 @@ NTSTATUS esync_reset_event( HANDLE handle )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_pulse_event( HANDLE handle )
+{
+    struct event *event = esync_get_object( handle );
+    static uint64_t value = 1;
+
+    TRACE("%p.\n", handle);
+
+    if (!event) return STATUS_INVALID_HANDLE;
+
+    /* This isn't really correct; an application could miss the write.
+     * Unfortunately we can't really do much better. Fortunately this is rarely
+     * used (and publicly deprecated). */
+    if (write( event->obj.fd, &value, sizeof(value) ) == -1)
+        return FILE_GetNtStatus();
+    read( event->obj.fd, &value, sizeof(value) );
+
+    return STATUS_SUCCESS;
+}
+
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
 
