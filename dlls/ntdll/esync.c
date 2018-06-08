@@ -22,6 +22,13 @@
 #include "wine/port.h"
 
 #include <assert.h>
+#include <errno.h>
+#ifdef HAVE_POLL_H
+#include <poll.h>
+#endif
+#ifdef HAVE_SYS_POLL_H
+# include <sys/poll.h>
+#endif
 #include <stdarg.h>
 #include <stdlib.h>
 #ifdef HAVE_SYS_EVENTFD_H
@@ -238,4 +245,158 @@ NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
         return FILE_GetNtStatus();
 
     return STATUS_SUCCESS;
+}
+
+#define TICKSPERSEC        10000000
+#define TICKSPERMSEC       10000
+
+static LONGLONG update_timeout( ULONGLONG end )
+{
+    LARGE_INTEGER now;
+    LONGLONG timeleft;
+
+    NtQuerySystemTime( &now );
+    timeleft = end - now.QuadPart;
+    if (timeleft < 0) timeleft = 0;
+    return timeleft;
+}
+
+static int do_poll( struct pollfd *fds, nfds_t nfds, ULONGLONG *end )
+{
+    if (end)
+    {
+        LONGLONG timeleft = update_timeout( *end );
+
+#ifdef HAVE_PPOLL
+        /* We use ppoll() if available since the time granularity is better. */
+        struct timespec tmo_p;
+        tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+        tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+        return ppoll( fds, nfds, &tmo_p, NULL );
+#else
+        return poll( fds, nfds, timeleft / TICKSPERMSEC );
+#endif
+    }
+    else
+        return poll( fds, nfds, -1 );
+}
+
+/* A value of STATUS_NOT_IMPLEMENTED returned from this function means that we
+ * need to delegate to server_select(). */
+NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
+                             BOOLEAN alertable, const LARGE_INTEGER *timeout )
+{
+    struct esync *objs[MAXIMUM_WAIT_OBJECTS];
+    struct pollfd fds[MAXIMUM_WAIT_OBJECTS];
+    int has_esync = 0, has_server = 0;
+    LONGLONG timeleft;
+    LARGE_INTEGER now;
+    ULONGLONG end;
+    int ret;
+    int i;
+
+    NtQuerySystemTime( &now );
+    if (timeout)
+    {
+        if (timeout->QuadPart == TIMEOUT_INFINITE)
+            timeout = NULL;
+        else if (timeout->QuadPart >= 0)
+            end = timeout->QuadPart;
+        else
+            end = now.QuadPart - timeout->QuadPart;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        objs[i] = esync_get_object( handles[i] );
+        if (objs[i])
+            has_esync = 1;
+        else
+            has_server = 1;
+    }
+
+    if (has_esync && has_server)
+    {
+        FIXME("Can't wait on esync and server objects at the same time!\n");
+        /* Wait on just the eventfds; it's the best we can do. */
+    }
+    else if (has_server)
+    {
+        /* It's just server objects, so delegate to the server. */
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
+    if (TRACE_ON(esync))
+    {
+        TRACE("Waiting for %s of %d handles:", wait_any ? "any" : "all", count);
+        for (i = 0; i < count; i++)
+            DPRINTF(" %p", handles[i]);
+
+        if (!timeout)
+            DPRINTF(", timeout = INFINITE.\n");
+        else
+        {
+            timeleft = update_timeout( end );
+            DPRINTF(", timeout = %ld.%07ld sec.\n",
+                (long) timeleft / TICKSPERSEC, (long) timeleft % TICKSPERSEC);
+        }
+    }
+
+    if (wait_any || count == 1)
+    {
+        for (i = 0; i < count; i++)
+        {
+            fds[i].fd = objs[i] ? objs[i]->fd : -1;
+            fds[i].events = POLLIN;
+        }
+
+        while (1)
+        {
+            ret = do_poll( fds, count, timeout ? &end : NULL );
+            if (ret > 0)
+            {
+                /* Find out which object triggered the wait. */
+                for (i = 0; i < count; i++)
+                {
+                    if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
+                    {
+                        ERR("Polling on fd %d returned %#x.\n", fds[i].fd, fds[i].revents);
+                        return STATUS_INVALID_HANDLE;
+                    }
+
+                    if (objs[i])
+                    {
+                        int64_t value;
+                        ssize_t size;
+
+                        if ((size = read( fds[i].fd, &value, sizeof(value) )) == sizeof(value))
+                        {
+                            /* We found our object. */
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            return i;
+                        }
+                    }
+                }
+
+                /* If we got here, someone else stole (or reset, etc.) whatever
+                 * we were waiting for. So keep waiting. */
+                NtQuerySystemTime( &now );
+            }
+            else if (ret == 0)
+            {
+                TRACE("Wait timed out.\n");
+                return STATUS_TIMEOUT;
+            }
+            else
+            {
+                ERR("ppoll failed: %s\n", strerror(errno));
+                return FILE_GetNtStatus();
+            }
+        }
+    }
+    else
+    {
+        FIXME("Wait-all not implemented.\n");
+        return STATUS_NOT_IMPLEMENTED;
+    }
 }
