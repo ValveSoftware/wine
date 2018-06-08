@@ -411,6 +411,7 @@ DECL_HANDLER(terminate_job);
 DECL_HANDLER(suspend_process);
 DECL_HANDLER(resume_process);
 DECL_HANDLER(create_esync);
+DECL_HANDLER(get_esync_fd);
 
 #ifdef WANT_REQUEST_HANDLERS
 
@@ -716,6 +717,7 @@ static const req_handler req_handlers[REQ_NB_REQUESTS] =
     (req_handler)req_suspend_process,
     (req_handler)req_resume_process,
     (req_handler)req_create_esync,
+    (req_handler)req_get_esync_fd,
 };
 
 C_ASSERT( sizeof(affinity_t) == 8 );
@@ -2451,6 +2453,9 @@ C_ASSERT( FIELD_OFFSET(struct create_esync_request, flags) == 20 );
 C_ASSERT( sizeof(struct create_esync_request) == 24 );
 C_ASSERT( FIELD_OFFSET(struct create_esync_reply, handle) == 8 );
 C_ASSERT( sizeof(struct create_esync_reply) == 16 );
+C_ASSERT( FIELD_OFFSET(struct get_esync_fd_request, handle) == 12 );
+C_ASSERT( sizeof(struct get_esync_fd_request) == 16 );
+C_ASSERT( sizeof(struct get_esync_fd_reply) == 8 );
 
 #endif  /* WANT_REQUEST_HANDLERS */
 
