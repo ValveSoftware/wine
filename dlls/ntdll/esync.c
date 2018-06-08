@@ -135,6 +135,25 @@ static void *esync_get_object( HANDLE handle )
     return esync_list[entry][idx];
 }
 
+NTSTATUS esync_close( HANDLE handle )
+{
+    UINT_PTR entry, idx = handle_to_index( handle, &entry );
+    struct esync *obj;
+
+    TRACE("%p.\n", handle);
+
+    if (entry < ESYNC_LIST_ENTRIES && esync_list[entry])
+    {
+        if ((obj = interlocked_xchg_ptr( (void **)&esync_list[entry][idx], 0 )))
+        {
+            close( obj->fd );
+            RtlFreeHeap( GetProcessHeap(), 0, obj );
+            return STATUS_SUCCESS;
+        }
+    }
+
+    return STATUS_INVALID_HANDLE;
+}
 
 static NTSTATUS create_esync(int *fd, HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, int initval, int flags)
