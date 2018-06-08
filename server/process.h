@@ -96,6 +96,7 @@ struct process
     struct list          rawinput_devices;/* list of registered rawinput devices */
     const struct rawinput_device *rawinput_mouse; /* rawinput mouse device, if any */
     const struct rawinput_device *rawinput_kbd;   /* rawinput keyboard device, if any */
+    int                  esync_fd;        /* esync file descriptor (signaled on exit) */
 };
 
 struct process_snapshot
