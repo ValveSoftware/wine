@@ -4533,6 +4533,11 @@ static void dump_create_esync_reply( const struct create_esync_reply *req )
     fprintf( stderr, " handle=%04x", req->handle );
 }
 
+static void dump_get_esync_fd_request( const struct get_esync_fd_request *req )
+{
+    fprintf( stderr, " handle=%04x", req->handle );
+}
+
 static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_new_process_request,
     (dump_func)dump_get_new_process_info_request,
@@ -4824,6 +4829,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_set_job_completion_port_request,
     (dump_func)dump_terminate_job_request,
     (dump_func)dump_create_esync_request,
+    (dump_func)dump_get_esync_fd_request,
 };
 
 static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
@@ -5117,6 +5123,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     NULL,
     NULL,
     (dump_func)dump_create_esync_reply,
+    NULL,
 };
 
 static const char * const req_names[REQ_NB_REQUESTS] = {
@@ -5410,6 +5417,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "set_job_completion_port",
     "terminate_job",
     "create_esync",
+    "get_esync_fd",
 };
 
 static const struct
@@ -5477,6 +5485,7 @@ static const struct
     { "INVALID_LOCK_SEQUENCE",       STATUS_INVALID_LOCK_SEQUENCE },
     { "INVALID_OWNER",               STATUS_INVALID_OWNER },
     { "INVALID_PARAMETER",           STATUS_INVALID_PARAMETER },
+    { "INVALID_READ_MODE",           STATUS_INVALID_READ_MODE },
     { "INVALID_SECURITY_DESCR",      STATUS_INVALID_SECURITY_DESCR },
     { "IO_TIMEOUT",                  STATUS_IO_TIMEOUT },
     { "KEY_DELETED",                 STATUS_KEY_DELETED },
@@ -5512,6 +5521,7 @@ static const struct
     { "OBJECT_TYPE_MISMATCH",        STATUS_OBJECT_TYPE_MISMATCH },
     { "PENDING",                     STATUS_PENDING },
     { "PIPE_BROKEN",                 STATUS_PIPE_BROKEN },
+    { "PIPE_BUSY",                   STATUS_PIPE_BUSY },
     { "PIPE_CONNECTED",              STATUS_PIPE_CONNECTED },
     { "PIPE_DISCONNECTED",           STATUS_PIPE_DISCONNECTED },
     { "PIPE_LISTENING",              STATUS_PIPE_LISTENING },
