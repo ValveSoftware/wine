@@ -3706,7 +3706,6 @@ struct handle_info
     obj_handle_t handle;       /* process handle */
 @END
 
-
 /* Iterate thread list for process */
 @REQ(get_next_thread)
     obj_handle_t process;      /* process handle */
@@ -3716,4 +3715,28 @@ struct handle_info
     unsigned int flags;        /* controls iteration direction */
 @REPLY
     obj_handle_t handle;       /* next thread handle */
+@END
+
+enum esync_type
+{
+    ESYNC_SEMAPHORE = 1,
+    ESYNC_AUTO_EVENT,
+    ESYNC_MANUAL_EVENT,
+    ESYNC_MUTEX,
+    ESYNC_AUTO_SERVER,
+    ESYNC_MANUAL_SERVER,
+    ESYNC_QUEUE,
+};
+
+/* Create a new eventfd-based synchronization object */
+@REQ(create_esync)
+    unsigned int access;        /* wanted access rights */
+    int          initval;       /* initial value */
+    int          type;          /* type of esync object */
+    int          max;           /* maximum count on a semaphore */
+    VARARG(objattr,object_attributes); /* object attributes */
+@REPLY
+    obj_handle_t handle;        /* handle to the object */
+    int          type;          /* actual type (may be different for events) */
+    unsigned int shm_idx;
 @END
