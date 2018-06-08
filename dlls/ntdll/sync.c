@@ -59,7 +59,9 @@
 #include "winternl.h"
 #include "wine/server.h"
 #include "wine/debug.h"
+
 #include "ntdll_misc.h"
+#include "esync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(sync);
 
@@ -248,6 +250,9 @@ NTSTATUS WINAPI NtCreateSemaphore( OUT PHANDLE SemaphoreHandle,
 
     if (MaximumCount <= 0 || InitialCount < 0 || InitialCount > MaximumCount)
         return STATUS_INVALID_PARAMETER;
+
+    if (do_esync())
+        return esync_create_semaphore( SemaphoreHandle, access, attr, InitialCount, MaximumCount );
 
     if ((ret = alloc_object_attributes( attr, &objattr, &len ))) return ret;
 
