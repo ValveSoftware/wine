@@ -76,6 +76,8 @@ int do_esync(void)
 enum esync_type
 {
     ESYNC_SEMAPHORE = 1,
+    ESYNC_AUTO_EVENT,
+    ESYNC_MANUAL_EVENT,
 };
 
 struct esync
@@ -88,6 +90,11 @@ struct semaphore
 {
     struct esync obj;
     int max;
+};
+
+struct event
+{
+    struct esync obj;
 };
 
 /* We'd like lookup to be fast. To that end, we use a static list indexed by handle.
@@ -245,6 +252,33 @@ NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
         return FILE_GetNtStatus();
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN initial )
+{
+    struct event *event;
+    NTSTATUS ret;
+    int fd;
+
+    TRACE("name %s, %s-reset, initial %d.\n",
+        attr ? debugstr_us(attr->ObjectName) : "<no name>",
+        type == NotificationEvent ? "manual" : "auto", initial);
+
+    ret = create_esync( &fd, handle, access, attr, initial, 0 );
+    if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
+    {
+        event = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*event) );
+        if (!event)
+            return STATUS_NO_MEMORY;
+
+        event->obj.type = (type == NotificationEvent ? ESYNC_MANUAL_EVENT : ESYNC_AUTO_EVENT);
+        event->obj.fd = fd;
+
+        add_to_list( *handle, &event->obj);
+    }
+
+    return ret;
 }
 
 #define TICKSPERSEC        10000000
