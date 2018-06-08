@@ -477,6 +477,9 @@ NTSTATUS WINAPI NtPulseEvent( HANDLE handle, PULONG PulseCount )
 {
     NTSTATUS ret;
 
+    if (do_esync())
+        return esync_pulse_event( handle );
+
     if (PulseCount)
       FIXME("(%p,%d)\n", handle, *PulseCount);
 
