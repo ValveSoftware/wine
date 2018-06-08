@@ -378,6 +378,9 @@ NTSTATUS WINAPI NtResetEvent( HANDLE handle, PULONG NumberOfThreadsReleased )
 {
     NTSTATUS ret;
 
+    if (do_esync())
+        return esync_reset_event( handle );
+
     /* resetting an event can't release any thread... */
     if (NumberOfThreadsReleased) *NumberOfThreadsReleased = 0;
 
