@@ -15,6 +15,7 @@ C_SRCS = \
 	directory.c \
 	env.c \
 	error.c \
+	esync.c \
 	exception.c \
 	file.c \
 	handletable.c \
