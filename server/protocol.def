@@ -3740,3 +3740,11 @@ enum esync_type
     int          type;          /* actual type (may be different for events) */
     unsigned int shm_idx;
 @END
+
+/* Retrieve the esync fd for an object. */
+@REQ(get_esync_fd)
+    obj_handle_t handle;        /* handle to the object */
+@REPLY
+    int          type;
+    unsigned int shm_idx;
+@END
