@@ -3946,3 +3946,13 @@ struct handle_info
 @REQ(resume_process)
     obj_handle_t handle;       /* process handle */
 @END
+
+/* Create a new eventfd-based synchronization object */
+@REQ(create_esync)
+    unsigned int access;        /* wanted access rights */
+    int          initval;       /* initial value */
+    int          flags;         /* flags (EFD_SEMAPHORE or 0) */
+    VARARG(objattr,object_attributes); /* object attributes */
+@REPLY
+    obj_handle_t handle;        /* handle to the object */
+@END
