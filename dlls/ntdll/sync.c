@@ -356,6 +356,9 @@ NTSTATUS WINAPI NtSetEvent( HANDLE handle, PULONG NumberOfThreadsReleased )
 {
     NTSTATUS ret;
 
+    if (do_esync())
+        return esync_set_event( handle );
+
     /* FIXME: set NumberOfThreadsReleased */
 
     SERVER_START_REQ( event_op )
