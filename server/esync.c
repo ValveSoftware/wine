@@ -135,3 +135,31 @@ DECL_HANDLER(create_esync)
 
     if (root) release_object( root );
 }
+
+/* Retrieve a file descriptor for an esync object which will be signaled by the
+ * server. The client should only read from (i.e. wait on) this object. */
+DECL_HANDLER(get_esync_fd)
+{
+    struct object *obj;
+    int fd;
+
+    if (!(obj = get_handle_obj( current->process, req->handle, SYNCHRONIZE, NULL )))
+        return;
+
+    if (obj->ops->get_esync_fd)
+    {
+        fd = obj->ops->get_esync_fd( obj );
+        send_client_fd( current->process, fd, req->handle );
+    }
+    else
+    {
+        if (debug_level)
+        {
+            fprintf( stderr, "%04x: esync: can't wait on object: ", current->id );
+            obj->ops->dump( obj, 0 );
+        }
+        set_error( STATUS_NOT_IMPLEMENTED );
+    }
+
+    release_object( obj );
+}
