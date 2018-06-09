@@ -96,6 +96,13 @@ struct event
     struct esync obj;
 };
 
+struct mutex
+{
+    struct esync obj;
+    DWORD tid;
+    int count;    /* recursion count */
+};
+
 /* We'd like lookup to be fast. To that end, we use a static list indexed by handle.
  * This is copied and adapted from the fd cache code. */
 
@@ -386,6 +393,38 @@ NTSTATUS esync_pulse_event( HANDLE handle )
     read( event->obj.fd, &value, sizeof(value) );
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
+{
+    struct mutex *mutex;
+    NTSTATUS ret;
+    int fd;
+
+    TRACE("name %s, initial %d.\n",
+        attr ? debugstr_us(attr->ObjectName) : "<no name>", initial);
+
+    ret = create_esync( &fd, handle, access, attr, initial ? 0 : 1, 0 );
+    if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
+    {
+        mutex = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*mutex) );
+        if (!mutex)
+            return STATUS_NO_MEMORY;
+
+        /* can't take ownership of the mutex if we didn't create it */
+        if (ret == STATUS_OBJECT_NAME_EXISTS)
+            initial = FALSE;
+
+        mutex->obj.type = ESYNC_MUTEX;
+        mutex->obj.fd = fd;
+        mutex->tid = initial ? GetCurrentThreadId() : 0;
+        mutex->count = initial ? 1 : 0;
+
+        add_to_list( *handle, &mutex->obj);
+    }
+
+    return ret;
 }
 
 #define TICKSPERSEC        10000000
