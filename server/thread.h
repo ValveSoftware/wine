@@ -89,6 +89,7 @@ struct thread
     timeout_t              creation_time; /* Thread creation time */
     timeout_t              exit_time;     /* Thread exit time */
     struct token          *token;         /* security token associated with this thread */
+    int                    esync_fd;      /* esync file descriptor (signalled on exit) */
 };
 
 struct thread_snapshot
