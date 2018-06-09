@@ -5673,6 +5673,17 @@ struct get_esync_fd_request
 struct get_esync_fd_reply
 {
     struct reply_header __header;
+    int          type;
+    char __pad_12[4];
+};
+
+enum esync_type
+{
+    ESYNC_SEMAPHORE = 1,
+    ESYNC_AUTO_EVENT,
+    ESYNC_MANUAL_EVENT,
+    ESYNC_MANUAL_SERVER,
+    ESYNC_QUEUE,
 };
 
 
@@ -6568,6 +6579,6 @@ union generic_reply
     struct get_esync_fd_reply get_esync_fd_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 560
+#define SERVER_PROTOCOL_VERSION 561
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

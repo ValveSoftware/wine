@@ -148,11 +148,12 @@ int esync_create_fd( int initval, int flags )
 void esync_wake_up( struct object *obj )
 {
     static const uint64_t value = 1;
+    enum esync_type dummy;
     int fd;
 
     if (obj->ops->get_esync_fd)
     {
-        fd = obj->ops->get_esync_fd( obj );
+        fd = obj->ops->get_esync_fd( obj, &dummy );
 
         if (write( fd, &value, sizeof(value) ) == -1)
             perror( "esync: write" );
@@ -217,6 +218,7 @@ DECL_HANDLER(create_esync)
 DECL_HANDLER(get_esync_fd)
 {
     struct object *obj;
+    enum esync_type type;
     int fd;
 
     if (!(obj = get_handle_obj( current->process, req->handle, SYNCHRONIZE, NULL )))
@@ -224,7 +226,8 @@ DECL_HANDLER(get_esync_fd)
 
     if (obj->ops->get_esync_fd)
     {
-        fd = obj->ops->get_esync_fd( obj );
+        fd = obj->ops->get_esync_fd( obj, &type );
+        reply->type = type;
         send_client_fd( current->process, fd, req->handle );
     }
     else
