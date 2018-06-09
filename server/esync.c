@@ -60,7 +60,7 @@ struct esync
 static void esync_dump( struct object *obj, int verbose );
 static void esync_destroy( struct object *obj );
 
-static const struct object_ops esync_ops =
+const struct object_ops esync_ops =
 {
     sizeof(struct esync),      /* size */
     esync_dump,                /* dump */
@@ -165,6 +165,26 @@ void esync_clear( int fd )
 
     /* we don't care about the return value */
     read( fd, &value, sizeof(value) );
+}
+
+/* Server-side event support. */
+void esync_set_event( struct esync *esync )
+{
+    static const uint64_t value = 1;
+
+    assert( esync->obj.ops == &esync_ops );
+    if (write( esync->fd, &value, sizeof(value) ) == -1)
+        perror( "esync: write" );
+}
+
+void esync_reset_event( struct esync *esync )
+{
+    static uint64_t value = 1;
+
+    assert( esync->obj.ops == &esync_ops );
+
+    /* we don't care about the return value */
+    read( esync->fd, &value, sizeof(value) );
 }
 
 DECL_HANDLER(create_esync)
