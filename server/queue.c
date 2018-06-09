@@ -158,7 +158,7 @@ static void msg_queue_dump( struct object *obj, int verbose );
 static int msg_queue_add_queue( struct object *obj, struct wait_queue_entry *entry );
 static void msg_queue_remove_queue( struct object *obj, struct wait_queue_entry *entry );
 static int msg_queue_signaled( struct object *obj, struct wait_queue_entry *entry );
-static int msg_queue_get_esync_fd( struct object *obj );
+static int msg_queue_get_esync_fd( struct object *obj, enum esync_type *type );
 static void msg_queue_satisfied( struct object *obj, struct wait_queue_entry *entry );
 static void msg_queue_destroy( struct object *obj );
 static void msg_queue_poll_event( struct fd *fd, int event );
@@ -975,9 +975,10 @@ static int msg_queue_signaled( struct object *obj, struct wait_queue_entry *entr
     return ret || is_signaled( queue );
 }
 
-static int msg_queue_get_esync_fd( struct object *obj )
+static int msg_queue_get_esync_fd( struct object *obj, enum esync_type *type )
 {
     struct msg_queue *queue = (struct msg_queue *)obj;
+    *type = ESYNC_QUEUE;
     return queue->esync_fd;
 }
 

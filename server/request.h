@@ -2418,7 +2418,8 @@ C_ASSERT( FIELD_OFFSET(struct create_esync_reply, handle) == 8 );
 C_ASSERT( sizeof(struct create_esync_reply) == 16 );
 C_ASSERT( FIELD_OFFSET(struct get_esync_fd_request, handle) == 12 );
 C_ASSERT( sizeof(struct get_esync_fd_request) == 16 );
-C_ASSERT( sizeof(struct get_esync_fd_reply) == 8 );
+C_ASSERT( FIELD_OFFSET(struct get_esync_fd_reply, type) == 8 );
+C_ASSERT( sizeof(struct get_esync_fd_reply) == 16 );
 
 #endif  /* WANT_REQUEST_HANDLERS */
 

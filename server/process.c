@@ -65,7 +65,7 @@ static int process_signaled( struct object *obj, struct wait_queue_entry *entry 
 static unsigned int process_map_access( struct object *obj, unsigned int access );
 static void process_poll_event( struct fd *fd, int event );
 static void process_destroy( struct object *obj );
-static int process_get_esync_fd( struct object *obj );
+static int process_get_esync_fd( struct object *obj, enum esync_type *type );
 static void terminate_process( struct process *process, struct thread *skip, int exit_code );
 
 static const struct object_ops process_ops =
@@ -648,9 +648,10 @@ static int process_signaled( struct object *obj, struct wait_queue_entry *entry 
     return !process->running_threads;
 }
 
-static int process_get_esync_fd( struct object *obj )
+static int process_get_esync_fd( struct object *obj, enum esync_type *type )
 {
     struct process *process = (struct process *)obj;
+    *type = ESYNC_MANUAL_SERVER;
     return process->esync_fd;
 }
 

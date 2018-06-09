@@ -79,17 +79,9 @@ void __wine_esync_set_queue_fd( int fd )
     ntdll_get_thread_data()->esync_queue_fd = fd;
 }
 
-enum esync_type
-{
-    ESYNC_SEMAPHORE = 1,
-    ESYNC_AUTO_EVENT,
-    ESYNC_MANUAL_EVENT,
-    ESYNC_MANUAL_SERVER,
-};
-
 struct esync
 {
-    enum esync_type type;
+    enum esync_type type;   /* defined in protocol.def */
     int fd;
 };
 
@@ -163,6 +155,7 @@ static void *esync_get_object( HANDLE handle )
 static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
 {
     obj_handle_t fd_handle;
+    enum esync_type type;
     struct esync *esync;
     sigset_t sigset;
     NTSTATUS ret;
@@ -179,6 +172,7 @@ static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
             req->handle = wine_server_obj_handle( handle );
             if (!(ret = wine_server_call( req )))
             {
+                type = reply->type;
                 fd = receive_fd( &fd_handle );
                 assert( wine_server_ptr_handle(fd_handle) == handle );
             }
@@ -205,7 +199,7 @@ static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
 
     esync = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*esync) );
     esync->fd = fd;
-    esync->type = ESYNC_MANUAL_SERVER;
+    esync->type = type;
 
     add_to_list( handle, esync );
 
@@ -444,8 +438,10 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                              BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
     struct esync *objs[MAXIMUM_WAIT_OBJECTS];
-    struct pollfd fds[MAXIMUM_WAIT_OBJECTS];
+    struct pollfd fds[MAXIMUM_WAIT_OBJECTS + 1];
     int has_esync = 0, has_server = 0;
+    DWORD pollcount = count;
+    BOOL msgwait = FALSE;
     LONGLONG timeleft;
     LARGE_INTEGER now;
     ULONGLONG end;
@@ -474,6 +470,15 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
             return ret;
     }
 
+    if (objs[count - 1] && objs[count - 1]->type == ESYNC_QUEUE)
+    {
+        /* Last object in the list is a queue, which means someone is using
+         * MsgWaitForMultipleObjects(). We have to wait not only for the server
+         * fd (signaled on send_message, etc.) but also the USER driver's fd
+         * (signaled on e.g. X11 events.) */
+        msgwait = TRUE;
+    }
+
     if (has_esync && has_server)
     {
         FIXME("Can't wait on esync and server objects at the same time!\n");
@@ -490,6 +495,9 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
         TRACE("Waiting for %s of %d handles:", wait_any ? "any" : "all", count);
         for (i = 0; i < count; i++)
             DPRINTF(" %p", handles[i]);
+
+        if (msgwait)
+            DPRINTF(" or driver events (fd %d)", ntdll_get_thread_data()->esync_queue_fd);
 
         if (!timeout)
             DPRINTF(", timeout = INFINITE.\n");
@@ -508,10 +516,16 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
             fds[i].fd = objs[i] ? objs[i]->fd : -1;
             fds[i].events = POLLIN;
         }
+        if (msgwait)
+        {
+            fds[count].fd = ntdll_get_thread_data()->esync_queue_fd;
+            fds[count].events = POLLIN;
+            pollcount++;
+        }
 
         while (1)
         {
-            ret = do_poll( fds, count, timeout ? &end : NULL );
+            ret = do_poll( fds, pollcount, timeout ? &end : NULL );
             if (ret > 0)
             {
                 /* Find out which object triggered the wait. */
@@ -547,6 +561,12 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                             }
                         }
                     }
+                }
+
+                if (msgwait && (fds[count].revents & POLLIN))
+                {
+                    TRACE("Woken up by driver events.\n");
+                    return count - 1;
                 }
 
                 /* If we got here, someone else stole (or reset, etc.) whatever
