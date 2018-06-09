@@ -170,6 +170,7 @@ static const struct object_ops context_ops =
 static void dump_thread( struct object *obj, int verbose );
 static struct object_type *thread_get_type( struct object *obj );
 static int thread_signaled( struct object *obj, struct wait_queue_entry *entry );
+static int thread_get_esync_fd( struct object *obj, enum esync_type *type );
 static unsigned int thread_map_access( struct object *obj, unsigned int access );
 static void thread_poll_event( struct fd *fd, int event );
 static struct list *thread_get_kernel_obj_list( struct object *obj );
@@ -183,7 +184,7 @@ static const struct object_ops thread_ops =
     add_queue,                  /* add_queue */
     remove_queue,               /* remove_queue */
     thread_signaled,            /* signaled */
-    NULL,                       /* get_esync_fd */
+    thread_get_esync_fd,        /* get_esync_fd */
     no_satisfied,               /* satisfied */
     no_signal,                  /* signal */
     no_get_fd,                  /* get_fd */
@@ -222,6 +223,7 @@ static inline void init_thread_structure( struct thread *thread )
     thread->context         = NULL;
     thread->teb             = 0;
     thread->entry_point     = 0;
+    thread->esync_fd        = -1;
     thread->debug_ctx       = NULL;
     thread->system_regs     = 0;
     thread->queue           = NULL;
@@ -357,6 +359,9 @@ struct thread *create_thread( int fd, struct process *process, const struct secu
         return NULL;
     }
 
+    if (do_esync())
+        thread->esync_fd = esync_create_fd( 0, 0 );
+
     set_fd_events( thread->request_fd, POLLIN );  /* start listening to events */
     add_process_thread( thread->process, thread );
     return thread;
@@ -436,6 +441,9 @@ static void destroy_thread( struct object *obj )
     release_object( thread->process );
     if (thread->id) free_ptid( thread->id );
     if (thread->token) release_object( thread->token );
+
+    if (do_esync())
+        close( thread->esync_fd );
 }
 
 /* dump a thread on stdout for debugging purposes */
@@ -459,6 +467,13 @@ static int thread_signaled( struct object *obj, struct wait_queue_entry *entry )
 {
     struct thread *mythread = (struct thread *)obj;
     return (mythread->state == TERMINATED);
+}
+
+static int thread_get_esync_fd( struct object *obj, enum esync_type *type )
+{
+    struct thread *thread = (struct thread *)obj;
+    *type = ESYNC_MANUAL_SERVER;
+    return thread->esync_fd;
 }
 
 static unsigned int thread_map_access( struct object *obj, unsigned int access )
