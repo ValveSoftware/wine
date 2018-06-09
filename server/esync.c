@@ -144,6 +144,21 @@ int esync_create_fd( int initval, int flags )
 #endif
 }
 
+/* Wake up a server-side esync object. */
+void esync_wake_up( struct object *obj )
+{
+    static const uint64_t value = 1;
+    int fd;
+
+    if (obj->ops->get_esync_fd)
+    {
+        fd = obj->ops->get_esync_fd( obj );
+
+        if (write( fd, &value, sizeof(value) ) == -1)
+            perror( "esync: write" );
+    }
+}
+
 DECL_HANDLER(create_esync)
 {
     struct esync *esync;

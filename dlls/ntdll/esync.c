@@ -78,6 +78,7 @@ enum esync_type
     ESYNC_SEMAPHORE = 1,
     ESYNC_AUTO_EVENT,
     ESYNC_MANUAL_EVENT,
+    ESYNC_MANUAL_SERVER,
 };
 
 struct esync
@@ -147,6 +148,63 @@ static void *esync_get_object( HANDLE handle )
     if (entry >= ESYNC_LIST_ENTRIES || !esync_list[entry]) return NULL;
 
     return esync_list[entry][idx];
+}
+
+/* Gets a waitable object. This is either a proper esync object (i.e. an event,
+ * semaphore, etc. created using create_esync) or a generic synchronizable
+ * server-side object which the server will signal (e.g. a process, thread,
+ * message queue, etc.) */
+static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
+{
+    obj_handle_t fd_handle;
+    struct esync *esync;
+    sigset_t sigset;
+    NTSTATUS ret;
+    int fd;
+
+    if ((*obj = esync_get_object( handle ))) return STATUS_SUCCESS;
+
+    /* We need to try grabbing it from the server. */
+    server_enter_uninterrupted_section( &fd_cache_section, &sigset );
+    if (!(esync = esync_get_object( handle )))
+    {
+        SERVER_START_REQ( get_esync_fd )
+        {
+            req->handle = wine_server_obj_handle( handle );
+            if (!(ret = wine_server_call( req )))
+            {
+                fd = receive_fd( &fd_handle );
+                assert( wine_server_ptr_handle(fd_handle) == handle );
+            }
+        }
+        SERVER_END_REQ;
+    }
+    server_leave_uninterrupted_section( &fd_cache_section, &sigset );
+
+    if (esync)
+    {
+        /* We managed to grab it while in the CS; return it. */
+        *obj = esync;
+        return STATUS_SUCCESS;
+    }
+
+    if (ret)
+    {
+        WARN("Failed to retrieve fd for handle %p, status %#x.\n", handle, ret);
+        *obj = NULL;
+        return ret;
+    }
+
+    TRACE("Got fd %d for handle %p.\n", fd, handle);
+
+    esync = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*esync) );
+    esync->fd = fd;
+    esync->type = ESYNC_MANUAL_SERVER;
+
+    add_to_list( handle, esync );
+
+    *obj = esync;
+    return ret;
 }
 
 NTSTATUS esync_close( HANDLE handle )
@@ -391,11 +449,13 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 
     for (i = 0; i < count; i++)
     {
-        objs[i] = esync_get_object( handles[i] );
-        if (objs[i])
+        ret = get_waitable_object( handles[i], &objs[i] );
+        if (ret == STATUS_SUCCESS)
             has_esync = 1;
-        else
+        else if (ret == STATUS_NOT_IMPLEMENTED)
             has_server = 1;
+        else
+            return ret;
     }
 
     if (has_esync && has_server)
@@ -452,7 +512,7 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                         int64_t value;
                         ssize_t size;
 
-                        if (objs[i]->type == ESYNC_MANUAL_EVENT)
+                        if (objs[i]->type == ESYNC_MANUAL_EVENT || objs[i]->type == ESYNC_MANUAL_SERVER)
                         {
                             /* Don't grab the object, just check if it's signaled. */
                             if (fds[i].revents & POLLIN)
