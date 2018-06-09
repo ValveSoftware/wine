@@ -583,7 +583,25 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
     {
         for (i = 0; i < count; i++)
         {
-            fds[i].fd = objs[i] ? objs[i]->fd : -1;
+            struct esync *obj = objs[i];
+
+            if (obj && obj->type == ESYNC_MUTEX)
+            {
+                /* If we already own the mutex, return immediately. */
+                /* Note: This violates the assumption that the *first* object
+                 * to be signaled will be returned. If that becomes a problem,
+                 * we can always check the state of each object before waiting. */
+                struct mutex *mutex = (struct mutex *)obj;
+
+                if (mutex->tid == GetCurrentThreadId())
+                {
+                    TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                    mutex->count++;
+                    return i;
+                }
+            }
+
+            fds[i].fd = obj ? obj->fd : -1;
             fds[i].events = POLLIN;
         }
         if (msgwait)
@@ -601,18 +619,20 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                 /* Find out which object triggered the wait. */
                 for (i = 0; i < count; i++)
                 {
+                    struct esync *obj = objs[i];
+
                     if (fds[i].revents & (POLLERR | POLLHUP | POLLNVAL))
                     {
                         ERR("Polling on fd %d returned %#x.\n", fds[i].fd, fds[i].revents);
                         return STATUS_INVALID_HANDLE;
                     }
 
-                    if (objs[i])
+                    if (obj)
                     {
                         int64_t value;
                         ssize_t size;
 
-                        if (objs[i]->type == ESYNC_MANUAL_EVENT || objs[i]->type == ESYNC_MANUAL_SERVER)
+                        if (obj->type == ESYNC_MANUAL_EVENT || obj->type == ESYNC_MANUAL_SERVER)
                         {
                             /* Don't grab the object, just check if it's signaled. */
                             if (fds[i].revents & POLLIN)
@@ -627,6 +647,12 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                             {
                                 /* We found our object. */
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                if (obj->type == ESYNC_MUTEX)
+                                {
+                                    struct mutex *mutex = (struct mutex *)obj;
+                                    mutex->tid = GetCurrentThreadId();
+                                    mutex->count = 1;
+                                }
                                 return i;
                             }
                         }
