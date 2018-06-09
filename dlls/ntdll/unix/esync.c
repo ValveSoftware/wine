@@ -431,22 +431,32 @@ static LONGLONG update_timeout( ULONGLONG end )
 
 static int do_poll( struct pollfd *fds, nfds_t nfds, ULONGLONG *end )
 {
-    if (end)
+    int ret;
+
+    do
     {
-        LONGLONG timeleft = update_timeout( *end );
+        if (end)
+        {
+            LONGLONG timeleft = update_timeout( *end );
 
 #ifdef HAVE_PPOLL
-        /* We use ppoll() if available since the time granularity is better. */
-        struct timespec tmo_p;
-        tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
-        tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
-        return ppoll( fds, nfds, &tmo_p, NULL );
+            /* We use ppoll() if available since the time granularity is better. */
+            struct timespec tmo_p;
+            tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+            tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+            ret = ppoll( fds, nfds, &tmo_p, NULL );
 #else
-        return poll( fds, nfds, timeleft / TICKSPERMSEC );
+            ret = poll( fds, nfds, timeleft / TICKSPERMSEC );
 #endif
-    }
-    else
-        return poll( fds, nfds, -1 );
+        }
+        else
+            ret = poll( fds, nfds, -1 );
+
+    /* If we receive EINTR we were probably suspended (SIGUSR1), possibly for a
+     * system APC. The right thing to do is just try again. */
+    } while (ret < 0 && errno == EINTR);
+
+    return ret;
 }
 
 static void update_grabbed_object( struct esync *obj )
