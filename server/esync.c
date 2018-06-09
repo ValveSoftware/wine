@@ -159,6 +159,14 @@ void esync_wake_up( struct object *obj )
     }
 }
 
+void esync_clear( int fd )
+{
+    uint64_t value;
+
+    /* we don't care about the return value */
+    read( fd, &value, sizeof(value) );
+}
+
 DECL_HANDLER(create_esync)
 {
     struct esync *esync;
