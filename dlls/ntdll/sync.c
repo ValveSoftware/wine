@@ -592,6 +592,9 @@ NTSTATUS WINAPI NtReleaseMutant( IN HANDLE handle, OUT PLONG prev_count OPTIONAL
 {
     NTSTATUS    status;
 
+    if (do_esync())
+        return esync_release_mutex( handle, prev_count );
+
     SERVER_START_REQ( release_mutex )
     {
         req->handle = wine_server_obj_handle( handle );
