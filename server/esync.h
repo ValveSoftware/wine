@@ -21,3 +21,4 @@
 extern int do_esync(void);
 int esync_create_fd( int initval, int flags );
 void esync_wake_up( struct object *obj );
+void esync_clear( int fd );
