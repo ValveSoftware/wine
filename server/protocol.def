@@ -3961,4 +3961,14 @@ struct handle_info
 @REQ(get_esync_fd)
     obj_handle_t handle;        /* handle to the object */
 @REPLY
+    int          type;          /* esync type (defined below) */
 @END
+
+enum esync_type
+{
+    ESYNC_SEMAPHORE = 1,
+    ESYNC_AUTO_EVENT,
+    ESYNC_MANUAL_EVENT,
+    ESYNC_MANUAL_SERVER,
+    ESYNC_QUEUE,
+};

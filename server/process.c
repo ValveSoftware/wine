@@ -68,7 +68,7 @@ static struct security_descriptor *process_get_sd( struct object *obj );
 static void process_poll_event( struct fd *fd, int event );
 static struct list *process_get_kernel_obj_list( struct object *obj );
 static void process_destroy( struct object *obj );
-static int process_get_esync_fd( struct object *obj );
+static int process_get_esync_fd( struct object *obj, enum esync_type *type );
 static void terminate_process( struct process *process, struct thread *skip, int exit_code );
 
 static const struct object_ops process_ops =
@@ -662,9 +662,10 @@ static int process_signaled( struct object *obj, struct wait_queue_entry *entry 
     return !process->running_threads;
 }
 
-static int process_get_esync_fd( struct object *obj )
+static int process_get_esync_fd( struct object *obj, enum esync_type *type )
 {
     struct process *process = (struct process *)obj;
+    *type = ESYNC_MANUAL_SERVER;
     return process->esync_fd;
 }
 

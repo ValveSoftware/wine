@@ -133,7 +133,7 @@ static const struct object_ops thread_apc_ops =
 static void dump_thread( struct object *obj, int verbose );
 static struct object_type *thread_get_type( struct object *obj );
 static int thread_signaled( struct object *obj, struct wait_queue_entry *entry );
-static int thread_get_esync_fd( struct object *obj );
+static int thread_get_esync_fd( struct object *obj, enum esync_type *type );
 static unsigned int thread_map_access( struct object *obj, unsigned int access );
 static void thread_poll_event( struct fd *fd, int event );
 static struct list *thread_get_kernel_obj_list( struct object *obj );
@@ -396,9 +396,10 @@ static int thread_signaled( struct object *obj, struct wait_queue_entry *entry )
     return (mythread->state == TERMINATED);
 }
 
-static int thread_get_esync_fd( struct object *obj )
+static int thread_get_esync_fd( struct object *obj, enum esync_type *type )
 {
     struct thread *thread = (struct thread *)obj;
+    *type = ESYNC_MANUAL_SERVER;
     return thread->esync_fd;
 }
 
