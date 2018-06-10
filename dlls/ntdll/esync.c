@@ -520,6 +520,36 @@ NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     return ret;
 }
 
+NTSTATUS esync_open_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    enum esync_type type = ESYNC_MUTEX;
+    struct mutex *mutex;
+    NTSTATUS ret;
+    int fd;
+
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    ret = open_esync( &type, &fd, handle, access, attr );
+    if (!ret)
+    {
+        mutex = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*mutex) );
+        if (!mutex)
+            return STATUS_NO_MEMORY;
+
+        mutex->obj.type = ESYNC_MUTEX;
+        mutex->obj.fd = fd;
+
+        FIXME("Attempt to open a mutex; this will not work.\n");
+        mutex->tid = 0;
+        mutex->count = 0;
+
+        add_to_list( *handle, &mutex->obj );
+    }
+
+    return ret;
+}
+
 NTSTATUS esync_release_mutex( HANDLE *handle, LONG *prev )
 {
     struct mutex *mutex = esync_get_object( handle );
