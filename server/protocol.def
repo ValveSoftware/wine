@@ -3952,9 +3952,11 @@ struct handle_info
     unsigned int access;        /* wanted access rights */
     int          initval;       /* initial value */
     int          flags;         /* flags (EFD_SEMAPHORE or 0) */
+    int          type;          /* type of esync object (see below) */
     VARARG(objattr,object_attributes); /* object attributes */
 @REPLY
     obj_handle_t handle;        /* handle to the object */
+    int          type;          /* type of esync object (see below) */
 @END
 
 /* Retrieve the esync fd for an object. */
