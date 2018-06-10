@@ -89,6 +89,7 @@ struct semaphore
 {
     struct esync obj;
     int max;
+    int count;
 };
 
 struct event
@@ -327,6 +328,7 @@ NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
         semaphore->obj.type = ESYNC_SEMAPHORE;
         semaphore->obj.fd = fd;
         semaphore->max = max;
+        semaphore->count = initial;
 
         add_to_list( *handle, &semaphore->obj );
     }
@@ -355,6 +357,7 @@ NTSTATUS esync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
         semaphore->obj.fd = fd;
 
         FIXME("Attempt to open a semaphore, this will not work.\n");
+        semaphore->count = 0;
         semaphore->max = 0xdeadbeef;
 
         add_to_list( *handle, &semaphore->obj );
@@ -367,16 +370,27 @@ NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
 {
     struct semaphore *semaphore = esync_get_object( handle );
     uint64_t count64 = count;
+    ULONG current;
 
     TRACE("%p, %d, %p.\n", handle, count, prev);
 
     if (!semaphore) return STATUS_INVALID_HANDLE;
 
-    if (prev)
+    /* FIXME: This won't work across processes. In that case it may be best to
+     * use shared memory. */
+    do
     {
-        FIXME("Can't write previous value.\n");
-        *prev = 1;
-    }
+        current = semaphore->count;
+
+        if (count + current > semaphore->max)
+            return STATUS_SEMAPHORE_LIMIT_EXCEEDED;
+    } while (interlocked_cmpxchg( &semaphore->count, count + current, current ) != current);
+
+    if (prev) *prev = current;
+
+    /* We don't have to worry about a race between increasing the count and
+     * write(). The fact that we were able to increase the count means that we
+     * have permission to actually write that many releases to the semaphore. */
 
     if (write( semaphore->obj.fd, &count64, sizeof(count64) ) == -1)
         return FILE_GetNtStatus();
@@ -775,6 +789,15 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                                     mutex->tid = GetCurrentThreadId();
                                     mutex->count = 1;
                                 }
+                                else if (obj->type == ESYNC_SEMAPHORE)
+                                {
+                                    struct semaphore *semaphore = (struct semaphore *)obj;
+                                    /* We don't have to worry about a race between this and read();
+                                     * the fact that we were able to grab it at all means the count
+                                     * is nonzero, and if someone else grabbed it then the count
+                                     * must have been >= 2, etc. */
+                                    interlocked_xchg_add( &semaphore->count, -1 );
+                                }
                                 return i;
                             }
                         }
@@ -913,7 +936,8 @@ tryagain:
                 }
 
                 /* If we got here, we successfully waited on every object. */
-                /* Make sure to let ourselves know that we grabbed the mutexes. */
+                /* Make sure to let ourselves know that we grabbed the mutexes
+                 * and semaphores. */
                 for (i = 0; i < count; i++)
                 {
                     if (objs[i]->type == ESYNC_MUTEX)
@@ -921,6 +945,11 @@ tryagain:
                         struct mutex *mutex = (struct mutex *)objs[i];
                         mutex->tid = GetCurrentThreadId();
                         mutex->count++;
+                    }
+                    else if (objs[i]->type == ESYNC_SEMAPHORE)
+                    {
+                        struct semaphore *semaphore = (struct semaphore *)objs[i];
+                        interlocked_xchg_add( &semaphore->count, -1 );
                     }
                 }
                 TRACE("Wait successful.\n");
