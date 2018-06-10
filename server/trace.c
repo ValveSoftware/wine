@@ -4546,12 +4546,14 @@ static void dump_create_esync_request( const struct create_esync_request *req )
     fprintf( stderr, " access=%08x", req->access );
     fprintf( stderr, ", initval=%d", req->initval );
     fprintf( stderr, ", flags=%d", req->flags );
+    fprintf( stderr, ", type=%d", req->type );
     dump_varargs_object_attributes( ", objattr=", cur_size );
 }
 
 static void dump_create_esync_reply( const struct create_esync_reply *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
+    fprintf( stderr, ", type=%d", req->type );
 }
 
 static void dump_get_esync_fd_request( const struct get_esync_fd_request *req )
