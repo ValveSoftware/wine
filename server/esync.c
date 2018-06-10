@@ -55,6 +55,7 @@ struct esync
 {
     struct object   obj;    /* object header */
     int             fd;     /* eventfd file descriptor */
+    enum esync_type type;
 };
 
 static void esync_dump( struct object *obj, int verbose );
@@ -96,9 +97,16 @@ static void esync_destroy( struct object *obj )
     close( esync->fd );
 }
 
-struct esync *create_esync( struct object *root, const struct unicode_str *name,
-                            unsigned int attr, int initval, int flags,
-                            const struct security_descriptor *sd )
+static int type_matches( enum esync_type type1, enum esync_type type2 )
+{
+    return (type1 == type2) ||
+           ((type1 == ESYNC_AUTO_EVENT || type1 == ESYNC_MANUAL_EVENT) &&
+            (type2 == ESYNC_AUTO_EVENT || type2 == ESYNC_MANUAL_EVENT));
+}
+
+static struct esync *create_esync( struct object *root, const struct unicode_str *name,
+    unsigned int attr, int initval, int flags, enum esync_type type,
+    const struct security_descriptor *sd )
 {
 #ifdef HAVE_SYS_EVENTFD_H
     struct esync *esync;
@@ -114,6 +122,17 @@ struct esync *create_esync( struct object *root, const struct unicode_str *name,
                 perror( "eventfd" );
                 file_set_error();
                 release_object( esync );
+                return NULL;
+            }
+            esync->type = type;
+        }
+        else
+        {
+            /* validate the type */
+            if (!type_matches( type, esync->type ))
+            {
+                release_object( &esync->obj );
+                set_error( STATUS_OBJECT_TYPE_MISMATCH );
                 return NULL;
             }
         }
@@ -198,7 +217,7 @@ DECL_HANDLER(create_esync)
 
     if (!objattr) return;
 
-    if ((esync = create_esync( root, &name, objattr->attributes, req->initval, req->flags, sd )))
+    if ((esync = create_esync( root, &name, objattr->attributes, req->initval, req->flags, req->type, sd )))
     {
         if (get_error() == STATUS_OBJECT_NAME_EXISTS)
             reply->handle = alloc_handle( current->process, esync, req->access, objattr->attributes );
@@ -206,6 +225,7 @@ DECL_HANDLER(create_esync)
             reply->handle = alloc_handle_no_access_check( current->process, esync,
                                                           req->access, objattr->attributes );
 
+        reply->type = esync->type;
         send_client_fd( current->process, esync->fd, reply->handle );
         release_object( esync );
     }
