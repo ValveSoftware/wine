@@ -823,3 +823,31 @@ err:
         return FILE_GetNtStatus();
     }
 }
+
+NTSTATUS esync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
+    const LARGE_INTEGER *timeout )
+{
+    struct esync *obj = esync_get_object( signal );
+    NTSTATUS ret;
+
+    if (!obj) return STATUS_INVALID_HANDLE;
+
+    switch (obj->type)
+    {
+    case ESYNC_SEMAPHORE:
+        ret = esync_release_semaphore( signal, 1, NULL );
+        break;
+    case ESYNC_AUTO_EVENT:
+    case ESYNC_MANUAL_EVENT:
+        ret = esync_set_event( signal );
+        break;
+    case ESYNC_MUTEX:
+        ret = esync_release_mutex( signal, NULL );
+        break;
+    default:
+        return STATUS_OBJECT_TYPE_MISMATCH;
+    }
+    if (ret) return ret;
+
+    return esync_wait_objects( 1, &wait, TRUE, alertable, timeout );
+}
