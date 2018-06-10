@@ -275,6 +275,37 @@ static NTSTATUS create_esync(enum esync_type *type, int *fd, HANDLE *handle,
     return ret;
 }
 
+static NTSTATUS open_esync( enum esync_type *type, int *fd, HANDLE *handle,
+    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr )
+{
+    NTSTATUS ret;
+    obj_handle_t fd_handle;
+    sigset_t sigset;
+
+    server_enter_uninterrupted_section( &fd_cache_section, &sigset );
+    SERVER_START_REQ( open_esync )
+    {
+        req->access     = access;
+        req->attributes = attr->Attributes;
+        req->rootdir    = wine_server_obj_handle( attr->RootDirectory );
+        req->type       = *type;
+        if (attr->ObjectName)
+            wine_server_add_data( req, attr->ObjectName->Buffer, attr->ObjectName->Length );
+        if (!(ret = wine_server_call( req )))
+        {
+            *handle = wine_server_ptr_handle( reply->handle );
+            *type = reply->type;
+            *fd = receive_fd( &fd_handle );
+            assert( wine_server_ptr_handle(fd_handle) == *handle );
+        }
+    }
+    SERVER_END_REQ;
+    server_leave_uninterrupted_section( &fd_cache_section, &sigset );
+
+    TRACE("-> handle %p, fd %d.\n", *handle, *fd);
+    return ret;
+}
+
 NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max)
 {
@@ -296,6 +327,35 @@ NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
         semaphore->obj.type = ESYNC_SEMAPHORE;
         semaphore->obj.fd = fd;
         semaphore->max = max;
+
+        add_to_list( *handle, &semaphore->obj );
+    }
+
+    return ret;
+}
+
+NTSTATUS esync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    enum esync_type type = ESYNC_SEMAPHORE;
+    struct semaphore *semaphore;
+    NTSTATUS ret;
+    int fd = -1;
+
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    ret = open_esync( &type, &fd, handle, access, attr );
+    if (!ret)
+    {
+        semaphore = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*semaphore) );
+        if (!semaphore)
+            return STATUS_NO_MEMORY;
+
+        semaphore->obj.type = ESYNC_SEMAPHORE;
+        semaphore->obj.fd = fd;
+
+        FIXME("Attempt to open a semaphore, this will not work.\n");
+        semaphore->max = 0xdeadbeef;
 
         add_to_list( *handle, &semaphore->obj );
     }
