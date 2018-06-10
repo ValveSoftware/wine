@@ -234,8 +234,10 @@ NTSTATUS esync_close( HANDLE handle )
     return STATUS_INVALID_HANDLE;
 }
 
-static NTSTATUS create_esync(int *fd, HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr, int initval, int flags)
+/* type is an in-out parameter; if the object already existed it returns the
+ * actual type. */
+static NTSTATUS create_esync(enum esync_type *type, int *fd, HANDLE *handle,
+    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int initval, int flags)
 {
     NTSTATUS ret;
     data_size_t len;
@@ -253,11 +255,13 @@ static NTSTATUS create_esync(int *fd, HANDLE *handle, ACCESS_MASK access,
         req->access  = access;
         req->initval = initval;
         req->flags   = flags;
+        req->type    = *type;
         wine_server_add_data( req, objattr, len );
         ret = wine_server_call( req );
         if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
         {
             *handle = wine_server_ptr_handle( reply->handle );
+            *type = reply->type;
             *fd = receive_fd( &fd_handle );
             assert( wine_server_ptr_handle(fd_handle) == *handle );
         }
@@ -274,6 +278,7 @@ static NTSTATUS create_esync(int *fd, HANDLE *handle, ACCESS_MASK access,
 NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max)
 {
+    enum esync_type type = ESYNC_SEMAPHORE;
     struct semaphore *semaphore;
     NTSTATUS ret;
     int fd = -1;
@@ -281,7 +286,7 @@ NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     TRACE("name %s, initial %d, max %d.\n",
         attr ? debugstr_us(attr->ObjectName) : "<no name>", initial, max);
 
-    ret = create_esync( &fd, handle, access, attr, initial, EFD_SEMAPHORE );
+    ret = create_esync( &type, &fd, handle, access, attr, initial, EFD_SEMAPHORE );
     if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
     {
         semaphore = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*semaphore) );
@@ -320,24 +325,25 @@ NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
 }
 
 NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
-    const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN initial )
+    const OBJECT_ATTRIBUTES *attr, EVENT_TYPE event_type, BOOLEAN initial )
 {
+    enum esync_type type = (event_type == SynchronizationEvent ? ESYNC_AUTO_EVENT : ESYNC_MANUAL_EVENT);
     struct event *event;
     NTSTATUS ret;
     int fd;
 
     TRACE("name %s, %s-reset, initial %d.\n",
         attr ? debugstr_us(attr->ObjectName) : "<no name>",
-        type == NotificationEvent ? "manual" : "auto", initial);
+        event_type == NotificationEvent ? "manual" : "auto", initial);
 
-    ret = create_esync( &fd, handle, access, attr, initial, 0 );
+    ret = create_esync( &type, &fd, handle, access, attr, initial, 0 );
     if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
     {
         event = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*event) );
         if (!event)
             return STATUS_NO_MEMORY;
 
-        event->obj.type = (type == NotificationEvent ? ESYNC_MANUAL_EVENT : ESYNC_AUTO_EVENT);
+        event->obj.type = type; /* note that the server might give us the real type */
         event->obj.fd = fd;
 
         add_to_list( *handle, &event->obj);
@@ -398,6 +404,7 @@ NTSTATUS esync_pulse_event( HANDLE handle )
 NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
 {
+    enum esync_type type = ESYNC_MUTEX;
     struct mutex *mutex;
     NTSTATUS ret;
     int fd;
@@ -405,7 +412,7 @@ NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     TRACE("name %s, initial %d.\n",
         attr ? debugstr_us(attr->ObjectName) : "<no name>", initial);
 
-    ret = create_esync( &fd, handle, access, attr, initial ? 0 : 1, 0 );
+    ret = create_esync( &type, &fd, handle, access, attr, initial ? 0 : 1, 0 );
     if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
     {
         mutex = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*mutex) );
