@@ -412,6 +412,32 @@ NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
     return ret;
 }
 
+NTSTATUS esync_open_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    enum esync_type type = ESYNC_AUTO_EVENT;
+    struct event *event;
+    NTSTATUS ret;
+    int fd;
+
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    ret = open_esync( &type, &fd, handle, access, attr );
+    if (!ret)
+    {
+        event = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*event) );
+        if (!event)
+            return STATUS_NO_MEMORY;
+
+        event->obj.type = type;
+        event->obj.fd = fd;
+
+        add_to_list( *handle, &event->obj );
+    }
+
+    return ret;
+}
+
 NTSTATUS esync_set_event( HANDLE handle )
 {
     struct event *event = esync_get_object( handle );
