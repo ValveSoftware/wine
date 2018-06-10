@@ -4615,6 +4615,21 @@ static void dump_create_esync_reply( const struct create_esync_reply *req )
     fprintf( stderr, ", type=%d", req->type );
 }
 
+static void dump_open_esync_request( const struct open_esync_request *req )
+{
+    fprintf( stderr, " access=%08x", req->access );
+    fprintf( stderr, ", attributes=%08x", req->attributes );
+    fprintf( stderr, ", rootdir=%04x", req->rootdir );
+    fprintf( stderr, ", type=%d", req->type );
+    dump_varargs_unicode_str( ", name=", cur_size );
+}
+
+static void dump_open_esync_reply( const struct open_esync_reply *req )
+{
+    fprintf( stderr, " handle=%04x", req->handle );
+    fprintf( stderr, ", type=%d", req->type );
+}
+
 static void dump_get_esync_fd_request( const struct get_esync_fd_request *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
@@ -4925,6 +4940,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_suspend_process_request,
     (dump_func)dump_resume_process_request,
     (dump_func)dump_create_esync_request,
+    (dump_func)dump_open_esync_request,
     (dump_func)dump_get_esync_fd_request,
 };
 
@@ -5228,6 +5244,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     NULL,
     NULL,
     (dump_func)dump_create_esync_reply,
+    (dump_func)dump_open_esync_reply,
     (dump_func)dump_get_esync_fd_reply,
 };
 
@@ -5531,6 +5548,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "suspend_process",
     "resume_process",
     "create_esync",
+    "open_esync",
     "get_esync_fd",
 };
 

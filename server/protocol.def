@@ -3959,6 +3959,18 @@ struct handle_info
     int          type;          /* type of esync object (see below) */
 @END
 
+/* Open an esync object */
+@REQ(open_esync)
+    unsigned int access;        /* wanted access rights */
+    unsigned int attributes;    /* object attributes */
+    obj_handle_t rootdir;       /* root directory */
+    int          type;          /* type of esync object (above) */
+    VARARG(name,unicode_str);   /* object name */
+@REPLY
+    obj_handle_t handle;        /* handle to the event */
+    int          type;          /* type of esync object (above) */
+@END
+
 /* Retrieve the esync fd for an object. */
 @REQ(get_esync_fd)
     obj_handle_t handle;        /* handle to the object */
