@@ -48,6 +48,7 @@
 #include "ntdll_misc.h"
 #include "ddk/wdm.h"
 #include "wine/exception.h"
+#include "esync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(thread);
 
