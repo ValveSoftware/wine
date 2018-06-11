@@ -910,17 +910,7 @@ static void cleanup_results( struct msg_queue *queue )
 /* check if the thread owning the queue is hung (not checking for messages) */
 static int is_queue_hung( struct msg_queue *queue )
 {
-    struct wait_queue_entry *entry;
-
-    if (current_time - queue->last_get_msg <= 5 * TICKS_PER_SEC)
-        return 0;  /* less than 5 seconds since last get message -> not hung */
-
-    LIST_FOR_EACH_ENTRY( entry, &queue->obj.wait_queue, struct wait_queue_entry, entry )
-    {
-        if (get_wait_queue_thread(entry)->queue == queue)
-            return 0;  /* thread is waiting on queue -> not hung */
-    }
-    return 1;
+    return is_signaled( queue ) && (current_time - queue->last_get_msg > 5 * TICKS_PER_SEC);
 }
 
 static int msg_queue_add_queue( struct object *obj, struct wait_queue_entry *entry )
