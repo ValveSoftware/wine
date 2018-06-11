@@ -4533,6 +4533,7 @@ static void dump_create_esync_reply( const struct create_esync_reply *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
     fprintf( stderr, ", type=%d", req->type );
+    fprintf( stderr, ", shm_idx=%08x", req->shm_idx );
 }
 
 static void dump_open_esync_request( const struct open_esync_request *req )
@@ -4548,6 +4549,7 @@ static void dump_open_esync_reply( const struct open_esync_reply *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
     fprintf( stderr, ", type=%d", req->type );
+    fprintf( stderr, ", shm_idx=%08x", req->shm_idx );
 }
 
 static void dump_get_esync_fd_request( const struct get_esync_fd_request *req )
