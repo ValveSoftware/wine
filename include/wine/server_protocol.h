@@ -5680,6 +5680,8 @@ struct create_esync_reply
     struct reply_header __header;
     obj_handle_t handle;
     int          type;
+    unsigned int shm_idx;
+    char __pad_20[4];
 };
 
 
@@ -5698,6 +5700,8 @@ struct open_esync_reply
     struct reply_header __header;
     obj_handle_t handle;
     int          type;
+    unsigned int shm_idx;
+    char __pad_20[4];
 };
 
 
@@ -6623,6 +6627,6 @@ union generic_reply
     struct get_esync_fd_reply get_esync_fd_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 578
+#define SERVER_PROTOCOL_VERSION 579
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

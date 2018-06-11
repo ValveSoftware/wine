@@ -36,6 +36,7 @@
 #include "file.h"
 #include "thread.h"
 #include "request.h"
+#include "esync.h"
 #include "wine/library.h"
 
 /* command-line options */
@@ -140,6 +141,9 @@ int main( int argc, char *argv[] )
 
     sock_init();
     open_master_socket();
+
+    if (do_esync())
+        esync_init();
 
     if (debug_level) fprintf( stderr, "wineserver: starting (pid=%ld)\n", (long) getpid() );
     init_signals();
