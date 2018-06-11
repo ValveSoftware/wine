@@ -103,6 +103,8 @@ static NTSTATUS (WINAPI *pNtQueryInformationThread)(HANDLE,THREADINFOCLASS,PVOID
 static BOOL (WINAPI *pGetThreadGroupAffinity)(HANDLE,GROUP_AFFINITY*);
 static BOOL (WINAPI *pSetThreadGroupAffinity)(HANDLE,const GROUP_AFFINITY*,GROUP_AFFINITY*);
 static NTSTATUS (WINAPI *pNtSetInformationThread)(HANDLE,THREADINFOCLASS,LPCVOID,ULONG);
+static HRESULT (WINAPI *pSetThreadDescription)(HANDLE,const WCHAR *);
+static HRESULT (WINAPI *pGetThreadDescription)(HANDLE,WCHAR **);
 
 static HANDLE create_target_process(const char *arg)
 {
@@ -1618,6 +1620,47 @@ static void test_ThreadErrorMode(void)
     pSetThreadErrorMode(oldmode, NULL);
 }
 
+static void test_ThreadDescription(void)
+{
+    HRESULT hr;
+    static const WCHAR test_nameW[] = {'t','e','s','t','_','n','a','m','e',0};
+    static const WCHAR emptyW[] = {0};
+    WCHAR *out;
+
+    if (!pSetThreadDescription)
+    {
+        win_skip("SetThreadDescription not implemented\n");
+        return;
+    }
+
+    if(0)
+    {
+        /* crash on win10 */
+        hr = pGetThreadDescription(GetCurrentThread(), NULL);
+    }
+
+    hr = pGetThreadDescription(GetCurrentThread(), &out);
+    ok(hr == 0x10000000, "GetThreadDescription failed: 0x%x\n", hr);
+    todo_wine ok(!lstrcmpW(out, emptyW), "Got non-empty thread name: %s\n", wine_dbgstr_w(out));
+    LocalFree(out);
+
+    hr = pSetThreadDescription(GetCurrentThread(), test_nameW);
+    ok(hr == 0x10000000, "SetThreadDescription failed: 0x%x\n", hr);
+
+    hr = pGetThreadDescription(GetCurrentThread(), &out);
+    ok(hr == 0x10000000, "GetThreadDescription failed: 0x%x\n", hr);
+    ok(!lstrcmpW(test_nameW, out), "Got wrong thread name: %s\n", wine_dbgstr_w(out));
+    LocalFree(out);
+
+    hr = pSetThreadDescription(GetCurrentThread(), NULL);
+    ok(hr == 0x10000000, "SetThreadDescription should have failed: 0x%x\n", hr);
+
+    hr = pGetThreadDescription(GetCurrentThread(), &out);
+    ok(hr == 0x10000000, "GetThreadDescription failed: 0x%x\n", hr);
+    ok(!lstrcmpW(emptyW, out), "Got wrong thread name: %s\n", wine_dbgstr_w(out));
+    LocalFree(out);
+}
+
 #if (defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))) || (defined(_MSC_VER) && defined(__i386__))
 static inline void set_fpu_cw(WORD cw)
 {
@@ -2049,6 +2092,8 @@ static void init_funcs(void)
 
     X(GetThreadGroupAffinity);
     X(SetThreadGroupAffinity);
+    X(SetThreadDescription);
+    X(GetThreadDescription);
 
     X(FlsAlloc);
     X(FlsFree);
@@ -2122,6 +2167,7 @@ START_TEST(thread)
    test_TLS();
    test_FLS();
    test_ThreadErrorMode();
+   test_ThreadDescription();
 #if (defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))) || (defined(_MSC_VER) && defined(__i386__))
    test_thread_fpu_cw();
 #endif
