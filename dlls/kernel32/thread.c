@@ -28,6 +28,9 @@
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
+#ifdef HAVE_SYS_PRCTL_H
+# include <sys/prctl.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -35,6 +38,7 @@
 #include "winbase.h"
 #include "winerror.h"
 #include "winternl.h"
+#include "winnls.h"
 #include "wine/exception.h"
 #include "wine/library.h"
 #include "wine/server.h"
@@ -269,20 +273,112 @@ BOOL WINAPI GetThreadContext( HANDLE handle,     /* [in]  Handle to thread with 
 
 
 /***********************************************************************
- * Wow64GetThreadContext [KERNEL32.@]
- */
+* Wow64GetThreadContext [KERNEL32.@]
+*/
 BOOL WINAPI Wow64GetThreadContext( HANDLE handle, WOW64_CONTEXT *context)
 {
 #ifdef __i386__
-    NTSTATUS status = NtGetContextThread( handle, (CONTEXT *)context );
+NTSTATUS status = NtGetContextThread( handle, (CONTEXT *)context );
 #elif defined(__x86_64__)
-    NTSTATUS status = RtlWow64GetThreadContext( handle, context );
+NTSTATUS status = RtlWow64GetThreadContext( handle, context );
 #else
-    NTSTATUS status = STATUS_NOT_IMPLEMENTED;
-    FIXME("not implemented on this platform\n");
+NTSTATUS status = STATUS_NOT_IMPLEMENTED;
+FIXME("not implemented on this platform\n");
 #endif
-    if (status) SetLastError( RtlNtStatusToDosError(status) );
-    return !status;
+if (status) SetLastError( RtlNtStatusToDosError(status) );
+return !status;
+}
+
+
+/* ??? MSDN says it should be HRESULT, but we get this */
+#define THREADDESC_SUCCESS 0x10000000
+
+/***********************************************************************
+* SetThreadDescription [KERNEL32.@]  Sets name of thread.
+*
+* RETURNS
+*    Success: TRUE
+*    Failure: FALSE
+*/
+HRESULT WINAPI SetThreadDescription( HANDLE handle, const WCHAR *descW )
+{
+TRACE("(%p,%s)\n", handle, wine_dbgstr_w( descW ));
+
+if (handle != GetCurrentThread())
+{
+    FIXME("Can't set other thread description\n");
+    return THREADDESC_SUCCESS;
+}
+
+#ifdef HAVE_PRCTL
+
+#ifndef PR_SET_NAME
+# define PR_SET_NAME 15
+#endif
+
+if (descW)
+{
+    DWORD length;
+    char *descA;
+
+    length = WideCharToMultiByte( CP_UNIXCP, 0, descW, -1, NULL, 0, NULL, NULL );
+    if (!(descA = HeapAlloc( GetProcessHeap(), 0, length ))) return E_OUTOFMEMORY;
+    WideCharToMultiByte( CP_UNIXCP, 0, descW, -1, descA, length, NULL, NULL );
+
+    prctl( PR_SET_NAME, descA );
+
+    HeapFree( GetProcessHeap(), 0, descA );
+}
+else
+    prctl( PR_SET_NAME, "" );
+
+#endif  /* HAVE_PRCTL */
+
+return THREADDESC_SUCCESS;
+}
+
+
+/***********************************************************************
+* GetThreadDescription [KERNEL32.@]  Retrieves name of thread.
+*
+* RETURNS
+*    Success: TRUE
+*    Failure: FALSE
+*/
+HRESULT WINAPI GetThreadDescription( HANDLE handle, WCHAR **descW )
+{
+#ifdef HAVE_PRCTL
+char descA[16];
+#endif
+
+*descW = LocalAlloc( 0, 16 * sizeof(WCHAR) );
+if(!*descW)
+    return E_OUTOFMEMORY;
+
+if (handle != GetCurrentThread())
+{
+    FIXME("Can't get other thread description\n");
+    (*descW)[0] = 0;
+    return THREADDESC_SUCCESS;
+}
+
+#ifdef HAVE_PRCTL
+#ifndef PR_GET_NAME
+# define PR_GET_NAME 16
+#endif
+
+    if (prctl( PR_GET_NAME, descA ) != 0)
+    {
+        (*descW)[0] = 0;
+        return THREADDESC_SUCCESS;
+    }
+
+    MultiByteToWideChar( CP_UNIXCP, 0, descA, -1, *descW, 16 );
+#else
+    (*descW)[0] = 0;
+#endif
+
+    return THREADDESC_SUCCESS;
 }
 
 
