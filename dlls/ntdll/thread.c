@@ -45,6 +45,7 @@
 #include "ntdll_misc.h"
 #include "ddk/wdm.h"
 #include "wine/exception.h"
+#include "esync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(thread);
 
@@ -258,6 +259,9 @@ void thread_init(void)
     user_shared_data->TickCountMultiplier = 1 << 24;
 
     fill_cpu_info();
+
+    if (do_esync())
+        esync_init();
 
     NtCreateKeyedEvent( &keyed_event, GENERIC_READ | GENERIC_WRITE, NULL, 0 );
 }
