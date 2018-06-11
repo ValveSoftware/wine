@@ -19,6 +19,7 @@
  */
 
 extern int do_esync(void) DECLSPEC_HIDDEN;
+extern void esync_init(void) DECLSPEC_HIDDEN;
 extern NTSTATUS esync_close( HANDLE handle ) DECLSPEC_HIDDEN;
 
 extern NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
