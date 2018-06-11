@@ -3957,6 +3957,7 @@ struct handle_info
 @REPLY
     obj_handle_t handle;        /* handle to the object */
     int          type;          /* type of esync object (see below) */
+    unsigned int shm_idx;       /* this object's index into the shm section */
 @END
 
 /* Open an esync object */
@@ -3969,6 +3970,7 @@ struct handle_info
 @REPLY
     obj_handle_t handle;        /* handle to the event */
     int          type;          /* type of esync object (above) */
+    unsigned int shm_idx;       /* this object's index into the shm section */
 @END
 
 /* Retrieve the esync fd for an object. */
