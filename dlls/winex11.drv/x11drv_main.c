@@ -622,12 +622,15 @@ void CDECL X11DRV_ThreadDetach(void)
     }
 }
 
+extern void __wine_esync_set_queue_fd( int fd );
 
 /* store the display fd into the message queue */
 static void set_queue_display_fd( Display *display )
 {
     HANDLE handle;
     int ret;
+
+    __wine_esync_set_queue_fd( ConnectionNumber(display) );
 
     if (wine_server_fd_to_handle( ConnectionNumber(display), GENERIC_READ | SYNCHRONIZE, 0, &handle ))
     {
