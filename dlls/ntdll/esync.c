@@ -73,6 +73,12 @@ int do_esync(void)
 #endif
 }
 
+/* Entry point for drivers to set queue fd. */
+void __wine_esync_set_queue_fd( int fd )
+{
+    ntdll_get_thread_data()->esync_queue_fd = fd;
+}
+
 enum esync_type
 {
     ESYNC_SEMAPHORE = 1,
