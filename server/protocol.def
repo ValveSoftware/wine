@@ -3978,6 +3978,7 @@ struct handle_info
     obj_handle_t handle;        /* handle to the object */
 @REPLY
     int          type;          /* esync type (defined below) */
+    unsigned int shm_idx;       /* this object's index into the shm section */
 @END
 
 enum esync_type

@@ -213,6 +213,7 @@ static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
 {
     obj_handle_t fd_handle;
     enum esync_type type;
+    unsigned int shm_idx;
     struct esync *esync;
     sigset_t sigset;
     NTSTATUS ret;
@@ -230,6 +231,7 @@ static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
             if (!(ret = wine_server_call( req )))
             {
                 type = reply->type;
+                shm_idx = reply->shm_idx;
                 fd = receive_fd( &fd_handle );
                 assert( wine_server_ptr_handle(fd_handle) == handle );
             }
@@ -258,9 +260,7 @@ static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
     esync->fd = fd;
     esync->type = type;
 
-    if (type == ESYNC_SEMAPHORE || type == ESYNC_MUTEX)
-        FIXME("Attempt to duplicate a semaphore or mutex; this will not work.\n");
-    esync->shm = NULL;
+    esync->shm = shm_idx ? get_shm( shm_idx ) : 0;
 
     add_to_list( handle, esync );
 
