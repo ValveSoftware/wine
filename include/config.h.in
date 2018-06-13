@@ -648,6 +648,9 @@
 /* Define to 1 if you have the <port.h> header file. */
 #undef HAVE_PORT_H
 
+/* Define to 1 if you have the `ppoll' function. */
+#undef HAVE_PPOLL
+
 /* Define to 1 if you have the `prctl' function. */
 #undef HAVE_PRCTL
 
@@ -755,6 +758,9 @@
 
 /* Define to 1 if `interface_id' is a member of `sg_io_hdr_t'. */
 #undef HAVE_SG_IO_HDR_T_INTERFACE_ID
+
+/* Define to 1 if you have the `shm_open' function. */
+#undef HAVE_SHM_OPEN
 
 /* Define if sigaddset is supported */
 #undef HAVE_SIGADDSET
@@ -916,6 +922,9 @@
 
 /* Define to 1 if you have the <sys/epoll.h> header file. */
 #undef HAVE_SYS_EPOLL_H
+
+/* Define to 1 if you have the <sys/eventfd.h> header file. */
+#undef HAVE_SYS_EVENTFD_H
 
 /* Define to 1 if you have the <sys/event.h> header file. */
 #undef HAVE_SYS_EVENT_H
