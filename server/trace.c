@@ -4581,6 +4581,7 @@ static void dump_get_esync_fd_request( const struct get_esync_fd_request *req )
 static void dump_get_esync_fd_reply( const struct get_esync_fd_reply *req )
 {
     fprintf( stderr, " type=%d", req->type );
+    fprintf( stderr, ", shm_idx=%08x", req->shm_idx );
 }
 
 static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
