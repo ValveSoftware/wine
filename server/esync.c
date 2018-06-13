@@ -362,6 +362,13 @@ DECL_HANDLER(get_esync_fd)
     {
         fd = obj->ops->get_esync_fd( obj, &type );
         reply->type = type;
+        if (obj->ops == &esync_ops)
+        {
+            struct esync *esync = (struct esync *)obj;
+            reply->shm_idx = esync->shm_idx;
+        }
+        else
+            reply->shm_idx = 0;
         send_client_fd( current->process, fd, req->handle );
     }
     else
