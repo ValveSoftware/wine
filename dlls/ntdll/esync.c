@@ -205,9 +205,48 @@ static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
 
     TRACE("Got fd %d for handle %p.\n", fd, handle);
 
-    esync = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*esync) );
-    esync->fd = fd;
-    esync->type = type;
+    switch (type)
+    {
+    case ESYNC_SEMAPHORE:
+    {
+        struct semaphore *semaphore = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*semaphore) );
+        semaphore->obj.type = ESYNC_SEMAPHORE;
+        semaphore->obj.fd = fd;
+
+        FIXME("Attempt to duplicate a semaphore; this will not work.\n");
+        semaphore->max = 0xdeadbeef;
+        semaphore->count = 0;
+        esync = &semaphore->obj;
+        break;
+    }
+    case ESYNC_AUTO_EVENT:
+    case ESYNC_MANUAL_EVENT:
+    {
+        struct event *event = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*event) );
+        event->obj.type = type;
+        event->obj.fd = fd;
+        esync = &event->obj;
+        break;
+    }
+    case ESYNC_MUTEX:
+    {
+        struct mutex *mutex = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*mutex) );
+        mutex->obj.type = type;
+        mutex->obj.fd = fd;
+
+        FIXME("Attempt to duplicate a mutex; this will not work.\n");
+        mutex->tid = 0;
+        mutex->count = 0;
+        esync = &mutex->obj;
+        break;
+    }
+    case ESYNC_MANUAL_SERVER:
+    case ESYNC_QUEUE:
+        esync = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*esync) );
+        esync->fd = fd;
+        esync->type = type;
+        break;
+    }
 
     add_to_list( handle, esync );
 
