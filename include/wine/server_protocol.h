@@ -5698,7 +5698,7 @@ struct get_esync_fd_reply
 {
     struct reply_header __header;
     int          type;
-    char __pad_12[4];
+    unsigned int shm_idx;
 };
 
 enum esync_type
@@ -6608,6 +6608,6 @@ union generic_reply
     struct get_esync_fd_reply get_esync_fd_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 566
+#define SERVER_PROTOCOL_VERSION 567
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
