@@ -54,6 +54,7 @@ static BOOLEAN (WINAPI *pTryAcquireSRWLockShared)(PSRWLOCK);
 
 static NTSTATUS (WINAPI *pNtAllocateVirtualMemory)(HANDLE, PVOID *, ULONG, SIZE_T *, ULONG, ULONG);
 static NTSTATUS (WINAPI *pNtFreeVirtualMemory)(HANDLE, PVOID *, SIZE_T *, ULONG);
+static NTSTATUS (WINAPI *pNtQuerySystemTime)(LARGE_INTEGER *);
 static NTSTATUS (WINAPI *pNtWaitForSingleObject)(HANDLE, BOOLEAN, const LARGE_INTEGER *);
 static NTSTATUS (WINAPI *pNtWaitForMultipleObjects)(ULONG,const HANDLE*,BOOLEAN,BOOLEAN,const LARGE_INTEGER*);
 static PSLIST_ENTRY (__fastcall *pRtlInterlockedPushListSList)(PSLIST_HEADER list, PSLIST_ENTRY first,
@@ -1480,11 +1481,15 @@ static HANDLE modify_handle(HANDLE handle, DWORD modify)
     return ULongToHandle(tmp);
 }
 
+#define TIMEOUT_INFINITE (((LONGLONG)0x7fffffff) << 32 | 0xffffffff)
+
 static void test_WaitForSingleObject(void)
 {
     HANDLE signaled, nonsignaled, invalid;
+    LARGE_INTEGER ntnow, ntthen;
     LARGE_INTEGER timeout;
     NTSTATUS status;
+    DWORD now, then;
     DWORD ret;
 
     signaled = CreateEventW(NULL, TRUE, TRUE, NULL);
@@ -1568,6 +1573,68 @@ static void test_WaitForSingleObject(void)
     timeout.QuadPart = -1000000;
     status = pNtWaitForSingleObject(GetCurrentThread(), FALSE, &timeout);
     ok(status == STATUS_TIMEOUT, "expected STATUS_TIMEOUT, got %08x\n", status);
+
+    ret = WaitForSingleObject( signaled, 0 );
+    ok(ret == 0, "got %u\n", ret);
+
+    ret = WaitForSingleObject( nonsignaled, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    /* test that a timed wait actually does wait */
+    now = GetTickCount();
+    ret = WaitForSingleObject( nonsignaled, 100 );
+    then = GetTickCount();
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+    ok(abs((then - now) - 100) < 5, "got %u ms\n", then - now);
+
+    now = GetTickCount();
+    ret = WaitForSingleObject( signaled, 100 );
+    then = GetTickCount();
+    ok(ret == 0, "got %u\n", ret);
+    ok(abs(then - now) < 5, "got %u ms\n", then - now);
+
+    ret = WaitForSingleObject( signaled, INFINITE );
+    ok(ret == 0, "got %u\n", ret);
+
+    /* test NT timeouts */
+    pNtQuerySystemTime( &ntnow );
+    timeout.QuadPart = ntnow.QuadPart + 100 * 10000;
+    status = pNtWaitForSingleObject( nonsignaled, FALSE, &timeout );
+    pNtQuerySystemTime( &ntthen );
+    ok(status == STATUS_TIMEOUT, "got %#x\n", status);
+    ok(abs(((ntthen.QuadPart - ntnow.QuadPart) / 10000) - 100) < 5, "got %s ns\n",
+        wine_dbgstr_longlong((ntthen.QuadPart - ntnow.QuadPart) * 100));
+
+    pNtQuerySystemTime( &ntnow );
+    timeout.QuadPart = -100 * 10000;
+    status = pNtWaitForSingleObject( nonsignaled, FALSE, &timeout );
+    pNtQuerySystemTime( &ntthen );
+    ok(status == STATUS_TIMEOUT, "got %#x\n", status);
+    ok(abs(((ntthen.QuadPart - ntnow.QuadPart) / 10000) - 100) < 5, "got %s ns\n",
+        wine_dbgstr_longlong((ntthen.QuadPart - ntnow.QuadPart) * 100));
+
+    status = pNtWaitForSingleObject( signaled, FALSE, NULL );
+    ok(status == 0, "got %#x\n", status);
+
+    timeout.QuadPart = TIMEOUT_INFINITE;
+    status = pNtWaitForSingleObject( signaled, FALSE, &timeout );
+    ok(status == 0, "got %#x\n", status);
+
+    pNtQuerySystemTime( &ntnow );
+    timeout.QuadPart = ntnow.QuadPart;
+    status = pNtWaitForSingleObject( nonsignaled, FALSE, &timeout );
+    pNtQuerySystemTime( &ntthen );
+    ok(status == STATUS_TIMEOUT, "got %#x\n", status);
+    ok(abs((ntthen.QuadPart - ntnow.QuadPart) / 10000) < 5, "got %s ns\n",
+        wine_dbgstr_longlong((ntthen.QuadPart - ntnow.QuadPart) * 100));
+
+    pNtQuerySystemTime( &ntnow );
+    timeout.QuadPart = ntnow.QuadPart - 100 * 10000;
+    status = pNtWaitForSingleObject( nonsignaled, FALSE, &timeout );
+    pNtQuerySystemTime( &ntthen );
+    ok(status == STATUS_TIMEOUT, "got %#x\n", status);
+    ok(abs((ntthen.QuadPart - ntnow.QuadPart) / 10000) < 5, "got %s ns\n",
+        wine_dbgstr_longlong((ntthen.QuadPart - ntnow.QuadPart) * 100));
 
     CloseHandle(signaled);
     CloseHandle(nonsignaled);
@@ -2970,6 +3037,7 @@ START_TEST(sync)
     pTryAcquireSRWLockShared = (void *)GetProcAddress(hdll, "TryAcquireSRWLockShared");
     pNtAllocateVirtualMemory = (void *)GetProcAddress(hntdll, "NtAllocateVirtualMemory");
     pNtFreeVirtualMemory = (void *)GetProcAddress(hntdll, "NtFreeVirtualMemory");
+    pNtQuerySystemTime = (void *)GetProcAddress(hntdll, "NtQuerySystemTime");
     pNtWaitForSingleObject = (void *)GetProcAddress(hntdll, "NtWaitForSingleObject");
     pNtWaitForMultipleObjects = (void *)GetProcAddress(hntdll, "NtWaitForMultipleObjects");
     pRtlInterlockedPushListSList = (void *)GetProcAddress(hntdll, "RtlInterlockedPushListSList");
