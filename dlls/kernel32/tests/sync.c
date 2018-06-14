@@ -227,8 +227,23 @@ static void test_temporary_objects(void)
     ok(GetLastError() == ERROR_FILE_NOT_FOUND, "wrong error %lu\n", GetLastError());
 }
 
+static HANDLE mutex, mutex2, mutices[2];
+
+static DWORD WINAPI mutex_thread( void *param )
+{
+    DWORD expect = (DWORD)(DWORD_PTR)param;
+    DWORD ret;
+
+    ret = WaitForSingleObject( mutex, 0 );
+    ok(ret == expect, "expected %lu, got %lu\n", expect, ret);
+
+    if (!ret) ReleaseMutex( mutex );
+    return 0;
+}
+
 static void test_mutex(void)
 {
+    HANDLE thread;
     DWORD wait_ret;
     BOOL ret;
     HANDLE hCreated;
@@ -339,6 +354,85 @@ todo_wine_if(getenv("WINEESYNC"))   /* XFAIL: due to the above */
     CloseHandle(hOpened);
 
     CloseHandle(hCreated);
+
+    mutex = CreateMutexA( NULL, FALSE, NULL );
+    ok(!!mutex, "got error %lu\n", GetLastError());
+
+    ret = ReleaseMutex( mutex );
+    ok(!ret, "got %d\n", ret);
+    ok(GetLastError() == ERROR_NOT_OWNER, "got error %lu\n", GetLastError());
+
+    for (i = 0; i < 100; i++)
+    {
+        ret = WaitForSingleObject( mutex, 0 );
+        ok(ret == 0, "got %u\n", ret);
+    }
+
+    for (i = 0; i < 100; i++)
+    {
+        ret = ReleaseMutex( mutex );
+        ok(ret, "got error %lu\n", GetLastError());
+    }
+
+    ret = ReleaseMutex( mutex );
+    ok(!ret, "got %d\n", ret);
+    ok(GetLastError() == ERROR_NOT_OWNER, "got error %lu\n", GetLastError());
+
+    thread = CreateThread( NULL, 0, mutex_thread, (void *)0, 0, NULL );
+    ret = WaitForSingleObject( thread, 2000 );
+    ok(ret == 0, "wait failed: %u\n", ret);
+
+    WaitForSingleObject( mutex, 0 );
+
+    thread = CreateThread( NULL, 0, mutex_thread, (void *)WAIT_TIMEOUT, 0, NULL );
+    ret = WaitForSingleObject( thread, 2000 );
+    ok(ret == 0, "wait failed: %u\n", ret);
+
+    ret = ReleaseMutex( mutex );
+        ok(ret, "got error %lu\n", GetLastError());
+
+    thread = CreateThread( NULL, 0, mutex_thread, (void *)0, 0, NULL );
+    ret = WaitForSingleObject( thread, 2000 );
+    ok(ret == 0, "wait failed: %u\n", ret);
+
+    mutex2 = CreateMutexA( NULL, TRUE, NULL );
+    ok(!!mutex2, "got error %lu\n", GetLastError());
+
+    ret = ReleaseMutex( mutex2 );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = ReleaseMutex( mutex2 );
+    ok(!ret, "got %d\n", ret);
+    ok(GetLastError() == ERROR_NOT_OWNER, "got error %lu\n", GetLastError());
+
+    mutices[0] = mutex;
+    mutices[1] = mutex2;
+
+    ret = WaitForMultipleObjects( 2, mutices, FALSE, 0 );
+    ok(ret == 0, "got %u\n", ret);
+
+    ret = ReleaseMutex( mutex );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = ReleaseMutex( mutex2 );
+    ok(!ret, "got %d\n", ret);
+    ok(GetLastError() == ERROR_NOT_OWNER, "got error %lu\n", GetLastError());
+
+    ret = WaitForMultipleObjects( 2, mutices, TRUE, 0 );
+    ok(ret == 0, "got %u\n", ret);
+
+    ret = ReleaseMutex( mutex );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = ReleaseMutex( mutex2 );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = CloseHandle( mutex );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = CloseHandle( mutex2 );
+    ok(ret, "got error %lu\n", GetLastError());
+
 }
 
 static void test_slist(void)
