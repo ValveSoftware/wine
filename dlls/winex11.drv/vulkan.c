@@ -660,4 +660,8 @@ const struct vulkan_funcs *get_vulkan_driver(UINT version)
     return NULL;
 }
 
+void wine_vk_surface_destroy(HWND hwnd)
+{
+}
+
 #endif /* SONAME_LIBVULKAN */
