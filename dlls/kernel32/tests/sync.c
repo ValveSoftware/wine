@@ -577,7 +577,10 @@ static void test_event(void)
 
 static void test_semaphore(void)
 {
-    HANDLE handle, handle2;
+    HANDLE handle, handle2, handles[2];
+    DWORD ret;
+    LONG prev;
+    int i;
 
     /* test case sensitivity */
 
@@ -619,6 +622,99 @@ static void test_semaphore(void)
     ok( GetLastError() == ERROR_INVALID_PARAMETER, "wrong error %u\n", GetLastError());
 
     CloseHandle( handle );
+
+    handle = CreateSemaphoreA( NULL, 0, 5, NULL );
+    ok(!!handle, "CreateSemaphore failed: %u\n", GetLastError());
+
+    ret = WaitForSingleObject( handle, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    ret = ReleaseSemaphore( handle, 1, &prev );
+    ok(ret, "got error %u\n", GetLastError());
+    ok(prev == 0, "got prev %d\n", prev);
+
+    ret = ReleaseSemaphore( handle, 1, &prev );
+    ok(ret, "got error %u\n", GetLastError());
+    ok(prev == 1, "got prev %d\n", prev);
+
+    ret = ReleaseSemaphore( handle, 5, &prev );
+    ok(!ret, "got %d\n", ret);
+    ok(GetLastError() == ERROR_TOO_MANY_POSTS, "got error %u\n", GetLastError());
+    ok(prev == 1, "got prev %d\n", prev);
+
+    ret = ReleaseSemaphore( handle, 2, &prev );
+    ok(ret, "got error %u\n", GetLastError());
+    ok(prev == 2, "got prev %d\n", prev);
+
+    ret = ReleaseSemaphore( handle, 1, &prev );
+    ok(ret, "got error %u\n", GetLastError());
+    ok(prev == 4, "got prev %d\n", prev);
+
+    for (i = 0; i < 5; i++)
+    {
+        ret = WaitForSingleObject( handle, 0 );
+        ok(ret == 0, "got %u\n", ret);
+    }
+
+    ret = WaitForSingleObject( handle, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    handle2 = CreateSemaphoreA( NULL, 3, 5, NULL );
+    ok(!!handle2, "CreateSemaphore failed: %u\n", GetLastError());
+
+    ret = ReleaseSemaphore( handle2, 1, &prev );
+    ok(ret, "got error %u\n", GetLastError());
+    ok(prev == 3, "got prev %d\n", prev);
+
+    for (i = 0; i < 4; i++)
+    {
+        ret = WaitForSingleObject( handle2, 0 );
+        ok(ret == 0, "got %u\n", ret);
+    }
+
+    ret = WaitForSingleObject( handle2, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    handles[0] = handle;
+    handles[1] = handle2;
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    ReleaseSemaphore( handle, 1, NULL );
+    ReleaseSemaphore( handle2, 1, NULL );
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 0, "got %u\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 1, "got %u\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    ReleaseSemaphore( handle, 1, NULL );
+    ReleaseSemaphore( handle2, 1, NULL );
+
+    ret = WaitForMultipleObjects( 2, handles, TRUE, 0 );
+    ok(ret == 0, "got %u\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    ReleaseSemaphore( handle, 1, NULL );
+
+    ret = WaitForMultipleObjects( 2, handles, TRUE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %u\n", ret);
+
+    ret = WaitForSingleObject( handle, 0 );
+    ok(ret == 0, "got %u\n", ret);
+
+    ret = CloseHandle( handle );
+    ok(ret, "got error %u\n", ret);
+
+    ret = CloseHandle( handle2 );
+    ok(ret, "got error %u\n", ret);
 }
 
 static void test_waitable_timer(void)
