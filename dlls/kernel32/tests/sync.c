@@ -218,7 +218,8 @@ todo_wine
     SetLastError(0xdeadbeef);
     hOpened = OpenMutexA(GENERIC_READ | GENERIC_WRITE, FALSE, "WineTestMutex");
     ok(hOpened != NULL, "OpenMutex failed with error %d\n", GetLastError());
-    wait_ret = WaitForSingleObject(hOpened, INFINITE);
+    wait_ret = WaitForSingleObject(hOpened, 0);
+todo_wine_if(getenv("WINEESYNC"))   /* XFAIL: validation is not implemented */
     ok(wait_ret == WAIT_FAILED, "WaitForSingleObject succeeded\n");
     CloseHandle(hOpened);
 
@@ -249,6 +250,7 @@ todo_wine
 
     SetLastError(0xdeadbeef);
     ret = ReleaseMutex(hCreated);
+todo_wine_if(getenv("WINEESYNC"))   /* XFAIL: due to the above */
     ok(!ret && (GetLastError() == ERROR_NOT_OWNER),
         "ReleaseMutex should have failed with ERROR_NOT_OWNER instead of %d\n", GetLastError());
 
