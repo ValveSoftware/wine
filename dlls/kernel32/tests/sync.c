@@ -514,12 +514,13 @@ static void test_slist(void)
 
 static void test_event(void)
 {
-    HANDLE handle, handle2;
+    HANDLE handle, handle2, handles[2];
     SECURITY_ATTRIBUTES sa;
     SECURITY_DESCRIPTOR sd;
     ACL acl;
     DWORD ret;
     BOOL val;
+    int i;
 
     /* no sd */
     handle = CreateEventA(NULL, FALSE, FALSE, __FILE__ ": Test Event");
@@ -623,6 +624,122 @@ static void test_event(void)
     ok( ret, "QueryMemoryResourceNotification failed err %lu\n", GetLastError() );
     ok( val == FALSE || val == TRUE, "wrong value %u\n", val );
     CloseHandle( handle );
+
+    handle = CreateEventA( NULL, TRUE, FALSE, NULL );
+    ok(!!handle, "got error %lu\n", GetLastError());
+
+    ret = WaitForSingleObject( handle, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    ret = SetEvent( handle );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = SetEvent( handle );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    for (i = 0; i < 100; i++)
+    {
+        ret = WaitForSingleObject( handle, 0 );
+        ok(ret == 0, "got %lu\n", ret);
+    }
+
+    ret = ResetEvent( handle );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = ResetEvent( handle );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = WaitForSingleObject( handle, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    handle2 = CreateEventA( NULL, FALSE, TRUE, NULL );
+    ok(!!handle2, "got error %lu\n", GetLastError());
+
+    ret = WaitForSingleObject( handle2, 0 );
+    ok(ret == 0, "got %lu\n", ret);
+
+    ret = WaitForSingleObject( handle2, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    ret = SetEvent( handle2 );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = SetEvent( handle2 );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = ResetEvent( handle2 );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = ResetEvent( handle2 );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = WaitForSingleObject( handle2, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    handles[0] = handle;
+    handles[1] = handle2;
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    SetEvent( handle );
+    SetEvent( handle2 );
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 0, "got %lu\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 0, "got %lu\n", ret);
+
+    ret = WaitForSingleObject( handle2, 0 );
+    ok(ret == 0, "got %lu\n", ret);
+
+    ResetEvent( handle );
+    SetEvent( handle2 );
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 1, "got %lu\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    SetEvent( handle );
+    SetEvent( handle2 );
+
+    ret = WaitForMultipleObjects( 2, handles, TRUE, 0 );
+    ok(ret == 0, "got %lu\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, TRUE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    SetEvent( handle2 );
+    ResetEvent( handle );
+
+    ret = WaitForMultipleObjects( 2, handles, TRUE, 0 );
+    ok(ret == WAIT_TIMEOUT, "got %lu\n", ret);
+
+    ret = WaitForSingleObject( handle2, 0 );
+    ok(ret == 0, "got %lu\n", ret);
+
+    handles[0] = handle2;
+    handles[1] = handle;
+    SetEvent( handle );
+    SetEvent( handle2 );
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 0, "got %lu\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 1, "got %lu\n", ret);
+
+    ret = WaitForMultipleObjects( 2, handles, FALSE, 0 );
+    ok(ret == 1, "got %lu\n", ret);
+
+    ret = CloseHandle( handle );
+    ok(ret, "got error %lu\n", GetLastError());
+
+    ret = CloseHandle( handle2 );
+    ok(ret, "got error %lu\n", GetLastError());
 }
 
 static void test_semaphore(void)
