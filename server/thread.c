@@ -204,6 +204,7 @@ static inline void init_thread_structure( struct thread *thread )
     thread->desktop_users   = 0;
     thread->token           = NULL;
     thread->esync_fd        = -1;
+    thread->esync_apc_fd    = -1;
 
     thread->creation_time = current_time;
     thread->exit_time     = 0;
@@ -289,7 +290,10 @@ struct thread *create_thread( int fd, struct process *process, const struct secu
     }
 
     if (do_esync())
+    {
         thread->esync_fd = esync_create_fd( 0, 0 );
+        thread->esync_apc_fd = esync_create_fd( 0, 0 );
+    }
 
     set_fd_events( thread->request_fd, POLLIN );  /* start listening to events */
     add_process_thread( thread->process, thread );
@@ -1022,7 +1026,12 @@ static int queue_apc( struct process *process, struct thread *thread, struct thr
     grab_object( apc );
     list_add_tail( queue, &apc->entry );
     if (!list_prev( queue, &apc->entry ))  /* first one */
+    {
         wake_thread( thread );
+
+        if (do_esync())
+            esync_wake_fd( thread->esync_apc_fd );
+    }
 
     return 1;
 }
@@ -1070,6 +1079,10 @@ static struct thread_apc *thread_dequeue_apc( struct thread *thread, int system_
         apc = LIST_ENTRY( ptr, struct thread_apc, entry );
         list_remove( ptr );
     }
+
+    if (do_esync() && list_empty( &thread->system_apc ) && list_empty( &thread->user_apc ))
+        esync_clear( thread->esync_apc_fd );
+
     return apc;
 }
 
