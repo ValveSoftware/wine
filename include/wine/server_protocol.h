@@ -5701,6 +5701,17 @@ struct get_esync_fd_reply
     unsigned int shm_idx;
 };
 
+
+struct get_esync_apc_fd_request
+{
+    struct request_header __header;
+    char __pad_12[4];
+};
+struct get_esync_apc_fd_reply
+{
+    struct reply_header __header;
+};
+
 enum esync_type
 {
     ESYNC_SEMAPHORE = 1,
@@ -6008,6 +6019,7 @@ enum request
     REQ_create_esync,
     REQ_open_esync,
     REQ_get_esync_fd,
+    REQ_get_esync_apc_fd,
     REQ_NB_REQUESTS
 };
 
@@ -6308,6 +6320,7 @@ union generic_request
     struct create_esync_request create_esync_request;
     struct open_esync_request open_esync_request;
     struct get_esync_fd_request get_esync_fd_request;
+    struct get_esync_apc_fd_request get_esync_apc_fd_request;
 };
 union generic_reply
 {
@@ -6606,8 +6619,9 @@ union generic_reply
     struct create_esync_reply create_esync_reply;
     struct open_esync_reply open_esync_reply;
     struct get_esync_fd_reply get_esync_fd_reply;
+    struct get_esync_apc_fd_reply get_esync_apc_fd_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 567
+#define SERVER_PROTOCOL_VERSION 568
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

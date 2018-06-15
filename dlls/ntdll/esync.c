@@ -665,18 +665,42 @@ static int do_poll( struct pollfd *fds, nfds_t nfds, ULONGLONG *end )
 NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                              BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
+    static const LARGE_INTEGER zero = {0};
+
     struct esync *objs[MAXIMUM_WAIT_OBJECTS];
-    struct pollfd fds[MAXIMUM_WAIT_OBJECTS + 1];
+    struct pollfd fds[MAXIMUM_WAIT_OBJECTS + 2];
     int has_esync = 0, has_server = 0;
-    DWORD pollcount = count;
     BOOL msgwait = FALSE;
     LONGLONG timeleft;
     LARGE_INTEGER now;
+    DWORD pollcount;
     ULONGLONG end;
     int64_t value;
     ssize_t size;
     int i, j;
     int ret;
+
+    /* Grab the APC fd if we don't already have it. */
+    if (alertable && ntdll_get_thread_data()->esync_apc_fd == -1)
+    {
+        obj_handle_t fd_handle;
+        sigset_t sigset;
+        int fd = -1;
+
+        server_enter_uninterrupted_section( &fd_cache_section, &sigset );
+        SERVER_START_REQ( get_esync_apc_fd )
+        {
+            if (!(ret = wine_server_call( req )))
+            {
+                fd = receive_fd( &fd_handle );
+                assert( fd_handle == GetCurrentThreadId() );
+            }
+        }
+        SERVER_END_REQ;
+        server_leave_uninterrupted_section( &fd_cache_section, &sigset );
+
+        ntdll_get_thread_data()->esync_apc_fd = fd;
+    }
 
     NtQuerySystemTime( &now );
     if (timeout)
@@ -728,6 +752,8 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 
         if (msgwait)
             DPRINTF(" or driver events (fd %d)", ntdll_get_thread_data()->esync_queue_fd);
+        if (alertable)
+            DPRINTF(", alertable");
 
         if (!timeout)
             DPRINTF(", timeout = INFINITE.\n");
@@ -766,10 +792,17 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
         }
         if (msgwait)
         {
-            fds[count].fd = ntdll_get_thread_data()->esync_queue_fd;
-            fds[count].events = POLLIN;
-            pollcount++;
+            fds[i].fd = ntdll_get_thread_data()->esync_queue_fd;
+            fds[i].events = POLLIN;
+            i++;
         }
+        if (alertable)
+        {
+            fds[i].fd = ntdll_get_thread_data()->esync_apc_fd;
+            fds[i].events = POLLIN;
+            i++;
+        }
+        pollcount = i;
 
         while (1)
         {
@@ -829,10 +862,18 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                     }
                 }
 
-                if (msgwait && (fds[count].revents & POLLIN))
+                if (msgwait)
                 {
-                    TRACE("Woken up by driver events.\n");
-                    return count - 1;
+                    if (fds[i++].revents & POLLIN)
+                    {
+                        TRACE("Woken up by driver events.\n");
+                        return count - 1;
+                    }
+                }
+                if (alertable)
+                {
+                    if (fds[i++].revents & POLLIN)
+                        goto userapc;
                 }
 
                 /* If we got here, someone else stole (or reset, etc.) whatever
@@ -871,6 +912,14 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 tryagain:
             /* First step: try to poll on each object in sequence. */
             fds[0].events = POLLIN;
+            pollcount = 1;
+            if (alertable)
+            {
+                /* We also need to wait on APCs. */
+                fds[1].fd = ntdll_get_thread_data()->esync_apc_fd;
+                fds[1].events = POLLIN;
+                pollcount++;
+            }
             for (i = 0; i < count; i++)
             {
                 struct esync *obj = objs[i];
@@ -886,9 +935,11 @@ tryagain:
                         continue;
                 }
 
-                ret = do_poll( fds, 1, timeout ? &end : NULL );
+                ret = do_poll( fds, pollcount, timeout ? &end : NULL );
                 if (ret <= 0)
                     goto err;
+                else if (alertable && (fds[1].revents & POLLIN))
+                    goto userapc;
 
                 if (fds[0].revents & (POLLHUP | POLLERR | POLLNVAL))
                 {
@@ -901,9 +952,11 @@ tryagain:
             if (msgwait)
             {
                 fds[0].fd = ntdll_get_thread_data()->esync_queue_fd;
-                ret = do_poll( fds, 1, timeout ? &end : NULL );
+                ret = do_poll( fds, pollcount, timeout ? &end : NULL );
                 if (ret <= 0)
                     goto err;
+                else if (alertable && (fds[1].revents & POLLIN))
+                    goto userapc;
             }
 
             /* If we got here and we haven't timed out, that means all of the
@@ -915,10 +968,12 @@ tryagain:
             }
             if (msgwait)
             {
-                fds[count].fd = ntdll_get_thread_data()->esync_queue_fd;
-                fds[count].events = POLLIN;
-                pollcount++;
+                fds[i].fd = ntdll_get_thread_data()->esync_queue_fd;
+                fds[i].events = POLLIN;
+                i++;
             }
+            /* There's no reason to check for APCs here. */
+            pollcount = i;
 
             /* Poll everything to see if they're still signaled. */
             ret = poll( fds, pollcount, 0 );
@@ -999,6 +1054,19 @@ err:
         ERR("ppoll failed: %s\n", strerror(errno));
         return FILE_GetNtStatus();
     }
+
+userapc:
+    TRACE("Woken up by user APC.\n");
+
+    /* We have to make a server call anyway to get the APC to execute, so just
+     * delegate down to server_select(). */
+    ret = server_select( NULL, 0, SELECT_INTERRUPTIBLE | SELECT_ALERTABLE, &zero );
+
+    /* This can happen if we received a system APC, and the APC fd was woken up
+     * before we got SIGUSR1. poll() doesn't return EINTR in that case. The
+     * right thing to do seems to be to return STATUS_USER_APC anyway. */
+    if (ret == STATUS_TIMEOUT) ret = STATUS_USER_APC;
+    return ret;
 }
 
 NTSTATUS esync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
