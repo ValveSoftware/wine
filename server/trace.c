@@ -4563,6 +4563,10 @@ static void dump_get_esync_fd_reply( const struct get_esync_fd_reply *req )
     fprintf( stderr, ", shm_idx=%08x", req->shm_idx );
 }
 
+static void dump_get_esync_apc_fd_request( const struct get_esync_apc_fd_request *req )
+{
+}
+
 static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_new_process_request,
     (dump_func)dump_get_new_process_info_request,
@@ -4856,6 +4860,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_create_esync_request,
     (dump_func)dump_open_esync_request,
     (dump_func)dump_get_esync_fd_request,
+    (dump_func)dump_get_esync_apc_fd_request,
 };
 
 static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
@@ -5151,6 +5156,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_create_esync_reply,
     (dump_func)dump_open_esync_reply,
     (dump_func)dump_get_esync_fd_reply,
+    NULL,
 };
 
 static const char * const req_names[REQ_NB_REQUESTS] = {
@@ -5446,6 +5452,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "create_esync",
     "open_esync",
     "get_esync_fd",
+    "get_esync_apc_fd",
 };
 
 static const struct
