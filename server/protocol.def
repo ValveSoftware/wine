@@ -3981,6 +3981,11 @@ struct handle_info
     unsigned int shm_idx;       /* this object's index into the shm section */
 @END
 
+/* Retrieve the fd to wait on for user APCs. */
+@REQ(get_esync_apc_fd)
+@REPLY
+@END
+
 enum esync_type
 {
     ESYNC_SEMAPHORE = 1,
