@@ -43,6 +43,10 @@
 #include "wine/library.h"
 #include "wine/debug.h"
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
+#endif
+
 #ifdef SONAME_LIBGL
 
 WINE_DEFAULT_DEBUG_CHANNEL(wgl);
@@ -206,7 +210,7 @@ struct wgl_context
     struct gl_drawable *new_drawables[2];
     BOOL refresh_drawables;
     BOOL fs_hack;
-    GLuint fs_hack_fbo, fs_hack_texture;
+    GLuint fs_hack_fbo, fs_hack_color_texture, fs_hack_ds_texture;
     GLuint current_draw_fbo, current_read_fbo;
     struct list entry;
 };
@@ -1867,13 +1871,61 @@ static void set_context_drawables( struct wgl_context *ctx, struct gl_drawable *
     for (i = 0; i < 4; i++) release_gl_drawable( prev[i] );
 }
 
-static void fs_hack_get_texture_format( struct gl_drawable *gl, GLint *internalformat, GLenum *format, GLenum *type )
+struct fs_hack_fbconfig_attribs
 {
-    /* FWIW d3d9 only accepts D3DFMT_X8R8G8B8 and D3DFMT_R5G6B5, ddraw and dxgi add a few more */
-    FIXME("Not implemented, always returning GL_RGB8 BGRA.\n");
-    *internalformat = GL_RGB8;
-    *format = GL_BGRA;
-    *type = GL_UNSIGNED_INT_8_8_8_8_REV;
+    int render_type;
+    int buffer_size;
+    int red_size;
+    int green_size;
+    int blue_size;
+    int alpha_size;
+    int depth_size;
+    int stencil_size;
+    int doublebuffer;
+    int samples;
+    int srgb;
+};
+
+struct fs_hack_fbo_attachments_config
+{
+    GLint color_internalformat;
+    GLenum color_format;
+    GLenum color_type;
+    GLint ds_internalformat;
+    GLenum ds_format;
+    GLenum ds_type;
+    int samples;
+};
+
+static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_hack_fbconfig_attribs *attribs,
+        struct fs_hack_fbo_attachments_config *config )
+{
+    if (attribs->render_type != GLX_RGBA_BIT)
+        FIXME( "Unsupported GLX_RENDER_TYPE %#x.\n", attribs->render_type );
+    if (attribs->red_size != 8 || attribs->green_size != 8 || attribs->blue_size != 8)
+        FIXME( "Unsupported RGBA color sizes {%u, %u, %u, %u}.\n",
+                attribs->red_size, attribs->green_size, attribs->blue_size, attribs->alpha_size );
+    if (attribs->srgb)
+        config->color_internalformat = attribs->alpha_size ? GL_SRGB8_ALPHA8 : GL_SRGB8;
+    else
+        config->color_internalformat = attribs->alpha_size ? GL_RGBA8 : GL_RGB8;
+    config->color_format = GL_BGRA;
+    config->color_type = GL_UNSIGNED_INT_8_8_8_8_REV;
+    if (attribs->depth_size || attribs->stencil_size)
+    {
+        if (attribs->depth_size != 24)
+            FIXME( "Unsupported depth buffer size %u.\n", attribs->depth_size );
+        if (attribs->stencil_size && attribs->stencil_size != 8)
+            FIXME( "Unsupported stencil buffer size %u.\n", attribs->stencil_size );
+        config->ds_internalformat = attribs->stencil_size ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT24;
+        config->ds_format = attribs->stencil_size ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT;
+        config->ds_type = attribs->stencil_size ? GL_UNSIGNED_INT_24_8 : GL_UNSIGNED_INT;
+    }
+    else
+    {
+        config->ds_internalformat = config->ds_format = config->ds_type = 0;
+    }
+    config->samples = attribs->samples;
 }
 
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
@@ -1882,8 +1934,29 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
     GLuint prev_draw_fbo, prev_read_fbo, prev_texture;
     POINT p = fs_hack_current_mode();
     float prev_clear_color[4];
-    GLint internalformat;
-    GLenum format, type;
+    unsigned int i;
+    struct fs_hack_fbo_attachments_config config;
+    struct fs_hack_fbconfig_attribs attribs;
+    static const struct fbconfig_attribs_query
+    {
+        int attribute;
+        unsigned int offset;
+    }
+    queries[] =
+    {
+        {GLX_RENDER_TYPE, offsetof(struct fs_hack_fbconfig_attribs, render_type)},
+        {GLX_BUFFER_SIZE, offsetof(struct fs_hack_fbconfig_attribs, buffer_size)},
+        {GLX_RED_SIZE, offsetof(struct fs_hack_fbconfig_attribs, red_size)},
+        {GLX_GREEN_SIZE, offsetof(struct fs_hack_fbconfig_attribs, green_size)},
+        {GLX_BLUE_SIZE, offsetof(struct fs_hack_fbconfig_attribs, blue_size)},
+        {GLX_ALPHA_SIZE, offsetof(struct fs_hack_fbconfig_attribs, alpha_size)},
+        {GLX_DEPTH_SIZE, offsetof(struct fs_hack_fbconfig_attribs, depth_size)},
+        {GLX_STENCIL_SIZE, offsetof(struct fs_hack_fbconfig_attribs, stencil_size)},
+        {GLX_DOUBLEBUFFER, offsetof(struct fs_hack_fbconfig_attribs, doublebuffer)},
+        {GLX_SAMPLES_ARB, offsetof(struct fs_hack_fbconfig_attribs, samples)},
+        {GLX_FRAMEBUFFER_SRGB_CAPABLE_EXT, offsetof(struct fs_hack_fbconfig_attribs, srgb)},
+    };
+    BYTE *ptr = (BYTE *)&attribs;
 
     if (ctx->fs_hack)
     {
@@ -1899,18 +1972,42 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
             TRACE( "Created FBO %u for fullscreen hack.\n", ctx->fs_hack_fbo );
         }
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_fbo );
-        if (!ctx->fs_hack_texture)
-        {
-            opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_texture );
-            TRACE( "Created texture %u for fullscreen hack.\n", ctx->fs_hack_texture );
-        }
 
-        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_texture );
-        fs_hack_get_texture_format( gl, &internalformat, &format, &type );
-        opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, internalformat, p.x, p.y, 0, format, type, NULL);
+        for (i = 0; i < ARRAY_SIZE(queries); ++i)
+            pglXGetFBConfigAttrib( gdi_display, gl->format->fbconfig, queries[i].attribute, (int *)&ptr[queries[i].offset] );
+        fs_hack_get_attachments_config( gl, &attribs, &config );
+
+        if (!ctx->fs_hack_color_texture)
+        {
+            opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_color_texture );
+            TRACE( "Created texture %u for fullscreen hack.\n", ctx->fs_hack_color_texture );
+        }
+        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_color_texture );
+        opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.color_internalformat, p.x, p.y,
+                0, config.color_format, config.color_type, NULL);
         opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
         opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
-        pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ctx->fs_hack_texture, 0 );
+        pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ctx->fs_hack_color_texture, 0 );
+
+        if (attribs.depth_size || attribs.stencil_size)
+        {
+            TRACE("fbconfig has a depth / stencil buffer.\n");
+            if (!ctx->fs_hack_ds_texture)
+            {
+                opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_ds_texture );
+                TRACE( "Created DS texture %u for fullscreen hack.\n", ctx->fs_hack_ds_texture );
+            }
+            opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_ds_texture );
+            opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.ds_internalformat, p.x, p.y,
+                    0, config.ds_format, config.ds_type, NULL);
+            opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+            opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
+            if (attribs.depth_size)
+                pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
+            if (attribs.stencil_size)
+                pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
+        }
+
         opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
         if(!gl->fs_hack_context_set_up)
             opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
@@ -1927,7 +2024,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
     }
     else
     {
-        TRACE( "Releasing fullscreen hack texture %u and FBO %u\n", ctx->fs_hack_texture, ctx->fs_hack_fbo );
+        TRACE( "Releasing fullscreen hack texture %u and FBO %u\n", ctx->fs_hack_color_texture, ctx->fs_hack_fbo );
         if (ctx->current_draw_fbo == ctx->fs_hack_fbo)
         {
             pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
@@ -1939,8 +2036,9 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
             ctx->current_read_fbo = 0;
         }
 
-        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_texture );
-        ctx->fs_hack_texture = 0;
+        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_color_texture );
+        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_ds_texture );
+        ctx->fs_hack_color_texture = ctx->fs_hack_ds_texture = 0;
         pglDeleteFramebuffers( 1, &ctx->fs_hack_fbo );
         ctx->fs_hack_fbo = 0;
 
