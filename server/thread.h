@@ -91,6 +91,7 @@ struct thread
     data_size_t            desc_len;      /* thread description length in bytes */
     WCHAR                 *desc;          /* thread description string */
     int                    esync_fd;      /* esync file descriptor (signalled on exit) */
+    int                    esync_apc_fd;  /* esync apc fd (signalled when APCs are present) */
 };
 
 struct thread_snapshot
