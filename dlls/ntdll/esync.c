@@ -240,6 +240,7 @@ static NTSTATUS get_waitable_object( HANDLE handle, struct esync **obj )
         esync = &mutex->obj;
         break;
     }
+    case ESYNC_AUTO_SERVER:
     case ESYNC_MANUAL_SERVER:
     case ESYNC_QUEUE:
         esync = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(*esync) );
