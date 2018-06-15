@@ -1,7 +1,13 @@
-EXTRADEFS = -DXAPOFX1_VER=5 -DXAUDIO2_VER=7
+EXTRADEFS = -DXAPOFX1_VER=5 -DXAUDIO2_VER=7 -DFAUDIO_WIN32_PLATFORM
 MODULE    = xapofx1_5.dll
 IMPORTS   = ole32
 PARENTSRC = ../xaudio2_7
 
 C_SRCS = \
-	xapofx.c
+	xapofx.c \
+	FAudio/FAPOBase.c \
+	FAudio/FAudio.c \
+	FAudio/FAudio_internal.c \
+	FAudio/FAudio_platform_win32.c \
+	FAudio/FAudioFX.c \
+	FAudio/FAudioFX_internal.c

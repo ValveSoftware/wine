@@ -524,7 +524,7 @@ static void test_buffer_callbacks(IXAudio2 *xa)
 
     if(xaudio27){
         hr = IXAudio27SourceVoice_SetSourceSampleRate((IXAudio27SourceVoice*)src, 48000);
-        todo_wine ok(hr == S_OK, "SetSourceSampleRate failed: %08x\n", hr);
+        ok(hr == S_OK, "SetSourceSampleRate failed: %08x\n", hr);
     }else{
         hr = IXAudio2SourceVoice_SetSourceSampleRate(src, 48000);
         ok(hr == XAUDIO2_E_INVALID_CALL, "SetSourceSampleRate should have failed: %08x\n", hr);

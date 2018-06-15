@@ -1,10 +1,15 @@
-EXTRADEFS = -DXAUDIO2_VER=7
+EXTRADEFS = -DXAUDIO2_VER=7 -DFAUDIO_WIN32_PLATFORM
 MODULE    = xaudio2_7.dll
 IMPORTS   = advapi32 ole32 user32 uuid
-EXTRALIBS = $(OPENAL_LIBS)
 
 C_SRCS = \
 	compat.c \
+	FAudio/FAPOBase.c \
+	FAudio/FAudio.c \
+	FAudio/FAudio_internal.c \
+	FAudio/FAudio_platform_win32.c \
+	FAudio/FAudioFX.c \
+	FAudio/FAudioFX_internal.c \
 	x3daudio.c \
 	xapofx.c \
 	xaudio_dll.c
