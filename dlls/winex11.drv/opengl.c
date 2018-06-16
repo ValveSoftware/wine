@@ -210,7 +210,9 @@ struct wgl_context
     struct gl_drawable *new_drawables[2];
     BOOL refresh_drawables;
     BOOL fs_hack;
-    GLuint fs_hack_fbo, fs_hack_color_texture, fs_hack_ds_texture;
+    GLuint fs_hack_fbo, fs_hack_resolve_fbo;
+    GLuint fs_hack_color_texture, fs_hack_ds_texture;
+    GLuint fs_hack_color_renderbuffer, fs_hack_color_resolve_renderbuffer, fs_hack_ds_renderbuffer;
     GLuint current_draw_fbo, current_read_fbo;
     struct list entry;
 };
@@ -412,12 +414,18 @@ static const GLubyte *wglGetString(GLenum name);
 
 /* Fullscreen hack */
 static void (*pglBindFramebuffer)( GLenum target, GLuint framebuffer );
+static void (*pglBindRenderbuffer)( GLenum target, GLuint renderbuffer );
 static void (*pglBlitFramebuffer)( GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter );
 void (*pglDeleteFramebuffers)( GLsizei n, const GLuint *framebuffers );
+void (*pglDeleteRenderbuffers)( GLsizei n, const GLuint *renderbuffers );
 static void (*pglDrawBuffer)( GLenum buffer );
+static void (*pglFramebufferRenderbuffer)( GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer );
 static void (*pglFramebufferTexture2D)( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level );
 static void (*pglGenFramebuffers)( GLsizei n, GLuint *ids );
+static void (*pglGenRenderbuffers)( GLsizei n, GLuint *renderbuffers );
 static void (*pglReadBuffer)( GLenum src );
+static void (*pglRenderbufferStorage)( GLenum target, GLenum internalformat, GLsizei width, GLsizei height );
+static void (*pglRenderbufferStorageMultisample)( GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height );
 
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void wglDrawBuffer( GLenum buffer );
@@ -611,10 +619,16 @@ static BOOL WINAPI init_opengl( INIT_ONCE *once, void *param, void **context )
     /* Fullscreen hack */
 #define LOAD_FUNCPTR(func) p##func = (void *)pglXGetProcAddressARB((const unsigned char *)#func);
     LOAD_FUNCPTR( glBindFramebuffer );
+    LOAD_FUNCPTR( glBindRenderbuffer );
     LOAD_FUNCPTR( glBlitFramebuffer );
     LOAD_FUNCPTR( glDeleteFramebuffers );
+    LOAD_FUNCPTR( glDeleteRenderbuffers );
+    LOAD_FUNCPTR( glFramebufferRenderbuffer );
     LOAD_FUNCPTR( glFramebufferTexture2D );
     LOAD_FUNCPTR( glGenFramebuffers );
+    LOAD_FUNCPTR( glGenRenderbuffers );
+    LOAD_FUNCPTR( glRenderbufferStorage );
+    LOAD_FUNCPTR( glRenderbufferStorageMultisample );
 #undef LOAD_FUNCPTR
 
 #define LOAD_FUNCPTR(f) do if((p##f = (void*)pglXGetProcAddressARB((const unsigned char*)#f)) == NULL) \
@@ -1931,7 +1945,7 @@ static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_ha
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *gl )
 {
-    GLuint prev_draw_fbo, prev_read_fbo, prev_texture;
+    GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer;
     POINT p = fs_hack_current_mode();
     float prev_clear_color[4];
     unsigned int i;
@@ -1963,49 +1977,91 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         opengl_funcs.gl.p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&prev_draw_fbo );
         opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&prev_read_fbo );
         opengl_funcs.gl.p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev_texture );
+        opengl_funcs.gl.p_glGetIntegerv( GL_RENDERBUFFER_BINDING, (GLint *)&prev_renderbuffer );
         opengl_funcs.gl.p_glGetFloatv( GL_COLOR_CLEAR_VALUE, prev_clear_color );
         TRACE( "Previous draw FBO %u, read FBO %u for ctx %p\n", prev_draw_fbo, prev_read_fbo, ctx);
 
         if (!ctx->fs_hack_fbo)
         {
             pglGenFramebuffers( 1, &ctx->fs_hack_fbo );
+            pglGenFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
             TRACE( "Created FBO %u for fullscreen hack.\n", ctx->fs_hack_fbo );
         }
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_fbo );
 
         for (i = 0; i < ARRAY_SIZE(queries); ++i)
-            pglXGetFBConfigAttrib( gdi_display, gl->format->fbconfig, queries[i].attribute, (int *)&ptr[queries[i].offset] );
+            pglXGetFBConfigAttrib( gdi_display, gl->format->fbconfig, queries[i].attribute,
+                    (int *)&ptr[queries[i].offset] );
         fs_hack_get_attachments_config( gl, &attribs, &config );
 
-        if (!ctx->fs_hack_color_texture)
+        if (config.samples)
         {
-            opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_color_texture );
-            TRACE( "Created texture %u for fullscreen hack.\n", ctx->fs_hack_color_texture );
+            if (!ctx->fs_hack_color_renderbuffer)
+                pglGenRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
+            pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
+            pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
+                    config.color_internalformat, p.x, p.y );
+            pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                    GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
+            TRACE( "Created renderbuffer %u for fullscreen hack.\n", ctx->fs_hack_color_renderbuffer );
+            pglGenRenderbuffers( 1, &ctx->fs_hack_color_resolve_renderbuffer );
+            pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_color_resolve_renderbuffer );
+            pglRenderbufferStorage( GL_RENDERBUFFER, config.color_internalformat, p.x, p.y );
+            pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
+            pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                    GL_RENDERBUFFER, ctx->fs_hack_color_resolve_renderbuffer );
+            pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_fbo );
+            pglBindRenderbuffer( GL_RENDERBUFFER, prev_renderbuffer );
+            TRACE( "Also created renderbuffer %u and FBO %u for color resolve.\n",
+                    ctx->fs_hack_color_resolve_renderbuffer, ctx->fs_hack_resolve_fbo );
         }
-        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_color_texture );
-        opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.color_internalformat, p.x, p.y,
-                0, config.color_format, config.color_type, NULL);
-        opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
-        pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ctx->fs_hack_color_texture, 0 );
-
-        if (attribs.depth_size || attribs.stencil_size)
+        else
         {
-            TRACE("fbconfig has a depth / stencil buffer.\n");
-            if (!ctx->fs_hack_ds_texture)
-            {
-                opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_ds_texture );
-                TRACE( "Created DS texture %u for fullscreen hack.\n", ctx->fs_hack_ds_texture );
-            }
-            opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_ds_texture );
-            opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.ds_internalformat, p.x, p.y,
-                    0, config.ds_format, config.ds_type, NULL);
+            if (!ctx->fs_hack_color_texture)
+                opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_color_texture );
+            opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_color_texture );
+            opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.color_internalformat, p.x, p.y,
+                    0, config.color_format, config.color_type, NULL);
             opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
             opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
-            if (attribs.depth_size)
-                pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
-            if (attribs.stencil_size)
-                pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
+            pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+                    GL_TEXTURE_2D, ctx->fs_hack_color_texture, 0 );
+            TRACE( "Created texture %u for fullscreen hack.\n", ctx->fs_hack_color_texture );
+        }
+
+        if (config.ds_internalformat)
+        {
+            if (config.samples)
+            {
+                if (!ctx->fs_hack_ds_renderbuffer)
+                    pglGenRenderbuffers( 1, &ctx->fs_hack_ds_renderbuffer );
+                pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
+                pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
+                        config.ds_internalformat, p.x, p.y );
+                pglBindRenderbuffer( GL_RENDERBUFFER, prev_renderbuffer );
+                if (attribs.depth_size)
+                    pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                            GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
+                if (attribs.stencil_size)
+                    pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
+                            GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
+                TRACE( "Created DS renderbuffer %u for fullscreen hack.\n", ctx->fs_hack_ds_renderbuffer );
+            }
+            else
+            {
+                if (!ctx->fs_hack_ds_texture)
+                    opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_ds_texture );
+                opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_ds_texture );
+                opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.ds_internalformat, p.x, p.y,
+                        0, config.ds_format, config.ds_type, NULL);
+                opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+                opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
+                if (attribs.depth_size)
+                    pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
+                if (attribs.stencil_size)
+                    pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
+                TRACE( "Created DS texture %u for fullscreen hack.\n", ctx->fs_hack_ds_texture );
+            }
         }
 
         opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
@@ -2036,9 +2092,14 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
             ctx->current_read_fbo = 0;
         }
 
-        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_color_texture );
+        pglDeleteRenderbuffers( 1, &ctx->fs_hack_ds_renderbuffer );
+        pglDeleteRenderbuffers( 1, &ctx->fs_hack_color_resolve_renderbuffer );
+        pglDeleteRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
         opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_ds_texture );
+        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_color_texture );
+        ctx->fs_hack_color_renderbuffer = ctx->fs_hack_color_resolve_renderbuffer = ctx->fs_hack_ds_renderbuffer = 0;
         ctx->fs_hack_color_texture = ctx->fs_hack_ds_texture = 0;
+        pglDeleteFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
         pglDeleteFramebuffers( 1, &ctx->fs_hack_fbo );
         ctx->fs_hack_fbo = 0;
 
@@ -2250,8 +2311,6 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     opengl_funcs.gl.p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&prev_draw_fbo );
     opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&prev_read_fbo );
     TRACE( "Previous draw FBO %u, read FBO %u\n", prev_draw_fbo, prev_read_fbo );
-    pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
-    pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_fbo );
 
     if(gl->has_scissor_indexed){
         opengl_funcs.ext.p_glGetIntegeri_v(GL_SCISSOR_BOX, 0, prev_scissor);
@@ -2261,14 +2320,24 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
         opengl_funcs.gl.p_glScissor(0, 0, real.x, real.y);
     }
 
+    pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_fbo );
+    if (ctx->fs_hack_color_resolve_renderbuffer)
+    {
+        pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
+        pglBlitFramebuffer( 0, 0, src.x, src.y, 0, 0, src.x, src.y, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+        pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
+    }
+    pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
+
+    //HACK
+    //pglDrawBuffer( draw_buffer );
+    pglDrawBuffer( GL_BACK );
+
     opengl_funcs.gl.p_glGetFloatv( GL_COLOR_CLEAR_VALUE, prev_clear_color );
     opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
     opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
     opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
 
-    //HACK
-    //pglDrawBuffer( draw_buffer );
-    pglDrawBuffer( GL_BACK );
     pglBlitFramebuffer( 0, 0, src.x, src.y, scaled_origin.x, scaled_origin.y, scaled_origin.x + scaled.x, scaled_origin.y + scaled.y, GL_COLOR_BUFFER_BIT, GL_LINEAR );
     //HACK
     if ( draw_buffer == GL_FRONT )
