@@ -36,11 +36,14 @@ static char *crash_log;
 
 int msgbox_res_id(HWND hwnd, UINT textId, UINT captionId, UINT uType)
 {
+    return 0;
+#if 0
     WCHAR caption[256];
     WCHAR text[256];
     LoadStringW(GetModuleHandleW(NULL), captionId, caption, sizeof(caption)/sizeof(caption[0]));
     LoadStringW(GetModuleHandleW(NULL), textId, text, sizeof(text)/sizeof(text[0]));
     return MessageBoxW(hwnd, text, caption, uType);
+#endif
 }
 
 static WCHAR *get_program_name(HANDLE hProcess)
