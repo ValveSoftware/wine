@@ -734,11 +734,22 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 
     if (objs[count - 1] && objs[count - 1]->type == ESYNC_QUEUE)
     {
+        select_op_t select_op;
+
         /* Last object in the list is a queue, which means someone is using
          * MsgWaitForMultipleObjects(). We have to wait not only for the server
          * fd (signaled on send_message, etc.) but also the USER driver's fd
          * (signaled on e.g. X11 events.) */
         msgwait = TRUE;
+
+        /* We need to let the server know we are doing a message wait, for two
+         * reasons. First one is WaitForInputIdle(). Second one is checking for
+         * hung queues. Do it like this. */
+        select_op.wait.op = SELECT_WAIT;
+        select_op.wait.handles[0] = wine_server_obj_handle( handles[count - 1] );
+        ret = server_select( &select_op, offsetof( select_op_t, wait.handles[1] ), 0, &zero );
+        if (ret != STATUS_WAIT_0 && ret != STATUS_TIMEOUT)
+            ERR("Unexpected ret %#x\n", ret);
     }
 
     if (has_esync && has_server)
