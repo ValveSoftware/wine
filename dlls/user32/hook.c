@@ -381,6 +381,7 @@ void *get_hook_proc( void *proc, const WCHAR *module, HMODULE *free_module )
 static LRESULT call_hook( struct hook_info *info, INT code, WPARAM wparam, LPARAM lparam )
 {
     DWORD_PTR ret = 0;
+    LRESULT lres;
 
     if (info->tid)
     {
@@ -394,19 +395,23 @@ static LRESULT call_hook( struct hook_info *info, INT code, WPARAM wparam, LPARA
         switch(info->id)
         {
         case WH_KEYBOARD_LL:
-            MSG_SendInternalMessageTimeout( info->pid, info->tid, WM_WINE_KEYBOARD_LL_HOOK,
-                                            wparam, (LPARAM)&h_extra, SMTO_ABORTIFHUNG,
-                                            get_ll_hook_timeout(), &ret );
+            lres = MSG_SendInternalMessageTimeout( info->pid, info->tid, WM_WINE_KEYBOARD_LL_HOOK,
+                wparam, (LPARAM)&h_extra, SMTO_ABORTIFHUNG, get_ll_hook_timeout(), &ret );
             break;
         case WH_MOUSE_LL:
-            MSG_SendInternalMessageTimeout( info->pid, info->tid, WM_WINE_MOUSE_LL_HOOK,
-                                            wparam, (LPARAM)&h_extra, SMTO_ABORTIFHUNG,
-                                            get_ll_hook_timeout(), &ret );
+            lres = MSG_SendInternalMessageTimeout( info->pid, info->tid, WM_WINE_MOUSE_LL_HOOK,
+                wparam, (LPARAM)&h_extra, SMTO_ABORTIFHUNG, get_ll_hook_timeout(), &ret );
             break;
         default:
             ERR("Unknown hook id %d\n", info->id);
             assert(0);
             break;
+        }
+
+        if (!lres && GetLastError() == ERROR_TIMEOUT)
+        {
+            TRACE("Hook %p timed out; removing it.\n", info->handle);
+            UnhookWindowsHookEx( info->handle );
         }
     }
     else if (info->proc)
