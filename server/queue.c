@@ -910,7 +910,7 @@ static void cleanup_results( struct msg_queue *queue )
 /* check if the thread owning the queue is hung (not checking for messages) */
 static int is_queue_hung( struct msg_queue *queue )
 {
-    return is_signaled( queue ) && (current_time - queue->last_get_msg > 5 * TICKS_PER_SEC);
+    return (current_time - queue->last_get_msg > 5 * TICKS_PER_SEC);
 }
 
 static int msg_queue_add_queue( struct object *obj, struct wait_queue_entry *entry )
@@ -925,6 +925,12 @@ static int msg_queue_add_queue( struct object *obj, struct wait_queue_entry *ent
         return 0;
     }
     if (process->idle_event && !(queue->wake_mask & QS_SMRESULT)) set_event( process->idle_event );
+
+    /* On Windows, we are considered hung iff we have not somehow processed
+     * messages OR done a MsgWait call in the last 5 seconds. Note that in the
+     * latter case repeatedly waiting for 0 seconds is not hung, but waiting
+     * forever is hung, so this is correct. */
+    queue->last_get_msg = current_time;
 
     if (queue->fd && list_empty( &obj->wait_queue ))  /* first on the queue */
         set_fd_events( queue->fd, POLLIN );
