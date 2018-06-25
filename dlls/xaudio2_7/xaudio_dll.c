@@ -20,6 +20,9 @@
 #include "config.h"
 
 #include <stdarg.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #define NONAMELESSUNION
 #define COBJMACROS
@@ -1604,6 +1607,20 @@ static HRESULT WINAPI IXAudio2Impl_CreateSourceVoice(IXAudio2 *iface,
 
     src->cb = pCallback;
 
+#if HAVE_FFMPEG
+    if(IS_WMA(pSourceFormat->wFormatTag)){
+        const char *home = getenv("HOME");
+        const char *appid = getenv("SteamGameId");
+        if(home && appid){
+            char fname[256];
+            int o;
+            snprintf(fname, sizeof(fname), "%s/uses_wma-%s", home, appid);
+            o = open(fname, O_WRONLY | O_CREAT, 0644);
+            close(o);
+        }
+    }
+#endif
+
     src->al_fmt = get_al_format(pSourceFormat);
     if(!src->al_fmt){
 #if HAVE_FFMPEG
@@ -1649,6 +1666,7 @@ static HRESULT WINAPI IXAudio2Impl_CreateSourceVoice(IXAudio2 *iface,
             /* xWMA doesn't provide the extradata info that FFmpeg needs to
              * decode WMA data, so we create some fake extradata. This is taken
              * from <ffmpeg/libavformat/xwma.c>. */
+            FIXME("this game uses WMA\n");
             TRACE("synthesizing extradata for xWMA\n");
             src->conv_ctx->extradata_size = 6;
             src->conv_ctx->extradata = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, AV_INPUT_BUFFER_PADDING_SIZE);
