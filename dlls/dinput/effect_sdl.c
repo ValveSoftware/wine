@@ -46,7 +46,7 @@
 #include "device_private.h"
 #include "joystick_private.h"
 
-#ifdef HAVE_SDL
+#ifdef HAVE_SDL2_SDL_H
 
 WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 

@@ -50,7 +50,7 @@
 #include "device_private.h"
 #include "joystick_private.h"
 
-#ifdef HAVE_SDL
+#ifdef HAVE_SDL2_SDL_H
 
 WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 
@@ -152,12 +152,8 @@ static void find_sdldevs(void)
             }
         }
 
-#ifdef HAVE_SDL_VIDPID
         sdldev.vendor_id = SDL_JoystickGetVendor(device);
         sdldev.product_id = SDL_JoystickGetProduct(device);
-#else
-        WARN("No SDL vid/pid\n");
-#endif
 
         if (!have_sdldevs)
             new_sdldevs = HeapAlloc(GetProcessHeap(), 0, sizeof(struct SDLDev));
@@ -1146,7 +1142,7 @@ static const IDirectInputDevice8WVtbl JoystickWvt =
     IDirectInputDevice8WImpl_GetImageInfo
 };
 
-#else  /* HAVE_SDL */
+#else
 
 const struct dinput_device joystick_sdl_device = {
   "Wine SDL joystick driver",
@@ -1155,4 +1151,4 @@ const struct dinput_device joystick_sdl_device = {
   NULL
 };
 
-#endif  /* HAVE_SDL */
+#endif
