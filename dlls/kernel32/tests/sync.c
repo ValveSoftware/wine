@@ -3012,6 +3012,84 @@ static void test_apc_deadlock(void)
     CloseHandle(pi.hProcess);
 }
 
+static int zigzag_state, zigzag_count[2], zigzag_stop;
+
+static DWORD CALLBACK zigzag_event0(void *arg)
+{
+    HANDLE *events = arg;
+
+    while (!zigzag_stop)
+    {
+        WaitForSingleObject(events[0], INFINITE);
+        ResetEvent(events[0]);
+        ok(zigzag_state == 0, "got wrong state %d\n", zigzag_state);
+        zigzag_state++;
+        SetEvent(events[1]);
+        zigzag_count[0]++;
+    }
+    trace("thread 0 got done\n");
+    return 0;
+}
+
+static DWORD CALLBACK zigzag_event1(void *arg)
+{
+    HANDLE *events = arg;
+
+    while (!zigzag_stop)
+    {
+        WaitForSingleObject(events[1], INFINITE);
+        ResetEvent(events[1]);
+        ok(zigzag_state == 1, "got wrong state %d\n", zigzag_state);
+        zigzag_state--;
+        SetEvent(events[0]);
+        zigzag_count[1]++;
+    }
+    trace("thread 1 got done\n");
+    return 0;
+}
+
+static void test_zigzag_event(void)
+{
+    /* The basic idea is to test SetEvent/Wait back and forth between two
+     * threads. Each thread clears their own event, sets some common data,
+     * signals the other's, then waits on their own. We make sure the common
+     * data is always in the right state. We also print performance data. */
+
+    HANDLE threads[2], events[2];
+    BOOL ret;
+
+    events[0] = CreateEventA(NULL, FALSE, FALSE, NULL);
+    events[1] = CreateEventA(NULL, FALSE, FALSE, NULL);
+
+    threads[0] = CreateThread(NULL, 0, zigzag_event0, events, 0, NULL);
+    threads[1] = CreateThread(NULL, 0, zigzag_event1, events, 0, NULL);
+
+    zigzag_state = 0;
+    zigzag_count[0] = zigzag_count[1] = 0;
+    zigzag_stop = 0;
+
+    trace("starting zigzag test (events)\n");
+    SetEvent(events[0]);
+    Sleep(2000);
+    zigzag_stop = 1;
+    ret = WaitForMultipleObjects(2, threads, FALSE, INFINITE);
+    trace("%d\n", ret);
+    ok(ret == 0 || ret == 1, "wait failed: %u\n", ret);
+
+    ok(zigzag_count[0] == zigzag_count[1] || zigzag_count[0] == zigzag_count[1] + 1,
+        "count did not match: %d != %d\n", zigzag_count[0], zigzag_count[1]);
+
+    /* signal the other thread to finish, if it didn't already
+     * (in theory they both would at the same time, but there's a slight race on teardown if we get
+     * thread 1 SetEvent -> thread 0 ResetEvent -> thread 0 Wait -> thread 1 exits */
+    zigzag_state = 1-ret;
+    SetEvent(events[1-ret]);
+    ret = WaitForSingleObject(threads[1-ret], 1000);
+    ok(!ret, "wait failed: %u\n", ret);
+
+    trace("count: %d\n", zigzag_count[0]);
+}
+
 START_TEST(sync)
 {
     char **argv;
@@ -3071,4 +3149,5 @@ START_TEST(sync)
     test_srwlock_example();
     test_alertable_wait();
     test_apc_deadlock();
+    test_zigzag_event();
 }
