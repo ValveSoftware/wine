@@ -83,6 +83,8 @@ void esync_init(void)
     else
         sprintf( shm_name, "/wine-%lx-esync", (unsigned long)st.st_ino );
 
+    shm_unlink( shm_name );
+
     shm_fd = shm_open( shm_name, O_RDWR | O_CREAT | O_EXCL, 0644 );
     if (shm_fd == -1)
         perror( "shm_open" );
