@@ -578,6 +578,33 @@ NTSTATUS esync_pulse_event( HANDLE handle )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_query_event( HANDLE handle, EVENT_INFORMATION_CLASS class,
+    void *info, ULONG len, ULONG *ret_len )
+{
+    struct esync *obj;
+    EVENT_BASIC_INFORMATION *out = info;
+    struct pollfd fd;
+    NTSTATUS ret;
+
+    TRACE("%p, %u, %p, %u, %p.\n", handle, class, info, len, ret_len);
+
+    if (class != EventBasicInformation)
+    {
+        FIXME("(%p,%d,%u) Unknown class\n", handle, class, len);
+        return STATUS_INVALID_INFO_CLASS;
+    }
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+
+    fd.fd = obj->fd;
+    fd.events = POLLIN;
+    out->EventState = poll( &fd, 1, 0 );
+    out->EventType = (obj->type == ESYNC_AUTO_EVENT ? SynchronizationEvent : NotificationEvent);
+    if (ret_len) *ret_len = sizeof(*out);
+
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
 {
