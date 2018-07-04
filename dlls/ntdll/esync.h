@@ -41,6 +41,8 @@ extern NTSTATUS esync_open_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr ) DECLSPEC_HIDDEN;
 extern NTSTATUS esync_query_semaphore( HANDLE handle, SEMAPHORE_INFORMATION_CLASS class,
     void *info, ULONG len, ULONG *ret_len ) DECLSPEC_HIDDEN;
+extern NTSTATUS esync_query_event( HANDLE handle, EVENT_INFORMATION_CLASS class,
+    void *info, ULONG len, ULONG *ret_len ) DECLSPEC_HIDDEN;
 
 extern NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                     BOOLEAN alertable, const LARGE_INTEGER *timeout ) DECLSPEC_HIDDEN;
