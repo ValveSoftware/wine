@@ -677,6 +677,33 @@ NTSTATUS esync_release_mutex( HANDLE *handle, LONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_query_mutex( HANDLE handle, MUTANT_INFORMATION_CLASS class,
+    void *info, ULONG len, ULONG *ret_len )
+{
+    struct esync *obj;
+    struct mutex *mutex;
+    MUTANT_BASIC_INFORMATION *out = info;
+    NTSTATUS ret;
+
+    TRACE("%p, %u, %p, %u, %p.\n", handle, class, info, len, ret_len);
+
+    if (class != MutantBasicInformation)
+    {
+        FIXME("(%p,%d,%u) Unknown class\n", handle, class, len);
+        return STATUS_INVALID_INFO_CLASS;
+    }
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+    mutex = obj->shm;
+
+    out->CurrentCount = 1 - mutex->count;
+    out->OwnedByCaller = (mutex->tid == GetCurrentThreadId());
+    out->AbandonedState = FALSE;
+    if (ret_len) *ret_len = sizeof(*out);
+
+    return STATUS_SUCCESS;
+}
+
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
 
