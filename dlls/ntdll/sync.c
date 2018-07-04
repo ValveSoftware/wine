@@ -306,6 +306,9 @@ NTSTATUS WINAPI NtQuerySemaphore( HANDLE handle, SEMAPHORE_INFORMATION_CLASS cla
     NTSTATUS ret;
     SEMAPHORE_BASIC_INFORMATION *out = info;
 
+    if (do_esync())
+        return esync_query_semaphore( handle, class, info, len, ret_len );
+
     TRACE("(%p, %u, %p, %u, %p)\n", handle, class, info, len, ret_len);
 
     if (class != SemaphoreBasicInformation)
