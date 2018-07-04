@@ -480,6 +480,32 @@ NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_query_semaphore( HANDLE handle, SEMAPHORE_INFORMATION_CLASS class,
+    void *info, ULONG len, ULONG *ret_len )
+{
+    struct esync *obj;
+    struct semaphore *semaphore;
+    SEMAPHORE_BASIC_INFORMATION *out = info;
+    NTSTATUS ret;
+
+    TRACE("%p, %u, %p, %u, %p.\n", handle, class, info, len, ret_len);
+
+    if (class != SemaphoreBasicInformation)
+    {
+        FIXME("(%p,%d,%u) Unknown class\n", handle, class, len);
+        return STATUS_INVALID_INFO_CLASS;
+    }
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+    semaphore = obj->shm;
+
+    out->CurrentCount = semaphore->count;
+    out->MaximumCount = semaphore->max;
+    if (ret_len) *ret_len = sizeof(*out);
+
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, EVENT_TYPE event_type, BOOLEAN initial )
 {
