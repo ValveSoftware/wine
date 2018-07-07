@@ -161,7 +161,7 @@ static const struct object_ops pipe_server_ops =
     add_queue,                    /* add_queue */
     remove_queue,                 /* remove_queue */
     default_fd_signaled,          /* signaled */
-    NULL,                         /* get_esync_fd */
+    default_fd_get_esync_fd,      /* get_esync_fd */
     no_satisfied,                 /* satisfied */
     no_signal,                    /* signal */
     pipe_end_get_fd,              /* get_fd */
@@ -203,7 +203,7 @@ static const struct object_ops pipe_client_ops =
     add_queue,                    /* add_queue */
     remove_queue,                 /* remove_queue */
     default_fd_signaled,          /* signaled */
-    NULL,                         /* get_esync_fd */
+    default_fd_get_esync_fd,      /* get_esync_fd */
     no_satisfied,                 /* satisfied */
     no_signal,                    /* signal */
     pipe_end_get_fd,              /* get_fd */
