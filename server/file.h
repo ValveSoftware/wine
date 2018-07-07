@@ -103,6 +103,7 @@ extern int is_fd_signaled( struct fd *fd );
 extern char *dup_fd_name( struct fd *root, const char *name );
 
 extern int default_fd_signaled( struct object *obj, struct wait_queue_entry *entry );
+extern int default_fd_get_esync_fd( struct object *obj, enum esync_type *type );
 extern unsigned int default_fd_map_access( struct object *obj, unsigned int access );
 extern int default_fd_get_poll_events( struct fd *fd );
 extern void default_poll_event( struct fd *fd, int event );
