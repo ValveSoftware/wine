@@ -736,12 +736,14 @@ static void pulse_rd_loop(ACImpl *This, size_t bytes)
                 This->peek_ofs += copy;
                 if(This->peek_len == This->peek_ofs)
                     This->peek_len = 0;
-            } else {
-                pa_stream_peek(This->stream, (const void**)&src, &src_len);
+            } else if (pa_stream_peek(This->stream, (const void**)&src, &src_len) && src_len) {
 
                 copy = min(rem, src_len);
 
-                memcpy(dst, src, rem);
+                if(src)
+                    memcpy(dst, src, copy);
+                else
+                    silence_buffer(This->ss.format, dst, copy);
 
                 dst += copy;
                 rem -= copy;
@@ -753,7 +755,11 @@ static void pulse_rd_loop(ACImpl *This, size_t bytes)
                         This->peek_buffer_len = src_len;
                     }
 
-                    memcpy(This->peek_buffer, src + copy, src_len - copy);
+                    if(src)
+                        memcpy(This->peek_buffer, src + copy, src_len - copy);
+                    else
+                        silence_buffer(This->ss.format, This->peek_buffer, src_len - copy);
+
                     This->peek_len = src_len - copy;
                     This->peek_ofs = 0;
                 }
