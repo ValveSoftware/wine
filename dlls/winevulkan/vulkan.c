@@ -659,6 +659,7 @@ VkResult WINAPI wine_vkCreateDevice(VkPhysicalDevice phys_dev,
     InitializeCriticalSection(&object->swapchain_lock);
 
     *device = object;
+    TRACE("Created device %p (native device %p).\n", object, object->device);
     return VK_SUCCESS;
 }
 
@@ -723,7 +724,7 @@ VkResult WINAPI wine_vkCreateInstance(const VkInstanceCreateInfo *create_info,
     }
 
     *instance = object;
-    TRACE("Done, instance=%p native_instance=%p\n", object, object->instance);
+    TRACE("Created instance %p (native instance %p).\n", object, object->instance);
     return VK_SUCCESS;
 }
 
