@@ -60,6 +60,17 @@ VkResult WINAPI wine_vkGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swa
 VkResult WINAPI wine_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pPresentInfo);
 VkResult WINAPI wine_vkQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo *pSubmits, VkFence fence);
 
+typedef struct VkAcquireNextImageInfoKHR_host
+{
+    VkStructureType sType;
+    const void *pNext;
+    VkSwapchainKHR swapchain;
+    uint64_t timeout;
+    VkSemaphore semaphore;
+    VkFence fence;
+    uint32_t deviceMask;
+} VkAcquireNextImageInfoKHR_host;
+
 typedef struct VkCommandBufferAllocateInfo_host
 {
     VkStructureType sType;
@@ -633,6 +644,11 @@ void free_VkImageMemoryBarrier_array(VkImageMemoryBarrier_host *in, uint32_t cou
 /* For use by vkDevice and children */
 struct vulkan_device_funcs
 {
+#if defined(USE_STRUCT_CONVERSION)
+    VkResult (*p_vkAcquireNextImage2KHR)(VkDevice, const VkAcquireNextImageInfoKHR_host *, uint32_t *);
+#else
+    VkResult (*p_vkAcquireNextImage2KHR)(VkDevice, const VkAcquireNextImageInfoKHR *, uint32_t *);
+#endif
     VkResult (*p_vkAcquireNextImageKHR)(VkDevice, VkSwapchainKHR, uint64_t, VkSemaphore, VkFence, uint32_t *);
 #if defined(USE_STRUCT_CONVERSION)
     VkResult (*p_vkAllocateCommandBuffers)(VkDevice, const VkCommandBufferAllocateInfo_host *, VkCommandBuffer *);
@@ -708,6 +724,8 @@ struct vulkan_device_funcs
 #endif
     void (*p_vkCmdCopyQueryPoolResults)(VkCommandBuffer, VkQueryPool, uint32_t, uint32_t, VkBuffer, VkDeviceSize, VkDeviceSize, VkQueryResultFlags);
     void (*p_vkCmdDispatch)(VkCommandBuffer, uint32_t, uint32_t, uint32_t);
+    void (*p_vkCmdDispatchBase)(VkCommandBuffer, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
+    void (*p_vkCmdDispatchBaseKHR)(VkCommandBuffer, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, uint32_t);
     void (*p_vkCmdDispatchIndirect)(VkCommandBuffer, VkBuffer, VkDeviceSize);
     void (*p_vkCmdDraw)(VkCommandBuffer, uint32_t, uint32_t, uint32_t, uint32_t);
     void (*p_vkCmdDrawIndexed)(VkCommandBuffer, uint32_t, uint32_t, uint32_t, int32_t, uint32_t);
@@ -740,6 +758,8 @@ struct vulkan_device_funcs
     void (*p_vkCmdSetBlendConstants)(VkCommandBuffer, const float[4]);
     void (*p_vkCmdSetDepthBias)(VkCommandBuffer, float, float, float);
     void (*p_vkCmdSetDepthBounds)(VkCommandBuffer, float, float);
+    void (*p_vkCmdSetDeviceMask)(VkCommandBuffer, uint32_t);
+    void (*p_vkCmdSetDeviceMaskKHR)(VkCommandBuffer, uint32_t);
     void (*p_vkCmdSetDiscardRectangleEXT)(VkCommandBuffer, uint32_t, uint32_t, const VkRect2D *);
     void (*p_vkCmdSetEvent)(VkCommandBuffer, VkEvent, VkPipelineStageFlags);
     void (*p_vkCmdSetLineWidth)(VkCommandBuffer, float);
@@ -871,6 +891,9 @@ struct vulkan_device_funcs
 #endif
     void (*p_vkGetDescriptorSetLayoutSupport)(VkDevice, const VkDescriptorSetLayoutCreateInfo *, VkDescriptorSetLayoutSupport *);
     void (*p_vkGetDescriptorSetLayoutSupportKHR)(VkDevice, const VkDescriptorSetLayoutCreateInfo *, VkDescriptorSetLayoutSupport *);
+    void (*p_vkGetDeviceGroupPeerMemoryFeatures)(VkDevice, uint32_t, uint32_t, uint32_t, VkPeerMemoryFeatureFlags *);
+    void (*p_vkGetDeviceGroupPeerMemoryFeaturesKHR)(VkDevice, uint32_t, uint32_t, uint32_t, VkPeerMemoryFeatureFlags *);
+    VkResult (*p_vkGetDeviceGroupPresentCapabilitiesKHR)(VkDevice, VkDeviceGroupPresentCapabilitiesKHR *);
     VkResult (*p_vkGetDeviceGroupSurfacePresentModesKHR)(VkDevice, VkSurfaceKHR, VkDeviceGroupPresentModeFlagsKHR *);
     void (*p_vkGetDeviceMemoryCommitment)(VkDevice, VkDeviceMemory, VkDeviceSize *);
     void (*p_vkGetDeviceQueue)(VkDevice, uint32_t, uint32_t, VkQueue *);
@@ -1026,6 +1049,7 @@ struct vulkan_instance_funcs
 };
 
 #define ALL_VK_DEVICE_FUNCS() \
+    USE_VK_FUNC(vkAcquireNextImage2KHR) \
     USE_VK_FUNC(vkAcquireNextImageKHR) \
     USE_VK_FUNC(vkAllocateCommandBuffers) \
     USE_VK_FUNC(vkAllocateDescriptorSets) \
@@ -1053,6 +1077,8 @@ struct vulkan_instance_funcs
     USE_VK_FUNC(vkCmdCopyImageToBuffer) \
     USE_VK_FUNC(vkCmdCopyQueryPoolResults) \
     USE_VK_FUNC(vkCmdDispatch) \
+    USE_VK_FUNC(vkCmdDispatchBase) \
+    USE_VK_FUNC(vkCmdDispatchBaseKHR) \
     USE_VK_FUNC(vkCmdDispatchIndirect) \
     USE_VK_FUNC(vkCmdDraw) \
     USE_VK_FUNC(vkCmdDrawIndexed) \
@@ -1077,6 +1103,8 @@ struct vulkan_instance_funcs
     USE_VK_FUNC(vkCmdSetBlendConstants) \
     USE_VK_FUNC(vkCmdSetDepthBias) \
     USE_VK_FUNC(vkCmdSetDepthBounds) \
+    USE_VK_FUNC(vkCmdSetDeviceMask) \
+    USE_VK_FUNC(vkCmdSetDeviceMaskKHR) \
     USE_VK_FUNC(vkCmdSetDiscardRectangleEXT) \
     USE_VK_FUNC(vkCmdSetEvent) \
     USE_VK_FUNC(vkCmdSetLineWidth) \
@@ -1152,6 +1180,9 @@ struct vulkan_instance_funcs
     USE_VK_FUNC(vkGetBufferMemoryRequirements2KHR) \
     USE_VK_FUNC(vkGetDescriptorSetLayoutSupport) \
     USE_VK_FUNC(vkGetDescriptorSetLayoutSupportKHR) \
+    USE_VK_FUNC(vkGetDeviceGroupPeerMemoryFeatures) \
+    USE_VK_FUNC(vkGetDeviceGroupPeerMemoryFeaturesKHR) \
+    USE_VK_FUNC(vkGetDeviceGroupPresentCapabilitiesKHR) \
     USE_VK_FUNC(vkGetDeviceGroupSurfacePresentModesKHR) \
     USE_VK_FUNC(vkGetDeviceMemoryCommitment) \
     USE_VK_FUNC(vkGetDeviceQueue) \

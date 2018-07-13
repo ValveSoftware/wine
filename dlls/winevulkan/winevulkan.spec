@@ -41,7 +41,7 @@
 @ stdcall __wine_get_native_VkPhysicalDevice(ptr)
 @ stdcall __wine_get_wrapped_VkPhysicalDevice(ptr)
 @ stdcall __wine_get_native_VkQueue(ptr)
-@ stub vkAcquireNextImage2KHR
+@ stdcall wine_vkAcquireNextImage2KHR(ptr ptr ptr)
 @ stdcall wine_vkAcquireNextImageKHR(ptr int64 int64 int64 int64 ptr)
 @ stdcall wine_vkAllocateCommandBuffers(ptr ptr ptr)
 @ stdcall wine_vkAllocateDescriptorSets(ptr ptr ptr)
@@ -67,7 +67,7 @@
 @ stdcall wine_vkCmdCopyImageToBuffer(ptr int64 long int64 long ptr)
 @ stdcall wine_vkCmdCopyQueryPoolResults(ptr int64 long long int64 int64 int64 long)
 @ stdcall wine_vkCmdDispatch(ptr long long long)
-@ stub vkCmdDispatchBase
+@ stdcall wine_vkCmdDispatchBase(ptr long long long long long long)
 @ stdcall wine_vkCmdDispatchIndirect(ptr int64 int64)
 @ stdcall wine_vkCmdDraw(ptr long long long long)
 @ stdcall wine_vkCmdDrawIndexed(ptr long long long long long)
@@ -86,7 +86,7 @@
 @ stdcall wine_vkCmdSetBlendConstants(ptr ptr)
 @ stdcall wine_vkCmdSetDepthBias(ptr float float float)
 @ stdcall wine_vkCmdSetDepthBounds(ptr float float)
-@ stub vkCmdSetDeviceMask
+@ stdcall wine_vkCmdSetDeviceMask(ptr long)
 @ stdcall wine_vkCmdSetEvent(ptr int64 long)
 @ stdcall wine_vkCmdSetLineWidth(ptr float)
 @ stdcall wine_vkCmdSetScissor(ptr long long ptr)
@@ -164,8 +164,8 @@
 @ stdcall wine_vkGetBufferMemoryRequirements(ptr int64 ptr)
 @ stdcall wine_vkGetBufferMemoryRequirements2(ptr ptr ptr)
 @ stdcall wine_vkGetDescriptorSetLayoutSupport(ptr ptr ptr)
-@ stub vkGetDeviceGroupPeerMemoryFeatures
-@ stub vkGetDeviceGroupPresentCapabilitiesKHR
+@ stdcall wine_vkGetDeviceGroupPeerMemoryFeatures(ptr long long long long)
+@ stdcall wine_vkGetDeviceGroupPresentCapabilitiesKHR(ptr ptr)
 @ stdcall wine_vkGetDeviceGroupSurfacePresentModesKHR(ptr int64 long)
 @ stdcall wine_vkGetDeviceMemoryCommitment(ptr int64 ptr)
 @ stdcall wine_vkGetDeviceProcAddr(ptr str)
