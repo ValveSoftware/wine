@@ -38,6 +38,8 @@
 #ifndef __WINE_VULKAN_THUNKS_H
 #define __WINE_VULKAN_THUNKS_H
 
+#define WINE_VK_VERSION VK_API_VERSION_1_0
+
 /* Functions for which we have custom implementations outside of the thunks. */
 VkResult WINAPI wine_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex);
 VkResult WINAPI wine_vkAllocateCommandBuffers(VkDevice device, const VkCommandBufferAllocateInfo *pAllocateInfo, VkCommandBuffer *pCommandBuffers);
