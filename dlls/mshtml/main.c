@@ -655,8 +655,6 @@ HRESULT WINAPI DllRegisterServer(void)
     hres = __wine_register_resources( hInst );
     if(SUCCEEDED(hres))
         hres = register_server(TRUE);
-    if(SUCCEEDED(hres))
-        load_gecko();
 
     return hres;
 }
