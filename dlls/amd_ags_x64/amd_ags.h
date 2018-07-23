@@ -96,8 +96,7 @@
 extern "C" {
 #endif
 
-
-#define AMD_AGS_API __declspec(dllexport)   ///< AGS calling convention
+#define AMD_AGS_API WINAPI
 
 // Forward declaration of D3D11 types
 struct IDXGIAdapter;
@@ -117,8 +116,6 @@ struct D3D11_TEXTURE1D_DESC;
 struct D3D11_TEXTURE2D_DESC;
 struct D3D11_TEXTURE3D_DESC;
 struct D3D11_SUBRESOURCE_DATA;
-struct tagRECT;
-typedef tagRECT D3D11_RECT;             ///< typedef this ourselves so we don't have to drag d3d11.h in
 
 // Forward declaration of D3D12 types
 struct ID3D12Device;
@@ -126,7 +123,7 @@ struct ID3D12GraphicsCommandList;
 
 
 /// The return codes
-enum AGSReturnCode
+typedef enum AGSReturnCode
 {
     AGS_SUCCESS,                    ///< Successful function call
     AGS_FAILURE,                    ///< Failed to complete call for some unspecified reason
@@ -136,10 +133,10 @@ enum AGSReturnCode
     AGS_ERROR_LEGACY_DRIVER,        ///< Returned if a feature is not present in the installed driver
     AGS_EXTENSION_NOT_SUPPORTED,    ///< Returned if the driver does not support the requested driver extension
     AGS_ADL_FAILURE,                ///< Failure in ADL (the AMD Display Library)
-};
+} AGSReturnCode;
 
 /// The DirectX11 extension support bits
-enum AGSDriverExtensionDX11
+typedef enum AGSDriverExtensionDX11
 {
     AGS_DX11_EXTENSION_QUADLIST                             = 1 << 0,
     AGS_DX11_EXTENSION_SCREENRECTLIST                       = 1 << 1,
@@ -161,10 +158,10 @@ enum AGSDriverExtensionDX11
     AGS_DX11_EXTENSION_CREATE_SHADER_CONTROLS               = 1 << 17,
     AGS_DX11_EXTENSION_MULTIVIEW                            = 1 << 18,
     AGS_DX11_EXTENSION_APP_REGISTRATION                     = 1 << 19    ///< Supported in Radeon Software Version 17.9.1 onwards.
-};
+} AGSDriverExtensionDX11;
 
 /// The DirectX12 extension support bits
-enum AGSDriverExtensionDX12
+typedef enum AGSDriverExtensionDX12
 {
     AGS_DX12_EXTENSION_INTRINSIC_READFIRSTLANE              = 1 << 0,   ///< Supported in Radeon Software Version 16.9.2 (driver version 16.40.2311) onwards.
     AGS_DX12_EXTENSION_INTRINSIC_READLANE                   = 1 << 1,   ///< Supported in Radeon Software Version 16.9.2 (driver version 16.40.2311) onwards.
@@ -177,48 +174,48 @@ enum AGSDriverExtensionDX12
     AGS_DX12_EXTENSION_INTRINSIC_WAVE_REDUCE                = 1 << 8,   ///< Supported in Radeon Software Version 17.9.1 onwards.
     AGS_DX12_EXTENSION_INTRINSIC_WAVE_SCAN                  = 1 << 9,   ///< Supported in Radeon Software Version 17.9.1 onwards.
     AGS_DX12_EXTENSION_USER_MARKERS                         = 1 << 10   ///< Supported in Radeon Software Version 17.9.1 onwards.
-};
+} AGSDriverExtensionDX12;
 
 /// The space id for DirectX12 intrinsic support
 const unsigned int AGS_DX12_SHADER_INSTRINSICS_SPACE_ID = 0x7FFF0ADE; // 2147420894
 
 
 /// Additional topologies supported via extensions
-enum AGSPrimitiveTopology
+typedef enum AGSPrimitiveTopology
 {
     AGS_PRIMITIVE_TOPOLOGY_QUADLIST                         = 7,
     AGS_PRIMITIVE_TOPOLOGY_SCREENRECTLIST                   = 9
-};
+} AGSPrimitiveTopology;
 
 /// The different modes to control Crossfire behavior.
-enum AGSCrossfireMode
+typedef enum AGSCrossfireMode
 {
     AGS_CROSSFIRE_MODE_DRIVER_AFR = 0,                              ///< Use the default driver-based AFR rendering
     AGS_CROSSFIRE_MODE_EXPLICIT_AFR,                                ///< Use the AGS Crossfire API functions to perform explicit AFR rendering without requiring a CF driver profile
     AGS_CROSSFIRE_MODE_DISABLE                                      ///< Completely disable AFR rendering
-};
+} AGSCrossfireMode;
 
 
 /// The Crossfire API transfer types
-enum AGSAfrTransferType
+typedef enum AGSAfrTransferType
 {
     AGS_AFR_TRANSFER_DEFAULT                                = 0,    ///< Default Crossfire driver resource tracking
     AGS_AFR_TRANSFER_DISABLE                                = 1,    ///< Turn off driver resource tracking
     AGS_AFR_TRANSFER_1STEP_P2P                              = 2,    ///< App controlled GPU to next GPU transfer
     AGS_AFR_TRANSFER_2STEP_NO_BROADCAST                     = 3,    ///< App controlled GPU to next GPU transfer using intermediate system memory
     AGS_AFR_TRANSFER_2STEP_WITH_BROADCAST                   = 4,    ///< App controlled GPU to all render GPUs transfer using intermediate system memory
-};
+} AGSAfrTransferType;
 
 /// The Crossfire API transfer engines
-enum AGSAfrTransferEngine
+typedef enum AGSAfrTransferEngine
 {
     AGS_AFR_TRANSFERENGINE_DEFAULT                          = 0,    ///< Use default engine for Crossfire API transfers
     AGS_AFR_TRANSFERENGINE_3D_ENGINE                        = 1,    ///< Use 3D engine for Crossfire API transfers
     AGS_AFR_TRANSFERENGINE_COPY_ENGINE                      = 2,    ///< Use Copy engine for Crossfire API transfers
-};
+} AGSAfrTransferEngine;
 
 /// The display flags describing various properties of the display.
-enum AGSDisplayFlags
+typedef enum AGSDisplayFlags
 {
     AGS_DISPLAYFLAG_PRIMARY_DISPLAY                         = 1 << 0,   ///< Whether this display is marked as the primary display. Not set on the WACK version.
     AGS_DISPLAYFLAG_HDR10                                   = 1 << 1,   ///< HDR10 is supported on this display
@@ -228,35 +225,33 @@ enum AGSDisplayFlags
     AGS_DISPLAYFLAG_EYEFINITY_IN_GROUP                      = 1 << 5,   ///< The display is part of the Eyefinity group
     AGS_DISPLAYFLAG_EYEFINITY_PREFERRED_DISPLAY             = 1 << 6,   ///< The display is the preferred display in the Eyefinity group for displaying the UI
     AGS_DISPLAYFLAG_EYEFINITY_IN_PORTRAIT_MODE              = 1 << 7,   ///< The display is in the Eyefinity group but in portrait mode
-};
+} AGSDisplayFlags;
 
-struct AGSContext;  ///< All function calls in AGS require a pointer to a context. This is generated via \ref agsInit
+typedef struct AGSContext AGSContext;  ///< All function calls in AGS require a pointer to a context. This is generated via \ref agsInit
 
 /// The rectangle struct used by AGS.
-struct AGSRect
+typedef struct AGSRect
 {
     int offsetX;    ///< Offset on X axis
     int offsetY;    ///< Offset on Y axis
     int width;      ///< Width of rectangle
     int height;     ///< Height of rectangle
-};
+} AGSRect;
 
 /// The clip rectangle struct used by \ref agsDriverExtensionsDX11_SetClipRects
-struct AGSClipRect
+typedef struct AGSClipRect
 {
     /// The inclusion mode for the rect
-    enum Mode
+    enum
     {
         ClipRectIncluded = 0,   ///< Include the rect
         ClipRectExcluded = 1    ///< Exclude the rect
-    };
-
-    Mode            mode; ///< Include/exclude rect region
+    }               mode; ; ///< Include/exclude rect region
     AGSRect         rect; ///< The rect to include/exclude
-};
+} AGSClipRect;
 
 /// The display info struct used to describe a display enumerated by AGS
-struct AGSDisplayInfo
+typedef struct AGSDisplayInfo
 {
     char                    name[ 256 ];                    ///< The name of the display
     char                    displayDeviceName[ 32 ];        ///< The display device name, i.e. DISPLAY_DEVICE::DeviceName
@@ -296,19 +291,19 @@ struct AGSDisplayInfo
 
     int                     logicalDisplayIndex;            ///< The internally used index of this display
     int                     adlAdapterIndex;                ///< The internally used ADL adapter index
-};
+} AGSDisplayInfo;
+
+/// The architecture version
+typedef enum ArchitectureVersion
+{
+    ArchitectureVersion_Unknown,                                ///< Unknown architecture, potentially from another IHV. Check \ref AGSDeviceInfo::vendorId
+    ArchitectureVersion_PreGCN,                                 ///< AMD architecture, pre-GCN
+    ArchitectureVersion_GCN                                     ///< AMD GCN architecture
+} ArchitectureVersion;
 
 /// The device info struct used to describe a physical GPU enumerated by AGS
-struct AGSDeviceInfo
+typedef struct AGSDeviceInfo
 {
-    /// The architecture version
-    enum ArchitectureVersion
-    {
-        ArchitectureVersion_Unknown,                                ///< Unknown architecture, potentially from another IHV. Check AGSDeviceInfo::vendorId
-        ArchitectureVersion_PreGCN,                                 ///< AMD architecture, pre-GCN
-        ArchitectureVersion_GCN                                     ///< AMD GCN architecture
-    };
-
     ArchitectureVersion             architectureVersion;            ///< Set to Unknown if not AMD hardware
     const char*                     adapterString;                  ///< The adapter name string
     int                             vendorId;                       ///< The vendor id
@@ -334,7 +329,7 @@ struct AGSDeviceInfo
     int                             eyefinityBezelCompensated;      ///< Indicates if bezel compensation is used for the current SLS display area. 1 if enabled, and 0 if disabled.
 
     int                             adlAdapterIndex;                ///< Internally used index into the ADL list of adapters
-};
+} AGSDeviceInfo;
 
 /// \defgroup general General API functions
 /// API for initialization, cleanup, HDR display modes and Crossfire GPU count
@@ -343,16 +338,15 @@ struct AGSDeviceInfo
 typedef void* (__stdcall *AGS_ALLOC_CALLBACK)( int allocationSize );    ///< AGS user defined allocation prototype
 typedef void (__stdcall *AGS_FREE_CALLBACK)( void* allocationPtr );     ///< AGS user defined free prototype
 
-                                                                        /// The configuration options that can be passed in to \ref agsInit
-struct AGSConfiguration
+/// The configuration options that can be passed in to \ref agsInit
+typedef struct AGSConfiguration
 {
     AGS_ALLOC_CALLBACK      allocCallback;                  ///< Optional memory allocation callback. If not supplied, malloc() is used
     AGS_FREE_CALLBACK       freeCallback;                   ///< Optional memory freeing callback. If not supplied, free() is used
-    AGSCrossfireMode        crossfireMode;                  ///< Desired Crossfire mode
-};
+} AGSConfiguration;
 
 /// The top level GPU information returned from \ref agsInit
-struct AGSGPUInfo
+typedef struct AGSGPUInfo
 {
     int                     agsVersionMajor;                ///< Major field of Major.Minor.Patch AGS version number
     int                     agsVersionMinor;                ///< Minor field of Major.Minor.Patch AGS version number
@@ -364,22 +358,20 @@ struct AGSGPUInfo
 
     int                     numDevices;                     ///< Number of GPUs in the system
     AGSDeviceInfo*          devices;                        ///< List of GPUs in the system
-};
+} AGSGPUInfo;
 
 /// The struct to specify the display settings to the driver.
-struct AGSDisplaySettings
+typedef struct AGSDisplaySettings
 {
     /// The display mode
-    enum Mode
+    enum
     {
         Mode_SDR,                                           ///< SDR mode
         Mode_HDR10_PQ,                                      ///< HDR10 PQ encoding, requiring a 1010102 UNORM swapchain and PQ encoding in the output shader.
         Mode_HDR10_scRGB,                                   ///< HDR10 scRGB, requiring an FP16 swapchain. Values of 1.0 == 80 nits, 125.0 == 10000 nits.
         Mode_Freesync2_scRGB,                               ///< Freesync2 scRGB, requiring an FP16 swapchain. Values in the range of 0.0 to 125.0 where 125.0 == AGSDisplayInfo::maxLuminance.
         Mode_DolbyVision                                    ///< Dolby Vision, requiring an 8888 UNORM swapchain
-    };
-
-    Mode                    mode;                           ///< The display mode to set the display into
+    }                       mode;                           ///< The display mode to set the display into
 
     double                  chromaticityRedX;               ///< Red display primary X coord
     double                  chromaticityRedY;               ///< Red display primary Y coord
@@ -398,7 +390,7 @@ struct AGSDisplaySettings
 
     double                  maxContentLightLevel;           ///< The maximum content light level in nits (MaxCLL)
     double                  maxFrameAverageLightLevel;      ///< The maximum frame average light level in nits (MaxFALL)
-};
+} AGSDisplaySettings;
 
 ///
 /// Function used to initialize the AGS library.
@@ -526,7 +518,7 @@ AMD_AGS_API AGSReturnCode agsDriverExtensionsDX12_SetMarker( AGSContext* context
 /// @{
 
 /// The struct to specify the existing DX11 device creation parameters
-struct AGSDX11DeviceCreationParams
+typedef struct AGSDX11DeviceCreationParams
 {
     IDXGIAdapter*               pAdapter;                   ///< Consult the DX documentation on D3D11CreateDevice for this parameter
     D3D_DRIVER_TYPE             DriverType;                 ///< Consult the DX documentation on D3D11CreateDevice for this parameter
@@ -536,13 +528,13 @@ struct AGSDX11DeviceCreationParams
     UINT                        FeatureLevels;              ///< Consult the DX documentation on D3D11CreateDevice for this parameter
     UINT                        SDKVersion;                 ///< Consult the DX documentation on D3D11CreateDevice for this parameter
     const DXGI_SWAP_CHAIN_DESC* pSwapChainDesc;             ///< Optional swapchain description. Specify this to invoke D3D11CreateDeviceAndSwapChain instead of D3D11CreateDevice. This must be null on the WACK compliant version
-};
+} AGSDX11DeviceCreationParams;
 
 #define AGS_MAKE_VERSION( major, minor, patch ) ( ( major << 22 ) | ( minor << 12 ) | patch ) ///< Macro to create the app and engine versions for the fields in \ref AGSDX11ExtensionParams
 #define AGS_UNSPECIFIED_VERSION 0xFFFFAD00                                                    ///< Use this to specify no version
 
 /// The struct to specify DX11 additional device creation parameters
-struct AGSDX11ExtensionParams
+typedef struct AGSDX11ExtensionParams
 {
     unsigned int    uavSlot;           ///< The UAV slot reserved for intrinsic support. This must match the slot defined in the HLSL, i.e. #define AmdDxExtShaderIntrinsicsUAVSlot.
                                        /// The default slot is 7, but the caller is free to use an alternative slot.
@@ -550,17 +542,17 @@ struct AGSDX11ExtensionParams
     UINT            appVersion;        ///< Application version
     const WCHAR*    pEngineName;       ///< Engine name
     UINT            engineVersion;     ///< Engine version
-};
+} AGSDX11ExtensionParams;
 
 /// The struct to hold all the returned parameters from the device creation call
-struct AGSDX11ReturnedParams
+typedef struct AGSDX11ReturnedParams
 {
     ID3D11Device*           pDevice;                ///< The newly created device
     D3D_FEATURE_LEVEL       FeatureLevel;           ///< The feature level supported by the newly created device
     ID3D11DeviceContext*    pImmediateContext;      ///< The newly created immediate device context
     IDXGISwapChain*         pSwapChain;             ///< The newly created swap chain. This is only created if a valid pSwapChainDesc is supplied in AGSDX11DeviceCreationParams. This is not supported on the WACK compliant version
     unsigned int            extensionsSupported;    ///< Bit mask that \ref agsDriverExtensionsDX11_CreateDevice will fill in to indicate which extensions are supported. See AGSDriverExtensionDX11
-};
+} AGSDX11ReturnedParams;
 
 ///
 /// Function used to create a D3D11 device with additional AMD-specific initialization parameters.
