@@ -1,0 +1,6 @@
+MODULE    = amd_ags_x64.dll
+IMPORTS   = vulkan-1
+IMPORTLIB = amd_ags_x64
+
+C_SRCS = \
+	amd_ags_x64_main.c
