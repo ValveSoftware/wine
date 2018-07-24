@@ -736,7 +736,7 @@ static void pulse_rd_loop(ACImpl *This, size_t bytes)
                 This->peek_ofs += copy;
                 if(This->peek_len == This->peek_ofs)
                     This->peek_len = 0;
-            } else if (pa_stream_peek(This->stream, (const void**)&src, &src_len) && src_len) {
+            } else if (pa_stream_peek(This->stream, (const void**)&src, &src_len) == 0 && src_len) {
 
                 copy = min(rem, src_len);
 
