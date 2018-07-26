@@ -850,23 +850,63 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 
     if (wait_any || count == 1)
     {
+        /* Try to check objects now, so we can obviate poll() at least. */
         for (i = 0; i < count; i++)
         {
             struct esync *obj = objs[i];
 
-            if (obj && obj->type == ESYNC_MUTEX)
+            if (obj)
             {
-                /* If we already own the mutex, return immediately. */
-                /* Note: This violates the assumption that the *first* object
-                 * to be signaled will be returned. If that becomes a problem,
-                 * we can always check the state of each object before waiting. */
-                struct mutex *mutex = obj->shm;
-
-                if (mutex->tid == GetCurrentThreadId())
+                switch (obj->type)
                 {
-                    TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                    mutex->count++;
-                    return i;
+                case ESYNC_MUTEX:
+                {
+                    struct mutex *mutex = obj->shm;
+
+                    if (mutex->tid == GetCurrentThreadId())
+                    {
+                        TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                        mutex->count++;
+                        return i;
+                    }
+                    else if (!mutex->count)
+                    {
+                        if ((size = read( obj->fd, &value, sizeof(value) )) == sizeof(value))
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            mutex->tid = GetCurrentThreadId();
+                            mutex->count++;
+                            return i;
+                        }
+                    }
+                    break;
+                }
+                case ESYNC_SEMAPHORE:
+                {
+                    struct semaphore *semaphore = obj->shm;
+
+                    if (semaphore->count)
+                    {
+                        if ((size = read( obj->fd, &value, sizeof(value) )) == sizeof(value))
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            interlocked_xchg_add( &semaphore->count, -1 );
+                            return i;
+                        }
+                    }
+                    break;
+                }
+                case ESYNC_AUTO_EVENT:
+                case ESYNC_MANUAL_EVENT:
+                    /* TODO */
+                    break;
+                case ESYNC_AUTO_SERVER:
+                case ESYNC_MANUAL_SERVER:
+                case ESYNC_QUEUE:
+                    /* We can't wait on any of these. Fortunately I don't think
+                     * they'll ever be uncontended anyway (at least, they won't be
+                     * performance-critical). */
+                    break;
                 }
             }
 
