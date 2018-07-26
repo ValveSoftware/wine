@@ -190,25 +190,21 @@ static struct esync *create_esync( struct object *root, const struct unicode_str
                 return NULL;
             }
             esync->type = type;
-            if (type == ESYNC_SEMAPHORE || type == ESYNC_MUTEX)
+
+            /* Use the fd as index, since that'll be unique across all
+             * processes, but should hopefully end up also allowing reuse. */
+            esync->shm_idx = esync->fd + 1; /* we keep index 0 reserved */
+            while (esync->shm_idx * 8 >= shm_size)
             {
-                /* Use the fd as index, since that'll be unique across all
-                 * processes, but should hopefully end up also allowing reuse. */
-                esync->shm_idx = esync->fd + 1; /* we keep index 0 reserved */
-                while (esync->shm_idx * 8 >= shm_size)
+                /* Better expand the shm section. */
+                shm_size += sysconf( _SC_PAGESIZE );
+                if (ftruncate( shm_fd, shm_size ) == -1)
                 {
-                    /* Better expand the shm section. */
-                    shm_size += sysconf( _SC_PAGESIZE );
-                    if (ftruncate( shm_fd, shm_size ) == -1)
-                    {
-                        fprintf( stderr, "esync: couldn't expand %s to size %ld: ",
-                            shm_name, shm_size );
-                        perror( "ftruncate" );
-                    }
+                    fprintf( stderr, "esync: couldn't expand %s to size %ld: ",
+                        shm_name, shm_size );
+                    perror( "ftruncate" );
                 }
             }
-            else
-                esync->shm_idx = 0;
         }
         else
         {
