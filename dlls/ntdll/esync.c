@@ -227,6 +227,12 @@ static NTSTATUS get_object( HANDLE handle, struct esync **obj )
 
     if ((*obj = get_cached_object( handle ))) return STATUS_SUCCESS;
 
+    if ((INT_PTR)handle < 0)
+    {
+        /* We can deal with pseudo-handles, but it's just easier this way */
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
     /* We need to try grabbing it from the server. */
     server_enter_uninterrupted_section( &fd_cache_section, &sigset );
     if (!(*obj = get_cached_object( handle )))
