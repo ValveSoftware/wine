@@ -142,8 +142,9 @@ static void *get_shm( unsigned int idx )
 
     if (entry >= shm_addrs_size)
     {
-        shm_addrs_size *= 2;
-        if (!(shm_addrs = RtlReAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, shm_addrs, shm_addrs_size )))
+        shm_addrs_size = entry + 1;
+        if (!(shm_addrs = RtlReAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                shm_addrs, shm_addrs_size * sizeof(shm_addrs[0]) )))
             ERR("Failed to grow shm_addrs array to size %d.\n", shm_addrs_size);
     }
 
