@@ -178,7 +178,7 @@ static int type_matches( enum esync_type type1, enum esync_type type2 )
 }
 
 static struct esync *create_esync( struct object *root, const struct unicode_str *name,
-    unsigned int attr, int initval, int flags, enum esync_type type,
+    unsigned int attr, int initval, enum esync_type type,
     const struct security_descriptor *sd )
 {
 #ifdef HAVE_SYS_EVENTFD_H
@@ -188,8 +188,13 @@ static struct esync *create_esync( struct object *root, const struct unicode_str
     {
         if (get_error() != STATUS_OBJECT_NAME_EXISTS)
         {
+            int flags = EFD_CLOEXEC | EFD_NONBLOCK;
+
+            if (type == ESYNC_SEMAPHORE)
+                flags |= EFD_SEMAPHORE;
+
             /* initialize it if it didn't already exist */
-            esync->fd = eventfd( initval, flags | EFD_CLOEXEC | EFD_NONBLOCK );
+            esync->fd = eventfd( initval, flags );
             if (esync->fd == -1)
             {
                 perror( "eventfd" );
@@ -407,7 +412,7 @@ DECL_HANDLER(create_esync)
 
     if (!objattr) return;
 
-    if ((esync = create_esync( root, &name, objattr->attributes, req->initval, req->flags, req->type, sd )))
+    if ((esync = create_esync( root, &name, objattr->attributes, req->initval, req->type, sd )))
     {
         if (get_error() == STATUS_OBJECT_NAME_EXISTS)
             reply->handle = alloc_handle( current->process, esync, req->access, objattr->attributes );
