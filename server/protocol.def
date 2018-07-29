@@ -3952,6 +3952,7 @@ struct handle_info
     unsigned int access;        /* wanted access rights */
     int          initval;       /* initial value */
     int          type;          /* type of esync object (see below) */
+    int          max;           /* maximum count on a semaphore */
     VARARG(objattr,object_attributes); /* object attributes */
 @REPLY
     obj_handle_t handle;        /* handle to the object */
