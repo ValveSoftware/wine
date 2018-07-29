@@ -4604,7 +4604,6 @@ static void dump_create_esync_request( const struct create_esync_request *req )
 {
     fprintf( stderr, " access=%08x", req->access );
     fprintf( stderr, ", initval=%d", req->initval );
-    fprintf( stderr, ", flags=%d", req->flags );
     fprintf( stderr, ", type=%d", req->type );
     dump_varargs_object_attributes( ", objattr=", cur_size );
 }
@@ -5628,6 +5627,7 @@ static const struct
     { "INVALID_LOCK_SEQUENCE",       STATUS_INVALID_LOCK_SEQUENCE },
     { "INVALID_OWNER",               STATUS_INVALID_OWNER },
     { "INVALID_PARAMETER",           STATUS_INVALID_PARAMETER },
+    { "INVALID_PARAMETER_4",         STATUS_INVALID_PARAMETER_4 },
     { "INVALID_PIPE_STATE",          STATUS_INVALID_PIPE_STATE },
     { "INVALID_READ_MODE",           STATUS_INVALID_READ_MODE },
     { "INVALID_SECURITY_DESCR",      STATUS_INVALID_SECURITY_DESCR },
