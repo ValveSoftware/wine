@@ -177,8 +177,63 @@ static int type_matches( enum esync_type type1, enum esync_type type2 )
             (type2 == ESYNC_AUTO_EVENT || type2 == ESYNC_MANUAL_EVENT));
 }
 
+static void *get_shm( unsigned int idx )
+{
+    int entry  = (idx * 8) / pagesize;
+    int offset = (idx * 8) % pagesize;
+
+    if (entry >= shm_addrs_size)
+    {
+        if (!(shm_addrs = realloc( shm_addrs, (entry + 1) * sizeof(shm_addrs[0]) )))
+            fprintf( stderr, "esync: couldn't expand shm_addrs array to size %d\n", entry + 1 );
+
+        memset( &shm_addrs[shm_addrs_size], 0, (entry + 1 - shm_addrs_size) * sizeof(shm_addrs[0]) );
+
+        shm_addrs_size = entry + 1;
+    }
+
+    if (!shm_addrs[entry])
+    {
+        void *addr = mmap( NULL, pagesize, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, entry * pagesize );
+        if (addr == (void *)-1)
+        {
+            fprintf( stderr, "esync: failed to map page %d (offset %#lx): ", entry, entry * pagesize );
+            perror( "mmap" );
+        }
+
+        if (debug_level)
+            fprintf( stderr, "esync: Mapping page %d at %p.\n", entry, addr );
+
+        if (interlocked_cmpxchg_ptr( &shm_addrs[entry], addr, 0 ))
+            munmap( addr, pagesize ); /* someone beat us to it */
+    }
+
+    return (void *)((unsigned long)shm_addrs[entry] + offset);
+}
+
+struct semaphore
+{
+    int max;
+    int count;
+};
+C_ASSERT(sizeof(struct semaphore) == 8);
+
+struct mutex
+{
+    DWORD tid;
+    int count;    /* recursion count */
+};
+C_ASSERT(sizeof(struct mutex) == 8);
+
+struct event
+{
+    int signaled;
+    int locked;
+};
+C_ASSERT(sizeof(struct event) == 8);
+
 static struct esync *create_esync( struct object *root, const struct unicode_str *name,
-    unsigned int attr, int initval, enum esync_type type,
+    unsigned int attr, int initval, int max, enum esync_type type,
     const struct security_descriptor *sd )
 {
 #ifdef HAVE_SYS_EVENTFD_H
@@ -217,6 +272,38 @@ static struct esync *create_esync( struct object *root, const struct unicode_str
                         shm_name, shm_size );
                     perror( "ftruncate" );
                 }
+            }
+
+            /* Initialize the shared memory portion. We want to do this on the
+             * server side to avoid a potential though unlikely race whereby
+             * the same object is opened and used between the time it's created
+             * and the time its shared memory portion is initialized. */
+            switch (type)
+            {
+            case ESYNC_SEMAPHORE:
+            {
+                struct semaphore *semaphore = get_shm( esync->shm_idx );
+                semaphore->max = max;
+                semaphore->count = initval;
+                break;
+            }
+            case ESYNC_AUTO_EVENT:
+            case ESYNC_MANUAL_EVENT:
+            {
+                struct event *event = get_shm( esync->shm_idx );
+                event->signaled = initval ? 1 : 0;
+                event->locked = 0;
+                break;
+            }
+            case ESYNC_MUTEX:
+            {
+                struct mutex *mutex = get_shm( esync->shm_idx );
+                mutex->tid = initval ? 0 : current->id;
+                mutex->count = initval ? 0 : 1;
+                break;
+            }
+            default:
+                assert( 0 );
             }
         }
         else
@@ -285,49 +372,6 @@ void esync_clear( int fd )
     /* we don't care about the return value */
     read( fd, &value, sizeof(value) );
 }
-
-/* Sadly, we need all of this infrastructure to keep the shm state in sync. */
-
-static void *get_shm( unsigned int idx )
-{
-    int entry  = (idx * 8) / pagesize;
-    int offset = (idx * 8) % pagesize;
-
-    if (entry >= shm_addrs_size)
-    {
-        if (!(shm_addrs = realloc( shm_addrs, (entry + 1) * sizeof(shm_addrs[0]) )))
-            fprintf( stderr, "esync: couldn't expand shm_addrs array to size %d\n", entry + 1 );
-
-        memset( &shm_addrs[shm_addrs_size], 0, (entry + 1 - shm_addrs_size) * sizeof(shm_addrs[0]) );
-
-        shm_addrs_size = entry + 1;
-    }
-
-    if (!shm_addrs[entry])
-    {
-        void *addr = mmap( NULL, pagesize, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, entry * pagesize );
-        if (addr == (void *)-1)
-        {
-            fprintf( stderr, "esync: failed to map page %d (offset %#lx): ", entry, entry * pagesize );
-            perror( "mmap" );
-        }
-
-        if (debug_level)
-            fprintf( stderr, "esync: Mapping page %d at %p.\n", entry, addr );
-
-        if (interlocked_cmpxchg_ptr( &shm_addrs[entry], addr, 0 ))
-            munmap( addr, pagesize ); /* someone beat us to it */
-    }
-
-    return (void *)((unsigned long)shm_addrs[entry] + offset);
-}
-
-struct event
-{
-    int signaled;
-    int locked;
-};
-C_ASSERT(sizeof(struct event) == 8);
 
 static inline void small_pause(void)
 {
@@ -412,7 +456,8 @@ DECL_HANDLER(create_esync)
 
     if (!objattr) return;
 
-    if ((esync = create_esync( root, &name, objattr->attributes, req->initval, req->type, sd )))
+    if ((esync = create_esync( root, &name, objattr->attributes, req->initval,
+        req->max, req->type, sd )))
     {
         if (get_error() == STATUS_OBJECT_NAME_EXISTS)
             reply->handle = alloc_handle( current->process, esync, req->access, objattr->attributes );
