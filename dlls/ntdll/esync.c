@@ -30,11 +30,9 @@
 # include <sys/poll.h>
 #endif
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
-#ifdef HAVE_SYS_EVENTFD_H
-# include <sys/eventfd.h>
-#endif
 #ifdef HAVE_SYS_MMAN_H
 # include <sys/mman.h>
 #endif
@@ -50,10 +48,6 @@
 
 #include "ntdll_misc.h"
 #include "esync.h"
-
-#ifndef EFD_SEMAPHORE
-#define EFD_SEMAPHORE 1
-#endif
 
 WINE_DEFAULT_DEBUG_CHANNEL(esync);
 
@@ -115,7 +109,7 @@ static int shm_addrs_size;  /* length of the allocated shm_addrs array */
 static long pagesize;
 
 static NTSTATUS create_esync( enum esync_type type, HANDLE *handle,
-    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int initval, int flags );
+    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int initval );
 
 void esync_init(void)
 {
@@ -127,7 +121,7 @@ void esync_init(void)
         HANDLE handle;
         NTSTATUS ret;
 
-        ret = create_esync( 0, &handle, 0, NULL, 0, 0 );
+        ret = create_esync( 0, &handle, 0, NULL, 0 );
         if (ret != STATUS_NOT_IMPLEMENTED)
         {
             ERR("Server is running with WINEESYNC but this process is not, please enable WINEESYNC or restart wineserver.\n");
@@ -326,7 +320,7 @@ NTSTATUS esync_close( HANDLE handle )
 }
 
 static NTSTATUS create_esync( enum esync_type type, HANDLE *handle,
-    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int initval, int flags )
+    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int initval )
 {
     NTSTATUS ret;
     data_size_t len;
@@ -345,7 +339,6 @@ static NTSTATUS create_esync( enum esync_type type, HANDLE *handle,
     {
         req->access  = access;
         req->initval = initval;
-        req->flags   = flags;
         req->type    = type;
         wine_server_add_data( req, objattr, len );
         ret = wine_server_call( req );
@@ -437,7 +430,7 @@ NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
      * before anyone else can open the object. */
     RtlEnterCriticalSection( &shm_init_section );
 
-    ret = create_esync( ESYNC_SEMAPHORE, handle, access, attr, initial, EFD_SEMAPHORE );
+    ret = create_esync( ESYNC_SEMAPHORE, handle, access, attr, initial );
     if (!ret)
     {
         /* Initialize the shared memory portion.
@@ -538,7 +531,7 @@ NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
 
     RtlEnterCriticalSection( &shm_init_section );
 
-    ret = create_esync( type, handle, access, attr, initial, 0 );
+    ret = create_esync( type, handle, access, attr, initial );
 
     if (!ret)
     {
@@ -735,7 +728,7 @@ NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
 
     RtlEnterCriticalSection( &shm_init_section );
 
-    ret = create_esync( ESYNC_MUTEX, handle, access, attr, initial ? 0 : 1, 0 );
+    ret = create_esync( ESYNC_MUTEX, handle, access, attr, initial ? 0 : 1 );
     if (!ret)
     {
         /* Initialize the shared memory portion. */
