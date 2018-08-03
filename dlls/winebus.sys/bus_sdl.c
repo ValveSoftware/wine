@@ -818,25 +818,17 @@ static void try_add_device(SDL_JoystickID index)
         controller = pSDL_GameControllerOpen(index);
 
     id = pSDL_JoystickInstanceID(joystick);
-    if (controller)
-    {
-        vid = VID_MICROSOFT;
-        pid = PID_XBOX_CONTROLLERS[3];
-        version = 0x01;
+
+    if (pSDL_JoystickGetProductVersion != NULL) {
+        vid = pSDL_JoystickGetVendor(joystick);
+        pid = pSDL_JoystickGetProduct(joystick);
+        version = pSDL_JoystickGetProductVersion(joystick);
     }
     else
     {
-        if (pSDL_JoystickGetProductVersion != NULL) {
-            vid = pSDL_JoystickGetVendor(joystick);
-            pid = pSDL_JoystickGetProduct(joystick);
-            version = pSDL_JoystickGetProductVersion(joystick);
-        }
-        else
-        {
-            vid = 0x01;
-            pid = pSDL_JoystickInstanceID(joystick) + 1;
-            version = 0;
-        }
+        vid = 0x01;
+        pid = pSDL_JoystickInstanceID(joystick) + 1;
+        version = 0;
     }
 
     guid = pSDL_JoystickGetGUID(joystick);
