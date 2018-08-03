@@ -182,6 +182,7 @@ static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD ver
     lpddi->guidInstance = DInput_Wine_SDL_Joystick_GUID;
     lpddi->guidInstance.Data3 = id;
     lpddi->guidProduct = DInput_Wine_SDL_Joystick_GUID;
+    lpddi->guidProduct.Data1 = MAKELONG(sdldevs[id].vendor_id, sdldevs[id].product_id);
     lpddi->guidFFDriver = GUID_NULL;
 
     if (version >= 0x0800)
@@ -359,6 +360,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->generic.guidInstance = DInput_Wine_SDL_Joystick_GUID;
     newDevice->generic.guidInstance.Data3 = index;
     newDevice->generic.guidProduct = DInput_Wine_SDL_Joystick_GUID;
+    newDevice->generic.guidProduct.Data1 = MAKELONG(sdldevs[index].vendor_id, sdldevs[index].product_id);
     newDevice->generic.joy_polldev = poll_sdl_device_state;
 
     newDevice->generic.base.IDirectInputDevice8A_iface.lpVtbl = &JoystickAvt;
