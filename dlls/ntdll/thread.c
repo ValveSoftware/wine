@@ -261,8 +261,7 @@ void thread_init(void)
 
     fill_cpu_info();
 
-    if (do_esync())
-        esync_init();
+    esync_init();
 
     NtCreateKeyedEvent( &keyed_event, GENERIC_READ | GENERIC_WRITE, NULL, 0 );
 }
