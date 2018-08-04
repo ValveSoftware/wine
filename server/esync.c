@@ -393,6 +393,18 @@ DECL_HANDLER(create_esync)
     const struct security_descriptor *sd;
     const struct object_attributes *objattr = get_req_object_attributes( &sd, &name, &root );
 
+    if (!do_esync())
+    {
+        set_error( STATUS_NOT_IMPLEMENTED );
+        return;
+    }
+
+    if (!req->type)
+    {
+        set_error( STATUS_INVALID_PARAMETER_4 );
+        return;
+    }
+
     if (!objattr) return;
 
     if ((esync = create_esync( root, &name, objattr->attributes, req->initval, req->flags, req->type, sd )))
