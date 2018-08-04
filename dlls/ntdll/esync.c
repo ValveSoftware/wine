@@ -114,9 +114,28 @@ static void **shm_addrs;
 static int shm_addrs_size;  /* length of the allocated shm_addrs array */
 static long pagesize;
 
+static NTSTATUS create_esync( enum esync_type type, HANDLE *handle,
+    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int initval, int flags );
+
 void esync_init(void)
 {
     struct stat st;
+
+    if (!do_esync())
+    {
+        /* make sure the server isn't running with WINEESYNC */
+        HANDLE handle;
+        NTSTATUS ret;
+
+        ret = create_esync( 0, &handle, 0, NULL, 0, 0 );
+        if (ret != STATUS_NOT_IMPLEMENTED)
+        {
+            ERR("Server is running with WINEESYNC but this process is not, please enable WINEESYNC or restart wineserver.\n");
+            exit(1);
+        }
+
+        return;
+    }
 
     if (stat( wine_get_config_dir(), &st ) == -1)
         ERR("Cannot stat %s\n", wine_get_config_dir());
@@ -127,7 +146,14 @@ void esync_init(void)
         sprintf( shm_name, "/wine-%lx-esync", (unsigned long)st.st_ino );
 
     if ((shm_fd = shm_open( shm_name, O_RDWR, 0644 )) == -1)
-        ERR("Failed to initialize shared memory: %s\n", strerror( errno ));
+    {
+        /* probably the server isn't running with WINEESYNC, tell the user and bail */
+        if (errno == ENOENT)
+            ERR("Failed to open esync shared memory file; make sure no stale wineserver instances are running without WINEESYNC.\n");
+        else
+            ERR("Failed to initialize shared memory: %s\n", strerror( errno ));
+        exit(1);
+    }
 
     pagesize = sysconf( _SC_PAGESIZE );
 
