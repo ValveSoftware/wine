@@ -700,52 +700,69 @@ static void pulse_started_callback(pa_stream *s, void *userdata)
     TRACE("%p: (Re)started playing\n", userdata);
 }
 
-static void pulse_rd_loop(ACImpl *This, size_t bytes)
+static void pulse_read(ACImpl *This)
 {
-    while (bytes >= This->period_bytes) {
-        ACPacket *p, *next;
-        LARGE_INTEGER stamp, freq;
-        BYTE *dst, *src;
-        size_t src_len, copy, rem = This->period_bytes;
-        if (!(p = (ACPacket*)list_head(&This->packet_free_head))) {
-            p = (ACPacket*)list_head(&This->packet_filled_head);
-            if (!p->discont) {
-                next = (ACPacket*)p->entry.next;
-                next->discont = 1;
-            } else
-                p = (ACPacket*)list_tail(&This->packet_filled_head);
-        } else {
-            This->held_bytes += This->period_bytes;
-        }
-        QueryPerformanceCounter(&stamp);
-        QueryPerformanceFrequency(&freq);
-        p->qpcpos = (stamp.QuadPart * (INT64)10000000) / freq.QuadPart;
-        p->discont = 0;
-        list_remove(&p->entry);
-        list_add_tail(&This->packet_filled_head, &p->entry);
+    size_t bytes = pa_stream_readable_size(This->stream);
 
-        dst = p->data;
+    TRACE("Readable total: %zu, fragsize: %u\n", bytes, pa_stream_get_buffer_attr(This->stream)->fragsize);
+
+    bytes += This->peek_len - This->peek_ofs;
+
+    while (bytes >= This->period_bytes) {
+        BYTE *dst = NULL, *src;
+        size_t src_len, copy, rem = This->period_bytes;
+
+        if (This->started) {
+            LARGE_INTEGER stamp, freq;
+            ACPacket *p, *next;
+
+            if (!(p = (ACPacket*)list_head(&This->packet_free_head))) {
+                p = (ACPacket*)list_head(&This->packet_filled_head);
+                if (!p->discont) {
+                    next = (ACPacket*)p->entry.next;
+                    next->discont = 1;
+                } else
+                    p = (ACPacket*)list_tail(&This->packet_filled_head);
+            } else {
+                This->held_bytes += This->period_bytes;
+            }
+            QueryPerformanceCounter(&stamp);
+            QueryPerformanceFrequency(&freq);
+            p->qpcpos = (stamp.QuadPart * (INT64)10000000) / freq.QuadPart;
+            p->discont = 0;
+            list_remove(&p->entry);
+            list_add_tail(&This->packet_filled_head, &p->entry);
+
+            dst = p->data;
+        }
+
         while (rem) {
             if (This->peek_len) {
                 copy = min(rem, This->peek_len - This->peek_ofs);
 
-                memcpy(dst, This->peek_buffer + This->peek_ofs, copy);
+                if (dst) {
+                    memcpy(dst, This->peek_buffer + This->peek_ofs, copy);
+                    dst += copy;
+                }
 
                 rem -= copy;
-                dst += copy;
                 This->peek_ofs += copy;
                 if(This->peek_len == This->peek_ofs)
-                    This->peek_len = 0;
+                    This->peek_len = This->peek_ofs = 0;
+
             } else if (pa_stream_peek(This->stream, (const void**)&src, &src_len) == 0 && src_len) {
 
                 copy = min(rem, src_len);
 
-                if(src)
-                    memcpy(dst, src, copy);
-                else
-                    silence_buffer(This->ss.format, dst, copy);
+                if (dst) {
+                    if(src)
+                        memcpy(dst, src, copy);
+                    else
+                        silence_buffer(This->ss.format, dst, copy);
 
-                dst += copy;
+                    dst += copy;
+                }
+
                 rem -= copy;
 
                 if (copy < src_len) {
@@ -770,46 +787,6 @@ static void pulse_rd_loop(ACImpl *This, size_t bytes)
 
         bytes -= This->period_bytes;
     }
-}
-
-static void pulse_rd_drop(ACImpl *This, size_t bytes)
-{
-    while (bytes >= This->period_bytes) {
-        size_t src_len, copy, rem = This->period_bytes;
-        while (rem) {
-            const void *src;
-            pa_stream_peek(This->stream, &src, &src_len);
-            src_len -= This->peek_ofs;
-
-            copy = rem;
-            if (copy > src_len)
-                copy = src_len;
-
-            src_len -= copy;
-            rem -= copy;
-
-            if (!src_len) {
-                This->peek_ofs = 0;
-                pa_stream_drop(This->stream);
-            } else
-                This->peek_ofs += copy;
-            bytes -= copy;
-        }
-    }
-}
-
-static void pulse_read(ACImpl *This)
-{
-    size_t bytes = pa_stream_readable_size(This->stream);
-    TRACE("Readable total: %zu, fragsize: %u\n", bytes, pa_stream_get_buffer_attr(This->stream)->fragsize);
-    bytes -= This->peek_ofs;
-    if (bytes < This->period_bytes)
-        return;
-
-    if (This->started)
-        pulse_rd_loop(This, bytes);
-    else
-        pulse_rd_drop(This, bytes);
 }
 
 static DWORD WINAPI pulse_timer_cb(void *user)
