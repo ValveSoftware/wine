@@ -220,7 +220,7 @@ static struct esync *add_to_list( HANDLE handle, enum esync_type type, int fd, v
         if (!entry) esync_list[0] = esync_list_initial_block;
         else
         {
-            void *ptr = wine_anon_mmap( NULL, ESYNC_LIST_BLOCK_SIZE * sizeof(struct esync *),
+            void *ptr = wine_anon_mmap( NULL, ESYNC_LIST_BLOCK_SIZE * sizeof(struct esync),
                                         PROT_READ | PROT_WRITE, 0 );
             if (ptr == MAP_FAILED) return FALSE;
             esync_list[entry] = ptr;
