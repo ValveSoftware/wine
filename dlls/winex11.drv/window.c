@@ -2387,7 +2387,8 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
         POINT p = fs_hack_real_mode();
         TRACE("Enabling fs hack, resizing the window to (%u,%u)-(%u,%u)\n", tl.x, tl.y, p.x, p.y);
         data->fs_hack = TRUE;
-        XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, p.x, p.y);
+        if(data->whole_window)
+            XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, p.x, p.y);
         if(data->client_window)
             XMoveResizeWindow(data->display, data->client_window, 0, 0, p.x, p.y);
     }else if(data->fs_hack &&
@@ -2396,10 +2397,11 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
                 window_rect->bottom - window_rect->top)){
         TRACE("Disabling fs hack\n");
         data->fs_hack = FALSE;
-        XMoveResizeWindow(data->display, data->whole_window,
-                window_rect->left, window_rect->top,
-                window_rect->right - window_rect->left,
-                window_rect->bottom - window_rect->top);
+        if(data->whole_window)
+            XMoveResizeWindow(data->display, data->whole_window,
+                    window_rect->left, window_rect->top,
+                    window_rect->right - window_rect->left,
+                    window_rect->bottom - window_rect->top);
         if(data->client_window){
             XMoveResizeWindow(data->display, data->client_window,
                     data->client_rect.left, data->client_rect.top,
