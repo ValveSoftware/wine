@@ -2392,9 +2392,15 @@ static void wglFinish(void)
         sync_context(ctx);
 
         if (gl->fs_hack) {
+            ctx->fs_hack = gl->fs_hack;
+            if(!gl->fs_hack_context_set_up)
+                fs_hack_setup_context( ctx, gl );
             if(!gl->fs_hack_did_swapbuf)
                 fs_hack_blit_framebuffer( gl, GL_FRONT );
             gl->fs_hack_did_swapbuf = FALSE;
+        }else if(gl->fs_hack_context_set_up){
+            ctx->fs_hack = FALSE;
+            fs_hack_setup_context(ctx, gl);
         }
 
         release_gl_drawable( gl );
@@ -2427,9 +2433,15 @@ static void wglFlush(void)
         sync_context(ctx);
 
         if (gl->fs_hack) {
+            ctx->fs_hack = gl->fs_hack;
+            if(!gl->fs_hack_context_set_up)
+                fs_hack_setup_context( ctx, gl );
             if(!gl->fs_hack_did_swapbuf)
                 fs_hack_blit_framebuffer( gl, GL_FRONT );
             gl->fs_hack_did_swapbuf = FALSE;
+        }else if(gl->fs_hack_context_set_up){
+            ctx->fs_hack = FALSE;
+            fs_hack_setup_context(ctx, gl);
         }
 
         release_gl_drawable( gl );
@@ -3757,8 +3769,14 @@ static BOOL glxdrv_wglSwapBuffers( HDC hdc )
             break;
         }
         if (gl->fs_hack){
+            ctx->fs_hack = gl->fs_hack;
+            if(!gl->fs_hack_context_set_up)
+                fs_hack_setup_context( ctx, gl );
             fs_hack_blit_framebuffer( gl, GL_BACK );
             gl->fs_hack_did_swapbuf = TRUE;
+        }else if(gl->fs_hack_context_set_up){
+            ctx->fs_hack = FALSE;
+            fs_hack_setup_context(ctx, gl);
         }
         pglXSwapBuffers(gdi_display, gl->drawable);
         break;
