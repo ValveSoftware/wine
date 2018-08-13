@@ -214,6 +214,7 @@ struct wgl_context
     GLuint fs_hack_fbo, fs_hack_resolve_fbo;
     GLuint fs_hack_color_texture, fs_hack_ds_texture;
     GLuint fs_hack_color_renderbuffer, fs_hack_color_resolve_renderbuffer, fs_hack_ds_renderbuffer;
+    POINT setup_for;
     GLuint current_draw_fbo, current_read_fbo;
     struct list entry;
 };
@@ -2084,6 +2085,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         wglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
         wglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
 
+        ctx->setup_for = p;
         gl->has_scissor_indexed = has_extension(glExtensions, "GL_ARB_viewport_array");
         gl->fs_hack_context_set_up = TRUE;
     }
@@ -2314,6 +2316,10 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     float prev_clear_color[4];
 
     fs_hack_user_to_real(&scaled_origin);
+
+    if(ctx->setup_for.x != src.x ||
+            ctx->setup_for.y != src.y)
+        fs_hack_setup_context( ctx, gl );
 
     TRACE( "Blitting from FBO %u %ux%u to %ux%u\n", ctx->fs_hack_fbo, src.x, src.y, scaled.x, scaled.y );
 
