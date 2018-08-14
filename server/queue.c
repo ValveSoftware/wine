@@ -142,6 +142,7 @@ struct msg_queue
     struct hook_table     *hooks;           /* hook table */
     timeout_t              last_get_msg;    /* time of last get message call */
     int                    esync_fd;        /* esync file descriptor (signalled on message) */
+    int                    esync_in_msgwait; /* our thread is currently waiting on us */
 };
 
 struct hotkey
@@ -910,7 +911,21 @@ static void cleanup_results( struct msg_queue *queue )
 /* check if the thread owning the queue is hung (not checking for messages) */
 static int is_queue_hung( struct msg_queue *queue )
 {
-    return (current_time - queue->last_get_msg > 5 * TICKS_PER_SEC);
+    struct wait_queue_entry *entry;
+
+    if (current_time - queue->last_get_msg <= 5 * TICKS_PER_SEC)
+        return 0;  /* less than 5 seconds since last get message -> not hung */
+
+    LIST_FOR_EACH_ENTRY( entry, &queue->obj.wait_queue, struct wait_queue_entry, entry )
+    {
+        if (get_wait_queue_thread(entry)->queue == queue)
+            return 0;  /* thread is waiting on queue -> not hung */
+    }
+
+    if (do_esync() && queue->esync_in_msgwait)
+        return 0;   /* thread is waiting on queue in absentia -> not hung */
+
+    return 1;
 }
 
 static int msg_queue_add_queue( struct object *obj, struct wait_queue_entry *entry )
@@ -925,12 +940,6 @@ static int msg_queue_add_queue( struct object *obj, struct wait_queue_entry *ent
         return 0;
     }
     if (process->idle_event && !(queue->wake_mask & QS_SMRESULT)) set_event( process->idle_event );
-
-    /* On Windows, we are considered hung iff we have not somehow processed
-     * messages OR done a MsgWait call in the last 5 seconds. Note that in the
-     * latter case repeatedly waiting for 0 seconds is not hung, but waiting
-     * forever is hung, so this is correct. */
-    queue->last_get_msg = current_time;
 
     if (queue->fd && list_empty( &obj->wait_queue ))  /* first on the queue */
         set_fd_events( queue->fd, POLLIN );
@@ -1577,6 +1586,7 @@ static int send_hook_ll_message( struct desktop *desktop, struct message *hardwa
 
     if (!(hook_thread = get_first_global_hook( id ))) return 0;
     if (!(queue = hook_thread->queue)) return 0;
+    if (is_queue_hung( queue )) return 0;
 
     if (!(msg = mem_alloc( sizeof(*msg) ))) return 0;
 
@@ -3140,4 +3150,15 @@ DECL_HANDLER(update_rawinput_devices)
     current->process->rawinput_mouse = e ? &e->device : NULL;
     e = find_rawinput_device( 1, 6 );
     current->process->rawinput_kbd   = e ? &e->device : NULL;
+}
+
+DECL_HANDLER(esync_msgwait)
+{
+    struct msg_queue *queue = get_current_queue();
+
+    if (!queue) return;
+    queue->esync_in_msgwait = req->in_msgwait;
+
+    if (current->process->idle_event && !(queue->wake_mask & QS_SMRESULT))
+        set_event( current->process->idle_event );
 }
