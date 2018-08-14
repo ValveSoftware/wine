@@ -812,8 +812,8 @@ static void update_grabbed_object( struct esync *obj )
 
 /* A value of STATUS_NOT_IMPLEMENTED returned from this function means that we
  * need to delegate to server_select(). */
-NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
-                             BOOLEAN alertable, const LARGE_INTEGER *timeout )
+static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles,
+    BOOLEAN wait_any, BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
     static const LARGE_INTEGER zero = {0};
 
@@ -876,22 +876,11 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 
     if (objs[count - 1] && objs[count - 1]->type == ESYNC_QUEUE)
     {
-        select_op_t select_op;
-
         /* Last object in the list is a queue, which means someone is using
          * MsgWaitForMultipleObjects(). We have to wait not only for the server
          * fd (signaled on send_message, etc.) but also the USER driver's fd
          * (signaled on e.g. X11 events.) */
         msgwait = TRUE;
-
-        /* We need to let the server know we are doing a message wait, for two
-         * reasons. First one is WaitForInputIdle(). Second one is checking for
-         * hung queues. Do it like this. */
-        select_op.wait.op = SELECT_WAIT;
-        select_op.wait.handles[0] = wine_server_obj_handle( handles[count - 1] );
-        ret = server_select( &select_op, offsetof( select_op_t, wait.handles[1] ), 0, &zero );
-        if (ret != STATUS_WAIT_0 && ret != STATUS_TIMEOUT)
-            ERR("Unexpected ret %#x\n", ret);
     }
 
     if (has_esync && has_server)
@@ -1260,6 +1249,44 @@ userapc:
      * before we got SIGUSR1. poll() doesn't return EINTR in that case. The
      * right thing to do seems to be to return STATUS_USER_APC anyway. */
     if (ret == STATUS_TIMEOUT) ret = STATUS_USER_APC;
+    return ret;
+}
+
+/* We need to let the server know when we are doing a message wait, and when we
+ * are done with one, so that all of the code surrounding hung queues works.
+ * We also need this for WaitForInputIdle(). */
+static void server_set_msgwait( int in_msgwait )
+{
+    SERVER_START_REQ( esync_msgwait )
+    {
+        req->in_msgwait = in_msgwait;
+        wine_server_call( req );
+    }
+    SERVER_END_REQ;
+}
+
+/* This is a very thin wrapper around the proper implementation above. The
+ * purpose is to make sure the server knows when we are doing a message wait.
+ * This is separated into a wrapper function since there are at least a dozen
+ * exit paths from esync_wait_objects(). */
+NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
+                             BOOLEAN alertable, const LARGE_INTEGER *timeout )
+{
+    BOOL msgwait = FALSE;
+    struct esync *obj;
+    NTSTATUS ret;
+
+    if (!get_object( handles[count - 1], &obj ) && obj->type == ESYNC_QUEUE)
+    {
+        msgwait = TRUE;
+        server_set_msgwait( 1 );
+    }
+
+    ret = __esync_wait_objects( count, handles, wait_any, alertable, timeout );
+
+    if (msgwait)
+        server_set_msgwait( 0 );
+
     return ret;
 }
 

@@ -3983,7 +3983,11 @@ struct handle_info
 
 /* Retrieve the fd to wait on for user APCs. */
 @REQ(get_esync_apc_fd)
-@REPLY
+@END
+
+/* Notify the server that we are doing a message wait (or done with one). */
+@REQ(esync_msgwait)
+    int          in_msgwait;    /* are we in a message wait? */
 @END
 
 enum esync_type
