@@ -5860,6 +5860,17 @@ struct get_esync_apc_fd_reply
     struct reply_header __header;
 };
 
+
+struct esync_msgwait_request
+{
+    struct request_header __header;
+    int          in_msgwait;
+};
+struct esync_msgwait_reply
+{
+    struct reply_header __header;
+};
+
 enum esync_type
 {
     ESYNC_SEMAPHORE = 1,
@@ -6175,6 +6186,7 @@ enum request
     REQ_open_esync,
     REQ_get_esync_fd,
     REQ_get_esync_apc_fd,
+    REQ_esync_msgwait,
     REQ_NB_REQUESTS
 };
 
@@ -6483,6 +6495,7 @@ union generic_request
     struct open_esync_request open_esync_request;
     struct get_esync_fd_request get_esync_fd_request;
     struct get_esync_apc_fd_request get_esync_apc_fd_request;
+    struct esync_msgwait_request esync_msgwait_request;
 };
 union generic_reply
 {
@@ -6789,8 +6802,9 @@ union generic_reply
     struct open_esync_reply open_esync_reply;
     struct get_esync_fd_reply get_esync_fd_reply;
     struct get_esync_apc_fd_reply get_esync_apc_fd_reply;
+    struct esync_msgwait_reply esync_msgwait_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 608
+#define SERVER_PROTOCOL_VERSION 609
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
