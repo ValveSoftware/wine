@@ -622,6 +622,8 @@ extern void fs_hack_user_to_real(POINT *pos) DECLSPEC_HIDDEN;
 extern void fs_hack_real_to_user(POINT *pos) DECLSPEC_HIDDEN;
 extern void fs_hack_scale_user_to_real(POINT *pos) DECLSPEC_HIDDEN;
 extern void fs_hack_scale_real_to_user(POINT *pos) DECLSPEC_HIDDEN;
+extern void fs_hack_rect_user_to_real(RECT *data) DECLSPEC_HIDDEN;
+extern void fs_hack_rgndata_user_to_real(RGNDATA *data) DECLSPEC_HIDDEN;
 extern POINT fs_hack_get_scaled_screen_size(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_window_is_hacked(HWND hwnd, struct x11drv_win_data *data) DECLSPEC_HIDDEN;
 extern void fs_hack_xrender_copy(Drawable src, Drawable dst) DECLSPEC_HIDDEN;

@@ -261,6 +261,35 @@ void fs_hack_real_to_user(POINT *pos)
     }
 }
 
+void fs_hack_rect_user_to_real(RECT *rect)
+{
+    fs_hack_user_to_real((POINT *)&rect->left);
+    fs_hack_user_to_real((POINT *)&rect->right);
+}
+
+/* this is for clipping */
+void fs_hack_rgndata_user_to_real(RGNDATA *data)
+{
+    unsigned int i;
+    XRectangle *xrect;
+
+    if (data && fs_hack_enabled())
+    {
+        xrect = (XRectangle *)data->Buffer;
+        for (i = 0; i < data->rdh.nCount; i++)
+        {
+            POINT p;
+            p.x = xrect[i].x;
+            p.y = xrect[i].y;
+            fs_hack_user_to_real(&p);
+            xrect[i].x = p.x;
+            xrect[i].y = p.y;
+            xrect[i].width  *= fs_hack_user_to_real_w;
+            xrect[i].height *= fs_hack_user_to_real_h;
+        }
+    }
+}
+
 static LONG X11DRV_nores_SetCurrentMode(int mode)
 {
     if (mode >= dd_mode_count)
