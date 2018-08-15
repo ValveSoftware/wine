@@ -585,7 +585,7 @@ NTSTATUS esync_set_event( HANDLE handle )
 
 NTSTATUS esync_reset_event( HANDLE handle )
 {
-    static uint64_t value;
+    uint64_t value;
     struct esync *obj;
     struct event *event;
     NTSTATUS ret;
@@ -614,7 +614,7 @@ NTSTATUS esync_reset_event( HANDLE handle )
 
 NTSTATUS esync_pulse_event( HANDLE handle )
 {
-    static uint64_t value = 1;
+    uint64_t value = 1;
     struct esync *obj;
     NTSTATUS ret;
 
