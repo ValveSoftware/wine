@@ -1462,6 +1462,46 @@ static void multiply_alpha( Picture pict, XRenderPictFormat *format, int alpha,
     XFreePixmap( gdi_display, mask_pixmap );
 }
 
+/* if we are letterboxing, draw black bars */
+static void fs_hack_draw_black_bars( Picture dst_pict )
+{
+    static const XRenderColor black = { 0, 0, 0, 0xffff };
+    POINT tl, br;   /* top-left / bottom-right */
+    POINT real_mode = fs_hack_real_mode();
+    POINT size = fs_hack_get_scaled_screen_size();
+    XRenderPictureAttributes pa;
+
+    /* first unclip the picture, so that we can actually draw them */
+    pa.clip_mask = None;
+    pXRenderChangePicture( gdi_display, dst_pict, CPClipMask, &pa );
+
+    tl.x = tl.y = 0;
+    fs_hack_user_to_real(&tl);
+    br.x = tl.x + size.x;
+    br.y = tl.y + size.y;
+
+    if (tl.x > 0)
+    {
+        /* black bars left & right */
+        pXRenderFillRectangle(gdi_display, PictOpSrc, dst_pict, &black,
+                0, 0, /* x, y */
+                tl.x, real_mode.y);    /* w, h */
+        pXRenderFillRectangle(gdi_display, PictOpSrc, dst_pict, &black,
+                br.x, 0,
+                real_mode.x - br.x, real_mode.y);
+    }
+    else if (tl.y > 0)
+    {
+        /* black bars top & bottom */
+        pXRenderFillRectangle(gdi_display, PictOpSrc, dst_pict, &black,
+                0, 0,
+                real_mode.x, tl.y);
+        pXRenderFillRectangle(gdi_display, PictOpSrc, dst_pict, &black,
+                0, br.y,
+                real_mode.x, real_mode.y - br.y);
+    }
+}
+
 /* Helper function for (stretched) blitting using xrender */
 static void xrender_blit( int op, Picture src_pict, Picture mask_pict, Picture dst_pict,
                           int x_src, int y_src, int width_src, int height_src,
@@ -1525,6 +1565,9 @@ static void xrender_blit( int op, Picture src_pict, Picture mask_pict, Picture d
     }
     pXRenderComposite( gdi_display, op, src_pict, mask_pict, dst_pict,
                        x_offset, y_offset, 0, 0, x_dst, y_dst, width_dst, height_dst );
+
+    if (fs_hack_enabled())
+        fs_hack_draw_black_bars( dst_pict );
 }
 
 /* Helper function for (stretched) mono->color blitting using xrender */
