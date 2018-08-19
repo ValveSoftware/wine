@@ -1,6 +1,5 @@
 This is eventfd-based synchronization, or 'esync' for short. Turn it on with
-WINEESYNC=1 (note that it checks the presence and not the value); debug it
-with +esync.
+WINEESYNC=1; debug it with +esync.
 
 == BUGS AND LIMITATIONS ==
 
