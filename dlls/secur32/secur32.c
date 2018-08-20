@@ -34,6 +34,7 @@
 #include "thunks.h"
 #include "lmcons.h"
 
+#include "wine/library.h"
 #include "wine/list.h"
 #include "wine/debug.h"
 #include "wine/unicode.h"
@@ -1201,9 +1202,21 @@ BOOLEAN WINAPI GetUserNameExW(
             return FALSE;
         }
 
+    case NameDisplay:
+        {
+            static const WCHAR wineusernameW[] = {'W','I','N','E','U','S','E','R','N','A','M','E',0};
+
+            DWORD needed = GetEnvironmentVariableW(wineusernameW, NULL, 0);
+            if (*nSize < needed) {
+                SetLastError(ERROR_MORE_DATA);
+                return FALSE;
+            }
+            *nSize = GetEnvironmentVariableW(wineusernameW, lpNameBuffer, *nSize);
+            return TRUE;
+        }
+
     case NameUnknown:
     case NameFullyQualifiedDN:
-    case NameDisplay:
     case NameUniqueId:
     case NameCanonical:
     case NameUserPrincipal:
