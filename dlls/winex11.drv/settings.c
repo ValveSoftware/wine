@@ -22,6 +22,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <assert.h>
+#include <math.h>
 
 #define NONAMELESSUNION
 #define NONAMELESSSTRUCT
@@ -194,8 +195,8 @@ void fs_hack_scale_user_to_real(POINT *pos)
 {
     if(fs_hack_enabled()){
         TRACE("from %d,%d\n", pos->x, pos->y);
-        pos->x *= fs_hack_user_to_real_w;
-        pos->y *= fs_hack_user_to_real_h;
+        pos->x = lround(pos->x * fs_hack_user_to_real_w);
+        pos->y = lround(pos->y * fs_hack_user_to_real_h);
         TRACE("to %d,%d\n", pos->x, pos->y);
     }
 }
@@ -204,8 +205,8 @@ void fs_hack_scale_real_to_user(POINT *pos)
 {
     if(fs_hack_enabled()){
         TRACE("from %d,%d\n", pos->x, pos->y);
-        pos->x *= fs_hack_real_to_user_w;
-        pos->y *= fs_hack_real_to_user_h;
+        pos->x = lround(pos->x * fs_hack_real_to_user_w);
+        pos->y = lround(pos->y * fs_hack_real_to_user_h);
         TRACE("to %d,%d\n", pos->x, pos->y);
     }
 }
