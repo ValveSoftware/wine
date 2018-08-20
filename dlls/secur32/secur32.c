@@ -34,6 +34,7 @@
 #include "thunks.h"
 #include "lmcons.h"
 
+#include "wine/library.h"
 #include "wine/list.h"
 #include "wine/debug.h"
 #include "wine/unicode.h"
@@ -1201,9 +1202,25 @@ BOOLEAN WINAPI GetUserNameExW(
             return FALSE;
         }
 
+    case NameDisplay:
+        {
+            const char *name = wine_get_user_name();
+            DWORD len = MultiByteToWideChar( CP_UNIXCP, 0, name, -1, NULL, 0 );
+
+            if (len > *nSize)
+            {
+                SetLastError( ERROR_MORE_DATA );
+                *nSize = len;
+                return FALSE;
+            }
+
+            *nSize = len - 1;
+            MultiByteToWideChar( CP_UNIXCP, 0, name, -1, lpNameBuffer, len );
+            return TRUE;
+        }
+
     case NameUnknown:
     case NameFullyQualifiedDN:
-    case NameDisplay:
     case NameUniqueId:
     case NameCanonical:
     case NameUserPrincipal:
