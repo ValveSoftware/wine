@@ -625,6 +625,7 @@ struct x11drv_win_data
     BOOL        skip_taskbar : 1; /* does window should be deleted from taskbar */
     BOOL        add_taskbar : 1; /* does window should be added to taskbar regardless of style */
     BOOL        pending_fullscreen : 1;
+    ULONGLONG   take_focus_back;
     int         wm_state;       /* current value of the WM_STATE property */
     DWORD       net_wm_state;   /* bit mask of active x11drv_net_wm_state values */
     Window      embedder;       /* window id of embedder */
