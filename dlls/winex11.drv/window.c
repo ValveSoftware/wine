@@ -928,6 +928,16 @@ static void set_mwm_hints( struct x11drv_win_data *data, UINT style, UINT ex_sty
         }
     }
 
+    if (wm_is_mutter(data->display) && NtUserGetGUIThreadInfo( GetCurrentThreadId(), &info ) &&
+        info.hwndFocus == data->hwnd && !!data->prev_hints.decorations != !!mwm_hints.decorations)
+    {
+        LARGE_INTEGER frequency, counter;
+        /* workaround for mutter gitlab bug #273 */
+        TRACE("workaround mutter bug, setting take_focus_back\n");
+        NtQueryPerformanceCounter( &counter, &frequency );
+        data->take_focus_back = 1000 * counter.QuadPart / frequency.QuadPart;
+    }
+
     data->prev_hints = mwm_hints;
 }
 
