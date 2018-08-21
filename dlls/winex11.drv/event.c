@@ -889,8 +889,29 @@ static void focus_out( Display *display , HWND hwnd )
     Window focus_win;
     int revert;
     XIC xic;
+    struct x11drv_win_data *data;
 
     if (ximInComposeMode) return;
+
+    data = get_win_data(hwnd);
+    if(data){
+        LARGE_INTEGER frequency, counter;
+        ULONGLONG now;
+        NtQueryPerformanceCounter( &counter, &frequency );
+        now = 1000 * counter.QuadPart / frequency.QuadPart;
+        if(data->take_focus_back > 0 &&
+                now >= data->take_focus_back &&
+                now - data->take_focus_back < 1000){
+            data->take_focus_back = 0;
+            TRACE("workaround mutter bug, taking focus back\n");
+            XSetInputFocus( data->display, data->whole_window, RevertToParent, CurrentTime);
+            release_win_data(data);
+            /* don't inform win32 client */
+            return;
+        }
+        data->take_focus_back = 0;
+        release_win_data(data);
+    }
 
     x11drv_thread_data()->last_focus = hwnd;
     if ((xic = X11DRV_get_ic( hwnd ))) XUnsetICFocus( xic );
