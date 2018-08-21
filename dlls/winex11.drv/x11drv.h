@@ -569,6 +569,7 @@ struct x11drv_win_data
     BOOL        layered : 1;    /* is window layered and with valid attributes? */
     BOOL        use_alpha : 1;  /* does window use an alpha channel? */
     BOOL        fs_hack : 1;
+    ULONGLONG   take_focus_back;
     int         wm_state;       /* current value of the WM_STATE property */
     DWORD       net_wm_state;   /* bit mask of active x11drv_net_wm_state values */
     Window      embedder;       /* window id of embedder */
