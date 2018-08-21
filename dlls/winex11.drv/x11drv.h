@@ -59,6 +59,8 @@ typedef int Status;
 #include "wine/gdi_driver.h"
 #include "wine/list.h"
 
+#include "mwm.h"
+
 #define MAX_DASHLEN 16
 
 #define WINE_XDND_VERSION 5
@@ -578,6 +580,7 @@ struct x11drv_win_data
     BOOL        use_alpha : 1;  /* does window use an alpha channel? */
     BOOL        fs_hack : 1;
     BOOL        pending_fullscreen : 1;
+    ULONGLONG   take_focus_back;
     int         wm_state;       /* current value of the WM_STATE property */
     DWORD       net_wm_state;   /* bit mask of active x11drv_net_wm_state values */
     Window      embedder;       /* window id of embedder */
@@ -587,6 +590,7 @@ struct x11drv_win_data
     Pixmap         icon_mask;
     unsigned long *icon_bits;
     unsigned int   icon_size;
+    MwmHints prev_hints;
 };
 
 extern struct x11drv_win_data *get_win_data( HWND hwnd ) DECLSPEC_HIDDEN;
