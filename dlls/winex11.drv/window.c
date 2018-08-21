@@ -736,6 +736,13 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
     XChangeProperty( data->display, data->whole_window, x11drv_atom(_MOTIF_WM_HINTS),
                      x11drv_atom(_MOTIF_WM_HINTS), 32, PropModeReplace,
                      (unsigned char*)&mwm_hints, sizeof(mwm_hints)/sizeof(long) );
+
+    if (GetFocus() == data->hwnd)
+    {
+        /* workaround for mutter gitlab bug #273 */
+        TRACE("workaround mutter bug, setting take_focus_back\n");
+        data->take_focus_back = GetTickCount64();
+    }
 }
 
 
