@@ -921,6 +921,14 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
         }
     }
 
+    if (wm_is_mutter(data->display) && GetFocus() == data->hwnd &&
+            !!data->prev_hints.decorations != !!mwm_hints.decorations)
+    {
+        /* workaround for mutter gitlab bug #273 */
+        TRACE("workaround mutter bug, setting take_focus_back\n");
+        data->take_focus_back = GetTickCount64();
+    }
+
     data->prev_hints = mwm_hints;
 }
 
