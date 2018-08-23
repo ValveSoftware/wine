@@ -3237,6 +3237,7 @@ HRESULT WINAPI DECLSPEC_HOTPATCH CoCreateInstance(
 {
     MULTI_QI multi_qi = { iid };
     HRESULT hres;
+    CoInitialize(NULL);
 
     TRACE("(rclsid=%s, pUnkOuter=%p, dwClsContext=%08x, riid=%s, ppv=%p)\n", debugstr_guid(rclsid),
           pUnkOuter, dwClsContext, debugstr_guid(iid), ppv);
