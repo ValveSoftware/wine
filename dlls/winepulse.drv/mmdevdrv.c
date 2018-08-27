@@ -948,6 +948,8 @@ static DWORD WINAPI pulse_timer_cb(void *user)
     DWORD delay;
     UINT32 adv_bytes;
     ACImpl *This = user;
+    int success;
+    pa_operation *o;
 
     pthread_mutex_lock(&pulse_lock);
     delay = This->mmdev_period_usec / 1000;
@@ -964,6 +966,13 @@ static DWORD WINAPI pulse_timer_cb(void *user)
 
         delay = This->mmdev_period_usec / 1000;
 
+        o = pa_stream_update_timing_info(This->stream, pulse_op_cb, &success);
+        if (o)
+        {
+            while (pa_operation_get_state(o) == PA_OPERATION_RUNNING)
+                pthread_cond_wait(&pulse_cond, &pulse_lock);
+            pa_operation_unref(o);
+        }
         err = pa_stream_get_time(This->stream, &now);
         if(err == 0){
             TRACE("got now: %llu, last time: %llu\n", now, This->last_time);
@@ -1052,10 +1061,10 @@ static HRESULT pulse_stream_connect(ACImpl *This, UINT32 period_bytes) {
     dump_attr(&attr);
     if (This->dataflow == eRender)
         ret = pa_stream_connect_playback(This->stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_INTERPOLATE_TIMING|PA_STREAM_ADJUST_LATENCY, NULL, NULL);
+        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY, NULL, NULL);
     else
         ret = pa_stream_connect_record(This->stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_AUTO_TIMING_UPDATE|PA_STREAM_INTERPOLATE_TIMING|PA_STREAM_ADJUST_LATENCY);
+        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY);
     if (ret < 0) {
         WARN("Returns %i\n", ret);
         return AUDCLNT_E_ENDPOINT_CREATE_FAILED;
