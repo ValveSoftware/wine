@@ -532,7 +532,7 @@ unsigned int get_tick_count(void)
     return mach_absolute_time() * timebase.numer / timebase.denom / 1000000;
 #elif defined(HAVE_CLOCK_GETTIME)
     struct timespec ts;
-#ifdef CLOCK_MONOTONIC_RAW
+#if 0
     if (!clock_gettime( CLOCK_MONOTONIC_RAW, &ts ))
         return ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 #endif
