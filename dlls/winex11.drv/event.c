@@ -798,14 +798,18 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
 
     data = get_win_data(hwnd);
     if(data){
-        if(data->take_focus_back){
-            data->take_focus_back = FALSE;
+        ULONGLONG now = GetTickCount64();
+        if(data->take_focus_back > 0 &&
+                now >= data->take_focus_back &&
+                now - data->take_focus_back < 100){
+            data->take_focus_back = 0;
             TRACE("workaround mutter bug, taking focus back\n");
             XSetInputFocus( data->display, data->whole_window, RevertToParent, CurrentTime);
             release_win_data(data);
             /* don't inform win32 client */
             return;
         }
+        data->take_focus_back = 0;
         release_win_data(data);
     }
 
@@ -1072,9 +1076,6 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
     }
 
     /* Get geometry */
-
-    /* fullscreening is done now, so stop avoiding focus loss */
-    data->take_focus_back = FALSE;
 
     parent = GetAncestor( hwnd, GA_PARENT );
     root_coords = event->send_event;  /* synthetic events are always in root coords */
