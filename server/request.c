@@ -533,7 +533,7 @@ timeout_t monotonic_counter(void)
     return mach_absolute_time() * timebase.numer / timebase.denom / 100;
 #elif defined(HAVE_CLOCK_GETTIME)
     struct timespec ts;
-#ifdef CLOCK_MONOTONIC_RAW
+#if 0
     if (!clock_gettime( CLOCK_MONOTONIC_RAW, &ts ))
         return (timeout_t)ts.tv_sec * TICKS_PER_SEC + ts.tv_nsec / 100;
 #endif
