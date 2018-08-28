@@ -1161,6 +1161,9 @@ NTSTATUS sdl_driver_init(void)
         pSDL_JoystickGetProduct = dlsym(sdl_handle, "SDL_JoystickGetProduct");
         pSDL_JoystickGetProductVersion = dlsym(sdl_handle, "SDL_JoystickGetProductVersion");
         pSDL_JoystickGetVendor = dlsym(sdl_handle, "SDL_JoystickGetVendor");
+        if(!pSDL_JoystickGetVendor){
+            ERR("SDL installation is old! Please upgrade to >=2.0.6 to get accurate joystick information.\n");
+        }
     }
 
     map_controllers = check_bus_option(&controller_mode, 1);
