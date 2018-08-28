@@ -39,6 +39,7 @@
 
 #include "wine/debug.h"
 #include "wine/unicode.h"
+#include "wine/library.h"
 #include "wine/list.h"
 #include "windef.h"
 #include "winbase.h"
@@ -112,6 +113,9 @@ static struct SDLDev *sdldevs = NULL;
 static void find_sdldevs(void)
 {
     int i;
+    Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick) = NULL;
+    Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick * joystick) = NULL;
+    void *sdl_handle = NULL;
 
     if (InterlockedCompareExchange(&have_sdldevs, 0, -1) != -1)
         /* Someone beat us to it */
@@ -119,6 +123,16 @@ static void find_sdldevs(void)
 
     SDL_Init(SDL_INIT_JOYSTICK|SDL_INIT_HAPTIC);
     SDL_JoystickEventState(SDL_ENABLE);
+
+    sdl_handle = wine_dlopen(SONAME_LIBSDL2, RTLD_NOW, NULL, 0);
+    if (sdl_handle) {
+        pSDL_JoystickGetProduct = wine_dlsym(sdl_handle, "SDL_JoystickGetProduct", NULL, 0);
+        pSDL_JoystickGetVendor = wine_dlsym(sdl_handle, "SDL_JoystickGetVendor", NULL, 0);
+    }
+
+    if(!pSDL_JoystickGetVendor){
+        ERR("SDL installation is old! Please upgrade to >=2.0.6 to get accurate joystick information.\n");
+    }
 
     for (i = 0; i < SDL_NumJoysticks(); i++)
     {
@@ -152,8 +166,13 @@ static void find_sdldevs(void)
             }
         }
 
-        sdldev.vendor_id = SDL_JoystickGetVendor(device);
-        sdldev.product_id = SDL_JoystickGetProduct(device);
+        if(pSDL_JoystickGetVendor){
+            sdldev.vendor_id = pSDL_JoystickGetVendor(device);
+            sdldev.product_id = pSDL_JoystickGetProduct(device);
+        }else{
+            sdldev.vendor_id = 0x01;
+            sdldev.product_id = SDL_JoystickInstanceID(device) + 1;
+        }
 
         if (!have_sdldevs)
             new_sdldevs = HeapAlloc(GetProcessHeap(), 0, sizeof(struct SDLDev));
