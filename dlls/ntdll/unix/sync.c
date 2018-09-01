@@ -452,6 +452,9 @@ NTSTATUS WINAPI NtSetEvent( HANDLE handle, LONG *prev_state )
     /* This comment is a dummy to make sure this patch applies in the right place. */
     NTSTATUS ret;
 
+    if (do_fsync())
+        return fsync_set_event( handle, prev_state );
+
     if (do_esync())
         return esync_set_event( handle );
 
