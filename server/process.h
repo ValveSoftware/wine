@@ -91,6 +91,7 @@ struct process
     struct list          kernel_object;   /* list of kernel object pointers */
     pe_image_info_t      image_info;      /* main exe image info */
     int                  esync_fd;        /* esync file descriptor (signaled on exit) */
+    unsigned int         fsync_idx;
 };
 
 /* process functions */
