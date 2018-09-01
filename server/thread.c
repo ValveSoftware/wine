@@ -184,6 +184,7 @@ struct type_descr thread_type =
 static void dump_thread( struct object *obj, int verbose );
 static int thread_signaled( struct object *obj, struct wait_queue_entry *entry );
 static int thread_get_esync_fd( struct object *obj, enum esync_type *type );
+static unsigned int thread_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static unsigned int thread_map_access( struct object *obj, unsigned int access );
 static void thread_poll_event( struct fd *fd, int event );
 static struct list *thread_get_kernel_obj_list( struct object *obj );
@@ -198,7 +199,7 @@ static const struct object_ops thread_ops =
     remove_queue,               /* remove_queue */
     thread_signaled,            /* signaled */
     thread_get_esync_fd,        /* get_esync_fd */
-    NULL,                       /* get_fsync_idx */
+    thread_get_fsync_idx,       /* get_fsync_idx */
     no_satisfied,               /* satisfied */
     no_signal,                  /* signal */
     no_get_fd,                  /* get_fd */
@@ -240,6 +241,7 @@ static inline void init_thread_structure( struct thread *thread )
     thread->entry_point     = 0;
     thread->esync_fd        = -1;
     thread->esync_apc_fd    = -1;
+    thread->fsync_idx       = 0;
     thread->system_regs     = 0;
     thread->queue           = NULL;
     thread->wait            = NULL;
@@ -387,6 +389,9 @@ struct thread *create_thread( int fd, struct process *process, const struct secu
         }
     }
 
+    if (do_fsync())
+        thread->fsync_idx = fsync_alloc_shm( 0, 0 );
+
     if (do_esync())
     {
         thread->esync_fd = esync_create_fd( 0, 0 );
@@ -497,6 +502,13 @@ static int thread_get_esync_fd( struct object *obj, enum esync_type *type )
     struct thread *thread = (struct thread *)obj;
     *type = ESYNC_MANUAL_SERVER;
     return thread->esync_fd;
+}
+
+static unsigned int thread_get_fsync_idx( struct object *obj, enum fsync_type *type )
+{
+    struct thread *thread = (struct thread *)obj;
+    *type = FSYNC_MANUAL_SERVER;
+    return thread->fsync_idx;
 }
 
 static unsigned int thread_map_access( struct object *obj, unsigned int access )
