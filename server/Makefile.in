@@ -15,6 +15,7 @@ C_SRCS = \
 	event.c \
 	fd.c \
 	file.c \
+	fsync.c \
 	handle.c \
 	hook.c \
 	mach.c \
