@@ -20,3 +20,4 @@
 
 extern int do_fsync(void);
 extern void fsync_init(void);
+extern unsigned int fsync_alloc_shm( int low, int high );
