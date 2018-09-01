@@ -373,6 +373,24 @@ NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
+{
+    struct event *event;
+    struct fsync *obj;
+    LONG current;
+
+    TRACE("%p.\n", handle);
+
+    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    event = obj->shm;
+
+    current = __atomic_exchange_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
+
+    if (prev) *prev = current;
+
+    return STATUS_SUCCESS;
+}
+
 static LONGLONG update_timeout( ULONGLONG end )
 {
     LARGE_INTEGER now;
