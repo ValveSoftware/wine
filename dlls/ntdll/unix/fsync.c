@@ -488,6 +488,34 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
                         futexes[i].val = current;
                         break;
                     }
+                    case FSYNC_AUTO_EVENT:
+                    {
+                        struct event *event = obj->shm;
+
+                        if (__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            return i;
+                        }
+
+                        futexes[i].addr = &event->signaled;
+                        futexes[i].val = 0;
+                        break;
+                    }
+                    case FSYNC_MANUAL_EVENT:
+                    {
+                        struct event *event = obj->shm;
+
+                        if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            return i;
+                        }
+
+                        futexes[i].addr = &event->signaled;
+                        futexes[i].val = 0;
+                        break;
+                    }
                     default:
                         assert(0);
                     }
