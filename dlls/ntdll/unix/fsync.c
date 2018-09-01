@@ -96,13 +96,6 @@ int do_fsync(void)
 #endif
 }
 
-enum fsync_type
-{
-    FSYNC_SEMAPHORE = 1,
-    FSYNC_AUTO_EVENT,
-    FSYNC_MANUAL_EVENT,
-};
-
 struct fsync
 {
     enum fsync_type type;
