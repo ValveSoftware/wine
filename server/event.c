@@ -176,6 +176,10 @@ struct event *create_event( struct object *root, const struct unicode_str *name,
 struct event *get_event_obj( struct process *process, obj_handle_t handle, unsigned int access )
 {
     struct object *obj;
+
+    if (do_fsync() && (obj = get_handle_obj( process, handle, access, &fsync_ops)))
+        return (struct event *)obj; /* even though it's not an event */
+
     if (do_esync() && (obj = get_handle_obj( process, handle, access, &esync_ops)))
         return (struct event *)obj; /* even though it's not an event */
 
@@ -195,6 +199,12 @@ static void pulse_event( struct event *event )
 
 void set_event( struct event *event )
 {
+    if (do_fsync() && event->obj.ops == &fsync_ops)
+    {
+        fsync_set_event( (struct fsync *)event );
+        return;
+    }
+
     if (do_esync() && event->obj.ops == &esync_ops)
     {
         esync_set_event( (struct esync *)event );
@@ -208,6 +218,12 @@ void set_event( struct event *event )
 
 void reset_event( struct event *event )
 {
+    if (do_fsync() && event->obj.ops == &fsync_ops)
+    {
+        fsync_reset_event( (struct fsync *)event );
+        return;
+    }
+
     if (do_esync() && event->obj.ops == &esync_ops)
     {
         esync_reset_event( (struct esync *)event );
