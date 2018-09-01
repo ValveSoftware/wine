@@ -5883,6 +5883,7 @@ enum fsync_type
     FSYNC_AUTO_EVENT,
     FSYNC_MANUAL_EVENT,
     FSYNC_MANUAL_SERVER,
+    FSYNC_QUEUE,
 };
 
 
@@ -6846,6 +6847,6 @@ union generic_reply
     struct get_fsync_idx_reply get_fsync_idx_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 600
+#define SERVER_PROTOCOL_VERSION 601
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
