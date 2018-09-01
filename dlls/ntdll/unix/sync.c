@@ -449,6 +449,9 @@ NTSTATUS WINAPI NtCreateEvent( HANDLE *handle, ACCESS_MASK access, const OBJECT_
 
     if (type != NotificationEvent && type != SynchronizationEvent) return STATUS_INVALID_PARAMETER;
 
+    if (do_fsync())
+        return fsync_create_event( handle, access, attr, type, state );
+
     if (do_esync())
         return esync_create_event( handle, access, attr, type, state );
 
