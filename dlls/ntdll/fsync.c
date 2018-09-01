@@ -97,6 +97,8 @@ int do_fsync(void)
 enum fsync_type
 {
     FSYNC_SEMAPHORE = 1,
+    FSYNC_AUTO_EVENT,
+    FSYNC_MANUAL_EVENT,
 };
 
 struct fsync
@@ -112,6 +114,12 @@ struct semaphore
 };
 C_ASSERT(sizeof(struct semaphore) == 8);
 
+struct event
+{
+    int signaled;
+    int unused;
+};
+C_ASSERT(sizeof(struct event) == 8);
 
 static char shm_name[29];
 static int shm_fd;
@@ -328,6 +336,18 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
         futex_wake( &semaphore->count, count );
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, EVENT_TYPE event_type, BOOLEAN initial )
+{
+    enum fsync_type type = (event_type == SynchronizationEvent ? FSYNC_AUTO_EVENT : FSYNC_MANUAL_EVENT);
+
+    TRACE("name %s, %s-reset, initial %d.\n",
+        attr ? debugstr_us(attr->ObjectName) : "<no name>",
+        event_type == NotificationEvent ? "manual" : "auto", initial);
+
+    return create_fsync( type, handle, access, attr, initial, 0xdeadbeef );
 }
 
 #define TICKSPERSEC        ((ULONGLONG)10000000)

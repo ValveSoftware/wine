@@ -379,6 +379,9 @@ NTSTATUS WINAPI NtCreateEvent( PHANDLE EventHandle, ACCESS_MASK DesiredAccess,
     data_size_t len;
     struct object_attributes *objattr;
 
+    if (do_fsync())
+        return fsync_create_event( EventHandle, DesiredAccess, attr, type, InitialState );
+
     if (do_esync())
         return esync_create_event( EventHandle, DesiredAccess, attr, type, InitialState );
 
