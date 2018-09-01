@@ -174,6 +174,7 @@ static const struct object_ops msg_queue_ops =
     msg_queue_remove_queue,    /* remove_queue */
     msg_queue_signaled,        /* signaled */
     msg_queue_get_esync_fd,    /* get_esync_fd */
+    NULL,                      /* get_fsync_idx */
     msg_queue_satisfied,       /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -212,6 +213,7 @@ static const struct object_ops thread_input_ops =
     NULL,                         /* remove_queue */
     NULL,                         /* signaled */
     NULL,                         /* get_esync_fd */
+    NULL,                         /* get_fsync_idx */
     NULL,                         /* satisfied */
     no_signal,                    /* signal */
     no_get_fd,                    /* get_fd */
