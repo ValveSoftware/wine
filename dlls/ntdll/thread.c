@@ -46,6 +46,7 @@
 #include "ddk/wdm.h"
 #include "wine/exception.h"
 #include "esync.h"
+#include "fsync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(thread);
 
@@ -260,6 +261,8 @@ void thread_init(void)
     user_shared_data->TickCountMultiplier = 1 << 24;
 
     fill_cpu_info();
+
+    fsync_init();
 
     esync_init();
 
