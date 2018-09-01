@@ -1,4 +1,4 @@
-1. INTRODUCTION
+# Wine
 
 Wine is a program which allows running Microsoft Windows programs
 (including DOS, Windows 3.x, Win32, and Win64 executables) on Unix.
@@ -8,10 +8,10 @@ API calls using their Unix, X11 or Mac equivalents.  The library may also
 be used for porting Windows code into native Unix executables.
 
 Wine is free software, released under the GNU LGPL; see the file
-LICENSE for the details.
+[LICENSE](https://github.com/ValveSoftware/wine/blob/proton_3.7/LICENSE) for the details.
 
 
-2. QUICK START
+## QUICK START
 
 From the top-level directory of the Wine source (which contains this file),
 run:
@@ -32,7 +32,7 @@ resolution, read the rest of this file, the Wine man page, and
 especially the wealth of information found at https://www.winehq.org.
 
 
-3. REQUIREMENTS
+## REQUIREMENTS
 
 To compile and run Wine, you must have one of the following:
 
@@ -87,7 +87,7 @@ Optional support libraries:
   libraries.
 
 
-4. COMPILATION
+## COMPILATION
 
 To build Wine, do:
 
@@ -104,7 +104,7 @@ To see compile configuration options, do ./configure --help.
 For more information, see https://wiki.winehq.org/Building_Wine
 
 
-5. SETUP
+## SETUP
 
 Once Wine has been built correctly, you can do "make install"; this
 will install the wine executable and libraries, the Wine man page, and
@@ -118,7 +118,7 @@ Once installed, you can run the "winecfg" configuration tool. See the
 Support area at https://www.winehq.org/ for configuration hints.
 
 
-6. RUNNING PROGRAMS
+## RUNNING PROGRAMS
 
 When invoking Wine, you may specify the entire path to the executable,
 or a filename only.
@@ -139,7 +139,7 @@ will get a crash log that you should attach to your report when filing
 a bug.
 
 
-7. GETTING MORE INFORMATION
+## GETTING MORE INFORMATION
 
 WWW:	A great deal of information about Wine is available from WineHQ at
 	https://www.winehq.org/ : various Wine Guides, application database,
@@ -167,5 +167,7 @@ using git-format-patch) to the wine-devel@winehq.org list for
 inclusion in the next release.
 
 --
+
 Alexandre Julliard
+
 julliard@winehq.org
