@@ -78,6 +78,7 @@ static const struct object_ops event_ops =
     remove_queue,              /* remove_queue */
     event_signaled,            /* signaled */
     event_get_esync_fd,        /* get_esync_fd */
+    NULL,                      /* get_fsync_idx */
     event_satisfied,           /* satisfied */
     event_signal,              /* signal */
     no_get_fd,                 /* get_fd */
@@ -126,6 +127,7 @@ static const struct object_ops keyed_event_ops =
     remove_queue,                /* remove_queue */
     keyed_event_signaled,        /* signaled */
     NULL,                        /* get_esync_fd */
+    NULL,                        /* get_fsync_idx */
     no_satisfied,                /* satisfied */
     no_signal,                   /* signal */
     no_get_fd,                   /* get_fd */
