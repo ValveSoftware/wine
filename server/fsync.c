@@ -132,7 +132,7 @@ struct fsync
 static void fsync_dump( struct object *obj, int verbose );
 static void fsync_destroy( struct object *obj );
 
-static const struct object_ops fsync_ops =
+const struct object_ops fsync_ops =
 {
     sizeof(struct fsync),      /* size */
     &no_type,                  /* type */
@@ -303,6 +303,23 @@ void fsync_clear( struct object *obj )
 
         __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
     }
+}
+
+void fsync_set_event( struct fsync *fsync )
+{
+    struct fsync_event *event = get_shm( fsync->shm_idx );
+    assert( fsync->obj.ops == &fsync_ops );
+
+    if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
+        futex_wake( &event->signaled, INT_MAX );
+}
+
+void fsync_reset_event( struct fsync *fsync )
+{
+    struct fsync_event *event = get_shm( fsync->shm_idx );
+    assert( fsync->obj.ops == &fsync_ops );
+
+    __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 }
 
 DECL_HANDLER(create_fsync)
