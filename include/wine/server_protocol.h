@@ -5882,6 +5882,14 @@ enum esync_type
     ESYNC_QUEUE,
 };
 
+enum fsync_type
+{
+    FSYNC_SEMAPHORE = 1,
+    FSYNC_AUTO_EVENT,
+    FSYNC_MANUAL_EVENT,
+    FSYNC_MANUAL_SERVER,
+};
+
 
 struct create_fsync_request
 {
@@ -5895,6 +5903,19 @@ struct create_fsync_reply
 {
     struct reply_header __header;
     obj_handle_t handle;
+    unsigned int shm_idx;
+};
+
+
+struct get_fsync_idx_request
+{
+    struct request_header __header;
+    obj_handle_t handle;
+};
+struct get_fsync_idx_reply
+{
+    struct reply_header __header;
+    int          type;
     unsigned int shm_idx;
 };
 
@@ -6204,6 +6225,7 @@ enum request
     REQ_get_esync_apc_fd,
     REQ_esync_msgwait,
     REQ_create_fsync,
+    REQ_get_fsync_idx,
     REQ_NB_REQUESTS
 };
 
@@ -6514,6 +6536,7 @@ union generic_request
     struct get_esync_apc_fd_request get_esync_apc_fd_request;
     struct esync_msgwait_request esync_msgwait_request;
     struct create_fsync_request create_fsync_request;
+    struct get_fsync_idx_request get_fsync_idx_request;
 };
 union generic_reply
 {
@@ -6822,8 +6845,9 @@ union generic_reply
     struct get_esync_apc_fd_reply get_esync_apc_fd_reply;
     struct esync_msgwait_reply esync_msgwait_reply;
     struct create_fsync_reply create_fsync_reply;
+    struct get_fsync_idx_reply get_fsync_idx_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 610
+#define SERVER_PROTOCOL_VERSION 611
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
