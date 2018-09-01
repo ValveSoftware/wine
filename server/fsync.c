@@ -286,3 +286,31 @@ DECL_HANDLER(create_fsync)
 
     if (root) release_object( root );
 }
+
+
+/* Retrieve the index of a shm section which will be signaled by the server. */
+DECL_HANDLER(get_fsync_idx)
+{
+    struct object *obj;
+    enum fsync_type type;
+
+    if (!(obj = get_handle_obj( current->process, req->handle, SYNCHRONIZE, NULL )))
+        return;
+
+    if (obj->ops->get_fsync_idx)
+    {
+        reply->shm_idx = obj->ops->get_fsync_idx( obj, &type );
+        reply->type = type;
+    }
+    else
+    {
+        if (debug_level)
+        {
+            fprintf( stderr, "%04x: fsync: can't wait on object: ", current->id );
+            obj->ops->dump( obj, 0 );
+        }
+        set_error( STATUS_NOT_IMPLEMENTED );
+    }
+
+    release_object( obj );
+}
