@@ -8,7 +8,7 @@ API calls using their Unix, X11 or Mac equivalents.  The library may also
 be used for porting Windows code into native Unix executables.
 
 Wine is free software, released under the GNU LGPL; see the file
-[LICENSE](https://github.com/LArrowHead/wine/blob/proton_3.7/LICENSE) for the details.
+[LICENSE](https://github.com/ValveSoftware/wine/blob/proton_3.7/LICENSE) for the details.
 
 
 ## QUICK START
