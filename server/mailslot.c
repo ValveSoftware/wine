@@ -80,6 +80,7 @@ static const struct object_ops mailslot_ops =
     remove_queue,              /* remove_queue */
     default_fd_signaled,       /* signaled */
     NULL,                      /* get_esync_fd */
+    NULL,                      /* get_fsync_idx */
     no_satisfied,              /* satisfied */
     no_signal,                 /* signal */
     mailslot_get_fd,           /* get_fd */
@@ -138,6 +139,7 @@ static const struct object_ops mail_writer_ops =
     NULL,                       /* remove_queue */
     NULL,                       /* signaled */
     NULL,                       /* get_esync_fd */
+    NULL,                       /* get_fsync_idx */
     NULL,                       /* satisfied */
     no_signal,                  /* signal */
     mail_writer_get_fd,         /* get_fd */
@@ -197,6 +199,7 @@ static const struct object_ops mailslot_device_ops =
     NULL,                           /* remove_queue */
     NULL,                           /* signaled */
     NULL,                           /* get_esync_fd */
+    NULL,                           /* get_fsync_idx */
     no_satisfied,                   /* satisfied */
     no_signal,                      /* signal */
     mailslot_device_get_fd,         /* get_fd */

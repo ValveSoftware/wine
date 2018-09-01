@@ -112,6 +112,7 @@ static const struct object_ops thread_apc_ops =
     remove_queue,               /* remove_queue */
     thread_apc_signaled,        /* signaled */
     NULL,                       /* get_esync_fd */
+    NULL,                       /* get_fsync_idx */
     no_satisfied,               /* satisfied */
     no_signal,                  /* signal */
     no_get_fd,                  /* get_fd */
@@ -148,6 +149,7 @@ static const struct object_ops thread_ops =
     remove_queue,               /* remove_queue */
     thread_signaled,            /* signaled */
     thread_get_esync_fd,        /* get_esync_fd */
+    NULL,                       /* get_fsync_idx */
     no_satisfied,               /* satisfied */
     no_signal,                  /* signal */
     no_get_fd,                  /* get_fd */
