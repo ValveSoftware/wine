@@ -23,3 +23,9 @@ extern void fsync_init(void);
 extern unsigned int fsync_alloc_shm( int low, int high );
 extern void fsync_wake_up( struct object *obj );
 extern void fsync_clear( struct object *obj );
+
+struct fsync;
+
+extern const struct object_ops fsync_ops;
+extern void fsync_set_event( struct fsync *fsync );
+extern void fsync_reset_event( struct fsync *fsync );
