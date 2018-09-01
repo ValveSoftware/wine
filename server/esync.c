@@ -126,6 +126,7 @@ const struct object_ops esync_ops =
     NULL,                      /* remove_queue */
     NULL,                      /* signaled */
     esync_get_esync_fd,        /* get_esync_fd */
+    NULL,                      /* get_fsync_idx */
     NULL,                      /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */

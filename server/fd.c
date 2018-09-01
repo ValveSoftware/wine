@@ -211,6 +211,7 @@ static const struct object_ops fd_ops =
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
     NULL,                     /* get_esync_fd */
+    NULL,                     /* get_fsync_idx */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -252,6 +253,7 @@ static const struct object_ops device_ops =
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
     NULL,                     /* get_esync_fd */
+    NULL,                     /* get_fsync_idx */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -292,6 +294,7 @@ static const struct object_ops inode_ops =
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
     NULL,                     /* get_esync_fd */
+    NULL,                     /* get_fsync_idx */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -334,6 +337,7 @@ static const struct object_ops file_lock_ops =
     remove_queue,               /* remove_queue */
     file_lock_signaled,         /* signaled */
     NULL,                       /* get_esync_fd */
+    NULL,                       /* get_fsync_idx */
     no_satisfied,               /* satisfied */
     no_signal,                  /* signal */
     no_get_fd,                  /* get_fd */
