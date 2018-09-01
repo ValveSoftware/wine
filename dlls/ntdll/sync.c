@@ -462,6 +462,9 @@ NTSTATUS WINAPI NtResetEvent( HANDLE handle, LONG *prev_state )
 {
     NTSTATUS ret;
 
+    if (do_fsync())
+        return fsync_reset_event( handle, prev_state );
+
     if (do_esync())
         return esync_reset_event( handle );
 
