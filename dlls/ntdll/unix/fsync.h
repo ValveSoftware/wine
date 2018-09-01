@@ -20,6 +20,7 @@
 
 extern int do_fsync(void) DECLSPEC_HIDDEN;
 extern void fsync_init(void) DECLSPEC_HIDDEN;
+extern NTSTATUS fsync_close( HANDLE handle ) DECLSPEC_HIDDEN;
 
 extern NTSTATUS fsync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max) DECLSPEC_HIDDEN;
