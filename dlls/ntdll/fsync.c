@@ -203,6 +203,49 @@ static struct fsync *get_cached_object( HANDLE handle )
     return &fsync_list[entry][idx];
 }
 
+/* Gets an object. This is either a proper fsync object (i.e. an event,
+ * semaphore, etc. created using create_fsync) or a generic synchronizable
+ * server-side object which the server will signal (e.g. a process, thread,
+ * message queue, etc.) */
+static NTSTATUS get_object( HANDLE handle, struct fsync **obj )
+{
+    NTSTATUS ret = STATUS_SUCCESS;
+    unsigned int shm_idx = 0;
+    enum fsync_type type;
+
+    if ((*obj = get_cached_object( handle ))) return STATUS_SUCCESS;
+
+    if ((INT_PTR)handle < 0)
+    {
+        /* We can deal with pseudo-handles, but it's just easier this way */
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
+    /* We need to try grabbing it from the server. */
+    SERVER_START_REQ( get_fsync_idx )
+    {
+        req->handle = wine_server_obj_handle( handle );
+        if (!(ret = wine_server_call( req )))
+        {
+            shm_idx = reply->shm_idx;
+            type    = reply->type;
+        }
+    }
+    SERVER_END_REQ;
+
+    if (ret)
+    {
+        WARN("Failed to retrieve shm index for handle %p, status %#x.\n", handle, ret);
+        *obj = NULL;
+        return ret;
+    }
+
+    TRACE("Got shm index %d for handle %p.\n", shm_idx, handle);
+
+    *obj = add_to_list( handle, type, get_shm( shm_idx ) );
+    return ret;
+}
+
 NTSTATUS fsync_close( HANDLE handle )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
@@ -419,10 +462,13 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
 
     for (i = 0; i < count; i++)
     {
-        if ((objs[i] = get_cached_object( handles[i] )))
+        ret = get_object( handles[i], &objs[i] );
+        if (ret == STATUS_SUCCESS)
             has_fsync = 1;
-        else
+        else if (ret == STATUS_NOT_IMPLEMENTED)
             has_server = 1;
+        else
+            return ret;
     }
 
     if (has_fsync && has_server)
@@ -495,6 +541,7 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
                         break;
                     }
                     case FSYNC_MANUAL_EVENT:
+                    case FSYNC_MANUAL_SERVER:
                     {
                         struct event *event = obj->shm;
 
