@@ -92,6 +92,7 @@ struct thread
     struct list            kernel_object; /* list of kernel object pointers */
     int                    esync_fd;      /* esync file descriptor (signalled on exit) */
     int                    esync_apc_fd;  /* esync apc fd (signalled when APCs are present) */
+    unsigned int           fsync_idx;
 };
 
 struct thread_snapshot
