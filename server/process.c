@@ -49,6 +49,7 @@
 #include "user.h"
 #include "security.h"
 #include "esync.h"
+#include "fsync.h"
 
 /* process structure */
 
@@ -69,6 +70,7 @@ static void process_poll_event( struct fd *fd, int event );
 static struct list *process_get_kernel_obj_list( struct object *obj );
 static void process_destroy( struct object *obj );
 static int process_get_esync_fd( struct object *obj, enum esync_type *type );
+static unsigned int process_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static void terminate_process( struct process *process, struct thread *skip, int exit_code );
 
 static const struct object_ops process_ops =
@@ -80,7 +82,7 @@ static const struct object_ops process_ops =
     remove_queue,                /* remove_queue */
     process_signaled,            /* signaled */
     process_get_esync_fd,        /* get_esync_fd */
-    NULL,                        /* get_fsync_idx */
+    process_get_fsync_idx,       /* get_fsync_idx */
     no_satisfied,                /* satisfied */
     no_signal,                   /* signal */
     no_get_fd,                   /* get_fd */
@@ -538,6 +540,7 @@ struct process *create_process( int fd, struct process *parent, int inherit_all,
     process->rawinput_kbd    = NULL;
     list_init( &process->kernel_object );
     process->esync_fd        = -1;
+    process->fsync_idx       = 0;
     list_init( &process->thread_list );
     list_init( &process->locks );
     list_init( &process->asyncs );
@@ -586,6 +589,9 @@ struct process *create_process( int fd, struct process *parent, int inherit_all,
      * makes more sense for the time being. */
     if (!token_assign_label( process->token, security_high_label_sid ))
         goto error;
+
+    if (do_fsync())
+        process->fsync_idx = fsync_alloc_shm( 0, 0 );
 
     if (do_esync())
         process->esync_fd = esync_create_fd( 0, 0 );
@@ -670,6 +676,13 @@ static int process_get_esync_fd( struct object *obj, enum esync_type *type )
     struct process *process = (struct process *)obj;
     *type = ESYNC_MANUAL_SERVER;
     return process->esync_fd;
+}
+
+static unsigned int process_get_fsync_idx( struct object *obj, enum fsync_type *type )
+{
+    struct process *process = (struct process *)obj;
+    *type = FSYNC_MANUAL_SERVER;
+    return process->fsync_idx;
 }
 
 static unsigned int process_map_access( struct object *obj, unsigned int access )
