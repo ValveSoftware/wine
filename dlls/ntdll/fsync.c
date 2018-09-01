@@ -329,3 +329,150 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
 
     return STATUS_SUCCESS;
 }
+
+#define TICKSPERSEC        ((ULONGLONG)10000000)
+
+static LONGLONG update_timeout( ULONGLONG end )
+{
+    LARGE_INTEGER now;
+    LONGLONG timeleft;
+
+    NtQuerySystemTime( &now );
+    timeleft = end - now.QuadPart;
+    if (timeleft < 0) timeleft = 0;
+    return timeleft;
+}
+
+NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
+    BOOLEAN wait_any, BOOLEAN alertable, const LARGE_INTEGER *timeout )
+{
+    struct futex_wait_block futexes[MAXIMUM_WAIT_OBJECTS];
+    struct fsync *objs[MAXIMUM_WAIT_OBJECTS];
+    int has_fsync = 0, has_server = 0;
+    int dummy_futex = 0;
+    LONGLONG timeleft;
+    LARGE_INTEGER now;
+    ULONGLONG end;
+    int i, ret;
+
+    NtQuerySystemTime( &now );
+    if (timeout)
+    {
+        if (timeout->QuadPart == TIMEOUT_INFINITE)
+            timeout = NULL;
+        else if (timeout->QuadPart > 0)
+            end = timeout->QuadPart;
+        else
+            end = now.QuadPart - timeout->QuadPart;
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        if ((objs[i] = get_cached_object( handles[i] )))
+            has_fsync = 1;
+        else
+            has_server = 1;
+    }
+
+    if (has_fsync && has_server)
+        FIXME("Can't wait on fsync and server objects at the same time!\n");
+    else if (has_server)
+        return STATUS_NOT_IMPLEMENTED;
+
+    if (TRACE_ON(fsync))
+    {
+        TRACE("Waiting for %s of %d handles:", wait_any ? "any" : "all", count);
+        for (i = 0; i < count; i++)
+            TRACE(" %p", handles[i]);
+
+        if (!timeout)
+            TRACE(", timeout = INFINITE.\n");
+        else
+        {
+            timeleft = update_timeout( end );
+            TRACE(", timeout = %ld.%07ld sec.\n",
+                (long) (timeleft / TICKSPERSEC), (long) (timeleft % TICKSPERSEC));
+        }
+    }
+
+    if (wait_any || count == 1)
+    {
+        while (1)
+        {
+            /* Try to grab anything. */
+
+            for (i = 0; i < count; i++)
+            {
+                struct fsync *obj = objs[i];
+
+                if (obj)
+                {
+                    switch (obj->type)
+                    {
+                    case FSYNC_SEMAPHORE:
+                    {
+                        struct semaphore *semaphore = obj->shm;
+                        int current;
+
+                        do
+                        {
+                            if (!(current = semaphore->count)) break;
+                        } while (__sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) != current);
+
+                        if (current)
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            return i;
+                        }
+
+                        futexes[i].addr = &semaphore->count;
+                        futexes[i].val = current;
+                        break;
+                    }
+                    default:
+                        assert(0);
+                    }
+                }
+                else
+                {
+                    /* Avoid breaking things entirely. */
+                    futexes[i].addr = &dummy_futex;
+                    futexes[i].val = dummy_futex;
+                }
+
+#if __SIZEOF_POINTER__ == 4
+                futexes[i].pad = 0;
+#endif
+            }
+
+            /* Looks like everything is contended, so wait. */
+
+            if (timeout)
+            {
+                LONGLONG timeleft = update_timeout( end );
+                struct timespec tmo_p;
+                tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+                tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+
+                ret = futex_wait_multiple( futexes, count, &tmo_p );
+            }
+            else
+                ret = futex_wait_multiple( futexes, count, NULL );
+
+            /* FUTEX_WAIT_MULTIPLE can succeed or return -EINTR, -EAGAIN,
+             * -EFAULT/-EACCES, -ETIMEDOUT. In the first three cases we need to
+             * try again, bad address is already handled by the fact that we
+             * tried to read from it, so only break out on a timeout. */
+            if (ret == -1 && errno == ETIMEDOUT)
+            {
+                TRACE("Wait timed out.\n");
+                return STATUS_TIMEOUT;
+            }
+        } /* while (1) */
+    }
+    else
+    {
+        FIXME("Wait-all not implemented.\n");
+        return STATUS_NOT_IMPLEMENTED;
+    }
+}
