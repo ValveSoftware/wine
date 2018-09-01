@@ -56,6 +56,7 @@ struct thread
     struct list            mutex_list;    /* list of currently owned mutexes */
     int                    esync_fd;      /* esync file descriptor (signalled on exit) */
     int                    esync_apc_fd;  /* esync apc fd (signalled when APCs are present) */
+    unsigned int           fsync_idx;
     struct debug_ctx      *debug_ctx;     /* debugger context if this thread is a debugger */
     unsigned int           system_regs;   /* which system regs have been set */
     struct msg_queue      *queue;         /* message queue */
