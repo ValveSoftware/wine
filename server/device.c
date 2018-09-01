@@ -70,6 +70,7 @@ static const struct object_ops irp_call_ops =
     NULL,                             /* signaled */
     NULL,                             /* get_esync_fd */
     NULL,                             /* satisfied */
+    NULL,                             /* satisfied */
     no_signal,                        /* signal */
     no_get_fd,                        /* get_fd */
     default_map_access,               /* map_access */
@@ -112,6 +113,7 @@ static const struct object_ops device_manager_ops =
     remove_queue,                     /* remove_queue */
     device_manager_signaled,          /* signaled */
     device_manager_get_esync_fd,      /* get_esync_fd */
+    NULL,                             /* get_fsync_idx */
     no_satisfied,                     /* satisfied */
     no_signal,                        /* signal */
     no_get_fd,                        /* get_fd */
@@ -170,6 +172,7 @@ static const struct object_ops device_ops =
     NULL,                             /* remove_queue */
     NULL,                             /* signaled */
     NULL,                             /* get_esync_fd */
+    NULL,                             /* get_fsync_idx */
     no_satisfied,                     /* satisfied */
     no_signal,                        /* signal */
     no_get_fd,                        /* get_fd */
@@ -223,6 +226,7 @@ static const struct object_ops device_file_ops =
     remove_queue,                     /* remove_queue */
     default_fd_signaled,              /* signaled */
     NULL,                             /* get_esync_fd */
+    NULL,                             /* get_fsync_idx */
     no_satisfied,                     /* satisfied */
     no_signal,                        /* signal */
     device_file_get_fd,               /* get_fd */
