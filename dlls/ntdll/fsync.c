@@ -201,6 +201,21 @@ static struct fsync *get_cached_object( HANDLE handle )
     return &fsync_list[entry][idx];
 }
 
+NTSTATUS fsync_close( HANDLE handle )
+{
+    UINT_PTR entry, idx = handle_to_index( handle, &entry );
+
+    TRACE("%p.\n", handle);
+
+    if (entry < FSYNC_LIST_ENTRIES && fsync_list[entry])
+    {
+        if (__atomic_exchange_n( &fsync_list[entry][idx].type, 0, __ATOMIC_SEQ_CST ))
+            return STATUS_SUCCESS;
+    }
+
+    return STATUS_INVALID_HANDLE;
+}
+
 static NTSTATUS create_fsync( enum fsync_type type, HANDLE *handle,
     ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr, int low, int high )
 {
