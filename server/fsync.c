@@ -207,6 +207,35 @@ static void *get_shm( unsigned int idx )
 /* FIXME: This is rather inefficient... */
 static unsigned int shm_idx_counter = 1;
 
+unsigned int fsync_alloc_shm( int low, int high )
+{
+#ifdef __linux__
+    int shm_idx = shm_idx_counter++;
+    int *shm;
+
+    while (shm_idx * 8 >= shm_size)
+    {
+        /* Better expand the shm section. */
+        shm_size += pagesize;
+        if (ftruncate( shm_fd, shm_size ) == -1)
+        {
+            fprintf( stderr, "fsync: couldn't expand %s to size %jd: ",
+                shm_name, shm_size );
+            perror( "ftruncate" );
+        }
+    }
+
+    shm = get_shm( shm_idx );
+    assert(shm);
+    shm[0] = low;
+    shm[1] = high;
+
+    return shm_idx;
+#else
+    return 0;
+#endif
+}
+
 struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
                             unsigned int attr, int low, int high,
                             const struct security_descriptor *sd )
@@ -218,32 +247,14 @@ struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
     {
         if (get_error() != STATUS_OBJECT_NAME_EXISTS)
         {
-            int *shm;
-
             /* initialize it if it didn't already exist */
-
-            fsync->shm_idx = shm_idx_counter++;
-            while (fsync->shm_idx * 8 >= shm_size)
-            {
-                /* Better expand the shm section. */
-                shm_size += pagesize;
-                if (ftruncate( shm_fd, shm_size ) == -1)
-                {
-                    fprintf( stderr, "fsync: couldn't expand %s to size %ld: ",
-                        shm_name, shm_size );
-                    perror( "ftruncate" );
-                }
-            }
 
             /* Initialize the shared memory portion. We want to do this on the
              * server side to avoid a potential though unlikely race whereby
              * the same object is opened and used between the time it's created
              * and the time its shared memory portion is initialized. */
 
-            shm = get_shm( fsync->shm_idx );
-            assert(shm);
-            shm[0] = low;
-            shm[1] = high;
+            fsync->shm_idx = fsync_alloc_shm( low, high );
         }
     }
 
