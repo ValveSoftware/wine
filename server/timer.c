@@ -81,6 +81,7 @@ static const struct object_ops timer_ops =
     remove_queue,              /* remove_queue */
     timer_signaled,            /* signaled */
     timer_get_esync_fd,        /* get_esync_fd */
+    NULL,                      /* get_fsync_idx */
     timer_satisfied,           /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
