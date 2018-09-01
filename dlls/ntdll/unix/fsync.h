@@ -20,6 +20,7 @@
 
 extern int do_fsync(void);
 extern void fsync_init(void);
+extern NTSTATUS fsync_close( HANDLE handle );
 
 extern NTSTATUS fsync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max);
