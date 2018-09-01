@@ -3769,3 +3769,14 @@ enum esync_type
 /* Retrieve the fd to wait on for user APCs. */
 @REQ(get_esync_apc_fd)
 @END
+
+/* Create a new futex-based synchronization object */
+@REQ(create_fsync)
+    unsigned int access;        /* wanted access rights */
+    int low;                    /* initial value of low word */
+    int high;                   /* initial value of high word */
+    VARARG(objattr,object_attributes); /* object attributes */
+@REPLY
+    obj_handle_t handle;        /* handle to the object */
+    unsigned int shm_idx;       /* this object's index into the shm section */
+@END
