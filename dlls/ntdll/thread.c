@@ -233,6 +233,7 @@ void thread_init(void)
     thread_data->wait_fd[1] = -1;
     thread_data->esync_queue_fd = -1;
     thread_data->esync_apc_fd = -1;
+    thread_data->fsync_apc_idx = 0;
 
     signal_init_thread( teb );
     virtual_init_threading();
@@ -530,6 +531,7 @@ NTSTATUS WINAPI RtlCreateUserThread( HANDLE process, SECURITY_DESCRIPTOR *descr,
     thread_data->start_stack = (char *)teb->Tib.StackBase;
     thread_data->esync_queue_fd = -1;
     thread_data->esync_apc_fd = -1;
+    thread_data->fsync_apc_idx = 0;
 
     pthread_attr_init( &attr );
     pthread_attr_setstack( &attr, teb->DeallocationStack,

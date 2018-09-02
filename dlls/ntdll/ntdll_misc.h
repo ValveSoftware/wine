@@ -281,6 +281,7 @@ struct ntdll_thread_data
     pthread_t          pthread_id;    /* pthread thread id */
     int                esync_queue_fd;/* fd to wait on for driver events */
     int                esync_apc_fd;  /* fd to wait on for user APCs */
+    unsigned int       fsync_apc_idx;
 };
 
 C_ASSERT( sizeof(struct ntdll_thread_data) <= sizeof(((TEB *)0)->GdiTebBatch) );
