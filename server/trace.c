@@ -4657,12 +4657,14 @@ static void dump_create_fsync_request( const struct create_fsync_request *req )
     fprintf( stderr, " access=%08x", req->access );
     fprintf( stderr, ", low=%d", req->low );
     fprintf( stderr, ", high=%d", req->high );
+    fprintf( stderr, ", type=%d", req->type );
     dump_varargs_object_attributes( ", objattr=", cur_size );
 }
 
 static void dump_create_fsync_reply( const struct create_fsync_reply *req )
 {
     fprintf( stderr, " handle=%04x", req->handle );
+    fprintf( stderr, ", type=%d", req->type );
     fprintf( stderr, ", shm_idx=%08x", req->shm_idx );
 }
 

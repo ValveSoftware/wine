@@ -4016,9 +4016,11 @@ enum fsync_type
     unsigned int access;        /* wanted access rights */
     int low;                    /* initial value of low word */
     int high;                   /* initial value of high word */
+    int type;                   /* type of fsync object */
     VARARG(objattr,object_attributes); /* object attributes */
 @REPLY
     obj_handle_t handle;        /* handle to the object */
+    int type;                   /* type of fsync object */
     unsigned int shm_idx;       /* this object's index into the shm section */
 @END
 
