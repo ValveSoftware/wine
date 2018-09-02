@@ -25,6 +25,8 @@ extern NTSTATUS fsync_close( HANDLE handle );
 extern NTSTATUS fsync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max);
 extern NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev );
+extern NTSTATUS fsync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr );
 extern NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN initial );
 extern NTSTATUS fsync_set_event( HANDLE handle, LONG *prev );
