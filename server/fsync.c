@@ -135,6 +135,7 @@ struct fsync
 };
 
 static void fsync_dump( struct object *obj, int verbose );
+static unsigned int fsync_map_access( struct object *obj, unsigned int access );
 static void fsync_destroy( struct object *obj );
 
 const struct object_ops fsync_ops =
@@ -150,7 +151,7 @@ const struct object_ops fsync_ops =
     NULL,                      /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
-    no_map_access,             /* map_access */
+    fsync_map_access,          /* map_access */
     default_get_sd,            /* get_sd */
     default_set_sd,            /* set_sd */
     no_lookup_name,            /* lookup_name */
@@ -167,6 +168,16 @@ static void fsync_dump( struct object *obj, int verbose )
     struct fsync *fsync = (struct fsync *)obj;
     assert( obj->ops == &fsync_ops );
     fprintf( stderr, "fsync idx=%d\n", fsync->shm_idx );
+}
+
+static unsigned int fsync_map_access( struct object *obj, unsigned int access )
+{
+    /* Sync objects have the same flags. */
+    if (access & GENERIC_READ)    access |= STANDARD_RIGHTS_READ | EVENT_QUERY_STATE;
+    if (access & GENERIC_WRITE)   access |= STANDARD_RIGHTS_WRITE | EVENT_MODIFY_STATE;
+    if (access & GENERIC_EXECUTE) access |= STANDARD_RIGHTS_EXECUTE | SYNCHRONIZE;
+    if (access & GENERIC_ALL)     access |= STANDARD_RIGHTS_ALL | EVENT_QUERY_STATE | EVENT_MODIFY_STATE;
+    return access & ~(GENERIC_READ | GENERIC_WRITE | GENERIC_EXECUTE | GENERIC_ALL);
 }
 
 static void fsync_destroy( struct object *obj )
