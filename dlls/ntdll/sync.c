@@ -284,6 +284,9 @@ NTSTATUS WINAPI NtOpenSemaphore( HANDLE *handle, ACCESS_MASK access, const OBJEC
 
     if ((ret = validate_open_object_attributes( attr ))) return ret;
 
+    if (do_fsync())
+        return fsync_open_semaphore( handle, access, attr );
+
     if (do_esync())
         return esync_open_semaphore( handle, access, attr );
 
