@@ -130,6 +130,7 @@ struct fsync
 {
     struct object  obj;
     unsigned int   shm_idx;
+    enum fsync_type type;
 };
 
 static void fsync_dump( struct object *obj, int verbose );
@@ -239,9 +240,16 @@ unsigned int fsync_alloc_shm( int low, int high )
 #endif
 }
 
+static int type_matches( enum fsync_type type1, enum fsync_type type2 )
+{
+    return (type1 == type2) ||
+           ((type1 == FSYNC_AUTO_EVENT || type1 == FSYNC_MANUAL_EVENT) &&
+            (type2 == FSYNC_AUTO_EVENT || type2 == FSYNC_MANUAL_EVENT));
+}
+
 struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
-                            unsigned int attr, int low, int high,
-                            const struct security_descriptor *sd )
+    unsigned int attr, int low, int high, enum fsync_type type,
+    const struct security_descriptor *sd )
 {
 #ifdef __linux__
     struct fsync *fsync;
@@ -258,6 +266,17 @@ struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
              * and the time its shared memory portion is initialized. */
 
             fsync->shm_idx = fsync_alloc_shm( low, high );
+            fsync->type = type;
+        }
+        else
+        {
+            /* validate the type */
+            if (!type_matches( type, fsync->type ))
+            {
+                release_object( &fsync->obj );
+                set_error( STATUS_OBJECT_TYPE_MISMATCH );
+                return NULL;
+            }
         }
     }
 
@@ -341,7 +360,7 @@ DECL_HANDLER(create_fsync)
     if (!objattr) return;
 
     if ((fsync = create_fsync( root, &name, objattr->attributes, req->low,
-                               req->high, sd )))
+                               req->high, req->type, sd )))
     {
         if (get_error() == STATUS_OBJECT_NAME_EXISTS)
             reply->handle = alloc_handle( current->process, fsync, req->access, objattr->attributes );
@@ -350,6 +369,7 @@ DECL_HANDLER(create_fsync)
                                                           req->access, objattr->attributes );
 
         reply->shm_idx = fsync->shm_idx;
+        reply->type = fsync->type;
         release_object( fsync );
     }
 
