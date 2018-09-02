@@ -444,6 +444,29 @@ NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
         initial ? GetCurrentThreadId() : 0, initial ? 1 : 0 );
 }
 
+NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
+{
+    struct mutex *mutex;
+    struct fsync *obj;
+
+    TRACE("%p, %p.\n", handle, prev);
+
+    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    mutex = obj->shm;
+
+    if (mutex->tid != GetCurrentThreadId()) return STATUS_MUTANT_NOT_OWNED;
+
+    if (prev) *prev = mutex->count;
+
+    if (!--mutex->count)
+    {
+        __atomic_store_n( &mutex->tid, 0, __ATOMIC_SEQ_CST );
+        futex_wake( &mutex->tid, 1 );
+    }
+
+    return STATUS_SUCCESS;
+}
+
 static LONGLONG update_timeout( ULONGLONG end )
 {
     LARGE_INTEGER now;
