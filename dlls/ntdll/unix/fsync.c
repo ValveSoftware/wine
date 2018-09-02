@@ -313,6 +313,38 @@ static NTSTATUS create_fsync( enum fsync_type type, HANDLE *handle,
     return ret;
 }
 
+static NTSTATUS open_fsync( enum fsync_type type, HANDLE *handle,
+    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr )
+{
+    NTSTATUS ret;
+    unsigned int shm_idx;
+
+    SERVER_START_REQ( open_fsync )
+    {
+        req->access     = access;
+        req->attributes = attr->Attributes;
+        req->rootdir    = wine_server_obj_handle( attr->RootDirectory );
+        req->type       = type;
+        if (attr->ObjectName)
+            wine_server_add_data( req, attr->ObjectName->Buffer, attr->ObjectName->Length );
+        if (!(ret = wine_server_call( req )))
+        {
+            *handle = wine_server_ptr_handle( reply->handle );
+            type = reply->type;
+            shm_idx = reply->shm_idx;
+        }
+    }
+    SERVER_END_REQ;
+
+    if (!ret)
+    {
+        add_to_list( *handle, type, get_shm( shm_idx ) );
+
+        TRACE("-> handle %p, shm index %u.\n", *handle, shm_idx);
+    }
+    return ret;
+}
+
 void fsync_init(void)
 {
     struct stat st;
@@ -364,6 +396,14 @@ NTSTATUS fsync_create_semaphore( HANDLE *handle, ACCESS_MASK access,
         attr ? debugstr_us(attr->ObjectName) : "<no name>", initial, max);
 
     return create_fsync( FSYNC_SEMAPHORE, handle, access, attr, initial, max );
+}
+
+NTSTATUS fsync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    return open_fsync( FSYNC_SEMAPHORE, handle, access, attr );
 }
 
 NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
