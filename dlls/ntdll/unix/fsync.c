@@ -913,3 +913,31 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 
     return ret;
 }
+
+NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
+    const LARGE_INTEGER *timeout )
+{
+    struct fsync *obj = get_cached_object( signal );
+    NTSTATUS ret;
+
+    if (!obj) return STATUS_INVALID_HANDLE;
+
+    switch (obj->type)
+    {
+    case FSYNC_SEMAPHORE:
+        ret = fsync_release_semaphore( signal, 1, NULL );
+        break;
+    case FSYNC_AUTO_EVENT:
+    case FSYNC_MANUAL_EVENT:
+        ret = fsync_set_event( signal, NULL );
+        break;
+    case FSYNC_MUTEX:
+        ret = fsync_release_mutex( signal, NULL );
+        break;
+    default:
+        return STATUS_OBJECT_TYPE_MISMATCH;
+    }
+    if (ret) return ret;
+
+    return fsync_wait_objects( 1, &wait, TRUE, alertable, timeout );
+}

@@ -1512,6 +1512,9 @@ NTSTATUS WINAPI NtSignalAndWaitForSingleObject( HANDLE signal, HANDLE wait,
     select_op_t select_op;
     UINT flags = SELECT_INTERRUPTIBLE;
 
+    if (do_fsync())
+        return fsync_signal_and_wait( signal, wait, alertable, timeout );
+
     if (do_esync())
         return esync_signal_and_wait( signal, wait, alertable, timeout );
 
