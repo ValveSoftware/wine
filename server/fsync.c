@@ -316,31 +316,35 @@ struct fsync_event
     int unused;
 };
 
+void fsync_wake_futex( unsigned int shm_idx )
+{
+    struct fsync_event *event = get_shm( shm_idx );
+
+    if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
+        futex_wake( &event->signaled, INT_MAX );
+}
+
 void fsync_wake_up( struct object *obj )
 {
-    struct fsync_event *event;
     enum fsync_type type;
 
     if (obj->ops->get_fsync_idx)
-    {
-        event = get_shm( obj->ops->get_fsync_idx( obj, &type ) );
+        fsync_wake_futex( obj->ops->get_fsync_idx( obj, &type ) );
+}
 
-        if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
-            futex_wake( &event->signaled, INT_MAX );
-    }
+void fsync_clear_futex( unsigned int shm_idx )
+{
+    struct fsync_event *event = get_shm( shm_idx );
+
+    __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 }
 
 void fsync_clear( struct object *obj )
 {
-    struct fsync_event *event;
     enum fsync_type type;
 
     if (obj->ops->get_fsync_idx)
-    {
-        event = get_shm( obj->ops->get_fsync_idx( obj, &type ) );
-
-        __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
-    }
+        fsync_clear_futex( obj->ops->get_fsync_idx( obj, &type ) );
 }
 
 void fsync_set_event( struct fsync *fsync )
@@ -446,4 +450,9 @@ DECL_HANDLER(get_fsync_idx)
     }
 
     release_object( obj );
+}
+
+DECL_HANDLER(get_fsync_apc_idx)
+{
+    reply->shm_idx = current->fsync_apc_idx;
 }
