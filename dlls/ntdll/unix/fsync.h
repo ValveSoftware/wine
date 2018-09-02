@@ -35,3 +35,5 @@ extern NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev ) DECLSPEC_HIDDEN
 
 extern NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                     BOOLEAN alertable, const LARGE_INTEGER *timeout ) DECLSPEC_HIDDEN;
+extern NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait,
+    BOOLEAN alertable, const LARGE_INTEGER *timeout ) DECLSPEC_HIDDEN;
