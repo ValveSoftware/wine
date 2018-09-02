@@ -438,12 +438,13 @@ static LONGLONG update_timeout( ULONGLONG end )
     return timeleft;
 }
 
-NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
+static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     BOOLEAN wait_any, BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
     struct futex_wait_block futexes[MAXIMUM_WAIT_OBJECTS];
     struct fsync *objs[MAXIMUM_WAIT_OBJECTS];
     int has_fsync = 0, has_server = 0;
+    BOOL msgwait = FALSE;
     int dummy_futex = 0;
     LONGLONG timeleft;
     LARGE_INTEGER now;
@@ -472,6 +473,9 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
             return ret;
     }
 
+    if (objs[count - 1] && objs[count - 1]->type == FSYNC_QUEUE)
+        msgwait = TRUE;
+
     if (has_fsync && has_server)
         FIXME("Can't wait on fsync and server objects at the same time!\n");
     else if (has_server)
@@ -482,6 +486,9 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
         TRACE("Waiting for %s of %d handles:", wait_any ? "any" : "all", count);
         for (i = 0; i < count; i++)
             TRACE(" %p", handles[i]);
+
+        if (msgwait)
+            TRACE(" or driver events");
 
         if (!timeout)
             TRACE(", timeout = INFINITE.\n");
@@ -543,6 +550,7 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
                     }
                     case FSYNC_MANUAL_EVENT:
                     case FSYNC_MANUAL_SERVER:
+                    case FSYNC_QUEUE:
                     {
                         struct event *event = obj->shm;
 
@@ -602,4 +610,46 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles,
         FIXME("Wait-all not implemented.\n");
         return STATUS_NOT_IMPLEMENTED;
     }
+}
+
+/* Like esync, we need to let the server know when we are doing a message wait,
+ * and when we are done with one, so that all of the code surrounding hung
+ * queues works, and we also need this for WaitForInputIdle().
+ *
+ * Unlike esync, we can't wait on the queue fd itself locally. Instead we let
+ * the server do that for us, the way it normally does. This could actually
+ * work for esync too, and that might be better. */
+static void server_set_msgwait( int in_msgwait )
+{
+    SERVER_START_REQ( fsync_msgwait )
+    {
+        req->in_msgwait = in_msgwait;
+        wine_server_call( req );
+    }
+    SERVER_END_REQ;
+}
+
+/* This is a very thin wrapper around the proper implementation above. The
+ * purpose is to make sure the server knows when we are doing a message wait.
+ * This is separated into a wrapper function since there are at least a dozen
+ * exit paths from fsync_wait_objects(). */
+NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
+                             BOOLEAN alertable, const LARGE_INTEGER *timeout )
+{
+    BOOL msgwait = FALSE;
+    struct fsync *obj;
+    NTSTATUS ret;
+
+    if (!get_object( handles[count - 1], &obj ) && obj->type == FSYNC_QUEUE)
+    {
+        msgwait = TRUE;
+        server_set_msgwait( 1 );
+    }
+
+    ret = __fsync_wait_objects( count, handles, wait_any, alertable, timeout );
+
+    if (msgwait)
+        server_set_msgwait( 0 );
+
+    return ret;
 }
