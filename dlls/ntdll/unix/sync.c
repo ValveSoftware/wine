@@ -352,6 +352,9 @@ NTSTATUS WINAPI NtOpenSemaphore( HANDLE *handle, ACCESS_MASK access, const OBJEC
 {
     NTSTATUS ret;
 
+    if (do_fsync())
+        return fsync_open_semaphore( handle, access, attr );
+
     if (do_esync())
         return esync_open_semaphore( handle, access, attr );
 
