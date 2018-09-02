@@ -544,20 +544,53 @@ static LONGLONG update_timeout( ULONGLONG end )
     return timeleft;
 }
 
-static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end )
+static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN alertable )
 {
     int ret;
 
-    if (end)
+    if (alertable)
     {
-        LONGLONG timeleft = update_timeout( *end );
-        struct timespec tmo_p;
-        tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
-        tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
-        ret = futex_wait( addr, val, &tmo_p );
+        struct event *apc_event = get_shm( ntdll_get_thread_data()->fsync_apc_idx );
+        struct futex_wait_block futexes[2];
+
+        if (__atomic_load_n( &apc_event->signaled, __ATOMIC_SEQ_CST ))
+            return STATUS_USER_APC;
+
+        futexes[0].addr = addr;
+        futexes[0].val = val;
+        futexes[1].addr = &apc_event->signaled;
+        futexes[1].val = 0;
+#if __SIZEOF_POINTER__ == 4
+        futexes[0].pad = futexes[1].pad = 0;
+#endif
+
+        if (end)
+        {
+            LONGLONG timeleft = update_timeout( *end );
+            struct timespec tmo_p;
+            tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+            tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+            ret = futex_wait_multiple( futexes, 2, &tmo_p );
+        }
+        else
+            ret = futex_wait_multiple( futexes, 2, NULL );
+
+        if (__atomic_load_n( &apc_event->signaled, __ATOMIC_SEQ_CST ))
+            return STATUS_USER_APC;
     }
     else
-        ret = futex_wait( addr, val, NULL );
+    {
+        if (end)
+        {
+            LONGLONG timeleft = update_timeout( *end );
+            struct timespec tmo_p;
+            tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+            tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+            ret = futex_wait( addr, val, &tmo_p );
+        }
+        else
+            ret = futex_wait( addr, val, NULL );
+    }
 
     if (!ret)
         return 0;
@@ -570,15 +603,29 @@ static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end )
 static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     BOOLEAN wait_any, BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
-    struct futex_wait_block futexes[MAXIMUM_WAIT_OBJECTS];
+    static const LARGE_INTEGER zero = {0};
+
+    struct futex_wait_block futexes[MAXIMUM_WAIT_OBJECTS + 1];
     struct fsync *objs[MAXIMUM_WAIT_OBJECTS];
     int has_fsync = 0, has_server = 0;
     BOOL msgwait = FALSE;
     int dummy_futex = 0;
     LONGLONG timeleft;
     LARGE_INTEGER now;
+    DWORD waitcount;
     ULONGLONG end;
     int i, ret;
+
+    /* Grab the APC futex if we don't already have it. */
+    if (alertable && !ntdll_get_thread_data()->fsync_apc_idx)
+    {
+        SERVER_START_REQ( get_fsync_apc_idx )
+        {
+            if (!(ret = wine_server_call( req )))
+                ntdll_get_thread_data()->fsync_apc_idx = reply->shm_idx;
+        }
+        SERVER_END_REQ;
+    }
 
     NtQuerySystemTime( &now );
     if (timeout)
@@ -618,6 +665,8 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
         if (msgwait)
             TRACE(" or driver events");
+        if (alertable)
+            TRACE(", alertable");
 
         if (!timeout)
             TRACE(", timeout = INFINITE.\n");
@@ -731,6 +780,21 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 #endif
             }
 
+            if (alertable)
+            {
+                struct event *event = get_shm( ntdll_get_thread_data()->fsync_apc_idx );
+                if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                    goto userapc;
+
+                futexes[i].addr = &event->signaled;
+                futexes[i].val = 0;
+#if __SIZEOF_POINTER__ == 4
+                futexes[i].pad = 0;
+#endif
+                i++;
+            }
+            waitcount = i;
+
             /* Looks like everything is contended, so wait. */
 
             if (timeout)
@@ -740,10 +804,10 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                 tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
                 tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
 
-                ret = futex_wait_multiple( futexes, count, &tmo_p );
+                ret = futex_wait_multiple( futexes, waitcount, &tmo_p );
             }
             else
-                ret = futex_wait_multiple( futexes, count, NULL );
+                ret = futex_wait_multiple( futexes, waitcount, NULL );
 
             /* FUTEX_WAIT_MULTIPLE can succeed or return -EINTR, -EAGAIN,
              * -EFAULT/-EACCES, -ETIMEDOUT. In the first three cases we need to
@@ -800,7 +864,7 @@ tryagain:
 
                     while ((current = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST )))
                     {
-                        status = do_single_wait( &mutex->tid, current, timeout ? &end : NULL );
+                        status = do_single_wait( &mutex->tid, current, timeout ? &end : NULL, alertable );
                         if (status != STATUS_PENDING)
                             break;
                     }
@@ -812,7 +876,7 @@ tryagain:
 
                     while (!__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
                     {
-                        status = do_single_wait( &event->signaled, 0, timeout ? &end : NULL );
+                        status = do_single_wait( &event->signaled, 0, timeout ? &end : NULL, alertable );
                         if (status != STATUS_PENDING)
                             break;
                     }
@@ -823,6 +887,8 @@ tryagain:
                     TRACE("Wait timed out.\n");
                     return status;
                 }
+                else if (status == STATUS_USER_APC)
+                    goto userapc;
             }
 
             /* If we got here and we haven't timed out, that means all of the
@@ -931,6 +997,21 @@ tooslow:
             }
         } /* while (1) */
     } /* else (wait-all) */
+
+    assert(0);  /* shouldn't reach here... */
+
+userapc:
+    TRACE("Woken up by user APC.\n");
+
+    /* We have to make a server call anyway to get the APC to execute, so just
+     * delegate down to server_select(). */
+    ret = server_select( NULL, 0, SELECT_INTERRUPTIBLE | SELECT_ALERTABLE, &zero );
+
+    /* This can happen if we received a system APC, and the APC fd was woken up
+     * before we got SIGUSR1. poll() doesn't return EINTR in that case. The
+     * right thing to do seems to be to return STATUS_USER_APC anyway. */
+    if (ret == STATUS_TIMEOUT) ret = STATUS_USER_APC;
+    return ret;
 }
 
 /* Like esync, we need to let the server know when we are doing a message wait,
