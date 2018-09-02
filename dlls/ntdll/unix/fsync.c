@@ -116,6 +116,13 @@ struct event
 };
 C_ASSERT(sizeof(struct event) == 8);
 
+struct mutex
+{
+    int tid;
+    int count;  /* recursion count */
+};
+C_ASSERT(sizeof(struct mutex) == 8);
+
 static char shm_name[29];
 static int shm_fd;
 static void **shm_addrs;
@@ -425,6 +432,16 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
     if (prev) *prev = current;
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
+{
+    TRACE("name %s, initial %d.\n",
+        attr ? debugstr_us(attr->ObjectName) : "<no name>", initial);
+
+    return create_fsync( FSYNC_MUTEX, handle, access, attr,
+        initial ? GetCurrentThreadId() : 0, initial ? 1 : 0 );
 }
 
 static LONGLONG update_timeout( ULONGLONG end )
