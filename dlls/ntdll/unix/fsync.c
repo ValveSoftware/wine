@@ -75,6 +75,11 @@ static inline int futex_wake( int *addr, int val )
     return syscall( __NR_futex, addr, 1, val, NULL, 0, 0 );
 }
 
+static inline int futex_wait( int *addr, int val, struct timespec *timeout )
+{
+    return syscall( __NR_futex, addr, 0, val, timeout, 0, 0 );
+}
+
 int do_fsync(void)
 {
 #ifdef __linux__
@@ -478,6 +483,29 @@ static LONGLONG update_timeout( ULONGLONG end )
     return timeleft;
 }
 
+static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end )
+{
+    int ret;
+
+    if (end)
+    {
+        LONGLONG timeleft = update_timeout( *end );
+        struct timespec tmo_p;
+        tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+        tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+        ret = futex_wait( addr, val, &tmo_p );
+    }
+    else
+        ret = futex_wait( addr, val, NULL );
+
+    if (!ret)
+        return 0;
+    else if (ret < 0 && errno == ETIMEDOUT)
+        return STATUS_TIMEOUT;
+    else
+        return STATUS_PENDING;
+}
+
 static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     BOOLEAN wait_any, BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
@@ -669,9 +697,179 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     }
     else
     {
-        FIXME("Wait-all not implemented.\n");
-        return STATUS_NOT_IMPLEMENTED;
-    }
+        /* Wait-all is a little trickier to implement correctly. Fortunately,
+         * it's not as common.
+         *
+         * The idea is basically just to wait in sequence on every object in the
+         * set. Then when we're done, try to grab them all in a tight loop. If
+         * that fails, release any resources we've grabbed (and yes, we can
+         * reliably do this—it's just mutexes and semaphores that we have to
+         * put back, and in both cases we just put back 1), and if any of that
+         * fails we start over.
+         *
+         * What makes this inherently bad is that we might temporarily grab a
+         * resource incorrectly. Hopefully it'll be quick (and hey, it won't
+         * block on wineserver) so nobody will notice. Besides, consider: if
+         * object A becomes signaled but someone grabs it before we can grab it
+         * and everything else, then they could just as well have grabbed it
+         * before it became signaled. Similarly if object A was signaled and we
+         * were blocking on object B, then B becomes available and someone grabs
+         * A before we can, then they might have grabbed A before B became
+         * signaled. In either case anyone who tries to wait on A or B will be
+         * waiting for an instant while we put things back. */
+
+        NTSTATUS status = STATUS_SUCCESS;
+        int current;
+
+        while (1)
+        {
+tryagain:
+            /* First step: try to wait on each object in sequence. */
+
+            for (i = 0; i < count; i++)
+            {
+                struct fsync *obj = objs[i];
+
+                if (obj && obj->type == FSYNC_MUTEX)
+                {
+                    struct mutex *mutex = obj->shm;
+
+                    if (mutex->tid == GetCurrentThreadId())
+                        continue;
+
+                    while ((current = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST )))
+                    {
+                        status = do_single_wait( &mutex->tid, current, timeout ? &end : NULL );
+                        if (status != STATUS_PENDING)
+                            break;
+                    }
+                }
+                else if (obj)
+                {
+                    /* this works for semaphores too */
+                    struct event *event = obj->shm;
+
+                    while (!__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                    {
+                        status = do_single_wait( &event->signaled, 0, timeout ? &end : NULL );
+                        if (status != STATUS_PENDING)
+                            break;
+                    }
+                }
+
+                if (status == STATUS_TIMEOUT)
+                {
+                    TRACE("Wait timed out.\n");
+                    return status;
+                }
+            }
+
+            /* If we got here and we haven't timed out, that means all of the
+             * handles were signaled. Check to make sure they still are. */
+            for (i = 0; i < count; i++)
+            {
+                struct fsync *obj = objs[i];
+
+                if (obj && obj->type == FSYNC_MUTEX)
+                {
+                    struct mutex *mutex = obj->shm;
+
+                    if (mutex->tid == GetCurrentThreadId())
+                        continue;   /* ok */
+
+                    if (__atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST ))
+                        goto tryagain;
+                }
+                else if (obj)
+                {
+                    struct event *event = obj->shm;
+
+                    if (!__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                        goto tryagain;
+                }
+            }
+
+            /* Yep, still signaled. Now quick, grab everything. */
+            for (i = 0; i < count; i++)
+            {
+                struct fsync *obj = objs[i];
+                switch (obj->type)
+                {
+                case FSYNC_MUTEX:
+                {
+                    struct mutex *mutex = obj->shm;
+                    if (mutex->tid == GetCurrentThreadId())
+                        break;
+                    if (__sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() ))
+                        goto tooslow;
+                    break;
+                }
+                case FSYNC_SEMAPHORE:
+                {
+                    struct semaphore *semaphore = obj->shm;
+                    if (__sync_fetch_and_sub( &semaphore->count, 1 ) <= 0)
+                        goto tooslow;
+                    break;
+                }
+                case FSYNC_AUTO_EVENT:
+                {
+                    struct event *event = obj->shm;
+                    if (!__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
+                        goto tooslow;
+                    break;
+                }
+                default:
+                    /* If a manual-reset event changed between there and
+                     * here, it's shouldn't be a problem. */
+                    break;
+                }
+            }
+
+            /* If we got here, we successfully waited on every object.
+             * Make sure to let ourselves know that we grabbed the mutexes. */
+            for (i = 0; i < count; i++)
+            {
+                if (objs[i] && objs[i]->type == FSYNC_MUTEX)
+                {
+                    struct mutex *mutex = objs[i]->shm;
+                    mutex->count++;
+                }
+            }
+
+            TRACE("Wait successful.\n");
+            return STATUS_SUCCESS;
+
+tooslow:
+            for (--i; i >= 0; i--)
+            {
+                struct fsync *obj = objs[i];
+                switch (obj->type)
+                {
+                case FSYNC_MUTEX:
+                {
+                    struct mutex *mutex = obj->shm;
+                    __atomic_store_n( &mutex->tid, 0, __ATOMIC_SEQ_CST );
+                    break;
+                }
+                case FSYNC_SEMAPHORE:
+                {
+                    struct semaphore *semaphore = obj->shm;
+                    __sync_fetch_and_add( &semaphore->count, 1 );
+                    break;
+                }
+                case FSYNC_AUTO_EVENT:
+                {
+                    struct event *event = obj->shm;
+                    __atomic_store_n( &event->signaled, 1, __ATOMIC_SEQ_CST );
+                    break;
+                }
+                default:
+                    /* doesn't need to be put back */
+                    break;
+                }
+            }
+        } /* while (1) */
+    } /* else (wait-all) */
 }
 
 /* Like esync, we need to let the server know when we are doing a message wait,
