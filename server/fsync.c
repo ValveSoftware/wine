@@ -375,6 +375,33 @@ DECL_HANDLER(create_fsync)
     if (root) release_object( root );
 }
 
+DECL_HANDLER(open_fsync)
+{
+    struct unicode_str name = get_req_unicode_str();
+
+    reply->handle = open_object( current->process, req->rootdir, req->access,
+                                 &fsync_ops, &name, req->attributes );
+
+    if (reply->handle)
+    {
+        struct fsync *fsync;
+
+        if (!(fsync = (struct fsync *)get_handle_obj( current->process, reply->handle,
+                                                      0, &fsync_ops )))
+            return;
+
+        if (!type_matches( req->type, fsync->type ))
+        {
+            set_error( STATUS_OBJECT_TYPE_MISMATCH );
+            release_object( fsync );
+            return;
+        }
+
+        reply->type = fsync->type;
+        reply->shm_idx = fsync->shm_idx;
+        release_object( fsync );
+    }
+}
 
 /* Retrieve the index of a shm section which will be signaled by the server. */
 DECL_HANDLER(get_fsync_idx)
