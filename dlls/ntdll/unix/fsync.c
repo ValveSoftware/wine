@@ -291,12 +291,14 @@ static NTSTATUS create_fsync( enum fsync_type type, HANDLE *handle,
         req->access = access;
         req->low    = low;
         req->high   = high;
+        req->type   = type;
         wine_server_add_data( req, objattr, len );
         ret = wine_server_call( req );
         if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
         {
             *handle = wine_server_ptr_handle( reply->handle );
             shm_idx = reply->shm_idx;
+            type    = reply->type;
         }
     }
     SERVER_END_REQ;
