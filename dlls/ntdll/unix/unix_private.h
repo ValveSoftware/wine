@@ -59,6 +59,7 @@ struct ntdll_thread_data
     pthread_t          pthread_id;    /* pthread thread id */
     struct list        entry;         /* entry in TEB list */
     int                esync_apc_fd;  /* fd to wait on for user APCs */
+    unsigned int       fsync_apc_idx;
 };
 
 C_ASSERT( sizeof(struct ntdll_thread_data) <= sizeof(((TEB *)0)->GdiTebBatch) );
