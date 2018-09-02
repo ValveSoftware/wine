@@ -627,6 +627,9 @@ NTSTATUS WINAPI NtCreateMutant( HANDLE *handle, ACCESS_MASK access, const OBJECT
     data_size_t len;
     struct object_attributes *objattr;
 
+    if (do_fsync())
+        return fsync_create_mutex( handle, access, attr, owned );
+
     if (do_esync())
         return esync_create_mutex( handle, access, attr, owned );
 
