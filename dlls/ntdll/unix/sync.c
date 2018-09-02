@@ -646,6 +646,9 @@ NTSTATUS WINAPI NtReleaseMutant( HANDLE handle, LONG *prev_count )
 {
     unsigned int ret;
 
+    if (do_fsync())
+        return fsync_release_mutex( handle, prev_count );
+
     if (do_esync())
         return esync_release_mutex( handle, prev_count );
 
