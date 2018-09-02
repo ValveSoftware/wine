@@ -29,6 +29,8 @@ extern NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN initial );
 extern NTSTATUS fsync_set_event( HANDLE handle, LONG *prev );
 extern NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev );
+extern NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, BOOLEAN initial );
 
 extern NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                     BOOLEAN alertable, const LARGE_INTEGER *timeout );
