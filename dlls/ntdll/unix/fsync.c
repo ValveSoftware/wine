@@ -444,6 +444,14 @@ NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
     return create_fsync( type, handle, access, attr, initial, 0xdeadbeef );
 }
 
+NTSTATUS fsync_open_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    return open_fsync( FSYNC_AUTO_EVENT, handle, access, attr );
+}
+
 NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
 {
     struct event *event;
