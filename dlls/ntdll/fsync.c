@@ -408,10 +408,11 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     struct fsync *obj;
     struct semaphore *semaphore;
     ULONG current;
+    NTSTATUS ret;
 
     TRACE("%p, %d, %p.\n", handle, count, prev);
 
-    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( handle, &obj ))) return ret;
     semaphore = obj->shm;
 
     do
@@ -454,10 +455,11 @@ NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
     struct event *event;
     struct fsync *obj;
     LONG current;
+    NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
-    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( handle, &obj ))) return ret;
     event = obj->shm;
 
     if (!(current = __atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST )))
@@ -473,10 +475,11 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
     struct event *event;
     struct fsync *obj;
     LONG current;
+    NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
-    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( handle, &obj ))) return ret;
     event = obj->shm;
 
     current = __atomic_exchange_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
@@ -508,10 +511,11 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
 {
     struct mutex *mutex;
     struct fsync *obj;
+    NTSTATUS ret;
 
     TRACE("%p, %p.\n", handle, prev);
 
-    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( handle, &obj ))) return ret;
     mutex = obj->shm;
 
     if (mutex->tid != GetCurrentThreadId()) return STATUS_MUTANT_NOT_OWNED;
@@ -974,10 +978,10 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
     const LARGE_INTEGER *timeout )
 {
-    struct fsync *obj = get_cached_object( signal );
+    struct fsync *obj;
     NTSTATUS ret;
 
-    if (!obj) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( signal, &obj ))) return ret;
 
     switch (obj->type)
     {
