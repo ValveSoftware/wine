@@ -131,6 +131,7 @@ struct fsync
 };
 
 static void fsync_dump( struct object *obj, int verbose );
+static unsigned int fsync_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static unsigned int fsync_map_access( struct object *obj, unsigned int access );
 static void fsync_destroy( struct object *obj );
 
@@ -143,7 +144,7 @@ const struct object_ops fsync_ops =
     NULL,                      /* remove_queue */
     NULL,                      /* signaled */
     NULL,                      /* get_esync_fd */
-    NULL,                      /* get_fsync_idx */
+    fsync_get_fsync_idx,       /* get_fsync_idx */
     NULL,                      /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -165,6 +166,13 @@ static void fsync_dump( struct object *obj, int verbose )
     struct fsync *fsync = (struct fsync *)obj;
     assert( obj->ops == &fsync_ops );
     fprintf( stderr, "fsync idx=%d\n", fsync->shm_idx );
+}
+
+static unsigned int fsync_get_fsync_idx( struct object *obj, enum fsync_type *type)
+{
+    struct fsync *fsync = (struct fsync *)obj;
+    *type = fsync->type;
+    return fsync->shm_idx;
 }
 
 static unsigned int fsync_map_access( struct object *obj, unsigned int access )
