@@ -574,6 +574,28 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         futexes[i].val = current;
                         break;
                     }
+                    case FSYNC_MUTEX:
+                    {
+                        struct mutex *mutex = obj->shm;
+
+                        if (mutex->tid == GetCurrentThreadId())
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            mutex->count++;
+                            return i;
+                        }
+
+                        if (!__sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() ))
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            mutex->count = 1;
+                            return i;
+                        }
+
+                        futexes[i].addr = &mutex->tid;
+                        futexes[i].val  = mutex->tid;
+                        break;
+                    }
                     case FSYNC_AUTO_EVENT:
                     {
                         struct event *event = obj->shm;
