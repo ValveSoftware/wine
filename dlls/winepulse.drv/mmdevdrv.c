@@ -847,6 +847,9 @@ static void pulse_underflow_callback(pa_stream *s, void *userdata)
     ACImpl *This = userdata;
     WARN("%p: Underflow\n", userdata);
     This->just_underran = TRUE;
+    /* re-sync */
+    This->pa_offs_bytes = This->lcl_offs_bytes;
+    This->pa_held_bytes = This->held_bytes;
 }
 
 static void pulse_started_callback(pa_stream *s, void *userdata)
@@ -2308,6 +2311,11 @@ static HRESULT WINAPI AudioRenderClient_ReleaseBuffer(
 
     This->held_bytes += written_bytes;
     This->pa_held_bytes += written_bytes;
+    if(This->pa_held_bytes > This->real_bufsize_bytes){
+        This->pa_offs_bytes += This->pa_held_bytes - This->real_bufsize_bytes;
+        This->pa_offs_bytes %= This->real_bufsize_bytes;
+        This->pa_held_bytes = This->real_bufsize_bytes;
+    }
     This->clock_written += written_bytes;
     This->locked = 0;
 
