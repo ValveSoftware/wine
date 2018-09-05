@@ -2123,7 +2123,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
  */
 static BOOL glxdrv_wglMakeCurrent(HDC hdc, struct wgl_context *ctx)
 {
-    BOOL ret = FALSE;
+    BOOL ret = FALSE, setup_fs_hack = FALSE;
     struct gl_drawable *gl;
 
     TRACE("(%p,%p)\n", hdc, ctx);
@@ -2152,11 +2152,16 @@ static BOOL glxdrv_wglMakeCurrent(HDC hdc, struct wgl_context *ctx)
         if (ret)
         {
             NtCurrentTeb()->glContext = ctx;
+            if (ctx->fs_hack != gl->fs_hack || (ctx->fs_hack && ctx->drawables[0] != gl))
+                setup_fs_hack = TRUE;
             ctx->hdc = hdc;
             set_context_drawables( ctx, gl, gl );
             ctx->refresh_drawables = FALSE;
-            ctx->fs_hack = gl->fs_hack;
-            fs_hack_setup_context( ctx, gl );
+            if (setup_fs_hack)
+            {
+                ctx->fs_hack = gl->fs_hack;
+                fs_hack_setup_context( ctx, gl );
+            }
             ctx->has_been_current = TRUE;
             LeaveCriticalSection( &context_section );
             goto done;
@@ -2176,7 +2181,7 @@ done:
  */
 static BOOL X11DRV_wglMakeContextCurrentARB( HDC draw_hdc, HDC read_hdc, struct wgl_context *ctx )
 {
-    BOOL ret = FALSE;
+    BOOL ret = FALSE, setup_fs_hack = FALSE;
     struct gl_drawable *draw_gl, *read_gl = NULL;
 
     TRACE("(%p,%p,%p)\n", draw_hdc, read_hdc, ctx);
@@ -2200,11 +2205,16 @@ static BOOL X11DRV_wglMakeContextCurrentARB( HDC draw_hdc, HDC read_hdc, struct 
         if (ret)
         {
             NtCurrentTeb()->glContext = ctx;
+            if (ctx->fs_hack != draw_gl->fs_hack || (ctx->fs_hack && ctx->drawables[0] != draw_gl))
+                setup_fs_hack = TRUE;
             ctx->hdc = draw_hdc;
             set_context_drawables( ctx, draw_gl, read_gl );
             ctx->refresh_drawables = FALSE;
-            ctx->fs_hack = draw_gl->fs_hack;
-            fs_hack_setup_context( ctx, draw_gl );
+            if (setup_fs_hack)
+            {
+                ctx->fs_hack = draw_gl->fs_hack;
+                fs_hack_setup_context( ctx, draw_gl );
+            }
             ctx->has_been_current = TRUE;
             LeaveCriticalSection( &context_section );
             goto done;
