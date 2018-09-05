@@ -415,6 +415,7 @@ static const GLubyte *wglGetString(GLenum name);
 
 /* Fullscreen hack */
 static void (*pglBindFramebuffer)( GLenum target, GLuint framebuffer );
+static void (*pglBindFramebufferEXT)( GLenum target, GLuint framebuffer );
 static void (*pglBindRenderbuffer)( GLenum target, GLuint renderbuffer );
 static void (*pglBlitFramebuffer)( GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter );
 void (*pglDeleteFramebuffers)( GLsizei n, const GLuint *framebuffers );
@@ -429,6 +430,7 @@ static void (*pglRenderbufferStorage)( GLenum target, GLenum internalformat, GLs
 static void (*pglRenderbufferStorageMultisample)( GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height );
 
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
+static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer );
 static void wglDrawBuffer( GLenum buffer );
 static void wglReadBuffer( GLenum src );
 
@@ -622,6 +624,7 @@ static BOOL WINAPI init_opengl( INIT_ONCE *once, void *param, void **context )
     /* Fullscreen hack */
 #define LOAD_FUNCPTR(func) p##func = (void *)pglXGetProcAddressARB((const unsigned char *)#func);
     LOAD_FUNCPTR( glBindFramebuffer );
+    LOAD_FUNCPTR( glBindFramebufferEXT );
     LOAD_FUNCPTR( glBindRenderbuffer );
     LOAD_FUNCPTR( glBlitFramebuffer );
     LOAD_FUNCPTR( glDeleteFramebuffers );
@@ -1876,6 +1879,8 @@ static PROC glxdrv_wglGetProcAddress(LPCSTR lpszProc)
     if (!strncmp(lpszProc, "wgl", 3)) return NULL;
     if (!strcmp(lpszProc, "glBindFramebuffer"))
         return (PROC)wglBindFramebuffer;
+    if (!strcmp(lpszProc, "glBindFramebufferEXT"))
+        return (PROC)wglBindFramebufferEXT;
     return pglXGetProcAddressARB((const GLubyte*)lpszProc);
 }
 
@@ -1952,7 +1957,6 @@ static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_ha
     config->samples = attribs->samples;
 }
 
-static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *gl )
 {
     GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer;
@@ -2288,6 +2292,22 @@ static void wglBindFramebuffer( GLenum target, GLuint framebuffer )
         ctx->current_read_fbo = framebuffer;
 
     pglBindFramebuffer( target, framebuffer );
+}
+
+static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer )
+{
+    struct wgl_context *ctx = NtCurrentTeb()->glContext;
+
+    TRACE( "target %#x, framebuffer %u\n", target, framebuffer );
+    if (ctx->fs_hack && !framebuffer)
+        framebuffer = ctx->fs_hack_fbo;
+
+    if (target == GL_DRAW_FRAMEBUFFER || target == GL_FRAMEBUFFER)
+        ctx->current_draw_fbo = framebuffer;
+    if (target == GL_READ_FRAMEBUFFER || target == GL_FRAMEBUFFER)
+        ctx->current_read_fbo = framebuffer;
+
+    pglBindFramebufferEXT( target, framebuffer );
 }
 
 static void wglDrawBuffer( GLenum buffer )
