@@ -2418,7 +2418,6 @@ static void wglFinish(void)
                 fs_hack_setup_context( ctx, gl );
             if(!gl->fs_hack_did_swapbuf)
                 fs_hack_blit_framebuffer( gl, GL_FRONT );
-            gl->fs_hack_did_swapbuf = FALSE;
         }else if(gl->fs_hack_context_set_up){
             ctx->fs_hack = FALSE;
             fs_hack_setup_context(ctx, gl);
@@ -2459,7 +2458,6 @@ static void wglFlush(void)
                 fs_hack_setup_context( ctx, gl );
             if(!gl->fs_hack_did_swapbuf)
                 fs_hack_blit_framebuffer( gl, GL_FRONT );
-            gl->fs_hack_did_swapbuf = FALSE;
         }else if(gl->fs_hack_context_set_up){
             ctx->fs_hack = FALSE;
             fs_hack_setup_context(ctx, gl);
