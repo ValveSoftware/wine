@@ -280,7 +280,7 @@ static LONG X11DRV_nores_SetCurrentMode(int mode)
     }else{
         double w = dd_modes[currentMode].width;
         double h = dd_modes[currentMode].height;
-        if(fs_modes[0].w + h < fs_modes[0].h + w){ /* in other words, (real_width - w < real_height - h) */
+        if(fs_modes[0].w / (double)fs_modes[0].h < w / h){ /* real mode is narrower than fake mode */
             /* scale to fit width */
             h = fs_modes[0].w * (h / w);
             w = fs_modes[0].w;
