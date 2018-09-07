@@ -304,13 +304,16 @@ static LONG encodeBase64W(const BYTE *in_buf, int in_len, LPCWSTR sep,
     needed = bytes + pad_bytes + 1;
     needed += (needed / 64 + 1) * strlenW(sep);
 
-    if (needed > *out_len)
-    {
+
+    if (out_buf == NULL) {
         *out_len = needed;
-        return ERROR_INSUFFICIENT_BUFFER;
+        return ERROR_SUCCESS;
     }
-    else
-        *out_len = needed;
+
+    if (needed > *out_len)
+        return ERROR_INSUFFICIENT_BUFFER;
+
+    *out_len = needed;
 
     /* Three bytes of input give 4 chars of output */
     div = in_len / 3;
@@ -409,6 +412,10 @@ static BOOL BinaryToBase64W(const BYTE *pbBinary,
         charsNeeded += strlenW(header) + strlenW(sep);
     if (trailer)
         charsNeeded += strlenW(trailer) + strlenW(sep);
+    if (pszString == NULL) {
+        *pcchString = charsNeeded - 1;
+        return ERROR_SUCCESS;
+    }
     if (charsNeeded <= *pcchString)
     {
         LPWSTR ptr = pszString;
@@ -431,14 +438,12 @@ static BOOL BinaryToBase64W(const BYTE *pbBinary,
         }
         *pcchString = charsNeeded - 1;
     }
-    else if (pszString)
+    else
     {
         *pcchString = charsNeeded;
         SetLastError(ERROR_INSUFFICIENT_BUFFER);
         ret = FALSE;
     }
-    else
-        *pcchString = charsNeeded;
     return ret;
 }
 
