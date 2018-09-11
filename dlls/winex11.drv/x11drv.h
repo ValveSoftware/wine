@@ -321,6 +321,7 @@ struct x11drv_valuator_data
     double min;
     double max;
     int number;
+    double accum;
 };
 
 struct x11drv_thread_data
