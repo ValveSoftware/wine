@@ -619,6 +619,7 @@ extern BOOL fs_hack_window_is_hacked(HWND hwnd, struct x11drv_win_data *data) DE
 extern void fs_hack_xrender_copy(Drawable src, Drawable dst) DECLSPEC_HIDDEN;
 extern double fs_hack_user_to_real_w, fs_hack_user_to_real_h DECLSPEC_HIDDEN;
 extern double fs_hack_real_to_user_w, fs_hack_real_to_user_h DECLSPEC_HIDDEN;
+BOOL fs_hack_matches_last_mode(int w, int h) DECLSPEC_HIDDEN;
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {

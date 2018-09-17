@@ -1527,8 +1527,9 @@ BOOL CDECL X11DRV_ClipCursor( LPCRECT clip )
         }
 
         /* we are clipping if the clip rectangle is smaller than the screen */
-        if (clip->left > virtual_rect.left || clip->right < virtual_rect.right ||
-            clip->top > virtual_rect.top || clip->bottom < virtual_rect.bottom)
+        if (!(!fs_hack_enabled() && clip->left == 0 && clip->top == 0 && fs_hack_matches_last_mode(clip->right, clip->bottom)) && /* fix games trying to reset clip to full screen */
+                (clip->left > virtual_rect.left || clip->right < virtual_rect.right ||
+                 clip->top > virtual_rect.top || clip->bottom < virtual_rect.bottom))
         {
             if (grab_clipping_window( clip )) return TRUE;
         }
