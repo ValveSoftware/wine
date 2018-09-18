@@ -28,6 +28,8 @@ import "d3d11.idl";
 interface IWineD3D11Texture2D : ID3D11Texture2D
 {
     void access_gl_texture(gl_texture_callback callback, IUnknown *depth_texture, const void *data, unsigned int data_size);
+
+    unsigned int get_gl_texture();
 }
 
 typedef void (__cdecl *user_cs_callback)(const void *data, unsigned int data_size);
