@@ -76,6 +76,7 @@ enum wined3d_cs_op
     WINED3D_CS_OP_GENERATE_MIPMAPS,
     WINED3D_CS_OP_GL_TEXTURE_CALLBACK,
     WINED3D_CS_OP_USER_CALLBACK,
+    WINED3D_CS_OP_FENCE,
     WINED3D_CS_OP_STOP,
 };
 
@@ -463,6 +464,12 @@ struct wined3d_cs_user_callback
 struct wined3d_cs_wait_idle
 {
     enum wined3d_cs_op opcode;
+};
+
+struct wined3d_cs_fence
+{
+    enum wined3d_cs_op opcode;
+    GLsync *fence;
 };
 
 struct wined3d_cs_stop
@@ -2679,6 +2686,48 @@ void wined3d_cs_emit_user_callback(struct wined3d_cs *cs,
     cs->ops->submit(cs, WINED3D_CS_QUEUE_DEFAULT);
 }
 
+static void wined3d_cs_exec_fence(struct wined3d_cs *cs, const void *data)
+{
+    const struct wined3d_cs_fence *op = data;
+    GLsync fence;
+    struct wined3d_context *context;
+    struct wined3d_context_gl *context_gl;
+    const struct wined3d_gl_info *gl_info;
+
+    context = context_acquire(cs->device, NULL, 0);
+    context_gl = wined3d_context_gl(context);
+    gl_info = context_gl->gl_info;
+
+    fence = GL_EXTCALL(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
+    gl_info->gl_ops.gl.p_glFlush();
+
+    *op->fence = fence;
+
+    checkGLcall("fence");
+
+    context_release(context);
+}
+
+static GLsync wined3d_cs_emit_fence(struct wined3d_cs *cs)
+{
+    struct wined3d_cs_fence *op;
+    GLsync fence;
+
+    op = cs->ops->require_space(cs, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
+    op->opcode = WINED3D_CS_OP_FENCE;
+    op->fence = &fence;
+
+    cs->ops->submit(cs, WINED3D_CS_QUEUE_DEFAULT);
+    cs->ops->finish(cs, WINED3D_CS_QUEUE_DEFAULT);
+
+    return fence;
+}
+
+GLsync wined3d_cs_synchronize(struct wined3d_cs *cs)
+{
+    return wined3d_cs_emit_fence(cs);
+}
+
 static void wined3d_cs_emit_stop(struct wined3d_cs *cs)
 {
     struct wined3d_cs_stop *op;
@@ -2741,6 +2790,7 @@ static void (* const wined3d_cs_op_handlers[])(struct wined3d_cs *cs, const void
     /* WINED3D_CS_OP_GENERATE_MIPMAPS            */ wined3d_cs_exec_generate_mipmaps,
     /* WINED3D_CS_OP_GL_TEXTURE_CALLBACK         */ wined3d_cs_exec_gl_texture_callback,
     /* WINED3D_CS_OP_USER_CALLBACK               */ wined3d_cs_exec_user_callback,
+    /* WINED3D_CS_OP_FENCE                       */ wined3d_cs_exec_fence,
 };
 
 static void *wined3d_cs_st_require_space(struct wined3d_cs *cs, size_t size, enum wined3d_cs_queue_id queue_id)
