@@ -801,7 +801,7 @@ static void focus_out( Display *display , HWND hwnd )
         ULONGLONG now = GetTickCount64();
         if(data->take_focus_back > 0 &&
                 now >= data->take_focus_back &&
-                now - data->take_focus_back < 100){
+                now - data->take_focus_back < 1000){
             data->take_focus_back = 0;
             TRACE("workaround mutter bug, taking focus back\n");
             XSetInputFocus( data->display, data->whole_window, RevertToParent, CurrentTime);

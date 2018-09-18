@@ -59,6 +59,8 @@ typedef int Status;
 #include "wine/gdi_driver.h"
 #include "wine/list.h"
 
+#include "mwm.h"
+
 #define MAX_DASHLEN 16
 
 #define WINE_XDND_VERSION 5
@@ -581,6 +583,7 @@ struct x11drv_win_data
     Pixmap         icon_mask;
     unsigned long *icon_bits;
     unsigned int   icon_size;
+    MwmHints prev_hints;
 };
 
 extern struct x11drv_win_data *get_win_data( HWND hwnd ) DECLSPEC_HIDDEN;
