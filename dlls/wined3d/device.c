@@ -545,6 +545,8 @@ void wined3d_device_cleanup(struct wined3d_device *device)
 
     wined3d_stateblock_state_cleanup(&device->stateblock_state);
 
+    wined3d_destroy_gl_vr_context(&device->vr_context);
+
     wined3d_cs_destroy(device->cs);
 
     if (device->recording && wined3d_stateblock_decref(device->recording))

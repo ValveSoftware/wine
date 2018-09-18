@@ -3142,6 +3142,14 @@ struct wined3d_stateblock_state
     struct wined3d_light_state light_state;
 };
 
+struct wined3d_vr_gl_context
+{
+    HWND window;
+    HDC dc;
+    HGLRC gl_ctx;
+    const struct wined3d_gl_info *gl_info;
+};
+
 struct wined3d_device
 {
     LONG ref;
@@ -3221,6 +3229,8 @@ struct wined3d_device
     /* Context management */
     struct wined3d_context **contexts;
     UINT context_count;
+
+    struct wined3d_vr_gl_context vr_context;
 };
 
 void wined3d_device_cleanup(struct wined3d_device *device) DECLSPEC_HIDDEN;
@@ -3982,6 +3992,10 @@ void wined3d_cs_emit_gl_texture_callback(struct wined3d_cs *cs, struct wined3d_t
         const void *data, unsigned int size) DECLSPEC_HIDDEN;
 void wined3d_cs_emit_user_callback(struct wined3d_cs *cs,
         wined3d_cs_callback callback, const void *data, unsigned int size) DECLSPEC_HIDDEN;
+
+GLsync wined3d_cs_synchronize(struct wined3d_cs *cs) DECLSPEC_HIDDEN;
+
+void wined3d_destroy_gl_vr_context(struct wined3d_vr_gl_context *ctx) DECLSPEC_HIDDEN;
 
 static inline void wined3d_cs_push_constants(struct wined3d_cs *cs, enum wined3d_push_constants p,
         unsigned int start_idx, unsigned int count, const void *constants)

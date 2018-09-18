@@ -744,6 +744,20 @@ static void STDMETHODCALLTYPE d3d11_texture2d_access_gl_texture(IWineD3D11Textur
     wined3d_mutex_unlock();
 }
 
+static unsigned int STDMETHODCALLTYPE d3d11_texture2d_get_gl_texture(IWineD3D11Texture2D *iface)
+{
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
+    unsigned int id;
+
+    TRACE("iface %p.\n", iface);
+
+    wined3d_mutex_lock();
+    id = wined3d_get_gl_texture(texture->wined3d_texture);
+    wined3d_mutex_unlock();
+
+    return id;
+}
+
 static const struct IWineD3D11Texture2DVtbl d3d11_texture2d_vtbl =
 {
     /* IUnknown methods */
@@ -763,6 +777,7 @@ static const struct IWineD3D11Texture2DVtbl d3d11_texture2d_vtbl =
     d3d11_texture2d_GetDesc,
     /* IWineD3D11Texture methods */
     d3d11_texture2d_access_gl_texture,
+    d3d11_texture2d_get_gl_texture,
 };
 
 struct d3d_texture2d *unsafe_impl_from_ID3D11Texture2D(ID3D11Texture2D *iface)
