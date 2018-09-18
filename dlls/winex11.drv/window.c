@@ -2540,7 +2540,7 @@ void CDECL X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags
     }
 
     /* don't change position if we are about to minimize or maximize a managed window */
-    if (!event_type &&
+    if ((!event_type || event_type == PropertyNotify) &&
         !(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE))))
         sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
 
@@ -2573,7 +2573,7 @@ void CDECL X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags
         else
         {
             if (swp_flags & (SWP_FRAMECHANGED|SWP_STATECHANGED)) set_wm_hints( data );
-            if (!event_type) update_net_wm_states( data );
+            if (!event_type || event_type == PropertyNotify) update_net_wm_states( data );
         }
     }
 
