@@ -103,6 +103,41 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 static CRITICAL_SECTION win_data_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
 
+/* enable workarounds for mutter bugs */
+static BOOL wm_is_mutter(Display *display)
+{
+    Window root = DefaultRootWindow(display), *wm_check;
+    Atom type;
+    int format;
+    unsigned long count, remaining;
+    static int cached = -1;
+    char *wm_name;
+
+    if(cached < 0){
+        if (XGetWindowProperty( display, root, x11drv_atom(_NET_SUPPORTING_WM_CHECK), 0,
+                                 sizeof(*wm_check)/sizeof(CARD32), False, x11drv_atom(WINDOW),
+                                 &type, &format, &count, &remaining, (unsigned char **)&wm_check ) == Success){
+            if (type == x11drv_atom(WINDOW) &&
+                    XGetWindowProperty( display, *wm_check, x11drv_atom(_NET_WM_NAME), 0,
+                        256/sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
+                        &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success){
+                if(type == x11drv_atom(UTF8_STRING)){
+                    TRACE("Got WM name %s\n", wm_name);
+                    cached = (strcmp(wm_name, "GNOME Shell") == 0) ||
+                        (strcmp(wm_name, "Mutter") == 0);
+                }
+                XFree(wm_name);
+            }else
+                cached = 0;
+            XFree(wm_check);
+        }else
+            cached = 0;
+    }
+
+    return cached;
+}
+
+
 /***********************************************************************
  * http://standards.freedesktop.org/startup-notification-spec
  */
@@ -966,7 +1001,12 @@ void update_net_wm_states( struct x11drv_win_data *data )
         new_state |= (1 << NET_WM_STATE_MAXIMIZED);
 
     ex_style = GetWindowLongW( data->hwnd, GWL_EXSTYLE );
-    if (ex_style & WS_EX_TOPMOST)
+    if ((ex_style & WS_EX_TOPMOST) &&
+            /* mutter < 3.31 has a bug where a FULLSCREEN and ABOVE window when
+             * minimized will incorrectly show a black window.  this workaround
+             * should be removed when the fix is widely distributed.  see
+             * mutter issue #306. */
+            !(wm_is_mutter(data->display) && (new_state & (1 << NET_WM_STATE_FULLSCREEN))))
         new_state |= (1 << NET_WM_STATE_ABOVE);
     if (ex_style & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE))
         new_state |= (1 << NET_WM_STATE_SKIP_TASKBAR) | (1 << NET_WM_STATE_SKIP_PAGER);
