@@ -468,6 +468,7 @@ struct wined3d_cs_wait_idle
 struct wined3d_cs_fence
 {
     enum wined3d_cs_op opcode;
+    struct wined3d_texture *texture;
     GLsync *fence;
 };
 
@@ -2618,6 +2619,8 @@ static void wined3d_cs_exec_fence(struct wined3d_cs *cs, const void *data)
     context = context_acquire(cs->device, NULL, 0);
     gl_info = context->gl_info;
 
+    wined3d_texture_load_location(op->texture, 0, context, WINED3D_LOCATION_TEXTURE_RGB);
+
     fence = GL_EXTCALL(glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0));
     context->gl_info->gl_ops.gl.p_glFlush();
 
@@ -2628,13 +2631,14 @@ static void wined3d_cs_exec_fence(struct wined3d_cs *cs, const void *data)
     context_release(context);
 }
 
-static GLsync wined3d_cs_emit_fence(struct wined3d_cs *cs)
+static GLsync wined3d_cs_emit_fence(struct wined3d_cs *cs, struct wined3d_texture *texture)
 {
     struct wined3d_cs_fence *op;
     GLsync fence;
 
     op = cs->ops->require_space(cs, sizeof(*op), WINED3D_CS_QUEUE_DEFAULT);
     op->opcode = WINED3D_CS_OP_FENCE;
+    op->texture = texture;
     op->fence = &fence;
 
     cs->ops->submit(cs, WINED3D_CS_QUEUE_DEFAULT);
@@ -2643,9 +2647,9 @@ static GLsync wined3d_cs_emit_fence(struct wined3d_cs *cs)
     return fence;
 }
 
-GLsync wined3d_cs_synchronize(struct wined3d_cs *cs)
+GLsync wined3d_cs_synchronize(struct wined3d_cs *cs, struct wined3d_texture *texture)
 {
-    return wined3d_cs_emit_fence(cs);
+    return wined3d_cs_emit_fence(cs, texture);
 }
 
 static void wined3d_cs_emit_stop(struct wined3d_cs *cs)

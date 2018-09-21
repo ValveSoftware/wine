@@ -3989,7 +3989,7 @@ unsigned int CDECL wined3d_get_gl_texture(struct wined3d_texture *texture)
     if (!(gl_info = wined3d_prepare_vr_gl_context(device)))
         return 0;
 
-    fence = wined3d_cs_synchronize(device->cs);
+    fence = wined3d_cs_synchronize(device->cs, texture);
     GL_EXTCALL(glWaitSync(fence, 0, GL_TIMEOUT_IGNORED));
     GL_EXTCALL(glDeleteSync(fence));
 
