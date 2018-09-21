@@ -719,27 +719,20 @@ static void STDMETHODCALLTYPE d3d11_texture2d_GetDesc(IWineD3D11Texture2D *iface
 }
 
 static void STDMETHODCALLTYPE d3d11_texture2d_access_gl_texture(IWineD3D11Texture2D *iface,
-        gl_texture_callback callback, IUnknown *depth_unk, const void *data, unsigned int size)
+        gl_texture_callback callback, IWineD3D11Texture2D *depth_texture, const void *data, unsigned int size)
 {
     struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface), *depth_tex = NULL;
-    IWineD3D11Texture2D *depth_d3d11 = NULL;
+    struct wined3d_texture *wined3d_depth_texture = NULL;
 
-    TRACE("iface %p, callback %p, data %p, size %u.\n", iface, callback, data, size);
+    TRACE("iface %p, callback %p, depth_texture %p, data %p, size %u.\n",
+            iface, callback, depth_texture, data, size);
 
     wined3d_mutex_lock();
 
-    if (depth_unk)
-    {
-        HRESULT hr;
-        hr = IUnknown_QueryInterface(depth_unk, &IID_IWineD3D11Texture2D, (void**)&depth_d3d11);
-        if(hr == S_OK)
-            depth_tex = impl_from_IWineD3D11Texture2D(depth_d3d11);
-    }
+    if (depth_texture)
+        wined3d_depth_texture = impl_from_IWineD3D11Texture2D(depth_texture)->wined3d_texture;
 
-    wined3d_access_gl_texture(texture->wined3d_texture, callback, depth_tex ? depth_tex->wined3d_texture : NULL, data, size);
-
-    if (depth_d3d11)
-        IWineD3D11Texture2D_Release(depth_d3d11);
+    wined3d_access_gl_texture(texture->wined3d_texture, callback, wined3d_depth_texture, data, size);
 
     wined3d_mutex_unlock();
 }
