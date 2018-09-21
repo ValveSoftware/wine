@@ -3993,7 +3993,7 @@ void wined3d_cs_emit_gl_texture_callback(struct wined3d_cs *cs, struct wined3d_t
 void wined3d_cs_emit_user_callback(struct wined3d_cs *cs,
         wined3d_cs_callback callback, const void *data, unsigned int size) DECLSPEC_HIDDEN;
 
-GLsync wined3d_cs_synchronize(struct wined3d_cs *cs) DECLSPEC_HIDDEN;
+GLsync wined3d_cs_synchronize(struct wined3d_cs *cs, struct wined3d_texture *texture) DECLSPEC_HIDDEN;
 
 void wined3d_destroy_gl_vr_context(struct wined3d_vr_gl_context *ctx) DECLSPEC_HIDDEN;
 
