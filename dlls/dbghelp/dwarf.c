@@ -3497,6 +3497,11 @@ BOOL dwarf2_parse(struct module* module, ULONG_PTR load_offset,
     BOOL                ret = TRUE;
     struct module_format* dwarf2_modfmt;
 
+/* Our DWARF parser has been known to crash winedbg in some cases. Since
+ * probably no concerned parties are going to be using plain winedbg, just don't
+ * bother parsing anything. */
+return FALSE;
+
     if (!dwarf2_init_section(&eh_frame,                fmap, ".eh_frame",     NULL,             &eh_frame_sect))
         /* lld produces .eh_fram to avoid generating a long name */
         dwarf2_init_section(&eh_frame,                fmap, ".eh_fram",      NULL,             &eh_frame_sect);
