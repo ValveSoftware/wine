@@ -757,7 +757,7 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
         {
             if (style & WS_MINIMIZEBOX) mwm_hints.functions |= MWM_FUNC_MINIMIZE;
             if (style & WS_MAXIMIZEBOX) mwm_hints.functions |= MWM_FUNC_MAXIMIZE;
-            if (style & WS_SYSMENU)     mwm_hints.functions |= MWM_FUNC_CLOSE;
+            /*if (style & WS_SYSMENU)*/     mwm_hints.functions |= MWM_FUNC_CLOSE;
         }
     }
 
