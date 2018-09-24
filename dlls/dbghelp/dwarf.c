@@ -3516,6 +3516,11 @@ BOOL dwarf2_parse(struct module* module, unsigned long load_offset,
     BOOL                ret = TRUE;
     struct module_format* dwarf2_modfmt;
 
+/* Our DWARF parser has been known to crash winedbg in some cases. Since
+ * probably no concerned parties are going to be using plain winedbg, just don't
+ * bother parsing anything. */
+return FALSE;
+
     dwarf2_init_section(&eh_frame,                fmap, ".eh_frame",     NULL,             &eh_frame_sect);
     dwarf2_init_section(&section[section_debug],  fmap, ".debug_info",   ".zdebug_info",   &debug_sect);
     dwarf2_init_section(&section[section_abbrev], fmap, ".debug_abbrev", ".zdebug_abbrev", &debug_abbrev_sect);
