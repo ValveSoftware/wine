@@ -350,7 +350,7 @@ void mmap_init(void)
     struct list *ptr;
     char stack;
     char * const stack_ptr = &stack;
-    char *user_space_limit = (char *)0x7ffe0000;
+    char *user_space_limit = (char *)0xbffe0000;
 
     reserve_malloc_space( 8 * 1024 * 1024 );
 
