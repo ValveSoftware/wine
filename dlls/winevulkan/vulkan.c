@@ -256,17 +256,10 @@ static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src
     dst->enabledLayerCount = 0;
     dst->ppEnabledLayerNames = NULL;
 
-    TRACE("Enabled %u extensions.\n", dst->enabledExtensionCount);
+    TRACE("Enabled extensions: %u.\n", dst->enabledExtensionCount);
     for (i = 0; i < dst->enabledExtensionCount; i++)
     {
-        const char *extension_name = dst->ppEnabledExtensionNames[i];
-        TRACE("Extension %u: %s.\n", i, debugstr_a(extension_name));
-        if (!wine_vk_device_extension_supported(extension_name))
-        {
-            WARN("Extension %s is not supported.\n", debugstr_a(extension_name));
-            wine_vk_device_free_create_info(dst);
-            return VK_ERROR_EXTENSION_NOT_PRESENT;
-        }
+        TRACE("Extension %u: %s.\n", i, debugstr_a(dst->ppEnabledExtensionNames[i]));
     }
 
     return VK_SUCCESS;
