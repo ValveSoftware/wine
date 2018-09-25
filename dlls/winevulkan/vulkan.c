@@ -279,16 +279,10 @@ static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src
     dst->enabledLayerCount = 0;
     dst->ppEnabledLayerNames = NULL;
 
-    TRACE("Enabled %u extensions.\n", dst->enabledExtensionCount);
+    TRACE("Enabled extensions: %u.\n", dst->enabledExtensionCount);
     for (i = 0; i < dst->enabledExtensionCount; i++)
     {
-        const char *extension_name = dst->ppEnabledExtensionNames[i];
-        TRACE("Extension %u: %s.\n", i, debugstr_a(extension_name));
-        if (!wine_vk_device_extension_supported(extension_name))
-        {
-            WARN("Extension %s is not supported.\n", debugstr_a(extension_name));
-            return VK_ERROR_EXTENSION_NOT_PRESENT;
-        }
+        TRACE("Extension %u: %s.\n", i, debugstr_a(dst->ppEnabledExtensionNames[i]));
     }
 
     return VK_SUCCESS;
@@ -625,8 +619,7 @@ VkResult WINAPI wine_vkCreateDevice(VkPhysicalDevice phys_dev,
     res = wine_vk_device_convert_create_info(create_info, &create_info_host);
     if (res != VK_SUCCESS)
     {
-        if (res != VK_ERROR_EXTENSION_NOT_PRESENT)
-            ERR("Failed to convert VkDeviceCreateInfo, res=%d.\n", res);
+        ERR("Failed to convert VkDeviceCreateInfo, res=%d.\n", res);
         wine_vk_device_free(object);
         return res;
     }
