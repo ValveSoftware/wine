@@ -1069,6 +1069,7 @@ void update_net_wm_states( struct x11drv_win_data *data )
 {
     DWORD i, style, ex_style, new_state = 0;
     HMONITOR monitor;
+    unsigned long net_wm_bypass_compositor = 0;
 
     if (!data->managed) return;
     if (data->whole_window == root_window) return;
@@ -1084,8 +1085,11 @@ void update_net_wm_states( struct x11drv_win_data *data )
         else if (!(style & WS_MINIMIZE))
         {
             if (!wm_is_steamcompmgr(data->display) || !fs_hack_enabled(monitor))
+            {
                 /* when fs hack is enabled, we don't want steamcompmgr to resize the window to be fullscreened */
+                net_wm_bypass_compositor = 1;
                 new_state |= (1 << NET_WM_STATE_FULLSCREEN);
+            }
         }
     }
     else if (style & WS_MAXIMIZE)
