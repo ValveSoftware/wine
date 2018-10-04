@@ -985,6 +985,7 @@ void update_user_time( Time time )
 void update_net_wm_states( struct x11drv_win_data *data )
 {
     DWORD i, style, ex_style, new_state = 0;
+    unsigned long net_wm_bypass_compositor = 0;
 
     if (!data->managed) return;
     if (data->whole_window == root_window) return;
@@ -997,7 +998,10 @@ void update_net_wm_states( struct x11drv_win_data *data )
         if ((style & WS_MAXIMIZE) && (style & WS_CAPTION) == WS_CAPTION)
             new_state |= (1 << NET_WM_STATE_MAXIMIZED);
         else if (!(style & WS_MINIMIZE))
+	{
+            net_wm_bypass_compositor = 1;
             new_state |= (1 << NET_WM_STATE_FULLSCREEN);
+	}
     }
     else if (style & WS_MAXIMIZE)
         new_state |= (1 << NET_WM_STATE_MAXIMIZED);
@@ -1063,6 +1067,9 @@ void update_net_wm_states( struct x11drv_win_data *data )
         }
     }
     data->net_wm_state = new_state;
+
+    XChangeProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_BYPASS_COMPOSITOR), XA_CARDINAL,
+                     32, PropModeReplace, (unsigned char *)&net_wm_bypass_compositor, 1 );
 
     if(new_state & (1 << NET_WM_STATE_FULLSCREEN))
         XSetInputFocus( data->display, data->whole_window, RevertToParent, CurrentTime );
