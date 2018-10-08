@@ -836,9 +836,7 @@ static HRESULT GetInternalConnections(IBaseFilter* pfilter, IPin* pinputpin, IPi
 
     TRACE("(%p, %p, %p, %p)\n", pfilter, pinputpin, pppins, pnb);
     hr = IPin_QueryInternalConnections(pinputpin, NULL, &nb);
-    if (hr == S_OK) {
-        /* Rendered input */
-    } else if (hr == S_FALSE) {
+    if (SUCCEEDED(hr) && nb > 0) {
         *pppins = CoTaskMemAlloc(sizeof(IPin*)*nb);
         hr = IPin_QueryInternalConnections(pinputpin, *pppins, &nb);
         if (hr != S_OK) {
