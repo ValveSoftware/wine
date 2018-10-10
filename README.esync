@@ -23,7 +23,7 @@ On distributions using systemd, the settings in `/etc/security/limits.conf`
 will be overridden by systemd's own settings. If you run `ulimit -Hn` and it
 returns a lower number than the one you've previously set, then you can set
 
-DefaultLimitNOFILE=1048576
+DefaultLimitNOFILE=1024:1048576
 
 in both `/etc/systemd/system.conf` and `/etc/systemd/user.conf`. You can then
 execute `sudo systemctl daemon-reexec` and restart your session. Check again
