@@ -721,7 +721,7 @@ static void STDMETHODCALLTYPE d3d11_texture2d_GetDesc(IWineD3D11Texture2D *iface
 static void STDMETHODCALLTYPE d3d11_texture2d_access_gl_texture(IWineD3D11Texture2D *iface,
         gl_texture_callback callback, IWineD3D11Texture2D *depth_texture, const void *data, unsigned int size)
 {
-    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface), *depth_tex = NULL;
+    struct d3d_texture2d *texture = impl_from_IWineD3D11Texture2D(iface);
     struct wined3d_texture *wined3d_depth_texture = NULL;
 
     TRACE("iface %p, callback %p, depth_texture %p, data %p, size %u.\n",
