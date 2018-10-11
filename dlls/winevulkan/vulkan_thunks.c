@@ -1295,6 +1295,12 @@ void WINAPI wine_vkCmdBeginQuery(VkCommandBuffer commandBuffer, VkQueryPool quer
     commandBuffer->device->funcs.p_vkCmdBeginQuery(commandBuffer->command_buffer, queryPool, query, flags);
 }
 
+static void WINAPI wine_vkCmdBeginQueryIndexedEXT(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query, VkQueryControlFlags flags, uint32_t index)
+{
+    TRACE("%p, 0x%s, %u, %#x, %u\n", commandBuffer, wine_dbgstr_longlong(queryPool), query, flags, index);
+    commandBuffer->device->funcs.p_vkCmdBeginQueryIndexedEXT(commandBuffer->command_buffer, queryPool, query, flags, index);
+}
+
 void WINAPI wine_vkCmdBeginRenderPass(VkCommandBuffer commandBuffer, const VkRenderPassBeginInfo *pRenderPassBegin, VkSubpassContents contents)
 {
 #if defined(USE_STRUCT_CONVERSION)
@@ -1325,6 +1331,12 @@ static void WINAPI wine_vkCmdBeginRenderPass2KHR(VkCommandBuffer commandBuffer, 
 #endif
 }
 
+static void WINAPI wine_vkCmdBeginTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer, uint32_t counterBufferCount, const VkBuffer *pCounterBuffers, const VkDeviceSize *pCounterBufferOffsets)
+{
+    TRACE("%p, %u, %u, %p, %p\n", commandBuffer, firstCounterBuffer, counterBufferCount, pCounterBuffers, pCounterBufferOffsets);
+    commandBuffer->device->funcs.p_vkCmdBeginTransformFeedbackEXT(commandBuffer->command_buffer, firstCounterBuffer, counterBufferCount, pCounterBuffers, pCounterBufferOffsets);
+}
+
 void WINAPI wine_vkCmdBindDescriptorSets(VkCommandBuffer commandBuffer, VkPipelineBindPoint pipelineBindPoint, VkPipelineLayout layout, uint32_t firstSet, uint32_t descriptorSetCount, const VkDescriptorSet *pDescriptorSets, uint32_t dynamicOffsetCount, const uint32_t *pDynamicOffsets)
 {
     TRACE("%p, %#x, 0x%s, %u, %u, %p, %u, %p\n", commandBuffer, pipelineBindPoint, wine_dbgstr_longlong(layout), firstSet, descriptorSetCount, pDescriptorSets, dynamicOffsetCount, pDynamicOffsets);
@@ -1347,6 +1359,12 @@ static void WINAPI wine_vkCmdBindShadingRateImageNV(VkCommandBuffer commandBuffe
 {
     TRACE("%p, 0x%s, %#x\n", commandBuffer, wine_dbgstr_longlong(imageView), imageLayout);
     commandBuffer->device->funcs.p_vkCmdBindShadingRateImageNV(commandBuffer->command_buffer, imageView, imageLayout);
+}
+
+static void WINAPI wine_vkCmdBindTransformFeedbackBuffersEXT(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount, const VkBuffer *pBuffers, const VkDeviceSize *pOffsets, const VkDeviceSize *pSizes)
+{
+    TRACE("%p, %u, %u, %p, %p, %p\n", commandBuffer, firstBinding, bindingCount, pBuffers, pOffsets, pSizes);
+    commandBuffer->device->funcs.p_vkCmdBindTransformFeedbackBuffersEXT(commandBuffer->command_buffer, firstBinding, bindingCount, pBuffers, pOffsets, pSizes);
 }
 
 void WINAPI wine_vkCmdBindVertexBuffers(VkCommandBuffer commandBuffer, uint32_t firstBinding, uint32_t bindingCount, const VkBuffer *pBuffers, const VkDeviceSize *pOffsets)
@@ -1499,6 +1517,12 @@ void WINAPI wine_vkCmdDrawIndirect(VkCommandBuffer commandBuffer, VkBuffer buffe
     commandBuffer->device->funcs.p_vkCmdDrawIndirect(commandBuffer->command_buffer, buffer, offset, drawCount, stride);
 }
 
+static void WINAPI wine_vkCmdDrawIndirectByteCountEXT(VkCommandBuffer commandBuffer, uint32_t instanceCount, uint32_t firstInstance, VkBuffer counterBuffer, VkDeviceSize counterBufferOffset, uint32_t counterOffset, uint32_t vertexStride)
+{
+    TRACE("%p, %u, %u, 0x%s, 0x%s, %u, %u\n", commandBuffer, instanceCount, firstInstance, wine_dbgstr_longlong(counterBuffer), wine_dbgstr_longlong(counterBufferOffset), counterOffset, vertexStride);
+    commandBuffer->device->funcs.p_vkCmdDrawIndirectByteCountEXT(commandBuffer->command_buffer, instanceCount, firstInstance, counterBuffer, counterBufferOffset, counterOffset, vertexStride);
+}
+
 static void WINAPI wine_vkCmdDrawIndirectCountAMD(VkCommandBuffer commandBuffer, VkBuffer buffer, VkDeviceSize offset, VkBuffer countBuffer, VkDeviceSize countBufferOffset, uint32_t maxDrawCount, uint32_t stride)
 {
     TRACE("%p, 0x%s, 0x%s, 0x%s, 0x%s, %u, %u\n", commandBuffer, wine_dbgstr_longlong(buffer), wine_dbgstr_longlong(offset), wine_dbgstr_longlong(countBuffer), wine_dbgstr_longlong(countBufferOffset), maxDrawCount, stride);
@@ -1541,6 +1565,12 @@ void WINAPI wine_vkCmdEndQuery(VkCommandBuffer commandBuffer, VkQueryPool queryP
     commandBuffer->device->funcs.p_vkCmdEndQuery(commandBuffer->command_buffer, queryPool, query);
 }
 
+static void WINAPI wine_vkCmdEndQueryIndexedEXT(VkCommandBuffer commandBuffer, VkQueryPool queryPool, uint32_t query, uint32_t index)
+{
+    TRACE("%p, 0x%s, %u, %u\n", commandBuffer, wine_dbgstr_longlong(queryPool), query, index);
+    commandBuffer->device->funcs.p_vkCmdEndQueryIndexedEXT(commandBuffer->command_buffer, queryPool, query, index);
+}
+
 void WINAPI wine_vkCmdEndRenderPass(VkCommandBuffer commandBuffer)
 {
     TRACE("%p\n", commandBuffer);
@@ -1551,6 +1581,12 @@ static void WINAPI wine_vkCmdEndRenderPass2KHR(VkCommandBuffer commandBuffer, co
 {
     TRACE("%p, %p\n", commandBuffer, pSubpassEndInfo);
     commandBuffer->device->funcs.p_vkCmdEndRenderPass2KHR(commandBuffer->command_buffer, pSubpassEndInfo);
+}
+
+static void WINAPI wine_vkCmdEndTransformFeedbackEXT(VkCommandBuffer commandBuffer, uint32_t firstCounterBuffer, uint32_t counterBufferCount, const VkBuffer *pCounterBuffers, const VkDeviceSize *pCounterBufferOffsets)
+{
+    TRACE("%p, %u, %u, %p, %p\n", commandBuffer, firstCounterBuffer, counterBufferCount, pCounterBuffers, pCounterBufferOffsets);
+    commandBuffer->device->funcs.p_vkCmdEndTransformFeedbackEXT(commandBuffer->command_buffer, firstCounterBuffer, counterBufferCount, pCounterBuffers, pCounterBufferOffsets);
 }
 
 void WINAPI wine_vkCmdFillBuffer(VkCommandBuffer commandBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size, uint32_t data)
@@ -2859,12 +2895,15 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkBindImageMemory2KHR", &wine_vkBindImageMemory2KHR},
     {"vkCmdBeginConditionalRenderingEXT", &wine_vkCmdBeginConditionalRenderingEXT},
     {"vkCmdBeginQuery", &wine_vkCmdBeginQuery},
+    {"vkCmdBeginQueryIndexedEXT", &wine_vkCmdBeginQueryIndexedEXT},
     {"vkCmdBeginRenderPass", &wine_vkCmdBeginRenderPass},
     {"vkCmdBeginRenderPass2KHR", &wine_vkCmdBeginRenderPass2KHR},
+    {"vkCmdBeginTransformFeedbackEXT", &wine_vkCmdBeginTransformFeedbackEXT},
     {"vkCmdBindDescriptorSets", &wine_vkCmdBindDescriptorSets},
     {"vkCmdBindIndexBuffer", &wine_vkCmdBindIndexBuffer},
     {"vkCmdBindPipeline", &wine_vkCmdBindPipeline},
     {"vkCmdBindShadingRateImageNV", &wine_vkCmdBindShadingRateImageNV},
+    {"vkCmdBindTransformFeedbackBuffersEXT", &wine_vkCmdBindTransformFeedbackBuffersEXT},
     {"vkCmdBindVertexBuffers", &wine_vkCmdBindVertexBuffers},
     {"vkCmdBlitImage", &wine_vkCmdBlitImage},
     {"vkCmdClearAttachments", &wine_vkCmdClearAttachments},
@@ -2885,6 +2924,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdDrawIndexedIndirectCountAMD", &wine_vkCmdDrawIndexedIndirectCountAMD},
     {"vkCmdDrawIndexedIndirectCountKHR", &wine_vkCmdDrawIndexedIndirectCountKHR},
     {"vkCmdDrawIndirect", &wine_vkCmdDrawIndirect},
+    {"vkCmdDrawIndirectByteCountEXT", &wine_vkCmdDrawIndirectByteCountEXT},
     {"vkCmdDrawIndirectCountAMD", &wine_vkCmdDrawIndirectCountAMD},
     {"vkCmdDrawIndirectCountKHR", &wine_vkCmdDrawIndirectCountKHR},
     {"vkCmdDrawMeshTasksIndirectCountNV", &wine_vkCmdDrawMeshTasksIndirectCountNV},
@@ -2892,8 +2932,10 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdDrawMeshTasksNV", &wine_vkCmdDrawMeshTasksNV},
     {"vkCmdEndConditionalRenderingEXT", &wine_vkCmdEndConditionalRenderingEXT},
     {"vkCmdEndQuery", &wine_vkCmdEndQuery},
+    {"vkCmdEndQueryIndexedEXT", &wine_vkCmdEndQueryIndexedEXT},
     {"vkCmdEndRenderPass", &wine_vkCmdEndRenderPass},
     {"vkCmdEndRenderPass2KHR", &wine_vkCmdEndRenderPass2KHR},
+    {"vkCmdEndTransformFeedbackEXT", &wine_vkCmdEndTransformFeedbackEXT},
     {"vkCmdExecuteCommands", &wine_vkCmdExecuteCommands},
     {"vkCmdFillBuffer", &wine_vkCmdFillBuffer},
     {"vkCmdNextSubpass", &wine_vkCmdNextSubpass},
@@ -3140,6 +3182,7 @@ static const char * const vk_device_extensions[] =
     "VK_EXT_shader_subgroup_ballot",
     "VK_EXT_shader_subgroup_vote",
     "VK_EXT_shader_viewport_index_layer",
+    "VK_EXT_transform_feedback",
     "VK_EXT_validation_cache",
     "VK_EXT_vertex_attribute_divisor",
     "VK_IMG_filter_cubic",
