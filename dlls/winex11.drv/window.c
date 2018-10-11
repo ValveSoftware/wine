@@ -1012,6 +1012,7 @@ void update_user_time( Time time )
 void update_net_wm_states( struct x11drv_win_data *data )
 {
     DWORD i, style, ex_style, new_state = 0;
+    unsigned long net_wm_bypass_compositor = 0;
 
     if (!data->managed) return;
     if (data->whole_window == root_window) return;
@@ -1021,6 +1022,7 @@ void update_net_wm_states( struct x11drv_win_data *data )
         new_state |= data->net_wm_state & ((1 << NET_WM_STATE_FULLSCREEN)|(1 << NET_WM_STATE_MAXIMIZED));
     if ((!data->fs_hack || fs_hack_enabled()) && is_window_rect_fullscreen( &data->whole_rect ))
     {
+        net_wm_bypass_compositor = 1;
         if ((style & WS_MAXIMIZE) && (style & WS_CAPTION) == WS_CAPTION)
             new_state |= (1 << NET_WM_STATE_MAXIMIZED);
         else if (!(style & WS_MINIMIZE))
@@ -1089,6 +1091,10 @@ void update_net_wm_states( struct x11drv_win_data *data )
         }
     }
     data->net_wm_state = new_state;
+
+    /* HACK: Bypass the compositor in fullscreen mode with fshack */
+    XChangeProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_BYPASS_COMPOSITOR), XA_CARDINAL,
+                     32, PropModeReplace, (unsigned char *)&net_wm_bypass_compositor, 1 );
 
     if(new_state & (1 << NET_WM_STATE_FULLSCREEN))
         XSetInputFocus( data->display, data->whole_window, RevertToParent, CurrentTime );
