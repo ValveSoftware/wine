@@ -1387,11 +1387,11 @@ static NTSTATUS map_image( HANDLE hmapping, ACCESS_MASK access, int fd, SIZE_T m
     server_enter_uninterrupted_section( &csVirtual, &sigset );
 
     if (base >= (char *)address_space_start)  /* make sure the DOS area remains free */
-        status = map_view( &view, base, total_size, mask, FALSE, SEC_IMAGE | SEC_FILE |
+        status = map_view( &view, base, total_size, mask, TRUE, SEC_IMAGE | SEC_FILE |
                            VPROT_COMMITTED | VPROT_READ | VPROT_EXEC | VPROT_WRITECOPY );
 
     if (status != STATUS_SUCCESS)
-        status = map_view( &view, NULL, total_size, mask, FALSE, SEC_IMAGE | SEC_FILE |
+        status = map_view( &view, NULL, total_size, mask, TRUE, SEC_IMAGE | SEC_FILE |
                            VPROT_COMMITTED | VPROT_READ | VPROT_EXEC | VPROT_WRITECOPY );
 
     if (status != STATUS_SUCCESS) goto error;
@@ -2750,7 +2750,7 @@ static int get_free_mem_state_callback( void *start, size_t size, void *arg )
     MEMORY_BASIC_INFORMATION *info = arg;
     void *end = (char *)start + size;
 
-    if ((char *)info->BaseAddress + info->RegionSize < (char *)start) return 0;
+    if ((char *)info->BaseAddress + info->RegionSize <= (char *)start) return 0;
 
     if (info->BaseAddress >= end)
     {
