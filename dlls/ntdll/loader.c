@@ -1992,6 +1992,127 @@ static BOOL is_valid_binary( HMODULE module, const pe_image_info_t *info )
 #endif
 }
 
+/***************************************************************************
+ *	get_basename
+ *
+ * Return the base name of a file name (i.e. remove the path components).
+ */
+static const WCHAR *get_basename( const WCHAR *name )
+{
+    const WCHAR *ptr;
+
+    if (name[0] && name[1] == ':') name += 2;  /* strip drive specification */
+    if ((ptr = strrchrW( name, '\\' ))) name = ptr + 1;
+    if ((ptr = strrchrW( name, '/' ))) name = ptr + 1;
+    return name;
+}
+
+
+/***************************************************************************
+ *	large_address_aware_env
+ *
+ * Checks for override for LARGE_ADDRESS_AWARE bit in environment. Takes
+ * precedence over any AppDefaults registry entry.
+ *
+ * Returns:
+ *    -1 if not defined in environment (prefer registry entries)
+ *     0 if disabled
+ *     1 if enabled
+ */
+static int large_address_aware_env( void )
+{
+    static int large_address_aware_cached = -2;
+
+    if (large_address_aware_cached == -2) {
+        const char *envvar = getenv("WINE_LARGE_ADDRESS_AWARE");
+        if (envvar)
+            large_address_aware_cached = atoi(envvar);
+        else
+            large_address_aware_cached = -1;
+    }
+
+    return large_address_aware_cached;
+}
+
+/***************************************************************************
+ *	needs_override_large_address_aware
+ *
+ * Checks for AppDefaults override for LARGE_ADDRESS_AWARE bit.
+ *
+ * Returns:
+ *    TRUE  if override was found in the registry, or environment variable
+ *          explicitly enabled this override
+ *    FALSE if no override was found in the registry, or environment variable
+ *          explicitly disabled this override
+ */
+static BOOL needs_override_large_address_aware(const WCHAR *exename)
+{
+    BOOL result;
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING nameW;
+    UNICODE_STRING valueNameW;
+    HANDLE root;
+    WCHAR *str;
+    static const WCHAR AppDefaultsW[] = {'S','o','f','t','w','a','r','e','\\','W','i','n','e','\\',
+                                         'A','p','p','D','e','f','a','u','l','t','s','\\',0};
+    static const WCHAR LargeAddressAwareW[] = {'L','a','r','g','e','A','d','d','r','e','s','s','A','w','a','r','e',0};
+    char tmp[64];
+    KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)tmp;
+    DWORD count;
+    int env_override;
+    HANDLE app_key = (HANDLE)-1;
+
+    /* Environment variable takes precedence. */
+    env_override = large_address_aware_env();
+    if (large_address_aware_env() >= 0)
+        return env_override;
+
+    exename = get_basename(exename);
+
+    if (app_key != (HANDLE)-1) return FALSE;
+
+    str = RtlAllocateHeap( GetProcessHeap(), 0,
+                           sizeof(AppDefaultsW) + strlenW(exename) * sizeof(WCHAR) );
+    if (!str) return FALSE;
+    strcpyW( str, AppDefaultsW );
+    strcatW( str, exename );
+
+    RtlOpenCurrentUser( KEY_ALL_ACCESS, &root );
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = root;
+    attr.ObjectName = &nameW;
+    attr.Attributes = 0;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+    RtlInitUnicodeString( &nameW, str );
+    RtlInitUnicodeString( &valueNameW, LargeAddressAwareW );
+
+    result = FALSE;
+
+    /* @@ Wine registry key: HKCU\Software\Wine\AppDefaults\app.exe */
+    if (!NtOpenKey( &app_key, KEY_ALL_ACCESS, &attr ))
+    {
+        if (!NtQueryValueKey( app_key, &valueNameW, KeyValuePartialInformation, tmp, sizeof(tmp)-1, &count))
+        {
+            if (info->DataLength >= sizeof(DWORD))
+            {
+                if ((*(DWORD *)info->Data) != 0)
+                    result = TRUE;
+            }
+        }
+        NtClose( app_key );
+    }
+    NtClose( root );
+    RtlFreeHeap( GetProcessHeap(), 0, str );
+    return result;
+}
+
+BOOL CDECL __wine_needs_override_large_address_aware(void)
+{
+    PEB *peb = NtCurrentTeb()->Peb;
+    return needs_override_large_address_aware(peb->ProcessParameters->ImagePathName.Buffer);
+}
+
 
 /******************************************************************************
  *	load_native_dll  (internal)
@@ -3369,6 +3490,7 @@ void WINAPI LdrInitializeThunk( void *kernel_start, ULONG_PTR unknown2,
     static const WCHAR globalflagW[] = {'G','l','o','b','a','l','F','l','a','g',0};
     NTSTATUS status;
     WINE_MODREF *wm;
+    BOOL force_large_address_aware = FALSE;
     PEB *peb = NtCurrentTeb()->Peb;
 
     kernel32_start_process = kernel_start;
@@ -3388,7 +3510,11 @@ void WINAPI LdrInitializeThunk( void *kernel_start, ULONG_PTR unknown2,
     if (!peb->ProcessParameters->WindowTitle.Buffer)
         peb->ProcessParameters->WindowTitle = wm->ldr.FullDllName;
     version_init( wm->ldr.FullDllName.Buffer );
-    virtual_set_large_address_space();
+
+    if (needs_override_large_address_aware(peb->ProcessParameters->ImagePathName.Buffer) > 0)
+        force_large_address_aware = TRUE;
+
+    virtual_set_large_address_space(force_large_address_aware);
 
     LdrQueryImageFileExecutionOptions( &peb->ProcessParameters->ImagePathName, globalflagW,
                                        REG_DWORD, &peb->NtGlobalFlag, sizeof(peb->NtGlobalFlag), NULL );
