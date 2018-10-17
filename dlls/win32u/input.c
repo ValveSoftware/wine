@@ -2533,7 +2533,7 @@ BOOL clip_fullscreen_window( HWND hwnd, BOOL reset )
     if (!NtUserGetWindowRect( hwnd, &rect )) return FALSE;
     if (!NtUserIsWindowRectFullScreen( &rect )) return FALSE;
     if (is_captured_by_system()) return FALSE;
-    if (NtGetTickCount() - thread_info->clipping_reset < 1000) return FALSE;
+    if (!reset && NtGetTickCount() - thread_info->clipping_reset < 1000) return FALSE;
     if (!reset && clipping_cursor && thread_info->clipping_cursor) return FALSE;  /* already clipping */
 
     if (!(monitor = NtUserMonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST ))) return FALSE;
