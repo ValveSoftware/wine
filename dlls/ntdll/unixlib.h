@@ -96,7 +96,7 @@ struct unix_funcs
     NTSTATUS      (CDECL *virtual_alloc_thread_stack)( INITIAL_TEB *stack, SIZE_T reserve_size, SIZE_T commit_size, SIZE_T *pthread_size );
     ssize_t       (CDECL *virtual_locked_recvmsg)( int fd, struct msghdr *hdr, int flags );
     void          (CDECL *virtual_release_address_space)(void);
-    void          (CDECL *virtual_set_large_address_space)(void);
+    void          (CDECL *virtual_set_large_address_space)(BOOL);
 
     /* thread/process functions */
     void          (CDECL *exit_thread)( int status );

@@ -1597,6 +1597,7 @@
 
 # Virtual memory
 @ cdecl __wine_locked_recvmsg(long ptr long)
+@ cdecl __wine_needs_override_large_address_aware()
 
 # Version
 @ cdecl wine_get_version()

@@ -111,7 +111,7 @@ extern NTSTATUS CDECL virtual_map_section( HANDLE handle, PVOID *addr_ptr, unsig
 extern NTSTATUS CDECL virtual_alloc_thread_stack( INITIAL_TEB *stack, SIZE_T reserve_size, SIZE_T commit_size, SIZE_T *pthread_size ) DECLSPEC_HIDDEN;
 extern ssize_t CDECL virtual_locked_recvmsg( int fd, struct msghdr *hdr, int flags ) DECLSPEC_HIDDEN;
 extern void CDECL virtual_release_address_space(void) DECLSPEC_HIDDEN;
-extern void CDECL virtual_set_large_address_space(void) DECLSPEC_HIDDEN;
+extern void CDECL virtual_set_large_address_space(BOOL) DECLSPEC_HIDDEN;
 
 extern void CDECL server_send_fd( int fd ) DECLSPEC_HIDDEN;
 extern NTSTATUS CDECL server_fd_to_handle( int fd, unsigned int access, unsigned int attributes,
