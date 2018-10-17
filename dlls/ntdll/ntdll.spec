@@ -1733,3 +1733,4 @@
 # Filesystem
 @ stdcall -syscall wine_nt_to_unix_file_name(ptr ptr ptr long)
 @ stdcall -syscall wine_unix_to_nt_file_name(str ptr ptr)
+@ stdcall -syscall __wine_needs_override_large_address_aware()

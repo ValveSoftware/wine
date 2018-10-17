@@ -821,3 +821,9 @@ NTSTATUS WINAPI wow64___wine_set_unix_env( UINT *args )
 
     return __wine_set_unix_env( var, val );
 }
+
+BOOL WINAPI __wine_needs_override_large_address_aware(void);
+NTSTATUS WINAPI wow64___wine_needs_override_large_address_aware( UINT * args )
+{
+    return __wine_needs_override_large_address_aware();
+}
