@@ -358,6 +358,7 @@ static void * const syscalls[] =
     NtWriteVirtualMemory,
     NtYieldExecution,
     __wine_dbg_write,
+    __wine_needs_override_large_address_aware,
     __wine_set_unix_env,
     __wine_unix_spawnvp,
     wine_nt_to_unix_file_name,
