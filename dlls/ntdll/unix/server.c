@@ -1584,6 +1584,11 @@ size_t server_init_process(void)
     }
 }
 
+static BOOL force_laa(void)
+{
+    const char *e = getenv("WINE_LARGE_ADDRESS_AWARE");
+    return (e != NULL) && (*e != '\0' && *e != '0');
+}
 
 /***********************************************************************
  *           server_init_process_done
@@ -1608,7 +1613,7 @@ void server_init_process_done(void)
 #ifdef __APPLE__
     send_server_task_port();
 #endif
-    if (nt->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) virtual_set_large_address_space();
+    if (force_laa() || (nt->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE)) virtual_set_large_address_space();
 
     /* Install signal handlers; this cannot be done earlier, since we cannot
      * send exceptions to the debugger before the create process event that
