@@ -5162,6 +5162,24 @@ static void virtual_release_address_space(void)
 
 #endif  /* _WIN64 */
 
+static int need_override_large_address_aware(void)
+{
+    static int needs_override = -1;
+
+    if (needs_override == -1)
+    {
+        const char *str = getenv( "WINE_LARGE_ADDRESS_AWARE" );
+
+        needs_override = !str /* on by default */ || atoi(str) == 1;
+    }
+    return needs_override;
+}
+
+static BOOL is_large_address_aware(void)
+{
+    return (main_image_info.ImageCharacteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE)
+           || need_override_large_address_aware();
+}
 
 /***********************************************************************
  *           virtual_set_large_address_space
@@ -5181,11 +5199,11 @@ void virtual_set_large_address_space(void)
                 free_reserved_memory( 0, (char *)0x7ffe0000 );
 #endif
         }
-        else user_space_wow_limit = ((main_image_info.ImageCharacteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) ? limit_4g : limit_2g) - 1;
+        else user_space_wow_limit = (is_large_address_aware() ? limit_4g : limit_2g) - 1;
     }
     else
     {
-        if (!(main_image_info.ImageCharacteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE)) return;
+        if (!is_large_address_aware()) return;
         free_reserved_memory( (char *)0x80000000, address_space_limit );
     }
     user_space_limit = working_set_limit = address_space_limit;

@@ -1166,6 +1166,23 @@ static void *get_rva( void *module, ULONG_PTR addr );
 static const void *get_module_data_dir( HMODULE module, ULONG dir, ULONG *size );
 
 /**********************************************************************
+ *      __wine_get_unix_env
+ */
+NTSTATUS WINAPI wine_get_unix_env( void *args )
+{
+    struct wine_get_unix_env_params *params = args;
+    unsigned int len;
+    char *s;
+
+    if (!(s = getenv( params->name ))) return STATUS_VARIABLE_NOT_FOUND;
+    len = strlen( s ) + 1;
+    if (len > params->buffer_len) return STATUS_BUFFER_TOO_SMALL;
+    memcpy( params->val, s, len );
+    return STATUS_SUCCESS;
+}
+
+
+/**********************************************************************
  *      __wine_set_unix_env
  */
 NTSTATUS WINAPI wine_set_unix_env( void *args )
@@ -1303,6 +1320,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     unixcall_wine_server_handle_to_fd,
     unixcall_wine_spawnvp,
     system_time_precise,
+    wine_get_unix_env,
     wine_set_unix_env,
     steamclient_setup_trampolines,
 };
@@ -1312,6 +1330,23 @@ static const unixlib_entry_t unix_call_funcs[] =
 
 static NTSTATUS wow64_load_so_dll( void *args ) { return STATUS_INVALID_IMAGE_FORMAT; }
 static NTSTATUS wow64_unwind_builtin_dll( void *args ) { return STATUS_UNSUCCESSFUL; }
+
+static NTSTATUS wow64___wine_get_unix_env( void *args )
+{
+    struct
+    {
+        ULONG name;
+        ULONG val;
+        unsigned int buffer_len;
+    } const *params32 = args;
+    struct wine_get_unix_env_params params =
+    {
+        .name = ULongToPtr( params32->name ),
+        .val = ULongToPtr( params32->val ),
+        .buffer_len = params32->buffer_len,
+    };
+    return wine_get_unix_env( &params );
+}
 
 static NTSTATUS wow64___wine_set_unix_env( void *args )
 {
@@ -1351,6 +1386,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64_wine_server_handle_to_fd,
     wow64_wine_spawnvp,
     system_time_precise,
+    wow64___wine_get_unix_env,
     wow64___wine_set_unix_env,
     wow64_steamclient_setup_trampolines,
 };

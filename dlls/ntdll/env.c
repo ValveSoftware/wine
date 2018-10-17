@@ -733,6 +733,20 @@ void init_user_process_params(void)
 
 
 /**********************************************************************
+ *      __wine_get_unix_env
+ */
+NTSTATUS WINAPI __wine_get_unix_env( const char *var, char *val, unsigned int buffer_len )
+{
+    struct wine_get_unix_env_params params =
+    {
+        .name = var, .val = val, .buffer_len = buffer_len,
+    };
+
+    return WINE_UNIX_CALL( unix___wine_get_unix_env, &params );
+}
+
+
+/**********************************************************************
  *      __wine_set_unix_env
  */
 NTSTATUS WINAPI __wine_set_unix_env( const char *var, const char *val )

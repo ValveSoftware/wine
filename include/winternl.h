@@ -5340,6 +5340,7 @@ NTSYSAPI NTSTATUS  WINAPI RtlLargeIntegerToChar(const ULONGLONG *,ULONG,ULONG,PC
 
 /* Wine internal functions */
 
+NTSYSAPI NTSTATUS WINAPI __wine_get_unix_env( const char *var, char *val, unsigned int buffer_len );
 NTSYSAPI NTSTATUS WINAPI __wine_set_unix_env( const char *var, const char *val );
 
 /***********************************************************************
