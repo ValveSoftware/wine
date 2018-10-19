@@ -1014,6 +1014,7 @@ static DWORD WINAPI pulse_timer_cb(void *user)
                     /* regardless of what PA does, advance one period */
                     adv_bytes = min(This->period_bytes, This->held_bytes);
                     This->lcl_offs_bytes += adv_bytes;
+                    This->lcl_offs_bytes %= This->real_bufsize_bytes;
                     This->held_bytes -= adv_bytes;
                 }else if(This->dataflow == eCapture){
                     pulse_read(This);
