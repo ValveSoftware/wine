@@ -2670,11 +2670,10 @@ BOOL process_wine_clipcursor( HWND hwnd, BOOL empty, BOOL reset )
 {
     struct user_thread_info *thread_info = get_user_thread_info();
     RECT rect, virtual_rect = NtUserGetVirtualScreenRect();
-    BOOL was_clipping;
 
     TRACE( "hwnd %p, empty %u, reset %u\n", hwnd, empty, reset );
 
-    if ((was_clipping = thread_info->clipping_cursor)) InterlockedDecrement( &clipping_cursor );
+    if (thread_info->clipping_cursor) InterlockedDecrement( &clipping_cursor );
     thread_info->clipping_cursor = FALSE;
 
     if (reset)
@@ -2692,7 +2691,7 @@ BOOL process_wine_clipcursor( HWND hwnd, BOOL empty, BOOL reset )
     if (empty)
     {
         /* if currently clipping, check if we should switch to fullscreen clipping */
-        if (was_clipping && clip_fullscreen_window( hwnd, TRUE )) return TRUE;
+        if (clip_fullscreen_window( hwnd, TRUE )) return TRUE;
         return user_driver->pClipCursor( NULL, FALSE );
     }
 
