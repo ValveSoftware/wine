@@ -380,6 +380,8 @@ static const WCHAR table[0x85e] =
     0x30d8, 0x30da, 0x30db, 0x30dd
 };
 
+#include "decompose.c"
+
 static inline int binary_search( WCHAR ch, int low, int high )
 {
     while (low <= high)
@@ -402,4 +404,57 @@ WCHAR DECLSPEC_HIDDEN wine_compose( const WCHAR *str )
         start = table[2 * pos + 1];
         count = table[2 * pos + 3];
     }
+}
+
+static inline int is_blocked(WCHAR *ptr1, WCHAR *ptr2)
+{
+    if (ptr1 >= ptr2) return -1;
+
+    while (++ptr1 < ptr2)
+    {
+        const WCHAR *map1, *map2;
+        map1 = unicode_table_lookup( *ptr1, 0, idx1_comb, 8, idx2_comb, 4,
+                                     offsets_comb, 4, data_comb, 0 );
+        map2 = unicode_table_lookup( *ptr2, 0, idx1_comb, 8, idx2_comb, 4,
+                                     offsets_comb, 4, data_comb, 0 );
+        if (*map1 == 0 || *map2 <= *map1) return 1;
+    }
+    return 0;
+}
+
+static inline int is_fullexcl(WCHAR ch)
+{
+    const WCHAR *map = unicode_table_lookup( ch, 0, idx1_fullcomp, 8, idx2_fullcomp,
+                                             4, offsets_fullcomp, 4, data_fullcomp, 0 );
+    return (int)*map;
+}
+
+int unicode_canonical_composition( WCHAR *str, int strlen )
+{
+    int i, j;
+    WCHAR dum[3] = {0};
+
+    if (strlen == 0) strlen = strlenW( str );
+
+    for (i = 1; i < strlen; i++)
+    {
+        WCHAR *ptr_comp = str+i-1, comp;
+        if (str[i] == 0) break;
+        while (ptr_comp - str > 0)
+        {
+            if (is_starter( *ptr_comp )) break;
+            --ptr_comp;
+        }
+        if (!is_starter( *ptr_comp ) || is_blocked( ptr_comp, str+i )) continue;
+        dum[0] = *ptr_comp;
+        dum[1] = str[i];
+        comp = wine_compose( dum );
+        if (!comp || is_fullexcl( comp )) continue;
+        *ptr_comp = comp;
+        for (j = i; j < strlen-1; j++) str[j] = str[j+1];
+        strlen--;
+        i--;
+    }
+
+    return strlen;
 }
