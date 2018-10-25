@@ -3055,12 +3055,11 @@ static void test_file_completion_information(void)
     if (!(h = create_temp_file(0))) return;
 
     status = pNtSetInformationFile(h, &io, &info, sizeof(info) - 1, FileIoCompletionNotificationInformation);
-    todo_wine
-    ok(status == STATUS_INFO_LENGTH_MISMATCH || status == STATUS_INVALID_INFO_CLASS /* XP */,
+    ok(status == STATUS_INFO_LENGTH_MISMATCH || broken(status == STATUS_INVALID_INFO_CLASS /* XP */),
        "expected STATUS_INFO_LENGTH_MISMATCH, got %08x\n", status);
-    if (status == STATUS_INVALID_INFO_CLASS || status == STATUS_NOT_IMPLEMENTED)
+    if (status != STATUS_INFO_LENGTH_MISMATCH)
     {
-        skip("FileIoCompletionNotificationInformation class not supported\n");
+        win_skip("FileIoCompletionNotificationInformation class not supported\n");
         CloseHandle(h);
         return;
     }
@@ -3132,7 +3131,9 @@ static void test_file_completion_information(void)
 
         pov = (void *)0xdeadbeef;
         ret = GetQueuedCompletionStatus(port, &num_bytes, &key, &pov, 500);
+        todo_wine
         ok(!ret, "GetQueuedCompletionStatus succeeded\n");
+        todo_wine
         ok(pov == NULL, "expected NULL, got %p\n", pov);
     }
     else
@@ -3159,7 +3160,9 @@ static void test_file_completion_information(void)
 
         pov = (void *)0xdeadbeef;
         ret = GetQueuedCompletionStatus(port, &num_bytes, &key, &pov, 1000);
+        todo_wine
         ok(!ret, "GetQueuedCompletionStatus succeeded\n");
+        todo_wine
         ok(pov == NULL, "expected NULL, got %p\n", pov);
     }
     else
