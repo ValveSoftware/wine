@@ -7,6 +7,13 @@ EXTRALIBS = $(SDL2_LIBS) $(LIBAVCODEC_LIBS) $(LIBAVUTIL_LIBS)
 C_SRCS = \
 	compat.c \
 	xaudio_dll.c \
+	xaudio_engine.c \
+	xaudio_voice_source.c \
+	xaudio_voice_submix.c \
+	xaudio_voice_master.c \
+	xaudio_voice_wrap.c \
+	xaudio_callbacks.c \
+	xapo_wrap.c \
 	FAudio/FAPOBase.c \
 	FAudio/FAudio.c \
 	FAudio/FAudio_ffmpeg.c \
