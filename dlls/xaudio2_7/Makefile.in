@@ -12,6 +12,7 @@ C_SRCS = \
 	xaudio_voice_master.c \
 	xaudio_voice_wrap.c \
 	xaudio_callbacks.c \
+	xapo.c \
 	xapo_wrap.c \
 	FAudio/FAPOBase.c \
 	FAudio/FAudio.c \

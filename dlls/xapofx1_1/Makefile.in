@@ -6,6 +6,7 @@ EXTRALIBS = $(SDL2_LIBS)
 
 C_SRCS = \
 	xapofx.c \
+	xapo.c \
 	FAudio/FAPOBase.c \
 	FAudio/FAPOFX.c \
 	FAudio/FAPOFX_eq.c \

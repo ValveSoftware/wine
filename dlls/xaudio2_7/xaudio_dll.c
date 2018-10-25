@@ -24,6 +24,7 @@
 #define NONAMELESSUNION
 #define COBJMACROS
 
+#include "initguid.h"
 #include "xaudio_private.h"
 
 #include "ole2.h"
@@ -105,6 +106,11 @@ HRESULT WINAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void **ppv)
 }
 
 #if XAUDIO2_VER >= 8
+static inline IXAudio2Impl *impl_from_IXAudio2(IXAudio2 *iface)
+{
+    return CONTAINING_RECORD(iface, IXAudio2Impl, IXAudio2_iface);
+}
+
 HRESULT WINAPI XAudio2Create(IXAudio2 **ppxa2, UINT32 flags, XAUDIO2_PROCESSOR proc)
 {
     HRESULT hr;
@@ -122,7 +128,7 @@ HRESULT WINAPI XAudio2Create(IXAudio2 **ppxa2, UINT32 flags, XAUDIO2_PROCESSOR p
     if(FAILED(hr))
         return hr;
 
-    hr = xaudio2_initialize(This->faudio, flags, proc);
+    hr = xaudio2_initialize(impl_from_IXAudio2(xa2), flags, proc);
     if(FAILED(hr)){
         IXAudio2_Release(xa2);
         return hr;
@@ -131,5 +137,37 @@ HRESULT WINAPI XAudio2Create(IXAudio2 **ppxa2, UINT32 flags, XAUDIO2_PROCESSOR p
     *ppxa2 = xa2;
 
     return S_OK;
+}
+
+HRESULT WINAPI CreateAudioVolumeMeter(IUnknown **out)
+{
+    IClassFactory *cf;
+    HRESULT hr;
+
+    hr = make_xapo_factory(&CLSID_AudioVolumeMeter27, &IID_IClassFactory, (void**)&cf);
+    if(FAILED(hr))
+        return hr;
+
+    hr = IClassFactory_CreateInstance(cf, NULL, &IID_IUnknown, (void**)out);
+
+    IClassFactory_Release(cf);
+
+    return hr;
+}
+
+HRESULT WINAPI CreateAudioReverb(IUnknown **out)
+{
+    IClassFactory *cf;
+    HRESULT hr;
+
+    hr = make_xapo_factory(&CLSID_AudioReverb27, &IID_IClassFactory, (void**)&cf);
+    if(FAILED(hr))
+        return hr;
+
+    hr = IClassFactory_CreateInstance(cf, NULL, &IID_IUnknown, (void**)out);
+
+    IClassFactory_Release(cf);
+
+    return hr;
 }
 #endif /* XAUDIO2_VER >= 8 */

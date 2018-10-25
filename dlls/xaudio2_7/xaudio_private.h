@@ -148,9 +148,6 @@ extern const IXAudio22Vtbl XAudio22_Vtbl DECLSPEC_HIDDEN;
 extern const IXAudio27Vtbl XAudio27_Vtbl DECLSPEC_HIDDEN;
 #endif
 
-/* xapofx.c */
-extern HRESULT make_xapo_factory(REFCLSID clsid, REFIID riid, void **ppv) DECLSPEC_HIDDEN;
-
 /* xaudio_engine.c */
 extern HRESULT make_xaudio2_factory(REFIID riid, void **ppv) DECLSPEC_HIDDEN;
 extern HRESULT xaudio2_initialize(IXAudio2Impl *This, UINT32 flags, XAUDIO2_PROCESSOR proc) DECLSPEC_HIDDEN;
@@ -176,6 +173,9 @@ extern XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface) DECLSPEC_HIDD
 /* xaudio_callbacks.c */
 extern const FAudioVoiceCallback FAudioVoiceCallback_Vtbl DECLSPEC_HIDDEN;
 extern const FAudioEngineCallback FAudioEngineCallback_Vtbl DECLSPEC_HIDDEN;
+
+/* xapo.c */
+extern HRESULT make_xapo_factory(REFCLSID clsid, REFIID riid, void **ppv) DECLSPEC_HIDDEN;
 
 /* xapo_wrap.c */
 extern FAudioEffectChain *wrap_effect_chain(const XAUDIO2_EFFECT_CHAIN *pEffectChain) DECLSPEC_HIDDEN;
