@@ -1058,6 +1058,14 @@ static const struct wined3d_gpu_description *query_gpu_description(const struct 
 
         gpu_description = wined3d_get_gpu_description(vendor, device);
     }
+    else if(vendor == HW_VENDOR_NVIDIA)
+    {
+        /* XXX: Fake having an AMD card in order to avoid games trying to load
+         * the Windows-only nvapi library. */
+        WARN("Nvidia card detected. Faking an AMD RX 480!\n");
+        vendor = HW_VENDOR_AMD;
+        device = CARD_AMD_RADEON_RX_480;
+    }
 
     if ((gpu_description_override = wined3d_get_user_override_gpu_description(vendor, device)))
         gpu_description = gpu_description_override;
