@@ -1788,7 +1788,7 @@ static HRESULT WINAPI XAudio2CF_CreateInstance(IClassFactory *iface, IUnknown *p
     InitializeCriticalSection(&object->mst.lock);
     object->mst.lock.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": XA2MasteringVoice.lock");
 
-    FAudio_Construct(&object->faudio, XAUDIO2_VER);
+    FAudio_COMConstructEXT(&object->faudio, XAUDIO2_VER);
 
     FAudio_RegisterForCallbacks(object->faudio, &object->FAudioEngineCallback_vtbl);
 
