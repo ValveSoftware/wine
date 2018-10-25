@@ -23,6 +23,8 @@
 
 #include "wine/debug.h"
 
+#include "FAudio/F3DAudio.h"
+
 #if XAUDIO2_VER >= 8 || defined X3DAUDIO1_VER
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
 #endif
@@ -48,7 +50,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, void *pReserved)
 HRESULT CDECL X3DAudioInitialize(UINT32 chanmask, float speedofsound,
         X3DAUDIO_HANDLE handle)
 {
-    FIXME("0x%x, %f, %p: Stub!\n", chanmask, speedofsound, handle);
+    F3DAudioInitialize(chanmask, speedofsound, handle);
     return S_OK;
 }
 #endif /* XAUDIO2_VER >= 8 */
@@ -57,7 +59,7 @@ HRESULT CDECL X3DAudioInitialize(UINT32 chanmask, float speedofsound,
 void CDECL LEGACY_X3DAudioInitialize(UINT32 chanmask, float speedofsound,
         X3DAUDIO_HANDLE handle)
 {
-    FIXME("0x%x, %f, %p: Stub!\n", chanmask, speedofsound, handle);
+    F3DAudioInitialize(chanmask, speedofsound, handle);
 }
 #endif /* X3DAUDIO1_VER */
 
@@ -66,19 +68,12 @@ void CDECL X3DAudioCalculate(const X3DAUDIO_HANDLE handle,
         const X3DAUDIO_LISTENER *listener, const X3DAUDIO_EMITTER *emitter,
         UINT32 flags, X3DAUDIO_DSP_SETTINGS *out)
 {
-    static int once = 0;
-    if(!once){
-        FIXME("%p %p %p 0x%x %p: Stub!\n", handle, listener, emitter, flags, out);
-        ++once;
-    }
-
-    out->LPFDirectCoefficient = 0;
-    out->LPFReverbCoefficient = 0;
-    out->ReverbLevel = 0;
-    out->DopplerFactor = 1;
-    out->EmitterToListenerAngle = 0;
-    out->EmitterToListenerDistance = 0;
-    out->EmitterVelocityComponent = 0;
-    out->ListenerVelocityComponent = 0;
+    F3DAudioCalculate(
+        handle,
+        (const F3DAUDIO_LISTENER*) listener,
+        (const F3DAUDIO_EMITTER*) emitter,
+        flags,
+        (F3DAUDIO_DSP_SETTINGS*) out
+    );
 }
 #endif /* XAUDIO2_VER >= 8 || defined X3DAUDIO1_VER */
