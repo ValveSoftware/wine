@@ -5362,7 +5362,7 @@ struct add_fd_completion_request
     apc_param_t    cvalue;
     apc_param_t    information;
     unsigned int   status;
-    char __pad_36[4];
+    int            async;
 };
 struct add_fd_completion_reply
 {
@@ -6619,6 +6619,6 @@ union generic_reply
     struct get_esync_apc_fd_reply get_esync_apc_fd_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 569
+#define SERVER_PROTOCOL_VERSION 570
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

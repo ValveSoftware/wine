@@ -642,7 +642,7 @@ static int ws_protocol_info(SOCKET s, int unicode, WSAPROTOCOL_INFOW *buffer, in
 int WSAIOCTL_GetInterfaceCount(void);
 int WSAIOCTL_GetInterfaceName(int intNumber, char *intName);
 
-static void WS_AddCompletion( SOCKET sock, ULONG_PTR CompletionValue, NTSTATUS CompletionStatus, ULONG Information );
+static void WS_AddCompletion( SOCKET sock, ULONG_PTR CompletionValue, NTSTATUS CompletionStatus, ULONG Information, BOOL force );
 
 #define MAP_OPTION(opt) { WS_##opt, opt }
 
@@ -2459,7 +2459,7 @@ static NTSTATUS WS2_async_accept_recv( void *user, IO_STATUS_BLOCK *iosb, NTSTAT
         return status;
 
     if (wsa->cvalue)
-        WS_AddCompletion( HANDLE2SOCKET(wsa->listen_socket), wsa->cvalue, iosb->u.Status, iosb->Information );
+        WS_AddCompletion( HANDLE2SOCKET(wsa->listen_socket), wsa->cvalue, iosb->u.Status, iosb->Information, TRUE );
 
     release_async_io( &wsa->io );
     return status;
@@ -3598,7 +3598,7 @@ static BOOL WINAPI WS2_ConnectEx(SOCKET s, const struct WS_sockaddr* name, int n
             {
                 ov->Internal = _get_sock_error(s, FD_CONNECT_BIT);
                 ov->InternalHigh = 0;
-                if (cvalue) WS_AddCompletion( s, cvalue, ov->Internal, ov->InternalHigh );
+                if (cvalue) WS_AddCompletion( s, cvalue, ov->Internal, ov->InternalHigh, FALSE );
                 if (ov->hEvent) NtSetEvent( ov->hEvent, NULL );
                 status = STATUS_PENDING;
             }
@@ -5089,7 +5089,7 @@ INT WINAPI WSAIoctl(SOCKET s, DWORD code, LPVOID in_buff, DWORD in_size, LPVOID 
         overlapped->Internal = status;
         overlapped->InternalHigh = total;
         if (overlapped->hEvent) NtSetEvent( overlapped->hEvent, NULL );
-        if (cvalue) WS_AddCompletion( HANDLE2SOCKET(s), cvalue, status, total );
+        if (cvalue) WS_AddCompletion( HANDLE2SOCKET(s), cvalue, status, total, FALSE );
     }
 
     if (!status)
@@ -5484,7 +5484,7 @@ int WINAPI WSAPoll(WSAPOLLFD *wfds, ULONG count, int timeout)
 
 /* helper to send completion messages for client-only i/o operation case */
 static void WS_AddCompletion( SOCKET sock, ULONG_PTR CompletionValue, NTSTATUS CompletionStatus,
-                              ULONG Information )
+                              ULONG Information, BOOL async )
 {
     SERVER_START_REQ( add_fd_completion )
     {
@@ -5492,6 +5492,7 @@ static void WS_AddCompletion( SOCKET sock, ULONG_PTR CompletionValue, NTSTATUS C
         req->cvalue      = CompletionValue;
         req->status      = CompletionStatus;
         req->information = Information;
+        req->async       = async;
         wine_server_call( req );
     }
     SERVER_END_REQ;
@@ -5636,7 +5637,7 @@ static int WS2_sendto( SOCKET s, LPWSABUF lpBuffers, DWORD dwBufferCount,
         if (lpNumberOfBytesSent) *lpNumberOfBytesSent = n;
         if (!wsa->completion_func)
         {
-            if (cvalue) WS_AddCompletion( s, cvalue, STATUS_SUCCESS, n );
+            if (cvalue) WS_AddCompletion( s, cvalue, STATUS_SUCCESS, n, FALSE );
             if (lpOverlapped->hEvent) SetEvent( lpOverlapped->hEvent );
             HeapFree( GetProcessHeap(), 0, wsa );
         }
@@ -8053,7 +8054,7 @@ static int WS2_recv_base( SOCKET s, LPWSABUF lpBuffers, DWORD dwBufferCount,
             iosb->Information = n;
             if (!wsa->completion_func)
             {
-                if (cvalue) WS_AddCompletion( s, cvalue, STATUS_SUCCESS, n );
+                if (cvalue) WS_AddCompletion( s, cvalue, STATUS_SUCCESS, n, FALSE );
                 if (lpOverlapped->hEvent) SetEvent( lpOverlapped->hEvent );
                 HeapFree( GetProcessHeap(), 0, wsa );
             }
