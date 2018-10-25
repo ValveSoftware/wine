@@ -2,14 +2,17 @@ EXTRADEFS = -DXAPOFX1_VER=3 -DXAUDIO2_VER=4 -DFAUDIO_WIN32_PLATFORM
 MODULE    = xapofx1_3.dll
 IMPORTS   = ole32
 PARENTSRC = ../xaudio2_7
+EXTRALIBS = $(SDL2_LIBS)
 
 C_SRCS = \
 	xapofx.c \
 	FAudio/FAPOBase.c \
-	FAudio/FAudio.c \
-	FAudio/FAudio_internal.c \
-	FAudio/FAudio_platform_win32.c \
-	FAudio/FAudioFX.c \
-	FAudio/FAudioFX_internal.c
+	FAudio/FAPOFX.c \
+	FAudio/FAPOFX_eq.c \
+	FAudio/FAPOFX_echo.c \
+	FAudio/FAPOFX_masteringlimiter.c \
+	FAudio/FAPOFX_reverb.c \
+	FAudio/FAudioFX_reverb.c \
+	FAudio/FAudioFX_volumemeter.c
 
 RC_SRCS = version.rc
