@@ -27,18 +27,15 @@
 #include "initguid.h"
 #endif /* XAPOFX1_VER */
 #include "xaudio_private.h"
-#if XAUDIO2_VER >= 8
-#include "initguid.h"
-#endif /* XAUDIO2_VER >= 8 */
 #include "xapofx.h"
+#include "xaudio2fx.h"
 
 #include "wine/debug.h"
 #include "wine/heap.h"
 
-#include "FAudio/FAPO.h"
-#include "FAudio/FAudioFX.h"
-
+#if XAUDIO2_VER >= 8 || defined XAPOFX1_VER
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
+#endif
 
 #ifdef XAPOFX1_VER
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, void *pReserved)
@@ -73,6 +70,12 @@ HRESULT CDECL CreateFX(REFCLSID clsid, IUnknown **out, void *initdata, UINT32 in
     else if(IsEqualGUID(clsid, &CLSID_FXEQ27) ||
             IsEqualGUID(clsid, &CLSID_FXEQ))
         class = &CLSID_FXEQ;
+    else if(IsEqualGUID(clsid, &CLSID_FXEcho27) ||
+            IsEqualGUID(clsid, &CLSID_FXEcho))
+        class = &CLSID_FXEcho;
+    else if(IsEqualGUID(clsid, &CLSID_FXMasteringLimiter27) ||
+            IsEqualGUID(clsid, &CLSID_FXMasteringLimiter))
+        class = &CLSID_FXMasteringLimiter;
 
     if(class){
         hr = make_xapo_factory(class, &IID_IClassFactory, (void**)&cf);
@@ -132,7 +135,12 @@ HRESULT CDECL CreateFX(REFCLSID clsid, IUnknown **out)
     else if(IsEqualGUID(clsid, &CLSID_FXEQ27) ||
             IsEqualGUID(clsid, &CLSID_FXEQ))
         class = &CLSID_FXEQ;
-    /* TODO FXECHO, FXMasteringLimiter, */
+    else if(IsEqualGUID(clsid, &CLSID_FXEcho27) ||
+            IsEqualGUID(clsid, &CLSID_FXEcho))
+        class = &CLSID_FXEcho;
+    else if(IsEqualGUID(clsid, &CLSID_FXMasteringLimiter27) ||
+            IsEqualGUID(clsid, &CLSID_FXMasteringLimiter))
+        class = &CLSID_FXMasteringLimiter;
 
     if(class){
         hr = make_xapo_factory(class, &IID_IClassFactory, (void**)&cf);

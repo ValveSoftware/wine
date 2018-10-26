@@ -23,7 +23,6 @@
 
 #include "mmsystem.h"
 #include "xaudio2.h"
-#include "xaudio2fx.h"
 #include "xapo.h"
 #include "devpkey.h"
 #include "mmdeviceapi.h"

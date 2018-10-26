@@ -26,6 +26,8 @@
 #define COBJMACROS
 
 #include "xaudio_private.h"
+#include "xaudio2fx.h"
+#include "xapofx.h"
 
 #include "ole2.h"
 #include "rpcproxy.h"
@@ -34,6 +36,7 @@
 #include "wine/heap.h"
 
 #include "FAudio/FAPO.h"
+#include "FAudio/FAPOFX.h"
 #include "FAudio/FAudioFX.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
@@ -304,6 +307,25 @@ static ULONG WINAPI xapocf_Release(IClassFactory *iface)
     return ref;
 }
 
+static inline HRESULT get_fapo_from_clsid(REFCLSID clsid, FAPO **fapo)
+{
+#if defined XAUDIO2_VER
+    if(IsEqualGUID(clsid, &CLSID_AudioVolumeMeter27))
+        return FAudioCreateVolumeMeter(fapo, 0);
+    if(IsEqualGUID(clsid, &CLSID_AudioReverb27))
+        return FAudioCreateReverb(fapo, 0);
+#endif
+#if XAUDIO2_VER >= 8 || defined XAPOFX1_VER
+    if(IsEqualGUID(clsid, &CLSID_FXReverb) ||
+            IsEqualGUID(clsid, &CLSID_FXEQ) ||
+            IsEqualGUID(clsid, &CLSID_FXEcho) ||
+            IsEqualGUID(clsid, &CLSID_FXMasteringLimiter))
+        return FAPOFX_CreateFX((const FAudioGUID*) clsid, fapo, NULL, 0);
+#endif
+    ERR("Invalid XAPO CLSID!");
+    return E_INVALIDARG;
+}
+
 static HRESULT WINAPI xapocf_CreateInstance(IClassFactory *iface, IUnknown *pOuter,
         REFIID riid, void **ppobj)
 {
@@ -322,14 +344,7 @@ static HRESULT WINAPI xapocf_CreateInstance(IClassFactory *iface, IUnknown *pOut
     object->IXAPO_iface.lpVtbl = &XAPOFX_Vtbl;
     object->IXAPOParameters_iface.lpVtbl = &XAPOFXParameters_Vtbl;
 
-    if(IsEqualGUID(This->class, &CLSID_AudioVolumeMeter27)){
-        hr = FAudioCreateVolumeMeter(&object->fapo, 0);
-    }else if(IsEqualGUID(This->class, &CLSID_AudioReverb27)){
-        hr = FAudioCreateReverb(&object->fapo, 0);
-    }else{
-        /* TODO FXECHO, FXMasteringLimiter, FXEQ */
-        hr = E_INVALIDARG;
-    }
+    hr = get_fapo_from_clsid(This->class, &object->fapo);
 
     if(FAILED(hr)){
         HeapFree(GetProcessHeap(), 0, object);

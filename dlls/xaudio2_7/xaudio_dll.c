@@ -26,6 +26,10 @@
 
 #include "initguid.h"
 #include "xaudio_private.h"
+#include "xaudio2fx.h"
+#if XAUDIO2_VER >= 8
+#include "xapofx.h"
+#endif
 
 #include "ole2.h"
 #include "rpcproxy.h"
