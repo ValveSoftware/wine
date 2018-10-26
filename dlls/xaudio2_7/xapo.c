@@ -105,14 +105,12 @@ static HRESULT WINAPI XAPOFX_GetRegistrationProperties(IXAPO *iface,
 
     TRACE("%p, %p\n", This, props);
 
-    /* TODO: check for version == 20 and use XAPO20_REGISTRATION_PROPERTIES */
     hr = This->fapo->GetRegistrationProperties(This->fapo, &fprops);
     if(FAILED(hr))
         return hr;
 
-    *props = CoTaskMemAlloc(sizeof(XAPO_REGISTRATION_PROPERTIES));
-    memcpy(*props, fprops, sizeof(XAPO_REGISTRATION_PROPERTIES));
-    heap_free(fprops);
+    /* TODO: check for version == 20 and use XAPO20_REGISTRATION_PROPERTIES */
+    *props = (XAPO_REGISTRATION_PROPERTIES*) fprops;
     return hr;
 }
 
