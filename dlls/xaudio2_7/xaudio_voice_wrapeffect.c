@@ -75,10 +75,8 @@ static uint32_t FAPOCALL XAPO_GetRegistrationProperties(void *iface,
     if(FAILED(hr))
         return hr;
 
-    *ppRegistrationProperties = heap_alloc(sizeof(FAPORegistrationProperties));
-    memcpy(*ppRegistrationProperties, xprops, sizeof(FAPORegistrationProperties));
-    CoTaskMemFree(xprops);
-
+    /* TODO: check for version == 20 and use XAPO20_REGISTRATION_PROPERTIES */
+    *ppRegistrationProperties = (FAPORegistrationProperties*) xprops;
     return 0;
 }
 
