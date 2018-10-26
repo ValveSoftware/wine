@@ -179,3 +179,8 @@ extern HRESULT make_xapo_factory(REFCLSID clsid, REFIID riid, void **ppv) DECLSP
 /* xapo_wrap.c */
 extern FAudioEffectChain *wrap_effect_chain(const XAUDIO2_EFFECT_CHAIN *pEffectChain) DECLSPEC_HIDDEN;
 extern void free_effect_chain(FAudioEffectChain *chain) DECLSPEC_HIDDEN;
+
+/* xaudio_allocator.c */
+extern void* XAudio_Internal_Alloc(size_t size) DECLSPEC_HIDDEN;
+extern void XAudio_Internal_Free(void* ptr) DECLSPEC_HIDDEN;
+extern void* XAudio_Internal_Realloc(void* ptr, size_t size) DECLSPEC_HIDDEN;
