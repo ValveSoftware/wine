@@ -1,6 +1,7 @@
 /*
  * Copyright (c) 2015 Mark Harmstone
  * Copyright (c) 2015 Andrew Eikum for CodeWeavers
+ * Copyright (c) 2018 Ethan Lee for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public

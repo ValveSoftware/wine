@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2015 Andrew Eikum for CodeWeavers
+ * Copyright (c) 2018 Ethan Lee for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -151,6 +152,10 @@ extern const IXAudio27Vtbl XAudio27_Vtbl DECLSPEC_HIDDEN;
 extern HRESULT make_xaudio2_factory(REFIID riid, void **ppv) DECLSPEC_HIDDEN;
 extern HRESULT xaudio2_initialize(IXAudio2Impl *This, UINT32 flags, XAUDIO2_PROCESSOR proc) DECLSPEC_HIDDEN;
 
+/* xaudio_voice.c */
+extern XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface) DECLSPEC_HIDDEN;
+extern void destroy_voice(XA2VoiceImpl *This) DECLSPEC_HIDDEN;
+
 /* xaudio_voice_source.c */
 extern XA2VoiceImpl *impl_from_IXAudio2SourceVoice(IXAudio2SourceVoice *iface) DECLSPEC_HIDDEN;
 extern const IXAudio2SourceVoiceVtbl XAudio2SourceVoice_Vtbl DECLSPEC_HIDDEN;
@@ -163,11 +168,13 @@ extern const struct IXAudio2SubmixVoiceVtbl XAudio2SubmixVoice_Vtbl DECLSPEC_HID
 extern XA2VoiceImpl *impl_from_IXAudio2MasteringVoice(IXAudio2MasteringVoice *iface) DECLSPEC_HIDDEN;
 extern const struct IXAudio2MasteringVoiceVtbl XAudio2MasteringVoice_Vtbl DECLSPEC_HIDDEN;
 
-/* xaudio_voice_wrap.c */
+/* xaudio_voice_wrapeffect.c */
+extern FAudioEffectChain *wrap_effect_chain(const XAUDIO2_EFFECT_CHAIN *pEffectChain) DECLSPEC_HIDDEN;
+extern void free_effect_chain(FAudioEffectChain *chain) DECLSPEC_HIDDEN;
+
+/* xaudio_voice_wrapsend.c */
 extern FAudioVoiceSends *wrap_voice_sends(const XAUDIO2_VOICE_SENDS *sends) DECLSPEC_HIDDEN;
 extern void free_voice_sends(FAudioVoiceSends *sends) DECLSPEC_HIDDEN;
-extern void destroy_voice(XA2VoiceImpl *This) DECLSPEC_HIDDEN;
-extern XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface) DECLSPEC_HIDDEN;
 
 /* xaudio_callbacks.c */
 extern const FAudioVoiceCallback FAudioVoiceCallback_Vtbl DECLSPEC_HIDDEN;
@@ -175,10 +182,6 @@ extern const FAudioEngineCallback FAudioEngineCallback_Vtbl DECLSPEC_HIDDEN;
 
 /* xapo.c */
 extern HRESULT make_xapo_factory(REFCLSID clsid, REFIID riid, void **ppv) DECLSPEC_HIDDEN;
-
-/* xapo_wrap.c */
-extern FAudioEffectChain *wrap_effect_chain(const XAUDIO2_EFFECT_CHAIN *pEffectChain) DECLSPEC_HIDDEN;
-extern void free_effect_chain(FAudioEffectChain *chain) DECLSPEC_HIDDEN;
 
 /* xaudio_allocator.c */
 extern void* XAudio_Internal_Alloc(size_t size) DECLSPEC_HIDDEN;

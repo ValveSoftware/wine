@@ -309,7 +309,7 @@ static ULONG WINAPI xapocf_Release(IClassFactory *iface)
 
 static inline HRESULT get_fapo_from_clsid(REFCLSID clsid, FAPO **fapo)
 {
-#if defined XAUDIO2_VER
+#ifndef XAPOFX1_VER
     if(IsEqualGUID(clsid, &CLSID_AudioVolumeMeter27))
         return FAudioCreateVolumeMeter(fapo, 0);
     if(IsEqualGUID(clsid, &CLSID_AudioReverb27))

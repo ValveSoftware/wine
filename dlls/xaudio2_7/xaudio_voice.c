@@ -35,40 +35,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
 
-FAudioVoiceSends *wrap_voice_sends(const XAUDIO2_VOICE_SENDS *sends)
-{
-    FAudioVoiceSends *ret;
-    int i;
-
-    if(!sends)
-        return NULL;
-
-    ret = heap_alloc(sizeof(*ret) + sends->SendCount * sizeof(FAudioSendDescriptor));
-    ret->SendCount = sends->SendCount;
-    ret->pSends = (FAudioSendDescriptor*)(ret + 1);
-    for(i = 0; i < sends->SendCount; ++i){
-        XA2VoiceImpl *voice = impl_from_IXAudio2Voice(sends->pSends[i].pOutputVoice);
-        ret->pSends[i].pOutputVoice = voice->faudio_voice;
-        ret->pSends[i].Flags = sends->pSends[i].Flags;
-    }
-    return ret;
-}
-
-void free_voice_sends(FAudioVoiceSends *sends)
-{
-    if(!sends)
-        return;
-    heap_free(sends);
-}
-
-void destroy_voice(XA2VoiceImpl *This)
-{
-    FAudioVoice_DestroyVoice(This->faudio_voice);
-    free_effect_chain(This->effect_chain);
-    This->effect_chain = NULL;
-    This->in_use = FALSE;
-}
-
 XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface)
 {
     if(iface->lpVtbl == (void*)&XAudio2SourceVoice_Vtbl)
@@ -101,4 +67,12 @@ XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface)
 #endif
     ERR("invalid IXAudio2Voice pointer: %p\n", iface);
     return NULL;
+}
+
+void destroy_voice(XA2VoiceImpl *This)
+{
+    FAudioVoice_DestroyVoice(This->faudio_voice);
+    free_effect_chain(This->effect_chain);
+    This->effect_chain = NULL;
+    This->in_use = FALSE;
 }

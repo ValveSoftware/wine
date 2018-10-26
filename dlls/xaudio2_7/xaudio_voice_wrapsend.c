@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 2015 Mark Harmstone
+ * Copyright (c) 2015 Andrew Eikum for CodeWeavers
  * Copyright (c) 2018 Ethan Lee for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
@@ -25,20 +27,34 @@
 
 #include "xaudio_private.h"
 
+#include "ole2.h"
+#include "rpcproxy.h"
+
 #include "wine/debug.h"
 #include "wine/heap.h"
 
-void* XAudio_Internal_Alloc(size_t size)
+FAudioVoiceSends *wrap_voice_sends(const XAUDIO2_VOICE_SENDS *sends)
 {
-    return CoTaskMemAlloc(size);
+    FAudioVoiceSends *ret;
+    int i;
+
+    if(!sends)
+        return NULL;
+
+    ret = heap_alloc(sizeof(*ret) + sends->SendCount * sizeof(FAudioSendDescriptor));
+    ret->SendCount = sends->SendCount;
+    ret->pSends = (FAudioSendDescriptor*)(ret + 1);
+    for(i = 0; i < sends->SendCount; ++i){
+        XA2VoiceImpl *voice = impl_from_IXAudio2Voice(sends->pSends[i].pOutputVoice);
+        ret->pSends[i].pOutputVoice = voice->faudio_voice;
+        ret->pSends[i].Flags = sends->pSends[i].Flags;
+    }
+    return ret;
 }
 
-void XAudio_Internal_Free(void* ptr)
+void free_voice_sends(FAudioVoiceSends *sends)
 {
-    return CoTaskMemFree(ptr);
-}
-
-void* XAudio_Internal_Realloc(void* ptr, size_t size)
-{
-    return CoTaskMemRealloc(ptr, size);
+    if(!sends)
+        return;
+    heap_free(sends);
 }
