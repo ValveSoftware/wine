@@ -1267,6 +1267,24 @@ uint32_t FAudioFXReverb_IsOutputFormatSupported(
 	return result;
 }
 
+uint32_t FAudioFXReverb_Initialize(
+	FAudioFXReverb *fapo,
+	const void* pData,
+	uint32_t DataByteSize
+) {
+	#define INITPARAMS(offset) \
+		FAudio_memcpy( \
+			fapo->base.m_pParameterBlocks + DataByteSize * offset, \
+			pData, \
+			DataByteSize \
+		);
+	INITPARAMS(0)
+	INITPARAMS(1)
+	INITPARAMS(2)
+	#undef INITPARAMS
+	return 0;
+}
+
 uint32_t FAudioFXReverb_LockForProcess(
 	FAudioFXReverb *fapo,
 	uint32_t InputLockedParameterCount,
@@ -1545,6 +1563,7 @@ uint32_t FAudioCreateReverbWithCustomAllocatorEXT(
 	ASSIGN_VT(LockForProcess);
 	ASSIGN_VT(IsInputFormatSupported);
 	ASSIGN_VT(IsOutputFormatSupported);
+	ASSIGN_VT(Initialize);
 	ASSIGN_VT(Reset);
 	ASSIGN_VT(Process);
 	result->base.Destructor = FAudioFXReverb_Free;

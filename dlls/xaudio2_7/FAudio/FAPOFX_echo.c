@@ -80,6 +80,24 @@ typedef struct FAPOFXEcho
 	/* TODO */
 } FAPOFXEcho;
 
+uint32_t FAPOFXEcho_Initialize(
+	FAPOFXEcho *fapo,
+	const void* pData,
+	uint32_t DataByteSize
+) {
+	#define INITPARAMS(offset) \
+		FAudio_memcpy( \
+			fapo->base.m_pParameterBlocks + DataByteSize * offset, \
+			pData, \
+			DataByteSize \
+		);
+	INITPARAMS(0)
+	INITPARAMS(1)
+	INITPARAMS(2)
+	#undef INITPARAMS
+	return 0;
+}
+
 void FAPOFXEcho_Process(
 	FAPOFXEcho *fapo,
 	uint32_t InputProcessParameterCount,
@@ -166,6 +184,8 @@ uint32_t FAPOFXCreateEcho(
 	);
 
 	/* Function table... */
+	result->base.base.Initialize = (InitializeFunc)
+		FAPOFXEcho_Initialize;
 	result->base.base.Process = (ProcessFunc)
 		FAPOFXEcho_Process;
 	result->base.Destructor = FAPOFXEcho_Free;

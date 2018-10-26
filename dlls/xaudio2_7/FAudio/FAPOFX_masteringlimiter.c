@@ -80,6 +80,24 @@ typedef struct FAPOFXMasteringLimiter
 	/* TODO */
 } FAPOFXMasteringLimiter;
 
+uint32_t FAPOFXMasteringLimiter_Initialize(
+	FAPOFXMasteringLimiter *fapo,
+	const void* pData,
+	uint32_t DataByteSize
+) {
+	#define INITPARAMS(offset) \
+		FAudio_memcpy( \
+			fapo->base.m_pParameterBlocks + DataByteSize * offset, \
+			pData, \
+			DataByteSize \
+		);
+	INITPARAMS(0)
+	INITPARAMS(1)
+	INITPARAMS(2)
+	#undef INITPARAMS
+	return 0;
+}
+
 void FAPOFXMasteringLimiter_Process(
 	FAPOFXMasteringLimiter *fapo,
 	uint32_t InputProcessParameterCount,
@@ -165,6 +183,8 @@ uint32_t FAPOFXCreateMasteringLimiter(
 	);
 
 	/* Function table... */
+	result->base.base.Initialize = (InitializeFunc)
+		FAPOFXMasteringLimiter_Initialize;
 	result->base.base.Process = (ProcessFunc)
 		FAPOFXMasteringLimiter_Process;
 	result->base.Destructor = FAPOFXMasteringLimiter_Free;

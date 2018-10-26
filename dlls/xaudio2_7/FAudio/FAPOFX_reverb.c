@@ -80,6 +80,24 @@ typedef struct FAPOFXReverb
 	/* TODO */
 } FAPOFXReverb;
 
+uint32_t FAPOFXReverb_Initialize(
+	FAPOFXReverb *fapo,
+	const void* pData,
+	uint32_t DataByteSize
+) {
+	#define INITPARAMS(offset) \
+		FAudio_memcpy( \
+			fapo->base.m_pParameterBlocks + DataByteSize * offset, \
+			pData, \
+			DataByteSize \
+		);
+	INITPARAMS(0)
+	INITPARAMS(1)
+	INITPARAMS(2)
+	#undef INITPARAMS
+	return 0;
+}
+
 void FAPOFXReverb_Process(
 	FAPOFXReverb *fapo,
 	uint32_t InputProcessParameterCount,
@@ -165,6 +183,8 @@ uint32_t FAPOFXCreateReverb(
 	);
 
 	/* Function table... */
+	result->base.base.Initialize = (InitializeFunc)
+		FAPOFXReverb_Initialize;
 	result->base.base.Process = (ProcessFunc)
 		FAPOFXReverb_Process;
 	result->base.Destructor = FAPOFXReverb_Free;

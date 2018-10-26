@@ -80,6 +80,24 @@ typedef struct FAPOFXEQ
 	/* TODO */
 } FAPOFXEQ;
 
+uint32_t FAPOFXEQ_Initialize(
+	FAPOFXEQ *fapo,
+	const void* pData,
+	uint32_t DataByteSize
+) {
+	#define INITPARAMS(offset) \
+		FAudio_memcpy( \
+			fapo->base.m_pParameterBlocks + DataByteSize * offset, \
+			pData, \
+			DataByteSize \
+		);
+	INITPARAMS(0)
+	INITPARAMS(1)
+	INITPARAMS(2)
+	#undef INITPARAMS
+	return 0;
+}
+
 void FAPOFXEQ_Process(
 	FAPOFXEQ *fapo,
 	uint32_t InputProcessParameterCount,
@@ -175,6 +193,8 @@ uint32_t FAPOFXCreateEQ(
 	);
 
 	/* Function table... */
+	result->base.base.Initialize = (InitializeFunc)
+		FAPOFXEQ_Initialize;
 	result->base.base.Process = (ProcessFunc)
 		FAPOFXEQ_Process;
 	result->base.Destructor = FAPOFXEQ_Free;
