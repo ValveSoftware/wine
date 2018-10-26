@@ -28,7 +28,7 @@
 #include "wine/debug.h"
 #include "wine/heap.h"
 
-void* XAudio_Internal_Alloc(size_t size)
+void* XAudio_Internal_Malloc(size_t size)
 {
     return CoTaskMemAlloc(size);
 }

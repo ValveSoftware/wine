@@ -5,7 +5,7 @@ PARENTSRC = ../xaudio2_7
 EXTRALIBS = $(SDL2_LIBS) $(LIBAVCODEC_LIBS) $(LIBAVUTIL_LIBS)
 
 C_SRCS = \
-	allocator.c \
+	xaudio_allocator.c \
 	compat.c \
 	xaudio_dll.c \
 	xaudio_engine.c \

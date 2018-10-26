@@ -311,16 +311,36 @@ static inline HRESULT get_fapo_from_clsid(REFCLSID clsid, FAPO **fapo)
 {
 #ifndef XAPOFX1_VER
     if(IsEqualGUID(clsid, &CLSID_AudioVolumeMeter27))
-        return FAudioCreateVolumeMeter(fapo, 0);
+        return FAudioCreateVolumeMeterWithCustomAllocatorEXT(
+            fapo,
+            0,
+            XAudio_Internal_Malloc,
+            XAudio_Internal_Free,
+            XAudio_Internal_Realloc
+        );
     if(IsEqualGUID(clsid, &CLSID_AudioReverb27))
-        return FAudioCreateReverb(fapo, 0);
+        return FAudioCreateReverbWithCustomAllocatorEXT(
+            fapo,
+            0,
+            XAudio_Internal_Malloc,
+            XAudio_Internal_Free,
+            XAudio_Internal_Realloc
+        );
 #endif
 #if XAUDIO2_VER >= 8 || defined XAPOFX1_VER
     if(IsEqualGUID(clsid, &CLSID_FXReverb) ||
             IsEqualGUID(clsid, &CLSID_FXEQ) ||
             IsEqualGUID(clsid, &CLSID_FXEcho) ||
             IsEqualGUID(clsid, &CLSID_FXMasteringLimiter))
-        return FAPOFX_CreateFX((const FAudioGUID*) clsid, fapo, NULL, 0);
+        return FAPOFX_CreateFXWithCustomAllocatorEXT(
+            (const FAudioGUID*) clsid,
+            fapo,
+            NULL,
+            0,
+            XAudio_Internal_Malloc,
+            XAudio_Internal_Free,
+            XAudio_Internal_Realloc
+        );
 #endif
     ERR("Invalid XAPO CLSID!");
     return E_INVALIDARG;

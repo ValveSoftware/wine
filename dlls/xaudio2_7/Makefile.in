@@ -4,7 +4,7 @@ IMPORTS   = advapi32 ole32 user32 uuid
 EXTRALIBS = $(SDL2_LIBS) $(LIBAVCODEC_LIBS) $(LIBAVUTIL_LIBS)
 
 C_SRCS = \
-	allocator.c \
+	xaudio_allocator.c \
 	compat.c \
 	xaudio_dll.c \
 	xaudio_engine.c \

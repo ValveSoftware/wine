@@ -184,6 +184,6 @@ extern const FAudioEngineCallback FAudioEngineCallback_Vtbl DECLSPEC_HIDDEN;
 extern HRESULT make_xapo_factory(REFCLSID clsid, REFIID riid, void **ppv) DECLSPEC_HIDDEN;
 
 /* xaudio_allocator.c */
-extern void* XAudio_Internal_Alloc(size_t size) DECLSPEC_HIDDEN;
+extern void* XAudio_Internal_Malloc(size_t size) DECLSPEC_HIDDEN;
 extern void XAudio_Internal_Free(void* ptr) DECLSPEC_HIDDEN;
 extern void* XAudio_Internal_Realloc(void* ptr, size_t size) DECLSPEC_HIDDEN;
