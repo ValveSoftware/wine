@@ -38,9 +38,9 @@ static inline XACT3CueImpl *impl_from_IXACT34Cue(IXACT34Cue *iface)
     return CONTAINING_RECORD(iface, IXACT3CueImpl, IXACT34Cue_iface);
 }
 
-static inline XACT3CueImpl *impl_from_IXACT37Cue(IXACT37Cue *iface)
+static inline XACT3CueImpl *impl_from_IXACT37Cue(IXACT3Cue *iface)
 {
-    return CONTAINING_RECORD(iface, IXACT3CueImpl, IXACT37Cue_iface);
+    return CONTAINING_RECORD(iface, IXACT3CueImpl, IXACT3Cue_iface);
 }
 
 XACT3CueImpl *impl_from_IXACT3Cue(IXACT3Cue *iface)
@@ -48,10 +48,9 @@ XACT3CueImpl *impl_from_IXACT3Cue(IXACT3Cue *iface)
 #if XACT3_VER <= 4
     if (iface->lpVtbl == (void*)&XACT34Cue_Vtbl)
         return impl_from_IXACT34Cue((IXACT34Cue*)iface);
-#elif XACT3_VER <= 7
-    if (iface->lpVtbl == (void*)&XACT37Cue_Vtbl)
-        return impl_from_IXACT37Cue((IXACT37Cue*)iface);
 #endif
+    if (iface->lpVtbl == (void*)&XACT3Cue_Vtbl)
+        return impl_from_IXACT37Cue(iface);
     ERR("Invalid IXACT3Cue pointer: %p\n", iface);
     return NULL;
 }
@@ -195,7 +194,7 @@ const XACT3Cue34Vtbl XACT3Cue34_Vtbl =
     IXACT3CueImpl_GetProperties
 };
 
-const XACT3Cue37Vtbl XACT3Cue37_Vtbl =
+const XACT3CueVtbl XACT3Cue_Vtbl =
 {
     IXACT3CueImpl_Play,
     IXACT3CueImpl_Stop,

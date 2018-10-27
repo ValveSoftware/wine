@@ -333,19 +333,19 @@ static void unwrap_notificationdesc(FACTNotificationDesc *fd,
     fd->cueIndex = xd->cueIndex;
     fd->waveIndex = xd->waveIndex;
     fd->pvContext = xd->pvContext;
-    if (fd->type == FACTNOTIFICATIONTYPE_CUEDESTROYED)
+    if (xd->type == XACTNOTIFICATIONTYPE_CUEDESTROYED)
     {
         fd->pCue = ((XACT3CueImpl*) xd->pCue)->fact_cue;
     }
-    else if (desc.type == FACTNOTIFICATIONTYPE_SOUNDBANKDESTROYED)
+    else if (xd->type == XACTNOTIFICATIONTYPE_SOUNDBANKDESTROYED)
     {
         fd->pSoundBank = ((XACT3SoundBankImpl*) xd->pSoundBank)->fact_soundbank;
     }
-    else if (desc.type == FACTNOTIFICATIONTYPE_WAVEBANKDESTROYED)
+    else if (xd->type == XACTNOTIFICATIONTYPE_WAVEBANKDESTROYED)
     {
         fd->pWaveBank = ((XACT3WaveBankImpl*) xd->pWaveBank)->fact_wavebank;
     }
-    else if (desc.type == FACTNOTIFICATIONTYPE_WAVEDESTROYED)
+    else if (xd->type == XACTNOTIFICATIONTYPE_WAVEDESTROYED)
     {
         fd->pWave = ((XACT3WaveImpl*) xd->pWave)->wave;
     }
