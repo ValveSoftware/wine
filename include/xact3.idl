@@ -17,6 +17,7 @@
  */
 
 import "unknwn.idl";
+import "xaudio2.idl";
 
 [
     uuid(9e33f661-2d07-43ec-9704-bbcb71a54972)
@@ -105,20 +106,21 @@ typedef BOOL (__stdcall *XACT_READFILE_CALLBACK)(
     LPVOID lpBuffer,
     DWORD nNumberOfBytesRead,
     LPDWORD lpNumberOfBytesRead,
-    LPOVERLAPPED lpOverlapped
+    void* lpOverlapped
 );
 typedef BOOL (__stdcall *XACT_GETOVERLAPPEDRESULT_CALLBACK)(
     HANDLE hFile,
-    LPOVERLAPPED lpOverlapped,
+    void* lpOverlapped,
     LPDWORD lpNumberOfBytesTransferred,
     BOOL bWait
 );
 typedef struct XACT_FILEIO_CALLBACKS
 {
-    XACT_READFILE_CALLBACK readFileCallback;
-    XACT_GETOVERLAPPEDRESULT_CALLBACK getOverlappedResultCallback;
+    BYTE* readFileCallback; /* FIXME: XACT_READFILE_CALLBACK */
+    BYTE* getOverlappedResultCallback; /* FIXME: XACT_GETOVERLAPPEDRESULT_CALLBACK */
 } XACT_FILEIO_CALLBACKS;
 
+typedef struct XACT_NOTIFICATION XACT_NOTIFICATION;
 typedef void (__stdcall XACT_NOTIFICATION_CALLBACK)(
     const XACT_NOTIFICATION *pNotification
 );
@@ -126,20 +128,20 @@ typedef void (__stdcall XACT_NOTIFICATION_CALLBACK)(
 typedef struct XACT_RUNTIME_PARAMETERS
 {
     DWORD lookAheadTime;
-    void *pGlobalSettingsBuffer;
+    BYTE* pGlobalSettingsBuffer; /* FIXME: void* */
     DWORD globalSettingsBufferSize;
     DWORD globalSettingsFlags;
     DWORD globalSettingsAllocAttributes;
     XACT_FILEIO_CALLBACKS fileIOCallbacks;
-    XACT_NOTIFICATION_CALLBACK fnNotificationCallback;
-    PWSTR pRendererID;
+    BYTE* fnNotificationCallback; /* FIXME: XACT_NOTIFICATION_CALLBACK */
+    BYTE* pRendererID; /* FIXME: PWSTR */
     IXAudio2 *pXAudio2;
     IXAudio2MasteringVoice *pMasteringVoice;
 } XACT_RUNTIME_PARAMETERS;
 
 typedef struct XACT_STREAMING_PARAMETERS
 {
-    HANDLE file;
+    BYTE* file; /* FIXME: HANDLE */
     DWORD offset;
     DWORD flags;
     WORD packetSize;
@@ -161,14 +163,14 @@ typedef struct WAVEBANKSAMPLEREGION
 
 typedef union WAVEBANKMINIWAVEFORMAT
 {
-    struct
+    union /* struct */
     {
-        DWORD wFormatTag : 2;
-        DWORD nChannels : 3;
-        DWORD nSamplesPerSec : 18;
-        DWORD wBlockAlign : 8;
-        DWORD wBitsPerSample : 1;
-    };
+        DWORD wFormatTag; /* : 2; */
+        DWORD nChannels; /* : 3; */
+        DWORD nSamplesPerSec; /* : 18; */
+        DWORD wBlockAlign; /* : 8; */
+        DWORD wBitsPerSample; /* : 1; */
+    } ihatethistool;
     DWORD dwValue;
 } WAVEBANKMINIWAVEFORMAT;
 
@@ -176,17 +178,17 @@ typedef struct WAVEBANKENTRY
 {
     union
     {
-        struct
+        union /* struct */
         {
-            DWORD dwFlags : 4;
-            DWORD Duration : 28;
-        };
+            DWORD dwFlags; /* : 4; */
+            DWORD Duration; /* : 28; */
+        } thistoolblows;
         DWORD dwFlagsAndDuration;
     };
     WAVEBANKMINIWAVEFORMAT Format;
     WAVEBANKREGION PlayRegion;
     WAVEBANKSAMPLEREGION LoopRegion;
-}
+} WAVEBANKENTRY;
 
 cpp_quote("#include <poppack.h>")
 
@@ -201,7 +203,7 @@ typedef struct XACT_WAVE_PROPERTIES
 
 typedef struct XACT_WAVE_INSTANCE_PROPERTIES
 {
-    XACT_WAVE_PROPERTIES properties;
+    XACT_WAVE_PROPERTIES waveProperties; /* FIXME: 'properties' */
     BOOL backgroundMusic;
 } XACT_WAVE_INSTANCE_PROPERTIES;
 
@@ -268,7 +270,7 @@ typedef struct XACT_NOTIFICATION_DESCRIPTION
     IXACT3Wave *pWave;
     XACTINDEX cueIndex;
     XACTINDEX waveIndex;
-    PVOID pvContext;
+    BYTE* pvContext; /* FIXME: LPVOID */
 } XACT_NOTIFICATION_DESCRIPTION;
 
 typedef struct XACT_NOTIFICATION_CUE
@@ -321,7 +323,7 @@ typedef struct XACT_NOTIFICATION_WAVE
     IXACT3Wave *pWave;
 } XACT_NOTIFICATION_WAVE;
 
-typedef struct XACT_NOTIFICATION
+struct XACT_NOTIFICATION
 {
     XACTNOTIFICATIONTYPE type;
     LONG timeStamp;
@@ -336,7 +338,7 @@ typedef struct XACT_NOTIFICATION
         XACT_NOTIFICATION_GUI gui;
         XACT_NOTIFICATION_WAVE wave;
     };
-} XACT_NOTIFICATION;
+};
 
 cpp_quote("#include <poppack.h>")
 
@@ -355,7 +357,7 @@ interface IXACT3Engine : IUnknown
 
     HRESULT GetRendererDetails(
         XACTINDEX nRendererIndex,
-        [out] LPXACT_RENDERER_DETAILS pRendererDetails);
+        [out] XACT_RENDERER_DETAILS *pRendererDetails);
 
     HRESULT GetFinalMixFormat([out] WAVEFORMATEXTENSIBLE *pFinalMixFormat);
 
@@ -366,26 +368,26 @@ interface IXACT3Engine : IUnknown
     HRESULT DoWork();
 
     HRESULT CreateSoundBank(
-        [in] const void* pvBuffer,
+        [in] const BYTE* pvBuffer, /* FIXME: void* */
         DWORD dwSize,
         DWORD dwFlags,
         DWORD dwAllocAttributes,
         [out] IXACT3SoundBank **ppSoundBank);
 
     HRESULT CreateInMemoryWaveBank(
-        [in] const void* pvBuffer,
+        [in] const BYTE* pvBuffer, /* FIXME: void* */
         DWORD dwSize,
         DWORD dwFlags,
         DWORD dwAllocAttributes,
         [out] IXACT3WaveBank **ppWaveBank);
 
     HRESULT CreateStreamingWaveBank(
-        [in] const XACT_WAVEBANK_STREAMING_PARAMETERS *pParms,
+        [in] const XACT_STREAMING_PARAMETERS *pParms,
         [out] IXACT3WaveBank **ppWaveBank);
 
     HRESULT PrepareWave(
         DWORD dwFlags,
-        [in] PCSTR szWavePath,
+        [in] BYTE* szWavePath, /* FIXME: PCSTR */
         WORD wStreamingPacketSize,
         DWORD dwAlignment,
         DWORD dwPlayOffset,
@@ -418,7 +420,7 @@ interface IXACT3Engine : IUnknown
         [in] const XACT_NOTIFICATION_DESCRIPTION *pNotificationDesc);
 
     XACTCATEGORY GetCategory(
-        [in] PCSTR szFriendlyName);
+        [in] BYTE* szFriendlyName); /* FIXME: PCSTR */
 
     HRESULT Stop(XACTCATEGORY nCategory, DWORD dwFlags);
 
@@ -426,7 +428,7 @@ interface IXACT3Engine : IUnknown
 
     HRESULT Pause(XACTCATEGORY nCategory, BOOL fPause);
 
-    XACTVARIABLEINDEX GetGlobalVariableIndex([in] PCSTR szFriendlyName);
+    XACTVARIABLEINDEX GetGlobalVariableIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
 
     HRESULT SetGlobalVariable(
         XACTVARIABLEINDEX nIndex,
@@ -435,11 +437,15 @@ interface IXACT3Engine : IUnknown
     HRESULT GetGlobalVariable(
         XACTVARIABLEINDEX nIndex,
         [out] XACTVARIABLEVALUE *nValue);
-};
+}
 
+[
+    object,
+    local
+]
 interface IXACT3SoundBank
 {
-    XACTINDEX GetCueIndex([in] PCSTR szFriendlyName);
+    XACTINDEX GetCueIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
 
     HRESULT GetNumCues([out] XACTINDEX *pnNumCues);
 
@@ -464,15 +470,19 @@ interface IXACT3SoundBank
     HRESULT Destroy();
 
     HRESULT GetState([out] DWORD *pdwState);
-};
+}
 
+[
+    object,
+    local
+]
 interface IXACT3WaveBank
 {
     HRESULT Destroy();
 
     HRESULT GetNumWaves([out] XACTINDEX *pnNumWaves);
 
-    XACTINDEX GetWaveIndex([in] PCSTR szFriendlyName);
+    XACTINDEX GetWaveIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
 
     HRESULT GetWaveProperties(
         XACTINDEX nWaveIndex,
@@ -495,8 +505,12 @@ interface IXACT3WaveBank
     HRESULT Stop(XACTINDEX nWaveIndex, DWORD dwFlags);
 
     HRESULT GetState([out] DWORD *pdwState);
-};
+}
 
+[
+    object,
+    local
+]
 interface IXACT34Cue
 {
     HRESULT Play();
@@ -512,7 +526,7 @@ interface IXACT34Cue
         UINT32 uDstChannelCount,
         [in] float *pMatrixCoefficients);
 
-    XACTVARIABLEINDEX GetVariableIndex([in] PCSTR szFriendlyName);
+    XACTVARIABLEINDEX GetVariableIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
 
     HRESULT SetVariable(XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE nValue);
 
@@ -523,8 +537,12 @@ interface IXACT34Cue
     HRESULT Pause(BOOL fPause);
 
     HRESULT GetProperties([out] XACT_CUE_INSTANCE_PROPERTIES **ppProperties);
-};
+}
 
+[
+    object,
+    local
+]
 interface IXACT3Cue
 {
     HRESULT Play();
@@ -540,7 +558,7 @@ interface IXACT3Cue
         UINT32 uDstChannelCount,
         [in] float *pMatrixCoefficients);
 
-    XACTVARIABLEINDEX GetVariableIndex([in] PCSTR szFriendlyName);
+    XACTVARIABLEINDEX GetVariableIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
 
     HRESULT SetVariable(XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE nValue);
 
@@ -559,8 +577,12 @@ interface IXACT3Cue
         UINT32 SourceChannels,
         UINT32 DestinationChannels,
         [in, size_is(SourceChannels * DestinationChannels)] const float *pLevelMatrix);
-};
+}
 
+[
+    object,
+    local
+]
 interface IXACT3Wave
 {
     HRESULT Destroy();
@@ -583,4 +605,4 @@ interface IXACT3Wave
         [in] float *pMatrixCoefficients);
 
     HRESULT GetProperties([out] XACT_WAVE_INSTANCE_PROPERTIES *pProperties);
-};
+}
