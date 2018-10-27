@@ -35,10 +35,10 @@ WINE_DEFAULT_DEBUG_CHANNEL(xact3);
 
 static inline XACT3WaveImpl *impl_from_IXACT3Wave(IXACT3Wave *iface)
 {
-    return CONTAINING_RECORD(iface, IXACT3WaveImpl, IXACT3Wave_iface);
+    return CONTAINING_RECORD(iface, XACT3WaveImpl, IXACT3Wave_iface);
 }
 
-static HRESULT IXACT3WaveImpl_Destroy(IXACT3Wave *iface)
+static HRESULT WINAPI IXACT3WaveImpl_Destroy(IXACT3Wave *iface)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
     HRESULT hr;
@@ -50,7 +50,7 @@ static HRESULT IXACT3WaveImpl_Destroy(IXACT3Wave *iface)
     return hr;
 }
 
-static HRESULT IXACT3WaveImpl_Play(IXACT3Wave *iface)
+static HRESULT WINAPI IXACT3WaveImpl_Play(IXACT3Wave *iface)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
@@ -59,7 +59,7 @@ static HRESULT IXACT3WaveImpl_Play(IXACT3Wave *iface)
     return FACTWave_Play(This->fact_wave);
 }
 
-static HRESULT IXACT3WaveImpl_Stop(IXACT3Wave *iface, DWORD dwFlags)
+static HRESULT WINAPI IXACT3WaveImpl_Stop(IXACT3Wave *iface, DWORD dwFlags)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
@@ -68,7 +68,7 @@ static HRESULT IXACT3WaveImpl_Stop(IXACT3Wave *iface, DWORD dwFlags)
     return FACTWave_Stop(This->fact_wave, dwFlags);
 }
 
-static HRESULT IXACT3WaveImpl_Pause(IXACT3Wave *iface, BOOL fPause)
+static HRESULT WINAPI IXACT3WaveImpl_Pause(IXACT3Wave *iface, BOOL fPause)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
@@ -77,7 +77,7 @@ static HRESULT IXACT3WaveImpl_Pause(IXACT3Wave *iface, BOOL fPause)
     return FACTWave_Pause(This->fact_wave, fPause);
 }
 
-static HRESULT IXACT3WaveImpl_GetState(IXACT3Wave *iface, DWORD *pdwState)
+static HRESULT WINAPI IXACT3WaveImpl_GetState(IXACT3Wave *iface, DWORD *pdwState)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
@@ -86,7 +86,7 @@ static HRESULT IXACT3WaveImpl_GetState(IXACT3Wave *iface, DWORD *pdwState)
     return FACTWave_GetState(This->fact_wave, pdwState);
 }
 
-static HRESULT IXACT3WaveImpl_SetPitch(IXACT3Wave *iface, XACTPITCH pitch)
+static HRESULT WINAPI IXACT3WaveImpl_SetPitch(IXACT3Wave *iface, XACTPITCH pitch)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
@@ -95,7 +95,7 @@ static HRESULT IXACT3WaveImpl_SetPitch(IXACT3Wave *iface, XACTPITCH pitch)
     return FACTWave_SetPitch(This->fact_wave, pitch);
 }
 
-static HRESULT IXACT3WaveImpl_SetVolume(IXACT3Wave *iface, XACTVOLUME volume)
+static HRESULT WINAPI IXACT3WaveImpl_SetVolume(IXACT3Wave *iface, XACTVOLUME volume)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
@@ -104,7 +104,7 @@ static HRESULT IXACT3WaveImpl_SetVolume(IXACT3Wave *iface, XACTVOLUME volume)
     return FACTWave_SetVolume(This->fact_wave, volume);
 }
 
-static HRESULT IXACT3WaveImpl_SetMatrixCoefficients(IXACT3Wave *iface,
+static HRESULT WINAPI IXACT3WaveImpl_SetMatrixCoefficients(IXACT3Wave *iface,
         UINT32 uSrcChannelCount, UINT32 uDstChannelCount,
         float *pMatrixCoefficients)
 {
@@ -117,8 +117,8 @@ static HRESULT IXACT3WaveImpl_SetMatrixCoefficients(IXACT3Wave *iface,
             uDstChannelCount, pMatrixCoefficients);
 }
 
-static HRESULT IXACT3WaveImpl_GetProperties(IXACT3Wave *iface,
-    LPXACT_WAVE_INSTANCE_PROPERTIES pProperties)
+static HRESULT WINAPI IXACT3WaveImpl_GetProperties(IXACT3Wave *iface,
+    XACT_WAVE_INSTANCE_PROPERTIES *pProperties)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
@@ -128,7 +128,7 @@ static HRESULT IXACT3WaveImpl_GetProperties(IXACT3Wave *iface,
             (FACTWaveInstanceProperties*) pProperties);
 }
 
-const XACT3WaveVtbl XACT3Wave_Vtbl =
+const IXACT3WaveVtbl XACT3Wave_Vtbl =
 {
     IXACT3WaveImpl_Destroy,
     IXACT3WaveImpl_Play,

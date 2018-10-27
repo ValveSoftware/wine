@@ -31,43 +31,44 @@
 #include "wine/debug.h"
 #include "wine/heap.h"
 
+#if XACT3_VER <= 4
 WINE_DEFAULT_DEBUG_CHANNEL(xact3);
 
-static inline XACT3CueImpl *impl_from_IXACT3Cue(IXACT3Cue *iface)
+XACT3CueImpl *impl_from_IXACT34Cue(IXACT34Cue *iface)
 {
-    return CONTAINING_RECORD(iface, XACT3CueImpl, IXACT3Cue_iface);
+    return CONTAINING_RECORD(iface, XACT3CueImpl, IXACT34Cue_iface);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_Play(IXACT3Cue *iface)
+static HRESULT WINAPI IXACT34CueImpl_Play(IXACT34Cue *iface)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)\n", iface);
 
     return FACTCue_Play(This->fact_cue);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_Stop(IXACT3Cue *iface, DWORD dwFlags)
+static HRESULT WINAPI IXACT34CueImpl_Stop(IXACT34Cue *iface, DWORD dwFlags)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)->(%u)\n", iface, dwFlags);
 
     return FACTCue_Stop(This->fact_cue, dwFlags);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_GetState(IXACT3Cue *iface, DWORD *pdwState)
+static HRESULT WINAPI IXACT34CueImpl_GetState(IXACT34Cue *iface, DWORD *pdwState)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)->(%p)\n", iface, pdwState);
 
     return FACTCue_GetState(This->fact_cue, pdwState);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_Destroy(IXACT3Cue *iface)
+static HRESULT WINAPI IXACT34CueImpl_Destroy(IXACT34Cue *iface)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
     HRESULT hr;
 
     TRACE("(%p)\n", iface);
@@ -77,11 +78,11 @@ static HRESULT WINAPI IXACT3CueImpl_Destroy(IXACT3Cue *iface)
     return hr;
 }
 
-static HRESULT WINAPI IXACT3CueImpl_SetMatrixCoefficients(IXACT3Cue *iface,
+static HRESULT WINAPI IXACT34CueImpl_SetMatrixCoefficients(IXACT34Cue *iface,
         UINT32 uSrcChannelCount, UINT32 uDstChannelCount,
         float *pMatrixCoefficients)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)->(%u, %u, %p)\n", iface, uSrcChannelCount, uDstChannelCount,
             pMatrixCoefficients);
@@ -90,49 +91,49 @@ static HRESULT WINAPI IXACT3CueImpl_SetMatrixCoefficients(IXACT3Cue *iface,
         uDstChannelCount, pMatrixCoefficients);
 }
 
-static XACTVARIABLEINDEX WINAPI IXACT3CueImpl_GetVariableIndex(IXACT3Cue *iface,
+static XACTVARIABLEINDEX WINAPI IXACT34CueImpl_GetVariableIndex(IXACT34Cue *iface,
         PCSTR szFriendlyName)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)->(%s)\n", iface, szFriendlyName);
 
     return FACTCue_GetVariableIndex(This->fact_cue, szFriendlyName);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_SetVariable(IXACT3Cue *iface,
+static HRESULT WINAPI IXACT34CueImpl_SetVariable(IXACT34Cue *iface,
         XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE nValue)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)->(%u, %f)\n", iface, nIndex, nValue);
 
     return FACTCue_SetVariable(This->fact_cue, nIndex, nValue);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_GetVariable(IXACT3Cue *iface,
+static HRESULT WINAPI IXACT34CueImpl_GetVariable(IXACT34Cue *iface,
         XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE *nValue)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)->(%u, %p)\n", iface, nIndex, nValue);
 
     return FACTCue_GetVariable(This->fact_cue, nIndex, nValue);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_Pause(IXACT3Cue *iface, BOOL fPause)
+static HRESULT WINAPI IXACT34CueImpl_Pause(IXACT34Cue *iface, BOOL fPause)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
 
     TRACE("(%p)->(%u)\n", iface, fPause);
 
     return FACTCue_Pause(This->fact_cue, fPause);
 }
 
-static HRESULT WINAPI IXACT3CueImpl_GetProperties(IXACT3Cue *iface,
+static HRESULT WINAPI IXACT34CueImpl_GetProperties(IXACT34Cue *iface,
         XACT_CUE_INSTANCE_PROPERTIES **ppProperties)
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
+    XACT3CueImpl *This = impl_from_IXACT34Cue(iface);
     FACTCueInstanceProperties *fProps;
     HRESULT hr;
 
@@ -146,35 +147,17 @@ static HRESULT WINAPI IXACT3CueImpl_GetProperties(IXACT3Cue *iface,
     return hr;
 }
 
-static HRESULT WINAPI IXACT3CueImpl_SetOutputVoices(IXACT3Cue *iface,
-        const XAUDIO2_VOICE_SENDS *pSendList)
+const IXACT34CueVtbl XACT34Cue_Vtbl =
 {
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
-    FIXME("(%p): stub!\n", This);
-    return S_OK;
-}
-
-static HRESULT WINAPI IXACT3CueImpl_SetOutputVoiceMatrix(IXACT3Cue *iface,
-        IXAudio2Voice *pDestinationVoice, UINT32 SourceChannels,
-        UINT32 DestinationChannels, const float *pLevelMatrix)
-{
-    XACT3CueImpl *This = impl_from_IXACT3Cue(iface);
-    FIXME("(%p): stub!\n", This);
-    return S_OK;
-}
-
-const IXACT3CueVtbl XACT3Cue_Vtbl =
-{
-    IXACT3CueImpl_Play,
-    IXACT3CueImpl_Stop,
-    IXACT3CueImpl_GetState,
-    IXACT3CueImpl_Destroy,
-    IXACT3CueImpl_SetMatrixCoefficients,
-    IXACT3CueImpl_GetVariableIndex,
-    IXACT3CueImpl_SetVariable,
-    IXACT3CueImpl_GetVariable,
-    IXACT3CueImpl_Pause,
-    IXACT3CueImpl_GetProperties,
-    IXACT3CueImpl_SetOutputVoices,
-    IXACT3CueImpl_SetOutputVoiceMatrix
+    IXACT34CueImpl_Play,
+    IXACT34CueImpl_Stop,
+    IXACT34CueImpl_GetState,
+    IXACT34CueImpl_Destroy,
+    IXACT34CueImpl_SetMatrixCoefficients,
+    IXACT34CueImpl_GetVariableIndex,
+    IXACT34CueImpl_SetVariable,
+    IXACT34CueImpl_GetVariable,
+    IXACT34CueImpl_Pause,
+    IXACT34CueImpl_GetProperties
 };
+#endif

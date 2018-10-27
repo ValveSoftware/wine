@@ -58,26 +58,24 @@ typedef struct _XACT3EngineImpl {
     FACTAudioEngine *fact_engine;
 } XACT3EngineImpl;
 
+#if XACT3_VER <= 4
+extern const IXACT34CueVtbl XACT34Cue_Vtbl DECLSPEC_HIDDEN;
+XACT3CueImpl *impl_from_IXACT34Cue(IXACT34Cue *iface);
+#endif
+
 /* xact_engine.c */
 extern HRESULT make_xact3_factory(REFIID riid, void **ppv) DECLSPEC_HIDDEN;
 
 /* xact_soundbank.c */
-extern XACT3SoundBankImpl *impl_from_IXACT3SoundBank(IXACT3SoundBank *iface) DECLSPEC_HIDDEN;
 extern const IXACT3SoundBankVtbl XACT3SoundBank_Vtbl DECLSPEC_HIDDEN;
 
 /* xact_wavebank.c */
-extern XACT3WaveBankImpl *impl_from_IXACT3WaveBank(IXACT3WaveBank *iface) DECLSPEC_HIDDEN;
 extern const IXACT3WaveBankVtbl XACT3WaveBank_Vtbl DECLSPEC_HIDDEN;
 
 /* xact_cue.c */
-extern XACT3CueImpl *impl_from_IXACT3Cue(IXACT3Cue *iface) DECLSPEC_HIDDEN;
-#if XACT3_VER <= 4
-extern const IXACT34CueVtbl XACT34Cue_Vtbl DECLSPEC_HIDDEN;
-#endif
 extern const IXACT3CueVtbl XACT3Cue_Vtbl DECLSPEC_HIDDEN;
 
 /* xact_wave.c */
-extern XACT3WaveImpl *impl_from_IXACT3Wave(IXACT3Wave *iface) DECLSPEC_HIDDEN;
 extern const IXACT3WaveVtbl XACT3Wave_Vtbl DECLSPEC_HIDDEN;
 
 /* xaudio_allocator.c */

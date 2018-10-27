@@ -2,10 +2,11 @@ EXTRADEFS = -DXACT3_VER=4
 MODULE    = xactengine3_4.dll
 IMPORTS   = advapi32 ole32 user32 uuid
 PARENTSRC = ../xaudio2_7
-EXTRALIBS = $(SDL2_LIBS)
+EXTRALIBS = $(SDL2_LIBS) $(LIBAVCODEC_LIBS) $(LIBAVUTIL_LIBS)
 
 C_SRCS = \
 	xaudio_allocator.c \
+	xact_compat.c \
 	xact_dll.c \
 	xact_engine.c \
 	xact_soundbank.c \
@@ -13,6 +14,13 @@ C_SRCS = \
 	xact_cue.c \
 	xact_wave.c \
 	FAudio/FACT.c \
-	FAudio/FACT_internal.c
+	FAudio/FACT_internal.c \
+	FAudio/FAudio.c \
+	FAudio/FAudio_ffmpeg.c \
+	FAudio/FAudio_internal.c \
+	FAudio/FAudio_internal_simd.c \
+	FAudio/FAudio_platform_sdl2.c \
+	FAudio/FAPOBase.c \
+	FAudio/FAudioFX_reverb.c
 
 IDL_SRCS = xact_classes.idl

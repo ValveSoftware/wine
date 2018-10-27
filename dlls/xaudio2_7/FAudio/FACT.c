@@ -980,6 +980,7 @@ uint32_t FACTSoundBank_Play(
 	return 0;
 }
 
+#if 0 /* Wine change! */
 uint32_t FACTSoundBank_Play3D(
 	FACTSoundBank *pSoundBank,
 	uint16_t nCueIndex,
@@ -1019,6 +1020,7 @@ uint32_t FACTSoundBank_Play3D(
 	FAudio_PlatformUnlockMutex(pSoundBank->parentEngine->apiLock);
 	return 0;
 }
+#endif
 
 uint32_t FACTSoundBank_Stop(
 	FACTSoundBank *pSoundBank,

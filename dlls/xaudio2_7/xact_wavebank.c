@@ -35,10 +35,10 @@ WINE_DEFAULT_DEBUG_CHANNEL(xact3);
 
 static inline XACT3WaveBankImpl *impl_from_IXACT3WaveBank(IXACT3WaveBank *iface)
 {
-    return CONTAINING_RECORD(iface, IXACT3WaveBankImpl, IXACT3WaveBank_iface);
+    return CONTAINING_RECORD(iface, XACT3WaveBankImpl, IXACT3WaveBank_iface);
 }
 
-static HRESULT IXACT3WaveBankImpl_Destroy(IXACT3WaveBank *iface)
+static HRESULT WINAPI IXACT3WaveBankImpl_Destroy(IXACT3WaveBank *iface)
 {
     XACT3WaveBankImpl *This = impl_from_IXACT3WaveBank(iface);
     HRESULT hr;
@@ -50,7 +50,7 @@ static HRESULT IXACT3WaveBankImpl_Destroy(IXACT3WaveBank *iface)
     return hr;
 }
 
-static HRESULT IXACT3WaveBankImpl_GetNumWaves(IXACT3WaveBank *iface,
+static HRESULT WINAPI IXACT3WaveBankImpl_GetNumWaves(IXACT3WaveBank *iface,
         XACTINDEX *pnNumWaves)
 {
     XACT3WaveBankImpl *This = impl_from_IXACT3WaveBank(iface);
@@ -60,7 +60,7 @@ static HRESULT IXACT3WaveBankImpl_GetNumWaves(IXACT3WaveBank *iface,
     return FACTWaveBank_GetNumWaves(This->fact_wavebank, pnNumWaves);
 }
 
-static XACTINDEX IXACT3WaveBankImpl_GetWaveIndex(IXACT3WaveBank *iface,
+static XACTINDEX WINAPI IXACT3WaveBankImpl_GetWaveIndex(IXACT3WaveBank *iface,
         PCSTR szFriendlyName)
 {
     XACT3WaveBankImpl *This = impl_from_IXACT3WaveBank(iface);
@@ -70,8 +70,8 @@ static XACTINDEX IXACT3WaveBankImpl_GetWaveIndex(IXACT3WaveBank *iface,
     return FACTWaveBank_GetWaveIndex(This->fact_wavebank, szFriendlyName);
 }
 
-static HRESULT IXACT3WaveBankImpl_GetWaveProperties(IXACT3WaveBank *iface,
-        XACTINDEX nWaveIndex, LPXACT_WAVE_PROPERTIES pWaveProperties)
+static HRESULT WINAPI IXACT3WaveBankImpl_GetWaveProperties(IXACT3WaveBank *iface,
+        XACTINDEX nWaveIndex, XACT_WAVE_PROPERTIES *pWaveProperties)
 {
     XACT3WaveBankImpl *This = impl_from_IXACT3WaveBank(iface);
 
@@ -81,7 +81,7 @@ static HRESULT IXACT3WaveBankImpl_GetWaveProperties(IXACT3WaveBank *iface,
             (FACTWaveProperties*) pWaveProperties);
 }
 
-static HRESULT IXACT3WaveBankImpl_Prepare(IXACT3WaveBank *iface,
+static HRESULT WINAPI IXACT3WaveBankImpl_Prepare(IXACT3WaveBank *iface,
         XACTINDEX nWaveIndex, DWORD dwFlags, DWORD dwPlayOffset,
         XACTLOOPCOUNT nLoopCount, IXACT3Wave** ppWave)
 {
@@ -90,11 +90,11 @@ static HRESULT IXACT3WaveBankImpl_Prepare(IXACT3WaveBank *iface,
     FACTWave *fwave;
     HRESULT hr;
 
-    TRACE("(%p)->(%x, %u, %x, %u, %p)\n", This, nWaveIndex, dwFlags, dwPlayOffset,
-            nLoopCount, ppWave);
+    TRACE("(%p)->(%x, %u, %x, %u, %p)\n", This, nWaveIndex, dwFlags,
+            dwPlayOffset, nLoopCount, ppWave);
 
-    hr = FACTWaveBank_Prepare(This->fact_wavebank, dwFlags, dwPlayOffset,
-            nLoopCount, &fwave);
+    hr = FACTWaveBank_Prepare(This->fact_wavebank, nWaveIndex, dwFlags,
+            dwPlayOffset, nLoopCount, &fwave);
     if(FAILED(hr))
         return hr;
 
@@ -107,14 +107,14 @@ static HRESULT IXACT3WaveBankImpl_Prepare(IXACT3WaveBank *iface,
 
     wave->IXACT3Wave_iface.lpVtbl = &XACT3Wave_Vtbl;
     wave->fact_wave = fwave;
-    *ppWave = wave;
+    *ppWave = (IXACT3Wave*)wave;
 
     TRACE("Created Wave: %p\n", wave);
 
     return hr;
 }
 
-static HRESULT IXACT3WaveBankImpl_Play(IXACT3WaveBank *iface,
+static HRESULT WINAPI IXACT3WaveBankImpl_Play(IXACT3WaveBank *iface,
         XACTINDEX nWaveIndex, DWORD dwFlags, DWORD dwPlayOffset,
         XACTLOOPCOUNT nLoopCount, IXACT3Wave** ppWave)
 {
@@ -148,22 +148,23 @@ static HRESULT IXACT3WaveBankImpl_Play(IXACT3WaveBank *iface,
 
         wave->IXACT3Wave_iface.lpVtbl = &XACT3Wave_Vtbl;
         wave->fact_wave = fwave;
-        *ppWave = wave;
+        *ppWave = (IXACT3Wave*)wave;
     }
 
     return hr;
 }
 
-static HRESULT IXACT3WaveBankImpl_Stop(IXACT3WaveBank *iface, DWORD dwFlags)
+static HRESULT WINAPI IXACT3WaveBankImpl_Stop(IXACT3WaveBank *iface,
+        XACTINDEX nWaveIndex, DWORD dwFlags)
 {
     XACT3WaveBankImpl *This = impl_from_IXACT3WaveBank(iface);
 
-    TRACE("(%p)->(%u)\n", This, dwFlags);
+    TRACE("(%p)->(%u, %u)\n", This, nWaveIndex, dwFlags);
 
-    return FACTWaveBank_Stop(This->fact_wavebank, dwFlags);
+    return FACTWaveBank_Stop(This->fact_wavebank, nWaveIndex, dwFlags);
 }
 
-static HRESULT IXACT3WaveBankImpl_GetState(IXACT3WaveBank *iface,
+static HRESULT WINAPI IXACT3WaveBankImpl_GetState(IXACT3WaveBank *iface,
         DWORD *pdwState)
 {
     XACT3WaveBankImpl *This = impl_from_IXACT3WaveBank(iface);
@@ -173,7 +174,7 @@ static HRESULT IXACT3WaveBankImpl_GetState(IXACT3WaveBank *iface,
     return FACTWaveBank_GetState(This->fact_wavebank, pdwState);
 }
 
-const XACT3WaveBankVtbl XACT3WaveBank_Vtbl =
+const IXACT3WaveBankVtbl XACT3WaveBank_Vtbl =
 {
     IXACT3WaveBankImpl_Destroy,
     IXACT3WaveBankImpl_GetNumWaves,

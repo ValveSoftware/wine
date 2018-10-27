@@ -71,14 +71,14 @@ HRESULT WINAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void **ppv)
 {
     TRACE("(%s, %s, %p)\n", debugstr_guid(rclsid), debugstr_guid(riid), ppv);
 
-    if(IsEqualGUID(rclsid, &CLSID_XACT30) ||
-            IsEqualGUID(rclsid, &CLSID_XACT31) ||
-            IsEqualGUID(rclsid, &CLSID_XACT32) ||
-            IsEqualGUID(rclsid, &CLSID_XACT33) ||
-            IsEqualGUID(rclsid, &CLSID_XACT34) ||
-            IsEqualGUID(rclsid, &CLSID_XACT35) ||
-            IsEqualGUID(rclsid, &CLSID_XACT36) ||
-            IsEqualGUID(rclsid, &CLSID_XACT37))
+    if(IsEqualGUID(rclsid, &CLSID_XACTEngine30) ||
+            IsEqualGUID(rclsid, &CLSID_XACTEngine31) ||
+            IsEqualGUID(rclsid, &CLSID_XACTEngine32) ||
+            IsEqualGUID(rclsid, &CLSID_XACTEngine33) ||
+            IsEqualGUID(rclsid, &CLSID_XACTEngine34) ||
+            IsEqualGUID(rclsid, &CLSID_XACTEngine35) ||
+            IsEqualGUID(rclsid, &CLSID_XACTEngine36) ||
+            IsEqualGUID(rclsid, &CLSID_XACTEngine37))
         return make_xact3_factory(riid, ppv);
 
     return CLASS_E_CLASSNOTAVAILABLE;
