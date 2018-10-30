@@ -6,12 +6,6 @@ EXTRALIBS = $(FAUDIO_LIBS)
 
 C_SRCS = \
 	xaudio_allocator.c \
-	xact_compat.c \
-	xact_dll.c \
-	xact_engine.c \
-	xact_soundbank.c \
-	xact_wavebank.c \
-	xact_cue.c \
-	xact_wave.c
+	xact_dll.c
 
 IDL_SRCS = xact_classes.idl
