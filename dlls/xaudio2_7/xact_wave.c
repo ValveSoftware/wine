@@ -63,7 +63,7 @@ static HRESULT WINAPI IXACT3WaveImpl_Stop(IXACT3Wave *iface, DWORD dwFlags)
 {
     XACT3WaveImpl *This = impl_from_IXACT3Wave(iface);
 
-    TRACE("(%p)->(%x)\n", This, dwFlags);
+    TRACE("(%p)->(0x%x)\n", This, dwFlags);
 
     return FACTWave_Stop(This->fact_wave, dwFlags);
 }

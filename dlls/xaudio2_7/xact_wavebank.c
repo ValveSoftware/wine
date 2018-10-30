@@ -90,7 +90,7 @@ static HRESULT WINAPI IXACT3WaveBankImpl_Prepare(IXACT3WaveBank *iface,
     FACTWave *fwave;
     HRESULT hr;
 
-    TRACE("(%p)->(%x, %u, %x, %u, %p)\n", This, nWaveIndex, dwFlags,
+    TRACE("(%p)->(0x%x, %u, 0x%x, %u, %p)\n", This, nWaveIndex, dwFlags,
             dwPlayOffset, nLoopCount, ppWave);
 
     hr = FACTWaveBank_Prepare(This->fact_wavebank, nWaveIndex, dwFlags,
@@ -123,7 +123,7 @@ static HRESULT WINAPI IXACT3WaveBankImpl_Play(IXACT3WaveBank *iface,
     FACTWave *fwave;
     HRESULT hr;
 
-    TRACE("(%p)->(%x, %u, %x, %u, %p)\n", This, nWaveIndex, dwFlags, dwPlayOffset,
+    TRACE("(%p)->(0x%x, %u, 0x%x, %u, %p)\n", This, nWaveIndex, dwFlags, dwPlayOffset,
             nLoopCount, ppWave);
 
     /* If the application doesn't want a handle, don't generate one at all.

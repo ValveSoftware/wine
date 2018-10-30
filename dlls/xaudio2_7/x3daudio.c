@@ -51,7 +51,7 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, void *pReserved)
 HRESULT CDECL X3DAudioInitialize(UINT32 chanmask, float speedofsound,
         X3DAUDIO_HANDLE handle)
 {
-    TRACE("%u, %f, %p\n", chanmask, speedofsound, handle);
+    TRACE("0x%x, %f, %p\n", chanmask, speedofsound, handle);
     F3DAudioInitialize(chanmask, speedofsound, handle);
     return S_OK;
 }
@@ -61,7 +61,7 @@ HRESULT CDECL X3DAudioInitialize(UINT32 chanmask, float speedofsound,
 void CDECL LEGACY_X3DAudioInitialize(UINT32 chanmask, float speedofsound,
         X3DAUDIO_HANDLE handle)
 {
-    TRACE("%u, %f, %p\n", chanmask, speedofsound, handle);
+    TRACE("0x%x, %f, %p\n", chanmask, speedofsound, handle);
     F3DAudioInitialize(chanmask, speedofsound, handle);
 }
 #endif /* X3DAUDIO1_VER */

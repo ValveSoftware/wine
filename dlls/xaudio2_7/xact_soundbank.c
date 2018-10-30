@@ -78,7 +78,7 @@ static HRESULT WINAPI IXACT3SoundBankImpl_Prepare(IXACT3SoundBank *iface,
     FACTCue *fcue;
     HRESULT hr;
 
-    TRACE("(%p)->(%u, %x, %u, %p)\n", This, nCueIndex, dwFlags, timeOffset,
+    TRACE("(%p)->(%u, 0x%x, %u, %p)\n", This, nCueIndex, dwFlags, timeOffset,
             ppCue);
 
     hr = FACTSoundBank_Prepare(This->fact_soundbank, nCueIndex, dwFlags,
@@ -118,7 +118,7 @@ static HRESULT WINAPI IXACT3SoundBankImpl_Play(IXACT3SoundBank *iface,
     FACTCue *fcue;
     HRESULT hr;
 
-    TRACE("(%p)->(%u, %x, %u, %p)\n", This, nCueIndex, dwFlags, timeOffset,
+    TRACE("(%p)->(%u, 0x%x, %u, %p)\n", This, nCueIndex, dwFlags, timeOffset,
             ppCue);
 
     /* If the application doesn't want a handle, don't generate one at all.

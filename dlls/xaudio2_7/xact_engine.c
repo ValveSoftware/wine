@@ -156,7 +156,7 @@ static HRESULT WINAPI IXACT3EngineImpl_CreateSoundBank(IXACT3Engine *iface,
     FACTSoundBank *fsb;
     HRESULT hr;
 
-    TRACE("(%p)->(%p, %u, %x, %x, %p)\n", This, pvBuffer, dwSize, dwFlags,
+    TRACE("(%p)->(%p, %u, 0x%x, 0x%x, %p)\n", This, pvBuffer, dwSize, dwFlags,
             dwAllocAttributes, ppSoundBank);
 
     hr = FACTAudioEngine_CreateSoundBank(This->fact_engine, pvBuffer, dwSize,
@@ -189,7 +189,7 @@ static HRESULT WINAPI IXACT3EngineImpl_CreateInMemoryWaveBank(IXACT3Engine *ifac
     FACTWaveBank *fwb;
     HRESULT hr;
 
-    TRACE("(%p)->(%p, %u, %x, %x, %p)\n", This, pvBuffer, dwSize, dwFlags,
+    TRACE("(%p)->(%p, %u, 0x%x, 0x%x, %p)\n", This, pvBuffer, dwSize, dwFlags,
             dwAllocAttributes, ppWaveBank);
 
     hr = FACTAudioEngine_CreateInMemoryWaveBank(This->fact_engine, pvBuffer,
@@ -408,7 +408,7 @@ static HRESULT WINAPI IXACT3EngineImpl_Stop(IXACT3Engine *iface,
 {
     XACT3EngineImpl *This = impl_from_IXACT3Engine(iface);
 
-    TRACE("(%p)->(%u, %x)\n", This, nCategory, dwFlags);
+    TRACE("(%p)->(%u, 0x%x)\n", This, nCategory, dwFlags);
 
     return FACTAudioEngine_Stop(This->fact_engine, nCategory, dwFlags);
 }
