@@ -23,10 +23,7 @@
 #define NONAMELESSUNION
 #define COBJMACROS
 
-#include "xaudio_private.h"
-
-#include "wine/debug.h"
-#include "wine/heap.h"
+#include "ole2.h"
 
 void* XAudio_Internal_Malloc(size_t size)
 {

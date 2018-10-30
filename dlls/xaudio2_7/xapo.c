@@ -29,9 +29,6 @@
 #include "xaudio2fx.h"
 #include "xapofx.h"
 
-#include "ole2.h"
-#include "rpcproxy.h"
-
 #include "wine/debug.h"
 #include "wine/heap.h"
 

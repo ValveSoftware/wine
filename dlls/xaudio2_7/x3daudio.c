@@ -19,7 +19,8 @@
 
 #include <stdarg.h>
 
-#include "xaudio_private.h"
+#include "windef.h"
+#include "winbase.h"
 #include "x3daudio.h"
 
 #include "wine/debug.h"

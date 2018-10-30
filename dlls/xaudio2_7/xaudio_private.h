@@ -18,16 +18,10 @@
  */
 
 #include "windef.h"
-#include "winbase.h"
-#include "winuser.h"
 #include "wine/list.h"
 
-#include "mmsystem.h"
 #include "xaudio2.h"
 #include "xapo.h"
-#include "devpkey.h"
-#include "mmdeviceapi.h"
-#include "audioclient.h"
 
 #include <FAudio.h>
 #include <FAPO.h>

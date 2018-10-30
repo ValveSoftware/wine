@@ -31,7 +31,6 @@
 #include "xapofx.h"
 
 #include "wine/debug.h"
-#include "wine/heap.h"
 
 #if XAUDIO2_VER >= 8 || defined XAPOFX1_VER
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);

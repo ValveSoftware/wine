@@ -23,18 +23,11 @@
 #define NONAMELESSUNION
 #define COBJMACROS
 
-#include "windef.h"
-#include "winbase.h"
-#include "winuser.h"
-
 #include "initguid.h"
 #include "xact3.h"
 
-#include "ole2.h"
 #include "rpcproxy.h"
-
 #include "wine/debug.h"
-#include "wine/heap.h"
 
 #include <FACT.h>
 
