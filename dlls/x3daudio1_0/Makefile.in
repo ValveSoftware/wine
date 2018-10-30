@@ -1,8 +1,7 @@
 EXTRADEFS = -DX3DAUDIO1_VER=0 -DXAUDIO2_VER=0
 MODULE    = x3daudio1_0.dll
 PARENTSRC = ../xaudio2_7
-EXTRALIBS = $(SDL2_LIBS)
+EXTRALIBS = $(FAUDIO_LIBS)
 
 C_SRCS = \
-	x3daudio.c \
-	FAudio/F3DAudio.c
+	x3daudio.c

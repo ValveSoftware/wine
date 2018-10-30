@@ -29,8 +29,8 @@
 #include "mmdeviceapi.h"
 #include "audioclient.h"
 
-#include "FAudio/FAudio.h"
-#include "FAudio/FAPO.h"
+#include <FAudio.h>
+#include <FAPO.h>
 
 typedef struct _XA2XAPOImpl {
     IXAPO *xapo;

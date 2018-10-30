@@ -2,7 +2,7 @@ EXTRADEFS = -DXAUDIO2_VER=4
 MODULE    = xaudio2_4.dll
 IMPORTS   = advapi32 ole32 user32 uuid
 PARENTSRC = ../xaudio2_7
-EXTRALIBS = $(SDL2_LIBS) $(LIBAVCODEC_LIBS) $(LIBAVUTIL_LIBS)
+EXTRALIBS = $(FAUDIO_LIBS)
 
 C_SRCS = \
 	xaudio_allocator.c \
@@ -16,14 +16,6 @@ C_SRCS = \
 	xaudio_voice_wrapeffect.c \
 	xaudio_voice_wrapsend.c \
 	xaudio_callbacks.c \
-	xapo.c \
-	FAudio/FAPOBase.c \
-	FAudio/FAudio.c \
-	FAudio/FAudio_ffmpeg.c \
-	FAudio/FAudio_internal.c \
-	FAudio/FAudio_internal_simd.c \
-	FAudio/FAudio_platform_sdl2.c \
-	FAudio/FAudioFX_reverb.c \
-	FAudio/FAudioFX_volumemeter.c
+	xapo.c
 
 IDL_SRCS = xaudio_classes.idl

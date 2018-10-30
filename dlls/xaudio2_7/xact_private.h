@@ -23,7 +23,7 @@
 
 #include "xact3.h"
 
-#include "FAudio/FACT.h"
+#include <FACT.h>
 
 typedef struct _XACT3CueImpl {
     IXACT3Cue IXACT3Cue_iface;

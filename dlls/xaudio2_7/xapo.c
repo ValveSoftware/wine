@@ -35,9 +35,9 @@
 #include "wine/debug.h"
 #include "wine/heap.h"
 
-#include "FAudio/FAPO.h"
-#include "FAudio/FAPOFX.h"
-#include "FAudio/FAudioFX.h"
+#include <FAPO.h>
+#include <FAPOFX.h>
+#include <FAudioFX.h>
 
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
 

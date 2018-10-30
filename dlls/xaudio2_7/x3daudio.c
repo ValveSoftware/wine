@@ -24,7 +24,7 @@
 
 #include "wine/debug.h"
 
-#include "FAudio/F3DAudio.h"
+#include <F3DAudio.h>
 
 #if XAUDIO2_VER >= 8 || defined X3DAUDIO1_VER
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
