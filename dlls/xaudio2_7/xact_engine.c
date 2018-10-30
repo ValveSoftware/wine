@@ -538,7 +538,7 @@ static ULONG WINAPI XACT3CF_Release(IClassFactory *iface)
 static HRESULT WINAPI XACT3CF_CreateInstance(IClassFactory *iface, IUnknown *pOuter,
                                                REFIID riid, void **ppobj)
 {
-    struct xaudio2_cf *This = impl_from_IClassFactory(iface);
+    struct xact3_cf *This = impl_from_IClassFactory(iface);
     HRESULT hr;
     XACT3EngineImpl *object;
 

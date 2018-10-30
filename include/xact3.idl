@@ -134,7 +134,7 @@ typedef struct XACT_RUNTIME_PARAMETERS
     DWORD globalSettingsAllocAttributes;
     XACT_FILEIO_CALLBACKS fileIOCallbacks;
     BYTE* fnNotificationCallback; /* FIXME: XACT_NOTIFICATION_CALLBACK */
-    BYTE* pRendererID; /* FIXME: PWSTR */
+    LPCWSTR pRendererID;
     IXAudio2 *pXAudio2;
     IXAudio2MasteringVoice *pMasteringVoice;
 } XACT_RUNTIME_PARAMETERS;
@@ -387,7 +387,7 @@ interface IXACT3Engine : IUnknown
 
     HRESULT PrepareWave(
         DWORD dwFlags,
-        [in] BYTE* szWavePath, /* FIXME: PCSTR */
+        [in] LPCSTR szWavePath,
         WORD wStreamingPacketSize,
         DWORD dwAlignment,
         DWORD dwPlayOffset,
@@ -420,7 +420,7 @@ interface IXACT3Engine : IUnknown
         [in] const XACT_NOTIFICATION_DESCRIPTION *pNotificationDesc);
 
     XACTCATEGORY GetCategory(
-        [in] BYTE* szFriendlyName); /* FIXME: PCSTR */
+        [in] LPCSTR szFriendlyName);
 
     HRESULT Stop(XACTCATEGORY nCategory, DWORD dwFlags);
 
@@ -428,7 +428,7 @@ interface IXACT3Engine : IUnknown
 
     HRESULT Pause(XACTCATEGORY nCategory, BOOL fPause);
 
-    XACTVARIABLEINDEX GetGlobalVariableIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
+    XACTVARIABLEINDEX GetGlobalVariableIndex([in] LPCSTR szFriendlyName);
 
     HRESULT SetGlobalVariable(
         XACTVARIABLEINDEX nIndex,
@@ -445,7 +445,7 @@ interface IXACT3Engine : IUnknown
 ]
 interface IXACT3SoundBank
 {
-    XACTINDEX GetCueIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
+    XACTINDEX GetCueIndex([in] LPCSTR szFriendlyName);
 
     HRESULT GetNumCues([out] XACTINDEX *pnNumCues);
 
@@ -482,7 +482,7 @@ interface IXACT3WaveBank
 
     HRESULT GetNumWaves([out] XACTINDEX *pnNumWaves);
 
-    XACTINDEX GetWaveIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
+    XACTINDEX GetWaveIndex([in] LPCSTR szFriendlyName);
 
     HRESULT GetWaveProperties(
         XACTINDEX nWaveIndex,
@@ -526,7 +526,7 @@ interface IXACT34Cue
         UINT32 uDstChannelCount,
         [in] float *pMatrixCoefficients);
 
-    XACTVARIABLEINDEX GetVariableIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
+    XACTVARIABLEINDEX GetVariableIndex([in] LPCSTR szFriendlyName);
 
     HRESULT SetVariable(XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE nValue);
 
@@ -558,7 +558,7 @@ interface IXACT3Cue
         UINT32 uDstChannelCount,
         [in] float *pMatrixCoefficients);
 
-    XACTVARIABLEINDEX GetVariableIndex([in] BYTE* szFriendlyName); /* FIXME: PCSTR */
+    XACTVARIABLEINDEX GetVariableIndex([in] LPCSTR szFriendlyName);
 
     HRESULT SetVariable(XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE nValue);
 
