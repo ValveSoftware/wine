@@ -684,6 +684,7 @@ HKLM,%FontsNT%,"Arial (TrueType)",,"arial.ttf"
 HKLM,%FontsNT%,"Arial Bold (TrueType)",,"arialbd.ttf"
 HKLM,%FontsNT%,"Times New Roman (TrueType)",,"times.ttf"
 HKLM,%FontsNT%,"Courier New (TrueType)",,"cour.ttf"
+HKCU,Software\Wine\Fonts\Replacements,"Palatino Linotype",,"Times New Roman"
 
 [MCI]
 HKLM,%Mci32Str%,"AVIVideo",,"mciavi32.dll"
