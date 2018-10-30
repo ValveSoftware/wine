@@ -142,6 +142,7 @@ extern const IXAudio22Vtbl XAudio22_Vtbl DECLSPEC_HIDDEN;
 extern const IXAudio27Vtbl XAudio27_Vtbl DECLSPEC_HIDDEN;
 #endif
 
+/* xaudio_dll.c */
 extern HRESULT xaudio2_initialize(IXAudio2Impl *This, UINT32 flags, XAUDIO2_PROCESSOR proc) DECLSPEC_HIDDEN;
 
 /* xapo.c */

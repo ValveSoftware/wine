@@ -38,6 +38,8 @@
 #include "wine/debug.h"
 #include "wine/heap.h"
 
+WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
+
 #if XAUDIO2_VER == 0
 #define COMPAT_E_INVALID_CALL E_INVALIDARG
 #define COMPAT_E_DEVICE_INVALIDATED XAUDIO20_E_DEVICE_INVALIDATED
@@ -46,9 +48,9 @@
 #define COMPAT_E_DEVICE_INVALIDATED XAUDIO2_E_DEVICE_INVALIDATED
 #endif
 
-WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
-
 static HINSTANCE instance;
+
+static XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface);
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, void *pReserved)
 {
@@ -81,7 +83,7 @@ HRESULT WINAPI DllUnregisterServer(void)
     return __wine_unregister_resources(instance);
 }
 
-XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface);
+/* Effect Wrapping */
 
 static inline XA2XAPOImpl *impl_from_FAPO(FAPO *iface)
 {
@@ -325,6 +327,8 @@ static void free_effect_chain(FAudioEffectChain *chain)
     heap_free(chain);
 }
 
+/* Send Wrapping */
+
 static FAudioVoiceSends *wrap_voice_sends(const XAUDIO2_VOICE_SENDS *sends)
 {
     FAudioVoiceSends *ret;
@@ -350,6 +354,8 @@ static void free_voice_sends(FAudioVoiceSends *sends)
         return;
     heap_free(sends);
 }
+
+/* Voice Callbacks */
 
 static inline XA2VoiceImpl *impl_from_FAudioVoiceCallback(FAudioVoiceCallback *iface)
 {
@@ -428,6 +434,8 @@ static const FAudioVoiceCallback FAudioVoiceCallback_Vtbl = {
     XA2VCB_OnVoiceProcessingPassStart
 };
 
+/* Engine Callbacks */
+
 static inline IXAudio2Impl *impl_from_FAudioEngineCallback(FAudioEngineCallback *iface)
 {
     return CONTAINING_RECORD(iface, IXAudio2Impl, FAudioEngineCallback_vtbl);
@@ -467,7 +475,9 @@ static const FAudioEngineCallback FAudioEngineCallback_Vtbl = {
     XA2ECB_OnProcessingPassStart
 };
 
-static void destroy_voice(XA2VoiceImpl *This)
+/* Common Voice Functions */
+
+static inline void destroy_voice(XA2VoiceImpl *This)
 {
     FAudioVoice_DestroyVoice(This->faudio_voice);
     free_effect_chain(This->effect_chain);
@@ -475,7 +485,9 @@ static void destroy_voice(XA2VoiceImpl *This)
     This->in_use = FALSE;
 }
 
-static XA2VoiceImpl *impl_from_IXAudio2SourceVoice(IXAudio2SourceVoice *iface)
+/* Source Voices */
+
+static inline XA2VoiceImpl *impl_from_IXAudio2SourceVoice(IXAudio2SourceVoice *iface)
 {
     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio2SourceVoice_iface);
 }
@@ -816,7 +828,9 @@ static const IXAudio2SourceVoiceVtbl XAudio2SourceVoice_Vtbl = {
     XA2SRC_SetSourceSampleRate
 };
 
-static XA2VoiceImpl *impl_from_IXAudio2SubmixVoice(IXAudio2SubmixVoice *iface)
+/* Submix Voices */
+
+static inline XA2VoiceImpl *impl_from_IXAudio2SubmixVoice(IXAudio2SubmixVoice *iface)
 {
     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio2SubmixVoice_iface);
 }
@@ -1050,7 +1064,9 @@ static const struct IXAudio2SubmixVoiceVtbl XAudio2SubmixVoice_Vtbl = {
     XA2SUB_DestroyVoice
 };
 
-static XA2VoiceImpl *impl_from_IXAudio2MasteringVoice(IXAudio2MasteringVoice *iface)
+/* Mastering Voices */
+
+static inline XA2VoiceImpl *impl_from_IXAudio2MasteringVoice(IXAudio2MasteringVoice *iface)
 {
     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio2MasteringVoice_iface);
 }
@@ -1295,7 +1311,9 @@ static const struct IXAudio2MasteringVoiceVtbl XAudio2MasteringVoice_Vtbl = {
     XA2M_GetChannelMask
 };
 
-XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface)
+/* More Common Voice Functions */
+
+static XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface)
 {
     if(iface->lpVtbl == (void*)&XAudio2SourceVoice_Vtbl)
         return impl_from_IXAudio2SourceVoice((IXAudio2SourceVoice*)iface);
@@ -1328,6 +1346,8 @@ XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface)
     ERR("invalid IXAudio2Voice pointer: %p\n", iface);
     return NULL;
 }
+
+/* XAudio2 Engine Implementation */
 
 static inline IXAudio2Impl *impl_from_IXAudio2(IXAudio2 *iface)
 {
@@ -1460,7 +1480,7 @@ static void WINAPI IXAudio2Impl_UnregisterForCallbacks(IXAudio2 *iface,
     LeaveCriticalSection(&This->lock);
 }
 
-static XA2VoiceImpl *create_voice(IXAudio2Impl *This)
+static inline XA2VoiceImpl *create_voice(IXAudio2Impl *This)
 {
     XA2VoiceImpl *voice;
 
@@ -1733,6 +1753,8 @@ static const IXAudio2Vtbl XAudio2_Vtbl =
     IXAudio2Impl_SetDebugConfiguration
 };
 
+/* XAudio2 ClassFactory */
+
 struct xaudio2_cf {
     IClassFactory IClassFactory_iface;
     LONG ref;
@@ -1863,7 +1885,9 @@ static const IClassFactoryVtbl XAudio2CF_Vtbl =
     XAudio2CF_LockServer
 };
 
-static HRESULT make_xaudio2_factory(REFIID riid, void **ppv)
+/* Engine Generators */
+
+static inline HRESULT make_xaudio2_factory(REFIID riid, void **ppv)
 {
     HRESULT hr;
     struct xaudio2_cf *ret = HeapAlloc(GetProcessHeap(), 0, sizeof(struct xaudio2_cf));
