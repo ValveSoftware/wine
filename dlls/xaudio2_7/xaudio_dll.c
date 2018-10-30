@@ -1942,11 +1942,6 @@ HRESULT WINAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void **ppv)
 }
 
 #if XAUDIO2_VER >= 8
-static inline IXAudio2Impl *impl_from_IXAudio2(IXAudio2 *iface)
-{
-    return CONTAINING_RECORD(iface, IXAudio2Impl, IXAudio2_iface);
-}
-
 HRESULT WINAPI XAudio2Create(IXAudio2 **ppxa2, UINT32 flags, XAUDIO2_PROCESSOR proc)
 {
     HRESULT hr;
