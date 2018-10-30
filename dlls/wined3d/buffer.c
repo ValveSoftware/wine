@@ -1293,7 +1293,7 @@ static HRESULT buffer_resource_sub_resource_map(struct wined3d_resource *resourc
         offset = size = 0;
     }
 
-    map_desc->row_pitch = map_desc->slice_pitch = buffer->desc.byte_width;
+    map_desc->row_pitch = map_desc->slice_pitch = resource->size;
     return wined3d_buffer_map(buffer, offset, size, (BYTE **)&map_desc->data, flags);
 }
 
@@ -1343,6 +1343,7 @@ static GLenum buffer_type_hint_from_bind_flags(const struct wined3d_gl_info *gl_
 
 static HRESULT buffer_init(struct wined3d_buffer *buffer, struct wined3d_device *device,
         UINT size, DWORD usage, enum wined3d_format_id format_id, unsigned int access, unsigned int bind_flags,
+        unsigned int structure_byte_stride,
         const struct wined3d_sub_resource_data *data, void *parent, const struct wined3d_parent_ops *parent_ops)
 {
     const struct wined3d_format *format = wined3d_get_format(device->adapter, format_id, usage);
@@ -1377,6 +1378,7 @@ static HRESULT buffer_init(struct wined3d_buffer *buffer, struct wined3d_device 
     }
     buffer->buffer_type_hint = buffer_type_hint_from_bind_flags(gl_info, bind_flags);
     buffer->bind_flags = bind_flags;
+    buffer->structure_byte_stride = structure_byte_stride;
     buffer->locations = data ? WINED3D_LOCATION_DISCARDED : WINED3D_LOCATION_SYSMEM;
 
     TRACE("buffer %p, size %#x, usage %#x, format %s, memory @ %p.\n",
@@ -1452,13 +1454,12 @@ HRESULT CDECL wined3d_buffer_create(struct wined3d_device *device, const struct 
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = buffer_init(object, device, desc->byte_width, desc->usage, WINED3DFMT_UNKNOWN,
-            desc->access, desc->bind_flags, data, parent, parent_ops)))
+            desc->access, desc->bind_flags, desc->structure_byte_stride, data, parent, parent_ops)))
     {
         WARN("Failed to initialize buffer, hr %#x.\n", hr);
         heap_free(object);
         return hr;
     }
-    object->desc = *desc;
 
     TRACE("Created buffer %p.\n", object);
 

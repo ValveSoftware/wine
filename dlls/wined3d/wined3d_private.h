@@ -3735,12 +3735,12 @@ struct wined3d_buffer
 {
     struct wined3d_resource resource;
 
-    struct wined3d_buffer_desc desc;
-
     GLuint buffer_object;
     GLenum buffer_object_usage;
     GLenum buffer_type_hint;
+
     unsigned int bind_flags;
+    unsigned int structure_byte_stride;
     DWORD flags;
     DWORD locations;
     void *map_ptr;
