@@ -10,14 +10,6 @@ C_SRCS = \
 	xapofx.c \
 	x3daudio.c \
 	xaudio_dll.c \
-	xaudio_engine.c \
-	xaudio_voice.c \
-	xaudio_voice_source.c \
-	xaudio_voice_submix.c \
-	xaudio_voice_master.c \
-	xaudio_voice_wrapeffect.c \
-	xaudio_voice_wrapsend.c \
-	xaudio_callbacks.c \
 	xapo.c
 
 IDL_SRCS = xaudio_classes.idl
