@@ -154,11 +154,11 @@ static void buffer_destroy_buffer_object(struct wined3d_buffer *buffer, struct w
      * rarely. */
     if (resource->bind_count)
     {
-        if (buffer->bind_flags & WINED3D_BIND_VERTEX_BUFFER)
+        if (resource->bind_flags & WINED3D_BIND_VERTEX_BUFFER)
             device_invalidate_state(resource->device, STATE_STREAMSRC);
-        if (buffer->bind_flags & WINED3D_BIND_INDEX_BUFFER)
+        if (resource->bind_flags & WINED3D_BIND_INDEX_BUFFER)
             device_invalidate_state(resource->device, STATE_INDEXBUFFER);
-        if (buffer->bind_flags & WINED3D_BIND_CONSTANT_BUFFER)
+        if (resource->bind_flags & WINED3D_BIND_CONSTANT_BUFFER)
         {
             device_invalidate_state(resource->device, STATE_CONSTANT_BUFFER(WINED3D_SHADER_TYPE_VERTEX));
             device_invalidate_state(resource->device, STATE_CONSTANT_BUFFER(WINED3D_SHADER_TYPE_HULL));
@@ -167,7 +167,7 @@ static void buffer_destroy_buffer_object(struct wined3d_buffer *buffer, struct w
             device_invalidate_state(resource->device, STATE_CONSTANT_BUFFER(WINED3D_SHADER_TYPE_PIXEL));
             device_invalidate_state(resource->device, STATE_CONSTANT_BUFFER(WINED3D_SHADER_TYPE_COMPUTE));
         }
-        if (buffer->bind_flags & WINED3D_BIND_STREAM_OUTPUT)
+        if (resource->bind_flags & WINED3D_BIND_STREAM_OUTPUT)
         {
             device_invalidate_state(resource->device, STATE_STREAM_OUTPUT);
             if (context->transform_feedback_active)
@@ -1371,7 +1371,7 @@ static HRESULT buffer_init(struct wined3d_buffer *buffer, struct wined3d_device 
     }
 
     if (FAILED(hr = resource_init(resource, device, WINED3D_RTYPE_BUFFER, format, WINED3D_MULTISAMPLE_NONE,
-            0, usage, access, size, 1, 1, size, parent, parent_ops, &buffer_resource_ops)))
+            0, usage, bind_flags, access, size, 1, 1, size, parent, parent_ops, &buffer_resource_ops)))
     {
         WARN("Failed to initialize resource, hr %#x.\n", hr);
         return hr;
