@@ -1768,6 +1768,7 @@ struct wined3d_resource_desc
     enum wined3d_multisample_type multisample_type;
     unsigned int multisample_quality;
     unsigned int usage;
+    unsigned int bind_flags;
     unsigned int access;
     unsigned int width;
     unsigned int height;
@@ -1781,6 +1782,7 @@ struct wined3d_sub_resource_desc
     enum wined3d_multisample_type multisample_type;
     unsigned int multisample_quality;
     unsigned int usage;
+    unsigned int bind_flags;
     unsigned int access;
     unsigned int width;
     unsigned int height;
