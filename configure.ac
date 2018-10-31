@@ -1794,7 +1794,7 @@ WINE_NOTICE_WITH(openal,[test "x$ac_cv_lib_openal" != xyes],
                  [libopenal ${notice_platform}development files not found (or too old), OpenAL won't be supported.],
                  [enable_openal32])
 
-if test "x$ac_cv_lib_soname_FAudio" != xyes
+if test "x$ac_cv_lib_soname_FAudio" = "x"
 then
     enable_x3daudio1_0=${enable_x3daudio1_0:-no}
     enable_x3daudio1_1=${enable_x3daudio1_1:-no}

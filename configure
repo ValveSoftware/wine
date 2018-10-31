@@ -15044,7 +15044,7 @@ esac
 enable_openal32=${enable_openal32:-no}
 fi
 
-if test "x$ac_cv_lib_soname_FAudio" != xyes
+if test "x$ac_cv_lib_soname_FAudio" = "x"
 then
     enable_x3daudio1_0=${enable_x3daudio1_0:-no}
     enable_x3daudio1_1=${enable_x3daudio1_1:-no}
