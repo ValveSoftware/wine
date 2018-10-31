@@ -1,0 +1,93 @@
+/*
+ * COM Classes for xactengine
+ *
+ * Copyright 2018 Ethan Lee for CodeWeavers
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+#pragma makedep register
+
+#if XACT3_VER == 7
+[
+    helpstring("XACT3 Class"),
+    threading(both),
+    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+]
+coclass XACT37Engine { interface IXACT37Engine; }
+#endif /* XACT3_VER == 7 */
+
+#if XACT3_VER == 6
+[
+    helpstring("XACT3.6 Class"),
+    threading(both),
+    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+]
+coclass XACT36Engine { interface IXACT37Engine; }
+#endif /* XACT3_VER == 6 */
+
+#if XACT3_VER == 5
+[
+    helpstring("XACT3.5 Class"),
+    threading(both),
+    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+]
+coclass XACT35Engine { interface IXACT37Engine; }
+#endif /* XACT3_VER == 5 */
+
+#if XACT3_VER == 4
+[
+    helpstring("XACT3.4 Class"),
+    threading(both),
+    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+]
+coclass XACT34Engine { interface IXACT37Engine; }
+#endif /* XACT3_VER == 4 */
+
+#if XACT3_VER == 3
+[
+    helpstring("XACT3.3 Class"),
+    threading(both),
+    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+]
+coclass XACT33Engine { interface IXACT37Engine; }
+#endif /* XACT3_VER == 3 */
+
+#if XACT3_VER == 2
+[
+    helpstring("XACT3.2 Class"),
+    threading(both),
+    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+]
+coclass XACT32Engine { interface IXACT32Engine; }
+#endif /* XACT3_VER == 2 */
+
+#if XACT3_VER == 1
+[
+    helpstring("XACT3.1 Class"),
+    threading(both),
+    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+]
+coclass XACT31Engine { interface IXACT32Engine; }
+#endif /* XACT3_VER == 1 */
+
+#if XACT3_VER == 0
+[
+    helpstring("XACT3.0 Class"),
+    threading(both),
+    uuid(9e33f661-2d07-43ec-9704-bbcb71a54972)
+]
+coclass XACT30Engine { interface IXACT30Engine; }
+#endif /* XACT3_VER == 0 */

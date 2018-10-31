@@ -43,7 +43,7 @@ AC_ARG_WITH(cups,      AS_HELP_STRING([--without-cups],[do not use CUPS]))
 AC_ARG_WITH(curses,    AS_HELP_STRING([--without-curses],[do not use (n)curses]),
             [if test "x$withval" = "xno"; then ac_cv_header_ncurses_h=no; ac_cv_header_curses_h=no; fi])
 AC_ARG_WITH(dbus,      AS_HELP_STRING([--without-dbus],[do not use DBus (dynamic device support)]))
-AC_ARG_WITH(ffmpeg,    AS_HELP_STRING([--without-ffmpeg],[do not use the FFmpeg library]))
+AC_ARG_WITH(faudio,    AS_HELP_STRING([--without-faudio],[do not use FAudio (XAudio support)]))
 AC_ARG_WITH(float-abi, AS_HELP_STRING([--with-float-abi=abi],[specify the ABI (soft|softfp|hard) for ARM platforms]))
 AC_ARG_WITH(fontconfig,AS_HELP_STRING([--without-fontconfig],[do not use fontconfig]))
 AC_ARG_WITH(freetype,  AS_HELP_STRING([--without-freetype],[do not use the FreeType library]))
@@ -1621,6 +1621,16 @@ fi
 WINE_NOTICE_WITH(sdl,[test "x$ac_cv_lib_soname_SDL2" = "x"],
                  [libSDL2 ${notice_platform}development files not found, SDL2 won't be supported.])
 
+dnl **** Check for FAudio ****
+if test "x$with_faudio" != "xno"
+then
+    WINE_PACKAGE_FLAGS(FAUDIO,[faudio],[-lFAudio],,,
+        [AC_CHECK_HEADERS([FAudio.h],
+            [WINE_CHECK_SONAME(FAudio,FAudioCreate,,,,[[libFAudio*]])])])
+fi
+WINE_NOTICE_WITH(faudio,[test "x$ac_cv_lib_soname_FAudio" = "x"],
+                 [libFAudio ${notice_platform}development files not found, XAudio2 won't be supported.])
+
 dnl **** Check for capi4linux ****
 if test "x$with_capi" != "xno"
 then
@@ -1774,38 +1784,6 @@ WINE_NOTICE_WITH(mpg123,[test "x$ac_cv_lib_mpg123_mpg123_feed" != xyes -a x"$ac_
                  [enable_l3codeca_acm])
 test "x$ac_cv_lib_mpg123_mpg123_feed" = xyes || enable_mp3dmod=${enable_mp3dmod:-no}
 
-dnl **** Check for FFmpeg's libavutil ****
-if test "x$with_ffmpeg" != "xno"
-then
-    WINE_PACKAGE_FLAGS(LIBAVUTIL,[libavutil],[-llibavutil],,,
-        [AC_CHECK_HEADERS([libavutil/avutil.h])
-        if test "$ac_cv_header_libavutil_avutil_h" = "yes"
-        then
-            AC_CHECK_LIB(avutil,av_frame_alloc,[:],[LIBAVUTIL_LIBS=""],[$LIBAVUTIL_LIBS])
-        else
-            LIBAVUTIL_CFLAGS=""
-            LIBAVUTIL_LIBS=""
-        fi])
-fi
-
-dnl **** Check for FFmpeg's libavcodec ****
-if test "x$with_ffmpeg" != "xno" -a "x$ac_cv_lib_avutil_av_frame_alloc" = "xyes"
-then
-    WINE_PACKAGE_FLAGS(LIBAVCODEC,[libavcodec],[-llibavcodec],,,
-        [AC_CHECK_HEADERS([libavcodec/avcodec.h])
-        if test "$ac_cv_header_libavcodec_avcodec_h" = "yes"
-        then
-            AC_CHECK_LIB(avcodec,avcodec_send_packet,
-                         [AC_DEFINE(HAVE_FFMPEG, 1, [Define to 1 if you have libavutil and libavcodec from ffmpeg.])],
-                         [LIBAVCODEC_LIBS=""], [$LIBAVUTIL_LIBS $LIBAVCODEC_LIBS])
-        else
-            LIBAVCODEC_CFLAGS=""
-            LIBAVCODEC_LIBS=""
-        fi])
-fi
-WINE_NOTICE_WITH(libavcodec,[test "x$ac_cv_lib_avcodec_avcodec_send_packet" != xyes],
-                 [libavcodec ${notice_platform}development files not found (or too old), XAudio2 WMA conversion won't be supported.])
-
 dnl **** Check for OpenAL 1.1 ****
 if test "$ac_cv_header_AL_al_h" = "yes"
 then
@@ -1817,19 +1795,8 @@ WINE_NOTICE_WITH(openal,[test "x$ac_cv_lib_openal" != xyes],
                  [libopenal ${notice_platform}development files not found (or too old), OpenAL won't be supported.],
                  [enable_openal32])
 
-dnl **** Check for openal-soft ****
-if test "x$ac_cv_lib_openal" = xyes
+if test "x$ac_cv_lib_soname_FAudio" = "x"
 then
-    AC_CACHE_CHECK([for openal-soft], ac_cv_have_openalsoft,
-        AC_COMPILE_IFELSE([AC_LANG_PROGRAM(
-            [[#include <AL/al.h>
-#include <AL/alc.h>
-#include <AL/alext.h>
-LPALCRENDERSAMPLESSOFT x;]])],[ac_cv_have_openalsoft=yes],[ac_cv_have_openalsoft=no]))
-fi
-if test "x$ac_cv_have_openalsoft" != xyes
-then
-    WINE_NOTICE([openal-soft ${notice_platform}development files not found (or too old), XAudio2 won't be supported.])
     enable_x3daudio1_0=${enable_x3daudio1_0:-no}
     enable_x3daudio1_1=${enable_x3daudio1_1:-no}
     enable_x3daudio1_2=${enable_x3daudio1_2:-no}
@@ -1838,6 +1805,14 @@ then
     enable_x3daudio1_5=${enable_x3daudio1_5:-no}
     enable_x3daudio1_6=${enable_x3daudio1_6:-no}
     enable_x3daudio1_7=${enable_x3daudio1_7:-no}
+    enable_xactengine3_0=${enable_xactengine3_0:-no}
+    enable_xactengine3_1=${enable_xactengine3_1:-no}
+    enable_xactengine3_2=${enable_xactengine3_2:-no}
+    enable_xactengine3_3=${enable_xactengine3_3:-no}
+    enable_xactengine3_4=${enable_xactengine3_4:-no}
+    enable_xactengine3_5=${enable_xactengine3_5:-no}
+    enable_xactengine3_6=${enable_xactengine3_6:-no}
+    enable_xactengine3_7=${enable_xactengine3_7:-no}
     enable_xapofx1_1=${enable_xapofx1_1:-no}
     enable_xapofx1_2=${enable_xapofx1_2:-no}
     enable_xapofx1_3=${enable_xapofx1_3:-no}
@@ -3899,6 +3874,14 @@ WINE_CONFIG_MAKEFILE(dlls/x3daudio1_4)
 WINE_CONFIG_MAKEFILE(dlls/x3daudio1_5)
 WINE_CONFIG_MAKEFILE(dlls/x3daudio1_6)
 WINE_CONFIG_MAKEFILE(dlls/x3daudio1_7)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_0)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_1)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_2)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_3)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_4)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_5)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_6)
+WINE_CONFIG_MAKEFILE(dlls/xactengine3_7)
 WINE_CONFIG_MAKEFILE(dlls/xapofx1_1)
 WINE_CONFIG_MAKEFILE(dlls/xapofx1_2)
 WINE_CONFIG_MAKEFILE(dlls/xapofx1_3)

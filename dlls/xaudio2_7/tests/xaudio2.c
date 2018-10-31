@@ -524,7 +524,7 @@ static void test_buffer_callbacks(IXAudio2 *xa)
 
     if(xaudio27){
         hr = IXAudio27SourceVoice_SetSourceSampleRate((IXAudio27SourceVoice*)src, 48000);
-        todo_wine ok(hr == S_OK, "SetSourceSampleRate failed: %08x\n", hr);
+        ok(hr == S_OK, "SetSourceSampleRate failed: %08x\n", hr);
     }else{
         hr = IXAudio2SourceVoice_SetSourceSampleRate(src, 48000);
         ok(hr == XAUDIO2_E_INVALID_CALL, "SetSourceSampleRate should have failed: %08x\n", hr);
@@ -1272,6 +1272,9 @@ START_TEST(xaudio2)
             &IID_IXAudio27, (void**)&xa27);
     if(hr == S_OK){
         xaudio27 = TRUE;
+
+        hr = IXAudio27_QueryInterface(xa27, &IID_IXAudio28, (void**) &xa);
+        ok(hr != S_OK, "QueryInterface with IID_IXAudio28 on IXAudio27 object returned success. Expected to fail\n");
 
         hr = IXAudio27_Initialize(xa27, 0, XAUDIO2_ANY_PROCESSOR);
         ok(hr == S_OK, "Initialize failed: %08x\n", hr);
