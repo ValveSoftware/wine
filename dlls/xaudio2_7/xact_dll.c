@@ -924,7 +924,7 @@ static HRESULT WINAPI IXACT3EngineImpl_DoWork(IXACT3Engine *iface)
 }
 
 static HRESULT WINAPI IXACT3EngineImpl_CreateSoundBank(IXACT3Engine *iface,
-        const void* pvBuffer, DWORD dwSize, DWORD dwFlags,
+        const BYTE* pvBuffer, DWORD dwSize, DWORD dwFlags,
         DWORD dwAllocAttributes, IXACT3SoundBank **ppSoundBank)
 {
     XACT3EngineImpl *This = impl_from_IXACT3Engine(iface);
@@ -957,7 +957,7 @@ static HRESULT WINAPI IXACT3EngineImpl_CreateSoundBank(IXACT3Engine *iface,
 }
 
 static HRESULT WINAPI IXACT3EngineImpl_CreateInMemoryWaveBank(IXACT3Engine *iface,
-        const void* pvBuffer, DWORD dwSize, DWORD dwFlags,
+        const BYTE* pvBuffer, DWORD dwSize, DWORD dwFlags,
         DWORD dwAllocAttributes, IXACT3WaveBank **ppWaveBank)
 {
     XACT3EngineImpl *This = impl_from_IXACT3Engine(iface);
