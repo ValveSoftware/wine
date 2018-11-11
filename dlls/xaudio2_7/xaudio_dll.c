@@ -223,7 +223,7 @@ static void FAPOCALL XAPO_Process(void *iface,
         const FAPOProcessBufferParameters* pInputProcessParameters,
         uint32_t OutputProcessParameterCount,
         FAPOProcessBufferParameters* pOutputProcessParameters,
-        uint8_t IsEnabled)
+        int32_t IsEnabled)
 {
     XA2XAPOImpl *This = impl_from_FAPO(iface);
     TRACE("%p\n", This);
@@ -585,10 +585,8 @@ static void WINAPI XA2SRC_GetEffectState(IXAudio2SourceVoice *iface, UINT32 Effe
         BOOL *pEnabled)
 {
     XA2VoiceImpl *This = impl_from_IXAudio2SourceVoice(iface);
-    uint8_t result;
     TRACE("%p, %u, %p\n", This, EffectIndex, pEnabled);
-    FAudioVoice_GetEffectState(This->faudio_voice, EffectIndex, &result);
-    *pEnabled = result;
+    FAudioVoice_GetEffectState(This->faudio_voice, EffectIndex, (int32_t*)pEnabled);
 }
 
 static HRESULT WINAPI XA2SRC_SetEffectParameters(IXAudio2SourceVoice *iface,
