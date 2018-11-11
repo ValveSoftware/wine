@@ -926,10 +926,8 @@ static void WINAPI XA2SUB_GetEffectState(IXAudio2SubmixVoice *iface, UINT32 Effe
         BOOL *pEnabled)
 {
     XA2VoiceImpl *This = impl_from_IXAudio2SubmixVoice(iface);
-    uint8_t result;
     TRACE("%p, %u, %p\n", This, EffectIndex, pEnabled);
-    FAudioVoice_GetEffectState(This->faudio_voice, EffectIndex, &result);
-    *pEnabled = result;
+    FAudioVoice_GetEffectState(This->faudio_voice, EffectIndex, (int32_t*)pEnabled);
 }
 
 static HRESULT WINAPI XA2SUB_SetEffectParameters(IXAudio2SubmixVoice *iface,
@@ -1162,10 +1160,8 @@ static void WINAPI XA2M_GetEffectState(IXAudio2MasteringVoice *iface, UINT32 Eff
         BOOL *pEnabled)
 {
     XA2VoiceImpl *This = impl_from_IXAudio2MasteringVoice(iface);
-    uint8_t result;
     TRACE("%p, %u, %p\n", This, EffectIndex, pEnabled);
-    FAudioVoice_GetEffectState(This->faudio_voice, EffectIndex, &result);
-    *pEnabled = result;
+    FAudioVoice_GetEffectState(This->faudio_voice, EffectIndex, (int32_t*)pEnabled);
 }
 
 static HRESULT WINAPI XA2M_SetEffectParameters(IXAudio2MasteringVoice *iface,
