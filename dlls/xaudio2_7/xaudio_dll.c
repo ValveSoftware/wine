@@ -393,14 +393,17 @@ static inline XA2VoiceImpl *impl_from_FAudioVoiceCallback(FAudioVoiceCallback *i
     return CONTAINING_RECORD(iface, XA2VoiceImpl, FAudioVoiceCallback_vtbl);
 }
 
-/* TODO callback v20 support */
 static void FAUDIOCALL XA2VCB_OnVoiceProcessingPassStart(FAudioVoiceCallback *iface,
         UINT32 BytesRequired)
 {
     XA2VoiceImpl *This = impl_from_FAudioVoiceCallback(iface);
     TRACE("%p\n", This);
     if(This->cb)
+#if XAUDIO2_VER == 0
+        IXAudio20VoiceCallback_OnVoiceProcessingPassStart((IXAudio20VoiceCallback*)This->cb);
+#else
         IXAudio2VoiceCallback_OnVoiceProcessingPassStart(This->cb, BytesRequired);
+#endif
 }
 
 static void FAUDIOCALL XA2VCB_OnVoiceProcessingPassEnd(FAudioVoiceCallback *iface)
