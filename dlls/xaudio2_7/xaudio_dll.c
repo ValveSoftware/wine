@@ -393,6 +393,7 @@ static inline XA2VoiceImpl *impl_from_FAudioVoiceCallback(FAudioVoiceCallback *i
     return CONTAINING_RECORD(iface, XA2VoiceImpl, FAudioVoiceCallback_vtbl);
 }
 
+/* TODO callback v20 support */
 static void FAUDIOCALL XA2VCB_OnVoiceProcessingPassStart(FAudioVoiceCallback *iface,
         UINT32 BytesRequired)
 {
@@ -1302,6 +1303,17 @@ static void WINAPI XA2M_DestroyVoice(IXAudio2MasteringVoice *iface)
     EnterCriticalSection(&This->lock);
 
     destroy_voice(This);
+#ifdef __APPLE__
+    /* TODO */
+#else
+    pthread_mutex_lock(&This->engine_lock);
+    This->engine_params.proc = NULL;
+    pthread_cond_broadcast(&This->engine_ready);
+    pthread_mutex_unlock(&This->engine_lock);
+#endif
+
+    WaitForSingleObject(This->engine_thread, INFINITE);
+    This->engine_thread = NULL;
 
     LeaveCriticalSection(&This->lock);
 }
@@ -1670,6 +1682,47 @@ static HRESULT WINAPI IXAudio2Impl_CreateSubmixVoice(IXAudio2 *iface,
     return S_OK;
 }
 
+/* called thread created by SDL, must not access Wine TEB */
+static void engine_cb(FAudioEngineCallEXT proc, FAudio *faudio, float *stream, void *user)
+{
+    XA2VoiceImpl *This = user;
+
+    pthread_mutex_lock(&This->engine_lock);
+
+    This->engine_params.proc = proc;
+    This->engine_params.stream = stream;
+    This->engine_params.faudio = faudio;
+
+    pthread_cond_broadcast(&This->engine_ready);
+
+    while(This->engine_params.proc)
+        pthread_cond_wait(&This->engine_done, &This->engine_lock);
+
+    pthread_mutex_unlock(&This->engine_lock);
+}
+
+/* wine thread, OK to access TEB, invoke client code, etc */
+static DWORD WINAPI engine_thread(void *user)
+{
+    XA2VoiceImpl *This = user;
+
+    pthread_mutex_lock(&This->engine_lock);
+
+    do{
+        pthread_cond_wait(&This->engine_ready, &This->engine_lock);
+
+        if(This->engine_params.proc){
+            This->engine_params.proc(This->engine_params.faudio, This->engine_params.stream);
+            This->engine_params.proc = NULL;
+            pthread_cond_broadcast(&This->engine_done);
+        }
+    }while(This->in_use);
+
+    pthread_mutex_unlock(&This->engine_lock);
+
+    return 0;
+}
+
 static HRESULT WINAPI IXAudio2Impl_CreateMasteringVoice(IXAudio2 *iface,
         IXAudio2MasteringVoice **ppMasteringVoice, UINT32 inputChannels,
         UINT32 inputSampleRate, UINT32 flags, const WCHAR *deviceId,
@@ -1705,6 +1758,10 @@ static HRESULT WINAPI IXAudio2Impl_CreateMasteringVoice(IXAudio2 *iface,
     LeaveCriticalSection(&This->lock);
 
     This->mst.effect_chain = wrap_effect_chain(pEffectChain);
+
+    This->mst.engine_thread = CreateThread(NULL, 0, &engine_thread, &This->mst, 0, NULL);
+
+    FAudio_SetEngineProcedureEXT(This->faudio, &engine_cb, &This->mst);
 
     FAudio_CreateMasteringVoice(This->faudio, &This->mst.faudio_voice, inputChannels,
             inputSampleRate, flags, 0 /* TODO */, This->mst.effect_chain);
@@ -1876,6 +1933,14 @@ static HRESULT WINAPI XAudio2CF_CreateInstance(IClassFactory *iface, IUnknown *p
     InitializeCriticalSection(&object->mst.lock);
     object->mst.lock.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": XA2MasteringVoice.lock");
 
+#ifdef __APPLE__
+    /* FIXME */
+#else
+    pthread_mutex_init(&object->mst.engine_lock, NULL);
+    pthread_cond_init(&object->mst.engine_done, NULL);
+    pthread_cond_init(&object->mst.engine_ready, NULL);
+#endif
+
     FAudioCOMConstructWithCustomAllocatorEXT(
         &object->faudio,
         XAUDIO2_VER,
@@ -1931,7 +1996,9 @@ static inline HRESULT make_xaudio2_factory(REFIID riid, void **ppv)
 
 HRESULT xaudio2_initialize(IXAudio2Impl *This, UINT32 flags, XAUDIO2_PROCESSOR proc)
 {
-    return FAudio_Initialize(This->faudio, flags, proc);
+    if(proc != XAUDIO2_ANY_PROCESSOR)
+        WARN("Processor affinity not implemented in FAudio\n");
+    return FAudio_Initialize(This->faudio, flags, FAUDIO_DEFAULT_PROCESSOR);
 }
 
 HRESULT WINAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void **ppv)
