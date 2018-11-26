@@ -2553,13 +2553,6 @@ static HRESULT WINAPI AudioClock_GetPosition(IAudioClock *iface, UINT64 *pos,
 
     *pos = This->clock_written - This->held_bytes;
 
-    if(This->started){
-        if(*pos < This->period_bytes)
-            *pos = 0;
-        else if(This->held_bytes > This->period_bytes)
-            *pos -= This->period_bytes;
-    }
-
     if (This->share == AUDCLNT_SHAREMODE_EXCLUSIVE)
         *pos /= pa_frame_size(&This->ss);
 
