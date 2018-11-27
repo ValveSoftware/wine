@@ -393,7 +393,6 @@ static inline XA2VoiceImpl *impl_from_FAudioVoiceCallback(FAudioVoiceCallback *i
     return CONTAINING_RECORD(iface, XA2VoiceImpl, FAudioVoiceCallback_vtbl);
 }
 
-/* TODO callback v20 support */
 static void FAUDIOCALL XA2VCB_OnVoiceProcessingPassStart(FAudioVoiceCallback *iface,
         UINT32 BytesRequired)
 {
@@ -1708,6 +1707,8 @@ static DWORD WINAPI engine_thread(void *user)
 
     pthread_mutex_lock(&This->engine_lock);
 
+    pthread_cond_broadcast(&This->engine_done);
+
     do{
         pthread_cond_wait(&This->engine_ready, &This->engine_lock);
 
@@ -1759,7 +1760,13 @@ static HRESULT WINAPI IXAudio2Impl_CreateMasteringVoice(IXAudio2 *iface,
 
     This->mst.effect_chain = wrap_effect_chain(pEffectChain);
 
+    pthread_mutex_lock(&This->mst.engine_lock);
+
     This->mst.engine_thread = CreateThread(NULL, 0, &engine_thread, &This->mst, 0, NULL);
+
+    pthread_cond_wait(&This->mst.engine_done, &This->mst.engine_lock);
+
+    pthread_mutex_unlock(&This->mst.engine_lock);
 
     FAudio_SetEngineProcedureEXT(This->faudio, &engine_cb, &This->mst);
 
