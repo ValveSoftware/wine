@@ -37,6 +37,7 @@
 
 #include "wine/debug.h"
 #include "wine/heap.h"
+#include "wine/unicode.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
 
@@ -1951,6 +1952,27 @@ static HRESULT WINAPI XAudio2CF_CreateInstance(IClassFactory *iface, IUnknown *p
     pthread_mutex_init(&object->mst.engine_lock, NULL);
     pthread_cond_init(&object->mst.engine_done, NULL);
     pthread_cond_init(&object->mst.engine_ready, NULL);
+
+
+    /* set PulseAudio's application.name in the environment since FAudio and
+     * SDL provide no way to pass this in */
+    {
+        WCHAR path[MAX_PATH], *name;
+        char *str;
+        DWORD len;
+
+        GetModuleFileNameW(NULL, path, ARRAY_SIZE(path));
+        name = strrchrW(path, '\\');
+        if (!name)
+            name = path;
+        else
+            name++;
+        len = WideCharToMultiByte(CP_UNIXCP, 0, name, -1, NULL, 0, NULL, NULL);
+        str = HeapAlloc(GetProcessHeap(), 0, len);
+        WideCharToMultiByte(CP_UNIXCP, 0, name, -1, str, len, NULL, NULL);
+        setenv("PULSE_PROP_application.name", str, 1);
+        HeapFree(GetProcessHeap(), 0, str);
+    }
 #endif
 
     FAudioCOMConstructWithCustomAllocatorEXT(
