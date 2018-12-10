@@ -292,6 +292,7 @@ static HRESULT pulse_connect(const char *name)
         pa_context_unref(pulse_ctx);
 
     pulse_ctx = pa_context_new(pa_mainloop_get_api(pulse_ml), name);
+    setenv("PULSE_PROP_application.name", name, 1);
     if (!pulse_ctx) {
         ERR("Failed to create context\n");
         return E_FAIL;
