@@ -724,6 +724,127 @@ static BOOL add_family_replacement( const WCHAR *new_name, const WCHAR *replace 
     return TRUE;
 }
 
+/* Simplified Chinese fonts */
+static const WCHAR SimSun[] = {'S','i','m','S','u','n',0};
+static const WCHAR atSimSun[] = {'@','S','i','m','S','u','n',0};
+static const WCHAR Microsoft_YaHei[] = {'M','i','c','r','o','s','o','f','t',' ','Y','a','H','e','i',0};
+static const WCHAR LiSu[] = {'L','i','S','u',0};
+/* Traditional Chinese fonts */
+static const WCHAR PMingLiU[] = {'P','M','i','n','g','L','i','U',0};
+static const WCHAR atPMingLiU[] = {'@','P','M','i','n','g','L','i','U',0};
+/* Korean fonts */
+static const WCHAR Gulim[] = {'G','u','l','i','m',0};
+static const WCHAR atGulim[] = {'@','G','u','l','i','m',0};
+
+static const WCHAR new_sc_fonts[] = {
+    /* Ubuntu 16.04 or later, Mint 19, Fedora 29 */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','S','C',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','S','C',0,
+    /* Popular open source Chinese font */
+    'W','e','n','Q','u','a','n','Y','i',' ','M','i','c','r','o',' ','H','e','i',0,
+    0
+};
+
+static const WCHAR vertical_new_sc_fonts[] = {
+    /* Ubuntu 16.04 or later, Mint 19, Fedora 29 */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','S','C',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','S','C',0,
+    /* popular open source Chinese font */
+    '@','W','e','n','Q','u','a','n','Y','i',' ','M','i','c','r','o',' ','H','e','i',0,
+    0
+};
+
+static const WCHAR new_tc_fonts[] = {
+    /* Ubuntu 16.04 or later, Mint 19, Fedora 29 */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','T','C',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','T','C',0,
+    /* popular open source Chinese font */
+    'W','e','n','Q','u','a','n','Y','i',' ','M','i','c','r','o',' ','H','e','i',0,
+    0
+};
+
+static const WCHAR vertical_new_tc_fonts[] = {
+    /* Ubuntu 16.04 or later */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','T','C',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','T','C',0,
+    /* popular open source Chinese font */
+    '@','W','e','n','Q','u','a','n','Y','i',' ','M','i','c','r','o',' ','H','e','i',0,
+    0
+};
+
+static const WCHAR new_jp_fonts[] = {
+    /* Ubuntu 16.04 or later */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','J','P',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','J','P',0,
+    0
+};
+
+static const WCHAR vertical_new_jp_fonts[] = {
+    /* Ubuntu 16.04 or later */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','J','P',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','J','P',0,
+    0
+};
+
+static const WCHAR new_kr_fonts[] = {
+    /* Ubuntu 16.04 or later */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','K','R',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    'N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','K','R',0,
+    0
+};
+
+static const WCHAR vertical_new_kr_fonts[] = {
+    /* Ubuntu 16.04 or later */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','K','R',' ','R','e','g','u','l','a','r',0,
+    /* Manjaro 18 */
+    '@','N','o','t','o',' ','S','a','n','s',' ','C','J','K',' ','K','R',0,
+    0
+};
+
+static const WCHAR MS_PGothic_cp932[]= {0x30fb,0xff6d,0x30fb,0xff73,' ',0x30fb,0xff70,0x7e67,0xff74,0x7e67,0xff77,0x7e5d,0x30fb,0x3051,0};
+
+static struct font_replacements
+{
+    const WCHAR *replacements[4];
+    const int count;
+    const WCHAR *new_fonts;
+    const WCHAR *vertical_new_fonts;
+    BOOL *font_seen;
+} font_replacements_list[] =
+{
+    /* Simplified Chinese */
+    {
+        {
+            SimSun, atSimSun, Microsoft_YaHei, LiSu
+        }, 4, new_sc_fonts, vertical_new_sc_fonts, NULL
+    },
+    /* Traditional Chinese */
+    {
+        {
+            PMingLiU, atPMingLiU
+        }, 2, new_tc_fonts, vertical_new_tc_fonts, NULL
+    },
+    /* Japanese */
+    {
+        {
+            L"MS UI Gothic", L"@MS UI Gothic", MS_PGothic_cp932
+        }, 3, new_jp_fonts, vertical_new_jp_fonts, NULL
+    },
+    /* Korean */
+    {
+        {
+            Gulim, atGulim
+        }, 2, new_kr_fonts, vertical_new_kr_fonts, NULL
+    }
+};
+
 /*
  * The replacement list is a way to map an entire font
  * family onto another family.  For example adding
@@ -751,6 +872,26 @@ static void load_gdi_font_replacements(void)
         /* "NewName"="Oldname" */
         if (!find_family_from_any_name( value ))
         {
+            int j;
+
+            for (j = 0; j < ARRAY_SIZE(font_replacements_list); j++)
+            {
+                int k;
+
+                struct font_replacements *replacement = &font_replacements_list[j];
+
+                replacement->font_seen = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                                   replacement->count * sizeof(BOOL));
+                for (k = 0; k < replacement->count; k++)
+                {
+                    if (!replacement->font_seen[k] && !lstrcmpW(value, replacement->replacements[k]))
+                    {
+                        replacement->font_seen[k] = TRUE;
+                        break;
+                    }
+                }
+            }
+
             if (type == REG_MULTI_SZ)
             {
                 WCHAR *replace = data;
@@ -768,6 +909,39 @@ static void load_gdi_font_replacements(void)
         dlen = sizeof(data);
         vlen = ARRAY_SIZE(value);
     }
+
+    for (i = 0; i < ARRAY_SIZE(font_replacements_list); i++)
+    {
+        int j;
+        struct font_replacements *replacement = &font_replacements_list[i];
+
+        for (j = 0; j < replacement->count; j++)
+        {
+            if (!replacement->font_seen ||
+                (!replacement->font_seen[j] && !find_family_from_any_name(replacement->replacements[j])))
+            {
+                const WCHAR *replace;
+
+                if (replacement->replacements[j][0] == '@')
+                    replace = replacement->vertical_new_fonts;
+                else
+                    replace = replacement->new_fonts;
+
+                while (*replace)
+                {
+                    if (add_family_replacement(replacement->replacements[j], replace))
+                    {
+                        TRACE("Replace %s with %s\n", wine_dbgstr_w(replacement->replacements[j]),
+                              wine_dbgstr_w(replace));
+                        break;
+                    }
+                    replace += lstrlenW(replace) + 1;
+                }
+            }
+        }
+        HeapFree(GetProcessHeap(), 0, replacement->font_seen);
+    }
+
     RegCloseKey( hkey );
 }
 
