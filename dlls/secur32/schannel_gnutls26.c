@@ -41,51 +41,6 @@
 #if defined(SONAME_LIBGNUTLS) && !defined(HAVE_SECURITY_SECURITY_H)
 
 WINE_DEFAULT_DEBUG_CHANNEL(secur32);
-WINE_DECLARE_DEBUG_CHANNEL(winediag);
-
-static void *libgnutls_handle;
-#define MAKE_FUNCPTR(f) static typeof(f) * p##f
-MAKE_FUNCPTR(gnutls_global_deinit);
-MAKE_FUNCPTR(gnutls_global_init);
-MAKE_FUNCPTR(gnutls_global_set_log_function);
-MAKE_FUNCPTR(gnutls_global_set_log_level);
-#undef MAKE_FUNCPTR
-
-#if GNUTLS_VERSION_MAJOR < 3
-#define GNUTLS_CIPHER_AES_192_CBC 92
-#define GNUTLS_CIPHER_AES_128_GCM 93
-#define GNUTLS_CIPHER_AES_256_GCM 94
-
-#define GNUTLS_MAC_AEAD 200
-
-#define GNUTLS_KX_ANON_ECDH     11
-#define GNUTLS_KX_ECDHE_RSA     12
-#define GNUTLS_KX_ECDHE_ECDSA   13
-#define GNUTLS_KX_ECDHE_PSK     14
-#endif
-
-static int compat_cipher_get_block_size(gnutls_cipher_algorithm_t cipher)
-{
-    switch(cipher) {
-    case GNUTLS_CIPHER_3DES_CBC:
-        return 8;
-    case GNUTLS_CIPHER_AES_128_CBC:
-    case GNUTLS_CIPHER_AES_256_CBC:
-        return 16;
-    case GNUTLS_CIPHER_ARCFOUR_128:
-    case GNUTLS_CIPHER_ARCFOUR_40:
-        return 1;
-    case GNUTLS_CIPHER_DES_CBC:
-        return 8;
-    case GNUTLS_CIPHER_NULL:
-        return 1;
-    case GNUTLS_CIPHER_RC2_40_CBC:
-        return 8;
-    default:
-        FIXME("Unknown cipher %#x, returning 1\n", cipher);
-        return 1;
-    }
-}
 
 static ssize_t schan_pull_adapter(gnutls_transport_ptr_t transport,
                                       void *buff, size_t buff_len)
@@ -131,44 +86,12 @@ static const struct {
     /* {SP_PROT_SSL2_CLIENT} is not supported by GnuTLS */
 };
 
-DWORD supported_protocols;
-
-static void check_supported_protocols(void)
-{
-    gnutls_session_t session;
-    char priority[64];
-    unsigned i;
-    int err;
-
-    err = pgnutls_init(&session, GNUTLS_CLIENT);
-    if (err != GNUTLS_E_SUCCESS)
-    {
-        pgnutls_perror(err);
-        return;
-    }
-
-    for(i = 0; i < ARRAY_SIZE(protocol_priority_flags); i++)
-    {
-        sprintf(priority, "NORMAL:-%s", protocol_priority_flags[i].gnutls_flag);
-        err = pgnutls_priority_set_direct(session, priority, NULL);
-        if (err == GNUTLS_E_SUCCESS)
-        {
-            TRACE("%s is supported\n", protocol_priority_flags[i].gnutls_flag);
-            supported_protocols |= protocol_priority_flags[i].enable_flag;
-        }
-        else
-            TRACE("%s is not supported\n", protocol_priority_flags[i].gnutls_flag);
-    }
-
-    pgnutls_deinit(session);
-}
-
-DWORD schan_imp_enabled_protocols_gnutls30(void)
+DWORD schan_imp_enabled_protocols_gnutls26(void)
 {
     return supported_protocols;
 }
 
-BOOL schan_imp_create_session_gnutls30(schan_imp_session *session, schan_credentials *cred)
+BOOL schan_imp_create_session_gnutls26(schan_imp_session *session, schan_credentials *cred)
 {
     gnutls_session_t *s = (gnutls_session_t*)session;
     char priority[128] = "NORMAL:%LATEST_RECORD_VERSION", *p;
@@ -231,26 +154,26 @@ BOOL schan_imp_create_session_gnutls30(schan_imp_session *session, schan_credent
     return TRUE;
 }
 
-void schan_imp_dispose_session_gnutls30(schan_imp_session session)
+void schan_imp_dispose_session_gnutls26(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     pgnutls_deinit(s);
 }
 
-void schan_imp_set_session_transport_gnutls30(schan_imp_session session, struct schan_transport *t)
+void schan_imp_set_session_transport_gnutls26(schan_imp_session session, struct schan_transport *t)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     pgnutls_transport_set_ptr(s, (gnutls_transport_ptr_t)t);
 }
 
-void schan_imp_set_session_target_gnutls30(schan_imp_session session, const char *target)
+void schan_imp_set_session_target_gnutls26(schan_imp_session session, const char *target)
 {
     gnutls_session_t s = (gnutls_session_t)session;
 
     pgnutls_server_name_set( s, GNUTLS_NAME_DNS, target, strlen(target) );
 }
 
-SECURITY_STATUS schan_imp_handshake_gnutls30(schan_imp_session session)
+SECURITY_STATUS schan_imp_handshake_gnutls26(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     int err;
@@ -387,18 +310,18 @@ static ALG_ID schannel_get_kx_algid(int kx)
     }
 }
 
-unsigned int schan_imp_get_session_cipher_block_size_gnutls30(schan_imp_session session)
+unsigned int schan_imp_get_session_cipher_block_size_gnutls26(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     return pgnutls_cipher_get_block_size(pgnutls_cipher_get(s));
 }
 
-unsigned int schan_imp_get_max_message_size_gnutls30(schan_imp_session session)
+unsigned int schan_imp_get_max_message_size_gnutls26(schan_imp_session session)
 {
     return pgnutls_record_get_max_size((gnutls_session_t)session);
 }
 
-SECURITY_STATUS schan_imp_get_connection_info_gnutls30(schan_imp_session session,
+SECURITY_STATUS schan_imp_get_connection_info_gnutls26(schan_imp_session session,
                                                        SecPkgContext_ConnectionInfo *info)
 {
     gnutls_session_t s = (gnutls_session_t)session;
@@ -418,7 +341,7 @@ SECURITY_STATUS schan_imp_get_connection_info_gnutls30(schan_imp_session session
     return SEC_E_OK;
 }
 
-ALG_ID schan_imp_get_key_signature_algorithm_gnutls30(schan_imp_session session)
+ALG_ID schan_imp_get_key_signature_algorithm_gnutls26(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     gnutls_kx_algorithm_t kx = pgnutls_kx_get(s);
@@ -439,7 +362,7 @@ ALG_ID schan_imp_get_key_signature_algorithm_gnutls30(schan_imp_session session)
     }
 }
 
-SECURITY_STATUS schan_imp_get_session_peer_certificate_gnutls30(schan_imp_session session, HCERTSTORE store,
+SECURITY_STATUS schan_imp_get_session_peer_certificate_gnutls26(schan_imp_session session, HCERTSTORE store,
                                                                 PCCERT_CONTEXT *ret)
 {
     gnutls_session_t s = (gnutls_session_t)session;
@@ -466,7 +389,7 @@ SECURITY_STATUS schan_imp_get_session_peer_certificate_gnutls30(schan_imp_sessio
     return SEC_E_OK;
 }
 
-SECURITY_STATUS schan_imp_send_gnutls30(schan_imp_session session, const void *buffer,
+SECURITY_STATUS schan_imp_send_gnutls26(schan_imp_session session, const void *buffer,
                                         SIZE_T *length)
 {
     gnutls_session_t s = (gnutls_session_t)session;
@@ -497,7 +420,7 @@ SECURITY_STATUS schan_imp_send_gnutls30(schan_imp_session session, const void *b
     }
 }
 
-SECURITY_STATUS schan_imp_recv_gnutls30(schan_imp_session session, void *buffer,
+SECURITY_STATUS schan_imp_recv_gnutls26(schan_imp_session session, void *buffer,
                                         SIZE_T *length)
 {
     gnutls_session_t s = (gnutls_session_t)session;
@@ -527,7 +450,7 @@ again:
     return SEC_E_OK;
 }
 
-BOOL schan_imp_allocate_certificate_credentials_gnutls30(schan_credentials *c)
+BOOL schan_imp_allocate_certificate_credentials_gnutls26(schan_credentials *c)
 {
     int ret = pgnutls_certificate_allocate_credentials((gnutls_certificate_credentials_t*)&c->credentials);
     if (ret != GNUTLS_E_SUCCESS)
@@ -535,100 +458,9 @@ BOOL schan_imp_allocate_certificate_credentials_gnutls30(schan_credentials *c)
     return (ret == GNUTLS_E_SUCCESS);
 }
 
-void schan_imp_free_certificate_credentials_gnutls30(schan_credentials *c)
+void schan_imp_free_certificate_credentials_gnutls26(schan_credentials *c)
 {
     pgnutls_certificate_free_credentials(c->credentials);
-}
-
-static void schan_gnutls_log(int level, const char *msg)
-{
-    TRACE("<%d> %s", level, msg);
-}
-
-BOOL schan_imp_init(void)
-{
-    int ret;
-
-    libgnutls_handle = wine_dlopen(SONAME_LIBGNUTLS, RTLD_NOW, NULL, 0);
-    if (!libgnutls_handle)
-    {
-        ERR_(winediag)("Failed to load libgnutls, secure connections will not be available.\n");
-        return FALSE;
-    }
-
-#define LOAD_FUNCPTR(f) \
-    if (!(p##f = wine_dlsym(libgnutls_handle, #f, NULL, 0))) \
-    { \
-        ERR("Failed to load %s\n", #f); \
-        goto fail; \
-    }
-
-    LOAD_FUNCPTR(gnutls_alert_get)
-    LOAD_FUNCPTR(gnutls_alert_get_name)
-    LOAD_FUNCPTR(gnutls_certificate_allocate_credentials)
-    LOAD_FUNCPTR(gnutls_certificate_free_credentials)
-    LOAD_FUNCPTR(gnutls_certificate_get_peers)
-    LOAD_FUNCPTR(gnutls_cipher_get)
-    LOAD_FUNCPTR(gnutls_cipher_get_key_size)
-    LOAD_FUNCPTR(gnutls_credentials_set)
-    LOAD_FUNCPTR(gnutls_deinit)
-    LOAD_FUNCPTR(gnutls_global_deinit)
-    LOAD_FUNCPTR(gnutls_global_init)
-    LOAD_FUNCPTR(gnutls_global_set_log_function)
-    LOAD_FUNCPTR(gnutls_global_set_log_level)
-    LOAD_FUNCPTR(gnutls_handshake)
-    LOAD_FUNCPTR(gnutls_init)
-    LOAD_FUNCPTR(gnutls_kx_get)
-    LOAD_FUNCPTR(gnutls_mac_get)
-    LOAD_FUNCPTR(gnutls_mac_get_key_size)
-    LOAD_FUNCPTR(gnutls_perror)
-    LOAD_FUNCPTR(gnutls_protocol_get_version)
-    LOAD_FUNCPTR(gnutls_priority_set_direct)
-    LOAD_FUNCPTR(gnutls_record_get_max_size);
-    LOAD_FUNCPTR(gnutls_record_recv);
-    LOAD_FUNCPTR(gnutls_record_send);
-    LOAD_FUNCPTR(gnutls_server_name_set)
-    LOAD_FUNCPTR(gnutls_transport_get_ptr)
-    LOAD_FUNCPTR(gnutls_transport_set_errno)
-    LOAD_FUNCPTR(gnutls_transport_set_ptr)
-    LOAD_FUNCPTR(gnutls_transport_set_pull_function)
-    LOAD_FUNCPTR(gnutls_transport_set_push_function)
-#undef LOAD_FUNCPTR
-
-    if (!(pgnutls_cipher_get_block_size = wine_dlsym(libgnutls_handle, "gnutls_cipher_get_block_size", NULL, 0)))
-    {
-        WARN("gnutls_cipher_get_block_size not found\n");
-        pgnutls_cipher_get_block_size = compat_cipher_get_block_size;
-        have_gnutls26 = TRUE;
-    }
-
-    ret = pgnutls_global_init();
-    if (ret != GNUTLS_E_SUCCESS)
-    {
-        pgnutls_perror(ret);
-        goto fail;
-    }
-
-    if (TRACE_ON(secur32))
-    {
-        pgnutls_global_set_log_level(4);
-        pgnutls_global_set_log_function(schan_gnutls_log);
-    }
-
-    check_supported_protocols();
-    return TRUE;
-
-fail:
-    wine_dlclose(libgnutls_handle, NULL, 0);
-    libgnutls_handle = NULL;
-    return FALSE;
-}
-
-void schan_imp_deinit(void)
-{
-    pgnutls_global_deinit();
-    wine_dlclose(libgnutls_handle, NULL, 0);
-    libgnutls_handle = NULL;
 }
 
 #endif /* SONAME_LIBGNUTLS && !HAVE_SECURITY_SECURITY_H */
