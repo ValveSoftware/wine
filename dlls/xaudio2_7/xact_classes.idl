@@ -24,7 +24,7 @@
 [
     helpstring("XACT3 Class"),
     threading(both),
-    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+    uuid(bcc782bc-6492-4c22-8c35-f5d72fe73c6e)
 ]
 coclass XACT37Engine { interface IXACT37Engine; }
 #endif /* XACT3_VER == 7 */
@@ -33,7 +33,7 @@ coclass XACT37Engine { interface IXACT37Engine; }
 [
     helpstring("XACT3.6 Class"),
     threading(both),
-    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+    uuid(248d8a3b-6256-44d3-a018-2ac96c459f47)
 ]
 coclass XACT36Engine { interface IXACT37Engine; }
 #endif /* XACT3_VER == 6 */
@@ -42,7 +42,7 @@ coclass XACT36Engine { interface IXACT37Engine; }
 [
     helpstring("XACT3.5 Class"),
     threading(both),
-    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+    uuid(074b110f-7f58-4743-aea5-12f15b5074ed)
 ]
 coclass XACT35Engine { interface IXACT37Engine; }
 #endif /* XACT3_VER == 5 */
@@ -51,7 +51,7 @@ coclass XACT35Engine { interface IXACT37Engine; }
 [
     helpstring("XACT3.4 Class"),
     threading(both),
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(0977d092-2d95-4e43-8d42-9ddcc2545ed5)
 ]
 coclass XACT34Engine { interface IXACT37Engine; }
 #endif /* XACT3_VER == 4 */
@@ -60,7 +60,7 @@ coclass XACT34Engine { interface IXACT37Engine; }
 [
     helpstring("XACT3.3 Class"),
     threading(both),
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(94c1affa-66e7-4961-9521-cfdef3128d4f)
 ]
 coclass XACT33Engine { interface IXACT37Engine; }
 #endif /* XACT3_VER == 3 */
@@ -69,7 +69,7 @@ coclass XACT33Engine { interface IXACT37Engine; }
 [
     helpstring("XACT3.2 Class"),
     threading(both),
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(d3332f02-3dd0-4de9-9aec-20d85c4111b6)
 ]
 coclass XACT32Engine { interface IXACT32Engine; }
 #endif /* XACT3_VER == 2 */
@@ -78,7 +78,7 @@ coclass XACT32Engine { interface IXACT32Engine; }
 [
     helpstring("XACT3.1 Class"),
     threading(both),
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(962f5027-99be-4692-a468-85802cf8de61)
 ]
 coclass XACT31Engine { interface IXACT32Engine; }
 #endif /* XACT3_VER == 1 */
@@ -87,7 +87,7 @@ coclass XACT31Engine { interface IXACT32Engine; }
 [
     helpstring("XACT3.0 Class"),
     threading(both),
-    uuid(9e33f661-2d07-43ec-9704-bbcb71a54972)
+    uuid(3b80ee2a-b0f5-4780-9e30-90cb39685b03)
 ]
 coclass XACT30Engine { interface IXACT30Engine; }
 #endif /* XACT3_VER == 0 */
