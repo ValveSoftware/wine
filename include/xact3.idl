@@ -20,56 +20,56 @@ import "unknwn.idl";
 import "xaudio2.idl";
 
 [
-    uuid(9e33f661-2d07-43ec-9704-bbcb71a54972)
+    uuid(3b80ee2a-b0f5-4780-9e30-90cb39685b03)
 ]
 coclass XACTEngine30 {
     interface IUnknown;
 }
 
 [
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(962f5027-99be-4692-a468-85802cf8de61)
 ]
 coclass XACTEngine31 {
     interface IUnknown;
 }
 
 [
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(d3332f02-3dd0-4de9-9aec-20d85c4111b6)
 ]
 coclass XACTEngine32 {
     interface IUnknown;
 }
 
 [
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(94c1affa-66e7-4961-9521-cfdef3128d4f)
 ]
 coclass XACTEngine33 {
     interface IUnknown;
 }
 
 [
-    uuid(e72c1b9a-d717-41c0-81a6-50eb56e80649)
+    uuid(0977d092-2d95-4e43-8d42-9ddcc2545ed5)
 ]
 coclass XACTEngine34 {
     interface IUnknown;
 }
 
 [
-    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+    uuid(074b110f-7f58-4743-aea5-12f15b5074ed)
 ]
 coclass XACTEngine35 {
     interface IUnknown;
 }
 
 [
-    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+    uuid(248d8a3b-6256-44d3-a018-2ac96c459f47)
 ]
 coclass XACTEngine36 {
     interface IUnknown;
 }
 
 [
-    uuid(b1ee676a-d9cd-4d2a-89a8-fa53eb9e480b)
+    uuid(bcc782bc-6492-4c22-8c35-f5d72fe73c6e)
 ]
 coclass XACTEngine37 {
     interface IUnknown;
