@@ -1733,6 +1733,19 @@ HWND apartment_getwindow(const struct apartment *apt)
     return apt->win;
 }
 
+static void oletls_release_spy_list(struct list *list)
+{
+    struct init_spy *cursor, *cursor2;
+
+    LIST_FOR_EACH_ENTRY_SAFE(cursor, cursor2, list, struct init_spy, entry)
+    {
+        list_remove(&cursor->entry);
+        if (cursor->spy)
+            IInitializeSpy_Release(cursor->spy);
+        heap_free(cursor);
+    }
+}
+
 static void COM_TlsDestroy(void)
 {
     struct oletls *info = NtCurrentTeb()->ReservedForOle;
@@ -1741,7 +1754,8 @@ static void COM_TlsDestroy(void)
         if (info->apt) apartment_release(info->apt);
         if (info->errorinfo) IErrorInfo_Release(info->errorinfo);
         if (info->state) IUnknown_Release(info->state);
-        if (info->spy) IInitializeSpy_Release(info->spy);
+        oletls_release_spy_list(&info->spies.active);
+        oletls_release_spy_list(&info->spies.freed);
         if (info->context_token) IObjContext_Release(info->context_token);
         HeapFree(GetProcessHeap(), 0, info);
         NtCurrentTeb()->ReservedForOle = NULL;
@@ -1783,6 +1797,7 @@ DWORD WINAPI CoBuildVersion(void)
 HRESULT WINAPI CoRegisterInitializeSpy(IInitializeSpy *spy, ULARGE_INTEGER *cookie)
 {
     struct oletls *info = COM_CurrentInfo();
+    struct init_spy *entry;
     HRESULT hr;
 
     TRACE("(%p, %p)\n", spy, cookie);
@@ -1794,19 +1809,33 @@ HRESULT WINAPI CoRegisterInitializeSpy(IInitializeSpy *spy, ULARGE_INTEGER *cook
         return E_INVALIDARG;
     }
 
-    if (info->spy)
+    hr = IInitializeSpy_QueryInterface(spy, &IID_IInitializeSpy, (void **)&spy);
+    if (FAILED(hr))
+        return hr;
+
+    if (list_empty(&info->spies.freed))
     {
-        FIXME("Already registered?\n");
-        return E_UNEXPECTED;
+        entry = heap_alloc(sizeof(*entry));
+        if (!entry)
+        {
+            IInitializeSpy_Release(spy);
+            return E_OUTOFMEMORY;
+        }
+        entry->id = info->spies.next_id++;
+    }
+    else
+    {
+        entry = LIST_ENTRY(list_tail(&info->spies.freed), struct init_spy, entry);
+        list_remove(&entry->entry);
     }
 
-    hr = IInitializeSpy_QueryInterface(spy, &IID_IInitializeSpy, (void **) &info->spy);
-    if (SUCCEEDED(hr))
-    {
-        cookie->QuadPart = (DWORD_PTR)spy;
-        return S_OK;
-    }
-    return hr;
+    entry->spy = spy;
+    list_add_head(&info->spies.active, &entry->entry);
+
+    cookie->HighPart = GetCurrentThreadId();
+    cookie->LowPart = entry->id;
+
+    return S_OK;
 }
 
 /******************************************************************************
@@ -1827,14 +1856,42 @@ HRESULT WINAPI CoRegisterInitializeSpy(IInitializeSpy *spy, ULARGE_INTEGER *cook
 HRESULT WINAPI CoRevokeInitializeSpy(ULARGE_INTEGER cookie)
 {
     struct oletls *info = COM_CurrentInfo();
+    struct init_spy *spy;
+
     TRACE("(%s)\n", wine_dbgstr_longlong(cookie.QuadPart));
 
-    if (!info || !info->spy || cookie.QuadPart != (DWORD_PTR)info->spy)
+    if (!info || list_empty(&info->spies.active))
         return E_INVALIDARG;
 
-    IInitializeSpy_Release(info->spy);
-    info->spy = NULL;
-    return S_OK;
+    if (cookie.HighPart != GetCurrentThreadId() || cookie.LowPart >= info->spies.next_id)
+        return E_INVALIDARG;
+
+    LIST_FOR_EACH_ENTRY(spy, &info->spies.active, struct init_spy, entry)
+    {
+        if (cookie.LowPart == spy->id)
+        {
+            IInitializeSpy_Release(spy->spy);
+            spy->spy = NULL;
+            list_remove(&spy->entry);
+
+            /* Move to freed list, unless it was latest item id or last item in the active list. */
+            if (spy->id == info->spies.next_id - 1)
+                info->spies.next_id--;
+            else if (list_empty(&info->spies.active))
+                oletls_release_spy_list(&info->spies.freed);
+            else
+            {
+                list_add_tail(&info->spies.freed, &spy->entry);
+                spy = NULL;
+            }
+
+            heap_free(spy);
+
+            return S_OK;
+        }
+    }
+
+    return E_INVALIDARG;
 }
 
 HRESULT enter_apartment( struct oletls *info, DWORD model )
@@ -1929,6 +1986,7 @@ HRESULT WINAPI CoInitialize(LPVOID lpReserved)
 HRESULT WINAPI DECLSPEC_HOTPATCH CoInitializeEx(LPVOID lpReserved, DWORD dwCoInit)
 {
   struct oletls *info = COM_CurrentInfo();
+  struct init_spy *cursor;
   HRESULT hr;
 
   TRACE("(%p, %x)\n", lpReserved, (int)dwCoInit);
@@ -1955,13 +2013,17 @@ HRESULT WINAPI DECLSPEC_HOTPATCH CoInitializeEx(LPVOID lpReserved, DWORD dwCoIni
     RunningObjectTableImpl_Initialize();
   }
 
-  if (info->spy)
-      IInitializeSpy_PreInitialize(info->spy, dwCoInit, info->inits);
+  LIST_FOR_EACH_ENTRY(cursor, &info->spies.active, struct init_spy, entry)
+  {
+      IInitializeSpy_PreInitialize(cursor->spy, dwCoInit, info->inits);
+  }
 
   hr = enter_apartment( info, dwCoInit );
 
-  if (info->spy)
-      IInitializeSpy_PostInitialize(info->spy, hr, dwCoInit, info->inits);
+  LIST_FOR_EACH_ENTRY(cursor, &info->spies.active, struct init_spy, entry)
+  {
+      hr = IInitializeSpy_PostInitialize(cursor->spy, hr, dwCoInit, info->inits);
+  }
 
   return hr;
 }
@@ -1985,6 +2047,7 @@ HRESULT WINAPI DECLSPEC_HOTPATCH CoInitializeEx(LPVOID lpReserved, DWORD dwCoIni
 void WINAPI DECLSPEC_HOTPATCH CoUninitialize(void)
 {
   struct oletls * info = COM_CurrentInfo();
+  struct init_spy *cursor;
   LONG lCOMRefCnt;
 
   TRACE("()\n");
@@ -1992,17 +2055,22 @@ void WINAPI DECLSPEC_HOTPATCH CoUninitialize(void)
   /* will only happen on OOM */
   if (!info) return;
 
-  if (info->spy)
-      IInitializeSpy_PreUninitialize(info->spy, info->inits);
+  LIST_FOR_EACH_ENTRY(cursor, &info->spies.active, struct init_spy, entry)
+  {
+      IInitializeSpy_PreUninitialize(cursor->spy, info->inits);
+  }
 
   /* sanity check */
   if (!info->inits)
   {
-    ERR("Mismatched CoUninitialize\n");
+      ERR("Mismatched CoUninitialize\n");
 
-    if (info->spy)
-        IInitializeSpy_PostUninitialize(info->spy, info->inits);
-    return;
+      LIST_FOR_EACH_ENTRY(cursor, &info->spies.active, struct init_spy, entry)
+      {
+          IInitializeSpy_PostUninitialize(cursor->spy, info->inits);
+      }
+
+      return;
   }
 
   leave_apartment( info );
@@ -2024,8 +2092,11 @@ void WINAPI DECLSPEC_HOTPATCH CoUninitialize(void)
     ERR( "CoUninitialize() - not CoInitialized.\n" );
     InterlockedExchangeAdd(&s_COMLockCount,1); /* restore the lock count. */
   }
-  if (info->spy)
-      IInitializeSpy_PostUninitialize(info->spy, info->inits);
+
+   LIST_FOR_EACH_ENTRY(cursor, &info->spies.active, struct init_spy, entry)
+   {
+       IInitializeSpy_PostUninitialize(cursor->spy, info->inits);
+   }
 }
 
 /******************************************************************************
