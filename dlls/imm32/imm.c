@@ -19,6 +19,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define COBJMACROS
+
 #include <stdarg.h>
 #include <stdio.h>
 
@@ -32,6 +34,8 @@
 #include "ddk/imm.h"
 #include "winnls.h"
 #include "winreg.h"
+#include "initguid.h"
+#include "objbase.h"
 #include "wine/list.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(imm);
@@ -94,7 +98,15 @@ typedef struct _tagIMMThreadData {
     HWND hwndDefault;
     BOOL disableIME;
     DWORD windowRefs;
+    IInitializeSpy IInitializeSpy_iface;
+    ULARGE_INTEGER spy_cookie;
+    BOOL apt_initialized;
 } IMMThreadData;
+
+static inline IMMThreadData *impl_from_IInitializeSpy(IInitializeSpy *iface)
+{
+    return CONTAINING_RECORD(iface, IMMThreadData, IInitializeSpy_iface);
+}
 
 static struct list ImmHklList = LIST_INIT(ImmHklList);
 static struct list ImmThreadDataList = LIST_INIT(ImmThreadDataList);
@@ -227,6 +239,88 @@ static DWORD convert_candidatelist_AtoW(
     return ret;
 }
 
+static HRESULT WINAPI initializespy_QueryInterface(IInitializeSpy *iface, REFIID riid, void **obj)
+{
+    if (IsEqualIID(&IID_IInitializeSpy, riid) ||
+            IsEqualIID(&IID_IUnknown, riid))
+    {
+        *obj = iface;
+        IInitializeSpy_AddRef(iface);
+        return S_OK;
+    }
+
+    *obj = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI initializespy_AddRef(IInitializeSpy *iface)
+{
+    return 2;
+}
+
+static ULONG WINAPI initializespy_Release(IInitializeSpy *iface)
+{
+    return 1;
+}
+
+static void imm_couninit_thread(IMMThreadData *thread_data)
+{
+    if (!thread_data->apt_initialized)
+        return;
+
+    thread_data->apt_initialized = FALSE;
+    CoUninitialize();
+}
+
+static HRESULT WINAPI initializespy_PreInitialize(IInitializeSpy *iface, DWORD coinit, DWORD refs)
+{
+    IMMThreadData *thread_data = impl_from_IInitializeSpy(iface);
+
+    /* Application requested initialization of different apartment type. */
+    if (!(coinit & COINIT_APARTMENTTHREADED))
+        imm_couninit_thread(thread_data);
+
+    return S_OK;
+}
+
+static HRESULT WINAPI initializespy_PostInitialize(IInitializeSpy *iface, HRESULT hr, DWORD coinit, DWORD refs)
+{
+    IMMThreadData *thread_data = impl_from_IInitializeSpy(iface);
+
+    /* Explicit initialization call should return S_OK first time. */
+    if (thread_data->apt_initialized && hr == S_FALSE && refs == 2)
+        hr = S_OK;
+
+    return hr;
+}
+
+static HRESULT WINAPI initializespy_PreUninitialize(IInitializeSpy *iface, DWORD refs)
+{
+    IMMThreadData *thread_data = impl_from_IInitializeSpy(iface);
+
+    /* Account for explicit uninitialization calls. */
+    if (thread_data->apt_initialized && refs == 1)
+        thread_data->apt_initialized = FALSE;
+
+    return S_OK;
+}
+
+static HRESULT WINAPI initializespy_PostUninitialize(IInitializeSpy *iface, DWORD refs)
+{
+    return S_OK;
+}
+
+static const IInitializeSpyVtbl initializespyvtbl =
+{
+    initializespy_QueryInterface,
+    initializespy_AddRef,
+    initializespy_Release,
+    initializespy_PreInitialize,
+    initializespy_PostInitialize,
+    initializespy_PreUninitialize,
+    initializespy_PostUninitialize,
+};
+
 static IMMThreadData *IMM_GetThreadData(HWND hwnd, DWORD thread)
 {
     IMMThreadData *data;
@@ -253,6 +347,7 @@ static IMMThreadData *IMM_GetThreadData(HWND hwnd, DWORD thread)
         if (data->threadID == thread) return data;
 
     data = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*data));
+    data->IInitializeSpy_iface.lpVtbl = &initializespyvtbl;
     data->threadID = thread;
     list_add_head(&ImmThreadDataList,&data->entry);
     TRACE("Thread Data Created (%x)\n",thread);
@@ -281,6 +376,7 @@ static void IMM_FreeThreadData(void)
             list_remove(&data->entry);
             LeaveCriticalSection(&threaddata_cs);
             IMM_DestroyContext(data->defaultContext);
+            imm_couninit_thread(data);
             HeapFree(GetProcessHeap(),0,data);
             TRACE("Thread Data Destroyed\n");
             return;
@@ -1636,6 +1732,32 @@ static BOOL needs_ime_window(HWND hwnd)
     return TRUE;
 }
 
+void WINAPI __wine_activate_window(HWND hwnd)
+{
+    IMMThreadData *thread_data;
+
+    TRACE("(%p)\n", hwnd);
+
+    if (!needs_ime_window(hwnd))
+        return;
+
+    thread_data = IMM_GetThreadData(hwnd, 0);
+    if (!thread_data)
+        return;
+
+    if (thread_data->disableIME || disable_ime)
+    {
+        TRACE("IME for this thread is disabled\n");
+        LeaveCriticalSection(&threaddata_cs);
+        return;
+    }
+
+    if (!thread_data->apt_initialized)
+        thread_data->apt_initialized = SUCCEEDED(CoInitializeEx(NULL, COINIT_APARTMENTTHREADED));
+
+    LeaveCriticalSection(&threaddata_cs);
+}
+
 /***********************************************************************
  *		__wine_register_window (IMM32.@)
  */
@@ -1665,6 +1787,8 @@ BOOL WINAPI __wine_register_window(HWND hwnd)
     /* Create default IME window */
     if (thread_data->windowRefs == 1)
     {
+        CoRegisterInitializeSpy(&thread_data->IInitializeSpy_iface, &thread_data->spy_cookie);
+
         /* Do not create the window inside of a critical section */
         LeaveCriticalSection(&threaddata_cs);
         new = CreateWindowExW( 0, L"IME", L"Default IME",
@@ -1706,8 +1830,11 @@ void WINAPI __wine_unregister_window(HWND hwnd)
           thread_data->windowRefs, thread_data->hwndDefault);
 
     /* Destroy default IME window */
-    if (thread_data->windowRefs == 0 && thread_data->hwndDefault)
+    if (thread_data->windowRefs == 0)
     {
+        CoRevokeInitializeSpy(thread_data->spy_cookie);
+        thread_data->spy_cookie.QuadPart = 0;
+        imm_couninit_thread(thread_data);
         to_destroy = thread_data->hwndDefault;
         thread_data->hwndDefault = NULL;
     }
