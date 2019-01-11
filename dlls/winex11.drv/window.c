@@ -1266,6 +1266,12 @@ void update_net_wm_states( struct x11drv_win_data *data )
                    i, data->hwnd, data->whole_window,
                    (new_state & (1 << i)) != 0, (data->net_wm_state & (1 << i)) != 0 );
 
+            if (i == NET_WM_STATE_FULLSCREEN)
+            {
+                data->pending_fullscreen = (new_state & (1 << i)) != 0;
+                TRACE( "set pending_fullscreen to: %u\n", data->pending_fullscreen );
+            }
+
             xev.xclient.data.l[0] = (new_state & (1 << i)) ? _NET_WM_STATE_ADD : _NET_WM_STATE_REMOVE;
             xev.xclient.data.l[1] = X11DRV_Atoms[net_wm_state_atoms[i] - FIRST_XATOM];
             xev.xclient.data.l[2] = ((net_wm_state_atoms[i] == XATOM__NET_WM_STATE_MAXIMIZED_VERT) ?
@@ -1395,6 +1401,7 @@ static void unmap_window( HWND hwnd )
 
         data->mapped = FALSE;
         data->net_wm_state = 0;
+        data->pending_fullscreen = FALSE;
     }
     release_win_data( data );
 }
@@ -1411,6 +1418,7 @@ void make_window_embedded( struct x11drv_win_data *data )
         if (!data->managed) XUnmapWindow( data->display, data->whole_window );
         else XWithdrawWindow( data->display, data->whole_window, data->vis.screen );
         data->net_wm_state = 0;
+        data->pending_fullscreen = FALSE;
     }
     data->embedded = TRUE;
     data->managed = TRUE;
@@ -2012,6 +2020,7 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
     data->whole_colormap = 0;
     data->wm_state = WithdrawnState;
     data->net_wm_state = 0;
+    data->pending_fullscreen = FALSE;
     data->mapped = FALSE;
     if (data->xic)
     {
