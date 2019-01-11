@@ -622,6 +622,7 @@ struct x11drv_win_data
     RECT        whole_rect;     /* X window rectangle for the whole window relative to win32 parent window client area */
     RECT        client_rect;    /* client area relative to win32 parent window client area */
     XIC         xic;            /* X input context */
+    BOOL        pending_fullscreen : 1; /* HACK: pending change to fullscreen state */
     BOOL        managed : 1;    /* is window managed? */
     BOOL        mapped : 1;     /* is window mapped? (in either normal or iconic state) */
     BOOL        iconic : 1;     /* is window in iconic state? */
