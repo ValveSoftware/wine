@@ -1076,6 +1076,12 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
                event->serial, data->configure_serial );
         goto done;
     }
+    if (data->pending_fullscreen)
+    {
+        TRACE( "win %p/%lx event %d,%d,%dx%d pending_fullscreen is pending, so ignoring\n",
+               hwnd, data->whole_window, event->x, event->y, event->width, event->height );
+        goto done;
+    }
 
     /* Get geometry */
 
@@ -1330,15 +1336,44 @@ done:
 }
 
 
+static void handle__net_wm_state_notify( HWND hwnd, XPropertyEvent *event )
+{
+    struct x11drv_win_data *data = get_win_data( hwnd );
+
+    if(data->pending_fullscreen)
+    {
+        read_net_wm_states( event->display, data );
+        if(data->net_wm_state & (1 << NET_WM_STATE_FULLSCREEN)){
+            data->pending_fullscreen = FALSE;
+            TRACE("PropertyNotify _NET_WM_STATE, now 0x%x, pending_fullscreen no longer pending.\n",
+                    data->net_wm_state);
+        }else
+            TRACE("PropertyNotify _NET_WM_STATE, now 0x%x, pending_fullscreen still pending.\n",
+                    data->net_wm_state);
+    }
+
+    release_win_data( data );
+}
+
+
 /***********************************************************************
  *           X11DRV_PropertyNotify
  */
 static BOOL X11DRV_PropertyNotify( HWND hwnd, XEvent *xev )
 {
     XPropertyEvent *event = &xev->xproperty;
+    char *name;
 
     if (!hwnd) return FALSE;
+
+    name = XGetAtomName(event->display, event->atom);
+    if(name){
+        TRACE("win %p PropertyNotify atom: %s, state: 0x%x\n", hwnd, name, event->state);
+        XFree(name);
+    }
+
     if (event->atom == x11drv_atom(WM_STATE)) handle_wm_state_notify( hwnd, event, TRUE );
+    else if (event->atom == x11drv_atom(_NET_WM_STATE)) handle__net_wm_state_notify( hwnd, event );
     return TRUE;
 }
 
