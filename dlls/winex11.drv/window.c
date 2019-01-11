@@ -1260,6 +1260,7 @@ static void unmap_window( HWND hwnd )
 
         data->mapped = FALSE;
         data->net_wm_state = 0;
+        data->pending_fullscreen = FALSE;
     }
     release_win_data( data );
 }
@@ -1276,6 +1277,7 @@ void make_window_embedded( struct x11drv_win_data *data )
         if (!data->managed) XUnmapWindow( data->display, data->whole_window );
         else XWithdrawWindow( data->display, data->whole_window, data->vis.screen );
         data->net_wm_state = 0;
+        data->pending_fullscreen = FALSE;
     }
     data->embedded = TRUE;
     data->managed = TRUE;
@@ -1759,6 +1761,7 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
     data->whole_colormap = 0;
     data->wm_state = WithdrawnState;
     data->net_wm_state = 0;
+    data->pending_fullscreen = FALSE;
     data->mapped = FALSE;
     if (data->xic)
     {
