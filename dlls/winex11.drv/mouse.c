@@ -1544,7 +1544,7 @@ BOOL CDECL X11DRV_ClipCursor( LPCRECT clip )
             struct x11drv_thread_data *data = x11drv_thread_data();
             if (data)
             {
-                if ((data->clip_hwnd && EqualRect( clip, &clip_rect )) || clip_fullscreen_window( foreground, TRUE ))
+                if ((data->clip_hwnd && EqualRect( clip, &clip_rect ) && !EqualRect(&clip_rect, &virtual_rect)) || clip_fullscreen_window( foreground, TRUE ))
                     return TRUE;
             }
         }
