@@ -152,6 +152,7 @@ static inline BOOL is_special_env_var( const char *var )
             !strncmp( var, "TEMP=", sizeof("TEMP=")-1 ) ||
             !strncmp( var, "TMP=", sizeof("TMP=")-1 ) ||
             !strncmp( var, "QT_", sizeof("QT_")-1 ) ||
+            !strncmp( var, "SDL_AUDIODRIVER=", sizeof("SDL_AUDIODRIVER=")-1 ) ||
             !strncmp( var, "VK_", sizeof("VK_")-1 ));
 }
 
