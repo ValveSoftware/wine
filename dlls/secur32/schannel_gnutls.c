@@ -549,11 +549,14 @@ BOOL schan_imp_init(void)
 {
     int ret;
 
-    libgnutls_handle = wine_dlopen(SONAME_LIBGNUTLS, RTLD_NOW, NULL, 0);
-    if (!libgnutls_handle)
+    if (!(libgnutls_handle = wine_dlopen( SONAME_LIBGNUTLS, RTLD_NOW, NULL, 0 )))
     {
-        ERR_(winediag)("Failed to load libgnutls, secure connections will not be available.\n");
-        return FALSE;
+        /* try old runtime version */
+        if (!(libgnutls_handle = wine_dlopen( "libgnutls.so.26", RTLD_NOW, NULL, 0 )))
+        {
+            ERR_(winediag)("Failed to load libgnutls, secure connections will not be available.\n");
+            return FALSE;
+        }
     }
 
 #define LOAD_FUNCPTR(f) \
