@@ -748,6 +748,7 @@ SOURCES = \
 	wtypes.idl \
 	wuapi.idl \
 	x3daudio.h \
+	xact3.idl \
 	xapo.idl \
 	xapofx.h \
 	xaudio2.idl \
