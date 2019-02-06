@@ -1,0 +1,12 @@
+EXTRADEFS = -DXACT3_VER=3
+MODULE    = xactengine3_3.dll
+IMPORTS   = advapi32 ole32 user32 uuid
+PARENTSRC = ../xaudio2_7
+EXTRALIBS = $(FAUDIO_LIBS)
+EXTRAINCL = $(FAUDIO_CFLAGS)
+
+C_SRCS = \
+	xaudio_allocator.c \
+	xact_dll.c
+
+IDL_SRCS = xact_classes.idl
