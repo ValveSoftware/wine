@@ -2396,6 +2396,7 @@ static HRESULT navigate_uri(HTMLOuterWindow *window, IUri *uri, const WCHAR *dis
         DWORD post_data_len = request_data ? request_data->post_data_len : 0;
         void *post_data = post_data_len ? request_data->post_data : NULL;
         const WCHAR *headers = request_data ? request_data->headers : NULL;
+        DWORD scheme;
 
         if(!(flags & BINDING_REFRESH)) {
             BSTR frame_name = NULL;
@@ -2418,6 +2419,12 @@ static HRESULT navigate_uri(HTMLOuterWindow *window, IUri *uri, const WCHAR *dis
 
         if(is_main_content_window(window))
             return super_navigate(window, uri, flags, headers, post_data, post_data_len);
+
+        hres = IUri_GetScheme(uri, &scheme);
+        if(SUCCEEDED(hres) && scheme == URL_SCHEME_JAVASCRIPT) {
+            FIXME("HACK Using super_navigate for javascript: navigation\n");
+            return super_navigate(window, uri, flags, headers, post_data, post_data_len);
+        }
     }
 
     if(is_main_content_window(window)) {
