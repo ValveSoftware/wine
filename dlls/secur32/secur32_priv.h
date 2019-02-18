@@ -230,53 +230,28 @@ extern int schan_push(struct schan_transport *t, const void *buff, size_t *buff_
 extern schan_imp_session schan_session_for_transport(struct schan_transport* t) DECLSPEC_HIDDEN;
 
 /* schannel implementation interface */
+extern BOOL schan_imp_create_session(schan_imp_session *session, schan_credentials *cred) DECLSPEC_HIDDEN;
+extern void schan_imp_dispose_session(schan_imp_session session) DECLSPEC_HIDDEN;
+extern void schan_imp_set_session_transport(schan_imp_session session,
+                                            struct schan_transport *t) DECLSPEC_HIDDEN;
+extern void schan_imp_set_session_target(schan_imp_session session, const char *target) DECLSPEC_HIDDEN;
+extern SECURITY_STATUS schan_imp_handshake(schan_imp_session session) DECLSPEC_HIDDEN;
+extern unsigned int schan_imp_get_session_cipher_block_size(schan_imp_session session) DECLSPEC_HIDDEN;
+extern unsigned int schan_imp_get_max_message_size(schan_imp_session session) DECLSPEC_HIDDEN;
+extern ALG_ID schan_imp_get_key_signature_algorithm(schan_imp_session session) DECLSPEC_HIDDEN;
+extern SECURITY_STATUS schan_imp_get_connection_info(schan_imp_session session,
+                                                     SecPkgContext_ConnectionInfo *info) DECLSPEC_HIDDEN;
+extern SECURITY_STATUS schan_imp_get_session_peer_certificate(schan_imp_session session, HCERTSTORE,
+                                                              PCCERT_CONTEXT *cert) DECLSPEC_HIDDEN;
+extern SECURITY_STATUS schan_imp_send(schan_imp_session session, const void *buffer,
+                                      SIZE_T *length) DECLSPEC_HIDDEN;
+extern SECURITY_STATUS schan_imp_recv(schan_imp_session session, void *buffer,
+                                      SIZE_T *length) DECLSPEC_HIDDEN;
+extern BOOL schan_imp_allocate_certificate_credentials(schan_credentials*) DECLSPEC_HIDDEN;
+extern void schan_imp_free_certificate_credentials(schan_credentials*) DECLSPEC_HIDDEN;
+extern DWORD schan_imp_enabled_protocols(void) DECLSPEC_HIDDEN;
 extern BOOL schan_imp_init(void) DECLSPEC_HIDDEN;
 extern void schan_imp_deinit(void) DECLSPEC_HIDDEN;
 
-/* HACK for Proton bug 16519 */
-extern BOOL schan_imp_create_session_gnutls26(schan_imp_session *session, schan_credentials *cred) DECLSPEC_HIDDEN;
-extern void schan_imp_dispose_session_gnutls26(schan_imp_session session) DECLSPEC_HIDDEN;
-extern void schan_imp_set_session_transport_gnutls26(schan_imp_session session,
-                                                     struct schan_transport *t) DECLSPEC_HIDDEN;
-extern void schan_imp_set_session_target_gnutls26(schan_imp_session session, const char *target) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_handshake_gnutls26(schan_imp_session session) DECLSPEC_HIDDEN;
-extern unsigned int schan_imp_get_session_cipher_block_size_gnutls26(schan_imp_session session) DECLSPEC_HIDDEN;
-extern unsigned int schan_imp_get_max_message_size_gnutls26(schan_imp_session session) DECLSPEC_HIDDEN;
-extern ALG_ID schan_imp_get_key_signature_algorithm_gnutls26(schan_imp_session session) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_get_connection_info_gnutls26(schan_imp_session session,
-                                                              SecPkgContext_ConnectionInfo *info) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_get_session_peer_certificate_gnutls26(schan_imp_session session, HCERTSTORE,
-                                                                       PCCERT_CONTEXT *cert) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_send_gnutls26(schan_imp_session session, const void *buffer,
-                                               SIZE_T *length) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_recv_gnutls26(schan_imp_session session, void *buffer,
-                                               SIZE_T *length) DECLSPEC_HIDDEN;
-extern BOOL schan_imp_allocate_certificate_credentials_gnutls26(schan_credentials*) DECLSPEC_HIDDEN;
-extern void schan_imp_free_certificate_credentials_gnutls26(schan_credentials*) DECLSPEC_HIDDEN;
-extern DWORD schan_imp_enabled_protocols_gnutls26(void) DECLSPEC_HIDDEN;
-
-extern BOOL schan_imp_create_session_gnutls30(schan_imp_session *session, schan_credentials *cred) DECLSPEC_HIDDEN;
-extern void schan_imp_dispose_session_gnutls30(schan_imp_session session) DECLSPEC_HIDDEN;
-extern void schan_imp_set_session_transport_gnutls30(schan_imp_session session,
-                                                     struct schan_transport *t) DECLSPEC_HIDDEN;
-extern void schan_imp_set_session_target_gnutls30(schan_imp_session session, const char *target) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_handshake_gnutls30(schan_imp_session session) DECLSPEC_HIDDEN;
-extern unsigned int schan_imp_get_session_cipher_block_size_gnutls30(schan_imp_session session) DECLSPEC_HIDDEN;
-extern unsigned int schan_imp_get_max_message_size_gnutls30(schan_imp_session session) DECLSPEC_HIDDEN;
-extern ALG_ID schan_imp_get_key_signature_algorithm_gnutls30(schan_imp_session session) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_get_connection_info_gnutls30(schan_imp_session session,
-                                                              SecPkgContext_ConnectionInfo *info) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_get_session_peer_certificate_gnutls30(schan_imp_session session, HCERTSTORE,
-                                                                       PCCERT_CONTEXT *cert) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_send_gnutls30(schan_imp_session session, const void *buffer,
-                                               SIZE_T *length) DECLSPEC_HIDDEN;
-extern SECURITY_STATUS schan_imp_recv_gnutls30(schan_imp_session session, void *buffer,
-                                               SIZE_T *length) DECLSPEC_HIDDEN;
-extern BOOL schan_imp_allocate_certificate_credentials_gnutls30(schan_credentials*) DECLSPEC_HIDDEN;
-extern void schan_imp_free_certificate_credentials_gnutls30(schan_credentials*) DECLSPEC_HIDDEN;
-extern DWORD schan_imp_enabled_protocols_gnutls30(void) DECLSPEC_HIDDEN;
-
-BOOL have_gnutls26 DECLSPEC_HIDDEN;
-DWORD supported_protocols DECLSPEC_HIDDEN;
 
 #endif /* ndef __SECUR32_PRIV_H__ */

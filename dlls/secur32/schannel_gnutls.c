@@ -27,7 +27,6 @@
 #ifdef SONAME_LIBGNUTLS
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
-#include "gnutls_priv.h"
 #endif
 
 #include "windef.h"
@@ -43,12 +42,41 @@
 WINE_DEFAULT_DEBUG_CHANNEL(secur32);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
+/* Not present in gnutls version < 2.9.10. */
+static int (*pgnutls_cipher_get_block_size)(gnutls_cipher_algorithm_t algorithm);
+
 static void *libgnutls_handle;
 #define MAKE_FUNCPTR(f) static typeof(f) * p##f
+MAKE_FUNCPTR(gnutls_alert_get);
+MAKE_FUNCPTR(gnutls_alert_get_name);
+MAKE_FUNCPTR(gnutls_certificate_allocate_credentials);
+MAKE_FUNCPTR(gnutls_certificate_free_credentials);
+MAKE_FUNCPTR(gnutls_certificate_get_peers);
+MAKE_FUNCPTR(gnutls_cipher_get);
+MAKE_FUNCPTR(gnutls_cipher_get_key_size);
+MAKE_FUNCPTR(gnutls_credentials_set);
+MAKE_FUNCPTR(gnutls_deinit);
 MAKE_FUNCPTR(gnutls_global_deinit);
 MAKE_FUNCPTR(gnutls_global_init);
 MAKE_FUNCPTR(gnutls_global_set_log_function);
 MAKE_FUNCPTR(gnutls_global_set_log_level);
+MAKE_FUNCPTR(gnutls_handshake);
+MAKE_FUNCPTR(gnutls_init);
+MAKE_FUNCPTR(gnutls_kx_get);
+MAKE_FUNCPTR(gnutls_mac_get);
+MAKE_FUNCPTR(gnutls_mac_get_key_size);
+MAKE_FUNCPTR(gnutls_perror);
+MAKE_FUNCPTR(gnutls_protocol_get_version);
+MAKE_FUNCPTR(gnutls_priority_set_direct);
+MAKE_FUNCPTR(gnutls_record_get_max_size);
+MAKE_FUNCPTR(gnutls_record_recv);
+MAKE_FUNCPTR(gnutls_record_send);
+MAKE_FUNCPTR(gnutls_server_name_set);
+MAKE_FUNCPTR(gnutls_transport_get_ptr);
+MAKE_FUNCPTR(gnutls_transport_set_errno);
+MAKE_FUNCPTR(gnutls_transport_set_ptr);
+MAKE_FUNCPTR(gnutls_transport_set_pull_function);
+MAKE_FUNCPTR(gnutls_transport_set_push_function);
 #undef MAKE_FUNCPTR
 
 #if GNUTLS_VERSION_MAJOR < 3
@@ -131,7 +159,7 @@ static const struct {
     /* {SP_PROT_SSL2_CLIENT} is not supported by GnuTLS */
 };
 
-DWORD supported_protocols;
+static DWORD supported_protocols;
 
 static void check_supported_protocols(void)
 {
@@ -163,12 +191,12 @@ static void check_supported_protocols(void)
     pgnutls_deinit(session);
 }
 
-DWORD schan_imp_enabled_protocols_gnutls30(void)
+DWORD schan_imp_enabled_protocols(void)
 {
     return supported_protocols;
 }
 
-BOOL schan_imp_create_session_gnutls30(schan_imp_session *session, schan_credentials *cred)
+BOOL schan_imp_create_session(schan_imp_session *session, schan_credentials *cred)
 {
     gnutls_session_t *s = (gnutls_session_t*)session;
     char priority[128] = "NORMAL:%LATEST_RECORD_VERSION", *p;
@@ -231,26 +259,27 @@ BOOL schan_imp_create_session_gnutls30(schan_imp_session *session, schan_credent
     return TRUE;
 }
 
-void schan_imp_dispose_session_gnutls30(schan_imp_session session)
+void schan_imp_dispose_session(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     pgnutls_deinit(s);
 }
 
-void schan_imp_set_session_transport_gnutls30(schan_imp_session session, struct schan_transport *t)
+void schan_imp_set_session_transport(schan_imp_session session,
+                                     struct schan_transport *t)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     pgnutls_transport_set_ptr(s, (gnutls_transport_ptr_t)t);
 }
 
-void schan_imp_set_session_target_gnutls30(schan_imp_session session, const char *target)
+void schan_imp_set_session_target(schan_imp_session session, const char *target)
 {
     gnutls_session_t s = (gnutls_session_t)session;
 
     pgnutls_server_name_set( s, GNUTLS_NAME_DNS, target, strlen(target) );
 }
 
-SECURITY_STATUS schan_imp_handshake_gnutls30(schan_imp_session session)
+SECURITY_STATUS schan_imp_handshake(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     int err;
@@ -387,19 +416,19 @@ static ALG_ID schannel_get_kx_algid(int kx)
     }
 }
 
-unsigned int schan_imp_get_session_cipher_block_size_gnutls30(schan_imp_session session)
+unsigned int schan_imp_get_session_cipher_block_size(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     return pgnutls_cipher_get_block_size(pgnutls_cipher_get(s));
 }
 
-unsigned int schan_imp_get_max_message_size_gnutls30(schan_imp_session session)
+unsigned int schan_imp_get_max_message_size(schan_imp_session session)
 {
     return pgnutls_record_get_max_size((gnutls_session_t)session);
 }
 
-SECURITY_STATUS schan_imp_get_connection_info_gnutls30(schan_imp_session session,
-                                                       SecPkgContext_ConnectionInfo *info)
+SECURITY_STATUS schan_imp_get_connection_info(schan_imp_session session,
+                                              SecPkgContext_ConnectionInfo *info)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     gnutls_protocol_t proto = pgnutls_protocol_get_version(s);
@@ -418,7 +447,7 @@ SECURITY_STATUS schan_imp_get_connection_info_gnutls30(schan_imp_session session
     return SEC_E_OK;
 }
 
-ALG_ID schan_imp_get_key_signature_algorithm_gnutls30(schan_imp_session session)
+ALG_ID schan_imp_get_key_signature_algorithm(schan_imp_session session)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     gnutls_kx_algorithm_t kx = pgnutls_kx_get(s);
@@ -439,8 +468,8 @@ ALG_ID schan_imp_get_key_signature_algorithm_gnutls30(schan_imp_session session)
     }
 }
 
-SECURITY_STATUS schan_imp_get_session_peer_certificate_gnutls30(schan_imp_session session, HCERTSTORE store,
-                                                                PCCERT_CONTEXT *ret)
+SECURITY_STATUS schan_imp_get_session_peer_certificate(schan_imp_session session, HCERTSTORE store,
+                                                       PCCERT_CONTEXT *ret)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     PCCERT_CONTEXT cert = NULL;
@@ -466,8 +495,8 @@ SECURITY_STATUS schan_imp_get_session_peer_certificate_gnutls30(schan_imp_sessio
     return SEC_E_OK;
 }
 
-SECURITY_STATUS schan_imp_send_gnutls30(schan_imp_session session, const void *buffer,
-                                        SIZE_T *length)
+SECURITY_STATUS schan_imp_send(schan_imp_session session, const void *buffer,
+                               SIZE_T *length)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     SSIZE_T ret, total = 0;
@@ -497,8 +526,8 @@ SECURITY_STATUS schan_imp_send_gnutls30(schan_imp_session session, const void *b
     }
 }
 
-SECURITY_STATUS schan_imp_recv_gnutls30(schan_imp_session session, void *buffer,
-                                        SIZE_T *length)
+SECURITY_STATUS schan_imp_recv(schan_imp_session session, void *buffer,
+                               SIZE_T *length)
 {
     gnutls_session_t s = (gnutls_session_t)session;
     ssize_t ret;
@@ -527,7 +556,7 @@ again:
     return SEC_E_OK;
 }
 
-BOOL schan_imp_allocate_certificate_credentials_gnutls30(schan_credentials *c)
+BOOL schan_imp_allocate_certificate_credentials(schan_credentials *c)
 {
     int ret = pgnutls_certificate_allocate_credentials((gnutls_certificate_credentials_t*)&c->credentials);
     if (ret != GNUTLS_E_SUCCESS)
@@ -535,7 +564,7 @@ BOOL schan_imp_allocate_certificate_credentials_gnutls30(schan_credentials *c)
     return (ret == GNUTLS_E_SUCCESS);
 }
 
-void schan_imp_free_certificate_credentials_gnutls30(schan_credentials *c)
+void schan_imp_free_certificate_credentials(schan_credentials *c)
 {
     pgnutls_certificate_free_credentials(c->credentials);
 }
@@ -599,7 +628,6 @@ BOOL schan_imp_init(void)
     {
         WARN("gnutls_cipher_get_block_size not found\n");
         pgnutls_cipher_get_block_size = compat_cipher_get_block_size;
-        have_gnutls26 = TRUE;
     }
 
     ret = pgnutls_global_init();
