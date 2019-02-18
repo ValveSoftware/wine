@@ -21,6 +21,15 @@
 #define __BCRYPT_INTERNAL_H
 
 #include <stdarg.h>
+#ifdef HAVE_GNUTLS_CIPHER_INIT
+#include <gnutls/gnutls.h>
+#include <gnutls/crypto.h>
+#include <gnutls/abstract.h>
+#elif HAVE_COMMONCRYPTO_COMMONCRYPTOR_H
+#include <AvailabilityMacros.h>
+#include <CommonCrypto/CommonCryptor.h>
+#endif
+
 #include "windef.h"
 #include "winbase.h"
 #include "bcrypt.h"
@@ -140,7 +149,7 @@ struct key_symmetric
 {
     enum mode_id        mode;
     ULONG               block_size;
-    void               *handle;
+    gnutls_cipher_hd_t  handle;
     UCHAR              *secret;
     ULONG               secret_len;
 };
@@ -197,33 +206,17 @@ struct key
 
 NTSTATUS get_alg_property( const struct algorithm *, const WCHAR *, UCHAR *, ULONG, ULONG * ) DECLSPEC_HIDDEN;
 
-/* HACK for Proton bug 16519 */
-NTSTATUS key_set_property_gnutls30( struct key *, const WCHAR *, UCHAR *, ULONG, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_init_gnutls30( struct key *, struct algorithm *, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_set_params_gnutls30( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_set_auth_data_gnutls30( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_encrypt_gnutls30( struct key *, const UCHAR *, ULONG, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_decrypt_gnutls30( struct key *, const UCHAR *, ULONG, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_get_tag_gnutls30( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_asymmetric_init_gnutls30( struct key *, struct algorithm *, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_asymmetric_verify_gnutls30( struct key *, void *, UCHAR *, ULONG, UCHAR *, ULONG, DWORD ) DECLSPEC_HIDDEN;
-NTSTATUS key_destroy_gnutls30( struct key * ) DECLSPEC_HIDDEN;
-
-NTSTATUS key_set_property_gnutls26( struct key *, const WCHAR *, UCHAR *, ULONG, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_init_gnutls26( struct key *, struct algorithm *, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_set_params_gnutls26( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_set_auth_data_gnutls26( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_encrypt_gnutls26( struct key *, const UCHAR *, ULONG, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_decrypt_gnutls26( struct key *, const UCHAR *, ULONG, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_symmetric_get_tag_gnutls26( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_asymmetric_init_gnutls26( struct key *, struct algorithm *, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_asymmetric_verify_gnutls26( struct key *, void *, UCHAR *, ULONG, UCHAR *, ULONG, DWORD ) DECLSPEC_HIDDEN;
-NTSTATUS key_destroy_gnutls26( struct key * ) DECLSPEC_HIDDEN;
-
+NTSTATUS key_set_property( struct key *, const WCHAR *, UCHAR *, ULONG, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_symmetric_init( struct key *, struct algorithm *, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_symmetric_set_params( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_symmetric_set_auth_data( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_symmetric_encrypt( struct key *, const UCHAR *, ULONG, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_symmetric_decrypt( struct key *, const UCHAR *, ULONG, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_symmetric_get_tag( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_asymmetric_init( struct key *, struct algorithm *, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_asymmetric_verify( struct key *, void *, UCHAR *, ULONG, UCHAR *, ULONG, DWORD ) DECLSPEC_HIDDEN;
+NTSTATUS key_destroy( struct key * ) DECLSPEC_HIDDEN;
 BOOL key_is_symmetric( struct key * ) DECLSPEC_HIDDEN;
-
-void *libgnutls_handle DECLSPEC_HIDDEN;
-BOOL have_gnutls26 DECLSPEC_HIDDEN;
 
 BOOL gnutls_initialize(void) DECLSPEC_HIDDEN;
 void gnutls_uninitialize(void) DECLSPEC_HIDDEN;

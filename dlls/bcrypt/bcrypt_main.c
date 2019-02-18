@@ -44,67 +44,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(bcrypt);
 
 static HINSTANCE instance;
 
-NTSTATUS key_set_property( struct key *key, const WCHAR *prop, UCHAR *value, ULONG size, ULONG flags )
-{
-    if (have_gnutls26) return key_set_property_gnutls26( key, prop, value, size, flags );
-    return key_set_property_gnutls30( key, prop, value, size, flags );
-}
-
-NTSTATUS key_symmetric_init( struct key *key, struct algorithm *alg, const UCHAR *secret, ULONG secret_len )
-{
-    if (have_gnutls26) return key_symmetric_init_gnutls26( key, alg, secret, secret_len );
-    return key_symmetric_init_gnutls30( key, alg, secret, secret_len );
-}
-
-NTSTATUS key_symmetric_set_params( struct key *key, UCHAR *iv, ULONG iv_len )
-{
-    if (have_gnutls26) return key_symmetric_set_params_gnutls26( key, iv, iv_len );
-    return key_symmetric_set_params_gnutls30( key, iv, iv_len );
-}
-
-NTSTATUS key_symmetric_set_auth_data( struct key *key, UCHAR *auth_data, ULONG len )
-{
-    if (have_gnutls26) return key_symmetric_set_auth_data_gnutls26( key, auth_data, len );
-    return key_symmetric_set_auth_data_gnutls30( key, auth_data, len );
-}
-
-NTSTATUS key_symmetric_encrypt( struct key *key, const UCHAR *input, ULONG input_len, UCHAR *output, ULONG output_len )
-{
-    if (have_gnutls26) return key_symmetric_encrypt_gnutls26( key, input, input_len, output, output_len );
-    return key_symmetric_encrypt_gnutls30( key, input, input_len, output, output_len );
-}
-
-NTSTATUS key_symmetric_decrypt( struct key *key, const UCHAR *input, ULONG input_len, UCHAR *output, ULONG output_len  )
-{
-    if (have_gnutls26) return key_symmetric_decrypt_gnutls26( key, input, input_len, output, output_len );
-    return key_symmetric_decrypt_gnutls30( key, input, input_len, output, output_len );
-}
-
-NTSTATUS key_symmetric_get_tag( struct key *key, UCHAR *tag, ULONG len )
-{
-    if (have_gnutls26) return key_symmetric_get_tag_gnutls26( key, tag, len );
-    return key_symmetric_get_tag_gnutls30( key, tag, len );
-}
-
-NTSTATUS key_asymmetric_init( struct key *key, struct algorithm *alg, const UCHAR *pubkey, ULONG pubkey_len )
-{
-    if (have_gnutls26) return key_asymmetric_init_gnutls26( key, alg, pubkey, pubkey_len );
-    return key_asymmetric_init_gnutls30( key, alg, pubkey, pubkey_len );
-}
-
-NTSTATUS key_asymmetric_verify( struct key *key, void *padding, UCHAR *hash, ULONG hash_len, UCHAR *signature,
-                                ULONG signature_len, DWORD flags )
-{
-    if (have_gnutls26) return key_asymmetric_verify_gnutls26( key, padding, hash, hash_len, signature, signature_len, flags );
-    return key_asymmetric_verify_gnutls30( key, padding, hash, hash_len, signature, signature_len, flags );
-}
-
-NTSTATUS key_destroy( struct key *key )
-{
-    if (have_gnutls26) return key_destroy_gnutls26( key );
-    return key_destroy_gnutls30( key );
-}
-
 NTSTATUS WINAPI BCryptAddContextFunction(ULONG table, LPCWSTR context, ULONG iface, LPCWSTR function, ULONG pos)
 {
     FIXME("%08x, %s, %08x, %s, %u: stub\n", table, debugstr_w(context), iface, debugstr_w(function), pos);

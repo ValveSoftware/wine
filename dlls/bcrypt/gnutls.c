@@ -26,7 +26,6 @@
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
 #include <gnutls/abstract.h>
-#include "gnutls_internal.h"
 #endif
 
 #include "ntstatus.h"
@@ -47,11 +46,47 @@
 WINE_DEFAULT_DEBUG_CHANNEL(bcrypt);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
+#if GNUTLS_VERSION_MAJOR < 3
+#define GNUTLS_CIPHER_AES_192_CBC 92
+#define GNUTLS_CIPHER_AES_128_GCM 93
+#define GNUTLS_CIPHER_AES_256_GCM 94
+#define GNUTLS_PK_ECC 4
+
+typedef enum
+{
+    GNUTLS_ECC_CURVE_INVALID,
+    GNUTLS_ECC_CURVE_SECP224R1,
+    GNUTLS_ECC_CURVE_SECP256R1,
+    GNUTLS_ECC_CURVE_SECP384R1,
+    GNUTLS_ECC_CURVE_SECP521R1,
+} gnutls_ecc_curve_t;
+#endif
+
+/* Not present in gnutls version < 3.0 */
+static int (*pgnutls_cipher_tag)(gnutls_cipher_hd_t, void *, size_t);
+static int (*pgnutls_cipher_add_auth)(gnutls_cipher_hd_t, const void *, size_t);
+static int (*pgnutls_pubkey_import_ecc_raw)(gnutls_pubkey_t, gnutls_ecc_curve_t,
+                                            const gnutls_datum_t *, const gnutls_datum_t *);
+static gnutls_sign_algorithm_t (*pgnutls_pk_to_sign)(gnutls_pk_algorithm_t, gnutls_digest_algorithm_t);
+static int (*pgnutls_pubkey_verify_hash2)(gnutls_pubkey_t, gnutls_sign_algorithm_t, unsigned int,
+                                          const gnutls_datum_t *, const gnutls_datum_t *);
+
+/* Not present in gnutls version < 2.11.0 */
+static int (*pgnutls_pubkey_import_rsa_raw)(gnutls_pubkey_t key, const gnutls_datum_t *m, const gnutls_datum_t *e);
+
+static void *libgnutls_handle;
 #define MAKE_FUNCPTR(f) static typeof(f) * p##f
+MAKE_FUNCPTR(gnutls_cipher_decrypt2);
+MAKE_FUNCPTR(gnutls_cipher_deinit);
+MAKE_FUNCPTR(gnutls_cipher_encrypt2);
+MAKE_FUNCPTR(gnutls_cipher_init);
 MAKE_FUNCPTR(gnutls_global_deinit);
 MAKE_FUNCPTR(gnutls_global_init);
 MAKE_FUNCPTR(gnutls_global_set_log_function);
 MAKE_FUNCPTR(gnutls_global_set_log_level);
+MAKE_FUNCPTR(gnutls_perror);
+MAKE_FUNCPTR(gnutls_pubkey_init);
+MAKE_FUNCPTR(gnutls_pubkey_deinit);
 #undef MAKE_FUNCPTR
 
 static int compat_gnutls_cipher_tag(gnutls_cipher_hd_t handle, void *tag, size_t tag_size)
@@ -98,12 +133,8 @@ BOOL gnutls_initialize(void)
 
     if (!(libgnutls_handle = wine_dlopen( SONAME_LIBGNUTLS, RTLD_NOW, NULL, 0 )))
     {
-        /* try old runtime version */
-        if (!(libgnutls_handle = wine_dlopen( "libgnutls.so.26", RTLD_NOW, NULL, 0 )))
-        {
-            ERR_(winediag)( "failed to load libgnutls, no support for encryption\n" );
-            return FALSE;
-        }
+        ERR_(winediag)( "failed to load libgnutls, no support for encryption\n" );
+        return FALSE;
     }
 
 #define LOAD_FUNCPTR(f) \
@@ -135,7 +166,6 @@ BOOL gnutls_initialize(void)
     {
         WARN("gnutls_cipher_add_auth not found\n");
         pgnutls_cipher_add_auth = compat_gnutls_cipher_add_auth;
-        have_gnutls26 = TRUE;
     }
 
     if ((ret = pgnutls_global_init()) != GNUTLS_E_SUCCESS)
@@ -288,7 +318,7 @@ static void buffer_append_asn1_r_s( struct buffer *buffer, BYTE *r, DWORD r_len,
     buffer_free( &value );
 }
 
-NTSTATUS key_set_property_gnutls30( struct key *key, const WCHAR *prop, UCHAR *value, ULONG size, ULONG flags )
+NTSTATUS key_set_property( struct key *key, const WCHAR *prop, UCHAR *value, ULONG size, ULONG flags )
 {
     if (!strcmpW( prop, BCRYPT_CHAINING_MODE ))
     {
@@ -325,7 +355,7 @@ static ULONG get_block_size( struct algorithm *alg )
     return ret;
 }
 
-NTSTATUS key_symmetric_init_gnutls30( struct key *key, struct algorithm *alg, const UCHAR *secret, ULONG secret_len )
+NTSTATUS key_symmetric_init( struct key *key, struct algorithm *alg, const UCHAR *secret, ULONG secret_len )
 {
     if (!libgnutls_handle) return STATUS_INTERNAL_ERROR;
 
@@ -381,7 +411,7 @@ static gnutls_cipher_algorithm_t get_gnutls_cipher( const struct key *key )
     }
 }
 
-NTSTATUS key_symmetric_set_params_gnutls30( struct key *key, UCHAR *iv, ULONG iv_len )
+NTSTATUS key_symmetric_set_params( struct key *key, UCHAR *iv, ULONG iv_len )
 {
     gnutls_cipher_algorithm_t cipher;
     gnutls_datum_t secret, vector;
@@ -404,7 +434,7 @@ NTSTATUS key_symmetric_set_params_gnutls30( struct key *key, UCHAR *iv, ULONG iv
         vector.size = iv_len;
     }
 
-    if ((ret = pgnutls_cipher_init( (gnutls_cipher_hd_t *)&key->u.s.handle, cipher, &secret, iv ? &vector : NULL )))
+    if ((ret = pgnutls_cipher_init( &key->u.s.handle, cipher, &secret, iv ? &vector : NULL )))
     {
         pgnutls_perror( ret );
         return STATUS_INTERNAL_ERROR;
@@ -413,7 +443,7 @@ NTSTATUS key_symmetric_set_params_gnutls30( struct key *key, UCHAR *iv, ULONG iv
     return STATUS_SUCCESS;
 }
 
-NTSTATUS key_symmetric_set_auth_data_gnutls30( struct key *key, UCHAR *auth_data, ULONG len )
+NTSTATUS key_symmetric_set_auth_data( struct key *key, UCHAR *auth_data, ULONG len )
 {
     int ret;
     if (!auth_data) return STATUS_SUCCESS;
@@ -425,7 +455,7 @@ NTSTATUS key_symmetric_set_auth_data_gnutls30( struct key *key, UCHAR *auth_data
     return STATUS_SUCCESS;
 }
 
-NTSTATUS key_symmetric_encrypt_gnutls30( struct key *key, const UCHAR *input, ULONG input_len, UCHAR *output, ULONG output_len )
+NTSTATUS key_symmetric_encrypt( struct key *key, const UCHAR *input, ULONG input_len, UCHAR *output, ULONG output_len )
 {
     int ret;
     if ((ret = pgnutls_cipher_encrypt2( key->u.s.handle, input, input_len, output, output_len )))
@@ -436,7 +466,7 @@ NTSTATUS key_symmetric_encrypt_gnutls30( struct key *key, const UCHAR *input, UL
     return STATUS_SUCCESS;
 }
 
-NTSTATUS key_symmetric_decrypt_gnutls30( struct key *key, const UCHAR *input, ULONG input_len, UCHAR *output, ULONG output_len  )
+NTSTATUS key_symmetric_decrypt( struct key *key, const UCHAR *input, ULONG input_len, UCHAR *output, ULONG output_len  )
 {
     int ret;
     if ((ret = pgnutls_cipher_decrypt2( key->u.s.handle, input, input_len, output, output_len )))
@@ -447,7 +477,7 @@ NTSTATUS key_symmetric_decrypt_gnutls30( struct key *key, const UCHAR *input, UL
     return STATUS_SUCCESS;
 }
 
-NTSTATUS key_symmetric_get_tag_gnutls30( struct key *key, UCHAR *tag, ULONG len )
+NTSTATUS key_symmetric_get_tag( struct key *key, UCHAR *tag, ULONG len )
 {
     int ret;
     if ((ret = pgnutls_cipher_tag( key->u.s.handle, tag, len )))
@@ -458,7 +488,7 @@ NTSTATUS key_symmetric_get_tag_gnutls30( struct key *key, UCHAR *tag, ULONG len 
     return STATUS_SUCCESS;
 }
 
-NTSTATUS key_asymmetric_init_gnutls30( struct key *key, struct algorithm *alg, const UCHAR *pubkey, ULONG pubkey_len )
+NTSTATUS key_asymmetric_init( struct key *key, struct algorithm *alg, const UCHAR *pubkey, ULONG pubkey_len )
 {
     if (!libgnutls_handle) return STATUS_INTERNAL_ERROR;
 
@@ -614,8 +644,8 @@ static NTSTATUS prepare_gnutls_signature( struct key *key, UCHAR *signature, ULO
     }
 }
 
-NTSTATUS key_asymmetric_verify_gnutls30( struct key *key, void *padding, UCHAR *hash, ULONG hash_len, UCHAR *signature,
-                                         ULONG signature_len, DWORD flags )
+NTSTATUS key_asymmetric_verify( struct key *key, void *padding, UCHAR *hash, ULONG hash_len, UCHAR *signature,
+                                ULONG signature_len, DWORD flags )
 {
     gnutls_digest_algorithm_t hash_alg;
     gnutls_sign_algorithm_t sign_alg;
@@ -691,7 +721,7 @@ NTSTATUS key_asymmetric_verify_gnutls30( struct key *key, void *padding, UCHAR *
     return (ret < 0) ? STATUS_INVALID_SIGNATURE : STATUS_SUCCESS;
 }
 
-NTSTATUS key_destroy_gnutls30( struct key *key )
+NTSTATUS key_destroy( struct key *key )
 {
     if (key_is_symmetric( key ))
     {
