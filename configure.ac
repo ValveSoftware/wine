@@ -2768,6 +2768,8 @@ AC_CHECK_FUNCS(\
 	lroundf \
 	nearbyint \
 	nearbyintf \
+	nexttoward \
+	nexttowardf \
 	powl \
 	remainder \
 	remainderf \
