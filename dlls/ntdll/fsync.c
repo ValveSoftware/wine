@@ -424,8 +424,7 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
 
     if (prev) *prev = current;
 
-    if (!current)
-        futex_wake( &semaphore->count, count );
+    futex_wake( &semaphore->count, INT_MAX );
 
     return STATUS_SUCCESS;
 }
@@ -463,7 +462,7 @@ NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
     event = obj->shm;
 
     if (!(current = __atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST )))
-        futex_wake( &event->signaled, obj->type == FSYNC_AUTO_EVENT ? 1 : INT_MAX );
+        futex_wake( &event->signaled, INT_MAX );
 
     if (prev) *prev = current;
 
@@ -525,7 +524,7 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
     if (!--mutex->count)
     {
         __atomic_store_n( &mutex->tid, 0, __ATOMIC_SEQ_CST );
-        futex_wake( &mutex->tid, 1 );
+        futex_wake( &mutex->tid, INT_MAX );
     }
 
     return STATUS_SUCCESS;
