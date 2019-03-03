@@ -432,6 +432,25 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS fsync_query_semaphore( HANDLE handle, void *info, ULONG *ret_len )
+{
+    struct fsync *obj;
+    struct semaphore *semaphore;
+    SEMAPHORE_BASIC_INFORMATION *out = info;
+    NTSTATUS ret;
+
+    TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+    semaphore = obj->shm;
+
+    out->CurrentCount = semaphore->count;
+    out->MaximumCount = semaphore->max;
+    if (ret_len) *ret_len = sizeof(*out);
+
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS fsync_create_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, EVENT_TYPE event_type, BOOLEAN initial )
 {
