@@ -102,6 +102,7 @@
 #include "process.h"
 #include "request.h"
 #include "esync.h"
+#include "fsync.h"
 
 #include "winternl.h"
 #include "winioctl.h"
@@ -197,6 +198,7 @@ struct fd
     apc_param_t          comp_key;    /* completion key to set in completion events */
     unsigned int         comp_flags;  /* completion flags */
     int                  esync_fd;    /* esync file descriptor */
+    unsigned int         fsync_idx;   /* fsync shm index */
 };
 
 static void fd_dump( struct object *obj, int verbose );
@@ -1668,8 +1670,12 @@ struct fd *alloc_pseudo_fd( const struct fd_ops *fd_user_ops, struct object *use
     list_init( &fd->inode_entry );
     list_init( &fd->locks );
 
+    if (do_fsync())
+        fd->fsync_idx = fsync_alloc_shm( 0, 0 );
+
     if (do_esync())
         fd->esync_fd = esync_create_fd( 0, 0 );
+
     return fd;
 }
 
@@ -1990,6 +1996,9 @@ void set_fd_signaled( struct fd *fd, int signaled )
     fd->signaled = signaled;
     if (signaled) wake_up( fd->user, 0 );
 
+    if (do_fsync() && !signaled)
+        fsync_clear( &fd->obj );
+
     if (do_esync() && !signaled)
         esync_clear( fd->esync_fd );
 }
@@ -2034,6 +2043,15 @@ int default_fd_get_esync_fd( struct object *obj, enum esync_type *type )
     struct fd *fd = get_obj_fd( obj );
     int ret = fd->esync_fd;
     *type = ESYNC_MANUAL_SERVER;
+    release_object( fd );
+    return ret;
+}
+
+unsigned int default_fd_get_fsync_idx( struct object *obj, enum fsync_type *type )
+{
+    struct fd *fd = get_obj_fd( obj );
+    unsigned int ret = fd->fsync_idx;
+    *type = FSYNC_MANUAL_SERVER;
     release_object( fd );
     return ret;
 }
