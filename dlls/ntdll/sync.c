@@ -532,6 +532,9 @@ NTSTATUS WINAPI NtQueryEvent( HANDLE handle, EVENT_INFORMATION_CLASS class,
     NTSTATUS ret;
     EVENT_BASIC_INFORMATION *out = info;
 
+    if (do_fsync())
+        return fsync_query_event( handle, class, info, len, ret_len );
+
     if (do_esync())
         return esync_query_event( handle, class, info, len, ret_len );
 
