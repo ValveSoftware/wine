@@ -40,6 +40,7 @@ extern NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
 extern NTSTATUS fsync_open_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr );
 extern NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev );
+extern NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len );
 
 extern NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                     BOOLEAN alertable, const LARGE_INTEGER *timeout );
