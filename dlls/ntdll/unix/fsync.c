@@ -734,6 +734,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         break;
                     }
                     case FSYNC_AUTO_EVENT:
+                    case FSYNC_AUTO_SERVER:
                     {
                         struct event *event = obj->shm;
 
@@ -938,6 +939,7 @@ tryagain:
                     break;
                 }
                 case FSYNC_AUTO_EVENT:
+                case FSYNC_AUTO_SERVER:
                 {
                     struct event *event = obj->shm;
                     if (!__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
@@ -984,6 +986,7 @@ tooslow:
                     break;
                 }
                 case FSYNC_AUTO_EVENT:
+                case FSYNC_AUTO_SERVER:
                 {
                     struct event *event = obj->shm;
                     __atomic_store_n( &event->signaled, 1, __ATOMIC_SEQ_CST );
