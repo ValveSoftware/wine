@@ -571,6 +571,26 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
+{
+    struct fsync *obj;
+    struct mutex *mutex;
+    MUTANT_BASIC_INFORMATION *out = info;
+    NTSTATUS ret;
+
+    TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+    mutex = obj->shm;
+
+    out->CurrentCount = 1 - mutex->count;
+    out->OwnedByCaller = (mutex->tid == GetCurrentThreadId());
+    out->AbandonedState = FALSE;
+    if (ret_len) *ret_len = sizeof(*out);
+
+    return STATUS_SUCCESS;
+}
+
 static LONGLONG update_timeout( ULONGLONG end )
 {
     LARGE_INTEGER now;
