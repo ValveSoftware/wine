@@ -36,6 +36,7 @@
 #include "handle.h"
 #include "request.h"
 #include "esync.h"
+#include "fsync.h"
 
 static const WCHAR timer_name[] = {'T','i','m','e','r'};
 
@@ -63,11 +64,13 @@ struct timer
     client_ptr_t         callback;  /* callback APC function */
     client_ptr_t         arg;       /* callback argument */
     int                  esync_fd;  /* esync file descriptor */
+    unsigned int         fsync_idx; /* fsync shm index */
 };
 
 static void timer_dump( struct object *obj, int verbose );
 static int timer_signaled( struct object *obj, struct wait_queue_entry *entry );
 static int timer_get_esync_fd( struct object *obj, enum esync_type *type );
+static unsigned int timer_get_fsync_idx( struct object *obj, enum fsync_type *type );
 static void timer_satisfied( struct object *obj, struct wait_queue_entry *entry );
 static void timer_destroy( struct object *obj );
 
@@ -80,7 +83,7 @@ static const struct object_ops timer_ops =
     remove_queue,              /* remove_queue */
     timer_signaled,            /* signaled */
     timer_get_esync_fd,        /* get_esync_fd */
-    NULL,                      /* get_fsync_idx */
+    timer_get_fsync_idx,       /* get_fsync_idx */
     timer_satisfied,           /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -116,6 +119,9 @@ static struct timer *create_timer( struct object *root, const struct unicode_str
             timer->timeout  = NULL;
             timer->thread   = NULL;
             timer->esync_fd = -1;
+
+            if (do_fsync())
+                timer->fsync_idx = fsync_alloc_shm( 0, 0 );
 
             if (do_esync())
                 timer->esync_fd = esync_create_fd( 0, 0 );
@@ -191,6 +197,9 @@ static int set_timer( struct timer *timer, timeout_t expire, unsigned int period
         period = 0;  /* period doesn't make any sense for a manual timer */
         timer->signaled = 0;
 
+        if (do_fsync())
+            fsync_clear( &timer->obj );
+
         if (do_esync())
             esync_clear( timer->esync_fd );
     }
@@ -225,6 +234,13 @@ static int timer_get_esync_fd( struct object *obj, enum esync_type *type )
     struct timer *timer = (struct timer *)obj;
     *type = timer->manual ? ESYNC_MANUAL_SERVER : ESYNC_AUTO_SERVER;
     return timer->esync_fd;
+}
+
+static unsigned int timer_get_fsync_idx( struct object *obj, enum fsync_type *type )
+{
+    struct timer *timer = (struct timer *)obj;
+    *type = timer->manual ? FSYNC_MANUAL_SERVER : FSYNC_AUTO_SERVER;
+    return timer->fsync_idx;
 }
 
 static void timer_satisfied( struct object *obj, struct wait_queue_entry *entry )
