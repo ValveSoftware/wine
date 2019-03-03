@@ -113,7 +113,7 @@ static const struct object_ops dir_ops =
     remove_queue,             /* remove_queue */
     default_fd_signaled,      /* signaled */
     default_fd_get_esync_fd,  /* get_esync_fd */
-    NULL,                     /* get_fsync_idx */
+    default_fd_get_fsync_idx, /* get_fsync_idx */
     no_satisfied,             /* satisfied */
     no_signal,                /* signal */
     dir_get_fd,               /* get_fd */
