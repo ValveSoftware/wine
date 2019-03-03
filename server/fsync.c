@@ -89,6 +89,8 @@ static void **shm_addrs;
 static int shm_addrs_size;  /* length of the allocated shm_addrs array */
 static long pagesize;
 
+static int is_fsync_initialized;
+
 static void shm_cleanup(void)
 {
     close( shm_fd );
@@ -123,6 +125,8 @@ void fsync_init(void)
     shm_size = pagesize;
     if (ftruncate( shm_fd, shm_size ) == -1)
         perror( "ftruncate" );
+
+    is_fsync_initialized = 1;
 
     atexit( shm_cleanup );
 }
@@ -232,8 +236,15 @@ static unsigned int shm_idx_counter = 1;
 unsigned int fsync_alloc_shm( int low, int high )
 {
 #ifdef __linux__
-    int shm_idx = shm_idx_counter++;
+    int shm_idx;
     int *shm;
+
+    /* this is arguably a bit of a hack, but we need some way to prevent
+     * allocating shm for the master socket */
+    if (!is_fsync_initialized)
+        return 0;
+
+    shm_idx = shm_idx_counter++;
 
     while (shm_idx * 8 >= shm_size)
     {

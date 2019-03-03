@@ -1632,6 +1632,9 @@ static struct fd *alloc_fd_object(void)
     list_init( &fd->inode_entry );
     list_init( &fd->locks );
 
+    if (do_fsync())
+        fd->fsync_idx = fsync_alloc_shm( 1, 0 );
+
     if ((fd->poll_index = add_poll_user( fd )) == -1)
     {
         release_object( fd );
