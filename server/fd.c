@@ -1728,6 +1728,9 @@ static struct fd *alloc_fd_object(void)
     if (do_esync())
         fd->esync_fd = esync_create_fd( 1, 0 );
 
+    if (do_fsync())
+        fd->fsync_idx = fsync_alloc_shm( 1, 0 );
+
     if ((fd->poll_index = add_poll_user( fd )) == -1)
     {
         release_object( fd );
