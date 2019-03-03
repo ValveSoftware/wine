@@ -667,6 +667,9 @@ NTSTATUS WINAPI NtQueryMutant( HANDLE handle, MUTANT_INFORMATION_CLASS class,
     NTSTATUS ret;
     MUTANT_BASIC_INFORMATION *out = info;
 
+    if (do_fsync())
+        return fsync_query_mutex( handle, class, info, len, ret_len );
+
     if (do_esync())
         return esync_query_mutex( handle, class, info, len, ret_len );
 
