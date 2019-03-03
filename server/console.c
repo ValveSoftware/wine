@@ -40,6 +40,7 @@
 #include "winternl.h"
 #include "wine/condrv.h"
 #include "esync.h"
+#include "fsync.h"
 
 struct screen_buffer;
 struct console_input_events;
@@ -130,6 +131,7 @@ static struct fd *console_input_events_get_fd( struct object *obj );
 static struct object *console_input_events_open_file( struct object *obj, unsigned int access,
                                                       unsigned int sharing, unsigned int options );
 static int console_input_events_get_esync_fd( struct object *obj, enum esync_type *type );
+static unsigned int console_input_events_get_fsync_idx( struct object *obj, enum fsync_type *type );
 
 struct console_input_events
 {
@@ -140,6 +142,7 @@ struct console_input_events
     struct condrv_renderer_event  *events;
     struct async_queue             read_q;      /* read queue */
     int                   esync_fd;    /* esync file descriptor (signalled when events present) */
+    unsigned int          fsync_idx;
 };
 
 static const struct object_ops console_input_events_ops =
@@ -151,7 +154,7 @@ static const struct object_ops console_input_events_ops =
     remove_queue,                     /* remove_queue */
     NULL,                             /* signaled */
     console_input_events_get_esync_fd,/* get_esync_fd */
-    NULL,                             /* get_fsync_idx */
+    console_input_events_get_fsync_idx, /* get_fsync_idx */
     no_satisfied,                     /* satisfied */
     no_signal,                        /* signal */
     console_input_events_get_fd,      /* get_fd */
@@ -386,6 +389,13 @@ static int console_input_events_get_esync_fd( struct object *obj, enum esync_typ
     return evts->esync_fd;
 }
 
+static unsigned int console_input_events_get_fsync_idx( struct object *obj, enum fsync_type *type )
+{
+    struct console_input_events *evts = (struct console_input_events *)obj;
+    *type = FSYNC_MANUAL_SERVER;
+    return evts->fsync_idx;
+}
+
 /* add an event to the console's renderer events list */
 static void console_input_events_append( struct console_input* console,
 					 struct condrv_renderer_event* evt)
@@ -431,6 +441,9 @@ static void console_input_events_append( struct console_input* console,
         release_object( async );
     }
 
+    if (do_fsync() && !evts->num_used)
+        fsync_clear( &evts->obj );
+
     if (do_esync() && !evts->num_used)
         esync_clear( evts->esync_fd );
 }
@@ -450,8 +463,12 @@ static struct object *create_console_input_events(void)
     }
     evt->esync_fd = -1;
 
+    if (do_fsync())
+        evt->fsync_idx = fsync_alloc_shm( 0, 0 );
+
     if (do_esync())
         evt->esync_fd = esync_create_fd( 0, 0 );
+
     return &evt->obj;
 }
 
