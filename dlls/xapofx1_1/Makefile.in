@@ -2,12 +2,8 @@ EXTRADEFS = -DXAPOFX1_VER=1 -DXAUDIO2_VER=2
 MODULE    = xapofx1_1.dll
 IMPORTS   = ole32
 PARENTSRC = ../xaudio2_7
-EXTRALIBS = $(FAUDIO_LIBS)
-EXTRAINCL = $(FAUDIO_CFLAGS)
 
 C_SRCS = \
-	xaudio_allocator.c \
-	xapofx.c \
-	xapo.c
+	xapofx.c
 
 RC_SRCS = version.rc
