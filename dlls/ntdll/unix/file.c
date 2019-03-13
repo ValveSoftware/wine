@@ -5754,6 +5754,7 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
     int unix_dest_len;
     DWORD max_length;
     NTSTATUS status;
+    ULONG flags = 0;
     WCHAR *nt_dest;
     INT prefix_len;
     ssize_t ret;
@@ -5798,6 +5799,17 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
         }
         buffer->ReparseTag |= (val << i);
     }
+    /* skip past the directory/file flag */
+    if (buffer->ReparseTag == IO_REPARSE_TAG_SYMLINK)
+    {
+        char c = *p++;
+
+        if ((c != '/' && c != '.') || (c == '.' && *p++ != '/'))
+        {
+            status = STATUS_NOT_IMPLEMENTED;
+            goto cleanup;
+        }
+    }
     unix_dest_len -= (p - unix_dest);
     memmove(unix_dest, p, unix_dest_len);
 
@@ -5829,6 +5841,16 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
         buffer->MountPointReparseBuffer.PrintNameOffset = nt_dest_len + sizeof(WCHAR);
         buffer->MountPointReparseBuffer.PrintNameLength = nt_dest_len - prefix_len*sizeof(WCHAR);
         print_name = &buffer->MountPointReparseBuffer.PathBuffer[buffer->MountPointReparseBuffer.PrintNameOffset/sizeof(WCHAR)];
+        break;
+    case IO_REPARSE_TAG_SYMLINK:
+        max_length = out_size-FIELD_OFFSET(typeof(*buffer), SymbolicLinkReparseBuffer.PathBuffer[1]);
+        buffer->SymbolicLinkReparseBuffer.SubstituteNameOffset = 0;
+        buffer->SymbolicLinkReparseBuffer.SubstituteNameLength = nt_dest_len;
+        subst_name = &buffer->SymbolicLinkReparseBuffer.PathBuffer[buffer->SymbolicLinkReparseBuffer.SubstituteNameOffset/sizeof(WCHAR)];
+        buffer->SymbolicLinkReparseBuffer.PrintNameOffset = nt_dest_len + sizeof(WCHAR);
+        buffer->SymbolicLinkReparseBuffer.PrintNameLength = nt_dest_len - prefix_len*sizeof(WCHAR);
+        print_name = &buffer->SymbolicLinkReparseBuffer.PathBuffer[buffer->SymbolicLinkReparseBuffer.PrintNameOffset/sizeof(WCHAR)];
+        buffer->SymbolicLinkReparseBuffer.Flags = flags;
         break;
     default:
         /* unrecognized (regular) files should probably be treated as symlinks */
