@@ -803,16 +803,15 @@ static void test_Stat(void)
         WCHAR const *path;
         enum file_type ret;
         int perms;
-        int is_todo;
     } tests[] = {
-        { NULL, file_not_found, 0xdeadbeef, FALSE },
-        { test_dirW, directory_file, 0777, FALSE },
-        { test_f1W, regular_file, 0777, FALSE },
-        { test_f2W, regular_file, 0555, FALSE },
-        { test_neW, file_not_found, 0xdeadbeef, FALSE },
-        { test_invW, file_not_found, 0xdeadbeef, FALSE },
-        { test_f1_linkW, regular_file, 0777, TRUE },
-        { test_dir_linkW, directory_file, 0777, TRUE },
+        { NULL, file_not_found, 0xdeadbeef },
+        { test_dirW, directory_file, 0777 },
+        { test_f1W, regular_file, 0777 },
+        { test_f2W, regular_file, 0555 },
+        { test_neW, file_not_found, 0xdeadbeef },
+        { test_invW, file_not_found, 0xdeadbeef },
+        { test_f1_linkW, regular_file, 0777 },
+        { test_dir_linkW, directory_file, 0777 },
     };
 
     GetCurrentDirectoryW(MAX_PATH, origin_path);
@@ -867,26 +866,20 @@ static void test_Stat(void)
     for(i=0; i<ARRAY_SIZE(tests); i++) {
         perms = 0xdeadbeef;
         val = p_Stat(tests[i].path, &perms);
-        todo_wine_if(tests[i].is_todo) {
-            ok(tests[i].ret == val, "_Stat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
-            ok(tests[i].perms == perms, "_Stat(): test %d perms expect: 0%o, got 0%o\n",
-                    i+1, tests[i].perms, perms);
-        }
+        ok(tests[i].ret == val, "_Stat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
+        ok(tests[i].perms == perms, "_Stat(): test %d perms expect: 0%o, got 0%o\n",
+                i+1, tests[i].perms, perms);
         val = p_Stat(tests[i].path, NULL);
-        todo_wine_if(tests[i].is_todo)
-            ok(tests[i].ret == val, "_Stat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
+        ok(tests[i].ret == val, "_Stat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
 
         /* test _Lstat */
         perms = 0xdeadbeef;
         val = p_Lstat(tests[i].path, &perms);
-        todo_wine_if(tests[i].is_todo) {
-            ok(tests[i].ret == val, "_Lstat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
-            ok(tests[i].perms == perms, "_Lstat(): test %d perms expect: 0%o, got 0%o\n",
-                    i+1, tests[i].perms, perms);
-        }
+        ok(tests[i].ret == val, "_Lstat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
+        ok(tests[i].perms == perms, "_Lstat(): test %d perms expect: 0%o, got 0%o\n",
+                i+1, tests[i].perms, perms);
         val = p_Lstat(tests[i].path, NULL);
-        todo_wine_if(tests[i].is_todo)
-            ok(tests[i].ret == val, "_Lstat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
+        ok(tests[i].ret == val, "_Lstat(): test %d expect: %d, got %d\n", i+1, tests[i].ret, val);
     }
 
     GetSystemDirectoryW(sys_path, MAX_PATH);
@@ -898,8 +891,8 @@ static void test_Stat(void)
     ok(perms == expected_perms, "_Stat(): perms expect: 0%o, got 0%o\n", expected_perms, perms);
 
     if(ret) {
-        todo_wine ok(DeleteFileW(test_f1_linkW), "expect wine_test_dir/f1_link to exist\n");
-        todo_wine ok(RemoveDirectoryW(test_dir_linkW), "expect wine_test_dir/dir_link to exist\n");
+        ok(DeleteFileW(test_f1_linkW), "expect wine_test_dir/f1_link to exist\n");
+        ok(RemoveDirectoryW(test_dir_linkW), "expect wine_test_dir/dir_link to exist\n");
     }
     ok(DeleteFileW(test_f1W), "expect wine_test_dir/f1 to exist\n");
     SetFileAttributesW(test_f2W, FILE_ATTRIBUTE_NORMAL);
@@ -1044,15 +1037,14 @@ static void test_Unlink(void)
     struct {
         WCHAR const *path;
         int last_error;
-        MSVCP_bool is_todo;
     } tests[] = {
-        { f1_symlinkW, ERROR_SUCCESS, TRUE },
-        { f1_linkW, ERROR_SUCCESS, FALSE },
-        { f1W, ERROR_SUCCESS, FALSE },
-        { wine_test_dirW, ERROR_ACCESS_DENIED, FALSE },
-        { not_existW, ERROR_FILE_NOT_FOUND, FALSE },
-        { not_exist_fileW, ERROR_PATH_NOT_FOUND, FALSE },
-        { NULL, ERROR_PATH_NOT_FOUND, FALSE }
+        { f1_symlinkW, ERROR_SUCCESS },
+        { f1_linkW, ERROR_SUCCESS },
+        { f1W, ERROR_SUCCESS },
+        { wine_test_dirW, ERROR_ACCESS_DENIED },
+        { not_existW, ERROR_FILE_NOT_FOUND },
+        { not_exist_fileW, ERROR_PATH_NOT_FOUND },
+        { NULL, ERROR_PATH_NOT_FOUND }
     };
 
     GetCurrentDirectoryW(MAX_PATH, current_path);
@@ -1081,9 +1073,8 @@ static void test_Unlink(void)
     for(i=0; i<ARRAY_SIZE(tests); i++) {
         errno = 0xdeadbeef;
         ret = p_Unlink(tests[i].path);
-        todo_wine_if(tests[i].is_todo)
-            ok(ret == tests[i].last_error, "_Unlink(): test %d expect: %d, got %d\n",
-                    i+1, tests[i].last_error, ret);
+        ok(ret == tests[i].last_error, "_Unlink(): test %d expect: %d, got %d\n",
+           i+1, tests[i].last_error, ret);
         ok(errno == 0xdeadbeef, "_Unlink(): test %d errno expect: 0xdeadbeef, got %d\n", i+1, ret);
     }
 
