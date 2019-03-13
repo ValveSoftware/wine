@@ -5136,13 +5136,24 @@ static void test_reparse_points(void)
     ok(dwret == STATUS_SUCCESS, "Failed to get symlink folder's attributes (0x%x).\n", dwret);
     buffer_len = build_reparse_buffer(nameW.Buffer, IO_REPARSE_TAG_SYMLINK, &buffer);
     bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
-    CloseHandle(handle);
     ok(bret, "Failed to create symlink! (0x%x)\n", GetLastError());
 
     /* Check the file attributes of the symlink */
     dwret = GetFileAttributesW(reparse_path);
     ok(dwret != (DWORD)~0, "Symlink doesn't exist (attributes: 0x%x)!\n", dwret);
     ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a symlink! (attributes: %d)\n", dwret);
+
+    /* Read back the symlink */
+    HeapFree(GetProcessHeap(), 0, buffer);
+    buffer_len = sizeof(*buffer) + MAX_PATH*sizeof(WCHAR);
+    buffer = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, buffer_len);
+    bret = DeviceIoControl(handle, FSCTL_GET_REPARSE_POINT, NULL, 0, (LPVOID)buffer, buffer_len, &dwret, 0);
+    string_len = buffer->SymbolicLinkReparseBuffer.SubstituteNameLength;
+    dest = &buffer->SymbolicLinkReparseBuffer.PathBuffer[buffer->SymbolicLinkReparseBuffer.SubstituteNameOffset/sizeof(WCHAR)];
+    ok(bret, "Failed to read symlink!\n");
+    ok((memcmp(dest, nameW.Buffer, string_len) == 0), "Symlink destination does not match ('%s' != '%s')!\n",
+                                                      wine_dbgstr_w(dest), wine_dbgstr_w(nameW.Buffer));
+    CloseHandle(handle);
 
 cleanup:
     /* Cleanup */

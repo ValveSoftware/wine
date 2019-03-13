@@ -1781,6 +1781,7 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
     UNICODE_STRING nt_dest;
     DWORD max_length;
     NTSTATUS status;
+    ULONG flags = 0;
     INT prefix_len;
     ssize_t ret;
     char *p;
@@ -1827,6 +1828,17 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
         }
         buffer->ReparseTag |= (val << i);
     }
+    /* skip past the directory/file flag */
+    if (buffer->ReparseTag == IO_REPARSE_TAG_SYMLINK)
+    {
+        char c = *p++;
+
+        if ((c != '/' && c != '.') || (c == '.' && *p++ != '/'))
+        {
+            status = STATUS_NOT_IMPLEMENTED;
+            goto cleanup;
+        }
+    }
     unix_dest.Length -= (p - unix_dest.Buffer);
     memmove(unix_dest.Buffer, p, unix_dest.Length);
 
@@ -1844,6 +1856,16 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
         buffer->MountPointReparseBuffer.PrintNameOffset = nt_dest.Length + sizeof(WCHAR);
         buffer->MountPointReparseBuffer.PrintNameLength = nt_dest.Length - prefix_len*sizeof(WCHAR);
         print_name = &buffer->MountPointReparseBuffer.PathBuffer[buffer->MountPointReparseBuffer.PrintNameOffset/sizeof(WCHAR)];
+        break;
+    case IO_REPARSE_TAG_SYMLINK:
+        max_length = out_size-FIELD_OFFSET(typeof(*buffer), SymbolicLinkReparseBuffer.PathBuffer[1]);
+        buffer->SymbolicLinkReparseBuffer.SubstituteNameOffset = 0;
+        buffer->SymbolicLinkReparseBuffer.SubstituteNameLength = nt_dest.Length;
+        subst_name = &buffer->SymbolicLinkReparseBuffer.PathBuffer[buffer->SymbolicLinkReparseBuffer.SubstituteNameOffset/sizeof(WCHAR)];
+        buffer->SymbolicLinkReparseBuffer.PrintNameOffset = nt_dest.Length + sizeof(WCHAR);
+        buffer->SymbolicLinkReparseBuffer.PrintNameLength = nt_dest.Length - prefix_len*sizeof(WCHAR);
+        print_name = &buffer->SymbolicLinkReparseBuffer.PathBuffer[buffer->SymbolicLinkReparseBuffer.PrintNameOffset/sizeof(WCHAR)];
+        buffer->SymbolicLinkReparseBuffer.Flags = flags;
         break;
     default:
         /* unrecognized (regular) files should probably be treated as symlinks */
