@@ -2063,6 +2063,7 @@ NTSTATUS WINAPI NtFsControlFile(HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc
         switch(buffer->ReparseTag)
         {
         case IO_REPARSE_TAG_MOUNT_POINT:
+        case IO_REPARSE_TAG_SYMLINK:
             status = FILE_RemoveSymlink( handle, buffer );
             break;
         default:
