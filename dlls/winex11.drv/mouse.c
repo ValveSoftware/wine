@@ -489,6 +489,8 @@ void reset_clipping_window(void)
     ClipCursor( NULL );  /* make sure the clip rectangle is reset too */
 }
 
+BOOL CDECL X11DRV_ClipCursor( const RECT *clip );
+
 /***********************************************************************
  *             clip_cursor_notify
  *
@@ -517,12 +519,10 @@ LRESULT clip_cursor_notify( HWND hwnd, HWND new_clip_hwnd )
     }
     else if (hwnd == GetForegroundWindow())  /* request to clip */
     {
-        RECT clip, virtual_rect = get_virtual_screen_rect();
+        RECT clip;
 
         GetClipCursor( &clip );
-        if (clip.left > virtual_rect.left || clip.right < virtual_rect.right ||
-            clip.top > virtual_rect.top   || clip.bottom < virtual_rect.bottom)
-            return grab_clipping_window( &clip );
+        X11DRV_ClipCursor( &clip );
     }
     return 0;
 }
@@ -1521,23 +1521,23 @@ BOOL CDECL X11DRV_ClipCursor( LPCRECT clip )
     if (grab_pointer)
     {
         HWND foreground = GetForegroundWindow();
+        DWORD tid, pid;
+
+        /* forward request to the foreground window if it's in a different thread */
+        tid = GetWindowThreadProcessId( foreground, &pid );
+        if (tid && tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
+        {
+            TRACE( "forwarding clip request to %p\n", foreground );
+            SendNotifyMessageW( foreground, WM_X11DRV_CLIP_CURSOR, 0, 0 );
+            return TRUE;
+        }
 
         /* we are clipping if the clip rectangle is smaller than the screen */
         if (!(!fs_hack_enabled() && clip->left == 0 && clip->top == 0 && fs_hack_matches_last_mode(clip->right, clip->bottom)) && /* fix games trying to reset clip to full screen */
                 (clip->left > virtual_rect.left || clip->right < virtual_rect.right ||
                  clip->top > virtual_rect.top || clip->bottom < virtual_rect.bottom))
         {
-            DWORD tid, pid;
-
-            /* forward request to the foreground window if it's in a different thread */
-            tid = GetWindowThreadProcessId( foreground, &pid );
-            if (tid && tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
-            {
-                TRACE( "forwarding clip request to %p\n", foreground );
-                SendNotifyMessageW( foreground, WM_X11DRV_CLIP_CURSOR, 0, 0 );
-                return TRUE;
-            }
-            else if (grab_clipping_window( clip )) return TRUE;
+            if (grab_clipping_window( clip )) return TRUE;
         }
         else /* check if we should switch to fullscreen clipping */
         {
