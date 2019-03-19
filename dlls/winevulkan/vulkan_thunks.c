@@ -3608,6 +3608,7 @@ static const char * const vk_device_extensions[] =
 
 static const char * const vk_instance_extensions[] =
 {
+    "VK_EXT_swapchain_colorspace",
     "VK_KHR_device_group_creation",
     "VK_KHR_get_physical_device_properties2",
     "VK_KHR_surface",
