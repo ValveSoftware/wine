@@ -5226,18 +5226,18 @@ static void test_reparse_points(void)
 
     /* Check deleting a file symlink as if it were a directory */
     bret = RemoveDirectoryW(reparse_path);
-    todo_wine ok(!bret, "Succeeded in deleting file symlink as a directory!\n");
+    ok(!bret, "Succeeded in deleting file symlink as a directory!\n");
     err = GetLastError();
     ok(err == ERROR_DIRECTORY,
        "Expected last error 0x%x for RemoveDirectory on file symlink (actually 0x%x)!\n",
        ERROR_DIRECTORY, err);
     dwret = GetFileAttributesW(reparse_path);
-    todo_wine ok(dwret != (DWORD)~0, "Symlink doesn't exist (attributes: 0x%x)!\n", dwret);
+    ok(dwret != (DWORD)~0, "Symlink doesn't exist (attributes: 0x%x)!\n", dwret);
     ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a symlink! (attributes: 0x%x)\n", dwret);
 
     /* Delete the symlink as a file */
     bret = DeleteFileW(reparse_path);
-    todo_wine ok(bret, "Failed to delete symlink as a file!\n");
+    ok(bret, "Failed to delete symlink as a file!\n");
 
     /* Create a blank slate for directory symlink tests */
     bret = CreateDirectoryW(reparse_path, NULL);
