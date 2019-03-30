@@ -124,6 +124,9 @@ mode_t FILE_umask = 0;
 
 static const WCHAR ntfsW[] = {'N','T','F','S'};
 
+NTSTATUS FILE_DecodeSymlink(const char *unix_src, char *unix_dest, USHORT *unix_dest_len,
+                            DWORD *tag, ULONG *flags, BOOL *is_dir);
+
 /* fetch the attributes of a file */
 static inline ULONG get_file_attributes( const struct stat *st )
 {
@@ -160,10 +163,15 @@ int get_file_info( const char *path, struct stat *st, ULONG *attr )
     if (ret == -1) return ret;
     if (S_ISLNK( st->st_mode ))
     {
-        ret = stat( path, st );
-        if (ret == -1) return ret;
-        /* is a symbolic link and a directory, consider these "reparse points" */
-        if (S_ISDIR( st->st_mode )) *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
+        BOOL is_dir;
+
+        /* return information about the destination (unless this is a dangling symlink) */
+        stat( path, st );
+        /* symbolic links (either junction points or NT symlinks) are "reparse points" */
+        *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
+        /* whether a reparse point is a file or a directory is stored inside the link target */
+        if (FILE_DecodeSymlink( path, NULL, NULL, NULL, NULL, &is_dir ) == STATUS_SUCCESS)
+            st->st_mode = (st->st_mode & ~S_IFMT) | (is_dir ? S_IFDIR : S_IFREG);
     }
     *attr |= get_file_attributes( st );
     return ret;
@@ -1818,6 +1826,87 @@ cleanup:
 }
 
 
+NTSTATUS FILE_DecodeSymlink(const char *unix_src, char *unix_dest, USHORT *unix_dest_len,
+                            DWORD *tag, ULONG *flags, BOOL *is_dir)
+{
+    USHORT len = MAX_PATH;
+    DWORD reparse_tag;
+    NTSTATUS status;
+    BOOL dir_flag;
+    char *p, *tmp;
+    ssize_t ret;
+    int i;
+
+    if (unix_dest_len) len = *unix_dest_len;
+    if (!unix_dest)
+        tmp = RtlAllocateHeap( GetProcessHeap(), 0, len );
+    else
+        tmp = unix_dest;
+    if ((ret = readlink( unix_src, tmp, len )) < 0)
+    {
+        status = FILE_GetNtStatus();
+        goto cleanup;
+    }
+    len = ret;
+    /* Decode the reparse tag from the symlink */
+    p = tmp;
+    if (*p == '.')
+    {
+        if (flags) *flags = SYMLINK_FLAG_RELATIVE;
+        p++;
+    }
+    if (*p++ != '/')
+    {
+        status = STATUS_NOT_IMPLEMENTED;
+        goto cleanup;
+    }
+    reparse_tag = 0;
+    for (i = 0; i < sizeof(ULONG)*8; i++)
+    {
+        char c = *p++;
+        int val;
+
+        if (c == '/')
+            val = 0;
+        else if (c == '.' && *p++ == '/')
+            val = 1;
+        else
+        {
+            status = STATUS_NOT_IMPLEMENTED;
+            goto cleanup;
+        }
+        reparse_tag |= (val << i);
+    }
+    /* skip past the directory/file flag */
+    if (reparse_tag == IO_REPARSE_TAG_SYMLINK)
+    {
+        char c = *p++;
+
+        if (c == '/')
+            dir_flag = FALSE;
+        else if (c == '.' && *p++ == '/')
+            dir_flag = TRUE;
+        else
+        {
+            status = STATUS_NOT_IMPLEMENTED;
+            goto cleanup;
+        }
+    }
+    else
+        dir_flag = TRUE;
+    len -= (p - tmp);
+    if (tag) *tag = reparse_tag;
+    if (is_dir) *is_dir = dir_flag;
+    if (unix_dest) memmove(unix_dest, p, len);
+    if (unix_dest_len) *unix_dest_len = len;
+    status = STATUS_SUCCESS;
+
+cleanup:
+    if (!unix_dest) RtlFreeHeap( GetProcessHeap(), 0, tmp );
+    return status;
+}
+
+
 /*
  * Retrieve the unix name corresponding to a file handle and use that to find the destination of the
  * symlink corresponding to that file handle.
@@ -1834,9 +1923,6 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
     NTSTATUS status;
     ULONG flags = 0;
     INT prefix_len;
-    ssize_t ret;
-    char *p;
-    int i;
 
     if ((status = server_get_unix_fd( handle, FILE_ANY_ACCESS, &dest_fd, &needs_close, NULL, NULL )))
         return status;
@@ -1844,59 +1930,13 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
     if ((status = server_get_unix_name( handle, &unix_src )))
         goto cleanup;
 
-    unix_dest.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, PATH_MAX );
     unix_dest.MaximumLength = PATH_MAX;
+    unix_dest.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, unix_dest.MaximumLength );
+    unix_dest.Length = unix_dest.MaximumLength;
     dest_allocated = TRUE;
-    ret = readlink( unix_src.Buffer, unix_dest.Buffer, unix_dest.MaximumLength );
-    if (ret < 0)
-    {
-        status = FILE_GetNtStatus();
+    if ((status = FILE_DecodeSymlink( unix_src.Buffer, unix_dest.Buffer, &unix_dest.Length,
+                                      &buffer->ReparseTag, &flags, NULL )))
         goto cleanup;
-    }
-    unix_dest.Length = ret;
-
-    /* Decode the reparse tag from the symlink */
-    p = unix_dest.Buffer;
-    if (*p == '.')
-    {
-        flags = SYMLINK_FLAG_RELATIVE;
-        p++;
-    }
-    if (*p++ != '/')
-    {
-        status = STATUS_NOT_IMPLEMENTED;
-        goto cleanup;
-    }
-    buffer->ReparseTag = 0;
-    for (i = 0; i < sizeof(ULONG)*8; i++)
-    {
-        char c = *p++;
-        int val;
-
-        if (c == '/')
-            val = 0;
-        else if (c == '.' && *p++ == '/')
-            val = 1;
-        else
-        {
-            status = STATUS_NOT_IMPLEMENTED;
-            goto cleanup;
-        }
-        buffer->ReparseTag |= (val << i);
-    }
-    /* skip past the directory/file flag */
-    if (buffer->ReparseTag == IO_REPARSE_TAG_SYMLINK)
-    {
-        char c = *p++;
-
-        if ((c != '/' && c != '.') || (c == '.' && *p++ != '/'))
-        {
-            status = STATUS_NOT_IMPLEMENTED;
-            goto cleanup;
-        }
-    }
-    unix_dest.Length -= (p - unix_dest.Buffer);
-    memmove(unix_dest.Buffer, p, unix_dest.Length);
 
     /* convert the relative path into an absolute path */
     if (flags == SYMLINK_FLAG_RELATIVE)

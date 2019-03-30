@@ -5134,13 +5134,13 @@ static void test_reparse_points(void)
 
     /* Check deleting a file symlink as if it were a directory */
     bret = RemoveDirectoryW(reparse_path);
-    todo_wine ok(!bret, "Succeeded in deleting file symlink as a directory!\n");
+    ok(!bret, "Succeeded in deleting file symlink as a directory!\n");
     err = GetLastError();
     todo_wine ok(err == ERROR_DIRECTORY,
                  "Expected last error 0x%x for RemoveDirectory on file symlink (actually 0x%x)!\n",
                  ERROR_DIRECTORY, err);
     dwret = GetFileAttributesW(reparse_path);
-    todo_wine ok(dwret != (DWORD)~0, "Symlink doesn't exist (attributes: 0x%x)!\n", dwret);
+    ok(dwret != (DWORD)~0, "Symlink doesn't exist (attributes: 0x%x)!\n", dwret);
     ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a symlink! (attributes: 0x%x)\n", dwret);
 
     /* Delete the symlink as a file */
@@ -5149,10 +5149,10 @@ static void test_reparse_points(void)
 
     /* Create a blank slate for directory symlink tests */
     bret = CreateDirectoryW(reparse_path, NULL);
-    ok(bret, "Failed to create junction point directory.\n");
+    todo_wine ok(bret, "Failed to create junction point directory.\n");
     dwret = GetFileAttributesW(reparse_path);
     ok(dwret != (DWORD)~0, "Path doesn't exist (attributes: 0x%x)!\n", dwret);
-    ok(!(dwret & FILE_ATTRIBUTE_REPARSE_POINT), "File is already a reparse point! (attributes: %d)\n", dwret);
+    todo_wine ok(!(dwret & FILE_ATTRIBUTE_REPARSE_POINT), "File is already a reparse point! (attributes: %d)\n", dwret);
 
     /* Create the directory symlink */
     HeapFree(GetProcessHeap(), 0, buffer);
