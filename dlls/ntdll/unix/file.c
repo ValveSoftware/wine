@@ -1450,6 +1450,9 @@ static BOOL append_entry( struct dir_data *data, const char *long_name,
 }
 
 
+NTSTATUS FILE_DecodeSymlink(const char *unix_src, char *unix_dest, int *unix_dest_len,
+                            DWORD *tag, ULONG *flags, BOOL *is_dir);
+
 /* fetch the attributes of a file */
 static inline ULONG get_file_attributes( const struct stat *st )
 {
@@ -1500,10 +1503,15 @@ static int get_file_info( const char *path, struct stat *st, ULONG *attr )
     if (ret == -1) return ret;
     if (S_ISLNK( st->st_mode ))
     {
-        ret = stat( path, st );
-        if (ret == -1) return ret;
-        /* is a symbolic link and a directory, consider these "reparse points" */
-        if (S_ISDIR( st->st_mode )) *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
+        BOOL is_dir;
+
+        /* return information about the destination (unless this is a dangling symlink) */
+        stat( path, st );
+        /* symbolic links (either junction points or NT symlinks) are "reparse points" */
+        *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
+        /* whether a reparse point is a file or a directory is stored inside the link target */
+        if (FILE_DecodeSymlink( path, NULL, NULL, NULL, NULL, &is_dir ) == STATUS_SUCCESS)
+            st->st_mode = (st->st_mode & ~S_IFMT) | (is_dir ? S_IFDIR : S_IFREG);
     }
     else if (S_ISDIR( st->st_mode ) && (parent_path = malloc( strlen(path) + 4 )))
     {
@@ -5834,47 +5842,34 @@ cleanup:
 }
 
 
-/*
- * Retrieve the unix name corresponding to a file handle and use that to find the destination of the
- * symlink corresponding to that file handle.
- */
-NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_size)
+NTSTATUS FILE_DecodeSymlink(const char *unix_src, char *unix_dest, int *unix_dest_len,
+                            DWORD *tag, ULONG *flags, BOOL *is_dir)
 {
-    char *unix_src, unix_dest[PATH_MAX];
-    VOID *subst_name, *print_name;
-    SIZE_T nt_dest_len = PATH_MAX;
-    BOOL dest_allocated = FALSE;
-    int dest_fd, needs_close;
-    int unix_dest_len;
-    int path_len = 0;
-    DWORD max_length;
+    int len = MAX_PATH;
+    DWORD reparse_tag;
     NTSTATUS status;
-    ULONG flags = 0;
-    WCHAR *nt_dest;
-    INT prefix_len;
+    BOOL dir_flag;
+    char *p, *tmp;
     ssize_t ret;
-    char *p;
     int i;
 
-    if ((status = server_get_unix_fd( handle, FILE_ANY_ACCESS, &dest_fd, &needs_close, NULL, NULL )))
-        return status;
-
-    if ((status = server_get_unix_name( handle, &unix_src )))
-        goto cleanup;
-
-    ret = readlink( unix_src, unix_dest, sizeof(unix_dest) );
-    if (ret < 0)
+    if (unix_dest_len) len = *unix_dest_len;
+    if (!unix_dest)
+        tmp = malloc( len );
+    else
+        tmp = unix_dest;
+    if ((ret = readlink( unix_src, tmp, len )) < 0)
     {
         status = errno_to_status( errno );
         goto cleanup;
     }
-    unix_dest_len = ret;
+    len = ret;
 
     /* Decode the reparse tag from the symlink */
-    p = unix_dest;
+    p = tmp;
     if (*p == '.')
     {
-        flags = SYMLINK_FLAG_RELATIVE;
+        if (flags) *flags = SYMLINK_FLAG_RELATIVE;
         p++;
     }
     if (*p++ != '/')
@@ -5882,7 +5877,7 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
         status = STATUS_NOT_IMPLEMENTED;
         goto cleanup;
     }
-    buffer->ReparseTag = 0;
+    reparse_tag = 0;
     for (i = 0; i < sizeof(ULONG)*8; i++)
     {
         char c = *p++;
@@ -5897,21 +5892,65 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
             status = STATUS_NOT_IMPLEMENTED;
             goto cleanup;
         }
-        buffer->ReparseTag |= (val << i);
+        reparse_tag |= (val << i);
     }
     /* skip past the directory/file flag */
-    if (buffer->ReparseTag == IO_REPARSE_TAG_SYMLINK)
+    if (reparse_tag == IO_REPARSE_TAG_SYMLINK)
     {
         char c = *p++;
 
-        if ((c != '/' && c != '.') || (c == '.' && *p++ != '/'))
+        if (c == '/')
+            dir_flag = FALSE;
+        else if (c == '.' && *p++ == '/')
+            dir_flag = TRUE;
+        else
         {
             status = STATUS_NOT_IMPLEMENTED;
             goto cleanup;
         }
     }
-    unix_dest_len -= (p - unix_dest);
-    memmove(unix_dest, p, unix_dest_len);
+    else
+        dir_flag = TRUE;
+    len -= (p - tmp);
+    if (tag) *tag = reparse_tag;
+    if (is_dir) *is_dir = dir_flag;
+    if (unix_dest) memmove(unix_dest, p, len + 1);
+    if (unix_dest_len) *unix_dest_len = len;
+    status = STATUS_SUCCESS;
+
+cleanup:
+    if (!unix_dest) free( tmp );
+    return status;
+}
+
+
+/*
+ * Retrieve the unix name corresponding to a file handle and use that to find the destination of the
+ * symlink corresponding to that file handle.
+ */
+NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_size)
+{
+    char *unix_src, unix_dest[PATH_MAX];
+    VOID *subst_name, *print_name;
+    SIZE_T nt_dest_len = PATH_MAX;
+    int unix_dest_len = PATH_MAX;
+    BOOL dest_allocated = FALSE;
+    int dest_fd, needs_close;
+    int path_len = 0;
+    DWORD max_length;
+    NTSTATUS status;
+    ULONG flags = 0;
+    WCHAR *nt_dest;
+    INT prefix_len;
+
+    if ((status = server_get_unix_fd( handle, FILE_ANY_ACCESS, &dest_fd, &needs_close, NULL, NULL )))
+        return status;
+
+    if ((status = server_get_unix_name( handle, &unix_src )))
+        goto cleanup;
+
+    if ((status = FILE_DecodeSymlink( unix_src, unix_dest, &unix_dest_len, &buffer->ReparseTag, &flags, NULL )))
+        goto cleanup;
 
     /* convert the relative path into an absolute path */
     if (flags == SYMLINK_FLAG_RELATIVE)
