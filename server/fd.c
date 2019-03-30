@@ -1934,6 +1934,55 @@ void get_nt_name( struct fd *fd, struct unicode_str *name )
     name->len = fd->nt_namelen;
 }
 
+static void decode_symlink(char *name, int *is_dir)
+{
+    char link[MAX_PATH], *p;
+    ULONG reparse_tag;
+    int len, i;
+
+    len = readlink( name, link, sizeof(link) );
+    if (len == -1)
+        return;
+    link[len] = 0;
+    p = link;
+    /* skip past relative/absolute indication */
+    if (*p == '.')
+        p++;
+    if (*p++ != '/')
+    {
+        return;
+    }
+    /* decode the reparse tag */
+    reparse_tag = 0;
+    for (i = 0; i < sizeof(ULONG)*8; i++)
+    {
+        char c = *p++;
+        int val;
+
+        if (c == '/')
+            val = 0;
+        else if (c == '.' && *p++ == '/')
+            val = 1;
+        else
+            return;
+        reparse_tag |= (val << i);
+    }
+    /* decode the directory/file flag */
+    if (reparse_tag == IO_REPARSE_TAG_SYMLINK)
+    {
+        char c = *p++;
+
+        if (c == '/')
+            *is_dir = FALSE;
+        else if (c == '.' && *p++ == '/')
+            *is_dir = TRUE;
+        else
+            return;
+    }
+    else
+        *is_dir = TRUE;
+}
+
 /* open() wrapper that returns a struct fd with no fd user set */
 struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_name,
                     int flags, mode_t *mode, unsigned int access,
@@ -2035,6 +2084,7 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     {
         unsigned int err;
         struct inode *inode = get_inode( st.st_dev, st.st_ino, fd->unix_fd );
+        int is_link = S_ISLNK(st.st_mode), is_dir;
 
         if (!inode)
         {
@@ -2049,16 +2099,20 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
         list_add_head( &inode->open, &fd->inode_entry );
         closed_fd = NULL;
 
+        /* decode symlink type */
         fstat( fd->unix_fd, &st );
         *mode = st.st_mode;
+        is_dir = S_ISDIR(st.st_mode);
+        if (is_link)
+            decode_symlink(fd->unlink_name, &is_dir);
 
         /* check directory options */
-        if ((options & FILE_DIRECTORY_FILE) && !S_ISDIR(st.st_mode))
+        if ((options & FILE_DIRECTORY_FILE) && !is_dir)
         {
             set_error( STATUS_NOT_A_DIRECTORY );
             goto error;
         }
-        if ((options & FILE_NON_DIRECTORY_FILE) && S_ISDIR(st.st_mode))
+        if ((options & FILE_NON_DIRECTORY_FILE) && is_dir)
         {
             set_error( STATUS_FILE_IS_A_DIRECTORY );
             goto error;
