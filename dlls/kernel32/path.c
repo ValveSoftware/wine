@@ -804,7 +804,10 @@ BOOL WINAPI RemoveDirectoryW( LPCWSTR path )
             ret = (unlink( unix_name.Buffer ) != -1);
         else
             ret = (rmdir( unix_name.Buffer ) != -1);
-        if (!ret) FILE_SetDosError();
+        if (status == STATUS_SUCCESS && (info.FileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) &&
+                                        !(info.FileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            SetLastError( ERROR_DIRECTORY );
+        else if (!ret) FILE_SetDosError();
         RtlFreeAnsiString( &unix_name );
     }
     else
