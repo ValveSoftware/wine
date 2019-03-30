@@ -5145,14 +5145,14 @@ static void test_reparse_points(void)
 
     /* Delete the symlink as a file */
     bret = DeleteFileW(reparse_path);
-    todo_wine ok(bret, "Failed to delete symlink as a file!\n");
+    ok(bret, "Failed to delete symlink as a file!\n");
 
     /* Create a blank slate for directory symlink tests */
     bret = CreateDirectoryW(reparse_path, NULL);
-    todo_wine ok(bret, "Failed to create junction point directory.\n");
+    ok(bret, "Failed to create junction point directory.\n");
     dwret = GetFileAttributesW(reparse_path);
     ok(dwret != (DWORD)~0, "Path doesn't exist (attributes: 0x%x)!\n", dwret);
-    todo_wine ok(!(dwret & FILE_ATTRIBUTE_REPARSE_POINT), "File is already a reparse point! (attributes: %d)\n", dwret);
+    ok(!(dwret & FILE_ATTRIBUTE_REPARSE_POINT), "File is already a reparse point! (attributes: %d)\n", dwret);
 
     /* Create the directory symlink */
     HeapFree(GetProcessHeap(), 0, buffer);

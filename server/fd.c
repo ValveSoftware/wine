@@ -107,6 +107,10 @@
 #include "winternl.h"
 #include "winioctl.h"
 
+#if !defined(O_SYMLINK) && defined(O_PATH)
+# define O_SYMLINK (O_NOFOLLOW | O_PATH)
+#endif
+
 #if defined(HAVE_SYS_EPOLL_H) && defined(HAVE_EPOLL_CREATE)
 # include <sys/epoll.h>
 # define USE_EPOLL
@@ -1081,7 +1085,7 @@ static void inode_destroy( struct object *obj )
         {
             /* make sure it is still the same file */
             struct stat st;
-            if (!stat( fd->unix_name, &st ) && st.st_dev == inode->device->dev && st.st_ino == inode->ino)
+            if (!lstat( fd->unix_name, &st ) && st.st_dev == inode->device->dev && st.st_ino == inode->ino)
             {
                 if (S_ISDIR(st.st_mode)) rmdir( fd->unix_name );
                 else unlink( fd->unix_name );
@@ -1776,6 +1780,53 @@ char *dup_fd_name( struct fd *root, const char *name )
     return ret;
 }
 
+static void decode_symlink(char *name, int *is_dir)
+{
+    char link[MAX_PATH], *p;
+    ULONG reparse_tag;
+    int len, i;
+
+    len = readlink( name, link, sizeof(link) );
+    link[len] = 0;
+    p = link;
+    /* skip past relative/absolute indication */
+    if (*p == '.')
+        p++;
+    if (*p++ != '/')
+    {
+        return;
+    }
+    /* decode the reparse tag */
+    reparse_tag = 0;
+    for (i = 0; i < sizeof(ULONG)*8; i++)
+    {
+        char c = *p++;
+        int val;
+
+        if (c == '/')
+            val = 0;
+        else if (c == '.' && *p++ == '/')
+            val = 1;
+        else
+            return;
+        reparse_tag |= (val << i);
+    }
+    /* decode the directory/file flag */
+    if (reparse_tag == IO_REPARSE_TAG_SYMLINK)
+    {
+        char c = *p++;
+
+        if (c == '/')
+            *is_dir = FALSE;
+        else if (c == '.' && *p++ == '/')
+            *is_dir = TRUE;
+        else
+            return;
+    }
+    else
+        *is_dir = TRUE;
+}
+
 /* open() wrapper that returns a struct fd with no fd user set */
 struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, unsigned int access,
                     unsigned int sharing, unsigned int options )
@@ -1844,6 +1895,13 @@ struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, 
             if ((access & FILE_UNIX_WRITE_ACCESS) || (flags & O_CREAT))
                 fd->unix_fd = open( name, O_RDONLY | (flags & ~(O_TRUNC | O_CREAT | O_EXCL)), *mode );
         }
+#if defined(O_SYMLINK)
+        /* if we tried to open a dangling symlink then try again with O_SYMLINK */
+        else if (errno == ENOENT)
+        {
+            fd->unix_fd = open( name, rw_mode | O_SYMLINK | (flags & ~O_TRUNC), *mode );
+        }
+#endif
 
         if (fd->unix_fd == -1)
         {
@@ -1855,14 +1913,15 @@ struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, 
     closed_fd->unix_fd = fd->unix_fd;
     closed_fd->unlink = 0;
     closed_fd->unix_name = fd->unix_name;
-    fstat( fd->unix_fd, &st );
+    lstat( fd->unix_name, &st );
     *mode = st.st_mode;
 
     /* only bother with an inode for normal files and directories */
-    if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))
+    if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode))
     {
         unsigned int err;
         struct inode *inode = get_inode( st.st_dev, st.st_ino, fd->unix_fd );
+        int is_link = S_ISLNK(st.st_mode), is_dir;
 
         if (!inode)
         {
@@ -1877,13 +1936,20 @@ struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, 
         list_add_head( &inode->open, &fd->inode_entry );
         closed_fd = NULL;
 
+        /* decode symlink type */
+        fstat( fd->unix_fd, &st );
+        *mode = st.st_mode;
+        is_dir = S_ISDIR(st.st_mode);
+        if (is_link)
+            decode_symlink(fd->unix_name, &is_dir);
+
         /* check directory options */
-        if ((options & FILE_DIRECTORY_FILE) && !S_ISDIR(st.st_mode))
+        if ((options & FILE_DIRECTORY_FILE) && !is_dir)
         {
             set_error( STATUS_NOT_A_DIRECTORY );
             goto error;
         }
-        if ((options & FILE_NON_DIRECTORY_FILE) && S_ISDIR(st.st_mode))
+        if ((options & FILE_NON_DIRECTORY_FILE) && is_dir)
         {
             set_error( STATUS_FILE_IS_A_DIRECTORY );
             goto error;
