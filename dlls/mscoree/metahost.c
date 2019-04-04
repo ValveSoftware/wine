@@ -128,8 +128,6 @@ void (CDECL *mono_thread_manage)(void);
 void (CDECL *mono_trace_set_print_handler)(MonoPrintCallback callback);
 void (CDECL *mono_trace_set_printerr_handler)(MonoPrintCallback callback);
 
-static BOOL get_mono_path(LPWSTR path);
-
 static BOOL find_mono_dll(LPCWSTR path, LPWSTR dll_path);
 
 static MonoAssembly* CDECL mono_assembly_preload_hook_fn(MonoAssemblyName *aname, char **assemblies_path, void *user_data);
@@ -771,7 +769,7 @@ static BOOL get_mono_path_datadir(LPWSTR path)
     return ret;
 }
 
-static BOOL get_mono_path(LPWSTR path)
+BOOL get_mono_path(LPWSTR path)
 {
     return get_mono_path_local(path) ||
         get_mono_path_registry(path) ||
