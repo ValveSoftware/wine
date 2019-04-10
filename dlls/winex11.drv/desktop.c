@@ -247,7 +247,7 @@ static BOOL CALLBACK update_windows_on_desktop_resize( HWND hwnd, LPARAM lparam 
             XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, p.x, p.y);
             if(data->client_window)
                 XMoveResizeWindow(data->display, data->client_window, 0, 0, p.x, p.y);
-            sync_gl_drawable(hwnd);
+            sync_gl_drawable(hwnd, FALSE);
             update_net_wm_states( data );
         }
     }else {
@@ -278,7 +278,7 @@ static BOOL CALLBACK update_windows_on_desktop_resize( HWND hwnd, LPARAM lparam 
                         data->client_rect.right - data->client_rect.left,
                         data->client_rect.bottom - data->client_rect.top);
             }
-            sync_gl_drawable(hwnd);
+            sync_gl_drawable(hwnd, FALSE);
         }
     }
     release_win_data( data );
