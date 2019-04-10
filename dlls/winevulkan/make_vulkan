@@ -225,6 +225,7 @@ FUNCTION_OVERRIDES = {
 shared_conversion_structs = ["VkBufferMemoryBarrier", "VkImageMemoryBarrier"]
 
 STRUCT_CHAIN_CONVERSIONS = [
+    "VkDeviceCreateInfo",
     "VkInstanceCreateInfo",
 ]
 
