@@ -776,6 +776,9 @@ VkBufferMemoryBarrier_host *convert_VkBufferMemoryBarrier_array_win_to_host(cons
 void free_VkBufferMemoryBarrier_array(VkBufferMemoryBarrier_host *in, uint32_t count);
 VkImageMemoryBarrier_host *convert_VkImageMemoryBarrier_array_win_to_host(const VkImageMemoryBarrier *in, uint32_t count);
 void free_VkImageMemoryBarrier_array(VkImageMemoryBarrier_host *in, uint32_t count);
+VkResult convert_VkInstanceCreateInfo_struct_chain(const void *pNext, VkInstanceCreateInfo *out_struct) DECLSPEC_HIDDEN;
+void free_VkInstanceCreateInfo_struct_chain(VkInstanceCreateInfo *s) DECLSPEC_HIDDEN;
+
 /* For use by vkDevice and children */
 struct vulkan_device_funcs
 {
