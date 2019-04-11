@@ -5119,6 +5119,35 @@ static void test_reparse_points(void)
     /* Delete the junction point directory and create a blank slate for symlink tests */
     bret = RemoveDirectoryW(reparse_path);
     ok(bret, "Failed to delete junction point!\n");
+
+    /* Create the file symlink */
+    HeapFree(GetProcessHeap(), 0, buffer);
+    handle = CreateFileW(reparse_path, GENERIC_READ | GENERIC_WRITE, 0, 0, CREATE_NEW,
+                         FILE_FLAG_BACKUP_SEMANTICS | FILE_FLAG_OPEN_REPARSE_POINT, 0);
+    ok(handle != INVALID_HANDLE_VALUE, "Failed to create symlink file.\n");
+    dwret = NtQueryInformationFile(handle, &iosb, &old_attrib, sizeof(old_attrib), FileBasicInformation);
+    ok(dwret == STATUS_SUCCESS, "Failed to get symlink file's attributes (0x%x).\n", dwret);
+    buffer_len = build_reparse_buffer(nameW.Buffer, IO_REPARSE_TAG_SYMLINK, 0, &buffer);
+    bret = DeviceIoControl(handle, FSCTL_SET_REPARSE_POINT, (LPVOID)buffer, buffer_len, NULL, 0, &dwret, 0);
+    ok(bret, "Failed to create symlink! (0x%x)\n", GetLastError());
+    CloseHandle(handle);
+
+    /* Check deleting a file symlink as if it were a directory */
+    bret = RemoveDirectoryW(reparse_path);
+    todo_wine ok(!bret, "Succeeded in deleting file symlink as a directory!\n");
+    err = GetLastError();
+    todo_wine ok(err == ERROR_DIRECTORY,
+                 "Expected last error 0x%x for RemoveDirectory on file symlink (actually 0x%x)!\n",
+                 ERROR_DIRECTORY, err);
+    dwret = GetFileAttributesW(reparse_path);
+    todo_wine ok(dwret != (DWORD)~0, "Symlink doesn't exist (attributes: 0x%x)!\n", dwret);
+    ok(dwret & FILE_ATTRIBUTE_REPARSE_POINT, "File is not a symlink! (attributes: 0x%x)\n", dwret);
+
+    /* Delete the symlink as a file */
+    bret = DeleteFileW(reparse_path);
+    todo_wine ok(bret, "Failed to delete symlink as a file!\n");
+
+    /* Create a blank slate for directory symlink tests */
     bret = CreateDirectoryW(reparse_path, NULL);
     ok(bret, "Failed to create junction point directory.\n");
     dwret = GetFileAttributesW(reparse_path);
