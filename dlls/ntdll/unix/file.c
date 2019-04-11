@@ -5608,17 +5608,20 @@ static void ignore_server_ioctl_struct_holes( ULONG code, const void *in_buffer,
  */
 NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
 {
-    BOOL src_allocated = FALSE, dest_allocated = FALSE, tempdir_created = FALSE;
+    BOOL src_allocated = FALSE, path_allocated = FALSE, dest_allocated = FALSE;
+    BOOL nt_dest_allocated = FALSE, tempdir_created = FALSE;
+    char *unix_src, *unix_dest, *unix_path = NULL;
     char tmpdir[PATH_MAX], tmplink[PATH_MAX], *d;
     SIZE_T unix_dest_len = PATH_MAX;
-    char *unix_src, *unix_dest;
     char magic_dest[PATH_MAX];
     int dest_fd, needs_close;
+    int relative_offset = 0;
     UNICODE_STRING nt_dest;
     int dest_len, offset;
     NTSTATUS status;
     struct stat st;
     WCHAR *dest;
+    ULONG flags;
     int i;
 
     switch(buffer->ReparseTag)
@@ -5627,11 +5630,13 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
         dest_len = buffer->MountPointReparseBuffer.SubstituteNameLength;
         offset = buffer->MountPointReparseBuffer.SubstituteNameOffset;
         dest = &buffer->MountPointReparseBuffer.PathBuffer[offset];
+        flags = 0;
         break;
     case IO_REPARSE_TAG_SYMLINK:
         dest_len = buffer->SymbolicLinkReparseBuffer.SubstituteNameLength;
         offset = buffer->SymbolicLinkReparseBuffer.SubstituteNameOffset;
         dest = &buffer->SymbolicLinkReparseBuffer.PathBuffer[offset];
+        flags = buffer->SymbolicLinkReparseBuffer.Flags;
         break;
     default:
         return STATUS_NOT_IMPLEMENTED;
@@ -5643,8 +5648,64 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
     if ((status = server_get_unix_name( handle, &unix_src )))
         goto cleanup;
     src_allocated = TRUE;
-    nt_dest.Buffer = dest;
-    nt_dest.Length = dest_len;
+    if (flags == SYMLINK_FLAG_RELATIVE)
+    {
+        SIZE_T nt_path_len = PATH_MAX, unix_path_len = PATH_MAX;
+        WCHAR *nt_path;
+
+        /* resolve the NT path of the source */
+        unix_path = malloc( strlen(unix_src) + 2 );
+        path_allocated = TRUE;
+        strcpy( unix_path, unix_src );
+        d = dirname( unix_path );
+        if (d != unix_path) strcpy( unix_path, d );
+        strcat( unix_path, "/");
+        for (;;)
+        {
+            nt_path = malloc( nt_path_len * sizeof(WCHAR) );
+            if (!nt_path)
+            {
+                status = STATUS_NO_MEMORY;
+                goto cleanup;
+            }
+            status = wine_unix_to_nt_file_name( unix_path, nt_path, &nt_path_len );
+            if (status != STATUS_BUFFER_TOO_SMALL) break;
+            free( nt_path );
+        }
+        if (status != STATUS_SUCCESS)
+            goto cleanup;
+        free(unix_path);
+        /* re-resolve the unix path for the source */
+        for (;;)
+        {
+            UNICODE_STRING nt_path_tmp;
+            unix_path = malloc( unix_path_len );
+            if (!unix_path)
+            {
+                status = STATUS_NO_MEMORY;
+                goto cleanup;
+            }
+            nt_path_tmp.Buffer = nt_path;
+            nt_path_tmp.Length = lstrlenW(nt_path) * sizeof(WCHAR);
+            status = wine_nt_to_unix_file_name( &nt_path_tmp, unix_path, &unix_path_len, FALSE );
+            if (status != STATUS_BUFFER_TOO_SMALL) break;
+            free( unix_path );
+        }
+        /* append the destination */
+        nt_dest.MaximumLength = dest_len + (lstrlenW( nt_path ) + 1) * sizeof(WCHAR);
+        nt_dest.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, nt_dest.MaximumLength );
+        lstrcpyW( nt_dest.Buffer, nt_path );
+        free( nt_path );
+        memcpy( &nt_dest.Buffer[lstrlenW(nt_dest.Buffer)], dest, dest_len + sizeof(WCHAR));
+        nt_dest.Length = lstrlenW( nt_dest.Buffer ) * sizeof(WCHAR);
+    }
+    else
+    {
+        RtlCreateUnicodeString( &nt_dest, dest );
+        nt_dest.Length = dest_len;
+    }
+    nt_dest_allocated = TRUE;
+    /* resolve the NT path of the destination */
     for (;;)
     {
         unix_dest = malloc( unix_dest_len );
@@ -5660,11 +5721,24 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
     if (status != STATUS_SUCCESS && status != STATUS_NO_SUCH_FILE)
         goto cleanup;
     dest_allocated = TRUE;
+    /* check that the source and destination paths are the same up to the relative path */
+    if (flags == SYMLINK_FLAG_RELATIVE)
+    {
+        relative_offset = strlen(unix_path);
+        if (strncmp( unix_path, unix_dest, relative_offset ) != 0)
+        {
+            status = STATUS_IO_REPARSE_DATA_INVALID;
+            goto cleanup;
+        }
+    }
 
-    TRACE( "Linking %s to %s\n", unix_src, unix_dest );
+    TRACE( "Linking %s to %s\n", unix_src, &unix_dest[relative_offset] );
 
     /* Encode the reparse tag into the symlink */
-    strcpy( magic_dest, "/" );
+    strcpy( magic_dest, "" );
+    if (flags == SYMLINK_FLAG_RELATIVE)
+        strcat( magic_dest, "." );
+    strcat( magic_dest, "/" );
     for (i = 0; i < sizeof(ULONG)*8; i++)
     {
         if ((buffer->ReparseTag >> i) & 1)
@@ -5683,7 +5757,7 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
             strcat( magic_dest, "." );
         strcat( magic_dest, "/" );
     }
-    strcat( magic_dest, unix_dest );
+    strcat( magic_dest, &unix_dest[relative_offset] );
 
     /* Produce the link in a temporary location in the same folder */
     strcpy( tmpdir, unix_src );
@@ -5733,7 +5807,9 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
 
 cleanup:
     if (tempdir_created) rmdir( tmpdir );
+    if (path_allocated) free( unix_path );
     if (dest_allocated) free( unix_dest );
+    if (nt_dest_allocated) RtlFreeUnicodeString( &nt_dest );
     if (src_allocated) free( unix_src );
     if (needs_close) close( dest_fd );
     return status;
