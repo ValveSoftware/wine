@@ -5828,6 +5828,7 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
     BOOL dest_allocated = FALSE;
     int dest_fd, needs_close;
     int unix_dest_len;
+    int path_len = 0;
     DWORD max_length;
     NTSTATUS status;
     ULONG flags = 0;
@@ -5853,6 +5854,11 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
 
     /* Decode the reparse tag from the symlink */
     p = unix_dest;
+    if (*p == '.')
+    {
+        flags = SYMLINK_FLAG_RELATIVE;
+        p++;
+    }
     if (*p++ != '/')
     {
         status = STATUS_NOT_IMPLEMENTED;
@@ -5889,6 +5895,25 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
     unix_dest_len -= (p - unix_dest);
     memmove(unix_dest, p, unix_dest_len);
 
+    /* convert the relative path into an absolute path */
+    if (flags == SYMLINK_FLAG_RELATIVE)
+    {
+        int unix_src_len = strlen(unix_src);
+        int offset = unix_src_len + 2;
+        char *d;
+
+        memcpy( &unix_dest[offset], unix_dest, unix_dest_len );
+        unix_dest[offset+unix_dest_len] = 0;
+        memcpy( unix_dest, unix_src, unix_src_len );
+        unix_dest[unix_src_len] = 0;
+        d = dirname( unix_dest );
+        if (d != unix_dest) strcpy( unix_dest, d );
+        strcat( unix_dest, "/" );
+        path_len = strlen( unix_dest );
+        memmove( &unix_dest[path_len], &unix_dest[offset], unix_dest_len + 1 );
+        unix_dest_len = strlen( unix_dest );
+    }
+    /* resolve the NT path */
     for (;;)
     {
         nt_dest = malloc( nt_dest_len * sizeof(WCHAR) );
@@ -5906,7 +5931,41 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
         goto cleanup;
     nt_dest_len *= sizeof(WCHAR);
 
-    prefix_len = strlen("\\??\\");
+    /* remove the relative path from the NT path */
+    if (flags == SYMLINK_FLAG_RELATIVE)
+    {
+        SIZE_T nt_path_len = PATH_MAX;
+        int relative_offset;
+        WCHAR *nt_path;
+
+        unix_dest_len = path_len;
+        for (;;)
+        {
+            nt_path = malloc( nt_path_len * sizeof(WCHAR) );
+            if (!nt_path)
+            {
+                status = STATUS_NO_MEMORY;
+                goto cleanup;
+            }
+            status = wine_unix_to_nt_file_name( unix_dest, nt_path, &nt_path_len );
+            if (status != STATUS_BUFFER_TOO_SMALL) break;
+            free( nt_path );
+        }
+        if (status != STATUS_SUCCESS)
+            goto cleanup;
+        relative_offset = lstrlenW( nt_path );
+        if (wcsnicmp( nt_path, nt_dest, relative_offset ) != 0)
+        {
+            free( nt_path );
+            status = STATUS_IO_REPARSE_DATA_INVALID;
+            goto cleanup;
+        }
+        free( nt_path );
+        nt_dest_len = lstrlenW( &nt_dest[relative_offset] ) * sizeof(WCHAR);
+        memmove( nt_dest, &nt_dest[relative_offset], nt_dest_len + sizeof(WCHAR) );
+    }
+
+    prefix_len = (flags == SYMLINK_FLAG_RELATIVE) ? 0 : strlen("\\??\\");
     switch(buffer->ReparseTag)
     {
     case IO_REPARSE_TAG_MOUNT_POINT:
