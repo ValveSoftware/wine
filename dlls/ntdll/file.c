@@ -1648,16 +1648,19 @@ NTSTATUS WINAPI NtDeviceIoControlFile(HANDLE handle, HANDLE event,
  */
 NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
 {
-    BOOL src_allocated = FALSE, dest_allocated = FALSE, tempdir_created = FALSE;
+    BOOL src_allocated = FALSE, path_allocated = FALSE, dest_allocated = FALSE;
+    BOOL nt_dest_allocated = FALSE, tempdir_created = FALSE;
     char tmpdir[PATH_MAX], tmplink[PATH_MAX], *d;
-    ANSI_STRING unix_src, unix_dest;
+    ANSI_STRING unix_src, unix_dest, unix_path;
     char magic_dest[PATH_MAX];
     int dest_fd, needs_close;
+    int relative_offset = 0;
     UNICODE_STRING nt_dest;
     int dest_len, offset;
     NTSTATUS status;
     struct stat st;
     WCHAR *dest;
+    ULONG flags;
     int i;
 
     switch(buffer->ReparseTag)
@@ -1666,11 +1669,13 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
         dest_len = buffer->MountPointReparseBuffer.SubstituteNameLength;
         offset = buffer->MountPointReparseBuffer.SubstituteNameOffset;
         dest = &buffer->MountPointReparseBuffer.PathBuffer[offset];
+        flags = 0;
         break;
     case IO_REPARSE_TAG_SYMLINK:
         dest_len = buffer->SymbolicLinkReparseBuffer.SubstituteNameLength;
         offset = buffer->SymbolicLinkReparseBuffer.SubstituteNameOffset;
         dest = &buffer->SymbolicLinkReparseBuffer.PathBuffer[offset];
+        flags = buffer->SymbolicLinkReparseBuffer.Flags;
         break;
     default:
         return STATUS_NOT_IMPLEMENTED;
@@ -1682,17 +1687,54 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
     if ((status = server_get_unix_name( handle, &unix_src )))
         goto cleanup;
     src_allocated = TRUE;
-    nt_dest.Buffer = dest;
-    nt_dest.Length = dest_len;
+    if (flags == SYMLINK_FLAG_RELATIVE)
+    {
+        UNICODE_STRING nt_path;
+
+        unix_path.MaximumLength = strlen(unix_src.Buffer) + 2;
+        unix_path.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, unix_path.MaximumLength );
+        path_allocated = TRUE;
+        strcpy( unix_path.Buffer, unix_src.Buffer );
+        d = dirname( unix_path.Buffer );
+        if (d != unix_path.Buffer) strcpy( unix_path.Buffer, d );
+        strcat( unix_path.Buffer, "/");
+        unix_path.Length = strlen( unix_path.Buffer );
+        if ((status = wine_unix_to_nt_file_name( &unix_path, &nt_path )))
+            goto cleanup;
+        nt_dest.MaximumLength = dest_len + (strlenW( nt_path.Buffer ) + 1) * sizeof(WCHAR);
+        nt_dest.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, nt_dest.MaximumLength );
+        strcpyW( nt_dest.Buffer, nt_path.Buffer );
+        RtlFreeUnicodeString( &nt_path );
+        memcpy( &nt_dest.Buffer[strlenW(nt_dest.Buffer)], dest, dest_len + sizeof(WCHAR));
+        nt_dest.Length = strlenW( nt_dest.Buffer ) * sizeof(WCHAR);
+    }
+    else
+    {
+        RtlCreateUnicodeString( &nt_dest, dest );
+        nt_dest.Length = dest_len;
+    }
+    nt_dest_allocated = TRUE;
     status = wine_nt_to_unix_file_name( &nt_dest, &unix_dest, 0, FALSE );
     if (status != STATUS_SUCCESS && status != STATUS_NO_SUCH_FILE)
         goto cleanup;
     dest_allocated = TRUE;
+    if (flags == SYMLINK_FLAG_RELATIVE)
+    {
+        relative_offset = strlen(unix_path.Buffer);
+        if (strncmp( unix_path.Buffer, unix_dest.Buffer, relative_offset ) != 0)
+        {
+            status = STATUS_IO_REPARSE_DATA_INVALID;
+            goto cleanup;
+        }
+    }
 
-    TRACE("Linking %s to %s\n", unix_src.Buffer, unix_dest.Buffer);
+    TRACE("Linking %s to %s\n", unix_src.Buffer, &unix_dest.Buffer[relative_offset]);
 
     /* Encode the reparse tag into the symlink */
-    strcpy( magic_dest, "/" );
+    strcpy( magic_dest, "" );
+    if (flags == SYMLINK_FLAG_RELATIVE)
+        strcat( magic_dest, "." );
+    strcat( magic_dest, "/" );
     for (i = 0; i < sizeof(ULONG)*8; i++)
     {
         if ((buffer->ReparseTag >> i) & 1)
@@ -1711,7 +1753,7 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
             strcat( magic_dest, "." );
         strcat( magic_dest, "/" );
     }
-    strcat( magic_dest, unix_dest.Buffer );
+    strcat( magic_dest, &unix_dest.Buffer[relative_offset] );
 
     /* Produce the link in a temporary location in the same folder */
     strcpy( tmpdir, unix_src.Buffer );
@@ -1761,7 +1803,9 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
 
 cleanup:
     if (tempdir_created) rmdir( tmpdir );
+    if (path_allocated) RtlFreeAnsiString( &unix_path );
     if (dest_allocated) RtlFreeAnsiString( &unix_dest );
+    if (nt_dest_allocated) RtlFreeUnicodeString( &nt_dest );
     if (src_allocated) RtlFreeAnsiString( &unix_src );
     if (needs_close) close( dest_fd );
     return status;
