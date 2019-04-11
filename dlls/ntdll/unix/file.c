@@ -5973,6 +5973,11 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
 
     /* Decode the reparse tag from the symlink */
     p = unix_dest;
+    if (*p == '.')
+    {
+        flags = SYMLINK_FLAG_RELATIVE;
+        p++;
+    }
     if (*p++ != '/')
     {
         status = STATUS_NOT_IMPLEMENTED;
@@ -6010,24 +6015,47 @@ NTSTATUS FILE_GetSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer, ULONG out_s
     memmove(unix_dest, p, unix_dest_len);
     unix_dest[unix_dest_len] = 0;
 
-    for (;;)
+    /* convert the relative path into an absolute path */
+    if (flags == SYMLINK_FLAG_RELATIVE)
     {
+        int i;
+
+        nt_dest_len = unix_dest_len;
         nt_dest = malloc( nt_dest_len * sizeof(WCHAR) );
         if (!nt_dest)
         {
             status = STATUS_NO_MEMORY;
             goto cleanup;
         }
-        status = wine_unix_to_nt_file_name( unix_dest, nt_dest, &nt_dest_len );
-        if (status != STATUS_BUFFER_TOO_SMALL) break;
-        free( nt_dest );
+        /* wine_unix_to_nt_file_name does not work on relative paths, so convert manually */
+        for (i = 0; i < unix_dest_len; i++)
+        {
+            if (unix_dest[i] == '/') unix_dest[i] = '\\';
+        }
+        ascii_to_unicode( nt_dest, unix_dest, unix_dest_len );
+    }
+    else
+    {
+        /* resolve the NT path */
+        for (;;)
+        {
+            nt_dest = malloc( nt_dest_len * sizeof(WCHAR) );
+            if (!nt_dest)
+            {
+                status = STATUS_NO_MEMORY;
+                goto cleanup;
+            }
+            status = wine_unix_to_nt_file_name( unix_dest, nt_dest, &nt_dest_len );
+            if (status != STATUS_BUFFER_TOO_SMALL) break;
+            free( nt_dest );
+        }
     }
     dest_allocated = TRUE;
     if (status != STATUS_SUCCESS)
         goto cleanup;
     nt_dest_len *= sizeof(WCHAR);
 
-    prefix_len = strlen("\\??\\");
+    prefix_len = (flags == SYMLINK_FLAG_RELATIVE) ? 0 : strlen("\\??\\");
     switch(buffer->ReparseTag)
     {
     case IO_REPARSE_TAG_MOUNT_POINT:
