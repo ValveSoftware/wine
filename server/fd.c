@@ -1704,6 +1704,9 @@ static struct fd *alloc_fd_object(void)
     list_init( &fd->inode_entry );
     list_init( &fd->locks );
 
+    if (do_esync())
+        fd->esync_fd = esync_create_fd( 1, 0 );
+
     if ((fd->poll_index = add_poll_user( fd )) == -1)
     {
         release_object( fd );
