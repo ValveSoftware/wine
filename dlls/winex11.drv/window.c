@@ -871,10 +871,13 @@ static void set_initial_wm_hints( Display *display, Window window )
     /* class hints */
     if ((class_hints = XAllocClassHint()))
     {
-        static char wine[] = "Wine";
+        static char steam_proton[] = "steam_proton";
+        char proton_app_class[128];
+        const char *app_id = getenv("SteamAppId");
 
+        snprintf(proton_app_class, sizeof(proton_app_class), "steam_app_%s", app_id);
         class_hints->res_name = process_name;
-        class_hints->res_class = wine;
+        class_hints->res_class = app_id ? proton_app_class : steam_proton;
         XSetClassHint( display, window, class_hints );
         XFree( class_hints );
     }
