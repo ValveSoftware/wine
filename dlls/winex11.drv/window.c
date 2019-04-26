@@ -855,8 +855,19 @@ static void set_initial_wm_hints( Display *display, Window window )
     /* class hints */
     if ((class_hints = XAllocClassHint()))
     {
-        class_hints->res_name = process_name;
-        class_hints->res_class = process_name;
+        static char steam_proton[] = "steam_proton";
+        const char *app_id = getenv("SteamAppId");
+        char proton_app_class[128];
+
+        if(app_id && *app_id){
+            snprintf(proton_app_class, sizeof(proton_app_class), "steam_app_%s", app_id);
+            class_hints->res_name = proton_app_class;
+            class_hints->res_class = proton_app_class;
+        }else{
+            class_hints->res_name = steam_proton;
+            class_hints->res_class = steam_proton;
+        }
+
         XSetClassHint( display, window, class_hints );
         XFree( class_hints );
     }
