@@ -1714,8 +1714,9 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
         RtlCreateUnicodeString( &nt_dest, dest );
         nt_dest.Length = dest_len;
     }
+
     nt_dest_allocated = TRUE;
-    status = wine_nt_to_unix_file_name( &nt_dest, &unix_dest, 0, FALSE );
+    status = wine_nt_to_unix_file_name( &nt_dest, &unix_dest, FILE_WINE_PATH, FALSE );
     if (status != STATUS_SUCCESS && status != STATUS_NO_SUCH_FILE)
         goto cleanup;
     dest_allocated = TRUE;
