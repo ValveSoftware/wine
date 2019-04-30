@@ -140,6 +140,13 @@ static inline struct platform_private *impl_from_DEVICE_OBJECT(DEVICE_OBJECT *de
     return (struct platform_private *)get_platform_private(device);
 }
 
+static const int controller_axis_map[SDL_CONTROLLER_AXIS_MAX] = {
+    /* SDL_CONTROLLER_AXIS_LEFTX -> */ 1,
+    /* SDL_CONTROLLER_AXIS_LEFTY -> */ 0,
+    /* SDL_CONTROLLER_AXIS_RIGHTX -> */ 3,
+    /* SDL_CONTROLLER_AXIS_RIGHTY -> */ 2,
+};
+
 static const BYTE REPORT_AXIS_TAIL[] = {
     0x17, 0x00, 0x00, 0x00, 0x00,   /* LOGICAL_MINIMUM (0) */
     0x27, 0xff, 0xff, 0x00, 0x00,   /* LOGICAL_MAXIMUM (65535) */
@@ -168,10 +175,10 @@ static const BYTE CONTROLLER_BUTTONS[] = {
 
 static const BYTE CONTROLLER_AXIS [] = {
     0x05, 0x01,         /* USAGE_PAGE (Generic Desktop) */
-    0x09, 0x30,         /* USAGE (X) */
     0x09, 0x31,         /* USAGE (Y) */
-    0x09, 0x33,         /* USAGE (RX) */
+    0x09, 0x30,         /* USAGE (X) */
     0x09, 0x34,         /* USAGE (RY) */
+    0x09, 0x33,         /* USAGE (RX) */
     0x17, 0x00, 0x00, 0x00, 0x00,   /* LOGICAL_MINIMUM (0) */
     0x27, 0xff, 0xff, 0x00, 0x00,   /* LOGICAL_MAXIMUM (65535) */
     0x37, 0x00, 0x00, 0x00, 0x00,   /* PHYSICAL_MINIMUM (0) */
@@ -606,16 +613,16 @@ static BOOL build_mapped_report_descriptor(struct platform_private *ext)
     }
 
     /* Initialize axis in the report */
-    set_axis_value(ext, SDL_CONTROLLER_AXIS_LEFTX,
+    set_axis_value(ext, controller_axis_map[SDL_CONTROLLER_AXIS_LEFTX],
             map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_LEFTX)));
 
-    set_axis_value(ext, SDL_CONTROLLER_AXIS_LEFTY,
+    set_axis_value(ext, controller_axis_map[SDL_CONTROLLER_AXIS_LEFTY],
             map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_LEFTY)));
 
-    set_axis_value(ext, SDL_CONTROLLER_AXIS_RIGHTX,
+    set_axis_value(ext, controller_axis_map[SDL_CONTROLLER_AXIS_RIGHTX],
             map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_RIGHTX)));
 
-    set_axis_value(ext, SDL_CONTROLLER_AXIS_RIGHTY,
+    set_axis_value(ext, controller_axis_map[SDL_CONTROLLER_AXIS_RIGHTY],
             map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_RIGHTY)));
 
     set_axis_value(ext, COMBINED_TRIGGER_INDEX, compose_trigger_value(ext->sdl_controller));
@@ -887,7 +894,7 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
                 case SDL_CONTROLLER_AXIS_LEFTY:
                 case SDL_CONTROLLER_AXIS_RIGHTX:
                 case SDL_CONTROLLER_AXIS_RIGHTY:
-                    set_axis_value(private, ie->axis, map_axis_to_hid(ie->value));
+                    set_axis_value(private, controller_axis_map[ie->axis], map_axis_to_hid(ie->value));
                     break;
                 case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
                 case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:
