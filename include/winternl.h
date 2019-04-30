@@ -2268,6 +2268,7 @@ typedef struct _RTL_ATOM_TABLE
 #define FILE_OVERWRITE                  4
 #define FILE_OVERWRITE_IF               5
 #define FILE_MAXIMUM_DISPOSITION        5
+#define FILE_WINE_PATH                  6
 
 /* Characteristics of a File System */
 #define FILE_REMOVABLE_MEDIA                      0x00000001
