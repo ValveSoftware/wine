@@ -64,7 +64,7 @@ struct hid_platform_private {
     BYTE current_report;
     CHAR *reports[2];
 
-    struct axis_info lx, ly, ltrigger, rx, ry, rtrigger;
+    struct axis_info lx, ly, triggers, rx, ry;
 };
 
 static DWORD last_check = 0;
@@ -77,10 +77,9 @@ static void MarkUsage(struct hid_platform_private *private, WORD usage, LONG min
     {
         case HID_USAGE_GENERIC_X: private->lx = info; break;
         case HID_USAGE_GENERIC_Y: private->ly = info; break;
-        case HID_USAGE_GENERIC_Z: private->ltrigger = info; break;
+        case HID_USAGE_GENERIC_Z: private->triggers = info; break;
         case HID_USAGE_GENERIC_RX: private->rx = info; break;
         case HID_USAGE_GENERIC_RY: private->ry = info; break;
-        case HID_USAGE_GENERIC_RZ: private->rtrigger = info; break;
     }
 }
 
@@ -132,14 +131,13 @@ static BOOL VerifyGamepad(PHIDP_PREPARSED_DATA ppd, XINPUT_CAPABILITIES *xinput_
     }
     HeapFree(GetProcessHeap(), 0, value_caps);
 
-    if (private->ltrigger.bits)
+    if (private->triggers.bits)
+    {
         xinput_caps->Gamepad.bLeftTrigger = (1u << (sizeof(xinput_caps->Gamepad.bLeftTrigger) + 1)) - 1;
-    else
-        WARN("Missing axis LeftTrigger\n");
-    if (private->rtrigger.bits)
         xinput_caps->Gamepad.bRightTrigger = (1u << (sizeof(xinput_caps->Gamepad.bRightTrigger) + 1)) - 1;
+    }
     else
-        WARN("Missing axis RightTrigger\n");
+        WARN("Missing Trigger axes\n");
     if (private->lx.bits)
         xinput_caps->Gamepad.sThumbLX = (1u << (sizeof(xinput_caps->Gamepad.sThumbLX) + 1)) - 1;
     else
@@ -439,13 +437,12 @@ void HID_update_state(xinput_controller *device, XINPUT_STATE *state)
                                         private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
             device->state.Gamepad.sThumbRY = -scale_short(value, &private->ry) - 1;
 
-        if(HidP_GetScaledUsageValue(HidP_Input, HID_USAGE_PAGE_GENERIC, 0, HID_USAGE_GENERIC_RZ, &value,
-                                        private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
-            device->state.Gamepad.bRightTrigger = scale_byte(value, &private->rtrigger);
-
         if(HidP_GetScaledUsageValue(HidP_Input, HID_USAGE_PAGE_GENERIC, 0, HID_USAGE_GENERIC_Z, &value,
                                         private->ppd, target_report, private->report_length) == HIDP_STATUS_SUCCESS)
-            device->state.Gamepad.bLeftTrigger = scale_byte(value, &private->ltrigger);
+        {
+            device->state.Gamepad.bLeftTrigger = scale_byte(value, &private->triggers);
+            device->state.Gamepad.bRightTrigger = scale_byte(value, &private->triggers);
+        }
     }
 
     memcpy(state, &device->state, sizeof(*state));

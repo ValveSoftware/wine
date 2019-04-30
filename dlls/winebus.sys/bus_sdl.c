@@ -184,17 +184,17 @@ static const BYTE CONTROLLER_AXIS [] = {
 static const BYTE CONTROLLER_TRIGGERS [] = {
     0x05, 0x01,         /* USAGE_PAGE (Generic Desktop) */
     0x09, 0x32,         /* USAGE (Z) */
-    0x09, 0x35,         /* USAGE (RZ) */
-    0x16, 0x00, 0x00,   /* LOGICAL_MINIMUM (0) */
-    0x26, 0xff, 0x7f,   /* LOGICAL_MAXIMUM (32767) */
-    0x36, 0x00, 0x00,   /* PHYSICAL_MINIMUM (0) */
-    0x46, 0xff, 0x7f,   /* PHYSICAL_MAXIMUM (32767) */
+    0x17, 0x00, 0x00, 0x00, 0x00,   /* LOGICAL_MINIMUM (0) */
+    0x27, 0xff, 0xff, 0x00, 0x00,   /* LOGICAL_MAXIMUM (65535) */
+    0x37, 0x00, 0x00, 0x00, 0x00,   /* PHYSICAL_MINIMUM (0) */
+    0x47, 0xff, 0xff, 0x00, 0x00,   /* PHYSICAL_MAXIMUM (65535) */
     0x75, 0x10,         /* REPORT_SIZE (16) */
-    0x95, 0x02,         /* REPORT_COUNT (2) */
+    0x95, 0x01,         /* REPORT_COUNT (1) */
     0x81, 0x02,         /* INPUT (Data,Var,Abs) */
 };
 
-#define CONTROLLER_NUM_AXES 6
+#define CONTROLLER_NUM_AXES 5
+#define COMBINED_TRIGGER_INDEX 4
 
 #define CONTROLLER_NUM_HATSWITCHES 1
 
@@ -264,14 +264,23 @@ static void set_button_value(struct platform_private *ext, int index, int value)
     }
 }
 
-static void set_axis_value(struct platform_private *ext, int index, short value, BOOL controller)
+static unsigned short map_axis_to_hid(short v)
+{
+    return ((int)v) + 32768;
+}
+
+static short compose_trigger_value(SDL_GameController *joystick)
+{
+    /* yes, they are combined into one value and cannot be detangled */
+    return 0x8000
+        + pSDL_GameControllerGetAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERLEFT)
+        - pSDL_GameControllerGetAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+}
+
+static void set_axis_value(struct platform_private *ext, int index, short value)
 {
     WORD *report = (WORD *)(ext->report_buffer + ext->axis_start);
-
-    if (controller && (index == SDL_CONTROLLER_AXIS_TRIGGERLEFT || index == SDL_CONTROLLER_AXIS_TRIGGERRIGHT))
-        report[index] = LE_WORD(value);
-    else
-        report[index] = LE_WORD(value) + 32768;
+    report[index] = LE_WORD(value);
 }
 
 static void set_ball_value(struct platform_private *ext, int index, int value1, int value2)
@@ -499,7 +508,7 @@ static BOOL build_report_descriptor(struct platform_private *ext)
 
     /* Initialize axis in the report */
     for (i = 0; i < axis_count; i++)
-        set_axis_value(ext, i, pSDL_JoystickGetAxis(ext->sdl_joystick, i), FALSE);
+        set_axis_value(ext, i, map_axis_to_hid(pSDL_JoystickGetAxis(ext->sdl_joystick, i)));
     for (i = 0; i < hat_count; i++)
         set_hat_value(ext, i, pSDL_JoystickGetHat(ext->sdl_joystick, i));
 
@@ -536,7 +545,7 @@ static SHORT compose_dpad_value(SDL_GameController *joystick)
 static BOOL build_mapped_report_descriptor(struct platform_private *ext)
 {
     BYTE *report_ptr;
-    INT i, descript_size;
+    INT descript_size;
 
     static const int BUTTON_BIT_COUNT = CONTROLLER_NUM_BUTTONS + CONTROLLER_NUM_HATSWITCHES * 4;
 
@@ -596,8 +605,19 @@ static BOOL build_mapped_report_descriptor(struct platform_private *ext)
     }
 
     /* Initialize axis in the report */
-    for (i = SDL_CONTROLLER_AXIS_LEFTX; i < SDL_CONTROLLER_AXIS_MAX; i++)
-        set_axis_value(ext, i, pSDL_GameControllerGetAxis(ext->sdl_controller, i), TRUE);
+    set_axis_value(ext, SDL_CONTROLLER_AXIS_LEFTX,
+            map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_LEFTX)));
+
+    set_axis_value(ext, SDL_CONTROLLER_AXIS_LEFTY,
+            map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_LEFTY)));
+
+    set_axis_value(ext, SDL_CONTROLLER_AXIS_RIGHTX,
+            map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_RIGHTX)));
+
+    set_axis_value(ext, SDL_CONTROLLER_AXIS_RIGHTY,
+            map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_RIGHTY)));
+
+    set_axis_value(ext, COMBINED_TRIGGER_INDEX, compose_trigger_value(ext->sdl_controller));
 
     set_hat_value(ext, 0, compose_dpad_value(ext->sdl_controller));
 
@@ -776,7 +796,7 @@ static BOOL set_report_from_event(SDL_Event *event)
 
             if (ie->axis < 6)
             {
-                set_axis_value(private, ie->axis, ie->value, FALSE);
+                set_axis_value(private, ie->axis, map_axis_to_hid(ie->value));
                 process_hid_report(device, private->report_buffer, private->buffer_length);
             }
             break;
@@ -864,8 +884,19 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
         case SDL_CONTROLLERAXISMOTION:
         {
             SDL_ControllerAxisEvent *ie = &event->caxis;
-
-            set_axis_value(private, ie->axis, ie->value, TRUE);
+            switch (ie->axis)
+            {
+                case SDL_CONTROLLER_AXIS_LEFTX:
+                case SDL_CONTROLLER_AXIS_LEFTY:
+                case SDL_CONTROLLER_AXIS_RIGHTX:
+                case SDL_CONTROLLER_AXIS_RIGHTY:
+                    set_axis_value(private, ie->axis, map_axis_to_hid(ie->value));
+                    break;
+                case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
+                case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:
+                    set_axis_value(private, COMBINED_TRIGGER_INDEX, compose_trigger_value(private->sdl_controller));
+                    break;
+            }
             process_hid_report(device, private->report_buffer, private->buffer_length);
             break;
         }
