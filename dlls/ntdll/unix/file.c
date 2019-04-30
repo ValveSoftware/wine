@@ -3154,6 +3154,19 @@ static NTSTATUS lookup_unix_name( const WCHAR *name, int name_len, char **buffer
                 status = STATUS_OBJECT_NAME_COLLISION;
             }
         }
+        else if (disposition == FILE_WINE_PATH && status == STATUS_OBJECT_PATH_NOT_FOUND)
+        {
+            ret = ntdll_wcstoumbs( name, end - name, unix_name + pos + 1, MAX_DIR_ENTRY_LEN + 1, TRUE );
+            if (ret > 0 && ret <= MAX_DIR_ENTRY_LEN)
+            {
+                unix_name[pos] = '/';
+                unix_name[pos + 1 + ret] = 0;
+                status = STATUS_NO_SUCH_FILE;
+                pos += strlen( unix_name + pos );
+                name = next;
+                continue;
+            }
+        }
 
         if (status != STATUS_SUCCESS) break;
 
@@ -5715,7 +5728,7 @@ NTSTATUS FILE_CreateSymlink(HANDLE handle, REPARSE_DATA_BUFFER *buffer)
             status = STATUS_NO_MEMORY;
             goto cleanup;
         }
-        status = wine_nt_to_unix_file_name( &nt_dest, unix_dest, &unix_dest_len, FALSE );
+        status = wine_nt_to_unix_file_name( &nt_dest, unix_dest, &unix_dest_len, FILE_WINE_PATH );
         if (status != STATUS_BUFFER_TOO_SMALL) break;
         free( unix_dest );
     }
