@@ -1251,6 +1251,31 @@ void WINAPI wine_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDev
     properties->externalSemaphoreFeatures = 0;
 }
 
+VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice phys_dev,
+        VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *capabilities)
+{
+    VkResult res;
+    VkExtent2D user_res;
+
+    TRACE("%p, 0x%s, %p\n", phys_dev, wine_dbgstr_longlong(surface), capabilities);
+
+    res = thunk_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phys_dev, surface, capabilities);
+
+    /* HACK: It happened more than once that a Windows game didn't expect that maxImageCount can be
+     * set to 0. A value of 0 means that there is no limit on the number of images. */
+    if (res == VK_SUCCESS && capabilities->minImageCount && !capabilities->maxImageCount)
+        capabilities->maxImageCount = 32;
+
+    if(vk_funcs->query_fs_hack &&
+            vk_funcs->query_fs_hack(NULL, &user_res, NULL)){
+        capabilities->currentExtent = user_res;
+        capabilities->minImageExtent = user_res;
+        capabilities->maxImageExtent = user_res;
+    }
+
+    return res;
+}
+
 BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p\n", hinst, reason, reserved);
@@ -1296,27 +1321,6 @@ static void *wine_vk_get_global_proc_addr(const char *name)
 void *native_vkGetInstanceProcAddrWINE(VkInstance instance, const char *name)
 {
     return vk_funcs->p_vkGetInstanceProcAddr(instance, name);
-}
-
-VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *pSurfaceCapabilities)
-{
-    VkResult res;
-    VkExtent2D user_res;
-
-    TRACE("%p, 0x%s, %p\n", physicalDevice, wine_dbgstr_longlong(surface), pSurfaceCapabilities);
-
-    res = physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice->phys_dev, surface, pSurfaceCapabilities);
-    if(res != VK_SUCCESS)
-        return res;
-
-    if(vk_funcs->query_fs_hack &&
-            vk_funcs->query_fs_hack(NULL, &user_res, NULL)){
-        pSurfaceCapabilities->currentExtent = user_res;
-        pSurfaceCapabilities->minImageExtent = user_res;
-        pSurfaceCapabilities->maxImageExtent = user_res;
-    }
-
-    return VK_SUCCESS;
 }
 
 VkResult WINAPI wine_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
