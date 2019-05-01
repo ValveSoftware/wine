@@ -2554,7 +2554,7 @@ static NTSTATUS find_file_in_dir( char *unix_name, int pos, const WCHAR *name, i
     if (ret >= 0 && ret <= MAX_DIR_ENTRY_LEN)
     {
         unix_name[pos + ret] = 0;
-        if (!stat( unix_name, &st ))
+        if (!lstat( unix_name, &st ))
         {
             if (is_win_dir) *is_win_dir = is_same_file( &windir, &st );
             return STATUS_SUCCESS;
@@ -2658,7 +2658,7 @@ not_found:
     return STATUS_OBJECT_PATH_NOT_FOUND;
 
 success:
-    if (is_win_dir && !stat( unix_name, &st )) *is_win_dir = is_same_file( &windir, &st );
+    if (is_win_dir && !lstat( unix_name, &st )) *is_win_dir = is_same_file( &windir, &st );
     return STATUS_SUCCESS;
 }
 
@@ -3231,7 +3231,7 @@ static NTSTATUS lookup_unix_name( const WCHAR *name, int name_len, char **buffer
         for (p = unix_name + pos ; *p; p++) if (*p == '\\') *p = '/';
         if (!name_len || !redirect || (!strstr( unix_name, "/windows/") && strncmp( unix_name, "windows/", 8 )))
         {
-            if (!stat( unix_name, &st ))
+            if (!lstat( unix_name, &st ))
             {
                 if (disposition == FILE_CREATE)
                     return STATUS_OBJECT_NAME_COLLISION;
