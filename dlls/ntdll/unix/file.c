@@ -1507,6 +1507,8 @@ static int get_file_info( const char *path, struct stat *st, ULONG *attr )
 
         /* return information about the destination (unless this is a dangling symlink) */
         stat( path, st );
+        /* symbolic links always report size 0 */
+        st->st_size = 0;
         /* symbolic links (either junction points or NT symlinks) are "reparse points" */
         *attr |= FILE_ATTRIBUTE_REPARSE_POINT;
         /* whether a reparse point is a file or a directory is stored inside the link target */

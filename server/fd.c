@@ -2001,6 +2001,7 @@ struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t *mode, 
     {
         fd->unlink_name = path;
         fd->unix_name = realpath( path, NULL );
+        if (!fd->unix_name) fd->unix_name = dup_fd_name( root, name ); /* dangling symlink */
     }
 
     closed_fd->unix_fd = fd->unix_fd;
@@ -2543,7 +2544,7 @@ static void set_fd_disposition( struct fd *fd, int unlink )
             file_set_error();
             return;
         }
-        if (S_ISREG( st.st_mode ))  /* can't unlink files we don't have permission to write */
+        if (S_ISREG( st.st_mode ) || S_ISLNK( st.st_mode ))  /* can't unlink files we don't have permission to write */
         {
             if (!(st.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)))
             {
