@@ -83,7 +83,7 @@ static INT32 alloc_new_handle(void)
     return InterlockedIncrement(&counter);
 }
 
-NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
+NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device, BOOL xinput_hack)
 {
     WCHAR device_instance_id[MAX_DEVICE_ID_LEN];
     SP_DEVINFO_DATA Data;
@@ -95,6 +95,8 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
     INT32 handle;
 
     HidD_GetHidGuid(&hidGuid);
+    if(xinput_hack)
+        hidGuid.Data4[7]++; /* HACK: use different GUID so only xinput will find this device */
     ext = device->DeviceExtension;
 
     RtlInitUnicodeString( &nameW, ext->device_name);
