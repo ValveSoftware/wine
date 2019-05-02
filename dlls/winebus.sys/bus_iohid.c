@@ -344,7 +344,7 @@ static void handle_DeviceMatchingCallback(void *context, IOReturn result, void *
         }
     }
 
-    device = bus_create_hid_device(iohid_driver_obj, busidW, vid, pid, version, 0, str?serial_string:NULL, is_gamepad, &GUID_DEVCLASS_IOHID, &iohid_vtbl, sizeof(struct platform_private));
+    device = bus_create_hid_device(iohid_driver_obj, busidW, vid, pid, version, 0, str?serial_string:NULL, is_gamepad, &GUID_DEVCLASS_IOHID, &iohid_vtbl, sizeof(struct platform_private), FALSE);
     if (!device)
         ERR("Failed to create device\n");
     else

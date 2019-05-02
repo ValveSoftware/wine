@@ -73,7 +73,7 @@ struct device_extension
 
     WORD vid, pid;
     DWORD uid, version, index;
-    BOOL is_gamepad;
+    BOOL is_gamepad, xinput_hack;
     WCHAR *serial;
     const WCHAR *busid;  /* Expected to be a static constant */
 
@@ -198,7 +198,8 @@ static WCHAR *get_compatible_ids(DEVICE_OBJECT *device)
 
 DEVICE_OBJECT *bus_create_hid_device(DRIVER_OBJECT *driver, const WCHAR *busidW, WORD vid, WORD pid,
                                      DWORD version, DWORD uid, const WCHAR *serialW, BOOL is_gamepad,
-                                     const GUID *class, const platform_vtbl *vtbl, DWORD platform_data_size)
+                                     const GUID *class, const platform_vtbl *vtbl, DWORD platform_data_size,
+                                     BOOL xinput_hack)
 {
     static const WCHAR device_name_fmtW[] = {'\\','D','e','v','i','c','e','\\','%','s','#','%','p',0};
     struct device_extension *ext;
@@ -238,6 +239,7 @@ DEVICE_OBJECT *bus_create_hid_device(DRIVER_OBJECT *driver, const WCHAR *busidW,
     ext->version            = version;
     ext->index              = get_vidpid_index(vid, pid);
     ext->is_gamepad         = is_gamepad;
+    ext->xinput_hack = xinput_hack;
     ext->serial             = strdupW(serialW);
     ext->busid              = busidW;
     ext->vtbl               = vtbl;
@@ -519,6 +521,7 @@ NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             attr->VendorID = ext->vid;
             attr->ProductID = ext->pid;
             attr->VersionNumber = ext->version;
+            attr->Reserved[0] = ext->xinput_hack;
 
             irp->IoStatus.u.Status = status = STATUS_SUCCESS;
             irp->IoStatus.Information = sizeof(*attr);

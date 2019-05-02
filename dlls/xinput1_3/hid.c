@@ -216,6 +216,7 @@ void HID_find_gamepads(xinput_controller *devices)
     last_check = idx;
 
     HidD_GetHidGuid(&hid_guid);
+    hid_guid.Data4[7]++; /* HACK: look up the xinput-specific devices */
 
     EnterCriticalSection(&hid_xinput_crit);
 

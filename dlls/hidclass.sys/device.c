@@ -76,7 +76,7 @@ NTSTATUS HID_CreateDevice(DEVICE_OBJECT *native_device, HID_MINIDRIVER_REGISTRAT
     return STATUS_SUCCESS;
 }
 
-NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
+NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device, BOOL xinput_hack)
 {
     SP_DEVINFO_DATA Data;
     UNICODE_STRING nameW;
@@ -86,6 +86,8 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
     BASE_DEVICE_EXTENSION *ext;
 
     HidD_GetHidGuid(&hidGuid);
+    if(xinput_hack)
+        hidGuid.Data4[7]++; /* HACK: use different GUID so only xinput will find this device */
     ext = device->DeviceExtension;
 
     RtlInitUnicodeString( &nameW, ext->device_name);

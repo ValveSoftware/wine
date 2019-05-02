@@ -72,10 +72,13 @@ DEFINE_GUID(GUID_DEVCLASS_SDL, 0x463d60b5,0x802b,0x4bb2,0x8f,0xdb,0x7d,0xa9,0xb9
 
 static void *sdl_handle = NULL;
 
+#define XINPUT_HACK_ID_BIT 0x80000000
+
 #ifdef SONAME_LIBSDL2
 #define MAKE_FUNCPTR(f) static typeof(f) * p##f = NULL
 MAKE_FUNCPTR(SDL_GetError);
 MAKE_FUNCPTR(SDL_Init);
+MAKE_FUNCPTR(SDL_JoystickClose);
 MAKE_FUNCPTR(SDL_JoystickEventState);
 MAKE_FUNCPTR(SDL_JoystickGetGUID);
 MAKE_FUNCPTR(SDL_JoystickGetGUIDString);
@@ -131,6 +134,8 @@ struct platform_private
 
     SDL_Haptic *sdl_haptic;
     int haptic_effect_id;
+
+    BOOL xinput_hack;
 };
 
 static inline struct platform_private *impl_from_DEVICE_OBJECT(DEVICE_OBJECT *device)
@@ -548,7 +553,7 @@ static SHORT compose_dpad_value(SDL_GameController *joystick)
     return SDL_HAT_CENTERED;
 }
 
-static BOOL build_mapped_report_descriptor(struct platform_private *ext)
+static BOOL build_mapped_report_descriptor(struct platform_private *ext, BOOL xinput_hack)
 {
     BYTE *report_ptr;
     INT descript_size;
@@ -770,7 +775,6 @@ static BOOL set_report_from_event(SDL_Event *event)
     device = bus_find_hid_device(&sdl_vtbl, ULongToPtr(index));
     if (!device)
     {
-        ERR("Failed to find device at index %i\n",index);
         return FALSE;
     }
     private = impl_from_DEVICE_OBJECT(device);
@@ -834,7 +838,6 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
     device = bus_find_hid_device(&sdl_vtbl, ULongToPtr(index));
     if (!device)
     {
-        ERR("Failed to find device at index %i\n",index);
         return FALSE;
     }
     private = impl_from_DEVICE_OBJECT(device);
@@ -920,7 +923,7 @@ static void try_remove_device(SDL_JoystickID index)
     bus_remove_hid_device(device);
 }
 
-static void try_add_device(SDL_JoystickID index)
+static void try_add_device(SDL_JoystickID index, BOOL xinput_hack)
 {
     DWORD vid = 0, pid = 0, version = 0;
     DEVICE_OBJECT *device = NULL;
@@ -942,7 +945,16 @@ static void try_add_device(SDL_JoystickID index)
     if (map_controllers && pSDL_IsGameController(index))
         controller = pSDL_GameControllerOpen(index);
 
+    if (xinput_hack && (!map_controllers || !controller))
+    {
+        /* xinput hack only applies to mapped controllers */
+        pSDL_JoystickClose(joystick);
+        return;
+    }
+
     id = pSDL_JoystickInstanceID(joystick);
+    if(xinput_hack)
+        id |= XINPUT_HACK_ID_BIT;
 
     if (pSDL_JoystickGetProductVersion != NULL) {
         vid = pSDL_JoystickGetVendor(joystick);
@@ -962,15 +974,15 @@ static void try_add_device(SDL_JoystickID index)
 
     if (controller)
     {
-        TRACE("Found sdl game controller %i (vid %04x, pid %04x, version %u, serial %s)\n",
-              id, vid, pid, version, debugstr_w(serial));
+        TRACE("Found sdl game controller 0x%x (vid %04x, pid %04x, version %u, serial %s, xinput_hack: %u)\n",
+              id, vid, pid, version, debugstr_w(serial), xinput_hack);
         is_xbox_gamepad = TRUE;
     }
     else
     {
         int button_count, axis_count;
 
-        TRACE("Found sdl device %i (vid %04x, pid %04x, version %u, serial %s)\n",
+        TRACE("Found sdl device 0x%x (vid %04x, pid %04x, version %u, serial %s)\n",
               id, vid, pid, version, debugstr_w(serial));
 
         axis_count = pSDL_JoystickNumAxes(joystick);
@@ -978,7 +990,7 @@ static void try_add_device(SDL_JoystickID index)
         is_xbox_gamepad = (axis_count == 6  && button_count >= 14);
     }
 
-    device = bus_create_hid_device(sdl_driver_obj, sdl_busidW, vid, pid, version, id, serial, is_xbox_gamepad, &GUID_DEVCLASS_SDL, &sdl_vtbl, sizeof(struct platform_private));
+    device = bus_create_hid_device(sdl_driver_obj, sdl_busidW, vid, pid, version, id, serial, is_xbox_gamepad, &GUID_DEVCLASS_SDL, &sdl_vtbl, sizeof(struct platform_private), xinput_hack);
 
     if (device)
     {
@@ -988,7 +1000,7 @@ static void try_add_device(SDL_JoystickID index)
         private->sdl_controller = controller;
         private->id = id;
         if (controller)
-            rc = build_mapped_report_descriptor(private);
+            rc = build_mapped_report_descriptor(private, xinput_hack);
         else
             rc = build_report_descriptor(private);
         if (!rc)
@@ -1011,13 +1023,33 @@ static void process_device_event(SDL_Event *event)
     TRACE_(hid_report)("Received action %x\n", event->type);
 
     if (event->type == SDL_JOYDEVICEADDED)
-        try_add_device(((SDL_JoyDeviceEvent*)event)->which);
+    {
+        try_add_device(((SDL_JoyDeviceEvent*)event)->which, FALSE);
+        try_add_device(((SDL_JoyDeviceEvent*)event)->which, TRUE);
+    }
     else if (event->type == SDL_JOYDEVICEREMOVED)
+    {
         try_remove_device(((SDL_JoyDeviceEvent*)event)->which);
+        try_remove_device(((SDL_JoyDeviceEvent*)event)->which | XINPUT_HACK_ID_BIT);
+    }
     else if (event->type >= SDL_JOYAXISMOTION && event->type <= SDL_JOYBUTTONUP)
+    {
+        SDL_Event xinput_hack_event = *event;
+
         set_report_from_event(event);
+
+        ((SDL_JoyAxisEvent*)&xinput_hack_event)->which |= XINPUT_HACK_ID_BIT;
+        set_report_from_event(&xinput_hack_event);
+    }
     else if (event->type >= SDL_CONTROLLERAXISMOTION && event->type <= SDL_CONTROLLERBUTTONUP)
+    {
+        SDL_Event xinput_hack_event = *event;
+
         set_mapped_report_from_event(event);
+
+        ((SDL_JoyAxisEvent*)&xinput_hack_event)->which |= XINPUT_HACK_ID_BIT;
+        set_mapped_report_from_event(&xinput_hack_event);
+    }
 }
 
 static DWORD CALLBACK deviceloop_thread(void *args)
@@ -1069,6 +1101,7 @@ NTSTATUS WINAPI sdl_driver_init(DRIVER_OBJECT *driver, UNICODE_STRING *registry_
 #define LOAD_FUNCPTR(f) if((p##f = wine_dlsym(sdl_handle, #f, NULL, 0)) == NULL){WARN("Can't find symbol %s\n", #f); goto sym_not_found;}
         LOAD_FUNCPTR(SDL_GetError);
         LOAD_FUNCPTR(SDL_Init);
+        LOAD_FUNCPTR(SDL_JoystickClose);
         LOAD_FUNCPTR(SDL_JoystickEventState);
         LOAD_FUNCPTR(SDL_JoystickGetGUID);
         LOAD_FUNCPTR(SDL_JoystickGetGUIDString);
