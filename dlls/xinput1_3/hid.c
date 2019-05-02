@@ -124,7 +124,7 @@ static BOOL VerifyGamepad(PHIDP_PREPARSED_DATA ppd, XINPUT_CAPABILITIES *xinput_
             button_count = max(button_count, button_caps[i].NotRange.Usage);
     }
     HeapFree(GetProcessHeap(), 0, button_caps);
-    if (button_count < 11)
+    if (button_count < 10)
         WARN("Too few buttons, continuing anyway\n");
     xinput_caps->Gamepad.wButtons = 0xffff;
 
@@ -335,7 +335,7 @@ void HID_update_state(xinput_controller* device)
     CHAR *report = private->reports[(private->current_report)%2];
     CHAR *target_report = private->reports[(private->current_report+1)%2];
 
-    USAGE buttons[11];
+    USAGE buttons[10];
     ULONG button_length, hat_value;
     LONG value;
 
@@ -379,7 +379,6 @@ void HID_update_state(xinput_controller* device)
             case 8: device->state.Gamepad.wButtons |= XINPUT_GAMEPAD_START; break;
             case 9: device->state.Gamepad.wButtons |= XINPUT_GAMEPAD_LEFT_THUMB; break;
             case 10: device->state.Gamepad.wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB; break;
-            case 11: device->state.Gamepad.wButtons |= XINPUT_GAMEPAD_GUIDE; break;
         }
     }
 
