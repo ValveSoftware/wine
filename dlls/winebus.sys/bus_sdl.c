@@ -149,17 +149,17 @@ static const BYTE REPORT_AXIS_TAIL[] = {
 };
 #define IDX_ABS_AXIS_COUNT 23
 
-#define CONTROLLER_NUM_BUTTONS 11
+#define CONTROLLER_NUM_BUTTONS 10
 
 static const BYTE CONTROLLER_BUTTONS[] = {
     0x05, 0x09, /* USAGE_PAGE (Button) */
     0x19, 0x01, /* USAGE_MINIMUM (Button 1) */
-    0x29, CONTROLLER_NUM_BUTTONS, /* USAGE_MAXIMUM (Button 11) */
+    0x29, CONTROLLER_NUM_BUTTONS, /* USAGE_MAXIMUM (Button 10) */
     0x15, 0x00, /* LOGICAL_MINIMUM (0) */
     0x25, 0x01, /* LOGICAL_MAXIMUM (1) */
     0x35, 0x00, /* LOGICAL_MINIMUM (0) */
     0x45, 0x01, /* LOGICAL_MAXIMUM (1) */
-    0x95, CONTROLLER_NUM_BUTTONS, /* REPORT_COUNT (11) */
+    0x95, CONTROLLER_NUM_BUTTONS, /* REPORT_COUNT (10) */
     0x75, 0x01, /* REPORT_SIZE (1) */
     0x81, 0x02, /* INPUT (Data,Var,Abs) */
 };
@@ -841,7 +841,10 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
                 case SDL_CONTROLLER_BUTTON_START: usage = 7; break;
                 case SDL_CONTROLLER_BUTTON_LEFTSTICK: usage = 8; break;
                 case SDL_CONTROLLER_BUTTON_RIGHTSTICK: usage = 9; break;
+
+                /* native HID does not report the guide button
                 case SDL_CONTROLLER_BUTTON_GUIDE: usage = 10; break;
+                */
 
                 case SDL_CONTROLLER_BUTTON_DPAD_UP:
                 case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
