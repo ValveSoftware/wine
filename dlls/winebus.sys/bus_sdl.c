@@ -163,6 +163,7 @@ static const BYTE REPORT_AXIS_TAIL[] = {
 #define IDX_ABS_AXIS_COUNT 23
 
 #define CONTROLLER_NUM_BUTTONS 10
+#define CONTROLLER_NUM_BUTTONS_XINPUT_HACK 11
 
 static const BYTE CONTROLLER_BUTTONS[] = {
     0x05, 0x09, /* USAGE_PAGE (Button) */
@@ -173,6 +174,19 @@ static const BYTE CONTROLLER_BUTTONS[] = {
     0x35, 0x00, /* LOGICAL_MINIMUM (0) */
     0x45, 0x01, /* LOGICAL_MAXIMUM (1) */
     0x95, CONTROLLER_NUM_BUTTONS, /* REPORT_COUNT (10) */
+    0x75, 0x01, /* REPORT_SIZE (1) */
+    0x81, 0x02, /* INPUT (Data,Var,Abs) */
+};
+
+static const BYTE CONTROLLER_BUTTONS_XINPUT_HACK[] = {
+    0x05, 0x09, /* USAGE_PAGE (Button) */
+    0x19, 0x01, /* USAGE_MINIMUM (Button 1) */
+    0x29, CONTROLLER_NUM_BUTTONS_XINPUT_HACK, /* USAGE_MAXIMUM (Button 11) */
+    0x15, 0x00, /* LOGICAL_MINIMUM (0) */
+    0x25, 0x01, /* LOGICAL_MAXIMUM (1) */
+    0x35, 0x00, /* LOGICAL_MINIMUM (0) */
+    0x45, 0x01, /* LOGICAL_MAXIMUM (1) */
+    0x95, CONTROLLER_NUM_BUTTONS_XINPUT_HACK, /* REPORT_COUNT (11) */
     0x75, 0x01, /* REPORT_SIZE (1) */
     0x81, 0x02, /* INPUT (Data,Var,Abs) */
 };
@@ -280,12 +294,24 @@ static unsigned short map_axis_to_hid(short v)
     return ((int)v) + 32768;
 }
 
-static short compose_trigger_value(SDL_GameController *joystick)
+static unsigned char map_trigger_to_byte(short v)
 {
+    return ((int)v) * 255 / 32767;
+}
+
+static short compose_trigger_value(struct platform_private *private)
+{
+    if(private->xinput_hack)
+    {
+        /* The range for triggers is [0,32767], so we have to map it to a byte. */
+        return map_trigger_to_byte(pSDL_GameControllerGetAxis(private->sdl_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT)) << 8 |
+                map_trigger_to_byte(pSDL_GameControllerGetAxis(private->sdl_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT));
+    }
+
     /* yes, they are combined into one value and cannot be detangled */
     return 0x8000
-        + pSDL_GameControllerGetAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERLEFT)
-        - pSDL_GameControllerGetAxis(joystick, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
+        + pSDL_GameControllerGetAxis(private->sdl_controller, SDL_CONTROLLER_AXIS_TRIGGERLEFT)
+        - pSDL_GameControllerGetAxis(private->sdl_controller, SDL_CONTROLLER_AXIS_TRIGGERRIGHT);
 }
 
 static void set_axis_value(struct platform_private *ext, int index, short value)
@@ -559,7 +585,7 @@ static BOOL build_mapped_report_descriptor(struct platform_private *ext, BOOL xi
     BYTE *report_ptr;
     INT descript_size;
 
-    static const int BUTTON_BIT_COUNT = CONTROLLER_NUM_BUTTONS + CONTROLLER_NUM_HATSWITCHES * 4;
+    int BUTTON_BIT_COUNT;
 
     descript_size = sizeof(REPORT_HEADER) + sizeof(REPORT_TAIL);
     descript_size += sizeof(CONTROLLER_AXIS);
@@ -567,13 +593,25 @@ static BOOL build_mapped_report_descriptor(struct platform_private *ext, BOOL xi
     descript_size += sizeof(CONTROLLER_BUTTONS);
     descript_size += sizeof(REPORT_HATSWITCH);
     descript_size += sizeof(REPORT_PADDING);
-    if (BUTTON_BIT_COUNT % 8 != 0)
-        descript_size += sizeof(REPORT_PADDING);
     descript_size += test_haptic(ext);
 
     ext->axis_start = 0;
     ext->button_start = CONTROLLER_NUM_AXES * sizeof(WORD);
-    ext->hat_bit_offs = CONTROLLER_NUM_BUTTONS;
+
+    if(ext->xinput_hack)
+    {
+        ext->hat_bit_offs = CONTROLLER_NUM_BUTTONS_XINPUT_HACK;
+        BUTTON_BIT_COUNT = CONTROLLER_NUM_BUTTONS_XINPUT_HACK + CONTROLLER_NUM_HATSWITCHES * 4;
+    }
+    else
+    {
+        ext->hat_bit_offs = CONTROLLER_NUM_BUTTONS;
+        BUTTON_BIT_COUNT = CONTROLLER_NUM_BUTTONS + CONTROLLER_NUM_HATSWITCHES * 4;
+    }
+
+
+    if (BUTTON_BIT_COUNT % 8 != 0)
+        descript_size += sizeof(REPORT_PADDING);
 
     ext->buffer_length = (BUTTON_BIT_COUNT + 7) / 8
         + CONTROLLER_NUM_AXES * sizeof(WORD)
@@ -598,8 +636,16 @@ static BOOL build_mapped_report_descriptor(struct platform_private *ext, BOOL xi
     report_ptr += sizeof(CONTROLLER_AXIS);
     memcpy(report_ptr, CONTROLLER_TRIGGERS, sizeof(CONTROLLER_TRIGGERS));
     report_ptr += sizeof(CONTROLLER_TRIGGERS);
-    memcpy(report_ptr, CONTROLLER_BUTTONS, sizeof(CONTROLLER_BUTTONS));
-    report_ptr += sizeof(CONTROLLER_BUTTONS);
+    if(ext->xinput_hack)
+    {
+        memcpy(report_ptr, CONTROLLER_BUTTONS_XINPUT_HACK, sizeof(CONTROLLER_BUTTONS_XINPUT_HACK));
+        report_ptr += sizeof(CONTROLLER_BUTTONS_XINPUT_HACK);
+    }
+    else
+    {
+        memcpy(report_ptr, CONTROLLER_BUTTONS, sizeof(CONTROLLER_BUTTONS));
+        report_ptr += sizeof(CONTROLLER_BUTTONS);
+    }
     report_ptr = add_hatswitch(report_ptr, 1);
     if (BUTTON_BIT_COUNT % 8 != 0)
         report_ptr = add_padding_block(report_ptr, 8 - (BUTTON_BIT_COUNT % 8));/* unused bits between hatswitch and following constant */
@@ -629,7 +675,7 @@ static BOOL build_mapped_report_descriptor(struct platform_private *ext, BOOL xi
     set_axis_value(ext, controller_axis_map[SDL_CONTROLLER_AXIS_RIGHTY],
             map_axis_to_hid(pSDL_GameControllerGetAxis(ext->sdl_controller, SDL_CONTROLLER_AXIS_RIGHTY)));
 
-    set_axis_value(ext, COMBINED_TRIGGER_INDEX, compose_trigger_value(ext->sdl_controller));
+    set_axis_value(ext, COMBINED_TRIGGER_INDEX, compose_trigger_value(ext));
 
     set_hat_value(ext, 0, compose_dpad_value(ext->sdl_controller));
 
@@ -864,9 +910,11 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
                 case SDL_CONTROLLER_BUTTON_LEFTSTICK: usage = 8; break;
                 case SDL_CONTROLLER_BUTTON_RIGHTSTICK: usage = 9; break;
 
-                /* native HID does not report the guide button
-                case SDL_CONTROLLER_BUTTON_GUIDE: usage = 10; break;
-                */
+                case SDL_CONTROLLER_BUTTON_GUIDE:
+                    /* native HID does not report the guide button */
+                    if(private->xinput_hack)
+                        usage = 10;
+                    break;
 
                 case SDL_CONTROLLER_BUTTON_DPAD_UP:
                 case SDL_CONTROLLER_BUTTON_DPAD_DOWN:
@@ -900,7 +948,7 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
                     break;
                 case SDL_CONTROLLER_AXIS_TRIGGERLEFT:
                 case SDL_CONTROLLER_AXIS_TRIGGERRIGHT:
-                    set_axis_value(private, COMBINED_TRIGGER_INDEX, compose_trigger_value(private->sdl_controller));
+                    set_axis_value(private, COMBINED_TRIGGER_INDEX, compose_trigger_value(private));
                     break;
             }
             process_hid_report(device, private->report_buffer, private->buffer_length);
@@ -1020,6 +1068,7 @@ static void try_add_device(SDL_JoystickID index, BOOL xinput_hack)
         private->sdl_joystick = joystick;
         private->sdl_controller = controller;
         private->id = id;
+        private->xinput_hack = xinput_hack;
         if (controller)
             rc = build_mapped_report_descriptor(private, xinput_hack);
         else
