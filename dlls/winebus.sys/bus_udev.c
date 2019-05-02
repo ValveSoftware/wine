@@ -1237,13 +1237,13 @@ static void try_add_device(struct udev_device *dev)
     if (strcmp(subsystem, "hidraw") == 0)
     {
         device = bus_create_hid_device(hidraw_busidW, vid, pid, input, version, 0, serial, is_gamepad,
-                                       &hidraw_vtbl, sizeof(struct platform_private));
+                                       &hidraw_vtbl, sizeof(struct platform_private), FALSE);
     }
 #ifdef HAS_PROPER_INPUT_HEADER
     else if (strcmp(subsystem, "input") == 0)
     {
         device = bus_create_hid_device(lnxev_busidW, vid, pid, input, version, 0, serial, is_gamepad,
-                                       &lnxev_vtbl, sizeof(struct wine_input_private));
+                                       &lnxev_vtbl, sizeof(struct wine_input_private), FALSE);
     }
 #endif
 
