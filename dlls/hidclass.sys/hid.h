@@ -93,7 +93,7 @@ minidriver* find_minidriver(DRIVER_OBJECT* driver) DECLSPEC_HIDDEN;
 
 /* Internal device functions */
 NTSTATUS HID_CreateDevice(DEVICE_OBJECT *native_device, HID_MINIDRIVER_REGISTRATION *driver, DEVICE_OBJECT **device) DECLSPEC_HIDDEN;
-NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device) DECLSPEC_HIDDEN;
+NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device, BOOL xinput_hack) DECLSPEC_HIDDEN;
 void HID_DeleteDevice(DEVICE_OBJECT *device) DECLSPEC_HIDDEN;
 void HID_StartDeviceThread(DEVICE_OBJECT *device) DECLSPEC_HIDDEN;
 
