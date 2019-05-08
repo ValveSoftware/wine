@@ -71,7 +71,7 @@ struct SDLDev {
     WORD product_id;
     CHAR *name;
 
-    BOOL has_ff;
+    BOOL has_ff, is_joystick;
     int autocenter;
     int gain;
     struct list effects;
@@ -174,6 +174,14 @@ static void find_sdldevs(void)
             sdldev.product_id = SDL_JoystickInstanceID(device) + 1;
         }
 
+        {
+            SDL_JoystickType type = SDL_JoystickGetType(device);
+            sdldev.is_joystick =
+                type == SDL_JOYSTICK_TYPE_WHEEL ||
+                type == SDL_JOYSTICK_TYPE_FLIGHT_STICK ||
+                type == SDL_JOYSTICK_TYPE_THROTTLE;
+        }
+
         if (!have_sdldevs)
             new_sdldevs = HeapAlloc(GetProcessHeap(), 0, sizeof(struct SDLDev));
         else
@@ -204,17 +212,14 @@ static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD ver
     lpddi->guidProduct.Data1 = MAKELONG(sdldevs[id].vendor_id, sdldevs[id].product_id);
     lpddi->guidFFDriver = GUID_NULL;
 
-    if (version >= 0x0800)
-        lpddi->dwDevType = DI8DEVTYPE_JOYSTICK | (DI8DEVTYPEJOYSTICK_STANDARD << 8);
-    else
-        lpddi->dwDevType = DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_TRADITIONAL << 8);
+    lpddi->dwDevType = get_device_type(version, sdldevs[id].is_joystick);
 
     /* Assume the joystick as HID if it is attached to USB bus and has a valid VID/PID */
     if ( sdldevs[id].vendor_id && sdldevs[id].product_id)
     {
         lpddi->dwDevType |= DIDEVTYPE_HID;
         lpddi->wUsagePage = 0x01; /* Desktop */
-        if (lpddi->dwDevType == DI8DEVTYPE_JOYSTICK || lpddi->dwDevType == DIDEVTYPE_JOYSTICK)
+        if (sdldevs[id].is_joystick)
             lpddi->wUsage = 0x04; /* Joystick */
         else
             lpddi->wUsage = 0x05; /* Game Pad */
