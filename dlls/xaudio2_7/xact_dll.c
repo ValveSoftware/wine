@@ -62,17 +62,17 @@ static inline IXAudio2Impl *impl_from_IXAudio27(IXAudio27 *iface)
 }
 #endif
 #if XACT3_VER == 0
-static inline XA2VoiceImpl *impl_from_IXAudio20MasteringVoice(IXAudio20MasteringVoice *iface)
+inline XA2VoiceImpl *impl_from_IXAudio20MasteringVoice(IXAudio20MasteringVoice *iface)
 {
     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio20MasteringVoice_iface);
 }
 #elif XACT3_VER <= 3
-static inline XA2VoiceImpl *impl_from_IXAudio23MasteringVoice(IXAudio23MasteringVoice *iface)
+inline XA2VoiceImpl *impl_from_IXAudio23MasteringVoice(IXAudio23MasteringVoice *iface)
 {
     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio23MasteringVoice_iface);
 }
 #else
-static inline XA2VoiceImpl *impl_from_IXAudio27MasteringVoice(IXAudio27MasteringVoice *iface)
+inline XA2VoiceImpl *impl_from_IXAudio27MasteringVoice(IXAudio27MasteringVoice *iface)
 {
     return CONTAINING_RECORD(iface, XA2VoiceImpl, IXAudio27MasteringVoice_iface);
 }
