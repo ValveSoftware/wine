@@ -393,6 +393,14 @@ float CDECL MSVCRT_floorf( float x )
 }
 
 /*********************************************************************
+ *      fmaf (MSVCRT.@)
+ */
+float CDECL MSVCRT_fmaf( float x, float y, float z )
+{
+  return fmaf(x, y, z);
+}
+
+/*********************************************************************
  *      frexpf (MSVCRT.@)
  */
 float CDECL MSVCRT_frexpf( float x, int *exp )
@@ -866,6 +874,14 @@ double CDECL MSVCRT_ceil( double x )
 double CDECL MSVCRT_floor( double x )
 {
   return floor(x);
+}
+
+/*********************************************************************
+ *      fma (MSVCRT.@)
+ */
+double CDECL MSVCRT_fma( double x, double y, double z )
+{
+  return fma(x, y, z);
 }
 
 /*********************************************************************
