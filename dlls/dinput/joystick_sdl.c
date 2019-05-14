@@ -70,6 +70,7 @@ struct SDLDev {
     WORD vendor_id;
     WORD product_id;
     CHAR *name;
+    BOOL is_xbox_gamepad;
 
     BOOL has_ff, is_joystick;
     int autocenter;
@@ -180,6 +181,11 @@ static void find_sdldevs(void)
                 type == SDL_JOYSTICK_TYPE_WHEEL ||
                 type == SDL_JOYSTICK_TYPE_FLIGHT_STICK ||
                 type == SDL_JOYSTICK_TYPE_THROTTLE;
+
+            if (SDL_IsGameController(i))
+                sdldev.is_xbox_gamepad = TRUE;
+            else
+                sdldev.is_xbox_gamepad  = SDL_JoystickNumAxes(device) == 6 && SDL_JoystickNumButtons(device) >= 14;
         }
 
         if (!have_sdldevs)
@@ -645,6 +651,26 @@ static HRESULT WINAPI JoystickWImpl_GetProperty(LPDIRECTINPUTDEVICE8W iface, REF
 
             pd->dwData = This->sdldev->id;
             TRACE("DIPROP_JOYSTICKID(%d)\n", pd->dwData);
+            break;
+        }
+
+        case (DWORD_PTR) DIPROP_GUIDANDPATH:
+        {
+            static const WCHAR formatW[] =  {'\\','\\','?','\\','H','I','D','#','V','I','D','_','%','0','4', 'x','&',
+                                             'P','I','D','_','%','0','4','x','&', '%','s','_','%','i',0};
+            static const WCHAR imW[] = {'I','M',0};
+            static const WCHAR igW[] = {'I','G',0};
+
+            LPDIPROPGUIDANDPATH pd = (LPDIPROPGUIDANDPATH)pdiph;
+
+            if (!This->sdldev->product_id || !This->sdldev->vendor_id)
+                return DIERR_UNSUPPORTED;
+
+            pd->guidClass = This->generic.base.guid;
+            sprintfW(pd->wszPath, formatW, This->sdldev->vendor_id, This->sdldev->product_id,
+                     This->sdldev->is_xbox_gamepad ? igW : imW, This->sdldev->id);
+
+            TRACE("DIPROP_GUIDANDPATH(%s, %s): returning fake path\n", debugstr_guid(&pd->guidClass), debugstr_w(pd->wszPath));
             break;
         }
 
