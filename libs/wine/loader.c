@@ -105,8 +105,8 @@ extern const char *get_dlldir( const char **default_dlldir );
 /* build the dll load path from the WINEDLLPATH variable */
 static void build_dll_path(void)
 {
-    int len, count = 0;
-    char *p, *path = getenv( "WINEDLLPATH" );
+    int len, count = 0, modcount = 0;
+    char *p, *path = getenv( "WINEDLLPATH" ), *modpath = getenv( "WINEMODPATH" );
     const char *dlldir = get_dlldir( &default_dlldir );
 
     if (path)
@@ -123,17 +123,50 @@ static void build_dll_path(void)
         }
     }
 
-    dll_paths = malloc( (count+2) * sizeof(*dll_paths) );
+    if (modpath)
+    {
+        /* count how many path elements we need */
+        modpath = strdup(modpath);
+        p = modpath;
+        while (*p)
+        {
+            while (*p == ':') p++;
+            if (!*p) break;
+            modcount++;
+            while (*p && *p != ':') p++;
+        }
+    }
+
+    dll_paths = malloc( (count+modcount+2) * sizeof(*dll_paths) );
     nb_dll_paths = 0;
 
     if (dlldir)
     {
         dll_path_maxlen = strlen(dlldir);
-        dll_paths[nb_dll_paths++] = dlldir;
     }
     else if ((build_dir = wine_get_build_dir()))
     {
         dll_path_maxlen = strlen(build_dir) + sizeof("/programs");
+    }
+
+    if (modcount)
+    {
+        p = modpath;
+        while (*p)
+        {
+            while (*p == ':') *p++ = 0;
+            if (!*p) break;
+            dll_paths[nb_dll_paths] = p;
+            while (*p && *p != ':') p++;
+            if (p - dll_paths[nb_dll_paths] > dll_path_maxlen)
+                dll_path_maxlen = p - dll_paths[nb_dll_paths];
+            nb_dll_paths++;
+        }
+    }
+
+    if (dlldir)
+    {
+        dll_paths[nb_dll_paths++] = dlldir;
     }
 
     if (count)
