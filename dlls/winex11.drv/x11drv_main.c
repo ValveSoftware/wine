@@ -64,7 +64,7 @@ XPixmapFormatValues **pixmap_formats;
 unsigned int screen_bpp;
 Window root_window;
 BOOL usexvidmode = FALSE;
-BOOL usexrandr = FALSE;
+BOOL usexrandr = TRUE;
 BOOL usexcomposite = TRUE;
 BOOL use_xkb = TRUE;
 BOOL use_take_focus = FALSE;

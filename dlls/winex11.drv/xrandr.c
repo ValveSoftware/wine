@@ -200,6 +200,9 @@ static void xrandr10_init_modes(void)
     int sizes_count;
     int i, j, nmodes = 0;
 
+    ERR("xrandr 1.2 support required\n");
+    return;
+
     sizes = pXRRSizes( gdi_display, DefaultScreen(gdi_display), &sizes_count );
     if (sizes_count <= 0) return;
 
@@ -444,7 +447,9 @@ static int xrandr12_init_modes(void)
     unsigned int only_one_resolution = 1, mode_count;
     XRRScreenResources *resources;
     XRROutputInfo *output_info;
+    XRRModeInfo *primary_mode = NULL;
     XRRCrtcInfo *crtc_info;
+    unsigned int primary_refresh, primary_dots;
     int ret = -1;
     int i, j;
 
@@ -469,6 +474,14 @@ static int xrandr12_init_modes(void)
         pXRRFreeScreenResources( resources );
         ERR("Failed to get primary CRTC info.\n");
         return ret;
+    }
+
+    for (i = 0; i < resources->nmode; ++i)
+    {
+        if (resources->modes[i].id == crtc_info->mode)
+        {
+            primary_mode = &resources->modes[i];
+        }
     }
 
     TRACE("CRTC %d: mode %#lx, %ux%u+%d+%d.\n", primary_crtc, crtc_info->mode,
@@ -497,10 +510,20 @@ static int xrandr12_init_modes(void)
     }
 
     dd_modes = X11DRV_Settings_SetHandlers( "XRandR 1.2",
-                                            xrandr12_get_current_mode,
-                                            xrandr12_set_current_mode,
+                                            NULL,
+                                            NULL,
                                             output_info->nmode, 1 );
 
+    if(primary_mode)
+    {
+        primary_dots = primary_mode->hTotal * primary_mode->vTotal;
+        primary_refresh = primary_dots ? (primary_mode->dotClock + primary_dots / 2) / primary_dots : 0;
+    }
+    else
+    {
+        WARN("Couldn't find primary mode! defaulting to 60 Hz\n");
+        primary_refresh = 60;
+    }
     xrandr_mode_count = 0;
     for (i = 0; i < output_info->nmode; ++i)
     {
@@ -510,12 +533,11 @@ static int xrandr12_init_modes(void)
 
             if (mode->id == output_info->modes[i])
             {
-                unsigned int dots = mode->hTotal * mode->vTotal;
-                unsigned int refresh = dots ? (mode->dotClock + dots / 2) / dots : 0;
-
-                TRACE("Adding mode %#lx: %ux%u@%u.\n", mode->id, mode->width, mode->height, refresh);
-                X11DRV_Settings_AddOneMode( mode->width, mode->height, 0, refresh );
-                xrandr12_modes[xrandr_mode_count++] = mode->id;
+                if(X11DRV_Settings_AddOneMode( mode->width, mode->height, 0, primary_refresh ))
+                {
+                    TRACE("Added mode %#lx: %ux%u@%u.\n", mode->id, mode->width, mode->height, primary_refresh);
+                    xrandr12_modes[xrandr_mode_count++] = mode->id;
+                }
                 break;
             }
         }
@@ -530,6 +552,11 @@ static int xrandr12_init_modes(void)
             break;
         }
     }
+
+    if(primary_mode)
+        X11DRV_Settings_SetRealMode(primary_mode->width, primary_mode->height);
+    else
+        X11DRV_Settings_SetRealMode(crtc_info->width, crtc_info->height);
 
     /* Recent (304.64, possibly earlier) versions of the nvidia driver only
      * report a DFP's native mode through RandR 1.2 / 1.3. Standard DMT modes

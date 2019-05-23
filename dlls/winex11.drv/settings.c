@@ -21,6 +21,7 @@
 #include "config.h"
 #include <string.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <math.h>
 
@@ -61,8 +62,10 @@ struct x11drv_mode_info *X11DRV_Settings_SetHandlers(const char *name,
                                                      int reserve_depths)
 {
     handler_name = name;
-    pGetCurrentMode = pNewGCM;
-    pSetCurrentMode = pNewSCM;
+    if(pNewGCM)
+        pGetCurrentMode = pNewGCM;
+    if(pNewSCM)
+        pSetCurrentMode = pNewSCM;
     TRACE("Resolution settings now handled by: %s\n", name);
     if (reserve_depths)
         /* leave room for other depths */
@@ -82,16 +85,29 @@ struct x11drv_mode_info *X11DRV_Settings_SetHandlers(const char *name,
 }
 
 /* Add one mode to the master list */
-void X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigned int bpp, unsigned int freq)
+BOOL X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigned int bpp, unsigned int freq)
 {
+    unsigned int i;
     struct x11drv_mode_info *info = &dd_modes[dd_mode_count];
     DWORD dwBpp = screen_bpp;
     if (dd_mode_count >= dd_max_modes)
     {
         ERR("Maximum modes (%d) exceeded\n", dd_max_modes);
-        return;
+        return FALSE;
     }
     if (bpp == 0) bpp = dwBpp;
+
+    for(i = 0; i < dd_mode_count; ++i)
+    {
+        if(dd_modes[i].width == width &&
+                dd_modes[i].height == height &&
+                dd_modes[i].refresh_rate == freq &&
+                dd_modes[i].bpp == bpp)
+        {
+            return FALSE;
+        }
+    }
+
     info->width         = width;
     info->height        = height;
     info->refresh_rate  = freq;
@@ -99,55 +115,13 @@ void X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigne
     TRACE("initialized mode %d: %dx%dx%d @%d Hz (%s)\n", 
           dd_mode_count, width, height, bpp, freq, handler_name);
     dd_mode_count++;
-}
 
-/* copy all the current modes using the other color depths */
-void X11DRV_Settings_AddDepthModes(void)
-{
-    int i, j;
-    int existing_modes = dd_mode_count;
-    DWORD dwBpp = screen_bpp;
-    const DWORD *depths = screen_bpp == 32 ? depths_32 : depths_24;
-
-    for (j=0; j<3; j++)
-    {
-        if (depths[j] != dwBpp)
-        {
-            for (i=0; i < existing_modes; i++)
-            {
-                X11DRV_Settings_AddOneMode(dd_modes[i].width, dd_modes[i].height,
-                                           depths[j], dd_modes[i].refresh_rate);
-            }
-        }
-    }
-}
-
-/* return the number of modes that are initialized */
-unsigned int X11DRV_Settings_GetModeCount(void)
-{
-    return dd_mode_count;
-}
-
-/***********************************************************************
- * Default handlers if resolution switching is not enabled
- *
- */
-static int currentMode = 0;
-double fs_hack_user_to_real_w = 1., fs_hack_user_to_real_h = 1.;
-double fs_hack_real_to_user_w = 1., fs_hack_real_to_user_h = 1.;
-static int offs_x = 0, offs_y = 0;
-static int fs_width = 0, fs_height = 0;
-
-static int X11DRV_nores_GetCurrentMode(void)
-{
-    return currentMode;
+    return TRUE;
 }
 
 static struct fs_mode {
     int w, h;
 } fs_modes[] = {
-    {0, 0}, /* mode 0 is the real mode */
-
     /* this table should provide a few resolution options for common display
      * ratios, so users can choose to render at lower resolution for
      * performance. */
@@ -172,9 +146,117 @@ static struct fs_mode {
     {1280, 1024}, /*  5:4 */
 };
 
+static int sort_display_modes(const void *l, const void *r)
+{
+    const struct x11drv_mode_info *left = l, *right = r;
+
+    /* largest first */
+    if(left->width < right->width)
+        return 1;
+
+    if(left->width > right->width)
+        return -1;
+
+    if(left->height < right->height)
+        return 1;
+
+    if(left->height > right->height)
+        return -1;
+
+    return 0;
+}
+
+static int currentMode = -1, realMode = -1;
+
+/* copy all the current modes using the other color depths */
+void X11DRV_Settings_AddDepthModes(void)
+{
+    int i, j;
+    int existing_modes = dd_mode_count;
+    DWORD dwBpp = screen_bpp;
+    const DWORD *depths = screen_bpp == 32 ? depths_32 : depths_24;
+    struct fs_mode real_mode;
+
+    real_mode.w = dd_modes[realMode].width;
+    real_mode.h = dd_modes[realMode].height;
+
+    /* Linux reports far fewer resolutions than Windows; add "missing" modes
+     * that some games may expect. */
+    for(i = 0; i < ARRAY_SIZE(fs_modes); ++i)
+    {
+        if(fs_modes[i].w <= real_mode.w &&
+                fs_modes[i].h <= real_mode.h)
+            X11DRV_Settings_AddOneMode(fs_modes[i].w, fs_modes[i].h, 0, dd_modes[realMode].refresh_rate);
+    }
+
+    qsort(dd_modes, dd_mode_count, sizeof(*dd_modes), sort_display_modes);
+
+    for (j=0; j<3; j++)
+    {
+        if (depths[j] != dwBpp)
+        {
+            for (i=0; i < existing_modes; i++)
+            {
+                X11DRV_Settings_AddOneMode(dd_modes[i].width, dd_modes[i].height,
+                                           depths[j], dd_modes[i].refresh_rate);
+            }
+        }
+    }
+
+    X11DRV_Settings_SetRealMode(real_mode.w, real_mode.h);
+}
+
+/* return the number of modes that are initialized */
+unsigned int X11DRV_Settings_GetModeCount(void)
+{
+    return dd_mode_count;
+}
+
+/***********************************************************************
+ * Default handlers if resolution switching is not enabled
+ *
+ */
+double fs_hack_user_to_real_w = 1., fs_hack_user_to_real_h = 1.;
+double fs_hack_real_to_user_w = 1., fs_hack_real_to_user_h = 1.;
+static int offs_x = 0, offs_y = 0;
+static int fs_width = 0, fs_height = 0;
+
+void X11DRV_Settings_SetRealMode(unsigned int w, unsigned int h)
+{
+    unsigned int i;
+
+    currentMode = realMode = -1;
+
+    for(i = 0; i < dd_mode_count; ++i)
+    {
+        if(dd_modes[i].width == w &&
+                dd_modes[i].height == h)
+        {
+            currentMode = i;
+            break;
+        }
+    }
+
+    if(currentMode < 0)
+    {
+        FIXME("Couldn't find current mode?! Returning 0...\n");
+        currentMode = 0;
+    }
+
+    realMode = currentMode;
+
+    TRACE("Set realMode to %d\n", realMode);
+}
+
+static int X11DRV_nores_GetCurrentMode(void)
+{
+    return currentMode;
+}
+
 BOOL fs_hack_enabled(void)
 {
-    return currentMode != 0;
+    return currentMode >= 0 &&
+        currentMode != realMode;
 }
 
 BOOL fs_hack_matches_current_mode(int w, int h)
@@ -187,8 +269,8 @@ BOOL fs_hack_matches_current_mode(int w, int h)
 BOOL fs_hack_matches_real_mode(int w, int h)
 {
     return fs_hack_enabled() &&
-        (w == fs_modes[0].w &&
-         h == fs_modes[0].h);
+        (w == dd_modes[realMode].width &&
+         h == dd_modes[realMode].height);
 }
 
 BOOL fs_hack_matches_last_mode(int w, int h)
@@ -314,22 +396,22 @@ static LONG X11DRV_nores_SetCurrentMode(int mode)
     }else{
         double w = dd_modes[currentMode].width;
         double h = dd_modes[currentMode].height;
-        if(fs_modes[0].w / (double)fs_modes[0].h < w / h){ /* real mode is narrower than fake mode */
+        if(dd_modes[realMode].width / (double)dd_modes[realMode].height < w / h){ /* real mode is narrower than fake mode */
             /* scale to fit width */
-            h = fs_modes[0].w * (h / w);
-            w = fs_modes[0].w;
+            h = dd_modes[realMode].width * (h / w);
+            w = dd_modes[realMode].width;
             offs_x = 0;
-            offs_y = (fs_modes[0].h - h) / 2;
-            fs_width = fs_modes[0].w;
+            offs_y = (dd_modes[realMode].height - h) / 2;
+            fs_width = dd_modes[realMode].width;
             fs_height = (int)h;
         }else{
             /* scale to fit height */
-            w = fs_modes[0].h * (w / h);
-            h = fs_modes[0].h;
-            offs_x = (fs_modes[0].w - w) / 2;
+            w = dd_modes[realMode].height * (w / h);
+            h = dd_modes[realMode].height;
+            offs_x = (dd_modes[realMode].width - w) / 2;
             offs_y = 0;
             fs_width = (int)w;
-            fs_height = fs_modes[0].h;
+            fs_height = dd_modes[realMode].height;
         }
         fs_hack_user_to_real_w = w / (double)dd_modes[currentMode].width;
         fs_hack_user_to_real_h = h / (double)dd_modes[currentMode].height;
@@ -360,24 +442,12 @@ POINT fs_hack_real_mode(void)
 
 void X11DRV_Settings_Init(void)
 {
-    int i;
     RECT primary = get_primary_monitor_rect();
     X11DRV_Settings_SetHandlers("NoRes", 
                                 X11DRV_nores_GetCurrentMode, 
                                 X11DRV_nores_SetCurrentMode, 
-                                sizeof(fs_modes) / sizeof(struct fs_mode), 1);
-    fs_modes[0].w = primary.right - primary.left;
-    fs_modes[0].h = primary.bottom - primary.top;
-    for(i = 0; i < sizeof(fs_modes) / sizeof(struct fs_mode); ++i){
-        if(i > 0 &&
-                ((fs_modes[i].w == fs_modes[0].w &&
-                  fs_modes[i].h == fs_modes[0].h) ||
-                 (fs_modes[i].w > fs_modes[0].w ||
-                  fs_modes[i].h > fs_modes[0].h)))
-            continue;
-        X11DRV_Settings_AddOneMode( fs_modes[i].w, fs_modes[i].h, 0, 60);
-    }
-    X11DRV_Settings_AddDepthModes();
+                                1, 0);
+    X11DRV_Settings_AddOneMode( primary.right - primary.left, primary.bottom - primary.top, 0, 60);
 }
 
 static BOOL get_display_device_reg_key(char *key, unsigned len)
