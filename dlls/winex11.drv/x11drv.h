@@ -689,7 +689,7 @@ extern BOOL is_detached_mode(const DEVMODEW *) DECLSPEC_HIDDEN;
 extern BOOL create_desktop_win_data( Window win ) DECLSPEC_HIDDEN;
 extern BOOL get_primary_adapter(WCHAR *) DECLSPEC_HIDDEN;
 extern void X11DRV_Settings_AddDepthModes(void) DECLSPEC_HIDDEN;
-extern void X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigned int bpp, unsigned int freq) DECLSPEC_HIDDEN;
+extern BOOL X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigned int bpp, unsigned int freq) DECLSPEC_HIDDEN;
 unsigned int X11DRV_Settings_GetModeCount(void) DECLSPEC_HIDDEN;
 void X11DRV_Settings_Init(void) DECLSPEC_HIDDEN;
 struct x11drv_mode_info *X11DRV_Settings_SetHandlers(const char *name,
@@ -697,6 +697,7 @@ struct x11drv_mode_info *X11DRV_Settings_SetHandlers(const char *name,
                                                      LONG (*pNewSCM)(int),
                                                      unsigned int nmodes,
                                                      int reserve_depths) DECLSPEC_HIDDEN;
+void X11DRV_Settings_SetRealMode(unsigned int w, unsigned int h) DECLSPEC_HIDDEN;
 
 void X11DRV_XF86VM_Init(void) DECLSPEC_HIDDEN;
 void X11DRV_XRandR_Init(void) DECLSPEC_HIDDEN;
