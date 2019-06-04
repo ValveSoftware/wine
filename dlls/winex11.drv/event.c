@@ -752,6 +752,14 @@ static const char * const focus_details[] =
     "NotifyDetailNone"
 };
 
+static const char * const focus_modes[] =
+{
+    "NotifyNormal",
+    "NotifyGrab",
+    "NotifyUngrab",
+    "NotifyWhileGrabbed"
+};
+
 /**********************************************************************
  *              X11DRV_FocusIn
  */
@@ -762,7 +770,7 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
 
     if (!hwnd) return FALSE;
 
-    TRACE( "win %p xwin %lx detail=%s\n", hwnd, event->window, focus_details[event->detail] );
+    TRACE( "win %p xwin %lx detail=%s mode=%s\n", hwnd, event->window, focus_details[event->detail], focus_modes[event->mode] );
 
     if (event->detail == NotifyPointer) return FALSE;
     if (hwnd == GetDesktopWindow()) return FALSE;
@@ -877,7 +885,7 @@ static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
 {
     XFocusChangeEvent *event = &xev->xfocus;
 
-    TRACE( "win %p xwin %lx detail=%s\n", hwnd, event->window, focus_details[event->detail] );
+    TRACE( "win %p xwin %lx detail=%s mode=%s\n", hwnd, event->window, focus_details[event->detail], focus_modes[event->mode] );
 
     if (event->detail == NotifyPointer)
     {
