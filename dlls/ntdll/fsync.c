@@ -876,7 +876,14 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
             /* Looks like everything is contended, so wait. */
 
-            if (timeout)
+            if (timeout && !timeout->QuadPart)
+            {
+                /* Unlike esync, we already know that we've timed out, so we
+                 * can avoid a syscall. */
+                TRACE("Wait timed out.\n");
+                return STATUS_TIMEOUT;
+            }
+            else if (timeout)
             {
                 LONGLONG timeleft = update_timeout( end );
                 struct timespec tmo_p;
