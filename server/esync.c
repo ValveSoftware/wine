@@ -399,9 +399,12 @@ void esync_set_event( struct esync *esync )
     if (debug_level)
         fprintf( stderr, "esync_set_event() fd=%d\n", esync->fd );
 
-    /* Acquire the spinlock. */
-    while (interlocked_cmpxchg( &event->locked, 1, 0 ))
-        small_pause();
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Acquire the spinlock. */
+        while (interlocked_cmpxchg( &event->locked, 1, 0 ))
+            small_pause();
+    }
 
     if (!interlocked_xchg( &event->signaled, 1 ))
     {
@@ -409,8 +412,11 @@ void esync_set_event( struct esync *esync )
             perror( "esync: write" );
     }
 
-    /* Release the spinlock. */
-    event->locked = 0;
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Release the spinlock. */
+        event->locked = 0;
+    }
 }
 
 void esync_reset_event( struct esync *esync )
@@ -424,9 +430,12 @@ void esync_reset_event( struct esync *esync )
     if (debug_level)
         fprintf( stderr, "esync_reset_event() fd=%d\n", esync->fd );
 
-    /* Acquire the spinlock. */
-    while (interlocked_cmpxchg( &event->locked, 1, 0 ))
-        small_pause();
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Acquire the spinlock. */
+        while (interlocked_cmpxchg( &event->locked, 1, 0 ))
+            small_pause();
+    }
 
     /* Only bother signaling the fd if we weren't already signaled. */
     if (interlocked_xchg( &event->signaled, 0 ))
@@ -435,8 +444,11 @@ void esync_reset_event( struct esync *esync )
         read( esync->fd, &value, sizeof(value) );
     }
 
-    /* Release the spinlock. */
-    event->locked = 0;
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Release the spinlock. */
+        event->locked = 0;
+    }
 }
 
 DECL_HANDLER(create_esync)
