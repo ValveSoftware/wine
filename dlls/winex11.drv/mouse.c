@@ -384,10 +384,14 @@ static BOOL grab_clipping_window( const RECT *clip )
 {
     static const WCHAR messageW[] = {'M','e','s','s','a','g','e',0};
     struct x11drv_thread_data *data = x11drv_thread_data();
+    static DWORD timeout = 5000;
+    static DWORD step = 100;
+    DWORD time = 0;
     Window clip_window;
     HWND msg_hwnd = 0;
     POINT pos;
     RECT real_clip;
+    INT ret;
 
     if (GetWindowThreadProcessId( GetDesktopWindow(), NULL ) == GetCurrentThreadId())
         return TRUE;  /* don't clip in the desktop process */
@@ -454,13 +458,24 @@ static BOOL grab_clipping_window( const RECT *clip )
         clip->right < clip_rect.right || clip->bottom < clip_rect.bottom)
         data->warp_serial = NextRequest( data->display );
 
-    if (!XGrabPointer( data->display, clip_window, False,
-                       PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
-                       GrabModeAsync, GrabModeAsync, clip_window, None, CurrentTime ))
+    /* Some windows managers temporarily grab the pointer during window transition. Retry grabbing. */
+    do
+    {
+        ret = XGrabPointer( data->display, clip_window, False, PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
+                            GrabModeAsync, GrabModeAsync, clip_window, None, CurrentTime );
+        if (ret == AlreadyGrabbed || ret == GrabFrozen)
+        {
+            time += step;
+            Sleep(step);
+        }
+    } while ((ret == AlreadyGrabbed || ret == GrabFrozen) && time < timeout);
+
+    if (ret == GrabSuccess)
         clipping_cursor = TRUE;
 
     if (!clipping_cursor)
     {
+        ERR("Failed to grab pointer\n");
         disable_xinput2();
         DestroyWindow( msg_hwnd );
         return FALSE;
