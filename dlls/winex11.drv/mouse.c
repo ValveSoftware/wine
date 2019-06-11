@@ -397,6 +397,12 @@ static BOOL grab_clipping_window( const RECT *clip )
                                     GetModuleHandleW(0), NULL )))
         return TRUE;
 
+    if (keyboard_grabbed)
+    {
+        WARN( "refusing to clip to %s\n", wine_dbgstr_rect(clip) );
+        return FALSE;
+    }
+
     /* enable XInput2 unless we are already clipping */
     if (!data->clip_hwnd) enable_xinput2();
 
@@ -1475,6 +1481,12 @@ BOOL CDECL X11DRV_SetCursorPos( INT x, INT y )
 
     fs_hack_user_to_real(&pos);
     pos = virtual_screen_to_root( pos.x, pos.y );
+
+    if (keyboard_grabbed)
+    {
+        WARN( "refusing to warp to %u, %u\n", pos.x, pos.y );
+        return FALSE;
+    }
 
     TRACE("real setting to %u, %u\n",
             pos.x, pos.y);
