@@ -1502,8 +1502,8 @@ BOOL CDECL X11DRV_GetCursorPos(LPPOINT pos)
     if (ret)
     {
         POINT old = *pos;
-        POINT p = root_to_virtual_screen( winX, winY );
-        fs_hack_real_to_user(&p);
+        *pos = root_to_virtual_screen( winX, winY );
+        fs_hack_real_to_user(pos);
         TRACE( "pointer at %s server pos %s\n", wine_dbgstr_point(pos), wine_dbgstr_point(&old) );
     }
     return ret;
