@@ -93,6 +93,7 @@ MAKE_FUNCPTR(SDL_JoystickNumHats);
 MAKE_FUNCPTR(SDL_JoystickGetAxis);
 MAKE_FUNCPTR(SDL_JoystickGetHat);
 MAKE_FUNCPTR(SDL_IsGameController);
+MAKE_FUNCPTR(SDL_GameControllerClose);
 MAKE_FUNCPTR(SDL_GameControllerGetAxis);
 MAKE_FUNCPTR(SDL_GameControllerGetButton);
 MAKE_FUNCPTR(SDL_GameControllerName);
@@ -962,13 +963,28 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
 static void try_remove_device(SDL_JoystickID index)
 {
     DEVICE_OBJECT *device = NULL;
+    struct platform_private *private;
+    SDL_Joystick *sdl_joystick;
+    SDL_GameController *sdl_controller;
+    SDL_Haptic *sdl_haptic;
 
     device = bus_find_hid_device(&sdl_vtbl, ULongToPtr(index));
     if (!device) return;
 
+    private = impl_from_DEVICE_OBJECT(device);
+    sdl_joystick = private->sdl_joystick;
+    sdl_controller = private->sdl_controller;
+    sdl_haptic = private->sdl_haptic;
+
     IoInvalidateDeviceRelations(device, RemovalRelations);
 
     bus_remove_hid_device(device);
+
+    pSDL_JoystickClose(sdl_joystick);
+    if (sdl_controller)
+        pSDL_GameControllerClose(sdl_controller);
+    if (sdl_haptic)
+        pSDL_HapticClose(sdl_haptic);
 }
 
 static void try_add_device(SDL_JoystickID index, BOOL xinput_hack)
@@ -1165,6 +1181,7 @@ NTSTATUS WINAPI sdl_driver_init(DRIVER_OBJECT *driver, UNICODE_STRING *registry_
         LOAD_FUNCPTR(SDL_JoystickGetAxis);
         LOAD_FUNCPTR(SDL_JoystickGetHat);
         LOAD_FUNCPTR(SDL_IsGameController);
+        LOAD_FUNCPTR(SDL_GameControllerClose);
         LOAD_FUNCPTR(SDL_GameControllerGetAxis);
         LOAD_FUNCPTR(SDL_GameControllerGetButton);
         LOAD_FUNCPTR(SDL_GameControllerName);
