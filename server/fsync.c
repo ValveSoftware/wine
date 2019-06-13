@@ -128,6 +128,8 @@ void fsync_init(void)
 
     is_fsync_initialized = 1;
 
+    fprintf( stderr, "fsync: up and running.\n" );
+
     atexit( shm_cleanup );
 }
 
