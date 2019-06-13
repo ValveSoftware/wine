@@ -4444,8 +4444,8 @@ static void shader_glsl_scalar_op(const struct wined3d_shader_instruction *ins)
             break;
 
         case WINED3DSIH_RCP:
-            prefix = "1.0 / ";
-            suffix = "";
+            prefix = "max(min(1.0 / ";
+            suffix = ", 1e10), -1e10)";
             break;
 
         case WINED3DSIH_RSQ:
