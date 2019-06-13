@@ -58,6 +58,7 @@
 
 #include "unix_private.h"
 #include "esync.h"
+#include "fsync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(esync);
 
@@ -67,7 +68,7 @@ int do_esync(void)
     static int do_esync_cached = -1;
 
     if (do_esync_cached == -1)
-        do_esync_cached = getenv("WINEESYNC") && atoi(getenv("WINEESYNC"));
+        do_esync_cached = getenv("WINEESYNC") && atoi(getenv("WINEESYNC")) && !do_fsync();
 
     return do_esync_cached;
 #else
