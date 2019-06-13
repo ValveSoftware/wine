@@ -101,6 +101,8 @@ void esync_init(void)
     if (ftruncate( shm_fd, shm_size ) == -1)
         perror( "ftruncate" );
 
+    fprintf( stderr, "esync: up and running.\n" );
+
     atexit( shm_cleanup );
 }
 
