@@ -719,6 +719,14 @@ static NTSTATUS get_string(DEVICE_OBJECT *device, DWORD index, WCHAR *buffer, DW
                 str = pSDL_GameControllerName(ext->sdl_controller);
             else
                 str = pSDL_JoystickName(ext->sdl_joystick);
+
+            // HACK: Force the Xbox360 controller name to the same name
+            // as on Windows, some applications are checking for it
+            if (pSDL_JoystickGetVendor != NULL &&
+                pSDL_JoystickGetProduct != NULL &&
+                is_xbox_gamepad(pSDL_JoystickGetVendor(ext->sdl_joystick),
+                                pSDL_JoystickGetProduct(ext->sdl_joystick)))
+                str = "Controller (XBOX 360 For Windows)";
             break;
         case HID_STRING_ID_IMANUFACTURER:
             str = "SDL";
