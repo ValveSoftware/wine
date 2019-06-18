@@ -506,17 +506,11 @@ static VkResult wine_vk_instance_convert_create_info(const VkInstanceCreateInfo 
         return VK_ERROR_LAYER_NOT_PRESENT;
     }
 
-    TRACE("Enabled %u instance extensions.\n", dst->enabledExtensionCount);
+    TRACE("Enabled extensions: %u\n", dst->enabledExtensionCount);
     for (i = 0; i < dst->enabledExtensionCount; i++)
     {
         const char *extension_name = dst->ppEnabledExtensionNames[i];
         TRACE("Extension %u: %s.\n", i, debugstr_a(extension_name));
-        if (!wine_vk_instance_extension_supported(extension_name))
-        {
-            WARN("Extension %s is not supported.\n", debugstr_a(extension_name));
-            free_VkInstanceCreateInfo_struct_chain(dst);
-            return VK_ERROR_EXTENSION_NOT_PRESENT;
-        }
         if (!strcmp(extension_name, "VK_EXT_debug_utils") || !strcmp(extension_name, "VK_EXT_debug_report"))
         {
             object->enable_wrapper_list = VK_TRUE;
