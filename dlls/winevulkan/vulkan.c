@@ -345,17 +345,10 @@ static VkResult wine_vk_instance_convert_create_info(const VkInstanceCreateInfo 
     dst->enabledLayerCount = 0;
     dst->ppEnabledLayerNames = NULL;
 
-    TRACE("Enabled %u instance extensions.\n", dst->enabledExtensionCount);
+    TRACE("Enabled extensions: %u\n", dst->enabledExtensionCount);
     for (i = 0; i < dst->enabledExtensionCount; i++)
     {
-        const char *extension_name = dst->ppEnabledExtensionNames[i];
-        TRACE("Extension %u: %s.\n", i, debugstr_a(extension_name));
-        if (!wine_vk_instance_extension_supported(extension_name))
-        {
-            WARN("Extension %s is not supported.\n", debugstr_a(extension_name));
-            free_VkInstanceCreateInfo_struct_chain(dst);
-            return VK_ERROR_EXTENSION_NOT_PRESENT;
-        }
+        TRACE("Extension %u: %s\n", i, debugstr_a(dst->ppEnabledExtensionNames[i]));
     }
 
     return VK_SUCCESS;
@@ -664,12 +657,7 @@ VkResult WINAPI wine_vkCreateInstance(const VkInstanceCreateInfo *create_info,
     }
     object->base.loader_magic = VULKAN_ICD_MAGIC_VALUE;
 
-    res = wine_vk_instance_convert_create_info(create_info, &create_info_host);
-    if (res != VK_SUCCESS)
-    {
-        wine_vk_instance_free(object);
-        return res;
-    }
+    wine_vk_instance_convert_create_info(create_info, &create_info_host);
 
     res = vk_funcs->p_vkCreateInstance(&create_info_host, NULL /* allocator */, &object->instance);
     free_VkInstanceCreateInfo_struct_chain(&create_info_host);
