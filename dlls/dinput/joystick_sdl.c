@@ -108,6 +108,10 @@ static const GUID DInput_Wine_SDL_Joystick_GUID = { /* 001E36B7-5DBA-4C4F-A8C9-C
   0x001E36B7, 0x5DBA, 0x4C4F, {0xA8, 0xC9, 0xCF, 0xC8, 0x68, 0x9D, 0xB4, 0x03}
 };
 
+static const GUID DInput_PIDVID_Product_GUID = { /* PIDVID-0000-0000-0000-504944564944 "PIDVID" */
+  0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x50, 0x49, 0x44, 0x56, 0x49, 0x44}
+};
+
 static int have_sdldevs = -1;
 static struct SDLDev *sdldevs = NULL;
 
@@ -214,7 +218,7 @@ static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD ver
     lpddi->dwSize       = dwSize;
     lpddi->guidInstance = DInput_Wine_SDL_Joystick_GUID;
     lpddi->guidInstance.Data3 = id;
-    lpddi->guidProduct = DInput_Wine_SDL_Joystick_GUID;
+    lpddi->guidProduct = DInput_PIDVID_Product_GUID;
     lpddi->guidProduct.Data1 = MAKELONG(sdldevs[id].vendor_id, sdldevs[id].product_id);
     lpddi->guidFFDriver = GUID_NULL;
 
@@ -389,7 +393,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
 
     newDevice->generic.guidInstance = DInput_Wine_SDL_Joystick_GUID;
     newDevice->generic.guidInstance.Data3 = index;
-    newDevice->generic.guidProduct = DInput_Wine_SDL_Joystick_GUID;
+    newDevice->generic.guidProduct = DInput_PIDVID_Product_GUID;
     newDevice->generic.guidProduct.Data1 = MAKELONG(sdldevs[index].vendor_id, sdldevs[index].product_id);
     newDevice->generic.joy_polldev = poll_sdl_device_state;
 
