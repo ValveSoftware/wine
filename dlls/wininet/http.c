@@ -3911,8 +3911,8 @@ lend:
          WININET_Release( &request->hdr );
 
     TRACE("%u <--\n", res);
-    if(res != ERROR_SUCCESS)
-        SetLastError(res);
+
+    SetLastError(res);
     return res == ERROR_SUCCESS;
 }
 
