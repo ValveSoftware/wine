@@ -393,6 +393,9 @@ static void set_cursor_pos( struct desktop *desktop, int x, int y )
     static const struct hw_msg_source source = { IMDT_UNAVAILABLE, IMO_SYSTEM };
     struct message *msg;
 
+    if (current->process->rawinput_mouse && 
+        current->process->rawinput_mouse->flags & RIDEV_NOLEGACY) return;
+
     if (!(msg = alloc_hardware_message( 0, source, get_tick_count() ))) return;
 
     msg->msg = WM_MOUSEMOVE;
@@ -1719,6 +1722,9 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         msg_data->rawinput.mouse.data = input->mouse.data;
 
         queue_hardware_message( desktop, msg, 0 );
+
+        if (device->flags & RIDEV_NOLEGACY)
+            return FALSE;
     }
 
     for (i = 0; i < ARRAY_SIZE( messages ); i++)
@@ -1844,6 +1850,9 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         msg_data->rawinput.kbd.scan    = input->kbd.scan;
 
         queue_hardware_message( desktop, msg, 0 );
+
+        if (device->flags & RIDEV_NOLEGACY)
+            return FALSE;
     }
 
     if (!(msg = alloc_hardware_message( input->kbd.info, source, time ))) return 0;
