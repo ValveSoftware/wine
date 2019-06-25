@@ -104,7 +104,7 @@ static CRITICAL_SECTION win_data_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
 
 /* enable workarounds for mutter bugs */
-static BOOL wm_is_mutter(Display *display)
+BOOL wm_is_mutter(Display *display)
 {
     Window root = DefaultRootWindow(display), *wm_check;
     Atom type;
