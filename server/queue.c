@@ -393,6 +393,9 @@ static void set_cursor_pos( struct desktop *desktop, int x, int y )
     static const struct hw_msg_source source = { IMDT_UNAVAILABLE, IMO_SYSTEM };
     struct message *msg;
 
+    if (current->process->rawinput_mouse &&
+        current->process->rawinput_mouse->flags & RIDEV_NOLEGACY) return;
+
     if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
 
     msg->msg = WM_MOUSEMOVE;
@@ -1718,6 +1721,7 @@ done:
 static int queue_mouse_message( struct desktop *desktop, user_handle_t win, const hw_input_t *input,
                                 unsigned int origin, struct msg_queue *sender, unsigned int req_flags )
 {
+    const struct rawinput_device *device;
     struct hardware_msg_data *msg_data;
     struct rawinput_message raw_msg;
     struct message *msg;
@@ -1793,6 +1797,8 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
 
     if (!(req_flags & SEND_HWMSG_WINDOW))
         return 0;
+    if ((device = current->process->rawinput_mouse) && (device->flags & RIDEV_NOLEGACY))
+        return 0;
 
     for (i = 0; i < ARRAY_SIZE( messages ); i++)
     {
@@ -1828,6 +1834,7 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
                                    unsigned int origin, struct msg_queue *sender, unsigned int req_flags )
 {
     struct hw_msg_source source = { IMDT_KEYBOARD, origin };
+    const struct rawinput_device *device;
     struct hardware_msg_data *msg_data;
     struct rawinput_message raw_msg;
     struct message *msg;
@@ -1924,6 +1931,8 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
     }
 
     if (!(req_flags & SEND_HWMSG_WINDOW))
+        return 0;
+    if ((device = current->process->rawinput_kbd) && (device->flags & RIDEV_NOLEGACY))
         return 0;
 
     if (!(msg = alloc_hardware_message( input->kbd.info, source, time, 0 ))) return 0;
