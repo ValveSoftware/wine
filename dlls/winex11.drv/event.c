@@ -787,6 +787,14 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         keyboard_grabbed = FALSE;
         break;
     case NotifyUngrab:
+        /* Focus was just restored but it can be right after super was
+         * pressed and gnome-shell needs a bit of time to respond and
+         * toggle the activity view. If we grab the cursor right away
+         * it will cancel it and super key will do nothing.
+         */
+        if (wm_is_mutter(event->display))
+            Sleep(100);
+
         keyboard_grabbed = FALSE;
         retry_grab_clipping_window();
         return TRUE; /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
