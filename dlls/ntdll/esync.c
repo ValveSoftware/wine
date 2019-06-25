@@ -263,6 +263,13 @@ static NTSTATUS get_object( HANDLE handle, struct esync **obj )
         return STATUS_NOT_IMPLEMENTED;
     }
 
+    if (!handle)
+    {
+        /* Shadow of the Tomb Raider really likes passing in NULL handles to
+         * various functions. Concerning, but let's avoid a server call. */
+        return STATUS_INVALID_HANDLE;
+    }
+
     /* We need to try grabbing it from the server. */
     server_enter_uninterrupted_section( &fd_cache_section, &sigset );
     if (!(*obj = get_cached_object( handle )))
