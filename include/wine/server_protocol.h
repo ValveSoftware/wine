@@ -291,7 +291,8 @@ struct hardware_msg_data
             int            type;
             int            x;
             int            y;
-            unsigned int   data;
+            unsigned short button_flags;
+            unsigned short button_data;
         } mouse;
     } rawinput;
 };
@@ -6904,6 +6905,6 @@ union generic_reply
     struct get_fsync_apc_idx_reply get_fsync_apc_idx_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 606
+#define SERVER_PROTOCOL_VERSION 607
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

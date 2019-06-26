@@ -2295,54 +2295,14 @@ static BOOL process_rawinput_message( MSG *msg, const struct hardware_msg_data *
     rawinput->header.dwType = msg_data->rawinput.type;
     if (msg_data->rawinput.type == RIM_TYPEMOUSE)
     {
-        static const unsigned int button_flags[] =
-        {
-            0,                              /* MOUSEEVENTF_MOVE */
-            RI_MOUSE_LEFT_BUTTON_DOWN,      /* MOUSEEVENTF_LEFTDOWN */
-            RI_MOUSE_LEFT_BUTTON_UP,        /* MOUSEEVENTF_LEFTUP */
-            RI_MOUSE_RIGHT_BUTTON_DOWN,     /* MOUSEEVENTF_RIGHTDOWN */
-            RI_MOUSE_RIGHT_BUTTON_UP,       /* MOUSEEVENTF_RIGHTUP */
-            RI_MOUSE_MIDDLE_BUTTON_DOWN,    /* MOUSEEVENTF_MIDDLEDOWN */
-            RI_MOUSE_MIDDLE_BUTTON_UP,      /* MOUSEEVENTF_MIDDLEUP */
-        };
-        unsigned int i;
-
         rawinput->header.dwSize  = FIELD_OFFSET(RAWINPUT, data) + sizeof(RAWMOUSE);
         rawinput->header.hDevice = WINE_MOUSE_HANDLE;
         rawinput->header.wParam  = 0;
 
         rawinput->data.mouse.usFlags           = MOUSE_MOVE_RELATIVE;
-        rawinput->data.mouse.u.s.usButtonFlags = 0;
-        rawinput->data.mouse.u.s.usButtonData  = 0;
-        for (i = 1; i < ARRAY_SIZE(button_flags); ++i)
-        {
-            if (msg_data->flags & (1 << i))
-                rawinput->data.mouse.u.s.usButtonFlags |= button_flags[i];
-        }
-        if (msg_data->flags & MOUSEEVENTF_WHEEL)
-        {
-            rawinput->data.mouse.u.s.usButtonFlags |= RI_MOUSE_WHEEL;
-            rawinput->data.mouse.u.s.usButtonData   = msg_data->rawinput.mouse.data;
-        }
-        if (msg_data->flags & MOUSEEVENTF_HWHEEL)
-        {
-            rawinput->data.mouse.u.s.usButtonFlags |= RI_MOUSE_HORIZONTAL_WHEEL;
-            rawinput->data.mouse.u.s.usButtonData   = msg_data->rawinput.mouse.data;
-        }
-        if (msg_data->flags & MOUSEEVENTF_XDOWN)
-        {
-            if (msg_data->rawinput.mouse.data == XBUTTON1)
-                rawinput->data.mouse.u.s.usButtonFlags |= RI_MOUSE_BUTTON_4_DOWN;
-            else if (msg_data->rawinput.mouse.data == XBUTTON2)
-                rawinput->data.mouse.u.s.usButtonFlags |= RI_MOUSE_BUTTON_5_DOWN;
-        }
-        if (msg_data->flags & MOUSEEVENTF_XUP)
-        {
-            if (msg_data->rawinput.mouse.data == XBUTTON1)
-                rawinput->data.mouse.u.s.usButtonFlags |= RI_MOUSE_BUTTON_4_UP;
-            else if (msg_data->rawinput.mouse.data == XBUTTON2)
-                rawinput->data.mouse.u.s.usButtonFlags |= RI_MOUSE_BUTTON_5_UP;
-        }
+
+        rawinput->data.mouse.u.s.usButtonFlags = msg_data->rawinput.mouse.button_flags;
+        rawinput->data.mouse.u.s.usButtonData = msg_data->rawinput.mouse.button_data;
 
         rawinput->data.mouse.ulRawButtons       = 0;
         rawinput->data.mouse.lLastX             = msg_data->rawinput.mouse.x;

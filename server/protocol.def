@@ -304,10 +304,11 @@ struct hardware_msg_data
         } kbd;
         struct
         {
-            int            type;    /* RIM_TYPEMOUSE */
-            int            x;       /* x coordinate */
-            int            y;       /* y coordinate */
-            unsigned int   data;    /* mouse data */
+            int            type;            /* RIM_TYPEMOUSE */
+            int            x;               /* x coordinate */
+            int            y;               /* y coordinate */
+            unsigned short button_flags;    /* mouse button */
+            unsigned short button_data;     /* event details */
         } mouse;
     } rawinput;
 };

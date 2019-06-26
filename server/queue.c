@@ -1678,6 +1678,16 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         WM_MOUSEHWHEEL   /* 0x1000 = MOUSEEVENTF_HWHEEL */
     };
 
+    static const unsigned int raw_button_flags[] =     {
+        0,                            /* 0x0001 = MOUSEEVENTF_MOVE */
+        RI_MOUSE_LEFT_BUTTON_DOWN,    /* 0x0002 = MOUSEEVENTF_LEFTDOWN */
+        RI_MOUSE_LEFT_BUTTON_UP,      /* 0x0004 = MOUSEEVENTF_LEFTUP */
+        RI_MOUSE_RIGHT_BUTTON_DOWN,   /* 0x0008 = MOUSEEVENTF_RIGHTDOWN */
+        RI_MOUSE_RIGHT_BUTTON_UP,     /* 0x0010 = MOUSEEVENTF_RIGHTUP */
+        RI_MOUSE_MIDDLE_BUTTON_DOWN,  /* 0x0020 = MOUSEEVENTF_MIDDLEDOWN */
+        RI_MOUSE_MIDDLE_BUTTON_UP,    /* 0x0040 = MOUSEEVENTF_MIDDLEUP */
+    };
+
     desktop->cursor.last_change = get_tick_count();
     flags = input->mouse.flags;
     time  = input->mouse.time;
@@ -1715,11 +1725,43 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         msg->wparam    = RIM_INPUT;
         msg->lparam    = 0;
 
-        msg_data->flags               = flags;
+        msg_data->flags               = 0;
         msg_data->rawinput.type       = RIM_TYPEMOUSE;
         msg_data->rawinput.mouse.x    = x - desktop->cursor.x;
         msg_data->rawinput.mouse.y    = y - desktop->cursor.y;
-        msg_data->rawinput.mouse.data = input->mouse.data;
+        msg_data->rawinput.mouse.button_flags = 0;
+        msg_data->rawinput.mouse.button_data = 0;
+
+        for (i = 1; i < ARRAY_SIZE(raw_button_flags); ++i)
+        {
+            if (flags & (1 << i))
+                msg_data->rawinput.mouse.button_flags |= raw_button_flags[i];
+        }
+
+        if (flags & MOUSEEVENTF_WHEEL)
+        {
+            msg_data->rawinput.mouse.button_flags |= RI_MOUSE_WHEEL;
+            msg_data->rawinput.mouse.button_data   = input->mouse.data;
+        }
+        if (flags & MOUSEEVENTF_HWHEEL)
+        {
+            msg_data->rawinput.mouse.button_flags |= RI_MOUSE_HORIZONTAL_WHEEL;
+            msg_data->rawinput.mouse.button_data   = input->mouse.data;
+        }
+        if (flags & MOUSEEVENTF_XDOWN)
+        {
+            if (input->mouse.data == XBUTTON1)
+                msg_data->rawinput.mouse.button_flags |= RI_MOUSE_BUTTON_4_DOWN;
+            else if (input->mouse.data == XBUTTON2)
+                msg_data->rawinput.mouse.button_flags |= RI_MOUSE_BUTTON_5_DOWN;
+        }
+        if (flags & MOUSEEVENTF_XUP)
+        {
+            if (input->mouse.data == XBUTTON1)
+                msg_data->rawinput.mouse.button_flags |= RI_MOUSE_BUTTON_4_UP;
+            else if (input->mouse.data == XBUTTON2)
+                msg_data->rawinput.mouse.button_flags |= RI_MOUSE_BUTTON_5_UP;
+        }
 
         queue_hardware_message( desktop, msg, 0 );
 
