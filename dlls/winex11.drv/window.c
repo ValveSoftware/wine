@@ -765,10 +765,16 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
         }
     }
 
+    mwm_hints.flags = MWM_HINTS_FUNCTIONS | MWM_HINTS_DECORATIONS;
+
+    if (data->prev_hints.flags == mwm_hints.flags &&
+        data->prev_hints.decorations == mwm_hints.decorations &&
+        data->prev_hints.functions == mwm_hints.functions)
+        return;
+
     TRACE( "%p setting mwm hints to %lx,%lx (style %x exstyle %x)\n",
            data->hwnd, mwm_hints.decorations, mwm_hints.functions, style, ex_style );
 
-    mwm_hints.flags = MWM_HINTS_FUNCTIONS | MWM_HINTS_DECORATIONS;
     mwm_hints.input_mode = 0;
     mwm_hints.status = 0;
     XChangeProperty( data->display, data->whole_window, x11drv_atom(_MOTIF_WM_HINTS),
