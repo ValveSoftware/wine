@@ -48,7 +48,6 @@
 #include "x11drv.h"
 #include "wine/debug.h"
 #include "wine/server.h"
-#include "mwm.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(x11drv);
 
@@ -814,6 +813,13 @@ static void set_size_hints( struct x11drv_win_data *data, DWORD style )
     XFree( size_hints );
 }
 
+static Bool is_unmap_notify( Display *display, XEvent *event, XPointer arg )
+{
+    struct x11drv_win_data *data = (struct x11drv_win_data *)arg;
+    return event->xany.serial >= data->unmapnotify_serial &&
+           event->xany.window == data->whole_window &&
+           event->type == UnmapNotify;
+}
 
 /***********************************************************************
  *              set_mwm_hints
@@ -821,6 +827,7 @@ static void set_size_hints( struct x11drv_win_data *data, DWORD style )
 static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_style )
 {
     MwmHints mwm_hints;
+    int enable_mutter_workaround, mapped;
 
     if (data->hwnd == GetDesktopWindow())
     {
@@ -848,12 +855,46 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
     TRACE( "%p setting mwm hints to %lx,%lx (style %x exstyle %x)\n",
            data->hwnd, mwm_hints.decorations, mwm_hints.functions, style, ex_style );
 
+    enable_mutter_workaround = wm_is_mutter(data->display) && GetFocus() == data->hwnd &&
+                               !!data->prev_hints.decorations != !!mwm_hints.decorations &&
+                               root_window == DefaultRootWindow(data->display);
+
+    /* workaround for mutter gitlab bug #649, we cannot trust the
+     * data->mapped flag as mapping is asynchronous.
+     */
+    if (enable_mutter_workaround)
+    {
+        XWindowAttributes attr;
+
+        mapped = data->mapped;
+        if (XGetWindowAttributes( data->display, data->whole_window, &attr ))
+            mapped = (attr.map_state != IsUnmapped);
+    }
+
     mwm_hints.flags = MWM_HINTS_FUNCTIONS | MWM_HINTS_DECORATIONS;
     mwm_hints.input_mode = 0;
     mwm_hints.status = 0;
+    data->unmapnotify_serial = NextRequest( data->display );
     XChangeProperty( data->display, data->whole_window, x11drv_atom(_MOTIF_WM_HINTS),
                      x11drv_atom(_MOTIF_WM_HINTS), 32, PropModeReplace,
                      (unsigned char*)&mwm_hints, sizeof(mwm_hints)/sizeof(long) );
+
+    if (enable_mutter_workaround)
+    {
+        XEvent event;
+
+        /* workaround for mutter gitlab bug #649, wait for the map notify
+         * event each time the decorations are modified before modifying
+         * them again.
+         */
+        if (mapped)
+        {
+            TRACE("workaround mutter bug #649, waiting for UnmapNotify\n");
+            XPeekIfEvent( data->display, &event, is_unmap_notify, (XPointer)data );
+        }
+    }
+
+    data->prev_hints = mwm_hints;
 }
 
 
