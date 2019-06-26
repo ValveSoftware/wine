@@ -270,31 +270,38 @@ struct hw_msg_source
     unsigned int    origin;
 };
 
+typedef union
+{
+    int type;
+    struct
+    {
+        int            type;
+        unsigned int   message;
+        unsigned short vkey;
+        unsigned short scan;
+    } kbd;
+    struct
+    {
+        int            type;
+        int            x;
+        int            y;
+        unsigned short button_flags;
+        unsigned short button_data;
+    } mouse;
+    struct
+    {
+        int type;
+
+    } hid;
+} hw_rawinput_t;
+
 struct hardware_msg_data
 {
     lparam_t             info;
     unsigned int         hw_id;
     unsigned int         flags;
     struct hw_msg_source source;
-    union
-    {
-        int type;
-        struct
-        {
-            int            type;
-            unsigned int   message;
-            unsigned short vkey;
-            unsigned short scan;
-        } kbd;
-        struct
-        {
-            int            type;
-            int            x;
-            int            y;
-            unsigned short button_flags;
-            unsigned short button_data;
-        } mouse;
-    } rawinput;
+    hw_rawinput_t        rawinput;
 };
 
 struct callback_msg_data
@@ -3175,6 +3182,18 @@ struct send_hardware_message_reply
     char __pad_28[4];
 };
 #define SEND_HWMSG_INJECTED    0x01
+
+
+struct send_rawinput_message_request
+{
+    struct request_header __header;
+    char __pad_12[4];
+    hw_rawinput_t input;
+};
+struct send_rawinput_message_reply
+{
+    struct reply_header __header;
+};
 
 
 
@@ -6108,6 +6127,7 @@ enum request
     REQ_send_message,
     REQ_post_quit_message,
     REQ_send_hardware_message,
+    REQ_send_rawinput_message,
     REQ_get_message,
     REQ_reply_message,
     REQ_accept_hardware_message,
@@ -6423,6 +6443,7 @@ union generic_request
     struct send_message_request send_message_request;
     struct post_quit_message_request post_quit_message_request;
     struct send_hardware_message_request send_hardware_message_request;
+    struct send_rawinput_message_request send_rawinput_message_request;
     struct get_message_request get_message_request;
     struct reply_message_request reply_message_request;
     struct accept_hardware_message_request accept_hardware_message_request;
@@ -6736,6 +6757,7 @@ union generic_reply
     struct send_message_reply send_message_reply;
     struct post_quit_message_reply post_quit_message_reply;
     struct send_hardware_message_reply send_hardware_message_reply;
+    struct send_rawinput_message_reply send_rawinput_message_reply;
     struct get_message_reply get_message_reply;
     struct reply_message_reply reply_message_reply;
     struct accept_hardware_message_reply accept_hardware_message_reply;
@@ -6905,6 +6927,6 @@ union generic_reply
     struct get_fsync_apc_idx_reply get_fsync_apc_idx_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 607
+#define SERVER_PROTOCOL_VERSION 608
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

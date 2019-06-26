@@ -399,6 +399,27 @@ static void dump_hw_input( const char *prefix, const hw_input_t *input )
     }
 }
 
+static void dump_hw_rawinput( const char *prefix, const hw_rawinput_t *rawinput )
+{
+    switch (rawinput->type)
+    {
+    case RIM_TYPEMOUSE:
+        fprintf( stderr, "%s{type=MOUSE,x=%d,y=%d,button_flags=%04hx,button_data=%04hx}",
+                 prefix, rawinput->mouse.x, rawinput->mouse.y, rawinput->mouse.button_flags,
+                 rawinput->mouse.button_data);
+        break;
+    case RIM_TYPEKEYBOARD:
+        fprintf( stderr, "%s{type=KEYBOARD}\n", prefix);
+        break;
+    case RIM_TYPEHID:
+        fprintf( stderr, "%s{type=HID}\n", prefix);
+        break;
+    default:
+        fprintf( stderr, "%s{type=%04x}", prefix, rawinput->type);
+        break;
+    }
+}
+
 static void dump_luid( const char *prefix, const luid_t *luid )
 {
     fprintf( stderr, "%s%d.%u", prefix, luid->high_part, luid->low_part );
@@ -2848,6 +2869,11 @@ static void dump_send_hardware_message_reply( const struct send_hardware_message
     dump_varargs_bytes( ", keystate=", cur_size );
 }
 
+static void dump_send_rawinput_message_request( const struct send_rawinput_message_request *req )
+{
+    dump_hw_rawinput( " input=", &req->input );
+}
+
 static void dump_get_message_request( const struct get_message_request *req )
 {
     fprintf( stderr, " flags=%08x", req->flags );
@@ -4851,6 +4877,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_send_message_request,
     (dump_func)dump_post_quit_message_request,
     (dump_func)dump_send_hardware_message_request,
+    (dump_func)dump_send_rawinput_message_request,
     (dump_func)dump_get_message_request,
     (dump_func)dump_reply_message_request,
     (dump_func)dump_accept_hardware_message_request,
@@ -5162,6 +5189,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     NULL,
     NULL,
     (dump_func)dump_send_hardware_message_reply,
+    NULL,
     (dump_func)dump_get_message_reply,
     NULL,
     NULL,
@@ -5473,6 +5501,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "send_message",
     "post_quit_message",
     "send_hardware_message",
+    "send_rawinput_message",
     "get_message",
     "reply_message",
     "accept_hardware_message",

@@ -53,6 +53,7 @@ my %formats =
     "ioctl_code_t"  => [  4,   4,  "&dump_ioctl_code" ],
     "cpu_type_t"    => [  4,   4,  "&dump_cpu_type" ],
     "hw_input_t"    => [  32,  8,  "&dump_hw_input" ],
+    "hw_rawinput_t" => [  16,  8,  "&dump_hw_rawinput" ]
 );
 
 my @requests = ();

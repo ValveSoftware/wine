@@ -253,6 +253,7 @@ DECL_HANDLER(get_process_idle_event);
 DECL_HANDLER(send_message);
 DECL_HANDLER(post_quit_message);
 DECL_HANDLER(send_hardware_message);
+DECL_HANDLER(send_rawinput_message);
 DECL_HANDLER(get_message);
 DECL_HANDLER(reply_message);
 DECL_HANDLER(accept_hardware_message);
@@ -567,6 +568,7 @@ static const req_handler req_handlers[REQ_NB_REQUESTS] =
     (req_handler)req_send_message,
     (req_handler)req_post_quit_message,
     (req_handler)req_send_hardware_message,
+    (req_handler)req_send_rawinput_message,
     (req_handler)req_get_message,
     (req_handler)req_reply_message,
     (req_handler)req_accept_hardware_message,
@@ -749,6 +751,7 @@ C_ASSERT( sizeof(cpu_type_t) == 4 );
 C_ASSERT( sizeof(data_size_t) == 4 );
 C_ASSERT( sizeof(file_pos_t) == 8 );
 C_ASSERT( sizeof(hw_input_t) == 32 );
+C_ASSERT( sizeof(hw_rawinput_t) == 16 );
 C_ASSERT( sizeof(int) == 4 );
 C_ASSERT( sizeof(ioctl_code_t) == 4 );
 C_ASSERT( sizeof(irp_params_t) == 32 );
@@ -1587,6 +1590,8 @@ C_ASSERT( FIELD_OFFSET(struct send_hardware_message_reply, prev_y) == 16 );
 C_ASSERT( FIELD_OFFSET(struct send_hardware_message_reply, new_x) == 20 );
 C_ASSERT( FIELD_OFFSET(struct send_hardware_message_reply, new_y) == 24 );
 C_ASSERT( sizeof(struct send_hardware_message_reply) == 32 );
+C_ASSERT( FIELD_OFFSET(struct send_rawinput_message_request, input) == 16 );
+C_ASSERT( sizeof(struct send_rawinput_message_request) == 32 );
 C_ASSERT( FIELD_OFFSET(struct get_message_request, flags) == 12 );
 C_ASSERT( FIELD_OFFSET(struct get_message_request, get_win) == 16 );
 C_ASSERT( FIELD_OFFSET(struct get_message_request, get_first) == 20 );

@@ -2478,6 +2478,54 @@ DECL_HANDLER(send_hardware_message)
     release_object( desktop );
 }
 
+/* send a hardware rawinput message to the queue thread */
+DECL_HANDLER(send_rawinput_message)
+{
+    const struct rawinput_device *device;
+    struct hardware_msg_data *msg_data;
+    struct message *msg;
+    struct desktop *desktop;
+    struct hw_msg_source source = { IMDT_MOUSE, IMO_HARDWARE };
+
+    desktop = get_thread_desktop( current, 0 );
+
+    switch (req->input.type)
+    {
+    case RIM_TYPEMOUSE:
+        if ((device = current->process->rawinput_mouse))
+        {
+            struct thread *thread = device->target ? get_window_thread( device->target ) : NULL;
+            if ((current->queue->input != desktop->foreground_input) || (thread && thread != current))
+                goto done;
+
+            if (!(msg = alloc_hardware_message( 0, source, 0 ))) goto done;
+            msg_data = msg->data;
+
+            msg->win       = device->target;
+            msg->msg       = WM_INPUT;
+            msg->wparam    = RIM_INPUT;
+            msg->lparam    = 0;
+
+            msg_data->flags               = 0;
+            msg_data->rawinput.type       = RIM_TYPEMOUSE;
+            msg_data->rawinput.mouse.x    = req->input.mouse.x;
+            msg_data->rawinput.mouse.y    = req->input.mouse.y;
+            msg_data->rawinput.mouse.button_flags = req->input.mouse.button_flags;
+            msg_data->rawinput.mouse.button_data = req->input.mouse.button_data;
+
+            queue_hardware_message( desktop, msg, 0 );
+
+            done:
+            if (thread) release_object( thread );
+        }
+        break;
+    default:
+        set_error( STATUS_INVALID_PARAMETER );
+    }
+
+    release_object(desktop);
+}
+
 /* post a quit message to the current queue */
 DECL_HANDLER(post_quit_message)
 {
