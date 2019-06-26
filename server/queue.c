@@ -1650,6 +1650,8 @@ static int send_hook_ll_message( struct desktop *desktop, struct message *hardwa
     return 1;
 }
 
+static int emulate_raw_mouse = 1;
+
 /* queue a hardware message for a mouse event */
 static int queue_mouse_message( struct desktop *desktop, user_handle_t win, const hw_input_t *input,
                                 unsigned int origin, struct msg_queue *sender )
@@ -1715,7 +1717,8 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         y = desktop->cursor.y;
     }
 
-    if ((device = current->process->rawinput_mouse))
+    device = current->process->rawinput_mouse;
+    if (device && emulate_raw_mouse)
     {
         if (!(msg = alloc_hardware_message( input->mouse.info, source, time ))) return 0;
         msg_data = msg->data;
@@ -2492,6 +2495,7 @@ DECL_HANDLER(send_rawinput_message)
     switch (req->input.type)
     {
     case RIM_TYPEMOUSE:
+        emulate_raw_mouse = 0;
         if ((device = current->process->rawinput_mouse))
         {
             struct thread *thread = device->target ? get_window_thread( device->target ) : NULL;
