@@ -581,6 +581,7 @@ struct x11drv_win_data
     int         wm_state;       /* current value of the WM_STATE property */
     DWORD       net_wm_state;   /* bit mask of active x11drv_net_wm_state values */
     Window      embedder;       /* window id of embedder */
+    unsigned long unmapnotify_serial; /* serial number of last UnmapNotify event */
     unsigned long configure_serial; /* serial number of last configure request */
     struct window_surface *surface;
     Pixmap         icon_pixmap;
