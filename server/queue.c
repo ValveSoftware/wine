@@ -1764,10 +1764,10 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         }
 
         queue_hardware_message( desktop, msg, 0 );
-
-        if (device->flags & RIDEV_NOLEGACY)
-            return FALSE;
     }
+
+    if (device && device->flags & RIDEV_NOLEGACY)
+        return FALSE;
 
     for (i = 0; i < ARRAY_SIZE( messages ); i++)
     {

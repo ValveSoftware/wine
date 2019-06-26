@@ -33,6 +33,7 @@
 #include <assert.h>
 
 #define NONAMELESSUNION
+#define NONAMELESSSTRUCT
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -125,6 +126,35 @@ BOOL set_capture_window( HWND hwnd, UINT gui_flags, HWND *prev_ret )
 BOOL CDECL __wine_send_input( HWND hwnd, const INPUT *input )
 {
     NTSTATUS status = send_hardware_message( hwnd, input, 0 );
+    if (status) SetLastError( RtlNtStatusToDosError(status) );
+    return !status;
+}
+
+BOOL CDECL __wine_send_raw_input( const RAWINPUT *raw_input )
+{
+    NTSTATUS status;
+
+    SERVER_START_REQ( send_rawinput_message )
+    {
+        req->input.type = raw_input->header.dwType;
+        switch (raw_input->header.dwType)
+        {
+        case RIM_TYPEMOUSE:
+            if (raw_input->data.mouse.usFlags ||
+                raw_input->data.mouse.ulRawButtons ||
+                raw_input->data.mouse.ulExtraInformation)
+                FIXME("Unhandled parameters\n");
+
+            req->input.mouse.x = raw_input->data.mouse.lLastX;
+            req->input.mouse.y = raw_input->data.mouse.lLastY;
+            req->input.mouse.button_flags = raw_input->data.mouse.u.s.usButtonFlags;
+            req->input.mouse.button_data = raw_input->data.mouse.u.s.usButtonData;
+            break;
+        }
+        status = wine_server_call( req );
+    }
+    SERVER_END_REQ;
+
     if (status) SetLastError( RtlNtStatusToDosError(status) );
     return !status;
 }

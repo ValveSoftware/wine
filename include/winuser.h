@@ -4357,6 +4357,7 @@ WORD        WINAPI SYSTEM_KillSystemTimer( WORD );
 
 #ifdef __WINESRC__
 WINUSERAPI BOOL CDECL __wine_send_input( HWND hwnd, const INPUT *input );
+WINUSERAPI BOOL CDECL __wine_send_raw_input( const RAWINPUT *raw_input );
 #endif
 
 #ifdef __cplusplus
