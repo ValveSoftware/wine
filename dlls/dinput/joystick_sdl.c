@@ -45,6 +45,7 @@
 #include "winbase.h"
 #include "winerror.h"
 #include "winreg.h"
+#include "devguid.h"
 #include "dinput.h"
 
 #include "dinput_private.h"
@@ -660,19 +661,19 @@ static HRESULT WINAPI JoystickWImpl_GetProperty(LPDIRECTINPUTDEVICE8W iface, REF
 
         case (DWORD_PTR) DIPROP_GUIDANDPATH:
         {
-            static const WCHAR formatW[] =  {'\\','\\','?','\\','H','I','D','#','V','I','D','_','%','0','4', 'x','&',
-                                             'P','I','D','_','%','0','4','x','&', '%','s','_','%','i',0};
-            static const WCHAR imW[] = {'I','M',0};
-            static const WCHAR igW[] = {'I','G',0};
+            static const WCHAR formatW[] = {'\\','\\','?','\\','h','i','d','#','v','i','d','_','%','0','4','x','&',
+                                            'p','i','d','_','%','0','4','x','&','%','s','_','%','i',0};
+            static const WCHAR miW[] = {'m','i',0};
+            static const WCHAR igW[] = {'i','g',0};
 
             LPDIPROPGUIDANDPATH pd = (LPDIPROPGUIDANDPATH)pdiph;
 
             if (!This->sdldev->product_id || !This->sdldev->vendor_id)
                 return DIERR_UNSUPPORTED;
 
-            pd->guidClass = This->generic.base.guid;
+            pd->guidClass = GUID_DEVCLASS_HIDCLASS;
             sprintfW(pd->wszPath, formatW, This->sdldev->vendor_id, This->sdldev->product_id,
-                     This->sdldev->is_xbox_gamepad ? igW : imW, This->sdldev->id);
+                     This->sdldev->is_xbox_gamepad ? igW : miW, This->sdldev->id);
 
             TRACE("DIPROP_GUIDANDPATH(%s, %s): returning fake path\n", debugstr_guid(&pd->guidClass), debugstr_w(pd->wszPath));
             break;
