@@ -290,9 +290,9 @@ static void update_relative_valuators(XIAnyClassInfo **valuators, int n_valuator
 
 
 /***********************************************************************
- *              enable_xinput2
+ *              X11DRV_XInput2_Enable
  */
-static void enable_xinput2(void)
+void X11DRV_XInput2_Enable(void)
 {
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
     struct x11drv_thread_data *data = x11drv_thread_data();
@@ -324,7 +324,6 @@ static void enable_xinput2(void)
     mask.deviceid = XIAllMasterDevices;
     memset( mask_bits, 0, sizeof(mask_bits) );
     XISetMask( mask_bits, XI_RawMotion );
-    XISetMask( mask_bits, XI_ButtonPress );
 
     /* XInput 2.0 has a problematic behavior where master pointer will
      * not send raw events to the root window whenever a grab is active
@@ -356,15 +355,15 @@ static void enable_xinput2(void)
 }
 
 /***********************************************************************
- *              disable_xinput2
+ *              X11DRV_XInput2_Disable
  */
-static void disable_xinput2(void)
+void X11DRV_XInput2_Disable(void)
 {
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
     struct x11drv_thread_data *data = x11drv_thread_data();
     XIEventMask mask;
 
-    if (data->xi2_state != xi_enabled) return;
+    if (data->xi2_state < xi_enabled) return;
 
     TRACE( "disabling\n" );
     data->xi2_state = xi_disabled;
@@ -389,6 +388,21 @@ static void disable_xinput2(void)
 #endif
 }
 
+static void use_xinput2_path(void)
+{
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
+
+    if (thread_data->xi2_state == xi_enabled)
+        thread_data->xi2_state = xi_extra;
+}
+
+static void disable_xinput2_path(void)
+{
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
+
+    if (thread_data->xi2_state == xi_extra)
+        thread_data->xi2_state = xi_enabled;
+}
 
 /***********************************************************************
  *		grab_clipping_window
@@ -431,9 +445,9 @@ static BOOL grab_clipping_window( const RECT *clip )
     }
 
     /* enable XInput2 unless we are already clipping */
-    if (!data->clip_hwnd) enable_xinput2();
+    if (!data->clip_hwnd) use_xinput2_path();
 
-    if (data->xi2_state != xi_enabled)
+    if (data->xi2_state < xi_extra)
     {
         WARN( "XInput2 not supported, refusing to clip to %s\n", wine_dbgstr_rect(clip) );
         DestroyWindow( msg_hwnd );
@@ -491,7 +505,7 @@ static BOOL grab_clipping_window( const RECT *clip )
     if (!clipping_cursor)
     {
         ERR("Failed to grab pointer\n");
-        disable_xinput2();
+        disable_xinput2_path();
         DestroyWindow( msg_hwnd );
         return FALSE;
     }
@@ -573,7 +587,7 @@ LRESULT clip_cursor_notify( HWND hwnd, HWND new_clip_hwnd )
         TRACE( "clip hwnd reset from %p\n", hwnd );
         data->clip_hwnd = 0;
         data->clip_reset = GetTickCount();
-        disable_xinput2();
+        disable_xinput2_path();
         DestroyWindow( hwnd );
     }
     else if (hwnd == GetForegroundWindow())  /* request to clip */
@@ -1852,17 +1866,19 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 {
     XIRawEvent *event = xev->data;
     const double *values = event->valuators.values;
+    const double *raw_values = event->raw_values;
     RECT virtual_rect;
     INPUT input;
+    RAWINPUT raw_input;
     POINT pt;
     int i;
-    double dx = 0, dy = 0, val;
+    double dx = 0, dy = 0, raw_dx = 0, raw_dy = 0, val, raw_val;
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     struct x11drv_valuator_data *x_rel, *y_rel;
 
     if (thread_data->x_rel_valuator.number < 0 || thread_data->y_rel_valuator.number < 0) return FALSE;
     if (!event->valuators.mask_len) return FALSE;
-    if (thread_data->xi2_state != xi_enabled) return FALSE;
+    if (thread_data->xi2_state < xi_enabled) return FALSE;
 
     if (xinput2_version_major == 2 && xinput2_version_minor == 0)
     {
@@ -1894,6 +1910,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     x_rel = &thread_data->x_rel_valuator;
     y_rel = &thread_data->y_rel_valuator;
 
+    input.type = INPUT_MOUSE;
     input.u.mi.mouseData   = 0;
     input.u.mi.dwFlags     = MOUSEEVENTF_MOVE;
     input.u.mi.time        = EVENT_x11_time_to_win32_time( event->time );
@@ -1901,18 +1918,30 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.u.mi.dx          = 0;
     input.u.mi.dy          = 0;
 
+    raw_input.header.dwType = RIM_TYPEMOUSE;
+    raw_input.data.mouse.u.usButtonFlags = 0;
+    raw_input.data.mouse.u.usButtonData = 0;
+    raw_input.data.mouse.usFlags = 0;
+    raw_input.data.mouse.ulRawButtons = 0;
+    raw_input.data.mouse.ulExtraInformation = 0;
+    raw_input.data.mouse.lLastX = 0;
+    raw_input.data.mouse.lLastY = 0;
+
     virtual_rect = get_virtual_screen_rect();
 
     for (i = 0; i <= max ( x_rel->number, y_rel->number ); i++)
     {
         if (!XIMaskIsSet( event->valuators.mask, i )) continue;
         val = *values++;
+        raw_val = *raw_values++;
         if (i == x_rel->number)
         {
             input.u.mi.dx = dx = val;
             if (x_rel->min < x_rel->max)
                 input.u.mi.dx = val * (virtual_rect.right - virtual_rect.left)
                                     / (x_rel->max - x_rel->min);
+
+            raw_input.data.mouse.lLastX = raw_dx = raw_val;
         }
         if (i == y_rel->number)
         {
@@ -1920,6 +1949,8 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
             if (y_rel->min < y_rel->max)
                 input.u.mi.dy = val * (virtual_rect.bottom - virtual_rect.top)
                                     / (y_rel->max - y_rel->min);
+
+            raw_input.data.mouse.lLastY = raw_dy = raw_val;
         }
     }
 
@@ -1929,16 +1960,21 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
         return FALSE;
     }
 
-    pt.x = input.u.mi.dx;
-    pt.y = input.u.mi.dy;
-    fs_hack_scale_real_to_user(&pt);
-    input.u.mi.dx = pt.x;
-    input.u.mi.dy = pt.y;
+    if (thread_data->xi2_state == xi_extra)
+    {
+        pt.x = input.u.mi.dx;
+        pt.y = input.u.mi.dy;
+        fs_hack_scale_real_to_user(&pt);
+        input.u.mi.dx = pt.x;
+        input.u.mi.dy = pt.y;
 
-    TRACE( "pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
+        TRACE( "pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
+        __wine_send_input( 0, &input );
+    }
 
-    input.type = INPUT_MOUSE;
-    __wine_send_input( 0, &input );
+    TRACE("raw event %f,%f\n",  raw_dx, raw_dy);
+    __wine_send_raw_input( &raw_input );
+
     return TRUE;
 }
 
