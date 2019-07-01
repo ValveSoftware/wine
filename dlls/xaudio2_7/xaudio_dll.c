@@ -2100,6 +2100,8 @@ HRESULT WINAPI CreateAudioVolumeMeter(IUnknown **out)
     IClassFactory *cf;
     HRESULT hr;
 
+    TRACE("%p\n", out);
+
     hr = make_xapo_factory(&CLSID_AudioVolumeMeter27, &IID_IClassFactory, (void**)&cf);
     if(FAILED(hr))
         return hr;
@@ -2115,6 +2117,8 @@ HRESULT WINAPI CreateAudioReverb(IUnknown **out)
 {
     IClassFactory *cf;
     HRESULT hr;
+
+    TRACE("%p\n", out);
 
     hr = make_xapo_factory(&CLSID_AudioReverb27, &IID_IClassFactory, (void**)&cf);
     if(FAILED(hr))
