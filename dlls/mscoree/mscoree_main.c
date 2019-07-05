@@ -22,8 +22,6 @@
 #include <stdarg.h>
 
 #define COBJMACROS
-#include "wine/unicode.h"
-#include "wine/library.h"
 #include "windef.h"
 #include "winbase.h"
 #include "winuser.h"
@@ -415,11 +413,11 @@ HRESULT WINAPI LoadLibraryShim( LPCWSTR szDllName, LPCWSTR szVersion, LPVOID pvR
             else
                 szVersion = default_version;
         }
-        strcatW(dll_filename, szVersion);
-        strcatW(dll_filename, slash);
+        lstrcatW(dll_filename, szVersion);
+        lstrcatW(dll_filename, slash);
     }
 
-    strcatW(dll_filename, szDllName);
+    lstrcatW(dll_filename, szDllName);
 
     *phModDll = LoadLibraryW(dll_filename);
 
@@ -580,7 +578,7 @@ HRESULT WINAPI CreateDebuggingInterfaceFromVersion(int nDebugVersion, LPCWSTR ve
 
     *ppv = NULL;
 
-    if(strcmpW(version, v2_0) != 0)
+    if(wcscmp(version, v2_0) != 0)
     {
         FIXME("Currently .NET Version '%s' not support.\n", debugstr_w(version));
         return E_INVALIDARG;
@@ -734,8 +732,8 @@ static BOOL get_support_msi(LPCWSTR mono_path, LPWSTR msi_path)
 
     hmsi = GetModuleHandleA("msi");
 
-    strcpyW(msi_path, mono_path);
-    strcatW(msi_path, support_msi_relative);
+    lstrcpyW(msi_path, mono_path);
+    lstrcatW(msi_path, support_msi_relative);
 
     pMsiOpenPackageW = (void*)GetProcAddress(hmsi, "MsiOpenPackageW");
 
