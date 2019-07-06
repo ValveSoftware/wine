@@ -371,8 +371,8 @@ static PSDRV_PDEVICE *create_psdrv_physdev( PRINTERINFO *pi )
 /**********************************************************************
  *	     PSDRV_CreateDC
  */
-static BOOL PSDRV_CreateDC( PHYSDEV *pdev, LPCWSTR driver, LPCWSTR device,
-                            LPCWSTR output, const DEVMODEW* initData )
+static BOOL CDECL PSDRV_CreateDC( PHYSDEV *pdev, LPCWSTR driver, LPCWSTR device,
+                                  LPCWSTR output, const DEVMODEW* initData )
 {
     PSDRV_PDEVICE *physDev;
     PRINTERINFO *pi;
@@ -415,7 +415,7 @@ static BOOL PSDRV_CreateDC( PHYSDEV *pdev, LPCWSTR driver, LPCWSTR device,
 /**********************************************************************
  *	     PSDRV_CreateCompatibleDC
  */
-static BOOL PSDRV_CreateCompatibleDC( PHYSDEV orig, PHYSDEV *pdev )
+static BOOL CDECL PSDRV_CreateCompatibleDC( PHYSDEV orig, PHYSDEV *pdev )
 {
     HDC hdc = (*pdev)->hdc;
     PSDRV_PDEVICE *physDev, *orig_dev = get_psdrv_dev( orig );
@@ -435,7 +435,7 @@ static BOOL PSDRV_CreateCompatibleDC( PHYSDEV orig, PHYSDEV *pdev )
 /**********************************************************************
  *	     PSDRV_DeleteDC
  */
-static BOOL PSDRV_DeleteDC( PHYSDEV dev )
+static BOOL CDECL PSDRV_DeleteDC( PHYSDEV dev )
 {
     PSDRV_PDEVICE *physDev = get_psdrv_dev( dev );
 
@@ -452,7 +452,7 @@ static BOOL PSDRV_DeleteDC( PHYSDEV dev )
 /**********************************************************************
  *	     ResetDC   (WINEPS.@)
  */
-static HDC PSDRV_ResetDC( PHYSDEV dev, const DEVMODEW *lpInitData )
+static HDC CDECL PSDRV_ResetDC( PHYSDEV dev, const DEVMODEW *lpInitData )
 {
     PSDRV_PDEVICE *physDev = get_psdrv_dev( dev );
 
@@ -467,7 +467,7 @@ static HDC PSDRV_ResetDC( PHYSDEV dev, const DEVMODEW *lpInitData )
 /***********************************************************************
  *           GetDeviceCaps    (WINEPS.@)
  */
-static INT PSDRV_GetDeviceCaps( PHYSDEV dev, INT cap )
+static INT CDECL PSDRV_GetDeviceCaps( PHYSDEV dev, INT cap )
 {
     PSDRV_PDEVICE *physDev = get_psdrv_dev( dev );
 

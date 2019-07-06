@@ -5344,8 +5344,8 @@ static BOOL select_charmap(FT_Face ft_face, FT_Encoding encoding)
 /*************************************************************
  * freetype_CreateDC
  */
-static BOOL freetype_CreateDC( PHYSDEV *dev, LPCWSTR driver, LPCWSTR device,
-                               LPCWSTR output, const DEVMODEW *devmode )
+static BOOL CDECL freetype_CreateDC( PHYSDEV *dev, LPCWSTR driver, LPCWSTR device,
+                                     LPCWSTR output, const DEVMODEW *devmode )
 {
     struct freetype_physdev *physdev = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(*physdev) );
 
@@ -5358,7 +5358,7 @@ static BOOL freetype_CreateDC( PHYSDEV *dev, LPCWSTR driver, LPCWSTR device,
 /*************************************************************
  * freetype_DeleteDC
  */
-static BOOL freetype_DeleteDC( PHYSDEV dev )
+static BOOL CDECL freetype_DeleteDC( PHYSDEV dev )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     release_font( physdev->font );
@@ -5666,7 +5666,7 @@ static void fill_fileinfo_from_face( GdiFont *font, Face *face )
 /*************************************************************
  * freetype_SelectFont
  */
-static HFONT freetype_SelectFont( PHYSDEV dev, HFONT hfont, UINT *aa_flags )
+static HFONT CDECL freetype_SelectFont( PHYSDEV dev, HFONT hfont, UINT *aa_flags )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     GdiFont *ret;
@@ -6426,7 +6426,7 @@ static BOOL enum_face_charsets(const Family *family, Face *face, struct enum_cha
 /*************************************************************
  * freetype_EnumFonts
  */
-static BOOL freetype_EnumFonts( PHYSDEV dev, LPLOGFONTW plf, FONTENUMPROCW proc, LPARAM lparam )
+static BOOL CDECL freetype_EnumFonts( PHYSDEV dev, LPLOGFONTW plf, FONTENUMPROCW proc, LPARAM lparam )
 {
     Family *family;
     Face *face;
@@ -6744,7 +6744,7 @@ static FT_UInt get_default_char_index(GdiFont *font)
 /*************************************************************
  * freetype_GetGlyphIndices
  */
-static DWORD freetype_GetGlyphIndices( PHYSDEV dev, LPCWSTR lpstr, INT count, LPWORD pgi, DWORD flags )
+static DWORD CDECL freetype_GetGlyphIndices( PHYSDEV dev, LPCWSTR lpstr, INT count, LPWORD pgi, DWORD flags )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     int i;
@@ -8393,8 +8393,8 @@ end:
 /*************************************************************
  * freetype_GetGlyphOutline
  */
-static DWORD freetype_GetGlyphOutline( PHYSDEV dev, UINT glyph, UINT format,
-                                       LPGLYPHMETRICS lpgm, DWORD buflen, LPVOID buf, const MAT2 *lpmat )
+static DWORD CDECL freetype_GetGlyphOutline( PHYSDEV dev, UINT glyph, UINT format,
+                                             LPGLYPHMETRICS lpgm, DWORD buflen, LPVOID buf, const MAT2 *lpmat )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     DWORD ret;
@@ -8416,7 +8416,7 @@ static DWORD freetype_GetGlyphOutline( PHYSDEV dev, UINT glyph, UINT format,
 /*************************************************************
  * freetype_GetTextMetrics
  */
-static BOOL freetype_GetTextMetrics( PHYSDEV dev, TEXTMETRICW *metrics )
+static BOOL CDECL freetype_GetTextMetrics( PHYSDEV dev, TEXTMETRICW *metrics )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     BOOL ret;
@@ -8437,7 +8437,7 @@ static BOOL freetype_GetTextMetrics( PHYSDEV dev, TEXTMETRICW *metrics )
 /*************************************************************
  * freetype_GetOutlineTextMetrics
  */
-static UINT freetype_GetOutlineTextMetrics( PHYSDEV dev, UINT cbSize, OUTLINETEXTMETRICW *potm )
+static UINT CDECL freetype_GetOutlineTextMetrics( PHYSDEV dev, UINT cbSize, OUTLINETEXTMETRICW *potm )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     UINT ret = 0;
@@ -8561,7 +8561,7 @@ done:
 /*************************************************************
  * freetype_GetCharWidth
  */
-static BOOL freetype_GetCharWidth( PHYSDEV dev, UINT firstChar, UINT lastChar, LPINT buffer )
+static BOOL CDECL freetype_GetCharWidth( PHYSDEV dev, UINT firstChar, UINT lastChar, LPINT buffer )
 {
     static const MAT2 identity = { {0,1},{0,0},{0,0},{0,1} };
     UINT c;
@@ -8590,7 +8590,7 @@ static BOOL freetype_GetCharWidth( PHYSDEV dev, UINT firstChar, UINT lastChar, L
 /*************************************************************
  * freetype_GetCharWidthInfo
  */
-static BOOL freetype_GetCharWidthInfo( PHYSDEV dev, void* ptr )
+static BOOL CDECL freetype_GetCharWidthInfo( PHYSDEV dev, void* ptr )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     struct char_width_info *info = ptr;
@@ -8624,7 +8624,7 @@ static BOOL freetype_GetCharWidthInfo( PHYSDEV dev, void* ptr )
 /*************************************************************
  * freetype_GetCharABCWidths
  */
-static BOOL freetype_GetCharABCWidths( PHYSDEV dev, UINT firstChar, UINT lastChar, LPABC buffer )
+static BOOL CDECL freetype_GetCharABCWidths( PHYSDEV dev, UINT firstChar, UINT lastChar, LPABC buffer )
 {
     static const MAT2 identity = { {0,1},{0,0},{0,0},{0,1} };
     UINT c;
@@ -8652,7 +8652,7 @@ static BOOL freetype_GetCharABCWidths( PHYSDEV dev, UINT firstChar, UINT lastCha
 /*************************************************************
  * freetype_GetCharABCWidthsI
  */
-static BOOL freetype_GetCharABCWidthsI( PHYSDEV dev, UINT firstChar, UINT count, LPWORD pgi, LPABC buffer )
+static BOOL CDECL freetype_GetCharABCWidthsI( PHYSDEV dev, UINT firstChar, UINT count, LPWORD pgi, LPABC buffer )
 {
     static const MAT2 identity = { {0,1},{0,0},{0,0},{0,1} };
     UINT c;
@@ -8682,7 +8682,7 @@ static BOOL freetype_GetCharABCWidthsI( PHYSDEV dev, UINT firstChar, UINT count,
 /*************************************************************
  * freetype_GetTextExtentExPoint
  */
-static BOOL freetype_GetTextExtentExPoint( PHYSDEV dev, LPCWSTR wstr, INT count, LPINT dxs )
+static BOOL CDECL freetype_GetTextExtentExPoint( PHYSDEV dev, LPCWSTR wstr, INT count, LPINT dxs )
 {
     static const MAT2 identity = { {0,1},{0,0},{0,0},{0,1} };
     INT idx, pos;
@@ -8715,7 +8715,7 @@ static BOOL freetype_GetTextExtentExPoint( PHYSDEV dev, LPCWSTR wstr, INT count,
 /*************************************************************
  * freetype_GetTextExtentExPointI
  */
-static BOOL freetype_GetTextExtentExPointI( PHYSDEV dev, const WORD *indices, INT count, LPINT dxs )
+static BOOL CDECL freetype_GetTextExtentExPointI( PHYSDEV dev, const WORD *indices, INT count, LPINT dxs )
 {
     static const MAT2 identity = { {0,1},{0,0},{0,0},{0,1} };
     INT idx, pos;
@@ -8749,7 +8749,7 @@ static BOOL freetype_GetTextExtentExPointI( PHYSDEV dev, const WORD *indices, IN
 /*************************************************************
  * freetype_GetFontData
  */
-static DWORD freetype_GetFontData( PHYSDEV dev, DWORD table, DWORD offset, LPVOID buf, DWORD cbData )
+static DWORD CDECL freetype_GetFontData( PHYSDEV dev, DWORD table, DWORD offset, LPVOID buf, DWORD cbData )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
 
@@ -8768,7 +8768,7 @@ static DWORD freetype_GetFontData( PHYSDEV dev, DWORD table, DWORD offset, LPVOI
 /*************************************************************
  * freetype_GetTextFace
  */
-static INT freetype_GetTextFace( PHYSDEV dev, INT count, LPWSTR str )
+static INT CDECL freetype_GetTextFace( PHYSDEV dev, INT count, LPWSTR str )
 {
     INT n;
     struct freetype_physdev *physdev = get_freetype_dev( dev );
@@ -8791,7 +8791,7 @@ static INT freetype_GetTextFace( PHYSDEV dev, INT count, LPWSTR str )
 /*************************************************************
  * freetype_GetTextCharsetInfo
  */
-static UINT freetype_GetTextCharsetInfo( PHYSDEV dev, LPFONTSIGNATURE fs, DWORD flags )
+static UINT CDECL freetype_GetTextCharsetInfo( PHYSDEV dev, LPFONTSIGNATURE fs, DWORD flags )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
 
@@ -8871,7 +8871,7 @@ static DWORD get_font_unicode_ranges(FT_Face face, GLYPHSET *gs)
 /*************************************************************
  * freetype_GetFontUnicodeRanges
  */
-static DWORD freetype_GetFontUnicodeRanges( PHYSDEV dev, LPGLYPHSET glyphset )
+static DWORD CDECL freetype_GetFontUnicodeRanges( PHYSDEV dev, LPGLYPHSET glyphset )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     DWORD size, num_ranges;
@@ -8896,7 +8896,7 @@ static DWORD freetype_GetFontUnicodeRanges( PHYSDEV dev, LPGLYPHSET glyphset )
 /*************************************************************
  * freetype_FontIsLinked
  */
-static BOOL freetype_FontIsLinked( PHYSDEV dev )
+static BOOL CDECL freetype_FontIsLinked( PHYSDEV dev )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     BOOL ret;
@@ -8928,7 +8928,7 @@ BOOL WINAPI GetRasterizerCaps( LPRASTERIZER_STATUS lprs, UINT cbNumBytes)
 /*************************************************************
  * freetype_GetFontRealizationInfo
  */
-static BOOL freetype_GetFontRealizationInfo( PHYSDEV dev, void *ptr )
+static BOOL CDECL freetype_GetFontRealizationInfo( PHYSDEV dev, void *ptr )
 {
     struct freetype_physdev *physdev = get_freetype_dev( dev );
     struct font_realization_info *info = ptr;
@@ -9119,7 +9119,7 @@ static DWORD parse_format0_kern_subtable(GdiFont *font,
 /*************************************************************
  * freetype_GetKerningPairs
  */
-static DWORD freetype_GetKerningPairs( PHYSDEV dev, DWORD cPairs, KERNINGPAIR *kern_pair )
+static DWORD CDECL freetype_GetKerningPairs( PHYSDEV dev, DWORD cPairs, KERNINGPAIR *kern_pair )
 {
     DWORD length;
     void *buf;
