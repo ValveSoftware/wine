@@ -3248,9 +3248,12 @@ static void output_module( struct makefile *make )
                                                   strchr( make->delayimports.str[i], '.' ) ? "" : ".dll" ));
         }
         strarray_add( &make->all_targets, strmake( "%s", make->module ));
+        strarray_add( &make->all_targets, strmake( "%s.fake", make->module ));
         add_install_rule( make, make->module, strmake( "%s", make->module ),
                           strmake( "c$(dlldir)/%s", make->module ));
-        output( "%s:", module_path );
+        add_install_rule( make, make->module, strmake( "%s.fake", make->module ),
+                              strmake( "d$(dlldir)/fakedlls/%s", make->module ));
+        output( "%s %s.fake:", module_path, module_path );
     }
     else
     {
