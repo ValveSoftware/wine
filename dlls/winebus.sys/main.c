@@ -35,6 +35,7 @@
 #include "winioctl.h"
 #include "ddk/wdm.h"
 #include "ddk/hidport.h"
+#include "ddk/hidtypes.h"
 #include "wine/debug.h"
 #include "wine/unicode.h"
 #include "wine/list.h"
@@ -46,22 +47,39 @@ WINE_DECLARE_DEBUG_CHANNEL(hid_report);
 
 static const WCHAR backslashW[] = {'\\',0};
 
+struct product_desc
+{
+    WORD vid;
+    WORD pid;
+    const WCHAR* manufacturer;
+    const WCHAR* product;
+    const WCHAR* serialnumber;
+};
+
 #define VID_MICROSOFT 0x045e
 
-static const WORD PID_XBOX_CONTROLLERS[] =  {
-    0x0202, /* Xbox Controller */
-    0x0285, /* Xbox Controller S */
-    0x0289, /* Xbox Controller S */
-    0x028e, /* Xbox360 Controller */
-    0x028f, /* Xbox360 Wireless Controller */
-    0x02d1, /* Xbox One Controller */
-    0x02dd, /* Xbox One Controller (Covert Forces/Firmware 2015) */
-    0x02e0, /* Xbox One X Controller */
-    0x02e3, /* Xbox One Elite Controller */
-    0x02e6, /* Wireless XBox Controller Dongle */
-    0x02ea, /* Xbox One S Controller */
-    0x02fd, /* Xbox One S Controller (Firmware 2017) */
-    0x0719, /* Xbox 360 Wireless Adapter */
+static const WCHAR xbox360_product_string[] = {
+    'C','o','n','t','r','o','l','l','e','r',' ','(','X','B','O','X',' ','3','6','0',' ','F','o','r',' ','W','i','n','d','o','w','s',')',0
+};
+
+static const WCHAR xboxone_product_string[] = {
+    'C','o','n','t','r','o','l','l','e','r',' ','(','X','B','O','X',' ','O','n','e',' ','F','o','r',' ','W','i','n','d','o','w','s',')',0
+};
+
+static const struct product_desc XBOX_CONTROLLERS[] = {
+    {VID_MICROSOFT, 0x0202, NULL, NULL, NULL}, /* Xbox Controller */
+    {VID_MICROSOFT, 0x0285, NULL, NULL, NULL}, /* Xbox Controller S */
+    {VID_MICROSOFT, 0x0289, NULL, NULL, NULL}, /* Xbox Controller S */
+    {VID_MICROSOFT, 0x028e, NULL, xbox360_product_string, NULL}, /* Xbox360 Controller */
+    {VID_MICROSOFT, 0x028f, NULL, xbox360_product_string, NULL}, /* Xbox360 Wireless Controller */
+    {VID_MICROSOFT, 0x02d1, NULL, xboxone_product_string, NULL}, /* Xbox One Controller */
+    {VID_MICROSOFT, 0x02dd, NULL, xboxone_product_string, NULL}, /* Xbox One Controller (Covert Forces/Firmware 2015) */
+    {VID_MICROSOFT, 0x02e0, NULL, NULL, NULL}, /* Xbox One X Controller */
+    {VID_MICROSOFT, 0x02e3, NULL, xboxone_product_string, NULL}, /* Xbox One Elite Controller */
+    {VID_MICROSOFT, 0x02e6, NULL, NULL, NULL}, /* Wireless XBox Controller Dongle */
+    {VID_MICROSOFT, 0x02ea, NULL, xboxone_product_string, NULL}, /* Xbox One S Controller */
+    {VID_MICROSOFT, 0x02fd, NULL, xboxone_product_string, NULL}, /* Xbox One S Controller (Firmware 2017) */
+    {VID_MICROSOFT, 0x0719, NULL, xbox360_product_string, NULL}, /* Xbox 360 Wireless Adapter */
 };
 
 static DRIVER_OBJECT *driver_obj;
@@ -511,6 +529,51 @@ static NTSTATUS deliver_last_report(struct device_extension *ext, DWORD buffer_l
     }
 }
 
+static NTSTATUS hid_get_native_string(DEVICE_OBJECT *device, DWORD index, WCHAR *buffer, DWORD length)
+{
+    struct device_extension *ext = (struct device_extension *)device->DeviceExtension;
+    int i;
+
+    if (ext->vid == VID_MICROSOFT)
+    {
+        for (i = 0; i < ARRAY_SIZE(XBOX_CONTROLLERS); i++)
+        {
+            if (ext->pid == XBOX_CONTROLLERS[i].pid)
+                break;
+        }
+
+        if (i >= ARRAY_SIZE(XBOX_CONTROLLERS))
+            return STATUS_UNSUCCESSFUL;
+
+        switch (index)
+        {
+        case HID_STRING_ID_IPRODUCT:
+            if (XBOX_CONTROLLERS[i].product)
+            {
+                strcpyW(buffer, XBOX_CONTROLLERS[i].product);
+                return STATUS_SUCCESS;
+            }
+            break;
+        case HID_STRING_ID_IMANUFACTURER:
+            if (XBOX_CONTROLLERS[i].manufacturer)
+            {
+                strcpyW(buffer, XBOX_CONTROLLERS[i].manufacturer);
+                return STATUS_SUCCESS;
+            }
+            break;
+        case HID_STRING_ID_ISERIALNUMBER:
+            if (XBOX_CONTROLLERS[i].serialnumber)
+            {
+                strcpyW(buffer, XBOX_CONTROLLERS[i].serialnumber);
+                return STATUS_SUCCESS;
+            }
+            break;
+        }
+    }
+
+    return STATUS_UNSUCCESSFUL;
+}
+
 static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
 {
     NTSTATUS status = irp->IoStatus.u.Status;
@@ -591,7 +654,9 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             DWORD index = (ULONG_PTR)irpsp->Parameters.DeviceIoControl.Type3InputBuffer;
             TRACE("IOCTL_HID_GET_STRING[%08x]\n", index);
 
-            irp->IoStatus.u.Status = status = ext->vtbl->get_string(device, index, (WCHAR *)irp->UserBuffer, length);
+            irp->IoStatus.u.Status = status = hid_get_native_string(device, index, (WCHAR *)irp->UserBuffer, length);
+            if (status != STATUS_SUCCESS)
+                irp->IoStatus.u.Status = status = ext->vtbl->get_string(device, index, (WCHAR *)irp->UserBuffer, length);
             if (status == STATUS_SUCCESS)
                 irp->IoStatus.Information = (strlenW((WCHAR *)irp->UserBuffer) + 1) * sizeof(WCHAR);
             break;
@@ -756,8 +821,8 @@ BOOL is_xbox_gamepad(WORD vid, WORD pid)
     if (vid != VID_MICROSOFT)
         return FALSE;
 
-    for (i = 0; i < ARRAY_SIZE(PID_XBOX_CONTROLLERS); i++)
-        if (pid == PID_XBOX_CONTROLLERS[i]) return TRUE;
+    for (i = 0; i < ARRAY_SIZE(XBOX_CONTROLLERS); i++)
+        if (pid == XBOX_CONTROLLERS[i].pid) return TRUE;
 
     return FALSE;
 }
