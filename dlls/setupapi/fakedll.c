@@ -878,6 +878,8 @@ static int install_fake_dll( WCHAR *dest, WCHAR *file, const WCHAR *ext, BOOL ex
     WCHAR *name = wcsrchr( file, '\\' ) + 1;
     WCHAR *end = name + lstrlenW(name);
 
+    TRACE("attempting dest: %s, file: %s\n", debugstr_w(dest), debugstr_w(file));
+
     if (ext) lstrcpyW( end, ext );
     if (!(ret = read_file( file, &data, &size, expect_builtin ))) return 0;
 
@@ -906,15 +908,18 @@ static int install_fake_dll( WCHAR *dest, WCHAR *file, const WCHAR *ext, BOOL ex
 }
 
 /* find and install all fake dlls in a given lib directory */
-static void install_lib_dir( WCHAR *dest, WCHAR *file, const WCHAR *default_ext, BOOL expect_builtin )
+static void install_lib_dir( WCHAR *dest, WCHAR *file, const WCHAR *default_ext )
 {
     static const WCHAR starW[] = {'*',0};
     static const WCHAR backslashW[] = {'\\',0};
     static const WCHAR dotW[] = {'.',0};
     static const WCHAR dotdotW[] = {'.','.',0};
-    WCHAR *name;
+    static const WCHAR fakedlls_subdirW[] = {'f','a','k','e','d','l','l','s','\\'};
+    static const WCHAR soW[] = {'.','s','o',0};
+    WCHAR *name, *ext;
     intptr_t handle;
     struct _wfinddata_t data;
+    size_t len;
 
     file[1] = '\\';  /* change \??\ to \\?\ */
     name = file + lstrlenW(file);
@@ -933,10 +938,30 @@ static void install_lib_dir( WCHAR *dest, WCHAR *file, const WCHAR *default_ext,
             lstrcatW( name, backslashW );
             lstrcatW( name, data.name );
             if (!wcschr( data.name, '.' )) lstrcatW( name, default_ext );
-            if (!install_fake_dll( dest, file, NULL, expect_builtin ))
-                install_fake_dll( dest, file, fakeW, FALSE );
+            len = lstrlenW( file );
+            if (!install_fake_dll( dest, file, fakeW, FALSE ))
+            {
+                file[len] = 0;
+                install_fake_dll( dest, file, NULL, TRUE );
+            }
         }
-        else install_fake_dll( dest, file, NULL, expect_builtin );
+        else
+        {
+            len = lstrlenW( name );
+            memmove( name + ARRAY_SIZE(fakedlls_subdirW), name, (len + 1) * sizeof(WCHAR) );
+            memcpy( name, fakedlls_subdirW, sizeof(fakedlls_subdirW) );
+            if ((ext = wcsrchr( name, '.' )))
+            {
+                if (!wcscmp( ext, soW )) *ext = 0;
+                else ext = NULL;
+            }
+            if (!install_fake_dll( dest, file, NULL, FALSE ))
+            {
+                if (ext) *ext = '.';
+                memmove( name, name + ARRAY_SIZE(fakedlls_subdirW), (len + 1) * sizeof(WCHAR) );
+                install_fake_dll( dest, file, NULL, TRUE );
+            }
+        }
     }
     while (!_wfindnext( handle, &data ));
     _findclose( handle );
@@ -967,18 +992,15 @@ static BOOL create_wildcard_dlls( const WCHAR *dirname )
     {
         lstrcpyW( file, build_dir );
         lstrcatW( file, dllsW );
-        install_lib_dir( dest, file, dllW, TRUE );
+        install_lib_dir( dest, file, dllW );
         lstrcpyW( file, build_dir );
         lstrcatW( file, programsW );
-        install_lib_dir( dest, file, exeW, TRUE );
+        install_lib_dir( dest, file, exeW );
     }
     for (i = 0; (path = enum_load_path( i )); i++)
     {
         lstrcpyW( file, path );
-        install_lib_dir( dest, file, NULL, TRUE );
-        lstrcpyW( file, path );
-        lstrcatW( file, fakedllsW );
-        install_lib_dir( dest, file, NULL, FALSE );
+        install_lib_dir( dest, file, NULL );
     }
     HeapFree( GetProcessHeap(), 0, file );
     HeapFree( GetProcessHeap(), 0, dest );
