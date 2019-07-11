@@ -484,6 +484,10 @@ my @dll_groups =
   "ntoskrnl.exe",
   "hal",
  ],
+ [
+  "mscoree",
+  "mscorwks",
+ ],
 );
 
 my $update_flags = 0;
