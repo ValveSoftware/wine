@@ -187,10 +187,7 @@ static void find_sdldevs(void)
                 type == SDL_JOYSTICK_TYPE_FLIGHT_STICK ||
                 type == SDL_JOYSTICK_TYPE_THROTTLE;
 
-            if (SDL_IsGameController(i))
-                sdldev.is_xbox_gamepad = TRUE;
-            else
-                sdldev.is_xbox_gamepad  = SDL_JoystickNumAxes(device) == 6 && SDL_JoystickNumButtons(device) >= 14;
+            sdldev.is_xbox_gamepad = is_xinput_device(NULL, sdldev.vendor_id, sdldev.product_id);
         }
 
         if (!have_sdldevs)

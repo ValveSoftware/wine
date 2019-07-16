@@ -31,26 +31,10 @@
 #include "joystick_private.h"
 #include "wine/debug.h"
 #include "winreg.h"
+#include "setupapi.h"
+#include "ddk/hidsdi.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(dinput);
-
-#define VID_MICROSOFT 0x045e
-
-static const WORD PID_XBOX_CONTROLLERS[] =  {
-    0x0202, /* Xbox Controller */
-    0x0285, /* Xbox Controller S */
-    0x0289, /* Xbox Controller S */
-    0x028e, /* Xbox360 Controller */
-    0x028f, /* Xbox360 Wireless Controller */
-    0x02d1, /* Xbox One Controller */
-    0x02dd, /* Xbox One Controller (Covert Forces/Firmware 2015) */
-    0x02e0, /* Xbox One X Controller */
-    0x02e3, /* Xbox One Elite Controller */
-    0x02e6, /* Wireless XBox Controller Dongle */
-    0x02ea, /* Xbox One S Controller */
-    0x02fd, /* Xbox One S Controller (Firmware 2017) */
-    0x0719, /* Xbox 360 Wireless Adapter */
-};
 
 static inline JoystickGenericImpl *impl_from_IDirectInputDevice8A(IDirectInputDevice8A *iface)
 {
@@ -301,15 +285,58 @@ BOOL device_disabled_registry(const char* name)
 
 BOOL is_xinput_device(const DIDEVCAPS *devcaps, WORD vid, WORD pid)
 {
-    int i;
+    HDEVINFO device_info_set;
+    GUID hid_guid;
+    SP_DEVICE_INTERFACE_DATA interface_data;
+    SP_DEVICE_INTERFACE_DETAIL_DATA_W *data;
+    DWORD idx;
+    BOOL ret = FALSE;
+    char pathA[MAX_PATH];
 
-    if (vid == VID_MICROSOFT)
+    HidD_GetHidGuid(&hid_guid);
+    hid_guid.Data4[7]++; /* HACK: look up the xinput-specific devices */
+
+    device_info_set = SetupDiGetClassDevsW(&hid_guid, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+
+    data = HeapAlloc(GetProcessHeap(), 0 , sizeof(*data) + MAX_PATH * sizeof(WCHAR));
+    data->cbSize = sizeof(*data);
+
+    ZeroMemory(&interface_data, sizeof(interface_data));
+    interface_data.cbSize = sizeof(interface_data);
+
+    idx = 0;
+    while (!ret && SetupDiEnumDeviceInterfaces(device_info_set, NULL, &hid_guid, idx++,
+           &interface_data))
     {
-        for (i = 0; i < ARRAY_SIZE(PID_XBOX_CONTROLLERS); i++)
-            if (pid == PID_XBOX_CONTROLLERS[i]) return TRUE;
+        const char *vid_s, *pid_s;
+        DWORD di_vid = 0, di_pid = 0;
+        static const WCHAR ig[] = {'I','G','_',0};
+
+        if (!SetupDiGetDeviceInterfaceDetailW(device_info_set,
+                &interface_data, data, sizeof(*data) + MAX_PATH * sizeof(WCHAR), NULL, NULL))
+            continue;
+
+        if (!strstrW(data->DevicePath, ig))
+            continue;
+
+        WideCharToMultiByte(CP_ACP, 0, data->DevicePath, -1,
+                pathA, sizeof(pathA), NULL, NULL);
+
+        vid_s = strstr(pathA, "VID_");
+        if (vid_s)
+            sscanf(vid_s, "VID_%4X", &di_vid);
+
+        pid_s = strstr(pathA, "PID_");
+        if (pid_s)
+            sscanf(pid_s, "PID_%4X", &di_pid);
+
+        ret = vid == di_vid && pid == di_pid;
     }
 
-    return (devcaps->dwAxes == 6 && devcaps->dwButtons >= 14);
+    HeapFree(GetProcessHeap(), 0, data);
+    SetupDiDestroyDeviceInfoList(device_info_set);
+
+    return ret;
 }
 
 /******************************************************************************
