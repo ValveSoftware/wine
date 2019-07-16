@@ -263,6 +263,10 @@ static void update_relative_valuators(XIAnyClassInfo **valuators, int n_valuator
     thread_data->y_rel_valuator.number = -1;
     thread_data->wheel_valuator.number = -1;
 
+    thread_data->x_rel_valuator.accum = 0;
+    thread_data->y_rel_valuator.accum = 0;
+    thread_data->wheel_valuator.accum = 0;
+
     for (i = 0; i < n_valuators; i++)
     {
         XIValuatorClassInfo *class = (XIValuatorClassInfo *)valuators[i];
@@ -1925,8 +1929,6 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.u.mi.dwFlags     = MOUSEEVENTF_MOVE;
     input.u.mi.time        = EVENT_x11_time_to_win32_time( event->time );
     input.u.mi.dwExtraInfo = 0;
-    input.u.mi.dx          = 0;
-    input.u.mi.dy          = 0;
 
     raw_input.header.dwType = RIM_TYPEMOUSE;
     raw_input.data.mouse.u.usButtonFlags = 0;
@@ -1946,18 +1948,18 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
         raw_val = *raw_values++;
         if (i == x_rel->number)
         {
-            input.u.mi.dx = dx = val;
+            dx = val;
             if (x_rel->min < x_rel->max)
-                input.u.mi.dx = val * (virtual_rect.right - virtual_rect.left)
+                dx = val * (virtual_rect.right - virtual_rect.left)
                                     / (x_rel->max - x_rel->min);
 
             raw_input.data.mouse.lLastX = raw_dx = raw_val;
         }
         if (i == y_rel->number)
         {
-            input.u.mi.dy = dy = val;
+            dy = val;
             if (y_rel->min < y_rel->max)
-                input.u.mi.dy = val * (virtual_rect.bottom - virtual_rect.top)
+                dy = val * (virtual_rect.bottom - virtual_rect.top)
                                     / (y_rel->max - y_rel->min);
 
             raw_input.data.mouse.lLastY = raw_dy = raw_val;
@@ -1968,26 +1970,53 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 
     if (broken_rawevents && is_old_motion_event( xev->serial ))
     {
-        TRACE( "pos %d,%d old serial %lu, ignoring\n", input.u.mi.dx, input.u.mi.dy, xev->serial );
+        TRACE( "pos %d,%d old serial %lu, ignoring\n", (LONG) dx, (LONG) dy, xev->serial );
         return FALSE;
     }
 
-    if (thread_data->xi2_state == xi_extra)
-    {
-        pt.x = input.u.mi.dx;
-        pt.y = input.u.mi.dy;
-        fs_hack_scale_real_to_user(&pt);
-        input.u.mi.dx = pt.x;
-        input.u.mi.dy = pt.y;
+    /* Accumulate the fractional parts so they aren't lost after casting
+     *  successive motion values to integral fields.
+     *
+     * Note: It looks like raw_dx and raw_dy are already integral values
+     * but that may be wrong.
+     */
 
-        TRACE( "pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
-        __wine_send_input( 0, &input );
+    x_rel->accum += dx;
+    y_rel->accum += dy;
+    if (fabs(x_rel->accum) < 1.0 && fabs(y_rel->accum) < 1.0)
+    {
+        TRACE( "accumulating raw motion (event %f,%f, accum %f,%f)\n", dx, dy, x_rel->accum, y_rel->accum );
+    }
+    else
+    {
+        input.u.mi.dx = x_rel->accum;
+        input.u.mi.dy = y_rel->accum;
+        x_rel->accum -= input.u.mi.dx;
+        y_rel->accum -= input.u.mi.dy;
+
+        if (thread_data->xi2_state == xi_extra)
+        {
+            pt.x = input.u.mi.dx;
+            pt.y = input.u.mi.dy;
+            fs_hack_scale_real_to_user(&pt);
+            input.u.mi.dx = pt.x;
+            input.u.mi.dy = pt.y;
+
+            TRACE( "pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
+            __wine_send_input( 0, &input );
+        }
     }
 
-    if (raw_dwheel)
+    wheel->accum += raw_dwheel;
+    if (fabs(wheel->accum) < 1.0)
+    {
+        TRACE("accumulating wheel motion (event %f, accum %f)\n", raw_dwheel, wheel->accum);
+    }
+    else
     {
         raw_input.data.mouse.u.usButtonFlags = RI_MOUSE_WHEEL;
-        raw_input.data.mouse.u.usButtonData  = raw_dwheel;
+        raw_input.data.mouse.u.usButtonData  = wheel->accum;
+        wheel->accum -= raw_dwheel;
     }
 
     TRACE("raw event %f,%f + %f\n",  raw_dx, raw_dy, raw_dwheel);
