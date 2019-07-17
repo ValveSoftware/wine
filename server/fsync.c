@@ -57,7 +57,7 @@ struct futex_wait_block
 static inline int futex_wait_multiple( const struct futex_wait_block *futexes,
         int count, const struct timespec *timeout )
 {
-    return syscall( __NR_futex, futexes, 13, count, timeout, 0, 0 );
+    return syscall( __NR_futex, futexes, 31, count, timeout, 0, 0 );
 }
 
 int do_fsync(void)
