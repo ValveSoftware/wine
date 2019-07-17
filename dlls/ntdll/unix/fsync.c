@@ -61,13 +61,14 @@ struct futex_wait_block
     int pad;
 #endif
     int val;
+    int bitset;
 };
 #include "poppack.h"
 
 static inline int futex_wait_multiple( const struct futex_wait_block *futexes,
         int count, const struct timespec *timeout )
 {
-    return syscall( __NR_futex, futexes, 13, count, timeout, 0, 0 );
+    return syscall( __NR_futex, futexes, 31, count, timeout, 0, 0 );
 }
 
 static inline int futex_wake( int *addr, int val )
@@ -621,6 +622,7 @@ static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN aler
 #if __SIZEOF_POINTER__ == 4
         futexes[0].pad = futexes[1].pad = 0;
 #endif
+        futexes[0].bitset = futexes[1].bitset = ~0;
 
         if (end)
         {
@@ -837,6 +839,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 #if __SIZEOF_POINTER__ == 4
                 futexes[i].pad = 0;
 #endif
+                futexes[i].bitset = ~0;
             }
 
             if (alertable)
@@ -850,6 +853,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 #if __SIZEOF_POINTER__ == 4
                 futexes[i].pad = 0;
 #endif
+                futexes[i].bitset = ~0;
                 i++;
             }
             waitcount = i;
