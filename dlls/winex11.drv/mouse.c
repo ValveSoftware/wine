@@ -132,6 +132,8 @@ static Cursor create_cursor( HANDLE handle );
 
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
 static BOOL xinput2_available;
+static int xinput2_version_major = 2;
+static int xinput2_version_minor = 1;
 static BOOL broken_rawevents;
 #define MAKE_FUNCPTR(f) static typeof(f) * p##f
 MAKE_FUNCPTR(XIGetClientPointer);
@@ -303,8 +305,11 @@ static void enable_xinput2(void)
 
     if (data->xi2_state == xi_unknown)
     {
-        int major = 2, minor = 0;
-        if (!pXIQueryVersion( data->display, &major, &minor )) data->xi2_state = xi_disabled;
+        if (!pXIQueryVersion( data->display, &xinput2_version_major, &xinput2_version_minor ))
+        {
+            TRACE( "XInput2 v%d.%d available\n", xinput2_version_major, xinput2_version_minor );
+            data->xi2_state = xi_disabled;
+        }
         else
         {
             data->xi2_state = xi_unavailable;
@@ -316,11 +321,19 @@ static void enable_xinput2(void)
 
     mask.mask     = mask_bits;
     mask.mask_len = sizeof(mask_bits);
-    mask.deviceid = XIAllDevices;
+    mask.deviceid = XIAllMasterDevices;
     memset( mask_bits, 0, sizeof(mask_bits) );
-    XISetMask( mask_bits, XI_DeviceChanged );
     XISetMask( mask_bits, XI_RawMotion );
     XISetMask( mask_bits, XI_ButtonPress );
+
+    /* XInput 2.0 has a problematic behavior where master pointer will
+     * not send raw events to the root window whenever a grab is active
+     */
+    if (xinput2_version_major == 2 && xinput2_version_minor == 0)
+    {
+        mask.deviceid = XIAllDevices;
+        XISetMask( mask_bits, XI_DeviceChanged );
+    }
 
     pXISelectEvents( data->display, DefaultRootWindow( data->display ), &mask, 1 );
 
@@ -335,7 +348,7 @@ static void enable_xinput2(void)
      * safe to be obtained statically at enable_xinput2() time.
      */
     if (data->xi2_devices) pXIFreeDeviceInfo( data->xi2_devices );
-    data->xi2_devices = pXIQueryDevice( data->display, XIAllDevices, &data->xi2_device_count );
+    data->xi2_devices = pXIQueryDevice( data->display, mask.deviceid, &data->xi2_device_count );
     data->xi2_current_slave = 0;
 
     data->xi2_state = xi_enabled;
@@ -358,7 +371,13 @@ static void disable_xinput2(void)
 
     mask.mask = NULL;
     mask.mask_len = 0;
-    mask.deviceid = XIAllDevices;
+    mask.deviceid = XIAllMasterDevices;
+
+    /* XInput 2.0 has a problematic behavior where master pointer will
+     * not send raw events to the root window whenever a grab is active
+     */
+    if (xinput2_version_major == 2 && xinput2_version_minor == 0)
+        mask.deviceid = XIAllDevices;
 
     pXISelectEvents( data->display, DefaultRootWindow( data->display ), &mask, 1 );
     pXIFreeDeviceInfo( data->xi2_devices );
@@ -1845,25 +1864,32 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     if (!event->valuators.mask_len) return FALSE;
     if (thread_data->xi2_state != xi_enabled) return FALSE;
 
-    /* If there is no slave currently detected, no previous motion nor device
-     * change events were received. Look it up now on the device list in this
-     * case.
-     */
-    if (!thread_data->xi2_current_slave)
+    if (xinput2_version_major == 2 && xinput2_version_minor == 0)
     {
         XIDeviceInfo *devices = thread_data->xi2_devices;
 
-        for (i = 0; i < thread_data->xi2_device_count; i++)
+        /* If there is no slave currently detected, no previous motion nor device
+         * change events were received. Look it up now on the device list in this
+         * case.
+         */
+        for (i = 0; !thread_data->xi2_current_slave && i < thread_data->xi2_device_count; i++)
         {
             if (devices[i].use != XISlavePointer) continue;
             if (devices[i].deviceid != event->deviceid) continue;
             if (devices[i].attachment != thread_data->xi2_core_pointer) continue;
             thread_data->xi2_current_slave = event->deviceid;
-            break;
         }
-    }
 
-    if (event->deviceid != thread_data->xi2_current_slave) return FALSE;
+        /* Only listen to slave device events on XInput == 2.0 */
+        if (event->deviceid != thread_data->xi2_current_slave)
+            return FALSE;
+    }
+    else
+    {
+        /* Only listen to master device events on XInput >= 2.1 */
+        if (event->deviceid != thread_data->xi2_core_pointer)
+            return FALSE;
+    }
 
     x_rel = &thread_data->x_rel_valuator;
     y_rel = &thread_data->y_rel_valuator;
