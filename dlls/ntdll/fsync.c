@@ -764,6 +764,16 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
         {
             /* Try to grab anything. */
 
+            if (alertable)
+            {
+                /* We must check this first! The server may set an event that
+                 * we're waiting on, but we need to return STATUS_USER_APC. */
+                struct event *event = get_shm( ntdll_get_thread_data()->fsync_apc_idx );
+                TRACE("...%d\n", __atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ));
+                if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                    goto userapc;
+            }
+
             for (i = 0; i < count; i++)
             {
                 struct fsync *obj = objs[i];
@@ -865,9 +875,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
             if (alertable)
             {
                 struct event *event = get_shm( ntdll_get_thread_data()->fsync_apc_idx );
-                if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
-                    goto userapc;
-
+                /* We already checked if it was signaled; don't bother doing it again. */
                 futexes[i].addr = &event->signaled;
                 futexes[i].val = 0;
 #if __SIZEOF_POINTER__ == 4
