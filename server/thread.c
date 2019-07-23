@@ -1072,7 +1072,7 @@ static int queue_apc( struct process *process, struct thread *thread, struct thr
         if (do_fsync())
             fsync_wake_futex( thread->fsync_apc_idx );
 
-        if (do_esync())
+        if (do_esync() && queue == &thread->user_apc)
             esync_wake_fd( thread->esync_apc_fd );
     }
 
