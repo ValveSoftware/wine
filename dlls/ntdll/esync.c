@@ -1070,6 +1070,14 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles,
             ret = do_poll( fds, pollcount, timeout ? &end : NULL );
             if (ret > 0)
             {
+                /* We must check this first! The server may set an event that
+                 * we're waiting on, but we need to return STATUS_USER_APC. */
+                if (alertable)
+                {
+                    if (fds[pollcount - 1].revents & POLLIN)
+                        goto userapc;
+                }
+
                 /* Find out which object triggered the wait. */
                 for (i = 0; i < count; i++)
                 {
@@ -1113,11 +1121,6 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles,
                         TRACE("Woken up by driver events.\n");
                         return count - 1;
                     }
-                }
-                if (alertable)
-                {
-                    if (fds[i++].revents & POLLIN)
-                        goto userapc;
                 }
 
                 /* If we got here, someone else stole (or reset, etc.) whatever
