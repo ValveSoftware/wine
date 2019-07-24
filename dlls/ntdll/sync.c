@@ -509,6 +509,9 @@ NTSTATUS WINAPI NtPulseEvent( HANDLE handle, LONG *prev_state )
 {
     NTSTATUS ret;
 
+    if (do_fsync())
+        return fsync_pulse_event( handle, prev_state );
+
     if (do_esync())
         return esync_pulse_event( handle );
 
