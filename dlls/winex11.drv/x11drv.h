@@ -486,6 +486,7 @@ enum x11drv_atoms
     XATOM__NET_SYSTEM_TRAY_OPCODE,
     XATOM__NET_SYSTEM_TRAY_S0,
     XATOM__NET_SYSTEM_TRAY_VISUAL,
+    XATOM__NET_WM_BYPASS_COMPOSITOR,
     XATOM__NET_WM_ICON,
     XATOM__NET_WM_MOVERESIZE,
     XATOM__NET_WM_NAME,
@@ -665,6 +666,8 @@ extern HWND create_foreign_window( Display *display, Window window ) DECLSPEC_HI
 extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
 extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
 extern BOOL wm_is_steamcompmgr(Display *) DECLSPEC_HIDDEN;
+
+extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
