@@ -1404,6 +1404,19 @@ static BOOL X11DRV_PropertyNotify( HWND hwnd, XEvent *xev )
         XFree(name);
     }
 
+    if (event->atom == x11drv_atom(_NET_WM_BYPASS_COMPOSITOR))
+    {
+        struct x11drv_win_data *data = get_win_data( hwnd );
+        if (!data) return TRUE;
+
+        /* workaround for mutter gitlab bug #676, changing decorations of a
+         * fullscreen and unredirected window freezes the compositing.
+         */
+        if (wm_is_mutter( data->display )) set_wm_hints( data );
+
+        release_win_data( data );
+    }
+
     if (event->atom == x11drv_atom(WM_STATE)) handle_wm_state_notify( hwnd, event, TRUE );
     else if (event->atom == x11drv_atom(_NET_WM_STATE)) handle__net_wm_state_notify( hwnd, event );
     return TRUE;

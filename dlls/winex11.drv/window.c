@@ -829,6 +829,33 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
     MwmHints mwm_hints;
     int enable_mutter_workaround, mapped;
 
+    /* workaround for mutter gitlab bug #676, changing decorations of a
+     * fullscreen and unredirected window freezes the compositing.
+     * The window style will be updated again once the window has returned
+     * from fullscreen.
+     */
+    if (wm_is_mutter(data->display) && (data->net_wm_state & (1 << NET_WM_STATE_FULLSCREEN)))
+    {
+        Atom type;
+        int format;
+        unsigned long *property, net_wm_bypass_compositor = 0, count, remaining;
+
+        if (XGetWindowProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_BYPASS_COMPOSITOR), 0,
+                                1, False, XA_CARDINAL, &type, &format, &count, &remaining,
+                                (unsigned char **)&property ) == Success &&
+            property)
+        {
+            net_wm_bypass_compositor = *property;
+            XFree(property);
+        }
+
+        if (net_wm_bypass_compositor)
+        {
+            TRACE("workaround mutter bug, ignoring decorations while compositor is bypassed\n");
+            return;
+        }
+    }
+
     if (data->hwnd == GetDesktopWindow())
     {
         if (is_desktop_fullscreen()) mwm_hints.decorations = 0;
@@ -1040,7 +1067,7 @@ static void make_owner_managed( HWND hwnd )
  *
  * Set all the window manager hints for a window.
  */
-static void set_wm_hints( struct x11drv_win_data *data )
+void set_wm_hints( struct x11drv_win_data *data )
 {
     DWORD style, ex_style;
 
