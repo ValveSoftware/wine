@@ -511,6 +511,35 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
+{
+    struct event *event;
+    struct fsync *obj;
+    LONG current;
+    NTSTATUS ret;
+
+    TRACE("%p.\n", handle);
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+    event = obj->shm;
+
+    /* This isn't really correct; an application could miss the write.
+     * Unfortunately we can't really do much better. Fortunately this is rarely
+     * used (and publicly deprecated). */
+    if (!(current = __atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST )))
+        futex_wake( &event->signaled, INT_MAX );
+
+    /* Try to give other threads a chance to wake up. Hopefully erring on this
+     * side is the better thing to do... */
+    NtYieldExecution();
+
+    __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
+
+    if (prev) *prev = current;
+
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len )
 {
     struct event *event;
