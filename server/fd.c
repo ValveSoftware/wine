@@ -2171,7 +2171,7 @@ void set_fd_signaled( struct fd *fd, int signaled )
     if (signaled) wake_up( fd->user, 0 );
 
     if (do_fsync() && !signaled)
-        fsync_clear( &fd->obj );
+        fsync_clear( fd->user );
 
     if (do_esync() && !signaled)
         esync_clear( fd->esync_fd );
