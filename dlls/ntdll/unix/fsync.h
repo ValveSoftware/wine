@@ -34,6 +34,7 @@ extern NTSTATUS fsync_open_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr ) DECLSPEC_HIDDEN;
 extern NTSTATUS fsync_set_event( HANDLE handle, LONG *prev ) DECLSPEC_HIDDEN;
 extern NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev ) DECLSPEC_HIDDEN;
+extern NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev ) DECLSPEC_HIDDEN;
 extern NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len ) DECLSPEC_HIDDEN;
 extern NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, BOOLEAN initial ) DECLSPEC_HIDDEN;
