@@ -780,6 +780,13 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
                 if (obj)
                 {
+                    if (!obj->type) /* gcc complains if we put this in the switch */
+                    {
+                        /* Someone probably closed an object while waiting on it. */
+                        WARN("Handle %p has type 0; was it closed?\n", handles[i]);
+                        return STATUS_INVALID_HANDLE;
+                    }
+
                     switch (obj->type)
                     {
                     case FSYNC_SEMAPHORE:
@@ -856,6 +863,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         break;
                     }
                     default:
+                        ERR("Invalid type %#x for handle %p.\n", obj->type, handles[i]);
                         assert(0);
                     }
                 }
