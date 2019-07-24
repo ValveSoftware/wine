@@ -331,8 +331,15 @@ struct fsync_event
 
 void fsync_wake_futex( unsigned int shm_idx )
 {
-    struct fsync_event *event = get_shm( shm_idx );
+    struct fsync_event *event;
 
+    if (debug_level)
+        fprintf( stderr, "fsync_wake_futex: index %u\n", shm_idx );
+
+    if (!shm_idx)
+        return;
+
+    event = get_shm( shm_idx );
     if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
         futex_wake( &event->signaled, INT_MAX );
 }
@@ -341,20 +348,33 @@ void fsync_wake_up( struct object *obj )
 {
     enum fsync_type type;
 
+    if (debug_level)
+        fprintf( stderr, "fsync_wake_up: object %p\n", obj );
+
     if (obj->ops->get_fsync_idx)
         fsync_wake_futex( obj->ops->get_fsync_idx( obj, &type ) );
 }
 
 void fsync_clear_futex( unsigned int shm_idx )
 {
-    struct fsync_event *event = get_shm( shm_idx );
+    struct fsync_event *event;
 
+    if (debug_level)
+        fprintf( stderr, "fsync_clear_futex: index %u\n", shm_idx );
+
+    if (!shm_idx)
+        return;
+
+    event = get_shm( shm_idx );
     __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 }
 
 void fsync_clear( struct object *obj )
 {
     enum fsync_type type;
+
+    if (debug_level)
+        fprintf( stderr, "fsync_clear: object %p\n", obj );
 
     if (obj->ops->get_fsync_idx)
         fsync_clear_futex( obj->ops->get_fsync_idx( obj, &type ) );
