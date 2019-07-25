@@ -812,14 +812,18 @@ static const platform_vtbl sdl_vtbl =
     set_feature_report,
 };
 
+static int compare_joystick_id(DEVICE_OBJECT *device, void* context)
+{
+    return impl_from_DEVICE_OBJECT(device)->id - PtrToUlong(context);
+}
+
 static BOOL set_report_from_event(SDL_Event *event)
 {
     DEVICE_OBJECT *device;
     struct platform_private *private;
     /* All the events coming in will have 'which' as a 3rd field */
-    SDL_JoystickID index = ((SDL_JoyButtonEvent*)event)->which;
-
-    device = bus_find_hid_device(&sdl_vtbl, ULongToPtr(index));
+    SDL_JoystickID id = ((SDL_JoyButtonEvent*)event)->which;
+    device = bus_enumerate_hid_devices(&sdl_vtbl, compare_joystick_id, ULongToPtr(id));
     if (!device)
     {
         return FALSE;
@@ -881,8 +885,8 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
     DEVICE_OBJECT *device;
     struct platform_private *private;
     /* All the events coming in will have 'which' as a 3rd field */
-    int index = ((SDL_ControllerButtonEvent*)event)->which;
-    device = bus_find_hid_device(&sdl_vtbl, ULongToPtr(index));
+    SDL_JoystickID id = ((SDL_ControllerButtonEvent*)event)->which;
+    device = bus_enumerate_hid_devices(&sdl_vtbl, compare_joystick_id, ULongToPtr(id));
     if (!device)
     {
         return FALSE;
@@ -960,7 +964,7 @@ static BOOL set_mapped_report_from_event(SDL_Event *event)
     return FALSE;
 }
 
-static void try_remove_device(SDL_JoystickID index)
+static void try_remove_device(SDL_JoystickID id)
 {
     DEVICE_OBJECT *device = NULL;
     struct platform_private *private;
@@ -968,7 +972,7 @@ static void try_remove_device(SDL_JoystickID index)
     SDL_GameController *sdl_controller;
     SDL_Haptic *sdl_haptic;
 
-    device = bus_find_hid_device(&sdl_vtbl, ULongToPtr(index));
+    device = bus_enumerate_hid_devices(&sdl_vtbl, compare_joystick_id, ULongToPtr(id));
     if (!device) return;
 
     private = impl_from_DEVICE_OBJECT(device);
@@ -987,7 +991,7 @@ static void try_remove_device(SDL_JoystickID index)
         pSDL_HapticClose(sdl_haptic);
 }
 
-static void try_add_device(SDL_JoystickID index, BOOL xinput_hack)
+static void try_add_device(unsigned int index, BOOL xinput_hack)
 {
     DWORD vid = 0, pid = 0, version = 0;
     DEVICE_OBJECT *device = NULL;
@@ -1019,7 +1023,10 @@ static void try_add_device(SDL_JoystickID index, BOOL xinput_hack)
 
     id = pSDL_JoystickInstanceID(joystick);
     if(xinput_hack)
+    {
         id |= XINPUT_HACK_ID_BIT;
+        index |= XINPUT_HACK_ID_BIT;
+    }
 
     if (pSDL_JoystickGetProductVersion != NULL) {
         vid = pSDL_JoystickGetVendor(joystick);
@@ -1058,7 +1065,7 @@ static void try_add_device(SDL_JoystickID index, BOOL xinput_hack)
         input = 0;
 
     device = bus_create_hid_device(sdl_busidW, vid, pid,
-            input, version, id, serial, is_xbox_gamepad, &GUID_DEVCLASS_SDL,
+            input, version, index, serial, is_xbox_gamepad, &GUID_DEVCLASS_SDL,
             &sdl_vtbl, sizeof(struct platform_private), xinput_hack);
 
     if (device)
