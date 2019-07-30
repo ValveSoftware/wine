@@ -1101,8 +1101,8 @@ static void process_device_event(SDL_Event *event)
 
     if (event->type == SDL_JOYDEVICEADDED)
     {
-        try_add_device(((SDL_JoyDeviceEvent*)event)->which, FALSE);
         try_add_device(((SDL_JoyDeviceEvent*)event)->which, TRUE);
+        try_add_device(((SDL_JoyDeviceEvent*)event)->which, FALSE);
     }
     else if (event->type == SDL_JOYDEVICEREMOVED)
     {
