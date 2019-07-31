@@ -237,6 +237,9 @@ int main( int argc, char *argv[] )
     if (do_esync())
         esync_init();
 
+    if (!do_fsync() && !do_esync())
+        fprintf( stderr, "wineserver: using server-side synchronization.\n" );
+
     if (debug_level) fprintf( stderr, "wineserver: starting (pid=%ld)\n", (long) getpid() );
     set_current_time();
     init_signals();
