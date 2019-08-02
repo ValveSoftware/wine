@@ -302,12 +302,16 @@ static void enable_xinput2(void)
 
     if (data->xi2_state == xi_unknown)
     {
-        int major = 2, minor = 0;
-        if (!pXIQueryVersion( data->display, &major, &minor )) data->xi2_state = xi_disabled;
+        int major = 2, minor = 1;
+        if (!pXIQueryVersion( data->display, &major, &minor ) && major == 2 && minor > 0)
+        {
+            TRACE( "XInput2 v%d.%d available\n", major, minor );
+            data->xi2_state = xi_disabled;
+        }
         else
         {
             data->xi2_state = xi_unavailable;
-            WARN( "X Input 2 not available\n" );
+            WARN( "XInput v2.1 not available\n" );
         }
     }
     if (data->xi2_state == xi_unavailable) return;
@@ -315,7 +319,7 @@ static void enable_xinput2(void)
 
     mask.mask     = mask_bits;
     mask.mask_len = sizeof(mask_bits);
-    mask.deviceid = XIAllDevices;
+    mask.deviceid = XIAllMasterDevices;
     memset( mask_bits, 0, sizeof(mask_bits) );
     XISetMask( mask_bits, XI_DeviceChanged );
     XISetMask( mask_bits, XI_RawMotion );
@@ -326,16 +330,6 @@ static void enable_xinput2(void)
     pointer_info = pXIQueryDevice( data->display, data->xi2_core_pointer, &count );
     update_relative_valuators( pointer_info->classes, pointer_info->num_classes );
     pXIFreeDeviceInfo( pointer_info );
-
-    /* This device info list is only used to find the initial current slave if
-     * no XI_DeviceChanged events happened. If any hierarchy change occurred that
-     * might be relevant here (eg. user switching mice after (un)plugging), a
-     * XI_DeviceChanged event will point us to the right slave. So this list is
-     * safe to be obtained statically at enable_xinput2() time.
-     */
-    if (data->xi2_devices) pXIFreeDeviceInfo( data->xi2_devices );
-    data->xi2_devices = pXIQueryDevice( data->display, XIAllDevices, &data->xi2_device_count );
-    data->xi2_current_slave = 0;
 
     data->xi2_state = xi_enabled;
 #endif
@@ -357,15 +351,12 @@ static void disable_xinput2(void)
 
     mask.mask = NULL;
     mask.mask_len = 0;
-    mask.deviceid = XIAllDevices;
+    mask.deviceid = XIAllMasterDevices;
 
     pXISelectEvents( data->display, DefaultRootWindow( data->display ), &mask, 1 );
-    pXIFreeDeviceInfo( data->xi2_devices );
     data->x_rel_valuator.number = -1;
     data->y_rel_valuator.number = -1;
-    data->xi2_devices = NULL;
     data->xi2_core_pointer = 0;
-    data->xi2_current_slave = 0;
 #endif
 }
 
@@ -1819,7 +1810,6 @@ static BOOL X11DRV_DeviceChanged( XGenericEventCookie *xev )
     if (event->reason != XISlaveSwitch) return FALSE;
 
     update_relative_valuators( event->classes, event->num_classes );
-    data->xi2_current_slave = event->sourceid;
     return TRUE;
 }
 
@@ -1840,26 +1830,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     if (thread_data->x_rel_valuator.number < 0 || thread_data->y_rel_valuator.number < 0) return FALSE;
     if (!event->valuators.mask_len) return FALSE;
     if (thread_data->xi2_state != xi_enabled) return FALSE;
-
-    /* If there is no slave currently detected, no previous motion nor device
-     * change events were received. Look it up now on the device list in this
-     * case.
-     */
-    if (!thread_data->xi2_current_slave)
-    {
-        XIDeviceInfo *devices = thread_data->xi2_devices;
-
-        for (i = 0; i < thread_data->xi2_device_count; i++)
-        {
-            if (devices[i].use != XISlavePointer) continue;
-            if (devices[i].deviceid != event->deviceid) continue;
-            if (devices[i].attachment != thread_data->xi2_core_pointer) continue;
-            thread_data->xi2_current_slave = event->deviceid;
-            break;
-        }
-    }
-
-    if (event->deviceid != thread_data->xi2_current_slave) return FALSE;
+    if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
 
     x_rel = &thread_data->x_rel_valuator;
     y_rel = &thread_data->y_rel_valuator;
