@@ -191,6 +191,7 @@ void X11DRV_Settings_AddDepthModes(void)
 
     qsort(dd_modes, dd_mode_count, sizeof(*dd_modes), sort_display_modes);
 
+    existing_modes = dd_mode_count;
     for (j=0; j<3; j++)
     {
         if (depths[j] != dwBpp)
