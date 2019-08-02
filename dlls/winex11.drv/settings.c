@@ -68,8 +68,8 @@ struct x11drv_mode_info *X11DRV_Settings_SetHandlers(const char *name,
         pSetCurrentMode = pNewSCM;
     TRACE("Resolution settings now handled by: %s\n", name);
     if (reserve_depths)
-        /* leave room for other depths */
-        dd_max_modes = (3+1)*(nmodes);
+        /* leave room for other depths and refresh rates */
+        dd_max_modes = 2*(3+1)*(nmodes);
     else 
         dd_max_modes = nmodes;
 
@@ -176,9 +176,11 @@ void X11DRV_Settings_AddDepthModes(void)
     DWORD dwBpp = screen_bpp;
     const DWORD *depths = screen_bpp == 32 ? depths_32 : depths_24;
     struct fs_mode real_mode;
+    unsigned int real_rate;
 
     real_mode.w = dd_modes[realMode].width;
     real_mode.h = dd_modes[realMode].height;
+    real_rate = dd_modes[realMode].refresh_rate;
 
     /* Linux reports far fewer resolutions than Windows; add "missing" modes
      * that some games may expect. */
@@ -190,6 +192,15 @@ void X11DRV_Settings_AddDepthModes(void)
     }
 
     qsort(dd_modes, dd_mode_count, sizeof(*dd_modes), sort_display_modes);
+
+    /* synthesize 60 FPS mode if needed */
+    if(real_rate != 60)
+    {
+        for(i = 0; i < existing_modes; ++i)
+        {
+            X11DRV_Settings_AddOneMode(dd_modes[i].width, dd_modes[i].height, dwBpp, 60);
+        }
+    }
 
     existing_modes = dd_mode_count;
     for (j=0; j<3; j++)
