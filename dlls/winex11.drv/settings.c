@@ -431,8 +431,8 @@ static LONG X11DRV_nores_SetCurrentMode(int mode)
         fs_hack_real_to_user_h = dd_modes[currentMode].height / (double)h;
 
         X11DRV_resize_desktop(
-                DisplayWidth(gdi_display, default_visual.screen) - (dd_modes[0].width - w),
-                DisplayHeight(gdi_display, default_visual.screen) - (dd_modes[0].height - h));
+                DisplayWidth(gdi_display, default_visual.screen) - (dd_modes[realMode].width - w),
+                DisplayHeight(gdi_display, default_visual.screen) - (dd_modes[realMode].height - h));
     }
 
     return DISP_CHANGE_SUCCESSFUL;
@@ -447,8 +447,8 @@ POINT fs_hack_current_mode(void)
 
 POINT fs_hack_real_mode(void)
 {
-    POINT ret = { dd_modes[0].width,
-        dd_modes[0].height };
+    POINT ret = { dd_modes[realMode].width,
+        dd_modes[realMode].height };
     return ret;
 }
 
