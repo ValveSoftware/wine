@@ -71,7 +71,7 @@ HRESULT sdl_input_get_info_W(SDL_Joystick *dev, REFGUID rguid, LPDIEFFECTINFOW i
 
 struct device_state_item {
     int type;
-    int idx;
+    int id;
     int val;
 };
 
@@ -315,6 +315,213 @@ static HRESULT sdl_enum_deviceW(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
   return S_FALSE;
 }
 
+static int buttons_to_sdl_hat(int u, int r, int d, int l)
+{
+    if(u == d)
+    {
+        if(l == r)
+            return SDL_HAT_CENTERED;
+        if(l)
+            return SDL_HAT_LEFT;
+        return SDL_HAT_RIGHT;
+    }
+    if(u)
+    {
+        if(l == r)
+            return SDL_HAT_UP;
+        if(l)
+            return SDL_HAT_LEFTUP;
+        return SDL_HAT_RIGHTUP;
+    }
+    if(l == r)
+        return SDL_HAT_DOWN;
+    if(l)
+        return SDL_HAT_LEFTDOWN;
+    return SDL_HAT_RIGHTDOWN;
+}
+
+/* playstation controllers */
+#define VID_SONY 0x054c
+#define PID_SONY_DUALSHOCK_4 0x05c4
+#define PID_SONY_DUALSHOCK_4_2 0x09cc
+#define PID_SONY_DUALSHOCK_4_DONGLE 0x0ba0
+
+static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_state_item *st, int idx)
+{
+#define SPECIALCASE_HAT -1
+#define SPECIALCASE_L2_BUTTON -2
+#define SPECIALCASE_R2_BUTTON -3
+
+    static const struct {
+        int type;
+        int sdl_idx;
+        int dnp_id;
+    } map_ds4_16button[] = {
+        { ITEM_TYPE_AXIS, 3, 5 }, /* R2 */
+        { ITEM_TYPE_AXIS, 2, 2 }, /* L2 */
+        { ITEM_TYPE_AXIS, 1, 1 }, /* left vert */
+        { ITEM_TYPE_AXIS, 0, 0 }, /* left horiz */
+
+        { ITEM_TYPE_HAT, SPECIALCASE_HAT, 0 }, /* d-pad */
+
+        { ITEM_TYPE_BUTTON, 2, 0}, /* square */
+        { ITEM_TYPE_BUTTON, 0, 1}, /* cross */
+        { ITEM_TYPE_BUTTON, 1, 2}, /* circle */
+        { ITEM_TYPE_BUTTON, 3, 3}, /* triangle */
+
+        { ITEM_TYPE_BUTTON, 9, 4}, /* L1 */
+        { ITEM_TYPE_BUTTON, 10, 5}, /* R1 */
+        { ITEM_TYPE_BUTTON, SPECIALCASE_L2_BUTTON, 6}, /* L2 button */
+        { ITEM_TYPE_BUTTON, SPECIALCASE_R2_BUTTON, 7}, /* R2 button */
+        { ITEM_TYPE_BUTTON, 4, 8}, /* share */
+        { ITEM_TYPE_BUTTON, 6, 9}, /* options */
+
+        { ITEM_TYPE_BUTTON, 7, 10}, /* guide */
+        { ITEM_TYPE_BUTTON, 8, 11}, /* L3 */
+        { ITEM_TYPE_BUTTON, 5, 12}, /* R3 */
+
+        { ITEM_TYPE_BUTTON, 15, 13}, /* touchpad button */
+
+        { ITEM_TYPE_AXIS, 5, 4 }, /* right vert */
+        { ITEM_TYPE_AXIS, 4, 3 }, /* right horiz */
+    };
+
+    if(idx >= ARRAY_SIZE(map_ds4_16button))
+        return FALSE;
+
+    st->type = map_ds4_16button[idx].type;
+    st->id = map_ds4_16button[idx].dnp_id;
+
+    if(map_ds4_16button[idx].sdl_idx >= 0)
+    {
+        /* simple reads */
+        switch(map_ds4_16button[idx].type)
+        {
+        case ITEM_TYPE_BUTTON:
+            st->val = SDL_JoystickGetButton(This->device, map_ds4_16button[idx].sdl_idx);
+            return TRUE;
+
+        case ITEM_TYPE_AXIS:
+            st->val = SDL_JoystickGetAxis(This->device, map_ds4_16button[idx].sdl_idx);
+            return TRUE;
+
+        case ITEM_TYPE_HAT:
+            st->val = SDL_JoystickGetHat(This->device, map_ds4_16button[idx].sdl_idx);
+            return TRUE;
+        }
+    }
+
+    switch(map_ds4_16button[idx].sdl_idx){
+    case SPECIALCASE_HAT:
+    {
+        /* d-pad */
+        static const int SDL_DPAD_UP_BUTTON = 11;
+        static const int SDL_DPAD_DOWN_BUTTON = 12;
+        static const int SDL_DPAD_LEFT_BUTTON = 13;
+        static const int SDL_DPAD_RIGHT_BUTTON = 14;
+        st->val = buttons_to_sdl_hat(
+                SDL_JoystickGetButton(This->device, SDL_DPAD_UP_BUTTON),
+                SDL_JoystickGetButton(This->device, SDL_DPAD_RIGHT_BUTTON),
+                SDL_JoystickGetButton(This->device, SDL_DPAD_DOWN_BUTTON),
+                SDL_JoystickGetButton(This->device, SDL_DPAD_LEFT_BUTTON));
+        return TRUE;
+    }
+
+    case SPECIALCASE_L2_BUTTON :
+    {
+        /* L2 button */
+        /* turn button on at about 1/8 of the trigger travel */
+        static const int SDL_L2_AXIS = 4;
+        st->val = SDL_JoystickGetAxis(This->device, SDL_L2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
+        return TRUE;
+    }
+
+    case SPECIALCASE_R2_BUTTON:
+    {
+        /* R2 button */
+        /* turn button on at about 1/8 of the trigger travel */
+        static const int SDL_R2_AXIS = 5;
+        st->val = SDL_JoystickGetAxis(This->device, SDL_R2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
+        return TRUE;
+    }
+    }
+
+    ERR("???\n"); /* error in static data above */
+    return FALSE;
+
+#undef SPECIALCASE_HAT
+#undef SPECIALCASE_L2_BUTTON
+#undef SPECIALCASE_R2_BUTTON
+}
+
+static BOOL enum_device_state_ds4_13button(JoystickImpl *This, struct device_state_item *st, int idx)
+{
+    static const struct {
+        int type;
+        int sdl_idx;
+        int dnp_id;
+    } map_ds4_13button[] = {
+        { ITEM_TYPE_AXIS, 4, 5 }, /* R2 */
+        { ITEM_TYPE_AXIS, 3, 2 }, /* L2 */
+        { ITEM_TYPE_AXIS, 1, 1 }, /* left vert */
+        { ITEM_TYPE_AXIS, 0, 0 }, /* left horiz */
+
+        { ITEM_TYPE_HAT, 0, 0 }, /* d-pad */
+
+        { ITEM_TYPE_BUTTON, 3, 0}, /* square */
+        { ITEM_TYPE_BUTTON, 0, 1}, /* cross */
+        { ITEM_TYPE_BUTTON, 1, 2}, /* circle */
+        { ITEM_TYPE_BUTTON, 2, 3}, /* triangle */
+
+        { ITEM_TYPE_BUTTON, 4, 4}, /* L1 */
+        { ITEM_TYPE_BUTTON, 5, 5}, /* R1 */
+        { ITEM_TYPE_BUTTON, 6, 6}, /* L2 button */
+        { ITEM_TYPE_BUTTON, 7, 7}, /* R2 button */
+        { ITEM_TYPE_BUTTON, 8, 8}, /* share */
+        { ITEM_TYPE_BUTTON, 9, 9}, /* options */
+
+        { ITEM_TYPE_BUTTON, 11, 10}, /* guide */
+        { ITEM_TYPE_BUTTON, 12, 11}, /* L3 */
+        { ITEM_TYPE_BUTTON, 10, 12}, /* R3 */
+
+        /* ps4 controller through linux event API does not support touchpad button */
+        { ITEM_TYPE_BUTTON, -1, 13}, /* touchpad button */
+
+        { ITEM_TYPE_AXIS, 5, 4 }, /* right vert */
+        { ITEM_TYPE_AXIS, 2, 3 }, /* right horiz */
+    };
+
+    if(idx >= ARRAY_SIZE(map_ds4_13button))
+        return FALSE;
+
+    st->type = map_ds4_13button[idx].type;
+    st->id = map_ds4_13button[idx].dnp_id;
+
+    if(map_ds4_13button[idx].sdl_idx < 0)
+    {
+        st->val = 0;
+        return TRUE;
+    }
+
+    switch(map_ds4_13button[idx].type)
+    {
+    case ITEM_TYPE_BUTTON:
+        st->val = SDL_JoystickGetButton(This->device, map_ds4_13button[idx].sdl_idx);
+        return TRUE;
+
+    case ITEM_TYPE_AXIS:
+        st->val = SDL_JoystickGetAxis(This->device, map_ds4_13button[idx].sdl_idx);
+        return TRUE;
+
+    case ITEM_TYPE_HAT:
+        st->val = SDL_JoystickGetHat(This->device, map_ds4_13button[idx].sdl_idx);
+        return TRUE;
+    }
+
+    ERR("???\n"); /* error in static data above */
+    return FALSE;
+}
+
 /* straight 1:1 mapping of SDL items and dinput items */
 static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_item *st, int idx)
 {
@@ -325,7 +532,7 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
     if(idx < n_buttons)
     {
         st->type = ITEM_TYPE_BUTTON;
-        st->idx = idx;
+        st->id = idx;
         st->val = SDL_JoystickGetButton(This->device, idx);
         return TRUE;
     }
@@ -337,7 +544,7 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
     if(idx < n_axes)
     {
         st->type = ITEM_TYPE_AXIS;
-        st->idx = idx;
+        st->id = idx;
         st->val = SDL_JoystickGetAxis(This->device, idx);
         return TRUE;
     }
@@ -349,7 +556,7 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
     if(idx < n_hats)
     {
         st->type = ITEM_TYPE_HAT;
-        st->idx = idx;
+        st->id = idx;
         st->val = SDL_JoystickGetHat(This->device, idx);
         return TRUE;
     }
@@ -373,13 +580,13 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
         case ITEM_TYPE_BUTTON:
         {
             int val = item.val;
-            int oldVal = This->generic.js.rgbButtons[item.idx];
+            int oldVal = This->generic.js.rgbButtons[item.id];
             newVal = val ? 0x80 : 0x0;
-            This->generic.js.rgbButtons[item.idx] = newVal;
+            This->generic.js.rgbButtons[item.id] = newVal;
             if (oldVal != newVal)
             {
-                TRACE("Button: %i val %d oldVal %d newVal %d\n",  item.idx, val, oldVal, newVal);
-                inst_id = DIDFT_MAKEINSTANCE(item.idx) | DIDFT_PSHBUTTON;
+                TRACE("Button: %i val %d oldVal %d newVal %d\n",  item.id, val, oldVal, newVal);
+                inst_id = DIDFT_MAKEINSTANCE(item.id) | DIDFT_PSHBUTTON;
                 queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
             }
             break;
@@ -387,10 +594,13 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
 
         case ITEM_TYPE_AXIS:
         {
-            int oldVal;
+            int oldVal, obj;
+
+            obj = id_to_object(This->generic.base.data_format.wine_df, DIDFT_MAKEINSTANCE(item.id) | DIDFT_ABSAXIS);
             newVal = item.val;
-            newVal = joystick_map_axis(&This->generic.props[item.idx], newVal);
-            switch (item.idx)
+            newVal = joystick_map_axis(&This->generic.props[obj], newVal);
+
+            switch (item.id)
             {
                 case 0: oldVal = This->generic.js.lX;
                         This->generic.js.lX  = newVal; break;
@@ -411,8 +621,8 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
             }
             if (oldVal != newVal)
             {
-                TRACE("Axis: %i oldVal %d newVal %d\n",  item.idx, oldVal, newVal);
-                inst_id = DIDFT_MAKEINSTANCE(item.idx) | DIDFT_ABSAXIS;
+                TRACE("Axis: %i oldVal %d newVal %d\n",  item.id, oldVal, newVal);
+                inst_id = DIDFT_MAKEINSTANCE(item.id) | DIDFT_ABSAXIS;
                 queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
             }
             break;
@@ -420,7 +630,7 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
 
         case ITEM_TYPE_HAT:
         {
-            int oldVal = This->generic.js.rgdwPOV[item.idx];
+            int oldVal = This->generic.js.rgdwPOV[item.id];
             newVal = item.val;
             switch (newVal)
             {
@@ -436,9 +646,9 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
             }
             if (oldVal != newVal)
             {
-                TRACE("Hat : %i oldVal %d newVal %d\n",  item.idx, oldVal, newVal);
-                This->generic.js.rgdwPOV[item.idx] = newVal;
-                inst_id = DIDFT_MAKEINSTANCE(item.idx) | DIDFT_POV;
+                TRACE("Hat : %i oldVal %d newVal %d\n",  item.id, oldVal, newVal);
+                This->generic.js.rgdwPOV[item.id] = newVal;
+                inst_id = DIDFT_MAKEINSTANCE(item.id) | DIDFT_POV;
                 queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
             }
             break;
@@ -449,6 +659,23 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
 
 static enum_device_state_function select_enum_function(struct SDLDev *sdldev)
 {
+    switch(sdldev->vendor_id){
+    case VID_SONY:
+        switch(sdldev->product_id){
+        case PID_SONY_DUALSHOCK_4:
+        case PID_SONY_DUALSHOCK_4_2:
+        case PID_SONY_DUALSHOCK_4_DONGLE:
+            TRACE("for %04x/%04x, polling ds4 controller\n", sdldev->vendor_id, sdldev->product_id);
+            if(sdldev->n_buttons >= 16)
+                return enum_device_state_ds4_16button;
+
+            TRACE("SDL only reports %u buttons for this PS4 controller. Please upgrade SDL to > 2.0.10 and/or give your user hidraw access.\n",
+                    sdldev->n_buttons);
+            return enum_device_state_ds4_13button;
+        }
+        break;
+    }
+
     TRACE("for %04x/%04x, using no maps\n", sdldev->vendor_id, sdldev->product_id);
     return enum_device_state_standard;
 }
@@ -511,16 +738,6 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
         newDevice->generic.devcaps.dwAxes = 8;
     }
 
-    for (i = 0; i < newDevice->generic.devcaps.dwAxes; i++)
-    {
-        newDevice->generic.props[i].lDevMin = -32768;
-        newDevice->generic.props[i].lDevMax = 32767;
-        newDevice->generic.props[i].lMin =  0;
-        newDevice->generic.props[i].lMax =  0xffff;
-        newDevice->generic.props[i].lDeadZone = 0;
-        newDevice->generic.props[i].lSaturation = 0;
-    }
-
     newDevice->generic.devcaps.dwPOVs = hat_count;
     if (newDevice->generic.devcaps.dwPOVs > 4)
     {
@@ -544,26 +761,36 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     df->dwNumObjs = newDevice->generic.devcaps.dwAxes + newDevice->generic.devcaps.dwPOVs + newDevice->generic.devcaps.dwButtons;
     if (!(df->rgodf = HeapAlloc(GetProcessHeap(), 0, df->dwNumObjs * df->dwObjSize))) goto failed;
 
-    for (i = 0; i < newDevice->generic.devcaps.dwAxes; i++)
-    {
-        memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[idx], df->dwObjSize);
-        df->rgodf[idx].dwType = DIDFT_MAKEINSTANCE(idx) | DIDFT_ABSAXIS;
-        if (newDevice->sdldev->has_ff && i < 2)
-             df->rgodf[idx].dwFlags |= DIDOI_FFACTUATOR;
-        ++idx;
-    }
+    i = 0;
+    while(newDevice->enum_device_state(newDevice, &item, i++)){
+        switch(item.type){
+            case ITEM_TYPE_BUTTON:
+                memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[item.id + 12], df->dwObjSize);
+                df->rgodf[idx].pguid = &GUID_Button;
+                df->rgodf[idx].dwType = DIDFT_MAKEINSTANCE(item.id) | DIDFT_PSHBUTTON;
+                ++idx;
+                break;
+            case ITEM_TYPE_AXIS:
+                memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[item.id], df->dwObjSize);
+                df->rgodf[idx].dwType = DIDFT_MAKEINSTANCE(item.id) | DIDFT_ABSAXIS;
+                if (newDevice->sdldev->has_ff && item.id < 2)
+                     df->rgodf[idx].dwFlags |= DIDOI_FFACTUATOR;
 
-    for (i = 0; i < newDevice->generic.devcaps.dwPOVs; i++)
-    {
-        memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[i + 8], df->dwObjSize);
-        df->rgodf[idx++].dwType = DIDFT_MAKEINSTANCE(i) | DIDFT_POV;
-    }
+                newDevice->generic.props[idx].lDevMin = -32768;
+                newDevice->generic.props[idx].lDevMax = 32767;
+                newDevice->generic.props[idx].lMin =  0;
+                newDevice->generic.props[idx].lMax =  0xffff;
+                newDevice->generic.props[idx].lDeadZone = 0;
+                newDevice->generic.props[idx].lSaturation = 0;
 
-    for (i = 0; i < newDevice->generic.devcaps.dwButtons; i++)
-    {
-        memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[i + 12], df->dwObjSize);
-        df->rgodf[idx].pguid = &GUID_Button;
-        df->rgodf[idx++].dwType = DIDFT_MAKEINSTANCE(i) | DIDFT_PSHBUTTON;
+                ++idx;
+                break;
+            case ITEM_TYPE_HAT:
+                memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[item.id + 8], df->dwObjSize);
+                df->rgodf[idx].dwType = DIDFT_MAKEINSTANCE(item.id) | DIDFT_POV;
+                ++idx;
+                break;
+        }
     }
 
     if (newDevice->sdldev->has_ff)
