@@ -1025,6 +1025,8 @@ void CDECL wined3d_device_restore_fullscreen_window(struct wined3d_device *devic
 
 HRESULT CDECL wined3d_device_acquire_focus_window(struct wined3d_device *device, HWND window)
 {
+    unsigned int screensaver_active;
+
     TRACE("device %p, window %p.\n", device, window);
 
     if (!wined3d_register_window(NULL, window, device, 0))
@@ -1035,6 +1037,9 @@ HRESULT CDECL wined3d_device_acquire_focus_window(struct wined3d_device *device,
 
     InterlockedExchangePointer((void **)&device->focus_window, window);
     SetWindowPos(window, 0, 0, 0, 0, 0, SWP_NOSIZE | SWP_NOMOVE);
+    SystemParametersInfoW(SPI_GETSCREENSAVEACTIVE, 0, &screensaver_active, 0);
+    if ((device->restore_screensaver = !!screensaver_active))
+        SystemParametersInfoW(SPI_SETSCREENSAVEACTIVE, FALSE, NULL, 0);
 
     return WINED3D_OK;
 }
@@ -1045,6 +1050,11 @@ void CDECL wined3d_device_release_focus_window(struct wined3d_device *device)
 
     if (device->focus_window) wined3d_unregister_window(device->focus_window);
     InterlockedExchangePointer((void **)&device->focus_window, NULL);
+    if (device->restore_screensaver)
+    {
+        SystemParametersInfoW(SPI_SETSCREENSAVEACTIVE, TRUE, NULL, 0);
+        device->restore_screensaver = FALSE;
+    }
 }
 
 static void device_init_swapchain_state(struct wined3d_device *device, struct wined3d_swapchain *swapchain)
