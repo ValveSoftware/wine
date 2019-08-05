@@ -65,6 +65,17 @@ HRESULT sdl_create_effect(SDL_Haptic *haptic, REFGUID rguid, struct list *parent
 HRESULT sdl_input_get_info_A(SDL_Joystick *dev, REFGUID rguid, LPDIEFFECTINFOA info);
 HRESULT sdl_input_get_info_W(SDL_Joystick *dev, REFGUID rguid, LPDIEFFECTINFOW info);
 
+#define ITEM_TYPE_BUTTON 1
+#define ITEM_TYPE_AXIS 2
+#define ITEM_TYPE_HAT 3
+
+struct device_state_item {
+    int type;
+    int idx;
+    int val;
+};
+
+typedef BOOL (*enum_device_state_function)(JoystickImpl*, struct device_state_item *, int);
 
 struct SDLDev {
     int id;
@@ -72,6 +83,8 @@ struct SDLDev {
     WORD product_id;
     CHAR *name;
     BOOL is_xbox_gamepad;
+
+    int n_buttons, n_axes, n_hats;
 
     BOOL has_ff, is_joystick;
     int autocenter;
@@ -87,6 +100,8 @@ struct JoystickImpl
     SDL_Joystick *device;
     SDL_Haptic *haptic;
     BOOL ff_paused;
+
+    enum_device_state_function enum_device_state;
 };
 
 static inline JoystickImpl *impl_from_IDirectInputDevice8A(IDirectInputDevice8A *iface)
@@ -189,6 +204,10 @@ static void find_sdldevs(void)
 
             sdldev.is_xbox_gamepad = is_xinput_device(NULL, sdldev.vendor_id, sdldev.product_id);
         }
+
+        sdldev.n_buttons = SDL_JoystickNumButtons(device);
+        sdldev.n_axes = SDL_JoystickNumAxes(device);
+        sdldev.n_hats = SDL_JoystickNumHats(device);
 
         if (!have_sdldevs)
             new_sdldevs = HeapAlloc(GetProcessHeap(), 0, sizeof(struct SDLDev));
@@ -300,83 +319,134 @@ static HRESULT sdl_enum_deviceW(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
   return S_FALSE;
 }
 
+/* straight 1:1 mapping of SDL items and dinput items */
+static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_item *st, int idx)
+{
+    if(idx < This->sdldev->n_buttons)
+    {
+        st->type = ITEM_TYPE_BUTTON;
+        st->idx = idx;
+        st->val = SDL_JoystickGetButton(This->device, idx);
+        return TRUE;
+    }
+
+    idx -= This->sdldev->n_buttons;
+
+    if(idx < This->sdldev->n_axes)
+    {
+        st->type = ITEM_TYPE_AXIS;
+        st->idx = idx;
+        st->val = SDL_JoystickGetAxis(This->device, idx);
+        return TRUE;
+    }
+
+    idx -= This->sdldev->n_axes;
+
+    if(idx < This->sdldev->n_hats)
+    {
+        st->type = ITEM_TYPE_HAT;
+        st->idx = idx;
+        st->val = SDL_JoystickGetHat(This->device, idx);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
 {
     JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
-    int i;
+    int i = 0;
     int inst_id = 0;
     int newVal = 0;
+    struct device_state_item item;
 
     SDL_JoystickUpdate();
 
-    for (i = 0; i < SDL_JoystickNumButtons(This->device); i++)
+    while(This->enum_device_state(This, &item, i++))
     {
-        int val = SDL_JoystickGetButton(This->device, i);
-        int oldVal = This->generic.js.rgbButtons[i];
-        newVal = val ? 0x80 : 0x0;
-        This->generic.js.rgbButtons[i] = newVal;
-        if (oldVal != newVal)
+        switch(item.type){
+        case ITEM_TYPE_BUTTON:
         {
-            TRACE("Button: %i val %d oldVal %d newVal %d\n",  i, val, oldVal, newVal);
-            inst_id = DIDFT_MAKEINSTANCE(i) | DIDFT_PSHBUTTON;
-            queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
+            int val = item.val;
+            int oldVal = This->generic.js.rgbButtons[item.idx];
+            newVal = val ? 0x80 : 0x0;
+            This->generic.js.rgbButtons[item.idx] = newVal;
+            if (oldVal != newVal)
+            {
+                TRACE("Button: %i val %d oldVal %d newVal %d\n",  item.idx, val, oldVal, newVal);
+                inst_id = DIDFT_MAKEINSTANCE(item.idx) | DIDFT_PSHBUTTON;
+                queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
+            }
+            break;
+        }
+
+        case ITEM_TYPE_AXIS:
+        {
+            int oldVal;
+            newVal = item.val;
+            newVal = joystick_map_axis(&This->generic.props[item.idx], newVal);
+            switch (item.idx)
+            {
+                case 0: oldVal = This->generic.js.lX;
+                        This->generic.js.lX  = newVal; break;
+                case 1: oldVal = This->generic.js.lY;
+                        This->generic.js.lY  = newVal; break;
+                case 2: oldVal = This->generic.js.lZ;
+                        This->generic.js.lZ  = newVal; break;
+                case 3: oldVal = This->generic.js.lRx;
+                        This->generic.js.lRx = newVal; break;
+                case 4: oldVal = This->generic.js.lRy;
+                        This->generic.js.lRy = newVal; break;
+                case 5: oldVal = This->generic.js.lRz;
+                        This->generic.js.lRz = newVal; break;
+                case 6: oldVal = This->generic.js.rglSlider[0];
+                        This->generic.js.rglSlider[0] = newVal; break;
+                case 7: oldVal = This->generic.js.rglSlider[1];
+                        This->generic.js.rglSlider[1] = newVal; break;
+            }
+            if (oldVal != newVal)
+            {
+                TRACE("Axis: %i oldVal %d newVal %d\n",  item.idx, oldVal, newVal);
+                inst_id = DIDFT_MAKEINSTANCE(item.idx) | DIDFT_ABSAXIS;
+                queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
+            }
+            break;
+        }
+
+        case ITEM_TYPE_HAT:
+        {
+            int oldVal = This->generic.js.rgdwPOV[item.idx];
+            newVal = item.val;
+            switch (newVal)
+            {
+                case SDL_HAT_CENTERED: newVal = -1; break;
+                case SDL_HAT_UP: newVal = 0; break;
+                case SDL_HAT_RIGHTUP:newVal = 4500; break;
+                case SDL_HAT_RIGHT: newVal = 9000; break;
+                case SDL_HAT_RIGHTDOWN: newVal = 13500; break;
+                case SDL_HAT_DOWN: newVal = 18000; break;
+                case SDL_HAT_LEFTDOWN: newVal = 22500; break;
+                case SDL_HAT_LEFT: newVal = 27000; break;
+                case SDL_HAT_LEFTUP: newVal = 31500; break;
+            }
+            if (oldVal != newVal)
+            {
+                TRACE("Hat : %i oldVal %d newVal %d\n",  item.idx, oldVal, newVal);
+                This->generic.js.rgdwPOV[item.idx] = newVal;
+                inst_id = DIDFT_MAKEINSTANCE(item.idx) | DIDFT_POV;
+                queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
+            }
+            break;
+        }
         }
     }
-    for (i = 0; i < SDL_JoystickNumAxes(This->device); i++)
-    {
-        int oldVal;
-        newVal = SDL_JoystickGetAxis(This->device, i);
-        newVal = joystick_map_axis(&This->generic.props[i], newVal);
-        switch (i)
-        {
-            case 0: oldVal = This->generic.js.lX;
-                    This->generic.js.lX  = newVal; break;
-            case 1: oldVal = This->generic.js.lY;
-                    This->generic.js.lY  = newVal; break;
-            case 2: oldVal = This->generic.js.lZ;
-                    This->generic.js.lZ  = newVal; break;
-            case 3: oldVal = This->generic.js.lRx;
-                    This->generic.js.lRx = newVal; break;
-            case 4: oldVal = This->generic.js.lRy;
-                    This->generic.js.lRy = newVal; break;
-            case 5: oldVal = This->generic.js.lRz;
-                    This->generic.js.lRz = newVal; break;
-            case 6: oldVal = This->generic.js.rglSlider[0];
-                    This->generic.js.rglSlider[0] = newVal; break;
-            case 7: oldVal = This->generic.js.rglSlider[1];
-                    This->generic.js.rglSlider[1] = newVal; break;
-        }
-        if (oldVal != newVal)
-        {
-            TRACE("Axis: %i oldVal %d newVal %d\n",  i, oldVal, newVal);
-            inst_id = DIDFT_MAKEINSTANCE(i) | DIDFT_ABSAXIS;
-            queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
-        }
-    }
-    for (i = 0; i < SDL_JoystickNumHats(This->device); i++)
-    {
-        int oldVal = This->generic.js.rgdwPOV[i];
-        newVal = SDL_JoystickGetHat(This->device, i);
-        switch (newVal)
-        {
-            case SDL_HAT_CENTERED: newVal = -1; break;
-            case SDL_HAT_UP: newVal = 0; break;
-            case SDL_HAT_RIGHTUP:newVal = 4500; break;
-            case SDL_HAT_RIGHT: newVal = 9000; break;
-            case SDL_HAT_RIGHTDOWN: newVal = 13500; break;
-            case SDL_HAT_DOWN: newVal = 18000; break;
-            case SDL_HAT_LEFTDOWN: newVal = 22500; break;
-            case SDL_HAT_LEFT: newVal = 27000; break;
-            case SDL_HAT_LEFTUP: newVal = 31500; break;
-        }
-        if (oldVal != newVal)
-        {
-            TRACE("Hat : %i oldVal %d newVal %d\n",  i, oldVal, newVal);
-            This->generic.js.rgdwPOV[i] = newVal;
-            inst_id = DIDFT_MAKEINSTANCE(i) | DIDFT_POV;
-            queue_event(iface, inst_id, newVal, GetCurrentTime(), This->generic.base.dinput->evsequence++);
-        }
-    }
+}
+
+static enum_device_state_function select_enum_function(struct SDLDev *sdldev)
+{
+    TRACE("for %04x/%04x, using no maps\n", sdldev->vendor_id, sdldev->product_id);
+    return enum_device_state_standard;
 }
 
 static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsigned short index)
@@ -384,7 +454,8 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     JoystickImpl* newDevice;
     LPDIDATAFORMAT df = NULL;
     DIDEVICEINSTANCEW ddi;
-    int i,idx = 0;
+    int i,idx = 0, axis_count = 0, button_count = 0, hat_count = 0;
+    struct device_state_item item;
 
     newDevice = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(JoystickImpl));
     if (!newDevice) return NULL;
@@ -394,6 +465,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->generic.guidProduct = DInput_PIDVID_Product_GUID;
     newDevice->generic.guidProduct.Data1 = MAKELONG(sdldevs[index].vendor_id, sdldevs[index].product_id);
     newDevice->generic.joy_polldev = poll_sdl_device_state;
+    newDevice->enum_device_state = select_enum_function(&sdldevs[index]);
 
     newDevice->generic.base.IDirectInputDevice8A_iface.lpVtbl = &JoystickAvt;
     newDevice->generic.base.IDirectInputDevice8W_iface.lpVtbl = &JoystickWvt;
@@ -413,9 +485,22 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->device = SDL_JoystickOpen(newDevice->sdldev->id);
     newDevice->haptic = SDL_HapticOpenFromJoystick(newDevice->device);
 
-    /* Count number of available axes - supported Axis & POVs */
-    newDevice->generic.devcaps.dwAxes = SDL_JoystickNumAxes(newDevice->device);
+    i = 0;
+    while(newDevice->enum_device_state(newDevice, &item, i++)){
+        switch(item.type){
+            case ITEM_TYPE_BUTTON:
+                ++button_count;
+                break;
+            case ITEM_TYPE_AXIS:
+                ++axis_count;
+                break;
+            case ITEM_TYPE_HAT:
+                ++hat_count;
+                break;
+        }
+    }
 
+    newDevice->generic.devcaps.dwAxes = axis_count;
     if (newDevice->generic.devcaps.dwAxes > 8 )
     {
         WARN("Can't support %d axis. Clamping down to 8\n", newDevice->generic.devcaps.dwAxes);
@@ -432,14 +517,14 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
         newDevice->generic.props[i].lSaturation = 0;
     }
 
-    newDevice->generic.devcaps.dwPOVs = SDL_JoystickNumHats(newDevice->device);
+    newDevice->generic.devcaps.dwPOVs = hat_count;
     if (newDevice->generic.devcaps.dwPOVs > 4)
     {
         WARN("Can't support %d POV. Clamping down to 4\n", newDevice->generic.devcaps.dwPOVs);
         newDevice->generic.devcaps.dwPOVs = 4;
     }
 
-    newDevice->generic.devcaps.dwButtons = SDL_JoystickNumButtons(newDevice->device);
+    newDevice->generic.devcaps.dwButtons = button_count;
     if (newDevice->generic.devcaps.dwButtons > 128)
     {
         WARN("Can't support %d buttons. Clamping down to 128\n", newDevice->generic.devcaps.dwButtons);
