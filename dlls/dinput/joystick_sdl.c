@@ -319,6 +319,208 @@ static HRESULT sdl_enum_deviceW(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
   return S_FALSE;
 }
 
+static int buttons_to_sdl_hat(int u, int r, int d, int l)
+{
+    if(u == d)
+    {
+        if(l == r)
+            return SDL_HAT_CENTERED;
+        if(l)
+            return SDL_HAT_LEFT;
+        return SDL_HAT_RIGHT;
+    }
+    if(u)
+    {
+        if(l == r)
+            return SDL_HAT_UP;
+        if(l)
+            return SDL_HAT_LEFTUP;
+        return SDL_HAT_RIGHTUP;
+    }
+    if(l == r)
+        return SDL_HAT_DOWN;
+    if(l)
+        return SDL_HAT_LEFTDOWN;
+    return SDL_HAT_RIGHTDOWN;
+}
+
+/* playstation controllers */
+#define VID_SONY 0x054c
+#define PID_SONY_DUALSHOCK_4 0x05c4
+#define PID_SONY_DUALSHOCK_4_2 0x09cc
+#define PID_SONY_DUALSHOCK_4_DONGLE 0x0ba0
+
+static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_state_item *st, int idx)
+{
+    static const int button_map_ds4_16button[] = {
+        /* [linux button] -> windows button */
+
+        /* [0] -> */ 1, /* cross */
+        /* [1] -> */ 2, /* circle */
+        /* [2] -> */ 0, /* square */
+        /* [3] -> */ 3, /* triangle */
+
+        /* [4] -> */ 8, /* share */
+        /* [5] -> */ 12, /* guide */
+        /* [6] -> */ 9, /* options */
+
+        /* [7] -> */ 10, /* L3 */
+        /* [8] -> */ 11, /* R3 */
+
+        /* [9] -> */ 4, /* L1 */
+        /* [10] -> */ 5, /* R1 */
+    };
+
+    static const int axis_map_ds4_16button[] = {
+        /* [linux axis] -> windows axis */
+
+        /* [0] -> */ 0, /* left horiz */
+        /* [1] -> */ 1, /* left vert */
+        /* [2] -> */ 2, /* right horiz */
+        /* [3] -> */ 5, /* right vert */
+        /* [4] -> */ 3, /* L2 */
+        /* [5] -> */ 4, /* R2 */
+    };
+
+    static const int DNP_TOUCHPAD_BUTTON = 13;
+    static const int SDL_TOUCHPAD_BUTTON = 15;
+
+    static const int DNP_L2_BUTTON = 6;
+    static const int SDL_L2_AXIS = 4;
+
+    static const int DNP_R2_BUTTON = 7;
+    static const int SDL_R2_AXIS = 5;
+
+    static const int SDL_DPAD_UP_BUTTON = 11;
+    static const int SDL_DPAD_DOWN_BUTTON = 12;
+    static const int SDL_DPAD_LEFT_BUTTON = 13;
+    static const int SDL_DPAD_RIGHT_BUTTON = 14;
+
+    if(idx < 11)
+    {
+        /* first 11 buttons */
+        st->type = ITEM_TYPE_BUTTON;
+        st->idx = button_map_ds4_16button[idx];
+        st->val = SDL_JoystickGetButton(This->device, idx);
+        return TRUE;
+    }
+
+    if(idx < 17)
+    {
+        /* six axes */
+        idx -= 11;
+        st->type = ITEM_TYPE_AXIS;
+        st->idx = axis_map_ds4_16button[idx];
+        st->val = SDL_JoystickGetAxis(This->device, idx);
+        return TRUE;
+    }
+
+    switch(idx)
+    {
+    case 17:
+        /* touchpad button */
+        st->type = ITEM_TYPE_BUTTON;
+        st->idx = DNP_TOUCHPAD_BUTTON;
+        st->val = SDL_JoystickGetButton(This->device, SDL_TOUCHPAD_BUTTON);
+        return TRUE;
+
+    case 18:
+        /* L2 button */
+        st->type = ITEM_TYPE_BUTTON;
+        st->idx = DNP_L2_BUTTON;
+        /* turn button on at about 1/8 of the trigger travel */
+        st->val = SDL_JoystickGetAxis(This->device, SDL_L2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
+        return TRUE;
+
+    case 19:
+        /* R2 button */
+        st->type = ITEM_TYPE_BUTTON;
+        st->idx = DNP_R2_BUTTON;
+        /* turn button on at about 1/8 of the trigger travel */
+        st->val = SDL_JoystickGetAxis(This->device, SDL_R2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
+        return TRUE;
+
+    case 20:
+        /* dpad buttons --> hatswitch */
+        st->type = ITEM_TYPE_HAT;
+        st->idx = 0;
+        st->val = buttons_to_sdl_hat(
+                SDL_JoystickGetButton(This->device, SDL_DPAD_UP_BUTTON),
+                SDL_JoystickGetButton(This->device, SDL_DPAD_RIGHT_BUTTON),
+                SDL_JoystickGetButton(This->device, SDL_DPAD_DOWN_BUTTON),
+                SDL_JoystickGetButton(This->device, SDL_DPAD_LEFT_BUTTON));
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
+static BOOL enum_device_state_ds4_13button(JoystickImpl *This, struct device_state_item *st, int idx)
+{
+    static const int button_map_ds4_13button[] = {
+        /* [linux button] -> windows button */
+
+        /* [0] -> */ 1, /* cross */
+        /* [1] -> */ 2, /* circle */
+        /* [2] -> */ 3, /* triangle */
+        /* [3] -> */ 0, /* square */
+
+        /* [4] -> */ 4, /* L1 */
+        /* [5] -> */ 5, /* R1 */
+        /* [6] -> */ 6, /* L2 */
+        /* [7] -> */ 7, /* R2 */
+        /* [8] -> */ 8, /* share */
+        /* [9] -> */ 9, /* options */
+
+        /* [10] -> */ 12, /* guide */
+        /* [11] -> */ 10, /* L3 */
+        /* [12] -> */ 11, /* R3 */
+
+        /* ps4 controller through linux event API does not support touchpad button */
+    };
+
+    static const int axis_map_ds4_13button[] = {
+        /* [linux axis] -> windows axis */
+
+        /* [0] -> */ 0, /* left horiz */
+        /* [1] -> */ 1, /* left vert */
+        /* [2] -> */ 3, /* L2 */
+        /* [3] -> */ 2, /* right horiz */
+        /* [4] -> */ 5, /* right vert */
+        /* [5] -> */ 4, /* R2 */
+    };
+
+    if(idx < This->sdldev->n_buttons)
+    {
+        st->type = ITEM_TYPE_BUTTON;
+        st->idx = button_map_ds4_13button[idx];
+        st->val = SDL_JoystickGetButton(This->device, idx);
+        return TRUE;
+    }
+
+    idx -= This->sdldev->n_buttons;
+
+    if(idx < This->sdldev->n_axes)
+    {
+        st->type = ITEM_TYPE_AXIS;
+        st->idx = axis_map_ds4_13button[idx];
+        st->val = SDL_JoystickGetAxis(This->device, idx);
+        return TRUE;
+    }
+
+    idx -= This->sdldev->n_axes;
+
+    if(idx < This->sdldev->n_hats)
+    {
+        st->type = ITEM_TYPE_HAT;
+        st->idx = idx;
+        st->val = SDL_JoystickGetHat(This->device, idx);
+        return TRUE;
+    }
+
+    return FALSE;
+}
+
 /* straight 1:1 mapping of SDL items and dinput items */
 static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_item *st, int idx)
 {
@@ -445,6 +647,23 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
 
 static enum_device_state_function select_enum_function(struct SDLDev *sdldev)
 {
+    switch(sdldev->vendor_id){
+    case VID_SONY:
+        switch(sdldev->product_id){
+        case PID_SONY_DUALSHOCK_4:
+        case PID_SONY_DUALSHOCK_4_2:
+        case PID_SONY_DUALSHOCK_4_DONGLE:
+            TRACE("for %04x/%04x, polling ds4 controller\n", sdldev->vendor_id, sdldev->product_id);
+            if(sdldev->n_buttons >= 16)
+                return enum_device_state_ds4_16button;
+
+            TRACE("SDL only reports %u buttons for this PS4 controller. Please upgrade SDL to > 2.0.10 and/or give your user hidraw access.\n",
+                    sdldev->n_buttons);
+            return enum_device_state_ds4_13button;
+        }
+        break;
+    }
+
     TRACE("for %04x/%04x, using no maps\n", sdldev->vendor_id, sdldev->product_id);
     return enum_device_state_standard;
 }
