@@ -1239,7 +1239,11 @@ static void try_add_device(struct udev_device *dev)
 #endif
 
     if (is_xbox_gamepad(vid, pid))
-        is_gamepad = TRUE;
+    {
+        /* SDL handles xbox (and steam) controllers */
+        close(fd);
+        return;
+    }
 #ifdef HAS_PROPER_INPUT_HEADER
     else
     {
