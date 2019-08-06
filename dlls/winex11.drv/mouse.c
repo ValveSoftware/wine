@@ -259,8 +259,6 @@ static void update_relative_valuators(XIAnyClassInfo **valuators, int n_valuator
 
     thread_data->x_rel_valuator.number = -1;
     thread_data->y_rel_valuator.number = -1;
-    thread_data->x_rel_valuator.accum = 0;
-    thread_data->y_rel_valuator.accum = 0;
 
     for (i = 0; i < n_valuators; i++)
     {
@@ -366,8 +364,6 @@ static void disable_xinput2(void)
     pXIFreeDeviceInfo( data->xi2_devices );
     data->x_rel_valuator.number = -1;
     data->y_rel_valuator.number = -1;
-    data->x_rel_valuator.accum = 0;
-    data->y_rel_valuator.accum = 0;
     data->xi2_devices = NULL;
     data->xi2_core_pointer = 0;
     data->xi2_current_slave = 0;
@@ -1883,39 +1879,23 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 
     for (i = 0; i <= max ( x_rel->number, y_rel->number ); i++)
     {
-        if (!XIMaskIsSet( event->valuators.mask, i ))
-            continue;
+        if (!XIMaskIsSet( event->valuators.mask, i )) continue;
         val = *values++;
         if (i == x_rel->number)
         {
-            dx = val;
+            input.u.mi.dx = dx = val;
             if (x_rel->min < x_rel->max)
-                dx = val * (virtual_rect.right - virtual_rect.left)
-                         / (x_rel->max - x_rel->min);
+                input.u.mi.dx = val * (virtual_rect.right - virtual_rect.left)
+                                    / (x_rel->max - x_rel->min);
         }
         if (i == y_rel->number)
         {
-            dy = val;
+            input.u.mi.dy = dy = val;
             if (y_rel->min < y_rel->max)
-                dy = val * (virtual_rect.bottom - virtual_rect.top)
-                         / (y_rel->max - y_rel->min);
+                input.u.mi.dy = val * (virtual_rect.bottom - virtual_rect.top)
+                                    / (y_rel->max - y_rel->min);
         }
     }
-
-    /* Accumulate the *double* dx/dy motions so sub-pixel motions wont be lost
-     * when sent/cast to *LONG* input.u.mi.dx/dy.
-     */
-    x_rel->accum += dx;
-    y_rel->accum += dy;
-    if (fabs(x_rel->accum) < 1.0 && fabs(y_rel->accum) < 1.0)
-    {
-        TRACE( "accumulating raw motion (event %f,%f, accum %f,%f)\n", dx, dy, x_rel->accum, y_rel->accum );
-        return TRUE;
-    }
-    input.u.mi.dx = x_rel->accum;
-    input.u.mi.dy = y_rel->accum;
-    x_rel->accum -= input.u.mi.dx;
-    y_rel->accum -= input.u.mi.dy;
 
     if (broken_rawevents && is_old_motion_event( xev->serial ))
     {
@@ -1929,7 +1909,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.u.mi.dx = pt.x;
     input.u.mi.dy = pt.y;
 
-    TRACE( "pos %d,%d (event %f,%f, accum %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy, x_rel->accum, y_rel->accum );
+    TRACE( "pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
 
     input.type = INPUT_MOUSE;
     __wine_send_input( 0, &input );
