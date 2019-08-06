@@ -47,7 +47,7 @@
 # include <linux/input.h>
 # undef SW_MAX
 # if defined(EVIOCGBIT) && defined(EV_ABS) && defined(BTN_PINKIE)
-#  define HAS_PROPER_INPUT_HEADER
+//#  define HAS_PROPER_INPUT_HEADER
 # endif
 # ifndef SYN_DROPPED
 #  define SYN_DROPPED 3
