@@ -135,10 +135,15 @@ static void **shm_addrs;
 static int shm_addrs_size;  /* length of the allocated shm_addrs array */
 static long pagesize;
 
+static pthread_mutex_t shm_addrs_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 static void *get_shm( unsigned int idx )
 {
     int entry  = (idx * 8) / pagesize;
     int offset = (idx * 8) % pagesize;
+    void *ret;
+
+    pthread_mutex_lock( &shm_addrs_mutex );
 
     if (entry >= shm_addrs_size)
     {
@@ -162,7 +167,11 @@ static void *get_shm( unsigned int idx )
             munmap( addr, pagesize ); /* someone beat us to it */
     }
 
-    return (void *)((unsigned long)shm_addrs[entry] + offset);
+    ret = (void *)((unsigned long)shm_addrs[entry] + offset);
+
+    pthread_mutex_unlock( &shm_addrs_mutex );
+
+    return ret;
 }
 
 /* We'd like lookup to be fast. To that end, we use a static list indexed by handle.
