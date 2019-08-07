@@ -638,15 +638,15 @@ static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN aler
 
     if (alertable)
     {
-        struct event *apc_event = get_shm( ntdll_get_thread_data()->fsync_apc_idx );
+        int *apc_futex = ntdll_get_thread_data()->fsync_apc_futex;
         struct futex_wait_block futexes[2];
 
-        if (__atomic_load_n( &apc_event->signaled, __ATOMIC_SEQ_CST ))
+        if (__atomic_load_n( apc_futex, __ATOMIC_SEQ_CST ))
             return STATUS_USER_APC;
 
         futexes[0].addr = addr;
         futexes[0].val = val;
-        futexes[1].addr = &apc_event->signaled;
+        futexes[1].addr = apc_futex;
         futexes[1].val = 0;
 #if __SIZEOF_POINTER__ == 4
         futexes[0].pad = futexes[1].pad = 0;
@@ -664,7 +664,7 @@ static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN aler
         else
             ret = futex_wait_multiple( futexes, 2, NULL );
 
-        if (__atomic_load_n( &apc_event->signaled, __ATOMIC_SEQ_CST ))
+        if (__atomic_load_n( apc_futex, __ATOMIC_SEQ_CST ))
             return STATUS_USER_APC;
     }
     else
@@ -706,14 +706,21 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     int i, ret;
 
     /* Grab the APC futex if we don't already have it. */
-    if (alertable && !ntdll_get_thread_data()->fsync_apc_idx)
+    if (alertable && !ntdll_get_thread_data()->fsync_apc_futex)
     {
+        unsigned int idx = 0;
         SERVER_START_REQ( get_fsync_apc_idx )
         {
             if (!(ret = wine_server_call( req )))
-                ntdll_get_thread_data()->fsync_apc_idx = reply->shm_idx;
+                idx = reply->shm_idx;
         }
         SERVER_END_REQ;
+
+        if (idx)
+        {
+            struct event *apc_event = get_shm( idx );
+            ntdll_get_thread_data()->fsync_apc_futex = &apc_event->signaled;
+        }
     }
 
     NtQuerySystemTime( &now );
@@ -777,9 +784,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
             {
                 /* We must check this first! The server may set an event that
                  * we're waiting on, but we need to return STATUS_USER_APC. */
-                struct event *event = get_shm( ntdll_get_thread_data()->fsync_apc_idx );
-                TRACE("...%d\n", __atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ));
-                if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                if (__atomic_load_n( ntdll_get_thread_data()->fsync_apc_futex, __ATOMIC_SEQ_CST ))
                     goto userapc;
             }
 
@@ -891,9 +896,8 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
             if (alertable)
             {
-                struct event *event = get_shm( ntdll_get_thread_data()->fsync_apc_idx );
                 /* We already checked if it was signaled; don't bother doing it again. */
-                futexes[i].addr = &event->signaled;
+                futexes[i].addr = ntdll_get_thread_data()->fsync_apc_futex;
                 futexes[i].val = 0;
 #if __SIZEOF_POINTER__ == 4
                 futexes[i].pad = 0;
