@@ -134,10 +134,22 @@ static void **shm_addrs;
 static int shm_addrs_size;  /* length of the allocated shm_addrs array */
 static long pagesize;
 
+static RTL_CRITICAL_SECTION shm_addrs_section;
+static RTL_CRITICAL_SECTION_DEBUG shm_addrs_debug =
+{
+    0, 0, &shm_addrs_section,
+    { &shm_addrs_debug.ProcessLocksList, &shm_addrs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": shm_addrs_section") }
+};
+static RTL_CRITICAL_SECTION shm_addrs_section = { &shm_addrs_debug, -1, 0, 0, 0, 0 };
+
 static void *get_shm( unsigned int idx )
 {
     int entry  = (idx * 8) / pagesize;
     int offset = (idx * 8) % pagesize;
+    void *ret;
+
+    RtlEnterCriticalSection(&shm_addrs_section);
 
     if (entry >= shm_addrs_size)
     {
@@ -159,7 +171,11 @@ static void *get_shm( unsigned int idx )
             munmap( addr, pagesize ); /* someone beat us to it */
     }
 
-    return (void *)((unsigned long)shm_addrs[entry] + offset);
+    ret = (void *)((unsigned long)shm_addrs[entry] + offset);
+
+    RtlLeaveCriticalSection(&shm_addrs_section);
+
+    return ret;
 }
 
 /* We'd like lookup to be fast. To that end, we use a static list indexed by handle.
