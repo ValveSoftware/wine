@@ -52,7 +52,7 @@ struct ntdll_thread_data
     struct debug_info *debug_info;    /* info for debugstr functions */
     void              *start_stack;   /* stack for thread startup */
     int                esync_apc_fd;  /* fd to wait on for user APCs */
-    unsigned int       fsync_apc_idx;
+    int               *fsync_apc_futex;
     int                request_fd;    /* fd for sending server requests */
     int                reply_fd;      /* fd for receiving server replies */
     int                wait_fd[2];    /* fd for sleeping server requests */
