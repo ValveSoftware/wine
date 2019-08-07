@@ -2577,7 +2577,7 @@ static void init_teb( TEB *teb, PEB *peb )
     thread_data->wait_fd[0] = -1;
     thread_data->wait_fd[1] = -1;
     thread_data->esync_apc_fd = -1;
-    thread_data->fsync_apc_idx = 0;
+    thread_data->fsync_apc_futex = NULL;
     list_add_head( &teb_list, &thread_data->entry );
 }
 
