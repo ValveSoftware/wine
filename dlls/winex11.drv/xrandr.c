@@ -447,7 +447,7 @@ static int xrandr12_init_modes(void)
     unsigned int only_one_resolution = 1, mode_count;
     XRRScreenResources *resources;
     XRROutputInfo *output_info;
-    XRRModeInfo *primary_mode = NULL;
+    XRRModeInfo *primary_mode = NULL, rotated_mode;
     XRRCrtcInfo *crtc_info;
     unsigned int primary_refresh, primary_dots;
     int ret = -1;
@@ -533,10 +533,20 @@ static int xrandr12_init_modes(void)
 
             if (mode->id == output_info->modes[i])
             {
-                if(X11DRV_Settings_AddOneMode( mode->width, mode->height, 0, primary_refresh ))
+
+                rotated_mode = *mode;
+                if((crtc_info->rotation & RR_Rotate_90) ||
+                        (crtc_info->rotation & RR_Rotate_270))
                 {
-                    TRACE("Added mode %#lx: %ux%u@%u.\n", mode->id, mode->width, mode->height, primary_refresh);
-                    xrandr12_modes[xrandr_mode_count++] = mode->id;
+                    int tmp = rotated_mode.width;
+                    rotated_mode.width = rotated_mode.height;
+                    rotated_mode.height = tmp;
+                }
+
+                if(X11DRV_Settings_AddOneMode( rotated_mode.width, rotated_mode.height, 0, primary_refresh ))
+                {
+                    TRACE("Added mode %#lx: %ux%u@%u.\n", rotated_mode.id, rotated_mode.width, rotated_mode.height, primary_refresh);
+                    xrandr12_modes[xrandr_mode_count++] = rotated_mode.id;
                 }
                 break;
             }
@@ -554,7 +564,18 @@ static int xrandr12_init_modes(void)
     }
 
     if(primary_mode)
-        X11DRV_Settings_SetRealMode(primary_mode->width, primary_mode->height);
+    {
+        rotated_mode = *primary_mode;
+        if((crtc_info->rotation & RR_Rotate_90) ||
+                (crtc_info->rotation & RR_Rotate_270))
+        {
+            int tmp = rotated_mode.width;
+            rotated_mode.width = rotated_mode.height;
+            rotated_mode.height = tmp;
+        }
+
+        X11DRV_Settings_SetRealMode(rotated_mode.width, rotated_mode.height);
+    }
     else
         X11DRV_Settings_SetRealMode(crtc_info->width, crtc_info->height);
 
