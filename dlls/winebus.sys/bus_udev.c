@@ -1252,9 +1252,10 @@ static void try_add_device(struct udev_device *dev)
         WARN("Could not get device to query VID, PID, Version and Serial\n");
 #endif
 
-    if (is_in_sdl_blacklist(vid, pid))
+    if (is_steam_controller(vid, pid) || is_in_sdl_blacklist(vid, pid))
     {
         /* this device is being used as a virtual Steam controller */
+        TRACE("hidraw %s: ignoring device %04x/%04x with virtual Steam controller\n", debugstr_a(devnode), vid, pid);
         close(fd);
         return;
     }
@@ -1262,6 +1263,7 @@ static void try_add_device(struct udev_device *dev)
     if (is_xbox_gamepad(vid, pid))
     {
         /* SDL handles xbox (and steam) controllers */
+        TRACE("hidraw %s: ignoring xinput device %04x/%04x\n", debugstr_a(devnode), vid, pid);
         close(fd);
         return;
     }
