@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#define _GNU_SOURCE
 #include "config.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -1157,6 +1158,19 @@ BOOL is_already_opened_by_hidraw(DWORD vid, DWORD pid)
     return bus_enumerate_hid_devices(&hidraw_vtbl, check_for_vidpid, &vidpid) != NULL;
 }
 
+static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
+{
+    char needle[16];
+    const char *blacklist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES");
+
+    if (!blacklist)
+        return FALSE;
+
+    sprintf(needle, "0x%04x/0x%04x", vid, pid);
+
+    return strcasestr(blacklist, needle) != NULL;
+}
+
 static void try_add_device(struct udev_device *dev)
 {
     DWORD vid = 0, pid = 0, version = 0;
@@ -1237,6 +1251,13 @@ static void try_add_device(struct udev_device *dev)
     else
         WARN("Could not get device to query VID, PID, Version and Serial\n");
 #endif
+
+    if (is_in_sdl_blacklist(vid, pid))
+    {
+        /* this device is being used as a virtual Steam controller */
+        close(fd);
+        return;
+    }
 
     if (is_xbox_gamepad(vid, pid))
     {
