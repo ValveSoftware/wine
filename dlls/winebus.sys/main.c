@@ -94,6 +94,18 @@ static const struct product_desc XBOX_CONTROLLERS[] = {
     {VID_MICROSOFT, 0x0719, NULL, xbox360_product_string, NULL}, /* Xbox 360 Wireless Adapter */
 };
 
+#define VID_VALVE 0x28de
+
+static const struct product_desc STEAM_CONTROLLERS[] = {
+    {VID_VALVE, 0x1101, NULL, NULL, NULL}, /* Valve Legacy Steam Controller */
+    {VID_VALVE, 0x1102, NULL, NULL, NULL}, /* Valve wired Steam Controller */
+    {VID_VALVE, 0x1105, NULL, NULL, NULL}, /* Valve Bluetooth Steam Controller */
+    {VID_VALVE, 0x1106, NULL, NULL, NULL}, /* Valve Bluetooth Steam Controller */
+    {VID_VALVE, 0x1142, NULL, NULL, NULL}, /* Valve wireless Steam Controller */
+    {VID_VALVE, 0x1201, NULL, NULL, NULL}, /* Valve wired Steam Controller */
+    {VID_VALVE, 0x1202, NULL, NULL, NULL}, /* Valve Bluetooth Steam Controller */
+};
+
 static DRIVER_OBJECT *driver_obj;
 
 static DEVICE_OBJECT *mouse_obj;
@@ -965,6 +977,18 @@ static NTSTATUS WINAPI driver_add_device(DRIVER_OBJECT *driver, DEVICE_OBJECT *p
     bus_fdo->Flags &= ~DO_DEVICE_INITIALIZING;
 
     return STATUS_SUCCESS;
+}
+
+BOOL is_steam_controller(WORD vid, WORD pid)
+{
+    if (vid == VID_VALVE)
+    {
+        int i;
+        for (i = 0; i < ARRAY_SIZE(STEAM_CONTROLLERS); i++)
+            if (pid == STEAM_CONTROLLERS[i].pid) return TRUE;
+    }
+
+    return FALSE;
 }
 
 static void WINAPI driver_unload(DRIVER_OBJECT *driver)
