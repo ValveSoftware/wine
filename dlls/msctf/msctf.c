@@ -69,7 +69,6 @@ static UINT array_size;
 static struct list AtsList = LIST_INIT(AtsList);
 static UINT activated = 0;
 
-DWORD tlsIndex = 0;
 TfClientId processId = 0;
 ITfCompartmentMgr *globalCompartmentMgr = NULL;
 
@@ -397,23 +396,19 @@ HRESULT add_active_textservice(TF_LANGUAGEPROFILE *lp)
     ActivatedTextService *actsvr;
     ITfCategoryMgr *catmgr;
     AtsEntry *entry;
-    ITfThreadMgrEx *tm = TlsGetValue(tlsIndex);
+    ITfThreadMgr *tm;
     ITfClientId *clientid;
 
-    if (!tm) return E_UNEXPECTED;
+    if (FAILED(TF_GetThreadMgr(&tm))) return E_UNEXPECTED;
 
     actsvr = HeapAlloc(GetProcessHeap(),0,sizeof(ActivatedTextService));
-    if (!actsvr) return E_OUTOFMEMORY;
+    if (!actsvr) goto fail;
 
-    ITfThreadMgrEx_QueryInterface(tm, &IID_ITfClientId, (void **)&clientid);
+    ITfThreadMgr_QueryInterface(tm, &IID_ITfClientId, (void **)&clientid);
     ITfClientId_GetClientId(clientid, &lp->clsid, &actsvr->tid);
     ITfClientId_Release(clientid);
 
-    if (!actsvr->tid)
-    {
-        HeapFree(GetProcessHeap(),0,actsvr);
-        return E_OUTOFMEMORY;
-    }
+    if (!actsvr->tid) goto fail;
 
     actsvr->pITfTextInputProcessor = NULL;
     actsvr->LanguageProfile = *lp;
@@ -440,20 +435,21 @@ HRESULT add_active_textservice(TF_LANGUAGEPROFILE *lp)
         deactivate_remove_conflicting_ts(&actsvr->LanguageProfile.catid);
 
     if (activated > 0)
-        activate_given_ts(actsvr, tm);
+        activate_given_ts(actsvr, (ITfThreadMgrEx *)tm);
 
     entry = HeapAlloc(GetProcessHeap(),0,sizeof(AtsEntry));
-
-    if (!entry)
-    {
-        HeapFree(GetProcessHeap(),0,actsvr);
-        return E_OUTOFMEMORY;
-    }
+    if (!entry) goto fail;
 
     entry->ats = actsvr;
     list_add_head(&AtsList, &entry->entry);
 
+    ITfThreadMgr_Release(tm);
     return S_OK;
+
+fail:
+    ITfThreadMgr_Release(tm);
+    HeapFree(GetProcessHeap(), 0, actsvr);
+    return E_OUTOFMEMORY;
 }
 
 BOOL get_active_textservice(REFCLSID rclsid, TF_LANGUAGEPROFILE *profile)
@@ -560,11 +556,9 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD fdwReason, LPVOID fImpLoad)
             return FALSE;   /* prefer native version */
         case DLL_PROCESS_ATTACH:
             MSCTF_hinstance = hinst;
-            tlsIndex = TlsAlloc();
             break;
         case DLL_PROCESS_DETACH:
             if (fImpLoad) break;
-            TlsFree(tlsIndex);
             break;
     }
     return TRUE;
@@ -620,20 +614,6 @@ HRESULT WINAPI TF_CreateThreadMgr(ITfThreadMgr **pptim)
 {
     TRACE("\n");
     return ThreadMgr_Constructor(NULL,(IUnknown**)pptim);
-}
-
-/***********************************************************************
- *              TF_GetThreadMgr (MSCTF.@)
- */
-HRESULT WINAPI TF_GetThreadMgr(ITfThreadMgr **pptim)
-{
-    TRACE("\n");
-    *pptim = TlsGetValue(tlsIndex);
-
-    if (*pptim)
-        ITfThreadMgr_AddRef(*pptim);
-
-    return S_OK;
 }
 
 /***********************************************************************
