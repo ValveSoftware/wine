@@ -479,6 +479,8 @@ BOOL WINAPI GetModuleHandleExW( DWORD flags, LPCWSTR name, HMODULE *module )
         UNICODE_STRING wstr;
         if(steamclient_hmod != NULL && strcasestrW(name, steamclientW)){
             *module = steamclient_hmod;
+            if (lock)
+                LdrUnlockLoaderLock( 0, magic );
             return TRUE;
         }
         RtlInitUnicodeString( &wstr, name );
