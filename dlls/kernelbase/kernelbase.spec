@@ -335,7 +335,7 @@
 @ stdcall EventUnregister(int64) ntdll.EtwEventUnregister
 @ stdcall EventWrite(int64 ptr long ptr) ntdll.EtwEventWrite
 # @ stub EventWriteEx
-# @ stub EventWriteString
+@ stdcall EventWriteString(int64 long int64 ptr) ntdll.EtwEventWriteString
 @ stdcall EventWriteTransfer(int64 ptr ptr ptr long ptr) ntdll.EtwEventWriteTransfer
 @ stdcall ExitProcess(long) kernel32.ExitProcess
 @ stdcall ExitThread(long) kernel32.ExitThread
