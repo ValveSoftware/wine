@@ -837,6 +837,16 @@ ULONG WINAPI EventActivityIdControl(ULONG code, GUID *guid)
 }
 
 /******************************************************************************
+ * EventWriteString [ADVAPI32.@]
+ */
+ULONG WINAPI EventWriteString( REGHANDLE handle, UCHAR level, ULONGLONG keyword, PCWSTR string )
+{
+    FIXME("%s, %u, %s, %s: stub\n", wine_dbgstr_longlong(handle), level,
+          wine_dbgstr_longlong(keyword), debugstr_w(string));
+    return ERROR_SUCCESS;
+}
+
+/******************************************************************************
  * EventWriteTransfer [ADVAPI32.@]
  */
 ULONG WINAPI EventWriteTransfer( REGHANDLE handle, PCEVENT_DESCRIPTOR descriptor, LPCGUID activity,
