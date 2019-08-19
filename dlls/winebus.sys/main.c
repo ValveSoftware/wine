@@ -557,6 +557,9 @@ static NTSTATUS fdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
     case IRP_MN_START_DEVICE:
         mouse_device_create();
 
+        udev_driver_init();
+        iohid_driver_init();
+
         if (check_bus_option(&SDL_enabled, 1))
         {
             if (sdl_driver_init() == STATUS_SUCCESS)
@@ -565,8 +568,6 @@ static NTSTATUS fdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
                 break;
             }
         }
-        udev_driver_init();
-        iohid_driver_init();
         irp->IoStatus.u.Status = STATUS_SUCCESS;
         break;
     case IRP_MN_SURPRISE_REMOVAL:

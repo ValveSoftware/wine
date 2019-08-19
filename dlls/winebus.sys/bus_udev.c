@@ -98,6 +98,10 @@ static int deviceloop_control[2];
 static const WCHAR hidraw_busidW[] = {'H','I','D','R','A','W',0};
 static const WCHAR lnxev_busidW[] = {'L','N','X','E','V',0};
 
+struct vidpid {
+    WORD vid, pid;
+};
+
 struct platform_private
 {
     struct udev_device *udev_device;
@@ -105,6 +109,8 @@ struct platform_private
 
     HANDLE report_thread;
     int control_pipe[2];
+
+    struct vidpid vidpid;
 };
 
 static inline struct platform_private *impl_from_DEVICE_OBJECT(DEVICE_OBJECT *device)
@@ -1135,6 +1141,20 @@ static DWORD a_to_bcd(const char *s)
     return r;
 }
 
+static int check_for_vidpid(DEVICE_OBJECT *device, void* context)
+{
+    struct vidpid *vidpid = context;
+    struct platform_private *dev = impl_from_DEVICE_OBJECT(device);
+    return !(dev->vidpid.vid == vidpid->vid &&
+        dev->vidpid.pid == vidpid->pid);
+}
+
+BOOL is_already_opened_by_hidraw(DWORD vid, DWORD pid)
+{
+    struct vidpid vidpid = {vid, pid};
+    return bus_enumerate_hid_devices(&hidraw_vtbl, check_for_vidpid, &vidpid) != NULL;
+}
+
 static void try_add_device(struct udev_device *dev)
 {
     DWORD vid = 0, pid = 0, version = 0;
@@ -1252,6 +1272,8 @@ static void try_add_device(struct udev_device *dev)
         struct platform_private *private = impl_from_DEVICE_OBJECT(device);
         private->udev_device = udev_device_ref(dev);
         private->device_fd = fd;
+        private->vidpid.vid = vid;
+        private->vidpid.pid = pid;
 #ifdef HAS_PROPER_INPUT_HEADER
         if (strcmp(subsystem, "input") == 0)
             if (!build_report_descriptor((struct wine_input_private*)private, dev))
