@@ -64,6 +64,15 @@ struct futex_wait_block
 };
 #include "poppack.h"
 
+static inline void small_pause(void)
+{
+#if defined(__i386__) || defined(__x86_64__)
+    __asm__ __volatile__( "rep;nop" : : : "memory" );
+#else
+    __asm__ __volatile__( "" : : : "memory" );
+#endif
+}
+
 static inline int futex_wait_multiple( const struct futex_wait_block *futexes,
         int count, const struct timespec *timeout )
 {
@@ -80,6 +89,8 @@ static inline int futex_wait( int *addr, int val, struct timespec *timeout )
     return syscall( __NR_futex, addr, 0, val, timeout, 0, 0 );
 }
 
+static unsigned int spincount;
+
 int do_fsync(void)
 {
 #ifdef __linux__
@@ -90,6 +101,8 @@ int do_fsync(void)
         static const struct timespec zero;
         futex_wait_multiple( NULL, 0, &zero );
         do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS;
+        if (getenv("WINEFSYNC_SPINCOUNT"))
+            spincount = atoi(getenv("WINEFSYNC_SPINCOUNT"));
     }
 
     return do_fsync_cached;
@@ -735,6 +748,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     int has_fsync = 0, has_server = 0;
     BOOL msgwait = FALSE;
     int dummy_futex = 0;
+    unsigned int spin;
     LONGLONG timeleft;
     LARGE_INTEGER now;
     DWORD waitcount;
@@ -844,10 +858,14 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         struct semaphore *semaphore = obj->shm;
                         int current;
 
-                        do
+                        for (spin = 0; spin < spincount + 1; ++spin)
                         {
-                            if (!(current = semaphore->count)) break;
-                        } while (__sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) != current);
+                            do
+                            {
+                                if (!(current = semaphore->count)) break;
+                            } while (__sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) != current);
+                            small_pause();
+                        }
 
                         if (current)
                         {
@@ -871,11 +889,15 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             return i;
                         }
 
-                        if (!(tid = __sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() )))
+                        for (spin = 0; spin < spincount + 1; ++spin)
                         {
-                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                            mutex->count = 1;
-                            return i;
+                            if (!(tid = __sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() )))
+                            {
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                mutex->count = 1;
+                                return i;
+                            }
+                            small_pause();
                         }
 
                         futexes[i].addr = &mutex->tid;
@@ -887,10 +909,14 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                     {
                         struct event *event = obj->shm;
 
-                        if (__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
+                        for (spin = 0; spin < spincount + 1; ++spin)
                         {
-                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                            return i;
+                            if (__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
+                            {
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                return i;
+                            }
+                            small_pause();
                         }
 
                         futexes[i].addr = &event->signaled;
@@ -903,10 +929,14 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                     {
                         struct event *event = obj->shm;
 
-                        if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                        for (spin = 0; spin < spincount + 1; ++spin)
                         {
-                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                            return i;
+                            if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
+                            {
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                return i;
+                            }
+                            small_pause();
                         }
 
                         futexes[i].addr = &event->signaled;
