@@ -1011,6 +1011,25 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
         return;
     }
 
+    if (pSDL_JoystickGetProductVersion != NULL) {
+        vid = pSDL_JoystickGetVendor(joystick);
+        pid = pSDL_JoystickGetProduct(joystick);
+        version = pSDL_JoystickGetProductVersion(joystick);
+    }
+    else
+    {
+        vid = 0x01;
+        pid = pSDL_JoystickInstanceID(joystick) + 1;
+        version = 0;
+    }
+
+    if(is_already_opened_by_hidraw(vid, pid))
+    {
+        /* we use SDL only for controllers which hidraw couldn't open */
+        TRACE("device %04x/%04x already opened by hidraw, skipping\n", vid, pid);
+        return;
+    }
+
     if (map_controllers && pSDL_IsGameController(index))
         controller = pSDL_GameControllerOpen(index);
 
@@ -1026,18 +1045,6 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
     {
         id |= XINPUT_HACK_ID_BIT;
         index |= XINPUT_HACK_ID_BIT;
-    }
-
-    if (pSDL_JoystickGetProductVersion != NULL) {
-        vid = pSDL_JoystickGetVendor(joystick);
-        pid = pSDL_JoystickGetProduct(joystick);
-        version = pSDL_JoystickGetProductVersion(joystick);
-    }
-    else
-    {
-        vid = 0x01;
-        pid = pSDL_JoystickInstanceID(joystick) + 1;
-        version = 0;
     }
 
     guid = pSDL_JoystickGetGUID(joystick);

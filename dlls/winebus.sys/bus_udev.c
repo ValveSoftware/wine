@@ -100,6 +100,10 @@ static const WCHAR lnxev_busidW[] = {'L','N','X','E','V',0};
 DEFINE_GUID(GUID_DEVCLASS_HIDRAW, 0x3def44ad,0x242e,0x46e5,0x82,0x6d,0x70,0x72,0x13,0xf3,0xaa,0x81);
 DEFINE_GUID(GUID_DEVCLASS_LINUXEVENT, 0x1b932c0d,0xfea7,0x42cd,0x8e,0xaa,0x0e,0x48,0x79,0xb6,0x9e,0xaa);
 
+struct vidpid {
+    WORD vid, pid;
+};
+
 struct platform_private
 {
     struct udev_device *udev_device;
@@ -107,6 +111,8 @@ struct platform_private
 
     HANDLE report_thread;
     int control_pipe[2];
+
+    struct vidpid vidpid;
 };
 
 static inline struct platform_private *impl_from_DEVICE_OBJECT(DEVICE_OBJECT *device)
@@ -1137,6 +1143,20 @@ static DWORD a_to_bcd(const char *s)
     return r;
 }
 
+static int check_for_vidpid(DEVICE_OBJECT *device, void* context)
+{
+    struct vidpid *vidpid = context;
+    struct platform_private *dev = impl_from_DEVICE_OBJECT(device);
+    return !(dev->vidpid.vid == vidpid->vid &&
+        dev->vidpid.pid == vidpid->pid);
+}
+
+BOOL is_already_opened_by_hidraw(DWORD vid, DWORD pid)
+{
+    struct vidpid vidpid = {vid, pid};
+    return bus_enumerate_hid_devices(&hidraw_vtbl, check_for_vidpid, &vidpid) != NULL;
+}
+
 static void try_add_device(struct udev_device *dev)
 {
     DWORD vid = 0, pid = 0, version = 0;
@@ -1254,6 +1274,8 @@ static void try_add_device(struct udev_device *dev)
         struct platform_private *private = impl_from_DEVICE_OBJECT(device);
         private->udev_device = udev_device_ref(dev);
         private->device_fd = fd;
+        private->vidpid.vid = vid;
+        private->vidpid.pid = pid;
 #ifdef HAS_PROPER_INPUT_HEADER
         if (strcmp(subsystem, "input") == 0)
             if (!build_report_descriptor((struct wine_input_private*)private, dev))

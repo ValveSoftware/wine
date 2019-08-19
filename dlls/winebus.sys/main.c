@@ -856,13 +856,13 @@ NTSTATUS WINAPI DriverEntry( DRIVER_OBJECT *driver, UNICODE_STRING *path )
     driver->MajorFunction[IRP_MJ_INTERNAL_DEVICE_CONTROL] = hid_internal_dispatch;
     driver->DriverUnload = driver_unload;
 
-    if (check_bus_option(&SDL_enabled, 1))
-    {
-        if (sdl_driver_init() == STATUS_SUCCESS)
-            return STATUS_SUCCESS;
-    }
     udev_driver_init();
     iohid_driver_init();
+
+    if (check_bus_option(&SDL_enabled, 1))
+    {
+        sdl_driver_init();
+    }
 
     return STATUS_SUCCESS;
 }
