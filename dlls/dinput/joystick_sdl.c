@@ -56,6 +56,11 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 
+#define VID_SONY 0x054c
+#define PID_SONY_DUALSHOCK_4 0x05c4
+#define PID_SONY_DUALSHOCK_4_2 0x09cc
+#define PID_SONY_DUALSHOCK_4_DONGLE 0x0ba0
+
 typedef struct JoystickImpl JoystickImpl;
 static const IDirectInputDevice8AVtbl JoystickAvt;
 static const IDirectInputDevice8WVtbl JoystickWvt;
@@ -225,9 +230,30 @@ static void find_sdldevs(void)
     }
 }
 
+static struct device_info_override {
+    WORD vid;
+    WORD pid;
+    const char *instance_name;
+    const char *product_name;
+    DWORD dev_type;
+    DWORD dev_type8;
+} device_info_overrides[] = {
+    { VID_SONY, PID_SONY_DUALSHOCK_4, "Wireless Controller", "Wireless Controller",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
+
+    { VID_SONY, PID_SONY_DUALSHOCK_4_2, "Wireless Controller", "Wireless Controller",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
+
+    { VID_SONY, PID_SONY_DUALSHOCK_4_DONGLE, "Wireless Controller", "Wireless Controller",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
+};
+
 static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD version, int id)
 {
-    DWORD dwSize = lpddi->dwSize;
+    DWORD dwSize = lpddi->dwSize, i;
 
     TRACE("%d %p\n", dwSize, lpddi);
     memset(lpddi, 0, dwSize);
@@ -252,8 +278,31 @@ static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD ver
             lpddi->wUsage = 0x05; /* Game Pad */
     }
 
-    strcpy(lpddi->tszInstanceName, sdldevs[id].name);
-    strcpy(lpddi->tszProductName,  sdldevs[id].name);
+    for(i = 0; i < ARRAY_SIZE(device_info_overrides); ++i)
+    {
+        const struct device_info_override *override = &device_info_overrides[i];
+        if(sdldevs[id].vendor_id == override->vid &&
+                sdldevs[id].product_id == override->pid)
+        {
+            TRACE("found devinfo override for %04hx/%04hx\n",
+                    override->vid, override->pid);
+            if(version >= 0x800)
+                lpddi->dwDevType = override->dev_type8;
+            else
+                lpddi->dwDevType = override->dev_type;
+
+            strcpy(lpddi->tszInstanceName, override->instance_name);
+            strcpy(lpddi->tszProductName,  override->product_name);
+
+            break;
+        }
+    }
+
+    if(i >= ARRAY_SIZE(device_info_overrides))
+    {
+        strcpy(lpddi->tszInstanceName, sdldevs[id].name);
+        strcpy(lpddi->tszProductName,  sdldevs[id].name);
+    }
 }
 
 static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD version, int id)
@@ -345,11 +394,6 @@ static int buttons_to_sdl_hat(int u, int r, int d, int l)
 }
 
 /* playstation controllers */
-#define VID_SONY 0x054c
-#define PID_SONY_DUALSHOCK_4 0x05c4
-#define PID_SONY_DUALSHOCK_4_2 0x09cc
-#define PID_SONY_DUALSHOCK_4_DONGLE 0x0ba0
-
 static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_state_item *st, int idx)
 {
     static const int button_map_ds4_16button[] = {
