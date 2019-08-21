@@ -698,13 +698,16 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
     return FALSE;
 }
 
-static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
+static HRESULT poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
 {
     JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
     int i = 0;
     int inst_id = 0;
     int newVal = 0;
     struct device_state_item item;
+
+    if(!SDL_JoystickGetAttached(This->device))
+        return DIERR_INPUTLOST;
 
     SDL_JoystickUpdate();
 
@@ -789,6 +792,8 @@ static void poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
         }
         }
     }
+
+    return DI_OK;
 }
 
 static enum_device_state_function select_enum_function(struct SDLDev *sdldev)

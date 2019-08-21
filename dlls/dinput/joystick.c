@@ -793,8 +793,7 @@ HRESULT WINAPI JoystickWGenericImpl_Poll(LPDIRECTINPUTDEVICE8W iface)
         return DIERR_NOTACQUIRED;
     }
 
-    This->joy_polldev(IDirectInputDevice8A_from_impl(This));
-    return DI_OK;
+    return This->joy_polldev(IDirectInputDevice8A_from_impl(This));
 }
 
 HRESULT WINAPI JoystickAGenericImpl_Poll(LPDIRECTINPUTDEVICE8A iface)
@@ -809,6 +808,7 @@ HRESULT WINAPI JoystickAGenericImpl_Poll(LPDIRECTINPUTDEVICE8A iface)
   */
 HRESULT WINAPI JoystickWGenericImpl_GetDeviceState(LPDIRECTINPUTDEVICE8W iface, DWORD len, LPVOID ptr)
 {
+    HRESULT hr;
     JoystickGenericImpl *This = impl_from_IDirectInputDevice8W(iface);
 
     TRACE("(%p,0x%08x,%p)\n", This, len, ptr);
@@ -819,12 +819,14 @@ HRESULT WINAPI JoystickWGenericImpl_GetDeviceState(LPDIRECTINPUTDEVICE8W iface, 
     }
 
     /* update joystick state */
-    This->joy_polldev(IDirectInputDevice8A_from_impl(This));
+    hr = This->joy_polldev(IDirectInputDevice8A_from_impl(This));
+    if (SUCCEEDED(hr))
+    {
+        /* convert and copy data to user supplied buffer */
+        fill_DataFormat(ptr, len, &This->js, &This->base.data_format);
+    }
 
-    /* convert and copy data to user supplied buffer */
-    fill_DataFormat(ptr, len, &This->js, &This->base.data_format);
-
-    return DI_OK;
+    return hr;
 }
 
 HRESULT WINAPI JoystickAGenericImpl_GetDeviceState(LPDIRECTINPUTDEVICE8A iface, DWORD len, LPVOID ptr)

@@ -155,7 +155,7 @@ static inline IDirectInputDevice8W *IDirectInputDevice8W_from_impl(JoystickImpl 
 
 static void fake_current_js_state(JoystickImpl *ji);
 static void find_joydevs(void);
-static void joy_polldev(LPDIRECTINPUTDEVICE8A iface);
+static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface);
 
 /* This GUID is slightly different from the linux joystick one. Take note. */
 static const GUID DInput_Wine_Joystick_Base_GUID = { /* 9e573eda-7734-11d2-8d4a-23903fb6bdf7 */
@@ -826,14 +826,14 @@ static void fake_current_js_state(JoystickImpl *ji)
 #undef CENTER_AXIS
 
 /* convert wine format offset to user format object index */
-static void joy_polldev(LPDIRECTINPUTDEVICE8A iface)
+static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface)
 {
     struct pollfd plfd;
     struct input_event ie;
     JoystickImpl *This = impl_from_IDirectInputDevice8A(iface);
 
     if (This->joyfd==-1)
-	return;
+	return DIERR_INPUTLOST;
 
     while (1)
     {
@@ -844,11 +844,11 @@ static void joy_polldev(LPDIRECTINPUTDEVICE8A iface)
 	plfd.events = POLLIN;
 
 	if (poll(&plfd,1,0) != 1)
-	    return;
+	    return DI_OK;
 
 	/* we have one event, so we can read */
 	if (sizeof(ie)!=read(This->joyfd,&ie,sizeof(ie)))
-	    return;
+	    return DIERR_INPUTLOST;
 
 	TRACE("input_event: type %d, code %d, value %d\n",ie.type,ie.code,ie.value);
 	switch (ie.type) {
@@ -927,6 +927,8 @@ static void joy_polldev(LPDIRECTINPUTDEVICE8A iface)
             queue_event(iface, inst_id,
                         value, GetCurrentTime(), This->generic.base.dinput->evsequence++);
     }
+
+    return DI_OK;
 }
 
 /******************************************************************************
