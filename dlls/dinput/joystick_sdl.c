@@ -225,7 +225,7 @@ static void find_sdldevs(void)
     }
 }
 
-static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD version, int id)
+static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD version, int id)
 {
     DWORD dwSize = lpddi->dwSize;
 
@@ -252,31 +252,31 @@ static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD ver
             lpddi->wUsage = 0x05; /* Game Pad */
     }
 
-    MultiByteToWideChar(CP_ACP, 0, sdldevs[id].name, -1, lpddi->tszInstanceName, MAX_PATH);
-    MultiByteToWideChar(CP_ACP, 0, sdldevs[id].name, -1, lpddi->tszProductName, MAX_PATH);
+    strcpy(lpddi->tszInstanceName, sdldevs[id].name);
+    strcpy(lpddi->tszProductName,  sdldevs[id].name);
 }
 
-static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD version, int id)
+static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD version, int id)
 {
-    DIDEVICEINSTANCEW lpddiW;
+    DIDEVICEINSTANCEA lpddiA;
     DWORD dwSize = lpddi->dwSize;
 
-    lpddiW.dwSize = sizeof(lpddiW);
-    fill_joystick_dideviceinstanceW(&lpddiW, version, id);
+    lpddiA.dwSize = sizeof(lpddiA);
+    fill_joystick_dideviceinstanceA(&lpddiA, version, id);
 
     TRACE("%d %p\n", dwSize, lpddi);
     memset(lpddi, 0, dwSize);
 
-    /* Convert W->A */
+    /* Convert A->W */
     lpddi->dwSize = dwSize;
-    lpddi->guidInstance = lpddiW.guidInstance;
-    lpddi->guidProduct = lpddiW.guidProduct;
-    lpddi->dwDevType = lpddiW.dwDevType;
-    strcpy(lpddi->tszInstanceName, sdldevs[id].name);
-    strcpy(lpddi->tszProductName,  sdldevs[id].name);
-    lpddi->guidFFDriver = lpddiW.guidFFDriver;
-    lpddi->wUsagePage = lpddiW.wUsagePage;
-    lpddi->wUsage = lpddiW.wUsage;
+    lpddi->guidInstance = lpddiA.guidInstance;
+    lpddi->guidProduct = lpddiA.guidProduct;
+    lpddi->dwDevType = lpddiA.dwDevType;
+    MultiByteToWideChar(CP_ACP, 0, lpddiA.tszInstanceName, -1, lpddi->tszInstanceName, MAX_PATH);
+    MultiByteToWideChar(CP_ACP, 0, lpddiA.tszProductName, -1, lpddi->tszProductName, MAX_PATH);
+    lpddi->guidFFDriver = lpddiA.guidFFDriver;
+    lpddi->wUsagePage = lpddiA.wUsagePage;
+    lpddi->wUsage = lpddiA.wUsage;
 }
 
 static HRESULT sdl_enum_deviceA(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTANCEA lpddi, DWORD version, int id)
