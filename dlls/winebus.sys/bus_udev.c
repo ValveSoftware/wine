@@ -1162,6 +1162,14 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
 {
     char needle[16];
     const char *blacklist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES");
+    const char *whitelist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT");
+
+    if (whitelist)
+    {
+        sprintf(needle, "0x%04x/0x%04x", vid, pid);
+
+        return strcasestr(whitelist, needle) == NULL;
+    }
 
     if (!blacklist)
         return FALSE;
