@@ -564,14 +564,65 @@ UINT WINAPI GetRawInputDeviceInfoW(HANDLE device, UINT command, void *data, UINT
     return *data_size;
 }
 
+static int compare_raw_input_devices(const void *ap, const void *bp)
+{
+    const RAWINPUTDEVICE a = *(const RAWINPUTDEVICE *)ap;
+    const RAWINPUTDEVICE b = *(const RAWINPUTDEVICE *)bp;
+
+    if (a.usUsagePage != b.usUsagePage) return a.usUsagePage - b.usUsagePage;
+    if (a.usUsage != b.usUsage) return a.usUsage - b.usUsage;
+    return 0;
+}
+
 /***********************************************************************
  *              GetRegisteredRawInputDevices   (USER32.@)
  */
 UINT WINAPI DECLSPEC_HOTPATCH GetRegisteredRawInputDevices(RAWINPUTDEVICE *devices, UINT *device_count, UINT size)
 {
-    FIXME("devices %p, device_count %p, size %u stub!\n", devices, device_count, size);
+    struct rawinput_device *d = NULL;
+    unsigned int count = ~0U;
 
-    return 0;
+    TRACE("devices %p, device_count %p, size %u\n", devices, device_count, size);
+
+    if (!device_count)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return ~0U;
+    }
+
+    if (devices && !(d = HeapAlloc( GetProcessHeap(), 0, *device_count * sizeof(*d) )))
+        return ~0U;
+
+    SERVER_START_REQ( get_rawinput_devices )
+    {
+        if (d)
+            wine_server_set_reply( req, d, *device_count * sizeof(*d) );
+
+        if (wine_server_call( req ))
+            goto done;
+
+        if (!d || reply->device_count > *device_count)
+        {
+            *device_count = reply->device_count;
+            SetLastError( ERROR_INSUFFICIENT_BUFFER );
+            goto done;
+        }
+
+        for (count = 0; count < reply->device_count; ++count)
+        {
+            devices[count].usUsagePage = d[count].usage_page;
+            devices[count].usUsage = d[count].usage;
+            devices[count].dwFlags = d[count].flags;
+            devices[count].hwndTarget = wine_server_ptr_handle(d[count].target);
+        }
+    }
+    SERVER_END_REQ;
+
+    qsort(devices, count, sizeof(*devices), compare_raw_input_devices);
+
+done:
+    if (d) HeapFree( GetProcessHeap(), 0, d );
+    return count;
 }
 
 
