@@ -1783,7 +1783,7 @@ done:
 
 /* queue a hardware message for a mouse event */
 static int queue_mouse_message( struct desktop *desktop, user_handle_t win, const hw_input_t *input,
-                                unsigned int origin, struct msg_queue *sender )
+                                unsigned int origin, struct msg_queue *sender, unsigned int req_flags )
 {
     const struct rawinput_device *device;
     struct hardware_msg_data *msg_data;
@@ -1838,7 +1838,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         y = desktop->cursor.y;
     }
 
-    if ((foreground = get_foreground_thread( desktop, win )))
+    if ((req_flags & SEND_HWMSG_RAWINPUT) && (foreground = get_foreground_thread( desktop, win )))
     {
         memset( &raw_msg, 0, sizeof(raw_msg) );
         raw_msg.foreground = foreground;
@@ -1897,7 +1897,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
 
 /* queue a hardware message for a keyboard event */
 static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, const hw_input_t *input,
-                                   unsigned int origin, struct msg_queue *sender )
+                                   unsigned int origin, struct msg_queue *sender, unsigned int req_flags )
 {
     struct hw_msg_source source = { IMDT_KEYBOARD, origin };
     const struct rawinput_device *device;
@@ -1975,7 +1975,7 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         break;
     }
 
-    if ((foreground = get_foreground_thread( desktop, win )))
+    if ((req_flags & SEND_HWMSG_RAWINPUT) && (foreground = get_foreground_thread( desktop, win )))
     {
         memset( &raw_msg, 0, sizeof(raw_msg) );
         raw_msg.foreground = foreground;
@@ -2599,10 +2599,10 @@ DECL_HANDLER(send_hardware_message)
     switch (req->input.type)
     {
     case INPUT_MOUSE:
-        reply->wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender );
+        reply->wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
     case INPUT_KEYBOARD:
-        reply->wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender );
+        reply->wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
     case INPUT_HARDWARE:
         queue_custom_hardware_message( desktop, req->win, origin, &req->input );
