@@ -653,7 +653,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
         }
         input->u.mi.dx += clip_rect.left;
         input->u.mi.dy += clip_rect.top;
-        __wine_send_input( hwnd, input );
+        __wine_send_input( hwnd, input, SEND_HWMSG_RAWINPUT|SEND_HWMSG_WINDOW );
         return;
     }
 
@@ -693,7 +693,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
         SERVER_END_REQ;
     }
 
-    __wine_send_input( hwnd, input );
+    __wine_send_input( hwnd, input, SEND_HWMSG_RAWINPUT|SEND_HWMSG_WINDOW );
 }
 
 #ifdef SONAME_LIBXCURSOR
@@ -1663,7 +1663,7 @@ void move_resize_window( HWND hwnd, int dir )
             input.u.mi.dwFlags     = button_up_flags[button - 1] | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
             input.u.mi.time        = GetTickCount();
             input.u.mi.dwExtraInfo = 0;
-            __wine_send_input( hwnd, &input );
+            __wine_send_input( hwnd, &input, SEND_HWMSG_RAWINPUT|SEND_HWMSG_WINDOW );
         }
 
         while (PeekMessageW( &msg, 0, 0, 0, PM_REMOVE ))
@@ -1902,7 +1902,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     TRACE( "pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
 
     input.type = INPUT_MOUSE;
-    __wine_send_input( 0, &input );
+    __wine_send_input( 0, &input, SEND_HWMSG_RAWINPUT|SEND_HWMSG_WINDOW );
     return TRUE;
 }
 
