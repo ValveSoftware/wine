@@ -2156,6 +2156,7 @@ enum message_type
     int             new_y;
 @END
 #define SEND_HWMSG_INJECTED    0x01
+#define SEND_HWMSG_RAWINPUT    0x02
 
 
 /* Get a message from the current queue */
