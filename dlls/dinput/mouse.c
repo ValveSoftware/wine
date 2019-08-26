@@ -246,6 +246,13 @@ static SysMouseImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput)
     list_add_tail(&dinput->devices_list, &newDevice->base.entry);
     LeaveCriticalSection(&dinput->crit);
 
+    if (dinput->dwVersion >= 0x0800)
+    {
+        newDevice->base.use_raw_input = TRUE;
+        newDevice->base.raw_device.usUsagePage = 1; /* HID generic device page */
+        newDevice->base.raw_device.usUsage = 2; /* HID generic mouse */
+    }
+
     return newDevice;
 
 failed:
@@ -318,7 +325,115 @@ static int dinput_mouse_hook( LPDIRECTINPUTDEVICE8A iface, WPARAM wparam, LPARAM
 {
     MSLLHOOKSTRUCT *hook = (MSLLHOOKSTRUCT *)lparam;
     SysMouseImpl* This = impl_from_IDirectInputDevice8A(iface);
-    int wdata = 0, inst_id = -1, ret = 0;
+    int wdata = 0, inst_id = -1, ret = 0, i;
+
+    if (wparam == RIM_INPUT || wparam == RIM_INPUTSINK)
+    {
+        RAWINPUTHEADER raw_header;
+        RAWINPUT raw_input;
+        UINT size;
+        POINT rel, pt;
+
+        static const USHORT mouse_button_flags[] =
+        {
+            RI_MOUSE_BUTTON_1_DOWN, RI_MOUSE_BUTTON_1_UP,
+            RI_MOUSE_BUTTON_2_DOWN, RI_MOUSE_BUTTON_2_UP,
+            RI_MOUSE_BUTTON_3_DOWN, RI_MOUSE_BUTTON_3_UP,
+            RI_MOUSE_BUTTON_4_DOWN, RI_MOUSE_BUTTON_4_UP,
+            RI_MOUSE_BUTTON_5_DOWN, RI_MOUSE_BUTTON_5_UP
+        };
+
+        TRACE("(%p) wp %08lx, lp %08lx\n", iface, wparam, lparam);
+
+        size = sizeof(raw_header);
+        if (GetRawInputData( (HRAWINPUT)lparam, RID_HEADER, &raw_header, &size, sizeof(RAWINPUTHEADER) ) != sizeof(raw_header))
+        {
+            WARN( "Unable to read raw input data header\n" );
+            return 0;
+        }
+
+        if (raw_header.dwType != RIM_TYPEMOUSE)
+            return 0;
+
+        if (raw_header.dwSize > sizeof(raw_input))
+        {
+            WARN( "Unexpected size for mouse raw input data\n" );
+            return 0;
+        }
+
+        size = raw_header.dwSize;
+        if (GetRawInputData( (HRAWINPUT)lparam, RID_INPUT, &raw_input, &size, sizeof(RAWINPUTHEADER) ) != raw_header.dwSize )
+        {
+            WARN( "Unable to read raw input data\n" );
+            return 0;
+        }
+
+        if (raw_input.data.mouse.usFlags & MOUSE_VIRTUAL_DESKTOP)
+            FIXME( "Unimplemented MOUSE_VIRTUAL_DESKTOP flag\n" );
+        if (raw_input.data.mouse.usFlags & MOUSE_ATTRIBUTES_CHANGED)
+            FIXME( "Unimplemented MOUSE_ATTRIBUTES_CHANGED flag\n" );
+
+        EnterCriticalSection(&This->base.crit);
+
+        rel.x = raw_input.data.mouse.lLastX;
+        rel.y = raw_input.data.mouse.lLastY;
+        if (raw_input.data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE)
+        {
+            GetCursorPos(&pt);
+            rel.x -= pt.x;
+            rel.y -= pt.y;
+        }
+
+        This->m_state.lX += rel.x;
+        This->m_state.lY += rel.y;
+
+        if (This->base.data_format.user_df->dwFlags & DIDF_ABSAXIS)
+        {
+            pt.x = This->m_state.lX;
+            pt.y = This->m_state.lY;
+        }
+        else
+        {
+            pt = rel;
+        }
+
+        if (rel.x)
+            queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_X_AXIS_INSTANCE) | DIDFT_RELAXIS,
+                        pt.x, GetCurrentTime(), This->base.dinput->evsequence);
+
+        if (rel.y)
+            queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_Y_AXIS_INSTANCE) | DIDFT_RELAXIS,
+                        pt.y, GetCurrentTime(), This->base.dinput->evsequence);
+
+        if (rel.x || rel.y)
+        {
+            if ((This->warp_override == WARP_FORCE_ON) ||
+                (This->warp_override != WARP_DISABLE && (This->base.dwCoopLevel & DISCL_EXCLUSIVE)))
+                This->need_warp = TRUE;
+        }
+
+        if (raw_input.data.mouse.usButtonFlags & RI_MOUSE_WHEEL)
+        {
+            This->m_state.lZ += (wdata = (SHORT)raw_input.data.mouse.usButtonData);
+            queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_Z_AXIS_INSTANCE) | DIDFT_RELAXIS,
+                        wdata, GetCurrentTime(), This->base.dinput->evsequence);
+            ret = This->clipped;
+        }
+
+        for (i = 0; i < ARRAY_SIZE(mouse_button_flags); ++i)
+        {
+            if (raw_input.data.mouse.usButtonFlags & mouse_button_flags[i])
+            {
+                This->m_state.rgbButtons[i / 2] = 0x80 - (i % 2) * 0x80;
+                queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_BUTTONS_INSTANCE + (i / 2)) | DIDFT_PSHBUTTON,
+                            This->m_state.rgbButtons[i / 2], GetCurrentTime(), This->base.dinput->evsequence);
+            }
+        }
+
+        LeaveCriticalSection(&This->base.crit);
+
+        return ret;
+    }
 
     TRACE("msg %lx @ (%d %d)\n", wparam, hook->pt.x, hook->pt.y);
 
