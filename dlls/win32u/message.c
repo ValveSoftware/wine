@@ -2623,6 +2623,7 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *r
             req->input.mouse.flags = input->mi.dwFlags;
             req->input.mouse.time  = input->mi.time;
             req->input.mouse.info  = input->mi.dwExtraInfo;
+            req->flags |= SEND_HWMSG_RAWINPUT;
             break;
         case INPUT_KEYBOARD:
             req->input.kbd.vkey  = input->ki.wVk;
@@ -2630,6 +2631,7 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *r
             req->input.kbd.flags = input->ki.dwFlags;
             req->input.kbd.time  = input->ki.time;
             req->input.kbd.info  = input->ki.dwExtraInfo;
+            req->flags |= SEND_HWMSG_RAWINPUT;
             break;
         case INPUT_HARDWARE:
             req->input.hw.msg    = input->hi.uMsg;
