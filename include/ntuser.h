@@ -1602,6 +1602,10 @@ struct hid_packet
 
 C_ASSERT(sizeof(struct hid_packet) == offsetof(struct hid_packet, data[0]));
 
+#define SEND_HWMSG_INJECTED 1
+#define SEND_HWMSG_NO_RAW   2
+#define SEND_HWMSG_NO_MSG   4
+
 struct send_hardware_input_params
 {
     UINT flags;

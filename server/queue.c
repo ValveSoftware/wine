@@ -2215,7 +2215,7 @@ static void dispatch_rawinput_message( struct desktop *desktop, struct rawinput_
 
 /* queue a hardware message for a mouse event */
 static int queue_mouse_message( struct desktop *desktop, user_handle_t win, const union hw_input *input,
-                                unsigned int origin, struct msg_queue *sender )
+                                unsigned int origin, struct msg_queue *sender, unsigned int send_flags )
 {
     desktop_shm_t *desktop_shm = desktop->shared;
     struct hardware_msg_data *msg_data;
@@ -2275,7 +2275,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         y = desktop_shm->cursor.y;
     }
 
-    if ((foreground = get_foreground_thread( desktop, win )))
+    if (!(send_flags & SEND_HWMSG_NO_RAW) && (foreground = get_foreground_thread( desktop, win )))
     {
         memset( &raw_msg, 0, sizeof(raw_msg) );
         raw_msg.foreground = foreground;
@@ -2289,6 +2289,8 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         dispatch_rawinput_message( desktop, &raw_msg );
         release_object( foreground );
     }
+
+    if (send_flags & SEND_HWMSG_NO_MSG) return 0;
 
     for (i = 0; i < ARRAY_SIZE( messages ); i++)
     {
@@ -2320,14 +2322,15 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
 }
 
 static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, const union hw_input *input,
-                                   unsigned int origin, struct msg_queue *sender, int repeat );
+                                   unsigned int origin, struct msg_queue *sender, unsigned int flags, int repeat );
 
 static void key_repeat_timeout( void *private )
 {
     struct desktop *desktop = private;
 
     desktop->key_repeat.timeout = NULL;
-    queue_keyboard_message( desktop, desktop->key_repeat.win, &desktop->key_repeat.input, IMO_HARDWARE, NULL, 1 );
+    queue_keyboard_message( desktop, desktop->key_repeat.win, &desktop->key_repeat.input,
+                            IMO_HARDWARE, NULL, desktop->key_repeat.flags, 1 );
 }
 
 static void stop_key_repeat( struct desktop *desktop )
@@ -2340,7 +2343,7 @@ static void stop_key_repeat( struct desktop *desktop )
 
 /* queue a hardware message for a keyboard event */
 static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, const union hw_input *input,
-                                   unsigned int origin, struct msg_queue *sender, int repeat )
+                                   unsigned int origin, struct msg_queue *sender, unsigned int send_flags, int repeat )
 {
     desktop_shm_t *desktop_shm = desktop->shared;
     struct hw_msg_source source = { IMDT_KEYBOARD, origin };
@@ -2456,6 +2459,7 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         {
             timeout_t timeout = repeat ? desktop->key_repeat.period : desktop->key_repeat.delay;
             desktop->key_repeat.input = *input;
+            desktop->key_repeat.flags = send_flags;
             desktop->key_repeat.input.kbd.time = 0;
             desktop->key_repeat.win = win;
             if (desktop->key_repeat.timeout) remove_timeout_user( desktop->key_repeat.timeout );
@@ -2463,7 +2467,7 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         }
     }
 
-    if (!unicode && (foreground = get_foreground_thread( desktop, win )))
+    if (!unicode && !(send_flags & SEND_HWMSG_NO_RAW) && (foreground = get_foreground_thread( desktop, win )))
     {
         struct rawinput_message raw_msg = {0};
         raw_msg.foreground = foreground;
@@ -2477,6 +2481,8 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         dispatch_rawinput_message( desktop, &raw_msg );
         release_object( foreground );
     }
+
+    if (send_flags & SEND_HWMSG_NO_MSG) return 0;
 
     if (!(msg = alloc_hardware_message( input->kbd.info, source, time, 0 ))) return 0;
     msg_data = msg->data;
@@ -3262,10 +3268,10 @@ DECL_HANDLER(send_hardware_message)
     switch (req->input.type)
     {
     case INPUT_MOUSE:
-        wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender );
+        wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
     case INPUT_KEYBOARD:
-        wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender, 0 );
+        wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender, req->flags, 0 );
         break;
     case INPUT_HARDWARE:
         queue_custom_hardware_message( desktop, req->win, origin, &req->input );
