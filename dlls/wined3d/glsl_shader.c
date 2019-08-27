@@ -4154,7 +4154,10 @@ static void shader_glsl_scalar_op(const struct wined3d_shader_instruction *ins)
 
         case WINED3DSIH_LOG:
         case WINED3DSIH_LOGP:
-            string_buffer_sprintf(prefix, "log2(abs(");
+            if (shader_version <= WINED3D_SHADER_VERSION(3, 0))
+                string_buffer_sprintf(prefix, "%s == 0.0 ? -FLT_MAX : log2(abs(", src0_param.param_str);
+            else
+                string_buffer_sprintf(prefix, "log2(abs(");
             string_buffer_sprintf(suffix, "))");
             break;
 
