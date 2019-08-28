@@ -3429,6 +3429,7 @@ void WINAPI RtlExitUserProcess( DWORD status )
     RtlAcquirePebLock();
     NtTerminateProcess( 0, status );
     LdrShutdownProcess();
+    HEAP_notify_thread_destroy(TRUE);
     for (;;) NtTerminateProcess( GetCurrentProcess(), status );
 }
 

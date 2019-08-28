@@ -141,6 +141,8 @@ void   *HEAP_std_reallocate( struct tagHEAP *heap, ULONG flags, void *ptr, SIZE_
 SIZE_T  HEAP_std_get_allocated_size( struct tagHEAP *heap, ULONG flags, const void *ptr );
 BOOLEAN HEAP_std_validate( struct tagHEAP *heap, ULONG flags, const void *ptr );
 
+void HEAP_notify_thread_destroy( BOOLEAN last );
+
 #define HASH_STRING_ALGORITHM_DEFAULT  0
 #define HASH_STRING_ALGORITHM_X65599   1
 #define HASH_STRING_ALGORITHM_INVALID  0xffffffff
