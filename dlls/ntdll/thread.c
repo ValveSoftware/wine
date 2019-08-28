@@ -100,6 +100,7 @@ void WINAPI RtlExitUserThread( ULONG status )
     }
     LdrShutdownThread();
     RtlFreeThreadActivationContextStack();
+    HEAP_notify_thread_destroy(FALSE);
     for (;;) unix_funcs->exit_thread( status );
 }
 

@@ -2423,3 +2423,7 @@ NTSTATUS WINAPI RtlSetHeapInformation( HANDLE heap, HEAP_INFORMATION_CLASS info_
     FIXME("%p %d %p %ld stub\n", heap, info_class, info, size);
     return STATUS_SUCCESS;
 }
+
+void HEAP_notify_thread_destroy( BOOLEAN last )
+{
+}
