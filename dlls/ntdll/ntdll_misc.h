@@ -134,6 +134,10 @@ static inline struct ntdll_thread_data *ntdll_get_thread_data(void)
     return (struct ntdll_thread_data *)&NtCurrentTeb()->GdiTebBatch;
 }
 
+#define HEAP_STD 0
+#define HEAP_LAL 1
+#define HEAP_LFH 2
+
 struct tagHEAP;
 void   *HEAP_std_allocate( struct tagHEAP *heap, ULONG flags, SIZE_T size );
 BOOLEAN HEAP_std_free( struct tagHEAP *heap, ULONG flags, void *ptr );
@@ -141,7 +145,15 @@ void   *HEAP_std_reallocate( struct tagHEAP *heap, ULONG flags, void *ptr, SIZE_
 SIZE_T  HEAP_std_get_allocated_size( struct tagHEAP *heap, ULONG flags, const void *ptr );
 BOOLEAN HEAP_std_validate( struct tagHEAP *heap, ULONG flags, const void *ptr );
 
+void   *HEAP_lfh_allocate( struct tagHEAP *std_heap, ULONG flags, SIZE_T size );
+BOOLEAN HEAP_lfh_free( struct tagHEAP *std_heap, ULONG flags, void *ptr );
+void   *HEAP_lfh_reallocate( struct tagHEAP *std_heap, ULONG flags, void *ptr, SIZE_T size );
+SIZE_T  HEAP_lfh_get_allocated_size( struct tagHEAP *std_heap, ULONG flags, const void *ptr );
+BOOLEAN HEAP_lfh_validate( struct tagHEAP *std_heap, ULONG flags, const void *ptr );
+
 void HEAP_notify_thread_destroy( BOOLEAN last );
+void HEAP_lfh_notify_thread_destroy( BOOLEAN last );
+void HEAP_lfh_set_debug_flags( ULONG flags );
 
 #define HASH_STRING_ALGORITHM_DEFAULT  0
 #define HASH_STRING_ALGORITHM_X65599   1
