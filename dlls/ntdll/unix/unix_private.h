@@ -61,6 +61,7 @@ struct ntdll_thread_data
     struct list        entry;         /* entry in TEB list */
     int                esync_apc_fd;  /* fd to wait on for user APCs */
     int               *fsync_apc_futex;
+    void              *heap;          /* thread local heap data */
 };
 
 C_ASSERT( sizeof(struct ntdll_thread_data) <= sizeof(((TEB *)0)->GdiTebBatch) );
