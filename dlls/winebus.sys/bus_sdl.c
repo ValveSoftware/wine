@@ -991,6 +991,35 @@ static void try_remove_device(SDL_JoystickID id)
         pSDL_HapticClose(sdl_haptic);
 }
 
+/* logic from SDL2's SDL_ShouldIgnoreGameController */
+static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
+{
+    char needle[16];
+    const char *blacklist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES");
+    const char *whitelist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT");
+    const char *allow_virtual = getenv("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD");
+
+    if (!blacklist && !whitelist)
+        return FALSE;
+
+    if (allow_virtual && *allow_virtual != '0')
+    {
+        if(vid == 0x28DE && pid == 0x11FF)
+            return FALSE;
+    }
+
+    if (whitelist)
+    {
+        sprintf(needle, "0x%04x/0x%04x", vid, pid);
+
+        return strcasestr(whitelist, needle) == NULL;
+    }
+
+    sprintf(needle, "0x%04x/0x%04x", vid, pid);
+
+    return strcasestr(blacklist, needle) != NULL;
+}
+
 static void try_add_device(unsigned int index, BOOL xinput_hack)
 {
     DWORD vid = 0, pid = 0, version = 0;
@@ -1027,6 +1056,12 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
     {
         /* we use SDL only for controllers which hidraw couldn't open */
         TRACE("device %04x/%04x already opened by hidraw, skipping\n", vid, pid);
+        return;
+    }
+
+    if(is_in_sdl_blacklist(vid, pid))
+    {
+        TRACE("device %04x/%04x is in blacklist, ignoring\n", vid, pid);
         return;
     }
 
