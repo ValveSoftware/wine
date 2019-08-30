@@ -61,6 +61,19 @@ WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 #define PID_SONY_DUALSHOCK_4_2 0x09cc
 #define PID_SONY_DUALSHOCK_4_DONGLE 0x0ba0
 
+#define VID_VALVE 0x28de
+#define PID_VALVE_VIRTUAL_CONTROLLER 0x11ff
+
+#define VID_MICROSOFT 0x045e
+#define PID_MICROSOFT_XBOX_360 0x028e
+#define PID_MICROSOFT_XBOX_360_WIRELESS 0x028f
+#define PID_MICROSOFT_XBOX_360_ADAPTER  0x0719
+#define PID_MICROSOFT_XBOX_ONE 0x02d1
+#define PID_MICROSOFT_XBOX_ONE_CF 0x02dd
+#define PID_MICROSOFT_XBOX_ONE_ELITE 0x02e3
+#define PID_MICROSOFT_XBOX_ONE_S 0x02ea
+#define PID_MICROSOFT_XBOX_ONE_S_2 0x02fd
+
 typedef struct JoystickImpl JoystickImpl;
 static const IDirectInputDevice8AVtbl JoystickAvt;
 static const IDirectInputDevice8WVtbl JoystickWvt;
@@ -148,7 +161,7 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
 
     if (allow_virtual && *allow_virtual != '0')
     {
-        if(vid == 0x28DE && pid == 0x11FF)
+        if(vid == VID_VALVE && pid == PID_VALVE_VIRTUAL_CONTROLLER)
             return FALSE;
     }
 
@@ -236,6 +249,12 @@ static void find_sdldevs(void)
             continue;
         }
 
+        if(sdldev.vendor_id == VID_VALVE && sdldev.product_id == PID_VALVE_VIRTUAL_CONTROLLER)
+        {
+            sdldev.vendor_id = VID_MICROSOFT;
+            sdldev.product_id = PID_MICROSOFT_XBOX_360;
+        }
+
         {
             SDL_JoystickType type = SDL_JoystickGetType(device);
             sdldev.is_joystick =
@@ -283,6 +302,38 @@ static struct device_info_override {
     { VID_SONY, PID_SONY_DUALSHOCK_4_DONGLE, "Wireless Controller", "Wireless Controller",
         DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
         DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_360, "Controller (XBOX 360 For Windows)", "Controller (XBOX 360 For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_360_WIRELESS, "Controller (XBOX 360 For Windows)", "Controller (XBOX 360 For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_360_ADAPTER, "Controller (XBOX 360 For Windows)", "Controller (XBOX 360 For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_CF, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_ELITE, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_S, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
+
+    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_S_2, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
 };
 
 static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD version, int id)
