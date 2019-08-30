@@ -1091,6 +1091,13 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
         TRACE("Found sdl game controller 0x%x (vid %04x, pid %04x, version %u, serial %s, xinput_hack: %u)\n",
               id, vid, pid, version, debugstr_w(serial), xinput_hack);
         is_xbox_gamepad = TRUE;
+
+        if(vid == 0x28DE && pid == 0x11FF)
+        {
+            TRACE("Steam virtual controller, pretending it's an Xbox 360 controller\n");
+            vid = 0x045e;
+            pid = 0x028e;
+        }
     }
     else
     {
