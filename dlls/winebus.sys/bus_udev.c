@@ -1261,15 +1261,18 @@ static void try_add_device(struct udev_device *dev)
         if (serial == NULL)
             serial = strdupAtoW(base_serial);
 
-        walk_device = dev;
-        while (walk_device && !bcdDevice)
+        if(bus_type != BUS_BLUETOOTH)
         {
-            bcdDevice = udev_device_get_sysattr_value(walk_device, "bcdDevice");
-            walk_device = udev_device_get_parent(walk_device);
-        }
-        if (bcdDevice)
-        {
-            version = a_to_bcd(bcdDevice);
+            walk_device = dev;
+            while (walk_device && !bcdDevice)
+            {
+                bcdDevice = udev_device_get_sysattr_value(walk_device, "bcdDevice");
+                walk_device = udev_device_get_parent(walk_device);
+            }
+            if (bcdDevice)
+            {
+                version = a_to_bcd(bcdDevice);
+            }
         }
     }
 #ifdef HAS_PROPER_INPUT_HEADER
