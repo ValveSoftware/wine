@@ -882,6 +882,13 @@ static void sdl_add_device(unsigned int index)
         return;
     }
 
+    if (desc.vid == 0x28de && desc.pid == 0x11ff)
+    {
+        TRACE("Steam virtual controller, pretending it's an Xbox 360 controller\n");
+        desc.vid = 0x045e;
+        desc.pid = 0x028e;
+    }
+
     if (options.map_controllers && pSDL_IsGameController(index))
         controller = pSDL_GameControllerOpen(index);
 
