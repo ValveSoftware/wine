@@ -135,6 +135,35 @@ static const GUID DInput_PIDVID_Product_GUID = { /* PIDVID-0000-0000-0000-504944
 static int have_sdldevs = -1;
 static struct SDLDev *sdldevs = NULL;
 
+/* logic from SDL2's SDL_ShouldIgnoreGameController */
+static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
+{
+    char needle[16];
+    const char *blacklist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES");
+    const char *whitelist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT");
+    const char *allow_virtual = getenv("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD");
+
+    if (!blacklist && !whitelist)
+        return FALSE;
+
+    if (allow_virtual && *allow_virtual != '0')
+    {
+        if(vid == 0x28DE && pid == 0x11FF)
+            return FALSE;
+    }
+
+    if (whitelist)
+    {
+        sprintf(needle, "0x%04x/0x%04x", vid, pid);
+
+        return strcasestr(whitelist, needle) == NULL;
+    }
+
+    sprintf(needle, "0x%04x/0x%04x", vid, pid);
+
+    return strcasestr(blacklist, needle) != NULL;
+}
+
 static void find_sdldevs(void)
 {
     int i;
@@ -175,6 +204,7 @@ static void find_sdldevs(void)
 
         if (device_disabled_registry(sdldev.name)) {
             SDL_JoystickClose(device);
+            HeapFree(GetProcessHeap(), 0, sdldev.name);
             continue;
         }
 
@@ -197,6 +227,13 @@ static void find_sdldevs(void)
         }else{
             sdldev.vendor_id = 0x01;
             sdldev.product_id = SDL_JoystickInstanceID(device) + 1;
+        }
+
+        if(is_in_sdl_blacklist(sdldev.vendor_id, sdldev.product_id))
+        {
+            TRACE("joystick %04x/%04x is in SDL blacklist, ignoring\n", sdldev.vendor_id, sdldev.product_id);
+            SDL_JoystickClose(device);
+            continue;
         }
 
         {
