@@ -978,6 +978,13 @@ static void sdl_add_device(unsigned int index)
         return;
     }
 
+    if (desc.vid == 0x28de && desc.pid == 0x11ff)
+    {
+        TRACE("Steam virtual controller, pretending it's an Xbox 360 controller\n");
+        desc.vid = 0x045e;
+        desc.pid = 0x028e;
+    }
+
     if (pSDL_JoystickGetSerial && (sdl_serial = pSDL_JoystickGetSerial(joystick)))
     {
         ntdll_umbstowcs(sdl_serial, strlen(sdl_serial) + 1, desc.serialnumber, ARRAY_SIZE(desc.serialnumber));
