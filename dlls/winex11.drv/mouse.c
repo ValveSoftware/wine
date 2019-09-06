@@ -1526,18 +1526,6 @@ BOOL CDECL X11DRV_SetCursorPos( INT x, INT y )
         return FALSE;
     }
 
-    if (!clipping_cursor &&
-        XGrabPointer( data->display, root_window, False,
-                      PointerMotionMask | ButtonPressMask | ButtonReleaseMask,
-                      GrabModeAsync, GrabModeAsync, root_window, None, CurrentTime ) != GrabSuccess)
-    {
-        WARN( "refusing to warp pointer to %u, %u without exclusive grab\n", pos.x, pos.y );
-        return FALSE;
-    }
-
-    if (!clipping_cursor)
-        XUngrabPointer( data->display, CurrentTime );
-
     TRACE("real setting to %u, %u\n",
             pos.x, pos.y);
 
