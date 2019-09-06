@@ -632,8 +632,6 @@ extern double fs_hack_user_to_real_w, fs_hack_user_to_real_h DECLSPEC_HIDDEN;
 extern double fs_hack_real_to_user_w, fs_hack_real_to_user_h DECLSPEC_HIDDEN;
 BOOL fs_hack_matches_last_mode(int w, int h) DECLSPEC_HIDDEN;
 
-BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
-
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
     int width = window_rect->right - window_rect->left;
