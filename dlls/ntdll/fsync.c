@@ -862,11 +862,11 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         {
                             do
                             {
-                                if (!(current = semaphore->count)) break;
+                                if (!(current = semaphore->count)) goto out;
                             } while (__sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) != current);
                             small_pause();
                         }
-
+out:
                         if (current)
                         {
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
