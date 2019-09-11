@@ -196,6 +196,8 @@ extern BOOL CDECL X11DRV_UnrealizePalette( HPALETTE hpal ) DECLSPEC_HIDDEN;
 
 extern void X11DRV_Xcursor_Init(void) DECLSPEC_HIDDEN;
 extern void X11DRV_XInput2_Init(void) DECLSPEC_HIDDEN;
+extern void X11DRV_XInput2_Enable(void) DECLSPEC_HIDDEN;
+extern void X11DRV_XInput2_Disable(void) DECLSPEC_HIDDEN;
 
 extern DWORD copy_image_bits( BITMAPINFO *info, BOOL is_r8g8b8, XImage *image,
                               const struct gdi_image_bits *src_bits, struct gdi_image_bits *dst_bits,
@@ -343,6 +345,7 @@ struct x11drv_thread_data
     struct x11drv_valuator_data x_rel_valuator;
     struct x11drv_valuator_data y_rel_valuator;
     int      xi2_core_pointer;     /* XInput2 core pointer id */
+    int      xi2_rawinput_only;
 };
 
 extern struct x11drv_thread_data *x11drv_init_thread_data(void) DECLSPEC_HIDDEN;

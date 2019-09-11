@@ -1958,12 +1958,12 @@ static void test_rawinput_mouse(const char *argv0)
         { TRUE, TRUE, 0, 2, 2, -1, -1, FALSE },
 
         /* clip cursor tests */
-        { TRUE, TRUE, 0, 0, 0, 0, 0, TRUE },
-        { TRUE, TRUE, 0, 20, 20, 20, 20, TRUE },
+        { TRUE, TRUE, 0, 0, 0, 0, 0, FALSE },
+        { TRUE, TRUE, 0, 20, 20, 20, 20, FALSE },
 
         /* same-process foreground tests */
-        { TRUE, TRUE, 0, 2, 2, 0, 0, TRUE },
-        { TRUE, TRUE, RIDEV_INPUTSINK, 2, 2, 0, 0, TRUE },
+        { TRUE, TRUE, 0, 2, 2, 0, 0, FALSE },
+        { TRUE, TRUE, RIDEV_INPUTSINK, 2, 2, 0, 0, FALSE },
 
         /* cross-process foreground tests */
         { TRUE, TRUE, 0, 0, 0, 0, 0, FALSE },
