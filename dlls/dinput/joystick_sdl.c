@@ -97,7 +97,9 @@ struct device_state_item {
 typedef BOOL (*enum_device_state_function)(JoystickImpl*, struct device_state_item *, int);
 
 struct SDLDev {
-    int id;
+    BOOL valid;
+
+    int instance_id;
     WORD vendor_id;
     WORD product_id;
     CHAR *name;
@@ -146,8 +148,16 @@ static const GUID DInput_PIDVID_Product_GUID = { /* PIDVID-0000-0000-0000-504944
   0x00000000, 0x0000, 0x0000, {0x00, 0x00, 0x50, 0x49, 0x44, 0x56, 0x49, 0x44}
 };
 
-static int have_sdldevs = -1;
-static struct SDLDev *sdldevs = NULL;
+static CRITICAL_SECTION sdldevs_lock;
+static CRITICAL_SECTION_DEBUG sdldevs_lock_debug =
+{
+    0, 0, &sdldevs_lock,
+    { &sdldevs_lock_debug.ProcessLocksList, &sdldevs_lock_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": sdldevs_lock") }
+};
+static CRITICAL_SECTION sdldevs_lock = { &sdldevs_lock_debug, -1, 0, 0, 0, 0 };
+
+static struct SDLDev sdldevs[64];
 
 /* logic from SDL2's SDL_ShouldIgnoreGameController */
 static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
@@ -184,6 +194,7 @@ static void find_sdldevs(void)
     Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick) = NULL;
     Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick * joystick) = NULL;
     void *sdl_handle = NULL;
+    static int have_sdldevs = -1;
 
     if (InterlockedCompareExchange(&have_sdldevs, 0, -1) != -1)
         /* Someone beat us to it */
@@ -204,25 +215,24 @@ static void find_sdldevs(void)
 
     for (i = 0; i < SDL_NumJoysticks(); i++)
     {
-        struct SDLDev sdldev = {0};
-        struct SDLDev *new_sdldevs;
+        struct SDLDev *sdldev = &sdldevs[have_sdldevs];
         SDL_Joystick *device;
         const CHAR* name;
 
-        sdldev.id = i;
         device = SDL_JoystickOpen(i);
+        sdldev->instance_id = SDL_JoystickInstanceID(device);
 
         name = SDL_JoystickName(device);
-        sdldev.name = HeapAlloc(GetProcessHeap(), 0, strlen(name) + 1);
-        strcpy(sdldev.name, name);
+        sdldev->name = HeapAlloc(GetProcessHeap(), 0, strlen(name) + 1);
+        strcpy(sdldev->name, name);
 
-        if (device_disabled_registry(sdldev.name)) {
+        if (device_disabled_registry(sdldev->name)) {
             SDL_JoystickClose(device);
-            HeapFree(GetProcessHeap(), 0, sdldev.name);
+            HeapFree(GetProcessHeap(), 0, sdldev->name);
             continue;
         }
 
-        TRACE("Found a joystick (%i) on %p: %s\n", have_sdldevs, device, sdldev.name);
+        TRACE("Found a joystick (%i) on %p: %s\n", have_sdldevs, device, sdldev->name);
 
         if (SDL_JoystickIsHaptic(device))
         {
@@ -230,56 +240,48 @@ static void find_sdldevs(void)
             if (haptic)
             {
                 TRACE(" ... with force feedback\n");
-                sdldev.has_ff = TRUE;
+                sdldev->has_ff = TRUE;
                 SDL_HapticClose(haptic);
             }
         }
 
         if(pSDL_JoystickGetVendor){
-            sdldev.vendor_id = pSDL_JoystickGetVendor(device);
-            sdldev.product_id = pSDL_JoystickGetProduct(device);
+            sdldev->vendor_id = pSDL_JoystickGetVendor(device);
+            sdldev->product_id = pSDL_JoystickGetProduct(device);
         }else{
-            sdldev.vendor_id = 0x01;
-            sdldev.product_id = SDL_JoystickInstanceID(device) + 1;
+            sdldev->vendor_id = 0x01;
+            sdldev->product_id = SDL_JoystickInstanceID(device) + 1;
         }
 
-        if(is_in_sdl_blacklist(sdldev.vendor_id, sdldev.product_id))
+        if(is_in_sdl_blacklist(sdldev->vendor_id, sdldev->product_id))
         {
-            TRACE("joystick %04x/%04x is in SDL blacklist, ignoring\n", sdldev.vendor_id, sdldev.product_id);
+            TRACE("joystick %04x/%04x is in SDL blacklist, ignoring\n", sdldev->vendor_id, sdldev->product_id);
             SDL_JoystickClose(device);
             continue;
         }
 
-        if(sdldev.vendor_id == VID_VALVE && sdldev.product_id == PID_VALVE_VIRTUAL_CONTROLLER)
+        if(sdldev->vendor_id == VID_VALVE && sdldev->product_id == PID_VALVE_VIRTUAL_CONTROLLER)
         {
-            sdldev.vendor_id = VID_MICROSOFT;
-            sdldev.product_id = PID_MICROSOFT_XBOX_360;
+            sdldev->vendor_id = VID_MICROSOFT;
+            sdldev->product_id = PID_MICROSOFT_XBOX_360;
         }
 
         {
             SDL_JoystickType type = SDL_JoystickGetType(device);
-            sdldev.is_joystick =
+            sdldev->is_joystick =
                 type == SDL_JOYSTICK_TYPE_WHEEL ||
                 type == SDL_JOYSTICK_TYPE_FLIGHT_STICK ||
                 type == SDL_JOYSTICK_TYPE_THROTTLE;
         }
 
-        sdldev.n_buttons = SDL_JoystickNumButtons(device);
-        sdldev.n_axes = SDL_JoystickNumAxes(device);
-        sdldev.n_hats = SDL_JoystickNumHats(device);
+        sdldev->n_buttons = SDL_JoystickNumButtons(device);
+        sdldev->n_axes = SDL_JoystickNumAxes(device);
+        sdldev->n_hats = SDL_JoystickNumHats(device);
 
-        if (!have_sdldevs)
-            new_sdldevs = HeapAlloc(GetProcessHeap(), 0, sizeof(struct SDLDev));
-        else
-            new_sdldevs = HeapReAlloc(GetProcessHeap(), 0, sdldevs, (1 + have_sdldevs) * sizeof(struct SDLDev));
+        sdldev->valid = TRUE;
 
         SDL_JoystickClose(device);
-        if (!new_sdldevs)
-        {
-            continue;
-        }
-        sdldevs = new_sdldevs;
-        sdldevs[have_sdldevs] = sdldev;
+
         have_sdldevs++;
     }
 }
@@ -418,9 +420,8 @@ static HRESULT sdl_enum_deviceA(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
 {
   find_sdldevs();
 
-  if (id >= have_sdldevs) {
-    return E_FAIL;
-  }
+    if (id >= ARRAY_SIZE(sdldevs) || !sdldevs[id].valid)
+        return E_FAIL;
 
   if (!((dwDevType == 0) ||
         ((dwDevType == DIDEVTYPE_JOYSTICK) && (version >= 0x0300 && version < 0x0800)) ||
@@ -436,11 +437,13 @@ static HRESULT sdl_enum_deviceA(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
 
 static HRESULT sdl_enum_deviceW(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTANCEW lpddi, DWORD version, int id)
 {
-  find_sdldevs();
+    find_sdldevs();
 
-  if (id >= have_sdldevs) {
-    return E_FAIL;
-  }
+    if (id >= ARRAY_SIZE(sdldevs) || !sdldevs[id].valid)
+        return E_FAIL;
+
+  if (!sdldevs[id].valid)
+      return E_FAIL;
 
   if (!((dwDevType == 0) ||
         ((dwDevType == DIDEVTYPE_JOYSTICK) && (version >= 0x0300 && version < 0x0800)) ||
@@ -826,6 +829,17 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     DIDEVICEINSTANCEW ddi;
     int i,idx = 0, axis_count = 0, button_count = 0, hat_count = 0;
     struct device_state_item item;
+    SDL_Joystick *sdl_js;
+
+    sdl_js = SDL_JoystickFromInstanceID(sdldevs[index].instance_id);
+    if (!sdl_js)
+        return NULL;
+
+    if (!SDL_JoystickGetAttached(sdl_js))
+    {
+        SDL_JoystickClose(sdl_js);
+        return NULL;
+    }
 
     newDevice = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(JoystickImpl));
     if (!newDevice) return NULL;
@@ -852,7 +866,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->generic.base.crit.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": JoystickImpl*->base.crit");
 
     /* Open Device */
-    newDevice->device = SDL_JoystickOpen(newDevice->sdldev->id);
+    newDevice->device = sdl_js;
     newDevice->haptic = SDL_HapticOpenFromJoystick(newDevice->device);
 
     i = 0;
@@ -992,8 +1006,7 @@ static HRESULT sdl_create_device(IDirectInputImpl *dinput, REFGUID rguid, REFIID
     find_sdldevs();
     *pdev = NULL;
 
-    if ((index = get_joystick_index(rguid)) < 0xffff &&
-        have_sdldevs && index < have_sdldevs)
+    if ((index = get_joystick_index(rguid)) < 0xffff && sdldevs[index].valid)
     {
         JoystickImpl *This;
 
@@ -1020,6 +1033,8 @@ static HRESULT sdl_create_device(IDirectInputImpl *dinput, REFGUID rguid, REFIID
         }
 
         This = alloc_device(rguid, dinput, index);
+        if (!This)
+            return DIERR_INPUTLOST;
         TRACE("Created a Joystick device (%p)\n", This);
 
         if (!This) return DIERR_OUTOFMEMORY;
@@ -1106,7 +1121,7 @@ static HRESULT WINAPI JoystickWImpl_GetProperty(LPDIRECTINPUTDEVICE8W iface, REF
         {
             LPDIPROPDWORD pd = (LPDIPROPDWORD)pdiph;
 
-            pd->dwData = This->sdldev->id;
+            pd->dwData = This->sdldev - sdldevs;
             TRACE("DIPROP_JOYSTICKID(%d)\n", pd->dwData);
             break;
         }
