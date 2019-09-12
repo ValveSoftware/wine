@@ -46,6 +46,7 @@ struct device
 {
     WCHAR *path;
     HANDLE file;
+    HANDLE handle;
     RID_DEVICE_INFO info;
     PHIDP_PREPARSED_DATA data;
 };
@@ -61,6 +62,8 @@ static CRITICAL_SECTION_DEBUG rawinput_devices_cs_debug =
       0, 0, { (DWORD_PTR)(__FILE__ ": rawinput_devices_cs") }
 };
 static CRITICAL_SECTION rawinput_devices_cs = { &rawinput_devices_cs_debug, -1, 0, 0, 0, 0 };
+
+extern DWORD WINAPI GetFinalPathNameByHandleW(HANDLE file, LPWSTR path, DWORD charcount, DWORD flags);
 
 static BOOL array_reserve(void **elements, unsigned int *capacity, unsigned int count, unsigned int size)
 {
@@ -142,9 +145,42 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
     device = &rawinput_devices[rawinput_devices_count++];
     device->path = path;
     device->file = file;
+    device->handle = INVALID_HANDLE_VALUE;
     device->info.cbSize = sizeof(RID_DEVICE_INFO);
 
     return device;
+}
+
+HANDLE rawinput_handle_from_device_handle(HANDLE device)
+{
+    WCHAR buffer[sizeof(OBJECT_NAME_INFORMATION) + MAX_PATH + 1];
+    OBJECT_NAME_INFORMATION *info = (OBJECT_NAME_INFORMATION*)&buffer;
+    ULONG dummy;
+    unsigned int i;
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+    {
+        if (rawinput_devices[i].handle == device)
+            return &rawinput_devices[i];
+    }
+
+    if (NtQueryObject( device, ObjectNameInformation, &buffer, sizeof(buffer) - sizeof(WCHAR), &dummy ) || !info->Name.Buffer)
+        return NULL;
+
+    /* replace \??\ with \\?\ to match rawinput_devices paths */
+    if (info->Name.Length > 1 && info->Name.Buffer[0] == '\\' && info->Name.Buffer[1] == '?')
+        info->Name.Buffer[1] = '\\';
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+    {
+        if (strcmpW(rawinput_devices[i].path, info->Name.Buffer) == 0)
+        {
+            rawinput_devices[i].handle = device;
+            return &rawinput_devices[i];
+        }
+    }
+
+    return NULL;
 }
 
 static void find_devices(void)
@@ -438,6 +474,7 @@ UINT WINAPI GetRawInputDeviceInfoW(HANDLE handle, UINT command, void *data, UINT
             handle, command, data, data_size);
 
     if (!data_size) return ~0U;
+    if (!device) return ~0U;
 
     /* each case below must set:
      *     *data_size: length (meaning defined by command) of data we want to copy
