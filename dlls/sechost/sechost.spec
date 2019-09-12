@@ -17,6 +17,8 @@
 @ stdcall GetServiceDisplayNameW(ptr wstr ptr ptr)
 @ stdcall GetServiceKeyNameA(long str ptr ptr)
 @ stdcall GetServiceKeyNameW(long wstr ptr ptr)
+@ stdcall I_ScRegisterDeviceNotification(ptr ptr long)
+@ stdcall I_ScUnregisterDeviceNotification(ptr)
 @ stdcall LockServiceDatabase(ptr)
 @ stdcall NotifyServiceStatusChangeW(ptr long ptr)
 @ stdcall OpenSCManagerA(str str long)

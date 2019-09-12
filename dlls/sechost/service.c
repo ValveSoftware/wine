@@ -96,6 +96,14 @@ typedef struct notify_data_t {
 
 static struct list notify_list = LIST_INIT(notify_list);
 
+struct device_notify_registration {
+    DEVICE_NOTIFICATION_DETAILS details;
+    struct list entry;
+};
+
+static struct list device_notify_list = LIST_INIT(device_notify_list);
+HANDLE device_notify_thread = NULL;
+
 static CRITICAL_SECTION service_cs;
 static CRITICAL_SECTION_DEBUG service_cs_debug =
 {
@@ -2766,4 +2774,137 @@ DWORD WINAPI NotifyServiceStatusChangeW(SC_HANDLE hService, DWORD dwNotifyMask,
     LeaveCriticalSection( &service_cs );
 
     return ERROR_SUCCESS;
+}
+
+static DWORD WINAPI device_notification_thread(void *user)
+{
+    DWORD err;
+    struct device_notify_registration *registration;
+    SC_DEV_NOTIFY_RPC_HANDLE handle = NULL;
+    DWORD code;
+    DWORD buf_size;
+    BYTE *buf;
+
+    __TRY
+    {
+        err = svcctl_OpenDeviceNotificationHandle(NULL, &handle);
+    }
+    __EXCEPT(rpc_filter)
+    {
+        err = map_exception_code(GetExceptionCode());
+    }
+    __ENDTRY
+
+    if (!handle)
+    {
+        WARN("OpenDeviceNotificationHandle server call failed: %d\n", err);
+        return 1;
+    }
+
+    for (;;)
+    {
+        buf = NULL;
+        __TRY
+        {
+            /* GetDeviceNotificationResults blocks until there is an event */
+            err = svcctl_GetDeviceNotificationResults(handle, &code, &buf, &buf_size);
+        }
+        __EXCEPT(rpc_filter)
+        {
+            err = map_exception_code(GetExceptionCode());
+        }
+        __ENDTRY
+
+        if (err != ERROR_SUCCESS)
+        {
+            WARN("GetDeviceNotificationResults server call failed: %d\n", err);
+            if (buf)
+                MIDL_user_free(buf);
+            Sleep(100);
+            continue;
+        }
+
+        EnterCriticalSection(&service_cs);
+        LIST_FOR_EACH_ENTRY(registration, &device_notify_list, struct device_notify_registration, entry)
+        {
+            registration->details.pNotificationCallback(registration->details.hRecipient,
+                    code, (DEV_BROADCAST_HDR *) buf);
+        }
+        LeaveCriticalSection(&service_cs);
+        MIDL_user_free(buf);
+    }
+}
+
+/******************************************************************************
+ * I_ScRegisterDeviceNotification [SECHOST.@]
+ */
+HDEVNOTIFY WINAPI I_ScRegisterDeviceNotification(DEVICE_NOTIFICATION_DETAILS *details, LPVOID filter, DWORD flags)
+{
+    struct device_notify_registration *registration;
+
+    TRACE("(%p)\n", details->hRecipient);
+
+    /* This implementation is not overly concerned with sending too many
+     * messages, so support for filters is not yet implemented.
+     */
+    if (filter)
+        FIXME("Notification filters are not yet implemented! All device notification events will be sent.\n");
+
+    if (!details || !details->pNotificationCallback)
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return NULL;
+    }
+
+    registration = heap_alloc(sizeof(struct device_notify_registration));
+    if (!registration)
+    {
+        SetLastError(ERROR_NOT_ENOUGH_MEMORY);
+        return NULL;
+    }
+
+    memcpy(&registration->details, details, sizeof(DEVICE_NOTIFICATION_DETAILS));
+
+    EnterCriticalSection(&service_cs);
+    list_add_tail(&device_notify_list, &registration->entry);
+
+    if (!device_notify_thread)
+        device_notify_thread = CreateThread(NULL, 0, &device_notification_thread, NULL, 0, NULL);
+
+    LeaveCriticalSection(&service_cs);
+
+    return (HDEVNOTIFY) registration;
+}
+
+/******************************************************************************
+ * I_ScUnregisterDeviceNotification [SECHOST.@]
+ */
+BOOL WINAPI I_ScUnregisterDeviceNotification(HDEVNOTIFY notificationHandle)
+{
+    struct device_notify_registration *item, *registration = NULL;
+
+    TRACE("(%p)\n", notificationHandle);
+
+    EnterCriticalSection(&service_cs);
+    LIST_FOR_EACH_ENTRY(item, &device_notify_list, struct device_notify_registration, entry)
+    {
+        if (item == notificationHandle)
+        {
+            registration = item;
+            break;
+        }
+    }
+
+    if (registration)
+        list_remove(&registration->entry);
+    LeaveCriticalSection(&service_cs);
+
+    if (!registration)
+    {
+        SetLastError(ERROR_INVALID_HANDLE);
+        return FALSE;
+    }
+
+    heap_free(registration);
+    return TRUE;
 }

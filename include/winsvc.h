@@ -376,6 +376,18 @@ typedef struct _QUERY_SERVICE_LOCK_STATUSW
 
 DECL_WINELIB_TYPE_AW(QUERY_SERVICE_LOCK_STATUS)
 
+#ifndef HDEVNOTIFY
+typedef  PVOID           HDEVNOTIFY;
+#endif
+#include "dbt.h"
+typedef DWORD (CALLBACK *REGISTER_DEVICE_NOTIFY_CALLBACK)(HANDLE hRecipient,
+    DWORD flags, DEV_BROADCAST_HDR *);
+typedef struct _DEVICE_NOTIFICATION_DETAILS
+{
+    REGISTER_DEVICE_NOTIFY_CALLBACK pNotificationCallback;
+    HANDLE hRecipient;
+} DEVICE_NOTIFICATION_DETAILS;
+
 /* Service control handler function prototype */
 
 typedef VOID (WINAPI *LPHANDLER_FUNCTION)(DWORD);
@@ -445,6 +457,8 @@ WINADVAPI BOOL        WINAPI StartServiceCtrlDispatcherA(const SERVICE_TABLE_ENT
 WINADVAPI BOOL        WINAPI StartServiceCtrlDispatcherW(const SERVICE_TABLE_ENTRYW*);
 #define                      StartServiceCtrlDispatcher WINELIB_NAME_AW(StartServiceCtrlDispatcher)
 WINADVAPI BOOL        WINAPI UnlockServiceDatabase(SC_LOCK);
+WINADVAPI HDEVNOTIFY  WINAPI I_ScRegisterDeviceNotification(DEVICE_NOTIFICATION_DETAILS *details, LPVOID filter, DWORD flags);
+WINADVAPI BOOL        WINAPI I_ScUnregisterDeviceNotification(HDEVNOTIFY notificationHandle);
 
 #ifdef __cplusplus
 } /* extern "C" */
