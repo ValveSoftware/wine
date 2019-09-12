@@ -2285,10 +2285,17 @@ static BOOL process_rawinput_message( MSG *msg, const struct hardware_msg_data *
 {
     struct user_thread_info *thread_info = get_user_thread_info();
     RAWINPUT *rawinput = thread_info->rawinput;
+    SIZE_T data_len = 0;
+
+    if (msg_data->rawinput.type == RIM_TYPEHID)
+    {
+        data_len = msg_data->rawinput.hid.length;
+        rawinput = thread_info->rawinput = HeapReAlloc( GetProcessHeap(), 0, rawinput, sizeof(*rawinput) + data_len );
+    }
 
     if (!rawinput)
     {
-        thread_info->rawinput = HeapAlloc( GetProcessHeap(), 0, sizeof(*rawinput) );
+        thread_info->rawinput = HeapAlloc( GetProcessHeap(), 0, sizeof(*rawinput) + data_len );
         if (!(rawinput = thread_info->rawinput)) return FALSE;
     }
 
@@ -2382,6 +2389,16 @@ static BOOL process_rawinput_message( MSG *msg, const struct hardware_msg_data *
 
         rawinput->data.keyboard.Message          = msg_data->rawinput.kbd.message;
         rawinput->data.keyboard.ExtraInformation = msg_data->info;
+    }
+    else if (msg_data->rawinput.type == RIM_TYPEHID)
+    {
+        rawinput->header.dwSize  = FIELD_OFFSET(RAWINPUT, data.hid.bRawData) + data_len;
+        rawinput->header.hDevice = rawinput_handle_from_device_handle(wine_server_ptr_handle(msg_data->rawinput.hid.device));
+        rawinput->header.wParam  = 0;
+
+        rawinput->data.hid.dwSizeHid = data_len;
+        rawinput->data.hid.dwCount = 1;
+        memcpy(rawinput->data.hid.bRawData, msg_data + 1, data_len);
     }
     else
     {
