@@ -109,6 +109,9 @@ struct SDLDev {
     BOOL has_ff, is_joystick;
     int autocenter;
     int gain;
+
+    SDL_Joystick *sdl_js;
+
     struct list effects;
 };
 
@@ -188,20 +191,12 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
     return strcasestr(blacklist, needle) != NULL;
 }
 
-static void find_sdldevs(void)
+static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick *);
+static Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick *);
+
+static BOOL WINAPI sdldrv_init(INIT_ONCE *once, void *param, void **context)
 {
-    int i;
-    Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick) = NULL;
-    Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick * joystick) = NULL;
     void *sdl_handle = NULL;
-    static int have_sdldevs = -1;
-
-    if (InterlockedCompareExchange(&have_sdldevs, 0, -1) != -1)
-        /* Someone beat us to it */
-        return;
-
-    SDL_Init(SDL_INIT_JOYSTICK|SDL_INIT_HAPTIC);
-    SDL_JoystickEventState(SDL_ENABLE);
 
     sdl_handle = wine_dlopen(SONAME_LIBSDL2, RTLD_NOW, NULL, 0);
     if (sdl_handle) {
@@ -213,11 +208,58 @@ static void find_sdldevs(void)
         ERR("SDL installation is old! Please upgrade to >=2.0.6 to get accurate joystick information.\n");
     }
 
+    SDL_Init(SDL_INIT_JOYSTICK|SDL_INIT_HAPTIC);
+    SDL_JoystickEventState(SDL_ENABLE);
+
+    return TRUE;
+}
+
+static void find_sdldevs(void)
+{
+    static INIT_ONCE init_once = INIT_ONCE_STATIC_INIT;
+    static ULONGLONG last_check = 0;
+    ULONGLONG now;
+    int i;
+
+    InitOnceExecuteOnce(&init_once, sdldrv_init, NULL, NULL);
+
+    SDL_PumpEvents();
+
+    now = GetTickCount64();
+
+    if(last_check > 0 && last_check + 1000 > now)
+        return;
+
+    last_check = now;
+
+    EnterCriticalSection(&sdldevs_lock);
+
     for (i = 0; i < SDL_NumJoysticks(); i++)
     {
-        struct SDLDev *sdldev = &sdldevs[have_sdldevs];
+        struct SDLDev *sdldev = &sdldevs[0];
         SDL_Joystick *device;
         const CHAR* name;
+
+        while(sdldev < &sdldevs[ARRAY_SIZE(sdldevs)] &&
+                sdldev->valid)
+        {
+            if(sdldev->instance_id == SDL_JoystickGetDeviceInstanceID(i))
+                break;
+            sdldev++;
+        }
+
+        if(sdldev >= &sdldevs[ARRAY_SIZE(sdldevs)])
+        {
+            ERR("ran out of joystick slots!!\n");
+            LeaveCriticalSection(&sdldevs_lock);
+            return;
+        }
+
+        if(sdldev->valid)
+        {
+            /* this joystic is already discovered */
+            continue;
+        }
 
         device = SDL_JoystickOpen(i);
         sdldev->instance_id = SDL_JoystickInstanceID(device);
@@ -232,7 +274,7 @@ static void find_sdldevs(void)
             continue;
         }
 
-        TRACE("Found a joystick (%i) on %p: %s\n", have_sdldevs, device, sdldev->name);
+        TRACE("Found a joystick on %p: %s\n", device, sdldev->name);
 
         if (SDL_JoystickIsHaptic(device))
         {
@@ -257,6 +299,7 @@ static void find_sdldevs(void)
         {
             TRACE("joystick %04x/%04x is in SDL blacklist, ignoring\n", sdldev->vendor_id, sdldev->product_id);
             SDL_JoystickClose(device);
+            HeapFree(GetProcessHeap(), 0, sdldev->name);
             continue;
         }
 
@@ -278,12 +321,13 @@ static void find_sdldevs(void)
         sdldev->n_axes = SDL_JoystickNumAxes(device);
         sdldev->n_hats = SDL_JoystickNumHats(device);
 
+        sdldev->sdl_js = device;
+
+        /* must be last member to be set */
         sdldev->valid = TRUE;
-
-        SDL_JoystickClose(device);
-
-        have_sdldevs++;
     }
+
+    LeaveCriticalSection(&sdldevs_lock);
 }
 
 static struct device_info_override {
@@ -418,21 +462,27 @@ static void fill_joystick_dideviceinstanceW(LPDIDEVICEINSTANCEW lpddi, DWORD ver
 
 static HRESULT sdl_enum_deviceA(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTANCEA lpddi, DWORD version, int id)
 {
-  find_sdldevs();
+    find_sdldevs();
 
     if (id >= ARRAY_SIZE(sdldevs) || !sdldevs[id].valid)
         return E_FAIL;
 
-  if (!((dwDevType == 0) ||
-        ((dwDevType == DIDEVTYPE_JOYSTICK) && (version >= 0x0300 && version < 0x0800)) ||
-        (((dwDevType == DI8DEVCLASS_GAMECTRL) || (dwDevType == DI8DEVTYPE_JOYSTICK)) && (version >= 0x0800))))
-    return S_FALSE;
+    if (!((dwDevType == 0) ||
+          ((dwDevType == DIDEVTYPE_JOYSTICK) && (version >= 0x0300 && version < 0x0800)) ||
+          (((dwDevType == DI8DEVCLASS_GAMECTRL) || (dwDevType == DI8DEVTYPE_JOYSTICK)) && (version >= 0x0800))))
+        return S_FALSE;
 
-  if (!(dwFlags & DIEDFL_FORCEFEEDBACK) || sdldevs[id].has_ff) {
+    if ((dwFlags & DIEDFL_FORCEFEEDBACK) && !sdldevs[id].has_ff)
+        return S_FALSE;
+
+    if (dwFlags & DIEDFL_ATTACHEDONLY)
+    {
+        if (!SDL_JoystickGetAttached(sdldevs[id].sdl_js))
+            return S_FALSE;
+    }
+
     fill_joystick_dideviceinstanceA(lpddi, version, id);
     return S_OK;
-  }
-  return S_FALSE;
 }
 
 static HRESULT sdl_enum_deviceW(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTANCEW lpddi, DWORD version, int id)
@@ -442,19 +492,22 @@ static HRESULT sdl_enum_deviceW(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
     if (id >= ARRAY_SIZE(sdldevs) || !sdldevs[id].valid)
         return E_FAIL;
 
-  if (!sdldevs[id].valid)
-      return E_FAIL;
+    if (!((dwDevType == 0) ||
+          ((dwDevType == DIDEVTYPE_JOYSTICK) && (version >= 0x0300 && version < 0x0800)) ||
+          (((dwDevType == DI8DEVCLASS_GAMECTRL) || (dwDevType == DI8DEVTYPE_JOYSTICK)) && (version >= 0x0800))))
+        return S_FALSE;
 
-  if (!((dwDevType == 0) ||
-        ((dwDevType == DIDEVTYPE_JOYSTICK) && (version >= 0x0300 && version < 0x0800)) ||
-        (((dwDevType == DI8DEVCLASS_GAMECTRL) || (dwDevType == DI8DEVTYPE_JOYSTICK)) && (version >= 0x0800))))
-    return S_FALSE;
+    if ((dwFlags & DIEDFL_FORCEFEEDBACK) && !sdldevs[id].has_ff)
+        return S_FALSE;
 
-  if (!(dwFlags & DIEDFL_FORCEFEEDBACK) || sdldevs[id].has_ff) {
+    if (dwFlags & DIEDFL_ATTACHEDONLY)
+    {
+        if (!SDL_JoystickGetAttached(sdldevs[id].sdl_js))
+            return S_FALSE;
+    }
+
     fill_joystick_dideviceinstanceW(lpddi, version, id);
     return S_OK;
-  }
-  return S_FALSE;
 }
 
 static int buttons_to_sdl_hat(int u, int r, int d, int l)
@@ -829,17 +882,9 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     DIDEVICEINSTANCEW ddi;
     int i,idx = 0, axis_count = 0, button_count = 0, hat_count = 0;
     struct device_state_item item;
-    SDL_Joystick *sdl_js;
 
-    sdl_js = SDL_JoystickFromInstanceID(sdldevs[index].instance_id);
-    if (!sdl_js)
+    if (!SDL_JoystickGetAttached(sdldevs[index].sdl_js))
         return NULL;
-
-    if (!SDL_JoystickGetAttached(sdl_js))
-    {
-        SDL_JoystickClose(sdl_js);
-        return NULL;
-    }
 
     newDevice = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(JoystickImpl));
     if (!newDevice) return NULL;
@@ -866,7 +911,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->generic.base.crit.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": JoystickImpl*->base.crit");
 
     /* Open Device */
-    newDevice->device = sdl_js;
+    newDevice->device = sdldevs[index].sdl_js;
     newDevice->haptic = SDL_HapticOpenFromJoystick(newDevice->device);
 
     i = 0;
@@ -1066,7 +1111,6 @@ static ULONG WINAPI JoystickWImpl_Release(LPDIRECTINPUTDEVICE8W iface)
         TRACE("Closing Joystick: %p\n",This);
         if (This->sdldev->has_ff)
             SDL_HapticClose(This->haptic);
-        SDL_JoystickClose(This->device);
         This->device = NULL;
     }
     return IDirectInputDevice2WImpl_Release(iface);
