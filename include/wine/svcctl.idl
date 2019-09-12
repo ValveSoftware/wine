@@ -62,6 +62,7 @@ interface svcctl
     typedef [context_handle] void *SC_RPC_HANDLE;
     typedef [context_handle] void *SC_RPC_LOCK;
     typedef [context_handle] void *SC_NOTIFY_RPC_HANDLE;
+    typedef [context_handle] void *SC_DEV_NOTIFY_RPC_HANDLE;
 
     /* undocumented access rights */
     cpp_quote("#define SERVICE_SET_STATUS   0x8000")
@@ -805,4 +806,16 @@ typedef [switch_type(DWORD)] union _SC_RPC_SERVICE_CONTROL_OUT_PARAMSW {
         [in] DWORD info_level,
         [out] SC_RPC_CONFIG_INFOW *info
     );
+
+    /* Not compatible with Windows function 57 */
+    DWORD svcctl_OpenDeviceNotificationHandle(
+        [in, string, unique] SVCCTL_HANDLEW machinename,
+        [out] SC_DEV_NOTIFY_RPC_HANDLE *handle);
+
+    /* Not compatible with Windows function 58 */
+    DWORD svcctl_GetDeviceNotificationResults(
+        [in] SC_DEV_NOTIFY_RPC_HANDLE handle,
+        [out] DWORD *event_code,
+        [out, size_is(,*event_size)] BYTE **event,
+        [out] DWORD *event_size);
 }
