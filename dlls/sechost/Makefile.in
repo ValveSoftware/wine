@@ -1,0 +1,8 @@
+EXTRADEFS = -D_SECHOST_
+MODULE    = sechost.dll
+IMPORTLIB = sechost
+IMPORTS   = kernelbase
+DELAYIMPORTS = rpcrt4
+
+C_SRCS	  = service.c
+IDL_SRCS  = svcctl.idl
