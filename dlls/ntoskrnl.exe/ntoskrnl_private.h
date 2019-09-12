@@ -22,6 +22,8 @@
 #define __WINE_NTOSKRNL_PRIVATE_H
 
 #include "wine/asm.h"
+#include "winuser.h"
+#include "dbt.h"
 
 static inline LPCSTR debugstr_us( const UNICODE_STRING *us )
 {
@@ -92,4 +94,7 @@ struct wine_device
     DEVICE_OBJECT device_obj;
     DEVICE_RELATIONS *children;
 };
+
+DWORD send_device_notification( DEV_BROADCAST_DEVICEINTERFACE_W *broadcast, BOOL enable );
+
 #endif

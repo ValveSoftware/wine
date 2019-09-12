@@ -818,4 +818,11 @@ typedef [switch_type(DWORD)] union _SC_RPC_SERVICE_CONTROL_OUT_PARAMSW {
         [out] DWORD *event_code,
         [out, size_is(,*event_size)] BYTE **event,
         [out] DWORD *event_size);
+
+    /* Not compatible with Windows function 59 */
+    DWORD svcctl_SendDeviceNotification(
+        [in, string, unique] SVCCTL_HANDLEW machinename,
+        [in] DWORD event_code,
+        [in, size_is(event_size)] const BYTE *event,
+        [in] DWORD event_size);
 }
