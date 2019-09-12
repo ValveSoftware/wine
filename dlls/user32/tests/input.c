@@ -54,6 +54,9 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "winnls.h"
+#include "dbt.h"
+#include "initguid.h"
+#include "ddk/hidclass.h"
 
 #include "wine/test.h"
 
@@ -2827,10 +2830,73 @@ static void test_GetPointerType(void)
     ok(type == PT_MOUSE, " type %d\n", type );
 }
 
+static void test_RegisterDeviceNotification(void)
+{
+    static const WCHAR mainwindowclassW[] = {'M','a','i','n','W','i','n','d','o','w','C','l','a','s','s',0};
+    static const WCHAR message_windowW[] = {'m','e','s','s','a','g','e',' ','w','i','n','d','o','w',0};
+
+    HDEVNOTIFY hnotify1, hnotify2;
+    DEV_BROADCAST_DEVICEINTERFACE_W dbh;
+    HWND hwnd;
+    WNDCLASSEXW cls;
+    BOOL ret;
+
+    memset(&cls, 0, sizeof(cls));
+    cls.cbSize = sizeof(cls);
+    cls.hInstance = 0;
+    cls.lpszClassName = mainwindowclassW;
+    cls.lpfnWndProc = DefWindowProcW;
+
+    RegisterClassExW(&cls);
+
+    hwnd = CreateWindowExW(0, mainwindowclassW, message_windowW, 0,
+                           0, 0, 0, 0, HWND_MESSAGE, 0, 0, NULL);
+    ok(hwnd != 0, "CreateWindowExW with parent HWND_MESSAGE failed\n");
+
+    memset(&dbh, 0, sizeof(dbh));
+
+    dbh.dbcc_size = sizeof(dbh);
+    dbh.dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE;
+    dbh.dbcc_classguid = GUID_DEVINTERFACE_HID;
+
+    /* Test RegisterDeviceNotification behavior */
+
+    /* Prior to Windows 8 a NULL recipient handle caused a failure, but more
+     * recent versions of windows allow it.
+     */
+    hnotify1 = RegisterDeviceNotificationW(NULL, &dbh, DEVICE_NOTIFY_WINDOW_HANDLE);
+    /* ok(hnotify1 != 0, "RegisterDeviceNotificationW failed when called with a NULL recipient window handle\n"); */
+    if (hnotify1 != 0)
+    {
+        ret = UnregisterDeviceNotification(hnotify1);
+        ok(ret, "UnregisterDeviceNotification failed with a valid handle\n");
+    }
+
+    hnotify1 = RegisterDeviceNotificationW(hwnd, &dbh, DEVICE_NOTIFY_WINDOW_HANDLE);
+    ok(hnotify1 != 0, "RegisterDeviceNotificationW failed when called with a message only window as recipient\n");
+
+    hnotify2 = RegisterDeviceNotificationW(hwnd, &dbh, DEVICE_NOTIFY_WINDOW_HANDLE);
+    ok(hnotify2 != 0, "RegisterDeviceNotificationW failed when called with a window that has already been registered as a recipient\n");
+
+    ret = UnregisterDeviceNotification(hnotify1);
+    ok(ret, "UnregisterDeviceNotification failed with a valid handle\n");
+    ret = UnregisterDeviceNotification(hnotify2);
+    ok(ret, "UnregisterDeviceNotification failed with a valid handle\n");
+    ret = UnregisterDeviceNotification(hnotify1);
+    ok(!ret, "UnregisterDeviceNotification succeeded with an already released handle\n");
+    ret = UnregisterDeviceNotification(NULL);
+    ok(!ret, "UnregisterDeviceNotification succeeded with NULL handle\n");
+
+    hnotify1 = RegisterDeviceNotificationW(hwnd, &dbh, 0xffff);
+    ok(hnotify1 == 0, "RegisterDeviceNotificationW accepted invalid flags\n");
+
+    /* FIXME: Find a way to trigger a device notification for testing */
+    DestroyWindow(hwnd);
+}
+
 START_TEST(input)
 {
     POINT pos;
-
     init_function_pointers();
     GetCursorPos( &pos );
 
@@ -2877,4 +2943,6 @@ START_TEST(input)
         test_GetPointerType();
     else
         win_skip("GetPointerType is not available\n");
+
+    test_RegisterDeviceNotification();
 }
