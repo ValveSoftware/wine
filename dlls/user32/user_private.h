@@ -369,4 +369,6 @@ static inline WCHAR *heap_strdupW(const WCHAR *src)
     return dst;
 }
 
+extern HANDLE rawinput_handle_from_device_handle(HANDLE device, BOOL rescan);
+
 #endif /* __WINE_USER_PRIVATE_H */

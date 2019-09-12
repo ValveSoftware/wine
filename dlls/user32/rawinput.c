@@ -43,6 +43,7 @@ struct hid_device
 {
     WCHAR *path;
     HANDLE file;
+    HANDLE handle;
     RID_DEVICE_INFO_HID info;
     PHIDP_PREPARSED_DATA data;
 };
@@ -138,11 +139,52 @@ static struct hid_device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *ifa
     device = &hid_devices[hid_devices_count++];
     device->path = path;
     device->file = file;
+    device->handle = INVALID_HANDLE_VALUE;
 
     return device;
 }
 
-static void find_hid_devices(void)
+extern DWORD WINAPI GetFinalPathNameByHandleW(HANDLE file, LPWSTR path, DWORD charcount, DWORD flags);
+static void find_hid_devices(BOOL);
+
+HANDLE rawinput_handle_from_device_handle(HANDLE device, BOOL rescan)
+{
+    WCHAR buffer[sizeof(OBJECT_NAME_INFORMATION) + MAX_PATH + 1];
+    OBJECT_NAME_INFORMATION *info = (OBJECT_NAME_INFORMATION*)&buffer;
+    ULONG dummy;
+    unsigned int i;
+
+    for (i = 0; i < hid_devices_count; ++i)
+    {
+        if (hid_devices[i].handle == device)
+            return &hid_devices[i];
+    }
+
+    if (NtQueryObject( device, ObjectNameInformation, &buffer, sizeof(buffer) - sizeof(WCHAR), &dummy ) || !info->Name.Buffer)
+        return NULL;
+
+    /* replace \??\ with \\?\ to match hid_devices paths */
+    if (info->Name.Length > 1 && info->Name.Buffer[0] == '\\' && info->Name.Buffer[1] == '?')
+        info->Name.Buffer[1] = '\\';
+
+    for (i = 0; i < hid_devices_count; ++i)
+    {
+        if (strcmpW(hid_devices[i].path, info->Name.Buffer) == 0)
+        {
+            hid_devices[i].handle = device;
+            return &hid_devices[i];
+        }
+    }
+
+    if (!rescan)
+        return NULL;
+
+    find_hid_devices(TRUE);
+
+    return rawinput_handle_from_device_handle(device, FALSE);
+}
+
+static void find_hid_devices(BOOL force)
 {
     static ULONGLONG last_check;
 
@@ -154,7 +196,7 @@ static void find_hid_devices(void)
     HDEVINFO set;
     DWORD idx;
 
-    if (GetTickCount64() - last_check < 2000)
+    if (!force && GetTickCount64() - last_check < 2000)
         return;
     last_check = GetTickCount64();
 
@@ -219,7 +261,7 @@ UINT WINAPI GetRawInputDeviceList(RAWINPUTDEVICELIST *devices, UINT *device_coun
         return ~0U;
     }
 
-    find_hid_devices();
+    find_hid_devices(FALSE);
 
     if (!devices)
     {
@@ -415,6 +457,7 @@ UINT WINAPI GetRawInputDeviceInfoW(HANDLE device, UINT command, void *data, UINT
             device, command, data, data_size);
 
     if (!data_size) return ~0U;
+    if (!device) return ~0U;
 
     /* each case below must set:
      *     *data_size: length (meaning defined by command) of data we want to copy
