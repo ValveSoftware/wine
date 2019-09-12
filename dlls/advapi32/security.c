@@ -416,15 +416,19 @@ static inline DWORD get_security_file( LPCWSTR full_file_name, DWORD access, HAN
 static inline DWORD get_security_service( LPWSTR full_service_name, DWORD access, HANDLE *service )
 {
     SC_HANDLE manager = 0;
-    DWORD err;
 
-    err = SERV_OpenSCManagerW( NULL, NULL, access, (SC_HANDLE *)&manager );
-    if (err == ERROR_SUCCESS)
+    manager = OpenSCManagerW( NULL, NULL, access );
+    if (manager)
     {
-        err = SERV_OpenServiceW( manager, full_service_name, access, (SC_HANDLE *)service );
+        *service = OpenServiceW( manager, full_service_name, access);
         CloseServiceHandle( manager );
+
+        if (*service)
+        {
+            return ERROR_SUCCESS;
+        }
     }
-    return err;
+    return GetLastError();
 }
 
 /* helper function for SE_REGISTRY_KEY objects in [Get|Set]NamedSecurityInfo */
@@ -1804,7 +1808,14 @@ DWORD WINAPI GetSecurityInfo(
     switch (ObjectType)
     {
     case SE_SERVICE:
-        status = SERV_QueryServiceObjectSecurity(hObject, SecurityInfo, NULL, 0, &n1);
+        if (QueryServiceObjectSecurity(hObject, SecurityInfo, NULL, 0, &n1))
+        {
+            status = STATUS_SUCCESS;
+        }
+        else
+        {
+            status = RtlGetLastNtStatus();
+        }
         break;
     default:
         status = NtQuerySecurityObject(hObject, SecurityInfo, NULL, 0, &n1);
@@ -1820,7 +1831,14 @@ DWORD WINAPI GetSecurityInfo(
     switch (ObjectType)
     {
     case SE_SERVICE:
-        status = SERV_QueryServiceObjectSecurity(hObject, SecurityInfo, sd, n1, &n2);
+        if (QueryServiceObjectSecurity(hObject, SecurityInfo, sd, n1, &n2))
+        {
+            status = STATUS_SUCCESS;
+        }
+        else
+        {
+            status = RtlGetLastNtStatus();
+        }
         break;
     default:
         status = NtQuerySecurityObject(hObject, SecurityInfo, sd, n1, &n2);
