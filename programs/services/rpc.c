@@ -2245,6 +2245,51 @@ DWORD __cdecl svcctl_GetDeviceNotificationResults(
     return ERROR_SUCCESS;
 }
 
+DWORD __cdecl svcctl_SendDeviceNotification(
+    MACHINE_HANDLEW MachineName, /* Note: this parameter is ignored */
+    DWORD code,
+    const BYTE *event_buf,
+    DWORD event_buf_size)
+{
+    struct sc_dev_notify_handle *listener;
+    struct devnotify_event *event;
+
+    if (!event_buf)
+        return ERROR_INVALID_PARAMETER;
+
+    EnterCriticalSection(&device_notifications_cs);
+    LIST_FOR_EACH_ENTRY(listener, &devnotify_listeners, struct sc_dev_notify_handle, entry)
+    {
+        WINE_TRACE("Triggering listener %p\n", listener);
+
+        event = HeapAlloc(GetProcessHeap(), 0, sizeof(struct devnotify_event));
+        if (event)
+            event->data = MIDL_user_allocate(event_buf_size);
+
+        if (!event || !event->data)
+        {
+            HeapFree(GetProcessHeap(), 0, event);
+
+            LeaveCriticalSection(&device_notifications_cs);
+            return ERROR_NOT_ENOUGH_SERVER_MEMORY;
+        }
+
+        event->code = code;
+        memcpy(event->data, event_buf, event_buf_size);
+        event->data_size = event_buf_size;
+
+        EnterCriticalSection(&listener->cs);
+        list_add_tail(&listener->event_list, &event->entry);
+        LeaveCriticalSection(&listener->cs);
+
+        SetEvent(listener->event);
+    }
+    WINE_TRACE("Done triggering registrations\n");
+    LeaveCriticalSection(&device_notifications_cs);
+
+    return ERROR_SUCCESS;
+}
+
 DWORD RPC_Init(void)
 {
     WCHAR transport[] = SVCCTL_TRANSPORT;

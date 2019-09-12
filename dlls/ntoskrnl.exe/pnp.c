@@ -672,6 +672,7 @@ NTSTATUS WINAPI IoSetDeviceInterfaceState( UNICODE_STRING *name, BOOLEAN enable 
         lstrcpynW( broadcast->dbcc_name, name->Buffer, namelen + 1 );
         BroadcastSystemMessageW( BSF_FORCEIFHUNG | BSF_QUERY, NULL, WM_DEVICECHANGE,
             enable ? DBT_DEVICEARRIVAL : DBT_DEVICEREMOVECOMPLETE, (LPARAM)broadcast );
+        send_device_notification( broadcast, enable );
 
         heap_free( broadcast );
     }

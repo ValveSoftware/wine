@@ -22,6 +22,8 @@
 #define __WINE_NTOSKRNL_PRIVATE_H
 
 #include "wine/asm.h"
+#include "winuser.h"
+#include "dbt.h"
 
 static inline LPCSTR debugstr_us( const UNICODE_STRING *us )
 {
@@ -82,4 +84,7 @@ static const WCHAR servicesW[] = {'\\','R','e','g','i','s','t','r','y',
                                   '\\','C','u','r','r','e','n','t','C','o','n','t','r','o','l','S','e','t',
                                   '\\','S','e','r','v','i','c','e','s',
                                   '\\',0};
+
+DWORD send_device_notification( DEV_BROADCAST_DEVICEINTERFACE_W *broadcast, BOOL enable );
+
 #endif
