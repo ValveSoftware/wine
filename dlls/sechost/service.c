@@ -1,5 +1,5 @@
 /*
- * Win32 advapi functions
+ * Win32 sechost functions
  *
  * Copyright 1995 Sven Verdoolaege
  * Copyright 2005 Mike McCormack
@@ -44,11 +44,11 @@
 #include "lmserver.h"
 
 #include "svcctl.h"
-
-#include "advapi32_misc.h"
+#include "dbt.h"
 
 #include "wine/exception.h"
 #include "wine/list.h"
+#include "wine/heap.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(service);
 
@@ -112,6 +112,17 @@ static HANDLE service_event;
 static BOOL stop_service;
 
 extern HANDLE CDECL __wine_make_process_system(void);
+
+static inline WCHAR *strdupAW( const char *src )
+{
+    WCHAR *dst = NULL;
+    if (src)
+    {
+        DWORD len = MultiByteToWideChar( CP_ACP, 0, src, -1, NULL, 0 );
+        if ((dst = heap_alloc( len * sizeof(WCHAR) ))) MultiByteToWideChar( CP_ACP, 0, src, -1, dst, len );
+    }
+    return dst;
+}
 
 static inline LPWSTR SERV_dupmulti(LPCSTR str)
 {
@@ -651,7 +662,7 @@ static BOOL service_run_main_thread(void)
 }
 
 /******************************************************************************
- * StartServiceCtrlDispatcherA [ADVAPI32.@]
+ * StartServiceCtrlDispatcherA [SECHOST.@]
  *
  * See StartServiceCtrlDispatcherW.
  */
@@ -691,7 +702,7 @@ BOOL WINAPI StartServiceCtrlDispatcherA( const SERVICE_TABLE_ENTRYA *servent )
 }
 
 /******************************************************************************
- * StartServiceCtrlDispatcherW [ADVAPI32.@]
+ * StartServiceCtrlDispatcherW [SECHOST.@]
  *
  *  Connects a process containing one or more services to the service control
  * manager.
@@ -739,7 +750,7 @@ BOOL WINAPI StartServiceCtrlDispatcherW( const SERVICE_TABLE_ENTRYW *servent )
 }
 
 /******************************************************************************
- * LockServiceDatabase  [ADVAPI32.@]
+ * LockServiceDatabase  [SECHOST.@]
  */
 SC_LOCK WINAPI LockServiceDatabase (SC_HANDLE hSCManager)
 {
@@ -766,7 +777,7 @@ SC_LOCK WINAPI LockServiceDatabase (SC_HANDLE hSCManager)
 }
 
 /******************************************************************************
- * UnlockServiceDatabase  [ADVAPI32.@]
+ * UnlockServiceDatabase  [SECHOST.@]
  */
 BOOL WINAPI UnlockServiceDatabase (SC_LOCK ScLock)
 {
@@ -793,7 +804,7 @@ BOOL WINAPI UnlockServiceDatabase (SC_LOCK ScLock)
 }
 
 /******************************************************************************
- * SetServiceStatus [ADVAPI32.@]
+ * SetServiceStatus [SECHOST.@]
  *
  * PARAMS
  *   hService []
@@ -847,7 +858,7 @@ SetServiceStatus( SERVICE_STATUS_HANDLE hService, LPSERVICE_STATUS lpStatus )
 
 
 /******************************************************************************
- * OpenSCManagerA [ADVAPI32.@]
+ * OpenSCManagerA [SECHOST.@]
  *
  * Establish a connection to the service control manager and open its database.
  *
@@ -875,7 +886,7 @@ SC_HANDLE WINAPI OpenSCManagerA( LPCSTR lpMachineName, LPCSTR lpDatabaseName,
 }
 
 /******************************************************************************
- * OpenSCManagerW [ADVAPI32.@]
+ * OpenSCManagerW [SECHOST.@]
  *
  * See OpenSCManagerA.
  */
@@ -917,7 +928,7 @@ SC_HANDLE WINAPI OpenSCManagerW( LPCWSTR lpMachineName, LPCWSTR lpDatabaseName,
 }
 
 /******************************************************************************
- * ControlService [ADVAPI32.@]
+ * ControlService [SECHOST.@]
  *
  * Send a control code to a service.
  *
@@ -960,7 +971,7 @@ BOOL WINAPI ControlService( SC_HANDLE hService, DWORD dwControl,
 }
 
 /******************************************************************************
- * CloseServiceHandle [ADVAPI32.@]
+ * CloseServiceHandle [SECHOST.@]
  * 
  * Close a handle to a service or the service control manager database.
  *
@@ -998,7 +1009,7 @@ CloseServiceHandle( SC_HANDLE hSCObject )
 
 
 /******************************************************************************
- * OpenServiceA [ADVAPI32.@]
+ * OpenServiceA [SECHOST.@]
  *
  * Open a handle to a service.
  *
@@ -1027,7 +1038,7 @@ SC_HANDLE WINAPI OpenServiceA( SC_HANDLE hSCManager, LPCSTR lpServiceName,
 
 
 /******************************************************************************
- * OpenServiceW [ADVAPI32.@]
+ * OpenServiceW [SECHOST.@]
  *
  * See OpenServiceA.
  */
@@ -1071,7 +1082,7 @@ SC_HANDLE WINAPI OpenServiceW( SC_HANDLE hSCManager, LPCWSTR lpServiceName,
 }
 
 /******************************************************************************
- * CreateServiceW [ADVAPI32.@]
+ * CreateServiceW [SECHOST.@]
  */
 SC_HANDLE WINAPI
 CreateServiceW( SC_HANDLE hSCManager, LPCWSTR lpServiceName,
@@ -1135,7 +1146,7 @@ CreateServiceW( SC_HANDLE hSCManager, LPCWSTR lpServiceName,
 
 
 /******************************************************************************
- * CreateServiceA [ADVAPI32.@]
+ * CreateServiceA [SECHOST.@]
  */
 SC_HANDLE WINAPI
 CreateServiceA( SC_HANDLE hSCManager, LPCSTR lpServiceName,
@@ -1179,7 +1190,7 @@ CreateServiceA( SC_HANDLE hSCManager, LPCSTR lpServiceName,
 
 
 /******************************************************************************
- * DeleteService [ADVAPI32.@]
+ * DeleteService [SECHOST.@]
  *
  * Delete a service from the service control manager database.
  *
@@ -1216,7 +1227,7 @@ BOOL WINAPI DeleteService( SC_HANDLE hService )
 
 
 /******************************************************************************
- * StartServiceA [ADVAPI32.@]
+ * StartServiceA [SECHOST.@]
  *
  * Start a service
  *
@@ -1267,7 +1278,7 @@ BOOL WINAPI StartServiceA( SC_HANDLE hService, DWORD dwNumServiceArgs,
 
 
 /******************************************************************************
- * StartServiceW [ADVAPI32.@]
+ * StartServiceW [SECHOST.@]
  * 
  * See StartServiceA.
  */
@@ -1297,7 +1308,7 @@ BOOL WINAPI StartServiceW(SC_HANDLE hService, DWORD dwNumServiceArgs,
 }
 
 /******************************************************************************
- * QueryServiceStatus [ADVAPI32.@]
+ * QueryServiceStatus [SECHOST.@]
  *
  * PARAMS
  *   hService        [I] Handle to service to get information about
@@ -1332,7 +1343,7 @@ BOOL WINAPI QueryServiceStatus(SC_HANDLE hService,
 
 
 /******************************************************************************
- * QueryServiceStatusEx [ADVAPI32.@]
+ * QueryServiceStatusEx [SECHOST.@]
  *
  * Get information about a service.
  *
@@ -1385,7 +1396,7 @@ BOOL WINAPI QueryServiceStatusEx(SC_HANDLE hService, SC_STATUS_TYPE InfoLevel,
 }
 
 /******************************************************************************
- * QueryServiceConfigA [ADVAPI32.@]
+ * QueryServiceConfigA [SECHOST.@]
  */
 BOOL WINAPI QueryServiceConfigA( SC_HANDLE hService, LPQUERY_SERVICE_CONFIGA config,
                                  DWORD size, LPDWORD needed )
@@ -1475,7 +1486,7 @@ static DWORD size_string(LPCWSTR string)
 }
 
 /******************************************************************************
- * QueryServiceConfigW [ADVAPI32.@]
+ * QueryServiceConfigW [SECHOST.@]
  */
 BOOL WINAPI 
 QueryServiceConfigW( SC_HANDLE hService,
@@ -1549,7 +1560,7 @@ QueryServiceConfigW( SC_HANDLE hService,
 }
 
 /******************************************************************************
- * QueryServiceConfig2A [ADVAPI32.@]
+ * QueryServiceConfig2A [SECHOST.@]
  *
  * Note
  *   observed under win2k:
@@ -1605,7 +1616,7 @@ cleanup:
 }
 
 /******************************************************************************
- * QueryServiceConfig2W [ADVAPI32.@]
+ * QueryServiceConfig2W [SECHOST.@]
  *
  * See QueryServiceConfig2A.
  */
@@ -1713,7 +1724,7 @@ BOOL WINAPI QueryServiceConfig2W(SC_HANDLE hService, DWORD dwLevel, LPBYTE buffe
 }
 
 /******************************************************************************
- * EnumServicesStatusA [ADVAPI32.@]
+ * EnumServicesStatusA [SECHOST.@]
  */
 BOOL WINAPI
 EnumServicesStatusA( SC_HANDLE hmngr, DWORD type, DWORD state, LPENUM_SERVICE_STATUSA
@@ -1780,7 +1791,7 @@ done:
 }
 
 /******************************************************************************
- * EnumServicesStatusW [ADVAPI32.@]
+ * EnumServicesStatusW [SECHOST.@]
  */
 BOOL WINAPI
 EnumServicesStatusW( SC_HANDLE hmngr, DWORD type, DWORD state, LPENUM_SERVICE_STATUSW
@@ -1890,7 +1901,7 @@ EnumServicesStatusW( SC_HANDLE hmngr, DWORD type, DWORD state, LPENUM_SERVICE_ST
 }
 
 /******************************************************************************
- * EnumServicesStatusExA [ADVAPI32.@]
+ * EnumServicesStatusExA [SECHOST.@]
  */
 BOOL WINAPI
 EnumServicesStatusExA( SC_HANDLE hmngr, SC_ENUM_TYPE level, DWORD type, DWORD state,
@@ -1961,7 +1972,7 @@ done:
 }
 
 /******************************************************************************
- * EnumServicesStatusExW [ADVAPI32.@]
+ * EnumServicesStatusExW [SECHOST.@]
  */
 BOOL WINAPI
 EnumServicesStatusExW( SC_HANDLE hmngr, SC_ENUM_TYPE level, DWORD type, DWORD state,
@@ -2078,7 +2089,7 @@ EnumServicesStatusExW( SC_HANDLE hmngr, SC_ENUM_TYPE level, DWORD type, DWORD st
 }
 
 /******************************************************************************
- * GetServiceKeyNameA [ADVAPI32.@]
+ * GetServiceKeyNameA [SECHOST.@]
  */
 BOOL WINAPI GetServiceKeyNameA( SC_HANDLE hSCManager, LPCSTR lpDisplayName,
                                 LPSTR lpServiceName, LPDWORD lpcchBuffer )
@@ -2124,7 +2135,7 @@ cleanup:
 }
 
 /******************************************************************************
- * GetServiceKeyNameW [ADVAPI32.@]
+ * GetServiceKeyNameW [SECHOST.@]
  */
 BOOL WINAPI GetServiceKeyNameW( SC_HANDLE hSCManager, LPCWSTR lpDisplayName,
                                 LPWSTR lpServiceName, LPDWORD lpcchBuffer )
@@ -2177,7 +2188,7 @@ BOOL WINAPI GetServiceKeyNameW( SC_HANDLE hSCManager, LPCWSTR lpDisplayName,
 }
 
 /******************************************************************************
- * QueryServiceLockStatusA [ADVAPI32.@]
+ * QueryServiceLockStatusA [SECHOST.@]
  */
 BOOL WINAPI QueryServiceLockStatusA( SC_HANDLE hSCManager,
                                      LPQUERY_SERVICE_LOCK_STATUSA lpLockStatus,
@@ -2189,7 +2200,7 @@ BOOL WINAPI QueryServiceLockStatusA( SC_HANDLE hSCManager,
 }
 
 /******************************************************************************
- * QueryServiceLockStatusW [ADVAPI32.@]
+ * QueryServiceLockStatusW [SECHOST.@]
  */
 BOOL WINAPI QueryServiceLockStatusW( SC_HANDLE hSCManager,
                                      LPQUERY_SERVICE_LOCK_STATUSW lpLockStatus,
@@ -2201,7 +2212,7 @@ BOOL WINAPI QueryServiceLockStatusW( SC_HANDLE hSCManager,
 }
 
 /******************************************************************************
- * GetServiceDisplayNameA  [ADVAPI32.@]
+ * GetServiceDisplayNameA  [SECHOST.@]
  */
 BOOL WINAPI GetServiceDisplayNameA( SC_HANDLE hSCManager, LPCSTR lpServiceName,
   LPSTR lpDisplayName, LPDWORD lpcchBuffer)
@@ -2248,7 +2259,7 @@ cleanup:
 }
 
 /******************************************************************************
- * GetServiceDisplayNameW  [ADVAPI32.@]
+ * GetServiceDisplayNameW  [SECHOST.@]
  */
 BOOL WINAPI GetServiceDisplayNameW( SC_HANDLE hSCManager, LPCWSTR lpServiceName,
   LPWSTR lpDisplayName, LPDWORD lpcchBuffer)
@@ -2301,7 +2312,7 @@ BOOL WINAPI GetServiceDisplayNameW( SC_HANDLE hSCManager, LPCWSTR lpServiceName,
 }
 
 /******************************************************************************
- * ChangeServiceConfigW  [ADVAPI32.@]
+ * ChangeServiceConfigW  [SECHOST.@]
  */
 BOOL WINAPI ChangeServiceConfigW( SC_HANDLE hService, DWORD dwServiceType,
   DWORD dwStartType, DWORD dwErrorControl, LPCWSTR lpBinaryPathName,
@@ -2339,7 +2350,7 @@ BOOL WINAPI ChangeServiceConfigW( SC_HANDLE hService, DWORD dwServiceType,
 }
 
 /******************************************************************************
- * ChangeServiceConfigA  [ADVAPI32.@]
+ * ChangeServiceConfigA  [SECHOST.@]
  */
 BOOL WINAPI ChangeServiceConfigA( SC_HANDLE hService, DWORD dwServiceType,
   DWORD dwStartType, DWORD dwErrorControl, LPCSTR lpBinaryPathName,
@@ -2379,7 +2390,7 @@ BOOL WINAPI ChangeServiceConfigA( SC_HANDLE hService, DWORD dwServiceType,
 }
 
 /******************************************************************************
- * ChangeServiceConfig2A  [ADVAPI32.@]
+ * ChangeServiceConfig2A  [SECHOST.@]
  */
 BOOL WINAPI ChangeServiceConfig2A( SC_HANDLE hService, DWORD dwInfoLevel, 
     LPVOID lpInfo)
@@ -2426,7 +2437,7 @@ BOOL WINAPI ChangeServiceConfig2A( SC_HANDLE hService, DWORD dwInfoLevel,
 }
 
 /******************************************************************************
- * ChangeServiceConfig2W  [ADVAPI32.@]
+ * ChangeServiceConfig2W  [SECHOST.@]
  */
 BOOL WINAPI ChangeServiceConfig2W( SC_HANDLE hService, DWORD dwInfoLevel, 
     LPVOID lpInfo)
@@ -2494,7 +2505,7 @@ static NTSTATUS SERV_QueryServiceObjectSecurity(SC_HANDLE hService,
 }
 
 /******************************************************************************
- * QueryServiceObjectSecurity [ADVAPI32.@]
+ * QueryServiceObjectSecurity [SECHOST.@]
  */
 BOOL WINAPI QueryServiceObjectSecurity(SC_HANDLE hService,
        SECURITY_INFORMATION dwSecurityInformation,
@@ -2512,7 +2523,7 @@ BOOL WINAPI QueryServiceObjectSecurity(SC_HANDLE hService,
 }
 
 /******************************************************************************
- * SetServiceObjectSecurity [ADVAPI32.@]
+ * SetServiceObjectSecurity [SECHOST.@]
  *
  * NOTES
  *  - SetSecurityInfo should be updated to call this function once it's implemented.
@@ -2526,7 +2537,7 @@ BOOL WINAPI SetServiceObjectSecurity(SC_HANDLE hService,
 }
 
 /******************************************************************************
- * SetServiceBits [ADVAPI32.@]
+ * SetServiceBits [SECHOST.@]
  */
 BOOL WINAPI SetServiceBits( SERVICE_STATUS_HANDLE hServiceStatus,
         DWORD dwServiceBits,
@@ -2548,7 +2559,7 @@ static DWORD WINAPI ctrl_handler_thunk( DWORD control, DWORD type, void *data, v
 }
 
 /******************************************************************************
- * RegisterServiceCtrlHandlerA [ADVAPI32.@]
+ * RegisterServiceCtrlHandlerA [SECHOST.@]
  */
 SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerA( LPCSTR name, LPHANDLER_FUNCTION handler )
 {
@@ -2556,7 +2567,7 @@ SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerA( LPCSTR name, LPHANDLER
 }
 
 /******************************************************************************
- * RegisterServiceCtrlHandlerW [ADVAPI32.@]
+ * RegisterServiceCtrlHandlerW [SECHOST.@]
  */
 SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerW( LPCWSTR name, LPHANDLER_FUNCTION handler )
 {
@@ -2564,7 +2575,7 @@ SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerW( LPCWSTR name, LPHANDLE
 }
 
 /******************************************************************************
- * RegisterServiceCtrlHandlerExA [ADVAPI32.@]
+ * RegisterServiceCtrlHandlerExA [SECHOST.@]
  */
 SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerExA( LPCSTR name, LPHANDLER_FUNCTION_EX handler, LPVOID context )
 {
@@ -2578,7 +2589,7 @@ SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerExA( LPCSTR name, LPHANDL
 }
 
 /******************************************************************************
- * RegisterServiceCtrlHandlerExW [ADVAPI32.@]
+ * RegisterServiceCtrlHandlerExW [SECHOST.@]
  */
 SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerExW( LPCWSTR lpServiceName,
         LPHANDLER_FUNCTION_EX lpHandlerProc, LPVOID lpContext )
@@ -2602,7 +2613,7 @@ SERVICE_STATUS_HANDLE WINAPI RegisterServiceCtrlHandlerExW( LPCWSTR lpServiceNam
 }
 
 /******************************************************************************
- * EnumDependentServicesA [ADVAPI32.@]
+ * EnumDependentServicesA [SECHOST.@]
  */
 BOOL WINAPI EnumDependentServicesA( SC_HANDLE hService, DWORD dwServiceState,
                                     LPENUM_SERVICE_STATUSA lpServices, DWORD cbBufSize,
@@ -2616,7 +2627,7 @@ BOOL WINAPI EnumDependentServicesA( SC_HANDLE hService, DWORD dwServiceState,
 }
 
 /******************************************************************************
- * EnumDependentServicesW [ADVAPI32.@]
+ * EnumDependentServicesW [SECHOST.@]
  */
 BOOL WINAPI EnumDependentServicesW( SC_HANDLE hService, DWORD dwServiceState,
                                     LPENUM_SERVICE_STATUSW lpServices, DWORD cbBufSize,
@@ -2693,7 +2704,7 @@ static DWORD WINAPI notify_thread(void *user)
 }
 
 /******************************************************************************
- * NotifyServiceStatusChangeW [ADVAPI32.@]
+ * NotifyServiceStatusChangeW [SECHOST.@]
  */
 DWORD WINAPI NotifyServiceStatusChangeW(SC_HANDLE hService, DWORD dwNotifyMask,
         SERVICE_NOTIFYW *pNotifyBuffer)
