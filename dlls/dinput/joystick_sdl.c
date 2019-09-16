@@ -102,6 +102,7 @@ struct SDLDev {
     int instance_id;
     WORD vendor_id;
     WORD product_id;
+    SDL_JoystickGUID sdl_guid;
     CHAR *name;
 
     int n_buttons, n_axes, n_hats;
@@ -243,8 +244,15 @@ static void find_sdldevs(void)
         while(sdldev < &sdldevs[ARRAY_SIZE(sdldevs)] &&
                 sdldev->valid)
         {
+            SDL_JoystickGUID sdl_guid;
             if(sdldev->instance_id == SDL_JoystickGetDeviceInstanceID(i))
                 break;
+            sdl_guid = SDL_JoystickGetDeviceGUID(i);
+            if(!memcmp(&sdldev->sdl_guid, &sdl_guid, sizeof(SDL_JoystickGUID))){
+                if(!SDL_JoystickGetAttached(sdldev->sdl_js))
+                    /* same GUID but detached; reconnected, so assign to this slot */
+                    break;
+            }
             sdldev++;
         }
 
@@ -257,12 +265,26 @@ static void find_sdldevs(void)
 
         if(sdldev->valid)
         {
-            /* this joystic is already discovered */
+            if(SDL_JoystickGetAttached(sdldev->sdl_js))
+            {
+                /* this joystic is already discovered */
+                continue;
+            }
+
+            /* reconnected, update sdldev */
+            TRACE("reconnected \"%s\"\n", sdldev->name);
+            device = SDL_JoystickOpen(i);
+            sdldev->instance_id = SDL_JoystickInstanceID(device);
+            if (SDL_JoystickIsHaptic(device))
+                sdldev->sdl_haptic = SDL_HapticOpenFromJoystick(device);
+
+            InterlockedExchangePointer((void**)&sdldev->sdl_js, device);
             continue;
         }
 
         device = SDL_JoystickOpen(i);
         sdldev->instance_id = SDL_JoystickInstanceID(device);
+        sdldev->sdl_guid = SDL_JoystickGetGUID(device);
 
         name = SDL_JoystickName(device);
         sdldev->name = HeapAlloc(GetProcessHeap(), 0, strlen(name) + 1);
@@ -762,10 +784,16 @@ static HRESULT poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
     struct device_state_item item;
     SDL_Joystick *js = This->sdldev->sdl_js;
 
-    if(!SDL_JoystickGetAttached(js))
-        return DIERR_INPUTLOST;
-
     SDL_JoystickUpdate();
+
+    if(!SDL_JoystickGetAttached(js))
+    {
+        find_sdldevs();
+
+        js = This->sdldev->sdl_js;
+        if(!SDL_JoystickGetAttached(js))
+            return DIERR_INPUTLOST;
+    }
 
     while(This->enum_device_state(js, This, &item, i++))
     {
@@ -1583,6 +1611,7 @@ static HRESULT WINAPI JoystickWImpl_GetEffectInfo(LPDIRECTINPUTDEVICE8W iface,
 {
     JoystickImpl* This = impl_from_IDirectInputDevice8W(iface);
     TRACE("(this=%p,%p,%s)\n", This, pdei, _dump_dinput_GUID(guid));
+    find_sdldevs();
     return sdl_input_get_info_W(This->sdldev->sdl_js, guid, pdei);
 }
 
@@ -1592,6 +1621,7 @@ static HRESULT WINAPI JoystickAImpl_GetEffectInfo(LPDIRECTINPUTDEVICE8A iface,
 {
     JoystickImpl* This = impl_from_IDirectInputDevice8A(iface);
     TRACE("(this=%p,%p,%s)\n", This, pdei, _dump_dinput_GUID(guid));
+    find_sdldevs();
     return sdl_input_get_info_A(This->sdldev->sdl_js, guid, pdei);
 }
 
