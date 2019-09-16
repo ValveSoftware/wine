@@ -860,17 +860,13 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
                         for (spin = 0; spin < spincount + 1; ++spin)
                         {
-                            do
+                            if ((current = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST ))
+                                    && __sync_val_compare_and_swap( &semaphore->count, current, current - 1) == current)
                             {
-                                if (!(current = semaphore->count)) goto out;
-                            } while (__sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) != current);
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                return i;
+                            }
                             small_pause();
-                        }
-out:
-                        if (current)
-                        {
-                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                            return i;
                         }
 
                         futexes[i].addr = &semaphore->count;
