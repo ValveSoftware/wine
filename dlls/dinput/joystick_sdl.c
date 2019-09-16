@@ -659,7 +659,11 @@ static BOOL enum_device_state_ds4_13button(JoystickImpl *This, struct device_sta
 /* straight 1:1 mapping of SDL items and dinput items */
 static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_item *st, int idx)
 {
-    if(idx < This->sdldev->n_buttons)
+    DWORD n_buttons, n_axes, n_hats;
+
+    n_buttons = This->generic.devcaps.dwButtons ? This->generic.devcaps.dwButtons : This->sdldev->n_buttons;
+
+    if(idx < n_buttons)
     {
         st->type = ITEM_TYPE_BUTTON;
         st->id = idx;
@@ -667,9 +671,11 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
         return TRUE;
     }
 
-    idx -= This->sdldev->n_buttons;
+    idx -= n_buttons;
 
-    if(idx < This->sdldev->n_axes)
+    n_axes = This->generic.devcaps.dwAxes ? This->generic.devcaps.dwAxes : This->sdldev->n_axes;
+
+    if(idx < n_axes)
     {
         st->type = ITEM_TYPE_AXIS;
         st->id = idx;
@@ -677,9 +683,11 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
         return TRUE;
     }
 
-    idx -= This->sdldev->n_axes;
+    idx -= n_axes;
 
-    if(idx < This->sdldev->n_hats)
+    n_hats = This->generic.devcaps.dwPOVs ? This->generic.devcaps.dwPOVs : This->sdldev->n_hats;
+
+    if(idx < n_hats)
     {
         st->type = ITEM_TYPE_HAT;
         st->id = idx;
