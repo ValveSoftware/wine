@@ -94,7 +94,7 @@ struct device_state_item {
     int val;
 };
 
-typedef BOOL (*enum_device_state_function)(JoystickImpl*, struct device_state_item *, int);
+typedef BOOL (*enum_device_state_function)(SDL_Joystick *, JoystickImpl *, struct device_state_item *, int);
 
 struct SDLDev {
     BOOL valid;
@@ -106,11 +106,12 @@ struct SDLDev {
 
     int n_buttons, n_axes, n_hats;
 
-    BOOL has_ff, is_joystick;
+    BOOL is_joystick;
     int autocenter;
     int gain;
 
     SDL_Joystick *sdl_js;
+    SDL_Haptic *sdl_haptic;
 
     struct list effects;
 };
@@ -120,8 +121,6 @@ struct JoystickImpl
     struct JoystickGenericImpl generic;
     struct SDLDev              *sdldev;
 
-    SDL_Joystick *device;
-    SDL_Haptic *haptic;
     BOOL ff_paused;
 
     enum_device_state_function enum_device_state;
@@ -234,6 +233,7 @@ static void find_sdldevs(void)
     {
         struct SDLDev *sdldev = &sdldevs[0];
         SDL_Joystick *device;
+        SDL_Haptic *haptic = NULL;
         const CHAR* name;
 
         while(sdldev < &sdldevs[ARRAY_SIZE(sdldevs)] &&
@@ -274,12 +274,10 @@ static void find_sdldevs(void)
 
         if (SDL_JoystickIsHaptic(device))
         {
-            SDL_Haptic *haptic = SDL_HapticOpenFromJoystick(device);
+            haptic = SDL_HapticOpenFromJoystick(device);
             if (haptic)
             {
                 TRACE(" ... with force feedback\n");
-                sdldev->has_ff = TRUE;
-                SDL_HapticClose(haptic);
             }
         }
 
@@ -318,6 +316,7 @@ static void find_sdldevs(void)
         sdldev->n_hats = SDL_JoystickNumHats(device);
 
         sdldev->sdl_js = device;
+        sdldev->sdl_haptic = haptic;
 
         /* must be last member to be set */
         sdldev->valid = TRUE;
@@ -468,7 +467,7 @@ static HRESULT sdl_enum_deviceA(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
           (((dwDevType == DI8DEVCLASS_GAMECTRL) || (dwDevType == DI8DEVTYPE_JOYSTICK)) && (version >= 0x0800))))
         return S_FALSE;
 
-    if ((dwFlags & DIEDFL_FORCEFEEDBACK) && !sdldevs[id].has_ff)
+    if ((dwFlags & DIEDFL_FORCEFEEDBACK) && !sdldevs[id].sdl_haptic)
         return S_FALSE;
 
     if (dwFlags & DIEDFL_ATTACHEDONLY)
@@ -493,7 +492,7 @@ static HRESULT sdl_enum_deviceW(DWORD dwDevType, DWORD dwFlags, LPDIDEVICEINSTAN
           (((dwDevType == DI8DEVCLASS_GAMECTRL) || (dwDevType == DI8DEVTYPE_JOYSTICK)) && (version >= 0x0800))))
         return S_FALSE;
 
-    if ((dwFlags & DIEDFL_FORCEFEEDBACK) && !sdldevs[id].has_ff)
+    if ((dwFlags & DIEDFL_FORCEFEEDBACK) && !sdldevs[id].sdl_haptic)
         return S_FALSE;
 
     if (dwFlags & DIEDFL_ATTACHEDONLY)
@@ -532,7 +531,7 @@ static int buttons_to_sdl_hat(int u, int r, int d, int l)
 }
 
 /* playstation controllers */
-static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_state_item *st, int idx)
+static BOOL enum_device_state_ds4_16button(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
 {
 #define SPECIALCASE_HAT -1
 #define SPECIALCASE_L2_BUTTON -2
@@ -584,15 +583,15 @@ static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_sta
         switch(map_ds4_16button[idx].type)
         {
         case ITEM_TYPE_BUTTON:
-            st->val = SDL_JoystickGetButton(This->device, map_ds4_16button[idx].sdl_idx);
+            st->val = SDL_JoystickGetButton(js, map_ds4_16button[idx].sdl_idx);
             return TRUE;
 
         case ITEM_TYPE_AXIS:
-            st->val = SDL_JoystickGetAxis(This->device, map_ds4_16button[idx].sdl_idx);
+            st->val = SDL_JoystickGetAxis(js, map_ds4_16button[idx].sdl_idx);
             return TRUE;
 
         case ITEM_TYPE_HAT:
-            st->val = SDL_JoystickGetHat(This->device, map_ds4_16button[idx].sdl_idx);
+            st->val = SDL_JoystickGetHat(js, map_ds4_16button[idx].sdl_idx);
             return TRUE;
         }
     }
@@ -606,10 +605,10 @@ static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_sta
         static const int SDL_DPAD_LEFT_BUTTON = 13;
         static const int SDL_DPAD_RIGHT_BUTTON = 14;
         st->val = buttons_to_sdl_hat(
-                SDL_JoystickGetButton(This->device, SDL_DPAD_UP_BUTTON),
-                SDL_JoystickGetButton(This->device, SDL_DPAD_RIGHT_BUTTON),
-                SDL_JoystickGetButton(This->device, SDL_DPAD_DOWN_BUTTON),
-                SDL_JoystickGetButton(This->device, SDL_DPAD_LEFT_BUTTON));
+                SDL_JoystickGetButton(js, SDL_DPAD_UP_BUTTON),
+                SDL_JoystickGetButton(js, SDL_DPAD_RIGHT_BUTTON),
+                SDL_JoystickGetButton(js, SDL_DPAD_DOWN_BUTTON),
+                SDL_JoystickGetButton(js, SDL_DPAD_LEFT_BUTTON));
         return TRUE;
     }
 
@@ -618,7 +617,7 @@ static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_sta
         /* L2 button */
         /* turn button on at about 1/8 of the trigger travel */
         static const int SDL_L2_AXIS = 4;
-        st->val = SDL_JoystickGetAxis(This->device, SDL_L2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
+        st->val = SDL_JoystickGetAxis(js, SDL_L2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
         return TRUE;
     }
 
@@ -627,7 +626,7 @@ static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_sta
         /* R2 button */
         /* turn button on at about 1/8 of the trigger travel */
         static const int SDL_R2_AXIS = 5;
-        st->val = SDL_JoystickGetAxis(This->device, SDL_R2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
+        st->val = SDL_JoystickGetAxis(js, SDL_R2_AXIS) > 3 * SDL_JOYSTICK_AXIS_MIN / 4;
         return TRUE;
     }
     }
@@ -640,7 +639,7 @@ static BOOL enum_device_state_ds4_16button(JoystickImpl *This, struct device_sta
 #undef SPECIALCASE_R2_BUTTON
 }
 
-static BOOL enum_device_state_ds4_13button(JoystickImpl *This, struct device_state_item *st, int idx)
+static BOOL enum_device_state_ds4_13button(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
 {
     static const struct {
         int type;
@@ -692,15 +691,15 @@ static BOOL enum_device_state_ds4_13button(JoystickImpl *This, struct device_sta
     switch(map_ds4_13button[idx].type)
     {
     case ITEM_TYPE_BUTTON:
-        st->val = SDL_JoystickGetButton(This->device, map_ds4_13button[idx].sdl_idx);
+        st->val = SDL_JoystickGetButton(js, map_ds4_13button[idx].sdl_idx);
         return TRUE;
 
     case ITEM_TYPE_AXIS:
-        st->val = SDL_JoystickGetAxis(This->device, map_ds4_13button[idx].sdl_idx);
+        st->val = SDL_JoystickGetAxis(js, map_ds4_13button[idx].sdl_idx);
         return TRUE;
 
     case ITEM_TYPE_HAT:
-        st->val = SDL_JoystickGetHat(This->device, map_ds4_13button[idx].sdl_idx);
+        st->val = SDL_JoystickGetHat(js, map_ds4_13button[idx].sdl_idx);
         return TRUE;
     }
 
@@ -709,7 +708,7 @@ static BOOL enum_device_state_ds4_13button(JoystickImpl *This, struct device_sta
 }
 
 /* straight 1:1 mapping of SDL items and dinput items */
-static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_item *st, int idx)
+static BOOL enum_device_state_standard(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
 {
     DWORD n_buttons, n_axes, n_hats;
 
@@ -719,7 +718,7 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
     {
         st->type = ITEM_TYPE_BUTTON;
         st->id = idx;
-        st->val = SDL_JoystickGetButton(This->device, idx);
+        st->val = SDL_JoystickGetButton(js, idx);
         return TRUE;
     }
 
@@ -731,7 +730,7 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
     {
         st->type = ITEM_TYPE_AXIS;
         st->id = idx;
-        st->val = SDL_JoystickGetAxis(This->device, idx);
+        st->val = SDL_JoystickGetAxis(js, idx);
         return TRUE;
     }
 
@@ -743,7 +742,7 @@ static BOOL enum_device_state_standard(JoystickImpl *This, struct device_state_i
     {
         st->type = ITEM_TYPE_HAT;
         st->id = idx;
-        st->val = SDL_JoystickGetHat(This->device, idx);
+        st->val = SDL_JoystickGetHat(js, idx);
         return TRUE;
     }
 
@@ -757,13 +756,14 @@ static HRESULT poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
     int inst_id = 0;
     int newVal = 0;
     struct device_state_item item;
+    SDL_Joystick *js = This->sdldev->sdl_js;
 
-    if(!SDL_JoystickGetAttached(This->device))
+    if(!SDL_JoystickGetAttached(js))
         return DIERR_INPUTLOST;
 
     SDL_JoystickUpdate();
 
-    while(This->enum_device_state(This, &item, i++))
+    while(This->enum_device_state(js, This, &item, i++))
     {
         switch(item.type){
         case ITEM_TYPE_BUTTON:
@@ -878,8 +878,11 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     DIDEVICEINSTANCEW ddi;
     int i,idx = 0, axis_count = 0, button_count = 0, hat_count = 0;
     struct device_state_item item;
+    SDL_Joystick *js;
 
-    if (!SDL_JoystickGetAttached(sdldevs[index].sdl_js))
+    js = sdldevs[index].sdl_js;
+
+    if (!SDL_JoystickGetAttached(js))
         return NULL;
 
     newDevice = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(JoystickImpl));
@@ -907,11 +910,9 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->generic.base.crit.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": JoystickImpl*->base.crit");
 
     /* Open Device */
-    newDevice->device = sdldevs[index].sdl_js;
-    newDevice->haptic = SDL_HapticOpenFromJoystick(newDevice->device);
 
     i = 0;
-    while(newDevice->enum_device_state(newDevice, &item, i++)){
+    while(newDevice->enum_device_state(js, newDevice, &item, i++)){
         switch(item.type){
             case ITEM_TYPE_BUTTON:
                 ++button_count;
@@ -956,7 +957,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     if (!(df->rgodf = HeapAlloc(GetProcessHeap(), 0, df->dwNumObjs * df->dwObjSize))) goto failed;
 
     i = 0;
-    while(newDevice->enum_device_state(newDevice, &item, i++)){
+    while(newDevice->enum_device_state(js, newDevice, &item, i++)){
         switch(item.type){
             case ITEM_TYPE_BUTTON:
                 memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[item.id + 12], df->dwObjSize);
@@ -967,7 +968,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
             case ITEM_TYPE_AXIS:
                 memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[item.id], df->dwObjSize);
                 df->rgodf[idx].dwType = DIDFT_MAKEINSTANCE(item.id) | DIDFT_ABSAXIS;
-                if (newDevice->sdldev->has_ff && item.id < 2)
+                if (newDevice->sdldev->sdl_haptic && item.id < 2)
                      df->rgodf[idx].dwFlags |= DIDOI_FFACTUATOR;
 
                 newDevice->generic.props[idx].lDevMin = -32768;
@@ -987,7 +988,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
         }
     }
 
-    if (newDevice->sdldev->has_ff)
+    if (newDevice->sdldev->sdl_haptic)
         newDevice->generic.devcaps.dwFlags |= DIDC_FORCEFEEDBACK;
 
     newDevice->generic.base.data_format.wine_df = df;
@@ -1000,7 +1001,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     fill_joystick_dideviceinstanceW(&ddi, newDevice->generic.base.dinput->dwVersion, index);
     newDevice->generic.devcaps.dwDevType = ddi.dwDevType;
 
-    if (newDevice->sdldev->has_ff)
+    if (newDevice->sdldev->sdl_haptic)
         newDevice->generic.devcaps.dwFlags |= DIDC_FORCEFEEDBACK;
 
     IDirectInput_AddRef(&newDevice->generic.base.dinput->IDirectInput7A_iface);
@@ -1096,15 +1097,7 @@ const struct dinput_device joystick_sdl_device = {
 
 static ULONG WINAPI JoystickWImpl_Release(LPDIRECTINPUTDEVICE8W iface)
 {
-    JoystickImpl *This = impl_from_IDirectInputDevice8W(iface);
     TRACE("(this=%p)\n", iface);
-    if (This->generic.base.ref == 1 && This->device >= 0)
-    {
-        TRACE("Closing Joystick: %p\n",This);
-        if (This->sdldev->has_ff)
-            SDL_HapticClose(This->haptic);
-        This->device = NULL;
-    }
     return IDirectInputDevice2WImpl_Release(iface);
 }
 
@@ -1258,7 +1251,7 @@ static BOOL _SetProperty(JoystickImpl *This, const GUID *prop, const DIPROPHEADE
 
             This->sdldev->autocenter = pd->dwData == DIPROPAUTOCENTER_ON;
 
-            rc = SDL_HapticSetAutocenter(This->haptic, This->sdldev->autocenter * 100);
+            rc = SDL_HapticSetAutocenter(This->sdldev->sdl_haptic, This->sdldev->autocenter * 100);
             if (rc != 0)
                 ERR("SDL_HapticSetAutocenter failed: %s\n", SDL_GetError());
             break;
@@ -1272,7 +1265,7 @@ static BOOL _SetProperty(JoystickImpl *This, const GUID *prop, const DIPROPHEADE
 
             This->sdldev->gain = pd->dwData;
 
-            rc = SDL_HapticSetGain(This->haptic, sdl_gain);
+            rc = SDL_HapticSetGain(This->sdldev->sdl_haptic, sdl_gain);
             if (rc != 0)
                 ERR("SDL_HapticSetGain (%i -> %i) failed: %s\n", pd->dwData, sdl_gain, SDL_GetError());
             break;
@@ -1358,7 +1351,7 @@ static HRESULT WINAPI JoystickWImpl_CreateEffect(IDirectInputDevice8W *iface,
     TRACE("%p %s %p %p %p\n", iface, debugstr_guid(rguid), lpeff, ppdef, pUnkOuter);
     if (lpeff) dump_DIEFFECT(lpeff, rguid, 0);
 
-    if(!This->sdldev->has_ff){
+    if(!This->sdldev->sdl_haptic){
         TRACE("No force feedback support\n");
         *ppdef = NULL;
         return DIERR_UNSUPPORTED;
@@ -1376,7 +1369,7 @@ static HRESULT WINAPI JoystickWImpl_CreateEffect(IDirectInputDevice8W *iface,
     if (!(new_effect = HeapAlloc(GetProcessHeap(), 0, sizeof(*new_effect))))
     return DIERR_OUTOFMEMORY;
 
-    retval = sdl_create_effect(This->haptic, rguid, &new_effect->entry, &new_effect->ref);
+    retval = sdl_create_effect(This->sdldev->sdl_haptic, rguid, &new_effect->entry, &new_effect->ref);
     if (retval != DI_OK)
     {
         HeapFree(GetProcessHeap(), 0, new_effect);
@@ -1427,7 +1420,7 @@ static HRESULT WINAPI JoystickWImpl_EnumEffects(LPDIRECTINPUTDEVICE8W iface,
     TRACE("(this=%p,%p,%d) type=%d\n", This, pvRef, dwEffType, type);
 
     dei.dwSize = sizeof(DIEFFECTINFOW);
-    query = SDL_HapticQuery(This->haptic);
+    query = SDL_HapticQuery(This->sdldev->sdl_haptic);
     TRACE("Effects 0x%x\n",query);
 
     if ((type == DIEFT_ALL || type == DIEFT_CONSTANTFORCE)
@@ -1508,7 +1501,7 @@ static HRESULT WINAPI JoystickAImpl_EnumEffects(LPDIRECTINPUTDEVICE8A iface,
     TRACE("(this=%p,%p,%d) type=%d\n", This, pvRef, dwEffType, type);
 
     dei.dwSize = sizeof(DIEFFECTINFOA);
-    query = SDL_HapticQuery(This->haptic);
+    query = SDL_HapticQuery(This->sdldev->sdl_haptic);
     TRACE("Effects 0x%x\n",query);
 
     if ((type == DIEFT_ALL || type == DIEFT_CONSTANTFORCE)
@@ -1582,7 +1575,7 @@ static HRESULT WINAPI JoystickWImpl_GetEffectInfo(LPDIRECTINPUTDEVICE8W iface,
 {
     JoystickImpl* This = impl_from_IDirectInputDevice8W(iface);
     TRACE("(this=%p,%p,%s)\n", This, pdei, _dump_dinput_GUID(guid));
-    return sdl_input_get_info_W(This->device, guid, pdei);
+    return sdl_input_get_info_W(This->sdldev->sdl_js, guid, pdei);
 }
 
 static HRESULT WINAPI JoystickAImpl_GetEffectInfo(LPDIRECTINPUTDEVICE8A iface,
@@ -1591,7 +1584,7 @@ static HRESULT WINAPI JoystickAImpl_GetEffectInfo(LPDIRECTINPUTDEVICE8A iface,
 {
     JoystickImpl* This = impl_from_IDirectInputDevice8A(iface);
     TRACE("(this=%p,%p,%s)\n", This, pdei, _dump_dinput_GUID(guid));
-    return sdl_input_get_info_A(This->device, guid, pdei);
+    return sdl_input_get_info_A(This->sdldev->sdl_js, guid, pdei);
 }
 
 static HRESULT WINAPI JoystickWImpl_SendForceFeedbackCommand(LPDIRECTINPUTDEVICE8W iface, DWORD dwFlags)
@@ -1625,12 +1618,12 @@ static HRESULT WINAPI JoystickWImpl_SendForceFeedbackCommand(LPDIRECTINPUTDEVICE
     }
     case DISFFC_PAUSE:
         This->ff_paused = TRUE;
-        if (SDL_HapticPause(This->haptic) != 0)
+        if (SDL_HapticPause(This->sdldev->sdl_haptic) != 0)
             ERR("SDL_HapticPause failed: %s\n",SDL_GetError());
         break;
     case DISFFC_CONTINUE:
         This->ff_paused = FALSE;
-        if (SDL_HapticUnpause(This->haptic) != 0)
+        if (SDL_HapticUnpause(This->sdldev->sdl_haptic) != 0)
             ERR("SDL_HapticUnpause failed: %s\n",SDL_GetError());
         break;
 
