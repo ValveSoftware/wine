@@ -811,7 +811,8 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
            data->hwnd, mwm_hints.decorations, mwm_hints.functions, style, ex_style );
 
     enable_mutter_workaround = wm_is_mutter(data->display) && GetFocus() == data->hwnd &&
-                               !!data->prev_hints.decorations != !!mwm_hints.decorations;
+                               !!data->prev_hints.decorations != !!mwm_hints.decorations &&
+                               root_window == DefaultRootWindow(data->display);
 
     /* workaround for mutter gitlab bug #649, we cannot trust the
      * data->mapped flag as mapping is asynchronous.
