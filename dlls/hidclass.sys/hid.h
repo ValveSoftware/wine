@@ -46,6 +46,7 @@ typedef struct _BASE_DEVICE_EXTENSION {
     ULONG poll_interval;
     WCHAR *device_name;
     UNICODE_STRING link_name;
+    HANDLE link_handle;
     WCHAR device_id[MAX_DEVICE_ID_LEN];
     WCHAR instance_id[MAX_DEVICE_ID_LEN];
     struct ReportRingBuffer *ring_buffer;
