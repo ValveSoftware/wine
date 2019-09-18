@@ -290,10 +290,26 @@ NTSTATUS WINAPI HID_PNP_Dispatch(DEVICE_OBJECT *device, IRP *irp)
         case IRP_MN_START_DEVICE:
         {
             BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
+            OBJECT_ATTRIBUTES attr;
 
             rc = minidriver->PNPDispatch(device, irp);
 
             IoSetDeviceInterfaceState(&ext->link_name, TRUE);
+
+            attr.Length = sizeof(attr);
+            attr.RootDirectory = 0;
+            attr.Attributes = OBJ_CASE_INSENSITIVE;
+            attr.ObjectName = &ext->link_name;
+            attr.SecurityDescriptor = NULL;
+            attr.SecurityQualityOfService = NULL;
+            NtOpenSymbolicLinkObject(&ext->link_handle, SYMBOLIC_LINK_QUERY, &attr);
+            ext->link_handle = ConvertToGlobalHandle(ext->link_handle);
+
+            if (ext->link_handle == INVALID_HANDLE_VALUE)
+                ERR("Failed to open link %s, error %u.\n", debugstr_w(ext->link_name.Buffer), GetLastError());
+            else
+                TRACE("Opened link handle: %p for %s\n", ext->link_handle, debugstr_w(ext->link_name.Buffer));
+
             return rc;
         }
         case IRP_MN_REMOVE_DEVICE:
