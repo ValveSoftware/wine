@@ -386,6 +386,28 @@ static enum event_merge_action merge_raw_motion_events( XIRawEvent *prev, XIRawE
 }
 #endif
 
+static void wait_grab_pointer( Display *display )
+{
+    RECT rect;
+
+    /* release cursor grab held by any Wine process */
+    NtUserGetClipCursor( &rect );
+    NtUserClipCursor( NULL );
+
+    while (XGrabPointer( display, root_window, False, 0, GrabModeAsync, GrabModeAsync,
+                         None, None, CurrentTime ) != GrabSuccess)
+    {
+        LARGE_INTEGER timeout = {.QuadPart = -10 * (ULONGLONG)10000};
+        NtDelayExecution( FALSE, &timeout );
+    }
+
+    XUngrabPointer( display, CurrentTime );
+    XFlush( display );
+
+    /* restore the previously used clipping rect */
+    NtUserClipCursor( &rect );
+}
+
 /***********************************************************************
  *           merge_events
  *
@@ -684,6 +706,8 @@ static void set_focus( Display *display, HWND hwnd, Time time )
     HWND focus;
     Window win;
     GUITHREADINFO threadinfo;
+
+    wait_grab_pointer( display );
 
     TRACE( "setting foreground window to %p\n", hwnd );
     NtUserSetForegroundWindow( hwnd );
