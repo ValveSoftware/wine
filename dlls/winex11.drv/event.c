@@ -321,6 +321,27 @@ static Bool filter_event( Display *display, XEvent *event, char *arg )
     }
 }
 
+static void wait_grab_pointer( Display *display )
+{
+    RECT rect;
+
+    /* release cursor grab held by any Wine process */
+    NtUserGetClipCursor( &rect );
+    NtUserClipCursor( NULL );
+
+    while (XGrabPointer( display, root_window, False, 0, GrabModeAsync, GrabModeAsync,
+                         None, None, CurrentTime ) != GrabSuccess)
+    {
+        LARGE_INTEGER timeout = {.QuadPart = -10 * (ULONGLONG)10000};
+        NtDelayExecution( FALSE, &timeout );
+    }
+
+    XUngrabPointer( display, CurrentTime );
+    XFlush( display );
+
+    /* restore the previously used clipping rect */
+    NtUserClipCursor( &rect );
+}
 
 enum event_merge_action
 {
@@ -643,6 +664,8 @@ static void set_focus( Display *display, HWND focus, Time time )
     Window win;
     GUITHREADINFO threadinfo;
 
+    wait_grab_pointer( display );
+
     TRACE( "setting foreground window to %p\n", focus );
 
     if (!is_net_supported( x11drv_atom(_NET_ACTIVE_WINDOW) ))
@@ -869,7 +892,12 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         if (!hwnd) hwnd = x11drv_thread_data()->last_focus;
         if (hwnd && can_activate_window(hwnd)) set_focus( event->display, hwnd, CurrentTime );
     }
-    else NtUserSetForegroundWindowInternal( hwnd );
+    else
+    {
+        wait_grab_pointer( event->display );
+        NtUserSetForegroundWindowInternal( hwnd );
+    }
+
     return TRUE;
 }
 
