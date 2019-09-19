@@ -323,6 +323,24 @@ static enum event_merge_action merge_raw_motion_events( XIRawEvent *prev, XIRawE
 }
 #endif
 
+static int try_grab_pointer( Display *display )
+{
+    if (!grab_pointer)
+        return 1;
+
+    /* if we are already clipping the cursor in the current thread, we should not
+     * call XGrabPointer here or it would change the confine-to window. */
+    if (clipping_cursor && x11drv_thread_data()->clip_hwnd)
+        return 1;
+
+    if (XGrabPointer( display, root_window, False, 0, GrabModeAsync, GrabModeAsync,
+                      None, None, CurrentTime ) != GrabSuccess)
+        return 0;
+
+    XUngrabPointer( display, CurrentTime );
+    return 1;
+}
+
 /***********************************************************************
  *           merge_events
  *
@@ -618,8 +636,16 @@ static void set_focus( XEvent *xev, HWND hwnd, Time time )
     Window win;
     GUITHREADINFO threadinfo;
 
-    TRACE( "setting foreground window to %p\n", hwnd );
-    SetForegroundWindow( hwnd );
+    if (!try_grab_pointer( xev->xany.display ))
+    {
+        XSendEvent( xev->xany.display, xev->xany.window, False, 0, xev );
+        return;
+    }
+    else
+    {
+        TRACE( "setting foreground window to %p\n", hwnd );
+        SetForegroundWindow( hwnd );
+    }
 
     threadinfo.cbSize = sizeof(threadinfo);
     GetGUIThreadInfo(0, &threadinfo);
@@ -831,8 +857,15 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         if (!hwnd) hwnd = GetActiveWindow();
         if (!hwnd) hwnd = x11drv_thread_data()->last_focus;
         if (hwnd && can_activate_window(hwnd)) set_focus( xev, hwnd, CurrentTime );
+        return TRUE;
     }
-    else SetForegroundWindow( hwnd );
+    else if (!try_grab_pointer( event->display ))
+    {
+        XSendEvent( event->display, event->window, False, 0, xev );
+        return FALSE;
+    }
+
+    SetForegroundWindow( hwnd );
     return TRUE;
 }
 
