@@ -311,6 +311,24 @@ static enum event_merge_action merge_raw_motion_events( XIRawEvent *prev, XIRawE
 }
 #endif
 
+static int try_grab_pointer( Display *display )
+{
+    if (!grab_pointer)
+        return 1;
+
+    /* if we are already clipping the cursor in the current thread, we should not
+     * call XGrabPointer here or it would change the confine-to window. */
+    if (clipping_cursor && x11drv_thread_data()->clip_hwnd)
+        return 1;
+
+    if (XGrabPointer( display, root_window, False, 0, GrabModeAsync, GrabModeAsync,
+                      None, None, CurrentTime ) != GrabSuccess)
+        return 0;
+
+    XUngrabPointer( display, CurrentTime );
+    return 1;
+}
+
 /***********************************************************************
  *           merge_events
  *
@@ -597,11 +615,17 @@ static void set_input_focus( struct x11drv_win_data *data )
 /**********************************************************************
  *              set_focus
  */
-static void set_focus( Display *display, HWND hwnd, Time time )
+static void set_focus( XEvent *event, HWND hwnd, Time time )
 {
     HWND focus;
     Window win;
     GUITHREADINFO threadinfo;
+
+    if (!try_grab_pointer( event->xany.display ))
+    {
+        XSendEvent( event->xany.display, event->xany.window, False, 0, event );
+        return;
+    }
 
     TRACE( "setting foreground window to %p\n", hwnd );
     SetForegroundWindow( hwnd );
@@ -616,7 +640,7 @@ static void set_focus( Display *display, HWND hwnd, Time time )
     if (win)
     {
         TRACE( "setting focus to %p (%lx) time=%ld\n", focus, win, time );
-        XSetInputFocus( display, win, RevertToParent, time );
+        XSetInputFocus( event->xany.display, win, RevertToParent, time );
     }
 }
 
@@ -715,7 +739,7 @@ static void handle_wm_protocols( HWND hwnd, XEvent *xev )
                                        MAKELONG(HTCAPTION,WM_LBUTTONDOWN) );
             if (ma != MA_NOACTIVATEANDEAT && ma != MA_NOACTIVATE)
             {
-                set_focus( event->display, hwnd, event_time );
+                set_focus( xev, hwnd, event_time );
                 return;
             }
         }
@@ -724,7 +748,7 @@ static void handle_wm_protocols( HWND hwnd, XEvent *xev )
             hwnd = GetForegroundWindow();
             if (!hwnd) hwnd = last_focus;
             if (!hwnd) hwnd = GetDesktopWindow();
-            set_focus( event->display, hwnd, event_time );
+            set_focus( xev, hwnd, event_time );
             return;
         }
         /* try to find some other window to give the focus to */
@@ -732,7 +756,7 @@ static void handle_wm_protocols( HWND hwnd, XEvent *xev )
         if (hwnd) hwnd = GetAncestor( hwnd, GA_ROOT );
         if (!hwnd) hwnd = GetActiveWindow();
         if (!hwnd) hwnd = last_focus;
-        if (hwnd && can_activate_window(hwnd)) set_focus( event->display, hwnd, event_time );
+        if (hwnd && can_activate_window(hwnd)) set_focus( xev, hwnd, event_time );
     }
     else if (protocol == x11drv_atom(_NET_WM_PING))
     {
@@ -797,9 +821,17 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         if (hwnd) hwnd = GetAncestor( hwnd, GA_ROOT );
         if (!hwnd) hwnd = GetActiveWindow();
         if (!hwnd) hwnd = x11drv_thread_data()->last_focus;
-        if (hwnd && can_activate_window(hwnd)) set_focus( event->display, hwnd, CurrentTime );
+        if (hwnd && can_activate_window(hwnd)) set_focus( xev, hwnd, CurrentTime );
+        return TRUE;
     }
-    else SetForegroundWindow( hwnd );
+
+    if (!try_grab_pointer( event->display ))
+    {
+        XSendEvent( event->display, event->window, False, 0, xev );
+        return FALSE;
+    }
+
+    SetForegroundWindow( hwnd );
     return TRUE;
 }
 
