@@ -293,6 +293,13 @@ struct hardware_msg_data
             int            y;
             unsigned int   data;
         } mouse;
+        struct
+        {
+            int            type;
+            obj_handle_t   device;
+            unsigned int   length;
+
+        } hid;
     } rawinput;
 };
 
@@ -339,7 +346,19 @@ typedef union
         unsigned int   msg;
         lparam_t       lparam;
     } hw;
+    struct
+    {
+        int            type;
+        obj_handle_t   device;
+        unsigned char  usage_page;
+        unsigned char  usage;
+        unsigned int   length;
+    } hid;
 } hw_input_t;
+#define HW_INPUT_KEYBOARD INPUT_KEYBOARD
+#define HW_INPUT_MOUSE    INPUT_MOUSE
+#define HW_INPUT_HARDWARE INPUT_HARDWARE
+#define HW_INPUT_HID      -1
 
 typedef union
 {
@@ -3160,6 +3179,7 @@ struct send_hardware_message_request
     user_handle_t   win;
     hw_input_t      input;
     unsigned int    flags;
+    /* VARARG(data,bytes); */
     char __pad_52[4];
 };
 struct send_hardware_message_reply
@@ -3174,6 +3194,9 @@ struct send_hardware_message_reply
     char __pad_28[4];
 };
 #define SEND_HWMSG_INJECTED    0x01
+#define SEND_HWMSG_ONLY_RAW    0x02
+#define SEND_HWMSG_SKIP_RAW    0x04
+#define SEND_HWMSG_BCAST_RAW   0x08
 
 
 
@@ -6904,6 +6927,6 @@ union generic_reply
     struct get_fsync_apc_idx_reply get_fsync_apc_idx_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 606
+#define SERVER_PROTOCOL_VERSION 607
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */
