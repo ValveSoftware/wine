@@ -973,6 +973,24 @@ typedef enum _POWER_REQUEST_TYPE
     PowerRequestAwayModeRequired
 } POWER_REQUEST_TYPE, *PPOWER_REQUEST_TYPE;
 
+#define AC_LINE_OFFLINE         0x00
+#define AC_LINE_ONLINE          0x01
+#define AC_LINE_BACKUP_POWER    0x02
+#define AC_LINE_UNKNOWN         0xFF
+
+#define BATTERY_FLAG_HIGH           0x01
+#define BATTERY_FLAG_LOW            0x02
+#define BATTERY_FLAG_CRITICAL       0x04
+#define BATTERY_FLAG_CHARGING       0x08
+#define BATTERY_FLAG_NO_BATTERY     0x80
+#define BATTERY_FLAG_UNKNOWN        0xFF
+
+#define BATTERY_PERCENTAGE_UNKNOWN  0xFF
+
+#define SYSTEM_STATUS_FLAG_POWER_SAVING_ON  0x01
+
+#define BATTERY_LIFE_UNKNOWN 0xFFFFFFFF
+
 typedef struct _SYSTEM_INFO
 {
     union {
