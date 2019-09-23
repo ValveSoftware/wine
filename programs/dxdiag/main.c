@@ -71,7 +71,13 @@ static BOOL process_file_name(const WCHAR *cmdline, enum output_type output_type
         endptr = cmdline + lstrlenW(cmdline);
 
     len = endptr - cmdline;
-    if (len == 0 || len >= filename_len)
+    if (len == 0)
+    {
+        *filename = 0;
+        return TRUE;
+    }
+
+    if (len >= filename_len)
         return FALSE;
 
     memcpy(filename, cmdline, len * sizeof(WCHAR));
