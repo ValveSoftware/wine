@@ -169,8 +169,12 @@ static BOOL output_text_information(struct dxdiag_information *dxdiag_info, cons
 
     fill_system_text_output_table(dxdiag_info, output_table[0].fields);
 
-    hFile = CreateFileW(filename, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
-                        NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    if (filename && *filename)
+        hFile = CreateFileW(filename, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
+                            NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, NULL);
+    else
+        hFile = GetStdHandle(STD_OUTPUT_HANDLE);
+
     if (hFile == INVALID_HANDLE_VALUE)
     {
         WINE_ERR("File creation failed, last error %u\n", GetLastError());
@@ -227,7 +231,7 @@ static HRESULT save_xml_document(IXMLDOMDocument *xmldoc, const WCHAR *filename)
     VARIANT destVar;
     HRESULT hr;
 
-    if (!bstr)
+    if (!bstr || !filename || !*filename)
         return E_OUTOFMEMORY;
 
     V_VT(&destVar) = VT_BSTR;
