@@ -297,7 +297,7 @@
 # @ stub EventWriteEndScenario
 # @ stub EventWriteEx
 # @ stub EventWriteStartScenario
-@ stdcall EventWriteString(int64 long int64 ptr)
+# @ stub EventWriteString
 @ stdcall EventWriteTransfer(int64 ptr ptr ptr long ptr)
 @ stdcall FileEncryptionStatusA(str ptr)
 @ stdcall FileEncryptionStatusW(wstr ptr)
