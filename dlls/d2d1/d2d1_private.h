@@ -349,6 +349,7 @@ struct d2d_bitmap
     ID3D10ShaderResourceView *view;
     ID3D10RenderTargetView *rtv;
     IDXGISurface *surface;
+    ID3D10Resource *texture;
     D2D1_SIZE_U pixel_size;
     D2D1_PIXEL_FORMAT format;
     float dpi_x;
