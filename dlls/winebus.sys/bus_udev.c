@@ -1583,6 +1583,9 @@ void udev_driver_unload( void )
 {
     TRACE("Unload Driver\n");
 
+    if (!deviceloop_handle)
+        return;
+
     write(deviceloop_control[1], "q", 1);
     WaitForSingleObject(deviceloop_handle, INFINITE);
     close(deviceloop_control[0]);
