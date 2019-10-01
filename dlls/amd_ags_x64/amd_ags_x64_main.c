@@ -176,6 +176,17 @@ AGSReturnCode WINAPI agsDeInit(AGSContext *context)
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count)
+{
+    TRACE("context %p gpu_count %p stub!\n", context, gpu_count);
+
+    if (!context || !gpu_count)
+        return AGS_INVALID_ARGS;
+
+    *gpu_count = 1;
+    return AGS_SUCCESS;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p.\n", instance, reason, reserved);
