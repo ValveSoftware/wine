@@ -24,6 +24,6 @@
 24 stub agsDriverExtensionsDX11_SetViewBroadcastMasks
 25 stub agsDriverExtensionsDX12_DeInit
 26 stub agsDriverExtensionsDX12_Init
-27 stub agsGetCrossfireGPUCount
+27 stdcall agsGetCrossfireGPUCount(ptr ptr)
 28 stdcall agsInit(ptr ptr ptr)
 29 stub agsSetDisplayMode
