@@ -26,6 +26,7 @@
 #include "windef.h"
 #include "winbase.h"
 #include "winerror.h"
+#include "winuser.h"
 
 #include "xinput.h"
 #include "xinput_private.h"
@@ -34,6 +35,8 @@
 #define XINPUT_GAMEPAD_GUIDE 0x0400
 
 WINE_DEFAULT_DEBUG_CHANNEL(xinput);
+
+static HINSTANCE xinput_instance;
 
 /* xinput_crit guards controllers array */
 static CRITICAL_SECTION_DEBUG xinput_critsect_debug =
@@ -96,11 +99,79 @@ static void unlock_device(xinput_controller *device)
     LeaveCriticalSection(&device->crit);
 }
 
+static BOOL should_check = TRUE;
+static BOOL msg_wnd_quit;
+static HWND msg_wnd;
+static HANDLE msg_wnd_thread;
+static HINSTANCE msg_wnd_module;
+
+static LRESULT CALLBACK device_notification_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+    switch(msg)
+    {
+    case WM_DEVICECHANGE:
+        should_check = TRUE;
+        break;
+    case WM_USER:
+        DestroyWindow(msg_wnd);
+        break;
+    case WM_DESTROY:
+        msg_wnd_quit = TRUE;
+        break;
+    }
+    return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+static DWORD WINAPI msg_wnd_threadproc(void *user)
+{
+    MSG msg;
+    WNDCLASSEXW cls = {0};
+    HANDLE inst;
+    HANDLE evt = user;
+
+    static const WCHAR xinput_class[] = {'_','_','w','i','n','e','_','x','i','n','p','u','t','_','d','e','v','n','o','t','i','f','y',0};
+
+    cls.cbSize = sizeof(cls);
+    cls.hInstance = xinput_instance;
+    cls.lpszClassName = xinput_class;
+    cls.lpfnWndProc = device_notification_wndproc;
+    RegisterClassExW(&cls);
+
+    msg_wnd = CreateWindowExW(0, xinput_class, NULL, 0, 0, 0, 0, 0,
+            HWND_MESSAGE, NULL, NULL, NULL);
+
+    RegisterDeviceNotificationW(msg_wnd, NULL, 0);
+
+    msg_wnd_quit = FALSE;
+
+    SetEvent(evt);
+    evt = NULL;
+
+    while(!msg_wnd_quit && ((int)GetMessageW(&msg, msg_wnd, 0, 0)) > 0)
+    {
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    EnterCriticalSection(&xinput_crit);
+    inst = msg_wnd_module;
+    msg_wnd_module = NULL;
+    CloseHandle(msg_wnd_thread);
+    msg_wnd_thread = NULL;
+    msg_wnd = NULL;
+    LeaveCriticalSection(&xinput_crit);
+
+    FreeLibraryAndExitThread(inst, 0);
+
+    return 0;
+}
+
 BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
 {
     switch(reason)
     {
         case DLL_PROCESS_ATTACH:
+            xinput_instance = inst;
             DisableThreadLibraryCalls(inst);
             break;
         case DLL_PROCESS_DETACH:
@@ -109,6 +180,43 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
             break;
     }
     return TRUE;
+}
+
+static void find_gamepads(void)
+{
+    static ULONGLONG last_check = 0;
+    ULONGLONG now;
+
+#define DELAY_BETWEEN_CHECKS_MS 2000
+
+    now = GetTickCount64();
+    if (!should_check && (now - last_check) < DELAY_BETWEEN_CHECKS_MS)
+        return;
+
+    EnterCriticalSection(&xinput_crit);
+
+    if (!msg_wnd_thread)
+    {
+        HANDLE evt = CreateEventW(NULL, 0, 0, NULL);
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                (const WCHAR *)&msg_wnd_threadproc, &msg_wnd_module);
+        msg_wnd_thread = CreateThread(NULL, 0, &msg_wnd_threadproc, evt, 0, NULL);
+        WaitForSingleObject(evt, INFINITE);
+        CloseHandle(evt);
+    }
+
+    if (!should_check && (now - last_check) < DELAY_BETWEEN_CHECKS_MS)
+    {
+        LeaveCriticalSection(&xinput_crit);
+        return;
+    }
+
+    last_check = now;
+    should_check = FALSE;
+
+    HID_find_gamepads(controllers);
+
+    LeaveCriticalSection(&xinput_crit);
 }
 
 void WINAPI DECLSPEC_HOTPATCH XInputEnable(BOOL enable)
@@ -121,7 +229,18 @@ void WINAPI DECLSPEC_HOTPATCH XInputEnable(BOOL enable)
     to the controllers. Setting to true will send the last vibration
     value (sent to XInputSetState) to the controller and allow messages to
     be sent */
-    HID_find_gamepads(controllers);
+
+    if (enable)
+    {
+        find_gamepads();
+    }
+    else
+    {
+        EnterCriticalSection(&xinput_crit);
+        if(msg_wnd)
+            PostMessageW(msg_wnd, WM_USER, 0, 0);
+        LeaveCriticalSection(&xinput_crit);
+    }
 
     for (index = 0; index < XUSER_MAX_COUNT; index ++)
     {
@@ -137,7 +256,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputSetState(DWORD index, XINPUT_VIBRATION* vib
 
     TRACE("(index %u, vibration %p)\n", index, vibration);
 
-    HID_find_gamepads(controllers);
+    find_gamepads();
 
     if (index >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
@@ -158,7 +277,7 @@ static DWORD xinput_get_state(DWORD index, XINPUT_STATE *state)
     if (!state)
         return ERROR_BAD_ARGUMENTS;
 
-    HID_find_gamepads(controllers);
+    find_gamepads();
 
     if (index >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
@@ -222,7 +341,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputGetCapabilities(DWORD index, DWORD flags, X
 {
     TRACE("(index %u, flags 0x%x, capabilities %p)\n", index, flags, capabilities);
 
-    HID_find_gamepads(controllers);
+    find_gamepads();
 
     if (index >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;

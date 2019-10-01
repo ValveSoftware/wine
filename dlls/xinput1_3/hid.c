@@ -70,8 +70,6 @@ struct hid_platform_private {
     struct axis_info lx, ly, triggers, rx, ry;
 };
 
-static DWORD last_check = 0;
-
 static void MarkUsage(struct hid_platform_private *private, WORD usage, LONG min, LONG max, USHORT bits)
 {
     struct axis_info info = {min, max-min, bits};
@@ -217,19 +215,6 @@ void HID_find_gamepads(xinput_controller *devices)
     DWORD idx;
     int i, open_device_idx;
 
-    idx = GetTickCount();
-    if ((idx - last_check) < 2000)
-        return;
-
-    EnterCriticalSection(&xinput_crit);
-
-    if ((idx - last_check) < 2000)
-    {
-        LeaveCriticalSection(&xinput_crit);
-        return;
-    }
-    last_check = idx;
-
     HidD_GetHidGuid(&hid_guid);
     hid_guid.Data4[7]++; /* HACK: look up the xinput-specific devices */
 
@@ -296,7 +281,6 @@ void HID_find_gamepads(xinput_controller *devices)
     }
     HeapFree(GetProcessHeap(), 0, data);
     SetupDiDestroyDeviceInfoList(device_info_set);
-    LeaveCriticalSection(&xinput_crit);
 }
 
 static void remove_gamepad(xinput_controller *device)
