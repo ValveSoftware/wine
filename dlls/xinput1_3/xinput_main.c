@@ -99,18 +99,19 @@ static void unlock_device(xinput_controller *device)
     LeaveCriticalSection(&device->crit);
 }
 
-static BOOL should_check = TRUE;
 static BOOL msg_wnd_quit;
 static HWND msg_wnd;
 static HANDLE msg_wnd_thread;
 static HINSTANCE msg_wnd_module;
+
+static void find_gamepads(BOOL force);
 
 static LRESULT CALLBACK device_notification_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
     switch(msg)
     {
     case WM_DEVICECHANGE:
-        should_check = TRUE;
+        find_gamepads(TRUE);
         break;
     case WM_USER:
         DestroyWindow(msg_wnd);
@@ -182,7 +183,7 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, LPVOID reserved)
     return TRUE;
 }
 
-static void find_gamepads(void)
+static void find_gamepads(BOOL force)
 {
     static ULONGLONG last_check = 0;
     ULONGLONG now;
@@ -190,7 +191,7 @@ static void find_gamepads(void)
 #define DELAY_BETWEEN_CHECKS_MS 2000
 
     now = GetTickCount64();
-    if (!should_check && (now - last_check) < DELAY_BETWEEN_CHECKS_MS)
+    if (!force && (now - last_check) < DELAY_BETWEEN_CHECKS_MS)
         return;
 
     EnterCriticalSection(&xinput_crit);
@@ -205,14 +206,13 @@ static void find_gamepads(void)
         CloseHandle(evt);
     }
 
-    if (!should_check && (now - last_check) < DELAY_BETWEEN_CHECKS_MS)
+    if (!force && (now - last_check) < DELAY_BETWEEN_CHECKS_MS)
     {
         LeaveCriticalSection(&xinput_crit);
         return;
     }
 
     last_check = now;
-    should_check = FALSE;
 
     HID_find_gamepads(controllers);
 
@@ -232,7 +232,7 @@ void WINAPI DECLSPEC_HOTPATCH XInputEnable(BOOL enable)
 
     if (enable)
     {
-        find_gamepads();
+        find_gamepads(FALSE);
     }
     else
     {
@@ -256,7 +256,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputSetState(DWORD index, XINPUT_VIBRATION* vib
 
     TRACE("(index %u, vibration %p)\n", index, vibration);
 
-    find_gamepads();
+    find_gamepads(FALSE);
 
     if (index >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
@@ -277,7 +277,7 @@ static DWORD xinput_get_state(DWORD index, XINPUT_STATE *state)
     if (!state)
         return ERROR_BAD_ARGUMENTS;
 
-    find_gamepads();
+    find_gamepads(FALSE);
 
     if (index >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
@@ -341,7 +341,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputGetCapabilities(DWORD index, DWORD flags, X
 {
     TRACE("(index %u, flags 0x%x, capabilities %p)\n", index, flags, capabilities);
 
-    find_gamepads();
+    find_gamepads(FALSE);
 
     if (index >= XUSER_MAX_COUNT)
         return ERROR_BAD_ARGUMENTS;
