@@ -148,9 +148,6 @@ static const char * event_names[MAX_EVENT_HANDLERS] =
     "SelectionNotify", "ColormapNotify", "ClientMessage", "MappingNotify", "GenericEvent"
 };
 
-/* is someone else grabbing the keyboard, for example the WM, when manipulating the window */
-BOOL keyboard_grabbed = FALSE;
-
 int xinput2_opcode = 0;
 
 /* return the name of an X event */
@@ -820,23 +817,6 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (event->detail == NotifyPointer) return FALSE;
     if (hwnd == GetDesktopWindow()) return FALSE;
 
-    switch (event->mode)
-    {
-    case NotifyGrab:
-        /* these are received when moving undecorated managed windows on mutter */
-        keyboard_grabbed = TRUE;
-        break;
-    case NotifyWhileGrabbed:
-        keyboard_grabbed = TRUE;
-        break;
-    case NotifyNormal:
-        keyboard_grabbed = FALSE;
-        break;
-    case NotifyUngrab:
-        keyboard_grabbed = FALSE;
-        break;
-    }
-
     /* ask the foreground window to re-apply the current ClipCursor rect */
     SendMessageW( GetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, 0, 0 );
 
@@ -933,23 +913,6 @@ static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
         return TRUE;
     }
     if (!hwnd) return FALSE;
-
-    switch (event->mode)
-    {
-    case NotifyUngrab:
-        /* these are received when moving undecorated managed windows on mutter */
-        keyboard_grabbed = FALSE;
-        break;
-    case NotifyNormal:
-        keyboard_grabbed = FALSE;
-        break;
-    case NotifyWhileGrabbed:
-        keyboard_grabbed = TRUE;
-        break;
-    case NotifyGrab:
-        keyboard_grabbed = TRUE;
-        break;
-    }
 
     if (hwnd == GetForegroundWindow()) ungrab_clipping_window();
 
