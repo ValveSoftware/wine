@@ -973,6 +973,8 @@ static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
         break;
     }
 
+    if (hwnd == NtUserGetForegroundWindow()) ungrab_clipping_window();
+
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
     if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
 
