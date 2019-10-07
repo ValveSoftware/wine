@@ -778,18 +778,8 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (event->detail == NotifyPointer) return FALSE;
     if (hwnd == GetDesktopWindow()) return FALSE;
 
-    switch (event->mode)
-    {
-    case NotifyGrab:
-        /* these are received when moving undecorated managed windows on mutter */
-        return FALSE;
-    case NotifyWhileGrabbed:
-        break;
-    case NotifyNormal:
-        break;
-    case NotifyUngrab:
-        return TRUE; /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
-    }
+    /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
+    if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
 
     if ((xic = X11DRV_get_ic( hwnd ))) XSetICFocus( xic );
     if (use_take_focus)
@@ -893,18 +883,8 @@ static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
     }
     if (!hwnd) return FALSE;
 
-    switch (event->mode)
-    {
-    case NotifyUngrab:
-        /* these are received when moving undecorated managed windows on mutter */
-        return FALSE;
-    case NotifyNormal:
-        break;
-    case NotifyWhileGrabbed:
-        break;
-    case NotifyGrab:
-        return TRUE; /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
-    }
+    /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
+    if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
 
     focus_out( event->display, hwnd );
     return TRUE;
