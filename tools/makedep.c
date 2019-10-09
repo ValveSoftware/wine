@@ -2328,6 +2328,7 @@ static void output_winegcc_command( struct makefile *make )
         output_filename( "-b" );
         output_filename( crosstarget );
         output_filename( "--lib-suffix=.cross.a" );
+        output_filename( "-gsplit-dwarf" );
     }
     else
     {
