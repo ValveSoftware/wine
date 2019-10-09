@@ -3300,6 +3300,7 @@ static void output_module( struct makefile *make )
     output_filenames_obj_dir( make, make->res_files );
     output_filenames( all_libs );
     output_filename( make->is_cross ? "$(CROSSLDFLAGS)" : "$(LDFLAGS)" );
+    output_filename( make->is_cross ? "-Wl,--file-alignment,4096" : "" );
     output( "\n" );
 
     if (spec_file && make->importlib)
