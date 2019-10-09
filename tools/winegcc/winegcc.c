@@ -408,6 +408,10 @@ static strarray *get_link_args( struct options *opts, const char *output_name )
             strarray_add( flags, "-image_base" );
             strarray_add( flags, opts->image_base );
         }
+        /* On Mac, change -s into -Wl,-x. ld's -s switch
+         * is deprecated, and it doesn't work on Tiger with
+         * MH_BUNDLEs anyway
+         */
         if (opts->strip) strarray_add( flags, "-Wl,-x" );
         return flags;
 
@@ -1162,8 +1166,20 @@ static void build(struct options* opts)
 
     if (opts->nodefaultlibs && is_pe) strarray_add( link_args, "-lgcc" );
 
+    if (opts->target_platform != PLATFORM_APPLE && !is_pe && opts->strip)
+        strarray_add(link_args, "-s");
+
     spawn(opts->prefix, link_args, 0);
     strarray_free (link_args);
+
+    if (opts->target_platform != PLATFORM_APPLE && is_pe && opts->strip)
+    {
+        strarray *strip_args = strarray_fromstring(build_tool_name(opts, "strip", "strip"), " ");
+        strarray_add(strip_args, "--strip-all");
+        strarray_add(strip_args, output_path);
+        spawn(opts->prefix, strip_args, 1);
+        strarray_free(strip_args);
+    }
 
     if (is_pe && opts->wine_builtin) make_wine_builtin( output_path );
 
@@ -1555,12 +1571,8 @@ int main(int argc, char **argv)
 			opts.shared = 1;
                         raw_compiler_arg = raw_linker_arg = 0;
 		    }
-                    else if (strcmp("-s", argv[i]) == 0 && opts.target_platform == PLATFORM_APPLE)
+                    else if (strcmp("-s", argv[i]) == 0)
                     {
-                        /* On Mac, change -s into -Wl,-x. ld's -s switch
-                         * is deprecated, and it doesn't work on Tiger with
-                         * MH_BUNDLEs anyway
-                         */
                         opts.strip = 1;
                         raw_linker_arg = 0;
                     }
@@ -1593,6 +1605,11 @@ int main(int argc, char **argv)
                             if (!strcmp(Wl->base[j], "--wine-builtin"))
                             {
                                 opts.wine_builtin = 1;
+                                continue;
+                            }
+                            if (!strcmp(Wl->base[j], "--strip-all") || !strcmp(Wl->base[j], "-s"))
+                            {
+                                opts.strip = 1;
                                 continue;
                             }
                             if (!strcmp(Wl->base[j], "--subsystem") && j < Wl->size - 1)
