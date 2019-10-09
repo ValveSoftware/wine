@@ -179,15 +179,36 @@ char* strarray_tostring(const strarray* arr, const char* sep)
     return str;
 }
 
+char* get_dirname(const char* file)
+{
+    char *dir_name, *p;
+
+    dir_name = xstrdup(file);
+    if ((p = strrchr(dir_name, '/'))) *p = 0;
+    else
+    {
+        free(dir_name);
+        dir_name = xstrdup(".");
+    }
+
+    return dir_name;
+}
+
+char* get_filename(const char* file)
+{
+    const char *file_name;
+
+    if ((file_name = strrchr(file, '/'))) file_name++;
+    else file_name = file;
+
+    return xstrdup(file_name);
+}
+
 char* get_basename(const char* file)
 {
-    const char* name;
     char *base_name, *p;
 
-    if ((name = strrchr(file, '/'))) name++;
-    else name = file;
-
-    base_name = strdup(name);
+    base_name = get_filename(file);
     if ((p = strrchr(base_name, '.'))) *p = 0;
 
     return base_name;
@@ -206,6 +227,22 @@ void create_file(const char* name, int mode, const char* fmt, ...)
     va_end(ap);
     fclose(file);
     chmod(name, mode);
+}
+
+void create_dir( const char *dir )
+{
+    char *p, *path;
+
+    p = path = xstrdup( dir );
+    while ((p = strchr( p, '/' )))
+    {
+        *p = 0;
+        if (mkdir( path, 0755 ) == -1 && errno != EEXIST) error( "mkdir %s", path );
+        *p++ = '/';
+        while (*p == '/') p++;
+    }
+    if (mkdir( path, 0755 ) == -1 && errno != EEXIST) error( "mkdir %s", path );
+    free( path );
 }
 
 file_type get_file_type(const char* filename)
