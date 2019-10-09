@@ -210,6 +210,7 @@ struct options
     int unwind_tables;
     int strip;
     int strip_debug;
+    int split_dwarf;
     int pic;
     const char* wine_objdir;
     const char* winebuild;
@@ -1265,6 +1266,31 @@ static void build(struct options* opts)
     spawn(opts->prefix, link_args, 0);
     strarray_free (link_args);
 
+    if (build_platform != PLATFORM_APPLE && is_pe && opts->split_dwarf)
+    {
+        char const *bfd_format = (opts->target_cpu == CPU_x86_64) ? "-Oelf64-x86-64" : "-Oelf32-i386";
+        strarray *objcopy_args = strarray_fromstring(build_tool_name(opts, "objcopy", "objcopy"), " ");
+        char *debug_path, *file_name;
+
+        file_name = get_filename(output_path);
+        debug_path = get_dirname(output_path);
+        debug_path = realloc(debug_path, strlen(debug_path) + strlen("/.debug/") + strlen(file_name) + 1);
+
+        strcat(debug_path, "/.debug/");
+        create_dir(debug_path);
+
+        strcat(debug_path, file_name);
+        free(file_name);
+
+        strarray_add(objcopy_args, bfd_format);
+        strarray_add(objcopy_args, "--only-keep-debug");
+        strarray_add(objcopy_args, output_path);
+        strarray_add(objcopy_args, debug_path);
+        spawn(opts->prefix, objcopy_args, 1);
+        strarray_free(objcopy_args);
+        free(debug_path);
+    }
+
     if (opts->target_platform != PLATFORM_APPLE && is_pe && opts->strip)
     {
         strarray *strip_args = strarray_fromstring(build_tool_name(opts, "strip", "strip"), " ");
@@ -1563,6 +1589,13 @@ int main(int argc, char **argv)
                 case 'i':
                     if (!strcmp( "-isysroot", argv[i] )) opts.isysroot = argv[i + 1];
                     break;
+        case 'g':
+            if (strcmp("-gsplit-dwarf", argv[i]) == 0)
+            {
+                opts.split_dwarf = 1;
+                raw_compiler_arg = 0;
+            }
+            break;
 		case 'l':
 		    strarray_add(opts.files, strmake("-l%s", option_arg));
                     raw_compiler_arg = 0;
