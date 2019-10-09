@@ -208,6 +208,7 @@ struct options
     int wine_builtin;
     int unwind_tables;
     int strip;
+    int strip_debug;
     int pic;
     const char* wine_objdir;
     const char* output_name;
@@ -1168,6 +1169,8 @@ static void build(struct options* opts)
 
     if (opts->target_platform != PLATFORM_APPLE && !is_pe && opts->strip)
         strarray_add(link_args, "-s");
+    else if (!is_pe && opts->strip_debug)
+        strarray_add(link_args, "-Wl,--strip-debug");
 
     spawn(opts->prefix, link_args, 0);
     strarray_free (link_args);
@@ -1176,6 +1179,14 @@ static void build(struct options* opts)
     {
         strarray *strip_args = strarray_fromstring(build_tool_name(opts, "strip", "strip"), " ");
         strarray_add(strip_args, "--strip-all");
+        strarray_add(strip_args, output_path);
+        spawn(opts->prefix, strip_args, 1);
+        strarray_free(strip_args);
+    }
+    else if (is_pe && opts->strip_debug)
+    {
+        strarray *strip_args = strarray_fromstring(build_tool_name(opts, "strip", "strip"), " ");
+        strarray_add(strip_args, "--strip-debug");
         strarray_add(strip_args, output_path);
         spawn(opts->prefix, strip_args, 1);
         strarray_free(strip_args);
@@ -1610,6 +1621,11 @@ int main(int argc, char **argv)
                             if (!strcmp(Wl->base[j], "--strip-all") || !strcmp(Wl->base[j], "-s"))
                             {
                                 opts.strip = 1;
+                                continue;
+                            }
+                            if (!strcmp(Wl->base[j], "--strip-debug") || !strcmp(Wl->base[j], "-S"))
+                            {
+                                opts.strip_debug = 1;
                                 continue;
                             }
                             if (!strcmp(Wl->base[j], "--subsystem") && j < Wl->size - 1)
