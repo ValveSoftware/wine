@@ -540,7 +540,8 @@ enum x11drv_window_messages
     WM_X11DRV_SET_WIN_REGION,
     WM_X11DRV_RESIZE_DESKTOP,
     WM_X11DRV_SET_CURSOR,
-    WM_X11DRV_CLIP_CURSOR
+    WM_X11DRV_CLIP_CURSOR,
+    WM_X11DRV_RELEASE_CURSOR
 };
 
 /* _NET_WM_STATE properties that we keep track of */
