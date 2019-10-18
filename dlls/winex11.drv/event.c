@@ -597,8 +597,10 @@ static void set_focus( Display *display, HWND hwnd, Time time )
 /**********************************************************************
  *              handle_manager_message
  */
-static void handle_manager_message( HWND hwnd, XClientMessageEvent *event )
+static void handle_manager_message( HWND hwnd, XEvent *xev )
 {
+    XClientMessageEvent *event = &xev->xclient;
+
     if (hwnd != NtUserGetDesktopWindow()) return;
 
     if (systray_atom && event->data.l[1] == systray_atom)
@@ -612,8 +614,9 @@ static void handle_manager_message( HWND hwnd, XClientMessageEvent *event )
 /**********************************************************************
  *              handle_wm_protocols
  */
-static void handle_wm_protocols( HWND hwnd, XClientMessageEvent *event )
+static void handle_wm_protocols( HWND hwnd, XEvent *xev )
 {
+    XClientMessageEvent *event = &xev->xclient;
     Atom protocol = (Atom)event->data.l[0];
     Time event_time = (Time)event->data.l[1];
 
@@ -1581,8 +1584,10 @@ static void EVENT_DropURLs( HWND hWnd, XClientMessageEvent *event )
 /**********************************************************************
  *              handle_xembed_protocol
  */
-static void handle_xembed_protocol( HWND hwnd, XClientMessageEvent *event )
+static void handle_xembed_protocol( HWND hwnd, XEvent *xev )
 {
+    XClientMessageEvent *event = &xev->xclient;
+
     switch (event->data.l[1])
     {
     case XEMBED_EMBEDDED_NOTIFY:
@@ -1637,8 +1642,9 @@ static void handle_xembed_protocol( HWND hwnd, XClientMessageEvent *event )
 /**********************************************************************
  *              handle_dnd_protocol
  */
-static void handle_dnd_protocol( HWND hwnd, XClientMessageEvent *event )
+static void handle_dnd_protocol( HWND hwnd, XEvent *xev )
 {
+    XClientMessageEvent *event = &xev->xclient;
     Window root, child;
     int root_x, root_y, child_x, child_y;
     unsigned int u;
@@ -1660,8 +1666,9 @@ static void handle_dnd_protocol( HWND hwnd, XClientMessageEvent *event )
  *
  * Handle an XdndEnter event.
  */
-static void handle_xdnd_enter_event( HWND hWnd, XClientMessageEvent *event )
+static void handle_xdnd_enter_event( HWND hWnd, XEvent *xev )
 {
+    XClientMessageEvent *event = &xev->xclient;
     struct format_entry *data;
     unsigned long count = 0;
     Atom *xdndtypes;
@@ -1764,8 +1771,9 @@ static long drop_effect_to_xdnd_action( UINT effect )
 }
 
 
-static void handle_xdnd_position_event( HWND hwnd, XClientMessageEvent *event )
+static void handle_xdnd_position_event( HWND hwnd, XEvent *xev )
 {
+    XClientMessageEvent *event = &xev->xclient;
     struct dnd_position_event_params params;
     XClientMessageEvent e;
     UINT effect;
@@ -1797,8 +1805,9 @@ static void handle_xdnd_position_event( HWND hwnd, XClientMessageEvent *event )
 }
 
 
-static void handle_xdnd_drop_event( HWND hwnd, XClientMessageEvent *event )
+static void handle_xdnd_drop_event( HWND hwnd, XEvent *xev )
 {
+    XClientMessageEvent *event = &xev->xclient;
     XClientMessageEvent e;
     DWORD effect;
 
@@ -1818,7 +1827,7 @@ static void handle_xdnd_drop_event( HWND hwnd, XClientMessageEvent *event )
 }
 
 
-static void handle_xdnd_leave_event( HWND hwnd, XClientMessageEvent *event )
+static void handle_xdnd_leave_event( HWND hwnd, XEvent *xev )
 {
     x11drv_client_call( client_dnd_leave_event, 0 );
 }
@@ -1826,8 +1835,8 @@ static void handle_xdnd_leave_event( HWND hwnd, XClientMessageEvent *event )
 
 struct client_message_handler
 {
-    int    atom;                                  /* protocol atom */
-    void (*handler)(HWND, XClientMessageEvent *); /* corresponding handler function */
+    int    atom;                     /* protocol atom */
+    void (*handler)(HWND, XEvent *); /* corresponding handler function */
 };
 
 static const struct client_message_handler client_messages[] =
@@ -1863,7 +1872,7 @@ static BOOL X11DRV_ClientMessage( HWND hwnd, XEvent *xev )
     {
         if (event->message_type == X11DRV_Atoms[client_messages[i].atom - FIRST_XATOM])
         {
-            client_messages[i].handler( hwnd, event );
+            client_messages[i].handler( hwnd, xev );
             return TRUE;
         }
     }
