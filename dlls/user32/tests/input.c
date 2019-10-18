@@ -3289,6 +3289,219 @@ static void test_RegisterDeviceNotification(void)
     DestroyWindow(hwnd);
 }
 
+static int clip_on_deactivate = 0;
+static int clip_skip_cleanup = 0;
+static int clip_default_cleanup = 0;
+static RECT clip_rect = { 0, 0, 1, 1 };
+
+static LRESULT WINAPI clip_cursor_wndproc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
+{
+
+    if (msg != WM_ACTIVATE)
+        return DefWindowProcA( hwnd, msg, wparam, lparam );
+
+    if (wparam != WA_INACTIVE)
+    {
+        ClipCursor( &clip_rect );
+    }
+    else
+    {
+        if (clip_on_deactivate)
+            ClipCursor( &clip_rect );
+
+        if (clip_on_deactivate || clip_skip_cleanup)
+            return 0;
+
+        if (clip_default_cleanup)
+            return DefWindowProcA( hwnd, msg, wparam, lparam );
+
+        ClipCursor( NULL );
+    }
+
+    return 0;
+}
+
+static void send_alt_tab(void)
+{
+    keybd_event( VK_MENU, 0xb8, 0, 0 );
+    Sleep( 100 );
+    empty_message_queue();
+
+    keybd_event( VK_TAB, 0x8f, 0, 0 );
+    Sleep( 100 );
+    empty_message_queue();
+
+    keybd_event( VK_TAB, 0x8f, KEYEVENTF_KEYUP, 0 );
+    Sleep( 100 );
+    empty_message_queue();
+
+    keybd_event( VK_MENU, 0xb8, KEYEVENTF_KEYUP, 0 );
+    Sleep( 100 );
+    empty_message_queue();
+}
+
+static void test_ClipCursor(void)
+{
+    WNDCLASSA cls;
+    HWND hwnd, clip_hwnd;
+    RECT rect, screen_rect;
+    BOOL ret;
+
+    cls.style = 0;
+    cls.lpfnWndProc = clip_cursor_wndproc;
+    cls.cbClsExtra = 0;
+    cls.cbWndExtra = 0;
+    cls.hInstance = GetModuleHandleA( 0 );
+    cls.hIcon = 0;
+    cls.hCursor = LoadCursorW( NULL, (LPCWSTR)IDC_ARROW );
+    cls.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    cls.lpszMenuName = NULL;
+    cls.lpszClassName = "ClipCursorClass";
+    if (!RegisterClassA( &cls )) return;
+
+    ret = ClipCursor( NULL );
+    ok( ret, "ClipCursor failed.\n" );
+    ret = GetClipCursor( &screen_rect );
+    ok( ret, "GetClipCursor failed.\n" );
+
+
+    hwnd = CreateWindowA( "static", NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                              0, 0, 100, 100, NULL, NULL, NULL, NULL );
+    ok( hwnd != NULL, "CreateWindowA failed, GetLastError(): %x.\n", GetLastError() );
+    ShowWindow( hwnd, SW_SHOW );
+    empty_message_queue();
+
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &screen_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+
+
+    clip_hwnd = CreateWindowA( cls.lpszClassName, NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+                               0, 0, 100, 100, NULL, NULL, NULL, NULL );
+    ok( clip_hwnd != NULL, "CreateWindowA failed, GetLastError(): %x.\n", GetLastError() );
+    ShowWindow( clip_hwnd, SW_SHOW );
+    empty_message_queue();
+
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &clip_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+
+
+    clip_on_deactivate = 0;
+    clip_skip_cleanup = 0;
+    clip_default_cleanup = 0;
+    SetForegroundWindow( hwnd );
+    empty_message_queue();
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &screen_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+    SetForegroundWindow( clip_hwnd );
+    empty_message_queue();
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &clip_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+
+
+    clip_on_deactivate = 1;
+    clip_skip_cleanup = 0;
+    clip_default_cleanup = 0;
+    SetForegroundWindow( hwnd );
+    empty_message_queue();
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &clip_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+    SetForegroundWindow( clip_hwnd );
+    empty_message_queue();
+
+
+    send_alt_tab();
+    /* this is not working on w8*, w1064v1809_2scr and wine */
+    if( GetForegroundWindow() == hwnd )
+    {
+        ok( GetForegroundWindow() == hwnd, "Failed to change windows with simulated Alt-Tab\n" );
+        ret = GetClipCursor( &rect );
+        ok( ret, "GetClipCursor failed.\n" );
+        ok( EqualRect( &rect, &screen_rect ) ||
+            EqualRect( &rect, &clip_rect ) /* wxppro, w2003std, w2008s64 */,
+            "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+    }
+    SetForegroundWindow( clip_hwnd );
+    empty_message_queue();
+
+
+    clip_on_deactivate = 0;
+    clip_skip_cleanup = 1;
+    clip_default_cleanup = 0;
+    SetForegroundWindow( hwnd );
+    empty_message_queue();
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &clip_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+    SetForegroundWindow( clip_hwnd );
+    empty_message_queue();
+
+
+    send_alt_tab();
+    /* this is not working on w8*, w1064v1809_2scr and wine */
+    if( GetForegroundWindow() == hwnd )
+    {
+        ok( GetForegroundWindow() == hwnd, "Failed to change windows with simulated Alt-Tab\n" );
+        ret = GetClipCursor( &rect );
+        ok( ret, "GetClipCursor failed.\n" );
+        ok( EqualRect( &rect, &screen_rect ) ||
+            EqualRect( &rect, &clip_rect ) /* wxppro, w2003std, w2008s64 */,
+            "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+    }
+    SetForegroundWindow( clip_hwnd );
+    empty_message_queue();
+
+
+    clip_on_deactivate = 0;
+    clip_skip_cleanup = 0;
+    clip_default_cleanup = 1;
+    SetForegroundWindow( hwnd );
+    empty_message_queue();
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &clip_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+    SetForegroundWindow( clip_hwnd );
+    empty_message_queue();
+
+
+    send_alt_tab();
+    /* this is not working on w8*, w1064v1809_2scr and wine */
+    if( GetForegroundWindow() == hwnd )
+    {
+        ok( GetForegroundWindow() == hwnd, "Failed to change windows with simulated Alt-Tab\n" );
+        ret = GetClipCursor( &rect );
+        ok( ret, "GetClipCursor failed.\n" );
+        ok( EqualRect( &rect, &screen_rect ) ||
+            EqualRect( &rect, &clip_rect ) /* wxppro, w2003std, w2008s64 */,
+            "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+    }
+    SetForegroundWindow( clip_hwnd );
+    empty_message_queue();
+
+
+    clip_on_deactivate = 1;
+    clip_skip_cleanup = 0;
+    clip_default_cleanup = 0;
+    DestroyWindow( clip_hwnd );
+    empty_message_queue();
+    ok( GetForegroundWindow() == hwnd, "Unexpected foreground window: %p\n", GetForegroundWindow() );
+    ret = GetClipCursor( &rect );
+    ok( ret, "GetClipCursor failed.\n" );
+    ok( EqualRect( &rect, &clip_rect ), "Unexpected ClipCursor rect %s.\n", wine_dbgstr_rect( &rect ) );
+
+
+    ClipCursor( NULL );
+
+    DestroyWindow( clip_hwnd );
+    DestroyWindow( hwnd );
+
+    UnregisterClassA( cls.lpszClassName, GetModuleHandleA( 0 ) );
+}
+
 START_TEST(input)
 {
     char **argv;
@@ -3351,4 +3564,5 @@ START_TEST(input)
         win_skip("GetPointerType is not available\n");
 
     test_RegisterDeviceNotification();
+    test_ClipCursor();
 }
