@@ -1,6 +1,7 @@
 MODULE    = wined3d.dll
 IMPORTLIB = wined3d
 IMPORTS   = opengl32 user32 gdi32 advapi32
+EXTRALIBS = -lstdc++
 
 C_SRCS = \
 	adapter_gl.c \
@@ -31,5 +32,9 @@ C_SRCS = \
 	vertexdeclaration.c \
 	view.c \
 	wined3d_main.c
+
+CPP_SRCS = \
+	dxvk/config.cpp \
+	dxvk/dxvk.cpp
 
 RC_SRCS = version.rc

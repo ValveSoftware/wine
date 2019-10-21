@@ -27,6 +27,8 @@
 #include "wined3d_private.h"
 #include "winternl.h"
 
+#include "dxvk/dxvk.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(d3d);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
@@ -1213,9 +1215,16 @@ HRESULT CDECL wined3d_get_adapter_identifier(const struct wined3d *wined3d,
         UINT adapter_idx, DWORD flags, struct wined3d_adapter_identifier *identifier)
 {
     const struct wined3d_adapter *adapter;
+    struct DXVKOptions dxvk_opts;
 
     TRACE("wined3d %p, adapter_idx %u, flags %#x, identifier %p.\n",
             wined3d, adapter_idx, flags, identifier);
+
+    dxvk_get_options(&dxvk_opts);
+    TRACE("got dxvk options:\n");
+    TRACE("\tnvapiHack: %u\n", dxvk_opts.nvapiHack);
+    TRACE("\tcustomVendorId: 0x%04x\n", dxvk_opts.customVendorId);
+    TRACE("\tcustomDeviceId: 0x%04x\n", dxvk_opts.customDeviceId);
 
     wined3d_mutex_lock();
 
@@ -1242,6 +1251,21 @@ HRESULT CDECL wined3d_get_adapter_identifier(const struct wined3d *wined3d,
     identifier->driver_version.u.LowPart = adapter->driver_info.version_low;
     identifier->vendor_id = adapter->driver_info.vendor;
     identifier->device_id = adapter->driver_info.device;
+
+    /* logic from dxvk/src/dxgi/dxgi_adapter.cpp:DxgiAdapter::GetDesc2 */
+    if (dxvk_opts.customVendorId >= 0)
+        identifier->vendor_id = dxvk_opts.customVendorId;
+
+    if (dxvk_opts.customDeviceId >= 0)
+        identifier->device_id = dxvk_opts.customDeviceId;
+
+    if (dxvk_opts.customVendorId < 0 && dxvk_opts.customDeviceId < 0 &&
+            dxvk_opts.nvapiHack && adapter->driver_info.vendor == HW_VENDOR_NVIDIA) {
+        TRACE("NvAPI workaround enabled, reporting AMD GPU\n");
+        identifier->vendor_id = HW_VENDOR_AMD;
+        identifier->device_id = CARD_AMD_RADEON_RX_480;
+    }
+
     identifier->subsystem_id = 0;
     identifier->revision = 0;
     identifier->device_identifier = IID_D3DDEVICE_D3DUID;
