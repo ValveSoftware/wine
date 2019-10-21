@@ -2063,6 +2063,7 @@ AC_CACHE_CHECK([for the need to disable Fortify], ac_cv_c_fortify_enabled,
 if test "$ac_cv_c_fortify_enabled" = yes
 then
     CFLAGS="$CFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0"
+    CXXFLAGS="$CXXFLAGS -U_FORTIFY_SOURCE -D_FORTIFY_SOURCE=0"
 fi
 
 dnl **** Check for CFI directives support ****

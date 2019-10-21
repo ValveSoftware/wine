@@ -38,6 +38,7 @@ CXX             = @CXX@
 CPPBIN          = @CPPBIN@
 CROSSCC         = @CROSSCC@
 CFLAGS          = @CFLAGS@
+CXXFLAGS        = @CXXFLAGS@
 CPPFLAGS        = @CPPFLAGS@
 CROSSCFLAGS     = @CROSSCFLAGS@
 EXTRACFLAGS     = @EXTRACFLAGS@

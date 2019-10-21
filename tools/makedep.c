@@ -3045,7 +3045,14 @@ static void output_source_default( struct makefile *make, struct incl_file *sour
         else
             strarray_add( &make->clean_files, strmake( "%s.o", obj ));
         output( "%s.o: %s\n", obj_dir_path( make, obj ), source->filename );
-        output( "\t$(CC) -c -o $@ %s", source->filename );
+        if (strendswith( source->name, ".cpp" ) || strendswith( source->name, ".cc" ))
+        {
+            output( "\t$(CXX) -c -o $@ %s", source->filename );
+        }
+        else
+        {
+            output( "\t$(CC) -c -o $@ %s", source->filename );
+        }
         output_filenames( defines );
         if (make->module || make->staticlib || make->sharedlib || make->testdll)
         {
@@ -3054,7 +3061,14 @@ static void output_source_default( struct makefile *make, struct incl_file *sour
         }
         output_filenames( extra_cflags );
         output_filenames( cpp_flags );
-        output_filename( "$(CFLAGS)" );
+        if (strendswith( source->name, ".cpp" ) || strendswith( source->name, ".cc" ))
+        {
+            output_filename( "$(CXXFLAGS)" );
+        }
+        else
+        {
+            output_filename( "$(CFLAGS)" );
+        }
         output( "\n" );
     }
     if (need_cross)
@@ -4143,6 +4157,7 @@ static void load_sources( struct makefile *make )
     {
         "SOURCES",
         "C_SRCS",
+        "CPP_SRCS",
         "OBJC_SRCS",
         "RC_SRCS",
         "MC_SRCS",

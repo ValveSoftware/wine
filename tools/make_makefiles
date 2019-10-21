@@ -58,6 +58,7 @@ my %ignored_source_files = (
 my @source_vars = (
     "BISON_SRCS",
     "C_SRCS",
+    "CPP_SRCS",
     "FONT_SRCS",
     "HEADER_SRCS",
     "IDL_SRCS",
@@ -356,6 +357,10 @@ sub assign_sources_to_makefiles(@)
         {
             push @{${$make}{"=C_SRCS"}}, $name;
         }
+        elsif ($name =~ /\.cpp$/)
+        {
+            push @{${$make}{"=CPP_SRCS"}}, $name;
+        }
         elsif ($name =~ /\.h$/ || $name =~ /\.rh$/ || $name =~ /\.inl$/ || $name =~ /\.x$/)
         {
             next if $dir ne "include";
@@ -403,6 +408,7 @@ sub assign_sources_to_makefiles(@)
         my $parent = get_parent_makefile( $file );
         next unless $parent;
         preserve_shared_source_files( $makefiles{$file}, $makefiles{$parent}, "C_SRCS" );
+        preserve_shared_source_files( $makefiles{$file}, $makefiles{$parent}, "CPP_SRCS" );
         preserve_shared_source_files( $makefiles{$file}, $makefiles{$parent}, "RC_SRCS" );
         preserve_shared_source_files( $makefiles{$file}, $makefiles{$parent}, "IDL_SRCS" );
         preserve_shared_source_files( $makefiles{$file}, $makefiles{$parent}, "LEX_SRCS" );
