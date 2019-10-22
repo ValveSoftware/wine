@@ -84,6 +84,17 @@ struct wait_work_item
     int CallbackInProgress;
 };
 
+static RTL_CRITICAL_SECTION_DEBUG wait_thread_executeinwaitthread_cs_debug;
+
+static RTL_CRITICAL_SECTION wait_thread_executeinwaitthread_cs = {&wait_thread_executeinwaitthread_cs_debug, -1, 0, 0, 0, 0};
+
+static RTL_CRITICAL_SECTION_DEBUG wait_thread_executeinwaitthread_cs_debug =
+{
+    0, 0, &wait_thread_executeinwaitthread_cs,
+    { &wait_thread_executeinwaitthread_cs_debug.ProcessLocksList, &wait_thread_executeinwaitthread_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": wait_thread_executeinwaitthread_cs") }
+};
+
 struct timer_queue;
 struct queue_timer
 {
@@ -527,7 +538,20 @@ static DWORD CALLBACK wait_thread_proc(LPVOID Arg)
                 TRACE( "Work has been canceled.\n" );
                 break;
             }
+
+            /* HACK: On Windows, waits created with WT_EXECUTEINWAITTHREAD often end up on the same wait thread
+             * and run serialized. Running these waits simultaneously on separate threads may expose race conditions
+             * not seen on Windows.
+             * Use a critical section to ensure these callbacks run serially.
+             */
+            if (wait_work_item->Flags & WT_EXECUTEINWAITTHREAD)
+                enter_critical_section(&wait_thread_executeinwaitthread_cs);
+
             wait_work_item->Callback( wait_work_item->Context, TimerOrWaitFired );
+
+            if (wait_work_item->Flags & WT_EXECUTEINWAITTHREAD)
+                leave_critical_section(&wait_thread_executeinwaitthread_cs);
+
             interlocked_xchg( &wait_work_item->CallbackInProgress, FALSE );
 
             if (wait_work_item->Flags & WT_EXECUTEONLYONCE)
