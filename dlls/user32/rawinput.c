@@ -42,7 +42,6 @@ struct hid_device
 {
     WCHAR *path;
     HANDLE file;
-    HANDLE handle;
     RID_DEVICE_INFO_HID info;
     PHIDP_PREPARSED_DATA data;
 };
@@ -58,40 +57,6 @@ static CRITICAL_SECTION_DEBUG hid_devices_cs_debug =
       0, 0, { (DWORD_PTR)(__FILE__ ": hid_devices_cs") }
 };
 static CRITICAL_SECTION hid_devices_cs = { &hid_devices_cs_debug, -1, 0, 0, 0, 0 };
-
-extern DWORD WINAPI GetFinalPathNameByHandleW(HANDLE file, LPWSTR path, DWORD charcount, DWORD flags);
-
-HANDLE rawinput_handle_from_device_handle(HANDLE device)
-{
-    WCHAR buffer[sizeof(OBJECT_NAME_INFORMATION) + MAX_PATH + 1];
-    OBJECT_NAME_INFORMATION *info = (OBJECT_NAME_INFORMATION*)&buffer;
-    ULONG dummy;
-    unsigned int i;
-
-    for (i = 0; i < hid_devices_count; ++i)
-    {
-        if (hid_devices[i].handle == device)
-            return &hid_devices[i];
-    }
-
-    if (NtQueryObject( device, ObjectNameInformation, &buffer, sizeof(buffer) - sizeof(WCHAR), &dummy ) || !info->Name.Buffer)
-        return NULL;
-
-    /* replace \??\ with \\?\ to match hid_devices paths */
-    if (info->Name.Length > 1 && info->Name.Buffer[0] == '\\' && info->Name.Buffer[1] == '?')
-        info->Name.Buffer[1] = '\\';
-
-    for (i = 0; i < hid_devices_count; ++i)
-    {
-        if (strcmpW(hid_devices[i].path, info->Name.Buffer) == 0)
-        {
-            hid_devices[i].handle = device;
-            return &hid_devices[i];
-        }
-    }
-
-    return NULL;
-}
 
 static void find_hid_devices(void)
 {
@@ -186,7 +151,6 @@ static void find_hid_devices(void)
 
         hid_devices[didx].path = path;
         hid_devices[didx].file = file;
-        hid_devices[didx].handle = INVALID_HANDLE_VALUE;
 
         attr.Size = sizeof(HIDD_ATTRIBUTES);
         if (!HidD_GetAttributes(file, &attr))
@@ -419,7 +383,6 @@ UINT WINAPI GetRawInputDeviceInfoW(HANDLE device, UINT command, void *data, UINT
             device, command, data, data_size);
 
     if (!data_size) return ~0U;
-    if (!device) return ~0U;
 
     switch (command)
     {
