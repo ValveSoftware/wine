@@ -103,6 +103,7 @@ static const WCHAR Linked[] = {'L','i','n','k','e','d',0};
 static const WCHAR dotInterfaces[] = {'.','I','n','t','e','r','f','a','c','e','s',0};
 static const WCHAR AddInterface[] = {'A','d','d','I','n','t','e','r','f','a','c','e',0};
 static const WCHAR backslashW[] = {'\\',0};
+static const WCHAR hashW[] = {'#',0};
 static const WCHAR emptyW[] = {0};
 
 #define SERVICE_CONTROL_REENUMERATE_ROOT_DEVICES 128
@@ -318,7 +319,6 @@ static WCHAR *get_iface_key_path(struct device_iface *iface)
 
 static WCHAR *get_refstr_key_path(struct device_iface *iface)
 {
-    static const WCHAR hashW[] = {'#',0};
     static const WCHAR slashW[] = {'\\',0};
     WCHAR *path, *ptr;
     size_t len = lstrlenW(DeviceClasses) + 1 + 38 + 1 + lstrlenW(iface->symlink) + 1 + 1;
@@ -2423,6 +2423,80 @@ static void SETUPDI_EnumerateInterfaces(HDEVINFO DeviceInfoSet,
     }
 }
 
+
+/* iterate over all interfaces supported by this device instance. if any of
+ * them are "linked", return TRUE */
+static BOOL is_device_instance_linked(HKEY interfacesKey, const WCHAR *deviceInstance)
+{
+    LONG l;
+    DWORD class_idx = 0, device_idx, len, type;
+    HKEY class_key, device_key, link_key;
+    WCHAR class_keyname[40], device_keyname[MAX_DEVICE_ID_LEN];
+    WCHAR interface_devinstance[MAX_DEVICE_ID_LEN];
+
+    while (1)
+    {
+        len = ARRAY_SIZE(class_keyname);
+        l = RegEnumKeyExW(interfacesKey, class_idx++, class_keyname, &len, NULL, NULL, NULL, NULL);
+        if (l)
+            break;
+
+        l = RegOpenKeyExW(interfacesKey, class_keyname, 0, KEY_READ, &class_key);
+        if (l)
+            continue;
+
+        device_idx = 0;
+        while (1)
+        {
+            len = ARRAY_SIZE(device_keyname);
+            l = RegEnumKeyExW(class_key, device_idx++, device_keyname, &len, NULL, NULL, NULL, NULL);
+            if (l)
+                break;
+
+            l = RegOpenKeyExW(class_key, device_keyname, 0, KEY_READ, &device_key);
+            if (l)
+                continue;
+
+            len = ARRAY_SIZE(interface_devinstance);
+            l = RegQueryValueExW(device_key, DeviceInstance, NULL, &type, (BYTE *)interface_devinstance, &len);
+            if (l || type != REG_SZ)
+            {
+                RegCloseKey(device_key);
+                continue;
+            }
+
+            if (lstrcmpiW(interface_devinstance, deviceInstance))
+            {
+                /* not our device instance */
+                RegCloseKey(device_key);
+                continue;
+            }
+
+            l = RegOpenKeyExW(device_key, hashW, 0, KEY_READ, &link_key);
+            if (l)
+            {
+                RegCloseKey(device_key);
+                continue;
+            }
+
+            if (is_linked(link_key))
+            {
+                RegCloseKey(link_key);
+                RegCloseKey(device_key);
+                RegCloseKey(class_key);
+                return TRUE;
+            }
+
+            RegCloseKey(link_key);
+            RegCloseKey(device_key);
+        }
+
+        RegCloseKey(class_key);
+    }
+
+    return FALSE;
+}
+
 static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
         LPCWSTR enumerator, LPCWSTR deviceName, HKEY deviceKey,
         const GUID *class, DWORD flags)
@@ -2431,6 +2505,7 @@ static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
     DWORD i, len;
     WCHAR deviceInstance[MAX_PATH];
     LONG l = ERROR_SUCCESS;
+    HKEY interfacesKey = SetupDiOpenClassRegKeyExW(NULL, KEY_READ, DIOCR_INTERFACE, NULL, NULL);
 
     TRACE("%s %s\n", debugstr_w(enumerator), debugstr_w(deviceName));
 
@@ -2467,7 +2542,9 @@ static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
                              {'%','s','\\','%','s','\\','%','s',0};
 
                             if (swprintf(id, ARRAY_SIZE(id), fmt, enumerator,
-                                    deviceName, deviceInstance) != -1)
+                                        deviceName, deviceInstance) != -1 &&
+                                    (!(flags & DIGCF_PRESENT) ||
+                                     is_device_instance_linked(interfacesKey, id)))
                             {
                                 create_device(set, &deviceClass, id, FALSE);
                             }
@@ -2480,6 +2557,8 @@ static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
             l = ERROR_SUCCESS;
         }
     }
+
+    RegCloseKey(interfacesKey);
 }
 
 static void SETUPDI_EnumerateMatchingDevices(HDEVINFO DeviceInfoSet,
