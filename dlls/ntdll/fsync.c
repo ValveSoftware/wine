@@ -858,10 +858,14 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         struct semaphore *semaphore = obj->shm;
                         int current;
 
-                        for (spin = 0; spin < spincount + 1; ++spin)
+                        /* It would be a little clearer (and less error-prone)
+                         * to use a dedicated interlocked_dec_if_nonzero()
+                         * helper, but nesting loops like that is probably not
+                         * great for performance... */
+                        for (spin = 0; spin < spincount + 1 || current; ++spin)
                         {
                             if ((current = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST ))
-                                    && __sync_val_compare_and_swap( &semaphore->count, current, current - 1) == current)
+                                    && __sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) == current)
                             {
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                                 return i;
@@ -870,7 +874,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         }
 
                         futexes[i].addr = &semaphore->count;
-                        futexes[i].val = current;
+                        futexes[i].val = 0;
                         break;
                     }
                     case FSYNC_MUTEX:
