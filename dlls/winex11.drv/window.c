@@ -1078,7 +1078,11 @@ void update_net_wm_states( struct x11drv_win_data *data )
 
     ex_style = GetWindowLongW( data->hwnd, GWL_EXSTYLE );
     if ((ex_style & WS_EX_TOPMOST) &&
-            !(new_state & (1 << NET_WM_STATE_FULLSCREEN)))
+            /* mutter < 3.31 has a bug where a FULLSCREEN and ABOVE window when
+             * minimized will incorrectly show a black window.  this workaround
+             * should be removed when the fix is widely distributed.  see
+             * mutter issue #306. */
+            !(wm_is_mutter(data->display) && (new_state & (1 << NET_WM_STATE_FULLSCREEN))))
         new_state |= (1 << NET_WM_STATE_ABOVE);
     if (ex_style & (WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE))
         new_state |= (1 << NET_WM_STATE_SKIP_TASKBAR) | (1 << NET_WM_STATE_SKIP_PAGER);
