@@ -1715,8 +1715,8 @@ done:
 static int queue_mouse_message( struct desktop *desktop, user_handle_t win, const hw_input_t *input,
                                 unsigned int origin, struct msg_queue *sender, unsigned int req_flags )
 {
+    const struct rawinput_device *device;
     struct hardware_msg_data *msg_data;
-    struct rawinput_message raw_msg;
     struct message *msg;
     unsigned int i, time, flags;
     struct hw_msg_source source = { IMDT_MOUSE, origin };
@@ -1766,26 +1766,24 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         y = desktop->cursor.y;
     }
 
-    if (!(req_flags & SEND_HWMSG_SKIP_RAW))
+    if ((device = current->process->rawinput_mouse) &&
+        !(req_flags & SEND_HWMSG_SKIP_RAW))
     {
-        raw_msg.desktop   = desktop;
-        raw_msg.source    = source;
-        raw_msg.time      = time;
-        raw_msg.extra     = NULL;
-        raw_msg.extra_len = 0;
+        if (!(msg = alloc_hardware_message( input->mouse.info, source, time, 0 ))) return 0;
+        msg_data = msg->data;
 
-        msg_data = &raw_msg.data;
-        msg_data->info                = input->mouse.info;
+        msg->win       = device->target;
+        msg->msg       = WM_INPUT;
+        msg->wparam    = RIM_INPUT;
+        msg->lparam    = 0;
+
         msg_data->flags               = flags;
         msg_data->rawinput.type       = RIM_TYPEMOUSE;
         msg_data->rawinput.mouse.x    = x - desktop->cursor.x;
         msg_data->rawinput.mouse.y    = y - desktop->cursor.y;
         msg_data->rawinput.mouse.data = input->mouse.data;
 
-        if (req_flags & SEND_HWMSG_BCAST_RAW)
-            enum_processes( queue_rawinput_message, &raw_msg );
-        else
-            queue_rawinput_message( current->process, &raw_msg );
+        queue_hardware_message( desktop, msg, 0 );
     }
 
     if (req_flags & SEND_HWMSG_ONLY_RAW)
@@ -1825,8 +1823,8 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
                                    unsigned int origin, struct msg_queue *sender, unsigned int req_flags )
 {
     struct hw_msg_source source = { IMDT_KEYBOARD, origin };
+    const struct rawinput_device *device;
     struct hardware_msg_data *msg_data;
-    struct rawinput_message raw_msg;
     struct message *msg;
     unsigned char vkey = input->kbd.vkey;
     unsigned int message_code, time;
@@ -1898,26 +1896,23 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         break;
     }
 
-    if (!(req_flags & SEND_HWMSG_SKIP_RAW))
+    if ((device = current->process->rawinput_kbd) &&
+        !(req_flags & SEND_HWMSG_SKIP_RAW))
     {
-        raw_msg.desktop   = desktop;
-        raw_msg.source    = source;
-        raw_msg.time      = time;
-        raw_msg.extra     = NULL;
-        raw_msg.extra_len = 0;
+        if (!(msg = alloc_hardware_message( input->kbd.info, source, time, 0 ))) return 0;
+        msg_data = msg->data;
 
-        msg_data = &raw_msg.data;
-        msg_data->info                 = input->kbd.info;
+        msg->win       = device->target;
+        msg->msg       = WM_INPUT;
+        msg->wparam    = RIM_INPUT;
+
         msg_data->flags                = input->kbd.flags;
         msg_data->rawinput.type        = RIM_TYPEKEYBOARD;
         msg_data->rawinput.kbd.message = message_code;
         msg_data->rawinput.kbd.vkey    = vkey;
         msg_data->rawinput.kbd.scan    = input->kbd.scan;
 
-        if (req_flags & SEND_HWMSG_BCAST_RAW)
-            enum_processes( queue_rawinput_message, &raw_msg );
-        else
-            queue_rawinput_message( current->process, &raw_msg );
+        queue_hardware_message( desktop, msg, 0 );
     }
 
     if (req_flags & SEND_HWMSG_ONLY_RAW)
