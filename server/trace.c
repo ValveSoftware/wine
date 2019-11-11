@@ -375,23 +375,27 @@ static void dump_hw_input( const char *prefix, const hw_input_t *input )
 {
     switch (input->type)
     {
-    case INPUT_MOUSE:
+    case HW_INPUT_MOUSE:
         fprintf( stderr, "%s{type=MOUSE,x=%d,y=%d,data=%08x,flags=%08x,time=%u",
                  prefix, input->mouse.x, input->mouse.y, input->mouse.data, input->mouse.flags,
                  input->mouse.time );
         dump_uint64( ",info=", &input->mouse.info );
         fputc( '}', stderr );
         break;
-    case INPUT_KEYBOARD:
+    case HW_INPUT_KEYBOARD:
         fprintf( stderr, "%s{type=KEYBOARD,vkey=%04hx,scan=%04hx,flags=%08x,time=%u",
                  prefix, input->kbd.vkey, input->kbd.scan, input->kbd.flags, input->kbd.time );
         dump_uint64( ",info=", &input->kbd.info );
         fputc( '}', stderr );
         break;
-    case INPUT_HARDWARE:
+    case HW_INPUT_HARDWARE:
         fprintf( stderr, "%s{type=HARDWARE,msg=%04x", prefix, input->hw.msg );
         dump_uint64( ",lparam=", &input->hw.lparam );
         fputc( '}', stderr );
+        break;
+    case HW_INPUT_HID:
+        fprintf( stderr, "%s{type=HID,device=%04x,usage_page=%02x,usage=%02x,length=%04x}",
+                 prefix, input->hid.device, input->hid.usage_page, input->hid.usage, input->hid.length );
         break;
     default:
         fprintf( stderr, "%s{type=%04x}", prefix, input->type );
@@ -2836,6 +2840,7 @@ static void dump_send_hardware_message_request( const struct send_hardware_messa
     fprintf( stderr, " win=%08x", req->win );
     dump_hw_input( ", input=", &req->input );
     fprintf( stderr, ", flags=%08x", req->flags );
+    dump_varargs_bytes( ", data=", cur_size );
 }
 
 static void dump_send_hardware_message_reply( const struct send_hardware_message_reply *req )

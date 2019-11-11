@@ -1608,7 +1608,7 @@ static int send_hook_ll_message( struct desktop *desktop, struct message *hardwa
     struct msg_queue *queue;
     struct message *msg;
     timeout_t timeout = 2000 * -10000;  /* FIXME: load from registry */
-    int id = (input->type == INPUT_MOUSE) ? WH_MOUSE_LL : WH_KEYBOARD_LL;
+    int id = (input->type == HW_INPUT_MOUSE) ? WH_MOUSE_LL : WH_KEYBOARD_LL;
 
     if (!(hook_thread = get_first_global_hook( id ))) return 0;
     if (!(queue = hook_thread->queue)) return 0;
@@ -1626,7 +1626,7 @@ static int send_hook_ll_message( struct desktop *desktop, struct message *hardwa
     msg->data_size = hardware_msg->data_size;
     msg->result    = NULL;
 
-    if (input->type == INPUT_KEYBOARD)
+    if (input->type == HW_INPUT_KEYBOARD)
     {
         unsigned short vkey = input->kbd.vkey;
         if (input->kbd.flags & KEYEVENTF_UNICODE) vkey = VK_PACKET;
@@ -1652,6 +1652,8 @@ struct rawinput_message
     struct desktop           *desktop;
     struct hw_msg_source      source;
     unsigned int              time;
+    unsigned char             usage_page;
+    unsigned char             usage;
     struct hardware_msg_data  data;
     const void               *extra;
     data_size_t               extra_len;
@@ -1660,6 +1662,7 @@ struct rawinput_message
 static int queue_rawinput_message( struct process* process, void* user )
 {
     const struct rawinput_message* raw_msg = user;
+    const struct rawinput_device_entry *entry;
     const struct rawinput_device *device = NULL;
     struct desktop *desktop = NULL;
     struct thread *thread = NULL, *foreground = NULL;
@@ -1670,6 +1673,8 @@ static int queue_rawinput_message( struct process* process, void* user )
         device = process->rawinput_mouse;
     else if (raw_msg->data.rawinput.type == RIM_TYPEKEYBOARD)
         device = process->rawinput_kbd;
+    else if ((entry = find_rawinput_device( process, raw_msg->usage_page, raw_msg->usage )))
+        device = &entry->device;
 
     if (!device)
         goto done;
@@ -1969,6 +1974,38 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
     msg->y         = desktop->cursor.y;
 
     queue_hardware_message( desktop, msg, 1 );
+}
+
+/* queue a hardware message for an hid event */
+static void queue_hid_message( struct desktop *desktop, user_handle_t win, const hw_input_t *input,
+                               unsigned int origin, struct msg_queue *sender, unsigned int req_flags,
+                               const void *report, data_size_t report_len )
+{
+    struct hw_msg_source source = { IMDT_UNAVAILABLE, origin };
+    struct hardware_msg_data *msg_data;
+    struct rawinput_message raw_msg;
+
+    if (!(req_flags & SEND_HWMSG_RAWINPUT))
+        return;
+
+    raw_msg.desktop    = NULL; /* send to all desktops */
+    raw_msg.source     = source;
+    raw_msg.time       = get_tick_count();
+    raw_msg.usage_page = input->hid.usage_page;
+    raw_msg.usage      = input->hid.usage;
+    raw_msg.extra      = report;
+    raw_msg.extra_len  = report_len;
+
+    msg_data = &raw_msg.data;
+    msg_data->flags               = 0;
+    msg_data->rawinput.type       = RIM_TYPEHID;
+    msg_data->rawinput.hid.device = input->hid.device;
+    msg_data->rawinput.hid.length = report_len;
+
+    if (req_flags == SEND_HWMSG_RAWINPUT)
+        enum_processes( queue_rawinput_message, &raw_msg );
+    else
+        queue_rawinput_message( current->process, &raw_msg );
 }
 
 /* check message filter for a hardware message */
@@ -2482,14 +2519,17 @@ DECL_HANDLER(send_hardware_message)
 
     switch (req->input.type)
     {
-    case INPUT_MOUSE:
+    case HW_INPUT_MOUSE:
         reply->wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
-    case INPUT_KEYBOARD:
+    case HW_INPUT_KEYBOARD:
         reply->wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
-    case INPUT_HARDWARE:
+    case HW_INPUT_HARDWARE:
         queue_custom_hardware_message( desktop, req->win, origin, &req->input );
+        break;
+    case HW_INPUT_HID:
+        queue_hid_message( desktop, req->win, &req->input, origin, sender, req->flags, get_req_data(), get_req_data_size() );
         break;
     default:
         set_error( STATUS_INVALID_PARAMETER );
