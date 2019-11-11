@@ -47,6 +47,7 @@ struct device
 {
     WCHAR *path;
     HANDLE file;
+    HANDLE handle;
     RID_DEVICE_INFO info;
     PHIDP_PREPARSED_DATA data;
 };
@@ -62,6 +63,8 @@ static CRITICAL_SECTION_DEBUG rawinput_devices_cs_debug =
       0, 0, { (DWORD_PTR)(__FILE__ ": rawinput_devices_cs") }
 };
 static CRITICAL_SECTION rawinput_devices_cs = { &rawinput_devices_cs_debug, -1, 0, 0, 0, 0 };
+
+extern DWORD WINAPI GetFinalPathNameByHandleW(HANDLE file, LPWSTR path, DWORD charcount, DWORD flags);
 
 static BOOL array_reserve(void **elements, unsigned int *capacity, unsigned int count, unsigned int size)
 {
@@ -144,8 +147,41 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
     device->path = path;
     device->file = file;
     device->info.cbSize = sizeof(RID_DEVICE_INFO);
+    device->handle = INVALID_HANDLE_VALUE;
 
     return device;
+}
+
+HANDLE rawinput_handle_from_device_handle(HANDLE device)
+{
+    WCHAR buffer[sizeof(OBJECT_NAME_INFORMATION) + MAX_PATH + 1];
+    OBJECT_NAME_INFORMATION *info = (OBJECT_NAME_INFORMATION*)&buffer;
+    ULONG dummy;
+    unsigned int i;
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+    {
+        if (rawinput_devices[i].handle == device)
+            return &rawinput_devices[i];
+    }
+
+    if (NtQueryObject( device, ObjectNameInformation, &buffer, sizeof(buffer) - sizeof(WCHAR), &dummy ) || !info->Name.Buffer)
+        return NULL;
+
+    /* replace \??\ with \\?\ to match rawinput_devices paths */
+    if (info->Name.Length > 1 && info->Name.Buffer[0] == '\\' && info->Name.Buffer[1] == '?')
+        info->Name.Buffer[1] = '\\';
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+    {
+        if (strcmpW(rawinput_devices[i].path, info->Name.Buffer) == 0)
+        {
+            rawinput_devices[i].handle = device;
+            return &rawinput_devices[i];
+        }
+    }
+
+    return NULL;
 }
 
 static void find_devices(void)
@@ -326,6 +362,22 @@ BOOL rawinput_from_hardware_message(RAWINPUT *rawinput, const struct hardware_ms
 
         rawinput->data.keyboard.Message          = msg_data->rawinput.kbd.message;
         rawinput->data.keyboard.ExtraInformation = msg_data->info;
+    }
+    else if (msg_data->rawinput.type == RIM_TYPEHID)
+    {
+        if (sizeof(*rawinput) + msg_data->rawinput.hid.length > RAWINPUT_BUFFER_SIZE)
+        {
+            ERR("unexpectedly large hardware message dropped\n");
+            return FALSE;
+        }
+
+        rawinput->header.dwSize  = FIELD_OFFSET(RAWINPUT, data.hid.bRawData) + msg_data->rawinput.hid.length;
+        rawinput->header.hDevice = rawinput_handle_from_device_handle(wine_server_ptr_handle(msg_data->rawinput.hid.device));
+        rawinput->header.wParam  = 0;
+
+        rawinput->data.hid.dwSizeHid = msg_data->rawinput.hid.length;
+        rawinput->data.hid.dwCount = 1;
+        memcpy(rawinput->data.hid.bRawData, msg_data + 1, msg_data->rawinput.hid.length);
     }
     else
     {
@@ -525,7 +577,7 @@ UINT WINAPI DECLSPEC_HOTPATCH GetRawInputBuffer(RAWINPUT *data, UINT *data_size,
     struct hardware_msg_data *msg_data;
     struct rawinput_thread_data *thread_data;
     RAWINPUT *rawinput;
-    UINT count = 0, rawinput_size, next_size, overhead;
+    UINT count = 0, rawinput_size, msg_size, next_size, overhead;
     BOOL is_wow64;
     int i;
 
@@ -585,7 +637,10 @@ UINT WINAPI DECLSPEC_HOTPATCH GetRawInputBuffer(RAWINPUT *data, UINT *data_size,
                               data->header.dwSize - sizeof(RAWINPUTHEADER));
         data->header.dwSize += overhead;
         data = NEXTRAWINPUTBLOCK(data);
-        msg_data++;
+        msg_size = sizeof(*msg_data);
+        if (msg_data->rawinput.type == RIM_TYPEHID)
+            msg_size += msg_data->rawinput.hid.length;
+        msg_data = (struct hardware_msg_data *)((char *)msg_data + msg_size);
     }
 
     if (count == 0 && next_size == 0) *data_size = 0;
@@ -660,6 +715,7 @@ UINT WINAPI GetRawInputDeviceInfoW(HANDLE handle, UINT command, void *data, UINT
             handle, command, data, data_size);
 
     if (!data_size) return ~0U;
+    if (!device) return ~0U;
 
     /* each case below must set:
      *     *data_size: length (meaning defined by command) of data we want to copy
