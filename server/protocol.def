@@ -2319,7 +2319,6 @@ enum message_type
 #define SEND_HWMSG_INJECTED    0x01
 #define SEND_HWMSG_ONLY_RAW    0x02
 #define SEND_HWMSG_SKIP_RAW    0x04
-#define SEND_HWMSG_BCAST_RAW   0x08
 
 
 /* Get a message from the current queue */
