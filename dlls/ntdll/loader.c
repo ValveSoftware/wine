@@ -1541,6 +1541,75 @@ static void thread_attach(void)
     }
 }
 
+#define LDR_STEAM_INTERNAL 0x20000000
+
+#ifdef _WIN64
+static WCHAR builtin_steamclient_w[] = {'C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','t','e','m','3','2','\\',
+                                        's','t','e','a','m','c','l','i','e','n','t','6','4','.','d','l','l',0};
+static WCHAR native_steamclient_w[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s',' ','(','x','8','6',')','\\','S','t','e','a','m','\\',
+                                       's','t','e','a','m','c','l','i','e','n','t','6','4','.','d','l','l',0};
+static WCHAR steamclient_w[] = {'s','t','e','a','m','c','l','i','e','n','t','6','4',0};
+#else
+static WCHAR builtin_steamclient_w[] = {'C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','t','e','m','3','2','\\',
+                                        's','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};
+static WCHAR native_steamclient_w[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s',' ','(','x','8','6',')','\\','S','t','e','a','m','\\',
+                                       's','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};
+static WCHAR steamclient_w[] = {'s','t','e','a','m','c','l','i','e','n','t',0};
+#endif
+static WCHAR lsteamclient_w[] = {'l','s','t','e','a','m','c','l','i','e','n','t',0};
+
+static WCHAR *strstriW( const WCHAR *str, const WCHAR *sub )
+{
+    while (*str)
+    {
+        const WCHAR *p1 = str, *p2 = sub;
+        while (*p1 && *p2 && tolowerW(*p1) == tolowerW(*p2)) { p1++; p2++; }
+        if (!*p2) return (WCHAR *)str;
+        str++;
+    }
+    return NULL;
+}
+
+static HMODULE get_builtin_steamclient_mod(BOOL load_module)
+{
+    HMODULE module = 0;
+    UNICODE_STRING steamclient_us;
+
+    RtlInitUnicodeString(&steamclient_us, builtin_steamclient_w);
+    LdrGetDllHandle(NULL, LDR_STEAM_INTERNAL, &steamclient_us, &module);
+    if (!module && load_module) LdrLoadDll(NULL, LDR_STEAM_INTERNAL, &steamclient_us, &module);
+    return module;
+}
+
+static HMODULE get_native_steamclient_mod(BOOL load_module)
+{
+    HMODULE module = 0;
+    UNICODE_STRING steamclient_us;
+
+    RtlInitUnicodeString(&steamclient_us, native_steamclient_w);
+    LdrGetDllHandle(NULL, LDR_STEAM_INTERNAL, &steamclient_us, &module);
+    if (!module && load_module) LdrLoadDll(NULL, LDR_STEAM_INTERNAL, &steamclient_us, &module);
+    return module;
+}
+
+static void swap_native_to_builtin_steamclient_hack(HMODULE *module)
+{
+    if (*module && *module == get_native_steamclient_mod(FALSE))
+    {
+        WARN("HACK: Swapping native to builtin steamclient module.\n");
+        *module = get_builtin_steamclient_mod(TRUE);
+    }
+}
+
+static void swap_builtin_to_native_steamclient_hack(HMODULE *module)
+{
+    if (*module && *module == get_builtin_steamclient_mod(FALSE))
+    {
+        WARN("HACK: Swapping builtin to native steamclient module.\n");
+        *module = get_native_steamclient_mod(TRUE);
+    }
+}
+
 /******************************************************************
  *		LdrDisableThreadCalloutsForDll (NTDLL.@)
  *
@@ -1572,6 +1641,8 @@ NTSTATUS WINAPI LdrFindEntryForAddress(const void* addr, PLDR_MODULE* pmod)
 {
     PLIST_ENTRY mark, entry;
     PLDR_MODULE mod;
+
+    swap_builtin_to_native_steamclient_hack((HMODULE*)&addr);
 
     mark = &NtCurrentTeb()->Peb->LdrData->InMemoryOrderModuleList;
     for (entry = mark->Flink; entry != mark; entry = entry->Flink)
@@ -1711,7 +1782,6 @@ NTSTATUS WINAPI LdrUnlockLoaderLock( ULONG flags, ULONG_PTR magic )
     return STATUS_SUCCESS;
 }
 
-
 /******************************************************************
  *		LdrGetProcedureAddress  (NTDLL.@)
  */
@@ -1723,6 +1793,7 @@ NTSTATUS WINAPI LdrGetProcedureAddress(HMODULE module, const ANSI_STRING *name,
     NTSTATUS ret = STATUS_PROCEDURE_NOT_FOUND;
 
     RtlEnterCriticalSection( &loader_section );
+    swap_native_to_builtin_steamclient_hack(&module);
 
     /* check if the module itself is invalid to return the proper error */
     if (!get_modref( module )) ret = STATUS_DLL_NOT_FOUND;
@@ -2331,6 +2402,12 @@ static NTSTATUS open_dll_file( UNICODE_STRING *nt_name, WINE_MODREF **pwm,
     }
     if (!status && !is_valid_binary( *module, image_info ))
     {
+        if (strstriW(nt_name->Buffer, native_steamclient_w))
+        {
+            WARN("HACK: Accepting native steamclient module from %s, even though it's the wrong arch.\n", debugstr_us(nt_name));
+            return STATUS_SUCCESS;
+        }
+
         TRACE( "%s is for arch %x, continuing search\n", debugstr_us(nt_name), image_info->machine );
         NtUnmapViewOfSection( NtCurrentProcess(), *module );
         *module = NULL;
@@ -2970,6 +3047,14 @@ static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, const WC
         return STATUS_SUCCESS;
     }
 
+    if (nts != STATUS_DLL_NOT_FOUND && strstriW(libname, native_steamclient_w))
+    {
+        WARN("HACK: Allocating native steamclient module from %s, but not loading dll.\n", debugstr_w(libname));
+        if (!(*pwm = alloc_module( module, &nt_name, FALSE )))
+            return STATUS_NO_MEMORY;
+        return STATUS_SUCCESS;
+    }
+
     if (nts && nts != STATUS_DLL_NOT_FOUND && nts != STATUS_INVALID_IMAGE_NOT_MZ) goto done;
 
     main_exe = get_modref( NtCurrentTeb()->Peb->ImageBaseAddress );
@@ -3088,6 +3173,14 @@ NTSTATUS WINAPI DECLSPEC_HOTPATCH LdrLoadDll(LPCWSTR path_name, DWORD flags,
 
     RtlEnterCriticalSection( &loader_section );
 
+    if (!(flags & LDR_STEAM_INTERNAL) && strstriW(libname->Buffer, steamclient_w) && !strstriW(libname->Buffer, lsteamclient_w))
+    {
+        *hModule = get_builtin_steamclient_mod(TRUE);
+        swap_builtin_to_native_steamclient_hack(hModule);
+        RtlLeaveCriticalSection( &loader_section );
+        return *hModule ? STATUS_SUCCESS : STATUS_DLL_NOT_FOUND;
+    }
+
     if (!path_name) path_name = NtCurrentTeb()->Peb->ProcessParameters->DllPath.Buffer;
     nts = load_dll( path_name, libname->Buffer, dllW, flags, &wm );
 
@@ -3133,6 +3226,7 @@ NTSTATUS WINAPI LdrGetDllHandle( LPCWSTR load_path, ULONG flags, const UNICODE_S
     }
     RtlFreeUnicodeString( &nt_name );
 
+    if (!(flags & LDR_STEAM_INTERNAL)) swap_builtin_to_native_steamclient_hack(base);
     RtlLeaveCriticalSection( &loader_section );
     TRACE( "%s -> %p (load path %s)\n", debugstr_us(name), status ? NULL : *base, debugstr_w(load_path) );
     return status;
@@ -3953,6 +4047,7 @@ PVOID WINAPI RtlPcToFileHeader( PVOID pc, PVOID *address )
 
     RtlEnterCriticalSection( &loader_section );
     if (!LdrFindEntryForAddress( pc, &module )) ret = module->BaseAddress;
+    swap_builtin_to_native_steamclient_hack((HMODULE*)&ret);
     RtlLeaveCriticalSection( &loader_section );
     *address = ret;
     return ret;
