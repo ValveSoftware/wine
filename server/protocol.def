@@ -2317,8 +2317,6 @@ enum message_type
     VARARG(keystate,bytes);    /* global state array for all the keys */
 @END
 #define SEND_HWMSG_INJECTED    0x01
-#define SEND_HWMSG_ONLY_RAW    0x02
-#define SEND_HWMSG_SKIP_RAW    0x04
 
 
 /* Get a message from the current queue */
