@@ -1966,7 +1966,7 @@ static void test_rawinput_mouse(const char *argv0)
         { TRUE, TRUE, RIDEV_INPUTSINK, 2, 2, 0, 0, TRUE },
 
         /* cross-process foreground tests */
-        { TRUE, TRUE, 0, 0, 0, 0, 0, TRUE },
+        { TRUE, TRUE, 0, 0, 0, 0, 0, FALSE },
         { TRUE, TRUE, RIDEV_INPUTSINK, 2, 0, 0, 0, TRUE },
     };
 
