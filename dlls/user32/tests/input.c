@@ -1884,6 +1884,7 @@ static DWORD WINAPI rawinput_mouse_thread(void *arg)
     struct rawinput_mouse_thread_params *params = arg;
     RECT rect_105 = { 105, 105, 105, 105 };
     RECT rect_110 = { 110, 110, 110, 110 };
+    HWND window;
     int i;
 
     while (WaitForSingleObject(params->ready, INFINITE) == 0)
@@ -1924,6 +1925,26 @@ static DWORD WINAPI rawinput_mouse_thread(void *arg)
                     Sleep(5);
                 }
                 break;
+            case 5:
+            case 6:
+                window = CreateWindowA("static", "static", WS_VISIBLE | WS_POPUP, 100, 100, 100, 100, 0, NULL, NULL, NULL);
+                ok(window != 0, "%d: CreateWindow failed\n", params->step);
+
+                ShowWindow(window, SW_SHOW);
+                SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE|SWP_NOMOVE);
+                SetForegroundWindow(window);
+                UpdateWindow(window);
+                empty_message_queue();
+
+                mouse_event(MOUSEEVENTF_MOVE, 1, 1, 0, 0);
+                SendMessageA(GetForegroundWindow(), WM_USER, 0, 0);
+                mouse_event(MOUSEEVENTF_MOVE, -1, -1, 0, 0);
+                SendMessageA(GetForegroundWindow(), WM_USER, 0, 0);
+
+                empty_message_queue();
+
+                DestroyWindow(window);
+                break;
             default:
                 return 0;
         }
@@ -1959,8 +1980,14 @@ static void test_rawinput_mouse(void)
         { FALSE, FALSE, 0, 0, 0, 0, 0, FALSE },
         { TRUE, FALSE, 0, 2, 2, -1, -1, FALSE },
         { TRUE, TRUE, 0, 2, 2, -1, -1, FALSE },
+
+        /* clip cursor tests */
         { TRUE, TRUE, 0, 0, 0, 0, 0, TRUE },
         { TRUE, TRUE, 0, 20, 20, 20, 20, TRUE },
+
+        /* same-process foreground tests */
+        { TRUE, TRUE, 0, 2, 2, 0, 0, TRUE },
+        { TRUE, TRUE, RIDEV_INPUTSINK, 2, 2, 0, 0, TRUE },
     };
 
     mouse_event(MOUSEEVENTF_ABSOLUTE, 100, 100, 0, 0);
