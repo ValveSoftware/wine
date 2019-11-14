@@ -1735,6 +1735,231 @@ static void test_RegisterRawInputDevices(void)
     DestroyWindow(hwnd);
 }
 
+static int rawinput_received;
+static int rawinput_received_foreground;
+static int rawinput_motion_x;
+static int rawinput_motion_y;
+static HANDLE rawinput_wndproc_done;
+
+static LRESULT CALLBACK rawinput_wndproc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+    UINT ret, raw_size;
+    RAWINPUT raw;
+
+    if (msg == WM_INPUT)
+    {
+        rawinput_received++;
+
+        ok(wparam == RIM_INPUT || wparam == RIM_INPUTSINK, "Unexpected wparam: %lu\n", wparam);
+        if (wparam == RIM_INPUT)
+            rawinput_received_foreground++;
+
+        ret = GetRawInputData((HRAWINPUT)lparam, RID_INPUT, NULL, &raw_size, sizeof(RAWINPUTHEADER));
+        ok(ret == 0, "GetRawInputData failed\n");
+        ok(raw_size <= sizeof(raw), "Unexpected rawinput data size: %u", raw_size);
+
+        if (raw_size <= sizeof(raw))
+        {
+            ret = GetRawInputData((HRAWINPUT)lparam, RID_INPUT, &raw, &raw_size, sizeof(RAWINPUTHEADER));
+            ok(ret > 0 && ret != (UINT)-1, "GetRawInputData failed\n");
+            ok(raw.header.dwType == RIM_TYPEMOUSE, "Unexpected rawinput type: %u\n", raw.header.dwType);
+
+            if (raw.header.dwType == RIM_TYPEMOUSE)
+            {
+                ok(!(raw.data.mouse.usFlags & MOUSE_MOVE_ABSOLUTE), "Unexpected absolute rawinput motion\n");
+                ok(!(raw.data.mouse.usFlags & MOUSE_VIRTUAL_DESKTOP), "Unexpected virtual desktop rawinput motion\n");
+                rawinput_motion_x += raw.data.mouse.lLastX;
+                rawinput_motion_y += raw.data.mouse.lLastY;
+            }
+        }
+    }
+
+    if (msg == WM_USER)
+        SetEvent(rawinput_wndproc_done);
+
+    return DefWindowProcA(hwnd, msg, wparam, lparam);
+}
+
+struct rawinput_mouse_thread_params
+{
+    int step;
+    HWND window;
+    HANDLE ready;
+    HANDLE start;
+};
+
+static DWORD WINAPI rawinput_mouse_thread(void *arg)
+{
+    struct rawinput_mouse_thread_params *params = arg;
+    RECT rect_105 = { 105, 105, 105, 105 };
+    RECT rect_110 = { 110, 110, 110, 110 };
+    int i;
+
+    while (WaitForSingleObject(params->ready, INFINITE) == 0)
+    {
+        ResetEvent(params->ready);
+        SetEvent(params->start);
+
+        switch (params->step)
+        {
+            case 0:
+            case 1:
+            case 2:
+                mouse_event(MOUSEEVENTF_MOVE, -1, 0, 0, 0);
+                mouse_event(MOUSEEVENTF_MOVE, 0, -1, 0, 0);
+                break;
+            case 3:
+                for (i = 0; i < 10; ++i)
+                {
+                    ClipCursor(&rect_105);
+                    Sleep(5);
+                    ClipCursor(&rect_110);
+                    Sleep(5);
+                    ClipCursor(NULL);
+                    Sleep(5);
+                }
+                break;
+            case 4:
+                for (i = 0; i < 10; ++i)
+                {
+                    ClipCursor(&rect_110);
+                    Sleep(5);
+                    mouse_event(MOUSEEVENTF_MOVE, 1, 1, 0, 0);
+                    ClipCursor(NULL);
+                    Sleep(5);
+                    mouse_event(MOUSEEVENTF_MOVE, 1, 1, 0, 0);
+                    ClipCursor(&rect_110);
+                    ClipCursor(NULL);
+                    Sleep(5);
+                }
+                break;
+            default:
+                return 0;
+        }
+
+        PostMessageA(params->window, WM_USER, 0, 0);
+    }
+
+    return 0;
+}
+
+struct rawinput_mouse_test
+{
+    BOOL register_device;
+    BOOL register_window;
+    DWORD register_flags;
+    int expect_received;
+    int expect_received_foreground;
+    int expect_motion_x;
+    int expect_motion_y;
+    BOOL todo;
+};
+
+static void test_rawinput_mouse(void)
+{
+    struct rawinput_mouse_thread_params params;
+    RAWINPUTDEVICE raw_devices[1];
+    HANDLE thread;
+    DWORD ret;
+    int i;
+
+    struct rawinput_mouse_test tests[] =
+    {
+        { FALSE, FALSE, 0, 0, 0, 0, 0, FALSE },
+        { TRUE, FALSE, 0, 2, 2, -1, -1, FALSE },
+        { TRUE, TRUE, 0, 2, 2, -1, -1, FALSE },
+        { TRUE, TRUE, 0, 0, 0, 0, 0, TRUE },
+        { TRUE, TRUE, 0, 20, 20, 20, 20, TRUE },
+    };
+
+    mouse_event(MOUSEEVENTF_ABSOLUTE, 100, 100, 0, 0);
+    SetCursorPos(100, 100);
+
+    rawinput_wndproc_done = CreateEventA(NULL, FALSE, FALSE, NULL);
+    ok(rawinput_wndproc_done != NULL, "CreateEvent failed\n");
+
+    params.window = CreateWindowA("static", "static", WS_VISIBLE | WS_POPUP, 100, 100, 100, 100, 0, NULL, NULL, NULL);
+    ok(params.window != 0, "CreateWindow failed\n");
+
+    ShowWindow(params.window, SW_SHOW);
+    SetWindowPos(params.window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE|SWP_NOMOVE);
+    SetForegroundWindow(params.window);
+    UpdateWindow(params.window);
+    empty_message_queue();
+
+    SetWindowLongPtrA(params.window, GWLP_WNDPROC, (LONG_PTR)rawinput_wndproc);
+
+    params.step = 0;
+    params.ready = CreateEventA(NULL, FALSE, FALSE, NULL);
+    ok(params.ready != NULL, "CreateEvent failed\n");
+
+    params.start = CreateEventA(NULL, FALSE, FALSE, NULL);
+    ok(params.start != NULL, "CreateEvent failed\n");
+
+    thread = CreateThread(NULL, 0, rawinput_mouse_thread, &params, 0, NULL);
+    ok(thread != NULL, "CreateThread failed\n");
+
+    for (i = 0; i < ARRAY_SIZE(tests); ++i)
+    {
+        rawinput_received = 0;
+        rawinput_received_foreground = 0;
+        rawinput_motion_x = 0;
+        rawinput_motion_y = 0;
+
+        raw_devices[0].usUsagePage = 0x01;
+        raw_devices[0].usUsage = 0x02;
+        raw_devices[0].dwFlags = tests[i].register_flags;
+        raw_devices[0].hwndTarget = tests[i].register_window ? params.window : 0;
+
+        if (tests[i].register_device)
+        {
+            SetLastError(0xdeadbeef);
+            ret = RegisterRawInputDevices(raw_devices, ARRAY_SIZE(raw_devices), sizeof(RAWINPUTDEVICE));
+            ok(ret, "%d: RegisterRawInputDevices failed\n", i);
+            ok(GetLastError() == 0xdeadbeef, "%d: RegisterRawInputDevices returned %08x\n", i, GetLastError());
+        }
+
+        params.step = i;
+        SetEvent(params.ready);
+
+        WaitForSingleObject(params.start, INFINITE);
+        ResetEvent(params.start);
+
+        while (MsgWaitForMultipleObjects(1, &rawinput_wndproc_done, FALSE, INFINITE, QS_ALLINPUT) != WAIT_OBJECT_0)
+            empty_message_queue();
+        ResetEvent(rawinput_wndproc_done);
+
+        /* Wine is sometimes passing some of the conditions, but not always, let's test
+         * all at once in the todo block, there should be at least one that fails. */
+        todo_wine_if(tests[i].todo)
+        ok(rawinput_received == tests[i].expect_received &&
+           rawinput_received_foreground == tests[i].expect_received_foreground &&
+           rawinput_motion_x == tests[i].expect_motion_x &&
+           rawinput_motion_y == tests[i].expect_motion_y,
+           "%d: Unexpected rawinput results: received %d, %d in foreground, motion is %dx%d\n",
+           i, rawinput_received, rawinput_received_foreground, rawinput_motion_x, rawinput_motion_y);
+
+        if (tests[i].register_device)
+        {
+            raw_devices[0].dwFlags = RIDEV_REMOVE;
+            raw_devices[0].hwndTarget = 0;
+
+            SetLastError(0xdeadbeef);
+            ret = RegisterRawInputDevices(raw_devices, ARRAY_SIZE(raw_devices), sizeof(RAWINPUTDEVICE));
+            ok(ret, "%d: RegisterRawInputDevices failed\n", i);
+            ok(GetLastError() == 0xdeadbeef, "%d: RegisterRawInputDevices returned %08x\n", i, GetLastError());
+        }
+    }
+
+    params.step = -1;
+    SetEvent(params.ready);
+    WaitForSingleObject(thread, INFINITE);
+
+    CloseHandle(params.start);
+    CloseHandle(params.ready);
+    CloseHandle(thread);
+}
+
 static void test_key_map(void)
 {
     HKL kl = GetKeyboardLayout(0);
@@ -2992,6 +3217,7 @@ START_TEST(input)
     test_OemKeyScan();
     test_GetRawInputData();
     test_RegisterRawInputDevices();
+    test_rawinput_mouse();
 
     if(pGetMouseMovePointsEx)
         test_GetMouseMovePointsEx();
