@@ -49,6 +49,7 @@
 #define _WIN32_IE 0x0500
 
 #include <stdarg.h>
+#include <stdio.h>
 #include <assert.h>
 
 #include "windef.h"
@@ -1786,7 +1787,35 @@ struct rawinput_mouse_thread_params
     HWND window;
     HANDLE ready;
     HANDLE start;
+    const char *argv0;
 };
+
+static void rawinput_mouse_process(void)
+{
+    HWND window;
+    HANDLE start_event, stop_event;
+
+    start_event = OpenEventA(EVENT_ALL_ACCESS, FALSE, "test_rawinput_mouse_start");
+    ok(start_event != 0, "OpenEventA failed, error: %u\n", GetLastError());
+
+    stop_event = OpenEventA(EVENT_ALL_ACCESS, FALSE, "test_rawinput_mouse_stop");
+    ok(stop_event != 0, "OpenEventA failed, error: %u\n", GetLastError());
+
+    window = CreateWindowA("static", "static", WS_VISIBLE | WS_POPUP, 200, 100, 100, 100, 0, NULL, NULL, NULL);
+    ok(window != 0, "CreateWindow failed\n");
+
+    ShowWindow(window, SW_SHOW);
+    SetWindowPos(window, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOSIZE|SWP_NOMOVE);
+    SetForegroundWindow(window);
+    UpdateWindow(window);
+    empty_message_queue();
+
+    SetEvent(start_event);
+    while (MsgWaitForMultipleObjects(1, &stop_event, FALSE, INFINITE, QS_ALLINPUT) != WAIT_OBJECT_0)
+	    empty_message_queue();
+
+    DestroyWindow(window);
+}
 
 static DWORD WINAPI rawinput_mouse_thread(void *arg)
 {
@@ -1795,6 +1824,11 @@ static DWORD WINAPI rawinput_mouse_thread(void *arg)
     RECT rect_110 = { 110, 110, 110, 110 };
     HWND window;
     int i;
+    char path[MAX_PATH];
+    PROCESS_INFORMATION process_info;
+    STARTUPINFOA startup_info;
+    HANDLE start_event, stop_event;
+    BOOL ret;
 
     while (WaitForSingleObject(params->ready, INFINITE) == 0)
     {
@@ -1854,6 +1888,39 @@ static DWORD WINAPI rawinput_mouse_thread(void *arg)
 
                 DestroyWindow(window);
                 break;
+            case 7:
+            case 8:
+                start_event = CreateEventA(NULL, 0, 0, "test_rawinput_mouse_start");
+                ok(start_event != 0, "%d: CreateEventA failed, error %u\n", params->step, GetLastError());
+
+                stop_event = CreateEventA(NULL, 0, 0, "test_rawinput_mouse_stop");
+                ok(stop_event != 0, "%d: CreateEventA failed, error %u\n", params->step, GetLastError());
+
+                memset(&startup_info, 0, sizeof(startup_info));
+                startup_info.cb = sizeof(startup_info);
+                startup_info.dwFlags = STARTF_USESHOWWINDOW;
+                startup_info.wShowWindow = SW_SHOWNORMAL;
+
+                sprintf(path, "%s input test_rawinput_mouse", params->argv0);
+                ret = CreateProcessA(NULL, path, NULL, NULL, TRUE, 0, NULL, NULL, &startup_info, &process_info );
+                ok(ret, "%d: CreateProcess '%s' failed err %u.\n", params->step, path, GetLastError());
+
+                ret = WaitForSingleObject(start_event, 5000);
+                ok(ret == WAIT_OBJECT_0, "%d: WaitForSingleObject failed\n", params->step);
+
+                mouse_event(MOUSEEVENTF_MOVE, 1, 1, 0, 0);
+                SendMessageA(GetForegroundWindow(), WM_USER, 0, 0);
+                mouse_event(MOUSEEVENTF_MOVE, -1, -1, 0, 0);
+                SendMessageA(GetForegroundWindow(), WM_USER, 0, 0);
+
+                SetEvent(stop_event);
+
+                winetest_wait_child_process(process_info.hProcess);
+                CloseHandle(process_info.hProcess);
+                CloseHandle(process_info.hThread);
+                CloseHandle(start_event);
+                CloseHandle(stop_event);
+                break;
             default:
                 return 0;
         }
@@ -1876,7 +1943,7 @@ struct rawinput_mouse_test
     BOOL todo;
 };
 
-static void test_rawinput_mouse(void)
+static void test_rawinput_mouse(const char *argv0)
 {
     struct rawinput_mouse_thread_params params;
     RAWINPUTDEVICE raw_devices[1];
@@ -1897,10 +1964,16 @@ static void test_rawinput_mouse(void)
         /* same-process foreground tests */
         { TRUE, TRUE, 0, 2, 2, 0, 0, TRUE },
         { TRUE, TRUE, RIDEV_INPUTSINK, 2, 2, 0, 0, TRUE },
+
+        /* cross-process foreground tests */
+        { TRUE, TRUE, 0, 0, 0, 0, 0, TRUE },
+        { TRUE, TRUE, RIDEV_INPUTSINK, 2, 0, 0, 0, TRUE },
     };
 
     mouse_event(MOUSEEVENTF_ABSOLUTE, 100, 100, 0, 0);
     SetCursorPos(100, 100);
+
+    params.argv0 = argv0;
 
     rawinput_wndproc_done = CreateEventA(NULL, FALSE, FALSE, NULL);
     ok(rawinput_wndproc_done != NULL, "CreateEvent failed\n");
@@ -3218,9 +3291,18 @@ static void test_RegisterDeviceNotification(void)
 
 START_TEST(input)
 {
+    char **argv;
+    int argc;
     POINT pos;
     init_function_pointers();
     GetCursorPos( &pos );
+
+    argc = winetest_get_mainargs(&argv);
+    if (argc >= 3 && strcmp(argv[2], "test_rawinput_mouse") == 0)
+    {
+        rawinput_mouse_process();
+        return;
+    }
 
     if (pSendInput)
     {
@@ -3244,7 +3326,7 @@ START_TEST(input)
     test_OemKeyScan();
     test_GetRawInputData();
     test_RegisterRawInputDevices();
-    test_rawinput_mouse();
+    test_rawinput_mouse(argv[0]);
 
     if(pGetMouseMovePointsEx)
         test_GetMouseMovePointsEx();
