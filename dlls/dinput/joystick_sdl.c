@@ -1000,7 +1000,7 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
             case ITEM_TYPE_AXIS:
                 memcpy(&df->rgodf[idx], &c_dfDIJoystick2.rgodf[item.id], df->dwObjSize);
                 df->rgodf[idx].dwType = DIDFT_MAKEINSTANCE(item.id) | DIDFT_ABSAXIS;
-                if (newDevice->sdldev->sdl_haptic && i < 2)
+                if (newDevice->sdldev->sdl_haptic && item.id < 2)
                      df->rgodf[idx].dwFlags |= DIDOI_FFACTUATOR;
 
                 newDevice->generic.props[idx].lDevMin = -32768;
