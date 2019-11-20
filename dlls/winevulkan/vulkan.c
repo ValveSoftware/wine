@@ -1267,7 +1267,7 @@ VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice 
         capabilities->maxImageCount = 32;
 
     if(vk_funcs->query_fs_hack &&
-            vk_funcs->query_fs_hack(NULL, &user_res, NULL)){
+            vk_funcs->query_fs_hack(NULL, &user_res, NULL, NULL)){
         capabilities->currentExtent = user_res;
         capabilities->minImageExtent = user_res;
         capabilities->maxImageExtent = user_res;
@@ -1715,7 +1715,7 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
         our_createinfo.oldSwapchain = ((struct VkSwapchainKHR_T *)(UINT_PTR)our_createinfo.oldSwapchain)->swapchain;
 
     if(vk_funcs->query_fs_hack &&
-            vk_funcs->query_fs_hack(&object->real_extent, &user_sz, &object->blit_dst) &&
+            vk_funcs->query_fs_hack(&object->real_extent, &user_sz, &object->blit_dst, &object->fs_hack_filter) &&
             our_createinfo.imageExtent.width == user_sz.width &&
             our_createinfo.imageExtent.height == user_sz.height)
     {
@@ -1946,8 +1946,8 @@ static VkResult init_blit_images(VkDevice device, struct VkSwapchainKHR_T *swapc
     uint32_t blit_memory_type = -1, i;
 
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.magFilter = swapchain->fs_hack_filter;
+    samplerInfo.minFilter = swapchain->fs_hack_filter;
     samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
     samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER;
@@ -2494,7 +2494,7 @@ static VkResult record_graphics_cmd(VkDevice device, struct VkSwapchainKHR_T *sw
     device->funcs.p_vkCmdBlitImage(hack->cmd,
             hack->user_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
             hack->swapchain_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-            1, &blitregion, VK_FILTER_LINEAR /* CUBIC_IMG? */);
+            1, &blitregion, swapchain->fs_hack_filter);
 
     /* transition user image from TRANSFER_SRC_OPTIMAL to GENERAL */
     barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
