@@ -545,13 +545,16 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
 }
 
 static VkBool32 X11DRV_query_fs_hack(VkExtent2D *real_sz, VkExtent2D *user_sz,
-        VkRect2D *dst_blit)
+        VkRect2D *dst_blit, VkFilter *filter)
 {
     if(fs_hack_enabled()){
         POINT real_res = fs_hack_real_mode();
         POINT user_res = fs_hack_current_mode();
         POINT scaled = fs_hack_get_scaled_screen_size();
         POINT scaled_origin = {0, 0};
+
+        if (filter)
+            *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
 
         fs_hack_user_to_real(&scaled_origin);
 

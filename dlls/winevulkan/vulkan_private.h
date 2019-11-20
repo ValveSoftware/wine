@@ -165,6 +165,7 @@ struct VkSwapchainKHR_T
     VkDeviceMemory user_image_memory, blit_image_memory;
     uint32_t n_images;
     struct fs_hack_image *fs_hack_images; /* struct fs_hack_image[n_images] */
+    VkFilter fs_hack_filter;
     VkSampler sampler;
     VkDescriptorPool descriptor_pool;
     VkDescriptorSetLayout descriptor_set_layout;

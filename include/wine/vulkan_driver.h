@@ -71,7 +71,7 @@ struct vulkan_funcs
      * resolution; user_sz will contain the app's requested mode; and dst_blit
      * will contain the area to blit the user image to in real coordinates.
      * All parameters are optional. */
-    VkBool32 (*query_fs_hack)(VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit);
+    VkBool32 (*query_fs_hack)(VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit, VkFilter *filter);
 };
 
 extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver(HDC hdc, UINT version);
