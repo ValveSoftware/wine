@@ -211,6 +211,7 @@ struct wgl_context
     struct gl_drawable *new_drawables[2];
     BOOL refresh_drawables;
     BOOL fs_hack;
+    BOOL fs_hack_integer;
     GLuint fs_hack_fbo, fs_hack_resolve_fbo;
     GLuint fs_hack_color_texture, fs_hack_ds_texture;
     GLuint fs_hack_color_renderbuffer, fs_hack_color_resolve_renderbuffer, fs_hack_ds_renderbuffer;
@@ -2091,6 +2092,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
         ctx->setup_for = p;
         gl->has_scissor_indexed = has_extension(glExtensions, "GL_ARB_viewport_array");
+        ctx->fs_hack_integer = fs_hack_is_integer();
         gl->fs_hack_context_set_up = TRUE;
     }
     else
@@ -2383,7 +2385,9 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
     opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
 
-    pglBlitFramebuffer( 0, 0, src.x, src.y, scaled_origin.x, scaled_origin.y, scaled_origin.x + scaled.x, scaled_origin.y + scaled.y, GL_COLOR_BUFFER_BIT, GL_LINEAR );
+    pglBlitFramebuffer( 0, 0, src.x, src.y,
+            scaled_origin.x, scaled_origin.y, scaled_origin.x + scaled.x, scaled_origin.y + scaled.y,
+            GL_COLOR_BUFFER_BIT, ctx->fs_hack_integer ? GL_NEAREST : GL_LINEAR );
     //HACK
     if ( draw_buffer == GL_FRONT )
         pglXSwapBuffers(gdi_display, gl->drawable);

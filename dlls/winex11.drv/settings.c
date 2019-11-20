@@ -24,6 +24,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <math.h>
+#include <stdlib.h>
 
 #define NONAMELESSUNION
 #define NONAMELESSSTRUCT
@@ -273,6 +274,17 @@ BOOL fs_hack_enabled(void)
         currentMode != realMode;
 }
 
+BOOL fs_hack_is_integer(void)
+{
+    static int is_int = -1;
+    if(is_int < 0)
+    {
+        const char *e = getenv("WINE_FULLSCREEN_INTEGER_SCALING");
+        is_int = e && strcmp(e, "0");
+    }
+    return is_int;
+}
+
 BOOL fs_hack_matches_current_mode(int w, int h)
 {
     return fs_hack_enabled() &&
@@ -410,7 +422,20 @@ static LONG X11DRV_nores_SetCurrentMode(int mode)
     }else{
         double w = dd_modes[currentMode].width;
         double h = dd_modes[currentMode].height;
-        if(dd_modes[realMode].width / (double)dd_modes[realMode].height < w / h){ /* real mode is narrower than fake mode */
+
+        if(fs_hack_is_integer()){
+            unsigned int scaleFactor = min(dd_modes[realMode].width / w,
+                                           dd_modes[realMode].height / h);
+
+            w *= scaleFactor;
+            h *= scaleFactor;
+
+            offs_x = (dd_modes[realMode].width  - w) / 2;
+            offs_y = (dd_modes[realMode].height - h) / 2;
+
+            fs_width  = dd_modes[realMode].width;
+            fs_height = dd_modes[realMode].height;
+        }else if(dd_modes[realMode].width / (double)dd_modes[realMode].height < w / h){ /* real mode is narrower than fake mode */
             /* scale to fit width */
             h = dd_modes[realMode].width * (h / w);
             w = dd_modes[realMode].width;
