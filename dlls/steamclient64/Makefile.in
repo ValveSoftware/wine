@@ -1,0 +1,6 @@
+MODULE        = steamclient64.dll
+PARENTSRC     = ../steamclient
+EXTRADLLFLAGS = -mno-cygwin
+
+C_SRCS = \
+	steamclient_main.c

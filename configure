@@ -1573,6 +1573,7 @@ enable_sspicli
 enable_stdole2_tlb
 enable_stdole32_tlb
 enable_sti
+enable_steamclient
 enable_strmbase
 enable_strmdll
 enable_strmiids
@@ -20926,6 +20927,8 @@ wine_fn_config_makefile dlls/stdole32.tlb enable_stdole32_tlb
 wine_fn_config_makefile dlls/sti enable_sti
 wine_fn_config_makefile dlls/sti/tests enable_tests
 wine_fn_config_makefile dlls/storage.dll16 enable_win16
+test "x$enable_win64" = xyes || wine_fn_config_makefile dlls/steamclient enable_steamclient
+test "x$enable_win64" = xno || wine_fn_config_makefile dlls/steamclient64 enable_steamclient
 wine_fn_config_makefile dlls/stress.dll16 enable_win16
 wine_fn_config_makefile dlls/strmbase enable_strmbase
 wine_fn_config_makefile dlls/strmdll enable_strmdll

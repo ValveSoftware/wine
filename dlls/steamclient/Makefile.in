@@ -1,0 +1,5 @@
+MODULE        = steamclient.dll
+EXTRADLLFLAGS = -mno-cygwin
+
+C_SRCS = \
+	steamclient_main.c
