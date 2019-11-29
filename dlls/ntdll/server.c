@@ -1472,6 +1472,8 @@ void server_init_process_done(void)
     }
     SERVER_END_REQ;
 
+    user_shared_data_init();
+
     assert( !status );
     signal_start_process( entry, suspend );
 }

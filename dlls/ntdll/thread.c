@@ -46,11 +46,13 @@
 #include "wine/server.h"
 #include "wine/debug.h"
 #include "ntdll_misc.h"
+#include "wine/usd.h"
 #include "ddk/wdm.h"
 #include "wine/exception.h"
 #include "esync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(thread);
+WINE_DECLARE_DEBUG_CHANNEL(wineusd);
 
 #ifndef PTHREAD_STACK_MIN
 #define PTHREAD_STACK_MIN 16384
@@ -150,6 +152,39 @@ static ULONG_PTR get_image_addr(void)
     return 0;
 }
 #endif
+
+void user_shared_data_init(void)
+{
+    static const WCHAR device_nameW[] = {'\\','D','e','v','i','c','e','\\','W','i','n','e','U','s','d',0};
+    struct _KUSER_SHARED_DATA data = *user_shared_data;
+    OBJECT_ATTRIBUTES attr = {sizeof(attr)};
+    UNICODE_STRING string;
+    IO_STATUS_BLOCK io;
+    NTSTATUS status;
+    HANDLE device;
+    void *addr = user_shared_data;
+    SIZE_T size = 0;
+
+    RtlInitUnicodeString( &string, device_nameW );
+    attr.ObjectName = &string;
+    if ((status = NtCreateFile( &device, 0, &attr, &io, NULL,
+                                FILE_ATTRIBUTE_NORMAL, 0, FILE_OPEN,
+                                FILE_NON_DIRECTORY_FILE, NULL, 0 )))
+    {
+        WARN_(wineusd)( "Failed to open user shared data device, status: %x.\n", status );
+        return;
+    }
+
+    NtFreeVirtualMemory( NtCurrentProcess(), &addr, &size, MEM_RELEASE );
+
+    if ((status = NtDeviceIoControlFile( device, NULL, NULL, NULL, &io,
+                                         IOCTL_WINEUSD_INITIALIZE,
+                                         &data, sizeof(data), NULL, 0 )))
+    {
+        MESSAGE( "wine: failed to map the shared user data: %08x\n", status );
+        exit(1);
+    }
+}
 
 
 /***********************************************************************
