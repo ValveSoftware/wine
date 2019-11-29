@@ -1,0 +1,6 @@
+MODULE        = wineusd.sys
+IMPORTS       = ntoskrnl
+EXTRADLLFLAGS = -Wl,--subsystem,native -mno-cygwin
+
+C_SRCS = \
+	wineusd_main.c
