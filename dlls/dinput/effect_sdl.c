@@ -427,8 +427,6 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
 
     TRACE("%p %p 0x%x\n", This, effect, flags);
 
-    dump_DIEFFECT(effect, &This->guid, flags);
-
     if (IsEqualGUID(&This->guid, &GUID_Sine))
         This->effect.type = SDL_HAPTIC_SINE;
     else if (IsEqualGUID(&This->guid, &GUID_Triangle))
@@ -469,6 +467,8 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
         This->first_axis_is_x = effect->rgdwAxes[0] == DIJOFS_X;
     }
 
+    dump_DIEFFECT(effect, &This->guid, flags);
+
     if (flags & DIEP_DIRECTION)
     {
         if (effect->cAxes == 1)
@@ -479,7 +479,6 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
                 if (flags & DIEP_AXES)
                 {
                     SET_BASE_EFFECT_FIELD(This->effect, direction.dir[0], effect->rglDirection[0]);
-                    SET_BASE_EFFECT_FIELD(This->effect, direction.dir[1], effect->rglDirection[1]);
                 }
             } else {
                 /* one-axis effects must use cartesian coords */
@@ -567,7 +566,8 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
             tsp = effect->lpvTypeSpecificParams;
 
             This->effect.periodic.magnitude = MulDiv(tsp->dwMagnitude, 32767, 10000);
-            This->effect.periodic.offset = tsp->lOffset;
+            This->effect.periodic.offset = SCALE(Sint16, 0xffff, -32767, tsp->lOffset, 20000,
+                    -10000);
             This->effect.periodic.phase = tsp->dwPhase;
             if (tsp->dwPeriod <= 1000)
                 This->effect.periodic.period = 1;

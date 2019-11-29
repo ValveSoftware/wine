@@ -183,6 +183,13 @@ void dump_DIEFFECT(LPCDIEFFECT eff, REFGUID guid, DWORD dwFlags)
     TRACE("  - dwTriggerButton: %d\n", eff->dwTriggerButton);
     TRACE("  - dwTriggerRepeatInterval: %d\n", eff->dwTriggerRepeatInterval);
     TRACE("  - rglDirection: %p\n", eff->rglDirection);
+    if (dwFlags & DIEP_DIRECTION) {
+        TRACE("    %d", eff->rglDirection[0]);
+        if (eff->cAxes > 1 && eff->dwFlags & DIEFF_CARTESIAN) {
+            TRACE(" %d", eff->rglDirection[1]);
+        }
+        TRACE("\n");
+    }
     TRACE("  - cbTypeSpecificParams: %d\n", eff->cbTypeSpecificParams);
     TRACE("  - lpvTypeSpecificParams: %p\n", eff->lpvTypeSpecificParams);
 

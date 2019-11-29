@@ -1295,11 +1295,13 @@ static BOOL _SetProperty(JoystickImpl *This, const GUID *prop, const DIPROPHEADE
         case (DWORD_PTR)DIPROP_FFGAIN:
         {
             LPCDIPROPDWORD pd = (LPCDIPROPDWORD)header;
-            int sdl_gain = MulDiv(This->sdldev->gain, 100, 10000);
+            int sdl_gain;
 
             TRACE("DIPROP_FFGAIN(%d)\n", pd->dwData);
 
             This->sdldev->gain = pd->dwData;
+
+            sdl_gain = MulDiv(This->sdldev->gain, 100, 10000);
 
             rc = SDL_HapticSetGain(This->sdldev->sdl_haptic, sdl_gain);
             if (rc != 0)
