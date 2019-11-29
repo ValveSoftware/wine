@@ -46,11 +46,14 @@
 #include "wine/server.h"
 #include "wine/debug.h"
 #include "ntdll_misc.h"
+#include "wine/unicode.h"
+#include "wine/usd.h"
 #include "ddk/wdm.h"
 #include "wine/exception.h"
 #include "esync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(thread);
+WINE_DECLARE_DEBUG_CHANNEL(wineusd);
 
 #ifndef PTHREAD_STACK_MIN
 #define PTHREAD_STACK_MIN 16384
@@ -215,6 +218,78 @@ static void set_process_name( int argc, char *argv[] )
 #endif  /* HAVE_PRCTL */
 }
 
+void user_shared_data_init(void)
+{
+    static const WCHAR directory_nameW[] = {'\\','D','e','v','i','c','e','\\','W','i','n','e','U','s','d',0};
+    static const WCHAR device_nameW[] = {'\\','D','e','v','i','c','e','\\','W','i','n','e','U','s','d','\\','C','o','n','t','r','o','l',0};
+    static const WCHAR section_formatW[] = {'\\','D','e','v','i','c','e','\\','W','i','n','e','U','s','d','\\','%','0','8','x',0};
+    OBJECT_ATTRIBUTES attr = {sizeof(attr)};
+    IO_STATUS_BLOCK io;
+    UNICODE_STRING string;
+    NTSTATUS status;
+    HANDLE directory, section, device;
+    WCHAR section_nameW[64];
+
+    struct _KUSER_SHARED_DATA tmp;
+    LARGE_INTEGER section_size;
+    SIZE_T size = 0x10000;
+    void *addr;
+
+    section_size.HighPart = 0;
+    section_size.LowPart = size;
+
+    RtlInitUnicodeString( &string, directory_nameW );
+    InitializeObjectAttributes( &attr, &string, 0, NULL, NULL );
+    if ((status = NtCreateDirectoryObject( &directory, 0, &attr )) && status != STATUS_OBJECT_NAME_COLLISION)
+        WARN_(wineusd)( "Failed to create directory, status: %x\n", status );
+
+    sprintfW( section_nameW, section_formatW, GetCurrentProcessId() );
+    RtlInitUnicodeString( &string, section_nameW );
+    InitializeObjectAttributes( &attr, &string, 0, NULL, NULL );
+    if ((status = NtCreateSection( &section, SECTION_ALL_ACCESS, &attr, &section_size,
+                                   PAGE_READWRITE, SEC_COMMIT, NULL )))
+    {
+        WARN_(wineusd)( "Failed to create section, status: %x\n", status );
+        return;
+    }
+
+    NtClose( directory );
+
+    addr = (void *)user_shared_data;
+    size = 0;
+    tmp = *user_shared_data;
+    if ((status = NtFreeVirtualMemory( NtCurrentProcess(), &addr, &size, MEM_RELEASE )))
+    {
+        ERR_(wineusd)( "Failed to release memory, status: %x\n", status );
+        NtClose( section );
+        return;
+    }
+
+    addr = (void *)user_shared_data;
+    size = 0;
+    if ((status = NtMapViewOfSection( section, NtCurrentProcess(), &addr, 0, 0, 0,
+                                      &size, ViewShare, 0, PAGE_READWRITE )))
+    {
+        WARN_(wineusd)( "wine: failed to map section, status: %x\n", status );
+        NtClose( section );
+
+        if ((status = NtAllocateVirtualMemory( NtCurrentProcess(), &addr, 0, &size,
+                                               MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE )))
+        {
+            MESSAGE( "wine: failed to remap the user shared data: %08x\n", status );
+            exit(1);
+        }
+    }
+    user_shared_data = addr;
+    *user_shared_data = tmp;
+
+    RtlInitUnicodeString( &string, device_nameW );
+    InitializeObjectAttributes( &attr, &string, 0, NULL, NULL );
+    if ((status = NtCreateFile( &device, 0, &attr, &io, NULL,
+                                FILE_ATTRIBUTE_NORMAL, 0, FILE_OPEN,
+                                FILE_NON_DIRECTORY_FILE, NULL, 0 )))
+        WARN_(wineusd)( "Failed to open device, status: %x\n", status );
+}
 
 /***********************************************************************
  *           thread_init
