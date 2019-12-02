@@ -427,8 +427,6 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
 
     TRACE("%p %p 0x%x\n", This, effect, flags);
 
-    dump_DIEFFECT(effect, &This->guid, flags);
-
     if (IsEqualGUID(&This->guid, &GUID_Sine))
         This->effect.type = SDL_HAPTIC_SINE;
     else if (IsEqualGUID(&This->guid, &GUID_Triangle))
@@ -468,6 +466,8 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
             return DIERR_INCOMPLETEEFFECT;
         This->first_axis_is_x = effect->rgdwAxes[0] == DIJOFS_X;
     }
+
+    dump_DIEFFECT(effect, &This->guid, flags);
 
     if (flags & DIEP_DIRECTION)
     {
