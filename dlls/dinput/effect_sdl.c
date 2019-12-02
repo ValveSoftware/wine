@@ -479,7 +479,6 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
                 if (flags & DIEP_AXES)
                 {
                     SET_BASE_EFFECT_FIELD(This->effect, direction.dir[0], effect->rglDirection[0]);
-                    SET_BASE_EFFECT_FIELD(This->effect, direction.dir[1], effect->rglDirection[1]);
                 }
             } else {
                 /* one-axis effects must use cartesian coords */
