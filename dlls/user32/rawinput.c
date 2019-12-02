@@ -184,37 +184,18 @@ HANDLE rawinput_handle_from_device_handle(HANDLE device, BOOL rescan)
     return rawinput_handle_from_device_handle(device, FALSE);
 }
 
-static void find_hid_devices(BOOL force)
+static void find_hid_devices_by_guid(const GUID *guid)
 {
-    static ULONGLONG last_check;
-
     SP_DEVICE_INTERFACE_DATA iface = { sizeof(iface) };
     struct hid_device *device;
     HIDD_ATTRIBUTES attr;
     HIDP_CAPS caps;
-    GUID hid_guid;
     HDEVINFO set;
     DWORD idx;
 
-    if (!force && GetTickCount64() - last_check < 2000)
-        return;
-    last_check = GetTickCount64();
+    set = SetupDiGetClassDevsW(guid, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
 
-    HidD_GetHidGuid(&hid_guid);
-
-    set = SetupDiGetClassDevsW(&hid_guid, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
-
-    EnterCriticalSection(&hid_devices_cs);
-
-    /* destroy previous list */
-    for (idx = 0; idx < hid_devices_count; ++idx)
-    {
-        CloseHandle(hid_devices[idx].file);
-        heap_free(hid_devices[idx].path);
-    }
-
-    hid_devices_count = 0;
-    for (idx = 0; SetupDiEnumDeviceInterfaces(set, NULL, &hid_guid, idx, &iface); ++idx)
+    for (idx = 0; SetupDiEnumDeviceInterfaces(set, NULL, guid, idx, &iface); ++idx)
     {
         if (!(device = add_device(set, &iface)))
             continue;
@@ -236,8 +217,47 @@ static void find_hid_devices(BOOL force)
         device->info.usUsage = caps.Usage;
     }
 
-    LeaveCriticalSection(&hid_devices_cs);
     SetupDiDestroyDeviceInfoList(set);
+}
+
+static void find_hid_devices(BOOL force)
+{
+    static ULONGLONG last_check;
+
+    DWORD idx;
+    GUID hid_guid;
+
+    if (!force && GetTickCount64() - last_check < 2000)
+        return;
+
+    HidD_GetHidGuid(&hid_guid);
+
+    EnterCriticalSection(&hid_devices_cs);
+
+    if (!force && GetTickCount64() - last_check < 2000)
+    {
+        LeaveCriticalSection(&hid_devices_cs);
+        return;
+    }
+
+    last_check = GetTickCount64();
+
+    /* destroy previous list */
+    for (idx = 0; idx < hid_devices_count; ++idx)
+    {
+        CloseHandle(hid_devices[idx].file);
+        heap_free(hid_devices[idx].path);
+    }
+
+    hid_devices_count = 0;
+
+    find_hid_devices_by_guid(&hid_guid);
+
+    /* HACK: also look up the xinput-specific devices */
+    hid_guid.Data4[7]++;
+    find_hid_devices_by_guid(&hid_guid);
+
+    LeaveCriticalSection(&hid_devices_cs);
 }
 
 /***********************************************************************
