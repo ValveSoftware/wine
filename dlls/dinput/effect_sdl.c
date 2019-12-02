@@ -289,7 +289,7 @@ static HRESULT WINAPI effect_GetParameters(IDirectInputEffect *iface,
             DIPERIODIC *tsp = effect->lpvTypeSpecificParams;
 
             tsp->dwMagnitude = MulDiv(This->effect.periodic.magnitude, 10000, 32767);
-            tsp->lOffset = This->effect.periodic.offset;
+            tsp->lOffset = SCALE(LONG, 20000, -10000, This->effect.periodic.offset, 0xffff, -32767);
             tsp->dwPhase = This->effect.periodic.phase;
             tsp->dwPeriod = This->effect.periodic.period * 1000;
         }
