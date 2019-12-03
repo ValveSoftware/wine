@@ -169,8 +169,21 @@ static HRESULT WINAPI effect_GetEffectGuid(IDirectInputEffect *iface, GUID *out)
         value = (target.custom.field); \
     }
 
-#define SCALE(type, target_range, target_min, value, source_range, source_min) \
-    (type)((((target_range)*(value + source_min))/source_range)-target_min)
+/* map [-32768, 0, 32767] -> [-10000, 0, 10000] */
+#define CENTERED_SDL_TO_DI(val) \
+    ((20000 * (val - 0x8000)) / 0xffff + 10000)
+
+/* map [-10000, 0, 10000] -> [-32768, 0, 32767] */
+#define CENTERED_DI_TO_SDL(val) \
+    ((0xffff * (val - 10000)) / 20000 + 0x7fff)
+
+/* map [0, sdl_max] -> [0, 10000] */
+#define ZEROED_SDL_TO_DI(val, sdl_max) \
+    ((10000 * val) / sdl_max)
+
+/* map [0, 10000] -> [0, sdl_max] */
+#define ZEROED_DI_TO_SDL(val, sdl_max) \
+    ((sdl_max * val) / 10000)
 
 static HRESULT WINAPI effect_GetParameters(IDirectInputEffect *iface,
         DIEFFECT *effect, DWORD flags)
@@ -288,22 +301,22 @@ static HRESULT WINAPI effect_GetParameters(IDirectInputEffect *iface,
         {
             DIPERIODIC *tsp = effect->lpvTypeSpecificParams;
 
-            tsp->dwMagnitude = MulDiv(This->effect.periodic.magnitude, 10000, 32767);
-            tsp->lOffset = SCALE(LONG, 20000, -10000, This->effect.periodic.offset, 0xffff, -32767);
+            tsp->dwMagnitude = ZEROED_SDL_TO_DI(This->effect.periodic.magnitude, SDL_MAX_SINT16);
+            tsp->lOffset = CENTERED_SDL_TO_DI(This->effect.periodic.offset);
             tsp->dwPhase = This->effect.periodic.phase;
             tsp->dwPeriod = This->effect.periodic.period * 1000;
         }
         else if (This->effect.type == SDL_HAPTIC_CONSTANT)
         {
             LPDICONSTANTFORCE tsp = effect->lpvTypeSpecificParams;
-            tsp->lMagnitude = SCALE(LONG, 20000, -10000, This->effect.constant.level, 0xffff, -32767);
+            tsp->lMagnitude = CENTERED_SDL_TO_DI(This->effect.constant.level);
         }
         else if (This->effect.type == SDL_HAPTIC_RAMP)
         {
             DIRAMPFORCE *tsp = effect->lpvTypeSpecificParams;
 
-            tsp->lStart = SCALE(Sint16, 20000, -10000, This->effect.ramp.start, 0xffff, -32767);
-            tsp->lEnd = SCALE(Sint16, 20000, -10000, This->effect.ramp.end, 0xffff, -32767);
+            tsp->lStart = CENTERED_SDL_TO_DI(This->effect.ramp.start);
+            tsp->lEnd = CENTERED_SDL_TO_DI(This->effect.ramp.end);
         }
         else if (This->effect.type == SDL_HAPTIC_SPRING ||
                  This->effect.type == SDL_HAPTIC_DAMPER ||
@@ -314,12 +327,12 @@ static HRESULT WINAPI effect_GetParameters(IDirectInputEffect *iface,
             DICONDITION *tsp = effect->lpvTypeSpecificParams;
             for (i = 0; i < 2; i++)
             {
-                tsp[i].lOffset = SCALE(LONG, 20000, -10000, This->effect.condition.center[i], 0xffff, -32767);
-                tsp[i].lPositiveCoefficient = SCALE(LONG, 20000, -10000, This->effect.condition.right_coeff[i], 0xffff, -32767);
-                tsp[i].lNegativeCoefficient = SCALE(LONG, 10000, -20000, This->effect.condition.left_coeff[i], 0xffff, -32767);
-                tsp[i].dwPositiveSaturation = SCALE(DWORD, 10000, 0, This->effect.condition.right_sat[i], 0xffff, 0);
-                tsp[i].dwNegativeSaturation = SCALE(DWORD, 10000, 0, This->effect.condition.left_sat[i], 0xffff, 0);
-                tsp[i].lDeadBand = SCALE(LONG, 20000, -10000, This->effect.condition.deadband[i], 0xffff, -32767);
+                tsp[i].lOffset = CENTERED_SDL_TO_DI(This->effect.condition.center[i]);
+                tsp[i].lPositiveCoefficient = CENTERED_SDL_TO_DI(This->effect.condition.right_coeff[i]);
+                tsp[i].lNegativeCoefficient = CENTERED_SDL_TO_DI(This->effect.condition.left_coeff[i]);
+                tsp[i].dwPositiveSaturation = ZEROED_SDL_TO_DI(This->effect.condition.right_sat[i], SDL_MAX_UINT16);
+                tsp[i].dwNegativeSaturation = ZEROED_SDL_TO_DI(This->effect.condition.left_sat[i], SDL_MAX_UINT16);
+                tsp[i].lDeadBand = This->effect.condition.deadband[i] * 10000 / SDL_MAX_UINT16;
             }
         }
         else if (This->effect.type == SDL_HAPTIC_CUSTOM)
@@ -565,8 +578,8 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
                 return DIERR_INVALIDPARAM;
             tsp = effect->lpvTypeSpecificParams;
 
-            This->effect.periodic.magnitude = MulDiv(tsp->dwMagnitude, 32767, 10000);
-            This->effect.periodic.offset = SCALE(Sint16, 0xffff, -32767, tsp->lOffset, 20000, -10000);
+            This->effect.periodic.magnitude = ZEROED_DI_TO_SDL(tsp->dwMagnitude, SDL_MAX_SINT16);
+            This->effect.periodic.offset = CENTERED_DI_TO_SDL(tsp->lOffset);
             This->effect.periodic.phase = tsp->dwPhase;
             if (tsp->dwPeriod <= 1000)
                 This->effect.periodic.period = 1;
@@ -580,7 +593,7 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
             if (effect->cbTypeSpecificParams != sizeof(DICONSTANTFORCE))
                 return DIERR_INVALIDPARAM;
             tsp = effect->lpvTypeSpecificParams;
-            This->effect.constant.level = SCALE(Sint16, 0xffff, -32767, tsp->lMagnitude, 20000, -10000);
+            This->effect.constant.level = CENTERED_DI_TO_SDL(tsp->lMagnitude);
         }
         else if (IsEqualGUID(&This->guid, &GUID_RampForce))
         {
@@ -589,8 +602,8 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
             if (effect->cbTypeSpecificParams != sizeof(DIRAMPFORCE))
                 return DIERR_INVALIDPARAM;
             tsp = effect->lpvTypeSpecificParams;
-            This->effect.ramp.start = SCALE(Sint16, 0xffff, -32767, tsp->lStart, 20000, -10000);
-            This->effect.ramp.end = SCALE(Sint16, 0xffff, -32767, tsp->lEnd, 20000, -10000);
+            This->effect.ramp.start = CENTERED_DI_TO_SDL(tsp->lStart);
+            This->effect.ramp.end = CENTERED_DI_TO_SDL(tsp->lEnd);
         }
         else if (IsEqualGUID(&This->guid, &GUID_Spring) ||
             IsEqualGUID(&This->guid, &GUID_Damper) ||
@@ -612,12 +625,12 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
 
             for (i = j = 0; i < 3; ++i)
             {
-                This->effect.condition.right_sat[i] = SCALE(Uint16, 0xffff, 0, tsp[j].dwPositiveSaturation, 10000, 0);
-                This->effect.condition.left_sat[i] = SCALE(Uint16, 0xffff, 0, tsp[j].dwNegativeSaturation, 10000, 0);
-                This->effect.condition.right_coeff[i] = SCALE(Sint16, 0xffff, -32767, tsp[j].lPositiveCoefficient, 20000, -10000);
-                This->effect.condition.left_coeff[i] = SCALE(Sint16, 0xffff, -32767, tsp[j].lNegativeCoefficient, 20000, -10000);
-                This->effect.condition.deadband[i] = SCALE(Uint16, 0xffff, 0, tsp[j].lDeadBand, 10000, 0);
-                This->effect.condition.center[i] = SCALE(Sint16, 0xffff, -32767, tsp[j].lOffset, 20000, -10000);
+                This->effect.condition.right_sat[i] = ZEROED_DI_TO_SDL(tsp[j].dwPositiveSaturation, SDL_MAX_UINT16);
+                This->effect.condition.left_sat[i] = ZEROED_DI_TO_SDL(tsp[j].dwNegativeSaturation, SDL_MAX_UINT16);
+                This->effect.condition.right_coeff[i] = CENTERED_DI_TO_SDL(tsp[j].lPositiveCoefficient);
+                This->effect.condition.left_coeff[i] = CENTERED_DI_TO_SDL(tsp[j].lNegativeCoefficient);
+                This->effect.condition.deadband[i] = tsp[j].lDeadBand * SDL_MAX_UINT16 / 10000;
+                This->effect.condition.center[i] = CENTERED_DI_TO_SDL(tsp[j].lOffset);
                if (sources-1 > j)
                 j++;
             }
