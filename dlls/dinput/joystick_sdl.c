@@ -733,6 +733,83 @@ static BOOL enum_device_state_ds4_13button(SDL_Joystick *js, JoystickImpl *This,
     return FALSE;
 }
 
+static BOOL enum_device_state_ms_xb360(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
+{
+#define SPECIALCASE_TRIGGERS -1
+
+    static const struct {
+        int type;
+        int sdl_idx;
+        int dnp_id;
+    } map_ms_xb360[] = {
+        { ITEM_TYPE_AXIS, 1, 1 }, /* left vert */
+        { ITEM_TYPE_AXIS, 0, 0 }, /* left horiz */
+        { ITEM_TYPE_AXIS, 4, 4 }, /* right vert */
+        { ITEM_TYPE_AXIS, 3, 3 }, /* right horiz */
+        { ITEM_TYPE_AXIS, SPECIALCASE_TRIGGERS, 2 }, /* combined triggers */
+
+        { ITEM_TYPE_BUTTON, 0, 0}, /* A */
+        { ITEM_TYPE_BUTTON, 1, 1}, /* B */
+        { ITEM_TYPE_BUTTON, 2, 2}, /* X */
+        { ITEM_TYPE_BUTTON, 3, 3}, /* Y */
+        { ITEM_TYPE_BUTTON, 4, 4}, /* LB */
+        { ITEM_TYPE_BUTTON, 5, 5}, /* RB */
+        { ITEM_TYPE_BUTTON, 6, 6}, /* Back */
+        { ITEM_TYPE_BUTTON, 7, 7}, /* Start */
+        /* guide button (#8) is not reported by dinput */
+        { ITEM_TYPE_BUTTON, 9, 8}, /* LS */
+        { ITEM_TYPE_BUTTON, 10, 9}, /* RS */
+
+        { ITEM_TYPE_HAT, 0, 0 }, /* d-pad */
+    };
+
+    if(idx >= ARRAY_SIZE(map_ms_xb360))
+        return FALSE;
+
+    st->type = map_ms_xb360[idx].type;
+    st->id = map_ms_xb360[idx].dnp_id;
+
+    if(map_ms_xb360[idx].sdl_idx >= 0)
+    {
+        /* simple reads */
+        switch(map_ms_xb360[idx].type)
+        {
+        case ITEM_TYPE_BUTTON:
+            st->val = SDL_JoystickGetButton(js, map_ms_xb360[idx].sdl_idx);
+            return TRUE;
+
+        case ITEM_TYPE_AXIS:
+            st->val = SDL_JoystickGetAxis(js, map_ms_xb360[idx].sdl_idx);
+            return TRUE;
+
+        case ITEM_TYPE_HAT:
+            st->val = SDL_JoystickGetHat(js, map_ms_xb360[idx].sdl_idx);
+            return TRUE;
+        }
+    }
+
+    switch(map_ms_xb360[idx].sdl_idx){
+    case SPECIALCASE_TRIGGERS:
+    {
+        /* combined triggers axis */
+        static const int SDL_LTRIGGER = 2;
+        static const int SDL_RTRIGGER = 5;
+
+        int ltrigger = SDL_JoystickGetAxis(js, SDL_LTRIGGER);
+        int rtrigger = SDL_JoystickGetAxis(js, SDL_RTRIGGER);
+
+        /* yes, they are combined into one value and cannot be detangled */
+        st->val = (ltrigger - rtrigger) / 2;
+        return TRUE;
+    }
+    }
+
+    ERR("???\n"); /* error in static data above */
+    return FALSE;
+
+#undef SPECIALCASE_TRIGGERS
+}
+
 /* straight 1:1 mapping of SDL items and dinput items */
 static BOOL enum_device_state_standard(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
 {
@@ -895,6 +972,21 @@ static enum_device_state_function select_enum_function(struct SDLDev *sdldev)
             TRACE("SDL only reports %u buttons for this PS4 controller. Please upgrade SDL to > 2.0.10 and/or give your user hidraw access.\n",
                     sdldev->n_buttons);
             return enum_device_state_ds4_13button;
+        }
+        break;
+
+    case VID_MICROSOFT:
+        switch(sdldev->product_id){
+        case PID_MICROSOFT_XBOX_360:
+        case PID_MICROSOFT_XBOX_360_WIRELESS:
+        case PID_MICROSOFT_XBOX_360_ADAPTER:
+        case PID_MICROSOFT_XBOX_ONE:
+        case PID_MICROSOFT_XBOX_ONE_CF:
+        case PID_MICROSOFT_XBOX_ONE_ELITE:
+        case PID_MICROSOFT_XBOX_ONE_S:
+        case PID_MICROSOFT_XBOX_ONE_S_2:
+            TRACE("for %04x/%04x, polling xbox 360/one controller\n", sdldev->vendor_id, sdldev->product_id);
+            return enum_device_state_ms_xb360;
         }
         break;
     }
