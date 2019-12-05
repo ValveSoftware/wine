@@ -159,6 +159,18 @@ static inline void ascii_to_unicode( WCHAR *dst, const char *src, size_t len )
     while (len--) *dst++ = (unsigned char)*src++;
 }
 
+static WCHAR *strcasestrW( const WCHAR *str, const WCHAR *sub )
+{
+    while (*str)
+    {
+        const WCHAR *p1 = str, *p2 = sub;
+        while (*p1 && *p2 && tolowerW(*p1) == tolowerW(*p2)) { p1++; p2++; }
+        if (!*p2) return (WCHAR *)str;
+        str++;
+    }
+    return NULL;
+}
+
 #define RTL_UNLOAD_EVENT_TRACE_NUMBER 64
 
 typedef struct _RTL_UNLOAD_EVENT_TRACE
@@ -2869,6 +2881,25 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname,
 done:
     RtlFreeHeap( GetProcessHeap(), 0, dllname );
     if (wow64_old_value) RtlWow64EnableFsRedirectionEx( 1, &wow64_old_value );
+
+    if (status != STATUS_SUCCESS)
+    {
+        /* HACK for Proton issue #17
+         *
+         * Some games try to load mfc42.dll, but then proceed to not use it.
+         * Just return a handle to kernel32 in that case.
+         */
+        static const WCHAR mfc42W[] = {'m','f','c','4','2',0};
+        static const WCHAR kernel32W[] = {'k','e','r','n','e','l','3','2','.','d','l','l',0};
+        const char *sgi = getenv( "SteamGameId" );
+        if (sgi &&
+            !strcmp( sgi, "105450" ) && /* AoE3 */
+            strcasestrW( libname, mfc42W ))
+        {
+            WARN_(loaddll)( "Using a fake mfc42 handle\n" );
+            status = find_dll_file( load_path, kernel32W, nt_name, pwm, module, image_info, st );
+        }
+    }
     return status;
 }
 
