@@ -2452,11 +2452,10 @@ BOOL wined3d_adapter_init(struct wined3d_adapter *adapter, unsigned int ordinal,
     TRACE("Display device: %s.\n", debugstr_w(display_device.DeviceName));
     strcpyW(adapter->device_name, display_device.DeviceName);
 
-    if (!AllocateLocallyUniqueId(&adapter->luid))
-    {
-        ERR("Failed to set adapter LUID (%#x).\n", GetLastError());
-        return FALSE;
-    }
+    /* HACK: Use ordinal instead of allocating a new LUID for every wined3d instance */
+    adapter->luid.HighPart = 0;
+    adapter->luid.LowPart = ordinal;
+
     TRACE("Allocated LUID %08x:%08x for adapter %p.\n",
             adapter->luid.HighPart, adapter->luid.LowPart, adapter);
 
