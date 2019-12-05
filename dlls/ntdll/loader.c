@@ -2938,6 +2938,43 @@ static BOOL is_apiset_dll_name( const WCHAR *name )
     return !wcsnicmp( name, name_prefix, ARRAY_SIZE(name_prefix) - 1 );
 }
 
+static WCHAR *strstriW( const WCHAR *str, const WCHAR *sub )
+{
+    while (*str)
+    {
+        const WCHAR *p1 = str, *p2 = sub;
+        while (*p1 && *p2 && tolower(*p1) == tolower(*p2)) { p1++; p2++; }
+        if (!*p2) return (WCHAR *)str;
+        str++;
+    }
+    return NULL;
+}
+
+static WCHAR *get_env( const WCHAR *var )
+{
+    UNICODE_STRING name, value;
+
+    RtlInitUnicodeString( &name, var );
+    value.Length = 0;
+    value.MaximumLength = 0;
+    value.Buffer = NULL;
+
+    if (RtlQueryEnvironmentVariable_U( NULL, &name, &value ) == STATUS_BUFFER_TOO_SMALL) {
+
+        value.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, value.Length + sizeof(WCHAR) );
+        value.MaximumLength = value.Length;
+
+        if (RtlQueryEnvironmentVariable_U( NULL, &name, &value ) == STATUS_SUCCESS) {
+            value.Buffer[value.Length / sizeof(WCHAR)] = 0;
+            return value.Buffer;
+        }
+
+        RtlFreeHeap( GetProcessHeap(), 0, value.Buffer );
+    }
+
+    return NULL;
+}
+
 /***********************************************************************
  *	find_dll_file
  *
@@ -2993,6 +3030,26 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
 done:
     RtlFreeHeap( GetProcessHeap(), 0, fullname );
     if (wow64_old_value) RtlWow64EnableFsRedirectionEx( 1, &wow64_old_value );
+
+    if (status != STATUS_SUCCESS)
+    {
+        /* HACK for Proton issue #17
+         *
+         * Some games try to load mfc42.dll, but then proceed to not use it.
+         * Just return a handle to kernel32 in that case.
+         */
+        WCHAR *sgi = get_env( L"SteamGameId" );
+        if (sgi)
+        {
+            if (!wcscmp( sgi, L"105450") &&
+                    strstriW( libname, L"mfc42" ))
+            {
+                WARN_(loaddll)( "Using a fake mfc42 handle\n" );
+                status = find_dll_file( load_path, L"kernel32.dll", nt_name, pwm, mapping, image_info, id );
+            }
+            RtlFreeHeap(GetProcessHeap(), 0, sgi);
+        }
+    }
     return status;
 }
 
