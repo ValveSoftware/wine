@@ -2879,12 +2879,10 @@ BOOL wined3d_adapter_init(struct wined3d_adapter *adapter, unsigned int ordinal,
         return FALSE;
     }
 
-    if (!AllocateLocallyUniqueId(&adapter->luid))
-    {
-        ERR("Failed to set adapter LUID (%#x).\n", GetLastError());
-        wined3d_output_cleanup(&adapter->output);
-        return FALSE;
-    }
+    /* HACK: Use ordinal instead of allocating a new LUID for every wined3d instance */
+    adapter->luid.HighPart = 0;
+    adapter->luid.LowPart = ordinal;
+
     TRACE("Allocated LUID %08x:%08x for adapter %p.\n",
             adapter->luid.HighPart, adapter->luid.LowPart, adapter);
 
