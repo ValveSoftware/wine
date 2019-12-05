@@ -2727,6 +2727,17 @@ done:
     return status;
 }
 
+static WCHAR *strstriW( const WCHAR *str, const WCHAR *sub )
+{
+    while (*str)
+    {
+        const WCHAR *p1 = str, *p2 = sub;
+        while (*p1 && *p2 && tolower(*p1) == tolower(*p2)) { p1++; p2++; }
+        if (!*p2) return (WCHAR *)str;
+        str++;
+    }
+    return NULL;
+}
 
 /***********************************************************************
  *	find_dll_file
@@ -2795,6 +2806,30 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, con
 done:
     RtlFreeHeap( GetProcessHeap(), 0, dllname );
     if (wow64_old_value) RtlWow64EnableFsRedirectionEx( 1, &wow64_old_value );
+
+    if (status != STATUS_SUCCESS)
+    {
+        /* HACK for Proton issue #17
+         *
+         * Some games try to load mfc42.dll, but then proceed to not use it.
+         * Just return a handle to kernel32 in that case.
+         */
+        static const WCHAR mfc42W[] = {'m','f','c','4','2',0};
+        static const WCHAR kernel32W[] = {'k','e','r','n','e','l','3','2','.','d','l','l',0};
+        static const WCHAR steamgameidW[] = {'S','t','e','a','m','G','a','m','e','I','d',0};
+        static const WCHAR aoe3_gameidW[] = {'1','0','5','4','5','0',0}; /* AoE3 */
+        WCHAR *sgi = get_env( steamgameidW );
+        if (sgi)
+        {
+            if (!wcscmp( sgi, aoe3_gameidW ) &&
+                    strstriW( libname, mfc42W ))
+            {
+                WARN_(loaddll)( "Using a fake mfc42 handle\n" );
+                status = find_dll_file( load_path, kernel32W, dllW, nt_name, pwm, module, image_info, id );
+            }
+            RtlFreeHeap(GetProcessHeap(), 0, sgi);
+        }
+    }
     return status;
 }
 
