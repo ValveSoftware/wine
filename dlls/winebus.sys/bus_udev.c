@@ -107,6 +107,9 @@ struct vidpid {
     WORD vid, pid;
 };
 
+/* the kernel is a great place to learn about these DS4 quirks */
+#define QUIRK_DS4_BT 0x1
+
 struct platform_private
 {
     struct udev_device *udev_device;
@@ -116,6 +119,8 @@ struct platform_private
     int control_pipe[2];
 
     struct vidpid vidpid;
+
+    DWORD quirks;
 
     DWORD bus_type;
 };
@@ -889,7 +894,20 @@ static DWORD CALLBACK device_report_thread(void *args)
         else if (size == 0)
             TRACE_(hid_report)("Failed to read report\n");
         else
-            process_hid_report(device, report_buffer, size);
+        {
+            if(private->quirks & QUIRK_DS4_BT)
+            {
+                /* Following the kernel example, report 17 is the only type we care about for
+                 * DS4 over bluetooth. but it has two extra header bytes, so skip those. */
+                if(report_buffer[0] == 0x11)
+                {
+                    /* update report number to match windows */
+                    report_buffer[2] = 1;
+                    process_hid_report(device, report_buffer + 2, size - 2);
+                }
+            }else
+                process_hid_report(device, report_buffer, size);
+        }
     }
     return 0;
 }
@@ -1214,6 +1232,34 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
     return strcasestr(blacklist, needle) != NULL;
 }
 
+static void set_quirks(struct platform_private *private)
+{
+#define VID_SONY 0x054c
+#define PID_SONY_DUALSHOCK_4 0x05c4
+#define PID_SONY_DUALSHOCK_4_2 0x09cc
+#define PID_SONY_DUALSHOCK_4_DONGLE 0x0ba0
+
+    private->quirks = 0;
+
+    switch(private->vidpid.vid)
+    {
+    case VID_SONY:
+        switch(private->vidpid.pid)
+        {
+        case PID_SONY_DUALSHOCK_4:
+        case PID_SONY_DUALSHOCK_4_2:
+        case PID_SONY_DUALSHOCK_4_DONGLE:
+            if(private->bus_type == BUS_BLUETOOTH)
+                private->quirks |= QUIRK_DS4_BT;
+            break;
+        }
+        break;
+    }
+
+    TRACE("for %04x/%04x, quirks set to: 0x%x\n", private->vidpid.vid,
+            private->vidpid.pid, private->quirks);
+}
+
 static void try_add_device(struct udev_device *dev)
 {
     DWORD vid = 0, pid = 0, version = 0, bus_type = 0;
@@ -1351,6 +1397,7 @@ static void try_add_device(struct udev_device *dev)
         private->vidpid.vid = vid;
         private->vidpid.pid = pid;
         private->bus_type = bus_type;
+        set_quirks(private);
 #ifdef HAS_PROPER_INPUT_HEADER
         if (strcmp(subsystem, "input") == 0)
             if (!build_report_descriptor((struct wine_input_private*)private, dev))
