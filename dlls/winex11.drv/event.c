@@ -829,6 +829,17 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (is_virtual_desktop() && hwnd == NtUserGetDesktopWindow()) retry_grab_clipping_window();
     if (hwnd == NtUserGetDesktopWindow()) return FALSE;
 
+    /* Focus was just restored but it can be right after super was
+     * pressed and gnome-shell needs a bit of time to respond and
+     * toggle the activity view. If we grab the cursor right away
+     * it will cancel it and super key will do nothing.
+     */
+    if (event->mode == NotifyUngrab && wm_is_mutter(event->display))
+    {
+        LARGE_INTEGER timeout = {.QuadPart = 100 * -10000};
+        NtDelayExecution( FALSE, &timeout );
+    }
+
     x11drv_thread_data()->keymapnotify_hwnd = hwnd;
 
     /* when keyboard grab is released, re-apply the cursor clipping rect */
