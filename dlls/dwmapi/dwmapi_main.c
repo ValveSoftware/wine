@@ -209,6 +209,13 @@ HRESULT WINAPI DwmGetWindowAttribute(HWND hwnd, DWORD attribute, PVOID pv_attrib
         *(BOOL*)(pv_attribute) = FALSE;
         break;
 
+    case DWMWA_EXTENDED_FRAME_BOUNDS:
+        if (size < sizeof(RECT)) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
+
+        WARN("DWMWA_EXTENDED_FRAME_BOUNDS: returning window rect.\n");
+        GetWindowRect(hwnd, pv_attribute);
+        break;
+
     case DWMWA_CLOAKED:
         if (size < sizeof(DWORD)) return E_INVALIDARG;
 
