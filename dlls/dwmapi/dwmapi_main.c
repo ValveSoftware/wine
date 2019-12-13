@@ -198,7 +198,31 @@ HRESULT WINAPI DwmGetWindowAttribute(HWND hwnd, DWORD attribute, PVOID pv_attrib
 {
     FIXME("(%p %ld %p %ld) stub\n", hwnd, attribute, pv_attribute, size);
 
-    return E_NOTIMPL;
+    if (!hwnd) return E_HANDLE;
+    if (!pv_attribute) return E_INVALIDARG;
+
+    switch (attribute)
+    {
+    case DWMWA_NCRENDERING_ENABLED:
+        if (size < sizeof(BOOL)) return E_INVALIDARG;
+
+        WARN("DWMWA_NCRENDERING_ENABLED: always returning FALSE.\n");
+        *(BOOL*)(pv_attribute) = FALSE;
+        break;
+
+    case DWMWA_CLOAKED:
+        if (size < sizeof(DWORD)) return E_INVALIDARG;
+
+        WARN("DWMWA_CLOAKED: always returning 0.\n");
+        *(DWORD*)(pv_attribute) = 0;
+        break;
+
+    default:
+        FIXME("unimplemented attribute %ld, size %lu, for hwnd %p.\n", attribute, size, hwnd);
+        return E_INVALIDARG;
+    }
+
+    return S_OK;
 }
 
 /**********************************************************************
