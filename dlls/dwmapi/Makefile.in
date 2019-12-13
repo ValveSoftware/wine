@@ -1,6 +1,7 @@
 MODULE    = dwmapi.dll
 IMPORTS   = user32
 IMPORTLIB = dwmapi
+IMPORTS   = user32
 
 EXTRADLLFLAGS = -Wb,--prefer-native
 
