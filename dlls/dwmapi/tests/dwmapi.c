@@ -29,6 +29,7 @@ static LRESULT WINAPI test_wndproc(HWND hwnd, UINT message, WPARAM wParam, LPARA
 static void test_DwmGetWindowAttribute(void)
 {
     BOOL nc_rendering;
+    RECT rc, rc2;
     HRESULT hr;
 
     hr = DwmGetWindowAttribute(NULL, DWMWA_NCRENDERING_ENABLED, &nc_rendering, sizeof(nc_rendering));
@@ -45,6 +46,19 @@ static void test_DwmGetWindowAttribute(void)
     hr = DwmGetWindowAttribute(test_wnd, DWMWA_NCRENDERING_ENABLED, &nc_rendering, sizeof(nc_rendering));
     ok(hr == S_OK, "DwmGetWindowAttribute(DWMWA_NCRENDERING_ENABLED) failed 0x%08x.\n", hr);
     ok(nc_rendering == FALSE || nc_rendering == TRUE, "non-boolean value 0x%x.\n", nc_rendering);
+
+    hr = DwmGetWindowAttribute(test_wnd, DWMWA_EXTENDED_FRAME_BOUNDS, &rc, sizeof(rc) - 1);
+    ok(hr == HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER) || broken(hr == E_INVALIDARG) /* Vista */,
+       "DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS) returned 0x%08x.\n", hr);
+    hr = DwmGetWindowAttribute(test_wnd, DWMWA_EXTENDED_FRAME_BOUNDS, &rc, sizeof(rc));
+    if (hr != E_HANDLE && hr != DWM_E_COMPOSITIONDISABLED /* Vista */)  /* composition is on */
+    {
+        /* For top-level Windows, the returned rect is always at least as large as GetWindowRect */
+        GetWindowRect(test_wnd, &rc2);
+        ok(hr == S_OK, "DwmGetWindowAttribute(DWMWA_EXTENDED_FRAME_BOUNDS) failed 0x%08x.\n", hr);
+        ok(rc.left >= rc2.left && rc.right <= rc2.right && rc.top >= rc2.top && rc.bottom <= rc2.bottom,
+           "returned rect %s not enclosed in window rect %s.\n", wine_dbgstr_rect(&rc), wine_dbgstr_rect(&rc2));
+    }
 }
 
 START_TEST(dwmapi)
