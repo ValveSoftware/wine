@@ -120,6 +120,8 @@ static const UINT button_up_data[NB_BUTTONS] =
     XBUTTON2
 };
 
+static unsigned char *x_pointer_map;
+
 XContext cursor_context = 0;
 
 static HWND cursor_window;
@@ -139,6 +141,26 @@ MAKE_FUNCPTR(XIQueryVersion);
 MAKE_FUNCPTR(XISelectEvents);
 #undef MAKE_FUNCPTR
 #endif
+
+void X11DRV_InitMouse( Display *display )
+{
+    int i, n_buttons;
+    unsigned char *new_map, *old_map;
+
+    n_buttons = XGetPointerMapping(display, NULL, 0);
+
+    new_map = HeapAlloc(GetProcessHeap(), 0, sizeof(*new_map) * n_buttons);
+
+    /* default mapping */
+    for (i = 0; i < n_buttons; ++i)
+        new_map[i] = i + 1;
+
+    XGetPointerMapping(display, new_map, n_buttons);
+
+    old_map = InterlockedExchangePointer((void**)&x_pointer_map, new_map);
+
+    HeapFree(GetProcessHeap(), 0, old_map);
+}
 
 /***********************************************************************
  *		X11DRV_Xcursor_Init
@@ -1886,6 +1908,16 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     return TRUE;
 }
 
+/* apply current X pointer map to raw button event */
+static unsigned char translate_raw_button(int from)
+{
+    unsigned char *cur_map = x_pointer_map;
+
+    if (!cur_map) return from;
+
+    return cur_map[from - 1];
+}
+
 /***********************************************************************
  *           X11DRV_RawButtonEvent
  */
@@ -1893,7 +1925,7 @@ static BOOL X11DRV_RawButtonEvent( XGenericEventCookie *cookie )
 {
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     XIRawEvent *event = cookie->data;
-    int button = event->detail - 1;
+    int button = translate_raw_button(event->detail) - 1;
     INPUT input;
 
     if (button >= NB_BUTTONS) return FALSE;
