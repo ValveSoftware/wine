@@ -2089,6 +2089,7 @@ HWND WINAPI GetDesktopWindow(void)
         WCHAR app[MAX_PATH + ARRAY_SIZE( explorer )];
         WCHAR cmdline[MAX_PATH + ARRAY_SIZE( explorer ) + ARRAY_SIZE( args )];
         WCHAR desktop[MAX_PATH];
+        char *ld_preload;
         void *redir;
 
         SERVER_START_REQ( set_user_object_info )
@@ -2121,6 +2122,12 @@ HWND WINAPI GetDesktopWindow(void)
         strcpyW( cmdline, app );
         strcatW( cmdline, args );
 
+        /* HACK: Unset LD_PRELOAD before executing explorer.exe to disable buggy gameoverlayrenderer.so
+         * It's not going to work through the CreateProcessW env parameter, as it will not be used for the loader execv.
+         */
+        if ((ld_preload = getenv("LD_PRELOAD")))
+            unsetenv("LD_PRELOAD");
+
         Wow64DisableWow64FsRedirection( &redir );
         if (CreateProcessW( app, cmdline, NULL, NULL, FALSE, DETACHED_PROCESS,
                             NULL, windir, &si, &pi ))
@@ -2132,6 +2139,9 @@ HWND WINAPI GetDesktopWindow(void)
         }
         else WARN( "failed to start explorer, err %d\n", GetLastError() );
         Wow64RevertWow64FsRedirection( redir );
+
+        /* HACK: Restore the previous value, just in case */
+        if (ld_preload) setenv("LD_PRELOAD", ld_preload, 1);
 
         SERVER_START_REQ( get_desktop_window )
         {
