@@ -1977,13 +1977,24 @@ BOOL X11DRV_MappingNotify( HWND dummy, XEvent *event )
 {
     HWND hwnd;
 
-    XRefreshKeyboardMapping(&event->xmapping);
-    X11DRV_InitKeyboard( event->xmapping.display );
+    switch (event->xmapping.request)
+    {
+    case MappingModifier:
+    case MappingKeyboard:
+        XRefreshKeyboardMapping( &event->xmapping );
+        X11DRV_InitKeyboard( event->xmapping.display );
 
-    hwnd = GetFocus();
-    if (!hwnd) hwnd = GetActiveWindow();
-    PostMessageW(hwnd, WM_INPUTLANGCHANGEREQUEST,
-                 0 /*FIXME*/, (LPARAM)X11DRV_GetKeyboardLayout(0));
+        hwnd = GetFocus();
+        if (!hwnd) hwnd = GetActiveWindow();
+        PostMessageW(hwnd, WM_INPUTLANGCHANGEREQUEST,
+                     0 /*FIXME*/, (LPARAM)X11DRV_GetKeyboardLayout(0));
+        break;
+
+    case MappingPointer:
+        X11DRV_InitMouse( event->xmapping.display );
+        break;
+    }
+
     return TRUE;
 }
 

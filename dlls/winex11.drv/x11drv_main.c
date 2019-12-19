@@ -616,6 +616,7 @@ static BOOL process_attach(void)
     if (use_xkb) use_xkb = XkbUseExtension( gdi_display, NULL, NULL );
 #endif
     X11DRV_InitKeyboard( gdi_display );
+    X11DRV_InitMouse( gdi_display );
     if (use_xim) use_xim = X11DRV_InitXIM( input_style );
 
     X11DRV_DisplayDevices_Init(FALSE);

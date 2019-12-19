@@ -37,6 +37,8 @@
 #include <X11/extensions/shape.h>
 #endif /* HAVE_LIBXSHAPE */
 
+#include "x11drv.h"
+
 /* avoid conflict with field names in included win32 headers */
 #undef Status
 #include "windef.h"
@@ -45,7 +47,7 @@
 #include "winuser.h"
 #include "wine/unicode.h"
 
-#include "x11drv.h"
+
 #include "wine/debug.h"
 #include "wine/server.h"
 #include "mwm.h"
