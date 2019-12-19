@@ -1939,6 +1939,10 @@ void check_dinput_hooks(LPDIRECTINPUTDEVICE8W iface, BOOL acquired)
             dev->raw_device.dwFlags = 0;
             if (dev->dwCoopLevel & DISCL_BACKGROUND)
                 dev->raw_device.dwFlags |= RIDEV_INPUTSINK;
+            if ((dev->dwCoopLevel & DISCL_EXCLUSIVE) && dev->raw_device.usUsage == 2)
+                dev->raw_device.dwFlags |= (RIDEV_CAPTUREMOUSE|RIDEV_NOLEGACY);
+            if ((dev->dwCoopLevel & DISCL_EXCLUSIVE) && dev->raw_device.usUsage == 6)
+                dev->raw_device.dwFlags |= (RIDEV_NOHOTKEYS|RIDEV_NOLEGACY);
             dev->raw_device.hwndTarget = di_em_win;
         }
         else
