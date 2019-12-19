@@ -712,6 +712,7 @@ static NTSTATUS x11drv_init( void *arg )
     if (use_xkb) use_xkb = XkbUseExtension( gdi_display, NULL, NULL );
 #endif
     X11DRV_InitKeyboard( gdi_display );
+    X11DRV_InitMouse( gdi_display );
     if (use_xim) use_xim = X11DRV_InitXIM( input_style );
 
     init_user_driver();
