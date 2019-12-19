@@ -36,9 +36,6 @@
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(xrandr);
-#ifdef HAVE_XRRGETPROVIDERRESOURCES
-WINE_DECLARE_DEBUG_CHANNEL(winediag);
-#endif
 
 #ifdef SONAME_LIBXRANDR
 
@@ -367,7 +364,6 @@ static BOOL is_broken_driver(void)
     XRRScreenResources *screen_resources;
     XRROutputInfo *output_info;
     XRRModeInfo *first_mode;
-    INT major, event, error;
     INT output_idx, i, j;
     BOOL only_one_mode;
 
@@ -418,15 +414,6 @@ static BOOL is_broken_driver(void)
 
         if (!only_one_mode)
             continue;
-
-        /* Check if it is NVIDIA proprietary driver */
-        if (XQueryExtension( gdi_display, "NV-CONTROL", &major, &event, &error ))
-        {
-            ERR_(winediag)("Broken NVIDIA RandR detected, falling back to RandR 1.0. "
-                           "Please consider using the Nouveau driver instead.\n");
-            pXRRFreeScreenResources( screen_resources );
-            return TRUE;
-        }
     }
     pXRRFreeScreenResources( screen_resources );
     return FALSE;
