@@ -629,22 +629,6 @@ static int xrandr12_init_modes(void)
 
     X11DRV_Settings_SetRealMode(primary_width, primary_height);
 
-    /* Recent (304.64, possibly earlier) versions of the nvidia driver only
-     * report a DFP's native mode through RandR 1.2 / 1.3. Standard DMT modes
-     * are only listed through RandR 1.0 / 1.1. This is completely useless,
-     * but NVIDIA considers this a feature, so it's unlikely to change. The
-     * best we can do is to fall back to RandR 1.0 and encourage users to
-     * consider more cooperative driver vendors when we detect such a
-     * configuration. */
-    if (only_one_resolution && XQueryExtension( gdi_display, "NV-CONTROL", &i, &j, &ret ))
-    {
-        ERR_(winediag)("Broken NVIDIA RandR detected, falling back to RandR 1.0. "
-                       "Please consider using the Nouveau driver instead.\n");
-        ret = -1;
-        HeapFree( GetProcessHeap(), 0, xrandr12_modes );
-        goto done;
-    }
-
     X11DRV_Settings_AddDepthModes();
     ret = 0;
 
