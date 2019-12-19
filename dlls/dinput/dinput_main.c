@@ -1936,7 +1936,9 @@ void check_dinput_hooks(LPDIRECTINPUTDEVICE8W iface, BOOL acquired)
     {
         if (acquired)
         {
-            dev->raw_device.dwFlags = RIDEV_INPUTSINK;
+            dev->raw_device.dwFlags = 0;
+            if (dev->dwCoopLevel & DISCL_BACKGROUND)
+                dev->raw_device.dwFlags |= RIDEV_INPUTSINK;
             dev->raw_device.hwndTarget = di_em_win;
         }
         else
