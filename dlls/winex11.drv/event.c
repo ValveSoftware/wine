@@ -608,7 +608,7 @@ static void set_input_focus( struct x11drv_win_data *data )
 /**********************************************************************
  *              set_focus
  */
-static void set_focus( Display *display, HWND hwnd, Time time )
+static void set_focus( XEvent *xev, HWND hwnd, Time time )
 {
     HWND focus;
     Window win;
@@ -627,7 +627,7 @@ static void set_focus( Display *display, HWND hwnd, Time time )
     if (win)
     {
         TRACE( "setting focus to %p (%lx) time=%ld\n", focus, win, time );
-        XSetInputFocus( display, win, RevertToParent, time );
+        XSetInputFocus( xev->xany.display, win, RevertToParent, time );
     }
 }
 
@@ -726,7 +726,7 @@ static void handle_wm_protocols( HWND hwnd, XEvent *xev )
                                        MAKELONG( HTMENU, WM_LBUTTONDOWN ) );
             if (ma != MA_NOACTIVATEANDEAT && ma != MA_NOACTIVATE)
             {
-                set_focus( event->display, hwnd, event_time );
+                set_focus( xev, hwnd, event_time );
                 return;
             }
         }
@@ -735,7 +735,7 @@ static void handle_wm_protocols( HWND hwnd, XEvent *xev )
             hwnd = GetForegroundWindow();
             if (!hwnd) hwnd = last_focus;
             if (!hwnd) hwnd = GetDesktopWindow();
-            set_focus( event->display, hwnd, event_time );
+            set_focus( xev, hwnd, event_time );
             return;
         }
         /* try to find some other window to give the focus to */
@@ -743,7 +743,7 @@ static void handle_wm_protocols( HWND hwnd, XEvent *xev )
         if (hwnd) hwnd = GetAncestor( hwnd, GA_ROOT );
         if (!hwnd) hwnd = GetActiveWindow();
         if (!hwnd) hwnd = last_focus;
-        if (hwnd && can_activate_window(hwnd)) set_focus( event->display, hwnd, event_time );
+        if (hwnd && can_activate_window(hwnd)) set_focus( xev, hwnd, event_time );
     }
     else if (protocol == x11drv_atom(_NET_WM_PING))
     {
@@ -823,7 +823,7 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         if (hwnd) hwnd = GetAncestor( hwnd, GA_ROOT );
         if (!hwnd) hwnd = GetActiveWindow();
         if (!hwnd) hwnd = x11drv_thread_data()->last_focus;
-        if (hwnd && can_activate_window(hwnd)) set_focus( event->display, hwnd, CurrentTime );
+        if (hwnd && can_activate_window(hwnd)) set_focus( xev, hwnd, CurrentTime );
     }
     else SetForegroundWindow( hwnd );
     return TRUE;
