@@ -24,6 +24,7 @@
 #include "wine/port.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <signal.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -57,6 +58,13 @@
 #endif
 #ifdef __APPLE__
 # include <mach/mach.h>
+#endif
+
+#if defined(HAVE_LINUX_FILTER_H) && defined(HAVE_LINUX_SECCOMP_H) && defined(HAVE_SYS_PRCTL_H)
+#define HAVE_SECCOMP 1
+# include <linux/filter.h>
+# include <linux/seccomp.h>
+# include <sys/prctl.h>
 #endif
 
 #define NONAMELESSUNION
@@ -3103,6 +3111,38 @@ static void usr1_handler( int signal, siginfo_t *siginfo, void *ucontext )
     restore_context( &context, ucontext );
 }
 
+extern unsigned int __wine_nb_syscalls;
+
+#ifdef HAVE_SECCOMP
+static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
+{
+    unsigned int thunk_ret_offset;
+    ucontext_t *ctx = sigcontext;
+    unsigned int syscall_nr;
+    void ***rsp;
+
+    WARN("SIGSYS, rax %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX]);
+
+    syscall_nr = ctx->uc_mcontext.gregs[REG_RAX] - 0xf000;
+    if (syscall_nr >= __wine_nb_syscalls)
+    {
+        ERR("Syscall %u is undefined.\n", syscall_nr);
+        return;
+    }
+
+    rsp = (void ***)&ctx->uc_mcontext.gregs[REG_RSP];
+    *rsp -= 1;
+
+#ifdef __APPLE__
+    thunk_ret_offset = 0xb;
+#else
+    thunk_ret_offset = 0xc;
+#endif
+
+    **rsp = (void *)(ctx->uc_mcontext.gregs[REG_RIP] + thunk_ret_offset);
+    ctx->uc_mcontext.gregs[REG_RIP] = (ULONG64)__wine_syscall_dispatcher;
+}
+#endif
 
 /***********************************************************************
  *           __wine_set_signal_handler   (NTDLL.@)
@@ -3273,6 +3313,53 @@ void signal_init_thread( TEB *teb )
 #endif
 }
 
+static void install_bpf(struct sigaction *sig_act)
+{
+#ifdef HAVE_SECCOMP
+    static struct sock_filter filter[] =
+    {
+       BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
+                (offsetof(struct seccomp_data, nr))),
+       BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0xf000, 0, 1),
+       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
+       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
+    struct sock_fprog prog;
+    int ret;
+
+    memset(&prog, 0, sizeof(prog));
+    prog.len = ARRAY_SIZE(filter);
+    prog.filter = filter;
+
+    if (!(ret = prctl(PR_GET_SECCOMP, 0, NULL, 0, 0)))
+    {
+        if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
+        {
+            perror("prctl(PR_SET_NO_NEW_PRIVS, ...)");
+            exit(1);
+        }
+
+        if (prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &prog, 0, 0))
+        {
+            perror("prctl(PR_SET_SECCOMP, ...)");
+            exit(1);
+        }
+    }
+    else
+    {
+        if (ret == 2)
+            TRACE("Seccomp filters already installed.\n");
+        else
+            ERR("Seccomp filters cannot be installed, ret %d, error %s.\n", ret, strerror(errno));
+    }
+
+    sig_act->sa_sigaction = sigsys_handler;
+    sigaction(SIGSYS, sig_act, NULL);
+#else
+    WARN("Built without seccomp.\n");
+#endif
+}
+
 /**********************************************************************
  *		signal_init_process
  */
@@ -3305,6 +3392,9 @@ void signal_init_process(void)
     sig_act.sa_sigaction = trap_handler;
     if (sigaction( SIGTRAP, &sig_act, NULL ) == -1) goto error;
 #endif
+
+    install_bpf(&sig_act);
+
     return;
 
  error:
