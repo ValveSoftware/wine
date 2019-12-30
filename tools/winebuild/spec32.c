@@ -531,7 +531,7 @@ static void output_syscall_thunks_x64( DLLSPEC *spec )
         output_cfi( ".cfi_startproc" );
         output( "\t.byte 0x4c,0x8b,0xd1\n" );                               /* mov r10, rcx */
         output( "\t.byte 0xb8\n" );                                         /* mov eax, SYSCALL */
-        output( "\t.long %d\n", i );
+        output( "\t.long %d\n", i + 0xf000 );
         output( "\t.byte 0xf6,0x04,0x25,0x08,0x03,0xfe,0x7f,0x01\n" );      /* test byte ptr [0x7ffe0308], 1 */
         output( "\t.byte 0x75,0x03\n" );                                    /* jne (over syscall) */
         output( "\t.byte 0x0f,0x05\n" );                                    /* syscall */
@@ -576,6 +576,9 @@ static void output_syscall_thunks_x64( DLLSPEC *spec )
         output( "\t.byte %d\n", max(get_args_size(odp), 32) - 32 );
     }
 
+    output( "%s\n", asm_globl("__wine_nb_syscalls") );
+    output( "\t.long %u\n", spec->nb_syscalls );
+
     output( "\n/* syscall dispatcher */\n\n" );
     output( "\t.text\n" );
     output( "\t.align %d\n", get_alignment(16) );
@@ -600,6 +603,8 @@ static void output_syscall_thunks_x64( DLLSPEC *spec )
         output( "\tsubq $0xb,0x8(%%rbp)\n" );
     else
         output( "\tsubq $0xc,0x8(%%rbp)\n" );
+
+    output( "\tsub $0xf000,%%rax\n" );
 
     /* copy over any arguments on the stack */
     output( "\tleaq 0x38(%%rbp),%%rsi\n" );
@@ -1233,7 +1238,7 @@ static void create_stub_exports_text_x64( DLLSPEC *spec )
         align_output_rva( 16, 16 );
         put_label( odp->link_name );
         put_byte( 0x4c ); put_byte( 0x8b ); put_byte( 0xd1 );  /* mov r10, rcx */
-        put_byte( 0xb8 ); put_dword( i );                      /* mov eax, SYSCALL */
+        put_byte( 0xb8 ); put_dword( i + 0xf000 );             /* mov eax, SYSCALL */
         put_byte( 0xf6 ); put_byte( 0x04 ); put_byte( 0x25 );  /* test byte ptr [0x7ffe0308], 1 */
                 put_byte( 0x08 ); put_byte( 0x03 ); put_byte( 0xfe );
                 put_byte( 0x7f ); put_byte( 0x01 );
