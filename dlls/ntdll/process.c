@@ -1378,7 +1378,7 @@ static NTSTATUS get_pe_file_info( UNICODE_STRING *path, ULONG attributes,
 
     memset( info, 0, sizeof(*info) );
     InitializeObjectAttributes( &attr, path, attributes, 0, 0 );
-    if ((status = NtOpenFile( handle, GENERIC_READ, &attr, &io,
+    if ((status = __syscall_NtOpenFile( handle, GENERIC_READ, &attr, &io,
                               FILE_SHARE_READ | FILE_SHARE_DELETE, FILE_SYNCHRONOUS_IO_NONALERT )))
     {
         BOOL is_64bit;

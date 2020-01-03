@@ -317,4 +317,13 @@ void     WINAPI LdrInitializeThunk(CONTEXT*,void**,ULONG_PTR,ULONG_PTR);
 /* string functions */
 int __cdecl NTDLL_tolower( int c );
 int __cdecl _stricmp( LPCSTR str1, LPCSTR str2 );
+
+#if defined(__i386__) || defined(__x86_64__)
+NTSTATUS WINAPI __syscall_NtOpenFile( PHANDLE handle, ACCESS_MASK access,
+                            POBJECT_ATTRIBUTES attr, PIO_STATUS_BLOCK io,
+                            ULONG sharing, ULONG options );
+#else
+#define __syscall_NtOpenFile NtOpenFile
+#endif
+
 #endif

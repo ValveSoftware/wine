@@ -3026,7 +3026,7 @@ NTSTATUS DIR_get_unix_cwd( char **cwd )
         attr.SecurityDescriptor = NULL;
         attr.SecurityQualityOfService = NULL;
 
-        status = NtOpenFile( &handle, SYNCHRONIZE, &attr, &io, 0,
+        status = __syscall_NtOpenFile( &handle, SYNCHRONIZE, &attr, &io, 0,
                              FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT );
         RtlFreeUnicodeString( &dirW );
         if (status != STATUS_SUCCESS) goto done;

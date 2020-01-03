@@ -249,7 +249,7 @@ static NTSTATUS open_nls_data_file( ULONG type, ULONG id, HANDLE *file )
         return STATUS_NO_MEMORY;
     valueW.Length = sprintfW( valueW.Buffer, pathfmtW, system_dir, name ) * sizeof(WCHAR);
     InitializeObjectAttributes( &attr, &valueW, 0, 0, NULL );
-    status = NtOpenFile( file, GENERIC_READ, &attr, &io, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_ALERT );
+    status = __syscall_NtOpenFile( file, GENERIC_READ, &attr, &io, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_ALERT );
     if (!status) TRACE( "found %s\n", debugstr_w( valueW.Buffer ));
     RtlFreeUnicodeString( &valueW );
     if (status != STATUS_OBJECT_NAME_NOT_FOUND) return status;
@@ -274,7 +274,7 @@ static NTSTATUS open_nls_data_file( ULONG type, ULONG id, HANDLE *file )
         strcatW( valueW.Buffer, name );
         valueW.Length = strlenW(valueW.Buffer) * sizeof(WCHAR);
         InitializeObjectAttributes( &attr, &valueW, 0, 0, NULL );
-        status = NtOpenFile( file, GENERIC_READ, &attr, &io, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_ALERT );
+        status = __syscall_NtOpenFile( file, GENERIC_READ, &attr, &io, FILE_SHARE_READ, FILE_SYNCHRONOUS_IO_ALERT );
         if (!status) TRACE( "found %s\n", debugstr_w( valueW.Buffer ));
     }
     RtlFreeUnicodeString( &valueW );
