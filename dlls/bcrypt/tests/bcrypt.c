@@ -2862,7 +2862,7 @@ raw_secret_end:
     buf = malloc(size);
     status = BCryptDeriveKey(secret, BCRYPT_KDF_HASH, &hash_params, buf, size, &size, 0);
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
-    ok(!(memcmp(hashed_secret, buf, size)), "wrong data\n");
+    todo_wine ok(!(memcmp(hashed_secret, buf, size)), "wrong data\n");
     free(buf);
 
     /* ulVersion is not verified */
@@ -3428,7 +3428,6 @@ static void test_SecretAgreement(void)
     ok(status == STATUS_INVALID_PARAMETER, "got %#lx\n", status);
 
     status = BCryptDeriveKey(secret, L"HASH", NULL, NULL, 0, &size, 0);
-    todo_wine
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
 
     status = BCryptDestroyHash(secret);
