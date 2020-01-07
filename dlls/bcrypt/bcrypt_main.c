@@ -2080,7 +2080,114 @@ NTSTATUS WINAPI BCryptDeriveKey(BCRYPT_SECRET_HANDLE handle, LPCWSTR kdf, BCrypt
     if (!secret || secret->hdr.magic != MAGIC_SECRET) return STATUS_INVALID_HANDLE;
     if (!kdf) return STATUS_INVALID_PARAMETER;
 
-    if (!(lstrcmpW( kdf, BCRYPT_KDF_RAW_SECRET )))
+    if (flags) FIXME("flags ignored: %08x\n", flags);
+
+    if (!(lstrcmpW( kdf, BCRYPT_KDF_HASH )))
+    {
+        unsigned int i;
+        BCryptBuffer *hash_algorithm = NULL;
+        BCryptBuffer *secret_prepend = NULL;
+        BCryptBuffer *secret_append = NULL;
+        enum alg_id hash_alg_id;
+        ULONG hash_length;
+        struct hash_impl hash;
+        NTSTATUS status;
+
+        if (parameter)
+        {
+            for (i = 0; i < parameter->cBuffers; i++)
+            {
+                BCryptBuffer *cur_buffer = &parameter->pBuffers[i];
+                switch(cur_buffer->BufferType)
+                {
+                case KDF_HASH_ALGORITHM:
+                    if (hash_algorithm)
+                        FIXME("Duplicate KDF_HASH_ALGORITHM, untested\n");
+                    hash_algorithm = cur_buffer;
+                    break;
+                case KDF_SECRET_PREPEND:
+                    if (secret_prepend)
+                        FIXME("Multiple prefixes unsupported\n");
+                    secret_prepend = cur_buffer;
+                    break;
+                case KDF_SECRET_APPEND:
+                    if (secret_append)
+                        FIXME("Multiple suffixes unsupported\n");
+                    secret_append = cur_buffer;
+                    break;
+                default:
+                    FIXME("Unsupported BCRYPT_KDF_HASH parameter type %x\n", cur_buffer->BufferType);
+                    break;
+                }
+            }
+        }
+
+        if (!(hash_algorithm))
+            hash_alg_id = ALG_ID_SHA1;
+        else
+        {
+            for (i = 0; i < ARRAY_SIZE( builtin_algorithms ); i++)
+            {
+                if (!lstrcmpW( hash_algorithm->pvBuffer, builtin_algorithms[i].name))
+                {
+                    hash_alg_id = i;
+                    break;
+                }
+            }
+            if (i == ARRAY_SIZE(builtin_algorithms))
+            {
+                WARN("Algorithm %s not found\n", debugstr_w(hash_algorithm->pvBuffer));
+                return STATUS_NOT_SUPPORTED;
+            }
+            if (builtin_algorithms[hash_alg_id].class != BCRYPT_HASH_INTERFACE)
+            {
+                WARN("Incorrect class %u\n", builtin_algorithms[hash_alg_id].class);
+                return STATUS_NOT_SUPPORTED;
+            }
+        }
+
+        hash_length = builtin_algorithms[hash_alg_id].hash_length;
+
+        if (!derived)
+        {
+            *result = hash_length;
+            return STATUS_SUCCESS;
+        }
+
+        if ((status = hash_init(&hash, hash_alg_id)))
+        {
+            return status;
+        }
+
+        if (secret_prepend)
+        {
+            hash_update(&hash, hash_alg_id, secret_prepend->pvBuffer, secret_prepend->cbBuffer);
+        }
+
+        hash_update(&hash, hash_alg_id, secret->data, secret->data_len);
+
+        if (secret_append)
+        {
+            hash_update(&hash, hash_alg_id, secret_append->pvBuffer, secret_append->cbBuffer);
+        }
+
+        if (derived_size >= hash_length)
+        {
+            hash_finish(&hash, hash_alg_id, derived, derived_size);
+            *result = hash_length;
+        }
+        else
+        {
+            UCHAR *output = heap_alloc(hash_length);
+            hash_finish(&hash, hash_alg_id, output, hash_length);
+            memcpy(derived, output, derived_size);
+            heap_free(output);
+            *result = derived_size;
+        }
+
+        return STATUS_SUCCESS;
+    }
+    else if (!(lstrcmpW( kdf, BCRYPT_KDF_RAW_SECRET )))
     {
         ULONG secret_length = secret->data_len;
         unsigned int i;;
