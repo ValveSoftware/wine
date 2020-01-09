@@ -387,6 +387,20 @@ static struct message *alloc_hardware_message( lparam_t info, struct hw_msg_sour
     return msg;
 }
 
+static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
+{
+    int updated;
+
+    x = max( min( x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
+    y = max( min( y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
+    updated = (desktop->cursor.x != x || desktop->cursor.y != y);
+    desktop->cursor.x = x;
+    desktop->cursor.y = y;
+    desktop->cursor.last_change = get_tick_count();
+
+    return updated;
+}
+
 /* set the cursor position and queue the corresponding mouse message */
 static void set_cursor_pos( struct desktop *desktop, int x, int y )
 {
@@ -394,7 +408,11 @@ static void set_cursor_pos( struct desktop *desktop, int x, int y )
     struct message *msg;
 
     if (current->process->rawinput_mouse &&
-        current->process->rawinput_mouse->flags & RIDEV_NOLEGACY) return;
+        current->process->rawinput_mouse->flags & RIDEV_NOLEGACY)
+    {
+        update_desktop_cursor_pos( desktop, x, y );
+        return;
+    }
 
     if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
 
@@ -1556,12 +1574,7 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
     {
         if (msg->msg == WM_MOUSEMOVE)
         {
-            int x = max( min( msg->x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
-            int y = max( min( msg->y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
-            if (desktop->cursor.x != x || desktop->cursor.y != y) always_queue = 1;
-            desktop->cursor.x = x;
-            desktop->cursor.y = y;
-            desktop->cursor.last_change = get_tick_count();
+            if (update_desktop_cursor_pos( desktop, msg->x, msg->y )) always_queue = 1;
         }
         if (desktop->keystate[VK_LBUTTON] & 0x80)  msg->wparam |= MK_LBUTTON;
         if (desktop->keystate[VK_MBUTTON] & 0x80)  msg->wparam |= MK_MBUTTON;
@@ -1798,7 +1811,10 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
     if (!(req_flags & SEND_HWMSG_WINDOW))
         return 0;
     if ((device = current->process->rawinput_mouse) && (device->flags & RIDEV_NOLEGACY))
+    {
+        if (flags & MOUSEEVENTF_MOVE) update_desktop_cursor_pos( desktop, x, y );
         return 0;
+    }
 
     for (i = 0; i < ARRAY_SIZE( messages ); i++)
     {
