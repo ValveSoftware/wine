@@ -125,7 +125,8 @@ BOOL wm_is_mutter(Display *display)
                     TRACE("Got WM name %s\n", wm_name);
                     cached = (strcmp(wm_name, "GNOME Shell") == 0) ||
                         (strcmp(wm_name, "Mutter") == 0);
-                }
+                }else
+                    cached = 0;
                 XFree(wm_name);
             }else
                 cached = 0;
