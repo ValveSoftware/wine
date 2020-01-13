@@ -611,6 +611,7 @@ extern void change_systray_owner( Display *display, Window systray_window ) DECL
 extern void update_systray_balloon_position(void) DECLSPEC_HIDDEN;
 extern HWND create_foreign_window( Display *display, Window window ) DECLSPEC_HIDDEN;
 extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
+extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
 
 extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_enabled(void) DECLSPEC_HIDDEN;
