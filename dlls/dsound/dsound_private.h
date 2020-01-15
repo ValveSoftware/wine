@@ -208,7 +208,6 @@ HRESULT IKsPrivatePropertySetImpl_Create(REFIID riid, void **ppv) DECLSPEC_HIDDE
 HRESULT DSOUND_Create(REFIID riid, void **ppv) DECLSPEC_HIDDEN;
 HRESULT DSOUND_Create8(REFIID riid, void **ppv) DECLSPEC_HIDDEN;
 HRESULT IDirectSoundImpl_Create(IUnknown *outer_unk, REFIID riid, void **ppv, BOOL has_ds8) DECLSPEC_HIDDEN;
-void DSOUND_ParseSpeakerConfig(DirectSoundDevice *device) DECLSPEC_HIDDEN;
 
 /* primary.c */
 
