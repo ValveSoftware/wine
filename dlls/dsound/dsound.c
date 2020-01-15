@@ -23,7 +23,6 @@
 #include <assert.h>
 #include <stdarg.h>
 #include <stdio.h>
-#include <math.h>
 
 #define COBJMACROS
 
@@ -137,9 +136,9 @@ static HRESULT DirectSoundDevice_Create(DirectSoundDevice ** ppDevice)
     device->ref            = 1;
     device->priolevel      = DSSCL_NORMAL;
     device->stopped        = 1;
-    device->speaker_config = DSSPEAKER_COMBINED(DSSPEAKER_STEREO, DSSPEAKER_GEOMETRY_WIDE);
 
-    DSOUND_ParseSpeakerConfig(device);
+    device->speaker_config = 0;
+    device->num_speakers = 0;
 
     /* 3D listener initial parameters */
     device->ds3dl.dwSize   = sizeof(DS3DLISTENER);
@@ -1123,76 +1122,4 @@ HRESULT WINAPI DirectSoundCreate8(
     *ppDS = pDS;
 
     return hr;
-}
-
-void DSOUND_ParseSpeakerConfig(DirectSoundDevice *device)
-{
-    switch (DSSPEAKER_CONFIG(device->speaker_config)) {
-        case DSSPEAKER_MONO:
-            device->speaker_angles[0] = M_PI/180.0f * 0.0f;
-            device->speaker_num[0] = 0;
-            device->num_speakers = 1;
-            device->lfe_channel = -1;
-        break;
-
-        case DSSPEAKER_STEREO:
-        case DSSPEAKER_HEADPHONE:
-            device->speaker_angles[0] = M_PI/180.0f * -90.0f;
-            device->speaker_angles[1] = M_PI/180.0f *  90.0f;
-            device->speaker_num[0] = 0; /* Left */
-            device->speaker_num[1] = 1; /* Right */
-            device->num_speakers = 2;
-            device->lfe_channel = -1;
-        break;
-
-        case DSSPEAKER_QUAD:
-            device->speaker_angles[0] = M_PI/180.0f * -135.0f;
-            device->speaker_angles[1] = M_PI/180.0f *  -45.0f;
-            device->speaker_angles[2] = M_PI/180.0f *   45.0f;
-            device->speaker_angles[3] = M_PI/180.0f *  135.0f;
-            device->speaker_num[0] = 2; /* Rear left */
-            device->speaker_num[1] = 0; /* Front left */
-            device->speaker_num[2] = 1; /* Front right */
-            device->speaker_num[3] = 3; /* Rear right */
-            device->num_speakers = 4;
-            device->lfe_channel = -1;
-        break;
-
-        case DSSPEAKER_5POINT1_BACK:
-            device->speaker_angles[0] = M_PI/180.0f * -135.0f;
-            device->speaker_angles[1] = M_PI/180.0f *  -45.0f;
-            device->speaker_angles[2] = M_PI/180.0f *    0.0f;
-            device->speaker_angles[3] = M_PI/180.0f *   45.0f;
-            device->speaker_angles[4] = M_PI/180.0f *  135.0f;
-            device->speaker_angles[5] = 9999.0f;
-            device->speaker_num[0] = 4; /* Rear left */
-            device->speaker_num[1] = 0; /* Front left */
-            device->speaker_num[2] = 2; /* Front centre */
-            device->speaker_num[3] = 1; /* Front right */
-            device->speaker_num[4] = 5; /* Rear right */
-            device->speaker_num[5] = 3; /* LFE */
-            device->num_speakers = 6;
-            device->lfe_channel = 3;
-        break;
-
-        case DSSPEAKER_5POINT1_SURROUND:
-            device->speaker_angles[0] = M_PI/180.0f *  -90.0f;
-            device->speaker_angles[1] = M_PI/180.0f *  -30.0f;
-            device->speaker_angles[2] = M_PI/180.0f *    0.0f;
-            device->speaker_angles[3] = M_PI/180.0f *   30.0f;
-            device->speaker_angles[4] = M_PI/180.0f *   90.0f;
-            device->speaker_angles[5] = 9999.0f;
-            device->speaker_num[0] = 4; /* Rear left */
-            device->speaker_num[1] = 0; /* Front left */
-            device->speaker_num[2] = 2; /* Front centre */
-            device->speaker_num[3] = 1; /* Front right */
-            device->speaker_num[4] = 5; /* Rear right */
-            device->speaker_num[5] = 3; /* LFE */
-            device->num_speakers = 6;
-            device->lfe_channel = 3;
-        break;
-
-        default:
-            WARN("unknown speaker_config %u\n", device->speaker_config);
-    }
 }
