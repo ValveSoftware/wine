@@ -52,6 +52,35 @@ static int (*pGetCurrentMode)(void);
 static LONG (*pSetCurrentMode)(int mode);
 static const char *handler_name;
 
+static const struct fs_mode {
+    int w, h;
+} fs_modes[] = {
+    /* this table should provide a few resolution options for common display
+     * ratios, so users can choose to render at lower resolution for
+     * performance. */
+    { 640,  480}, /*  4:3 */
+    { 800,  600}, /*  4:3 */
+    {1024,  768}, /*  4:3 */
+    {1600, 1200}, /*  4:3 */
+    { 960,  540}, /* 16:9 */
+    {1280,  720}, /* 16:9 */
+    {1600,  900}, /* 16:9 */
+    {1920, 1080}, /* 16:9 */
+    {2560, 1440}, /* 16:9 */
+    {2880, 1620}, /* 16:9 */
+    {3200, 1800}, /* 16:9 */
+    {1440,  900}, /*  8:5 */
+    {1680, 1050}, /*  8:5 */
+    {1920, 1200}, /*  8:5 */
+    {2560, 1600}, /*  8:5 */
+    {1440,  960}, /*  3:2 */
+    {1920, 1280}, /*  3:2 */
+    {2560, 1080}, /* 21:9 ultra-wide */
+    {1920,  800}, /* 12:5 */
+    {3840, 1600}, /* 12:5 */
+    {1280, 1024}, /*  5:4 */
+};
+
 /*
  * Set the handlers for resolution changing functions
  * and initialize the master list of modes
@@ -68,6 +97,7 @@ struct x11drv_mode_info *X11DRV_Settings_SetHandlers(const char *name,
     if(pNewSCM)
         pSetCurrentMode = pNewSCM;
     TRACE("Resolution settings now handled by: %s\n", name);
+    nmodes += ARRAY_SIZE(fs_modes);
     if (reserve_depths)
         /* leave room for other depths and refresh rates */
         dd_max_modes = 2*(3+1)*(nmodes);
@@ -119,35 +149,6 @@ BOOL X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigne
 
     return TRUE;
 }
-
-static struct fs_mode {
-    int w, h;
-} fs_modes[] = {
-    /* this table should provide a few resolution options for common display
-     * ratios, so users can choose to render at lower resolution for
-     * performance. */
-    { 640,  480}, /*  4:3 */
-    { 800,  600}, /*  4:3 */
-    {1024,  768}, /*  4:3 */
-    {1600, 1200}, /*  4:3 */
-    { 960,  540}, /* 16:9 */
-    {1280,  720}, /* 16:9 */
-    {1600,  900}, /* 16:9 */
-    {1920, 1080}, /* 16:9 */
-    {2560, 1440}, /* 16:9 */
-    {2880, 1620}, /* 16:9 */
-    {3200, 1800}, /* 16:9 */
-    {1440,  900}, /*  8:5 */
-    {1680, 1050}, /*  8:5 */
-    {1920, 1200}, /*  8:5 */
-    {2560, 1600}, /*  8:5 */
-    {1440,  960}, /*  3:2 */
-    {1920, 1280}, /*  3:2 */
-    {2560, 1080}, /* 21:9 ultra-wide */
-    {1920,  800}, /* 12:5 */
-    {3840, 1600}, /* 12:5 */
-    {1280, 1024}, /*  5:4 */
-};
 
 static int sort_display_modes(const void *l, const void *r)
 {
