@@ -278,6 +278,30 @@ static void update_relative_valuators(XIAnyClassInfo **valuators, int n_valuator
 
 
 /***********************************************************************
+ *              X11DRV_XInput2_Init
+ */
+void X11DRV_XInput2_Init(void)
+{
+#ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
+    struct x11drv_thread_data *data = x11drv_thread_data();
+    int major = 2, minor = 0;
+
+    if (xinput2_available &&
+        !pXIQueryVersion( data->display, &major, &minor ))
+    {
+        TRACE( "XInput2 %d.%d available\n", major, minor );
+        data->xi2_state = xi_disabled;
+    }
+    else
+    {
+        data->xi2_state = xi_unavailable;
+        WARN( "XInput 2.0 not available\n" );
+    }
+#endif
+}
+
+
+/***********************************************************************
  *              enable_xinput2
  */
 static void enable_xinput2(void)
@@ -288,19 +312,7 @@ static void enable_xinput2(void)
     unsigned char mask_bits[XIMaskLen(XI_LASTEVENT)];
     int count;
 
-    if (!xinput2_available) return;
-
-    if (data->xi2_state == xi_unknown)
-    {
-        int major = 2, minor = 0;
-        if (!pXIQueryVersion( data->display, &major, &minor )) data->xi2_state = xi_disabled;
-        else
-        {
-            data->xi2_state = xi_unavailable;
-            WARN( "X Input 2 not available\n" );
-        }
-    }
-    if (data->xi2_state == xi_unavailable) return;
+    if (data->xi2_state != xi_disabled) return;
     if (!pXIGetClientPointer( data->display, None, &data->xi2_core_pointer )) return;
 
     mask.mask     = mask_bits;
@@ -1921,9 +1933,9 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 
 
 /***********************************************************************
- *              X11DRV_XInput2_Init
+ *              X11DRV_XInput2_Load
  */
-void X11DRV_XInput2_Init(void)
+void X11DRV_XInput2_Load(void)
 {
 #if defined(SONAME_LIBXI) && defined(HAVE_X11_EXTENSIONS_XINPUT2_H)
     int event, error;
