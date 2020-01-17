@@ -503,12 +503,12 @@ DWORD CDECL X11DRV_MsgWaitForMultipleObjectsEx( DWORD count, const HANDLE *handl
 }
 
 /***********************************************************************
- *           EVENT_x11_time_to_win32_time
+ *           x11drv_time_to_ticks
  *
  * Make our timer and the X timer line up as best we can
  *  Pass 0 to retrieve the current adjustment value (times -1)
  */
-DWORD EVENT_x11_time_to_win32_time(Time time)
+DWORD x11drv_time_to_ticks( Time time )
 {
   static DWORD adjust = 0;
   DWORD now = GetTickCount();
@@ -569,10 +569,10 @@ static void set_input_focus( struct x11drv_win_data *data )
 
     if (!data->whole_window) return;
 
-    if (EVENT_x11_time_to_win32_time(0))
+    if (x11drv_time_to_ticks(0))
         /* ICCCM says don't use CurrentTime, so try to use last message time if possible */
         /* FIXME: this is not entirely correct */
-        timestamp = GetMessageTime() - EVENT_x11_time_to_win32_time(0);
+        timestamp = GetMessageTime() - x11drv_time_to_ticks(0);
     else
         timestamp = CurrentTime;
 

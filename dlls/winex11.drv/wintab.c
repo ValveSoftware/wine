@@ -893,7 +893,7 @@ static BOOL motion_event( HWND hwnd, XEvent *event )
 
     /* Set cursor to inverted if cursor is the eraser */
     gMsgPacket.pkStatus = (cursor->TYPE  == CSR_TYPE_ERASER ? TPS_INVERT:0);
-    gMsgPacket.pkTime = EVENT_x11_time_to_win32_time(motion->time);
+    gMsgPacket.pkTime = x11drv_time_to_ticks(motion->time);
     gMsgPacket.pkSerialNumber = gSerial++;
     gMsgPacket.pkCursor = curnum;
     gMsgPacket.pkX = motion->axis_data[0];
@@ -926,7 +926,7 @@ static BOOL button_event( HWND hwnd, XEvent *event )
     /* Set cursor to inverted if cursor is the eraser */
     gMsgPacket.pkStatus = (cursor->TYPE == CSR_TYPE_ERASER ? TPS_INVERT:0);
     set_button_state(curnum, button->deviceid);
-    gMsgPacket.pkTime = EVENT_x11_time_to_win32_time(button->time);
+    gMsgPacket.pkTime = x11drv_time_to_ticks(button->time);
     gMsgPacket.pkSerialNumber = gSerial++;
     gMsgPacket.pkCursor = curnum;
     if (button->axes_count > 0) {
@@ -976,7 +976,7 @@ static BOOL proximity_event( HWND hwnd, XEvent *event )
     /* Set cursor to inverted if cursor is the eraser */
     gMsgPacket.pkStatus = (cursor->TYPE == CSR_TYPE_ERASER ? TPS_INVERT:0);
     gMsgPacket.pkStatus |= (event->type==proximity_out_type)?TPS_PROXIMITY:0;
-    gMsgPacket.pkTime = EVENT_x11_time_to_win32_time(proximity->time);
+    gMsgPacket.pkTime = x11drv_time_to_ticks(proximity->time);
     gMsgPacket.pkSerialNumber = gSerial++;
     gMsgPacket.pkCursor = curnum;
     gMsgPacket.pkX = proximity->axis_data[0];
