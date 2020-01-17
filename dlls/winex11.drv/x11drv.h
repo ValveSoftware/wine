@@ -267,6 +267,7 @@ extern void X11DRV_ThreadDetach(void);
 /* X11 driver internal functions */
 
 extern void X11DRV_Xcursor_Init(void);
+extern void X11DRV_XInput2_Load(void);
 extern void X11DRV_XInput2_Init(void);
 
 extern DWORD copy_image_bits( BITMAPINFO *info, BOOL is_r8g8b8, XImage *image,

@@ -735,7 +735,7 @@ static NTSTATUS x11drv_init( void *arg )
 #ifdef SONAME_LIBXCOMPOSITE
     X11DRV_XComposite_Init();
 #endif
-    X11DRV_XInput2_Init();
+    X11DRV_XInput2_Load();
 
     XkbUseExtension( gdi_display, NULL, NULL );
     X11DRV_InitKeyboard( gdi_display );
@@ -848,6 +848,8 @@ struct x11drv_thread_data *x11drv_init_thread_data(void)
     NtUserGetThreadInfo()->driver_data = (UINT_PTR)data;
 
     if (use_xim) xim_thread_attach( data );
+
+    X11DRV_XInput2_Init();
 
     return data;
 }
