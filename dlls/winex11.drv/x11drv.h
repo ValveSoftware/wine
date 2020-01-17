@@ -597,7 +597,7 @@ extern int xinput2_opcode;
 extern Bool (*pXGetEventData)( Display *display, XEvent /*XGenericEventCookie*/ *event );
 extern void (*pXFreeEventData)( Display *display, XEvent /*XGenericEventCookie*/ *event );
 
-extern DWORD EVENT_x11_time_to_win32_time(Time time);
+extern DWORD x11drv_time_to_ticks( Time time );
 
 /* X11 driver private messages */
 enum x11drv_window_messages
