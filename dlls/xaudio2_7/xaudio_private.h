@@ -97,6 +97,7 @@ typedef struct _XA2VoiceImpl {
         float *stream;
     } engine_params;
 
+    BOOL stop_engine_thread;
     HANDLE engine_thread;
     pthread_cond_t engine_done, engine_ready;
     pthread_mutex_t engine_lock;
