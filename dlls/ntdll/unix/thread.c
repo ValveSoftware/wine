@@ -2247,6 +2247,50 @@ NTSTATUS WINAPI NtSetInformationThread( HANDLE handle, THREADINFOCLASS class,
             status = wine_server_call( req );
         }
         SERVER_END_REQ;
+
+#ifdef HAVE_PRCTL
+
+#ifndef PR_SET_NAME
+# define PR_SET_NAME 15
+#endif
+
+        if (SUCCEEDED(status))
+        {
+            if (handle == GetCurrentThread())
+            {
+                if (info->ThreadName.Length)
+                {
+                    size_t len = info->ThreadName.Length / sizeof(WCHAR);
+                    char *descA;
+                    int ret;
+
+                    if ((descA = malloc( len * 3 + 1 )))
+                    {
+                        ret = ntdll_wcstoumbs( info->ThreadName.Buffer, len, descA, len * 3, FALSE );
+                        if (ret >= 0)
+                        {
+                            descA[ret] = '\0';
+                            prctl( PR_SET_NAME, descA );
+                        }
+                        else
+                        {
+                            FIXME("Failed to ntdll_wcstoumbs\n");
+                        }
+                        free( descA );
+                    }
+                }
+                else
+                {
+                    prctl( PR_SET_NAME, "" );
+                }
+            }
+            else
+            {
+                FIXME("Can't set other thread's platform description\n");
+            }
+        }
+#endif
+
         return status;
     }
 
