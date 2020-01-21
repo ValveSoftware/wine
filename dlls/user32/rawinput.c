@@ -146,7 +146,8 @@ static struct hid_device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *ifa
     return device;
 }
 
-HANDLE rawinput_handle_from_device_handle(HANDLE device)
+static void find_hid_devices(BOOL force);
+HANDLE rawinput_handle_from_device_handle(HANDLE device, BOOL rescan)
 {
     WCHAR buffer[sizeof(OBJECT_NAME_INFORMATION) + MAX_PATH + 1];
     OBJECT_NAME_INFORMATION *info = (OBJECT_NAME_INFORMATION*)&buffer;
@@ -175,10 +176,15 @@ HANDLE rawinput_handle_from_device_handle(HANDLE device)
         }
     }
 
-    return NULL;
+    if (!rescan)
+        return NULL;
+
+    find_hid_devices(TRUE);
+
+    return rawinput_handle_from_device_handle(device, FALSE);
 }
 
-static void find_hid_devices(void)
+static void find_hid_devices(BOOL force)
 {
     static ULONGLONG last_check;
 
@@ -190,7 +196,7 @@ static void find_hid_devices(void)
     HDEVINFO set;
     DWORD idx;
 
-    if (GetTickCount64() - last_check < 2000)
+    if (!force && GetTickCount64() - last_check < 2000)
         return;
     last_check = GetTickCount64();
 
@@ -255,7 +261,7 @@ UINT WINAPI GetRawInputDeviceList(RAWINPUTDEVICELIST *devices, UINT *device_coun
         return ~0U;
     }
 
-    find_hid_devices();
+    find_hid_devices(FALSE);
 
     if (!devices)
     {

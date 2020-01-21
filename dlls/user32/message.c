@@ -2393,7 +2393,7 @@ static BOOL process_rawinput_message( MSG *msg, const struct hardware_msg_data *
     else if (msg_data->rawinput.type == RIM_TYPEHID)
     {
         rawinput->header.dwSize  = FIELD_OFFSET(RAWINPUT, data.hid.bRawData) + data_len;
-        rawinput->header.hDevice = rawinput_handle_from_device_handle(wine_server_ptr_handle(msg_data->rawinput.hid.device));
+        rawinput->header.hDevice = rawinput_handle_from_device_handle(wine_server_ptr_handle(msg_data->rawinput.hid.device), TRUE);
         rawinput->header.wParam  = 0;
 
         rawinput->data.hid.dwSizeHid = data_len;
