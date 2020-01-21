@@ -423,6 +423,7 @@ HRESULT WINAPI DECLSPEC_HOTPATCH SetThreadDescription( HANDLE thread, PCWSTR des
 {
     THREAD_DESCRIPTION_INFORMATION info;
     int length;
+    HRESULT hr;
 
     TRACE( "(%p, %s)\n", thread, debugstr_w( description ));
 
@@ -434,7 +435,42 @@ HRESULT WINAPI DECLSPEC_HOTPATCH SetThreadDescription( HANDLE thread, PCWSTR des
     info.Description.Length = info.Description.MaximumLength = length;
     info.Description.Buffer = (WCHAR *)description;
 
-    return HRESULT_FROM_NT(NtSetInformationThread( thread, ThreadDescription, &info, sizeof(info) ));
+    hr = HRESULT_FROM_NT(NtSetInformationThread( thread, ThreadDescription, &info, sizeof(info) ));
+
+#ifdef HAVE_PRCTL
+
+#ifndef PR_SET_NAME
+# define PR_SET_NAME 15
+#endif
+
+    if (SUCCEEDED(hr))
+    {
+        if (thread == GetCurrentThread())
+        {
+            if (description)
+            {
+                char *descA;
+
+                length = WideCharToMultiByte( CP_UNIXCP, 0, description, -1, NULL, 0, NULL, NULL );
+                if ((descA = HeapAlloc( GetProcessHeap(), 0, length )))
+                {
+                    WideCharToMultiByte( CP_UNIXCP, 0, descW, -1, descA, length, NULL, NULL );
+
+                    prctl( PR_SET_NAME, descA );
+
+                    HeapFree( GetProcessHeap(), 0, descA );
+                }
+            }
+            else
+                prctl( PR_SET_NAME, "" );
+        }
+        else
+            FIXME("Can't set other thread's platform description\n");
+    }
+
+#endif
+
+    return hr;
 }
 
 /***********************************************************************
