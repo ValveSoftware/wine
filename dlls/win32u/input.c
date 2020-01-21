@@ -2843,6 +2843,12 @@ BOOL WINAPI NtUserClipCursor( const RECT *rect )
 
     TRACE( "Clipping to %s\n", wine_dbgstr_rect(rect) );
 
+    if (NtUserGetForegroundWindow() == NtUserGetDesktopWindow())
+    {
+        WARN( "desktop is foreground, ignoring ClipCursor\n" );
+        rect = NULL;
+    }
+
     if (rect)
     {
         HWND foreground = NtUserGetForegroundWindow();
