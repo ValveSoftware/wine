@@ -380,7 +380,8 @@ void X11DRV_resize_desktop( BOOL send_display_change )
 
     if (GetWindowThreadProcessId( hwnd, NULL ) != GetCurrentThreadId())
     {
-        SendMessageW( hwnd, WM_X11DRV_RESIZE_DESKTOP, 0, (LPARAM)send_display_change );
+        POINT new_mode = fs_hack_current_mode();
+        SendMessageW( hwnd, WM_X11DRV_RESIZE_DESKTOP, MAKEWPARAM(new_mode.x, new_mode.y), (LPARAM)send_display_change );
     }
     else
     {

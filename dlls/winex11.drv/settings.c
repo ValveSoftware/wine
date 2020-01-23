@@ -458,6 +458,21 @@ static LONG X11DRV_nores_SetCurrentMode(int mode)
     return DISP_CHANGE_SUCCESSFUL;
 }
 
+void fs_hack_choose_mode(int w, int h)
+{
+    unsigned int i;
+
+    for(i = 0; i < dd_mode_count; ++i)
+    {
+        if(dd_modes[i].width == w &&
+                dd_modes[i].height == h)
+        {
+            X11DRV_nores_SetCurrentMode(i);
+            break;
+        }
+    }
+}
+
 POINT fs_hack_current_mode(void)
 {
     POINT ret = { dd_modes[currentMode].width,

@@ -2990,7 +2990,7 @@ LRESULT CDECL X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
         }
         return 0;
     case WM_X11DRV_RESIZE_DESKTOP:
-        X11DRV_resize_desktop( (BOOL)lp );
+        fs_hack_choose_mode(LOWORD(wp), HIWORD(wp));
         return 0;
     case WM_X11DRV_SET_CURSOR:
         if ((data = get_win_data( hwnd )))
