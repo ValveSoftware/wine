@@ -5616,12 +5616,12 @@ HKLM,"System\CurrentControlSet\Services\Winsock\Parameters",,16
 HKLM,"System\CurrentControlSet\Services\Winsock2\Parameters\Protocol_Catalog9\Catalog_Entries",,16
 
 [VersionInfo]
-HKLM,%CurrentVersionNT%,"CurrentVersion",2,"6.1"
-HKLM,%CurrentVersionNT%,"CurrentMajorVersionNumber",0x10001,6
-HKLM,%CurrentVersionNT%,"CurrentMinorVersionNumber",0x10001,1
-HKLM,%CurrentVersionNT%,"CSDVersion",2,"Service Pack 1"
-HKLM,%CurrentVersionNT%,"CurrentBuild",2,"7601"
-HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"7601"
+HKLM,%CurrentVersionNT%,"CurrentVersion",2,"10.0"
+HKLM,%CurrentVersionNT%,"CurrentMajorVersionNumber",0x10001,10
+HKLM,%CurrentVersionNT%,"CurrentMinorVersionNumber",0x10001,0
+HKLM,%CurrentVersionNT%,"CSDVersion",2,""
+HKLM,%CurrentVersionNT%,"CurrentBuild",2,"17134"
+HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"17134"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
 HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
@@ -5630,16 +5630,16 @@ HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
-HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 7"
+HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 10"
 HKLM,%Control%\ProductOptions,"ProductType",2,"WinNT"
-HKLM,%Control%\Windows,"CSDVersion",0x10003,0x100
+HKLM,%Control%\Windows,"CSDVersion",0x10003,0x0
 HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
 
 [VersionInfo.ntamd64]
-HKLM,%CurrentVersionNT%,"CurrentVersion",2,"6.1"
-HKLM,%CurrentVersionNT%,"CSDVersion",2,"Service Pack 1"
-HKLM,%CurrentVersionNT%,"CurrentBuild",2,"7601"
-HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"7601"
+HKLM,%CurrentVersionNT%,"CurrentVersion",2,"10.0"
+HKLM,%CurrentVersionNT%,"CSDVersion",2,""
+HKLM,%CurrentVersionNT%,"CurrentBuild",2,"17134"
+HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"17134"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
 HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
@@ -5648,9 +5648,9 @@ HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
-HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 7"
+HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 10"
 HKLM,%Control%\ProductOptions,"ProductType",2,"WinNT"
-HKLM,%Control%\Windows,"CSDVersion",0x10003,0x100
+HKLM,%Control%\Windows,"CSDVersion",0x10003,0x0
 HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
 
 [Wow64]
