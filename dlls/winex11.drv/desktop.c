@@ -444,7 +444,8 @@ void X11DRV_resize_desktop( unsigned int width, unsigned int height )
 
     if (GetWindowThreadProcessId( hwnd, NULL ) != GetCurrentThreadId())
     {
-        SendMessageW( hwnd, WM_X11DRV_RESIZE_DESKTOP, 0, MAKELPARAM( width, height ) );
+        POINT new_mode = fs_hack_current_mode();
+        SendMessageW( hwnd, WM_X11DRV_RESIZE_DESKTOP, MAKEWPARAM(new_mode.x, new_mode.y), MAKELPARAM( width, height ) );
     }
     else
     {
