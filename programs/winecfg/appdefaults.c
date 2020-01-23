@@ -146,7 +146,7 @@ static void update_comboboxes(HWND dialog)
             return;
         }
         if (ver != -1) winver = strdupA( win_versions[ver].szVersion );
-        else winver = strdupA("win7");
+        else winver = strdupA("win10");
     }
     WINE_TRACE("winver is %s\n", winver);
 

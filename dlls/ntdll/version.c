@@ -479,7 +479,7 @@ void version_init(void)
     const WCHAR *p, *appname = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
     WCHAR appversion[MAX_PATH+20];
 
-    current_version = &VersionData[WIN7];
+    current_version = &VersionData[WIN10];
 
     RtlOpenCurrentUser( KEY_ALL_ACCESS, &root );
     attr.Length = sizeof(attr);
