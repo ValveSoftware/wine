@@ -467,7 +467,7 @@ void version_init(void)
 
     NtQuerySystemInformation( SystemWineVersionInformation, wine_version, sizeof(wine_version), NULL );
 
-    current_version = &VersionData[WIN7];
+    current_version = &VersionData[WIN10];
 
     RtlOpenCurrentUser( KEY_ALL_ACCESS, &root );
     attr.Length = sizeof(attr);
