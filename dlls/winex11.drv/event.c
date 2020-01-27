@@ -1171,11 +1171,14 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
     else pos = root_to_virtual_screen( x, y );
 
     if(data->fs_hack){
-        POINT p = fs_hack_current_mode();
-        rect.left = 0;
-        rect.top = 0;
-        rect.right = p.x;
-        rect.bottom = p.y;
+        MONITORINFO monitor_info;
+        HMONITOR monitor;
+
+        monitor = fs_hack_monitor_from_hwnd( hwnd );
+        monitor_info.cbSize = sizeof(monitor_info);
+        GetMonitorInfoW( monitor, &monitor_info );
+        rect = monitor_info.rcMonitor;
+        TRACE( "monitor %p rect: %s\n", monitor, wine_dbgstr_rect(&rect) );
     }else{
         X11DRV_X_to_window_rect( data, &rect, pos.x, pos.y, event->width, event->height );
         if (root_coords) MapWindowPoints( 0, parent, (POINT *)&rect, 2 );

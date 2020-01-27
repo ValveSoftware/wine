@@ -957,29 +957,6 @@ static BOOL xrandr14_get_monitors( ULONG_PTR adapter_id, struct x11drv_monitor *
             OffsetRect( &monitors[i].rc_monitor, -primary_rect.left, -primary_rect.top );
             OffsetRect( &monitors[i].rc_work, -primary_rect.left, -primary_rect.top );
         }
-
-        if (primary_index >= 0 && fs_hack_enabled())
-        {
-            /* apply fs hack to primary monitor */
-            POINT fs_hack = fs_hack_current_mode();
-
-            monitors[0].rc_monitor.right = monitors[0].rc_monitor.left + fs_hack.x;
-            monitors[0].rc_monitor.bottom = monitors[0].rc_monitor.top + fs_hack.y;
-
-            fs_hack.x = monitors[0].rc_work.left;
-            fs_hack.y = monitors[0].rc_work.top;
-            fs_hack_real_to_user(&fs_hack);
-            monitors[0].rc_work.left = fs_hack.x;
-            monitors[0].rc_work.top = fs_hack.y;
-
-            fs_hack.x = monitors[0].rc_work.right;
-            fs_hack.y = monitors[0].rc_work.bottom;
-            fs_hack_real_to_user(&fs_hack);
-            monitors[0].rc_work.right = fs_hack.x;
-            monitors[0].rc_work.bottom = fs_hack.y;
-
-            /* TODO adjust other monitor positions */
-        }
     }
 
     *new_monitors = monitors;
@@ -1379,6 +1356,24 @@ done:
     return ret;
 }
 
+static void xrandr14_convert_coordinates( struct x11drv_display_setting *displays, UINT display_count )
+{
+    INT left_most = INT_MAX, top_most = INT_MAX;
+    UINT display_idx;
+
+    for (display_idx = 0; display_idx < display_count; ++display_idx)
+    {
+        left_most = min( left_most, displays[display_idx].desired_mode.u1.s2.dmPosition.x );
+        top_most = min( top_most, displays[display_idx].desired_mode.u1.s2.dmPosition.y );
+    }
+
+    for (display_idx = 0; display_idx < display_count; ++display_idx)
+    {
+        displays[display_idx].desired_mode.u1.s2.dmPosition.x -= left_most;
+        displays[display_idx].desired_mode.u1.s2.dmPosition.y -= top_most;
+    }
+}
+
 #endif
 
 void X11DRV_XRandR_Init(void)
@@ -1409,6 +1404,7 @@ void X11DRV_XRandR_Init(void)
     settings_handler.free_modes = xrandr10_free_modes;
     settings_handler.get_current_mode = xrandr10_get_current_mode;
     settings_handler.set_current_mode = xrandr10_set_current_mode;
+    settings_handler.convert_coordinates = NULL;
     X11DRV_Settings_SetHandler( &settings_handler );
 
 #ifdef HAVE_XRRGETPROVIDERRESOURCES
@@ -1432,6 +1428,7 @@ void X11DRV_XRandR_Init(void)
         settings_handler.free_modes = xrandr14_free_modes;
         settings_handler.get_current_mode = xrandr14_get_current_mode;
         settings_handler.set_current_mode = xrandr14_set_current_mode;
+        settings_handler.convert_coordinates = xrandr14_convert_coordinates;
         X11DRV_Settings_SetHandler( &settings_handler );
     }
 #endif

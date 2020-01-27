@@ -310,6 +310,7 @@ void X11DRV_init_desktop( Window win, unsigned int width, unsigned int height )
     settings_handler.free_modes = X11DRV_desktop_free_modes;
     settings_handler.get_current_mode = X11DRV_desktop_get_current_mode;
     settings_handler.set_current_mode = X11DRV_desktop_set_current_mode;
+    settings_handler.convert_coordinates = NULL;
     X11DRV_Settings_SetHandler( &settings_handler );
 }
 
@@ -421,8 +422,7 @@ void X11DRV_resize_desktop( BOOL send_display_change )
 
     if (GetWindowThreadProcessId( hwnd, NULL ) != GetCurrentThreadId())
     {
-        POINT new_mode = fs_hack_current_mode();
-        SendMessageW( hwnd, WM_X11DRV_RESIZE_DESKTOP, MAKEWPARAM(new_mode.x, new_mode.y), (LPARAM)send_display_change );
+        SendMessageW( hwnd, WM_X11DRV_RESIZE_DESKTOP, 0, (LPARAM)send_display_change );
     }
     else
     {

@@ -601,35 +601,53 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
     return res;
 }
 
-static VkBool32 X11DRV_query_fs_hack(VkExtent2D *real_sz, VkExtent2D *user_sz,
+static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz,
         VkRect2D *dst_blit, VkFilter *filter)
 {
-    if(fs_hack_enabled()){
-        POINT real_res = fs_hack_real_mode();
-        POINT user_res = fs_hack_current_mode();
-        POINT scaled = fs_hack_get_scaled_screen_size();
-        POINT scaled_origin = {0, 0};
+    struct wine_vk_surface *x11_surface = surface_from_handle(surface);
+    HMONITOR monitor;
+    HWND hwnd;
+
+    if (XFindContext(gdi_display, x11_surface->window, winContext, (char **)&hwnd) != 0)
+    {
+        ERR("Failed to find hwnd context\n");
+        return VK_FALSE;
+    }
+
+    monitor = fs_hack_monitor_from_hwnd(hwnd);
+    if(fs_hack_enabled(monitor)){
+        RECT real_rect = fs_hack_real_mode(monitor);
+        RECT user_rect = fs_hack_current_mode(monitor);
+        SIZE scaled = fs_hack_get_scaled_screen_size(monitor);
+        POINT scaled_origin;
+
+        TRACE("real_rect:%s user_rect:%s scaled:%dx%d scaled_origin:%s\n", wine_dbgstr_rect(&real_rect),
+              wine_dbgstr_rect(&user_rect), scaled.cx, scaled.cy, wine_dbgstr_point(&scaled_origin));
 
         if(filter)
             *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
 
-        fs_hack_user_to_real(&scaled_origin);
+        scaled_origin.x = user_rect.left;
+        scaled_origin.y = user_rect.top;
+        fs_hack_point_user_to_real(&scaled_origin);
+        scaled_origin.x -= real_rect.left;
+        scaled_origin.y -= real_rect.top;
 
         if(real_sz){
-            real_sz->width = real_res.x;
-            real_sz->height = real_res.y;
+            real_sz->width = real_rect.right - real_rect.left;
+            real_sz->height = real_rect.bottom - real_rect.top;
         }
 
         if(user_sz){
-            user_sz->width = user_res.x;
-            user_sz->height = user_res.y;
+            user_sz->width = user_rect.right - user_rect.left;
+            user_sz->height = user_rect.bottom - user_rect.top;
         }
 
         if(dst_blit){
             dst_blit->offset.x = scaled_origin.x;
             dst_blit->offset.y = scaled_origin.y;
-            dst_blit->extent.width = scaled.x;
-            dst_blit->extent.height = scaled.y;
+            dst_blit->extent.width = scaled.cx;
+            dst_blit->extent.height = scaled.cy;
         }
 
         return VK_TRUE;

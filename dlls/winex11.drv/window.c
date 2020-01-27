@@ -1140,6 +1140,7 @@ void update_net_wm_states( struct x11drv_win_data *data )
 {
     DWORD i, style, ex_style, new_state = 0;
     unsigned long net_wm_bypass_compositor = 0;
+    HMONITOR monitor;
 
     if (!data->managed) return;
     if (data->whole_window == root_window) return;
@@ -1147,7 +1148,8 @@ void update_net_wm_states( struct x11drv_win_data *data )
     style = GetWindowLongW( data->hwnd, GWL_STYLE );
     if (style & WS_MINIMIZE)
         new_state |= data->net_wm_state & ((1 << NET_WM_STATE_FULLSCREEN)|(1 << NET_WM_STATE_MAXIMIZED));
-    if ((!data->fs_hack || fs_hack_enabled()) && is_window_rect_full_screen( &data->whole_rect ))
+    monitor = fs_hack_monitor_from_hwnd( data->hwnd );
+    if ((!data->fs_hack || fs_hack_enabled( monitor )) && is_window_rect_full_screen( &data->whole_rect ))
     {
         if ((style & WS_MAXIMIZE) && (style & WS_CAPTION) == WS_CAPTION)
             new_state |= (1 << NET_WM_STATE_MAXIMIZED);
@@ -1155,7 +1157,7 @@ void update_net_wm_states( struct x11drv_win_data *data )
 	{
             if (is_window_rect_full_virtual_screen( &data->whole_rect ))
                 net_wm_bypass_compositor = 1;
-            if (!wm_is_steamcompmgr(data->display) || !fs_hack_enabled())
+            if (!wm_is_steamcompmgr(data->display) || !fs_hack_enabled(monitor))
                 /* when fs hack is enabled, we don't want steamcompmgr to resize the window to be fullscreened */
                 new_state |= (1 << NET_WM_STATE_FULLSCREEN);
 	}
@@ -1475,9 +1477,14 @@ static void sync_window_position( struct x11drv_win_data *data,
     if (!(style & WS_MAXIMIZE) || !data->managed)
     {
         if(data->fs_hack){
-            POINT p = fs_hack_real_mode();
-            changes.width = p.x;
-            changes.height = p.y;
+            HMONITOR monitor;
+            RECT rect;
+
+            monitor = fs_hack_monitor_from_hwnd(data->hwnd);
+            rect = fs_hack_real_mode(monitor);
+            changes.width = rect.right - rect.left;
+            changes.height = rect.bottom - rect.top;
+            TRACE("change width:%d height:%d\n", changes.width, changes.height);
         }else{
             changes.width = data->whole_rect.right - data->whole_rect.left;
             changes.height = data->whole_rect.bottom - data->whole_rect.top;
@@ -1565,12 +1572,17 @@ static void sync_client_position( struct x11drv_win_data *data,
     if (changes.height != old_client_rect->bottom - old_client_rect->top) mask |= CWHeight;
 
     if(data->fs_hack){
-        POINT p = fs_hack_real_mode();
+        HMONITOR monitor;
+        RECT rect;
+
+        monitor = fs_hack_monitor_from_hwnd(data->hwnd);
+        rect = fs_hack_real_mode(monitor);
         changes.x = 0;
         changes.y = 0;
-        changes.width = p.x;
-        changes.height = p.y;
+        changes.width = rect.right - rect.left;
+        changes.height = rect.bottom - rect.top;
         mask = CWX | CWY | CWWidth | CWHeight;
+        TRACE( "x:%d y:%d width:%d height:%d\n", changes.x, changes.y, changes.width, changes.height );
     }
 
     if (mask)
@@ -1728,9 +1740,12 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual )
 
 
     if(data->fs_hack){
-        POINT p = fs_hack_real_mode();
-        cx = p.x;
-        cy = p.y;
+        HMONITOR monitor = fs_hack_monitor_from_hwnd(hwnd);
+        RECT rect = fs_hack_real_mode(monitor);
+        cx = rect.right - rect.left;
+        cy = rect.bottom - rect.top;
+
+        TRACE("width:%d height:%d\n", cx, cy);
     }
 
     TRACE("setting client rect: %u, %u x %ux%u\n", x, y, cx, cy);
@@ -1742,6 +1757,8 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual )
     if (data->client_window)
     {
         XSaveContext( data->display, data->client_window, winContext, (char *)data->hwnd );
+        /* Save to gdi_display as well for fullscreen hack, needed in X11DRV_query_fs_hack() */
+        XSaveContext( gdi_display, data->client_window, winContext, (char *)data->hwnd );
         XMapWindow( gdi_display, data->client_window );
         XSync( gdi_display, False );
         if (data->whole_window) XSelectInput( data->display, data->client_window, ExposureMask );
@@ -1795,9 +1812,14 @@ static void create_whole_window( struct x11drv_win_data *data )
     else if (cy > 65535) cy = 65535;
 
     if(data->fs_hack){
-        POINT p = fs_hack_real_mode();
-        cx = p.x;
-        cy = p.y;
+        RECT rect = {0, 0, 0, 0};
+        HMONITOR monitor;
+
+        monitor = fs_hack_monitor_from_hwnd(data->hwnd);
+        rect = fs_hack_real_mode(monitor);
+        cx = rect.right - rect.left;
+        cy = rect.bottom - rect.top;
+        TRACE("width:%d height:%d\n", cx, cy);
     }
 
     pos = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
@@ -2532,27 +2554,6 @@ static inline BOOL get_surface_rect( const RECT *visible_rect, RECT *surface_rec
     return TRUE;
 }
 
-
-BOOL fs_hack_window_is_hacked(HWND hwnd, struct x11drv_win_data *data)
-{
-    BOOL release = FALSE, ret;
-
-    if(!data){
-        data = get_win_data(hwnd);
-        if(!data)
-            return FALSE;
-        release = TRUE;
-    }
-
-    ret = data->fs_hack;
-
-    if(release)
-        release_win_data(data);
-
-    return ret;
-}
-
-
 /***********************************************************************
  *		WindowPosChanging   (X11DRV.@)
  */
@@ -2565,26 +2566,29 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
     DWORD flags;
     COLORREF key;
     BOOL layered = GetWindowLongW( hwnd, GWL_EXSTYLE ) & WS_EX_LAYERED;
+    HMONITOR monitor;
 
     if (!data && !(data = X11DRV_create_win_data( hwnd, window_rect, client_rect ))) return;
 
-    if(!wm_is_steamcompmgr(data->display) &&
-            !data->fs_hack &&
-            fs_hack_matches_current_mode(
+    monitor = fs_hack_monitor_from_hwnd(hwnd);
+    if(!wm_is_steamcompmgr(data->display) && !data->fs_hack && fs_hack_enabled(monitor) &&
+            fs_hack_matches_current_mode(monitor,
                 window_rect->right - window_rect->left,
                 window_rect->bottom - window_rect->top)){
-        POINT tl = virtual_screen_to_root(0, 0);
-        POINT p = fs_hack_real_mode();
-        TRACE("Enabling fs hack, resizing the window to (%u,%u)-(%u,%u)\n", tl.x, tl.y, p.x, p.y);
+        RECT real_rect = fs_hack_real_mode(monitor);
+        RECT user_rect = fs_hack_current_mode(monitor);
+        POINT tl = virtual_screen_to_root(user_rect.left, user_rect.top);
+
+        TRACE("Enabling fs hack, resizing the window to (%u,%u)-(%u,%u)\n", tl.x, tl.y, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
         data->fs_hack = TRUE;
         if(data->whole_window)
-            XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, p.x, p.y);
+            XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
         if(data->client_window)
-            XMoveResizeWindow(data->display, data->client_window, 0, 0, p.x, p.y);
-    }else if(data->fs_hack &&
-            !fs_hack_matches_current_mode(
+            XMoveResizeWindow(data->display, data->client_window, 0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
+    }else if(data->fs_hack && (!fs_hack_enabled(monitor) ||
+            !fs_hack_matches_current_mode(monitor,
                 window_rect->right - window_rect->left,
-                window_rect->bottom - window_rect->top)){
+                window_rect->bottom - window_rect->top))){
         TRACE("Disabling fs hack\n");
         data->fs_hack = FALSE;
         if(data->whole_window)
@@ -2860,14 +2864,20 @@ UINT CDECL X11DRV_ShowWindow( HWND hwnd, INT cmd, RECT *rect, UINT swp )
                   &root, &x, &y, &width, &height, &border, &depth );
     XTranslateCoordinates( thread_data->display, data->whole_window, root, 0, 0, &x, &y, &top );
     pos = root_to_virtual_screen( x, y );
-    if(data->fs_hack){
-        POINT p = fs_hack_current_mode();
-        rect->left = 0;
-        rect->top = 0;
-        rect->right = p.x;
-        rect->bottom = p.y;
-        X11DRV_X_to_window_rect( data, rect, 0, 0, p.x, p.y );
-    }else{
+    if (data->fs_hack)
+    {
+        MONITORINFO monitor_info;
+        HMONITOR monitor;
+
+        monitor = fs_hack_monitor_from_hwnd( hwnd );
+        monitor_info.cbSize = sizeof(monitor_info);
+        GetMonitorInfoW( monitor, &monitor_info );
+        X11DRV_X_to_window_rect( data, rect, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
+                                 monitor_info.rcMonitor.right - monitor_info.rcMonitor.left,
+                                 monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top );
+    }
+    else
+    {
         X11DRV_X_to_window_rect( data, rect, pos.x, pos.y, width, height );
     }
     swp &= ~(SWP_NOMOVE | SWP_NOCLIENTMOVE | SWP_NOSIZE | SWP_NOCLIENTSIZE);
@@ -3075,7 +3085,7 @@ LRESULT CDECL X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
         }
         return 0;
     case WM_X11DRV_RESIZE_DESKTOP:
-        fs_hack_choose_mode(LOWORD(wp), HIWORD(wp));
+        X11DRV_resize_desktop( (BOOL)lp );
         return 0;
     case WM_X11DRV_SET_CURSOR:
         if ((data = get_win_data( hwnd )))

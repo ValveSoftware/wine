@@ -25,6 +25,7 @@
 #include <X11/Xlib.h>
 #include <X11/cursorfont.h>
 #include <stdarg.h>
+#include <math.h>
 #ifdef HAVE_X11_EXTENSIONS_XINPUT_H
 #include <X11/extensions/XInput.h>
 #endif
@@ -488,19 +489,12 @@ static BOOL grab_clipping_window( const RECT *clip )
 
     if (!data->clip_hwnd) XUnmapWindow( data->display, clip_window );
 
-    pos.x = clip->left;
-    pos.y = clip->top;
-    fs_hack_user_to_real(&pos);
-    real_clip.left = pos.x;
-    real_clip.top = pos.y;
+    TRACE("user clip rect %s\n", wine_dbgstr_rect(clip));
 
-    pos.x = clip->right;
-    pos.y = clip->bottom;
-    fs_hack_user_to_real(&pos);
-    real_clip.right = pos.x;
-    real_clip.bottom = pos.y;
+    real_clip = *clip;
+    fs_hack_rect_user_to_real(&real_clip);
 
-    pos = virtual_screen_to_root( real_clip.left, real_clip.top );
+    pos = virtual_screen_to_root( clip->left, clip->top );
 
     TRACE("setting real clip to %d,%d x %d,%d\n",
             pos.x, pos.y,
@@ -687,7 +681,7 @@ static POINT map_event_coords(const XButtonEvent *event, HWND hwnd)
     if ((data = get_win_data(hwnd)))
     {
         if(data->fs_hack)
-            fs_hack_real_to_user(&pt);
+            fs_hack_point_real_to_user(&pt);
 
         if (event->window == data->whole_window && !data->fs_hack)
         {
@@ -742,11 +736,11 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
 
         pt.x = clip_rect.left;
         pt.y = clip_rect.top;
-        fs_hack_user_to_real(&pt);
+        fs_hack_point_user_to_real(&pt);
 
         pt.x += input->u.mi.dx;
         pt.y += input->u.mi.dy;
-        fs_hack_real_to_user(&pt);
+        fs_hack_point_real_to_user(&pt);
 
         input->u.mi.dx = pt.x;
         input->u.mi.dy = pt.y;
@@ -1579,7 +1573,6 @@ BOOL CDECL X11DRV_SetCursorPos( INT x, INT y )
     struct x11drv_thread_data *data = x11drv_init_thread_data();
     POINT pos = {x, y};
 
-    fs_hack_user_to_real(&pos);
     pos = virtual_screen_to_root( pos.x, pos.y );
 
     TRACE("real setting to %u, %u\n",
@@ -1609,7 +1602,6 @@ BOOL CDECL X11DRV_GetCursorPos(LPPOINT pos)
     {
         POINT old = *pos;
         *pos = root_to_virtual_screen( winX, winY );
-        fs_hack_real_to_user(pos);
         TRACE( "pointer at %s server pos %s\n", wine_dbgstr_point(pos), wine_dbgstr_point(&old) );
     }
     return ret;
@@ -1646,9 +1638,8 @@ BOOL CDECL X11DRV_ClipCursor( LPCRECT clip )
         }
 
         /* we are clipping if the clip rectangle is smaller than the screen */
-        if (!(!fs_hack_enabled() && clip->left == 0 && clip->top == 0 && fs_hack_matches_last_mode(clip->right, clip->bottom)) && /* fix games trying to reset clip to full screen */
-                (clip->left > virtual_rect.left || clip->right < virtual_rect.right ||
-                 clip->top > virtual_rect.top || clip->bottom < virtual_rect.bottom))
+        if (clip->left > virtual_rect.left || clip->right < virtual_rect.right ||
+            clip->top > virtual_rect.top || clip->bottom < virtual_rect.bottom)
         {
             if (grab_clipping_window( clip )) return TRUE;
         }
@@ -1904,6 +1895,8 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     RECT virtual_rect;
     INPUT input;
     POINT pt;
+    HMONITOR monitor;
+    double user_to_real_scale;
     int i;
     double dx = 0, dy = 0, val;
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
@@ -1969,11 +1962,11 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
         return FALSE;
     }
 
-    pt.x = input.u.mi.dx;
-    pt.y = input.u.mi.dy;
-    fs_hack_scale_real_to_user(&pt);
-    input.u.mi.dx = pt.x;
-    input.u.mi.dy = pt.y;
+    GetCursorPos(&pt);
+    monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
+    user_to_real_scale = fs_hack_get_user_to_real_scale(monitor);
+    input.u.mi.dx = lround((double)input.u.mi.dx / user_to_real_scale);
+    input.u.mi.dy = lround((double)input.u.mi.dy / user_to_real_scale);
 
     if (!thread_data->xi2_rawinput_only)
     {

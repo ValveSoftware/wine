@@ -1936,7 +1936,6 @@ static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_ha
 static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *gl )
 {
     GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer;
-    POINT p = fs_hack_current_mode();
     float prev_clear_color[4];
     unsigned int i;
     struct fs_hack_fbo_attachments_config config;
@@ -1964,6 +1963,19 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
     if (ctx->fs_hack)
     {
+        MONITORINFO monitor_info;
+        HMONITOR monitor;
+        int width, height;
+
+        monitor = fs_hack_monitor_from_hwnd(WindowFromDC(ctx->hdc));
+        memset(&monitor_info, 0, sizeof(monitor_info));
+        monitor_info.cbSize = sizeof(monitor_info);
+        GetMonitorInfoW(monitor, &monitor_info);
+        width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+        height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+
+        TRACE("Render buffer width:%d height:%d\n", width, height);
+
         opengl_funcs.gl.p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&prev_draw_fbo );
         opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&prev_read_fbo );
         opengl_funcs.gl.p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev_texture );
@@ -1990,13 +2002,13 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
                 pglGenRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
             pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
             pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
-                    config.color_internalformat, p.x, p.y );
+                    config.color_internalformat, width, height );
             pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                     GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
             TRACE( "Created renderbuffer %u for fullscreen hack.\n", ctx->fs_hack_color_renderbuffer );
             pglGenRenderbuffers( 1, &ctx->fs_hack_color_resolve_renderbuffer );
             pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_color_resolve_renderbuffer );
-            pglRenderbufferStorage( GL_RENDERBUFFER, config.color_internalformat, p.x, p.y );
+            pglRenderbufferStorage( GL_RENDERBUFFER, config.color_internalformat, width, height );
             pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
             pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                     GL_RENDERBUFFER, ctx->fs_hack_color_resolve_renderbuffer );
@@ -2010,7 +2022,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
             if (!ctx->fs_hack_color_texture)
                 opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_color_texture );
             opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_color_texture );
-            opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.color_internalformat, p.x, p.y,
+            opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.color_internalformat, width, height,
                     0, config.color_format, config.color_type, NULL);
             opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
             opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
@@ -2027,7 +2039,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
                     pglGenRenderbuffers( 1, &ctx->fs_hack_ds_renderbuffer );
                 pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
                 pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
-                        config.ds_internalformat, p.x, p.y );
+                        config.ds_internalformat, width, height );
                 pglBindRenderbuffer( GL_RENDERBUFFER, prev_renderbuffer );
                 if (attribs.depth_size)
                     pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
@@ -2042,7 +2054,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
                 if (!ctx->fs_hack_ds_texture)
                     opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_ds_texture );
                 opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_ds_texture );
-                opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.ds_internalformat, p.x, p.y,
+                opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.ds_internalformat, width, height,
                         0, config.ds_format, config.ds_type, NULL);
                 opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
                 opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
@@ -2065,7 +2077,8 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         wglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
         wglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
 
-        ctx->setup_for = p;
+        ctx->setup_for.x = width;
+        ctx->setup_for.y = height;
         gl->has_scissor_indexed = has_extension(glExtensions, "GL_ARB_viewport_array");
         ctx->fs_hack_integer = fs_hack_is_integer();
         gl->fs_hack_context_set_up = TRUE;
@@ -2314,21 +2327,37 @@ static void wglReadBuffer( GLenum buffer )
 static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer )
 {
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
-    POINT scaled = fs_hack_get_scaled_screen_size();
+    SIZE scaled, src, real;
     GLuint prev_draw_fbo, prev_read_fbo;
     GLint prev_scissor[4];
-    POINT src = fs_hack_current_mode();
-    POINT real = fs_hack_real_mode();
-    POINT scaled_origin = {0, 0};
+    RECT user_rect, real_rect;
+    POINT scaled_origin;
     float prev_clear_color[4];
+    HMONITOR monitor;
 
-    fs_hack_user_to_real(&scaled_origin);
+    monitor = fs_hack_monitor_from_hwnd(WindowFromDC(ctx->hdc));
+    scaled = fs_hack_get_scaled_screen_size(monitor);
+    user_rect = fs_hack_current_mode(monitor);
+    real_rect = fs_hack_real_mode(monitor);
+    src.cx = user_rect.right - user_rect.left;
+    src.cy = user_rect.bottom - user_rect.top;
+    real.cx = real_rect.right - real_rect.left;
+    real.cy = real_rect.bottom - real_rect.top;
+    scaled_origin.x = user_rect.left;
+    scaled_origin.y = user_rect.top;
+    fs_hack_point_user_to_real(&scaled_origin);
+    scaled_origin.x -= real_rect.left;
+    scaled_origin.y -= real_rect.top;
 
-    if(ctx->setup_for.x != src.x ||
-            ctx->setup_for.y != src.y)
+    TRACE("scaled:%dx%d src:%dx%d real:%dx%d user_rect:%s real_rect:%s scaled_origin:%s\n", scaled.cx, scaled.cy,
+          src.cx, src.cy, real.cx, real.cy, wine_dbgstr_rect(&user_rect), wine_dbgstr_rect(&real_rect),
+          wine_dbgstr_point(&scaled_origin));
+
+    if(ctx->setup_for.x != src.cx ||
+            ctx->setup_for.y != src.cy)
         fs_hack_setup_context( ctx, gl );
 
-    TRACE( "Blitting from FBO %u %ux%u to %ux%u\n", ctx->fs_hack_fbo, src.x, src.y, scaled.x, scaled.y );
+    TRACE( "Blitting from FBO %u %ux%u to %ux%u\n", ctx->fs_hack_fbo, src.cx, src.cy, scaled.cx, scaled.cy );
 
     opengl_funcs.gl.p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&prev_draw_fbo );
     opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&prev_read_fbo );
@@ -2336,17 +2365,17 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
 
     if(gl->has_scissor_indexed){
         opengl_funcs.ext.p_glGetIntegeri_v(GL_SCISSOR_BOX, 0, prev_scissor);
-        opengl_funcs.ext.p_glScissorIndexed(0, 0, 0, real.x, real.y);
+        opengl_funcs.ext.p_glScissorIndexed(0, 0, 0, real.cx, real.cy);
     }else{
         opengl_funcs.gl.p_glGetIntegerv(GL_SCISSOR_BOX, prev_scissor);
-        opengl_funcs.gl.p_glScissor(0, 0, real.x, real.y);
+        opengl_funcs.gl.p_glScissor(0, 0, real.cx, real.cy);
     }
 
     pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_fbo );
     if (ctx->fs_hack_color_resolve_renderbuffer)
     {
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
-        pglBlitFramebuffer( 0, 0, src.x, src.y, 0, 0, src.x, src.y, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+        pglBlitFramebuffer( 0, 0, src.cx, src.cy, 0, 0, src.cx, src.cy, GL_COLOR_BUFFER_BIT, GL_NEAREST );
         pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
     }
     pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
@@ -2360,8 +2389,8 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
     opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
 
-    pglBlitFramebuffer( 0, 0, src.x, src.y,
-            scaled_origin.x, scaled_origin.y, scaled_origin.x + scaled.x, scaled_origin.y + scaled.y,
+    pglBlitFramebuffer( 0, 0, src.cx, src.cy,
+            scaled_origin.x, scaled_origin.y, scaled_origin.x + scaled.cx, scaled_origin.y + scaled.cy,
             GL_COLOR_BUFFER_BIT, ctx->fs_hack_integer ? GL_NEAREST : GL_LINEAR );
     //HACK
     if ( draw_buffer == GL_FRONT )
