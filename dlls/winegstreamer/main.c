@@ -838,6 +838,8 @@ HRESULT WINAPI DllRegisterServer(void)
 
     TRACE(".\n");
 
+    init_gstreamer();
+
     if (FAILED(hr = __wine_register_resources()))
         return hr;
 
