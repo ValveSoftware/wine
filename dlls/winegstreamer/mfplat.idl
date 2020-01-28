@@ -19,6 +19,27 @@
 #pragma makedep register
 
 [
+    helpstring("AVI Splitter"),
+    threading(both),
+    uuid(1b544c20-fd0b-11ce-8c63-00aa0044b51e)
+]
+coclass AviSplitter {}
+
+[
+    helpstring("MPEG-I Stream Splitter"),
+    threading(both),
+    uuid(336475d0-942a-11ce-a870-00aa002feab5)
+]
+coclass MPEG1Splitter {}
+
+[
+    helpstring("Wave Parser"),
+    threading(both),
+    uuid(d51bd5a1-7548-11cf-a520-0080c77ef58a)
+]
+coclass WAVEParser {}
+
+[
     threading(both),
     uuid(88753b26-5b24-49bd-b2e7-0c445c78c982)
 
