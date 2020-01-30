@@ -1739,8 +1739,8 @@ HWND WIN_CreateWindowEx( CREATESTRUCTW *cs, LPCWSTR className, HINSTANCE module,
     if ((cs->style & WS_THICKFRAME) || !(cs->style & (WS_POPUP | WS_CHILD)))
     {
         MINMAXINFO info = WINPOS_GetMinMaxInfo( hwnd );
-        cx = max( min( cx, info.ptMaxTrackSize.x ), info.ptMinTrackSize.x );
-        cy = max( min( cy, info.ptMaxTrackSize.y ), info.ptMinTrackSize.y );
+        cx = max( cx, info.ptMinTrackSize.x );
+        cy = max( cy, info.ptMinTrackSize.y );
     }
 
     if (cx < 0) cx = 0;

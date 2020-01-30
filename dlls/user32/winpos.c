@@ -1663,8 +1663,6 @@ LONG WINPOS_HandleWindowPosChanging( HWND hwnd, WINDOWPOS *winpos )
     if ((style & WS_THICKFRAME) || ((style & (WS_POPUP | WS_CHILD)) == 0))
     {
 	MINMAXINFO info = WINPOS_GetMinMaxInfo( hwnd );
-        winpos->cx = min( winpos->cx, info.ptMaxTrackSize.x );
-        winpos->cy = min( winpos->cy, info.ptMaxTrackSize.y );
 	if (!(style & WS_MINIMIZE))
 	{
             winpos->cx = max( winpos->cx, info.ptMinTrackSize.x );
