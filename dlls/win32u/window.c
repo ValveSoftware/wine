@@ -5823,8 +5823,18 @@ HWND WINAPI NtUserCreateWindowEx( DWORD ex_style, UNICODE_STRING *class_name,
     if ((cs.style & WS_THICKFRAME) || !(cs.style & (WS_POPUP | WS_CHILD)))
     {
         MINMAXINFO info = get_min_max_info( hwnd );
-        cx = max( min( cx, info.ptMaxTrackSize.x ), info.ptMinTrackSize.x );
-        cy = max( min( cy, info.ptMaxTrackSize.y ), info.ptMinTrackSize.y );
+
+        /* HACK: This code changes the window's size to fit the display. However,
+         * some games (Bayonetta, Dragon's Dogma) will then have the incorrect
+         * render size. So just let windows be too big to fit the display. */
+        if (!user_driver->pHasWindowManager( "steamcompmgr" ))
+        {
+            cx = min( cx, info.ptMaxTrackSize.x );
+            cy = min( cy, info.ptMaxTrackSize.y );
+        }
+
+        cx = max( cx, info.ptMinTrackSize.x );
+        cy = max( cy, info.ptMinTrackSize.y );
     }
 
     if (cx < 0) cx = 0;
