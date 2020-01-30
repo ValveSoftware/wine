@@ -344,7 +344,7 @@ static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
     if (!(data = get_win_data(hwnd)))
         return TRUE;
 
-    if (fs_hack_enabled() &&
+    if (fs_hack_mapping_required() &&
             fs_hack_matches_current_mode(
                 data->whole_rect.right - data->whole_rect.left,
                 data->whole_rect.bottom - data->whole_rect.top)){

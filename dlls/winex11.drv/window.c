@@ -102,42 +102,77 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 };
 static CRITICAL_SECTION win_data_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
+static const int WM_UNKNOWN = 0;
+static const int WM_MUTTER = 1;
+static const int WM_STEAMCOMPMGR = 2;
 
 /* enable workarounds for mutter bugs */
-BOOL wm_is_mutter(Display *display)
+static int detect_wm(Display *dpy)
 {
+    Display *display = dpy ? dpy : thread_init_display(); /* DefaultRootWindow is a macro... */
     Window root = DefaultRootWindow(display), *wm_check;
     Atom type;
     int format;
     unsigned long count, remaining;
-    static int cached = -1;
     char *wm_name;
 
+    static int cached = -1;
+
     if(cached < 0){
+
         if (XGetWindowProperty( display, root, x11drv_atom(_NET_SUPPORTING_WM_CHECK), 0,
                                  sizeof(*wm_check)/sizeof(CARD32), False, x11drv_atom(WINDOW),
                                  &type, &format, &count, &remaining, (unsigned char **)&wm_check ) == Success){
-            if (type == x11drv_atom(WINDOW) &&
-                    XGetWindowProperty( display, *wm_check, x11drv_atom(_NET_WM_NAME), 0,
-                        256/sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
-                        &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success){
-                if(type == x11drv_atom(UTF8_STRING)){
-                    TRACE("Got WM name %s\n", wm_name);
-                    cached = (strcmp(wm_name, "GNOME Shell") == 0) ||
-                        (strcmp(wm_name, "Mutter") == 0);
+            if (type == x11drv_atom(WINDOW)){
+                if(XGetWindowProperty( display, *wm_check, x11drv_atom(_NET_WM_NAME), 0,
+                            256/sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
+                            &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success &&
+                        type == x11drv_atom(UTF8_STRING)){
+                    /* noop */
+                }else if(XGetWindowProperty( display, *wm_check, x11drv_atom(WM_NAME), 0,
+                            256/sizeof(CARD32), False, x11drv_atom(STRING),
+                            &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success &&
+                        type == x11drv_atom(STRING)){
+                    /* noop */
                 }else
-                    cached = 0;
-                XFree(wm_name);
+                    wm_name = NULL;
+
+                if(wm_name){
+                    TRACE("Got WM name %s\n", wm_name);
+
+                    if((strcmp(wm_name, "GNOME Shell") == 0) ||
+                            (strcmp(wm_name, "Mutter") == 0))
+                        cached = WM_MUTTER;
+                    else if(strcmp(wm_name, "steamcompmgr") == 0)
+                        cached = WM_STEAMCOMPMGR;
+                    else
+                        cached = WM_UNKNOWN;
+
+                    XFree(wm_name);
+                }else{
+                    TRACE("WM did not set _NET_WM_NAME or WM_NAME\n");
+                    cached = WM_UNKNOWN;
+                }
             }else
-                cached = 0;
+                cached = WM_UNKNOWN;
+
             XFree(wm_check);
         }else
-            cached = 0;
+            cached = WM_UNKNOWN;
     }
 
     return cached;
 }
 
+BOOL wm_is_mutter(Display *display)
+{
+    return detect_wm(display) == WM_MUTTER;
+}
+
+BOOL wm_is_steamcompmgr(Display *display)
+{
+    return detect_wm(display) == WM_STEAMCOMPMGR;
+}
 
 /***********************************************************************
  * http://standards.freedesktop.org/startup-notification-spec
@@ -1080,7 +1115,9 @@ void update_net_wm_states( struct x11drv_win_data *data )
         else if (!(style & WS_MINIMIZE))
 	{
             net_wm_bypass_compositor = 1;
-            new_state |= (1 << NET_WM_STATE_FULLSCREEN);
+            if (!wm_is_steamcompmgr(data->display) || !fs_hack_enabled())
+                /* when fs hack is enabled, we don't want steamcompmgr to resize the window to be fullscreened */
+                new_state |= (1 << NET_WM_STATE_FULLSCREEN);
 	}
     }
     else if (style & WS_MAXIMIZE)
@@ -2484,7 +2521,8 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
 
     if (!data && !(data = X11DRV_create_win_data( hwnd, window_rect, client_rect ))) return;
 
-    if(!data->fs_hack &&
+    if(!wm_is_steamcompmgr(data->display) &&
+            !data->fs_hack &&
             fs_hack_matches_current_mode(
                 window_rect->right - window_rect->left,
                 window_rect->bottom - window_rect->top)){

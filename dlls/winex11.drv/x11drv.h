@@ -427,6 +427,7 @@ enum x11drv_atoms
     XATOM_TEXT,
     XATOM_TIMESTAMP,
     XATOM_UTF8_STRING,
+    XATOM_STRING,
     XATOM_RAW_ASCENT,
     XATOM_RAW_DESCENT,
     XATOM_RAW_CAP_HEIGHT,
@@ -434,6 +435,7 @@ enum x11drv_atoms
     XATOM_Rel_Y,
     XATOM_WM_PROTOCOLS,
     XATOM_WM_DELETE_WINDOW,
+    XATOM_WM_NAME,
     XATOM_WM_STATE,
     XATOM_WM_TAKE_FOCUS,
     XATOM_DndProtocol,
@@ -619,9 +621,11 @@ extern void update_systray_balloon_position(void) DECLSPEC_HIDDEN;
 extern HWND create_foreign_window( Display *display, Window window ) DECLSPEC_HIDDEN;
 extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
 extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
+extern BOOL wm_is_steamcompmgr(Display *) DECLSPEC_HIDDEN;
 
 extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_enabled(void) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_mapping_required(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_is_integer(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_matches_current_mode(int w, int h) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_matches_real_mode(int w, int h) DECLSPEC_HIDDEN;

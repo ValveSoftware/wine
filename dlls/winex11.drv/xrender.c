@@ -1509,7 +1509,7 @@ static void xrender_blit( int op, Picture src_pict, Picture mask_pict, Picture d
 {
     int x_offset, y_offset;
 
-    if (fs_hack_enabled())
+    if (fs_hack_mapping_required())
     {
         POINT p;
         p.x = x_dst;
@@ -1563,7 +1563,7 @@ static void xrender_blit( int op, Picture src_pict, Picture mask_pict, Picture d
     pXRenderComposite( gdi_display, op, src_pict, mask_pict, dst_pict,
                        x_offset, y_offset, 0, 0, x_dst, y_dst, width_dst, height_dst );
 
-    if (fs_hack_enabled())
+    if (fs_hack_mapping_required())
         fs_hack_draw_black_bars( dst_pict );
 }
 
@@ -1799,7 +1799,7 @@ static BOOL CDECL xrenderdrv_StretchBlt( PHYSDEV dst_dev, struct bitblt_coords *
     if (physdev_dst->format == WXR_FORMAT_MONO && physdev_src->format != WXR_FORMAT_MONO)
         goto x11drv_fallback;
 
-    if (fs_hack_enabled())
+    if (fs_hack_mapping_required())
         stretch = TRUE;
 
     /* if not stretching, we only need to handle format conversion */
@@ -1821,7 +1821,7 @@ static BOOL CDECL xrenderdrv_StretchBlt( PHYSDEV dst_dev, struct bitblt_coords *
         XSetSubwindowMode( gdi_display, tmpGC, IncludeInferiors );
         XSetGraphicsExposures( gdi_display, tmpGC, False );
 
-        if (fs_hack_enabled())
+        if (fs_hack_mapping_required())
         {
             unsigned int real_width  = (tmp.visrect.right - tmp.visrect.left) * fs_hack_user_to_real_w;
             unsigned int real_height = (tmp.visrect.bottom - tmp.visrect.top) * fs_hack_user_to_real_h;
@@ -1904,7 +1904,7 @@ static DWORD CDECL xrenderdrv_PutImage( PHYSDEV dev, HRGN clip, BITMAPINFO *info
             XSetSubwindowMode( gdi_display, gc, IncludeInferiors );
             XSetGraphicsExposures( gdi_display, gc, False );
 
-            if (fs_hack_enabled())
+            if (fs_hack_mapping_required())
             {
                 unsigned int real_width  = (tmp.visrect.right - tmp.visrect.left) * fs_hack_user_to_real_w;
                 unsigned int real_height = (tmp.visrect.bottom - tmp.visrect.top) * fs_hack_user_to_real_h;
