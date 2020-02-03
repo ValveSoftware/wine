@@ -138,6 +138,12 @@ static inline struct ntdll_thread_data *ntdll_get_thread_data(void)
 #define HEAP_LAL 1
 #define HEAP_LFH 2
 
+/* some undocumented flags (names are made up) */
+#define HEAP_PAGE_ALLOCS      0x01000000
+#define HEAP_VALIDATE         0x10000000
+#define HEAP_VALIDATE_ALL     0x20000000
+#define HEAP_VALIDATE_PARAMS  0x40000000
+
 struct tagHEAP;
 void   *HEAP_std_allocate( struct tagHEAP *heap, ULONG flags, SIZE_T size );
 BOOLEAN HEAP_std_free( struct tagHEAP *heap, ULONG flags, void *ptr );
