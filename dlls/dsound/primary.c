@@ -33,7 +33,6 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "mmsystem.h"
-#include "winternl.h"
 #include "mmddk.h"
 #include "wine/debug.h"
 #include "dsound.h"
@@ -347,9 +346,9 @@ static HRESULT DSOUND_PrimaryOpen(DirectSoundDevice *device, WAVEFORMATEX *wfx, 
     device->playpos = 0;
 
     for (i = 0; i < device->nrofbuffers; i++) {
-        RtlAcquireResourceExclusive(&dsb[i]->lock, TRUE);
+        AcquireSRWLockExclusive(&dsb[i]->lock);
         DSOUND_RecalcFormat(dsb[i]);
-        RtlReleaseResource(&dsb[i]->lock);
+        ReleaseSRWLockExclusive(&dsb[i]->lock);
     }
 
     return DS_OK;
