@@ -114,6 +114,12 @@ static inline TEB64 *NtCurrentTeb64(void) { return (TEB64 *)NtCurrentTeb()->GdiB
 #define HEAP_LAL 1
 #define HEAP_LFH 2
 
+/* some undocumented flags (names are made up) */
+#define HEAP_PAGE_ALLOCS      0x01000000
+#define HEAP_VALIDATE         0x10000000
+#define HEAP_VALIDATE_ALL     0x20000000
+#define HEAP_VALIDATE_PARAMS  0x40000000
+
 NTSTATUS HEAP_std_allocate( HANDLE heap, ULONG flags, SIZE_T size, void **out );
 NTSTATUS HEAP_std_free( HANDLE heap, ULONG flags, void *ptr );
 NTSTATUS HEAP_std_reallocate( HANDLE heap, ULONG flags, void *ptr, SIZE_T size, void **out );

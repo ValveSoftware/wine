@@ -171,12 +171,6 @@ typedef struct tagHEAP
 #define COMMIT_MASK          0xffff  /* bitmask for commit/decommit granularity */
 #define MAX_FREE_PENDING     1024    /* max number of free requests to delay */
 
-/* some undocumented flags (names are made up) */
-#define HEAP_PAGE_ALLOCS      0x01000000
-#define HEAP_VALIDATE         0x10000000
-#define HEAP_VALIDATE_ALL     0x20000000
-#define HEAP_VALIDATE_PARAMS  0x40000000
-
 static HEAP *processHeap;  /* main process heap */
 
 static BOOL HEAP_IsRealArena( HEAP *heapPtr, DWORD flags, LPCVOID block, BOOL quiet );
