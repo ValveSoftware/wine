@@ -933,5 +933,7 @@ NTSTATUS WINAPI HidP_GetLinkCollectionNodes(HIDP_LINK_COLLECTION_NODE *LinkColle
 {
     TRACE("stub (%p, %p, %p)\n", LinkCollectionNode, LinkCollectionNodeLength, PreparsedData);
 
+    *LinkCollectionNodeLength = 0;
+
     return STATUS_NOT_IMPLEMENTED;
 }

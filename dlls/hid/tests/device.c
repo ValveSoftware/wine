@@ -233,7 +233,6 @@ static void process_data(HIDP_CAPS Caps, PHIDP_PREPARSED_DATA ppd, CHAR *data, D
         HeapFree(GetProcessHeap(), 0, values);
     }
 
-    todo_wine
     ok(Caps.NumberLinkCollectionNodes > 0, "Expected at least one link collection\n");
     if (Caps.NumberLinkCollectionNodes)
     {

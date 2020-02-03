@@ -911,6 +911,7 @@ static WINE_HIDP_PREPARSED_DATA* build_PreparseData(struct collection *base_coll
     data->dwSize = size;
     data->caps.Usage = base_collection->caps.u.NotRange.Usage;
     data->caps.UsagePage = base_collection->caps.UsagePage;
+    data->caps.NumberLinkCollectionNodes = 1;
     data->elementOffset = element_off;
 
     preparse_collection(base_collection, data, &ctx);
