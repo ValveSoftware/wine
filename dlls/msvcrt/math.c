@@ -123,12 +123,7 @@ int CDECL MSVCRT__set_SSE2_enable(int flag)
  */
 int CDECL MSVCRT__get_FMA3_enable(void)
 {
-    #if !defined(__FMA__) && defined(__AVX2__)
-        #define __FMA__ 1
-    #endif
-    #if defined(__FMA__)
-        return 1;
-    #endif
+    FIXME("() stub\n");
     return 0;
 }
 
