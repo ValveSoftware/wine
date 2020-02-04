@@ -29,6 +29,7 @@
 #include "initguid.h"
 #include "devguid.h"
 #include "devpkey.h"
+#include "ntddvdeo.h"
 #include "setupapi.h"
 #define WIN32_NO_STATUS
 #include "winternl.h"
@@ -1403,6 +1404,59 @@ void macdrv_displays_changed(const macdrv_event *event)
     }
 }
 
+/* This function sets device interface link state to enabled.
+ * The link state should be set via IoSetDeviceInterfaceState(),
+ * but IoSetDeviceInterfaceState() requires a PnP driver, which
+ * currently doesn't exist for display devices. */
+static BOOL link_device(const WCHAR *instance, const GUID *guid)
+{
+    static const WCHAR device_instanceW[] = {'D','e','v','i','c','e','I','n','s','t','a','n','c','e',0};
+    static const WCHAR hash_controlW[] = {'#','\\','C','o','n','t','r','o','l',0};
+    static const WCHAR linkedW[] = {'L','i','n','k','e','d',0};
+    static const DWORD enabled = 1;
+    WCHAR device_key_name[MAX_PATH], device_instance[MAX_PATH];
+    HKEY iface_key, device_key, control_key;
+    DWORD length, type, index = 0;
+    BOOL ret = FALSE;
+    LSTATUS lr;
+
+    iface_key = SetupDiOpenClassRegKeyExW(guid, KEY_ALL_ACCESS, DIOCR_INTERFACE, NULL, NULL);
+    while (1)
+    {
+        length = ARRAY_SIZE(device_key_name);
+        lr = RegEnumKeyExW(iface_key, index++, device_key_name, &length, NULL, NULL, NULL, NULL);
+        if (lr)
+            break;
+
+        lr = RegOpenKeyExW(iface_key, device_key_name, 0, KEY_ALL_ACCESS, &device_key);
+        if (lr)
+            continue;
+
+        length = sizeof(device_instance);
+        lr = RegQueryValueExW(device_key, device_instanceW, NULL, &type, (BYTE *)device_instance, &length);
+        if (lr || type != REG_SZ || lstrcmpiW(device_instance, instance))
+        {
+            RegCloseKey(device_key);
+            continue;
+        }
+
+        lr = RegCreateKeyExW(device_key, hash_controlW, 0, NULL, REG_OPTION_VOLATILE, KEY_ALL_ACCESS, NULL, &control_key, NULL);
+        RegCloseKey(device_key);
+        if (lr)
+            continue;
+
+        lr = RegSetValueExW(control_key, linkedW, 0, REG_DWORD, (const BYTE *)&enabled, sizeof(enabled));
+        RegCloseKey(control_key);
+        if (!lr)
+        {
+            ret = TRUE;
+            break;
+        }
+    }
+    RegCloseKey(iface_key);
+    return ret;
+}
+
 /***********************************************************************
  *              macdrv_init_gpu
  *
@@ -1415,6 +1469,7 @@ static BOOL macdrv_init_gpu(HDEVINFO devinfo, const struct macdrv_gpu *gpu, int 
                             WCHAR *driver, LUID *gpu_luid)
 {
     static const BOOL present = TRUE;
+    SP_DEVICE_INTERFACE_DATA iface_data = {sizeof(iface_data)};
     SP_DEVINFO_DATA device_data = {sizeof(device_data)};
     WCHAR instanceW[MAX_PATH];
     DEVPROPTYPE property_type;
@@ -1436,6 +1491,13 @@ static BOOL macdrv_init_gpu(HDEVINFO devinfo, const struct macdrv_gpu *gpu, int 
         if (!SetupDiRegisterDeviceInfo(devinfo, &device_data, 0, NULL, NULL, NULL))
             goto done;
     }
+
+    /* Register GUID_DEVINTERFACE_DISPLAY_ADAPTER */
+    if (!SetupDiCreateDeviceInterfaceW(devinfo, &device_data, &GUID_DEVINTERFACE_DISPLAY_ADAPTER, NULL, 0, &iface_data))
+        goto done;
+
+    if (!link_device(instanceW, &GUID_DEVINTERFACE_DISPLAY_ADAPTER))
+        goto done;
 
     /* Write HardwareID registry property, REG_MULTI_SZ */
     written = sprintfW(bufferW, gpu_hardware_id_fmtW, gpu->vendor_id, gpu->device_id);
@@ -1590,7 +1652,8 @@ done:
 static BOOL macdrv_init_monitor(HDEVINFO devinfo, const struct macdrv_monitor *monitor, int monitor_index,
                                  int video_index, const LUID *gpu_luid, UINT output_id)
 {
-    SP_DEVINFO_DATA device_data = {sizeof(SP_DEVINFO_DATA)};
+    SP_DEVICE_INTERFACE_DATA iface_data = {sizeof(iface_data)};
+    SP_DEVINFO_DATA device_data = {sizeof(device_data)};
     WCHAR nameW[MAX_PATH];
     WCHAR bufferW[MAX_PATH];
     HKEY hkey;
@@ -1602,6 +1665,13 @@ static BOOL macdrv_init_monitor(HDEVINFO devinfo, const struct macdrv_monitor *m
     MultiByteToWideChar(CP_UTF8, 0, monitor->name, -1, nameW, ARRAY_SIZE(nameW));
     SetupDiCreateDeviceInfoW(devinfo, bufferW, &GUID_DEVCLASS_MONITOR, nameW, NULL, 0, &device_data);
     if (!SetupDiRegisterDeviceInfo(devinfo, &device_data, 0, NULL, NULL, NULL))
+        goto done;
+
+    /* Register GUID_DEVINTERFACE_MONITOR */
+    if (!SetupDiCreateDeviceInterfaceW(devinfo, &device_data, &GUID_DEVINTERFACE_MONITOR, NULL, 0, &iface_data))
+        goto done;
+
+    if (!link_device(bufferW, &GUID_DEVINTERFACE_MONITOR))
         goto done;
 
     /* Write HardwareID registry property */
