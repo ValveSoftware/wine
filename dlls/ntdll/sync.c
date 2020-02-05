@@ -2581,6 +2581,7 @@ NTSTATUS WINAPI RtlWaitOnAddress( const void *addr, const void *cmp, SIZE_T size
     apc_call_t call;
     apc_result_t result;
     timeout_t abs_timeout = timeout ? timeout->QuadPart : TIMEOUT_INFINITE;
+    sigset_t old_set;
 
     if (size != 1 && size != 2 && size != 4 && size != 8)
         return STATUS_INVALID_PARAMETER;
@@ -2603,6 +2604,7 @@ NTSTATUS WINAPI RtlWaitOnAddress( const void *addr, const void *cmp, SIZE_T size
             return STATUS_SUCCESS;
         }
 
+        pthread_sigmask( SIG_BLOCK, &server_block_set, &old_set );
         for (;;)
         {
             SERVER_START_REQ( select )
@@ -2613,7 +2615,7 @@ NTSTATUS WINAPI RtlWaitOnAddress( const void *addr, const void *cmp, SIZE_T size
                 req->timeout  = abs_timeout;
                 wine_server_add_data( req, &result, sizeof(result) );
                 wine_server_add_data( req, &select_op, sizeof(select_op.keyed_event) );
-                ret = wine_server_call( req );
+                ret = server_call_unlocked( req );
                 abs_timeout = reply->timeout;
                 apc_handle  = reply->apc_handle;
                 call        = reply->call;
@@ -2623,6 +2625,7 @@ NTSTATUS WINAPI RtlWaitOnAddress( const void *addr, const void *cmp, SIZE_T size
             if (ret != STATUS_KERNEL_APC) break;
             invoke_apc( &call, &result );
         }
+        pthread_sigmask( SIG_SETMASK, &old_set, NULL );
 
         RtlLeaveCriticalSection( &addr_section );
 
