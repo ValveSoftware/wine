@@ -36,6 +36,7 @@
 #include "winnt.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(environ);
+WINE_DECLARE_DEBUG_CHANNEL(steamclient);
 
 static WCHAR empty[] = {0};
 static const UNICODE_STRING empty_str = { 0, sizeof(empty), empty };
@@ -206,11 +207,68 @@ NTSTATUS WINAPI RtlSetEnvironmentVariable(PWSTR* penv, PUNICODE_STRING name,
     LPWSTR      p, env;
     NTSTATUS    nts = STATUS_VARIABLE_NOT_FOUND;
     MEMORY_BASIC_INFORMATION mbi;
+    static const WCHAR steamapi_envs[][21] =
+    {
+        {'S','t','e','a','m','A','p','p','I','d',0},
+        {'I','g','n','o','r','e','C','h','i','l','d','P','r','o','c','e','s','s','e','s',0},
+    };
 
     TRACE("(%p, %s, %s)\n", penv, debugstr_us(name), debugstr_us(value));
 
     if (!name || !name->Buffer || !name->Length)
         return STATUS_INVALID_PARAMETER_1;
+
+
+    for (unsigned int i = 0; i < ARRAY_SIZE(steamapi_envs); i++)
+    {
+        UNICODE_STRING steam_env;
+        RtlInitUnicodeString(&steam_env, steamapi_envs[i]);
+
+        if (!(RtlCompareUnicodeString(&steam_env, name, FALSE)))
+        {
+            char *native_name = NULL, *native_value = NULL;
+            ULONG size;
+            NTSTATUS stat;
+
+            WARN_(steamclient)("HACK: Setting system environment variable %s=%s\n", debugstr_us(name), debugstr_us(value));
+
+            if ((stat = RtlUnicodeToUTF8N(NULL, 0, &size, name->Buffer, name->Length)))
+                goto end;
+
+            native_name = RtlAllocateHeap(GetProcessHeap(), HEAP_ZERO_MEMORY, size + 1);
+
+            if ((stat = RtlUnicodeToUTF8N(native_name, size, &size, name->Buffer, name->Length)))
+                goto end;
+
+            if (value)
+            {
+                if ((stat = RtlUnicodeToUTF8N(NULL, 0, &size, value->Buffer, value->Length)))
+                    goto end;
+
+                native_value =  RtlAllocateHeap(GetProcessHeap(), HEAP_ZERO_MEMORY, size + 1);
+
+                if ((stat = RtlUnicodeToUTF8N(native_value, size, &size, value->Buffer, value->Length)))
+                    goto end;
+
+                TRACE_(steamclient)("HACK: Calling setenv(\"%s\", \"%s\", 1);\n", debugstr_a(native_name), debugstr_a(native_value));
+                setenv(native_name, native_value, 1);
+            }
+            else
+            {
+                TRACE_(steamclient)("HACK: Calling unsetenv(\"%s\");", debugstr_a(native_name));
+                unsetenv(native_name);
+            }
+
+
+            end:
+            if (stat)
+                ERR_(steamclient)("HACK: Failed to set system environment variable, ntstatus = %#x.\n", stat);
+            if (native_name)
+                RtlFreeHeap(GetProcessHeap(), 0, native_name);
+            if (native_value)
+                RtlFreeHeap(GetProcessHeap(), 0, native_value);
+        }
+    }
 
     len = name->Length / sizeof(WCHAR);
 
