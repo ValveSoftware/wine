@@ -232,6 +232,33 @@ static void process_data(HIDP_CAPS Caps, PHIDP_PREPARSED_DATA ppd, CHAR *data, D
 
         HeapFree(GetProcessHeap(), 0, values);
     }
+
+    todo_wine
+    ok(Caps.NumberLinkCollectionNodes > 0, "Expected at least one link collection\n");
+    if (Caps.NumberLinkCollectionNodes)
+    {
+        HIDP_LINK_COLLECTION_NODE nodes[256];
+        ULONG nodes_count = ARRAY_SIZE(nodes);
+
+        status = HidP_GetLinkCollectionNodes(nodes, &nodes_count, ppd);
+        todo_wine
+        ok(status == HIDP_STATUS_SUCCESS, "HidP_GetLinkCollectionNodes failed:%x\n", status);
+
+        for (i = 0; i < nodes_count; ++i)
+        {
+            trace("  [%d] LinkUsage: %x LinkUsagePage: %x Parent: %x "
+                  "NumberOfChildren: %x NextSibling: %x FirstChild: %x "
+                  "CollectionType: %x IsAlias: %x UserContext: %p\n",
+                  i, nodes[i].LinkUsage, nodes[i].LinkUsagePage, nodes[i].Parent,
+                  nodes[i].NumberOfChildren, nodes[i].NextSibling, nodes[i].FirstChild,
+                  nodes[i].CollectionType, nodes[i].IsAlias, nodes[i].UserContext);
+        }
+
+        ok(nodes_count > 0, "Unexpected number of link collection nodes:%u.\n", nodes_count);
+        ok(nodes[0].LinkUsagePage == Caps.UsagePage, "Unexpected top collection usage page:%x\n", nodes[0].LinkUsagePage);
+        ok(nodes[0].LinkUsage == Caps.Usage, "Unexpected top collection usage:%x\n", nodes[0].LinkUsage);
+        ok(nodes[0].CollectionType == 1, "Unexpected top collection type:%x\n", nodes[0].CollectionType);
+    }
 }
 
 static void test_read_device(void)
