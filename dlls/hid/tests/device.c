@@ -240,7 +240,6 @@ static void process_data(HIDP_CAPS Caps, PHIDP_PREPARSED_DATA ppd, CHAR *data, D
         ULONG nodes_count = ARRAY_SIZE(nodes);
 
         status = HidP_GetLinkCollectionNodes(nodes, &nodes_count, ppd);
-        todo_wine
         ok(status == HIDP_STATUS_SUCCESS, "HidP_GetLinkCollectionNodes failed:%x\n", status);
 
         for (i = 0; i < nodes_count; ++i)

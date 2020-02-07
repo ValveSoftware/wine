@@ -931,9 +931,23 @@ NTSTATUS WINAPI HidP_GetData(HIDP_REPORT_TYPE ReportType, HIDP_DATA *DataList, U
 NTSTATUS WINAPI HidP_GetLinkCollectionNodes(HIDP_LINK_COLLECTION_NODE *LinkCollectionNode,
     ULONG *LinkCollectionNodeLength, PHIDP_PREPARSED_DATA PreparsedData)
 {
-    TRACE("stub (%p, %p, %p)\n", LinkCollectionNode, LinkCollectionNodeLength, PreparsedData);
+    WINE_HIDP_PREPARSED_DATA *data = (WINE_HIDP_PREPARSED_DATA*)PreparsedData;
 
-    *LinkCollectionNodeLength = 0;
+    TRACE("(%p, %p, %p)\n", LinkCollectionNode, LinkCollectionNodeLength, PreparsedData);
 
-    return STATUS_NOT_IMPLEMENTED;
+    if (data->caps.NumberLinkCollectionNodes > 1)
+        FIXME("Unsupported number of link collections!\n");
+
+    *LinkCollectionNodeLength = 1;
+    LinkCollectionNode[0].LinkUsage = data->caps.Usage;
+    LinkCollectionNode[0].LinkUsagePage = data->caps.UsagePage;
+    LinkCollectionNode[0].Parent = 0;
+    LinkCollectionNode[0].NumberOfChildren = 0;
+    LinkCollectionNode[0].NextSibling = 0;
+    LinkCollectionNode[0].FirstChild = 0;
+    LinkCollectionNode[0].CollectionType = 1;
+    LinkCollectionNode[0].IsAlias = 0;
+    LinkCollectionNode[0].UserContext = 0;
+
+    return HIDP_STATUS_SUCCESS;
 }
