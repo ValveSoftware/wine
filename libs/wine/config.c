@@ -263,14 +263,14 @@ static void init_paths(void)
     struct stat st;
 
     const char *home = getenv( "HOME" );
-    const char *user = NULL;
+    const char *user = getenv( "WINEUSER" ) || "steamuser";
     const char *prefix = getenv( "WINEPREFIX" );
     char uid_str[32];
     struct passwd *pwd = getpwuid( getuid() );
 
     if (pwd)
     {
-        user = pwd->pw_name;
+        if (!user) user = pwd->pw_name;
         if (!home) home = pwd->pw_dir;
     }
     if (!user)
