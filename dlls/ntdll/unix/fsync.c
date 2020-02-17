@@ -640,7 +640,7 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
 
     out->CurrentCount = 1 - mutex->count;
     out->OwnedByCaller = (mutex->tid == GetCurrentThreadId());
-    out->AbandonedState = FALSE;
+    out->AbandonedState = (mutex->tid == ~0);
     if (ret_len) *ret_len = sizeof(*out);
 
     return STATUS_SUCCESS;
@@ -873,6 +873,12 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                                 mutex->count = 1;
                                 return i;
                             }
+                            else if (tid == ~0 && (tid = __sync_val_compare_and_swap( &mutex->tid, ~0, GetCurrentThreadId() )) == ~0)
+                            {
+                                TRACE("Woken up by abandoned mutex %p [%d].\n", handles[i], i);
+                                mutex->count = 1;
+                                return STATUS_ABANDONED_WAIT_0 + i;
+                            }
                             small_pause();
                         }
 
@@ -1010,7 +1016,11 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
         while (1)
         {
+            BOOL abandoned;
+
 tryagain:
+            abandoned = FALSE;
+
             /* First step: try to wait on each object in sequence. */
 
             for (i = 0; i < count; i++)
@@ -1062,11 +1072,9 @@ tryagain:
                 if (obj && obj->type == FSYNC_MUTEX)
                 {
                     struct mutex *mutex = obj->shm;
+                    int tid = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST );
 
-                    if (mutex->tid == GetCurrentThreadId())
-                        continue;   /* ok */
-
-                    if (__atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST ))
+                    if (tid && tid != ~0 && tid != GetCurrentThreadId())
                         goto tryagain;
                 }
                 else if (obj)
@@ -1087,10 +1095,15 @@ tryagain:
                 case FSYNC_MUTEX:
                 {
                     struct mutex *mutex = obj->shm;
-                    if (mutex->tid == GetCurrentThreadId())
+                    int tid = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST );
+                    if (tid == GetCurrentThreadId())
                         break;
-                    if (__sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() ))
+                    if (tid && tid != ~0)
                         goto tooslow;
+                    if (__sync_val_compare_and_swap( &mutex->tid, tid, GetCurrentThreadId() ) != tid)
+                        goto tooslow;
+                    if (tid == ~0)
+                        abandoned = TRUE;
                     break;
                 }
                 case FSYNC_SEMAPHORE:
@@ -1126,6 +1139,11 @@ tryagain:
                 }
             }
 
+            if (abandoned)
+            {
+                TRACE("Wait successful, but some object(s) were abandoned.\n");
+                return STATUS_ABANDONED;
+            }
             TRACE("Wait successful.\n");
             return STATUS_SUCCESS;
 
@@ -1138,6 +1156,9 @@ tooslow:
                 case FSYNC_MUTEX:
                 {
                     struct mutex *mutex = obj->shm;
+                    /* HACK: This won't do the right thing with abandoned
+                     * mutexes, but fixing it is probably more trouble than
+                     * it's worth. */
                     __atomic_store_n( &mutex->tid, 0, __ATOMIC_SEQ_CST );
                     break;
                 }
