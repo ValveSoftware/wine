@@ -106,12 +106,15 @@ void esync_init(void)
     atexit( shm_cleanup );
 }
 
+static struct list mutex_list = LIST_INIT(mutex_list);
+
 struct esync
 {
-    struct object   obj;    /* object header */
-    int             fd;     /* eventfd file descriptor */
+    struct object   obj;            /* object header */
+    int             fd;             /* eventfd file descriptor */
     enum esync_type type;
-    unsigned int    shm_idx;    /* index into the shared memory section */
+    unsigned int    shm_idx;        /* index into the shared memory section */
+    struct list     mutex_entry;    /* entry in the mutex list (if applicable) */
 };
 
 static void esync_dump( struct object *obj, int verbose );
@@ -171,6 +174,8 @@ static unsigned int esync_map_access( struct object *obj, unsigned int access )
 static void esync_destroy( struct object *obj )
 {
     struct esync *esync = (struct esync *)obj;
+    if (esync->type == ESYNC_MUTEX)
+        list_remove( &esync->mutex_entry );
     close( esync->fd );
 }
 
@@ -304,6 +309,7 @@ static struct esync *create_esync( struct object *root, const struct unicode_str
                 struct mutex *mutex = get_shm( esync->shm_idx );
                 mutex->tid = initval ? 0 : current->id;
                 mutex->count = initval ? 0 : 1;
+                list_add_tail( &mutex_list, &esync->mutex_entry );
                 break;
             }
             default:
@@ -447,6 +453,26 @@ void esync_reset_event( struct esync *esync )
     {
         /* Release the spinlock. */
         event->locked = 0;
+    }
+}
+
+void esync_abandon_mutexes( struct thread *thread )
+{
+    unsigned int index = 0;
+    struct esync *esync;
+
+    LIST_FOR_EACH_ENTRY( esync, &mutex_list, struct esync, mutex_entry )
+    {
+        struct mutex *mutex = get_shm( esync->shm_idx );
+
+        if (mutex->tid == thread->id)
+        {
+            if (debug_level)
+                fprintf( stderr, "esync_abandon_mutexes() fd=%d\n", esync->fd );
+            mutex->tid = ~0;
+            mutex->count = 0;
+            esync_wake_fd( esync->fd );
+        }
     }
 }
 

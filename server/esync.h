@@ -30,3 +30,4 @@ struct esync;
 extern const struct object_ops esync_ops;
 void esync_set_event( struct esync *esync );
 void esync_reset_event( struct esync *esync );
+void esync_abandon_mutexes( struct thread *thread );
