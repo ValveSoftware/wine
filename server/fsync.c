@@ -129,11 +129,14 @@ void fsync_init(void)
     atexit( shm_cleanup );
 }
 
+static struct list mutex_list = LIST_INIT(mutex_list);
+
 struct fsync
 {
     struct object  obj;
     unsigned int   shm_idx;
     enum fsync_type type;
+    struct list     mutex_entry;
 };
 
 static void fsync_dump( struct object *obj, int verbose );
@@ -193,6 +196,9 @@ static unsigned int fsync_map_access( struct object *obj, unsigned int access )
 
 static void fsync_destroy( struct object *obj )
 {
+    struct fsync *fsync = (struct fsync *)obj;
+    if (fsync->type == FSYNC_MUTEX)
+        list_remove( &fsync->mutex_entry );
 }
 
 static void *get_shm( unsigned int idx )
@@ -297,6 +303,8 @@ struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
 
             fsync->shm_idx = fsync_alloc_shm( low, high );
             fsync->type = type;
+            if (type == FSYNC_MUTEX)
+                list_add_tail( &mutex_list, &fsync->mutex_entry );
         }
         else
         {
@@ -395,6 +403,31 @@ void fsync_reset_event( struct fsync *fsync )
     assert( fsync->obj.ops == &fsync_ops );
 
     __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
+}
+
+struct mutex
+{
+    int tid;
+    int count;  /* recursion count */
+};
+
+void fsync_abandon_mutexes( struct thread *thread )
+{
+    struct fsync *fsync;
+
+    LIST_FOR_EACH_ENTRY( fsync, &mutex_list, struct fsync, mutex_entry )
+    {
+        struct mutex *mutex = get_shm( fsync->shm_idx );
+
+        if (mutex->tid == thread->id)
+        {
+            if (debug_level)
+                fprintf( stderr, "fsync_abandon_mutexes() idx=%d\n", fsync->shm_idx );
+            mutex->tid = ~0;
+            mutex->count = 0;
+            futex_wake( &mutex->tid, INT_MAX );
+        }
+    }
 }
 
 DECL_HANDLER(create_fsync)
