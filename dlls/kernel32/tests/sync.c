@@ -193,6 +193,13 @@ static DWORD WINAPI mutex_thread( void *param )
     return 0;
 }
 
+static DWORD WINAPI abandon_mutex_thread( void *param )
+{
+    DWORD ret = WaitForSingleObject( mutex, 0 );
+    ok(!ret, "got %u\n", ret);
+    return 0;
+}
+
 static void test_mutex(void)
 {
     HANDLE thread;
@@ -379,12 +386,24 @@ todo_wine_if(getenv("WINEESYNC"))   /* XFAIL: due to the above */
     ret = ReleaseMutex( mutex2 );
     ok(ret, "got error %u\n", GetLastError());
 
+    thread = CreateThread( NULL, 0, abandon_mutex_thread, NULL, 0, NULL );
+    ret = WaitForSingleObject( thread, 2000 );
+    ok(ret == 0, "wait failed: %u\n", ret);
+
+    ret = WaitForSingleObject( mutex, 0 );
+    ok(ret == WAIT_ABANDONED, "got %u\n", ret);
+
+    ret = ReleaseMutex( mutex );
+    ok(ret, "got error %u\n", GetLastError());
+
+    ret = WaitForSingleObject( mutex, 0 );
+    ok(!ret, "got %u\n", ret);
+
     ret = CloseHandle( mutex );
     ok(ret, "got error %u\n", GetLastError());
 
     ret = CloseHandle( mutex2 );
     ok(ret, "got error %u\n", GetLastError());
-
 }
 
 static void test_slist(void)
