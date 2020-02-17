@@ -31,3 +31,4 @@ struct fsync;
 extern const struct object_ops fsync_ops;
 extern void fsync_set_event( struct fsync *fsync );
 extern void fsync_reset_event( struct fsync *fsync );
+extern void fsync_abandon_mutexes( struct thread *thread );
