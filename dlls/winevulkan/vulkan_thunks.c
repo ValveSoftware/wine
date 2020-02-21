@@ -6338,17 +6338,14 @@ VkResult WINAPI wine_vkGetPhysicalDevicePresentRectanglesKHR(VkPhysicalDevice ph
     return physicalDevice->instance->funcs.p_vkGetPhysicalDevicePresentRectanglesKHR(physicalDevice->phys_dev, wine_surface_from_handle(surface)->driver_surface, pRectCount, pRects);
 }
 
-void WINAPI wine_vkGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties *pProperties)
+void thunk_vkGetPhysicalDeviceProperties(VkPhysicalDevice physicalDevice, VkPhysicalDeviceProperties *pProperties)
 {
 #if defined(USE_STRUCT_CONVERSION)
     VkPhysicalDeviceProperties_host pProperties_host;
-    TRACE("%p, %p\n", physicalDevice, pProperties);
-
     physicalDevice->instance->funcs.p_vkGetPhysicalDeviceProperties(physicalDevice->phys_dev, &pProperties_host);
 
     convert_VkPhysicalDeviceProperties_host_to_win(&pProperties_host, pProperties);
 #else
-    TRACE("%p, %p\n", physicalDevice, pProperties);
     physicalDevice->instance->funcs.p_vkGetPhysicalDeviceProperties(physicalDevice->phys_dev, pProperties);
 #endif
 }
