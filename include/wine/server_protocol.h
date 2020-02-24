@@ -5794,6 +5794,19 @@ struct set_job_completion_port_reply
 };
 
 
+struct get_job_info_request
+{
+    struct request_header __header;
+    obj_handle_t handle;
+};
+struct get_job_info_reply
+{
+    struct reply_header __header;
+    unsigned int total_processes;
+    unsigned int active_processes;
+};
+
+
 
 struct terminate_job_request
 {
@@ -6301,6 +6314,7 @@ enum request
     REQ_process_in_job,
     REQ_set_job_limits,
     REQ_set_job_completion_port,
+    REQ_get_job_info,
     REQ_terminate_job,
     REQ_suspend_process,
     REQ_resume_process,
@@ -6616,6 +6630,7 @@ union generic_request
     struct process_in_job_request process_in_job_request;
     struct set_job_limits_request set_job_limits_request;
     struct set_job_completion_port_request set_job_completion_port_request;
+    struct get_job_info_request get_job_info_request;
     struct terminate_job_request terminate_job_request;
     struct suspend_process_request suspend_process_request;
     struct resume_process_request resume_process_request;
@@ -6929,6 +6944,7 @@ union generic_reply
     struct process_in_job_reply process_in_job_reply;
     struct set_job_limits_reply set_job_limits_reply;
     struct set_job_completion_port_reply set_job_completion_port_reply;
+    struct get_job_info_reply get_job_info_reply;
     struct terminate_job_reply terminate_job_reply;
     struct suspend_process_reply suspend_process_reply;
     struct resume_process_reply resume_process_reply;
@@ -6944,6 +6960,6 @@ union generic_reply
     struct get_fsync_apc_idx_reply get_fsync_apc_idx_reply;
 };
 
-#define SERVER_PROTOCOL_VERSION 620
+#define SERVER_PROTOCOL_VERSION 621
 
 #endif /* __WINE_WINE_SERVER_PROTOCOL_H */

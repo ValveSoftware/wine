@@ -3966,6 +3966,14 @@ struct handle_info
     client_ptr_t key;             /* key to send with completion messages */
 @END
 
+/* Retrieve information about a job */
+@REQ(get_job_info)
+    obj_handle_t handle;
+@REPLY
+    unsigned int total_processes;
+    unsigned int active_processes;
+@END
+
 
 /* Terminate all processes associated with the job  */
 @REQ(terminate_job)

@@ -164,6 +164,7 @@ struct job
     struct object obj;             /* object header */
     struct list process_list;      /* list of all processes */
     int num_processes;             /* count of running processes */
+    int assign_counter;            /* Number of processes which have been assigned */
     unsigned int limit_flags;      /* limit flags */
     int terminating;               /* job is terminating */
     int signaled;                  /* job is signaled */
@@ -208,6 +209,7 @@ static struct job *create_job_object( struct object *root, const struct unicode_
             /* initialize it if it didn't already exist */
             list_init( &job->process_list );
             job->num_processes = 0;
+            job->assign_counter = 0;
             job->limit_flags = 0;
             job->terminating = 0;
             job->signaled = 0;
@@ -250,6 +252,7 @@ static void add_job_process( struct job *job, struct process *process )
     process->job = (struct job *)grab_object( job );
     list_add_tail( &job->process_list, &process->job_entry );
     job->num_processes++;
+    job->assign_counter++;
 
     add_job_completion( job, JOB_OBJECT_MSG_NEW_PROCESS, get_process_id(process) );
 }
@@ -1748,6 +1751,17 @@ DECL_HANDLER(process_in_job)
         release_object( job );
     }
     release_object( process );
+}
+
+/* retrieve information about a job */
+DECL_HANDLER(get_job_info)
+{
+    struct job *job = get_job_obj( current->process, req->handle, JOB_OBJECT_QUERY );
+
+    reply->total_processes = job->assign_counter;
+    reply->active_processes = job->num_processes;
+
+    release_object( job );
 }
 
 /* terminate all processes associated with the job */
