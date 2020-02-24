@@ -565,11 +565,12 @@ static ULONG WINAPI src_reader_Release(IMFSourceReader *iface)
     {
         if (reader->async_callback)
             IMFSourceReaderCallback_Release(reader->async_callback);
-        if (reader->shutdown_on_release)
+        if (reader->source && reader->shutdown_on_release)
             IMFMediaSource_Shutdown(reader->source);
         if (reader->descriptor)
             IMFPresentationDescriptor_Release(reader->descriptor);
-        IMFMediaSource_Release(reader->source);
+        if (reader->source)
+            IMFMediaSource_Release(reader->source);
 
         for (i = 0; i < reader->stream_count; ++i)
         {
