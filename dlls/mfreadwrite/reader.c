@@ -1277,11 +1277,12 @@ static ULONG WINAPI src_reader_Release(IMFSourceReader *iface)
     {
         if (reader->async_callback)
             IMFSourceReaderCallback_Release(reader->async_callback);
-        if (reader->flags & SOURCE_READER_SHUTDOWN_ON_RELEASE)
+        if (reader->source && reader->flags & SOURCE_READER_SHUTDOWN_ON_RELEASE)
             IMFMediaSource_Shutdown(reader->source);
         if (reader->descriptor)
             IMFPresentationDescriptor_Release(reader->descriptor);
-        IMFMediaSource_Release(reader->source);
+        if (reader->source)
+            IMFMediaSource_Release(reader->source);
 
         for (i = 0; i < reader->stream_count; ++i)
         {
