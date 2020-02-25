@@ -147,7 +147,6 @@ struct fs_hack_image
     VkSemaphore blit_finished;
     VkImageView user_view, blit_view;
     VkDescriptorSet descriptor_set;
-    VkPipeline pipeline;
 };
 
 struct VkSwapchainKHR_T
@@ -170,6 +169,7 @@ struct VkSwapchainKHR_T
     VkDescriptorPool descriptor_pool;
     VkDescriptorSetLayout descriptor_set_layout;
     VkPipelineLayout pipeline_layout;
+    VkPipeline pipeline;
 };
 
 void *wine_vk_get_device_proc_addr(const char *name) DECLSPEC_HIDDEN;
