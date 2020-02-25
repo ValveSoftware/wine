@@ -2172,7 +2172,7 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
         result = init_blit_images(device, object);
         if(result != VK_SUCCESS){
             ERR("creating blit images failed: %d\n", result);
-            wine_vkDestroySwapchainKHR(device, (VkSwapchainKHR)object, NULL);
+            wine_vkDestroySwapchainKHR(device, (VkSwapchainKHR)(UINT_PTR)object, NULL);
             return result;
         }
     }
