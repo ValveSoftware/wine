@@ -626,6 +626,7 @@ extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_enabled(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_mapping_required(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_is_integer(void) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_is_cas(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_matches_current_mode(int w, int h) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_matches_real_mode(int w, int h) DECLSPEC_HIDDEN;
 extern POINT fs_hack_current_mode(void) DECLSPEC_HIDDEN;

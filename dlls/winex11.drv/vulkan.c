@@ -545,7 +545,7 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
 }
 
 static VkBool32 X11DRV_query_fs_hack(VkExtent2D *real_sz, VkExtent2D *user_sz,
-        VkRect2D *dst_blit, VkFilter *filter)
+        VkRect2D *dst_blit, VkFilter *filter, BOOL *cas_scaling)
 {
     if(fs_hack_enabled()){
         POINT real_res = fs_hack_real_mode();
@@ -555,6 +555,9 @@ static VkBool32 X11DRV_query_fs_hack(VkExtent2D *real_sz, VkExtent2D *user_sz,
 
         if(filter)
             *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
+
+        if(cas_scaling)
+            *cas_scaling = fs_hack_is_cas();
 
         fs_hack_user_to_real(&scaled_origin);
 

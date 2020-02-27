@@ -160,12 +160,15 @@ struct VkSwapchainKHR_T
     VkExtent2D user_extent;
     VkExtent2D real_extent;
     VkImageUsageFlags surface_usage;
+    VkFormat swapchain_format;
     VkRect2D blit_dst;
     VkCommandPool *cmd_pools; /* VkCommandPool[device->max_queue_families] */
     VkDeviceMemory user_image_memory, blit_image_memory;
     uint32_t n_images;
     struct fs_hack_image *fs_hack_images; /* struct fs_hack_image[n_images] */
     VkFilter fs_hack_filter;
+    BOOL fs_hack_cas;
+    float fs_hack_cas_sharpness;
     VkSampler sampler;
     VkDescriptorPool descriptor_pool;
     VkDescriptorSetLayout descriptor_set_layout;

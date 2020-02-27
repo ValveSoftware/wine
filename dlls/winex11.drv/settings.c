@@ -294,6 +294,17 @@ BOOL fs_hack_is_integer(void)
     return is_int;
 }
 
+BOOL fs_hack_is_cas(void)
+{
+    static int is_int = -1;
+    if(is_int < 0)
+    {
+        const char *e = getenv("WINE_FULLSCREEN_CAS_SCALING");
+        is_int = e && strcmp(e, "0");
+    }
+    return is_int;
+}
+
 BOOL fs_hack_matches_current_mode(int w, int h)
 {
     return fs_hack_enabled() &&
