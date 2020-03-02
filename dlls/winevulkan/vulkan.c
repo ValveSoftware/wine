@@ -1988,7 +1988,7 @@ static VkResult init_fs_hack_images(VkDevice device, struct VkSwapchainKHR_T *sw
         imageInfo.format = createinfo->imageFormat;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-        imageInfo.usage = createinfo->imageUsage | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.usage = createinfo->imageUsage | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         imageInfo.sharingMode = createinfo->imageSharingMode;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.queueFamilyIndexCount = createinfo->queueFamilyIndexCount;
@@ -2616,9 +2616,9 @@ static VkResult record_compute_cmd(VkDevice device, struct VkSwapchainKHR_T *swa
     device->funcs.p_vkBeginCommandBuffer(hack->cmd, &beginInfo);
 
     /* for the cs we run... */
-    /* transition user image from TRANSFER_SRC to SHADER_READ */
+    /* transition user image from PRESENT_SRC to SHADER_READ */
     barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barriers[0].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barriers[0].oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     barriers[0].newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
@@ -2628,7 +2628,7 @@ static VkResult record_compute_cmd(VkDevice device, struct VkSwapchainKHR_T *swa
     barriers[0].subresourceRange.levelCount = 1;
     barriers[0].subresourceRange.baseArrayLayer = 0;
     barriers[0].subresourceRange.layerCount = 1;
-    barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barriers[0].srcAccessMask = 0;
     barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
     /* storage image... */
@@ -2679,10 +2679,10 @@ static VkResult record_compute_cmd(VkDevice device, struct VkSwapchainKHR_T *swa
     device->funcs.p_vkCmdDispatch(hack->cmd, ceil(swapchain->real_extent.width / 8.),
             ceil(swapchain->real_extent.height / 8.), 1);
 
-    /* transition user image from SHADER_READ back to TRANSFER_SRC */
+    /* transition user image from SHADER_READ back to PRESENT_SRC */
     barriers[0].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barriers[0].oldLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    barriers[0].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barriers[0].newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
     barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barriers[0].image = hack->user_image;
@@ -2692,7 +2692,7 @@ static VkResult record_compute_cmd(VkDevice device, struct VkSwapchainKHR_T *swa
     barriers[0].subresourceRange.baseArrayLayer = 0;
     barriers[0].subresourceRange.layerCount = 1;
     barriers[0].srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barriers[0].dstAccessMask = 0;
 
     device->funcs.p_vkCmdPipelineBarrier(
             hack->cmd,
@@ -2864,6 +2864,21 @@ static VkResult record_graphics_cmd(VkDevice device, struct VkSwapchainKHR_T *sw
     barriers[0].srcAccessMask = 0;
     barriers[0].dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
+    /* transition user image from PRESENT_SRC to TRANSFER_SRC_OPTIMAL */
+    barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[1].oldLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barriers[1].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].image = hack->user_image;
+    barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[1].subresourceRange.baseMipLevel = 0;
+    barriers[1].subresourceRange.levelCount = 1;
+    barriers[1].subresourceRange.baseArrayLayer = 0;
+    barriers[1].subresourceRange.layerCount = 1;
+    barriers[1].srcAccessMask = 0;
+    barriers[1].dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
     device->funcs.p_vkCmdPipelineBarrier(
             hack->cmd,
             VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -2871,7 +2886,7 @@ static VkResult record_graphics_cmd(VkDevice device, struct VkSwapchainKHR_T *sw
             0,
             0, NULL,
             0, NULL,
-            1, barriers
+            2, barriers
     );
 
     /* clear the image */
@@ -2924,6 +2939,21 @@ static VkResult record_graphics_cmd(VkDevice device, struct VkSwapchainKHR_T *sw
     barriers[0].srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
     barriers[0].dstAccessMask = 0;
 
+    /* transition user image from TRANSFER_SRC_OPTIMAL to back to PRESENT_SRC */
+    barriers[1].sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barriers[1].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+    barriers[1].newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    barriers[1].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barriers[1].image = hack->user_image;
+    barriers[1].subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    barriers[1].subresourceRange.baseMipLevel = 0;
+    barriers[1].subresourceRange.levelCount = 1;
+    barriers[1].subresourceRange.baseArrayLayer = 0;
+    barriers[1].subresourceRange.layerCount = 1;
+    barriers[1].srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+    barriers[1].dstAccessMask = 0;
+
     device->funcs.p_vkCmdPipelineBarrier(
             hack->cmd,
             VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -2931,7 +2961,7 @@ static VkResult record_graphics_cmd(VkDevice device, struct VkSwapchainKHR_T *sw
             0,
             0, NULL,
             0, NULL,
-            1, barriers
+            2, barriers
     );
 
     result = device->funcs.p_vkEndCommandBuffer(hack->cmd);
@@ -3074,8 +3104,6 @@ void WINAPI wine_vkCmdPipelineBarrier(VkCommandBuffer commandBuffer,
     VkBufferMemoryBarrier_host *pBufferMemoryBarriers_host;
 #endif
     VkImageMemoryBarrier_host *pImageMemoryBarriers_host = NULL;
-    uint32_t i, j, k;
-    int old, new;
 
     TRACE("%p, %#x, %#x, %#x, %u, %p, %u, %p, %u, %p\n", commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
 
@@ -3083,41 +3111,6 @@ void WINAPI wine_vkCmdPipelineBarrier(VkCommandBuffer commandBuffer,
     pBufferMemoryBarriers_host = convert_VkBufferMemoryBarrier_array_win_to_host(pBufferMemoryBarriers, bufferMemoryBarrierCount);
     pImageMemoryBarriers_host = convert_VkImageMemoryBarrier_array_win_to_host(pImageMemoryBarriers, imageMemoryBarrierCount);
 #endif
-
-    /* if the client is trying to transition a user image to PRESENT_SRC,
-     * transition it to TRANSFER_SRC_OPTIMAL instead. */
-    EnterCriticalSection(&commandBuffer->device->swapchain_lock);
-    for(i = 0; i < imageMemoryBarrierCount; ++i){
-        old = pImageMemoryBarriers[i].oldLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        new = pImageMemoryBarriers[i].newLayout == VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-        if(old || new){
-            for(j = 0; j < commandBuffer->device->num_swapchains; ++j){
-                struct VkSwapchainKHR_T *swapchain = commandBuffer->device->swapchains[j];
-                if(swapchain->fs_hack_enabled){
-                    for(k = 0; k < swapchain->n_images; ++k){
-                        struct fs_hack_image *hack = &swapchain->fs_hack_images[k];
-                        if(pImageMemoryBarriers[i].image == hack->user_image){
-#if !defined(USE_STRUCT_CONVERSION)
-                            if(!pImageMemoryBarriers_host)
-                                pImageMemoryBarriers_host = convert_VkImageMemoryBarrier_array_win_to_host(pImageMemoryBarriers, imageMemoryBarrierCount);
-#endif
-                            if(old) {
-                                pImageMemoryBarriers_host[i].oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-                                pImageMemoryBarriers_host[i].srcAccessMask |= VK_ACCESS_TRANSFER_READ_BIT;
-                            }
-                            if(new) {
-                                pImageMemoryBarriers_host[i].newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-                                pImageMemoryBarriers_host[i].dstAccessMask |= VK_ACCESS_TRANSFER_READ_BIT;
-                            }
-                            goto next;
-                        }
-                    }
-                }
-            }
-        }
-next:   ;
-    }
-    LeaveCriticalSection(&commandBuffer->device->swapchain_lock);
 
     commandBuffer->device->funcs.p_vkCmdPipelineBarrier(commandBuffer->command_buffer,
             srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
