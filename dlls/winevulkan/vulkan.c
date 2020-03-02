@@ -1908,7 +1908,6 @@ static VkResult create_descriptor_set(VkDevice device, struct VkSwapchainKHR_T *
 
 static void destroy_fs_hack_image(VkDevice device, struct VkSwapchainKHR_T *swapchain, struct fs_hack_image *hack)
 {
-    device->funcs.p_vkFreeDescriptorSets(device->device, swapchain->descriptor_pool, 1, &hack->descriptor_set);
     device->funcs.p_vkDestroyImageView(device->device, hack->user_view, NULL);
     device->funcs.p_vkDestroyImageView(device->device, hack->blit_view, NULL);
     device->funcs.p_vkDestroyImage(device->device, hack->user_image, NULL);
