@@ -3092,44 +3092,6 @@ VkResult WINAPI wine_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pP
 
 }
 
-void WINAPI wine_vkCmdPipelineBarrier(VkCommandBuffer commandBuffer,
-        VkPipelineStageFlags srcStageMask, VkPipelineStageFlags dstStageMask,
-        VkDependencyFlags dependencyFlags, uint32_t memoryBarrierCount,
-        const VkMemoryBarrier *pMemoryBarriers, uint32_t bufferMemoryBarrierCount,
-        const VkBufferMemoryBarrier *pBufferMemoryBarriers, uint32_t imageMemoryBarrierCount,
-        const VkImageMemoryBarrier *pImageMemoryBarriers)
-{
-#if defined(USE_STRUCT_CONVERSION)
-    VkBufferMemoryBarrier_host *pBufferMemoryBarriers_host;
-#endif
-    VkImageMemoryBarrier_host *pImageMemoryBarriers_host = NULL;
-
-    TRACE("%p, %#x, %#x, %#x, %u, %p, %u, %p, %u, %p\n", commandBuffer, srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount, pMemoryBarriers, bufferMemoryBarrierCount, pBufferMemoryBarriers, imageMemoryBarrierCount, pImageMemoryBarriers);
-
-#if defined(USE_STRUCT_CONVERSION)
-    pBufferMemoryBarriers_host = convert_VkBufferMemoryBarrier_array_win_to_host(pBufferMemoryBarriers, bufferMemoryBarrierCount);
-    pImageMemoryBarriers_host = convert_VkImageMemoryBarrier_array_win_to_host(pImageMemoryBarriers, imageMemoryBarrierCount);
-#endif
-
-    commandBuffer->device->funcs.p_vkCmdPipelineBarrier(commandBuffer->command_buffer,
-            srcStageMask, dstStageMask, dependencyFlags, memoryBarrierCount,
-            pMemoryBarriers, bufferMemoryBarrierCount,
-#if defined(USE_STRUCT_CONVERSION)
-            pBufferMemoryBarriers_host, imageMemoryBarrierCount, pImageMemoryBarriers_host
-#else
-            pBufferMemoryBarriers, imageMemoryBarrierCount,
-            pImageMemoryBarriers_host ? (VkImageMemoryBarrier*)pImageMemoryBarriers_host : pImageMemoryBarriers
-#endif
-            );
-
-#if defined(USE_STRUCT_CONVERSION)
-    free_VkBufferMemoryBarrier_array(pBufferMemoryBarriers_host, bufferMemoryBarrierCount);
-#else
-    if(pImageMemoryBarriers_host)
-#endif
-        free_VkImageMemoryBarrier_array(pImageMemoryBarriers_host, imageMemoryBarrierCount);
-}
-
 VkDevice WINAPI __wine_get_native_VkDevice(VkDevice device)
 {
     return device->device;

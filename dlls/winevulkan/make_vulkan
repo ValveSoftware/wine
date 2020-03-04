@@ -173,7 +173,6 @@ FUNCTION_OVERRIDES = {
     "vkCmdExecuteCommands" : {"dispatch" : True, "driver" : False, "thunk" : False},
     "vkCreateCommandPool" : {"dispatch": True, "driver" : False, "thunk" : False},
     "vkDestroyCommandPool" : {"dispatch": True, "driver" : False, "thunk" : False},
-    "vkCmdPipelineBarrier" : {"dispatch" : True, "driver" : False, "thunk" : False},
     "vkDestroyDevice" : {"dispatch" : True, "driver" : False, "thunk" : False},
     "vkFreeCommandBuffers" : {"dispatch" : True, "driver" : False, "thunk" : False},
     "vkGetDeviceProcAddr" : {"dispatch" : False, "driver" : True, "thunk" : False},
