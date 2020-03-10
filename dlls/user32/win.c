@@ -1607,17 +1607,12 @@ HWND WIN_CreateWindowEx( CREATESTRUCTW *cs, LPCWSTR className, HINSTANCE module,
 
     cx = cs->cx;
     cy = cs->cy;
-#if 0
-    /* HACK: This code changes the window's size to fit the display. However,
-     * some games (Bayonetta, Dragon's Dogma) will then have the incorrect
-     * render size. So just let windows be too big to fit the display. */
     if ((cs->style & WS_THICKFRAME) || !(cs->style & (WS_POPUP | WS_CHILD)))
     {
         MINMAXINFO info = WINPOS_GetMinMaxInfo( hwnd );
-        cx = max( min( cx, info.ptMaxTrackSize.x ), info.ptMinTrackSize.x );
-        cy = max( min( cy, info.ptMaxTrackSize.y ), info.ptMinTrackSize.y );
+        cx = max( cx, info.ptMinTrackSize.x );
+        cy = max( cy, info.ptMinTrackSize.y );
     }
-#endif
 
     if (cx < 0) cx = 0;
     if (cy < 0) cy = 0;
