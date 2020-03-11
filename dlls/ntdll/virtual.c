@@ -909,6 +909,7 @@ static DWORD VIRTUAL_GetWin32Prot( BYTE vprot, unsigned int map_prot )
     if ((vprot & (VPROT_COPIED | VPROT_WRITECOPY)) == (VPROT_COPIED | VPROT_WRITECOPY))
         vprot = (vprot & ~VPROT_WRITECOPY) | VPROT_WRITE;
     ret = VIRTUAL_Win32Flags[vprot & 0x0f];
+    if (vprot & VPROT_GUARD) ret |= PAGE_GUARD;
     if (map_prot & SEC_NOCACHE) ret |= PAGE_NOCACHE;
     return ret;
 }
