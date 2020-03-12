@@ -85,7 +85,9 @@ static VkResult (*pvkGetDeviceGroupSurfacePresentModesKHR)(VkDevice, VkSurfaceKH
 static void * (*pvkGetDeviceProcAddr)(VkDevice, const char *);
 static void * (*pvkGetInstanceProcAddr)(VkInstance, const char *);
 static VkResult (*pvkGetPhysicalDevicePresentRectanglesKHR)(VkPhysicalDevice, VkSurfaceKHR, uint32_t *, VkRect2D *);
+static VkResult (*pvkGetPhysicalDeviceSurfaceCapabilities2KHR)(VkPhysicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR *, VkSurfaceCapabilities2KHR *);
 static VkResult (*pvkGetPhysicalDeviceSurfaceCapabilitiesKHR)(VkPhysicalDevice, VkSurfaceKHR, VkSurfaceCapabilitiesKHR *);
+static VkResult (*pvkGetPhysicalDeviceSurfaceFormats2KHR)(VkPhysicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR *, uint32_t *, VkSurfaceFormat2KHR *);
 static VkResult (*pvkGetPhysicalDeviceSurfaceFormatsKHR)(VkPhysicalDevice, VkSurfaceKHR, uint32_t *, VkSurfaceFormatKHR *);
 static VkResult (*pvkGetPhysicalDeviceSurfacePresentModesKHR)(VkPhysicalDevice, VkSurfaceKHR, uint32_t *, VkPresentModeKHR *);
 static VkResult (*pvkGetPhysicalDeviceSurfaceSupportKHR)(VkPhysicalDevice, uint32_t, VkSurfaceKHR, VkBool32 *);
@@ -122,7 +124,9 @@ static BOOL WINAPI wine_vk_init(INIT_ONCE *once, void *param, void **context)
     LOAD_FUNCPTR(vkEnumerateInstanceExtensionProperties)
     LOAD_FUNCPTR(vkGetDeviceProcAddr)
     LOAD_FUNCPTR(vkGetInstanceProcAddr)
+    LOAD_FUNCPTR(vkGetPhysicalDeviceSurfaceCapabilities2KHR)
     LOAD_FUNCPTR(vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
+    LOAD_FUNCPTR(vkGetPhysicalDeviceSurfaceFormats2KHR)
     LOAD_FUNCPTR(vkGetPhysicalDeviceSurfaceFormatsKHR)
     LOAD_FUNCPTR(vkGetPhysicalDeviceSurfacePresentModesKHR)
     LOAD_FUNCPTR(vkGetPhysicalDeviceSurfaceSupportKHR)
@@ -486,6 +490,34 @@ static VkResult X11DRV_vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevic
     return pvkGetPhysicalDeviceSurfacePresentModesKHR(phys_dev, x11_surface->surface, count, modes);
 }
 
+static VkResult X11DRV_vkGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice phys_dev,
+        const VkPhysicalDeviceSurfaceInfo2KHR* surface_info, VkSurfaceCapabilities2KHR *capabilities)
+{
+    struct wine_vk_surface *x11_surface = surface_from_handle(surface_info->surface);
+    VkPhysicalDeviceSurfaceInfo2KHR x11_surface_info;
+    x11_surface_info.sType   = surface_info->sType;
+    x11_surface_info.pNext   = surface_info->pNext;
+    x11_surface_info.surface = x11_surface->surface;
+
+    TRACE("%p, %p, %p\n", phys_dev, surface_info, capabilities);
+
+    return pvkGetPhysicalDeviceSurfaceCapabilities2KHR(phys_dev, &x11_surface_info, capabilities);
+}
+
+static VkResult X11DRV_vkGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice phys_dev,
+        const VkPhysicalDeviceSurfaceInfo2KHR* surface_info, uint32_t *count, VkSurfaceFormat2KHR *formats)
+{
+    struct wine_vk_surface *x11_surface = surface_from_handle(surface_info->surface);
+    VkPhysicalDeviceSurfaceInfo2KHR x11_surface_info;
+    x11_surface_info.sType   = surface_info->sType;
+    x11_surface_info.pNext   = surface_info->pNext;
+    x11_surface_info.surface = x11_surface->surface;
+
+    TRACE("%p, %p, %p, %p\n", phys_dev, surface_info, count, formats);
+
+    return pvkGetPhysicalDeviceSurfaceFormats2KHR(phys_dev, &x11_surface_info, count, formats);
+}
+
 static VkResult X11DRV_vkGetPhysicalDeviceSurfaceSupportKHR(VkPhysicalDevice phys_dev,
         uint32_t index, VkSurfaceKHR surface, VkBool32 *supported)
 {
@@ -593,7 +625,9 @@ static const struct vulkan_funcs vulkan_funcs =
     X11DRV_vkGetDeviceProcAddr,
     X11DRV_vkGetInstanceProcAddr,
     X11DRV_vkGetPhysicalDevicePresentRectanglesKHR,
+    X11DRV_vkGetPhysicalDeviceSurfaceCapabilities2KHR,
     X11DRV_vkGetPhysicalDeviceSurfaceCapabilitiesKHR,
+    X11DRV_vkGetPhysicalDeviceSurfaceFormats2KHR,
     X11DRV_vkGetPhysicalDeviceSurfaceFormatsKHR,
     X11DRV_vkGetPhysicalDeviceSurfacePresentModesKHR,
     X11DRV_vkGetPhysicalDeviceSurfaceSupportKHR,
