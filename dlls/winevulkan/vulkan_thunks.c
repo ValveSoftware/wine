@@ -1053,6 +1053,15 @@ static inline void convert_VkPhysicalDeviceProperties2_host_to_win(const VkPhysi
     convert_VkPhysicalDeviceProperties_host_to_win(&in->properties, &out->properties);
 }
 
+static inline void convert_VkPhysicalDeviceSurfaceInfo2KHR_win_to_host(const VkPhysicalDeviceSurfaceInfo2KHR *in, VkPhysicalDeviceSurfaceInfo2KHR_host *out)
+{
+    if (!in) return;
+
+    out->sType = in->sType;
+    out->pNext = in->pNext;
+    out->surface = in->surface;
+}
+
 static inline void convert_VkPipelineExecutableInfoKHR_win_to_host(const VkPipelineExecutableInfoKHR *in, VkPipelineExecutableInfoKHR_host *out)
 {
     if (!in) return;
@@ -3770,9 +3779,8 @@ VkResult WINAPI wine_vkGetDeviceGroupPresentCapabilitiesKHR(VkDevice device, VkD
     return device->funcs.p_vkGetDeviceGroupPresentCapabilitiesKHR(device->device, pDeviceGroupPresentCapabilities);
 }
 
-VkResult WINAPI wine_vkGetDeviceGroupSurfacePresentModesKHR(VkDevice device, VkSurfaceKHR surface, VkDeviceGroupPresentModeFlagsKHR *pModes)
+VkResult thunk_vkGetDeviceGroupSurfacePresentModesKHR(VkDevice device, VkSurfaceKHR surface, VkDeviceGroupPresentModeFlagsKHR *pModes)
 {
-    TRACE("%p, 0x%s, %p\n", device, wine_dbgstr_longlong(surface), pModes);
     return device->funcs.p_vkGetDeviceGroupSurfacePresentModesKHR(device->device, surface, pModes);
 }
 
@@ -4145,9 +4153,37 @@ static VkResult WINAPI wine_vkGetPhysicalDeviceSupportedFramebufferMixedSamplesC
     return physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV(physicalDevice->phys_dev, pCombinationCount, pCombinations);
 }
 
+VkResult thunk_vkGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR *pSurfaceInfo, VkSurfaceCapabilities2KHR *pSurfaceCapabilities)
+{
+#if defined(USE_STRUCT_CONVERSION)
+    VkResult result;
+    VkPhysicalDeviceSurfaceInfo2KHR_host pSurfaceInfo_host;
+    convert_VkPhysicalDeviceSurfaceInfo2KHR_win_to_host(pSurfaceInfo, &pSurfaceInfo_host);
+    result = physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfaceCapabilities2KHR(physicalDevice->phys_dev, &pSurfaceInfo_host, pSurfaceCapabilities);
+
+    return result;
+#else
+    return physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfaceCapabilities2KHR(physicalDevice->phys_dev, pSurfaceInfo, pSurfaceCapabilities);
+#endif
+}
+
 VkResult thunk_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *pSurfaceCapabilities)
 {
     return physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(physicalDevice->phys_dev, surface, pSurfaceCapabilities);
+}
+
+VkResult thunk_vkGetPhysicalDeviceSurfaceFormats2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR *pSurfaceInfo, uint32_t *pSurfaceFormatCount, VkSurfaceFormat2KHR *pSurfaceFormats)
+{
+#if defined(USE_STRUCT_CONVERSION)
+    VkResult result;
+    VkPhysicalDeviceSurfaceInfo2KHR_host pSurfaceInfo_host;
+    convert_VkPhysicalDeviceSurfaceInfo2KHR_win_to_host(pSurfaceInfo, &pSurfaceInfo_host);
+    result = physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfaceFormats2KHR(physicalDevice->phys_dev, &pSurfaceInfo_host, pSurfaceFormatCount, pSurfaceFormats);
+
+    return result;
+#else
+    return physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfaceFormats2KHR(physicalDevice->phys_dev, pSurfaceInfo, pSurfaceFormatCount, pSurfaceFormats);
+#endif
 }
 
 VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t *pSurfaceFormatCount, VkSurfaceFormatKHR *pSurfaceFormats)
@@ -4156,9 +4192,8 @@ VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceFormatsKHR(VkPhysicalDevice physi
     return physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfaceFormatsKHR(physicalDevice->phys_dev, surface, pSurfaceFormatCount, pSurfaceFormats);
 }
 
-VkResult WINAPI wine_vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t *pPresentModeCount, VkPresentModeKHR *pPresentModes)
+VkResult thunk_vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t *pPresentModeCount, VkPresentModeKHR *pPresentModes)
 {
-    TRACE("%p, 0x%s, %p, %p\n", physicalDevice, wine_dbgstr_longlong(surface), pPresentModeCount, pPresentModes);
     return physicalDevice->instance->funcs.p_vkGetPhysicalDeviceSurfacePresentModesKHR(physicalDevice->phys_dev, surface, pPresentModeCount, pPresentModes);
 }
 
@@ -4479,6 +4514,7 @@ static VkResult WINAPI wine_vkWaitSemaphoresKHR(VkDevice device, const VkSemapho
 
 static const struct vulkan_func vk_device_dispatch_table[] =
 {
+    {"vkAcquireFullScreenExclusiveModeEXT", &wine_vkAcquireFullScreenExclusiveModeEXT},
     {"vkAcquireNextImage2KHR", &wine_vkAcquireNextImage2KHR},
     {"vkAcquireNextImageKHR", &wine_vkAcquireNextImageKHR},
     {"vkAcquirePerformanceConfigurationINTEL", &wine_vkAcquirePerformanceConfigurationINTEL},
@@ -4650,6 +4686,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkGetDeviceGroupPeerMemoryFeatures", &wine_vkGetDeviceGroupPeerMemoryFeatures},
     {"vkGetDeviceGroupPeerMemoryFeaturesKHR", &wine_vkGetDeviceGroupPeerMemoryFeaturesKHR},
     {"vkGetDeviceGroupPresentCapabilitiesKHR", &wine_vkGetDeviceGroupPresentCapabilitiesKHR},
+    {"vkGetDeviceGroupSurfacePresentModes2EXT", &wine_vkGetDeviceGroupSurfacePresentModes2EXT},
     {"vkGetDeviceGroupSurfacePresentModesKHR", &wine_vkGetDeviceGroupSurfacePresentModesKHR},
     {"vkGetDeviceMemoryCommitment", &wine_vkGetDeviceMemoryCommitment},
     {"vkGetDeviceProcAddr", &wine_vkGetDeviceProcAddr},
@@ -4688,6 +4725,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkQueueSetPerformanceConfigurationINTEL", &wine_vkQueueSetPerformanceConfigurationINTEL},
     {"vkQueueSubmit", &wine_vkQueueSubmit},
     {"vkQueueWaitIdle", &wine_vkQueueWaitIdle},
+    {"vkReleaseFullScreenExclusiveModeEXT", &wine_vkReleaseFullScreenExclusiveModeEXT},
     {"vkReleasePerformanceConfigurationINTEL", &wine_vkReleasePerformanceConfigurationINTEL},
     {"vkResetCommandBuffer", &wine_vkResetCommandBuffer},
     {"vkResetCommandPool", &wine_vkResetCommandPool},
@@ -4751,8 +4789,11 @@ static const struct vulkan_func vk_instance_dispatch_table[] =
     {"vkGetPhysicalDeviceSparseImageFormatProperties2", &wine_vkGetPhysicalDeviceSparseImageFormatProperties2},
     {"vkGetPhysicalDeviceSparseImageFormatProperties2KHR", &wine_vkGetPhysicalDeviceSparseImageFormatProperties2KHR},
     {"vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV", &wine_vkGetPhysicalDeviceSupportedFramebufferMixedSamplesCombinationsNV},
+    {"vkGetPhysicalDeviceSurfaceCapabilities2KHR", &wine_vkGetPhysicalDeviceSurfaceCapabilities2KHR},
     {"vkGetPhysicalDeviceSurfaceCapabilitiesKHR", &wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR},
+    {"vkGetPhysicalDeviceSurfaceFormats2KHR", &wine_vkGetPhysicalDeviceSurfaceFormats2KHR},
     {"vkGetPhysicalDeviceSurfaceFormatsKHR", &wine_vkGetPhysicalDeviceSurfaceFormatsKHR},
+    {"vkGetPhysicalDeviceSurfacePresentModes2EXT", &wine_vkGetPhysicalDeviceSurfacePresentModes2EXT},
     {"vkGetPhysicalDeviceSurfacePresentModesKHR", &wine_vkGetPhysicalDeviceSurfacePresentModesKHR},
     {"vkGetPhysicalDeviceSurfaceSupportKHR", &wine_vkGetPhysicalDeviceSurfaceSupportKHR},
     {"vkGetPhysicalDeviceWin32PresentationSupportKHR", &wine_vkGetPhysicalDeviceWin32PresentationSupportKHR},
@@ -4821,6 +4862,7 @@ static const char * const vk_device_extensions[] =
     "VK_EXT_filter_cubic",
     "VK_EXT_fragment_density_map",
     "VK_EXT_fragment_shader_interlock",
+    "VK_EXT_full_screen_exclusive",
     "VK_EXT_global_priority",
     "VK_EXT_host_query_reset",
     "VK_EXT_index_type_uint8",
@@ -4921,6 +4963,11 @@ static const char * const vk_device_extensions[] =
     "VK_NV_viewport_swizzle",
 };
 
+static const VkExtensionProperties vk_device_extension_discards[] =
+{
+    {"VK_EXT_full_screen_exclusive", 4},
+};
+
 static const char * const vk_instance_extensions[] =
 {
     "VK_EXT_headless_surface",
@@ -4930,6 +4977,7 @@ static const char * const vk_instance_extensions[] =
     "VK_KHR_external_memory_capabilities",
     "VK_KHR_external_semaphore_capabilities",
     "VK_KHR_get_physical_device_properties2",
+    "VK_KHR_get_surface_capabilities2",
     "VK_KHR_surface",
     "VK_KHR_win32_surface",
 };
@@ -4943,6 +4991,27 @@ BOOL wine_vk_device_extension_supported(const char *name)
             return TRUE;
     }
     return FALSE;
+}
+
+BOOL wine_vk_device_extension_faked(const char *name)
+{
+    unsigned int i;
+    for (i = 0; i < ARRAY_SIZE(vk_device_extension_discards); i++)
+    {
+        if (strcmp(vk_device_extension_discards[i].extensionName, name) == 0)
+            return TRUE;
+    }
+    return FALSE;
+}
+
+unsigned int wine_vk_device_extension_faked_count(void)
+{
+    return ARRAY_SIZE(vk_device_extension_discards);
+}
+
+const VkExtensionProperties* wine_vk_device_extension_faked_idx(unsigned int idx)
+{
+    return &vk_device_extension_discards[idx];
 }
 
 BOOL wine_vk_instance_extension_supported(const char *name)
