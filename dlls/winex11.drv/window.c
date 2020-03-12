@@ -102,10 +102,6 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 };
 static CRITICAL_SECTION win_data_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
-static const int WM_UNKNOWN = 0;
-static const int WM_MUTTER = 1;
-static const int WM_STEAMCOMPMGR = 2;
-
 /* enable workarounds for mutter bugs */
 static int detect_wm(Display *dpy)
 {
@@ -142,23 +138,25 @@ static int detect_wm(Display *dpy)
 
                     if((strcmp(wm_name, "GNOME Shell") == 0) ||
                             (strcmp(wm_name, "Mutter") == 0))
-                        cached = WM_MUTTER;
+                        cached = WINE_WM_X11_MUTTER;
                     else if(strcmp(wm_name, "steamcompmgr") == 0)
-                        cached = WM_STEAMCOMPMGR;
+                        cached = WINE_WM_X11_STEAMCOMPMGR;
                     else
-                        cached = WM_UNKNOWN;
+                        cached = WINE_WM_UNKNOWN;
 
                     XFree(wm_name);
                 }else{
                     TRACE("WM did not set _NET_WM_NAME or WM_NAME\n");
-                    cached = WM_UNKNOWN;
+                    cached = WINE_WM_UNKNOWN;
                 }
             }else
-                cached = WM_UNKNOWN;
+                cached = WINE_WM_UNKNOWN;
 
             XFree(wm_check);
         }else
-            cached = WM_UNKNOWN;
+            cached = WINE_WM_UNKNOWN;
+
+        __wine_set_window_manager(cached);
     }
 
     return cached;
@@ -166,12 +164,12 @@ static int detect_wm(Display *dpy)
 
 BOOL wm_is_mutter(Display *display)
 {
-    return detect_wm(display) == WM_MUTTER;
+    return detect_wm(display) == WINE_WM_X11_MUTTER;
 }
 
 BOOL wm_is_steamcompmgr(Display *display)
 {
-    return detect_wm(display) == WM_STEAMCOMPMGR;
+    return detect_wm(display) == WINE_WM_X11_STEAMCOMPMGR;
 }
 
 /***********************************************************************
@@ -1984,6 +1982,8 @@ BOOL create_desktop_win_data( Window win )
 BOOL CDECL X11DRV_CreateDesktopWindow( HWND hwnd )
 {
     unsigned int width, height;
+
+    detect_wm( gdi_display );
 
     /* retrieve the real size of the desktop */
     SERVER_START_REQ( get_window_rectangles )
