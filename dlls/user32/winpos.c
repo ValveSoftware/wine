@@ -1663,6 +1663,16 @@ LONG WINPOS_HandleWindowPosChanging( HWND hwnd, WINDOWPOS *winpos )
     if ((style & WS_THICKFRAME) || ((style & (WS_POPUP | WS_CHILD)) == 0))
     {
 	MINMAXINFO info = WINPOS_GetMinMaxInfo( hwnd );
+
+        /* HACK: This code changes the window's size to fit the display. However,
+         * some games (Bayonetta, Dragon's Dogma) will then have the incorrect
+         * render size. So just let windows be too big to fit the display. */
+        if (__wine_get_window_manager() != WINE_WM_X11_STEAMCOMPMGR)
+        {
+            winpos->cx = min( winpos->cx, info.ptMaxTrackSize.x );
+            winpos->cy = min( winpos->cy, info.ptMaxTrackSize.y );
+        }
+
 	if (!(style & WS_MINIMIZE))
 	{
             winpos->cx = max( winpos->cx, info.ptMinTrackSize.x );
