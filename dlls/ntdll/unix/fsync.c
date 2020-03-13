@@ -771,7 +771,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
             return ret;
     }
 
-    if (objs[count - 1] && objs[count - 1]->type == FSYNC_QUEUE)
+    if (count && objs[count - 1] && objs[count - 1]->type == FSYNC_QUEUE)
         msgwait = TRUE;
 
     if (has_fsync && has_server)
@@ -800,7 +800,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
         }
     }
 
-    if (wait_any || count == 1)
+    if (wait_any || count <= 1)
     {
         while (1)
         {
@@ -1227,7 +1227,7 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
     struct fsync *obj;
     NTSTATUS ret;
 
-    if (!get_object( handles[count - 1], &obj ) && obj->type == FSYNC_QUEUE)
+    if (count && !get_object( handles[count - 1], &obj ) && obj->type == FSYNC_QUEUE)
     {
         msgwait = TRUE;
         server_set_msgwait( 1 );
