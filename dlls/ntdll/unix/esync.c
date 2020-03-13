@@ -859,7 +859,7 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
             return ret;
     }
 
-    if (objs[count - 1] && objs[count - 1]->type == ESYNC_QUEUE)
+    if (count && objs[count - 1] && objs[count - 1]->type == ESYNC_QUEUE)
         msgwait = TRUE;
 
     if (has_esync && has_server)
@@ -888,7 +888,7 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
         }
     }
 
-    if (wait_any || count == 1)
+    if (wait_any || count <= 1)
     {
         /* Try to check objects now, so we can obviate poll() at least. */
         for (i = 0; i < count; i++)
