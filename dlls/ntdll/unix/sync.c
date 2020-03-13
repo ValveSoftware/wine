@@ -1569,7 +1569,24 @@ NTSTATUS WINAPI NtYieldExecution(void)
 NTSTATUS WINAPI NtDelayExecution( BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
     /* if alertable, we need to query the server */
-    if (alertable) return server_wait( NULL, 0, SELECT_INTERRUPTIBLE | SELECT_ALERTABLE, timeout );
+    if (alertable)
+    {
+        if (do_fsync())
+        {
+            NTSTATUS ret = fsync_wait_objects( 0, NULL, TRUE, TRUE, timeout );
+            if (ret != STATUS_NOT_IMPLEMENTED)
+                return ret;
+        }
+
+        if (do_esync())
+        {
+            NTSTATUS ret = esync_wait_objects( 0, NULL, TRUE, TRUE, timeout );
+            if (ret != STATUS_NOT_IMPLEMENTED)
+                return ret;
+        }
+
+        return server_wait( NULL, 0, SELECT_INTERRUPTIBLE | SELECT_ALERTABLE, timeout );
+    }
 
     if (!timeout || timeout->QuadPart == TIMEOUT_INFINITE)  /* sleep forever */
     {
