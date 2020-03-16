@@ -1863,6 +1863,9 @@ static void handle_nc_calc_size( HWND hwnd, WPARAM wparam, RECT *win_rect )
 
     if (!win_rect) return;
 
+    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR && !((style & WS_POPUP) && (ex_style & WS_EX_TOOLWINDOW)))
+        return;
+
     if (!(style & WS_MINIMIZE))
     {
         AdjustWindowRectEx( &rect, style, FALSE, ex_style & ~WS_EX_CLIENTEDGE );
