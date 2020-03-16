@@ -28,6 +28,7 @@
 #include "user_private.h"
 #include "controls.h"
 #include "wine/debug.h"
+#include "wine/gdi_driver.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(nonclient);
 
@@ -59,6 +60,9 @@ WINE_DEFAULT_DEBUG_CHANNEL(nonclient);
 static void adjust_window_rect( RECT *rect, DWORD style, BOOL menu, DWORD exStyle, NONCLIENTMETRICSW *ncm )
 {
     int adjust = 0;
+
+    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR)
+        return;
 
     if ((exStyle & (WS_EX_STATICEDGE|WS_EX_DLGMODALFRAME)) == WS_EX_STATICEDGE)
         adjust = 1; /* for the outer frame always present */
@@ -355,6 +359,9 @@ LRESULT NC_HandleNCCalcSize( HWND hwnd, WPARAM wparam, RECT *winRect )
     LONG exStyle = GetWindowLongW( hwnd, GWL_EXSTYLE );
 
     if (winRect == NULL)
+        return 0;
+
+    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR)
         return 0;
 
     if (cls_style & CS_VREDRAW) result |= WVR_VREDRAW;
