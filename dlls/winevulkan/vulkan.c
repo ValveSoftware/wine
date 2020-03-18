@@ -142,11 +142,19 @@ static struct VkPhysicalDevice_T *wine_vk_physical_device_alloc(struct VkInstanc
 
     for (i = 0; i < wine_vk_device_extension_faked_count(); i++)
     {
-        object->extensions[j] = *wine_vk_device_extension_faked_idx(i);
-        j++;
+        const VkExtensionProperties *e = wine_vk_device_extension_faked_idx(i);
+
+        if(!strcmp(e->extensionName, "VK_EXT_full_screen_exclusive") &&
+                (!vk_funcs->p_vkGetPhysicalDeviceSurfaceCapabilities2KHR ||
+                 !vk_funcs->p_vkGetPhysicalDeviceSurfaceFormats2KHR)){
+            /* ignore */
+        }else{
+            object->extensions[j] = *e;
+            j++;
+        }
     }
 
-    object->extension_count = num_properties;
+    object->extension_count = j;
 
     heap_free(host_properties);
     return object;
@@ -807,7 +815,14 @@ VkResult WINAPI wine_vkEnumerateInstanceExtensionProperties(const char *layer_na
     for (i = 0; i < num_host_properties; i++)
     {
         if (wine_vk_instance_extension_supported(host_properties[i].extensionName))
-            num_properties++;
+        {
+            if(!strcmp(host_properties[i].extensionName, "VK_KHR_get_physical_device_properties2") &&
+                    (!vk_funcs->p_vkGetPhysicalDeviceSurfaceCapabilities2KHR ||
+                     !vk_funcs->p_vkGetPhysicalDeviceSurfaceFormats2KHR)){
+                /* ignore - outdated vulkan loader */
+            }else
+                num_properties++;
+        }
         else
             TRACE("Instance extension '%s' is not supported.\n", host_properties[i].extensionName);
     }
@@ -824,8 +839,14 @@ VkResult WINAPI wine_vkEnumerateInstanceExtensionProperties(const char *layer_na
     {
         if (wine_vk_instance_extension_supported(host_properties[i].extensionName))
         {
-            TRACE("Enabling extension '%s'.\n", host_properties[i].extensionName);
-            properties[j++] = host_properties[i];
+            if(!strcmp(host_properties[i].extensionName, "VK_KHR_get_physical_device_properties2") &&
+                    (!vk_funcs->p_vkGetPhysicalDeviceSurfaceCapabilities2KHR ||
+                     !vk_funcs->p_vkGetPhysicalDeviceSurfaceFormats2KHR)){
+                /* ignore - outdated vulkan loader */
+            }else{
+                TRACE("Enabling extension '%s'.\n", host_properties[i].extensionName);
+                properties[j++] = host_properties[i];
+            }
         }
     }
     *count = min(*count, num_properties);
