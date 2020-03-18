@@ -4935,6 +4935,8 @@ void actctx_init(void)
     ctx.lpResourceName = (LPCWSTR)CREATEPROCESS_MANIFEST_RESOURCE_ID;
 
     if (!RtlCreateActivationContext( &handle, &ctx )) process_actctx = check_actctx(handle);
+
+    NtCurrentTeb()->Peb->ActivationContextData = process_actctx;
 }
 
 
