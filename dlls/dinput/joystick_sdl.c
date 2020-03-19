@@ -287,7 +287,7 @@ static void find_sdldevs(void)
             TRACE("reconnected \"%s\"\n", sdldev->name);
             device = SDL_JoystickOpen(i);
             sdldev->instance_id = SDL_JoystickInstanceID(device);
-            if (SDL_JoystickIsHaptic(device))
+            if (sdldev->is_joystick && SDL_JoystickIsHaptic(device))
                 sdldev->sdl_haptic = SDL_HapticOpenFromJoystick(device);
 
             InterlockedExchangePointer((void**)&sdldev->sdl_js, device);
@@ -310,13 +310,21 @@ static void find_sdldevs(void)
 
         TRACE("Found a joystick on %p: %s\n", device, sdldev->name);
 
+        {
+            SDL_JoystickType type = SDL_JoystickGetType(device);
+            sdldev->is_joystick =
+                type == SDL_JOYSTICK_TYPE_UNKNOWN ||
+                type == SDL_JOYSTICK_TYPE_WHEEL ||
+                type == SDL_JOYSTICK_TYPE_FLIGHT_STICK ||
+                type == SDL_JOYSTICK_TYPE_THROTTLE;
+        }
+
         if (SDL_JoystickIsHaptic(device))
         {
-            haptic = SDL_HapticOpenFromJoystick(device);
-            if (haptic)
-            {
+            if (!sdldev->is_joystick)
+                WARN("Ignoring force feedback support for \"%s\"\n", sdldev->name);
+            else if ((haptic = SDL_HapticOpenFromJoystick(device)))
                 TRACE(" ... with force feedback\n");
-            }
         }
 
         if(pSDL_JoystickGetVendor){
@@ -347,14 +355,6 @@ static void find_sdldevs(void)
         {
             sdldev->vendor_id = VID_MICROSOFT;
             sdldev->product_id = PID_MICROSOFT_XBOX_360;
-        }
-
-        {
-            SDL_JoystickType type = SDL_JoystickGetType(device);
-            sdldev->is_joystick =
-                type == SDL_JOYSTICK_TYPE_WHEEL ||
-                type == SDL_JOYSTICK_TYPE_FLIGHT_STICK ||
-                type == SDL_JOYSTICK_TYPE_THROTTLE;
         }
 
         sdldev->n_buttons = SDL_JoystickNumButtons(device);
