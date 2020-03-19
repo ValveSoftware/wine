@@ -90,7 +90,7 @@ static inline int futex_wait( int *addr, int val, struct timespec *timeout )
     return syscall( __NR_futex, addr, 0, val, timeout, 0, 0 );
 }
 
-static unsigned int spincount;
+static unsigned int spincount = 100;
 
 int do_fsync(void)
 {
