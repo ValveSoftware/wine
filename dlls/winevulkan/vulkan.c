@@ -49,6 +49,15 @@ static void *wine_vk_find_struct_(void *s, VkStructureType t)
     return NULL;
 }
 
+#define wine_vk_exchange_pnext(a, b) wine_vk_exchange_pnext_((VkBaseOutStructure *)a, (VkBaseOutStructure *)b)
+static void wine_vk_exchange_pnext_(VkBaseOutStructure *a, VkBaseOutStructure *b)
+{
+    b->pNext = a->pNext;
+    a->pNext = b;
+}
+
+#define wine_vk_copy_pnext(a, ctype, stype, b) do { ctype* lookup = wine_vk_find_struct(a, stype); if (lookup) { b = *lookup; wine_vk_exchange_pnext(a, &b); } } while (0)
+
 static void *wine_vk_get_global_proc_addr(const char *name);
 
 static const struct vulkan_funcs *vk_funcs;
@@ -1739,6 +1748,9 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
 #else
     VkSwapchainCreateInfoKHR our_createinfo;
 #endif
+    VkDeviceGroupSwapchainCreateInfoKHR  our_device_group_swapchain_create_info;
+    VkImageFormatListCreateInfoKHR       our_image_format_list_create_info;
+
     VkExtent2D user_sz;
     struct VkSwapchainKHR_T *object;
     uint32_t i;
@@ -1753,6 +1765,19 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
     object->base.loader_magic = VULKAN_ICD_MAGIC_VALUE;
 
     convert_VkSwapchainCreateInfoKHR_win_to_host(pCreateInfo, &our_createinfo);
+
+    our_createinfo.pNext = NULL;
+
+    wine_vk_copy_pnext(&our_createinfo, VkDeviceGroupSwapchainCreateInfoKHR, DEVICE_GROUP_SWAPCHAIN_CREATE_INFO_KHR, our_device_group_swapchain_create_info);
+
+    wine_vk_copy_pnext(&our_createinfo, VkImageFormatListCreateInfoKHR, IMAGE_FORMAT_LIST_CREATE_INFO_KHR, our_image_format_list_create_info);
+
+    // VkSwapchainCounterCreateInfoEXT is not in our version of WineVulkan
+    // Come back to me when this gets into Proton Wine!
+
+    // Ignoring VkSurfaceFullScreenExclusiveInfoEXT and VkSurfaceFullScreenExclusiveWin32InfoEXT
+    // as we want to nuke those
+    // and VkSwapchainDisplayNativeHdrCreateInfoAMD (blacklisted for HDR for now)
 
     if(our_createinfo.oldSwapchain)
         our_createinfo.oldSwapchain = ((struct VkSwapchainKHR_T *)(UINT_PTR)our_createinfo.oldSwapchain)->swapchain;
