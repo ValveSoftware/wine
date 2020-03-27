@@ -1833,7 +1833,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         return 0;
     if ((device = current->process->rawinput_mouse) && (device->flags & RIDEV_NOLEGACY))
     {
-        if (flags & MOUSEEVENTF_MOVE) update_desktop_cursor_pos( desktop, x, y );
+        update_desktop_mouse_state( desktop, flags, x, y, input->mouse.data << 16 );
         return 0;
     }
 
