@@ -130,6 +130,16 @@ static int KeyboardCallback( LPDIRECTINPUTDEVICE8A iface, WPARAM wparam, LPARAM 
     }
     new_diks = hook->flags & LLKHF_UP ? 0 : 0x80;
 
+    /* HACK: GTA IV calls SendInput() with a VK_F8 keydown every few minutes and
+     * never releases the key. This causes multiple gamepad issues.
+     */
+    const char *sgi = getenv("SteamGameId");
+    if (sgi && !strcmp(sgi, "12210") &&
+        hook->flags & LLKHF_INJECTED && dik_code == DIK_F8) {
+        TRACE(" ignoring injected F8 key press to work around GTA IV gamepad issues\n");
+        return ret;
+    }
+
     /* returns now if key event already known */
     if (new_diks == This->DInputKeyState[dik_code])
         return ret;
