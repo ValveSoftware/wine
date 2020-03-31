@@ -251,6 +251,7 @@ enum dc_gl_type
 struct gl_drawable
 {
     LONG                           ref;          /* reference count */
+    HWND                           hwnd;
     enum dc_gl_type                type;         /* type of GL surface */
     GLXDrawable                    drawable;     /* drawable for rendering with GL */
     Window                         window;       /* window if drawable is a GLXWindow */
@@ -1294,10 +1295,23 @@ static void release_gl_drawable( struct gl_drawable *gl )
     {
     case DC_GL_WINDOW:
     case DC_GL_CHILD_WIN:
+    {
+        struct x11drv_win_data *data = get_win_data( gl->hwnd );
+
         TRACE( "destroying %lx drawable %lx\n", gl->window, gl->drawable );
+        if (data)
+        {
+            if (data->client_window == gl->window)
+            {
+                XDeleteContext( data->display, data->client_window, winContext );
+                data->client_window = 0;
+            }
+            release_win_data( data );
+        }
         pglXDestroyWindow( gdi_display, gl->drawable );
         XDestroyWindow( gdi_display, gl->window );
         break;
+    }
     case DC_GL_PIXMAP_WIN:
         TRACE( "destroying pixmap %lx drawable %lx\n", gl->pixmap, gl->drawable );
         pglXDestroyPixmap( gdi_display, gl->drawable );
@@ -1454,6 +1468,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
     /* Default GLX and WGL swap interval is 1, but in case of glXSwapIntervalSGI
      * there is no way to query it, so we have to store it here.
      */
+    gl->hwnd = hwnd;
     gl->swap_interval = 1;
     gl->refresh_swap_interval = TRUE;
     gl->format = format;
