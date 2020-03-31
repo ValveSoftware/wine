@@ -47,6 +47,8 @@
 #include "hidusage.h"
 #include "controller.h"
 
+#include "wine/js_blacklist.h" /* for wine_js_blacklist */
+
 #ifdef WORDS_BIGENDIAN
 # define LE_WORD(x) RtlUshortByteSwap(x)
 #else
@@ -1020,6 +1022,20 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
     return strcasestr(blacklist, needle) != NULL;
 }
 
+static BOOL is_in_wine_blacklist(const DWORD vid, const DWORD pid)
+{
+    int i;
+    for(i = 0; i < ARRAY_SIZE(wine_js_blacklist); ++i)
+    {
+        if(vid == wine_js_blacklist[i].vid &&
+                (wine_js_blacklist[i].pid == 0 ||
+                 wine_js_blacklist[i].pid == pid))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 static void try_add_device(unsigned int index, BOOL xinput_hack)
 {
     DWORD vid = 0, pid = 0, version = 0;
@@ -1061,7 +1077,13 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
 
     if(is_in_sdl_blacklist(vid, pid))
     {
-        TRACE("device %04x/%04x is in blacklist, ignoring\n", vid, pid);
+        TRACE("device %04x/%04x is in SDL blacklist, ignoring\n", vid, pid);
+        return;
+    }
+
+    if(is_in_wine_blacklist(vid, pid))
+    {
+        TRACE("device %04x/%04x is in Wine blacklist, ignoring\n", vid, pid);
         return;
     }
 

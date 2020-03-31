@@ -53,6 +53,8 @@
 #include "device_private.h"
 #include "joystick_private.h"
 
+#include "wine/js_blacklist.h" /* for wine_js_blacklist */
+
 #ifdef HAVE_SDL2_SDL_H
 
 WINE_DEFAULT_DEBUG_CHANNEL(dinput);
@@ -187,6 +189,20 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
     return strcasestr(blacklist, needle) != NULL;
 }
 
+static BOOL is_in_wine_blacklist(const DWORD vid, const DWORD pid)
+{
+    int i;
+    for(i = 0; i < ARRAY_SIZE(wine_js_blacklist); ++i)
+    {
+        if(vid == wine_js_blacklist[i].vid &&
+                (wine_js_blacklist[i].pid == 0 ||
+                 wine_js_blacklist[i].pid == pid))
+            return TRUE;
+    }
+
+    return FALSE;
+}
+
 static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick *);
 static Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick *);
 
@@ -314,6 +330,14 @@ static void find_sdldevs(void)
         if(is_in_sdl_blacklist(sdldev->vendor_id, sdldev->product_id))
         {
             TRACE("joystick %04x/%04x is in SDL blacklist, ignoring\n", sdldev->vendor_id, sdldev->product_id);
+            SDL_JoystickClose(device);
+            HeapFree(GetProcessHeap(), 0, sdldev->name);
+            continue;
+        }
+
+        if(is_in_wine_blacklist(sdldev->vendor_id, sdldev->product_id))
+        {
+            TRACE("joystick %04x/%04x is in Wine blacklist, ignoring\n", sdldev->vendor_id, sdldev->product_id);
             SDL_JoystickClose(device);
             HeapFree(GetProcessHeap(), 0, sdldev->name);
             continue;
