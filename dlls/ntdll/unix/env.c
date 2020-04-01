@@ -2426,6 +2426,7 @@ void WINAPI RtlSetLastWin32Error( DWORD err )
  */
 ULONG WINAPI __wine_set_unix_env( const char *var, const char *val )
 {
-    setenv(var, val, 1);
+    if (!val) unsetenv(var);
+    else setenv(var, val, 1);
     return 0;
 }
