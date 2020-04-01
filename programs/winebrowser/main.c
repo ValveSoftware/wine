@@ -63,6 +63,17 @@ static char *strdup_unixcp( const WCHAR *str )
     return ret;
 }
 
+static void restore_system_environment(void)
+{
+    const char* orig_ld_path = getenv("ORIG_LD_LIBRARY_PATH");
+
+    if (orig_ld_path)
+    {
+        __wine_set_unix_env("LD_LIBRARY_PATH", orig_ld_path);
+        __wine_set_unix_env("ORIG_LD_LIBRARY_PATH", NULL);
+    }
+}
+
 /* try to launch a unix app from a comma separated string of app names */
 static int launch_app( const WCHAR *candidates, const WCHAR *argv1 )
 {
@@ -71,6 +82,11 @@ static int launch_app( const WCHAR *candidates, const WCHAR *argv1 )
     char **argv_new;
 
     if (!(cmdline = strdup_unixcp( argv1 ))) return 1;
+
+    /* PROTON HACK: Restore ORIG_LD_LIBRARY_PATH to LD_LIBRARY_PATH.
+     * System programs may not work correctly with our libraries, in
+     * particular gio on Ubuntu 19.04 is broken by our libgio. */
+    restore_system_environment();
 
     while (*candidates)
     {
