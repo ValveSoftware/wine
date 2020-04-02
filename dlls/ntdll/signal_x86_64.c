@@ -3315,6 +3315,16 @@ void signal_init_thread( TEB *teb )
 
 static void install_bpf(struct sigaction *sig_act)
 {
+    static int enable_seccomp = -1;
+
+    if (enable_seccomp == -1)
+        enable_seccomp = getenv("WINESECCOMP") && atoi(getenv("WINESECCOMP"));
+
+    if (!enable_seccomp)
+        return;
+
+    MESSAGE("wine: enabling seccomp syscall filters.\n");
+
 #ifdef HAVE_SECCOMP
     static struct sock_filter filter[] =
     {
