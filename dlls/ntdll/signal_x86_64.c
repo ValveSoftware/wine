@@ -3342,8 +3342,17 @@ static void install_bpf(struct sigaction *sig_act)
        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
     };
+    static int enable_seccomp = -1;
     struct sock_fprog prog;
     int ret;
+
+    if (enable_seccomp == -1)
+        enable_seccomp = getenv("WINESECCOMP") && atoi(getenv("WINESECCOMP"));
+
+    if (!enable_seccomp)
+        return;
+
+    MESSAGE("wine: enabling seccomp syscall filters.\n");
 
     memset(&prog, 0, sizeof(prog));
     prog.len = ARRAY_SIZE(filter);
