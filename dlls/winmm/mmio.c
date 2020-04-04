@@ -76,8 +76,7 @@ static LRESULT CALLBACK mmioDosIOProc(LPMMIOINFO lpmmioinfo, UINT uMessage,
 
 	    /* if filename NULL, assume open file handle in adwInfo[0] */
 	    if (szFileName) {
-                OFSTRUCT    ofs;
-                lpmmioinfo->adwInfo[0] = OpenFile(szFileName, &ofs, lpmmioinfo->dwFlags & 0xFFFF);
+                lpmmioinfo->adwInfo[0] = _lopen(szFileName, lpmmioinfo->dwFlags);
             }
 	    if (lpmmioinfo->adwInfo[0] == HFILE_ERROR)
 		ret = MMIOERR_FILENOTFOUND;
