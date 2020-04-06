@@ -388,6 +388,13 @@ static inline BOOL is_window_resizable( struct x11drv_win_data *data, DWORD styl
     return NtUserIsWindowRectFullScreen( &data->whole_rect );
 }
 
+BOOL is_window_rect_full_virtual_screen( const RECT *rect )
+{
+    RECT virtual_rect = NtUserGetVirtualScreenRect();
+    return (rect->left <= virtual_rect.left && rect->right >= virtual_rect.right &&
+            rect->top <= virtual_rect.top && rect->bottom >= virtual_rect.bottom);
+}
+
 /***********************************************************************
  *              get_mwm_decorations
  */
@@ -1263,7 +1270,8 @@ void update_net_wm_states( struct x11drv_win_data *data )
             if (!wm_is_steamcompmgr( data->display ) || !fs_hack_enabled( monitor ))
             {
                 /* when fs hack is enabled, we don't want steamcompmgr to resize the window to be fullscreened */
-                net_wm_bypass_compositor = 1;
+                if (is_window_rect_full_virtual_screen( &data->whole_rect ))
+                    net_wm_bypass_compositor = 1;
                 new_state |= (1 << NET_WM_STATE_FULLSCREEN);
             }
         }
