@@ -130,6 +130,7 @@ struct ACImpl {
     IAudioCaptureClient IAudioCaptureClient_iface;
     IAudioClock IAudioClock_iface;
     IAudioClock2 IAudioClock2_iface;
+    IAudioClockAdjustment IAudioClockAdjustment_iface;
     IAudioStreamVolume IAudioStreamVolume_iface;
     IUnknown *marshal;
     IMMDevice *parent;
@@ -157,6 +158,7 @@ static const ISimpleAudioVolumeVtbl SimpleAudioVolume_Vtbl;
 static const IChannelAudioVolumeVtbl ChannelAudioVolume_Vtbl;
 static const IAudioClockVtbl AudioClock_Vtbl;
 static const IAudioClock2Vtbl AudioClock2_Vtbl;
+static const IAudioClockAdjustmentVtbl AudioClockAdjustment_Vtbl;
 static const IAudioStreamVolumeVtbl AudioStreamVolume_Vtbl;
 
 static AudioSessionWrapper *AudioSessionWrapper_Create(ACImpl *client);
@@ -199,6 +201,11 @@ static inline ACImpl *impl_from_IAudioClock(IAudioClock *iface)
 static inline ACImpl *impl_from_IAudioClock2(IAudioClock2 *iface)
 {
     return CONTAINING_RECORD(iface, ACImpl, IAudioClock2_iface);
+}
+
+static inline ACImpl *impl_from_IAudioClockAdjustment(IAudioClockAdjustment *iface)
+{
+    return CONTAINING_RECORD(iface, ACImpl, IAudioClockAdjustment_iface);
 }
 
 static inline ACImpl *impl_from_IAudioStreamVolume(IAudioStreamVolume *iface)
@@ -339,6 +346,7 @@ HRESULT WINAPI AUDDRV_GetAudioEndpoint(GUID *guid, IMMDevice *dev, IAudioClient 
     This->IAudioCaptureClient_iface.lpVtbl = &AudioCaptureClient_Vtbl;
     This->IAudioClock_iface.lpVtbl = &AudioClock_Vtbl;
     This->IAudioClock2_iface.lpVtbl = &AudioClock2_Vtbl;
+    This->IAudioClockAdjustment_iface.lpVtbl = &AudioClockAdjustment_Vtbl;
     This->IAudioStreamVolume_iface.lpVtbl = &AudioStreamVolume_Vtbl;
     This->dataflow = dataflow;
     This->parent = dev;
@@ -372,6 +380,8 @@ static HRESULT WINAPI AudioClient_QueryInterface(IAudioClient3 *iface,
             IsEqualIID(riid, &IID_IAudioClient2) ||
             IsEqualIID(riid, &IID_IAudioClient3))
         *ppv = iface;
+    else if (IsEqualIID(riid, &IID_IAudioClockAdjustment))
+        *ppv = &This->IAudioClockAdjustment_iface;
     if (*ppv) {
         IUnknown_AddRef((IUnknown*)*ppv);
         return S_OK;
@@ -1479,6 +1489,43 @@ static const IAudioClock2Vtbl AudioClock2_Vtbl =
     AudioClock2_AddRef,
     AudioClock2_Release,
     AudioClock2_GetDevicePosition
+};
+
+static HRESULT WINAPI AudioClockAdjustment_QueryInterface(IAudioClockAdjustment *iface,
+        REFIID riid, void **ppv)
+{
+    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
+    return IAudioClock_QueryInterface(&This->IAudioClock_iface, riid, ppv);
+}
+
+static ULONG WINAPI AudioClockAdjustment_AddRef(IAudioClockAdjustment *iface)
+{
+    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
+    return IAudioClient_AddRef((IAudioClient *)&This->IAudioClient3_iface);
+}
+
+static ULONG WINAPI AudioClockAdjustment_Release(IAudioClockAdjustment *iface)
+{
+    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
+    return IAudioClient_Release((IAudioClient *)&This->IAudioClient3_iface);
+}
+
+static HRESULT WINAPI AudioClockAdjustment_SetSampleRate(IAudioClockAdjustment *iface,
+        float new_rate)
+{
+    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
+
+    TRACE("(%p)->(%f)\n", This, new_rate);
+
+    return E_NOTIMPL;
+}
+
+static const IAudioClockAdjustmentVtbl AudioClockAdjustment_Vtbl =
+{
+    AudioClockAdjustment_QueryInterface,
+    AudioClockAdjustment_AddRef,
+    AudioClockAdjustment_Release,
+    AudioClockAdjustment_SetSampleRate
 };
 
 static HRESULT WINAPI AudioStreamVolume_QueryInterface(
