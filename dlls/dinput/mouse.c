@@ -333,6 +333,7 @@ static int dinput_mouse_hook( LPDIRECTINPUTDEVICE8A iface, WPARAM wparam, LPARAM
         RAWINPUT raw_input;
         UINT size;
         POINT rel, pt;
+        DWORD seq;
 
         static const USHORT mouse_button_flags[] =
         {
@@ -374,6 +375,7 @@ static int dinput_mouse_hook( LPDIRECTINPUTDEVICE8A iface, WPARAM wparam, LPARAM
             FIXME( "Unimplemented MOUSE_ATTRIBUTES_CHANGED flag\n" );
 
         EnterCriticalSection(&This->base.crit);
+        seq = This->base.dinput->evsequence++;
 
         rel.x = raw_input.data.mouse.lLastX;
         rel.y = raw_input.data.mouse.lLastY;
@@ -399,11 +401,11 @@ static int dinput_mouse_hook( LPDIRECTINPUTDEVICE8A iface, WPARAM wparam, LPARAM
 
         if (rel.x)
             queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_X_AXIS_INSTANCE) | DIDFT_RELAXIS,
-                        pt.x, GetCurrentTime(), This->base.dinput->evsequence);
+                        pt.x, GetCurrentTime(), seq);
 
         if (rel.y)
             queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_Y_AXIS_INSTANCE) | DIDFT_RELAXIS,
-                        pt.y, GetCurrentTime(), This->base.dinput->evsequence);
+                        pt.y, GetCurrentTime(), seq);
 
         if (rel.x || rel.y)
         {
@@ -416,7 +418,7 @@ static int dinput_mouse_hook( LPDIRECTINPUTDEVICE8A iface, WPARAM wparam, LPARAM
         {
             This->m_state.lZ += (wdata = (SHORT)raw_input.data.mouse.usButtonData);
             queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_Z_AXIS_INSTANCE) | DIDFT_RELAXIS,
-                        wdata, GetCurrentTime(), This->base.dinput->evsequence);
+                        wdata, GetCurrentTime(), seq);
             ret = This->clipped;
         }
 
@@ -426,7 +428,7 @@ static int dinput_mouse_hook( LPDIRECTINPUTDEVICE8A iface, WPARAM wparam, LPARAM
             {
                 This->m_state.rgbButtons[i / 2] = 0x80 - (i % 2) * 0x80;
                 queue_event(iface, DIDFT_MAKEINSTANCE(WINE_MOUSE_BUTTONS_INSTANCE + (i / 2)) | DIDFT_PSHBUTTON,
-                            This->m_state.rgbButtons[i / 2], GetCurrentTime(), This->base.dinput->evsequence);
+                            This->m_state.rgbButtons[i / 2], GetCurrentTime(), seq);
             }
         }
 
