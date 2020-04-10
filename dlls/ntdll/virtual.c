@@ -196,6 +196,26 @@ struct range_entry
 static struct range_entry *free_ranges;
 static struct range_entry *free_ranges_end;
 
+static size_t free_ranges_max;
+static size_t view_count;
+static size_t view_count_max;
+
+
+static inline void dump_free_ranges_stats( void )
+{
+    if (view_count <= view_count_max && (free_ranges_end - free_ranges) <= free_ranges_max)
+        return;
+
+    if (view_count_max < view_count)
+        view_count_max = view_count;
+
+    if (free_ranges_max < (free_ranges_end - free_ranges))
+        free_ranges_max = (free_ranges_end - free_ranges);
+
+    WARN( "view_count: %zd / %zd max, free_ranges: %zd / %zd max\n",
+        view_count, view_count_max, (free_ranges_end - free_ranges), free_ranges_max );
+}
+
 
 /***********************************************************************
  *           free_ranges_lower_bound
@@ -274,13 +294,17 @@ static void free_ranges_insert_view( struct file_view *view )
         else
             range->base = view_end;
 
-        if (range->base < range->end) return;
+        if (range->base < range->end) goto done;
 
         /* and possibly remove it if it's now empty */
         memmove( range, next, (free_ranges_end - next) * sizeof(struct range_entry) );
         free_ranges_end -= 1;
         assert( free_ranges_end - free_ranges > 0 );
     }
+
+done:
+    view_count++;
+    dump_free_ranges_stats();
 }
 
 
@@ -355,6 +379,9 @@ static void free_ranges_remove_view( struct file_view *view )
         range->base = view_base;
         range->end = view_end;
     }
+
+    view_count--;
+    dump_free_ranges_stats();
 }
 
 
