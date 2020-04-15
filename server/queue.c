@@ -1720,12 +1720,15 @@ static int queue_rawinput_message( struct process* process, void* user )
         (raw_msg->desktop && desktop != raw_msg->desktop))
         goto done;
 
+    if (!device->target && !desktop->foreground_input)
+        goto done;
+
     if (!(thread = get_window_thread( device->target ? device->target : desktop->foreground_input->active )) ||
         process != thread->process)
         goto done;
 
     /* FIXME: Implement RIDEV_INPUTSINK */
-    if (!(foreground = get_window_thread( desktop->foreground_input->active )) ||
+    if (!desktop->foreground_input || !(foreground = get_window_thread( desktop->foreground_input->active )) ||
         thread->process != foreground->process)
         goto done;
 
