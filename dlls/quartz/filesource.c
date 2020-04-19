@@ -787,6 +787,9 @@ static HRESULT WINAPI FileAsyncReader_Request(IAsyncReader * iface, IMediaSample
     if (SUCCEEDED(hr))
         hr = IMediaSample_GetTime(pSample, &Start, &Stop);
 
+    if (BYTES_FROM_MEDIATIME(Start) >= This->file_size.QuadPart)
+        return HRESULT_FROM_WIN32(ERROR_HANDLE_EOF);
+
     if (SUCCEEDED(hr))
         hr = IMediaSample_GetPointer(pSample, &pBuffer);
 
