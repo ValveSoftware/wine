@@ -71,6 +71,7 @@ typedef struct AsyncReader
     unsigned int queued_number;
     unsigned int samples;
     unsigned int oldest_sample;
+    LARGE_INTEGER file_size;
     CRITICAL_SECTION sample_cs;
     DATAREQUEST *sample_list;
     /* Have a handle for every sample, and then one more as flushing handle */
@@ -464,6 +465,12 @@ static HRESULT WINAPI FileSource_Load(IFileSourceFilter * iface, LPCOLESTR pszFi
 
     if (hFile == INVALID_HANDLE_VALUE)
     {
+        return HRESULT_FROM_WIN32(GetLastError());
+    }
+
+    if (!GetFileSizeEx(hFile, &This->file_size))
+    {
+        WARN("Could not get file size.\n");
         return HRESULT_FROM_WIN32(GetLastError());
     }
 
@@ -1053,14 +1060,10 @@ static HRESULT WINAPI FileAsyncReader_SyncRead(IAsyncReader *iface,
 static HRESULT WINAPI FileAsyncReader_Length(IAsyncReader *iface, LONGLONG *total, LONGLONG *available)
 {
     AsyncReader *filter = impl_from_IAsyncReader(iface);
-    DWORD low, high;
 
     TRACE("iface %p, total %p, available %p.\n", iface, total, available);
 
-    if ((low = GetFileSize(filter->file, &high)) == -1 && GetLastError() != NO_ERROR)
-        return HRESULT_FROM_WIN32(GetLastError());
-
-    *available = *total = (LONGLONG)low | (LONGLONG)high << (sizeof(DWORD) * 8);
+    *available = *total = filter->file_size.QuadPart;
 
     return S_OK;
 }
