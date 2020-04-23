@@ -172,6 +172,7 @@ static void test_NtGetTickCount(void)
     {
         diff = (user_shared_data->u.TickCountQuad * user_shared_data->TickCountMultiplier) >> 24;
         diff = pNtGetTickCount() - diff;
+        todo_wine
         ok(diff < 100, "NtGetTickCount - TickCountQuad too high, expected < 100 got %d\n", diff);
         Sleep(50);
     }
