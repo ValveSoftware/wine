@@ -723,6 +723,11 @@ static HRESULT WINAPI mfsession_GetEvent(IMFMediaSession *iface, DWORD flags, IM
 static HRESULT WINAPI mfsession_BeginGetEvent(IMFMediaSession *iface, IMFAsyncCallback *callback, IUnknown *state)
 {
     struct media_session *session = impl_from_IMFMediaSession(iface);
+    const char *sgi = getenv("SteamGameId");
+
+    /* HACK: Street Fighter 5 */
+    if (sgi && !strcmp(sgi, "310950"))
+        return IMFMediaEventQueue_BeginGetEvent(session->event_queue, callback, state);
 
     FIXME("%p, %p, %p.\n", iface, callback, state);
 
