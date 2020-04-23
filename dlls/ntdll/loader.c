@@ -164,6 +164,15 @@ static RTL_BITMAP tls_bitmap;
 static RTL_BITMAP tls_expansion_bitmap;
 static RTL_BITMAP fls_bitmap;
 
+static CRITICAL_SECTION fls_section;
+static CRITICAL_SECTION_DEBUG fls_critsect_debug =
+{
+    0, 0, &fls_section,
+    { &fls_critsect_debug.ProcessLocksList, &fls_critsect_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": fls_section") }
+};
+static CRITICAL_SECTION fls_section = { &fls_critsect_debug, -1, 0, 0, 0, 0 };;
+
 static WINE_MODREF *cached_modref;
 static WINE_MODREF *current_modref;
 static WINE_MODREF *last_failed_modref;
@@ -203,6 +212,16 @@ typedef struct _RTL_UNLOAD_EVENT_TRACE
 static RTL_UNLOAD_EVENT_TRACE unload_traces[RTL_UNLOAD_EVENT_TRACE_NUMBER];
 static RTL_UNLOAD_EVENT_TRACE *unload_trace_ptr;
 static unsigned int unload_trace_seq;
+
+static void WINAPI lock_fls_section( PVOID dummy )
+{
+    RtlEnterCriticalSection( &fls_section );
+}
+
+static void WINAPI unlock_fls_section( PVOID dummy )
+{
+    RtlLeaveCriticalSection( &fls_section );
+}
 
 static void module_push_unload_trace( const LDR_DATA_TABLE_ENTRY *ldr )
 {
@@ -3196,6 +3215,13 @@ void WINAPI LdrShutdownThread(void)
     /* don't do any detach calls if process is exiting */
     if (process_detaching) return;
 
+    if (NtCurrentTeb()->FlsSlots)
+    {
+        lock_fls_section( NULL );
+        RemoveEntryList( (LIST_ENTRY *)NtCurrentTeb()->FlsSlots );
+        unlock_fls_section( NULL );
+    }
+
     RtlEnterCriticalSection( &loader_section );
     wm = get_modref( NtCurrentTeb()->Peb->ImageBaseAddress );
 
@@ -3409,6 +3435,7 @@ PIMAGE_NT_HEADERS WINAPI RtlImageNtHeader(HMODULE hModule)
  */
 void WINAPI LdrInitializeThunk( CONTEXT *context, void **entry, ULONG_PTR unknown3, ULONG_PTR unknown4 )
 {
+    static const unsigned int fls_slot_count = 8 * sizeof(NtCurrentTeb()->Peb->FlsBitmapBits);
     static int attach_done;
     int i;
     NTSTATUS status;
@@ -3443,6 +3470,25 @@ void WINAPI LdrInitializeThunk( CONTEXT *context, void **entry, ULONG_PTR unknow
     RtlAcquirePebLock();
     InsertHeadList( &tls_links, &NtCurrentTeb()->TlsLinks );
     RtlReleasePebLock();
+
+    if (!NtCurrentTeb()->Peb->FlsCallback)
+    {
+        NtCurrentTeb()->Peb->FlsCallback = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                 (fls_slot_count + 2) * sizeof(void*) );
+        if (!NtCurrentTeb()->Peb->FlsCallback)
+            ERR( "No memory for FLS callbacks.\n" );
+
+        if (NtCurrentTeb()->Peb->FlsCallback)
+        {
+            NtCurrentTeb()->Peb->FlsCallback[0] = lock_fls_section;
+            NtCurrentTeb()->Peb->FlsCallback[1] = unlock_fls_section;
+        }
+    }
+    NtCurrentTeb()->FlsSlots = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
+             sizeof(LIST_ENTRY) + fls_slot_count * sizeof(void*) );
+    lock_fls_section( NULL );
+    InsertTailList(&NtCurrentTeb()->Peb->FlsListHead, (LIST_ENTRY *)NtCurrentTeb()->FlsSlots);
+    unlock_fls_section( NULL );
 
     if (!attach_done)  /* first time around */
     {

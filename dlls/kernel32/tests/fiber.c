@@ -19,6 +19,7 @@
  */
 
 #include "wine/test.h"
+#include <winternl.h>
 
 static LPVOID (WINAPI *pCreateFiber)(SIZE_T,LPFIBER_START_ROUTINE,LPVOID);
 static LPVOID (WINAPI *pConvertThreadToFiber)(LPVOID);
@@ -171,8 +172,25 @@ static void test_FiberHandling(void)
     if (pIsThreadAFiber) ok(!pIsThreadAFiber(), "IsThreadAFiber reported TRUE\n");
 }
 
+static unsigned int list_size(const LIST_ENTRY *le)
+{
+    unsigned int count = 0;
+    LIST_ENTRY *entry;
+
+    for (entry = le->Flink; entry != le; entry = entry->Flink)
+        ++count;
+
+    return count;
+}
+
+#define FLS_TEST_INDEX_COUNT 2048
+
 static void test_FiberLocalStorage(void)
 {
+    static DWORD fls_indices[FLS_TEST_INDEX_COUNT];
+    TEB *teb = NtCurrentTeb();
+    unsigned int i, count;
+    PEB *peb = teb->Peb;
     DWORD fls, fls_2;
     BOOL ret;
     void* val;
@@ -182,6 +200,23 @@ static void test_FiberLocalStorage(void)
         win_skip( "Fiber Local Storage not supported\n" );
         return;
     }
+
+    ok(!!teb->FlsSlots, "Got NULL teb->FlsSlots.\n");
+    ok(!!peb->FlsCallback, "Got NULL peb->FlsCallback.\n");
+
+    count = list_size(&peb->FlsListHead);
+    ok(count == 1, "Got unexpected FLS list size %u.\n", count);
+
+    for (i = 0; i < FLS_TEST_INDEX_COUNT; ++i)
+    {
+        if ((fls_indices[i] = pFlsAlloc(NULL)) == FLS_OUT_OF_INDEXES)
+            break;
+    }
+    count = i;
+    ok(count <= 127, "Could allocate %u FLS indices.\n", count);
+
+    for (i = 0; i < count; ++i)
+        pFlsFree(fls_indices[i]);
 
     /* Test an unallocated index
      * FlsFree should fail
