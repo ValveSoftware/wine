@@ -1149,7 +1149,6 @@ DWORD WINAPI DECLSPEC_HOTPATCH FlsAlloc( PFLS_CALLBACK_FUNCTION callback )
     return index;
 }
 
-
 /***********************************************************************
  *           FlsFree   (kernelbase.@)
  */
@@ -1160,11 +1159,17 @@ BOOL WINAPI DECLSPEC_HOTPATCH FlsFree( DWORD index )
     lock_fls_section();
     ret = RtlAreBitsSet( NtCurrentTeb()->Peb->FlsBitmap, index, 1 );
     if (ret) RtlClearBits( NtCurrentTeb()->Peb->FlsBitmap, index, 1 );
-    if (ret)
+    if (ret && NtCurrentTeb()->FlsSlots)
     {
-        /* FIXME: call Fls callback */
-        /* FIXME: add equivalent of ThreadZeroTlsCell here */
-        if (NtCurrentTeb()->FlsSlots) *fls_addr_from_index(NtCurrentTeb()->FlsSlots, index) = NULL;
+        LIST_ENTRY *entry;
+
+        for (entry = NtCurrentTeb()->Peb->FlsListHead.Flink;
+                entry != &NtCurrentTeb()->Peb->FlsListHead;
+                entry = entry->Flink)
+        {
+            /* FIXME: call Fls callback */
+            *fls_addr_from_index(entry, index) = NULL;
+        }
     }
     else SetLastError( ERROR_INVALID_PARAMETER );
     unlock_fls_section();
