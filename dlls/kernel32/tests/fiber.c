@@ -409,7 +409,7 @@ static void test_FiberLocalStorageWithFibers(PFLS_CALLBACK_FUNCTION cbfunc)
     fls_value_to_set = val1;
     pDeleteFiber(fibers[1]);
     ok(fiberCount == 0, "Wrong fiber count: %d\n", fiberCount);
-    todo_wine ok(cbCount == 1, "Wrong callback count: %d\n", cbCount);
+    ok(cbCount == 1, "Wrong callback count: %d\n", cbCount);
 
     fiberCount = 0;
     cbCount = 0;
