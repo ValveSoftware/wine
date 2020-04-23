@@ -1148,15 +1148,24 @@ BOOL WINAPI DECLSPEC_HOTPATCH FlsFree( DWORD index )
     if (ret) RtlClearBits( NtCurrentTeb()->Peb->FlsBitmap, index, 1 );
     if (ret && NtCurrentTeb()->FlsSlots)
     {
+        PFLS_CALLBACK_FUNCTION *fls_callbacks;
         LIST_ENTRY *entry;
+
+        fls_callbacks = (PFLS_CALLBACK_FUNCTION *)NtCurrentTeb()->Peb->FlsCallback;
 
         for (entry = NtCurrentTeb()->Peb->FlsListHead.Flink;
                 entry != &NtCurrentTeb()->Peb->FlsListHead;
                 entry = entry->Flink)
         {
-            /* FIXME: call Fls callback */
-            *fls_addr_from_index(entry, index) = NULL;
+            void **value_ptr = fls_addr_from_index(entry, index);
+
+            if (fls_callbacks && fls_callbacks[index + 2] && *value_ptr)
+                fls_callbacks[index + 2](*value_ptr);
+
+            *value_ptr = NULL;
         }
+        if (fls_callbacks)
+            fls_callbacks[index + 2] = NULL;
     }
     else SetLastError( ERROR_INVALID_PARAMETER );
     unlock_fls_section();

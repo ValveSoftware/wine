@@ -344,7 +344,7 @@ static void test_FiberLocalStorageCallback(PFLS_CALLBACK_FUNCTION cbfunc)
 
     ret = pFlsFree( fls );
     ok(ret, "FlsFree failed with error %u\n", GetLastError() );
-    todo_wine ok( cbCount == 1, "Wrong callback count: %d\n", cbCount );
+    ok( cbCount == 1, "Wrong callback count: %d\n", cbCount );
 
     /* Test that callback is not executed if value is NULL */
     cbCount = 0;
@@ -416,7 +416,7 @@ static void test_FiberLocalStorageWithFibers(PFLS_CALLBACK_FUNCTION cbfunc)
     fls_value_to_set = val2;
     pFlsFree(fls_index_to_set);
     ok(fiberCount == 0, "Wrong fiber count: %d\n", fiberCount);
-    todo_wine ok(cbCount == 2, "Wrong callback count: %d\n", cbCount);
+    ok(cbCount == 2, "Wrong callback count: %d\n", cbCount);
 
     fiberCount = 0;
     cbCount = 0;

@@ -2437,11 +2437,8 @@ todo_wine
             ret = pFlsFree(fls_index);
             ok(ret, "FlsFree failed with error %u\n", GetLastError());
             fls_index = FLS_OUT_OF_INDEXES;
-            todo_wine
-            {
-                ok(fls_callback_count == fls_count,
-                   "wrong FLS callback count %d, expected %d\n", fls_callback_count, fls_count);
-            }
+            ok(fls_callback_count == fls_count,
+               "wrong FLS callback count %d, expected %d\n", fls_callback_count, fls_count);
         }
 
         ok(attached_thread_count >= 2, "attached thread count should be >= 2\n");
