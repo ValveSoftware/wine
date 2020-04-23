@@ -1024,6 +1024,30 @@ LPVOID WINAPI DECLSPEC_HOTPATCH ConvertThreadToFiberEx( LPVOID param, DWORD flag
     return fiber;
 }
 
+static void call_fls_callbacks(void **fls_slots)
+{
+    PFLS_CALLBACK_FUNCTION *fls_callbacks;
+    PRTL_BITMAP fls_bitmap;
+    void **fls_slot_data;
+    DWORD fls_index;
+
+    if ((fls_callbacks = (PFLS_CALLBACK_FUNCTION *)NtCurrentTeb()->Peb->FlsCallback))
+    {
+        fls_slot_data = (void **)((BYTE *)fls_slots + sizeof(LIST_ENTRY));
+        fls_bitmap = NtCurrentTeb()->Peb->FlsBitmap;
+        fls_index = 0;
+        for (fls_index = 0; fls_index < fls_bitmap->SizeOfBitMap; ++fls_index)
+        {
+            if (!RtlAreBitsSet( fls_bitmap, fls_index, 1 ))
+                continue;
+
+            if (fls_callbacks[fls_index + 2] && fls_slot_data[fls_index])
+                fls_callbacks[fls_index + 2](fls_slot_data[fls_index]);
+
+            fls_slot_data[fls_index] = NULL;
+        }
+    }
+}
 
 /***********************************************************************
  *           DeleteFiber   (kernelbase.@)
@@ -1044,8 +1068,8 @@ void WINAPI DECLSPEC_HOTPATCH DeleteFiber( LPVOID fiber_ptr )
     {
         lock_fls_section();
         RemoveEntryList( (LIST_ENTRY *)fiber->fls_slots );
+        call_fls_callbacks(fiber->fls_slots);
         unlock_fls_section();
-
         HeapFree( GetProcessHeap(), 0, fiber->fls_slots );
     }
 
