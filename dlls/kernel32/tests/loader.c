@@ -2423,18 +2423,12 @@ todo_wine
             void* value;
             SetLastError(0xdeadbeef);
             value = pFlsGetValue(fls_index);
-            todo_wine
-            {
-                ok(broken(value == (void*) 0x31415) || /* Win2k3 */
-                   value == NULL, "FlsGetValue returned %p, expected NULL\n", value);
-            }
+            ok(broken(value == (void*) 0x31415) || /* Win2k3 */
+               value == NULL, "FlsGetValue returned %p, expected NULL\n", value);
             ok(GetLastError() == ERROR_SUCCESS, "FlsGetValue failed with error %u\n", GetLastError());
-            todo_wine
-            {
-                ok(broken(fls_callback_count == thread_detach_count) || /* Win2k3 */
-                   fls_callback_count == thread_detach_count + 1,
-                   "wrong FLS callback count %d, expected %d\n", fls_callback_count, thread_detach_count + 1);
-            }
+            ok(broken(fls_callback_count == thread_detach_count) || /* Win2k3 */
+               fls_callback_count == thread_detach_count + 1,
+               "wrong FLS callback count %d, expected %d\n", fls_callback_count, thread_detach_count + 1);
         }
         if (pFlsFree)
         {
@@ -2629,8 +2623,7 @@ todo_wine
             SetLastError(0xdeadbeef);
             value = pFlsGetValue(fls_index);
             ok(!value, "FlsGetValue returned %p, expected NULL\n", value);
-            todo_wine
-                ok(GetLastError() == ERROR_SUCCESS, "FlsGetValue failed with error %u\n", GetLastError());
+            ok(GetLastError() == ERROR_SUCCESS, "FlsGetValue failed with error %u\n", GetLastError());
             ret = pFlsSetValue(fls_index, (void*) 0x31415);
             ok(ret, "FlsSetValue failed\n");
             fls_count++;
@@ -2660,11 +2653,8 @@ todo_wine
             void* value;
             SetLastError(0xdeadbeef);
             value = pFlsGetValue(fls_index);
-            todo_wine
-            {
-                ok(broken(value == (void*) 0x31415) || /* Win2k3 */
-                   !value, "FlsGetValue returned %p, expected NULL\n", value);
-            }
+            ok(broken(value == (void*) 0x31415) || /* Win2k3 */
+               !value, "FlsGetValue returned %p, expected NULL\n", value);
             ok(GetLastError() == ERROR_SUCCESS, "FlsGetValue failed with error %u\n", GetLastError());
         }
 

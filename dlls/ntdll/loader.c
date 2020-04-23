@@ -1488,6 +1488,30 @@ static void attach_implicitly_loaded_dlls( LPVOID reserved )
     }
 }
 
+static void call_fls_callbacks(void)
+{
+    PFLS_CALLBACK_FUNCTION *fls_callbacks;
+    PRTL_BITMAP fls_bitmap;
+    void **fls_slot_data;
+    DWORD fls_index;
+
+    if ((fls_callbacks = (PFLS_CALLBACK_FUNCTION *)NtCurrentTeb()->Peb->FlsCallback) && NtCurrentTeb()->FlsSlots)
+    {
+        fls_slot_data = (void **)((BYTE *)NtCurrentTeb()->FlsSlots + sizeof(LIST_ENTRY));
+        fls_bitmap = NtCurrentTeb()->Peb->FlsBitmap;
+        fls_index = 0;
+        for (fls_index = 0; fls_index < fls_bitmap->SizeOfBitMap; ++fls_index)
+        {
+            if (!RtlAreBitsSet( fls_bitmap, fls_index, 1 ))
+                continue;
+
+            if (fls_callbacks[fls_index + 2] && fls_slot_data[fls_index])
+                fls_callbacks[fls_index + 2](fls_slot_data[fls_index]);
+
+            fls_slot_data[fls_index] = NULL;
+        }
+    }
+}
 
 /*************************************************************************
  *		process_detach
@@ -3181,6 +3205,11 @@ fail:
 void WINAPI LdrShutdownProcess(void)
 {
     TRACE("()\n");
+
+    lock_fls_section(NULL);
+    call_fls_callbacks();
+    unlock_fls_section(NULL);
+
     process_detaching = TRUE;
     process_detach();
 }
@@ -3219,6 +3248,7 @@ void WINAPI LdrShutdownThread(void)
     {
         lock_fls_section( NULL );
         RemoveEntryList( (LIST_ENTRY *)NtCurrentTeb()->FlsSlots );
+        call_fls_callbacks();
         unlock_fls_section( NULL );
     }
 
