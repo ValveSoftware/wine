@@ -22,6 +22,7 @@
 #define __WINE_SERVER_FILE_H
 
 #include <sys/types.h>
+#include <sys/stat.h>
 
 #include "object.h"
 
@@ -85,6 +86,7 @@ extern struct fd *open_fd( struct fd *root, const char *name, struct unicode_str
                            unsigned int sharing, unsigned int options );
 extern struct fd *create_anonymous_fd( const struct fd_ops *fd_user_ops,
                                        int unix_fd, struct object *user, unsigned int options );
+extern void set_unix_name_of_fd( struct fd *fd, const struct stat *fd_st );
 extern struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sharing,
                                  unsigned int options );
 extern struct fd *get_fd_object_for_mapping( struct fd *fd, unsigned int access, unsigned int sharing );
