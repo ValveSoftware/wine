@@ -2701,8 +2701,16 @@ NTSTATUS nt_to_unix_file_name_attr( const OBJECT_ATTRIBUTES *attr, ANSI_STRING *
     NTSTATUS status;
     BOOLEAN check_case = !(attr->Attributes & OBJ_CASE_INSENSITIVE);
 
+    if (!attr->ObjectName->Buffer && attr->ObjectName->Length)
+        return STATUS_ACCESS_VIOLATION;
+
     if (!attr->RootDirectory)  /* without root dir fall back to normal lookup */
+    {
+        if (!attr->ObjectName->Buffer)
+            return STATUS_OBJECT_PATH_SYNTAX_BAD;
+
         return wine_nt_to_unix_file_name( attr->ObjectName, unix_name_ret, disposition, check_case );
+    }
 
     name     = attr->ObjectName->Buffer;
     name_len = attr->ObjectName->Length / sizeof(WCHAR);
