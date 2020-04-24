@@ -2143,6 +2143,45 @@ struct fd *create_anonymous_fd( const struct fd_ops *fd_user_ops, int unix_fd, s
     return NULL;
 }
 
+void set_unix_name_of_fd( struct fd *fd, const struct stat *fd_st )
+{
+#ifdef __linux__
+    static const char procfs_fmt[] = "/proc/self/fd/%d";
+
+    char path[PATH_MAX], procfs_path[sizeof(procfs_fmt) - 2 /* %d */ + 11];
+    struct stat path_st;
+    ssize_t len;
+
+    sprintf( procfs_path, procfs_fmt, fd->unix_fd );
+    len = readlink( procfs_path, path, sizeof(path) );
+    if (len == -1 || len >= sizeof(path) )
+        return;
+    path[len] = '\0';
+
+    /* Make sure it's an absolute path, has at least one hardlink, and the same inode */
+    if (path[0] != '/' || stat( path, &path_st ) || path_st.st_nlink < 1 ||
+        path_st.st_dev != fd_st->st_dev || path_st.st_ino != fd_st->st_ino)
+        return;
+
+    if (!(fd->unix_name = mem_alloc( len + 1 )))
+        return;
+    memcpy( fd->unix_name, path, len + 1 );
+
+#elif defined(F_GETPATH)
+    char path[PATH_MAX];
+    size_t size;
+
+    if (fcntl( fd->unix_fd, F_GETPATH, path ) == -1 || path[0] != '/')
+        return;
+
+    size = strlen(path) + 1;
+    if (!(fd->unix_name = mem_alloc( size )))
+        return;
+    memcpy( fd->unix_name, path, size );
+
+#endif
+}
+
 /* retrieve the object that is using an fd */
 void *get_fd_user( struct fd *fd )
 {
