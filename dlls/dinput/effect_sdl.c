@@ -463,13 +463,10 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
     else if (IsEqualGUID(&This->guid, &GUID_CustomForce))
         This->effect.type = SDL_HAPTIC_CUSTOM;
 
-    if ((flags & ~DIEP_NORESTART & ~DIEP_NODOWNLOAD & ~DIEP_START) == 0)
-    {
-        /* set everything */
-        flags = DIEP_AXES | DIEP_DIRECTION | DIEP_DURATION | DIEP_ENVELOPE |
-                DIEP_GAIN | DIEP_SAMPLEPERIOD | DIEP_STARTDELAY | DIEP_TRIGGERBUTTON |
-                DIEP_TRIGGERREPEATINTERVAL | DIEP_TYPESPECIFICPARAMS;
-    }
+    dump_DIEFFECT(effect, &This->guid, flags);
+
+    if (!flags)
+        return DI_NOEFFECT;
 
     if (flags & DIEP_AXES)
     {
@@ -482,8 +479,6 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
             return DIERR_INCOMPLETEEFFECT;
         This->first_axis_is_x = effect->rgdwAxes[0] == DIJOFS_X;
     }
-
-    dump_DIEFFECT(effect, &This->guid, flags);
 
     if (flags & DIEP_DIRECTION)
     {
