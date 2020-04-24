@@ -157,6 +157,7 @@ struct file *create_file_for_fd( int fd, unsigned int access, unsigned int shari
         release_object( file );
         return NULL;
     }
+    set_unix_name_of_fd( file->fd, &st );
     allow_fd_caching( file->fd );
     return file;
 }
