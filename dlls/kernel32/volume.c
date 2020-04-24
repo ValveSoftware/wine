@@ -700,7 +700,7 @@ static DWORD WINAPI get_fs_flags( UNICODE_STRING *nt_name )
     NTSTATUS status;
     DWORD flags = 0;
 
-    status = wine_nt_to_unix_file_name( nt_name, &unix_name, FILE_OPEN, FALSE );
+    status = wine_nt_to_unix_file_name( nt_name, &unix_name, FILE_OPEN );
     if (status != STATUS_SUCCESS)
         return flags;
 #if defined(HAVE_FSTATFS)
@@ -1776,7 +1776,7 @@ BOOL WINAPI GetVolumePathNameW(LPCWSTR filename, LPWSTR volumepathname, DWORD bu
         if (!RtlDosPathNameToNtPathName_U( volumenameW, &nt_name, NULL, NULL ))
             goto cleanup;
         volumenameW[pos] = '\0';
-        status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN, FALSE );
+        status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN );
         RtlFreeUnicodeString( &nt_name );
         if (status == STATUS_SUCCESS)
         {

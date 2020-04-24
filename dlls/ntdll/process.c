@@ -1458,7 +1458,7 @@ static char *get_unix_curdir( const RTL_USER_PROCESS_PARAMETERS *params )
 
     if (!RtlDosPathNameToNtPathName_U( params->CurrentDirectory.DosPath.Buffer, &nt_name, NULL, NULL ))
         return NULL;
-    status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN_IF, FALSE );
+    status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN_IF );
     RtlFreeUnicodeString( &nt_name );
     if (status && status != STATUS_NO_SUCH_FILE) return NULL;
     return unix_name.Buffer;
@@ -1479,7 +1479,7 @@ static NTSTATUS fork_and_exec( UNICODE_STRING *path, const RTL_USER_PROCESS_PARA
     ANSI_STRING unix_name;
     NTSTATUS status;
 
-    status = wine_nt_to_unix_file_name( path, &unix_name, FILE_OPEN, FALSE );
+    status = wine_nt_to_unix_file_name( path, &unix_name, FILE_OPEN );
     if (status) return status;
 
 #ifdef HAVE_PIPE2

@@ -487,7 +487,7 @@ BOOL WINAPI MoveFileWithProgressW( LPCWSTR source, LPCWSTR dest,
     status = NtOpenFile( &source_handle, DELETE | SYNCHRONIZE, &attr, &io,
                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, FILE_SYNCHRONOUS_IO_NONALERT );
     if (status == STATUS_SUCCESS)
-        status = wine_nt_to_unix_file_name( &nt_name, &source_unix, FILE_OPEN, FALSE );
+        status = wine_nt_to_unix_file_name( &nt_name, &source_unix, FILE_OPEN );
     RtlFreeUnicodeString( &nt_name );
     if (status != STATUS_SUCCESS)
     {
@@ -541,7 +541,7 @@ BOOL WINAPI MoveFileWithProgressW( LPCWSTR source, LPCWSTR dest,
         goto error;
     }
 
-    status = wine_nt_to_unix_file_name( &nt_name, &dest_unix, FILE_OPEN_IF, FALSE );
+    status = wine_nt_to_unix_file_name( &nt_name, &dest_unix, FILE_OPEN_IF );
     RtlFreeUnicodeString( &nt_name );
     if (status != STATUS_SUCCESS && status != STATUS_NO_SUCH_FILE)
     {
@@ -682,10 +682,10 @@ BOOL WINAPI CreateHardLinkW(LPCWSTR lpFileName, LPCWSTR lpExistingFileName,
     }
 
     unixSource.Buffer = unixDest.Buffer = NULL;
-    status = wine_nt_to_unix_file_name( &ntSource, &unixSource, FILE_OPEN, FALSE );
+    status = wine_nt_to_unix_file_name( &ntSource, &unixSource, FILE_OPEN );
     if (!status)
     {
-        status = wine_nt_to_unix_file_name( &ntDest, &unixDest, FILE_CREATE, FALSE );
+        status = wine_nt_to_unix_file_name( &ntDest, &unixDest, FILE_CREATE );
         if (!status) /* destination must not exist */
         {
             status = STATUS_OBJECT_NAME_EXISTS;
@@ -797,7 +797,7 @@ BOOL WINAPI RemoveDirectoryW( LPCWSTR path )
         return FALSE;
     }
 
-    status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN, FALSE );
+    status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN );
     if (status == STATUS_SUCCESS)
     {
         status = NtQueryAttributesFile( &attr, &info );
@@ -885,7 +885,7 @@ char * CDECL wine_get_unix_file_name( LPCWSTR dosW )
     NTSTATUS status;
 
     if (!RtlDosPathNameToNtPathName_U( dosW, &nt_name, NULL, NULL )) return NULL;
-    status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN_IF, FALSE );
+    status = wine_nt_to_unix_file_name( &nt_name, &unix_name, FILE_OPEN_IF );
     RtlFreeUnicodeString( &nt_name );
     if (status && status != STATUS_NO_SUCH_FILE)
     {

@@ -2866,7 +2866,7 @@ static NTSTATUS load_so_dll( LPCWSTR load_path, const UNICODE_STRING *nt_name,
     else
     {
         TRACE( "loading %s as so lib\n", debugstr_us(nt_name) );
-        if (wine_nt_to_unix_file_name( nt_name, &unix_name, FILE_OPEN, FALSE ))
+        if (wine_nt_to_unix_file_name( nt_name, &unix_name, FILE_OPEN ))
             return STATUS_DLL_NOT_FOUND;
     }
 

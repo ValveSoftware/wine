@@ -471,7 +471,7 @@ BOOL WINAPI ReplaceFileW(LPCWSTR lpReplacedFileName, LPCWSTR lpReplacementFileNa
                         FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
                         FILE_SYNCHRONOUS_IO_NONALERT|FILE_NON_DIRECTORY_FILE);
     if (status == STATUS_SUCCESS)
-        status = wine_nt_to_unix_file_name(&nt_replaced_name, &unix_replaced_name, replaced_flags, FALSE);
+        status = wine_nt_to_unix_file_name(&nt_replaced_name, &unix_replaced_name, replaced_flags);
     RtlFreeUnicodeString(&nt_replaced_name);
     if (status != STATUS_SUCCESS)
     {
@@ -511,7 +511,7 @@ BOOL WINAPI ReplaceFileW(LPCWSTR lpReplacedFileName, LPCWSTR lpReplacementFileNa
                         &attr, &io, 0,
                         FILE_SYNCHRONOUS_IO_NONALERT|FILE_NON_DIRECTORY_FILE);
     if (status == STATUS_SUCCESS)
-        status = wine_nt_to_unix_file_name(&nt_replacement_name, &unix_replacement_name, FILE_OPEN, FALSE);
+        status = wine_nt_to_unix_file_name(&nt_replacement_name, &unix_replacement_name, FILE_OPEN);
     RtlFreeUnicodeString(&nt_replacement_name);
     if (status != STATUS_SUCCESS)
     {
@@ -548,7 +548,7 @@ BOOL WINAPI ReplaceFileW(LPCWSTR lpReplacedFileName, LPCWSTR lpReplacementFileNa
                               FILE_SYNCHRONOUS_IO_NONALERT|FILE_NON_DIRECTORY_FILE,
                               NULL, 0);
         if (status == STATUS_SUCCESS)
-            status = wine_nt_to_unix_file_name(&nt_backup_name, &unix_backup_name, FILE_OPEN_IF, FALSE);
+            status = wine_nt_to_unix_file_name(&nt_backup_name, &unix_backup_name, FILE_OPEN_IF);
         RtlFreeUnicodeString(&nt_backup_name);
         if (status != STATUS_SUCCESS)
         {
