@@ -658,8 +658,14 @@ int ntdll_umbstowcs( DWORD flags, const char *src, int srclen, WCHAR *dst, int d
 int ntdll_wcstoumbs( DWORD flags, const WCHAR *src, int srclen, char *dst, int dstlen,
                      const char *defchar, int *used )
 {
-    DWORD reslen;
+    DWORD reslen = 0;
     NTSTATUS status;
+
+    if (!src)
+    {
+        if (used) *used = 0;
+        return 0;
+    }
 
     if (unix_table) return wine_cp_wcstombs( unix_table, flags, src, srclen, dst, dstlen, defchar, used );
 
