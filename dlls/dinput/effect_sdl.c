@@ -473,6 +473,9 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
 
     if (flags & DIEP_AXES)
     {
+        if (!effect->rgdwAxes)
+            return DIERR_INVALIDPARAM;
+
         if (effect->cAxes > 2)
             return DIERR_INVALIDPARAM;
         else if (effect->cAxes < 1)
@@ -484,6 +487,9 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
 
     if (flags & DIEP_DIRECTION)
     {
+        if (!effect->rglDirection)
+            return DIERR_INVALIDPARAM;
+
         if (effect->cAxes == 1)
         {
             if (effect->dwFlags & DIEFF_CARTESIAN)
@@ -568,6 +574,9 @@ static HRESULT WINAPI effect_SetParameters(IDirectInputEffect *iface,
 
     if (flags & DIEP_TYPESPECIFICPARAMS)
     {
+        if (!effect->lpvTypeSpecificParams)
+            return DIERR_INVALIDPARAM;
+
         if (IsEqualGUID(&This->guid, &GUID_Sine) ||
             IsEqualGUID(&This->guid, &GUID_Triangle) ||
             IsEqualGUID(&This->guid, &GUID_SawtoothUp) ||
