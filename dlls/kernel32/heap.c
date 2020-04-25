@@ -326,6 +326,8 @@ SIZE_T WINAPI GlobalSize(HGLOBAL hmem)
        return 0;
    }
 
+    __TRY
+    {
    if(ISPOINTER(hmem))
    {
       retval=HeapSize(GetProcessHeap(), 0, hmem);
@@ -359,6 +361,14 @@ SIZE_T WINAPI GlobalSize(HGLOBAL hmem)
       }
       RtlUnlockHeap(GetProcessHeap());
    }
+   }
+   __EXCEPT_PAGE_FAULT
+   {
+       SetLastError( ERROR_INVALID_HANDLE );
+       retval = 0;
+   }
+   __ENDTRY
+
    if (retval == ~(SIZE_T)0) retval = 0;
    return retval;
 }
