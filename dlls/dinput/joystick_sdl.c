@@ -109,6 +109,7 @@ struct SDLDev {
 
     int n_buttons, n_axes, n_hats;
 
+    SDL_JoystickType type;
     BOOL is_joystick;
     int autocenter;
     int gain;
@@ -312,6 +313,7 @@ static void find_sdldevs(void)
 
         {
             SDL_JoystickType type = SDL_JoystickGetType(device);
+            sdldev->type = type;
             sdldev->is_joystick =
                 type == SDL_JOYSTICK_TYPE_UNKNOWN ||
                 type == SDL_JOYSTICK_TYPE_WHEEL ||
@@ -439,6 +441,13 @@ static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD ver
     lpddi->guidFFDriver = GUID_NULL;
 
     lpddi->dwDevType = get_device_type(version, sdldevs[id].is_joystick);
+
+    /* DirectInput 8 has more-specific device types which some games look for */
+    if (version >= 0x800)
+    {
+        if (sdldevs[id].type == SDL_JOYSTICK_TYPE_WHEEL)
+            lpddi->dwDevType = DI8DEVTYPE_DRIVING | (DI8DEVTYPEDRIVING_DUALPEDALS << 8);
+    }
 
     /* Assume the joystick as HID if it is attached to USB bus and has a valid VID/PID */
     if ( sdldevs[id].vendor_id && sdldevs[id].product_id)
