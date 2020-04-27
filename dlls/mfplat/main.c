@@ -4803,6 +4803,7 @@ static HRESULT resolver_handler_end_create(struct source_resolver *resolver, enu
         IMFAsyncResult *result)
 {
     IMFAsyncResult *inner_result = (IMFAsyncResult *)IMFAsyncResult_GetStateNoAddRef(result);
+    MFASYNCRESULT *data = (MFASYNCRESULT *)inner_result;
     struct resolver_queued_result *queued_result;
     union
     {
@@ -4811,7 +4812,8 @@ static HRESULT resolver_handler_end_create(struct source_resolver *resolver, enu
         IMFSchemeHandler *scheme_handler;
     } handler;
 
-    queued_result = heap_alloc_zero(sizeof(*queued_result));
+    if (!(queued_result = heap_alloc_zero(sizeof(*queued_result))))
+        return E_OUTOFMEMORY;
 
     IMFAsyncResult_GetObject(inner_result, &handler.handler);
 
@@ -4831,37 +4833,30 @@ static HRESULT resolver_handler_end_create(struct source_resolver *resolver, enu
 
     IUnknown_Release(handler.handler);
 
-    if (SUCCEEDED(queued_result->hr))
+    if (data->hEvent)
     {
-        MFASYNCRESULT *data = (MFASYNCRESULT *)inner_result;
+        queued_result->inner_result = inner_result;
+        IMFAsyncResult_AddRef(queued_result->inner_result);
+    }
 
-        if (data->hEvent)
+    /* Push resolved object type and created object, so we don't have to guess on End*() call. */
+    EnterCriticalSection(&resolver->cs);
+    list_add_tail(&resolver->pending, &queued_result->entry);
+    LeaveCriticalSection(&resolver->cs);
+
+    if (data->hEvent)
+        SetEvent(data->hEvent);
+    else
+    {
+        IUnknown *caller_state = IMFAsyncResult_GetStateNoAddRef(inner_result);
+        IMFAsyncResult *caller_result;
+
+        if (SUCCEEDED(MFCreateAsyncResult(queued_result->object, data->pCallback, caller_state, &caller_result)))
         {
-            queued_result->inner_result = inner_result;
-            IMFAsyncResult_AddRef(queued_result->inner_result);
-        }
-
-        /* Push resolved object type and created object, so we don't have to guess on End*() call. */
-        EnterCriticalSection(&resolver->cs);
-        list_add_tail(&resolver->pending, &queued_result->entry);
-        LeaveCriticalSection(&resolver->cs);
-
-        if (data->hEvent)
-            SetEvent(data->hEvent);
-        else
-        {
-            IUnknown *caller_state = IMFAsyncResult_GetStateNoAddRef(inner_result);
-            IMFAsyncResult *caller_result;
-
-            if (SUCCEEDED(MFCreateAsyncResult(queued_result->object, data->pCallback, caller_state, &caller_result)))
-            {
-                MFInvokeCallback(caller_result);
-                IMFAsyncResult_Release(caller_result);
-            }
+            MFInvokeCallback(caller_result);
+            IMFAsyncResult_Release(caller_result);
         }
     }
-    else
-        heap_free(queued_result);
 
     return S_OK;
 }
