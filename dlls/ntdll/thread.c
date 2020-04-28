@@ -57,6 +57,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(thread);
 #endif
 
 struct _KUSER_SHARED_DATA *user_shared_data = NULL;
+size_t user_shared_data_size = 0;
 static const WCHAR default_windirW[] = {'C',':','\\','w','i','n','d','o','w','s',0};
 
 extern void DECLSPEC_NORETURN __wine_syscall_dispatcher( void );
@@ -246,6 +247,7 @@ TEB *thread_init(void)
         exit(1);
     }
     user_shared_data = addr;
+    user_shared_data_size = size;
     memcpy( user_shared_data->NtSystemRoot, default_windirW, sizeof(default_windirW) );
 
     /* allocate and initialize the PEB */

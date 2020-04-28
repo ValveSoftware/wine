@@ -35,6 +35,7 @@
 #define WIN32_NO_STATUS
 #include "windef.h"
 #include "winternl.h"
+#include "ddk/wdm.h"
 
 #include "file.h"
 #include "handle.h"
@@ -947,6 +948,74 @@ int get_page_size(void)
 {
     if (!page_mask) page_mask = sysconf( _SC_PAGESIZE ) - 1;
     return page_mask + 1;
+}
+
+static int kusd_fd;
+static KSHARED_USER_DATA *kusd;
+static const timeout_t kusd_timeout = 16 * -TICKS_PER_SEC / 1000;
+
+static void kusd_set_current_time( void *private )
+{
+    ULONG system_time_high = current_time >> 32;
+    ULONG system_time_low = current_time & 0xffffffff;
+    ULONG interrupt_time_high = monotonic_time >> 32;
+    ULONG interrupt_time_low = monotonic_time & 0xffffffff;
+    ULONG tick_count_high = (monotonic_time * 1000 / TICKS_PER_SEC) >> 32;
+    ULONG tick_count_low = (monotonic_time * 1000 / TICKS_PER_SEC) & 0xffffffff;
+    KSHARED_USER_DATA *ptr = kusd;
+
+    add_timeout_user( kusd_timeout, kusd_set_current_time, NULL );
+
+#if defined(__GNUC__) && ((__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7)))
+    __atomic_store_n(&ptr->SystemTime.High2Time, system_time_high, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&ptr->SystemTime.LowPart, system_time_low, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&ptr->SystemTime.High1Time, system_time_high, __ATOMIC_SEQ_CST);
+
+    __atomic_store_n(&ptr->InterruptTime.High2Time, interrupt_time_high, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&ptr->InterruptTime.LowPart, interrupt_time_low, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&ptr->InterruptTime.High1Time, interrupt_time_high, __ATOMIC_SEQ_CST);
+
+    __atomic_store_n(&ptr->TickCount.High2Time, tick_count_high, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&ptr->TickCount.LowPart, tick_count_low, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&ptr->TickCount.High1Time, tick_count_high, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&ptr->TickCountLowDeprecated, tick_count_low, __ATOMIC_SEQ_CST);
+#else
+    ptr->SystemTime.High2Time = system_time_high;
+    ptr->SystemTime.LowPart = system_time_low;
+    ptr->SystemTime.High1Time = system_time_high;
+
+    ptr->InterruptTime.High2Time = interrupt_time_high;
+    ptr->InterruptTime.LowPart = interrupt_time_low;
+    ptr->InterruptTime.High1Time = interrupt_time_high;
+
+    ptr->TickCount.High2Time = tick_count_high;
+    ptr->TickCount.LowPart = tick_count_low;
+    ptr->TickCount.High1Time = tick_count_high;
+    ptr->TickCountLowDeprecated = tick_count_low;
+#endif
+}
+
+int get_user_shared_data_fd( const void *usd_init, data_size_t usd_size )
+{
+    /* keep it the same as user_shared_data_size in ntdll */
+    size_t size = 0x10000;
+
+    if (sizeof(*kusd) != usd_size) return -1;
+    if (kusd) return kusd_fd;
+
+    if ((kusd_fd = create_temp_file( size )) == -1)
+        return -1;
+
+    if ((kusd = mmap( NULL, size, PROT_WRITE, MAP_SHARED, kusd_fd, 0 )) == MAP_FAILED)
+    {
+        close( kusd_fd );
+        return -1;
+    }
+
+    memcpy( kusd, usd_init, usd_size );
+
+    kusd_set_current_time( NULL );
+    return kusd_fd;
 }
 
 /* create a file mapping */

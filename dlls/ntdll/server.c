@@ -81,6 +81,7 @@
 #include "wine/server.h"
 #include "wine/debug.h"
 #include "ntdll_misc.h"
+#include "ddk/wdm.h"
 #include "esync.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(server);
@@ -1452,8 +1453,15 @@ void server_init_process_done(void)
     PEB *peb = NtCurrentTeb()->Peb;
     IMAGE_NT_HEADERS *nt = RtlImageNtHeader( peb->ImageBaseAddress );
     void *entry = (char *)peb->ImageBaseAddress + nt->OptionalHeader.AddressOfEntryPoint;
+    obj_handle_t usd_handle;
     NTSTATUS status;
-    int suspend;
+    int suspend, usd_fd = -1;
+    sigset_t old_set;
+    SIZE_T size = user_shared_data_size;
+    void *addr = user_shared_data;
+    ULONG old_prot;
+
+    NtProtectVirtualMemory( NtCurrentProcess(), &addr, &size, PAGE_READONLY, &old_prot );
 
 #ifdef __APPLE__
     send_server_task_port();
@@ -1468,6 +1476,7 @@ void server_init_process_done(void)
     signal_init_process();
 
     /* Signal the parent process to continue */
+    pthread_sigmask( SIG_BLOCK, &server_block_set, &old_set );
     SERVER_START_REQ( init_process_done )
     {
         req->module   = wine_server_client_ptr( peb->ImageBaseAddress );
@@ -1476,10 +1485,22 @@ void server_init_process_done(void)
 #endif
         req->entry    = wine_server_client_ptr( entry );
         req->gui      = (nt->OptionalHeader.Subsystem != IMAGE_SUBSYSTEM_WINDOWS_CUI);
-        status = wine_server_call( req );
+        wine_server_add_data( req, user_shared_data, sizeof(*user_shared_data) );
+        status = server_call_unlocked( req );
         suspend = reply->suspend;
     }
     SERVER_END_REQ;
+    if (!status) usd_fd = receive_fd( &usd_handle );
+    pthread_sigmask( SIG_SETMASK, &old_set, NULL );
+
+    if (usd_fd != -1)
+    {
+        munmap( user_shared_data, user_shared_data_size );
+        if (user_shared_data != mmap( user_shared_data, user_shared_data_size,
+                                      PROT_READ, MAP_SHARED | MAP_FIXED, usd_fd, 0 ))
+            fatal_error( "failed to remap the process user shared data\n" );
+        close( usd_fd );
+    }
 
     assert( !status );
     signal_start_process( entry, suspend );

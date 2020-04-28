@@ -1399,6 +1399,7 @@ DECL_HANDLER(init_process_done)
 {
     struct process_dll *dll;
     struct process *process = current->process;
+    int usd_fd;
 
     if (is_process_init_done(process))
     {
@@ -1410,6 +1411,13 @@ DECL_HANDLER(init_process_done)
         set_error( STATUS_DLL_NOT_FOUND );
         return;
     }
+    if ((usd_fd = get_user_shared_data_fd( get_req_data(), get_req_data_size() )) == -1)
+    {
+        set_error( STATUS_NO_MEMORY );
+        return;
+    }
+
+    send_client_fd( process, usd_fd, -1 );
 
     /* main exe is the first in the dll list */
     list_remove( &dll->entry );
