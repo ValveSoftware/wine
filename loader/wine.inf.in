@@ -164,7 +164,6 @@ AddService=FontCache3.0.0.0,0,WPFFontCacheService
 AddService=LanmanServer,0,LanmanServerService
 AddService=FontCache,0,FontCacheService
 AddService=Schedule,0,TaskSchedulerService
-AddService=WineUsd,0,WineUsdService
 AddService=Winmgmt,0,WinmgmtService
 AddService=wuauserv,0,wuauService
 
@@ -182,7 +181,6 @@ AddService=FontCache3.0.0.0,0,WPFFontCacheService
 AddService=LanmanServer,0,LanmanServerService
 AddService=FontCache,0,FontCacheService
 AddService=Schedule,0,TaskSchedulerService
-AddService=WineUsd,0,WineUsdService
 AddService=Winmgmt,0,WinmgmtService
 AddService=wuauserv,0,wuauService
 
@@ -200,7 +198,6 @@ AddService=FontCache3.0.0.0,0,WPFFontCacheService
 AddService=LanmanServer,0,LanmanServerService
 AddService=FontCache,0,FontCacheService
 AddService=Schedule,0,TaskSchedulerService
-AddService=WineUsd,0,WineUsdService
 AddService=Winmgmt,0,WinmgmtService
 AddService=wuauserv,0,wuauService
 
@@ -218,7 +215,6 @@ AddService=FontCache3.0.0.0,0,WPFFontCacheService
 AddService=LanmanServer,0,LanmanServerService
 AddService=FontCache,0,FontCacheService
 AddService=Schedule,0,TaskSchedulerService
-AddService=WineUsd,0,WineUsdService
 AddService=Winmgmt,0,WinmgmtService
 AddService=wuauserv,0,wuauService
 
@@ -3660,14 +3656,6 @@ DisplayName="Terminal Services"
 ServiceBinary="%11%\termsv.exe"
 ServiceType=32
 StartType=3
-ErrorControl=1
-
-[WineUsdService]
-Description="User shared data update service"
-DisplayName="Wine User Shared Data"
-ServiceBinary="%12%\WineUsd.sys"
-ServiceType=1
-StartType=0
 ErrorControl=1
 
 [WinmgmtService]
