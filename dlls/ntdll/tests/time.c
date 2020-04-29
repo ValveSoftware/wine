@@ -18,9 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#define NONAMELESSUNION
 #include "ntdll_test.h"
-#include "ddk/wdm.h"
 
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
@@ -31,7 +29,6 @@ static VOID (WINAPI *pRtlTimeFieldsToTime)(  PTIME_FIELDS TimeFields,  PLARGE_IN
 static NTSTATUS (WINAPI *pNtQueryPerformanceCounter)( LARGE_INTEGER *counter, LARGE_INTEGER *frequency );
 static NTSTATUS (WINAPI *pRtlQueryTimeZoneInformation)( RTL_TIME_ZONE_INFORMATION *);
 static NTSTATUS (WINAPI *pRtlQueryDynamicTimeZoneInformation)( RTL_DYNAMIC_TIME_ZONE_INFORMATION *);
-static ULONG (WINAPI *pNtGetTickCount)(void);
 
 static const int MonthLengths[2][12] =
 {
@@ -156,35 +153,12 @@ static void test_RtlQueryTimeZoneInformation(void)
        wine_dbgstr_w(tzinfo.DaylightName));
 }
 
-static void test_NtGetTickCount(void)
-{
-    KSHARED_USER_DATA *user_shared_data = (void *)0x7ffe0000;
-    LONG diff;
-    int i;
-
-    if (!pNtGetTickCount)
-    {
-        win_skip("NtGetTickCount is not available\n");
-        return;
-    }
-
-    for (i = 0; i < 5; ++i)
-    {
-        diff = (user_shared_data->u.TickCountQuad * user_shared_data->TickCountMultiplier) >> 24;
-        diff = pNtGetTickCount() - diff;
-        todo_wine
-        ok(diff < 100, "NtGetTickCount - TickCountQuad too high, expected < 100 got %d\n", diff);
-        Sleep(50);
-    }
-}
-
 START_TEST(time)
 {
     HMODULE mod = GetModuleHandleA("ntdll.dll");
     pRtlTimeToTimeFields = (void *)GetProcAddress(mod,"RtlTimeToTimeFields");
     pRtlTimeFieldsToTime = (void *)GetProcAddress(mod,"RtlTimeFieldsToTime");
     pNtQueryPerformanceCounter = (void *)GetProcAddress(mod, "NtQueryPerformanceCounter");
-    pNtGetTickCount = (void *)GetProcAddress(mod,"NtGetTickCount");
     pRtlQueryTimeZoneInformation =
         (void *)GetProcAddress(mod, "RtlQueryTimeZoneInformation");
     pRtlQueryDynamicTimeZoneInformation =
@@ -195,6 +169,5 @@ START_TEST(time)
     else
         win_skip("Required time conversion functions are not available\n");
     test_NtQueryPerformanceCounter();
-    test_NtGetTickCount();
     test_RtlQueryTimeZoneInformation();
 }
