@@ -3077,8 +3077,8 @@ static struct wined3d_adapter *wined3d_adapter_no3d_create(unsigned int ordinal,
 BOOL wined3d_adapter_init(struct wined3d_adapter *adapter, unsigned int ordinal, const LUID *luid,
         const struct wined3d_adapter_ops *adapter_ops)
 {
+    unsigned int output_idx = 0, primary_idx = 0, output_count = 0;
     DISPLAY_DEVICEW display_device;
-    unsigned int output_idx;
     BOOL ret = FALSE;
     HRESULT hr;
 
@@ -3101,23 +3101,51 @@ BOOL wined3d_adapter_init(struct wined3d_adapter *adapter, unsigned int ordinal,
     TRACE("adapter %p LUID %08x:%08x.\n", adapter, adapter->luid.HighPart, adapter->luid.LowPart);
 
     display_device.cb = sizeof(display_device);
-    EnumDisplayDevicesW(NULL, ordinal, &display_device, 0);
-    TRACE("Display device: %s.\n", debugstr_w(display_device.DeviceName));
-    strcpyW(adapter->device_name, display_device.DeviceName);
-
-    if (!(adapter->outputs = heap_calloc(1, sizeof(*adapter->outputs))))
+    while (EnumDisplayDevicesW(NULL, output_idx++, &display_device, 0))
     {
-        ERR("Failed to allocate outputs.\n");
-        return FALSE;
+        /* Detached outputs are not enumerated */
+        if (display_device.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP)
+            ++output_count;
     }
 
-    if (FAILED(hr = wined3d_output_init(&adapter->outputs[0], 0, adapter,
-            display_device.DeviceName)))
+    adapter->outputs = heap_calloc(output_count, sizeof(*adapter->outputs));
+    if (!adapter->outputs)
     {
-        ERR("Failed to initialise output, hr %#x.\n", hr);
+        ERR("Failed to allocate memory.\n");
         goto done;
     }
-    adapter->output_count = 1;
+
+    output_idx = 0;
+    while (EnumDisplayDevicesW(NULL, output_idx++, &display_device, 0))
+    {
+        if (!(display_device.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP))
+            continue;
+
+        if (display_device.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE)
+            primary_idx = adapter->output_count;
+
+        if (FAILED(hr = wined3d_output_init(&adapter->outputs[adapter->output_count],
+                adapter->output_count, adapter, display_device.DeviceName)))
+        {
+            ERR("Failed to initialise output %s, hr %#x.\n",
+                    wine_dbgstr_w(display_device.DeviceName), hr);
+            goto done;
+        }
+
+        ++adapter->output_count;
+        TRACE("Initialised output %s.\n", wine_dbgstr_w(display_device.DeviceName));
+    }
+    TRACE("Initialised %d outputs for adapter %p.\n", adapter->output_count, adapter);
+
+    /* Make the primary output first */
+    if (primary_idx)
+    {
+        struct wined3d_output tmp = adapter->outputs[0];
+        adapter->outputs[0] = adapter->outputs[primary_idx];
+        adapter->outputs[0].ordinal = 0;
+        adapter->outputs[primary_idx] = tmp;
+        adapter->outputs[primary_idx].ordinal = primary_idx;
+    }
 
     memset(&adapter->driver_uuid, 0, sizeof(adapter->driver_uuid));
     memset(&adapter->device_uuid, 0, sizeof(adapter->device_uuid));
