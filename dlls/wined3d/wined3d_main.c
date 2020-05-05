@@ -136,7 +136,7 @@ struct wined3d * CDECL wined3d_create(DWORD flags)
     struct wined3d *object;
     HRESULT hr;
 
-    if (!(object = heap_alloc_zero(FIELD_OFFSET(struct wined3d, adapters[1]))))
+    if (!(object = heap_alloc_zero(sizeof(*object))))
     {
         ERR("Failed to allocate wined3d object memory.\n");
         return NULL;
