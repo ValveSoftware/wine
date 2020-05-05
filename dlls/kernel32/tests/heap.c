@@ -653,10 +653,8 @@ static void test_HeapCreate(void)
 
         hci = 1;
         SetLastError(0xdeadbeef);
-        todo_wine
         ok(!pHeapSetInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci)),
            "HeapSetInformation succeeded\n");
-        todo_wine
         ok(GetLastError() == ERROR_GEN_FAILURE,
            "expected ERROR_GEN_FAILURE, got %u\n", GetLastError());
 
