@@ -2315,8 +2315,40 @@ NTSTATUS WINAPI RtlQueryHeapInformation( HANDLE heap, HEAP_INFORMATION_CLASS inf
  */
 NTSTATUS WINAPI RtlSetHeapInformation( HANDLE heap, HEAP_INFORMATION_CLASS info_class, PVOID info, SIZE_T size)
 {
-    FIXME("%p %d %p %ld stub\n", heap, info_class, info, size);
-    return STATUS_SUCCESS;
+    TRACE("%p %d %p %ld stub\n", heap, info_class, info, size);
+
+    switch (info_class)
+    {
+    case HeapEnableTerminationOnCorruption:
+        FIXME("unimplemented HeapEnableTerminationOnCorruption\n");
+        return STATUS_SUCCESS;
+
+    case HeapCompatibilityInformation:
+    {
+        HEAP *heapPtr;
+        heapPtr = HEAP_GetPtr( heap );
+
+        if (size < sizeof(ULONG))
+            return STATUS_BUFFER_TOO_SMALL;
+
+        if (heapPtr->extended_type != HEAP_STD)
+            return STATUS_UNSUCCESSFUL;
+
+        if (*(ULONG *)info != HEAP_STD &&
+            *(ULONG *)info != HEAP_LFH)
+        {
+            FIXME("unimplemented HeapCompatibilityInformation %d\n", *(ULONG *)info);
+            return STATUS_SUCCESS;
+        }
+
+        heapPtr->extended_type = *(ULONG *)info;
+        return STATUS_SUCCESS;
+    }
+
+    default:
+        FIXME("Unknown heap information class %u\n", info_class);
+        return STATUS_INVALID_INFO_CLASS;
+    }
 }
 
 void HEAP_notify_thread_destroy( BOOLEAN last )
