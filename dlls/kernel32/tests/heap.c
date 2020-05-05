@@ -644,7 +644,28 @@ static void test_HeapCreate(void)
            "HeapQueryInformation failed\n");
         trace("HeapQueryInformation returned %d\n", hci);
 
+        hci = 0;
+        ok(pHeapSetInformation(NULL, HeapEnableTerminationOnCorruption, NULL, 0),
+           "HeapSetInformation(HeapEnableTerminationOnCorruption) failed\n");
+        ok(pHeapSetInformation((HANDLE)0xdeadbeef, HeapEnableTerminationOnCorruption, &hci, sizeof(hci)),
+           "HeapSetInformation(HeapEnableTerminationOnCorruption) succeeded\n");
+        ok(pHeapSetInformation(heap, HeapEnableTerminationOnCorruption, &hci, sizeof(hci)),
+           "HeapSetInformation(HeapEnableTerminationOnCorruption) succeeded\n");
+        ok(pHeapSetInformation(heap, HeapEnableTerminationOnCorruption, NULL, 0),
+           "HeapSetInformation(HeapEnableTerminationOnCorruption) failed\n");
+        ok(!pHeapQueryInformation(heap, HeapEnableTerminationOnCorruption, NULL, 0, &size),
+           "HeapQueryInformation(HeapEnableTerminationOnCorruption) succeeded\n");
+
         hci = 2;
+        SetLastError(0xdeadbeef);
+        ok(!pHeapSetInformation(NULL, HeapCompatibilityInformation, NULL, 0),
+           "HeapSetInformation succeeded\n");
+        ok(GetLastError() == ERROR_INSUFFICIENT_BUFFER,
+           "expected ERROR_INSUFFICIENT_BUFFER, got %u\n", GetLastError());
+        ok(!pHeapSetInformation(NULL, HeapCompatibilityInformation, &hci, 2),
+           "HeapSetInformation succeeded\n");
+        ok(GetLastError() == ERROR_INSUFFICIENT_BUFFER,
+           "expected ERROR_INSUFFICIENT_BUFFER, got %u\n", GetLastError());
         ok(pHeapSetInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci)),
            "HeapSetInformation failed\n");
         ok(pHeapQueryInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci), &size),
@@ -653,10 +674,8 @@ static void test_HeapCreate(void)
 
         hci = 1;
         SetLastError(0xdeadbeef);
-        todo_wine
         ok(!pHeapSetInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci)),
            "HeapSetInformation succeeded\n");
-        todo_wine
         ok(GetLastError() == ERROR_GEN_FAILURE,
            "expected ERROR_GEN_FAILURE, got %u\n", GetLastError());
 
