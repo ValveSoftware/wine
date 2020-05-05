@@ -4071,6 +4071,7 @@ static NTSTATUS process_init(void)
     INITIAL_TEB stack;
     TEB *teb = NtCurrentTeb();
     PEB *peb = teb->Peb;
+    DWORD hci = 2;
 
     peb->LdrData            = &ldr;
     peb->FastPebLock        = &peb_lock;
@@ -4165,6 +4166,7 @@ static NTSTATUS process_init(void)
         peb64->SessionId        = peb->SessionId;
     }
 #endif
+    RtlSetHeapInformation( GetProcessHeap(), HeapCompatibilityInformation, &hci, sizeof(hci) );
 
     build_ntdll_module();
 
