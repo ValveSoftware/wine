@@ -530,7 +530,9 @@ int CDECL _set_sbh_threshold(MSVCRT_size_t threshold)
 
   if(!sb_heap)
   {
+      ULONG hci = 2;
       sb_heap = HeapCreate(0, 0, 0);
+      HeapSetInformation(sb_heap, HeapCompatibilityInformation, &hci, sizeof(hci));
       if(!sb_heap)
           return 0;
   }
@@ -867,7 +869,9 @@ int CDECL MSVCRT_strncpy_s(char *dest, MSVCRT_size_t numberOfElements,
 
 BOOL msvcrt_init_heap(void)
 {
+    ULONG hci = 2;
     heap = HeapCreate(0, 0, 0);
+    HeapSetInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci));
     return heap != NULL;
 }
 
