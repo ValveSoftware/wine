@@ -42,6 +42,7 @@
 static LPVOID (WINAPI *pHeapAlloc)(HANDLE,DWORD,SIZE_T);
 static LPVOID (WINAPI *pHeapReAlloc)(HANDLE,DWORD,LPVOID,SIZE_T);
 static BOOL (WINAPI *pHeapQueryInformation)(HANDLE, HEAP_INFORMATION_CLASS, PVOID, SIZE_T, PSIZE_T);
+static BOOL (WINAPI *pHeapSetInformation)(HANDLE, HEAP_INFORMATION_CLASS, PVOID, SIZE_T);
 static BOOL (WINAPI *pGetPhysicallyInstalledSystemMemory)(ULONGLONG *);
 static ULONG (WINAPI *pRtlGetNtGlobalFlags)(void);
 
@@ -528,6 +529,8 @@ static void test_HeapCreate(void)
     UINT i;
     BOOL error;
     DWORD dwSize;
+    ULONG hci;
+    SIZE_T size;
 
     /* Retrieve the page size for this system */
     GetSystemInfo(&sysInfo);
@@ -624,6 +627,71 @@ static void test_HeapCreate(void)
 
    /* Check that HeapDestroy works */
    ok(HeapDestroy(heap),"HeapDestroy failed\n");
+
+
+    if (!(pHeapQueryInformation = (void *)GetProcAddress(GetModuleHandleA("kernel32.dll"), "HeapQueryInformation")) ||
+        !(pHeapSetInformation = (void *)GetProcAddress(GetModuleHandleA("kernel32.dll"), "HeapSetInformation")))
+        win_skip("HeapQueryInformation / HeapSetInformation not available\n");
+    else
+    {
+        heap = HeapCreate(0, 0, 0);
+        ok(!!heap, "HeapCreate failed\n");
+
+        mem1 = HeapAlloc(heap, 0, 16);
+        mem2 = HeapAlloc(heap, 0, 16);
+
+        ok(pHeapQueryInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci), &size),
+           "HeapQueryInformation failed\n");
+        trace("HeapQueryInformation returned %d\n", hci);
+
+        hci = 2;
+        ok(pHeapSetInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci)),
+           "HeapSetInformation failed\n");
+        ok(pHeapQueryInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci), &size),
+           "HeapQueryInformation failed\n");
+        trace("HeapQueryInformation returned %d\n", hci);
+
+        hci = 1;
+        SetLastError(0xdeadbeef);
+        todo_wine
+        ok(!pHeapSetInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci)),
+           "HeapSetInformation succeeded\n");
+        todo_wine
+        ok(GetLastError() == ERROR_GEN_FAILURE,
+           "expected ERROR_GEN_FAILURE, got %u\n", GetLastError());
+
+        mem3 = HeapAlloc(heap, 0, 16);
+
+        ok(HeapValidate(heap, 0, NULL), "HeapValidate failed\n");
+
+        SetLastError(0xdeadbeef);
+        dwSize = HeapSize(heap, 0, mem1);
+        ok(dwSize == 16, "HeapSize failed\n");
+        ok(GetLastError() == 0xdeadbeef, "GetLastError failed: %u\n", GetLastError());
+        mem1 = HeapReAlloc(heap, 0, mem1, 1024);
+        ok(mem1 != NULL, "HeapReAlloc failed\n");
+
+        dwSize = HeapSize(heap, 0, mem1);
+        ok(dwSize == 1024, "HeapSize failed\n");
+
+        dwSize = HeapSize(heap, 0, mem2);
+        ok(dwSize == 16, "HeapSize failed\n");
+        ok(GetLastError() == 0xdeadbeef, "GetLastError failed: %u\n", GetLastError());
+
+        dwSize = HeapSize(heap, 0, mem3);
+        ok(dwSize == 16, "HeapSize failed\n");
+        ok(GetLastError() == 0xdeadbeef, "GetLastError failed: %u\n", GetLastError());
+
+        ok(HeapValidate(heap, 0, NULL), "HeapValidate failed\n");
+
+        ok(HeapFree(heap, 0, mem1), "HeapFree failed\n");
+        ok(HeapFree(heap, 0, mem2), "HeapFree failed\n");
+        ok(HeapFree(heap, 0, mem3), "HeapFree failed\n");
+
+        ok(HeapValidate(heap, 0, NULL), "HeapValidate failed\n");
+
+        ok(HeapDestroy(heap),"HeapDestroy failed\n");
+    }
 }
 
 
