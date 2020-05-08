@@ -190,6 +190,13 @@ static BYTE **pages_vprot;
 static BYTE *pages_vprot;
 #endif
 
+static BOOL use_kernel_writewatch;
+static int pagemap_fd, pagemap_reset_fd, clear_refs_fd;
+#define PAGE_FLAGS_BUFFER_LENGTH 1024
+#define PM_SOFT_DIRTY_PAGE (1ull << 57)
+
+static void reset_write_watches( void *base, SIZE_T size );
+
 static struct file_view *view_block_start, *view_block_end, *next_free_view;
 #ifdef _WIN64
 static const size_t view_block_size = 0x200000;
@@ -811,7 +818,7 @@ static int get_unix_prot( BYTE vprot )
         if (vprot & VPROT_WRITE) prot |= PROT_WRITE | PROT_READ;
         if (vprot & VPROT_WRITECOPY) prot |= PROT_WRITE | PROT_READ;
         if (vprot & VPROT_EXEC) prot |= PROT_EXEC | PROT_READ;
-        if (vprot & VPROT_WRITEWATCH) prot &= ~PROT_WRITE;
+        if (vprot & VPROT_WRITEWATCH && !use_kernel_writewatch) prot &= ~PROT_WRITE;
     }
     if (!prot) prot = PROT_NONE;
     return prot;
@@ -1254,6 +1261,10 @@ static NTSTATUS create_view( struct file_view **view_ret, void *base, size_t siz
         TRACE( "forcing exec permission on %p-%p\n", base, (char *)base + size - 1 );
         mprotect( base, size, unix_prot | PROT_EXEC );
     }
+
+    if (vprot & VPROT_WRITEWATCH && use_kernel_writewatch)
+        reset_write_watches( view->base, view->size );
+
     return STATUS_SUCCESS;
 }
 
@@ -1377,7 +1388,7 @@ static BOOL set_vprot( struct file_view *view, void *base, size_t size, BYTE vpr
 {
     int unix_prot = get_unix_prot(vprot);
 
-    if (view->protect & VPROT_WRITEWATCH)
+    if (!use_kernel_writewatch && view->protect & VPROT_WRITEWATCH)
     {
         /* each page may need different protections depending on write watch flag */
         set_page_vprot_bits( base, size, vprot & ~VPROT_WRITEWATCH, ~vprot & ~VPROT_WRITEWATCH );
@@ -1450,8 +1461,24 @@ static void update_write_watches( void *base, size_t size, size_t accessed_size 
  */
 static void reset_write_watches( void *base, SIZE_T size )
 {
-    set_page_vprot_bits( base, size, VPROT_WRITEWATCH, 0 );
-    mprotect_range( base, size, 0, 0 );
+    if (use_kernel_writewatch)
+    {
+        char buffer[17];
+        ssize_t ret;
+
+        memset(buffer, 0, sizeof(buffer));
+        buffer[0] = '6';
+        *(void **)&buffer[1] = base;
+        *(void **)&buffer[1 + 8] = (char *)base + size;
+
+        if ((ret = write(clear_refs_fd, buffer, sizeof(buffer))) != sizeof(buffer))
+            ERR("Could not clear soft dirty bits, ret %zd, error %s.\n", ret, strerror(errno));
+    }
+    else
+    {
+        set_page_vprot_bits( base, size, VPROT_WRITEWATCH, 0 );
+        mprotect_range( base, size, 0, 0 );
+    }
 }
 
 
@@ -2439,11 +2466,29 @@ void virtual_init(void)
     size_t size, align;
     int i;
     pthread_mutexattr_t attr;
+    const char *env_var;
 
     pthread_mutexattr_init( &attr );
     pthread_mutexattr_settype( &attr, PTHREAD_MUTEX_RECURSIVE );
     pthread_mutex_init( &virtual_mutex, &attr );
     pthread_mutexattr_destroy( &attr );
+
+    if (!((env_var = getenv("WINE_DISABLE_KERNEL_WRITEWATCH")) && atoi(env_var))
+            && (pagemap_reset_fd = open("/proc/self/pagemap_reset", O_RDONLY)) != -1)
+    {
+        use_kernel_writewatch = TRUE;
+        if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) == -1)
+        {
+            ERR("Could not open pagemap file, error %s.\n", strerror(errno));
+            exit(-1);
+        }
+        if ((clear_refs_fd = open("/proc/self/clear_refs", O_WRONLY)) == -1)
+        {
+            ERR("Could not open clear_refs file, error %s.\n", strerror(errno));
+            exit(-1);
+        }
+        ERR("Using kernel write watches (experimental).\n");
+    }
 
     if (preload_info && *preload_info)
         for (i = 0; (*preload_info)[i].size; i++)
@@ -2975,7 +3020,7 @@ NTSTATUS virtual_handle_fault( void *addr, DWORD err, void *stack )
         }
         else ret = grow_thread_stack( page );
     }
-    else if (err & EXCEPTION_WRITE_FAULT)
+    else if (!use_kernel_writewatch && err & EXCEPTION_WRITE_FAULT)
     {
         if (vprot & VPROT_WRITEWATCH)
         {
@@ -3063,11 +3108,11 @@ static NTSTATUS check_write_access( void *base, size_t size, BOOL *has_write_wat
     for (i = 0; i < size; i += page_size)
     {
         BYTE vprot = get_page_vprot( addr + i );
-        if (vprot & VPROT_WRITEWATCH) *has_write_watch = TRUE;
+        if (!use_kernel_writewatch && vprot & VPROT_WRITEWATCH) *has_write_watch = TRUE;
         if (!(get_unix_prot( vprot & ~VPROT_WRITEWATCH ) & PROT_WRITE))
             return STATUS_INVALID_USER_BUFFER;
     }
-    if (*has_write_watch)
+    if (!use_kernel_writewatch && *has_write_watch)
         mprotect_range( addr, size, 0, VPROT_WRITEWATCH );  /* temporarily enable write access */
     return STATUS_SUCCESS;
 }
@@ -4429,17 +4474,90 @@ NTSTATUS WINAPI NtGetWriteWatch( HANDLE process, ULONG flags, PVOID base, SIZE_T
         char *addr = base;
         char *end = addr + size;
 
-        while (pos < *count && addr < end)
+        if (use_kernel_writewatch)
         {
-            if (!(get_page_vprot( addr ) & VPROT_WRITEWATCH)) addresses[pos++] = addr;
-            addr += page_size;
+            static UINT64 buffer[PAGE_FLAGS_BUFFER_LENGTH];
+            unsigned int i, length;
+            ssize_t read_length;
+
+            if (flags & WRITE_WATCH_FLAG_RESET)
+            {
+                if (is_win64)
+                {
+                    addresses[0] = end;
+                    if ((read_length = pread(pagemap_reset_fd, addresses, *count * sizeof(*addresses),
+                            ((ULONG_PTR)addr >> page_shift) * sizeof(*addresses))) == -1)
+                    {
+                        ERR("Error reading page flags, read_length %zd, error %s.\n", read_length, strerror(errno));
+                        status = STATUS_INVALID_ADDRESS;
+                        goto done;
+                    }
+                    *count = read_length / sizeof(*addresses);
+                    *granularity = page_size;
+                    goto done;
+                }
+
+                while (pos < *count && addr < end)
+                {
+                    length = min(PAGE_FLAGS_BUFFER_LENGTH, *count - pos);
+
+                    buffer[0] = (ULONG_PTR)end;
+                    if ((read_length = pread(pagemap_reset_fd, buffer, length * sizeof(*buffer),
+                            ((ULONG_PTR)addr >> page_shift) * sizeof(*buffer))) == -1)
+                    {
+                        ERR("Error reading page flags, read_length %zd, error %s.\n", read_length, strerror(errno));
+                        status = STATUS_INVALID_ADDRESS;
+                        goto done;
+                    }
+                    read_length /= sizeof(*buffer);
+                    for (i = 0; i < read_length; ++i)
+                    {
+                        assert(pos < *count);
+                        addresses[pos++] = (void *)(ULONG_PTR)buffer[i];
+                    }
+                    if (read_length < length)
+                        break;
+                    addr = (char *)(ULONG_PTR)buffer[read_length - 1] + page_size;
+                }
+            }
+            else
+            {
+                while (pos < *count && addr < end)
+                {
+                    length = min(PAGE_FLAGS_BUFFER_LENGTH, (end - addr) >> page_shift);
+
+                    if ((read_length = pread(pagemap_fd, buffer, length * sizeof(*buffer),
+                            ((ULONG_PTR)addr >> page_shift) * sizeof(*buffer))) != length * sizeof(*buffer))
+                    {
+                        ERR("Error reading page flags, read_length %zd, error %s.\n", read_length, strerror(errno));
+                        status = STATUS_INVALID_ADDRESS;
+                        goto done;
+                    }
+                    for (i = 0; i < length && pos < *count; ++i)
+                    {
+                        if (buffer[i] & PM_SOFT_DIRTY_PAGE)
+                            addresses[pos++] = addr;
+
+                        addr += page_size;
+                    }
+                }
+            }
         }
-        if (flags & WRITE_WATCH_FLAG_RESET) reset_write_watches( base, addr - (char *)base );
+        else
+        {
+            while (pos < *count && addr < end)
+            {
+                if (!(get_page_vprot( addr ) & VPROT_WRITEWATCH)) addresses[pos++] = addr;
+                addr += page_size;
+            }
+            if (flags & WRITE_WATCH_FLAG_RESET) reset_write_watches( base, addr - (char *)base );
+        }
         *count = pos;
         *granularity = page_size;
     }
     else status = STATUS_INVALID_PARAMETER;
 
+done:
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
     return status;
 }
