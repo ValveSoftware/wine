@@ -106,8 +106,8 @@ static HRESULT register_d3d10core_layers(HMODULE d3d10core)
 
     if (!dxgi_main.d3d10core)
     {
-        HRESULT hr;
-        HRESULT (WINAPI *d3d11core_register_layers)(void);
+        HRESULT hr = E_FAIL;
+        HRESULT (WINAPI *register_layers)(void);
         HMODULE mod;
         BOOL ret;
 
@@ -117,8 +117,10 @@ static HRESULT register_d3d10core_layers(HMODULE d3d10core)
             return E_FAIL;
         }
 
-        d3d11core_register_layers = (void *)GetProcAddress(mod, "D3D11CoreRegisterLayers");
-        hr = d3d11core_register_layers();
+        if ((register_layers = (void *)GetProcAddress(mod, "D3D11CoreRegisterLayers")) ||
+            (register_layers = (void *)GetProcAddress(mod, "D3D10CoreRegisterLayers")))
+            hr = register_layers();
+
         if (FAILED(hr))
         {
             ERR("Failed to register d3d11 layers, returning %#x.\n", hr);
