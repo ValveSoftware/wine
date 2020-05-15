@@ -539,6 +539,7 @@ struct d3d_device
     LONG refcount;
 
     D3D_FEATURE_LEVEL feature_level;
+    int d3d11_only;
 
     struct d3d11_immediate_context immediate_context;
 
@@ -553,6 +554,11 @@ struct d3d_device
     struct d3d_depthstencil_state *depth_stencil_state;
     UINT stencil_ref;
 };
+
+static inline struct d3d_device *impl_from_ID3D11Device(ID3D11Device *iface)
+{
+    return CONTAINING_RECORD((ID3D11Device2 *)iface, struct d3d_device, ID3D11Device2_iface);
+}
 
 static inline struct d3d_device *impl_from_ID3D11Device2(ID3D11Device2 *iface)
 {
