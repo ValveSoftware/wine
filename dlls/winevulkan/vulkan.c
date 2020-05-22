@@ -1729,6 +1729,27 @@ VkResult WINAPI wine_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapc
     return device->funcs.p_vkAcquireNextImageKHR(device->device, object->swapchain, timeout, semaphore, fence, pImageIndex);
 }
 
+VkResult WINAPI wine_vkAcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR *pAcquireInfo, uint32_t *pImageIndex)
+{
+#if defined(USE_STRUCT_CONVERSION)
+    VkAcquireNextImageInfoKHR_host image_info_host = {0};
+#else
+    VkAcquireNextImageInfoKHR image_info_host = {0};
+#endif
+    struct VkSwapchainKHR_T *object = (struct VkSwapchainKHR_T *)(UINT_PTR)pAcquireInfo->swapchain;
+    TRACE("%p, %p, %p\n", device, pAcquireInfo, pImageIndex);
+
+    image_info_host.sType = pAcquireInfo->sType;
+    image_info_host.pNext = pAcquireInfo->pNext;
+    image_info_host.swapchain = object->swapchain;
+    image_info_host.timeout = pAcquireInfo->timeout;
+    image_info_host.semaphore = pAcquireInfo->semaphore;
+    image_info_host.fence = pAcquireInfo->fence;
+    image_info_host.deviceMask = pAcquireInfo->deviceMask;
+
+    return device->funcs.p_vkAcquireNextImage2KHR(device->device, &image_info_host, pImageIndex);
+}
+
 #if defined(USE_STRUCT_CONVERSION)
 static inline void convert_VkSwapchainCreateInfoKHR_win_to_host(const VkSwapchainCreateInfoKHR *in, VkSwapchainCreateInfoKHR_host *out)
 #else
