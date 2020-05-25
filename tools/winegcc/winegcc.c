@@ -1420,9 +1420,13 @@ static void build(struct options* opts)
 
     if (opts->debug_file && !strendswith(opts->debug_file, ".pdb"))
     {
+        char const *bfd_format = (opts->target_cpu == CPU_x86_64) ? "-Oelf64-x86-64" :
+                                 (opts->target_cpu == CPU_x86) ? "-Oelf32-i386" :
+                                 NULL;
         strarray *tool, *objcopy = build_tool_name(opts, TOOL_OBJCOPY);
 
         tool = strarray_dup(objcopy);
+        if (bfd_format) strarray_add(tool, bfd_format);
         strarray_add(tool, "--only-keep-debug");
         strarray_add(tool, output_path);
         strarray_add(tool, opts->debug_file);
