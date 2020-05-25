@@ -2363,7 +2363,7 @@ static const char *get_debug_file( struct makefile *make, const char *name )
     const char *debug_file = NULL;
     if (!make->is_cross || !crossdebug) return NULL;
     if (!strcmp( crossdebug, "pdb" )) debug_file = strmake( "%s.pdb", get_base_name( name ));
-    else if(!strncmp( crossdebug, "split", 5 )) debug_file = strmake( "%s.debug", name );
+    else if(!strncmp( crossdebug, "split", 5 )) debug_file = strmake( ".debug/%s", name );
     if (debug_file) strarray_add( &make->debug_files, debug_file );
     return debug_file;
 }
