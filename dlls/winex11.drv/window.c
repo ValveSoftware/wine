@@ -1487,6 +1487,7 @@ static void sync_window_position( struct x11drv_win_data *data,
 {
     DWORD style = GetWindowLongW( data->hwnd, GWL_STYLE );
     DWORD ex_style = GetWindowLongW( data->hwnd, GWL_EXSTYLE );
+    RECT original_rect = {0};
     XWindowChanges changes;
     unsigned int mask = 0;
 
@@ -1541,9 +1542,21 @@ static void sync_window_position( struct x11drv_win_data *data,
 
     set_size_hints( data, style );
     set_mwm_hints( data, style, ex_style );
+    /* KWin doesn't allow moving a window with _NET_WM_STATE_FULLSCREEN set. So we need to remove
+     * _NET_WM_STATE_FULLSCREEN before moving the window and restore it later */
+    if (wm_is_kde( data->display ) && is_window_rect_full_screen( &data->whole_rect ))
+    {
+        original_rect = data->whole_rect;
+        SetRectEmpty( &data->whole_rect );
+    }
     update_net_wm_states( data );
     data->configure_serial = NextRequest( data->display );
     XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
+    if (!IsRectEmpty( &original_rect ))
+    {
+        data->whole_rect = original_rect;
+        update_net_wm_states( data );
+    }
 #ifdef HAVE_LIBXSHAPE
     if (IsRectEmpty( old_window_rect ) != IsRectEmpty( &data->window_rect ))
         sync_window_region( data, (HRGN)1 );
