@@ -8793,8 +8793,6 @@ static void test_fullscreen(void)
                 monitor_info.second_monitor.bottom - monitor_info.second_monitor.top, SWP_NOZORDER);
         flush_events(TRUE);
         GetWindowRect(hwnd, &rc);
-        /* todo_wine on KWin */
-        todo_wine_if(!EqualRect(&rc, &monitor_info.second_monitor))
         ok(EqualRect(&rc, &monitor_info.second_monitor), "Expected window rect %s, got %s.\n",
                 wine_dbgstr_rect(&monitor_info.second_monitor), wine_dbgstr_rect(&rc));
         DestroyWindow(hwnd);
@@ -8810,8 +8808,6 @@ static void test_fullscreen(void)
                 monitor_info.first_monitor.bottom - monitor_info.first_monitor.top, SWP_NOZORDER);
         flush_events(TRUE);
         GetWindowRect(hwnd, &rc);
-        /* todo_wine on KWin */
-        todo_wine_if(!EqualRect(&rc, &monitor_info.first_monitor))
         ok(EqualRect(&rc, &monitor_info.first_monitor), "Expected window rect %s, got %s.\n",
                 wine_dbgstr_rect(&monitor_info.first_monitor), wine_dbgstr_rect(&rc));
         DestroyWindow(hwnd);
