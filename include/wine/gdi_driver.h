@@ -296,6 +296,7 @@ extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver( HDC hdc, UINT
 #define WINE_WM_UNKNOWN          0
 #define WINE_WM_X11_MUTTER       1
 #define WINE_WM_X11_STEAMCOMPMGR 2
+#define WINE_WM_X11_KDE          3
 
 static inline LONG_PTR __wine_get_window_manager(void)
 {
