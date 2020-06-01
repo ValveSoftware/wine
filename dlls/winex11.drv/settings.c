@@ -121,12 +121,22 @@ BOOL X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigne
     unsigned int i;
     struct x11drv_mode_info *info = &dd_modes[dd_mode_count];
     DWORD dwBpp = screen_bpp;
+    const char *appid;
     if (dd_mode_count >= dd_max_modes)
     {
         ERR("Maximum modes (%d) exceeded\n", dd_max_modes);
         return FALSE;
     }
     if (bpp == 0) bpp = dwBpp;
+
+    if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130"))
+    {
+        /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
+        if (height <= 600 && !(height == 600 && width == 800))
+        {
+            return FALSE;
+        }
+    }
 
     for(i = 0; i < dd_mode_count; ++i)
     {
