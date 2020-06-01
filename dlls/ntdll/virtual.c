@@ -160,7 +160,7 @@ static void *working_set_limit;
 static void *address_space_start = (void *)0x10000;
 #endif  /* __i386__ */
 static const BOOL is_win64 = (sizeof(void *) > sizeof(int));
-static const UINT_PTR granularity_mask = 0xfff;
+static const UINT_PTR granularity_mask = 0xffff;
 
 #define ROUND_ADDR(addr,mask) \
    ((void *)((UINT_PTR)(addr) & ~(UINT_PTR)(mask)))
@@ -1013,7 +1013,8 @@ static void delete_view( struct file_view *view ) /* [in] View */
 {
     if (!(view->protect & VPROT_SYSTEM)) unmap_area( view->base, view->size );
     set_page_vprot( view->base, view->size, 0 );
-    free_ranges_remove_view( view );
+    if (wine_mmap_is_in_reserved_area( view->base, view->size ))
+        free_ranges_remove_view( view );
     wine_rb_remove( &views_tree, &view->entry );
     *(struct file_view **)view = next_free_view;
     next_free_view = view;
@@ -1061,7 +1062,8 @@ static NTSTATUS create_view( struct file_view **view_ret, void *base, size_t siz
     set_page_vprot( base, size, vprot );
 
     wine_rb_put( &views_tree, view->base, &view->entry );
-    free_ranges_insert_view( view );
+    if (wine_mmap_is_in_reserved_area( view->base, view->size ))
+        free_ranges_insert_view( view );
 
     *view_ret = view;
 
