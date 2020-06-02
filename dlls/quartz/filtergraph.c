@@ -152,6 +152,7 @@ struct filter
 {
     struct list entry;
     IBaseFilter *filter;
+    IMediaSeeking *seeking;
     WCHAR *name;
 };
 
@@ -619,6 +620,7 @@ static HRESULT WINAPI FilterGraph2_AddFilter(IFilterGraph2 *iface, IBaseFilter *
     }
 
     IBaseFilter_AddRef(entry->filter = pFilter);
+    entry->seeking = NULL;
     entry->name = wszFilterName;
     list_add_head(&This->filters, &entry->entry);
     This->version++;
@@ -697,6 +699,8 @@ static HRESULT WINAPI FilterGraph2_RemoveFilter(IFilterGraph2 *iface, IBaseFilte
             {
                 IBaseFilter_SetSyncSource(pFilter, NULL);
                 IBaseFilter_Release(pFilter);
+                if (entry->seeking)
+                    IMediaSeeking_Release(entry->seeking);
                 list_remove(&entry->entry);
                 CoTaskMemFree(entry->name);
                 heap_free(entry);
@@ -1961,6 +1965,14 @@ static HRESULT WINAPI MediaControl_Invoke(IMediaControl *iface, DISPID dispIdMem
 
 typedef HRESULT(WINAPI *fnFoundFilter)(IBaseFilter *, DWORD_PTR data);
 
+static IMediaSeeking *get_filter_seeking(struct filter *filter)
+{
+    if (!filter->seeking)
+        if (FAILED(IBaseFilter_QueryInterface(filter->filter, &IID_IMediaSeeking, (void**)&filter->seeking)))
+            filter->seeking = NULL;
+    return filter->seeking;
+}
+
 static BOOL has_output_pins(IBaseFilter *filter)
 {
     IEnumPins *enumpins;
@@ -2278,13 +2290,11 @@ static HRESULT all_renderers_seek(IFilterGraphImpl *This, fnFoundSeek FoundSeek,
 
     LIST_FOR_EACH_ENTRY(filter, &This->filters, struct filter, entry)
     {
-        IMediaSeeking *seek = NULL;
+        IMediaSeeking *seek = get_filter_seeking(filter);
 
-        IBaseFilter_QueryInterface(filter->filter, &IID_IMediaSeeking, (void **)&seek);
         if (!seek)
             continue;
         hr = FoundSeek(This, seek, arg);
-        IMediaSeeking_Release(seek);
         if (hr_return != E_NOTIMPL)
             allnotimpl = FALSE;
         if (hr_return == S_OK || (FAILED(hr) && hr != E_NOTIMPL && SUCCEEDED(hr_return)))
@@ -2488,11 +2498,11 @@ static HRESULT WINAPI MediaSeeking_GetStopPosition(IMediaSeeking *iface, LONGLON
 
     LIST_FOR_EACH_ENTRY(filter, &graph->filters, struct filter, entry)
     {
-        if (FAILED(IBaseFilter_QueryInterface(filter->filter, &IID_IMediaSeeking, (void **)&seeking)))
+        seeking = get_filter_seeking(filter);
+        if (!seeking)
             continue;
 
         filter_hr = IMediaSeeking_GetStopPosition(seeking, &filter_stop);
-        IMediaSeeking_Release(seeking);
         if (SUCCEEDED(filter_hr))
         {
             hr = S_OK;
@@ -2590,12 +2600,12 @@ static HRESULT WINAPI MediaSeeking_SetPositions(IMediaSeeking *iface, LONGLONG *
     {
         LONGLONG current = current_ptr ? *current_ptr : 0, stop = stop_ptr ? *stop_ptr : 0;
 
-        if (FAILED(IBaseFilter_QueryInterface(filter->filter, &IID_IMediaSeeking, (void **)&seeking)))
+        seeking = get_filter_seeking(filter);
+        if (!seeking)
             continue;
 
         filter_hr = IMediaSeeking_SetPositions(seeking, &current,
                 current_flags | AM_SEEKING_ReturnTime, &stop, stop_flags);
-        IMediaSeeking_Release(seeking);
         if (SUCCEEDED(filter_hr))
         {
             hr = S_OK;
