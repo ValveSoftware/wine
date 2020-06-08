@@ -1604,13 +1604,15 @@ static WCHAR builtin_steamclient_w[] = {'C',':','\\','w','i','n','d','o','w','s'
                                         's','t','e','a','m','c','l','i','e','n','t','6','4','.','d','l','l',0};
 static WCHAR native_steamclient_w[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s',' ','(','x','8','6',')','\\','S','t','e','a','m','\\',
                                        's','t','e','a','m','c','l','i','e','n','t','6','4','.','d','l','l',0};
-static WCHAR steamclient_w[] = {'s','t','e','a','m','c','l','i','e','n','t','6','4','.','d','l','l',0};
+static WCHAR steamclient_w[] = {'s','t','e','a','m','c','l','i','e','n','t','6','4',0};
+static WCHAR steamclient_dll_w[] = {'s','t','e','a','m','c','l','i','e','n','t','6','4','.','d','l','l',0};
 #else
 static WCHAR builtin_steamclient_w[] = {'C',':','\\','w','i','n','d','o','w','s','\\','s','y','s','t','e','m','3','2','\\',
                                         's','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};
 static WCHAR native_steamclient_w[] = {'C',':','\\','P','r','o','g','r','a','m',' ','F','i','l','e','s',' ','(','x','8','6',')','\\','S','t','e','a','m','\\',
                                        's','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};
-static WCHAR steamclient_w[] = {'s','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};
+static WCHAR steamclient_w[] = {'s','t','e','a','m','c','l','i','e','n','t',0};
+static WCHAR steamclient_dll_w[] = {'s','t','e','a','m','c','l','i','e','n','t','.','d','l','l',0};
 #endif
 
 static WCHAR *strstriW( const WCHAR *str, const WCHAR *sub )
@@ -3368,7 +3370,8 @@ NTSTATUS WINAPI DECLSPEC_HOTPATCH LdrLoadDll(LPCWSTR path_name, DWORD flags,
 
     RtlEnterCriticalSection( &loader_section );
 
-    if (!(flags & LDR_STEAM_INTERNAL) && !strcmpiW(get_basename(libname->Buffer), steamclient_w))
+    if (!(flags & LDR_STEAM_INTERNAL) && (!strcmpiW(get_basename(libname->Buffer), steamclient_w) ||
+                                          !strcmpiW(get_basename(libname->Buffer), steamclient_dll_w)))
     {
         *hModule = get_builtin_steamclient_mod(TRUE);
         swap_builtin_to_native_steamclient_hack(hModule);
