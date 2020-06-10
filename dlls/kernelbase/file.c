@@ -715,23 +715,57 @@ static unsigned int blacklist_filename_count;
 
 static BOOL CALLBACK init_file_blacklist(PINIT_ONCE init_once, PVOID parameter, PVOID *context)
 {
+    static WCHAR origin_blacklist[] = L"kernel32.dll;user32.dll";
+
     const WCHAR separators[] = L",; ";
     WCHAR *buffer, *token;
     DWORD size;
 
-    if (!(size = GetEnvironmentVariableW(L"WINE_BLACKLIST_FILES", NULL, 0)))
-        return TRUE;
-
-    if (!(buffer = heap_alloc(sizeof(*buffer) * size)))
+    if ((size = GetEnvironmentVariableW(L"WINE_BLACKLIST_FILES", NULL, 0)))
     {
-        ERR("No memory.\n");
-        return FALSE;
+        if (!(buffer = heap_alloc(sizeof(*buffer) * size)))
+        {
+            ERR("No memory.\n");
+            return FALSE;
+        }
+
+        if (GetEnvironmentVariableW(L"WINE_BLACKLIST_FILES", buffer, size) != size - 1)
+        {
+            ERR("Error getting WINE_BLACKLIST_FILES env variable.\n");
+            return FALSE;
+        }
     }
-
-    if (GetEnvironmentVariableW(L"WINE_BLACKLIST_FILES", buffer, size) != size - 1)
+    else
     {
-        ERR("Error getting WINE_BLACKLIST_FILES env variable.\n");
-        return FALSE;
+        static const WCHAR *origin_names[] = {
+            L"igoproxy64.exe",
+            L"igoproxy.exe",
+            L"origin.exe",
+            L"easteamproxy.exe"
+        };
+
+        WCHAR cur_exe[MAX_PATH];
+        DWORD cur_exe_len, i;
+
+        if (!(cur_exe_len = GetModuleFileNameW(NULL, cur_exe, ARRAY_SIZE(cur_exe))))
+            return TRUE;
+
+        buffer = NULL;
+
+        for (i = 0; i < ARRAY_SIZE(origin_names); ++i)
+        {
+            DWORD origin_name_len = wcslen(origin_names[i]);
+            if (cur_exe_len >= origin_name_len &&
+                    wcsicmp(cur_exe + cur_exe_len - origin_name_len, origin_names[i]) == 0)
+            {
+                FIXME("using origin file blacklist for %s\n", debugstr_w(cur_exe));
+                buffer = origin_blacklist;
+                break;
+            }
+        }
+
+        if (!buffer)
+            return TRUE;
     }
 
     blacklist_filename_count = 0;
