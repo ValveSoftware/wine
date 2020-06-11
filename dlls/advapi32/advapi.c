@@ -84,7 +84,7 @@ GetUserNameA( LPSTR lpszName, LPDWORD lpSize )
 BOOL WINAPI
 GetUserNameW( LPWSTR lpszName, LPDWORD lpSize )
 {
-    const char *name = "steamuser"/*wine_get_user_name()*/;
+    const char *name = wine_get_user_name();
     DWORD i, len = MultiByteToWideChar( CP_UNIXCP, 0, name, -1, NULL, 0 );
     LPWSTR backslash;
 
@@ -235,7 +235,7 @@ BOOL WINAPI InitiateSystemShutdownExA( LPSTR lpMachineName, LPSTR lpMessage,
             debugstr_a(lpMessage), dwTimeout, bForceAppsClosed,
             bRebootAfterShutdown, dwReason);
      return TRUE;
-} 
+}
 
 /******************************************************************************
  * InitiateSystemShutdownExW [ADVAPI32.@]
@@ -250,7 +250,7 @@ BOOL WINAPI InitiateSystemShutdownExW( LPWSTR lpMachineName, LPWSTR lpMessage,
             debugstr_w(lpMessage), dwTimeout, bForceAppsClosed,
             bRebootAfterShutdown, dwReason);
      return TRUE;
-} 
+}
 
 BOOL WINAPI InitiateSystemShutdownA( LPSTR lpMachineName, LPSTR lpMessage, DWORD dwTimeout,
                                      BOOL bForceAppsClosed, BOOL bRebootAfterShutdown )
