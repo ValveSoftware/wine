@@ -15,8 +15,29 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(amd_ags);
 
+enum amd_ags_version
+{
+    AMD_AGS_VERSION_5_1_1,
+    AMD_AGS_VERSION_5_2_0,
+
+    AMD_AGS_VERSION_COUNT
+};
+
+struct
+{
+    int major;
+    int minor;
+    int patch;
+}
+static const amd_ags_versions[AMD_AGS_VERSION_COUNT] =
+{
+    {5, 1, 1},
+    {5, 2, 0},
+};
+
 struct AGSContext
 {
+    enum amd_ags_version version;
     unsigned int device_count;
     AGSDeviceInfo *devices;
     VkPhysicalDeviceProperties *properties;
@@ -88,6 +109,8 @@ static AGSReturnCode init_ags_context(AGSContext *context)
     AGSReturnCode ret;
     unsigned int i;
 
+    // TODO: version check
+    context->version = AMD_AGS_VERSION_5_1_1;
     context->device_count = 0;
     context->devices = NULL;
     context->properties = NULL;
@@ -108,15 +131,32 @@ static AGSReturnCode init_ags_context(AGSContext *context)
         const VkPhysicalDeviceProperties *vk_properties = &context->properties[i];
         AGSDeviceInfo *device = &context->devices[i];
 
-        device->adapterString = vk_properties->deviceName;
-        device->vendorId = vk_properties->vendorID;
-        device->deviceId = vk_properties->deviceID;
+        switch (context->version)
+        {
+        case AMD_AGS_VERSION_5_1_1:
+            device->agsDeviceInfo511.adapterString = vk_properties->deviceName;
+            device->agsDeviceInfo511.vendorId = vk_properties->vendorID;
+            device->agsDeviceInfo511.deviceId = vk_properties->deviceID;
 
-        if (device->vendorId == 0x1002)
-            device->architectureVersion = ArchitectureVersion_GCN;
+            if (device->agsDeviceInfo511.vendorId == 0x1002)
+                device->agsDeviceInfo511.architectureVersion = ArchitectureVersion_GCN;
 
-        if (!i)
-            device->isPrimaryDevice = 1;
+            if (!i)
+                device->agsDeviceInfo511.isPrimaryDevice = 1;
+            break;
+        case AMD_AGS_VERSION_5_2_0:
+        default:
+            device->agsDeviceInfo520.adapterString = vk_properties->deviceName;
+            device->agsDeviceInfo520.vendorId = vk_properties->vendorID;
+            device->agsDeviceInfo520.deviceId = vk_properties->deviceID;
+
+            if (device->agsDeviceInfo520.vendorId == 0x1002)
+                device->agsDeviceInfo520.architectureVersion = ArchitectureVersion_GCN;
+
+            if (!i)
+                device->agsDeviceInfo520.isPrimaryDevice = 1;
+            break;
+        }
     }
 
     return AGS_SUCCESS;
@@ -145,9 +185,9 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     }
 
     memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->agsVersionMajor = AMD_AGS_VERSION_MAJOR;
-    gpu_info->agsVersionMinor = AMD_AGS_VERSION_MINOR;
-    gpu_info->agsVersionPatch = AMD_AGS_VERSION_PATCH;
+    gpu_info->agsVersionMajor = amd_ags_versions[object->version].major;
+    gpu_info->agsVersionMinor = amd_ags_versions[object->version].minor;
+    gpu_info->agsVersionPatch = amd_ags_versions[object->version].patch;
     gpu_info->driverVersion = "18.10.16-180516a-328911C-RadeonSoftwareAdrenalin";
     gpu_info->radeonSoftwareVersion  = "18.5.1";
     gpu_info->numDevices = object->device_count;
