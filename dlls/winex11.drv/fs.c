@@ -128,6 +128,7 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
     DEVMODEW *real_modes, *real_mode, current_mode;
     UINT real_mode_count;
     ULONG_PTR real_id;
+    const char *appid;
     ULONG offset;
     BOOL found;
     UINT i, j;
@@ -160,6 +161,11 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
             real_mode->dmPelsHeight > current_mode.dmPelsHeight)
             continue;
 
+        /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
+        if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130") &&
+            real_mode->dmPelsHeight <= 600 && !(real_mode->dmPelsHeight == 600 && real_mode->dmPelsWidth == 800))
+            continue;
+
         add_fs_mode(&fs_monitor->modes[fs_monitor->mode_count++], real_mode->dmBitsPerPel,
                     real_mode->dmPelsWidth, real_mode->dmPelsHeight, real_mode->dmDisplayFrequency);
     }
@@ -171,6 +177,11 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
         /* Don't report modes that are larger than the current mode */
         if (fs_monitor_sizes[i].width > current_mode.dmPelsWidth ||
             fs_monitor_sizes[i].height > current_mode.dmPelsHeight)
+            continue;
+
+        /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
+        if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130") &&
+            fs_monitor_sizes[i].height <= 600 && !(fs_monitor_sizes[i].height == 600 && fs_monitor_sizes[i].width == 800))
             continue;
 
         /* Skip modes that are already added */
