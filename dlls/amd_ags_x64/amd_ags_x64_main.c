@@ -53,12 +53,14 @@ struct AGSContext
     unsigned int device_count;
     AGSDeviceInfo *devices;
     VkPhysicalDeviceProperties *properties;
+    VkPhysicalDeviceMemoryProperties *memory_properties;
 };
 
 static AGSReturnCode vk_get_physical_device_properties(unsigned int *out_count,
-        VkPhysicalDeviceProperties **out)
+        VkPhysicalDeviceProperties **out, VkPhysicalDeviceMemoryProperties **out_memory)
 {
     VkPhysicalDeviceProperties *properties = NULL;
+    VkPhysicalDeviceMemoryProperties *memory_properties = NULL;
     VkPhysicalDevice *vk_physical_devices = NULL;
     VkInstance vk_instance = VK_NULL_HANDLE;
     VkInstanceCreateInfo create_info;
@@ -103,11 +105,23 @@ static AGSReturnCode vk_get_physical_device_properties(unsigned int *out_count,
         goto done;
     }
 
+    if (!(memory_properties = heap_calloc(count, sizeof(*memory_properties))))
+    {
+        WARN("Failed to allocate memory.\n");
+        heap_free(properties);
+        ret = AGS_OUT_OF_MEMORY;
+        goto done;
+    }
+
     for (i = 0; i < count; ++i)
         vkGetPhysicalDeviceProperties(vk_physical_devices[i], &properties[i]);
 
+    for (i = 0; i < count; ++i)
+        vkGetPhysicalDeviceMemoryProperties(vk_physical_devices[i], &memory_properties[i]);
+
     *out_count = count;
     *out = properties;
+    *out_memory = memory_properties;
 
 done:
     heap_free(vk_physical_devices);
@@ -119,15 +133,16 @@ done:
 static AGSReturnCode init_ags_context(AGSContext *context)
 {
     AGSReturnCode ret;
-    unsigned int i;
+    unsigned int i, j;
 
     // TODO: version check
     context->version = AMD_AGS_VERSION_5_1_1;
     context->device_count = 0;
     context->devices = NULL;
     context->properties = NULL;
+    context->memory_properties = NULL;
 
-    ret = vk_get_physical_device_properties(&context->device_count, &context->properties);
+    ret = vk_get_physical_device_properties(&context->device_count, &context->properties, &context->memory_properties);
     if (ret != AGS_SUCCESS || !context->device_count)
         return ret;
 
@@ -135,13 +150,26 @@ static AGSReturnCode init_ags_context(AGSContext *context)
     {
         WARN("Failed to allocate memory.\n");
         heap_free(context->properties);
+        heap_free(context->memory_properties);
         return AGS_OUT_OF_MEMORY;
     }
 
     for (i = 0; i < context->device_count; ++i)
     {
         const VkPhysicalDeviceProperties *vk_properties = &context->properties[i];
+        const VkPhysicalDeviceMemoryProperties *vk_memory_properties = &context->memory_properties[i];
         AGSDeviceInfo *device = &context->devices[i];
+        VkDeviceSize local_memory_size = 0;
+
+        for (j = 0; j < vk_memory_properties->memoryHeapCount; j++)
+        {
+            if (vk_memory_properties->memoryHeaps[j].flags & VK_MEMORY_HEAP_DEVICE_LOCAL_BIT)
+            {
+                local_memory_size = vk_memory_properties->memoryHeaps[j].size;
+                break;
+            }
+        }
+        TRACE("reporting local memory size 0x%s bytes\n", wine_dbgstr_longlong(local_memory_size));
 
         switch (context->version)
         {
@@ -149,6 +177,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
             device->agsDeviceInfo511.adapterString = vk_properties->deviceName;
             device->agsDeviceInfo511.vendorId = vk_properties->vendorID;
             device->agsDeviceInfo511.deviceId = vk_properties->deviceID;
+            device->agsDeviceInfo511.localMemoryInBytes = local_memory_size;
 
             if (device->agsDeviceInfo511.vendorId == 0x1002)
                 device->agsDeviceInfo511.architectureVersion = ArchitectureVersion_GCN;
@@ -162,6 +191,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
             device->agsDeviceInfo520.adapterString = vk_properties->deviceName;
             device->agsDeviceInfo520.vendorId = vk_properties->vendorID;
             device->agsDeviceInfo520.deviceId = vk_properties->deviceID;
+            device->agsDeviceInfo520.localMemoryInBytes = local_memory_size;
 
             if (device->agsDeviceInfo520.vendorId == 0x1002)
                 device->agsDeviceInfo520.architectureVersion = ArchitectureVersion_GCN;
@@ -173,6 +203,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
             device->agsDeviceInfo540.adapterString = vk_properties->deviceName;
             device->agsDeviceInfo540.vendorId = vk_properties->vendorID;
             device->agsDeviceInfo540.deviceId = vk_properties->deviceID;
+            device->agsDeviceInfo540.localMemoryInBytes = local_memory_size;
 
             if (device->agsDeviceInfo540.vendorId == 0x1002)
                 device->agsDeviceInfo540.asicFamily = AsicFamily_GCN4;
@@ -185,6 +216,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
             device->agsDeviceInfo541.adapterString = vk_properties->deviceName;
             device->agsDeviceInfo541.vendorId = vk_properties->vendorID;
             device->agsDeviceInfo541.deviceId = vk_properties->deviceID;
+            device->agsDeviceInfo541.localMemoryInBytes = local_memory_size;
 
             if (device->agsDeviceInfo541.vendorId == 0x1002)
                 device->agsDeviceInfo541.asicFamily = AsicFamily_GCN4;
@@ -242,6 +274,7 @@ AGSReturnCode WINAPI agsDeInit(AGSContext *context)
 
     if (context)
     {
+        heap_free(context->memory_properties);
         heap_free(context->properties);
         heap_free(context->devices);
         heap_free(context);
