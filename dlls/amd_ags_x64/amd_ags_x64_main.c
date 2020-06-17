@@ -26,6 +26,7 @@ enum amd_ags_version
     AMD_AGS_VERSION_5_2_1,
     AMD_AGS_VERSION_5_3_0,
     AMD_AGS_VERSION_5_4_0,
+    AMD_AGS_VERSION_5_4_1,
 
     AMD_AGS_VERSION_COUNT
 };
@@ -43,6 +44,7 @@ static const amd_ags_versions[AMD_AGS_VERSION_COUNT] =
     {5, 2, 1},
     {5, 3, 0},
     {5, 4, 0},
+    {5, 4, 1},
 };
 
 struct AGSContext
@@ -168,7 +170,6 @@ static AGSReturnCode init_ags_context(AGSContext *context)
                 device->agsDeviceInfo520.isPrimaryDevice = 1;
             break;
         case AMD_AGS_VERSION_5_4_0:
-        default:
             device->agsDeviceInfo540.adapterString = vk_properties->deviceName;
             device->agsDeviceInfo540.vendorId = vk_properties->vendorID;
             device->agsDeviceInfo540.deviceId = vk_properties->deviceID;
@@ -178,6 +179,18 @@ static AGSReturnCode init_ags_context(AGSContext *context)
 
             if (!i)
                 device->agsDeviceInfo540.isPrimaryDevice = 1;
+            break;
+        case AMD_AGS_VERSION_5_4_1:
+        default:
+            device->agsDeviceInfo541.adapterString = vk_properties->deviceName;
+            device->agsDeviceInfo541.vendorId = vk_properties->vendorID;
+            device->agsDeviceInfo541.deviceId = vk_properties->deviceID;
+
+            if (device->agsDeviceInfo541.vendorId == 0x1002)
+                device->agsDeviceInfo541.asicFamily = AsicFamily_GCN4;
+
+            if (!i)
+                device->agsDeviceInfo541.isPrimaryDevice = 1;
             break;
         }
     }
