@@ -33,6 +33,12 @@
 /// Online documentation is publicly hosted here: http://gpuopen-librariesandsdks.github.io/ags/
 /// \endinternal
 ///
+/// What's new in AGS 5.2.1 since version 5.2.0
+/// ---------------------------------------
+/// * Fix for crash when using Eyefinity
+/// * Fix for DX12 app registration in the UWP version
+///
+///
 /// What's new in AGS 5.2.0 since version 5.1
 /// ---------------------------------------
 /// AGS 5.2 includes the following updates:
@@ -98,7 +104,7 @@
 
 #define AMD_AGS_VERSION_MAJOR 5             ///< AGS major version
 #define AMD_AGS_VERSION_MINOR 2             ///< AGS minor version
-#define AMD_AGS_VERSION_PATCH 0             ///< AGS patch version
+#define AMD_AGS_VERSION_PATCH 1             ///< AGS patch version
 
 #ifdef __cplusplus
 extern "C" {
@@ -622,7 +628,7 @@ AMD_AGS_API AGSReturnCode agsDriverExtensionsDX12_SetMarker( AGSContext* context
 /// The different modes to control Crossfire behavior.
 typedef enum AGSCrossfireMode
 {
-    AGS_CROSSFIRE_MODE_DRIVER_AFR = 0,                      ///< Use the default driver-based AFR rendering
+    AGS_CROSSFIRE_MODE_DRIVER_AFR = 0,                      ///< Use the default driver-based AFR rendering. If this mode is specified, do NOT use the agsDriverExtensionsDX11_Create*() APIs to create resources
     AGS_CROSSFIRE_MODE_EXPLICIT_AFR,                        ///< Use the AGS Crossfire API functions to perform explicit AFR rendering without requiring a CF driver profile
     AGS_CROSSFIRE_MODE_DISABLE                              ///< Completely disable AFR rendering
 } AGSCrossfireMode;
@@ -739,7 +745,7 @@ AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_DestroyDevice_511( AGSContext*
 
 /// \defgroup dx11appreg App Registration
 /// @{
-/// This extension allows an apllication to voluntarily register itself with the driver, providing a more robust app detection solution and avoid the issue of the driver
+/// This extension allows an apllication to voluntarily register itself with the driver, providing a more robust app detection solution and avoid the issue of the driver 
 /// relying on exe names to match the app to a driver profile.
 /// This feature is supported in Radeon Software Version 17.9.2 onwards.
 /// Rules:
@@ -1151,7 +1157,7 @@ AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount(
 
 ///
 /// This method can be used to determine the total number of asynchronous shader compile jobs that are either
-/// queued for waiting for compilation or being compiled by the driver’s asynchronous compilation threads.
+/// queued for waiting for compilation or being compiled by the driverÂ’s asynchronous compilation threads.
 /// This method can be called at any during the lifetime of the driver.
 ///
 /// \param [in] context                             Pointer to a context.
