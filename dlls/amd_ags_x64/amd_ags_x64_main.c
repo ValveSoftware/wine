@@ -23,6 +23,7 @@ enum amd_ags_version
 {
     AMD_AGS_VERSION_5_1_1,
     AMD_AGS_VERSION_5_2_0,
+    AMD_AGS_VERSION_5_2_1,
 
     AMD_AGS_VERSION_COUNT
 };
@@ -37,6 +38,7 @@ static const amd_ags_versions[AMD_AGS_VERSION_COUNT] =
 {
     {5, 1, 1},
     {5, 2, 0},
+    {5, 2, 1},
 };
 
 struct AGSContext
@@ -149,6 +151,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
                 device->agsDeviceInfo511.isPrimaryDevice = 1;
             break;
         case AMD_AGS_VERSION_5_2_0:
+        case AMD_AGS_VERSION_5_2_1:
         default:
             device->agsDeviceInfo520.adapterString = vk_properties->deviceName;
             device->agsDeviceInfo520.vendorId = vk_properties->vendorID;
