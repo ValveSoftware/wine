@@ -1,5 +1,5 @@
 //
-// Copyright (c) 2018 Advanced Micro Devices, Inc. All rights reserved.
+// Copyright (c) 2020 Advanced Micro Devices, Inc. All rights reserved.
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -34,11 +34,21 @@
 /// \endinternal
 ///
 /// ---------------------------------------
+/// What's new in AGS 5.4.1 since version 5.4.0
+/// ---------------------------------------
+/// AGS 5.4.1 includes the following updates:
+/// * AsicFamily_Count to help with code maintenance.
+/// * Visual Studio 2019 support.
+/// * x86 support
+/// * BaseInstance and BaseVertex intrinsics along with corresponding caps bits.
+/// * GetWaveSize intrinsic along with corresponding caps bits.
+///
+/// ---------------------------------------
 /// What's new in AGS 5.4 since version 5.3
 /// ---------------------------------------
 /// AGS 5.4 includes the following updates:
 /// * A more detailed description of the GPU architecture, now including RDNA GPUs.
-/// * Navi 10, Navi 14 and Radeon 7 core and memory speeds returned.
+/// * Radeon 7 core and memory speeds returned.
 /// * Draw index and Atomic U64 intrinsics for both DX11 and DX12.
 ///
 /// ---------------------------------------
@@ -47,7 +57,7 @@
 /// AGS 5.3 includes the following updates:
 /// * DX11 deferred context support for Multi Draw Indirect and UAV Overlap extensions.
 /// * A Radeon Software Version helper to determine whether the installed driver meets your game's minimum driver version requirements.
-/// * Freesync2 Gamma 2.2 mode which uses a 1010102 swapchain and can be considered as an alternative to using the 64 bit swapchain required for Freesync2 scRGB.
+/// * Freesync HDR Gamma 2.2 mode which uses a 1010102 swapchain and can be considered as an alternative to using the 64 bit swapchain required for Freesync HDR scRGB.
 ///
 /// What's new in AGS 5.2.1 since version 5.2.0
 /// ---------------------------------------
@@ -120,16 +130,19 @@
 
 #define AMD_AGS_VERSION_MAJOR 5             ///< AGS major version
 #define AMD_AGS_VERSION_MINOR 4             ///< AGS minor version
-#define AMD_AGS_VERSION_PATCH 0             ///< AGS patch version
+#define AMD_AGS_VERSION_PATCH 1             ///< AGS patch version
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+/// \defgroup Defines AGS defines
+/// @{
 #define AMD_AGS_API WINAPI
 
 #define AGS_MAKE_VERSION( major, minor, patch ) ( ( major << 22 ) | ( minor << 12 ) | patch ) ///< Macro to create the app and engine versions for the fields in \ref AGSDX12ExtensionParams and \ref AGSDX11ExtensionParams and the Radeon Software Version
 #define AGS_UNSPECIFIED_VERSION 0xFFFFAD00                                                    ///< Use this to specify no version
+/// @}
 
 // Forward declaration of D3D11 types
 struct IDXGIAdapter;
@@ -154,6 +167,8 @@ struct D3D11_SUBRESOURCE_DATA;
 struct ID3D12Device;
 struct ID3D12GraphicsCommandList;
 
+/// \defgroup enums General enumerations
+/// @{
 
 /// The return codes
 typedef enum AGSReturnCode
@@ -162,8 +177,10 @@ typedef enum AGSReturnCode
     AGS_FAILURE,                    ///< Failed to complete call for some unspecified reason
     AGS_INVALID_ARGS,               ///< Invalid arguments into the function
     AGS_OUT_OF_MEMORY,              ///< Out of memory when allocating space internally
-    AGS_ERROR_MISSING_DLL,          ///< Returned when a driver dll fails to load - most likely due to not being present in legacy driver installation
-    AGS_ERROR_LEGACY_DRIVER,        ///< Returned if a feature is not present in the installed driver
+    AGS_MISSING_D3D_DLL,            ///< Returned when a D3D dll fails to load
+    AGS_LEGACY_DRIVER,              ///< Returned if a feature is not present in the installed driver
+    // AGS_NO_AMD_DRIVER_INSTALLED ADDED IN 5.4.1
+    AGS_NO_AMD_DRIVER_INSTALLED,    ///< Returned if the AMD GPU driver does not appear to be installed
     AGS_EXTENSION_NOT_SUPPORTED,    ///< Returned if the driver does not support the requested driver extension
     AGS_ADL_FAILURE,                ///< Failure in ADL (the AMD Display Library)
     AGS_DX_FAILURE                  ///< Failure from DirectX runtime
@@ -197,7 +214,10 @@ typedef enum AGSDriverExtensionDX11
     AGS_DX11_EXTENSION_UAV_OVERLAP_DEFERRED_CONTEXTS        = 1 << 22,   ///< Supported in Radeon Software Version 18.8.1 onwards.
     AGS_DX11_EXTENSION_DEPTH_BOUNDS_DEFERRED_CONTEXTS       = 1 << 23,   ///< Supported in Radeon Software Version 18.8.1 onwards.
     AGS_DX11_EXTENSION_INTRINSIC_DRAW_INDEX                 = 1 << 24,   ///< Supported in Radeon Software Version 19.12.2 onwards.
-    AGS_DX11_EXTENSION_INTRINSIC_ATOMIC_U64                 = 1 << 25    ///< Supported in Radeon Software Version 19.12.2 onwards.
+    AGS_DX11_EXTENSION_INTRINSIC_ATOMIC_U64                 = 1 << 25,   ///< Supported in Radeon Software Version 19.12.2 onwards.
+    AGS_DX11_EXTENSION_INTRINSIC_GET_WAVE_SIZE              = 1 << 26,   ///< Supported in Radeon Software Version 20.2.1 onwards.
+    AGS_DX11_EXTENSION_INTRINSIC_BASE_VERTEX                = 1 << 27,   ///< Supported in Radeon Software Version 20.2.1 onwards.
+    AGS_DX11_EXTENSION_INTRINSIC_BASE_INSTANCE              = 1 << 28    ///< Supported in Radeon Software Version 20.2.1 onwards.
 } AGSDriverExtensionDX11;
 
 /// The DirectX12 extension support bits
@@ -217,7 +237,10 @@ typedef enum AGSDriverExtensionDX12
     AGS_DX12_EXTENSION_APP_REGISTRATION                     = 1 << 11,  ///< Supported in Radeon Software Version 17.9.1 onwards.
     AGS_DX12_EXTENSION_INTRINSIC_UAV_BIND_SLOT              = 1 << 12,  ///< Supported in Radeon Software Version 19.5.1 onwards.
     AGS_DX12_EXTENSION_INTRINSIC_DRAW_INDEX                 = 1 << 13,  ///< Supported in Radeon Software Version 19.12.2 onwards.
-    AGS_DX12_EXTENSION_INTRINSIC_ATOMIC_U64                 = 1 << 14   ///< Supported in Radeon Software Version 19.12.2 onwards.
+    AGS_DX12_EXTENSION_INTRINSIC_ATOMIC_U64                 = 1 << 14,  ///< Supported in Radeon Software Version 19.12.2 onwards.
+    AGS_DX12_EXTENSION_INTRINSIC_BASE_VERTEX                = 1 << 15,  ///< Supported in Radeon Software Version 20.2.1 onwards.
+    AGS_DX12_EXTENSION_INTRINSIC_BASE_INSTANCE              = 1 << 16,  ///< Supported in Radeon Software Version 20.2.1 onwards.
+    AGS_DX12_EXTENSION_INTRINSIC_GET_WAVE_SIZE              = 1 << 17   ///< Supported in Radeon Software Version 20.5.1 onwards.
 } AGSDriverExtensionDX12;
 
 /// The space id for DirectX12 intrinsic support
@@ -238,7 +261,7 @@ typedef enum AGSDisplayFlags
     AGS_DISPLAYFLAG_HDR10                                   = 1 << 1,   ///< HDR10 is supported on this display
     AGS_DISPLAYFLAG_DOLBYVISION                             = 1 << 2,   ///< Dolby Vision is supported on this display
     AGS_DISPLAYFLAG_FREESYNC                                = 1 << 3,   ///< Freesync is supported on this display
-    AGS_DISPLAYFLAG_FREESYNC_2                              = 1 << 4,   ///< Freesync 2 is supported on this display
+    AGS_DISPLAYFLAG_FREESYNC_HDR                            = 1 << 4,   ///< Freesync HDR is supported on this display
     AGS_DISPLAYFLAG_EYEFINITY_IN_GROUP                      = 1 << 5,   ///< The display is part of the Eyefinity group
     AGS_DISPLAYFLAG_EYEFINITY_PREFERRED_DISPLAY             = 1 << 6,   ///< The display is the preferred display in the Eyefinity group for displaying the UI
     AGS_DISPLAYFLAG_EYEFINITY_IN_PORTRAIT_MODE              = 1 << 7,   ///< The display is in the Eyefinity group but in portrait mode
@@ -250,6 +273,7 @@ typedef enum AGSDisplaySettingsFlags
     AGS_DISPLAYSETTINGSFLAG_DISABLE_LOCAL_DIMMING           = 1 << 0,   ///< Disables local dimming if possible
 } AGSDisplaySettingsFlags;
 
+/// @}
 
 typedef struct AGSContext AGSContext;  ///< All function calls in AGS require a pointer to a context. This is generated via \ref agsInit
 
@@ -280,7 +304,7 @@ typedef struct AGSDisplayInfo
     char                    name[ 256 ];                    ///< The name of the display
     char                    displayDeviceName[ 32 ];        ///< The display device name, i.e. DISPLAY_DEVICE::DeviceName
 
-    unsigned int            displayFlags;                   ///< Bitfield of ::AGSDisplayFlags
+    unsigned int            displayFlags;                   ///< Bitfield of \ref AGSDisplayFlags
 
     int                     maxResolutionX;                 ///< The maximum supported resolution of the unrotated display
     int                     maxResolutionY;                 ///< The maximum supported resolution of the unrotated display
@@ -335,7 +359,9 @@ typedef enum AsicFamily
     AsicFamily_GCN3,                                            ///< AMD GCN 3 architecture: Tonga & Fiji.
     AsicFamily_GCN4,                                            ///< AMD GCN 4 architecture: Polaris.
     AsicFamily_Vega,                                            ///< AMD Vega architecture, including Raven Ridge (ie AMD Ryzen CPU + AMD Vega GPU).
-    AsicFamily_RDNA                                             ///< AMD RDNA architecture
+    AsicFamily_RDNA,                                            ///< AMD RDNA architecture
+
+    AsicFamily_Count                                            ///< Number of enumerated ASIC families
 } AsicFamily;
 
 /// The device info struct used to describe a physical GPU enumerated by AGS
@@ -437,11 +463,47 @@ typedef struct AGSDeviceInfo_540
     int                             adlAdapterIndex;                ///< Internally used index into the ADL list of adapters
 } AGSDeviceInfo_540;
 
+/// The device info struct used to describe a physical GPU enumerated by AGS
+typedef struct AGSDeviceInfo_541
+{
+    const char*                     adapterString;                  ///< The adapter name string
+    AsicFamily                      asicFamily;                     ///< Set to Unknown if not AMD hardware
+    int                             isAPU;                          ///< Whether or not this is an APU
+    int                             vendorId;                       ///< The vendor id
+    int                             deviceId;                       ///< The device id
+    int                             revisionId;                     ///< The revision id
+
+    int                             numCUs;                         ///< Number of compute units.
+    int                             numWGPs;                        ///< Number of RDNA Work Group Processors.  Only valid if ASIC is RDNA onwards.
+
+    int                             numROPs;                        ///< Number of ROPs
+    int                             coreClock;                      ///< Core clock speed at 100% power in MHz
+    int                             memoryClock;                    ///< Memory clock speed at 100% power in MHz
+    int                             memoryBandwidth;                ///< Memory bandwidth in MB/s
+    float                           teraFlops;                      ///< Teraflops of GPU. Zero if not GCN onwards. Calculated from iCoreClock * iNumCUs * 64 Pixels/clk * 2 instructions/MAD
+
+    int                             isPrimaryDevice;                ///< Whether or not this is the primary adapter in the system. Not set on the WACK version.
+    long long                       localMemoryInBytes;             ///< The size of local memory in bytes. 0 for non AMD hardware.
+
+    int                             numDisplays;                    ///< The number of active displays found to be attached to this adapter.
+    AGSDisplayInfo*                 displays;                       ///< List of displays allocated by AGS to be numDisplays in length.
+
+    int                             eyefinityEnabled;               ///< Indicates if Eyefinity is active
+    int                             eyefinityGridWidth;             ///< Contains width of the multi-monitor grid that makes up the Eyefinity Single Large Surface.
+    int                             eyefinityGridHeight;            ///< Contains height of the multi-monitor grid that makes up the Eyefinity Single Large Surface.
+    int                             eyefinityResolutionX;           ///< Contains width in pixels of the multi-monitor Single Large Surface.
+    int                             eyefinityResolutionY;           ///< Contains height in pixels of the multi-monitor Single Large Surface.
+    int                             eyefinityBezelCompensated;      ///< Indicates if bezel compensation is used for the current SLS display area. 1 if enabled, and 0 if disabled.
+
+    int                             adlAdapterIndex;                ///< Internally used index into the ADL list of adapters
+} AGSDeviceInfo_541;
+
 typedef union AGSDeviceInfo
 {
     AGSDeviceInfo_511 agsDeviceInfo511;
     AGSDeviceInfo_520 agsDeviceInfo520;
     AGSDeviceInfo_540 agsDeviceInfo540;
+    AGSDeviceInfo_541 agsDeviceInfo541;
 } AGSDeviceInfo;
 
 /// \defgroup general General API functions
@@ -495,10 +557,12 @@ typedef struct AGSDisplaySettings
         Mode_SDR,                                           ///< SDR mode
         Mode_HDR10_PQ,                                      ///< HDR10 PQ encoding, requiring a 1010102 UNORM swapchain and PQ encoding in the output shader.
         Mode_HDR10_scRGB,                                   ///< HDR10 scRGB, requiring an FP16 swapchain. Values of 1.0 == 80 nits, 125.0 == 10000 nits.
-        Mode_Freesync2_scRGB,                               ///< Freesync2 scRGB, requiring an FP16 swapchain. 1.0 == 80 nits. Tonemap your scene to the range of 0.0 to AGSDisplayInfo::maxLuminance.
-        // Mode_Freesync2_Gamma22 ADDED IN 5.3.0
-        Mode_Freesync2_Gamma22,                             ///< Freesync2 Gamma 2.2, requiring a 1010102 UNORM swapchain.  The output needs to be encoded to gamma 2.2.
-        Mode_DolbyVision                                    ///< Dolby Vision, requiring an 8888 UNORM swapchain
+        Mode_FreesyncHDR_scRGB,                             ///< Freesync HDR scRGB, requiring an FP16 swapchain. A value of 1.0 == 80 nits.
+        // Mode_FreesyncHDR_Gamma22 ADDED IN 5.3.0
+        Mode_FreesyncHDR_Gamma22,                           ///< Freesync HDR Gamma 2.2, requiring a 1010102 UNORM swapchain.  The output needs to be encoded to gamma 2.2.
+        Mode_DolbyVision,                                   ///< Dolby Vision, requiring an 8888 UNORM swapchain
+
+        Mode_Count                                          ///< Number of enumerated display modes
     }                       mode;                           ///< The display mode to set the display into
 
     double                  chromaticityRedX;               ///< Red display primary X coord
@@ -545,7 +609,9 @@ AMD_AGS_API AGSDriverVersionResult agsCheckDriverVersion( const char* radeonSoft
 /// Function used to initialize the AGS library.
 /// Must be called prior to any of the subsequent AGS API calls.
 /// Must be called prior to ID3D11Device or ID3D12Device creation.
-/// \note This function will fail with \ref AGS_ERROR_LEGACY_DRIVER in Catalyst versions before 12.20.
+/// \note The caller of this function should handle the possibility of the call failing in the cases below. One option is to do a vendor id check and only call \ref agsInit if there is an AMD GPU present.
+/// \note This function will fail with \ref AGS_NO_AMD_DRIVER_INSTALLED if there is no AMD driver found on the system.
+/// \note This function will fail with \ref AGS_LEGACY_DRIVER in Catalyst versions before 12.20.
 /// \note It is good practice to check the AGS version returned from AGSGPUInfo against the version defined in the header in case a mismatch between the dll and header has occurred.
 ///
 /// \param [in, out] context                        Address of a pointer to a context. This function allocates a context on the heap which is then required for all subsequent API calls.
@@ -577,7 +643,8 @@ AMD_AGS_API AGSReturnCode agsGetCrossfireGPUCount( AGSContext* context, int* num
 /// \note Call this function after each mode change (switch to fullscreen, any change in swapchain etc).
 /// \note HDR10 PQ mode requires a 1010102 swapchain.
 /// \note HDR10 scRGB mode requires an FP16 swapchain.
-/// \note Freesync2 scRGB mode requires an FP16 swapchain.
+/// \note Freesync HDR scRGB mode requires an FP16 swapchain.
+/// \note Freesync HDR Gamma 2.2 mode requires a 1010102 swapchain.
 /// \note Dolby Vision requires a 8888 UNORM swapchain.
 ///
 /// \param [in] context                             Pointer to a context. This is generated by \ref agsInit
