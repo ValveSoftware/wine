@@ -800,6 +800,11 @@ struct cpu_topology_override
     unsigned char host_cpu_id[64];
 };
 
+struct desktop_shared_memory
+{
+    int placeholder;
+};
+
 
 
 
@@ -6721,7 +6726,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 636
+#define SERVER_PROTOCOL_VERSION 637
 
 /* ### protocol_version end ### */
 

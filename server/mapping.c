@@ -962,7 +962,7 @@ int get_page_size(void)
 }
 
 struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
-                                        unsigned int attr, const struct security_descriptor *sd )
+                                         unsigned int attr, const struct security_descriptor *sd )
 {
     void *ptr;
     struct mapping *mapping;
@@ -975,6 +975,23 @@ struct object *create_user_data_mapping( struct object *root, const struct unico
         user_shared_data = ptr;
         user_shared_data->SystemCall = 1;
     }
+    return &mapping->obj;
+}
+
+struct object *create_desktop_mapping( struct object *root, const struct unicode_str *name,
+                                       mem_size_t size, const struct security_descriptor *sd, void **ptr )
+{
+    struct mapping *mapping;
+
+    if (!(mapping = create_mapping( root, name, OBJ_OPENIF, size, SEC_COMMIT, 0,
+                                    FILE_READ_DATA | FILE_WRITE_DATA, sd ))) return NULL;
+    *ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
+    if (*ptr == MAP_FAILED)
+    {
+        release_object( &mapping->obj );
+        return NULL;
+    }
+
     return &mapping->obj;
 }
 

@@ -816,6 +816,11 @@ struct cpu_topology_override
     unsigned char host_cpu_id[64];
 };
 
+struct desktop_shared_memory
+{
+    int placeholder;
+};
+
 /****************************************************************/
 /* Request declarations */
 
