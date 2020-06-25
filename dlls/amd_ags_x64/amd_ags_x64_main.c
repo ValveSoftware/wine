@@ -126,13 +126,79 @@ done:
     return ret;
 }
 
+static enum amd_ags_version determine_ags_version(void)
+{
+    /* AMD AGS is not binary compatible between versions (even minor versions), and the game
+     * does not request a specific version when calling agsInit().
+     * Checking the version of amd_ags_x64.dll shipped with the game is the only way to
+     * determine what version the game was built against.
+     *
+     * An update to AGS 5.4.1 included an amd_ags_x64.dll with no file version info.
+     * In case of an error, assume it's that version.
+     */
+    enum amd_ags_version ret = AMD_AGS_VERSION_5_4_1;
+    DWORD infosize;
+    void *infobuf = NULL;
+    void *val;
+    UINT vallen, i;
+    VS_FIXEDFILEINFO *info;
+    UINT16 major, minor, patch;
+
+    infosize = GetFileVersionInfoSizeW(L"amd_ags_x64.dll", NULL);
+    if (!infosize)
+    {
+        WARN("Unable to determine desired version of amd_ags_x64.dll.\n");
+        goto done;
+    }
+
+    if (!(infobuf = heap_alloc(infosize)))
+    {
+        WARN("Failed to allocate memory.\n");
+        goto done;
+    }
+
+    if (!GetFileVersionInfoW(L"amd_ags_x64.dll", 0, infosize, infobuf))
+    {
+        WARN("Unable to determine desired version of amd_ags_x64.dll.\n");
+        goto done;
+    }
+
+    if (!VerQueryValueW(infobuf, L"\\", &val, &vallen) || (vallen != sizeof(VS_FIXEDFILEINFO)))
+    {
+        WARN("Unable to determine desired version of amd_ags_x64.dll.\n");
+        goto done;
+    }
+
+    info = val;
+    major = info->dwFileVersionMS >> 16;
+    minor = info->dwFileVersionMS;
+    patch = info->dwFileVersionLS >> 16;
+    TRACE("Found amd_ags_x64.dll v%d.%d.%d\n", major, minor, patch);
+
+    for (i = 0; i < ARRAY_SIZE(amd_ags_versions); i++)
+    {
+        if ((major == amd_ags_versions[i].major) &&
+            (minor == amd_ags_versions[i].minor) &&
+            (patch == amd_ags_versions[i].patch))
+        {
+            ret = i;
+            break;
+        }
+    }
+
+done:
+    heap_free(infobuf);
+    TRACE("Using AGS v%d.%d.%d interface\n",
+          amd_ags_versions[ret].major, amd_ags_versions[ret].minor, amd_ags_versions[ret].patch);
+    return ret;
+}
+
 static AGSReturnCode init_ags_context(AGSContext *context)
 {
     AGSReturnCode ret;
     unsigned int i, j;
 
-    // TODO: version check
-    context->version = AMD_AGS_VERSION_5_1_1;
+    context->version = determine_ags_version();
     context->device_count = 0;
     context->devices = NULL;
     context->properties = NULL;
