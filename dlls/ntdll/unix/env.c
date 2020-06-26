@@ -399,7 +399,7 @@ DWORD ntdll_umbstowcs( const char *src, DWORD srclen, WCHAR *dst, DWORD dstlen )
  */
 int ntdll_wcstoumbs( const WCHAR *src, DWORD srclen, char *dst, DWORD dstlen, BOOL strict )
 {
-    unsigned int i, reslen;
+    unsigned int i, reslen = 0;
 
     if (unix_cp.CodePage != CP_UTF8)
     {
