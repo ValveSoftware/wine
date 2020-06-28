@@ -91,6 +91,9 @@ struct unix_funcs
     int           (CDECL *dbg_output)( const char *str );
     int           (CDECL *dbg_header)( enum __wine_debug_class cls, struct __wine_debug_channel *channel,
                                        const char *function );
+
+    /* steamclient HACK */
+    void          (CDECL *steamclient_setup_trampolines)( HMODULE src_mod, HMODULE tgt_mod );
 };
 
 #endif /* __NTDLL_UNIXLIB_H */
