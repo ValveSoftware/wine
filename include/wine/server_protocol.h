@@ -809,8 +809,13 @@ struct shared_cursor
 
 struct desktop_shared_memory
 {
+    unsigned int         seq;
     struct shared_cursor cursor;
 };
+
+
+#define SEQUENCE_MASK_BITS  4
+#define SEQUENCE_MASK ((1UL << SEQUENCE_MASK_BITS) - 1)
 
 
 
@@ -6733,7 +6738,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 638
+#define SERVER_PROTOCOL_VERSION 639
 
 /* ### protocol_version end ### */
 

@@ -825,8 +825,13 @@ struct shared_cursor
 
 struct desktop_shared_memory
 {
+    unsigned int         seq;              /* sequence number - server updating if (seq_no & SEQUENCE_MASK) != 0 */
     struct shared_cursor cursor;           /* global cursor information */
 };
+
+/* Bits that must be clear for client to read */
+#define SEQUENCE_MASK_BITS  4
+#define SEQUENCE_MASK ((1UL << SEQUENCE_MASK_BITS) - 1)
 
 /****************************************************************/
 /* Request declarations */
