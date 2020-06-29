@@ -397,10 +397,10 @@ static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
 
     x = max( min( x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
     y = max( min( y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
-    updated = (desktop->cursor.x != x || desktop->cursor.y != y);
-    desktop->cursor.x = x;
-    desktop->cursor.y = y;
-    desktop->cursor.last_change = get_tick_count();
+    updated = (desktop->shared->cursor.x != x || desktop->shared->cursor.y != y);
+    desktop->shared->cursor.x = x;
+    desktop->shared->cursor.y = y;
+    desktop->shared->cursor.last_change = get_tick_count();
 
     return updated;
 }
@@ -431,8 +431,8 @@ static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsig
 {
     struct desktop *desktop = queue->input->desktop;
 
-    *x = desktop->cursor.x;
-    *y = desktop->cursor.y;
+    *x = desktop->shared->cursor.x;
+    *y = desktop->shared->cursor.y;
     *time = get_tick_count();
 }
 
@@ -459,9 +459,9 @@ static void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect
         post_desktop_message( desktop, desktop->cursor.clip_msg, rect != NULL, 0 );
 
     /* warp the mouse to be inside the clip rect */
-    x = max( min( desktop->cursor.x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
-    y = max( min( desktop->cursor.y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
-    if (x != desktop->cursor.x || y != desktop->cursor.y) set_cursor_pos( desktop, x, y );
+    x = max( min( desktop->shared->cursor.x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
+    y = max( min( desktop->shared->cursor.y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
+    if (x != desktop->shared->cursor.x || y != desktop->shared->cursor.y) set_cursor_pos( desktop, x, y );
 }
 
 /* change the foreground input and reset the cursor clip rect */
@@ -1615,8 +1615,8 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
         if (desktop->keystate[VK_XBUTTON1] & 0x80) msg->wparam |= MK_XBUTTON1;
         if (desktop->keystate[VK_XBUTTON2] & 0x80) msg->wparam |= MK_XBUTTON2;
     }
-    msg->x = desktop->cursor.x;
-    msg->y = desktop->cursor.y;
+    msg->x = desktop->shared->cursor.x;
+    msg->y = desktop->shared->cursor.y;
 
     if (msg->win && (thread = get_window_thread( msg->win )))
     {
@@ -1803,10 +1803,10 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         WM_MOUSEHWHEEL   /* 0x1000 = MOUSEEVENTF_HWHEEL */
     };
 
-    update_desktop_cursor_pos( desktop, desktop->cursor.x, desktop->cursor.y ); /* Update last change time */
+    update_desktop_cursor_pos( desktop, desktop->shared->cursor.x, desktop->shared->cursor.y ); /* Update last change time */
     flags = input->mouse.flags;
     time  = input->mouse.time;
-    if (!time) time = desktop->cursor.last_change;
+    if (!time) time = desktop->shared->cursor.last_change;
 
     if (flags & MOUSEEVENTF_MOVE)
     {
@@ -1815,19 +1815,19 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
             x = input->mouse.x;
             y = input->mouse.y;
             if (flags & ~(MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE) &&
-                x == desktop->cursor.x && y == desktop->cursor.y)
+                x == desktop->shared->cursor.x && y == desktop->shared->cursor.y)
                 flags &= ~MOUSEEVENTF_MOVE;
         }
         else
         {
-            x = desktop->cursor.x + input->mouse.x;
-            y = desktop->cursor.y + input->mouse.y;
+            x = desktop->shared->cursor.x + input->mouse.x;
+            y = desktop->shared->cursor.y + input->mouse.y;
         }
     }
     else
     {
-        x = desktop->cursor.x;
-        y = desktop->cursor.y;
+        x = desktop->shared->cursor.x;
+        y = desktop->shared->cursor.y;
     }
 
     if ((foreground = get_foreground_thread( desktop, win )))
@@ -1843,8 +1843,8 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         msg_data->info                = input->mouse.info;
         msg_data->flags               = flags;
         msg_data->rawinput.type       = RIM_TYPEMOUSE;
-        msg_data->rawinput.mouse.x    = x - desktop->cursor.x;
-        msg_data->rawinput.mouse.y    = y - desktop->cursor.y;
+        msg_data->rawinput.mouse.x    = x - desktop->shared->cursor.x;
+        msg_data->rawinput.mouse.y    = y - desktop->shared->cursor.y;
         msg_data->rawinput.mouse.data = input->mouse.data;
 
         if ((req_flags & SEND_HWMSG_RAWINPUT))
@@ -2045,8 +2045,8 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
     msg->msg       = input->hw.msg;
     msg->wparam    = 0;
     msg->lparam    = input->hw.lparam;
-    msg->x         = desktop->cursor.x;
-    msg->y         = desktop->cursor.y;
+    msg->x         = desktop->shared->cursor.x;
+    msg->y         = desktop->shared->cursor.y;
 
     queue_hardware_message( desktop, msg, 1 );
 }
@@ -2586,8 +2586,8 @@ DECL_HANDLER(send_hardware_message)
 
     if (desktop)
     {
-        reply->prev_x = desktop->cursor.x;
-        reply->prev_y = desktop->cursor.y;
+        reply->prev_x = desktop->shared->cursor.x;
+        reply->prev_y = desktop->shared->cursor.y;
     }
 
     switch (req->input.type)
@@ -2614,8 +2614,8 @@ DECL_HANDLER(send_hardware_message)
 
     if (desktop)
     {
-        reply->new_x = desktop->cursor.x;
-        reply->new_y = desktop->cursor.y;
+        reply->new_x = desktop->shared->cursor.x;
+        reply->new_y = desktop->shared->cursor.y;
         set_reply_data( desktop->keystate, size );
         release_object( desktop );
     }
@@ -3325,8 +3325,8 @@ DECL_HANDLER(set_cursor)
 
     reply->prev_handle = input->cursor;
     reply->prev_count  = input->cursor_count;
-    reply->prev_x      = input->desktop->cursor.x;
-    reply->prev_y      = input->desktop->cursor.y;
+    reply->prev_x      = input->desktop->shared->cursor.x;
+    reply->prev_y      = input->desktop->shared->cursor.y;
 
     if (req->flags & SET_CURSOR_HANDLE)
     {
@@ -3357,10 +3357,10 @@ DECL_HANDLER(set_cursor)
         set_clip_rectangle( desktop, (req->flags & SET_CURSOR_NOCLIP) ? NULL : &req->clip, 0 );
     }
 
-    reply->new_x       = input->desktop->cursor.x;
-    reply->new_y       = input->desktop->cursor.y;
+    reply->new_x       = input->desktop->shared->cursor.x;
+    reply->new_y       = input->desktop->shared->cursor.y;
     reply->new_clip    = input->desktop->cursor.clip;
-    reply->last_change = input->desktop->cursor.last_change;
+    reply->last_change = input->desktop->shared->cursor.last_change;
 }
 
 /* Get the history of the 64 last cursor positions */

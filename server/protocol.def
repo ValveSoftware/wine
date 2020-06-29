@@ -816,9 +816,16 @@ struct cpu_topology_override
     unsigned char host_cpu_id[64];
 };
 
+struct shared_cursor
+{
+    int                  x;                /* cursor position */
+    int                  y;
+    unsigned int         last_change;      /* time of last position change */
+};
+
 struct desktop_shared_memory
 {
-    int placeholder;
+    struct shared_cursor cursor;           /* global cursor information */
 };
 
 /****************************************************************/
