@@ -391,16 +391,60 @@ static struct message *alloc_hardware_message( lparam_t info, struct hw_msg_sour
     return msg;
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+
+#define SHARED_WRITE_BEGIN( x )                                  \
+    do {                                                         \
+        volatile unsigned int __seq = *(x);                      \
+        assert( (__seq & SEQUENCE_MASK) != SEQUENCE_MASK );      \
+        *(x) = ++__seq;                                          \
+    } while(0)
+
+#define SHARED_WRITE_END( x )                                    \
+    do {                                                         \
+        volatile unsigned int __seq = *(x);                      \
+        assert( (__seq & SEQUENCE_MASK) != 0 );                  \
+        if ((__seq & SEQUENCE_MASK) > 1) __seq--;                \
+        else __seq += SEQUENCE_MASK;                             \
+        *(x) = __seq;                                            \
+    } while(0)
+
+#else
+
+#define SHARED_WRITE_BEGIN( x )                                         \
+    do {                                                                \
+        assert( (*(x) & SEQUENCE_MASK) != SEQUENCE_MASK );              \
+        if ((__atomic_add_fetch( x, 1, __ATOMIC_RELAXED ) & SEQUENCE_MASK) == 1) \
+            __atomic_thread_fence( __ATOMIC_RELEASE );                  \
+    } while(0)
+
+#define SHARED_WRITE_END( x )                                           \
+    do {                                                                \
+        assert( (*(x) & SEQUENCE_MASK) != 0 );                          \
+        if ((*(x) & SEQUENCE_MASK) > 1)                                 \
+            __atomic_sub_fetch( x, 1, __ATOMIC_RELAXED );               \
+        else {                                                          \
+            __atomic_thread_fence( __ATOMIC_RELEASE );                  \
+            __atomic_add_fetch( x, SEQUENCE_MASK, __ATOMIC_RELAXED );   \
+        }                                                               \
+    } while(0)
+
+#endif
+
 static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
 {
     int updated;
+    unsigned int time = get_tick_count();
 
     x = max( min( x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
     y = max( min( y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
     updated = (desktop->shared->cursor.x != x || desktop->shared->cursor.y != y);
+
+    SHARED_WRITE_BEGIN( &desktop->shared->seq );
     desktop->shared->cursor.x = x;
     desktop->shared->cursor.y = y;
-    desktop->shared->cursor.last_change = get_tick_count();
+    desktop->shared->cursor.last_change = time;
+    SHARED_WRITE_END( &desktop->shared->seq );
 
     return updated;
 }
