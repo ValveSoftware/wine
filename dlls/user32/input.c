@@ -250,25 +250,23 @@ void WINAPI mouse_event( DWORD dwFlags, DWORD dx, DWORD dy,
  */
 BOOL WINAPI DECLSPEC_HOTPATCH GetCursorPos( POINT *pt )
 {
-    BOOL ret;
+    BOOL ret = TRUE;
     DWORD last_change;
     UINT dpi;
+    volatile struct desktop_shared_memory *shared = get_desktop_shared_memory();
 
-    if (!pt) return FALSE;
+    if (!pt || !shared) return FALSE;
 
-    SERVER_START_REQ( set_cursor )
+    SHARED_READ_BEGIN( &shared->seq )
     {
-        if ((ret = !wine_server_call( req )))
-        {
-            pt->x = reply->new_x;
-            pt->y = reply->new_y;
-            last_change = reply->last_change;
-        }
+        pt->x = shared->cursor.x;
+        pt->y = shared->cursor.y;
+        last_change = shared->cursor.last_change;
     }
-    SERVER_END_REQ;
+    SHARED_READ_END( &shared->seq );
 
     /* query new position from graphics driver if we haven't updated recently */
-    if (ret && GetTickCount() - last_change > 100) ret = USER_Driver->pGetCursorPos( pt );
+    if (GetTickCount() - last_change > 100) ret = USER_Driver->pGetCursorPos( pt );
     if (ret && (dpi = get_thread_dpi()))
     {
         DPI_AWARENESS_CONTEXT context;
