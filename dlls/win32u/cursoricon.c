@@ -200,30 +200,26 @@ BOOL WINAPI NtUserClipCursor( const RECT *rect )
 
 BOOL get_clip_cursor( RECT *rect )
 {
+    volatile struct desktop_shared_memory *shared = get_desktop_shared_memory();
     UINT dpi;
-    BOOL ret;
 
-    if (!rect) return FALSE;
+    if (!rect || !shared) return FALSE;
 
-    SERVER_START_REQ( set_cursor )
+    SHARED_READ_BEGIN( &shared->seq )
     {
-        req->flags = 0;
-        if ((ret = !wine_server_call( req )))
-        {
-            rect->left   = reply->new_clip.left;
-            rect->top    = reply->new_clip.top;
-            rect->right  = reply->new_clip.right;
-            rect->bottom = reply->new_clip.bottom;
-        }
+        rect->left   = shared->cursor.clip.left;
+        rect->top    = shared->cursor.clip.top;
+        rect->right  = shared->cursor.clip.right;
+        rect->bottom = shared->cursor.clip.bottom;
     }
-    SERVER_END_REQ;
+    SHARED_READ_END( &shared->seq );
 
-    if (ret && (dpi = get_thread_dpi()))
+    if ((dpi = get_thread_dpi()))
     {
         HMONITOR monitor = monitor_from_rect( rect, MONITOR_DEFAULTTOPRIMARY, 0 );
         *rect = map_dpi_rect( *rect, get_monitor_dpi( monitor ), dpi );
     }
-    return ret;
+    return TRUE;
 }
 
 HICON alloc_cursoricon_handle( BOOL is_icon )
