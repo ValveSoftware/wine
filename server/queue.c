@@ -501,8 +501,8 @@ void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int s
     SHARED_WRITE_BEGIN( &desktop->shared->seq );
     desktop->shared->cursor.clip = new_rect;
 
-    if (desktop->cursor.clip_msg && send_clip_msg)
-        post_desktop_message( desktop, desktop->cursor.clip_msg, rect != NULL, 0 );
+    if (desktop->cursor_clip_msg && send_clip_msg)
+        post_desktop_message( desktop, desktop->cursor_clip_msg, rect != NULL, 0 );
 
     /* warp the mouse to be inside the clip rect */
     x = max( min( desktop->shared->cursor.x, desktop->shared->cursor.clip.right - 1 ), desktop->shared->cursor.clip.left );
@@ -1681,8 +1681,8 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
     }
     input = thread->queue->input;
 
-    if (win != desktop->cursor.win) always_queue = 1;
-    desktop->cursor.win = win;
+    if (win != desktop->cursor_win) always_queue = 1;
+    desktop->cursor_win = win;
 
     if (!always_queue || merge_message( input, msg )) free_message( msg );
     else
@@ -3399,7 +3399,7 @@ DECL_HANDLER(set_cursor)
 
         /* only the desktop owner can set the message */
         if (req->clip_msg && get_top_window_owner(desktop) == current->process)
-            desktop->cursor.clip_msg = req->clip_msg;
+            desktop->cursor_clip_msg = req->clip_msg;
 
         set_clip_rectangle( desktop, (req->flags & SET_CURSOR_NOCLIP) ? NULL : &req->clip, 0 );
     }
