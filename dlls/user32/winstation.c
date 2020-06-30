@@ -104,6 +104,60 @@ static const WCHAR *get_winstation_default_name( void )
     return ret ? name : NULL;
 }
 
+
+volatile struct desktop_shared_memory *get_desktop_shared_memory( void )
+{
+    static const WCHAR dir_desktop_mapsW[] = {'_','_','w','i','n','e','_','d','e','s','k','t','o','p','_','m','a','p','p','i','n','g','s','\\'};
+    struct user_thread_info *thread_info = get_user_thread_info();
+    HANDLE root = get_winstations_dir_handle(), handles[2];
+    WCHAR buf[MAX_PATH], *ptr;
+    DWORD i, needed;
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING section_str;
+    NTSTATUS status;
+    SIZE_T size;
+
+    if (thread_info->shared_memory) return thread_info->shared_memory;
+
+    handles[0] = GetProcessWindowStation();
+    handles[1] = GetThreadDesktop( GetCurrentThreadId() );
+
+    memcpy( buf, dir_desktop_mapsW, sizeof(dir_desktop_mapsW) );
+    ptr = buf + ARRAY_SIZE(dir_desktop_mapsW);
+
+    for (i = 0; i < 2; i++)
+    {
+        GetUserObjectInformationW( handles[i], UOI_NAME, (void *)ptr, sizeof(buf) - (ptr - buf) * sizeof(WCHAR), &needed );
+        ptr += needed / sizeof(WCHAR);
+        if (i == 0) *(ptr - 1) = '\\';
+    }
+
+    RtlInitUnicodeString( &section_str, buf );
+    InitializeObjectAttributes( &attr, &section_str, 0, root, NULL );
+    status = NtOpenSection( &handles[0], SECTION_ALL_ACCESS, &attr );
+    if (status)
+    {
+        ERR( "failed to open the desktop section: %08x\n", status );
+        return NULL;
+    }
+
+    ptr = NULL;
+    size = sizeof(struct desktop_shared_memory);
+    status = NtMapViewOfSection( handles[0], GetCurrentProcess(), (void *)&ptr, 0, 0, NULL,
+                                 &size, ViewUnmap, 0, PAGE_READONLY );
+    if (status)
+    {
+        ERR( "failed to map view of the desktop section: %08x\n", status );
+        CloseHandle( handles[0] );
+        return NULL;
+    }
+
+    thread_info->desktop_shared_map = handles[0];
+    thread_info->shared_memory = (struct desktop_shared_memory *)ptr;
+    return thread_info->shared_memory;
+}
+
+
 /***********************************************************************
  *              CreateWindowStationA  (USER32.@)
  */
@@ -464,6 +518,12 @@ BOOL WINAPI SetThreadDesktop( HDESK handle )
         thread_info->top_window = 0;
         thread_info->msg_window = 0;
         if (key_state_info) key_state_info->time = 0;
+        if (thread_info->desktop_shared_map)
+        {
+            CloseHandle( thread_info->desktop_shared_map );
+            thread_info->desktop_shared_map = NULL;
+            thread_info->shared_memory = NULL;
+        }
     }
     return ret;
 }
