@@ -203,6 +203,8 @@ struct user_thread_info
     HWND                          top_window;             /* Desktop window */
     HWND                          msg_window;             /* HWND_MESSAGE parent window */
     struct rawinput_thread_data  *rawinput;               /* RawInput thread local data / buffer */
+    HANDLE                        desktop_shared_map;     /* HANDLE to server's desktop shared memory */
+    struct desktop_shared_memory *shared_memory;          /* Ptr to server's desktop shared memory */
 };
 
 C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
@@ -295,6 +297,7 @@ extern BOOL WINPROC_call_window( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
 extern const WCHAR *CLASS_GetVersionedName(const WCHAR *classname, UINT *basename_offset,
         WCHAR *combined, BOOL register_class) DECLSPEC_HIDDEN;
+extern volatile struct desktop_shared_memory *get_desktop_shared_memory( void ) DECLSPEC_HIDDEN;
 
 /* message spy definitions */
 
@@ -386,5 +389,25 @@ static inline WCHAR *heap_strdupW(const WCHAR *src)
     if ((dst = heap_alloc(len))) memcpy(dst, src, len);
     return dst;
 }
+
+#if defined(__i386__) || defined(__x86_64__)
+#define __SHARED_READ_SEQ( x ) (*(x))
+#define __SHARED_READ_FENCE do {} while(0)
+#else
+#define __SHARED_READ_SEQ( x ) __atomic_load_n( x, __ATOMIC_RELAXED )
+#define __SHARED_READ_FENCE __atomic_thread_fence( __ATOMIC_ACQUIRE )
+#endif
+
+#define SHARED_READ_BEGIN( x )                                          \
+    do {                                                                \
+        unsigned int __seq;                                             \
+        do {                                                            \
+            while ((__seq = __SHARED_READ_SEQ( x )) & SEQUENCE_MASK) NtYieldExecution(); \
+            __SHARED_READ_FENCE;
+
+#define SHARED_READ_END( x )                       \
+            __SHARED_READ_FENCE;                   \
+        } while (__SHARED_READ_SEQ( x ) != __seq); \
+    } while(0)
 
 #endif /* __WINE_USER_PRIVATE_H */
