@@ -217,6 +217,7 @@ extern BOOL WINPROC_call_window( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 
 extern const WCHAR *CLASS_GetVersionedName(const WCHAR *classname, UINT *basename_offset,
         WCHAR *combined, BOOL register_class) DECLSPEC_HIDDEN;
+extern volatile struct desktop_shared_memory *get_desktop_shared_memory( void ) DECLSPEC_HIDDEN;
 
 /* kernel callbacks */
 
@@ -308,5 +309,25 @@ LRESULT WINAPI USER_ScrollBarProc(HWND, UINT, WPARAM, LPARAM, BOOL) DECLSPEC_HID
 void WINAPI USER_ScrollBarDraw(HWND, HDC, INT, enum SCROLL_HITTEST,
                                const struct SCROLL_TRACKING_INFO *, BOOL, BOOL, RECT *, INT, INT,
                                INT, BOOL) DECLSPEC_HIDDEN;
+
+#if defined(__i386__) || defined(__x86_64__)
+#define __SHARED_READ_SEQ( x ) (*(x))
+#define __SHARED_READ_FENCE do {} while(0)
+#else
+#define __SHARED_READ_SEQ( x ) __atomic_load_n( x, __ATOMIC_RELAXED )
+#define __SHARED_READ_FENCE __atomic_thread_fence( __ATOMIC_ACQUIRE )
+#endif
+
+#define SHARED_READ_BEGIN( x )                                          \
+    do {                                                                \
+        unsigned int __seq;                                             \
+        do {                                                            \
+            while ((__seq = __SHARED_READ_SEQ( x )) & SEQUENCE_MASK) NtYieldExecution(); \
+            __SHARED_READ_FENCE;
+
+#define SHARED_READ_END( x )                       \
+            __SHARED_READ_FENCE;                   \
+        } while (__SHARED_READ_SEQ( x ) != __seq); \
+    } while(0)
 
 #endif /* __WINE_USER_PRIVATE_H */
