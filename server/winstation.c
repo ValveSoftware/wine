@@ -247,7 +247,8 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->close_timeout = NULL;
             desktop->foreground_input = NULL;
             desktop->users = 0;
-            memset( &desktop->cursor, 0, sizeof(desktop->cursor) );
+            desktop->cursor_clip_msg = 0;
+            desktop->cursor_win = 0;
             memset( desktop->keystate, 0, sizeof(desktop->keystate) );
             list_add_tail( &winstation->desktops, &desktop->entry );
             list_init( &desktop->hotkeys );
