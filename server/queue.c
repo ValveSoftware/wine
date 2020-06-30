@@ -436,8 +436,8 @@ static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
     int updated;
     unsigned int time = get_tick_count();
 
-    x = max( min( x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
-    y = max( min( y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
+    x = max( min( x, desktop->shared->cursor.clip.right - 1 ), desktop->shared->cursor.clip.left );
+    y = max( min( y, desktop->shared->cursor.clip.bottom - 1 ), desktop->shared->cursor.clip.top );
     updated = (desktop->shared->cursor.x != x || desktop->shared->cursor.y != y);
 
     SHARED_WRITE_BEGIN( &desktop->shared->seq );
@@ -483,29 +483,32 @@ static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsig
 /* set the cursor clip rectangle */
 void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int send_clip_msg )
 {
-    rectangle_t top_rect;
+    rectangle_t top_rect, new_rect;
     int x, y;
 
     get_top_window_rectangle( desktop, &top_rect );
     if (rect)
     {
-        rectangle_t new_rect = *rect;
+        new_rect = *rect;
         if (new_rect.left   < top_rect.left)   new_rect.left   = top_rect.left;
         if (new_rect.right  > top_rect.right)  new_rect.right  = top_rect.right;
         if (new_rect.top    < top_rect.top)    new_rect.top    = top_rect.top;
         if (new_rect.bottom > top_rect.bottom) new_rect.bottom = top_rect.bottom;
         if (new_rect.left > new_rect.right || new_rect.top > new_rect.bottom) new_rect = top_rect;
-        desktop->cursor.clip = new_rect;
     }
-    else desktop->cursor.clip = top_rect;
+    else new_rect = top_rect;
+
+    SHARED_WRITE_BEGIN( &desktop->shared->seq );
+    desktop->shared->cursor.clip = new_rect;
 
     if (desktop->cursor.clip_msg && send_clip_msg)
         post_desktop_message( desktop, desktop->cursor.clip_msg, rect != NULL, 0 );
 
     /* warp the mouse to be inside the clip rect */
-    x = max( min( desktop->shared->cursor.x, desktop->cursor.clip.right - 1 ), desktop->cursor.clip.left );
-    y = max( min( desktop->shared->cursor.y, desktop->cursor.clip.bottom - 1 ), desktop->cursor.clip.top );
+    x = max( min( desktop->shared->cursor.x, desktop->shared->cursor.clip.right - 1 ), desktop->shared->cursor.clip.left );
+    y = max( min( desktop->shared->cursor.y, desktop->shared->cursor.clip.bottom - 1 ), desktop->shared->cursor.clip.top );
     if (x != desktop->shared->cursor.x || y != desktop->shared->cursor.y) set_cursor_pos( desktop, x, y );
+    SHARED_WRITE_END( &desktop->shared->seq );
 }
 
 /* change the foreground input and reset the cursor clip rect */
@@ -3403,7 +3406,7 @@ DECL_HANDLER(set_cursor)
 
     reply->new_x       = input->desktop->shared->cursor.x;
     reply->new_y       = input->desktop->shared->cursor.y;
-    reply->new_clip    = input->desktop->cursor.clip;
+    reply->new_clip    = input->desktop->shared->cursor.clip;
     reply->last_change = input->desktop->shared->cursor.last_change;
 }
 
