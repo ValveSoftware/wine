@@ -71,6 +71,7 @@ struct desktop
     user_handle_t                          cursor_win;       /* window that contains the cursor */
     struct object                         *shared_mapping;   /* desktop shared memory mapping */
     volatile struct desktop_shared_memory *shared;           /* desktop shared memory ptr */
+    unsigned int                           last_press_alt:1; /* last key press was Alt (used to determine msg on Alt release) */
 };
 
 /* user handles functions */
