@@ -267,6 +267,13 @@ static void thread_detach(void)
     HeapFree( GetProcessHeap(), 0, thread_info->key_state );
     HeapFree( GetProcessHeap(), 0, thread_info->rawinput );
 
+    if (thread_info->desktop_shared_map)
+    {
+        CloseHandle( thread_info->desktop_shared_map );
+        thread_info->desktop_shared_map = NULL;
+        thread_info->desktop_shared_memory = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 
