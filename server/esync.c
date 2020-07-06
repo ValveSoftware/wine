@@ -348,19 +348,25 @@ int esync_create_fd( int initval, int flags )
 #endif
 }
 
+/* Wake up a specific fd. */
+void esync_wake_fd( int fd )
+{
+    static const uint64_t value = 1;
+
+    if (write( fd, &value, sizeof(value) ) == -1)
+        perror( "esync: write" );
+}
+
 /* Wake up a server-side esync object. */
 void esync_wake_up( struct object *obj )
 {
-    static const uint64_t value = 1;
     enum esync_type dummy;
     int fd;
 
     if (obj->ops->get_esync_fd)
     {
         fd = obj->ops->get_esync_fd( obj, &dummy );
-
-        if (write( fd, &value, sizeof(value) ) == -1)
-            perror( "esync: write" );
+        esync_wake_fd( fd );
     }
 }
 
@@ -497,4 +503,10 @@ DECL_HANDLER(get_esync_fd)
     }
 
     release_object( obj );
+}
+
+/* Return the fd used for waiting on user APCs. */
+DECL_HANDLER(get_esync_apc_fd)
+{
+    send_client_fd( current->process, current->esync_apc_fd, current->id );
 }
