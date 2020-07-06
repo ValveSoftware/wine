@@ -583,6 +583,9 @@ NTSTATUS WINAPI NtOpenMutant( HANDLE *handle, ACCESS_MASK access, const OBJECT_A
     *handle = 0;
     if ((ret = validate_open_object_attributes( attr ))) return ret;
 
+    if (do_esync())
+        return esync_open_mutex( handle, access, attr );
+
     SERVER_START_REQ( open_mutex )
     {
         req->access  = access;
