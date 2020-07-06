@@ -20,6 +20,7 @@
 
 extern int do_esync(void);
 extern void esync_init(void);
+extern NTSTATUS esync_close( HANDLE handle );
 
 extern NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max);
