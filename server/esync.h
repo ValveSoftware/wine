@@ -20,3 +20,4 @@
 
 extern int do_esync(void);
 void esync_init(void);
+int esync_create_fd( int initval, int flags );
