@@ -28,6 +28,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <stdlib.h>
 #ifdef HAVE_SYS_MMAN_H
 # include <sys/mman.h>
@@ -173,6 +174,16 @@ static struct esync *add_to_list( HANDLE handle, enum esync_type type, int fd, v
     return &esync_list[entry][idx];
 }
 
+static struct esync *get_cached_object( HANDLE handle )
+{
+    UINT_PTR entry, idx = handle_to_index( handle, &entry );
+
+    if (entry >= ESYNC_LIST_ENTRIES || !esync_list[entry]) return NULL;
+    if (!esync_list[entry][idx].type) return NULL;
+
+    return &esync_list[entry][idx];
+}
+
 static NTSTATUS create_esync( enum esync_type type, HANDLE *handle, ACCESS_MASK access,
                               const OBJECT_ATTRIBUTES *attr, int initval, int max )
 {
@@ -226,6 +237,38 @@ extern NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
         attr ? debugstr_us(attr->ObjectName) : "<no name>", initial, max);
 
     return create_esync( ESYNC_SEMAPHORE, handle, access, attr, initial, max );
+}
+
+NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
+{
+    struct esync *obj;
+    struct semaphore *semaphore;
+    uint64_t count64 = count;
+    ULONG current;
+
+    TRACE("%p, %d, %p.\n", handle, count, prev);
+
+    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    semaphore = obj->shm;
+
+    do
+    {
+        current = semaphore->count;
+
+        if (count + current > semaphore->max)
+            return STATUS_SEMAPHORE_LIMIT_EXCEEDED;
+    } while (InterlockedCompareExchange( &semaphore->count, count + current, current ) != current);
+
+    if (prev) *prev = current;
+
+    /* We don't have to worry about a race between increasing the count and
+     * write(). The fact that we were able to increase the count means that we
+     * have permission to actually write that many releases to the semaphore. */
+
+    if (write( obj->fd, &count64, sizeof(count64) ) == -1)
+        return errno_to_status( errno );
+
+    return STATUS_SUCCESS;
 }
 
 void esync_init(void)

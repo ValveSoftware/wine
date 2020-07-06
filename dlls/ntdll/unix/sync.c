@@ -407,6 +407,9 @@ NTSTATUS WINAPI NtReleaseSemaphore( HANDLE handle, ULONG count, ULONG *previous 
 {
     NTSTATUS ret;
 
+    if (do_esync())
+        return esync_release_semaphore( handle, count, previous );
+
     SERVER_START_REQ( release_semaphore )
     {
         req->handle = wine_server_obj_handle( handle );
