@@ -37,6 +37,8 @@ extern NTSTATUS esync_release_mutex( HANDLE *handle, LONG *prev ) DECLSPEC_HIDDE
 
 extern NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                                     BOOLEAN alertable, const LARGE_INTEGER *timeout ) DECLSPEC_HIDDEN;
+extern NTSTATUS esync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
+    const LARGE_INTEGER *timeout ) DECLSPEC_HIDDEN;
 
 
 /* We have to synchronize on the fd cache mutex so that our calls to receive_fd
