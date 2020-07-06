@@ -388,6 +388,9 @@ NTSTATUS WINAPI NtQuerySemaphore( HANDLE handle, SEMAPHORE_INFORMATION_CLASS cla
 
     if (len != sizeof(SEMAPHORE_BASIC_INFORMATION)) return STATUS_INFO_LENGTH_MISMATCH;
 
+    if (do_esync())
+        return esync_query_semaphore( handle, info, ret_len );
+
     SERVER_START_REQ( query_semaphore )
     {
         req->handle = wine_server_obj_handle( handle );
