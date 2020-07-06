@@ -717,7 +717,7 @@ NTSTATUS esync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
 
     out->CurrentCount = 1 - mutex->count;
     out->OwnedByCaller = (mutex->tid == GetCurrentThreadId());
-    out->AbandonedState = FALSE;
+    out->AbandonedState = (mutex->tid == ~0);
     if (ret_len) *ret_len = sizeof(*out);
 
     return STATUS_SUCCESS;
@@ -767,14 +767,19 @@ static int do_poll( struct pollfd *fds, nfds_t nfds, ULONGLONG *end )
     return ret;
 }
 
-static void update_grabbed_object( struct esync *obj )
+/* Return TRUE if abandoned. */
+static BOOL update_grabbed_object( struct esync *obj )
 {
+    BOOL ret = FALSE;
+
     if (obj->type == ESYNC_MUTEX)
     {
         struct mutex *mutex = obj->shm;
         /* We don't have to worry about a race between this and read(); the
          * fact that we grabbed it means the count is now zero, so nobody else
          * can (and the only thread that can release it is us). */
+        if (mutex->tid == ~0)
+            ret = TRUE;
         mutex->tid = GetCurrentThreadId();
         mutex->count++;
     }
@@ -795,6 +800,8 @@ static void update_grabbed_object( struct esync *obj )
          * This might already be 0, but that's okay! */
         event->signaled = 0;
     }
+
+    return ret;
 }
 
 /* A value of STATUS_NOT_IMPLEMENTED returned from this function means that we
@@ -914,7 +921,13 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
                     {
                         if ((size = read( obj->fd, &value, sizeof(value) )) == sizeof(value))
                         {
-                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            if (mutex->tid == ~0)
+                            {
+                                TRACE("Woken up by abandoned mutex %p [%d].\n", handles[i], i);
+                                i += STATUS_ABANDONED_WAIT_0;
+                            }
+                            else
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             mutex->tid = GetCurrentThreadId();
                             mutex->count++;
                             return i;
@@ -1027,7 +1040,8 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
                             {
                                 /* We found our object. */
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                                update_grabbed_object( obj );
+                                if (update_grabbed_object( obj ))
+                                    return STATUS_ABANDONED_WAIT_0 + i;
                                 return i;
                             }
                         }
@@ -1120,6 +1134,8 @@ tryagain:
             ret = poll( fds, pollcount, 0 );
             if (ret == pollcount)
             {
+                BOOL abandoned = FALSE;
+
                 /* Quick, grab everything. */
                 for (i = 0; i < count; i++)
                 {
@@ -1160,8 +1176,13 @@ tryagain:
                 /* Make sure to let ourselves know that we grabbed the mutexes
                  * and semaphores. */
                 for (i = 0; i < count; i++)
-                    update_grabbed_object( objs[i] );
+                    abandoned |= update_grabbed_object( objs[i] );
 
+                if (abandoned)
+                {
+                    TRACE("Wait successful, but some object(s) were abandoned.\n");
+                    return STATUS_ABANDONED;
+                }
                 TRACE("Wait successful.\n");
                 return STATUS_SUCCESS;
             }
