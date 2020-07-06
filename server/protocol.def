@@ -3765,3 +3765,7 @@ enum esync_type
 @REQ(esync_msgwait)
     int          in_msgwait;    /* are we in a message wait? */
 @END
+
+/* Retrieve the fd to wait on for user APCs. */
+@REQ(get_esync_apc_fd)
+@END
