@@ -700,6 +700,9 @@ NTSTATUS WINAPI NtQueryMutant( HANDLE handle, MUTANT_INFORMATION_CLASS class,
 
     if (len != sizeof(MUTANT_BASIC_INFORMATION)) return STATUS_INFO_LENGTH_MISMATCH;
 
+    if (do_esync())
+        return esync_query_mutex( handle, info, ret_len );
+
     SERVER_START_REQ( query_mutex )
     {
         req->handle = wine_server_obj_handle( handle );
