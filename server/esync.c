@@ -412,6 +412,37 @@ DECL_HANDLER(create_esync)
     if (root) release_object( root );
 }
 
+DECL_HANDLER(open_esync)
+{
+    struct unicode_str name = get_req_unicode_str();
+
+    reply->handle = open_object( current->process, req->rootdir, req->access,
+                                 &esync_ops, &name, req->attributes );
+
+    /* send over the fd */
+    if (reply->handle)
+    {
+        struct esync *esync;
+
+        if (!(esync = (struct esync *)get_handle_obj( current->process, reply->handle,
+                                                      0, &esync_ops )))
+            return;
+
+        if (!type_matches( req->type, esync->type ))
+        {
+            set_error( STATUS_OBJECT_TYPE_MISMATCH );
+            release_object( esync );
+            return;
+        }
+
+        reply->type = esync->type;
+        reply->shm_idx = esync->shm_idx;
+
+        send_client_fd( current->process, esync->fd, reply->handle );
+        release_object( esync );
+    }
+}
+
 /* Retrieve a file descriptor for an esync object which will be signaled by the
  * server. The client should only read from (i.e. wait on) this object. */
 DECL_HANDLER(get_esync_fd)

@@ -336,6 +336,45 @@ static NTSTATUS create_esync( enum esync_type type, HANDLE *handle, ACCESS_MASK 
     return ret;
 }
 
+static NTSTATUS open_esync( enum esync_type type, HANDLE *handle,
+    ACCESS_MASK access, const OBJECT_ATTRIBUTES *attr )
+{
+    NTSTATUS ret;
+    obj_handle_t fd_handle;
+    unsigned int shm_idx;
+    sigset_t sigset;
+    int fd;
+
+    server_enter_uninterrupted_section( &fd_cache_mutex, &sigset );
+    SERVER_START_REQ( open_esync )
+    {
+        req->access     = access;
+        req->attributes = attr->Attributes;
+        req->rootdir    = wine_server_obj_handle( attr->RootDirectory );
+        req->type       = type;
+        if (attr->ObjectName)
+            wine_server_add_data( req, attr->ObjectName->Buffer, attr->ObjectName->Length );
+        if (!(ret = wine_server_call( req )))
+        {
+            *handle = wine_server_ptr_handle( reply->handle );
+            type = reply->type;
+            shm_idx = reply->shm_idx;
+            fd = receive_fd( &fd_handle );
+            assert( wine_server_ptr_handle(fd_handle) == *handle );
+        }
+    }
+    SERVER_END_REQ;
+    server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
+
+    if (!ret)
+    {
+        add_to_list( *handle, type, fd, shm_idx ? get_shm( shm_idx ) : 0 );
+
+        TRACE("-> handle %p, fd %d.\n", *handle, fd);
+    }
+    return ret;
+}
+
 extern NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max)
 {
@@ -343,6 +382,14 @@ extern NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
         attr ? debugstr_us(attr->ObjectName) : "<no name>", initial, max);
 
     return create_esync( ESYNC_SEMAPHORE, handle, access, attr, initial, max );
+}
+
+NTSTATUS esync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    return open_esync( ESYNC_SEMAPHORE, handle, access, attr );
 }
 
 NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
