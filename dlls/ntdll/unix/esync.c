@@ -496,6 +496,26 @@ NTSTATUS esync_reset_event( HANDLE handle )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_query_event( HANDLE handle, void *info, ULONG *ret_len )
+{
+    struct esync *obj;
+    EVENT_BASIC_INFORMATION *out = info;
+    struct pollfd fd;
+    NTSTATUS ret;
+
+    TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+
+    fd.fd = obj->fd;
+    fd.events = POLLIN;
+    out->EventState = poll( &fd, 1, 0 );
+    out->EventType = (obj->type == ESYNC_AUTO_EVENT ? SynchronizationEvent : NotificationEvent);
+    if (ret_len) *ret_len = sizeof(*out);
+
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
 {
