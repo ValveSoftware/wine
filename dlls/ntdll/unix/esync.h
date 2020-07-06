@@ -33,6 +33,7 @@ extern NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN initial );
 extern NTSTATUS esync_open_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr );
+extern NTSTATUS esync_query_event( HANDLE handle, void *info, ULONG *ret_len );
 extern NTSTATUS esync_reset_event( HANDLE handle );
 extern NTSTATUS esync_set_event( HANDLE handle );
 
