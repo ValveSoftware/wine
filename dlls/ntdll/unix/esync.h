@@ -30,6 +30,8 @@ extern NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev
 
 extern NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, EVENT_TYPE type, BOOLEAN initial ) DECLSPEC_HIDDEN;
+extern NTSTATUS esync_open_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr ) DECLSPEC_HIDDEN;
 extern NTSTATUS esync_reset_event( HANDLE handle ) DECLSPEC_HIDDEN;
 extern NTSTATUS esync_set_event( HANDLE handle ) DECLSPEC_HIDDEN;
 
