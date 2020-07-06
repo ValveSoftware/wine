@@ -41,6 +41,7 @@ extern NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, BOOLEAN initial ) DECLSPEC_HIDDEN;
 extern NTSTATUS esync_open_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr ) DECLSPEC_HIDDEN;
+extern NTSTATUS esync_query_mutex( HANDLE handle, void *info, ULONG *ret_len ) DECLSPEC_HIDDEN;
 extern NTSTATUS esync_release_mutex( HANDLE *handle, LONG *prev ) DECLSPEC_HIDDEN;
 
 extern NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
