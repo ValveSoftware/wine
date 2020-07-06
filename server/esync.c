@@ -297,6 +297,24 @@ struct esync *create_esync( struct object *root, const struct unicode_str *name,
 #endif
 }
 
+/* Create a file descriptor for an existing handle.
+ * Caller must close the handle when it's done; it's not linked to an esync
+ * server object in any way. */
+int esync_create_fd( int initval, int flags )
+{
+#ifdef HAVE_SYS_EVENTFD_H
+    int fd;
+
+    fd = eventfd( initval, flags | EFD_CLOEXEC | EFD_NONBLOCK );
+    if (fd == -1)
+        perror( "eventfd" );
+
+    return fd;
+#else
+    return -1;
+#endif
+}
+
 DECL_HANDLER(create_esync)
 {
     struct esync *esync;
