@@ -607,6 +607,31 @@ NTSTATUS esync_reset_event( HANDLE handle )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_pulse_event( HANDLE handle )
+{
+    uint64_t value = 1;
+    struct esync *obj;
+    NTSTATUS ret;
+
+    TRACE("%p.\n", handle);
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+
+    /* This isn't really correct; an application could miss the write.
+     * Unfortunately we can't really do much better. Fortunately this is rarely
+     * used (and publicly deprecated). */
+    if (write( obj->fd, &value, sizeof(value) ) == -1)
+        return errno_to_status( errno );
+
+    /* Try to give other threads a chance to wake up. Hopefully erring on this
+     * side is the better thing to do... */
+    NtYieldExecution();
+
+    read( obj->fd, &value, sizeof(value) );
+
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS esync_query_event( HANDLE handle, void *info, ULONG *ret_len )
 {
     struct esync *obj;
