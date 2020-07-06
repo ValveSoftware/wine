@@ -511,7 +511,16 @@ static int do_poll( struct pollfd *fds, nfds_t nfds, ULONGLONG *end )
 
 static void update_grabbed_object( struct esync *obj )
 {
-    if (obj->type == ESYNC_SEMAPHORE)
+    if (obj->type == ESYNC_MUTEX)
+    {
+        struct mutex *mutex = obj->shm;
+        /* We don't have to worry about a race between this and read(); the
+         * fact that we grabbed it means the count is now zero, so nobody else
+         * can (and the only thread that can release it is us). */
+        mutex->tid = GetCurrentThreadId();
+        mutex->count++;
+    }
+    else if (obj->type == ESYNC_SEMAPHORE)
     {
         struct semaphore *semaphore = obj->shm;
         /* We don't have to worry about a race between this and read(); the
@@ -597,7 +606,25 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
     {
         for (i = 0; i < count; i++)
         {
-            fds[i].fd = objs[i] ? objs[i]->fd : -1;
+            struct esync *obj = objs[i];
+
+            if (obj && obj->type == ESYNC_MUTEX)
+            {
+                /* If we already own the mutex, return immediately. */
+                /* Note: This violates the assumption that the *first* object
+                 * to be signaled will be returned. If that becomes a problem,
+                 * we can always check the state of each object before waiting. */
+                struct mutex *mutex = (struct mutex *)obj;
+
+                if (mutex->tid == GetCurrentThreadId())
+                {
+                    TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                    mutex->count++;
+                    return i;
+                }
+            }
+
+            fds[i].fd = obj ? obj->fd : -1;
             fds[i].events = POLLIN;
         }
 
