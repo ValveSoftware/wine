@@ -486,6 +486,14 @@ NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     return create_esync( ESYNC_MUTEX, handle, access, attr, initial ? 0 : 1, 0 );
 }
 
+NTSTATUS esync_open_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    return open_esync( ESYNC_MUTEX, handle, access, attr );
+}
+
 NTSTATUS esync_release_mutex( HANDLE *handle, LONG *prev )
 {
     struct esync *obj;
