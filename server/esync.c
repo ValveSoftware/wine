@@ -41,6 +41,7 @@
 #include "handle.h"
 #include "request.h"
 #include "file.h"
+#include "esync.h"
 
 int do_esync(void)
 {
