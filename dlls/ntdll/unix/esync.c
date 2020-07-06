@@ -431,6 +431,40 @@ NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     return create_esync( ESYNC_MUTEX, handle, access, attr, initial ? 0 : 1, 0 );
 }
 
+NTSTATUS esync_release_mutex( HANDLE *handle, LONG *prev )
+{
+    struct esync *obj;
+    struct mutex *mutex;
+    static const uint64_t value = 1;
+    NTSTATUS ret;
+
+    TRACE("%p, %p.\n", handle, prev);
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+    mutex = obj->shm;
+
+    /* This is thread-safe, because the only thread that can change the tid to
+     * or from our tid is ours. */
+    if (mutex->tid != GetCurrentThreadId()) return STATUS_MUTANT_NOT_OWNED;
+
+    if (prev) *prev = mutex->count;
+
+    mutex->count--;
+
+    if (!mutex->count)
+    {
+        /* This is also thread-safe, as long as signaling the file is the last
+         * thing we do. Other threads don't care about the tid if it isn't
+         * theirs. */
+        mutex->tid = 0;
+
+        if (write( obj->fd, &value, sizeof(value) ) == -1)
+            return errno_to_status( errno );
+    }
+
+    return STATUS_SUCCESS;
+}
+
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
 
