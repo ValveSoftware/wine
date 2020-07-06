@@ -23,6 +23,7 @@ extern void esync_init(void) DECLSPEC_HIDDEN;
 
 extern NTSTATUS esync_create_semaphore(HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, LONG initial, LONG max) DECLSPEC_HIDDEN;
+extern NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev ) DECLSPEC_HIDDEN;
 
 
 /* We have to synchronize on the fd cache mutex so that our calls to receive_fd
