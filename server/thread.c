@@ -1300,6 +1300,8 @@ void kill_thread( struct thread *thread, int violent_death )
     kill_console_processes( thread, 0 );
     debug_exit_thread( thread );
     abandon_mutexes( thread );
+    if (do_esync())
+        esync_abandon_mutexes( thread );
     wake_up( &thread->obj, 0 );
     if (violent_death) send_thread_signal( thread, SIGQUIT );
     cleanup_thread( thread );
