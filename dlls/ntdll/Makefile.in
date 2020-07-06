@@ -47,6 +47,7 @@ C_SRCS = \
 	unix/cdrom.c \
 	unix/debug.c \
 	unix/env.c \
+	unix/esync.c \
 	unix/file.c \
 	unix/loader.c \
 	unix/loadorder.c \
