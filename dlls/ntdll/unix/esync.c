@@ -316,6 +316,21 @@ NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
     return create_esync( type, handle, access, attr, initial, 0 );
 }
 
+NTSTATUS esync_set_event( HANDLE handle )
+{
+    static const uint64_t value = 1;
+    struct esync *obj;
+
+    TRACE("%p.\n", handle);
+
+    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+
+    if (write( obj->fd, &value, sizeof(value) ) == -1)
+        ERR("write: %s\n", strerror(errno));
+
+    return STATUS_SUCCESS;
+}
+
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
 
