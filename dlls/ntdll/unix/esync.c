@@ -483,12 +483,24 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                         int64_t value;
                         ssize_t size;
 
-                        if ((size = read( fds[i].fd, &value, sizeof(value) )) == sizeof(value))
+                        if (obj->type == ESYNC_MANUAL_EVENT)
                         {
-                            /* We found our object. */
-                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                            update_grabbed_object( obj );
-                            return i;
+                            /* Don't grab the object, just check if it's signaled. */
+                            if (fds[i].revents & POLLIN)
+                            {
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                return i;
+                            }
+                        }
+                        else
+                        {
+                            if ((size = read( fds[i].fd, &value, sizeof(value) )) == sizeof(value))
+                            {
+                                /* We found our object. */
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                update_grabbed_object( obj );
+                                return i;
+                            }
                         }
                     }
                 }
