@@ -464,18 +464,103 @@ NTSTATUS esync_open_event( HANDLE *handle, ACCESS_MASK access,
     return open_esync( ESYNC_AUTO_EVENT, handle, access, attr ); /* doesn't matter which */
 }
 
+static inline void small_pause(void)
+{
+#ifdef __i386__
+    __asm__ __volatile__( "rep;nop" : : : "memory" );
+#else
+    __asm__ __volatile__( "" : : : "memory" );
+#endif
+}
+
+/* Manual-reset events are actually racier than other objects in terms of shm
+ * state. With other objects, races don't matter, because we only treat the shm
+ * state as a hint that lets us skip poll()—we still have to read(). But with
+ * manual-reset events we don't, which means that the shm state can be out of
+ * sync with the actual state.
+ *
+ * In general we shouldn't have to worry about races between modifying the
+ * event and waiting on it. If the state changes while we're waiting, it's
+ * equally plausible that we caught it before or after the state changed.
+ * However, we can have races between SetEvent() and ResetEvent(), so that the
+ * event has inconsistent internal state.
+ *
+ * To solve this we have to use the other field to lock the event. Currently
+ * this is implemented as a spinlock, but I'm not sure if a futex might be
+ * better. I'm also not sure if it's possible to obviate locking by arranging
+ * writes and reads in a certain way.
+ *
+ * Note that we don't have to worry about locking in esync_wait_objects().
+ * There's only two general patterns:
+ *
+ * WaitFor()    SetEvent()
+ * -------------------------
+ * read()
+ * signaled = 0
+ *              signaled = 1
+ *              write()
+ * -------------------------
+ * read()
+ *              signaled = 1
+ * signaled = 0
+ *              <no write(), because it was already signaled>
+ * -------------------------
+ *
+ * That is, if SetEvent() tries to signal the event before WaitFor() resets its
+ * signaled state, it won't bother trying to write(), and then the signaled
+ * state will be reset, so the result is a consistent non-signaled event.
+ * There's several variations to this pattern but all of them are protected in
+ * the same way. Note however this is why we have to use interlocked_xchg()
+ * event inside of the lock.
+ */
+
+/* Removing this spinlock is harder than it looks. esync_wait_objects() can
+ * deal with inconsistent state well enough, and a race between SetEvent() and
+ * ResetEvent() gives us license to yield either result as long as we act
+ * consistently, but that's not enough. Notably, esync_wait_objects() should
+ * probably act like a fence, so that the second half of esync_set_event() does
+ * not seep past a subsequent reset. That's one problem, but no guarantee there
+ * aren't others. */
+
 NTSTATUS esync_set_event( HANDLE handle )
 {
     static const uint64_t value = 1;
     struct esync *obj;
+    struct event *event;
     NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
-    if ((ret = get_object( handle, &obj))) return ret;
+    if ((ret = get_object( handle, &obj ))) return ret;
+    event = obj->shm;
 
-    if (write( obj->fd, &value, sizeof(value) ) == -1)
-        ERR("write: %s\n", strerror(errno));
+    if (obj->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Acquire the spinlock. */
+        while (InterlockedCompareExchange( &event->locked, 1, 0 ))
+            small_pause();
+    }
+
+    /* For manual-reset events, as long as we're in a lock, we can take the
+     * optimization of only calling write() if the event wasn't already
+     * signaled.
+     *
+     * For auto-reset events, esync_wait_objects() must grab the kernel object.
+     * Thus if we got into a race so that the shm state is signaled but the
+     * eventfd is unsignaled (i.e. reset shm, set shm, set fd, reset fd), we
+     * *must* signal the fd now, or any waiting threads will never wake up. */
+
+    if (!InterlockedExchange( &event->signaled, 1 ) || obj->type == ESYNC_AUTO_EVENT)
+    {
+        if (write( obj->fd, &value, sizeof(value) ) == -1)
+            ERR("write: %s\n", strerror(errno));
+    }
+
+    if (obj->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Release the spinlock. */
+        event->locked = 0;
+    }
 
     return STATUS_SUCCESS;
 }
@@ -484,14 +569,40 @@ NTSTATUS esync_reset_event( HANDLE handle )
 {
     uint64_t value;
     struct esync *obj;
+    struct event *event;
     NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
-    if ((ret = get_object( handle, &obj))) return ret;
+    if ((ret = get_object( handle, &obj ))) return ret;
+    event = obj->shm;
 
-    if (read( obj->fd, &value, sizeof(value) ) == -1 && errno != EWOULDBLOCK && errno != EAGAIN)
-        ERR("read: %s\n", strerror(errno));
+    if (obj->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Acquire the spinlock. */
+        while (InterlockedCompareExchange( &event->locked, 1, 0 ))
+            small_pause();
+    }
+
+    /* For manual-reset events, as long as we're in a lock, we can take the
+     * optimization of only calling read() if the event was already signaled.
+     *
+     * For auto-reset events, we have no guarantee that the previous "signaled"
+     * state is actually correct. We need to leave both states unsignaled after
+     * leaving this function, so we always have to read(). */
+    if (InterlockedExchange( &event->signaled, 0 ) || obj->type == ESYNC_AUTO_EVENT)
+    {
+        if (read( obj->fd, &value, sizeof(value) ) == -1 && errno != EWOULDBLOCK && errno != EAGAIN)
+        {
+            ERR("read: %s\n", strerror(errno));
+        }
+    }
+
+    if (obj->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Release the spinlock. */
+        event->locked = 0;
+    }
 
     return STATUS_SUCCESS;
 }
@@ -802,9 +913,31 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
                     break;
                 }
                 case ESYNC_AUTO_EVENT:
-                case ESYNC_MANUAL_EVENT:
-                    /* TODO */
+                {
+                    struct event *event = obj->shm;
+
+                    if (event->signaled)
+                    {
+                        if ((size = read( obj->fd, &value, sizeof(value) )) == sizeof(value))
+                        {
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            event->signaled = 0;
+                            return i;
+                        }
+                    }
                     break;
+                }
+                case ESYNC_MANUAL_EVENT:
+                {
+                    struct event *event = obj->shm;
+
+                    if (event->signaled)
+                    {
+                        TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                        return i;
+                    }
+                    break;
+                }
                 case ESYNC_AUTO_SERVER:
                 case ESYNC_MANUAL_SERVER:
                 case ESYNC_QUEUE:

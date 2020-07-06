@@ -378,24 +378,77 @@ void esync_clear( int fd )
     read( fd, &value, sizeof(value) );
 }
 
+static inline void small_pause(void)
+{
+#ifdef __i386__
+    __asm__ __volatile__( "rep;nop" : : : "memory" );
+#else
+    __asm__ __volatile__( "" : : : "memory" );
+#endif
+}
+
 /* Server-side event support. */
 void esync_set_event( struct esync *esync )
 {
     static const uint64_t value = 1;
+    struct event *event = get_shm( esync->shm_idx );
 
     assert( esync->obj.ops == &esync_ops );
-    if (write( esync->fd, &value, sizeof(value) ) == -1)
-        perror( "esync: write" );
+    assert( event != NULL );
+
+    if (debug_level)
+        fprintf( stderr, "esync_set_event() fd=%d\n", esync->fd );
+
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Acquire the spinlock. */
+        while (__sync_val_compare_and_swap( &event->locked, 0, 1 ))
+            small_pause();
+    }
+
+    if (!__atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST ))
+    {
+        if (write( esync->fd, &value, sizeof(value) ) == -1)
+            perror( "esync: write" );
+    }
+
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Release the spinlock. */
+        event->locked = 0;
+    }
 }
 
 void esync_reset_event( struct esync *esync )
 {
     static uint64_t value = 1;
+    struct event *event = get_shm( esync->shm_idx );
 
     assert( esync->obj.ops == &esync_ops );
+    assert( event != NULL );
 
-    /* we don't care about the return value */
-    read( esync->fd, &value, sizeof(value) );
+    if (debug_level)
+        fprintf( stderr, "esync_reset_event() fd=%d\n", esync->fd );
+
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Acquire the spinlock. */
+        while (__sync_val_compare_and_swap( &event->locked, 0, 1 ))
+            small_pause();
+    }
+
+    /* Only bother signaling the fd if we weren't already signaled. */
+    if (__atomic_exchange_n( &event->signaled, 0, __ATOMIC_SEQ_CST ))
+    {
+        /* we don't care about the return value */
+        read( esync->fd, &value, sizeof(value) );
+    }
+
+    if (esync->type == ESYNC_MANUAL_EVENT)
+    {
+        /* Release the spinlock. */
+        event->locked = 0;
+    }
 }
 
 DECL_HANDLER(create_esync)
