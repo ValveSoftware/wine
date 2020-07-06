@@ -114,6 +114,7 @@ struct esync
 };
 
 static void esync_dump( struct object *obj, int verbose );
+static int esync_get_esync_fd( struct object *obj, enum esync_type *type );
 static unsigned int esync_map_access( struct object *obj, unsigned int access );
 static void esync_destroy( struct object *obj );
 
@@ -125,7 +126,7 @@ const struct object_ops esync_ops =
     no_add_queue,              /* add_queue */
     NULL,                      /* remove_queue */
     NULL,                      /* signaled */
-    NULL,                      /* get_esync_fd */
+    esync_get_esync_fd,        /* get_esync_fd */
     NULL,                      /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -147,6 +148,13 @@ static void esync_dump( struct object *obj, int verbose )
     struct esync *esync = (struct esync *)obj;
     assert( obj->ops == &esync_ops );
     fprintf( stderr, "esync fd=%d\n", esync->fd );
+}
+
+static int esync_get_esync_fd( struct object *obj, enum esync_type *type )
+{
+    struct esync *esync = (struct esync *)obj;
+    *type = esync->type;
+    return esync->fd;
 }
 
 static unsigned int esync_map_access( struct object *obj, unsigned int access )
