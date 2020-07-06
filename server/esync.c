@@ -203,6 +203,13 @@ struct semaphore
 };
 C_ASSERT(sizeof(struct semaphore) == 8);
 
+struct event
+{
+    int signaled;
+    int locked;
+};
+C_ASSERT(sizeof(struct event) == 8);
+
 struct esync *create_esync( struct object *root, const struct unicode_str *name,
                             unsigned int attr, int initval, int max, enum esync_type type,
                             const struct security_descriptor *sd )
@@ -256,6 +263,14 @@ struct esync *create_esync( struct object *root, const struct unicode_str *name,
                 struct semaphore *semaphore = get_shm( esync->shm_idx );
                 semaphore->max = max;
                 semaphore->count = initval;
+                break;
+            }
+            case ESYNC_AUTO_EVENT:
+            case ESYNC_MANUAL_EVENT:
+            {
+                struct event *event = get_shm( esync->shm_idx );
+                event->signaled = initval ? 1 : 0;
+                event->locked = 0;
                 break;
             }
             default:

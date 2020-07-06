@@ -91,6 +91,13 @@ struct semaphore
 };
 C_ASSERT(sizeof(struct semaphore) == 8);
 
+struct event
+{
+    int signaled;
+    int locked;
+};
+C_ASSERT(sizeof(struct event) == 8);
+
 static char shm_name[29];
 static int shm_fd;
 static void **shm_addrs;
@@ -297,6 +304,18 @@ NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, EVENT_TYPE event_type, BOOLEAN initial )
+{
+    enum esync_type type = (event_type == SynchronizationEvent ? ESYNC_AUTO_EVENT : ESYNC_MANUAL_EVENT);
+
+    TRACE("name %s, %s-reset, initial %d.\n",
+        attr ? debugstr_us(attr->ObjectName) : "<no name>",
+        event_type == NotificationEvent ? "manual" : "auto", initial);
+
+    return create_esync( type, handle, access, attr, initial, 0 );
+}
+
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
 
@@ -341,6 +360,14 @@ static void update_grabbed_object( struct esync *obj )
          * and if someone else grabbed it then the count must have been >= 2,
          * etc. */
         InterlockedExchangeAdd( &semaphore->count, -1 );
+    }
+    else if (obj->type == ESYNC_AUTO_EVENT)
+    {
+        struct event *event = obj->shm;
+        /* We don't have to worry about a race between this and read(), since
+         * this is just a hint, and the real state is in the kernel object.
+         * This might already be 0, but that's okay! */
+        event->signaled = 0;
     }
 }
 
