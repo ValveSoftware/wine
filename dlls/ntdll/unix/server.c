@@ -88,6 +88,7 @@
 #include "wine/server.h"
 #include "wine/debug.h"
 #include "unix_private.h"
+#include "esync.h"
 #include "ddk/wdm.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(server);
@@ -1710,6 +1711,9 @@ NTSTATUS WINAPI NtClose( HANDLE handle )
     HANDLE port;
     NTSTATUS ret;
     int fd = remove_fd_from_cache( handle );
+
+    if (do_esync())
+        esync_close( handle );
 
     SERVER_START_REQ( close_handle )
     {

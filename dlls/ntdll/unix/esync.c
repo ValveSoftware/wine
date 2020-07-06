@@ -184,6 +184,24 @@ static struct esync *get_cached_object( HANDLE handle )
     return &esync_list[entry][idx];
 }
 
+NTSTATUS esync_close( HANDLE handle )
+{
+    UINT_PTR entry, idx = handle_to_index( handle, &entry );
+
+    TRACE("%p.\n", handle);
+
+    if (entry < ESYNC_LIST_ENTRIES && esync_list[entry])
+    {
+        if (InterlockedExchange((int *)&esync_list[entry][idx].type, 0))
+        {
+            close( esync_list[entry][idx].fd );
+            return STATUS_SUCCESS;
+        }
+    }
+
+    return STATUS_INVALID_HANDLE;
+}
+
 static NTSTATUS create_esync( enum esync_type type, HANDLE *handle, ACCESS_MASK access,
                               const OBJECT_ATTRIBUTES *attr, int initval, int max )
 {
