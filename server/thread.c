@@ -54,6 +54,7 @@
 #include "user.h"
 #include "security.h"
 #include "unicode.h"
+#include "esync.h"
 
 
 /* thread queues */
@@ -1217,6 +1218,9 @@ void wake_up( struct object *obj, int max )
 {
     struct list *ptr;
     int ret;
+
+    if (do_esync())
+        esync_wake_up( obj );
 
     LIST_FOR_EACH( ptr, &obj->wait_queue )
     {
