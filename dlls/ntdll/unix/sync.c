@@ -413,6 +413,9 @@ NTSTATUS WINAPI NtOpenEvent( HANDLE *handle, ACCESS_MASK access, const OBJECT_AT
     *handle = 0;
     if ((ret = validate_open_object_attributes( attr ))) return ret;
 
+    if (do_esync())
+        return esync_open_event( handle, access, attr );
+
     SERVER_START_REQ( open_event )
     {
         req->access     = access;
