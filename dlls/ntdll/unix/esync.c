@@ -437,6 +437,14 @@ NTSTATUS esync_create_event( HANDLE *handle, ACCESS_MASK access,
     return create_esync( type, handle, access, attr, initial, 0 );
 }
 
+NTSTATUS esync_open_event( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr )
+{
+    TRACE("name %s.\n", debugstr_us(attr->ObjectName));
+
+    return open_esync( ESYNC_AUTO_EVENT, handle, access, attr ); /* doesn't matter which */
+}
+
 NTSTATUS esync_set_event( HANDLE handle )
 {
     static const uint64_t value = 1;
