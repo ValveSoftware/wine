@@ -199,6 +199,72 @@ static struct esync *get_cached_object( HANDLE handle )
     return &esync_list[entry][idx];
 }
 
+/* Gets an object. This is either a proper esync object (i.e. an event,
+ * semaphore, etc. created using create_esync) or a generic synchronizable
+ * server-side object which the server will signal (e.g. a process, thread,
+ * message queue, etc.) */
+static NTSTATUS get_object( HANDLE handle, struct esync **obj )
+{
+    NTSTATUS ret = STATUS_SUCCESS;
+    enum esync_type type = 0;
+    unsigned int shm_idx = 0;
+    obj_handle_t fd_handle;
+    sigset_t sigset;
+    int fd = -1;
+
+    if ((*obj = get_cached_object( handle ))) return STATUS_SUCCESS;
+
+    if ((INT_PTR)handle < 0)
+    {
+        /* We can deal with pseudo-handles, but it's just easier this way */
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
+    if (!handle)
+    {
+        /* Shadow of the Tomb Raider really likes passing in NULL handles to
+         * various functions. Concerning, but let's avoid a server call. */
+        return STATUS_INVALID_HANDLE;
+    }
+
+    /* We need to try grabbing it from the server. */
+    server_enter_uninterrupted_section( &fd_cache_mutex, &sigset );
+    if (!(*obj = get_cached_object( handle )))
+    {
+        SERVER_START_REQ( get_esync_fd )
+        {
+            req->handle = wine_server_obj_handle( handle );
+            if (!(ret = wine_server_call( req )))
+            {
+                type = reply->type;
+                shm_idx = reply->shm_idx;
+                fd = receive_fd( &fd_handle );
+                assert( wine_server_ptr_handle(fd_handle) == handle );
+            }
+        }
+        SERVER_END_REQ;
+    }
+    server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
+
+    if (*obj)
+    {
+        /* We managed to grab it while in the CS; return it. */
+        return STATUS_SUCCESS;
+    }
+
+    if (ret)
+    {
+        WARN("Failed to retrieve fd for handle %p, status %#x.\n", handle, ret);
+        *obj = NULL;
+        return ret;
+    }
+
+    TRACE("Got fd %d for handle %p.\n", fd, handle);
+
+    *obj = add_to_list( handle, type, fd, shm_idx ? get_shm( shm_idx ) : 0 );
+    return ret;
+}
+
 NTSTATUS esync_close( HANDLE handle )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
@@ -278,10 +344,11 @@ NTSTATUS esync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     struct semaphore *semaphore;
     uint64_t count64 = count;
     ULONG current;
+    NTSTATUS ret;
 
     TRACE("%p, %d, %p.\n", handle, count, prev);
 
-    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( handle, &obj))) return ret;
     semaphore = obj->shm;
 
     do
@@ -320,10 +387,11 @@ NTSTATUS esync_set_event( HANDLE handle )
 {
     static const uint64_t value = 1;
     struct esync *obj;
+    NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
-    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( handle, &obj))) return ret;
 
     if (write( obj->fd, &value, sizeof(value) ) == -1)
         ERR("write: %s\n", strerror(errno));
@@ -335,10 +403,11 @@ NTSTATUS esync_reset_event( HANDLE handle )
 {
     uint64_t value;
     struct esync *obj;
+    NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
-    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+    if ((ret = get_object( handle, &obj))) return ret;
 
     if (read( obj->fd, &value, sizeof(value) ) == -1 && errno != EWOULDBLOCK && errno != EAGAIN)
         ERR("read: %s\n", strerror(errno));
@@ -427,10 +496,13 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 
     for (i = 0; i < count; i++)
     {
-        if ((objs[i] = get_cached_object( handles[i] )))
+        ret = get_object( handles[i], &objs[i] );
+        if (ret == STATUS_SUCCESS)
             has_esync = 1;
-        else
+        else if (ret == STATUS_NOT_IMPLEMENTED)
             has_server = 1;
+        else
+            return ret;
     }
 
     if (has_esync && has_server)
@@ -483,7 +555,7 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                         int64_t value;
                         ssize_t size;
 
-                        if (obj->type == ESYNC_MANUAL_EVENT)
+                        if (obj->type == ESYNC_MANUAL_EVENT || obj->type == ESYNC_MANUAL_SERVER)
                         {
                             /* Don't grab the object, just check if it's signaled. */
                             if (fds[i].revents & POLLIN)
