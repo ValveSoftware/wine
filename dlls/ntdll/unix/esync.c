@@ -482,12 +482,13 @@ static void update_grabbed_object( struct esync *obj )
 
 /* A value of STATUS_NOT_IMPLEMENTED returned from this function means that we
  * need to delegate to server_select(). */
-NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
+static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
                              BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
     struct esync *objs[MAXIMUM_WAIT_OBJECTS];
     struct pollfd fds[MAXIMUM_WAIT_OBJECTS];
     int has_esync = 0, has_server = 0;
+    BOOL msgwait = FALSE;
     LONGLONG timeleft;
     LARGE_INTEGER now;
     ULONGLONG end;
@@ -515,6 +516,9 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
             return ret;
     }
 
+    if (objs[count - 1] && objs[count - 1]->type == ESYNC_QUEUE)
+        msgwait = TRUE;
+
     if (has_esync && has_server)
         FIXME("Can't wait on esync and server objects at the same time!\n");
     else if (has_server)
@@ -525,6 +529,9 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
         TRACE("Waiting for %s of %d handles:", wait_any ? "any" : "all", count);
         for (i = 0; i < count; i++)
             TRACE(" %p", handles[i]);
+
+        if (msgwait)
+            TRACE(" or driver events");
 
         if (!timeout)
             TRACE(", timeout = INFINITE.\n");
@@ -565,7 +572,9 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                         int64_t value;
                         ssize_t size;
 
-                        if (obj->type == ESYNC_MANUAL_EVENT || obj->type == ESYNC_MANUAL_SERVER)
+                        if (obj->type == ESYNC_MANUAL_EVENT
+                                || obj->type == ESYNC_MANUAL_SERVER
+                                || obj->type == ESYNC_QUEUE)
                         {
                             /* Don't grab the object, just check if it's signaled. */
                             if (fds[i].revents & POLLIN)
@@ -608,6 +617,44 @@ NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
         FIXME("Wait-all not implemented.\n");
         return STATUS_NOT_IMPLEMENTED;
     }
+}
+
+/* We need to let the server know when we are doing a message wait, and when we
+ * are done with one, so that all of the code surrounding hung queues works.
+ * We also need this for WaitForInputIdle(). */
+static void server_set_msgwait( int in_msgwait )
+{
+    SERVER_START_REQ( esync_msgwait )
+    {
+        req->in_msgwait = in_msgwait;
+        wine_server_call( req );
+    }
+    SERVER_END_REQ;
+}
+
+/* This is a very thin wrapper around the proper implementation above. The
+ * purpose is to make sure the server knows when we are doing a message wait.
+ * This is separated into a wrapper function since there are at least a dozen
+ * exit paths from esync_wait_objects(). */
+NTSTATUS esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_any,
+                             BOOLEAN alertable, const LARGE_INTEGER *timeout )
+{
+    BOOL msgwait = FALSE;
+    struct esync *obj;
+    NTSTATUS ret;
+
+    if (count && !get_object( handles[count - 1], &obj ) && obj->type == ESYNC_QUEUE)
+    {
+        msgwait = TRUE;
+        server_set_msgwait( 1 );
+    }
+
+    ret = __esync_wait_objects( count, handles, wait_any, alertable, timeout );
+
+    if (msgwait)
+        server_set_msgwait( 0 );
+
+    return ret;
 }
 
 void esync_init(void)
