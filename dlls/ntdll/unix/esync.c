@@ -551,7 +551,9 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
     LONGLONG timeleft;
     LARGE_INTEGER now;
     ULONGLONG end;
-    int i, ret;
+    int64_t value;
+    ssize_t size;
+    int i, j, ret;
 
     NtQuerySystemTime( &now );
     if (timeout)
@@ -646,9 +648,6 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
 
                     if (obj)
                     {
-                        int64_t value;
-                        ssize_t size;
-
                         if (obj->type == ESYNC_MANUAL_EVENT
                                 || obj->type == ESYNC_MANUAL_SERVER
                                 || obj->type == ESYNC_QUEUE)
@@ -677,22 +676,139 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
                  * we were waiting for. So keep waiting. */
                 NtQuerySystemTime( &now );
             }
-            else if (ret == 0)
-            {
-                TRACE("Wait timed out.\n");
-                return STATUS_TIMEOUT;
-            }
             else
-            {
-                ERR("ppoll failed: %s\n", strerror( errno ));
-                return errno_to_status( errno );
-            }
+                goto err;
         }
     }
     else
     {
-        FIXME("Wait-all not implemented.\n");
-        return STATUS_NOT_IMPLEMENTED;
+        /* Wait-all is a little trickier to implement correctly. Fortunately,
+         * it's not as common.
+         *
+         * The idea is basically just to wait in sequence on every object in the
+         * set. Then when we're done, try to grab them all in a tight loop. If
+         * that fails, release any resources we've grabbed (and yes, we can
+         * reliably do this—it's just mutexes and semaphores that we have to
+         * put back, and in both cases we just put back 1), and if any of that
+         * fails we start over.
+         *
+         * What makes this inherently bad is that we might temporarily grab a
+         * resource incorrectly. Hopefully it'll be quick (and hey, it won't
+         * block on wineserver) so nobody will notice. Besides, consider: if
+         * object A becomes signaled but someone grabs it before we can grab it
+         * and everything else, then they could just as well have grabbed it
+         * before it became signaled. Similarly if object A was signaled and we
+         * were blocking on object B, then B becomes available and someone grabs
+         * A before we can, then they might have grabbed A before B became
+         * signaled. In either case anyone who tries to wait on A or B will be
+         * waiting for an instant while we put things back. */
+
+        while (1)
+        {
+tryagain:
+            /* First step: try to poll on each object in sequence. */
+            fds[0].events = POLLIN;
+            for (i = 0; i < count; i++)
+            {
+                struct esync *obj = objs[i];
+
+                fds[0].fd = obj ? obj->fd : -1;
+
+                if (obj && obj->type == ESYNC_MUTEX)
+                {
+                    /* It might be ours. */
+                    struct mutex *mutex = obj->shm;
+
+                    if (mutex->tid == GetCurrentThreadId())
+                        continue;
+                }
+
+                ret = do_poll( fds, 1, timeout ? &end : NULL );
+                if (ret <= 0)
+                    goto err;
+
+                if (fds[0].revents & (POLLHUP | POLLERR | POLLNVAL))
+                {
+                    ERR("Polling on fd %d returned %#x.\n", fds[0].fd, fds[0].revents);
+                    return STATUS_INVALID_HANDLE;
+                }
+            }
+
+            /* If we got here and we haven't timed out, that means all of the
+             * handles were signaled. Check to make sure they still are. */
+            for (i = 0; i < count; i++)
+            {
+                fds[i].fd = objs[i] ? objs[i]->fd : -1;
+                fds[i].events = POLLIN;
+            }
+
+            /* Poll everything to see if they're still signaled. */
+            ret = poll( fds, count, 0 );
+            if (ret == count)
+            {
+                /* Quick, grab everything. */
+                for (i = 0; i < count; i++)
+                {
+                    struct esync *obj = objs[i];
+
+                    switch (obj->type)
+                    {
+                    case ESYNC_MUTEX:
+                    {
+                        struct mutex *mutex = obj->shm;
+                        if (mutex->tid == GetCurrentThreadId())
+                            break;
+                        /* otherwise fall through */
+                    }
+                    case ESYNC_SEMAPHORE:
+                    case ESYNC_AUTO_EVENT:
+                        if ((size = read( fds[i].fd, &value, sizeof(value) )) != sizeof(value))
+                        {
+                            /* We were too slow. Put everything back. */
+                            value = 1;
+                            for (j = i; j >= 0; j--)
+                            {
+                                if (write( obj->fd, &value, sizeof(value) ) == -1)
+                                    return errno_to_status( errno );
+                            }
+
+                            goto tryagain;  /* break out of two loops and a switch */
+                        }
+                        break;
+                    default:
+                        /* If a manual-reset event changed between there and
+                         * here, it's shouldn't be a problem. */
+                        break;
+                    }
+                }
+
+                /* If we got here, we successfully waited on every object. */
+                /* Make sure to let ourselves know that we grabbed the mutexes
+                 * and semaphores. */
+                for (i = 0; i < count; i++)
+                    update_grabbed_object( objs[i] );
+
+                TRACE("Wait successful.\n");
+                return STATUS_SUCCESS;
+            }
+
+            /* If we got here, ppoll() returned less than all of our objects.
+             * So loop back to the beginning and try again. */
+        } /* while(1) */
+    } /* else (wait-all) */
+
+err:
+    /* We should only get here if poll() failed. */
+
+    if (ret == 0)
+    {
+        TRACE("Wait timed out.\n");
+        return STATUS_TIMEOUT;
+    }
+    else
+    {
+        ERR("ppoll failed: %s\n", strerror(errno));
+        return errno_to_status( errno );
     }
 }
 
