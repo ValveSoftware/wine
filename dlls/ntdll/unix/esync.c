@@ -331,6 +331,21 @@ NTSTATUS esync_set_event( HANDLE handle )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS esync_reset_event( HANDLE handle )
+{
+    uint64_t value;
+    struct esync *obj;
+
+    TRACE("%p.\n", handle);
+
+    if (!(obj = get_cached_object( handle ))) return STATUS_INVALID_HANDLE;
+
+    if (read( obj->fd, &value, sizeof(value) ) == -1 && errno != EWOULDBLOCK && errno != EAGAIN)
+        ERR("read: %s\n", strerror(errno));
+
+    return STATUS_SUCCESS;
+}
+
 #define TICKSPERSEC        10000000
 #define TICKSPERMSEC       10000
 

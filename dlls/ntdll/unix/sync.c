@@ -509,7 +509,11 @@ NTSTATUS WINAPI NtSetEvent( HANDLE handle, LONG *prev_state )
  */
 NTSTATUS WINAPI NtResetEvent( HANDLE handle, LONG *prev_state )
 {
+    /* This comment is a dummy to make sure this patch applies in the right place. */
     NTSTATUS ret;
+
+    if (do_esync())
+        return esync_reset_event( handle );
 
     SERVER_START_REQ( event_op )
     {
