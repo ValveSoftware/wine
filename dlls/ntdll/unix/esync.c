@@ -91,6 +91,13 @@ struct semaphore
 };
 C_ASSERT(sizeof(struct semaphore) == 8);
 
+struct mutex
+{
+    DWORD tid;
+    int count;    /* recursion count */
+};
+C_ASSERT(sizeof(struct mutex) == 8);
+
 struct event
 {
     int signaled;
@@ -413,6 +420,15 @@ NTSTATUS esync_reset_event( HANDLE handle )
         ERR("read: %s\n", strerror(errno));
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS esync_create_mutex( HANDLE *handle, ACCESS_MASK access,
+    const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
+{
+    TRACE("name %s, initial %d.\n",
+        attr ? debugstr_us(attr->ObjectName) : "<no name>", initial);
+
+    return create_esync( ESYNC_MUTEX, handle, access, attr, initial ? 0 : 1, 0 );
 }
 
 #define TICKSPERSEC        10000000

@@ -204,6 +204,13 @@ struct semaphore
 };
 C_ASSERT(sizeof(struct semaphore) == 8);
 
+struct mutex
+{
+    DWORD tid;
+    int count;    /* recursion count */
+};
+C_ASSERT(sizeof(struct mutex) == 8);
+
 struct event
 {
     int signaled;
@@ -272,6 +279,13 @@ struct esync *create_esync( struct object *root, const struct unicode_str *name,
                 struct event *event = get_shm( esync->shm_idx );
                 event->signaled = initval ? 1 : 0;
                 event->locked = 0;
+                break;
+            }
+            case ESYNC_MUTEX:
+            {
+                struct mutex *mutex = get_shm( esync->shm_idx );
+                mutex->tid = initval ? 0 : current->id;
+                mutex->count = initval ? 0 : 1;
                 break;
             }
             default:
