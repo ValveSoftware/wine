@@ -140,6 +140,7 @@ struct msg_queue
     struct hook_table     *hooks;           /* hook table */
     timeout_t              last_get_msg;    /* time of last get message call */
     int                    esync_fd;        /* esync file descriptor (signalled on message) */
+    int                    esync_in_msgwait; /* our thread is currently waiting on us */
 };
 
 struct hotkey
@@ -309,6 +310,7 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
         queue->hooks           = NULL;
         queue->last_get_msg    = current_time;
         queue->esync_fd        = -1;
+        queue->esync_in_msgwait = 0;
         list_init( &queue->send_result );
         list_init( &queue->callback_result );
         list_init( &queue->pending_timers );
@@ -947,6 +949,10 @@ static int is_queue_hung( struct msg_queue *queue )
         if (get_wait_queue_thread(entry)->queue == queue)
             return 0;  /* thread is waiting on queue -> not hung */
     }
+
+    if (do_esync() && queue->esync_in_msgwait)
+        return 0;   /* thread is waiting on queue in absentia -> not hung */
+
     return 1;
 }
 
@@ -3418,4 +3424,19 @@ DECL_HANDLER(get_rawinput_devices)
         LIST_FOR_EACH_ENTRY( e, &current->process->rawinput_devices, struct rawinput_device_entry, entry )
             devices[i++] = e->device;
     }
+}
+
+DECL_HANDLER(esync_msgwait)
+{
+    struct msg_queue *queue = get_current_queue();
+
+    if (!queue) return;
+    queue->esync_in_msgwait = req->in_msgwait;
+
+    if (current->process->idle_event && !(queue->wake_mask & QS_SMRESULT))
+        set_event( current->process->idle_event );
+
+    /* and start/stop waiting on the driver */
+    if (queue->fd)
+        set_fd_events( queue->fd, req->in_msgwait ? POLLIN : 0 );
 }
