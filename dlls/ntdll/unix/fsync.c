@@ -510,6 +510,25 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
     return STATUS_SUCCESS;
 }
 
+NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len )
+{
+    struct event *event;
+    struct fsync *obj;
+    EVENT_BASIC_INFORMATION *out = info;
+    NTSTATUS ret;
+
+    TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
+
+    if ((ret = get_object( handle, &obj ))) return ret;
+    event = obj->shm;
+
+    out->EventState = event->signaled;
+    out->EventType = (obj->type == FSYNC_AUTO_EVENT ? SynchronizationEvent : NotificationEvent);
+    if (ret_len) *ret_len = sizeof(*out);
+
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, BOOLEAN initial )
 {
