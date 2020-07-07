@@ -34,6 +34,7 @@ extern NTSTATUS fsync_open_event( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr );
 extern NTSTATUS fsync_set_event( HANDLE handle, LONG *prev );
 extern NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev );
+extern NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len );
 extern NTSTATUS fsync_create_mutex( HANDLE *handle, ACCESS_MASK access,
     const OBJECT_ATTRIBUTES *attr, BOOLEAN initial );
 extern NTSTATUS fsync_open_mutex( HANDLE *handle, ACCESS_MASK access,
