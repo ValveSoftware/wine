@@ -369,6 +369,9 @@ NTSTATUS WINAPI NtReleaseSemaphore( HANDLE handle, ULONG count, ULONG *previous 
 {
     unsigned int ret;
 
+    if (do_fsync())
+        return fsync_release_semaphore( handle, count, previous );
+
     if (do_esync())
         return esync_release_semaphore( handle, count, previous );
 
