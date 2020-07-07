@@ -1384,7 +1384,7 @@ static struct timer *set_timer( struct msg_queue *queue, unsigned int rate )
 }
 
 /* change the input key state for a given key */
-static void set_input_key_state( unsigned char *keystate, unsigned char key, int down )
+static void set_input_key_state( unsigned char *keystate, unsigned char key, unsigned char down )
 {
     if (down)
     {
@@ -1398,31 +1398,30 @@ static void set_input_key_state( unsigned char *keystate, unsigned char key, int
 static void update_input_key_state( struct desktop *desktop, unsigned char *keystate,
                                     unsigned int msg, lparam_t wparam )
 {
-    unsigned char key;
-    int down = 0;
+    unsigned char key, down = 0, down_val = (keystate == desktop->keystate) ? 0xc0 : 0x80;
 
     switch (msg)
     {
     case WM_LBUTTONDOWN:
-        down = (keystate == desktop->keystate) ? 0xc0 : 0x80;
+        down = down_val;
         /* fall through */
     case WM_LBUTTONUP:
         set_input_key_state( keystate, VK_LBUTTON, down );
         break;
     case WM_MBUTTONDOWN:
-        down = (keystate == desktop->keystate) ? 0xc0 : 0x80;
+        down = down_val;
         /* fall through */
     case WM_MBUTTONUP:
         set_input_key_state( keystate, VK_MBUTTON, down );
         break;
     case WM_RBUTTONDOWN:
-        down = (keystate == desktop->keystate) ? 0xc0 : 0x80;
+        down = down_val;
         /* fall through */
     case WM_RBUTTONUP:
         set_input_key_state( keystate, VK_RBUTTON, down );
         break;
     case WM_XBUTTONDOWN:
-        down = (keystate == desktop->keystate) ? 0xc0 : 0x80;
+        down = down_val;
         /* fall through */
     case WM_XBUTTONUP:
         if (wparam >> 16 == XBUTTON1) set_input_key_state( keystate, VK_XBUTTON1, down );
@@ -1430,7 +1429,7 @@ static void update_input_key_state( struct desktop *desktop, unsigned char *keys
         break;
     case WM_KEYDOWN:
     case WM_SYSKEYDOWN:
-        down = (keystate == desktop->keystate) ? 0xc0 : 0x80;
+        down = down_val;
         /* fall through */
     case WM_KEYUP:
     case WM_SYSKEYUP:
