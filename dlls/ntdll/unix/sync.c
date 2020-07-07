@@ -557,6 +557,9 @@ NTSTATUS WINAPI NtQueryEvent( HANDLE handle, EVENT_INFORMATION_CLASS class,
 
     if (len != sizeof(EVENT_BASIC_INFORMATION)) return STATUS_INFO_LENGTH_MISMATCH;
 
+    if (do_fsync())
+        return fsync_query_event( handle, info, ret_len );
+
     if (do_esync())
         return esync_query_event( handle, info, ret_len );
 
