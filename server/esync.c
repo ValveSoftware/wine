@@ -23,6 +23,7 @@
 
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <stdarg.h>
 #ifdef HAVE_SYS_EVENTFD_H
 # include <sys/eventfd.h>
