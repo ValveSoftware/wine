@@ -828,6 +828,7 @@ struct desktop_shared_memory
 {
     unsigned int         seq;              /* sequence number - server updating if (seq_no & SEQUENCE_MASK) != 0 */
     struct shared_cursor cursor;           /* global cursor information */
+    unsigned char        keystate[256];    /* asynchronous key state */
 };
 
 /* Bits that must be clear for client to read */
