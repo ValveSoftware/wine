@@ -812,6 +812,7 @@ struct desktop_shared_memory
 {
     unsigned int         seq;
     struct shared_cursor cursor;
+    unsigned char        keystate[256];
 };
 
 
@@ -6739,7 +6740,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 640
+#define SERVER_PROTOCOL_VERSION 641
 
 /* ### protocol_version end ### */
 
