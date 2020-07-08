@@ -2691,7 +2691,6 @@ DECL_HANDLER(send_hardware_message)
     struct desktop *desktop;
     unsigned int origin = (req->flags & SEND_HWMSG_INJECTED ? IMO_INJECTED : IMO_HARDWARE);
     struct msg_queue *sender = get_current_queue();
-    data_size_t size = min( 256, get_reply_max_size() );
 
     if (!(desktop = get_thread_desktop( current, 0 ))) return;
 
@@ -2727,7 +2726,6 @@ DECL_HANDLER(send_hardware_message)
 
     reply->new_x = desktop->shared->cursor.x;
     reply->new_y = desktop->shared->cursor.y;
-    set_reply_data( (void *)desktop->shared->keystate, size );
     release_object( desktop );
 }
 
