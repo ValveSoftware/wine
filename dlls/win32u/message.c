@@ -2638,10 +2638,8 @@ LRESULT send_internal_message_timeout( DWORD dest_pid, DWORD dest_tid,
  */
 NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *rawinput, UINT flags )
 {
-    struct user_key_state_info *key_state_info = get_user_thread_info()->key_state;
     struct send_message_info info;
     int prev_x, prev_y, new_x, new_y;
-    INT counter = global_key_state_counter;
     USAGE hid_usage_page, hid_usage;
     NTSTATUS ret;
     BOOL wait;
@@ -2728,8 +2726,6 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *r
             }
             break;
         }
-        if (key_state_info) wine_server_set_reply( req, key_state_info->state,
-                                                   sizeof(key_state_info->state) );
         ret = wine_server_call( req );
         wait = reply->wait;
         prev_x = reply->prev_x;
@@ -2739,16 +2735,8 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *r
     }
     SERVER_END_REQ;
 
-    if (!ret)
-    {
-        if (key_state_info)
-        {
-            key_state_info->time    = NtGetTickCount();
-            key_state_info->counter = counter;
-        }
-        if ((flags & SEND_HWMSG_INJECTED) && (prev_x != new_x || prev_y != new_y))
-            user_driver->pSetCursorPos( new_x, new_y );
-    }
+    if (!ret && (flags & SEND_HWMSG_INJECTED) && (prev_x != new_x || prev_y != new_y))
+        user_driver->pSetCursorPos( new_x, new_y );
 
     if (wait)
     {

@@ -238,10 +238,8 @@ BOOL WINAPI NtUserSetThreadDesktop( HDESK handle )
     if (ret)  /* reset the desktop windows */
     {
         struct user_thread_info *thread_info = get_user_thread_info();
-        struct user_key_state_info *key_state_info = thread_info->key_state;
         thread_info->client_info.top_window = 0;
         thread_info->client_info.msg_window = 0;
-        if (key_state_info) key_state_info->time = 0;
         if (thread_info->desktop_shared_map)
         {
             NtClose( thread_info->desktop_shared_map );

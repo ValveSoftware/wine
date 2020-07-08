@@ -51,7 +51,6 @@ static const WCHAR keyboard_layouts_keyW[] =
 };
 
 
-LONG global_key_state_counter = 0;
 BOOL enable_mouse_in_pointer = FALSE;
 
 
@@ -279,52 +278,32 @@ static void check_for_events( UINT flags )
  */
 SHORT WINAPI NtUserGetAsyncKeyState( INT key )
 {
-    struct user_key_state_info *key_state_info = get_user_thread_info()->key_state;
-    INT counter = global_key_state_counter;
-    BYTE prev_key_state;
+    volatile struct desktop_shared_memory *shared = get_desktop_shared_memory();
+    BYTE state;
     SHORT ret;
 
-    if (key < 0 || key >= 256) return 0;
+    if (key < 0 || key >= 256 || !shared) return 0;
 
     check_for_events( QS_INPUT );
 
-    if (key_state_info && !(key_state_info->state[key] & 0xc0) &&
-        key_state_info->counter == counter && NtGetTickCount() - key_state_info->time < 50)
+    SHARED_READ_BEGIN( &shared->seq )
     {
-        /* use cached value */
-        return 0;
+        state = shared->keystate[key];
     }
-    else if (!key_state_info)
-    {
-        key_state_info = calloc( 1, sizeof(*key_state_info) );
-        get_user_thread_info()->key_state = key_state_info;
-    }
+    SHARED_READ_END( &shared->seq );
 
+    if (!(state & 0x40)) return (state & 0x80) << 8;
+
+    /* Need to make a server call to reset the last pressed bit */
     ret = 0;
     SERVER_START_REQ( get_key_state )
     {
         req->async = 1;
         req->key = key;
-        if (key_state_info)
-        {
-            prev_key_state = key_state_info->state[key];
-            wine_server_set_reply( req, key_state_info->state, sizeof(key_state_info->state) );
-        }
         if (!wine_server_call( req ))
         {
             if (reply->state & 0x40) ret |= 0x0001;
             if (reply->state & 0x80) ret |= 0x8000;
-            if (key_state_info)
-            {
-                /* force refreshing the key state cache - some multithreaded programs
-                 * (like Adobe Photoshop CS5) expect that changes to the async key state
-                 * are also immediately available in other threads. */
-                if (prev_key_state != key_state_info->state[key])
-                    counter = InterlockedIncrement( &global_key_state_counter );
-
-                key_state_info->time    = NtGetTickCount();
-                key_state_info->counter = counter;
-            }
         }
     }
     SERVER_END_REQ;

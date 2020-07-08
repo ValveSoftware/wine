@@ -5429,8 +5429,6 @@ static void thread_detach(void)
 
     user_driver->pThreadDetach();
 
-    free( thread_info->key_state );
-    thread_info->key_state = 0;
     free( thread_info->rawinput );
 
     destroy_thread_windows();
