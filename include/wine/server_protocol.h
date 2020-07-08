@@ -3013,7 +3013,6 @@ struct send_hardware_message_reply
     int             prev_y;
     int             new_x;
     int             new_y;
-    /* VARARG(keystate,bytes); */
     char __pad_28[4];
 };
 #define SEND_HWMSG_INJECTED    0x01
@@ -6740,7 +6739,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 641
+#define SERVER_PROTOCOL_VERSION 642
 
 /* ### protocol_version end ### */
 
