@@ -199,7 +199,6 @@ struct user_thread_info
     DWORD                         GetMessageTimeVal;      /* Value for GetMessageTime */
     DWORD                         GetMessagePosVal;       /* Value for GetMessagePos */
     ULONG_PTR                     GetMessageExtraInfoVal; /* Value for GetMessageExtraInfo */
-    struct user_key_state_info   *key_state;              /* Cache of global key state */
     HWND                          top_window;             /* Desktop window */
     HWND                          msg_window;             /* HWND_MESSAGE parent window */
     struct rawinput_thread_data  *rawinput;               /* RawInput thread local data / buffer */
@@ -209,17 +208,9 @@ struct user_thread_info
 
 C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
 
-extern INT global_key_state_counter DECLSPEC_HIDDEN;
 extern BOOL (WINAPI *imm_register_window)(HWND) DECLSPEC_HIDDEN;
 extern void (WINAPI *imm_unregister_window)(HWND) DECLSPEC_HIDDEN;
 extern void (WINAPI *imm_activate_window)(HWND) DECLSPEC_HIDDEN;
-
-struct user_key_state_info
-{
-    UINT                          time;                   /* Time of last key state refresh */
-    INT                           counter;                /* Counter to invalidate the key state */
-    BYTE                          state[256];             /* State for each key */
-};
 
 struct hook_extra_info
 {
