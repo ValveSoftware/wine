@@ -4000,6 +4000,7 @@ HKCU,Software\Wine\DllOverrides,"msvcr140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"ucrtbase",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcomp140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcruntime140",0x2,"native,builtin"
+HKCU,Software\Wine\DllOverrides,"atiadlxx",,"disabled"
 
 [SteamClient.ntamd64]
 HKCU,Software\Valve\Steam,"SteamPath",,"%16422%\Steam"
@@ -4041,3 +4042,4 @@ HKCU,Software\Wine\DllOverrides,"msvcr140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"ucrtbase",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcomp140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcruntime140",0x2,"native,builtin"
+HKCU,Software\Wine\DllOverrides,"atiadlxx",,"disabled"
