@@ -1185,6 +1185,7 @@ enable_api_ms_win_shell_shellcom_l1_1_0
 enable_api_ms_win_shell_shellfolders_l1_1_0
 enable_apphelp
 enable_appwiz_cpl
+enable_atiadlxx
 enable_atl
 enable_atl100
 enable_atl110
@@ -21650,6 +21651,7 @@ wine_fn_config_makefile dlls/api-ms-win-shell-shellfolders-l1-1-0 enable_api_ms_
 wine_fn_config_makefile dlls/apphelp enable_apphelp
 wine_fn_config_makefile dlls/apphelp/tests enable_tests
 wine_fn_config_makefile dlls/appwiz.cpl enable_appwiz_cpl
+wine_fn_config_makefile dlls/atiadlxx enable_atiadlxx
 wine_fn_config_makefile dlls/atl enable_atl
 wine_fn_config_makefile dlls/atl/tests enable_tests
 wine_fn_config_makefile dlls/atl100 enable_atl100
