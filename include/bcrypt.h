@@ -46,6 +46,7 @@ typedef LONG NTSTATUS;
 #define BCRYPT_BLOCK_LENGTH         L"BlockLength"
 #define BCRYPT_BLOCK_SIZE_LIST      L"BlockSizeList"
 #define BCRYPT_CHAINING_MODE        L"ChainingMode"
+#define BCRYPT_DH_PARAMETERS        L"DHParameters"
 #define BCRYPT_EFFECTIVE_KEY_LENGTH L"EffectiveKeyLength"
 #define BCRYPT_HASH_BLOCK_LENGTH    L"HashBlockLength"
 #define BCRYPT_HASH_LENGTH          L"HashDigestLength"
@@ -75,6 +76,8 @@ typedef LONG NTSTATUS;
 #define LEGACY_DSA_PRIVATE_BLOB     L"CAPIDSAPRIVATEBLOB"
 #define LEGACY_DSA_V2_PUBLIC_BLOB   L"V2CAPIDSAPUBLICBLOB"
 #define LEGACY_DSA_V2_PRIVATE_BLOB  L"V2CAPIDSAPRIVATEBLOB"
+#define BCRYPT_DH_PUBLIC_BLOB       L"DHPUBLICBLOB"
+#define BCRYPT_DH_PRIVATE_BLOB      L"DHPRIVATEBLOB"
 
 #define MS_PRIMITIVE_PROVIDER       L"Microsoft Primitive Provider"
 #define MS_PLATFORM_CRYPTO_PROVIDER L"Microsoft Platform Crypto Provider"
@@ -82,6 +85,7 @@ typedef LONG NTSTATUS;
 #define BCRYPT_3DES_ALGORITHM       L"3DES"
 #define BCRYPT_AES_ALGORITHM        L"AES"
 #define BCRYPT_DES_ALGORITHM        L"DES"
+#define BCRYPT_DH_ALGORITHM         L"DH"
 #define BCRYPT_DSA_ALGORITHM        L"DSA"
 #define BCRYPT_ECDH_P256_ALGORITHM  L"ECDH_P256"
 #define BCRYPT_ECDSA_P256_ALGORITHM L"ECDSA_P256"
@@ -118,6 +122,7 @@ static const WCHAR BCRYPT_AUTH_TAG_LENGTH[] = {'A','u','t','h','T','a','g','L','
 static const WCHAR BCRYPT_BLOCK_LENGTH[] = {'B','l','o','c','k','L','e','n','g','t','h',0};
 static const WCHAR BCRYPT_BLOCK_SIZE_LIST[] = {'B','l','o','c','k','S','i','z','e','L','i','s','t',0};
 static const WCHAR BCRYPT_CHAINING_MODE[] = {'C','h','a','i','n','i','n','g','M','o','d','e',0};
+static const WCHAR BCRYPT_DH_PARAMETERS[] = {'D','H','P','a','r','a','m','e','t','e','r','s',0};
 static const WCHAR BCRYPT_EFFECTIVE_KEY_LENGTH[] = {'E','f','f','e','c','t','i','v','e','K','e','y','L','e','n','g','t','h',0};
 static const WCHAR BCRYPT_HASH_BLOCK_LENGTH[] = {'H','a','s','h','B','l','o','c','k','L','e','n','g','t','h',0};
 static const WCHAR BCRYPT_HASH_LENGTH[] = {'H','a','s','h','D','i','g','e','s','t','L','e','n','g','t','h',0};
@@ -147,6 +152,8 @@ static const WCHAR LEGACY_DSA_PUBLIC_BLOB[] = {'C','A','P','I','D','S','A','P','
 static const WCHAR LEGACY_DSA_PRIVATE_BLOB[] = {'C','A','P','I','D','S','A','P','R','I','V','A','T','E','B','L','O','B',0};
 static const WCHAR LEGACY_DSA_V2_PUBLIC_BLOB[] = {'V','2','C','A','P','I','D','S','A','P','U','B','L','I','C','B','L','O','B',0};
 static const WCHAR LEGACY_DSA_V2_PRIVATE_BLOB[] = {'V','2','C','A','P','I','D','S','A','P','R','I','V','A','T','E','B','L','O','B',0};
+static const WCHAR BCRYPT_DH_PUBLIC_BLOB[] = {'D','H','P','U','B','L','I','C','B','L','O','B',0};
+static const WCHAR BCRYPT_DH_PRIVATE_BLOB[] = {'D','H','P','R','I','V','A','T','E','B','L','O','B',0};
 
 static const WCHAR MS_PRIMITIVE_PROVIDER[] = \
 {'M','i','c','r','o','s','o','f','t',' ','P','r','i','m','i','t','i','v','e',' ','P','r','o','v','i','d','e','r',0};
@@ -156,6 +163,7 @@ static const WCHAR MS_PLATFORM_CRYPTO_PROVIDER[] = \
 static const WCHAR BCRYPT_3DES_ALGORITHM[] = {'3','D','E','S',0};
 static const WCHAR BCRYPT_AES_ALGORITHM[] = {'A','E','S',0};
 static const WCHAR BCRYPT_DES_ALGORITHM[] = {'D','E','S',0};
+static const WCHAR BCRYPT_DH_ALGORITHM[] = {'D','H',0};
 static const WCHAR BCRYPT_DSA_ALGORITHM[] = {'D','S','A',0};
 static const WCHAR BCRYPT_ECDH_P256_ALGORITHM[] = {'E','C','D','H','_','P','2','5','6',0};
 static const WCHAR BCRYPT_ECDSA_P256_ALGORITHM[] = {'E','C','D','S','A','_','P','2','5','6',0};
@@ -324,6 +332,22 @@ typedef struct _BCRYPT_DSA_KEY_BLOB_V2
     UCHAR               Count[4];
 } BCRYPT_DSA_KEY_BLOB_V2, *PBCRYPT_DSA_KEY_BLOB_V2;
 
+#define BCRYPT_DH_PARAMETERS_MAGIC 0x4d504844
+#define BCRYPT_DH_PUBLIC_MAGIC     0x42504844
+#define BCRYPT_DH_PRIVATE_MAGIC    0x56504844
+
+typedef struct _BCRYPT_DH_PARAMETER_HEADER
+{
+    ULONG cbLength;
+    ULONG dwMagic;
+    ULONG cbKeyLength;
+} BCRYPT_DH_PARAMETER_HEADER;
+
+typedef struct _BCRYPT_DH_KEY_BLOB {
+    ULONG dwMagic;
+    ULONG cbKey;
+} BCRYPT_DH_KEY_BLOB, *PBCRYPT_DH_KEY_BLOB;
+
 #define BCRYPT_AUTHENTICATED_CIPHER_MODE_INFO_VERSION 1
 
 #define BCRYPT_AUTH_MODE_CHAIN_CALLS_FLAG 0x00000001
@@ -362,6 +386,20 @@ typedef struct _BCRYPT_KEY_DATA_BLOB_HEADER
 #define KDF_HASH_ALGORITHM 0x00000000
 #define KDF_SECRET_PREPEND 0x00000001
 #define KDF_SECRET_APPEND  0x00000002
+#define KDF_HMAC_KEY       0x00000003
+#define KDF_TLS_PRF_LABEL  0x00000004
+#define KDF_TLS_PRF_SEED   0x00000005
+#define KDF_SECRET_HANDLE  0x00000006
+#define KDF_TLS_PRF_PROTOCOL 0x000007
+#define KDF_ALGORITHMID    0x00000008
+#define KDF_PARTYUINFO     0x00000009
+#define KDF_PARTYVINFO     0x0000000A
+#define KDF_SUPPPUBINFO    0x0000000B
+#define KDF_SUPPPRIVINFO   0x0000000C
+#define KDF_LABEL          0x0000000D
+#define KDF_CONTEXT        0x0000000E
+#define KDF_SALT           0x0000000F
+#define KDF_ITERATION_COUNT 0x0000010
 
 typedef struct _BCryptBuffer
 {
