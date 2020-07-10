@@ -1,0 +1,5 @@
+MODULE = atiadlxx.dll
+EXTRADLLFLAGS = -mno-cygwin -Wb,--prefer-native
+
+C_SRCS = \
+	atiadlxx_main.c
