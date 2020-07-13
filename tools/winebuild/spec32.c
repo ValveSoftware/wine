@@ -394,6 +394,7 @@ void output_exports( DLLSPEC *spec )
     int nr_exports = get_exports_count( spec );
     const char *func_ptr = (target_platform == PLATFORM_WINDOWS) ? ".rva" : get_asm_ptr_keyword();
     const char *name;
+    int is_ntdll = spec->dll_name && !strcmp(spec->dll_name, "ntdll");
 
     if (!nr_exports) return;
 
@@ -445,6 +446,7 @@ void output_exports( DLLSPEC *spec )
             else if ((odp->flags & FLAG_IMPORT) && (target_cpu == CPU_x86 || target_cpu == CPU_x86_64))
             {
                 name = odp->name ? odp->name : odp->export_name;
+
                 if (name) output( "\t%s %s_%s\n", func_ptr, asm_name("__wine_spec_imp"), name );
                 else output( "\t%s %s_%u\n", func_ptr, asm_name("__wine_spec_imp"), i );
                 needs_imports = 1;
@@ -455,7 +457,19 @@ void output_exports( DLLSPEC *spec )
             }
             else
             {
-                output( "\t%s %s\n", func_ptr, asm_name( get_link_name( odp )));
+                const char *name = get_link_name( odp );
+
+                if (!(odp->flags & FLAG_SYSCALL) && is_ntdll
+                        && (!strncmp(name, "Nt", 2) || !strncmp(name, "Zw", 2)))
+                {
+                    char sc_name[256];
+                    sprintf(sc_name, "_syscall_%s", name);
+                    output( "\t%s %s\n", func_ptr, asm_name( sc_name ));
+                }
+                else
+                {
+                    output( "\t%s %s\n", func_ptr, asm_name( name ));
+                }
             }
             break;
         case TYPE_STUB:
