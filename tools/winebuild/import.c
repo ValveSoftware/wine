@@ -1470,6 +1470,9 @@ void output_syscalls( DLLSPEC *spec )
             output( "\tmovl %%esp,%%edi\n" );
             output( "\tcld\n" );
             output( "\trep; movsl\n" );
+            output( "\tmovl -0x4(%%ebp),%%esi\n" );
+            output( "\tmovl -0x8(%%ebp),%%edi\n" );
+
             if (UsePIC)
                 output( "\tcall *.Lsyscall_table-1b(%%eax,%%edx,4)\n" );
             else
