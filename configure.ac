@@ -447,6 +447,7 @@ AC_CHECK_HEADERS(\
 	linux/ioctl.h \
 	linux/major.h \
 	linux/param.h \
+	linux/seccomp.h \
 	linux/serial.h \
 	linux/types.h \
 	linux/ucdrom.h \
