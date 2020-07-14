@@ -686,6 +686,7 @@ AC_CHECK_HEADERS(\
 	linux/major.h \
 	linux/ntsync.h \
 	linux/param.h \
+	linux/seccomp.h \
 	linux/serial.h \
 	linux/types.h \
 	linux/ucdrom.h \
