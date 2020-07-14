@@ -1613,10 +1613,10 @@ void output_syscalls( DLLSPEC *spec )
             output( "\t.byte 0xc3\n" );           /* ret */
             output( "\tjmp 1f\n" );
             output( "\t.byte 0xc3\n" );           /* ret */
-            if (target_platform == PLATFORM_WINDOWS)
+            if (target_platform == PLATFORM_WINDOWS || target_platform == PLATFORM_APPLE)
             {
-                output( "1:\t.byte 0xff,0x14,0x25\n" ); /* 2: callq *(__wine_syscall_dispatcher) */
-                output( "\t.long __wine_syscall_dispatcher\n" );
+                output( "1:\t.byte 0xff,0x14,0x25\n" ); /* call *(user_shared_data + 0x1000) */
+                output( "\t.long 0x7ffe1000\n" );
             }
             else
             {
@@ -1653,7 +1653,7 @@ void output_syscalls( DLLSPEC *spec )
         output( "\t.align %d\n", get_alignment(16) );
         output( "\t%s\n", func_declaration("__wine_syscall") );
         output( "%s:\n", asm_name("__wine_syscall") );
-        output( "\tjmp *(%s)\n", asm_name("__wine_syscall_dispatcher") );
+        output( "\tjmp *(0x7ffe1000)\n" );
         output_function_size( "__wine_syscall" );
     }
     output( "\t.data\n" );
