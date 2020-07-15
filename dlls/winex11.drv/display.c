@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include <stdarg.h>
+#include <stdlib.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -474,6 +475,18 @@ void CDECL X11DRV_UpdateDisplayDevices( const struct gdi_device_manager *device_
 
     for (gpu = 0; gpu < gpu_count; gpu++)
     {
+        {
+            const char *sgi = getenv("WINE_HIDE_NVIDIA_GPU");
+            if (sgi && *sgi != '0')
+            {
+                if (gpus[gpu].vendor_id == 0x10de /* NVIDIA */)
+                {
+                    gpus[gpu].vendor_id = 0x1002; /* AMD */
+                    gpus[gpu].device_id = 0x67df; /* RX 480 */
+                }
+            }
+        }
+
         device_manager->add_gpu( &gpus[gpu], param );
 
         /* Initialize adapters */
