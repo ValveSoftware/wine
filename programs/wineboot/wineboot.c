@@ -1413,6 +1413,43 @@ static void update_user_profile(void)
     LocalFree(sid);
 }
 
+static void update_win_version(void)
+{
+    static const WCHAR win10_buildW[] = L"17763";
+
+    HKEY cv_h;
+    DWORD type, sz;
+    WCHAR current_version[256];
+
+    if(RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Microsoft\\Windows NT\\CurrentVersion",
+                0, KEY_ALL_ACCESS, &cv_h) == ERROR_SUCCESS){
+        /* get the current windows version */
+        sz = sizeof(current_version);
+        if(RegQueryValueExW(cv_h, L"CurrentVersion", NULL, &type, (BYTE *)current_version, &sz) == ERROR_SUCCESS &&
+                type == REG_SZ){
+            if(!wcscmp(current_version, L"10.0")){
+                RegSetValueExW(cv_h, L"CurrentBuild", 0, REG_SZ, (const BYTE *)win10_buildW, sizeof(win10_buildW));
+                RegSetValueExW(cv_h, L"CurrentBuildNumber", 0, REG_SZ, (const BYTE *)win10_buildW, sizeof(win10_buildW));
+            }
+        }
+        RegCloseKey(cv_h);
+    }
+
+    if(RegOpenKeyExW(HKEY_LOCAL_MACHINE, L"Software\\Wow6432Node\\Microsoft\\Windows NT\\CurrentVersion",
+                0, KEY_ALL_ACCESS, &cv_h) == ERROR_SUCCESS){
+        /* get the current windows version */
+        sz = sizeof(current_version);
+        if(RegQueryValueExW(cv_h, L"CurrentVersion", NULL, &type, (BYTE *)current_version, &sz) == ERROR_SUCCESS &&
+                type == REG_SZ){
+            if(!wcscmp(current_version, L"10.0")){
+                RegSetValueExW(cv_h, L"CurrentBuild", 0, REG_SZ, (const BYTE *)win10_buildW, sizeof(win10_buildW));
+                RegSetValueExW(cv_h, L"CurrentBuildNumber", 0, REG_SZ, (const BYTE *)win10_buildW, sizeof(win10_buildW));
+            }
+        }
+        RegCloseKey(cv_h);
+    }
+}
+
 /* execute rundll32 on the wine.inf file if necessary */
 static void update_wineprefix( BOOL force )
 {
@@ -1466,6 +1503,7 @@ static void update_wineprefix( BOOL force )
         }
         install_root_pnp_devices();
         update_user_profile();
+        update_win_version();
 
         WINE_MESSAGE( "wine: configuration in %s has been updated.\n", debugstr_w(prettyprint_configdir()) );
     }
