@@ -1,0 +1,5 @@
+MODULE = windows.gaming.input.dll
+IMPORTS = combase
+EXTRADLLFLAGS = -mno-cygwin
+C_SRCS = \
+	windows.gaming.input_main.c
