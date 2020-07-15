@@ -1586,6 +1586,13 @@ void output_syscalls( DLLSPEC *spec )
         output( ".Lsyscall_args:\n" );
         for (i = 0; i < count; i++)
             output( "\t.byte %u\n", get_args_size( syscalls[i] ));
+
+        for (i = 0; i < count; i++)
+        {
+            output( "\t.align %d\n", get_alignment( get_ptr_size() ) );
+            output( "%s\n", asm_globl(strmake( "__wine_syscall_nr_%s", get_link_name( syscalls[i] ) )) );
+            output( "\t.long %u\n", i + 0xf000 );
+        }
         return;
     }
 
