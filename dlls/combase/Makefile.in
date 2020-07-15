@@ -1,4 +1,5 @@
 MODULE    = combase.dll
+IMPORTLIB = combase
 IMPORTS   = advapi32 ole32 uuid
 
 EXTRADLLFLAGS = -mno-cygwin
