@@ -523,6 +523,56 @@ DECLARE_INTERFACE(IXACT3Cue)
 #endif
 
 /*****************************************************************************
+ * IXACT34Cue interface
+ */
+#define INTERFACE IXACT34Cue
+DECLARE_INTERFACE(IXACT34Cue)
+{
+    /*** IXACT34Cue methods ***/
+    STDMETHOD(Play)(THIS) PURE;
+    STDMETHOD(Stop)(THIS_ DWORD pdwFlags) PURE;
+    STDMETHOD(GetState)(THIS_ DWORD *pdwState) PURE;
+    STDMETHOD(Destroy)(THIS) PURE;
+    STDMETHOD(SetMatrixCoefficients)(THIS_ UINT32 uSrcChannelCount, UINT32 uDstChannelCount, float *pMatrixCoefficients) PURE;
+    STDMETHOD_(XACTVARIABLEINDEX,GetVariableIndex)(THIS_ PCSTR szFriendlyName) PURE;
+    STDMETHOD(SetVariable)(THIS_ XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE nValue) PURE;
+    STDMETHOD(GetVariable)(THIS_ XACTVARIABLEINDEX nIndex, XACTVARIABLEVALUE *nValue) PURE;
+    STDMETHOD(Pause)(THIS_ BOOL fPause) PURE;
+    STDMETHOD(GetProperties)(THIS_ LPXACT_CUE_INSTANCE_PROPERTIES *ppProperties) PURE;
+};
+#undef INTERFACE
+
+#if !defined(__cplusplus) || defined(CINTERFACE)
+/*** IXACT34Cue methods ***/
+#define IXACT34Cue_Play(p)               (p)->lpVtbl->Destroy(p)
+#define IXACT34Cue_Stop(p,a)             (p)->lpVtbl->Stop(p,a)
+#define IXACT34Cue_GetState(p,a)         (p)->lpVtbl->GetState(p,a)
+#define IXACT34Cue_Destroy(p)            (p)->lpVtbl->Destroy(p)
+#define IXACT34Cue_SetMatrixCoefficients(p,a,b,c) (p)->lpVtbl->SetMatrixCoefficients(p,a,b,c)
+#define IXACT34Cue_GetVariableIndex(p,a) (p)->lpVtbl->GetVariableIndex(p,a)
+#define IXACT34Cue_SetVariable(p,a,b)    (p)->lpVtbl->SetVariable(p,a,b)
+#define IXACT34Cue_GetVariable(p,a,b)    (p)->lpVtbl->GetVariable(p,a,b)
+#define IXACT34Cue_Pause(p,a)            (p)->lpVtbl->Pause(p,a)
+#define IXACT34Cue_GetProperties(p,a)    (p)->lpVtbl->GetProperties(p,a)
+#define IXACT34Cue_SetOutputVoices(p,a)  (p)->lpVtbl->SetOutputVoices(p,a)
+#define IXACT34Cue_SetOutputVoiceMatrix(p,a,b,c,d) (p)->lpVtbl->SetOutputVoiceMatrix(p,a,b,c,d)
+#else
+/*** IXACT34Cue methods ***/
+#define IXACT34Cue_Play(p)               (p)->Destroy()
+#define IXACT34Cue_Stop(p,a)             (p)->Stop(a)
+#define IXACT34Cue_GetState(p,a)         (p)->Stop(a)
+#define IXACT34Cue_Destroy(p)            (p)->Destroy()
+#define IXACT34Cue_SetMatrixCoefficients(p,a,b,c) (p)->SetMatrixCoefficients(a,b,c)
+#define IXACT34Cue_GetVariableIndex(p,a) (p)->GetVariableIndex(a)
+#define IXACT34Cue_SetVariable(p,a,b)    (p)->SetVariable(a,b)
+#define IXACT34Cue_GetVariable(p,a,b)    (p)->GetVariable(a,b)
+#define IXACT34Cue_Pause(p,a)            (p)->Pause(a)
+#define IXACT34Cue_GetProperties(p,a)    (p)->GetProperties(a)
+#define IXACT34Cue_SetOutputVoices(p,a)  (p)->SetOutputVoices(a)
+#define IXACT34Cue_SetOutputVoiceMatrix(p,a,b,c,d) (p)->SetOutputVoiceMatrix(a,b,c,d)
+#endif
+
+/*****************************************************************************
  * IXACT3Wave interface
  */
 #define INTERFACE IXACT3Wave
