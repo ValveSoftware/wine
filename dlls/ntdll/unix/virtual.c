@@ -210,7 +210,11 @@ static int pagemap_fd, pagemap_reset_fd, clear_refs_fd;
 static void reset_write_watches( void *base, SIZE_T size );
 
 static struct file_view *view_block_start, *view_block_end, *next_free_view;
+#ifdef _WIN64
+static const size_t view_block_size = 0x200000;
+#else
 static const size_t view_block_size = 0x100000;
+#endif
 static void *preload_reserve_start;
 static void *preload_reserve_end;
 static BOOL force_exec_prot;  /* whether to force PROT_EXEC on all PROT_READ mmaps */
