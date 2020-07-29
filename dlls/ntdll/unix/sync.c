@@ -2279,12 +2279,9 @@ NTSTATUS CDECL fast_RtlpWaitForCriticalSection( RTL_CRITICAL_SECTION *crit, int 
     {
         HANDLE sem = get_critsection_semaphore( crit );
         LARGE_INTEGER time;
-        select_op_t select_op;
 
         time.QuadPart = timeout * (LONGLONG)-10000000;
-        select_op.wait.op = SELECT_WAIT;
-        select_op.wait.handles[0] = wine_server_obj_handle( sem );
-        ret = server_wait( &select_op, offsetof( select_op_t, wait.handles[1] ), 0, &time );
+        ret = NtWaitForSingleObject( sem, FALSE, &time );
     }
     return ret;
 }
