@@ -1791,12 +1791,6 @@ static void test_ECDSA(void)
     status = pBCryptImportKeyPair(alg, NULL, BCRYPT_ECCPUBLIC_BLOB, &key, buffer, size, 0);
     ok(status == STATUS_INVALID_PARAMETER, "Expected STATUS_INVALID_PARAMETER, got %08x\n", status);
 
-    ecckey->dwMagic = BCRYPT_ECDH_PUBLIC_P256_MAGIC;
-    ecckey->cbKey = 32;
-    status = pBCryptImportKeyPair(alg, NULL, BCRYPT_ECCPUBLIC_BLOB, &key, buffer, size, 0);
-    ok(status == STATUS_INVALID_PARAMETER, "Expected STATUS_INVALID_PARAMETER, got %08x\n", status);
-
-    ecckey->dwMagic = BCRYPT_ECDSA_PUBLIC_P256_MAGIC;
     ecckey->cbKey = 32;
     status = pBCryptImportKeyPair(alg, NULL, BCRYPT_ECCPUBLIC_BLOB, &key, buffer, size, 0);
     ok(!status, "BCryptImportKeyPair failed: %08x\n", status);
@@ -1816,23 +1810,9 @@ static void test_ECDSA(void)
     status = pBCryptImportKeyPair(alg, NULL, BCRYPT_ECCPRIVATE_BLOB, &key, buffer, size, 0);
     ok(status == STATUS_INVALID_PARAMETER, "Expected STATUS_INVALID_PARAMETER, got %08x\n", status);
 
-    ecckey->dwMagic = BCRYPT_ECDH_PRIVATE_P256_MAGIC;
-    ecckey->cbKey = 32;
-    status = pBCryptImportKeyPair(alg, NULL, BCRYPT_ECCPRIVATE_BLOB, &key, buffer, size, 0);
-    ok(status == STATUS_INVALID_PARAMETER, "Expected STATUS_INVALID_PARAMETER, got %08x\n", status);
-
-    ecckey->dwMagic = BCRYPT_ECDSA_PRIVATE_P256_MAGIC;
     ecckey->cbKey = 32;
     status = pBCryptImportKeyPair(alg, NULL, BCRYPT_ECCPRIVATE_BLOB, &key, buffer, size, 0);
     ok(!status, "BCryptImportKeyPair failed: %08x\n", status);
-
-    memset( buffer, 0, sizeof(buffer) );
-    status = pBCryptExportKey(key, NULL, BCRYPT_ECCPRIVATE_BLOB, buffer, size, &size, 0);
-    ok(status == STATUS_SUCCESS, "got %08x\n", status);
-    ecckey = (BCRYPT_ECCKEY_BLOB *)buffer;
-    ok(ecckey->dwMagic == BCRYPT_ECDSA_PRIVATE_P256_MAGIC, "got %08x\n", ecckey->dwMagic);
-    ok(ecckey->cbKey == 32, "got %u\n", ecckey->cbKey);
-    ok(size == sizeof(*ecckey) + ecckey->cbKey * 3, "got %u\n", size);
 
     pBCryptDestroyKey(key);
     pBCryptCloseAlgorithmProvider(alg, 0);
