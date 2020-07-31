@@ -914,9 +914,11 @@ static NTSTATUS dlopen_dll( const char *so_name, void **ret_module )
     struct builtin_module *builtin;
     void *module, *handle;
     const IMAGE_NT_HEADERS *nt;
+    BOOL mapped = FALSE;
 
     callback_module = (void *)1;
-    handle = dlopen( so_name, RTLD_NOW );
+    if ((handle = dlopen( so_name, RTLD_NOW | RTLD_NOLOAD ))) mapped = TRUE;
+    else handle = dlopen( so_name, RTLD_NOW );
     if (!handle)
     {
         WARN( "failed to load .so lib %s: %s\n", debugstr_a(so_name), dlerror() );
@@ -935,7 +937,7 @@ static NTSTATUS dlopen_dll( const char *so_name, void **ret_module )
         module = (HMODULE)((nt->OptionalHeader.ImageBase + 0xffff) & ~0xffff);
         LIST_FOR_EACH_ENTRY( builtin, &builtin_modules, struct builtin_module, entry )
             if (builtin->module == module) goto already_loaded;
-        if (map_so_dll( nt, module ))
+        if (!mapped && map_so_dll( nt, module ))
         {
             dlclose( handle );
             return STATUS_NO_MEMORY;
