@@ -5865,3 +5865,4 @@ HKCU,Software\Wine\DllOverrides,"vcomp140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcruntime140",0x2,"native,builtin"
 ;;App-specific overrides for amd_ags_x64.dll.
 HKCU,Software\Wine\AppDefaults\NewColossus_x64vk.exe\DllOverrides,"amd_ags_x64",0x2,"builtin,native"
+HKCU,Software\Wine\AppDefaults\RDR2.exe\DllOverrides,"amd_ags_x64",0x2,"builtin,native"
