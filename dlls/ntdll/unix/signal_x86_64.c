@@ -2026,6 +2026,62 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 
     ctx->uc_mcontext.gregs[REG_RIP] = (ULONG64)__wine_syscall_dispatcher;
 }
+
+extern unsigned int __wine_syscall_nr_NtClose;
+extern unsigned int __wine_syscall_nr_NtCreateFile;
+extern unsigned int __wine_syscall_nr_NtGetContextThread;
+extern unsigned int __wine_syscall_nr_NtQueryInformationProcess;
+extern unsigned int __wine_syscall_nr_NtQuerySystemInformation;
+extern unsigned int __wine_syscall_nr_NtQueryVirtualMemory;
+extern unsigned int __wine_syscall_nr_NtReadFile;
+extern unsigned int __wine_syscall_nr_NtWriteFile;
+
+static void sigsys_handler_rdr2( int signal, siginfo_t *siginfo, void *sigcontext )
+{
+    ucontext_t *ctx = sigcontext;
+    void ***rsp;
+
+    TRACE("SIGSYS, rax %#llx, rip %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX],
+            ctx->uc_mcontext.gregs[REG_RIP]);
+
+    rsp = (void ***)&ctx->uc_mcontext.gregs[REG_RSP];
+    *rsp -= 1;
+    **rsp = (void *)(ctx->uc_mcontext.gregs[REG_RIP] + 0xb);
+
+    ctx->uc_mcontext.gregs[REG_RIP] = (ULONG64)__wine_syscall_dispatcher;
+
+    /* syscall numbers are for Windows 10 1809 (build 17763) */
+    switch (ctx->uc_mcontext.gregs[REG_RAX])
+    {
+        case 0x19:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtQueryInformationProcess;
+            break;
+        case 0x36:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtQuerySystemInformation;
+            break;
+        case 0xec:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtGetContextThread;
+            break;
+        case 0x55:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtCreateFile;
+            break;
+        case 0x08:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtWriteFile;
+            break;
+        case 0x06:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtReadFile;
+            break;
+        case 0x0f:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtClose;
+            break;
+        case 0x23:
+            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtQueryVirtualMemory;
+            break;
+         default:
+            FIXME("Unhandled syscall %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX]);
+            break;
+    }
+}
 #endif
 
 #ifdef HAVE_SECCOMP
@@ -2083,12 +2139,43 @@ static void install_bpf(struct sigaction *sig_act)
        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
     };
+    static struct sock_filter filter_rdr2[] =
+    {
+        /* Trap anything called from RDR2 or the launcher (0x140000000 - 0x150000000)*/
+        /* > 0x140000000 */
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 0),
+        BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x40000000 /*lsb*/, 0, 7),
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 4),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x1 /*msb*/, 0, 5),
+
+        /* < 0x150000000 */
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 0),
+        BPF_JUMP(BPF_JMP | BPF_JGT | BPF_K, 0x50000000 /*lsb*/, 3, 0),
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 4),
+        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x1 /*msb*/, 0, 1),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
+
+        /* Allow everything else */
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+    };
     struct sock_fprog prog;
     int ret;
 
     memset(&prog, 0, sizeof(prog));
     prog.len = ARRAY_SIZE(filter);
     prog.filter = filter;
+    sig_act->sa_sigaction = sigsys_handler;
+
+    {
+        const char *sgi = getenv("SteamGameId");
+        if (sgi && !strcmp(sgi, "1174180"))
+        {
+            /* Use specific filter and signal handler for Red Dead Redemption 2 */
+            prog.len = ARRAY_SIZE(filter_rdr2);
+            prog.filter = filter_rdr2;
+            sig_act->sa_sigaction = sigsys_handler_rdr2;
+        }
+    }
 
     if (!(ret = prctl(PR_GET_SECCOMP, 0, NULL, 0, 0)))
     {
@@ -2115,7 +2202,6 @@ static void install_bpf(struct sigaction *sig_act)
             ERR("Seccomp filters cannot be installed, ret %d, error %s.\n", ret, strerror(errno));
     }
 
-    sig_act->sa_sigaction = sigsys_handler;
     sigaction(SIGSYS, sig_act, NULL);
 #else
     WARN("Built without seccomp.\n");
