@@ -991,8 +991,22 @@ void *steamclient_handle_fault( LPCVOID addr, DWORD err )
     return NULL;
 }
 
+static void steamclient_write_jump(void *src_addr, void *tgt_addr)
+{
+#ifdef _WIN64
+    static const char mov[] = {0x48, 0xb8};
+#else
+    static const char mov[] = {0xb8};
+#endif
+    static const char jmp[] = {0xff, 0xe0};
+    memcpy(src_addr, mov, sizeof(mov));
+    memcpy((char *)src_addr + sizeof(mov), &tgt_addr, sizeof(tgt_addr));
+    memcpy((char *)src_addr + sizeof(mov) + sizeof(tgt_addr), jmp, sizeof(jmp));
+}
+
 static NTSTATUS steamclient_setup_trampolines( void *args )
 {
+    static int noexec_cached = -1;
     struct steamclient_setup_trampolines_params *params = args;
     HMODULE src_mod = params->src_mod, tgt_mod = params->tgt_mod;
     SYSTEM_BASIC_INFORMATION info;
@@ -1003,9 +1017,12 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
     const DWORD *names;
     SIZE_T size;
     void *addr, *src_addr, *tgt_addr;
-    char *name;
+    char *name, *wsne;
     UINT_PTR page_mask;
     int i;
+
+    if (noexec_cached == -1)
+        noexec_cached = (wsne = getenv("WINESTEAMNOEXEC")) && atoi(wsne);
 
     virtual_get_system_info( &info, !!NtCurrentTeb()->WowTebOffset );
     page_mask = info.PageSize - 1;
@@ -1015,7 +1032,8 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
         if (memcmp(src_sec[i].Name, ".text", 5)) continue;
         addr = (void *)(((UINT_PTR)src_mod + src_sec[i].VirtualAddress) & ~page_mask);
         size = (src_sec[i].Misc.VirtualSize + page_mask) & ~page_mask;
-        mprotect(addr, size, PROT_READ);
+        if (noexec_cached) mprotect(addr, size, PROT_READ);
+        else mprotect(addr, size, PROT_READ|PROT_WRITE|PROT_EXEC);
     }
 
     src_exp = get_module_data_dir( src_mod, IMAGE_FILE_EXPORT_DIRECTORY, NULL );
@@ -1029,7 +1047,8 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
         assert(steamclient_count < ARRAY_SIZE(steamclient_srcs));
         steamclient_srcs[steamclient_count] = src_addr;
         steamclient_tgts[steamclient_count] = tgt_addr;
-        steamclient_count++;
+        if (!noexec_cached) steamclient_write_jump(src_addr, tgt_addr);
+        else steamclient_count++;
     }
 
     src_addr = (void *)((UINT_PTR)src_mod + src_nt->OptionalHeader.AddressOfEntryPoint);
@@ -1037,7 +1056,8 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
     assert(steamclient_count < ARRAY_SIZE(steamclient_srcs));
     steamclient_srcs[steamclient_count] = src_addr;
     steamclient_tgts[steamclient_count] = tgt_addr;
-    steamclient_count++;
+    if (!noexec_cached) steamclient_write_jump(src_addr, tgt_addr);
+    else steamclient_count++;
 
     return STATUS_SUCCESS;
 }
