@@ -1627,6 +1627,10 @@ static BOOL gstdecoder_init_gst(struct gstdemux *filter)
     g_signal_connect(element, "unknown-type", G_CALLBACK(unknown_type_wrapper), filter);
     g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_wrapper), filter);
 
+    gst_util_set_object_arg(G_OBJECT(element), "max-size-buffers", "4294967295"); /* UINT_MAX */
+    gst_util_set_object_arg(G_OBJECT(element), "max-size-bytes", "8388608"); /* 8 MB */
+    gst_util_set_object_arg(G_OBJECT(element), "max-size-time", "1000000000"); /* 1 sec */
+
     filter->their_sink = gst_element_get_static_pad(element, "sink");
     ResetEvent(filter->no_more_pads_event);
 
