@@ -1392,17 +1392,43 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
 
     for (i = 0; i < object->stream_count; i++)
     {
+        struct media_stream *stream = object->streams[i];
         gint64 stream_pres_time;
-        if (gst_pad_query_duration(object->streams[i]->their_src, GST_FORMAT_TIME, &stream_pres_time))
-        {
-            TRACE("Stream %u has duration %llu\n", i, (unsigned long long int) stream_pres_time);
+        GstEvent *tag_event;
 
+        if (gst_pad_query_duration(stream->their_src, GST_FORMAT_TIME, &stream_pres_time))
+        {
             if (stream_pres_time > total_pres_time)
                 total_pres_time = stream_pres_time;
         }
         else
         {
             WARN("Unable to get presentation time of stream %u\n", i);
+        }
+
+        tag_event = gst_pad_get_sticky_event(stream->their_src, GST_EVENT_TAG, 0);
+        if (tag_event)
+        {
+            GstTagList *tag_list;
+            gchar *language_code = NULL;
+
+            gst_event_parse_tag(tag_event, &tag_list);
+
+            gst_tag_list_get_string(tag_list, "language-code", &language_code);
+            if (language_code)
+            {
+                DWORD char_count = MultiByteToWideChar(CP_UTF8, 0, language_code, -1, NULL, 0);
+                if (char_count)
+                {
+                    WCHAR *language_codeW = heap_alloc(char_count * sizeof(WCHAR));
+                    MultiByteToWideChar(CP_UTF8, 0, language_code, -1, language_codeW, char_count);
+                    IMFStreamDescriptor_SetString(stream->descriptor, &MF_SD_LANGUAGE, language_codeW);
+                    heap_free(language_codeW);
+                }
+                g_free(language_code);
+            }
+
+            gst_event_unref(tag_event);
         }
     }
 
