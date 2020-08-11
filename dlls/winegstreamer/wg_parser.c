@@ -1615,6 +1615,10 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
     g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
 
+    gst_util_set_object_arg(G_OBJECT(element), "max-size-buffers", "4294967295"); /* UINT_MAX */
+    gst_util_set_object_arg(G_OBJECT(element), "max-size-bytes", "8388608"); /* 8 MB */
+    gst_util_set_object_arg(G_OBJECT(element), "max-size-time", "1000000000"); /* 1 sec */
+
     parser->their_sink = gst_element_get_static_pad(element, "sink");
 
     pthread_mutex_lock(&parser->mutex);
