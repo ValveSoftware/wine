@@ -692,6 +692,7 @@ struct x11drv_display_setting
     ULONG_PTR id;
     BOOL placed;
     RECT new_rect;
+    RECT old_rect;
     RECT desired_rect;
     DEVMODEW desired_mode;
 };
