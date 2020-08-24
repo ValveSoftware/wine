@@ -91,6 +91,7 @@ struct fs_monitor
     POINT top_left;             /* Top left corner of the fake monitor rectangle in real virtual screen coordinates */
     DEVMODEW *modes;            /* Supported display modes */
     UINT mode_count;            /* Display mode count */
+    UINT unique_resolutions;    /* Number of unique resolutions in terms of WxH */
 };
 
 static int mode_compare(const void *p1, const void *p2)
@@ -109,9 +110,44 @@ static int mode_compare(const void *p1, const void *p2)
     return a->dmDisplayFrequency - b->dmDisplayFrequency;
 }
 
-static void add_fs_mode(DEVMODEW *mode, DWORD depth, DWORD width, DWORD height, DWORD frequency)
+static void add_fs_mode(struct fs_monitor *fs_monitor, DWORD depth, DWORD width, DWORD height, DWORD frequency)
 {
+    int i;
+    DEVMODEW *mode;
+    const char *appid;
+    BOOL is_new_resolution;
+
+    /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
+    if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130") &&
+        height <= 600 && !(height == 600 && width == 800))
+        return;
+
+    is_new_resolution = TRUE;
+
+    for (i = 0; i < fs_monitor->mode_count; ++i)
+    {
+        if (fs_monitor->modes[i].dmPelsWidth == width &&
+            fs_monitor->modes[i].dmPelsHeight == height)
+        {
+            is_new_resolution = FALSE;
+
+            if (fs_monitor->modes[i].dmBitsPerPel == depth &&
+                fs_monitor->modes[i].dmDisplayFrequency == frequency)
+                return; /* The exact mode is already added, nothing to do */
+        }
+    }
+
+    if (is_new_resolution) {
+        /* Some games crash if we report too many unique resolutions (in terms of HxW) */
+        if (limit_number_of_resolutions && fs_monitor->unique_resolutions >= limit_number_of_resolutions)
+            return;
+
+        fs_monitor->unique_resolutions++;
+    }
+
+    mode = &fs_monitor->modes[fs_monitor->mode_count++];
     mode->dmSize = sizeof(*mode);
+
     mode->dmDriverExtra = 0;
     mode->dmFields = DM_DISPLAYORIENTATION | DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT |
                      DM_DISPLAYFLAGS | DM_DISPLAYFREQUENCY;
@@ -128,9 +164,7 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
     DEVMODEW *real_modes, *real_mode, current_mode;
     UINT real_mode_count;
     ULONG_PTR real_id;
-    const char *appid;
     ULONG offset;
-    BOOL found;
     UINT i, j;
 
     if (!real_settings_handler.get_id(fs_monitor->user_mode.dmDeviceName, &real_id))
@@ -143,6 +177,7 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
         return FALSE;
 
     fs_monitor->mode_count = 0;
+    fs_monitor->unique_resolutions = 0;
     fs_monitor->modes = heap_calloc(ARRAY_SIZE(fs_monitor_sizes) * DEPTH_COUNT + real_mode_count,
                                     sizeof(*fs_monitor->modes));
     if (!fs_monitor->modes)
@@ -150,6 +185,10 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
         real_settings_handler.free_modes(real_modes);
         return FALSE;
     }
+
+    /* Add the current mode early, in case we have to limit */
+    add_fs_mode(fs_monitor, current_mode.dmBitsPerPel, current_mode.dmPelsWidth,
+                current_mode.dmPelsHeight, current_mode.dmDisplayFrequency);
 
     /* Linux reports far fewer resolutions than Windows. Add modes that some games may expect. */
     for (i = 0; i < ARRAY_SIZE(fs_monitor_sizes); ++i)
@@ -159,14 +198,9 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
             fs_monitor_sizes[i].height > current_mode.dmPelsHeight)
             continue;
 
-        /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
-        if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130") &&
-            fs_monitor_sizes[i].height <= 600 && !(fs_monitor_sizes[i].height == 600 && fs_monitor_sizes[i].width == 800))
-            continue;
-
         for (j = 0; j < DEPTH_COUNT; ++j)
-            add_fs_mode(&fs_monitor->modes[fs_monitor->mode_count++], depths[j],
-                        fs_monitor_sizes[i].width, fs_monitor_sizes[i].height, 60);
+            add_fs_mode(fs_monitor, depths[j], fs_monitor_sizes[i].width,
+                        fs_monitor_sizes[i].height, 60);
     }
 
     for (i = 0; i < real_mode_count; ++i)
@@ -179,30 +213,8 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
             real_mode->dmPelsHeight > current_mode.dmPelsHeight)
             continue;
 
-        /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
-        if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130") &&
-            real_mode->dmPelsHeight <= 600 && !(real_mode->dmPelsHeight == 600 && real_mode->dmPelsWidth == 800))
-            continue;
-
-        /* Skip modes that are already added */
-        found = FALSE;
-        for (j = 0; j < fs_monitor->mode_count; ++j)
-        {
-            if (fs_monitor->modes[j].dmPelsWidth == real_mode->dmPelsWidth &&
-                fs_monitor->modes[j].dmPelsHeight == real_mode->dmPelsHeight &&
-                fs_monitor->modes[j].dmBitsPerPel == real_mode->dmBitsPerPel &&
-                fs_monitor->modes[j].dmDisplayFrequency == real_mode->dmDisplayFrequency)
-            {
-                found = TRUE;
-                break;
-            }
-        }
-
-        if (found)
-            continue;
-
-        add_fs_mode(&fs_monitor->modes[fs_monitor->mode_count++], real_mode->dmBitsPerPel,
-                    real_mode->dmPelsWidth, real_mode->dmPelsHeight, real_mode->dmDisplayFrequency);
+        add_fs_mode(fs_monitor, real_mode->dmBitsPerPel, real_mode->dmPelsWidth,
+                    real_mode->dmPelsHeight, real_mode->dmDisplayFrequency);
     }
     real_settings_handler.free_modes(real_modes);
 
