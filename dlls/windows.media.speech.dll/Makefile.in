@@ -1,0 +1,5 @@
+MODULE = windows.media.speech.dll
+IMPORTS = combase
+EXTRADLLFLAGS = -mno-cygwin
+C_SRCS = \
+	windows.media.speech_main.c
