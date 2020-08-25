@@ -1191,8 +1191,8 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
         const char *steamgameid = getenv("SteamGameId");
         if(steamgameid && !strcmp(steamgameid, "590380")){
             /* Into The Breach is extremely picky about the size of its window. */
-            if(is_window_rect_fullscreen(&data->whole_rect) &&
-                    is_window_rect_fullscreen(&rect)){
+            if(is_window_rect_full_screen(&data->whole_rect) &&
+                    is_window_rect_full_screen(&rect)){
                 TRACE("window is fullscreen and new size is also fullscreen, so preserving window size\n");
                 rect.right = rect.left + (data->whole_rect.right - data->whole_rect.left);
                 rect.bottom = rect.top + (data->whole_rect.bottom - data->whole_rect.top);
