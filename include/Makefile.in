@@ -732,6 +732,7 @@ SOURCES = \
 	windef.h \
 	windns.h \
 	windows.foundation.idl \
+	windows.globalization.idl \
 	windows.h \
 	windowsx.h \
 	wine/debug.h \
