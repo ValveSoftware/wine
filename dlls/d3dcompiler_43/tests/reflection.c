@@ -1925,10 +1925,10 @@ static void test_reflection_constant_buffer(void)
         ok(vdesc.uFlags == pvdesc->uFlags, "Got unexpected uFlags %#x, i %u.\n", vdesc.uFlags, i);
         ok(vdesc.DefaultValue == pvdesc->DefaultValue, "Got unexpected DefaultValue %p, i %u.\n",
                 vdesc.DefaultValue, i);
-        todo_wine ok(vdesc.StartTexture == 0xffffffff, "Got unexpected StartTexture %#x, i %u.\n", vdesc.StartTexture, i);
-        todo_wine ok(!vdesc.TextureSize, "Got unexpected TextureSize %u, i %u.\n", vdesc.TextureSize, i);
-        todo_wine ok(vdesc.StartSampler == 0xffffffff, "Got unexpected StartSampler %u, i %u.\n", vdesc.StartSampler, i);
-        todo_wine ok(!vdesc.SamplerSize, "Got unexpected SamplerSize %u, i %u.\n", vdesc.SamplerSize, i);
+        ok(vdesc.StartTexture == 0xffffffff, "Got unexpected StartTexture %#x, i %u.\n", vdesc.StartTexture, i);
+        ok(!vdesc.TextureSize, "Got unexpected TextureSize %u, i %u.\n", vdesc.TextureSize, i);
+        ok(vdesc.StartSampler == 0xffffffff, "Got unexpected StartSampler %u, i %u.\n", vdesc.StartSampler, i);
+        ok(!vdesc.SamplerSize, "Got unexpected SamplerSize %u, i %u.\n", vdesc.SamplerSize, i);
 
         if (ref12)
         {
@@ -1937,7 +1937,7 @@ static void test_reflection_constant_buffer(void)
             hr = v12->lpVtbl->GetDesc(v12, &vdesc12);
             ok(hr == S_OK, "Got unexpected hr %#x, i %u.\n", hr, i);
             ok(!strcmp(vdesc12.Name, pvdesc->Name), "Got unexpected name \"%s\", i %u", vdesc12.Name, i);
-            todo_wine ok(!memcmp(&vdesc12.StartOffset, &vdesc.StartOffset,
+            ok(!memcmp(&vdesc12.StartOffset, &vdesc.StartOffset,
                     sizeof(vdesc) - offsetof(D3D11_SHADER_VARIABLE_DESC, StartOffset)),
                     "D3D11 and D3D12 descs do not match.\n");
         }
