@@ -26,9 +26,9 @@
 #include "initguid.h"
 #include "windows.h"
 #include "ole2.h"
-#include "msxml2.h"
+#include "msxml6.h"
 #undef CLSID_DOMDocument
-#include "msxml2did.h"
+#include "msxml6did.h"
 #include "dispex.h"
 #include "cguid.h"
 
