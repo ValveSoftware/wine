@@ -658,7 +658,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH CreateFile2( LPCWSTR name, DWORD access, DWORD s
                                              CREATEFILE2_EXTENDED_PARAMETERS *params )
 {
     LPSECURITY_ATTRIBUTES sa = params ? params->lpSecurityAttributes : NULL;
-    DWORD attributes = params ? params->dwFileAttributes : 0;
+    DWORD attributes = params ? (params->dwFileAttributes | params->dwFileFlags) : 0;
     HANDLE template = params ? params->hTemplateFile : NULL;
 
     FIXME( "(%s %x %x %x %p), partial stub\n", debugstr_w(name), access, sharing, creation, params );
