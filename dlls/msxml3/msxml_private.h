@@ -501,6 +501,7 @@ extern HRESULT XMLDocument_create(void**) DECLSPEC_HIDDEN;
 extern HRESULT SAXXMLReader_create(MSXML_VERSION, void**) DECLSPEC_HIDDEN;
 extern HRESULT SAXAttributes_create(MSXML_VERSION, void**) DECLSPEC_HIDDEN;
 extern HRESULT XMLHTTPRequest_create(void **) DECLSPEC_HIDDEN;
+extern HRESULT XMLHTTPRequest2_create(void **) DECLSPEC_HIDDEN;
 extern HRESULT ServerXMLHTTP_create(void **) DECLSPEC_HIDDEN;
 extern HRESULT XSLTemplate_create(void**) DECLSPEC_HIDDEN;
 extern HRESULT MXWriter_create(MSXML_VERSION, void**) DECLSPEC_HIDDEN;
