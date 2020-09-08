@@ -5901,3 +5901,7 @@ HKCU,Software\Wine\AppDefaults\NFS16.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\ShadowOfWar.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\DIRT5.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\gotg.exe\DllOverrides,"atiadlxx",,"builtin"
+;;App-specific overrides to limit the number of resolutions
+HKCU,Software\Wine\AppDefaults\DarkSoulsIII.exe\X11 Driver,"LimitNumberOfResolutions",0x2,"32"
+HKCU,Software\Wine\AppDefaults\sekiro.exe\X11 Driver,"LimitNumberOfResolutions",0x2,"32"
+HKCU,Software\Wine\AppDefaults\NieRAutomata.exe\X11 Driver,"LimitNumberOfResolutions",0x2,"32"
