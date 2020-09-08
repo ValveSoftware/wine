@@ -344,6 +344,7 @@ extern HRESULT XMLDocument_create(void**);
 extern HRESULT SAXXMLReader_create(MSXML_VERSION, void**);
 extern HRESULT SAXAttributes_create(MSXML_VERSION, void**);
 extern HRESULT XMLHTTPRequest_create(void **);
+extern HRESULT XMLHTTPRequest2_create(void **);
 extern HRESULT ServerXMLHTTP_create(void **);
 extern HRESULT XSLTemplate_create(void**);
 extern HRESULT MXWriter_create(MSXML_VERSION, void**);
