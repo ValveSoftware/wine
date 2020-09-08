@@ -1,5 +1,5 @@
 MODULE    = msxml3.dll
-IMPORTS   = uuid urlmon shlwapi oleaut32 ole32 user32 advapi32
+IMPORTS   = uuid urlmon shlwapi oleaut32 ole32 user32 advapi32 rtworkq
 EXTRALIBS = $(XML2_LIBS)
 EXTRAINCL = $(XML2_CFLAGS) $(XSLT_CFLAGS)
 
