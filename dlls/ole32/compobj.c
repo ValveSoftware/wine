@@ -3461,6 +3461,17 @@ HRESULT WINAPI DECLSPEC_HOTPATCH CoCreateInstanceEx(
 }
 
 /***********************************************************************
+ *           CoCreateInstanceFromApp [OLE32.@]
+ */
+HRESULT WINAPI DECLSPEC_HOTPATCH CoCreateInstanceFromApp(REFCLSID clsid, IUnknown *unk_outer,
+        DWORD clsctx, void *reserved, DWORD count, MULTI_QI *results)
+{
+    static int once;
+    if (!once++) FIXME("(%s %p %x %p %u %p) semi-stub\n", debugstr_guid(clsid), unk_outer, clsctx, reserved, count, results);
+    return CoCreateInstanceEx(clsid, unk_outer, clsctx, NULL, count, results);
+}
+
+/***********************************************************************
  *           CoGetInstanceFromFile [OLE32.@]
  */
 HRESULT WINAPI DECLSPEC_HOTPATCH CoGetInstanceFromFile(
