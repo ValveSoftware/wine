@@ -1716,17 +1716,6 @@ interface ISAXDeclHandler : IUnknown
 }
 
 [
-    helpstring("Free Threaded XML HTTP Request class 6.0"),
-    progid("Msxml2.FreeThreadedXMLHTTP60.6.0"),
-    threading(both),
-    uuid(88d96a09-f192-11d4-a65f-0040963251e5)
-]
-coclass FreeThreadedXMLHTTP60
-{
-    [default] interface IXMLHTTPRequest2;
-}
-
-[
     object,
     local,
     uuid(e15c1baf-afb3-4d60-8c36-19a8c45defed)
@@ -3052,6 +3041,17 @@ interface ISchemaNotation;
     enum _SCHEMATYPEVARIETY __schemaTypeVarietyEnum__;
     SCHEMATYPEVARIETY __schemaTypeVariety__;
 } __msxml6_ReferenceRemainingTypes__;
+
+[
+    helpstring("Free Threaded XML HTTP Request class 6.0"),
+    progid("Msxml2.FreeThreadedXMLHTTP60.6.0"),
+    threading(both),
+    uuid(88d96a09-f192-11d4-a65f-0040963251e5)
+]
+coclass FreeThreadedXMLHTTP60
+{
+    [default] interface IXMLHTTPRequest2;
+}
 
 [
     helpstring("XML DOM Document 6.0"),
