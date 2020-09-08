@@ -281,6 +281,7 @@ static HRESULT DOMClassFactory_Create(const GUID *clsid, REFIID riid, void **ppv
 
 static ClassFactory xmldoccf = { { &ClassFactoryVtbl }, XMLDocument_create };
 static ClassFactory httpreqcf = { { &ClassFactoryVtbl }, XMLHTTPRequest_create };
+static ClassFactory httpreqcf2 = { { &ClassFactoryVtbl }, XMLHTTPRequest2_create };
 static ClassFactory serverhttp = { { &ClassFactoryVtbl }, ServerXMLHTTP_create };
 static ClassFactory xsltemplatecf = { { &ClassFactoryVtbl }, XSLTemplate_create };
 static ClassFactory mxnsmanagercf = { {&ClassFactoryVtbl }, MXNamespaceManager_create };
@@ -341,6 +342,10 @@ HRESULT WINAPI DllGetClassObject( REFCLSID rclsid, REFIID riid, void **ppv )
              IsEqualCLSID( rclsid, &CLSID_XMLHTTP60 ))
     {
         cf = &httpreqcf.IClassFactory_iface;
+    }
+    else if( IsEqualCLSID( rclsid, &CLSID_FreeThreadedXMLHTTP60 ))
+    {
+        cf = &httpreqcf2.IClassFactory_iface;
     }
     else if( IsEqualCLSID( rclsid, &CLSID_ServerXMLHTTP ) ||
              IsEqualCLSID( rclsid, &CLSID_ServerXMLHTTP30 ) ||
