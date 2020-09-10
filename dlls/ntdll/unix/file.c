@@ -1619,9 +1619,24 @@ static int fd_set_dos_attrib( int fd, UINT attr, BOOL force_set )
     else return xattr_fremove( fd, SAMBA_XATTR_DOS_ATTRIB );
 }
 
+static unsigned int server_get_unix_name( HANDLE handle, char **unix_name );
+
+/* return TRUE if this is a file owned by Wine which applications should not try to mess with. */
+static BOOL is_wine_file( HANDLE handle )
+{
+    char *unix_name;
+    BOOL ret;
+
+    if (server_get_unix_name( handle, &unix_name ))
+        return FALSE;
+    ret = strstr(unix_name, "/lib/wine/" ) || strstr( unix_name, "/lib64/wine/" ) ||strstr( unix_name, "/share/wine/" );
+    free(unix_name);
+    return ret;
+}
+
 
 /* set the stat info and file attributes for a file (by file descriptor) */
-static NTSTATUS fd_set_file_info( int fd, UINT attr, BOOL force_set_xattr )
+static NTSTATUS fd_set_file_info( int fd, HANDLE handle, UINT attr, BOOL force_set_xattr )
 {
     struct stat st;
 
@@ -1635,8 +1650,16 @@ static NTSTATUS fd_set_file_info( int fd, UINT attr, BOOL force_set_xattr )
     }
     else
     {
-        /* add write permission only where we already have read permission */
-        st.st_mode |= (0600 | ((st.st_mode & 044) >> 1)) & (~start_umask);
+        if (is_wine_file( handle ))
+        {
+            TRACE("HACK: Not giving write permission to wine file!\n");
+            return STATUS_ACCESS_DENIED;
+        }
+        else
+        {
+            /* add write permission only where we already have read permission */
+            st.st_mode |= (0600 | ((st.st_mode & 044) >> 1)) & (~start_umask);
+        }
     }
     if (fchmod( fd, st.st_mode ) == -1) return errno_to_status( errno );
 
@@ -4592,8 +4615,8 @@ NTSTATUS WINAPI NtSetInformationFile( HANDLE handle, IO_STATUS_BLOCK *io,
                 status = set_file_times( fd, &mtime, &atime );
 
             if (status == STATUS_SUCCESS)
-                status = fd_set_file_info( fd, info->FileAttributes,
-                                           unix_name && is_hidden_file( unix_name ));
+                status = fd_set_file_info( fd, handle, info->FileAttributes,
+                                           unix_name && is_hidden_file( unix_name ) );
 
             if (needs_close) close( fd );
             free( unix_name );
