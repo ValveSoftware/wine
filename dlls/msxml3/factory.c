@@ -31,6 +31,7 @@
 #include "ole2.h"
 #include "msxml.h"
 #include "msxml2.h"
+#include "msxml6.h"
 #include "xmlparser.h"
 
 /* undef the #define in msxml2 so that we can access the v.2 version
@@ -52,8 +53,6 @@ DEFINE_GUID(CLSID_MXXMLWriter60, 0x88d96a0f, 0xf192, 0x11d4, 0xa6, 0x5f, 0x00, 0
 DEFINE_GUID(CLSID_XSLTemplate60, 0x88d96a08, 0xf192, 0x11d4, 0xa6, 0x5f, 0x00, 0x40, 0x96, 0x32, 0x51, 0xe5);
 
 WINE_DEFAULT_DEBUG_CHANNEL(msxml);
-
-extern GUID CLSID_XMLSchemaCache60;
 
 typedef HRESULT (*ClassFactoryCreateInstanceFunc)(void**);
 typedef HRESULT (*DOMFactoryCreateInstanceFunc)(MSXML_VERSION, void**);
