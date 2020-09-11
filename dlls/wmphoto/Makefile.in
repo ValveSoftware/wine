@@ -1,4 +1,5 @@
 MODULE = wmphoto.dll
+IMPORTS = windowscodecs uuid kernelbase
 
 EXTRADLLFLAGS = -mno-cygwin
 
