@@ -82,7 +82,7 @@ static void test_decode(void)
 
     hr = CoCreateInstance(&CLSID_WICWmpDecoder, NULL, CLSCTX_INPROC_SERVER,
                           &IID_IWICBitmapDecoder, (void **)&decoder);
-    todo_wine ok(SUCCEEDED(hr), "CoCreateInstance failed, hr=%x\n", hr);
+    ok(SUCCEEDED(hr), "CoCreateInstance failed, hr=%x\n", hr);
     if (FAILED(hr)) return;
 
     hr = CoCreateInstance(&CLSID_WICImagingFactory, NULL, CLSCTX_INPROC_SERVER,
