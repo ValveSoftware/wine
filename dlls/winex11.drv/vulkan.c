@@ -608,6 +608,9 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
     HMONITOR monitor;
     HWND hwnd;
 
+    if (wm_is_steamcompmgr(gdi_display))
+        return VK_FALSE;
+
     if (XFindContext(gdi_display, x11_surface->window, winContext, (char **)&hwnd) != 0)
     {
         ERR("Failed to find hwnd context\n");
