@@ -110,6 +110,12 @@ static struct object *named_pipe_open_file( struct object *obj, unsigned int acc
                                             unsigned int sharing, unsigned int options );
 static void named_pipe_destroy( struct object *obj );
 
+static struct object *named_pipe_lookup_name( struct object *obj, struct unicode_str *name,
+                                                     unsigned int attr )
+{
+    return NULL;
+}
+
 static const struct object_ops named_pipe_ops =
 {
     sizeof(struct named_pipe),    /* size */
@@ -126,7 +132,7 @@ static const struct object_ops named_pipe_ops =
     named_pipe_map_access,        /* map_access */
     default_get_sd,               /* get_sd */
     default_set_sd,               /* set_sd */
-    no_lookup_name,               /* lookup_name */
+    named_pipe_lookup_name,       /* lookup_name */
     named_pipe_link_name,         /* link_name */
     default_unlink_name,          /* unlink_name */
     named_pipe_open_file,         /* open_file */
@@ -154,6 +160,20 @@ static void pipe_server_dump( struct object *obj, int verbose );
 static void pipe_server_destroy( struct object *obj);
 static int pipe_server_ioctl( struct fd *fd, ioctl_code_t code, struct async *async );
 
+static struct object *pipe_server_lookup_name( struct object *obj, struct unicode_str *name,
+                                                     unsigned int attr )
+{
+    struct pipe_server *server = (struct pipe_server *) obj;
+
+    if (!name && server->pipe_end.pipe)
+        return grab_object ( &server->pipe_end.pipe->obj );
+
+    if (!name)
+        set_error( STATUS_OBJECT_TYPE_MISMATCH );
+
+    return NULL;
+}
+
 static const struct object_ops pipe_server_ops =
 {
     sizeof(struct pipe_server),   /* size */
@@ -170,7 +190,7 @@ static const struct object_ops pipe_server_ops =
     default_fd_map_access,        /* map_access */
     pipe_end_get_sd,              /* get_sd */
     pipe_end_set_sd,              /* set_sd */
-    no_lookup_name,               /* lookup_name */
+    pipe_server_lookup_name,      /* lookup_name */
     no_link_name,                 /* link_name */
     NULL,                         /* unlink_name */
     no_open_file,                 /* open_file */
@@ -1361,7 +1381,18 @@ DECL_HANDLER(create_named_pipe)
             set_error( STATUS_OBJECT_PATH_SYNTAX_BAD );
             return;
         }
-        if (!(root = get_directory_obj( current->process, objattr->rootdir ))) return;
+        if (!(root = get_directory_obj( current->process, objattr->rootdir ))
+                && !(root = get_handle_obj( current->process, objattr->rootdir, 0, &named_pipe_device_ops ))
+                && !(root = get_handle_obj( current->process, objattr->rootdir, 0, &named_pipe_device_file_ops )))
+            return;
+    }
+
+    if (root && root->ops == &named_pipe_device_file_ops)
+    {
+        struct object *obj = root;
+
+        root = grab_object( &((struct named_pipe_device_file *)root)->device->obj );
+        release_object( obj );
     }
 
     pipe = create_named_object( root, &named_pipe_ops, &name, objattr->attributes | OBJ_OPENIF, NULL );
