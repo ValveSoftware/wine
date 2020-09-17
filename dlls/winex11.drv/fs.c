@@ -94,7 +94,8 @@ struct fs_monitor
     UINT unique_resolutions;    /* Number of unique resolutions in terms of WxH */
 };
 
-static void add_fs_mode(struct fs_monitor *fs_monitor, DWORD depth, DWORD width, DWORD height, DWORD frequency)
+static void add_fs_mode(struct fs_monitor *fs_monitor, DWORD depth, DWORD width, DWORD height,
+                        DWORD frequency, DWORD orientation)
 {
     int i;
     DEVMODEW *mode;
@@ -102,9 +103,19 @@ static void add_fs_mode(struct fs_monitor *fs_monitor, DWORD depth, DWORD width,
     BOOL is_new_resolution;
 
     /* Titan Souls renders incorrectly if we report modes smaller than 800x600 */
-    if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130") &&
-        height <= 600 && !(height == 600 && width == 800))
-        return;
+    if ((appid = getenv("SteamAppId")) && !strcmp(appid, "297130"))
+    {
+        if (orientation == DMDO_DEFAULT || orientation == DMDO_180)
+        {
+            if (height <= 600 && !(height == 600 && width == 800))
+                return;
+        }
+        else
+        {
+            if (width <= 600 && !(width == 600 && height == 800))
+                return;
+        }
+    }
 
     is_new_resolution = TRUE;
 
@@ -116,7 +127,8 @@ static void add_fs_mode(struct fs_monitor *fs_monitor, DWORD depth, DWORD width,
             is_new_resolution = FALSE;
 
             if (fs_monitor->modes[i].dmBitsPerPel == depth &&
-                fs_monitor->modes[i].dmDisplayFrequency == frequency)
+                fs_monitor->modes[i].dmDisplayFrequency == frequency &&
+                fs_monitor->modes[i].u1.s2.dmDisplayOrientation == orientation)
                 return; /* The exact mode is already added, nothing to do */
         }
     }
@@ -135,7 +147,7 @@ static void add_fs_mode(struct fs_monitor *fs_monitor, DWORD depth, DWORD width,
     mode->dmDriverExtra = 0;
     mode->dmFields = DM_DISPLAYORIENTATION | DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT |
                      DM_DISPLAYFLAGS | DM_DISPLAYFREQUENCY;
-    mode->u1.s2.dmDisplayOrientation = DMDO_DEFAULT;
+    mode->u1.s2.dmDisplayOrientation = orientation;
     mode->dmBitsPerPel = depth;
     mode->dmPelsWidth = width;
     mode->dmPelsHeight = height;
@@ -147,6 +159,7 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
 {
     DEVMODEW *real_modes, *real_mode, current_mode;
     UINT real_mode_count;
+    DWORD width, height;
     ULONG_PTR real_id;
     ULONG offset;
     UINT i, j;
@@ -157,6 +170,7 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
     if (!real_settings_handler.get_current_mode(real_id, &current_mode))
         return FALSE;
 
+    /* Fullscreen hack doesn't support changing display orientations */
     if (!real_settings_handler.get_modes(real_id, 0, &real_modes, &real_mode_count))
         return FALSE;
 
@@ -172,19 +186,31 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
 
     /* Add the current mode early, in case we have to limit */
     add_fs_mode(fs_monitor, current_mode.dmBitsPerPel, current_mode.dmPelsWidth,
-                current_mode.dmPelsHeight, current_mode.dmDisplayFrequency);
+                current_mode.dmPelsHeight, current_mode.dmDisplayFrequency,
+                current_mode.u1.s2.dmDisplayOrientation);
 
     /* Linux reports far fewer resolutions than Windows. Add modes that some games may expect. */
     for (i = 0; i < ARRAY_SIZE(fs_monitor_sizes); ++i)
     {
+        if (current_mode.u1.s2.dmDisplayOrientation == DMDO_DEFAULT ||
+            current_mode.u1.s2.dmDisplayOrientation == DMDO_180)
+        {
+            width = fs_monitor_sizes[i].width;
+            height = fs_monitor_sizes[i].height;
+        }
+        else
+        {
+            width = fs_monitor_sizes[i].height;
+            height = fs_monitor_sizes[i].width;
+        }
+
         /* Don't report modes that are larger than the current mode */
-        if (fs_monitor_sizes[i].width > current_mode.dmPelsWidth ||
-            fs_monitor_sizes[i].height > current_mode.dmPelsHeight)
+        if (width > current_mode.dmPelsWidth || height > current_mode.dmPelsHeight)
             continue;
 
         for (j = 0; j < DEPTH_COUNT; ++j)
-            add_fs_mode(fs_monitor, depths[j], fs_monitor_sizes[i].width,
-                        fs_monitor_sizes[i].height, 60);
+            add_fs_mode(fs_monitor, depths[j], width, height, 60,
+                        current_mode.u1.s2.dmDisplayOrientation);
     }
 
     for (i = 0; i < real_mode_count; ++i)
@@ -198,7 +224,8 @@ static BOOL fs_monitor_add_modes(struct fs_monitor *fs_monitor)
             continue;
 
         add_fs_mode(fs_monitor, real_mode->dmBitsPerPel, real_mode->dmPelsWidth,
-                    real_mode->dmPelsHeight, real_mode->dmDisplayFrequency);
+                    real_mode->dmPelsHeight, real_mode->dmDisplayFrequency,
+                    real_mode->u1.s2.dmDisplayOrientation);
     }
     real_settings_handler.free_modes(real_modes);
 
