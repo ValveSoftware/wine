@@ -353,7 +353,7 @@ BOOL get_primary_adapter(WCHAR *name)
     return FALSE;
 }
 
-static int mode_compare(const void *p1, const void *p2)
+int mode_compare(const void *p1, const void *p2)
 {
     DWORD a_width, a_height, b_width, b_height;
     const DEVMODEW *a = p1, *b = p2;

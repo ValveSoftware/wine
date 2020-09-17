@@ -94,22 +94,6 @@ struct fs_monitor
     UINT unique_resolutions;    /* Number of unique resolutions in terms of WxH */
 };
 
-static int mode_compare(const void *p1, const void *p2)
-{
-    const DEVMODEW *a = p1, *b = p2;
-
-    if (a->dmBitsPerPel != b->dmBitsPerPel)
-        return b->dmBitsPerPel - a->dmBitsPerPel;
-
-    if (a->dmPelsWidth != b->dmPelsWidth)
-        return a->dmPelsWidth - b->dmPelsWidth;
-
-    if (a->dmPelsHeight != b->dmPelsHeight)
-        return a->dmPelsHeight - b->dmPelsHeight;
-
-    return a->dmDisplayFrequency - b->dmDisplayFrequency;
-}
-
 static void add_fs_mode(struct fs_monitor *fs_monitor, DWORD depth, DWORD width, DWORD height, DWORD frequency)
 {
     int i;
