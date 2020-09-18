@@ -236,7 +236,8 @@ static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioCaptureDeviceC
 {
     struct windows_media_devices *impl = impl_from_IMediaDeviceStatics(iface);
     FIXME("%p, handler %p, token %p stub!\n", impl, handler, token);
-    return E_NOTIMPL;
+    token->value = 1;
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioCaptureDeviceChanged_remove(
@@ -244,7 +245,7 @@ static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioCaptureDeviceC
 {
     struct windows_media_devices *impl = impl_from_IMediaDeviceStatics(iface);
     FIXME("%p, token %#I64x stub!\n", impl, token.value);
-    return E_NOTIMPL;
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioRenderDeviceChanged_add(
@@ -252,7 +253,8 @@ static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioRenderDeviceCh
 {
     struct windows_media_devices *impl = impl_from_IMediaDeviceStatics(iface);
     FIXME("%p, handler %p, token %p stub!\n", impl, handler, token);
-    return E_NOTIMPL;
+    token->value = 1;
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioRenderDeviceChanged_remove(
@@ -260,7 +262,7 @@ static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioRenderDeviceCh
 {
     struct windows_media_devices *impl = impl_from_IMediaDeviceStatics(iface);
     FIXME("%p, token %#I64x stub!\n", impl, token.value);
-    return E_NOTIMPL;
+    return S_OK;
 }
 
 static const struct IMediaDeviceStaticsVtbl media_device_statics_vtbl =
