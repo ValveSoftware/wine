@@ -215,20 +215,69 @@ static HRESULT STDMETHODCALLTYPE media_device_statics_GetVideoCaptureSelector(
     return E_NOTIMPL;
 }
 
+static HRESULT get_default_device_id(EDataFlow direction, ERole role, HSTRING *device_id_hstr)
+{
+    HRESULT hr;
+    WCHAR *devid;
+    IMMDevice *dev;
+    IMMDeviceEnumerator *devenum;
+
+    *device_id_hstr = NULL;
+
+    hr = CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL,
+            CLSCTX_INPROC_SERVER, &IID_IMMDeviceEnumerator, (void**)&devenum);
+    if (FAILED(hr))
+    {
+        WARN("Failed to create MMDeviceEnumerator: %08x\n", hr);
+        return hr;
+    }
+
+    hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(devenum, direction, role, &dev);
+    if (FAILED(hr))
+    {
+        WARN("GetDefaultAudioEndpoint failed: %08x\n", hr);
+        IMMDeviceEnumerator_Release(devenum);
+        return hr;
+    }
+
+    hr = IMMDevice_GetId(dev, &devid);
+    if (FAILED(hr))
+    {
+        WARN("GetId failed: %08x\n", hr);
+        IMMDevice_Release(dev);
+        IMMDeviceEnumerator_Release(devenum);
+        return hr;
+    }
+
+    hr = WindowsCreateString(devid, lstrlenW(devid), device_id_hstr);
+    if (FAILED(hr))
+        WARN("WindowsCreateString failed: %08x\n", hr);
+
+    CoTaskMemFree(devid);
+    IMMDevice_Release(dev);
+    IMMDeviceEnumerator_Release(devenum);
+
+    return hr;
+}
+
 static HRESULT STDMETHODCALLTYPE media_device_statics_GetDefaultAudioCaptureId(
-    IMediaDeviceStatics *iface, Windows_Media_Devices_AudioDeviceRole role, HSTRING *device_id)
+    IMediaDeviceStatics *iface, Windows_Media_Devices_AudioDeviceRole role, HSTRING *device_id_hstr)
 {
     struct windows_media_devices *impl = impl_from_IMediaDeviceStatics(iface);
-    FIXME("%p, role %#x, device_id %p stub!\n", impl, role, device_id);
-    return E_NOTIMPL;
+
+    TRACE("%p, role %#x, device_id %p\n", impl, role, device_id_hstr);
+
+    return get_default_device_id(eCapture, role, device_id_hstr);
 }
 
 static HRESULT STDMETHODCALLTYPE media_device_statics_GetDefaultAudioRenderId(
-    IMediaDeviceStatics *iface, Windows_Media_Devices_AudioDeviceRole role, HSTRING *device_id)
+    IMediaDeviceStatics *iface, Windows_Media_Devices_AudioDeviceRole role, HSTRING *device_id_hstr)
 {
     struct windows_media_devices *impl = impl_from_IMediaDeviceStatics(iface);
-    FIXME("%p, role %#x, device_id %p stub!\n", impl, role, device_id);
-    return E_NOTIMPL;
+
+    TRACE("%p, role %#x, device_id %p\n", impl, role, device_id_hstr);
+
+    return get_default_device_id(eRender, role, device_id_hstr);
 }
 
 static HRESULT STDMETHODCALLTYPE media_device_statics_DefaultAudioCaptureDeviceChanged_add(
