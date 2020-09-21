@@ -6806,6 +6806,12 @@ msgstr "未実装"
 msgid "No Signature found in file.\n"
 msgstr "ファイルにデジタル署名がありません。\n"
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "レベルは正しくありません。\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "ローカル ポート"

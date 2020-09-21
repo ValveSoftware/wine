@@ -6846,6 +6846,12 @@ msgstr "لم تنفّذ"
 msgid "No Signature found in file.\n"
 msgstr "الرسالة 0x%1 غير موجودة في الملف %2.\n"
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "المستوى غير سليم.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "المنفذ المحلي"

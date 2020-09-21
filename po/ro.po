@@ -6906,6 +6906,12 @@ msgstr "Neimplementat"
 msgid "No Signature found in file.\n"
 msgstr "Mesajul 0x%1 n-a fost găsit în fișierul %2.\n"
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "Nivel nevalid.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Port local"

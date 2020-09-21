@@ -6816,6 +6816,12 @@ msgstr "Eklenmedi/Geliştirilmedi"
 msgid "No Signature found in file.\n"
 msgstr "Dosyada imza bulunamadı.\n"
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "Geçersiz seviye.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Yerel Bağlantı Noktası"

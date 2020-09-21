@@ -6761,6 +6761,12 @@ msgstr "Ne realigita"
 msgid "No Signature found in file.\n"
 msgstr ""
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid table.\n"
+msgid "Invalid call.\n"
+msgstr "Nevalida tabelo.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Loka Pordo"

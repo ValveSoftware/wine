@@ -6824,6 +6824,12 @@ msgstr "Не реализовано"
 msgid "No Signature found in file.\n"
 msgstr "Подпись файла не обнаружена.\n"
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "Неверный уровень системного вызова.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Локальный порт"

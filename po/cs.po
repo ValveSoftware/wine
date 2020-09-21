@@ -6781,6 +6781,12 @@ msgstr "Neimplementováno"
 msgid "No Signature found in file.\n"
 msgstr ""
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "Neplatná úroveň.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Místní port"

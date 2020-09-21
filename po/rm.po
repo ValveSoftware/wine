@@ -6769,6 +6769,10 @@ msgstr "Na implementa"
 msgid "No Signature found in file.\n"
 msgstr ""
 
+#: winerror.mc:3774
+msgid "Invalid call.\n"
+msgstr ""
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr ""

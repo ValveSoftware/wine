@@ -6834,6 +6834,12 @@ msgstr "No implementat"
 msgid "No Signature found in file.\n"
 msgstr "No s'ha trobat cap signatura en el fitxer.\n"
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "El nivell no és vàlid.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Port local"

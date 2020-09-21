@@ -6859,6 +6859,12 @@ msgstr "Nie zaimplementowane"
 msgid "No Signature found in file.\n"
 msgstr "Nie znaleziono wiadomości 0x%1 w pliku %2.\n"
 
+#: winerror.mc:3774
+#, fuzzy
+#| msgid "Invalid level.\n"
+msgid "Invalid call.\n"
+msgstr "Niepoprawny poziom.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Port lokalny"
