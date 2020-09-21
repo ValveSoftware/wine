@@ -6830,6 +6830,12 @@ msgstr "Keine Signatur in Datei gefunden.\n"
 msgid "Invalid call.\n"
 msgstr "Ungültige Ebene.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Value is not available.\n"
+msgid "Resource is not currently available.\n"
+msgstr "Wert nicht verfügbar.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Lokaler Anschluss"

@@ -6851,6 +6851,12 @@ msgstr ""
 msgid "Invalid call.\n"
 msgstr "Nesprávne údaje.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Help not available."
+msgid "Resource is not currently available.\n"
+msgstr "Nápoveda nedostupná."
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr ""

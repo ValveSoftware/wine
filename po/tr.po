@@ -6822,6 +6822,12 @@ msgstr "Dosyada imza bulunamadı.\n"
 msgid "Invalid call.\n"
 msgstr "Geçersiz seviye.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Value is not available.\n"
+msgid "Resource is not currently available.\n"
+msgstr "Değer kullanılamıyor.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Yerel Bağlantı Noktası"

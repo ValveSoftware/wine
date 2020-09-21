@@ -6894,6 +6894,12 @@ msgstr "Bericht 0x%1 niet gevonden in bestand %2.\n"
 msgid "Invalid call.\n"
 msgstr "Ongeldig niveau.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Help not available."
+msgid "Resource is not currently available.\n"
+msgstr "Help is niet beschikbaar."
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Lokale poort"

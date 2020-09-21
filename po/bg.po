@@ -6972,6 +6972,11 @@ msgstr ""
 msgid "Invalid call.\n"
 msgstr "Невалидни знаци в пътя.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+msgid "Resource is not currently available.\n"
+msgstr "Оставащ размер.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Локален порт"

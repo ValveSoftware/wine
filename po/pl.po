@@ -6865,6 +6865,12 @@ msgstr "Nie znaleziono wiadomości 0x%1 w pliku %2.\n"
 msgid "Invalid call.\n"
 msgstr "Niepoprawny poziom.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Help not available."
+msgid "Resource is not currently available.\n"
+msgstr "Pomoc nie jest dostępna."
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Port lokalny"

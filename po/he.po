@@ -7104,6 +7104,11 @@ msgstr ""
 msgid "Invalid call.\n"
 msgstr "אפשרות שגויה.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+msgid "Resource is not currently available.\n"
+msgstr "הגודל הזמין.\n"
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "פתחה מקומית"

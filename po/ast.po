@@ -6721,6 +6721,12 @@ msgstr ""
 msgid "Invalid call.\n"
 msgstr "El nivel nun ye válidu.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Help not available."
+msgid "Resource is not currently available.\n"
+msgstr "L'ayuda nun ta disponible."
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Puertu llocal"

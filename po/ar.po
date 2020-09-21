@@ -6852,6 +6852,12 @@ msgstr "الرسالة 0x%1 غير موجودة في الملف %2.\n"
 msgid "Invalid call.\n"
 msgstr "المستوى غير سليم.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Help not available."
+msgid "Resource is not currently available.\n"
+msgstr "المساعدة غير متاحة."
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "المنفذ المحلي"

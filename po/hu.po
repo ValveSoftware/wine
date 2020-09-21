@@ -6911,6 +6911,12 @@ msgstr "0x%1 üzenet nem található a %2 fájlban.\n"
 msgid "Invalid call.\n"
 msgstr "Érvénytelen szint.\n"
 
+#: winerror.mc:3781
+#, fuzzy
+#| msgid "Help not available."
+msgid "Resource is not currently available.\n"
+msgstr "A súgó nem elérhető."
+
 #: localspl.rc:31 localui.rc:31 winspool.rc:30
 msgid "Local Port"
 msgstr "Helyi port"
