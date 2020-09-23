@@ -114,6 +114,7 @@ static int (__cdecl *p__mbccpy_s)(unsigned char*, size_t, int*, const unsigned c
 static int (__cdecl *p__memicmp)(const char*, const char*, size_t);
 static int (__cdecl *p__memicmp_l)(const char*, const char*, size_t, _locale_t);
 static size_t (__cdecl *p___strncnt)(const char*, size_t);
+static unsigned int (__cdecl *p_mbsnextc_l)(const unsigned char*, _locale_t);
 
 #define SETNOFAIL(x,y) x = (void*)GetProcAddress(hMsvcrt,y)
 #define SET(x,y) SETNOFAIL(x,y); ok(x != NULL, "Export '%s' not found\n", y)
@@ -348,6 +349,11 @@ static void test_mbcp(void)
     expect_eq(_mbsnextc(mbstring), 0xb0b1, int, "%x");
     expect_eq(_mbsnextc(&mbstring[2]), 0xb220, int, "%x");  /* lead + invalid tail */
     expect_eq(_mbsnextc(&mbstring[3]), 0x20, int, "%x");    /* single char */
+
+    if (!p_mbsnextc_l)
+        win_skip("_mbsnextc_l tests\n");
+    else
+        expect_eq(p_mbsnextc_l(mbstring, NULL), 0xb0b1, int, "%x");
 
     /* _mbclen/_mbslen */
     expect_eq(_mbclen(mbstring), 2, int, "%d");
@@ -4301,6 +4307,7 @@ START_TEST(string)
     p__memicmp = (void*)GetProcAddress(hMsvcrt, "_memicmp");
     p__memicmp_l = (void*)GetProcAddress(hMsvcrt, "_memicmp_l");
     p___strncnt = (void*)GetProcAddress(hMsvcrt, "__strncnt");
+    p_mbsnextc_l = (void*)GetProcAddress(hMsvcrt, "_mbsnextc_l");
 
     /* MSVCRT memcpy behaves like memmove for overlapping moves,
        MFC42 CString::Insert seems to rely on that behaviour */
