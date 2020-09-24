@@ -101,10 +101,10 @@ struct x11drv_mode_info *X11DRV_Settings_SetHandlers(const char *name,
     if (reserve_depths)
         /* leave room for other depths and refresh rates */
         dd_max_modes = 2*(3+1)*(nmodes);
-    else 
+    else
         dd_max_modes = nmodes;
 
-    if (dd_modes) 
+    if (dd_modes)
     {
         TRACE("Destroying old display modes array\n");
         HeapFree(GetProcessHeap(), 0, dd_modes);
@@ -138,6 +138,15 @@ BOOL X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigne
         }
     }
 
+    if ((appid = getenv("SteamAppId")) && (!strcmp(appid, "374320") | !strcmp(appid, "814380") | !strcmp(appid, "524220")))
+    {
+        /* DarkSouls3 Sekiro NierAutomata crashes if we report modes smaller than 1280x720 */
+        if (height <= 720 && !(height == 720 && width == 1280))
+        {
+            return FALSE;
+        }
+    }
+
     for(i = 0; i < dd_mode_count; ++i)
     {
         if(dd_modes[i].width == width &&
@@ -153,7 +162,7 @@ BOOL X11DRV_Settings_AddOneMode(unsigned int width, unsigned int height, unsigne
     info->height        = height;
     info->refresh_rate  = freq;
     info->bpp           = bpp;
-    TRACE("initialized mode %d: %dx%dx%d @%d Hz (%s)\n", 
+    TRACE("initialized mode %d: %dx%dx%d @%d Hz (%s)\n",
           dd_mode_count, width, height, bpp, freq, handler_name);
     dd_mode_count++;
 
@@ -516,9 +525,9 @@ POINT fs_hack_real_mode(void)
 void X11DRV_Settings_Init(void)
 {
     RECT primary = get_host_primary_monitor_rect();
-    X11DRV_Settings_SetHandlers("NoRes", 
-                                X11DRV_nores_GetCurrentMode, 
-                                X11DRV_nores_SetCurrentMode, 
+    X11DRV_Settings_SetHandlers("NoRes",
+                                X11DRV_nores_GetCurrentMode,
+                                X11DRV_nores_SetCurrentMode,
                                 1, 0);
     X11DRV_Settings_AddOneMode( primary.right - primary.left, primary.bottom - primary.top, 0, 60);
 }
@@ -670,7 +679,7 @@ BOOL CDECL X11DRV_EnumDisplaySettingsEx( LPCWSTR name, DWORD n, LPDEVMODEW devmo
         else
         {
             TRACE("mode %d -- %dx%dx%dbpp (%s)\n", n,
-                  devmode->dmPelsWidth, devmode->dmPelsHeight, devmode->dmBitsPerPel, 
+                  devmode->dmPelsWidth, devmode->dmPelsHeight, devmode->dmBitsPerPel,
                   handler_name);
         }
         return TRUE;
