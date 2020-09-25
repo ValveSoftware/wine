@@ -1736,8 +1736,21 @@ static void update_surface_region( struct x11drv_window_surface *surface )
 
     if ((data = X11DRV_GetRegionData( rgn, 0 )))
     {
-        XShapeCombineRectangles( gdi_display, surface->window, ShapeBounding, 0, 0,
-                                 (XRectangle *)data->Buffer, data->rdh.nCount, ShapeSet, YXBanded );
+        if (!data->rdh.nCount && wm_is_mutter(gdi_display))
+        {
+            XRectangle xrect;
+
+            xrect.x = xrect.y = -1;
+            xrect.width = 1;
+            xrect.height = 1;
+            XShapeCombineRectangles( gdi_display, surface->window, ShapeBounding, 0, 0,
+                                     &xrect, 1, ShapeSet, YXBanded );
+        }
+        else
+        {
+            XShapeCombineRectangles( gdi_display, surface->window, ShapeBounding, 0, 0,
+                                     (XRectangle *)data->Buffer, data->rdh.nCount, ShapeSet, YXBanded );
+        }
         HeapFree( GetProcessHeap(), 0, data );
     }
 
