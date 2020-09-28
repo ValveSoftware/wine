@@ -567,15 +567,16 @@ BOOL CDECL X11DRV_ClipCursor( const RECT *clip );
  *
  * Notification function called upon receiving a WM_X11DRV_CLIP_CURSOR.
  */
-LRESULT clip_cursor_notify( HWND hwnd, HWND prev_clip_hwnd, HWND new_clip_hwnd )
+LRESULT clip_cursor_notify( HWND hwnd, WPARAM wparam, LPARAM lparam )
 {
     struct x11drv_thread_data *data = x11drv_init_thread_data();
+    HWND prev_clip_hwnd;
+    RECT clip;
 
     if (hwnd == GetDesktopWindow())  /* change the clip window stored in the desktop process */
     {
         static HWND clip_hwnd;
-
-        HWND prev = clip_hwnd;
+        HWND prev = clip_hwnd, new_clip_hwnd = (HWND)lparam;
         clip_hwnd = new_clip_hwnd;
         if (prev || new_clip_hwnd) TRACE( "clip hwnd changed from %p to %p\n", prev, new_clip_hwnd );
         if (prev) SendNotifyMessageW( prev, WM_X11DRV_CLIP_CURSOR, (WPARAM)prev, 0 );
@@ -590,12 +591,14 @@ LRESULT clip_cursor_notify( HWND hwnd, HWND prev_clip_hwnd, HWND new_clip_hwnd )
     }
     else if (hwnd == GetForegroundWindow())  /* request to clip */
     {
-        RECT clip;
-
-        GetClipCursor( &clip );
-        X11DRV_ClipCursor( &clip );
+        if (wparam) clip_fullscreen_window( hwnd, lparam );
+        else
+        {
+            GetClipCursor( &clip );
+            X11DRV_ClipCursor( &clip );
+        }
     }
-    else if (prev_clip_hwnd)
+    else if ((prev_clip_hwnd = (HWND)wparam))
     {
         /* This is a notification send by the desktop window to an old
          * dangling clip window.
@@ -619,6 +622,16 @@ BOOL clip_fullscreen_window( HWND hwnd, BOOL reset )
     HMONITOR monitor;
     DWORD style;
     BOOL fullscreen;
+    DWORD tid, pid;
+
+    /* forward request to the window thread if it's in a different thread */
+    if ((tid = GetWindowThreadProcessId( hwnd, &pid )) &&
+         tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
+    {
+        TRACE( "forwarding clip request to %p\n", hwnd );
+        SendNotifyMessageW( hwnd, WM_X11DRV_CLIP_CURSOR, TRUE, reset );
+        return TRUE;
+    }
 
     if (hwnd == GetDesktopWindow()) return FALSE;
     style = GetWindowLongW( hwnd, GWL_STYLE );
@@ -1633,7 +1646,7 @@ BOOL CDECL X11DRV_ClipCursor( LPCRECT clip )
         if (tid && tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
         {
             TRACE( "forwarding clip request to %p\n", foreground );
-            SendNotifyMessageW( foreground, WM_X11DRV_CLIP_CURSOR, 0, 0 );
+            SendNotifyMessageW( foreground, WM_X11DRV_CLIP_CURSOR, FALSE, FALSE );
             return TRUE;
         }
 
