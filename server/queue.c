@@ -2035,16 +2035,13 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
 }
 
 /* queue a hardware message for an hid event */
-static void queue_hid_message( struct desktop *desktop, user_handle_t win, const hw_input_t *input,
-                               unsigned int origin, struct msg_queue *sender, unsigned int req_flags,
+static void queue_hid_message( user_handle_t win, const hw_input_t *input,
+                               unsigned int origin, struct msg_queue *sender,
                                const void *report, data_size_t report_len )
 {
     struct hw_msg_source source = { IMDT_UNAVAILABLE, origin };
     struct hardware_msg_data *msg_data;
     struct rawinput_message raw_msg;
-
-    if (!(req_flags & SEND_HWMSG_RAWINPUT))
-        return;
 
     /* send to all desktops */
     raw_msg.foreground = NULL;
@@ -2553,15 +2550,14 @@ DECL_HANDLER(send_message)
 DECL_HANDLER(send_hardware_message)
 {
     struct thread *thread = NULL;
-    struct desktop *desktop;
+    struct desktop *desktop = get_thread_desktop( current, 0 );
     unsigned int origin = (req->flags & SEND_HWMSG_INJECTED ? IMO_INJECTED : IMO_HARDWARE);
     struct msg_queue *sender = get_current_queue();
     data_size_t size = min( 256, get_reply_max_size() );
 
-    if (!(desktop = get_thread_desktop( current, 0 ))) return;
-
     if (req->win)
     {
+        if (!desktop) return;
         if (!(thread = get_window_thread( req->win ))) return;
         if (desktop != thread->queue->input->desktop)
         {
@@ -2571,32 +2567,41 @@ DECL_HANDLER(send_hardware_message)
         }
     }
 
-    reply->prev_x = desktop->cursor.x;
-    reply->prev_y = desktop->cursor.y;
+    if (desktop)
+    {
+        reply->prev_x = desktop->cursor.x;
+        reply->prev_y = desktop->cursor.y;
+    }
 
     switch (req->input.type)
     {
     case HW_INPUT_MOUSE:
+        if (!desktop) return;
         reply->wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
     case HW_INPUT_KEYBOARD:
+        if (!desktop) return;
         reply->wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
     case HW_INPUT_HARDWARE:
+        if (!desktop) return;
         queue_custom_hardware_message( desktop, req->win, origin, &req->input );
         break;
     case HW_INPUT_HID:
-        queue_hid_message( desktop, req->win, &req->input, origin, sender, req->flags, get_req_data(), get_req_data_size() );
+        queue_hid_message( req->win, &req->input, origin, sender, get_req_data(), get_req_data_size() );
         break;
     default:
         set_error( STATUS_INVALID_PARAMETER );
     }
     if (thread) release_object( thread );
 
-    reply->new_x = desktop->cursor.x;
-    reply->new_y = desktop->cursor.y;
-    set_reply_data( desktop->keystate, size );
-    release_object( desktop );
+    if (desktop)
+    {
+        reply->new_x = desktop->cursor.x;
+        reply->new_y = desktop->cursor.y;
+        set_reply_data( desktop->keystate, size );
+        release_object( desktop );
+    }
 }
 
 /* post a quit message to the current queue */
