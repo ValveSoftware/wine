@@ -64,8 +64,6 @@ static CRITICAL_SECTION_DEBUG rawinput_devices_cs_debug =
 };
 static CRITICAL_SECTION rawinput_devices_cs = { &rawinput_devices_cs_debug, -1, 0, 0, 0, 0 };
 
-extern DWORD WINAPI GetFinalPathNameByHandleW(HANDLE file, LPWSTR path, DWORD charcount, DWORD flags);
-
 static BOOL array_reserve(void **elements, unsigned int *capacity, unsigned int count, unsigned int size)
 {
     unsigned int new_capacity, max_capacity;
@@ -147,7 +145,7 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
     device->path = path;
     device->file = file;
     device->info.cbSize = sizeof(RID_DEVICE_INFO);
-    device->handle = INVALID_HANDLE_VALUE;
+    device->handle = 0;
 
     return device;
 }
@@ -160,6 +158,9 @@ static HANDLE rawinput_handle_from_device_handle(HANDLE device, BOOL rescan)
     ULONG dummy;
     unsigned int i;
 
+    if (!device) return NULL;
+
+    /* check already known devices to avoid comparing paths again */
     for (i = 0; i < rawinput_devices_count; ++i)
     {
         if (rawinput_devices[i].handle == device)
