@@ -1003,7 +1003,7 @@ static void init_new_decoded_pad(GstElement *bin, GstPad *pad, struct gstdemux *
 
     if (!strcmp(typename, "video/x-raw"))
     {
-        GstElement *capssetter, *deinterlace, *vconv, *flip;
+        GstElement *capssetter, *deinterlace, *vconv, *flip, *vconv2;
 
         /* Hack?: Flatten down the colorimetry to default values, without
          * actually modifying the video at all.
@@ -1081,6 +1081,18 @@ static void init_new_decoded_pad(GstElement *bin, GstPad *pad, struct gstdemux *
             goto out;
         }
 
+        /* videoflip does not support 15 and 16-bit RGB so add a second videoconvert
+         * to do the final conversion. */
+        if (!(vconv2 = gst_element_factory_make("videoconvert", NULL)))
+        {
+            ERR("Failed to create videoconvert, are %u-bit GStreamer \"base\" plugins installed?\n",
+                    8 * (int)sizeof(void *));
+            goto out;
+        }
+
+        /* Avoid expensive color matrix conversions. */
+        gst_util_set_object_arg(G_OBJECT(vconv2), "matrix-mode", "none");
+
         /* The bin takes ownership of these elements. */
         gst_bin_add(GST_BIN(This->container), capssetter);
         gst_element_sync_state_with_parent(capssetter);
@@ -1090,13 +1102,16 @@ static void init_new_decoded_pad(GstElement *bin, GstPad *pad, struct gstdemux *
         gst_element_sync_state_with_parent(vconv);
         gst_bin_add(GST_BIN(This->container), flip);
         gst_element_sync_state_with_parent(flip);
+        gst_bin_add(GST_BIN(This->container), vconv2);
+        gst_element_sync_state_with_parent(vconv2);
 
         gst_element_link(capssetter, deinterlace);
         gst_element_link(deinterlace, vconv);
         gst_element_link(vconv, flip);
+        gst_element_link(flip, vconv2);
 
         pin->post_sink = gst_element_get_static_pad(capssetter, "sink");
-        pin->post_src = gst_element_get_static_pad(flip, "src");
+        pin->post_src = gst_element_get_static_pad(vconv2, "src");
         pin->flip = flip;
     }
     else if (!strcmp(typename, "audio/x-raw"))
