@@ -681,14 +681,14 @@
 @ stub ADL_APO_AudioDelay_Set
 @ stub ADL_AdapterLimitation_Caps
 @ stub ADL_AdapterX2_Caps
-@ stub ADL_Adapter_ASICFamilyType_Get
+@ stdcall ADL_Adapter_ASICFamilyType_Get(long ptr ptr)
 @ stub ADL_Adapter_ASICInfo_Get
 @ stub ADL_Adapter_Accessibility_Get
 @ stub ADL_Adapter_Active_Get
 @ stub ADL_Adapter_Active_Set
 @ stub ADL_Adapter_Active_SetPrefer
 @ stub ADL_Adapter_AdapterInfoX2_Get
-@ stub ADL_Adapter_AdapterInfo_Get
+@ stdcall ADL_Adapter_AdapterInfo_Get(ptr long)
 @ stub ADL_Adapter_AdapterList_Disable
 @ stub ADL_Adapter_Aspects_Get
 @ stub ADL_Adapter_AudioChannelSplitConfiguration_Get
@@ -714,8 +714,8 @@
 @ stub ADL_Adapter_CrossdisplayInfo_Get
 @ stub ADL_Adapter_CrossdisplayInfo_Set
 @ stub ADL_Adapter_CrossfireX2_Get
-@ stub ADL_Adapter_Crossfire_Caps
-@ stub ADL_Adapter_Crossfire_Get
+@ stdcall ADL_Adapter_Crossfire_Caps(long ptr ptr ptr)
+@ stdcall ADL_Adapter_Crossfire_Get(long ptr ptr)
 @ stub ADL_Adapter_Crossfire_Set
 @ stub ADL_Adapter_DefaultAudioChannelTable_Load
 @ stub ADL_Adapter_DisplayAudioEndpoint_Enable
@@ -736,14 +736,14 @@
 @ stub ADL_Adapter_LocalDisplayState_Get
 @ stub ADL_Adapter_MaxCursorSize_Get
 @ stub ADL_Adapter_MemoryInfo2_Get
-@ stub ADL_Adapter_MemoryInfo_Get
+@ stdcall ADL_Adapter_MemoryInfo_Get(long ptr)
 @ stub ADL_Adapter_MirabilisSupport_Get
 @ stub ADL_Adapter_ModeSwitch
 @ stub ADL_Adapter_ModeTimingOverride_Caps
 @ stub ADL_Adapter_Modes_ReEnumerate
 @ stub ADL_Adapter_NumberOfActivatableSources_Get
-@ stub ADL_Adapter_NumberOfAdapters_Get
-@ stub ADL_Adapter_ObservedClockInfo_Get
+@ stdcall ADL_Adapter_NumberOfAdapters_Get(ptr)
+@ stdcall ADL_Adapter_ObservedClockInfo_Get(long ptr ptr)
 @ stub ADL_Adapter_ObservedGameClockInfo_Get
 @ stub ADL_Adapter_Primary_Get
 @ stub ADL_Adapter_Primary_Set
@@ -844,7 +844,7 @@
 @ stub ADL_Display_DisplayContent_Cap
 @ stub ADL_Display_DisplayContent_Get
 @ stub ADL_Display_DisplayContent_Set
-@ stub ADL_Display_DisplayInfo_Get
+@ stdcall ADL_Display_DisplayInfo_Get(long long ptr long)
 @ stub ADL_Display_DisplayMapConfig_Get
 @ stub ADL_Display_DisplayMapConfig_PossibleAddAndRemove
 @ stub ADL_Display_DisplayMapConfig_Set
@@ -969,7 +969,7 @@
 @ stub ADL_Display_WriteAndReadI2CLargePayload
 @ stub ADL_Display_WriteAndReadI2CRev_Get
 @ stub ADL_Flush_Driver_Data
-@ stub ADL_Graphics_Platform_Get
+@ stdcall ADL_Graphics_Platform_Get(ptr)
 @ stdcall ADL_Graphics_Versions_Get(ptr)
 @ stub ADL_MMD_FeatureList_Get
 @ stub ADL_MMD_FeatureValuesX2_Get
