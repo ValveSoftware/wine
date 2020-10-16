@@ -1,0 +1,7 @@
+MODULE    = dotnetfx35.exe
+IMPORTS   =
+
+EXTRADLLFLAGS = -mwindows -mno-cygwin
+
+C_SRCS = \
+	main.c
