@@ -1846,6 +1846,7 @@ enable_control
 enable_cscript
 enable_dism
 enable_dplaysvr
+enable_dotnetfx35
 enable_dpnsvr
 enable_dpvsetup
 enable_dxdiag
@@ -22618,6 +22619,7 @@ wine_fn_config_makefile programs/control enable_control
 wine_fn_config_makefile programs/cscript enable_cscript
 wine_fn_config_makefile programs/dism enable_dism
 wine_fn_config_makefile programs/dplaysvr enable_dplaysvr
+wine_fn_config_makefile programs/dotnetfx35 enable_dotnetfx35
 wine_fn_config_makefile programs/dpnsvr enable_dpnsvr
 wine_fn_config_makefile programs/dpvsetup enable_dpvsetup
 wine_fn_config_makefile programs/dxdiag enable_dxdiag
