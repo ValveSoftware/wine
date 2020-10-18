@@ -673,7 +673,7 @@ static BOOLEAN LFH_validate_used_block(ULONG flags, const LFH_block *block)
         return FALSE;
     if (block->type != LFH_block_type_used)
         err = "invalid used block type";
-    else if (flags & HEAP_TAIL_CHECKING_ENABLED)
+    else if (0 && (flags & HEAP_TAIL_CHECKING_ENABLED))
     {
         const unsigned char *data = (const unsigned char *)LFH_ptr_from_block(block);
         size_t alloc_size = LFH_block_get_alloc_size(block, flags);
