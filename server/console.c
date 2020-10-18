@@ -42,6 +42,7 @@
 #include "wincon.h"
 #include "winternl.h"
 #include "wine/condrv.h"
+#include "esync.h"
 
 struct screen_buffer;
 
@@ -138,11 +139,13 @@ struct console_server
     int                   busy;        /* flag if server processing an ioctl */
     int                   term_fd;     /* UNIX terminal fd */
     struct termios        termios;     /* original termios */
+    int                   esync_fd;
 };
 
 static void console_server_dump( struct object *obj, int verbose );
 static void console_server_destroy( struct object *obj );
 static int console_server_signaled( struct object *obj, struct wait_queue_entry *entry );
+static int console_server_get_esync_fd( struct object *obj, enum esync_type *type );
 static struct fd *console_server_get_fd( struct object *obj );
 static struct object *console_server_lookup_name( struct object *obj, struct unicode_str *name,
                                                 unsigned int attr, struct object *root );
@@ -157,7 +160,7 @@ static const struct object_ops console_server_ops =
     add_queue,                        /* add_queue */
     remove_queue,                     /* remove_queue */
     console_server_signaled,          /* signaled */
-    NULL,                             /* get_esync_fd */
+    console_server_get_esync_fd,      /* get_esync_fd */
     no_satisfied,                     /* satisfied */
     no_signal,                        /* signal */
     console_server_get_fd,            /* get_fd */
@@ -574,6 +577,8 @@ static void disconnect_console_server( struct console_server *server )
         list_remove( &call->entry );
         console_host_ioctl_terminate( call, STATUS_CANCELLED );
     }
+    if (do_esync())
+        esync_clear( server->esync_fd );
     while (!list_empty( &server->read_queue ))
     {
         struct console_host_ioctl *call = LIST_ENTRY( list_head( &server->read_queue ), struct console_host_ioctl, entry );
@@ -875,6 +880,13 @@ static int console_server_signaled( struct object *obj, struct wait_queue_entry 
     return !server->console || !list_empty( &server->queue );
 }
 
+static int console_server_get_esync_fd( struct object *obj, enum esync_type *type )
+{
+    struct console_server *server = (struct console_server*)obj;
+    *type = ESYNC_MANUAL_SERVER;
+    return server->esync_fd;
+}
+
 static struct fd *console_server_get_fd( struct object* obj )
 {
     struct console_server *server = (struct console_server*)obj;
@@ -905,6 +917,10 @@ static struct object *create_console_server( void )
         return NULL;
     }
     allow_fd_caching(server->fd);
+    server->esync_fd = -1;
+
+    if (do_esync())
+        server->esync_fd = esync_create_fd( 0, 0 );
 
     return &server->obj;
 }
@@ -1502,6 +1518,8 @@ DECL_HANDLER(get_next_console_request)
         /* set result of previous ioctl */
         ioctl = LIST_ENTRY( list_head( &server->queue ), struct console_host_ioctl, entry );
         list_remove( &ioctl->entry );
+        if (do_esync() && list_empty( &server->queue ))
+            esync_clear( server->esync_fd );
     }
 
     if (ioctl)
@@ -1600,6 +1618,8 @@ DECL_HANDLER(get_next_console_request)
     {
         set_error( STATUS_PENDING );
     }
+    if (do_esync() && list_empty( &server->queue ))
+        esync_clear( server->esync_fd );
 
     release_object( server );
 }
