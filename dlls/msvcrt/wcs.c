@@ -1791,7 +1791,8 @@ int CDECL MSVCRT__wctomb_s_l(int *len, char *mbchar, MSVCRT_size_t size,
         MSVCRT_wchar_t wch, MSVCRT__locale_t locale)
 {
     MSVCRT_pthreadlocinfo locinfo;
-    BOOL error;
+    BOOL error = FALSE;
+    BOOL *perror;
     int mblen;
 
     if(!mbchar && size>0) {
@@ -1828,7 +1829,8 @@ int CDECL MSVCRT__wctomb_s_l(int *len, char *mbchar, MSVCRT_size_t size,
         return 0;
     }
 
-    mblen = WideCharToMultiByte(locinfo->lc_codepage, 0, &wch, 1, mbchar, size, NULL, &error);
+    perror = (locinfo->lc_codepage != CP_UTF8 ? &error : NULL);
+    mblen = WideCharToMultiByte(locinfo->lc_codepage, 0, &wch, 1, mbchar, size, NULL, perror);
     if(!mblen || error) {
         if(!mblen && GetLastError()==ERROR_INSUFFICIENT_BUFFER) {
             if(mbchar && size>0)
