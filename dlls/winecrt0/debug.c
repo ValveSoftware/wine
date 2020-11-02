@@ -30,6 +30,7 @@
 
 WINE_DECLARE_DEBUG_CHANNEL(pid);
 WINE_DECLARE_DEBUG_CHANNEL(timestamp);
+WINE_DECLARE_DEBUG_CHANNEL(microsecs);
 
 static const char * (__cdecl *p__wine_dbg_strdup)( const char *str );
 static int (__cdecl *p__wine_dbg_output)( const char *str );
@@ -189,7 +190,16 @@ static int __cdecl fallback__wine_dbg_header( enum __wine_debug_class cls,
     /* skip header if partial line and no other thread came in between */
     if (partial_line_tid == GetCurrentThreadId()) return 0;
 
-    if (TRACE_ON(timestamp))
+    if (TRACE_ON(microsecs))
+    {
+        static LARGE_INTEGER frequency;
+        LARGE_INTEGER counter, microsecs;
+        if (!frequency.QuadPart) QueryPerformanceFrequency(&frequency);
+        QueryPerformanceCounter(&counter);
+        microsecs.QuadPart = counter.QuadPart * 1000000 / frequency.QuadPart;
+        pos += sprintf( pos, "%3u.%06u:", (unsigned int)(microsecs.QuadPart / 1000000), (unsigned int)(microsecs.QuadPart % 1000000) );
+    }
+    else if (TRACE_ON(timestamp))
     {
         ULONG ticks = GetTickCount();
         pos += sprintf( pos, "%3u.%03u:", ticks / 1000, ticks % 1000 );
