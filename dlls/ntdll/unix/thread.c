@@ -1879,7 +1879,7 @@ static void set_native_thread_name( HANDLE handle, const UNICODE_STRING *name )
 #ifdef linux
     unsigned int status;
     char path[64], nameA[64];
-    int unix_pid, unix_tid, len, fd;
+    int unix_pid = -1, unix_tid = -1, len, fd;
 
     SERVER_START_REQ( get_thread_times )
     {
