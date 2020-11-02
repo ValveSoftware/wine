@@ -26,6 +26,7 @@
 #include <winbase.h>
 #include <winternl.h>
 #include <wine/server_protocol.h>
+#include <wine/debug.h>
 
 /* client communication functions */
 
@@ -123,6 +124,8 @@ static inline void *wine_server_get_ptr( client_ptr_t ptr )
 
 #define SERVER_START_REQ(type) \
     do { \
+        WINE_DECLARE_DEBUG_CHANNEL(client); \
+        static const char *const __req_name = #type; \
         struct __server_request_info __req; \
         struct type##_request * const req = &__req.u.req.type##_request; \
         const struct type##_reply * const reply = &__req.u.reply.type##_reply; \
@@ -130,10 +133,12 @@ static inline void *wine_server_get_ptr( client_ptr_t ptr )
         __req.u.req.request_header.req = REQ_##type; \
         __req.data_count = 0; \
         (void)reply; \
+        TRACE_(client)("%s start\n", __req_name); \
         do
 
 #define SERVER_END_REQ \
         while(0); \
+        TRACE_(client)("%s end\n", __req_name); \
     } while(0)
 
 
