@@ -830,7 +830,8 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
     static const char core_info[] = "/sys/devices/system/cpu/cpu%u/topology/%s";
     static const char cache_info[] = "/sys/devices/system/cpu/cpu%u/cache/index%u/%s";
     static const char numa_info[] = "/sys/devices/system/node/node%u/cpumap";
-
+    const char *env_fake_logical_cores = getenv("WINE_LOGICAL_CPUS_AS_CORES");
+    BOOL fake_logical_cpus_as_cores = env_fake_logical_cores && atoi(env_fake_logical_cores);
     FILE *fcpu_list, *fnuma_list, *f;
     DWORD len = 0, beg, end, i, j, r, num_cpus = 0, max_cpus = 0;
     char op, name[MAX_PATH];
@@ -902,7 +903,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
             {
                 /* Mask of logical threads sharing same physical core in kernel core numbering. */
                 sprintf(name, core_info, i, "thread_siblings");
-                if(!sysfs_parse_bitmap(name, &thread_mask)) thread_mask = 1<<i;
+                if(fake_logical_cpus_as_cores || !sysfs_parse_bitmap(name, &thread_mask)) thread_mask = (ULONG_PTR)1<<i;
 
                 /* Needed later for NumaNode and Group. */
                 all_cpus_mask |= thread_mask;
@@ -910,7 +911,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
                 if (relation == RelationAll || relation == RelationProcessorCore)
                 {
                     sprintf(name, core_info, i, "thread_siblings_list");
-                    f = fopen(name, "r");
+                    f = fake_logical_cpus_as_cores ? NULL : fopen(name, "r");
                     if (f)
                     {
                         fscanf(f, "%d%c", &phys_core, &op);
