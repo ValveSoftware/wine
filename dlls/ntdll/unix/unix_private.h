@@ -327,6 +327,7 @@ extern void init_files(void);
 extern void init_cpu_info(void);
 extern void add_completion( HANDLE handle, ULONG_PTR value, NTSTATUS status, ULONG info, BOOL async );
 extern void set_async_direct_result( HANDLE *async_handle, NTSTATUS status, ULONG_PTR information, BOOL mark_pending );
+extern struct cpu_topology_override *get_cpu_topology_override(void);
 
 extern NTSTATUS unixcall_wine_dbg_write( void *args );
 extern NTSTATUS unixcall_wine_server_call( void *args );
