@@ -1563,6 +1563,7 @@ static BOOL force_laa(void)
  */
 void server_init_process_done(void)
 {
+    struct cpu_topology_override *cpu_override = get_cpu_topology_override();
     void *entry, *teb;
     NTSTATUS status;
     int suspend;
@@ -1589,6 +1590,8 @@ void server_init_process_done(void)
     /* Signal the parent process to continue */
     SERVER_START_REQ( init_process_done )
     {
+        if (cpu_override)
+            wine_server_add_data( req, cpu_override, sizeof(*cpu_override) );
         req->teb      = wine_server_client_ptr( teb );
         req->peb      = NtCurrentTeb64() ? NtCurrentTeb64()->Peb : wine_server_client_ptr( peb );
 #ifdef __i386__
