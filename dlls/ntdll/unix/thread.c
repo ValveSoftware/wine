@@ -2672,6 +2672,20 @@ ULONG WINAPI NtGetCurrentProcessorNumber(void)
 
 #if defined(HAVE_SCHED_GETCPU)
     int res = sched_getcpu();
+    if (res != -1)
+    {
+        struct cpu_topology_override *override = get_cpu_topology_override();
+        unsigned int i;
+
+        if (!override)
+            return res;
+
+        for (i = 0; i < override->cpu_count; ++i)
+            if (override->host_cpu_id[i] == res)
+                return i;
+
+        WARN("Thread is running on processor which is not in the defined override.\n");
+    }
     if (res >= 0) return res;
 #elif defined(__APPLE__) && defined(MAC_OS_VERSION_11_0)
     if (__builtin_available( macOS 11.0, * ))

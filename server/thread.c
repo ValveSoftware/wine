@@ -799,8 +799,19 @@ int set_thread_affinity( struct thread *thread, affinity_t affinity )
 
         CPU_ZERO( &set );
         for (i = 0, mask = 1; mask; i++, mask <<= 1)
-            if (affinity & mask) CPU_SET( i, &set );
-
+            if (affinity & mask)
+            {
+                if (thread->process->cpu_override.cpu_count)
+                {
+                    if (i >= thread->process->cpu_override.cpu_count)
+                        break;
+                    CPU_SET( thread->process->cpu_override.host_cpu_id[i], &set );
+                }
+                else
+                {
+                    CPU_SET( i, &set );
+                }
+            }
         ret = sched_setaffinity( thread->unix_tid, sizeof(set), &set );
     }
 #endif
@@ -818,8 +829,21 @@ affinity_t get_thread_affinity( struct thread *thread )
         unsigned int i;
 
         if (!sched_getaffinity( thread->unix_tid, sizeof(set), &set ))
+        {
             for (i = 0; i < 8 * sizeof(mask); i++)
-                if (CPU_ISSET( i, &set )) mask |= (affinity_t)1 << i;
+                if (CPU_ISSET( i, &set ))
+                {
+                    if (thread->process->cpu_override.cpu_count)
+                    {
+                        if (i < ARRAY_SIZE(thread->process->wine_cpu_id_from_host))
+                            mask |= (affinity_t)1 << thread->process->wine_cpu_id_from_host[i];
+                    }
+                    else
+                    {
+                        mask |= (affinity_t)1 << i;
+                    }
+                }
+        }
     }
 #endif
     if (!mask) mask = ~(affinity_t)0;
@@ -1751,6 +1775,29 @@ DECL_HANDLER(init_first_thread)
 {
     struct process *process = current->process;
     int fd;
+    const struct cpu_topology_override *cpu_override = get_req_data();
+    unsigned int have_cpu_override = get_req_data_size() / sizeof(*cpu_override);
+    unsigned int i;
+
+    if (have_cpu_override)
+    {
+        if (cpu_override->cpu_count > ARRAY_SIZE(process->wine_cpu_id_from_host))
+        {
+            set_error( STATUS_INVALID_PARAMETER );
+            return;
+        }
+        memset( process->wine_cpu_id_from_host, 0, sizeof(process->wine_cpu_id_from_host) );
+        for (i = 0; i < cpu_override->cpu_count; ++i)
+        {
+            if (cpu_override->host_cpu_id[i] >= ARRAY_SIZE(process->wine_cpu_id_from_host))
+            {
+                set_error( STATUS_INVALID_PARAMETER );
+                return;
+            }
+            process->wine_cpu_id_from_host[cpu_override->host_cpu_id[i]] = i;
+        }
+        process->cpu_override = *cpu_override;
+    }
 
     if (!init_thread( current, req->reply_fd, req->wait_fd )) return;
 

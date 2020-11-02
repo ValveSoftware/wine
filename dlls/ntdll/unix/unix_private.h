@@ -368,12 +368,14 @@ extern NTSTATUS open_unix_file( HANDLE *handle, const char *unix_name, ACCESS_MA
                                 ULONG options, void *ea_buffer, ULONG ea_length );
 extern NTSTATUS get_device_info( int fd, struct _FILE_FS_DEVICE_INFORMATION *info );
 extern void init_files(void);
+extern void fill_cpu_override(void);
 extern void init_cpu_info(void);
 extern void init_shared_data_cpuinfo( struct _KUSER_SHARED_DATA *data );
 extern void file_complete_async( HANDLE handle, unsigned int options, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user,
                                  IO_STATUS_BLOCK *io, NTSTATUS status, ULONG_PTR information );
 extern void set_async_direct_result( HANDLE *async_handle, unsigned int options, IO_STATUS_BLOCK *io,
                                      NTSTATUS status, ULONG_PTR information, BOOL mark_pending );
+extern struct cpu_topology_override *get_cpu_topology_override(void);
 
 extern NTSTATUS unixcall_wine_dbg_write( void *args );
 extern NTSTATUS unixcall_wine_server_call( void *args );

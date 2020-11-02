@@ -1592,6 +1592,7 @@ void process_exit_wrapper( int status )
  */
 size_t server_init_process(void)
 {
+    struct cpu_topology_override *cpu_override;
     const char *arch = getenv( "WINEARCH" );
     const char *env_socket = getenv( "WINESERVERSOCKET" );
     struct ntdll_thread_data *data = ntdll_get_thread_data();
@@ -1664,8 +1665,13 @@ size_t server_init_process(void)
 
     reply_pipe = init_thread_pipe();
 
+    fill_cpu_override();
+    cpu_override = get_cpu_topology_override();
+
     SERVER_START_REQ( init_first_thread )
     {
+        if (cpu_override)
+            wine_server_add_data( req, cpu_override, sizeof(*cpu_override) );
         req->unix_pid    = getpid();
         req->unix_tid    = get_unix_tid();
         req->reply_fd    = reply_pipe;
