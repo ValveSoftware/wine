@@ -148,6 +148,25 @@ static int dns_only_query( const char *node, const struct addrinfo *hints, struc
     return 0;
 }
 
+static BOOL eac_download_hack(void)
+{
+    static int eac_download_hack_enabled = -1;
+    char str[64];
+
+    if (eac_download_hack_enabled == -1)
+    {
+        if (GetEnvironmentVariableA("WINE_DISABLE_EAC_ALT_DOWNLOAD", str, sizeof(str)))
+            eac_download_hack_enabled = !!atoi(str);
+        else
+            eac_download_hack_enabled = GetEnvironmentVariableA("SteamGameId", str, sizeof(str))
+                                        && !strcmp(str, "626690");
+
+        if (eac_download_hack_enabled)
+            ERR("HACK: failing download-alt.easyanticheat.net resolution.\n");
+    }
+    return eac_download_hack_enabled;
+}
+
 /***********************************************************************
  *      getaddrinfo   (ws2_32.@)
  */
@@ -169,6 +188,12 @@ int WINAPI getaddrinfo( const char *node, const char *service,
 
     if (node)
     {
+        if (eac_download_hack() && !strcmp(node, "download-alt.easyanticheat.net"))
+        {
+            SetLastError(WSAHOST_NOT_FOUND);
+            return WSAHOST_NOT_FOUND;
+        }
+
         if (!node[0])
         {
             if (!(fqdn = get_fqdn())) return WSA_NOT_ENOUGH_MEMORY;
@@ -924,6 +949,12 @@ struct hostent * WINAPI gethostbyname( const char *name )
     if (!num_startup)
     {
         SetLastError( WSANOTINITIALISED );
+        return NULL;
+    }
+
+    if (eac_download_hack() && name && !strcmp(name, "download-alt.easyanticheat.net"))
+    {
+        SetLastError( WSAHOST_NOT_FOUND );
         return NULL;
     }
 
