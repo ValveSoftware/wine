@@ -491,8 +491,6 @@ static HRESULT WINAPI source_reader_source_events_callback_Invoke(IMFAsyncCallba
 
     TRACE("%p, %p.\n", iface, result);
 
-    return E_NOTIMPL;
-
     source = (IMFMediaSource *)IMFAsyncResult_GetStateNoAddRef(result);
 
     if (FAILED(hr = IMFMediaSource_EndGetEvent(source, result, &event)))
@@ -779,8 +777,6 @@ static HRESULT WINAPI source_reader_stream_events_callback_Invoke(IMFAsyncCallba
     HRESULT hr;
 
     TRACE("%p, %p.\n", iface, result);
-
-    return E_NOTIMPL;
 
     stream = (IMFMediaStream *)IMFAsyncResult_GetStateNoAddRef(result);
 
@@ -1137,8 +1133,6 @@ static HRESULT WINAPI source_reader_async_commands_callback_Invoke(IMFAsyncCallb
     HRESULT hr, status;
     IUnknown *state;
 
-    return E_NOTIMPL;
-
     if (FAILED(hr = IMFAsyncResult_GetState(result, &state)))
         return hr;
 
@@ -1309,8 +1303,6 @@ static HRESULT WINAPI src_reader_GetStreamSelection(IMFSourceReader *iface, DWOR
 
     TRACE("%p, %#x, %p.\n", iface, index, selected);
 
-    return E_NOTIMPL;
-
     switch (index)
     {
         case MF_SOURCE_READER_FIRST_VIDEO_STREAM:
@@ -1334,8 +1326,6 @@ static HRESULT WINAPI src_reader_SetStreamSelection(IMFSourceReader *iface, DWOR
     unsigned int i;
 
     TRACE("%p, %#x, %d.\n", iface, index, selection);
-
-    return E_NOTIMPL;
 
     selection = !!selection;
 
@@ -1445,8 +1435,6 @@ static HRESULT WINAPI src_reader_GetNativeMediaType(IMFSourceReader *iface, DWOR
 
     TRACE("%p, %#x, %#x, %p.\n", iface, index, type_index, type);
 
-    return E_NOTIMPL;
-
     return source_reader_get_native_media_type(reader, index, type_index, type);
 }
 
@@ -1456,8 +1444,6 @@ static HRESULT WINAPI src_reader_GetCurrentMediaType(IMFSourceReader *iface, DWO
     HRESULT hr;
 
     TRACE("%p, %#x, %p.\n", iface, index, type);
-
-    return E_NOTIMPL;
 
     switch (index)
     {
@@ -1672,8 +1658,6 @@ static HRESULT WINAPI src_reader_SetCurrentMediaType(IMFSourceReader *iface, DWO
 
     TRACE("%p, %#x, %p, %p.\n", iface, index, reserved, type);
 
-    return E_NOTIMPL;
-
     switch (index)
     {
         case MF_SOURCE_READER_FIRST_VIDEO_STREAM:
@@ -1709,8 +1693,6 @@ static HRESULT WINAPI src_reader_SetCurrentPosition(IMFSourceReader *iface, REFG
     HRESULT hr;
 
     TRACE("%p, %s, %p.\n", iface, debugstr_guid(format), position);
-
-    return E_NOTIMPL;
 
     if (FAILED(hr = IMFMediaSource_GetCharacteristics(reader->source, &flags)))
         return hr;
@@ -1852,8 +1834,6 @@ static HRESULT WINAPI src_reader_ReadSample(IMFSourceReader *iface, DWORD index,
 
     TRACE("%p, %#x, %#x, %p, %p, %p, %p\n", iface, index, flags, actual_index, stream_flags, timestamp, sample);
 
-    return E_NOTIMPL;
-
     EnterCriticalSection(&reader->cs);
 
     while (reader->flags & SOURCE_READER_SEEKING)
@@ -1915,8 +1895,6 @@ static HRESULT WINAPI src_reader_Flush(IMFSourceReader *iface, DWORD index)
 
     TRACE("%p, %#x.\n", iface, index);
 
-    return E_NOTIMPL;
-
     EnterCriticalSection(&reader->cs);
 
     if (reader->async_callback)
@@ -1937,8 +1915,6 @@ static HRESULT WINAPI src_reader_GetServiceForStream(IMFSourceReader *iface, DWO
     HRESULT hr;
 
     TRACE("%p, %#x, %s, %s, %p\n", iface, index, debugstr_guid(service), debugstr_guid(riid), object);
-
-    return E_NOTIMPL;
 
     switch (index)
     {
@@ -1978,8 +1954,6 @@ static HRESULT WINAPI src_reader_GetPresentationAttribute(IMFSourceReader *iface
     HRESULT hr;
 
     TRACE("%p, %#x, %s, %p.\n", iface, index, debugstr_guid(guid), value);
-
-    return E_NOTIMPL;
 
     switch (index)
     {
@@ -2381,29 +2355,9 @@ static HRESULT create_source_reader_from_object(IUnknown *unk, IMFAttributes *at
 HRESULT WINAPI MFCreateSourceReaderFromByteStream(IMFByteStream *stream, IMFAttributes *attributes,
         IMFSourceReader **reader)
 {
-    struct source_reader *object;
-
     TRACE("%p, %p, %p.\n", stream, attributes, reader);
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
-        return E_OUTOFMEMORY;
-
-    object->IMFSourceReader_iface.lpVtbl = &srcreader_vtbl;
-    object->source_events_callback.lpVtbl = &source_events_callback_vtbl;
-    object->stream_events_callback.lpVtbl = &stream_events_callback_vtbl;
-    object->async_commands_callback.lpVtbl = &async_commands_callback_vtbl;
-    object->refcount = 1;
-    list_init(&object->responses);
-    InitializeCriticalSection(&object->cs);
-    InitializeConditionVariable(&object->sample_event);
-    InitializeConditionVariable(&object->state_event);
-
-    *reader = &object->IMFSourceReader_iface;
-
-    return S_OK;
-
-    //return create_source_reader_from_object((IUnknown *)stream, attributes, &IID_IMFSourceReader, (void **)reader);
+    return create_source_reader_from_object((IUnknown *)stream, attributes, &IID_IMFSourceReader, (void **)reader);
 }
 
 /***********************************************************************
