@@ -77,8 +77,8 @@ static const UINT button_down_flags[NB_BUTTONS] =
     MOUSEEVENTF_RIGHTDOWN,
     MOUSEEVENTF_WHEEL,
     MOUSEEVENTF_WHEEL,
-    MOUSEEVENTF_HWHEEL,
-    MOUSEEVENTF_HWHEEL,
+    MOUSEEVENTF_XDOWN,  /* FIXME: horizontal wheel */
+    MOUSEEVENTF_XDOWN,
     MOUSEEVENTF_XDOWN,
     MOUSEEVENTF_XDOWN
 };
@@ -90,8 +90,8 @@ static const UINT button_up_flags[NB_BUTTONS] =
     MOUSEEVENTF_RIGHTUP,
     0,
     0,
-    0,
-    0,
+    MOUSEEVENTF_XUP,
+    MOUSEEVENTF_XUP,
     MOUSEEVENTF_XUP,
     MOUSEEVENTF_XUP
 };
@@ -103,8 +103,8 @@ static const UINT button_down_data[NB_BUTTONS] =
     0,
     WHEEL_DELTA,
     -WHEEL_DELTA,
-    -WHEEL_DELTA,
-    WHEEL_DELTA,
+    XBUTTON1,
+    XBUTTON2,
     XBUTTON1,
     XBUTTON2
 };
@@ -116,8 +116,8 @@ static const UINT button_up_data[NB_BUTTONS] =
     0,
     0,
     0,
-    0,
-    0,
+    XBUTTON1,
+    XBUTTON2,
     XBUTTON1,
     XBUTTON2
 };
