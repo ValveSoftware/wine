@@ -253,7 +253,7 @@ static void update_x11_clipping( X11DRV_PDEVICE *physDev, HRGN rgn )
     {
         fs_hack_rgndata_user_to_real(data);
         XSetClipRectangles( gdi_display, physDev->gc, physDev->dc_rect.left, physDev->dc_rect.top,
-                            (XRectangle *)data->Buffer, data->rdh.nCount, YXBanded );
+                            (XRectangle *)data->Buffer, data->rdh.nCount, Unsorted );
         HeapFree( GetProcessHeap(), 0, data );
     }
 }

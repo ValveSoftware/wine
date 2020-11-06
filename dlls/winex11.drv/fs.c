@@ -695,11 +695,17 @@ void fs_hack_point_real_to_user(POINT *pos)
 }
 
 /* Transform RGNDATA in user virtual screen coordinates to real virtual screen coordinates.
- * This is for clipping */
+ * This is for clipping. Be sure to use Unsorted for Xlib calls after this transformation because
+ * this may break the requirement of using YXBanded. For example, say there are two monitors aligned
+ * horizontally with the primary monitor on the right. Each of monitor is of real resolution
+ * 1920x1080 and the fake primary monitor resolution is 1024x768. Then (0, 10, 1024, 768) should be
+ * transformed to (0, 14, 1920, 1080). While (1024, 10, 2944, 1080) should be transformed to
+ * (1920, 10, 3840, 1080) and this is breaking YXBanded because it requires y in non-decreasing order */
 void fs_hack_rgndata_user_to_real(RGNDATA *data)
 {
     unsigned int i;
     XRectangle *xrect;
+    RECT rect;
 
     if (!data || wm_is_steamcompmgr(NULL))
         return;
@@ -707,27 +713,17 @@ void fs_hack_rgndata_user_to_real(RGNDATA *data)
     xrect = (XRectangle *)data->Buffer;
     for (i = 0; i < data->rdh.nCount; i++)
     {
-        struct fs_monitor *fs_monitor;
-        HMONITOR monitor;
-        POINT p;
-
-        p.x = xrect[i].x;
-        p.y = xrect[i].y;
-        monitor = MonitorFromPoint(p, MONITOR_DEFAULTTONULL);
-        EnterCriticalSection(&fs_section);
-        if ((fs_monitor = fs_find_monitor_by_handle(monitor)))
-        {
-            TRACE("from point %d, %d\n", p.x, p.y);
-            fs_hack_point_user_to_real(&p);
-            TRACE("to point %d, %d\n", p.x, p.y);
-            xrect[i].x = p.x;
-            xrect[i].y = p.y;
-            TRACE("from width %d height %d\n", xrect[i].width, xrect[i].height);
-            xrect[i].width *= fs_monitor->user_to_real_scale;
-            xrect[i].height *= fs_monitor->user_to_real_scale;
-            TRACE("to width %d height %d\n", xrect[i].width, xrect[i].height);
-        }
-        LeaveCriticalSection(&fs_section);
+        rect.left = xrect[i].x;
+        rect.top = xrect[i].y;
+        rect.right = xrect[i].x + xrect[i].width;
+        rect.bottom = xrect[i].y + xrect[i].height;
+        TRACE("from rect %s\n", wine_dbgstr_rect(&rect));
+        fs_hack_rect_user_to_real(&rect);
+        TRACE("to rect %s\n", wine_dbgstr_rect(&rect));
+        xrect[i].x = rect.left;
+        xrect[i].y = rect.top;
+        xrect[i].width = rect.right - rect.left;
+        xrect[i].height = rect.bottom - rect.top;
     }
 }
 
@@ -752,7 +748,7 @@ void fs_hack_rect_user_to_real(RECT *rect)
 
     point.x = rect->left;
     point.y = rect->top;
-    monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONULL);
+    monitor = MonitorFromPoint(point, MONITOR_DEFAULTTONEAREST);
     EnterCriticalSection(&fs_section);
     fs_monitor = fs_find_monitor_by_handle(monitor);
     if (!fs_monitor)
