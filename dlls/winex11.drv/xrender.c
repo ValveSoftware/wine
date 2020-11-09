@@ -1941,7 +1941,7 @@ static DWORD CDECL xrenderdrv_PutImage( PHYSDEV dev, HRGN clip, BITMAPINFO *info
             }
 
             xrender_put_image( src_pixmap, src_pict, mask_pict, NULL, physdev->pict_format,
-                               NULL, tmp_pixmap, src, &tmp, use_repeat );
+                               physdev, tmp_pixmap, src, &tmp, use_repeat );
             execute_rop( physdev->x11dev, tmp_pixmap, gc, &dst->visrect, rop );
 
             XFreePixmap( gdi_display, tmp_pixmap );
