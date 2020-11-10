@@ -2039,7 +2039,14 @@ NTSTATUS udev_driver_init(void)
         goto error;
     }
 
-    bypass_udevd = check_bus_option(&disable_udevd, 0);
+    if (access ("/run/pressure-vessel", R_OK)
+        || access ("/.flatpak-info", R_OK))
+    {
+        TRACE("Container detected, bypassing udevd by default\n");
+        bypass_udevd = 1;
+    }
+
+    bypass_udevd = check_bus_option(&disable_udevd, bypass_udevd);
     if (bypass_udevd)
         TRACE("udev disabled, falling back to inotify\n");
 
