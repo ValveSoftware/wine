@@ -3386,24 +3386,25 @@ static void copy_rawinput_buffer( struct thread_input *input, char *reply_buf, d
     {
         struct message *msg = LIST_ENTRY( ptr, struct message, entry );
         struct hardware_msg_data *data = msg->data;
+        data_size_t hid_size = data->rawinput.type != RIM_TYPEHID ? 0 : data->rawinput.hid.length;
 
         ptr = list_next( &input->msg_list, ptr );
         if (msg->msg != WM_INPUT) continue;
 
-        if (next_size) *next_size = client_elt_size;
-        if (client_buf_size < client_elt_size) break;
-        if (reply_buf_size < sizeof(*data)) break;
+        if (next_size) *next_size = client_elt_size + hid_size;
+        if (client_buf_size < client_elt_size + hid_size) break;
+        if (reply_buf_size < sizeof(*data) + hid_size) break;
 
         if (reply_buf)
         {
-            memcpy( reply_ptr, data, sizeof(*data) );
+            memcpy( reply_ptr, data, sizeof(*data) + hid_size );
             list_remove( &msg->entry );
             free_message( msg );
         }
 
-        client_buf_size -= client_elt_size;
-        reply_buf_size -= sizeof(*data);
-        reply_ptr += sizeof(*data);
+        client_buf_size -= client_elt_size + hid_size;
+        reply_buf_size -= sizeof(*data) + hid_size;
+        reply_ptr += sizeof(*data) + hid_size;
         n++;
     }
 
