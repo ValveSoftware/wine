@@ -1745,6 +1745,12 @@ NTSTATUS udev_bus_init(void *args)
         goto error;
     }
 
+    if (access("/run/pressure-vessel", R_OK) || access("/.flatpak-info", R_OK))
+    {
+        TRACE("Container detected, bypassing udevd by default\n");
+        disable_udevd = TRUE;
+    }
+
 #ifdef HAVE_SYS_INOTIFY_H
     if (disable_udevd) monitor_fd = create_inotify();
     if (monitor_fd < 0) disable_udevd = FALSE;
