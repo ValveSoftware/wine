@@ -3374,19 +3374,13 @@ DECL_HANDLER(get_cursor_history)
             pos[i] = cursor_history[(i + cursor_history_latest) % ARRAY_SIZE(cursor_history)];
 }
 
-DECL_HANDLER(get_rawinput_buffer)
+static void copy_rawinput_buffer( struct thread_input *input, char *reply_buf, data_size_t reply_buf_size, data_size_t *reply_size,
+                                  data_size_t client_buf_size, data_size_t client_elt_size, data_size_t *next_size, unsigned int *count )
 {
-    struct thread_input *input = current->queue->input;
-    data_size_t size = 0, next_size = 0;
+    unsigned int n = 0;
     struct list *ptr;
-    char *buf, *cur;
-    int count = 0;
+    char *reply_ptr = reply_buf;
 
-    if (!req->buffer_size) buf = NULL;
-    else if (!(buf = mem_alloc( get_reply_max_size() )))
-        return;
-
-    cur = buf;
     ptr = list_head( &input->msg_list );
     while (ptr)
     {
@@ -3396,22 +3390,44 @@ DECL_HANDLER(get_rawinput_buffer)
         ptr = list_next( &input->msg_list, ptr );
         if (msg->msg != WM_INPUT) continue;
 
-        next_size = req->rawinput_size;
-        if (size + next_size > req->buffer_size) break;
-        if (cur + sizeof(*data) > buf + get_reply_max_size()) break;
+        if (next_size) *next_size = client_elt_size;
+        if (client_buf_size < client_elt_size) break;
+        if (reply_buf_size < sizeof(*data)) break;
 
-        memcpy(cur, data, sizeof(*data));
-        list_remove( &msg->entry );
-        free_message( msg );
+        if (reply_buf)
+        {
+            memcpy( reply_ptr, data, sizeof(*data) );
+            list_remove( &msg->entry );
+            free_message( msg );
+        }
 
-        size += next_size;
-        cur += sizeof(*data);
-        count++;
+        client_buf_size -= client_elt_size;
+        reply_buf_size -= sizeof(*data);
+        reply_ptr += sizeof(*data);
+        n++;
     }
 
-    reply->next_size = next_size;
-    reply->count = count;
-    set_reply_data_ptr( buf, cur - buf );
+    if (reply_size) *reply_size = reply_ptr - reply_buf;
+    if (count) *count = n;
+}
+
+DECL_HANDLER(get_rawinput_buffer)
+{
+    struct thread_input *input = current->queue->input;
+    data_size_t reply_size;
+    char *reply_buf;
+
+    reply->next_size = 0;
+    reply->count = 0;
+
+    copy_rawinput_buffer( input, NULL, get_reply_max_size(), &reply_size, req->buffer_size,
+                          req->rawinput_size, &reply->next_size, &reply->count );
+
+    if (!req->buffer_size || !reply_size) return;
+    if (!(reply_buf = set_reply_data_size( reply_size ))) return;
+
+    copy_rawinput_buffer( input, reply_buf, reply_size, NULL, req->buffer_size,
+                          req->rawinput_size, NULL, NULL );
 }
 
 DECL_HANDLER(update_rawinput_devices)
