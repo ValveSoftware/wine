@@ -3392,23 +3392,20 @@ DECL_HANDLER(get_rawinput_buffer)
     {
         struct message *msg = LIST_ENTRY( ptr, struct message, entry );
         struct hardware_msg_data *data = msg->data;
-        data_size_t msg_size = sizeof(*data);
-        if (data->rawinput.type == RIM_TYPEHID)
-            msg_size += data->rawinput.hid.length;
 
         ptr = list_next( &input->msg_list, ptr );
         if (msg->msg != WM_INPUT) continue;
 
         next_size = req->rawinput_size;
         if (size + next_size > req->buffer_size) break;
-        if (cur + msg_size > buf + get_reply_max_size()) break;
+        if (cur + sizeof(*data) > buf + get_reply_max_size()) break;
 
-        memcpy(cur, data, msg_size);
+        memcpy(cur, data, sizeof(*data));
         list_remove( &msg->entry );
         free_message( msg );
 
         size += next_size;
-        cur += msg_size;
+        cur += sizeof(*data);
         count++;
     }
 
