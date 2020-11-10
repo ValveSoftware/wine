@@ -108,6 +108,7 @@ struct vidpid {
 
 struct platform_private
 {
+    const platform_vtbl *vtbl;
     struct udev_device *udev_device;
     int device_fd;
 
@@ -1268,6 +1269,10 @@ static void try_add_device(struct udev_device *dev)
     WORD input = -1;
     int fd;
     static const CHAR *base_serial = "0000";
+    const platform_vtbl *vtbl = NULL;
+#ifdef HAS_PROPER_INPUT_HEADER
+    const platform_vtbl *other_vtbl = NULL;
+#endif
 
     if (!(devnode = udev_device_get_devnode(dev)))
         return;
@@ -1279,17 +1284,34 @@ static void try_add_device(struct udev_device *dev)
     }
 
     subsystem = udev_device_get_subsystem(dev);
+
+    if (strcmp(subsystem, "hidraw") == 0)
+    {
+        vtbl = &hidraw_vtbl;
+#ifdef HAS_PROPER_INPUT_HEADER
+        other_vtbl = &lnxev_vtbl;
+#endif
+    }
+#ifdef HAS_PROPER_INPUT_HEADER
+    else if (strcmp(subsystem, "input") == 0)
+    {
+        vtbl = &lnxev_vtbl;
+        other_vtbl = &hidraw_vtbl;
+    }
+#endif
+    else
+    {
+        WARN("Unexpected subsystem %s for %s\n", debugstr_a(subsystem), debugstr_a(devnode));
+        close(fd);
+        return;
+    }
+
     hiddev = udev_device_get_parent_with_subsystem_devtype(dev, "hid", NULL);
     if (hiddev)
     {
         const char *bcdDevice = NULL;
 #ifdef HAS_PROPER_INPUT_HEADER
-        const platform_vtbl *other_vtbl = NULL;
         DEVICE_OBJECT *dup = NULL;
-        if (strcmp(subsystem, "hidraw") == 0)
-            other_vtbl = &lnxev_vtbl;
-        else if (strcmp(subsystem, "input") == 0)
-            other_vtbl = &hidraw_vtbl;
 
         if (other_vtbl)
             dup = bus_enumerate_hid_devices(other_vtbl, check_same_device, dev);
@@ -1372,16 +1394,16 @@ static void try_add_device(struct udev_device *dev)
     TRACE("Found udev device %s (vid %04x, pid %04x, version %u, serial %s)\n",
           debugstr_a(devnode), vid, pid, version, debugstr_w(serial));
 
-    if (strcmp(subsystem, "hidraw") == 0)
+    if (vtbl == &hidraw_vtbl)
     {
         device = bus_create_hid_device(hidraw_busidW, vid, pid, input, version, 0, serial, is_gamepad,
-                                       &hidraw_vtbl, sizeof(struct platform_private), FALSE);
+                                       vtbl, sizeof(struct platform_private), FALSE);
     }
 #ifdef HAS_PROPER_INPUT_HEADER
-    else if (strcmp(subsystem, "input") == 0)
+    else if (vtbl == &lnxev_vtbl)
     {
         device = bus_create_hid_device(lnxev_busidW, vid, pid, input, version, 0, serial, is_gamepad,
-                                       &lnxev_vtbl, sizeof(struct wine_input_private), FALSE);
+                                       vtbl, sizeof(struct wine_input_private), FALSE);
     }
 #endif
 
@@ -1393,9 +1415,11 @@ static void try_add_device(struct udev_device *dev)
         private->vidpid.vid = vid;
         private->vidpid.pid = pid;
         private->bus_type = bus_type;
+        private->vtbl = vtbl;
         set_quirks(private);
+
 #ifdef HAS_PROPER_INPUT_HEADER
-        if (strcmp(subsystem, "input") == 0)
+        if (private->vtbl == &lnxev_vtbl)
             if (!build_report_descriptor((struct wine_input_private*)private, dev))
             {
                 ERR("Building report descriptor failed, removing device\n");
@@ -1422,17 +1446,11 @@ static void try_remove_device(struct udev_device *dev)
 {
     DEVICE_OBJECT *device = NULL;
     struct platform_private* private;
-#ifdef HAS_PROPER_INPUT_HEADER
-    BOOL is_input = FALSE;
-#endif
 
     device = bus_find_hid_device(&hidraw_vtbl, dev);
 #ifdef HAS_PROPER_INPUT_HEADER
     if (device == NULL)
-    {
         device = bus_find_hid_device(&lnxev_vtbl, dev);
-        is_input = TRUE;
-    }
 #endif
     if (!device) return;
 
@@ -1449,7 +1467,7 @@ static void try_remove_device(struct udev_device *dev)
         close(private->control_pipe[1]);
         CloseHandle(private->report_thread);
 #ifdef HAS_PROPER_INPUT_HEADER
-        if (strcmp(udev_device_get_subsystem(dev), "input") == 0)
+        if (private->vtbl == &lnxev_vtbl)
         {
             HeapFree(GetProcessHeap(), 0, ((struct wine_input_private*)private)->current_report_buffer);
             HeapFree(GetProcessHeap(), 0, ((struct wine_input_private*)private)->last_report_buffer);
@@ -1458,7 +1476,7 @@ static void try_remove_device(struct udev_device *dev)
     }
 
 #ifdef HAS_PROPER_INPUT_HEADER
-    if (is_input)
+    if (private->vtbl == &lnxev_vtbl)
     {
         struct wine_input_private *ext = (struct wine_input_private*)private;
         HeapFree(GetProcessHeap(), 0, ext->report_descriptor);
