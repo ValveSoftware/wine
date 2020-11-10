@@ -1442,22 +1442,47 @@ static void try_add_device(struct udev_device *dev)
     HeapFree(GetProcessHeap(), 0, serial);
 }
 
-static void try_remove_device(struct udev_device *dev)
+/* Return 0 to stop enumeration if @device's canonical path in /dev is @context. */
+static int stop_if_devnode_equals(DEVICE_OBJECT *device, void *context)
+{
+    struct platform_private *private = impl_from_DEVICE_OBJECT(device);
+    const char *want_devnode = context;
+    const char *devnode = udev_device_get_devnode(private->udev_device);
+
+    if (!devnode)
+        return 1;
+
+    if (strcmp(devnode, want_devnode) == 0)
+    {
+        TRACE("Found device %p with devnode %s\n", private, debugstr_a(want_devnode));
+        return 0;
+    }
+
+    return 1;
+}
+
+static void try_remove_device_by_devnode(const char *devnode)
 {
     DEVICE_OBJECT *device = NULL;
     struct platform_private* private;
+    struct udev_device *dev;
 
-    device = bus_find_hid_device(&hidraw_vtbl, dev);
+    TRACE("Removing device if present: %s\n", debugstr_a(devnode));
+    device = bus_enumerate_hid_devices(&hidraw_vtbl, stop_if_devnode_equals, (void *) devnode);
+
 #ifdef HAS_PROPER_INPUT_HEADER
     if (device == NULL)
-        device = bus_find_hid_device(&lnxev_vtbl, dev);
+        device = bus_enumerate_hid_devices(&lnxev_vtbl, stop_if_devnode_equals, (void *) devnode);
 #endif
     if (!device) return;
 
+    private = impl_from_DEVICE_OBJECT(device);
+    TRACE("Removing %s device: devnode %s udev_device %p -> %p\n",
+          (private->vtbl == &hidraw_vtbl ? "hidraw" : "evdev"),
+          debugstr_a(devnode), private->udev_device, private);
+
     bus_unlink_hid_device(device);
     IoInvalidateDeviceRelations(bus_pdo, BusRelations);
-
-    private = impl_from_DEVICE_OBJECT(device);
 
     if (private->report_thread)
     {
@@ -1487,6 +1512,17 @@ static void try_remove_device(struct udev_device *dev)
     close(private->device_fd);
     bus_remove_hid_device(device);
     udev_device_unref(dev);
+}
+
+static void try_remove_device(struct udev_device *dev)
+{
+    const char *devnode = udev_device_get_devnode(dev);
+
+    /* If it didn't have a device node, then we wouldn't be tracking it anyway */
+    if (!devnode)
+        return;
+
+    try_remove_device_by_devnode(devnode);
 }
 
 static void build_initial_deviceset(void)
