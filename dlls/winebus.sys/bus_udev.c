@@ -48,7 +48,7 @@
 # include <linux/input.h>
 # undef SW_MAX
 # if defined(EVIOCGBIT) && defined(EV_ABS) && defined(BTN_PINKIE)
-//#  define HAS_PROPER_INPUT_HEADER
+#  define HAS_PROPER_INPUT_HEADER
 # endif
 # ifndef SYN_DROPPED
 #  define SYN_DROPPED 3
@@ -1746,9 +1746,9 @@ NTSTATUS udev_driver_init(void)
         TRACE("UDEV hidraw devices disabled in registry\n");
 
 #ifdef HAS_PROPER_INPUT_HEADER
-    disable_input = check_bus_option(&input_disabled, 0);
+    disable_input = check_bus_option(&input_disabled, 1);
     if (disable_input)
-        TRACE("UDEV input devices disabled in registry\n");
+        TRACE("UDEV input devices disabled in registry or by default\n");
 #endif
 
     if (!(events[0] = CreateEventW(NULL, TRUE, FALSE, NULL)))
