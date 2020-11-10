@@ -25,6 +25,7 @@
 #include "config.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -500,7 +501,303 @@ static struct base_device *find_device_from_syspath(const char *path)
 
 #define test_bit(arr,bit) (((BYTE*)(arr))[(bit)>>3]&(1<<((bit)&7)))
 
-static const BYTE* what_am_I(struct udev_device *dev)
+/* Minimal compatibility with code taken from steam-runtime-tools */
+typedef int gboolean;
+#define g_debug(fmt, ...) TRACE(fmt "\n", ## __VA_ARGS__)
+#define G_N_ELEMENTS(arr) (sizeof(arr)/sizeof(arr[0]))
+
+typedef enum
+{
+  SRT_INPUT_DEVICE_TYPE_FLAGS_JOYSTICK = (1 << 0),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_ACCELEROMETER = (1 << 1),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_KEYBOARD = (1 << 2),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_HAS_KEYS = (1 << 3),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_MOUSE = (1 << 4),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHPAD = (1 << 5),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHSCREEN = (1 << 6),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_TABLET = (1 << 7),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_TABLET_PAD = (1 << 8),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_POINTING_STICK = (1 << 9),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_SWITCH = (1 << 10),
+  SRT_INPUT_DEVICE_TYPE_FLAGS_NONE = 0
+} SrtInputDeviceTypeFlags;
+
+#define BITS_PER_LONG           (sizeof (unsigned long) * CHAR_BIT)
+#define LONGS_FOR_BITS(x)       ((((x)-1)/BITS_PER_LONG)+1)
+typedef struct
+{
+  unsigned long ev[LONGS_FOR_BITS (EV_MAX)];
+  unsigned long keys[LONGS_FOR_BITS (KEY_MAX)];
+  unsigned long abs[LONGS_FOR_BITS (ABS_MAX)];
+  unsigned long rel[LONGS_FOR_BITS (REL_MAX)];
+  unsigned long ff[LONGS_FOR_BITS (FF_MAX)];
+  unsigned long props[LONGS_FOR_BITS (INPUT_PROP_MAX)];
+} SrtEvdevCapabilities;
+
+static gboolean
+_srt_get_caps_from_evdev (int fd,
+                          unsigned int type,
+                          unsigned long *bitmask,
+                          size_t bitmask_len_longs)
+{
+  size_t bitmask_len_bytes = bitmask_len_longs * sizeof (*bitmask);
+
+  memset (bitmask, 0, bitmask_len_bytes);
+
+  if (ioctl (fd, EVIOCGBIT (type, bitmask_len_bytes), bitmask) < 0)
+    return FALSE;
+
+  return TRUE;
+}
+
+static gboolean
+_srt_evdev_capabilities_set_from_evdev (SrtEvdevCapabilities *caps,
+                                        int fd)
+{
+  if (_srt_get_caps_from_evdev (fd, 0, caps->ev, G_N_ELEMENTS (caps->ev)))
+    {
+      _srt_get_caps_from_evdev (fd, EV_KEY, caps->keys, G_N_ELEMENTS (caps->keys));
+      _srt_get_caps_from_evdev (fd, EV_ABS, caps->abs, G_N_ELEMENTS (caps->abs));
+      _srt_get_caps_from_evdev (fd, EV_REL, caps->rel, G_N_ELEMENTS (caps->rel));
+      _srt_get_caps_from_evdev (fd, EV_FF, caps->ff, G_N_ELEMENTS (caps->ff));
+      ioctl (fd, EVIOCGPROP (sizeof (caps->props)), caps->props);
+      return TRUE;
+    }
+
+  memset (caps, 0, sizeof (*caps));
+  return FALSE;
+}
+
+#define JOYSTICK_ABS_AXES \
+  ((1 << ABS_X) | (1 << ABS_Y) \
+   | (1 << ABS_RX) | (1 << ABS_RY) \
+   | (1 << ABS_THROTTLE) | (1 << ABS_RUDDER) \
+   | (1 << ABS_WHEEL) | (1 << ABS_GAS) | (1 << ABS_BRAKE) \
+   | (1 << ABS_HAT0X) | (1 << ABS_HAT0Y) \
+   | (1 << ABS_HAT1X) | (1 << ABS_HAT1Y) \
+   | (1 << ABS_HAT2X) | (1 << ABS_HAT2Y) \
+   | (1 << ABS_HAT3X) | (1 << ABS_HAT3Y))
+
+static const unsigned int first_mouse_button = BTN_MOUSE;
+static const unsigned int last_mouse_button = BTN_JOYSTICK - 1;
+
+static const unsigned int first_joystick_button = BTN_JOYSTICK;
+static const unsigned int last_joystick_button = BTN_GAMEPAD - 1;
+
+static const unsigned int first_gamepad_button = BTN_GAMEPAD;
+static const unsigned int last_gamepad_button = BTN_DIGI - 1;
+
+static const unsigned int first_dpad_button = BTN_DPAD_UP;
+static const unsigned int last_dpad_button = BTN_DPAD_RIGHT;
+
+static const unsigned int first_extra_joystick_button = BTN_TRIGGER_HAPPY;
+static const unsigned int last_extra_joystick_button = BTN_TRIGGER_HAPPY40;
+
+SrtInputDeviceTypeFlags
+_srt_evdev_capabilities_guess_type (const SrtEvdevCapabilities *caps)
+{
+  SrtInputDeviceTypeFlags flags = SRT_INPUT_DEVICE_TYPE_FLAGS_NONE;
+  unsigned int i;
+  gboolean has_joystick_axes = FALSE;
+  gboolean has_joystick_buttons = FALSE;
+
+  /* Some properties let us be fairly sure about a device */
+  if (test_bit (caps->props, INPUT_PROP_ACCELEROMETER))
+    {
+      g_debug ("INPUT_PROP_ACCELEROMETER => is accelerometer");
+      flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_ACCELEROMETER;
+    }
+
+  if (test_bit (caps->props, INPUT_PROP_POINTING_STICK))
+    {
+      g_debug ("INPUT_PROP_POINTING_STICK => is pointing stick");
+      flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_POINTING_STICK;
+    }
+
+  if (test_bit (caps->props, INPUT_PROP_BUTTONPAD)
+      || test_bit (caps->props, INPUT_PROP_TOPBUTTONPAD))
+    {
+      g_debug ("INPUT_PROP_[TOP]BUTTONPAD => is touchpad");
+      flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHPAD;
+    }
+
+  /* Devices with a stylus or pen are assumed to be graphics tablets */
+  if (test_bit (caps->keys, BTN_STYLUS)
+      || test_bit (caps->keys, BTN_TOOL_PEN))
+    {
+      g_debug ("Stylus or pen => is tablet");
+      flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_TABLET;
+    }
+
+  /* Devices that accept a finger touch are assumed to be touchpads or
+   * touchscreens.
+   *
+   * In Steam we mostly only care about these as a way to
+   * reject non-joysticks, so we're not very precise here yet.
+   *
+   * SDL assumes that TOUCH means a touchscreen and FINGER
+   * means a touchpad. */
+  if (flags == SRT_INPUT_DEVICE_TYPE_FLAGS_NONE
+      && (test_bit (caps->keys, BTN_TOOL_FINGER)
+          || test_bit (caps->keys, BTN_TOUCH)
+          || test_bit (caps->props, INPUT_PROP_SEMI_MT)))
+    {
+      g_debug ("Finger or touch or semi-MT => is touchpad or touchscreen");
+
+      if (test_bit (caps->props, INPUT_PROP_POINTER))
+        flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHPAD;
+      else
+        flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHSCREEN;
+    }
+
+  /* Devices with mouse buttons are ... probably mice? */
+  if (flags == SRT_INPUT_DEVICE_TYPE_FLAGS_NONE)
+    {
+      for (i = first_mouse_button; i <= last_mouse_button; i++)
+        {
+          if (test_bit (caps->keys, i))
+            {
+              g_debug ("Mouse button => mouse");
+              flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_MOUSE;
+            }
+        }
+    }
+
+  if (flags == SRT_INPUT_DEVICE_TYPE_FLAGS_NONE)
+    {
+      for (i = ABS_X; i < ABS_Z; i++)
+        {
+          if (!test_bit (caps->abs, i))
+            break;
+        }
+
+      /* If it has 3 axes and no buttons it's probably an accelerometer. */
+      if (i == ABS_Z && !test_bit (caps->ev, EV_KEY))
+        {
+          g_debug ("3 left axes and no buttons => accelerometer");
+          flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_ACCELEROMETER;
+        }
+
+      /* Same for RX..RZ (e.g. Wiimote) */
+      for (i = ABS_RX; i < ABS_RZ; i++)
+        {
+          if (!test_bit (caps->abs, i))
+            break;
+        }
+
+      if (i == ABS_RZ && !test_bit (caps->ev, EV_KEY))
+        {
+          g_debug ("3 right axes and no buttons => accelerometer");
+          flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_ACCELEROMETER;
+        }
+    }
+
+  /* Bits 1 to 31 are ESC, numbers and Q to D, which SDL and udev both
+   * consider to be enough to count as a fully-functioned keyboard. */
+  if ((caps->keys[0] & 0xfffffffe) == 0xfffffffe)
+    {
+      g_debug ("First few keys => keyboard");
+      flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_KEYBOARD;
+    }
+
+  /* If we have *any* keys, consider it to be something a bit
+   * keyboard-like. Bits 0 to 63 are all keyboard keys.
+   * Make sure we stop before reaching KEY_UP which is sometimes
+   * used on game controller mappings, e.g. for the Wiimote. */
+  for (i = 0; i < (64 / BITS_PER_LONG); i++)
+    {
+      if (caps->keys[i] != 0)
+        flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_HAS_KEYS;
+    }
+
+  if (caps->abs[0] & JOYSTICK_ABS_AXES)
+    has_joystick_axes = TRUE;
+
+  /* Flight stick buttons */
+  for (i = first_joystick_button; i <= last_joystick_button; i++)
+    {
+      if (test_bit (caps->keys, i))
+        has_joystick_buttons = TRUE;
+    }
+
+  /* Gamepad buttons (Xbox, PS3, etc.) */
+  for (i = first_gamepad_button; i <= last_gamepad_button; i++)
+    {
+      if (test_bit (caps->keys, i))
+        has_joystick_buttons = TRUE;
+    }
+
+  /* Gamepad digital dpad */
+  for (i = first_dpad_button; i <= last_dpad_button; i++)
+    {
+      if (test_bit (caps->keys, i))
+        has_joystick_buttons = TRUE;
+    }
+
+  /* Steering wheel gear-change buttons */
+  for (i = BTN_GEAR_DOWN; i <= BTN_GEAR_UP; i++)
+    {
+      if (test_bit (caps->keys, i))
+        has_joystick_buttons = TRUE;
+    }
+
+  /* Reserved space for extra game-controller buttons, e.g. on Corsair
+   * gaming keyboards */
+  for (i = first_extra_joystick_button; i <= last_extra_joystick_button; i++)
+    {
+      if (test_bit (caps->keys, i))
+        has_joystick_buttons = TRUE;
+    }
+
+  if (test_bit (caps->keys, last_mouse_button))
+    {
+      /* Mice with a very large number of buttons can apparently
+       * overflow into the joystick-button space, but they're still not
+       * joysticks. */
+      has_joystick_buttons = FALSE;
+    }
+
+  /* TODO: Do we want to consider BTN_0 up to BTN_9 to be joystick buttons?
+   * libmanette and SDL look for BTN_1, udev does not.
+   *
+   * They're used by some game controllers, like BTN_1 and BTN_2 for the
+   * Wiimote, BTN_1..BTN_9 for the SpaceTec SpaceBall and BTN_0..BTN_3
+   * for Playstation dance pads, but they're also used by
+   * non-game-controllers like Logitech mice. For now we entirely ignore
+   * these buttons: they are not evidence that it's a joystick, but
+   * neither are they evidence that it *isn't* a joystick. */
+
+  /* We consider it to be a joystick if there is some evidence that it is,
+   * and no evidence that it's something else.
+   *
+   * Unlike SDL, we accept devices with only axes and no buttons as a
+   * possible joystick, unless they have X/Y/Z axes in which case we
+   * assume they're accelerometers. */
+  if ((has_joystick_buttons || has_joystick_axes)
+      && (flags == SRT_INPUT_DEVICE_TYPE_FLAGS_NONE))
+    {
+      g_debug ("Looks like a joystick");
+      flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_JOYSTICK;
+    }
+
+  /* If we have *any* keys below BTN_MISC, consider it to be something
+   * a bit keyboard-like, but don't rule out *also* being considered
+   * to be a joystick (again for e.g. the Wiimote). */
+  for (i = 0; i < (BTN_MISC / BITS_PER_LONG); i++)
+    {
+      if (caps->keys[i] != 0)
+        flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_HAS_KEYS;
+    }
+
+  /* Also non-exclusive: don't rule out a device being a joystick and
+   * having a switch */
+  if (test_bit (caps->ev, EV_SW))
+    flags |= SRT_INPUT_DEVICE_TYPE_FLAGS_SWITCH;
+
+  return flags;
+}
+
+static const BYTE* what_am_I(struct udev_device *dev, int fd)
 {
     static const BYTE Unknown[2]     = {HID_USAGE_PAGE_GENERIC, 0};
     static const BYTE Mouse[2]       = {HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_MOUSE};
@@ -510,6 +807,7 @@ static const BYTE* what_am_I(struct udev_device *dev)
     static const BYTE Tablet[2]      = {HID_USAGE_PAGE_DIGITIZER, HID_USAGE_DIGITIZER_PEN};
     static const BYTE Touchscreen[2] = {HID_USAGE_PAGE_DIGITIZER, HID_USAGE_DIGITIZER_TOUCH_SCREEN};
     static const BYTE Touchpad[2]    = {HID_USAGE_PAGE_DIGITIZER, HID_USAGE_DIGITIZER_TOUCH_PAD};
+    SrtEvdevCapabilities caps;
 
     struct udev_device *parent = dev;
 
@@ -533,6 +831,34 @@ static const BYTE* what_am_I(struct udev_device *dev)
 
         parent = udev_device_get_parent_with_subsystem_devtype(parent, "input", NULL);
     }
+
+    /* In a container, udev properties might not be available. Fall back to deriving the device
+     * type from the fd's evdev capabilities. */
+    if (_srt_evdev_capabilities_set_from_evdev (&caps, fd))
+    {
+        SrtInputDeviceTypeFlags guessed_type;
+
+        guessed_type = _srt_evdev_capabilities_guess_type (&caps);
+
+        if (guessed_type & (SRT_INPUT_DEVICE_TYPE_FLAGS_MOUSE
+                            | SRT_INPUT_DEVICE_TYPE_FLAGS_POINTING_STICK))
+            return Mouse;
+        else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_KEYBOARD)
+            return Keyboard;
+        else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_JOYSTICK)
+            return Gamepad;
+        else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_HAS_KEYS)
+            return Keypad;
+        else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHPAD)
+            return Touchpad;
+        else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHSCREEN)
+            return Touchscreen;
+        else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_TABLET)
+            return Tablet;
+
+        /* Mapped to Unknown: ACCELEROMETER, TABLET_PAD, SWITCH. */
+    }
+
     return Unknown;
 }
 
@@ -587,8 +913,8 @@ static NTSTATUS build_report_descriptor(struct unix_device *iface, struct udev_d
     USHORT count = 0;
     USAGE usages[16];
     INT i, button_count, abs_count, rel_count, hat_count;
-    const BYTE *device_usage = what_am_I(dev);
     struct lnxev_device *impl = lnxev_impl_from_unix_device(iface);
+    const BYTE *device_usage = what_am_I(dev, impl->base.device_fd);
 
     if (ioctl(impl->base.device_fd, EVIOCGBIT(EV_REL, sizeof(relbits)), relbits) == -1)
     {
