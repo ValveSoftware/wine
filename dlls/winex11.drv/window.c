@@ -1335,6 +1335,9 @@ static void map_window( HWND hwnd, DWORD new_style )
 
         data->mapped = TRUE;
         data->iconic = (new_style & WS_MINIMIZE) != 0;
+        /* Mutter always unminimizes windows when handling map requests. Restore iconic state here */
+        if (data->iconic)
+            XIconifyWindow( data->display, data->whole_window, data->vis.screen );
     }
     release_win_data( data );
 }
