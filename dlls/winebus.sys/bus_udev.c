@@ -1276,6 +1276,7 @@ static void try_add_device(struct udev_device *dev)
     DWORD vid = 0, pid = 0, version = 0, bus_type = 0;
     struct udev_device *hiddev = NULL, *walk_device;
     DEVICE_OBJECT *device = NULL;
+    DEVICE_OBJECT *dup = NULL;
     const char *subsystem;
     const char *devnode;
     WCHAR *serial = NULL;
@@ -1322,13 +1323,20 @@ static void try_add_device(struct udev_device *dev)
         return;
     }
 
+    dup = bus_enumerate_hid_devices(vtbl, stop_if_syspath_equals, (void *) syspath);
+    if (dup)
+    {
+        TRACE("Duplicate %s device (%p) found, not adding the new one\n",
+              debugstr_a(syspath), dup);
+        close(fd);
+        return;
+    }
+
     hiddev = udev_device_get_parent_with_subsystem_devtype(dev, "hid", NULL);
     if (hiddev)
     {
         const char *bcdDevice = NULL;
 #ifdef HAS_PROPER_INPUT_HEADER
-        DEVICE_OBJECT *dup = NULL;
-
         if (other_vtbl)
             dup = bus_enumerate_hid_devices(other_vtbl, stop_if_syspath_equals, (void *) syspath);
         if (dup)
@@ -1652,12 +1660,10 @@ static void process_monitor_event(struct udev_monitor *monitor)
 
     if (!action)
         WARN("No action received\n");
-    else if (strcmp(action, "add") == 0)
-        try_add_device(dev);
     else if (strcmp(action, "remove") == 0)
         try_remove_device(dev);
     else
-        WARN("Unhandled action %s\n", debugstr_a(action));
+        try_add_device(dev);
 
     udev_device_unref(dev);
 }
