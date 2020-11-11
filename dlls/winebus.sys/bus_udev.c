@@ -1176,9 +1176,23 @@ static const platform_vtbl lnxev_vtbl = {
 };
 #endif
 
-static int check_same_device(DEVICE_OBJECT *device, void* context)
+/* Return 0 to stop enumeration if @device's canonical path in /sys is @context. */
+static int stop_if_syspath_equals(DEVICE_OBJECT *device, void *context)
 {
-    return !compare_platform_device(device, context);
+    struct platform_private *private = impl_from_DEVICE_OBJECT(device);
+    const char *want_syspath = context;
+    const char *syspath = udev_device_get_syspath(private->udev_device);
+
+    if (!syspath)
+        return 1;
+
+    if (strcmp(syspath, want_syspath) == 0)
+    {
+        TRACE("Found device %p with syspath %s\n", private, debugstr_a(want_syspath));
+        return 0;
+    }
+
+    return 1;
 }
 
 static DWORD a_to_bcd(const char *s)
@@ -1273,6 +1287,7 @@ static void try_add_device(struct udev_device *dev)
 #ifdef HAS_PROPER_INPUT_HEADER
     const platform_vtbl *other_vtbl = NULL;
 #endif
+    const char *syspath;
 
     if (!(devnode = udev_device_get_devnode(dev)))
         return;
@@ -1283,6 +1298,7 @@ static void try_add_device(struct udev_device *dev)
         return;
     }
 
+    syspath = udev_device_get_syspath(dev);
     subsystem = udev_device_get_subsystem(dev);
 
     if (strcmp(subsystem, "hidraw") == 0)
@@ -1314,10 +1330,11 @@ static void try_add_device(struct udev_device *dev)
         DEVICE_OBJECT *dup = NULL;
 
         if (other_vtbl)
-            dup = bus_enumerate_hid_devices(other_vtbl, check_same_device, dev);
+            dup = bus_enumerate_hid_devices(other_vtbl, stop_if_syspath_equals, (void *) syspath);
         if (dup)
         {
-            TRACE("Duplicate cross bus device (%p) found, not adding the new one\n", dup);
+            TRACE("Duplicate cross bus device %s (%p) found, not adding the new one\n",
+                  debugstr_a(syspath), dup);
             close(fd);
             return;
         }
