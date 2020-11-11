@@ -1346,6 +1346,9 @@ static void map_window( HWND hwnd, DWORD new_style )
             update_net_wm_states( data );
             sync_window_style( data );
             XMapWindow( data->display, data->whole_window );
+            /* Mutter always unminimizes windows when handling map requests. Restore iconic state */
+            if (new_style & WS_MINIMIZE)
+                XIconifyWindow( data->display, data->whole_window, data->vis.screen );
             XFlush( data->display );
             if (data->surface && data->vis.visualid != default_visual.visualid)
                 data->surface->funcs->flush( data->surface );
@@ -2947,9 +2950,17 @@ void CDECL X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags
             data->iconic = (new_style & WS_MINIMIZE) != 0;
             TRACE( "changing win %p iconic state to %u\n", data->hwnd, data->iconic );
             if (data->iconic)
+            {
                 XIconifyWindow( data->display, data->whole_window, data->vis.screen );
+            }
             else if (is_window_rect_mapped( rectWindow ))
+            {
+                /* whole_window could be both iconic and mapped. Since XMapWindow() doesn't do
+                 * anything if the window is already mapped, we need to unmap it first */
+                if (data->mapped)
+                    XUnmapWindow( data->display, data->whole_window );
                 XMapWindow( data->display, data->whole_window );
+            }
             update_net_wm_states( data );
         }
         else
