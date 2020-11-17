@@ -2611,7 +2611,8 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
                     window_rect->bottom - window_rect->top);
         if(data->client_window){
             XMoveResizeWindow(data->display, data->client_window,
-                    data->client_rect.left, data->client_rect.top,
+                    data->client_rect.left - data->whole_rect.left,
+                    data->client_rect.top - data->whole_rect.top,
                     data->client_rect.right - data->client_rect.left,
                     data->client_rect.bottom - data->client_rect.top);
         }

@@ -415,7 +415,8 @@ static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
             data->fs_hack = FALSE;
             if(data->client_window){
                 XMoveResizeWindow(data->display, data->client_window,
-                        data->client_rect.left, data->client_rect.top,
+                        data->client_rect.left - data->whole_rect.left,
+                        data->client_rect.top - data->whole_rect.top,
                         data->client_rect.right - data->client_rect.left,
                         data->client_rect.bottom - data->client_rect.top);
             }
