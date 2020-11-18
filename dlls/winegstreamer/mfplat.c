@@ -865,3 +865,72 @@ done:
 
     return out;
 }
+
+GstBuffer *gst_buffer_from_mf_sample(IMFSample *mf_sample)
+{
+    GstBuffer *out = gst_buffer_new();
+    IMFMediaBuffer *mf_buffer = NULL;
+    LONGLONG duration, time;
+    DWORD buffer_count;
+    unsigned int i;
+    HRESULT hr;
+
+    if (FAILED(hr = IMFSample_GetSampleDuration(mf_sample, &duration)))
+        goto fail;
+
+    if (FAILED(hr = IMFSample_GetSampleTime(mf_sample, &time)))
+        goto fail;
+
+    GST_BUFFER_DURATION(out) = duration;
+    GST_BUFFER_PTS(out) = time * 100;
+
+    if (FAILED(hr = IMFSample_GetBufferCount(mf_sample, &buffer_count)))
+        goto fail;
+
+    for (i = 0; i < buffer_count; i++)
+    {
+        DWORD buffer_size;
+        GstMapInfo map_info;
+        GstMemory *memory;
+        BYTE *buf_data;
+
+        if (FAILED(hr = IMFSample_GetBufferByIndex(mf_sample, i, &mf_buffer)))
+            goto fail;
+
+        if (FAILED(hr = IMFMediaBuffer_GetCurrentLength(mf_buffer, &buffer_size)))
+            goto fail;
+
+        memory = gst_allocator_alloc(NULL, buffer_size, NULL);
+        gst_memory_resize(memory, 0, buffer_size);
+
+        if (!gst_memory_map(memory, &map_info, GST_MAP_WRITE))
+        {
+            hr = E_FAIL;
+            goto fail;
+        }
+
+        if (FAILED(hr = IMFMediaBuffer_Lock(mf_buffer, &buf_data, NULL, NULL)))
+            goto fail;
+
+        memcpy(map_info.data, buf_data, buffer_size);
+
+        if (FAILED(hr = IMFMediaBuffer_Unlock(mf_buffer)))
+            goto fail;
+
+        gst_memory_unmap(memory, &map_info);
+
+        gst_buffer_append_memory(out, memory);
+
+        IMFMediaBuffer_Release(mf_buffer);
+        mf_buffer = NULL;
+    }
+
+    return out;
+
+fail:
+    ERR("Failed to copy IMFSample to GstBuffer, hr = %#x\n", hr);
+    if (mf_buffer)
+        IMFMediaBuffer_Release(mf_buffer);
+    gst_buffer_unref(out);
+    return NULL;
+}
