@@ -1713,6 +1713,12 @@ HANDLE WINAPI RtlDestroyHeap( HANDLE heap )
     void *addr;
 
     TRACE("%p\n", heap );
+    if (!heapPtr && heap && (((HEAP *)heap)->flags & HEAP_VALIDATE_PARAMS) &&
+        NtCurrentTeb()->Peb->BeingDebugged)
+    {
+        DbgPrint( "Attempt to destroy an invalid heap\n" );
+        DbgBreakPoint();
+    }
     if (!heapPtr) return heap;
 
     if (heap == processHeap) return heap; /* cannot delete the main process heap */
