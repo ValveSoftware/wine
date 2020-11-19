@@ -12,8 +12,10 @@
 #ifndef __WINE_VULKAN_DRIVER_H
 #define __WINE_VULKAN_DRIVER_H
 
+#include "wine/list.h"
+
 /* Wine internal vulkan driver version, needs to be bumped upon vulkan_funcs changes. */
-#define WINE_VULKAN_DRIVER_VERSION 8
+#define WINE_VULKAN_DRIVER_VERSION 9
 
 struct vulkan_funcs
 {
@@ -118,5 +120,22 @@ static inline void *get_vulkan_driver_instance_proc_addr(
 
     return get_vulkan_driver_device_proc_addr(vulkan_funcs, name);
 }
+
+/* Some extensions have callbacks for those we need to be able to
+ * get the wine wrapper for a native handle
+ */
+struct wine_vk_mapping
+{
+    struct list link;
+    uint64_t native_handle;
+    uint64_t wine_wrapped_handle;
+};
+
+/* Drivers wrap VkSurfaceKHR, this has to be the first member. */
+struct wine_vk_driver_surface_base
+{
+    VkSurfaceKHR surface; /* native surface */
+    struct wine_vk_mapping mapping;
+};
 
 #endif /* __WINE_VULKAN_DRIVER_H */

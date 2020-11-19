@@ -60,16 +60,6 @@ struct wine_vk_base
     UINT_PTR loader_magic;
 };
 
-/* Some extensions have callbacks for those we need to be able to
- * get the wine wrapper for a native handle
- */
-struct wine_vk_mapping
-{
-    struct list link;
-    uint64_t native_handle;
-    uint64_t wine_wrapped_handle;
-};
-
 struct VkCommandBuffer_T
 {
     struct wine_vk_base base;
@@ -252,6 +242,11 @@ static inline VkDebugReportCallbackEXT wine_debug_report_callback_to_handle(
         struct wine_debug_report_callback *debug_messenger)
 {
     return (VkDebugReportCallbackEXT)(uintptr_t)debug_messenger;
+}
+
+static inline struct wine_vk_driver_surface_base *wine_surface_from_handle(VkSurfaceKHR handle)
+{
+    return (struct wine_vk_driver_surface_base *)(uintptr_t)handle;
 }
 
 void *wine_vk_get_device_proc_addr(const char *name) DECLSPEC_HIDDEN;

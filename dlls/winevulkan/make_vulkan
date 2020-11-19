@@ -132,7 +132,7 @@ CORE_EXTENSIONS = [
 # Functions part of our winevulkan graphics driver interface.
 # DRIVER_VERSION should be bumped on any change to driver interface
 # in FUNCTION_OVERRIDES
-DRIVER_VERSION = 8
+DRIVER_VERSION = 9
 
 # Table of functions for which we have a special implementation.
 # These are regular device / instance functions for which we need
@@ -176,7 +176,7 @@ FUNCTION_OVERRIDES = {
     "vkQueueSubmit" : {"dispatch": True, "driver" : False, "thunk" : False},
 
     # VK_KHR_surface
-    "vkDestroySurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
+    "vkDestroySurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : False},
     "vkGetPhysicalDeviceSurfaceSupportKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
     "vkGetPhysicalDeviceSurfaceCapabilitiesKHR" : {"dispatch" : True, "driver" : True, "thunk" : False, "private_thunk" : True},
     "vkGetPhysicalDeviceSurfaceFormatsKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
@@ -187,7 +187,7 @@ FUNCTION_OVERRIDES = {
     "vkGetPhysicalDeviceSurfaceFormats2KHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
 
     # VK_KHR_win32_surface
-    "vkCreateWin32SurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
+    "vkCreateWin32SurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : False},
     "vkGetPhysicalDeviceWin32PresentationSupportKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
 
     # VK_KHR_swapchain
@@ -2366,7 +2366,7 @@ class VkGenerator(object):
 
         f.write("BOOL wine_vk_is_type_wrapped(VkObjectType type)\n")
         f.write("{\n")
-        f.write("    return FALSE")
+        f.write("    return type == VK_OBJECT_TYPE_SURFACE_KHR")
         for handle in self.registry.handles:
             if not handle.is_required() or not handle.is_wrapped() or handle.is_alias():
                 continue
@@ -2389,6 +2389,8 @@ class VkGenerator(object):
                 f.write("        return (uint64_t) ")
                 f.write(handle.native_handle("handle"))
             f.write(";\n");
+        f.write("    case VK_OBJECT_TYPE_SURFACE_KHR:\n")
+        f.write("       return (uint64_t) wine_surface_from_handle(handle)->surface;\n")
         f.write("    default:\n")
         f.write("       return handle;\n")
         f.write("    }\n")
@@ -2609,6 +2611,8 @@ class VkGenerator(object):
         f.write("#ifndef __WINE_VULKAN_DRIVER_H\n")
         f.write("#define __WINE_VULKAN_DRIVER_H\n\n")
 
+        f.write("#include \"wine/list.h\"\n\n")
+
         f.write("/* Wine internal vulkan driver version, needs to be bumped upon vulkan_funcs changes. */\n")
         f.write("#define WINE_VULKAN_DRIVER_VERSION {0}\n\n".format(DRIVER_VERSION))
 
@@ -2667,6 +2671,23 @@ class VkGenerator(object):
         f.write("\n")
         f.write("    name -= 2;\n\n")
         f.write("    return get_vulkan_driver_device_proc_addr(vulkan_funcs, name);\n}\n\n")
+
+        f.write("/* Some extensions have callbacks for those we need to be able to\n")
+        f.write(" * get the wine wrapper for a native handle\n")
+        f.write(" */\n")
+        f.write("struct wine_vk_mapping\n")
+        f.write("{\n")
+        f.write("    struct list link;\n")
+        f.write("    uint64_t native_handle;\n")
+        f.write("    uint64_t wine_wrapped_handle;\n")
+        f.write("};\n\n")
+
+        f.write("/* Drivers wrap VkSurfaceKHR, this has to be the first member. */\n")
+        f.write("struct wine_vk_driver_surface_base\n")
+        f.write("{\n")
+        f.write("    VkSurfaceKHR surface; /* native surface */\n")
+        f.write("    struct wine_vk_mapping mapping;\n")
+        f.write("};\n\n")
 
         f.write("#endif /* __WINE_VULKAN_DRIVER_H */\n")
 

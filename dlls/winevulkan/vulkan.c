@@ -1809,6 +1809,51 @@ void WINAPI wine_vkGetPrivateDataEXT(VkDevice device, VkObjectType object_type, 
     device->funcs.p_vkGetPrivateDataEXT(device->device, object_type, object_handle, private_data_slot, data);
 }
 
+VkResult WINAPI wine_vkCreateWin32SurfaceKHR(VkInstance instance,
+        const VkWin32SurfaceCreateInfoKHR *createInfo, const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface)
+{
+    struct wine_vk_driver_surface_base *object;
+    VkResult res;
+
+    TRACE("%p, %p, %p, %p\n", instance, createInfo, allocator, surface);
+    res = instance->funcs.p_vkCreateWin32SurfaceKHR(instance->instance, createInfo, NULL, surface);
+
+    if (res != VK_SUCCESS)
+        return res;
+
+    object = wine_surface_from_handle(*surface);
+    WINE_VK_ADD_NON_DISPATCHABLE_MAPPING(instance, object, object->surface);
+    return VK_SUCCESS;
+}
+
+void WINAPI wine_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface, const VkAllocationCallbacks *allocator)
+{
+    struct wine_vk_mapping tmp_mapping;
+
+    TRACE("%p, 0x%s, %p\n", instance, wine_dbgstr_longlong(surface), allocator);
+
+    /* The wine driver frees the surface wrapper before we can remove it
+     * like other handles, so replace it temporarily.
+     */
+    if (instance->enable_wrapper_list)
+    {
+        AcquireSRWLockExclusive(&instance->wrapper_lock);
+        list_remove(&wine_surface_from_handle(surface)->mapping.link);
+        tmp_mapping = wine_surface_from_handle(surface)->mapping;
+        list_add_tail(&instance->wrappers, &tmp_mapping.link);
+        ReleaseSRWLockExclusive(&instance->wrapper_lock);
+    }
+
+    instance->funcs.p_vkDestroySurfaceKHR(instance->instance, surface, NULL);
+
+    if (instance->enable_wrapper_list)
+    {
+        AcquireSRWLockExclusive(&instance->wrapper_lock);
+        list_remove(&tmp_mapping.link);
+        ReleaseSRWLockExclusive(&instance->wrapper_lock);
+    }
+}
+
 static inline void adjust_max_image_count(VkPhysicalDevice phys_dev, VkSurfaceCapabilitiesKHR* capabilities)
 {
     /* Many Windows games, for example Strange Brigade, No Man's Sky, Path of Exile
