@@ -830,6 +830,12 @@ typedef struct
     lparam_t info;
 } cursor_pos_t;
 
+struct cpu_topology_override
+{
+    unsigned int cpu_count;
+    unsigned char host_cpu_id[64];
+};
+
 
 
 
@@ -936,6 +942,7 @@ struct init_process_done_reply
 {
     struct reply_header __header;
     client_ptr_t entry;
+    /* VARARG(cpu_override,cpu_topology_override); */
     int          suspend;
     char __pad_20[4];
 };
@@ -6453,7 +6460,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 687
+#define SERVER_PROTOCOL_VERSION 688
 
 /* ### protocol_version end ### */
 
