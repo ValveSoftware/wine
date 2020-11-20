@@ -147,6 +147,7 @@ struct msg_queue
     int                    esync_in_msgwait; /* our thread is currently waiting on us */
     unsigned int           fsync_idx;
     int                    fsync_in_msgwait; /* our thread is currently waiting on us */
+    volatile struct queue_shared_memory *shared;  /* thread queue shared memory ptr */
 };
 
 struct hotkey
@@ -243,6 +244,46 @@ static unsigned int last_input_time;
 static cursor_pos_t cursor_history[64];
 static unsigned int cursor_history_latest;
 
+#if defined(__i386__) || defined(__x86_64__)
+
+#define SHARED_WRITE_BEGIN( x )                                  \
+    do {                                                         \
+        volatile unsigned int __seq = *(x);                      \
+        assert( (__seq & SEQUENCE_MASK) != SEQUENCE_MASK );      \
+        *(x) = ++__seq;                                          \
+    } while(0)
+
+#define SHARED_WRITE_END( x )                                    \
+    do {                                                         \
+        volatile unsigned int __seq = *(x);                      \
+        assert( (__seq & SEQUENCE_MASK) != 0 );                  \
+        if ((__seq & SEQUENCE_MASK) > 1) __seq--;                \
+        else __seq += SEQUENCE_MASK;                             \
+        *(x) = __seq;                                            \
+    } while(0)
+
+#else
+
+#define SHARED_WRITE_BEGIN( x )                                         \
+    do {                                                                \
+        assert( (*(x) & SEQUENCE_MASK) != SEQUENCE_MASK );              \
+        if ((__atomic_add_fetch( x, 1, __ATOMIC_RELAXED ) & SEQUENCE_MASK) == 1) \
+            __atomic_thread_fence( __ATOMIC_RELEASE );                  \
+    } while(0)
+
+#define SHARED_WRITE_END( x )                                           \
+    do {                                                                \
+        assert( (*(x) & SEQUENCE_MASK) != 0 );                          \
+        if ((*(x) & SEQUENCE_MASK) > 1)                                 \
+            __atomic_sub_fetch( x, 1, __ATOMIC_RELAXED );               \
+        else {                                                          \
+            __atomic_thread_fence( __ATOMIC_RELEASE );                  \
+            __atomic_add_fetch( x, SEQUENCE_MASK, __ATOMIC_RELAXED );   \
+        }                                                               \
+    } while(0)
+
+#endif
+
 static void queue_hardware_message( struct desktop *desktop, struct message *msg, int always_queue );
 static void free_message( struct message *msg );
 
@@ -326,6 +367,7 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
         queue->esync_in_msgwait = 0;
         queue->fsync_idx       = 0;
         queue->fsync_in_msgwait = 0;
+        queue->shared          = thread->queue_shared;
         list_init( &queue->send_result );
         list_init( &queue->callback_result );
         list_init( &queue->pending_timers );
@@ -338,6 +380,9 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
         if (do_esync())
             queue->esync_fd = esync_create_fd( 0, 0 );
 
+        SHARED_WRITE_BEGIN( &queue->shared->seq );
+        queue->shared->created = TRUE;
+        SHARED_WRITE_END( &queue->shared->seq );
         thread->queue = queue;
     }
     if (new_input) release_object( new_input );
@@ -425,46 +470,6 @@ static struct message *alloc_hardware_message( lparam_t info, struct hw_msg_sour
     msg_data->source = source;
     return msg;
 }
-
-#if defined(__i386__) || defined(__x86_64__)
-
-#define SHARED_WRITE_BEGIN( x )                                  \
-    do {                                                         \
-        volatile unsigned int __seq = *(x);                      \
-        assert( (__seq & SEQUENCE_MASK) != SEQUENCE_MASK );      \
-        *(x) = ++__seq;                                          \
-    } while(0)
-
-#define SHARED_WRITE_END( x )                                    \
-    do {                                                         \
-        volatile unsigned int __seq = *(x);                      \
-        assert( (__seq & SEQUENCE_MASK) != 0 );                  \
-        if ((__seq & SEQUENCE_MASK) > 1) __seq--;                \
-        else __seq += SEQUENCE_MASK;                             \
-        *(x) = __seq;                                            \
-    } while(0)
-
-#else
-
-#define SHARED_WRITE_BEGIN( x )                                         \
-    do {                                                                \
-        assert( (*(x) & SEQUENCE_MASK) != SEQUENCE_MASK );              \
-        if ((__atomic_add_fetch( x, 1, __ATOMIC_RELAXED ) & SEQUENCE_MASK) == 1) \
-            __atomic_thread_fence( __ATOMIC_RELEASE );                  \
-    } while(0)
-
-#define SHARED_WRITE_END( x )                                           \
-    do {                                                                \
-        assert( (*(x) & SEQUENCE_MASK) != 0 );                          \
-        if ((*(x) & SEQUENCE_MASK) > 1)                                 \
-            __atomic_sub_fetch( x, 1, __ATOMIC_RELAXED );               \
-        else {                                                          \
-            __atomic_thread_fence( __ATOMIC_RELEASE );                  \
-            __atomic_add_fetch( x, SEQUENCE_MASK, __ATOMIC_RELAXED );   \
-        }                                                               \
-    } while(0)
-
-#endif
 
 static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
 {
