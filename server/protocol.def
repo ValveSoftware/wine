@@ -831,6 +831,15 @@ struct desktop_shared_memory
     unsigned char        keystate[256];    /* asynchronous key state */
 };
 
+struct thread_shared_memory
+{
+    unsigned int         seq;              /* sequence number - server updating if (seq_no & SEQUENCE_MASK) != 0 */
+    unsigned int         wake_bits;
+    unsigned int         changed_bits;
+    unsigned int         wake_mask;
+    unsigned int         changed_mask;
+};
+
 /* Bits that must be clear for client to read */
 #define SEQUENCE_MASK_BITS  4
 #define SEQUENCE_MASK ((1UL << SEQUENCE_MASK_BITS) - 1)
