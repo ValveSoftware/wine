@@ -1293,6 +1293,24 @@ static void dump_varargs_handle_infos( const char *prefix, data_size_t size )
     fputc( '}', stderr );
 }
 
+static void dump_varargs_cpu_topology_override( const char *prefix, data_size_t size )
+{
+    const struct cpu_topology_override *cpu_topology = cur_data;
+    unsigned int i;
+
+    if (size < sizeof(*cpu_topology))
+        return;
+
+    fprintf( stderr,"%s{", prefix );
+    for (i = 0; i < cpu_topology->cpu_count; ++i)
+    {
+        if (i) fputc( ',', stderr );
+        fprintf( stderr, "%u", cpu_topology->host_cpu_id[i] );
+    }
+    fputc( '}', stderr );
+    remove_data( size );
+}
+
 typedef void (*dump_func)( const void *req );
 
 /* Everything below this line is generated automatically by tools/make_requests */
@@ -1369,6 +1387,7 @@ static void dump_init_process_done_request( const struct init_process_done_reque
     dump_uint64( ", module=", &req->module );
     dump_uint64( ", ldt_copy=", &req->ldt_copy );
     dump_uint64( ", entry=", &req->entry );
+    dump_varargs_cpu_topology_override( ", cpu_override=", cur_size );
 }
 
 static void dump_init_process_done_reply( const struct init_process_done_reply *req )

@@ -29,6 +29,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <assert.h>
 #ifdef HAVE_SYS_TIME_H
 # include <sys/time.h>
 #endif
@@ -165,6 +166,12 @@ struct smbios_boot_info
 #define RSMB 0x52534D42
 
 static SYSTEM_CPU_INFORMATION cpu_info;
+static struct
+{
+    struct cpu_topology_override mapping;
+    BOOL smt;
+}
+cpu_override;
 
 /*******************************************************************************
  * Architecture specific feature detection for CPUs
@@ -475,6 +482,88 @@ static void get_cpuinfo( SYSTEM_CPU_INFORMATION *info )
 
 #endif /* End architecture specific feature detection for CPUs */
 
+static void fill_cpu_override(unsigned int host_cpu_count)
+{
+    const char *env_override = getenv("WINE_CPU_TOPOLOGY");
+    unsigned int i;
+    char *s;
+
+    if (!env_override)
+        return;
+
+    cpu_override.mapping.cpu_count = strtol(env_override, &s, 10);
+    if (s == env_override)
+        goto error;
+
+    if (!cpu_override.mapping.cpu_count || cpu_override.mapping.cpu_count > MAXIMUM_PROCESSORS)
+    {
+        ERR("Invalid logical CPU count %u, limit %u.\n", cpu_override.mapping.cpu_count, MAXIMUM_PROCESSORS);
+        goto error;
+    }
+
+    if (tolower(*s) == 's')
+    {
+        cpu_override.mapping.cpu_count *= 2;
+        if (cpu_override.mapping.cpu_count > MAXIMUM_PROCESSORS)
+        {
+            ERR("Logical CPU count exceeds limit %u.\n", MAXIMUM_PROCESSORS);
+            goto error;
+        }
+        cpu_override.smt = TRUE;
+        ++s;
+    }
+    if (*s != ':')
+        goto error;
+    ++s;
+    for (i = 0; i < cpu_override.mapping.cpu_count; ++i)
+    {
+        char *next;
+
+        if (i)
+        {
+            if (*s != ',')
+            {
+                if (!*s)
+                    ERR("Incomplete host CPU mapping string, %u CPUs mapping required.\n",
+                            cpu_override.mapping.cpu_count);
+                goto error;
+            }
+            ++s;
+        }
+
+        cpu_override.mapping.host_cpu_id[i] = strtol(s, &next, 10);
+        if (next == s)
+            goto error;
+        if (cpu_override.mapping.host_cpu_id[i] >= host_cpu_count)
+        {
+            ERR("Invalid host CPU index %u (host_cpu_count %u).\n",
+                    cpu_override.mapping.host_cpu_id[i], host_cpu_count);
+            goto error;
+        }
+        s = next;
+    }
+    if (*s)
+        goto error;
+
+    ERR("Overriding CPU configuration, %u logical CPUs, host CPUs ", cpu_override.mapping.cpu_count);
+    for (i = 0; i < cpu_override.mapping.cpu_count; ++i)
+    {
+        if (i)
+            ERR(",");
+        ERR("%u", cpu_override.mapping.host_cpu_id[i]);
+    }
+    ERR("\n");
+    return;
+error:
+    cpu_override.mapping.cpu_count = 0;
+    ERR("Invalid WINE_CPU_TOPOLOGY string %s (%s).\n", debugstr_a(env_override), debugstr_a(s));
+}
+
+struct cpu_topology_override *get_cpu_topology_override(void)
+{
+    return cpu_override.mapping.cpu_count ? &cpu_override.mapping : NULL;
+}
+
 /******************************************************************
  *		init_cpu_info
  *
@@ -508,7 +597,11 @@ void init_cpu_info(void)
     num = 1;
     FIXME("Detecting the number of processors is not supported.\n");
 #endif
-    NtCurrentTeb()->Peb->NumberOfProcessors = num;
+
+    fill_cpu_override(num);
+
+    NtCurrentTeb()->Peb->NumberOfProcessors = cpu_override.mapping.cpu_count
+            ? cpu_override.mapping.cpu_count : num;
     get_cpuinfo( &cpu_info );
     TRACE( "<- CPU arch %d, level %d, rev %d, features 0x%x\n",
            cpu_info.Architecture, cpu_info.Level, cpu_info.Revision, cpu_info.FeatureSet );
@@ -860,6 +953,12 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
         if (op == '-') fscanf(fcpu_list, "%u%c ", &end, &op);
         else end = beg;
 
+        if (cpu_override.mapping.cpu_count)
+        {
+            beg = 0;
+            end = cpu_override.mapping.cpu_count - 1;
+        }
+
         for(i = beg; i <= end; i++)
         {
             DWORD phys_core = 0;
@@ -873,7 +972,9 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
 
             if (relation == RelationAll || relation == RelationProcessorPackage)
             {
-                sprintf(name, core_info, i, "physical_package_id");
+                sprintf(name, core_info, cpu_override.mapping.cpu_count ? cpu_override.mapping.host_cpu_id[i] : i,
+                        "physical_package_id");
+
                 f = fopen(name, "r");
                 if (f)
                 {
@@ -881,6 +982,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
                     fclose(f);
                 }
                 else r = 0;
+
                 if (!logical_proc_info_add_by_id(data, dataex, &len, max_len, RelationProcessorPackage, r, (ULONG_PTR)1 << i))
                 {
                     fclose(fcpu_list);
@@ -903,21 +1005,36 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
             {
                 /* Mask of logical threads sharing same physical core in kernel core numbering. */
                 sprintf(name, core_info, i, "thread_siblings");
-                if(fake_logical_cpus_as_cores || !sysfs_parse_bitmap(name, &thread_mask)) thread_mask = (ULONG_PTR)1<<i;
+
+                if (cpu_override.mapping.cpu_count)
+                {
+                    thread_mask = cpu_override.smt ? (ULONG_PTR)0x3 << (i & ~1) : (ULONG_PTR)1 << i;
+                }
+                else
+                {
+                    if(fake_logical_cpus_as_cores || !sysfs_parse_bitmap(name, &thread_mask)) thread_mask = (ULONG_PTR)1<<i;
+                }
 
                 /* Needed later for NumaNode and Group. */
                 all_cpus_mask |= thread_mask;
 
                 if (relation == RelationAll || relation == RelationProcessorCore)
                 {
-                    sprintf(name, core_info, i, "thread_siblings_list");
-                    f = fake_logical_cpus_as_cores ? NULL : fopen(name, "r");
-                    if (f)
+                    if (cpu_override.mapping.cpu_count)
                     {
-                        fscanf(f, "%d%c", &phys_core, &op);
-                        fclose(f);
+                        phys_core = cpu_override.smt ? i / 2 : i;
                     }
-                    else phys_core = i;
+                    else
+                    {
+                        sprintf(name, core_info, i, "thread_siblings_list");
+                        f = fake_logical_cpus_as_cores ? NULL : fopen(name, "r");
+                        if (f)
+                        {
+                            fscanf(f, "%d%c", &phys_core, &op);
+                            fclose(f);
+                        }
+                        else phys_core = i;
+                    }
 
                     if (!logical_proc_info_add_by_id(data, dataex, &len, max_len, RelationProcessorCore, phys_core, thread_mask))
                     {
@@ -929,36 +1046,40 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
 
             if (relation == RelationAll || relation == RelationCache)
             {
+                unsigned int cpu_id;
+
+                cpu_id = cpu_override.mapping.cpu_count ? cpu_override.mapping.host_cpu_id[i] : i;
+
                 for(j = 0; j < 4; j++)
                 {
                     CACHE_DESCRIPTOR cache;
                     ULONG_PTR mask = 0;
 
-                    sprintf(name, cache_info, i, j, "shared_cpu_map");
+                    sprintf(name, cache_info, cpu_id, j, "shared_cpu_map");
                     if(!sysfs_parse_bitmap(name, &mask)) continue;
 
-                    sprintf(name, cache_info, i, j, "level");
+                    sprintf(name, cache_info, cpu_id, j, "level");
                     f = fopen(name, "r");
                     if(!f) continue;
                     fscanf(f, "%u", &r);
                     fclose(f);
                     cache.Level = r;
 
-                    sprintf(name, cache_info, i, j, "ways_of_associativity");
+                    sprintf(name, cache_info, cpu_id, j, "ways_of_associativity");
                     f = fopen(name, "r");
                     if(!f) continue;
                     fscanf(f, "%u", &r);
                     fclose(f);
                     cache.Associativity = r;
 
-                    sprintf(name, cache_info, i, j, "coherency_line_size");
+                    sprintf(name, cache_info, cpu_id, j, "coherency_line_size");
                     f = fopen(name, "r");
                     if(!f) continue;
                     fscanf(f, "%u", &r);
                     fclose(f);
                     cache.LineSize = r;
 
-                    sprintf(name, cache_info, i, j, "size");
+                    sprintf(name, cache_info, cpu_id, j, "size");
                     f = fopen(name, "r");
                     if(!f) continue;
                     fscanf(f, "%u%c", &r, &op);
@@ -967,7 +1088,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
                         WARN("unknown cache size %u%c\n", r, op);
                     cache.Size = (op=='K' ? r*1024 : r);
 
-                    sprintf(name, cache_info, i, j, "type");
+                    sprintf(name, cache_info, cpu_id, j, "type");
                     f = fopen(name, "r");
                     if(!f) continue;
                     fscanf(f, "%s", name);
@@ -979,6 +1100,19 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
                     else
                         cache.Type = CacheUnified;
 
+                    if (cpu_override.mapping.cpu_count)
+                    {
+                        ULONG_PTR host_mask = mask;
+                        unsigned int id;
+
+                        mask = 0;
+                        for (id = 0; id < cpu_override.mapping.cpu_count; ++id)
+                            if (host_mask & ((ULONG_PTR)1 << cpu_override.mapping.host_cpu_id[id]))
+                                mask |= (ULONG_PTR)1 << id;
+
+                        assert(mask);
+                    }
+
                     if (!logical_proc_info_add_cache(data, dataex, &len, max_len, mask, &cache))
                     {
                         fclose(fcpu_list);
@@ -987,6 +1121,9 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
                 }
             }
         }
+
+        if (cpu_override.mapping.cpu_count)
+            break;
     }
     fclose(fcpu_list);
 

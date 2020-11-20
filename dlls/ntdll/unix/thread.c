@@ -1323,7 +1323,20 @@ ULONG WINAPI NtGetCurrentProcessorNumber(void)
 
 #if defined(__linux__) && defined(__NR_getcpu)
     int res = syscall(__NR_getcpu, &processor, NULL, NULL);
-    if (res != -1) return processor;
+    if (res != -1)
+    {
+        struct cpu_topology_override *override = get_cpu_topology_override();
+        unsigned int i;
+
+        if (!override)
+            return processor;
+
+        for (i = 0; i < override->cpu_count; ++i)
+            if (override->host_cpu_id[i] == processor)
+                return i;
+
+        WARN("Thread is running on processor which is not in the defined override.\n");
+    }
 #endif
 
     if (NtCurrentTeb()->Peb->NumberOfProcessors > 1)
