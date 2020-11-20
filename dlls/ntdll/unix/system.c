@@ -546,8 +546,8 @@ static DWORD count_bits(ULONG_PTR mask)
     DWORD count = 0;
     while (mask > 0)
     {
+        if (mask & 1) ++count;
         mask >>= 1;
-        count++;
     }
     return count;
 }
