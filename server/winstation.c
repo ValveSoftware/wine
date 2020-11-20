@@ -221,8 +221,8 @@ static volatile void *init_desktop_mapping( struct desktop *desktop, const struc
 
     if (!dir) return NULL;
 
-    desktop->shared_mapping = create_desktop_mapping( dir, name, sizeof(struct desktop_shared_memory),
-                                                      NULL, (void **)&desktop->shared );
+    desktop->shared_mapping = create_shared_mapping( dir, name, sizeof(struct desktop_shared_memory),
+                                                     NULL, (void **)&desktop->shared );
     release_object( dir );
     if (desktop->shared) memset( (void *)desktop->shared, 0, sizeof(*desktop->shared) );
     return desktop->shared;

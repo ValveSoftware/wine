@@ -203,7 +203,9 @@ struct user_thread_info
     HWND                          msg_window;             /* HWND_MESSAGE parent window */
     struct rawinput_thread_data  *rawinput;               /* RawInput thread local data / buffer */
     HANDLE                        desktop_shared_map;     /* HANDLE to server's desktop shared memory */
-    struct desktop_shared_memory *shared_memory;          /* Ptr to server's desktop shared memory */
+    struct desktop_shared_memory *desktop_shared_memory;  /* Ptr to server's desktop shared memory */
+    HANDLE                        thread_shared_map;      /* HANDLE to server's thread shared memory */
+    struct thread_shared_memory  *thread_shared_memory;   /* Ptr to server's thread shared memory */
 };
 
 C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
@@ -289,6 +291,7 @@ extern BOOL WINPROC_call_window( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPar
 extern const WCHAR *CLASS_GetVersionedName(const WCHAR *classname, UINT *basename_offset,
         WCHAR *combined, BOOL register_class) DECLSPEC_HIDDEN;
 extern volatile struct desktop_shared_memory *get_desktop_shared_memory( void ) DECLSPEC_HIDDEN;
+extern volatile struct thread_shared_memory *get_thread_shared_memory( void ) DECLSPEC_HIDDEN;
 
 /* message spy definitions */
 

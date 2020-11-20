@@ -815,6 +815,15 @@ struct desktop_shared_memory
     unsigned char        keystate[256];
 };
 
+struct thread_shared_memory
+{
+    unsigned int         seq;
+    unsigned int         wake_bits;
+    unsigned int         changed_bits;
+    unsigned int         wake_mask;
+    unsigned int         changed_mask;
+};
+
 
 #define SEQUENCE_MASK_BITS  4
 #define SEQUENCE_MASK ((1UL << SEQUENCE_MASK_BITS) - 1)
@@ -6756,7 +6765,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 643
+#define SERVER_PROTOCOL_VERSION 644
 
 /* ### protocol_version end ### */
 

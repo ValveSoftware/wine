@@ -146,6 +146,7 @@ struct msg_queue
     int                    esync_in_msgwait; /* our thread is currently waiting on us */
     unsigned int           fsync_idx;
     int                    fsync_in_msgwait; /* our thread is currently waiting on us */
+    volatile struct thread_shared_memory *shared;  /* thread shared memory ptr */
 };
 
 struct hotkey
@@ -319,6 +320,7 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
         queue->esync_in_msgwait = 0;
         queue->fsync_idx       = 0;
         queue->fsync_in_msgwait = 0;
+        queue->shared          = thread->shared;
         list_init( &queue->send_result );
         list_init( &queue->callback_result );
         list_init( &queue->pending_timers );
@@ -546,6 +548,12 @@ static inline void set_queue_bits( struct msg_queue *queue, unsigned int bits )
 {
     queue->wake_bits |= bits;
     queue->changed_bits |= bits;
+
+    SHARED_WRITE_BEGIN( &queue->shared->seq );
+    queue->shared->wake_bits = queue->wake_bits;
+    queue->shared->changed_bits = queue->changed_bits;
+    SHARED_WRITE_END( &queue->shared->seq );
+
     if (is_signaled( queue )) wake_up( &queue->obj, 0 );
 }
 
@@ -554,6 +562,11 @@ static inline void clear_queue_bits( struct msg_queue *queue, unsigned int bits 
 {
     queue->wake_bits &= ~bits;
     queue->changed_bits &= ~bits;
+
+    SHARED_WRITE_BEGIN( &queue->shared->seq );
+    queue->shared->wake_bits = queue->wake_bits;
+    queue->shared->changed_bits = queue->changed_bits;
+    SHARED_WRITE_END( &queue->shared->seq );
 
     if (do_fsync() && !is_signaled( queue ))
         fsync_clear( &queue->obj );
@@ -1090,6 +1103,11 @@ static void msg_queue_satisfied( struct object *obj, struct wait_queue_entry *en
     struct msg_queue *queue = (struct msg_queue *)obj;
     queue->wake_mask = 0;
     queue->changed_mask = 0;
+
+    SHARED_WRITE_BEGIN( &queue->shared->seq );
+    queue->shared->wake_mask = queue->wake_mask;
+    queue->shared->changed_mask = queue->changed_mask;
+    SHARED_WRITE_END( &queue->shared->seq );
 }
 
 static void msg_queue_destroy( struct object *obj )
@@ -2510,10 +2528,23 @@ DECL_HANDLER(set_queue_mask)
         queue->changed_mask = req->changed_mask;
         reply->wake_bits    = queue->wake_bits;
         reply->changed_bits = queue->changed_bits;
+
+        SHARED_WRITE_BEGIN( &queue->shared->seq );
+        queue->shared->wake_mask = queue->wake_mask;
+        queue->shared->changed_mask = queue->changed_mask;
+        SHARED_WRITE_END( &queue->shared->seq );
+
         if (is_signaled( queue ))
         {
             /* if skip wait is set, do what would have been done in the subsequent wait */
-            if (req->skip_wait) queue->wake_mask = queue->changed_mask = 0;
+            if (req->skip_wait)
+            {
+                queue->wake_mask = queue->changed_mask = 0;
+                SHARED_WRITE_BEGIN( &queue->shared->seq );
+                queue->shared->wake_mask = queue->wake_mask;
+                queue->shared->changed_mask = queue->changed_mask;
+                SHARED_WRITE_END( &queue->shared->seq );
+            }
             else wake_up( &queue->obj, 0 );
         }
     }
@@ -2529,6 +2560,10 @@ DECL_HANDLER(get_queue_status)
         reply->wake_bits    = queue->wake_bits;
         reply->changed_bits = queue->changed_bits;
         queue->changed_bits &= ~req->clear_bits;
+
+        SHARED_WRITE_BEGIN( &queue->shared->seq );
+        queue->shared->changed_bits = queue->changed_bits;
+        SHARED_WRITE_END( &queue->shared->seq );
 
         if (do_fsync() && !is_signaled( queue ))
             fsync_clear( &queue->obj );
@@ -2725,6 +2760,10 @@ DECL_HANDLER(get_message)
     if (filter & QS_INPUT) queue->changed_bits &= ~QS_INPUT;
     if (filter & QS_PAINT) queue->changed_bits &= ~QS_PAINT;
 
+    SHARED_WRITE_BEGIN( &queue->shared->seq );
+    queue->shared->changed_bits = queue->changed_bits;
+    SHARED_WRITE_END( &queue->shared->seq );
+
     /* then check for posted messages */
     if ((filter & QS_POSTMESSAGE) &&
         get_posted_message( queue, get_win, req->get_first, req->get_last, req->flags, reply ))
@@ -2778,6 +2817,12 @@ DECL_HANDLER(get_message)
     if (get_win == -1 && current->process->idle_event) set_event( current->process->idle_event );
     queue->wake_mask = req->wake_mask;
     queue->changed_mask = req->changed_mask;
+
+    SHARED_WRITE_BEGIN( &queue->shared->seq );
+    queue->shared->wake_mask = queue->wake_mask;
+    queue->shared->changed_mask = queue->changed_mask;
+    SHARED_WRITE_END( &queue->shared->seq );
+
     set_error( STATUS_PENDING );  /* FIXME */
 }
 

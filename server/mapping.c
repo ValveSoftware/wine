@@ -978,8 +978,8 @@ struct object *create_user_data_mapping( struct object *root, const struct unico
     return &mapping->obj;
 }
 
-struct object *create_desktop_mapping( struct object *root, const struct unicode_str *name,
-                                       mem_size_t size, const struct security_descriptor *sd, void **ptr )
+struct object *create_shared_mapping( struct object *root, const struct unicode_str *name,
+                                      mem_size_t size, const struct security_descriptor *sd, void **ptr )
 {
     struct mapping *mapping;
 
