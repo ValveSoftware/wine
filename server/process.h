@@ -100,6 +100,7 @@ struct process
     struct list          kernel_object;   /* list of kernel object pointers */
     int                  esync_fd;        /* esync file descriptor (signaled on exit) */
     unsigned int         fsync_idx;
+    struct cpu_topology_override cpu_override; /* Overridden CPUs to host CPUs mapping. */
 };
 
 #define CPU_FLAG(cpu) (1 << (cpu))
