@@ -159,6 +159,7 @@ extern const char *get_timeout_str( timeout_t timeout );
 /* directory functions */
 
 extern struct object *create_desktop_map_directory( struct winstation *winstation );
+extern struct object *create_thread_map_directory( void );
 
 /* file functions */
 
@@ -182,8 +183,8 @@ extern void free_mapped_views( struct process *process );
 extern int get_page_size(void);
 extern struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
                                                 unsigned int attr, const struct security_descriptor *sd );
-extern struct object *create_desktop_mapping( struct object *root, const struct unicode_str *name,
-                                              mem_size_t size, const struct security_descriptor *sd, void **ptr );
+extern struct object *create_shared_mapping( struct object *root, const struct unicode_str *name,
+                                             mem_size_t size, const struct security_descriptor *sd, void **ptr );
 
 /* device functions */
 

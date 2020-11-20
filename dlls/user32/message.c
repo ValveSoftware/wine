@@ -2652,12 +2652,14 @@ static inline void call_sendmsg_callback( SENDASYNCPROC callback, HWND hwnd, UIN
 static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags, UINT changed_mask )
 {
     LRESULT result;
+    volatile struct thread_shared_memory *shared = get_thread_shared_memory();
     struct user_thread_info *thread_info = get_user_thread_info();
     INPUT_MESSAGE_SOURCE prev_source = thread_info->msg_source;
     struct received_message_info info, *old_info;
     unsigned int hw_id = 0;  /* id of previous hardware message */
     void *buffer;
     size_t buffer_size = 256;
+    BOOL skip = FALSE;
 
     if (!(buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size ))) return -1;
 
@@ -2669,10 +2671,37 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
         NTSTATUS res;
         size_t size = 0;
         const message_data_t *msg_data = buffer;
+        UINT wake_mask = changed_mask & (QS_SENDMESSAGE | QS_SMRESULT);
+        DWORD clear_bits = 0, filter = flags >> 16 ? flags >> 16 : QS_ALLINPUT;
+        if (filter & QS_POSTMESSAGE)
+        {
+            clear_bits |= QS_POSTMESSAGE | QS_HOTKEY | QS_TIMER;
+            if (first == 0 && last == ~0U) clear_bits |= QS_ALLPOSTMESSAGE;
+        }
+        if (filter & QS_INPUT) clear_bits |= QS_INPUT;
+        if (filter & QS_PAINT) clear_bits |= QS_PAINT;
 
         thread_info->msg_source = prev_source;
 
-        SERVER_START_REQ( get_message )
+        if (!shared) skip = FALSE;
+        else SHARED_READ_BEGIN( &shared->seq )
+        {
+            /* if the masks need an update */
+            if (shared->wake_mask != wake_mask) skip = FALSE;
+            else if (shared->changed_mask != changed_mask) skip = FALSE;
+            /* or if the queue is signaled */
+            else if (shared->wake_bits & wake_mask) skip = FALSE;
+            else if (shared->changed_bits & changed_mask) skip = FALSE;
+            /* or if the filter matches some bits */
+            else if (shared->wake_bits & filter) skip = FALSE;
+            /* or if we should clear some bits */
+            else if (shared->changed_bits & clear_bits) skip = FALSE;
+            else skip = TRUE;
+        }
+        SHARED_READ_END( &shared->seq );
+
+        if (skip) res = STATUS_PENDING;
+        else SERVER_START_REQ( get_message )
         {
             req->flags     = flags;
             req->get_win   = wine_server_user_handle( hwnd );

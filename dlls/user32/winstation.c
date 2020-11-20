@@ -117,7 +117,7 @@ volatile struct desktop_shared_memory *get_desktop_shared_memory( void )
     NTSTATUS status;
     SIZE_T size;
 
-    if (thread_info->shared_memory) return thread_info->shared_memory;
+    if (thread_info->desktop_shared_memory) return thread_info->desktop_shared_memory;
 
     handles[0] = GetProcessWindowStation();
     handles[1] = GetThreadDesktop( GetCurrentThreadId() );
@@ -153,8 +153,51 @@ volatile struct desktop_shared_memory *get_desktop_shared_memory( void )
     }
 
     thread_info->desktop_shared_map = handles[0];
-    thread_info->shared_memory = (struct desktop_shared_memory *)ptr;
-    return thread_info->shared_memory;
+    thread_info->desktop_shared_memory = (struct desktop_shared_memory *)ptr;
+    return thread_info->desktop_shared_memory;
+}
+
+
+volatile struct thread_shared_memory *get_thread_shared_memory( void )
+{
+    static const WCHAR dir_thread_mapsW[] = {'\\','K','e','r','n','e','l','O','b','j','e','c','t','s',
+                                             '\\','_','_','w','i','n','e','_','t','h','r','e','a','d','_','m','a','p','p','i','n','g','s',
+                                             '\\','%','0','8','x',0};
+    struct user_thread_info *thread_info = get_user_thread_info();
+    HANDLE handle;
+    WCHAR buf[MAX_PATH];
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING section_str;
+    NTSTATUS status;
+    SIZE_T size;
+    void *ptr;
+
+    if (thread_info->thread_shared_memory) return thread_info->thread_shared_memory;
+
+    snprintfW( buf, ARRAY_SIZE(buf), dir_thread_mapsW, GetCurrentThreadId() );
+    RtlInitUnicodeString( &section_str, buf );
+    InitializeObjectAttributes( &attr, &section_str, 0, NULL, NULL );
+    status = NtOpenSection( &handle, SECTION_ALL_ACCESS, &attr );
+    if (status)
+    {
+        ERR( "failed to open the thread section: %08x\n", status );
+        return NULL;
+    }
+
+    ptr = NULL;
+    size = sizeof(struct thread_shared_memory);
+    status = NtMapViewOfSection( handle, GetCurrentProcess(), (void *)&ptr, 0, 0, NULL,
+                                 &size, ViewUnmap, 0, PAGE_READONLY );
+    if (status)
+    {
+        ERR( "failed to map view of the thread section: %08x\n", status );
+        CloseHandle( handle );
+        return NULL;
+    }
+
+    thread_info->thread_shared_map = handle;
+    thread_info->thread_shared_memory = (struct thread_shared_memory *)ptr;
+    return thread_info->thread_shared_memory;
 }
 
 
@@ -520,7 +563,7 @@ BOOL WINAPI SetThreadDesktop( HDESK handle )
         {
             CloseHandle( thread_info->desktop_shared_map );
             thread_info->desktop_shared_map = NULL;
-            thread_info->shared_memory = NULL;
+            thread_info->desktop_shared_memory = NULL;
         }
     }
     return ret;
