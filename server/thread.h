@@ -95,6 +95,8 @@ struct thread
     struct list            kernel_object; /* list of kernel object pointers */
     data_size_t            desc_len;      /* thread description length in bytes */
     WCHAR                 *desc;          /* thread description string */
+    struct object         *shared_mapping;         /* thread shared memory mapping */
+    volatile struct thread_shared_memory *shared;  /* thread shared memory ptr */
 };
 
 extern struct thread *current;
