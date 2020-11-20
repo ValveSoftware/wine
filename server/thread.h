@@ -96,6 +96,8 @@ struct thread
     data_size_t            desc_len;      /* thread description length in bytes */
     WCHAR                 *desc;          /* thread description string */
     struct object         *locked_completion; /* completion port wait object successfully waited by the thread */
+    struct object         *queue_shared_mapping; /* thread queue shared memory mapping */
+    volatile struct queue_shared_memory *queue_shared;  /* thread queue shared memory ptr */
 };
 
 extern struct thread *current;
