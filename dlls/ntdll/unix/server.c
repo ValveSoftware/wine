@@ -1467,6 +1467,7 @@ void CDECL server_init_process_done( void *relay )
     PEB *peb = NtCurrentTeb()->Peb;
     IMAGE_NT_HEADERS *nt = get_exe_nt_header();
     void *entry = (char *)peb->ImageBaseAddress + nt->OptionalHeader.AddressOfEntryPoint;
+    struct cpu_topology_override *cpu_override = get_cpu_topology_override();
     NTSTATUS status;
     int suspend;
 
@@ -1488,6 +1489,8 @@ void CDECL server_init_process_done( void *relay )
 #endif
         req->entry    = wine_server_client_ptr( entry );
         req->gui      = (nt->OptionalHeader.Subsystem != IMAGE_SUBSYSTEM_WINDOWS_CUI);
+        if (cpu_override)
+            wine_server_add_data( req, cpu_override, sizeof(*cpu_override) );
         status = wine_server_call( req );
         suspend = reply->suspend;
     }

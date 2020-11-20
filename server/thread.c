@@ -605,8 +605,19 @@ int set_thread_affinity( struct thread *thread, affinity_t affinity )
 
         CPU_ZERO( &set );
         for (i = 0, mask = 1; mask; i++, mask <<= 1)
-            if (affinity & mask) CPU_SET( i, &set );
-
+            if (affinity & mask)
+            {
+                if (thread->process->cpu_override.cpu_count)
+                {
+                    if (i >= thread->process->cpu_override.cpu_count)
+                        break;
+                    CPU_SET( thread->process->cpu_override.host_cpu_id[i], &set );
+                }
+                else
+                {
+                    CPU_SET( i, &set );
+                }
+            }
         ret = sched_setaffinity( thread->unix_tid, sizeof(set), &set );
     }
 #endif
@@ -1500,7 +1511,7 @@ DECL_HANDLER(init_thread)
         reply->info_size  = init_process( current );
         if (!process->parent_id)
             process->affinity = current->affinity = get_thread_affinity( current );
-        else
+        else if (!process->cpu_override.cpu_count)
             set_thread_affinity( current, current->affinity );
     }
     else
@@ -1514,7 +1525,8 @@ DECL_HANDLER(init_thread)
             process->unix_pid = -1;  /* can happen with linuxthreads */
         init_thread_context( current );
         generate_debug_event( current, CREATE_THREAD_DEBUG_EVENT, &req->entry );
-        set_thread_affinity( current, current->affinity );
+        if (!process->cpu_override.cpu_count)
+            set_thread_affinity( current, current->affinity );
     }
     debug_level = max( debug_level, req->debug_level );
 
