@@ -163,6 +163,7 @@ extern const char *get_timeout_str( timeout_t timeout );
 /* directory functions */
 
 extern struct object *create_desktop_map_directory( struct winstation *winstation );
+extern struct object *create_thread_map_directory( void );
 
 /* file functions */
 
