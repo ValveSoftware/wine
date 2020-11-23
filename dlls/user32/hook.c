@@ -130,6 +130,27 @@ static UINT get_ll_hook_timeout(void)
 
 
 /***********************************************************************
+ *      get_active_hooks
+ *
+ */
+static UINT get_active_hooks(void)
+{
+    struct user_thread_info *thread_info = get_user_thread_info();
+
+    if (!thread_info->active_hooks)
+    {
+        SERVER_START_REQ( get_active_hooks )
+        {
+            if (!wine_server_call( req )) thread_info->active_hooks = reply->active_hooks;
+        }
+        SERVER_END_REQ;
+    }
+
+    return thread_info->active_hooks;
+}
+
+
+/***********************************************************************
  *		set_windows_hook
  *
  * Implementation of SetWindowsHookExA and SetWindowsHookExW.
@@ -462,10 +483,9 @@ static LRESULT call_hook( struct hook_info *info, INT code, WPARAM wparam, LPARA
  */
 static BOOL HOOK_IsHooked( INT id )
 {
-    struct user_thread_info *thread_info = get_user_thread_info();
-
-    if (!thread_info->active_hooks) return TRUE;
-    return (thread_info->active_hooks & (1 << (id - WH_MINHOOK))) != 0;
+    UINT active_hooks = get_active_hooks();
+    if (!active_hooks) return TRUE;
+    return (active_hooks & (1 << (id - WH_MINHOOK))) != 0;
 }
 
 
@@ -482,7 +502,7 @@ LRESULT HOOK_CallHooks( INT id, INT code, WPARAM wparam, LPARAM lparam, BOOL uni
 
     if (!HOOK_IsHooked( id ))
     {
-        TRACE( "skipping hook %s mask %x\n", hook_names[id-WH_MINHOOK], thread_info->active_hooks );
+        TRACE( "skipping hook %s mask %x\n", hook_names[id-WH_MINHOOK], get_active_hooks() );
         return 0;
     }
 
@@ -798,7 +818,7 @@ static inline BOOL find_first_hook(DWORD id, DWORD event, HWND hwnd, LONG object
 
     if (!HOOK_IsHooked( id ))
     {
-        TRACE( "skipping hook %s mask %x\n", hook_names[id-WH_MINHOOK], thread_info->active_hooks );
+        TRACE( "skipping hook %s mask %x\n", hook_names[id-WH_MINHOOK], get_active_hooks() );
         return FALSE;
     }
 

@@ -3043,9 +3043,9 @@ struct get_message_reply
     int             x;
     int             y;
     unsigned int    time;
-    unsigned int    active_hooks;
     data_size_t     total;
     /* VARARG(data,message_data); */
+    char __pad_52[4];
 };
 
 
@@ -4260,6 +4260,20 @@ enum caret_state
     CARET_STATE_ON,
     CARET_STATE_TOGGLE,
     CARET_STATE_ON_IF_MOVED
+};
+
+
+
+struct get_active_hooks_request
+{
+    struct request_header __header;
+    char __pad_12[4];
+};
+struct get_active_hooks_reply
+{
+    struct reply_header __header;
+    unsigned int   active_hooks;
+    char __pad_12[4];
 };
 
 
@@ -6029,6 +6043,7 @@ enum request
     REQ_set_capture_window,
     REQ_set_caret_window,
     REQ_set_caret_info,
+    REQ_get_active_hooks,
     REQ_set_hook,
     REQ_remove_hook,
     REQ_start_hook_chain,
@@ -6335,6 +6350,7 @@ union generic_request
     struct set_capture_window_request set_capture_window_request;
     struct set_caret_window_request set_caret_window_request;
     struct set_caret_info_request set_caret_info_request;
+    struct get_active_hooks_request get_active_hooks_request;
     struct set_hook_request set_hook_request;
     struct remove_hook_request remove_hook_request;
     struct start_hook_chain_request start_hook_chain_request;
@@ -6639,6 +6655,7 @@ union generic_reply
     struct set_capture_window_reply set_capture_window_reply;
     struct set_caret_window_reply set_caret_window_reply;
     struct set_caret_info_reply set_caret_info_reply;
+    struct get_active_hooks_reply get_active_hooks_reply;
     struct set_hook_reply set_hook_reply;
     struct remove_hook_reply remove_hook_reply;
     struct start_hook_chain_reply start_hook_chain_reply;
@@ -6739,7 +6756,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 642
+#define SERVER_PROTOCOL_VERSION 643
 
 /* ### protocol_version end ### */
 
