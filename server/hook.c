@@ -357,7 +357,7 @@ static int is_hook_active( struct hook_table *table, int index )
 }
 
 /* get a bitmap of all active hooks for the current thread */
-unsigned int get_active_hooks(void)
+static unsigned int get_active_hooks(void)
 {
     struct hook_table *table = get_queue_hooks( current );
     struct hook_table *global_hooks = get_global_hooks( current );
@@ -382,6 +382,12 @@ struct thread *get_first_global_hook( int id )
     if (!global_hooks) return NULL;
     if (!(hook = get_first_valid_hook( global_hooks, id - WH_MINHOOK, EVENT_MIN, 0, 0, 0 ))) return NULL;
     return hook->owner;
+}
+
+/* get thread active hooks */
+DECL_HANDLER(get_active_hooks)
+{
+    reply->active_hooks = get_active_hooks();
 }
 
 /* set a window hook */
