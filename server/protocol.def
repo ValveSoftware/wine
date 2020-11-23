@@ -2244,7 +2244,6 @@ enum message_type
     int             x;         /* message x position */
     int             y;         /* message y position */
     unsigned int    time;      /* message time */
-    unsigned int    active_hooks; /* active hooks bitmap */
     data_size_t     total;     /* total size of extra data */
     VARARG(data,message_data); /* message data for sent messages */
 @END
@@ -3021,6 +3020,13 @@ enum caret_state
     CARET_STATE_TOGGLE,     /* toggle current state */
     CARET_STATE_ON_IF_MOVED /* on if the position differs, unchanged otherwise */
 };
+
+
+/* get thread active hooks */
+@REQ(get_active_hooks)
+@REPLY
+    unsigned int   active_hooks;   /* active hooks bitmap */
+@END
 
 
 /* Set a window hook */

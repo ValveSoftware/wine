@@ -2698,8 +2698,6 @@ DECL_HANDLER(get_message)
     user_handle_t get_win = get_user_full_handle( req->get_win );
     unsigned int filter = req->flags >> 16;
 
-    reply->active_hooks = get_active_hooks();
-
     if (get_win && get_win != 1 && get_win != -1 && !get_user_object( get_win, USER_WINDOW ))
     {
         set_win32_error( ERROR_INVALID_WINDOW_HANDLE );
