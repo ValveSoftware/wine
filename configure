@@ -17997,7 +17997,8 @@ for ac_func in \
 	sigprocmask \
 	symlink \
 	tcdrain \
-	thr_kill2
+	thr_kill2 \
+	utimensat
 
 do :
   as_ac_var=`$as_echo "ac_cv_func_$ac_func" | $as_tr_sh`

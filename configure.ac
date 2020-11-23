@@ -2211,7 +2211,8 @@ AC_CHECK_FUNCS(\
 	sigprocmask \
 	symlink \
 	tcdrain \
-	thr_kill2
+	thr_kill2 \
+	utimensat
 )
 CFLAGS="$ac_save_CFLAGS"
 
