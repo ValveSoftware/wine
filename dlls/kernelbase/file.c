@@ -723,6 +723,8 @@ static UINT get_nt_file_options( DWORD attributes )
         options |= FILE_RANDOM_ACCESS;
     if (attributes & FILE_FLAG_WRITE_THROUGH)
         options |= FILE_WRITE_THROUGH;
+    if (attributes & FILE_FLAG_OPEN_REPARSE_POINT)
+        options |= FILE_OPEN_REPARSE_POINT;
     return options;
 }
 
