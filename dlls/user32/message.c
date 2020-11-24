@@ -3699,7 +3699,8 @@ void WINAPI PostQuitMessage( INT exit_code )
 /* check for driver events if we detect that the app is not properly consuming messages */
 static inline void check_for_driver_events( UINT msg )
 {
-    if (get_user_thread_info()->message_count > 200)
+    struct user_thread_info *thread_info = get_user_thread_info();
+    if (thread_info->message_count > 200)
     {
         flush_window_surfaces( FALSE );
         USER_Driver->pMsgWaitForMultipleObjectsEx( 0, NULL, 0, QS_ALLINPUT, 0 );
@@ -3707,9 +3708,9 @@ static inline void check_for_driver_events( UINT msg )
     else if (msg == WM_TIMER || msg == WM_SYSTIMER)
     {
         /* driver events should have priority over timers, so make sure we'll check for them soon */
-        get_user_thread_info()->message_count += 100;
+        thread_info->message_count += 100;
     }
-    else get_user_thread_info()->message_count++;
+    else thread_info->message_count++;
 }
 
 /***********************************************************************
@@ -3717,17 +3718,21 @@ static inline void check_for_driver_events( UINT msg )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH PeekMessageW( MSG *msg_out, HWND hwnd, UINT first, UINT last, UINT flags )
 {
+    struct user_thread_info *thread_info = get_user_thread_info();
     MSG msg;
     int ret;
 
     USER_CheckNotLock();
-    check_for_driver_events( 0 );
+    if (thread_info->last_driver_time != GetTickCount())
+        check_for_driver_events( 0 );
 
     ret = peek_message( &msg, hwnd, first, last, flags, 0 );
     if (ret < 0) return FALSE;
 
     if (!ret)
     {
+        if (thread_info->last_driver_time == GetTickCount()) return FALSE;
+        thread_info->last_driver_time = GetTickCount();
         flush_window_surfaces( TRUE );
         ret = wow_handlers.wait_message( 0, NULL, 0, QS_ALLINPUT, 0 );
         /* if we received driver events, check again for a pending message */
@@ -3735,6 +3740,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH PeekMessageW( MSG *msg_out, HWND hwnd, UINT first,
     }
 
     check_for_driver_events( msg.message );
+    thread_info->last_driver_time = GetTickCount() - 1;
 
     /* copy back our internal safe copy of message data to msg_out.
      * msg_out is a variable from the *program*, so it can't be used
