@@ -2649,7 +2649,7 @@ static inline void call_sendmsg_callback( SENDASYNCPROC callback, HWND hwnd, UIN
  * available; -1 on error.
  * All pending sent messages are processed before returning.
  */
-static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags, UINT changed_mask )
+static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags, UINT changed_mask, BOOL waited )
 {
     LRESULT result;
     volatile struct thread_shared_memory *shared = get_thread_shared_memory();
@@ -2683,7 +2683,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
 
         thread_info->msg_source = prev_source;
 
-        if (!shared) skip = FALSE;
+        if (!shared || waited) skip = FALSE;
         else SHARED_READ_BEGIN( &shared->seq )
         {
             /* if the masks need an update */
@@ -2888,7 +2888,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
                 }
                 else
                     peek_message( msg, info.msg.hwnd, info.msg.message,
-                                  info.msg.message, flags | PM_REMOVE, changed_mask );
+                                  info.msg.message, flags | PM_REMOVE, changed_mask, TRUE );
                 continue;
             }
 	    if (info.msg.message >= WM_DDE_FIRST && info.msg.message <= WM_DDE_LAST)
@@ -2932,7 +2932,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
 static inline void process_sent_messages(void)
 {
     MSG msg;
-    peek_message( &msg, 0, 0, 0, PM_REMOVE | PM_QS_SENDMESSAGE, 0 );
+    peek_message( &msg, 0, 0, 0, PM_REMOVE | PM_QS_SENDMESSAGE, 0, FALSE );
 }
 
 
@@ -3726,7 +3726,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH PeekMessageW( MSG *msg_out, HWND hwnd, UINT first,
     if (thread_info->last_driver_time != GetTickCount())
         check_for_driver_events( 0 );
 
-    ret = peek_message( &msg, hwnd, first, last, flags, 0 );
+    ret = peek_message( &msg, hwnd, first, last, flags, 0, FALSE );
     if (ret < 0) return FALSE;
 
     if (!ret)
@@ -3736,7 +3736,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH PeekMessageW( MSG *msg_out, HWND hwnd, UINT first,
         flush_window_surfaces( TRUE );
         ret = wow_handlers.wait_message( 0, NULL, 0, QS_ALLINPUT, 0 );
         /* if we received driver events, check again for a pending message */
-        if (ret == WAIT_TIMEOUT || peek_message( &msg, hwnd, first, last, flags, 0 ) <= 0) return FALSE;
+        if (ret == WAIT_TIMEOUT || peek_message( &msg, hwnd, first, last, flags, 0, TRUE ) <= 0) return FALSE;
     }
 
     check_for_driver_events( msg.message );
@@ -3791,7 +3791,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetMessageW( MSG *msg, HWND hwnd, UINT first, UINT
     }
     else mask = QS_ALLINPUT;
 
-    while (!(ret = peek_message( msg, hwnd, first, last, PM_REMOVE | (mask << 16), mask )))
+    while (!(ret = peek_message( msg, hwnd, first, last, PM_REMOVE | (mask << 16), mask, TRUE )))
     {
         wait_objects( 1, &server_queue, INFINITE, mask & (QS_SENDMESSAGE | QS_SMRESULT), mask, 0 );
     }
