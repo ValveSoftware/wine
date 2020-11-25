@@ -603,6 +603,7 @@ IMFMediaType *mf_media_type_from_caps(const GstCaps *caps)
             unsigned int i;
 
             IMFMediaType_SetUINT32(media_type, &MF_MT_COMPRESSED, FALSE);
+            IMFMediaType_SetUINT32(media_type, &MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
 
             /* First try FOURCC */
             if ((fourcc_subtype.Data1 = gst_video_format_to_fourcc(video_info.finfo->format)))
