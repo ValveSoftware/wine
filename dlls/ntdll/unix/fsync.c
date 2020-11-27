@@ -969,10 +969,18 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                 tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
                 tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
 
-                ret = futex_wait_multiple( futexes, waitcount, &tmo_p );
+                if (waitcount == 1)
+                    ret = futex_wait( futexes[0].addr, futexes[0].val, &tmo_p );
+                else
+                    ret = futex_wait_multiple( futexes, waitcount, &tmo_p );
             }
             else
-                ret = futex_wait_multiple( futexes, waitcount, NULL );
+            {
+                if (waitcount == 1)
+                    ret = futex_wait( futexes[0].addr, futexes[0].val, NULL );
+                else
+                    ret = futex_wait_multiple( futexes, waitcount, NULL );
+            }
 
             /* FUTEX_WAIT_MULTIPLE can succeed or return -EINTR, -EAGAIN,
              * -EFAULT/-EACCES, -ETIMEDOUT. In the first three cases we need to
