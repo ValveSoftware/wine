@@ -323,7 +323,7 @@ static void test_RtlRegisterWait(void)
     result = WaitForSingleObject(semaphores[0], 200);
     ok(result == WAIT_OBJECT_0, "WaitForSingleObject returned %u\n", result);
     ok(info.userdata == 1, "expected info.userdata = 1, got %u\n", info.userdata);
-    todo_wine ok(info.threadid == threadid, "unexpected different wait thread id %x\n", info.threadid);
+    ok(info.threadid == threadid, "unexpected different wait thread id %x\n", info.threadid);
     result = WaitForSingleObject(semaphores[1], 0);
     ok(result == WAIT_TIMEOUT, "WaitForSingleObject returned %u\n", result);
     Sleep(50);
@@ -354,7 +354,7 @@ static void test_RtlRegisterWait(void)
     result = WaitForSingleObject(semaphores[0], 200);
     ok(result == WAIT_OBJECT_0, "WaitForSingleObject returned %u\n", result);
     ok(info.userdata == 1, "expected info.userdata = 1, got %u\n", info.userdata);
-    todo_wine ok(info.threadid == threadid, "unexpected different wait thread id %x\n", info.threadid);
+    ok(info.threadid == threadid, "unexpected different wait thread id %x\n", info.threadid);
     result = WaitForSingleObject(semaphores[1], 0);
     ok(result == WAIT_TIMEOUT, "WaitForSingleObject returned %u\n", result);
     Sleep(50);
@@ -437,7 +437,6 @@ static void test_RtlRegisterWait(void)
     ok(!status, "RtlDeregisterWaitEx failed with status %x\n", status);
     ok(info.userdata == 0, "expected info.userdata = 0, got %u\n", info.userdata);
     result = WaitForSingleObject(event, 200);
-    todo_wine
     ok(result == WAIT_OBJECT_0, "WaitForSingleObject returned %u\n", result);
 
     /* test RtlDeregisterWaitEx after wait expired */
@@ -474,7 +473,6 @@ static void test_RtlRegisterWait(void)
     ok(!status, "RtlDeregisterWaitEx failed with status %x\n", status);
     ok(info.userdata == 0x10000, "expected info.userdata = 0x10000, got %u\n", info.userdata);
     result = WaitForSingleObject(event, 200);
-    todo_wine
     ok(result == WAIT_OBJECT_0, "WaitForSingleObject returned %u\n", result);
 
     /* test RtlDeregisterWaitEx while callback is running */
