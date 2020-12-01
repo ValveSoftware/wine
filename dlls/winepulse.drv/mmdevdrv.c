@@ -2838,13 +2838,13 @@ static HRESULT WINAPI AudioClockAdjustment_QueryInterface(IAudioClockAdjustment 
 static ULONG WINAPI AudioClockAdjustment_AddRef(IAudioClockAdjustment *iface)
 {
     ACImpl *This = impl_from_IAudioClockAdjustment(iface);
-    return IAudioClient_AddRef(&This->IAudioClient_iface);
+    return IAudioClient_AddRef(&This->IAudioClient3_iface);
 }
 
 static ULONG WINAPI AudioClockAdjustment_Release(IAudioClockAdjustment *iface)
 {
     ACImpl *This = impl_from_IAudioClockAdjustment(iface);
-    return IAudioClient_Release(&This->IAudioClient_iface);
+    return IAudioClient_Release(&This->IAudioClient3_iface);
 }
 
 static HRESULT WINAPI AudioClockAdjustment_SetSampleRate(IAudioClockAdjustment *iface,
