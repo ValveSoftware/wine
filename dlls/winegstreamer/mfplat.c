@@ -26,6 +26,7 @@
 #include "gst_private.h"
 #include "mfapi.h"
 #include "mfidl.h"
+#include "wmcodecdsp.h"
 
 #include "wine/debug.h"
 #include "wine/heap.h"
@@ -417,6 +418,7 @@ class_objects[] =
     { &CLSID_VideoProcessorMFT, &video_processor_create },
     { &CLSID_GStreamerByteStreamHandler, &winegstreamer_stream_handler_create },
     { &CLSID_WINEAudioConverter, &audio_converter_create },
+    { &CLSID_CColorConvertDMO, &color_converter_create },
 };
 
 HRESULT mfplat_get_class_object(REFCLSID rclsid, REFIID riid, void **obj)

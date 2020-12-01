@@ -7,6 +7,7 @@ PARENTSRC = ../strmbase
 
 C_SRCS = \
 	audioconvert.c \
+	colorconvert.c \
 	filter.c \
 	gst_cbs.c \
 	gstdemux.c \
