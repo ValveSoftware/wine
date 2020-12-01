@@ -87,5 +87,6 @@ GstBuffer *gst_buffer_from_mf_sample(IMFSample *in) DECLSPEC_HIDDEN;
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj) DECLSPEC_HIDDEN;
 
 HRESULT audio_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
+HRESULT color_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
 #endif /* __GST_PRIVATE_INCLUDED__ */
