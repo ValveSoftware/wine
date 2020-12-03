@@ -341,53 +341,51 @@ DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD secur
         status = InitializeSecurityContextW(cred_handle, &ctx, hostname,  isc_req_flags, 0, 0, &in_desc,
                 0, NULL, &out_desc, &attrs, NULL);
         TRACE("InitializeSecurityContext ret %08x\n", status);
-
-        if(status == SEC_E_OK) {
-            if(in_bufs[1].BufferType == SECBUFFER_EXTRA)
-                FIXME("SECBUFFER_EXTRA not supported\n");
-
-            status = QueryContextAttributesW(&ctx, SECPKG_ATTR_STREAM_SIZES, &conn->ssl_sizes);
-            if(status != SEC_E_OK) {
-                WARN("Could not get sizes\n");
-                break;
-            }
-
-            status = QueryContextAttributesW(&ctx, SECPKG_ATTR_REMOTE_CERT_CONTEXT, (void*)&cert);
-            if(status == SEC_E_OK) {
-                res = netconn_verify_cert(cert, hostname, security_flags, check_revocation);
-                CertFreeCertificateContext(cert);
-                if(res != ERROR_SUCCESS) {
-                    WARN("cert verify failed: %u\n", res);
-                    break;
-                }
-            }else {
-                WARN("Could not get cert\n");
-                break;
-            }
-
-            conn->ssl_buf = heap_alloc(conn->ssl_sizes.cbHeader + conn->ssl_sizes.cbMaximumMessage + conn->ssl_sizes.cbTrailer);
-            if(!conn->ssl_buf) {
-                res = ERROR_OUTOFMEMORY;
-                break;
-            }
-        }
+        if(status == SEC_E_OK && in_bufs[1].BufferType == SECBUFFER_EXTRA)
+            FIXME("SECBUFFER_EXTRA not supported\n");
     }
 
     heap_free(read_buf);
 
-    if(status != SEC_E_OK || res != ERROR_SUCCESS) {
-        WARN("Failed to initialize security context: %08x\n", status);
-        heap_free(conn->ssl_buf);
-        conn->ssl_buf = NULL;
-        DeleteSecurityContext(&ctx);
-        return ERROR_WINHTTP_SECURE_CHANNEL_ERROR;
+    if(status != SEC_E_OK)
+        goto failed;
+
+    status = QueryContextAttributesW(&ctx, SECPKG_ATTR_STREAM_SIZES, &conn->ssl_sizes);
+    if(status != SEC_E_OK) {
+        WARN("Could not get sizes\n");
+        goto failed;
     }
 
+    status = QueryContextAttributesW(&ctx, SECPKG_ATTR_REMOTE_CERT_CONTEXT, (void*)&cert);
+    if(status != SEC_E_OK) {
+        WARN("Could not get cert\n");
+        goto failed;
+    }
+
+    res = netconn_verify_cert(cert, hostname, security_flags, check_revocation);
+    CertFreeCertificateContext(cert);
+    if(res != ERROR_SUCCESS) {
+        WARN("cert verify failed: %u\n", res);
+        goto failed;
+    }
+
+    conn->ssl_buf = heap_alloc(conn->ssl_sizes.cbHeader + conn->ssl_sizes.cbMaximumMessage + conn->ssl_sizes.cbTrailer);
+    if(!conn->ssl_buf) {
+        res = ERROR_OUTOFMEMORY;
+        goto failed;
+    }
 
     TRACE("established SSL connection\n");
     conn->secure = TRUE;
     conn->ssl_ctx = ctx;
     return ERROR_SUCCESS;
+
+failed:
+    WARN("Failed to initialize security context: %08x\n", status);
+    heap_free(conn->ssl_buf);
+    conn->ssl_buf = NULL;
+    DeleteSecurityContext(&ctx);
+    return ERROR_WINHTTP_SECURE_CHANNEL_ERROR;
 }
 
 static DWORD send_ssl_chunk( struct netconn *conn, const void *msg, size_t size )
