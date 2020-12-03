@@ -454,8 +454,10 @@ DWORD netconn_send( struct netconn *conn, const void *msg, size_t len, int *sent
 
 static DWORD read_ssl_chunk( struct netconn *conn, void *buf, SIZE_T buf_size, SIZE_T *ret_size, BOOL *eof )
 {
+    const DWORD isc_req_flags = ISC_REQ_ALLOCATE_MEMORY|ISC_REQ_USE_SESSION_KEY|ISC_REQ_CONFIDENTIALITY
+        |ISC_REQ_SEQUENCE_DETECT|ISC_REQ_REPLAY_DETECT|ISC_REQ_USE_SUPPLIED_CREDS;
     const SIZE_T ssl_buf_size = conn->ssl_sizes.cbHeader+conn->ssl_sizes.cbMaximumMessage+conn->ssl_sizes.cbTrailer;
-    SecBuffer bufs[4];
+    SecBuffer bufs[4], tmp;
     SecBufferDesc buf_desc = {SECBUFFER_VERSION, ARRAY_SIZE(bufs), bufs};
     SSIZE_T size, buf_len;
     unsigned int i;
@@ -496,7 +498,16 @@ static DWORD read_ssl_chunk( struct netconn *conn, void *buf, SIZE_T buf_size, S
 
         case SEC_I_RENEGOTIATE:
             TRACE("renegotiate\n");
-            return ERROR_WINHTTP_CLIENT_AUTH_CERT_NEEDED;
+            memset(&tmp, 0, sizeof(tmp));
+            for(i = 0; i < ARRAY_SIZE(bufs); i++) {
+                if(bufs[i].BufferType == SECBUFFER_EXTRA) tmp = bufs[i];
+            }
+            memset(bufs, 0, sizeof(bufs));
+            bufs[0] = tmp;
+            bufs[0].BufferType = SECBUFFER_TOKEN;
+            res = netconn_negotiate(conn, NULL, &conn->ssl_ctx, conn->host->hostname, isc_req_flags, &buf_desc, NULL);
+            if (res != SEC_E_OK) return res;
+            break;
 
         case SEC_I_CONTEXT_EXPIRED:
             TRACE("context expired\n");
