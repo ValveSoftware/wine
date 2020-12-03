@@ -220,9 +220,43 @@ static HRESULT WINAPI color_converter_GetInputAvailableType(IMFTransform *iface,
 static HRESULT WINAPI color_converter_GetOutputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
         IMFMediaType **type)
 {
-    FIXME("%p, %u, %u, %p.\n", iface, id, index, type);
+    IMFMediaType *output_type;
+    HRESULT hr;
 
-    return E_NOTIMPL;
+    struct color_converter *converter = impl_color_converter_from_IMFTransform(iface);
+
+    TRACE("%p, %u, %u, %p.\n", iface, id, index, type);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    if (index >= ARRAY_SIZE(raw_types))
+        return MF_E_NO_MORE_TYPES;
+
+    if (FAILED(hr = MFCreateMediaType(&output_type)))
+        return hr;
+
+    EnterCriticalSection(&converter->cs);
+
+    if (!(converter->input_type))
+    {
+        LeaveCriticalSection(&converter->cs);
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+    }
+
+    IMFMediaType_CopyAllItems(converter->input_type, (IMFAttributes *)output_type);
+
+    LeaveCriticalSection(&converter->cs);
+
+    if (FAILED(hr = IMFMediaType_SetGUID(output_type, &MF_MT_SUBTYPE, raw_types[index])))
+    {
+        IMFMediaType_Release(output_type);
+        return hr;
+    }
+
+    *type = output_type;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI color_converter_SetInputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
