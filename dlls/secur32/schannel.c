@@ -64,6 +64,7 @@ struct schan_context
     const CERT_CONTEXT *cert;
     SIZE_T header_size;
     BOOL shutdown_requested;
+    BOOL rehandshake_requested;
 };
 
 static struct schan_handle *schan_handle_table;
@@ -875,7 +876,7 @@ static SECURITY_STATUS establish_context(
             buffer = &pInput->pBuffers[idx];
             ptr = buffer->pvBuffer;
 
-            if (buffer->cbBuffer < ctx->header_size)
+            if (buffer->cbBuffer < ctx->header_size && !ctx->rehandshake_requested)
             {
                 TRACE("Expected at least %Iu bytes, but buffer only contains %lu bytes.\n",
                       ctx->header_size, buffer->cbBuffer);
@@ -892,7 +893,7 @@ static SECURITY_STATUS establish_context(
                 ptr += record_size;
             }
 
-            if (!expected_size)
+            if (!expected_size && !ctx->rehandshake_requested)
             {
                 TRACE("Expected at least %Iu bytes, but buffer only contains %lu bytes.\n",
                       max(ctx->header_size, record_size), buffer->cbBuffer);
@@ -942,6 +943,7 @@ static SECURITY_STATUS establish_context(
     params.output_offset = &output_offset;
     params.control_token = ctx->shutdown_requested ? control_token_shutdown : control_token_none;
     ctx->shutdown_requested = FALSE;
+    ctx->rehandshake_requested = FALSE;
     ret = GNUTLS_CALL( handshake, &params );
 
     if (output_buffer_idx != -1)
@@ -1563,6 +1565,7 @@ static SECURITY_STATUS SEC_ENTRY schan_DecryptMessage(PCtxtHandle context_handle
     buffer->BufferType = SECBUFFER_STREAM_HEADER;
     buffer->cbBuffer = ctx->header_size;
 
+    if (status == SEC_I_RENEGOTIATE) ctx->rehandshake_requested = TRUE;
     return status;
 }
 
