@@ -881,7 +881,7 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
             ptr += record_size;
         }
 
-        if (!expected_size)
+        if (!expected_size && record_size)
         {
             TRACE("Expected at least %lu bytes, but buffer only contains %u bytes.\n",
                     max(6, record_size), buffer->cbBuffer);
@@ -912,6 +912,8 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
     {
         SecBuffer *buffer = &out_buffers->desc->pBuffers[0];
         buffer->cbBuffer = 0;
+        /* Nothing to read or to send, but we got SEC_I_CONTINUE_NEEDED, it means missing input */
+        if (!expected_size && ret == SEC_I_CONTINUE_NEEDED) ret = SEC_E_INCOMPLETE_MESSAGE;
     }
 
     if(ctx->transport.in.offset && ctx->transport.in.offset != pInput->pBuffers[0].cbBuffer) {
