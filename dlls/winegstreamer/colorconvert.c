@@ -487,9 +487,16 @@ static HRESULT WINAPI color_converter_ProcessEvent(IMFTransform *iface, DWORD id
 
 static HRESULT WINAPI color_converter_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
-    FIXME("%p, %u %lu.\n", iface, message, param);
+    TRACE("%p, %u %lu.\n", iface, message, param);
 
-    return E_NOTIMPL;
+    switch(message)
+    {
+        case MFT_MESSAGE_NOTIFY_BEGIN_STREAMING:
+            return S_OK;
+        default:
+            FIXME("Unhandled message type %x.\n", message);
+            return E_NOTIMPL;
+    }
 }
 
 static HRESULT WINAPI color_converter_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
