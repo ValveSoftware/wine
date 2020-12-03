@@ -30,6 +30,24 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
+static const GUID *raw_types[] = {
+    &MFVideoFormat_RGB24,
+    &MFVideoFormat_RGB32,
+    &MFVideoFormat_RGB555,
+    &MFVideoFormat_RGB8,
+    &MFVideoFormat_AYUV,
+    &MFVideoFormat_I420,
+    &MFVideoFormat_IYUV,
+    &MFVideoFormat_NV11,
+    &MFVideoFormat_NV12,
+    &MFVideoFormat_UYVY,
+    &MFVideoFormat_v216,
+    &MFVideoFormat_v410,
+    &MFVideoFormat_YUY2,
+    &MFVideoFormat_YVYU,
+    &MFVideoFormat_YVYU,
+};
+
 struct color_converter
 {
     IMFTransform IMFTransform_iface;
@@ -164,9 +182,35 @@ static HRESULT WINAPI color_converter_AddInputStreams(IMFTransform *iface, DWORD
 static HRESULT WINAPI color_converter_GetInputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
         IMFMediaType **type)
 {
-    FIXME("%p, %u, %u, %p.\n", iface, id, index, type);
+    IMFMediaType *ret;
+    HRESULT hr;
 
-    return E_NOTIMPL;
+    TRACE("%p, %u, %u, %p.\n", iface, id, index, type);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    if (index >= ARRAY_SIZE(raw_types))
+        return MF_E_NO_MORE_TYPES;
+
+    if (FAILED(hr = MFCreateMediaType(&ret)))
+        return hr;
+
+    if (FAILED(hr = IMFMediaType_SetGUID(ret, &MF_MT_MAJOR_TYPE, &MFMediaType_Video)))
+    {
+        IMFMediaType_Release(ret);
+        return hr;
+    }
+
+    if (FAILED(hr = IMFMediaType_SetGUID(ret, &MF_MT_SUBTYPE, raw_types[index])))
+    {
+        IMFMediaType_Release(ret);
+        return hr;
+    }
+
+    *type = ret;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI color_converter_GetOutputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
