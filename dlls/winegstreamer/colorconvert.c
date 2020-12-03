@@ -138,16 +138,34 @@ static HRESULT WINAPI color_converter_GetStreamIDs(IMFTransform *iface, DWORD in
 
 static HRESULT WINAPI color_converter_GetInputStreamInfo(IMFTransform *iface, DWORD id, MFT_INPUT_STREAM_INFO *info)
 {
-    FIXME("%p %u %p.\n", iface, id, info);
+    TRACE("%p %u %p.\n", iface, id, info);
 
-    return E_NOTIMPL;
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_DOES_NOT_ADDREF;
+    info->cbMaxLookahead = 0;
+    info->cbAlignment = 0;
+    info->hnsMaxLatency = 0;
+    /* TODO: this can be calculated using MFCalculateImageSize */
+    info->cbSize = 0;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI color_converter_GetOutputStreamInfo(IMFTransform *iface, DWORD id, MFT_OUTPUT_STREAM_INFO *info)
 {
-    FIXME("%p %u %p.\n", iface, id, info);
+    TRACE("%p %u %p.\n", iface, id, info);
 
-    return E_NOTIMPL;
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    info->dwFlags = MFT_OUTPUT_STREAM_PROVIDES_SAMPLES | MFT_OUTPUT_STREAM_WHOLE_SAMPLES;
+    info->cbAlignment = 0;
+    /* TODO: this can be calculated using MFCalculateImageSize */
+    info->cbSize = 0;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI color_converter_GetAttributes(IMFTransform *iface, IMFAttributes **attributes)
