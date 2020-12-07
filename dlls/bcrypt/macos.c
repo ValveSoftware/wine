@@ -278,6 +278,12 @@ static NTSTATUS CDECL key_asymmetric_decrypt( struct key *key, UCHAR *input, ULO
     return STATUS_NOT_IMPLEMENTED;
 }
 
+static NTSTATUS CDECL key_secret_agreement( struct key *priv_key, struct key *peer_key, struct secret *secret )
+{
+    FIXME( "not implemented on Mac\n" );
+    return STATUS_NOT_IMPLEMENTED;
+}
+
 static const struct key_funcs key_funcs =
 {
     key_set_property,
@@ -299,7 +305,8 @@ static const struct key_funcs key_funcs =
     key_export_ecc,
     key_import_dsa_capi,
     key_import_ecc,
-    key_import_rsa
+    key_import_rsa,
+    key_secret_agreement,
 };
 
 NTSTATUS CDECL __wine_init_unix_lib( HMODULE module, DWORD reason, const void *ptr_in, void *ptr_out )
