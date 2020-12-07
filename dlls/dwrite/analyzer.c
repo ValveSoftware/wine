@@ -220,6 +220,21 @@ static const DWRITE_UNICODE_RANGE cjk_ranges[] =
     { 0x4e00, 0x9fff }, /* CJK Unified Ideographs */
 };
 
+static const WCHAR timesW[] = {'T','i','m','e','s',' ','N','e','w',' ','R','o','m','a','n',0};
+static const WCHAR liberationW[] = {'L','i','b','e','r','a','t','i','o','n',' ','S','e','r','i','f',0};
+static const WCHAR dejavuW[] = {'D','e','j','a','V','u',' ','S','e','r','i','f',0};
+
+static const WCHAR *latin_families[] = { timesW, liberationW, dejavuW };
+
+static const DWRITE_UNICODE_RANGE latin_ranges[] =
+{
+    { 0x0000, 0x05ff },
+    { 0x1d00, 0x2eff },
+    { 0xa700, 0xa7ff },
+    { 0xfb00, 0xfb4f },
+    { 0xfe20, 0xfe23 },
+};
+
 struct fallback_mapping {
     DWRITE_UNICODE_RANGE *ranges;
     UINT32 ranges_count;
@@ -236,6 +251,7 @@ static const struct fallback_mapping fontfallback_neutral_data[] = {
           (WCHAR **)families, ARRAY_SIZE(families) }
 
     MAPPING_RANGE(cjk_ranges, cjk_families),
+    MAPPING_RANGE(latin_ranges, latin_families),
 
 #undef MAPPING_RANGE
 };
