@@ -3286,9 +3286,12 @@ static void test_ECDH_alg(const struct ecdh_test *t)
         goto raw_secret_end;
     }
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
-    if (status != STATUS_SUCCESS) goto raw_secret_end;
 
     ok(size == (t->bitlen + 7) / 8, "size of secret key incorrect, got %lu, expected 32\n", size);
+    if (!size)
+        goto raw_secret_end;
+
+
     buf = malloc(size);
     status = BCryptDeriveKey(secret, BCRYPT_KDF_RAW_SECRET, NULL, buf, size, &size, 0);
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
@@ -4386,8 +4389,8 @@ static void test_SecretAgreement(void)
         status = BCryptDeriveKey(secret, NULL, NULL, NULL, 0, &size, 0);
         ok(status == STATUS_INVALID_PARAMETER, "got %#lx\n", status);
 
-        status = BCryptDeriveKey(secret, L"HASH", NULL, NULL, 0, &size, 0);
-        ok(status == STATUS_SUCCESS, "got %#lx\n", status);
+    status = BCryptDeriveKey(secret, L"HASH", NULL, NULL, 0, &size, 0);
+    ok(status == STATUS_SUCCESS, "got %#lx\n", status);
 
         status = BCryptDestroyHash(secret);
         ok(status == STATUS_INVALID_PARAMETER, "got %#lx\n", status);
