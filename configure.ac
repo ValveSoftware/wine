@@ -1496,6 +1496,14 @@ WINE_PACKAGE_FLAGS(DRMAMDGPU,[libdrm_amdgpu],,,,
     [AC_CHECK_HEADERS([amdgpu_drm.h],
         [WINE_CHECK_SONAME(drm_amdgpu,amdgpu_query_info,,,[$DRMAMDGPU_LIBS])])])
 
+dnl **** Check for libgmp ****
+if test "x$with_gnutls" != "xno"
+then
+    WINE_PACKAGE_FLAGS(GMP,[gmp],[-lgmp],,,
+        [AC_CHECK_HEADERS([gmp.h],
+            [WINE_CHECK_SONAME(gmp,__gmpz_init,,[GMP_CFLAGS=""],[$GMP_LIBS],[[libgmp-*]])])])
+fi
+
 dnl **** Check for SANE ****
 if test "x$with_sane" != "xno"
 then

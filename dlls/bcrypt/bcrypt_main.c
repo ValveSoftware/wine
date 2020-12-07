@@ -853,6 +853,21 @@ static NTSTATUS set_alg_property( struct algorithm *alg, const WCHAR *prop, UCHA
 
 static NTSTATUS set_key_property( struct key *key, const WCHAR *prop, UCHAR *value, ULONG size, ULONG flags )
 {
+    if (key->alg_id == ALG_ID_DH)
+    {
+        if (!lstrcmpW( prop, BCRYPT_DH_PARAMETERS ))
+        {
+            struct key_asymmetric_import_params params;
+
+            params.key   = key;
+            params.flags = KEY_IMPORT_FLAG_DH_PARAMETERS;
+            params.buf   = value;
+            params.len   = size;
+            return UNIX_CALL( key_asymmetric_import, &params );
+        }
+        return STATUS_NOT_IMPLEMENTED;
+    }
+
     if (!wcscmp( prop, BCRYPT_CHAINING_MODE ))
     {
         if (!wcscmp( (WCHAR *)value, BCRYPT_CHAIN_MODE_ECB ))
@@ -902,6 +917,20 @@ static NTSTATUS get_hash_property( const struct hash *hash, const WCHAR *prop, U
     return status;
 }
 
+static NTSTATUS get_dh_property( const struct key *key, const WCHAR *prop, UCHAR *buf, ULONG size, ULONG *ret_size )
+{
+    struct key_asymmetric_export_params params;
+
+    if (wcscmp( prop, BCRYPT_DH_PARAMETERS )) return STATUS_NOT_SUPPORTED;
+
+    params.key     = (struct key *)key;
+    params.flags   = KEY_EXPORT_FLAG_DH_PARAMETERS;
+    params.buf     = buf;
+    params.len     = size;
+    params.ret_len = ret_size;
+    return UNIX_CALL( key_asymmetric_export, &params );
+}
+
 static NTSTATUS get_key_property( const struct key *key, const WCHAR *prop, UCHAR *buf, ULONG size, ULONG *ret_size )
 {
     if (!wcscmp( prop, BCRYPT_KEY_STRENGTH ))
@@ -924,6 +953,9 @@ static NTSTATUS get_key_property( const struct key *key, const WCHAR *prop, UCHA
     case ALG_ID_AES:
         if (!wcscmp( prop, BCRYPT_AUTH_TAG_LENGTH )) return STATUS_NOT_SUPPORTED;
         return get_aes_property( key->u.s.mode, prop, buf, size, ret_size );
+
+    case ALG_ID_DH:
+        return get_dh_property( key, prop, buf, size, ret_size );
 
     default:
         FIXME( "unsupported algorithm %u\n", key->alg_id );
@@ -1175,6 +1207,8 @@ static NTSTATUS key_asymmetric_create( enum alg_id alg_id, ULONG bitlen, struct 
         ERR( "no encryption support\n" );
         return STATUS_NOT_IMPLEMENTED;
     }
+
+    if (alg_id == ALG_ID_DH && bitlen < 512) return STATUS_INVALID_PARAMETER;
 
     if (!(key = calloc( 1, sizeof(*key) ))) return STATUS_NO_MEMORY;
     key->hdr.magic  = MAGIC_KEY;
@@ -2488,6 +2522,9 @@ NTSTATUS WINAPI BCryptSecretAgreement( BCRYPT_KEY_HANDLE privkey_handle, BCRYPT_
     if (!privkey || !pubkey) return STATUS_INVALID_HANDLE;
     if (!is_agreement_key( privkey ) || !is_agreement_key( pubkey )) return STATUS_NOT_SUPPORTED;
     if (!ret_handle) return STATUS_INVALID_PARAMETER;
+    if (privkey->alg_id != pubkey->alg_id) return STATUS_INVALID_PARAMETER;
+    if (privkey->alg_id == ALG_ID_DH && !(privkey->u.a.flags & pubkey->u.a.flags & KEY_FLAG_FINALIZED)) return STATUS_INVALID_PARAMETER;
+    if (privkey->u.a.bitlen != pubkey->u.a.bitlen) return STATUS_INVALID_PARAMETER;
 
     if (!(secret = calloc( 1, sizeof(*secret) ))) return STATUS_NO_MEMORY;
     secret->hdr.magic = MAGIC_SECRET;

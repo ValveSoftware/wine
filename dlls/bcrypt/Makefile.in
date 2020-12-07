@@ -2,7 +2,7 @@ MODULE    = bcrypt.dll
 IMPORTS   = advapi32
 IMPORTLIB = bcrypt
 UNIXLIB   = bcrypt.so
-UNIX_CFLAGS = $(GNUTLS_CFLAGS)
+UNIX_CFLAGS = $(GNUTLS_CFLAGS) $(GMP_CFLAGS)
 
 SOURCES = \
 	bcrypt_main.c \

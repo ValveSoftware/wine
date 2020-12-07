@@ -3236,12 +3236,7 @@ static void test_DH(void)
     ok(key != NULL, "key not set\n");
 
     status = BCryptFinalizeKeyPair(key, 0);
-    todo_wine ok(status == STATUS_SUCCESS, "got %#lx\n", status);
-    if (status != STATUS_SUCCESS)
-    {
-        BCryptDestroyKey(key);
-        return;
-    }
+    ok(status == STATUS_SUCCESS, "got %#lx\n", status);
 
     size = 0;
     status = BCryptExportKey(key, NULL, BCRYPT_DH_PUBLIC_BLOB, NULL, 0, &size, 0);
@@ -3914,7 +3909,7 @@ static void test_SecretAgreement(void)
         BCryptCloseAlgorithmProvider(alg, 0);
         return;
     }
-    todo_wine ok(status == STATUS_SUCCESS, "got %#lx\n", status);
+    ok(status == STATUS_SUCCESS, "got %#lx\n", status);
 
     status = BCryptSecretAgreement(key, key, &secret, 0);
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
@@ -3923,7 +3918,7 @@ static void test_SecretAgreement(void)
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
 
     status = BCryptDeriveKey(secret, L"HASH", NULL, NULL, 0, &size, 0);
-    todo_wine ok(status == STATUS_SUCCESS, "got %#lx\n", status);
+    ok(status == STATUS_SUCCESS, "got %#lx\n", status);
 
     status = BCryptDestroySecret(secret);
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
@@ -4086,6 +4081,9 @@ static void test_dh_SecretAgreement(void)
     status = BCryptImportKeyPair(alg, NULL, BCRYPT_DH_PRIVATE_BLOB, &key, buffer, size, 0);
     ok(status == STATUS_SUCCESS, "got %08lx\n", status);
 
+    status = BCryptFinalizeKeyPair(key, 0);
+    ok(status == STATUS_INVALID_HANDLE, "got %08lx\n", status);
+
     memset(buffer, 0xcc, sizeof(buffer));
     size = 0xdeadbeef;
     status = BCryptExportKey(key, NULL, BCRYPT_DH_PUBLIC_BLOB, NULL, 0, &size, 0);
@@ -4101,6 +4099,14 @@ static void test_dh_SecretAgreement(void)
     ok(dh_key_blob->cbKey == length / 8, "Got unexpected length %lu.\n", dh_key_blob->cbKey);
     ok(!memcmp(dh_key_blob + 1, private_key_data, length / 8 * 3), "Key data does not match.\n");
 
+    status = BCryptImportKeyPair(alg, NULL, BCRYPT_DH_PUBLIC_BLOB, &key2, buffer, size, 0);
+    ok(status == STATUS_SUCCESS, "got %#lx.\n", status);
+    status = BCryptFinalizeKeyPair(key2, 0);
+    ok(status == STATUS_INVALID_HANDLE, "got %#lx.\n", status);
+    status = BCryptSecretAgreement(key2, key2, &secret, 0);
+    todo_wine ok(status == STATUS_INVALID_PARAMETER, "got %08lx\n", status);
+    BCryptDestroyKey(key2);
+
     status = BCryptGenerateKeyPair(alg, &key2, length, 0);
     ok(status == STATUS_SUCCESS, "got %08lx\n", status);
     dh_header = (BCRYPT_DH_PARAMETER_HEADER *)buffer;
@@ -4110,8 +4116,15 @@ static void test_dh_SecretAgreement(void)
     memcpy(dh_header + 1, private_key_data, length / 8 * 2);
     status = BCryptSetProperty(key2, BCRYPT_DH_PARAMETERS, buffer, dh_header->cbLength, 0);
     ok(status == STATUS_SUCCESS, "got %08lx\n", status);
+    status = BCryptSetProperty(key2, BCRYPT_DH_PARAMETERS, buffer, dh_header->cbLength, 0);
+    ok(status == STATUS_SUCCESS, "got %08lx\n", status);
     status = BCryptFinalizeKeyPair(key2, 0);
     ok(status == STATUS_SUCCESS, "got %08lx\n", status);
+    if (0)
+    {
+        /* Crashes on Windows. */
+        BCryptSetProperty(key2, BCRYPT_DH_PARAMETERS, buffer, dh_header->cbLength, 0);
+    }
 
     status = BCryptExportKey(key2, NULL, BCRYPT_DH_PUBLIC_BLOB, buffer, sizeof(buffer), &size, 0);
     ok(status == STATUS_SUCCESS, "got %08lx\n", status);
