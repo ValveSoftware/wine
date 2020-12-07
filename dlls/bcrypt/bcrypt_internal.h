@@ -121,6 +121,7 @@ struct key_symmetric
 
 #define KEY_FLAG_LEGACY_DSA_V2  0x00000001
 #define KEY_FLAG_FINALIZED      0x00000002
+#define KEY_FLAG_DH_PARAMS_SET  0x00000004
 
 struct key_asymmetric
 {
