@@ -2843,10 +2843,13 @@ static void test_ECDH(void)
         win_skip("BCRYPT_KDF_RAW_SECRET not supported\n");
         goto raw_secret_end;
     }
-    todo_wine ok(status == STATUS_SUCCESS, "got %#lx\n", status);
-    if (status != STATUS_SUCCESS) goto raw_secret_end;
+    ok(status == STATUS_SUCCESS, "got %#lx\n", status);
 
     ok(size == 32, "size of secret key incorrect, got %lu, expected 32\n", size);
+    if (!size)
+        goto raw_secret_end;
+
+
     buf = malloc(size);
     status = BCryptDeriveKey(secret, BCRYPT_KDF_RAW_SECRET, NULL, buf, size, &size, 0);
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
@@ -2855,14 +2858,14 @@ static void test_ECDH(void)
 
 raw_secret_end:
     status = BCryptDeriveKey(secret, BCRYPT_KDF_HASH, &hash_params, NULL, 0, &size, 0);
-    todo_wine ok (status == STATUS_SUCCESS, "got %#lx\n", status);
+    ok (status == STATUS_SUCCESS, "got %#lx\n", status);
     if (status != STATUS_SUCCESS) goto derive_end;
 
     ok (size == 20, "got %lu\n", size);
     buf = malloc(size);
     status = BCryptDeriveKey(secret, BCRYPT_KDF_HASH, &hash_params, buf, size, &size, 0);
     ok(status == STATUS_SUCCESS, "got %#lx\n", status);
-    todo_wine ok(!(memcmp(hashed_secret, buf, size)), "wrong data\n");
+    ok(!(memcmp(hashed_secret, buf, size)), "wrong data\n");
     free(buf);
 
     /* ulVersion is not verified */

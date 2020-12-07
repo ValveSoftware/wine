@@ -57,6 +57,10 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#ifdef HAVE_GCRYPT_H
+#include <gcrypt.h>
+#endif
+
 WINE_DEFAULT_DEBUG_CHANNEL(bcrypt);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
@@ -193,6 +197,12 @@ static int (*pgnutls_dh_params_import_raw2)(gnutls_dh_params_t dh_params, const 
 static int (*pgnutls_dh_params_export_raw)(gnutls_dh_params_t params, gnutls_datum_t * prime,
         gnutls_datum_t * generator, unsigned int *bits);
 
+static int (*pgnutls_ecdh_compute_key)(gnutls_ecc_curve_t curve,
+        const gnutls_datum_t *x, const gnutls_datum_t *y,
+        const gnutls_datum_t *k,
+        const gnutls_datum_t *peer_x, const gnutls_datum_t *peer_y,
+        gnutls_datum_t *Z);
+
 static void *libgnutls_handle;
 
 #define MAKE_FUNCPTR(f) static typeof(f) * p##f
@@ -230,6 +240,24 @@ MAKE_FUNCPTR(mpz_mod);
 MAKE_FUNCPTR(mpz_powm);
 MAKE_FUNCPTR(mpz_sub_ui);
 #endif
+
+#if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
+static BOOL gcrypt_available;
+static void *libgcrypt_handle;
+
+MAKE_FUNCPTR(gcry_check_version);
+MAKE_FUNCPTR(gcry_sexp_build);
+MAKE_FUNCPTR(gcry_pk_encrypt);
+MAKE_FUNCPTR(gcry_mpi_new);
+MAKE_FUNCPTR(gcry_mpi_print);
+MAKE_FUNCPTR(gcry_sexp_release);
+MAKE_FUNCPTR(gcry_mpi_release);
+MAKE_FUNCPTR(gcry_strsource);
+MAKE_FUNCPTR(gcry_strerror);
+MAKE_FUNCPTR(gcry_sexp_find_token);
+MAKE_FUNCPTR(gcry_sexp_nth_mpi);
+#endif
+
 #undef MAKE_FUNCPTR
 
 static int compat_gnutls_cipher_tag(gnutls_cipher_hd_t handle, void *tag, size_t tag_size)
@@ -450,6 +478,36 @@ static NTSTATUS gnutls_process_attach( void *args )
 #undef LOAD_FUNCPTR_STR
 #endif
 
+#if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
+#define LOAD_FUNCPTR(f) \
+    if (!(p##f = dlsym( libgcrypt_handle, #f ))) \
+    { \
+        WARN( "failed to load %s\n", #f ); \
+        gcrypt_available = FALSE; \
+    }
+
+    if ((libgcrypt_handle = dlopen( SONAME_LIBGCRYPT, RTLD_NOW )))
+    {
+        gcrypt_available = TRUE;
+
+        LOAD_FUNCPTR(gcry_check_version);
+        LOAD_FUNCPTR(gcry_sexp_build);
+        LOAD_FUNCPTR(gcry_pk_encrypt);
+        LOAD_FUNCPTR(gcry_mpi_new);
+        LOAD_FUNCPTR(gcry_mpi_print);
+        LOAD_FUNCPTR(gcry_sexp_release);
+        LOAD_FUNCPTR(gcry_mpi_release);
+        LOAD_FUNCPTR(gcry_strsource);
+        LOAD_FUNCPTR(gcry_strerror);
+        LOAD_FUNCPTR(gcry_sexp_find_token);
+        LOAD_FUNCPTR(gcry_sexp_nth_mpi);
+    }
+    else
+        WARN("failed to load gcrypt, no support for ECC secret agreement\n");
+
+#undef LOAD_FUNCPTR
+#endif
+
 #define LOAD_FUNCPTR_OPT(f) \
     if (!(p##f = dlsym( libgnutls_handle, #f ))) \
     { \
@@ -517,6 +575,12 @@ static NTSTATUS gnutls_process_attach( void *args )
     ERR_(winediag)("Compiled without DH support.\n");
 #endif
 
+    if (!(pgnutls_ecdh_compute_key = dlsym( libgnutls_handle, "_gnutls_ecdh_compute_key" ))
+            && !(pgnutls_ecdh_compute_key = dlsym( libgnutls_handle, "gnutls_ecdh_compute_key" )))
+    {
+        WARN("gnutls_ecdh_compute_key not found\n");
+    }
+
     if (TRACE_ON( bcrypt ))
     {
         pgnutls_global_set_log_level( 4 );
@@ -552,6 +616,11 @@ static NTSTATUS gnutls_process_detach( void *args )
 #if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
     dlclose( libgmp_handle );
     libgmp_handle = NULL;
+#endif
+
+#if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
+    dlclose( libgcrypt_handle );
+    libgcrypt_handle = NULL;
 #endif
 }
 
@@ -2657,12 +2726,66 @@ static NTSTATUS key_asymmetric_encrypt( void *args )
     return status;
 }
 
+#if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
+static NTSTATUS gcrypt_extract_result_into_secret(gcry_sexp_t result, struct secret *secret)
+{
+    NTSTATUS status = STATUS_SUCCESS;
+    gcry_mpi_t fullcoords = NULL;
+    gcry_sexp_t fragment = NULL;
+    UCHAR *tmp_buffer = NULL;
+    gcry_error_t err;
+    size_t size;
+
+    fragment = pgcry_sexp_find_token( result, "s", 0 );
+    if (!fragment)
+    {
+        status = STATUS_NO_MEMORY;
+        goto done;
+    }
+
+    fullcoords = pgcry_sexp_nth_mpi( fragment, 1, GCRYMPI_FMT_USG );
+    if (!fullcoords)
+    {
+        status = STATUS_NO_MEMORY;
+        goto done;
+    }
+
+    if ((err = pgcry_mpi_print( GCRYMPI_FMT_USG, NULL, 0, &size, fullcoords)) )
+    {
+        ERR("Error = %s/%s.\n", pgcry_strsource( err ), pgcry_strerror( err ));
+        status = STATUS_INTERNAL_ERROR;
+        goto done;
+    }
+
+    tmp_buffer = malloc(size);
+    if ((err = pgcry_mpi_print( GCRYMPI_FMT_STD, tmp_buffer, size, NULL, fullcoords)) )
+    {
+        ERR( "Error = %s/%s.\n", pgcry_strsource(err), pgcry_strerror(err) );
+        status = STATUS_INTERNAL_ERROR;
+        goto done;
+    }
+
+    memcpy( secret->data, tmp_buffer + size % 2, size / 2 );
+    secret->data_len = size / 2;
+
+done:
+    free( tmp_buffer );
+
+    pgcry_mpi_release( fullcoords );
+    pgcry_sexp_release( fragment );
+
+    return status;
+}
+#endif
+
+
 static NTSTATUS key_secret_agreement( void *args )
 {
     struct key_secret_agreement_params *params = args;
     struct secret *secret;
     struct key *priv_key;
     struct key *peer_key;
+
     priv_key = params->privkey;
     peer_key = params->pubkey;
     secret = params->secret;
@@ -2723,8 +2846,111 @@ static NTSTATUS key_secret_agreement( void *args )
 #endif
 
         case ALG_ID_ECDH_P256:
-            FIXME("ECDH is not supported.\n");
+        case ALG_ID_ECDH_P384:
+/* this is necessary since GNUTLS doesn't support ECDH public key encryption, maybe we can replace this when it does:
+   https://github.com/gnutls/gnutls/blob/cdc4fc288d87f91f974aa23b6e8595a53970ce00/lib/nettle/pk.c#L495 */
+#if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
+        {
+            gcry_sexp_t xchg_result = NULL;
+            gcry_sexp_t privkey = NULL;
+            gcry_sexp_t pubkey = NULL;
+            const char *pubkey_format;
+            BCRYPT_ECCKEY_BLOB *h;
+            UCHAR *privkey_blob;
+            UCHAR *pubkey_raw;
+            gcry_error_t err;
+            ULONG key_length;
+            NTSTATUS status;
+            ULONG key_len;
+
+            if (!gcrypt_available)
+            {
+                ERR("ECDH secret agreement is not available.\n");
+                return STATUS_NOT_IMPLEMENTED;
+            }
+
+            if (priv_key->alg_id == ALG_ID_ECDH_P256)
+            {
+                pubkey_format = "NIST P-256";
+                key_length = 32;
+            }
+            else if (priv_key->alg_id == ALG_ID_ECDH_P384)
+            {
+                pubkey_format = "NIST P-384";
+                key_length = 48;
+            }
+            else return STATUS_NOT_IMPLEMENTED;
+
+            if (key_length != priv_key->u.a.bitlen / 8)
+            {
+                ERR( "Key length mismatch, key->u.a.bitlen %u, key_length %u.\n", (int)priv_key->u.a.bitlen,
+                     (int)key_length );
+                return STATUS_INVALID_PARAMETER;
+            }
+
+            if ((status = key_export_ecc( priv_key, NULL, 0, &key_len )))
+                return status;
+            privkey_blob = malloc( key_len );
+            if ((status = key_export_ecc( priv_key, privkey_blob, key_len, &key_len )))
+            {
+                free( privkey_blob );
+                return status;
+            }
+
+            if ((status = key_export_ecc_public( peer_key, NULL, 0, &key_len )))
+                return status;
+            h = malloc( key_len );
+            if ((status = key_export_ecc_public( peer_key, (UCHAR *)h, key_len, &key_len )))
+            {
+                free( privkey_blob );
+                return status;
+            }
+
+            /* copy public key into temporary buffer so we can prepend 0x04 (to indicate it is uncompressed) */
+            pubkey_raw = malloc( (key_length * 2) + 1 );
+            pubkey_raw[0] = 0x04;
+            memcpy( pubkey_raw + 1, h + 1, key_length * 2 );
+            free( h );
+
+            err = pgcry_sexp_build( &pubkey, NULL, "(key-data(public-key(ecdh(curve %s)(q %b))))", pubkey_format,
+                                   (key_length * 2) + 1, pubkey_raw );
+            free( pubkey_raw );
+            if (err)
+            {
+                free( privkey_blob );
+                ERR( "Failed to build gcrypt public key. err %s/%s\n", pgcry_strsource( err ), pgcry_strerror( err ));
+                return STATUS_INTERNAL_ERROR;
+            }
+
+            err = pgcry_sexp_build( &privkey, NULL, "(data(flags raw)(value %b))", key_length,
+                                   privkey_blob + sizeof(BCRYPT_ECCKEY_BLOB) + key_length * 2 );
+            free( privkey_blob );
+            if (err)
+            {
+                pgcry_sexp_release( pubkey );
+                return STATUS_INTERNAL_ERROR;
+            }
+            err = pgcry_pk_encrypt( &xchg_result, privkey, pubkey );
+            pgcry_sexp_release( privkey );
+            pgcry_sexp_release( pubkey );
+            if (err)
+            {
+                ERR( "Failed to perform key exchange. err %s/%s\n", pgcry_strsource( err ), pgcry_strerror( err ));
+                return STATUS_INTERNAL_ERROR;
+            }
+            status = gcrypt_extract_result_into_secret( xchg_result, secret );
+            pgcry_sexp_release(xchg_result);
+            if (status)
+            {
+                ERR("Failed to extract secret key.\n");
+                return status;
+            }
             break;
+        }
+#else
+            WARN("Compiled without ECC secret support.\n");
+            return STATUS_NOT_IMPLEMENTED;
+#endif
 
         default:
             ERR( "unhandled algorithm %u\n", priv_key->alg_id );
