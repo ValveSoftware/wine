@@ -1500,6 +1500,19 @@ X11DRV_KEYBOARD_DetectLayout( Display *display )
       for (i = 0; i < syms; i++) {
         if (!(keysym = XkbKeycodeToKeysym( display, keyc, 0, i ))) continue;
         ckey[keyc][i] = keysym_to_char(keysym);
+        if (TRACE_ON(keyboard))
+        {
+            char buf[32];
+            WCHAR bufW[32];
+            int len, lenW;
+            KeySym orig_keysym = keysym;
+            len = XkbTranslateKeySym(display, &keysym, 0, buf, sizeof(buf), NULL);
+            lenW = ntdll_umbstowcs(buf, len, bufW, ARRAY_SIZE(bufW));
+            if (lenW < ARRAY_SIZE(bufW))
+                bufW[lenW] = 0;
+            TRACE("keycode %u, index %d, orig_keysym 0x%04lx, keysym 0x%04lx, buf %s, bufW %s\n",
+                    keyc, i, orig_keysym, keysym, debugstr_a(buf), debugstr_w(bufW));
+        }
       }
   }
 
