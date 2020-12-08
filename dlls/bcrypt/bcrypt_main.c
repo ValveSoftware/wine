@@ -488,14 +488,14 @@ static NTSTATUS generic_alg_property( enum alg_id id, const WCHAR *prop, UCHAR *
 
 static NTSTATUS get_3des_property( enum mode_id mode, const WCHAR *prop, UCHAR *buf, ULONG size, ULONG *ret_size )
 {
-    if (!wcscmp( prop, BCRYPT_BLOCK_LENGTH ))
+    if (!lstrcmpW( prop, BCRYPT_BLOCK_LENGTH ))
     {
         *ret_size = sizeof(ULONG);
         if (size < sizeof(ULONG)) return STATUS_BUFFER_TOO_SMALL;
         if (buf) *(ULONG *)buf = BLOCK_LENGTH_3DES;
         return STATUS_SUCCESS;
     }
-    if (!wcscmp( prop, BCRYPT_CHAINING_MODE ))
+    if (!lstrcmpW( prop, BCRYPT_CHAINING_MODE ))
     {
         const WCHAR *str;
         switch (mode)
@@ -509,7 +509,7 @@ static NTSTATUS get_3des_property( enum mode_id mode, const WCHAR *prop, UCHAR *
         memcpy( buf, str, (lstrlenW(str) + 1) * sizeof(WCHAR) );
         return STATUS_SUCCESS;
     }
-    if (!wcscmp( prop, BCRYPT_KEY_LENGTHS ))
+    if (!lstrcmpW( prop, BCRYPT_KEY_LENGTHS ))
     {
         BCRYPT_KEY_LENGTHS_STRUCT *key_lengths = (void *)buf;
         *ret_size = sizeof(*key_lengths);
@@ -639,9 +639,9 @@ static NTSTATUS set_alg_property( struct algorithm *alg, const WCHAR *prop, UCHA
     switch (alg->id)
     {
     case ALG_ID_3DES:
-        if (!wcscmp( prop, BCRYPT_CHAINING_MODE ))
+        if (!lstrcmpW( prop, BCRYPT_CHAINING_MODE ))
         {
-            if (!wcscmp( (WCHAR *)value, BCRYPT_CHAIN_MODE_CBC ))
+            if (!lstrcmpW( (WCHAR *)value, BCRYPT_CHAIN_MODE_CBC ))
             {
                 alg->mode = MODE_ID_CBC;
                 return STATUS_SUCCESS;
