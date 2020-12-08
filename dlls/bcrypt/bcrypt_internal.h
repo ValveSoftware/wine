@@ -136,6 +136,7 @@ enum alg_id
     ALG_ID_RSA,
 
     /* secret agreement */
+    ALG_ID_DH,
     ALG_ID_ECDH_P256,
 
     /* signature */
@@ -163,6 +164,9 @@ struct algorithm
     ULONG         flags;
 };
 
+#define KEY_FLAG_DH_PARAMS_SET  0x00000002
+#define KEY_FLAG_FINALIZED      0x00000004
+
 #if defined(HAVE_GNUTLS_CIPHER_INIT)
 struct key_symmetric
 {
@@ -179,9 +183,11 @@ struct key_asymmetric
 {
     gnutls_privkey_t  handle;
     ULONG             bitlen;     /* ignored for ECC keys */
+    ULONG             flags;
     UCHAR            *pubkey;
     ULONG             pubkey_len;
     DSSSEED           dss_seed;
+    UCHAR            *privkey;    /* Used for DH private key only. */
 };
 
 struct key
@@ -244,6 +250,8 @@ struct key
 struct secret
 {
     struct object hdr;
+    UCHAR *data;
+    ULONG  data_len;
 };
 
 NTSTATUS get_alg_property( const struct algorithm *, const WCHAR *, UCHAR *, ULONG, ULONG * ) DECLSPEC_HIDDEN;
@@ -265,6 +273,7 @@ NTSTATUS key_export_dsa_capi( struct key *, UCHAR *, ULONG, ULONG * ) DECLSPEC_H
 NTSTATUS key_export_ecc( struct key *, UCHAR *, ULONG, ULONG * ) DECLSPEC_HIDDEN;
 NTSTATUS key_import_dsa_capi( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
 NTSTATUS key_import_ecc( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
+NTSTATUS key_secret_agreement( struct key *, struct key *, struct secret * );
 
 BOOL is_zero_vector( const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
 BOOL is_equal_vector( const UCHAR *, ULONG, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
