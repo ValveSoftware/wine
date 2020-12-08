@@ -1633,6 +1633,223 @@ static void test_clip_box(void)
     DeleteObject(bitmap);
 }
 
+static void test_multi_monitor_dc(void)
+{
+    INT value, count, old_count;
+    DWORD device_idx, mode_idx;
+    DEVMODEA dm, dm2, dm3;
+    DISPLAY_DEVICEA dd;
+    BOOL ret;
+    LONG res;
+    HDC hdc;
+
+    /* Test DCs covering the entire virtual screen */
+    hdc = CreateDCA("DISPLAY", NULL, NULL, NULL);
+    ok(!!hdc, "CreateDCA failed.\n");
+
+    memset(&dm, 0, sizeof(dm));
+    dm.dmSize = sizeof(dm);
+    ret = EnumDisplaySettingsA(NULL, ENUM_CURRENT_SETTINGS, &dm);
+    ok(ret, "EnumDisplaySettingsA failed.\n");
+
+    value = GetDeviceCaps(hdc, HORZRES);
+    ok(value == dm.dmPelsWidth, "Expected %d, got %d.\n", dm.dmPelsWidth, value);
+
+    value = GetDeviceCaps(hdc, VERTRES);
+    ok(value == dm.dmPelsHeight, "Expected %d, got %d.\n", dm.dmPelsHeight, value);
+
+    value = GetDeviceCaps(hdc, DESKTOPHORZRES);
+    todo_wine_if(dm.dmPelsWidth != GetSystemMetrics(SM_CXVIRTUALSCREEN)
+                 && value == GetSystemMetrics(SM_CXVIRTUALSCREEN))
+    ok(value == dm.dmPelsWidth, "Expected %d, got %d.\n", dm.dmPelsWidth, value);
+
+    value = GetDeviceCaps(hdc, DESKTOPVERTRES);
+    todo_wine_if(dm.dmPelsHeight != GetSystemMetrics(SM_CYVIRTUALSCREEN)
+                 && value == GetSystemMetrics(SM_CYVIRTUALSCREEN))
+    ok(value == dm.dmPelsHeight, "Expected %d, got %d.\n", dm.dmPelsHeight, value);
+
+    value = GetDeviceCaps(hdc, VREFRESH);
+    todo_wine_if(value != dm.dmDisplayFrequency && value == 1)
+    ok(value == dm.dmDisplayFrequency, "Expected %d, got %d.\n", dm.dmDisplayFrequency, value);
+
+    /* Test GetDeviceCaps() values after mode changes */
+    memset(&dm2, 0, sizeof(dm2));
+    dm2.dmSize = sizeof(dm2);
+    for (mode_idx = 0; EnumDisplaySettingsA(NULL, mode_idx, &dm2); ++mode_idx)
+    {
+        if (dm2.dmPelsWidth != dm.dmPelsWidth && dm2.dmPelsHeight != dm.dmPelsHeight)
+            break;
+    }
+    ok(dm2.dmPelsWidth && dm2.dmPelsWidth != dm.dmPelsWidth && dm2.dmPelsHeight != dm.dmPelsHeight,
+       "Failed to find a different resolution.\n");
+
+    res = ChangeDisplaySettingsExA(NULL, &dm2, NULL, CDS_RESET, NULL);
+    ok(res == DISP_CHANGE_SUCCESSFUL || broken(res == DISP_CHANGE_FAILED), /* Win8 TestBots */
+       "ChangeDisplaySettingsExA returned unexpected %d.\n", res);
+    if (res == DISP_CHANGE_SUCCESSFUL)
+    {
+        value = GetDeviceCaps(hdc, HORZRES);
+        ok(value == dm2.dmPelsWidth, "Expected %d, got %d.\n", dm2.dmPelsWidth, value);
+
+        value = GetDeviceCaps(hdc, VERTRES);
+        ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
+
+        value = GetDeviceCaps(hdc, DESKTOPHORZRES);
+        todo_wine_if(dm2.dmPelsWidth != GetSystemMetrics(SM_CXVIRTUALSCREEN)
+                     && value == GetSystemMetrics(SM_CXVIRTUALSCREEN))
+        ok(value == dm2.dmPelsWidth, "Expected %d, got %d.\n", dm2.dmPelsWidth, value);
+
+        value = GetDeviceCaps(hdc, DESKTOPVERTRES);
+        todo_wine_if(dm2.dmPelsHeight != GetSystemMetrics(SM_CYVIRTUALSCREEN)
+                     && value == GetSystemMetrics(SM_CYVIRTUALSCREEN))
+        ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
+
+        value = GetDeviceCaps(hdc, VREFRESH);
+        todo_wine_if(value != dm2.dmDisplayFrequency && value == 1)
+        ok(value == dm2.dmDisplayFrequency, "Expected %d, got %d.\n", dm2.dmDisplayFrequency, value);
+
+        res = ChangeDisplaySettingsExA(NULL, NULL, NULL, 0, NULL);
+        ok(res == DISP_CHANGE_SUCCESSFUL, "ChangeDisplaySettingsExA returned unexpected %d.\n", res);
+    }
+
+    DeleteDC(hdc);
+
+    /* Test DCs covering a specific monitor */
+    dd.cb = sizeof(dd);
+    for (device_idx = 0; EnumDisplayDevicesA(NULL, device_idx, &dd, 0); ++device_idx)
+    {
+        if (!(dd.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP))
+            continue;
+
+        memset(&dm, 0, sizeof(dm));
+        dm.dmSize = sizeof(dm);
+        ret = EnumDisplaySettingsA(dd.DeviceName, ENUM_CURRENT_SETTINGS, &dm);
+        ok(ret, "EnumDisplaySettingsA %s failed.\n", dd.DeviceName);
+
+        hdc = CreateDCA(dd.DeviceName, NULL, NULL, NULL);
+        ok(!!hdc, "CreateDCA %s failed.\n", dd.DeviceName);
+
+        value = GetDeviceCaps(hdc, HORZRES);
+        todo_wine_if(dm.dmPelsWidth != GetSystemMetrics(SM_CXSCREEN))
+        ok(value == dm.dmPelsWidth, "Expected %d, got %d.\n", dm.dmPelsWidth, value);
+
+        value = GetDeviceCaps(hdc, VERTRES);
+        todo_wine_if(dm.dmPelsHeight != GetSystemMetrics(SM_CYSCREEN))
+        ok(value == dm.dmPelsHeight, "Expected %d, got %d.\n", dm.dmPelsHeight, value);
+
+        value = GetDeviceCaps(hdc, DESKTOPHORZRES);
+        todo_wine_if(dm.dmPelsWidth != GetSystemMetrics(SM_CXVIRTUALSCREEN)
+                     && value == GetSystemMetrics(SM_CXVIRTUALSCREEN))
+        ok(value == dm.dmPelsWidth, "Expected %d, got %d.\n", dm.dmPelsWidth, value);
+
+        value = GetDeviceCaps(hdc, DESKTOPVERTRES);
+        todo_wine_if(dm.dmPelsHeight != GetSystemMetrics(SM_CYVIRTUALSCREEN)
+                     && value == GetSystemMetrics(SM_CYVIRTUALSCREEN))
+        ok(value == dm.dmPelsHeight, "Expected %d, got %d.\n", dm.dmPelsHeight, value);
+
+        value = GetDeviceCaps(hdc, VREFRESH);
+        todo_wine_if(value != dm.dmDisplayFrequency && value == 1)
+        ok(value == dm.dmDisplayFrequency, "Expected %d, got %d.\n", dm.dmDisplayFrequency, value);
+
+        /* Test GetDeviceCaps() values after mode changes */
+        memset(&dm2, 0, sizeof(dm2));
+        dm2.dmSize = sizeof(dm2);
+        for (mode_idx = 0; EnumDisplaySettingsA(dd.DeviceName, mode_idx, &dm2); ++mode_idx)
+        {
+            if (dm2.dmPelsWidth != dm.dmPelsWidth && dm2.dmPelsHeight != dm.dmPelsHeight)
+                break;
+        }
+        ok(dm2.dmPelsWidth && dm2.dmPelsWidth != dm.dmPelsWidth && dm2.dmPelsHeight != dm.dmPelsHeight,
+           "Failed to find a different resolution for %s.\n", dd.DeviceName);
+
+        res = ChangeDisplaySettingsExA(dd.DeviceName, &dm2, NULL, CDS_RESET, NULL);
+        ok(res == DISP_CHANGE_SUCCESSFUL
+           || broken(res == DISP_CHANGE_FAILED), /* Win8 TestBots */
+           "ChangeDisplaySettingsExA %s returned unexpected %d.\n", dd.DeviceName, res);
+        if (res != DISP_CHANGE_SUCCESSFUL)
+        {
+            win_skip("Failed to change display mode for %s.\n", dd.DeviceName);
+            DeleteDC(hdc);
+            continue;
+        }
+
+        value = GetDeviceCaps(hdc, HORZRES);
+        todo_wine_if(dm2.dmPelsWidth != GetSystemMetrics(SM_CXSCREEN))
+        ok(value == dm2.dmPelsWidth, "Expected %d, got %d.\n", dm2.dmPelsWidth, value);
+
+        value = GetDeviceCaps(hdc, VERTRES);
+        todo_wine_if(dm2.dmPelsHeight != GetSystemMetrics(SM_CYSCREEN))
+        ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
+
+        value = GetDeviceCaps(hdc, DESKTOPHORZRES);
+        todo_wine_if(dm2.dmPelsWidth != GetSystemMetrics(SM_CXVIRTUALSCREEN)
+                     && value == GetSystemMetrics(SM_CXVIRTUALSCREEN))
+        ok(value == dm2.dmPelsWidth, "Expected %d, got %d.\n", dm2.dmPelsWidth, value);
+
+        value = GetDeviceCaps(hdc, DESKTOPVERTRES);
+        todo_wine_if(dm2.dmPelsHeight != GetSystemMetrics(SM_CYVIRTUALSCREEN)
+                     && value == GetSystemMetrics(SM_CYVIRTUALSCREEN))
+        ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
+
+        value = GetDeviceCaps(hdc, VREFRESH);
+        todo_wine_if(value != dm2.dmDisplayFrequency && value == 1)
+        ok(value == dm2.dmDisplayFrequency, "Expected %d, got %d.\n", dm2.dmDisplayFrequency, value);
+
+        /* Test GetDeviceCaps() values after monitor detach */
+        if (!(dd.StateFlags & DISPLAY_DEVICE_PRIMARY_DEVICE))
+        {
+            old_count = GetSystemMetrics(SM_CMONITORS);
+
+            ret = EnumDisplaySettingsA(dd.DeviceName, ENUM_CURRENT_SETTINGS, &dm3);
+            ok(ret, "EnumDisplaySettingsA %s failed.\n", dd.DeviceName);
+
+            dm3.dmFields = DM_POSITION | DM_PELSWIDTH | DM_PELSHEIGHT;
+            dm3.dmPelsWidth = 0;
+            dm3.dmPelsHeight = 0;
+            res = ChangeDisplaySettingsExA(dd.DeviceName, &dm3, NULL, CDS_UPDATEREGISTRY | CDS_NORESET, NULL);
+            ok(res == DISP_CHANGE_SUCCESSFUL, "ChangeDisplaySettingsExA %s returned unexpected %d.\n",
+               dd.DeviceName, res);
+            res = ChangeDisplaySettingsExA(dd.DeviceName, NULL, NULL, 0, NULL);
+            ok(res == DISP_CHANGE_SUCCESSFUL, "ChangeDisplaySettingsExA %s returned unexpected %d.\n",
+               dd.DeviceName, res);
+
+            count = GetSystemMetrics(SM_CMONITORS);
+            ok(count == old_count - 1, "Expect monitor count %d, got %d.\n", old_count - 1, count);
+
+            /* Should report the same values before detach */
+            value = GetDeviceCaps(hdc, HORZRES);
+            todo_wine_if(dm2.dmPelsWidth != GetSystemMetrics(SM_CXSCREEN))
+            ok(value == dm2.dmPelsWidth, "Expected %d, got %d.\n", dm2.dmPelsWidth, value);
+
+            value = GetDeviceCaps(hdc, VERTRES);
+            todo_wine_if(dm2.dmPelsHeight != GetSystemMetrics(SM_CYSCREEN))
+            ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
+
+            value = GetDeviceCaps(hdc, DESKTOPHORZRES);
+            todo_wine_if(dm2.dmPelsWidth != GetSystemMetrics(SM_CXVIRTUALSCREEN)
+                         && value == GetSystemMetrics(SM_CXVIRTUALSCREEN))
+            ok(value == dm2.dmPelsWidth, "Expected %d, got %d.\n", dm2.dmPelsWidth, value);
+
+            value = GetDeviceCaps(hdc, DESKTOPVERTRES);
+            todo_wine_if(dm2.dmPelsHeight != GetSystemMetrics(SM_CYVIRTUALSCREEN)
+                         && value == GetSystemMetrics(SM_CYVIRTUALSCREEN))
+            ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
+
+            value = GetDeviceCaps(hdc, VREFRESH);
+            todo_wine_if(value != dm2.dmDisplayFrequency && value == 1)
+            ok(value == dm2.dmDisplayFrequency, "Expected %d, got %d.\n", dm2.dmDisplayFrequency, value);
+        }
+
+        res = ChangeDisplaySettingsExA(dd.DeviceName, &dm, NULL, CDS_UPDATEREGISTRY | CDS_NORESET, NULL);
+        ok(res == DISP_CHANGE_SUCCESSFUL, "ChangeDisplaySettingsExA %s returned unexpected %d.\n",
+           dd.DeviceName, res);
+        res = ChangeDisplaySettingsExA(NULL, NULL, NULL, 0, NULL);
+        ok(res == DISP_CHANGE_SUCCESSFUL, "ChangeDisplaySettingsExA %s returned unexpected %d.\n",
+           dd.DeviceName, res);
+        DeleteDC(hdc);
+    }
+}
+
 START_TEST(dc)
 {
     test_dc_values();
@@ -1649,4 +1866,5 @@ START_TEST(dc)
     test_printer_dc();
     test_pscript_printer_dc();
     test_clip_box();
+    test_multi_monitor_dc();
 }
