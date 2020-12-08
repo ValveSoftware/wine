@@ -2168,7 +2168,7 @@ static void install_bpf(struct sigaction *sig_act)
 
     {
         const char *sgi = getenv("SteamGameId");
-        if (sgi && !strcmp(sgi, "1174180"))
+        if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210")))
         {
             /* Use specific filter and signal handler for Red Dead Redemption 2 */
             prog.len = ARRAY_SIZE(filter_rdr2);
