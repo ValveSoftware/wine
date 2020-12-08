@@ -101,9 +101,6 @@ MAKE_FUNCPTR(gnutls_cipher_decrypt2);
 MAKE_FUNCPTR(gnutls_cipher_deinit);
 MAKE_FUNCPTR(gnutls_cipher_encrypt2);
 MAKE_FUNCPTR(gnutls_cipher_init);
-MAKE_FUNCPTR(gnutls_dh_params_export_raw);
-MAKE_FUNCPTR(gnutls_dh_params_import_raw2);
-MAKE_FUNCPTR(gnutls_dh_params_init);
 MAKE_FUNCPTR(gnutls_global_deinit);
 MAKE_FUNCPTR(gnutls_global_init);
 MAKE_FUNCPTR(gnutls_global_set_log_function);
@@ -219,9 +216,6 @@ BOOL gnutls_initialize(void)
     LOAD_FUNCPTR(gnutls_cipher_deinit)
     LOAD_FUNCPTR(gnutls_cipher_encrypt2)
     LOAD_FUNCPTR(gnutls_cipher_init)
-    LOAD_FUNCPTR(gnutls_dh_params_export_raw)
-    LOAD_FUNCPTR(gnutls_dh_params_import_raw2)
-    LOAD_FUNCPTR(gnutls_dh_params_init)
     LOAD_FUNCPTR(gnutls_global_deinit)
     LOAD_FUNCPTR(gnutls_global_init)
     LOAD_FUNCPTR(gnutls_global_set_log_function)
@@ -455,26 +449,6 @@ NTSTATUS key_set_property( struct key *key, const WCHAR *prop, UCHAR *value, ULO
             FIXME( "unsupported mode %s\n", debugstr_w((WCHAR *)value) );
             return STATUS_NOT_IMPLEMENTED;
         }
-    }
-    else if (!strcmpW( prop, BCRYPT_DH_PARAMETERS ))
-    {
-        BCRYPT_DH_PARAMETER_HEADER *dh_params = (BCRYPT_DH_PARAMETER_HEADER *)value;
-        gnutls_datum_t prime, generator;
-
-        if (size < sizeof(*dh_params)) return STATUS_INVALID_PARAMETER;
-        if (key->alg_id != ALG_ID_DH || dh_params->dwMagic != BCRYPT_DH_PARAMETERS_MAGIC) return STATUS_NOT_SUPPORTED;
-
-        if (!key->u.a.dh_params)
-            pgnutls_dh_params_init(&key->u.a.dh_params);
-
-        prime.data = value + sizeof(*dh_params);
-        prime.size = dh_params->cbKeyLength;
-
-        generator.data = value + sizeof(*dh_params) + dh_params->cbKeyLength;
-        generator.size = dh_params->cbKeyLength;
-
-        pgnutls_dh_params_import_raw2(key->u.a.dh_params, &prime, &generator, key->u.a.bitlen);
-        return STATUS_SUCCESS;
     }
 
     FIXME( "unsupported key property %s\n", debugstr_w(prop) );
@@ -887,9 +861,6 @@ NTSTATUS key_asymmetric_generate( struct key *key )
         bitlen = GNUTLS_CURVE_TO_BITS( GNUTLS_ECC_CURVE_SECP256R1 );
         break;
 
-    case ALG_ID_DH:
-	return STATUS_SUCCESS;
-
     default:
         FIXME( "algorithm %u not supported\n", key->alg_id );
         return STATUS_NOT_SUPPORTED;
@@ -1163,39 +1134,6 @@ NTSTATUS key_import_dsa_capi( struct key *key, UCHAR *buf, ULONG len )
     return STATUS_SUCCESS;
 }
 
-NTSTATUS key_export_dh( struct key *key, UCHAR *buf, ULONG len, ULONG *ret_len )
-{
-    BCRYPT_DH_KEY_BLOB blob;
-    gnutls_datum_t p, g;
-
-    pgnutls_dh_params_export_raw(key->u.a.dh_params, &p, &g, NULL);
-
-    *ret_len = sizeof(blob) + p.size + g.size /*+ public key size */;
-
-    if (!buf)
-        return STATUS_SUCCESS;
-    if (*ret_len < len)
-        return STATUS_BUFFER_TOO_SMALL;
-
-    memset(&blob, 0, sizeof(blob));
-    blob.dwMagic = BCRYPT_DH_PUBLIC_MAGIC;
-    blob.cbKey = p.size;
-
-    memcpy( buf, &blob, sizeof(blob) );
-    memcpy( buf+sizeof(blob), p.data, p.size );
-    memcpy( buf+sizeof(blob)+p.size, g.data, g.size );
-    /* copy public key to buf+sizeof(blob)+prime.size+generator.size */
-
-    free( p.data ); free( g.data );
-    return STATUS_SUCCESS;
-}
-
-NTSTATUS key_import_pair_dh( struct key *key, UCHAR *buf, ULONG len )
-{
-    BCRYPT_DH_KEY_BLOB *blob = (BCRYPT_DH_KEY_BLOB *)buf;
-    return STATUS_SUCCESS;
-}
-
 NTSTATUS key_asymmetric_init( struct key *key, struct algorithm *alg, ULONG bitlen, const UCHAR *pubkey,
                               ULONG pubkey_len )
 {
@@ -1203,7 +1141,6 @@ NTSTATUS key_asymmetric_init( struct key *key, struct algorithm *alg, ULONG bitl
 
     switch (alg->id)
     {
-    case ALG_ID_DH:
     case ALG_ID_ECDH_P256:
     case ALG_ID_ECDSA_P256:
     case ALG_ID_ECDSA_P384:
