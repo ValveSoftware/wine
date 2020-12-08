@@ -116,7 +116,6 @@ builtin_algorithms[] =
     {  BCRYPT_MD4_ALGORITHM,        BCRYPT_HASH_INTERFACE,                  270,   16,  512 },
     {  BCRYPT_MD2_ALGORITHM,        BCRYPT_HASH_INTERFACE,                  270,   16,  128 },
     {  BCRYPT_RSA_ALGORITHM,        BCRYPT_ASYMMETRIC_ENCRYPTION_INTERFACE, 0,      0,    0 },
-    {  BCRYPT_DH_ALGORITHM,         BCRYPT_SECRET_AGREEMENT_INTERFACE,      0,      0,    0 },
     {  BCRYPT_ECDH_P256_ALGORITHM,  BCRYPT_SECRET_AGREEMENT_INTERFACE,      0,      0,    0 },
     {  BCRYPT_RSA_SIGN_ALGORITHM,   BCRYPT_SIGNATURE_INTERFACE,             0,      0,    0 },
     {  BCRYPT_ECDSA_P256_ALGORITHM, BCRYPT_SIGNATURE_INTERFACE,             0,      0,    0 },
@@ -245,17 +244,6 @@ NTSTATUS WINAPI BCryptOpenAlgorithmProvider( BCRYPT_ALG_HANDLE *handle, LPCWSTR 
     {
         FIXME( "algorithm %s not supported\n", debugstr_w(id) );
         return STATUS_NOT_IMPLEMENTED;
-    }
-
-    if (!strcmpW( id, BCRYPT_DH_ALGORITHM ))
-    {
-        const char *sgi = getenv( "SteamGameId" );
-        if (!sgi || strcmp( sgi, "1174180" ))
-        {
-            /* Only allow the stub DH support to be used by Red Dead Redemption 2 (needed for online mode) */
-            FIXME( "algorithm %s not supported\n", debugstr_w(id) );
-            return STATUS_NOT_IMPLEMENTED;
-        }
     }
 
     if (implementation && strcmpW( implementation, MS_PRIMITIVE_PROVIDER ))
@@ -1030,10 +1018,6 @@ static NTSTATUS key_export( struct key *key, const WCHAR *type, UCHAR *output, U
     {
         return key_export_dsa_capi( key, output, output_len, size );
     }
-    else if (!strcmpW( type, BCRYPT_DH_PUBLIC_BLOB ))
-    {
-        return key_export_dh( key, output, output_len, size );
-    }
 
     FIXME( "unsupported key type %s\n", debugstr_w(type) );
     return STATUS_NOT_IMPLEMENTED;
@@ -1391,31 +1375,6 @@ static NTSTATUS key_import_pair( struct algorithm *alg, const WCHAR *type, BCRYP
             return status;
         }
         if ((status = key_import_dsa_capi( key, input, input_len )))
-        {
-            heap_free( key );
-            return status;
-        }
-
-        *ret_key = key;
-        return STATUS_SUCCESS;
-    }
-    else if (!strcmpW( type, BCRYPT_DH_PUBLIC_BLOB ))
-    {
-        BCRYPT_DH_KEY_BLOB *blob = (BCRYPT_DH_KEY_BLOB *)input;
-
-        if (input_len < sizeof(*blob)) return STATUS_INVALID_PARAMETER;
-        if ((alg->id != ALG_ID_DH) || blob->dwMagic != BCRYPT_DH_PUBLIC_MAGIC)
-            return STATUS_NOT_SUPPORTED;
-
-        if (!(key = heap_alloc_zero( sizeof(*key) ))) return STATUS_NO_MEMORY;
-        key->hdr.magic = MAGIC_KEY;
-
-        if ((status = key_asymmetric_init( key, alg, blob->cbKey / 8, NULL, 0 )))
-        {
-            heap_free( key );
-            return status;
-        }
-        if ((status = key_import_pair_dh( key, input, input_len )))
         {
             heap_free( key );
             return status;

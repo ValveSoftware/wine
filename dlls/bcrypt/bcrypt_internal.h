@@ -135,7 +135,6 @@ enum alg_id
     ALG_ID_RSA,
 
     /* secret agreement */
-    ALG_ID_DH,
     ALG_ID_ECDH_P256,
 
     /* signature */
@@ -182,7 +181,6 @@ struct key_asymmetric
     UCHAR            *pubkey;
     ULONG             pubkey_len;
     DSSSEED           dss_seed;
-    gnutls_dh_params_t dh_params;
 };
 
 struct key
@@ -261,8 +259,6 @@ NTSTATUS key_export_dsa_capi( struct key *, UCHAR *, ULONG, ULONG * ) DECLSPEC_H
 NTSTATUS key_export_ecc( struct key *, UCHAR *, ULONG, ULONG * ) DECLSPEC_HIDDEN;
 NTSTATUS key_import_dsa_capi( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
 NTSTATUS key_import_ecc( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
-NTSTATUS key_export_dh( struct key *, UCHAR *, ULONG, ULONG * ) DECLSPEC_HIDDEN;
-NTSTATUS key_import_pair_dh( struct key *, UCHAR *, ULONG ) DECLSPEC_HIDDEN;
 
 BOOL is_zero_vector( const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
 BOOL is_equal_vector( const UCHAR *, ULONG, const UCHAR *, ULONG ) DECLSPEC_HIDDEN;
