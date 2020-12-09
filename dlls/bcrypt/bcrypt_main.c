@@ -1640,16 +1640,25 @@ NTSTATUS WINAPI BCryptGenerateKeyPair( BCRYPT_ALG_HANDLE algorithm, BCRYPT_KEY_H
 
 NTSTATUS WINAPI BCryptFinalizeKeyPair( BCRYPT_KEY_HANDLE handle, ULONG flags )
 {
+    static int fake_success = -1;
+
     struct key *key = handle;
     NTSTATUS ret;
 
     TRACE( "%p, %08x\n", key, flags );
     if (!key || key->hdr.magic != MAGIC_KEY) return STATUS_INVALID_HANDLE;
 
-    if (!(ret = key_asymmetric_generate( key )))
+    if (fake_success == -1)
+    {
+        const char *sgi = getenv( "SteamGameId" );
+
+        fake_success = sgi && (!strcmp( sgi, "1174180" ) || !strcmp( sgi, "1404210" ));
+    }
+
+    if (!(ret = key_asymmetric_generate( key )) || fake_success)
         key->u.a.flags |= KEY_FLAG_FINALIZED;
 
-    return ret;
+    return fake_success ? STATUS_SUCCESS : ret;
 }
 
 NTSTATUS WINAPI BCryptImportKey( BCRYPT_ALG_HANDLE algorithm, BCRYPT_KEY_HANDLE decrypt_key, LPCWSTR type,
