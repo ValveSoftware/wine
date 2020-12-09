@@ -208,8 +208,10 @@ const char *debugstr_sa_script(UINT16 script)
 
 /* system font falback configuration */
 static const WCHAR meiryoW[] = {'M','e','i','r','y','o',0};
+static const WCHAR droidW[] = {'D','r','o','i','d',' ','S','a','n','s',' ','F','a','l','l','b','a','c','k',0};
+static const WCHAR notoW[] = {'N','o','t','o',' ','S','e','r','i','f',' ','C','J','K',' ','S','C',0};
 
-static const WCHAR *cjk_families[] = { meiryoW };
+static const WCHAR *cjk_families[] = { meiryoW, droidW, notoW };
 
 static const DWRITE_UNICODE_RANGE cjk_ranges[] =
 {
