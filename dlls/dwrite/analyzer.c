@@ -211,7 +211,7 @@ const char *debugstr_sa_script(UINT16 script)
 }
 
 /* system font falback configuration */
-static const WCHAR *cjk_families[] = { L"Meiryo" };
+static const WCHAR *cjk_families[] = { L"Meiryo", L"Droid Sans Fallback", L"Noto Serif CJK SC" };
 
 static const DWRITE_UNICODE_RANGE cjk_ranges[] =
 {
