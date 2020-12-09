@@ -76,7 +76,7 @@ NTSTATUS HID_CreateDevice(DEVICE_OBJECT *native_device, HID_MINIDRIVER_REGISTRAT
     return STATUS_SUCCESS;
 }
 
-NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device, BOOL xinput_hack)
+NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
 {
     static const WCHAR backslashW[] = {'\\',0};
     WCHAR device_instance_id[MAX_DEVICE_ID_LEN];
@@ -85,12 +85,10 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device, BOOL xinput_hack)
     NTSTATUS status;
     HDEVINFO devinfo;
     GUID hidGuid;
-    BASE_DEVICE_EXTENSION *ext;
+    BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
 
     HidD_GetHidGuid(&hidGuid);
-    if(xinput_hack)
-        hidGuid.Data4[7]++; /* HACK: use different GUID so only xinput will find this device */
-    ext = device->DeviceExtension;
+    if (ext->xinput_hack) hidGuid.Data4[7]++; /* HACK: use different GUID so only xinput will find this device */
 
     RtlInitUnicodeString( &nameW, ext->device_name);
 
@@ -252,6 +250,8 @@ static NTSTATUS copy_packet_into_buffer(HID_XFER_PACKET *packet, BYTE* buffer, U
 static void HID_Device_sendRawInput(DEVICE_OBJECT *device, HID_XFER_PACKET *packet)
 {
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
+
+    if (ext->xinput_hack) return;
 
     SERVER_START_REQ(send_hardware_message)
     {

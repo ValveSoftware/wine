@@ -197,7 +197,9 @@ NTSTATUS WINAPI PNP_AddDevice(DRIVER_OBJECT *driver, DEVICE_OBJECT *PDO)
     lstrcatW(ext->device_id, separator_W);
     lstrcatW(ext->device_id, wcschr(device_id, '\\') + 1);
 
-    HID_LinkDevice(device, attr.Reserved[0]/*xinput_hack*/);
+    ext->xinput_hack = attr.Reserved[0];
+
+    HID_LinkDevice(device);
 
     ext->poll_interval = DEFAULT_POLL_INTERVAL;
 
