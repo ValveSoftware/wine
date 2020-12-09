@@ -1938,12 +1938,33 @@ NTSTATUS WINAPI BCryptDeriveKey(BCRYPT_SECRET_HANDLE handle, LPCWSTR kdf, BCrypt
 {
     struct secret *secret = handle;
 
-    FIXME( "%p, %s, %p, %p, %d, %p, %08x\n", secret, debugstr_w(kdf), parameter, derived, derived_size, result, flags );
+    TRACE( "%p, %s, %p, %p, %d, %p, %08x\n", secret, debugstr_w(kdf), parameter, derived, derived_size, result, flags );
 
     if (!secret || secret->hdr.magic != MAGIC_SECRET) return STATUS_INVALID_HANDLE;
     if (!kdf) return STATUS_INVALID_PARAMETER;
 
-    return STATUS_INTERNAL_ERROR;
+    if (!(lstrcmpW( kdf, BCRYPT_KDF_RAW_SECRET )))
+    {
+        ULONG secret_length = secret->data_len;
+        unsigned int i;;
+
+        if (!derived)
+        {
+            *result = secret_length;
+            return STATUS_SUCCESS;
+        }
+
+        /* outputs in little endian for some reason */
+        for (i = 0; i < min(secret_length, derived_size); i++)
+        {
+            derived[i] = secret->data[secret_length - i - 1];
+        }
+
+        *result = i;
+        return STATUS_SUCCESS;
+    }
+    FIXME( "Derivation function %s not supported.\n", debugstr_w(kdf) );
+    return STATUS_NOT_IMPLEMENTED;
 }
 
 BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
