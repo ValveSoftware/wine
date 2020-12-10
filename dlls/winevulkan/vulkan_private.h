@@ -82,11 +82,7 @@ struct VkDevice_T
 
     unsigned int quirks;
 
-    uint32_t num_swapchains;
-    struct VkSwapchainKHR_T **swapchains;
     VkQueueFamilyProperties *queue_props;
-
-    CRITICAL_SECTION swapchain_lock;
 
     struct wine_vk_mapping mapping;
 };
@@ -187,7 +183,6 @@ struct fs_hack_image
 
 struct VkSwapchainKHR_T
 {
-    struct wine_vk_base base;
     VkSwapchainKHR swapchain; /* native swapchain */
 
     /* fs hack data below */
