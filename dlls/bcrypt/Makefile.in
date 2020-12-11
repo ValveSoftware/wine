@@ -1,7 +1,7 @@
 MODULE    = bcrypt.dll
 IMPORTS   = advapi32
 IMPORTLIB = bcrypt
-EXTRAINCL = $(GNUTLS_CFLAGS)
+EXTRAINCL = $(GNUTLS_CFLAGS) $(GMP_CFLAGS)
 
 C_SRCS = \
 	bcrypt_main.c \
