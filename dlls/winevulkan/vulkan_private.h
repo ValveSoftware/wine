@@ -201,6 +201,8 @@ struct VkSwapchainKHR_T
     VkDescriptorSetLayout descriptor_set_layout;
     VkPipelineLayout pipeline_layout;
     VkPipeline pipeline;
+
+    struct wine_vk_mapping mapping;
 };
 
 struct wine_debug_utils_messenger

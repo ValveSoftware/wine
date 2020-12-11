@@ -192,7 +192,7 @@ FUNCTION_OVERRIDES = {
     "vkGetPhysicalDeviceWin32PresentationSupportKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
 
     # VK_KHR_swapchain
-    "vkAcquireNextImageKHR": {"dispatch" : True, "driver" : False, "thunk" : False},
+    "vkAcquireNextImageKHR": {"dispatch" : True, "driver" : False, "thunk" : True},
     "vkAcquireNextImage2KHR": {"dispatch" : True, "driver" : False, "thunk" : False},
     "vkCreateSwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : False},
     "vkDestroySwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : False},
@@ -955,6 +955,8 @@ class VkHandle(object):
     def native_handle(self, name):
         """ Provide access to the native handle of a wrapped object. """
 
+        if self.name == "VkSwapchainKHR":
+            return "((struct VkSwapchainKHR_T *)(uintptr_t) ({0}))->swapchain".format(name)
         if self.name == "VkCommandPool":
             return "wine_cmd_pool_from_handle({0})->command_pool".format(name)
         if self.name == "VkDebugUtilsMessengerEXT":
