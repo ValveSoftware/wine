@@ -1730,11 +1730,9 @@ static void test_multi_monitor_dc(void)
         ok(!!hdc, "CreateDCA %s failed.\n", dd.DeviceName);
 
         value = GetDeviceCaps(hdc, HORZRES);
-        todo_wine_if(dm.dmPelsWidth != GetSystemMetrics(SM_CXSCREEN))
         ok(value == dm.dmPelsWidth, "Expected %d, got %d.\n", dm.dmPelsWidth, value);
 
         value = GetDeviceCaps(hdc, VERTRES);
-        todo_wine_if(dm.dmPelsHeight != GetSystemMetrics(SM_CYSCREEN))
         ok(value == dm.dmPelsHeight, "Expected %d, got %d.\n", dm.dmPelsHeight, value);
 
         value = GetDeviceCaps(hdc, DESKTOPHORZRES);
@@ -1774,11 +1772,9 @@ static void test_multi_monitor_dc(void)
         }
 
         value = GetDeviceCaps(hdc, HORZRES);
-        todo_wine_if(dm2.dmPelsWidth != GetSystemMetrics(SM_CXSCREEN))
         ok(value == dm2.dmPelsWidth, "Expected %d, got %d.\n", dm2.dmPelsWidth, value);
 
         value = GetDeviceCaps(hdc, VERTRES);
-        todo_wine_if(dm2.dmPelsHeight != GetSystemMetrics(SM_CYSCREEN))
         ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
 
         value = GetDeviceCaps(hdc, DESKTOPHORZRES);
