@@ -2344,13 +2344,6 @@ HRESULT WINAPI DllUnregisterServer(void)
     return S_OK;
 }
 
-VkResult WINAPI wine_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
-{
-    struct VkSwapchainKHR_T *object = (struct VkSwapchainKHR_T *)(UINT_PTR)swapchain;
-    TRACE("%p, 0x%s, 0x%s, 0x%s, 0x%s, %p\n", device, wine_dbgstr_longlong(swapchain), wine_dbgstr_longlong(timeout), wine_dbgstr_longlong(semaphore), wine_dbgstr_longlong(fence), pImageIndex);
-    return device->funcs.p_vkAcquireNextImageKHR(device->device, object->swapchain, timeout, semaphore, fence, pImageIndex);
-}
-
 VkResult WINAPI wine_vkAcquireNextImage2KHR(VkDevice device, const VkAcquireNextImageInfoKHR *pAcquireInfo, uint32_t *pImageIndex)
 {
 #if defined(USE_STRUCT_CONVERSION)
@@ -2795,6 +2788,7 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
         heap_free(object);
         return result;
     }
+    WINE_VK_ADD_NON_DISPATCHABLE_MAPPING(device->phys_dev->instance, object, object->swapchain);
 
     if(object->fs_hack_enabled){
         object->user_extent = pCreateInfo->imageExtent;
@@ -2803,6 +2797,7 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
         if(result != VK_SUCCESS){
             ERR("creating fs hack images failed: %d\n", result);
             device->funcs.p_vkDestroySwapchainKHR(device->device, object->swapchain, NULL);
+            WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, object);
             heap_free(object);
             return result;
         }
@@ -2853,6 +2848,7 @@ void WINAPI wine_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain
 
     device->funcs.p_vkDestroySwapchainKHR(device->device, object->swapchain, NULL);
 
+    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, object);
     heap_free(object);
 }
 
