@@ -3154,9 +3154,6 @@ fail:
     for(i = 0; i < swapchain->n_images; ++i){
         struct fs_hack_image *hack = &swapchain->fs_hack_images[i];
 
-        device->funcs.p_vkFreeDescriptorSets(device->device, swapchain->descriptor_pool, 1, &hack->descriptor_set);
-        hack->descriptor_set = VK_NULL_HANDLE;
-
         device->funcs.p_vkDestroyImageView(device->device, hack->blit_view, NULL);
         hack->blit_view = VK_NULL_HANDLE;
 
