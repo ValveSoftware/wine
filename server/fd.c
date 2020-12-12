@@ -109,6 +109,10 @@
 #include "winioctl.h"
 #include "ddk/wdm.h"
 
+#if !defined(O_SYMLINK) && defined(O_PATH)
+# define O_SYMLINK (O_NOFOLLOW | O_PATH)
+#endif
+
 #if defined(HAVE_SYS_EPOLL_H) && defined(HAVE_EPOLL_CREATE)
 # include <sys/epoll.h>
 # define USE_EPOLL
@@ -1990,6 +1994,11 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     }
     else rw_mode = O_RDONLY;
 
+#if defined(O_SYMLINK)
+    if ((options & FILE_OPEN_REPARSE_POINT) && !(flags & O_CREAT))
+        flags |= O_SYMLINK;
+#endif
+
     if ((fd->unix_fd = open( name, rw_mode | (flags & ~O_TRUNC), *mode )) == -1)
     {
         /* if we tried to open a directory for write access, retry read-only */
@@ -2487,6 +2496,7 @@ static struct fd *get_handle_fd_obj( struct process *process, obj_handle_t handl
 
 static int is_dir_empty( int fd )
 {
+    int dir_fd;
     DIR *dir;
     int empty;
     struct dirent *de;
@@ -2494,8 +2504,13 @@ static int is_dir_empty( int fd )
     if ((fd = dup( fd )) == -1)
         return -1;
 
-    if (!(dir = fdopendir( fd )))
+    /* use openat() so that if 'fd' was opened with O_SYMLINK we can still check the contents */
+    dir_fd = openat( fd, ".", O_RDONLY | O_DIRECTORY | O_NONBLOCK );
+    if (dir_fd == -1)
+        return -1;
+    if (!(dir = fdopendir( dir_fd )))
     {
+        close( dir_fd );
         close( fd );
         return -1;
     }
@@ -2507,6 +2522,7 @@ static int is_dir_empty( int fd )
         empty = 0;
     }
     closedir( dir );
+    close( dir_fd );
     return empty;
 }
 
