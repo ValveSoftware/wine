@@ -1362,6 +1362,8 @@ static HRESULT WINAPI JoystickWImpl_GetProperty(LPDIRECTINPUTDEVICE8W iface, REF
                     return DIERR_GENERIC;
                 }
 
+                strlwrW(pd->wszPath);
+
                 pd->guidClass = GUID_DEVCLASS_HIDCLASS;
 
                 TRACE("DIPROP_GUIDANDPATH(%s, %s): returning path\n", debugstr_guid(&pd->guidClass), debugstr_w(pd->wszPath));
