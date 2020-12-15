@@ -114,6 +114,7 @@ MAKE_FUNCPTR(SDL_GameControllerAddMapping);
 MAKE_FUNCPTR(SDL_RegisterEvents);
 MAKE_FUNCPTR(SDL_PushEvent);
 MAKE_FUNCPTR(SDL_GetTicks);
+MAKE_FUNCPTR(SDL_LogSetPriority);
 static int (*pSDL_JoystickRumble)(SDL_Joystick *joystick, Uint16 low_frequency_rumble, Uint16 high_frequency_rumble, Uint32 duration_ms);
 static int (*pSDL_JoystickRumbleTriggers)(SDL_Joystick *joystick, Uint16 left_rumble, Uint16 right_rumble, Uint32 duration_ms);
 static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick);
@@ -1152,6 +1153,7 @@ NTSTATUS sdl_bus_init(void *args)
     LOAD_FUNCPTR(SDL_RegisterEvents);
     LOAD_FUNCPTR(SDL_PushEvent);
     LOAD_FUNCPTR(SDL_GetTicks);
+    LOAD_FUNCPTR(SDL_LogSetPriority);
 #undef LOAD_FUNCPTR
     pSDL_JoystickRumble = dlsym(sdl_handle, "SDL_JoystickRumble");
     pSDL_JoystickRumbleTriggers = dlsym(sdl_handle, "SDL_JoystickRumbleTriggers");
@@ -1171,6 +1173,11 @@ NTSTATUS sdl_bus_init(void *args)
     {
         ERR("error registering quit event\n");
         goto failed;
+    }
+
+    if (TRACE_ON(hid))
+    {
+        pSDL_LogSetPriority(SDL_LOG_CATEGORY_INPUT, SDL_LOG_PRIORITY_VERBOSE);
     }
 
     pSDL_JoystickEventState(SDL_ENABLE);
