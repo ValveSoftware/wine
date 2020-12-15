@@ -113,6 +113,7 @@ MAKE_FUNCPTR(SDL_memset);
 MAKE_FUNCPTR(SDL_GameControllerAddMapping);
 MAKE_FUNCPTR(SDL_RegisterEvents);
 MAKE_FUNCPTR(SDL_PushEvent);
+MAKE_FUNCPTR(SDL_LogSetPriority);
 #endif
 static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick);
 static Uint16 (*pSDL_JoystickGetProductVersion)(SDL_Joystick * joystick);
@@ -1206,6 +1207,11 @@ static DWORD CALLBACK deviceloop_thread(void *args)
     {
         ERR("Can't init SDL: %s\n", pSDL_GetError());
         return STATUS_UNSUCCESSFUL;
+    }
+
+    if (TRACE_ON(plugplay))
+    {
+        pSDL_LogSetPriority(SDL_LOG_CATEGORY_INPUT, SDL_LOG_PRIORITY_VERBOSE);
     }
 
     pSDL_JoystickEventState(SDL_ENABLE);
