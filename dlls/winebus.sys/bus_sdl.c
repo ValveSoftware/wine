@@ -111,6 +111,7 @@ MAKE_FUNCPTR(SDL_memset);
 MAKE_FUNCPTR(SDL_GameControllerAddMapping);
 MAKE_FUNCPTR(SDL_RegisterEvents);
 MAKE_FUNCPTR(SDL_PushEvent);
+MAKE_FUNCPTR(SDL_LogSetPriority);
 static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick);
 static Uint16 (*pSDL_JoystickGetProductVersion)(SDL_Joystick * joystick);
 static Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick * joystick);
@@ -1204,6 +1205,11 @@ static DWORD CALLBACK deviceloop_thread(void *args)
         return STATUS_UNSUCCESSFUL;
     }
 
+    if (TRACE_ON(plugplay))
+    {
+        pSDL_LogSetPriority(SDL_LOG_CATEGORY_INPUT, SDL_LOG_PRIORITY_VERBOSE);
+    }
+
     pSDL_JoystickEventState(SDL_ENABLE);
     pSDL_GameControllerEventState(SDL_ENABLE);
 
@@ -1353,6 +1359,7 @@ NTSTATUS sdl_driver_init(void)
         LOAD_FUNCPTR(SDL_GameControllerAddMapping);
         LOAD_FUNCPTR(SDL_RegisterEvents);
         LOAD_FUNCPTR(SDL_PushEvent);
+        LOAD_FUNCPTR(SDL_LogSetPriority);
 #undef LOAD_FUNCPTR
         pSDL_JoystickGetProduct = dlsym(sdl_handle, "SDL_JoystickGetProduct");
         pSDL_JoystickGetProductVersion = dlsym(sdl_handle, "SDL_JoystickGetProductVersion");
