@@ -1713,6 +1713,7 @@ static struct fd *alloc_fd_object(void)
     fd->comp_flags = 0;
     fd->esync_fd   = -1;
     fd->fsync_idx  = 0;
+    fd->unlink_name = NULL;
     init_async_queue( &fd->read_q );
     init_async_queue( &fd->write_q );
     init_async_queue( &fd->wait_q );
@@ -1790,6 +1791,12 @@ struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sha
         strcpy( fd->unix_name, orig->unix_name );
     }
 
+    if (orig->unlink_name)
+    {
+        if (!(fd->unlink_name = mem_alloc( strlen(orig->unlink_name) + 1 ))) goto failed;
+        strcpy( fd->unlink_name, orig->unlink_name );
+    }
+
     if (orig->inode)
     {
         struct closed_fd *closed = mem_alloc( sizeof(*closed) );
@@ -1802,6 +1809,7 @@ struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sha
         }
         closed->unix_fd = fd->unix_fd;
         closed->unlink = 0;
+        closed->unlink_name = fd->unlink_name;
         closed->unix_name = fd->unix_name;
         fd->closed = closed;
         fd->inode = (struct inode *)grab_object( orig->inode );
