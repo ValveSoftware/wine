@@ -1726,6 +1726,7 @@ static struct fd *alloc_fd_object(void)
     fd->comp_flags = 0;
     fd->esync_fd   = -1;
     fd->fsync_idx  = 0;
+    fd->unlink_name = NULL;
     init_async_queue( &fd->read_q );
     init_async_queue( &fd->write_q );
     init_async_queue( &fd->wait_q );
@@ -1809,6 +1810,12 @@ struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sha
     {
         if (!(fd->nt_name = memdup( orig->nt_name, orig->nt_namelen ))) goto failed;
         fd->nt_namelen = orig->nt_namelen;
+    }
+
+    if (orig->unlink_name)
+    {
+        if (!(fd->unlink_name = mem_alloc( strlen(orig->unlink_name) + 1 ))) goto failed;
+        strcpy( fd->unlink_name, orig->unlink_name );
     }
 
     if (orig->unlink_name)
