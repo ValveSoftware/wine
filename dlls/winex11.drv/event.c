@@ -433,13 +433,18 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
 {
     XEvent event, prev_event;
     int count = 0;
-    BOOL queued = FALSE;
+    BOOL queued = FALSE, overlay_enabled = FALSE;
     enum event_merge_action action = MERGE_DISCARD;
+    ULONG_PTR overlay_filter = QS_KEY | QS_MOUSEBUTTON | QS_MOUSEMOVE;
+
+    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
+        overlay_enabled = TRUE;
 
     prev_event.type = 0;
     while (XCheckIfEvent( display, &event, filter, (char *)arg ))
     {
         count++;
+        if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
         if (XFilterEvent( &event, None ))
         {
             /*
