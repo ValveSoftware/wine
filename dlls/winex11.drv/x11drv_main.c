@@ -86,6 +86,7 @@ int alloc_system_colors = 256;
 int xrender_error_base = 0;
 int xfixes_event_base = 0;
 char *process_name = NULL;
+HANDLE steam_overlay_event;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -693,6 +694,19 @@ static NTSTATUS x11drv_init( void *arg )
 {
     Display *display;
     void *libx11 = dlopen( SONAME_LIBX11, RTLD_NOW|RTLD_GLOBAL );
+    OBJECT_ATTRIBUTES attr;
+    WCHAR buffer[MAX_PATH];
+    char path[MAX_PATH];
+    UNICODE_STRING str;
+
+    RtlInitUnicodeString( &str, buffer );
+    InitializeObjectAttributes( &attr, &str, OBJ_CASE_INSENSITIVE | OBJ_OPENIF, 0, NULL );
+
+    str.Length = sprintf( path, "\\Sessions\\%u\\BaseNamedObjects\\__wine_steamclient_GameOverlayActivated",
+                          (int)NtCurrentTeb()->Peb->SessionId );
+    ascii_to_unicode( buffer, path, str.Length + 1 );
+    str.Length *= sizeof(WCHAR);
+    NtCreateEvent( &steam_overlay_event, EVENT_ALL_ACCESS, &attr, NotificationEvent, FALSE );
 
     if (!libx11)
     {

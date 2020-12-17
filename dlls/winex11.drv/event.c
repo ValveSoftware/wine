@@ -509,6 +509,12 @@ BOOL X11DRV_ProcessEvents( DWORD mask )
     XEvent event, prev_event;
     int count = 0;
     enum event_merge_action action = MERGE_DISCARD;
+    ULONG_PTR overlay_filter = QS_KEY | QS_MOUSEBUTTON | QS_MOUSEMOVE;
+    BOOL overlay_enabled = FALSE;
+    LARGE_INTEGER timeout = {0};
+
+    if (NtWaitForSingleObject(steam_overlay_event, FALSE, &timeout) == WAIT_OBJECT_0)
+        overlay_enabled = TRUE;
 
     if (!data) return FALSE;
     if (data->current_event) mask = 0;  /* don't process nested events */
@@ -531,6 +537,7 @@ BOOL X11DRV_ProcessEvents( DWORD mask )
         }
 
         count++;
+        if (overlay_enabled && filter_event( data->display, &event, (char *)overlay_filter )) continue;
         if (XFilterEvent( &event, None )) continue;
         if (host_window_filter_event( &event, &prev_event )) continue;
 

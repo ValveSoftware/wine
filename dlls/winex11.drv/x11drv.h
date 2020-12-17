@@ -482,6 +482,7 @@ extern int xrender_error_base;
 extern int xfixes_event_base;
 extern char *process_name;
 extern Display *clipboard_display;
+extern HANDLE steam_overlay_event;
 
 /* atoms */
 
