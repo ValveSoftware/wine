@@ -125,6 +125,7 @@ extern void thread_cancel_apc( struct thread *thread, struct object *owner, enum
 extern int thread_add_inflight_fd( struct thread *thread, int client, int server );
 extern int thread_get_inflight_fd( struct thread *thread, int client );
 extern struct token *thread_get_impersonation_token( struct thread *thread );
+extern int set_thread_priority( struct thread *thread, int priority_class, int priority );
 extern int set_thread_affinity( struct thread *thread, affinity_t affinity );
 extern int is_cpu_supported( enum cpu_type cpu );
 extern unsigned int get_supported_cpu_mask(void);
