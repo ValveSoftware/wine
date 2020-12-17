@@ -961,7 +961,8 @@ struct init_first_thread_request
     int          reply_fd;
     int          wait_fd;
     client_cpu_t cpu;
-    char __pad_60[4];
+    char         nice_limit;
+    char __pad_61[3];
 };
 struct init_first_thread_reply
 {
@@ -6460,7 +6461,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 688
+#define SERVER_PROTOCOL_VERSION 689
 
 /* ### protocol_version end ### */
 
