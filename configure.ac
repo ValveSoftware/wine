@@ -1436,7 +1436,7 @@ dnl **** Check for libdbus ****
 if test "x$with_dbus" != "xno"
 then
     WINE_PACKAGE_FLAGS(DBUS,[dbus-1],,,,
-        [AC_CHECK_HEADER([dbus/dbus.h],
+        [AC_CHECK_HEADERS([dbus/dbus.h],
             [WINE_CHECK_SONAME(dbus-1, dbus_connection_close,,[DBUS_CFLAGS=""],[$DBUS_LIBS])],
             [DBUS_CFLAGS=""])])
 fi

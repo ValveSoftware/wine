@@ -44,6 +44,9 @@
 #ifdef HAVE_SYS_RESOURCE_H
 #include <sys/resource.h>
 #endif
+#ifdef HAVE_DBUS_DBUS_H
+#include <dbus/dbus.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -226,6 +229,98 @@ static const struct fd_ops thread_fd_ops =
 static struct list thread_list = LIST_INIT(thread_list);
 static int nice_limit;
 
+#ifdef HAVE_DBUS_DBUS_H
+static DBusConnection *dbus;
+
+static const char *rtkit_iface = "org.freedesktop.RealtimeKit1";
+static const char *rtkit_path = "/org/freedesktop/RealtimeKit1";
+static int rtkit_nice_limit;
+
+static void dbus_cleanup(void)
+{
+    static int do_it_once;
+    if (!do_it_once++) dbus_connection_unref( dbus );
+}
+
+static int rtkit_get_int_value( DBusMessageIter *it, int *val )
+{
+    DBusMessageIter subit;
+    dbus_int32_t i32;
+    dbus_int64_t i64;
+    int type;
+    while ((type = dbus_message_iter_get_arg_type( it )) != DBUS_TYPE_INVALID)
+    {
+        switch (type)
+        {
+        case DBUS_TYPE_VARIANT:
+            dbus_message_iter_recurse( it, &subit );
+            if (!rtkit_get_int_value( &subit, val )) break;
+            return 1;
+        case DBUS_TYPE_INT32:
+            dbus_message_iter_get_basic( it, &i32 );
+            *val = i32;
+            return 1;
+        case DBUS_TYPE_INT64:
+            dbus_message_iter_get_basic( it, &i64 );
+            *val = i64;
+            return 1;
+        }
+        dbus_message_iter_next( it );
+    }
+    return 0;
+}
+
+static int rtkit_get_nice_limit(void)
+{
+    static const char *property = "MinNiceLevel";
+    DBusMessageIter it;
+    DBusMessage *reply = NULL;
+    DBusMessage *msg;
+    DBusError error;
+    int ret = 0;
+
+    if (!dbus) return 0;
+    if (!(msg = dbus_message_new_method_call( rtkit_iface, rtkit_path, "org.freedesktop.DBus.Properties", "Get" )))
+        return 0;
+
+    dbus_error_init( &error );
+    if (dbus_message_append_args( msg, DBUS_TYPE_STRING, &rtkit_iface, DBUS_TYPE_STRING, &property, DBUS_TYPE_INVALID ) &&
+        (reply = dbus_connection_send_with_reply_and_block( dbus, msg, DBUS_TIMEOUT_USE_DEFAULT, &error )) &&
+        !dbus_set_error_from_message( &error, reply ))
+    {
+        dbus_message_iter_init( reply, &it );
+        rtkit_get_int_value( &it, &ret );
+    }
+
+    if (reply) dbus_message_unref( reply );
+    dbus_message_unref( msg );
+    return ret;
+}
+
+static int rtkit_set_niceness( dbus_uint64_t process, dbus_uint64_t thread, dbus_int32_t niceness )
+{
+    DBusMessage *reply = NULL;
+    DBusMessage *msg;
+    DBusError error;
+    int ret = FALSE;
+
+    if (!(msg = dbus_message_new_method_call( rtkit_iface, rtkit_path, rtkit_iface, "MakeThreadHighPriorityWithPID" )))
+        return FALSE;
+
+    dbus_error_init( &error );
+    if (dbus_message_append_args( msg, DBUS_TYPE_UINT64, &process, DBUS_TYPE_UINT64, &thread,
+                                  DBUS_TYPE_INT32, &niceness, DBUS_TYPE_INVALID ) &&
+        (reply = dbus_connection_send_with_reply_and_block( dbus, msg, DBUS_TIMEOUT_USE_DEFAULT, &error )) &&
+        !dbus_set_error_from_message( &error, reply ))
+        ret = TRUE;
+
+    if (reply) dbus_message_unref( reply );
+    dbus_message_unref( msg );
+
+    return ret;
+}
+#endif
+
 void init_threading(void)
 {
 #ifdef RLIMIT_NICE
@@ -246,6 +341,15 @@ void init_threading(void)
     }
 #endif
     if (nice_limit < 0) fprintf(stderr, "wine: Using setpriority to control niceness in the [%d,%d] range\n", nice_limit, -nice_limit );
+#ifdef HAVE_DBUS_DBUS_H
+    else if ((dbus = dbus_bus_get( DBUS_BUS_SYSTEM, NULL )))
+    {
+        atexit( dbus_cleanup );
+        rtkit_nice_limit = rtkit_get_nice_limit();
+        if (rtkit_nice_limit >= 0) fprintf(stderr, "wine: Unable to use RTKit to control niceness, rtkit-daemon not found or MinNiceLevel >= 0\n");
+        else fprintf(stderr, "wine: Using RTKit to control niceness in the [%d,%d] range\n", rtkit_nice_limit, -rtkit_nice_limit );
+    }
+#endif
 }
 
 /* initialize the structure for a newly allocated thread */
@@ -759,6 +863,18 @@ static void apply_thread_priority( struct thread *thread, int priority_class, in
         if (setpriority( PRIO_PROCESS, thread->unix_tid, niceness ) != 0)
             fprintf( stderr, "wine: setpriority %d for pid %d failed: %d\n", niceness, thread->unix_tid, errno );
         return;
+    }
+#endif
+#ifdef HAVE_DBUS_DBUS_H
+    if (rtkit_nice_limit < 0)
+    {
+        niceness = get_unix_niceness( get_base_priority( priority_class, priority ), rtkit_nice_limit );
+        if (!delayed)
+            thread->delay_priority = add_timeout_user( -TICKS_PER_SEC, delayed_set_thread_priority, thread );
+        else if (setpriority( PRIO_PROCESS, thread->unix_tid, niceness ) == 0)
+            return;
+        else if (!rtkit_set_niceness( thread->unix_pid, thread->unix_tid, niceness ))
+            thread->delay_priority = add_timeout_user( -TICKS_PER_SEC, delayed_set_thread_priority, thread );
     }
 #endif
 #endif
