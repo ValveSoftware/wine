@@ -1399,6 +1399,7 @@ static void dump_init_thread_request( const struct init_thread_request *req )
 {
     fprintf( stderr, " unix_pid=%d", req->unix_pid );
     fprintf( stderr, ", unix_tid=%d", req->unix_tid );
+    fprintf( stderr, ", nice_limit=%d", req->nice_limit );
     fprintf( stderr, ", debug_level=%d", req->debug_level );
     dump_uint64( ", teb=", &req->teb );
     dump_uint64( ", entry=", &req->entry );
