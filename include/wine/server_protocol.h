@@ -945,13 +945,15 @@ struct init_thread_request
     struct request_header __header;
     int          unix_pid;
     int          unix_tid;
+    int          nice_limit;
     int          debug_level;
+    char __pad_28[4];
     client_ptr_t teb;
     client_ptr_t entry;
     int          reply_fd;
     int          wait_fd;
     client_cpu_t cpu;
-    char __pad_52[4];
+    char __pad_60[4];
 };
 struct init_thread_reply
 {
@@ -6765,7 +6767,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 644
+#define SERVER_PROTOCOL_VERSION 645
 
 /* ### protocol_version end ### */
 

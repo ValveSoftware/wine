@@ -58,6 +58,9 @@
 #ifdef HAVE_SYS_PRCTL_H
 # include <sys/prctl.h>
 #endif
+#ifdef HAVE_SYS_RESOURCE_H
+# include <sys/resource.h>
+#endif
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
@@ -1515,6 +1518,8 @@ size_t server_init_thread( void *entry_point, BOOL *suspend )
     struct sigaction sig_act;
     stack_t ss;
     size_t info_size;
+    struct rlimit rlimit;
+    int nice_limit = 0;
 
     /* ignore SIGPIPE so that we get an EPIPE error instead  */
     sig_act.sa_handler = SIG_IGN;
@@ -1535,10 +1540,19 @@ size_t server_init_thread( void *entry_point, BOOL *suspend )
     ntdll_get_thread_data()->reply_fd = reply_pipe[0];
     close( reply_pipe[1] );
 
+#ifdef RLIMIT_NICE
+    if (!getrlimit( RLIMIT_NICE, &rlimit ))
+    {
+        if (rlimit.rlim_cur <= 40) nice_limit = 20 - rlimit.rlim_cur;
+        else if (rlimit.rlim_cur == -1 /* RLIMIT_INFINITY */) nice_limit = -20;
+    }
+#endif
+
     SERVER_START_REQ( init_thread )
     {
         req->unix_pid    = getpid();
         req->unix_tid    = get_unix_tid();
+        req->nice_limit  = nice_limit;
         req->teb         = wine_server_client_ptr( NtCurrentTeb() );
         req->entry       = wine_server_client_ptr( entry_point );
         req->reply_fd    = reply_pipe[1];
