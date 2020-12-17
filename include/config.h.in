@@ -91,6 +91,9 @@
 /* Define to 1 if you have the <cups/ppd.h> header file. */
 #undef HAVE_CUPS_PPD_H
 
+/* Define to 1 if you have the <dbus/dbus.h> header file. */
+#undef HAVE_DBUS_DBUS_H
+
 /* Define to 1 if you have the <dirent.h> header file. */
 #undef HAVE_DIRENT_H
 
