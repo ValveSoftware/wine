@@ -102,6 +102,7 @@ static DWORD disable_hidraw = 0;
 static DWORD disable_input = 0;
 static HANDLE deviceloop_handle;
 static int deviceloop_control[2];
+static HANDLE steam_overlay_event;
 
 static const WCHAR hidraw_busidW[] = {'H','I','D','R','A','W',0};
 static const WCHAR lnxev_busidW[] = {'L','N','X','E','V',0};
@@ -1214,15 +1215,22 @@ static DWORD CALLBACK device_report_thread(void *args)
     {
         int size;
         BYTE report_buffer[1024];
+        BOOL overlay_enabled = FALSE;
 
         if (poll(plfds, 2, -1) <= 0) continue;
         if (plfds[1].revents)
             break;
+
+        if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
+            overlay_enabled = TRUE;
+
         size = read(plfds[0].fd, report_buffer, sizeof(report_buffer));
         if (size == -1)
             TRACE_(hid_report)("Read failed. Likely an unplugged device %d %s\n", errno, strerror(errno));
         else if (size == 0)
             TRACE_(hid_report)("Failed to read report\n");
+        else if (overlay_enabled)
+            TRACE_(hid_report)("Overlay is enabled, dropping report\n");
         else
         {
             if(private->quirks & QUIRK_DS4_BT)
@@ -2341,6 +2349,8 @@ void udev_driver_unload( void )
 #ifdef HAS_PROPER_INPUT_HEADER
     bus_enumerate_hid_devices(&lnxev_vtbl, device_unload, NULL);
 #endif
+
+    CloseHandle(steam_overlay_event);
 }
 
 NTSTATUS udev_driver_init(void)
@@ -2353,6 +2363,8 @@ NTSTATUS udev_driver_init(void)
     static const UNICODE_STRING hidraw_disabled = {sizeof(hidraw_disabledW) - sizeof(WCHAR), sizeof(hidraw_disabledW), (WCHAR*)hidraw_disabledW};
     static const WCHAR input_disabledW[] = {'D','i','s','a','b','l','e','I','n','p','u','t',0};
     static const UNICODE_STRING input_disabled = {sizeof(input_disabledW) - sizeof(WCHAR), sizeof(input_disabledW), (WCHAR*)input_disabledW};
+
+    steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
 
     if (pipe(deviceloop_control) != 0)
     {

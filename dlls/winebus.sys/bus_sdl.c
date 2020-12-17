@@ -70,6 +70,7 @@ static DWORD map_controllers = 0;
 static void *sdl_handle = NULL;
 static HANDLE deviceloop_handle;
 static UINT quit_event = -1;
+static HANDLE steam_overlay_event;
 
 #define XINPUT_HACK_ID_BIT 0x80000000
 
@@ -1166,7 +1167,12 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
 
 static void process_device_event(SDL_Event *event)
 {
+    BOOL overlay_enabled = FALSE;
+
     TRACE_(hid_report)("Received action %x\n", event->type);
+
+    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
+        overlay_enabled = TRUE;
 
     if (event->type == SDL_JOYDEVICEADDED)
     {
@@ -1182,6 +1188,8 @@ static void process_device_event(SDL_Event *event)
     {
         SDL_Event xinput_hack_event = *event;
 
+        if (overlay_enabled) return;
+
         set_report_from_event(event);
 
         ((SDL_JoyAxisEvent*)&xinput_hack_event)->which |= XINPUT_HACK_ID_BIT;
@@ -1190,6 +1198,8 @@ static void process_device_event(SDL_Event *event)
     else if (event->type >= SDL_CONTROLLERAXISMOTION && event->type <= SDL_CONTROLLERBUTTONUP)
     {
         SDL_Event xinput_hack_event = *event;
+
+        if (overlay_enabled) return;
 
         set_mapped_report_from_event(event);
 
@@ -1299,6 +1309,7 @@ void sdl_driver_unload( void )
     WaitForSingleObject(deviceloop_handle, INFINITE);
     CloseHandle(deviceloop_handle);
     dlclose(sdl_handle);
+    CloseHandle(steam_overlay_event);
 }
 
 NTSTATUS sdl_driver_init(void)
@@ -1308,6 +1319,7 @@ NTSTATUS sdl_driver_init(void)
 
     HANDLE events[2];
     DWORD result;
+    steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
 
     if (sdl_handle == NULL)
     {
