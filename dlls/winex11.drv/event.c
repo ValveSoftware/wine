@@ -405,13 +405,23 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
 {
     XEvent event, prev_event;
     int count = 0;
-    BOOL queued = FALSE;
+    BOOL queued = FALSE, overlay_enabled = FALSE, steam_keyboard_opened = FALSE;
     enum event_merge_action action = MERGE_DISCARD;
+    ULONG_PTR overlay_filter = QS_KEY | QS_MOUSEBUTTON | QS_MOUSEMOVE;
+    ULONG_PTR keyboard_filter = QS_MOUSEBUTTON | QS_MOUSEMOVE;
+    LARGE_INTEGER timeout = {0};
+
+    if (NtWaitForSingleObject(steam_overlay_event, FALSE, &timeout) == WAIT_OBJECT_0)
+        overlay_enabled = TRUE;
+    if (NtWaitForSingleObject(steam_keyboard_event, FALSE, &timeout) == WAIT_OBJECT_0)
+        steam_keyboard_opened = TRUE;
 
     prev_event.type = 0;
     while (XCheckIfEvent( display, &event, filter, (char *)arg ))
     {
         count++;
+        if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
+        if (steam_keyboard_opened && filter_event( display, &event, (char *)keyboard_filter )) continue;
         if (XFilterEvent( &event, None ))
         {
             /*
@@ -1369,9 +1379,11 @@ static int handle_gamescope_focused_app_error( Display *dpy, XErrorEvent *event,
 static void handle_gamescope_focused_app( XPropertyEvent *event )
 {
     static const char *sgi = NULL;
+    static BOOL steam_keyboard_opened;
 
     unsigned long count, remaining, *property;
     int format, app_id, focused_app_id;
+    BOOL keyboard_opened;
     Atom type;
 
     if (!sgi && !(sgi = getenv( "SteamGameId" ))) return;
@@ -1388,7 +1400,21 @@ static void handle_gamescope_focused_app( XPropertyEvent *event )
         XFree( property );
     }
 
-    TRACE( "Got app id %u, focused app %u\n", app_id, focused_app_id );
+    keyboard_opened = app_id != focused_app_id;
+    if (steam_keyboard_opened == keyboard_opened) return;
+    steam_keyboard_opened = keyboard_opened;
+
+    FIXME( "HACK: Got app id %u, focused app %u\n", app_id, focused_app_id );
+    if (keyboard_opened)
+    {
+        FIXME( "HACK: Steam Keyboard is opened, filtering events.\n" );
+        NtSetEvent( steam_keyboard_event, NULL );
+    }
+    else
+    {
+        FIXME( "HACK: Steam Keyboard is closed, stopping events filter.\n" );
+        NtResetEvent( steam_keyboard_event, NULL );
+    }
 }
 
 /***********************************************************************

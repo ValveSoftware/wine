@@ -460,6 +460,8 @@ extern int xrender_error_base;
 extern char *process_name;
 extern Display *clipboard_display;
 extern WNDPROC client_foreign_window_proc;
+extern HANDLE steam_overlay_event;
+extern HANDLE steam_keyboard_event;
 
 extern int limit_number_of_resolutions;
 

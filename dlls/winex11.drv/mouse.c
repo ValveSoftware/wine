@@ -1427,10 +1427,14 @@ BOOL X11DRV_SetCursorPos( INT x, INT y )
 BOOL X11DRV_GetCursorPos(LPPOINT pos)
 {
     Display *display = thread_init_display();
+    LARGE_INTEGER timeout = {0};
     Window root, child;
     int rootX, rootY, winX, winY;
     unsigned int xstate;
     BOOL ret;
+
+    if (NtWaitForSingleObject(steam_overlay_event, FALSE, &timeout) == WAIT_OBJECT_0) return TRUE;
+    if (NtWaitForSingleObject(steam_keyboard_event, FALSE, &timeout) == WAIT_OBJECT_0) return TRUE;
 
     ret = XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &winX, &winY, &xstate );
     if (ret)
