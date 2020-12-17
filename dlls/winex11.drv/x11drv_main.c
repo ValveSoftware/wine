@@ -89,6 +89,7 @@ int xrender_error_base = 0;
 int xfixes_event_base = 0;
 HMODULE x11drv_module = 0;
 char *process_name = NULL;
+HANDLE steam_overlay_event;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -819,6 +820,10 @@ BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
         DisableThreadLibraryCalls( hinst );
         x11drv_module = hinst;
         ret = process_attach();
+        steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
+        break;
+    case DLL_PROCESS_DETACH:
+        CloseHandle(steam_overlay_event);
         break;
     }
     return ret;
