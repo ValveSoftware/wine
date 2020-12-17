@@ -38,6 +38,12 @@
 #ifdef HAVE_SCHED_H
 #include <sched.h>
 #endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -1580,6 +1586,7 @@ DECL_HANDLER(init_thread)
         process->unix_pid = current->unix_pid;
         process->peb      = req->entry;
         process->cpu      = req->cpu;
+        process->nice_limit = req->nice_limit;
         reply->info_size  = init_process( current );
         if (!process->parent_id)
             process->affinity = current->affinity = get_thread_affinity( current );
