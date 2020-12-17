@@ -97,6 +97,9 @@
 /* Define to 1 if you have the <curses.h> header file. */
 #undef HAVE_CURSES_H
 
+/* Define to 1 if you have the <dbus/dbus.h> header file. */
+#undef HAVE_DBUS_DBUS_H
+
 /* Define to 1 if you have the <dirent.h> header file. */
 #undef HAVE_DIRENT_H
 
