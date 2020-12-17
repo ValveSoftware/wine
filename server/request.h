@@ -773,6 +773,7 @@ C_ASSERT( FIELD_OFFSET(struct init_first_thread_request, ldt_copy) == 40 );
 C_ASSERT( FIELD_OFFSET(struct init_first_thread_request, reply_fd) == 48 );
 C_ASSERT( FIELD_OFFSET(struct init_first_thread_request, wait_fd) == 52 );
 C_ASSERT( FIELD_OFFSET(struct init_first_thread_request, cpu) == 56 );
+C_ASSERT( FIELD_OFFSET(struct init_first_thread_request, nice_limit) == 60 );
 C_ASSERT( sizeof(struct init_first_thread_request) == 64 );
 C_ASSERT( FIELD_OFFSET(struct init_first_thread_reply, pid) == 8 );
 C_ASSERT( FIELD_OFFSET(struct init_first_thread_reply, tid) == 12 );
