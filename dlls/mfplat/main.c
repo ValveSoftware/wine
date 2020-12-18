@@ -1584,6 +1584,18 @@ HRESULT WINAPI MFTGetInfo(CLSID clsid, WCHAR **name, MFT_REGISTER_TYPE_INFO **in
     return hr;
 }
 
+static BOOL CALLBACK register_winegstreamer_proc(INIT_ONCE *once, void *param, void **ctx)
+{
+    HMODULE mod = LoadLibraryW(L"winegstreamer.dll");
+    if (mod)
+    {
+        HRESULT (WINAPI *proc)(void) = (void *)GetProcAddress(mod, "DllRegisterServer");
+        proc();
+        FreeLibrary(mod);
+    }
+    return TRUE;
+}
+
 /***********************************************************************
  *      MFStartup (mfplat.@)
  */
@@ -1591,8 +1603,11 @@ HRESULT WINAPI MFStartup(ULONG version, DWORD flags)
 {
 #define MF_VERSION_XP   MAKELONG( MF_API_VERSION, 1 )
 #define MF_VERSION_WIN7 MAKELONG( MF_API_VERSION, 2 )
+    static INIT_ONCE once = INIT_ONCE_STATIC_INIT;
 
     TRACE("%#lx, %#lx.\n", version, flags);
+
+    InitOnceExecuteOnce(&once, register_winegstreamer_proc, NULL, NULL);
 
     if (version != MF_VERSION_XP && version != MF_VERSION_WIN7)
         return MF_E_BAD_STARTUP_VERSION;
