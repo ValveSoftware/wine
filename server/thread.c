@@ -230,7 +230,13 @@ void init_threading(void)
 {
 #ifdef RLIMIT_NICE
     struct rlimit rlimit;
-    if (!getrlimit( RLIMIT_NICE, &rlimit ))
+#endif
+#ifdef HAVE_SETPRIORITY
+    if (setpriority( PRIO_PROCESS, getpid(), -20 ) == 0) nice_limit = -19;
+    setpriority( PRIO_PROCESS, getpid(), 0 );
+#endif
+#ifdef RLIMIT_NICE
+    if (!nice_limit && !getrlimit( RLIMIT_NICE, &rlimit ))
     {
         rlimit.rlim_cur = rlimit.rlim_max;
         setrlimit( RLIMIT_NICE, &rlimit );
