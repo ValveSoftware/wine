@@ -247,6 +247,7 @@ static inline void init_thread_structure( struct thread *thread )
     thread->state           = RUNNING;
     thread->exit_code       = 0;
     thread->priority        = 0;
+    thread->delay_priority  = NULL;
     thread->suspend         = 0;
     thread->dbg_hidden      = 0;
     thread->desktop_users   = 0;
@@ -437,6 +438,9 @@ static struct list *thread_get_kernel_obj_list( struct object *obj )
 static void cleanup_thread( struct thread *thread )
 {
     int i;
+
+    if (thread->delay_priority) remove_timeout_user( thread->delay_priority );
+    thread->delay_priority = NULL;
 
     if (thread->context)
     {
@@ -678,6 +682,27 @@ affinity_t get_thread_affinity( struct thread *thread )
 #define THREAD_PRIORITY_REALTIME_HIGHEST 6
 #define THREAD_PRIORITY_REALTIME_LOWEST -7
 
+static void apply_thread_priority( struct thread *thread, int priority_class, int priority, int delayed );
+
+static void delayed_set_thread_priority( void *private )
+{
+    struct thread *thread = private;
+    int priority_class = thread->process->priority, priority = thread->priority;
+    apply_thread_priority( thread, priority_class, priority, TRUE );
+}
+
+static void apply_thread_priority( struct thread *thread, int priority_class, int priority, int delayed )
+{
+    if (!delayed && thread->delay_priority) remove_timeout_user( thread->delay_priority );
+    thread->delay_priority = NULL;
+
+    if (thread->unix_tid == -1)
+    {
+        thread->delay_priority = add_timeout_user( -TICKS_PER_SEC, delayed_set_thread_priority, thread );
+        return;
+    }
+}
+
 int set_thread_priority( struct thread *thread, int priority_class, int priority )
 {
     int max = THREAD_PRIORITY_HIGHEST;
@@ -700,6 +725,7 @@ int set_thread_priority( struct thread *thread, int priority_class, int priority
         return 0;
     thread->priority = priority;
 
+    apply_thread_priority( thread, priority_class, priority, FALSE );
     return 0;
 }
 
