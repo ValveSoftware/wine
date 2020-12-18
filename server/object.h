@@ -245,6 +245,10 @@ extern struct object_type *get_object_type( const struct unicode_str *name );
 extern int directory_link_name( struct object *obj, struct object_name *name, struct object *parent );
 extern void init_directories(void);
 
+/* thread functions */
+
+extern void init_threading(void);
+
 /* symbolic link functions */
 
 extern struct object *create_obj_symlink( struct object *root, const struct unicode_str *name,
