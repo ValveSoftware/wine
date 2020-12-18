@@ -85,6 +85,7 @@ struct thread
     client_ptr_t           entry_point;   /* entry point (in client address space) */
     affinity_t             affinity;      /* affinity mask */
     int                    priority;      /* priority level */
+    struct timeout_user   *delay_priority;/* delayed set_thread_priority */
     int                    suspend;       /* suspend count */
     int                    dbg_hidden;    /* hidden from debugger */
     obj_handle_t           desktop;       /* desktop handle */
