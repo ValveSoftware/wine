@@ -224,6 +224,23 @@ static const struct fd_ops thread_fd_ops =
 };
 
 static struct list thread_list = LIST_INIT(thread_list);
+static int nice_limit;
+
+void init_threading(void)
+{
+#ifdef RLIMIT_NICE
+    struct rlimit rlimit;
+    if (!getrlimit( RLIMIT_NICE, &rlimit ))
+    {
+        rlimit.rlim_cur = rlimit.rlim_max;
+        setrlimit( RLIMIT_NICE, &rlimit );
+        if (rlimit.rlim_max <= 40) nice_limit = 20 - rlimit.rlim_max;
+        else if (rlimit.rlim_max == -1) nice_limit = -20;
+        if (nice_limit >= 0) fprintf(stderr, "wine: RLIMIT_NICE is <= 20, unable to use setpriority safely\n");
+    }
+#endif
+    if (nice_limit < 0) fprintf(stderr, "wine: Using setpriority to control niceness in the [%d,%d] range\n", nice_limit, -nice_limit );
+}
 
 /* initialize the structure for a newly allocated thread */
 static inline void init_thread_structure( struct thread *thread )
@@ -685,6 +702,21 @@ affinity_t get_thread_affinity( struct thread *thread )
     return mask;
 }
 
+static int get_base_priority( int priority_class, int priority )
+{
+    static const int class_offsets[] = { 4, 8, 13, 24, 6, 10 };
+    assert(priority_class <= ARRAY_SIZE(class_offsets));
+    if (priority == THREAD_PRIORITY_IDLE) return (priority_class == PROCESS_PRIOCLASS_REALTIME ? 16 : 1);
+    else if (priority == THREAD_PRIORITY_TIME_CRITICAL) return (priority_class == PROCESS_PRIOCLASS_REALTIME ? 31 : 15);
+    else return class_offsets[priority_class - 1] + priority;
+}
+
+static int get_unix_niceness( int base_priority, int limit )
+{
+    int min = -limit, max = limit, range = max - min;
+    return min + (base_priority - 1) * range / 14;
+}
+
 #define THREAD_PRIORITY_REALTIME_HIGHEST 6
 #define THREAD_PRIORITY_REALTIME_LOWEST -7
 
@@ -699,6 +731,8 @@ static void delayed_set_thread_priority( void *private )
 
 static void apply_thread_priority( struct thread *thread, int priority_class, int priority, int delayed )
 {
+    int niceness, limit = min( nice_limit, thread->process->nice_limit );
+
     if (!delayed && thread->delay_priority) remove_timeout_user( thread->delay_priority );
     thread->delay_priority = NULL;
 
@@ -707,6 +741,21 @@ static void apply_thread_priority( struct thread *thread, int priority_class, in
         thread->delay_priority = add_timeout_user( -TICKS_PER_SEC, delayed_set_thread_priority, thread );
         return;
     }
+
+    /* FIXME: handle REALTIME class using SCHED_RR if possible, for now map it to HIGH */
+    if (priority_class == PROCESS_PRIOCLASS_REALTIME) priority_class = PROCESS_PRIOCLASS_HIGH;
+
+#ifdef __linux__
+#ifdef HAVE_SETPRIORITY
+    if (limit < 0)
+    {
+        niceness = get_unix_niceness( get_base_priority( priority_class, priority ), limit );
+        if (setpriority( PRIO_PROCESS, thread->unix_tid, niceness ) != 0)
+            fprintf( stderr, "wine: setpriority %d for pid %d failed: %d\n", niceness, thread->unix_tid, errno );
+        return;
+    }
+#endif
+#endif
 }
 
 int set_thread_priority( struct thread *thread, int priority_class, int priority )
