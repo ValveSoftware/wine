@@ -762,6 +762,9 @@
 /* Define to 1 if you have the <Security/Security.h> header file. */
 #undef HAVE_SECURITY_SECURITY_H
 
+/* Define to 1 if you have the `setpriority' function. */
+#undef HAVE_SETPRIORITY
+
 /* Define to 1 if you have the `setproctitle' function. */
 #undef HAVE_SETPROCTITLE
 
