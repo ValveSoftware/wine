@@ -1832,11 +1832,98 @@ static HRESULT WINAPI PngFrameEncode_Commit(IWICBitmapFrameEncode *iface)
     return S_OK;
 }
 
+static HRESULT WINAPI PngQueryWriter_QueryInterface(IWICMetadataQueryWriter *iface, REFIID iid,
+    void **ppv)
+{
+    TRACE("(%p,%s,%p)\n", iface, debugstr_guid(iid), ppv);
+
+    if (!ppv) return E_INVALIDARG;
+
+    if (IsEqualIID(&IID_IUnknown, iid)
+            || IsEqualIID(&IID_IWICMetadataQueryWriter, iid)
+            || IsEqualIID(&IID_IWICMetadataQueryReader, iid))
+    {
+        *ppv = iface;
+    }
+    else
+    {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown*)*ppv);
+    return S_OK;
+}
+
+static ULONG WINAPI PngQueryWriter_AddRef(IWICMetadataQueryWriter *iface)
+{
+    TRACE("iface %p.\n", iface);
+    return 1;
+}
+
+static ULONG WINAPI PngQueryWriter_Release(IWICMetadataQueryWriter *iface)
+{
+    TRACE("iface %p.\n", iface);
+    return 1;
+}
+
+static HRESULT WINAPI PngQueryWriter_GetContainerFormat(IWICMetadataQueryWriter *iface, GUID *pguidContainerFormat)
+{
+    FIXME("pguidContainerFormat %p stub.\n", pguidContainerFormat);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI PngQueryWriter_GetEnumerator(IWICMetadataQueryWriter *iface, IEnumString **ppIEnumString)
+{
+    FIXME("ppIEnumString %p stub.\n", ppIEnumString);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI PngQueryWriter_GetLocation(IWICMetadataQueryWriter *iface, UINT cchMaxLength, WCHAR *wzNamespace, UINT *pcchActualLength)
+{
+    FIXME("cchMaxLength %u, wzNamespace %s, pcchActualLength %p stub.\n", cchMaxLength, debugstr_w(wzNamespace), pcchActualLength);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI PngQueryWriter_GetMetadataByName(IWICMetadataQueryWriter *iface, LPCWSTR wzName, PROPVARIANT *pvarValue)
+{
+    FIXME("wzName %s, pvarValue %p stub.\n", debugstr_w(wzName), pvarValue);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI PngQueryWriter_SetMetadataByName(IWICMetadataQueryWriter *iface, LPCWSTR wzName, const PROPVARIANT *pvarValue)
+{
+    FIXME("iface %p, wzName %s, pvarValue %p stub.\n", iface, debugstr_w(wzName), pvarValue);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI PngQueryWriter_RemoveMetadataByName(IWICMetadataQueryWriter *iface, LPCWSTR wzName)
+{
+    FIXME("iface %p, wzName %s stub.\n", iface, debugstr_w(wzName));
+    return E_NOTIMPL;
+}
+
+static const IWICMetadataQueryWriterVtbl PngEncoder_QueryWriterVtbl =
+{
+    PngQueryWriter_QueryInterface,
+    PngQueryWriter_AddRef,
+    PngQueryWriter_Release,
+    PngQueryWriter_GetContainerFormat,
+    PngQueryWriter_GetLocation,
+    PngQueryWriter_GetMetadataByName,
+    PngQueryWriter_GetEnumerator,
+    PngQueryWriter_SetMetadataByName,
+    PngQueryWriter_RemoveMetadataByName,
+};
+
 static HRESULT WINAPI PngFrameEncode_GetMetadataQueryWriter(IWICBitmapFrameEncode *iface,
     IWICMetadataQueryWriter **ppIMetadataQueryWriter)
 {
+    static IWICMetadataQueryWriter query_writer = {&PngEncoder_QueryWriterVtbl};
+
     FIXME("(%p, %p): stub\n", iface, ppIMetadataQueryWriter);
-    return E_NOTIMPL;
+    *ppIMetadataQueryWriter = &query_writer;
+    return S_OK;
 }
 
 static const IWICBitmapFrameEncodeVtbl PngEncoder_FrameVtbl = {
