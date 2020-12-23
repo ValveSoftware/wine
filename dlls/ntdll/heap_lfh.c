@@ -143,6 +143,7 @@ struct LFH_class
 struct LFH_heap
 {
     LFH_slist *list_defer;
+    LFH_arena *cached_large_arena;
 
     LFH_class block_class[TOTAL_BLOCK_CLASS_COUNT];
     LFH_class large_class[TOTAL_LARGE_CLASS_COUNT];
@@ -367,6 +368,13 @@ static BOOLEAN LFH_deallocate_deferred_blocks(LFH_heap *heap)
     return TRUE;
 }
 
+static void LFH_deallocated_cached_arenas(LFH_heap *heap)
+{
+    if (!heap->cached_large_arena) return;
+    LFH_memory_deallocate(heap->cached_large_arena, LARGE_ARENA_SIZE);
+    heap->cached_large_arena = NULL;
+}
+
 static size_t LFH_huge_alloc_size(size_t size)
 {
     return (ARENA_HEADER_SIZE + size + BLOCK_ARENA_MASK) & ~BLOCK_ARENA_MASK;
@@ -388,8 +396,10 @@ static LFH_arena *LFH_allocate_large_arena(LFH_heap *heap, LFH_class *class)
 {
     LFH_arena *arena;
 
-    if ((arena = LFH_memory_allocate(LARGE_ARENA_SIZE)))
+    if ((arena = heap->cached_large_arena) ||
+        (arena = LFH_memory_allocate(LARGE_ARENA_SIZE)))
     {
+        heap->cached_large_arena = NULL;
         LFH_arena_initialize(heap, class, arena, 0);
         LFH_class_push_arena(class, arena);
     }
@@ -430,7 +440,12 @@ static LFH_arena *LFH_acquire_arena(LFH_heap *heap, LFH_class *class)
 static BOOLEAN LFH_release_arena(LFH_heap *heap, LFH_arena *arena)
 {
     LFH_arena *large_arena = LFH_large_arena_from_block(arena);
-    if (arena == large_arena)
+    if (arena == large_arena && !heap->cached_large_arena)
+    {
+        heap->cached_large_arena = arena;
+        return TRUE;
+    }
+    else if (arena == large_arena)
         return LFH_memory_deallocate(arena, LARGE_ARENA_SIZE);
     else
         return LFH_deallocate_block(heap, large_arena, (LFH_block *)arena);
@@ -489,6 +504,7 @@ static void LFH_heap_initialize(LFH_heap *heap)
         LFH_class_initialize(heap, &heap->block_class[i], i);
 
     heap->list_defer = NULL;
+    heap->cached_large_arena = NULL;
 }
 
 static void LFH_heap_finalize(LFH_heap *heap)
@@ -514,6 +530,8 @@ static void LFH_heap_finalize(LFH_heap *heap)
             LFH_memory_deallocate(arena, LARGE_ARENA_SIZE);
         }
     }
+
+    LFH_deallocated_cached_arenas(heap);
 }
 
 static LFH_heap *LFH_heap_allocate(void)
@@ -824,10 +842,10 @@ static LFH_ptr *LFH_allocate(ULONG flags, size_t size)
     LFH_heap *heap = LFH_thread_heap(TRUE);
     size_t class_size = LFH_get_class_size(flags, size);
 
-    if (!LFH_deallocate_deferred_blocks(heap))
+    if (class_size == ~(size_t)0)
         return NULL;
 
-    if (class_size == ~(size_t)0)
+    if (!LFH_deallocate_deferred_blocks(heap))
         return NULL;
 
     if ((class = LFH_heap_get_class(heap, class_size)))
@@ -842,6 +860,8 @@ static LFH_ptr *LFH_allocate(ULONG flags, size_t size)
         if (arena) block = LFH_arena_get_block(arena, ARENA_HEADER_SIZE);
         if (block) LFH_block_initialize(block, flags, 0, size, LFH_block_get_class_size(block));
     }
+
+    LFH_deallocated_cached_arenas(heap);
 
     if (!block) return NULL;
     return LFH_ptr_from_block(block);
@@ -1060,4 +1080,5 @@ void HEAP_lfh_set_debug_flags(ULONG flags)
     if (!heap) return;
 
     LFH_deallocate_deferred_blocks(heap);
+    LFH_deallocated_cached_arenas(heap);
 }
