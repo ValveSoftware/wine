@@ -149,10 +149,22 @@ struct LFH_heap
     LFH_class large_class[TOTAL_LARGE_CLASS_COUNT];
 
     SLIST_ENTRY entry_orphan;
+#ifdef _WIN64
+    void *pad[0xc2];
+#else
+    void *pad[0xc3];
+#endif
 };
 
 C_ASSERT(TOTAL_BLOCK_CLASS_COUNT == 0x7d);
 C_ASSERT(TOTAL_LARGE_CLASS_COUNT == 0x20);
+
+/* make sure this aligns to power of two so we can mask class pointers in LFH_heap_from_arena */
+#ifdef _WIN64
+C_ASSERT(sizeof(LFH_heap) == 0x1000);
+#else
+C_ASSERT(sizeof(LFH_heap) == 0x800);
+#endif
 
 /* arena->class/arena->parent pointer low bits are used to discriminate between the two */
 C_ASSERT(offsetof(LFH_heap, block_class[0]) > 0);
@@ -165,7 +177,7 @@ C_ASSERT(offsetof(LFH_heap, large_class[TOTAL_LARGE_CLASS_COUNT]) < BLOCK_ARENA_
                                      ? LFH_parent_from_arena(arena)->class : NULL)
 
 /* helper to retrieve the heap from an arena, using its class pointer */
-#define LFH_heap_from_arena(arena) ((LFH_heap *)((UINT_PTR)LFH_class_from_arena(arena) & ~BLOCK_ARENA_MASK))
+#define LFH_heap_from_arena(arena) ((LFH_heap *)((UINT_PTR)LFH_class_from_arena(arena) & ~(sizeof(LFH_heap) - 1)))
 
 /* helpers to retrieve block pointers to the containing block or large (maybe child) arena */
 #define LFH_large_arena_from_block(block) ((LFH_arena *)((UINT_PTR)(block) & ~BLOCK_ARENA_MASK))
@@ -475,22 +487,33 @@ static BOOLEAN LFH_deallocate_block(LFH_heap *heap, LFH_arena *arena, LFH_block 
     return LFH_release_arena(heap, arena);
 }
 
+static void LFH_heap_initialize(LFH_heap *heap);
+
 static SLIST_HEADER *LFH_orphan_list(void)
 {
     static SLIST_HEADER *header;
     SLIST_HEADER *ptr, *expected = NULL;
+    LFH_heap *tmp;
+
+    C_ASSERT(sizeof(LFH_heap) >= sizeof(SLIST_HEADER));
 
     if ((ptr = __atomic_load_n(&header, __ATOMIC_RELAXED)))
         return ptr;
 
-    if (!(ptr = LFH_memory_allocate(sizeof(*header))))
+    if (!(ptr = LFH_memory_allocate(BLOCK_ARENA_SIZE)))
         return NULL;
 
     RtlInitializeSListHead(ptr);
+    for (tmp = (LFH_heap *)ptr + 1; tmp < (LFH_heap *)ptr + BLOCK_ARENA_SIZE / sizeof(*tmp); tmp++)
+    {
+        LFH_heap_initialize(tmp);
+        RtlInterlockedPushEntrySList(ptr, &tmp->entry_orphan);
+    }
+
     if (__atomic_compare_exchange_n(&header, &expected, ptr, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
         return ptr;
 
-    LFH_memory_deallocate(ptr, sizeof(*header));
+    LFH_memory_deallocate(ptr, BLOCK_ARENA_SIZE);
     return expected;
 }
 
@@ -536,19 +559,21 @@ static void LFH_heap_finalize(LFH_heap *heap)
 
 static LFH_heap *LFH_heap_allocate(void)
 {
-    void *addr;
-    addr = LFH_memory_allocate(sizeof(LFH_heap));
-    if (!addr)
+    SLIST_HEADER *list_orphan = LFH_orphan_list();
+    LFH_heap *heap, *tmp;
+
+    heap = LFH_memory_allocate(BLOCK_ARENA_SIZE);
+    if (!heap)
         return NULL;
 
-    LFH_heap_initialize(addr);
-    return addr;
-}
+    for (tmp = heap + 1; tmp < heap + BLOCK_ARENA_SIZE / sizeof(*tmp); tmp++)
+    {
+        LFH_heap_initialize(tmp);
+        RtlInterlockedPushEntrySList(list_orphan, &tmp->entry_orphan);
+    }
 
-static void LFH_heap_deallocate(LFH_heap *heap)
-{
-    LFH_heap_finalize(heap);
-    LFH_memory_deallocate(heap, sizeof(*heap));
+    LFH_heap_initialize(heap);
+    return heap;
 }
 
 static LFH_heap *LFH_thread_heap(BOOL create)
@@ -1067,8 +1092,9 @@ void HEAP_lfh_notify_thread_destroy(BOOLEAN last)
         {
             LFH_heap *orphan = LIST_ENTRY(entry_orphan, LFH_heap, entry_orphan);
             entry_orphan = entry_orphan->Next;
-            LFH_heap_deallocate(orphan);
+            LFH_heap_finalize(orphan);
         }
+        LFH_memory_deallocate(list_orphan, BLOCK_ARENA_SIZE);
     }
     else if ((heap = LFH_thread_heap(FALSE)) && LFH_validate_heap(0, heap))
         RtlInterlockedPushEntrySList(list_orphan, &heap->entry_orphan);
