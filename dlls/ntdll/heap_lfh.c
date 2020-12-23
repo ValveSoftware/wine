@@ -201,7 +201,7 @@ static void *LFH_memory_allocate(size_t size)
     SIZE_T alloc_size = size;
 
     if (NtAllocateVirtualMemory(NtCurrentProcess(), (void **)&addr, 0, &alloc_size,
-                                MEM_RESERVE | MEM_COMMIT | MEM_TOP_DOWN, PAGE_READWRITE))
+                                MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE))
         return NULL;
 
     return addr;
