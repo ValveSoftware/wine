@@ -1681,7 +1681,7 @@ HANDLE WINAPI RtlCreateHeap( ULONG flags, PVOID addr, SIZE_T totalSize, SIZE_T c
     else if (!addr)
     {
         processHeap = subheap->heap;  /* assume the first heap we create is the process main heap */
-        processHeap->extended_type = HEAP_LFH;
+        processHeap->extended_type = HEAP_STD;
         list_init( &processHeap->entry );
     }
 
