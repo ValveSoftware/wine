@@ -4213,6 +4213,7 @@ void __wine_process_init(void)
     ULONG_PTR val;
     TEB *teb = NtCurrentTeb();
     PEB *peb = teb->Peb;
+    DWORD hci = 2;
 
     peb->LdrData            = &ldr;
     peb->FastPebLock        = &peb_lock;
@@ -4313,6 +4314,7 @@ void __wine_process_init(void)
     }
 
     unix_funcs->virtual_set_large_address_space(needs_override_large_address_aware(NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer));
+    RtlSetHeapInformation( GetProcessHeap(), HeapCompatibilityInformation, &hci, sizeof(hci) );
 
     /* the main exe needs to be the first in the load order list */
     RemoveEntryList( &wm->ldr.InLoadOrderLinks );
