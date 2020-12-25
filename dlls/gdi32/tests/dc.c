@@ -1669,7 +1669,6 @@ static void test_multi_monitor_dc(void)
     ok(value == dm.dmPelsHeight, "Expected %d, got %d.\n", dm.dmPelsHeight, value);
 
     value = GetDeviceCaps(hdc, VREFRESH);
-    todo_wine_if(value != dm.dmDisplayFrequency && value == 1)
     ok(value == dm.dmDisplayFrequency, "Expected %d, got %d.\n", dm.dmDisplayFrequency, value);
 
     /* Test GetDeviceCaps() values after mode changes */
@@ -1705,7 +1704,6 @@ static void test_multi_monitor_dc(void)
         ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
 
         value = GetDeviceCaps(hdc, VREFRESH);
-        todo_wine_if(value != dm2.dmDisplayFrequency && value == 1)
         ok(value == dm2.dmDisplayFrequency, "Expected %d, got %d.\n", dm2.dmDisplayFrequency, value);
 
         res = ChangeDisplaySettingsExA(NULL, NULL, NULL, 0, NULL);
@@ -1746,7 +1744,6 @@ static void test_multi_monitor_dc(void)
         ok(value == dm.dmPelsHeight, "Expected %d, got %d.\n", dm.dmPelsHeight, value);
 
         value = GetDeviceCaps(hdc, VREFRESH);
-        todo_wine_if(value != dm.dmDisplayFrequency && value == 1)
         ok(value == dm.dmDisplayFrequency, "Expected %d, got %d.\n", dm.dmDisplayFrequency, value);
 
         /* Test GetDeviceCaps() values after mode changes */
@@ -1788,7 +1785,6 @@ static void test_multi_monitor_dc(void)
         ok(value == dm2.dmPelsHeight, "Expected %d, got %d.\n", dm2.dmPelsHeight, value);
 
         value = GetDeviceCaps(hdc, VREFRESH);
-        todo_wine_if(value != dm2.dmDisplayFrequency && value == 1)
         ok(value == dm2.dmDisplayFrequency, "Expected %d, got %d.\n", dm2.dmDisplayFrequency, value);
 
         /* Test GetDeviceCaps() values after monitor detach */
