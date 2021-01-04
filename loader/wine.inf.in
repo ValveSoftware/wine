@@ -4017,6 +4017,7 @@ HKCU,Software\Valve\Steam\ActiveProcess,"SteamClientDll",,"%16426%\Steam\steamcl
 HKCU,Software\Valve\Steam\ActiveProcess,"SteamClientDll64",,"%16426%\Steam\steamclient64.dll"
 HKCU,Software\Valve\Steam\ActiveProcess,"SteamPath",,"%16426%\Steam"
 HKLM,Software\Wow6432Node\Valve\Steam,"InstallPath",,"%16422%\Steam"
+HKLM,Software\Khronos\OpenXR\1,"ActiveRuntime",,"C:\openxr\wineopenxr64.json"
 HKCU,Software\Wine\AppDefaults\NewColossus_x64vk.exe\DllOverrides,"amd_ags_x64",0x2,"builtin,native"
 HKCU,Software\Wine\AppDefaults\RDR2.exe\DllOverrides,"amd_ags_x64",0x2,"builtin,native"
 HKCU,Software\Wine\AppDefaults\DarkSoulsIII.exe\X11 Driver,"LimitNumberOfResolutions",0x2,"32"
