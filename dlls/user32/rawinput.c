@@ -191,18 +191,37 @@ static HANDLE rawinput_handle_from_device_handle(HANDLE device, BOOL rescan)
     return rawinput_handle_from_device_handle(device, FALSE);
 }
 
-static void find_rawinput_devices_by_guid(const GUID *guid)
+static void find_devices(BOOL force)
 {
+    static ULONGLONG last_check;
+
     SP_DEVICE_INTERFACE_DATA iface = { sizeof(iface) };
     struct device *device;
     HIDD_ATTRIBUTES attr;
     HIDP_CAPS caps;
+    GUID hid_guid;
     HDEVINFO set;
     DWORD idx;
 
-    set = SetupDiGetClassDevsW(guid, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+    if (!force && GetTickCount64() - last_check < 2000)
+        return;
+    last_check = GetTickCount64();
 
-    for (idx = 0; SetupDiEnumDeviceInterfaces(set, NULL, guid, idx, &iface); ++idx)
+    HidD_GetHidGuid(&hid_guid);
+
+    EnterCriticalSection(&rawinput_devices_cs);
+
+    /* destroy previous list */
+    for (idx = 0; idx < rawinput_devices_count; ++idx)
+    {
+        CloseHandle(rawinput_devices[idx].file);
+        heap_free(rawinput_devices[idx].path);
+    }
+    rawinput_devices_count = 0;
+
+    set = SetupDiGetClassDevsW(&hid_guid, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+
+    for (idx = 0; SetupDiEnumDeviceInterfaces(set, NULL, &hid_guid, idx, &iface); ++idx)
     {
         if (!(device = add_device(set, &iface)))
             continue;
@@ -227,46 +246,6 @@ static void find_rawinput_devices_by_guid(const GUID *guid)
     }
 
     SetupDiDestroyDeviceInfoList(set);
-}
-
-static void find_devices(BOOL force)
-{
-    static ULONGLONG last_check;
-
-    SP_DEVICE_INTERFACE_DATA iface = { sizeof(iface) };
-    struct device *device;
-    HDEVINFO set;
-    DWORD idx;
-    GUID hid_guid;
-
-    if (!force && GetTickCount64() - last_check < 2000)
-        return;
-
-    HidD_GetHidGuid(&hid_guid);
-
-    EnterCriticalSection(&rawinput_devices_cs);
-
-    if (!force && GetTickCount64() - last_check < 2000)
-    {
-        LeaveCriticalSection(&rawinput_devices_cs);
-        return;
-    }
-
-    last_check = GetTickCount64();
-
-    /* destroy previous list */
-    for (idx = 0; idx < rawinput_devices_count; ++idx)
-    {
-        CloseHandle(rawinput_devices[idx].file);
-        heap_free(rawinput_devices[idx].path);
-    }
-    rawinput_devices_count = 0;
-
-    find_rawinput_devices_by_guid(&hid_guid);
-
-    /* HACK: also look up the xinput-specific devices */
-    hid_guid.Data4[7]++;
-    find_rawinput_devices_by_guid(&hid_guid);
 
     set = SetupDiGetClassDevsW(&GUID_DEVINTERFACE_MOUSE, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
 
