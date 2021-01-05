@@ -96,7 +96,7 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
     SP_DEVICE_INTERFACE_DETAIL_DATA_W *detail;
     struct device *device;
     HANDLE file;
-    WCHAR *path;
+    WCHAR *path, *pos;
     DWORD size;
 
     SetupDiGetDeviceInterfaceDetailW(set, iface, NULL, 0, &size, NULL);
@@ -122,6 +122,9 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
         return NULL;
     }
     heap_free(detail);
+
+    /* upper case everything but the GUID */
+    for (pos = path; *pos && *pos != '{'; pos++) *pos = toupperW(*pos);
 
     file = CreateFileW(path, GENERIC_READ | GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, 0, 0);
