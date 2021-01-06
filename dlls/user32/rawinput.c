@@ -176,7 +176,7 @@ static HANDLE rawinput_handle_from_device_handle(HANDLE device, BOOL rescan)
 
     for (i = 0; i < rawinput_devices_count; ++i)
     {
-        if (strcmpW(rawinput_devices[i].path, info->Name.Buffer) == 0)
+        if (strcmpiW(rawinput_devices[i].path, info->Name.Buffer) == 0)
         {
             rawinput_devices[i].handle = device;
             return &rawinput_devices[i];
