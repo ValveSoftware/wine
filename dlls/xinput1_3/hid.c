@@ -231,7 +231,7 @@ void HID_find_gamepads(xinput_controller *devices)
                 &interface_data, data, sizeof(*data) + detail_size, NULL, NULL))
             continue;
 
-        if (!wcsstr(data->DevicePath, L"IG_"))
+        if (!wcsstr(data->DevicePath, L"IG_") && !wcsstr(data->DevicePath, L"ig_"))
             continue;
 
         open_device_idx = -1;
