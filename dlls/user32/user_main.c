@@ -391,6 +391,13 @@ static void thread_detach(void)
         thread_info->desktop_shared_memory = NULL;
     }
 
+    if (thread_info->thread_shared_map)
+    {
+        CloseHandle( thread_info->thread_shared_map );
+        thread_info->thread_shared_map = NULL;
+        thread_info->thread_shared_memory = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 
