@@ -741,7 +741,8 @@ static BOOL CALLBACK init_file_blacklist(PINIT_ONCE init_once, PVOID parameter, 
             L"igoproxy64.exe",
             L"igoproxy.exe",
             L"origin.exe",
-            L"easteamproxy.exe"
+            L"easteamproxy.exe",
+            L"NFS11Remastered.exe"
         };
 
         WCHAR cur_exe[MAX_PATH];
