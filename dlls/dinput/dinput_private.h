@@ -46,6 +46,8 @@ struct dinput
 
 extern const IDirectInput7AVtbl dinput7_a_vtbl;
 extern const IDirectInput8AVtbl dinput8_a_vtbl;
+extern HANDLE steam_overlay_event;
+extern HANDLE steam_keyboard_event;
 
 extern void dinput_internal_addref( struct dinput *dinput );
 extern void dinput_internal_release( struct dinput *dinput );
