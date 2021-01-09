@@ -160,6 +160,7 @@ static CRITICAL_SECTION_DEBUG sdldevs_lock_debug =
 static CRITICAL_SECTION sdldevs_lock = { &sdldevs_lock_debug, -1, 0, 0, 0, 0 };
 
 static struct SDLDev sdldevs[64];
+static HANDLE steam_overlay_event;
 
 /* logic from SDL2's SDL_ShouldIgnoreGameController */
 static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
@@ -223,6 +224,8 @@ static BOOL WINAPI sdldrv_init(INIT_ONCE *once, void *param, void **context)
 
     SDL_Init(SDL_INIT_JOYSTICK|SDL_INIT_HAPTIC);
     SDL_JoystickEventState(SDL_ENABLE);
+
+    steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
 
     return TRUE;
 }
@@ -889,6 +892,9 @@ static HRESULT poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
     int newVal = 0;
     struct device_state_item item;
     SDL_Joystick *js = This->sdldev->sdl_js;
+
+    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
+        return DI_OK; /* steam overlay is enabled */
 
     SDL_JoystickUpdate();
 
