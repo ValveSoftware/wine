@@ -48,6 +48,7 @@ struct IDirectInputImpl
 
 extern const IDirectInput7AVtbl dinput7_a_vtbl DECLSPEC_HIDDEN;
 extern const IDirectInput8AVtbl dinput8_a_vtbl DECLSPEC_HIDDEN;
+extern HANDLE steam_overlay_event DECLSPEC_HIDDEN;
 
 extern HRESULT mouse_enum_device( DWORD type, DWORD flags, DIDEVICEINSTANCEW *instance, DWORD version );
 extern HRESULT mouse_create_device( IDirectInputImpl *dinput, const GUID *guid, IDirectInputDevice8W **out );

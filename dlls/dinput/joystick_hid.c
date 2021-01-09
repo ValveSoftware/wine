@@ -1092,6 +1092,7 @@ struct parse_device_state_params
 {
     BYTE old_state[DEVICE_STATE_MAX_SIZE];
     BYTE buttons[128];
+    BOOL reset_state;
     DWORD time;
     DWORD seq;
 };
@@ -1107,6 +1108,9 @@ static BOOL check_device_state_button( struct hid_joystick *impl, struct hid_val
 
     value = params->buttons[instance->wUsage - 1];
     old_value = params->old_state[instance->dwOfs];
+
+    if (params->reset_state) value = 0;
+
     impl->base.device_state[instance->dwOfs] = value;
     if (old_value != value)
         queue_event( iface, instance->dwType, value, params->time, params->seq );
@@ -1189,6 +1193,16 @@ static BOOL read_device_state_value( struct hid_joystick *impl, struct hid_value
     if (instance->dwType & DIDFT_AXIS) value = scale_axis_value( logical_value, properties );
     else value = scale_value( logical_value, properties );
 
+    if (params->reset_state)
+    {
+        if (instance->dwType & DIDFT_POV) value = -1;
+        else if (instance->dwType & DIDFT_AXIS)
+        {
+            if (!properties->range_min) value = properties->range_max / 2;
+            else value = round( (properties->range_min + properties->range_max) / 2.0 );
+        }
+    }
+
     old_value = *(LONG *)(params->old_state + instance->dwOfs);
     *(LONG *)(impl->base.device_state + instance->dwOfs) = value;
     if (old_value != value)
@@ -1232,6 +1246,11 @@ static HRESULT hid_joystick_read( IDirectInputDevice8W *iface )
             TRACE("%s\n", buffer);
         }
     }
+
+    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0) /* steam overlay is enabled */
+        params.reset_state = TRUE;
+    else
+        params.reset_state = FALSE;
 
     EnterCriticalSection( &impl->base.crit );
     while (ret)
