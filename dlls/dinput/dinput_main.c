@@ -509,6 +509,8 @@ void check_dinput_events(void)
     MsgWaitForMultipleObjectsEx(0, NULL, 0, QS_ALLINPUT, 0);
 }
 
+HANDLE steam_overlay_event;
+
 BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, void *reserved )
 {
     TRACE( "inst %p, reason %lu, reserved %p.\n", inst, reason, reserved );
@@ -517,12 +519,14 @@ BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, void *reserved )
     {
       case DLL_PROCESS_ATTACH:
         DisableThreadLibraryCalls(inst);
+        steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
         DINPUT_instance = inst;
         register_di_em_win_class();
         break;
       case DLL_PROCESS_DETACH:
         if (reserved) break;
         unregister_di_em_win_class();
+        CloseHandle(steam_overlay_event);
         break;
     }
     return TRUE;
