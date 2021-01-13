@@ -356,14 +356,14 @@ static HRESULT WINAPI SAORS_Reset(ISpatialAudioObjectRenderStream *iface)
 }
 
 static HRESULT WINAPI SAORS_BeginUpdatingAudioObjects(ISpatialAudioObjectRenderStream *iface,
-        UINT32 *count, UINT32 *frames)
+        UINT32 *dyn_count, UINT32 *frames)
 {
     SpatialAudioStreamImpl *This = impl_from_ISpatialAudioObjectRenderStream(iface);
     SpatialAudioObjectImpl *object;
     UINT32 pad;
     HRESULT hr;
 
-    TRACE("(%p)->(%p, %p)\n", This, count, frames);
+    TRACE("(%p)->(%p, %p)\n", This, dyn_count, frames);
 
     EnterCriticalSection(&This->lock);
 
@@ -385,6 +385,7 @@ static HRESULT WINAPI SAORS_BeginUpdatingAudioObjects(ISpatialAudioObjectRenderS
         This->update_frames = 0;
     }
 
+    *dyn_count = 0;
     if(This->update_frames > 0){
         hr = IAudioRenderClient_GetBuffer(This->render, This->update_frames, (BYTE **)&This->buf);
         if(FAILED(hr)){
@@ -394,13 +395,9 @@ static HRESULT WINAPI SAORS_BeginUpdatingAudioObjects(ISpatialAudioObjectRenderS
             return hr;
         }
 
-        *count = 0;
         LIST_FOR_EACH_ENTRY(object, &This->objects, SpatialAudioObjectImpl, entry){
             memset(object->buf, 0, This->update_frames * This->sa_client->object_fmtex.Format.nBlockAlign);
-            *count += 1;
         }
-    }else{
-        *count = list_count(&This->objects);
     }
 
     *frames = This->update_frames;
