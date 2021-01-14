@@ -1188,7 +1188,7 @@ static void process_device_event(SDL_Event *event)
     {
         SDL_Event xinput_hack_event = *event;
 
-        if (overlay_enabled) return;
+        if (overlay_enabled && event->type != SDL_JOYBUTTONUP) return;
 
         set_report_from_event(event);
 
@@ -1199,7 +1199,7 @@ static void process_device_event(SDL_Event *event)
     {
         SDL_Event xinput_hack_event = *event;
 
-        if (overlay_enabled) return;
+        if (overlay_enabled && event->type != SDL_CONTROLLERBUTTONUP) return;
 
         set_mapped_report_from_event(event);
 
