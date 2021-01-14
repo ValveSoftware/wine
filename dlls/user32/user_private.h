@@ -207,6 +207,8 @@ struct user_thread_info
     struct desktop_shared_memory *desktop_shared_memory;  /* Ptr to server's desktop shared memory */
     HANDLE                        queue_shared_map;       /* HANDLE to server's thread queue shared memory */
     struct queue_shared_memory   *queue_shared_memory;     /* Ptr to server's thread queue shared memory */
+    HANDLE                        input_shared_map;       /* HANDLE to server's thread input shared memory */
+    struct input_shared_memory   *input_shared_memory;     /* Ptr to server's thread input shared memory */
 };
 
 C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
@@ -295,6 +297,7 @@ extern const WCHAR *CLASS_GetVersionedName(const WCHAR *classname, UINT *basenam
         WCHAR *combined, BOOL register_class) DECLSPEC_HIDDEN;
 extern volatile struct desktop_shared_memory *get_desktop_shared_memory( void ) DECLSPEC_HIDDEN;
 extern volatile struct queue_shared_memory *get_queue_shared_memory( void ) DECLSPEC_HIDDEN;
+extern volatile struct input_shared_memory *get_input_shared_memory( void ) DECLSPEC_HIDDEN;
 
 /* message spy definitions */
 
