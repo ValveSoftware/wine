@@ -299,8 +299,8 @@ static inline void init_thread_structure( struct thread *thread )
     thread->token           = NULL;
     thread->desc            = NULL;
     thread->desc_len        = 0;
-    thread->shared_mapping  = NULL;
-    thread->shared          = NULL;
+    thread->queue_shared_mapping = NULL;
+    thread->queue_shared         = NULL;
 
     thread->creation_time = current_time;
     thread->exit_time     = 0;
@@ -349,7 +349,7 @@ static struct context *create_thread_context( struct thread *thread )
 }
 
 
-static volatile void *init_thread_mapping( struct thread *thread )
+static volatile void *init_queue_mapping( struct thread *thread )
 {
     struct unicode_str name;
     struct object *dir = create_thread_map_directory();
@@ -358,16 +358,16 @@ static volatile void *init_thread_mapping( struct thread *thread )
 
     if (!dir) return NULL;
 
-    sprintf( nameA, "%08x", thread->id );
+    sprintf( nameA, "%08x-queue", thread->id );
     nameW = ascii_to_unicode_str( nameA, &name );
 
-    thread->shared_mapping = create_shared_mapping( dir, &name, sizeof(struct thread_shared_memory),
-                                                    NULL, (void **)&thread->shared );
+    thread->queue_shared_mapping = create_shared_mapping( dir, &name, sizeof(struct queue_shared_memory),
+                                                          NULL, (void **)&thread->queue_shared );
     release_object( dir );
-    if (thread->shared) memset( (void *)thread->shared, 0, sizeof(*thread->shared) );
+    if (thread->queue_shared) memset( (void *)thread->queue_shared, 0, sizeof(*thread->queue_shared) );
 
     free( nameW );
-    return thread->shared;
+    return thread->queue_shared;
 }
 
 
@@ -436,7 +436,7 @@ struct thread *create_thread( int fd, struct process *process, const struct secu
         release_object( thread );
         return NULL;
     }
-    if (!init_thread_mapping( thread ))
+    if (!init_queue_mapping( thread ))
     {
         release_object( thread );
         return NULL;
@@ -514,8 +514,8 @@ static void cleanup_thread( struct thread *thread )
         }
     }
     free( thread->desc );
-    if (thread->shared_mapping) release_object( thread->shared_mapping );
-    thread->shared_mapping = NULL;
+    if (thread->queue_shared_mapping) release_object( thread->queue_shared_mapping );
+    thread->queue_shared_mapping = NULL;
     thread->req_data = NULL;
     thread->reply_data = NULL;
     thread->request_fd = NULL;

@@ -146,7 +146,7 @@ struct msg_queue
     int                    esync_in_msgwait; /* our thread is currently waiting on us */
     unsigned int           fsync_idx;
     int                    fsync_in_msgwait; /* our thread is currently waiting on us */
-    volatile struct thread_shared_memory *shared;  /* thread shared memory ptr */
+    volatile struct queue_shared_memory *shared;  /* thread queue shared memory ptr */
 };
 
 struct hotkey
@@ -322,7 +322,7 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
         queue->esync_in_msgwait = 0;
         queue->fsync_idx       = 0;
         queue->fsync_in_msgwait = 0;
-        queue->shared          = thread->shared;
+        queue->shared          = thread->queue_shared;
         list_init( &queue->send_result );
         list_init( &queue->callback_result );
         list_init( &queue->pending_timers );
