@@ -174,6 +174,39 @@ volatile struct queue_shared_memory *get_queue_shared_memory( void )
 }
 
 
+static volatile struct input_shared_memory *get_thread_input_shared_memory( DWORD tid, HANDLE *handle,
+                                                                            struct input_shared_memory **ptr )
+{
+    WCHAR buf[MAX_PATH];
+
+    if (*ptr && (*ptr)->tid == tid) return *ptr;
+    if (*ptr) CloseHandle( *handle );
+
+    swprintf( buf, ARRAY_SIZE(buf), L"\\KernelObjects\\__wine_thread_mappings\\%08x-input", tid );
+    map_shared_memory_section( buf, sizeof(struct input_shared_memory), NULL,
+                               handle, (void **)ptr );
+    return *ptr;
+}
+
+
+volatile struct input_shared_memory *get_input_shared_memory( void )
+{
+    volatile struct queue_shared_memory *queue = get_queue_shared_memory();
+    struct user_thread_info *thread_info = get_user_thread_info();
+    DWORD tid;
+
+    if (!queue) return NULL;
+    SHARED_READ_BEGIN( &queue->seq )
+    {
+        tid = queue->input_tid;
+    }
+    SHARED_READ_END( &queue->seq );
+
+    return get_thread_input_shared_memory( tid, &thread_info->input_shared_map,
+                                           &thread_info->input_shared_memory );
+}
+
+
 /***********************************************************************
  *              CreateWindowStationA  (USER32.@)
  */
