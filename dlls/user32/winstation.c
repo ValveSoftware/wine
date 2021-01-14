@@ -160,20 +160,20 @@ volatile struct desktop_shared_memory *get_desktop_shared_memory( void )
 }
 
 
-volatile struct thread_shared_memory *get_thread_shared_memory( void )
+volatile struct queue_shared_memory *get_queue_shared_memory( void )
 {
     static const WCHAR dir_thread_mapsW[] = {'\\','K','e','r','n','e','l','O','b','j','e','c','t','s',
                                              '\\','_','_','w','i','n','e','_','t','h','r','e','a','d','_','m','a','p','p','i','n','g','s',
-                                             '\\','%','0','8','x',0};
+                                             '\\','%','0','8','x','-','q','u','e','u','e',0};
     struct user_thread_info *thread_info = get_user_thread_info();
     WCHAR buf[MAX_PATH];
 
-    if (thread_info->thread_shared_memory) return thread_info->thread_shared_memory;
+    if (thread_info->queue_shared_memory) return thread_info->queue_shared_memory;
 
     swprintf( buf, ARRAY_SIZE(buf), dir_thread_mapsW, GetCurrentThreadId() );
-    map_shared_memory_section( buf, sizeof(struct thread_shared_memory), NULL,
-                               &thread_info->thread_shared_map, (void **)&thread_info->thread_shared_memory );
-    return thread_info->thread_shared_memory;
+    map_shared_memory_section( buf, sizeof(struct queue_shared_memory), NULL,
+                               &thread_info->queue_shared_map, (void **)&thread_info->queue_shared_memory );
+    return thread_info->queue_shared_memory;
 }
 
 
