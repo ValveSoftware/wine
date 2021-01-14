@@ -867,7 +867,7 @@ struct desktop_shared_memory
     unsigned char        keystate[256];    /* asynchronous key state */
 };
 
-struct thread_shared_memory
+struct queue_shared_memory
 {
     unsigned int         seq;              /* sequence number - server updating if (seq_no & SEQUENCE_MASK) != 0 */
     unsigned int         wake_bits;

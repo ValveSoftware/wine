@@ -2698,7 +2698,7 @@ static inline void call_sendmsg_callback( SENDASYNCPROC callback, HWND hwnd, UIN
 static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags, UINT changed_mask, BOOL waited )
 {
     LRESULT result;
-    volatile struct thread_shared_memory *shared = get_thread_shared_memory();
+    volatile struct queue_shared_memory *shared = get_queue_shared_memory();
     struct user_thread_info *thread_info = get_user_thread_info();
     INPUT_MESSAGE_SOURCE prev_source = thread_info->msg_source;
     struct received_message_info info, *old_info;
