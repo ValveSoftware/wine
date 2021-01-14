@@ -860,6 +860,14 @@ struct queue_shared_memory
     unsigned int         changed_bits;
     unsigned int         wake_mask;
     unsigned int         changed_mask;
+    thread_id_t          input_tid;
+};
+
+struct input_shared_memory
+{
+    unsigned int         seq;              /* sequence number - server updating if (seq_no & SEQUENCE_MASK) != 0 */
+    int                  created;
+    thread_id_t          tid;
 };
 
 /* Bits that must be clear for client to read */
