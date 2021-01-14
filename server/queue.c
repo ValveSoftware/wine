@@ -116,6 +116,8 @@ struct thread_input
     unsigned char          keystate[256]; /* state of each key */
     unsigned char          desktop_keystate[256]; /* desktop keystate when keystate was synced */
     int                    keystate_lock; /* keystate is locked */
+    struct object         *shared_mapping; /* thread input shared memory mapping */
+    volatile struct input_shared_memory *shared;  /* thread input shared memory ptr */
 };
 
 struct msg_queue
@@ -309,6 +311,8 @@ static struct thread_input *create_thread_input( struct thread *thread )
 
     if ((input = alloc_object( &thread_input_ops )))
     {
+        input->shared_mapping = grab_object( thread->input_shared_mapping );
+        input->shared = thread->input_shared;
         input->focus        = 0;
         input->capture      = 0;
         input->active       = 0;
@@ -328,6 +332,10 @@ static struct thread_input *create_thread_input( struct thread *thread )
         }
         memcpy( input->desktop_keystate, (void *)input->desktop->shared->keystate,
                 sizeof(input->desktop_keystate) );
+
+        SHARED_WRITE_BEGIN( &input->shared->seq );
+        input->shared->created = TRUE;
+        SHARED_WRITE_END( &input->shared->seq );
     }
     return input;
 }
@@ -385,7 +393,13 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
         SHARED_WRITE_END( &queue->shared->seq );
         thread->queue = queue;
     }
-    if (new_input) release_object( new_input );
+    if (new_input)
+    {
+        SHARED_WRITE_BEGIN( &queue->shared->seq );
+        queue->shared->input_tid = new_input->shared->tid;
+        SHARED_WRITE_END( &queue->shared->seq );
+        release_object( new_input );
+    }
     return queue;
 }
 
@@ -442,6 +456,10 @@ static int assign_thread_input( struct thread *thread, struct thread_input *new_
     queue->input = (struct thread_input *)grab_object( new_input );
     if (queue->keystate_lock) lock_input_keystate( queue->input );
     new_input->cursor_count += queue->cursor_count;
+
+    SHARED_WRITE_BEGIN( &queue->shared->seq );
+    queue->shared->input_tid = queue->input->shared->tid;
+    SHARED_WRITE_END( &queue->shared->seq );
     return 1;
 }
 
@@ -1225,6 +1243,7 @@ static void thread_input_destroy( struct object *obj )
         if (input->desktop->foreground_input == input) set_foreground_input( input->desktop, NULL );
         release_object( input->desktop );
     }
+    release_object( input->shared_mapping );
 }
 
 /* fix the thread input data when a window is destroyed */
