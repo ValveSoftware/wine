@@ -98,6 +98,8 @@ struct thread
     struct object         *locked_completion; /* completion port wait object successfully waited by the thread */
     struct object         *queue_shared_mapping; /* thread queue shared memory mapping */
     volatile struct queue_shared_memory *queue_shared;  /* thread queue shared memory ptr */
+    struct object         *input_shared_mapping; /* thread input shared memory mapping */
+    volatile struct input_shared_memory *input_shared;  /* thread input shared memory ptr */
 };
 
 extern struct thread *current;
