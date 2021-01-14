@@ -822,6 +822,13 @@ struct queue_shared_memory
     unsigned int         changed_bits;
     unsigned int         wake_mask;
     unsigned int         changed_mask;
+    thread_id_t          input_tid;
+};
+
+struct input_shared_memory
+{
+    unsigned int         seq;
+    thread_id_t          tid;
 };
 
 
@@ -6767,7 +6774,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 646
+#define SERVER_PROTOCOL_VERSION 647
 
 /* ### protocol_version end ### */
 
