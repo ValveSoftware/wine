@@ -212,6 +212,7 @@ extern const WCHAR *CLASS_GetVersionedName(const WCHAR *classname, UINT *basenam
 extern volatile struct desktop_shared_memory *get_desktop_shared_memory( void ) DECLSPEC_HIDDEN;
 extern volatile struct queue_shared_memory *get_queue_shared_memory( void ) DECLSPEC_HIDDEN;
 extern volatile struct input_shared_memory *get_input_shared_memory( void ) DECLSPEC_HIDDEN;
+extern volatile struct input_shared_memory *get_foreground_shared_memory( void ) DECLSPEC_HIDDEN;
 
 /* kernel callbacks */
 
