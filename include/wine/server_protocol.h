@@ -815,7 +815,7 @@ struct desktop_shared_memory
     unsigned char        keystate[256];
 };
 
-struct thread_shared_memory
+struct queue_shared_memory
 {
     unsigned int         seq;
     unsigned int         wake_bits;
@@ -6767,7 +6767,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 645
+#define SERVER_PROTOCOL_VERSION 646
 
 /* ### protocol_version end ### */
 
