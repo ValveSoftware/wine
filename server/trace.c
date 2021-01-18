@@ -3507,7 +3507,6 @@ static void dump_get_thread_input_reply( const struct get_thread_input_reply *re
     fprintf( stderr, " focus=%08x", req->focus );
     fprintf( stderr, ", capture=%08x", req->capture );
     fprintf( stderr, ", active=%08x", req->active );
-    fprintf( stderr, ", foreground=%08x", req->foreground );
     fprintf( stderr, ", menu_owner=%08x", req->menu_owner );
     fprintf( stderr, ", move_size=%08x", req->move_size );
     fprintf( stderr, ", caret=%08x", req->caret );
