@@ -3259,8 +3259,6 @@ DECL_HANDLER(get_thread_input)
         reply->rect       = input->shared->caret_rect;
     }
 
-    /* foreground window is active window of foreground thread */
-    reply->foreground = desktop->foreground_input ? desktop->foreground_input->shared->active : 0;
     if (thread) release_object( thread );
     release_object( desktop );
 }
