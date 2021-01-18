@@ -813,6 +813,7 @@ struct desktop_shared_memory
     unsigned int         seq;
     struct shared_cursor cursor;
     unsigned char        keystate[256];
+    thread_id_t          foreground_tid;
 };
 
 struct queue_shared_memory
@@ -6776,7 +6777,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 649
+#define SERVER_PROTOCOL_VERSION 650
 
 /* ### protocol_version end ### */
 
