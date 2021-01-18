@@ -829,6 +829,7 @@ struct input_shared_memory
 {
     unsigned int         seq;
     thread_id_t          tid;
+    user_handle_t        focus;
     user_handle_t        active;
 };
 
@@ -6775,7 +6776,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 648
+#define SERVER_PROTOCOL_VERSION 649
 
 /* ### protocol_version end ### */
 
