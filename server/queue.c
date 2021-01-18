@@ -575,6 +575,9 @@ static void set_foreground_input( struct desktop *desktop, struct thread_input *
     if (desktop->foreground_input == input) return;
     set_clip_rectangle( desktop, NULL, 1 );
     desktop->foreground_input = input;
+    SHARED_WRITE_BEGIN( &desktop->shared->seq );
+    desktop->shared->foreground_tid = input ? input->shared->tid : 0;
+    SHARED_WRITE_END( &desktop->shared->seq );
 }
 
 /* get the hook table for a given thread */
