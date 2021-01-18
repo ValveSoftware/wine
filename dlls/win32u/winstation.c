@@ -650,6 +650,57 @@ volatile struct queue_shared_memory *get_queue_shared_memory( void )
     return thread_info->queue_shared_memory;
 }
 
+static volatile struct input_shared_memory *get_thread_input_shared_memory( UINT tid, HANDLE *handle,
+                                                                            struct input_shared_memory **ptr )
+{
+    WCHAR bufferW[MAX_PATH];
+    char buffer[MAX_PATH];
+
+    if (*ptr && (*ptr)->tid == tid) return *ptr;
+    if (*ptr) NtClose( *handle );
+
+    snprintf( buffer, ARRAY_SIZE(buffer), "\\KernelObjects\\__wine_thread_mappings\\%08x-input", tid );
+    asciiz_to_unicode( bufferW, buffer );
+    map_shared_memory_section( bufferW, sizeof(struct input_shared_memory), NULL,
+                               handle, (void **)ptr );
+    return *ptr;
+}
+
+volatile struct input_shared_memory *get_input_shared_memory( void )
+{
+    volatile struct queue_shared_memory *queue = get_queue_shared_memory();
+    struct user_thread_info *thread_info = get_user_thread_info();
+    UINT tid;
+
+    if (!queue) return NULL;
+    SHARED_READ_BEGIN( &queue->seq )
+    {
+        tid = queue->input_tid;
+    }
+    SHARED_READ_END( &queue->seq );
+
+    return get_thread_input_shared_memory( tid, &thread_info->input_shared_map,
+                                           &thread_info->input_shared_memory );
+}
+
+volatile struct input_shared_memory *get_foreground_shared_memory( void )
+{
+    volatile struct desktop_shared_memory *desktop = get_desktop_shared_memory();
+    struct user_thread_info *thread_info = get_user_thread_info();
+    UINT tid;
+
+    if (!desktop) return NULL;
+    SHARED_READ_BEGIN( &desktop->seq )
+    {
+        tid = desktop->foreground_tid;
+    }
+    SHARED_READ_END( &desktop->seq );
+
+    if (!tid) return NULL;
+    return get_thread_input_shared_memory( tid, &thread_info->foreground_shared_map,
+                                           &thread_info->foreground_shared_memory );
+}
+
 /***********************************************************************
  *           winstation_init
  *

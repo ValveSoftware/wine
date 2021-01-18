@@ -5449,6 +5449,20 @@ static void thread_detach(void)
         thread_info->queue_shared_memory = NULL;
     }
 
+    if (thread_info->input_shared_map)
+    {
+        NtClose( thread_info->input_shared_map );
+        thread_info->input_shared_map = NULL;
+        thread_info->input_shared_memory = NULL;
+    }
+
+    if (thread_info->foreground_shared_memory)
+    {
+        NtClose( thread_info->foreground_shared_map );
+        thread_info->foreground_shared_map = NULL;
+        thread_info->foreground_shared_memory = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 
