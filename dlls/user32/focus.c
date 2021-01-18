@@ -381,14 +381,15 @@ HWND WINAPI GetFocus(void)
  */
 HWND WINAPI GetForegroundWindow(void)
 {
+    volatile struct input_shared_memory *shared = get_foreground_shared_memory();
     HWND ret = 0;
 
-    SERVER_START_REQ( get_thread_input )
+    if (!shared) return 0;
+    SHARED_READ_BEGIN( &shared->seq )
     {
-        req->tid = 0;
-        if (!wine_server_call_err( req )) ret = wine_server_ptr_handle( reply->foreground );
+        ret = wine_server_ptr_handle( shared->active );
     }
-    SERVER_END_REQ;
+    SHARED_READ_END( &shared->seq );
     return ret;
 }
 
