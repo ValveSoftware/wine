@@ -4129,10 +4129,8 @@ struct get_thread_input_reply
     user_handle_t  menu_owner;
     user_handle_t  move_size;
     user_handle_t  caret;
-    user_handle_t  cursor;
-    int            show_count;
     rectangle_t    rect;
-    char __pad_60[4];
+    char __pad_52[4];
 };
 
 
@@ -6784,7 +6782,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 653
+#define SERVER_PROTOCOL_VERSION 654
 
 /* ### protocol_version end ### */
 
