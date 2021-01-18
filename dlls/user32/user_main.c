@@ -287,6 +287,13 @@ static void thread_detach(void)
         thread_info->input_shared_memory = NULL;
     }
 
+    if (thread_info->foreground_shared_memory)
+    {
+        CloseHandle( thread_info->foreground_shared_map );
+        thread_info->foreground_shared_map = NULL;
+        thread_info->foreground_shared_memory = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 
