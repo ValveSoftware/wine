@@ -103,8 +103,6 @@ struct thread_input
     struct desktop        *desktop;       /* desktop that this thread input belongs to */
     int                    caret_hide;    /* caret hide count */
     int                    caret_state;   /* caret on/off state */
-    user_handle_t          cursor;        /* current cursor */
-    int                    cursor_count;  /* cursor show count */
     struct list            msg_list;      /* list of hardware messages */
     unsigned char          keystate[256]; /* state of each key */
     unsigned char          desktop_keystate[256]; /* desktop keystate when keystate was synced */
@@ -314,8 +312,8 @@ static struct thread_input *create_thread_input( struct thread *thread )
         input->shared->active       = 0;
         input->shared->menu_owner   = 0;
         input->shared->move_size    = 0;
-        input->cursor       = 0;
-        input->cursor_count = 0;
+        input->shared->cursor       = 0;
+        input->shared->cursor_count = 0;
         SHARED_WRITE_END( &input->shared->seq );
         list_init( &input->msg_list );
         set_caret_window( input, 0 );
@@ -446,13 +444,17 @@ static int assign_thread_input( struct thread *thread, struct thread_input *new_
     }
     if (queue->input)
     {
-        queue->input->cursor_count -= queue->cursor_count;
+        SHARED_WRITE_BEGIN( &queue->input->shared->seq );
+        queue->input->shared->cursor_count -= queue->cursor_count;
+        SHARED_WRITE_END( &queue->input->shared->seq );
         if (queue->keystate_lock) unlock_input_keystate( queue->input );
         release_object( queue->input );
     }
     queue->input = (struct thread_input *)grab_object( new_input );
     if (queue->keystate_lock) lock_input_keystate( queue->input );
-    new_input->cursor_count += queue->cursor_count;
+    SHARED_WRITE_BEGIN( &new_input->shared->seq );
+    new_input->shared->cursor_count += queue->cursor_count;
+    SHARED_WRITE_END( &new_input->shared->seq );
 
     SHARED_WRITE_BEGIN( &queue->shared->seq );
     queue->shared->input_tid = queue->input->shared->tid;
@@ -1208,7 +1210,9 @@ static void msg_queue_destroy( struct object *obj )
         free( timer );
     }
     if (queue->timeout) remove_timeout_user( queue->timeout );
-    queue->input->cursor_count -= queue->cursor_count;
+    SHARED_WRITE_BEGIN( &queue->input->shared->seq );
+    queue->input->shared->cursor_count -= queue->cursor_count;
+    SHARED_WRITE_END( &queue->input->shared->seq );
     if (queue->keystate_lock) unlock_input_keystate( queue->input );
     release_object( queue->input );
     if (queue->hooks) release_object( queue->hooks );
@@ -3261,8 +3265,8 @@ DECL_HANDLER(get_thread_input)
         reply->menu_owner = input->shared->menu_owner;
         reply->move_size  = input->shared->move_size;
         reply->caret      = input->shared->caret;
-        reply->cursor     = input->cursor;
-        reply->show_count = input->cursor_count;
+        reply->cursor     = input->shared->cursor;
+        reply->show_count = input->shared->cursor_count;
         reply->rect       = input->shared->caret_rect;
     }
 
@@ -3501,25 +3505,29 @@ DECL_HANDLER(set_cursor)
     if (!queue) return;
     input = queue->input;
 
-    reply->prev_handle = input->cursor;
-    reply->prev_count  = input->cursor_count;
+    reply->prev_handle = input->shared->cursor;
+    reply->prev_count  = input->shared->cursor_count;
     reply->prev_x      = input->desktop->shared->cursor.x;
     reply->prev_y      = input->desktop->shared->cursor.y;
 
+    if ((req->flags & SET_CURSOR_HANDLE) && req->handle &&
+        !get_user_object( req->handle, USER_CLIENT ))
+    {
+        set_win32_error( ERROR_INVALID_CURSOR_HANDLE );
+        return;
+    }
+
+    SHARED_WRITE_BEGIN( &input->shared->seq );
     if (req->flags & SET_CURSOR_HANDLE)
     {
-        if (req->handle && !get_user_object( req->handle, USER_CLIENT ))
-        {
-            set_win32_error( ERROR_INVALID_CURSOR_HANDLE );
-            return;
-        }
-        input->cursor = req->handle;
+        input->shared->cursor = req->handle;
     }
     if (req->flags & SET_CURSOR_COUNT)
     {
         queue->cursor_count += req->show_count;
-        input->cursor_count += req->show_count;
+        input->shared->cursor_count += req->show_count;
     }
+    SHARED_WRITE_END( &input->shared->seq );
     if (req->flags & SET_CURSOR_POS)
     {
         set_cursor_pos( input->desktop, req->x, req->y );
