@@ -836,7 +836,9 @@ struct input_shared_memory
     user_handle_t        menu_owner;
     user_handle_t        move_size;
     user_handle_t        caret;
+    user_handle_t        cursor;
     rectangle_t          caret_rect;
+    int                  cursor_count;
 };
 
 
@@ -6782,7 +6784,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 652
+#define SERVER_PROTOCOL_VERSION 653
 
 /* ### protocol_version end ### */
 
