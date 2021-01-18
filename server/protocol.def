@@ -874,6 +874,8 @@ struct input_shared_memory
     user_handle_t        active;           /* handle to the active window */
     user_handle_t        menu_owner;       /* handle to the menu owner */
     user_handle_t        move_size;        /* handle to the moving/resizing window */
+    user_handle_t        caret;            /* handle to the caret window */
+    rectangle_t          caret_rect;       /* caret rectangle */
 };
 
 /* Bits that must be clear for client to read */
