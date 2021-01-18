@@ -868,6 +868,7 @@ struct input_shared_memory
     unsigned int         seq;              /* sequence number - server updating if (seq_no & SEQUENCE_MASK) != 0 */
     int                  created;
     thread_id_t          tid;
+    user_handle_t        active;           /* handle to the active window */
 };
 
 /* Bits that must be clear for client to read */
