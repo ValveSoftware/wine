@@ -337,20 +337,19 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetCursorPos( POINT *pt )
  */
 BOOL WINAPI GetCursorInfo( PCURSORINFO pci )
 {
+    volatile struct input_shared_memory *shared = get_foreground_shared_memory();
     BOOL ret;
 
     if (!pci) return FALSE;
 
-    SERVER_START_REQ( get_thread_input )
+    if (!shared) ret = FALSE;
+    else SHARED_READ_BEGIN( &shared->seq )
     {
-        req->tid = 0;
-        if ((ret = !wine_server_call( req )))
-        {
-            pci->hCursor = wine_server_ptr_handle( reply->cursor );
-            pci->flags = (reply->show_count >= 0) ? CURSOR_SHOWING : 0;
-        }
+        pci->hCursor = wine_server_ptr_handle( shared->cursor );
+        pci->flags = (shared->cursor_count >= 0) ? CURSOR_SHOWING : 0;
+        ret = TRUE;
     }
-    SERVER_END_REQ;
+    SHARED_READ_END( &shared->seq );
     GetCursorPos(&pci->ptScreenPos);
     return ret;
 }
