@@ -1367,6 +1367,7 @@ NTSTATUS sdl_driver_init(void)
         LOAD_FUNCPTR(SDL_GameControllerAddMapping);
         LOAD_FUNCPTR(SDL_RegisterEvents);
         LOAD_FUNCPTR(SDL_PushEvent);
+        LOAD_FUNCPTR(SDL_LogSetPriority);
 #undef LOAD_FUNCPTR
         pSDL_JoystickGetProduct = dlsym(sdl_handle, "SDL_JoystickGetProduct");
         pSDL_JoystickGetProductVersion = dlsym(sdl_handle, "SDL_JoystickGetProductVersion");
