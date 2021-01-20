@@ -2592,7 +2592,7 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
         RECT user_rect = fs_hack_current_mode(monitor);
         POINT tl = virtual_screen_to_root(user_rect.left, user_rect.top);
 
-        TRACE("Enabling fs hack, resizing the window to (%u,%u)-(%u,%u)\n", tl.x, tl.y, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
+        TRACE("Enabling fs hack for %p, resizing the window to (%u,%u)-(%u,%u)\n", hwnd, tl.x, tl.y, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
         data->fs_hack = TRUE;
         if(data->whole_window)
             XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
@@ -2602,7 +2602,7 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
             !fs_hack_matches_current_mode(monitor,
                 window_rect->right - window_rect->left,
                 window_rect->bottom - window_rect->top))){
-        TRACE("Disabling fs hack\n");
+        TRACE("Disabling fs hack for %p\n", hwnd);
         data->fs_hack = FALSE;
         if(data->whole_window)
             XMoveResizeWindow(data->display, data->whole_window,
@@ -2848,6 +2848,7 @@ UINT CDECL X11DRV_ShowWindow( HWND hwnd, INT cmd, RECT *rect, UINT swp )
     DWORD style = GetWindowLongW( hwnd, GWL_STYLE );
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     struct x11drv_win_data *data = get_win_data( hwnd );
+    HMONITOR monitor;
 
     if (!data || !data->whole_window) goto done;
     if (IsRectEmpty( rect )) goto done;
@@ -2878,12 +2879,15 @@ UINT CDECL X11DRV_ShowWindow( HWND hwnd, INT cmd, RECT *rect, UINT swp )
                   &root, &x, &y, &width, &height, &border, &depth );
     XTranslateCoordinates( thread_data->display, data->whole_window, root, 0, 0, &x, &y, &top );
     pos = root_to_virtual_screen( x, y );
-    if (data->fs_hack)
+    monitor = fs_hack_monitor_from_hwnd(hwnd);
+    if (data->fs_hack ||
+            (fs_hack_enabled(monitor) &&
+             fs_hack_matches_current_mode(monitor,
+                 rect->right - rect->left,
+                 rect->bottom - rect->top)))
     {
         MONITORINFO monitor_info;
-        HMONITOR monitor;
 
-        monitor = fs_hack_monitor_from_hwnd( hwnd );
         monitor_info.cbSize = sizeof(monitor_info);
         GetMonitorInfoW( monitor, &monitor_info );
         X11DRV_X_to_window_rect( data, rect, monitor_info.rcMonitor.left, monitor_info.rcMonitor.top,
