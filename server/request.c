@@ -526,6 +526,46 @@ int send_client_fd( struct process *process, int fd, obj_handle_t handle )
     return -1;
 }
 
+#ifndef __NR_clock_gettime64
+#define __NR_clock_gettime64 403
+#endif
+
+struct timespec64
+{
+    long long tv_sec;
+    long long tv_nsec;
+};
+
+static inline int do_clock_gettime( clockid_t clock_id, ULONGLONG *ticks )
+{
+    static int clock_gettime64_supported = -1;
+    struct timespec64 ts64;
+    struct timespec ts;
+    int ret;
+
+    if (clock_gettime64_supported < 0)
+    {
+        if (!syscall( __NR_clock_gettime64, clock_id, &ts64 ))
+        {
+            clock_gettime64_supported = 1;
+            *ticks = ts64.tv_sec * (ULONGLONG)TICKS_PER_SEC + ts64.tv_nsec / 100;
+            return 0;
+        }
+        clock_gettime64_supported = 0;
+    }
+
+    if (clock_gettime64_supported)
+    {
+        if (!(ret = syscall( __NR_clock_gettime64, clock_id, &ts64 )))
+            *ticks = ts64.tv_sec * (ULONGLONG)TICKS_PER_SEC + ts64.tv_nsec / 100;
+        return ret;
+    }
+
+    if (!(ret = clock_gettime( clock_id, &ts )))
+        *ticks = ts.tv_sec * (ULONGLONG)TICKS_PER_SEC + ts.tv_nsec / 100;
+    return ret;
+}
+
 /* return a monotonic time counter */
 timeout_t monotonic_counter(void)
 {
@@ -539,13 +579,13 @@ timeout_t monotonic_counter(void)
 #endif
     return mach_absolute_time() * timebase.numer / timebase.denom / 100;
 #elif defined(HAVE_CLOCK_GETTIME)
-    struct timespec ts;
+    ULONGLONG ticks;
 #if 0
-    if (!clock_gettime( CLOCK_MONOTONIC_RAW, &ts ))
-        return (timeout_t)ts.tv_sec * TICKS_PER_SEC + ts.tv_nsec / 100;
+    if (!do_clock_gettime( CLOCK_MONOTONIC_RAW, &ticks ))
+        return ticks;
 #endif
-    if (!clock_gettime( CLOCK_MONOTONIC, &ts ))
-        return (timeout_t)ts.tv_sec * TICKS_PER_SEC + ts.tv_nsec / 100;
+    if (!do_clock_gettime( CLOCK_MONOTONIC, &ticks ))
+        return ticks;
 #endif
     return current_time - server_start_time;
 }
