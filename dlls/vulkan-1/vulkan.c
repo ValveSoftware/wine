@@ -33,8 +33,9 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
     switch (reason)
     {
         case DLL_WINE_PREATTACH:
-            /* Prefer native as it provides more functionality. */
-            return FALSE;
+            /* Prefer builtin, as the loader must not wrap Vk objects and then
+             * pass those to OpenVR or OpenXR */
+            return TRUE;
 
         case DLL_PROCESS_ATTACH:
             DisableThreadLibraryCalls(hinst);
