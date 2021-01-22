@@ -228,10 +228,12 @@ static Cursor get_cursor( HCURSOR handle )
     else
     {
         XSaveContext( gdi_display, (XID)handle, cursor_context, (char *)cursor );
+        XSync( gdi_display, FALSE ); /* make sure it's actually created */
         TRACE( "cursor %p created %lx\n", handle, cursor );
     }
     XUnlockDisplay( gdi_display );
 
+    SendNotifyMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_SET_HICON_CURSOR, (WPARAM)handle, cursor );
     return cursor;
 }
 
