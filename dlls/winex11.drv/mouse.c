@@ -201,35 +201,46 @@ static Cursor get_empty_cursor(void)
     return cursor;
 }
 
+static Cursor get_cursor( HCURSOR handle )
+{
+    Cursor cursor, prev;
+
+    if (!handle) return get_empty_cursor();
+
+    XLockDisplay( gdi_display );
+    if (!XFindContext( gdi_display, (XID)handle, cursor_context, (char **)&cursor ))
+    {
+        XUnlockDisplay( gdi_display );
+        return cursor;
+    }
+    XUnlockDisplay( gdi_display );
+
+    /* try to create it */
+    if (!(cursor = create_cursor( handle ))) return None;
+
+    XLockDisplay( gdi_display );
+    if (!XFindContext( gdi_display, (XID)handle, cursor_context, (char **)&prev ))
+    {
+        /* someone else was here first */
+        XFreeCursor( gdi_display, cursor );
+        cursor = prev;
+    }
+    else
+    {
+        XSaveContext( gdi_display, (XID)handle, cursor_context, (char *)cursor );
+        TRACE( "cursor %p created %lx\n", handle, cursor );
+    }
+    XUnlockDisplay( gdi_display );
+
+    return cursor;
+}
+
 /***********************************************************************
  *		set_window_cursor
  */
 void set_window_cursor( Window window, HCURSOR handle )
 {
-    Cursor cursor, prev;
-
-    if (!handle) cursor = get_empty_cursor();
-    else if (XFindContext( gdi_display, (XID)handle, cursor_context, (char **)&cursor ))
-    {
-        /* try to create it */
-        if (!(cursor = create_cursor( handle ))) return;
-
-        XLockDisplay( gdi_display );
-        if (!XFindContext( gdi_display, (XID)handle, cursor_context, (char **)&prev ))
-        {
-            /* someone else was here first */
-            XFreeCursor( gdi_display, cursor );
-            cursor = prev;
-        }
-        else
-        {
-            XSaveContext( gdi_display, (XID)handle, cursor_context, (char *)cursor );
-            TRACE( "cursor %p created %lx\n", handle, cursor );
-        }
-        XUnlockDisplay( gdi_display );
-    }
-
-    XDefineCursor( gdi_display, window, cursor );
+    XDefineCursor( gdi_display, window, get_cursor( handle ) );
     /* make the change take effect immediately */
     XFlush( gdi_display );
 }
@@ -1506,12 +1517,14 @@ void CDECL X11DRV_DestroyCursorIcon( HCURSOR handle )
 {
     Cursor cursor;
 
+    XLockDisplay( gdi_display );
     if (!XFindContext( gdi_display, (XID)handle, cursor_context, (char **)&cursor ))
     {
         TRACE( "%p xid %lx\n", handle, cursor );
         XFreeCursor( gdi_display, cursor );
         XDeleteContext( gdi_display, (XID)handle, cursor_context );
     }
+    XUnlockDisplay( gdi_display );
 }
 
 /***********************************************************************
