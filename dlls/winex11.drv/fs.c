@@ -531,6 +531,16 @@ BOOL fs_hack_is_integer(void)
     return is_int;
 }
 
+HMONITOR fs_hack_monitor_from_rect(const RECT *in_rect)
+{
+    RECT rect = *in_rect;
+
+    TRACE("rect %s\n", wine_dbgstr_rect(&rect));
+    rect.right = rect.left + 1;
+    rect.bottom = rect.top + 1;
+    return MonitorFromRect(&rect, MONITOR_DEFAULTTOPRIMARY);
+}
+
 /* Get the monitor a window is on. MonitorFromWindow() doesn't work here because it finds the
  * monitor with the maximum overlapped rectangle when a window is spanned over two monitors, whereas
  * for the fullscreen hack, the monitor where the left top corner of the window is on is the correct
@@ -545,9 +555,7 @@ HMONITOR fs_hack_monitor_from_hwnd(HWND hwnd)
         ERR("Invalid hwnd %p.\n", hwnd);
 
     TRACE("hwnd %p rect %s\n", hwnd, wine_dbgstr_rect(&rect));
-    rect.right = rect.left + 1;
-    rect.bottom = rect.top + 1;
-    return MonitorFromRect(&rect, MONITOR_DEFAULTTOPRIMARY);
+    return fs_hack_monitor_from_rect(&rect);
 }
 
 /* Return the rectangle of a monitor in current mode in user virtual screen coordinates */

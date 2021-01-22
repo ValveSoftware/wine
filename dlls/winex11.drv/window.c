@@ -2583,7 +2583,7 @@ void CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
 
     if (!data && !(data = X11DRV_create_win_data( hwnd, window_rect, client_rect ))) return;
 
-    monitor = fs_hack_monitor_from_hwnd(hwnd);
+    monitor = fs_hack_monitor_from_rect(window_rect);
     if(!wm_is_steamcompmgr(data->display) && !data->fs_hack && fs_hack_enabled(monitor) &&
             fs_hack_matches_current_mode(monitor,
                 window_rect->right - window_rect->left,
