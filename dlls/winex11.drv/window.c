@@ -2962,6 +2962,18 @@ done:
     return swp;
 }
 
+/***********************************************************************
+ *             x11drv_desktop_set_hicon_cursor
+ *
+ * Function called upon receiving a WM_X11DRV_DESKTOP_SET_HICON_CURSOR.
+ */
+static void x11drv_desktop_set_hicon_cursor( HICON handle, Cursor cursor )
+{
+    XLockDisplay( gdi_display );
+    if (cursor) XSaveContext( gdi_display, (XID)handle, cursor_context, (char *)cursor );
+    else XDeleteContext( gdi_display, (XID)handle, cursor_context );
+    XUnlockDisplay( gdi_display );
+}
 
 /**********************************************************************
  *		SetWindowIcon (X11DRV.@)
@@ -3170,6 +3182,9 @@ LRESULT CDECL X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
             if (win) set_window_cursor( win, (HCURSOR)lp );
         }
         if (clipping_cursor) set_window_cursor( x11drv_thread_data()->clip_window, (HCURSOR)lp );
+        return 0;
+    case WM_X11DRV_DESKTOP_SET_HICON_CURSOR:
+        x11drv_desktop_set_hicon_cursor( (HICON)wp, (Cursor)lp );
         return 0;
     case WM_X11DRV_DESKTOP_SET_WINDOW_CURSOR:
         SendNotifyMessageW( (HWND)wp, WM_X11DRV_SET_CURSOR, 0, lp );
