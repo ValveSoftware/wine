@@ -83,7 +83,7 @@ int do_fsync(void)
         if (getenv( "WINEFSYNC_FUTEX2" ))
             use_futex2 = atoi( getenv( "WINEFSYNC_FUTEX2" ) );
 
-        if (use_futex2 && (f = fopen( "/sys/kernel/futex2/wait", "r" )))
+        if (use_futex2 && (f = fopen( "/sys/kernel/futex2/wake", "r" )))
         {
             char buffer[13];
 
