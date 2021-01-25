@@ -3684,14 +3684,16 @@ DECL_HANDLER(set_cursor)
 {
     struct msg_queue *queue = get_current_queue();
     struct thread_input *input;
+    struct desktop *desktop;
 
     if (!queue) return;
     input = queue->input;
+    desktop = input->desktop;
 
     reply->prev_handle = input->shared->cursor;
     reply->prev_count  = input->shared->cursor_count;
-    reply->prev_x      = input->desktop->shared->cursor.x;
-    reply->prev_y      = input->desktop->shared->cursor.y;
+    reply->prev_x      = desktop->shared->cursor.x;
+    reply->prev_y      = desktop->shared->cursor.y;
 
     if ((req->flags & SET_CURSOR_HANDLE) && req->handle &&
         !get_user_object( req->handle, USER_CLIENT ))
@@ -3711,20 +3713,14 @@ DECL_HANDLER(set_cursor)
         input->shared->cursor_count += req->show_count;
     }
     SHARED_WRITE_END( &input->shared->seq );
-    if (req->flags & SET_CURSOR_POS)
-    {
-        set_cursor_pos( input->desktop, req->x, req->y );
-    }
-    if (req->flags & (SET_CURSOR_CLIP | SET_CURSOR_NOCLIP))
-    {
-        struct desktop *desktop = input->desktop;
-        set_clip_rectangle( desktop, (req->flags & SET_CURSOR_NOCLIP) ? NULL : &req->clip, 0 );
-    }
+    if (req->flags & SET_CURSOR_POS) set_cursor_pos( desktop, req->x, req->y );
+    if (req->flags & SET_CURSOR_CLIP) set_clip_rectangle( desktop, &req->clip, 0 );
+    if (req->flags & SET_CURSOR_NOCLIP) set_clip_rectangle( desktop, NULL, 0 );
 
-    reply->new_x       = input->desktop->shared->cursor.x;
-    reply->new_y       = input->desktop->shared->cursor.y;
-    reply->new_clip    = input->desktop->shared->cursor.clip;
-    reply->last_change = input->desktop->shared->cursor.last_change;
+    reply->new_x       = desktop->shared->cursor.x;
+    reply->new_y       = desktop->shared->cursor.y;
+    reply->new_clip    = desktop->shared->cursor.clip;
+    reply->last_change = desktop->shared->cursor.last_change;
 }
 
 /* Get the history of the 64 last cursor positions */
