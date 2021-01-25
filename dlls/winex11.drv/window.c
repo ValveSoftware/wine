@@ -3162,8 +3162,7 @@ LRESULT CDECL X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
             release_win_data( data );
             if (win) set_window_cursor( win, (HCURSOR)lp );
         }
-        else if (hwnd == x11drv_thread_data()->clip_hwnd)
-            set_window_cursor( x11drv_thread_data()->clip_window, (HCURSOR)lp );
+        if (clipping_cursor) set_window_cursor( x11drv_thread_data()->clip_window, (HCURSOR)lp );
         return 0;
     case WM_X11DRV_CLIP_CURSOR_NOTIFY:
         return clip_cursor_notify( hwnd, (HWND)wp, (HWND)lp );
