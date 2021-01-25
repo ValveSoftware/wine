@@ -1891,8 +1891,6 @@ static void create_whole_window( struct x11drv_win_data *data )
 
     XFlush( data->display );  /* make sure the window exists before we start painting to it */
 
-    sync_window_cursor( data->whole_window );
-
 done:
     if (win_rgn) DeleteObject( win_rgn );
 }
@@ -2110,6 +2108,15 @@ BOOL CDECL X11DRV_CreateDesktopWindow( HWND hwnd )
     unsigned int width, height;
 
     detect_wm( gdi_display );
+
+    SERVER_START_REQ( set_cursor )
+    {
+        req->flags = SET_CURSOR_HANDLE;
+        req->handle = 0;
+        req->change_msg = WM_X11DRV_DESKTOP_SET_WINDOW_CURSOR;
+        wine_server_call( req );
+    }
+    SERVER_END_REQ;
 
     /* retrieve the real size of the desktop */
     SERVER_START_REQ( get_window_rectangles )
@@ -3163,6 +3170,9 @@ LRESULT CDECL X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
             if (win) set_window_cursor( win, (HCURSOR)lp );
         }
         if (clipping_cursor) set_window_cursor( x11drv_thread_data()->clip_window, (HCURSOR)lp );
+        return 0;
+    case WM_X11DRV_DESKTOP_SET_WINDOW_CURSOR:
+        SendNotifyMessageW( (HWND)wp, WM_X11DRV_SET_CURSOR, 0, lp );
         return 0;
     case WM_X11DRV_CLIP_CURSOR_NOTIFY:
         return clip_cursor_notify( hwnd, (HWND)wp, (HWND)lp );
