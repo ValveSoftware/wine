@@ -538,6 +538,7 @@ enum x11drv_window_messages
     WM_X11DRV_SET_WIN_REGION,
     WM_X11DRV_RESIZE_DESKTOP,
     WM_X11DRV_SET_CURSOR,
+    WM_X11DRV_DESKTOP_SET_WINDOW_CURSOR,
     WM_X11DRV_CLIP_CURSOR_NOTIFY,
     WM_X11DRV_CLIP_CURSOR_REQUEST,
     WM_X11DRV_RELEASE_CURSOR
@@ -657,7 +658,6 @@ extern XContext cursor_context DECLSPEC_HIDDEN;
 extern void X11DRV_InitClipboard(void) DECLSPEC_HIDDEN;
 extern void CDECL X11DRV_SetFocus( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void set_window_cursor( Window window, HCURSOR handle ) DECLSPEC_HIDDEN;
-extern void sync_window_cursor( Window window ) DECLSPEC_HIDDEN;
 extern LRESULT clip_cursor_notify( HWND hwnd, HWND prev_clip_hwnd, HWND new_clip_hwnd ) DECLSPEC_HIDDEN;
 extern LRESULT clip_cursor_request( HWND hwnd, BOOL fullscreen, BOOL reset ) DECLSPEC_HIDDEN;
 extern void ungrab_clipping_window(void) DECLSPEC_HIDDEN;
