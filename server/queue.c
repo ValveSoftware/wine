@@ -476,7 +476,11 @@ static int update_desktop_cursor_pos( struct desktop *desktop, user_handle_t win
     else if (!win || !is_window_visible( win ) || is_window_transparent( win ))
         win = shallow_window_from_point( desktop, x, y );
 
-    if (win != desktop->cursor_win) updated = 1;
+    if (win != desktop->cursor_win)
+    {
+        post_desktop_message( desktop, desktop->cursor_change_msg, win, desktop->cursor_handle );
+        updated = 1;
+    }
     desktop->cursor_win = win;
 
     return updated;
