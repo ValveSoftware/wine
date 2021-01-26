@@ -447,8 +447,10 @@ static struct message *alloc_hardware_message( lparam_t info, struct hw_msg_sour
     return msg;
 }
 
-static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
+static int update_desktop_cursor_pos( struct desktop *desktop, user_handle_t win, int x, int y )
 {
+    struct thread_input *input;
+    struct thread *thread;
     int updated;
     unsigned int time = get_tick_count();
 
@@ -461,6 +463,21 @@ static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
     desktop->shared->cursor.y = y;
     desktop->shared->cursor.last_change = time;
     SHARED_WRITE_END( &desktop->shared->seq );
+
+    if (win && (thread = get_window_thread( win )))
+    {
+        input = thread->queue->input;
+        release_object( thread );
+    }
+    else input = desktop->foreground_input;
+
+    if (input && input->shared->capture)
+        win = input->shared->capture;
+    else if (!win || !is_window_visible( win ) || is_window_transparent( win ))
+        win = shallow_window_from_point( desktop, x, y );
+
+    if (win != desktop->cursor_win) updated = 1;
+    desktop->cursor_win = win;
 
     return updated;
 }
@@ -481,7 +498,7 @@ static void set_cursor_pos( struct desktop *desktop, int x, int y )
 
     if ((device = current->process->rawinput_mouse) && (device->flags & RIDEV_NOLEGACY))
     {
-        update_desktop_cursor_pos( desktop, x, y );
+        update_desktop_cursor_pos( desktop, 0, x, y );
         return;
     }
 
@@ -1536,10 +1553,10 @@ static void update_desktop_key_state( struct desktop *desktop, unsigned int msg,
 
 /* update the desktop key state according to a mouse message flags */
 static void update_desktop_mouse_state( struct desktop *desktop, unsigned int flags,
-                                        int x, int y, lparam_t wparam )
+                                        user_handle_t win, int x, int y, lparam_t wparam )
 {
     if (flags & MOUSEEVENTF_MOVE)
-        update_desktop_cursor_pos( desktop, x, y );
+        update_desktop_cursor_pos( desktop, win, x, y );
     if (flags & MOUSEEVENTF_LEFTDOWN)
         update_desktop_key_state( desktop, WM_LBUTTONDOWN, wparam );
     if (flags & MOUSEEVENTF_LEFTUP)
@@ -1646,11 +1663,9 @@ static user_handle_t find_hardware_message_window( struct desktop *desktop, stru
             if (*msg_code < WM_SYSKEYDOWN) *msg_code += WM_SYSKEYDOWN - WM_KEYDOWN;
         }
     }
-    else if (!input || !(win = input->shared->capture)) /* mouse message */
+    else /* mouse message */
     {
-        if (is_window_visible( msg->win ) && !is_window_transparent( msg->win )) win = msg->win;
-        else win = shallow_window_from_point( desktop, msg->x, msg->y );
-
+        win = desktop->cursor_win;
         *thread = window_thread_from_point( win, msg->x, msg->y );
     }
 
@@ -1728,7 +1743,7 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
         if (msg->msg == WM_MOUSEMOVE)
         {
             prepend_cursor_history( msg->x, msg->y, msg->time, msg_data->info );
-            if (update_desktop_cursor_pos( desktop, msg->x, msg->y )) always_queue = 1;
+            if (update_desktop_cursor_pos( desktop, msg->win, msg->x, msg->y )) always_queue = 1;
         }
         if (desktop->shared->keystate[VK_LBUTTON] & 0x80)  msg->wparam |= MK_LBUTTON;
         if (desktop->shared->keystate[VK_MBUTTON] & 0x80)  msg->wparam |= MK_MBUTTON;
@@ -1756,9 +1771,6 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
         return;
     }
     input = thread->queue->input;
-
-    if (win != desktop->cursor_win) always_queue = 1;
-    desktop->cursor_win = win;
 
     if (!always_queue || merge_message( input, msg )) free_message( msg );
     else
@@ -1935,7 +1947,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         WM_MOUSEHWHEEL   /* 0x1000 = MOUSEEVENTF_HWHEEL */
     };
 
-    update_desktop_cursor_pos( desktop, desktop->shared->cursor.x, desktop->shared->cursor.y ); /* Update last change time */
+    update_desktop_cursor_pos( desktop, win, desktop->shared->cursor.x, desktop->shared->cursor.y ); /* Update last change time */
     flags = input->mouse.flags;
     time  = input->mouse.time;
     if (!time) time = desktop->shared->cursor.last_change;
@@ -1989,7 +2001,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
 
     if ((device = current->process->rawinput_mouse) && (device->flags & RIDEV_NOLEGACY))
     {
-        update_desktop_mouse_state( desktop, flags, x, y, input->mouse.data << 16 );
+        update_desktop_mouse_state( desktop, flags, win, x, y, input->mouse.data << 16 );
         return 0;
     }
 
