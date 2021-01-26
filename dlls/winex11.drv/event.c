@@ -318,7 +318,7 @@ static int try_grab_pointer( Display *display )
 
     /* if we are already clipping the cursor in the current thread, we should not
      * call XGrabPointer here or it would change the confine-to window. */
-    if (clipping_cursor && x11drv_thread_data()->clip_hwnd)
+    if (clipping_cursor)
         return 1;
 
     if (XGrabPointer( display, root_window, False, 0, GrabModeAsync, GrabModeAsync,

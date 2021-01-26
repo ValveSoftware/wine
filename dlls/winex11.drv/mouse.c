@@ -448,7 +448,6 @@ void X11DRV_XInput2_Disable(void)
  */
 static BOOL grab_clipping_window( const RECT *clip )
 {
-    static const WCHAR messageW[] = {'M','e','s','s','a','g','e',0};
     struct x11drv_thread_data *data = x11drv_thread_data();
     CURSORINFO pci;
     Window clip_window;
@@ -458,17 +457,10 @@ static BOOL grab_clipping_window( const RECT *clip )
     if (!data) return FALSE;
     if (!(clip_window = init_clip_window())) return TRUE;
 
-    if (!data->clip_hwnd &&
-        !(data->clip_hwnd = CreateWindowW( messageW, NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, 0,
-                                    GetModuleHandleW(0), NULL )))
-        return TRUE;
-
     if (data->xi2_state != xi_enabled) X11DRV_XInput2_Enable();
     if (data->xi2_state != xi_enabled)
     {
         WARN( "XInput2 not supported, refusing to clip to %s\n", wine_dbgstr_rect(clip) );
-        DestroyWindow( data->clip_hwnd );
-        data->clip_hwnd = NULL;
         ClipCursor( NULL );
         return TRUE;
     }
@@ -511,8 +503,6 @@ static BOOL grab_clipping_window( const RECT *clip )
     {
         X11DRV_XInput2_Disable();
         XUnmapWindow( data->display, clip_window );
-        DestroyWindow( data->clip_hwnd );
-        data->clip_hwnd = NULL;
         return FALSE;
     }
     clip_rect = *clip;
@@ -539,8 +529,6 @@ void ungrab_clipping_window(void)
         XFlush( data->display );
     }
     clipping_cursor = FALSE;
-    if (data->clip_hwnd) DestroyWindow( data->clip_hwnd );
-    data->clip_hwnd = NULL;
     data->clip_reset = GetTickCount();
 }
 
@@ -582,7 +570,7 @@ static BOOL clip_fullscreen_window( HWND hwnd, BOOL reset )
     if (!(thread_data = x11drv_thread_data())) return FALSE;
     if (!reset) {
         if (GetTickCount() - thread_data->clip_reset < 1000) return FALSE;
-        if (!reset && clipping_cursor && thread_data->clip_hwnd) return FALSE;  /* already clipping */
+        if (!reset && clipping_cursor) return FALSE;  /* already clipping */
     }
     monitor = MonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST );
     if (!monitor) return FALSE;
@@ -1554,7 +1542,7 @@ void x11drv_desktop_clip_cursor( BOOL fullscreen, BOOL reset )
             struct x11drv_thread_data *data = x11drv_thread_data();
             if (data)
             {
-                if ((data->clip_hwnd && EqualRect( &clip, &clip_rect ) && !EqualRect(&clip_rect, &virtual_rect)) || clip_fullscreen_window( foreground, TRUE ))
+                if ((clipping_cursor && EqualRect( &clip, &clip_rect ) && !EqualRect(&clip_rect, &virtual_rect)) || clip_fullscreen_window( foreground, TRUE ))
                     return;
             }
         }
