@@ -465,6 +465,13 @@ static int update_desktop_cursor_pos( struct desktop *desktop, int x, int y )
     return updated;
 }
 
+static void update_desktop_cursor_handle( struct desktop *desktop, user_handle_t handle )
+{
+    if (desktop->cursor_change_msg && desktop->cursor_handle != handle)
+        post_desktop_message( desktop, desktop->cursor_change_msg, desktop->cursor_win, handle );
+    desktop->cursor_handle = handle;
+}
+
 /* set the cursor position and queue the corresponding mouse message */
 static void set_cursor_pos( struct desktop *desktop, int x, int y )
 {
@@ -3509,6 +3516,10 @@ DECL_HANDLER(set_cursor)
     SHARED_WRITE_BEGIN( &input->shared->seq );
     if (req->flags & SET_CURSOR_HANDLE)
     {
+        /* only the desktop owner can set the message */
+        if (req->change_msg && get_top_window_owner(desktop) == current->process)
+            desktop->cursor_change_msg = req->change_msg;
+
         input->shared->cursor = req->handle;
     }
     if (req->flags & SET_CURSOR_COUNT)
@@ -3528,6 +3539,12 @@ DECL_HANDLER(set_cursor)
             desktop->cursor_clip_msg = req->clip_msg;
 
         set_clip_rectangle( desktop, (req->flags & SET_CURSOR_NOCLIP) ? NULL : &req->clip, 0 );
+    }
+
+    if (req->flags & (SET_CURSOR_HANDLE | SET_CURSOR_COUNT))
+    {
+        if (input->shared->cursor_count < 0) update_desktop_cursor_handle( desktop, 0 );
+        else update_desktop_cursor_handle( desktop, input->shared->cursor );
     }
 
     reply->new_x       = desktop->shared->cursor.x;
