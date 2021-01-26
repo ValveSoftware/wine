@@ -4354,6 +4354,7 @@ static void dump_set_cursor_request( const struct set_cursor_request *req )
     fprintf( stderr, ", y=%d", req->y );
     dump_rectangle( ", clip=", &req->clip );
     fprintf( stderr, ", clip_msg=%08x", req->clip_msg );
+    fprintf( stderr, ", change_msg=%08x", req->change_msg );
 }
 
 static void dump_set_cursor_reply( const struct set_cursor_reply *req )
