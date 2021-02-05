@@ -5875,4 +5875,5 @@ HKCU,Software\Wine\AppDefaults\h1_sp64_ship.exe\DllOverrides,"atiadlxx",,"builti
 HKCU,Software\Wine\AppDefaults\h1_mp64_ship.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\iw7_ship.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\BlackOps3.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\NFS16.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\ShadowOfWar.exe\DllOverrides,"atiadlxx",,"builtin"
