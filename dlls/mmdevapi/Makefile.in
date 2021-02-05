@@ -6,7 +6,6 @@ EXTRADLLFLAGS = -mno-cygwin
 C_SRCS = \
 	audiovolume.c \
 	devenum.c \
-	main.c \
-	spatialaudio.c
+	main.c
 
 IDL_SRCS = mmdevapi_classes.idl
