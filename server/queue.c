@@ -3232,25 +3232,15 @@ DECL_HANDLER(get_key_state)
         set_reply_data( (void *)desktop->shared->keystate, size );
         release_object( desktop );
     }
+    else if (!current->queue)
+    {
+        reply->state = 0;
+        memset( set_reply_data_size( size ), 0, size );
+    }
     else
     {
-        unsigned char *keystate;
-        if (current->queue)
-        {
-            if (req->key >= 0) reply->state = current->queue->input->keystate[req->key & 0xff];
-            set_reply_data( current->queue->input->keystate, size );
-            return;
-        }
-
-        /* fallback to desktop keystate */
-        if (!(desktop = get_thread_desktop( current, 0 ))) return;
-        if (req->key >= 0) reply->state = desktop->shared->keystate[req->key & 0xff] & ~0x40;
-        if ((keystate = set_reply_data_size( size )))
-        {
-            unsigned int i;
-            for (i = 0; i < size; i++) keystate[i] = desktop->shared->keystate[i] & ~0x40;
-        }
-        release_object( desktop );
+        if (req->key >= 0) reply->state = current->queue->input->keystate[req->key & 0xff];
+        set_reply_data( current->queue->input->keystate, size );
     }
 }
 
