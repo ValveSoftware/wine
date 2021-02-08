@@ -3216,6 +3216,7 @@ DECL_HANDLER(get_thread_input)
 /* retrieve queue keyboard state for current thread or global async state */
 DECL_HANDLER(get_key_state)
 {
+    struct thread *foreground;
     struct desktop *desktop;
     data_size_t size = min( 256, get_reply_max_size() );
 
@@ -3239,8 +3240,25 @@ DECL_HANDLER(get_key_state)
     }
     else
     {
-        if (req->key >= 0) reply->state = current->queue->input->keystate[req->key & 0xff];
         set_reply_data( current->queue->input->keystate, size );
+        if (req->key == 0) return;
+        reply->state = current->queue->input->keystate[req->key & 0xff];
+
+        if (!(desktop = get_thread_desktop( current, 0 ))) return;
+        if (current->queue->input == desktop->foreground_input ||
+            !(foreground = get_foreground_thread( desktop, 0 )))
+        {
+            release_object( desktop );
+            return;
+        }
+
+        if (foreground != current && foreground->process == current->process)
+        {
+            reply->state = desktop->shared->keystate[req->key & 0xff];
+            memcpy( current->queue->input->keystate, desktop->shared->keystate, 256 );
+        }
+        release_object( foreground );
+        release_object( desktop );
     }
 }
 
