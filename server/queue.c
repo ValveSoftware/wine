@@ -3255,33 +3255,19 @@ DECL_HANDLER(get_key_state)
 }
 
 
-/* set queue keyboard state for a given thread */
+/* set queue keyboard state for current thread */
 DECL_HANDLER(set_key_state)
 {
-    struct thread *thread;
     struct desktop *desktop;
     data_size_t size = min( 256, get_req_data_size() );
 
-    if (!req->tid)  /* set global async key state */
+    if (current->queue) memcpy( current->queue->input->keystate, get_req_data(), size );
+    if (req->async && (desktop = get_thread_desktop( current, 0 )))
     {
-        if (!(desktop = get_thread_desktop( current, 0 ))) return;
         SHARED_WRITE_BEGIN( &desktop->shared->seq );
         memcpy( (void *)desktop->shared->keystate, get_req_data(), size );
         SHARED_WRITE_END( &desktop->shared->seq );
         release_object( desktop );
-    }
-    else
-    {
-        if (!(thread = get_thread_from_id( req->tid ))) return;
-        if (thread->queue) memcpy( thread->queue->input->keystate, get_req_data(), size );
-        if (req->async && (desktop = get_thread_desktop( thread, 0 )))
-        {
-            SHARED_WRITE_BEGIN( &desktop->shared->seq );
-            memcpy( (void *)desktop->shared->keystate, get_req_data(), size );
-            SHARED_WRITE_END( &desktop->shared->seq );
-            release_object( desktop );
-        }
-        release_object( thread );
     }
 }
 
