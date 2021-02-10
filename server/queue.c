@@ -370,13 +370,13 @@ static int assign_thread_input( struct thread *thread, struct thread_input *new_
 
 /* allocate a hardware message and its data */
 static struct message *alloc_hardware_message( lparam_t info, struct hw_msg_source source,
-                                               unsigned int time )
+                                               unsigned int time, data_size_t extra_len )
 {
     struct hardware_msg_data *msg_data;
     struct message *msg;
 
     if (!(msg = mem_alloc( sizeof(*msg) ))) return NULL;
-    if (!(msg_data = mem_alloc( sizeof(*msg_data) )))
+    if (!(msg_data = mem_alloc( sizeof(*msg_data) + extra_len )))
     {
         free( msg );
         return NULL;
@@ -385,9 +385,9 @@ static struct message *alloc_hardware_message( lparam_t info, struct hw_msg_sour
     msg->type      = MSG_HARDWARE;
     msg->time      = time;
     msg->data      = msg_data;
-    msg->data_size = sizeof(*msg_data);
+    msg->data_size = sizeof(*msg_data) + extra_len;
 
-    memset( msg_data, 0, sizeof(*msg_data) );
+    memset( msg_data, 0, sizeof(*msg_data) + extra_len );
     msg_data->info   = info;
     msg_data->source = source;
     return msg;
@@ -420,7 +420,7 @@ static void set_cursor_pos( struct desktop *desktop, int x, int y )
         return;
     }
 
-    if (!(msg = alloc_hardware_message( 0, source, get_tick_count() ))) return;
+    if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
 
     msg->msg = WM_MOUSEMOVE;
     msg->x   = x;
@@ -1712,6 +1712,8 @@ struct rawinput_message
     struct hw_msg_source     source;
     unsigned int             time;
     struct hardware_msg_data data;
+    const void              *extra;
+    data_size_t              extra_len;
 };
 
 /* check if process is supposed to receive a WM_INPUT message and eventually queue it */
@@ -1722,6 +1724,7 @@ static int queue_rawinput_message( struct process* process, void *arg )
     struct desktop *target_desktop = NULL;
     struct thread *target_thread = NULL;
     struct message *msg;
+    struct hardware_msg_data *msg_data;
     int wparam = RIM_INPUT;
 
     if (raw_msg->data.rawinput.type == RIM_TYPEMOUSE)
@@ -1739,14 +1742,18 @@ static int queue_rawinput_message( struct process* process, void *arg )
         wparam = RIM_INPUTSINK;
     }
 
-    if (!(msg = alloc_hardware_message( raw_msg->data.info, raw_msg->source, raw_msg->time )))
+    if (!(msg = alloc_hardware_message( raw_msg->data.info, raw_msg->source, raw_msg->time, raw_msg->extra_len )))
         goto done;
+    msg_data = msg->data;
 
     msg->win    = device->target;
     msg->msg    = WM_INPUT;
     msg->wparam = wparam;
     msg->lparam = 0;
-    memcpy( msg->data, &raw_msg->data, sizeof(raw_msg->data) );
+
+    memcpy( msg_data, &raw_msg->data, sizeof(*msg_data) );
+    if (raw_msg->extra_len && raw_msg->extra)
+        memcpy( msg_data + 1, raw_msg->extra, raw_msg->extra_len );
 
     queue_hardware_message( raw_msg->desktop, msg, 1 );
 
@@ -1819,6 +1826,8 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         raw_msg.desktop    = desktop;
         raw_msg.source     = source;
         raw_msg.time       = time;
+        raw_msg.extra      = NULL;
+        raw_msg.extra_len  = 0;
 
         msg_data = &raw_msg.data;
         msg_data->info                = input->mouse.info;
@@ -1844,7 +1853,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         if (!(flags & (1 << i))) continue;
         flags &= ~(1 << i);
 
-        if (!(msg = alloc_hardware_message( input->mouse.info, source, time ))) return 0;
+        if (!(msg = alloc_hardware_message( input->mouse.info, source, time, 0 ))) return 0;
         msg_data = msg->data;
 
         msg->win       = get_user_full_handle( win );
@@ -1953,6 +1962,8 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         raw_msg.desktop    = desktop;
         raw_msg.source     = source;
         raw_msg.time       = time;
+        raw_msg.extra      = NULL;
+        raw_msg.extra_len  = 0;
 
         msg_data = &raw_msg.data;
         msg_data->info                 = input->kbd.info;
@@ -1972,7 +1983,7 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
         return 0;
     }
 
-    if (!(msg = alloc_hardware_message( input->kbd.info, source, time ))) return 0;
+    if (!(msg = alloc_hardware_message( input->kbd.info, source, time, 0 ))) return 0;
     msg_data = msg->data;
 
     msg->win       = get_user_full_handle( win );
@@ -2010,7 +2021,7 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
     struct hw_msg_source source = { IMDT_UNAVAILABLE, origin };
     struct message *msg;
 
-    if (!(msg = alloc_hardware_message( 0, source, get_tick_count() ))) return;
+    if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
 
     msg->win       = get_user_full_handle( win );
     msg->msg       = input->hw.msg;
