@@ -26,6 +26,7 @@
 #include "winuser.h"
 #include "setupapi.h"
 
+#include "wine/server.h"
 #include "wine/debug.h"
 #include "ddk/hidsdi.h"
 #include "ddk/hidtypes.h"
@@ -237,6 +238,32 @@ static NTSTATUS copy_packet_into_buffer(HID_XFER_PACKET *packet, BYTE* buffer, U
         return STATUS_BUFFER_OVERFLOW;
 }
 
+static void HID_Device_sendRawInput(DEVICE_OBJECT *device, HID_XFER_PACKET *packet)
+{
+    BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
+
+    SERVER_START_REQ(send_hardware_message)
+    {
+        req->win                  = 0;
+        req->flags                = 0;
+        req->input.type           = HW_INPUT_HID;
+        req->input.hid.device     = 0; /* FIXME */
+        req->input.hid.usage_page = ext->preparseData->caps.UsagePage;
+        req->input.hid.usage      = ext->preparseData->caps.Usage;
+        req->input.hid.length     = packet->reportBufferLen;
+
+        if (ext->preparseData->reports[0].reportID == 0) {
+            BYTE zero_byte = 0;
+            req->input.hid.length++;
+            wine_server_add_data(req, &zero_byte, sizeof(zero_byte));
+        }
+
+        wine_server_add_data(req, packet->reportBuffer, packet->reportBufferLen);
+        wine_server_call(req);
+    }
+    SERVER_END_REQ;
+}
+
 static void HID_Device_processQueue(DEVICE_OBJECT *device)
 {
     IRP *irp;
@@ -320,6 +347,7 @@ static DWORD CALLBACK hid_device_thread(void *args)
             if (irp->IoStatus.u.Status == STATUS_SUCCESS)
             {
                 RingBuffer_Write(ext->ring_buffer, packet);
+                HID_Device_sendRawInput(device, packet);
                 HID_Device_processQueue(device);
             }
 
@@ -366,6 +394,7 @@ static DWORD CALLBACK hid_device_thread(void *args)
                 else
                     packet->reportId = 0;
                 RingBuffer_Write(ext->ring_buffer, packet);
+                HID_Device_sendRawInput(device, packet);
                 HID_Device_processQueue(device);
             }
 
