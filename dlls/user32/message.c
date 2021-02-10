@@ -3240,10 +3240,10 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags )
     {
         req->win        = wine_server_user_handle( hwnd );
         req->flags      = flags;
-        req->input.type = input->type;
         switch (input->type)
         {
         case INPUT_MOUSE:
+            req->input.type        = HW_INPUT_MOUSE;
             req->input.mouse.x     = input->u.mi.dx;
             req->input.mouse.y     = input->u.mi.dy;
             req->input.mouse.data  = input->u.mi.mouseData;
@@ -3252,6 +3252,7 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags )
             req->input.mouse.info  = input->u.mi.dwExtraInfo;
             break;
         case INPUT_KEYBOARD:
+            req->input.type      = HW_INPUT_KEYBOARD;
             req->input.kbd.vkey  = input->u.ki.wVk;
             req->input.kbd.scan  = input->u.ki.wScan;
             req->input.kbd.flags = input->u.ki.dwFlags;
@@ -3259,6 +3260,7 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags )
             req->input.kbd.info  = input->u.ki.dwExtraInfo;
             break;
         case INPUT_HARDWARE:
+            req->input.type      = HW_INPUT_HARDWARE;
             req->input.hw.msg    = input->u.hi.uMsg;
             req->input.hw.lparam = MAKELONG( input->u.hi.wParamL, input->u.hi.wParamH );
             break;

@@ -326,6 +326,22 @@ BOOL rawinput_from_hardware_message(RAWINPUT *rawinput, const struct hardware_ms
         rawinput->data.keyboard.Message          = msg_data->rawinput.kbd.message;
         rawinput->data.keyboard.ExtraInformation = msg_data->info;
     }
+    else if (msg_data->rawinput.type == RIM_TYPEHID)
+    {
+        if (sizeof(*rawinput) + msg_data->rawinput.hid.length > RAWINPUT_BUFFER_SIZE)
+        {
+            ERR("unexpectedly large hardware message dropped\n");
+            return FALSE;
+        }
+
+        rawinput->header.dwSize  = FIELD_OFFSET(RAWINPUT, data.hid.bRawData) + msg_data->rawinput.hid.length;
+        rawinput->header.hDevice = 0; /* FIXME */
+        rawinput->header.wParam  = 0;
+
+        rawinput->data.hid.dwSizeHid = msg_data->rawinput.hid.length;
+        rawinput->data.hid.dwCount = 1;
+        memcpy(rawinput->data.hid.bRawData, msg_data + 1, msg_data->rawinput.hid.length);
+    }
     else
     {
         FIXME("Unhandled rawinput type %#x.\n", msg_data->rawinput.type);
@@ -524,7 +540,7 @@ UINT WINAPI DECLSPEC_HOTPATCH GetRawInputBuffer(RAWINPUT *data, UINT *data_size,
     struct hardware_msg_data *msg_data;
     struct rawinput_thread_data *thread_data;
     RAWINPUT *rawinput;
-    UINT count = 0, rawinput_size, next_size, overhead;
+    UINT count = 0, rawinput_size, msg_size, next_size, overhead;
     BOOL is_wow64;
     int i;
 
@@ -584,7 +600,10 @@ UINT WINAPI DECLSPEC_HOTPATCH GetRawInputBuffer(RAWINPUT *data, UINT *data_size,
                               data->header.dwSize - sizeof(RAWINPUTHEADER));
         data->header.dwSize += overhead;
         data = NEXTRAWINPUTBLOCK(data);
-        msg_data++;
+        msg_size = sizeof(*msg_data);
+        if (msg_data->rawinput.type == RIM_TYPEHID)
+            msg_size += msg_data->rawinput.hid.length;
+        msg_data = (struct hardware_msg_data *)((char *)msg_data + msg_size);
     }
 
     if (count == 0 && next_size == 0) *data_size = 0;
@@ -657,6 +676,7 @@ UINT WINAPI GetRawInputDeviceInfoW(HANDLE handle, UINT command, void *data, UINT
             handle, command, data, data_size);
 
     if (!data_size) return ~0U;
+    if (!device) return ~0U;
 
     /* each case below must set:
      *     *data_size: length (meaning defined by command) of data we want to copy
