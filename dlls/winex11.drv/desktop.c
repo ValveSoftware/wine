@@ -425,23 +425,16 @@ void X11DRV_resize_desktop( BOOL send_display_change )
     width = primary_rect.right;
     height = primary_rect.bottom;
 
-    if (GetWindowThreadProcessId( hwnd, NULL ) != GetCurrentThreadId())
-    {
-        SendMessageW( hwnd, WM_X11DRV_RESIZE_DESKTOP, 0, (LPARAM)send_display_change );
-    }
-    else
-    {
-        TRACE( "desktop %p change to (%dx%d)\n", hwnd, width, height );
-        update_desktop_fullscreen( width, height );
-        SetWindowPos( hwnd, 0, virtual_rect.left, virtual_rect.top,
-                      virtual_rect.right - virtual_rect.left, virtual_rect.bottom - virtual_rect.top,
-                      SWP_NOZORDER | SWP_NOACTIVATE | SWP_DEFERERASE );
-        ungrab_clipping_window();
+    TRACE( "desktop %p change to (%dx%d)\n", hwnd, width, height );
+    update_desktop_fullscreen( width, height );
+    SetWindowPos( hwnd, 0, virtual_rect.left, virtual_rect.top,
+                  virtual_rect.right - virtual_rect.left, virtual_rect.bottom - virtual_rect.top,
+                  SWP_NOZORDER | SWP_NOACTIVATE | SWP_DEFERERASE );
+    ungrab_clipping_window();
 
-        if (send_display_change)
-        {
-            SendMessageTimeoutW( HWND_BROADCAST, WM_DISPLAYCHANGE, screen_bpp, MAKELPARAM( width, height ),
-                                 SMTO_ABORTIFHUNG, 2000, NULL );
-        }
+    if (send_display_change)
+    {
+        SendMessageTimeoutW( HWND_BROADCAST, WM_DISPLAYCHANGE, screen_bpp, MAKELPARAM( width, height ),
+                             SMTO_ABORTIFHUNG, 2000, NULL );
     }
 }
