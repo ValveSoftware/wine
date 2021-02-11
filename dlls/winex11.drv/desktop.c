@@ -418,6 +418,7 @@ void X11DRV_resize_desktop( BOOL send_display_change )
 {
     RECT primary_rect, virtual_rect;
     HWND hwnd = GetDesktopWindow();
+    DEVMODEW current_mode;
     INT width, height;
 
     virtual_rect = get_virtual_screen_rect();
@@ -437,4 +438,7 @@ void X11DRV_resize_desktop( BOOL send_display_change )
         SendMessageTimeoutW( HWND_BROADCAST, WM_DISPLAYCHANGE, screen_bpp, MAKELPARAM( width, height ),
                              SMTO_ABORTIFHUNG, 2000, NULL );
     }
+
+    EnumDisplaySettingsW( NULL, ENUM_CURRENT_SETTINGS, &current_mode );
+    ChangeDisplaySettingsExW( NULL, &current_mode, NULL, 0, NULL );
 }
