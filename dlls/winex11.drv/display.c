@@ -486,7 +486,7 @@ void X11DRV_DisplayDevices_Update(BOOL send_display_change)
 {
     RECT old_virtual_rect, new_virtual_rect;
     DWORD tid, pid;
-    HWND foreground;
+    HWND foreground, desktop = GetDesktopWindow();
     UINT mask = 0;
 
     old_virtual_rect = get_virtual_screen_rect();
@@ -499,12 +499,14 @@ void X11DRV_DisplayDevices_Update(BOOL send_display_change)
     if (old_virtual_rect.top != new_virtual_rect.top)
         mask |= CWY;
 
-    X11DRV_resize_desktop(send_display_change);
     EnumWindows(update_windows_on_display_change, (LPARAM)mask);
+
+    if (GetWindowThreadProcessId( desktop, NULL ) != GetCurrentThreadId())
+        SendMessageW( desktop, WM_X11DRV_RESIZE_DESKTOP, 0, (LPARAM)send_display_change );
 
     /* forward clip_fullscreen_window request to the desktop window */
     if ((foreground = GetForegroundWindow()) && (tid = GetWindowThreadProcessId( foreground, &pid )) && pid == GetCurrentProcessId())
-        SendNotifyMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR, TRUE, TRUE );
+        SendNotifyMessageW( desktop, WM_X11DRV_DESKTOP_CLIP_CURSOR, TRUE, TRUE );
 }
 
 /* This function sets device interface link state to enabled.
