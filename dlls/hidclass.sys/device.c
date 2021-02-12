@@ -262,6 +262,14 @@ static void HID_Device_sendRawInput(DEVICE_OBJECT *device, HID_XFER_PACKET *pack
         req->input.hid.usage_page = ext->preparseData->caps.UsagePage;
         req->input.hid.usage      = ext->preparseData->caps.Usage;
         req->input.hid.length     = packet->reportBufferLen;
+
+        /* report-id-less reports */
+        if (ext->preparseData->reports[0].reportID == 0) {
+            BYTE zero_byte = 0;
+            req->input.hid.length++;
+            wine_server_add_data(req, &zero_byte, sizeof(zero_byte));
+        }
+
         wine_server_add_data(req, packet->reportBuffer, packet->reportBufferLen);
         wine_server_call(req);
     }
