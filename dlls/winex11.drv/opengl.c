@@ -1950,7 +1950,8 @@ static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_ha
 static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *gl )
 {
     GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer;
-    float prev_clear_color[4];
+    float prev_clear_color[4], prev_clear_depth;
+    int prev_clear_stencil;
     unsigned int i;
     struct fs_hack_fbo_attachments_config config;
     struct fs_hack_fbconfig_attribs attribs;
@@ -1995,6 +1996,8 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         opengl_funcs.gl.p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev_texture );
         opengl_funcs.gl.p_glGetIntegerv( GL_RENDERBUFFER_BINDING, (GLint *)&prev_renderbuffer );
         opengl_funcs.gl.p_glGetFloatv( GL_COLOR_CLEAR_VALUE, prev_clear_color );
+        opengl_funcs.gl.p_glGetFloatv( GL_DEPTH_CLEAR_VALUE, &prev_clear_depth );
+        opengl_funcs.gl.p_glGetIntegerv( GL_STENCIL_CLEAR_VALUE, &prev_clear_stencil );
         TRACE( "Previous draw FBO %u, read FBO %u for ctx %p\n", prev_draw_fbo, prev_read_fbo, ctx);
 
         if (!ctx->fs_hack_fbo)
@@ -2080,14 +2083,22 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
             }
         }
 
-        opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
         if(!gl->fs_hack_context_set_up)
-            opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
+        {
+            opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+            opengl_funcs.gl.p_glClearDepth( 1.0 );
+            opengl_funcs.gl.p_glClearStencil( 0 );
+            opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
+        }
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
         pglDrawBuffer( GL_BACK );
         if(!gl->fs_hack_context_set_up)
+        {
             opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
-        opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
+            opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
+            opengl_funcs.gl.p_glClearDepth( prev_clear_depth );
+            opengl_funcs.gl.p_glClearStencil( prev_clear_stencil );
+        }
         wglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
         wglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
 
