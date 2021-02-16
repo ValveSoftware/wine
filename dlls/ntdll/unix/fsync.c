@@ -93,6 +93,7 @@ static long nr_futex2_wait, nr_futex2_waitv, nr_futex2_wake;
 
 #define FUTEX_32 2
 #define FUTEX_SHARED_FLAG 8
+#define FUTEX_CLOCK_REALTIME 256
 
 struct futex_waitv
 {
@@ -126,9 +127,12 @@ static inline int futex_wait( int *addr, int val, const ULONGLONG *end )
         if (end)
         {
             struct timespec64 timespec;
-            timespec.tv_sec = *end / (ULONGLONG)TICKSPERSEC;
-            timespec.tv_nsec = (*end % TICKSPERSEC) * 100;
-            return syscall( nr_futex2_wait, addr, val, FUTEX_32 | FUTEX_SHARED_FLAG, &timespec );
+            ULONGLONG tmp = *end - SECS_1601_TO_1970 * TICKSPERSEC;
+            timespec.tv_sec = tmp / (ULONGLONG)TICKSPERSEC;
+            timespec.tv_nsec = (tmp % TICKSPERSEC) * 100;
+
+            return syscall( nr_futex2_wait, addr, val, FUTEX_32 |
+                            FUTEX_SHARED_FLAG | FUTEX_CLOCK_REALTIME, &timespec );
         }
         else
         {
@@ -187,9 +191,11 @@ static inline int futex_wait_multiple( union futex_vector *vector, unsigned int 
         if (end)
         {
             struct timespec64 timespec;
-            timespec.tv_sec = *end / (ULONGLONG)TICKSPERSEC;
-            timespec.tv_nsec = (*end % TICKSPERSEC) * 100;
-            return syscall( nr_futex2_waitv, &vector->futex2, count, 0, &timespec );
+            ULONGLONG tmp = *end - SECS_1601_TO_1970 * TICKSPERSEC;
+            timespec.tv_sec = tmp / (ULONGLONG)TICKSPERSEC;
+            timespec.tv_nsec = (tmp % TICKSPERSEC) * 100;
+
+            return syscall( nr_futex2_waitv, &vector->futex2, count, FUTEX_CLOCK_REALTIME, &timespec );
         }
         else
         {
