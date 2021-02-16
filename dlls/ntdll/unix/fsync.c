@@ -98,9 +98,6 @@ static long nr_futex2_wait, nr_futex2_waitv, nr_futex2_wake;
 struct futex_waitv
 {
     void *uaddr;
-#if __SIZEOF_POINTER__ == 4
-    int pad;
-#endif
     unsigned int val;
     unsigned int flags;
 };
@@ -168,9 +165,6 @@ static inline void futex_vector_set( union futex_vector *vector, unsigned int in
     {
         vector->futex2[index].uaddr = addr;
         vector->futex2[index].val = val;
-#if __SIZEOF_POINTER__ == 4
-        vector->futex2[index].pad = 0;
-#endif
         vector->futex2[index].flags = FUTEX_32 | FUTEX_SHARED_FLAG;
     }
     else
