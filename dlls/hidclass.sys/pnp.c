@@ -25,6 +25,7 @@
 #include "ddk/hidtypes.h"
 #include "ddk/wdm.h"
 #include "regstr.h"
+#include "wine/server.h"
 #include "wine/debug.h"
 #include "wine/list.h"
 
@@ -67,6 +68,26 @@ static NTSTATUS get_device_id(DEVICE_OBJECT *device, BUS_QUERY_ID_TYPE type, WCH
     CloseHandle(event);
 
     return status;
+}
+
+static void HID_PNP_SendDeviceChange(DEVICE_OBJECT *device, WPARAM wparam)
+{
+    BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
+
+    SERVER_START_REQ(send_hardware_message)
+    {
+        req->win                  = 0;
+        req->flags                = 0;
+        req->input.type           = HW_INPUT_HID;
+        req->input.hid.msg        = WM_INPUT_DEVICE_CHANGE;
+        req->input.hid.device     = wine_server_obj_handle(ext->rawinput_handle);
+        req->input.hid.wparam     = wparam;
+        req->input.hid.usage_page = ext->preparseData->caps.UsagePage;
+        req->input.hid.usage      = ext->preparseData->caps.Usage;
+
+        wine_server_call(req);
+    }
+    SERVER_END_REQ;
 }
 
 NTSTATUS WINAPI PNP_AddDevice(DRIVER_OBJECT *driver, DEVICE_OBJECT *PDO)
@@ -278,10 +299,13 @@ NTSTATUS WINAPI HID_PNP_Dispatch(DEVICE_OBJECT *device, IRP *irp)
             if (ext->is_mouse)
                 IoSetDeviceInterfaceState(&ext->mouse_link_name, TRUE);
 
+            HID_PNP_SendDeviceChange(device, GIDC_ARRIVAL);
+
             return rc;
         }
         case IRP_MN_REMOVE_DEVICE:
         {
+            HID_PNP_SendDeviceChange(device, GIDC_REMOVAL);
             return remove_device(minidriver, device, irp);
         }
         default:
