@@ -278,6 +278,7 @@ static void HID_Device_sendRawInput(DEVICE_OBJECT *device, HID_XFER_PACKET *pack
         req->win                  = 0;
         req->flags                = 0;
         req->input.type           = HW_INPUT_HID;
+        req->input.hid.msg        = WM_INPUT;
         req->input.hid.device     = wine_server_obj_handle(ext->rawinput_handle);
         req->input.hid.usage_page = ext->preparseData->caps.UsagePage;
         req->input.hid.usage      = ext->preparseData->caps.Usage;
