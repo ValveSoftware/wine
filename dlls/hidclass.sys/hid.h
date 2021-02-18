@@ -51,6 +51,7 @@ typedef struct _BASE_DEVICE_EXTENSION {
     struct ReportRingBuffer *ring_buffer;
     HANDLE halt_event;
     HANDLE thread;
+    HANDLE rawinput_handle;
 
     KSPIN_LOCK irp_queue_lock;
     LIST_ENTRY irp_queue;
