@@ -39,6 +39,10 @@ static struct x11drv_display_device_handler real_device_handler;
 static struct x11drv_settings_handler real_settings_handler;
 static struct list fs_monitors = LIST_INIT(fs_monitors);
 
+static WORD gamma_ramp_i[GAMMA_RAMP_SIZE * 3];
+static float gamma_ramp[GAMMA_RAMP_SIZE * 3];
+static LONG gamma_serial;
+
 /* Access to fs_monitors is protected by fs_section */
 static CRITICAL_SECTION fs_section;
 static CRITICAL_SECTION_DEBUG critsect_debug =
@@ -896,4 +900,31 @@ void fs_hack_init(void)
     device_handler.free_monitors = real_device_handler.free_monitors;
     device_handler.register_event_handlers = NULL;
     X11DRV_DisplayDevices_SetHandler(&device_handler);
+}
+
+const float *fs_hack_get_gamma_ramp(LONG *serial)
+{
+    if(gamma_serial == 0)
+        return NULL;
+    if(serial)
+        *serial = gamma_serial;
+    return gamma_ramp;
+}
+
+void fs_hack_set_gamma_ramp(const WORD *ramp)
+{
+    int i;
+    if(memcmp(gamma_ramp_i, ramp, sizeof(gamma_ramp_i)) == 0){
+        /* identical */
+        return;
+    }
+    for(i = 0; i < GAMMA_RAMP_SIZE * 3; ++i){
+        gamma_ramp[i] = ramp[i] / 65535.f;
+    }
+    memcpy(gamma_ramp_i, ramp, sizeof(gamma_ramp_i));
+    InterlockedIncrement(&gamma_serial);
+    TRACE("new gamma serial: %u\n", gamma_serial);
+    if(gamma_serial == 0){
+        InterlockedIncrement(&gamma_serial);
+    }
 }
