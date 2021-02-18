@@ -277,6 +277,7 @@ NTSTATUS WINAPI HID_PNP_Dispatch(DEVICE_OBJECT *device, IRP *irp)
             IoSetDeviceInterfaceState(&ext->link_name, TRUE);
             if (ext->is_mouse)
                 IoSetDeviceInterfaceState(&ext->mouse_link_name, TRUE);
+
             return rc;
         }
         case IRP_MN_REMOVE_DEVICE:
