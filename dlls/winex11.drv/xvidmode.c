@@ -554,6 +554,25 @@ void X11DRV_XF86VM_Init(void)
 
 #endif /* SONAME_LIBXXF86VM */
 
+static BOOL CALLBACK gammahack_UpdateWindowGamma(HWND hwnd, LPARAM lparam)
+{
+    /* XXX: Technically, the ramp should only apply to windows on the given
+     * device, but I can't think of a situation in which that would matter. */
+
+    sync_gl_drawable(hwnd, FALSE);
+
+    return TRUE;
+}
+
+static BOOL gamma_hack_SetGammaRamp(PHYSDEV dev, const WORD *ramp)
+{
+    fs_hack_set_gamma_ramp(ramp);
+
+    EnumWindows(gammahack_UpdateWindowGamma, 0);
+
+    return TRUE;
+}
+
 /***********************************************************************
  *		GetDeviceGammaRamp (X11DRV.@)
  *
@@ -580,7 +599,9 @@ BOOL CDECL X11DRV_GetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp)
 BOOL CDECL X11DRV_SetDeviceGammaRamp(PHYSDEV dev, LPVOID ramp)
 {
 #ifdef SONAME_LIBXXF86VM
-  return X11DRV_XF86VM_SetGammaRamp(ramp);
+  if(!X11DRV_XF86VM_SetGammaRamp(ramp))
+      return gamma_hack_SetGammaRamp(dev, ramp);
+  return TRUE;
 #else
   return FALSE;
 #endif

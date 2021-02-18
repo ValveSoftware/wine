@@ -688,6 +688,8 @@ extern double fs_hack_get_user_to_real_scale(HMONITOR) DECLSPEC_HIDDEN;
 extern SIZE fs_hack_get_scaled_screen_size(HMONITOR monitor) DECLSPEC_HIDDEN;
 extern RECT fs_hack_get_real_virtual_screen(void) DECLSPEC_HIDDEN;
 extern void fs_hack_init(void) DECLSPEC_HIDDEN;
+extern const float *fs_hack_get_gamma_ramp(LONG *serial);
+extern void fs_hack_set_gamma_ramp(const WORD *ramp);
 extern int mode_compare(const void *p1, const void *p2) DECLSPEC_HIDDEN;
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
