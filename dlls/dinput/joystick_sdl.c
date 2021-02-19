@@ -104,6 +104,7 @@ struct SDLDev {
     int instance_id;
     WORD vendor_id;
     WORD product_id;
+    int nth_instance; /* zero-indexed nth instance of this vid/pid */
     SDL_JoystickGUID sdl_guid;
     CHAR *name;
 
@@ -146,8 +147,24 @@ static inline IDirectInputDevice8W *IDirectInputDevice8W_from_impl(JoystickImpl 
     return &This->generic.base.IDirectInputDevice8W_iface;
 }
 
-static const GUID DInput_Wine_SDL_Joystick_GUID = { /* 001E36B7-5DBA-4C4F-A8C9-CFC8689DB403 */
-  0x001E36B7, 0x5DBA, 0x4C4F, {0xA8, 0xC9, 0xCF, 0xC8, 0x68, 0x9D, 0xB4, 0x03}
+#define PUT_JS_GUID_VID(guid, vid) \
+    (guid)->Data4[2] = (vid >> 8) & 0xFF; \
+    (guid)->Data4[3] = vid & 0xFF
+#define PUT_JS_GUID_PID(guid, pid) \
+    (guid)->Data4[4] = (pid >> 8) & 0xFF; \
+    (guid)->Data4[5] = pid & 0xFF
+#define PUT_JS_GUID_INSTANCE(guid, instance) \
+    (guid)->Data4[7] = instance & 0xFF
+
+#define GET_JS_GUID_VID(guid) \
+    ((guid)->Data4[2] << 8) | (guid)->Data4[3]
+#define GET_JS_GUID_PID(guid) \
+    ((guid)->Data4[4] << 8) | (guid)->Data4[5]
+#define GET_JS_GUID_INSTANCE(guid) \
+    (guid)->Data4[7]
+
+static const GUID DInput_Wine_SDL_Joystick_GUID = { /* 001E36B7-5DBA-4C4F-A8C9-000000000000 */
+  0x001E36B7, 0x5DBA, 0x4C4F, {0xA8, 0xC9, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}
 };
 
 static CRITICAL_SECTION sdldevs_lock;
@@ -228,6 +245,21 @@ static BOOL WINAPI sdldrv_init(INIT_ONCE *once, void *param, void **context)
     steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
 
     return TRUE;
+}
+
+static int get_num_vidpids(WORD vid, WORD pid)
+{
+    int i, ret = 0;
+
+    for(i = 0; i < ARRAY_SIZE(sdldevs); ++i){
+        if(!sdldevs[i].valid)
+            break;
+        if(sdldevs[i].vendor_id == vid &&
+                sdldevs[i].product_id == pid)
+            ++ret;
+    }
+
+    return ret;
 }
 
 static void find_sdldevs(void)
@@ -362,6 +394,8 @@ static void find_sdldevs(void)
             sdldev->product_id = PID_MICROSOFT_XBOX_360;
         }
 
+        sdldev->nth_instance = get_num_vidpids(sdldev->vendor_id, sdldev->product_id);
+
         sdldev->n_buttons = SDL_JoystickNumButtons(device);
         sdldev->n_axes = SDL_JoystickNumAxes(device);
         sdldev->n_hats = SDL_JoystickNumHats(device);
@@ -442,7 +476,9 @@ static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD ver
 
     lpddi->dwSize       = dwSize;
     lpddi->guidInstance = DInput_Wine_SDL_Joystick_GUID;
-    lpddi->guidInstance.Data3 = id;
+    PUT_JS_GUID_VID(&lpddi->guidInstance, sdldevs[id].vendor_id);
+    PUT_JS_GUID_PID(&lpddi->guidInstance, sdldevs[id].product_id);
+    PUT_JS_GUID_INSTANCE(&lpddi->guidInstance, sdldevs[id].nth_instance);
     lpddi->guidProduct = DInput_PIDVID_Product_GUID;
     lpddi->guidProduct.Data1 = MAKELONG(sdldevs[id].vendor_id, sdldevs[id].product_id);
     lpddi->guidFFDriver = GUID_NULL;
@@ -1101,7 +1137,9 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     if (!newDevice) return NULL;
 
     newDevice->generic.guidInstance = DInput_Wine_SDL_Joystick_GUID;
-    newDevice->generic.guidInstance.Data3 = index;
+    PUT_JS_GUID_VID(&newDevice->generic.guidInstance, sdldevs[index].vendor_id);
+    PUT_JS_GUID_PID(&newDevice->generic.guidInstance, sdldevs[index].product_id);
+    PUT_JS_GUID_INSTANCE(&newDevice->generic.guidInstance, sdldevs[index].nth_instance);
     newDevice->generic.guidProduct = DInput_PIDVID_Product_GUID;
     newDevice->generic.guidProduct.Data1 = MAKELONG(sdldevs[index].vendor_id, sdldevs[index].product_id);
     newDevice->generic.joy_polldev = poll_sdl_device_state;
@@ -1232,17 +1270,30 @@ failed:
   */
 static unsigned short get_joystick_index(REFGUID guid)
 {
-    GUID wine_joystick = DInput_Wine_SDL_Joystick_GUID;
-    GUID dev_guid = *guid;
-
-    wine_joystick.Data3 = 0;
-    dev_guid.Data3 = 0;
+    int i;
+    WORD vid, pid;
+    LONG nth_instance;
 
     /* for the standard joystick GUID use index 0 */
     if(IsEqualGUID(&GUID_Joystick,guid)) return 0;
 
-    /* for the wine joystick GUIDs use the index stored in Data3 */
-    if(IsEqualGUID(&wine_joystick, &dev_guid)) return guid->Data3;
+    if(guid->Data1 == DInput_Wine_SDL_Joystick_GUID.Data1 &&
+            guid->Data2 == DInput_Wine_SDL_Joystick_GUID.Data2 &&
+            guid->Data3 == DInput_Wine_SDL_Joystick_GUID.Data3){
+        vid = GET_JS_GUID_VID(guid);
+        pid = GET_JS_GUID_PID(guid);
+        nth_instance = GET_JS_GUID_INSTANCE(guid);
+
+        for(i = 0; i < ARRAY_SIZE(sdldevs); ++i){
+            if(!sdldevs[i].valid)
+                break;
+            if(sdldevs[i].vendor_id == vid &&
+                    sdldevs[i].product_id == pid &&
+                    sdldevs[i].nth_instance == nth_instance){
+                return i;
+            }
+        }
+    }
 
     return 0xffff;
 }
