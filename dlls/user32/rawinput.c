@@ -381,7 +381,7 @@ BOOL rawinput_from_hardware_message(RAWINPUT *rawinput, const struct hardware_ms
         }
 
         rawinput->header.dwSize  = FIELD_OFFSET(RAWINPUT, data.hid.bRawData) + msg_data->rawinput.hid.length;
-        rawinput->header.hDevice = 0; /* FIXME */
+        rawinput->header.hDevice = wine_server_ptr_handle(msg_data->rawinput.hid.device);
         rawinput->header.wParam  = 0;
 
         rawinput->data.hid.dwSizeHid = msg_data->rawinput.hid.length;
