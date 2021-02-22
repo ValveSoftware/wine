@@ -46,6 +46,7 @@ struct device
 {
     WCHAR *path;
     HANDLE file;
+    HANDLE handle;
     RID_DEVICE_INFO info;
     PHIDP_PREPARSED_DATA data;
 };
@@ -147,6 +148,21 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
     return device;
 }
 
+static struct device *rawinput_device_from_handle(HANDLE handle)
+{
+    unsigned int i;
+
+    if (!handle) return NULL;
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+    {
+        if (rawinput_devices[i].handle == handle)
+            return &rawinput_devices[i];
+    }
+
+    return NULL;
+}
+
 static void find_devices(void)
 {
     static ULONGLONG last_check;
@@ -158,6 +174,7 @@ static void find_devices(void)
     GUID hid_guid;
     HDEVINFO set;
     DWORD idx;
+    INT_PTR next_handle = (INT_PTR) WINE_KEYBOARD_HANDLE + 1;
 
     if (GetTickCount64() - last_check < 2000)
         return;
@@ -199,6 +216,7 @@ static void find_devices(void)
 
         device->info.u.hid.usUsagePage = caps.UsagePage;
         device->info.u.hid.usUsage = caps.Usage;
+        device->handle = (HANDLE) next_handle++;
     }
 
     SetupDiDestroyDeviceInfoList(set);
@@ -214,6 +232,7 @@ static void find_devices(void)
 
         device->info.dwType = RIM_TYPEMOUSE;
         device->info.u.mouse = mouse_info;
+        device->handle = (HANDLE) next_handle++;
     }
 
     SetupDiDestroyDeviceInfoList(set);
@@ -395,7 +414,7 @@ UINT WINAPI GetRawInputDeviceList(RAWINPUTDEVICELIST *devices, UINT *device_coun
 
     for (i = 0; i < rawinput_devices_count; ++i)
     {
-        devices[2 + i].hDevice = &rawinput_devices[i];
+        devices[2 + i].hDevice = rawinput_devices[i].handle;
         devices[2 + i].dwType = rawinput_devices[i].info.dwType;
     }
 
@@ -668,7 +687,7 @@ UINT WINAPI GetRawInputDeviceInfoW(HANDLE handle, UINT command, void *data, UINT
     static const RID_DEVICE_INFO_MOUSE mouse_info = {1, 5, 0, FALSE};
 
     RID_DEVICE_INFO info;
-    struct device *device = handle;
+    struct device *device = rawinput_device_from_handle(handle);
     const void *to_copy;
     UINT to_copy_bytes, avail_bytes;
 
