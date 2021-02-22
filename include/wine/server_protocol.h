@@ -352,6 +352,8 @@ typedef union
     struct
     {
         int            type;
+        unsigned int   msg;
+        lparam_t       wparam;
         obj_handle_t   device;
         unsigned char  usage_page;
         unsigned char  usage;
@@ -6778,7 +6780,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 657
+#define SERVER_PROTOCOL_VERSION 658
 
 /* ### protocol_version end ### */
 

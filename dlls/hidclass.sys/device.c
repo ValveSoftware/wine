@@ -35,6 +35,7 @@
 
 #include "initguid.h"
 #include "devguid.h"
+#include "devpkey.h"
 #include "ntddmou.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(hid);
@@ -42,6 +43,8 @@ WINE_DECLARE_DEBUG_CHANNEL(hid_report);
 
 static const WCHAR device_name_fmtW[] = {'\\','D','e','v','i','c','e',
     '\\','H','I','D','#','%','p','&','%','p',0};
+
+DEFINE_DEVPROPKEY(DEVPROPKEY_HID_HANDLE, 0xbc62e415, 0xf4fe, 0x405c, 0x8e, 0xda, 0x63, 0x6f, 0xb5, 0x9f, 0x08, 0x98, 2);
 
 NTSTATUS HID_CreateDevice(DEVICE_OBJECT *native_device, HID_MINIDRIVER_REGISTRATION *driver, DEVICE_OBJECT **device)
 {
@@ -76,6 +79,14 @@ NTSTATUS HID_CreateDevice(DEVICE_OBJECT *native_device, HID_MINIDRIVER_REGISTRAT
     return STATUS_SUCCESS;
 }
 
+/* user32 reserves 1 & 2 for winemouse and winekeyboard */
+#define WINE_KEYBOARD_HANDLE 2
+static INT32 alloc_new_handle(void)
+{
+    static INT32 counter = WINE_KEYBOARD_HANDLE+1;
+    return InterlockedIncrement(&counter);
+}
+
 NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
 {
     static const WCHAR backslashW[] = {'\\',0};
@@ -86,6 +97,7 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
     HDEVINFO devinfo;
     GUID hidGuid;
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
+    INT32 handle;
 
     HidD_GetHidGuid(&hidGuid);
     if (ext->xinput_hack) hidGuid.Data4[7]++; /* HACK: use different GUID so only xinput will find this device */
@@ -116,7 +128,19 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
         FIXME( "failed to create device info %x\n", GetLastError());
         goto error;
     }
+
     SetupDiDestroyDeviceInfoList(devinfo);
+
+    handle = alloc_new_handle();
+    status = IoSetDevicePropertyData(device, &DEVPROPKEY_HID_HANDLE, LOCALE_NEUTRAL,
+                                     PLUGPLAY_PROPERTY_PERSISTENT, DEVPROP_TYPE_INT32,
+                                     sizeof(handle), &handle);
+    if (status != STATUS_SUCCESS)
+    {
+        FIXME( "failed to set device property %x\n", status );
+        return status;
+    }
+    ext->rawinput_handle = (HANDLE)(UINT_PTR) handle;
 
     status = IoRegisterDeviceInterface(device, &hidGuid, NULL, &ext->link_name);
     if (status != STATUS_SUCCESS)
@@ -124,8 +148,6 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
         FIXME( "failed to register device interface %x\n", status );
         return status;
     }
-
-    ext->link_handle = 0;
 
     /* FIXME: This should probably be done in mouhid.sys. */
     if (ext->preparseData->caps.UsagePage == HID_USAGE_PAGE_GENERIC
@@ -211,8 +233,6 @@ void HID_DeleteDevice(DEVICE_OBJECT *device)
         IoCompleteRequest(irp, IO_NO_INCREMENT);
     }
 
-    CloseHandle(ext->link_handle);
-
     TRACE("Delete device(%p) %s\n", device, debugstr_w(ext->device_name));
     HeapFree(GetProcessHeap(), 0, ext->device_name);
     RtlFreeUnicodeString(&ext->link_name);
@@ -258,7 +278,7 @@ static void HID_Device_sendRawInput(DEVICE_OBJECT *device, HID_XFER_PACKET *pack
         req->win                  = 0;
         req->flags                = 0;
         req->input.type           = HW_INPUT_HID;
-        req->input.hid.device     = wine_server_obj_handle(ext->link_handle);
+        req->input.hid.device     = wine_server_obj_handle(ext->rawinput_handle);
         req->input.hid.usage_page = ext->preparseData->caps.UsagePage;
         req->input.hid.usage      = ext->preparseData->caps.Usage;
         req->input.hid.length     = packet->reportBufferLen;

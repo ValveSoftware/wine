@@ -301,31 +301,12 @@ NTSTATUS WINAPI HID_PNP_Dispatch(DEVICE_OBJECT *device, IRP *irp)
         case IRP_MN_START_DEVICE:
         {
             BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
-            OBJECT_ATTRIBUTES attr;
-            HANDLE tmp;
 
             rc = minidriver->PNPDispatch(device, irp);
 
             IoSetDeviceInterfaceState(&ext->link_name, TRUE);
             if (ext->is_mouse)
                 IoSetDeviceInterfaceState(&ext->mouse_link_name, TRUE);
-
-            attr.Length = sizeof(attr);
-            attr.RootDirectory = 0;
-            attr.Attributes = OBJ_CASE_INSENSITIVE;
-            attr.ObjectName = &ext->link_name;
-            attr.SecurityDescriptor = NULL;
-            attr.SecurityQualityOfService = NULL;
-
-            if (!NtOpenSymbolicLinkObject(&tmp, SYMBOLIC_LINK_QUERY, &attr) &&
-                (ext->link_handle = ConvertToGlobalHandle(tmp)) != INVALID_HANDLE_VALUE)
-                TRACE("Opened link handle: %p for %s\n", ext->link_handle, debugstr_w(ext->link_name.Buffer));
-            else
-            {
-                ERR("Failed to open link %s, error %u.\n", debugstr_w(ext->link_name.Buffer), GetLastError());
-                ext->link_handle = 0;
-            }
-            NtClose(tmp);
 
             return rc;
         }
