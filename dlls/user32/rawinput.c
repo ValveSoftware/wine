@@ -38,9 +38,12 @@
 #include "user_private.h"
 
 #include "initguid.h"
+#include "devpkey.h"
 #include "ntddmou.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(rawinput);
+
+DEFINE_DEVPROPKEY(DEVPROPKEY_HID_HANDLE, 0xbc62e415, 0xf4fe, 0x405c, 0x8e, 0xda, 0x63, 0x6f, 0xb5, 0x9f, 0x08, 0x98, 2);
 
 struct device
 {
@@ -92,11 +95,13 @@ static BOOL array_reserve(void **elements, unsigned int *capacity, unsigned int 
 
 static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
 {
+    SP_DEVINFO_DATA device_data = {sizeof(device_data)};
     SP_DEVICE_INTERFACE_DETAIL_DATA_W *detail;
+    INT32 handle;
     struct device *device;
     HANDLE file;
     WCHAR *path;
-    DWORD size;
+    DWORD idx, size, type;
 
     SetupDiGetDeviceInterfaceDetailW(set, iface, NULL, 0, &size, NULL);
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER)
@@ -110,7 +115,27 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
         return FALSE;
     }
     detail->cbSize = sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W);
-    SetupDiGetDeviceInterfaceDetailW(set, iface, detail, size, NULL, NULL);
+    SetupDiGetDeviceInterfaceDetailW(set, iface, detail, size, NULL, &device_data);
+
+    if (!SetupDiGetDevicePropertyW(set, &device_data, &DEVPROPKEY_HID_HANDLE, &type, (BYTE *)&handle, sizeof(handle), NULL, 0))
+    {
+        ERR("Failed to get handle for %s, skipping HID device.\n", debugstr_w(detail->DevicePath));
+        heap_free(detail);
+        return NULL;
+    }
+
+    if (type != DEVPROP_TYPE_INT32)
+        ERR("Wrong prop type for HANDLE.\n");
+
+    for (idx = 0; idx < rawinput_devices_count; ++idx)
+    {
+        if (rawinput_devices[idx].handle == (HANDLE)(UINT_PTR) handle)
+        {
+            TRACE("Discarding %s as it's a duplicate of %s.\n", debugstr_w(detail->DevicePath), debugstr_w(rawinput_devices[idx].path));
+            heap_free(detail);
+            return NULL;
+        }
+    }
 
     TRACE("Found HID device %s.\n", debugstr_w(detail->DevicePath));
 
@@ -144,10 +169,12 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
     device->path = path;
     device->file = file;
     device->info.cbSize = sizeof(RID_DEVICE_INFO);
+    device->handle = (HANDLE)(UINT_PTR) handle;
 
     return device;
 }
 
+static void find_devices(void);
 static struct device *rawinput_device_from_handle(HANDLE handle)
 {
     unsigned int i;
@@ -160,13 +187,19 @@ static struct device *rawinput_device_from_handle(HANDLE handle)
             return &rawinput_devices[i];
     }
 
+    find_devices();
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+    {
+        if (rawinput_devices[i].handle == handle)
+            return &rawinput_devices[i];
+    }
+
     return NULL;
 }
 
 static void find_devices(void)
 {
-    static ULONGLONG last_check;
-
     SP_DEVICE_INTERFACE_DATA iface = { sizeof(iface) };
     struct device *device;
     HIDD_ATTRIBUTES attr;
@@ -174,11 +207,6 @@ static void find_devices(void)
     GUID hid_guid;
     HDEVINFO set;
     DWORD idx;
-    INT_PTR next_handle = (INT_PTR) WINE_KEYBOARD_HANDLE + 1;
-
-    if (GetTickCount64() - last_check < 2000)
-        return;
-    last_check = GetTickCount64();
 
     HidD_GetHidGuid(&hid_guid);
 
@@ -191,6 +219,22 @@ static void find_devices(void)
         heap_free(rawinput_devices[idx].path);
     }
     rawinput_devices_count = 0;
+
+    set = SetupDiGetClassDevsW(&GUID_DEVINTERFACE_MOUSE, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+
+    /* add mice first so we won't add the duplicated HID devices */
+    for (idx = 0; SetupDiEnumDeviceInterfaces(set, NULL, &GUID_DEVINTERFACE_MOUSE, idx, &iface); ++idx)
+    {
+        static const RID_DEVICE_INFO_MOUSE mouse_info = {1, 5, 0, FALSE};
+
+        if (!(device = add_device(set, &iface)))
+            continue;
+
+        device->info.dwType = RIM_TYPEMOUSE;
+        device->info.u.mouse = mouse_info;
+    }
+
+    SetupDiDestroyDeviceInfoList(set);
 
     set = SetupDiGetClassDevsW(&hid_guid, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
 
@@ -216,23 +260,6 @@ static void find_devices(void)
 
         device->info.u.hid.usUsagePage = caps.UsagePage;
         device->info.u.hid.usUsage = caps.Usage;
-        device->handle = (HANDLE) next_handle++;
-    }
-
-    SetupDiDestroyDeviceInfoList(set);
-
-    set = SetupDiGetClassDevsW(&GUID_DEVINTERFACE_MOUSE, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
-
-    for (idx = 0; SetupDiEnumDeviceInterfaces(set, NULL, &GUID_DEVINTERFACE_MOUSE, idx, &iface); ++idx)
-    {
-        static const RID_DEVICE_INFO_MOUSE mouse_info = {1, 5, 0, FALSE};
-
-        if (!(device = add_device(set, &iface)))
-            continue;
-
-        device->info.dwType = RIM_TYPEMOUSE;
-        device->info.u.mouse = mouse_info;
-        device->handle = (HANDLE) next_handle++;
     }
 
     SetupDiDestroyDeviceInfoList(set);
