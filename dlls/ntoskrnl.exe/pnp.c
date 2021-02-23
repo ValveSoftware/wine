@@ -783,6 +783,51 @@ NTSTATUS WINAPI IoSetDeviceInterfaceState( UNICODE_STRING *name, BOOLEAN enable 
 }
 
 /***********************************************************************
+ *           IoSetDevicePropertyData (NTOSKRNL.EXE.@)
+ */
+NTSTATUS WINAPI IoSetDevicePropertyData( DEVICE_OBJECT *device, const DEVPROPKEY *property_key,
+                                         LCID lcid, ULONG flags, DEVPROPTYPE type, ULONG size,
+                                         PVOID data)
+{
+    SP_DEVINFO_DATA sp_device = {sizeof(sp_device)};
+    WCHAR device_instance_id[MAX_DEVICE_ID_LEN];
+    NTSTATUS status;
+    HDEVINFO set;
+
+    /* flags is always treated as PLUGPLAY_PROPERTY_PERSISTENT starting with Win 8 / 2012 */
+
+    if (lcid != LOCALE_NEUTRAL)
+        FIXME("only LOCALE_NEUTRAL is supported\n");
+
+    if ((status = get_device_instance_id( device, device_instance_id )))
+        return status;
+
+    if ((set = SetupDiCreateDeviceInfoList( &GUID_NULL, NULL )) == INVALID_HANDLE_VALUE)
+    {
+        ERR("Failed to create device list, error %#x.\n", GetLastError());
+        return GetLastError();
+    }
+
+    if (!SetupDiOpenDeviceInfoW( set, device_instance_id, NULL, 0, &sp_device ))
+    {
+        ERR("Failed to open device, error %#x.\n", GetLastError());
+        SetupDiDestroyDeviceInfoList( set );
+        return GetLastError();
+    }
+
+    if (!SetupDiSetDevicePropertyW(set, &sp_device, property_key, type, data, size, 0))
+    {
+        ERR("Failed to set property, error %#x.\n", GetLastError());
+        SetupDiDestroyDeviceInfoList( set );
+        return GetLastError();
+    }
+
+    SetupDiDestroyDeviceInfoList( set );
+
+    return STATUS_SUCCESS;
+}
+
+/***********************************************************************
  *           IoRegisterDeviceInterface (NTOSKRNL.EXE.@)
  */
 NTSTATUS WINAPI IoRegisterDeviceInterface(DEVICE_OBJECT *device, const GUID *class_guid,
