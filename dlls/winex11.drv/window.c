@@ -2660,6 +2660,7 @@ BOOL CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
             XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
         if(data->client_window)
             XMoveResizeWindow(gdi_display, data->client_window, 0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top);
+        EnumChildWindows( hwnd, fs_hack_update_child_window_client_surface, TRUE );
     }else if(data->fs_hack && (!fs_hack_enabled(monitor) ||
             !fs_hack_matches_current_mode(monitor,
                 window_rect->right - window_rect->left,
@@ -2678,6 +2679,7 @@ BOOL CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
                     data->client_rect.right - data->client_rect.left,
                     data->client_rect.bottom - data->client_rect.top);
         }
+        EnumChildWindows( hwnd, fs_hack_update_child_window_client_surface, FALSE );
     }
 
     /* check if we need to switch the window to managed */
