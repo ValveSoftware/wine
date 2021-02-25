@@ -11,6 +11,7 @@ C_SRCS = \
 	desktop.c \
 	display.c \
 	event.c \
+	fs.c \
 	graphics.c \
 	ime.c \
 	init.c \
