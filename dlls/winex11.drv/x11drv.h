@@ -404,6 +404,7 @@ extern BOOL private_color_map DECLSPEC_HIDDEN;
 extern int primary_monitor DECLSPEC_HIDDEN;
 extern int copy_default_colors DECLSPEC_HIDDEN;
 extern int alloc_system_colors DECLSPEC_HIDDEN;
+extern int limit_number_of_resolutions DECLSPEC_HIDDEN;
 extern int xrender_error_base DECLSPEC_HIDDEN;
 extern HMODULE x11drv_module DECLSPEC_HIDDEN;
 extern char *process_name DECLSPEC_HIDDEN;
@@ -578,6 +579,7 @@ struct x11drv_win_data
     BOOL        shaped : 1;     /* is window using a custom region shape? */
     BOOL        layered : 1;    /* is window layered and with valid attributes? */
     BOOL        use_alpha : 1;  /* does window use an alpha channel? */
+    BOOL        fs_hack : 1;
     int         wm_state;       /* current value of the WM_STATE property */
     DWORD       net_wm_state;   /* bit mask of active x11drv_net_wm_state values */
     Window      embedder;       /* window id of embedder */
@@ -613,6 +615,25 @@ extern HWND create_foreign_window( Display *display, Window window ) DECLSPEC_HI
 extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
 extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
 extern BOOL wm_is_steamcompmgr(Display *) DECLSPEC_HIDDEN;
+
+extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_enabled(HMONITOR monitor) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_mapping_required(HMONITOR monitor) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_is_integer(void) DECLSPEC_HIDDEN;
+extern HMONITOR fs_hack_monitor_from_hwnd(HWND hwnd) DECLSPEC_HIDDEN;
+extern HMONITOR fs_hack_monitor_from_rect(const RECT *rect) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_matches_current_mode(HMONITOR monitor, INT width, INT height) DECLSPEC_HIDDEN;
+extern RECT fs_hack_current_mode(HMONITOR monitor) DECLSPEC_HIDDEN;
+extern RECT fs_hack_real_mode(HMONITOR monitor) DECLSPEC_HIDDEN;
+extern void fs_hack_point_user_to_real(POINT *pos) DECLSPEC_HIDDEN;
+extern void fs_hack_point_real_to_user(POINT *pos) DECLSPEC_HIDDEN;
+extern void fs_hack_rect_user_to_real(RECT *rect) DECLSPEC_HIDDEN;
+extern void fs_hack_rgndata_user_to_real(RGNDATA *data) DECLSPEC_HIDDEN;
+extern double fs_hack_get_user_to_real_scale(HMONITOR) DECLSPEC_HIDDEN;
+extern SIZE fs_hack_get_scaled_screen_size(HMONITOR monitor) DECLSPEC_HIDDEN;
+extern RECT fs_hack_get_real_virtual_screen(void) DECLSPEC_HIDDEN;
+extern void fs_hack_init(void) DECLSPEC_HIDDEN;
+extern int mode_compare(const void *p1, const void *p2) DECLSPEC_HIDDEN;
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
@@ -662,6 +683,16 @@ extern void xinerama_init( unsigned int width, unsigned int height ) DECLSPEC_HI
 #define DEPTH_COUNT 3
 extern const unsigned int *depths DECLSPEC_HIDDEN;
 
+struct x11drv_display_setting
+{
+    ULONG_PTR id;
+    BOOL placed;
+    RECT new_rect;
+    RECT old_rect;
+    RECT desired_rect;
+    DEVMODEW desired_mode;
+};
+
 /* Required functions for changing and enumerating display settings */
 struct x11drv_settings_handler
 {
@@ -705,9 +736,14 @@ struct x11drv_settings_handler
      *
      * Return DISP_CHANGE_*, same as ChangeDisplaySettingsExW() return values */
     LONG (*set_current_mode)(ULONG_PTR id, DEVMODEW *mode);
+
+    /* convert_coordinates() will be called to convert virtual screen coordinates to driver specific coordinates.
+     * This function is optional and can be NULL if driver don't need to convert coordinates */
+    void (*convert_coordinates)(struct x11drv_display_setting *displays, UINT display_count);
 };
 
 extern void X11DRV_Settings_SetHandler(const struct x11drv_settings_handler *handler) DECLSPEC_HIDDEN;
+extern struct x11drv_settings_handler X11DRV_Settings_GetHandler(void) DECLSPEC_HIDDEN;
 
 extern void X11DRV_init_desktop( Window win, unsigned int width, unsigned int height ) DECLSPEC_HIDDEN;
 extern void X11DRV_resize_desktop(BOOL) DECLSPEC_HIDDEN;
@@ -806,6 +842,7 @@ extern HANDLE get_display_device_init_mutex(void) DECLSPEC_HIDDEN;
 extern BOOL get_host_primary_gpu(struct x11drv_gpu *gpu) DECLSPEC_HIDDEN;
 extern void release_display_device_init_mutex(HANDLE) DECLSPEC_HIDDEN;
 extern void X11DRV_DisplayDevices_SetHandler(const struct x11drv_display_device_handler *handler) DECLSPEC_HIDDEN;
+extern struct x11drv_display_device_handler X11DRV_DisplayDevices_GetHandler(void) DECLSPEC_HIDDEN;
 extern void X11DRV_DisplayDevices_Init(BOOL force) DECLSPEC_HIDDEN;
 extern void X11DRV_DisplayDevices_RegisterEventHandlers(void) DECLSPEC_HIDDEN;
 extern void X11DRV_DisplayDevices_Update(BOOL) DECLSPEC_HIDDEN;
