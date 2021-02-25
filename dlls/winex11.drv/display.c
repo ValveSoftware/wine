@@ -308,6 +308,44 @@ void X11DRV_DisplayDevices_RegisterEventHandlers(void)
         handler->register_event_handlers();
 }
 
+BOOL CALLBACK fs_hack_update_child_window_client_surface(HWND hwnd, LPARAM enable_fs_hack)
+{
+    struct x11drv_win_data *data;
+    RECT client_rect;
+
+    if (!(data = get_win_data( hwnd )))
+        return TRUE;
+
+    if (enable_fs_hack && data->client_window)
+    {
+        client_rect = data->client_rect;
+        ClientToScreen( hwnd, (POINT *)&client_rect.left );
+        ClientToScreen( hwnd, (POINT *)&client_rect.right );
+        fs_hack_rect_user_to_real( &client_rect );
+
+        FIXME( "Enabling child fshack, resizing window %p to %s.\n", hwnd, wine_dbgstr_rect( &client_rect ) );
+        XMoveResizeWindow( gdi_display, data->client_window,
+                           client_rect.left, client_rect.top,
+                           client_rect.right - client_rect.left,
+                           client_rect.bottom - client_rect.top );
+        data->fs_hack = TRUE;
+    }
+    else if (!enable_fs_hack && data->client_window)
+    {
+        FIXME( "Disabling child fshack, restoring window %p.\n", hwnd );
+        XMoveResizeWindow( gdi_display, data->client_window,
+                           data->client_rect.left - data->whole_rect.left,
+                           data->client_rect.top - data->whole_rect.top,
+                           data->client_rect.right - data->client_rect.left,
+                           data->client_rect.bottom - data->client_rect.top );
+        data->fs_hack = FALSE;
+    }
+
+    if (data->client_window) sync_gl_drawable( hwnd, TRUE );
+    release_win_data( data );
+    return TRUE;
+}
+
 static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
 {
     struct x11drv_win_data *data;
@@ -342,6 +380,7 @@ static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
                 XMoveResizeWindow(gdi_display, data->client_window, 0, 0, width, height);
             sync_gl_drawable(hwnd, FALSE);
             update_net_wm_states( data );
+            EnumChildWindows( hwnd, fs_hack_update_child_window_client_surface, TRUE );
         }
     } else {
         /* update the full screen state */
@@ -373,6 +412,7 @@ static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
                         data->client_rect.bottom - data->client_rect.top);
             }
             sync_gl_drawable(hwnd, FALSE);
+            EnumChildWindows( hwnd, fs_hack_update_child_window_client_surface, FALSE );
         }
     }
     release_win_data(data);
