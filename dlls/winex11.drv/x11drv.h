@@ -637,6 +637,7 @@ extern SIZE fs_hack_get_scaled_screen_size(HMONITOR monitor) DECLSPEC_HIDDEN;
 extern RECT fs_hack_get_real_virtual_screen(void) DECLSPEC_HIDDEN;
 extern void fs_hack_init(void) DECLSPEC_HIDDEN;
 extern int mode_compare(const void *p1, const void *p2) DECLSPEC_HIDDEN;
+BOOL CALLBACK fs_hack_update_child_window_client_surface(HWND hwnd, LPARAM enable_fs_hack) DECLSPEC_HIDDEN;
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
