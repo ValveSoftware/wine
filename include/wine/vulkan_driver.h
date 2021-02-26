@@ -51,6 +51,10 @@ struct vulkan_funcs
      * will contain the area to blit the user image to in real coordinates.
      * All parameters are optional. */
     VkBool32 (*query_fs_hack)(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit, VkFilter *filter);
+    VkResult (*create_vk_instance_with_callback)(const VkInstanceCreateInfo *create_info,
+            const VkAllocationCallbacks *allocator, VkInstance *instance,
+            VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,
+            VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context);
 };
 
 extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver(HDC hdc, UINT version);

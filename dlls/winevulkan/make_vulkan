@@ -2664,6 +2664,12 @@ class VkGenerator(object):
         f.write("     * will contain the area to blit the user image to in real coordinates.\n")
         f.write("     * All parameters are optional. */\n")
         f.write("    VkBool32 (*query_fs_hack)(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit, VkFilter *filter);\n")
+
+        f.write("    VkResult (*create_vk_instance_with_callback)(const VkInstanceCreateInfo *create_info,\n")
+        f.write("            const VkAllocationCallbacks *allocator, VkInstance *instance,\n")
+        f.write("            VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,\n")
+        f.write("            VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context);\n")
+
         f.write("};\n\n")
 
         f.write("extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver(HDC hdc, UINT version);\n\n")
@@ -2709,6 +2715,8 @@ class VkGenerator(object):
         f.write("@ stdcall __wine_get_native_VkPhysicalDevice(ptr)\n")
         f.write("@ stdcall __wine_get_wrapped_VkPhysicalDevice(ptr)\n")
         f.write("@ stdcall __wine_get_native_VkQueue(ptr)\n")
+        f.write("@ stdcall __wine_create_vk_instance_with_callback(ptr ptr ptr ptr ptr)\n")
+        f.write("@ stdcall __wine_create_vk_device_with_callback(ptr ptr ptr ptr ptr ptr)\n")
 
         # Export symbols for all Vulkan Core functions.
         for func in self.registry.funcs.values():
