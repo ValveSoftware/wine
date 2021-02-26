@@ -106,6 +106,82 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 static CRITICAL_SECTION win_data_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
 
+static int detect_wm(Display *dpy)
+{
+    Display *display = dpy ? dpy : thread_init_display(); /* DefaultRootWindow is a macro... */
+    Window root = DefaultRootWindow(display), *wm_check;
+    Atom type;
+    int format;
+    unsigned long count, remaining;
+    char *wm_name;
+
+    static int cached = -1;
+
+    if(cached < 0){
+
+        if (XGetWindowProperty( display, root, x11drv_atom(_NET_SUPPORTING_WM_CHECK), 0,
+                                 sizeof(*wm_check)/sizeof(CARD32), False, x11drv_atom(WINDOW),
+                                 &type, &format, &count, &remaining, (unsigned char **)&wm_check ) == Success){
+            if (type == x11drv_atom(WINDOW)){
+                if(XGetWindowProperty( display, *wm_check, x11drv_atom(_NET_WM_NAME), 0,
+                            256/sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
+                            &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success &&
+                        type == x11drv_atom(UTF8_STRING)){
+                    /* noop */
+                }else if(XGetWindowProperty( display, *wm_check, x11drv_atom(WM_NAME), 0,
+                            256/sizeof(CARD32), False, x11drv_atom(STRING),
+                            &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success &&
+                        type == x11drv_atom(STRING)){
+                    /* noop */
+                }else
+                    wm_name = NULL;
+
+                if(wm_name){
+                    TRACE("Got WM name %s\n", wm_name);
+
+                    if((strcmp(wm_name, "GNOME Shell") == 0) ||
+                            (strcmp(wm_name, "Mutter") == 0))
+                        cached = WINE_WM_X11_MUTTER;
+                    else if(strcmp(wm_name, "steamcompmgr") == 0)
+                        cached = WINE_WM_X11_STEAMCOMPMGR;
+                    else if(strcmp(wm_name, "KWin") == 0)
+                        cached = WINE_WM_X11_KDE;
+                    else
+                        cached = WINE_WM_UNKNOWN;
+
+                    XFree(wm_name);
+                }else{
+                    TRACE("WM did not set _NET_WM_NAME or WM_NAME\n");
+                    cached = WINE_WM_UNKNOWN;
+                }
+            }else
+                cached = WINE_WM_UNKNOWN;
+
+            XFree(wm_check);
+        }else
+            cached = WINE_WM_UNKNOWN;
+
+        __wine_set_window_manager(cached);
+    }
+
+    return cached;
+}
+
+BOOL wm_is_mutter(Display *display)
+{
+    return detect_wm(display) == WINE_WM_X11_MUTTER;
+}
+
+BOOL wm_is_kde(Display *display)
+{
+    return detect_wm(display) == WINE_WM_X11_KDE;
+}
+
+BOOL wm_is_steamcompmgr(Display *display)
+{
+    return detect_wm(display) == WINE_WM_X11_STEAMCOMPMGR;
+}
+
 /***********************************************************************
  * http://standards.freedesktop.org/startup-notification-spec
  */
@@ -1842,6 +1918,8 @@ BOOL create_desktop_win_data( Window win )
 BOOL CDECL X11DRV_CreateDesktopWindow( HWND hwnd )
 {
     unsigned int width, height;
+
+    detect_wm( gdi_display );
 
     /* retrieve the real size of the desktop */
     SERVER_START_REQ( get_window_rectangles )

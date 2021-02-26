@@ -462,6 +462,7 @@ enum x11drv_atoms
     XATOM_TEXT,
     XATOM_TIMESTAMP,
     XATOM_UTF8_STRING,
+    XATOM_STRING,
     XATOM_RAW_ASCENT,
     XATOM_RAW_DESCENT,
     XATOM_RAW_CAP_HEIGHT,
@@ -469,6 +470,7 @@ enum x11drv_atoms
     XATOM_Rel_Y,
     XATOM_WM_PROTOCOLS,
     XATOM_WM_DELETE_WINDOW,
+    XATOM_WM_NAME,
     XATOM_WM_STATE,
     XATOM_WM_TAKE_FOCUS,
     XATOM_DndProtocol,
@@ -478,6 +480,7 @@ enum x11drv_atoms
     XATOM__NET_STARTUP_INFO_BEGIN,
     XATOM__NET_STARTUP_INFO,
     XATOM__NET_SUPPORTED,
+    XATOM__NET_SUPPORTING_WM_CHECK,
     XATOM__NET_SYSTEM_TRAY_OPCODE,
     XATOM__NET_SYSTEM_TRAY_S0,
     XATOM__NET_SYSTEM_TRAY_VISUAL,
@@ -528,6 +531,7 @@ enum x11drv_atoms
     XATOM_WCF_SYLK,
     XATOM_WCF_TIFF,
     XATOM_WCF_WAVE,
+    XATOM_WINDOW,
     XATOM_image_bmp,
     XATOM_image_gif,
     XATOM_image_jpeg,
@@ -654,6 +658,8 @@ extern void change_systray_owner( Display *display, Window systray_window ) DECL
 extern void update_systray_balloon_position(void) DECLSPEC_HIDDEN;
 extern HWND create_foreign_window( Display *display, Window window ) DECLSPEC_HIDDEN;
 extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
+extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
+extern BOOL wm_is_steamcompmgr(Display *) DECLSPEC_HIDDEN;
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
