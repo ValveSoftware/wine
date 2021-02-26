@@ -854,7 +854,7 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
     }
 
     monitor = fs_hack_monitor_from_hwnd(hwnd);
-    if(fs_hack_enabled(monitor)){
+    if(fs_hack_enabled(monitor) && !x11_surface->offscreen){
         RECT real_rect = fs_hack_real_mode(monitor);
         RECT user_rect = fs_hack_current_mode(monitor);
         SIZE scaled = fs_hack_get_scaled_screen_size(monitor);
@@ -884,6 +884,38 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
             dst_blit->offset.y = scaled_origin.y;
             dst_blit->extent.width = scaled.cx;
             dst_blit->extent.height = scaled.cy;
+        }
+
+        if (filter)
+            *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
+
+        return VK_TRUE;
+    }
+    else if (fs_hack_enabled(monitor))
+    {
+        double scale = fs_hack_get_user_to_real_scale( monitor );
+        RECT client_rect;
+
+        GetClientRect( hwnd, &client_rect );
+
+        if (real_sz)
+        {
+            real_sz->width = (client_rect.right - client_rect.left) * scale;
+            real_sz->height = (client_rect.bottom - client_rect.top) * scale;
+        }
+
+        if (user_sz)
+        {
+            user_sz->width = client_rect.right - client_rect.left;
+            user_sz->height = client_rect.bottom - client_rect.top;
+        }
+
+        if (dst_blit)
+        {
+            dst_blit->offset.x = client_rect.left * scale;
+            dst_blit->offset.y = client_rect.top * scale;
+            dst_blit->extent.width = (client_rect.right - client_rect.left) * scale;
+            dst_blit->extent.height = (client_rect.bottom - client_rect.top) * scale;
         }
 
         if(filter)
