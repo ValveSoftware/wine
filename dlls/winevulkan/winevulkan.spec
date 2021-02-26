@@ -16,6 +16,8 @@
 @ stdcall __wine_get_native_VkPhysicalDevice(ptr)
 @ stdcall __wine_get_wrapped_VkPhysicalDevice(ptr)
 @ stdcall __wine_get_native_VkQueue(ptr)
+@ stdcall __wine_create_vk_instance_with_callback(ptr ptr ptr ptr ptr)
+@ stdcall __wine_create_vk_device_with_callback(ptr ptr ptr ptr ptr ptr)
 @ stdcall -private wine_vkAcquireNextImage2KHR(ptr ptr ptr)
 @ stdcall -private wine_vkAcquireNextImageKHR(ptr int64 int64 int64 int64 ptr)
 @ stdcall -private wine_vkAllocateCommandBuffers(ptr ptr ptr)
