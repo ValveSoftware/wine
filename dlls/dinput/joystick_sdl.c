@@ -62,6 +62,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 #define PID_SONY_DUALSHOCK_4 0x05c4
 #define PID_SONY_DUALSHOCK_4_2 0x09cc
 #define PID_SONY_DUALSHOCK_4_DONGLE 0x0ba0
+#define PID_SONY_DUALSENSE 0x0ce6
 
 #define VID_VALVE 0x28de
 #define PID_VALVE_VIRTUAL_CONTROLLER 0x11ff
@@ -395,6 +396,10 @@ static struct device_info_override {
         DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
         DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
 
+    { VID_SONY, PID_SONY_DUALSENSE, "Wireless Controller", "Wireless Controller",
+        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
+        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
+
     { VID_MICROSOFT, PID_MICROSOFT_XBOX_360, "Controller (XBOX 360 For Windows)", "Controller (XBOX 360 For Windows)",
         DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
         DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
@@ -587,73 +592,45 @@ static int buttons_to_sdl_hat(int u, int r, int d, int l)
     return SDL_HAT_RIGHTDOWN;
 }
 
-/* playstation controllers */
-static BOOL enum_device_state_ds4_16button(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
-{
 #define SPECIALCASE_HAT -1
 #define SPECIALCASE_L2_BUTTON -2
 #define SPECIALCASE_R2_BUTTON -3
 
-    static const struct {
-        int type;
-        int sdl_idx;
-        int dnp_id;
-    } map_ds4_16button[] = {
-        { ITEM_TYPE_AXIS, 3, 5 }, /* R2 */
-        { ITEM_TYPE_AXIS, 2, 2 }, /* L2 */
-        { ITEM_TYPE_AXIS, 1, 1 }, /* left vert */
-        { ITEM_TYPE_AXIS, 0, 0 }, /* left horiz */
+struct enum_map
+{
+    int type;
+    int sdl_idx;
+    int dnp_id;
+};
 
-        { ITEM_TYPE_HAT, SPECIALCASE_HAT, 0 }, /* d-pad */
-
-        { ITEM_TYPE_BUTTON, 2, 0}, /* square */
-        { ITEM_TYPE_BUTTON, 0, 1}, /* cross */
-        { ITEM_TYPE_BUTTON, 1, 2}, /* circle */
-        { ITEM_TYPE_BUTTON, 3, 3}, /* triangle */
-
-        { ITEM_TYPE_BUTTON, 9, 4}, /* L1 */
-        { ITEM_TYPE_BUTTON, 10, 5}, /* R1 */
-        { ITEM_TYPE_BUTTON, SPECIALCASE_L2_BUTTON, 6}, /* L2 button */
-        { ITEM_TYPE_BUTTON, SPECIALCASE_R2_BUTTON, 7}, /* R2 button */
-        { ITEM_TYPE_BUTTON, 4, 8}, /* share */
-        { ITEM_TYPE_BUTTON, 6, 9}, /* options */
-
-        { ITEM_TYPE_BUTTON, 7, 10}, /* guide */
-        { ITEM_TYPE_BUTTON, 8, 11}, /* L3 */
-        { ITEM_TYPE_BUTTON, 5, 12}, /* R3 */
-
-        { ITEM_TYPE_BUTTON, 15, 13}, /* touchpad button */
-
-        { ITEM_TYPE_AXIS, 5, 4 }, /* right vert */
-        { ITEM_TYPE_AXIS, 4, 3 }, /* right horiz */
-    };
-
-    if(idx >= ARRAY_SIZE(map_ds4_16button))
+static BOOL enum_device_state_sony(const struct enum_map *enum_map, int map_size, SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
+{
+    if(idx >= map_size)
         return FALSE;
 
-    st->type = map_ds4_16button[idx].type;
-    st->id = map_ds4_16button[idx].dnp_id;
+    st->type = enum_map[idx].type;
+    st->id = enum_map[idx].dnp_id;
 
-    if(map_ds4_16button[idx].sdl_idx >= 0)
+    if(enum_map[idx].sdl_idx >= 0)
     {
         /* simple reads */
-        switch(map_ds4_16button[idx].type)
+        switch(enum_map[idx].type)
         {
         case ITEM_TYPE_BUTTON:
-            st->val = SDL_JoystickGetButton(js, map_ds4_16button[idx].sdl_idx);
+            st->val = SDL_JoystickGetButton(js, enum_map[idx].sdl_idx);
             return TRUE;
 
         case ITEM_TYPE_AXIS:
-            st->val = SDL_JoystickGetAxis(js, map_ds4_16button[idx].sdl_idx);
+            st->val = SDL_JoystickGetAxis(js, enum_map[idx].sdl_idx);
             return TRUE;
 
         case ITEM_TYPE_HAT:
-            st->val = SDL_JoystickGetHat(js, map_ds4_16button[idx].sdl_idx);
+            st->val = SDL_JoystickGetHat(js, enum_map[idx].sdl_idx);
             return TRUE;
         }
     }
 
-    switch(map_ds4_16button[idx].sdl_idx){
+    switch(enum_map[idx].sdl_idx){
     case SPECIALCASE_HAT:
     {
         /* d-pad */
@@ -691,10 +668,85 @@ static BOOL enum_device_state_ds4_16button(SDL_Joystick *js, JoystickImpl *This,
     ERR("???\n"); /* error in static data above */
     return FALSE;
 
+}
+
+/* playstation controllers */
+static BOOL enum_device_state_ds4_16button(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
+{
+
+    static const struct enum_map map_ds4_16button[] = {
+        { ITEM_TYPE_AXIS, 3, 5 }, /* R2 */
+        { ITEM_TYPE_AXIS, 2, 2 }, /* L2 */
+        { ITEM_TYPE_AXIS, 1, 1 }, /* left vert */
+        { ITEM_TYPE_AXIS, 0, 0 }, /* left horiz */
+
+        { ITEM_TYPE_HAT, SPECIALCASE_HAT, 0 }, /* d-pad */
+
+        { ITEM_TYPE_BUTTON, 2, 0}, /* square */
+        { ITEM_TYPE_BUTTON, 0, 1}, /* cross */
+        { ITEM_TYPE_BUTTON, 1, 2}, /* circle */
+        { ITEM_TYPE_BUTTON, 3, 3}, /* triangle */
+
+        { ITEM_TYPE_BUTTON, 9, 4}, /* L1 */
+        { ITEM_TYPE_BUTTON, 10, 5}, /* R1 */
+        { ITEM_TYPE_BUTTON, SPECIALCASE_L2_BUTTON, 6}, /* L2 button */
+        { ITEM_TYPE_BUTTON, SPECIALCASE_R2_BUTTON, 7}, /* R2 button */
+        { ITEM_TYPE_BUTTON, 4, 8}, /* share */
+        { ITEM_TYPE_BUTTON, 6, 9}, /* options */
+
+        { ITEM_TYPE_BUTTON, 7, 10}, /* guide */
+        { ITEM_TYPE_BUTTON, 8, 11}, /* L3 */
+        { ITEM_TYPE_BUTTON, 5, 12}, /* R3 */
+
+        { ITEM_TYPE_BUTTON, 15, 13}, /* touchpad button */
+
+        { ITEM_TYPE_AXIS, 5, 4 }, /* right vert */
+        { ITEM_TYPE_AXIS, 4, 3 }, /* right horiz */
+    };
+
+    return enum_device_state_sony(map_ds4_16button, ARRAY_SIZE(map_ds4_16button), js, This, st, idx);
+}
+
+static BOOL enum_device_state_dualsense(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
+{
+
+    static const struct enum_map map_dualsense[] = {
+        { ITEM_TYPE_AXIS, 3, 5 }, /* R2 */
+        { ITEM_TYPE_AXIS, 2, 2 }, /* L2 */
+        { ITEM_TYPE_AXIS, 1, 1 }, /* left vert */
+        { ITEM_TYPE_AXIS, 0, 0 }, /* left horiz */
+
+        { ITEM_TYPE_HAT, SPECIALCASE_HAT, 0 }, /* d-pad */
+
+        { ITEM_TYPE_BUTTON, 2, 0}, /* square */
+        { ITEM_TYPE_BUTTON, 0, 1}, /* cross */
+        { ITEM_TYPE_BUTTON, 1, 2}, /* circle */
+        { ITEM_TYPE_BUTTON, 3, 3}, /* triangle */
+
+        { ITEM_TYPE_BUTTON, 9, 4}, /* L1 */
+        { ITEM_TYPE_BUTTON, 10, 5}, /* R1 */
+        { ITEM_TYPE_BUTTON, SPECIALCASE_L2_BUTTON, 6}, /* L2 button */
+        { ITEM_TYPE_BUTTON, SPECIALCASE_R2_BUTTON, 7}, /* R2 button */
+        { ITEM_TYPE_BUTTON, 4, 8}, /* share */
+        { ITEM_TYPE_BUTTON, 6, 9}, /* options */
+
+        { ITEM_TYPE_BUTTON, 7, 10}, /* guide */
+        { ITEM_TYPE_BUTTON, 8, 11}, /* L3 */
+        { ITEM_TYPE_BUTTON, 5, 12}, /* R3 */
+
+        { ITEM_TYPE_BUTTON, 16, 13}, /* touchpad button */
+        { ITEM_TYPE_BUTTON, 15, 14}, /* mic mute button */
+
+        { ITEM_TYPE_AXIS, 5, 4 }, /* right vert */
+        { ITEM_TYPE_AXIS, 4, 3 }, /* right horiz */
+    };
+
+    return enum_device_state_sony(map_dualsense, ARRAY_SIZE(map_dualsense), js, This, st, idx);
+}
+
 #undef SPECIALCASE_HAT
 #undef SPECIALCASE_L2_BUTTON
 #undef SPECIALCASE_R2_BUTTON
-}
 
 static BOOL enum_device_state_ds4_13button(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
 {
@@ -1007,6 +1059,8 @@ static enum_device_state_function select_enum_function(struct SDLDev *sdldev)
                     sdldev->n_buttons);
             return enum_device_state_ds4_13button;
         }
+        case PID_SONY_DUALSENSE:
+                return enum_device_state_dualsense;
         break;
 
     case VID_MICROSOFT:
