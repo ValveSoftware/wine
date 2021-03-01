@@ -79,3 +79,10 @@ BOOL APIENTRY MprAdminIsServiceRunning(LPWSTR server)
 
     return FALSE;
 }
+
+DWORD APIENTRY MprConfigServerConnect(LPWSTR server_name, HANDLE *hmprconfig)
+{
+    FIXME("server_name %s, hmprconfig %p.\n", debugstr_w(server_name), hmprconfig);
+
+    return ERROR_NOT_ENOUGH_MEMORY;
+}
