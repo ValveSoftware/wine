@@ -3258,7 +3258,7 @@ DECL_HANDLER(get_key_state)
             desktop->shared->keystate[req->key & 0xff] &= ~0x40;
             SHARED_WRITE_END( &desktop->shared->seq );
         }
-        set_reply_data( (void *)desktop->shared->keystate, size );
+        else set_reply_data( (void *)desktop->shared->keystate, size );
         release_object( desktop );
     }
     else if (!input)
@@ -3269,7 +3269,7 @@ DECL_HANDLER(get_key_state)
     else
     {
         if (req->key >= 0) reply->state = input->keystate[req->key & 0xff];
-        set_reply_data( input->keystate, size );
+        else set_reply_data( current->queue->input->keystate, size );
 
         if (!(desktop = get_thread_desktop( current, 0 ))) return;
         if (desktop->foreground_input != input &&
