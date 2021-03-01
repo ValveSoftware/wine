@@ -106,7 +106,6 @@ struct thread_input
     int                    caret_hide;    /* caret hide count */
     int                    caret_state;   /* caret on/off state */
     struct list            msg_list;      /* list of hardware messages */
-    unsigned char          keystate[256]; /* state of each key */
     struct object         *shared_mapping; /* thread input shared memory mapping */
     volatile struct input_shared_memory *shared;  /* thread input shared memory ptr */
 };
@@ -313,10 +312,10 @@ static struct thread_input *create_thread_input( struct thread *thread )
         input->shared->move_size    = 0;
         input->shared->cursor       = 0;
         input->shared->cursor_count = 0;
+        memset( (void *)input->shared->keystate, 0, sizeof(input->shared->keystate) );
         SHARED_WRITE_END( &input->shared->seq );
         list_init( &input->msg_list );
         set_caret_window( input, 0 );
-        memset( input->keystate, 0, sizeof(input->keystate) );
 
         if (!(input->desktop = get_thread_desktop( thread, 0 /* FIXME: access rights */ )))
         {
@@ -1268,7 +1267,12 @@ int attach_thread_input( struct thread *thread_from, struct thread *thread_to )
     }
 
     ret = assign_thread_input( thread_from, input );
-    if (ret) memset( input->keystate, 0, sizeof(input->keystate) );
+    if (ret)
+    {
+        SHARED_WRITE_BEGIN( &input->shared->seq );
+        memset( (void *)input->shared->keystate, 0, sizeof(input->shared->keystate) );
+        SHARED_WRITE_END( &input->shared->seq );
+    }
     release_object( input );
     return ret;
 }
@@ -1511,7 +1515,9 @@ static void update_key_state( volatile unsigned char *keystate, unsigned int msg
 
 static void update_input_key_state( struct thread_input *input, unsigned int msg, lparam_t wparam )
 {
-    update_key_state( input->keystate, msg, wparam, 0 );
+    SHARED_WRITE_BEGIN( &input->shared->seq );
+    update_key_state( input->shared->keystate, msg, wparam, 0 );
+    SHARED_WRITE_END( &input->shared->seq );
 }
 
 static void update_desktop_key_state( struct desktop *desktop, unsigned int msg, lparam_t wparam )
@@ -3268,8 +3274,8 @@ DECL_HANDLER(get_key_state)
     }
     else
     {
-        if (req->key >= 0) reply->state = input->keystate[req->key & 0xff];
-        else set_reply_data( current->queue->input->keystate, size );
+        if (req->key >= 0) reply->state = input->shared->keystate[req->key & 0xff];
+        else set_reply_data( (void *)input->shared->keystate, size );
 
         if (!(desktop = get_thread_desktop( current, 0 ))) return;
         if (desktop->foreground_input != input &&
@@ -3277,7 +3283,9 @@ DECL_HANDLER(get_key_state)
             foreground->process == current->process)
         {
             reply->state = desktop->shared->keystate[req->key & 0xff];
-            memcpy( input->keystate, desktop->shared->keystate, 256 );
+            SHARED_WRITE_BEGIN( &input->shared->seq );
+            memcpy( (void *)input->shared->keystate, (const void *)desktop->shared->keystate, 256 );
+            SHARED_WRITE_END( &input->shared->seq );
         }
 
         if (foreground) release_object( foreground );
@@ -3293,7 +3301,12 @@ DECL_HANDLER(set_key_state)
     struct desktop *desktop;
     data_size_t size = min( 256, get_req_data_size() );
 
-    if (input) memcpy( input->keystate, get_req_data(), size );
+    if (input)
+    {
+        SHARED_WRITE_BEGIN( &input->shared->seq );
+        memcpy( (void *)input->shared->keystate, get_req_data(), size );
+        SHARED_WRITE_END( &input->shared->seq );
+    }
     if (req->async && (desktop = get_thread_desktop( current, 0 )))
     {
         SHARED_WRITE_BEGIN( &desktop->shared->seq );
