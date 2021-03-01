@@ -814,7 +814,6 @@ SHORT WINAPI NtUserGetAsyncKeyState( INT key )
 {
     const desktop_shm_t *shared = get_desktop_shared_memory();
     BYTE state;
-    SHORT ret;
 
     if (key < 0 || key >= 256 || !shared) return 0;
 
@@ -826,23 +825,7 @@ SHORT WINAPI NtUserGetAsyncKeyState( INT key )
     }
     SHARED_READ_END
 
-    if (!(state & 0x40)) return (state & 0x80) << 8;
-
-    /* Need to make a server call to reset the last pressed bit */
-    ret = 0;
-    SERVER_START_REQ( get_key_state )
-    {
-        req->async = 1;
-        req->key = key;
-        if (!wine_server_call( req ))
-        {
-            if (reply->state & 0x40) ret |= 0x0001;
-            if (reply->state & 0x80) ret |= 0x8000;
-        }
-    }
-    SERVER_END_REQ;
-
-    return ret;
+    return (state & 0x80) << 8;
 }
 
 /***********************************************************************
