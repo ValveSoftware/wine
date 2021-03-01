@@ -523,10 +523,21 @@ SHORT WINAPI DECLSPEC_HOTPATCH GetKeyState(INT vkey)
  */
 BOOL WINAPI DECLSPEC_HOTPATCH GetKeyboardState( LPBYTE state )
 {
-    BOOL ret;
+    volatile struct input_shared_memory *shared = get_input_shared_memory();
+    BOOL ret, skip = TRUE;
     UINT i;
 
     TRACE("(%p)\n", state);
+
+    if (!shared) skip = FALSE;
+    else SHARED_READ_BEGIN( &shared->seq )
+    {
+        if (!shared->created) skip = FALSE; /* server needs to create the queue */
+        else memcpy( state, (const void *)shared->keystate, 256 );
+    }
+    SHARED_READ_END( &shared->seq );
+
+    if (skip) return TRUE;
 
     memset( state, 0, 256 );
     SERVER_START_REQ( get_key_state )
