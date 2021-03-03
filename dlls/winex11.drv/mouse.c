@@ -1484,22 +1484,7 @@ void x11drv_desktop_set_cursor_pos( INT x, INT y )
  */
 BOOL CDECL X11DRV_GetCursorPos(LPPOINT pos)
 {
-    Display *display = thread_init_display();
-    Window root, child;
-    int rootX, rootY, winX, winY;
-    unsigned int xstate;
-    BOOL ret;
-
-    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0) return FALSE;
-
-    ret = XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &winX, &winY, &xstate );
-    if (ret)
-    {
-        POINT old = *pos;
-        *pos = root_to_virtual_screen( winX, winY );
-        TRACE( "pointer at %s server pos %s\n", wine_dbgstr_point(pos), wine_dbgstr_point(&old) );
-    }
-    return ret;
+    return TRUE;
 }
 
 /***********************************************************************
