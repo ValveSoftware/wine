@@ -842,6 +842,7 @@ struct shared_cursor
     int                  y;
     unsigned int         last_change;
     rectangle_t          clip;
+    user_handle_t        handle;
 };
 
 struct desktop_shared_memory
@@ -6538,7 +6539,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 694
+#define SERVER_PROTOCOL_VERSION 695
 
 /* ### protocol_version end ### */
 
