@@ -1835,8 +1835,9 @@ HCURSOR WINAPI GetCursor(void)
  */
 BOOL WINAPI DECLSPEC_HOTPATCH ClipCursor( const RECT *rect )
 {
+    volatile struct desktop_shared_memory *shared = get_desktop_shared_memory();
     UINT dpi;
-    BOOL ret;
+    BOOL ret, need_request;
     RECT new_rect;
 
     TRACE( "Clipping to %s\n", wine_dbgstr_rect(rect) );
@@ -1851,6 +1852,18 @@ BOOL WINAPI DECLSPEC_HOTPATCH ClipCursor( const RECT *rect )
             rect = &new_rect;
         }
     }
+
+    if (!shared || !rect) need_request = TRUE;
+    else SHARED_READ_BEGIN( &shared->seq )
+    {
+        need_request = rect->left != shared->cursor.clip.left ||
+                       rect->top != shared->cursor.clip.top ||
+                       rect->right != shared->cursor.clip.right ||
+                       rect->bottom != shared->cursor.clip.bottom;
+    }
+    SHARED_READ_END( &shared->seq );
+
+    if (!need_request) return TRUE;
 
     SERVER_START_REQ( set_cursor )
     {
