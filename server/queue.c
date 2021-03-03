@@ -478,7 +478,7 @@ static int update_desktop_cursor_pos( struct desktop *desktop, user_handle_t win
 
     if (win != desktop->cursor_win)
     {
-        post_desktop_message( desktop, desktop->cursor_change_msg, win, desktop->cursor_handle );
+        post_desktop_message( desktop, desktop->cursor_change_msg, win, desktop->shared->cursor.handle );
         updated = 1;
     }
     desktop->cursor_win = win;
@@ -488,9 +488,12 @@ static int update_desktop_cursor_pos( struct desktop *desktop, user_handle_t win
 
 static void update_desktop_cursor_handle( struct desktop *desktop, user_handle_t handle )
 {
-    if (desktop->cursor_change_msg && desktop->cursor_handle != handle)
+    if (desktop->cursor_change_msg && desktop->shared->cursor.handle != handle)
         post_desktop_message( desktop, desktop->cursor_change_msg, desktop->cursor_win, handle );
-    desktop->cursor_handle = handle;
+
+    SHARED_WRITE_BEGIN( &desktop->shared->seq );
+    desktop->shared->cursor.handle = handle;
+    SHARED_WRITE_END( &desktop->shared->seq );
 }
 
 /* set the cursor position and queue the corresponding mouse message */

@@ -1740,31 +1740,49 @@ BOOL WINAPI DrawIcon( HDC hdc, INT x, INT y, HICON hIcon )
  */
 HCURSOR WINAPI DECLSPEC_HOTPATCH SetCursor( HCURSOR hCursor /* [in] Handle of cursor to show */ )
 {
+    volatile struct desktop_shared_memory *desktop = get_desktop_shared_memory();
+    volatile struct input_shared_memory *shared = get_input_shared_memory();
     struct cursoricon_object *obj;
-    HCURSOR hOldCursor;
+    HCURSOR old_cursor, new_cursor;
     int show_count;
-    BOOL ret;
+    BOOL ret, need_request;
 
     TRACE("%p\n", hCursor);
 
-    SERVER_START_REQ( set_cursor )
+    if (!shared || !desktop) return 0;
+
+    SHARED_READ_BEGIN( &shared->seq )
+    {
+        SHARED_READ_BEGIN( &desktop->seq )
+        {
+            old_cursor = wine_server_ptr_handle( shared->cursor );
+            show_count = shared->cursor_count;
+            new_cursor = show_count >= 0 ? hCursor : 0;
+            need_request = wine_server_ptr_handle( desktop->cursor.handle ) != new_cursor;
+        }
+        SHARED_READ_END( &desktop->seq );
+    }
+    SHARED_READ_END( &shared->seq );
+
+    if (!need_request) ret = TRUE;
+    else SERVER_START_REQ( set_cursor )
     {
         req->flags = SET_CURSOR_HANDLE;
         req->handle = wine_server_user_handle( hCursor );
         if ((ret = !wine_server_call_err( req )))
         {
-            hOldCursor = wine_server_ptr_handle( reply->prev_handle );
+            old_cursor = wine_server_ptr_handle( reply->prev_handle );
             show_count = reply->prev_count;
         }
     }
     SERVER_END_REQ;
 
     if (!ret) return 0;
-    USER_Driver->pSetCursor( show_count >= 0 ? hCursor : 0 );
+    USER_Driver->pSetCursor( new_cursor );
 
-    if (!(obj = get_icon_ptr( hOldCursor ))) return 0;
+    if (!(obj = get_icon_ptr( old_cursor ))) return 0;
     release_user_handle_ptr( obj );
-    return hOldCursor;
+    return old_cursor;
 }
 
 /***********************************************************************
