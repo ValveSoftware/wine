@@ -7547,6 +7547,37 @@ SOCKET WINAPI WSASocketW(int af, int type, int protocol,
         CloseHandle(handle);
         return INVALID_SOCKET;
     }
+
+    /*
+     * msvcmon spawns new server instances for each connection, which conflicts
+     * with previous instance (which is no longer listening, but client connection
+     * is still active). This is allowed on Windows, but Linux handles it differently.
+     */
+    if (af == WS_AF_INET || af == WS_AF_INET6)
+    {
+        static int once, msvsmon;
+        if (!once++) {
+            char name[MAX_PATH], *p;
+            GetModuleFileNameA(GetModuleHandleA(NULL), name, ARRAY_SIZE(name));
+            p = strrchr(name, '\\');
+            p = p ? p+1 : name;
+            if (!strcasecmp(p, "msvsmon.exe")) {
+                FIXME("Using REUSESOCKET hack.\n");
+                msvsmon = 1;
+            }
+        }
+        if (msvsmon)
+        {
+            int fd = get_sock_fd(ret, 0, NULL);
+            if (fd != -1)
+            {
+                const int enable = 1;
+                setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
+                release_sock_fd(ret, fd);
+            }
+        }
+    }
+
     return ret;
 
 done:
