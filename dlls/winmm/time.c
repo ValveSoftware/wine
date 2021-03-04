@@ -254,10 +254,11 @@ MMRESULT WINAPI timeGetSystemTime(LPMMTIME lpTime, UINT wSize)
  */
 DWORD WINAPI timeGetTime(void)
 {
-    LARGE_INTEGER now, freq;
+    static LARGE_INTEGER freq;
+    LARGE_INTEGER now;
 
+    if (!freq.QuadPart) QueryPerformanceFrequency(&freq);
     QueryPerformanceCounter(&now);
-    QueryPerformanceFrequency(&freq);
 
     return (now.QuadPart * 1000) / freq.QuadPart;
 }
