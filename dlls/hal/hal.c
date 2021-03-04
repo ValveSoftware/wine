@@ -193,6 +193,7 @@ ULONGLONG WINAPI KeQueryPerformanceCounter(LARGE_INTEGER *frequency)
 
     TRACE("(%p)\n", frequency);
 
-    NtQueryPerformanceCounter(&counter, frequency);
+    RtlQueryPerformanceFrequency(frequency);
+    RtlQueryPerformanceCounter(&counter);
     return counter.QuadPart;
 }
