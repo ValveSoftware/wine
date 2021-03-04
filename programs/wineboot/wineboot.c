@@ -82,6 +82,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(wineboot);
 
+#define TICKSPERSEC        10000000
+
 extern BOOL shutdown_close_windows( BOOL force );
 extern BOOL shutdown_all_desktops( BOOL force );
 extern void kill_processes( BOOL kill_desktop );
@@ -241,10 +243,26 @@ static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
     TRACE("XSAVE feature 2 %#x, %#x, %#x, %#x.\n", regs[0], regs[1], regs[2], regs[3]);
 }
 
+static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
+{
+    data->QpcBypassEnabled = 0;
+    data->QpcFrequency = TICKSPERSEC;
+    data->QpcShift = 0;
+    data->QpcBias = 0;
+}
+
 #else
 
 static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
 {
+}
+
+static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
+{
+    data->QpcBypassEnabled = 0;
+    data->QpcFrequency = TICKSPERSEC;
+    data->QpcShift = 0;
+    data->QpcBias = 0;
 }
 
 #endif
@@ -336,6 +354,7 @@ static void create_user_shared_data(void)
     data->ActiveGroupCount = 1;
 
     initialize_xstate_features( data );
+    initialize_qpc_features( data );
 
     UnmapViewOfFile( data );
 }
