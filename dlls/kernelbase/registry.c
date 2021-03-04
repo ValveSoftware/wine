@@ -1331,7 +1331,8 @@ static DWORD query_perf_data(const WCHAR *query, DWORD *type, void *data, DWORD 
     pdb->HeaderLength = sizeof(*pdb);
     pdb->NumObjectTypes = 0;
     pdb->DefaultObject = 0;
-    NtQueryPerformanceCounter( &pdb->PerfTime, &pdb->PerfFreq );
+    RtlQueryPerformanceFrequency( &pdb->PerfFreq );
+    RtlQueryPerformanceCounter( &pdb->PerfTime );
 
     data = pdb + 1;
     pdb->SystemNameOffset = sizeof(*pdb);
