@@ -39,6 +39,7 @@
 #include "wine/exception.h"
 #include "wine/debug.h"
 #include "ntdll_misc.h"
+#include "intrin.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ntdll);
 
@@ -380,6 +381,26 @@ LONGLONG WINAPI RtlGetSystemTimePrecise( void )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceCounter( LARGE_INTEGER *counter )
 {
+    if (user_shared_data->u3.QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_ENABLED)
+    {
+        unsigned __int64 tsc;
+        unsigned int aux;
+
+        if (user_shared_data->u3.QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_RDTSCP)
+            tsc = __rdtscp(&aux);
+        else
+        {
+            if (user_shared_data->u3.QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_MFENCE)
+                __asm__ __volatile__ ( "mfence" : : : "memory" );
+            if (user_shared_data->u3.QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_LFENCE)
+                __asm__ __volatile__ ( "lfence" : : : "memory" );
+            tsc = __rdtsc();
+        }
+
+        counter->QuadPart = (tsc + user_shared_data->QpcBias) >> user_shared_data->u3.QpcShift;
+        return TRUE;
+    }
+
     NtQueryPerformanceCounter( counter, NULL );
     return TRUE;
 }
