@@ -2021,6 +2021,7 @@ AC_CHECK_FUNCS(\
 	getrandom \
 	kqueue \
 	mach_continuous_time \
+	memfd_create \
 	pipe2 \
 	port_create \
 	posix_fadvise \

@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -163,6 +164,7 @@ struct mapping
     pe_image_info_t image;           /* image info (for PE image mapping) */
     struct ranges  *committed;       /* list of committed ranges in this mapping */
     struct shared_map *shared;       /* temp file for shared PE mapping */
+    void           *shared_ptr;      /* mmaped pointer for shared mappings */
 };
 
 static void mapping_dump( struct object *obj, int verbose );
@@ -265,6 +267,7 @@ int grow_file( int unix_fd, file_pos_t new_size )
     return 0;
 }
 
+#ifndef HAVE_MEMFD_CREATE
 /* simplified version of mkstemps() */
 static int make_temp_file( char name[16] )
 {
@@ -298,10 +301,23 @@ static int check_current_dir_for_exec(void)
     unlink( tmpfn );
     return (ret != MAP_FAILED);
 }
+#endif
 
 /* create a temp file for anonymous mappings */
 static int create_temp_file( file_pos_t size )
 {
+#ifdef HAVE_MEMFD_CREATE
+    int fd = memfd_create( "wine-mapping", MFD_ALLOW_SEALING );
+    if (fd != -1)
+    {
+        if (!grow_file( fd, size ))
+        {
+            close( fd );
+            fd = -1;
+        }
+    }
+    else file_set_error();
+#else
     static int temp_dir_fd = -1;
     char tmpfn[16];
     int fd;
@@ -334,6 +350,7 @@ static int create_temp_file( file_pos_t size )
     else file_set_error();
 
     if (temp_dir_fd != server_dir_fd) fchdir( server_dir_fd );
+#endif
     return fd;
 }
 
@@ -887,6 +904,7 @@ static struct mapping *create_mapping( struct object *root, const struct unicode
     mapping->fd          = NULL;
     mapping->shared      = NULL;
     mapping->committed   = NULL;
+    mapping->shared_ptr  = MAP_FAILED;
 
     if (!(mapping->flags = get_mapping_flags( handle, flags ))) goto error;
 
@@ -1087,6 +1105,7 @@ static void mapping_destroy( struct object *obj )
     if (mapping->fd) release_object( mapping->fd );
     if (mapping->committed) release_object( mapping->committed );
     if (mapping->shared) release_object( mapping->shared );
+    if (mapping->shared_ptr != MAP_FAILED) munmap( mapping->shared_ptr, mapping->size );
 }
 
 static enum server_fd_type mapping_get_fd_type( struct fd *fd )
@@ -1100,8 +1119,12 @@ int get_page_size(void)
     return page_mask + 1;
 }
 
+#ifndef F_SEAL_FUTURE_WRITE
+#define F_SEAL_FUTURE_WRITE 0x0010  /* prevent future writes while mapped */
+#endif
+
 struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
-                                        unsigned int attr, const struct security_descriptor *sd )
+                                         unsigned int attr, const struct security_descriptor *sd )
 {
     void *ptr;
     struct mapping *mapping;
@@ -1109,11 +1132,38 @@ struct object *create_user_data_mapping( struct object *root, const struct unico
     if (!(mapping = create_mapping( root, name, attr, sizeof(KSHARED_USER_DATA),
                                     SEC_COMMIT, 0, FILE_READ_DATA | FILE_WRITE_DATA, sd ))) return NULL;
     ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
+
     if (ptr != MAP_FAILED)
     {
         user_shared_data = ptr;
         user_shared_data->SystemCall = 1;
     }
+    return &mapping->obj;
+}
+
+struct object *create_shared_mapping( struct object *root, const struct unicode_str *name,
+                                      mem_size_t size, const struct security_descriptor *sd, void **ptr )
+{
+    static int seals = F_SEAL_FUTURE_WRITE | F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL;
+    struct mapping *mapping;
+
+    if (!(mapping = create_mapping( root, name, OBJ_OPENIF, size, SEC_COMMIT, 0,
+                                    FILE_READ_DATA | FILE_WRITE_DATA, sd ))) return NULL;
+
+    if (mapping->shared_ptr == MAP_FAILED)
+        mapping->shared_ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED,
+                                    get_unix_fd( mapping->fd ), 0 );
+
+    if (mapping->shared_ptr == MAP_FAILED)
+    {
+        fprintf( stderr, "wine: Failed to map shared memory: %u %m\n", errno );
+        release_object( &mapping->obj );
+        return NULL;
+    }
+
+    fcntl( get_unix_fd( mapping->fd ), F_ADD_SEALS, seals );
+    *ptr = mapping->shared_ptr;
+
     return &mapping->obj;
 }
 

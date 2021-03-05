@@ -865,6 +865,11 @@ typedef struct
     lparam_t info;
 } cursor_pos_t;
 
+struct desktop_shared_memory
+{
+    int placeholder;
+};
+
 /****************************************************************/
 /* Request declarations */
 
