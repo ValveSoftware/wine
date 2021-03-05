@@ -37,6 +37,7 @@
 #include "process.h"
 #include "file.h"
 #include "unicode.h"
+#include "user.h"
 
 #define HASH_SIZE 7  /* default hash size */
 
@@ -279,6 +280,22 @@ struct object *get_root_directory(void)
 struct object *get_directory_obj( struct process *process, obj_handle_t handle )
 {
     return get_handle_obj( process, handle, 0, &directory_ops );
+}
+
+struct object *create_desktop_map_directory( struct winstation *winstation )
+{
+    static const WCHAR dir_desktop_mapsW[] = {'_','_','w','i','n','e','_','d','e','s','k','t','o','p','_','m','a','p','p','i','n','g','s'};
+    static const struct unicode_str dir_desktop_maps_str = {dir_desktop_mapsW, sizeof(dir_desktop_mapsW)};
+    struct object *root;
+    struct directory *mapping_root, *ret;
+    const struct unicode_str winsta_name = {winstation->obj.name->name, winstation->obj.name->len};
+
+    root = winstation->obj.name->parent;
+    mapping_root = create_directory( root, &dir_desktop_maps_str, OBJ_OPENIF, HASH_SIZE, NULL );
+    ret = create_directory( &mapping_root->obj, &winsta_name, OBJ_OPENIF, HASH_SIZE, NULL );
+    release_object( &mapping_root->obj );
+
+    return &ret->obj;
 }
 
 /* Global initialization */
