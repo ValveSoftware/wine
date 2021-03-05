@@ -160,6 +160,10 @@ extern struct timeout_user *add_timeout_user( timeout_t when, timeout_callback f
 extern void remove_timeout_user( struct timeout_user *user );
 extern const char *get_timeout_str( timeout_t timeout );
 
+/* directory functions */
+
+extern struct object *create_desktop_map_directory( struct winstation *winstation );
+
 /* file functions */
 
 extern struct file *get_file_obj( struct process *process, obj_handle_t handle,
@@ -188,6 +192,8 @@ extern struct mapping *create_fd_mapping( struct object *root, const struct unic
                                           unsigned int attr, const struct security_descriptor *sd );
 extern struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
                                                 unsigned int attr, const struct security_descriptor *sd );
+extern struct object *create_shared_mapping( struct object *root, const struct unicode_str *name,
+                                             mem_size_t size, const struct security_descriptor *sd, void **ptr );
 
 /* device functions */
 
