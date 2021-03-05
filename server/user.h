@@ -64,19 +64,21 @@ struct global_cursor
 
 struct desktop
 {
-    struct object        obj;              /* object header */
-    unsigned int         flags;            /* desktop flags */
-    struct winstation   *winstation;       /* winstation this desktop belongs to */
-    struct list          entry;            /* entry in winstation list of desktops */
-    struct window       *top_window;       /* desktop window for this desktop */
-    struct window       *msg_window;       /* HWND_MESSAGE top window */
-    struct hook_table   *global_hooks;     /* table of global hooks on this desktop */
-    struct list          hotkeys;          /* list of registered hotkeys */
-    struct timeout_user *close_timeout;    /* timeout before closing the desktop */
-    struct thread_input *foreground_input; /* thread input of foreground thread */
-    unsigned int         users;            /* processes and threads using this desktop */
-    struct global_cursor cursor;           /* global cursor information */
-    unsigned char        keystate[256];    /* asynchronous key state */
+    struct object                          obj;              /* object header */
+    unsigned int                           flags;            /* desktop flags */
+    struct winstation                     *winstation;       /* winstation this desktop belongs to */
+    struct list                            entry;            /* entry in winstation list of desktops */
+    struct window                         *top_window;       /* desktop window for this desktop */
+    struct window                         *msg_window;       /* HWND_MESSAGE top window */
+    struct hook_table                     *global_hooks;     /* table of global hooks on this desktop */
+    struct list                            hotkeys;          /* list of registered hotkeys */
+    struct timeout_user                   *close_timeout;    /* timeout before closing the desktop */
+    struct thread_input                   *foreground_input; /* thread input of foreground thread */
+    unsigned int                           users;            /* processes and threads using this desktop */
+    struct global_cursor                   cursor;           /* global cursor information */
+    struct object                         *shared_mapping;   /* desktop shared memory mapping */
+    volatile struct desktop_shared_memory *shared;           /* desktop shared memory ptr */
+    unsigned char                          keystate[256];    /* asynchronous key state */
 };
 
 /* user handles functions */
