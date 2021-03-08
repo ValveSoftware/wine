@@ -157,6 +157,7 @@ case $host in
       export PKG_CONFIG_PATH
       enable_win16=${enable_win16:-yes}
       with_unwind=${with_unwind:-no}
+      AC_SUBST(XAUDIO_NATIVE_SWITCH,["-Wb,--prefer-native"])
     else
       if test "x${GCC}" = "xyes"
       then
@@ -170,6 +171,7 @@ case $host in
       host_cpu="x86_64"
       notice_platform="64-bit "
       TARGETFLAGS="-m64"
+      AC_SUBST(XAUDIO_NATIVE_SWITCH,"")
     fi
     ;;
   arm*)
