@@ -777,6 +777,7 @@ AR
 BISON
 FLEX
 TOOLSDIR
+XAUDIO_NATIVE_SWITCH
 TARGETFLAGS
 LD
 CPPBIN
@@ -5689,6 +5690,8 @@ $as_echo "$wine_cv_cc_m32" >&6; }
       export PKG_CONFIG_PATH
       enable_win16=${enable_win16:-yes}
       with_unwind=${with_unwind:-no}
+      XAUDIO_NATIVE_SWITCH="-Wb,--prefer-native"
+
     else
       if test "x${GCC}" = "xyes"
       then
@@ -5724,6 +5727,8 @@ $as_echo "$wine_cv_builtin_ms_va_list" >&6; }
       host_cpu="x86_64"
       notice_platform="64-bit "
       TARGETFLAGS="-m64"
+      XAUDIO_NATIVE_SWITCH=""
+
     fi
     ;;
   arm*)
