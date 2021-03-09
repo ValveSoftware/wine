@@ -1173,6 +1173,17 @@ BOOL WINAPI GetSystemCpuSetInformation(SYSTEM_CPU_SET_INFORMATION *info, ULONG b
 }
 
 
+/***********************************************************************
+ *           SetThreadSelectedCpuSets   (kernelbase.@)
+ */
+BOOL WINAPI SetThreadSelectedCpuSets(HANDLE thread, const ULONG *cpu_set_ids, ULONG count)
+{
+    FIXME("thread %p, cpu_set_ids %p, count %u stub.\n", thread, cpu_set_ids, count);
+
+    return TRUE;
+}
+
+
 /**********************************************************************
  *             GetNumaHighestNodeNumber   (kernelbase.@)
  */
