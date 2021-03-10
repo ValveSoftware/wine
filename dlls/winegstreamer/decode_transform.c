@@ -221,9 +221,36 @@ static HRESULT WINAPI mf_decoder_GetInputAvailableType(IMFTransform *iface, DWOR
 static HRESULT WINAPI mf_decoder_GetOutputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
         IMFMediaType **type)
 {
-    FIXME("%p, %u, %u, %p.\n", iface, id, index, type);
+    struct mf_decoder *decoder = impl_mf_decoder_from_IMFTransform(iface);
+    IMFMediaType *output_type;
+    HRESULT hr;
 
-    return E_NOTIMPL;
+    TRACE("%p, %u, %u, %p\n", decoder, id, index, type);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    if (index >= decoder_descs[decoder->type].output_types_count)
+        return MF_E_NO_MORE_TYPES;
+
+    if (FAILED(hr = MFCreateMediaType(&output_type)))
+        return hr;
+
+    if (FAILED(hr = IMFMediaType_SetGUID(output_type, &MF_MT_MAJOR_TYPE, decoder_descs[decoder->type].major_type)))
+    {
+        IMFMediaType_Release(output_type);
+        return hr;
+    }
+
+    if (FAILED(hr = IMFMediaType_SetGUID(output_type, &MF_MT_SUBTYPE, decoder_descs[decoder->type].output_types[index])))
+    {
+        IMFMediaType_Release(output_type);
+        return hr;
+    }
+
+    *type = output_type;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI mf_decoder_SetInputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
