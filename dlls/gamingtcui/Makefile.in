@@ -1,0 +1,4 @@
+MODULE    = gamingtcui.dll
+
+C_SRCS = \
+	gamingtcui_main.c
