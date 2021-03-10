@@ -321,6 +321,9 @@ HRESULT WINAPI DllRegisterServer(void)
 
     init_gstreamer();
 
+    if (FAILED(hr = mfplat_DllRegisterServer()))
+        return hr;
+
     if (FAILED(hr = __wine_register_resources(winegstreamer_instance)))
         return hr;
 
