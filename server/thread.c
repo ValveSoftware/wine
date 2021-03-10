@@ -2098,3 +2098,53 @@ DECL_HANDLER(get_selector_entry)
         release_object( thread );
     }
 }
+
+/* Iterate process list */
+DECL_HANDLER(get_next_thread)
+{
+    struct thread *thread, *next;
+    struct process *process;
+    struct list *ptr;
+
+    reply->handle = 0;
+
+    if ( req->flags > 1 )
+    {
+        set_error( STATUS_INVALID_PARAMETER );
+        return;
+    }
+
+    if (!(process = get_process_from_handle( req->process, PROCESS_QUERY_INFORMATION )))
+        return;
+
+    if (!req->last)
+    {
+        ptr = req->flags ? list_tail( &thread_list ) : list_head( &thread_list );
+    }
+    else if ((thread = get_thread_from_handle( req->last, 0 )))
+    {
+        ptr = req->flags ? list_prev( &thread_list, &thread->entry ) :
+                list_next( &thread_list, &thread->entry );
+        release_object( thread );
+    }
+    else
+    {
+        release_object( process );
+        return;
+    }
+
+    while (ptr)
+    {
+        next = LIST_ENTRY( ptr, struct thread, entry );
+        if (next->process == process
+                && (reply->handle = alloc_handle( current->process, next, req->access, req->attributes )))
+            break;
+        ptr = req->flags ? list_prev( &thread_list, &next->entry )
+                : list_next( &thread_list, &next->entry );
+    }
+
+    if (!reply->handle)
+        set_error( STATUS_NO_MORE_ENTRIES );
+
+    release_object( process );
+}
