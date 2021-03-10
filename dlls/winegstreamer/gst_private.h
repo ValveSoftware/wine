@@ -118,6 +118,8 @@ HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj) DECLSPEC_HI
 
 HRESULT audio_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
+HRESULT decode_transform_create(REFIID riid, void **obj) DECLSPEC_HIDDEN;
+
 struct wm_stream
 {
     struct wm_reader *reader;
