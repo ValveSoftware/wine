@@ -836,6 +836,52 @@ struct cpu_topology_override
     unsigned char host_cpu_id[64];
 };
 
+struct shared_cursor
+{
+    int                  x;
+    int                  y;
+    unsigned int         last_change;
+    rectangle_t          clip;
+};
+
+struct desktop_shared_memory
+{
+    unsigned int         seq;
+    struct shared_cursor cursor;
+    unsigned char        keystate[256];
+    thread_id_t          foreground_tid;
+};
+
+struct queue_shared_memory
+{
+    unsigned int         seq;
+    unsigned int         wake_bits;
+    unsigned int         changed_bits;
+    unsigned int         wake_mask;
+    unsigned int         changed_mask;
+    thread_id_t          input_tid;
+};
+
+struct input_shared_memory
+{
+    unsigned int         seq;
+    thread_id_t          tid;
+    user_handle_t        focus;
+    user_handle_t        capture;
+    user_handle_t        active;
+    user_handle_t        menu_owner;
+    user_handle_t        move_size;
+    user_handle_t        caret;
+    user_handle_t        cursor;
+    rectangle_t          caret_rect;
+    int                  cursor_count;
+    unsigned char        keystate[256];
+};
+
+
+#define SEQUENCE_MASK_BITS  4
+#define SEQUENCE_MASK ((1UL << SEQUENCE_MASK_BITS) - 1)
+
 
 
 
@@ -2747,7 +2793,6 @@ struct send_hardware_message_reply
     int             prev_y;
     int             new_x;
     int             new_y;
-    /* VARARG(keystate,bytes); */
     char __pad_28[4];
 };
 #define SEND_HWMSG_INJECTED    0x01
@@ -2778,9 +2823,9 @@ struct get_message_reply
     int             x;
     int             y;
     unsigned int    time;
-    unsigned int    active_hooks;
     data_size_t     total;
     /* VARARG(data,message_data); */
+    char __pad_52[4];
 };
 
 
@@ -3832,14 +3877,10 @@ struct get_thread_input_reply
     user_handle_t  focus;
     user_handle_t  capture;
     user_handle_t  active;
-    user_handle_t  foreground;
     user_handle_t  menu_owner;
     user_handle_t  move_size;
     user_handle_t  caret;
-    user_handle_t  cursor;
-    int            show_count;
     rectangle_t    rect;
-    char __pad_60[4];
 };
 
 
@@ -3993,6 +4034,20 @@ enum caret_state
     CARET_STATE_ON,
     CARET_STATE_TOGGLE,
     CARET_STATE_ON_IF_MOVED
+};
+
+
+
+struct get_active_hooks_request
+{
+    struct request_header __header;
+    char __pad_12[4];
+};
+struct get_active_hooks_reply
+{
+    struct reply_header __header;
+    unsigned int   active_hooks;
+    char __pad_12[4];
 };
 
 
@@ -5589,6 +5644,24 @@ struct get_fsync_apc_idx_reply
 };
 
 
+
+struct get_next_thread_request
+{
+    struct request_header __header;
+    obj_handle_t process;
+    obj_handle_t last;
+    unsigned int access;
+    unsigned int attributes;
+    unsigned int flags;
+};
+struct get_next_thread_reply
+{
+    struct reply_header __header;
+    obj_handle_t handle;
+    char __pad_12[4];
+};
+
+
 enum request
 {
     REQ_new_process,
@@ -5777,6 +5850,7 @@ enum request
     REQ_set_capture_window,
     REQ_set_caret_window,
     REQ_set_caret_info,
+    REQ_get_active_hooks,
     REQ_set_hook,
     REQ_remove_hook,
     REQ_start_hook_chain,
@@ -5875,6 +5949,7 @@ enum request
     REQ_get_fsync_idx,
     REQ_fsync_msgwait,
     REQ_get_fsync_apc_idx,
+    REQ_get_next_thread,
     REQ_NB_REQUESTS
 };
 
@@ -6068,6 +6143,7 @@ union generic_request
     struct set_capture_window_request set_capture_window_request;
     struct set_caret_window_request set_caret_window_request;
     struct set_caret_info_request set_caret_info_request;
+    struct get_active_hooks_request get_active_hooks_request;
     struct set_hook_request set_hook_request;
     struct remove_hook_request remove_hook_request;
     struct start_hook_chain_request start_hook_chain_request;
@@ -6166,6 +6242,7 @@ union generic_request
     struct get_fsync_idx_request get_fsync_idx_request;
     struct fsync_msgwait_request fsync_msgwait_request;
     struct get_fsync_apc_idx_request get_fsync_apc_idx_request;
+    struct get_next_thread_request get_next_thread_request;
 };
 union generic_reply
 {
@@ -6357,6 +6434,7 @@ union generic_reply
     struct set_capture_window_reply set_capture_window_reply;
     struct set_caret_window_reply set_caret_window_reply;
     struct set_caret_info_reply set_caret_info_reply;
+    struct get_active_hooks_reply get_active_hooks_reply;
     struct set_hook_reply set_hook_reply;
     struct remove_hook_reply remove_hook_reply;
     struct start_hook_chain_reply start_hook_chain_reply;
@@ -6455,11 +6533,12 @@ union generic_reply
     struct get_fsync_idx_reply get_fsync_idx_reply;
     struct fsync_msgwait_reply fsync_msgwait_reply;
     struct get_fsync_apc_idx_reply get_fsync_apc_idx_reply;
+    struct get_next_thread_reply get_next_thread_reply;
 };
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 691
+#define SERVER_PROTOCOL_VERSION 693
 
 /* ### protocol_version end ### */
 

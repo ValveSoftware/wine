@@ -2676,7 +2676,6 @@ static void dump_send_hardware_message_reply( const struct send_hardware_message
     fprintf( stderr, ", prev_y=%d", req->prev_y );
     fprintf( stderr, ", new_x=%d", req->new_x );
     fprintf( stderr, ", new_y=%d", req->new_y );
-    dump_varargs_bytes( ", keystate=", cur_size );
 }
 
 static void dump_get_message_request( const struct get_message_request *req )
@@ -2700,7 +2699,6 @@ static void dump_get_message_reply( const struct get_message_reply *req )
     fprintf( stderr, ", x=%d", req->x );
     fprintf( stderr, ", y=%d", req->y );
     fprintf( stderr, ", time=%08x", req->time );
-    fprintf( stderr, ", active_hooks=%08x", req->active_hooks );
     fprintf( stderr, ", total=%u", req->total );
     dump_varargs_message_data( ", data=", cur_size );
 }
@@ -3405,12 +3403,9 @@ static void dump_get_thread_input_reply( const struct get_thread_input_reply *re
     fprintf( stderr, " focus=%08x", req->focus );
     fprintf( stderr, ", capture=%08x", req->capture );
     fprintf( stderr, ", active=%08x", req->active );
-    fprintf( stderr, ", foreground=%08x", req->foreground );
     fprintf( stderr, ", menu_owner=%08x", req->menu_owner );
     fprintf( stderr, ", move_size=%08x", req->move_size );
     fprintf( stderr, ", caret=%08x", req->caret );
-    fprintf( stderr, ", cursor=%08x", req->cursor );
-    fprintf( stderr, ", show_count=%d", req->show_count );
     dump_rectangle( ", rect=", &req->rect );
 }
 
@@ -3516,6 +3511,15 @@ static void dump_set_caret_info_reply( const struct set_caret_info_reply *req )
     dump_rectangle( ", old_rect=", &req->old_rect );
     fprintf( stderr, ", old_hide=%d", req->old_hide );
     fprintf( stderr, ", old_state=%d", req->old_state );
+}
+
+static void dump_get_active_hooks_request( const struct get_active_hooks_request *req )
+{
+}
+
+static void dump_get_active_hooks_reply( const struct get_active_hooks_reply *req )
+{
+    fprintf( stderr, " active_hooks=%08x", req->active_hooks );
 }
 
 static void dump_set_hook_request( const struct set_hook_request *req )
@@ -4586,6 +4590,20 @@ static void dump_get_fsync_apc_idx_reply( const struct get_fsync_apc_idx_reply *
     fprintf( stderr, " shm_idx=%08x", req->shm_idx );
 }
 
+static void dump_get_next_thread_request( const struct get_next_thread_request *req )
+{
+    fprintf( stderr, " process=%04x", req->process );
+    fprintf( stderr, ", last=%04x", req->last );
+    fprintf( stderr, ", access=%08x", req->access );
+    fprintf( stderr, ", attributes=%08x", req->attributes );
+    fprintf( stderr, ", flags=%08x", req->flags );
+}
+
+static void dump_get_next_thread_reply( const struct get_next_thread_reply *req )
+{
+    fprintf( stderr, " handle=%04x", req->handle );
+}
+
 static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_new_process_request,
     (dump_func)dump_exec_process_request,
@@ -4773,6 +4791,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_set_capture_window_request,
     (dump_func)dump_set_caret_window_request,
     (dump_func)dump_set_caret_info_request,
+    (dump_func)dump_get_active_hooks_request,
     (dump_func)dump_set_hook_request,
     (dump_func)dump_remove_hook_request,
     (dump_func)dump_start_hook_chain_request,
@@ -4871,6 +4890,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_get_fsync_idx_request,
     (dump_func)dump_fsync_msgwait_request,
     (dump_func)dump_get_fsync_apc_idx_request,
+    (dump_func)dump_get_next_thread_request,
 };
 
 static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
@@ -5060,6 +5080,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_set_capture_window_reply,
     (dump_func)dump_set_caret_window_reply,
     (dump_func)dump_set_caret_info_reply,
+    (dump_func)dump_get_active_hooks_reply,
     (dump_func)dump_set_hook_reply,
     (dump_func)dump_remove_hook_reply,
     (dump_func)dump_start_hook_chain_reply,
@@ -5158,6 +5179,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_get_fsync_idx_reply,
     NULL,
     (dump_func)dump_get_fsync_apc_idx_reply,
+    (dump_func)dump_get_next_thread_reply,
 };
 
 static const char * const req_names[REQ_NB_REQUESTS] = {
@@ -5347,6 +5369,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "set_capture_window",
     "set_caret_window",
     "set_caret_info",
+    "get_active_hooks",
     "set_hook",
     "remove_hook",
     "start_hook_chain",
@@ -5445,6 +5468,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "get_fsync_idx",
     "fsync_msgwait",
     "get_fsync_apc_idx",
+    "get_next_thread",
 };
 
 static const struct
