@@ -271,6 +271,7 @@ unsigned int wg_format_get_max_size(const struct wg_format *format)
                      * but as long as every sample fits into our allocator, we're fine. */
                     return width * height * 3;
 
+                case WG_VIDEO_FORMAT_H264:
                 case WG_VIDEO_FORMAT_UNKNOWN:
                     FIXME("Cannot guess maximum sample size for unknown video format.\n");
                     return 0;
