@@ -62,9 +62,19 @@ struct wg_format
                 WG_VIDEO_FORMAT_YVYU,
 
                 WG_VIDEO_FORMAT_CINEPAK,
+
+                WG_VIDEO_FORMAT_H264,
             } format;
             int32_t width, height;
             uint32_t fps_n, fps_d;
+            union
+            {
+                struct
+                {
+                    uint32_t profile;
+                    uint32_t level;
+                } h264;
+            } compressed;
         } video;
         struct
         {
