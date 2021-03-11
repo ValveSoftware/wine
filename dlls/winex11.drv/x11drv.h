@@ -473,12 +473,14 @@ extern BOOL use_primary_selection;
 extern BOOL use_system_cursors;
 extern BOOL grab_fullscreen;
 extern BOOL usexcomposite;
+extern BOOL use_xfixes;
 extern BOOL managed_mode;
 extern BOOL private_color_map;
 extern int primary_monitor;
 extern int copy_default_colors;
 extern int alloc_system_colors;
 extern int xrender_error_base;
+extern int xfixes_event_base;
 extern char *process_name;
 extern Display *clipboard_display;
 
