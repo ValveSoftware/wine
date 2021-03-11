@@ -4580,7 +4580,6 @@ static void test_rt_caps(const GUID *device_guid)
         }
 
         hr = IDirectDrawSurface_QueryInterface(surface, device_guid, (void **)&device);
-        todo_wine_if(software_device && test_data[i].create_device_hr == D3DERR_SURFACENOTINVIDMEM)
         ok((!software_device && hr == test_data[i].create_device_hr)
                 || (software_device && (hr == (test_data[i].create_device_hr == D3DERR_SURFACENOTINVIDMEM
                 ? DD_OK : test_data[i].create_device_hr))),
