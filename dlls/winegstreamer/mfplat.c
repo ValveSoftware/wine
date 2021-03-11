@@ -528,6 +528,7 @@ video_formats[] =
     {&MFVideoFormat_YUY2,   WG_VIDEO_FORMAT_YUY2},
     {&MFVideoFormat_YV12,   WG_VIDEO_FORMAT_YV12},
     {&MFVideoFormat_YVYU,   WG_VIDEO_FORMAT_YVYU},
+    {&MFVideoFormat_H264,   WG_VIDEO_FORMAT_H264},
 };
 
 static const struct
@@ -715,10 +716,22 @@ static void mf_media_type_to_wg_format_video(IMFMediaType *type, struct wg_forma
         if (IsEqualGUID(&subtype, video_formats[i].subtype))
         {
             format->u.video.format = video_formats[i].format;
-            return;
+            break;
         }
     }
-    FIXME("Unrecognized video subtype %s.\n", debugstr_guid(&subtype));
+    if (i == ARRAY_SIZE(video_formats))
+        FIXME("Unrecognized video subtype %s.\n", debugstr_guid(&subtype));
+
+    if (format->u.video.format == WG_VIDEO_FORMAT_H264)
+    {
+        UINT32 profile, level;
+
+        if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_MPEG2_PROFILE, &profile)))
+            format->u.video.compressed.h264.profile = profile;
+
+        if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_MPEG2_LEVEL, &level)))
+            format->u.video.compressed.h264.level = level;
+    }
 }
 
 void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
