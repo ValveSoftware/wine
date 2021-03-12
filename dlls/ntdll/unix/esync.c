@@ -1147,10 +1147,22 @@ tryagain:
                         {
                             /* We were too slow. Put everything back. */
                             value = 1;
-                            for (j = i; j >= 0; j--)
+                            for (j = i - 1; j >= 0; j--)
                             {
-                                if (write( obj->fd, &value, sizeof(value) ) == -1)
+                                struct esync *obj = objs[j];
+
+                                if (obj->type == ESYNC_MUTEX)
+                                {
+                                    struct mutex *mutex = obj->shm;
+
+                                    if (mutex->tid == GetCurrentThreadId())
+                                        continue;
+                                }
+                                if (write( fds[j].fd, &value, sizeof(value) ) == -1)
+                                {
+                                    ERR("write failed.\n");
                                     return errno_to_status( errno );
+                                }
                             }
 
                             goto tryagain;  /* break out of two loops and a switch */
