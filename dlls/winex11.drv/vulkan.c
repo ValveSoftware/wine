@@ -64,6 +64,7 @@ struct wine_vk_surface
     LONG ref;
     Window window;
     VkSurfaceKHR surface; /* native surface */
+    HDC dc;
 };
 
 typedef struct VkXlibSurfaceCreateInfoKHR
@@ -206,15 +207,24 @@ static struct wine_vk_surface *wine_vk_surface_grab(struct wine_vk_surface *surf
 
 static void wine_vk_surface_release(struct wine_vk_surface *surface)
 {
+    struct wine_vk_surface *previous = NULL;
+    struct list *surface_list, *entry;
+    HWND hwnd;
+
     if (InterlockedDecrement(&surface->ref))
         return;
 
+    hwnd = WindowFromDC(surface->dc);
+    ReleaseDC(hwnd, surface->dc);
+
     EnterCriticalSection(&context_section);
     list_remove(&surface->entry);
+    if (!XFindContext(gdi_display, (XID)hwnd, vulkan_hwnd_context, (char **)&surface_list) && (entry = list_head(surface_list)))
+        previous = LIST_ENTRY(entry, struct wine_vk_surface, entry);
     LeaveCriticalSection(&context_section);
 
     if (surface->window)
-        XDestroyWindow(gdi_display, surface->window);
+        destroy_client_window(hwnd, surface->window, previous ? previous->window : None);
 
     heap_free(surface);
 }
@@ -337,6 +347,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
     x11_surface->ref = 1;
+    x11_surface->dc = GetDC(create_info->hwnd);
     list_init(&x11_surface->entry);
 
     x11_surface->window = create_client_window(create_info->hwnd, &default_visual);

@@ -1723,6 +1723,23 @@ static Window get_dummy_parent(void)
 
 
 /**********************************************************************
+ *		destroy_client_window
+ */
+void destroy_client_window( HWND hwnd, Window old_window, Window new_window )
+{
+    struct x11drv_win_data *data;
+    if ((data = get_win_data( hwnd )))
+    {
+        if (data->client_window == old_window) data->client_window = new_window;
+        /* make sure any request that could use old_window has been flushed */
+        XFlush( data->display );
+        release_win_data( data );
+    }
+    XDestroyWindow( gdi_display, old_window );
+}
+
+
+/**********************************************************************
  *		create_client_window
  */
 Window create_client_window( HWND hwnd, const XVisualInfo *visual )
