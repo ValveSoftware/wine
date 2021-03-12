@@ -54,6 +54,7 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 static CRITICAL_SECTION context_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
 static XContext vulkan_hwnd_context;
+static XContext vulkan_swapchain_context;
 
 #define VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR 1000004000
 
@@ -138,6 +139,7 @@ static BOOL WINAPI wine_vk_init(INIT_ONCE *once, void *param, void **context)
 #undef LOAD_OPTIONAL_FUNCPTR
 
     vulkan_hwnd_context = XUniqueContext();
+    vulkan_swapchain_context = XUniqueContext();
 
     return TRUE;
 
@@ -268,16 +270,26 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
         const VkSwapchainCreateInfoKHR *create_info,
         const VkAllocationCallbacks *allocator, VkSwapchainKHR *swapchain)
 {
+    VkResult result;
     VkSwapchainCreateInfoKHR create_info_host;
+    struct wine_vk_surface *x11_surface = surface_from_handle(create_info->surface);
+
     TRACE("%p %p %p %p\n", device, create_info, allocator, swapchain);
 
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
 
     create_info_host = *create_info;
-    create_info_host.surface = surface_from_handle(create_info->surface)->surface;
+    create_info_host.surface = x11_surface->surface;
 
-    return pvkCreateSwapchainKHR(device, &create_info_host, NULL /* allocator */, swapchain);
+    result = pvkCreateSwapchainKHR(device, &create_info_host, NULL /* allocator */, swapchain);
+    if (result == VK_SUCCESS)
+    {
+        EnterCriticalSection(&context_section);
+        XSaveContext(gdi_display, (XID)(*swapchain), vulkan_swapchain_context, (char *)wine_vk_surface_grab(x11_surface));
+        LeaveCriticalSection(&context_section);
+    }
+    return result;
 }
 
 static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
@@ -379,12 +391,19 @@ static void X11DRV_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface
 static void X11DRV_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain,
          const VkAllocationCallbacks *allocator)
 {
+    struct wine_vk_surface *surface;
+
     TRACE("%p, 0x%s %p\n", device, wine_dbgstr_longlong(swapchain), allocator);
 
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
 
     pvkDestroySwapchainKHR(device, swapchain, NULL /* allocator */);
+
+    EnterCriticalSection(&context_section);
+    if (!XFindContext(gdi_display, (XID)swapchain, vulkan_swapchain_context, (char **)&surface)) wine_vk_surface_release(surface);
+    XDeleteContext(gdi_display, (XID)swapchain, vulkan_swapchain_context);
+    LeaveCriticalSection(&context_section);
 }
 
 static VkResult X11DRV_vkEnumerateInstanceExtensionProperties(const char *layer_name,
