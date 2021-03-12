@@ -50,6 +50,7 @@ WINE_DECLARE_DEBUG_CHANNEL(fps);
 static pthread_mutex_t vulkan_mutex;
 
 static XContext vulkan_hwnd_context;
+static XContext vulkan_swapchain_context;
 
 #define VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR 1000004000
 
@@ -141,6 +142,8 @@ static void wine_vk_init(void)
 #undef LOAD_OPTIONAL_FUNCPTR
 
     vulkan_hwnd_context = XUniqueContext();
+    vulkan_swapchain_context = XUniqueContext();
+
     return;
 
 fail:
@@ -304,6 +307,8 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
 {
     struct wine_vk_surface *x11_surface = surface_from_handle(create_info->surface);
     VkSwapchainCreateInfoKHR create_info_host;
+    VkResult result;
+
     TRACE("%p %p %p %p\n", device, create_info, allocator, swapchain);
 
     if (allocator)
@@ -315,7 +320,14 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
     create_info_host = *create_info;
     create_info_host.surface = x11_surface->surface;
 
-    return pvkCreateSwapchainKHR(device, &create_info_host, NULL /* allocator */, swapchain);
+    result = pvkCreateSwapchainKHR(device, &create_info_host, NULL /* allocator */, swapchain);
+    if (result == VK_SUCCESS)
+    {
+        pthread_mutex_lock(&vulkan_mutex);
+        XSaveContext(gdi_display, (XID)(*swapchain), vulkan_swapchain_context, (char *)wine_vk_surface_grab(x11_surface));
+        pthread_mutex_unlock(&vulkan_mutex);
+    }
+    return result;
 }
 
 static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
@@ -427,12 +439,20 @@ static void X11DRV_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface
 static void X11DRV_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapchain,
          const VkAllocationCallbacks *allocator)
 {
+    struct wine_vk_surface *surface;
+
     TRACE("%p, 0x%s %p\n", device, wine_dbgstr_longlong(swapchain), allocator);
 
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
 
     pvkDestroySwapchainKHR(device, swapchain, NULL /* allocator */);
+
+    pthread_mutex_lock(&vulkan_mutex);
+    if (!XFindContext(gdi_display, (XID)swapchain, vulkan_swapchain_context, (char **)&surface))
+        wine_vk_surface_release(surface);
+    XDeleteContext(gdi_display, (XID)swapchain, vulkan_swapchain_context);
+    pthread_mutex_unlock(&vulkan_mutex);
 }
 
 static VkResult X11DRV_vkEnumerateInstanceExtensionProperties(const char *layer_name,
