@@ -74,6 +74,8 @@ static void HID_PNP_SendDeviceChange(DEVICE_OBJECT *device, WPARAM wparam)
 {
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
 
+    if (ext->xinput_hack) return;
+
     SERVER_START_REQ(send_hardware_message)
     {
         req->win                  = 0;
