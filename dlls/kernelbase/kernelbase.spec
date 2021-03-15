@@ -614,7 +614,7 @@
 # @ stub GetPackageStatusForUser
 # @ stub GetPackageTargetPlatformProperty
 # @ stub GetPackageVolumeSisPath
-# @ stub GetPackagesByPackageFamily
+@ stdcall GetPackagesByPackageFamily(wstr ptr ptr ptr ptr)
 @ stdcall GetPerformanceInfo(ptr long)
 @ stdcall GetPhysicallyInstalledSystemMemory(ptr)
 # @ stub GetPreviousFgPolicyRefreshInfoInternal
