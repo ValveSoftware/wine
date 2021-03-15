@@ -23,6 +23,7 @@
 #include "winternl.h"
 #include "appmodel.h"
 
+static LONG (WINAPI * pGetPackagesByPackageFamily)(const WCHAR *, UINT32 *, WCHAR **, UINT32 *, WCHAR *);
 static BOOL (WINAPI * pGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD *);
 static UINT (WINAPI * pGetSystemFirmwareTable)(DWORD, DWORD, void *, DWORD);
 static LONG (WINAPI * pPackageIdFromFullName)(const WCHAR *, UINT32, UINT32 *, BYTE *);
@@ -43,6 +44,7 @@ static void init_function_pointers(void)
 
     hmod = GetModuleHandleA("kernel32.dll");
 
+    GET_PROC(GetPackagesByPackageFamily);
     GET_PROC(GetProductInfo);
     GET_PROC(GetSystemFirmwareTable);
     GET_PROC(PackageIdFromFullName);
@@ -1075,6 +1077,135 @@ static void test_pe_os_version(void)
     }
 }
 
+
+static void test_package_info(void)
+{
+    static const WCHAR package_family_msvc140[] = L"Microsoft.VCLibs.140.00_8wekyb3d8bbwe";
+    UINT32 count, length, curr_length, size;
+    WCHAR *full_names[32];
+    BYTE id_buffer[512];
+    WCHAR buffer[2048];
+    BOOL arch_found;
+    SYSTEM_INFO si;
+    unsigned int i;
+    PACKAGE_ID *id;
+    DWORD arch;
+    LONG ret;
+
+    if (!pGetPackagesByPackageFamily)
+    {
+        win_skip("GetPackagesByPackageFamily not available.\n");
+        return;
+    }
+
+    GetSystemInfo(&si);
+    arch = si.wProcessorArchitecture;
+
+    count = 0;
+    length = 0;
+    ret = pGetPackagesByPackageFamily(L"Unknown_8wekyb3d8bbwe", &count, NULL, &length, NULL);
+    ok(ret == ERROR_SUCCESS, "Got unexpected ret %u.\n", ret);
+    ok(!count, "Got unexpected count %u.\n", count);
+    ok(!length, "Got unexpected length %u.\n", length);
+
+    count = 0;
+    length = 0;
+    ret = pGetPackagesByPackageFamily(L"Unknown_iekyb3d8bbwe", &count, NULL, &length, NULL);
+    ok(ret == ERROR_SUCCESS, "Got unexpected ret %u.\n", ret);
+    ok(!count, "Got unexpected count %u.\n", count);
+    ok(!length, "Got unexpected length %u.\n", length);
+
+    count = 0xdeadbeef;
+    length = 0xdeadbeef;
+    ret = pGetPackagesByPackageFamily(L"Unknown", &count, NULL, &length, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+    ok(count == 0xdeadbeef, "Got unexpected count %u.\n", count);
+    ok(length == 0xdeadbeef, "Got unexpected length %u.\n", length);
+
+    count = 0;
+    length = 0;
+    ret = pGetPackagesByPackageFamily(L"Unknown", &count, NULL, &length, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+    ok(!count, "Got unexpected count %u.\n", count);
+    ok(!length, "Got unexpected length %u.\n", length);
+
+    count = 0;
+    length = 0;
+    ret = pGetPackagesByPackageFamily(L"Unknown_8wekyb3d8bbwe_b", &count, NULL, &length, NULL);
+    ok(ret == ERROR_SUCCESS, "Got unexpected ret %u.\n", ret);
+    ok(!count, "Got unexpected count %u.\n", count);
+    ok(!length, "Got unexpected length %u.\n", length);
+
+    count = 0;
+    length = 0;
+    ret = pGetPackagesByPackageFamily(L"Unknown_", &count, NULL, &length, NULL);
+    ok(ret == ERROR_SUCCESS, "Got unexpected ret %u.\n", ret);
+    ok(!count, "Got unexpected count %u.\n", count);
+    ok(!length, "Got unexpected length %u.\n", length);
+
+    length = 0;
+    ret = pGetPackagesByPackageFamily(package_family_msvc140, NULL, NULL, &length, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+    ok(!length, "Got unexpected length %u.\n", length);
+
+    count = 0;
+    ret = pGetPackagesByPackageFamily(package_family_msvc140, &count, NULL, NULL, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+    ok(!count, "Got unexpected count %u.\n", count);
+
+    count = ARRAY_SIZE(full_names);
+    length = ARRAY_SIZE(buffer);
+    ret = pGetPackagesByPackageFamily(package_family_msvc140, &count, NULL, &length, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+    ok(count == ARRAY_SIZE(full_names), "Got unexpected count %u.\n", count);
+    ok(length == ARRAY_SIZE(buffer), "Got unexpected length %u.\n", length);
+
+    ret = pGetPackagesByPackageFamily(package_family_msvc140, &count, full_names, &length, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+    ok(count == ARRAY_SIZE(full_names), "Got unexpected count %u.\n", count);
+    ok(length == ARRAY_SIZE(buffer), "Got unexpected length %u.\n", length);
+
+    ret = pGetPackagesByPackageFamily(package_family_msvc140, &count, NULL, &length, buffer);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+    ok(count == ARRAY_SIZE(full_names), "Got unexpected count %u.\n", count);
+    ok(length == ARRAY_SIZE(buffer), "Got unexpected length %u.\n", length);
+
+    count = 0;
+    length = 0;
+    ret = pGetPackagesByPackageFamily(package_family_msvc140, &count, NULL, &length, NULL);
+    if (!ret && !count && !length)
+    {
+        win_skip("Package VCLibs.140.00 is not installed.\n");
+        return;
+    }
+
+    ok(ret == ERROR_INSUFFICIENT_BUFFER, "Got unexpected ret %u.\n", ret);
+    ok(count >= 1, "Got unexpected count %u.\n", count);
+    ok(length > 1, "Got unexpected length %u.\n", length);
+
+    ret = pGetPackagesByPackageFamily(package_family_msvc140, &count, full_names, &length, buffer);
+    ok(ret == ERROR_SUCCESS, "Got unexpected ret %u.\n", ret);
+    ok(count >= 1, "Got unexpected count %u.\n", count);
+    ok(length > 1, "Got unexpected length %u.\n", length);
+
+    id = (PACKAGE_ID *)id_buffer;
+    curr_length = 0;
+    arch_found = FALSE;
+    for (i = 0; i < count; ++i)
+    {
+        curr_length += lstrlenW(full_names[i]) + 1;
+
+        size = sizeof(id_buffer);
+        ret = pPackageIdFromFullName(full_names[i], 0, &size, id_buffer);
+        ok(ret == ERROR_SUCCESS, "Got unexpected ret %u.\n", ret);
+
+        if (id->processorArchitecture == arch)
+            arch_found = TRUE;
+    }
+    ok(curr_length == length, "Got unexpected length %u.\n", length);
+    ok(arch_found, "Did not find package for current arch.\n");
+}
+
 START_TEST(version)
 {
     char **argv;
@@ -1102,4 +1233,5 @@ START_TEST(version)
     test_pe_os_version();
     test_GetSystemFirmwareTable();
     test_PackageIdFromFullName();
+    test_package_info();
 }
