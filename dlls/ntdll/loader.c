@@ -3071,29 +3071,19 @@ static WCHAR *strstriW( const WCHAR *str, const WCHAR *sub )
     return NULL;
 }
 
-static WCHAR *get_env( const WCHAR *var )
+static BOOL get_env( const WCHAR *var, WCHAR *val, unsigned int len )
 {
     UNICODE_STRING name, value;
 
-    RtlInitUnicodeString( &name, var );
+    name.Length = wcslen( var ) * sizeof(WCHAR);
+    name.MaximumLength = name.Length + sizeof(WCHAR);
+    name.Buffer = (WCHAR *)var;
+
     value.Length = 0;
-    value.MaximumLength = 0;
-    value.Buffer = NULL;
+    value.MaximumLength = len;
+    value.Buffer = val;
 
-    if (RtlQueryEnvironmentVariable_U( NULL, &name, &value ) == STATUS_BUFFER_TOO_SMALL) {
-
-        value.Buffer = RtlAllocateHeap( GetProcessHeap(), 0, value.Length + sizeof(WCHAR) );
-        value.MaximumLength = value.Length;
-
-        if (RtlQueryEnvironmentVariable_U( NULL, &name, &value ) == STATUS_SUCCESS) {
-            value.Buffer[value.Length / sizeof(WCHAR)] = 0;
-            return value.Buffer;
-        }
-
-        RtlFreeHeap( GetProcessHeap(), 0, value.Buffer );
-    }
-
-    return NULL;
+    return !RtlQueryEnvironmentVariable_U( NULL, &name, &value );
 }
 
 /***********************************************************************
@@ -3161,8 +3151,9 @@ done:
          * Some games try to load mfc42.dll, but then proceed to not use it.
          * Just return a handle to kernel32 in that case.
          */
-        WCHAR *sgi = get_env( L"SteamGameId" );
-        if (sgi)
+        WCHAR sgi[32];
+
+        if (get_env( L"SteamGameId", sgi, sizeof(sgi) ))
         {
             if (!wcscmp( sgi, L"105450") &&
                     strstriW( libname, L"mfc42" ))
@@ -3170,7 +3161,6 @@ done:
                 WARN_(loaddll)( "Using a fake mfc42 handle\n" );
                 status = find_dll_file( load_path, L"kernel32.dll", nt_name, pwm, mapping, image_info, id );
             }
-            RtlFreeHeap(GetProcessHeap(), 0, sgi);
         }
     }
     return status;
@@ -4193,6 +4183,7 @@ void WINAPI LdrInitializeThunk( CONTEXT *context, ULONG_PTR unknown2, ULONG_PTR 
         ANSI_STRING func_name;
         WINE_MODREF *kernel32;
         PEB *peb = NtCurrentTeb()->Peb;
+        WCHAR env_str[16];
 
         NtQueryVirtualMemory( GetCurrentProcess(), LdrInitializeThunk, MemoryBasicInformation,
                               &meminfo, sizeof(meminfo), NULL );
@@ -4204,6 +4195,16 @@ void WINAPI LdrInitializeThunk( CONTEXT *context, ULONG_PTR unknown2, ULONG_PTR 
         peb->TlsBitmap          = &tls_bitmap;
         peb->TlsExpansionBitmap = &tls_expansion_bitmap;
         peb->LoaderLock         = &loader_section;
+
+        if (get_env( L"WINE_HEAP_DELAY_FREE", env_str, sizeof(env_str)) )
+        {
+            if (env_str[0] == L'1')
+            {
+                ERR( "Enabling heap free delay hack.\n" );
+                delay_heap_free = TRUE;
+            }
+        }
+
         peb->ProcessHeap        = RtlCreateHeap( HEAP_GROWABLE, NULL, 0, 0, NULL, NULL );
 
         RtlInitializeBitMap( &tls_bitmap, peb->TlsBitmapBits, sizeof(peb->TlsBitmapBits) * 8 );

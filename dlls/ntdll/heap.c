@@ -225,6 +225,8 @@ C_ASSERT( offsetof(struct heap, subheap) <= REGION_ALIGN - 1 );
 #define HEAP_DEF_SIZE        (0x40000 * BLOCK_ALIGN)
 #define MAX_FREE_PENDING     1024    /* max number of free requests to delay */
 
+BOOL delay_heap_free = FALSE;
+
 static struct heap *process_heap;  /* main process heap */
 
 /* check if memory range a contains memory range b */
@@ -1286,8 +1288,8 @@ static void heap_set_debug_flags( HANDLE handle )
         }
     }
 
-    if ((heap->flags & HEAP_GROWABLE) && !heap->pending_free &&
-        ((flags & HEAP_FREE_CHECKING_ENABLED) || RUNNING_ON_VALGRIND))
+    if (delay_heap_free || ((heap->flags & HEAP_GROWABLE) && !heap->pending_free &&
+        ((flags & HEAP_FREE_CHECKING_ENABLED) || RUNNING_ON_VALGRIND)))
     {
         heap->pending_free = RtlAllocateHeap( handle, HEAP_ZERO_MEMORY,
                                               MAX_FREE_PENDING * sizeof(*heap->pending_free) );
@@ -2069,7 +2071,8 @@ NTSTATUS WINAPI RtlSetHeapInformation( HANDLE handle, HEAP_INFORMATION_CLASS inf
             FIXME( "HeapCompatibilityInformation %lu not implemented!\n", compat_info );
             return STATUS_UNSUCCESSFUL;
         }
-        InterlockedCompareExchange( &heap->compat_info, compat_info, HEAP_STD );
+        if (!delay_heap_free)
+            InterlockedCompareExchange( &heap->compat_info, compat_info, HEAP_STD );
         return STATUS_SUCCESS;
     }
 
