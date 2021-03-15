@@ -642,6 +642,13 @@ static BOOL process_attach(void)
     dlopen( SONAME_LIBXEXT, RTLD_NOW|RTLD_GLOBAL );
 #endif
 
+    {
+        const char *e = getenv("WINE_ALLOW_XIM");
+        if(e){
+            use_xim = IS_OPTION_TRUE(*e);
+        }
+    }
+
     setup_options();
 
     if ((thread_data_tls_index = TlsAlloc()) == TLS_OUT_OF_INDEXES) return FALSE;
