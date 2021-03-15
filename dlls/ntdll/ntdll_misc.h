@@ -47,6 +47,8 @@ static const UINT_PTR page_size = 0x1000;
 extern UINT_PTR page_size;
 #endif
 
+extern BOOL delay_heap_free;
+
 /* exceptions */
 extern LONG call_vectored_handlers( EXCEPTION_RECORD *rec, CONTEXT *context );
 extern void DECLSPEC_NORETURN raise_status( NTSTATUS status, EXCEPTION_RECORD *rec );
