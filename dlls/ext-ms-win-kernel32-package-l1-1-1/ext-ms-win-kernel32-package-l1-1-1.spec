@@ -12,7 +12,7 @@
 @ stub GetPackageId
 @ stub GetPackageInfo
 @ stub GetPackagePath
-@ stub GetPackagesByPackageFamily
+@ stdcall GetPackagesByPackageFamily(wstr ptr ptr ptr ptr) kernel32.GetPackagesByPackageFamily
 @ stub GetStagedPackageOrigin
 @ stub OpenPackageInfoByFullName
 @ stub PackageFamilyNameFromFullName
