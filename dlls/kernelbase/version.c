@@ -1878,3 +1878,85 @@ LONG WINAPI GetPackagesByPackageFamily(const WCHAR *family_name, UINT32 *count, 
 
     return short_buffer ? ERROR_INSUFFICIENT_BUFFER : ERROR_SUCCESS;
 }
+
+
+/***********************************************************************
+ *         GetPackagePath   (kernelbase.@)
+ */
+LONG WINAPI GetPackagePath(const PACKAGE_ID *package_id, const UINT32 reserved, UINT32 *length, WCHAR *path)
+{
+    WCHAR *key_name = NULL, *expanded_path = NULL;
+    UINT32 required_length, have_length;
+    unsigned int offset;
+    HKEY key = NULL;
+    DWORD size;
+    LONG ret;
+
+    TRACE("package_id %p, reserved %u, length %p, path %p.\n", package_id, reserved, length, path);
+
+    if (!length)
+        return ERROR_INVALID_PARAMETER;
+    if (!path && *length)
+        return ERROR_INVALID_PARAMETER;
+
+    required_length = 0;
+    if ((ret = PackageFullNameFromId(package_id, &required_length, NULL)) != ERROR_INSUFFICIENT_BUFFER)
+        return ret;
+
+    offset = lstrlenW(packages_key_name) + 1;
+    if (!(key_name = heap_alloc((offset + required_length) * sizeof(WCHAR))))
+    {
+        ERR("No memory.");
+        return ERROR_OUTOFMEMORY;
+    }
+
+    if ((ret = PackageFullNameFromId(package_id, &required_length, key_name + offset)))
+        goto done;
+
+    memcpy(key_name, packages_key_name, (offset - 1) * sizeof(WCHAR));
+    key_name[offset - 1] = L'\\';
+
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key_name, 0, KEY_READ, &key))
+    {
+        WARN("Key %s not found.\n", debugstr_w(key_name));
+        ret = ERROR_NOT_FOUND;
+        goto done;
+    }
+    if (RegGetValueW(key, NULL, L"Path", RRF_RT_REG_SZ, NULL, NULL, &size))
+    {
+        WARN("Path value not found in %s.\n", debugstr_w(key_name));
+        ret = ERROR_NOT_FOUND;
+        goto done;
+    }
+    if (!(expanded_path = heap_alloc(size)))
+    {
+        ERR("No memory.");
+        ret = ERROR_OUTOFMEMORY;
+        goto done;
+    }
+    if (RegGetValueW(key, NULL, L"Path", RRF_RT_REG_SZ, NULL, expanded_path, &size))
+    {
+        WARN("Could not get Path value from %s.\n", debugstr_w(key_name));
+        ret = ERROR_NOT_FOUND;
+        goto done;
+    }
+
+    have_length = *length;
+    *length = lstrlenW(expanded_path) + 1;
+    if (have_length >= *length)
+    {
+        memcpy(path, expanded_path, *length * sizeof(*path));
+        ret = ERROR_SUCCESS;
+    }
+    else
+    {
+        ret = ERROR_INSUFFICIENT_BUFFER;
+    }
+
+done:
+    if (key)
+        RegCloseKey(key);
+    heap_free(expanded_path);
+    heap_free(key_name);
+    return ret;
+}
