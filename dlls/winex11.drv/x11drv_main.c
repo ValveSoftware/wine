@@ -671,6 +671,13 @@ static NTSTATUS x11drv_init( void *arg )
     dlopen( SONAME_LIBXEXT, RTLD_NOW|RTLD_GLOBAL );
 #endif
 
+    {
+        const char *e = getenv("WINE_ALLOW_XIM");
+        if(e){
+            use_xim = IS_OPTION_TRUE(*e);
+        }
+    }
+
     setup_options();
 
     /* Open display */
