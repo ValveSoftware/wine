@@ -39,10 +39,12 @@
 #include "winnls.h"
 #include "winternl.h"
 #include "winerror.h"
+#include "winreg.h"
 #include "appmodel.h"
 
 #include "kernelbase.h"
 #include "wine/debug.h"
+#include "wine/heap.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ver);
 
@@ -161,6 +163,8 @@ static const struct
     }
 };
 
+static const WCHAR packages_key_name[] = L"Software\\Classes\\Local Settings\\Software\\Microsoft\\Windows"
+        L"\\CurrentVersion\\AppModel\\PackageRepository\\Packages";
 
 /******************************************************************************
  *  init_current_version
@@ -1719,4 +1723,115 @@ LONG WINAPI PackageIdFromFullName(const WCHAR *full_name, UINT32 flags, UINT32 *
     id->publisherId[len] = 0;
 
     return ERROR_SUCCESS;
+}
+
+
+/***********************************************************************
+ *         GetPackagesByPackageFamily   (kernelbase.@)
+ */
+LONG WINAPI GetPackagesByPackageFamily(const WCHAR *family_name, UINT32 *count, WCHAR **full_names,
+        UINT32 *buffer_length, WCHAR *buffer)
+{
+    UINT32 curr_count, curr_length, package_id_buf_size, size;
+    unsigned int i, name_len, publisher_id_len;
+    DWORD subkey_count, max_key_len, length;
+    const WCHAR *publisher_id;
+    WCHAR *package_name;
+    BOOL short_buffer;
+    PACKAGE_ID *id;
+    HKEY key;
+
+    TRACE("family_name %s, count %p, full_names %p, buffer_length %p, buffer %p.\n",
+            debugstr_w(family_name), count, full_names, buffer_length, buffer);
+
+    if (!buffer_length || !count || !family_name)
+        return ERROR_INVALID_PARAMETER;
+
+    if ((*buffer_length || *count) && (!full_names || !buffer))
+        return ERROR_INVALID_PARAMETER;
+
+    if (!(publisher_id = wcschr(family_name, L'_')))
+        return ERROR_INVALID_PARAMETER;
+
+    name_len = publisher_id - family_name;
+    ++publisher_id;
+    publisher_id_len = lstrlenW(publisher_id);
+
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, packages_key_name, 0, KEY_READ, &key))
+    {
+        ERR("Key open failed.\n");
+        *count = 0;
+        *buffer_length = 0;
+        return ERROR_SUCCESS;
+    }
+    if (RegQueryInfoKeyW(key, NULL, NULL, NULL, &subkey_count, &max_key_len, NULL, NULL, NULL, NULL, NULL, NULL))
+    {
+        ERR("Query key info failed.\n");
+        RegCloseKey(key);
+        *count = 0;
+        *buffer_length = 0;
+        return ERROR_SUCCESS;
+    }
+
+    if (!(package_name = heap_alloc((max_key_len + 1) * sizeof(*package_name))))
+    {
+        ERR("No memory.\n");
+        RegCloseKey(key);
+        return ERROR_OUTOFMEMORY;
+    }
+
+    package_id_buf_size = sizeof(*id) + (max_key_len + 1) * sizeof(WCHAR);
+    if (!(id = heap_alloc(package_id_buf_size)))
+    {
+        ERR("No memory.\n");
+        heap_free(package_name);
+        RegCloseKey(key);
+        return ERROR_OUTOFMEMORY;
+    }
+
+    curr_count = curr_length = 0;
+    for (i = 0; i < subkey_count; ++i)
+    {
+        length = max_key_len + 1;
+        if (RegEnumKeyExW(key, i, package_name, &length, NULL, NULL, NULL, NULL))
+        {
+            ERR("Error enumerating key %u.\n", i);
+            continue;
+        }
+
+        size = package_id_buf_size;
+        if (PackageIdFromFullName(package_name, 0, &size, (BYTE *)id))
+        {
+            ERR("Error getting package id from full name.\n");
+            continue;
+        }
+
+        if (lstrlenW(id->name) != name_len)
+            continue;
+        if (wcsnicmp(family_name, id->name, name_len))
+            continue;
+
+        if (lstrlenW(id->publisherId) != publisher_id_len)
+            continue;
+        if (wcsnicmp(publisher_id, id->publisherId, publisher_id_len))
+            continue;
+        if (curr_length + length < *buffer_length)
+        {
+            memcpy(buffer + curr_length, package_name, (length + 1) * sizeof(*package_name));
+            if (curr_count < *count)
+                full_names[curr_count] = buffer + curr_length;
+        }
+        curr_length += length + 1;
+        ++curr_count;
+    }
+
+    heap_free(id);
+    heap_free(package_name);
+    RegCloseKey(key);
+
+    short_buffer = curr_length > *buffer_length || curr_count > *count;
+    *count = curr_count;
+    *buffer_length = curr_length;
+
+    return short_buffer ? ERROR_INSUFFICIENT_BUFFER : ERROR_SUCCESS;
 }
