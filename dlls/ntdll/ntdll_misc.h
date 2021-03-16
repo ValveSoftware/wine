@@ -110,12 +110,24 @@ static inline TEB64 *NtCurrentTeb64(void) { return NULL; }
 static inline TEB64 *NtCurrentTeb64(void) { return (TEB64 *)NtCurrentTeb()->GdiBatchCount; }
 #endif
 
+#define HEAP_STD 0
+#define HEAP_LAL 1
+#define HEAP_LFH 2
+
 NTSTATUS HEAP_std_allocate( HANDLE heap, ULONG flags, SIZE_T size, void **out );
 NTSTATUS HEAP_std_free( HANDLE heap, ULONG flags, void *ptr );
 NTSTATUS HEAP_std_reallocate( HANDLE heap, ULONG flags, void *ptr, SIZE_T size, void **out );
 NTSTATUS HEAP_std_get_allocated_size( HANDLE heap, ULONG flags, const void *ptr, SIZE_T *out );
 
+NTSTATUS HEAP_lfh_allocate( HANDLE std_heap, ULONG flags, SIZE_T size, void **out );
+NTSTATUS HEAP_lfh_free( HANDLE std_heap, ULONG flags, void *ptr );
+NTSTATUS HEAP_lfh_reallocate( HANDLE std_heap, ULONG flags, void *ptr, SIZE_T size, void **out );
+NTSTATUS HEAP_lfh_get_allocated_size( HANDLE std_heap, ULONG flags, const void *ptr, SIZE_T *out );
+NTSTATUS HEAP_lfh_validate( HANDLE std_heap, ULONG flags, const void *ptr );
+
 void HEAP_notify_thread_destroy( BOOLEAN last );
+void HEAP_lfh_notify_thread_destroy( BOOLEAN last );
+void HEAP_lfh_set_debug_flags( ULONG flags );
 
 #define HASH_STRING_ALGORITHM_DEFAULT  0
 #define HASH_STRING_ALGORITHM_X65599   1
