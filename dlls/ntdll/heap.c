@@ -1921,10 +1921,8 @@ NTSTATUS HEAP_std_free( HANDLE heap, ULONG flags, void *ptr )
  */
 PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size )
 {
-    ARENA_INUSE *pArena;
+    NTSTATUS status;
     HEAP *heapPtr;
-    SUBHEAP *subheap;
-    SIZE_T oldBlockSize, oldActualSize, rounded_size;
     void *ret;
 
     if (!ptr) return NULL;
@@ -1940,17 +1938,33 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
              HEAP_REALLOC_IN_PLACE_ONLY;
     flags |= heapPtr->flags;
     if (!(flags & HEAP_NO_SERIALIZE)) RtlEnterCriticalSection( &heapPtr->critSection );
+    status = HEAP_std_reallocate( heap, flags, ptr, size, &ret );
+    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
+
+    TRACE("(%p,%08x,%p,%08lx): returning %p, status %#x\n", heapPtr, flags, ptr, size, ret, status );
+    if (!status) return ret;
+    if ((flags & HEAP_GENERATE_EXCEPTIONS) && (status == STATUS_NO_MEMORY)) RtlRaiseStatus( status );
+    RtlSetLastWin32ErrorAndNtStatusFromNtStatus( status );
+    return NULL;
+}
+
+NTSTATUS HEAP_std_reallocate( HANDLE heap, ULONG flags, void *ptr, SIZE_T size, void **out )
+{
+    HEAP *heapPtr = heap;
+    ARENA_INUSE *pArena;
+    SUBHEAP *subheap;
+    SIZE_T oldBlockSize, oldActualSize, rounded_size;
 
     rounded_size = ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE;
-    if (rounded_size < size) goto oom;  /* overflow */
+    if (rounded_size < size) return STATUS_NO_MEMORY; /* overflow */
     if (rounded_size < HEAP_MIN_DATA_SIZE) rounded_size = HEAP_MIN_DATA_SIZE;
 
     pArena = (ARENA_INUSE *)ptr - 1;
-    if (!validate_block_pointer( heapPtr, &subheap, pArena )) goto error;
+    if (!validate_block_pointer( heapPtr, &subheap, pArena )) return STATUS_INVALID_PARAMETER;
     if (!subheap)
     {
-        if (!(ret = realloc_large_block( heapPtr, flags, ptr, size ))) goto oom;
-        goto done;
+        if (!(*out = realloc_large_block( heapPtr, flags, ptr, size ))) return STATUS_NO_MEMORY;
+        return STATUS_SUCCESS;
     }
 
     /* Check if we need to grow the block */
@@ -1963,12 +1977,12 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
 
         if (rounded_size >= HEAP_MIN_LARGE_BLOCK_SIZE && (flags & HEAP_GROWABLE))
         {
-            if (flags & HEAP_REALLOC_IN_PLACE_ONLY) goto oom;
-            if (!(ret = allocate_large_block( heapPtr, flags, size ))) goto oom;
-            memcpy( ret, pArena + 1, oldActualSize );
+            if (flags & HEAP_REALLOC_IN_PLACE_ONLY) return STATUS_NO_MEMORY;
+            if (!(*out = allocate_large_block( heapPtr, flags, size ))) return STATUS_NO_MEMORY;
+            memcpy( *out, pArena + 1, oldActualSize );
             notify_free( pArena + 1 );
             HEAP_MakeInUseBlockFree( subheap, pArena );
-            goto done;
+            return STATUS_SUCCESS;
         }
         if ((pNext < (char *)subheap->base + subheap->size) &&
             (*(DWORD *)pNext & ARENA_FLAG_FREE) &&
@@ -1978,7 +1992,7 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
             ARENA_FREE *pFree = (ARENA_FREE *)pNext;
             HEAP_DeleteFreeBlock( heapPtr, pFree );
             pArena->size += (pFree->size & ARENA_SIZE_MASK) + sizeof(*pFree);
-            if (!HEAP_Commit( subheap, pArena, rounded_size )) goto oom;
+            if (!HEAP_Commit( subheap, pArena, rounded_size )) return STATUS_NO_MEMORY;
             notify_realloc( pArena + 1, oldActualSize, size );
             HEAP_ShrinkBlock( subheap, pArena, rounded_size );
         }
@@ -1990,7 +2004,7 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
 
             if ((flags & HEAP_REALLOC_IN_PLACE_ONLY) ||
                 !(pNew = HEAP_FindFreeBlock( heapPtr, rounded_size, &newsubheap )))
-                goto oom;
+                return STATUS_NO_MEMORY;
 
             /* Build the in-use arena */
 
@@ -2031,24 +2045,8 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
 
     /* Return the new arena */
 
-    ret = pArena + 1;
-done:
-    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-    TRACE("(%p,%08x,%p,%08lx): returning %p\n", heap, flags, ptr, size, ret );
-    return ret;
-
-oom:
-    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-    if (flags & HEAP_GENERATE_EXCEPTIONS) RtlRaiseStatus( STATUS_NO_MEMORY );
-    RtlSetLastWin32ErrorAndNtStatusFromNtStatus( STATUS_NO_MEMORY );
-    TRACE("(%p,%08x,%p,%08lx): returning NULL\n", heap, flags, ptr, size );
-    return NULL;
-
-error:
-    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-    RtlSetLastWin32ErrorAndNtStatusFromNtStatus( STATUS_INVALID_PARAMETER );
-    TRACE("(%p,%08x,%p,%08lx): returning NULL\n", heap, flags, ptr, size );
-    return NULL;
+    *out = pArena + 1;
+    return STATUS_SUCCESS;
 }
 
 
