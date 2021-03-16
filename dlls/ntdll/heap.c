@@ -1643,46 +1643,48 @@ HANDLE WINAPI RtlDestroyHeap( HANDLE heap )
  */
 void * WINAPI DECLSPEC_HOTPATCH RtlAllocateHeap( HANDLE heap, ULONG flags, SIZE_T size )
 {
-    ARENA_FREE *pArena;
-    ARENA_INUSE *pInUse;
-    SUBHEAP *subheap;
+    NTSTATUS status;
     HEAP *heapPtr = HEAP_GetPtr( heap );
-    SIZE_T rounded_size;
+    void *ptr;
 
     /* Validate the parameters */
 
     if (!heapPtr) return NULL;
     flags &= HEAP_GENERATE_EXCEPTIONS | HEAP_NO_SERIALIZE | HEAP_ZERO_MEMORY;
     flags |= heapPtr->flags;
-    rounded_size = ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE;
-    if (rounded_size < size)  /* overflow */
-    {
-        if (flags & HEAP_GENERATE_EXCEPTIONS) RtlRaiseStatus( STATUS_NO_MEMORY );
-        return NULL;
-    }
-    if (rounded_size < HEAP_MIN_DATA_SIZE) rounded_size = HEAP_MIN_DATA_SIZE;
 
     if (!(flags & HEAP_NO_SERIALIZE)) RtlEnterCriticalSection( &heapPtr->critSection );
+    status = HEAP_std_allocate( heap, flags, size, &ptr );
+    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
+
+    TRACE("(%p,%08x,%08lx), status %#x, ptr %p\n", heapPtr, flags, size, status, ptr );
+    if (!status) return ptr;
+    if ((flags & HEAP_GENERATE_EXCEPTIONS) && status == STATUS_NO_MEMORY) RtlRaiseStatus( status );
+    RtlSetLastWin32ErrorAndNtStatusFromNtStatus( status );
+    return NULL;
+}
+
+NTSTATUS HEAP_std_allocate( HANDLE heap, ULONG flags, SIZE_T size, void **out )
+{
+    HEAP *heapPtr = heap;
+    ARENA_FREE *pArena;
+    ARENA_INUSE *pInUse;
+    SUBHEAP *subheap;
+    SIZE_T rounded_size;
+
+    rounded_size = ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE;
+    if (rounded_size < size) return STATUS_NO_MEMORY; /* overflow */
+    if (rounded_size < HEAP_MIN_DATA_SIZE) rounded_size = HEAP_MIN_DATA_SIZE;
 
     if (rounded_size >= HEAP_MIN_LARGE_BLOCK_SIZE && (flags & HEAP_GROWABLE))
     {
-        void *ret = allocate_large_block( heap, flags, size );
-        if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-        if (!ret && (flags & HEAP_GENERATE_EXCEPTIONS)) RtlRaiseStatus( STATUS_NO_MEMORY );
-        TRACE("(%p,%08x,%08lx): returning %p\n", heap, flags, size, ret );
-        return ret;
+        if (!(*out = allocate_large_block( heapPtr, flags, size ))) return STATUS_NO_MEMORY;
+        return STATUS_SUCCESS;
     }
 
     /* Locate a suitable free block */
 
-    if (!(pArena = HEAP_FindFreeBlock( heapPtr, rounded_size, &subheap )))
-    {
-        TRACE("(%p,%08x,%08lx): returning NULL\n",
-                  heap, flags, size  );
-        if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-        if (flags & HEAP_GENERATE_EXCEPTIONS) RtlRaiseStatus( STATUS_NO_MEMORY );
-        return NULL;
-    }
+    if (!(pArena = HEAP_FindFreeBlock( heapPtr, rounded_size, &subheap ))) return STATUS_NO_MEMORY;
 
     /* Remove the arena from the free list */
 
@@ -1705,10 +1707,8 @@ void * WINAPI DECLSPEC_HOTPATCH RtlAllocateHeap( HANDLE heap, ULONG flags, SIZE_
     notify_alloc( pInUse + 1, size, flags & HEAP_ZERO_MEMORY );
     initialize_block( pInUse + 1, size, pInUse->unused_bytes, flags );
 
-    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-
-    TRACE("(%p,%08x,%08lx): returning %p\n", heap, flags, size, pInUse + 1 );
-    return pInUse + 1;
+    *out = pInUse + 1;
+    return STATUS_SUCCESS;
 }
 
 
