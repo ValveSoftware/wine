@@ -1728,8 +1728,7 @@ void * WINAPI DECLSPEC_HOTPATCH RtlAllocateHeap( HANDLE heap, ULONG flags, SIZE_
  */
 BOOLEAN WINAPI DECLSPEC_HOTPATCH RtlFreeHeap( HANDLE heap, ULONG flags, void *ptr )
 {
-    ARENA_INUSE *pInUse;
-    SUBHEAP *subheap;
+    NTSTATUS status;
     HEAP *heapPtr;
 
     /* Validate the parameters */
@@ -1745,29 +1744,36 @@ BOOLEAN WINAPI DECLSPEC_HOTPATCH RtlFreeHeap( HANDLE heap, ULONG flags, void *pt
 
     flags &= HEAP_NO_SERIALIZE;
     flags |= heapPtr->flags;
+
     if (!(flags & HEAP_NO_SERIALIZE)) RtlEnterCriticalSection( &heapPtr->critSection );
+    status = HEAP_std_free( heap, flags, ptr );
+    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
+
+    TRACE("(%p,%08x,%p), status %#x\n", heapPtr, flags, ptr, status );
+    if (!status) return TRUE;
+    RtlSetLastWin32ErrorAndNtStatusFromNtStatus( status );
+    return FALSE;
+}
+
+NTSTATUS HEAP_std_free( HANDLE heap, ULONG flags, void *ptr )
+{
+    ARENA_INUSE *pInUse;
+    HEAP *heapPtr = heap;
+    SUBHEAP *subheap;
 
     /* Inform valgrind we are trying to free memory, so it can throw up an error message */
     notify_free( ptr );
 
     /* Some sanity checks */
     pInUse  = (ARENA_INUSE *)ptr - 1;
-    if (!validate_block_pointer( heapPtr, &subheap, pInUse )) goto error;
+    if (!validate_block_pointer( heapPtr, &subheap, pInUse )) return STATUS_INVALID_PARAMETER;
 
     if (!subheap)
         free_large_block( heapPtr, flags, ptr );
     else
         HEAP_MakeInUseBlockFree( subheap, pInUse );
 
-    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-    TRACE("(%p,%08x,%p): returning TRUE\n", heap, flags, ptr );
-    return TRUE;
-
-error:
-    if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
-    RtlSetLastWin32ErrorAndNtStatusFromNtStatus( STATUS_INVALID_PARAMETER );
-    TRACE("(%p,%08x,%p): returning FALSE\n", heap, flags, ptr );
-    return FALSE;
+    return STATUS_SUCCESS;
 }
 
 
