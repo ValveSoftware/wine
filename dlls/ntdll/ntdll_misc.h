@@ -115,6 +115,7 @@ extern enum loadorder get_load_order( const WCHAR *app_name, const UNICODE_STRIN
 static inline TEB64 *NtCurrentTeb64(void) { return (TEB64 *)NtCurrentTeb()->GdiBatchCount; }
 #endif
 
+NTSTATUS HEAP_std_allocate( HANDLE heap, ULONG flags, SIZE_T size, void **out );
 NTSTATUS HEAP_std_free( HANDLE heap, ULONG flags, void *ptr );
 NTSTATUS HEAP_std_get_allocated_size( HANDLE heap, ULONG flags, const void *ptr, SIZE_T *out );
 
