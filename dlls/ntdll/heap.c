@@ -2003,39 +2003,40 @@ BOOLEAN WINAPI RtlUnlockHeap( HANDLE heap )
  */
 SIZE_T WINAPI RtlSizeHeap( HANDLE heap, ULONG flags, const void *ptr )
 {
-    SIZE_T ret;
-    const ARENA_INUSE *pArena;
-    SUBHEAP *subheap;
     HEAP *heapPtr = HEAP_GetPtr( heap );
+    NTSTATUS status;
+    SIZE_T size = ~(SIZE_T)0;
 
     if (!heapPtr)
     {
         RtlSetLastWin32ErrorAndNtStatusFromNtStatus( STATUS_INVALID_HANDLE );
         return ~(SIZE_T)0;
     }
+
     flags &= HEAP_NO_SERIALIZE;
     flags |= heapPtr->flags;
-    if (!(flags & HEAP_NO_SERIALIZE)) RtlEnterCriticalSection( &heapPtr->critSection );
 
-    pArena = (const ARENA_INUSE *)ptr - 1;
-    if (!validate_block_pointer( heapPtr, &subheap, pArena ))
-    {
-        RtlSetLastWin32ErrorAndNtStatusFromNtStatus( STATUS_INVALID_PARAMETER );
-        ret = ~(SIZE_T)0;
-    }
-    else if (!subheap)
-    {
-        const ARENA_LARGE *large_arena = (const ARENA_LARGE *)ptr - 1;
-        ret = large_arena->data_size;
-    }
-    else
-    {
-        ret = (pArena->size & ARENA_SIZE_MASK) - pArena->unused_bytes;
-    }
+    if (!(flags & HEAP_NO_SERIALIZE)) RtlEnterCriticalSection( &heapPtr->critSection );
+    status = HEAP_std_get_allocated_size( heap, flags, ptr, &size );
     if (!(flags & HEAP_NO_SERIALIZE)) RtlLeaveCriticalSection( &heapPtr->critSection );
 
-    TRACE("(%p,%08x,%p): returning %08lx\n", heap, flags, ptr, ret );
-    return ret;
+    TRACE("(%p,%08x,%p): status %#x, size %08lx\n", heapPtr, flags, ptr, status, size );
+    if (!status) return size;
+    RtlSetLastWin32ErrorAndNtStatusFromNtStatus( status );
+    return ~(SIZE_T)0;
+}
+
+NTSTATUS HEAP_std_get_allocated_size( HANDLE heap, ULONG flags, const void *ptr, SIZE_T *out )
+{
+    const ARENA_LARGE *large_arena = (const ARENA_LARGE *)ptr - 1;
+    const ARENA_INUSE *arena = (const ARENA_INUSE *)ptr - 1;
+    HEAP *heapPtr = heap;
+    SUBHEAP *subheap;
+
+    if (!validate_block_pointer( heapPtr, &subheap, arena )) return STATUS_INVALID_PARAMETER;
+    else if (!subheap) *out = large_arena->data_size;
+    else *out = (arena->size & ARENA_SIZE_MASK) - arena->unused_bytes;
+    return STATUS_SUCCESS;
 }
 
 
