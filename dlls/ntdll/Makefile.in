@@ -18,6 +18,7 @@ C_SRCS = \
 	exception.c \
 	handletable.c \
 	heap.c \
+	heap_lfh.c \
 	large_int.c \
 	loader.c \
 	loadorder.c \
