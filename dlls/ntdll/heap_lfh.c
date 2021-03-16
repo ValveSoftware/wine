@@ -21,37 +21,1112 @@
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 
+#include "wine/list.h"
+#include "wine/debug.h"
+
 #include "ntdll_misc.h"
 
-NTSTATUS HEAP_lfh_allocate( HANDLE std_heap, ULONG flags, SIZE_T size, void **out )
+WINE_DEFAULT_DEBUG_CHANNEL(heap);
+
+typedef struct LFH_ptr LFH_ptr;
+typedef struct LFH_block LFH_block;
+typedef enum LFH_block_type LFH_block_type;
+typedef struct LFH_arena LFH_arena;
+typedef struct LFH_class LFH_class;
+typedef struct LFH_heap LFH_heap;
+typedef struct LFH_slist LFH_slist;
+
+#define ARENA_HEADER_SIZE (sizeof(LFH_arena))
+
+#define LARGE_ARENA_SIZE 0x400000 /* 4MiB */
+#define LARGE_ARENA_MASK (LARGE_ARENA_SIZE - 1)
+
+#define BLOCK_ARENA_SIZE 0x10000 /* 64kiB */
+#define BLOCK_ARENA_MASK (BLOCK_ARENA_SIZE - 1)
+
+#define SMALL_CLASS_STEP     0x20
+#define SMALL_CLASS_MASK     (SMALL_CLASS_STEP - 1)
+#define SMALL_CLASS_MIN_SIZE SMALL_CLASS_STEP
+#define SMALL_CLASS_MAX_SIZE 0x800
+#define SMALL_CLASS_COUNT    ((SMALL_CLASS_MAX_SIZE - SMALL_CLASS_MIN_SIZE) / SMALL_CLASS_STEP + 1)
+#define SMALL_CLASS_FIRST    0
+#define SMALL_CLASS_LAST     (SMALL_CLASS_FIRST + SMALL_CLASS_COUNT - 1)
+
+#define MEDIUM_CLASS_STEP     (16 * SMALL_CLASS_STEP)
+#define MEDIUM_CLASS_MASK     (MEDIUM_CLASS_STEP - 1)
+#define MEDIUM_CLASS_MIN_SIZE SMALL_CLASS_MAX_SIZE
+#define MEDIUM_CLASS_MAX_SIZE ((BLOCK_ARENA_SIZE - ARENA_HEADER_SIZE - ARENA_HEADER_SIZE) / 2)
+#define MEDIUM_CLASS_COUNT    ((MEDIUM_CLASS_MAX_SIZE - MEDIUM_CLASS_MIN_SIZE + MEDIUM_CLASS_MASK) / MEDIUM_CLASS_STEP + 1)
+#define MEDIUM_CLASS_FIRST    (SMALL_CLASS_LAST + 1)
+#define MEDIUM_CLASS_LAST     (MEDIUM_CLASS_FIRST + MEDIUM_CLASS_COUNT - 1)
+
+#define LARGE_CLASS_STEP      BLOCK_ARENA_SIZE
+#define LARGE_CLASS_MASK      (LARGE_CLASS_STEP - 1)
+#define LARGE_CLASS_MIN_SIZE  (BLOCK_ARENA_SIZE - ARENA_HEADER_SIZE)
+#define LARGE_CLASS_MAX_SIZE  (LARGE_ARENA_SIZE / 2 - ARENA_HEADER_SIZE) /* we need an arena header for every large block */
+#define LARGE_CLASS_COUNT     ((LARGE_CLASS_MAX_SIZE - LARGE_CLASS_MIN_SIZE) / LARGE_CLASS_STEP + 1)
+#define LARGE_CLASS_FIRST     0
+#define LARGE_CLASS_LAST      (LARGE_CLASS_FIRST + LARGE_CLASS_COUNT - 1)
+
+#define TOTAL_BLOCK_CLASS_COUNT (MEDIUM_CLASS_LAST + 1)
+#define TOTAL_LARGE_CLASS_COUNT (LARGE_CLASS_LAST + 1)
+
+struct LFH_slist
 {
-    return STATUS_NOT_IMPLEMENTED;
+    LFH_slist *next;
+};
+
+static inline void LFH_slist_push(LFH_slist **list, LFH_slist *entry)
+{
+    /* There will be no ABA issue here, other threads can only replace
+     * list->next with a different entry, or NULL. */
+    entry->next = __atomic_load_n(list, __ATOMIC_RELAXED);
+    while (!__atomic_compare_exchange_n(list, &entry->next, entry, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE));
 }
 
-NTSTATUS HEAP_lfh_free( HANDLE std_heap, ULONG flags, void *ptr )
+static inline LFH_slist *LFH_slist_flush(LFH_slist **list)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    if (!__atomic_load_n(list, __ATOMIC_RELAXED)) return NULL;
+    return __atomic_exchange_n(list, NULL, __ATOMIC_ACQUIRE);
 }
 
-NTSTATUS HEAP_lfh_reallocate( HANDLE std_heap, ULONG flags, void *ptr, SIZE_T size, void **out )
+/* be sure to keep these different from ARENA_INUSE magic */
+enum LFH_block_type
 {
-    return STATUS_NOT_IMPLEMENTED;
+    LFH_block_type_used = 0xa55a5aa5a55a5aa5ul,
+    LFH_block_type_free = 0xc33c3cc3c33c3cc3ul,
+};
+
+struct DECLSPEC_ALIGN(16) LFH_block
+{
+    union
+    {
+        ssize_t next_free;
+        LFH_slist entry_defer;
+        size_t alloc_size;
+    };
+
+    LFH_block_type type;
+};
+
+C_ASSERT(sizeof(LFH_block) == 0x10);
+C_ASSERT(offsetof(LFH_block, entry_defer) == 0);
+
+struct DECLSPEC_ALIGN(16) LFH_arena
+{
+    ssize_t next_free;
+    LFH_arena *class_entry;
+
+    union
+    {
+        LFH_arena *parent;
+        LFH_class *class;
+    };
+
+    union
+    {
+        size_t huge_size;
+        size_t used_count;
+    };
+};
+
+#ifdef _WIN64
+C_ASSERT(sizeof(LFH_arena) == 0x20);
+#else
+C_ASSERT(sizeof(LFH_arena) == 0x10);
+#endif
+
+struct LFH_class
+{
+    LFH_arena *next;
+    size_t     size;
+};
+
+struct LFH_heap
+{
+    LFH_slist *list_defer;
+    LFH_arena *cached_large_arena;
+
+    LFH_class block_class[TOTAL_BLOCK_CLASS_COUNT];
+    LFH_class large_class[TOTAL_LARGE_CLASS_COUNT];
+
+    SLIST_ENTRY entry_orphan;
+#ifdef _WIN64
+    void *pad[0xc2];
+#else
+    void *pad[0xc3];
+#endif
+};
+
+C_ASSERT(TOTAL_BLOCK_CLASS_COUNT == 0x7d);
+C_ASSERT(TOTAL_LARGE_CLASS_COUNT == 0x20);
+
+/* arena->class/arena->parent pointer low bits are used to discriminate between the two */
+C_ASSERT(offsetof(LFH_heap, block_class[0]) > 0);
+C_ASSERT(offsetof(LFH_heap, large_class[TOTAL_LARGE_CLASS_COUNT]) < BLOCK_ARENA_SIZE);
+
+/* helpers to retrieve parent arena from a child, or class pointer from a large or block arena */
+static inline LFH_arena *LFH_parent_from_arena(const LFH_arena *arena)
+{
+    if (!arena->parent) return (LFH_arena *)arena;
+    if (!((UINT_PTR)(arena)->parent & BLOCK_ARENA_MASK)) return arena->parent;
+    return (LFH_arena *)arena;
 }
 
-NTSTATUS HEAP_lfh_get_allocated_size( HANDLE std_heap, ULONG flags, const void *ptr, SIZE_T *out )
+static inline LFH_class *LFH_class_from_arena(const LFH_arena *arena)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    const LFH_arena *parent = LFH_parent_from_arena(arena);
+    if ((UINT_PTR)parent->class & BLOCK_ARENA_MASK) return parent->class;
+    return NULL;
 }
 
-NTSTATUS HEAP_lfh_validate( HANDLE std_heap, ULONG flags, const void *ptr )
+/* make sure its aligns to power of two so we can mask class pointers in LFH_heap_from_arena */
+#ifdef _WIN64
+C_ASSERT(sizeof(LFH_heap) == 0x1000);
+#else
+C_ASSERT(sizeof(LFH_heap) == 0x800);
+#endif
+
+/* helper to retrieve the heap from an arena, using its class pointer */
+static inline LFH_heap *LFH_heap_from_arena(const LFH_arena *arena)
 {
-    return STATUS_NOT_IMPLEMENTED;
+    LFH_class *class = LFH_class_from_arena(arena);
+    return (LFH_heap *)((UINT_PTR)class & ~(sizeof(LFH_heap) - 1));
+}
+
+/* helpers to retrieve block pointers to the containing block or large (maybe child) arena */
+static inline LFH_arena *LFH_large_arena_from_block(const LFH_block *block)
+{
+    return (LFH_arena *)((UINT_PTR)block & ~BLOCK_ARENA_MASK);
+}
+
+static inline LFH_arena *LFH_block_arena_from_block(const LFH_block *block)
+{
+    return LFH_large_arena_from_block(block) + 1;
+}
+
+static inline LFH_arena *LFH_arena_from_block(const LFH_block *block)
+{
+    LFH_arena *block_arena = LFH_block_arena_from_block(block);
+    if (block_arena == (LFH_arena *)block) return LFH_large_arena_from_block(block);
+    return block_arena;
+}
+
+/* helpers to translate between data pointer and LFH_block header */
+static inline LFH_block *LFH_block_from_ptr(const LFH_ptr *ptr)
+{
+    return ((LFH_block *)ptr) - 1;
+}
+
+static inline void *LFH_ptr_from_block(const LFH_block *block)
+{
+    return (LFH_ptr *)(block + 1);
+}
+
+static inline size_t LFH_block_get_class_size(const LFH_block *block)
+{
+    const LFH_arena *arena = LFH_arena_from_block(block);
+    const LFH_class *class = LFH_class_from_arena(arena);
+    if (class) return class->size;
+    return arena->huge_size;
+}
+
+static inline size_t LFH_block_get_alloc_size(const LFH_block *block, ULONG flags)
+{
+    return block->alloc_size;
+}
+
+static inline size_t LFH_get_class_size(ULONG flags, size_t size)
+{
+    size_t extra = sizeof(LFH_block) + ((flags & HEAP_TAIL_CHECKING_ENABLED) ? 16 : 0);
+    if (size + extra < size) return ~(size_t)0;
+    return size + extra;
+}
+
+static inline void *LFH_memory_allocate(size_t size)
+{
+    void *addr = NULL;
+    SIZE_T alloc_size = size;
+
+    if (NtAllocateVirtualMemory(NtCurrentProcess(), (void **)&addr, 0, &alloc_size,
+                                MEM_RESERVE | MEM_COMMIT, PAGE_READWRITE))
+        return NULL;
+
+    return addr;
+}
+
+static inline BOOLEAN LFH_memory_deallocate(void *addr, size_t size)
+{
+    SIZE_T release_size = 0;
+
+    if (NtFreeVirtualMemory(NtCurrentProcess(), &addr, &release_size, MEM_RELEASE))
+        return FALSE;
+
+    return TRUE;
+}
+
+static inline LFH_block *LFH_arena_get_block(const LFH_arena *arena, size_t offset)
+{
+    return (LFH_block *)((UINT_PTR)arena + offset);
+}
+
+static inline void LFH_arena_push_block(LFH_arena *arena, LFH_block *block)
+{
+    block->type = LFH_block_type_free;
+    block->next_free = arena->next_free;
+    arena->next_free = (UINT_PTR)block - (UINT_PTR)arena;
+    arena->used_count--;
+}
+
+static inline LFH_block *LFH_arena_pop_block(LFH_arena *arena)
+{
+    if (arena->next_free > 0)
+    {
+        LFH_block *block = LFH_arena_get_block(arena, arena->next_free);
+        arena->next_free = block->next_free;
+        arena->used_count++;
+        return block;
+    }
+    else
+    {
+        LFH_arena *child, *large_arena = LFH_large_arena_from_block((LFH_block *)arena);
+        LFH_class *class = LFH_class_from_arena(arena);
+        LFH_block *block = LFH_arena_get_block(arena, -arena->next_free);
+        ssize_t extra = 0, limit;
+
+        if (arena == large_arena)
+        {
+            extra = ARENA_HEADER_SIZE;
+            limit = LARGE_ARENA_SIZE;
+            child = LFH_large_arena_from_block(block);
+            if (arena != child) child->parent = arena;
+        }
+        else limit = LFH_class_from_arena(large_arena)->size;
+
+        arena->next_free -= class->size + extra;
+        if (-arena->next_free > limit - class->size)
+            arena->next_free = 0;
+
+        arena->used_count++;
+        return block;
+    }
+}
+
+static inline int LFH_arena_is_empty(LFH_arena *arena)
+{
+    return arena->next_free == 0;
+}
+
+static inline int LFH_arena_is_used(LFH_arena *arena)
+{
+    return arena->used_count > 0;
+}
+
+static inline int LFH_class_is_block(LFH_heap *heap, LFH_class *class)
+{
+    return class >= heap->block_class && class < (heap->block_class + TOTAL_BLOCK_CLASS_COUNT);
+}
+
+static void LFH_class_initialize(LFH_heap *heap, LFH_class *class, size_t index)
+{
+    class->next = NULL;
+
+    if (LFH_class_is_block(heap, class))
+    {
+        if (index <= SMALL_CLASS_LAST)
+            class->size = min(SMALL_CLASS_MIN_SIZE + SMALL_CLASS_STEP * (index - SMALL_CLASS_FIRST), SMALL_CLASS_MAX_SIZE);
+        else
+            class->size = min(MEDIUM_CLASS_MIN_SIZE + MEDIUM_CLASS_STEP * (index - MEDIUM_CLASS_FIRST), MEDIUM_CLASS_MAX_SIZE);
+    }
+    else
+    {
+        class->size = min(LARGE_CLASS_MIN_SIZE + LARGE_CLASS_STEP * (index - LARGE_CLASS_FIRST), LARGE_CLASS_MAX_SIZE);
+    }
+}
+
+static inline LFH_arena *LFH_class_pop_arena(LFH_class *class)
+{
+    LFH_arena *arena = class->next;
+    if (!arena) return NULL;
+    class->next = arena->class_entry;
+    return arena;
+}
+
+static inline void LFH_class_remove_arena(LFH_class *class, LFH_arena *arena)
+{
+    LFH_arena **next = &class->next;
+    while (*next != arena) next = &(*next)->class_entry;
+    *next = arena->class_entry;
+}
+
+static inline LFH_arena *LFH_class_peek_arena(LFH_class *class)
+{
+    return class->next;
+}
+
+static inline void LFH_class_push_arena(LFH_class *class, LFH_arena *arena)
+{
+    arena->class_entry = class->next;
+    class->next = arena;
+}
+
+static inline LFH_class *LFH_heap_get_class(LFH_heap *heap, size_t size)
+{
+    if (size == 0)
+        return &heap->block_class[0];
+    else if (size <= SMALL_CLASS_MAX_SIZE)
+        return &heap->block_class[SMALL_CLASS_FIRST + (size + SMALL_CLASS_MASK - SMALL_CLASS_MIN_SIZE) / SMALL_CLASS_STEP];
+    else if (size <= MEDIUM_CLASS_MAX_SIZE)
+        return &heap->block_class[MEDIUM_CLASS_FIRST + (size + MEDIUM_CLASS_MASK - MEDIUM_CLASS_MIN_SIZE) / MEDIUM_CLASS_STEP];
+    else if (size <= LARGE_CLASS_MAX_SIZE)
+        return &heap->large_class[LARGE_CLASS_FIRST + (size + LARGE_CLASS_MASK - LARGE_CLASS_MIN_SIZE) / LARGE_CLASS_STEP];
+    else
+        return NULL;
+}
+
+static void LFH_arena_initialize(LFH_heap *heap, LFH_class *class, LFH_arena *arena, size_t huge_size)
+{
+    arena->class = class;
+    arena->next_free = -ARENA_HEADER_SIZE;
+
+    if (class == NULL)
+        arena->huge_size = huge_size;
+    else
+        arena->used_count = 0;
+}
+
+static LFH_arena *LFH_acquire_arena(LFH_heap *heap, LFH_class *class);
+static BOOLEAN LFH_release_arena(LFH_heap *heap, LFH_arena *arena);
+
+static inline LFH_block *LFH_allocate_block(LFH_heap *heap, LFH_class *class, LFH_arena *arena);
+static inline BOOLEAN LFH_deallocate_block(LFH_heap *heap, LFH_arena *arena, LFH_block *block);
+
+static inline BOOLEAN LFH_deallocate_deferred_blocks(LFH_heap *heap)
+{
+    LFH_slist *entry = LFH_slist_flush(&heap->list_defer);
+
+    while (entry)
+    {
+        LFH_block *block = LIST_ENTRY(entry, LFH_block, entry_defer);
+        entry = entry->next;
+
+        if (!LFH_deallocate_block(heap, LFH_arena_from_block(block), block))
+            return FALSE;
+    }
+
+    return TRUE;
+}
+
+static inline void LFH_deallocated_cached_arenas(LFH_heap *heap)
+{
+    if (!heap->cached_large_arena) return;
+    LFH_memory_deallocate(heap->cached_large_arena, LARGE_ARENA_SIZE);
+    heap->cached_large_arena = NULL;
+}
+
+static inline size_t LFH_huge_alloc_size(size_t size)
+{
+    return (ARENA_HEADER_SIZE + size + BLOCK_ARENA_MASK) & ~BLOCK_ARENA_MASK;
+}
+
+static inline LFH_arena *LFH_allocate_huge_arena(LFH_heap *heap, size_t size)
+{
+    LFH_arena *arena;
+    size_t alloc_size = LFH_huge_alloc_size(size);
+    if (alloc_size < size) return NULL;
+
+    if ((arena = LFH_memory_allocate(alloc_size)))
+        LFH_arena_initialize(heap, NULL, arena, size);
+
+    return arena;
+}
+
+static inline LFH_arena *LFH_allocate_large_arena(LFH_heap *heap, LFH_class *class)
+{
+    LFH_arena *arena;
+
+    if ((arena = heap->cached_large_arena) ||
+        (arena = LFH_memory_allocate(LARGE_ARENA_SIZE)))
+    {
+        heap->cached_large_arena = NULL;
+        LFH_arena_initialize(heap, class, arena, 0);
+        LFH_class_push_arena(class, arena);
+    }
+
+    return arena;
+}
+
+static inline LFH_arena *LFH_allocate_block_arena(LFH_heap *heap, LFH_class *large_class, LFH_class *block_class)
+{
+    LFH_arena *large_arena;
+    LFH_arena *arena = NULL;
+
+    if ((large_arena = LFH_acquire_arena(heap, large_class)))
+    {
+        arena = (LFH_arena *)LFH_allocate_block(heap, large_class, large_arena);
+        LFH_arena_initialize(heap, block_class, arena, 0);
+        LFH_class_push_arena(block_class, arena);
+    }
+
+    return arena;
+}
+
+static inline LFH_arena *LFH_acquire_arena(LFH_heap *heap, LFH_class *class)
+{
+    LFH_arena *arena;
+
+    if (!(arena = LFH_class_peek_arena(class)))
+    {
+        if (LFH_class_is_block(heap, class))
+            arena = LFH_allocate_block_arena(heap, &heap->large_class[0], class);
+        else
+            arena = LFH_allocate_large_arena(heap, class);
+    }
+
+    return arena;
+}
+
+static inline BOOLEAN LFH_release_arena(LFH_heap *heap, LFH_arena *arena)
+{
+    LFH_arena *large_arena = LFH_large_arena_from_block((LFH_block *)arena);
+    if (arena == large_arena && !heap->cached_large_arena)
+    {
+        heap->cached_large_arena = arena;
+        return TRUE;
+    }
+    else if (arena == large_arena)
+        return LFH_memory_deallocate(arena, LARGE_ARENA_SIZE);
+    else
+        return LFH_deallocate_block(heap, large_arena, (LFH_block *)arena);
+};
+
+static inline LFH_block *LFH_allocate_block(LFH_heap *heap, LFH_class *class, LFH_arena *arena)
+{
+    LFH_block *block = LFH_arena_pop_block(arena);
+    if (LFH_arena_is_empty(arena))
+        LFH_class_pop_arena(class);
+    return block;
+}
+
+static inline BOOLEAN LFH_deallocate_block(LFH_heap *heap, LFH_arena *arena, LFH_block *block)
+{
+    LFH_class *class = LFH_class_from_arena(arena);
+
+    arena = LFH_parent_from_arena(arena);
+    if (LFH_arena_is_empty(arena))
+        LFH_class_push_arena(class, arena);
+
+    LFH_arena_push_block(arena, block);
+    if (LFH_arena_is_used(arena))
+        return TRUE;
+
+    LFH_class_remove_arena(class, arena);
+    return LFH_release_arena(heap, arena);
+}
+
+static void LFH_heap_initialize(LFH_heap *heap)
+{
+    size_t i;
+
+    for (i = 0; i < TOTAL_LARGE_CLASS_COUNT; ++i)
+        LFH_class_initialize(heap, &heap->large_class[i], i);
+    for (i = 0; i < TOTAL_BLOCK_CLASS_COUNT; ++i)
+        LFH_class_initialize(heap, &heap->block_class[i], i);
+
+    heap->list_defer = NULL;
+    heap->cached_large_arena = NULL;
+}
+
+static SLIST_HEADER *LFH_orphan_list(void)
+{
+    static SLIST_HEADER *header;
+    SLIST_HEADER *ptr, *expected = NULL;
+    LFH_heap *tmp;
+
+    C_ASSERT(sizeof(LFH_heap) >= sizeof(SLIST_HEADER));
+
+    if ((ptr = __atomic_load_n(&header, __ATOMIC_RELAXED)))
+        return ptr;
+
+    if (!(ptr = LFH_memory_allocate(BLOCK_ARENA_SIZE)))
+        return NULL;
+
+    RtlInitializeSListHead(ptr);
+    for (tmp = (LFH_heap *)ptr + 1; tmp < (LFH_heap *)ptr + BLOCK_ARENA_SIZE / sizeof(*tmp); tmp++)
+    {
+        LFH_heap_initialize(tmp);
+        RtlInterlockedPushEntrySList(ptr, &tmp->entry_orphan);
+    }
+
+    if (__atomic_compare_exchange_n(&header, &expected, ptr, 0, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE))
+        return ptr;
+
+    LFH_memory_deallocate(ptr, BLOCK_ARENA_SIZE);
+    return expected;
+}
+
+static void LFH_heap_finalize(LFH_heap *heap)
+{
+    LFH_arena *arena;
+
+    LFH_deallocate_deferred_blocks(heap);
+
+    for (size_t i = 0; i < TOTAL_BLOCK_CLASS_COUNT; ++i)
+    {
+        while ((arena = LFH_class_pop_arena(&heap->block_class[i])))
+        {
+            WARN("block arena %p still has used blocks\n", arena);
+            LFH_release_arena(heap, arena);
+        }
+    }
+
+    for (size_t i = 0; i < TOTAL_LARGE_CLASS_COUNT; ++i)
+    {
+        while ((arena = LFH_class_pop_arena(&heap->large_class[i])))
+        {
+            WARN("large arena %p still has used blocks\n", arena);
+            LFH_memory_deallocate(arena, LARGE_ARENA_SIZE);
+        }
+    }
+
+    LFH_deallocated_cached_arenas(heap);
+}
+
+static LFH_heap *LFH_heap_allocate(void)
+{
+    SLIST_HEADER *list_orphan = LFH_orphan_list();
+    LFH_heap *heap, *tmp;
+
+    heap = LFH_memory_allocate(BLOCK_ARENA_SIZE);
+    if (!heap)
+        return NULL;
+
+    for (tmp = heap + 1; tmp < heap + BLOCK_ARENA_SIZE / sizeof(*tmp); tmp++)
+    {
+        LFH_heap_initialize(tmp);
+        RtlInterlockedPushEntrySList(list_orphan, &tmp->entry_orphan);
+    }
+
+    LFH_heap_initialize(heap);
+    return heap;
+}
+
+static LFH_heap *LFH_create_thread_heap(void)
+{
+    SLIST_ENTRY *entry;
+    LFH_heap *heap;
+
+    if ((entry = RtlInterlockedPopEntrySList(LFH_orphan_list())))
+        heap = LIST_ENTRY(entry, LFH_heap, entry_orphan);
+    else
+        heap = LFH_heap_allocate();
+
+    return (NtCurrentTeb()->Reserved5[2] = heap);
+}
+
+static inline LFH_heap *LFH_thread_heap(BOOL create)
+{
+    LFH_heap *heap = (LFH_heap *)NtCurrentTeb()->Reserved5[2];
+    if (!heap && create) return LFH_create_thread_heap();
+    return heap;
+}
+
+static void LFH_dump_arena(LFH_heap *heap, LFH_class *class, LFH_arena *arena)
+{
+    LFH_arena *large_arena = LFH_large_arena_from_block((LFH_block *)arena);
+    LFH_arena *block_arena = LFH_block_arena_from_block((LFH_block *)arena);
+
+    if (arena == block_arena)
+        WARN("    block arena: %p-%p", arena, (void *)((UINT_PTR)large_arena + BLOCK_ARENA_SIZE - 1));
+    else if (arena == large_arena)
+        WARN("    large arena: %p-%p", arena, (void *)((UINT_PTR)large_arena + LARGE_ARENA_SIZE - 1));
+
+    WARN(" heap: %p class: %p parent: %p free: %Id used: %Id\n",
+          LFH_heap_from_arena(arena), LFH_class_from_arena(arena), LFH_parent_from_arena(arena), arena->next_free, arena->used_count);
+}
+
+static void LFH_dump_class(LFH_heap *heap, LFH_class *class)
+{
+    LFH_arena *arena = class->next;
+    if (!arena) return;
+
+    if (LFH_class_is_block(heap, class))
+        WARN("  block class: %p size: %Ix\n", class, class->size);
+    else
+        WARN("  large class: %p size: %Ix\n", class, class->size);
+
+    while (arena)
+    {
+        LFH_dump_arena(heap, class, arena);
+        arena = arena->class_entry;
+    }
+}
+
+static void LFH_dump_heap(LFH_heap *heap)
+{
+    size_t i;
+
+    WARN("heap: %p\n", heap);
+
+    for (i = 0; i < TOTAL_BLOCK_CLASS_COUNT; ++i)
+        LFH_dump_class(heap, &heap->block_class[i]);
+
+    for (i = 0; i < TOTAL_LARGE_CLASS_COUNT; ++i)
+        LFH_dump_class(heap, &heap->large_class[i]);
+}
+
+static BOOLEAN LFH_validate_arena(ULONG flags, const LFH_arena *arena);
+static BOOLEAN LFH_validate_heap(ULONG flags, const LFH_heap *heap);
+
+static inline BOOLEAN LFH_validate_block(ULONG flags, const LFH_block *block)
+{
+    const LFH_arena *arena = LFH_arena_from_block(block);
+    const LFH_arena *large_arena = LFH_large_arena_from_block(block);
+    const LFH_arena *block_arena = LFH_block_arena_from_block(block);
+    const LFH_arena *arena_arena = LFH_large_arena_from_block((LFH_block *)arena);
+    const char *err = NULL;
+
+    if (flags & HEAP_VALIDATE)
+        return LFH_validate_arena(flags, arena);
+
+    if (!arena)
+        err = "invalid arena";
+    else if (arena != arena_arena && arena != (arena_arena + 1))
+        err = "invalid arena alignment";
+    else if (arena == block_arena)
+    {
+        if ((UINT_PTR)block < (UINT_PTR)block_arena + ARENA_HEADER_SIZE)
+            err = "invalid block alignment";
+        if (((UINT_PTR)block & (sizeof(*block) - 1)))
+            err = "invalid block alignment";
+    }
+    else if (arena != large_arena)
+        err = "large/huge arena mismatch";
+    else if ((UINT_PTR)block != (UINT_PTR)block_arena)
+        err = "invalid block for large/huge arena";
+
+    if (err) WARN("%08x %p: %s\n", flags, block, err);
+    return err == NULL;
+}
+
+static BOOLEAN LFH_validate_free_block(ULONG flags, const LFH_block *block)
+{
+    const char *err = NULL;
+
+    if (!LFH_validate_block(flags, block))
+        return FALSE;
+    if (block->type != LFH_block_type_free)
+        err = "invalid free block type";
+
+    if (err) WARN("%08x %p: %s\n", flags, block, err);
+    return err == NULL;
+}
+
+static BOOLEAN LFH_validate_defer_block(ULONG flags, const LFH_block *block)
+{
+    const char *err = NULL;
+
+    if (!LFH_validate_block(flags, block))
+        return FALSE;
+    if (block->type != LFH_block_type_free)
+        err = "invalid defer block type";
+    else if (flags & HEAP_FREE_CHECKING_ENABLED)
+    {
+        const unsigned int *data = (const unsigned int *)LFH_ptr_from_block(block);
+        size_t class_size = LFH_block_get_class_size(block);
+        for (size_t i = 0; i < class_size / 4 - (data - (const unsigned int *)block) && !err; ++i)
+            if (data[i] != 0xfeeefeee) err = "invalid free filler";
+    }
+
+    if (err) WARN("%08x %p: %s\n", flags, block, err);
+    return err == NULL;
+}
+
+static inline BOOLEAN LFH_validate_used_block(ULONG flags, const LFH_block *block)
+{
+    const char *err = NULL;
+
+    if (!LFH_validate_block(flags, block))
+        return FALSE;
+    if (block->type != LFH_block_type_used)
+        err = "invalid used block type";
+    else if (flags & HEAP_TAIL_CHECKING_ENABLED)
+    {
+        const unsigned char *data = (const unsigned char *)LFH_ptr_from_block(block);
+        size_t alloc_size = LFH_block_get_alloc_size(block, flags);
+        size_t class_size = LFH_block_get_class_size(block);
+        for (size_t i = alloc_size; i < class_size - (data - (const unsigned char *)block) && !err; ++i)
+            if (data[i] != 0xab) err = "invalid tail filler";
+    }
+
+    if (err) WARN("%08x %p: %s\n", flags, block, err);
+    return err == NULL;
+}
+
+static BOOLEAN LFH_validate_arena_free_blocks(ULONG flags, const LFH_arena *arena)
+{
+    ssize_t offset = arena->next_free;
+    while (offset > 0)
+    {
+        LFH_block *block = LFH_arena_get_block(arena, offset);
+        if (!LFH_validate_free_block(flags, block))
+            return FALSE;
+        offset = block->next_free;
+    }
+
+    return TRUE;
+}
+
+static BOOLEAN LFH_validate_arena(ULONG flags, const LFH_arena *arena)
+{
+    const char *err = NULL;
+    const LFH_arena *parent;
+    const LFH_arena *block_arena = LFH_block_arena_from_block((LFH_block *)arena);
+    const LFH_arena *large_arena = LFH_large_arena_from_block((LFH_block *)arena);
+
+    if (flags & HEAP_VALIDATE)
+        return LFH_validate_heap(flags, LFH_heap_from_arena(arena));
+
+    if (arena != large_arena && arena != block_arena)
+        err = "invalid arena alignment";
+    else if (arena == block_arena)
+    {
+        if (!LFH_validate_block(flags, (LFH_block *)arena))
+            err = "invalid block arena";
+        else if (!LFH_validate_arena_free_blocks(flags, arena))
+            err = "invalid block arena free list";
+    }
+    else if (arena == large_arena && !LFH_class_from_arena(arena))
+    {
+        if (arena->huge_size <= LARGE_CLASS_MAX_SIZE)
+            err = "invalid huge arena size";
+    }
+    else if (arena == large_arena && (parent = LFH_parent_from_arena(arena)) != arena)
+    {
+        if (arena > parent || LFH_large_arena_from_block((LFH_block *)parent) != parent)
+            err = "invalid child arena parent";
+    }
+    else
+    {
+        if (!LFH_validate_arena_free_blocks(flags, arena))
+            err = "invalid large arena free list";
+    }
+
+    if (err) WARN("%08x %p: %s\n", flags, arena, err);
+    return err == NULL;
+}
+
+static BOOLEAN LFH_validate_class_arenas(ULONG flags, const LFH_class *class)
+{
+    LFH_arena *arena = class->next;
+    while (arena)
+    {
+        if (!LFH_validate_arena(flags, arena))
+            return FALSE;
+
+        arena = arena->class_entry;
+    }
+
+    return TRUE;
+}
+
+static BOOLEAN LFH_validate_heap_defer_blocks(ULONG flags, const LFH_heap *heap)
+{
+    const LFH_slist *entry = heap->list_defer;
+
+    while (entry)
+    {
+        const LFH_block *block = LIST_ENTRY(entry, LFH_block, entry_defer);
+        if (!LFH_validate_defer_block(flags, block))
+            return FALSE;
+        entry = entry->next;
+    }
+
+    return TRUE;
+}
+
+static BOOLEAN LFH_validate_heap(ULONG flags, const LFH_heap *heap)
+{
+    const char *err = NULL;
+    UINT i;
+
+    flags &= ~HEAP_VALIDATE;
+
+    if (heap != LFH_thread_heap(FALSE))
+        err = "unable to validate foreign heap";
+    else if (!LFH_validate_heap_defer_blocks(flags, heap))
+        err = "invalid heap defer blocks";
+    else
+    {
+        for (i = 0; err == NULL && i < TOTAL_BLOCK_CLASS_COUNT; ++i)
+        {
+            if (!LFH_validate_class_arenas(flags, &heap->block_class[i]))
+                return FALSE;
+        }
+
+        for (i = 0; err == NULL && i < TOTAL_LARGE_CLASS_COUNT; ++i)
+        {
+            if (!LFH_validate_class_arenas(flags, &heap->large_class[i]))
+                return FALSE;
+        }
+    }
+
+    if (err) WARN("%08x %p: %s\n", flags, heap, err);
+    return err == NULL;
+}
+
+static inline void LFH_block_initialize(LFH_block *block, ULONG flags, size_t old_size, size_t new_size, size_t class_size)
+{
+    char *ptr = (char *)LFH_ptr_from_block(block);
+
+    TRACE("block %p, flags %x, old_size %Ix, new_size %Ix, class_size %Ix, ptr %p\n", block, flags, old_size, new_size, class_size, ptr);
+
+    if ((flags & HEAP_ZERO_MEMORY) && new_size > old_size)
+        memset(ptr + old_size, 0, new_size - old_size);
+    else if ((flags & HEAP_FREE_CHECKING_ENABLED) && new_size > old_size && class_size < BLOCK_ARENA_SIZE)
+        memset(ptr + old_size, 0x55, new_size - old_size);
+
+    if ((flags & HEAP_TAIL_CHECKING_ENABLED))
+        memset(ptr + new_size, 0xab, class_size - new_size - (ptr - (char *)block));
+
+    block->type = LFH_block_type_used;
+    block->alloc_size = new_size;
+}
+
+static FORCEINLINE LFH_ptr *LFH_allocate(ULONG flags, size_t size)
+{
+    LFH_block *block = NULL;
+    LFH_class *class;
+    LFH_arena *arena;
+    LFH_heap *heap = LFH_thread_heap(TRUE);
+    size_t class_size = LFH_get_class_size(flags, size);
+
+    if (class_size == ~(size_t)0)
+        return NULL;
+
+    if (!LFH_deallocate_deferred_blocks(heap))
+        return NULL;
+
+    if ((class = LFH_heap_get_class(heap, class_size)))
+    {
+        arena = LFH_acquire_arena(heap, class);
+        if (arena) block = LFH_allocate_block(heap, class, arena);
+        if (block) LFH_block_initialize(block, flags, 0, size, LFH_block_get_class_size(block));
+    }
+    else
+    {
+        arena = LFH_allocate_huge_arena(heap, class_size);
+        if (arena) block = LFH_arena_get_block(arena, ARENA_HEADER_SIZE);
+        if (block) LFH_block_initialize(block, flags & ~HEAP_ZERO_MEMORY, 0, size, LFH_block_get_class_size(block));
+    }
+
+    LFH_deallocated_cached_arenas(heap);
+
+    if (!block) return NULL;
+    return LFH_ptr_from_block(block);
+}
+
+static FORCEINLINE BOOLEAN LFH_free(ULONG flags, LFH_ptr *ptr)
+{
+    LFH_block *block = LFH_block_from_ptr(ptr);
+    LFH_arena *arena = LFH_arena_from_block(block);
+    LFH_heap *heap = LFH_heap_from_arena(arena);
+
+    if (!LFH_class_from_arena(arena))
+        return LFH_memory_deallocate(arena, LFH_block_get_class_size(block));
+
+    if (flags & HEAP_FREE_CHECKING_ENABLED)
+    {
+        unsigned int *data = (unsigned int *)LFH_ptr_from_block(block);
+        size_t class_size = LFH_block_get_class_size(block);
+        for (size_t i = 0; i < class_size / 4 - (data - (const unsigned int *)block); ++i)
+            data[i] = 0xfeeefeee;
+    }
+
+    block->type = LFH_block_type_free;
+
+    if (heap == LFH_thread_heap(FALSE) && !(flags & HEAP_FREE_CHECKING_ENABLED))
+        LFH_deallocate_block(heap, LFH_arena_from_block(block), block);
+    else
+        LFH_slist_push(&heap->list_defer, &block->entry_defer);
+
+    return TRUE;
+}
+
+static FORCEINLINE LFH_ptr *LFH_reallocate(ULONG flags, LFH_ptr *old_ptr, size_t new_size)
+{
+    LFH_block *block = LFH_block_from_ptr(old_ptr);
+    LFH_arena *arena = LFH_arena_from_block(block);
+    LFH_heap *heap = LFH_heap_from_arena(arena);
+    size_t old_size = LFH_block_get_alloc_size(block, flags);
+    size_t old_class_size = LFH_block_get_class_size(block);
+    size_t new_class_size = LFH_get_class_size(flags, new_size);
+    LFH_class *new_class, *old_class = LFH_class_from_arena(arena);
+    LFH_ptr *new_ptr = NULL;
+
+    if (new_class_size == ~(size_t)0)
+        return NULL;
+
+    if (new_class_size <= old_class_size)
+        goto in_place;
+
+    if ((new_class = LFH_heap_get_class(heap, new_class_size)) && new_class == old_class)
+        goto in_place;
+
+    old_class_size = LFH_huge_alloc_size(old_class_size);
+    new_class_size = LFH_huge_alloc_size(new_class_size);
+    if (!new_class && !old_class && old_class_size == new_class_size)
+        goto in_place;
+
+    if (flags & HEAP_REALLOC_IN_PLACE_ONLY)
+        return NULL;
+
+    if (!(new_ptr = LFH_allocate(flags, new_size)))
+        return NULL;
+
+    memcpy(new_ptr, old_ptr, old_size);
+
+    if (LFH_free(flags, old_ptr))
+        return new_ptr;
+
+    LFH_free(flags, new_ptr);
+    return NULL;
+
+in_place:
+    LFH_block_initialize(block, flags, old_size, new_size, old_class_size);
+    return old_ptr;
+}
+
+static inline size_t LFH_get_allocated_size(ULONG flags, const LFH_ptr *ptr)
+{
+    const LFH_block *block = LFH_block_from_ptr(ptr);
+    return LFH_block_get_alloc_size(block, flags);
+}
+
+static inline BOOLEAN LFH_validate(ULONG flags, const LFH_ptr *ptr)
+{
+    const LFH_block *block = LFH_block_from_ptr(ptr);
+    const LFH_heap *heap;
+
+    /* clear HEAP_VALIDATE so we only validate block */
+    if (ptr)
+        return LFH_validate_used_block(flags & ~HEAP_VALIDATE, block);
+
+    if (!(heap = LFH_thread_heap(FALSE)))
+        return TRUE;
+
+    return LFH_validate_heap(flags, heap);
+}
+
+static inline BOOLEAN LFH_try_validate_all(ULONG flags)
+{
+    if (!(flags & HEAP_VALIDATE_ALL))
+        return TRUE;
+
+    if (LFH_validate(flags, NULL))
+        return TRUE;
+
+    LFH_dump_heap(LFH_thread_heap(FALSE));
+    return FALSE;
+}
+
+NTSTATUS HEAP_lfh_allocate(HANDLE heap, ULONG flags, SIZE_T size, void **out)
+{
+    TRACE("heap %p, flags %08x, size %lx, out %p.\n", heap, flags, size, out);
+
+    if (!LFH_try_validate_all(flags))
+        return STATUS_INVALID_PARAMETER;
+
+    if (!(*out = LFH_allocate(flags, size)))
+        return STATUS_NO_MEMORY;
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HEAP_lfh_free(HANDLE heap, ULONG flags, void *ptr)
+{
+    TRACE("heap %p, flags %08x, ptr %p.\n", heap, flags, ptr);
+
+    if (!LFH_try_validate_all(flags))
+        return STATUS_INVALID_PARAMETER;
+
+    if (!LFH_validate(flags, ptr))
+        return STATUS_INVALID_PARAMETER;
+
+    if (!LFH_free(flags, ptr))
+        return STATUS_INVALID_PARAMETER;
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HEAP_lfh_reallocate(HANDLE heap, ULONG flags, void *ptr, SIZE_T size, void **out)
+{
+    TRACE("heap %p, flags %08x, ptr %p, size %lx, out %p.\n", heap, flags, ptr, size, out);
+
+    if (!LFH_try_validate_all(flags))
+        return STATUS_INVALID_PARAMETER;
+
+    if (!LFH_validate(flags, ptr))
+        return STATUS_INVALID_PARAMETER;
+
+    if (!(*out = LFH_reallocate(flags, ptr, size)))
+        return STATUS_NO_MEMORY;
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HEAP_lfh_get_allocated_size(HANDLE heap, ULONG flags, const void *ptr, SIZE_T* out)
+{
+    TRACE("heap %p, flags %08x, ptr %p, out %p.\n", heap, flags, ptr, out);
+
+    if (!LFH_try_validate_all(flags))
+        return STATUS_INVALID_PARAMETER;
+
+    if (!LFH_validate(flags, ptr))
+        return STATUS_INVALID_PARAMETER;
+
+    *out = LFH_get_allocated_size(flags, ptr);
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS HEAP_lfh_validate(HANDLE heap, ULONG flags, const void *ptr)
+{
+    TRACE("heap %p, flags %08x, ptr %p.\n", heap, flags, ptr);
+
+    if (!LFH_try_validate_all(flags))
+        return STATUS_INVALID_PARAMETER;
+
+    if (!LFH_validate(flags, ptr))
+        return STATUS_INVALID_PARAMETER;
+
+    return STATUS_SUCCESS;
 }
 
 void HEAP_lfh_notify_thread_destroy(BOOLEAN last)
 {
+    SLIST_HEADER *list_orphan = LFH_orphan_list();
+    SLIST_ENTRY *entry_orphan = NULL;
+    LFH_heap *heap;
+
+    if (last)
+    {
+        while ((entry_orphan || (entry_orphan = RtlInterlockedFlushSList(list_orphan))))
+        {
+            LFH_heap *orphan = LIST_ENTRY(entry_orphan, LFH_heap, entry_orphan);
+            entry_orphan = entry_orphan->Next;
+            LFH_heap_finalize(orphan);
+        }
+        LFH_memory_deallocate(list_orphan, BLOCK_ARENA_SIZE);
+    }
+    else if ((heap = LFH_thread_heap(FALSE)) && LFH_validate_heap(0, heap))
+        RtlInterlockedPushEntrySList(list_orphan, &heap->entry_orphan);
 }
 
 void HEAP_lfh_set_debug_flags(ULONG flags)
 {
+    LFH_heap *heap = LFH_thread_heap(FALSE);
+    if (!heap) return;
+
+    LFH_deallocate_deferred_blocks(heap);
+    LFH_deallocated_cached_arenas(heap);
 }
