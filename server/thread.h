@@ -85,6 +85,7 @@ struct thread
     affinity_t             affinity;      /* affinity mask */
     int                    priority;      /* priority level */
     struct timeout_user   *delay_priority;/* delayed set_thread_priority */
+    timeout_t              delay_prio_time;/* last delayed set_thread_priority time */
     int                    suspend;       /* suspend count */
     int                    dbg_hidden;    /* hidden from debugger */
     obj_handle_t           desktop;       /* desktop handle */

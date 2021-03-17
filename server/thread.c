@@ -398,6 +398,7 @@ static inline void init_thread_structure( struct thread *thread )
     thread->exit_code       = 0;
     thread->priority        = 0;
     thread->delay_priority  = NULL;
+    thread->delay_prio_time = 0;
     thread->suspend         = 0;
     thread->dbg_hidden      = 0;
     thread->desktop_users   = 0;
@@ -562,6 +563,7 @@ static void cleanup_thread( struct thread *thread )
 
     if (thread->delay_priority) remove_timeout_user( thread->delay_priority );
     thread->delay_priority = NULL;
+    thread->delay_prio_time = 0;
 
     if (thread->context)
     {
@@ -826,9 +828,13 @@ static void apply_thread_priority( struct thread *thread, int priority_class, in
     if (!delayed && thread->delay_priority) remove_timeout_user( thread->delay_priority );
     thread->delay_priority = NULL;
 
+    if (!delayed) thread->delay_prio_time = -TICKS_PER_SEC;
+    else thread->delay_prio_time *= 2; /* retry later if still failing */
+
     if (thread->unix_tid == -1)
     {
-        thread->delay_priority = add_timeout_user( -TICKS_PER_SEC, delayed_set_thread_priority, thread );
+        thread->delay_priority = add_timeout_user( thread->delay_prio_time, delayed_set_thread_priority, thread );
+        thread->delay_prio_time = 0;
         return;
     }
 
@@ -842,6 +848,7 @@ static void apply_thread_priority( struct thread *thread, int priority_class, in
         niceness = get_unix_niceness( get_base_priority( priority_class, priority ), limit );
         if (setpriority( PRIO_PROCESS, thread->unix_tid, niceness ) != 0)
             fprintf( stderr, "wine: setpriority %d for pid %d failed: %d\n", niceness, thread->unix_tid, errno );
+        thread->delay_prio_time = 0;
         return;
     }
 #endif
@@ -850,11 +857,13 @@ static void apply_thread_priority( struct thread *thread, int priority_class, in
     {
         niceness = get_unix_niceness( get_base_priority( priority_class, priority ), rtkit_nice_limit );
         if (!delayed)
-            thread->delay_priority = add_timeout_user( -TICKS_PER_SEC, delayed_set_thread_priority, thread );
+            thread->delay_priority = add_timeout_user( thread->delay_prio_time, delayed_set_thread_priority, thread );
         else if (setpriority( PRIO_PROCESS, thread->unix_tid, niceness ) == 0)
-            return;
+            thread->delay_prio_time = 0;
         else if (!rtkit_set_niceness( thread->unix_pid, thread->unix_tid, niceness ))
-            thread->delay_priority = add_timeout_user( -TICKS_PER_SEC, delayed_set_thread_priority, thread );
+            thread->delay_priority = add_timeout_user( thread->delay_prio_time, delayed_set_thread_priority, thread );
+        else
+            thread->delay_prio_time = 0;
     }
 #endif
 #endif
