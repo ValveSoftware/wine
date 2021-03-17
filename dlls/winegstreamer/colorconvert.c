@@ -133,16 +133,72 @@ static HRESULT WINAPI color_converter_GetStreamIDs(IMFTransform *iface, DWORD in
 
 static HRESULT WINAPI color_converter_GetInputStreamInfo(IMFTransform *iface, DWORD id, MFT_INPUT_STREAM_INFO *info)
 {
-    FIXME("%p %u %p.\n", iface, id, info);
+    struct color_converter *converter = impl_color_converter_from_IMFTransform(iface);
+    UINT64 framesize;
+    GUID subtype;
 
-    return E_NOTIMPL;
+    TRACE("%p %u %p.\n", iface, id, info);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_DOES_NOT_ADDREF | MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE;
+    info->cbMaxLookahead = 0;
+    info->cbAlignment = 0;
+    info->hnsMaxLatency = 0;
+    info->cbSize = 0;
+
+    EnterCriticalSection(&converter->cs);
+
+    if (converter->input_type)
+    {
+        if (SUCCEEDED(IMFMediaType_GetGUID(converter->input_type, &MF_MT_SUBTYPE, &subtype)) &&
+            SUCCEEDED(IMFMediaType_GetUINT64(converter->input_type, &MF_MT_FRAME_SIZE, &framesize)))
+        {
+            MFCalculateImageSize(&subtype, framesize >> 32, (UINT32) framesize, &info->cbSize);
+        }
+
+        if (!info->cbSize)
+            WARN("Failed to get desired input buffer size, the non-provided sample path will likely break\n");
+    }
+
+    LeaveCriticalSection(&converter->cs);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI color_converter_GetOutputStreamInfo(IMFTransform *iface, DWORD id, MFT_OUTPUT_STREAM_INFO *info)
 {
-    FIXME("%p %u %p.\n", iface, id, info);
+    struct color_converter *converter = impl_color_converter_from_IMFTransform(iface);
+    UINT64 framesize;
+    GUID subtype;
 
-    return E_NOTIMPL;
+    TRACE("%p %u %p.\n", iface, id, info);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    info->dwFlags = MFT_OUTPUT_STREAM_FIXED_SAMPLE_SIZE | MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES | MFT_OUTPUT_STREAM_WHOLE_SAMPLES | MFT_OUTPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER;
+    info->cbAlignment = 0;
+    info->cbSize = 0;
+
+    EnterCriticalSection(&converter->cs);
+
+    if (converter->output_type)
+    {
+        if (SUCCEEDED(IMFMediaType_GetGUID(converter->output_type, &MF_MT_SUBTYPE, &subtype)) &&
+            SUCCEEDED(IMFMediaType_GetUINT64(converter->output_type, &MF_MT_FRAME_SIZE, &framesize)))
+        {
+            MFCalculateImageSize(&subtype, framesize >> 32, (UINT32) framesize, &info->cbSize);
+        }
+
+        if (!info->cbSize)
+            WARN("Failed to get desired output buffer size, the non-provided sample path will likely break\n");
+    }
+
+    LeaveCriticalSection(&converter->cs);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI color_converter_GetAttributes(IMFTransform *iface, IMFAttributes **attributes)
