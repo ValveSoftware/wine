@@ -6367,8 +6367,30 @@ NTSTATUS WINAPI NtFsControlFile( HANDLE handle, HANDLE event, PIO_APC_ROUTINE ap
     }
     case FSCTL_GET_REPARSE_POINT:
     {
-        REPARSE_DATA_BUFFER *buffer = (REPARSE_DATA_BUFFER *)out_buffer;
-        status = FILE_GetSymlink( handle, buffer, out_size );
+        REPARSE_GUID_DATA_BUFFER *d = (REPARSE_GUID_DATA_BUFFER *)out_buffer;
+        unsigned int options;
+        int fd, needs_close;
+        struct stat st;
+
+        if ((status = FILE_GetSymlink( handle, (REPARSE_DATA_BUFFER *)out_buffer, out_size ))
+                != STATUS_INVALID_PARAMETER)
+            break;
+
+        if (server_get_unix_fd( handle, FILE_ANY_ACCESS, &fd, &needs_close, NULL, &options ))
+            break;
+        if (options & FILE_OPEN_REPARSE_POINT && !fstat( fd, &st ) && fd_is_mount_point( fd, &st ))
+        {
+            FIXME("Returning IO_REPARSE_TAG_UNHANDLED for mount point.\n");
+
+            if (sizeof(*d) <= out_size)
+            {
+                memset(d, 0, sizeof(*d));
+                d->ReparseTag = IO_REPARSE_TAG_UNHANDLED;
+                status = STATUS_SUCCESS;
+            }
+            else status = STATUS_BUFFER_TOO_SMALL;
+        }
+        if (needs_close) close( fd );
         break;
     }
     case FSCTL_SET_REPARSE_POINT:
