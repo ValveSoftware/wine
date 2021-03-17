@@ -191,7 +191,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_EXPEDITED_DATA | XP1_GRACEFUL_CLOSE
                 | XP1_GUARANTEED_ORDER | XP1_GUARANTEED_DELIVERY,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0xe70f1aa0, 0xab8b, 0x11cf, {0x8c, 0xa3, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}},
+        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
         .dwCatalogEntryId = 1001,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
@@ -206,7 +206,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_SUPPORT_BROADCAST
                 | XP1_SUPPORT_MULTIPOINT | XP1_MESSAGE_ORIENTED | XP1_CONNECTIONLESS,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0xe70f1aa0, 0xab8b, 0x11cf, {0x8c, 0xa3, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}},
+        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
         .dwCatalogEntryId = 1002,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
@@ -222,7 +222,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_EXPEDITED_DATA | XP1_GRACEFUL_CLOSE
                 | XP1_GUARANTEED_ORDER | XP1_GUARANTEED_DELIVERY,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0xf9eab0c0, 0x26d4, 0x11d0, {0xbb, 0xbf, 0x00, 0xaa, 0x00, 0x6c, 0x34, 0xe4}},
+        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
         .dwCatalogEntryId = 1004,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
@@ -237,7 +237,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_SUPPORT_BROADCAST
                 | XP1_SUPPORT_MULTIPOINT | XP1_MESSAGE_ORIENTED | XP1_CONNECTIONLESS,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0xf9eab0c0, 0x26d4, 0x11d0, {0xbb, 0xbf, 0x00, 0xaa, 0x00, 0x6c, 0x34, 0xe4}},
+        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
         .dwCatalogEntryId = 1005,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
