@@ -115,16 +115,50 @@ static HRESULT WINAPI audio_converter_GetStreamIDs(IMFTransform *iface, DWORD in
 
 static HRESULT WINAPI audio_converter_GetInputStreamInfo(IMFTransform *iface, DWORD id, MFT_INPUT_STREAM_INFO *info)
 {
-    FIXME("%p %u %p.\n", iface, id, info);
+    struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
 
-    return E_NOTIMPL;
+    TRACE("%p %u %p.\n", iface, id, info);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_DOES_NOT_ADDREF;
+    info->cbMaxLookahead = 0;
+    info->cbAlignment = 0;
+    info->hnsMaxLatency = 0;
+    info->cbSize = 0;
+
+    EnterCriticalSection(&converter->cs);
+
+    if (converter->input_type)
+        IMFMediaType_GetUINT32(converter->input_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &info->cbSize);
+
+    LeaveCriticalSection(&converter->cs);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI audio_converter_GetOutputStreamInfo(IMFTransform *iface, DWORD id, MFT_OUTPUT_STREAM_INFO *info)
 {
-    FIXME("%p %u %p.\n", iface, id, info);
+    struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
 
-    return E_NOTIMPL;
+    TRACE("%p %u %p.\n", iface, id, info);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    info->dwFlags = MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES | MFT_OUTPUT_STREAM_WHOLE_SAMPLES;
+    info->cbAlignment = 0;
+    info->cbSize = 0;
+
+    EnterCriticalSection(&converter->cs);
+
+    if (converter->output_type)
+        IMFMediaType_GetUINT32(converter->output_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &info->cbSize);
+
+    LeaveCriticalSection(&converter->cs);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI audio_converter_GetAttributes(IMFTransform *iface, IMFAttributes **attributes)
