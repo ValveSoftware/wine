@@ -173,7 +173,7 @@ struct unix_funcs
             void **data, uint64_t *offset, uint32_t *size);
     void (CDECL *wg_parser_complete_read_request)(struct wg_parser *parser, bool ret);
 
-    void (CDECL *wg_parser_set_unlimited_buffering)(struct wg_parser *parser);
+    void (CDECL *wg_parser_set_large_buffering)(struct wg_parser *parser);
 
     uint32_t (CDECL *wg_parser_get_stream_count)(struct wg_parser *parser);
     struct wg_parser_stream *(CDECL *wg_parser_get_stream)(struct wg_parser *parser, uint32_t index);
