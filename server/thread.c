@@ -330,6 +330,8 @@ static int rtkit_set_niceness( dbus_uint64_t process, dbus_uint64_t thread, dbus
         !dbus_set_error_from_message( &error, reply ))
         ret = TRUE;
 
+    if (dbus_error_is_set( &error )) dbus_error_free(&error);
+
     if (reply) dbus_message_unref( reply );
     dbus_message_unref( msg );
 
