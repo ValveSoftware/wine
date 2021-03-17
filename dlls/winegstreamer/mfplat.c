@@ -22,6 +22,7 @@
 #include "mfapi.h"
 #include "ks.h"
 #include "ksmedia.h"
+#include "wmcodecdsp.h"
 
 #include "wine/debug.h"
 
@@ -422,6 +423,7 @@ class_objects[] =
     { &CLSID_VideoProcessorMFT, &video_processor_create },
     { &CLSID_GStreamerByteStreamHandler, &winegstreamer_stream_handler_create },
     { &CLSID_WINEAudioConverter, &audio_converter_create },
+    { &CLSID_CColorConvertDMO, &color_converter_create },
     { &CLSID_CMSH264DecoderMFT, &h264_decoder_create },
     { &CLSID_CMSAACDecMFT, &aac_decoder_create },
 };
