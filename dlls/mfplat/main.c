@@ -8903,8 +8903,20 @@ static const IMFDXGIDeviceManagerVtbl dxgi_device_manager_vtbl =
 HRESULT WINAPI MFCreateDXGIDeviceManager(UINT *token, IMFDXGIDeviceManager **manager)
 {
     struct dxgi_device_manager *object;
+    const char *sgi = getenv("SteamGameId");
 
     TRACE("%p, %p.\n", token, manager);
+
+    /* Returning a device manager is known to break some games,
+       e.g. The Long Dark and Trailmakers. On the other hand, not
+       returning it breaks other games, e.g. CONTRA: ROGUE CORPS and
+       NieR Replicant. So we error out on all games except these last
+       two. This should be removed once CW bug #19126 is solved. */
+    if (sgi && !(strcmp(sgi, "1020540") == 0 || strcmp(sgi, "1113560") == 0))
+    {
+        FIXME("stubbing out\n");
+        return E_NOTIMPL;
+    }
 
     if (!token || !manager)
         return E_POINTER;
