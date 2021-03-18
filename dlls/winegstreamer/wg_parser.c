@@ -832,6 +832,15 @@ static NTSTATUS wg_parser_stream_enable(void *args)
 
         if (aperture)
         {
+            if (!stream->box && (stream->aperture.left || stream->aperture.top ||
+                (stream->aperture.right && stream->aperture.right != stream->current_format.u.video.width) ||
+                (stream->aperture.bottom && stream->aperture.bottom != stream->current_format.u.video.height)))
+            {
+                fprintf(stderr, "winegstreamer: failed to create videobox, are %u-bit GStreamer \"good\" plugins installed?\n",
+                    8 * (int)sizeof(void *));
+                return E_FAIL;
+            }
+
             if (aperture->left)
                 g_object_set(G_OBJECT(stream->box), "left", -aperture->left, NULL);
             if (aperture->top)
@@ -1499,8 +1508,7 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
         if (!(flip = create_element("videoflip", "good")))
             goto out;
 
-        if (!(box = create_element("videbox", "base")))
-            goto out;
+        box = gst_element_factory_make("videobox", NULL);
 
         /* videoflip does not support 15 and 16-bit RGB so add a second videoconvert
          * to do the final conversion. */
@@ -1509,6 +1517,14 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
 
         if (!parser->seekable)
         {
+            if (!box && (stream->aperture.left || stream->aperture.top ||
+                (stream->aperture.right && stream->aperture.right != stream->current_format.u.video.width) ||
+                (stream->aperture.bottom && stream->aperture.bottom != stream->current_format.u.video.height)))
+            {
+                fprintf(stderr, "winegstreamer: failed to create videobox, are %u-bit GStreamer \"good\" plugins installed?\n",
+                    8 * (int)sizeof(void *));
+                goto out;
+            }
             if (stream->aperture.left)
                 g_object_set(G_OBJECT(box), "left", -stream->aperture.left, NULL);
             if (stream->aperture.bottom)
@@ -1528,16 +1544,26 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
         gst_element_sync_state_with_parent(vconv);
         gst_bin_add(GST_BIN(parser->container), flip);
         gst_element_sync_state_with_parent(flip);
-        gst_bin_add(GST_BIN(parser->container), box);
-        gst_element_sync_state_with_parent(box);
+        if (box)
+        {
+            gst_bin_add(GST_BIN(parser->container), box);
+            gst_element_sync_state_with_parent(box);
+        }
         gst_bin_add(GST_BIN(parser->container), vconv2);
         gst_element_sync_state_with_parent(vconv2);
 
         gst_element_link(capssetter, deinterlace);
         gst_element_link(deinterlace, vconv);
         gst_element_link(vconv, flip);
-        gst_element_link(flip, box);
-        gst_element_link(box, vconv2);
+        if (box)
+        {
+            gst_element_link(flip, box);
+            gst_element_link(box, vconv2);
+        }
+        else
+        {
+            gst_element_link(flip, vconv2);
+        }
 
         stream->post_sink = gst_element_get_static_pad(capssetter, "sink");
         stream->post_src = gst_element_get_static_pad(vconv2, "src");
