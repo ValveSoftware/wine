@@ -1273,6 +1273,7 @@ static unsigned short get_joystick_index(REFGUID guid)
     int i;
     WORD vid, pid;
     LONG nth_instance;
+    GUID prod_guid = *guid;
 
     /* for the standard joystick GUID use index 0 */
     if(IsEqualGUID(&GUID_Joystick,guid)) return 0;
@@ -1295,6 +1296,19 @@ static unsigned short get_joystick_index(REFGUID guid)
         }
     }
 
+    prod_guid.Data1 = 0;
+    if(IsEqualGUID(&prod_guid, &DInput_PIDVID_Product_GUID)){
+        vid = LOWORD(guid->Data1);
+        pid = HIWORD(guid->Data1);
+
+        for(i = 0; i < ARRAY_SIZE(sdldevs); ++i){
+            if(!sdldevs[i].valid)
+                break;
+            if(sdldevs[i].vendor_id == vid &&
+                    sdldevs[i].product_id == pid)
+                return i;
+            }
+    }
     return 0xffff;
 }
 
@@ -1587,6 +1601,9 @@ static HRESULT WINAPI JoystickAImpl_GetDeviceInfo(LPDIRECTINPUTDEVICE8A iface,
 
     fill_joystick_dideviceinstanceA(pdidi, This->generic.base.dinput->dwVersion,
                                     get_joystick_index(&This->generic.base.guid));
+
+    pdidi->guidInstance = This->generic.base.guid;
+
     return DI_OK;
 }
 
@@ -1604,6 +1621,9 @@ static HRESULT WINAPI JoystickWImpl_GetDeviceInfo(LPDIRECTINPUTDEVICE8W iface,
 
     fill_joystick_dideviceinstanceW(pdidi, This->generic.base.dinput->dwVersion,
                                     get_joystick_index(&This->generic.base.guid));
+
+    pdidi->guidInstance = This->generic.base.guid;
+
     return DI_OK;
 }
 
