@@ -1315,6 +1315,7 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemLogicalProcessorInformationEx = 107,
     SystemKernelDebuggerInformationEx = 149,
     SystemCpuSetInformation = 175,
+    SystemHypervisorSharedPageInformation = 197,
     SystemInformationClassMax
 } SYSTEM_INFORMATION_CLASS, *PSYSTEM_INFORMATION_CLASS;
 
