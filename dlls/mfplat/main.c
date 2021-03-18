@@ -8953,8 +8953,20 @@ static const IMFDXGIDeviceManagerVtbl dxgi_device_manager_vtbl =
 HRESULT WINAPI MFCreateDXGIDeviceManager(UINT *token, IMFDXGIDeviceManager **manager)
 {
     struct dxgi_device_manager *object;
+    const char *sgi = getenv("SteamGameId");
 
     TRACE("%p, %p.\n", token, manager);
+
+    /* Returning a DXGI device manager triggers a bug and breaks The
+     * Long Dark and  Trailmakers. This should be removed once CW bug
+     * #19126 is solved. Returning a DXGI device manager also breaks 
+     * Age of Empires Definitive Edition - this gameid should be removed 
+     * once CW bug #19741 is solved.*/
+    if (sgi && (strcmp(sgi, "305620") == 0 || strcmp(sgi, "585420") == 0 || strcmp(sgi, "1017900") == 0))
+    {
+        FIXME("stubbing out\n");
+        return E_NOTIMPL;
+    }
 
     if (!token || !manager)
         return E_POINTER;
