@@ -1125,7 +1125,7 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
      * never deselects it). Remove buffering limits from decodebin in order to
      * account for this. Note that this does leak memory, but the same memory
      * leak occurs with native. */
-    unix_funcs->wg_parser_set_unlimited_buffering(parser);
+    unix_funcs->wg_parser_set_large_buffering(parser);
 
     object->stream_count = unix_funcs->wg_parser_get_stream_count(parser);
 

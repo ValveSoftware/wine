@@ -543,11 +543,11 @@ static void CDECL wg_parser_complete_read_request(struct wg_parser *parser, bool
     pthread_cond_signal(&parser->read_done_cond);
 }
 
-static void CDECL wg_parser_set_unlimited_buffering(struct wg_parser *parser)
+static void CDECL wg_parser_set_large_buffering(struct wg_parser *parser)
 {
-    g_object_set(parser->decodebin, "max-size-buffers", 0, NULL);
-    g_object_set(parser->decodebin, "max-size-time", G_GUINT64_CONSTANT(0), NULL);
-    g_object_set(parser->decodebin, "max-size-bytes", 0, NULL);
+    g_object_set(parser->decodebin, "max-size-buffers", G_MAXUINT, NULL);
+    g_object_set(parser->decodebin, "max-size-time", G_MAXUINT64, NULL);
+    g_object_set(parser->decodebin, "max-size-bytes", G_MAXUINT, NULL);
 }
 
 static void CDECL wg_parser_stream_get_preferred_format(struct wg_parser_stream *stream, struct wg_format *format)
@@ -1939,7 +1939,7 @@ static const struct unix_funcs funcs =
     wg_parser_get_read_request,
     wg_parser_complete_read_request,
 
-    wg_parser_set_unlimited_buffering,
+    wg_parser_set_large_buffering,
 
     wg_parser_get_stream_count,
     wg_parser_get_stream,
