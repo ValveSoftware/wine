@@ -100,6 +100,7 @@ static bool amt_from_wg_format_audio(AM_MEDIA_TYPE *mt, const struct wg_format *
     switch (format->u.audio.format)
     {
     case WG_AUDIO_FORMAT_UNKNOWN:
+    case WG_AUDIO_FORMAT_AAC:
         return false;
 
     case WG_AUDIO_FORMAT_MPEG1_LAYER1:
@@ -313,6 +314,7 @@ unsigned int wg_format_get_max_size(const struct wg_format *format)
                 case WG_AUDIO_FORMAT_MPEG1_LAYER3:
                     return 40000;
 
+                case WG_AUDIO_FORMAT_AAC:
                 case WG_AUDIO_FORMAT_UNKNOWN:
                     FIXME("Cannot guess maximum sample size for unknown audio format.\n");
                     return 0;
