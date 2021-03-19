@@ -1491,12 +1491,13 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
             {WG_PARSER_TAG_LANGUAGE, &MF_SD_LANGUAGE},
             {WG_PARSER_TAG_NAME, &MF_SD_STREAM_NAME},
         };
+        IMFStreamDescriptor **descriptor = descriptors + object->stream_count - 1 - i;
         unsigned int j;
         WCHAR *strW;
         DWORD len;
         char *str;
 
-        IMFMediaStream_GetStreamDescriptor(&object->streams[i]->IMFMediaStream_iface, &descriptors[i]);
+        IMFMediaStream_GetStreamDescriptor(&object->streams[i]->IMFMediaStream_iface, descriptor);
 
         for (j = 0; j < ARRAY_SIZE(tags); ++j)
         {
@@ -1509,7 +1510,7 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
             }
             strW = malloc(len * sizeof(*strW));
             if (MultiByteToWideChar(CP_UTF8, 0, str, -1, strW, len))
-                IMFStreamDescriptor_SetString(descriptors[i], tags[j].mf_attr, strW);
+                IMFStreamDescriptor_SetString(*descriptor, tags[j].mf_attr, strW);
             free(strW);
             free(str);
         }
