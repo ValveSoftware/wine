@@ -216,9 +216,9 @@ static HRESULT WINAPI mf_decoder_GetOutputStreamInfo(IMFTransform *iface, DWORD 
 
 static HRESULT WINAPI mf_decoder_GetAttributes(IMFTransform *iface, IMFAttributes **attributes)
 {
-    FIXME("%p, %p.\n", iface, attributes);
+    FIXME("%p, %p. semi-stub!\n", iface, attributes);
 
-    return E_NOTIMPL;
+    return MFCreateAttributes(attributes, 0);
 }
 
 static HRESULT WINAPI mf_decoder_GetInputStreamAttributes(IMFTransform *iface, DWORD id,
