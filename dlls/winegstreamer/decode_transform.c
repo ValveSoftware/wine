@@ -61,14 +61,47 @@ static struct decoder_desc
     }
 };
 
+struct pipeline_event
+{
+    enum
+    {
+        PIPELINE_EVENT_NONE,
+        PIPELINE_EVENT_PARSER_STARTED,
+        PIPELINE_EVENT_READ_REQUEST,
+    } type;
+    union
+    {
+        struct
+        {
+            struct wg_parser_stream *stream;
+        } parser_started;
+    } u;
+};
+
 struct mf_decoder
 {
     IMFTransform IMFTransform_iface;
     LONG refcount;
     enum decoder_type type;
     IMFMediaType *input_type, *output_type;
-    CRITICAL_SECTION cs;
-    BOOL video;
+    CRITICAL_SECTION cs, help_cs, event_cs;
+    CONDITION_VARIABLE help_cv, event_cv;
+    BOOL flushing, draining, eos, helper_thread_shutdown, video;
+    HANDLE helper_thread, read_thread;
+    uint64_t offset_tracker;
+    struct wg_parser *wg_parser;
+    struct wg_parser_stream *wg_stream;
+
+    struct
+    {
+        enum
+        {
+            HELP_REQ_NONE,
+            HELP_REQ_START_PARSER,
+        } type;
+    } help_request;
+
+    struct pipeline_event event;
 };
 
 static struct mf_decoder *impl_mf_decoder_from_IMFTransform(IMFTransform *iface)
@@ -124,7 +157,35 @@ static ULONG WINAPI mf_decoder_Release(IMFTransform *iface)
             decoder->output_type = NULL;
         }
 
+        if (decoder->wg_parser)
+        {
+            /* NULL wg_parser is possible if the wg_parser creation failed. */
+
+            if (decoder->wg_stream)
+                wg_parser_disconnect(decoder->wg_parser);
+
+            EnterCriticalSection(&decoder->event_cs);
+            decoder->helper_thread_shutdown = TRUE;
+            WakeAllConditionVariable(&decoder->event_cv);
+            LeaveCriticalSection(&decoder->event_cs);
+
+            EnterCriticalSection(&decoder->help_cs);
+            WakeAllConditionVariable(&decoder->help_cv);
+            LeaveCriticalSection(&decoder->help_cs);
+
+            if (WaitForSingleObject(decoder->helper_thread, 10000) != WAIT_OBJECT_0)
+                FIXME("Failed waiting for helper thread to terminate.\n");
+            CloseHandle(decoder->helper_thread);
+            if (WaitForSingleObject(decoder->read_thread, 10000) != WAIT_OBJECT_0)
+                FIXME("Failed waiting for read thread to terminate.\n");
+            CloseHandle(decoder->read_thread);
+
+            wg_parser_destroy(decoder->wg_parser);
+        }
+
         DeleteCriticalSection(&decoder->cs);
+        DeleteCriticalSection(&decoder->help_cs);
+        DeleteCriticalSection(&decoder->event_cs);
 
         heap_free(decoder);
     }
@@ -351,6 +412,12 @@ static HRESULT WINAPI mf_decoder_SetInputType(IMFTransform *iface, DWORD id, IMF
 
         EnterCriticalSection(&decoder->cs);
 
+        if (decoder->wg_stream)
+        {
+            decoder->wg_stream = NULL;
+            wg_parser_disconnect(decoder->wg_parser);
+        }
+
         if (decoder->input_type)
         {
             IMFMediaType_Release(decoder->input_type);
@@ -389,6 +456,12 @@ static HRESULT WINAPI mf_decoder_SetInputType(IMFTransform *iface, DWORD id, IMF
 
     hr = S_OK;
 
+    if (decoder->wg_stream)
+    {
+        decoder->wg_stream = NULL;
+        wg_parser_disconnect(decoder->wg_parser);
+    }
+
     if (!decoder->input_type)
         hr = MFCreateMediaType(&decoder->input_type);
 
@@ -396,6 +469,16 @@ static HRESULT WINAPI mf_decoder_SetInputType(IMFTransform *iface, DWORD id, IMF
     {
         IMFMediaType_Release(decoder->input_type);
         decoder->input_type = NULL;
+    }
+
+    if (decoder->input_type && decoder->output_type)
+    {
+        EnterCriticalSection(&decoder->help_cs);
+        while(decoder->help_request.type != HELP_REQ_NONE)
+            SleepConditionVariableCS(&decoder->help_cv, &decoder->help_cs, INFINITE);
+        decoder->help_request.type = HELP_REQ_START_PARSER;
+        LeaveCriticalSection(&decoder->help_cs);
+        WakeAllConditionVariable(&decoder->help_cv);
     }
 
     LeaveCriticalSection(&decoder->cs);
@@ -421,6 +504,12 @@ static HRESULT WINAPI mf_decoder_SetOutputType(IMFTransform *iface, DWORD id, IM
             return S_OK;
 
         EnterCriticalSection(&decoder->cs);
+
+        if (decoder->wg_stream)
+        {
+            decoder->wg_stream = NULL;
+            wg_parser_disconnect(decoder->wg_parser);
+        }
 
         if (decoder->output_type)
         {
@@ -460,6 +549,12 @@ static HRESULT WINAPI mf_decoder_SetOutputType(IMFTransform *iface, DWORD id, IM
 
     hr = S_OK;
 
+    if (decoder->wg_stream)
+    {
+        decoder->wg_stream = NULL;
+        wg_parser_disconnect(decoder->wg_parser);
+    }
+
     if (!decoder->output_type)
         hr = MFCreateMediaType(&decoder->output_type);
 
@@ -467,6 +562,16 @@ static HRESULT WINAPI mf_decoder_SetOutputType(IMFTransform *iface, DWORD id, IM
     {
         IMFMediaType_Release(decoder->output_type);
         decoder->output_type = NULL;
+    }
+
+    if (decoder->input_type && decoder->output_type)
+    {
+        EnterCriticalSection(&decoder->help_cs);
+        while(decoder->help_request.type != HELP_REQ_NONE)
+            SleepConditionVariableCS(&decoder->help_cv, &decoder->help_cs, INFINITE);
+        decoder->help_request.type = HELP_REQ_START_PARSER;
+        LeaveCriticalSection(&decoder->help_cs);
+        WakeAllConditionVariable(&decoder->help_cv);
     }
 
     LeaveCriticalSection(&decoder->cs);
@@ -515,6 +620,117 @@ static HRESULT WINAPI mf_decoder_ProcessEvent(IMFTransform *iface, DWORD id, IMF
     return E_NOTIMPL;
 }
 
+static DWORD CALLBACK helper_thread_func(PVOID ctx)
+{
+    struct mf_decoder *decoder = (struct mf_decoder *)ctx;
+
+    for(;;)
+    {
+        EnterCriticalSection(&decoder->help_cs);
+
+        while(!decoder->helper_thread_shutdown && decoder->help_request.type == HELP_REQ_NONE)
+            SleepConditionVariableCS(&decoder->help_cv, &decoder->help_cs, INFINITE);
+        if (decoder->helper_thread_shutdown)
+        {
+            LeaveCriticalSection(&decoder->help_cs);
+            return 0;
+        }
+
+        switch(decoder->help_request.type)
+        {
+            case HELP_REQ_START_PARSER:
+            {
+                struct wg_format input_format, output_format;
+
+                decoder->help_request.type = HELP_REQ_NONE;
+                LeaveCriticalSection(&decoder->help_cs);
+
+                mf_media_type_to_wg_format(decoder->input_type, &input_format);
+                mf_media_type_to_wg_format(decoder->output_type, &output_format);
+
+                wg_parser_connect_unseekable(decoder->wg_parser, &input_format, 1, &output_format);
+
+                EnterCriticalSection(&decoder->event_cs);
+                while (!decoder->helper_thread_shutdown && decoder->event.type != PIPELINE_EVENT_NONE)
+                    SleepConditionVariableCS(&decoder->event_cv, &decoder->event_cs, INFINITE);
+
+                if (decoder->helper_thread_shutdown)
+                {
+                    LeaveCriticalSection(&decoder->event_cs);
+                    return 0;
+                }
+
+                decoder->event.type = PIPELINE_EVENT_PARSER_STARTED;
+                decoder->event.u.parser_started.stream = wg_parser_get_stream(decoder->wg_parser, 0);
+
+                LeaveCriticalSection(&decoder->event_cs);
+                WakeAllConditionVariable(&decoder->event_cv);
+
+                break;
+            }
+            default:
+                assert(0);
+        }
+    }
+}
+
+/* We use a separate thread to wait for reads, as we may want to wait to WAIT_ANY
+   on a read and another event. */
+static DWORD CALLBACK read_thread_func(PVOID ctx)
+{
+    struct mf_decoder *decoder = (struct mf_decoder *)ctx;
+    uint64_t offset;
+    uint32_t size;
+
+    for (;;)
+    {
+        if (decoder->helper_thread_shutdown)
+            break;
+
+        if (!wg_parser_get_next_read_offset(decoder->wg_parser, &offset, &size))
+            continue;
+
+        EnterCriticalSection(&decoder->event_cs);
+        while (!decoder->helper_thread_shutdown && decoder->event.type != PIPELINE_EVENT_NONE)
+            SleepConditionVariableCS(&decoder->event_cv, &decoder->event_cs, INFINITE);
+
+        if (decoder->helper_thread_shutdown)
+        {
+            LeaveCriticalSection(&decoder->event_cs);
+            break;
+        }
+
+        decoder->event.type = PIPELINE_EVENT_READ_REQUEST;
+        WakeAllConditionVariable(&decoder->event_cv);
+        while (!decoder->helper_thread_shutdown && decoder->event.type == PIPELINE_EVENT_READ_REQUEST)
+            SleepConditionVariableCS(&decoder->event_cv, &decoder->event_cs, INFINITE);
+        LeaveCriticalSection(&decoder->event_cs);
+    }
+
+    return 0;
+}
+
+static struct pipeline_event get_pipeline_event(struct mf_decoder *decoder)
+{
+    struct pipeline_event ret;
+
+    EnterCriticalSection(&decoder->event_cs);
+    while(decoder->event.type == PIPELINE_EVENT_NONE)
+        SleepConditionVariableCS(&decoder->event_cv, &decoder->event_cs, INFINITE);
+
+    ret = decoder->event;
+
+    if (ret.type != PIPELINE_EVENT_READ_REQUEST)
+    {
+        decoder->event.type = PIPELINE_EVENT_NONE;
+        WakeAllConditionVariable(&decoder->event_cv);
+    }
+
+    LeaveCriticalSection(&decoder->event_cs);
+
+    return ret;
+}
+
 static HRESULT WINAPI mf_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
     FIXME("%p, %u %lu.\n", iface, message, param);
@@ -524,17 +740,315 @@ static HRESULT WINAPI mf_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAGE
 
 static HRESULT WINAPI mf_decoder_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
 {
-    FIXME("%p, %u, %p, %#x.\n", iface, id, sample, flags);
+    struct mf_decoder *decoder = impl_mf_decoder_from_IMFTransform(iface);
+    struct pipeline_event pip_event;
+    IMFMediaBuffer *buffer = NULL;
+    HRESULT hr = S_OK;
+    BYTE *buffer_data;
+    DWORD buffer_size;
+    uint32_t size = 0;
+    uint64_t offset;
 
-    return E_NOTIMPL;
+    TRACE("%p, %u, %p, %#x.\n", decoder, id, sample, flags);
+
+    if (flags)
+        WARN("Unsupported flags %#x\n", flags);
+
+    if (id != 0)
+        return MF_E_INVALIDSTREAMNUMBER;
+
+    EnterCriticalSection(&decoder->cs);
+
+    if (!decoder->input_type || !decoder->output_type)
+    {
+        LeaveCriticalSection(&decoder->cs);
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+    }
+
+    if (decoder->draining)
+    {
+        LeaveCriticalSection(&decoder->cs);
+        return MF_E_NOTACCEPTING;
+    }
+
+    if (!decoder->wg_stream)
+    {
+        pip_event = get_pipeline_event(decoder);
+
+        switch (pip_event.type)
+        {
+            case PIPELINE_EVENT_PARSER_STARTED:
+                decoder->wg_stream = pip_event.u.parser_started.stream;
+                break;
+            case PIPELINE_EVENT_READ_REQUEST:
+                break;
+            default:
+                assert(0);
+        }
+    }
+
+    if (decoder->wg_stream && !wg_parser_stream_drain(decoder->wg_stream))
+    {
+        LeaveCriticalSection(&decoder->cs);
+        return MF_E_NOTACCEPTING;
+    }
+
+    /* At this point, we either have a pre-init read request, or drained pipeline */
+
+    if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(sample, &buffer)))
+        goto done;
+
+    if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &buffer_data, NULL, &buffer_size)))
+        goto done;
+
+    pip_event = get_pipeline_event(decoder);
+    assert(pip_event.type == PIPELINE_EVENT_READ_REQUEST);
+
+    for(;;)
+    {
+        uint32_t copy_size;
+
+        if (!wg_parser_get_next_read_offset(decoder->wg_parser, &offset, &size))
+            continue;
+
+        copy_size = min(size, buffer_size);
+
+        if (offset != decoder->offset_tracker)
+        {
+            ERR("A seek is needed, MFTs don't support this!\n");
+            wg_parser_push_data(decoder->wg_parser, WG_READ_FAILURE, NULL, 0);
+            IMFMediaBuffer_Unlock(buffer);
+            hr = E_FAIL;
+            goto done;
+        }
+
+        wg_parser_push_data(decoder->wg_parser, WG_READ_SUCCESS, buffer_data, buffer_size);
+
+        decoder->offset_tracker += copy_size;
+
+        if (buffer_size <= size)
+            break;
+
+        buffer_data += copy_size;
+        buffer_size -= copy_size;
+
+        WARN("Input sample split into multiple read requests\n");
+    }
+
+    EnterCriticalSection(&decoder->event_cs);
+    decoder->event.type = PIPELINE_EVENT_NONE;
+    LeaveCriticalSection(&decoder->event_cs);
+    WakeAllConditionVariable(&decoder->event_cv);
+
+    IMFMediaBuffer_Unlock(buffer);
+
+    done:
+    if (buffer)
+        IMFMediaBuffer_Release(buffer);
+    LeaveCriticalSection(&decoder->cs);
+    return hr;
 }
 
 static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
         MFT_OUTPUT_DATA_BUFFER *samples, DWORD *status)
 {
-    FIXME("%p, %#x, %u, %p, %p.\n", iface, flags, count, samples, status);
+    struct mf_decoder *decoder = impl_mf_decoder_from_IMFTransform(iface);
+    MFT_OUTPUT_DATA_BUFFER *relevant_buffer = NULL;
+    struct wg_parser_event event;
+    struct pipeline_event pip_event;
+    IMFMediaBuffer *buffer;
+    DWORD buffer_len;
+    unsigned int i;
+    BYTE *data;
+    HRESULT hr;
 
-    return E_NOTIMPL;
+    TRACE("%p, %#x, %u, %p, %p.\n", iface, flags, count, samples, status);
+
+    if (flags)
+        WARN("Unsupported flags %#x\n", flags);
+
+    for (i = 0; i < count; i++)
+    {
+        MFT_OUTPUT_DATA_BUFFER *out_buffer = &samples[i];
+
+        if (out_buffer->dwStreamID != 0)
+            return MF_E_INVALIDSTREAMNUMBER;
+
+        if (relevant_buffer)
+            return MF_E_INVALIDSTREAMNUMBER;
+
+        relevant_buffer = out_buffer;
+    }
+
+    if (!relevant_buffer)
+        return S_OK;
+
+    EnterCriticalSection(&decoder->cs);
+
+    if (!decoder->input_type || !decoder->output_type)
+    {
+        LeaveCriticalSection(&decoder->cs);
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+    }
+
+    if (!decoder->wg_stream)
+    {
+        pip_event = get_pipeline_event(decoder);
+
+        switch (pip_event.type)
+        {
+            case PIPELINE_EVENT_PARSER_STARTED:
+                decoder->wg_stream = pip_event.u.parser_started.stream;
+                break;
+            case PIPELINE_EVENT_READ_REQUEST:
+                LeaveCriticalSection(&decoder->cs);
+                return MF_E_TRANSFORM_NEED_MORE_INPUT;
+            default:
+                assert(0);
+        }
+    }
+
+    if (wg_parser_stream_drain(decoder->wg_stream))
+    {
+        /* this would be unexpected, as we should get the EOS-event when a drain command completes. */
+        assert (!decoder->draining);
+
+        LeaveCriticalSection(&decoder->cs);
+        return MF_E_TRANSFORM_NEED_MORE_INPUT;
+    }
+
+    for (;;)
+    {
+        if (!wg_parser_stream_get_event(decoder->wg_stream, &event))
+        {
+            LeaveCriticalSection(&decoder->cs);
+            return E_FAIL;
+        }
+
+        if (event.type == WG_PARSER_EVENT_BUFFER)
+            break;
+
+        if (event.type == WG_PARSER_EVENT_EOS)
+        {
+            if (!decoder->draining)
+            {
+                LeaveCriticalSection(&decoder->cs);
+                WARN("Received EOS event while not draining\n");
+                return E_FAIL;
+            }
+            decoder->draining = FALSE;
+            LeaveCriticalSection(&decoder->cs);
+            return MF_E_TRANSFORM_NEED_MORE_INPUT;
+        }
+
+        assert(event.type != WG_PARSER_EVENT_NONE);
+    }
+
+    if (relevant_buffer->pSample)
+    {
+        if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(relevant_buffer->pSample, &buffer)))
+        {
+            ERR("Failed to get buffer from sample, hr %#x.\n", hr);
+            LeaveCriticalSection(&decoder->cs);
+            return hr;
+        }
+    }
+    else
+    {
+        if (FAILED(hr = MFCreateMemoryBuffer(event.u.buffer.size, &buffer)))
+        {
+            ERR("Failed to create buffer, hr %#x.\n", hr);
+            LeaveCriticalSection(&decoder->cs);
+            return hr;
+        }
+
+        if (FAILED(hr = MFCreateSample(&relevant_buffer->pSample)))
+        {
+            ERR("Failed to create sample, hr %#x.\n", hr);
+            LeaveCriticalSection(&decoder->cs);
+            IMFMediaBuffer_Release(buffer);
+            return hr;
+        }
+
+        if (FAILED(hr = IMFSample_AddBuffer(relevant_buffer->pSample, buffer)))
+        {
+            ERR("Failed to add buffer, hr %#x.\n", hr);
+            goto out;
+        }
+    }
+
+    if (FAILED(hr = IMFMediaBuffer_GetMaxLength(buffer, &buffer_len)))
+    {
+        ERR("Failed to get buffer size, hr %#x.\n", hr);
+        goto out;
+    }
+
+    if (buffer_len < event.u.buffer.size)
+    {
+        WARN("Client's buffer is smaller (%u bytes) than the output sample (%u bytes)\n",
+            buffer_len, event.u.buffer.size);
+
+        if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, buffer_len)))
+        {
+            ERR("Failed to set size, hr %#x.\n", hr);
+            goto out;
+        }
+    }
+    else if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event.u.buffer.size)))
+    {
+        ERR("Failed to set size, hr %#x.\n", hr);
+        goto out;
+    }
+
+
+    if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &data, NULL, NULL)))
+    {
+        ERR("Failed to lock buffer, hr %#x.\n", hr);
+        goto out;
+    }
+
+    if (!wg_parser_stream_copy_buffer(decoder->wg_stream, data, 0, min(buffer_len, event.u.buffer.size)))
+    {
+        hr = E_FAIL;
+        goto out;
+    }
+
+    if (FAILED(hr = IMFMediaBuffer_Unlock(buffer)))
+    {
+        ERR("Failed to unlock buffer, hr %#x.\n", hr);
+        goto out;
+    }
+
+    if (FAILED(hr = IMFSample_SetSampleTime(relevant_buffer->pSample, event.u.buffer.pts)))
+    {
+        ERR("Failed to set sample time, hr %#x.\n", hr);
+        goto out;
+    }
+
+    if (FAILED(hr = IMFSample_SetSampleDuration(relevant_buffer->pSample, event.u.buffer.duration)))
+    {
+        ERR("Failed to set sample duration, hr %#x.\n", hr);
+        goto out;
+    }
+
+    relevant_buffer->dwStatus = 0;
+    relevant_buffer->pEvents = NULL;
+    *status = 0;
+
+    out:
+    if (SUCCEEDED(hr))
+        wg_parser_stream_release_buffer(decoder->wg_stream);
+    LeaveCriticalSection(&decoder->cs);
+
+    if (FAILED(hr))
+    {
+        IMFSample_Release(relevant_buffer->pSample);
+        relevant_buffer->pSample = NULL;
+    }
+
+    IMFMediaBuffer_Release(buffer);
+
+    return hr;
 }
 
 static const IMFTransformVtbl mf_decoder_vtbl =
@@ -570,6 +1084,7 @@ static const IMFTransformVtbl mf_decoder_vtbl =
 HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type type)
 {
     struct mf_decoder *object;
+    struct wg_parser *parser;
 
     TRACE("%s, %p %u.\n", debugstr_guid(riid), obj, type);
 
@@ -583,6 +1098,21 @@ HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type type)
     object->video = decoder_descs[type].major_type == &MFMediaType_Video;
 
     InitializeCriticalSection(&object->cs);
+    InitializeCriticalSection(&object->help_cs);
+    InitializeCriticalSection(&object->event_cs);
+    InitializeConditionVariable(&object->help_cv);
+    InitializeConditionVariable(&object->event_cv);
+
+    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, TRUE)))
+    {
+        ERR("Failed to create Decoder MFT type %u: Unspecified GStreamer error\n", type);
+        IMFTransform_Release(&object->IMFTransform_iface);
+        return E_OUTOFMEMORY;
+    }
+    object->wg_parser = parser;
+
+    object->helper_thread = CreateThread(NULL, 0, helper_thread_func, object, 0, NULL);
+    object->read_thread = CreateThread(NULL, 0, read_thread_func, object, 0, NULL);
 
     *obj = &object->IMFTransform_iface;
     return S_OK;
