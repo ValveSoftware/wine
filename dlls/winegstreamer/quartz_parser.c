@@ -100,6 +100,7 @@ static bool amt_from_wg_format_audio(AM_MEDIA_TYPE *mt, const struct wg_format *
     switch (format->u.audio.format)
     {
     case WG_AUDIO_FORMAT_UNKNOWN:
+    case WG_AUDIO_FORMAT_AAC:
         return false;
 
     case WG_AUDIO_FORMAT_MPEG1_LAYER1:
