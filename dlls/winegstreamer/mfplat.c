@@ -448,6 +448,20 @@ static const GUID *audio_converter_supported_types[] =
     &MFAudioFormat_Float,
 };
 
+static WCHAR h264_decoderW[] = L"H.264 Decoder";
+static const GUID *h264_decoder_input_types[] =
+{
+    &MFVideoFormat_H264,
+};
+static const GUID *h264_decoder_output_types[] =
+{
+    &MFVideoFormat_NV12,
+    &MFVideoFormat_I420,
+    &MFVideoFormat_IYUV,
+    &MFVideoFormat_YUY2,
+    &MFVideoFormat_YV12,
+};
+
 static const struct mft
 {
     const GUID *clsid;
@@ -472,6 +486,17 @@ mfts[] =
         audio_converter_supported_types,
         ARRAY_SIZE(audio_converter_supported_types),
         audio_converter_supported_types,
+    },
+    {
+        &CLSID_MSH264DecoderMFT,
+        &MFT_CATEGORY_VIDEO_DECODER,
+        h264_decoderW,
+        MFT_ENUM_FLAG_SYNCMFT,
+        &MFMediaType_Video,
+        ARRAY_SIZE(h264_decoder_input_types),
+        h264_decoder_input_types,
+        ARRAY_SIZE(h264_decoder_output_types),
+        h264_decoder_output_types,
     },
 };
 
