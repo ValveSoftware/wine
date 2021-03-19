@@ -105,6 +105,7 @@ enum media_stream_flags
     STREAM_FLAG_SAMPLE_REQUESTED = 0x1, /* Protects from making multiple sample requests. */
     STREAM_FLAG_SELECTED = 0x2,         /* Mirrors descriptor, used to simplify tests when starting the source. */
     STREAM_FLAG_PRESENTED = 0x4,        /* Set if stream was selected last time Start() was called. */
+    STREAM_FLAG_REQUESTED_ONCE = 0x8,   /* Used for MF_SOURCE_READER_ANY_STREAM in synchronous mode. */
 };
 
 struct media_stream
@@ -114,7 +115,7 @@ struct media_stream
     IMFTransform *decoder;
     IMFVideoSampleAllocatorEx *allocator;
     IMFVideoSampleAllocatorNotify notify_cb;
-    unsigned int id;
+    DWORD id;
     unsigned int index;
     enum media_stream_state state;
     unsigned int flags;
@@ -183,16 +184,15 @@ struct source_reader
     LONG refcount;
     IMFMediaSource *source;
     IMFPresentationDescriptor *descriptor;
+    DWORD first_audio_stream_index;
+    DWORD first_video_stream_index;
     IMFSourceReaderCallback *async_callback;
     IMFAttributes *attributes;
     IUnknown *device_manager;
-    unsigned int first_audio_stream_index;
-    unsigned int first_video_stream_index;
-    unsigned int last_read_index;
-    unsigned int stream_count;
     unsigned int flags;
     enum media_source_state source_state;
     struct media_stream *streams;
+    DWORD stream_count;
     struct list responses;
     CRITICAL_SECTION cs;
     CONDITION_VARIABLE sample_event;
@@ -475,7 +475,7 @@ static HRESULT source_reader_request_sample(struct source_reader *reader, struct
             WARN("Sample request failed, hr %#x.\n", hr);
         else
         {
-            stream->flags |= STREAM_FLAG_SAMPLE_REQUESTED;
+            stream->flags |= (STREAM_FLAG_SAMPLE_REQUESTED | STREAM_FLAG_REQUESTED_ONCE);
         }
     }
 
@@ -1076,42 +1076,39 @@ static BOOL source_reader_get_read_result(struct source_reader *reader, struct m
     return !request_sample;
 }
 
-static HRESULT source_reader_get_next_selected_stream(struct source_reader *reader, unsigned int *stream_index)
+static HRESULT source_reader_get_first_selected_stream(struct source_reader *reader, unsigned int flags,
+        unsigned int *stream_index)
 {
-    unsigned int i, start_idx, stop_idx, first_selected = ~0u, requests = ~0u;
+    unsigned int i, first_selected = ~0u;
     BOOL selected, stream_drained;
 
-    start_idx = (reader->last_read_index + 1) % reader->stream_count;
-    stop_idx = reader->last_read_index == ~0u ? reader->stream_count : reader->last_read_index;
-
-    for (i = start_idx; i < reader->stream_count && i != stop_idx; i = (i + 1) % (reader->stream_count + 1))
+    for (i = 0; i < reader->stream_count; ++i)
     {
         stream_drained = reader->streams[i].state == STREAM_STATE_EOS && !reader->streams[i].responses;
         selected = SUCCEEDED(source_reader_get_stream_selection(reader, i, &selected)) && selected;
 
-        if (selected)
+        if (selected && !(reader->streams[i].flags & flags))
         {
             if (first_selected == ~0u)
                 first_selected = i;
 
-            /* Try to balance pending reads. */
-            if (!stream_drained && reader->streams[i].requests < requests)
+            if (!stream_drained)
             {
-                requests = reader->streams[i].requests;
                 *stream_index = i;
+                break;
             }
         }
     }
 
-    /* If all selected streams reached EOS, use first selected. */
-    if (first_selected != ~0u)
+    /* If all selected streams reached EOS, use first selected. This fallback only applies after reader went through all
+       selected streams once. */
+    if (i == reader->stream_count && first_selected != ~0u && !flags)
     {
-        if (requests == ~0u)
-            *stream_index = first_selected;
-        reader->last_read_index = *stream_index;
+        *stream_index = first_selected;
+        i = first_selected;
     }
 
-    return first_selected == ~0u ? MF_E_MEDIA_SOURCE_NO_STREAMS_SELECTED : S_OK;
+    return i == reader->stream_count ? MF_E_MEDIA_SOURCE_NO_STREAMS_SELECTED : S_OK;
 }
 
 static HRESULT source_reader_get_stream_read_index(struct source_reader *reader, unsigned int index, unsigned int *stream_index)
@@ -1128,7 +1125,18 @@ static HRESULT source_reader_get_stream_read_index(struct source_reader *reader,
             *stream_index = reader->first_audio_stream_index;
             break;
         case MF_SOURCE_READER_ANY_STREAM:
-            return source_reader_get_next_selected_stream(reader, stream_index);
+            if (reader->async_callback)
+            {
+                /* Pick first selected stream. */
+                hr = source_reader_get_first_selected_stream(reader, 0, stream_index);
+            }
+            else
+            {
+                /* Cycle through all selected streams once, next pick first selected. */
+                if (FAILED(hr = source_reader_get_first_selected_stream(reader, STREAM_FLAG_REQUESTED_ONCE, stream_index)))
+                    hr = source_reader_get_first_selected_stream(reader, 0, stream_index);
+            }
+            return hr;
         default:
             *stream_index = index;
     }
@@ -1435,7 +1443,8 @@ static HRESULT WINAPI src_reader_SetStreamSelection(IMFSourceReader *iface, DWOR
             if (!selection_changed)
             {
                 source_reader_get_stream_selection(reader, i, &selected);
-                selection_changed = !!(selected ^ selection);
+                if (selected ^ selection)
+                    selection_changed = TRUE;
             }
 
             if (selection)
@@ -1459,7 +1468,8 @@ static HRESULT WINAPI src_reader_SetStreamSelection(IMFSourceReader *iface, DWOR
         }
 
         source_reader_get_stream_selection(reader, index, &selected);
-        selection_changed = !!(selected ^ selection);
+        if (selected ^ selection)
+            selection_changed = TRUE;
 
         if (selection)
             hr = IMFPresentationDescriptor_SelectStream(reader->descriptor, index);
@@ -1467,8 +1477,11 @@ static HRESULT WINAPI src_reader_SetStreamSelection(IMFSourceReader *iface, DWOR
             hr = IMFPresentationDescriptor_DeselectStream(reader->descriptor, index);
     }
 
-    if (selection_changed)
-        reader->last_read_index = ~0u;
+    if (SUCCEEDED(hr) && selection_changed)
+    {
+        for (i = 0; i < reader->stream_count; ++i)
+            reader->streams[i].flags &= ~STREAM_FLAG_REQUESTED_ONCE;
+    }
 
     LeaveCriticalSection(&reader->cs);
 
@@ -2353,7 +2366,6 @@ static HRESULT create_source_reader_from_source(IMFMediaSource *source, IMFAttri
     /* At least one major type has to be set. */
     object->first_audio_stream_index = reader_get_first_stream_index(object->descriptor, &MFMediaType_Audio);
     object->first_video_stream_index = reader_get_first_stream_index(object->descriptor, &MFMediaType_Video);
-    object->last_read_index = ~0u;
 
     if (object->first_audio_stream_index == MF_SOURCE_READER_INVALID_STREAM_INDEX &&
             object->first_video_stream_index == MF_SOURCE_READER_INVALID_STREAM_INDEX)
