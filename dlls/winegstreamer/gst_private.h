@@ -121,6 +121,7 @@ HRESULT audio_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 enum decoder_type
 {
     DECODER_TYPE_H264,
+    DECODER_TYPE_AAC,
 };
 HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type) DECLSPEC_HIDDEN;
 
