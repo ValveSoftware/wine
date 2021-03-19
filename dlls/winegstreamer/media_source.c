@@ -305,7 +305,7 @@ static void start_pipeline(struct media_source *source, struct source_async_comm
             IMFMediaTypeHandler_GetCurrentMediaType(mth, &current_mt);
 
             mf_media_type_to_wg_format(current_mt, &format);
-            unix_funcs->wg_parser_stream_enable(stream->wg_stream, &format);
+            unix_funcs->wg_parser_stream_enable(stream->wg_stream, &format, NULL);
 
             IMFMediaType_Release(current_mt);
             IMFMediaTypeHandler_Release(mth);
@@ -548,7 +548,7 @@ static DWORD CALLBACK read_thread(void *arg)
             hr = IMFByteStream_Read(byte_stream, data, size, &ret_size);
         if (SUCCEEDED(hr) && ret_size != size)
             ERR("Unexpected short read: requested %u bytes, got %u.\n", size, ret_size);
-        unix_funcs->wg_parser_complete_read_request(source->wg_parser, SUCCEEDED(hr));
+        unix_funcs->wg_parser_complete_read_request(source->wg_parser, SUCCEEDED(hr) ? WG_READ_SUCCESS : WG_READ_FAILURE, ret_size);
     }
 
     TRACE("Media source is shutting down; exiting.\n");
