@@ -1242,7 +1242,7 @@ static struct wg_parser_stream *create_stream(struct wg_parser *parser)
     pthread_cond_init(&stream->event_cond, NULL);
     pthread_cond_init(&stream->event_empty_cond, NULL);
 
-    sprintf(pad_name, "qz_sink_%u", parser->stream_count);
+    sprintf(pad_name, "wine_sink_%u", parser->stream_count);
     stream->my_sink = gst_pad_new(pad_name, GST_PAD_SINK);
     gst_pad_set_element_private(stream->my_sink, stream);
     gst_pad_set_chain_function(stream->my_sink, sink_chain_cb);
@@ -2000,7 +2000,7 @@ static LONGLONG query_duration(GstPad *pad)
 
 static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
 {
-    GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("quartz_src",
+    GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("wine_src",
             GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS_ANY);
 
     parser->sink_connected = true;
@@ -2014,7 +2014,7 @@ static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
     parser->container = gst_bin_new(NULL);
     gst_element_set_bus(parser->container, parser->bus);
 
-    parser->my_src = gst_pad_new_from_static_template(&src_template, "quartz-src");
+    parser->my_src = gst_pad_new_from_static_template(&src_template, "wine-src");
     gst_pad_set_getrange_function(parser->my_src, src_getrange_cb);
     gst_pad_set_query_function(parser->my_src, src_query_cb);
     gst_pad_set_activatemode_function(parser->my_src, src_activate_mode_cb);
