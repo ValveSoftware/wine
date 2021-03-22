@@ -614,11 +614,31 @@ static HRESULT WINAPI audio_converter_ProcessEvent(IMFTransform *iface, DWORD id
 
 static HRESULT WINAPI audio_converter_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
+    struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
+    struct wg_parser_event event;
+
     TRACE("%p, %u %lu.\n", iface, message, param);
 
     switch(message)
     {
         case MFT_MESSAGE_COMMAND_FLUSH:
+        {
+            EnterCriticalSection(&converter->cs);
+            if (!converter->buffer_inflight)
+            {
+                LeaveCriticalSection(&converter->cs);
+                return S_OK;
+            }
+
+            while (event.type != WG_PARSER_EVENT_BUFFER)
+                wg_parser_stream_get_event(converter->stream, &event);
+
+            wg_parser_stream_release_buffer(converter->stream);
+            converter->buffer_inflight = FALSE;
+
+            LeaveCriticalSection(&converter->cs);
+            return S_OK;
+        }
         case MFT_MESSAGE_NOTIFY_BEGIN_STREAMING:
             return S_OK;
         default:
