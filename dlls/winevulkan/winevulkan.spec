@@ -9,6 +9,7 @@
 #
 
 @ stdcall -private vk_icdGetInstanceProcAddr(ptr str) wine_vk_icdGetInstanceProcAddr
+@ stdcall -private vk_icdGetPhysicalDeviceProcAddr(ptr str) wine_vk_icdGetPhysicalDeviceProcAddr
 @ stdcall -private vk_icdNegotiateLoaderICDInterfaceVersion(ptr) wine_vk_icdNegotiateLoaderICDInterfaceVersion
 @ cdecl -norelay native_vkGetInstanceProcAddrWINE(ptr str)
 @ stdcall __wine_get_native_VkDevice(ptr)
