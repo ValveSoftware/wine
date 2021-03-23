@@ -744,7 +744,7 @@ HRESULT WINAPI JoystickAGenericImpl_GetDeviceInfo(
         index = pd.dwData;
 
     /* Return joystick */
-    pdidi->guidInstance = This->guidInstance;
+    pdidi->guidInstance = This->base.guid;
     pdidi->guidProduct = This->guidProduct;
     /* we only support traditional joysticks for now */
     pdidi->dwDevType = This->devcaps.dwDevType;
@@ -788,7 +788,7 @@ HRESULT WINAPI JoystickWGenericImpl_GetDeviceInfo(
         index = pd.dwData;
 
     /* Return joystick */
-    pdidi->guidInstance = This->guidInstance;
+    pdidi->guidInstance = This->base.guid;
     pdidi->guidProduct = This->guidProduct;
     /* we only support traditional joysticks for now */
     pdidi->dwDevType = This->devcaps.dwDevType;
