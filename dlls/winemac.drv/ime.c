@@ -37,6 +37,7 @@
 #include "macdrv_dll.h"
 #include "imm.h"
 #include "ddk/imm.h"
+#include "wine/server.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(imm);
@@ -1409,6 +1410,7 @@ NTSTATUS WINAPI macdrv_ime_set_text(void *arg, ULONG size)
                                      params->cursor_pos, !params->complete);
         else
         {
+            RAWINPUT rawinput;
             INPUT input;
             unsigned int i;
 
@@ -1421,10 +1423,10 @@ NTSTATUS WINAPI macdrv_ime_set_text(void *arg, ULONG size)
             {
                 input.ki.wScan      = params->text[i];
                 input.ki.dwFlags    = KEYEVENTF_UNICODE;
-                __wine_send_input(hwnd, &input, NULL);
+                __wine_send_input(hwnd, &input, &rawinput);
 
                 input.ki.dwFlags    = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
-                __wine_send_input(hwnd, &input, NULL);
+                __wine_send_input(hwnd, &input, &rawinput);
             }
         }
     }
