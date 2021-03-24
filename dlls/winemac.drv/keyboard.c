@@ -916,6 +916,7 @@ void macdrv_compute_keyboard_layout(struct macdrv_thread_data *thread_data)
  */
 static void macdrv_send_keyboard_input(HWND hwnd, WORD vkey, WORD scan, DWORD flags, DWORD time)
 {
+    RAWINPUT rawinput;
     INPUT input;
 
     TRACE_(key)("hwnd %p vkey=%04x scan=%04x flags=%04x\n", hwnd, vkey, scan, flags);
@@ -927,7 +928,7 @@ static void macdrv_send_keyboard_input(HWND hwnd, WORD vkey, WORD scan, DWORD fl
     input.ki.time           = time;
     input.ki.dwExtraInfo    = 0;
 
-    __wine_send_input(hwnd, &input, NULL);
+    __wine_send_input(hwnd, &input, &rawinput);
 }
 
 
