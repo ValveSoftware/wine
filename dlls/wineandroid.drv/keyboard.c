@@ -671,6 +671,7 @@ static BOOL get_async_key_state( BYTE state[256] )
 
 static void send_keyboard_input( HWND hwnd, WORD vkey, WORD scan, DWORD flags )
 {
+    RAWINPUT rawinput;
     INPUT input;
 
     input.type             = INPUT_KEYBOARD;
@@ -680,7 +681,7 @@ static void send_keyboard_input( HWND hwnd, WORD vkey, WORD scan, DWORD flags )
     input.u.ki.time        = 0;
     input.u.ki.dwExtraInfo = 0;
 
-    __wine_send_input( hwnd, &input, NULL );
+    __wine_send_input( hwnd, &input, &rawinput );
 }
 
 /***********************************************************************
