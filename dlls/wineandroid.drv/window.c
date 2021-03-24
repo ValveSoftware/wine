@@ -421,6 +421,7 @@ static int process_events( DWORD mask )
     DPI_AWARENESS_CONTEXT context;
     struct java_event *event, *next, *previous;
     unsigned int count = 0;
+    RAWINPUT rawinput;
 
     assert( GetCurrentThreadId() == desktop_tid );
 
@@ -514,7 +515,7 @@ static int process_events( DWORD mask )
                     }
                     SERVER_END_REQ;
                 }
-                __wine_send_input( capture ? capture : event->data.motion.hwnd, &event->data.motion.input, NULL );
+                __wine_send_input( capture ? capture : event->data.motion.hwnd, &event->data.motion.input, &rawinput );
             }
             break;
 
@@ -528,7 +529,7 @@ static int process_events( DWORD mask )
                       event->data.kbd.input.ki.wVk, event->data.kbd.input.ki.wVk,
                       event->data.kbd.input.ki.wScan );
             update_keyboard_lock_state( event->data.kbd.input.ki.wVk, event->data.kbd.lock_state );
-            __wine_send_input( 0, &event->data.kbd.input, NULL );
+            __wine_send_input( 0, &event->data.kbd.input, &rawinput );
             break;
 
         default:

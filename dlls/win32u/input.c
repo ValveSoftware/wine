@@ -664,6 +664,7 @@ UINT WINAPI NtUserSendInput( UINT count, INPUT *inputs, int size )
 {
     UINT i;
     NTSTATUS status = STATUS_SUCCESS;
+    RAWINPUT rawinput;
 
     if (size != sizeof(INPUT))
     {
@@ -693,7 +694,7 @@ UINT WINAPI NtUserSendInput( UINT count, INPUT *inputs, int size )
             update_mouse_coords( &input );
             /* fallthrough */
         case INPUT_KEYBOARD:
-            status = send_hardware_message( 0, &input, NULL, SEND_HWMSG_INJECTED );
+            status = send_hardware_message( 0, &input, &rawinput, SEND_HWMSG_INJECTED );
             break;
         case INPUT_HARDWARE:
             RtlSetLastWin32Error( ERROR_CALL_NOT_IMPLEMENTED );

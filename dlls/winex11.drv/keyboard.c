@@ -1121,6 +1121,7 @@ static WORD EVENT_event_to_vkey( XIC xic, XKeyEvent *e)
  */
 static void X11DRV_send_keyboard_input( HWND hwnd, WORD vkey, WORD scan, UINT flags, UINT time )
 {
+    RAWINPUT rawinput;
     INPUT input;
 
     TRACE_(key)( "hwnd %p vkey=%04x scan=%04x flags=%04x\n", hwnd, vkey, scan, flags );
@@ -1132,7 +1133,7 @@ static void X11DRV_send_keyboard_input( HWND hwnd, WORD vkey, WORD scan, UINT fl
     input.ki.time        = time;
     input.ki.dwExtraInfo = 0;
 
-    __wine_send_input( hwnd, &input, NULL );
+    __wine_send_input( hwnd, &input, &rawinput );
 }
 
 
