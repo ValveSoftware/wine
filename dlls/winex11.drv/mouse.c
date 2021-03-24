@@ -689,6 +689,7 @@ static void map_event_coords( HWND hwnd, Window window, Window event_root, int x
 static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPUT *input )
 {
     struct x11drv_win_data *data;
+    RAWINPUT rawinput;
 
     input->type = INPUT_MOUSE;
 
@@ -705,7 +706,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
             sync_window_cursor( window );
             last_cursor_change = input->u.mi.time;
         }
-        __wine_send_input( hwnd, input, NULL );
+        __wine_send_input( hwnd, input, &rawinput );
         return;
     }
 
@@ -745,7 +746,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
         SERVER_END_REQ;
     }
 
-    __wine_send_input( hwnd, input, NULL );
+    __wine_send_input( hwnd, input, &rawinput );
 }
 
 #ifdef SONAME_LIBXCURSOR
@@ -1700,6 +1701,7 @@ void move_resize_window( HWND hwnd, int dir )
     {
         MSG msg;
         INPUT input;
+        RAWINPUT rawinput;
         int x, y, rootX, rootY;
 
         if (!XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &x, &y, &xstate )) break;
@@ -1715,7 +1717,7 @@ void move_resize_window( HWND hwnd, int dir )
             input.u.mi.dwFlags     = button_up_flags[button - 1] | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
             input.u.mi.time        = GetTickCount();
             input.u.mi.dwExtraInfo = 0;
-            __wine_send_input( hwnd, &input, NULL );
+            __wine_send_input( hwnd, &input, &rawinput );
         }
 
         while (PeekMessageW( &msg, 0, 0, 0, PM_REMOVE ))
@@ -1927,6 +1929,7 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
 static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 {
     XIRawEvent *event = xev->data;
+    RAWINPUT rawinput;
     INPUT input;
 
     if (broken_rawevents && is_old_motion_event( xev->serial ))
@@ -1944,7 +1947,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.u.mi.dy          = 0;
     if (!map_raw_event_coords( event, &input )) return FALSE;
 
-    __wine_send_input( 0, &input, NULL );
+    __wine_send_input( 0, &input, &rawinput );
     return TRUE;
 }
 
