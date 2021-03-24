@@ -216,6 +216,7 @@ UINT WINAPI SendInput( UINT count, LPINPUT inputs, int size )
 {
     UINT i;
     NTSTATUS status = STATUS_SUCCESS;
+    RAWINPUT rawinput;
 
     if (size != sizeof(INPUT))
     {
@@ -245,7 +246,7 @@ UINT WINAPI SendInput( UINT count, LPINPUT inputs, int size )
             update_mouse_coords( &input );
             /* fallthrough */
         case INPUT_KEYBOARD:
-            status = send_hardware_message( 0, &input, NULL, SEND_HWMSG_INJECTED );
+            status = send_hardware_message( 0, &input, &rawinput, SEND_HWMSG_INJECTED );
             break;
         case INPUT_HARDWARE:
             SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
