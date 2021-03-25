@@ -17,5 +17,5 @@
 @ stub OpenPackageInfoByFullName
 @ stub PackageFamilyNameFromFullName
 @ stub PackageFamilyNameFromId
-@ stub PackageFullNameFromId
+@ stdcall PackageFullNameFromId(ptr ptr ptr) kernel32.PackageFullNameFromId
 @ stdcall PackageIdFromFullName(wstr long ptr ptr) kernel32.PackageIdFromFullName
