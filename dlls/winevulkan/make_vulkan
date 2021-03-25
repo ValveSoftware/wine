@@ -191,8 +191,8 @@ FUNCTION_OVERRIDES = {
     "vkGetPhysicalDeviceWin32PresentationSupportKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
 
     # VK_KHR_swapchain
-    "vkAcquireNextImageKHR" : {"dispatch" : True, "driver" : False, "thunk" : True},
-    "vkAcquireNextImage2KHR": {"dispatch" : True, "driver" : False, "thunk" : False},
+    "vkAcquireNextImageKHR" : {"dispatch" : True, "driver" : True, "thunk" : True},
+    "vkAcquireNextImage2KHR": {"dispatch" : True, "driver" : True, "thunk" : False},
     "vkCreateSwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : False},
     "vkDestroySwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : False},
     "vkGetSwapchainImagesKHR": {"dispatch" : True, "driver" : True, "thunk" : False},
