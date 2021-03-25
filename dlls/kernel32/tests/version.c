@@ -26,6 +26,7 @@
 static LONG (WINAPI * pGetPackagesByPackageFamily)(const WCHAR *, UINT32 *, WCHAR **, UINT32 *, WCHAR *);
 static BOOL (WINAPI * pGetProductInfo)(DWORD, DWORD, DWORD, DWORD, DWORD *);
 static UINT (WINAPI * pGetSystemFirmwareTable)(DWORD, DWORD, void *, DWORD);
+static LONG (WINAPI * pPackageFullNameFromId)(const PACKAGE_ID *, UINT32 *, WCHAR *);
 static LONG (WINAPI * pPackageIdFromFullName)(const WCHAR *, UINT32, UINT32 *, BYTE *);
 static NTSTATUS (WINAPI * pNtQuerySystemInformation)(SYSTEM_INFORMATION_CLASS, void *, ULONG, ULONG *);
 static NTSTATUS (WINAPI * pRtlGetVersion)(RTL_OSVERSIONINFOEXW *);
@@ -47,6 +48,7 @@ static void init_function_pointers(void)
     GET_PROC(GetPackagesByPackageFamily);
     GET_PROC(GetProductInfo);
     GET_PROC(GetSystemFirmwareTable);
+    GET_PROC(PackageFullNameFromId);
     GET_PROC(PackageIdFromFullName);
 
     hmod = GetModuleHandleA("ntdll.dll");
@@ -803,9 +805,11 @@ static void test_PackageIdFromFullName(void)
     {
         0, PROCESSOR_ARCHITECTURE_INTEL,
                 {{.Major = 1, .Minor = 2, .Build = 3, .Revision = 4}},
-                (WCHAR *)L"TestPackage", NULL,
+                (WCHAR *)L"TestPackage", (WCHAR *)L"TestResource",
                 (WCHAR *)L"TestResourceId", (WCHAR *)L"0abcdefghjkme"
     };
+    static const WCHAR test_package_fullname[] =
+            L"TestPackage_1.2.3.4_x86_TestResourceId_0abcdefghjkme";
     UINT32 size, expected_size;
     PACKAGE_ID test_id;
     WCHAR fullname[512];
@@ -918,6 +922,22 @@ static void test_PackageIdFromFullName(void)
     size = sizeof(id_buffer);
     ret = pPackageIdFromFullName(L"TestPackage_1.2.3.4_X86_0abcdefghjkme", 0, &size, id_buffer);
     ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+
+    ret = pPackageFullNameFromId(&test_package_id, NULL, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+
+    size = sizeof(fullname);
+    ret = pPackageFullNameFromId(&test_package_id, &size, NULL);
+    ok(ret == ERROR_INVALID_PARAMETER, "Got unexpected ret %u.\n", ret);
+
+    size = 0;
+    ret = pPackageFullNameFromId(&test_package_id, &size, NULL);
+    ok(ret == ERROR_INSUFFICIENT_BUFFER, "Got unexpected ret %u.\n", ret);
+    ok(size == lstrlenW(test_package_fullname) + 1, "Got unexpected size %u.\n", size);
+
+    ret = pPackageFullNameFromId(&test_package_id, &size, fullname);
+    ok(ret == ERROR_SUCCESS, "Got unexpected ret %u.\n", ret);
+    ok(!lstrcmpW(fullname, test_package_fullname), "Got unexpected fullname %s.\n", debugstr_w(fullname));
 }
 
 #define TEST_VERSION_WIN7   1

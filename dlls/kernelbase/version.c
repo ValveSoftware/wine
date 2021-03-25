@@ -1636,6 +1636,16 @@ static UINT32 processor_arch_from_string(const WCHAR *str, unsigned int len)
     return ~0u;
 }
 
+const WCHAR *string_from_processor_arch(UINT32 code)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(arch_names); ++i)
+        if (code == arch_names[i].code)
+            return arch_names[i].name;
+    return NULL;
+}
+
 /***********************************************************************
  *         PackageIdFromFullName   (kernelbase.@)
  */
@@ -1722,6 +1732,39 @@ LONG WINAPI PackageIdFromFullName(const WCHAR *full_name, UINT32 flags, UINT32 *
     memcpy(id->publisherId, publisher_id, sizeof(*id->publisherId) * len);
     id->publisherId[len] = 0;
 
+    return ERROR_SUCCESS;
+}
+
+
+/***********************************************************************
+ *         PackageFullNameFromId   (kernelbase.@)
+ */
+LONG WINAPI PackageFullNameFromId(const PACKAGE_ID *package_id, UINT32 *length, WCHAR *full_name)
+{
+    WCHAR ver_str[5 * 4 + 3 + 1];
+    const WCHAR *arch_str;
+    UINT32 have_length;
+
+    TRACE("package_id %p, length %p, full_name %p.\n", package_id, length, full_name);
+
+    if (!package_id || !length)
+        return ERROR_INVALID_PARAMETER;
+    if (!full_name && *length)
+        return ERROR_INVALID_PARAMETER;
+    if (!package_id->name || !package_id->resourceId || !package_id->publisherId
+            || !(arch_str = string_from_processor_arch(package_id->processorArchitecture)))
+        return ERROR_INVALID_PARAMETER;
+
+    swprintf(ver_str, ARRAY_SIZE(ver_str), L"%u.%u.%u.%u", package_id->version.u.s.Major,
+            package_id->version.u.s.Minor, package_id->version.u.s.Build, package_id->version.u.s.Revision);
+    have_length = *length;
+    *length = lstrlenW(package_id->name) + 1 + lstrlenW(ver_str) + 1 + lstrlenW(arch_str) + 1
+            + lstrlenW(package_id->resourceId) + 1 + lstrlenW(package_id->publisherId) + 1;
+
+    if (have_length < *length)
+        return ERROR_INSUFFICIENT_BUFFER;
+
+    swprintf(full_name, *length, L"%s_%s_%s_%s_%s", package_id->name, ver_str, arch_str, package_id->resourceId, package_id->publisherId);
     return ERROR_SUCCESS;
 }
 
