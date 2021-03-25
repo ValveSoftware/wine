@@ -2070,6 +2070,9 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
         msg_data->size     = sizeof(*msg_data) + report_size;
         msg_data->rawinput = input->hw.rawinput;
 
+        if (input->hw.msg == WM_INPUT && input->hw.rawinput.type == RIM_TYPEMOUSE)
+            msg_data->flags = input->hw.lparam;
+
         enum_processes( queue_rawinput_message, &raw_msg );
 
         if (raw_msg.foreground) release_object( raw_msg.foreground );
