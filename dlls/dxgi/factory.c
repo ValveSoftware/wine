@@ -28,7 +28,7 @@ static inline struct dxgi_factory *impl_from_IWineDXGIFactory(IWineDXGIFactory *
     return CONTAINING_RECORD(iface, struct dxgi_factory, IWineDXGIFactory_iface);
 }
 
-static HRESULT STDMETHODCALLTYPE dxgi_factory_QueryInterface(IWineDXGIFactory *iface, REFIID iid, void **out)
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH dxgi_factory_QueryInterface(IWineDXGIFactory *iface, REFIID iid, void **out)
 {
     struct dxgi_factory *factory = impl_from_IWineDXGIFactory(iface);
 
@@ -57,7 +57,7 @@ static HRESULT STDMETHODCALLTYPE dxgi_factory_QueryInterface(IWineDXGIFactory *i
     return E_NOINTERFACE;
 }
 
-static ULONG STDMETHODCALLTYPE dxgi_factory_AddRef(IWineDXGIFactory *iface)
+static ULONG STDMETHODCALLTYPE DECLSPEC_HOTPATCH dxgi_factory_AddRef(IWineDXGIFactory *iface)
 {
     struct dxgi_factory *factory = impl_from_IWineDXGIFactory(iface);
     ULONG refcount = InterlockedIncrement(&factory->refcount);
@@ -67,7 +67,7 @@ static ULONG STDMETHODCALLTYPE dxgi_factory_AddRef(IWineDXGIFactory *iface)
     return refcount;
 }
 
-static ULONG STDMETHODCALLTYPE dxgi_factory_Release(IWineDXGIFactory *iface)
+static ULONG STDMETHODCALLTYPE DECLSPEC_HOTPATCH dxgi_factory_Release(IWineDXGIFactory *iface)
 {
     struct dxgi_factory *factory = impl_from_IWineDXGIFactory(iface);
     ULONG refcount = InterlockedDecrement(&factory->refcount);
@@ -269,7 +269,494 @@ static BOOL STDMETHODCALLTYPE dxgi_factory_IsWindowedStereoEnabled(IWineDXGIFact
     return FALSE;
 }
 
-static HRESULT STDMETHODCALLTYPE dxgi_factory_CreateSwapChainForHwnd(IWineDXGIFactory *iface,
+struct proxy_swapchain
+{
+    IDXGISwapChain4 IDXGISwapChain4_iface;
+    IDXGISwapChain4 *swapchain;
+};
+
+static inline struct proxy_swapchain *proxy_swapchain_from_IDXGISwapChain4(IDXGISwapChain4 *iface)
+{
+    return CONTAINING_RECORD(iface, struct proxy_swapchain, IDXGISwapChain4_iface);
+}
+
+/* IUnknown methods */
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_QueryInterface(IDXGISwapChain4 *iface, REFIID riid, void **object)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+    TRACE("iface %p, riid %s, object %p\n", iface, debugstr_guid(riid), object);
+
+    if (IsEqualGUID(riid, &IID_IUnknown)
+            || IsEqualGUID(riid, &IID_IDXGIObject)
+            || IsEqualGUID(riid, &IID_IDXGIDeviceSubObject)
+            || IsEqualGUID(riid, &IID_IDXGISwapChain)
+            || IsEqualGUID(riid, &IID_IDXGISwapChain1)
+            || IsEqualGUID(riid, &IID_IDXGISwapChain2)
+            || IsEqualGUID(riid, &IID_IDXGISwapChain3)
+            || IsEqualGUID(riid, &IID_IDXGISwapChain4))
+    {
+        IDXGISwapChain4_AddRef(swapchain->swapchain);
+        *object = iface;
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE\n", debugstr_guid(riid));
+
+    *object = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_AddRef(IDXGISwapChain4 *iface)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE("swapchain %p.\n", swapchain);
+
+    return IDXGISwapChain4_AddRef(swapchain->swapchain);
+}
+
+static ULONG STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_Release(IDXGISwapChain4 *iface)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+    ULONG refcount = IDXGISwapChain4_Release(swapchain->swapchain);
+
+    TRACE("%p decreasing refcount to %u.\n", swapchain, refcount);
+
+    if (!refcount)
+        heap_free(swapchain);
+
+    return refcount;
+}
+
+/* IDXGIObject methods */
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetPrivateData(IDXGISwapChain4 *iface,
+        REFGUID guid, UINT data_size, const void *data)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE("iface %p, guid %s, data_size %u, data %p.\n", iface, debugstr_guid(guid), data_size, data);
+
+    return IDXGISwapChain4_SetPrivateData(swapchain->swapchain, guid, data_size, data);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetPrivateDataInterface(IDXGISwapChain4 *iface,
+        REFGUID guid, const IUnknown *object)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE("iface %p, guid %s, object %p.\n", iface, debugstr_guid(guid), object);
+
+    return IDXGISwapChain4_SetPrivateDataInterface(swapchain->swapchain, guid, object);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetPrivateData(IDXGISwapChain4 *iface,
+        REFGUID guid, UINT *data_size, void *data)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE("iface %p, guid %s, data_size %p, data %p.\n", iface, debugstr_guid(guid), data_size, data);
+
+    return IDXGISwapChain4_GetPrivateData(swapchain->swapchain, guid, data_size, data);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetParent(IDXGISwapChain4 *iface, REFIID riid, void **parent)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE("iface %p, riid %s, parent %p.\n", iface, debugstr_guid(riid), parent);
+
+    return IDXGISwapChain4_GetParent(swapchain->swapchain, riid, parent);
+}
+
+/* IDXGIDeviceSubObject methods */
+
+static HRESULT STDMETHODCALLTYPE proxy_swapchain_GetDevice(IDXGISwapChain4 *iface, REFIID riid, void **device)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE("iface %p, riid %s, device %p.\n", iface, debugstr_guid(riid), device);
+
+    return IDXGISwapChain4_GetDevice(swapchain->swapchain, riid, device);
+}
+
+/* IDXGISwapChain methods */
+
+HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_Present(IDXGISwapChain4 *iface, UINT sync_interval, UINT flags)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE("iface %p, sync_interval %u, flags %#x.\n", iface, sync_interval, flags);
+
+    return IDXGISwapChain4_Present(swapchain->swapchain, sync_interval, flags);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetBuffer(IDXGISwapChain4 *iface,
+        UINT buffer_idx, REFIID riid, void **surface)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetBuffer(swapchain->swapchain, buffer_idx, riid, surface);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetFullscreenState(IDXGISwapChain4 *iface,
+        BOOL fullscreen, IDXGIOutput *target)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetFullscreenState(swapchain->swapchain, fullscreen, target);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetFullscreenState(IDXGISwapChain4 *iface,
+        BOOL *fullscreen, IDXGIOutput **target)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetFullscreenState(swapchain->swapchain, fullscreen, target);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetDesc(IDXGISwapChain4 *iface, DXGI_SWAP_CHAIN_DESC *desc)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetDesc(swapchain->swapchain, desc);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_ResizeBuffers(IDXGISwapChain4 *iface,
+        UINT buffer_count, UINT width, UINT height, DXGI_FORMAT format, UINT flags)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_ResizeBuffers(swapchain->swapchain, buffer_count, width, height, format, flags);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_ResizeTarget(IDXGISwapChain4 *iface,
+        const DXGI_MODE_DESC *target_mode_desc)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_ResizeTarget(swapchain->swapchain, target_mode_desc);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetContainingOutput(IDXGISwapChain4 *iface, IDXGIOutput **output)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetContainingOutput(swapchain->swapchain, output);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetFrameStatistics(IDXGISwapChain4 *iface,
+        DXGI_FRAME_STATISTICS *stats)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetFrameStatistics(swapchain->swapchain, stats);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetLastPresentCount(IDXGISwapChain4 *iface,
+        UINT *last_present_count)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetLastPresentCount(swapchain->swapchain, last_present_count);
+}
+
+/* IDXGISwapChain1 methods */
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetDesc1(IDXGISwapChain4 *iface, DXGI_SWAP_CHAIN_DESC1 *desc)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetDesc1(swapchain->swapchain, desc);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetFullscreenDesc(IDXGISwapChain4 *iface,
+        DXGI_SWAP_CHAIN_FULLSCREEN_DESC *desc)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetFullscreenDesc(swapchain->swapchain, desc);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetHwnd(IDXGISwapChain4 *iface, HWND *hwnd)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetHwnd(swapchain->swapchain, hwnd);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetCoreWindow(IDXGISwapChain4 *iface,
+        REFIID iid, void **core_window)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetCoreWindow(swapchain->swapchain, iid, core_window);
+}
+
+HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_Present1(IDXGISwapChain4 *iface,
+        UINT sync_interval, UINT flags, const DXGI_PRESENT_PARAMETERS *present_parameters)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_Present1(swapchain->swapchain, sync_interval, flags, present_parameters);
+}
+
+static BOOL STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_IsTemporaryMonoSupported(IDXGISwapChain4 *iface)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_IsTemporaryMonoSupported(swapchain->swapchain);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetRestrictToOutput(IDXGISwapChain4 *iface, IDXGIOutput **output)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetRestrictToOutput(swapchain->swapchain, output);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetBackgroundColor(IDXGISwapChain4 *iface, const DXGI_RGBA *color)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetBackgroundColor(swapchain->swapchain, color);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetBackgroundColor(IDXGISwapChain4 *iface, DXGI_RGBA *color)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetBackgroundColor(swapchain->swapchain, color);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetRotation(IDXGISwapChain4 *iface, DXGI_MODE_ROTATION rotation)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetRotation(swapchain->swapchain, rotation);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetRotation(IDXGISwapChain4 *iface, DXGI_MODE_ROTATION *rotation)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetRotation(swapchain->swapchain, rotation);
+}
+
+/* IDXGISwapChain2 methods */
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetSourceSize(IDXGISwapChain4 *iface, UINT width, UINT height)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetSourceSize(swapchain->swapchain, width, height);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetSourceSize(IDXGISwapChain4 *iface, UINT *width, UINT *height)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetSourceSize(swapchain->swapchain, width, height);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetMaximumFrameLatency(IDXGISwapChain4 *iface, UINT max_latency)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetMaximumFrameLatency(swapchain->swapchain, max_latency);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetMaximumFrameLatency(IDXGISwapChain4 *iface, UINT *max_latency)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetMaximumFrameLatency(swapchain->swapchain, max_latency);
+}
+
+static HANDLE STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetFrameLatencyWaitableObject(IDXGISwapChain4 *iface)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetFrameLatencyWaitableObject(swapchain->swapchain);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetMatrixTransform(IDXGISwapChain4 *iface,
+        const DXGI_MATRIX_3X2_F *matrix)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetMatrixTransform(swapchain->swapchain, matrix);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetMatrixTransform(IDXGISwapChain4 *iface,
+        DXGI_MATRIX_3X2_F *matrix)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetMatrixTransform(swapchain->swapchain, matrix);
+}
+
+/* IDXGISwapChain3 methods */
+
+static UINT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_GetCurrentBackBufferIndex(IDXGISwapChain4 *iface)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_GetCurrentBackBufferIndex(swapchain->swapchain);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_CheckColorSpaceSupport(IDXGISwapChain4 *iface,
+        DXGI_COLOR_SPACE_TYPE colour_space, UINT *colour_space_support)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_CheckColorSpaceSupport(swapchain->swapchain, colour_space, colour_space_support);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetColorSpace1(IDXGISwapChain4 *iface,
+        DXGI_COLOR_SPACE_TYPE colour_space)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetColorSpace1(swapchain->swapchain, colour_space);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_ResizeBuffers1(IDXGISwapChain4 *iface,
+        UINT buffer_count, UINT width, UINT height, DXGI_FORMAT format, UINT flags,
+        const UINT *node_mask, IUnknown * const *present_queue)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_ResizeBuffers1(swapchain->swapchain, buffer_count, width, height, format, flags, node_mask, present_queue);
+}
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_SetHDRMetaData(IDXGISwapChain4 *iface,
+        DXGI_HDR_METADATA_TYPE type, UINT size, void *metadata)
+{
+    struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+
+    TRACE(".\n");
+
+    return IDXGISwapChain4_SetHDRMetaData(swapchain->swapchain, type, size, metadata);
+}
+
+static const struct IDXGISwapChain4Vtbl proxy_swapchain_vtbl =
+{
+    /* IUnknown methods */
+    proxy_swapchain_QueryInterface,
+    proxy_swapchain_AddRef,
+    proxy_swapchain_Release,
+    /* IDXGIObject methods */
+    proxy_swapchain_SetPrivateData,
+    proxy_swapchain_SetPrivateDataInterface,
+    proxy_swapchain_GetPrivateData,
+    proxy_swapchain_GetParent,
+    /* IDXGIDeviceSubObject methods */
+    proxy_swapchain_GetDevice,
+    /* IDXGISwapChain methods */
+    proxy_swapchain_Present,
+    proxy_swapchain_GetBuffer,
+    proxy_swapchain_SetFullscreenState,
+    proxy_swapchain_GetFullscreenState,
+    proxy_swapchain_GetDesc,
+    proxy_swapchain_ResizeBuffers,
+    proxy_swapchain_ResizeTarget,
+    proxy_swapchain_GetContainingOutput,
+    proxy_swapchain_GetFrameStatistics,
+    proxy_swapchain_GetLastPresentCount,
+    /* IDXGISwapChain1 methods */
+    proxy_swapchain_GetDesc1,
+    proxy_swapchain_GetFullscreenDesc,
+    proxy_swapchain_GetHwnd,
+    proxy_swapchain_GetCoreWindow,
+    proxy_swapchain_Present1,
+    proxy_swapchain_IsTemporaryMonoSupported,
+    proxy_swapchain_GetRestrictToOutput,
+    proxy_swapchain_SetBackgroundColor,
+    proxy_swapchain_GetBackgroundColor,
+    proxy_swapchain_SetRotation,
+    proxy_swapchain_GetRotation,
+    /* IDXGISwapChain2 methods */
+    proxy_swapchain_SetSourceSize,
+    proxy_swapchain_GetSourceSize,
+    proxy_swapchain_SetMaximumFrameLatency,
+    proxy_swapchain_GetMaximumFrameLatency,
+    proxy_swapchain_GetFrameLatencyWaitableObject,
+    proxy_swapchain_SetMatrixTransform,
+    proxy_swapchain_GetMatrixTransform,
+    /* IDXGISwapChain3 methods */
+    proxy_swapchain_GetCurrentBackBufferIndex,
+    proxy_swapchain_CheckColorSpaceSupport,
+    proxy_swapchain_SetColorSpace1,
+    proxy_swapchain_ResizeBuffers1,
+    /* IDXGISwapChain4 methods */
+    proxy_swapchain_SetHDRMetaData,
+};
+
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH dxgi_factory_CreateSwapChainForHwnd(IWineDXGIFactory *iface,
         IUnknown *device, HWND window, const DXGI_SWAP_CHAIN_DESC1 *desc,
         const DXGI_SWAP_CHAIN_FULLSCREEN_DESC *fullscreen_desc,
         IDXGIOutput *output, IDXGISwapChain1 **swapchain)
@@ -301,9 +788,23 @@ static HRESULT STDMETHODCALLTYPE dxgi_factory_CreateSwapChainForHwnd(IWineDXGIFa
 
     if (SUCCEEDED(IUnknown_QueryInterface(device, &IID_IWineDXGISwapChainFactory, (void **)&swapchain_factory)))
     {
+        IDXGISwapChain4 *swapchain_impl;
         hr = IWineDXGISwapChainFactory_create_swapchain(swapchain_factory,
-                (IDXGIFactory *)iface, window, desc, fullscreen_desc, output, swapchain);
+                (IDXGIFactory *)iface, window, desc, fullscreen_desc, output, (IDXGISwapChain1 **)&swapchain_impl);
         IWineDXGISwapChainFactory_Release(swapchain_factory);
+        if (SUCCEEDED(hr))
+        {
+            struct proxy_swapchain *obj;
+
+            obj = heap_alloc_zero(sizeof(*obj));
+            obj->IDXGISwapChain4_iface.lpVtbl = &proxy_swapchain_vtbl;
+            obj->swapchain = swapchain_impl;
+            *swapchain = (IDXGISwapChain1 *)&obj->IDXGISwapChain4_iface;
+        }
+        else
+        {
+            *swapchain = NULL;
+        }
         return hr;
     }
 
