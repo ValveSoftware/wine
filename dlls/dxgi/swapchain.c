@@ -232,7 +232,7 @@ static ULONG STDMETHODCALLTYPE d3d11_swapchain_AddRef(IDXGISwapChain1 *iface)
     return refcount;
 }
 
-static ULONG STDMETHODCALLTYPE d3d11_swapchain_Release(IDXGISwapChain1 *iface)
+static ULONG STDMETHODCALLTYPE DECLSPEC_HOTPATCH d3d11_swapchain_Release(IDXGISwapChain1 *iface)
 {
     struct d3d11_swapchain *swapchain = d3d11_swapchain_from_IDXGISwapChain1(iface);
     ULONG refcount = InterlockedDecrement(&swapchain->refcount);
@@ -325,7 +325,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetDevice(IDXGISwapChain1 *ifac
 
 /* IDXGISwapChain1 methods */
 
-static HRESULT d3d11_swapchain_present(struct d3d11_swapchain *swapchain,
+static HRESULT DECLSPEC_HOTPATCH d3d11_swapchain_present(struct d3d11_swapchain *swapchain,
         unsigned int sync_interval, unsigned int flags)
 {
     HRESULT hr;
@@ -705,7 +705,7 @@ static HRESULT STDMETHODCALLTYPE d3d11_swapchain_GetCoreWindow(IDXGISwapChain1 *
     return DXGI_ERROR_INVALID_CALL;
 }
 
-static HRESULT STDMETHODCALLTYPE d3d11_swapchain_Present1(IDXGISwapChain1 *iface,
+static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH d3d11_swapchain_Present1(IDXGISwapChain1 *iface,
         UINT sync_interval, UINT flags, const DXGI_PRESENT_PARAMETERS *present_parameters)
 {
     struct d3d11_swapchain *swapchain = d3d11_swapchain_from_IDXGISwapChain1(iface);
