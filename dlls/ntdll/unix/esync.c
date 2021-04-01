@@ -948,6 +948,8 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
 
                     if (event->signaled)
                     {
+                        if (ac_odyssey && alertable)
+                            usleep( 0 );
                         if ((size = read( obj->fd, &value, sizeof(value) )) == sizeof(value))
                         {
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
@@ -963,6 +965,12 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
 
                     if (event->signaled)
                     {
+                        if (ac_odyssey && alertable)
+                        {
+                            usleep( 0 );
+                            if (!event->signaled)
+                                break;
+                        }
                         TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                         return i;
                     }
@@ -991,6 +999,9 @@ static NTSTATUS __esync_wait_objects( DWORD count, const HANDLE *handles, BOOLEA
 
         while (1)
         {
+            if (ac_odyssey && alertable)
+                usleep( 0 );
+
             ret = do_poll( fds, pollcount, timeout ? &end : NULL );
             if (ret > 0)
             {
