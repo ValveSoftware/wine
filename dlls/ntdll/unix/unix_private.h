@@ -146,6 +146,8 @@ extern BOOL is_wow64 DECLSPEC_HIDDEN;
 extern struct ldt_copy __wine_ldt_copy DECLSPEC_HIDDEN;
 #endif
 
+extern BOOL ac_odyssey DECLSPEC_HIDDEN;
+
 extern void init_environment( int argc, char *argv[], char *envp[] ) DECLSPEC_HIDDEN;
 extern void init_startup_info(void) DECLSPEC_HIDDEN;
 extern void *create_startup_info( const UNICODE_STRING *nt_image, const RTL_USER_PROCESS_PARAMETERS *params,
