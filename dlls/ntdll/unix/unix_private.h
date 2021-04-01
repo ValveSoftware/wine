@@ -137,6 +137,8 @@ extern SYSTEM_CPU_INFORMATION cpu_info DECLSPEC_HIDDEN;
 extern struct ldt_copy __wine_ldt_copy DECLSPEC_HIDDEN;
 #endif
 
+extern BOOL ac_odyssey DECLSPEC_HIDDEN;
+
 extern void init_environment( int argc, char *argv[], char *envp[] ) DECLSPEC_HIDDEN;
 extern void init_startup_info(void) DECLSPEC_HIDDEN;
 extern DWORD ntdll_umbstowcs( const char *src, DWORD srclen, WCHAR *dst, DWORD dstlen ) DECLSPEC_HIDDEN;
