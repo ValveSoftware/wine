@@ -2179,6 +2179,18 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     steamclient_setup_trampolines,
 };
 
+BOOL ac_odyssey;
+
+static void hacks_init(void)
+{
+    static const char ac_odyssey_exe[] = "ACOdyssey.exe";
+
+    if (main_argc > 1 && strstr(main_argv[1], ac_odyssey_exe))
+    {
+        ERR("HACK: AC Odyssey sync tweak on.\n");
+        ac_odyssey = TRUE;
+    }
+}
 
 #ifdef _WIN64
 
@@ -2209,6 +2221,7 @@ static void start_main_thread(void)
     signal_alloc_thread( teb );
     dbg_init();
     startup_info_size = server_init_process();
+    hacks_init();
     fsync_init();
     esync_init();
     virtual_map_user_shared_data();
