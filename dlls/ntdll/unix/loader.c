@@ -1920,9 +1920,17 @@ static ULONG_PTR get_image_address(void)
     return 0;
 }
 
+BOOL ac_odyssey;
+
 static void hacks_init(void)
 {
     const char *sgi = getenv( "SteamGameId" );
+
+    if (main_argc > 1 && strstr(main_argv[1], "ACOdyssey.exe"))
+    {
+        ERR("HACK: AC Odyssey sync tweak on.\n");
+        ac_odyssey = TRUE;
+    }
 
     switch (sgi ? atoi( sgi ) : -1)
     {
