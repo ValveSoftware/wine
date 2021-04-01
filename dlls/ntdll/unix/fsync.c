@@ -894,6 +894,9 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         {
                             if (__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
                             {
+                                if (ac_odyssey && alertable)
+                                    usleep( 0 );
+
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                                 return i;
                             }
@@ -914,6 +917,9 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         {
                             if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
                             {
+                                if (ac_odyssey && alertable)
+                                    usleep( 0 );
+
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                                 return i;
                             }
@@ -956,6 +962,9 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
             waitcount = i;
 
             /* Looks like everything is contended, so wait. */
+
+            if (ac_odyssey && alertable)
+                usleep( 0 );
 
             if (timeout && !timeout->QuadPart)
             {
