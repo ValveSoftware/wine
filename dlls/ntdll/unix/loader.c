@@ -2255,6 +2255,7 @@ static ULONG_PTR get_image_address(void)
     return 0;
 }
 
+BOOL ac_odyssey;
 BOOL fsync_help_simulated_pulse;
 BOOL localsystem_sid;
 BOOL simulate_writecopy;
@@ -2274,6 +2275,12 @@ static void hacks_init(void)
     {
         ram_reporting_bias = atoll(env_str) * 1024 * 1024;
         ERR( "HACK: ram_reporting_bias %lldMB.\n", ram_reporting_bias / (1024 * 1024) );
+    }
+
+    if (main_argc > 1 && strstr(main_argv[1], "ACOdyssey.exe"))
+    {
+        ERR("HACK: AC Odyssey sync tweak on.\n");
+        ac_odyssey = TRUE;
     }
 
     env_str = getenv("WINE_ALERT_SIMULATE_SCHED_QUANTUM");
