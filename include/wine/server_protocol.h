@@ -3879,10 +3879,8 @@ struct get_key_state_reply
 struct set_key_state_request
 {
     struct request_header __header;
-    thread_id_t    tid;
     int            async;
     /* VARARG(keystate,bytes); */
-    char __pad_20[4];
 };
 struct set_key_state_reply
 {
