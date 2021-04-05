@@ -2155,6 +2155,7 @@ static struct unix_funcs unix_funcs =
     NtCurrentTeb,
 #endif
     steamclient_setup_trampolines,
+    set_unix_env,
 };
 
 
