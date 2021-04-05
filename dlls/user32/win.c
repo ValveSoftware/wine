@@ -2176,7 +2176,7 @@ HWND WINAPI GetDesktopWindow(void)
             }
             while (*next);
 
-            SetEnvironmentVariableA("LD_PRELOAD", env);
+            __wine_set_unix_env("LD_PRELOAD", env);
             HeapFree(GetProcessHeap(), 0, env);
         }
 
@@ -2193,7 +2193,7 @@ HWND WINAPI GetDesktopWindow(void)
         Wow64RevertWow64FsRedirection( redir );
 
         /* HACK: Restore the previous value, just in case */
-        if (ld_preload) SetEnvironmentVariableA("LD_PRELOAD", ld_preload);
+        if (ld_preload) __wine_set_unix_env("LD_PRELOAD", ld_preload);
 
         LeaveCriticalSection( &desktop_section );
 
