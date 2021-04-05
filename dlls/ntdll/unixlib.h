@@ -43,6 +43,7 @@ struct unix_funcs
 
     /* steamclient HACK */
     void          (CDECL *steamclient_setup_trampolines)( HMODULE src_mod, HMODULE tgt_mod );
+    void          (CDECL *set_unix_env)( const char *var, const char *val );
 };
 
 #endif /* __NTDLL_UNIXLIB_H */
