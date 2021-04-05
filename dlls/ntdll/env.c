@@ -1072,3 +1072,8 @@ void init_user_process_params(void)
     set_wow64_environment( &params->Environment );
     params->EnvironmentSize = RtlSizeHeap( GetProcessHeap(), 0, params->Environment );
 }
+
+void __cdecl __wine_set_unix_env( const char *var, const char *val)
+{
+    unix_funcs->set_unix_env( var, val );
+}

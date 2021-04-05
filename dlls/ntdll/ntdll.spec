@@ -1610,6 +1610,7 @@
 @ cdecl __wine_init_unix_lib(long long ptr ptr)
 @ extern __wine_syscall_dispatcher
 @ extern -arch=i386 __wine_ldt_copy
+@ cdecl __wine_set_unix_env(ptr ptr)
 
 # Debugging
 @ cdecl -norelay __wine_dbg_get_channel_flags(ptr)

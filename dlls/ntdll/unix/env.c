@@ -1735,3 +1735,8 @@ NTSTATUS WINAPI NtQueryInstallUILanguage( LANGID *lang )
     *lang = system_ui_language;
     return STATUS_SUCCESS;
 }
+
+void CDECL set_unix_env( const char *var, const char *val )
+{
+    setenv(var, val, 1);
+}
