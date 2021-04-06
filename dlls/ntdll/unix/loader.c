@@ -2277,7 +2277,7 @@ static void hacks_init(void)
         ERR( "HACK: ram_reporting_bias %lldMB.\n", ram_reporting_bias / (1024 * 1024) );
     }
 
-    if (main_argc > 1 && strstr(main_argv[1], "ACOdyssey.exe"))
+    if (inproc_device_fd >= 0 && main_argc > 1 && strstr(main_argv[1], "ACOdyssey.exe"))
     {
         ERR("HACK: AC Odyssey sync tweak on.\n");
         ac_odyssey = TRUE;
