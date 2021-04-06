@@ -2210,7 +2210,11 @@ static void hacks_init(void)
 
     if (!strcasecmp(cur_exe, ac_odyssey_exe))
     {
-        ERR("HACK: AC Odyssey sync tweak on.\n");
+        if (do_esync() || do_fsync())
+            ERR("HACK: AC Odyssey sync tweak on.\n");
+        else
+            ERR("Not enabling AC Odyssey sync tweak as esync and fsync are disabled.\n");
+
         ac_odyssey = TRUE;
     }
 }
