@@ -2969,6 +2969,21 @@ C_ASSERT( sizeof(struct process_info) <= sizeof(SYSTEM_PROCESS_INFORMATION) );
         ret = STATUS_SUCCESS;
         break;
 
+    case SystemCodeIntegrityInformation:
+    {
+        SYSTEM_CODEINTEGRITY_INFORMATION *integrity_info = info;
+
+        FIXME("SystemCodeIntegrityInformation, size %u, info %p, stub!\n", size, info);
+
+        len = sizeof(SYSTEM_CODEINTEGRITY_INFORMATION);
+
+        if (size < len)
+            integrity_info->CodeIntegrityOptions = CODEINTEGRITY_OPTION_ENABLED;
+        else
+            ret = STATUS_INFO_LENGTH_MISMATCH;
+        break;
+    }
+
     default:
 	FIXME( "(0x%08x,%p,0x%08x,%p) stub\n", class, info, size, ret_size );
 
