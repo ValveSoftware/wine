@@ -1583,6 +1583,7 @@ DECL_HANDLER(get_process_image_name)
         }
         else set_error( STATUS_BUFFER_TOO_SMALL );
     }
+    else set_error( STATUS_INVALID_HANDLE );
     release_object( process );
 }
 
