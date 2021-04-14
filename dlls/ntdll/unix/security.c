@@ -419,7 +419,7 @@ NTSTATUS WINAPI NtQueryInformationToken( HANDLE token, TOKEN_INFORMATION_CLASS c
 
     case TokenSessionId:
         {
-            *(DWORD *)info = 0;
+            *(DWORD *)info = 1;
             FIXME("QueryInformationToken( ..., TokenSessionId, ...) semi-stub\n");
         }
         break;
