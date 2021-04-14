@@ -1177,6 +1177,14 @@ static HRESULT WINAPI InternetProtocolSink_ReportResult(IInternetProtocolSink *i
 
     TRACE("(%p)->(%08x %d %s)\n", This, hrResult, dwError, debugstr_w(szResult));
 
+    /* Make sure we don't call stop_binding before available data has been reported,
+       as some custom protocol handlers call ReportResult within LockRequest */
+    if (!(This->state & BINDING_LOCKED) && hrResult == S_OK)
+    {
+        This->download_state = END_DOWNLOAD;
+        return S_OK;
+    }
+
     stop_binding(This, hrResult, szResult);
 
     IInternetProtocolEx_Terminate(&This->protocol->IInternetProtocolEx_iface, 0);
