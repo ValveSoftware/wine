@@ -3192,6 +3192,9 @@ LRESULT CDECL X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
     case WM_X11DRV_DESKTOP_SET_WINDOW_CURSOR:
         SendNotifyMessageW( (HWND)wp, WM_X11DRV_SET_CURSOR, 0, lp );
         return 0;
+    case WM_X11DRV_DESKTOP_CLIP_CURSOR:
+        x11drv_desktop_clip_cursor( (BOOL)wp, (BOOL)lp );
+        return 0;
     case WM_X11DRV_CLIP_CURSOR_NOTIFY:
         return clip_cursor_notify( hwnd, (HWND)wp, (HWND)lp );
     case WM_X11DRV_CLIP_CURSOR_REQUEST:
