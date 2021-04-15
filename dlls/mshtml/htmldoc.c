@@ -5988,18 +5988,12 @@ static DWORD WINAPI gecko_main_thread_proc(void *arg)
 
 static BOOL WINAPI read_thread_config(INIT_ONCE *once, void *param, void **context)
 {
-    HKEY key;
-    DWORD res;
-    static const WCHAR enable_keyW[] =
-        {'S','o','f','t','w','a','r','e',
-         '\\','W','i','n','e',
-         '\\','M','S','H','T','M','L',
-         '\\','M','a','i','n','T','h','r','e','a','d','H','a','c','k',0};
+    char str[64];
 
-    res = RegOpenKeyW(HKEY_CURRENT_USER, enable_keyW, &key);
-    if(res == ERROR_SUCCESS) {
-        RegCloseKey(key);
-        FIXME("CXHACK: Using separated main thread.\n");
+    if((GetEnvironmentVariableA("SteamGameId", str, sizeof(str)) && !strcmp(str, "491540"))
+            || (GetEnvironmentVariableA("WINE_GECKO_MAIN_THREAD", str, sizeof(str)) && *str != '0'))
+    {
+        FIXME("HACK: Using separated main thread.\n");
         gecko_main_thread_config = TRUE;
     }
 
@@ -6040,10 +6034,10 @@ static HRESULT create_document_object(BOOL is_mhtml, IUnknown *outer, REFIID rii
         gecko_main_thread = GetCurrentThreadId();
         gecko_main_thread_hwnd = get_thread_hwnd();
     }else if(GetCurrentThreadId() != gecko_main_thread) {
-        FIXME("CXHACK: Creating HTMLDocument outside Gecko main thread\n");
+        FIXME("HACK: Creating HTMLDocument outside Gecko main thread\n");
         if(!gecko_main_thread_config) {
-            FIXME("CXHACK: Dedicated main thread not configured\n");
-            FIXME("CXHACK: Create HKCU\\Software\\Wine\\MSHTML\\MainThreadHack key\n");
+            FIXME("HACK: Dedicated main thread not configured\n");
+            FIXME("HACK: Create HKCU\\Software\\Wine\\MSHTML\\MainThreadHack key\n");
         }
         return create_marshaled_doc(gecko_main_thread_hwnd, riid, ppv);
     }
