@@ -2656,6 +2656,32 @@ NTSTATUS wine_vkDestroyDebugReportCallbackEXT(void *args)
     return STATUS_SUCCESS;
 }
 
+/* HACK: Rainbow Six Siege tries to call this function regardless of whether the extension is exposed */
+NTSTATUS wine_vkCmdWriteBufferMarkerAMD(void *args)
+{
+    struct vkCmdWriteBufferMarkerAMD_params *params = args;
+    VkCommandBuffer commandBuffer = params->commandBuffer;
+    VkPipelineStageFlagBits pipelineStage = params->pipelineStage;
+    VkBuffer dstBuffer = params->dstBuffer;
+    VkDeviceSize dstOffset = params->dstOffset;
+    uint32_t marker = params->marker;
+
+    TRACE("%p, %#x, 0x%s, 0x%s, %u\n", commandBuffer, pipelineStage, wine_dbgstr_longlong(dstBuffer), wine_dbgstr_longlong(dstOffset), marker);
+
+    if (commandBuffer->device->funcs.p_vkCmdWriteBufferMarkerAMD)
+    {
+        commandBuffer->device->funcs.p_vkCmdWriteBufferMarkerAMD(commandBuffer->command_buffer, pipelineStage, dstBuffer, dstOffset, marker);
+    }
+    else
+    {
+        static unsigned int once;
+
+        if (!once++)
+            FIXME("HACK: returning success from unexposed function.\n");
+    }
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS wine_vkAcquireNextImage2KHR(void *args)
 {
     struct vkAcquireNextImage2KHR_params *params = args;
