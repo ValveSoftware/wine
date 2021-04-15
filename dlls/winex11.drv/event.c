@@ -834,8 +834,8 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         return FALSE;
     }
 
-    /* ask the foreground window to re-apply the current ClipCursor rect */
-    SendMessageW( GetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, 0, 0 );
+    /* ask the desktop window to re-apply the current ClipCursor rect */
+    SendNotifyMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR, FALSE, FALSE );
 
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
     if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
@@ -843,7 +843,7 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if ((xic = X11DRV_get_ic( hwnd ))) XSetICFocus( xic );
     if (use_take_focus)
     {
-        if (hwnd == GetForegroundWindow()) clip_fullscreen_window( hwnd, FALSE );
+        if (hwnd == GetForegroundWindow()) SendNotifyMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR, TRUE, FALSE );
         return TRUE;
     }
 
