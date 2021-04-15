@@ -93,6 +93,7 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
     GUID hidGuid;
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
     INT32 handle;
+    HKEY hkey;
 
     HidD_GetHidGuid(&hidGuid);
     if (ext->xinput_hack) hidGuid.Data4[7]++; /* HACK: use different GUID so only xinput will find this device */
@@ -118,11 +119,27 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
             goto error;
         }
     }
-    else if (GetLastError() != ERROR_DEVINST_ALREADY_EXISTS)
+    else if (GetLastError() == ERROR_DEVINST_ALREADY_EXISTS)
+    {
+        Data.cbSize = sizeof(Data);
+        if (!SetupDiOpenDeviceInfoW(devinfo, device_instance_id, NULL, 0, &Data ))
+        {
+            FIXME( "failed to open device info %x\n", GetLastError() );
+            goto error;
+        }
+    }
+    else
     {
         FIXME( "failed to create device info %x\n", GetLastError());
         goto error;
     }
+
+    hkey = SetupDiCreateDevRegKeyW(devinfo, &Data, DICS_FLAG_GLOBAL, 0, DIREG_DRV, NULL, NULL);
+    if (hkey == INVALID_HANDLE_VALUE)
+        FIXME( "failed to create/open driver reg key %x\n", GetLastError() );
+    else
+        RegCloseKey(hkey);
+
 
     SetupDiDestroyDeviceInfoList(devinfo);
 
