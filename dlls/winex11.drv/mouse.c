@@ -604,7 +604,7 @@ LRESULT clip_cursor_notify( HWND hwnd, HWND prev_clip_hwnd, HWND new_clip_hwnd )
  *
  * Turn on clipping if the active window is fullscreen.
  */
-BOOL clip_fullscreen_window( HWND hwnd, BOOL reset )
+static BOOL clip_fullscreen_window( HWND hwnd, BOOL reset )
 {
     struct x11drv_win_data *data;
     struct x11drv_thread_data *thread_data;
@@ -737,7 +737,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
     {
         hwnd = GetAncestor( hwnd, GA_ROOT );
         if ((input->u.mi.dwFlags & (MOUSEEVENTF_LEFTDOWN|MOUSEEVENTF_RIGHTDOWN)) && hwnd == GetForegroundWindow())
-            clip_fullscreen_window( hwnd, FALSE );
+            SendNotifyMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR, TRUE, FALSE );
     }
 
     /* update the wine server Z-order */
@@ -1587,49 +1587,18 @@ BOOL CDECL X11DRV_GetCursorPos(LPPOINT pos)
  */
 BOOL CDECL X11DRV_ClipCursor( LPCRECT clip )
 {
-    RECT virtual_rect = get_virtual_screen_rect();
-
-    if (!clip) clip = &virtual_rect;
-
-    if (grab_pointer)
-    {
-        HWND foreground = GetForegroundWindow();
-        DWORD tid, pid;
-
-        if (foreground == GetDesktopWindow())
-        {
-            WARN( "desktop is foreground, ignoring ClipCursor\n" );
-            ungrab_clipping_window();
-            return TRUE;
-        }
-
-        /* forward request to the foreground window if it's in a different thread */
-        tid = GetWindowThreadProcessId( foreground, &pid );
-        if (tid && tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
-        {
-            TRACE( "forwarding clip request to %p\n", foreground );
-            SendNotifyMessageW( foreground, WM_X11DRV_CLIP_CURSOR_REQUEST, FALSE, FALSE );
-            return TRUE;
-        }
-
-        /* we are clipping if the clip rectangle is smaller than the screen */
-        if (clip->left > virtual_rect.left || clip->right < virtual_rect.right ||
-            clip->top > virtual_rect.top || clip->bottom < virtual_rect.bottom)
-        {
-            if (grab_clipping_window( clip )) return TRUE;
-        }
-        else /* check if we should switch to fullscreen clipping */
-        {
-            struct x11drv_thread_data *data = x11drv_thread_data();
-            if (data)
-            {
-                if ((data->clip_hwnd && EqualRect( clip, &clip_rect ) && !EqualRect(&clip_rect, &virtual_rect)) || clip_fullscreen_window( foreground, TRUE ))
-                    return TRUE;
-            }
-        }
-    }
-    ungrab_clipping_window();
+    SendNotifyMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR, FALSE, clip == NULL );
     return TRUE;
+}
+
+/***********************************************************************
+ *		x11drv_desktop_clip_cursor
+ *
+ * Function called upon receiving a WM_X11DRV_DESKTOP_CLIP_CURSOR.
+ */
+void x11drv_desktop_clip_cursor( BOOL fullscreen, BOOL reset )
+{
+    SendNotifyMessageW( GetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, fullscreen, reset );
 }
 
 /***********************************************************************
@@ -1639,18 +1608,40 @@ BOOL CDECL X11DRV_ClipCursor( LPCRECT clip )
  */
 LRESULT clip_cursor_request( HWND hwnd, BOOL fullscreen, BOOL reset )
 {
-    RECT clip;
+    RECT clip, virtual_rect;
+    HWND foreground = GetForegroundWindow();
 
     if (hwnd == GetDesktopWindow())
         WARN( "ignoring clip cursor request on desktop window.\n" );
-    else if (hwnd != GetForegroundWindow())
+    else if (hwnd != foreground)
         WARN( "ignoring clip cursor request on non-foreground window.\n" );
     else if (fullscreen)
         clip_fullscreen_window( hwnd, reset );
+    else if (!grab_pointer)
+        ungrab_clipping_window();
     else
     {
-        GetClipCursor( &clip );
-        X11DRV_ClipCursor( &clip );
+        virtual_rect = get_virtual_screen_rect();
+        if (reset) clip = virtual_rect;
+        else GetClipCursor( &clip );
+
+        /* we are clipping if the clip rectangle is smaller than the screen */
+        if (clip.left > virtual_rect.left || clip.right < virtual_rect.right ||
+            clip.top > virtual_rect.top || clip.bottom < virtual_rect.bottom)
+        {
+            if (grab_clipping_window( &clip )) return 0;
+        }
+        else /* if currently clipping, check if we should switch to fullscreen clipping */
+        {
+            struct x11drv_thread_data *data = x11drv_thread_data();
+            if (data)
+            {
+                if ((data->clip_hwnd && EqualRect( &clip, &clip_rect ) && !EqualRect(&clip_rect, &virtual_rect)) || clip_fullscreen_window( foreground, TRUE ))
+                    return TRUE;
+            }
+        }
+
+        ungrab_clipping_window();
     }
 
     return 0;
