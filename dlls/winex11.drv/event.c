@@ -632,8 +632,8 @@ static void set_focus( XEvent *xev, HWND hwnd, Time time )
 
     if (!try_grab_pointer( xev->xany.display ))
     {
-        /* ask the foreground window to release its grab before trying to get ours */
-        SendMessageW( GetForegroundWindow(), WM_X11DRV_RELEASE_CURSOR, 0, 0 );
+        /* ask the desktop window to release its grab before trying to get ours */
+        SendMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR_RELEASE, 0, 0 );
         XSendEvent( xev->xany.display, xev->xany.window, False, 0, xev );
         return;
     }
@@ -829,7 +829,7 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (!try_grab_pointer( event->display ))
     {
         /* ask the desktop window to release its grab before trying to get ours */
-        SendMessageW( GetDesktopWindow(), WM_X11DRV_RELEASE_CURSOR, 0, 0 );
+        SendMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR_RELEASE, 0, 0 );
         XSendEvent( event->display, event->window, False, 0, xev );
         return FALSE;
     }
@@ -944,7 +944,7 @@ static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
     }
     if (!hwnd) return FALSE;
 
-    if (hwnd == GetForegroundWindow()) ungrab_clipping_window();
+    if (hwnd == GetForegroundWindow()) SendNotifyMessageW( GetDesktopWindow(), WM_X11DRV_DESKTOP_CLIP_CURSOR_RELEASE, 0, 0 );
 
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
     if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
