@@ -541,6 +541,7 @@ enum x11drv_window_messages
     WM_X11DRV_DESKTOP_SET_CURSOR_POS,
     WM_X11DRV_DESKTOP_SET_HICON_CURSOR,
     WM_X11DRV_DESKTOP_SET_WINDOW_CURSOR,
+    WM_X11DRV_DESKTOP_CLIP_CURSOR,
     WM_X11DRV_CLIP_CURSOR_NOTIFY,
     WM_X11DRV_CLIP_CURSOR_REQUEST,
     WM_X11DRV_RELEASE_CURSOR
@@ -661,9 +662,9 @@ extern void X11DRV_InitClipboard(void) DECLSPEC_HIDDEN;
 extern void CDECL X11DRV_SetFocus( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void set_window_cursor( Window window, HCURSOR handle ) DECLSPEC_HIDDEN;
 extern void x11drv_desktop_set_cursor_pos( INT x, INT y ) DECLSPEC_HIDDEN;
+extern void x11drv_desktop_clip_cursor( BOOL fullscreen, BOOL reset ) DECLSPEC_HIDDEN;
 extern void ungrab_clipping_window(void) DECLSPEC_HIDDEN;
 extern void reset_clipping_window(void) DECLSPEC_HIDDEN;
-extern BOOL clip_fullscreen_window( HWND hwnd, BOOL reset ) DECLSPEC_HIDDEN;
 extern void move_resize_window( HWND hwnd, int dir ) DECLSPEC_HIDDEN;
 extern void X11DRV_InitKeyboard( Display *display ) DECLSPEC_HIDDEN;
 extern void X11DRV_InitMouse( Display *display ) DECLSPEC_HIDDEN;
