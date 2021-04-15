@@ -3031,6 +3031,17 @@ VkResult WINAPI wine_vkDebugMarkerSetObjectNameEXT(VkDevice device, const VkDebu
     return thunk_vkDebugMarkerSetObjectNameEXT(device, &wine_name_info);
 }
 
+
+/* HACK: Rainbow Six Siege tries to call this function regardless of whether the extension is exposed */
+void WINAPI wine_vkCmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage,
+    VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker)
+{
+    TRACE("%p, %#x, 0x%s, 0x%s, %u\n", commandBuffer, pipelineStage, wine_dbgstr_longlong(dstBuffer), wine_dbgstr_longlong(dstOffset), marker);
+
+    if (commandBuffer->device->funcs.p_vkCmdWriteBufferMarkerAMD)
+        thunk_vkCmdWriteBufferMarkerAMD(commandBuffer, pipelineStage, dstBuffer, dstOffset, marker);
+}
+
 BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p\n", hinst, reason, reserved);
