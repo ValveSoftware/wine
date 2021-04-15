@@ -5228,9 +5228,8 @@ static void WINAPI wine_vkCmdWriteBufferMarker2AMD(VkCommandBuffer commandBuffer
     commandBuffer->device->funcs.p_vkCmdWriteBufferMarker2AMD(commandBuffer->command_buffer, stage, dstBuffer, dstOffset, marker);
 }
 
-static void WINAPI wine_vkCmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage, VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker)
+void thunk_vkCmdWriteBufferMarkerAMD(VkCommandBuffer commandBuffer, VkPipelineStageFlagBits pipelineStage, VkBuffer dstBuffer, VkDeviceSize dstOffset, uint32_t marker)
 {
-    TRACE("%p, %#x, 0x%s, 0x%s, %u\n", commandBuffer, pipelineStage, wine_dbgstr_longlong(dstBuffer), wine_dbgstr_longlong(dstOffset), marker);
     commandBuffer->device->funcs.p_vkCmdWriteBufferMarkerAMD(commandBuffer->command_buffer, pipelineStage, dstBuffer, dstOffset, marker);
 }
 
