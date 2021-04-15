@@ -246,6 +246,8 @@ FUNCTION_OVERRIDES = {
     # VK_EXT_debug_marker
     "vkDebugMarkerSetObjectNameEXT" : {"dispatch": True, "driver" : False, "thunk" : True, "private_thunk" : True},
     "vkDebugMarkerSetObjectTagEXT" : {"dispatch": True, "driver" : False, "thunk" : True, "private_thunk" : True},
+
+    "vkCmdWriteBufferMarkerAMD" : {"dispatch": True, "driver" : False, "thunk" : True, "private_thunk" : True},
 }
 
 STRUCT_CHAIN_CONVERSIONS = [
