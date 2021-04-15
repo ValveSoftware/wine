@@ -3183,6 +3183,9 @@ LRESULT CDECL X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
         }
         if (clipping_cursor) set_window_cursor( x11drv_thread_data()->clip_window, (HCURSOR)lp );
         return 0;
+    case WM_X11DRV_DESKTOP_SET_CURSOR_POS:
+        x11drv_desktop_set_cursor_pos( (INT)wp, (INT)lp );
+        return 0;
     case WM_X11DRV_DESKTOP_SET_HICON_CURSOR:
         x11drv_desktop_set_hicon_cursor( (HICON)wp, (Cursor)lp );
         return 0;
