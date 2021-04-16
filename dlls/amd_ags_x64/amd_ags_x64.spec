@@ -1,5 +1,5 @@
 @ stdcall agsDeInit(ptr)
-@ stub agsCheckDriverVersion
+@ stdcall agsCheckDriverVersion(ptr long)
 @ stub agsDriverExtensionsDX11_BeginUAVOverlap
 @ stub agsDriverExtensionsDX11_CreateBuffer
 @ stub agsDriverExtensionsDX11_CreateDevice
