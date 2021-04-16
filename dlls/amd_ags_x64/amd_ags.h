@@ -498,13 +498,7 @@ typedef struct AGSDeviceInfo_541
     int                             adlAdapterIndex;                ///< Internally used index into the ADL list of adapters
 } AGSDeviceInfo_541;
 
-typedef union AGSDeviceInfo
-{
-    AGSDeviceInfo_511 agsDeviceInfo511;
-    AGSDeviceInfo_520 agsDeviceInfo520;
-    AGSDeviceInfo_540 agsDeviceInfo540;
-    AGSDeviceInfo_541 agsDeviceInfo541;
-} AGSDeviceInfo;
+struct AGSDeviceInfo;
 
 /// \defgroup general General API functions
 /// API for initialization, cleanup, HDR display modes and Crossfire GPU count
@@ -545,7 +539,7 @@ typedef struct AGSGPUInfo
     const char*             radeonSoftwareVersion;          ///< The Radeon Software Version
 
     int                     numDevices;                     ///< Number of GPUs in the system
-    AGSDeviceInfo*          devices;                        ///< List of GPUs in the system
+    struct AGSDeviceInfo*   devices;                        ///< List of GPUs in the system
 } AGSGPUInfo;
 
 /// The struct to specify the display settings to the driver.
