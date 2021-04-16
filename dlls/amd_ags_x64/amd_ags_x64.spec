@@ -1,10 +1,15 @@
 @ stdcall agsDeInit(ptr)
+@ stub agsCheckDriverVersion
 @ stub agsDriverExtensionsDX11_BeginUAVOverlap
 @ stub agsDriverExtensionsDX11_CreateBuffer
+@ stub agsDriverExtensionsDX11_CreateDevice
+@ stub agsDriverExtensionsDX11_CreateFromDevice
 @ stub agsDriverExtensionsDX11_CreateTexture1D
 @ stub agsDriverExtensionsDX11_CreateTexture2D
 @ stub agsDriverExtensionsDX11_CreateTexture3D
 @ stub agsDriverExtensionsDX11_DeInit
+@ stub agsDriverExtensionsDX11_Destroy
+@ stub agsDriverExtensionsDX11_DestroyDevice
 @ stub agsDriverExtensionsDX11_EndUAVOverlap
 @ stub agsDriverExtensionsDX11_GetMaxClipRects
 @ stub agsDriverExtensionsDX11_IASetPrimitiveTopology
@@ -22,8 +27,16 @@
 @ stub agsDriverExtensionsDX11_SetDiskShaderCacheEnabled
 @ stub agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount
 @ stub agsDriverExtensionsDX11_SetViewBroadcastMasks
+@ stub agsDriverExtensionsDX11_WriteBreadcrumb
+@ stub agsDriverExtensionsDX12_CreateDevice
+@ stub agsDriverExtensionsDX12_CreateFromDevice
 @ stub agsDriverExtensionsDX12_DeInit
+@ stub agsDriverExtensionsDX12_Destroy
+@ stub agsDriverExtensionsDX12_DestroyDevice
 @ stub agsDriverExtensionsDX12_Init
+@ stub agsDriverExtensionsDX12_PopMarker
+@ stub agsDriverExtensionsDX12_PushMarker
+@ stub agsDriverExtensionsDX12_SetMarker
 @ stdcall agsGetCrossfireGPUCount(ptr ptr)
 @ stdcall agsInit(ptr ptr ptr)
 @ stub agsSetDisplayMode
