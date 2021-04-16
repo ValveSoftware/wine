@@ -1,5 +1,6 @@
 #include <stdarg.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -27,27 +28,74 @@ enum amd_ags_version
     AMD_AGS_VERSION_COUNT
 };
 
-struct
+static const struct
 {
     int major;
     int minor;
     int patch;
+    unsigned int device_size;
 }
-static const amd_ags_versions[AMD_AGS_VERSION_COUNT] =
+amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
-    {5, 1, 1},
-    {5, 2, 0},
-    {5, 2, 1},
-    {5, 3, 0},
-    {5, 4, 0},
-    {5, 4, 1},
+    {5, 1, 1, sizeof(AGSDeviceInfo_511)},
+    {5, 2, 0, sizeof(AGSDeviceInfo_520)},
+    {5, 2, 1, sizeof(AGSDeviceInfo_520)},
+    {5, 3, 0, sizeof(AGSDeviceInfo_520)},
+    {5, 4, 0, sizeof(AGSDeviceInfo_540)},
+    {5, 4, 1, sizeof(AGSDeviceInfo_541)},
 };
+
+#define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
+        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name)}}
+#define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
+        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), -1, \
+        -1}}
+#define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, \
+        -1, -1, offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name)}}
+
+#define DEVICE_FIELD_adapterString 0
+#define DEVICE_FIELD_architectureVersion 1
+#define DEVICE_FIELD_asicFamily 2
+#define DEVICE_FIELD_vendorId 3
+#define DEVICE_FIELD_deviceId 4
+#define DEVICE_FIELD_isPrimaryDevice 5
+#define DEVICE_FIELD_localMemoryInBytes 6
+
+static const struct
+{
+    unsigned int field_index;
+    int offset[AMD_AGS_VERSION_COUNT];
+}
+device_struct_fields[] =
+{
+    DEF_FIELD(adapterString),
+    DEF_FIELD_520_BELOW(architectureVersion),
+    DEF_FIELD_540_UP(asicFamily),
+    DEF_FIELD(vendorId),
+    DEF_FIELD(deviceId),
+    DEF_FIELD(isPrimaryDevice),
+    DEF_FIELD(localMemoryInBytes),
+};
+
+#undef DEF_FIELD
+
+#define GET_DEVICE_FIELD_ADDR(device, name, type, version) \
+        (device_struct_fields[DEVICE_FIELD_##name].offset[version] == -1 ? NULL \
+        : (type *)((BYTE *)device + device_struct_fields[DEVICE_FIELD_##name].offset[version]))
+
+#define SET_DEVICE_FIELD(device, name, type, version, value) { \
+        type *addr; \
+        if ((addr = GET_DEVICE_FIELD_ADDR(device, name, type, version))) \
+            *addr = value; \
+    }
 
 struct AGSContext
 {
     enum amd_ags_version version;
     unsigned int device_count;
-    AGSDeviceInfo *devices;
+    struct AGSDeviceInfo *devices;
     VkPhysicalDeviceProperties *properties;
     VkPhysicalDeviceMemoryProperties *memory_properties;
 };
@@ -190,11 +238,11 @@ static enum amd_ags_version determine_ags_version(void)
     patch = info->dwFileVersionLS >> 16;
     TRACE("Found amd_ags_x64.dll v%d.%d.%d\n", major, minor, patch);
 
-    for (i = 0; i < ARRAY_SIZE(amd_ags_versions); i++)
+    for (i = 0; i < ARRAY_SIZE(amd_ags_info); i++)
     {
-        if ((major == amd_ags_versions[i].major) &&
-            (minor == amd_ags_versions[i].minor) &&
-            (patch == amd_ags_versions[i].patch))
+        if ((major == amd_ags_info[i].major) &&
+            (minor == amd_ags_info[i].minor) &&
+            (patch == amd_ags_info[i].patch))
         {
             ret = i;
             break;
@@ -204,7 +252,7 @@ static enum amd_ags_version determine_ags_version(void)
 done:
     heap_free(infobuf);
     TRACE("Using AGS v%d.%d.%d interface\n",
-          amd_ags_versions[ret].major, amd_ags_versions[ret].minor, amd_ags_versions[ret].patch);
+          amd_ags_info[ret].major, amd_ags_info[ret].minor, amd_ags_info[ret].patch);
     return ret;
 }
 
@@ -212,6 +260,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
 {
     AGSReturnCode ret;
     unsigned int i, j;
+    BYTE *device;
 
     context->version = determine_ags_version();
     context->device_count = 0;
@@ -223,7 +272,9 @@ static AGSReturnCode init_ags_context(AGSContext *context)
     if (ret != AGS_SUCCESS || !context->device_count)
         return ret;
 
-    if (!(context->devices = heap_calloc(context->device_count, sizeof(*context->devices))))
+    assert(context->version < AMD_AGS_VERSION_COUNT);
+
+    if (!(context->devices = heap_calloc(context->device_count, amd_ags_info[context->version].device_size)))
     {
         WARN("Failed to allocate memory.\n");
         heap_free(context->properties);
@@ -231,11 +282,11 @@ static AGSReturnCode init_ags_context(AGSContext *context)
         return AGS_OUT_OF_MEMORY;
     }
 
+    device = (BYTE *)context->devices;
     for (i = 0; i < context->device_count; ++i)
     {
         const VkPhysicalDeviceProperties *vk_properties = &context->properties[i];
         const VkPhysicalDeviceMemoryProperties *vk_memory_properties = &context->memory_properties[i];
-        AGSDeviceInfo *device = &context->devices[i];
         VkDeviceSize local_memory_size = 0;
 
         for (j = 0; j < vk_memory_properties->memoryHeapCount; j++)
@@ -248,60 +299,19 @@ static AGSReturnCode init_ags_context(AGSContext *context)
         }
         TRACE("reporting local memory size 0x%s bytes\n", wine_dbgstr_longlong(local_memory_size));
 
-        switch (context->version)
+        SET_DEVICE_FIELD(device, adapterString, const char *, context->version, vk_properties->deviceName);
+        SET_DEVICE_FIELD(device, vendorId, int, context->version, vk_properties->vendorID);
+        SET_DEVICE_FIELD(device, deviceId, int, context->version, vk_properties->deviceID);
+        if (vk_properties->vendorID == 0x1002)
         {
-        case AMD_AGS_VERSION_5_1_1:
-            device->agsDeviceInfo511.adapterString = vk_properties->deviceName;
-            device->agsDeviceInfo511.vendorId = vk_properties->vendorID;
-            device->agsDeviceInfo511.deviceId = vk_properties->deviceID;
-            device->agsDeviceInfo511.localMemoryInBytes = local_memory_size;
-
-            if (device->agsDeviceInfo511.vendorId == 0x1002)
-                device->agsDeviceInfo511.architectureVersion = ArchitectureVersion_GCN;
-
-            if (!i)
-                device->agsDeviceInfo511.isPrimaryDevice = 1;
-            break;
-        case AMD_AGS_VERSION_5_2_0:
-        case AMD_AGS_VERSION_5_2_1:
-        case AMD_AGS_VERSION_5_3_0:
-            device->agsDeviceInfo520.adapterString = vk_properties->deviceName;
-            device->agsDeviceInfo520.vendorId = vk_properties->vendorID;
-            device->agsDeviceInfo520.deviceId = vk_properties->deviceID;
-            device->agsDeviceInfo520.localMemoryInBytes = local_memory_size;
-
-            if (device->agsDeviceInfo520.vendorId == 0x1002)
-                device->agsDeviceInfo520.architectureVersion = ArchitectureVersion_GCN;
-
-            if (!i)
-                device->agsDeviceInfo520.isPrimaryDevice = 1;
-            break;
-        case AMD_AGS_VERSION_5_4_0:
-            device->agsDeviceInfo540.adapterString = vk_properties->deviceName;
-            device->agsDeviceInfo540.vendorId = vk_properties->vendorID;
-            device->agsDeviceInfo540.deviceId = vk_properties->deviceID;
-            device->agsDeviceInfo540.localMemoryInBytes = local_memory_size;
-
-            if (device->agsDeviceInfo540.vendorId == 0x1002)
-                device->agsDeviceInfo540.asicFamily = AsicFamily_GCN4;
-
-            if (!i)
-                device->agsDeviceInfo540.isPrimaryDevice = 1;
-            break;
-        case AMD_AGS_VERSION_5_4_1:
-        default:
-            device->agsDeviceInfo541.adapterString = vk_properties->deviceName;
-            device->agsDeviceInfo541.vendorId = vk_properties->vendorID;
-            device->agsDeviceInfo541.deviceId = vk_properties->deviceID;
-            device->agsDeviceInfo541.localMemoryInBytes = local_memory_size;
-
-            if (device->agsDeviceInfo541.vendorId == 0x1002)
-                device->agsDeviceInfo541.asicFamily = AsicFamily_GCN4;
-
-            if (!i)
-                device->agsDeviceInfo541.isPrimaryDevice = 1;
-            break;
+            SET_DEVICE_FIELD(device, architectureVersion, ArchitectureVersion, context->version, ArchitectureVersion_GCN);
+            SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version, AsicFamily_GCN4);
         }
+        SET_DEVICE_FIELD(device, localMemoryInBytes, ULONG64, context->version, local_memory_size);
+        if (!i)
+            SET_DEVICE_FIELD(device, isPrimaryDevice, int, context->version, 1);
+
+        device += amd_ags_info[context->version].device_size;
     }
 
     return AGS_SUCCESS;
@@ -330,9 +340,9 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     }
 
     memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->agsVersionMajor = amd_ags_versions[object->version].major;
-    gpu_info->agsVersionMinor = amd_ags_versions[object->version].minor;
-    gpu_info->agsVersionPatch = amd_ags_versions[object->version].patch;
+    gpu_info->agsVersionMajor = amd_ags_info[object->version].major;
+    gpu_info->agsVersionMinor = amd_ags_info[object->version].minor;
+    gpu_info->agsVersionPatch = amd_ags_info[object->version].patch;
     gpu_info->driverVersion = "20.20.2-180516a-328911C-RadeonSoftwareAdrenalin";
     gpu_info->radeonSoftwareVersion  = "20.20.2";
     gpu_info->numDevices = object->device_count;
