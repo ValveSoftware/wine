@@ -28,7 +28,7 @@
 @ stub agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount
 @ stub agsDriverExtensionsDX11_SetViewBroadcastMasks
 @ stub agsDriverExtensionsDX11_WriteBreadcrumb
-@ stub agsDriverExtensionsDX12_CreateDevice
+@ stdcall agsDriverExtensionsDX12_CreateDevice(ptr ptr ptr ptr)
 @ stub agsDriverExtensionsDX12_CreateFromDevice
 @ stub agsDriverExtensionsDX12_DeInit
 @ stub agsDriverExtensionsDX12_Destroy
