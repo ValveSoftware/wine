@@ -62,6 +62,8 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
 #define DEVICE_FIELD_deviceId 4
 #define DEVICE_FIELD_isPrimaryDevice 5
 #define DEVICE_FIELD_localMemoryInBytes 6
+#define DEVICE_FIELD_numDisplays 7
+#define DEVICE_FIELD_displays 8
 
 static const struct
 {
@@ -77,6 +79,8 @@ device_struct_fields[] =
     DEF_FIELD(deviceId),
     DEF_FIELD(isPrimaryDevice),
     DEF_FIELD(localMemoryInBytes),
+    DEF_FIELD(numDisplays),
+    DEF_FIELD(displays),
 };
 
 #undef DEF_FIELD
@@ -256,6 +260,116 @@ done:
     return ret;
 }
 
+struct monitor_enum_context
+{
+    const char *adapter_name;
+    AGSDisplayInfo **ret_displays;
+    int *ret_display_count;
+};
+
+static BOOL WINAPI monitor_enum_proc(HMONITOR hmonitor, HDC hdc, RECT *rect, LPARAM context)
+{
+    struct monitor_enum_context *c = (struct monitor_enum_context *)context;
+    MONITORINFOEXA monitor_info;
+    AGSDisplayInfo *new_alloc;
+    DISPLAY_DEVICEA device;
+    AGSDisplayInfo *info;
+    unsigned int i, mode;
+    DEVMODEA dev_mode;
+
+
+    monitor_info.cbSize = sizeof(monitor_info);
+    GetMonitorInfoA(hmonitor, (MONITORINFO *)&monitor_info);
+    TRACE("monitor_info.szDevice %s.\n", debugstr_a(monitor_info.szDevice));
+
+    device.cb = sizeof(device);
+    i = 0;
+    while (EnumDisplayDevicesA(NULL, i, &device, 0))
+    {
+        TRACE("device.DeviceName %s, device.DeviceString %s.\n", debugstr_a(device.DeviceName), debugstr_a(device.DeviceString));
+        ++i;
+        if (strcmp(device.DeviceString, c->adapter_name) || strcmp(device.DeviceName, monitor_info.szDevice))
+            continue;
+
+        if (*c->ret_display_count)
+        {
+            if (!(new_alloc = heap_realloc(*c->ret_displays, sizeof(*new_alloc) * (*c->ret_display_count + 1))))
+            {
+                ERR("No memory.");
+                return FALSE;
+            }
+            *c->ret_displays = new_alloc;
+        }
+        else if (!(*c->ret_displays = heap_alloc(sizeof(**c->ret_displays))))
+        {
+            ERR("No memory.");
+            return FALSE;
+        }
+        info = &(*c->ret_displays)[*c->ret_display_count];
+        memset(info, 0, sizeof(*info));
+        strcpy(info->displayDeviceName, device.DeviceName);
+        if (EnumDisplayDevicesA(info->displayDeviceName, 0, &device, 0))
+        {
+            strcpy(info->name, device.DeviceString);
+        }
+        else
+        {
+            ERR("Could not get monitor name for device %s.\n", debugstr_a(info->displayDeviceName));
+            strcpy(info->name, "Unknown");
+        }
+        if (monitor_info.dwFlags & MONITORINFOF_PRIMARY)
+            info->displayFlags |= AGS_DISPLAYFLAG_PRIMARY_DISPLAY;
+
+        mode = 0;
+        memset(&dev_mode, 0, sizeof(dev_mode));
+        dev_mode.dmSize = sizeof(dev_mode);
+        while (EnumDisplaySettingsExA(monitor_info.szDevice, mode, &dev_mode, EDS_RAWMODE))
+        {
+            ++mode;
+            if (dev_mode.dmPelsWidth > info->maxResolutionX)
+                info->maxResolutionX = dev_mode.dmPelsWidth;
+            if (dev_mode.dmPelsHeight > info->maxResolutionY)
+                info->maxResolutionY = dev_mode.dmPelsHeight;
+            if (dev_mode.dmDisplayFrequency > info->maxRefreshRate)
+                info->maxRefreshRate = dev_mode.dmDisplayFrequency;
+            memset(&dev_mode, 0, sizeof(dev_mode));
+            dev_mode.dmSize = sizeof(dev_mode);
+        }
+
+        info->currentResolution.offsetX = monitor_info.rcMonitor.left;
+        info->currentResolution.offsetY = monitor_info.rcMonitor.top;
+        info->currentResolution.width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+        info->currentResolution.height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+        info->visibleResolution = info->currentResolution;
+
+        memset(&dev_mode, 0, sizeof(dev_mode));
+        dev_mode.dmSize = sizeof(dev_mode);
+
+        if (EnumDisplaySettingsExA(monitor_info.szDevice, ENUM_CURRENT_SETTINGS, &dev_mode, EDS_RAWMODE))
+            info->currentRefreshRate = dev_mode.dmDisplayFrequency;
+        else
+            ERR("Could not get current display settings.\n");
+        ++*c->ret_display_count;
+
+        TRACE("Added display %s for %s.\n", debugstr_a(monitor_info.szDevice), debugstr_a(c->adapter_name));
+    }
+
+    return TRUE;
+}
+
+static void init_device_displays(const char *adapter_name, AGSDisplayInfo **ret_displays, int *ret_display_count)
+{
+    struct monitor_enum_context context;
+
+    TRACE("adapter_name %s.\n", debugstr_a(adapter_name));
+
+    context.adapter_name = adapter_name;
+    context.ret_displays = ret_displays;
+    context.ret_display_count = ret_display_count;
+
+    EnumDisplayMonitors(NULL, NULL, monitor_enum_proc, (LPARAM)&context);
+}
+
 static AGSReturnCode init_ags_context(AGSContext *context)
 {
     AGSReturnCode ret;
@@ -297,7 +411,8 @@ static AGSReturnCode init_ags_context(AGSContext *context)
                 break;
             }
         }
-        TRACE("reporting local memory size 0x%s bytes\n", wine_dbgstr_longlong(local_memory_size));
+        TRACE("device %s, %04x:%04x, reporting local memory size 0x%s bytes\n", debugstr_a(vk_properties->deviceName),
+                vk_properties->vendorID, vk_properties->deviceID, wine_dbgstr_longlong(local_memory_size));
 
         SET_DEVICE_FIELD(device, adapterString, const char *, context->version, vk_properties->deviceName);
         SET_DEVICE_FIELD(device, vendorId, int, context->version, vk_properties->vendorID);
@@ -310,6 +425,10 @@ static AGSReturnCode init_ags_context(AGSContext *context)
         SET_DEVICE_FIELD(device, localMemoryInBytes, ULONG64, context->version, local_memory_size);
         if (!i)
             SET_DEVICE_FIELD(device, isPrimaryDevice, int, context->version, 1);
+
+        init_device_displays(vk_properties->deviceName,
+                GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo *, context->version),
+                GET_DEVICE_FIELD_ADDR(device, numDisplays, int, context->version));
 
         device += amd_ags_info[context->version].device_size;
     }
@@ -357,12 +476,21 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
 
 AGSReturnCode WINAPI agsDeInit(AGSContext *context)
 {
+    unsigned int i;
+    BYTE *device;
+
     TRACE("context %p.\n", context);
 
     if (context)
     {
         heap_free(context->memory_properties);
         heap_free(context->properties);
+        device = (BYTE *)context->devices;
+        for (i = 0; i < context->device_count; ++i)
+        {
+            heap_free(*GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo *, context->version));
+            device += amd_ags_info[context->version].device_size;
+        }
         heap_free(context->devices);
         heap_free(context);
     }
