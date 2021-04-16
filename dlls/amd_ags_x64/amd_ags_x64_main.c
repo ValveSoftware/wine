@@ -462,8 +462,8 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     gpu_info->agsVersionMajor = amd_ags_info[object->version].major;
     gpu_info->agsVersionMinor = amd_ags_info[object->version].minor;
     gpu_info->agsVersionPatch = amd_ags_info[object->version].patch;
-    gpu_info->driverVersion = "20.20.2-180516a-328911C-RadeonSoftwareAdrenalin";
-    gpu_info->radeonSoftwareVersion  = "20.20.2";
+    gpu_info->driverVersion = "20.50.03.05-210326a-365573E-RadeonSoftwareAdrenalin2020";
+    gpu_info->radeonSoftwareVersion  = "21.3.2";
     gpu_info->numDevices = object->device_count;
     gpu_info->devices = object->devices;
 
