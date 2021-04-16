@@ -52,6 +52,21 @@ struct AGSContext
     VkPhysicalDeviceMemoryProperties *memory_properties;
 };
 
+static HMODULE hd3d12;
+static typeof(D3D12CreateDevice) *pD3D12CreateDevice;
+
+static BOOL load_d3d12_functions(void)
+{
+    if (hd3d12)
+        return TRUE;
+
+    if (!(hd3d12 = LoadLibraryA("d3d12.dll")))
+        return FALSE;
+
+    pD3D12CreateDevice = (void *)GetProcAddress(hd3d12, "D3D12CreateDevice");
+    return TRUE;
+}
+
 static AGSReturnCode vk_get_physical_device_properties(unsigned int *out_count,
         VkPhysicalDeviceProperties **out, VkPhysicalDeviceMemoryProperties **out_memory)
 {
@@ -353,6 +368,34 @@ AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count
         return AGS_INVALID_ARGS;
 
     *gpu_count = 1;
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX12_CreateDevice(AGSContext *context,
+        const AGSDX12DeviceCreationParams *creation_params, const AGSDX12ExtensionParams *extension_params,
+        AGSDX12ReturnedParams *returned_params)
+{
+    HRESULT hr;
+
+    TRACE("feature level %#x, app %s, engine %s %#x %#x.\n", creation_params->FeatureLevel, debugstr_w(extension_params->pAppName),
+            debugstr_w(extension_params->pEngineName), extension_params->appVersion, extension_params->engineVersion);
+
+    if (!load_d3d12_functions())
+    {
+        ERR("Could not load d3d12.dll.\n");
+        return AGS_MISSING_D3D_DLL;
+    }
+
+    memset(returned_params, 0, sizeof(*returned_params));
+    if (FAILED(hr = pD3D12CreateDevice((IUnknown *)creation_params->pAdapter, creation_params->FeatureLevel,
+            &creation_params->iid, (void **)&returned_params->pDevice)))
+    {
+        ERR("D3D12CreateDevice failed, hr %#x.\n", hr);
+        return AGS_DX_FAILURE;
+    }
+
+    TRACE("Created d3d12 device %p.\n", returned_params->pDevice);
+
     return AGS_SUCCESS;
 }
 
