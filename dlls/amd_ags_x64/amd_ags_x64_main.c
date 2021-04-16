@@ -356,6 +356,13 @@ AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count
     return AGS_SUCCESS;
 }
 
+AGSDriverVersionResult WINAPI agsCheckDriverVersion(const char* version_reported, unsigned int version_required)
+{
+    FIXME("version_reported %s, version_required %d semi-stub.\n", debugstr_a(version_reported), version_required);
+
+    return AGS_SOFTWAREVERSIONCHECK_OK;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p.\n", instance, reason, reserved);
