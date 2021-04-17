@@ -24,6 +24,7 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 
 #include "windef.h"
@@ -140,14 +141,85 @@ void * __cdecl memmove( void *dst, const void *src, size_t n )
 }
 
 
+static FORCEINLINE void __cdecl memset_c_unaligned_32(char *d, uint64_t v, size_t n)
+{
+    if (n >= 24)
+    {
+        *(uint64_t *)d = v;
+        *(uint64_t *)(d + 8) = v;
+        *(uint64_t *)(d + 16) = v;
+        *(uint64_t *)(d + n - 8) = v;
+    }
+    else if (n >= 16)
+    {
+        *(uint64_t *)d = v;
+        *(uint64_t *)(d + 8) = v;
+        *(uint64_t *)(d + n - 8) = v;
+    }
+    else if (n >= 8)
+    {
+        *(uint64_t *)d = v;
+        *(uint64_t *)(d + n - 8) = v;
+    }
+    else if (n >= 4)
+    {
+        *(uint32_t *)d = v;
+        *(uint32_t *)(d + n - 4) = v;
+    }
+    else if (n >= 2)
+    {
+        *(uint16_t *)d = v;
+        *(uint16_t *)(d + n - 2) = v;
+    }
+    else if (n >= 1)
+    {
+        *(uint8_t *)d = v;
+    }
+}
+
+static FORCEINLINE void *__cdecl memset_c(char *d, unsigned char c, size_t n)
+{
+    uint16_t tmp16 = ((uint16_t)c << 8) | c;
+    uint32_t tmp32 = ((uint32_t)tmp16 << 16) | tmp16;
+    uint64_t v = ((uint64_t)tmp32 << 32) | tmp32;
+
+    while (n >= 48)
+    {
+        *(uint64_t*)(d + n -  8) = v;
+        *(uint64_t*)(d + n - 16) = v;
+        *(uint64_t*)(d + n - 24) = v;
+        *(uint64_t*)(d + n - 32) = v;
+        *(uint64_t*)(d + n - 40) = v;
+        *(uint64_t*)(d + n - 48) = v;
+        n -= 48;
+    }
+    while (n >= 24)
+    {
+        *(uint64_t*)(d + n -  8) = v;
+        *(uint64_t*)(d + n - 16) = v;
+        *(uint64_t*)(d + n - 24) = v;
+        n -= 24;
+    }
+
+    memset_c_unaligned_32(d, v, n);
+    return d;
+}
+
+
 /*********************************************************************
  *                  memset   (NTDLL.@)
  */
-void * __cdecl memset( void *dst, int c, size_t n )
+void *__cdecl memset( void *dst, int c, size_t n )
 {
-    volatile unsigned char *d = dst;  /* avoid gcc optimizations */
-    while (n--) *d++ = c;
-    return dst;
+    if (n <= 32)
+    {
+        uint16_t tmp16 = ((uint16_t)c << 8) | c;
+        uint32_t tmp32 = ((uint32_t)tmp16 << 16) | tmp16;
+        uint64_t v = ((uint64_t)tmp32 << 32) | tmp32;
+        memset_c_unaligned_32(dst, v, n);
+        return dst;
+    }
+    return memset_c(dst, c, n);
 }
 
 
