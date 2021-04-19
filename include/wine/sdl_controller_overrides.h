@@ -37,6 +37,10 @@
 #define PID_MICROSOFT_XBOX_ONE_ELITE 0x02e3
 #define PID_MICROSOFT_XBOX_ONE_S 0x02ea
 #define PID_MICROSOFT_XBOX_ONE_S_WIRELESS 0x02fd
+#define PID_MICROSOFT_XBOX_ELITE_2 0x0B00
+#define PID_MICROSOFT_XBOX_ELITE_2_WIRELESS 0x0B05
+#define PID_MICROSOFT_XBOX_SERIES 0x0b12
+#define PID_MICROSOFT_XBOX_SERIES_WIRELESS 0x0b13
 
 static BOOL __controller_hack_sdl_is_vid_pid_xbox_360(WORD vid, WORD pid)
 {
@@ -58,7 +62,11 @@ static BOOL __controller_hack_sdl_is_vid_pid_xbox_one(WORD vid, WORD pid) {
         pid == PID_MICROSOFT_XBOX_ONE_CF ||
         pid == PID_MICROSOFT_XBOX_ONE_ELITE ||
         pid == PID_MICROSOFT_XBOX_ONE_S ||
-        pid == PID_MICROSOFT_XBOX_ONE_S_WIRELESS)
+        pid == PID_MICROSOFT_XBOX_ONE_S_WIRELESS ||
+        pid == PID_MICROSOFT_XBOX_ELITE_2 ||
+        pid == PID_MICROSOFT_XBOX_ELITE_2_WIRELESS ||
+        pid == PID_MICROSOFT_XBOX_SERIES ||
+        pid == PID_MICROSOFT_XBOX_SERIES_WIRELESS)
         return TRUE;
 
     return FALSE;
