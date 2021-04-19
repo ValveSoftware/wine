@@ -59,6 +59,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(plugplay);
 
+#include "wine/sdl_controller_overrides.h"
+
 #ifdef SONAME_LIBSDL2
 
 WINE_DECLARE_DEBUG_CHANNEL(hid_report);
@@ -122,6 +124,7 @@ struct platform_private
     SDL_Joystick *sdl_joystick;
     SDL_GameController *sdl_controller;
     SDL_JoystickID id;
+    char name[MAX_PATH];
 
     int button_start;
     int axis_start;
@@ -714,10 +717,7 @@ static NTSTATUS get_string(DEVICE_OBJECT *device, DWORD index, WCHAR *buffer, DW
     switch (index)
     {
         case HID_STRING_ID_IPRODUCT:
-            if (ext->sdl_controller)
-                str = pSDL_GameControllerName(ext->sdl_controller);
-            else
-                str = pSDL_JoystickName(ext->sdl_joystick);
+            str = ext->name;
             break;
         case HID_STRING_ID_IMANUFACTURER:
             str = "SDL";
@@ -992,7 +992,7 @@ static void try_remove_device(SDL_JoystickID id)
 }
 
 /* logic from SDL2's SDL_ShouldIgnoreGameController */
-static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
+static BOOL is_in_sdl_blacklist(WORD vid, WORD pid)
 {
     char needle[16];
     const char *blacklist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES");
@@ -1004,7 +1004,7 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
 
     if (allow_virtual && *allow_virtual != '0')
     {
-        if(vid == 0x28DE && pid == 0x11FF)
+        if(vid == VID_VALVE && pid == PID_VALVE_VIRTUAL_CONTROLLER)
             return FALSE;
     }
 
@@ -1020,7 +1020,7 @@ static BOOL is_in_sdl_blacklist(DWORD vid, DWORD pid)
     return strcasestr(blacklist, needle) != NULL;
 }
 
-static BOOL is_in_wine_blacklist(const DWORD vid, const DWORD pid)
+static BOOL is_in_wine_blacklist(const WORD vid, const WORD pid)
 {
     int i;
     for(i = 0; i < ARRAY_SIZE(wine_js_blacklist); ++i)
@@ -1036,12 +1036,13 @@ static BOOL is_in_wine_blacklist(const DWORD vid, const DWORD pid)
 
 static void try_add_device(unsigned int index, BOOL xinput_hack)
 {
-    DWORD vid = 0, pid = 0, version = 0;
+    WORD vid = 0, pid = 0, version = 0;
     DEVICE_OBJECT *device = NULL;
     WCHAR serial[34] = {0};
     char guid_str[34];
     BOOL is_xbox_gamepad;
     WORD input = -1;
+    const char *name;
 
     SDL_Joystick* joystick;
     SDL_JoystickID id;
@@ -1107,14 +1108,8 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
     {
         TRACE("Found sdl game controller 0x%x (vid %04x, pid %04x, version %u, serial %s, xinput_hack: %u)\n",
               id, vid, pid, version, debugstr_w(serial), xinput_hack);
-        is_xbox_gamepad = TRUE;
 
-        if(vid == 0x28DE && pid == 0x11FF)
-        {
-            TRACE("Steam virtual controller, pretending it's an Xbox 360 controller\n");
-            vid = 0x045e;
-            pid = 0x028e;
-        }
+        is_xbox_gamepad = TRUE;
     }
     else
     {
@@ -1127,6 +1122,15 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
         button_count = pSDL_JoystickNumButtons(joystick);
         is_xbox_gamepad = (axis_count == 6  && button_count >= 14);
     }
+
+    if (controller)
+        name = pSDL_GameControllerName(controller);
+    else
+        name = pSDL_JoystickName(joystick);
+
+    __controller_hack_sdl_vid_pid_override(&vid, &pid, pSDL_JoystickName(joystick));
+    __controller_hack_sdl_name_override(vid, pid, &name);
+
     if (is_xbox_gamepad)
         input = 0;
 
@@ -1139,6 +1143,7 @@ static void try_add_device(unsigned int index, BOOL xinput_hack)
         struct platform_private *private = impl_from_DEVICE_OBJECT(device);
         private->sdl_joystick = joystick;
         private->sdl_controller = controller;
+        strcpy(private->name, name);
         private->id = id;
         private->xinput_hack = xinput_hack;
         if (controller)
