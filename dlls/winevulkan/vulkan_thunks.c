@@ -3291,6 +3291,24 @@ VkResult convert_VkDeviceCreateInfo_struct_chain(const void *pNext, VkDeviceCrea
             break;
         }
 
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTENDED_DYNAMIC_STATE_2_FEATURES_EXT:
+        {
+            const VkPhysicalDeviceExtendedDynamicState2FeaturesEXT *in = (const VkPhysicalDeviceExtendedDynamicState2FeaturesEXT *)in_header;
+            VkPhysicalDeviceExtendedDynamicState2FeaturesEXT *out;
+
+            if (!(out = heap_alloc(sizeof(*out)))) goto out_of_memory;
+
+            out->sType = in->sType;
+            out->pNext = NULL;
+            out->extendedDynamicState2 = in->extendedDynamicState2;
+            out->extendedDynamicState2LogicOp = in->extendedDynamicState2LogicOp;
+            out->extendedDynamicState2PatchControlPoints = in->extendedDynamicState2PatchControlPoints;
+
+            out_header->pNext = (VkBaseOutStructure *)out;
+            out_header = out_header->pNext;
+            break;
+        }
+
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DIAGNOSTICS_CONFIG_FEATURES_NV:
         {
             const VkPhysicalDeviceDiagnosticsConfigFeaturesNV *in = (const VkPhysicalDeviceDiagnosticsConfigFeaturesNV *)in_header;
@@ -3494,6 +3512,38 @@ VkResult convert_VkDeviceCreateInfo_struct_chain(const void *pNext, VkDeviceCrea
             break;
         }
 
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VERTEX_INPUT_DYNAMIC_STATE_FEATURES_EXT:
+        {
+            const VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT *in = (const VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT *)in_header;
+            VkPhysicalDeviceVertexInputDynamicStateFeaturesEXT *out;
+
+            if (!(out = heap_alloc(sizeof(*out)))) goto out_of_memory;
+
+            out->sType = in->sType;
+            out->pNext = NULL;
+            out->vertexInputDynamicState = in->vertexInputDynamicState;
+
+            out_header->pNext = (VkBaseOutStructure *)out;
+            out_header = out_header->pNext;
+            break;
+        }
+
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_COLOR_WRITE_ENABLE_FEATURES_EXT:
+        {
+            const VkPhysicalDeviceColorWriteEnableFeaturesEXT *in = (const VkPhysicalDeviceColorWriteEnableFeaturesEXT *)in_header;
+            VkPhysicalDeviceColorWriteEnableFeaturesEXT *out;
+
+            if (!(out = heap_alloc(sizeof(*out)))) goto out_of_memory;
+
+            out->sType = in->sType;
+            out->pNext = NULL;
+            out->colorWriteEnable = in->colorWriteEnable;
+
+            out_header->pNext = (VkBaseOutStructure *)out;
+            out_header = out_header->pNext;
+            break;
+        }
+
         case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR:
         {
             const VkPhysicalDeviceSynchronization2FeaturesKHR *in = (const VkPhysicalDeviceSynchronization2FeaturesKHR *)in_header;
@@ -3504,6 +3554,38 @@ VkResult convert_VkDeviceCreateInfo_struct_chain(const void *pNext, VkDeviceCrea
             out->sType = in->sType;
             out->pNext = NULL;
             out->synchronization2 = in->synchronization2;
+
+            out_header->pNext = (VkBaseOutStructure *)out;
+            out_header = out_header->pNext;
+            break;
+        }
+
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_INHERITED_VIEWPORT_SCISSOR_FEATURES_NV:
+        {
+            const VkPhysicalDeviceInheritedViewportScissorFeaturesNV *in = (const VkPhysicalDeviceInheritedViewportScissorFeaturesNV *)in_header;
+            VkPhysicalDeviceInheritedViewportScissorFeaturesNV *out;
+
+            if (!(out = heap_alloc(sizeof(*out)))) goto out_of_memory;
+
+            out->sType = in->sType;
+            out->pNext = NULL;
+            out->inheritedViewportScissor2D = in->inheritedViewportScissor2D;
+
+            out_header->pNext = (VkBaseOutStructure *)out;
+            out_header = out_header->pNext;
+            break;
+        }
+
+        case VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_YCBCR_2_PLANE_444_FORMATS_FEATURES_EXT:
+        {
+            const VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT *in = (const VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT *)in_header;
+            VkPhysicalDeviceYcbcr2Plane444FormatsFeaturesEXT *out;
+
+            if (!(out = heap_alloc(sizeof(*out)))) goto out_of_memory;
+
+            out->sType = in->sType;
+            out->pNext = NULL;
+            out->ycbcr2plane444Formats = in->ycbcr2plane444Formats;
 
             out_header->pNext = (VkBaseOutStructure *)out;
             out_header = out_header->pNext;
@@ -4664,6 +4746,12 @@ static void WINAPI wine_vkCmdSetCoarseSampleOrderNV(VkCommandBuffer commandBuffe
     commandBuffer->device->funcs.p_vkCmdSetCoarseSampleOrderNV(commandBuffer->command_buffer, sampleOrderType, customSampleOrderCount, pCustomSampleOrders);
 }
 
+static void WINAPI wine_vkCmdSetColorWriteEnableEXT(VkCommandBuffer commandBuffer, uint32_t attachmentCount, const VkBool32 *pColorWriteEnables)
+{
+    TRACE("%p, %u, %p\n", commandBuffer, attachmentCount, pColorWriteEnables);
+    commandBuffer->device->funcs.p_vkCmdSetColorWriteEnableEXT(commandBuffer->command_buffer, attachmentCount, pColorWriteEnables);
+}
+
 static void WINAPI wine_vkCmdSetCullModeEXT(VkCommandBuffer commandBuffer, VkCullModeFlags cullMode)
 {
     TRACE("%p, %#x\n", commandBuffer, cullMode);
@@ -4674,6 +4762,12 @@ void WINAPI wine_vkCmdSetDepthBias(VkCommandBuffer commandBuffer, float depthBia
 {
     TRACE("%p, %f, %f, %f\n", commandBuffer, depthBiasConstantFactor, depthBiasClamp, depthBiasSlopeFactor);
     commandBuffer->device->funcs.p_vkCmdSetDepthBias(commandBuffer->command_buffer, depthBiasConstantFactor, depthBiasClamp, depthBiasSlopeFactor);
+}
+
+static void WINAPI wine_vkCmdSetDepthBiasEnableEXT(VkCommandBuffer commandBuffer, VkBool32 depthBiasEnable)
+{
+    TRACE("%p, %u\n", commandBuffer, depthBiasEnable);
+    commandBuffer->device->funcs.p_vkCmdSetDepthBiasEnableEXT(commandBuffer->command_buffer, depthBiasEnable);
 }
 
 void WINAPI wine_vkCmdSetDepthBounds(VkCommandBuffer commandBuffer, float minDepthBounds, float maxDepthBounds)
@@ -4782,6 +4876,18 @@ void WINAPI wine_vkCmdSetLineWidth(VkCommandBuffer commandBuffer, float lineWidt
     commandBuffer->device->funcs.p_vkCmdSetLineWidth(commandBuffer->command_buffer, lineWidth);
 }
 
+static void WINAPI wine_vkCmdSetLogicOpEXT(VkCommandBuffer commandBuffer, VkLogicOp logicOp)
+{
+    TRACE("%p, %#x\n", commandBuffer, logicOp);
+    commandBuffer->device->funcs.p_vkCmdSetLogicOpEXT(commandBuffer->command_buffer, logicOp);
+}
+
+static void WINAPI wine_vkCmdSetPatchControlPointsEXT(VkCommandBuffer commandBuffer, uint32_t patchControlPoints)
+{
+    TRACE("%p, %u\n", commandBuffer, patchControlPoints);
+    commandBuffer->device->funcs.p_vkCmdSetPatchControlPointsEXT(commandBuffer->command_buffer, patchControlPoints);
+}
+
 static VkResult WINAPI wine_vkCmdSetPerformanceMarkerINTEL(VkCommandBuffer commandBuffer, const VkPerformanceMarkerInfoINTEL *pMarkerInfo)
 {
 #if defined(USE_STRUCT_CONVERSION)
@@ -4822,10 +4928,22 @@ static VkResult WINAPI wine_vkCmdSetPerformanceStreamMarkerINTEL(VkCommandBuffer
     return commandBuffer->device->funcs.p_vkCmdSetPerformanceStreamMarkerINTEL(commandBuffer->command_buffer, pMarkerInfo);
 }
 
+static void WINAPI wine_vkCmdSetPrimitiveRestartEnableEXT(VkCommandBuffer commandBuffer, VkBool32 primitiveRestartEnable)
+{
+    TRACE("%p, %u\n", commandBuffer, primitiveRestartEnable);
+    commandBuffer->device->funcs.p_vkCmdSetPrimitiveRestartEnableEXT(commandBuffer->command_buffer, primitiveRestartEnable);
+}
+
 static void WINAPI wine_vkCmdSetPrimitiveTopologyEXT(VkCommandBuffer commandBuffer, VkPrimitiveTopology primitiveTopology)
 {
     TRACE("%p, %#x\n", commandBuffer, primitiveTopology);
     commandBuffer->device->funcs.p_vkCmdSetPrimitiveTopologyEXT(commandBuffer->command_buffer, primitiveTopology);
+}
+
+static void WINAPI wine_vkCmdSetRasterizerDiscardEnableEXT(VkCommandBuffer commandBuffer, VkBool32 rasterizerDiscardEnable)
+{
+    TRACE("%p, %u\n", commandBuffer, rasterizerDiscardEnable);
+    commandBuffer->device->funcs.p_vkCmdSetRasterizerDiscardEnableEXT(commandBuffer->command_buffer, rasterizerDiscardEnable);
 }
 
 static void WINAPI wine_vkCmdSetRayTracingPipelineStackSizeKHR(VkCommandBuffer commandBuffer, uint32_t pipelineStackSize)
@@ -4880,6 +4998,12 @@ void WINAPI wine_vkCmdSetStencilWriteMask(VkCommandBuffer commandBuffer, VkStenc
 {
     TRACE("%p, %#x, %u\n", commandBuffer, faceMask, writeMask);
     commandBuffer->device->funcs.p_vkCmdSetStencilWriteMask(commandBuffer->command_buffer, faceMask, writeMask);
+}
+
+static void WINAPI wine_vkCmdSetVertexInputEXT(VkCommandBuffer commandBuffer, uint32_t vertexBindingDescriptionCount, const VkVertexInputBindingDescription2EXT *pVertexBindingDescriptions, uint32_t vertexAttributeDescriptionCount, const VkVertexInputAttributeDescription2EXT *pVertexAttributeDescriptions)
+{
+    TRACE("%p, %u, %p, %u, %p\n", commandBuffer, vertexBindingDescriptionCount, pVertexBindingDescriptions, vertexAttributeDescriptionCount, pVertexAttributeDescriptions);
+    commandBuffer->device->funcs.p_vkCmdSetVertexInputEXT(commandBuffer->command_buffer, vertexBindingDescriptionCount, pVertexBindingDescriptions, vertexAttributeDescriptionCount, pVertexAttributeDescriptions);
 }
 
 void WINAPI wine_vkCmdSetViewport(VkCommandBuffer commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport *pViewports)
@@ -6969,8 +7093,10 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdSetBlendConstants", &wine_vkCmdSetBlendConstants},
     {"vkCmdSetCheckpointNV", &wine_vkCmdSetCheckpointNV},
     {"vkCmdSetCoarseSampleOrderNV", &wine_vkCmdSetCoarseSampleOrderNV},
+    {"vkCmdSetColorWriteEnableEXT", &wine_vkCmdSetColorWriteEnableEXT},
     {"vkCmdSetCullModeEXT", &wine_vkCmdSetCullModeEXT},
     {"vkCmdSetDepthBias", &wine_vkCmdSetDepthBias},
+    {"vkCmdSetDepthBiasEnableEXT", &wine_vkCmdSetDepthBiasEnableEXT},
     {"vkCmdSetDepthBounds", &wine_vkCmdSetDepthBounds},
     {"vkCmdSetDepthBoundsTestEnableEXT", &wine_vkCmdSetDepthBoundsTestEnableEXT},
     {"vkCmdSetDepthCompareOpEXT", &wine_vkCmdSetDepthCompareOpEXT},
@@ -6987,10 +7113,14 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdSetFrontFaceEXT", &wine_vkCmdSetFrontFaceEXT},
     {"vkCmdSetLineStippleEXT", &wine_vkCmdSetLineStippleEXT},
     {"vkCmdSetLineWidth", &wine_vkCmdSetLineWidth},
+    {"vkCmdSetLogicOpEXT", &wine_vkCmdSetLogicOpEXT},
+    {"vkCmdSetPatchControlPointsEXT", &wine_vkCmdSetPatchControlPointsEXT},
     {"vkCmdSetPerformanceMarkerINTEL", &wine_vkCmdSetPerformanceMarkerINTEL},
     {"vkCmdSetPerformanceOverrideINTEL", &wine_vkCmdSetPerformanceOverrideINTEL},
     {"vkCmdSetPerformanceStreamMarkerINTEL", &wine_vkCmdSetPerformanceStreamMarkerINTEL},
+    {"vkCmdSetPrimitiveRestartEnableEXT", &wine_vkCmdSetPrimitiveRestartEnableEXT},
     {"vkCmdSetPrimitiveTopologyEXT", &wine_vkCmdSetPrimitiveTopologyEXT},
+    {"vkCmdSetRasterizerDiscardEnableEXT", &wine_vkCmdSetRasterizerDiscardEnableEXT},
     {"vkCmdSetRayTracingPipelineStackSizeKHR", &wine_vkCmdSetRayTracingPipelineStackSizeKHR},
     {"vkCmdSetSampleLocationsEXT", &wine_vkCmdSetSampleLocationsEXT},
     {"vkCmdSetScissor", &wine_vkCmdSetScissor},
@@ -7000,6 +7130,7 @@ static const struct vulkan_func vk_device_dispatch_table[] =
     {"vkCmdSetStencilReference", &wine_vkCmdSetStencilReference},
     {"vkCmdSetStencilTestEnableEXT", &wine_vkCmdSetStencilTestEnableEXT},
     {"vkCmdSetStencilWriteMask", &wine_vkCmdSetStencilWriteMask},
+    {"vkCmdSetVertexInputEXT", &wine_vkCmdSetVertexInputEXT},
     {"vkCmdSetViewport", &wine_vkCmdSetViewport},
     {"vkCmdSetViewportShadingRatePaletteNV", &wine_vkCmdSetViewportShadingRatePaletteNV},
     {"vkCmdSetViewportWScalingNV", &wine_vkCmdSetViewportWScalingNV},
@@ -7328,6 +7459,7 @@ static const char * const vk_device_extensions[] =
     "VK_EXT_blend_operation_advanced",
     "VK_EXT_buffer_device_address",
     "VK_EXT_calibrated_timestamps",
+    "VK_EXT_color_write_enable",
     "VK_EXT_conditional_rendering",
     "VK_EXT_conservative_rasterization",
     "VK_EXT_custom_border_color",
@@ -7337,6 +7469,7 @@ static const char * const vk_device_extensions[] =
     "VK_EXT_descriptor_indexing",
     "VK_EXT_discard_rectangles",
     "VK_EXT_extended_dynamic_state",
+    "VK_EXT_extended_dynamic_state2",
     "VK_EXT_external_memory_host",
     "VK_EXT_filter_cubic",
     "VK_EXT_fragment_density_map",
@@ -7374,6 +7507,8 @@ static const char * const vk_device_extensions[] =
     "VK_EXT_transform_feedback",
     "VK_EXT_validation_cache",
     "VK_EXT_vertex_attribute_divisor",
+    "VK_EXT_vertex_input_dynamic_state",
+    "VK_EXT_ycbcr_2plane_444_formats",
     "VK_EXT_ycbcr_image_arrays",
     "VK_GOOGLE_decorate_string",
     "VK_GOOGLE_hlsl_functionality1",
@@ -7454,6 +7589,7 @@ static const char * const vk_device_extensions[] =
     "VK_NV_framebuffer_mixed_samples",
     "VK_NV_geometry_shader_passthrough",
     "VK_NV_glsl_shader",
+    "VK_NV_inherited_viewport_scissor",
     "VK_NV_mesh_shader",
     "VK_NV_ray_tracing",
     "VK_NV_representative_fragment_test",
