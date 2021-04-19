@@ -442,6 +442,39 @@ void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
     }
 }
 
+VkResult WINAPI vkGetCalibratedTimestampsEXT(VkDevice device, uint32_t timestampCount, const VkCalibratedTimestampInfoEXT *pTimestampInfos, uint64_t *pTimestamps, uint64_t *pMaxDeviation)
+{
+    struct vkGetCalibratedTimestampsEXT_params params;
+    static LARGE_INTEGER freq;
+    VkResult res;
+    uint32_t i;
+
+    if (!freq.QuadPart)
+    {
+        LARGE_INTEGER temp;
+
+        QueryPerformanceFrequency(&temp);
+        InterlockedCompareExchange64(&freq.QuadPart, temp.QuadPart, 0);
+    }
+
+    params.device = device;
+    params.timestampCount = timestampCount;
+    params.pTimestampInfos = pTimestampInfos;
+    params.pTimestamps = pTimestamps;
+    params.pMaxDeviation = pMaxDeviation;
+    res = vk_unix_call(unix_vkGetCalibratedTimestampsEXT, &params);
+    if (res != VK_SUCCESS)
+        return res;
+
+    for (i = 0; i < timestampCount; i++)
+    {
+        if (pTimestampInfos[i].timeDomain != VK_TIME_DOMAIN_QUERY_PERFORMANCE_COUNTER_EXT) continue;
+        pTimestamps[i] *= freq.QuadPart / 10000000;
+    }
+
+    return VK_SUCCESS;
+}
+
 static BOOL WINAPI call_vulkan_debug_report_callback( struct wine_vk_debug_report_params *params, ULONG size )
 {
     return params->user_callback(params->flags, params->object_type, params->object_handle, params->location,
