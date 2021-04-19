@@ -1653,7 +1653,6 @@ VkResult WINAPI wine_vkGetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevi
 
 /* From ntdll/unix/sync.c */
 #define NANOSECONDS_IN_A_SECOND 1000000000
-#define TICKSPERSEC             10000000
 
 static inline VkTimeDomainEXT get_performance_counter_time_domain(void)
 {
@@ -1680,7 +1679,17 @@ static VkTimeDomainEXT map_to_host_time_domain(VkTimeDomainEXT domain)
 
 static inline uint64_t convert_monotonic_timestamp(uint64_t value)
 {
-    return value / (NANOSECONDS_IN_A_SECOND / TICKSPERSEC);
+    static LARGE_INTEGER freq;
+
+    if (!freq.QuadPart)
+    {
+        LARGE_INTEGER temp;
+
+        QueryPerformanceFrequency(&temp);
+        InterlockedCompareExchange64(&freq.QuadPart, temp.QuadPart, 0);
+    }
+
+    return value * freq.QuadPart / NANOSECONDS_IN_A_SECOND;
 }
 
 static inline uint64_t convert_timestamp(VkTimeDomainEXT host_domain, VkTimeDomainEXT target_domain, uint64_t value)
