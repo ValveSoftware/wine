@@ -77,6 +77,85 @@ WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 #define PID_MICROSOFT_XBOX_ONE_S 0x02ea
 #define PID_MICROSOFT_XBOX_ONE_S_2 0x02fd
 
+static BOOL __controller_hack_sdl_is_vid_pid_xbox_360(WORD vid, WORD pid)
+{
+    if(vid != VID_MICROSOFT)
+        return FALSE;
+
+    if(pid == PID_MICROSOFT_XBOX_360 ||
+        pid == PID_MICROSOFT_XBOX_360_WIRELESS ||
+        pid == PID_MICROSOFT_XBOX_360_ADAPTER)
+        return TRUE;
+
+    return FALSE;
+}
+static BOOL __controller_hack_sdl_is_vid_pid_xbox_one(WORD vid, WORD pid) {
+    if(vid != VID_MICROSOFT)
+        return FALSE;
+
+    if(pid == PID_MICROSOFT_XBOX_ONE ||
+        pid == PID_MICROSOFT_XBOX_ONE_CF ||
+        pid == PID_MICROSOFT_XBOX_ONE_ELITE ||
+        pid == PID_MICROSOFT_XBOX_ONE_S ||
+        pid == PID_MICROSOFT_XBOX_ONE_S_2)
+        return TRUE;
+
+    return FALSE;
+}
+
+static BOOL __controller_hack_sdl_is_vid_pid_sony_dualshock4(WORD vid, WORD pid)
+{
+    if(vid != VID_SONY)
+        return FALSE;
+
+    if(pid == PID_SONY_DUALSHOCK_4 ||
+        pid == PID_SONY_DUALSHOCK_4_2 ||
+        pid == PID_SONY_DUALSHOCK_4_DONGLE)
+        return TRUE;
+
+    return FALSE;
+}
+
+static BOOL __controller_hack_sdl_is_vid_pid_sony_dualsense(WORD vid, WORD pid)
+{
+    if(vid == VID_SONY && pid == PID_SONY_DUALSENSE)
+        return TRUE;
+
+    return FALSE;
+}
+
+static void __controller_hack_sdl_vid_pid_override(WORD *vid, WORD *pid)
+{
+    TRACE("(*vid = %04hx, *pid = *%04hx\n", *vid, *pid);
+    if(*vid == VID_VALVE && *pid == PID_VALVE_VIRTUAL_CONTROLLER)
+    {
+        TRACE("Valve Virtual Controller found - pretending it's x360\n");
+        *vid = VID_MICROSOFT;
+        *pid = PID_MICROSOFT_XBOX_360;
+    }
+}
+
+static void __controller_hack_sdl_name_override(WORD vid, WORD pid, const char **name)
+{
+    const char *new_name = NULL;
+
+    TRACE("vid = %04hx, pid = %04hx, *name = %s\n", vid, pid, debugstr_a(*name));
+
+    if(__controller_hack_sdl_is_vid_pid_xbox_360(vid, pid))
+        new_name = "Controller (XBOX 360 For Windows)";
+    else if(__controller_hack_sdl_is_vid_pid_xbox_one(vid, pid))
+        new_name = "Controller (XBOX One For Windows)";
+    else if(__controller_hack_sdl_is_vid_pid_sony_dualshock4(vid, pid) ||
+             __controller_hack_sdl_is_vid_pid_sony_dualsense(vid, pid))
+        new_name = "Wireless Controller";
+
+    if(new_name)
+    {
+        TRACE("new name for the controller = %s\n", debugstr_a(new_name));
+        *name = new_name;
+    }
+}
+
 typedef struct JoystickImpl JoystickImpl;
 static const IDirectInputDevice8AVtbl JoystickAvt;
 static const IDirectInputDevice8WVtbl JoystickWvt;
@@ -388,11 +467,7 @@ static void find_sdldevs(void)
             continue;
         }
 
-        if(sdldev->vendor_id == VID_VALVE && sdldev->product_id == PID_VALVE_VIRTUAL_CONTROLLER)
-        {
-            sdldev->vendor_id = VID_MICROSOFT;
-            sdldev->product_id = PID_MICROSOFT_XBOX_360;
-        }
+        __controller_hack_sdl_vid_pid_override(&sdldev->vendor_id, &sdldev->product_id);
 
         sdldev->nth_instance = get_num_vidpids(sdldev->vendor_id, sdldev->product_id);
 
@@ -410,66 +485,10 @@ static void find_sdldevs(void)
     LeaveCriticalSection(&sdldevs_lock);
 }
 
-static struct device_info_override {
-    WORD vid;
-    WORD pid;
-    const char *instance_name;
-    const char *product_name;
-    DWORD dev_type;
-    DWORD dev_type8;
-} device_info_overrides[] = {
-    { VID_SONY, PID_SONY_DUALSHOCK_4, "Wireless Controller", "Wireless Controller",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
-
-    { VID_SONY, PID_SONY_DUALSHOCK_4_2, "Wireless Controller", "Wireless Controller",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
-
-    { VID_SONY, PID_SONY_DUALSHOCK_4_DONGLE, "Wireless Controller", "Wireless Controller",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
-
-    { VID_SONY, PID_SONY_DUALSENSE, "Wireless Controller", "Wireless Controller",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_360, "Controller (XBOX 360 For Windows)", "Controller (XBOX 360 For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_360_WIRELESS, "Controller (XBOX 360 For Windows)", "Controller (XBOX 360 For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_360_ADAPTER, "Controller (XBOX 360 For Windows)", "Controller (XBOX 360 For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_CF, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_ELITE, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_S, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-
-    { VID_MICROSOFT, PID_MICROSOFT_XBOX_ONE_S_2, "Controller (XBOX One For Windows)", "Controller (XBOX One For Windows)",
-        DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8),
-        DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8) },
-};
-
 static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD version, int id)
 {
-    DWORD dwSize = lpddi->dwSize, i;
+    DWORD dwSize = lpddi->dwSize;
+    const char *name;
 
     TRACE("%d %p\n", dwSize, lpddi);
     memset(lpddi, 0, dwSize);
@@ -503,30 +522,26 @@ static void fill_joystick_dideviceinstanceA(LPDIDEVICEINSTANCEA lpddi, DWORD ver
             lpddi->wUsage = 0x05; /* Game Pad */
     }
 
-    for(i = 0; i < ARRAY_SIZE(device_info_overrides); ++i)
+    name = sdldevs[id].name;
+    __controller_hack_sdl_name_override(sdldevs[id].vendor_id, sdldevs[id].product_id, &name);
+    strcpy(lpddi->tszInstanceName, name);
+    strcpy(lpddi->tszProductName, name);
+
+    if(__controller_hack_sdl_is_vid_pid_xbox_one(sdldevs[id].vendor_id, sdldevs[id].product_id) ||
+       __controller_hack_sdl_is_vid_pid_xbox_360(sdldevs[id].vendor_id, sdldevs[id].product_id))
     {
-        const struct device_info_override *override = &device_info_overrides[i];
-        if(sdldevs[id].vendor_id == override->vid &&
-                sdldevs[id].product_id == override->pid)
-        {
-            TRACE("found devinfo override for %04hx/%04hx\n",
-                    override->vid, override->pid);
             if(version >= 0x800)
-                lpddi->dwDevType = override->dev_type8;
+                lpddi->dwDevType = DIDEVTYPE_HID | DI8DEVTYPE_GAMEPAD | (DI8DEVTYPEGAMEPAD_STANDARD << 8);
             else
-                lpddi->dwDevType = override->dev_type;
-
-            strcpy(lpddi->tszInstanceName, override->instance_name);
-            strcpy(lpddi->tszProductName,  override->product_name);
-
-            break;
-        }
+                lpddi->dwDevType = DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8);
     }
-
-    if(i >= ARRAY_SIZE(device_info_overrides))
+    else if(__controller_hack_sdl_is_vid_pid_sony_dualshock4(sdldevs[id].vendor_id, sdldevs[id].product_id) ||
+            __controller_hack_sdl_is_vid_pid_sony_dualsense(sdldevs[id].vendor_id, sdldevs[id].product_id))
     {
-        strcpy(lpddi->tszInstanceName, sdldevs[id].name);
-        strcpy(lpddi->tszProductName,  sdldevs[id].name);
+            if (version >= 0x800)
+                lpddi->dwDevType = DIDEVTYPE_HID | DI8DEVTYPE_1STPERSON | (DI8DEVTYPE1STPERSON_SIXDOF << 8);
+            else
+                lpddi->dwDevType = DIDEVTYPE_HID | DIDEVTYPE_JOYSTICK | (DIDEVTYPEJOYSTICK_GAMEPAD << 8);
     }
 }
 
@@ -1081,38 +1096,25 @@ static HRESULT poll_sdl_device_state(LPDIRECTINPUTDEVICE8A iface)
 
 static enum_device_state_function select_enum_function(struct SDLDev *sdldev)
 {
-    switch(sdldev->vendor_id){
-    case VID_SONY:
-        switch(sdldev->product_id){
-        case PID_SONY_DUALSHOCK_4:
-        case PID_SONY_DUALSHOCK_4_2:
-        case PID_SONY_DUALSHOCK_4_DONGLE:
-            TRACE("for %04x/%04x, polling ds4 controller\n", sdldev->vendor_id, sdldev->product_id);
-            if(sdldev->n_buttons >= 16)
-                return enum_device_state_ds4_16button;
+    if(__controller_hack_sdl_is_vid_pid_sony_dualshock4(sdldev->vendor_id, sdldev->product_id))
+    {
+        TRACE("for %04x/%04x, polling ds4 controller\n", sdldev->vendor_id, sdldev->product_id);
+        if(sdldev->n_buttons >= 16)
+            return enum_device_state_ds4_16button;
 
-            TRACE("SDL only reports %u buttons for this PS4 controller. Please upgrade SDL to > 2.0.10 and/or give your user hidraw access.\n",
-                    sdldev->n_buttons);
-            return enum_device_state_ds4_13button;
-        }
-        case PID_SONY_DUALSENSE:
-                return enum_device_state_dualsense;
-        break;
-
-    case VID_MICROSOFT:
-        switch(sdldev->product_id){
-        case PID_MICROSOFT_XBOX_360:
-        case PID_MICROSOFT_XBOX_360_WIRELESS:
-        case PID_MICROSOFT_XBOX_360_ADAPTER:
-        case PID_MICROSOFT_XBOX_ONE:
-        case PID_MICROSOFT_XBOX_ONE_CF:
-        case PID_MICROSOFT_XBOX_ONE_ELITE:
-        case PID_MICROSOFT_XBOX_ONE_S:
-        case PID_MICROSOFT_XBOX_ONE_S_2:
-            TRACE("for %04x/%04x, polling xbox 360/one controller\n", sdldev->vendor_id, sdldev->product_id);
-            return enum_device_state_ms_xb360;
-        }
-        break;
+        TRACE("SDL only reports %u buttons for this PS4 controller. Please upgrade SDL to > 2.0.10 and/or give your user hidraw access.\n",
+                sdldev->n_buttons);
+        return enum_device_state_ds4_13button;
+    }
+    else if(__controller_hack_sdl_is_vid_pid_sony_dualsense(sdldev->vendor_id, sdldev->product_id))
+    {
+            return enum_device_state_dualsense;
+    }
+    else if(__controller_hack_sdl_is_vid_pid_xbox_360(sdldev->vendor_id, sdldev->product_id) ||
+            __controller_hack_sdl_is_vid_pid_xbox_one(sdldev->vendor_id, sdldev->product_id))
+    {
+        TRACE("for %04x/%04x, polling xbox 360/one controller\n", sdldev->vendor_id, sdldev->product_id);
+        return enum_device_state_ms_xb360;
     }
 
     TRACE("for %04x/%04x, using no maps\n", sdldev->vendor_id, sdldev->product_id);
