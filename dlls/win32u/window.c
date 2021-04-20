@@ -1234,6 +1234,7 @@ static HWND set_window_owner( HWND hwnd, HWND owner )
 /* Helper function for SetWindowLong(). */
 LONG_PTR set_window_long( HWND hwnd, INT offset, UINT size, LONG_PTR newval, BOOL ansi )
 {
+    const char *sgi = getenv( "SteamGameId" );
     BOOL ok, made_visible = FALSE;
     LONG_PTR retval = 0;
     STYLESTRUCT style;
@@ -1289,6 +1290,8 @@ LONG_PTR set_window_long( HWND hwnd, INT offset, UINT size, LONG_PTR newval, BOO
         if (win->dwStyle & WS_MINIMIZE) newval |= WS_MINIMIZE;
         break;
     case GWL_EXSTYLE:
+        /* FIXME: Layered windows don't work well right now, disable them */
+        if (sgi && !strcmp( sgi, "694280" )) newval &= ~WS_EX_LAYERED;
         style.styleOld = win->dwExStyle;
         style.styleNew = newval;
         release_win_ptr( win );
