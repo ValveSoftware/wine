@@ -2504,6 +2504,7 @@ LONG_PTR WIN_SetWindowLong( HWND hwnd, INT offset, UINT size, LONG_PTR newval, B
     BOOL ok, made_visible = FALSE;
     LONG_PTR retval = 0;
     WND *wndPtr;
+    const char *sgi = getenv("SteamGameId");
 
     TRACE( "%p %d %lx %c\n", hwnd, offset, newval, unicode ? 'W' : 'A' );
 
@@ -2557,6 +2558,8 @@ LONG_PTR WIN_SetWindowLong( HWND hwnd, INT offset, UINT size, LONG_PTR newval, B
            WS_EX_WINDOWEDGE too */
         break;
     case GWL_EXSTYLE:
+        /* FIXME: Layered windows don't work well right now, disable them */
+        if (sgi && !strcmp(sgi, "694280")) newval &= ~WS_EX_LAYERED;
         style.styleOld = wndPtr->dwExStyle;
         style.styleNew = newval;
         WIN_ReleasePtr( wndPtr );
