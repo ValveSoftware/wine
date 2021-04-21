@@ -960,6 +960,7 @@ static void install_lib_dir( WCHAR *dest, WCHAR *file, const WCHAR *default_ext,
         if (lstrlenW( data.name ) > max_dll_name_len) continue;
         if (!wcscmp( data.name, L"." )) continue;
         if (!wcscmp( data.name, L".." )) continue;
+        if (!wcscmp( data.name, L"amd_ags_x64.dll" )) continue;
         lstrcpyW( name, data.name );
         if (default_ext)  /* inside build dir */
         {
