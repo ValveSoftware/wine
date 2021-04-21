@@ -44,6 +44,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(globalmem);
 
 static HANDLE systemHeap;   /* globally shared heap */
 
+static BOOL is_win64 = sizeof(void *) == 8;
 
 /***********************************************************************
  *           HEAP_CreateSystemHeap
@@ -582,7 +583,7 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
     osver.dwOSVersionInfoSize = sizeof(osver);
     GetVersionExW(&osver);
 
-    if ( osver.dwMajorVersion >= 5 || osver.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS )
+    if ( !is_win64 && (osver.dwMajorVersion >= 5 || osver.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS) )
     {
         lpBuffer->dwTotalPhys = min( memstatus.ullTotalPhys, MAXDWORD );
         lpBuffer->dwAvailPhys = min( memstatus.ullAvailPhys, MAXDWORD );
@@ -593,7 +594,7 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
         lpBuffer->dwAvailVirtual = min( memstatus.ullAvailVirtual, MAXDWORD );
 
     }
-    else /* duplicate NT bug */
+    else /* 64 bit case, or duplicate NT bug */
     {
         lpBuffer->dwTotalPhys = memstatus.ullTotalPhys;
         lpBuffer->dwAvailPhys = memstatus.ullAvailPhys;
@@ -615,7 +616,7 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
     }
 
     /* work around for broken photoshop 4 installer */
-    if ( lpBuffer->dwAvailPhys +  lpBuffer->dwAvailPageFile >= 2U*1024*1024*1024)
+    if ( !is_win64 && lpBuffer->dwAvailPhys +  lpBuffer->dwAvailPageFile >= 2U*1024*1024*1024 )
          lpBuffer->dwAvailPageFile = 2U*1024*1024*1024 -  lpBuffer->dwAvailPhys - 1;
 
     /* limit page file size for really old binaries */
