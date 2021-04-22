@@ -1760,6 +1760,32 @@ static MonoAssembly* CDECL mono_assembly_preload_hook_fn(MonoAssemblyName *aname
         }
     }
 
+    if (!strcmp(assemblyname, "ManagedStarter"))
+    {
+        /* HACK for Mount & Blade II: Bannerlord
+         *
+         * The launcher executable uses an AssemblyResolve event handler
+         * to redirect loads of the "ManagedStarter" assembly to
+         * Bannerlord.exe. Due to Mono issue #11319, the runtime attempts
+         * to load ManagedStarter before executing the static constructor
+         * that adds this event handler. We work around this by doing the
+         * same thing in our own assembly load hook. */
+        const char* sgi = getenv("SteamGameId");
+        if (sgi && !strcmp(sgi, "261550"))
+        {
+            FIXME("hack, using Bannerlord.exe\n");
+
+            result = mono_assembly_open("Bannerlord.exe", &stat);
+
+            if (result)
+                goto done;
+            else
+            {
+                ERR("Bannerlord.exe failed to load\n");
+            }
+        }
+    }
+
     /* FIXME: We should search the given paths before the GAC. */
 
     if ((search_flags & ASSEMBLY_SEARCH_GAC) != 0)
