@@ -1710,7 +1710,7 @@ void detach_client_window( struct x11drv_win_data *data, Window client_window, B
 /**********************************************************************
  *             attach_client_window
  */
-static void attach_client_window( struct x11drv_win_data *data, Window client_window )
+void attach_client_window( struct x11drv_win_data *data, Window client_window )
 {
     if (data->client_window == client_window || !client_window) return;
     detach_client_window( data, data->client_window, TRUE );
