@@ -1723,6 +1723,22 @@ static Window get_dummy_parent(void)
 
 
 /**********************************************************************
+ *		udpate_client_window
+ */
+void udpate_client_window( HWND hwnd )
+{
+    struct x11drv_win_data *data;
+    if ((data = get_win_data( hwnd )))
+    {
+        data->client_window = wine_vk_active_surface( hwnd );
+        /* make sure any request that could use old client window has been flushed */
+        release_win_data( data );
+        XFlush( data->display );
+    }
+}
+
+
+/**********************************************************************
  *		create_dummy_client_window
  */
 Window create_dummy_client_window(void)
