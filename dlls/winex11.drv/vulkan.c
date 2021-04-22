@@ -226,12 +226,28 @@ static void wine_vk_surface_release(struct wine_vk_surface *surface)
         }
         list_remove(&surface->entry);
         LeaveCriticalSection(&context_section);
+
+        /* we can't call udpate_client_window within the context_section, as it'll need to
+         * acquire window data cs, which could be held by another thread calling resize_vk_surfaces
+         * waiting itself on context_section, so we need wine_vk_active_surface to help */
+        udpate_client_window(hwnd);
     }
 
     if (surface->window)
         XDestroyWindow(gdi_display, surface->window);
 
     heap_free(surface);
+}
+
+Window wine_vk_active_surface(HWND hwnd)
+{
+    struct list *entry;
+    Window active = None;
+    EnterCriticalSection(&context_section);
+    if (!XFindContext(gdi_display, (XID)hwnd, vulkan_hwnd_context, (char **)&entry))
+        active = LIST_ENTRY(entry, struct wine_vk_surface, entry)->window;
+    LeaveCriticalSection(&context_section);
+    return active;
 }
 
 void wine_vk_surface_destroy(HWND hwnd)
@@ -815,6 +831,11 @@ const struct vulkan_funcs *get_vulkan_driver(UINT version)
 
 void wine_vk_surface_destroy(HWND hwnd)
 {
+}
+
+Window wine_vk_active_surface(HWND hwnd)
+{
+    return None;
 }
 
 void resize_vk_surfaces(HWND hwnd, Window active, int mask, XWindowChanges changes)
