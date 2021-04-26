@@ -646,15 +646,21 @@ static BOOL get_gpu_properties_from_vulkan( struct x11drv_gpu *gpu, const XRRPro
 
     for (device_idx = 0; device_idx < device_count; ++device_idx)
     {
-        for (output_idx = 0; output_idx < provider_info->noutputs; ++output_idx)
+        for (output_idx = 0; output_idx < (provider_info ? provider_info->noutputs : 1); ++output_idx)
         {
-            X11DRV_expect_error( gdi_display, XRandRErrorHandler, NULL );
-            vr = pvkGetRandROutputDisplayEXT( vk_physical_devices[device_idx], gdi_display,
-                                              provider_info->outputs[output_idx], &vk_display );
-            XSync( gdi_display, FALSE );
-            if (X11DRV_check_error() || vr != VK_SUCCESS || vk_display == VK_NULL_HANDLE)
-                continue;
-
+            if (provider_info)
+            {
+                X11DRV_expect_error( gdi_display, XRandRErrorHandler, NULL );
+                vr = pvkGetRandROutputDisplayEXT( vk_physical_devices[device_idx], gdi_display,
+                                                  provider_info->outputs[output_idx], &vk_display );
+                XSync( gdi_display, FALSE );
+                if (X11DRV_check_error() || vr != VK_SUCCESS || vk_display == VK_NULL_HANDLE)
+                    continue;
+            }
+            else if (properties2.properties.vendorID >= 0x10000)
+            {
+                break;
+            }
             memset( &id, 0, sizeof(id) );
             id.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
             properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
@@ -713,7 +719,8 @@ static BOOL xrandr14_get_gpus2( struct x11drv_gpu **new_gpus, int *count, BOOL g
     if (!provider_resources->nproviders)
     {
         WARN("XRandR implementation doesn't report any providers, faking one.\n");
-        lstrcpyW( gpus[0].name, wine_adapterW );
+        if (!get_gpu_properties_from_vulkan( &gpus[0], NULL ))
+            lstrcpyW( gpus[0].name, wine_adapterW );
         *new_gpus = gpus;
         *count = 1;
         ret = TRUE;
