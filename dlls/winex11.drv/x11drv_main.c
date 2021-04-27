@@ -90,6 +90,7 @@ int xfixes_event_base = 0;
 HMODULE x11drv_module = 0;
 char *process_name = NULL;
 HANDLE steam_overlay_event;
+BOOL layered_window_client_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -712,6 +713,17 @@ static BOOL process_attach(void)
     if (use_xim) use_xim = X11DRV_InitXIM( input_style );
 
     fs_hack_init();
+
+    {
+        const char *sgi = getenv("SteamGameId");
+        const char *e = getenv("WINE_LAYERED_WINDOW_CLIENT_HACK");
+        layered_window_client_hack =
+            (sgi && (
+                strcmp(sgi, "435150") == 0 || /* Divinity: Original Sin 2 launcher */
+                strcmp(sgi, "227020") == 0 /* Rise of Venice launcher */
+            )) ||
+            (e && *e != '\0' && *e != '0');
+    }
 
     init_user_driver();
     X11DRV_DisplayDevices_Init(FALSE);
