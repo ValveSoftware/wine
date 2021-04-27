@@ -988,7 +988,10 @@ static BOOL X11DRV_Expose( HWND hwnd, XEvent *xev )
     rect.right  = pos.x + event->width;
     rect.bottom = pos.y + event->height;
 
-    if (event->window != data->client_window)
+    if (layered_window_client_hack && event->window == data->client_window)
+        OffsetRect( &rect, data->client_rect.left - data->whole_rect.left,
+                    data->client_rect.top - data->whole_rect.top );
+    if (layered_window_client_hack || event->window != data->client_window)
     {
         if (data->surface)
         {
