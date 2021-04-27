@@ -890,4 +890,6 @@ static inline BOOL is_window_rect_mapped( const RECT *rect )
             max( rect->bottom, rect->top + 1 ) > virtual_rect.top);
 }
 
+extern BOOL layered_window_client_hack;
+
 #endif  /* __WINE_X11DRV_H */
