@@ -95,6 +95,7 @@ BOOL vulkan_disable_child_window_rendering_hack = FALSE;
 BOOL vulkan_gdi_blit_source_hack = FALSE;
 HANDLE steam_overlay_event;
 HANDLE steam_keyboard_event;
+BOOL layered_window_client_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -830,6 +831,17 @@ static NTSTATUS x11drv_init( void *arg )
             (sgi && (
                 !strcmp(sgi, "429660") || /* Bug 21949 : Tales of Berseria video tearing */
                 !strcmp(sgi, "1009290")   /* Bug 21949 : SWORD ART ONLINE Alicization Lycoris video tearing */
+            )) ||
+            (e && *e != '\0' && *e != '0');
+    }
+
+    {
+        const char *sgi = getenv("SteamGameId");
+        const char *e = getenv("WINE_LAYERED_WINDOW_CLIENT_HACK");
+        layered_window_client_hack =
+            (sgi && (
+                strcmp(sgi, "435150") == 0 || /* Divinity: Original Sin 2 launcher */
+                strcmp(sgi, "227020") == 0 /* Rise of Venice launcher */
             )) ||
             (e && *e != '\0' && *e != '0');
     }
