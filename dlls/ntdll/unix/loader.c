@@ -1841,6 +1841,7 @@ static void start_main_thread(void)
     fsync_init();
     esync_init();
     virtual_map_user_shared_data();
+    virtual_map_hypervisor_shared_data();
     init_cpu_info();
     syscall_dispatcher = signal_init_syscalls();
     init_files();
