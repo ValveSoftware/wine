@@ -2697,6 +2697,7 @@ LONG_PTR WIN_SetWindowLong( HWND hwnd, INT offset, UINT size, LONG_PTR newval, B
         /* FIXME: Layered windows don't work well right now, disable them */
         if (sgi && !strcmp(sgi, "694280")) newval &= ~WS_EX_LAYERED;
         if (sgi && !strcmp(sgi, "312670")) newval &= ~WS_EX_LAYERED;
+        if (sgi && !strcmp(sgi, "700600")) newval &= ~WS_EX_LAYERED;
         style.styleOld = wndPtr->dwExStyle;
         style.styleNew = newval;
         WIN_ReleasePtr( wndPtr );
