@@ -1851,12 +1851,11 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
     struct user_thread_info *thread_info = get_user_thread_info();
     INPUT_MESSAGE_SOURCE prev_source = thread_info->client_info.msg_source;
     struct received_message_info info;
+    unsigned char buffer_init[1024];
     unsigned int hw_id = 0;  /* id of previous hardware message */
+    void *buffer = buffer_init;
     BOOL skip = FALSE;
-    void *buffer;
     size_t buffer_size = 1024;
-
-    if (!(buffer = malloc( buffer_size ))) return -1;
 
     if (!first && !last) last = ~0;
     if (hwnd == HWND_BROADCAST) hwnd = HWND_TOPMOST;
@@ -1932,19 +1931,22 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
 
         if (res)
         {
-            free( buffer );
             if (res == STATUS_PENDING)
             {
                 thread_info->wake_mask = changed_mask & (QS_SENDMESSAGE | QS_SMRESULT);
                 thread_info->changed_mask = changed_mask;
+                if (buffer != buffer_init) free( buffer );
                 return 0;
             }
             if (res != STATUS_BUFFER_OVERFLOW)
             {
                 RtlSetLastWin32Error( RtlNtStatusToDosError(res) );
+                if (buffer != buffer_init) free( buffer );
                 return -1;
             }
-            if (!(buffer = malloc( buffer_size ))) return -1;
+            if (buffer == buffer_init) buffer = malloc( buffer_size );
+            else buffer = realloc( buffer, buffer_size );
+            if (!buffer) return -1;
             continue;
         }
 
@@ -1961,6 +1963,12 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             break;
         case MSG_NOTIFY:
             info.flags = ISMEX_NOTIFY;
+            /* unpack_message may have to reallocate */
+            if (buffer == buffer_init)
+            {
+                buffer = malloc( buffer_size );
+                memcpy( buffer, buffer_init, buffer_size );
+            }
             if (!unpack_message( info.msg.hwnd, info.msg.message, &info.msg.wParam,
                                  &info.msg.lParam, &buffer, size ))
                 continue;
@@ -2040,6 +2048,12 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             continue;
         case MSG_OTHER_PROCESS:
             info.flags = ISMEX_SEND;
+            /* unpack_message may have to reallocate */
+            if (buffer == buffer_init)
+            {
+                buffer = malloc( buffer_size );
+                memcpy( buffer, buffer_init, buffer_size );
+            }
             if (!unpack_message( info.msg.hwnd, info.msg.message, &info.msg.wParam,
                                  &info.msg.lParam, &buffer, size ))
             {
@@ -2063,7 +2077,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
                 thread_info->client_info.message_pos   = MAKELONG( info.msg.pt.x, info.msg.pt.y );
                 thread_info->client_info.message_time  = info.msg.time;
                 thread_info->client_info.message_extra = msg_data->hardware.info;
-                free( buffer );
+                if (buffer != buffer_init) free( buffer );
                 call_hooks( WH_GETMESSAGE, HC_ACTION, flags & PM_REMOVE, (LPARAM)msg, sizeof(*msg) );
                 return 1;
             }
@@ -2078,7 +2092,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
                     /* if this is a nested call return right away */
                     if (first == info.msg.message && last == info.msg.message)
                     {
-                        free( buffer );
+                        if (buffer != buffer_init) free( buffer );
                         return 0;
                     }
                 }
@@ -2117,7 +2131,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             thread_info->client_info.message_time  = info.msg.time;
             thread_info->client_info.message_extra = 0;
             thread_info->client_info.msg_source = msg_source_unavailable;
-            free( buffer );
+            if (buffer != buffer_init) free( buffer );
             call_hooks( WH_GETMESSAGE, HC_ACTION, flags & PM_REMOVE, (LPARAM)msg, sizeof(*msg) );
             return 1;
         }
