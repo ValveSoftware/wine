@@ -2697,11 +2697,10 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
     INPUT_MESSAGE_SOURCE prev_source = thread_info->msg_source;
     struct received_message_info info, *old_info;
     unsigned int hw_id = 0;  /* id of previous hardware message */
-    void *buffer;
+    char buffer_init[256];
     size_t buffer_size = 256;
+    void *buffer = buffer_init;
     BOOL skip = FALSE;
-
-    if (!(buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size ))) return -1;
 
     if (!first && !last) last = ~0;
     if (hwnd == HWND_BROADCAST) hwnd = HWND_TOPMOST;
@@ -2776,19 +2775,22 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
 
         if (res)
         {
-            HeapFree( GetProcessHeap(), 0, buffer );
             if (res == STATUS_PENDING)
             {
                 thread_info->wake_mask = changed_mask & (QS_SENDMESSAGE | QS_SMRESULT);
                 thread_info->changed_mask = changed_mask;
+                if (buffer != buffer_init) HeapFree( GetProcessHeap(), 0, buffer );
                 return 0;
             }
             if (res != STATUS_BUFFER_OVERFLOW)
             {
                 SetLastError( RtlNtStatusToDosError(res) );
+                if (buffer != buffer_init) HeapFree( GetProcessHeap(), 0, buffer );
                 return -1;
             }
-            if (!(buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size ))) return -1;
+            if (buffer == buffer_init) buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size );
+            else buffer = HeapReAlloc( GetProcessHeap(), 0, buffer, buffer_size );
+            if (!buffer) return -1;
             continue;
         }
 
@@ -2805,6 +2807,12 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             break;
         case MSG_NOTIFY:
             info.flags = ISMEX_NOTIFY;
+            /* unpack_message may have to reallocate */
+            if (buffer == buffer_init)
+            {
+                buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size );
+                memcpy( buffer, buffer_init, buffer_size );
+            }
             if (!unpack_message( info.msg.hwnd, info.msg.message, &info.msg.wParam,
                                  &info.msg.lParam, &buffer, size ))
                 continue;
@@ -2888,6 +2896,12 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             continue;
         case MSG_OTHER_PROCESS:
             info.flags = ISMEX_SEND;
+            /* unpack_message may have to reallocate */
+            if (buffer == buffer_init)
+            {
+                buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size );
+                memcpy( buffer, buffer_init, buffer_size );
+            }
             if (!unpack_message( info.msg.hwnd, info.msg.message, &info.msg.wParam,
                                  &info.msg.lParam, &buffer, size ))
             {
@@ -2910,7 +2924,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
                 thread_info->GetMessagePosVal = MAKELONG( info.msg.pt.x, info.msg.pt.y );
                 thread_info->GetMessageTimeVal = info.msg.time;
                 thread_info->GetMessageExtraInfoVal = msg_data->hardware.info;
-                HeapFree( GetProcessHeap(), 0, buffer );
+                if (buffer != buffer_init) HeapFree( GetProcessHeap(), 0, buffer );
                 HOOK_CallHooks( WH_GETMESSAGE, HC_ACTION, flags & PM_REMOVE, (LPARAM)msg, TRUE );
                 return 1;
             }
@@ -2925,7 +2939,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
                     /* if this is a nested call return right away */
                     if (first == info.msg.message && last == info.msg.message)
                     {
-                        HeapFree( GetProcessHeap(), 0, buffer );
+                        if (buffer != buffer_init) HeapFree( GetProcessHeap(), 0, buffer );
                         return 0;
                     }
                 }
@@ -2955,7 +2969,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             thread_info->GetMessageTimeVal = info.msg.time;
             thread_info->GetMessageExtraInfoVal = 0;
             thread_info->msg_source = msg_source_unavailable;
-            HeapFree( GetProcessHeap(), 0, buffer );
+            if (buffer != buffer_init) HeapFree( GetProcessHeap(), 0, buffer );
             HOOK_CallHooks( WH_GETMESSAGE, HC_ACTION, flags & PM_REMOVE, (LPARAM)msg, TRUE );
             return 1;
         }
