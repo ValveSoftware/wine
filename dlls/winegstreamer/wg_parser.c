@@ -2345,89 +2345,6 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
     return TRUE;
 }
 
-static BOOL raw_media_converter_init_gst(struct wg_parser *parser)
-{
-    BOOL video = parser->input_format.major_type == WG_MAJOR_TYPE_VIDEO;
-    struct wg_parser_stream *stream;
-    GstElement *convert, *resampler;
-    GstPad *their_src;
-    int ret;
-
-    if (parser->seekable)
-        return FALSE;
-
-    if (parser->expected_stream_count != 1)
-        return FALSE;
-
-    if (video)
-    {
-        if (!(convert = gst_element_factory_make("videoconvert", NULL)))
-        {
-            ERR("Failed to create videoconvert; are %u-bit GStreamer \"base\" plugins installed?\n",
-                    8 * (int)sizeof(void*));
-            return FALSE;
-        }
-
-        gst_bin_add(GST_BIN(parser->container), convert);
-
-        parser->their_sink = gst_element_get_static_pad(convert, "sink");
-        their_src = gst_element_get_static_pad(convert, "src");
-    }
-    else
-    {
-        if (!(convert = gst_element_factory_make("audioconvert", NULL)))
-        {
-            ERR("Failed to create audioconvert; are %u-bit GStreamer \"base\" plugins installed?\n",
-                    8 * (int)sizeof(void*));
-            return FALSE;
-        }
-
-        gst_bin_add(GST_BIN(parser->container), convert);
-
-        if (!(resampler = gst_element_factory_make("audioresample", NULL)))
-        {
-            ERR("Failed to create audioresample; are %u-bit GStreamer \"base\" plugins installed?\n",
-                    8 * (int)sizeof(void*));
-            return FALSE;
-        }
-
-        gst_bin_add(GST_BIN(parser->container), resampler);
-
-        gst_element_link(convert, resampler);
-        parser->their_sink = gst_element_get_static_pad(convert, "sink");
-        their_src = gst_element_get_static_pad(resampler, "src");
-    }
-
-    if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
-    {
-        ERR("Failed to link sink pads, error %d.\n", ret);
-        return FALSE;
-    }
-
-    if (!(stream = create_stream(parser)))
-        return FALSE;
-
-    stream->their_src = their_src;
-    gst_object_ref(stream->their_src);
-    if ((ret = gst_pad_link(stream->their_src, stream->my_sink)) < 0)
-    {
-        ERR("Failed to link source pads, error %d.\n", ret);
-        return FALSE;
-    }
-
-    gst_pad_set_active(stream->my_sink, 1);
-    gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    gst_pad_set_active(parser->my_src, 1);
-    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
-    if (ret == GST_STATE_CHANGE_FAILURE)
-    {
-        ERR("Failed to play stream.\n");
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
 static struct wg_parser *wg_parser_create(void)
 {
     struct wg_parser *parser;
@@ -2481,15 +2398,6 @@ static struct wg_parser * CDECL wg_wave_parser_create(void)
     return parser;
 }
 
-static struct wg_parser * CDECL wg_raw_media_converter_create(void)
-{
-    struct wg_parser *parser;
-
-    if ((parser = wg_parser_create()))
-        parser->init_gst = raw_media_converter_init_gst;
-    return parser;
-}
-
 static void CDECL wg_parser_destroy(struct wg_parser *parser)
 {
     if (parser->bus)
@@ -2512,7 +2420,6 @@ static const struct unix_funcs funcs =
     wg_avi_parser_create,
     wg_mpeg_audio_parser_create,
     wg_wave_parser_create,
-    wg_raw_media_converter_create,
     wg_parser_destroy,
 
     wg_parser_connect,
