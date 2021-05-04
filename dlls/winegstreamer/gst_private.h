@@ -203,7 +203,6 @@ struct unix_funcs
     struct wg_parser *(CDECL *wg_avi_parser_create)(void);
     struct wg_parser *(CDECL *wg_mpeg_audio_parser_create)(void);
     struct wg_parser *(CDECL *wg_wave_parser_create)(void);
-    struct wg_parser *(CDECL *wg_raw_media_converter_create)(void);
     void (CDECL *wg_parser_destroy)(struct wg_parser *parser);
 
     HRESULT (CDECL *wg_parser_connect)(struct wg_parser *parser, uint64_t file_size);
