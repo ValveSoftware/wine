@@ -67,9 +67,3 @@ coclass GStreamerByteStreamHandler {}
     uuid(6a170414-aad9-4693-b806-3a0c47c570d6)
 ]
 coclass WINEAudioConverter { }
-
-[
-    threading(both),
-    uuid(62ce7e72-4c71-4d20-b15d-452831a87d9d)
-]
-coclass CMSH264DecoderMFT { }
