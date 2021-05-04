@@ -788,44 +788,6 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
                 goto done;
         }
     }
-    else if (format.major_type == WG_MAJOR_TYPE_AUDIO)
-    {
-        /* Make sure to expose both a F32 and PCM type for the source reader to pick from */
-
-        stream_types = malloc( sizeof(IMFMediaType *) * 2 );
-
-        stream_types[0] = mf_media_type_from_wg_format(&format);
-        if (stream_types[0])
-        {
-            GUID base_subtype;
-            UINT32 sample_rate, channel_count, channel_mask;
-
-            IMFMediaType_GetGUID(stream_types[0], &MF_MT_SUBTYPE, &base_subtype);
-            IMFMediaType_GetUINT32(stream_types[0], &MF_MT_AUDIO_SAMPLES_PER_SECOND, &sample_rate);
-            IMFMediaType_GetUINT32(stream_types[0], &MF_MT_AUDIO_NUM_CHANNELS, &channel_count);
-            IMFMediaType_GetUINT32(stream_types[0], &MF_MT_AUDIO_CHANNEL_MASK, &channel_mask);
-
-            MFCreateMediaType(&stream_types[1]);
-            IMFMediaType_SetGUID(stream_types[1], &MF_MT_MAJOR_TYPE, &MFMediaType_Audio);
-            IMFMediaType_SetUINT32(stream_types[1], &MF_MT_AUDIO_SAMPLES_PER_SECOND, sample_rate);
-            IMFMediaType_SetUINT32(stream_types[1], &MF_MT_AUDIO_NUM_CHANNELS, channel_count);
-            IMFMediaType_SetUINT32(stream_types[1], &MF_MT_AUDIO_CHANNEL_MASK, channel_mask);
-            IMFMediaType_SetUINT32(stream_types[1], &MF_MT_ALL_SAMPLES_INDEPENDENT, TRUE);
-
-            /* regardless of which format is used in the base type, when the non base-type is used
-               we'd be converting either to or from a floating point type, which has 32 bits per sample */
-            IMFMediaType_SetUINT32(stream_types[1], &MF_MT_AUDIO_BITS_PER_SAMPLE, 32);
-            IMFMediaType_SetUINT32(stream_types[1], &MF_MT_AUDIO_BLOCK_ALIGNMENT, channel_count * 32 / 8);
-            IMFMediaType_SetUINT32(stream_types[1], &MF_MT_AUDIO_AVG_BYTES_PER_SECOND, sample_rate * channel_count * 32 / 8);
-
-            if (IsEqualGUID(&base_subtype, &MFAudioFormat_Float))
-                IMFMediaType_SetGUID(stream_types[1], &MF_MT_SUBTYPE, &MFAudioFormat_PCM);
-            else
-                IMFMediaType_SetGUID(stream_types[1], &MF_MT_SUBTYPE, &MFAudioFormat_Float);
-
-            type_count = 2;
-        }
-    }
     else
     {
         stream_type = mf_media_type_from_wg_format(&format);
