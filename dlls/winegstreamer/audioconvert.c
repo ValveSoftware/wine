@@ -35,10 +35,6 @@ struct audio_converter
     IMFMediaType *input_type;
     IMFMediaType *output_type;
     CRITICAL_SECTION cs;
-    BOOL buffer_inflight;
-    LONGLONG buffer_pts, buffer_dur;
-    struct wg_parser *parser;
-    struct wg_parser_stream *stream;
 };
 
 static struct audio_converter *impl_audio_converter_from_IMFTransform(IMFTransform *iface)
@@ -84,10 +80,6 @@ static ULONG WINAPI audio_converter_Release(IMFTransform *iface)
     {
         transform->cs.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&transform->cs);
-        if (transform->stream)
-            unix_funcs->wg_parser_disconnect(transform->parser);
-        if (transform->parser)
-            unix_funcs->wg_parser_destroy(transform->parser);
         free(transform);
     }
 
@@ -280,7 +272,6 @@ fail:
 static HRESULT WINAPI audio_converter_SetInputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
 {
     GUID major_type, subtype;
-    struct wg_format format;
     DWORD unused;
     HRESULT hr;
 
@@ -300,11 +291,6 @@ static HRESULT WINAPI audio_converter_SetInputType(IMFTransform *iface, DWORD id
 
         if (converter->input_type)
         {
-            if (converter->stream)
-            {
-                unix_funcs->wg_parser_disconnect(converter->parser);
-                converter->stream = NULL;
-            }
             IMFMediaType_Release(converter->input_type);
             converter->input_type = NULL;
         }
@@ -331,10 +317,6 @@ static HRESULT WINAPI audio_converter_SetInputType(IMFTransform *iface, DWORD id
     if (!IsEqualGUID(&subtype, &MFAudioFormat_PCM) && !IsEqualGUID(&subtype, &MFAudioFormat_Float))
         return MF_E_INVALIDTYPE;
 
-    mf_media_type_to_wg_format(type, &format);
-    if (!format.major_type)
-        return MF_E_INVALIDTYPE;
-
     if (flags & MFT_SET_TYPE_TEST_ONLY)
         return S_OK;
 
@@ -354,21 +336,6 @@ static HRESULT WINAPI audio_converter_SetInputType(IMFTransform *iface, DWORD id
         converter->input_type = NULL;
     }
 
-    if (converter->stream)
-    {
-        unix_funcs->wg_parser_disconnect(converter->parser);
-        converter->stream = NULL;
-    }
-
-    if (converter->input_type && converter->output_type)
-    {
-        struct wg_format output_format;
-        mf_media_type_to_wg_format(converter->output_type, &output_format);
-
-        if (SUCCEEDED(hr = unix_funcs->wg_parser_connect_unseekable(converter->parser, &format, 1, &output_format, NULL)))
-            converter->stream = unix_funcs->wg_parser_get_stream(converter->parser, 0);
-    }
-
     LeaveCriticalSection(&converter->cs);
 
     return hr;
@@ -378,7 +345,6 @@ static HRESULT WINAPI audio_converter_SetOutputType(IMFTransform *iface, DWORD i
 {
     struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
     GUID major_type, subtype;
-    struct wg_format format;
     DWORD unused;
     HRESULT hr;
 
@@ -386,6 +352,9 @@ static HRESULT WINAPI audio_converter_SetOutputType(IMFTransform *iface, DWORD i
 
     if (id != 0)
         return MF_E_INVALIDSTREAMNUMBER;
+
+    if (!converter->input_type)
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
 
     if (!type)
     {
@@ -396,11 +365,6 @@ static HRESULT WINAPI audio_converter_SetOutputType(IMFTransform *iface, DWORD i
 
         if (converter->output_type)
         {
-            if (converter->stream)
-            {
-                unix_funcs->wg_parser_disconnect(converter->parser);
-                converter->stream = NULL;
-            }
             IMFMediaType_Release(converter->output_type);
             converter->output_type = NULL;
         }
@@ -427,10 +391,6 @@ static HRESULT WINAPI audio_converter_SetOutputType(IMFTransform *iface, DWORD i
     if (!IsEqualGUID(&subtype, &MFAudioFormat_PCM) && !IsEqualGUID(&subtype, &MFAudioFormat_Float))
         return MF_E_INVALIDTYPE;
 
-    mf_media_type_to_wg_format(type, &format);
-    if (!format.major_type)
-        return MF_E_INVALIDTYPE;
-
     if (flags & MFT_SET_TYPE_TEST_ONLY)
         return S_OK;
 
@@ -448,21 +408,6 @@ static HRESULT WINAPI audio_converter_SetOutputType(IMFTransform *iface, DWORD i
     {
         IMFMediaType_Release(converter->output_type);
         converter->output_type = NULL;
-    }
-
-    if (converter->stream)
-    {
-        unix_funcs->wg_parser_disconnect(converter->parser);
-        converter->stream = NULL;
-    }
-
-    if (converter->input_type && converter->output_type)
-    {
-        struct wg_format input_format;
-        mf_media_type_to_wg_format(converter->input_type, &input_format);
-
-        if (SUCCEEDED(hr = unix_funcs->wg_parser_connect_unseekable(converter->parser, &input_format, 1, &format, NULL)))
-            converter->stream = unix_funcs->wg_parser_get_stream(converter->parser, 0);
     }
 
     LeaveCriticalSection(&converter->cs);
@@ -576,221 +521,17 @@ static HRESULT WINAPI audio_converter_ProcessMessage(IMFTransform *iface, MFT_ME
 
 static HRESULT WINAPI audio_converter_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
 {
-    struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
-    IMFMediaBuffer *buffer = NULL;
-    unsigned char *buffer_data;
-    DWORD buffer_size;
-    uint64_t offset;
-    uint32_t size;
-    void *data;
-    HRESULT hr;
+    FIXME("%p, %u, %p, %#x.\n", iface, id, sample, flags);
 
-    TRACE("%p, %u, %p, %#x.\n", iface, id, sample, flags);
-
-    if (flags)
-        WARN("Unsupported flags %#x.\n", flags);
-
-    if (id != 0)
-        return MF_E_INVALIDSTREAMNUMBER;
-
-    EnterCriticalSection(&converter->cs);
-
-    if (!converter->stream)
-    {
-        hr = MF_E_TRANSFORM_TYPE_NOT_SET;
-        goto done;
-    }
-
-    if (converter->buffer_inflight)
-    {
-        hr = MF_E_NOTACCEPTING;
-        goto done;
-    }
-
-    if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(sample, &buffer)))
-        goto done;
-
-    if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &buffer_data, NULL, &buffer_size)))
-        goto done;
-
-    for (;;)
-    {
-        if (!unix_funcs->wg_parser_get_read_request(converter->parser, &data, &offset, &size))
-            continue;
-
-        memcpy(data, buffer_data, min(buffer_size, size));
-
-        unix_funcs->wg_parser_complete_read_request(converter->parser, WG_READ_SUCCESS, buffer_size);
-
-        if (buffer_size <= size)
-            break;
-
-        buffer_data += size;
-        buffer_size -= size;
-    }
-
-    IMFMediaBuffer_Unlock(buffer);
-    converter->buffer_inflight = TRUE;
-    if (FAILED(IMFSample_GetSampleTime(sample, &converter->buffer_pts)))
-        converter->buffer_pts = -1;
-    if (FAILED(IMFSample_GetSampleDuration(sample, &converter->buffer_dur)))
-        converter->buffer_dur = -1;
-
-done:
-    if (buffer)
-        IMFMediaBuffer_Release(buffer);
-    LeaveCriticalSection(&converter->cs);
-    return hr;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
         MFT_OUTPUT_DATA_BUFFER *samples, DWORD *status)
 {
-    struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
-    IMFSample *allocated_sample = NULL;
-    IMFMediaBuffer *buffer = NULL;
-    struct wg_parser_event event;
-    unsigned char *buffer_data;
-    DWORD buffer_len;
-    HRESULT hr = S_OK;
+    FIXME("%p, %#x, %u, %p, %p.\n", iface, flags, count, samples, status);
 
-    TRACE("%p, %#x, %u, %p, %p.\n", iface, flags, count, samples, status);
-
-    if (flags)
-        WARN("Unsupported flags %#x.\n", flags);
-
-    if (!count)
-        return S_OK;
-
-    if (count != 1)
-        return MF_E_INVALIDSTREAMNUMBER;
-
-    if (samples[0].dwStreamID != 0)
-        return MF_E_INVALIDSTREAMNUMBER;
-
-    EnterCriticalSection(&converter->cs);
-
-    if (!converter->stream)
-    {
-        hr = MF_E_TRANSFORM_TYPE_NOT_SET;
-        goto done;
-    }
-
-    if (!converter->buffer_inflight)
-    {
-        hr = MF_E_TRANSFORM_NEED_MORE_INPUT;
-        goto done;
-    }
-
-    for (;;)
-    {
-        unix_funcs->wg_parser_stream_get_event(converter->stream, &event);
-
-        switch (event.type)
-        {
-            case WG_PARSER_EVENT_BUFFER:
-                break;
-
-            case WG_PARSER_EVENT_SEGMENT:
-                continue;
-
-            default:
-                WARN("Unexpected event, %u\n", event.type);
-                continue;
-        }
-        break;
-    }
-
-    if (!samples[0].pSample)
-    {
-        if (FAILED(hr = MFCreateMemoryBuffer(event.u.buffer.size, &buffer)))
-        {
-            ERR("Failed to create buffer, hr %#x.\n", hr);
-            goto done;
-        }
-
-        if (FAILED(hr = MFCreateSample(&allocated_sample)))
-        {
-            ERR("Failed to create sample, hr %#x.\n", hr);
-            goto done;
-        }
-
-        samples[0].pSample = allocated_sample;
-
-        if (FAILED(hr = IMFSample_AddBuffer(samples[0].pSample, buffer)))
-        {
-            ERR("Failed to add buffer, hr %#x.\n", hr);
-            goto done;
-        }
-
-        IMFMediaBuffer_Release(buffer);
-        buffer = NULL;
-    }
-
-    if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(samples[0].pSample, &buffer)))
-    {
-        ERR("Failed to get buffer from sample, hr %#x.\n", hr);
-        goto done;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_GetMaxLength(buffer, &buffer_len)))
-    {
-        ERR("Failed to get buffer size, hr %#x.\n", hr);
-        goto done;
-    }
-
-    if (buffer_len < event.u.buffer.size)
-    {
-        WARN("Client's buffer is smaller (%u bytes) than the output sample (%u bytes)\n",
-            buffer_len, event.u.buffer.size);
-
-        hr = MF_E_BUFFERTOOSMALL;
-        goto done;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event.u.buffer.size)))
-    {
-        ERR("Failed to set size, hr %#x.\n", hr);
-        goto done;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &buffer_data, NULL, NULL)))
-    {
-        ERR("Failed to lock buffer hr %#x.\n", hr);
-        goto done;
-    }
-
-    if (!unix_funcs->wg_parser_stream_copy_buffer(converter->stream, buffer_data, 0, event.u.buffer.size))
-    {
-        ERR("Failed to copy buffer.\n");
-        IMFMediaBuffer_Unlock(buffer);
-        hr = E_FAIL;
-        goto done;
-    }
-
-    IMFMediaBuffer_Unlock(buffer);
-
-    unix_funcs->wg_parser_stream_release_buffer(converter->stream);
-    converter->buffer_inflight = FALSE;
-
-    if (converter->buffer_pts != -1)
-        IMFSample_SetSampleTime(samples[0].pSample, converter->buffer_pts);
-    if (converter->buffer_dur != -1)
-        IMFSample_SetSampleDuration(samples[0].pSample, converter->buffer_dur);
-
-    samples[0].dwStatus = 0;
-    samples[0].pEvents = NULL;
-
-    done:
-    if (buffer)
-        IMFMediaBuffer_Release(buffer);
-    if (allocated_sample && FAILED(hr))
-    {
-        IMFSample_Release(allocated_sample);
-        samples[0].pSample = NULL;
-    }
-    LeaveCriticalSection(&converter->cs);
-    return hr;
+    return E_NOTIMPL;
 }
 
 static const IMFTransformVtbl audio_converter_vtbl =
@@ -837,13 +578,6 @@ HRESULT audio_converter_create(REFIID riid, void **ret)
 
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": audio_converter_lock");
-
-    if (!(object->parser = unix_funcs->wg_raw_media_converter_create()))
-    {
-        ERR("Failed to create audio converter due to GStreamer error.\n");
-        IMFTransform_Release(&object->IMFTransform_iface);
-        return E_OUTOFMEMORY;
-    }
 
     *ret = &object->IMFTransform_iface;
     return S_OK;
