@@ -1695,9 +1695,9 @@ static void *push_data(void *arg)
         ULONG size;
         int ret;
 
-        if (parser->seekable && parser->next_offset >= max_size)
+        if (parser->next_offset >= max_size)
             break;
-        size = parser->seekable ? min(alloc_size, max_size - parser->next_offset) : alloc_size;
+        size = min(alloc_size, max_size - parser->next_offset);
 
         ret = pull_data(parser, parser->next_offset, size, &size, &buffer);
 
