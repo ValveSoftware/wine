@@ -39,7 +39,6 @@ struct audio_converter
     LONGLONG buffer_pts, buffer_dur;
     struct wg_parser *parser;
     struct wg_parser_stream *stream;
-    IMFAttributes *attributes, *output_attributes;
 };
 
 static struct audio_converter *impl_audio_converter_from_IMFTransform(IMFTransform *iface)
@@ -85,10 +84,6 @@ static ULONG WINAPI audio_converter_Release(IMFTransform *iface)
     {
         transform->cs.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&transform->cs);
-        if (transform->attributes)
-            IMFAttributes_Release(transform->attributes);
-        if (transform->output_attributes)
-            IMFAttributes_Release(transform->output_attributes);
         if (transform->stream)
             unix_funcs->wg_parser_disconnect(transform->parser);
         if (transform->parser)
@@ -176,14 +171,9 @@ static HRESULT WINAPI audio_converter_GetOutputStreamInfo(IMFTransform *iface, D
 
 static HRESULT WINAPI audio_converter_GetAttributes(IMFTransform *iface, IMFAttributes **attributes)
 {
-    struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
+    FIXME("%p, %p.\n", iface, attributes);
 
-    TRACE("%p, %p.\n", iface, attributes);
-
-    *attributes = converter->attributes;
-    IMFAttributes_AddRef(*attributes);
-
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI audio_converter_GetInputStreamAttributes(IMFTransform *iface, DWORD id,
@@ -197,17 +187,9 @@ static HRESULT WINAPI audio_converter_GetInputStreamAttributes(IMFTransform *ifa
 static HRESULT WINAPI audio_converter_GetOutputStreamAttributes(IMFTransform *iface, DWORD id,
         IMFAttributes **attributes)
 {
-    struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
+    FIXME("%p, %u, %p.\n", iface, id, attributes);
 
-    TRACE("%p, %u, %p.\n", iface, id, attributes);
-
-    if (id != 0)
-        return MF_E_INVALIDSTREAMNUMBER;
-
-    *attributes = converter->output_attributes;
-    IMFAttributes_AddRef(*attributes);
-
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI audio_converter_DeleteInputStream(IMFTransform *iface, DWORD id)
@@ -878,7 +860,6 @@ static const IMFTransformVtbl audio_converter_vtbl =
 HRESULT audio_converter_create(REFIID riid, void **ret)
 {
     struct audio_converter *object;
-    HRESULT hr;
 
     TRACE("%s %p\n", debugstr_guid(riid), ret);
 
@@ -890,18 +871,6 @@ HRESULT audio_converter_create(REFIID riid, void **ret)
 
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": audio_converter_lock");
-
-    if (FAILED(hr = MFCreateAttributes(&object->attributes, 0)))
-    {
-        IMFTransform_Release(&object->IMFTransform_iface);
-        return hr;
-    }
-
-    if (FAILED(hr = MFCreateAttributes(&object->output_attributes, 0)))
-    {
-        IMFTransform_Release(&object->IMFTransform_iface);
-        return hr;
-    }
 
     if (!(object->parser = unix_funcs->wg_raw_media_converter_create()))
     {
