@@ -2594,6 +2594,56 @@ static void test_IsProcessInJob(void)
 
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
+
+    ret = pAssignProcessToJobObject(job, GetCurrentProcess());
+    ok(ret, "AssignProcessToJobObject error %u\n", GetLastError());
+
+    create_process("wait", &pi);
+
+    ret = pAssignProcessToJobObject(job, pi.hProcess);
+    ok(ret, "AssignProcessToJobObject error %u\n", GetLastError());
+    ret = pAssignProcessToJobObject(job2, pi.hProcess);
+    ok(ret, "AssignProcessToJobObject error %u\n", GetLastError());
+
+    out = FALSE;
+    ret = pIsProcessInJob(pi.hProcess, NULL, &out);
+    ok(ret, "IsProcessInJob error %u\n", GetLastError());
+    ok(out, "IsProcessInJob returned out=%u\n", out);
+
+    out = FALSE;
+    ret = pIsProcessInJob(pi.hProcess, job, &out);
+    ok(ret, "IsProcessInJob error %u\n", GetLastError());
+    ok(out, "IsProcessInJob returned out=%u\n", out);
+
+    out = FALSE;
+    ret = pIsProcessInJob(pi.hProcess, job2, &out);
+    ok(ret, "IsProcessInJob error %u\n", GetLastError());
+    ok(out, "IsProcessInJob returned out=%u\n", out);
+
+    TerminateProcess(pi.hProcess, 0);
+    wait_child_process(pi.hProcess);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    ret = pAssignProcessToJobObject(job2, GetCurrentProcess());
+    ok(ret, "AssignProcessToJobObject error %u\n", GetLastError());
+
+    create_process("wait", &pi);
+    out = FALSE;
+    ret = pIsProcessInJob(pi.hProcess, job, &out);
+    ok(ret, "IsProcessInJob error %u\n", GetLastError());
+    ok(out, "IsProcessInJob returned out=%u\n", out);
+
+    out = FALSE;
+    ret = pIsProcessInJob(pi.hProcess, job2, &out);
+    ok(ret, "IsProcessInJob error %u\n", GetLastError());
+    ok(out, "IsProcessInJob returned out=%u\n", out);
+
+    TerminateProcess(pi.hProcess, 0);
+    wait_child_process(pi.hProcess);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
     CloseHandle(job);
     CloseHandle(job2);
 }
