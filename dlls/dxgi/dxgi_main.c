@@ -56,6 +56,18 @@ BOOL WINAPI DllMain(HINSTANCE inst, DWORD reason, void *reserved)
     return TRUE;
 }
 
+static BOOL is_re8(void)
+{
+    static int status = -1;
+
+    if(status < 0){
+        const char *sgi = getenv("SteamGameId");
+        status = sgi && !strcmp(sgi, "1196590");
+    }
+
+    return status != 0;
+}
+
 HRESULT WINAPI CreateDXGIFactory2(UINT flags, REFIID iid, void **factory)
 {
     TRACE("flags %#x, iid %s, factory %p.\n", flags, debugstr_guid(iid), factory);
@@ -69,6 +81,9 @@ HRESULT WINAPI CreateDXGIFactory2(UINT flags, REFIID iid, void **factory)
 HRESULT WINAPI CreateDXGIFactory1(REFIID iid, void **factory)
 {
     TRACE("iid %s, factory %p.\n", debugstr_guid(iid), factory);
+
+    if(is_re8())
+        return get_re8_dxgi_factory(iid, factory);
 
     return dxgi_factory_create(iid, factory, TRUE);
 }
