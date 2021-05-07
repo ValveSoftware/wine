@@ -209,4 +209,6 @@ struct dxgi_surface
 HRESULT dxgi_surface_init(struct dxgi_surface *surface, IDXGIDevice *device,
         IUnknown *outer, struct wined3d_texture *wined3d_texture) DECLSPEC_HIDDEN;
 
+HRESULT get_re8_dxgi_factory(REFIID riid, void **factory) DECLSPEC_HIDDEN;
+
 #endif /* __WINE_DXGI_PRIVATE_H */
