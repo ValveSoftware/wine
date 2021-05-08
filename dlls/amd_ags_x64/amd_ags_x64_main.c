@@ -25,6 +25,7 @@ enum amd_ags_version
     AMD_AGS_VERSION_5_3_0,
     AMD_AGS_VERSION_5_4_0,
     AMD_AGS_VERSION_5_4_1,
+    AMD_AGS_VERSION_5_4_2,
 
     AMD_AGS_VERSION_COUNT
 };
@@ -44,17 +45,18 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
     {5, 3, 0, sizeof(AGSDeviceInfo_520)},
     {5, 4, 0, sizeof(AGSDeviceInfo_540)},
     {5, 4, 1, sizeof(AGSDeviceInfo_541)},
+    {5, 4, 2, sizeof(AGSDeviceInfo_542)},
 };
 
 #define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name)}}
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name)}}
 #define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), -1, \
-        -1}}
+        -1, -1}}
 #define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, \
         -1, -1, offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name)}}
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name)}}
 
 #define DEVICE_FIELD_adapterString 0
 #define DEVICE_FIELD_architectureVersion 1
