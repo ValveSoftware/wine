@@ -34,6 +34,13 @@
 /// \endinternal
 ///
 /// ---------------------------------------
+/// What's new in AGS 5.4.2 since version 5.4.1
+/// ---------------------------------------
+/// AGS 5.4.2 includes the following updates:
+/// * sharedMemoryInBytes has been reinstated.
+/// * Clock speed returned for APUs.
+///
+/// ---------------------------------------
 /// What's new in AGS 5.4.1 since version 5.4.0
 /// ---------------------------------------
 /// AGS 5.4.1 includes the following updates:
@@ -130,7 +137,7 @@
 
 #define AMD_AGS_VERSION_MAJOR 5             ///< AGS major version
 #define AMD_AGS_VERSION_MINOR 4             ///< AGS minor version
-#define AMD_AGS_VERSION_PATCH 1             ///< AGS patch version
+#define AMD_AGS_VERSION_PATCH 2             ///< AGS patch version
 
 #ifdef __cplusplus
 extern "C" {
@@ -497,6 +504,43 @@ typedef struct AGSDeviceInfo_541
 
     int                             adlAdapterIndex;                ///< Internally used index into the ADL list of adapters
 } AGSDeviceInfo_541;
+
+/// The device info struct used to describe a physical GPU enumerated by AGS
+typedef struct AGSDeviceInfo_542
+{
+    const char*                     adapterString;                  ///< The adapter name string
+    AsicFamily                      asicFamily;                     ///< Set to Unknown if not AMD hardware
+    int                             isAPU;                          ///< Whether or not this is an APU
+    int                             vendorId;                       ///< The vendor id
+    int                             deviceId;                       ///< The device id
+    int                             revisionId;                     ///< The revision id
+
+    int                             numCUs;                         ///< Number of compute units.
+    int                             numWGPs;                        ///< Number of RDNA Work Group Processors.  Only valid if ASIC is RDNA onwards.
+
+    int                             numROPs;                        ///< Number of ROPs
+    int                             coreClock;                      ///< Core clock speed at 100% power in MHz
+    int                             memoryClock;                    ///< Memory clock speed at 100% power in MHz
+    int                             memoryBandwidth;                ///< Memory bandwidth in MB/s
+    float                           teraFlops;                      ///< Teraflops of GPU. Zero if not GCN onwards. Calculated from iCoreClock * iNumCUs * 64 Pixels/clk * 2 instructions/MAD
+
+    int                             isPrimaryDevice;                ///< Whether or not this is the primary adapter in the system. Not set on the WACK version.
+    unsigned long long              localMemoryInBytes;             ///< The size of local memory in bytes. 0 for non AMD hardware.
+    unsigned long long              sharedMemoryInBytes;            ///< The size of system memory available to the GPU in bytes.  It is important to factor this into your VRAM budget for APUs
+                                                                    ///< as the reported local memory will only be a small fraction of the total memory available to the GPU.
+
+    int                             numDisplays;                    ///< The number of active displays found to be attached to this adapter.
+    AGSDisplayInfo*                 displays;                       ///< List of displays allocated by AGS to be numDisplays in length.
+
+    int                             eyefinityEnabled;               ///< Indicates if Eyefinity is active
+    int                             eyefinityGridWidth;             ///< Contains width of the multi-monitor grid that makes up the Eyefinity Single Large Surface.
+    int                             eyefinityGridHeight;            ///< Contains height of the multi-monitor grid that makes up the Eyefinity Single Large Surface.
+    int                             eyefinityResolutionX;           ///< Contains width in pixels of the multi-monitor Single Large Surface.
+    int                             eyefinityResolutionY;           ///< Contains height in pixels of the multi-monitor Single Large Surface.
+    int                             eyefinityBezelCompensated;      ///< Indicates if bezel compensation is used for the current SLS display area. 1 if enabled, and 0 if disabled.
+
+    int                             adlAdapterIndex;                ///< Internally used index into the ADL list of adapters
+} AGSDeviceInfo_542;
 
 struct AGSDeviceInfo;
 
