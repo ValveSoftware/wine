@@ -9,6 +9,7 @@
 
 #include "wine/vulkan.h"
 
+#define COBJMACROS
 #include "d3d11.h"
 #include "d3d12.h"
 
@@ -533,6 +534,20 @@ AGSReturnCode WINAPI agsDriverExtensionsDX12_CreateDevice(AGSContext *context,
     }
 
     TRACE("Created d3d12 device %p.\n", returned_params->pDevice);
+
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX12_DestroyDevice(AGSContext* context, ID3D12Device* device, unsigned int* device_refs)
+{
+    ULONG ref_count;
+
+    if (!device)
+        return AGS_SUCCESS;
+
+    ref_count = ID3D12Device_Release(device);
+    if (device_refs)
+        *device_refs = (unsigned int)ref_count;
 
     return AGS_SUCCESS;
 }
