@@ -1,4 +1,5 @@
 @ stdcall agsDeInit(ptr)
+@ stdcall agsDeInitialize(ptr)
 @ stdcall agsCheckDriverVersion(ptr long)
 @ stub agsDriverExtensionsDX11_BeginUAVOverlap
 @ stub agsDriverExtensionsDX11_CreateBuffer
@@ -38,5 +39,7 @@
 @ stub agsDriverExtensionsDX12_PushMarker
 @ stub agsDriverExtensionsDX12_SetMarker
 @ stdcall agsGetCrossfireGPUCount(ptr ptr)
+@ stdcall agsGetVersionNumber()
 @ stdcall agsInit(ptr ptr ptr)
+@ stdcall agsInitialize(long ptr ptr ptr)
 @ stub agsSetDisplayMode

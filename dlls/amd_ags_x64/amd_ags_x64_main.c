@@ -26,6 +26,7 @@ enum amd_ags_version
     AMD_AGS_VERSION_5_4_0,
     AMD_AGS_VERSION_5_4_1,
     AMD_AGS_VERSION_5_4_2,
+    AMD_AGS_VERSION_6_0_0,
 
     AMD_AGS_VERSION_COUNT
 };
@@ -46,17 +47,21 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
     {5, 4, 0, sizeof(AGSDeviceInfo_540)},
     {5, 4, 1, sizeof(AGSDeviceInfo_541)},
     {5, 4, 2, sizeof(AGSDeviceInfo_542)},
+    {6, 0, 0, sizeof(AGSDeviceInfo_600)},
 };
 
 #define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name)}}
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name)}}
 #define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), -1, \
-        -1, -1}}
+        -1, -1, -1}}
 #define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, \
         -1, -1, offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name)}}
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name)}}
+#define DEF_FIELD_600_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
+        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), -1}}
 
 #define DEVICE_FIELD_adapterString 0
 #define DEVICE_FIELD_architectureVersion 1
@@ -80,7 +85,7 @@ device_struct_fields[] =
     DEF_FIELD_540_UP(asicFamily),
     DEF_FIELD(vendorId),
     DEF_FIELD(deviceId),
-    DEF_FIELD(isPrimaryDevice),
+    DEF_FIELD_600_BELOW(isPrimaryDevice),
     DEF_FIELD(localMemoryInBytes),
     DEF_FIELD(numDisplays),
     DEF_FIELD(displays),
@@ -263,20 +268,20 @@ done:
     return ret;
 }
 
-struct monitor_enum_context
+struct monitor_enum_context_511
 {
     const char *adapter_name;
-    AGSDisplayInfo **ret_displays;
+    AGSDisplayInfo_511 **ret_displays;
     int *ret_display_count;
 };
 
-static BOOL WINAPI monitor_enum_proc(HMONITOR hmonitor, HDC hdc, RECT *rect, LPARAM context)
+static BOOL WINAPI monitor_enum_proc_511(HMONITOR hmonitor, HDC hdc, RECT *rect, LPARAM context)
 {
-    struct monitor_enum_context *c = (struct monitor_enum_context *)context;
+    struct monitor_enum_context_511 *c = (struct monitor_enum_context_511 *)context;
     MONITORINFOEXA monitor_info;
-    AGSDisplayInfo *new_alloc;
+    AGSDisplayInfo_511 *new_alloc;
     DISPLAY_DEVICEA device;
-    AGSDisplayInfo *info;
+    AGSDisplayInfo_511 *info;
     unsigned int i, mode;
     DEVMODEA dev_mode;
 
@@ -360,9 +365,10 @@ static BOOL WINAPI monitor_enum_proc(HMONITOR hmonitor, HDC hdc, RECT *rect, LPA
     return TRUE;
 }
 
-static void init_device_displays(const char *adapter_name, AGSDisplayInfo **ret_displays, int *ret_display_count)
+
+static void init_device_displays_511(const char *adapter_name, AGSDisplayInfo_511 **ret_displays, int *ret_display_count)
 {
-    struct monitor_enum_context context;
+    struct monitor_enum_context_511 context;
 
     TRACE("adapter_name %s.\n", debugstr_a(adapter_name));
 
@@ -370,8 +376,119 @@ static void init_device_displays(const char *adapter_name, AGSDisplayInfo **ret_
     context.ret_displays = ret_displays;
     context.ret_display_count = ret_display_count;
 
-    EnumDisplayMonitors(NULL, NULL, monitor_enum_proc, (LPARAM)&context);
+    EnumDisplayMonitors(NULL, NULL, monitor_enum_proc_511, (LPARAM)&context);
 }
+
+struct monitor_enum_context_600
+{
+    const char *adapter_name;
+    AGSDisplayInfo_600 **ret_displays;
+    int *ret_display_count;
+};
+
+static BOOL WINAPI monitor_enum_proc_600(HMONITOR hmonitor, HDC hdc, RECT *rect, LPARAM context)
+{
+    struct monitor_enum_context_600 *c = (struct monitor_enum_context_600 *)context;
+    MONITORINFOEXA monitor_info;
+    AGSDisplayInfo_600 *new_alloc;
+    DISPLAY_DEVICEA device;
+    AGSDisplayInfo_600 *info;
+    unsigned int i, mode;
+    DEVMODEA dev_mode;
+
+
+    monitor_info.cbSize = sizeof(monitor_info);
+    GetMonitorInfoA(hmonitor, (MONITORINFO *)&monitor_info);
+    TRACE("monitor_info.szDevice %s.\n", debugstr_a(monitor_info.szDevice));
+
+    device.cb = sizeof(device);
+    i = 0;
+    while (EnumDisplayDevicesA(NULL, i, &device, 0))
+    {
+        TRACE("device.DeviceName %s, device.DeviceString %s.\n", debugstr_a(device.DeviceName), debugstr_a(device.DeviceString));
+        ++i;
+        if (strcmp(device.DeviceString, c->adapter_name) || strcmp(device.DeviceName, monitor_info.szDevice))
+            continue;
+
+        if (*c->ret_display_count)
+        {
+            if (!(new_alloc = heap_realloc(*c->ret_displays, sizeof(*new_alloc) * (*c->ret_display_count + 1))))
+            {
+                ERR("No memory.");
+                return FALSE;
+            }
+            *c->ret_displays = new_alloc;
+        }
+        else if (!(*c->ret_displays = heap_alloc(sizeof(**c->ret_displays))))
+        {
+            ERR("No memory.");
+            return FALSE;
+        }
+        info = &(*c->ret_displays)[*c->ret_display_count];
+        memset(info, 0, sizeof(*info));
+        strcpy(info->displayDeviceName, device.DeviceName);
+        if (EnumDisplayDevicesA(info->displayDeviceName, 0, &device, 0))
+        {
+            strcpy(info->name, device.DeviceString);
+        }
+        else
+        {
+            ERR("Could not get monitor name for device %s.\n", debugstr_a(info->displayDeviceName));
+            strcpy(info->name, "Unknown");
+        }
+        if (monitor_info.dwFlags & MONITORINFOF_PRIMARY)
+            info->isPrimaryDisplay = 1;
+
+        mode = 0;
+        memset(&dev_mode, 0, sizeof(dev_mode));
+        dev_mode.dmSize = sizeof(dev_mode);
+        while (EnumDisplaySettingsExA(monitor_info.szDevice, mode, &dev_mode, EDS_RAWMODE))
+        {
+            ++mode;
+            if (dev_mode.dmPelsWidth > info->maxResolutionX)
+                info->maxResolutionX = dev_mode.dmPelsWidth;
+            if (dev_mode.dmPelsHeight > info->maxResolutionY)
+                info->maxResolutionY = dev_mode.dmPelsHeight;
+            if (dev_mode.dmDisplayFrequency > info->maxRefreshRate)
+                info->maxRefreshRate = dev_mode.dmDisplayFrequency;
+            memset(&dev_mode, 0, sizeof(dev_mode));
+            dev_mode.dmSize = sizeof(dev_mode);
+        }
+
+        info->currentResolution.offsetX = monitor_info.rcMonitor.left;
+        info->currentResolution.offsetY = monitor_info.rcMonitor.top;
+        info->currentResolution.width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+        info->currentResolution.height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+        info->visibleResolution = info->currentResolution;
+
+        memset(&dev_mode, 0, sizeof(dev_mode));
+        dev_mode.dmSize = sizeof(dev_mode);
+
+        if (EnumDisplaySettingsExA(monitor_info.szDevice, ENUM_CURRENT_SETTINGS, &dev_mode, EDS_RAWMODE))
+            info->currentRefreshRate = dev_mode.dmDisplayFrequency;
+        else
+            ERR("Could not get current display settings.\n");
+        ++*c->ret_display_count;
+
+        TRACE("Added display %s for %s.\n", debugstr_a(monitor_info.szDevice), debugstr_a(c->adapter_name));
+    }
+
+    return TRUE;
+}
+
+static void init_device_displays_600(const char *adapter_name, AGSDisplayInfo_600 **ret_displays, int *ret_display_count)
+{
+    struct monitor_enum_context_600 context;
+
+    TRACE("adapter_name %s.\n", debugstr_a(adapter_name));
+
+    context.adapter_name = adapter_name;
+    context.ret_displays = ret_displays;
+    context.ret_display_count = ret_display_count;
+
+    EnumDisplayMonitors(NULL, NULL, monitor_enum_proc_600, (LPARAM)&context);
+}
+
 
 static AGSReturnCode init_ags_context(AGSContext *context)
 {
@@ -427,11 +544,31 @@ static AGSReturnCode init_ags_context(AGSContext *context)
         }
         SET_DEVICE_FIELD(device, localMemoryInBytes, ULONG64, context->version, local_memory_size);
         if (!i)
-            SET_DEVICE_FIELD(device, isPrimaryDevice, int, context->version, 1);
+        {
+            if (context->version >= AMD_AGS_VERSION_6_0_0)
+            {
+                // This is a bitfield now... Nice...
+                struct AGSDeviceInfo_600 *device_600 = (struct AGSDeviceInfo_600 *)device;
+                device_600->isPrimaryDevice = 1;
+            }
+            else
+            {
+                SET_DEVICE_FIELD(device, isPrimaryDevice, int, context->version, 1);
+            }   
+        }
 
-        init_device_displays(vk_properties->deviceName,
-                GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo *, context->version),
-                GET_DEVICE_FIELD_ADDR(device, numDisplays, int, context->version));
+        if (context->version >= AMD_AGS_VERSION_6_0_0)
+        {
+            init_device_displays_600(vk_properties->deviceName,
+                    GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo_600 *, context->version),
+                    GET_DEVICE_FIELD_ADDR(device, numDisplays, int, context->version));
+        }
+        else
+        {
+            init_device_displays_511(vk_properties->deviceName,
+                    GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo_511 *, context->version),
+                    GET_DEVICE_FIELD_ADDR(device, numDisplays, int, context->version));
+        }
 
         device += amd_ags_info[context->version].device_size;
     }
@@ -439,7 +576,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
     return AGS_SUCCESS;
 }
 
-AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *config, AGSGPUInfo *gpu_info)
+AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *config, AGSGPUInfo_511 *gpu_info)
 {
     struct AGSContext *object;
     AGSReturnCode ret;
@@ -477,7 +614,47 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsInitialize(int ags_version, const AGSConfiguration *config, AGSContext **context, AGSGPUInfo_600 *gpu_info)
+{
+    struct AGSContext *object;
+    AGSReturnCode ret;
+
+    TRACE("ags_verison %d, context %p, config %p, gpu_info %p.\n", ags_version, context, config, gpu_info);
+
+    if (!context || !gpu_info)
+        return AGS_INVALID_ARGS;
+
+    if (config)
+        FIXME("Ignoring config %p.\n", config);
+
+    if (!(object = heap_alloc(sizeof(*object))))
+        return AGS_OUT_OF_MEMORY;
+
+    if ((ret = init_ags_context(object)) != AGS_SUCCESS)
+    {
+        heap_free(object);
+        return ret;
+    }
+
+    memset(gpu_info, 0, sizeof(*gpu_info));
+    gpu_info->driverVersion = "20.50.03.05-210326a-365573E-RadeonSoftwareAdrenalin2020";
+    gpu_info->radeonSoftwareVersion  = "21.3.2";
+    gpu_info->numDevices = object->device_count;
+    gpu_info->devices = object->devices;
+
+    TRACE("Created context %p.\n", object);
+
+    *context = object;
+
+    return AGS_SUCCESS;
+}
+
 AGSReturnCode WINAPI agsDeInit(AGSContext *context)
+{
+    return agsDeInitialize(context);
+}
+
+AGSReturnCode WINAPI agsDeInitialize(AGSContext *context)
 {
     unsigned int i;
     BYTE *device;
@@ -491,7 +668,7 @@ AGSReturnCode WINAPI agsDeInit(AGSContext *context)
         device = (BYTE *)context->devices;
         for (i = 0; i < context->device_count; ++i)
         {
-            heap_free(*GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo *, context->version));
+            heap_free(*GET_DEVICE_FIELD_ADDR(device, displays, void *, context->version));
             device += amd_ags_info[context->version].device_size;
         }
         heap_free(context->devices);
@@ -559,6 +736,15 @@ AGSDriverVersionResult WINAPI agsCheckDriverVersion(const char* version_reported
     FIXME("version_reported %s, version_required %d semi-stub.\n", debugstr_a(version_reported), version_required);
 
     return AGS_SOFTWAREVERSIONCHECK_OK;
+}
+
+int WINAPI agsGetVersionNumber(void)
+{
+    enum amd_ags_version version = determine_ags_version();
+
+    TRACE("version %d.\n", version);
+
+    return AGS_MAKE_VERSION(amd_ags_info[version].major, amd_ags_info[version].minor, amd_ags_info[version].patch);
 }
 
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
