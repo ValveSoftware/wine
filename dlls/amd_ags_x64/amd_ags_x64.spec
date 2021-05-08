@@ -32,7 +32,7 @@
 @ stub agsDriverExtensionsDX12_CreateFromDevice
 @ stub agsDriverExtensionsDX12_DeInit
 @ stub agsDriverExtensionsDX12_Destroy
-@ stub agsDriverExtensionsDX12_DestroyDevice
+@ stdcall agsDriverExtensionsDX12_DestroyDevice(ptr ptr ptr)
 @ stub agsDriverExtensionsDX12_Init
 @ stub agsDriverExtensionsDX12_PopMarker
 @ stub agsDriverExtensionsDX12_PushMarker
