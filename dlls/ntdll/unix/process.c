@@ -683,6 +683,11 @@ void DECLSPEC_NORETURN exec_process( NTSTATUS status )
         fchdir( unixdir );
         do
         {
+            SERVER_START_REQ( prevent_kill )
+            {
+                wine_server_call( req );
+            }
+            SERVER_END_REQ;
             status = exec_wineloader( argv, socketfd[0], &pe_info );
         }
 #ifdef __APPLE__

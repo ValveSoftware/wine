@@ -3832,3 +3832,6 @@ enum fsync_type
 @REPLY
     unsigned int shm_idx;
 @END
+
+@REQ(prevent_kill)
+@END

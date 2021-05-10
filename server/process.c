@@ -1835,3 +1835,8 @@ DECL_HANDLER(list_processes)
         }
     }
 }
+
+DECL_HANDLER(prevent_kill)
+{
+    current->process->unix_pid = -1;
+}

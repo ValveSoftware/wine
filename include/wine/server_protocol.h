@@ -5588,6 +5588,16 @@ struct get_fsync_apc_idx_reply
     char __pad_12[4];
 };
 
+struct prevent_kill_request
+{
+    struct request_header __header;
+    char __pad_12[4];
+};
+struct prevent_kill_reply
+{
+    struct reply_header __header;
+};
+
 
 enum request
 {
@@ -5875,6 +5885,7 @@ enum request
     REQ_get_fsync_idx,
     REQ_fsync_msgwait,
     REQ_get_fsync_apc_idx,
+    REQ_prevent_kill,
     REQ_NB_REQUESTS
 };
 
@@ -6166,6 +6177,7 @@ union generic_request
     struct get_fsync_idx_request get_fsync_idx_request;
     struct fsync_msgwait_request fsync_msgwait_request;
     struct get_fsync_apc_idx_request get_fsync_apc_idx_request;
+    struct prevent_kill_request prevent_kill_request;
 };
 union generic_reply
 {
@@ -6455,11 +6467,12 @@ union generic_reply
     struct get_fsync_idx_reply get_fsync_idx_reply;
     struct fsync_msgwait_reply fsync_msgwait_reply;
     struct get_fsync_apc_idx_reply get_fsync_apc_idx_reply;
+    struct prevent_kill_reply prevent_kill_reply;
 };
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 691
+#define SERVER_PROTOCOL_VERSION 692
 
 /* ### protocol_version end ### */
 
