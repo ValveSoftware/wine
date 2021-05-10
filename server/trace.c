@@ -4605,6 +4605,10 @@ static void dump_get_next_thread_reply( const struct get_next_thread_reply *req 
     fprintf( stderr, " handle=%04x", req->handle );
 }
 
+static void dump_prevent_kill_request( const struct prevent_kill_request *req )
+{
+}
+
 static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_new_process_request,
     (dump_func)dump_exec_process_request,
@@ -4892,6 +4896,7 @@ static const dump_func req_dumpers[REQ_NB_REQUESTS] = {
     (dump_func)dump_fsync_msgwait_request,
     (dump_func)dump_get_fsync_apc_idx_request,
     (dump_func)dump_get_next_thread_request,
+    (dump_func)dump_prevent_kill_request,
 };
 
 static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
@@ -5181,6 +5186,7 @@ static const dump_func reply_dumpers[REQ_NB_REQUESTS] = {
     NULL,
     (dump_func)dump_get_fsync_apc_idx_reply,
     (dump_func)dump_get_next_thread_reply,
+    NULL,
 };
 
 static const char * const req_names[REQ_NB_REQUESTS] = {
@@ -5470,6 +5476,7 @@ static const char * const req_names[REQ_NB_REQUESTS] = {
     "fsync_msgwait",
     "get_fsync_apc_idx",
     "get_next_thread",
+    "prevent_kill",
 };
 
 static const struct

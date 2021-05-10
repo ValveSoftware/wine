@@ -405,6 +405,7 @@ DECL_HANDLER(get_fsync_idx);
 DECL_HANDLER(fsync_msgwait);
 DECL_HANDLER(get_fsync_apc_idx);
 DECL_HANDLER(get_next_thread);
+DECL_HANDLER(prevent_kill);
 
 #ifdef WANT_REQUEST_HANDLERS
 
@@ -697,6 +698,7 @@ static const req_handler req_handlers[REQ_NB_REQUESTS] =
     (req_handler)req_fsync_msgwait,
     (req_handler)req_get_fsync_apc_idx,
     (req_handler)req_get_next_thread,
+    (req_handler)req_prevent_kill,
 };
 
 C_ASSERT( sizeof(abstime_t) == 8 );
@@ -2323,6 +2325,7 @@ C_ASSERT( FIELD_OFFSET(struct get_next_thread_request, flags) == 28 );
 C_ASSERT( sizeof(struct get_next_thread_request) == 32 );
 C_ASSERT( FIELD_OFFSET(struct get_next_thread_reply, handle) == 8 );
 C_ASSERT( sizeof(struct get_next_thread_reply) == 16 );
+C_ASSERT( sizeof(struct prevent_kill_request) == 16 );
 
 #endif  /* WANT_REQUEST_HANDLERS */
 

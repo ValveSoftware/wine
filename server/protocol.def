@@ -3894,3 +3894,6 @@ enum fsync_type
 @REPLY
     obj_handle_t handle;       /* next thread handle */
 @END
+
+@REQ(prevent_kill)
+@END
