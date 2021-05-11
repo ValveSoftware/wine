@@ -1454,6 +1454,18 @@ NTSTATUS WINAPI D3DKMTCloseAdapter( const D3DKMT_CLOSEADAPTER *desc )
     return status;
 }
 
+
+static void d3dkmt_adapter_alloc_handle( struct d3dkmt_adapter *adapter )
+{
+    static D3DKMT_HANDLE handle_start = 0;
+
+    EnterCriticalSection( &driver_section );
+    /* D3DKMT_HANDLE is UINT, so we can't use pointer as handle */
+    adapter->handle = ++handle_start;
+    list_add_tail( &d3dkmt_adapters, &adapter->entry );
+    LeaveCriticalSection( &driver_section );
+}
+
 /******************************************************************************
  *		D3DKMTOpenAdapterFromGdiDisplayName [GDI32.@]
  */
@@ -1462,7 +1474,6 @@ NTSTATUS WINAPI D3DKMTOpenAdapterFromGdiDisplayName( D3DKMT_OPENADAPTERFROMGDIDI
     WCHAR *end, key_nameW[MAX_PATH], bufferW[MAX_PATH];
     HDEVINFO devinfo = INVALID_HANDLE_VALUE;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    static D3DKMT_HANDLE handle_start = 0;
     struct d3dkmt_adapter *adapter;
     SP_DEVINFO_DATA device_data;
     DWORD size, state_flags;
@@ -1517,13 +1528,9 @@ NTSTATUS WINAPI D3DKMTOpenAdapterFromGdiDisplayName( D3DKMT_OPENADAPTERFROMGDIDI
                                     (BYTE *)&luid, sizeof( luid ), NULL, 0))
         goto done;
 
-    EnterCriticalSection( &driver_section );
-    /* D3DKMT_HANDLE is UINT, so we can't use pointer as handle */
-    adapter->handle = ++handle_start;
-    list_add_tail( &d3dkmt_adapters, &adapter->entry );
-    LeaveCriticalSection( &driver_section );
+    d3dkmt_adapter_alloc_handle( adapter );
 
-    desc->hAdapter = handle_start;
+    desc->hAdapter = adapter->handle;
     desc->AdapterLuid = luid;
     desc->VidPnSourceId = index;
     status = STATUS_SUCCESS;
@@ -1666,4 +1673,94 @@ NTSTATUS WINAPI D3DKMTCheckVidPnExclusiveOwnership( const D3DKMT_CHECKVIDPNEXCLU
         return STATUS_INVALID_PARAMETER;
 
     return get_display_driver()->pD3DKMTCheckVidPnExclusiveOwnership( desc );
+}
+
+/******************************************************************************
+ *		D3DKMTOpenAdapterFromDeviceName [GDI32.@]
+ */
+NTSTATUS WINAPI D3DKMTOpenAdapterFromDeviceName(D3DKMT_OPENADAPTERFROMDEVICENAME *device_name)
+{
+    SP_DEVICE_INTERFACE_DATA iface_data = {sizeof(iface_data)};
+    SP_DEVICE_INTERFACE_DETAIL_DATA_W *iface_detail_data;
+    SP_DEVINFO_DATA device_data = {sizeof(device_data)};
+    WCHAR iface_detail_buffer[256];
+    struct d3dkmt_adapter *adapter;
+    UNICODE_STRING guid_str;
+    unsigned int i, j;
+    DEVPROPTYPE type;
+    LUID luid = {0};
+    GUID iface_uid;
+    const WCHAR *p;
+    HDEVINFO set;
+    BOOL found;
+
+    TRACE( "device_name %p.\n", device_name );
+
+    p = device_name->pDeviceName + lstrlenW( device_name->pDeviceName );
+    while(p != device_name->pDeviceName && *p != L'#')
+        --p;
+    if (*p == L'#') ++p;
+    RtlInitUnicodeString( &guid_str, p );
+    if (RtlGUIDFromString( &guid_str, &iface_uid ))
+    {
+        WARN( "Could not parse guid from %s.\n", debugstr_w( device_name->pDeviceName ));
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    set = SetupDiGetClassDevsW( &iface_uid, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT );
+    iface_detail_data = (SP_DEVICE_INTERFACE_DETAIL_DATA_W *)iface_detail_buffer;
+    iface_detail_data->cbSize = sizeof(*iface_detail_data);
+
+    found = FALSE;
+    j = 0;
+    while (SetupDiEnumDeviceInfo( set, j, &device_data ))
+    {
+        i = 0;
+        while (SetupDiEnumDeviceInterfaces(set, &device_data, &iface_uid, i, &iface_data))
+        {
+            if (SetupDiGetDeviceInterfaceDetailW( set, &iface_data, iface_detail_data,
+                                                  sizeof(iface_detail_buffer), NULL, &device_data ))
+            {
+                if (!lstrcmpiW( device_name->pDeviceName, iface_detail_data->DevicePath ))
+                {
+                    found = TRUE;
+
+                    if (SetupDiGetDevicePropertyW( set, &device_data, &DEVPROPKEY_GPU_LUID, &type,
+                                                    (BYTE *)&luid, sizeof( luid ), NULL, 0))
+                        TRACE( "luid %#x:%#x.\n", luid.HighPart, luid.LowPart );
+                    else
+                        ERR( "Could not get luid.\n" );
+
+                    goto done;
+                }
+            }
+            else
+            {
+                ERR( "Could not get interface detail, iface %u.\n", i );
+            }
+            ++i;
+        }
+        ++j;
+    }
+
+done:
+    SetupDiDestroyDeviceInfoList( set );
+    if (!found)
+    {
+        WARN( "Device %s not found.\n", debugstr_w(device_name->pDeviceName ));
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    adapter = heap_alloc( sizeof( *adapter ));
+    if (!adapter)
+    {
+        ERR( "No memory.\n" );
+        return STATUS_NO_MEMORY;
+    }
+    d3dkmt_adapter_alloc_handle( adapter );
+
+    device_name->hAdapter = adapter->handle;
+    device_name->AdapterLuid = luid;
+
+    return STATUS_SUCCESS;
 }
