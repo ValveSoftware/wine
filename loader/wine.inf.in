@@ -75,7 +75,8 @@ AddReg=\
     Timezones,\
     VersionInfo,\
     LicenseInformation, \
-    SteamClient
+    SteamClient, \
+    NVIDIANGX
 
 [DefaultInstall.ntamd64]
 RegisterDlls=RegisterDllsSection
@@ -104,7 +105,8 @@ AddReg=\
     Timezones,\
     VersionInfo.ntamd64,\
     LicenseInformation, \
-    SteamClient.ntamd64
+    SteamClient.ntamd64, \
+    NVIDIANGX
 
 [DefaultInstall.ntarm64]
 RegisterDlls=RegisterDllsSection
@@ -149,7 +151,8 @@ AddReg=\
     Tapi,\
     VersionInfo.ntamd64,\
     LicenseInformation, \
-    SteamClient.ntamd64
+    SteamClient.ntamd64, \
+    NVIDIANGX
 
 [Wow64Install.ntarm64]
 WineFakeDlls=FakeDllsWin32
@@ -4255,3 +4258,6 @@ HKCU,Software\Wine\DllOverrides,"ucrtbase",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcomp140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcruntime140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"atiadlxx",,"disabled"
+
+[NVIDIANGX]
+HKLM,Software\NVIDIA Corporation\Global\NGXCore,"FullPath",,"C:\Windows\System32"
