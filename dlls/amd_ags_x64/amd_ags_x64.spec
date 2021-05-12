@@ -1,4 +1,5 @@
 @ stdcall agsDeInit(ptr)
+@ stdcall agsDeInitialize(ptr)
 @ stdcall agsCheckDriverVersion(ptr long)
 @ stub agsDriverExtensionsDX11_BeginUAVOverlap
 @ stub agsDriverExtensionsDX11_CreateBuffer
@@ -32,11 +33,13 @@
 @ stub agsDriverExtensionsDX12_CreateFromDevice
 @ stub agsDriverExtensionsDX12_DeInit
 @ stub agsDriverExtensionsDX12_Destroy
-@ stub agsDriverExtensionsDX12_DestroyDevice
+@ stdcall agsDriverExtensionsDX12_DestroyDevice(ptr ptr ptr)
 @ stub agsDriverExtensionsDX12_Init
 @ stub agsDriverExtensionsDX12_PopMarker
 @ stub agsDriverExtensionsDX12_PushMarker
 @ stub agsDriverExtensionsDX12_SetMarker
 @ stdcall agsGetCrossfireGPUCount(ptr ptr)
+@ stdcall agsGetVersionNumber()
 @ stdcall agsInit(ptr ptr ptr)
+@ stdcall agsInitialize(long ptr ptr ptr)
 @ stub agsSetDisplayMode
