@@ -47,27 +47,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
-static HRESULT heap_strdupW(const WCHAR *str, WCHAR **dest)
-{
-    HRESULT hr = S_OK;
-
-    if (str)
-    {
-        unsigned int size;
-
-        size = (lstrlenW(str) + 1) * sizeof(WCHAR);
-        *dest = heap_alloc(size);
-        if (*dest)
-            memcpy(*dest, str, size);
-        else
-            hr = E_OUTOFMEMORY;
-    }
-    else
-        *dest = NULL;
-
-    return hr;
-}
-
 struct local_handler
 {
     struct list entry;
@@ -204,7 +183,7 @@ static ULONG WINAPI transform_activate_Release(IMFActivate *iface)
             IClassFactory_Release(activate->factory);
         if (activate->transform)
             IMFTransform_Release(activate->transform);
-        heap_free(activate);
+        free(activate);
     }
 
     return refcount;
@@ -598,13 +577,12 @@ static HRESULT create_transform_activate(IClassFactory *factory, IMFActivate **a
     struct transform_activate *object;
     HRESULT hr;
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = init_attributes_object(&object->attributes, 0)))
     {
-        heap_free(object);
+        free(object);
         return hr;
     }
 
@@ -745,14 +723,14 @@ static HRESULT register_transform(const CLSID *clsid, const WCHAR *name, UINT32 
     {
         if (SUCCEEDED(hr = MFGetAttributesAsBlobSize(attributes, &size)))
         {
-            if ((blob = heap_alloc(size)))
+            if ((blob = malloc(size)))
             {
                 if (SUCCEEDED(hr = MFGetAttributesAsBlob(attributes, blob, size)))
                 {
                     if ((ret = RegSetValueExW(hclsid, L"Attributes", 0, REG_BINARY, blob, size)))
                         hr = HRESULT_FROM_WIN32(ret);
                 }
-                heap_free(blob);
+                free(blob);
             }
             else
                 hr = E_OUTOFMEMORY;
@@ -813,10 +791,10 @@ static void release_mft_registration(struct mft_registration *mft)
 {
     if (mft->factory)
         IClassFactory_Release(mft->factory);
-    heap_free(mft->name);
-    heap_free(mft->input_types);
-    heap_free(mft->output_types);
-    heap_free(mft);
+    free(mft->name);
+    free(mft->input_types);
+    free(mft->output_types);
+    free(mft);
 }
 
 static HRESULT mft_register_local(IClassFactory *factory, REFCLSID clsid, REFGUID category, LPCWSTR name, UINT32 flags,
@@ -824,7 +802,7 @@ static HRESULT mft_register_local(IClassFactory *factory, REFCLSID clsid, REFGUI
         const MFT_REGISTER_TYPE_INFO *output_types)
 {
     struct mft_registration *mft, *cur, *unreg_mft = NULL;
-    HRESULT hr;
+    HRESULT hr = S_OK;
 
     if (!factory && !clsid)
     {
@@ -832,8 +810,7 @@ static HRESULT mft_register_local(IClassFactory *factory, REFCLSID clsid, REFGUI
         return E_FAIL;
     }
 
-    mft = heap_alloc_zero(sizeof(*mft));
-    if (!mft)
+    if (!(mft = calloc(1, sizeof(*mft))))
         return E_OUTOFMEMORY;
 
     mft->factory = factory;
@@ -846,13 +823,16 @@ static HRESULT mft_register_local(IClassFactory *factory, REFCLSID clsid, REFGUI
         flags |= MFT_ENUM_FLAG_SYNCMFT;
     mft->flags = flags;
     mft->local = TRUE;
-    if (FAILED(hr = heap_strdupW(name, &mft->name)))
+    if (name && !(mft->name = wcsdup(name)))
+    {
+        hr = E_OUTOFMEMORY;
         goto failed;
+    }
 
     if (input_count && input_types)
     {
         mft->input_types_count = input_count;
-        if (!(mft->input_types = heap_calloc(mft->input_types_count, sizeof(*input_types))))
+        if (!(mft->input_types = calloc(mft->input_types_count, sizeof(*input_types))))
         {
             hr = E_OUTOFMEMORY;
             goto failed;
@@ -863,7 +843,7 @@ static HRESULT mft_register_local(IClassFactory *factory, REFCLSID clsid, REFGUI
     if (output_count && output_types)
     {
         mft->output_types_count = output_count;
-        if (!(mft->output_types = heap_calloc(mft->output_types_count, sizeof(*output_types))))
+        if (!(mft->output_types = calloc(mft->output_types_count, sizeof(*output_types))))
         {
             hr = E_OUTOFMEMORY;
             goto failed;
@@ -1063,14 +1043,14 @@ static void mft_get_reg_type_info(const WCHAR *clsidW, const WCHAR *typeW, MFT_R
     if (!size || size % sizeof(**type))
         goto out;
 
-    if (!(*type = heap_alloc(size)))
+    if (!(*type = malloc(size)))
         goto out;
 
     *count = size / sizeof(**type);
 
     if (RegQueryValueExW(hfilter, typeW, NULL, &reg_type, (BYTE *)*type, &size))
     {
-        heap_free(*type);
+        free(*type);
         *type = NULL;
         *count = 0;
     }
@@ -1139,12 +1119,12 @@ static HRESULT mft_collect_machine_reg(struct list *mfts, const GUID *category, 
 
         if (!mft_is_type_info_match(&mft, category, flags, plugin_control, input_type, output_type))
         {
-            heap_free(mft.input_types);
-            heap_free(mft.output_types);
+            free(mft.input_types);
+            free(mft.output_types);
             goto next;
         }
 
-        cur = heap_alloc(sizeof(*cur));
+        cur = malloc(sizeof(*cur));
         /* Reuse allocated type arrays. */
         *cur = mft;
         list_add_tail(mfts, &cur->entry);
@@ -1216,7 +1196,7 @@ static HRESULT mft_enum(GUID category, UINT32 flags, const MFT_REGISTER_TYPE_INF
         {
             if (mft_is_type_info_match(local, &category, flags, plugin_control, input_type, output_type))
             {
-                mft = heap_alloc_zero(sizeof(*mft));
+                mft = calloc(1, sizeof(*mft));
 
                 mft->clsid = local->clsid;
                 mft->factory = local->factory;
@@ -2200,7 +2180,7 @@ static ULONG WINAPI mfattributes_Release(IMFAttributes *iface)
     if (!refcount)
     {
         clear_attributes_object(attributes);
-        heap_free(attributes);
+        free(attributes);
     }
 
     return refcount;
@@ -2686,7 +2666,7 @@ HRESULT attributes_DeleteAllItems(struct attributes *attributes)
     {
         PropVariantClear(&attributes->attributes[--attributes->count].value);
     }
-    heap_free(attributes->attributes);
+    free(attributes->attributes);
     attributes->attributes = NULL;
     attributes->capacity = 0;
 
@@ -3162,7 +3142,7 @@ void clear_attributes_object(struct attributes *object)
 
     for (i = 0; i < object->count; i++)
         PropVariantClear(&object->attributes[i].value);
-    heap_free(object->attributes);
+    free(object->attributes);
 
     DeleteCriticalSection(&object->cs);
 }
@@ -3177,13 +3157,12 @@ HRESULT WINAPI MFCreateAttributes(IMFAttributes **attributes, UINT32 size)
 
     TRACE("%p, %d\n", attributes, size);
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = init_attributes_object(object, size)))
     {
-        heap_free(object);
+        free(object);
         return hr;
     }
     *attributes = &object->IMFAttributes_iface;
@@ -3590,7 +3569,7 @@ static ULONG WINAPI async_stream_op_Release(IUnknown *iface)
     {
         if (op->caller)
             IMFAsyncResult_Release(op->caller);
-        heap_free(op);
+        free(op);
     }
 
     return refcount;
@@ -3610,7 +3589,7 @@ static HRESULT bytestream_create_io_request(struct bytestream *stream, enum asyn
     IRtwqAsyncResult *request;
     HRESULT hr;
 
-    op = heap_alloc(sizeof(*op));
+    op = malloc(sizeof(*op));
     if (!op)
         return E_OUTOFMEMORY;
 
@@ -3772,7 +3751,7 @@ static ULONG WINAPI bytestream_Release(IMFByteStream *iface)
             IStream_Release(stream->stream);
         if (stream->hfile)
             CloseHandle(stream->hfile);
-        heap_free(stream);
+        free(stream);
     }
 
     return refcount;
@@ -4335,13 +4314,12 @@ HRESULT WINAPI MFCreateMFByteStreamOnStream(IStream *stream, IMFByteStream **byt
 
     TRACE("%p, %p.\n", stream, bytestream);
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = init_attributes_object(&object->attributes, 0)))
     {
-        heap_free(object);
+        free(object);
         return hr;
     }
 
@@ -4500,8 +4478,7 @@ HRESULT WINAPI MFCreateFile(MF_FILE_ACCESSMODE accessmode, MF_FILE_OPENMODE open
     if(file == INVALID_HANDLE_VALUE)
         return HRESULT_FROM_WIN32(GetLastError());
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
     {
         CloseHandle(file);
         return E_OUTOFMEMORY;
@@ -4510,7 +4487,7 @@ HRESULT WINAPI MFCreateFile(MF_FILE_ACCESSMODE accessmode, MF_FILE_OPENMODE open
     if (FAILED(hr = init_attributes_object(&object->attributes, 2)))
     {
         CloseHandle(file);
-        heap_free(object);
+        free(object);
         return hr;
     }
     object->IMFByteStream_iface.lpVtbl = &bytestream_file_vtbl;
@@ -4683,7 +4660,7 @@ static ULONG WINAPI bytestream_wrapper_Release(IMFByteStream *iface)
         if (wrapper->attributes)
             IMFAttributes_Release(wrapper->attributes);
         IMFByteStream_Release(wrapper->stream);
-        heap_free(wrapper);
+        free(wrapper);
     }
 
     return refcount;
@@ -5560,8 +5537,7 @@ HRESULT WINAPI MFCreateMFByteStreamWrapper(IMFByteStream *stream, IMFByteStream 
 
     TRACE("%p, %p.\n", stream, wrapper);
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFByteStreamCacheControl_iface.lpVtbl = &bytestream_wrapper_cache_control_vtbl;
@@ -5753,7 +5729,7 @@ static HRESULT resolver_handler_end_create(struct source_resolver *resolver, enu
         IMFSchemeHandler *scheme_handler;
     } handler;
 
-    if (!(queued_result = heap_alloc_zero(sizeof(*queued_result))))
+    if (!(queued_result = calloc(1, sizeof(*queued_result))))
         return E_OUTOFMEMORY;
 
     queued_result->origin = origin;
@@ -5838,7 +5814,7 @@ static ULONG WINAPI resolver_cancel_object_Release(IUnknown *iface)
         if (object->cancel_cookie)
             IUnknown_Release(object->cancel_cookie);
         IUnknown_Release(object->u.handler);
-        heap_free(object);
+        free(object);
     }
 
     return refcount;
@@ -5865,8 +5841,7 @@ static HRESULT resolver_create_cancel_object(IUnknown *handler, enum resolved_ob
 {
     struct resolver_cancel_object *object;
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IUnknown_iface.lpVtbl = &resolver_cancel_object_vtbl;
@@ -6168,7 +6143,7 @@ static HRESULT resolver_get_scheme_handler(const WCHAR *url, DWORD flags, IMFSch
     }
 
     len = ptr - url;
-    scheme = heap_alloc((len + 1) * sizeof(WCHAR));
+    scheme = malloc((len + 1) * sizeof(WCHAR));
     if (!scheme)
         return E_OUTOFMEMORY;
 
@@ -6179,7 +6154,7 @@ static HRESULT resolver_get_scheme_handler(const WCHAR *url, DWORD flags, IMFSch
     if (FAILED(hr) && url != fileschemeW)
         hr = resolver_create_scheme_handler(fileschemeW, flags, handler);
 
-    heap_free(scheme);
+    free(scheme);
 
     return hr;
 }
@@ -6217,7 +6192,7 @@ static HRESULT resolver_end_create_object(struct source_resolver *resolver, enum
         hr = queued_result->hr;
         if (queued_result->inner_result)
             IRtwqAsyncResult_Release(queued_result->inner_result);
-        heap_free(queued_result);
+        free(queued_result);
     }
     else
         hr = E_UNEXPECTED;
@@ -6272,10 +6247,10 @@ static ULONG WINAPI source_resolver_Release(IMFSourceResolver *iface)
             if (result->object)
                 IUnknown_Release(result->object);
             list_remove(&result->entry);
-            heap_free(result);
+            free(result);
         }
         DeleteCriticalSection(&resolver->cs);
-        heap_free(resolver);
+        free(resolver);
     }
 
     return refcount;
@@ -6503,8 +6478,7 @@ HRESULT WINAPI MFCreateSourceResolver(IMFSourceResolver **resolver)
     if (!resolver)
         return E_POINTER;
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFSourceResolver_iface.lpVtbl = &mfsourceresolvervtbl;
@@ -6579,7 +6553,7 @@ static ULONG WINAPI mfmediaevent_Release(IMFMediaEvent *iface)
     {
         clear_attributes_object(&event->attributes);
         PropVariantClear(&event->value);
-        heap_free(event);
+        free(event);
     }
 
     return refcount;
@@ -6956,13 +6930,13 @@ HRESULT WINAPI MFCreateMediaEvent(MediaEventType type, REFGUID extended_type, HR
     TRACE("%s, %s, %#x, %s, %p.\n", debugstr_eventid(type), debugstr_guid(extended_type), status,
             debugstr_propvar(value), event);
 
-    object = heap_alloc(sizeof(*object));
+    object = malloc(sizeof(*object));
     if (!object)
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = init_attributes_object(&object->attributes, 0)))
     {
-        heap_free(object);
+        free(object);
         return hr;
     }
     object->IMFMediaEvent_iface.lpVtbl = &mfmediaevent_vtbl;
@@ -7018,7 +6992,7 @@ static IMFMediaEvent *queue_pop_event(struct event_queue *queue)
     queued_event = LIST_ENTRY(head, struct queued_event, entry);
     event = queued_event->event;
     list_remove(&queued_event->entry);
-    heap_free(queued_event);
+    free(queued_event);
     return event;
 }
 
@@ -7078,7 +7052,7 @@ static ULONG WINAPI eventqueue_Release(IMFMediaEventQueue *iface)
     {
         event_queue_cleanup(queue);
         DeleteCriticalSection(&queue->cs);
-        heap_free(queue);
+        free(queue);
     }
 
     return refcount;
@@ -7194,7 +7168,7 @@ static HRESULT eventqueue_queue_event(struct event_queue *queue, IMFMediaEvent *
     struct queued_event *queued_event;
     HRESULT hr = S_OK;
 
-    queued_event = heap_alloc(sizeof(*queued_event));
+    queued_event = malloc(sizeof(*queued_event));
     if (!queued_event)
         return E_OUTOFMEMORY;
 
@@ -7214,7 +7188,7 @@ static HRESULT eventqueue_queue_event(struct event_queue *queue, IMFMediaEvent *
     LeaveCriticalSection(&queue->cs);
 
     if (FAILED(hr))
-        heap_free(queued_event);
+        free(queued_event);
 
     WakeAllConditionVariable(&queue->update_event);
 
@@ -7313,8 +7287,7 @@ HRESULT WINAPI MFCreateEventQueue(IMFMediaEventQueue **queue)
 
     TRACE("%p\n", queue);
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFMediaEventQueue_iface.lpVtbl = &eventqueuevtbl;
@@ -7352,7 +7325,7 @@ static void collection_clear(struct collection *collection)
             IUnknown_Release(collection->elements[i]);
     }
 
-    heap_free(collection->elements);
+    free(collection->elements);
     collection->elements = NULL;
     collection->count = 0;
     collection->capacity = 0;
@@ -7395,8 +7368,8 @@ static ULONG WINAPI collection_Release(IMFCollection *iface)
     if (!refcount)
     {
         collection_clear(collection);
-        heap_free(collection->elements);
-        heap_free(collection);
+        free(collection->elements);
+        free(collection);
     }
 
     return refcount;
@@ -7542,8 +7515,7 @@ HRESULT WINAPI MFCreateCollection(IMFCollection **collection)
     if (!collection)
         return E_POINTER;
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFCollection_iface.lpVtbl = &mfcollectionvtbl;
@@ -7617,7 +7589,7 @@ static ULONG WINAPI system_clock_Release(IMFClock *iface)
     TRACE("%p, refcount %u.\n", iface, refcount);
 
     if (!refcount)
-        heap_free(clock);
+        free(clock);
 
     return refcount;
 }
@@ -7691,7 +7663,7 @@ static HRESULT create_system_clock(IMFClock **clock)
 {
     struct system_clock *object;
 
-    if (!(object = heap_alloc(sizeof(*object))))
+    if (!(object = malloc(sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFClock_iface.lpVtbl = &system_clock_vtbl;
@@ -7750,7 +7722,7 @@ static ULONG WINAPI system_time_source_Release(IMFPresentationTimeSource *iface)
         if (source->clock)
             IMFClock_Release(source->clock);
         DeleteCriticalSection(&source->cs);
-        heap_free(source);
+        free(source);
     }
 
     return refcount;
@@ -8040,7 +8012,7 @@ HRESULT WINAPI MFCreateSystemTimeSource(IMFPresentationTimeSource **time_source)
 
     TRACE("%p.\n", time_source);
 
-    object = heap_alloc_zero(sizeof(*object));
+    object = calloc(1, sizeof(*object));
     if (!object)
         return E_OUTOFMEMORY;
 
@@ -8120,8 +8092,8 @@ static ULONG WINAPI async_create_file_callback_Release(IRtwqAsyncCallback *iface
 
     if (!refcount)
     {
-        heap_free(async->path);
-        heap_free(async);
+        free(async->path);
+        free(async);
     }
 
     return refcount;
@@ -8146,7 +8118,7 @@ static HRESULT WINAPI async_create_file_callback_Invoke(IRtwqAsyncCallback *ifac
     {
         struct async_create_file_result *result_item;
 
-        result_item = heap_alloc(sizeof(*result_item));
+        result_item = malloc(sizeof(*result_item));
         if (result_item)
         {
             result_item->result = caller;
@@ -8197,8 +8169,7 @@ HRESULT WINAPI MFBeginCreateFile(MF_FILE_ACCESSMODE access_mode, MF_FILE_OPENMOD
     if (FAILED(hr = RtwqCreateAsyncResult(NULL, (IRtwqAsyncCallback *)callback, state, &caller)))
         return hr;
 
-    async = heap_alloc(sizeof(*async));
-    if (!async)
+    if (!(async = malloc(sizeof(*async))))
     {
         hr = E_OUTOFMEMORY;
         goto failed;
@@ -8209,8 +8180,11 @@ HRESULT WINAPI MFBeginCreateFile(MF_FILE_ACCESSMODE access_mode, MF_FILE_OPENMOD
     async->access_mode = access_mode;
     async->open_mode = open_mode;
     async->flags = flags;
-    if (FAILED(hr = heap_strdupW(path, &async->path)))
+    if (!(async->path = wcsdup(path)))
+    {
+        hr = E_OUTOFMEMORY;
         goto failed;
+    }
 
     hr = RtwqCreateAsyncResult(NULL, &async->IRtwqAsyncCallback_iface, (IUnknown *)caller, &item);
     if (FAILED(hr))
@@ -8255,7 +8229,7 @@ static HRESULT async_create_file_pull_result(IUnknown *unk, IMFByteStream **stre
             *stream = item->stream;
             IRtwqAsyncResult_Release(item->result);
             list_remove(&item->entry);
-            heap_free(item);
+            free(item);
             break;
         }
     }
@@ -8304,20 +8278,19 @@ HRESULT WINAPI MFCancelCreateFile(IUnknown *cancel_cookie)
 HRESULT WINAPI MFRegisterLocalSchemeHandler(const WCHAR *scheme, IMFActivate *activate)
 {
     struct local_handler *handler;
-    HRESULT hr;
 
     TRACE("%s, %p.\n", debugstr_w(scheme), activate);
 
     if (!scheme || !activate)
         return E_INVALIDARG;
 
-    if (!(handler = heap_alloc(sizeof(*handler))))
+    if (!(handler = malloc(sizeof(*handler))))
         return E_OUTOFMEMORY;
 
-    if (FAILED(hr = heap_strdupW(scheme, &handler->u.scheme)))
+    if (!(handler->u.scheme = wcsdup(scheme)))
     {
-        heap_free(handler);
-        return hr;
+        free(handler);
+        return E_OUTOFMEMORY;
     }
     handler->activate = activate;
     IMFActivate_AddRef(handler->activate);
@@ -8335,35 +8308,32 @@ HRESULT WINAPI MFRegisterLocalSchemeHandler(const WCHAR *scheme, IMFActivate *ac
 HRESULT WINAPI MFRegisterLocalByteStreamHandler(const WCHAR *extension, const WCHAR *mime, IMFActivate *activate)
 {
     struct local_handler *handler;
-    HRESULT hr;
 
     TRACE("%s, %s, %p.\n", debugstr_w(extension), debugstr_w(mime), activate);
 
     if ((!extension && !mime) || !activate)
         return E_INVALIDARG;
 
-    if (!(handler = heap_alloc_zero(sizeof(*handler))))
+    if (!(handler = calloc(1, sizeof(*handler))))
         return E_OUTOFMEMORY;
 
-    hr = heap_strdupW(extension, &handler->u.bytestream.extension);
-    if (SUCCEEDED(hr))
-        hr = heap_strdupW(mime, &handler->u.bytestream.mime);
-
-    if (FAILED(hr))
+    if (extension && !(handler->u.bytestream.extension = wcsdup(extension)))
+        goto failed;
+    if (mime && !(handler->u.bytestream.mime = wcsdup(mime)))
         goto failed;
 
     EnterCriticalSection(&local_handlers_section);
     list_add_head(&local_bytestream_handlers, &handler->entry);
     LeaveCriticalSection(&local_handlers_section);
 
-    return hr;
+    return S_OK;
 
 failed:
-    heap_free(handler->u.bytestream.extension);
-    heap_free(handler->u.bytestream.mime);
-    heap_free(handler);
+    free(handler->u.bytestream.extension);
+    free(handler->u.bytestream.mime);
+    free(handler);
 
-    return hr;
+    return E_OUTOFMEMORY;
 }
 
 struct property_store
@@ -8420,8 +8390,8 @@ static ULONG WINAPI property_store_Release(IPropertyStore *iface)
     if (!refcount)
     {
         DeleteCriticalSection(&store->cs);
-        heap_free(store->values);
-        heap_free(store);
+        free(store->values);
+        free(store);
     }
 
     return refcount;
@@ -8555,7 +8525,7 @@ HRESULT WINAPI CreatePropertyStore(IPropertyStore **store)
     if (!store)
         return E_INVALIDARG;
 
-    if (!(object = heap_alloc_zero(sizeof(*object))))
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IPropertyStore_iface.lpVtbl = &property_store_vtbl;
@@ -8655,8 +8625,8 @@ static ULONG WINAPI dxgi_device_manager_Release(IMFDXGIDeviceManager *iface)
         if (manager->device)
             IDXGIDevice_Release(manager->device);
         DeleteCriticalSection(&manager->cs);
-        heap_free(manager->handles);
-        heap_free(manager);
+        free(manager->handles);
+        free(manager);
     }
 
     return refcount;
@@ -8941,7 +8911,7 @@ HRESULT WINAPI MFCreateDXGIDeviceManager(UINT *token, IMFDXGIDeviceManager **man
     if (!token || !manager)
         return E_POINTER;
 
-    if (!(object = heap_alloc_zero(sizeof(*object))))
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFDXGIDeviceManager_iface.lpVtbl = &dxgi_device_manager_vtbl;
