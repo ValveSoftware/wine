@@ -371,7 +371,7 @@ static void find_sdldevs(void)
             continue;
         }
 
-        __controller_hack_sdl_vid_pid_override(&sdldev->vendor_id, &sdldev->product_id);
+        __controller_hack_sdl_vid_pid_override(&sdldev->vendor_id, &sdldev->product_id, sdldev->name);
 
         sdldev->nth_instance = get_num_vidpids(sdldev->vendor_id, sdldev->product_id);
 
