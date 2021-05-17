@@ -227,13 +227,15 @@ static INT CDECL X11DRV_ExtEscape( PHYSDEV dev, INT escape, INT in_count, LPCVOI
                 {
                     const struct x11drv_escape_present_drawable *data = in_data;
                     RECT rect = physDev->dc_rect;
+                    RECT real_rect = physDev->dc_rect;
 
+                    fs_hack_rect_user_to_real( &real_rect );
                     OffsetRect( &rect, -physDev->dc_rect.left, -physDev->dc_rect.top );
                     if (data->flush) XFlush( gdi_display );
                     XSetFunction( gdi_display, physDev->gc, GXcopy );
                     XCopyArea( gdi_display, data->drawable, physDev->drawable, physDev->gc,
-                               0, 0, rect.right, rect.bottom,
-                               physDev->dc_rect.left, physDev->dc_rect.top );
+                               0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top,
+                               real_rect.left, real_rect.top );
                     add_device_bounds( physDev, &rect );
                     return TRUE;
                 }
