@@ -230,7 +230,9 @@ static INT CDECL X11DRV_ExtEscape( PHYSDEV dev, INT escape, INT in_count, LPCVOI
                 {
                     const struct x11drv_escape_present_drawable *data = in_data;
                     RECT rect = physDev->dc_rect;
+                    RECT real_rect = physDev->dc_rect;
 
+                    fs_hack_rect_user_to_real( &real_rect );
                     OffsetRect( &rect, -physDev->dc_rect.left, -physDev->dc_rect.top );
                     if (data->flush) XFlush( gdi_display );
 
@@ -238,7 +240,7 @@ static INT CDECL X11DRV_ExtEscape( PHYSDEV dev, INT escape, INT in_count, LPCVOI
                     if (use_xpresent && use_xfixes && usexcomposite)
                     {
                         XserverRegion update, valid;
-                        XRectangle xrect = {0, 0, rect.right - rect.left, rect.bottom - rect.top};
+                        XRectangle xrect = {0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top};
                         Drawable drawable = data->drawable;
                         update = pXFixesCreateRegionFromGC( gdi_display, physDev->gc );
                         valid = pXFixesCreateRegion( gdi_display, &xrect, 1 );
@@ -246,7 +248,7 @@ static INT CDECL X11DRV_ExtEscape( PHYSDEV dev, INT escape, INT in_count, LPCVOI
                         if (usexcomposite) drawable = pXCompositeNameWindowPixmap( gdi_display, drawable );
 #endif
                         pXPresentPixmap( gdi_display, physDev->drawable, drawable, XNextRequest( gdi_display ),
-                                         valid, update, physDev->dc_rect.left, physDev->dc_rect.top, None, None,
+                                         valid, update, real_rect.left, real_rect.top, None, None,
                                          None, 0, 0, 0, 0, NULL, 0 );
                         pXFixesDestroyRegion( gdi_display, update );
                         pXFixesDestroyRegion( gdi_display, valid );
@@ -256,8 +258,8 @@ static INT CDECL X11DRV_ExtEscape( PHYSDEV dev, INT escape, INT in_count, LPCVOI
                     {
                         XSetFunction( gdi_display, physDev->gc, GXcopy );
                         XCopyArea( gdi_display, data->drawable, physDev->drawable, physDev->gc,
-                                   0, 0, rect.right, rect.bottom,
-                                   physDev->dc_rect.left, physDev->dc_rect.top );
+                                   0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top,
+                                   real_rect.left, real_rect.top );
                     }
 
                     add_device_bounds( physDev, &rect );
