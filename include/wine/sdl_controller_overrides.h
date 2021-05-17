@@ -117,7 +117,7 @@ static void __controller_hack_sdl_name_override(WORD vid, WORD pid, const char *
     if (__controller_hack_sdl_is_vid_pid_xbox_360(vid, pid))
         new_name = "Controller (XBOX 360 For Windows)";
     else if (__controller_hack_sdl_is_vid_pid_xbox_one(vid, pid))
-        new_name = "Controller (XBOX One For Windows)";
+        new_name = "Controller (Xbox One For Windows)";
     else if (__controller_hack_sdl_is_vid_pid_sony_dualshock4(vid, pid) ||
              __controller_hack_sdl_is_vid_pid_sony_dualsense(vid, pid))
         new_name = "Wireless Controller";
