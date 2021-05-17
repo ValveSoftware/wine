@@ -85,12 +85,24 @@ static BOOL __controller_hack_sdl_is_vid_pid_sony_dualsense(WORD vid, WORD pid)
     return FALSE;
 }
 
-static void __controller_hack_sdl_vid_pid_override(WORD *vid, WORD *pid)
+static void __controller_hack_sdl_vid_pid_override(WORD *vid, WORD *pid, const char *sdl_joystick_name)
 {
     TRACE("(*vid = %04hx, *pid = *%04hx\n", *vid, *pid);
     if (*vid == VID_VALVE && *pid == PID_VALVE_VIRTUAL_CONTROLLER)
     {
         TRACE("Valve Virtual Controller found - pretending it's x360\n");
+        *vid = VID_MICROSOFT;
+        *pid = PID_MICROSOFT_XBOX_360;
+    }
+    else if (sdl_joystick_name &&
+             (strstr(sdl_joystick_name, "Xbox") ||
+              strstr(sdl_joystick_name, "XBOX") ||
+              strstr(sdl_joystick_name, "X-Box")) &&
+             !(__controller_hack_sdl_is_vid_pid_xbox_one(*vid, *pid) ||
+               __controller_hack_sdl_is_vid_pid_xbox_360(*vid, *pid)))
+    {
+        WARN("Unknown xinput controller found - pretending it's x360\n");
+
         *vid = VID_MICROSOFT;
         *pid = PID_MICROSOFT_XBOX_360;
     }
