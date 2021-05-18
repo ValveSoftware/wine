@@ -285,6 +285,9 @@ static inline struct proxy_swapchain *proxy_swapchain_from_IDXGISwapChain4(IDXGI
 static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_QueryInterface(IDXGISwapChain4 *iface, REFIID riid, void **object)
 {
     struct proxy_swapchain *swapchain = proxy_swapchain_from_IDXGISwapChain4(iface);
+    HRESULT hr;
+    IUnknown *unk;
+
     TRACE("iface %p, riid %s, object %p\n", iface, debugstr_guid(riid), object);
 
     if (IsEqualGUID(riid, &IID_IUnknown)
@@ -296,9 +299,14 @@ static HRESULT STDMETHODCALLTYPE DECLSPEC_HOTPATCH proxy_swapchain_QueryInterfac
             || IsEqualGUID(riid, &IID_IDXGISwapChain3)
             || IsEqualGUID(riid, &IID_IDXGISwapChain4))
     {
-        IDXGISwapChain4_AddRef(swapchain->swapchain);
-        *object = iface;
-        return S_OK;
+        hr = IDXGISwapChain4_QueryInterface(swapchain->swapchain, riid, (void **)&unk);
+        if(SUCCEEDED(hr))
+            /* return proxy */
+            *object = iface;
+        else
+            *object = NULL;
+
+        return hr;
     }
 
     WARN("%s not implemented, returning E_NOINTERFACE\n", debugstr_guid(riid));
