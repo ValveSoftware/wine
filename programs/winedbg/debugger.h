@@ -283,6 +283,7 @@ extern	DWORD	                dbg_curr_tid;
 extern  dbg_ctx_t               dbg_context;
 extern  BOOL                    dbg_interactiveP;
 extern  HANDLE                  dbg_houtput;
+extern  HANDLE                  dbg_crash_report_file;
 
 struct dbg_internal_var
 {
