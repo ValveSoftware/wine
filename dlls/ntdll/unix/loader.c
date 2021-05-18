@@ -1821,6 +1821,7 @@ static struct unix_funcs unix_funcs =
     __wine_dbg_header,
     steamclient_setup_trampolines,
     set_unix_env,
+    write_crash_log,
 };
 
 
