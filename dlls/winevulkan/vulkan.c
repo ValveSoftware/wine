@@ -1426,8 +1426,25 @@ static VkResult wine_vk_get_physical_device_image_format_properties_2(struct win
         VkResult (*p_vkGetPhysicalDeviceImageFormatProperties2)(VkPhysicalDevice, const VkPhysicalDeviceImageFormatInfo2 *, VkImageFormatProperties2 *),
         const VkPhysicalDeviceImageFormatInfo2 *format_info, VkImageFormatProperties2 *properties)
 {
+    VkPhysicalDeviceExternalImageFormatInfo *external_image_info;
     VkExternalImageFormatProperties *external_image_properties;
     VkResult res;
+
+    if ((external_image_info = find_next_struct(format_info, VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_IMAGE_FORMAT_INFO))
+            && external_image_info->handleType)
+    {
+        wine_vk_normalize_handle_types_win(&external_image_info->handleType);
+
+        if (external_image_info->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+            external_image_info->handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+        wine_vk_normalize_handle_types_host(&external_image_info->handleType);
+        if (!external_image_info->handleType)
+        {
+            FIXME("Unsupported handle type %#x.\n", external_image_info->handleType);
+            return VK_ERROR_FORMAT_NOT_SUPPORTED;
+        }
+    }
 
     res = p_vkGetPhysicalDeviceImageFormatProperties2(phys_dev->host_physical_device,
             format_info, properties);
@@ -1436,9 +1453,14 @@ static VkResult wine_vk_get_physical_device_image_format_properties_2(struct win
                                                       VK_STRUCTURE_TYPE_EXTERNAL_IMAGE_FORMAT_PROPERTIES)))
     {
         VkExternalMemoryProperties *p = &external_image_properties->externalMemoryProperties;
-        p->externalMemoryFeatures = 0;
-        p->exportFromImportedHandleTypes = 0;
-        p->compatibleHandleTypes = 0;
+
+        if (p->exportFromImportedHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
+            p->exportFromImportedHandleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        wine_vk_normalize_handle_types_win(&p->exportFromImportedHandleTypes);
+
+        if (p->compatibleHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
+            p->compatibleHandleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        wine_vk_normalize_handle_types_win(&p->compatibleHandleTypes);
     }
     return res;
 }
@@ -2652,11 +2674,16 @@ VkResult wine_vkCreateImage(VkDevice handle, const VkImageCreateInfo *create_inf
                             const VkAllocationCallbacks *allocator, VkImage *image)
 {
     struct wine_device *device = wine_device_from_handle(handle);
-    VkExternalMemoryImageCreateInfo external_memory_info;
+    VkExternalMemoryImageCreateInfo external_memory_info, *update_info;
     VkImageCreateInfo info = *create_info;
 
-    if (device->phys_dev->external_memory_align &&
-        !find_next_struct(info.pNext, VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO))
+    if ((update_info = find_next_struct(info.pNext, VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO)))
+    {
+        if (update_info->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR)
+            update_info->handleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
+        wine_vk_normalize_handle_types_host(&update_info->handleTypes);
+    }
+    else if (device->phys_dev->external_memory_align)
     {
         external_memory_info.sType = VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_IMAGE_CREATE_INFO;
         external_memory_info.pNext = info.pNext;
