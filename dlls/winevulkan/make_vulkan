@@ -206,6 +206,7 @@ FUNCTION_OVERRIDES = {
     "vkAllocateMemory" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkCreateBuffer" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkCreateCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
+    "vkCreateImage" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyDevice" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkFreeCommandBuffers" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
@@ -278,7 +279,9 @@ STRUCT_CHAIN_CONVERSIONS = {
 
     # Structs which require pNext chain modification
     "VkBufferCreateInfo": [],
+    "VkImageCreateInfo": [],
     "VkMemoryAllocateInfo": ["VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR", "VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR"],
+    "VkPhysicalDeviceImageFormatInfo2": [],
 }
 
 
