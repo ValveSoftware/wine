@@ -238,7 +238,7 @@ static inline size_t LFH_block_get_alloc_size(const LFH_block *block, ULONG flag
 
 static inline size_t LFH_get_class_size(ULONG flags, size_t size)
 {
-    size_t extra = sizeof(LFH_block) + ((flags & HEAP_TAIL_CHECKING_ENABLED) ? 16 : 0);
+    size_t extra = sizeof(LFH_block) + 16;
     if (size + extra < size) return ~(size_t)0;
     return size + extra;
 }
