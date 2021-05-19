@@ -113,7 +113,6 @@ UNSUPPORTED_EXTENSIONS = [
     "VK_EXT_physical_device_drm",
     "VK_GOOGLE_surfaceless_query",
     "VK_KHR_external_fence_fd",
-    "VK_KHR_external_memory_fd",
     "VK_KHR_external_semaphore_fd",
     "VK_SEC_amigo_profiling", # Angle specific.
 
@@ -129,7 +128,6 @@ UNSUPPORTED_EXTENSIONS = [
 # winevulkan may nonetheless use, or extensions we want to generate headers for
 # but not expose to applications (useful for test commits)
 UNEXPOSED_EXTENSIONS = {
-    "VK_KHR_external_memory_win32",
 }
 
 # The Vulkan loader provides entry-points for core functionality and important
@@ -174,22 +172,27 @@ FUNCTION_OVERRIDES = {
     # Instance functions
     "vkCreateDevice" : {"extra_param" : "client_ptr"},
     "vkDestroyInstance" : {"dispatch" : False},
-    "vkGetPhysicalDeviceExternalBufferProperties" : {"dispatch" : False},
+    "vkGetPhysicalDeviceExternalBufferProperties" : {"dispatch" : True},
     "vkGetPhysicalDeviceExternalFenceProperties" : {"dispatch" : False},
     "vkGetPhysicalDeviceExternalSemaphoreProperties" : {"dispatch" : False},
 
     # Device functions
     "vkCreateCommandPool" : {"extra_param" : "client_ptr"},
     "vkGetDeviceProcAddr" : {"dispatch" : False},
+    "vkAllocateMemory" : {"extra_param" : "pAllocateInfo"},
 
     # VK_KHR_external_fence_capabilities
     "vkGetPhysicalDeviceExternalFencePropertiesKHR" : {"dispatch" : False},
 
     # VK_KHR_external_memory_capabilities
-    "vkGetPhysicalDeviceExternalBufferPropertiesKHR" : {"dispatch" : False},
+    "vkGetPhysicalDeviceExternalBufferPropertiesKHR" : {"dispatch" : True},
 
     # VK_KHR_external_semaphore_capabilities
     "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR" : {"dispatch" : False},
+
+    # VK_KHR_external_memory_win32
+    "vkGetMemoryWin32HandleKHR" : {"dispatch" : True},
+    "vkGetMemoryWin32HandlePropertiesKHR" : {"dispatch" : True},
 }
 
 # functions for which a user driver entry must be generated
@@ -252,6 +255,8 @@ MANUAL_UNIX_THUNKS = {
     "vkFreeMemory",
     "vkGetCalibratedTimestampsEXT",
     "vkGetDeviceProcAddr",
+    "vkGetMemoryWin32HandleKHR",
+    "vkGetMemoryWin32HandlePropertiesKHR",
     "vkGetDeviceQueue",
     "vkGetDeviceQueue2",
     "vkGetInstanceProcAddr",
@@ -302,6 +307,10 @@ STRUCT_CHAIN_CONVERSIONS = {
     # Ignore to not confuse host loader.
     "VkDeviceCreateInfo": ["VK_STRUCTURE_TYPE_LOADER_DEVICE_CREATE_INFO"],
     "VkInstanceCreateInfo": ["VK_STRUCTURE_TYPE_LOADER_INSTANCE_CREATE_INFO"],
+
+    # Structs which require pNext chain modification
+    "VkBufferCreateInfo": [],
+    "VkMemoryAllocateInfo": ["VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR", "VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR"],
 }
 
 # Some struct members are conditionally ignored and callers are free to leave them uninitialized.
@@ -809,7 +818,14 @@ class VkFunction(object):
         proto += ", ".join([p.definition() for p in self.params])
 
         if is_thunk and self.extra_param:
-            proto += ", void *" + self.extra_param
+            extra_param_is_new = True
+            for p in self.params:
+                if p.name == self.extra_param:
+                    extra_param_is_new = False
+            if extra_param_is_new:
+                proto += ", void *" + self.extra_param
+            else:
+                proto += ", void *win_" + self.extra_param
 
         proto += ")"
         return proto
@@ -893,7 +909,7 @@ class VkFunction(object):
             if conv:
                 params += ", UlongToPtr({0}{1})".format(params_prefix, self.extra_param)
             else:
-                params += ", {0}{1}".format(params_prefix, self.extra_param)
+                params += ", (void *){0}{1}".format(params_prefix, self.extra_param)
 
         if self.name not in MANUAL_UNIX_THUNKS:
             func_prefix = "{0}.p_".format(self.params[0].dispatch_table(params_prefix, conv))
@@ -971,9 +987,12 @@ class VkFunction(object):
         if conv:
             thunk += "    struct\n"
             thunk += "    {\n"
+            extra_param_is_new = True
             for p in self.params:
                 thunk += "        {0};\n".format(p.definition(conv=True, is_member=True))
-            if self.extra_param:
+                if p.name == self.extra_param:
+                    extra_param_is_new = False
+            if self.extra_param and extra_param_is_new:
                 thunk += "        PTR32 {0};\n".format(self.extra_param)
             if self.type != "void":
                 thunk += "        {0} result;\n".format(self.type)
@@ -1576,8 +1595,9 @@ class VkMember(VkVariable):
                     return "{0}{1} = {2} ? {3} : 0;\n".format(output, self.name, self.value(input, conv),
                         handle.unwrap_handle(self.value(input, conv), unwrap))
                 else:
-                    return "{0}{1} = {2};\n".format(output, self.name,
-                        handle.unwrap_handle(self.value(input, conv), unwrap))
+                    input_name = "{0}{1}".format(input, self.name)
+                    return "{0}{1} = {2} ? {3} : VK_NULL_HANDLE;\n".format(output, self.name,
+                        input_name, handle.unwrap_handle(self.value(input, conv), unwrap))
             elif self.is_generic_handle():
                 if direction == Direction.OUTPUT:
                     LOGGER.err("OUTPUT parameter {0}.{1} cannot be unwrapped".format(self.type, self.name))
@@ -2444,9 +2464,12 @@ class StructConversionFunction(object):
             ident = "            "
 
             if self.direction == Direction.INPUT and self.type in STRUCT_CHAIN_CONVERSIONS:
+                has_any_chain_conversions = False
                 for i in STRUCT_CHAIN_CONVERSIONS[self.type]:
                     body += "        case {0}:\n".format(i)
-                body += ident + "break;\n"
+                    has_any_chain_conversions = True
+                if has_any_chain_conversions:
+                    body += ident + "break;\n"
 
             for ext in self.operand.struct_extensions:
                 if not ext.required:
@@ -2456,6 +2479,8 @@ class StructConversionFunction(object):
                     continue
 
                 stype = next(x for x in ext.members if x.name == "sType").values
+                if self.type in STRUCT_CHAIN_CONVERSIONS and stype in STRUCT_CHAIN_CONVERSIONS[self.type]:
+                    continue
                 win_type = ext.name + "32" if self.conv and ext.needs_win32_type() else ext.name
                 if self.direction == Direction.INPUT:
                     in_type = "const " + win_type
@@ -3059,9 +3084,13 @@ class VkGenerator(object):
 
             f.write("struct {0}_params\n".format(vk_func.name))
             f.write("{\n");
+            extra_param_is_new = True
             for p in vk_func.params:
                 f.write("    {0};\n".format(p.definition(is_member=True)))
-            if vk_func.extra_param:
+                if p.name == vk_func.extra_param:
+                    extra_param_is_new = False
+
+            if vk_func.extra_param and extra_param_is_new:
                 f.write("    void *{0};\n".format(vk_func.extra_param))
             if vk_func.type != "void":
                 f.write("    {0} result;\n".format(vk_func.type))

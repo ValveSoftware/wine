@@ -221,8 +221,17 @@ static inline struct wine_cmd_pool *wine_cmd_pool_from_handle(VkCommandPool hand
 struct wine_device_memory
 {
     VkDeviceMemory host_memory;
+    VkExternalMemoryHandleTypeFlagBits handle_types;
+    BOOL inherit;
+    DWORD access;
+    HANDLE handle;
     void *mapping;
 };
+
+static inline VkDeviceMemory wine_device_memory_to_handle(struct wine_device_memory *device_memory)
+{
+    return (VkDeviceMemory)(uintptr_t)device_memory;
+}
 
 static inline struct wine_device_memory *wine_device_memory_from_handle(VkDeviceMemory handle)
 {
