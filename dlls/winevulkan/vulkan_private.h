@@ -242,6 +242,30 @@ static inline VkSurfaceKHR wine_surface_to_handle(struct wine_surface *surface)
     return (VkSurfaceKHR)(uintptr_t)surface;
 }
 
+struct wine_dev_mem
+{
+    VkDeviceMemory dev_mem;
+
+    VkExternalMemoryHandleTypeFlagBits handle_types;
+
+    BOOL inherit;
+    DWORD access;
+
+    HANDLE handle;
+
+    struct wine_vk_mapping mapping;
+};
+
+static inline struct wine_dev_mem *wine_dev_mem_from_handle(VkDeviceMemory handle)
+{
+    return (struct wine_dev_mem *)(uintptr_t)handle;
+}
+
+static inline VkDeviceMemory wine_dev_mem_to_handle(struct wine_dev_mem *dev_mem)
+{
+    return (VkDeviceMemory)(uintptr_t)dev_mem;
+}
+
 BOOL wine_vk_device_extension_supported(const char *name) DECLSPEC_HIDDEN;
 BOOL wine_vk_instance_extension_supported(const char *name) DECLSPEC_HIDDEN;
 
