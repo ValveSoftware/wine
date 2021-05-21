@@ -37,6 +37,12 @@
 #define _WITH_CPU_SET_T
 #include <sched.h>
 #endif
+#ifdef HAVE_SYS_TIME_H
+#include <sys/time.h>
+#endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -1520,6 +1526,7 @@ DECL_HANDLER(init_first_thread)
 
     current->unix_pid = process->unix_pid = req->unix_pid;
     current->unix_tid = req->unix_tid;
+    process->nice_limit = req->nice_limit;
 
     if (!process->parent_id)
         process->affinity = current->affinity = get_thread_affinity( current );
