@@ -546,6 +546,8 @@ static WCHAR kbd_tables_vkey_to_wchar( const KBDTABLES *tables, UINT vkey, const
 
 #undef NEXT_ENTRY
 
+BOOL enable_mouse_in_pointer = FALSE;
+
 /*******************************************************************
  *           NtUserGetForegroundWindow  (win32u.@)
  */
@@ -2485,9 +2487,9 @@ void toggle_caret( HWND hwnd )
  */
 BOOL WINAPI NtUserEnableMouseInPointer( BOOL enable )
 {
-    FIXME( "enable %u stub!\n", enable );
-    RtlSetLastWin32Error( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    FIXME( "enable %u semi-stub!\n", enable );
+    enable_mouse_in_pointer = TRUE;
+    return TRUE;
 }
 
 /**********************************************************************
