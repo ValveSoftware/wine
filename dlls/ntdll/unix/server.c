@@ -53,6 +53,9 @@
 # include <sys/prctl.h>
 #endif
 #include <sys/stat.h>
+#ifdef HAVE_SYS_RESOURCE_H
+# include <sys/resource.h>
+#endif
 #ifdef HAVE_SYS_SYSCALL_H
 # include <sys/syscall.h>
 #endif
@@ -1425,6 +1428,8 @@ size_t server_init_process(void)
     struct sigaction sig_act;
     size_t info_size;
     DWORD pid, tid;
+    struct rlimit rlimit;
+    int nice_limit = 0;
 
     server_pid = -1;
     if (env_socket)
@@ -1486,10 +1491,19 @@ size_t server_init_process(void)
 
     reply_pipe = init_thread_pipe();
 
+#ifdef RLIMIT_NICE
+    if (!getrlimit( RLIMIT_NICE, &rlimit ))
+    {
+        if (rlimit.rlim_cur <= 40) nice_limit = 20 - rlimit.rlim_cur;
+        else if (rlimit.rlim_cur == -1 /* RLIMIT_INFINITY */) nice_limit = -20;
+    }
+#endif
+
     SERVER_START_REQ( init_first_thread )
     {
         req->unix_pid    = getpid();
         req->unix_tid    = get_unix_tid();
+        req->nice_limit  = nice_limit;
         req->reply_fd    = reply_pipe;
         req->wait_fd     = ntdll_get_thread_data()->wait_fd[1];
         req->debug_level = (TRACE_ON(server) != 0);
