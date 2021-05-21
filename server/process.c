@@ -1682,6 +1682,8 @@ DECL_HANDLER(read_process_memory)
 
     if (!(process = get_process_from_handle( req->handle, PROCESS_VM_READ ))) return;
 
+    reply->unix_pid = process->unix_pid;
+
     if (len)
     {
         char *buffer = mem_alloc( len );
