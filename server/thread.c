@@ -1885,12 +1885,7 @@ DECL_HANDLER(select)
              current->context && current->suspend_cookie == req->cookie)
     {
         if (current->context->regs.flags)
-        {
-            unsigned int system_flags = get_context_system_regs(current->process->cpu) &
-                                        current->context->regs.flags;
-            if (system_flags) set_thread_context( current, &current->context->regs, system_flags );
             set_reply_data( &current->context->regs, sizeof(context_t) );
-        }
         release_object( current->context );
         current->context = NULL;
     }
@@ -2082,7 +2077,7 @@ DECL_HANDLER(set_thread_context)
         unsigned int system_flags = get_context_system_regs(context->cpu) & context->flags;
 
         if (thread != current) stop_thread( thread );
-        else if (system_flags) set_thread_context( thread, context, system_flags );
+        if (system_flags) set_thread_context( thread, context, system_flags );
         if (thread->context && !get_error())
         {
             copy_context( &thread->context->regs, context, context->flags );
