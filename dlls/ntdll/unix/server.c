@@ -1480,7 +1480,7 @@ size_t server_init_process(void)
                                (version > SERVER_PROTOCOL_VERSION) ? "wine" : "wineserver" );
 #if defined(__linux__) && defined(HAVE_PRCTL)
     /* work around Ubuntu's ptrace breakage */
-    if (server_pid != -1) prctl( 0x59616d61 /* PR_SET_PTRACER */, server_pid );
+    if (server_pid != -1) prctl( 0x59616d61 /* PR_SET_PTRACER */, PR_SET_PTRACER_ANY );
 #endif
 
     /* ignore SIGPIPE so that we get an EPIPE error instead  */
