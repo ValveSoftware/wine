@@ -1923,9 +1923,7 @@ DECL_HANDLER(select)
         {
             apc_call_t *data;
             data_size_t size = sizeof(*data) + (ctx->regs[CTX_WOW].flags ? 2 : 1) * sizeof(context_t);
-            unsigned int flags = system_flags & ctx->regs[CTX_NATIVE].flags;
 
-            if (flags) set_thread_context( current, &ctx->regs[CTX_NATIVE], flags );
             size = min( size, get_reply_max_size() );
             if ((data = set_reply_data_size( size )))
             {
@@ -2171,7 +2169,7 @@ DECL_HANDLER(set_thread_context)
         unsigned int flags = system_flags & contexts[CTX_NATIVE].flags;
 
         if (thread != current) stop_thread( thread );
-        else if (flags) set_thread_context( thread, &contexts[CTX_NATIVE], flags );
+        if (flags) set_thread_context( thread, &contexts[CTX_NATIVE], flags );
 
         if (thread->context && !get_error())
         {
