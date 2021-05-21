@@ -1855,8 +1855,6 @@ DECL_HANDLER(select)
         if (ctx->regs[CTX_NATIVE].flags || ctx->regs[CTX_WOW].flags)
         {
             data_size_t size = (ctx->regs[CTX_WOW].flags ? 2 : 1) * sizeof(context_t);
-            unsigned int flags = system_flags & ctx->regs[CTX_NATIVE].flags;
-            if (flags) set_thread_context( current, &ctx->regs[CTX_NATIVE], flags );
             set_reply_data( ctx->regs, min( size, get_reply_max_size() ));
         }
         release_object( ctx );
@@ -2095,7 +2093,7 @@ DECL_HANDLER(set_thread_context)
         unsigned int native_flags = always_native_flags & context->flags;
 
         if (thread != current) stop_thread( thread );
-        else if (flags) set_thread_context( thread, context, flags );
+        if (system_flags) set_thread_context( thread, context, system_flags );
         if (thread->context && !get_error())
         {
             if (ctx_count == 2)
