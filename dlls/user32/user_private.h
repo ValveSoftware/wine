@@ -152,6 +152,7 @@ static inline BOOL is_broadcast( HWND hwnd )
 }
 
 extern HMODULE user32_module DECLSPEC_HIDDEN;
+extern BOOL enable_mouse_in_pointer DECLSPEC_HIDDEN;
 
 struct dce;
 struct tagWND;
