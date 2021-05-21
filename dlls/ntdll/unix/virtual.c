@@ -4685,7 +4685,54 @@ NTSTATUS WINAPI NtReadVirtualMemory( HANDLE process, const void *addr, void *buf
                                      SIZE_T size, SIZE_T *bytes_read )
 {
     NTSTATUS status;
+#ifdef linux
+    int unix_pid;
+    ssize_t ret;
+    char fn[32];
+    int fd;
 
+    SERVER_START_REQ( read_process_memory )
+    {
+        req->handle = wine_server_obj_handle( process );
+        status = wine_server_call( req );
+        unix_pid = reply->unix_pid;
+    }
+    SERVER_END_REQ;
+
+    if (status)
+    {
+        WARN( "Could not get unix_pid for process %p, status %#x.\n", process, status );
+        size = 0;
+        goto done;
+    }
+
+    sprintf( fn, "/proc/%u/mem", unix_pid );
+    if ((fd = open( fn, O_RDONLY )) == -1)
+    {
+        ERR( "Could not open %s, errno %d.\n", fn, errno );
+        size = 0;
+        status = errno_to_status( errno );
+        goto done;
+    }
+    if ((ret = virtual_locked_pread( fd, buffer, size, (off_t)(ULONG_PTR)addr )) != size)
+    {
+        WARN( "Error reading memory from process %p, addr %p, size %p, buffer %p, ret %p, errno %d.\n",
+              process, addr, (void *)size, buffer, (void *)ret, errno );
+
+        if (ret == -1)
+        {
+            status = errno_to_status( errno );
+            size = 0;
+        }
+        else
+        {
+            status = STATUS_PARTIAL_COPY;
+            size = ret;
+        }
+    }
+    close(fd);
+done:
+#else
     if (virtual_check_buffer_for_write( buffer, size ))
     {
         SERVER_START_REQ( read_process_memory )
@@ -4702,6 +4749,7 @@ NTSTATUS WINAPI NtReadVirtualMemory( HANDLE process, const void *addr, void *buf
         status = STATUS_ACCESS_VIOLATION;
         size = 0;
     }
+#endif
     if (bytes_read) *bytes_read = size;
     return status;
 }
