@@ -2320,7 +2320,8 @@ static void dump_read_process_memory_request( const struct read_process_memory_r
 
 static void dump_read_process_memory_reply( const struct read_process_memory_reply *req )
 {
-    dump_varargs_bytes( " data=", cur_size );
+    fprintf( stderr, " unix_pid=%d", req->unix_pid );
+    dump_varargs_bytes( ", data=", cur_size );
 }
 
 static void dump_write_process_memory_request( const struct write_process_memory_request *req )

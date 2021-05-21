@@ -2248,7 +2248,9 @@ struct read_process_memory_request
 struct read_process_memory_reply
 {
     struct reply_header __header;
+    int unix_pid;
     /* VARARG(data,bytes); */
+    char __pad_12[4];
 };
 
 
@@ -6551,7 +6553,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 693
+#define SERVER_PROTOCOL_VERSION 696
 
 /* ### protocol_version end ### */
 
