@@ -1885,18 +1885,23 @@ NTSTATUS WINAPI NtSetContextThread( HANDLE handle, const CONTEXT *context )
  */
 NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
 {
-    NTSTATUS ret;
-    DWORD needed_flags;
     struct syscall_frame *frame = amd64_thread_data()->syscall_frame;
     BOOL self = (handle == GetCurrentThread());
+    BOOL use_cached_debug_regs = FALSE;
+    DWORD needed_flags;
     XSTATE *xstate;
+    NTSTATUS ret;
 
     if (!context) return STATUS_INVALID_PARAMETER;
 
     needed_flags = context->ContextFlags & ~CONTEXT_AMD64;
 
-    /* debug registers require a server call */
-    if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64)) self = FALSE;
+    if (self && needed_flags & CONTEXT_DEBUG_REGISTERS)
+    {
+        /* debug registers require a server call if hw breakpoints are enabled */
+        if (amd64_thread_data()->dr7 & 0xff) self = FALSE;
+        else use_cached_debug_regs = TRUE;
+    }
 
     if (!self)
     {
@@ -1983,15 +1988,27 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
             context->MxCsr = context->u.FltSave.MxCsr;
             context->ContextFlags |= CONTEXT_FLOATING_POINT;
         }
-        /* update the cached version of the debug registers */
         if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64))
         {
-            amd64_thread_data()->dr0 = context->Dr0;
-            amd64_thread_data()->dr1 = context->Dr1;
-            amd64_thread_data()->dr2 = context->Dr2;
-            amd64_thread_data()->dr3 = context->Dr3;
-            amd64_thread_data()->dr6 = context->Dr6;
-            amd64_thread_data()->dr7 = context->Dr7;
+            if (use_cached_debug_regs)
+            {
+                context->Dr0 = amd64_thread_data()->dr0;
+                context->Dr1 = amd64_thread_data()->dr1;
+                context->Dr2 = amd64_thread_data()->dr2;
+                context->Dr3 = amd64_thread_data()->dr3;
+                context->Dr6 = amd64_thread_data()->dr6;
+                context->Dr7 = amd64_thread_data()->dr7;
+            }
+            else
+            {
+                /* update the cached version of the debug registers */
+                amd64_thread_data()->dr0 = context->Dr0;
+                amd64_thread_data()->dr1 = context->Dr1;
+                amd64_thread_data()->dr2 = context->Dr2;
+                amd64_thread_data()->dr3 = context->Dr3;
+                amd64_thread_data()->dr6 = context->Dr6;
+                amd64_thread_data()->dr7 = context->Dr7;
+            }
         }
         if ((cpu_info.FeatureSet & CPU_FEATURE_AVX) && (xstate = xstate_from_context( context )))
         {
