@@ -990,10 +990,15 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
     struct syscall_frame *frame = x86_thread_data()->syscall_frame;
     DWORD needed_flags = context->ContextFlags & ~CONTEXT_i386;
     BOOL self = (handle == GetCurrentThread());
+    BOOL use_cached_debug_regs = FALSE;
     NTSTATUS ret;
 
-    /* debug registers require a server call */
-    if (needed_flags & CONTEXT_DEBUG_REGISTERS) self = FALSE;
+    if (self && needed_flags & CONTEXT_DEBUG_REGISTERS)
+    {
+        /* debug registers require a server call if hw breakpoints are enabled */
+        if (x86_thread_data()->dr7 & 0xff) self = FALSE;
+        else use_cached_debug_regs = TRUE;
+    }
 
     if (!self)
     {
@@ -1101,15 +1106,27 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
                 xstate->YmmContext = frame->xstate.YmmContext;
             }
         }
-        /* update the cached version of the debug registers */
-        if (needed_flags & CONTEXT_DEBUG_REGISTERS)
+        if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_i386))
         {
-            x86_thread_data()->dr0 = context->Dr0;
-            x86_thread_data()->dr1 = context->Dr1;
-            x86_thread_data()->dr2 = context->Dr2;
-            x86_thread_data()->dr3 = context->Dr3;
-            x86_thread_data()->dr6 = context->Dr6;
-            x86_thread_data()->dr7 = context->Dr7;
+            if (use_cached_debug_regs)
+            {
+                context->Dr0 = x86_thread_data()->dr0;
+                context->Dr1 = x86_thread_data()->dr1;
+                context->Dr2 = x86_thread_data()->dr2;
+                context->Dr3 = x86_thread_data()->dr3;
+                context->Dr6 = x86_thread_data()->dr6;
+                context->Dr7 = x86_thread_data()->dr7;
+            }
+            else
+            {
+                /* update the cached version of the debug registers */
+                x86_thread_data()->dr0 = context->Dr0;
+                x86_thread_data()->dr1 = context->Dr1;
+                x86_thread_data()->dr2 = context->Dr2;
+                x86_thread_data()->dr3 = context->Dr3;
+                x86_thread_data()->dr6 = context->Dr6;
+                x86_thread_data()->dr7 = context->Dr7;
+            }
         }
     }
 
