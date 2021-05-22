@@ -1803,10 +1803,15 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
 {
     struct syscall_frame *frame = amd64_thread_data()->syscall_frame;
     DWORD needed_flags = context->ContextFlags & ~CONTEXT_AMD64;
+    BOOL use_cached_debug_regs = FALSE;
     BOOL self = (handle == GetCurrentThread());
 
-    /* debug registers require a server call */
-    if (needed_flags & CONTEXT_DEBUG_REGISTERS) self = FALSE;
+    if (self && needed_flags & CONTEXT_DEBUG_REGISTERS)
+    {
+        /* debug registers require a server call if hw breakpoints are enabled */
+        if (amd64_thread_data()->dr7 & 0xff) self = FALSE;
+        else use_cached_debug_regs = TRUE;
+    }
 
     if (!self)
     {
@@ -1905,15 +1910,27 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
             memcpy( &xstate->YmmContext, &frame->xstate.YmmContext, sizeof(xstate->YmmContext) );
         }
     }
-    /* update the cached version of the debug registers */
-    if (needed_flags & CONTEXT_DEBUG_REGISTERS)
+    if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64))
     {
-        amd64_thread_data()->dr0 = context->Dr0;
-        amd64_thread_data()->dr1 = context->Dr1;
-        amd64_thread_data()->dr2 = context->Dr2;
-        amd64_thread_data()->dr3 = context->Dr3;
-        amd64_thread_data()->dr6 = context->Dr6;
-        amd64_thread_data()->dr7 = context->Dr7;
+        if (use_cached_debug_regs)
+        {
+            context->Dr0 = amd64_thread_data()->dr0;
+            context->Dr1 = amd64_thread_data()->dr1;
+            context->Dr2 = amd64_thread_data()->dr2;
+            context->Dr3 = amd64_thread_data()->dr3;
+            context->Dr6 = amd64_thread_data()->dr6;
+            context->Dr7 = amd64_thread_data()->dr7;
+        }
+        else
+        {
+            /* update the cached version of the debug registers */
+            amd64_thread_data()->dr0 = context->Dr0;
+            amd64_thread_data()->dr1 = context->Dr1;
+            amd64_thread_data()->dr2 = context->Dr2;
+            amd64_thread_data()->dr3 = context->Dr3;
+            amd64_thread_data()->dr6 = context->Dr6;
+            amd64_thread_data()->dr7 = context->Dr7;
+        }
     }
     return STATUS_SUCCESS;
 }
