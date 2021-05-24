@@ -3294,7 +3294,19 @@ void DECLSPEC_HIDDEN call_init_thunk( LPTHREAD_START_ROUTINE entry, void *arg, B
         *(XSAVE_FORMAT *)wow_context->ExtendedRegisters = context.u.FltSave;
     }
 
-    if (suspend) wait_suspend( &context );
+    if (suspend)
+    {
+        wait_suspend( &context );
+        if (context.ContextFlags & CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64)
+        {
+            amd64_thread_data()->dr0 = context.Dr0;
+            amd64_thread_data()->dr1 = context.Dr1;
+            amd64_thread_data()->dr2 = context.Dr2;
+            amd64_thread_data()->dr3 = context.Dr3;
+            amd64_thread_data()->dr6 = context.Dr6;
+            amd64_thread_data()->dr7 = context.Dr7;
+        }
+    }
 
     ctx = (CONTEXT *)((ULONG_PTR)context.Rsp & ~15) - 1;
     *ctx = context;
