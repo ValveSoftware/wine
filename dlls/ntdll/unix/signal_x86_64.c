@@ -3113,6 +3113,15 @@ PCONTEXT DECLSPEC_HIDDEN get_initial_context( LPTHREAD_START_ROUTINE entry, void
         wait_suspend( &context );
         ctx = (CONTEXT *)((ULONG_PTR)context.Rsp & ~15) - 1;
         *ctx = context;
+        if (context.ContextFlags & CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64)
+        {
+            amd64_thread_data()->dr0 = context.Dr0;
+            amd64_thread_data()->dr1 = context.Dr1;
+            amd64_thread_data()->dr2 = context.Dr2;
+            amd64_thread_data()->dr3 = context.Dr3;
+            amd64_thread_data()->dr6 = context.Dr6;
+            amd64_thread_data()->dr7 = context.Dr7;
+        }
     }
     else
     {
