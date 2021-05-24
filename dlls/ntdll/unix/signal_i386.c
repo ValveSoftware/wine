@@ -2481,6 +2481,15 @@ void init_syscall_frame( LPTHREAD_START_ROUTINE entry, void *arg, BOOL suspend, 
     {
         context.ContextFlags |= CONTEXT_EXCEPTION_REPORTING | CONTEXT_EXCEPTION_ACTIVE;
         wait_suspend( &context );
+        if (context.ContextFlags & CONTEXT_DEBUG_REGISTERS & ~CONTEXT_i386)
+        {
+            x86_thread_data()->dr0 = context.Dr0;
+            x86_thread_data()->dr1 = context.Dr1;
+            x86_thread_data()->dr2 = context.Dr2;
+            x86_thread_data()->dr3 = context.Dr3;
+            x86_thread_data()->dr6 = context.Dr6;
+            x86_thread_data()->dr7 = context.Dr7;
+        }
     }
 
     ctx = (CONTEXT *)((ULONG_PTR)context.Esp & ~3) - 1;
