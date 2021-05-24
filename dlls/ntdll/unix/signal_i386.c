@@ -2390,7 +2390,19 @@ void DECLSPEC_HIDDEN call_init_thunk( LPTHREAD_START_ROUTINE entry, void *arg, B
     ((XSAVE_FORMAT *)context.ExtendedRegisters)->MxCsr = 0x1f80;
     if ((ctx = get_cpu_area( IMAGE_FILE_MACHINE_I386 ))) *ctx = context;
 
-    if (suspend) wait_suspend( &context );
+    if (suspend)
+    {
+        wait_suspend( &context );
+        if (context.ContextFlags & CONTEXT_DEBUG_REGISTERS & ~CONTEXT_i386)
+        {
+            x86_thread_data()->dr0 = context.Dr0;
+            x86_thread_data()->dr1 = context.Dr1;
+            x86_thread_data()->dr2 = context.Dr2;
+            x86_thread_data()->dr3 = context.Dr3;
+            x86_thread_data()->dr6 = context.Dr6;
+            x86_thread_data()->dr7 = context.Dr7;
+        }
+    }
 
     ctx = (CONTEXT *)((ULONG_PTR)context.Esp & ~3) - 1;
     *ctx = context;
