@@ -1021,17 +1021,48 @@ static HRESULT WINAPI HTMLStyleSheet_put_cssText(IHTMLStyleSheet *iface, BSTR v)
     }while(NS_SUCCEEDED(nsres));
 
     if(v && *v) {
+        UINT32 i, depth, idx;
         nsAString nsstr;
-        UINT32 idx;
+        WCHAR *ws;
 
-        /* FIXME: This won't work for multiple rules in the string. */
-        nsAString_InitDepend(&nsstr, v);
-        nsres = nsIDOMCSSStyleSheet_InsertRule(This->nsstylesheet, &nsstr, 0, &idx);
-        nsAString_Finish(&nsstr);
-        if(NS_FAILED(nsres)) {
-            FIXME("InsertRule failed for string %s. Probably multiple rules passed.\n", debugstr_w(v));
-            return E_FAIL;
+        depth = 0;
+        ws = heap_alloc(sizeof(*ws) * (lstrlenW(v) + 1));
+        do
+        {
+            for (i = 0; v[i]; ++i)
+            {
+                ws[i] = v[i];
+                if (ws[i] == '{')
+                    ++depth;
+                else if (ws[i] == '}' && !--depth)
+                    break;
+            }
+            if (ws[i])
+                ws[++i] = 0;
+
+            v += i;
+
+            for (i = 0; ws[i]; ++i)
+                if (!iswspace(ws[i]))
+                    break;
+
+            if (!ws[i])
+            {
+                TRACE("Skipping empty part.\n");
+                continue;
+            }
+
+            nsAString_InitDepend(&nsstr, ws);
+            nsres = nsIDOMCSSStyleSheet_InsertRule(This->nsstylesheet, &nsstr, 0, &idx);
+            nsAString_Finish(&nsstr);
+
+            if(NS_FAILED(nsres))
+                FIXME("InsertRule failed for string %s.\n", debugstr_w(ws));
+            else
+                TRACE("Added rule %s.\n", debugstr_w(ws));
         }
+        while (*v);
+        heap_free(ws);
     }
 
     return S_OK;
