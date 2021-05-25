@@ -11326,6 +11326,46 @@ interface IHTMLDatabinding : IDispatch
     WINE_IELEMENTSELECTOR_DISPINTERFACE_DECL;   \
     WINE_IHTMLDOMCONSTRUCTOR_DISPINTERFACE_DECL
 
+
+[
+    odl,
+    oleautomation,
+    dual,
+    uuid(5acf28ca-0cd7-4786-be9b-97a9df3b31e2)
+]
+interface IDOMTokenList : IDispatch
+{
+    [id(1)]
+    HRESULT add([in] VARIANT *token);
+
+    [id(2)]
+    HRESULT remove([in] VARIANT *token);
+}
+
+[
+    hidden,
+    uuid(5acf28ca-0cd7-4786-be9b-97a9df3b31e2)
+]
+dispinterface DispDOMTokenList
+{
+properties:
+methods:
+    [id(1)]
+    void add([in] VARIANT *token);
+
+    [id(2)]
+    void remove([in] VARIANT *token);
+}
+
+[
+    uuid(fe4671a2-7957-40ed-b5eb-27cec0ef41eb)
+]
+coclass DOMTokenList
+{
+    [default]         dispinterface DispDOMTokenList;
+    interface IDOMTokenList;
+}
+
 /*****************************************************************************
  *    IHTMLGenericElement interface
  */

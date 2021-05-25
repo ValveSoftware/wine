@@ -18,6 +18,7 @@
 
 
 #include <stdarg.h>
+#include <assert.h>
 
 #define COBJMACROS
 
@@ -31,6 +32,20 @@
 #include "mshtml_private.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
+
+typedef struct domtokenlist
+{
+    DispatchEx dispex;
+    IDOMTokenList IDOMTokenList_iface;
+    IHTMLElement *element;
+
+    LONG ref;
+} tokenlist;
+
+static inline tokenlist *impl_from_IDOMTokenList(IDOMTokenList *iface)
+{
+    return CONTAINING_RECORD(iface, tokenlist, IDOMTokenList_iface);
+}
 
 struct HTMLGenericElement {
     HTMLElement element;
@@ -147,6 +162,16 @@ static HRESULT HTMLGenericElement_QI(HTMLDOMNode *iface, REFIID riid, void **ppv
 static void HTMLGenericElement_destructor(HTMLDOMNode *iface)
 {
     HTMLGenericElement *This = impl_from_HTMLDOMNode(iface);
+    tokenlist *class_list;
+    VARIANT *class_list_prop;
+
+    if (SUCCEEDED(dispex_get_dprop_ref(&This->element.node.event_target.dispex, L"classList", FALSE, &class_list_prop))
+            && V_VT(class_list_prop) == VT_DISPATCH)
+    {
+        class_list = impl_from_IDOMTokenList((IDOMTokenList *)V_DISPATCH(class_list_prop));
+        if (class_list)
+            class_list->element = NULL;
+    }
 
     HTMLElement_destructor(&This->element.node);
 }
@@ -174,8 +199,275 @@ static dispex_static_data_t HTMLGenericElement_dispex = {
     HTMLElement_init_dispex_info
 };
 
+static HRESULT WINAPI tokenlist_QueryInterface(IDOMTokenList *iface, REFIID riid, void **ppv)
+{
+    tokenlist *This = impl_from_IDOMTokenList(iface);
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+
+    if(IsEqualGUID(&IID_IUnknown, riid)) {
+        *ppv = &This->IDOMTokenList_iface;
+    }else if(IsEqualGUID(&IID_IDOMTokenList, riid)) {
+        *ppv = &This->IDOMTokenList_iface;
+    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
+        return *ppv ? S_OK : E_NOINTERFACE;
+    }else {
+        FIXME("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown*)*ppv);
+    return S_OK;
+}
+
+static ULONG WINAPI tokenlist_AddRef(IDOMTokenList *iface)
+{
+    tokenlist *This = impl_from_IDOMTokenList(iface);
+    LONG ref = InterlockedIncrement(&This->ref);
+
+    TRACE("(%p) ref=%d\n", This, ref);
+
+    return ref;
+}
+
+static ULONG WINAPI tokenlist_Release(IDOMTokenList *iface)
+{
+    tokenlist *This = impl_from_IDOMTokenList(iface);
+    LONG ref = InterlockedDecrement(&This->ref);
+
+    TRACE("(%p) ref=%d\n", This, ref);
+
+    if(!ref) {
+        release_dispex(&This->dispex);
+        heap_free(This);
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI tokenlist_GetTypeInfoCount(IDOMTokenList *iface, UINT *pctinfo)
+{
+    tokenlist *This = impl_from_IDOMTokenList(iface);
+    FIXME("(%p)->(%p)\n", This, pctinfo);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI tokenlist_GetTypeInfo(IDOMTokenList *iface, UINT iTInfo,
+        LCID lcid, ITypeInfo **ppTInfo)
+{
+    tokenlist *This = impl_from_IDOMTokenList(iface);
+
+    return IDispatchEx_GetTypeInfo(&This->dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
+}
+
+static HRESULT WINAPI tokenlist_GetIDsOfNames(IDOMTokenList *iface, REFIID riid,
+        LPOLESTR *rgszNames, UINT cNames, LCID lcid, DISPID *rgDispId)
+{
+    tokenlist *This = impl_from_IDOMTokenList(iface);
+
+    return IDispatchEx_GetIDsOfNames(&This->dispex.IDispatchEx_iface, riid, rgszNames, cNames,
+            lcid, rgDispId);
+}
+
+static HRESULT WINAPI tokenlist_Invoke(IDOMTokenList *iface, DISPID dispIdMember,
+        REFIID riid, LCID lcid, WORD wFlags, DISPPARAMS *pDispParams,
+        VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
+{
+    tokenlist *This = impl_from_IDOMTokenList(iface);
+
+    return IDispatchEx_Invoke(&This->dispex.IDispatchEx_iface, dispIdMember, riid, lcid, wFlags,
+            pDispParams, pVarResult, pExcepInfo, puArgErr);
+}
+
+static const WCHAR *token_present(const WCHAR *list, const WCHAR *token, unsigned int token_len)
+{
+    const WCHAR *ptr, *next;
+
+    if (!list || !token)
+        return NULL;
+
+    ptr = list;
+    while (*ptr)
+    {
+        while (iswspace(*ptr))
+            ++ptr;
+        if (!*ptr)
+            break;
+        next = ptr + 1;
+        while (*next && !iswspace(*next))
+            ++next;
+
+        if (next - ptr == token_len && !wcsncmp(ptr, token, token_len))
+            return ptr;
+        ptr = next;
+    }
+    return NULL;
+}
+
+static HRESULT WINAPI tokenlist_add(IDOMTokenList *iface, VARIANT *token)
+{
+    tokenlist *list = impl_from_IDOMTokenList(iface);
+    const WCHAR *ptr, *next;
+    unsigned int new_pos, alloc_len;
+    WCHAR *old, *new;
+    HRESULT hr;
+
+    TRACE("iface %p, token %p (%s).\n", iface, token,
+            token && V_VT(token) == VT_BSTR ? debugstr_w(V_BSTR(token)) : "");
+
+    if (!list->element)
+        return E_FAIL;
+
+    if (V_VT(token) != VT_BSTR)
+    {
+        FIXME("Unexpected token type %u.\n", V_VT(token));
+        return E_INVALIDARG;
+    }
+
+    if (FAILED(hr = IHTMLElement_get_className(list->element, &old)))
+        return hr;
+
+    TRACE("old %s.\n", debugstr_w(old));
+
+    ptr = V_BSTR(token);
+    new_pos = old ? lstrlenW(old) : 0;
+    alloc_len = new_pos + lstrlenW(ptr) + 2;
+    new = heap_alloc(sizeof(*new) * (new_pos + lstrlenW(ptr) + 2));
+    memcpy(new, old, sizeof(*new) * new_pos);
+    while (*ptr)
+    {
+        while (iswspace(*ptr))
+            ++ptr;
+        if (!*ptr)
+            break;
+        next = ptr + 1;
+        while (*next && !iswspace(*next))
+            ++next;
+
+        if (!token_present(old, ptr, next - ptr))
+        {
+            if (new_pos)
+                new[new_pos++] = L' ';
+            memcpy(new + new_pos, ptr, sizeof(*new) * (next - ptr));
+            new_pos += next - ptr;
+            assert(new_pos < alloc_len);
+        }
+        ptr = next;
+    }
+    new[new_pos] = 0;
+
+    SysFreeString(old);
+    TRACE("new %s.\n", debugstr_w(new));
+
+    hr = IHTMLElement_put_className(list->element, new);
+    heap_free(new);
+    return hr;
+}
+
+static HRESULT WINAPI tokenlist_remove(IDOMTokenList *iface, VARIANT *token)
+{
+    tokenlist *list = impl_from_IDOMTokenList(iface);
+    const WCHAR *ptr, *next;
+    unsigned int new_pos;
+    WCHAR *old, *new;
+    HRESULT hr;
+
+    TRACE("iface %p, token %p (%s).\n", iface, token,
+            token && V_VT(token) == VT_BSTR ? debugstr_w(V_BSTR(token)) : "");
+
+    if (!list->element)
+        return E_FAIL;
+
+    if (V_VT(token) != VT_BSTR)
+    {
+        FIXME("Unexpected token type %u.\n", V_VT(token));
+        return E_INVALIDARG;
+    }
+
+    if (FAILED(hr = IHTMLElement_get_className(list->element, &old)))
+        return hr;
+
+    if (!old)
+        return S_OK;
+
+    TRACE("old %s.\n", debugstr_w(old));
+
+    ptr = old;
+    new_pos = 0;
+    new = heap_alloc(sizeof(*new) * (lstrlenW(old) + 1));
+    while (*ptr)
+    {
+        while (iswspace(*ptr))
+            ++ptr;
+        if (!*ptr)
+            break;
+        next = ptr + 1;
+        while (*next && !iswspace(*next))
+            ++next;
+
+        if (!token_present(V_BSTR(token), ptr, next - ptr))
+        {
+            if (new_pos)
+                new[new_pos++] = L' ';
+            memcpy(new + new_pos, ptr, sizeof(*new) * (next - ptr));
+            new_pos += next - ptr;
+        }
+        ptr = next;
+    }
+    new[new_pos] = 0;
+
+    SysFreeString(old);
+    TRACE("new %s, new_pos %d\n", debugstr_w(new), new_pos);
+
+    hr = IHTMLElement_put_className(list->element, new);
+    heap_free(new);
+    return hr;
+}
+
+static const IDOMTokenListVtbl DOMTokenListVtbl = {
+    tokenlist_QueryInterface,
+    tokenlist_AddRef,
+    tokenlist_Release,
+    tokenlist_GetTypeInfoCount,
+    tokenlist_GetTypeInfo,
+    tokenlist_GetIDsOfNames,
+    tokenlist_Invoke,
+    tokenlist_add,
+    tokenlist_remove,
+};
+
+static const tid_t domtokenlist_iface_tids[] = {
+    IDOMTokenList_tid,
+    0
+};
+static dispex_static_data_t domtokenlist_dispex = {
+    NULL,
+    IDOMTokenList_tid,
+    domtokenlist_iface_tids
+};
+
+static HRESULT create_domtokenlist(IHTMLElement *element, IDOMTokenList **ret)
+{
+    tokenlist *obj;
+
+    obj = heap_alloc_zero(sizeof(*obj));
+    if(!obj)
+        return E_OUTOFMEMORY;
+
+    obj->IDOMTokenList_iface.lpVtbl = &DOMTokenListVtbl;
+    obj->ref = 1;
+    obj->element = element;
+    init_dispex(&obj->dispex, (IUnknown*)&obj->IDOMTokenList_iface, &domtokenlist_dispex);
+
+    *ret = &obj->IDOMTokenList_iface;
+    return S_OK;
+}
+
 HRESULT HTMLGenericElement_Create(HTMLDocumentNode *doc, nsIDOMElement *nselem, HTMLElement **elem)
 {
+    IDOMTokenList *class_list;
+    VARIANT *class_list_prop;
     HTMLGenericElement *ret;
 
     ret = heap_alloc_zero(sizeof(HTMLGenericElement));
@@ -187,6 +479,20 @@ HRESULT HTMLGenericElement_Create(HTMLDocumentNode *doc, nsIDOMElement *nselem, 
 
     HTMLElement_Init(&ret->element, doc, nselem, &HTMLGenericElement_dispex);
 
+    if (FAILED(create_domtokenlist(&ret->element.IHTMLElement_iface, &class_list)))
+    {
+        ERR("Could not create class_list.\n");
+    }
+    else if (FAILED(dispex_get_dprop_ref(&ret->element.node.event_target.dispex, L"classList", TRUE, &class_list_prop)))
+    {
+        IDOMTokenList_Release(class_list);
+        ERR("Could not add classList property.\n");
+    }
+    else
+    {
+        V_VT(class_list_prop) = VT_DISPATCH;
+        V_DISPATCH(class_list_prop) = (IDispatch *)class_list;
+    }
     *elem = &ret->element;
     return S_OK;
 }
