@@ -2104,7 +2104,18 @@ static HRESULT WINAPI src_reader_Flush(IMFSourceReaderEx *iface, DWORD index)
     struct source_reader *reader = impl_from_IMFSourceReaderEx(iface);
     HRESULT hr;
 
+    const char *sgi;
+
     TRACE("%p, %#lx.\n", iface, index);
+
+    sgi = getenv("SteamGameId");
+    if (sgi && strcmp(sgi, "1293160") == 0)
+    {
+        /* In The Medium flushes sometimes lead to the callback
+           calling objects that have already been destroyed. */
+        WARN("ignoring flush\n");
+        return S_OK;
+    }
 
     EnterCriticalSection(&reader->cs);
 
