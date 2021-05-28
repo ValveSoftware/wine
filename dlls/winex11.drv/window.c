@@ -132,6 +132,7 @@ static int detect_wm(Display *dpy)
     int format, err;
     unsigned long count, remaining;
     char *wm_name;
+    char const *sgi = getenv("SteamGameId");
 
     static int cached = -1;
 
@@ -182,6 +183,11 @@ static int detect_wm(Display *dpy)
             XFree(wm_check);
         }else
             cached = WINE_WM_UNKNOWN;
+
+        /* Street Fighter V expects a certain sequence of window resizes
+           or gets stuck on startup. The AdjustWindowRect / WM_NCCALCSIZE
+           hacks confuse it completely, so let's disable them */
+        if (sgi && !strcmp(sgi, "310950")) cached = WINE_WM_UNKNOWN;
 
         __wine_set_window_manager(cached);
     }
