@@ -3812,8 +3812,19 @@ void net_supporting_wm_check_init( struct x11drv_thread_data *data )
     else if (get_window_net_wm_name( data->display, window, &data->window_manager ) ||
              get_window_wm_name( data->display, window, &data->window_manager ))
     {
+        char const *sgi = getenv( "SteamGameId" );
+
         if (!strcmp( data->window_manager, "GNOME Shell" )) strcpy( data->window_manager, "Mutter" );
         TRACE( "Detected window manager: %s\n", debugstr_a(data->window_manager) );
+
+        /* Street Fighter V expects a certain sequence of window resizes
+           or gets stuck on startup. The AdjustWindowRect / WM_NCCALCSIZE
+           hacks confuse it completely, so let's disable them */
+        if (sgi && !strcmp(sgi, "310950"))
+        {
+            XFree( data->window_manager );
+            data->window_manager = NULL;
+        }
     }
 }
 
