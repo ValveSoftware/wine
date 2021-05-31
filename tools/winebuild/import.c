@@ -1447,6 +1447,8 @@ static void output_syscall_dispatcher( int count, const char *variant )
         output( "\tmovl %%esi,-0x04(%%ebp)\n" );
         output_cfi( ".cfi_rel_offset %%esi,-0x04\n" );
         output( "\tpushfl\n" );
+        output( "\tpushl $0x202\n" );
+        output( "\tpopfl\n" );
         output( "\tmovw %%gs,-0x1a(%%ebp)\n" );
         output( "\tmovw %%fs,-0x1c(%%ebp)\n" );
         output( "\tmovw %%es,-0x1e(%%ebp)\n" );
