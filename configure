@@ -1905,6 +1905,7 @@ enable_start
 enable_subst
 enable_svchost
 enable_systeminfo
+enable_tabtip
 enable_taskkill
 enable_tasklist
 enable_taskmgr
@@ -22689,6 +22690,7 @@ wine_fn_config_makefile programs/start enable_start
 wine_fn_config_makefile programs/subst enable_subst
 wine_fn_config_makefile programs/svchost enable_svchost
 wine_fn_config_makefile programs/systeminfo enable_systeminfo
+wine_fn_config_makefile programs/tabtip enable_tabtip
 wine_fn_config_makefile programs/taskkill enable_taskkill
 wine_fn_config_makefile programs/tasklist enable_tasklist
 wine_fn_config_makefile programs/taskmgr enable_taskmgr
