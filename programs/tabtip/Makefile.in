@@ -1,0 +1,6 @@
+MODULE    = tabtip.exe
+IMPORTS   = uuid ole32 user32 oleacc uiautomationcore rpcrt4 shell32
+
+EXTRADLLFLAGS = -mconsole -municode -mno-cygwin
+
+C_SRCS = tabtip.c
