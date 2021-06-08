@@ -817,6 +817,8 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (event->detail == NotifyPointer) return FALSE;
     if (hwnd == GetDesktopWindow()) return FALSE;
 
+    x11drv_thread_data()->keymapnotify_hwnd = hwnd;
+
     /* Focus was just restored but it can be right after super was
      * pressed and gnome-shell needs a bit of time to respond and
      * toggle the activity view. If we grab the cursor right away
