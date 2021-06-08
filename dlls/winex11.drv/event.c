@@ -829,7 +829,11 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     SendMessageW( GetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, 0, 0 );
 
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
-    if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
+    if (event->mode == NotifyGrab || event->mode == NotifyUngrab)
+    {
+        x11drv_thread_data()->kbd_grab_release_hwnd = hwnd;
+        return FALSE;
+    }
 
     if ((xic = X11DRV_get_ic( hwnd ))) XSetICFocus( xic );
     if (use_take_focus)
