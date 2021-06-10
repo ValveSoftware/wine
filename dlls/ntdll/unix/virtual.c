@@ -54,6 +54,8 @@
 # include <mach/mach_vm.h>
 #endif
 
+#include <sys/uio.h>
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "windef.h"
@@ -4686,10 +4688,9 @@ NTSTATUS WINAPI NtReadVirtualMemory( HANDLE process, const void *addr, void *buf
 {
     NTSTATUS status;
 #ifdef linux
+    struct iovec local, remote;
     int unix_pid;
     ssize_t ret;
-    char fn[32];
-    int fd;
 
     SERVER_START_REQ( read_process_memory )
     {
@@ -4706,22 +4707,20 @@ NTSTATUS WINAPI NtReadVirtualMemory( HANDLE process, const void *addr, void *buf
         goto done;
     }
 
-    sprintf( fn, "/proc/%u/mem", unix_pid );
-    if ((fd = open( fn, O_RDONLY )) == -1)
-    {
-        ERR( "Could not open %s, errno %d.\n", fn, errno );
-        size = 0;
-        status = errno_to_status( errno );
-        goto done;
-    }
-    if ((ret = virtual_locked_pread( fd, buffer, size, (off_t)(ULONG_PTR)addr )) != size)
+    local.iov_base = buffer;
+    local.iov_len = size;
+
+    remote.iov_base = (void *)addr;
+    remote.iov_len = size;
+
+    if ((ret = process_vm_readv( unix_pid, &local, 1, &remote, 1, 0 )) != size)
     {
         WARN( "Error reading memory from process %p, addr %p, size %p, buffer %p, ret %p, errno %d.\n",
               process, addr, (void *)size, buffer, (void *)ret, errno );
 
         if (ret == -1)
         {
-            status = errno_to_status( errno );
+            status = errno == ESRCH ? STATUS_PARTIAL_COPY : errno_to_status( errno );
             size = 0;
         }
         else
@@ -4730,7 +4729,6 @@ NTSTATUS WINAPI NtReadVirtualMemory( HANDLE process, const void *addr, void *buf
             size = ret;
         }
     }
-    close(fd);
 done:
 #else
     if (virtual_check_buffer_for_write( buffer, size ))
