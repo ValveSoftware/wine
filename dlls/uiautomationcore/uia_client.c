@@ -29,6 +29,13 @@ struct uia_data {
     LONG ref;
 };
 
+struct uia_elem_data {
+    IUIAutomationElement IUIAutomationElement_iface;
+    LONG ref;
+};
+
+static inline struct uia_elem_data *impl_from_IUIAutomationElement(IUIAutomationElement *iface);
+
 static inline struct uia_data *impl_from_IUIAutomation(IUIAutomation *iface)
 {
     return CONTAINING_RECORD(iface, struct uia_data, IUIAutomation_iface);
@@ -613,6 +620,818 @@ HRESULT create_uia_iface(IUIAutomation **iface)
     uia->IUIAutomation_iface.lpVtbl = &uia_vtbl;
     uia->ref = 1;
     *iface = &uia->IUIAutomation_iface;
+
+    return S_OK;
+}
+
+static inline struct uia_elem_data *impl_from_IUIAutomationElement(IUIAutomationElement *iface)
+{
+    return CONTAINING_RECORD(iface, struct uia_elem_data, IUIAutomationElement_iface);
+}
+
+static HRESULT WINAPI uia_elem_QueryInterface(IUIAutomationElement *iface, REFIID riid,
+        void **ppvObject)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_guid(riid), ppvObject);
+
+    if (IsEqualIID(riid, &IID_IUIAutomationElement) ||
+            IsEqualIID(riid, &IID_IUnknown))
+        *ppvObject = iface;
+    else
+    {
+        WARN("no interface: %s\n", debugstr_guid(riid));
+        *ppvObject = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUIAutomationElement_AddRef(iface);
+
+    return S_OK;
+}
+
+static ULONG WINAPI uia_elem_AddRef(IUIAutomationElement *iface)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    ULONG ref = InterlockedIncrement(&This->ref);
+
+    TRACE("(%p) ref = %u\n", This, ref);
+    return ref;
+}
+
+static ULONG WINAPI uia_elem_Release(IUIAutomationElement *iface)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    ULONG ref = InterlockedDecrement(&This->ref);
+
+    TRACE("(%p) ref = %u\n", This, ref);
+
+    if(!ref)
+        heap_free(This);
+
+    return ref;
+}
+
+static HRESULT WINAPI uia_elem_SetFocus(IUIAutomationElement *iface)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetRuntimeId(IUIAutomationElement *iface,
+        SAFEARRAY **runtimeId)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_FindFirst(IUIAutomationElement *iface,
+        enum TreeScope scope, IUIAutomationCondition *condition,
+        IUIAutomationElement **found)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_FindAll(IUIAutomationElement *iface,
+        enum TreeScope scope, IUIAutomationCondition *condition,
+        IUIAutomationElementArray **found)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_FindFirstBuildCache(IUIAutomationElement *iface,
+        enum TreeScope scope, IUIAutomationCondition *condition,
+        IUIAutomationCacheRequest *cacheRequest,
+        IUIAutomationElement **found)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_FindAllBuildCache(IUIAutomationElement *iface,
+        enum TreeScope scope, IUIAutomationCondition *condition,
+        IUIAutomationCacheRequest *cacheRequest, IUIAutomationElementArray **found)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_BuildUpdatedCache(IUIAutomationElement *iface,
+        IUIAutomationCacheRequest *cacheRequest, IUIAutomationElement **updatedElement)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCurrentPropertyValue(IUIAutomationElement *iface,
+        PROPERTYID propertyId, VARIANT *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCurrentPropertyValueEx(IUIAutomationElement *iface,
+        PROPERTYID propertyId, BOOL ignoreDefaultValue, VARIANT *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCachedPropertyValue(IUIAutomationElement *iface,
+        PROPERTYID propertyId, VARIANT *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCachedPropertyValueEx(IUIAutomationElement *iface,
+        PROPERTYID propertyId, BOOL ignoreDefaultValue, VARIANT *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCurrentPatternAs(IUIAutomationElement *iface,
+        PATTERNID patternId, REFIID riid, void **patternObject)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCachedPatternAs(IUIAutomationElement *iface,
+        PATTERNID patternId, REFIID riid, void **patternObject)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCurrentPattern(IUIAutomationElement *iface,
+        PATTERNID patternId, IUnknown **patternObject)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCachedPattern(IUIAutomationElement *iface,
+        PATTERNID patternId, IUnknown **patternObject)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCachedParent(IUIAutomationElement *iface,
+        IUIAutomationElement **parent)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetCachedChildren(IUIAutomationElement *iface,
+        IUIAutomationElementArray **children)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentProcessId(IUIAutomationElement *iface,
+        int *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentControlType(IUIAutomationElement *iface,
+        CONTROLTYPEID *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentLocalizedControlType(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentName(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentAcceleratorKey(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentAccessKey(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentHasKeyboardFocus(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsKeyboardFocusable(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsEnabled(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentAutomationId(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentClassName(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentHelpText(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentCulture(IUIAutomationElement *iface,
+        int *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsControlElement(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsContentElement(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsPassword(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentNativeWindowHandle(IUIAutomationElement *iface,
+        UIA_HWND *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentItemType(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsOffscreen(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentOrientation(IUIAutomationElement *iface,
+        enum OrientationType *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentFrameworkId(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsRequiredForForm(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentItemStatus(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentBoundingRectangle(IUIAutomationElement *iface,
+        RECT *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentLabeledBy(IUIAutomationElement *iface,
+        IUIAutomationElement **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentAriaRole(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentAriaProperties(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentIsDataValidForForm(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentControllerFor(IUIAutomationElement *iface,
+        IUIAutomationElementArray **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentDescribedBy(IUIAutomationElement *iface,
+        IUIAutomationElementArray **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentFlowsTo(IUIAutomationElement *iface,
+        IUIAutomationElementArray **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CurrentProviderDescription(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedProcessId(IUIAutomationElement *iface,
+        int *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedControlType(IUIAutomationElement *iface,
+        CONTROLTYPEID *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedLocalizedControlType(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedName(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedAcceleratorKey(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedAccessKey(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedHasKeyboardFocus(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsKeyboardFocusable(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsEnabled(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedAutomationId(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedClassName(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedHelpText(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedCulture(IUIAutomationElement *iface,
+        int *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsControlElement(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsContentElement(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsPassword(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedNativeWindowHandle(IUIAutomationElement *iface,
+        UIA_HWND *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedItemType(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsOffscreen(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedOrientation(IUIAutomationElement *iface,
+        enum OrientationType *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedFrameworkId(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsRequiredForForm(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedItemStatus(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedBoundingRectangle(IUIAutomationElement *iface,
+        RECT *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedLabeledBy(IUIAutomationElement *iface,
+        IUIAutomationElement **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedAriaRole(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedAriaProperties(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedIsDataValidForForm(IUIAutomationElement *iface,
+        BOOL *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedControllerFor(IUIAutomationElement *iface,
+        IUIAutomationElementArray **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedDescribedBy(IUIAutomationElement *iface,
+        IUIAutomationElementArray **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedFlowsTo(IUIAutomationElement *iface,
+        IUIAutomationElementArray **retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_get_CachedProviderDescription(IUIAutomationElement *iface,
+        BSTR *retVal)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI uia_elem_GetClickablePoint(IUIAutomationElement *iface,
+        POINT *clickable, BOOL *gotClickable)
+{
+    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
+    FIXME("%p\n", This);
+    return E_NOTIMPL;
+}
+
+static const IUIAutomationElementVtbl uia_elem_vtbl = {
+    uia_elem_QueryInterface,
+    uia_elem_AddRef,
+    uia_elem_Release,
+    uia_elem_SetFocus,
+    uia_elem_GetRuntimeId,
+    uia_elem_FindFirst,
+    uia_elem_FindAll,
+    uia_elem_FindFirstBuildCache,
+    uia_elem_FindAllBuildCache,
+    uia_elem_BuildUpdatedCache,
+    uia_elem_GetCurrentPropertyValue,
+    uia_elem_GetCurrentPropertyValueEx,
+    uia_elem_GetCachedPropertyValue,
+    uia_elem_GetCachedPropertyValueEx,
+    uia_elem_GetCurrentPatternAs,
+    uia_elem_GetCachedPatternAs,
+    uia_elem_GetCurrentPattern,
+    uia_elem_GetCachedPattern,
+    uia_elem_GetCachedParent,
+    uia_elem_GetCachedChildren,
+    uia_elem_get_CurrentProcessId,
+    uia_elem_get_CurrentControlType,
+    uia_elem_get_CurrentLocalizedControlType,
+    uia_elem_get_CurrentName,
+    uia_elem_get_CurrentAcceleratorKey,
+    uia_elem_get_CurrentAccessKey,
+    uia_elem_get_CurrentHasKeyboardFocus,
+    uia_elem_get_CurrentIsKeyboardFocusable,
+    uia_elem_get_CurrentIsEnabled,
+    uia_elem_get_CurrentAutomationId,
+    uia_elem_get_CurrentClassName,
+    uia_elem_get_CurrentHelpText,
+    uia_elem_get_CurrentCulture,
+    uia_elem_get_CurrentIsControlElement,
+    uia_elem_get_CurrentIsContentElement,
+    uia_elem_get_CurrentIsPassword,
+    uia_elem_get_CurrentNativeWindowHandle,
+    uia_elem_get_CurrentItemType,
+    uia_elem_get_CurrentIsOffscreen,
+    uia_elem_get_CurrentOrientation,
+    uia_elem_get_CurrentFrameworkId,
+    uia_elem_get_CurrentIsRequiredForForm,
+    uia_elem_get_CurrentItemStatus,
+    uia_elem_get_CurrentBoundingRectangle,
+    uia_elem_get_CurrentLabeledBy,
+    uia_elem_get_CurrentAriaRole,
+    uia_elem_get_CurrentAriaProperties,
+    uia_elem_get_CurrentIsDataValidForForm,
+    uia_elem_get_CurrentControllerFor,
+    uia_elem_get_CurrentDescribedBy,
+    uia_elem_get_CurrentFlowsTo,
+    uia_elem_get_CurrentProviderDescription,
+    uia_elem_get_CachedProcessId,
+    uia_elem_get_CachedControlType,
+    uia_elem_get_CachedLocalizedControlType,
+    uia_elem_get_CachedName,
+    uia_elem_get_CachedAcceleratorKey,
+    uia_elem_get_CachedAccessKey,
+    uia_elem_get_CachedHasKeyboardFocus,
+    uia_elem_get_CachedIsKeyboardFocusable,
+    uia_elem_get_CachedIsEnabled,
+    uia_elem_get_CachedAutomationId,
+    uia_elem_get_CachedClassName,
+    uia_elem_get_CachedHelpText,
+    uia_elem_get_CachedCulture,
+    uia_elem_get_CachedIsControlElement,
+    uia_elem_get_CachedIsContentElement,
+    uia_elem_get_CachedIsPassword,
+    uia_elem_get_CachedNativeWindowHandle,
+    uia_elem_get_CachedItemType,
+    uia_elem_get_CachedIsOffscreen,
+    uia_elem_get_CachedOrientation,
+    uia_elem_get_CachedFrameworkId,
+    uia_elem_get_CachedIsRequiredForForm,
+    uia_elem_get_CachedItemStatus,
+    uia_elem_get_CachedBoundingRectangle,
+    uia_elem_get_CachedLabeledBy,
+    uia_elem_get_CachedAriaRole,
+    uia_elem_get_CachedAriaProperties,
+    uia_elem_get_CachedIsDataValidForForm,
+    uia_elem_get_CachedControllerFor,
+    uia_elem_get_CachedDescribedBy,
+    uia_elem_get_CachedFlowsTo,
+    uia_elem_get_CachedProviderDescription,
+    uia_elem_GetClickablePoint,
+};
+
+static HRESULT create_uia_elem_iface(IUIAutomationElement **iface)
+{
+    struct uia_elem_data *uia;
+
+    uia = heap_alloc_zero(sizeof(*uia));
+    if (!uia)
+        return E_OUTOFMEMORY;
+
+    uia->IUIAutomationElement_iface.lpVtbl = &uia_elem_vtbl;
+    uia->ref = 1;
+    *iface = &uia->IUIAutomationElement_iface;
 
     return S_OK;
 }
