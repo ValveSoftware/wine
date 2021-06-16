@@ -477,7 +477,7 @@ static BOOL CALLBACK register_dsound_devices(GUID *guid, const WCHAR *desc, cons
     static const WCHAR defaultW[] = L"Default DirectSound Device";
     IPropertyBag *prop_bag = NULL;
     REGFILTERPINS2 rgpins = {0};
-    REGPINTYPES rgtypes = {0};
+    REGPINTYPES rgtypes[2] = {};
     REGFILTER2 rgf = {0};
     WCHAR clsid[CHARS_IN_GUID];
     VARIANT var;
@@ -508,10 +508,12 @@ static BOOL CALLBACK register_dsound_devices(GUID *guid, const WCHAR *desc, cons
     rgf.rgPins2 = &rgpins;
     rgpins.dwFlags = REG_PINFLAG_B_RENDERER;
     /* FIXME: native registers many more formats */
-    rgpins.nMediaTypes = 1;
-    rgpins.lpMediaType = &rgtypes;
-    rgtypes.clsMajorType = &MEDIATYPE_Audio;
-    rgtypes.clsMinorType = &MEDIASUBTYPE_PCM;
+    rgpins.nMediaTypes = 2;
+    rgpins.lpMediaType = rgtypes;
+    rgtypes[0].clsMajorType = &MEDIATYPE_Audio;
+    rgtypes[0].clsMinorType = &MEDIASUBTYPE_PCM;
+    rgtypes[1].clsMajorType = &MEDIATYPE_Audio;
+    rgtypes[1].clsMinorType = &MEDIASUBTYPE_IEEE_FLOAT;
 
     write_filter_data(prop_bag, &rgf);
 
