@@ -29,7 +29,6 @@
 #include "mf_private.h"
 
 #include "wine/debug.h"
-#include "wine/heap.h"
 #include "wine/list.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
@@ -94,7 +93,7 @@ static ULONG WINAPI activate_object_Release(IMFActivate *iface)
         if (activate->object)
             IUnknown_Release(activate->object);
         IMFAttributes_Release(activate->attributes);
-        heap_free(activate);
+        free(activate);
     }
 
     return refcount;
@@ -462,15 +461,14 @@ HRESULT create_activation_object(void *context, const struct activate_funcs *fun
     struct activate_object *object;
     HRESULT hr;
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFActivate_iface.lpVtbl = &activate_object_vtbl;
     object->refcount = 1;
     if (FAILED(hr = MFCreateAttributes(&object->attributes, 0)))
     {
-        heap_free(object);
+        free(object);
         return hr;
     }
     object->funcs = funcs;
@@ -621,12 +619,12 @@ static ULONG WINAPI file_scheme_handler_Release(IMFSchemeHandler *iface)
             IMFAsyncResult_Release(result->result);
             if (result->object)
                 IUnknown_Release(result->object);
-            heap_free(result);
+            free(result);
         }
         DeleteCriticalSection(&handler->cs);
         if (handler->resolver)
             IMFSourceResolver_Release(handler->resolver);
-        heap_free(handler);
+        free(handler);
     }
 
     return refcount;
@@ -684,8 +682,8 @@ static ULONG WINAPI create_object_context_Release(IUnknown *iface)
     {
         if (context->props)
             IPropertyStore_Release(context->props);
-        heap_free(context->url);
-        heap_free(context);
+        free(context->url);
+        free(context);
     }
 
     return refcount;
@@ -697,23 +695,6 @@ static const IUnknownVtbl create_object_context_vtbl =
     create_object_context_AddRef,
     create_object_context_Release,
 };
-
-static WCHAR *heap_strdupW(const WCHAR *str)
-{
-    WCHAR *ret = NULL;
-
-    if (str)
-    {
-        unsigned int size;
-
-        size = (lstrlenW(str) + 1) * sizeof(WCHAR);
-        ret = heap_alloc(size);
-        if (ret)
-            memcpy(ret, str, size);
-    }
-
-    return ret;
-}
 
 static HRESULT WINAPI file_scheme_handler_BeginCreateObject(IMFSchemeHandler *iface, const WCHAR *url, DWORD flags,
         IPropertyStore *props, IUnknown **cancel_cookie, IMFAsyncCallback *callback, IUnknown *state)
@@ -731,8 +712,7 @@ static HRESULT WINAPI file_scheme_handler_BeginCreateObject(IMFSchemeHandler *if
     if (FAILED(hr = MFCreateAsyncResult(NULL, callback, state, &caller)))
         return hr;
 
-    context = heap_alloc(sizeof(*context));
-    if (!context)
+    if (!(context = malloc(sizeof(*context))))
     {
         IMFAsyncResult_Release(caller);
         return E_OUTOFMEMORY;
@@ -744,7 +724,7 @@ static HRESULT WINAPI file_scheme_handler_BeginCreateObject(IMFSchemeHandler *if
     if (context->props)
         IPropertyStore_AddRef(context->props);
     context->flags = flags;
-    context->url = heap_strdupW(url);
+    context->url = wcsdup(url);
     if (!context->url)
     {
         IMFAsyncResult_Release(caller);
@@ -801,7 +781,7 @@ static HRESULT WINAPI file_scheme_handler_EndCreateObject(IMFSchemeHandler *ifac
         *object = found->object;
         hr = IMFAsyncResult_GetStatus(found->result);
         IMFAsyncResult_Release(found->result);
-        heap_free(found);
+        free(found);
     }
     else
     {
@@ -839,7 +819,7 @@ static HRESULT WINAPI file_scheme_handler_CancelObjectCreation(IMFSchemeHandler 
         IMFAsyncResult_Release(found->result);
         if (found->object)
             IUnknown_Release(found->object);
-        heap_free(found);
+        free(found);
     }
 
     return found ? S_OK : MF_E_UNEXPECTED;
@@ -958,7 +938,7 @@ static HRESULT WINAPI file_scheme_handler_callback_Invoke(IMFAsyncCallback *ifac
         }
     }
 
-    handler_result = heap_alloc(sizeof(*handler_result));
+    handler_result = malloc(sizeof(*handler_result));
     if (handler_result)
     {
         handler_result->result = caller;
@@ -1001,8 +981,7 @@ static HRESULT file_scheme_handler_construct(REFIID riid, void **obj)
 
     TRACE("%s, %p.\n", debugstr_guid(riid), obj);
 
-    handler = heap_alloc_zero(sizeof(*handler));
-    if (!handler)
+    if (!(handler = calloc(1, sizeof(*handler))))
         return E_OUTOFMEMORY;
 
     handler->IMFSchemeHandler_iface.lpVtbl = &file_scheme_handler_vtbl;
@@ -1136,8 +1115,7 @@ static HRESULT mf_get_handler_strings(const WCHAR *path, WCHAR filter, unsigned 
     int i, index;
     WCHAR *buffW;
 
-    buffW = heap_calloc(maxlen, sizeof(*buffW));
-    if (!buffW)
+    if (!(buffW = calloc(maxlen, sizeof(*buffW))))
         return E_OUTOFMEMORY;
 
     memset(dst, 0, sizeof(*dst));
@@ -1173,7 +1151,7 @@ static HRESULT mf_get_handler_strings(const WCHAR *path, WCHAR filter, unsigned 
     if (FAILED(hr))
         PropVariantClear(dst);
 
-    heap_free(buffW);
+    free(buffW);
 
     return hr;
 }
@@ -1314,7 +1292,7 @@ static ULONG WINAPI simple_type_handler_Release(IMFMediaTypeHandler *iface)
         if (handler->media_type)
             IMFMediaType_Release(handler->media_type);
         DeleteCriticalSection(&handler->cs);
-        heap_free(handler);
+        free(handler);
     }
 
     return refcount;
@@ -1448,8 +1426,7 @@ HRESULT WINAPI MFCreateSimpleTypeHandler(IMFMediaTypeHandler **handler)
 
     TRACE("%p.\n", handler);
 
-    object = heap_alloc_zero(sizeof(*object));
-    if (!object)
+    if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFMediaTypeHandler_iface.lpVtbl = &simple_type_handler_vtbl;
