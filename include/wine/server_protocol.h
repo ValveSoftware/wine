@@ -3863,7 +3863,7 @@ struct get_last_input_time_reply
 struct get_key_state_request
 {
     struct request_header __header;
-    int            async;
+    thread_id_t    tid;
     int            key;
     char __pad_20[4];
 };
