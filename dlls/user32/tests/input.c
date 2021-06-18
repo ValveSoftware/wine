@@ -3774,13 +3774,14 @@ static DWORD WINAPI get_key_state_thread(void *arg)
     ret = GetKeyboardState(keystate);
     ok(ret, "GetKeyboardState failed, %u\n", GetLastError());
     result = keystate['X'];
+    todo_wine_if(!has_queue)
     ok(!result, "%d: expected that keystate is not set, got %#x\n", i, result);
 
     result = keystate['C'];
     ok(!result, "%d: expected that C keystate is not set, got %#x\n", i, result);
 
     result = GetKeyState('X');
-    if (!has_queue) ok(!(result & 0x8000), "%d: expected that highest bit is unset, got %#x\n", i, result);
+    if (!has_queue) todo_wine ok(!(result & 0x8000), "%d: expected that highest bit is unset, got %#x\n", i, result);
     else todo_wine ok((result & 0x8000), "%d: expected that highest bit is set, got %#x\n", i, result);
     ok(!(result & 0x007e), "%d: expected that undefined bits are unset, got %#x\n", i, result);
 
@@ -3792,7 +3793,7 @@ static DWORD WINAPI get_key_state_thread(void *arg)
     ret = GetKeyboardState(keystate);
     ok(ret, "GetKeyboardState failed, %u\n", GetLastError());
     result = keystate['X'];
-    if (!has_queue) ok(!result, "%d: expected that keystate is unset, got %#x\n", i, result);
+    if (!has_queue) todo_wine ok(!result, "%d: expected that keystate is unset, got %#x\n", i, result);
     else todo_wine ok(result, "%d: expected that keystate is set, got %#x\n", i, result);
 
     result = keystate['C'];
