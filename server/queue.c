@@ -3118,7 +3118,6 @@ DECL_HANDLER(get_thread_input)
 DECL_HANDLER(get_key_state)
 {
     struct thread_input *input = current->queue ? current->queue->input : NULL;
-    struct thread *foreground = NULL;
     struct desktop *desktop;
     data_size_t size = min( 256, get_reply_max_size() );
 
@@ -3142,18 +3141,6 @@ DECL_HANDLER(get_key_state)
     {
         if (req->key >= 0) reply->state = input->keystate[req->key & 0xff];
         set_reply_data( input->keystate, size );
-
-        if (!(desktop = get_thread_desktop( current, 0 ))) return;
-        if (desktop->foreground_input != input &&
-            (foreground = get_foreground_thread( desktop, 0 )) &&
-            foreground->process == current->process)
-        {
-            reply->state = desktop->keystate[req->key & 0xff];
-            memcpy( input->keystate, desktop->keystate, 256 );
-        }
-
-        if (foreground) release_object( foreground );
-        release_object( desktop );
     }
 }
 
