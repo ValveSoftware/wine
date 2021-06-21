@@ -4,6 +4,7 @@ PROGRAMS = \
 	make_xftmpl
 
 SOURCES = \
+	gdbinit.py.in \
 	install.c \
 	make_xftmpl.c \
 	makedep.c
