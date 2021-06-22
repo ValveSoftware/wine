@@ -2237,14 +2237,27 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         MONITORINFO monitor_info;
         HMONITOR monitor;
         int width, height;
+        RECT rect = {0};
         GLuint profile;
+        HWND hwnd;
 
-        monitor = fs_hack_monitor_from_hwnd(WindowFromDC(ctx->hdc));
-        memset(&monitor_info, 0, sizeof(monitor_info));
-        monitor_info.cbSize = sizeof(monitor_info);
-        GetMonitorInfoW(monitor, &monitor_info);
-        width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
-        height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+        hwnd = WindowFromDC(ctx->hdc);
+        monitor = fs_hack_monitor_from_hwnd(hwnd);
+
+        if (fs_hack_enabled(monitor))
+        {
+            memset(&monitor_info, 0, sizeof(monitor_info));
+            monitor_info.cbSize = sizeof(monitor_info);
+            GetMonitorInfoW(monitor, &monitor_info);
+            rect = monitor_info.rcMonitor;
+        }
+        else
+        {
+            GetClientRect(hwnd, &rect);
+        }
+
+        width = rect.right - rect.left;
+        height = rect.bottom - rect.top;
 
         TRACE("Render buffer width:%d height:%d\n", width, height);
 
@@ -2869,18 +2882,32 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     };
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
     SIZE scaled, src, real;
-    RECT user_rect, real_rect;
+    RECT user_rect = {0}, real_rect;
     POINT scaled_origin;
     HMONITOR monitor;
     struct fs_hack_gl_state state;
     const float *gamma_ramp;
     LONG gamma_serial;
     unsigned int i;
+    HWND hwnd;
 
-    monitor = fs_hack_monitor_from_hwnd(WindowFromDC(ctx->hdc));
-    scaled = fs_hack_get_scaled_screen_size(monitor);
-    user_rect = fs_hack_current_mode(monitor);
-    real_rect = fs_hack_real_mode(monitor);
+    hwnd = WindowFromDC(ctx->hdc);
+    monitor = fs_hack_monitor_from_hwnd(hwnd);
+
+    if (fs_hack_enabled(monitor))
+    {
+        user_rect = fs_hack_current_mode(monitor);
+        real_rect = fs_hack_real_mode(monitor);
+        scaled = fs_hack_get_scaled_screen_size(monitor);
+    }
+    else
+    {
+        GetClientRect(hwnd, &user_rect);
+        real_rect = user_rect;
+        scaled.cx = user_rect.right - user_rect.left;
+        scaled.cy = user_rect.bottom - user_rect.top;
+    }
+
     src.cx = user_rect.right - user_rect.left;
     src.cy = user_rect.bottom - user_rect.top;
     real.cx = real_rect.right - real_rect.left;
