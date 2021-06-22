@@ -2234,27 +2234,13 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
     if (ctx->fs_hack)
     {
-        MONITORINFO monitor_info;
-        HMONITOR monitor;
         int width, height;
         RECT rect = {0};
         GLuint profile;
         HWND hwnd;
 
         hwnd = WindowFromDC(ctx->hdc);
-        monitor = fs_hack_monitor_from_hwnd(hwnd);
-
-        if (fs_hack_enabled(monitor))
-        {
-            memset(&monitor_info, 0, sizeof(monitor_info));
-            monitor_info.cbSize = sizeof(monitor_info);
-            GetMonitorInfoW(monitor, &monitor_info);
-            rect = monitor_info.rcMonitor;
-        }
-        else
-        {
-            GetClientRect(hwnd, &rect);
-        }
+        GetClientRect(hwnd, &rect);
 
         width = rect.right - rect.left;
         height = rect.bottom - rect.top;
