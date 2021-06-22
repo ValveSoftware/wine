@@ -1469,7 +1469,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
         if (gl->window)
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
         data = get_win_data( hwnd );
-        gl->fs_hack = data->fs_hack;
+        gl->fs_hack = data->fs_hack || fs_hack_get_gamma_ramp(NULL);
         if (gl->fs_hack)
             TRACE( "Window %p has the fullscreen hack enabled\n", hwnd );
         release_win_data( data );
