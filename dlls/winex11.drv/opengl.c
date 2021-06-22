@@ -263,6 +263,7 @@ struct gl_drawable
     BOOL                           fs_hack;
     BOOL                           fs_hack_did_swapbuf;
     BOOL                           fs_hack_context_set_up;
+    BOOL                           fs_hack_needs_resolve;
     BOOL                           has_scissor_indexed;
     BOOL                           has_clip_control;
     BOOL                           has_ati_frag_shader;
@@ -2252,11 +2253,13 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
         if (config.samples)
         {
+            gl->fs_hack_needs_resolve = TRUE;
             if (!ctx->fs_hack_color_renderbuffer)
                 pglGenRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
             pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
             pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
                     config.color_internalformat, width, height );
+
             pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                     GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
             TRACE( "Created renderbuffer %u and FBO %u for fullscreen hack.\n", ctx->fs_hack_color_renderbuffer, ctx->fs_hack_resolve_fbo );
@@ -2268,6 +2271,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         }
         else
         {
+            gl->fs_hack_needs_resolve = FALSE;
             pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
                     GL_TEXTURE_2D, ctx->fs_hack_color_texture, 0 );
         }
@@ -2281,6 +2285,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
                 pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
                 pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
                         config.ds_internalformat, width, height );
+
                 pglBindRenderbuffer( GL_RENDERBUFFER, prev_renderbuffer );
                 if (attribs.depth_size)
                     pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
@@ -2866,7 +2871,7 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
         fs_hack_setup_context( ctx, gl );
 
     /* Can't stretch blit with multisampled renderbuffers */
-    if (ctx->fs_hack_color_renderbuffer && !gamma_ramp){
+    if (gl->fs_hack_needs_resolve && !gamma_ramp){
         gamma_ramp = fs_hack_get_default_gamma_ramp();
         gamma_serial = 0;
     }
@@ -2883,7 +2888,7 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
 
     pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_fbo );
 
-    if (ctx->fs_hack_color_renderbuffer)
+    if (gl->fs_hack_needs_resolve)
     {
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
 
