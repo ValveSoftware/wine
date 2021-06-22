@@ -2077,6 +2077,11 @@ static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, struct gl_drawa
     char errstr[512];
     const float *default_gamma_ramp = fs_hack_get_default_gamma_ramp();
 
+    gl->last_gamma_serial = 0;
+
+    if (ctx->fs_hack_gamma_pgm)
+        return;
+
     opengl_funcs.gl.p_glGetIntegerv( GL_CURRENT_PROGRAM, (GLint *)&prev_program );
     /* vertex shader */
     vshader = pglCreateShader(GL_VERTEX_SHADER);
@@ -2146,7 +2151,6 @@ static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, struct gl_drawa
     pglGenBuffers(1, &ctx->ramp_ubo);
     pglBindBuffer(GL_UNIFORM_BUFFER, ctx->ramp_ubo);
     pglBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 3 * GAMMA_RAMP_SIZE, default_gamma_ramp, GL_DYNAMIC_DRAW);
-    gl->last_gamma_serial = 0;
 
     ramp_index = pglGetUniformBlockIndex(program, "ramp");
     pglUniformBlockBinding(program, ramp_index, 0);
