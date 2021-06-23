@@ -623,6 +623,113 @@ static BOOL is_crtc_primary( RECT primary, const XRRCrtcInfo *crtc )
            crtc->y + crtc->height == primary.bottom;
 }
 
+static void add_remaining_gpus_via_vulkan( struct gdi_gpu **gpus, int *count )
+{
+    static const char *extensions[] =
+    {
+        VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
+    };
+    const struct vulkan_funcs *vulkan_funcs = get_vulkan_driver( WINE_VULKAN_DRIVER_VERSION );
+    PFN_vkGetPhysicalDeviceProperties2KHR pvkGetPhysicalDeviceProperties2KHR;
+    PFN_vkEnumeratePhysicalDevices pvkEnumeratePhysicalDevices;
+    uint32_t device_count;
+    VkPhysicalDevice *vk_physical_devices = NULL;
+    VkPhysicalDeviceProperties2 properties2;
+    VkInstanceCreateInfo create_info;
+    VkPhysicalDeviceIDProperties id;
+    VkInstance vk_instance = NULL;
+    INT gpu_idx, device_idx;
+    INT original_gpu_count = *count;
+    struct gdi_gpu *new_gpu;
+    BOOL new;
+    VkResult vr;
+
+    memset( &create_info, 0, sizeof(create_info) );
+    create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    create_info.enabledExtensionCount = ARRAY_SIZE(extensions);
+    create_info.ppEnabledExtensionNames = extensions;
+    vr = vulkan_funcs->p_vkCreateInstance( &create_info, NULL, &vk_instance );
+
+    if (vr != VK_SUCCESS)
+    {
+        WARN("Failed to create a Vulkan instance, vr %d.\n", vr);
+        goto done;
+    }
+
+#define LOAD_VK_FUNC(f)                                                             \
+    if (!(p##f = (void *)vulkan_funcs->p_vkGetInstanceProcAddr( vk_instance, #f ))) \
+    {                                                                               \
+        WARN("Failed to load " #f ".\n");                                           \
+        goto done;                                                                  \
+    }
+
+    LOAD_VK_FUNC(vkEnumeratePhysicalDevices)
+    LOAD_VK_FUNC(vkGetPhysicalDeviceProperties2KHR)
+#undef LOAD_VK_FUNC
+
+    vr = pvkEnumeratePhysicalDevices( vk_instance, &device_count, NULL );
+    if (vr != VK_SUCCESS || !device_count)
+    {
+        WARN("No Vulkan device found, vr %d, device_count %d.\n", vr, device_count);
+        goto done;
+    }
+
+    if (!(vk_physical_devices = heap_calloc( device_count, sizeof(*vk_physical_devices) )))
+        goto done;
+
+    vr = pvkEnumeratePhysicalDevices( vk_instance, &device_count, vk_physical_devices );
+    if (vr != VK_SUCCESS)
+    {
+        WARN("vkEnumeratePhysicalDevices failed, vr %d.\n", vr);
+        goto done;
+    }
+
+    for (device_idx = 0; device_idx < device_count; ++device_idx)
+    {
+            memset( &id, 0, sizeof(id) );
+            id.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+            properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+            properties2.pNext = &id;
+
+            pvkGetPhysicalDeviceProperties2KHR( vk_physical_devices[device_idx], &properties2 );
+
+            /* Ignore Khronos vendor IDs */
+            if (properties2.properties.vendorID >= 0x10000)
+                continue;
+
+            new = TRUE;
+            for (gpu_idx = 0; gpu_idx < original_gpu_count; ++gpu_idx)
+            {
+                if (!memcmp( &(*gpus)[gpu_idx].vulkan_uuid, id.deviceUUID, sizeof(id.deviceUUID) ))
+                {
+                    new = FALSE;
+                    break;
+                }
+            }
+
+            if (!new)
+                continue;
+
+            *gpus = heap_realloc( *gpus, (*count + 1) * sizeof(**gpus) );
+            if (!gpus) goto done;
+            new_gpu = &(*gpus)[(*count)++];
+            memset( new_gpu, 0, sizeof(*new_gpu) );
+            new_gpu->id = -1;
+
+            memcpy( &new_gpu->vulkan_uuid, id.deviceUUID, sizeof(id.deviceUUID) );
+            new_gpu->vendor_id = properties2.properties.vendorID;
+            new_gpu->device_id = properties2.properties.deviceID;
+            MultiByteToWideChar( CP_UTF8, 0, properties2.properties.deviceName, -1, new_gpu->name, ARRAY_SIZE(new_gpu->name) );
+
+            TRACE("Added a new GPU via Vulkan: %04x:%04x %s\n", new_gpu->vendor_id, new_gpu->device_id, debugstr_w(new_gpu->name));
+    }
+
+done:
+    heap_free( vk_physical_devices );
+    if (vk_instance)
+        vulkan_funcs->p_vkDestroyInstance( vk_instance, NULL );
+}
+
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkDisplayKHR)
 
 static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProviderInfo *provider_info )
@@ -742,6 +849,7 @@ static BOOL xrandr14_get_gpus2( struct gdi_gpu **new_gpus, int *count, BOOL get_
     XRRProviderInfo *provider_info = NULL;
     XRRCrtcInfo *crtc_info = NULL;
     INT primary_provider = -1;
+    INT gpu_count = 0;
     RECT primary_rect;
     BOOL ret = FALSE;
     INT i, j;
@@ -754,21 +862,16 @@ static BOOL xrandr14_get_gpus2( struct gdi_gpu **new_gpus, int *count, BOOL get_
     if (!provider_resources)
         goto done;
 
-    gpus = heap_calloc( provider_resources->nproviders ? provider_resources->nproviders : 1, sizeof(*gpus) );
-    if (!gpus)
-        goto done;
-
     /* Some XRandR implementations don't support providers.
      * In this case, report a fake one to try searching adapters in screen resources */
     if (!provider_resources->nproviders)
     {
         WARN("XRandR implementation doesn't report any providers, faking one.\n");
-        lstrcpyW( gpus[0].name, wine_adapterW );
-        *new_gpus = gpus;
-        *count = 1;
-        ret = TRUE;
-        goto done;
+        goto fallback;
     }
+
+    gpus = heap_calloc( provider_resources->nproviders, sizeof(*gpus) );
+    if (!gpus) goto done;
 
     primary_rect = get_primary_rect( screen_resources );
     for (i = 0; i < provider_resources->nproviders; ++i)
@@ -802,6 +905,7 @@ static BOOL xrandr14_get_gpus2( struct gdi_gpu **new_gpus, int *count, BOOL get_
             /* FIXME: Add an alternate method of getting PCI IDs, for systems that don't support Vulkan */
         }
         pXRRFreeProviderInfo( provider_info );
+        gpu_count++;
     }
 
     /* Make primary GPU the first */
@@ -812,8 +916,29 @@ static BOOL xrandr14_get_gpus2( struct gdi_gpu **new_gpus, int *count, BOOL get_
         gpus[primary_provider] = tmp;
     }
 
+fallback:
+    /* Add the Vulkan only GPUs only if we need all the detailed properties */
+    if (get_properties)
+        add_remaining_gpus_via_vulkan( &gpus, &gpu_count );
+
+    if (gpu_count == 0)
+    {
+        /* we need at least one for get_adapters() / get_id() */
+        gpus = heap_calloc( 1, sizeof(*gpus) );
+        if (!gpus) goto done;
+        lstrcpyW( gpus[0].name, wine_adapterW );
+        gpu_count = 1;
+    }
+    else if (gpus[0].id == -1)
+    {
+        /* the only GPUs we have are from Vulkan, mark the first one
+         * as main so that we can use screen resources for adapters,
+         * see xrandr14_get_adapters() */
+        gpus[0].id = 0;
+    }
+
     *new_gpus = gpus;
-    *count = provider_resources->nproviders;
+    *count = gpu_count;
     ret = TRUE;
 done:
     if (provider_resources)
@@ -856,6 +981,10 @@ static BOOL xrandr14_get_adapters( ULONG_PTR gpu_id, struct gdi_adapter **new_ad
 
     screen_resources = xrandr_get_screen_resources();
     if (!screen_resources)
+        goto done;
+
+    /* Vulkan-only, adapter-less GPU */
+    if (gpu_id == -1)
         goto done;
 
     if (gpu_id)
