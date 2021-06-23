@@ -1895,6 +1895,29 @@ static struct wgl_context * WINAPI glxdrv_wglCreateContext( HDC hdc )
     return ret;
 }
 
+static void fs_hack_destroy_context( struct wgl_context *ctx )
+{
+    pglDeleteBuffers(1, &ctx->ramp_ubo);
+    pglDeleteProgram(ctx->fs_hack_gamma_pgm);
+    ctx->fs_hack_gamma_pgm = 0;
+
+    if (ctx->fs_hack_ds_renderbuffer)
+        pglDeleteRenderbuffers( 1, &ctx->fs_hack_ds_renderbuffer );
+    if (ctx->fs_hack_color_renderbuffer)
+        pglDeleteRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
+    if (ctx->fs_hack_ds_texture)
+        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_ds_texture );
+    if (ctx->fs_hack_color_texture)
+        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_color_texture );
+    ctx->fs_hack_color_renderbuffer = ctx->fs_hack_ds_renderbuffer = 0;
+    ctx->fs_hack_color_texture = ctx->fs_hack_ds_texture = 0;
+    if (ctx->fs_hack_resolve_fbo)
+        pglDeleteFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
+    if (ctx->fs_hack_fbo)
+        pglDeleteFramebuffers( 1, &ctx->fs_hack_fbo );
+    ctx->fs_hack_resolve_fbo = ctx->fs_hack_fbo = 0;
+}
+
 /***********************************************************************
  *		glxdrv_wglDeleteContext
  */
@@ -1903,6 +1926,8 @@ static BOOL WINAPI glxdrv_wglDeleteContext(struct wgl_context *ctx)
     struct wgl_pbuffer *pb;
 
     TRACE("(%p)\n", ctx);
+
+    fs_hack_destroy_context( ctx );
 
     EnterCriticalSection( &context_section );
     list_remove( &ctx->entry );
@@ -2223,7 +2248,6 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         if (!ctx->fs_hack_fbo)
         {
             pglGenFramebuffers( 1, &ctx->fs_hack_fbo );
-            pglGenFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
             TRACE( "Created FBO %u for fullscreen hack.\n", ctx->fs_hack_fbo );
         }
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0);
@@ -2250,6 +2274,13 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         if (config.samples)
         {
             gl->fs_hack_needs_resolve = TRUE;
+
+            if (!ctx->fs_hack_resolve_fbo)
+            {
+                pglGenFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
+                TRACE( "Created resolve FBO %u for fullscreen hack.\n", ctx->fs_hack_resolve_fbo );
+            }
+
             if (!ctx->fs_hack_color_renderbuffer)
                 pglGenRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
             pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
@@ -2350,21 +2381,6 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
             pglBindFramebuffer( GL_READ_FRAMEBUFFER, 0 );
             ctx->current_read_fbo = 0;
         }
-
-        pglDeleteBuffers(1, &ctx->ramp_ubo);
-        pglDeleteProgram(ctx->fs_hack_gamma_pgm);
-        ctx->fs_hack_gamma_pgm = 0;
-
-        pglDeleteRenderbuffers( 1, &ctx->fs_hack_ds_renderbuffer );
-        pglDeleteRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
-        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_ds_texture );
-        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_color_texture );
-        ctx->fs_hack_color_renderbuffer = ctx->fs_hack_ds_renderbuffer = 0;
-        ctx->fs_hack_color_texture = ctx->fs_hack_ds_texture = 0;
-        pglDeleteFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
-        pglDeleteFramebuffers( 1, &ctx->fs_hack_fbo );
-        ctx->fs_hack_fbo = 0;
-
         gl->fs_hack_context_set_up = FALSE;
     }
 }
