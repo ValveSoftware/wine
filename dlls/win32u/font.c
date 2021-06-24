@@ -1684,6 +1684,8 @@ static const WCHAR p_ming_li_uW[] =
     {'P','M','i','n','g','L','i','U',0};
 static const WCHAR batangW[] =
     {'B','a','t','a','n','g',0};
+static const WCHAR arialW[] =
+    {'A','r','i','a','l',0};
 
 static const WCHAR * const font_links_list[] =
 {
@@ -2879,6 +2881,7 @@ static void update_font_system_link_info(UINT current_ansi_codepage)
         set_multi_value_key(hkey, lucida_sans_unicodeW, link, len);
         set_multi_value_key(hkey, microsoft_sans_serifW, link, len);
         set_multi_value_key(hkey, tahomaW, link, len);
+        set_multi_value_key(hkey, arialW, link, len);
         NtClose( hkey );
     }
 }
@@ -2909,7 +2912,13 @@ static void update_codepage( UINT screen_dpi )
     if (query_reg_ascii_value( wine_fonts_key, "Codepages", info, sizeof(value_buffer) ))
     {
         cp_match = !wcscmp( (const WCHAR *)info->Data, cpbufW );
-        if (cp_match && screen_dpi == font_dpi) return;  /* already set correctly */
+        if (cp_match && screen_dpi == font_dpi)
+        {
+            /* already set correctly, but, as a HACK, update font link
+               info anyway, so that old Proton prefixes are fixed */
+            update_font_system_link_info(ansi_cp);
+            return;
+        }
         TRACE( "updating registry, codepages/logpixels changed %s/%u -> %u,%u/%u\n",
                debugstr_w((const WCHAR *)info->Data), font_dpi, ansi_cp, oem_cp, screen_dpi );
     }
