@@ -2594,6 +2594,7 @@ static void update_font_system_link_info(UINT current_ansi_codepage)
         set_multi_value_key(hkey, L"Lucida Sans Unicode", link, len);
         set_multi_value_key(hkey, L"Microsoft Sans Serif", link, len);
         set_multi_value_key(hkey, L"Tahoma", link, len);
+        set_multi_value_key(hkey, L"Arial", link, len);
         RegCloseKey(hkey);
     }
 }
