@@ -2594,6 +2594,7 @@ static void update_font_system_link_info(UINT current_ansi_codepage)
         set_multi_value_key(hkey, L"Lucida Sans Unicode", link, len);
         set_multi_value_key(hkey, L"Microsoft Sans Serif", link, len);
         set_multi_value_key(hkey, L"Tahoma", link, len);
+        set_multi_value_key(hkey, L"Arial", link, len);
         RegCloseKey(hkey);
     }
 }
@@ -2623,7 +2624,13 @@ static void update_codepage(void)
     len = sizeof(buf);
     if (!RegQueryValueExA(wine_fonts_key, "Codepages", 0, &type, (BYTE *)buf, &len) && type == REG_SZ)
     {
-        if (!strcmp( buf, cpbuf ) && screen_dpi == font_dpi) return;  /* already set correctly */
+        if (!strcmp( buf, cpbuf ) && screen_dpi == font_dpi)
+        {
+            /* already set correctly, but, as a HACK, update font link
+               info anyway, so that old Proton prefixes are fixed */
+            update_font_system_link_info(ansi_cp);
+            return;
+        }
         TRACE("updating registry, codepages/logpixels changed %s/%u -> %u,%u/%u\n",
               buf, font_dpi, ansi_cp, oem_cp, screen_dpi);
     }
