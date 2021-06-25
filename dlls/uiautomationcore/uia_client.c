@@ -467,8 +467,10 @@ static HRESULT WINAPI uia_RemoveFocusChangedEventHandler(IUIAutomation *iface,
 static HRESULT WINAPI uia_RemoveAllEventHandlers(IUIAutomation *iface)
 {
     struct uia_data *This = impl_from_IUIAutomation(iface);
-    FIXME("This %p\n", This);
-    return E_NOTIMPL;
+
+    TRACE("iface %p\n", iface);
+
+    return uia_evh_remove_all_event_handlers(This);
 }
 
 static HRESULT WINAPI uia_IntNativeArrayToSafeArray(IUIAutomation *iface,
