@@ -49,11 +49,27 @@ struct uia_evh
     } u;
 };
 
+struct uia_data;
+
+/*
+ * EVL = Event listener.
+ */
+struct uia_evl
+{
+    HANDLE h_thread, pump_initialized, first_event;
+    CRITICAL_SECTION ev_handler_cs;
+    UINT tid;
+
+    struct uia_data *data;
+
+    struct list uia_evh_list;
+};
+
 struct uia_data {
     IUIAutomation IUIAutomation_iface;
     LONG ref;
 
-    struct list uia_evh_list;
+    struct uia_evl *evl;
 };
 
 HRESULT create_uia_iface(IUIAutomation **) DECLSPEC_HIDDEN;
