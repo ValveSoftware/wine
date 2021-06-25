@@ -553,7 +553,7 @@ NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
 
     /* Try to give other threads a chance to wake up. Hopefully erring on this
      * side is the better thing to do... */
-    NtYieldExecution();
+    usleep(0);
 
     __atomic_store_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 
