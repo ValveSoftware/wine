@@ -75,3 +75,49 @@ HRESULT uia_evh_remove_focus_event_handler(struct uia_data *data,
 
     return S_OK;
 }
+
+HRESULT uia_evh_remove_all_event_handlers(struct uia_data *data)
+{
+    struct list *evh_list = &data->uia_evh_list;
+    struct list *cursor, *cursor2;
+    struct uia_evh *evh;
+
+    LIST_FOR_EACH_SAFE(cursor, cursor2, evh_list)
+    {
+        evh = LIST_ENTRY(cursor, struct uia_evh, entry);
+        switch (evh->event_type)
+        {
+            case BASIC_EVH:
+                IUIAutomationEventHandler_Release(evh->u.IUIAutomationEvh_iface);
+                break;
+
+            case CHANGES_EVH:
+                IUIAutomationChangesEventHandler_Release(evh->u.IUIAutomationChangesEvh_iface);
+                break;
+
+            case FOCUS_EVH:
+                IUIAutomationFocusChangedEventHandler_Release(evh->u.IUIAutomationFocusChangedEvh_iface);
+                break;
+
+            case PROPERTY_EVH:
+                IUIAutomationPropertyChangedEventHandler_Release(evh->u.IUIAutomationPropertyChangedEvh_iface);
+                break;
+
+            case STRUCTURE_EVH:
+                IUIAutomationStructureChangedEventHandler_Release(evh->u.IUIAutomationStructureChangedEvh_iface);
+                break;
+
+            case TEXT_EDIT_EVH:
+                IUIAutomationTextEditTextChangedEventHandler_Release(evh->u.IUIAutomationTextEditTextChangedEvh_iface);
+                break;
+
+            default:
+                break;
+        }
+
+        list_remove(cursor);
+        heap_free(evh);
+    }
+
+    return S_OK;
+}
