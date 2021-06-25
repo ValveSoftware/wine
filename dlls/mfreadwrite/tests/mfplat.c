@@ -903,6 +903,7 @@ static void test_source_reader_from_media_source(void)
     LONGLONG timestamp;
     IMFAttributes *attributes;
     ULONG refcount;
+    PROPVARIANT pos;
     int i;
     PROPVARIANT pos;
 
