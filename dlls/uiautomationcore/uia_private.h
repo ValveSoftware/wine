@@ -70,3 +70,4 @@ HRESULT uia_evh_add_focus_event_handler(struct uia_data *data,
         IUIAutomationFocusChangedEventHandler *handler) DECLSPEC_HIDDEN;
 HRESULT uia_evh_remove_focus_event_handler(struct uia_data *data,
         IUIAutomationFocusChangedEventHandler *handler) DECLSPEC_HIDDEN;
+HRESULT uia_evh_remove_all_event_handlers(struct uia_data *data) DECLSPEC_HIDDEN;
