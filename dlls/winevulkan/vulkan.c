@@ -879,6 +879,8 @@ VkResult WINAPI __wine_create_vk_device_with_callback(VkPhysicalDevice phys_dev,
         VkResult (WINAPI *native_vkCreateDevice)(VkPhysicalDevice, const VkDeviceCreateInfo *, const VkAllocationCallbacks *,
         VkDevice *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateDevice_context)
 {
+    VkPhysicalDeviceFeatures features = {0};
+    VkPhysicalDeviceFeatures2 *features2;
     VkDeviceCreateInfo create_info_host;
     uint32_t max_queue_families;
     struct VkDevice_T *object;
@@ -911,6 +913,26 @@ VkResult WINAPI __wine_create_vk_device_with_callback(VkPhysicalDevice phys_dev,
     res = wine_vk_device_convert_create_info(create_info, &create_info_host, &create_info_free_extensions);
     if (res != VK_SUCCESS)
         goto fail;
+
+    /* Enable shaderStorageImageWriteWithoutFormat for fshack
+     * This is available on all hardware and driver combinations we care about.
+     */
+    if (create_info_host.pEnabledFeatures)
+    {
+        features = *create_info_host.pEnabledFeatures;
+        features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+        create_info_host.pEnabledFeatures = &features;
+    }
+    if ((features2 = wine_vk_find_struct(&create_info_host, PHYSICAL_DEVICE_FEATURES_2)))
+    {
+        features2->features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+    }
+    else if (!create_info_host.pEnabledFeatures)
+    {
+        features.shaderStorageImageWriteWithoutFormat = VK_TRUE;
+        create_info_host.pEnabledFeatures = &features;
+    }
+
 
     if (native_vkCreateDevice)
         res = native_vkCreateDevice(phys_dev->phys_dev,
