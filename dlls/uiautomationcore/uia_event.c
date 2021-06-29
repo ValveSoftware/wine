@@ -24,6 +24,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(uiautomation);
 
+DWORD tls_index = TLS_OUT_OF_INDEXES;
+
 /*
  * UI Automation Event Listener functions.
  * The first time an event handler interface is added on the client side, the
@@ -39,6 +41,9 @@ static HRESULT uia_event_listener_thread_initialize(struct uia_evl *evl)
     if (FAILED(hr))
         return hr;
 
+    if (!TlsSetValue(tls_index, (LPVOID)evl))
+        FIXME("Failed to set Tls index value!\n");
+
     return S_OK;
 }
 
@@ -48,6 +53,8 @@ static void uia_event_listener_thread_exit(struct uia_evl *evl)
 
     heap_free(evl);
     data->evl = NULL;
+    if (!TlsSetValue(tls_index, NULL))
+        FIXME("Failed to set Tls index value!\n");
 
     CoUninitialize();
 }
@@ -103,6 +110,9 @@ static HRESULT start_uia_event_listener(struct uia_data *data)
     evl = heap_alloc_zero(sizeof(*evl));
     if (!evl)
         return E_OUTOFMEMORY;
+
+    if (tls_index == TLS_OUT_OF_INDEXES)
+        tls_index = TlsAlloc();
 
     evl->data = data;
     list_init(&evl->uia_evh_list);
