@@ -60,6 +60,9 @@ struct uia_evl
     CRITICAL_SECTION ev_handler_cs;
     UINT tid;
 
+    HWINEVENTHOOK win_creation_hook;
+    HWINEVENTHOOK object_focus_hook;
+
     struct uia_data *data;
 
     struct list uia_evh_list;
