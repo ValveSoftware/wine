@@ -49,6 +49,38 @@ struct uia_evh
     } u;
 };
 
+/*
+ * EVM = Event message. Result of an event being raised, either with
+ * UiaRaiseAutomationEvent or an MSAA event with NotifyWinEvent.
+ */
+struct uia_evm
+{
+    struct list entry;
+
+    UINT event;
+    IUIAutomationElement *elem;
+
+    enum uia_event_origin
+    {
+        UIA_EVO_MSAA,
+        UIA_EVO_UIA,
+    } uia_evo;
+
+    union
+    {
+        struct
+        {
+            HWND hwnd;
+
+            LONG obj_id, child_id;
+        } msaa_ev;
+        struct
+        {
+            IRawElementProviderSimple *elem_prov;
+        } uia_ev;
+    } u;
+};
+
 struct uia_data;
 
 /*
@@ -58,6 +90,7 @@ struct uia_evl
 {
     HANDLE h_thread, pump_initialized, first_event;
     CRITICAL_SECTION ev_handler_cs;
+    CRITICAL_SECTION evm_queue_cs;
     UINT tid;
 
     HWINEVENTHOOK win_creation_hook;
@@ -66,6 +99,7 @@ struct uia_evl
     struct uia_data *data;
 
     struct list uia_evh_list;
+    struct list uia_evm_queue;
 };
 
 struct uia_data {
