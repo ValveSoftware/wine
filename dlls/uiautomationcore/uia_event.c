@@ -27,6 +27,26 @@ WINE_DEFAULT_DEBUG_CHANNEL(uiautomation);
 DWORD tls_index = TLS_OUT_OF_INDEXES;
 
 /*
+ * Event hook callback for window creation events.
+ */
+void CALLBACK uia_evl_window_create_proc(HWINEVENTHOOK hWinEventHook, DWORD event,
+        HWND hwnd, LONG idObject, LONG idChild, DWORD idEventThread,
+        DWORD dwmsEventTime)
+{
+    return;
+}
+
+/*
+ * Event hook callback for MSAA object focus events.
+ */
+void CALLBACK uia_evl_msaa_obj_focus_proc(HWINEVENTHOOK hWinEventHook, DWORD event,
+        HWND hwnd, LONG idObject, LONG idChild, DWORD idEventThread,
+        DWORD dwmsEventTime)
+{
+    return;
+}
+
+/*
  * UI Automation Event Listener functions.
  * The first time an event handler interface is added on the client side, the
  * event listener thread is created. It is responsible for listening for
@@ -44,12 +64,20 @@ static HRESULT uia_event_listener_thread_initialize(struct uia_evl *evl)
     if (!TlsSetValue(tls_index, (LPVOID)evl))
         FIXME("Failed to set Tls index value!\n");
 
+    evl->object_focus_hook = SetWinEventHook(EVENT_OBJECT_FOCUS,
+            EVENT_OBJECT_FOCUS, 0, uia_evl_msaa_obj_focus_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
+    evl->win_creation_hook = SetWinEventHook(EVENT_OBJECT_CREATE,
+            EVENT_OBJECT_CREATE, 0, uia_evl_window_create_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
+
     return S_OK;
 }
 
 static void uia_event_listener_thread_exit(struct uia_evl *evl)
 {
     struct uia_data *data = evl->data;
+
+    UnhookWinEvent(evl->object_focus_hook);
+    UnhookWinEvent(evl->win_creation_hook);
 
     heap_free(evl);
     data->evl = NULL;
