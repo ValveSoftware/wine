@@ -396,7 +396,26 @@ LRESULT WINAPI UiaReturnRawElementProvider(HWND hwnd, WPARAM wParam,
  */
 HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *provider, EVENTID id)
 {
-    FIXME("(%p, %d): stub\n", provider, id);
+    struct uia_provider_evlc *evlc;
+    struct list *cursor, *cursor2;
+    HRESULT hr;
+
+    TRACE("(%p, %d)\n", provider, id);
+
+    LIST_FOR_EACH_SAFE(cursor, cursor2, &global_provider_evlc_list)
+    {
+        evlc = LIST_ENTRY(cursor, struct uia_provider_evlc, entry);
+        hr = IUIAEvlConnection_ProviderRaiseEvent(evlc->evlc_iface, id, provider);
+        TRACE("Event raised!\n");
+        if (hr == CO_E_OBJNOTCONNECTED)
+        {
+            TRACE("Evlc no longer active, removing.\n");
+            list_remove(cursor);
+            IUIAEvlConnection_Release(evlc->evlc_iface);
+            heap_free(evlc);
+        }
+    }
+
     return S_OK;
 }
 
