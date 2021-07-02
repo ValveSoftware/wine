@@ -148,6 +148,13 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
     if (IsWindow(hwnd))
     {
         SendMessageW( hwnd, WM_NCACTIVATE, (hwnd == GetForegroundWindow()), (LPARAM)previous );
+
+        if (GetPropW( hwnd, L"__WINE_RESTORE_WINDOW" ))
+        {
+            SetPropW( hwnd, L"__WINE_RESTORE_WINDOW", NULL );
+            SendMessageW( hwnd, WM_SYSCOMMAND, SC_RESTORE, 0 );
+        }
+
         SendMessageW( hwnd, WM_ACTIVATE,
                       MAKEWPARAM( mouse ? WA_CLICKACTIVE : WA_ACTIVE, IsIconic(hwnd) ),
                       (LPARAM)previous );
