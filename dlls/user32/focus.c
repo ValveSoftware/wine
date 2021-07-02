@@ -164,6 +164,12 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
                       (LPARAM)previous );
         if (GetAncestor( hwnd, GA_PARENT ) == GetDesktopWindow())
             PostMessageW( GetDesktopWindow(), WM_PARENTNOTIFY, WM_NCACTIVATE, (LPARAM)hwnd );
+
+        if (GetPropW( hwnd, L"__WINE_RESTORE_WINDOW" ))
+        {
+            SetPropW( hwnd, L"__WINE_RESTORE_WINDOW", NULL );
+            SendMessageW( hwnd, WM_SYSCOMMAND, SC_RESTORE, 0 );
+        }
     }
 
     /* now change focus if necessary */
