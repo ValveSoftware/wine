@@ -80,6 +80,8 @@ extern BOOL ximInComposeMode;
 #define XEMBED_UNREGISTER_ACCELERATOR 13
 #define XEMBED_ACTIVATE_ACCELERATOR   14
 
+static const WCHAR restore_window_propW[] = {'_','_','W','I','N','E','_','R','E','S','T','O','R','E','_','W','I','N','D','O','W',0};
+
 Bool (*pXGetEventData)( Display *display, XEvent /*XGenericEventCookie*/ *event ) = NULL;
 void (*pXFreeEventData)( Display *display, XEvent /*XGenericEventCookie*/ *event ) = NULL;
 
@@ -582,7 +584,7 @@ static inline BOOL can_activate_window( HWND hwnd )
 
     if (!(style & WS_VISIBLE)) return FALSE;
     if ((style & (WS_POPUP|WS_CHILD)) == WS_CHILD) return FALSE;
-    if (style & WS_MINIMIZE) return FALSE;
+    if ((style & WS_MINIMIZE) && !GetPropW( hwnd, restore_window_propW )) return FALSE;
     if (GetWindowLongW( hwnd, GWL_EXSTYLE ) & WS_EX_NOACTIVATE) return FALSE;
     if (hwnd == GetDesktopWindow()) return FALSE;
     if (GetWindowRect( hwnd, &rect ) && IsRectEmpty( &rect )) return FALSE;
@@ -1367,9 +1369,10 @@ static void handle_wm_state_notify( HWND hwnd, XPropertyEvent *event, BOOL updat
             {
                 TRACE( "restoring win %p/%lx\n", data->hwnd, data->whole_window );
                 release_win_data( data );
-                if ((style & (WS_MINIMIZE | WS_VISIBLE)) == (WS_MINIMIZE | WS_VISIBLE))
-                    SetActiveWindow( hwnd );
-                SendMessageW( hwnd, WM_SYSCOMMAND, SC_RESTORE, 0 );
+                if ((style & (WS_MINIMIZE | WS_VISIBLE)) == (WS_MINIMIZE | WS_VISIBLE) && GetActiveWindow() != hwnd)
+                    SetPropW( hwnd, restore_window_propW, (HANDLE) TRUE );
+                else
+                    SendMessageW( hwnd, WM_SYSCOMMAND, SC_RESTORE, 0 );
                 return;
             }
             TRACE( "not restoring win %p/%lx style %08x\n", data->hwnd, data->whole_window, style );
