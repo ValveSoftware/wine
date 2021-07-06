@@ -74,6 +74,7 @@ struct filter
     struct list entry;
     IBaseFilter *filter;
     IMediaSeeking *seeking;
+    IMediaPosition *position;
     WCHAR *name;
     BOOL sorting;
 };
@@ -557,6 +558,7 @@ static BOOL has_output_pins(IBaseFilter *filter)
 
 static void update_seeking(struct filter *filter)
 {
+    IMediaPosition *position;
     IMediaSeeking *seeking;
 
     if (!filter->seeking)
@@ -575,11 +577,19 @@ static void update_seeking(struct filter *filter)
                 IMediaSeeking_Release(seeking);
         }
     }
+
+    if (!filter->position)
+    {
+        /* Tokyo Xanadu eX+, same as above, same developer, destroys its filter when
+         * its IMediaPosition interface is released, so cache the interface instead
+         * of querying for it every time. */
+        if (SUCCEEDED(IBaseFilter_QueryInterface(filter->filter, &IID_IMediaPosition, (void **)&position)))
+            filter->position = position;
+    }
 }
 
 static BOOL is_renderer(struct filter *filter)
 {
-    IMediaPosition *media_position;
     IAMFilterMiscFlags *flags;
     BOOL ret = FALSE;
 
@@ -589,16 +599,11 @@ static BOOL is_renderer(struct filter *filter)
             ret = TRUE;
         IAMFilterMiscFlags_Release(flags);
     }
-    else if (SUCCEEDED(IBaseFilter_QueryInterface(filter->filter, &IID_IMediaPosition, (void **)&media_position)))
-    {
-        if (!has_output_pins(filter->filter))
-            ret = TRUE;
-        IMediaPosition_Release(media_position);
-    }
     else
     {
         update_seeking(filter);
-        if (filter->seeking && !has_output_pins(filter->filter))
+        if ((filter->seeking || filter->position) &&
+            !has_output_pins(filter->filter))
             ret = TRUE;
     }
     return ret;
@@ -671,6 +676,7 @@ static HRESULT WINAPI FilterGraph2_AddFilter(IFilterGraph2 *iface,
     list_add_head(&graph->filters, &entry->entry);
     entry->sorting = FALSE;
     entry->seeking = NULL;
+    entry->position = NULL;
     ++graph->version;
 
     return duplicate_name ? VFW_S_DUPLICATE_NAME : hr;
@@ -738,6 +744,8 @@ static HRESULT WINAPI FilterGraph2_RemoveFilter(IFilterGraph2 *iface, IBaseFilte
             {
                 IBaseFilter_SetSyncSource(pFilter, NULL);
                 IBaseFilter_Release(pFilter);
+                if (entry->position)
+                    IMediaPosition_Release(entry->position);
                 if (entry->seeking)
                     IMediaSeeking_Release(entry->seeking);
                 list_remove(&entry->entry);
