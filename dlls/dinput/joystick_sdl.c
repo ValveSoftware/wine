@@ -60,6 +60,9 @@ WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 
 #include "wine/sdl_controller_overrides.h"
 
+#define VID_LOGITECH 0x046d
+#define PID_LOGITECH_G920 0xc262
+
 typedef struct JoystickImpl JoystickImpl;
 static const IDirectInputDevice8AVtbl JoystickAvt;
 static const IDirectInputDevice8WVtbl JoystickWvt;
@@ -848,6 +851,69 @@ static BOOL enum_device_state_ms_xb360(SDL_Joystick *js, JoystickImpl *This, str
 #undef SPECIALCASE_TRIGGERS
 }
 
+static BOOL enum_device_state_g920(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
+{
+    static const struct enum_map {
+        int type;
+        int sdl_idx;
+        int dnp_id;
+    } map_g920[] = {
+        { ITEM_TYPE_HAT, 0, 0 }, /* D-Pad */
+
+        { ITEM_TYPE_BUTTON,  0,  0}, /* A */
+        { ITEM_TYPE_BUTTON,  1,  1}, /* B */
+        { ITEM_TYPE_BUTTON,  2,  2}, /* X */
+        { ITEM_TYPE_BUTTON,  3,  3}, /* Y */
+        { ITEM_TYPE_BUTTON,  4,  4}, /* Right Paddle */
+        { ITEM_TYPE_BUTTON,  5,  5}, /* Left Paddle */
+        { ITEM_TYPE_BUTTON,  6,  6}, /* Start */
+        { ITEM_TYPE_BUTTON,  7,  7}, /* Select */
+        { ITEM_TYPE_BUTTON,  8,  8}, /* RSB */
+        { ITEM_TYPE_BUTTON,  9,  9}, /* LSB */
+        { ITEM_TYPE_BUTTON, 10, 10}, /* Guide Button */
+
+        /* XXX: probably the shifter */
+        { ITEM_TYPE_BUTTON, 11, 11}, /* ?? */
+        { ITEM_TYPE_BUTTON, 12, 12}, /* ?? */
+        { ITEM_TYPE_BUTTON, 13, 13}, /* ?? */
+        { ITEM_TYPE_BUTTON, 14, 14}, /* ?? */
+        { ITEM_TYPE_BUTTON, 15, 15}, /* ?? */
+        { ITEM_TYPE_BUTTON, 16, 16}, /* ?? */
+        { ITEM_TYPE_BUTTON, 17, 17}, /* ?? */
+
+        { ITEM_TYPE_AXIS, 0, 0 }, /* Wheel */
+        { ITEM_TYPE_AXIS, 3, 6 }, /* Clutch */
+        { ITEM_TYPE_AXIS, 2, 5 }, /* Brake */
+        { ITEM_TYPE_AXIS, 1, 1 }, /* Accelerator  */
+
+        /* XXX: missing Collection 0 and Collection 1 GUID_Unknown objects */
+    };
+
+    if(idx >= ARRAY_SIZE(map_g920))
+        return FALSE;
+
+    st->type = map_g920[idx].type;
+    st->id = map_g920[idx].dnp_id;
+
+    switch(map_g920[idx].type)
+    {
+    case ITEM_TYPE_BUTTON:
+        st->val = SDL_JoystickGetButton(js, map_g920[idx].sdl_idx);
+        return TRUE;
+
+    case ITEM_TYPE_AXIS:
+        st->val = SDL_JoystickGetAxis(js, map_g920[idx].sdl_idx);
+        return TRUE;
+
+    case ITEM_TYPE_HAT:
+        st->val = SDL_JoystickGetHat(js, map_g920[idx].sdl_idx);
+        return TRUE;
+    }
+
+    ERR("???\n"); /* error in static data above */
+    return FALSE;
+}
+
 /* straight 1:1 mapping of SDL items and dinput items */
 static BOOL enum_device_state_standard(SDL_Joystick *js, JoystickImpl *This, struct device_state_item *st, int idx)
 {
@@ -1019,6 +1085,11 @@ static enum_device_state_function select_enum_function(struct SDLDev *sdldev)
     {
         TRACE("for %04x/%04x, polling xbox 360/one controller\n", sdldev->vendor_id, sdldev->product_id);
         return enum_device_state_ms_xb360;
+    }
+    else if(sdldev->vendor_id == VID_LOGITECH && sdldev->product_id == PID_LOGITECH_G920)
+    {
+        TRACE("for %04x/%04x, polling Logitech G920 wheel\n", sdldev->vendor_id, sdldev->product_id);
+        return enum_device_state_g920;
     }
 
     TRACE("for %04x/%04x, using no maps\n", sdldev->vendor_id, sdldev->product_id);
