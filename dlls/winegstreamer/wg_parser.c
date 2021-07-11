@@ -34,7 +34,10 @@
 #include <gst/video/video.h>
 #include <gst/audio/audio.h>
 
-WINE_DEFAULT_DEBUG_CHANNEL(gstreamer);
+/* GStreamer callbacks may be called on threads not created by Wine, and
+ * therefore cannot access the Wine TEB. This means that we must use GStreamer
+ * debug logging instead of Wine debug logging. In order to be safe we forbid
+ * any use of Wine debug logging in this entire file. */
 
 GST_DEBUG_CATEGORY_STATIC(wine);
 #define GST_CAT_DEFAULT wine
@@ -609,7 +612,7 @@ static bool CDECL wg_parser_stream_get_event(struct wg_parser_stream *stream, st
     if (parser->flushing)
     {
         pthread_mutex_unlock(&parser->mutex);
-        TRACE("Filter is flushing.\n");
+        GST_DEBUG("Filter is flushing.\n");
         return false;
     }
 
@@ -706,13 +709,13 @@ static void CDECL wg_parser_stream_notify_qos(struct wg_parser_stream *stream,
         /* This can happen legitimately if the sample falls outside of the
          * segment bounds. GStreamer elements shouldn't present the sample in
          * that case, but DirectShow doesn't care. */
-        TRACE("Ignoring QoS event.\n");
+        GST_LOG("Ignoring QoS event.\n");
         return;
     }
 
     if (!(event = gst_event_new_qos(underflow ? GST_QOS_TYPE_UNDERFLOW : GST_QOS_TYPE_OVERFLOW,
             proportion, diff * 100, stream_time)))
-        ERR("Failed to create QOS event.\n");
+        GST_ERROR("Failed to create QOS event.\n");
     gst_pad_push_event(stream->my_sink, event);
 }
 
@@ -721,7 +724,7 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
 {
     const char *name = gst_element_factory_get_longname(fact);
 
-    GST_TRACE("Using \"%s\".", name);
+    GST_INFO("Using \"%s\".", name);
 
     if (strstr(name, "Player protection"))
     {
@@ -1545,7 +1548,7 @@ static LONGLONG query_duration(GstPad *pad)
     if (gst_pad_query_duration(pad, GST_FORMAT_TIME, &duration))
         return duration / 100;
 
-    WARN("Failed to query time duration; trying to convert from byte length.\n");
+    GST_INFO("Failed to query time duration; trying to convert from byte length.\n");
 
     /* To accurately get a duration for the stream, we want to only consider the
      * length of that stream. Hence, query for the pad duration, instead of
@@ -1554,7 +1557,7 @@ static LONGLONG query_duration(GstPad *pad)
             && gst_pad_query_convert(pad, GST_FORMAT_BYTES, byte_length, GST_FORMAT_TIME, &duration))
         return duration / 100;
 
-    ERR("Failed to query duration.\n");
+    GST_WARNING("Failed to query duration.\n");
     return 0;
 }
 
@@ -1704,7 +1707,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
 
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
-        ERR("Failed to link pads, error %d.\n", ret);
+        GST_ERROR("Failed to link pads, error %d.\n", ret);
         return FALSE;
     }
 
@@ -1712,7 +1715,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        ERR("Failed to play stream.\n");
+        GST_ERROR("Failed to play stream.\n");
         return FALSE;
     }
 
@@ -1751,7 +1754,7 @@ static BOOL avi_parser_init_gst(struct wg_parser *parser)
 
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
-        ERR("Failed to link pads, error %d.\n", ret);
+        GST_ERROR("Failed to link pads, error %d.\n", ret);
         return FALSE;
     }
 
@@ -1759,7 +1762,7 @@ static BOOL avi_parser_init_gst(struct wg_parser *parser)
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        ERR("Failed to play stream.\n");
+        GST_ERROR("Failed to play stream.\n");
         return FALSE;
     }
 
@@ -1790,7 +1793,7 @@ static BOOL mpeg_audio_parser_init_gst(struct wg_parser *parser)
     parser->their_sink = gst_element_get_static_pad(element, "sink");
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
-        ERR("Failed to link sink pads, error %d.\n", ret);
+        GST_ERROR("Failed to link sink pads, error %d.\n", ret);
         return FALSE;
     }
 
@@ -1800,7 +1803,7 @@ static BOOL mpeg_audio_parser_init_gst(struct wg_parser *parser)
     gst_object_ref(stream->their_src = gst_element_get_static_pad(element, "src"));
     if ((ret = gst_pad_link(stream->their_src, stream->my_sink)) < 0)
     {
-        ERR("Failed to link source pads, error %d.\n", ret);
+        GST_ERROR("Failed to link source pads, error %d.\n", ret);
         return FALSE;
     }
 
@@ -1809,7 +1812,7 @@ static BOOL mpeg_audio_parser_init_gst(struct wg_parser *parser)
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        ERR("Failed to play stream.\n");
+        GST_ERROR("Failed to play stream.\n");
         return FALSE;
     }
 
@@ -1839,7 +1842,7 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
     parser->their_sink = gst_element_get_static_pad(element, "sink");
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
-        ERR("Failed to link sink pads, error %d.\n", ret);
+        GST_ERROR("Failed to link sink pads, error %d.\n", ret);
         return FALSE;
     }
 
@@ -1850,7 +1853,7 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
     gst_object_ref(stream->their_src);
     if ((ret = gst_pad_link(stream->their_src, stream->my_sink)) < 0)
     {
-        ERR("Failed to link source pads, error %d.\n", ret);
+        GST_ERROR("Failed to link source pads, error %d.\n", ret);
         return FALSE;
     }
 
@@ -1859,7 +1862,7 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        ERR("Failed to play stream.\n");
+        GST_ERROR("Failed to play stream.\n");
         return FALSE;
     }
 
@@ -1879,7 +1882,7 @@ static struct wg_parser *wg_parser_create(void)
     pthread_cond_init(&parser->read_done_cond, NULL);
     parser->flushing = true;
 
-    TRACE("Created winegstreamer parser %p.\n", parser);
+    GST_DEBUG("Created winegstreamer parser %p.\n", parser);
     return parser;
 }
 
@@ -1999,14 +2002,15 @@ NTSTATUS CDECL __wine_init_unix_lib(HMODULE module, DWORD reason, const void *pt
 
         if (!gst_init_check(&argc, &argv, &err))
         {
-            ERR("Failed to initialize GStreamer: %s\n", debugstr_a(err->message));
+            fprintf(stderr, "winegstreamer: failed to initialize GStreamer: %s\n", debugstr_a(err->message));
             g_error_free(err);
             return STATUS_UNSUCCESSFUL;
         }
-        TRACE("GStreamer library version %s; wine built with %d.%d.%d.\n",
-                gst_version_string(), GST_VERSION_MAJOR, GST_VERSION_MINOR, GST_VERSION_MICRO);
 
         GST_DEBUG_CATEGORY_INIT(wine, "WINE", GST_DEBUG_FG_RED, "Wine GStreamer support");
+
+        GST_INFO("GStreamer library version %s; wine built with %d.%d.%d.\n",
+                gst_version_string(), GST_VERSION_MAJOR, GST_VERSION_MINOR, GST_VERSION_MICRO);
 
         *(const struct unix_funcs **)ptr_out = &funcs;
     }
