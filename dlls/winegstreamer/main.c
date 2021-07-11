@@ -30,7 +30,7 @@
 static HINSTANCE winegstreamer_instance;
 LONG object_locks;
 
-WINE_DEFAULT_DEBUG_CHANNEL(gstreamer);
+WINE_DEFAULT_DEBUG_CHANNEL(quartz);
 
 const struct unix_funcs *unix_funcs = NULL;
 
