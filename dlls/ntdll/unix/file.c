@@ -4375,6 +4375,15 @@ NTSTATUS WINAPI NtSetInformationFile( HANDLE handle, IO_STATUS_BLOCK *io,
         else io->u.Status = STATUS_INVALID_PARAMETER_3;
         break;
 
+    case FileAllocationInformation:
+    {
+        const FILE_ALLOCATION_INFORMATION *info = ptr;
+
+        FIXME("FileAllocationInformation AllocationSize %p stub.\n", (void *)(ULONG_PTR)info->AllocationSize.QuadPart);
+        io->u.Status = STATUS_SUCCESS;
+        break;
+    }
+
     case FilePipeInformation:
         if (len >= sizeof(FILE_PIPE_INFORMATION))
         {
