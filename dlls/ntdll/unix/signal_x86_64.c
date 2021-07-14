@@ -71,6 +71,7 @@
 # include <linux/filter.h>
 # include <linux/seccomp.h>
 # include <sys/prctl.h>
+# include <linux/audit.h>
 #endif
 
 #define NONAMELESSUNION
@@ -2490,37 +2491,46 @@ static void install_bpf(struct sigaction *sig_act)
 #   ifndef SECCOMP_SET_MODE_FILTER
 #       define SECCOMP_SET_MODE_FILTER 1
 #   endif
+    static const BYTE syscall_trap_test[] =
+    {
+        0x48, 0x89, 0xc8,   /* mov %rcx, %rax */
+        0x0f, 0x05,         /* syscall */
+        0xc3,               /* retq */
+    };
     static const unsigned int flags = SECCOMP_FILTER_FLAG_SPEC_ALLOW;
+
+#define NATIVE_SYSCALL_ADDRESS_START 0x700000000000
+
     static struct sock_filter filter[] =
     {
-       BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
-                (offsetof(struct seccomp_data, nr))),
-       BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0xf000, 0, 1),
-       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-    };
-    static struct sock_filter filter_rdr2[] =
-    {
-        /* Trap anything called from RDR2 or the launcher (0x140000000 - 0x150000000)*/
-        /* > 0x140000000 */
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 0),
-        BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x40000000 /*lsb*/, 0, 7),
         BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 4),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x1 /*msb*/, 0, 5),
-
-        /* < 0x150000000 */
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 0),
-        BPF_JUMP(BPF_JMP | BPF_JGT | BPF_K, 0x50000000 /*lsb*/, 3, 0),
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 4),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x1 /*msb*/, 0, 1),
+        /* Native libs are loaded at high addresses. */
+        BPF_JUMP(BPF_JMP | BPF_JGT | BPF_K, NATIVE_SYSCALL_ADDRESS_START >> 32, 0, 1),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+        /* Allow i386. */
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)),
+        BPF_JUMP (BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_X86_64, 1, 0),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+        /* Allow wine64-preloader */
+        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer)),
+        BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x7d400000, 1, 0),
         BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-
-        /* Allow everything else */
+        BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x7d402000, 0, 1),
+        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
         BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
     };
+    long (WINAPI *test_syscall)(long sc_number);
     struct sock_fprog prog;
-    BOOL rdr2 = FALSE;
     NTSTATUS status;
+
+    if ((ULONG_PTR)sc_seccomp < NATIVE_SYSCALL_ADDRESS_START
+            || (ULONG_PTR)syscall < NATIVE_SYSCALL_ADDRESS_START)
+    {
+        ERR("Native libs are being loaded in low addresses, sc_seccomp %p, syscall %p, not installing seccomp.\n",
+                sc_seccomp, syscall);
+        ERR("The known reasons are /proc/sys/vm/legacy_va_layout set to 1 or 'ulimit -s' being 'unlimited'.\n");
+        return;
+    }
 
     sig_act->sa_sigaction = sigsys_handler;
     memset(&prog, 0, sizeof(prog));
@@ -2529,19 +2539,22 @@ static void install_bpf(struct sigaction *sig_act)
         const char *sgi = getenv("SteamGameId");
         if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210")))
         {
-            /* Use specific filter and signal handler for Red Dead Redemption 2 */
-            prog.len = ARRAY_SIZE(filter_rdr2);
-            prog.filter = filter_rdr2;
+            /* Use specific signal handler for Red Dead Redemption 2 */
             sig_act->sa_sigaction = sigsys_handler_rdr2;
-            rdr2 = TRUE;
         }
     }
 
     sigaction(SIGSYS, sig_act, NULL);
 
-    if (rdr2)
+    test_syscall = mmap((void *)0x600000000000, 0x1000, PROT_EXEC | PROT_READ | PROT_WRITE,
+            MAP_PRIVATE | MAP_ANON, -1, 0);
+    if (test_syscall != (void *)0x600000000000)
     {
         int ret;
+
+        ERR("Could not allocate test syscall, falling back to seccomp presence check, test_syscall %p, errno %d.\n",
+                test_syscall, errno);
+        if (test_syscall != MAP_FAILED) munmap(test_syscall, 0x1000);
 
         if ((ret = prctl(PR_GET_SECCOMP, 0, NULL, 0, 0)))
         {
@@ -2554,7 +2567,10 @@ static void install_bpf(struct sigaction *sig_act)
     }
     else
     {
-        if ((status = syscall(0xffff)) == STATUS_INVALID_PARAMETER)
+        memcpy(test_syscall, syscall_trap_test, sizeof(syscall_trap_test));
+        status = test_syscall(0xffff);
+        munmap(test_syscall, 0x1000);
+        if (status == STATUS_INVALID_PARAMETER)
         {
             TRACE("Seccomp filters already installed.\n");
             return;
@@ -2564,9 +2580,12 @@ static void install_bpf(struct sigaction *sig_act)
             ERR("Unexpected status %#x, errno %d.\n", status, errno);
             return;
         }
-        prog.len = ARRAY_SIZE(filter);
-        prog.filter = filter;
     }
+
+    TRACE("Installing seccomp filters.\n");
+
+    prog.len = ARRAY_SIZE(filter);
+    prog.filter = filter;
 
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
     {
