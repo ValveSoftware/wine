@@ -1313,6 +1313,7 @@ typedef enum _SYSTEM_INFORMATION_CLASS {
     SystemFileCacheInformationEx = 81,
     SystemDynamicTimeZoneInformation = 102,
     SystemLogicalProcessorInformationEx = 107,
+    SystemKernelDebuggerInformationEx = 149,
     SystemCpuSetInformation = 175,
     SystemHypervisorSharedPageInformation = 197,
     SystemInformationClassMax
@@ -1977,6 +1978,12 @@ typedef struct _SYSTEM_KERNEL_DEBUGGER_INFORMATION {
 	BOOLEAN  DebuggerEnabled;
 	BOOLEAN  DebuggerNotPresent;
 } SYSTEM_KERNEL_DEBUGGER_INFORMATION, *PSYSTEM_KERNEL_DEBUGGER_INFORMATION;
+
+typedef struct _SYSTEM_KERNEL_DEBUGGER_INFORMATION_EX {
+	BOOLEAN  DebuggerAllowed;
+	BOOLEAN  DebuggerEnabled;
+    BOOLEAN  DebuggerPresent;
+} SYSTEM_KERNEL_DEBUGGER_INFORMATION_EX, *PSYSTEM_KERNEL_DEBUGGER_INFORMATION_EX;
 
 typedef struct _VM_COUNTERS
 {
