@@ -535,6 +535,23 @@ BOOL fs_hack_is_integer(void)
     return is_int;
 }
 
+BOOL fs_hack_is_fsr(float *sharpness)
+{
+    static int is_fsr = -1;
+    if (is_fsr < 0)
+    {
+        const char *e = getenv("WINE_FULLSCREEN_FSR");
+        is_fsr = e && strcmp(e, "0");
+    }
+    TRACE("is_fsr: %s", is_fsr ? "TRUE" : "FALSE");
+    if (is_fsr && sharpness)
+    {
+        *sharpness = 0.0f; /* TODO */
+        TRACE("sharpness: %2.4f\n", *sharpness);
+    }
+    return is_fsr;
+}
+
 HMONITOR fs_hack_monitor_from_rect(const RECT *in_rect)
 {
     RECT rect = *in_rect;

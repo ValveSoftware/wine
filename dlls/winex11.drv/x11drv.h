@@ -629,6 +629,7 @@ extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_enabled(HMONITOR monitor) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_mapping_required(HMONITOR monitor) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_is_integer(void) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_is_fsr(float *sharpness) DECLSPEC_HIDDEN;
 extern HMONITOR fs_hack_monitor_from_hwnd(HWND hwnd) DECLSPEC_HIDDEN;
 extern HMONITOR fs_hack_monitor_from_rect(const RECT *rect) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_matches_current_mode(HMONITOR monitor, INT width, INT height) DECLSPEC_HIDDEN;

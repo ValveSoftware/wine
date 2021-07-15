@@ -102,11 +102,18 @@ struct fs_hack_image
     uint32_t cmd_queue_idx;
     VkCommandBuffer cmd;
     VkImage swapchain_image;
-    VkImage blit_image;
+    VkImage fsr_image;
     VkImage user_image;
     VkSemaphore blit_finished;
-    VkImageView user_view, blit_view;
-    VkDescriptorSet descriptor_set;
+    VkImageView user_view, swapchain_view, fsr_view;
+    VkDescriptorSet descriptor_set, fsr_set;
+};
+
+struct fs_comp_pipeline
+{
+    VkPipelineLayout pipeline_layout;
+    VkPipeline pipeline;
+    uint32_t push_size;
 };
 
 struct VkSwapchainKHR_T
@@ -120,15 +127,20 @@ struct VkSwapchainKHR_T
     VkImageUsageFlags surface_usage;
     VkRect2D blit_dst;
     VkCommandPool *cmd_pools; /* VkCommandPool[device->max_queue_families] */
-    VkDeviceMemory user_image_memory, blit_image_memory;
+    VkDeviceMemory user_image_memory, fsr_image_memory;
     uint32_t n_images;
     struct fs_hack_image *fs_hack_images; /* struct fs_hack_image[n_images] */
     VkFilter fs_hack_filter;
     VkSampler sampler;
     VkDescriptorPool descriptor_pool;
     VkDescriptorSetLayout descriptor_set_layout;
-    VkPipelineLayout pipeline_layout;
-    VkPipeline pipeline;
+    VkFormat format;
+    BOOL fsr;
+    float sharpness;
+
+    struct fs_comp_pipeline blit_pipeline;
+    struct fs_comp_pipeline fsr_easu_pipeline;
+    struct fs_comp_pipeline fsr_rcas_pipeline;
 
     struct wine_vk_mapping mapping;
 };
