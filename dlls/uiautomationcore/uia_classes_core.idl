@@ -1,5 +1,5 @@
 /*
- * Copyright 2021 Connor McAdams for CodeWeavers
+ * Copyright 2021 Connor Mcadams for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -16,7 +16,6 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "uiautomation.h"
-#include "oleacc.h"
+#pragma makedep regtypelib
 
-HRESULT create_uia_iface(IUIAutomation **) DECLSPEC_HIDDEN;
+#include "uiautomationcore.idl"
