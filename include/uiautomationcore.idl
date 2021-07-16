@@ -179,6 +179,9 @@ struct UiaChangeInfo {
 [
     version(1.0),
     uuid(930299ce-9965-4dec-b0f4-a54848d4b667),
+#ifdef __WIDL__
+    id(2),
+#endif
     lcid(0),
     hidden
 ]
@@ -262,7 +265,8 @@ library UIA
     [
         object,
         uuid(a407b27b-0f6d-4427-9292-473c7bf93258),
-        pointer_default(unique)
+        pointer_default(unique),
+        oleautomation
     ]
     interface IRawElementProviderAdviseEvents : IUnknown {
         HRESULT AdviseEventAdded([in]EVENTID eventId,
