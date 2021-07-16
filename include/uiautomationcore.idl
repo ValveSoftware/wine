@@ -176,6 +176,9 @@ struct UiaChangeInfo {
 [
     version(1.0),
     uuid(930299ce-9965-4dec-b0f4-a54848d4b667),
+#ifdef __WIDL__
+    id(2),
+#endif
     lcid(0),
     hidden
 ]
@@ -186,6 +189,9 @@ library UIA
     [
         object,
         uuid(d6dd68d1-86fd-4332-8666-9abedea2d24c),
+#ifdef __WIDL__
+        oleautomation,
+#endif
         pointer_default(unique)
     ]
     interface IRawElementProviderSimple : IUnknown
@@ -232,6 +238,9 @@ library UIA
     [
         object,
         uuid(f7063da8-8359-439c-9297-bbc5299a7d87),
+#ifdef __WIDL__
+        oleautomation,
+#endif
         pointer_default(unique)
     ]
     interface IRawElementProviderFragment : IUnknown {
@@ -255,6 +264,9 @@ library UIA
     [
         object,
         uuid(a407b27b-0f6d-4427-9292-473c7bf93258),
+#ifdef __WIDL__
+        oleautomation,
+#endif
         pointer_default(unique)
     ]
     interface IRawElementProviderAdviseEvents : IUnknown {
@@ -268,6 +280,9 @@ library UIA
     [
         object,
         uuid(620ce2a5-ab8f-40a9-86cb-de3c75599b58),
+#ifdef __WIDL__
+        oleautomation,
+#endif
         pointer_default(unique)
     ]
     interface IRawElementProviderFragmentRoot : IUnknown {
