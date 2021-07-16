@@ -20,3 +20,8 @@
 #include "oleacc.h"
 
 HRESULT create_uia_iface(IUIAutomation **) DECLSPEC_HIDDEN;
+
+HRESULT create_uia_elem_from_raw_provider(IUIAutomationElement **,
+        IRawElementProviderSimple *) DECLSPEC_HIDDEN;
+HRESULT create_uia_elem_from_msaa_acc(IUIAutomationElement **,
+        IAccessible *, INT) DECLSPEC_HIDDEN;
