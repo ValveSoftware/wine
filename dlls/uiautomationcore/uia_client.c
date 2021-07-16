@@ -18,6 +18,7 @@
 
 #define COBJMACROS
 #include "uia_private.h"
+#include "winuser.h"
 
 #include "wine/debug.h"
 #include "wine/heap.h"
@@ -32,6 +33,11 @@ struct uia_data {
 struct uia_elem_data {
     IUIAutomationElement IUIAutomationElement_iface;
     LONG ref;
+
+    IRawElementProviderSimple *elem_prov;
+
+    IAccessible *acc;
+    VARIANT child_id;
 };
 
 static inline struct uia_elem_data *impl_from_IUIAutomationElement(IUIAutomationElement *iface);
@@ -115,9 +121,54 @@ static HRESULT WINAPI uia_GetRootElement(IUIAutomation *iface,
 static HRESULT WINAPI uia_ElementFromHandle(IUIAutomation *iface, UIA_HWND hwnd,
         IUIAutomationElement **element)
 {
-    struct uia_data *This = impl_from_IUIAutomation(iface);
-    FIXME("This %p\n", This);
-    return E_NOTIMPL;
+    IUIAutomationElement *elem;
+    LRESULT lres;
+    HRESULT hr;
+
+    TRACE("iface %p, hwnd %p, element %p\n", iface, hwnd, element);
+
+    /* FIXME: Is this what actually gets returned? */
+    if (!IsWindow(hwnd))
+        return E_FAIL;
+
+    lres = SendMessageW(hwnd, WM_GETOBJECT, 0, UiaRootObjectId);
+    if (FAILED(lres))
+        return lres;
+
+    /*
+     * If lres is 0, this is probably not a UIA provider, but instead an
+     * MSAA server.
+     */
+    if (!lres)
+    {
+        IAccessible *acc;
+
+        hr = AccessibleObjectFromWindow((HWND)hwnd, OBJID_CLIENT,
+                &IID_IAccessible, (void **)&acc);
+        if (FAILED(hr))
+            return hr;
+
+        hr = create_uia_elem_from_msaa_acc(&elem, acc, CHILDID_SELF);
+        if (FAILED(hr))
+            return hr;
+    }
+    else
+    {
+        IRawElementProviderSimple *elem_prov;
+
+        hr = ObjectFromLresult(lres, &IID_IRawElementProviderSimple, 0,
+                (void **)&elem_prov);
+        if (FAILED(hr))
+            return hr;
+
+        hr = create_uia_elem_from_raw_provider(&elem, elem_prov);
+        if (FAILED(hr))
+            return hr;
+    }
+
+    *element = elem;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI uia_ElementFromPoint(IUIAutomation *iface, POINT pt,
@@ -668,7 +719,14 @@ static ULONG WINAPI uia_elem_Release(IUIAutomationElement *iface)
     TRACE("(%p) ref = %u\n", This, ref);
 
     if(!ref)
+    {
+        if (This->elem_prov)
+            IRawElementProviderSimple_Release(This->elem_prov);
+        else if (This->acc)
+            IAccessible_Release(This->acc);
+
         heap_free(This);
+    }
 
     return ref;
 }
@@ -1432,6 +1490,42 @@ static HRESULT create_uia_elem_iface(IUIAutomationElement **iface)
     uia->IUIAutomationElement_iface.lpVtbl = &uia_elem_vtbl;
     uia->ref = 1;
     *iface = &uia->IUIAutomationElement_iface;
+
+    return S_OK;
+}
+
+HRESULT create_uia_elem_from_raw_provider(IUIAutomationElement **iface,
+        IRawElementProviderSimple *wrap)
+{
+    struct uia_elem_data *uia;
+    HRESULT hr;
+
+    hr = create_uia_elem_iface(iface);
+    if (FAILED(hr))
+        return hr;
+
+    uia = impl_from_IUIAutomationElement(*iface);
+    uia->elem_prov = wrap;
+    uia->acc = NULL;
+
+    return S_OK;
+}
+
+HRESULT create_uia_elem_from_msaa_acc(IUIAutomationElement **iface,
+        IAccessible *wrap, INT child_id)
+{
+    struct uia_elem_data *uia;
+    HRESULT hr;
+
+    hr = create_uia_elem_iface(iface);
+    if (FAILED(hr))
+        return hr;
+
+    uia = impl_from_IUIAutomationElement(*iface);
+    uia->elem_prov = NULL;
+    uia->acc = wrap;
+    V_VT(&uia->child_id) = VT_I4;
+    V_I4(&uia->child_id) = child_id;
 
     return S_OK;
 }
