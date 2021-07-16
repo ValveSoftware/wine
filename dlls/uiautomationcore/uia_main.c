@@ -313,8 +313,15 @@ int WINAPI UiaLookupId(enum AutomationIdentifierType type, const GUID *guid)
 LRESULT WINAPI UiaReturnRawElementProvider(HWND hwnd, WPARAM wParam,
         LPARAM lParam, IRawElementProviderSimple *elprov)
 {
-    FIXME("(%p, %lx, %lx, %p) stub!\n", hwnd, wParam, lParam, elprov);
-    return 0;
+    TRACE("(%p, %lx, %lx, %p)\n", hwnd, wParam, lParam, elprov);
+
+    if (lParam != UiaRootObjectId)
+    {
+        FIXME("Unsupported object id %ld\n", lParam);
+        return 0;
+    }
+
+    return LresultFromObject(&IID_IRawElementProviderSimple, wParam, (IUnknown *)elprov);
 }
 
 /***********************************************************************
