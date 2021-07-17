@@ -538,6 +538,7 @@ BOOL fs_hack_is_integer(void)
 BOOL fs_hack_is_fsr(float *sharpness)
 {
     static int is_fsr = -1;
+    int sharpness_int = 2;
     if (is_fsr < 0)
     {
         const char *e = getenv("WINE_FULLSCREEN_FSR");
@@ -546,7 +547,10 @@ BOOL fs_hack_is_fsr(float *sharpness)
     TRACE("is_fsr: %s", is_fsr ? "TRUE" : "FALSE");
     if (is_fsr && sharpness)
     {
-        *sharpness = 0.0f; /* TODO */
+        const char *e = getenv("WINE_FULLSCREEN_FSR_STRENGTH");
+        if (e)
+            sharpness_int = atoi(e);
+        *sharpness = (float) sharpness_int / 10.0f;
         TRACE("sharpness: %2.4f\n", *sharpness);
     }
     return is_fsr;
