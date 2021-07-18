@@ -2957,6 +2957,24 @@ static VkResult create_descriptor_set(VkDevice device, struct VkSwapchainKHR_T *
     return VK_SUCCESS;
 }
 
+static VkFormat srgb_to_unorm(VkFormat format)
+{
+    switch (format)
+    {
+        case VK_FORMAT_R8G8B8A8_SRGB: return VK_FORMAT_R8G8B8A8_UNORM;
+        case VK_FORMAT_B8G8R8A8_SRGB: return VK_FORMAT_B8G8R8A8_UNORM;
+        case VK_FORMAT_R8G8B8_SRGB: return VK_FORMAT_R8G8B8_UNORM;
+        case VK_FORMAT_B8G8R8_SRGB: return VK_FORMAT_B8G8R8_UNORM;
+        case VK_FORMAT_A8B8G8R8_SRGB_PACK32: return VK_FORMAT_A8B8G8R8_UNORM_PACK32;
+        default: return format;
+    }
+}
+
+static BOOL is_srgb(VkFormat format)
+{
+    return format != srgb_to_unorm(format);
+}
+
 static VkResult init_compute_state(VkDevice device, struct VkSwapchainKHR_T *swapchain)
 {
     VkResult res;
@@ -3074,7 +3092,7 @@ static VkResult init_compute_state(VkDevice device, struct VkSwapchainKHR_T *swa
             imageInfo.extent.depth = 1;
             imageInfo.mipLevels = 1;
             imageInfo.arrayLayers = 1;
-            imageInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+            imageInfo.format = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
             imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
             imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
             imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -3151,7 +3169,7 @@ static VkResult init_compute_state(VkDevice device, struct VkSwapchainKHR_T *swa
             viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
             viewInfo.image = hack->fsr_image;
             viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-            viewInfo.format = VK_FORMAT_R8G8B8A8_UNORM;
+            viewInfo.format = VK_FORMAT_A2B10G10R10_UNORM_PACK32;
             viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
             viewInfo.subresourceRange.baseMipLevel = 0;
             viewInfo.subresourceRange.levelCount = 1;
@@ -3175,7 +3193,7 @@ static VkResult init_compute_state(VkDevice device, struct VkSwapchainKHR_T *swa
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = hack->swapchain_image;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = swapchain->format;
+        viewInfo.format = srgb_to_unorm(swapchain->format);
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
@@ -3315,6 +3333,13 @@ static VkResult init_fs_hack_images(VkDevice device, struct VkSwapchainKHR_T *sw
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.queueFamilyIndexCount = createinfo->queueFamilyIndexCount;
         imageInfo.pQueueFamilyIndices = createinfo->pQueueFamilyIndices;
+
+        if (is_srgb(createinfo->imageFormat))
+            imageInfo.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT;
+
+        if (createinfo->flags & VK_SWAPCHAIN_CREATE_MUTABLE_FORMAT_BIT_KHR)
+            imageInfo.flags = VK_IMAGE_CREATE_MUTABLE_FORMAT_BIT | VK_IMAGE_CREATE_EXTENDED_USAGE_BIT;
+
         res = device->funcs.p_vkCreateImage(device->device, &imageInfo, NULL, &hack->user_image);
         if(res != VK_SUCCESS){
             ERR("vkCreateImage failed: %d\n", res);
@@ -3380,7 +3405,7 @@ static VkResult init_fs_hack_images(VkDevice device, struct VkSwapchainKHR_T *sw
         viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
         viewInfo.image = swapchain->fs_hack_images[i].user_image;
         viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-        viewInfo.format = createinfo->imageFormat;
+        viewInfo.format = srgb_to_unorm(createinfo->imageFormat);
         viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
         viewInfo.subresourceRange.baseMipLevel = 0;
         viewInfo.subresourceRange.levelCount = 1;
@@ -3489,6 +3514,9 @@ VkResult WINAPI wine_vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCrea
         native_info.imageUsage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT; /* XXX: check if supported by surface */
 
         object->format = native_info.imageFormat;
+
+        if (object->fsr)
+            native_info.imageFormat = srgb_to_unorm(native_info.imageFormat);
 
         if(native_info.imageFormat != VK_FORMAT_B8G8R8A8_UNORM &&
                 native_info.imageFormat != VK_FORMAT_B8G8R8A8_SRGB){
@@ -4555,6 +4583,11 @@ VkResult WINAPI wine_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pP
                 {
                     if(queue->device->queue_props[queue_idx].queueFlags & VK_QUEUE_COMPUTE_BIT)
                         res = record_fsr_cmd(queue->device, swapchain, hack);
+                    else
+                    {
+                        ERR("Present queue is not a compute queue!\n");
+                        res = VK_ERROR_DEVICE_LOST;
+                    }
                 }
                 else
                 {
