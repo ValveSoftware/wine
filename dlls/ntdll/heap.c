@@ -2229,7 +2229,7 @@ BOOLEAN WINAPI RtlValidateHeap( HANDLE heap, ULONG flags, LPCVOID ptr )
     switch (heapPtr->extended_type)
     {
     case HEAP_LFH:
-        if (!(status = HEAP_lfh_validate( heapPtr, flags, ptr ))) return TRUE;
+        if (!HEAP_lfh_validate( heapPtr, flags, ptr )) break;
         /* fallthrough */
     default:
         if (!(flags & HEAP_NO_SERIALIZE)) RtlEnterCriticalSection( &heapPtr->critSection );
