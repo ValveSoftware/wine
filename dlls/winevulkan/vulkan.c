@@ -4671,6 +4671,47 @@ VkResult WINAPI wine_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *pP
 
 }
 
+struct wine_vk_sampler_bias
+{
+    float bias;
+    BOOL aniso_only;
+};
+
+static BOOL WINAPI get_mip_bias(INIT_ONCE *once, void *param, void **context)
+{
+    struct wine_vk_sampler_bias *bias = param;
+
+    const char *c = getenv("WINE_VULKAN_BIAS_ALL_SAMPLERS");
+
+    bias->aniso_only = !(c && strcmp(c, "0"));
+
+    c = getenv("WINE_VULKAN_NEGATIVE_MIP_BIAS");
+    if (c)
+        bias->bias = ((float) -atoi(c)) / 100.0f;
+    else
+        bias->bias = 0.0f;
+
+    return TRUE;
+}
+
+VkResult WINAPI wine_vkCreateSampler(VkDevice device, const VkSamplerCreateInfo *create_info, const VkAllocationCallbacks *allocator, VkSampler *sampler)
+{
+    static INIT_ONCE init_once = INIT_ONCE_STATIC_INIT;
+    static struct wine_vk_sampler_bias bias;
+    VkSamplerCreateInfo wine_info;
+
+    TRACE("%p, %p, %p, %p\n", device, create_info, allocator, sampler);
+
+    wine_info = *create_info;
+
+    InitOnceExecuteOnce(&init_once, get_mip_bias, &bias, NULL);
+
+    if (wine_info.anisotropyEnable || !bias.aniso_only)
+        wine_info.mipLodBias += bias.bias;
+
+    return device->funcs.p_vkCreateSampler(device->device, &wine_info, NULL, sampler);
+}
+
 VkDevice WINAPI __wine_get_native_VkDevice(VkDevice device)
 {
     return device->device;

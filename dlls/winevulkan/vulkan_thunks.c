@@ -5630,12 +5630,6 @@ static VkResult WINAPI wine_vkCreateRenderPass2KHR(VkDevice device, const VkRend
     return device->funcs.p_vkCreateRenderPass2KHR(device->device, pCreateInfo, NULL, pRenderPass);
 }
 
-VkResult WINAPI wine_vkCreateSampler(VkDevice device, const VkSamplerCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSampler *pSampler)
-{
-    TRACE("%p, %p, %p, %p\n", device, pCreateInfo, pAllocator, pSampler);
-    return device->funcs.p_vkCreateSampler(device->device, pCreateInfo, NULL, pSampler);
-}
-
 VkResult WINAPI wine_vkCreateSamplerYcbcrConversion(VkDevice device, const VkSamplerYcbcrConversionCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkSamplerYcbcrConversion *pYcbcrConversion)
 {
     TRACE("%p, %p, %p, %p\n", device, pCreateInfo, pAllocator, pYcbcrConversion);
