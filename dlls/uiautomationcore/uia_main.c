@@ -17,9 +17,11 @@
  */
 
 #define COBJMACROS
+#include <initguid.h>
 
-#include "initguid.h"
-#include "uiautomation.h"
+#include "uia_private.h"
+#include "ole2.h"
+#include "rpcproxy.h"
 
 #include "wine/debug.h"
 #include "wine/heap.h"
@@ -366,4 +368,144 @@ HRESULT WINAPI UiaDisconnectProvider(IRawElementProviderSimple *provider)
 {
     FIXME("(%p): stub\n", provider);
     return E_NOTIMPL;
+}
+
+/* UIAutomation ClassFactory */
+struct uia_cf {
+    IClassFactory IClassFactory_iface;
+    LONG ref;
+};
+
+static struct uia_cf *impl_from_IClassFactory(IClassFactory *iface)
+{
+    return CONTAINING_RECORD(iface, struct uia_cf, IClassFactory_iface);
+}
+
+static HRESULT WINAPI uia_cf_QueryInterface(IClassFactory *iface, REFIID riid, void **ppobj)
+{
+    if(IsEqualGUID(riid, &IID_IUnknown)
+            || IsEqualGUID(riid, &IID_IClassFactory))
+    {
+        IClassFactory_AddRef(iface);
+        *ppobj = iface;
+        return S_OK;
+    }
+
+    *ppobj = NULL;
+    WARN("(%p)->(%s, %p): interface not found\n", iface, debugstr_guid(riid), ppobj);
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI uia_cf_AddRef(IClassFactory *iface)
+{
+    struct uia_cf *This = impl_from_IClassFactory(iface);
+    ULONG ref = InterlockedIncrement(&This->ref);
+    TRACE("(%p)->(): Refcount now %u\n", This, ref);
+    return ref;
+}
+
+static ULONG WINAPI uia_cf_Release(IClassFactory *iface)
+{
+    struct uia_cf *This = impl_from_IClassFactory(iface);
+    ULONG ref = InterlockedDecrement(&This->ref);
+    TRACE("(%p)->(): Refcount now %u\n", This, ref);
+    if (!ref)
+        HeapFree(GetProcessHeap(), 0, This);
+    return ref;
+}
+
+static HRESULT WINAPI uia_cf_CreateInstance(IClassFactory *iface, IUnknown *pOuter,
+                                               REFIID riid, void **ppobj)
+{
+    struct uia_cf *This = impl_from_IClassFactory(iface);
+
+    TRACE("(%p)->(%p,%s,%p)\n", This, pOuter, debugstr_guid(riid), ppobj);
+
+    *ppobj = NULL;
+
+    if(pOuter)
+        return CLASS_E_NOAGGREGATION;
+
+    if (!IsEqualGUID(riid, &IID_IUIAutomation))
+        return E_NOINTERFACE;
+
+    return create_uia_iface((IUIAutomation **)ppobj);
+}
+
+static HRESULT WINAPI uia_cf_LockServer(IClassFactory *iface, BOOL dolock)
+{
+    struct uia_cf *This = impl_from_IClassFactory(iface);
+    FIXME("(%p)->(%d): stub!\n", This, dolock);
+    return S_OK;
+}
+
+static const IClassFactoryVtbl uia_cf_Vtbl =
+{
+    uia_cf_QueryInterface,
+    uia_cf_AddRef,
+    uia_cf_Release,
+    uia_cf_CreateInstance,
+    uia_cf_LockServer
+};
+
+static inline HRESULT make_uia_factory(REFIID riid, void **ppv)
+{
+    HRESULT hr;
+    struct uia_cf *ret = HeapAlloc(GetProcessHeap(), 0, sizeof(*ret));
+    ret->IClassFactory_iface.lpVtbl = &uia_cf_Vtbl;
+    ret->ref = 0;
+
+    hr = IClassFactory_QueryInterface(&ret->IClassFactory_iface, riid, ppv);
+    if(FAILED(hr))
+        HeapFree(GetProcessHeap(), 0, ret);
+
+    return hr;
+}
+
+HRESULT WINAPI DllGetClassObject(REFCLSID rclsid, REFIID riid, void **ppv)
+{
+    TRACE("(%s, %s, %p)\n", debugstr_guid(rclsid), debugstr_guid(riid), ppv);
+
+    if (IsEqualGUID(rclsid, &CLSID_CUIAutomation))
+        return make_uia_factory(riid, ppv);
+
+    return CLASS_E_CLASSNOTAVAILABLE;
+}
+
+/******************************************************************
+ *              DllCanUnloadNow (uiautomationcore.@)
+ */
+HRESULT WINAPI DllCanUnloadNow(void)
+{
+    return S_FALSE;
+}
+
+/***********************************************************************
+ *          DllRegisterServer (uiautomationcore.@)
+ */
+HRESULT WINAPI DllRegisterServer(void)
+{
+    return __wine_register_resources();
+}
+
+/***********************************************************************
+ *          DllUnregisterServer (uiautomationcore.@)
+ */
+HRESULT WINAPI DllUnregisterServer(void)
+{
+    return __wine_unregister_resources();
+}
+
+BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
+{
+    TRACE("%p,%u,%p\n", hinst, reason, reserved);
+
+    switch (reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        DisableThreadLibraryCalls(hinst);
+        break;
+    }
+
+    return TRUE;
 }
