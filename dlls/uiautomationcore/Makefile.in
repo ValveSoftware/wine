@@ -1,7 +1,11 @@
 MODULE = uiautomationcore.dll
 IMPORTLIB = uiautomationcore
+IMPORTS   = uuid ole32
 
 EXTRADLLFLAGS = -mno-cygwin -Wb,--prefer-native
 
 C_SRCS = \
-	uia_main.c
+	uia_main.c \
+	uia_client.c
+
+IDL_SRCS = uia_classes.idl
