@@ -5,4 +5,7 @@ IMPORTS   = uuid ole32 oleaut32 user32
 EXTRADLLFLAGS = -Wb,--prefer-native
 
 C_SRCS = \
-	uia_main.c
+	uia_main.c \
+	uia_client.c
+
+IDL_SRCS = uia_classes.idl

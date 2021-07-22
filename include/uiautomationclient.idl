@@ -1583,6 +1583,9 @@ library UIAutomationClient {
 
     [
         uuid(ff48dba4-60ef-4201-aa87-54103eef594e),
+#ifdef __WIDL__
+        threading(both),
+#endif
         version(1.0),
     ]
     coclass CUIAutomation
