@@ -2882,6 +2882,8 @@ static HRESULT _SHRegisterFolders(HKEY hRootKey, HANDLE hToken,
  LPCWSTR szUserShellFolderPath, LPCWSTR szShellFolderPath, const UINT folders[],
  UINT foldersLen)
 {
+    static const WCHAR WineVistaPathsW[] = {'_','_','W','i','n','e','V','i','s','t','a','P','a','t','h','s',0};
+
     const WCHAR *szValueName;
     WCHAR buffer[40];
     UINT i;
@@ -2890,6 +2892,7 @@ static HRESULT _SHRegisterFolders(HKEY hRootKey, HANDLE hToken,
     HKEY hUserKey = NULL, hKey = NULL;
     DWORD dwType, dwPathLen;
     LONG ret;
+    DWORD already_vista_paths = 0;
 
     TRACE("%p,%p,%s,%p,%u\n", hRootKey, hToken,
      debugstr_w(szUserShellFolderPath), folders, foldersLen);
@@ -2903,6 +2906,12 @@ static HRESULT _SHRegisterFolders(HKEY hRootKey, HANDLE hToken,
         if (ret)
             hr = HRESULT_FROM_WIN32(ret);
     }
+
+    /* check if the registry has already been updated to the vista+ style paths */
+    dwPathLen = sizeof(already_vista_paths);
+    RegQueryValueExW(hUserKey, WineVistaPathsW, NULL, &dwType,
+            (LPBYTE)&already_vista_paths, &dwPathLen);
+
     for (i = 0; SUCCEEDED(hr) && i < foldersLen; i++)
     {
         dwPathLen = MAX_PATH * sizeof(WCHAR);
@@ -2915,9 +2924,10 @@ static HRESULT _SHRegisterFolders(HKEY hRootKey, HANDLE hToken,
             szValueName = &buffer[0];
         }
 
-        if (RegQueryValueExW(hUserKey, szValueName, NULL,
-         &dwType, (LPBYTE)path, &dwPathLen) || (dwType != REG_SZ &&
-         dwType != REG_EXPAND_SZ))
+        if (!already_vista_paths ||
+                RegQueryValueExW(hUserKey, szValueName, NULL, &dwType,
+                    (LPBYTE)path, &dwPathLen) ||
+                (dwType != REG_SZ && dwType != REG_EXPAND_SZ))
         {
             *path = '\0';
             if (CSIDL_Data[folders[i]].type == CSIDL_Type_User)
@@ -2958,6 +2968,11 @@ static HRESULT _SHRegisterFolders(HKEY hRootKey, HANDLE hToken,
              hToken, SHGFP_TYPE_DEFAULT, path);
         }
     }
+
+    already_vista_paths = 1;
+    RegSetValueExW(hUserKey, WineVistaPathsW, 0, REG_DWORD,
+            (LPBYTE)&already_vista_paths, sizeof(already_vista_paths));
+
     if (hUserKey)
         RegCloseKey(hUserKey);
     if (hKey)
