@@ -1813,7 +1813,7 @@ BOOL release_capture(void)
  *
  * Change the focus window, sending the WM_SETFOCUS and WM_KILLFOCUS messages
  */
-static HWND set_focus_window( HWND hwnd )
+static HWND set_focus_window( HWND hwnd, BOOL from_active )
 {
     HWND previous = 0, ime_hwnd;
     BOOL ret;
@@ -1830,6 +1830,9 @@ static HWND set_focus_window( HWND hwnd )
 
     if (previous)
     {
+        if (!NtUserIsWindow(hwnd) && !from_active)
+            NtUserNotifyWinEvent( EVENT_OBJECT_FOCUS, previous, OBJID_CLIENT, CHILDID_SELF );
+
         send_message( previous, WM_KILLFOCUS, (WPARAM)hwnd, 0 );
 
         ime_hwnd = get_default_ime_window( previous );
@@ -1842,6 +1845,8 @@ static HWND set_focus_window( HWND hwnd )
     if (is_window(hwnd))
     {
         user_driver->pSetFocus(hwnd);
+        if (!from_active)
+            NtUserNotifyWinEvent( EVENT_OBJECT_FOCUS, hwnd, OBJID_CLIENT, CHILDID_SELF );
 
         ime_hwnd = get_default_ime_window( hwnd );
         if (ime_hwnd)
@@ -1954,7 +1959,7 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
         if (hwnd == info.hwndActive)
         {
             if (!info.hwndFocus || !hwnd || NtUserGetAncestor( info.hwndFocus, GA_ROOT ) != hwnd)
-                set_focus_window( hwnd );
+                set_focus_window( hwnd, TRUE );
         }
     }
 
@@ -2048,7 +2053,7 @@ HWND WINAPI NtUserSetFocus( HWND hwnd )
     }
 
     /* change focus and send messages */
-    return set_focus_window( hwnd );
+    return set_focus_window( hwnd, FALSE );
 }
 
 /*******************************************************************
