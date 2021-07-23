@@ -62,6 +62,7 @@ static HWND set_focus_window( HWND hwnd )
     if (IsWindow(hwnd))
     {
         USER_Driver->pSetFocus(hwnd);
+        NotifyWinEvent( EVENT_OBJECT_FOCUS, hwnd, OBJID_CLIENT, CHILDID_SELF );
         SendMessageW( hwnd, WM_SETFOCUS, (WPARAM)previous, 0 );
     }
     return previous;
