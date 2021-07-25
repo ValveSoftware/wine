@@ -825,6 +825,18 @@ static VkSurfaceKHR X11DRV_wine_get_native_surface(VkSurfaceKHR surface)
     return x11_surface->surface;
 }
 
+BOOL disable_fs_hack(void)
+{
+    static int is_int = -1;
+    if (is_int < 0)
+    {
+        const char *e = getenv("WINE_DISABLE_FULLSCREEN_HACK");
+        is_int = e && strcmp(e, "0");
+    }
+    TRACE("disabled fullscreen hack: %s\n", is_int ? "TRUE" : "FALSE");
+    return is_int;
+}
+
 static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz,
         VkRect2D *dst_blit, VkFilter *filter)
 {
@@ -832,7 +844,7 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
     HMONITOR monitor;
     HWND hwnd;
 
-    if (wm_is_steamcompmgr(gdi_display))
+    if (wm_is_steamcompmgr(gdi_display) || disable_fs_hack())
         return VK_FALSE;
 
     if (XFindContext(gdi_display, x11_surface->window, winContext, (char **)&hwnd) != 0)
