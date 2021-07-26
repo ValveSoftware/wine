@@ -751,6 +751,12 @@ static void uia_get_default_property_val(PROPERTYID propertyId, VARIANT *retVal)
         V_BSTR(retVal) = SysAllocString(L"");
         break;
 
+    case UIA_IsKeyboardFocusablePropertyId:
+    case UIA_HasKeyboardFocusPropertyId:
+        V_VT(retVal) = VT_BOOL;
+        V_BOOL(retVal) = VARIANT_FALSE;
+        break;
+
     default:
         FIXME("Unimplemented default value for PropertyId %d!\n", propertyId);
         V_VT(retVal) = VT_EMPTY;
@@ -810,6 +816,34 @@ static HRESULT uia_get_msaa_acc_property_val(IAccessible *acc,
         }
         break;
     }
+
+    case UIA_IsKeyboardFocusablePropertyId:
+        hr = IAccessible_get_accState(acc, child_id, &res);
+        if (SUCCEEDED(hr) && V_VT(&res) == VT_I4)
+        {
+            V_VT(retVal) = VT_BOOL;
+            if (V_I4(&res) & STATE_SYSTEM_FOCUSABLE)
+                V_BOOL(retVal) = VARIANT_TRUE;
+            else
+                V_BOOL(retVal) = VARIANT_FALSE;
+
+            *use_default = FALSE;
+        }
+        break;
+
+    case UIA_HasKeyboardFocusPropertyId:
+        hr = IAccessible_get_accState(acc, child_id, &res);
+        if (SUCCEEDED(hr) && V_VT(&res) == VT_I4)
+        {
+            V_VT(retVal) = VT_BOOL;
+            if (V_I4(&res) & STATE_SYSTEM_FOCUSED)
+                V_BOOL(retVal) = VARIANT_TRUE;
+            else
+                V_BOOL(retVal) = VARIANT_FALSE;
+
+            *use_default = FALSE;
+        }
+        break;
 
     default:
         FIXME("UIA PropertyId %d unimplemented for IAccessible!\n", propertyId);
