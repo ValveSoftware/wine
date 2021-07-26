@@ -95,11 +95,23 @@ struct uia_evl
 
     HWINEVENTHOOK win_creation_hook;
     HWINEVENTHOOK object_focus_hook;
+    IUIAEvlConnection *evlc_iface;
 
     struct uia_data *data;
 
     struct list uia_evh_list;
     struct list uia_evm_queue;
+};
+
+/*
+ * EVLC = Event listener connection.
+ */
+struct uia_evlc
+{
+    IUIAEvlConnection IUIAEvlConnection_iface;
+    LONG ref;
+
+    struct uia_evl *evl;
 };
 
 struct uia_data {
