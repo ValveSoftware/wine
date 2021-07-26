@@ -586,31 +586,11 @@ static HRESULT WINAPI color_converter_ProcessEvent(IMFTransform *iface, DWORD id
 
 static HRESULT WINAPI color_converter_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
-    struct color_converter *converter = impl_color_converter_from_IMFTransform(iface);
-    struct wg_parser_event event;
-
     TRACE("%p, %u %lu.\n", iface, message, param);
 
     switch(message)
     {
         case MFT_MESSAGE_COMMAND_FLUSH:
-        {
-            EnterCriticalSection(&converter->cs);
-            if (!converter->buffer_inflight)
-            {
-                LeaveCriticalSection(&converter->cs);
-                return S_OK;
-            }
-
-            while (event.type != WG_PARSER_EVENT_BUFFER)
-                unix_funcs->wg_parser_stream_get_event(converter->stream, &event);
-
-            unix_funcs->wg_parser_stream_release_buffer(converter->stream);
-            converter->buffer_inflight = FALSE;
-
-            LeaveCriticalSection(&converter->cs);
-            return S_OK;
-        }
         case MFT_MESSAGE_NOTIFY_BEGIN_STREAMING:
             return S_OK;
         default:
@@ -661,10 +641,7 @@ static HRESULT WINAPI color_converter_ProcessInput(IMFTransform *iface, DWORD id
     for (;;)
     {
         if (!unix_funcs->wg_parser_get_read_request(converter->parser, &data, &offset, &size))
-        {
-            TRACE("sink unconnected\n");
             continue;
-        }
 
         memcpy(data, buffer_data, min(buffer_size, size));
 
