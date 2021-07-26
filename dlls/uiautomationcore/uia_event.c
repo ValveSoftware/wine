@@ -28,6 +28,107 @@ DWORD tls_index = TLS_OUT_OF_INDEXES;
 
 static HRESULT uia_evm_add_msaa_event(struct uia_evl *evl, HWND hwnd,
         LONG obj_id, LONG child_id, LONG event);
+static HRESULT uia_evm_add_uia_event(struct uia_evl *evl,
+        IRawElementProviderSimple *elem_prov, UINT event);
+
+/*
+ * Custom COM interface that is passed to UIA providers. Allows them to raise
+ * events to be sent to any clients with active event listener threads.
+ */
+static inline struct uia_evlc *impl_from_IUIAEvlConnection(IUIAEvlConnection *iface)
+{
+    return CONTAINING_RECORD(iface, struct uia_evlc, IUIAEvlConnection_iface);
+}
+
+static HRESULT WINAPI evlc_QueryInterface(IUIAEvlConnection *iface, REFIID riid,
+        void **ppvObject)
+{
+    struct uia_evlc *This = impl_from_IUIAEvlConnection(iface);
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_guid(riid), ppvObject);
+
+    if (IsEqualIID(riid, &IID_IUIAEvlConnection) ||
+            IsEqualIID(riid, &IID_IUnknown))
+        *ppvObject = iface;
+    else
+    {
+        WARN("no interface: %s\n", debugstr_guid(riid));
+        *ppvObject = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUIAEvlConnection_AddRef(iface);
+
+    return S_OK;
+}
+
+static ULONG WINAPI evlc_AddRef(IUIAEvlConnection *iface)
+{
+    struct uia_evlc *This = impl_from_IUIAEvlConnection(iface);
+    ULONG ref = InterlockedIncrement(&This->ref);
+
+    TRACE("(%p) ref = %u\n", This, ref);
+    return ref;
+}
+
+static FORCEINLINE ULONG WINAPI evlc_Release(IUIAEvlConnection *iface)
+{
+    struct uia_evlc *This = impl_from_IUIAEvlConnection(iface);
+    ULONG ref = InterlockedDecrement(&This->ref);
+
+    TRACE("(%p) ref = %u\n", This, ref);
+
+    if(!ref)
+        heap_free(This);
+
+    return ref;
+}
+
+static HRESULT WINAPI evlc_ProviderRaiseEvent(IUIAEvlConnection *iface,
+        LONG event_type, IRawElementProviderSimple *pRetVal)
+{
+    struct uia_evlc *This = impl_from_IUIAEvlConnection(iface);
+
+    TRACE("(%p)\n", This);
+
+    /* Do stuff here. */
+    IRawElementProviderSimple_AddRef(pRetVal);
+    uia_evm_add_uia_event(This->evl, pRetVal, event_type);
+
+    return S_OK;
+}
+
+static HRESULT WINAPI evlc_CheckListenerStatus(IUIAEvlConnection *iface,
+        VARIANT *val)
+{
+    V_VT(val) = VT_BOOL;
+    V_BOOL(val) = VARIANT_TRUE;
+
+    return S_OK;
+}
+
+static const IUIAEvlConnectionVtbl uia_evlc_vtbl = {
+    evlc_QueryInterface,
+    evlc_AddRef,
+    evlc_Release,
+    evlc_ProviderRaiseEvent,
+    evlc_CheckListenerStatus,
+};
+
+static HRESULT create_uia_evlc_iface(IUIAEvlConnection **iface)
+{
+    struct uia_evlc *uia;
+
+    uia = heap_alloc_zero(sizeof(*uia));
+    if (!uia)
+        return E_OUTOFMEMORY;
+
+    uia->IUIAEvlConnection_iface.lpVtbl = &uia_evlc_vtbl;
+    uia->ref = 1;
+    *iface = &uia->IUIAEvlConnection_iface;
+
+    return S_OK;
+}
 
 static EVENTID uia_msaa_event_to_uia_event_id(LONG obj_id, LONG event)
 {
@@ -208,6 +309,12 @@ static HRESULT uia_event_listener_thread_initialize(struct uia_evl *evl)
     evl->win_creation_hook = SetWinEventHook(EVENT_OBJECT_CREATE,
             EVENT_OBJECT_CREATE, 0, uia_evl_window_create_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
 
+    /*
+     * Create interface to be passed to providers so that they can signal
+     * events to active listeners.
+     */
+    create_uia_evlc_iface(&evl->evlc_iface);
+
     return S_OK;
 }
 
@@ -217,6 +324,9 @@ static void uia_event_listener_thread_exit(struct uia_evl *evl)
 
     UnhookWinEvent(evl->object_focus_hook);
     UnhookWinEvent(evl->win_creation_hook);
+
+    CoDisconnectObject((IUnknown *)evl->evlc_iface, 0);
+    IUIAEvlConnection_Release(evl->evlc_iface);
 
     DeleteCriticalSection(&evl->ev_handler_cs);
     DeleteCriticalSection(&evl->evm_queue_cs);
@@ -482,6 +592,24 @@ static HRESULT uia_evm_add_msaa_event(struct uia_evl *evl, HWND hwnd,
     evm->u.msaa_ev.obj_id = obj_id;
     evm->u.msaa_ev.child_id = child_id;
     evm->event = uia_msaa_event_to_uia_event_id(obj_id, event);
+
+    uia_evm_add_message_to_queue(evl, evm);
+
+    return S_OK;
+}
+
+static HRESULT uia_evm_add_uia_event(struct uia_evl *evl,
+        IRawElementProviderSimple *elem_prov, UINT event)
+{
+    struct uia_evm *evm = heap_alloc_zero(sizeof(*evm));
+
+    TRACE("evl %p, elem_prov %p, event %#x\n", evl, elem_prov, event);
+    if (!evm)
+        return E_OUTOFMEMORY;
+
+    evm->uia_evo = UIA_EVO_UIA;
+    evm->u.uia_ev.elem_prov = elem_prov;
+    evm->event = event;
 
     uia_evm_add_message_to_queue(evl, evm);
 
