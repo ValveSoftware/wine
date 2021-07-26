@@ -5990,7 +5990,7 @@ static BOOL WINAPI read_thread_config(INIT_ONCE *once, void *param, void **conte
 {
     char str[64];
 
-    if((GetEnvironmentVariableA("SteamGameId", str, sizeof(str)) && !strcmp(str, "491540"))
+    if((GetEnvironmentVariableA("SteamGameId", str, sizeof(str)) && (!strcmp(str, "491540") || !strcmp(str,"47890")))
             || (GetEnvironmentVariableA("WINE_GECKO_MAIN_THREAD", str, sizeof(str)) && *str != '0'))
     {
         FIXME("HACK: Using separated main thread.\n");
