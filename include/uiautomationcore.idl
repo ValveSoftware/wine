@@ -291,4 +291,21 @@ library UIA
 
         HRESULT GetFocus([out, retval] IRawElementProviderFragment **pRetVal);
     }
+
+#ifdef __WIDL__
+    [
+        object,
+        uuid(5d419260-d515-11eb-b8bc-0242ac130003),
+        oleautomation,
+        pointer_default(unique)
+    ]
+    interface IUIAEvlConnection : IUnknown
+    {
+        HRESULT ProviderRaiseEvent(
+                [in] long event,
+                [in] IRawElementProviderSimple *pRetVal);
+        HRESULT CheckListenerStatus(
+                [out, retval] VARIANT *val);
+    }
+#endif
 }
