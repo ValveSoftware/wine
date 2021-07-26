@@ -746,6 +746,11 @@ static void uia_get_default_property_val(PROPERTYID propertyId, VARIANT *retVal)
         V_I4(retVal) = UIA_CustomControlTypeId;
         break;
 
+    case UIA_NamePropertyId:
+        V_VT(retVal) = VT_BSTR;
+        V_BSTR(retVal) = SysAllocString(L"");
+        break;
+
     default:
         FIXME("Unimplemented default value for PropertyId %d!\n", propertyId);
         V_VT(retVal) = VT_EMPTY;
@@ -791,6 +796,20 @@ static HRESULT uia_get_msaa_acc_property_val(IAccessible *acc,
             *use_default = FALSE;
         }
         break;
+
+    case UIA_NamePropertyId:
+    {
+        BSTR name;
+
+        hr = IAccessible_get_accName(acc, child_id, &name);
+        if (SUCCEEDED(hr) && name)
+        {
+            V_VT(retVal) = VT_BSTR;
+            V_BSTR(retVal) = name;
+            *use_default = FALSE;
+        }
+        break;
+    }
 
     default:
         FIXME("UIA PropertyId %d unimplemented for IAccessible!\n", propertyId);
@@ -1056,9 +1075,21 @@ static HRESULT WINAPI uia_elem_get_CurrentLocalizedControlType(IUIAutomationElem
 static HRESULT WINAPI uia_elem_get_CurrentName(IUIAutomationElement *iface,
         BSTR *retVal)
 {
-    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
-    FIXME("%p\n", This);
-    return E_NOTIMPL;
+    VARIANT res;
+    HRESULT hr;
+
+    TRACE("%p %p\n", iface, retVal);
+
+    *retVal = NULL;
+    hr = IUIAutomationElement_GetCurrentPropertyValue(iface,
+            UIA_NamePropertyId, &res);
+    if (FAILED(hr))
+        return hr;
+
+    if (V_VT(&res) == VT_BSTR)
+        *retVal = V_BSTR(&res);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI uia_elem_get_CurrentAcceleratorKey(IUIAutomationElement *iface,
