@@ -25,11 +25,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(uiautomation);
 
-struct uia_data {
-    IUIAutomation IUIAutomation_iface;
-    LONG ref;
-};
-
 struct uia_elem_data {
     IUIAutomationElement IUIAutomationElement_iface;
     LONG ref;
@@ -451,16 +446,22 @@ static HRESULT WINAPI uia_AddFocusChangedEventHandler(IUIAutomation *iface,
         IUIAutomationFocusChangedEventHandler *handler)
 {
     struct uia_data *This = impl_from_IUIAutomation(iface);
-    FIXME("This %p\n", This);
-    return E_NOTIMPL;
+
+    TRACE("%p %p %p\n", iface, cacheRequest, handler);
+    if (cacheRequest)
+        FIXME("Cache request unimplemented in event handler!\n");
+
+    return uia_evh_add_focus_event_handler(This, handler);
 }
 
 static HRESULT WINAPI uia_RemoveFocusChangedEventHandler(IUIAutomation *iface,
         IUIAutomationFocusChangedEventHandler *handler)
 {
     struct uia_data *This = impl_from_IUIAutomation(iface);
-    FIXME("This %p\n", This);
-    return E_NOTIMPL;
+
+    TRACE("iface %p, handler %p\n", iface, handler);
+
+    return uia_evh_remove_focus_event_handler(This, handler);
 }
 
 static HRESULT WINAPI uia_RemoveAllEventHandlers(IUIAutomation *iface)
