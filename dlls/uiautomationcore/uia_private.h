@@ -19,9 +19,54 @@
 #include "uiautomation.h"
 #include "oleacc.h"
 
+#include "wine/list.h"
+
+/*
+ * EVH = Event Handler.
+ */
+enum {
+    BASIC_EVH,
+    CHANGES_EVH,
+    FOCUS_EVH,
+    PROPERTY_EVH,
+    STRUCTURE_EVH,
+    TEXT_EDIT_EVH,
+};
+
+struct uia_evh
+{
+    struct list entry;
+
+    UINT event_type;
+    union
+    {
+        IUIAutomationEventHandler                    *IUIAutomationEvh_iface;
+        IUIAutomationChangesEventHandler             *IUIAutomationChangesEvh_iface;
+        IUIAutomationFocusChangedEventHandler        *IUIAutomationFocusChangedEvh_iface;
+        IUIAutomationPropertyChangedEventHandler     *IUIAutomationPropertyChangedEvh_iface;
+        IUIAutomationStructureChangedEventHandler    *IUIAutomationStructureChangedEvh_iface;
+        IUIAutomationTextEditTextChangedEventHandler *IUIAutomationTextEditTextChangedEvh_iface;
+    } u;
+};
+
+struct uia_data {
+    IUIAutomation IUIAutomation_iface;
+    LONG ref;
+
+    struct list uia_evh_list;
+};
+
 HRESULT create_uia_iface(IUIAutomation **) DECLSPEC_HIDDEN;
 
 HRESULT create_uia_elem_from_raw_provider(IUIAutomationElement **,
         IRawElementProviderSimple *) DECLSPEC_HIDDEN;
 HRESULT create_uia_elem_from_msaa_acc(IUIAutomationElement **,
         IAccessible *, INT) DECLSPEC_HIDDEN;
+
+/*
+ * uia_event.c functions.
+ */
+HRESULT uia_evh_add_focus_event_handler(struct uia_data *data,
+        IUIAutomationFocusChangedEventHandler *handler) DECLSPEC_HIDDEN;
+HRESULT uia_evh_remove_focus_event_handler(struct uia_data *data,
+        IUIAutomationFocusChangedEventHandler *handler) DECLSPEC_HIDDEN;
