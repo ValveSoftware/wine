@@ -34,6 +34,8 @@ struct uia_elem_data {
     IUIAutomationElement IUIAutomationElement_iface;
     LONG ref;
 
+    BOOL elem_disconnected;
+
     IRawElementProviderSimple *elem_prov;
 
     IAccessible *acc;
@@ -675,6 +677,129 @@ HRESULT create_uia_iface(IUIAutomation **iface)
     return S_OK;
 }
 
+/*
+ * IUIAutomationElement helper functions.
+ */
+static BOOL uia_hresult_is_obj_disconnected(HRESULT hr)
+{
+    if ((hr == CO_E_OBJNOTCONNECTED) || (hr == HRESULT_FROM_WIN32(RPC_S_SERVER_UNAVAILABLE)))
+        return TRUE;
+
+    return FALSE;
+}
+
+static INT uia_msaa_role_to_uia_control_type(INT role)
+{
+    switch (role)
+    {
+
+        case ROLE_SYSTEM_PUSHBUTTON: return UIA_ButtonControlTypeId;
+        case ROLE_SYSTEM_CLIENT: return UIA_CalendarControlTypeId;
+        case ROLE_SYSTEM_CHECKBUTTON: return UIA_CheckBoxControlTypeId;
+        case ROLE_SYSTEM_COMBOBOX: return UIA_ComboBoxControlTypeId;
+        case ROLE_SYSTEM_DOCUMENT: return UIA_DocumentControlTypeId;
+        case ROLE_SYSTEM_TEXT: return UIA_EditControlTypeId;
+        case ROLE_SYSTEM_GROUPING: return UIA_GroupControlTypeId;
+        case ROLE_SYSTEM_COLUMNHEADER: return UIA_HeaderItemControlTypeId;
+        case ROLE_SYSTEM_LINK: return UIA_HyperlinkControlTypeId;
+        case ROLE_SYSTEM_GRAPHIC: return UIA_ImageControlTypeId;
+        case ROLE_SYSTEM_LIST: return UIA_ListControlTypeId;
+        case ROLE_SYSTEM_LISTITEM: return UIA_ListItemControlTypeId;
+        case ROLE_SYSTEM_MENUPOPUP: return UIA_MenuControlTypeId;
+        case ROLE_SYSTEM_MENUBAR: return UIA_MenuBarControlTypeId;
+        case ROLE_SYSTEM_MENUITEM: return UIA_MenuItemControlTypeId;
+        case ROLE_SYSTEM_PANE: return UIA_PaneControlTypeId;
+        case ROLE_SYSTEM_PROGRESSBAR: return UIA_ProgressBarControlTypeId;
+        case ROLE_SYSTEM_RADIOBUTTON: return UIA_RadioButtonControlTypeId;
+        case ROLE_SYSTEM_SCROLLBAR: return UIA_ScrollBarControlTypeId;
+        case ROLE_SYSTEM_SEPARATOR: return UIA_SeparatorControlTypeId;
+        case ROLE_SYSTEM_SLIDER: return UIA_SliderControlTypeId;
+        case ROLE_SYSTEM_SPINBUTTON: return UIA_SpinnerControlTypeId;
+        case ROLE_SYSTEM_SPLITBUTTON: return UIA_SplitButtonControlTypeId;
+        case ROLE_SYSTEM_STATUSBAR: return UIA_StatusBarControlTypeId;
+        case ROLE_SYSTEM_PAGETABLIST: return UIA_TabControlTypeId;
+        case ROLE_SYSTEM_PAGETAB: return UIA_TabItemControlTypeId;
+        case ROLE_SYSTEM_TABLE: return UIA_TableControlTypeId;
+        case ROLE_SYSTEM_STATICTEXT: return UIA_TextControlTypeId;
+        case ROLE_SYSTEM_INDICATOR: return UIA_ThumbControlTypeId;
+        case ROLE_SYSTEM_TITLEBAR: return UIA_TitleBarControlTypeId;
+        case ROLE_SYSTEM_TOOLBAR: return UIA_ToolBarControlTypeId;
+        case ROLE_SYSTEM_TOOLTIP: return UIA_ToolTipControlTypeId;
+        case ROLE_SYSTEM_OUTLINE: return UIA_TreeControlTypeId;
+        case ROLE_SYSTEM_OUTLINEITEM: return UIA_TreeItemControlTypeId;
+        case ROLE_SYSTEM_WINDOW: return UIA_WindowControlTypeId;
+        default:
+            FIXME("Unhandled MSAA role %#x, defaulting to UIA_ButtonControlTypeId.\n",
+                    role);
+            break;
+    }
+
+    return UIA_ButtonControlTypeId;
+}
+
+static void uia_get_default_property_val(PROPERTYID propertyId, VARIANT *retVal)
+{
+    switch (propertyId)
+    {
+    case UIA_ControlTypePropertyId:
+        V_VT(retVal) = VT_I4;
+        V_I4(retVal) = UIA_CustomControlTypeId;
+        break;
+
+    default:
+        FIXME("Unimplemented default value for PropertyId %d!\n", propertyId);
+        V_VT(retVal) = VT_EMPTY;
+        break;
+    }
+}
+
+static HRESULT uia_get_uia_elem_prov_property_val(IRawElementProviderSimple *elem_prov,
+        PROPERTYID propertyId, BOOL *use_default, VARIANT *retVal)
+{
+    VARIANT res;
+    HRESULT hr;
+
+    VariantInit(&res);
+    *use_default = TRUE;
+    hr = IRawElementProviderSimple_GetPropertyValue(elem_prov, propertyId, &res);
+
+    /* VT_EMPTY means this PropertyId is unimplemented/unsupported. */
+    if (V_VT(&res) != VT_EMPTY && SUCCEEDED(hr))
+    {
+        *use_default = FALSE;
+        *retVal = res;
+    }
+
+    return hr;
+}
+
+static HRESULT uia_get_msaa_acc_property_val(IAccessible *acc,
+        VARIANT child_id, PROPERTYID propertyId, BOOL *use_default, VARIANT *retVal)
+{
+    HRESULT hr = S_OK;
+    VARIANT res;
+
+    *use_default = TRUE;
+    switch (propertyId)
+    {
+    case UIA_ControlTypePropertyId:
+        hr = IAccessible_get_accRole(acc, child_id, &res);
+        if (SUCCEEDED(hr))
+        {
+            V_VT(retVal) = VT_I4;
+            V_I4(retVal) = uia_msaa_role_to_uia_control_type(V_I4(&res));
+            *use_default = FALSE;
+        }
+        break;
+
+    default:
+        FIXME("UIA PropertyId %d unimplemented for IAccessible!\n", propertyId);
+        break;
+    }
+
+    return hr;
+}
+
 static inline struct uia_elem_data *impl_from_IUIAutomationElement(IUIAutomationElement *iface)
 {
     return CONTAINING_RECORD(iface, struct uia_elem_data, IUIAutomationElement_iface);
@@ -794,17 +919,39 @@ static HRESULT WINAPI uia_elem_BuildUpdatedCache(IUIAutomationElement *iface,
 static HRESULT WINAPI uia_elem_GetCurrentPropertyValue(IUIAutomationElement *iface,
         PROPERTYID propertyId, VARIANT *retVal)
 {
-    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
-    FIXME("%p\n", This);
-    return E_NOTIMPL;
+    return IUIAutomationElement_GetCurrentPropertyValueEx(iface, propertyId, FALSE, retVal);
 }
 
 static HRESULT WINAPI uia_elem_GetCurrentPropertyValueEx(IUIAutomationElement *iface,
         PROPERTYID propertyId, BOOL ignoreDefaultValue, VARIANT *retVal)
 {
     struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
-    FIXME("%p\n", This);
-    return E_NOTIMPL;
+    BOOL use_default;
+    HRESULT hr;
+
+    TRACE("%p, %d, %d, %p\n", iface, propertyId, ignoreDefaultValue, retVal);
+
+    VariantInit(retVal);
+    if (This->elem_disconnected)
+        return UIA_E_ELEMENTNOTAVAILABLE;
+
+    if (This->elem_prov)
+        hr = uia_get_uia_elem_prov_property_val(This->elem_prov,
+                propertyId, &use_default, retVal);
+    else
+        hr = uia_get_msaa_acc_property_val(This->acc,
+                This->child_id, propertyId, &use_default, retVal);
+
+    if (FAILED(hr) && uia_hresult_is_obj_disconnected(hr))
+    {
+        This->elem_disconnected = TRUE;
+        return UIA_E_ELEMENTNOTAVAILABLE;
+    }
+
+    if (SUCCEEDED(hr) && use_default && !ignoreDefaultValue)
+        uia_get_default_property_val(propertyId, retVal);
+
+    return hr;
 }
 
 static HRESULT WINAPI uia_elem_GetCachedPropertyValue(IUIAutomationElement *iface,
@@ -882,9 +1029,20 @@ static HRESULT WINAPI uia_elem_get_CurrentProcessId(IUIAutomationElement *iface,
 static HRESULT WINAPI uia_elem_get_CurrentControlType(IUIAutomationElement *iface,
         CONTROLTYPEID *retVal)
 {
-    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
-    FIXME("%p\n", This);
-    return E_NOTIMPL;
+    VARIANT res;
+    HRESULT hr;
+
+    TRACE("%p %p\n", iface, retVal);
+
+    hr = IUIAutomationElement_GetCurrentPropertyValue(iface,
+            UIA_ControlTypePropertyId, &res);
+    if (FAILED(hr))
+        return hr;
+
+    if (V_VT(&res) == VT_I4)
+        *retVal = V_I4(&res);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI uia_elem_get_CurrentLocalizedControlType(IUIAutomationElement *iface,
