@@ -259,13 +259,51 @@ IRawElementProviderSimpleVtbl hwnd_host_provider_vtbl = {
     hwnd_host_provider_get_HostRawElementProvider,
 };
 
+struct uia_provider_evlc
+{
+    struct list entry;
+
+    IUIAEvlConnection *evlc_iface;
+};
+
+static struct list global_provider_evlc_list = LIST_INIT( global_provider_evlc_list );
+
+/*
+ * Check the current list of evlc's on the provider side to see if they are
+ * still active. If not, remove them from the list.
+ */
+static void prune_listener_list(void)
+{
+    struct uia_provider_evlc *evlc;
+    struct list *cursor, *cursor2;
+    VARIANT var;
+    HRESULT hr;
+
+    LIST_FOR_EACH_SAFE(cursor, cursor2, &global_provider_evlc_list)
+    {
+        evlc = LIST_ENTRY(cursor, struct uia_provider_evlc, entry);
+        hr = IUIAEvlConnection_CheckListenerStatus(evlc->evlc_iface, &var);
+        if (hr == CO_E_OBJNOTCONNECTED)
+        {
+            list_remove(cursor);
+            IUIAEvlConnection_Release(evlc->evlc_iface);
+            heap_free(evlc);
+        }
+    }
+}
+
 /***********************************************************************
  *          UiaClientsAreListening (uiautomationcore.@)
  */
 BOOL WINAPI UiaClientsAreListening(void)
 {
-    FIXME("()\n");
-    return FALSE;
+    TRACE("()\n");
+
+    prune_listener_list();
+    if (list_empty(&global_provider_evlc_list))
+        return FALSE;
+
+    return TRUE;
 }
 
 /***********************************************************************
@@ -318,6 +356,35 @@ LRESULT WINAPI UiaReturnRawElementProvider(HWND hwnd, WPARAM wParam,
     if (lParam != UiaRootObjectId)
     {
         FIXME("Unsupported object id %ld\n", lParam);
+        return 0;
+    }
+
+    /*
+     * If a client send a WM_GETOBJECT message with a wParam value that isn't
+     * 0, it's attempting to send an IUIAEvlConnection interface so that the
+     * provider can signal events to the event listener.
+     */
+    if (wParam)
+    {
+        IUIAEvlConnection *evlc_iface;
+        VARIANT var;
+        HRESULT hr;
+
+        TRACE("Client sent IUIAEvlConnection interface!\n");
+        hr = ObjectFromLresult((LRESULT)wParam, &IID_IUIAEvlConnection, 0,
+                (void **)&evlc_iface);
+        hr = IUIAEvlConnection_CheckListenerStatus(evlc_iface, &var);
+        if (SUCCEEDED(hr))
+        {
+            struct uia_provider_evlc *uia = heap_alloc_zero(sizeof(*uia));
+            if (!uia)
+                return 0;
+
+            /* If success, add this to the providers listening clients list. */
+            uia->evlc_iface = evlc_iface;
+            list_add_tail(&global_provider_evlc_list, &uia->entry);
+        }
+
         return 0;
     }
 
