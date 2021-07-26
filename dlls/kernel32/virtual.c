@@ -36,6 +36,7 @@
 #include "psapi.h"
 #include "wine/exception.h"
 #include "wine/debug.h"
+#include "wine/asm.h"
 
 #include "kernel_private.h"
 
@@ -294,7 +295,8 @@ LPWSTR WINAPI lstrcatW( LPWSTR dst, LPCWSTR src )
  *           lstrcpyA   (KERNEL32.@)
  *           lstrcpy    (KERNEL32.@)
  */
-LPSTR WINAPI lstrcpyA( LPSTR dst, LPCSTR src )
+#ifdef __x86_64__
+LPSTR WINAPI lstrcpyA_impl( LPSTR dst, LPCSTR src )
 {
     __TRY
     {
@@ -310,6 +312,42 @@ LPSTR WINAPI lstrcpyA( LPSTR dst, LPCSTR src )
     return dst;
 }
 
+__ASM_GLOBAL_FUNC( lstrcpyA,
+                   ".byte 0x48, 0x8d, 0xa4, 0x24, 0x00, 0x00, 0x00, 0x00\n\t"
+                   "pushq %rbp\n\t"
+                   __ASM_SEH(".seh_pushreg %rbp\n\t")
+                   __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
+                   __ASM_CFI(".cfi_rel_offset %rbp,0\n\t")
+                   "movq %rsp,%rbp\n\t"
+                   __ASM_SEH(".seh_setframe %rbp,0\n\t")
+                   __ASM_CFI(".cfi_def_cfa_register %rbp\n\t")
+                   __ASM_SEH(".seh_endprologue\n\t")
+                   "subq $0x20,%rsp\n\t"
+                   "andq $~15,%rsp\n\t"
+                   "call " __ASM_NAME("lstrcpyA_impl") "\n\t"
+                   "leaq 0(%rbp),%rsp\n\t"
+                   __ASM_CFI(".cfi_def_cfa_register %rsp\n\t")
+                   "popq %rbp\n\t"
+                   __ASM_CFI(".cfi_adjust_cfa_offset -8\n\t")
+                   __ASM_CFI(".cfi_same_value %rbp\n\t")
+                   "ret" )
+#else /* __x86_64__ */
+LPSTR WINAPI lstrcpyA( LPSTR dst, LPCSTR src )
+{
+    __TRY
+    {
+        /* this is how Windows does it */
+        memmove( dst, src, strlen(src)+1 );
+    }
+    __EXCEPT( badptr_handler )
+    {
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return NULL;
+    }
+    __ENDTRY
+    return dst;
+}
+#endif
 
 /***********************************************************************
  *           lstrcpyW   (KERNEL32.@)
