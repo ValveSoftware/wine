@@ -32,6 +32,102 @@ static HRESULT uia_evm_add_uia_event(struct uia_evl *evl,
         IRawElementProviderSimple *elem_prov, UINT event);
 
 /*
+ * FIXME: Need to keep track of each UIA provider window, and be able to
+ * dynamically use the IRawElementProviderAdviseEvents interface to add/remove
+ * events as they are added/removed. For now, we're just adding the
+ * UIA_AutomationFocusChangedEventId event if the fragment root exposes
+ * an IRawElementProviderAdviseEvents interface.
+ */
+static void uia_get_advise_events_iface(IRawElementProviderSimple *elprov)
+{
+    IRawElementProviderAdviseEvents *elem_events = NULL;
+    IRawElementProviderFragmentRoot *frag_root = NULL;
+    IRawElementProviderFragment *elem_frag = NULL;
+    HRESULT hr;
+
+    hr = IRawElementProviderSimple_QueryInterface(elprov, &IID_IRawElementProviderFragment, (void **)&elem_frag);
+    if (FAILED(hr) || !elem_frag)
+        return;
+
+    hr = IRawElementProviderFragment_get_FragmentRoot(elem_frag, &frag_root);
+    if (FAILED(hr) || !frag_root)
+        goto exit;
+
+    hr = IRawElementProviderFragmentRoot_QueryInterface(frag_root, &IID_IRawElementProviderAdviseEvents, (void **)&elem_events);
+    if (FAILED(hr) || !elem_events)
+        goto exit;
+
+    IRawElementProviderAdviseEvents_AdviseEventAdded(elem_events, UIA_AutomationFocusChangedEventId, NULL);
+
+exit:
+    if (elem_frag)
+        IRawElementProviderFragment_Release(elem_frag);
+    if (frag_root)
+        IRawElementProviderFragmentRoot_Release(frag_root);
+    if (elem_events)
+        IRawElementProviderAdviseEvents_Release(elem_events);
+}
+
+/*
+ * Check if a window responds to a request for a UI Automation object, and if
+ * it does, send it an event listener connection interface.
+ */
+static BOOL uia_evl_attempt_evlc_connect(HWND hwnd, IUIAEvlConnection *iface)
+{
+    IRawElementProviderSimple *elem_prov;
+    LRESULT lres;
+    HRESULT hr;
+
+    lres = SendMessageW(hwnd, WM_GETOBJECT, 0, UiaRootObjectId);
+    if (!lres || FAILED(lres))
+        return FALSE;
+
+    /*
+     * This confirms we have an actual UI Automation provider, release the
+     * returned raw element provider interface and send an evlc interface.
+     */
+    hr = ObjectFromLresult(lres, &IID_IRawElementProviderSimple, 0,
+            (void **)&elem_prov);
+    if (FAILED(hr))
+        return FALSE;
+
+    uia_get_advise_events_iface(elem_prov);
+    IRawElementProviderSimple_Release(elem_prov);
+
+    /* FIXME: Probably a less hacky way to do this. Revisit later. */
+    lres = LresultFromObject(&IID_IUIAEvlConnection, 0, (IUnknown *)iface);
+    PostMessageW(hwnd, WM_GETOBJECT, (WPARAM)lres, UiaRootObjectId);
+
+    return TRUE;
+}
+
+/*
+ * Attempt to send an evlc interface to a window if it's a UIA Provider.
+ * If it isn't, try to get an IAccessible from it so that if it has
+ * accessibility functionality, it gets activated.
+ */
+static void uia_evl_query_hwnd(HWND hwnd, struct uia_evl *evl)
+{
+    IAccessible *acc;
+    WCHAR buf[256];
+
+    /*
+     * FIXME: Ignore windows that are obviously created by Wine. Before I did
+     * this, there'd be random hangs. Might be a better solution.
+     */
+    if (GetClassNameW(hwnd, buf, ARRAY_SIZE(buf)) && (!lstrcmpW(buf, L"OleMainThreadWndClass") ||
+            !lstrcmpW(buf, L"IME")))
+        return;
+
+    if (uia_evl_attempt_evlc_connect(hwnd, evl->evlc_iface))
+        return;
+
+    AccessibleObjectFromWindow(hwnd, OBJID_CLIENT, &IID_IAccessible, (void **)&acc);
+    if (acc)
+        IAccessible_Release(acc);
+}
+
+/*
  * Custom COM interface that is passed to UIA providers. Allows them to raise
  * events to be sent to any clients with active event listener threads.
  */
@@ -187,7 +283,11 @@ void CALLBACK uia_evl_window_create_proc(HWINEVENTHOOK hWinEventHook, DWORD even
         HWND hwnd, LONG idObject, LONG idChild, DWORD idEventThread,
         DWORD dwmsEventTime)
 {
-    return;
+    if (event == EVENT_OBJECT_CREATE && idObject == OBJID_WINDOW)
+    {
+        struct uia_evl *evl = (struct uia_evl *)TlsGetValue(tls_index);
+        uia_evl_query_hwnd(hwnd, evl);
+    }
 }
 
 /*
@@ -287,6 +387,17 @@ message_abort:
 }
 
 /*
+ * Upon event listener creation, query each window on the desktop for
+ * accessibility data. Once started, new windows will be queried upon
+ * creation.
+ */
+static BOOL CALLBACK uia_evl_enumerate_windows(HWND hwnd, LPARAM lparam)
+{
+    uia_evl_query_hwnd(hwnd, (struct uia_evl *)lparam);
+    return TRUE;
+}
+
+/*
  * UI Automation Event Listener functions.
  * The first time an event handler interface is added on the client side, the
  * event listener thread is created. It is responsible for listening for
@@ -314,6 +425,8 @@ static HRESULT uia_event_listener_thread_initialize(struct uia_evl *evl)
      * events to active listeners.
      */
     create_uia_evlc_iface(&evl->evlc_iface);
+    impl_from_IUIAEvlConnection(evl->evlc_iface)->evl = evl;
+    EnumWindows(uia_evl_enumerate_windows, (LPARAM)evl);
 
     return S_OK;
 }
