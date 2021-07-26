@@ -461,26 +461,6 @@ static const GUID *audio_converter_supported_types[] =
     &MFAudioFormat_Float,
 };
 
-static WCHAR color_converterW[] = L"Color Converter";
-static const GUID *color_converter_supported_types[] =
-{
-    &MFVideoFormat_RGB24,
-    &MFVideoFormat_RGB32,
-    &MFVideoFormat_RGB555,
-    &MFVideoFormat_RGB8,
-    &MFVideoFormat_AYUV,
-    &MFVideoFormat_I420,
-    &MFVideoFormat_IYUV,
-    &MFVideoFormat_NV11,
-    &MFVideoFormat_NV12,
-    &MFVideoFormat_UYVY,
-    &MFVideoFormat_v216,
-    &MFVideoFormat_v410,
-    &MFVideoFormat_YUY2,
-    &MFVideoFormat_YVYU,
-    &MFVideoFormat_YVYU,
-};
-
 static WCHAR h264_decoderW[] = L"H.264 Decoder";
 static const GUID *h264_decoder_input_types[] =
 {
@@ -532,17 +512,6 @@ mfts[] =
         audio_converter_supported_types,
     },
     {
-        &CLSID_CColorConvertDMO,
-        &MFT_CATEGORY_VIDEO_EFFECT,
-        color_converterW,
-        MFT_ENUM_FLAG_SYNCMFT,
-        &MFMediaType_Video,
-        ARRAY_SIZE(color_converter_supported_types),
-        color_converter_supported_types,
-        ARRAY_SIZE(color_converter_supported_types),
-        color_converter_supported_types,
-    },
-    {
         &CLSID_CMSH264DecoderMFT,
         &MFT_CATEGORY_VIDEO_DECODER,
         h264_decoderW,
@@ -570,7 +539,7 @@ HRESULT mfplat_DllRegisterServer(void)
 {
     unsigned int i, j;
     HRESULT hr;
-    MFT_REGISTER_TYPE_INFO input_types[15], output_types[15];
+    MFT_REGISTER_TYPE_INFO input_types[2], output_types[2];
 
     for (i = 0; i < ARRAY_SIZE(mfts); i++)
     {
