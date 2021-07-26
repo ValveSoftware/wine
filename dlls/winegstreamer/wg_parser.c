@@ -1337,7 +1337,7 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
          */
         if (!(capssetter = gst_element_factory_make("capssetter", NULL)))
         {
-            ERR("Failed to create capssetter, are %u-bit GStreamer \"good\" plugins installed?\n",
+            GST_ERROR("Failed to create capssetter, are %u-bit GStreamer \"good\" plugins installed?\n",
                     8 * (int)sizeof(void *));
             goto out;
         }
