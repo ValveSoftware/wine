@@ -338,6 +338,7 @@ SOURCES = \
 	httprequest.idl \
 	httprequestid.h \
 	i_cryptasn1tls.h \
+        ia2api.idl \
 	iads.idl \
 	icftypes.idl \
 	icm.h \
