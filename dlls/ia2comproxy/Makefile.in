@@ -1,0 +1,10 @@
+MODULE    = ia2comproxy.dll
+IMPORTLIB = ia2comproxy
+IMPORTS   = uuid rpcrt4 oleacc ole32 oleaut32
+
+EXTRADLLFLAGS = -mno-cygwin
+
+IDL_SRCS = ia2_classes.idl \
+           oleacc_classes.idl
+
+dlldata_EXTRADEFS = -DWINE_REGISTER_DLL -DPROXY_DELEGATION
