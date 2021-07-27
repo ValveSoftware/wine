@@ -1999,6 +1999,9 @@ int __cdecl main( int argc, char *argv[] )
     {
         ProcessRunKeys( HKEY_LOCAL_MACHINE, L"RunServices", FALSE, FALSE );
         start_services_process();
+
+        /* FIXME: hack, run tabtip.exe on startup. */
+        runCmd((LPWSTR)L"C:\\windows\\system32\\tabtip.exe", NULL, FALSE, FALSE);
     }
     if (init || update) update_wineprefix( update );
 
