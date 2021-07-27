@@ -1296,6 +1296,40 @@ static BOOL start_services_process(void)
     return TRUE;
 }
 
+static BOOL start_tabtip_process(void)
+{
+    static const WCHAR tabtip_started_event[] = L"TABTIP_STARTED_EVENT";
+    PROCESS_INFORMATION pi;
+    STARTUPINFOW si = { sizeof(si) };
+    HANDLE wait_handles[2];
+
+    if (!CreateProcessW(L"C:\\windows\\system32\\tabtip.exe", NULL,
+                        NULL, NULL, TRUE, DETACHED_PROCESS, NULL, NULL, &si, &pi))
+    {
+        WINE_ERR("Couldn't start tabtip.exe: error %u\n", GetLastError());
+        return FALSE;
+    }
+    CloseHandle(pi.hThread);
+
+    wait_handles[0] = CreateEventW(NULL, TRUE, FALSE, tabtip_started_event);
+    wait_handles[1] = pi.hProcess;
+
+    /* wait for the event to become available or the process to exit */
+    if ((WaitForMultipleObjects(2, wait_handles, FALSE, INFINITE)) == WAIT_OBJECT_0 + 1)
+    {
+        DWORD exit_code;
+        GetExitCodeProcess(pi.hProcess, &exit_code);
+        WINE_ERR("Unexpected termination of tabtip.exe - exit code %d\n", exit_code);
+        CloseHandle(pi.hProcess);
+        CloseHandle(wait_handles[0]);
+        return FALSE;
+    }
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(wait_handles[0]);
+    return TRUE;
+}
+
 static HANDLE start_rundll32( const WCHAR *inf_path, const WCHAR *install, WORD machine )
 {
     WCHAR app[MAX_PATH + ARRAY_SIZE(L"\\rundll32.exe" )];
@@ -1713,6 +1747,9 @@ int __cdecl main( int argc, char *argv[] )
     {
         ProcessRunKeys( HKEY_LOCAL_MACHINE, L"RunServices", FALSE, FALSE );
         start_services_process();
+
+        /* FIXME: hack, run tabtip.exe on startup. */
+        start_tabtip_process();
     }
     if (init || update) update_wineprefix( update );
 
