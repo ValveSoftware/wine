@@ -1538,6 +1538,8 @@ static void CALLBACK ioqueue_thread_proc( void *param )
         {
             RtlEnterCriticalSection( &io->pool->cs );
 
+            --io->u.io.pending_count;
+
             if (!array_reserve((void **)&io->u.io.completions, &io->u.io.completion_max,
                     io->u.io.completion_count + 1, sizeof(*io->u.io.completions)))
             {
@@ -2140,7 +2142,6 @@ static void tp_object_execute( struct threadpool_object *object, BOOL wait_threa
     {
         assert( object->u.io.completion_count );
         completion = object->u.io.completions[--object->u.io.completion_count];
-        object->u.io.pending_count--;
     }
 
     /* Leave critical section and do the actual callback. */
