@@ -277,6 +277,17 @@ static EVENTID uia_msaa_event_to_uia_event_id(LONG obj_id, LONG event)
 }
 
 /*
+ * Event hook callback for IAccessible2 events.
+ */
+void CALLBACK uia_evl_ia2_event_proc(HWINEVENTHOOK hWinEventHook, DWORD event,
+        HWND hwnd, LONG idObject, LONG idChild, DWORD idEventThread,
+        DWORD dwmsEventTime)
+{
+    TRACE("hook %p, event %d, hwnd %p, obj_id %#x, child_id %#x, tid %#x, time %d\n",
+            hWinEventHook, event, hwnd, idObject, idChild, idEventThread, dwmsEventTime);
+}
+
+/*
  * Event hook callback for window creation events.
  */
 void CALLBACK uia_evl_window_create_proc(HWINEVENTHOOK hWinEventHook, DWORD event,
@@ -419,7 +430,8 @@ static HRESULT uia_event_listener_thread_initialize(struct uia_evl *evl)
             EVENT_OBJECT_FOCUS, 0, uia_evl_msaa_obj_focus_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
     evl->win_creation_hook = SetWinEventHook(EVENT_OBJECT_CREATE,
             EVENT_OBJECT_CREATE, 0, uia_evl_window_create_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
-
+    evl->ia2_event_hook = SetWinEventHook(IA2_EVENT_ACTION_CHANGED, IA2_EVENT_ROLE_CHANGED, 0, uia_evl_ia2_event_proc,
+            0, 0, WINEVENT_OUTOFCONTEXT);
     /*
      * Create interface to be passed to providers so that they can signal
      * events to active listeners.
@@ -437,6 +449,7 @@ static void uia_event_listener_thread_exit(struct uia_evl *evl)
 
     UnhookWinEvent(evl->object_focus_hook);
     UnhookWinEvent(evl->win_creation_hook);
+    UnhookWinEvent(evl->ia2_event_hook);
 
     CoDisconnectObject((IUnknown *)evl->evlc_iface, 0);
     IUIAEvlConnection_Release(evl->evlc_iface);
