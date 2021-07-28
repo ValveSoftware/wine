@@ -18,6 +18,8 @@
 
 #include "uiautomation.h"
 #include "oleacc.h"
+#include "ia2api.h"
+#include "servprov.h"
 
 #include "wine/list.h"
 
@@ -95,6 +97,7 @@ struct uia_evl
 
     HWINEVENTHOOK win_creation_hook;
     HWINEVENTHOOK object_focus_hook;
+    HWINEVENTHOOK ia2_event_hook;
     IUIAEvlConnection *evlc_iface;
 
     struct uia_data *data;
