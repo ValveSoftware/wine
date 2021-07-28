@@ -1737,6 +1737,36 @@ HRESULT create_uia_elem_from_raw_provider(IUIAutomationElement **iface,
     return S_OK;
 }
 
+static void uia_test_iaccessible2(IAccessible *acc, INT child_id)
+{
+    IServiceProvider *serv_prov;
+    IAccessible2 *acc2;
+    HRESULT hr;
+    HWND parent_win;
+    LONG tmp;
+
+    hr = IAccessible_QueryInterface(acc, &IID_IServiceProvider, (void **)&serv_prov);
+    if (FAILED(hr))
+        return;
+
+    TRACE("Got IServiceProvider, passed first step.\n");
+    hr = IServiceProvider_QueryService(serv_prov, &IID_IAccessible, &IID_IAccessible2, (void **)&acc2);
+    if (FAILED(hr))
+    {
+        IServiceProvider_Release(serv_prov);
+        return;
+    }
+
+    TRACE("Got IAccessible2 interface, success!\n");
+    hr = IAccessible2_get_uniqueID(acc2, &tmp);
+    hr = IAccessible2_get_windowHandle(acc2, &parent_win);
+    if (SUCCEEDED(hr))
+        TRACE("Child_id %d, UniqueID %d, hwnd %p!\n", child_id, tmp, parent_win);
+
+    IServiceProvider_Release(serv_prov);
+    IAccessible2_Release(acc2);
+}
+
 HRESULT create_uia_elem_from_msaa_acc(IUIAutomationElement **iface,
         IAccessible *wrap, INT child_id)
 {
@@ -1752,6 +1782,8 @@ HRESULT create_uia_elem_from_msaa_acc(IUIAutomationElement **iface,
     uia->acc = wrap;
     V_VT(&uia->child_id) = VT_I4;
     V_I4(&uia->child_id) = child_id;
+
+    uia_test_iaccessible2(wrap, child_id);
 
     return S_OK;
 }
