@@ -900,6 +900,7 @@ with_xinerama
 with_xinput
 with_xinput2
 with_xml
+with_xpresent
 with_xrandr
 with_xrender
 with_xshape
@@ -2646,6 +2647,7 @@ Optional Packages:
   --without-xinput        do not use the Xinput extension
   --without-xinput2       do not use the Xinput 2 extension
   --without-xml           do not use XML
+  --without-xpresent      do not use the Xpresent extension
   --without-xrandr        do not use Xrandr (multi-monitor support)
   --without-xrender       do not use the Xrender extension
   --without-xshape        do not use the Xshape extension
@@ -4247,6 +4249,12 @@ fi
 # Check whether --with-xml was given.
 if test "${with_xml+set}" = set; then :
   withval=$with_xml;
+fi
+
+
+# Check whether --with-xpresent was given.
+if test "${with_xpresent+set}" = set; then :
+  withval=$with_xpresent; if test "x$withval" = "xno"; then ac_cv_header_X11_extensions_Xpresent_h=no; fi
 fi
 
 
@@ -11618,6 +11626,7 @@ fi
                       X11/extensions/Xcomposite.h \
                       X11/extensions/Xfixes.h \
                       X11/extensions/Xinerama.h \
+                      X11/extensions/Xpresent.h \
                       X11/extensions/Xrandr.h \
                       X11/extensions/Xrender.h \
                       X11/extensions/xf86vmode.h \
@@ -12430,6 +12439,89 @@ rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
   xno) ;;
   *)   as_fn_error $? "libxinerama ${notice_platform}development files not found, multi-monitor setups won't be supported.
 This is an error since --with-xinerama was requested." "$LINENO" 5 ;;
+esac
+
+fi
+
+                if test "$ac_cv_header_X11_extensions_Xpresent_h" = "yes"
+        then
+                cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+#include <X11/Xlib.h>
+#include <X11/extensions/Xpresent.h>
+int
+main ()
+{
+static typeof(XPresentQueryVersion) * func; if (func) return 0;
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_compile "$LINENO"; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for -lXpresent" >&5
+$as_echo_n "checking for -lXpresent... " >&6; }
+if ${ac_cv_lib_soname_Xpresent+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_check_soname_save_LIBS=$LIBS
+LIBS="-lXpresent $X_LIBS $X_EXTRA_LIBS $LIBS"
+  cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char XPresentQueryVersion ();
+int
+main ()
+{
+return XPresentQueryVersion ();
+  ;
+  return 0;
+}
+_ACEOF
+if ac_fn_c_try_link "$LINENO"; then :
+  case "$LIBEXT" in
+    dll) ac_cv_lib_soname_Xpresent=`$ac_cv_path_LDD conftest.exe | grep "Xpresent" | sed -e "s/dll.*/dll/"';2,$d'` ;;
+    dylib) ac_cv_lib_soname_Xpresent=`$OTOOL -L conftest$ac_exeext | grep "libXpresent\\.[0-9A-Za-z.]*dylib" | sed -e "s/^.*\/\(libXpresent\.[0-9A-Za-z.]*dylib\).*$/\1/"';2,$d'` ;;
+    *) ac_cv_lib_soname_Xpresent=`$READELF -d conftest$ac_exeext | grep "NEEDED.*libXpresent\\.$LIBEXT" | sed -e "s/^.*\\[\\(libXpresent\\.$LIBEXT[^	 ]*\\)\\].*$/\1/"';2,$d'`
+       if ${ac_cv_lib_soname_Xpresent:+false} :; then :
+  ac_cv_lib_soname_Xpresent=`$LDD conftest$ac_exeext | grep "libXpresent\\.$LIBEXT" | sed -e "s/^.*\(libXpresent\.$LIBEXT[^	 ]*\).*$/\1/"';2,$d'`
+fi ;;
+  esac
+else
+  ac_cv_lib_soname_Xpresent=
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext conftest.$ac_ext
+  LIBS=$ac_check_soname_save_LIBS
+fi
+if ${ac_cv_lib_soname_Xpresent:+false} :; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: not found" >&5
+$as_echo "not found" >&6; }
+
+else
+  { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_lib_soname_Xpresent" >&5
+$as_echo "$ac_cv_lib_soname_Xpresent" >&6; }
+
+cat >>confdefs.h <<_ACEOF
+#define SONAME_LIBXPRESENT "$ac_cv_lib_soname_Xpresent"
+_ACEOF
+
+
+fi
+fi
+rm -f core conftest.err conftest.$ac_objext conftest.$ac_ext
+        fi
+        if test "x$ac_cv_lib_soname_Xpresent" = "x"; then :
+  case "x$with_Xpresent" in
+  x)   as_fn_append wine_notices "|libXpresent ${notice_platform}development files not found, Xpresent won't be supported." ;;
+  xno) ;;
+  *)   as_fn_error $? "libXpresent ${notice_platform}development files not found, Xpresent won't be supported.
+This is an error since --with-Xpresent was requested." "$LINENO" 5 ;;
 esac
 
 fi
