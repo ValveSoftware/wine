@@ -500,6 +500,32 @@ done:
     return ret;
 }
 
+static const WCHAR *hack_append_command_line( const WCHAR *cmd )
+{
+    static const struct
+    {
+        const WCHAR *exe_name;
+        const WCHAR *append;
+    }
+    options[] =
+    {
+        {L"Paradox Launcher.exe", L" --use-gl=swiftshader --in-process-gpu"},
+    };
+    unsigned int i;
+
+    if (!cmd) return NULL;
+
+    for (i = 0; i < ARRAY_SIZE(options); ++i)
+    {
+        if (wcsstr( cmd, options[i].exe_name ))
+        {
+            FIXME( "HACK: appending %s to command line.\n", debugstr_w(options[i].append) );
+            return options[i].append;
+        }
+    }
+    return NULL;
+}
+
 /**********************************************************************
  *           CreateProcessInternalW   (kernelbase.@)
  */
@@ -516,6 +542,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
     RTL_USER_PROCESS_PARAMETERS *params = NULL;
     RTL_USER_PROCESS_INFORMATION rtl_info = { 0 };
     HANDLE parent = 0, debug = 0;
+    const WCHAR *append;
     ULONG nt_flags = 0;
     USHORT machine = 0;
     NTSTATUS status;
@@ -534,10 +561,39 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
                 return FALSE;
             swprintf( tidy_cmdline, lstrlenW(app_name) + 3, L"\"%s\"", app_name );
         }
+        else if ((append = hack_append_command_line( app_name )))
+        {
+            tidy_cmdline = RtlAllocateHeap( GetProcessHeap(), 0,
+                                            sizeof(WCHAR) * (lstrlenW(cmd_line) + lstrlenW(append) + 1) );
+            lstrcpyW(tidy_cmdline, cmd_line);
+            lstrcatW(tidy_cmdline, append);
+        }
     }
     else
     {
-        if (!(tidy_cmdline = get_file_name( cmd_line, name, ARRAY_SIZE(name) ))) return FALSE;
+        WCHAR *cmdline_new = NULL;
+
+        if ((append = hack_append_command_line( cmd_line )))
+        {
+            cmdline_new = RtlAllocateHeap( GetProcessHeap(), 0, sizeof(WCHAR)
+                                           * (lstrlenW(cmd_line) + lstrlenW(append) + 1) );
+            lstrcpyW(cmdline_new, cmd_line);
+            lstrcatW(cmdline_new, append);
+        }
+
+        tidy_cmdline = get_file_name( cmdline_new ? cmdline_new : cmd_line, name, ARRAY_SIZE(name) );
+
+        if (!tidy_cmdline)
+        {
+            HeapFree( GetProcessHeap(), 0, cmdline_new );
+            return FALSE;
+        }
+
+        if (cmdline_new)
+        {
+            if (cmdline_new == tidy_cmdline) cmd_line = NULL;
+            else HeapFree( GetProcessHeap(), 0, cmdline_new );
+        }
         app_name = name;
     }
 
