@@ -503,11 +503,34 @@ static HANDLE create_dest_file( const WCHAR *name, BOOL delete )
     }
     else if (!delete)
     {
+        if (GetLastError() == ERROR_ACCESS_DENIED) return 0;
         if (GetLastError() == ERROR_PATH_NOT_FOUND) create_directories( name );
 
         h = CreateFileW( name, GENERIC_WRITE, 0, NULL, CREATE_NEW, 0, NULL );
         if (h == INVALID_HANDLE_VALUE)
             ERR( "failed to create %s (error=%u)\n", debugstr_w(name), GetLastError() );
+    }
+    return h;
+}
+
+static HANDLE check_dest_file_size_match( const WCHAR *name, SIZE_T size )
+{
+    HANDLE h = CreateFileW( name, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL );
+    if (h && h != INVALID_HANDLE_VALUE)
+    {
+        LARGE_INTEGER li;
+
+        if (GetFileSizeEx(h, &li) && (size == li.QuadPart))
+        {
+            CloseHandle( h );
+            h = CreateFileW( L"nul", GENERIC_READ|GENERIC_WRITE, 0, NULL, OPEN_EXISTING, 0, NULL );
+        }
+        else
+        {
+            ERR( "Incorrect file size for %s, not registering!\n", debugstr_w(name) );
+            CloseHandle ( h );
+            h = 0;
+        }
     }
     return h;
 }
@@ -908,6 +931,17 @@ static int install_fake_dll( WCHAR *dest, WCHAR *file, BOOL delete, struct list 
     if (ret != -1)
     {
         HANDLE h = create_dest_file( dest, delete );
+
+        /*
+         * In Proton, prefixes contain read-only symlinks to dll's, so there's
+         * no need to copy anything. However, we still want to make sure new
+         * dll's are registered properly. So, check if we seem to have a
+         * matching file by checking if their sizes match, and if we do,
+         * just set the handle to NUL for the write and allow register_fake_dll
+         * to run.
+         */
+        if (!h && GetLastError() == ERROR_ACCESS_DENIED)
+            h = check_dest_file_size_match( dest, size );
 
         if (h && h != INVALID_HANDLE_VALUE)
         {
