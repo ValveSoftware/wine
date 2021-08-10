@@ -207,17 +207,30 @@ const char *debugstr_sa_script(UINT16 script)
 }
 
 /* system font falback configuration */
+static const WCHAR simsunW[] = {'S','i','m','S','u','n',0};
 static const WCHAR meiryoW[] = {'M','e','i','r','y','o',0};
 static const WCHAR droidW[] = {'D','r','o','i','d',' ','S','a','n','s',' ','F','a','l','l','b','a','c','k',0};
 static const WCHAR notoW[] = {'N','o','t','o',' ','S','e','r','i','f',' ','C','J','K',' ','S','C',0};
 
-static const WCHAR *cjk_families[] = { meiryoW, droidW, notoW };
+static const WCHAR *cjk_families[] = { simsunW, meiryoW, droidW, notoW };
 
 static const DWRITE_UNICODE_RANGE cjk_ranges[] =
 {
     { 0x3000, 0x30ff }, /* CJK Symbols and Punctuation, Hiragana, Katakana */
     { 0x31f0, 0x31ff }, /* Katakana Phonetic Extensions */
     { 0x4e00, 0x9fff }, /* CJK Unified Ideographs */
+};
+
+static const WCHAR malgunW[] = {'M','a','l','g','u','n',' ','G','o','t','h','i','c',0};
+
+static const WCHAR *hangul_families[] = { malgunW };
+
+static const DWRITE_UNICODE_RANGE hangul_ranges[] =
+{
+    { 0x1100, 0x11ff }, /* Hangul Jamo */
+    { 0x3130, 0x318f }, /* Hangul Compatibility Jamo */
+    { 0xa960, 0xa97f }, /* Hangul Jamo Extended-A */
+    { 0xac00, 0xd7ff }, /* Hangul Syllables, Hangul Jamo Extended-B */
 };
 
 static const WCHAR timesW[] = {'T','i','m','e','s',' ','N','e','w',' ','R','o','m','a','n',0};
@@ -233,6 +246,19 @@ static const DWRITE_UNICODE_RANGE latin_ranges[] =
     { 0xa700, 0xa7ff },
     { 0xfb00, 0xfb4f },
     { 0xfe20, 0xfe23 },
+};
+
+static const WCHAR noto_sans_arabicW[] = {'N','o','t','o',' ','S','a','n','s',' ','A','r','a','b','i','c',0};
+
+static const WCHAR *arabic_families[] = { noto_sans_arabicW };
+
+static const DWRITE_UNICODE_RANGE arabic_ranges[] =
+{
+    { 0x0600, 0x06ff }, /* Arabic */
+    { 0x0750, 0x077f }, /* Arabic Supplement */
+    { 0x08a0, 0x08ff }, /* Arabic Extended-A */
+    { 0xfb50, 0xfdff }, /* Arabic Presentation Forms-A */
+    { 0xfe70, 0xfeff }, /* Arabic Presentation Forms-B */
 };
 
 struct fallback_mapping {
@@ -251,7 +277,9 @@ static const struct fallback_mapping fontfallback_neutral_data[] = {
           (WCHAR **)families, ARRAY_SIZE(families) }
 
     MAPPING_RANGE(cjk_ranges, cjk_families),
+    MAPPING_RANGE(hangul_ranges, hangul_families),
     MAPPING_RANGE(latin_ranges, latin_families),
+    MAPPING_RANGE(arabic_ranges, arabic_families),
 
 #undef MAPPING_RANGE
 };
