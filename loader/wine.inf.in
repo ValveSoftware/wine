@@ -663,6 +663,11 @@ HKLM,%FontsNT%,"Arial (TrueType)",,"arial.ttf"
 HKLM,%FontsNT%,"Arial Bold (TrueType)",,"arialbd.ttf"
 HKLM,%FontsNT%,"Times New Roman (TrueType)",,"times.ttf"
 HKLM,%FontsNT%,"Courier New (TrueType)",,"cour.ttf"
+HKLM,%FontsNT%,"Malgun Gothic",,"malgun.ttf"
+HKLM,%FontsNT%,"MS Gothic",,"msgothic.ttc"
+HKLM,%FontsNT%,"Microsoft YaHei",,"msyh.ttf"
+HKLM,%FontsNT%,"SimSun",,"simsun.ttc"
+HKLM,%FontsNT%,"Noto Sans Arabic",,"NotoSansArabic-Regular.ttf"
 HKCU,Software\Wine\Fonts\Replacements,"Palatino Linotype",,"Times New Roman"
 
 [MCI]
