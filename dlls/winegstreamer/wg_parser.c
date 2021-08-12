@@ -93,7 +93,6 @@ struct wg_parser_stream
     bool flushing, eos, enabled, has_caps;
 
     uint64_t duration;
-    gchar *language_code;
 };
 
 static enum wg_audio_format wg_audio_format_from_gst(GstAudioFormat format)
@@ -847,11 +846,6 @@ static void CDECL wg_parser_stream_release_buffer(struct wg_parser_stream *strea
 static uint64_t CDECL wg_parser_stream_get_duration(struct wg_parser_stream *stream)
 {
     return stream->duration;
-}
-
-static char * CDECL wg_parser_stream_get_language(struct wg_parser_stream *stream)
-{
-    return stream->language_code;
 }
 
 static bool CDECL wg_parser_stream_seek(struct wg_parser_stream *stream, double rate,
@@ -2004,22 +1998,6 @@ static LONGLONG query_duration(GstPad *pad)
     return 0;
 }
 
-static gchar *query_language(GstPad *pad)
-{
-    GstTagList *tag_list;
-    GstEvent *tag_event;
-    gchar *ret = NULL;
-
-    if ((tag_event = gst_pad_get_sticky_event(pad, GST_EVENT_TAG, 0)))
-    {
-        gst_event_parse_tag(tag_event, &tag_list);
-        gst_tag_list_get_string(tag_list, "language-code", &ret);
-        gst_event_unref(tag_event);
-    }
-
-    return ret;
-}
-
 static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
 {
     GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("wine_src",
@@ -2082,7 +2060,6 @@ static HRESULT CDECL wg_parser_connect(struct wg_parser *parser, uint64_t file_s
          * fixing caps, so as a heuristic, wait until we get caps before trying
          * to query for duration. */
         stream->duration = query_duration(stream->their_src);
-        stream->language_code = query_language(stream->their_src);
     }
 
     pthread_mutex_unlock(&parser->mutex);
@@ -2148,9 +2125,6 @@ static void free_stream(struct wg_parser_stream *stream)
 
     pthread_cond_destroy(&stream->event_cond);
     pthread_cond_destroy(&stream->event_empty_cond);
-
-    if (stream->language_code)
-        g_free(stream->language_code);
 
     free(stream);
 }
@@ -2605,7 +2579,6 @@ static const struct unix_funcs funcs =
     wg_parser_stream_notify_qos,
 
     wg_parser_stream_get_duration,
-    wg_parser_stream_get_language,
     wg_parser_stream_seek,
     wg_parser_stream_drain,
 };
