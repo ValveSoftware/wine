@@ -268,7 +268,6 @@ static unsigned int get_image_size(const struct wg_format *format)
             return width * height * 3;
 
         case WG_VIDEO_FORMAT_UNKNOWN:
-        case WG_VIDEO_FORMAT_H264:
             break;
     }
 
