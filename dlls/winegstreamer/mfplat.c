@@ -473,17 +473,6 @@ static const GUID *h264_decoder_output_types[] =
     &MFVideoFormat_YV12,
 };
 
-static WCHAR aac_decoderW[] = L"AAC Decoder";
-static const GUID *aac_decoder_input_types[] =
-{
-    &MFAudioFormat_AAC,
-};
-static const GUID *aac_decoder_output_types[] =
-{
-    &MFAudioFormat_Float,
-    &MFAudioFormat_PCM,
-};
-
 static const struct mft
 {
     const GUID *clsid;
@@ -519,17 +508,6 @@ mfts[] =
         h264_decoder_input_types,
         ARRAY_SIZE(h264_decoder_output_types),
         h264_decoder_output_types,
-    },
-    {
-        &CLSID_CMSAACDecMFT,
-        &MFT_CATEGORY_AUDIO_DECODER,
-        aac_decoderW,
-        MFT_ENUM_FLAG_SYNCMFT,
-        &MFMediaType_Audio,
-        ARRAY_SIZE(aac_decoder_input_types),
-        aac_decoder_input_types,
-        ARRAY_SIZE(aac_decoder_output_types),
-        aac_decoder_output_types,
     },
 };
 
