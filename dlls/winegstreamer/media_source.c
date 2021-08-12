@@ -1364,25 +1364,7 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
     descriptors = malloc(object->stream_count * sizeof(IMFStreamDescriptor *));
     for (i = 0; i < object->stream_count; i++)
     {
-        IMFStreamDescriptor **descriptor = &descriptors[object->stream_count - 1 - i];
-        DWORD language_len;
-        WCHAR *languageW;
-        char *language;
-
-        IMFMediaStream_GetStreamDescriptor(&object->streams[i]->IMFMediaStream_iface, descriptor);
-
-        if ((language = unix_funcs->wg_parser_stream_get_language(object->streams[i]->wg_stream)))
-        {
-            if ((language_len = MultiByteToWideChar(CP_UTF8, 0, language, -1, NULL, 0)))
-            {
-                languageW = malloc(language_len * sizeof(WCHAR));
-                if (MultiByteToWideChar(CP_UTF8, 0, language, -1, languageW, language_len))
-                {
-                    IMFStreamDescriptor_SetString(*descriptor, &MF_SD_LANGUAGE, languageW);
-                }
-                free(languageW);
-            }
-        }
+        IMFMediaStream_GetStreamDescriptor(&object->streams[i]->IMFMediaStream_iface, &descriptors[object->stream_count - 1 - i]);
     }
 
     if (FAILED(hr = MFCreatePresentationDescriptor(object->stream_count, descriptors, &object->pres_desc)))
