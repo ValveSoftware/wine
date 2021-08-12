@@ -2122,7 +2122,8 @@ static HRESULT connect_to_sink(struct transform_output_type *output_type, struct
     hr = IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, output_type->type);
     if (SUCCEEDED(hr))
         hr = IMFTransform_SetOutputType(output_type->transform, 0, output_type->type, 0);
-    return hr;
+
+    return S_OK;
 }
 
 static HRESULT connect_to_converter(struct transform_output_type *output_type, struct connect_context *context)
