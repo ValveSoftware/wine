@@ -879,6 +879,7 @@ struct input_shared_memory
     rectangle_t          caret_rect;       /* caret rectangle */
     int                  cursor_count;     /* cursor show count */
     unsigned char        keystate[256];    /* key state */
+    int                  keystate_lock;    /* keystate is locked */
 };
 
 /* Bits that must be clear for client to read */
