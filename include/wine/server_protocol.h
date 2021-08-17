@@ -876,6 +876,7 @@ struct input_shared_memory
     rectangle_t          caret_rect;
     int                  cursor_count;
     unsigned char        keystate[256];
+    int                  keystate_lock; /* keystate is locked */
 };
 
 
