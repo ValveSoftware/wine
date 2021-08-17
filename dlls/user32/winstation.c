@@ -160,6 +160,19 @@ volatile struct desktop_shared_memory *get_desktop_shared_memory( void )
 }
 
 
+volatile struct queue_shared_memory *get_queue_shared_memory( void )
+{
+    struct user_thread_info *thread_info = get_user_thread_info();
+    WCHAR buf[MAX_PATH];
+
+    if (thread_info->queue_shared_memory) return thread_info->queue_shared_memory;
+
+    swprintf( buf, ARRAY_SIZE(buf), L"\\KernelObjects\\__wine_thread_mappings\\%08x-queue", GetCurrentThreadId() );
+    map_shared_memory_section( buf, sizeof(struct queue_shared_memory), NULL,
+                               &thread_info->queue_shared_map, (void **)&thread_info->queue_shared_memory );
+    return thread_info->queue_shared_memory;
+}
+
 
 /***********************************************************************
  *              CreateWindowStationA  (USER32.@)
