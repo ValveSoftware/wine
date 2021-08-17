@@ -3289,7 +3289,7 @@ DECL_HANDLER(get_key_state)
             desktop->shared->keystate[req->key & 0xff] &= ~0x40;
             SHARED_WRITE_END( &desktop->shared->seq );
         }
-        set_reply_data( (void *)desktop->shared->keystate, size );
+        else set_reply_data( (void *)desktop->shared->keystate, size );
         release_object( desktop );
     }
     else
@@ -3301,7 +3301,7 @@ DECL_HANDLER(get_key_state)
             sync_input_keystate( queue->input );
             reply->state = keystate[req->key & 0xff];
         }
-        set_reply_data( keystate, size );
+        else set_reply_data( keystate, size );
     }
 }
 
