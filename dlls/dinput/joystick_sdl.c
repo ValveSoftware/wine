@@ -1229,8 +1229,12 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
     newDevice->generic.devcaps.dwDevType = ddi.dwDevType;
 
     if (newDevice->sdldev->sdl_haptic)
+    {
         newDevice->generic.devcaps.dwFlags |= DIDC_FORCEFEEDBACK;
 
+        /* Some games require a non-zero value to enable FF */
+        newDevice->generic.devcaps.dwFFDriverVersion = 1;
+    }
     IDirectInput_AddRef(&newDevice->generic.base.dinput->IDirectInput7A_iface);
 
     return newDevice;
