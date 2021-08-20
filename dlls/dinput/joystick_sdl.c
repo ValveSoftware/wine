@@ -1144,9 +1144,6 @@ static JoystickImpl *alloc_device(REFGUID rguid, IDirectInputImpl *dinput, unsig
         }
     }
 
-    if (newDevice->sdldev->sdl_haptic)
-        newDevice->generic.devcaps.dwFlags |= DIDC_FORCEFEEDBACK;
-
     newDevice->generic.base.data_format.wine_df = df;
 
     /* Fill the caps */
