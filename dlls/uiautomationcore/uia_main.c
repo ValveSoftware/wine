@@ -180,6 +180,16 @@ HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *provider, EVEN
     return S_OK;
 }
 
+/***********************************************************************
+ *          UiaRaiseStructureChangedEvent (uiautomationcore.@)
+ */
+HRESULT WINAPI UiaRaiseStructureChangedEvent(IRawElementProviderSimple *provider, enum StructureChangeType structureChangeType,
+                                             int *pRuntimeId, int cRuntimeIdLen)
+{
+    FIXME("(%p, %d, %p, %d): stub\n", provider, structureChangeType, pRuntimeId, cRuntimeIdLen);
+    return S_OK;
+}
+
 void WINAPI UiaRegisterProviderCallback(UiaProviderCallback *callback)
 {
     FIXME("(%p): stub\n", callback);
