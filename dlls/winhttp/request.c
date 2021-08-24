@@ -2926,6 +2926,7 @@ BOOL WINAPI WinHttpReadData( HINTERNET hrequest, LPVOID buffer, DWORD to_read, L
 {
     DWORD ret;
     struct request *request;
+    BOOL async;
 
     TRACE("%p, %p, %d, %p\n", hrequest, buffer, to_read, read);
 
@@ -2941,7 +2942,8 @@ BOOL WINAPI WinHttpReadData( HINTERNET hrequest, LPVOID buffer, DWORD to_read, L
         return FALSE;
     }
 
-    if (request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if ((async = request->connect->hdr.flags & WINHTTP_FLAG_ASYNC) && !end_of_read_data( request )
+                                                                   && !query_data_ready( request ))
     {
         struct read_data *r;
 
@@ -2957,12 +2959,13 @@ BOOL WINAPI WinHttpReadData( HINTERNET hrequest, LPVOID buffer, DWORD to_read, L
             release_object( &request->hdr );
             heap_free( r );
         }
+        else ret = ERROR_IO_PENDING;
     }
-    else ret = read_data( request, buffer, to_read, read, FALSE );
+    else ret = read_data( request, buffer, to_read, read, async );
 
     release_object( &request->hdr );
     SetLastError( ret );
-    return !ret;
+    return !ret || ret == ERROR_IO_PENDING;
 }
 
 static DWORD write_data( struct request *request, const void *buffer, DWORD to_write, DWORD *written, BOOL async )
