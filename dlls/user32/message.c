@@ -2814,6 +2814,12 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             break;
         case MSG_NOTIFY:
             info.flags = ISMEX_NOTIFY;
+            /* unpack_message may have to reallocate */
+            if (buffer == buffer_init)
+            {
+                buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size );
+                memcpy( buffer, buffer_init, buffer_size );
+            }
             if (!unpack_message( info.msg.hwnd, info.msg.message, &info.msg.wParam,
                                  &info.msg.lParam, &buffer, size ))
                 continue;
@@ -2897,6 +2903,12 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             continue;
         case MSG_OTHER_PROCESS:
             info.flags = ISMEX_SEND;
+            /* unpack_message may have to reallocate */
+            if (buffer == buffer_init)
+            {
+                buffer = HeapAlloc( GetProcessHeap(), 0, buffer_size );
+                memcpy( buffer, buffer_init, buffer_size );
+            }
             if (!unpack_message( info.msg.hwnd, info.msg.message, &info.msg.wParam,
                                  &info.msg.lParam, &buffer, size ))
             {
