@@ -157,11 +157,31 @@ static ULONG WINAPI mf_decoder_Release(IMFTransform *iface)
             decoder->output_type = NULL;
         }
 
-        if (decoder->wg_stream)
-            unix_funcs->wg_parser_disconnect(decoder->wg_parser);
-
         if (decoder->wg_parser)
+        {
+            /* NULL wg_parser is possible if the wg_parser creation failed. */
+
+            EnterCriticalSection(&decoder->event_cs);
+            decoder->helper_thread_shutdown = TRUE;
+            WakeAllConditionVariable(&decoder->event_cv);
+            LeaveCriticalSection(&decoder->event_cs);
+
+            EnterCriticalSection(&decoder->help_cs);
+            WakeAllConditionVariable(&decoder->help_cv);
+            LeaveCriticalSection(&decoder->help_cs);
+
+            if (decoder->wg_stream)
+                unix_funcs->wg_parser_disconnect(decoder->wg_parser);
+
+            if (WaitForSingleObject(decoder->helper_thread, 10000) != WAIT_OBJECT_0)
+                FIXME("Failed waiting for helper thread to terminate.\n");
+            CloseHandle(decoder->helper_thread);
+            if (WaitForSingleObject(decoder->read_thread, 10000) != WAIT_OBJECT_0)
+                FIXME("Failed waiting for read thread to terminate.\n");
+            CloseHandle(decoder->read_thread);
+
             unix_funcs->wg_parser_destroy(decoder->wg_parser);
+        }
 
         DeleteCriticalSection(&decoder->cs);
         DeleteCriticalSection(&decoder->help_cs);
@@ -611,7 +631,10 @@ static DWORD CALLBACK helper_thread_func(PVOID ctx)
         while(!decoder->helper_thread_shutdown && decoder->help_request.type == HELP_REQ_NONE)
             SleepConditionVariableCS(&decoder->help_cv, &decoder->help_cs, INFINITE);
         if (decoder->helper_thread_shutdown)
+        {
+            LeaveCriticalSection(&decoder->help_cs);
             return 0;
+        }
 
         switch(decoder->help_request.type)
         {
@@ -649,8 +672,14 @@ static DWORD CALLBACK helper_thread_func(PVOID ctx)
                     &input_format, 1, &output_format, aperture ? &wg_aperture : NULL);
 
                 EnterCriticalSection(&decoder->event_cs);
-                while (decoder->event.type != PIPELINE_EVENT_NONE)
+                while (!decoder->helper_thread_shutdown && decoder->event.type != PIPELINE_EVENT_NONE)
                     SleepConditionVariableCS(&decoder->event_cv, &decoder->event_cs, INFINITE);
+
+                if (decoder->helper_thread_shutdown)
+                {
+                    LeaveCriticalSection(&decoder->event_cs);
+                    return 0;
+                }
 
                 decoder->event.type = PIPELINE_EVENT_PARSER_STARTED;
                 decoder->event.u.parser_started.stream = unix_funcs->wg_parser_get_stream(decoder->wg_parser, 0);
@@ -677,19 +706,25 @@ static DWORD CALLBACK read_thread_func(PVOID ctx)
 
     for (;;)
     {
-        if (!unix_funcs->wg_parser_get_read_request(decoder->wg_parser, &data, &offset, &size))
-            continue;
-
         if (decoder->helper_thread_shutdown)
             break;
 
+        if (!unix_funcs->wg_parser_get_read_request(decoder->wg_parser, &data, &offset, &size))
+            continue;
+
         EnterCriticalSection(&decoder->event_cs);
-        while (decoder->event.type != PIPELINE_EVENT_NONE)
+        while (!decoder->helper_thread_shutdown && decoder->event.type != PIPELINE_EVENT_NONE)
             SleepConditionVariableCS(&decoder->event_cv, &decoder->event_cs, INFINITE);
+
+        if (decoder->helper_thread_shutdown)
+        {
+            LeaveCriticalSection(&decoder->event_cs);
+            break;
+        }
 
         decoder->event.type = PIPELINE_EVENT_READ_REQUEST;
         WakeAllConditionVariable(&decoder->event_cv);
-        while (decoder->event.type == PIPELINE_EVENT_READ_REQUEST)
+        while (!decoder->helper_thread_shutdown && decoder->event.type == PIPELINE_EVENT_READ_REQUEST)
             SleepConditionVariableCS(&decoder->event_cv, &decoder->event_cs, INFINITE);
         LeaveCriticalSection(&decoder->event_cs);
     }
