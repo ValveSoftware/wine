@@ -1185,9 +1185,6 @@ HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type type)
     InitializeConditionVariable(&object->help_cv);
     InitializeConditionVariable(&object->event_cv);
 
-    object->helper_thread = CreateThread(NULL, 0, helper_thread_func, object, 0, NULL);
-    object->read_thread = CreateThread(NULL, 0, read_thread_func, object, 0, NULL);
-
     if (!(parser = unix_funcs->wg_decodebin_parser_create()))
     {
         ERR("Failed to create Decoder MFT type %u: Unspecified GStreamer error\n", type);
@@ -1195,6 +1192,9 @@ HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type type)
         return E_OUTOFMEMORY;
     }
     object->wg_parser = parser;
+
+    object->helper_thread = CreateThread(NULL, 0, helper_thread_func, object, 0, NULL);
+    object->read_thread = CreateThread(NULL, 0, read_thread_func, object, 0, NULL);
 
     *obj = &object->IMFTransform_iface;
     return S_OK;
