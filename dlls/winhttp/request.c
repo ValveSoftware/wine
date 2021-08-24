@@ -2868,6 +2868,7 @@ BOOL WINAPI WinHttpQueryDataAvailable( HINTERNET hrequest, LPDWORD available )
 {
     DWORD ret;
     struct request *request;
+    BOOL async;
 
     TRACE("%p, %p\n", hrequest, available);
 
@@ -2883,7 +2884,8 @@ BOOL WINAPI WinHttpQueryDataAvailable( HINTERNET hrequest, LPDWORD available )
         return FALSE;
     }
 
-    if (request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if ((async = request->connect->hdr.flags & WINHTTP_FLAG_ASYNC) && !end_of_read_data( request )
+                                                                   && !query_data_ready( request ))
     {
         struct query_data *q;
 
@@ -2897,12 +2899,13 @@ BOOL WINAPI WinHttpQueryDataAvailable( HINTERNET hrequest, LPDWORD available )
             release_object( &request->hdr );
             heap_free( q );
         }
+        else ret = ERROR_IO_PENDING;
     }
-    else ret = query_data_available( request, available, FALSE );
+    else ret = query_data_available( request, available, async );
 
     release_object( &request->hdr );
     SetLastError( ret );
-    return !ret;
+    return !ret || ret == ERROR_IO_PENDING;
 }
 
 static void CALLBACK task_read_data( TP_CALLBACK_INSTANCE *instance, void *ctx, TP_WORK *work )
