@@ -1554,16 +1554,17 @@ void X11DRV_X_to_window_rect( struct x11drv_win_data *data, RECT *rect, int x, i
  *
  * Synchronize the X window position with the Windows one
  */
-static void sync_window_position( struct x11drv_win_data *data,
+static HWND sync_window_position( struct x11drv_win_data *data,
                                   UINT swp_flags, const RECT *old_window_rect,
                                   const RECT *old_whole_rect, const RECT *old_client_rect )
 {
     DWORD style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
     DWORD ex_style = NtUserGetWindowLongW( data->hwnd, GWL_EXSTYLE );
+    HWND prev_window = NULL;
     XWindowChanges changes;
     unsigned int mask = 0;
 
-    if (data->managed && data->iconic) return;
+    if (data->managed && data->iconic) return NULL;
 
     /* resizing a managed maximized window is not allowed */
     if (!(style & WS_MAXIMIZE) || !data->managed)
@@ -1604,9 +1605,10 @@ static void sync_window_position( struct x11drv_win_data *data,
     {
         /* find window that this one must be after */
         HWND prev = NtUserGetWindowRelative( data->hwnd, GW_HWNDPREV );
+
         while (prev && !(NtUserGetWindowLongW( prev, GWL_STYLE ) & WS_VISIBLE))
             prev = NtUserGetWindowRelative( prev, GW_HWNDPREV );
-        if (!prev)  /* top child */
+        if (!(prev_window = prev))  /* top child */
         {
             changes.stack_mode = Above;
             mask |= CWStackMode;
@@ -1620,6 +1622,7 @@ static void sync_window_position( struct x11drv_win_data *data,
     update_net_wm_states( data );
     data->configure_serial = NextRequest( data->display );
     XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
+
 #ifdef HAVE_LIBXSHAPE
     if (IsRectEmpty( old_window_rect ) != IsRectEmpty( &data->window_rect ))
         sync_window_region( data, (HRGN)1 );
@@ -1640,6 +1643,8 @@ static void sync_window_position( struct x11drv_win_data *data,
            (int)(data->whole_rect.right - data->whole_rect.left),
            (int)(data->whole_rect.bottom - data->whole_rect.top),
            changes.sibling, mask, data->configure_serial );
+
+    return prev_window;
 }
 
 
@@ -3048,6 +3053,25 @@ done:
 }
 
 
+static void restack_windows( struct x11drv_win_data *data, HWND prev )
+{
+    struct x11drv_win_data *prev_data;
+
+    TRACE("data->hwnd %p, prev %p.\n", data->hwnd, prev);
+
+    while (prev)
+    {
+        if (!(prev_data = get_win_data( prev ))) break;
+
+        TRACE( "Raising window %p.\n", prev );
+
+        if (prev_data->whole_window && data->display == prev_data->display)
+            XRaiseWindow( prev_data->display, prev_data->whole_window );
+        release_win_data( prev_data );
+        prev = NtUserGetWindowRelative( prev, GW_HWNDPREV );
+    }
+}
+
 /***********************************************************************
  *		WindowPosChanged   (X11DRV.@)
  */
@@ -3060,6 +3084,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
     struct x11drv_win_data *data;
     UINT new_style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
     RECT old_window_rect, old_whole_rect, old_client_rect;
+    HWND prev_window = NULL;
     BOOL needs_resize;
     int event_type;
 
@@ -3165,7 +3190,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
     /* don't change position if we are about to minimize or maximize a managed window */
     if ((!event_type || event_type == PropertyNotify) &&
         !(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE))))
-        sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
+        prev_window = sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
 
     if ((new_style & WS_VISIBLE) &&
         ((new_style & WS_MINIMIZE) || is_window_rect_mapped( rectWindow )))
@@ -3181,6 +3206,10 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
             release_win_data( data );
             if (needs_icon) fetch_icon_data( hwnd, 0, 0 );
             if (needs_map) map_window( hwnd, new_style );
+
+            if (!(data = get_win_data( hwnd ))) return;
+            restack_windows( data, prev_window );
+            release_win_data( data );
             return;
         }
         else if ((swp_flags & SWP_STATECHANGED) && (!data->iconic != !(new_style & WS_MINIMIZE)))
@@ -3197,9 +3226,19 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
         else
         {
             if (swp_flags & (SWP_FRAMECHANGED|SWP_STATECHANGED)) set_wm_hints( data );
-            if (!event_type || event_type == PropertyNotify) update_net_wm_states( data );
+            if (!event_type || event_type == PropertyNotify)
+            {
+                update_net_wm_states( data );
+                if (!prev_window && insert_after && data->net_wm_state & (1 << NET_WM_STATE_FULLSCREEN))
+                {
+                    prev_window = NtUserGetWindowRelative( hwnd, GW_HWNDPREV );
+                    if (prev_window != insert_after) prev_window = NULL;
+                }
+            }
         }
     }
+
+    restack_windows( data, prev_window );
 
     XFlush( data->display );  /* make sure changes are done before we start painting again */
     if (data->surface && data->vis.visualid != default_visual.visualid)
