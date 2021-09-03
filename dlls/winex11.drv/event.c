@@ -817,6 +817,8 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (event->detail == NotifyPointer) return FALSE;
     if (hwnd == GetDesktopWindow()) return FALSE;
 
+    x11drv_thread_data()->keymapnotify_hwnd = hwnd;
+
     /* Focus was just restored but it can be right after super was
      * pressed and gnome-shell needs a bit of time to respond and
      * toggle the activity view. If we grab the cursor right away
@@ -829,11 +831,7 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     SendMessageW( GetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, 0, 0 );
 
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
-    if (event->mode == NotifyGrab || event->mode == NotifyUngrab)
-    {
-        x11drv_thread_data()->kbd_grab_release_hwnd = hwnd;
-        return FALSE;
-    }
+    if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
 
     if ((xic = X11DRV_get_ic( hwnd ))) XSetICFocus( xic );
     if (use_take_focus)
