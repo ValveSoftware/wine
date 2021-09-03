@@ -1210,7 +1210,7 @@ BOOL X11DRV_KeymapNotify( HWND hwnd, XEvent *event )
     WORD vkey;
     DWORD flags;
     KeyCode keycode;
-    HWND kbd_grab_release_hwnd;
+    HWND keymapnotify_hwnd;
     BOOL changed = FALSE;
     struct {
         WORD vkey;
@@ -1219,8 +1219,8 @@ BOOL X11DRV_KeymapNotify( HWND hwnd, XEvent *event )
     } keys[256];
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
 
-    kbd_grab_release_hwnd = thread_data->kbd_grab_release_hwnd;
-    thread_data->kbd_grab_release_hwnd = NULL;
+    keymapnotify_hwnd = thread_data->keymapnotify_hwnd;
+    thread_data->keymapnotify_hwnd = NULL;
 
     if (!get_async_key_state( keystate )) return FALSE;
 
@@ -1274,12 +1274,12 @@ BOOL X11DRV_KeymapNotify( HWND hwnd, XEvent *event )
              * event sequences, e.g. KDE performs two keyboard grabs for
              * Alt+Tab, which would sync the Tab press.
              */
-            if (kbd_grab_release_hwnd && !keys[vkey].pressed)
+            if (keymapnotify_hwnd && !keys[vkey].pressed)
             {
                 TRACE( "Sending KEYUP for a modifier %#.2x\n", vkey);
                 flags = KEYEVENTF_KEYUP;
                 if (keys[vkey].vkey & 0x1000) flags |= KEYEVENTF_EXTENDEDKEY;
-                X11DRV_send_keyboard_input( kbd_grab_release_hwnd, vkey, keys[vkey].scan, flags, GetTickCount() );
+                X11DRV_send_keyboard_input( keymapnotify_hwnd, vkey, keys[vkey].scan, flags, GetTickCount() );
             }
 
             update_key_state( keystate, vkey, keys[vkey].pressed );
