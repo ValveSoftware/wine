@@ -3223,19 +3223,43 @@ static NTSTATUS lookup_unix_name( const WCHAR *name, int name_len, char **buffer
     int ret, len;
     struct stat st;
     char *unix_name = *buffer;
+    const WCHAR *ptr, *end;
 #ifdef _WIN64
     const BOOL redirect = FALSE;
 #else
     const BOOL redirect = NtCurrentTeb64() && !NtCurrentTeb64()->TlsSlots[WOW64_TLS_FILESYSREDIR];
 #endif
 
-    /* try a shortcut first */
-
     while (name_len && IS_SEPARATOR(*name))
     {
         name++;
         name_len--;
     }
+
+    for (ptr = name, end = name + name_len; ptr < end; ptr++)
+    {
+        if (*ptr == '\\') break;  /* duplicate backslash */
+        if (*ptr == '.')
+        {
+            if (ptr + 1 == end) break;  /* "." element */
+            if (ptr[1] == '\\') break;  /* "." element */
+            if (ptr[1] == '.')
+            {
+                if (ptr + 2 == end) break;  /* ".." element */
+                if (ptr[2] == '\\') break;  /* ".." element */
+            }
+        }
+        for ( ; ptr < end && *ptr != '\\'; ptr++)
+            if (!*ptr) break;
+    }
+
+    if (!check_case && ptr < end)
+    {
+        ERR("Bad name %s.\n", debugstr_w(name));
+        return STATUS_OBJECT_NAME_INVALID;
+    }
+
+    /* try a shortcut first */
 
     unix_name[pos] = '/';
     ret = ntdll_wcstoumbs( name, name_len, unix_name + pos + 1, unix_len - pos - 1, TRUE );
@@ -3562,6 +3586,84 @@ NTSTATUS CDECL wine_nt_to_unix_file_name( const UNICODE_STRING *nameW, char *nam
 
 
 /******************************************************************
+ *		collapse_path
+ *
+ * Get rid of . and .. components in the path.
+ */
+static void collapse_path( WCHAR *path )
+{
+    WCHAR *p, *start, *next;
+
+    /* convert every / into a \ */
+    for (p = path; *p; p++) if (*p == '/') *p = '\\';
+
+    p = path + 4;
+    while (*p && *p != '\\') p++;
+    start = p + 1;
+
+    /* collapse duplicate backslashes */
+    next = start;
+    for (p = next; *p; p++) if (*p != '\\' || next[-1] != '\\') *next++ = *p;
+    *next = 0;
+
+    p = start;
+    while (*p)
+    {
+        if (*p == '.')
+        {
+            switch(p[1])
+            {
+            case '\\': /* .\ component */
+                next = p + 2;
+                memmove( p, next, (wcslen(next) + 1) * sizeof(WCHAR) );
+                continue;
+            case 0:  /* final . */
+                if (p > start) p--;
+                *p = 0;
+                continue;
+            case '.':
+                if (p[2] == '\\')  /* ..\ component */
+                {
+                    next = p + 3;
+                    if (p > start)
+                    {
+                        p--;
+                        while (p > start && p[-1] != '\\') p--;
+                    }
+                    memmove( p, next, (wcslen(next) + 1) * sizeof(WCHAR) );
+                    continue;
+                }
+                else if (!p[2])  /* final .. */
+                {
+                    if (p > start)
+                    {
+                        p--;
+                        while (p > start && p[-1] != '\\') p--;
+                        if (p > start) p--;
+                    }
+                    *p = 0;
+                    continue;
+                }
+                break;
+            }
+        }
+        /* skip to the next component */
+        while (*p && *p != '\\') p++;
+        if (*p == '\\')
+        {
+            /* remove last dot in previous dir name */
+            if (p > start && p[-1] == '.') memmove( p-1, p, (wcslen(p) + 1) * sizeof(WCHAR) );
+            else p++;
+        }
+    }
+
+    /* remove trailing spaces and dots (yes, Windows really does that, don't ask) */
+    while (p > start && (p[-1] == ' ' || p[-1] == '.')) p--;
+    *p = 0;
+}
+
+
+/******************************************************************
  *           unix_to_nt_file_name
  */
 NTSTATUS unix_to_nt_file_name( const char *name, WCHAR **nt )
@@ -3572,7 +3674,7 @@ NTSTATUS unix_to_nt_file_name( const char *name, WCHAR **nt )
     unsigned int lenW, lenA = strlen(name);
     const char *path = name;
     NTSTATUS status;
-    WCHAR *p, *buffer;
+    WCHAR *buffer;
     int drive;
 
     status = find_drive_rootA( &path, lenA, &drive );
@@ -3591,7 +3693,7 @@ NTSTATUS unix_to_nt_file_name( const char *name, WCHAR **nt )
     memcpy( buffer, prefix, lenW * sizeof(WCHAR) );
     lenW += ntdll_umbstowcs( path, lenA, buffer + lenW, lenA );
     buffer[lenW] = 0;
-    for (p = buffer; *p; p++) if (*p == '/') *p = '\\';
+    collapse_path( buffer );
     *nt = buffer;
     return STATUS_SUCCESS;
 }
