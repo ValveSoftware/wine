@@ -740,6 +740,24 @@ static INT uia_msaa_role_to_uia_control_type(INT role)
     return UIA_ButtonControlTypeId;
 }
 
+static void uia_create_bounding_rect_variant(double left, double top,
+        double width, double height, VARIANT *arr_out)
+{
+    SAFEARRAYBOUND sab = { 0 };
+    LPSAFEARRAY lpsa;
+
+    sab.cElements = 4;
+    lpsa = SafeArrayCreate(VT_R8, 1, &sab);
+    ((double *)lpsa->pvData)[0] = left;
+    ((double *)lpsa->pvData)[1] = top;
+    ((double *)lpsa->pvData)[2] = width;
+    ((double *)lpsa->pvData)[3] = height;
+
+    VariantInit(arr_out);
+    V_VT(arr_out) = VT_R8 | VT_ARRAY;
+    V_ARRAY(arr_out) = lpsa;
+}
+
 static void uia_get_default_property_val(PROPERTYID propertyId, VARIANT *retVal)
 {
     switch (propertyId)
@@ -760,6 +778,10 @@ static void uia_get_default_property_val(PROPERTYID propertyId, VARIANT *retVal)
         V_BOOL(retVal) = VARIANT_FALSE;
         break;
 
+    case UIA_BoundingRectanglePropertyId:
+        uia_create_bounding_rect_variant(0, 0, 0, 0, retVal);
+        break;
+
     default:
         FIXME("Unimplemented default value for PropertyId %d!\n", propertyId);
         V_VT(retVal) = VT_EMPTY;
@@ -775,7 +797,34 @@ static HRESULT uia_get_uia_elem_prov_property_val(IRawElementProviderSimple *ele
 
     VariantInit(&res);
     *use_default = TRUE;
-    hr = IRawElementProviderSimple_GetPropertyValue(elem_prov, propertyId, &res);
+    switch (propertyId)
+    {
+    case UIA_BoundingRectanglePropertyId:
+    {
+        IRawElementProviderFragment *elem_frag;
+
+        hr = IRawElementProviderSimple_QueryInterface(elem_prov,
+                &IID_IRawElementProviderFragment, (void **)&elem_frag);
+        if (SUCCEEDED(hr))
+        {
+            struct UiaRect rect;
+
+            hr = IRawElementProviderFragment_get_BoundingRectangle(elem_frag, &rect);
+            IRawElementProviderFragment_Release(elem_frag);
+            if (SUCCEEDED(hr))
+            {
+                uia_create_bounding_rect_variant(rect.left, rect.top, rect.width, rect.height, &res);
+                break;
+            }
+        }
+        hr = IRawElementProviderSimple_GetPropertyValue(elem_prov, propertyId, &res);
+    }
+        break;
+
+    default:
+        hr = IRawElementProviderSimple_GetPropertyValue(elem_prov, propertyId, &res);
+        break;
+    }
 
     /* VT_EMPTY means this PropertyId is unimplemented/unsupported. */
     if (V_VT(&res) != VT_EMPTY && SUCCEEDED(hr))
@@ -846,6 +895,20 @@ static HRESULT uia_get_msaa_acc_property_val(IAccessible *acc,
 
             *use_default = FALSE;
         }
+        break;
+
+    case UIA_BoundingRectanglePropertyId:
+    {
+        LONG left, top, width, height;
+
+        hr = IAccessible_accLocation(acc, &left, &top, &width, &height, child_id);
+        if (SUCCEEDED(hr))
+        {
+            uia_create_bounding_rect_variant((double)left, (double)top,
+                    (double)width, (double)height, retVal);
+            *use_default = FALSE;
+        }
+    }
         break;
 
     default:
@@ -1284,9 +1347,26 @@ static HRESULT WINAPI uia_elem_get_CurrentItemStatus(IUIAutomationElement *iface
 static HRESULT WINAPI uia_elem_get_CurrentBoundingRectangle(IUIAutomationElement *iface,
         RECT *retVal)
 {
-    struct uia_elem_data *This = impl_from_IUIAutomationElement(iface);
-    FIXME("%p\n", This);
-    return E_NOTIMPL;
+    VARIANT res;
+    HRESULT hr;
+
+    TRACE("%p %p\n", iface, retVal);
+
+    memset(retVal, 0, sizeof(*retVal));
+    hr = IUIAutomationElement_GetCurrentPropertyValue(iface,
+            UIA_BoundingRectanglePropertyId, &res);
+    if (FAILED(hr))
+        return hr;
+
+    if (V_VT(&res) == (VT_R8 | VT_ARRAY))
+    {
+        retVal->left = (LONG)((double *)V_ARRAY(&res)->pvData)[0];
+        retVal->top = (LONG)((double *)V_ARRAY(&res)->pvData)[1];
+        retVal->right = retVal->left + (LONG)((double *)V_ARRAY(&res)->pvData)[2];
+        retVal->bottom = retVal->top + (LONG)((double *)V_ARRAY(&res)->pvData)[3];
+    }
+
+    return S_OK;
 }
 
 static HRESULT WINAPI uia_elem_get_CurrentLabeledBy(IUIAutomationElement *iface,
