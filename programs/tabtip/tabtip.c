@@ -155,12 +155,14 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
     WINE_TRACE("This %p, sender %p\n", This, sender);
     if (sender)
     {
+        RECT rect = { 0 };
         VARIANT var;
         INT ct_id;
         BSTR name;
 
         IUIAutomationElement_get_CurrentControlType(sender, &ct_id);
         IUIAutomationElement_get_CurrentName(sender, &name);
+        IUIAutomationElement_get_CurrentBoundingRectangle(sender, &rect);
         IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_IsKeyboardFocusablePropertyId, &var);
 
         if ((last_keyup_event < (GetTickCount() - 5000)) &&
@@ -170,7 +172,16 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
             {
                 WINE_TRACE("Keyboard up!\n");
                 keyboard_up = TRUE;
-                ShellExecuteW(NULL, NULL, L"steam://open/keyboard", NULL, NULL, SW_SHOWNOACTIVATE);
+                if (rect.left || rect.top || rect.right || rect.bottom)
+                {
+                    WCHAR link_buf[1024];
+
+                    wsprintfW(link_buf, L"steam://open/keyboard?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
+                            rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
+                    ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
+                }
+                else
+                    ShellExecuteW(NULL, NULL, L"steam://open/keyboard", NULL, NULL, SW_SHOWNOACTIVATE);
 
                 last_keyup_event = GetTickCount();
             }
@@ -189,7 +200,8 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
         else
             ct_id = 0;
 
-        WINE_TRACE("element name: %s, ct_id %s\n", wine_dbgstr_w(name), ct_id_str[ct_id]);
+        WINE_TRACE("element name: %s, ct_id %s, rect { %d, %d } - { %d, %d }\n", wine_dbgstr_w(name), ct_id_str[ct_id],
+                rect.left, rect.top, rect.right, rect.bottom);
     }
 
     return S_OK;
