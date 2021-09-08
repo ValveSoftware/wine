@@ -1566,6 +1566,7 @@ enable_ntdll
 enable_ntdsapi
 enable_ntoskrnl_exe
 enable_ntprint
+enable_nvcuda
 enable_objsel
 enable_odbc32
 enable_odbcbcp
@@ -22205,6 +22206,7 @@ wine_fn_config_makefile dlls/ntoskrnl.exe enable_ntoskrnl_exe
 wine_fn_config_makefile dlls/ntoskrnl.exe/tests enable_tests
 wine_fn_config_makefile dlls/ntprint enable_ntprint
 wine_fn_config_makefile dlls/ntprint/tests enable_tests
+wine_fn_config_makefile dlls/nvcuda enable_nvcuda
 wine_fn_config_makefile dlls/objsel enable_objsel
 wine_fn_config_makefile dlls/odbc32 enable_odbc32
 wine_fn_config_makefile dlls/odbcbcp enable_odbcbcp
