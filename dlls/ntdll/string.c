@@ -213,9 +213,7 @@ void *__cdecl memset( void *dst, int c, size_t n )
 {
     if (n <= 32)
     {
-        uint16_t tmp16 = ((uint16_t)c << 8) | c;
-        uint32_t tmp32 = ((uint32_t)tmp16 << 16) | tmp16;
-        uint64_t v = ((uint64_t)tmp32 << 32) | tmp32;
+        uint64_t v = 0x101010101010101ull * (unsigned char)c;
         memset_c_unaligned_32(dst, v, n);
         return dst;
     }
