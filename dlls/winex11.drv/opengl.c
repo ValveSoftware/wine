@@ -255,6 +255,7 @@ enum dc_gl_layered_type
 {
     DC_GL_LAYERED_NONE,
     DC_GL_LAYERED_UPDATES,
+    DC_GL_LAYERED_ATTRIBUTES,
 };
 
 struct gl_drawable
@@ -1464,7 +1465,8 @@ static enum dc_gl_layered_type get_gl_layered_type( HWND hwnd )
     enum dc_gl_layered_type ret;
 
     if (!(data = get_win_data( hwnd ))) return DC_GL_LAYERED_NONE;
-    ret = data->layered && !data->layered_attributes ? DC_GL_LAYERED_UPDATES : DC_GL_LAYERED_NONE;
+    if (data->layered) ret = data->layered_attributes ? DC_GL_LAYERED_ATTRIBUTES : DC_GL_LAYERED_UPDATES;
+    else ret = DC_GL_LAYERED_NONE;
     release_win_data( data );
 
     return ret;
@@ -3023,11 +3025,81 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
         general_state_handlers[i].state_handler(RESET, gl, ctx, &state, NULL, NULL, NULL);
 }
 
+static void update_window_surface(struct gl_drawable *gl, HWND hwnd)
+{
+    char buffer[FIELD_OFFSET( BITMAPINFO, bmiColors[256] )];
+    BITMAPINFO *bmi = (BITMAPINFO *)buffer;
+    struct window_surface *surface;
+    struct x11drv_win_data *data;
+    unsigned int y, width, height, stride, pitch;
+    BYTE *dst_bits, *src_bits;
+    XImage *image;
+    RECT rect;
+
+    TRACE( "gl %p, hwnd %p, gl->layered_type %u.\n", gl, hwnd, gl->layered_type );
+
+    if (gl->layered_type != DC_GL_LAYERED_ATTRIBUTES || !gl->pixmap) return;
+
+    if (!(data = get_win_data( hwnd ))) return;
+
+    surface = data->surface;
+    if (!surface)
+    {
+        TRACE( "No surface.\n" );
+        release_win_data( data );
+        return;
+    }
+
+    rect = data->client_rect;
+    OffsetRect( &rect, -data->whole_rect.left, -data->whole_rect.top );
+
+    dst_bits = surface->funcs->get_info( surface, bmi );
+    surface->funcs->lock( surface );
+
+    rect.right = min( rect.right, abs( bmi->bmiHeader.biWidth ));
+    rect.bottom = min( rect.bottom, abs( bmi->bmiHeader.biHeight ));
+
+    width = min( rect.right - rect.left, gl->pixmap_size.cx );
+    height = min( rect.bottom - rect.top, gl->pixmap_size.cy );
+
+    image = XGetImage( gdi_display, gl->pixmap, 0, 0, width, height,
+                       AllPlanes, ZPixmap );
+    if (!image)
+    {
+        TRACE( "NULL image.\n" );
+        goto done;
+    }
+
+    if (image->bits_per_pixel != bmi->bmiHeader.biBitCount)
+    {
+        static unsigned int once;
+
+        if (!once++)
+            FIXME("Bits per pixel does not match, image %u, bmi %u.\n", image->bits_per_pixel, bmi->bmiHeader.biBitCount);
+        goto done;
+    }
+
+    stride = bmi->bmiHeader.biBitCount / 8;
+    pitch = (bmi->bmiHeader.biWidth * stride + 3) & ~3;
+    src_bits = (BYTE *)image->data;
+    for (y = 0; y < height; ++y)
+        memcpy( dst_bits + (y + rect.top) * pitch + rect.left * stride,
+                src_bits + y * image->bytes_per_line, width * stride );
+
+    add_bounds_rect( surface->funcs->get_bounds( surface ), &rect );
+
+done:
+    surface->funcs->unlock( surface );
+    if (image) XDestroyImage( image );
+    release_win_data( data );
+}
+
 static void wglFinish(void)
 {
     struct x11drv_escape_present_drawable escape;
     struct gl_drawable *gl;
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
+    HWND hwnd;
 
     TRACE("\n");
 
@@ -3035,7 +3107,7 @@ static void wglFinish(void)
     escape.drawable = 0;
     escape.flush = FALSE;
 
-    if ((gl = get_gl_drawable( WindowFromDC( ctx->hdc ), 0 )))
+    if ((gl = get_gl_drawable( (hwnd = WindowFromDC( ctx->hdc )), 0 )))
     {
         switch (gl->type)
         {
@@ -3055,7 +3127,7 @@ static void wglFinish(void)
             ctx->fs_hack = FALSE;
             fs_hack_setup_context(ctx, gl);
         }
-
+        update_window_surface( gl, hwnd );
         release_gl_drawable( gl );
     }
 
@@ -3068,6 +3140,7 @@ static void wglFlush(void)
     struct x11drv_escape_present_drawable escape;
     struct gl_drawable *gl;
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
+    HWND hwnd;
 
     TRACE("\n");
 
@@ -3075,7 +3148,7 @@ static void wglFlush(void)
     escape.drawable = 0;
     escape.flush = FALSE;
 
-    if ((gl = get_gl_drawable( WindowFromDC( ctx->hdc ), 0 )))
+    if ((gl = get_gl_drawable( (hwnd = WindowFromDC( ctx->hdc )), 0 )))
     {
         switch (gl->type)
         {
@@ -3095,7 +3168,7 @@ static void wglFlush(void)
             ctx->fs_hack = FALSE;
             fs_hack_setup_context(ctx, gl);
         }
-
+        update_window_surface( gl, hwnd );
         release_gl_drawable( gl );
     }
 
@@ -4419,6 +4492,7 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
     struct gl_drawable *gl;
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
     INT64 ust, msc, sbc, target_sbc = 0;
+    HWND hwnd;
 
     TRACE("(%p)\n", hdc);
 
@@ -4426,7 +4500,7 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
     escape.drawable = 0;
     escape.flush = !pglXWaitForSbcOML;
 
-    if (!(gl = get_gl_drawable( WindowFromDC( hdc ), hdc )))
+    if (!(gl = get_gl_drawable( (hwnd = WindowFromDC( hdc )), hdc )))
     {
         SetLastError( ERROR_INVALID_HANDLE );
         return FALSE;
@@ -4491,6 +4565,7 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
     if (escape.drawable && pglXWaitForSbcOML)
         pglXWaitForSbcOML( gdi_display, gl->drawable, target_sbc, &ust, &msc, &sbc );
 
+    update_window_surface( gl, hwnd );
     release_gl_drawable( gl );
 
     if (escape.drawable) ExtEscape( ctx->hdc, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
