@@ -55,6 +55,7 @@ typedef struct {
 
 DWORD last_keyup_event;
 BOOL keyboard_up;
+BOOL use_steam_osk;
 
 static const char *ct_id_str[] = {
     "UIA_ButtonControlTypeId (50000)",
@@ -165,7 +166,7 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
         IUIAutomationElement_get_CurrentBoundingRectangle(sender, &rect);
         IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_IsKeyboardFocusablePropertyId, &var);
 
-        if ((last_keyup_event < (GetTickCount() - 5000)) &&
+        if (use_steam_osk && (last_keyup_event < (GetTickCount() - 5000)) &&
                 ct_id == UIA_EditControlTypeId && (V_VT(&var) == VT_BOOL && V_BOOL(&var)))
         {
             if (!keyboard_up)
@@ -259,6 +260,18 @@ static DWORD WINAPI tabtip_exit_watcher(LPVOID lpParam)
     return 0;
 }
 
+static void tabtip_use_osk_check(void)
+{
+    const char *var = getenv("SteamDeck");
+
+    if (var && !strcmp(var, "1"))
+        use_steam_osk = TRUE;
+    else
+        use_steam_osk = FALSE;
+
+    WINE_TRACE("use_steam_osk=%d\n", use_steam_osk);
+}
+
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
     HANDLE wine_exit_event, pgm_exit_event, started_event;
@@ -275,6 +288,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     wine_exit_event = pgm_exit_event = started_event = NULL;
     last_keyup_event = 0;
     keyboard_up = FALSE;
+    tabtip_use_osk_check();
 
     NtSetInformationProcess( GetCurrentProcess(), ProcessWineMakeProcessSystem,
                              &wine_exit_event, sizeof(HANDLE *) );
