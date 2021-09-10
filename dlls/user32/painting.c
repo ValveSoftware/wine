@@ -105,7 +105,6 @@ static void update_visible_region( struct dce *dce )
     HRGN vis_rgn = 0;
     HWND top_win = 0;
     DWORD flags = dce->flags;
-    DWORD paint_flags = 0;
     size_t size = 256;
     RECT win_rect, top_rect;
     WND *win;
@@ -142,7 +141,6 @@ static void update_visible_region( struct dce *dce )
                 top_rect.top    = reply->top_rect.top;
                 top_rect.right  = reply->top_rect.right;
                 top_rect.bottom = reply->top_rect.bottom;
-                paint_flags     = reply->paint_flags;
             }
             else size = reply->total_size;
         }
@@ -157,16 +155,12 @@ static void update_visible_region( struct dce *dce )
     if (dce->clip_rgn) CombineRgn( vis_rgn, vis_rgn, dce->clip_rgn,
                                    (flags & DCX_INTERSECTRGN) ? RGN_AND : RGN_DIFF );
 
-    /* don't use a surface to paint the client area of OpenGL windows */
-    if (!(paint_flags & SET_WINPOS_PIXEL_FORMAT) || (flags & DCX_WINDOW))
+    win = WIN_GetPtr( top_win );
+    if (win && win != WND_DESKTOP && win != WND_OTHER_PROCESS)
     {
-        win = WIN_GetPtr( top_win );
-        if (win && win != WND_DESKTOP && win != WND_OTHER_PROCESS)
-        {
-            surface = win->surface;
-            if (surface) window_surface_add_ref( surface );
-            WIN_ReleasePtr( win );
-        }
+        surface = win->surface;
+        if (surface) window_surface_add_ref( surface );
+        WIN_ReleasePtr( win );
     }
 
     if (!surface) SetRectEmpty( &top_rect );
