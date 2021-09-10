@@ -1789,6 +1789,30 @@ void update_client_window( HWND hwnd )
 
 
 /**********************************************************************
+ *		detach_client_window
+ */
+void detach_client_window( HWND hwnd )
+{
+    struct x11drv_win_data *data;
+
+    if (!(data = get_win_data( hwnd ))) return;
+
+    if (!data->client_window)
+    {
+        release_win_data( data );
+        return;
+    }
+
+    XDeleteContext( data->display, data->client_window, winContext );
+    XReparentWindow( gdi_display, data->client_window, get_dummy_parent(), 0, 0 );
+    TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
+    data->client_window = 0;
+    XFlush( data->display );
+    release_win_data( data );
+}
+
+
+/**********************************************************************
  *		create_dummy_client_window
  */
 Window create_dummy_client_window(void)
@@ -2068,6 +2092,7 @@ void X11DRV_SetWindowStyle( HWND hwnd, INT offset, STYLESTRUCT *style )
     struct x11drv_win_data *data;
     DWORD changed = style->styleNew ^ style->styleOld;
     HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
+    BOOL need_sync_gl = FALSE;
 
     if (offset == GWL_STYLE && (changed & WS_CHILD))
     {
@@ -2087,12 +2112,15 @@ void X11DRV_SetWindowStyle( HWND hwnd, INT offset, STYLESTRUCT *style )
     if (offset == GWL_EXSTYLE && (changed & WS_EX_LAYERED)) /* changing WS_EX_LAYERED resets attributes */
     {
         data->layered = FALSE;
+        data->layered_attributes = FALSE;
+        need_sync_gl = TRUE;
         set_window_visual( data, &default_visual, FALSE );
         sync_window_opacity( data->display, data->whole_window, 0, 0, 0 );
         if (data->surface) set_surface_color_key( data->surface, CLR_INVALID );
     }
 done:
     release_win_data( data );
+    if (need_sync_gl) sync_gl_drawable( hwnd, FALSE );
 }
 
 
@@ -3230,6 +3258,7 @@ void X11DRV_SetWindowRgn( HWND hwnd, HRGN hrgn, BOOL redraw )
 void X11DRV_SetLayeredWindowAttributes( HWND hwnd, COLORREF key, BYTE alpha, DWORD flags )
 {
     struct x11drv_win_data *data = get_win_data( hwnd );
+    BOOL need_sync_gl;
 
     if (data)
     {
@@ -3240,7 +3269,9 @@ void X11DRV_SetLayeredWindowAttributes( HWND hwnd, COLORREF key, BYTE alpha, DWO
         if (data->surface)
             set_surface_color_key( data->surface, (flags & LWA_COLORKEY) ? key : CLR_INVALID );
 
+        need_sync_gl = !data->layered || !data->layered_attributes;
         data->layered = TRUE;
+        data->layered_attributes = TRUE;
         if (!data->mapped)  /* mapping is delayed until attributes are set */
         {
             DWORD style = NtUserGetWindowLongW( data->hwnd, GWL_STYLE );
@@ -3250,10 +3281,12 @@ void X11DRV_SetLayeredWindowAttributes( HWND hwnd, COLORREF key, BYTE alpha, DWO
             {
                 release_win_data( data );
                 map_window( hwnd, style );
+                if (need_sync_gl) sync_gl_drawable( hwnd, FALSE );
                 return;
             }
         }
         release_win_data( data );
+        if (need_sync_gl) sync_gl_drawable( hwnd, FALSE );
     }
     else
     {
@@ -3282,12 +3315,14 @@ BOOL X11DRV_UpdateLayeredWindow( HWND hwnd, const UPDATELAYEREDWINDOWINFO *info,
     BITMAPINFO *bmi = (BITMAPINFO *)buffer;
     void *src_bits, *dst_bits;
     RECT rect, src_rect;
+    BOOL need_sync_gl;
     HDC hdc = 0;
     HBITMAP dib;
     BOOL mapped, ret = FALSE;
 
     if (!(data = get_win_data( hwnd ))) return FALSE;
 
+    need_sync_gl = !data->layered;
     data->layered = TRUE;
     if (!data->embedded && argb_visual.visualid) set_window_visual( data, &argb_visual, TRUE );
 
@@ -3316,6 +3351,8 @@ BOOL X11DRV_UpdateLayeredWindow( HWND hwnd, const UPDATELAYEREDWINDOWINFO *info,
         if ((style & WS_VISIBLE) && ((style & WS_MINIMIZE) || is_window_rect_mapped( window_rect )))
             map_window( hwnd, style );
     }
+
+    if (need_sync_gl) sync_gl_drawable( hwnd, FALSE );
 
     if (!surface) return FALSE;
     if (!info->hdcSrc)
