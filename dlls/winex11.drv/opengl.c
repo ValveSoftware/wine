@@ -248,6 +248,12 @@ enum dc_gl_type
     DC_GL_PBUFFER     /* pseudo memory DC using a PBuffer */
 };
 
+enum dc_gl_layered_type
+{
+    DC_GL_LAYERED_NONE,
+    DC_GL_LAYERED_UPDATES,
+};
+
 struct gl_drawable
 {
     LONG                           ref;          /* reference count */
@@ -258,6 +264,7 @@ struct gl_drawable
     Pixmap                         pixmap;       /* base pixmap if drawable is a GLXPixmap */
     const struct wgl_pixel_format *format;       /* pixel format for the drawable */
     SIZE                           pixmap_size;  /* pixmap size for GLXPixmap drawables */
+    enum dc_gl_layered_type        layered_type;
     int                            swap_interval;
     BOOL                           refresh_swap_interval;
     BOOL                           mutable_pf;
@@ -1450,6 +1457,19 @@ static GLXContext create_glxcontext(Display *display, struct wgl_context *contex
 }
 
 
+static enum dc_gl_layered_type get_gl_layered_type( HWND hwnd )
+{
+    struct x11drv_win_data *data;
+    enum dc_gl_layered_type ret;
+
+    if (!(data = get_win_data( hwnd ))) return DC_GL_LAYERED_NONE;
+    ret = data->layered && !data->layered_attributes ? DC_GL_LAYERED_UPDATES : DC_GL_LAYERED_NONE;
+    release_win_data( data );
+
+    return ret;
+}
+
+
 /***********************************************************************
  *              create_gl_drawable
  */
@@ -1457,6 +1477,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
                                                BOOL mutable_pf )
 {
     struct gl_drawable *gl, *prev;
+    struct x11drv_win_data *data;
     XVisualInfo *visual = format->visual;
     RECT rect;
     int width, height;
@@ -1477,10 +1498,24 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
     gl->ref = 1;
     gl->mutable_pf = mutable_pf;
 
-    if (!known_child && !GetWindow( hwnd, GW_CHILD ) && GetAncestor( hwnd, GA_PARENT ) == GetDesktopWindow())  /* childless top-level window */
-    {
-        struct x11drv_win_data *data;
+    gl->layered_type = get_gl_layered_type( hwnd );
 
+    if (gl->layered_type)
+    {
+        detach_client_window( hwnd );
+        gl->type = DC_GL_PIXMAP_WIN;
+        gl->pixmap = XCreatePixmap( gdi_display, root_window, width, height, visual->depth );
+        if (gl->pixmap)
+        {
+            gl->drawable = pglXCreatePixmap( gdi_display, gl->format->fbconfig, gl->pixmap, NULL );
+            if (!gl->drawable) XFreePixmap( gdi_display, gl->pixmap );
+            gl->pixmap_size.cx = width;
+            gl->pixmap_size.cy = height;
+        }
+        TRACE( "%p created pixmap drawable %lx for layered window, type %u.\n", hwnd, gl->drawable, gl->layered_type );
+    }
+    else if (!known_child && !GetWindow( hwnd, GW_CHILD ) && GetAncestor( hwnd, GA_PARENT ) == GetDesktopWindow())  /* childless top-level window */
+    {
         gl->type = DC_GL_WINDOW;
         gl->window = create_client_window( hwnd, visual );
         if (gl->window)
@@ -1610,6 +1645,7 @@ static BOOL set_pixel_format(HDC hdc, int format, BOOL allow_change)
  */
 void sync_gl_drawable( HWND hwnd, BOOL known_child )
 {
+    enum dc_gl_layered_type new_layered_type;
     struct gl_drawable *old, *new;
     struct x11drv_win_data *data;
 
@@ -1617,20 +1653,17 @@ void sync_gl_drawable( HWND hwnd, BOOL known_child )
 
     if (!(old = get_gl_drawable( hwnd, 0 ))) return;
 
-    switch (old->type)
+    new_layered_type = get_gl_layered_type( hwnd );
+    if (old->type == DC_GL_PIXMAP_WIN || (known_child && old->type == DC_GL_WINDOW)
+        || old->layered_type != new_layered_type)
     {
-    case DC_GL_WINDOW:
-        if (!known_child) break; /* Still a childless top-level window */
-        /* fall through */
-    case DC_GL_PIXMAP_WIN:
-        if (!(new = create_gl_drawable( hwnd, old->format, known_child, old->mutable_pf ))) break;
-        mark_drawable_dirty( old, new );
-        XFlush( gdi_display );
-        TRACE( "Recreated GL drawable %lx to replace %lx\n", new->drawable, old->drawable );
-        release_gl_drawable( new );
-        break;
-    default:
-        break;
+        if ((new = create_gl_drawable( hwnd, old->format, known_child, old->mutable_pf )))
+        {
+            mark_drawable_dirty( old, new );
+            XFlush( gdi_display );
+            TRACE( "Recreated GL drawable %lx to replace %lx\n", new->drawable, old->drawable );
+            release_gl_drawable( new );
+        }
     }
 
     if (DC_GL_PIXMAP_WIN != old->type) {
@@ -3007,7 +3040,7 @@ static void wglFinish(void)
     {
         switch (gl->type)
         {
-        case DC_GL_PIXMAP_WIN: escape.drawable = gl->pixmap; break;
+        case DC_GL_PIXMAP_WIN: if (!gl->layered_type) escape.drawable = gl->pixmap; break;
         case DC_GL_CHILD_WIN:  escape.drawable = gl->window; break;
         default: break;
         }
@@ -3045,7 +3078,7 @@ static void wglFlush(void)
     {
         switch (gl->type)
         {
-        case DC_GL_PIXMAP_WIN: escape.drawable = gl->pixmap; break;
+        case DC_GL_PIXMAP_WIN: if (!gl->layered_type) escape.drawable = gl->pixmap; break;
         case DC_GL_CHILD_WIN:  escape.drawable = gl->window; break;
         default: break;
         }
@@ -4410,7 +4443,7 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
     {
     case DC_GL_PIXMAP_WIN:
         if (ctx) sync_context( ctx );
-        escape.drawable = gl->pixmap;
+        if (!gl->layered_type) escape.drawable = gl->pixmap;
         if (pglXCopySubBufferMESA) {
             /* (glX)SwapBuffers has an implicit glFlush effect, however
              * GLX_MESA_copy_sub_buffer doesn't. Make sure GL is flushed before

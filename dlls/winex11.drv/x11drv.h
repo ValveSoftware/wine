@@ -624,6 +624,8 @@ struct x11drv_win_data
     BOOL        embedded : 1;   /* is window an XEMBED client? */
     BOOL        shaped : 1;     /* is window using a custom region shape? */
     BOOL        layered : 1;    /* is window layered and with valid attributes? */
+    BOOL        layered_attributes : 1;
+                                /* is layered window has leyered attributes set (or otherwise managed with UpdateLayeredWindow()? */
     BOOL        use_alpha : 1;  /* does window use an alpha channel? */
     BOOL        skip_taskbar : 1; /* does window should be deleted from taskbar */
     BOOL        add_taskbar : 1; /* does window should be added to taskbar regardless of style */
@@ -667,6 +669,7 @@ extern void make_window_embedded( struct x11drv_win_data *data ) DECLSPEC_HIDDEN
 extern Window create_dummy_client_window(void) DECLSPEC_HIDDEN;
 extern Window create_client_window( HWND hwnd, const XVisualInfo *visual ) DECLSPEC_HIDDEN;
 extern void update_client_window( HWND hwnd ) DECLSPEC_HIDDEN;
+extern void detach_client_window( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void set_window_visual( struct x11drv_win_data *data, const XVisualInfo *vis, BOOL use_alpha ) DECLSPEC_HIDDEN;
 extern void change_systray_owner( Display *display, Window systray_window ) DECLSPEC_HIDDEN;
 extern void update_systray_balloon_position(void) DECLSPEC_HIDDEN;
