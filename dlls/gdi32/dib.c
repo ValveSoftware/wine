@@ -1171,12 +1171,18 @@ void get_ddb_bitmapinfo( BITMAPOBJ *bmp, BITMAPINFO *info )
     info->bmiHeader.biHeight        = -bmp->dib.dsBm.bmHeight;
     info->bmiHeader.biPlanes        = 1;
     info->bmiHeader.biBitCount      = bmp->dib.dsBm.bmBitsPixel;
-    info->bmiHeader.biCompression   = BI_RGB;
+    info->bmiHeader.biCompression   = bmp->no_alpha ? BI_BITFIELDS : BI_RGB;
     info->bmiHeader.biSizeImage     = get_dib_image_size( info );
     info->bmiHeader.biXPelsPerMeter = 0;
     info->bmiHeader.biYPelsPerMeter = 0;
     info->bmiHeader.biClrUsed       = 0;
     info->bmiHeader.biClrImportant  = 0;
+    if (bmp->no_alpha)
+    {
+        ((DWORD *)info->bmiColors)[0] = 0x0000ff;
+        ((DWORD *)info->bmiColors)[1] = 0x00ff00;
+        ((DWORD *)info->bmiColors)[2] = 0xff0000;
+    }
 }
 
 BITMAPINFO *copy_packed_dib( const BITMAPINFO *src_info, UINT usage )
