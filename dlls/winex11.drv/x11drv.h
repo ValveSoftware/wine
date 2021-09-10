@@ -630,6 +630,8 @@ struct x11drv_win_data
     UINT        embedded : 1;   /* is window an XEMBED client? */
     UINT        shaped : 1;     /* is window using a custom region shape? */
     UINT        layered : 1;    /* is window layered and with valid attributes? */
+    UINT        layered_attributes : 1;
+                                /* is layered window has leyered attributes set (or otherwise managed with UpdateLayeredWindow()? */
     UINT        use_alpha : 1;  /* does window use an alpha channel? */
     UINT        skip_taskbar : 1; /* does window should be deleted from taskbar */
     UINT        add_taskbar : 1; /* does window should be added to taskbar regardless of style */
