@@ -2810,6 +2810,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
     struct x11drv_win_data *data;
     UINT new_style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
     RECT old_window_rect, old_whole_rect, old_client_rect;
+    BOOL needs_resize;
     int event_type;
 
     if (!(data = get_win_data( hwnd ))) return;
@@ -2870,13 +2871,13 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
 
     sync_client_position( data, &old_client_rect, &old_whole_rect );
 
+    needs_resize = !data->client_window && (data->client_rect.right - data->client_rect.left !=
+                   old_client_rect.right - old_client_rect.left ||
+                   data->client_rect.bottom - data->client_rect.top !=
+                   old_client_rect.bottom - old_client_rect.top);
+
     if (!data->whole_window)
     {
-        BOOL needs_resize = (!data->client_window &&
-                             (data->client_rect.right - data->client_rect.left !=
-                              old_client_rect.right - old_client_rect.left ||
-                              data->client_rect.bottom - data->client_rect.top !=
-                              old_client_rect.bottom - old_client_rect.top));
         release_win_data( data );
         if (needs_resize) sync_gl_drawable( hwnd, FALSE );
         return;
@@ -2951,6 +2952,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
         data->surface->funcs->flush( data->surface );
 
     release_win_data( data );
+    if (needs_resize) sync_gl_drawable( hwnd, FALSE );
 }
 
 /* check if the window icon should be hidden (i.e. moved off-screen) */
