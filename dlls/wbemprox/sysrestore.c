@@ -54,7 +54,7 @@ HRESULT enable_restore( IWbemClassObject *obj, IWbemContext *context, IWbemClass
     hr = IWbemClassObject_Get( in, L"Drive", 0, &drive, NULL, NULL );
     if (hr != S_OK) return hr;
 
-    hr = create_signature( L"SystemRestore", L"Enable", PARAM_OUT, &sig );
+    hr = create_signature( WBEMPROX_NAMESPACE_CIMV2, L"SystemRestore", L"Enable", PARAM_OUT, &sig );
     if (hr != S_OK)
     {
         VariantClear( &drive );
