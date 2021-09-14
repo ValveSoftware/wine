@@ -197,38 +197,9 @@ BOOL WINAPI DwmDefWindowProc(HWND hWnd, UINT Msg, WPARAM wParam, LPARAM lParam, 
  */
 HRESULT WINAPI DwmGetWindowAttribute(HWND hwnd, DWORD attribute, PVOID pv_attribute, DWORD size)
 {
-    if (!hwnd) return E_HANDLE;
-    if (!pv_attribute) return E_INVALIDARG;
+    FIXME("(%p %d %p %d) stub\n", hwnd, attribute, pv_attribute, size);
 
-    switch (attribute)
-    {
-    case DWMWA_NCRENDERING_ENABLED:
-        if (size < sizeof(BOOL)) return E_INVALIDARG;
-
-        WARN("DWMWA_NCRENDERING_ENABLED: always returning FALSE.\n");
-        *(BOOL*)(pv_attribute) = FALSE;
-        break;
-
-    case DWMWA_EXTENDED_FRAME_BOUNDS:
-        if (size < sizeof(RECT)) return HRESULT_FROM_WIN32(ERROR_INSUFFICIENT_BUFFER);
-
-        WARN("DWMWA_EXTENDED_FRAME_BOUNDS: returning window rect.\n");
-        GetWindowRect(hwnd, pv_attribute);
-        break;
-
-    case DWMWA_CLOAKED:
-        if (size < sizeof(DWORD)) return E_INVALIDARG;
-
-        WARN("DWMWA_CLOAKED: always returning 0.\n");
-        *(DWORD*)(pv_attribute) = 0;
-        break;
-
-    default:
-        FIXME("unimplemented attribute %d, size %u, for hwnd %p.\n", attribute, size, hwnd);
-        return E_INVALIDARG;
-    }
-
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 /**********************************************************************

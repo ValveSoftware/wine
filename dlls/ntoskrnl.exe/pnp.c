@@ -20,30 +20,17 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include <stdarg.h>
-
 #define NONAMELESSUNION
 
-#include "ntstatus.h"
-#define WIN32_NO_STATUS
-#include "windef.h"
-#include "winbase.h"
-#include "winioctl.h"
+#include "ntoskrnl_private.h"
 #include "winreg.h"
 #include "winuser.h"
-#include "winsvc.h"
-#include "winternl.h"
 #include "setupapi.h"
 #include "cfgmgr32.h"
 #include "dbt.h"
-#include "ddk/wdm.h"
-#include "ddk/ntifs.h"
-#include "wine/debug.h"
 #include "wine/exception.h"
 #include "wine/heap.h"
-#include "wine/rbtree.h"
 
-#include "ntoskrnl_private.h"
 #include "plugplay.h"
 
 #include "initguid.h"
@@ -154,28 +141,34 @@ static NTSTATUS get_device_instance_id( DEVICE_OBJECT *device, WCHAR *buffer )
     return STATUS_SUCCESS;
 }
 
-static void send_power_irp( DEVICE_OBJECT *device, DEVICE_POWER_STATE power )
+static NTSTATUS get_device_caps( DEVICE_OBJECT *device, DEVICE_CAPABILITIES *caps )
 {
-    IO_STATUS_BLOCK irp_status;
     IO_STACK_LOCATION *irpsp;
+    IO_STATUS_BLOCK irp_status;
     KEVENT event;
     IRP *irp;
+
+    memset( caps, 0, sizeof(*caps) );
+    caps->Size = sizeof(*caps);
+    caps->Version = 1;
+    caps->Address = 0xffffffff;
+    caps->UINumber = 0xffffffff;
 
     device = IoGetAttachedDevice( device );
 
     KeInitializeEvent( &event, NotificationEvent, FALSE );
-    if (!(irp = IoBuildSynchronousFsdRequest( IRP_MJ_POWER, device, NULL, 0, NULL, &event, &irp_status )))
-        return;
+    if (!(irp = IoBuildSynchronousFsdRequest( IRP_MJ_PNP, device, NULL, 0, NULL, NULL, &irp_status )))
+        return STATUS_NO_MEMORY;
 
     irpsp = IoGetNextIrpStackLocation( irp );
-    irpsp->MinorFunction = IRP_MN_SET_POWER;
-
-    irpsp->Parameters.Power.Type = DevicePowerState;
-    irpsp->Parameters.Power.State.DeviceState = power;
+    irpsp->MinorFunction = IRP_MN_QUERY_CAPABILITIES;
+    irpsp->Parameters.DeviceCapabilities.Capabilities = caps;
 
     irp->IoStatus.u.Status = STATUS_NOT_SUPPORTED;
     if (IoCallDriver( device, irp ) == STATUS_PENDING)
         KeWaitForSingleObject( &event, Executive, KernelMode, FALSE, NULL );
+
+    return irp_status.u.Status;
 }
 
 static void load_function_driver( DEVICE_OBJECT *device, HDEVINFO set, SP_DEVINFO_DATA *sp_device )
@@ -300,10 +293,7 @@ static void start_device( DEVICE_OBJECT *device, HDEVINFO set, SP_DEVINFO_DATA *
 {
     load_function_driver( device, set, sp_device );
     if (device->DriverObject)
-    {
         send_pnp_irp( device, IRP_MN_START_DEVICE );
-        send_power_irp( device, PowerDeviceD0 );
-    }
 }
 
 static void enumerate_new_device( DEVICE_OBJECT *device, HDEVINFO set )
@@ -312,7 +302,9 @@ static void enumerate_new_device( DEVICE_OBJECT *device, HDEVINFO set )
 
     SP_DEVINFO_DATA sp_device = {sizeof(sp_device)};
     WCHAR device_instance_id[MAX_DEVICE_ID_LEN];
+    DEVICE_CAPABILITIES caps;
     BOOL need_driver = TRUE;
+    NTSTATUS status;
     HKEY key;
 
     if (get_device_instance_id( device, device_instance_id ))
@@ -337,8 +329,17 @@ static void enumerate_new_device( DEVICE_OBJECT *device, HDEVINFO set )
         RegCloseKey( key );
     }
 
-    if (need_driver && !install_device_driver( device, set, &sp_device ))
+    if ((status = get_device_caps( device, &caps )))
+    {
+        ERR("Failed to get caps for device %s, status %#x.\n", debugstr_w(device_instance_id), status);
         return;
+    }
+
+    if (need_driver && !install_device_driver( device, set, &sp_device ) && !caps.RawDeviceOK)
+    {
+        ERR("Unable to install a function driver for device %s.\n", debugstr_w(device_instance_id));
+        return;
+    }
 
     start_device( device, set, &sp_device );
 }
@@ -356,7 +357,6 @@ static void remove_device( DEVICE_OBJECT *device )
             remove_device( wine_device->children->Objects[i] );
     }
 
-    send_power_irp( device, PowerDeviceD3 );
     send_pnp_irp( device, IRP_MN_SURPRISE_REMOVAL );
     send_pnp_irp( device, IRP_MN_REMOVE_DEVICE );
 }
@@ -784,51 +784,6 @@ NTSTATUS WINAPI IoSetDeviceInterfaceState( UNICODE_STRING *name, BOOLEAN enable 
 }
 
 /***********************************************************************
- *           IoSetDevicePropertyData (NTOSKRNL.EXE.@)
- */
-NTSTATUS WINAPI IoSetDevicePropertyData( DEVICE_OBJECT *device, const DEVPROPKEY *property_key,
-                                         LCID lcid, ULONG flags, DEVPROPTYPE type, ULONG size,
-                                         PVOID data)
-{
-    SP_DEVINFO_DATA sp_device = {sizeof(sp_device)};
-    WCHAR device_instance_id[MAX_DEVICE_ID_LEN];
-    NTSTATUS status;
-    HDEVINFO set;
-
-    /* flags is always treated as PLUGPLAY_PROPERTY_PERSISTENT starting with Win 8 / 2012 */
-
-    if (lcid != LOCALE_NEUTRAL)
-        FIXME("only LOCALE_NEUTRAL is supported\n");
-
-    if ((status = get_device_instance_id( device, device_instance_id )))
-        return status;
-
-    if ((set = SetupDiCreateDeviceInfoList( &GUID_NULL, NULL )) == INVALID_HANDLE_VALUE)
-    {
-        ERR("Failed to create device list, error %#x.\n", GetLastError());
-        return GetLastError();
-    }
-
-    if (!SetupDiOpenDeviceInfoW( set, device_instance_id, NULL, 0, &sp_device ))
-    {
-        ERR("Failed to open device, error %#x.\n", GetLastError());
-        SetupDiDestroyDeviceInfoList( set );
-        return GetLastError();
-    }
-
-    if (!SetupDiSetDevicePropertyW(set, &sp_device, property_key, type, data, size, 0))
-    {
-        ERR("Failed to set property, error %#x.\n", GetLastError());
-        SetupDiDestroyDeviceInfoList( set );
-        return GetLastError();
-    }
-
-    SetupDiDestroyDeviceInfoList( set );
-
-    return STATUS_SUCCESS;
-}
-
-/***********************************************************************
  *           IoRegisterDeviceInterface (NTOSKRNL.EXE.@)
  */
 NTSTATUS WINAPI IoRegisterDeviceInterface(DEVICE_OBJECT *device, const GUID *class_guid,
@@ -968,19 +923,22 @@ static DRIVER_OBJECT *pnp_manager;
 struct root_pnp_device
 {
     WCHAR id[MAX_DEVICE_ID_LEN];
-    struct wine_rb_entry entry;
+    struct list entry;
     DEVICE_OBJECT *device;
 };
 
-static int root_pnp_devices_rb_compare( const void *key, const struct wine_rb_entry *entry )
+static struct root_pnp_device *find_root_pnp_device( struct wine_driver *driver, const WCHAR *id )
 {
-    const struct root_pnp_device *device = WINE_RB_ENTRY_VALUE( entry, const struct root_pnp_device, entry );
-    const WCHAR *k = key;
+    struct root_pnp_device *device;
 
-    return wcsicmp( k, device->id );
+    LIST_FOR_EACH_ENTRY( device, &driver->root_pnp_devices, struct root_pnp_device, entry )
+    {
+        if (!wcsicmp( id, device->id ))
+            return device;
+    }
+
+    return NULL;
 }
-
-static struct wine_rb_tree root_pnp_devices = { root_pnp_devices_rb_compare };
 
 static NTSTATUS WINAPI pnp_manager_device_pnp( DEVICE_OBJECT *device, IRP *irp )
 {
@@ -997,8 +955,11 @@ static NTSTATUS WINAPI pnp_manager_device_pnp( DEVICE_OBJECT *device, IRP *irp )
         break;
     case IRP_MN_START_DEVICE:
     case IRP_MN_SURPRISE_REMOVAL:
-    case IRP_MN_REMOVE_DEVICE:
         /* Nothing to do. */
+        irp->IoStatus.u.Status = STATUS_SUCCESS;
+        break;
+    case IRP_MN_REMOVE_DEVICE:
+        list_remove( &root_device->entry );
         irp->IoStatus.u.Status = STATUS_SUCCESS;
         break;
     case IRP_MN_QUERY_CAPABILITIES:
@@ -1088,32 +1049,37 @@ void pnp_manager_start(void)
         ERR("RpcBindingFromStringBinding() failed, error %#x\n", err);
 }
 
-static void destroy_root_pnp_device( struct wine_rb_entry *entry, void *context )
+void pnp_manager_stop_driver( struct wine_driver *driver )
 {
-    struct root_pnp_device *device = WINE_RB_ENTRY_VALUE(entry, struct root_pnp_device, entry);
-    remove_device( device->device );
+    struct root_pnp_device *device, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE( device, next, &driver->root_pnp_devices, struct root_pnp_device, entry )
+        remove_device( device->device );
 }
 
 void pnp_manager_stop(void)
 {
-    wine_rb_destroy( &root_pnp_devices, destroy_root_pnp_device, NULL );
     IoDeleteDriver( pnp_manager );
     RpcBindingFree( &plugplay_binding_handle );
 }
 
-void pnp_manager_enumerate_root_devices( const WCHAR *driver_name )
+void CDECL wine_enumerate_root_devices( const WCHAR *driver_name )
 {
     static const WCHAR driverW[] = {'\\','D','r','i','v','e','r','\\',0};
     static const WCHAR rootW[] = {'R','O','O','T',0};
     WCHAR buffer[MAX_SERVICE_NAME + ARRAY_SIZE(driverW)], id[MAX_DEVICE_ID_LEN];
     SP_DEVINFO_DATA sp_device = {sizeof(sp_device)};
-    struct root_pnp_device *pnp_device;
+    struct list new_list = LIST_INIT(new_list);
+    struct root_pnp_device *pnp_device, *next;
+    struct wine_driver *driver;
     DEVICE_OBJECT *device;
     NTSTATUS status;
     unsigned int i;
     HDEVINFO set;
 
     TRACE("Searching for new root-enumerated devices for driver %s.\n", debugstr_w(driver_name));
+
+    driver = get_driver( driver_name );
 
     set = SetupDiGetClassDevsW( NULL, rootW, NULL, DIGCF_ALLCLASSES );
     if (set == INVALID_HANDLE_VALUE)
@@ -1133,8 +1099,13 @@ void pnp_manager_enumerate_root_devices( const WCHAR *driver_name )
 
         SetupDiGetDeviceInstanceIdW( set, &sp_device, id, ARRAY_SIZE(id), NULL );
 
-        if (wine_rb_get( &root_pnp_devices, id ))
+        if ((pnp_device = find_root_pnp_device( driver, id )))
+        {
+            TRACE("Found device %s already enumerated.\n", debugstr_w(id));
+            list_remove( &pnp_device->entry );
+            list_add_tail( &new_list, &pnp_device->entry );
             continue;
+        }
 
         TRACE("Adding new root-enumerated device %s.\n", debugstr_w(id));
 
@@ -1148,15 +1119,19 @@ void pnp_manager_enumerate_root_devices( const WCHAR *driver_name )
         pnp_device = device->DeviceExtension;
         wcscpy( pnp_device->id, id );
         pnp_device->device = device;
-        if (wine_rb_put( &root_pnp_devices, id, &pnp_device->entry ))
-        {
-            ERR("Failed to insert device %s into tree.\n", debugstr_w(id));
-            IoDeleteDevice( device );
-            continue;
-        }
+        list_add_tail( &new_list, &pnp_device->entry );
 
         start_device( device, set, &sp_device );
     }
+
+    LIST_FOR_EACH_ENTRY_SAFE( pnp_device, next, &driver->root_pnp_devices, struct root_pnp_device, entry )
+    {
+        TRACE("Removing device %s.\n", debugstr_w(pnp_device->id));
+
+        remove_device( pnp_device->device );
+    }
+
+    list_move_head( &driver->root_pnp_devices, &new_list );
 
     SetupDiDestroyDeviceInfoList(set);
 }

@@ -37,17 +37,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(msctf);
 
-static CRITICAL_SECTION ThreadMgrCs;
-static CRITICAL_SECTION_DEBUG ThreadMgrCsDebug =
-{
-    0, 0, &ThreadMgrCs,
-    {&ThreadMgrCsDebug.ProcessLocksList,
-     &ThreadMgrCsDebug.ProcessLocksList },
-     0, 0, {(DWORD_PTR)(__FILE__ ": ThreadMgrCs")}
-};
-static CRITICAL_SECTION ThreadMgrCs = {&ThreadMgrCsDebug, -1, 0, 0, 0, 0};
-struct list ThreadMgrList = LIST_INIT(ThreadMgrList);
-
 typedef struct tagPreservedKey
 {
     struct list     entry;
@@ -109,9 +98,6 @@ typedef struct tagACLMulti {
     struct list     ThreadMgrEventSink;
     struct list     UIElementSink;
     struct list     InputProcessorProfileActivationSink;
-
-    DWORD threadId;
-    struct list entry;
 } ThreadMgr;
 
 typedef struct tagEnumTfDocumentMgr {
@@ -123,11 +109,6 @@ typedef struct tagEnumTfDocumentMgr {
 } EnumTfDocumentMgr;
 
 static HRESULT EnumTfDocumentMgr_Constructor(struct list* head, IEnumTfDocumentMgrs **ppOut);
-
-static inline ThreadMgr *impl_from_ITfThreadMgr(ITfThreadMgr *iface)
-{
-    return CONTAINING_RECORD(iface, ThreadMgr, ITfThreadMgrEx_iface);
-}
 
 static inline ThreadMgr *impl_from_ITfThreadMgrEx(ITfThreadMgrEx *iface)
 {
@@ -174,35 +155,6 @@ static inline EnumTfDocumentMgr *impl_from_IEnumTfDocumentMgrs(IEnumTfDocumentMg
     return CONTAINING_RECORD(iface, EnumTfDocumentMgr, IEnumTfDocumentMgrs_iface);
 }
 
-/***********************************************************************
- *              TF_GetThreadMgr (MSCTF.@)
- */
-HRESULT WINAPI TF_GetThreadMgr(ITfThreadMgr **pptim)
-{
-    DWORD id = GetCurrentThreadId();
-    ThreadMgr *cursor;
-
-    TRACE("%p\n", pptim);
-
-    if (!pptim)
-        return E_INVALIDARG;
-
-    EnterCriticalSection(&ThreadMgrCs);
-    LIST_FOR_EACH_ENTRY(cursor, &ThreadMgrList, ThreadMgr, entry)
-    {
-        if (cursor->threadId == id)
-        {
-            ITfThreadMgrEx_AddRef(&cursor->ITfThreadMgrEx_iface);
-            *pptim = (ITfThreadMgr *)&cursor->ITfThreadMgrEx_iface;
-            LeaveCriticalSection(&ThreadMgrCs);
-            return S_OK;
-        }
-    }
-    LeaveCriticalSection(&ThreadMgrCs);
-    *pptim = NULL;
-    return E_FAIL;
-}
-
 static void ThreadMgr_Destructor(ThreadMgr *This)
 {
     struct list *cursor, *cursor2;
@@ -211,9 +163,7 @@ static void ThreadMgr_Destructor(ThreadMgr *This)
     if (This->focusHook)
         UnhookWindowsHookEx(This->focusHook);
 
-    EnterCriticalSection(&ThreadMgrCs);
-    list_remove(&This->entry);
-    LeaveCriticalSection(&ThreadMgrCs);
+    TlsSetValue(tlsIndex,NULL);
     TRACE("destroying %p\n", This);
     if (This->focus)
         ITfDocumentMgr_Release(This->focus);
@@ -436,20 +386,17 @@ static HRESULT WINAPI ThreadMgr_SetFocus(ITfThreadMgrEx *iface, ITfDocumentMgr *
 
 static LRESULT CALLBACK ThreadFocusHookProc(int nCode, WPARAM wParam, LPARAM lParam)
 {
-    ITfThreadMgr *ThreadMgr_iface;
     ThreadMgr *This;
 
-    if (FAILED(TF_GetThreadMgr(&ThreadMgr_iface)))
+    This = TlsGetValue(tlsIndex);
+    if (!This)
     {
         ERR("Hook proc but no ThreadMgr for this thread. Serious Error\n");
         return 0;
     }
-
-    This = impl_from_ITfThreadMgr(ThreadMgr_iface);
     if (!This->focusHook)
     {
         ERR("Hook proc but no ThreadMgr focus Hook. Serious Error\n");
-        ITfThreadMgr_Release(ThreadMgr_iface);
         return 0;
     }
 
@@ -470,7 +417,6 @@ static LRESULT CALLBACK ThreadFocusHookProc(int nCode, WPARAM wParam, LPARAM lPa
         }
     }
 
-    ITfThreadMgr_Release(ThreadMgr_iface);
     return CallNextHookEx(This->focusHook, nCode, wParam, lParam);
 }
 
@@ -1400,8 +1346,13 @@ HRESULT ThreadMgr_Constructor(IUnknown *pUnkOuter, IUnknown **ppOut)
         return CLASS_E_NOAGGREGATION;
 
     /* Only 1 ThreadMgr is created per thread */
-    if (SUCCEEDED(TF_GetThreadMgr((ITfThreadMgr **)ppOut)))
+    This = TlsGetValue(tlsIndex);
+    if (This)
+    {
+        ThreadMgr_AddRef(&This->ITfThreadMgrEx_iface);
+        *ppOut = (IUnknown*)&This->ITfThreadMgrEx_iface;
         return S_OK;
+    }
 
     This = HeapAlloc(GetProcessHeap(),HEAP_ZERO_MEMORY,sizeof(ThreadMgr));
     if (This == NULL)
@@ -1416,6 +1367,7 @@ HRESULT ThreadMgr_Constructor(IUnknown *pUnkOuter, IUnknown **ppOut)
     This->ITfUIElementMgr_iface.lpVtbl = &ThreadMgrUIElementMgrVtbl;
     This->ITfSourceSingle_iface.lpVtbl = &SourceSingleVtbl;
     This->refCount = 1;
+    TlsSetValue(tlsIndex,This);
 
     CompartmentMgr_Constructor((IUnknown*)&This->ITfThreadMgrEx_iface, &IID_IUnknown, (IUnknown**)&This->CompartmentMgr);
 
@@ -1431,11 +1383,6 @@ HRESULT ThreadMgr_Constructor(IUnknown *pUnkOuter, IUnknown **ppOut)
     list_init(&This->ThreadMgrEventSink);
     list_init(&This->UIElementSink);
     list_init(&This->InputProcessorProfileActivationSink);
-
-    This->threadId = GetCurrentThreadId();
-    EnterCriticalSection(&ThreadMgrCs);
-    list_add_tail(&ThreadMgrList, &This->entry);
-    LeaveCriticalSection(&ThreadMgrCs);
 
     TRACE("returning %p\n", This);
     *ppOut = (IUnknown *)&This->ITfThreadMgrEx_iface;

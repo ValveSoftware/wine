@@ -62,12 +62,10 @@ struct completion
     struct object  obj;
     struct list    queue;
     unsigned int   depth;
-    int            abandoned;
 };
 
 static void completion_dump( struct object*, int );
 static int completion_signaled( struct object *obj, struct wait_queue_entry *entry );
-static int completion_close( struct object *obj, struct process *process, obj_handle_t handle );
 static void completion_destroy( struct object * );
 
 static const struct object_ops completion_ops =
@@ -78,8 +76,6 @@ static const struct object_ops completion_ops =
     add_queue,                 /* add_queue */
     remove_queue,              /* remove_queue */
     completion_signaled,       /* signaled */
-    NULL,                      /* get_esync_fd */
-    NULL,                      /* get_fsync_idx */
     no_satisfied,              /* satisfied */
     no_signal,                 /* signal */
     no_get_fd,                 /* get_fd */
@@ -92,7 +88,7 @@ static const struct object_ops completion_ops =
     default_unlink_name,       /* unlink_name */
     no_open_file,              /* open_file */
     no_kernel_obj_list,        /* get_kernel_obj_list */
-    completion_close,          /* close_handle */
+    no_close_handle,           /* close_handle */
     completion_destroy         /* destroy */
 };
 
@@ -104,22 +100,6 @@ struct comp_msg
     apc_param_t   information;
     unsigned int  status;
 };
-
-static int completion_close( struct object *obj, struct process *process, obj_handle_t handle )
-{
-    struct completion *completion = (struct completion *) obj;
-    struct wait_queue_entry *entry;
-
-    LIST_FOR_EACH_ENTRY( entry, &obj->wait_queue, struct wait_queue_entry, entry )
-    {
-        make_wait_abandoned( entry );
-    }
-
-    completion->abandoned = 1;
-    wake_up( &completion->obj, 0 );
-
-    return 1;
-}
 
 static void completion_destroy( struct object *obj)
 {
@@ -144,7 +124,7 @@ static int completion_signaled( struct object *obj, struct wait_queue_entry *ent
 {
     struct completion *completion = (struct completion *)obj;
 
-    return !list_empty( &completion->queue ) || completion->abandoned;
+    return !list_empty( &completion->queue );
 }
 
 static struct completion *create_completion( struct object *root, const struct unicode_str *name,
@@ -158,7 +138,6 @@ static struct completion *create_completion( struct object *root, const struct u
         if (get_error() != STATUS_OBJECT_NAME_EXISTS)
         {
             list_init( &completion->queue );
-            completion->abandoned = 0;
             completion->depth = 0;
         }
     }

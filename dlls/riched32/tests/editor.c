@@ -53,7 +53,7 @@ static HWND new_richedit(HWND parent) {
 static BOOL is_rtl(void) {
   LOCALESIGNATURE sig;
 
-  return (GetLocaleInfoA(LOCALE_USER_DEFAULT, LOCALE_FONTSIGNATURE,
+  return (GetLocaleInfoA(LOCALE_SYSTEM_DEFAULT, LOCALE_FONTSIGNATURE,
                          (LPSTR) &sig, sizeof(LOCALESIGNATURE)) &&
           (sig.lsUsb[3] & 0x08000000) != 0);
 }
@@ -155,7 +155,7 @@ static void test_WM_GETTEXTLENGTH(void)
     {
         SendMessageA(hwndRichEdit, WM_SETTEXT, 0, (LPARAM)text3);
         result = SendMessageA(hwndRichEdit, WM_GETTEXTLENGTH, 0, 0);
-        ok(result == 8, "WM_GETTEXTLENGTH returned %d, expected 8\n", result);
+        todo_wine ok(result == 8, "WM_GETTEXTLENGTH returned %d, expected 8\n", result);
     }
 
     DestroyWindow(hwndRichEdit);
@@ -584,7 +584,7 @@ static void test_EM_GETTEXTRANGE(void)
         textRange.chrg.cpMax = 8;
         result = SendMessageA(hwndRichEdit, EM_GETTEXTRANGE, 0, (LPARAM)&textRange);
         ok(result == 4, "EM_GETTEXTRANGE returned %ld\n", result);
-        todo_wine ok(!strcmp("ef\x8e\xf0", buffer), "EM_GETTEXTRANGE filled %s\n", buffer);
+        ok(!strcmp("ef\x8e\xf0", buffer), "EM_GETTEXTRANGE filled %s\n", buffer);
     }
 
     DestroyWindow(hwndRichEdit);
@@ -623,7 +623,7 @@ static void test_EM_GETSELTEXT(void)
         SendMessageA(hwndRichEdit, EM_SETSEL, 4, 8);
         result = SendMessageA(hwndRichEdit, EM_GETSELTEXT, 0, (LPARAM)buffer);
         ok(result == 4, "EM_GETSELTEXT returned %ld\n", result);
-        todo_wine ok(!strcmp("ef\x8e\xf0", buffer), "EM_GETSELTEXT filled %s\n", buffer);
+        ok(!strcmp("ef\x8e\xf0", buffer), "EM_GETSELTEXT filled %s\n", buffer);
     }
 
     DestroyWindow(hwndRichEdit);
@@ -1362,7 +1362,7 @@ static void test_EM_EXSETSEL(void)
         result =  SendMessageA(hwndRichEdit, EM_EXSETSEL, 0, (LPARAM)&cr);
         todo_wine ok(result == 7, "EM_EXSETSEL return %ld expected 7\n", result);
         result = SendMessageA(hwndRichEdit, EM_GETSELTEXT, sizeof(bufA), (LPARAM)bufA);
-        todo_wine ok(!strcmp(bufA, "ef\x8e\xf0"), "EM_GETSELTEXT return incorrect string\n");
+        ok(!strcmp(bufA, "ef\x8e\xf0"), "EM_GETSELTEXT return incorrect string\n");
         SendMessageA(hwndRichEdit, EM_EXGETSEL, 0, (LPARAM)&cr);
         ok(cr.cpMin == 4, "Selection start incorrectly: %d expected 4\n", cr.cpMin);
         ok(cr.cpMax == 8, "Selection end incorrectly: %d expected 8\n", cr.cpMax);
@@ -1421,7 +1421,7 @@ static void test_EM_SETSEL(void)
         result =  SendMessageA(hwndRichEdit, EM_SETSEL, 4, 8);
         todo_wine ok(result == 7, "EM_SETSEL return %ld expected 7\n", result);
         result = SendMessageA(hwndRichEdit, EM_GETSELTEXT, sizeof(buffA), (LPARAM)buffA);
-        todo_wine ok(!strcmp(buffA, "ef\x8e\xf0"), "EM_GETSELTEXT return incorrect string\n");
+        ok(!strcmp(buffA, "ef\x8e\xf0"), "EM_GETSELTEXT return incorrect string\n");
         result = SendMessageA(hwndRichEdit, EM_GETSEL, (WPARAM)&sel_start, (LPARAM)&sel_end);
         ok(sel_start == 4, "Selection start incorrectly: %d expected 4\n", sel_start);
         ok(sel_end == 8, "Selection end incorrectly: %d expected 8\n", sel_end);
@@ -1440,7 +1440,7 @@ START_TEST( editor )
    * RICHED32.DLL, so the linker doesn't actually link to it. */
   hmoduleRichEdit = LoadLibraryA("riched32.dll");
   ok(hmoduleRichEdit != NULL, "error: %d\n", (int) GetLastError());
-  is_lang_japanese = (PRIMARYLANGID(GetUserDefaultLangID()) == LANG_JAPANESE);
+  is_lang_japanese = (PRIMARYLANGID(GetSystemDefaultLangID()) == LANG_JAPANESE);
 
   test_WM_SETTEXT();
   test_EM_GETTEXTRANGE();

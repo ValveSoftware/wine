@@ -20,7 +20,6 @@
 
 #include <stdarg.h>
 #include <string.h>
-#include <limits.h>
 
 #define COBJMACROS
 
@@ -262,9 +261,6 @@ static HRESULT (WINAPI *pMFCreateDXGISurfaceBuffer)(REFIID riid, IUnknown *surfa
         IMFMediaBuffer **buffer);
 static HRESULT (WINAPI *pMFCreateVideoMediaTypeFromSubtype)(const GUID *subtype, IMFVideoMediaType **media_type);
 static HRESULT (WINAPI *pMFLockSharedWorkQueue)(const WCHAR *name, LONG base_priority, DWORD *taskid, DWORD *queue);
-static HRESULT (WINAPI *pMFLockDXGIDeviceManager)(UINT *token, IMFDXGIDeviceManager **manager);
-static HRESULT (WINAPI *pMFUnlockDXGIDeviceManager)(void);
-static HRESULT (WINAPI *pMFInitVideoFormat_RGB)(MFVIDEOFORMAT *format, DWORD width, DWORD height, DWORD d3dformat);
 
 static HWND create_window(void)
 {
@@ -655,16 +651,12 @@ static void test_source_resolver(void)
     IMFStreamDescriptor *sd;
     IUnknown *cancel_cookie;
     IMFByteStream *stream;
-    IMFGetService *get_service;
-    IMFRateSupport *rate_support;
     WCHAR pathW[MAX_PATH];
     int i, sample_count;
     WCHAR *filename;
     PROPVARIANT var;
     HRESULT hr;
     GUID guid;
-    float rate;
-    UINT32 rotation;
 
     if (!pMFCreateSourceResolver)
     {
@@ -770,62 +762,6 @@ static void test_source_resolver(void)
 
     check_interface(mediasource, &IID_IMFGetService, TRUE);
     check_service_interface(mediasource, &MF_RATE_CONTROL_SERVICE, &IID_IMFRateSupport, TRUE);
-
-    hr = IMFMediaSource_QueryInterface(mediasource, &IID_IMFGetService, (void**)&get_service);
-    ok(hr == S_OK, "Failed to get service interface, hr %#x.\n", hr);
-
-    hr = IMFGetService_GetService(get_service, &MF_RATE_CONTROL_SERVICE, &IID_IMFRateSupport, (void**)&rate_support);
-    ok(hr == S_OK, "Failed to get rate support interface, hr %#x.\n", hr);
-
-    hr = IMFRateSupport_GetFastestRate(rate_support, MFRATE_FORWARD, FALSE, &rate);
-    ok(hr == S_OK, "Failed to query fastest rate, hr %#x.\n", hr);
-    ok(rate == 1e6f, "Unexpected fastest rate %f.\n", rate);
-    hr = IMFRateSupport_GetFastestRate(rate_support, MFRATE_FORWARD, TRUE, &rate);
-    ok(hr == S_OK, "Failed to query fastest rate, hr %#x.\n", hr);
-    ok(rate == 1e6f, "Unexpected fastest rate %f.\n", rate);
-    hr = IMFRateSupport_GetFastestRate(rate_support, MFRATE_REVERSE, FALSE, &rate);
-    ok(hr == S_OK, "Failed to query fastest rate, hr %#x.\n", hr);
-    ok(rate == -1e6f, "Unexpected fastest rate %f.\n", rate);
-    hr = IMFRateSupport_GetFastestRate(rate_support, MFRATE_REVERSE, TRUE, &rate);
-    ok(hr == S_OK, "Failed to query fastest rate, hr %#x.\n", hr);
-    ok(rate == -1e6f, "Unexpected fastest rate %f.\n", rate);
-
-    hr = IMFRateSupport_GetSlowestRate(rate_support, MFRATE_FORWARD, FALSE, &rate);
-    ok(hr == S_OK, "Failed to query slowest rate, hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected slowest rate %f.\n", rate);
-    hr = IMFRateSupport_GetSlowestRate(rate_support, MFRATE_FORWARD, TRUE, &rate);
-    ok(hr == S_OK, "Failed to query slowest rate, hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected slowest rate %f.\n", rate);
-    hr = IMFRateSupport_GetSlowestRate(rate_support, MFRATE_REVERSE, FALSE, &rate);
-    ok(hr == S_OK, "Failed to query slowest rate, hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected slowest rate %f.\n", rate);
-    hr = IMFRateSupport_GetSlowestRate(rate_support, MFRATE_REVERSE, TRUE, &rate);
-    ok(hr == S_OK, "Failed to query slowest rate, hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected slowest rate %f.\n", rate);
-
-    hr = IMFRateSupport_IsRateSupported(rate_support, FALSE, 0.0f, NULL);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    hr = IMFRateSupport_IsRateSupported(rate_support, FALSE, 0.0f, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected rate %f.\n", rate);
-
-    hr = IMFRateSupport_IsRateSupported(rate_support, FALSE, 1.0f, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == 1.0f, "Unexpected rate %f.\n", rate);
-    hr = IMFRateSupport_IsRateSupported(rate_support, FALSE, -1.0f, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == -1.0f, "Unexpected rate %f.\n", rate);
-    hr = IMFRateSupport_IsRateSupported(rate_support, FALSE, 1e6f + 1.0f, &rate);
-    ok(hr == MF_E_UNSUPPORTED_RATE, "Unexpected hr %#x.\n", hr);
-    ok(rate == 1e6f + 1.0f || broken(rate == 1e6f) /* Win7 */, "Unexpected %f.\n", rate);
-    hr = IMFRateSupport_IsRateSupported(rate_support, FALSE, -1e6f, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == -1e6f, "Unexpected rate %f.\n", rate);
-
-    hr = IMFRateSupport_IsRateSupported(rate_support, FALSE, -1e6f - 1.0f, &rate);
-    ok(hr == MF_E_UNSUPPORTED_RATE, "Unexpected hr %#x.\n", hr);
-    ok(rate == -1e6f - 1.0f || broken(rate == -1e6f) /* Win7 */, "Unexpected rate %f.\n", rate);
-
     check_service_interface(mediasource, &MF_RATE_CONTROL_SERVICE, &IID_IMFRateControl, TRUE);
     hr = IMFMediaSource_CreatePresentationDescriptor(mediasource, &descriptor);
     ok(hr == S_OK, "Failed to get presentation descriptor, hr %#x.\n", hr);
@@ -850,12 +786,6 @@ static void test_source_resolver(void)
     ok(hr == S_OK, "Failed to get media sub type, hr %#x.\n", hr);
 todo_wine
     ok(IsEqualGUID(&guid, &MFVideoFormat_M4S2), "Unexpected sub type %s.\n", debugstr_guid(&guid));
-
-    hr = IMFMediaType_GetUINT32(media_type, &MF_MT_VIDEO_ROTATION, &rotation);
-    ok(hr == S_OK || broken(hr == MF_E_ATTRIBUTENOTFOUND) /* Win7 */, "Failed to get rotation, hr %#x.\n", hr);
-    if (hr == S_OK)
-        ok(rotation == MFVideoRotationFormat_0, "Got wrong rotation %u.\n", rotation);
-
     IMFMediaType_Release(media_type);
 
     hr = IMFPresentationDescriptor_SelectStream(descriptor, 0);
@@ -945,8 +875,6 @@ todo_wine
     hr = IMFMediaSource_CreatePresentationDescriptor(mediasource, NULL);
     ok(hr == MF_E_SHUTDOWN, "Unexpected hr %#x.\n", hr);
 
-    IMFRateSupport_Release(rate_support);
-    IMFGetService_Release(get_service);
     IMFMediaSource_Release(mediasource);
     IMFByteStream_Release(stream);
 
@@ -1006,8 +934,6 @@ static void init_functions(void)
     X(MFCreateVideoSampleAllocatorEx);
     X(MFGetPlaneSize);
     X(MFGetStrideForBitmapInfoHeader);
-    X(MFInitVideoFormat_RGB);
-    X(MFLockDXGIDeviceManager);
     X(MFLockSharedWorkQueue);
     X(MFMapDX9FormatToDXGIFormat);
     X(MFMapDXGIFormatToDX9Format);
@@ -1020,7 +946,6 @@ static void init_functions(void)
     X(MFTRegisterLocalByCLSID);
     X(MFTUnregisterLocal);
     X(MFTUnregisterLocalByCLSID);
-    X(MFUnlockDXGIDeviceManager);
 
     if ((mod = LoadLibraryA("d3d11.dll")))
     {
@@ -5457,16 +5382,14 @@ static void test_MFCreate2DMediaBuffer(void)
         unsigned int contiguous_length;
         int pitch;
         unsigned int plane_multiplier;
-        unsigned int max_length;
     } _2d_buffer_tests[] =
     {
-        { 2,  2, MAKEFOURCC('N','V','1','2'), 6, 64, 0, 192 },
-        { 4,  2, MAKEFOURCC('N','V','1','2'), 12, 64 },
-        { 2,  4, MAKEFOURCC('N','V','1','2'), 12, 64 },
-        { 1,  3, MAKEFOURCC('N','V','1','2'), 4, 64 },
-        { 4, 16, MAKEFOURCC('N','V','1','2'), 96, 64, 0, 1536 },
+        { 2, 2, MAKEFOURCC('N','V','1','2'), 6, 64 },
+        { 4, 2, MAKEFOURCC('N','V','1','2'), 12, 64 },
+        { 2, 4, MAKEFOURCC('N','V','1','2'), 12, 64 },
+        { 1, 3, MAKEFOURCC('N','V','1','2'), 4, 64 },
 
-        { 2, 2, MAKEFOURCC('I','M','C','2'), 6, 128, 0, 384 },
+        { 2, 2, MAKEFOURCC('I','M','C','2'), 6, 128 },
         { 4, 2, MAKEFOURCC('I','M','C','2'), 12, 128 },
         { 2, 4, MAKEFOURCC('I','M','C','2'), 12, 128 },
         { 2, 2, MAKEFOURCC('I','M','C','4'), 6, 128 },
@@ -5475,29 +5398,29 @@ static void test_MFCreate2DMediaBuffer(void)
 
         { 4,  2, MAKEFOURCC('I','M','C','1'),  32, 128, 2 },
         { 4,  4, MAKEFOURCC('I','M','C','1'),  64, 128, 2 },
-        { 4, 16, MAKEFOURCC('I','M','C','1'), 256, 128, 2, 4096 },
+        { 4, 16, MAKEFOURCC('I','M','C','1'), 256, 128, 2 },
         { 4, 20, MAKEFOURCC('I','M','C','1'), 320, 128, 2 },
 
         { 4,  2, MAKEFOURCC('I','M','C','3'),  32, 128, 2 },
         { 4,  4, MAKEFOURCC('I','M','C','3'),  64, 128, 2 },
-        { 4, 16, MAKEFOURCC('I','M','C','3'), 256, 128, 2, 4096 },
+        { 4, 16, MAKEFOURCC('I','M','C','3'), 256, 128, 2 },
         { 4, 20, MAKEFOURCC('I','M','C','3'), 320, 128, 2 },
 
         { 4,  2, MAKEFOURCC('Y','V','1','2'),  12, 128 },
         { 4,  4, MAKEFOURCC('Y','V','1','2'),  24, 128 },
-        { 4, 16, MAKEFOURCC('Y','V','1','2'),  96, 128, 0, 3072 },
+        { 4, 16, MAKEFOURCC('Y','V','1','2'),  96, 128 },
 
         { 4,  2, MAKEFOURCC('A','Y','U','V'),  32, 64 },
         { 4,  4, MAKEFOURCC('A','Y','U','V'),  64, 64 },
-        { 4, 16, MAKEFOURCC('A','Y','U','V'), 256, 64, 0, 1024 },
+        { 4, 16, MAKEFOURCC('A','Y','U','V'), 256, 64 },
 
         { 4,  2, MAKEFOURCC('Y','U','Y','2'),  16, 64 },
         { 4,  4, MAKEFOURCC('Y','U','Y','2'),  32, 64 },
-        { 4, 16, MAKEFOURCC('Y','U','Y','2'), 128, 64, 0, 1024 },
+        { 4, 16, MAKEFOURCC('Y','U','Y','2'), 128, 64 },
 
         { 4,  2, MAKEFOURCC('U','Y','V','Y'),  16, 64 },
         { 4,  4, MAKEFOURCC('U','Y','V','Y'),  32, 64 },
-        { 4, 16, MAKEFOURCC('U','Y','V','Y'), 128, 64, 0, 1024 },
+        { 4, 16, MAKEFOURCC('U','Y','V','Y'), 128, 64 },
 
         { 2, 4, D3DFMT_A8R8G8B8, 32, 64 },
         { 1, 4, D3DFMT_A8R8G8B8, 16, 64 },
@@ -5505,10 +5428,10 @@ static void test_MFCreate2DMediaBuffer(void)
     };
     unsigned int max_length, length, length2;
     BYTE *buffer_start, *data, *data2;
-    int i, j, k, pitch, pitch2, stride;
     IMF2DBuffer2 *_2dbuffer2;
     IMF2DBuffer *_2dbuffer;
     IMFMediaBuffer *buffer;
+    int i, pitch, pitch2;
     HRESULT hr;
     BOOL ret;
 
@@ -5690,12 +5613,6 @@ static void test_MFCreate2DMediaBuffer(void)
         hr = pMFCreate2DMediaBuffer(ptr->width, ptr->height, ptr->fourcc, FALSE, &buffer);
         ok(hr == S_OK, "Failed to create a buffer, hr %#x.\n", hr);
 
-        hr = IMFMediaBuffer_GetMaxLength(buffer, &length);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-        if (ptr->max_length)
-            ok(length == ptr->max_length, "%u: unexpected maximum length %u for %u x %u, format %s.\n",
-                    i, length, ptr->width, ptr->height, wine_dbgstr_an((char *)&ptr->fourcc, 4));
-
         hr = IMFMediaBuffer_QueryInterface(buffer, &IID_IMF2DBuffer, (void **)&_2dbuffer);
         ok(hr == S_OK, "Failed to get interface, hr %#x.\n", hr);
 
@@ -5708,8 +5625,6 @@ static void test_MFCreate2DMediaBuffer(void)
         ok(hr == S_OK, "Failed to lock buffer, hr %#x.\n", hr);
         ok(length2 == ptr->contiguous_length, "%d: unexpected linear buffer length %u for %u x %u, format %s.\n",
                 i, length2, ptr->width, ptr->height, wine_dbgstr_an((char *)&ptr->fourcc, 4));
-
-        memset(data, 0xff, length2);
 
         hr = IMFMediaBuffer_Unlock(buffer);
         ok(hr == S_OK, "Failed to unlock buffer, hr %#x.\n", hr);
@@ -5728,44 +5643,6 @@ static void test_MFCreate2DMediaBuffer(void)
         ok(hr == S_OK, "Failed to get scanline, hr %#x.\n", hr);
         ok(data2 == data, "Unexpected data pointer.\n");
         ok(pitch == pitch2, "Unexpected pitch.\n");
-
-        /* primary plane */
-        for(j = 0; j < ptr->height; j++)
-            for (k = 0; k < ptr->width; k++)
-                ok(data[j * pitch + k] == 0xff, "Unexpected byte %02x at test %d row %d column %d.\n", data[j * pitch + k], i, j, k);
-
-        hr = pMFGetStrideForBitmapInfoHeader(ptr->fourcc, ptr->width, &stride);
-        ok(hr == S_OK, "Failed to get stride, hr %#x.\n", hr);
-
-        /* secondary planes */
-        switch (ptr->fourcc)
-        {
-            case MAKEFOURCC('I','M','C','1'):
-            case MAKEFOURCC('I','M','C','3'):
-                for (j = ptr->height; j < length2 / stride; j++)
-                    for (k = 0; k < ptr->width / 2; k++)
-                        ok(data[j * pitch + k] == 0xff, "Unexpected byte %02x at test %d row %d column %d.\n", data[j * pitch + k], i, j, k);
-                break;
-
-            case MAKEFOURCC('I','M','C','2'):
-            case MAKEFOURCC('I','M','C','4'):
-                for (j = ptr->height; j < length2 / stride; j++)
-                    for (k = 0; k < ptr->width / 2; k++)
-                        ok(data[j * pitch + k] == 0xff, "Unexpected byte %02x at test %d row %d column %d.\n", data[j * pitch + k], i, j, k);
-                for (j = ptr->height; j < length2 / stride; j++)
-                    for (k = pitch / 2; k < pitch / 2 + ptr->width / 2; k++)
-                        ok(data[j * pitch + k] == 0xff, "Unexpected byte %02x at test %d row %d column %d.\n", data[j * pitch + k], i, j, k);
-                break;
-
-            case MAKEFOURCC('N','V','1','2'):
-                for (j = ptr->height; j < length2 / stride; j++)
-                    for (k = 0; k < ptr->width; k++)
-                        ok(data[j * pitch + k] == 0xff, "Unexpected byte %02x at test %d row %d column %d.\n", data[j * pitch + k], i, j, k);
-                break;
-
-            default:
-                ;
-        }
 
         hr = IMF2DBuffer_Unlock2D(_2dbuffer);
         ok(hr == S_OK, "Failed to unlock buffer, hr %#x.\n", hr);
@@ -6798,12 +6675,6 @@ static void test_sample_allocator(void)
         D3D11_USAGE_STAGING,
         D3D11_USAGE_STAGING + 1,
     };
-    static const unsigned int sharing[] =
-    {
-        D3D11_RESOURCE_MISC_SHARED | D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX,
-        D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX,
-        D3D11_RESOURCE_MISC_SHARED,
-    };
 
     if (!pMFCreateVideoSampleAllocatorEx)
     {
@@ -7161,67 +7032,6 @@ todo_wine
         IMFVideoSampleAllocatorEx_Release(allocatorex);
     }
 
-    /* MF_SA_D3D11_SHARED, MF_SA_D3D11_SHARED_WITHOUT_MUTEX */
-    for (i = 0; i < ARRAY_SIZE(sharing); ++i)
-    {
-        hr = pMFCreateVideoSampleAllocatorEx(&IID_IMFVideoSampleAllocatorEx, (void **)&allocatorex);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-        hr = IMFVideoSampleAllocatorEx_SetDirectXManager(allocatorex, (IUnknown *)manager);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-        hr = IMFAttributes_DeleteAllItems(attributes);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-        hr = IMFAttributes_SetUINT32(attributes, &MF_SA_D3D11_USAGE, D3D11_USAGE_DEFAULT);
-        ok(hr == S_OK, "Failed to set attribute, hr %#x.\n", hr);
-
-        if (sharing[i] & D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX)
-        {
-            hr = IMFAttributes_SetUINT32(attributes, &MF_SA_D3D11_SHARED, TRUE);
-            ok(hr == S_OK, "Failed to set attribute, hr %#x.\n", hr);
-        }
-
-        if (sharing[i] & D3D11_RESOURCE_MISC_SHARED)
-        {
-            hr = IMFAttributes_SetUINT32(attributes, &MF_SA_D3D11_SHARED_WITHOUT_MUTEX, TRUE);
-            ok(hr == S_OK, "Failed to set attribute, hr %#x.\n", hr);
-        }
-
-        hr = IMFVideoSampleAllocatorEx_InitializeSampleAllocatorEx(allocatorex, 0, 0, attributes, video_type);
-        if (sharing[i] == (D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX | D3D11_RESOURCE_MISC_SHARED))
-        {
-        todo_wine
-            ok(hr == E_INVALIDARG, "%u: Unexpected hr %#x.\n", i, hr);
-            IMFVideoSampleAllocatorEx_Release(allocatorex);
-            continue;
-        }
-        ok(hr == S_OK, "%u: Unexpected hr %#x.\n", i, hr);
-
-        hr = IMFVideoSampleAllocatorEx_AllocateSample(allocatorex, &sample);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-        hr = IMFSample_GetBufferByIndex(sample, 0, &buffer);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-        hr = IMFMediaBuffer_QueryInterface(buffer, &IID_IMFDXGIBuffer, (void **)&dxgi_buffer);
-        ok(hr == S_OK, "Failed to get interface, hr %#x.\n", hr);
-
-        hr = IMFDXGIBuffer_GetResource(dxgi_buffer, &IID_ID3D11Texture2D, (void **)&texture);
-        ok(hr == S_OK, "Failed to get resource, hr %#x.\n", hr);
-
-        ID3D11Texture2D_GetDesc(texture, &desc);
-        ok(desc.MiscFlags == sharing[i], "%u: unexpected misc flags %#x.\n", i, desc.MiscFlags);
-
-        ID3D11Texture2D_Release(texture);
-        IMFDXGIBuffer_Release(dxgi_buffer);
-        IMFMediaBuffer_Release(buffer);
-
-        IMFSample_Release(sample);
-
-        IMFVideoSampleAllocatorEx_Release(allocatorex);
-    }
-
     IMFAttributes_Release(attributes);
 
     IMFDXGIDeviceManager_Release(manager);
@@ -7320,180 +7130,6 @@ static void test_MFLockSharedWorkQueue(void)
     ok(hr == S_OK, "Failed to shut down, hr %#x.\n", hr);
 }
 
-static void test_MFllMulDiv(void)
-{
-    /* (a * b + d) / c */
-    static const struct muldivtest
-    {
-        LONGLONG a;
-        LONGLONG b;
-        LONGLONG c;
-        LONGLONG d;
-        LONGLONG result;
-    }
-    muldivtests[] =
-    {
-        { 0, 0, 0, 0, _I64_MAX },
-        { 1000000, 1000000, 2, 0, 500000000000 },
-        { _I64_MAX, 3, _I64_MAX, 0, 3 },
-        { _I64_MAX, 3, _I64_MAX, 1, 3 },
-        { -10000, 3, 100, 0, -300 },
-        { 2, 0, 3, 5, 1 },
-        { 2, 1, 1, -3, -1 },
-        /* a * b product does not fit in uint64_t */
-        { _I64_MAX, 4, 8, 0, _I64_MAX / 2 },
-        /* Large a * b product, large denominator */
-        { _I64_MAX, 4, 0x100000000, 0, 0x1ffffffff },
-    };
-    unsigned int i;
-
-    for (i = 0; i < ARRAY_SIZE(muldivtests); ++i)
-    {
-        LONGLONG result;
-
-        result = MFllMulDiv(muldivtests[i].a, muldivtests[i].b, muldivtests[i].c, muldivtests[i].d);
-        ok(result == muldivtests[i].result, "%u: unexpected result %s, expected %s.\n", i,
-                wine_dbgstr_longlong(result), wine_dbgstr_longlong(muldivtests[i].result));
-    }
-}
-
-static void test_shared_dxgi_device_manager(void)
-{
-    IMFDXGIDeviceManager *manager;
-    HRESULT hr;
-    UINT token;
-
-    if (!pMFLockDXGIDeviceManager)
-    {
-        win_skip("Shared DXGI device manager is not supported.\n");
-        return;
-    }
-
-    hr = pMFUnlockDXGIDeviceManager();
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-    manager = NULL;
-    hr = pMFLockDXGIDeviceManager(NULL, &manager);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(!!manager, "Unexpected instance.\n");
-
-    hr = pMFLockDXGIDeviceManager(&token, &manager);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-    EXPECT_REF(manager, 3);
-
-    hr = pMFUnlockDXGIDeviceManager();
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-    EXPECT_REF(manager, 2);
-
-    hr = pMFUnlockDXGIDeviceManager();
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-}
-
-static void check_video_format(const MFVIDEOFORMAT *format, unsigned int width, unsigned int height,
-        DWORD d3dformat)
-{
-    unsigned int transfer_function;
-    GUID guid;
-
-    if (!d3dformat) d3dformat = D3DFMT_X8R8G8B8;
-
-    switch (d3dformat)
-    {
-        case D3DFMT_X8R8G8B8:
-        case D3DFMT_R8G8B8:
-        case D3DFMT_A8R8G8B8:
-        case D3DFMT_R5G6B5:
-        case D3DFMT_X1R5G5B5:
-        case D3DFMT_A2B10G10R10:
-        case D3DFMT_P8:
-            transfer_function = MFVideoTransFunc_sRGB;
-            break;
-        default:
-            transfer_function = MFVideoTransFunc_10;
-    }
-
-    memcpy(&guid, &MFVideoFormat_Base, sizeof(guid));
-    guid.Data1 = d3dformat;
-
-    ok(format->dwSize == sizeof(*format), "Unexpected format size.\n");
-    ok(format->videoInfo.dwWidth == width, "Unexpected width %u.\n", format->videoInfo.dwWidth);
-    ok(format->videoInfo.dwHeight == height, "Unexpected height %u.\n", format->videoInfo.dwHeight);
-    ok(format->videoInfo.PixelAspectRatio.Numerator == 1 &&
-            format->videoInfo.PixelAspectRatio.Denominator == 1, "Unexpected PAR.\n");
-    ok(format->videoInfo.SourceChromaSubsampling == MFVideoChromaSubsampling_Unknown, "Unexpected chroma subsampling.\n");
-    ok(format->videoInfo.InterlaceMode == MFVideoInterlace_Progressive, "Unexpected interlace mode %u.\n",
-            format->videoInfo.InterlaceMode);
-    ok(format->videoInfo.TransferFunction == transfer_function, "Unexpected transfer function %u.\n",
-            format->videoInfo.TransferFunction);
-    ok(format->videoInfo.ColorPrimaries == MFVideoPrimaries_BT709, "Unexpected color primaries %u.\n",
-            format->videoInfo.ColorPrimaries);
-    ok(format->videoInfo.TransferMatrix == MFVideoTransferMatrix_Unknown, "Unexpected transfer matrix.\n");
-    ok(format->videoInfo.SourceLighting == MFVideoLighting_office, "Unexpected source lighting %u.\n",
-            format->videoInfo.SourceLighting);
-    ok(format->videoInfo.FramesPerSecond.Numerator == 60 &&
-            format->videoInfo.FramesPerSecond.Denominator == 1, "Unexpected frame rate %u/%u.\n",
-            format->videoInfo.FramesPerSecond.Numerator, format->videoInfo.FramesPerSecond.Denominator);
-    ok(format->videoInfo.NominalRange == MFNominalRange_Normal, "Unexpected nominal range %u.\n",
-            format->videoInfo.NominalRange);
-    ok(format->videoInfo.GeometricAperture.Area.cx == width && format->videoInfo.GeometricAperture.Area.cy == height,
-            "Unexpected geometric aperture.\n");
-    ok(!memcmp(&format->videoInfo.GeometricAperture, &format->videoInfo.MinimumDisplayAperture, sizeof(MFVideoArea)),
-            "Unexpected minimum display aperture.\n");
-    ok(format->videoInfo.PanScanAperture.Area.cx == 0 && format->videoInfo.PanScanAperture.Area.cy == 0,
-            "Unexpected geometric aperture.\n");
-    ok(format->videoInfo.VideoFlags == 0, "Unexpected video flags.\n");
-    ok(IsEqualGUID(&format->guidFormat, &guid), "Unexpected format guid %s.\n", wine_dbgstr_guid(&format->guidFormat));
-    ok(format->compressedInfo.AvgBitrate == 0, "Unexpected bitrate.\n");
-    ok(format->compressedInfo.AvgBitErrorRate == 0, "Unexpected error bitrate.\n");
-    ok(format->compressedInfo.MaxKeyFrameSpacing == 0, "Unexpected MaxKeyFrameSpacing.\n");
-    ok(format->surfaceInfo.Format == d3dformat, "Unexpected format %u.\n", format->surfaceInfo.Format);
-    ok(format->surfaceInfo.PaletteEntries == 0, "Unexpected palette size %u.\n", format->surfaceInfo.PaletteEntries);
-}
-
-static void test_MFInitVideoFormat_RGB(void)
-{
-    static const DWORD formats[] =
-    {
-        0, /* same D3DFMT_X8R8G8B8 */
-        D3DFMT_X8R8G8B8,
-        D3DFMT_R8G8B8,
-        D3DFMT_A8R8G8B8,
-        D3DFMT_R5G6B5,
-        D3DFMT_X1R5G5B5,
-        D3DFMT_A2B10G10R10,
-        D3DFMT_P8,
-        D3DFMT_L8,
-        D3DFMT_YUY2,
-        D3DFMT_DXT1,
-        D3DFMT_D16,
-        D3DFMT_L16,
-        D3DFMT_A16B16G16R16F,
-    };
-    MFVIDEOFORMAT format;
-    unsigned int i;
-    HRESULT hr;
-
-    if (!pMFInitVideoFormat_RGB)
-    {
-        win_skip("MFInitVideoFormat_RGB is not available.\n");
-        return;
-    }
-
-    hr = pMFInitVideoFormat_RGB(NULL, 64, 32, 0);
-    ok(hr == E_INVALIDARG, "Unexpected hr %#x.\n", hr);
-
-    for (i = 0; i < ARRAY_SIZE(formats); ++i)
-    {
-        memset(&format, 0, sizeof(format));
-        hr = pMFInitVideoFormat_RGB(&format, 64, 32, formats[i]);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-        if (SUCCEEDED(hr))
-            check_video_format(&format, 64, 32, formats[i]);
-    }
-}
-
 START_TEST(mfplat)
 {
     char **argv;
@@ -7558,9 +7194,6 @@ START_TEST(mfplat)
     test_dxgi_surface_buffer();
     test_sample_allocator();
     test_MFMapDX9FormatToDXGIFormat();
-    test_MFllMulDiv();
-    test_shared_dxgi_device_manager();
-    test_MFInitVideoFormat_RGB();
 
     CoUninitialize();
 }

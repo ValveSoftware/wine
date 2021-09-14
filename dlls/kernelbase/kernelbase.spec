@@ -601,7 +601,7 @@
 # @ stub GetPackageInfo
 # @ stub GetPackageInstallTime
 # @ stub GetPackageOSMaxVersionTested
-@ stdcall GetPackagePath(ptr long ptr ptr)
+# @ stub GetPackagePath
 # @ stub GetPackagePathByFullName
 # @ stub GetPackagePathOnVolume
 # @ stub GetPackageProperty
@@ -614,7 +614,7 @@
 # @ stub GetPackageStatusForUser
 # @ stub GetPackageTargetPlatformProperty
 # @ stub GetPackageVolumeSisPath
-@ stdcall GetPackagesByPackageFamily(wstr ptr ptr ptr ptr)
+# @ stub GetPackagesByPackageFamily
 @ stdcall GetPerformanceInfo(ptr long)
 @ stdcall GetPhysicallyInstalledSystemMemory(ptr)
 # @ stub GetPreviousFgPolicyRefreshInfoInternal
@@ -1012,7 +1012,7 @@
 # @ stub PackageFamilyNameFromFullName
 # @ stub PackageFamilyNameFromId
 # @ stub PackageFamilyNameFromProductId
-@ stdcall PackageFullNameFromId(ptr ptr ptr)
+# @ stub PackageFullNameFromId
 # @ stub PackageFullNameFromProductId
 @ stdcall PackageIdFromFullName(wstr long ptr ptr)
 # @ stub PackageIdFromProductId
@@ -1494,7 +1494,7 @@
 @ stdcall SetThreadPreferredUILanguages(long ptr ptr)
 @ stdcall SetThreadPriority(long long)
 @ stdcall SetThreadPriorityBoost(long long)
-@ stdcall SetThreadSelectedCpuSets(ptr ptr long)
+# @ stub SetThreadSelectedCpuSets
 @ stdcall SetThreadStackGuarantee(ptr)
 @ stdcall SetThreadToken(ptr ptr)
 @ stdcall SetThreadUILanguage(long)
@@ -1509,6 +1509,7 @@
 @ stdcall SetTokenInformation(long long ptr long)
 @ stdcall SetUnhandledExceptionFilter(ptr)
 @ stdcall SetUserGeoID(long)
+@ stdcall SetUserGeoName(wstr)
 @ stdcall SetWaitableTimer(long ptr long ptr ptr long)
 @ stdcall SetWaitableTimerEx(long ptr long ptr ptr ptr long)
 @ stdcall -arch=i386,x86_64 SetXStateFeaturesMask(ptr int64)

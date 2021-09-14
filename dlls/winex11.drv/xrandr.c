@@ -29,6 +29,9 @@
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(xrandr);
+#ifdef HAVE_XRRGETPROVIDERRESOURCES
+WINE_DECLARE_DEBUG_CHANNEL(winediag);
+#endif
 
 #ifdef SONAME_LIBXRANDR
 
@@ -321,32 +324,6 @@ static LONG xrandr10_set_current_mode( ULONG_PTR id, DEVMODEW *mode )
 
 #ifdef HAVE_XRRGETPROVIDERRESOURCES
 
-static struct current_mode
-{
-    ULONG_PTR id;
-    BOOL loaded;
-    DEVMODEW mode;
-} *current_modes;
-static int current_mode_count;
-
-static CRITICAL_SECTION current_modes_section;
-static CRITICAL_SECTION_DEBUG current_modes_critsect_debug =
-{
-    0, 0, &current_modes_section,
-    {&current_modes_critsect_debug.ProcessLocksList, &current_modes_critsect_debug.ProcessLocksList},
-     0, 0, {(DWORD_PTR)(__FILE__ ": current_modes_section")}
-};
-static CRITICAL_SECTION current_modes_section = {&current_modes_critsect_debug, -1, 0, 0, 0, 0};
-
-static void xrandr14_invalidate_current_mode_cache(void)
-{
-    EnterCriticalSection( &current_modes_section );
-    heap_free( current_modes);
-    current_modes = NULL;
-    current_mode_count = 0;
-    LeaveCriticalSection( &current_modes_section );
-}
-
 static XRRScreenResources *xrandr_get_screen_resources(void)
 {
     XRRScreenResources *resources = pXRRGetScreenResourcesCurrent( gdi_display, root_window );
@@ -373,6 +350,7 @@ static BOOL is_broken_driver(void)
     XRRScreenResources *screen_resources;
     XRROutputInfo *output_info;
     XRRModeInfo *first_mode;
+    INT major, event, error;
     INT output_idx, i, j;
     BOOL only_one_mode;
 
@@ -423,6 +401,15 @@ static BOOL is_broken_driver(void)
 
         if (!only_one_mode)
             continue;
+
+        /* Check if it is NVIDIA proprietary driver */
+        if (XQueryExtension( gdi_display, "NV-CONTROL", &major, &event, &error ))
+        {
+            ERR_(winediag)("Broken NVIDIA RandR detected, falling back to RandR 1.0. "
+                           "Please consider using the Nouveau driver instead.\n");
+            pXRRFreeScreenResources( screen_resources );
+            return TRUE;
+        }
     }
     pXRRFreeScreenResources( screen_resources );
     return FALSE;
@@ -1128,7 +1115,6 @@ static void xrandr14_free_monitors( struct x11drv_monitor *monitors )
 
 static BOOL xrandr14_device_change_handler( HWND hwnd, XEvent *event )
 {
-    xrandr14_invalidate_current_mode_cache();
     if (hwnd == GetDesktopWindow() && GetWindowThreadProcessId( hwnd, NULL ) == GetCurrentThreadId())
     {
         /* Don't send a WM_DISPLAYCHANGE message here because this event may be a result from
@@ -1162,8 +1148,7 @@ static void xrandr14_register_event_handlers(void)
 /* XRandR 1.4 display settings handler */
 static BOOL xrandr14_get_id( const WCHAR *device_name, ULONG_PTR *id )
 {
-    struct current_mode *tmp_modes, *new_current_modes = NULL;
-    INT gpu_count, adapter_count, new_current_mode_count = 0;
+    INT gpu_count, adapter_count, display_count = 0;
     INT gpu_idx, adapter_idx, display_idx;
     struct x11drv_adapter *adapters;
     struct x11drv_gpu *gpus;
@@ -1174,60 +1159,31 @@ static BOOL xrandr14_get_id( const WCHAR *device_name, ULONG_PTR *id )
     if (*end)
         return FALSE;
 
-    /* Update cache */
-    EnterCriticalSection( &current_modes_section );
-    if (!current_modes)
+    if (!xrandr14_get_gpus2( &gpus, &gpu_count, FALSE ))
+        return FALSE;
+
+    for (gpu_idx = 0; gpu_idx < gpu_count; ++gpu_idx)
     {
-        if (!xrandr14_get_gpus2( &gpus, &gpu_count, FALSE ))
+        if (!xrandr14_get_adapters( gpus[gpu_idx].id, &adapters, &adapter_count ))
         {
-            LeaveCriticalSection( &current_modes_section );
+            xrandr14_free_gpus( gpus );
             return FALSE;
         }
 
-        for (gpu_idx = 0; gpu_idx < gpu_count; ++gpu_idx)
+        adapter_idx = display_idx - display_count;
+        if (adapter_idx < adapter_count)
         {
-            if (!xrandr14_get_adapters( gpus[gpu_idx].id, &adapters, &adapter_count ))
-                break;
-
-            if (!new_current_modes)
-                tmp_modes = heap_alloc( adapter_count * sizeof(*tmp_modes) );
-            else
-                tmp_modes = heap_realloc( new_current_modes, (new_current_mode_count + adapter_count) * sizeof(*tmp_modes) );
-
-            if (!tmp_modes)
-            {
-                xrandr14_free_adapters( adapters );
-                break;
-            }
-            new_current_modes = tmp_modes;
-
-            for (adapter_idx = 0; adapter_idx < adapter_count; ++adapter_idx)
-            {
-                new_current_modes[new_current_mode_count + adapter_idx].id = adapters[adapter_idx].id;
-                new_current_modes[new_current_mode_count + adapter_idx].loaded = FALSE;
-            }
-            new_current_mode_count += adapter_count;
+            *id = adapters[adapter_idx].id;
             xrandr14_free_adapters( adapters );
+            xrandr14_free_gpus( gpus );
+            return TRUE;
         }
-        xrandr14_free_gpus( gpus );
 
-        if (new_current_modes)
-        {
-            heap_free( current_modes );
-            current_modes = new_current_modes;
-            current_mode_count = new_current_mode_count;
-        }
+        display_count += adapter_count;
+        xrandr14_free_adapters( adapters );
     }
-
-    if (display_idx >= current_mode_count)
-    {
-        LeaveCriticalSection( &current_modes_section );
-        return FALSE;
-    }
-
-    *id = current_modes[display_idx].id;
-    LeaveCriticalSection( &current_modes_section );
-    return TRUE;
+    xrandr14_free_gpus( gpus );
+    return FALSE;
 }
 
 static void add_xrandr14_mode( DEVMODEW *mode, XRRModeInfo *info, DWORD depth, DWORD frequency,
@@ -1386,21 +1342,6 @@ static BOOL xrandr14_get_current_mode( ULONG_PTR id, DEVMODEW *mode )
     RECT primary;
     INT mode_idx;
 
-    EnterCriticalSection( &current_modes_section );
-    for (mode_idx = 0; mode_idx < current_mode_count; ++mode_idx)
-    {
-        if (current_modes[mode_idx].id != id)
-            continue;
-
-        if (!current_modes[mode_idx].loaded)
-            break;
-
-        memcpy( mode, &current_modes[mode_idx].mode, sizeof(*mode) );
-        LeaveCriticalSection( &current_modes_section );
-        return TRUE;
-    }
-    LeaveCriticalSection( &current_modes_section );
-
     screen_resources = xrandr_get_screen_resources();
     if (!screen_resources)
         goto done;
@@ -1459,21 +1400,6 @@ static BOOL xrandr14_get_current_mode( ULONG_PTR id, DEVMODEW *mode )
     mode->u1.s2.dmPosition.x = crtc_info->x - primary.left;
     mode->u1.s2.dmPosition.y = crtc_info->y - primary.top;
     ret = TRUE;
-
-    EnterCriticalSection( &current_modes_section );
-    for (mode_idx = 0; mode_idx < current_mode_count; ++mode_idx)
-    {
-        if (current_modes[mode_idx].id != id)
-            continue;
-
-        memcpy( &current_modes[mode_idx].mode, mode, sizeof(*mode) );
-        current_modes[mode_idx].mode.dmSize = sizeof(*mode);
-        current_modes[mode_idx].mode.dmDriverExtra = 0;
-        current_modes[mode_idx].loaded = TRUE;
-        break;
-    }
-    LeaveCriticalSection( &current_modes_section );
-
 done:
     if (crtc_info)
         pXRRFreeCrtcInfo( crtc_info );
@@ -1591,29 +1517,10 @@ done:
     if (output_info)
         pXRRFreeOutputInfo( output_info );
     pXRRFreeScreenResources( screen_resources );
-    xrandr14_invalidate_current_mode_cache();
     return ret;
 }
 
 #endif
-
-static void xrandr14_convert_coordinates( struct x11drv_display_setting *displays, UINT display_count )
-{
-    INT left_most = INT_MAX, top_most = INT_MAX;
-    UINT display_idx;
-
-    for (display_idx = 0; display_idx < display_count; ++display_idx)
-    {
-        left_most = min( left_most, displays[display_idx].desired_mode.u1.s2.dmPosition.x );
-        top_most = min( top_most, displays[display_idx].desired_mode.u1.s2.dmPosition.y );
-    }
-
-    for (display_idx = 0; display_idx < display_count; ++display_idx)
-    {
-        displays[display_idx].desired_mode.u1.s2.dmPosition.x -= left_most;
-        displays[display_idx].desired_mode.u1.s2.dmPosition.y -= top_most;
-    }
-}
 
 void X11DRV_XRandR_Init(void)
 {
@@ -1643,7 +1550,6 @@ void X11DRV_XRandR_Init(void)
     settings_handler.free_modes = xrandr10_free_modes;
     settings_handler.get_current_mode = xrandr10_get_current_mode;
     settings_handler.set_current_mode = xrandr10_set_current_mode;
-    settings_handler.convert_coordinates = NULL;
     X11DRV_Settings_SetHandler( &settings_handler );
 
 #ifdef HAVE_XRRGETPROVIDERRESOURCES
@@ -1702,7 +1608,6 @@ void X11DRV_XRandR_Init(void)
         settings_handler.free_modes = xrandr14_free_modes;
         settings_handler.get_current_mode = xrandr14_get_current_mode;
         settings_handler.set_current_mode = xrandr14_set_current_mode;
-        settings_handler.convert_coordinates = xrandr14_convert_coordinates;
         X11DRV_Settings_SetHandler( &settings_handler );
     }
 #endif

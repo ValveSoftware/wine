@@ -28,6 +28,7 @@
 #include <winreg.h>
 #include <winerror.h>
 #include <wincrypt.h>
+#include <bcrypt.h>
 
 #include "wine/test.h"
 
@@ -39,13 +40,9 @@ static BOOL (WINAPI *pCryptHashCertificate2)(LPCWSTR, DWORD, void*, const BYTE*,
 static BOOL (WINAPI * pCryptVerifyCertificateSignatureEx)
                         (HCRYPTPROV, DWORD, DWORD, void *, DWORD, void *, DWORD, void *);
 
-static BOOL (WINAPI * pCryptAcquireContextA)
-                        (HCRYPTPROV *, LPCSTR, LPCSTR, DWORD, DWORD);
-
 static void init_function_pointers(void)
 {
     HMODULE hCrypt32 = GetModuleHandleA("crypt32.dll");
-    HMODULE hAdvapi32 = GetModuleHandleA("advapi32.dll");
 
 #define GET_PROC(dll, func) \
     p ## func = (void *)GetProcAddress(dll, #func); \
@@ -58,9 +55,6 @@ static void init_function_pointers(void)
     GET_PROC(hCrypt32, CryptEncodeObjectEx)
     GET_PROC(hCrypt32, CryptHashCertificate2)
     GET_PROC(hCrypt32, CryptVerifyCertificateSignatureEx)
-
-    GET_PROC(hAdvapi32, CryptAcquireContextA)
-
 #undef GET_PROC
 }
 
@@ -2135,9 +2129,9 @@ static void testCertSigs(void)
     DWORD sigSize = sizeof(sig);
 
     /* Just in case a previous run failed, delete this thing */
-    pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_NEWKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
 
@@ -2146,7 +2140,7 @@ static void testCertSigs(void)
     testVerifyCertSigEx(csp, &toBeSigned, szOID_RSA_SHA1RSA, sig, sigSize);
 
     CryptReleaseContext(csp, 0);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
 }
@@ -2278,9 +2272,9 @@ static void testCreateSelfSignCert(void)
      */
 
     /* Acquire a CSP */
-    pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_NEWKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
 
@@ -2335,14 +2329,14 @@ static void testCreateSelfSignCert(void)
     }
 
     CryptReleaseContext(csp, 0);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
 
     /* Do the same test with a CSP, AT_KEYEXCHANGE and key info */
-    pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_NEWKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
     ret = CryptGenKey(csp, AT_SIGNATURE, 0, &key);
@@ -2407,7 +2401,7 @@ static void testCreateSelfSignCert(void)
     CryptDestroyKey(key);
 
     CryptReleaseContext(csp, 0);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
 
@@ -2452,13 +2446,13 @@ static void testCreateSelfSignCert(void)
         CertFreeCertificateContext(context);
     }
 
-    pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
         CRYPT_DELETEKEYSET);
 
     /* Acquire a CSP and generate an AT_KEYEXCHANGE key in it. */
-    pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_NEWKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
 
@@ -2530,7 +2524,7 @@ static void testCreateSelfSignCert(void)
     }
 
     CryptReleaseContext(csp, 0);
-    ret = pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    ret = CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
     ok(ret, "CryptAcquireContext failed: %08x\n", GetLastError());
 
@@ -3866,7 +3860,7 @@ static void testAcquireCertPrivateKey(void)
     keyProvInfo.rgProvParam = NULL;
     keyProvInfo.dwKeySpec = AT_SIGNATURE;
 
-    pCryptAcquireContextA(NULL, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(NULL, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
 
     cert = CertCreateCertificateContext(X509_ASN_ENCODING, selfSignedCert,
@@ -3901,7 +3895,7 @@ static void testAcquireCertPrivateKey(void)
        GetLastError() == NTE_BAD_PROV_TYPE /* win10 */),
      "Expected CRYPT_E_NO_KEY_PROPERTY, got %08x\n", GetLastError());
 
-    pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_NEWKEYSET);
     ret = CryptImportKey(csp, privKey, sizeof(privKey), 0, 0, &key);
     ok(ret, "CryptImportKey failed: %08x\n", GetLastError());
@@ -4044,7 +4038,7 @@ static void testAcquireCertPrivateKey(void)
     }
 
     CryptReleaseContext(csp, 0);
-    pCryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
+    CryptAcquireContextA(&csp, cspNameA, MS_DEF_PROV_A, PROV_RSA_FULL,
      CRYPT_DELETEKEYSET);
 
     CertFreeCertificateContext(cert);
@@ -4237,6 +4231,98 @@ static void testKeyProvInfo(void)
     CertCloseStore(store, 0);
 }
 
+static void test_VerifySignature(void)
+{
+    PCCERT_CONTEXT cert;
+    PCERT_SIGNED_CONTENT_INFO info;
+    DWORD size;
+    BOOL ret;
+    HCRYPTPROV prov;
+    HCRYPTKEY key;
+    HCRYPTHASH hash;
+    BYTE hash_value[20], *sig_value;
+    DWORD hash_len, i;
+    BCRYPT_KEY_HANDLE bkey;
+    BCRYPT_HASH_HANDLE bhash;
+    BCRYPT_ALG_HANDLE alg;
+    BCRYPT_PKCS1_PADDING_INFO pad;
+    NTSTATUS status;
+
+    cert = CertCreateCertificateContext(X509_ASN_ENCODING, selfSignedCert, sizeof(selfSignedCert));
+    ok(cert != NULL, "CertCreateCertificateContext error %#x\n", GetLastError());
+
+    /* 1. Verify certificate signature with Crypto API */
+    ret = CryptVerifyCertificateSignature(0, cert->dwCertEncodingType,
+            cert->pbCertEncoded, cert->cbCertEncoded, &cert->pCertInfo->SubjectPublicKeyInfo);
+    ok(ret, "CryptVerifyCertificateSignature error %#x\n", GetLastError());
+
+    /* 2. Verify certificate signature with Crypto API manually */
+    ret = CryptAcquireContextA(&prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT);
+    ok(ret, "CryptAcquireContext error %#x\n", GetLastError());
+
+    ret = CryptImportPublicKeyInfoEx(prov, cert->dwCertEncodingType, &cert->pCertInfo->SubjectPublicKeyInfo, 0, 0, NULL, &key);
+    ok(ret, "CryptImportPublicKeyInfoEx error %#x\n", GetLastError());
+
+    ret = CryptDecodeObjectEx(cert->dwCertEncodingType, X509_CERT,
+            cert->pbCertEncoded, cert->cbCertEncoded, CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
+    ok(ret, "CryptDecodeObjectEx error %#x\n", GetLastError());
+
+    ret = CryptCreateHash(prov, CALG_SHA1, 0, 0, &hash);
+    ok(ret, "CryptCreateHash error %#x\n", GetLastError());
+
+    ret = CryptHashData(hash, info->ToBeSigned.pbData, info->ToBeSigned.cbData, 0);
+    ok(ret, "CryptHashData error %#x\n", GetLastError());
+
+    ret = CryptVerifySignatureW(hash, info->Signature.pbData, info->Signature.cbData, key, NULL, 0);
+    ok(ret, "CryptVerifySignature error %#x\n", GetLastError());
+
+    CryptDestroyHash(hash);
+    CryptDestroyKey(key);
+    CryptReleaseContext(prov, 0);
+
+    /* 3. Verify certificate signature with CNG */
+    ret = CryptImportPublicKeyInfoEx2(cert->dwCertEncodingType, &cert->pCertInfo->SubjectPublicKeyInfo, 0, NULL, &bkey);
+    ok(ret, "CryptImportPublicKeyInfoEx error %#x\n", GetLastError());
+
+    status = BCryptOpenAlgorithmProvider(&alg, BCRYPT_SHA1_ALGORITHM, MS_PRIMITIVE_PROVIDER, 0);
+    ok(!status, "got %#x\n", status);
+
+    status = BCryptCreateHash(alg, &bhash, NULL, 0, NULL, 0, 0);
+    ok(!status || broken(status == STATUS_INVALID_PARAMETER) /* Vista */, "got %#x\n", status);
+    if (status == STATUS_INVALID_PARAMETER)
+    {
+        win_skip("broken BCryptCreateHash\n");
+        goto done;
+    }
+
+    status = BCryptHashData(bhash, info->ToBeSigned.pbData, info->ToBeSigned.cbData, 0);
+    ok(!status, "got %#x\n", status);
+
+    status = BCryptFinishHash(bhash, hash_value, sizeof(hash_value), 0);
+    ok(!status, "got %#x\n", status);
+    ok(!memcmp(hash_value, selfSignedSignatureHash, sizeof(hash_value)), "got wrong hash value\n");
+
+    status = BCryptGetProperty(bhash, BCRYPT_HASH_LENGTH, (BYTE *)&hash_len, sizeof(hash_len), &size, 0);
+    ok(!status, "got %#x\n", status);
+    ok(hash_len == sizeof(hash_value), "got %u\n", hash_len);
+
+    sig_value = HeapAlloc(GetProcessHeap(), 0, info->Signature.cbData);
+    for (i = 0; i < info->Signature.cbData; i++)
+        sig_value[i] = info->Signature.pbData[info->Signature.cbData - i - 1];
+
+    pad.pszAlgId = BCRYPT_SHA1_ALGORITHM;
+    status = BCryptVerifySignature(bkey, &pad, hash_value, sizeof(hash_value), sig_value, info->Signature.cbData, BCRYPT_PAD_PKCS1);
+    ok(!status, "got %#x\n", status);
+
+    HeapFree(GetProcessHeap(), 0, sig_value);
+    BCryptDestroyHash(bhash);
+done:
+    BCryptCloseAlgorithmProvider(alg, 0);
+
+    LocalFree(info);
+    CertFreeCertificateContext(cert);
+}
+
 START_TEST(cert)
 {
     init_function_pointers();
@@ -4270,4 +4356,5 @@ START_TEST(cert)
     testAcquireCertPrivateKey();
     testGetPublicKeyLength();
     testIsRDNAttrsInCertificateName();
+    test_VerifySignature();
 }

@@ -5,13 +5,34 @@ msgstr ""
 "Project-Id-Version: Wine\n"
 "Report-Msgid-Bugs-To: https://bugs.winehq.org\n"
 "POT-Creation-Date: N/A\n"
-"PO-Revision-Date: 2021-01-30 22:00+0100\n"
+"PO-Revision-Date: 2021-04-21 09:20+0200\n"
 "Last-Translator: Floris Renaud <jkfloris@dds.nl>\n"
 "Language-Team: Dutch\n"
 "Language: nl\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+
+#: dlls/aclui/aclui.rc:29 dlls/inetcpl.cpl/inetcpl.rc:90
+#: programs/winefile/winefile.rc:114
+msgid "Security"
+msgstr "Beveiliging"
+
+#: dlls/aclui/aclui.rc:32
+msgid "&Group or user names:"
+msgstr "&Groeps- of gebruikersnamen:"
+
+#: dlls/aclui/aclui.rc:38
+msgid "Allow"
+msgstr "Toestaan"
+
+#: dlls/aclui/aclui.rc:39
+msgid "Deny"
+msgstr "Weigeren"
+
+#: dlls/aclui/aclui.rc:47
+msgid "Permissions for %1"
+msgstr "Rechten voor %1"
 
 #: dlls/appwiz.cpl/appwiz.rc:58
 msgid "Install/Uninstall"
@@ -3607,10 +3628,6 @@ msgstr ""
 msgid "Delete"
 msgstr "Verwijderen"
 
-#: dlls/inetcpl.cpl/inetcpl.rc:90 programs/winefile/winefile.rc:114
-msgid "Security"
-msgstr "Beveiliging"
-
 #: dlls/inetcpl.cpl/inetcpl.rc:112
 msgid ""
 "Certificates are used for your personal identification and to identify "
@@ -3855,15 +3872,15 @@ msgstr "Conditionele compilatie is uitgeschakeld"
 msgid "Expected '@'"
 msgstr "Verwacht '@'"
 
-#: dlls/jscript/jscript.rc:78
+#: dlls/jscript/jscript.rc:79
 msgid "Microsoft JScript compilation error"
 msgstr "Microsoft JScript compilatie fout"
 
-#: dlls/jscript/jscript.rc:79
+#: dlls/jscript/jscript.rc:80
 msgid "Microsoft JScript runtime error"
 msgstr "Microsoft JScript runtime-fout"
 
-#: dlls/jscript/jscript.rc:80 dlls/vbscript/vbscript.rc:64
+#: dlls/jscript/jscript.rc:81 dlls/vbscript/vbscript.rc:64
 msgid "Unknown runtime error"
 msgstr "Onbekende runtime-fout"
 
@@ -3956,14 +3973,18 @@ msgstr ""
 "ingesteld voor dit object"
 
 #: dlls/jscript/jscript.rc:74
+msgid "Cannot define property '|': object is not extensible"
+msgstr "Kan de eigenschap '|' niet definiëren: object is niet uitbreidbaar"
+
+#: dlls/jscript/jscript.rc:75
 msgid "Cannot redefine non-configurable property '|'"
 msgstr "Kan onconfigureerbare eigenschap '|' niet herdefiniëren"
 
-#: dlls/jscript/jscript.rc:75
+#: dlls/jscript/jscript.rc:76
 msgid "Cannot modify non-writable property '|'"
 msgstr "Kan onschrijfbare eigenschap '|' niet veranderen"
 
-#: dlls/jscript/jscript.rc:76
+#: dlls/jscript/jscript.rc:77
 msgid "Property cannot have both accessors and a value"
 msgstr "Eigenschap kan niet zowel accessors als een waarde hebben"
 
@@ -9500,10 +9521,9 @@ msgstr "Wilt u uw Wine sessie afsluiten?"
 msgid "Programs"
 msgstr "Programma's"
 
-#: dlls/shell32/shell32.rc:204 dlls/shell32/shell32.rc:219
-#: dlls/shell32/shell32.rc:150 dlls/shell32/shell32.rc:235
-msgid "Documents"
-msgstr "Documenten"
+#: dlls/shell32/shell32.rc:204
+msgid "My Documents"
+msgstr "Mijn Documenten"
 
 #: dlls/shell32/shell32.rc:205
 msgid "Favorites"
@@ -9517,13 +9537,13 @@ msgstr "Opstarten"
 msgid "Start Menu"
 msgstr "Start Menu"
 
-#: dlls/shell32/shell32.rc:208 dlls/shell32/shell32.rc:221
-msgid "Music"
-msgstr "Muziek"
+#: dlls/shell32/shell32.rc:208
+msgid "My Music"
+msgstr "Mijn Muziek"
 
-#: dlls/shell32/shell32.rc:209 dlls/shell32/shell32.rc:223
-msgid "Videos"
-msgstr "Video's"
+#: dlls/shell32/shell32.rc:209
+msgid "My Videos"
+msgstr "Mijn Video's"
 
 #: dlls/shell32/shell32.rc:210
 msgctxt "directory"
@@ -9550,17 +9570,34 @@ msgstr "Geschiedenis"
 msgid "Program Files"
 msgstr "Program Files"
 
-#: dlls/shell32/shell32.rc:217 dlls/shell32/shell32.rc:222
-msgid "Pictures"
-msgstr "Afbeeldingen"
+#: dlls/shell32/shell32.rc:217
+msgid "My Pictures"
+msgstr "Mijn Afbeeldingen"
 
 #: dlls/shell32/shell32.rc:218
 msgid "Common Files"
 msgstr "Gemeenschappelijke Bestanden"
 
+#: dlls/shell32/shell32.rc:219 dlls/shell32/shell32.rc:150
+#: dlls/shell32/shell32.rc:235
+msgid "Documents"
+msgstr "Documenten"
+
 #: dlls/shell32/shell32.rc:220
 msgid "Administrative Tools"
 msgstr "Administratief gereedschap"
+
+#: dlls/shell32/shell32.rc:221
+msgid "Music"
+msgstr "Muziek"
+
+#: dlls/shell32/shell32.rc:222
+msgid "Pictures"
+msgstr "Afbeeldingen"
+
+#: dlls/shell32/shell32.rc:223
+msgid "Videos"
+msgstr "Video's"
 
 #: dlls/shell32/shell32.rc:216
 msgid "Program Files (x86)"
@@ -12415,7 +12452,7 @@ msgstr ""
 "enzovoort. Deze opdracht heeft geen effect als hij wordt aangeroepen vanaf\n"
 "de opdrachtregel.\n"
 
-#: programs/cmd/cmd.rc:212 programs/start/start.rc:56
+#: programs/cmd/cmd.rc:212
 msgid ""
 "Start a program, or open a document in the program normally used for files\n"
 "with that suffix.\n"
@@ -12733,12 +12770,12 @@ msgstr ""
 msgid "Are you sure?"
 msgstr "Weet u het zeker?"
 
-#: programs/cmd/cmd.rc:366 programs/reg/reg.rc:50 programs/xcopy/xcopy.rc:43
+#: programs/cmd/cmd.rc:366 programs/reg/reg.rc:127 programs/xcopy/xcopy.rc:43
 msgctxt "Yes key"
 msgid "Y"
 msgstr "J"
 
-#: programs/cmd/cmd.rc:367 programs/reg/reg.rc:51 programs/xcopy/xcopy.rc:44
+#: programs/cmd/cmd.rc:367 programs/reg/reg.rc:128 programs/xcopy/xcopy.rc:44
 msgctxt "No key"
 msgid "N"
 msgstr "N"
@@ -12877,7 +12914,7 @@ msgstr "Volume in schijfstation %1!c! is %2\n"
 msgid "Volume in drive %1!c! has no label.\n"
 msgstr "Volume in schijfstation %1!c! heeft geen label.\n"
 
-#: programs/cmd/cmd.rc:402 programs/reg/reg.rc:49
+#: programs/cmd/cmd.rc:402 programs/reg/reg.rc:126
 msgid " (Yes|No)"
 msgstr " (Ja|Nee)"
 
@@ -13096,11 +13133,11 @@ msgstr "Wine Verkenner"
 
 #: programs/explorer/explorer.rc:33
 msgid "Start"
-msgstr "Opstarten"
+msgstr "Start"
 
 #: programs/explorer/explorer.rc:34 programs/winefile/winefile.rc:36
 msgid "&Run..."
-msgstr "&Starten..."
+msgstr "&Uitvoeren..."
 
 #: programs/fsutil/fsutil.mc:28
 msgid ""
@@ -14264,7 +14301,7 @@ msgid ""
 "  REG [operation] [parameters]\n"
 "\n"
 "Supported operations:\n"
-"  ADD | DELETE | IMPORT | EXPORT | QUERY\n"
+"  ADD | DELETE | EXPORT | IMPORT | QUERY\n"
 "\n"
 "For help on a specific operation, type:\n"
 "  REG [operation] /?\n"
@@ -14274,96 +14311,325 @@ msgstr ""
 "  REG [opdracht] [parameters]\n"
 "\n"
 "Ondersteunde opdrachten:\n"
-"  ADD | DELETE | IMPORT | EXPORT | QUERY\n"
+"  ADD | DELETE | EXPORT | IMPORT | QUERY\n"
 "\n"
 "Voor hulp bij een opdracht, type:\n"
 "  REG [opdracht] /?\n"
 "\n"
 
-#: programs/reg/reg.rc:36
+#: programs/reg/reg.rc:67
 msgid ""
-"REG ADD key_name [/v value_name | /ve] [/t type] [/s separator] [/d data] [/"
-"f]\n"
+"REG ADD <key> [/v value_name | /ve] [/t type] [/s separator] [/d data] [/f]\n"
+"\n"
+"  Adds a key to the registry or adds a new value to a given registry key.\n"
+"\n"
+"  <key>\n"
+"     The registry key to add or, if either [/v] or [/ve] is specified,\n"
+"     the key in which to add the new registry data.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to add.\n"
+"\n"
+"  /ve\n"
+"     Add an unnamed registry value. This option modifies the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /t <type>\n"
+"     The type of data to add to the registry. If [/t] is specified,\n"
+"     <type> must be one of the following:\n"
+"\n"
+"         REG_SZ    | REG_MULTI_SZ | REG_EXPAND_SZ\n"
+"         REG_DWORD | REG_BINARY   | REG_NONE\n"
+"\n"
+"     If [/t] is not specified, the default data type is REG_SZ.\n"
+"\n"
+"  /s <separator>\n"
+"     The character used to separate strings in REG_MULTI_SZ data.\n"
+"     If [/s] is not specified, the default separator is \\0.\n"
+"\n"
+"  /d <data>\n"
+"     The data to add to the new registry value.\n"
+"\n"
+"  /f\n"
+"     Modify the registry without prompting for confirmation.\n"
+"\n"
 msgstr ""
-"REG ADD sleutel_naam [/v waarde_naam | /ve] [/t type] [/s scheidingsteken] [/"
-"d data] [/f]\n"
+"REG ADD <sleutel> [/v waardenaam | /ve] [/t type] [/s scheidingsteken] [/d "
+"gegevens] [/f]\n"
+"\n"
+"  Voeg een sleutel toe aan het register of geef een nieuwe waarde aan een "
+"registersleutel.\n"
+"\n"
+"  <sleutel>\n"
+"     De registersleutel die toegevoegd wordt. Als [/v] of [/ve] is gegeven,\n"
+"     de sleutel waaraan de nieuwe registergegevens moeten worden "
+"toegevoegd.\n"
+"\n"
+"     Formaat: HOOFDSLEUTEL\\Subsleutel\n"
+"\n"
+"     HOOFDSLEUTEL: Een voorgedefinieerde registersleutel. Dit is één van:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subsleutel: Het volledige pad naar een registersleutel onder de "
+"gegeven\n"
+"     HOOFDSLEUTEL.\n"
+"\n"
+"  /v <waardenaam>\n"
+"     De naam van de registerwaarde die moet worden toegevoegd.\n"
+"\n"
+"  /ve\n"
+"     Voeg een lege registerwaarde toe. Deze optie wijzigt de (Standaard)\n"
+"     registerwaarde.\n"
+"\n"
+"  /t <type>\n"
+"     Het gegevenstype van de registersleutel. Als [/t] is gegeven, dan moet\n"
+"     <type> één van de volgende zijn:\n"
+"\n"
+"         REG_SZ    | REG_MULTI_SZ | REG_EXPAND_SZ\n"
+"         REG_DWORD | REG_BINARY   | REG_NONE\n"
+"\n"
+"     Als [/t] niet is gegeven, dan wordt het type REG_SZ verondersteld.\n"
+"\n"
+"  /s <scheidingsteken>\n"
+"     Het teken dat gebruikt wordt om gegevens in REG_MULTI_SZ te scheiden.\n"
+"     Als [/s] niet is gegeven, wordt het standaard teken \\0 verwacht.\n"
+"\n"
+"  /d <gegevens>\n"
+"     De gevens die toegevoegd moeten worden aan een registerwaarde.\n"
+"\n"
+"  /f\n"
+"     Wijzig het register zonder bevestiging te vragen.\n"
+"\n"
 
-#: programs/reg/reg.rc:37
-msgid "REG DELETE key_name [/v value_name | /ve | /va] [/f]\n"
-msgstr "REG DELETE sleutel_naam [/v waarde_naam | /ve | /va] [/f]\n"
+#: programs/reg/reg.rc:92
+msgid ""
+"REG DELETE <key> [/v value_name | /ve | /va] [/f]\n"
+"\n"
+"  Deletes a registry key (including all subkeys and values), or deletes\n"
+"  one or more values from a given registry key.\n"
+"\n"
+"  <key>\n"
+"     The registry key to delete or, if one of [/v], [/ve] or [/va] is\n"
+"     specified, the registry key in which to delete one or more values.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to delete.\n"
+"\n"
+"  /ve\n"
+"     Delete an unnamed registry value. This option deletes the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /va\n"
+"     Delete all values from a registry key.\n"
+"\n"
+"  /f\n"
+"     Delete a registry key (including all subkeys and values) without\n"
+"     prompting for confirmation.\n"
+"\n"
+msgstr ""
+"REG DELETE <sleutel> [/v waardenaam | /ve | /va] [/f]\n"
+"\n"
+"  Verwijder een registersleutel (inclusief alle subsleutels en waardes),\n"
+"  of een waarde van een registersleutel.\n"
+"\n"
+"  <sleutel>\n"
+"     De registersleutel die moet worden verwijderd. Als [/v], [/ve] of [/"
+"va]\n"
+"     is gegeven, de registersleutel waarin de waarde moet worden "
+"verwijderd.\n"
+"\n"
+"     Formaat: HOOFDSLEUTEL\\Subsleutel\n"
+"\n"
+"     HOOFDSLEUTEL: Een voorgedefinieerde registersleutel. Dit is één van:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subsleutel: Het volledige pad naar een registersleutel onder de "
+"gegeven\n"
+"     HOOFDSLEUTEL.\n"
+"\n"
+"  /v <waardenaam>\n"
+"     De naam van de registerwaarde die verwijderd moet worden.\n"
+"\n"
+"  /ve\n"
+"     Verwijder een lege registerwaarde. Deze optie haalt de (Standaard)\n"
+"     registerwaarde weg.\n"
+"\n"
+"  /va\n"
+"     Verwijder alle waardes van een registersleutel.\n"
+"\n"
+"  /f\n"
+"     Verwijder een registersleutel (inclusief alle subsleutels en waardes)\n"
+"     zonder bevestiging te vragen.\n"
+"\n"
 
-#: programs/reg/reg.rc:38
-msgid "REG QUERY key_name [/v value_name | /ve] [/s]\n"
-msgstr "REG QUERY sleutel_naam [/v waarde_naam | /ve] [/s]\n"
+#: programs/reg/reg.rc:114
+msgid ""
+"REG QUERY <key> [/v value_name | /ve] [/s]\n"
+"\n"
+"  Queries a specified registry key and lists all immediate subkeys, values\n"
+"  and data within that key. Use [/s] to recursively query each subkey.\n"
+"\n"
+"  <key>\n"
+"     The registry key to query.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to query. If neither [/v] nor [/ve] is\n"
+"     specified, all values under <key> are listed.\n"
+"\n"
+"  /ve\n"
+"     Query an unnamed registry value. This option queries the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /s\n"
+"     List all registry entries under <key> and its subkeys.\n"
+"\n"
+msgstr ""
+"REG QUERY <sleutel> [/v waardenaam | /ve] [/s]\n"
+"\n"
+"  Toon een registersleutel en laat alle directe subsleutels, waardes en\n"
+"  gegevens zien. Gebruik [/s] om de gegevens van de onderliggende\n"
+"  subsleutels te tonen.\n"
+"\n"
+"  <sleutel>\n"
+"     De te tonen registersleutel.\n"
+"\n"
+"     Formaat: HOOFDSLEUTEL\\Subsleutel\n"
+"\n"
+"     HOOFDSLEUTEL: Een voorgedefinieerde registersleutel. Dit is één van:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subsleutel: Het volledige pad naar een registersleutel onder de "
+"gegeven\n"
+"     HOOFDSLEUTEL.\n"
+"\n"
+"  /v <waardenaam>\n"
+"     Toon de gegevens van de registerwaarde. Als noch [/v] noch [/ve] is\n"
+"     gegeven, worden alle waardes van de <sleutel> getoond.\n"
+"\n"
+"  /ve\n"
+"     Toon een een lege registerwaarde. Deze optie vraagt de waarde op van\n"
+"     de (Standaard) registerwaarde.\n"
+"\n"
+"  /s\n"
+"     Toon alle registervermeldingen onder <sleutel> en zijn subsleutels.\n"
+"\n"
 
-#: programs/reg/reg.rc:39
-msgid "The operation completed successfully\n"
-msgstr "De bewerking is succesvol voltooid\n"
+#: programs/reg/reg.rc:116
+msgid "reg: The operation completed successfully\n"
+msgstr "reg: De bewerking is succesvol voltooid\n"
 
-#: programs/reg/reg.rc:40
-msgid "reg: Invalid key name\n"
-msgstr "reg: Foutieve sleutelnaam\n"
+#: programs/reg/reg.rc:117
+msgid "reg: Invalid registry key\n"
+msgstr "reg: Foutieve registersleutel\n"
 
-#: programs/reg/reg.rc:41
+#: programs/reg/reg.rc:118
 msgid "reg: Invalid command line parameters\n"
 msgstr "reg: Foutieve opdrachtregel-parameters\n"
 
-#: programs/reg/reg.rc:42
+#: programs/reg/reg.rc:119
 msgid "reg: Unable to access remote machine\n"
 msgstr "reg: Kan de computer op afstand niet benaderen\n"
 
-#: programs/reg/reg.rc:43
-msgid ""
-"reg: The system was unable to find the specified registry key or value\n"
-msgstr ""
-"reg: Het systeem kon de gespecificeerde registersleutel of waarde niet "
-"vinden\n"
+#: programs/reg/reg.rc:120
+msgid "reg: Unable to find the specified registry value\n"
+msgstr "reg: Kan de gegeven registerwaarde niet vinden\n"
 
-#: programs/reg/reg.rc:44
+#: programs/reg/reg.rc:121
 msgid "reg: Unsupported registry data type [%1]\n"
 msgstr "reg: Register data type wordt niet ondersteund [%1]\n"
 
-#: programs/reg/reg.rc:45
+#: programs/reg/reg.rc:122
 msgid "reg: The option [/d] must be followed by a valid integer\n"
 msgstr "reg: De optie [/d] moet gevolgd worden door een geheel getal\n"
 
-#: programs/reg/reg.rc:46
+#: programs/reg/reg.rc:123
 msgid "reg: The option [/d] must be followed by a valid hexadecimal value\n"
 msgstr "reg: De optie [/d] moet gevolgd worden door een hexadecimale waarde\n"
 
-#: programs/reg/reg.rc:47
+#: programs/reg/reg.rc:124
 msgid "reg: Unhandled registry data type [/t 0x%1!x!, /d %2]\n"
 msgstr "reg: Onverwerkte registergegevenstypen [/t 0x%1!x!, /d %2]\n"
 
-#: programs/reg/reg.rc:48
+#: programs/reg/reg.rc:125
 msgid "The registry value '%1' already exists. Do you want to overwrite it?"
 msgstr "De registerwaarde '%1' bestand bestaat al. Wilt u het vervangen?"
 
-#: programs/reg/reg.rc:52
-msgid "The registry operation was cancelled\n"
-msgstr "De register bewerking is afgebroken\n"
+#: programs/reg/reg.rc:129
+msgid "reg: The registry operation was cancelled\n"
+msgstr "reg: De register bewerking is afgebroken\n"
 
-#: programs/reg/reg.rc:53 programs/regedit/regedit.rc:239
+#: programs/reg/reg.rc:130 programs/regedit/regedit.rc:239
 msgid "(Default)"
 msgstr "(Standaard)"
 
-#: programs/reg/reg.rc:54
+#: programs/reg/reg.rc:131
 msgid "Are you sure you want to delete the registry value '%1'?"
 msgstr "Weet u zeker dat u de registerwaarde '%1' wilt verwijderen?"
 
-#: programs/reg/reg.rc:55
+#: programs/reg/reg.rc:132
 msgid "Are you sure you want to delete all registry values in '%1'?"
 msgstr "Weet u zeker dat u alle registerwaardes in '%1' wilt verwijderen?"
 
-#: programs/reg/reg.rc:56
+#: programs/reg/reg.rc:133
 msgid "Are you sure you want to delete the registry key '%1'?"
 msgstr "Weet u zeker dat u registersleutel '%1' wilt verwijderen?"
 
-#: programs/reg/reg.rc:57
+#: programs/reg/reg.rc:134
 msgid "reg: The option [/d] must be followed by a valid string\n"
 msgstr "reg: De optie [/d] moet gevolgd worden door tekenreeks\n"
 
-#: programs/reg/reg.rc:58
+#: programs/reg/reg.rc:135
 msgid ""
 "reg: Unable to delete all registry values in '%1'. An unexpected error "
 "occurred.\n"
@@ -14371,7 +14637,7 @@ msgstr ""
 "reg: Onmogelijk om alle registerwaardes in '%1' te verwijderen. Er is een "
 "onverwachte fout opgetreden.\n"
 
-#: programs/reg/reg.rc:59
+#: programs/reg/reg.rc:136
 msgid ""
 "reg: Unable to complete the specified operation. An unexpected error "
 "occurred.\n"
@@ -14379,57 +14645,152 @@ msgstr ""
 "reg: Onmogelijk om de gevraagde opdracht uit te voeren. Er is een "
 "onverwachte fout opgetreden.\n"
 
-#: programs/reg/reg.rc:60
+#: programs/reg/reg.rc:137
 msgid "Search complete. Number of matches found: %1!d!\n"
 msgstr "Zoeken voltooid. Aantal gevonden resultaten: %1!d!\n"
 
-#: programs/reg/reg.rc:61
+#: programs/reg/reg.rc:138
 msgid "reg: Invalid syntax. "
 msgstr "reg: Foutieve syntax. "
 
-#: programs/reg/reg.rc:62
+#: programs/reg/reg.rc:139
 msgid "reg: Invalid option [%1]. "
 msgstr "reg: Ongeldige optie [%1]. "
 
-#: programs/reg/reg.rc:63
+#: programs/reg/reg.rc:140
 msgid "Type \"REG /?\" for help.\n"
 msgstr "Type \"REG /?\" voor hulp.\n"
 
-#: programs/reg/reg.rc:64
+#: programs/reg/reg.rc:141
 msgid "Type \"REG %1 /?\" for help.\n"
 msgstr "Type \"REG %1 /?\" voor hulp.\n"
 
-#: programs/reg/reg.rc:65 programs/regedit/regedit.rc:240
+#: programs/reg/reg.rc:142 programs/regedit/regedit.rc:240
 msgid "(value not set)"
 msgstr "(Geen waarde ingesteld)"
 
-#: programs/reg/reg.rc:66
-msgid "REG IMPORT file.reg\n"
-msgstr "REG IMPORT bestand.reg\n"
+#: programs/reg/reg.rc:147
+msgid ""
+"REG IMPORT <file>\n"
+"\n"
+"  Imports keys, values and data from a given file into the registry.\n"
+"\n"
+"  <file>\n"
+"     The name and path of the registry file to import.\n"
+"\n"
+msgstr ""
+"REG IMPORT <bestand>\n"
+"\n"
+"  Importeer sleutels, waardes en gegevens uit een bestand in het register.\n"
+"\n"
+"  <bestand>\n"
+"     De naam en het pad van het registerbestand dat geïmporteerd moet "
+"worden.\n"
+"\n"
 
-#: programs/reg/reg.rc:67
+#: programs/reg/reg.rc:149
 msgid "reg: The file '%1' was not found.\n"
 msgstr "reg: Het bestand '%1' is niet gevonden.\n"
 
-#: programs/reg/reg.rc:68
+#: programs/reg/reg.rc:150
 msgid "reg: Unable to open the registry key '%1'.\n"
 msgstr "reg: Onmogelijk om de registersleutel '%1' te openen.\n"
 
-#: programs/reg/reg.rc:69
+#: programs/reg/reg.rc:151
 msgid "reg: Unrecognized escape sequence [\\%1!c!]\n"
 msgstr "reg: Escape-tekenreeks niet herkend [\\%1!c!]\n"
 
-#: programs/reg/reg.rc:70
-msgid "REG EXPORT key_name file.reg [/y]\n"
-msgstr "REG EXPORT sleutelnaam bestand.reg [/y]\n"
+#: programs/reg/reg.rc:170
+msgid ""
+"REG EXPORT <key> <file> [/y]\n"
+"\n"
+"  Exports a specified registry key (including all subkeys and values)\n"
+"  to a file.\n"
+"\n"
+"  <key>\n"
+"     The registry key to export.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  <file>\n"
+"     The name and path of the registry file that will be created.\n"
+"     This file must have a .reg extension.\n"
+"\n"
+"  /y\n"
+"     Overwrite <file> without prompting for confirmation.\n"
+"\n"
+msgstr ""
+"REG EXPORT <sleutel> <bestand> [/y]\n"
+"\n"
+"  Exporteer een registersleutel (inclusief alle subsleutels en waardes)\n"
+"  naar een bestand.\n"
+"\n"
+"  <sleutel>\n"
+"     De registersleutel die geëxporteerd moet worden.\n"
+"\n"
+"     Formaat: HOOFDSLEUTEL\\Subsleutel\n"
+"\n"
+"     HOOFDSLEUTEL: Een voorgedefinieerde registersleutel. Dit is één van:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subsleutel: Het volledige pad naar een registersleutel onder de "
+"gegeven\n"
+"     HOOFDSLEUTEL.\n"
+"\n"
+"  <bestand>\n"
+"     De naam en pad van het registerbestand dat aangemaakt wordt.\n"
+"     Dit bestand moet de extensie .reg hebben.\n"
+"\n"
+"  /y\n"
+"     <bestand> overschrijven zonder een bevestiging te vragen.\n"
+"\n"
 
-#: programs/reg/reg.rc:71
-msgid "reg: Invalid system key [%1]\n"
-msgstr "reg: Foutieve systeemsleutel [%1]\n"
+#: programs/reg/reg.rc:172
+msgid "reg: Invalid system key\n"
+msgstr "reg: Foutieve systeemsleutel\n"
 
-#: programs/reg/reg.rc:72
+#: programs/reg/reg.rc:173
 msgid "The file '%1' already exists. Do you want to overwrite it?"
 msgstr "Het bestand '%1' bestaat al. Wilt u het overschrijven?"
+
+#: programs/reg/reg.rc:174
+msgid "reg: Unable to find the specified registry key\n"
+msgstr "reg: Kan de gegeven registersleutel niet vinden\n"
+
+#: programs/reg/reg.rc:175
+msgid "reg: Unable to import the registry key '%1'\n"
+msgstr "reg: Importeren van de registersleutel '%1' is niet mogelijk.\n"
+
+#: programs/reg/reg.rc:179
+msgid ""
+"  /reg:32\n"
+"     Access the registry using the 32-bit view.\n"
+"\n"
+"  /reg:64\n"
+"     Access the registry using the 64-bit view.\n"
+"\n"
+msgstr ""
+"  /reg:32\n"
+"     Open de 32-bits weergave van het register.\n"
+"\n"
+"  /reg:64\n"
+"     Open de 64-bits weergave van het register.\n"
+"\n"
 
 #: programs/regedit/regedit.rc:34
 msgid "&Registry"
@@ -15100,7 +15461,68 @@ msgstr "regsvr32: Verwijderen van DLL '%1' mislukt\n"
 msgid "regsvr32: Successfully uninstalled DLL '%1'\n"
 msgstr "regsvr32: Verwijderen van DLL '%1' gelukt\n"
 
-#: programs/start/start.rc:58
+#: programs/start/start.rc:57
+msgid ""
+"Start a program, or open a document in the program normally used for files\n"
+"with that suffix.\n"
+"Usage:\n"
+"start [options] program_filename [...]\n"
+"start [options] document_filename\n"
+"\n"
+"Options:\n"
+"\"title\"        Specifies the title of the child windows.\n"
+"/d directory   Start the program in the specified directory.\n"
+"/b             Don't create a new console for the program.\n"
+"/i             Start the program with fresh environment variables.\n"
+"/min           Start the program minimized.\n"
+"/max           Start the program maximized.\n"
+"/low           Start the program in the idle priority class.\n"
+"/normal        Start the program in the normal priority class.\n"
+"/high          Start the program in the high priority class.\n"
+"/realtime      Start the program in the realtime priority class.\n"
+"/abovenormal   Start the program in the abovenormal priority class.\n"
+"/belownormal   Start the program in the belownormal priority class.\n"
+"/node n        Start the program on the specified NUMA node.\n"
+"/affinity mask Start the program with the specified affinity mask.\n"
+"/wait          Wait for the started program to finish, then exit with its\n"
+"exit code.\n"
+"/unix          Use a Unix filename and start the file like Windows\n"
+"Explorer.\n"
+"/exec          Exec the specified file (for internal Wine usage).\n"
+"/ProgIDOpen    Open a document using the specified progID.\n"
+"/?             Display this help and exit.\n"
+msgstr ""
+"Start een programma, of open een document met het programma dat normaal "
+"voor\n"
+"deze extensie gebruikt wordt.\n"
+"Gebruik:\n"
+"start [opties] programma-naam [...]\n"
+"start [opties] document-naam\n"
+"\n"
+"Opties:\n"
+"\"titel\"        Specificeer de titel van het \"child\" venster.\n"
+"/d map         Start het programma in de gespecificeerde map.\n"
+"/b             Creeer geen nieuwe console voor het programma.\n"
+"/i             Start het programma met verse omgevingsvariabelen.\n"
+"/min           Start het programma geminimaliseerd op.\n"
+"/max           Start het programma gemaximaliseerd op.\n"
+"/low           Start het programma met lage prioriteit op.\n"
+"/normal        Start het programma met normale prioriteit op.\n"
+"/high          Start het programma met hoge prioriteit op.\n"
+"/realtime      Start het programma met \"realtime\" prioriteit op.\n"
+"/abovenormal   Start het programma in \"abovenormal\" prioriteit op.\n"
+"/belownormal   Start het programma in \"belownormal\" prioriteit op.\n"
+"/node n        Start het programma op de gespecificeerde NUMA node.\n"
+"/affinity mask Start het program met het gespecificeerde affiniteitsmasker.\n"
+"/wait          Wacht tot het gestarte programma beeindigd is, dan afsluiten\n"
+"               met de exit code.\n"
+"/unix          Gebruik een Unix bestandsnaam en start het bestand zoals\n"
+"               Windows Verkenner.\n"
+"/exec          Voer het opgegeven bestand uit (intern gebruikt in Wine).\n"
+"/ProgIDOpen    Open een document met het specificeerde progID.\n"
+"/?             Toon deze hulp en eindig.\n"
+
+#: programs/start/start.rc:59
 msgid ""
 "Application could not be started, or no application associated with the "
 "specified file.\n"
@@ -15110,7 +15532,7 @@ msgstr ""
 "opgegeven bestand.\n"
 "ShellExecuteEx is mislukt"
 
-#: programs/start/start.rc:60
+#: programs/start/start.rc:61
 msgid "Could not translate the specified Unix filename to a DOS filename."
 msgstr ""
 "Kon de opgegeven Unix bestandsnaam niet omzetten naar een DOS bestandsnaam."
@@ -16129,10 +16551,10 @@ msgid ""
 "linked to the Libraries and Graphics tabs to allow you to change system-wide "
 "or per-application settings in those tabs as well."
 msgstr ""
-"Wine geeft de mogelijkheid om per toepassing de Windows versie in te "
-"stellen. Dit tabblad is gekoppeld aan de tabbladen 'Bibliotheken' en "
-"'Grafisch' om zowel systeembreed als programmaspecifiek instellingen in deze "
-"tabbladen mogelijk te maken."
+"Voor elk programma kan Wine apart de Windows versie instellen. Dit tabblad "
+"is gekoppeld aan de tabbladen 'Bibliotheken' en 'Grafisch'. Hierdoor kan per "
+"programma de standaardinstellingen of programmaspecifieke instellingen "
+"gebruikt worden."
 
 #: programs/winecfg/winecfg.rc:158
 msgid "Add appli&cation..."
@@ -16164,7 +16586,7 @@ msgstr "Laat de vensterbeheerder de vensters &beheren"
 
 #: programs/winecfg/winecfg.rc:172
 msgid "&Emulate a virtual desktop"
-msgstr "&Emuleer een virtueel bureaublad"
+msgstr "Maak een &virtueel bureaublad"
 
 #: programs/winecfg/winecfg.rc:174
 msgid "Desktop &size:"
@@ -16498,7 +16920,7 @@ msgstr "Automatisch"
 
 #: programs/winecfg/winecfg.rc:69
 msgid "Local hard disk"
-msgstr "Hardeschijf"
+msgstr "Harde schijf"
 
 #: programs/winecfg/winecfg.rc:70
 msgid "Network share"
@@ -16510,7 +16932,7 @@ msgstr "Diskettestation"
 
 #: programs/winecfg/winecfg.rc:72
 msgid "CD-ROM"
-msgstr "Cd-rom"
+msgstr "CD-ROM"
 
 #: programs/winecfg/winecfg.rc:73
 msgid ""
@@ -16520,7 +16942,7 @@ msgid ""
 msgstr ""
 "U kunt geen schijven meer toevoegen.\n"
 "\n"
-"Elke schijf moet een letter van A tot Z hebben dus het kunnen er niet meer "
+"Elke schijf moet een letter van A tot Z hebben. Het kunnen er dus niet meer "
 "dan 26 zijn."
 
 #: programs/winecfg/winecfg.rc:74
@@ -16711,8 +17133,8 @@ msgid ""
 "Database</a> for tips about running this application."
 msgstr ""
 "Dit kan veroorzaakt worden door een probleem in het programma of een fout in "
-"Wine. U kunt zoeken op <a href=\"https://appdb.winehq.org\">Application "
-"Database</a> naar tips voor dit programma."
+"Wine. Zoek in de <a href=\"https://appdb.winehq.org\">Programma Database</a> "
+"naar tips voor dit programma."
 
 #: programs/winedbg/winedbg.rc:62
 msgid "Show &Details"
@@ -16729,9 +17151,9 @@ msgid ""
 "button, then <a href=\"https://wiki.winehq.org/Bugs\">file a bug report</a> "
 "and attach that file to the report."
 msgstr ""
-"Indien dit probleem zich niet voordoet onder Windows en het probleem is nog "
-"niet gerapporteerd, dan kunt U gedetailleerde informatie in een bestand "
-"opslaan met de \"Opslaan als\" knop. Dit bestand kunt U via <a href="
+"Indien dit probleem zich niet voordoet onder Windows en het probleem nog "
+"niet is gerapporteerd, dan kunt u gedetailleerde informatie in een bestand "
+"opslaan met de \"Opslaan als\" knop. Dit bestand kunt u via <a href="
 "\"https://wiki.winehq.org/Bugs\">file a bug report</a> versturen."
 
 #: programs/winedbg/winedbg.rc:40

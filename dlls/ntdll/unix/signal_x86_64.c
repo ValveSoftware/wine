@@ -28,7 +28,6 @@
 #include "wine/port.h"
 
 #include <assert.h>
-#include <errno.h>
 #include <pthread.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -64,13 +63,6 @@
 #endif
 #ifdef __APPLE__
 # include <mach/mach.h>
-#endif
-
-#if defined(HAVE_LINUX_FILTER_H) && defined(HAVE_LINUX_SECCOMP_H) && defined(HAVE_SYS_PRCTL_H)
-#define HAVE_SECCOMP 1
-# include <linux/filter.h>
-# include <linux/seccomp.h>
-# include <sys/prctl.h>
 #endif
 
 #define NONAMELESSUNION
@@ -1715,6 +1707,65 @@ NTSTATUS context_to_server( context_t *to, const CONTEXT *from )
  */
 NTSTATUS context_from_server( CONTEXT *to, const context_t *from )
 {
+    if (from->cpu == CPU_x86)
+    {
+        /* convert the WoW64 context */
+        to->ContextFlags = CONTEXT_AMD64;
+        if (from->flags & SERVER_CTX_CONTROL)
+        {
+            to->ContextFlags |= CONTEXT_CONTROL;
+            to->Rbp    = from->ctl.i386_regs.ebp;
+            to->Rip    = from->ctl.i386_regs.eip;
+            to->Rsp    = from->ctl.i386_regs.esp;
+            to->SegCs  = from->ctl.i386_regs.cs;
+            to->SegSs  = from->ctl.i386_regs.ss;
+            to->EFlags = from->ctl.i386_regs.eflags;
+        }
+
+        if (from->flags & SERVER_CTX_INTEGER)
+        {
+            to->ContextFlags |= CONTEXT_INTEGER;
+            to->Rax = from->integer.i386_regs.eax;
+            to->Rcx = from->integer.i386_regs.ecx;
+            to->Rdx = from->integer.i386_regs.edx;
+            to->Rbx = from->integer.i386_regs.ebx;
+            to->Rsi = from->integer.i386_regs.esi;
+            to->Rdi = from->integer.i386_regs.edi;
+            to->R8  = 0;
+            to->R9  = 0;
+            to->R10 = 0;
+            to->R11 = 0;
+            to->R12 = 0;
+            to->R13 = 0;
+            to->R14 = 0;
+            to->R15 = 0;
+        }
+        if (from->flags & SERVER_CTX_SEGMENTS)
+        {
+            to->ContextFlags |= CONTEXT_SEGMENTS;
+            to->SegDs = from->seg.i386_regs.ds;
+            to->SegEs = from->seg.i386_regs.es;
+            to->SegFs = from->seg.i386_regs.fs;
+            to->SegGs = from->seg.i386_regs.gs;
+        }
+        if (from->flags & SERVER_CTX_FLOATING_POINT)
+        {
+            to->ContextFlags |= CONTEXT_FLOATING_POINT;
+            memset(&to->u.FltSave, 0, sizeof(to->u.FltSave));
+        }
+        if (from->flags & SERVER_CTX_DEBUG_REGISTERS)
+        {
+            to->ContextFlags |= CONTEXT_DEBUG_REGISTERS;
+            to->Dr0 = from->debug.i386_regs.dr0;
+            to->Dr1 = from->debug.i386_regs.dr1;
+            to->Dr2 = from->debug.i386_regs.dr2;
+            to->Dr3 = from->debug.i386_regs.dr3;
+            to->Dr6 = from->debug.i386_regs.dr6;
+            to->Dr7 = from->debug.i386_regs.dr7;
+        }
+        return STATUS_SUCCESS;
+    }
+
     if (from->cpu != CPU_x86_64) return STATUS_INVALID_PARAMETER;
 
     to->ContextFlags = CONTEXT_AMD64 | (to->ContextFlags & 0x40);
@@ -1885,23 +1936,18 @@ NTSTATUS WINAPI NtSetContextThread( HANDLE handle, const CONTEXT *context )
  */
 NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
 {
+    NTSTATUS ret;
+    DWORD needed_flags;
     struct syscall_frame *frame = amd64_thread_data()->syscall_frame;
     BOOL self = (handle == GetCurrentThread());
-    BOOL use_cached_debug_regs = FALSE;
-    DWORD needed_flags;
     XSTATE *xstate;
-    NTSTATUS ret;
 
     if (!context) return STATUS_INVALID_PARAMETER;
 
     needed_flags = context->ContextFlags & ~CONTEXT_AMD64;
 
-    if (self && needed_flags & CONTEXT_DEBUG_REGISTERS)
-    {
-        /* debug registers require a server call if hw breakpoints are enabled */
-        if (amd64_thread_data()->dr7 & 0xff) self = FALSE;
-        else use_cached_debug_regs = TRUE;
-    }
+    /* debug registers require a server call */
+    if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64)) self = FALSE;
 
     if (!self)
     {
@@ -1988,27 +2034,15 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
             context->MxCsr = context->u.FltSave.MxCsr;
             context->ContextFlags |= CONTEXT_FLOATING_POINT;
         }
+        /* update the cached version of the debug registers */
         if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64))
         {
-            if (use_cached_debug_regs)
-            {
-                context->Dr0 = amd64_thread_data()->dr0;
-                context->Dr1 = amd64_thread_data()->dr1;
-                context->Dr2 = amd64_thread_data()->dr2;
-                context->Dr3 = amd64_thread_data()->dr3;
-                context->Dr6 = amd64_thread_data()->dr6;
-                context->Dr7 = amd64_thread_data()->dr7;
-            }
-            else
-            {
-                /* update the cached version of the debug registers */
-                amd64_thread_data()->dr0 = context->Dr0;
-                amd64_thread_data()->dr1 = context->Dr1;
-                amd64_thread_data()->dr2 = context->Dr2;
-                amd64_thread_data()->dr3 = context->Dr3;
-                amd64_thread_data()->dr6 = context->Dr6;
-                amd64_thread_data()->dr7 = context->Dr7;
-            }
+            amd64_thread_data()->dr0 = context->Dr0;
+            amd64_thread_data()->dr1 = context->Dr1;
+            amd64_thread_data()->dr2 = context->Dr2;
+            amd64_thread_data()->dr3 = context->Dr3;
+            amd64_thread_data()->dr6 = context->Dr6;
+            amd64_thread_data()->dr7 = context->Dr7;
         }
         if ((cpu_info.FeatureSet & CPU_FEATURE_AVX) && (xstate = xstate_from_context( context )))
         {
@@ -2369,220 +2403,6 @@ static inline DWORD is_privileged_instr( CONTEXT *context )
     return 0;
 }
 
-#ifdef HAVE_SECCOMP
-static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
-{
-    ULONG64 *dispatcher_address = (ULONG64 *)((char *)user_shared_data + page_size);
-    ucontext_t *ctx = sigcontext;
-    void ***rsp;
-
-    TRACE("SIGSYS, rax %#llx, rip %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX],
-            ctx->uc_mcontext.gregs[REG_RIP]);
-
-    rsp = (void ***)&ctx->uc_mcontext.gregs[REG_RSP];
-    *rsp -= 1;
-    **rsp = (void *)(ctx->uc_mcontext.gregs[REG_RIP] + 0xb);
-
-    ctx->uc_mcontext.gregs[REG_RIP] = *dispatcher_address;
-}
-
-extern unsigned int __wine_syscall_nr_NtClose;
-extern unsigned int __wine_syscall_nr_NtCreateFile;
-extern unsigned int __wine_syscall_nr_NtGetContextThread;
-extern unsigned int __wine_syscall_nr_NtQueryInformationProcess;
-extern unsigned int __wine_syscall_nr_NtQuerySystemInformation;
-extern unsigned int __wine_syscall_nr_NtQueryVirtualMemory;
-extern unsigned int __wine_syscall_nr_NtReadFile;
-extern unsigned int __wine_syscall_nr_NtWriteFile;
-
-static void sigsys_handler_rdr2( int signal, siginfo_t *siginfo, void *sigcontext )
-{
-    ULONG64 *dispatcher_address = (ULONG64 *)((char *)user_shared_data + page_size);
-    ucontext_t *ctx = sigcontext;
-    void ***rsp;
-
-    TRACE("SIGSYS, rax %#llx, rip %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX],
-            ctx->uc_mcontext.gregs[REG_RIP]);
-
-    rsp = (void ***)&ctx->uc_mcontext.gregs[REG_RSP];
-    *rsp -= 1;
-    **rsp = (void *)(ctx->uc_mcontext.gregs[REG_RIP] + 0xb);
-
-    ctx->uc_mcontext.gregs[REG_RIP] = *dispatcher_address;
-
-    /* syscall numbers are for Windows 10 1809 (build 17763) */
-    switch (ctx->uc_mcontext.gregs[REG_RAX])
-    {
-        case 0x19:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtQueryInformationProcess;
-            break;
-        case 0x36:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtQuerySystemInformation;
-            break;
-        case 0xec:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtGetContextThread;
-            break;
-        case 0x55:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtCreateFile;
-            break;
-        case 0x08:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtWriteFile;
-            break;
-        case 0x06:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtReadFile;
-            break;
-        case 0x0f:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtClose;
-            break;
-        case 0x23:
-            ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtQueryVirtualMemory;
-            break;
-         default:
-            FIXME("Unhandled syscall %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX]);
-            break;
-    }
-}
-#endif
-
-#ifdef HAVE_SECCOMP
-static int sc_seccomp(unsigned int operation, unsigned int flags, void *args)
-{
-#ifndef __NR_seccomp
-#   define __NR_seccomp 317
-#endif
-    return syscall(__NR_seccomp, operation, flags, args);
-}
-#endif
-
-static void check_bpf_jit_enable(void)
-{
-    char enabled;
-    int fd;
-
-    fd = open("/proc/sys/net/core/bpf_jit_enable", O_RDONLY);
-    if (fd == -1)
-    {
-        WARN("Could not open /proc/sys/net/core/bpf_jit_enable.\n");
-        return;
-    }
-
-    if (read(fd, &enabled, sizeof(enabled)) == sizeof(enabled))
-    {
-        TRACE("enabled %#x.\n", enabled);
-
-        if (enabled != '1')
-            ERR("BPF JIT is not enabled in the kernel, enable it to reduce syscall emulation overhead.\n");
-    }
-    else
-    {
-        WARN("Could not read /proc/sys/net/core/bpf_jit_enable.\n");
-    }
-    close(fd);
-}
-
-static void install_bpf(struct sigaction *sig_act)
-{
-#ifdef HAVE_SECCOMP
-#   ifndef SECCOMP_FILTER_FLAG_SPEC_ALLOW
-#       define SECCOMP_FILTER_FLAG_SPEC_ALLOW (1UL << 2)
-#   endif
-
-#   ifndef SECCOMP_SET_MODE_FILTER
-#       define SECCOMP_SET_MODE_FILTER 1
-#   endif
-    static const unsigned int flags = SECCOMP_FILTER_FLAG_SPEC_ALLOW;
-    static struct sock_filter filter[] =
-    {
-       BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
-                (offsetof(struct seccomp_data, nr))),
-       BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0xf000, 0, 1),
-       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-    };
-    static struct sock_filter filter_rdr2[] =
-    {
-        /* Trap anything called from RDR2 or the launcher (0x140000000 - 0x150000000)*/
-        /* > 0x140000000 */
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 0),
-        BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x40000000 /*lsb*/, 0, 7),
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 4),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x1 /*msb*/, 0, 5),
-
-        /* < 0x150000000 */
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 0),
-        BPF_JUMP(BPF_JMP | BPF_JGT | BPF_K, 0x50000000 /*lsb*/, 3, 0),
-        BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, instruction_pointer) + 4),
-        BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, 0x1 /*msb*/, 0, 1),
-        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_TRAP),
-
-        /* Allow everything else */
-        BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-    };
-    struct sock_fprog prog;
-    BOOL rdr2 = FALSE;
-    NTSTATUS status;
-
-    sig_act->sa_sigaction = sigsys_handler;
-    memset(&prog, 0, sizeof(prog));
-
-    {
-        const char *sgi = getenv("SteamGameId");
-        if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210")))
-        {
-            /* Use specific filter and signal handler for Red Dead Redemption 2 */
-            prog.len = ARRAY_SIZE(filter_rdr2);
-            prog.filter = filter_rdr2;
-            sig_act->sa_sigaction = sigsys_handler_rdr2;
-            rdr2 = TRUE;
-        }
-    }
-
-    sigaction(SIGSYS, sig_act, NULL);
-
-    if (rdr2)
-    {
-        int ret;
-
-        if ((ret = prctl(PR_GET_SECCOMP, 0, NULL, 0, 0)))
-        {
-            if (ret == 2)
-                TRACE("Seccomp filters already installed.\n");
-            else
-                ERR("Seccomp filters cannot be installed, ret %d, error %s.\n", ret, strerror(errno));
-            return;
-        }
-    }
-    else
-    {
-        if ((status = syscall(0xffff)) == STATUS_INVALID_PARAMETER)
-        {
-            TRACE("Seccomp filters already installed.\n");
-            return;
-        }
-        if (status != -ENOSYS && (status != -1 || errno != ENOSYS))
-        {
-            ERR("Unexpected status %#x, errno %d.\n", status, errno);
-            return;
-        }
-        prog.len = ARRAY_SIZE(filter);
-        prog.filter = filter;
-    }
-
-    if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0))
-    {
-        ERR("prctl(PR_SET_NO_NEW_PRIVS, ...): %s.\n", strerror(errno));
-        return;
-    }
-    if (sc_seccomp(SECCOMP_SET_MODE_FILTER, flags, &prog))
-    {
-        ERR("prctl(PR_SET_SECCOMP, ...): %s.\n", strerror(errno));
-        return;
-    }
-    check_bpf_jit_enable();
-#else
-    WARN("Built without seccomp.\n");
-#endif
-}
 
 /***********************************************************************
  *           handle_interrupt
@@ -2689,7 +2509,6 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     EXCEPTION_RECORD rec = { 0 };
     struct xcontext context;
     ucontext_t *ucontext = sigcontext;
-    void *steamclient_addr = NULL;
 
     rec.ExceptionAddress = (void *)RIP_sig(ucontext);
     save_context( &context, sigcontext );
@@ -2721,12 +2540,6 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         }
         break;
     case TRAP_x86_PAGEFLT:  /* Page fault */
-        if ((steamclient_addr = steamclient_handle_fault( siginfo->si_addr, (ERROR_sig(ucontext) >> 1) & 0x09 )))
-        {
-            RIP_sig(ucontext) = (intptr_t)steamclient_addr;
-            return;
-        }
-
         rec.NumberParameters = 2;
         rec.ExceptionInformation[0] = (ERROR_sig(ucontext) >> 1) & 0x09;
         rec.ExceptionInformation[1] = (ULONG_PTR)siginfo->si_addr;
@@ -3062,7 +2875,6 @@ void signal_init_process(void)
     if (sigaction( SIGSEGV, &sig_act, NULL ) == -1) goto error;
     if (sigaction( SIGILL, &sig_act, NULL ) == -1) goto error;
     if (sigaction( SIGBUS, &sig_act, NULL ) == -1) goto error;
-    install_bpf(&sig_act);
     return;
 
  error:
@@ -3130,15 +2942,6 @@ PCONTEXT DECLSPEC_HIDDEN get_initial_context( LPTHREAD_START_ROUTINE entry, void
         wait_suspend( &context );
         ctx = (CONTEXT *)((ULONG_PTR)context.Rsp & ~15) - 1;
         *ctx = context;
-        if (context.ContextFlags & CONTEXT_DEBUG_REGISTERS & ~CONTEXT_AMD64)
-        {
-            amd64_thread_data()->dr0 = context.Dr0;
-            amd64_thread_data()->dr1 = context.Dr1;
-            amd64_thread_data()->dr2 = context.Dr2;
-            amd64_thread_data()->dr3 = context.Dr3;
-            amd64_thread_data()->dr6 = context.Dr6;
-            amd64_thread_data()->dr7 = context.Dr7;
-        }
     }
     else
     {

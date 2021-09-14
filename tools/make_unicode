@@ -26,6 +26,7 @@ my $UNIVERSION = "13.0.0";
 my $UNIDATA  = "https://www.unicode.org/Public/$UNIVERSION/ucd/UCD.zip";
 my $IDNADATA = "https://www.unicode.org/Public/idna/$UNIVERSION";
 my $JISDATA  = "https://www.unicode.org/Public/MAPPINGS/OBSOLETE/EASTASIA/JIS";
+my $KSCDATA  = "https://www.unicode.org/Public/MAPPINGS/OBSOLETE/EASTASIA/KSC";
 my $REPORTS = "http://www.unicode.org/reports";
 my $MSDATA = "https://download.microsoft.com/download/C/F/7/CF713A5E-9FBC-4FD6-9246-275F65C0E498";
 my $MSCODEPAGES = "$MSDATA/Windows Supported Code Page Data Files.zip";
@@ -942,6 +943,62 @@ sub dump_eucjp_codepage()
     output_codepage_file( 20932 );
 }
 
+################################################################
+# build Korean Wansung table from the KSX1001 file
+sub dump_krwansung_codepage(@)
+{
+    my @cp949 = @_;
+    @cp2uni = ();
+    @glyph2uni = ();
+    @lead_bytes = ();
+    @uni2cp = ();
+    $default_char = 0x3f;
+    $default_wchar = 0x003f;
+
+    # ASCII and undefined chars
+    foreach my $i (0x00 .. 0x9f) { add_mapping( $i, $i ); }
+    add_mapping( 0xa0, 0xf8e6 );
+    add_mapping( 0xad, 0xf8e7 );
+    add_mapping( 0xae, 0xf8e8 );
+    add_mapping( 0xaf, 0xf8e9 );
+    add_mapping( 0xfe, 0xf8ea );
+    add_mapping( 0xff, 0xf8eb );
+
+    my $INPUT = open_data_file( $KSCDATA, "KSX1001.TXT" );
+    while (<$INPUT>)
+    {
+        next if /^\#/;  # skip comments
+        next if /^$/;  # skip empty lines
+        next if /\x1a/;  # skip ^Z
+        if (/^0x([0-9a-fA-F]+)\s+0x([0-9a-fA-F]+)\s+(\#.*)?/)
+        {
+            add_mapping( 0x8080 + hex $1, hex $2 );
+            next;
+        }
+        die "Unrecognized line $_\n";
+    }
+    close $INPUT;
+
+    # get some extra mappings from cp 949
+    my @defined_lb;
+    map { $defined_lb[$_] = 1; } @lead_bytes;
+    foreach my $i (0x0000 .. 0xffff)
+    {
+        next if ($i >= 0x1100 && $i <= 0x11ff);  # range not used in 20949
+        next unless defined $cp949[$i];
+        if ($cp949[$i] >= 0xff)
+        {
+            # only add chars for lead bytes that exist in 20949
+            my $hi = $cp949[$i] >> 8;
+            my $lo = $cp949[$i] & 0xff;
+            next unless $defined_lb[$hi];
+            next unless $lo >= 0xa1 && $lo <= 0xfe;
+        }
+        add_mapping( $cp949[$i], $i );
+    }
+
+    output_codepage_file( 20949 );
+}
 
 ################################################################
 # build the sort keys table
@@ -2301,6 +2358,8 @@ sub dump_msdata_codepage($)
     close $INPUT;
 
     output_codepage_file( $codepage );
+
+    if ($codepage == 949) { dump_krwansung_codepage( @uni2cp ); }
 }
 
 ################################################################
@@ -2718,7 +2777,7 @@ sub dump_registry_script($%)
                 $i == $#subkeys && $def ? " = s '$def'" : "", 4 * $indent, "";
             $indent++;
         }
-        foreach my $v (@vals) { printf OUTPUT "%*sval $v\n", 4 * $indent, ""; }
+        foreach my $v (sort @vals) { printf OUTPUT "%*sval $v\n", 4 * $indent, ""; }
         for (my $i = 0; $i < @subkeys; $i++) { printf OUTPUT "%*s}\n", 4 * --$indent, ""; }
     }
     while ($indent) { printf OUTPUT "%*s}\n", 4 * --$indent, ""; }

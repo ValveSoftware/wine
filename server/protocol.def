@@ -128,7 +128,7 @@ typedef union
 /* supported CPU types */
 enum cpu_type
 {
-    CPU_x86, CPU_x86_64, CPU_POWERPC, CPU_ARM, CPU_ARM64
+    CPU_x86, CPU_x86_64, CPU_ARM, CPU_ARM64
 };
 typedef int client_cpu_t;
 
@@ -142,7 +142,6 @@ typedef struct
         struct { unsigned int eip, ebp, esp, eflags, cs, ss; } i386_regs;
         struct { unsigned __int64 rip, rbp, rsp;
                  unsigned int cs, ss, flags, __pad; } x86_64_regs;
-        struct { unsigned int iar, msr, ctr, lr, dar, dsisr, trap, __pad; } powerpc_regs;
         struct { unsigned int sp, lr, pc, cpsr; } arm_regs;
         struct { unsigned __int64 sp, pc, pstate; } arm64_regs;
     } ctl;  /* selected by SERVER_CTX_CONTROL */
@@ -151,7 +150,6 @@ typedef struct
         struct { unsigned int eax, ebx, ecx, edx, esi, edi; } i386_regs;
         struct { unsigned __int64 rax,rbx, rcx, rdx, rsi, rdi,
                                   r8, r9, r10, r11, r12, r13, r14, r15; } x86_64_regs;
-        struct { unsigned int gpr[32], cr, xer; } powerpc_regs;
         struct { unsigned int r[13]; } arm_regs;
         struct { unsigned __int64 x[31]; } arm64_regs;
     } integer;  /* selected by SERVER_CTX_INTEGER */
@@ -165,7 +163,6 @@ typedef struct
         struct { unsigned int ctrl, status, tag, err_off, err_sel, data_off, data_sel, cr0npx;
                  unsigned char regs[80]; } i386_regs;
         struct { struct { unsigned __int64 low, high; } fpregs[32]; } x86_64_regs;
-        struct { double fpr[32], fpscr; } powerpc_regs;
         struct { unsigned __int64 d[32]; unsigned int fpscr; } arm_regs;
         struct { struct { unsigned __int64 low, high; } q[32]; unsigned int fpcr, fpsr; } arm64_regs;
     } fp;  /* selected by SERVER_CTX_FLOATING_POINT */
@@ -173,7 +170,6 @@ typedef struct
     {
         struct { unsigned int dr0, dr1, dr2, dr3, dr6, dr7; } i386_regs;
         struct { unsigned __int64 dr0, dr1, dr2, dr3, dr6, dr7; } x86_64_regs;
-        struct { unsigned int dr[8]; } powerpc_regs;
         struct { unsigned int bvr[8], bcr[8], wvr[1], wcr[1]; } arm_regs;
         struct { unsigned __int64 bvr[8], wvr[2]; unsigned int bcr[8], wcr[2]; } arm64_regs;
     } debug;  /* selected by SERVER_CTX_DEBUG_REGISTERS */
@@ -312,13 +308,6 @@ struct hardware_msg_data
             int            y;       /* y coordinate */
             unsigned int   data;    /* mouse data */
         } mouse;
-        struct
-        {
-            int            type;    /* RIM_TYPEHID */
-            obj_handle_t   device;
-            unsigned int   length;  /* HID report length */
-            /* followed by length bytes of HID report data  */
-        } hid;
     } rawinput;
 };
 
@@ -342,7 +331,7 @@ typedef union
     int type;
     struct
     {
-        int            type;    /* HW_INPUT_KEYBOARD */
+        int            type;    /* INPUT_KEYBOARD */
         unsigned short vkey;    /* virtual key code */
         unsigned short scan;    /* scan code */
         unsigned int   flags;   /* event flags */
@@ -351,7 +340,7 @@ typedef union
     } kbd;
     struct
     {
-        int            type;    /* HW_INPUT_MOUSE */
+        int            type;    /* INPUT_MOUSE */
         int            x;       /* coordinates */
         int            y;
         unsigned int   data;    /* mouse data */
@@ -361,25 +350,11 @@ typedef union
     } mouse;
     struct
     {
-        int            type;    /* HW_INPUT_HARDWARE */
+        int            type;    /* INPUT_HARDWARE */
         unsigned int   msg;     /* message code */
         lparam_t       lparam;  /* message param */
     } hw;
-    struct
-    {
-        int            type;    /* HW_INPUT_HID */
-        unsigned int   msg;
-        lparam_t       wparam;
-        obj_handle_t   device;
-        unsigned char  usage_page;
-        unsigned char  usage;
-        unsigned int   length;
-    } hid;
 } hw_input_t;
-#define HW_INPUT_MOUSE         0
-#define HW_INPUT_KEYBOARD      1
-#define HW_INPUT_HARDWARE      2
-#define HW_INPUT_HID           3
 
 typedef union
 {
@@ -504,6 +479,7 @@ enum apc_type
     APC_MAP_VIEW,
     APC_UNMAP_VIEW,
     APC_CREATE_THREAD,
+    APC_DUP_HANDLE,
     APC_BREAK_PROCESS
 };
 
@@ -614,6 +590,15 @@ typedef union
         mem_size_t       reserve;   /* reserve size for thread stack */
         mem_size_t       commit;    /* commit size for thread stack */
     } create_thread;
+    struct
+    {
+        enum apc_type    type;         /* APC_DUP_HANDLE */
+        obj_handle_t     src_handle;   /* src handle to duplicate */
+        obj_handle_t     dst_process;  /* dst process handle */
+        unsigned int     access;       /* wanted access rights */
+        unsigned int     attributes;   /* object attributes */
+        unsigned int     options;      /* duplicate options */
+    } dup_handle;
 } apc_call_t;
 
 typedef union
@@ -689,7 +674,7 @@ typedef union
     } map_view;
     struct
     {
-        enum apc_type    type;      /* APC_MAP_VIEW */
+        enum apc_type    type;      /* APC_UNMAP_VIEW */
         unsigned int     status;    /* status returned by call */
     } unmap_view;
     struct
@@ -701,6 +686,12 @@ typedef union
         client_ptr_t     teb;       /* thread teb (in process address space) */
         obj_handle_t     handle;    /* handle to new thread */
     } create_thread;
+    struct
+    {
+        enum apc_type    type;      /* APC_DUP_HANDLE */
+        unsigned int     status;    /* status returned by call */
+        obj_handle_t     handle;    /* duplicated handle in dst process */
+    } dup_handle;
     struct
     {
         enum apc_type    type;      /* APC_BREAK_PROCESS */
@@ -817,8 +808,6 @@ typedef struct
     unsigned int   checksum;
     unsigned int   dbg_offset;
     unsigned int   dbg_size;
-    client_cpu_t   cpu;
-    int            __pad;
 } pe_image_info_t;
 #define IMAGE_FLAGS_ComPlusNativeReady        0x01
 #define IMAGE_FLAGS_ComPlusILOnly             0x02
@@ -846,12 +835,6 @@ typedef struct
     lparam_t info;
 } cursor_pos_t;
 
-struct cpu_topology_override
-{
-    unsigned int cpu_count;
-    unsigned char host_cpu_id[64];
-};
-
 /****************************************************************/
 /* Request declarations */
 
@@ -860,8 +843,7 @@ struct cpu_topology_override
     obj_handle_t token;          /* process token */
     obj_handle_t debug;          /* process debug object */
     obj_handle_t parent_process; /* parent process */
-    int          inherit_all;    /* inherit all handles from parent */
-    unsigned int create_flags;   /* creation flags */
+    unsigned int flags;          /* process creation flags */
     int          socket_fd;      /* file descriptor for process socket */
     unsigned int access;         /* access rights for process object */
     client_cpu_t cpu;            /* CPU that the new process will use */
@@ -875,13 +857,6 @@ struct cpu_topology_override
     obj_handle_t info;           /* new process info handle */
     process_id_t pid;            /* process id */
     obj_handle_t handle;         /* process handle (in the current process) */
-@END
-
-
-/* Execute a process, replacing the current one */
-@REQ(exec_process)
-    int          socket_fd;      /* file descriptor for process socket */
-    client_cpu_t cpu;            /* CPU that the new process will use */
 @END
 
 
@@ -920,7 +895,6 @@ struct cpu_topology_override
 @REQ(init_process_done)
 @REPLY
     client_ptr_t entry;        /* process entry point */
-    VARARG(cpu_override,cpu_topology_override); /* Overridden CPUs to host CPUs mapping. */
     int          suspend;      /* is process suspended? */
 @END
 
@@ -936,13 +910,12 @@ struct cpu_topology_override
     int          reply_fd;     /* fd for reply pipe */
     int          wait_fd;      /* fd for blocking calls pipe */
     client_cpu_t cpu;          /* CPU that this thread is running on */
-    char         nice_limit;   /* RLIMIT_NICE of new thread */
 @REPLY
     process_id_t pid;          /* process id of the new thread's process */
     thread_id_t  tid;          /* thread id of the new thread */
     timeout_t    server_start; /* server start time */
     data_size_t  info_size;    /* total size of startup info */
-    unsigned int all_cpus;     /* bitset of supported CPUs */
+    VARARG(machines,ushorts);  /* array of supported machines */
 @END
 
 
@@ -990,7 +963,7 @@ struct cpu_topology_override
     timeout_t    end_time;         /* process end time */
     int          exit_code;        /* process exit code */
     int          priority;         /* priority class */
-    client_cpu_t cpu;              /* CPU that this process is running on */
+    unsigned short machine;        /* process architecture */
     VARARG(image,pe_image_info);   /* image info for main exe */
 @END
 
@@ -1145,11 +1118,9 @@ struct cpu_topology_override
     obj_handle_t dst_process;  /* dst process handle */
     unsigned int access;       /* wanted access rights */
     unsigned int attributes;   /* object attributes */
-    unsigned int options;      /* duplicate options (see below) */
+    unsigned int options;      /* duplicate options */
 @REPLY
     obj_handle_t handle;       /* duplicated handle in dst process */
-    int          self;         /* is the source the current process? */
-    int          closed;       /* whether the source handle has been closed */
 @END
 
 
@@ -1565,7 +1536,9 @@ enum server_fd_type
     mem_size_t   size;          /* mapping size */
     unsigned int flags;         /* SEC_* flags */
     obj_handle_t shared_file;   /* shared mapping file handle */
+    data_size_t  total;         /* total required buffer size in bytes */
     VARARG(image,pe_image_info);/* image info for SEC_IMAGE mappings */
+    VARARG(name,unicode_str);   /* filename for SEC_IMAGE mappings */
 @END
 
 
@@ -1724,7 +1697,6 @@ struct process_info
     obj_handle_t handle;       /* process handle */
     client_ptr_t addr;         /* addr to read from */
 @REPLY
-    int unix_pid;              /* Unix pid of new process */
     VARARG(data,bytes);        /* result data */
 @END
 
@@ -2054,7 +2026,6 @@ enum message_type
     user_handle_t   win;       /* window handle */
     hw_input_t      input;     /* input data */
     unsigned int    flags;     /* flags (see below) */
-    VARARG(data,bytes);        /* hid report data */
 @REPLY
     int             wait;      /* do we need to wait for a reply? */
     int             prev_x;    /* previous cursor position */
@@ -2064,8 +2035,6 @@ enum message_type
     VARARG(keystate,bytes);    /* global state array for all the keys */
 @END
 #define SEND_HWMSG_INJECTED    0x01
-#define SEND_HWMSG_RAWINPUT    0x02
-#define SEND_HWMSG_WINDOW      0x04
 
 
 /* Get a message from the current queue */
@@ -3725,126 +3694,4 @@ struct handle_info
 /* Resume a process */
 @REQ(resume_process)
     obj_handle_t handle;       /* process handle */
-@END
-
-enum esync_type
-{
-    ESYNC_SEMAPHORE = 1,
-    ESYNC_AUTO_EVENT,
-    ESYNC_MANUAL_EVENT,
-    ESYNC_MUTEX,
-    ESYNC_AUTO_SERVER,
-    ESYNC_MANUAL_SERVER,
-    ESYNC_QUEUE,
-};
-
-/* Create a new eventfd-based synchronization object */
-@REQ(create_esync)
-    unsigned int access;        /* wanted access rights */
-    int          initval;       /* initial value */
-    int          type;          /* type of esync object */
-    int          max;           /* maximum count on a semaphore */
-    VARARG(objattr,object_attributes); /* object attributes */
-@REPLY
-    obj_handle_t handle;        /* handle to the object */
-    int          type;          /* actual type (may be different for events) */
-    unsigned int shm_idx;
-@END
-
-@REQ(open_esync)
-    unsigned int access;        /* wanted access rights */
-    unsigned int attributes;    /* object attributes */
-    obj_handle_t rootdir;       /* root directory */
-    int          type;          /* type of esync object (above) */
-    VARARG(name,unicode_str);   /* object name */
-@REPLY
-    obj_handle_t handle;        /* handle to the event */
-    int          type;          /* type of esync object (above) */
-    unsigned int shm_idx;       /* this object's index into the shm section */
-@END
-
-/* Retrieve the esync fd for an object. */
-@REQ(get_esync_fd)
-    obj_handle_t handle;        /* handle to the object */
-@REPLY
-    int          type;
-    unsigned int shm_idx;
-@END
-
-/* Notify the server that we are doing a message wait or done with one. */
-@REQ(esync_msgwait)
-    int          in_msgwait;    /* are we in a message wait? */
-@END
-
-/* Retrieve the fd to wait on for user APCs. */
-@REQ(get_esync_apc_fd)
-@END
-
-enum fsync_type
-{
-    FSYNC_SEMAPHORE = 1,
-    FSYNC_AUTO_EVENT,
-    FSYNC_MANUAL_EVENT,
-    FSYNC_MUTEX,
-    FSYNC_AUTO_SERVER,
-    FSYNC_MANUAL_SERVER,
-    FSYNC_QUEUE,
-};
-
-/* Create a new futex-based synchronization object */
-@REQ(create_fsync)
-    unsigned int access;        /* wanted access rights */
-    int low;                    /* initial value of low word */
-    int high;                   /* initial value of high word */
-    int type;                   /* type of fsync object */
-    VARARG(objattr,object_attributes); /* object attributes */
-@REPLY
-    obj_handle_t handle;        /* handle to the object */
-    int type;                   /* type of fsync object */
-    unsigned int shm_idx;       /* this object's index into the shm section */
-@END
-
-/* Open an fsync object */
-@REQ(open_fsync)
-    unsigned int access;        /* wanted access rights */
-    unsigned int attributes;    /* object attributes */
-    obj_handle_t rootdir;       /* root directory */
-    int          type;          /* type of fsync object */
-    VARARG(name,unicode_str);   /* object name */
-@REPLY
-    obj_handle_t handle;        /* handle to the event */
-    int          type;          /* type of fsync object */
-    unsigned int shm_idx;       /* this object's index into the shm section */
-@END
-
-/* Retrieve the shm index for an object. */
-@REQ(get_fsync_idx)
-    obj_handle_t handle;        /* handle to the object */
-@REPLY
-    int          type;
-    unsigned int shm_idx;
-@END
-
-@REQ(fsync_msgwait)
-    int          in_msgwait;    /* are we in a message wait? */
-@END
-
-@REQ(get_fsync_apc_idx)
-@REPLY
-    unsigned int shm_idx;
-@END
-
-
-/* Iterate process list */
-@REQ(get_next_thread)
-    obj_handle_t process;      /* process handle */
-    obj_handle_t last;         /* thread handle to start with */
-    unsigned int access;       /* desired access for returned handle */
-    unsigned int attributes;   /* returned handle attributes */
-    unsigned int flags;        /* controls iteration direction */
-@REPLY
-    obj_handle_t handle;       /* next thread handle */
-@END
-
-@REQ(prevent_kill)
 @END

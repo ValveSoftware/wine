@@ -8400,6 +8400,7 @@ static void testImportPublicKey(HCRYPTPROV csp, PCERT_PUBLIC_KEY_INFO info)
 {
     BOOL ret;
     HCRYPTKEY key;
+    BCRYPT_KEY_HANDLE key2;
     PCCERT_CONTEXT context;
     DWORD dwSize;
     ALG_ID ai;
@@ -8469,6 +8470,12 @@ static void testImportPublicKey(HCRYPTPROV csp, PCERT_PUBLIC_KEY_INFO info)
          &context->pCertInfo->SubjectPublicKeyInfo, 0, 0, NULL, &key);
         ok(ret, "CryptImportPublicKeyInfoEx failed: %08x\n", GetLastError());
         CryptDestroyKey(key);
+
+        ret = CryptImportPublicKeyInfoEx2(X509_ASN_ENCODING,
+         &context->pCertInfo->SubjectPublicKeyInfo, 0, NULL, &key2);
+        ok(ret, "CryptImportPublicKeyInfoEx2 failed: %08x\n", GetLastError());
+        BCryptDestroyKey(key2);
+
         CertFreeCertificateContext(context);
     }
 }

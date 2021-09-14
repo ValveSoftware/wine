@@ -23,6 +23,7 @@
 #include "dshow.h"
 #include "d3d9.h"
 #include "vmr9.h"
+#include "wine/heap.h"
 #include "wine/strmbase.h"
 #include "wine/test.h"
 
@@ -968,13 +969,13 @@ static DWORD WINAPI frame_thread(void *arg)
     hr = IMemInputPin_Receive(params->sink, params->sample);
     if (winetest_debug > 1) trace("%04x: Returned %#x.\n", GetCurrentThreadId(), hr);
     IMediaSample_Release(params->sample);
-    free(params);
+    heap_free(params);
     return hr;
 }
 
 static HANDLE send_frame(IMemInputPin *sink)
 {
-    struct frame_thread_params *params = malloc(sizeof(*params));
+    struct frame_thread_params *params = heap_alloc(sizeof(*params));
     REFERENCE_TIME start_time, end_time;
     IMemAllocator *allocator;
     IMediaSample *sample;
@@ -1020,18 +1021,6 @@ static HRESULT join_thread_(int line, HANDLE thread)
     return ret;
 }
 #define join_thread(a) join_thread_(__LINE__, a)
-
-static void commit_allocator(IMemInputPin *input)
-{
-    IMemAllocator *allocator;
-    HRESULT hr;
-
-    hr = IMemInputPin_GetAllocator(input, &allocator);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    hr = IMemAllocator_Commit(allocator);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    IMemAllocator_Release(allocator);
-}
 
 static void test_filter_state(IMemInputPin *input, IMediaControl *control)
 {
@@ -1142,7 +1131,9 @@ static void test_filter_state(IMemInputPin *input, IMediaControl *control)
     hr = IMediaControl_GetState(control, 0, &state);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
-    commit_allocator(input);
+    hr = IMemAllocator_Commit(allocator);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+
     hr = IMediaControl_Pause(control);
     ok(hr == S_FALSE, "Got hr %#x.\n", hr);
 
@@ -1173,11 +1164,17 @@ static void test_filter_state(IMemInputPin *input, IMediaControl *control)
 
 static void test_flushing(IPin *pin, IMemInputPin *input, IMediaControl *control)
 {
+    IMemAllocator *allocator;
     OAFilterState state;
     HANDLE thread;
     HRESULT hr;
 
-    commit_allocator(input);
+    hr = IMemInputPin_GetAllocator(input, &allocator);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    hr = IMemAllocator_Commit(allocator);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    IMemAllocator_Release(allocator);
+
     hr = IMediaControl_Pause(control);
     ok(hr == S_FALSE, "Got hr %#x.\n", hr);
 
@@ -1243,6 +1240,7 @@ static void test_current_image(IBaseFilter *filter, IMemInputPin *input,
     const BITMAPINFOHEADER *bih = (BITMAPINFOHEADER *)buffer;
     const DWORD *data = (DWORD *)((char *)buffer + sizeof(BITMAPINFOHEADER));
     BITMAPINFOHEADER expect_bih = *req_bih;
+    IMemAllocator *allocator;
     OAFilterState state;
     IBasicVideo *video;
     unsigned int i;
@@ -1275,7 +1273,12 @@ static void test_current_image(IBaseFilter *filter, IMemInputPin *input,
     ok(!memcmp(bih, &expect_bih, sizeof(BITMAPINFOHEADER)), "Bitmap headers didn't match.\n");
     /* The contents seem to reflect the last frame rendered. */
 
-    commit_allocator(input);
+    hr = IMemInputPin_GetAllocator(input, &allocator);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    hr = IMemAllocator_Commit(allocator);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
+    IMemAllocator_Release(allocator);
+
     hr = IMediaControl_Pause(control);
     ok(hr == S_FALSE, "Got hr %#x.\n", hr);
 
@@ -1322,110 +1325,6 @@ static void test_current_image(IBaseFilter *filter, IMemInputPin *input,
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
     IBasicVideo_Release(video);
-}
-
-static unsigned int check_ec_userabort(IMediaEvent *eventsrc, DWORD timeout)
-{
-    LONG_PTR param1, param2;
-    unsigned int ret = 0;
-    HRESULT hr;
-    LONG code;
-
-    while ((hr = IMediaEvent_GetEvent(eventsrc, &code, &param1, &param2, timeout)) == S_OK)
-    {
-        if (code == EC_USERABORT)
-        {
-            ok(!param1, "Got param1 %#lx.\n", param1);
-            ok(!param2, "Got param2 %#lx.\n", param2);
-            ret++;
-        }
-        IMediaEvent_FreeEventParams(eventsrc, code, param1, param2);
-        timeout = 0;
-    }
-    ok(hr == E_ABORT, "Got hr %#x.\n", hr);
-
-    return ret;
-}
-
-static void test_window_close(IPin *pin, IMemInputPin *input, IMediaControl *control)
-{
-    IMediaEvent *eventsrc;
-    OAFilterState state;
-    IOverlay *overlay;
-    HANDLE thread;
-    HRESULT hr;
-    HWND hwnd;
-    BOOL ret;
-
-    IMediaControl_QueryInterface(control, &IID_IMediaEvent, (void **)&eventsrc);
-    IPin_QueryInterface(pin, &IID_IOverlay, (void **)&overlay);
-
-    hr = IOverlay_GetWindowHandle(overlay, &hwnd);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    IOverlay_Release(overlay);
-
-    commit_allocator(input);
-    hr = IMediaControl_Pause(control);
-    ok(hr == S_FALSE, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    SendMessageW(hwnd, WM_CLOSE, 0, 0);
-
-    hr = IMediaControl_GetState(control, 1000, &state);
-    ok(hr == VFW_S_STATE_INTERMEDIATE, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(ret == 1, "Expected EC_USERABORT.\n");
-
-    ok(IsWindow(hwnd), "Window should exist.\n");
-    ok(!IsWindowVisible(hwnd), "Window should be visible.\n");
-
-    thread = send_frame(input);
-    ret = WaitForSingleObject(thread, 1000);
-    todo_wine ok(ret == WAIT_OBJECT_0, "Wait failed\n");
-    if (ret == WAIT_OBJECT_0)
-    {
-        GetExitCodeThread(thread, (DWORD *)&hr);
-        ok(hr == E_UNEXPECTED, "Got hr %#x.\n", hr);
-    }
-    CloseHandle(thread);
-
-    hr = IMediaControl_Run(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    hr = IMediaControl_Stop(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    /* We receive an EC_USERABORT notification immediately. */
-
-    commit_allocator(input);
-    hr = IMediaControl_Run(control);
-    ok(hr == S_FALSE, "Got hr %#x.\n", hr);
-    hr = join_thread(send_frame(input));
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    hr = IMediaControl_GetState(control, 1000, &state);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    SendMessageW(hwnd, WM_CLOSE, 0, 0);
-
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(ret == 1, "Expected EC_USERABORT.\n");
-
-    ok(IsWindow(hwnd), "Window should exist.\n");
-    ok(!IsWindowVisible(hwnd), "Window should be visible.\n");
-
-    hr = IMediaControl_Stop(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    IMediaEvent_Release(eventsrc);
 }
 
 static void test_connect_pin(void)
@@ -1572,7 +1471,6 @@ static void test_connect_pin(void)
     test_filter_state(input, control);
     test_flushing(pin, input, control);
     test_current_image(filter, input, control, &vih.bmiHeader);
-    test_window_close(pin, input, control);
 
     hr = IFilterGraph2_Disconnect(graph, pin);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
@@ -2197,55 +2095,37 @@ static void test_video_window_messages(IVideoWindow *window, HWND hwnd, HWND our
 
     flush_events();
 
-    /* Demonstrate that messages should be sent, not posted, and that only some
-     * messages should be forwarded. A previous implementation unconditionally
-     * posted all messages. */
-
     hr = IVideoWindow_NotifyOwnerMessage(window, (OAHWND)our_hwnd, WM_SYSCOLORCHANGE, 0, 0);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
-    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-    {
-        ok(msg.message != WM_SYSCOLORCHANGE, "WM_SYSCOLORCHANGE should not be posted.\n");
-        DispatchMessageA(&msg);
-    }
+    ret = GetQueueStatus(QS_SENDMESSAGE | QS_POSTMESSAGE);
+    ok(!ret, "Got unexpected status %#x.\n", ret);
 
-    hr = IVideoWindow_NotifyOwnerMessage(window, (OAHWND)our_hwnd, WM_FONTCHANGE, 0, 0);
+    hr = IVideoWindow_NotifyOwnerMessage(window, (OAHWND)our_hwnd, WM_SETCURSOR,
+            (WPARAM)hwnd, MAKELONG(HTCLIENT, WM_MOUSEMOVE));
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
-    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-    {
-        ok(msg.message != WM_FONTCHANGE, "WM_FONTCHANGE should not be posted.\n");
-        DispatchMessageA(&msg);
-    }
+    ret = GetQueueStatus(QS_SENDMESSAGE | QS_POSTMESSAGE);
+    ok(!ret, "Got unexpected status %#x.\n", ret);
 
     params.window = window;
     params.hwnd = our_hwnd;
     params.message = WM_SYSCOLORCHANGE;
     thread = CreateThread(NULL, 0, notify_message_proc, &params, 0, NULL);
     ok(WaitForSingleObject(thread, 100) == WAIT_TIMEOUT, "Thread should block.\n");
+    ret = MsgWaitForMultipleObjects(0, NULL, FALSE, 1000, QS_SENDMESSAGE);
+    ok(!ret, "Did not find a sent message.\n");
 
-    while ((ret = MsgWaitForMultipleObjects(1, &thread, FALSE, 1000, QS_ALLINPUT)) == 1)
-    {
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-        {
-            ok(msg.message != WM_SYSCOLORCHANGE, "WM_SYSCOLORCHANGE should not be posted.\n");
-            DispatchMessageA(&msg);
-        }
-    }
-    ok(!ret, "Wait timed out.\n");
+    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
+    ok(!WaitForSingleObject(thread, 1000), "Wait timed out.\n");
     CloseHandle(thread);
 
-    params.message = WM_FONTCHANGE;
+    params.message = WM_SETCURSOR;
     thread = CreateThread(NULL, 0, notify_message_proc, &params, 0, NULL);
     ok(!WaitForSingleObject(thread, 1000), "Thread should not block.\n");
     CloseHandle(thread);
-
-    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-    {
-        ok(msg.message != WM_FONTCHANGE, "WM_FONTCHANGE should not be posted.\n");
-        DispatchMessageA(&msg);
-    }
+    ret = GetQueueStatus(QS_SENDMESSAGE | QS_POSTMESSAGE);
+    ok(!ret, "Got unexpected status %#x.\n", ret);
 
     hr = IVideoWindow_put_Owner(window, 0);
     ok(hr == S_OK, "Got hr %#x.\n", hr);

@@ -114,8 +114,6 @@ static const struct object_ops dir_ops =
     add_queue,                /* add_queue */
     remove_queue,             /* remove_queue */
     default_fd_signaled,      /* signaled */
-    default_fd_get_esync_fd,  /* get_esync_fd */
-    default_fd_get_fsync_idx, /* get_fsync_idx */
     no_satisfied,             /* satisfied */
     no_signal,                /* signal */
     dir_get_fd,               /* get_fd */
@@ -423,7 +421,6 @@ static int dir_close_handle( struct object *obj, struct process *process, obj_ha
 {
     struct dir *dir = (struct dir *)obj;
 
-    if (!fd_close_handle( obj, process, handle )) return 0;
     if (obj->handle_count == 1) release_dir_cache_entry( dir ); /* closing last handle, release cache */
     return 1;  /* ok to close */
 }

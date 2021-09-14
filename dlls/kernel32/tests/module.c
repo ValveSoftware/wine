@@ -377,11 +377,7 @@ static void testLoadLibraryEx(void)
     SetLastError(0xdeadbeef);
     hmodule = LoadLibraryExA("testfile.dll", NULL, LOAD_LIBRARY_AS_DATAFILE);
     ok(hmodule == 0, "Expected 0, got %p\n", hmodule);
-    todo_wine
-    {
-        ok(GetLastError() == ERROR_FILE_INVALID,
-           "Expected ERROR_FILE_INVALID, got %d\n", GetLastError());
-    }
+    ok(GetLastError() == ERROR_FILE_INVALID, "Expected ERROR_FILE_INVALID, got %d\n", GetLastError());
 
     DeleteFileA("testfile.dll");
 
@@ -422,10 +418,7 @@ static void testLoadLibraryEx(void)
     /* load kernel32.dll with an absolute path that does not exist */
     SetLastError(0xdeadbeef);
     hmodule = LoadLibraryExA(path, NULL, LOAD_LIBRARY_AS_DATAFILE);
-    todo_wine
-    {
-        ok(hmodule == 0, "Expected 0, got %p\n", hmodule);
-    }
+    ok(hmodule == 0, "Expected 0, got %p\n", hmodule);
     ok(GetLastError() == ERROR_FILE_NOT_FOUND,
        "Expected ERROR_FILE_NOT_FOUND, got %d\n", GetLastError());
 
@@ -1100,7 +1093,7 @@ static void test_SetDefaultDllDirectories(void)
     ret = pSetDefaultDllDirectories( LOAD_LIBRARY_SEARCH_USER_DIRS );
     ok( ret, "SetDefaultDllDirectories failed err %u\n", GetLastError() );
     mod = LoadLibraryA( "authz.dll" );
-    todo_wine ok( !mod, "loading authz succeeded\n" );
+    ok( !mod, "loading authz succeeded\n" );
     FreeLibrary( mod );
     ret = pSetDefaultDllDirectories( LOAD_LIBRARY_SEARCH_SYSTEM32 );
     ok( ret, "SetDefaultDllDirectories failed err %u\n", GetLastError() );
@@ -1108,12 +1101,12 @@ static void test_SetDefaultDllDirectories(void)
     ok( mod != NULL, "loading authz failed\n" );
     FreeLibrary( mod );
     mod = LoadLibraryExA( "authz.dll", 0, LOAD_LIBRARY_SEARCH_APPLICATION_DIR );
-    todo_wine ok( !mod, "loading authz succeeded\n" );
+    ok( !mod, "loading authz succeeded\n" );
     FreeLibrary( mod );
     ret = pSetDefaultDllDirectories( LOAD_LIBRARY_SEARCH_APPLICATION_DIR );
     ok( ret, "SetDefaultDllDirectories failed err %u\n", GetLastError() );
     mod = LoadLibraryA( "authz.dll" );
-    todo_wine ok( !mod, "loading authz succeeded\n" );
+    ok( !mod, "loading authz succeeded\n" );
     FreeLibrary( mod );
     ret = pSetDefaultDllDirectories( LOAD_LIBRARY_SEARCH_DEFAULT_DIRS );
     ok( ret, "SetDefaultDllDirectories failed err %u\n", GetLastError() );

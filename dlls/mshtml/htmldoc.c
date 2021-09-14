@@ -1647,6 +1647,7 @@ static HRESULT WINAPI HTMLDocument_get_styleSheets(IHTMLDocument2 *iface,
     HTMLDocument *This = impl_from_IHTMLDocument2(iface);
     nsIDOMStyleSheetList *nsstylelist;
     nsresult nsres;
+    HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
@@ -1660,13 +1661,13 @@ static HRESULT WINAPI HTMLDocument_get_styleSheets(IHTMLDocument2 *iface,
     nsres = nsIDOMHTMLDocument_GetStyleSheets(This->doc_node->nsdoc, &nsstylelist);
     if(NS_FAILED(nsres)) {
         ERR("GetStyleSheets failed: %08x\n", nsres);
-        return E_FAIL;
+        return map_nsresult(nsres);
     }
 
-    *p = HTMLStyleSheetsCollection_Create(nsstylelist);
+    hres = create_style_sheet_collection(nsstylelist,
+                                         dispex_compat_mode(&This->doc_node->node.event_target.dispex), p);
     nsIDOMStyleSheetList_Release(nsstylelist);
-
-    return S_OK;
+    return hres;
 }
 
 static HRESULT WINAPI HTMLDocument_put_onbeforeupdate(IHTMLDocument2 *iface, VARIANT v)
@@ -1733,8 +1734,8 @@ static HRESULT WINAPI HTMLDocument_createStyleSheet(IHTMLDocument2 *iface, BSTR 
 
     if(bstrHref && *bstrHref) {
         FIXME("semi-stub for href %s\n", debugstr_w(bstrHref));
-        *ppnewStyleSheet = HTMLStyleSheet_Create(NULL);
-        return S_OK;
+        return create_style_sheet(NULL, dispex_compat_mode(&This->doc_node->node.event_target.dispex),
+                                  ppnewStyleSheet);
     }
 
     hres = create_element(This->doc_node, L"style", &elem);
@@ -2637,7 +2638,8 @@ static HRESULT WINAPI HTMLDocument4_get_namespaces(IHTMLDocument4 *iface, IDispa
     if(!This->doc_node->namespaces) {
         HRESULT hres;
 
-        hres = create_namespace_collection(&This->doc_node->namespaces);
+        hres = create_namespace_collection(dispex_compat_mode(&This->doc_node->node.event_target.dispex),
+                                           &This->doc_node->namespaces);
         if(FAILED(hres))
             return hres;
     }
@@ -2681,7 +2683,7 @@ static HRESULT WINAPI HTMLDocument4_createEventObject(IHTMLDocument4 *iface,
         return E_NOTIMPL;
     }
 
-    return create_event_obj(ppEventObj);
+    return create_event_obj(dispex_compat_mode(&This->doc_node->node.event_target.dispex), ppEventObj);
 }
 
 static HRESULT WINAPI HTMLDocument4_fireEvent(IHTMLDocument4 *iface, BSTR bstrEventName,
@@ -4347,21 +4349,21 @@ static HRESULT WINAPI DocumentSelector_querySelectorAll(IDocumentSelector *iface
     HTMLDocument *This = impl_from_IDocumentSelector(iface);
     nsIDOMNodeList *node_list;
     nsAString nsstr;
-    nsresult nsres;
+    HRESULT hres;
 
     TRACE("(%p)->(%s %p)\n", This, debugstr_w(v), pel);
 
     nsAString_InitDepend(&nsstr, v);
-    nsres = nsIDOMHTMLDocument_QuerySelectorAll(This->doc_node->nsdoc, &nsstr, &node_list);
+    hres = map_nsresult(nsIDOMHTMLDocument_QuerySelectorAll(This->doc_node->nsdoc, &nsstr, &node_list));
     nsAString_Finish(&nsstr);
-    if(NS_FAILED(nsres)) {
-        ERR("QuerySelectorAll failed: %08x\n", nsres);
-        return E_FAIL;
+    if(FAILED(hres)) {
+        ERR("QuerySelectorAll failed: %08x\n", hres);
+        return hres;
     }
 
-    *pel = create_child_collection(node_list);
+    hres = create_child_collection(node_list, dispex_compat_mode(&This->doc_node->node.event_target.dispex), pel);
     nsIDOMNodeList_Release(node_list);
-    return *pel ? S_OK : E_OUTOFMEMORY;
+    return hres;
 }
 
 static const IDocumentSelectorVtbl DocumentSelectorVtbl = {
@@ -5198,7 +5200,7 @@ static HRESULT WINAPI DocumentRange_createRange(IDocumentRange *iface, IHTMLDOMR
     if(NS_FAILED(nsIDOMHTMLDocument_CreateRange(This->doc_node->nsdoc, &nsrange)))
         return E_FAIL;
 
-    hres = HTMLDOMRange_Create(nsrange, p);
+    hres = create_dom_range(nsrange, dispex_compat_mode(&This->doc_node->node.event_target.dispex), p);
     nsIDOMRange_Release(nsrange);
     return hres;
 }
@@ -5953,95 +5955,14 @@ static dispex_static_data_t HTMLDocumentObj_dispex = {
     HTMLDocumentObj_iface_tids
 };
 
-/* TRUE if we create a dedicated thread for all HTML documents */
-static BOOL gecko_main_thread_config;
-
-static LONG gecko_main_thread;
-static HWND gecko_main_thread_hwnd;
-static HANDLE gecko_main_thread_event;
-
-static DWORD WINAPI gecko_main_thread_proc(void *arg)
-{
-    MSG msg;
-
-    TRACE("\n");
-
-    CoInitialize(NULL);
-
-    gecko_main_thread_hwnd = get_thread_hwnd();
-    if(!gecko_main_thread_hwnd) {
-        ERR("Could not create thread window\n");
-        SetEvent(gecko_main_thread_event);
-        CoUninitialize();
-        return 0;
-    }
-
-    gecko_main_thread = GetCurrentThreadId();
-    SetEvent(gecko_main_thread_event);
-
-    while(GetMessageW(&msg, NULL, 0, 0)) {
-        DispatchMessageW(&msg);
-        TranslateMessage(&msg);
-    }
-
-    CoUninitialize();
-    return 0;
-}
-
-static BOOL WINAPI read_thread_config(INIT_ONCE *once, void *param, void **context)
-{
-    char str[64];
-
-    if((GetEnvironmentVariableA("SteamGameId", str, sizeof(str)) && (!strcmp(str, "491540") || !strcmp(str,"47890")))
-            || (GetEnvironmentVariableA("WINE_GECKO_MAIN_THREAD", str, sizeof(str)) && *str != '0'))
-    {
-        FIXME("HACK: Using separated main thread.\n");
-        gecko_main_thread_config = TRUE;
-    }
-
-    return TRUE;
-}
-
 static HRESULT create_document_object(BOOL is_mhtml, IUnknown *outer, REFIID riid, void **ppv)
 {
     HTMLDocumentObj *doc;
     HRESULT hres;
 
-    static INIT_ONCE init_once = INIT_ONCE_STATIC_INIT;
-
     if(outer && !IsEqualGUID(&IID_IUnknown, riid)) {
         *ppv = NULL;
         return E_INVALIDARG;
-    }
-
-    /* CXHACK 15579 */
-    InitOnceExecuteOnce(&init_once, read_thread_config, NULL, NULL);
-    if(gecko_main_thread_config && !gecko_main_thread) {
-        HANDLE thread, event;
-
-        event = CreateEventW(NULL, TRUE, FALSE, NULL);
-        if(InterlockedCompareExchangePointer(&gecko_main_thread_event, event, NULL))
-            CloseHandle(event);
-
-        thread = CreateThread(NULL, 0, gecko_main_thread_proc, NULL, 0, NULL);
-        if(thread) {
-            WaitForSingleObject(gecko_main_thread_event, INFINITE);
-            CloseHandle(thread);
-        }else {
-            ERR("Could not create a thread\n");
-        }
-    }
-
-    if(!gecko_main_thread) {
-        gecko_main_thread = GetCurrentThreadId();
-        gecko_main_thread_hwnd = get_thread_hwnd();
-    }else if(GetCurrentThreadId() != gecko_main_thread) {
-        FIXME("HACK: Creating HTMLDocument outside Gecko main thread\n");
-        if(!gecko_main_thread_config) {
-            FIXME("HACK: Dedicated main thread not configured\n");
-            FIXME("HACK: Create HKCU\\Software\\Wine\\MSHTML\\MainThreadHack key\n");
-        }
-        return create_marshaled_doc(gecko_main_thread_hwnd, riid, ppv);
     }
 
     /* ensure that security manager is initialized */
@@ -6058,7 +5979,7 @@ static HRESULT create_document_object(BOOL is_mhtml, IUnknown *outer, REFIID rii
 
     doc->basedoc.doc_obj = doc;
 
-    init_dispex(&doc->dispex, (IUnknown*)&doc->ICustomDoc_iface, &HTMLDocumentObj_dispex);
+    init_dispatch(&doc->dispex, (IUnknown*)&doc->ICustomDoc_iface, &HTMLDocumentObj_dispex, COMPAT_MODE_QUIRKS);
     init_doc(&doc->basedoc, outer ? outer : &doc->IUnknown_inner, &doc->dispex.IDispatchEx_iface);
     TargetContainer_Init(doc);
     doc->is_mhtml = is_mhtml;

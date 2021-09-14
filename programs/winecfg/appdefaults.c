@@ -75,7 +75,7 @@ static const struct win_version win_versions[] =
 #endif
 };
 
-#define DEFAULT_WIN_VERSION   "win10"
+#define DEFAULT_WIN_VERSION   "win7"
 
 static const char szKey9x[] = "Software\\Microsoft\\Windows\\CurrentVersion";
 static const char szKeyNT[] = "Software\\Microsoft\\Windows NT\\CurrentVersion";

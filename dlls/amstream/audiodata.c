@@ -25,7 +25,7 @@
 #include "winbase.h"
 #include "amstream_private.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(amstream);
 
 typedef struct {
     IAudioData IAudioData_iface;

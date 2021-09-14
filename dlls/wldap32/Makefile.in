@@ -4,6 +4,8 @@ IMPORTS   = user32
 EXTRAINCL = $(LDAP_CFLAGS)
 EXTRALIBS = $(LDAP_LIBS)
 
+EXTRADLLFLAGS = -mno-cygwin
+
 C_SRCS = \
 	add.c \
 	ber.c \
@@ -15,6 +17,7 @@ C_SRCS = \
 	error.c \
 	extended.c \
 	init.c \
+	libldap.c \
 	main.c \
 	misc.c \
 	modify.c \

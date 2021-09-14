@@ -2874,7 +2874,6 @@ static INT CALLBACK arial_enum_proc(const LOGFONTA *lf, const TEXTMETRICA *tm, D
     const NEWTEXTMETRICA *ntm = (const NEWTEXTMETRICA *)tm;
 
     ok(lf->lfHeight == tm->tmHeight, "lfHeight %d != tmHeight %d\n", lf->lfHeight, tm->tmHeight);
-    ok(lf->lfHeight > 0 && lf->lfHeight < 200, "enumerated font height %d\n", lf->lfHeight);
 
     if (type != TRUETYPE_FONTTYPE) return 1;
 
@@ -2897,7 +2896,6 @@ static INT CALLBACK arial_enum_procw(const LOGFONTW *lf, const TEXTMETRICW *tm, 
     const NEWTEXTMETRICW *ntm = (const NEWTEXTMETRICW *)tm;
 
     ok(lf->lfHeight == tm->tmHeight, "lfHeight %d != tmHeight %d\n", lf->lfHeight, tm->tmHeight);
-    ok(lf->lfHeight > 0 && lf->lfHeight < 200, "enumerated font height %d\n", lf->lfHeight);
 
     if (type != TRUETYPE_FONTTYPE) return 1;
 
@@ -3924,6 +3922,25 @@ static void test_text_metrics(const LOGFONTA *lf, const NEWTEXTMETRICA *ntm)
         cell_height = ascent + descent;
         ok(ntm->ntmCellHeight == cell_height, "%s: ntmCellHeight %u != %u, os2.usWinAscent/os2.usWinDescent %u/%u\n",
            font_name, ntm->ntmCellHeight, cell_height, ascent, descent);
+
+        /* NEWTEXTMETRIC's scaling method is different from TEXTMETRIC's */
+#define SCALE_NTM(value) (MulDiv(ntm->tmHeight, (value), cell_height))
+        size = MulDiv(32, ntm->ntmCellHeight, ntm->ntmSizeEM);
+        ok(ntm->tmHeight == size, "%s: ntm->tmHeight %d != %d (%u/%u)\n",
+           font_name, ntm->tmHeight, size, ntm->ntmCellHeight, ntm->ntmSizeEM);
+        size = SCALE_NTM(ntm->ntmAvgWidth);
+        ok(ntm->tmAveCharWidth == size, "%s: ntm->tmAveCharWidth %d != %d (%u/%u,%d)\n",
+           font_name, ntm->tmAveCharWidth, size, ntm->ntmAvgWidth, cell_height, ntm->tmHeight);
+        size = SCALE_NTM(ascent);
+        ok(ntm->tmAscent == size, "%s: ntm->tmAscent %d != %d (%u/%u,%d)\n",
+           font_name, ntm->tmAscent, size, ascent, cell_height, ntm->tmHeight);
+        size = ntm->tmHeight - ntm->tmAscent;
+        ok(ntm->tmDescent == size, "%s: ntm->tmDescent %d != %d (%u/%u,%d)\n",
+           font_name, ntm->tmDescent, size, descent, cell_height, ntm->tmHeight);
+        size = SCALE_NTM(cell_height - ntm->ntmSizeEM);
+        ok(ntm->tmInternalLeading == size, "%s: ntm->tmInternalLeading %d != %d (%u/%u,%d)\n",
+           font_name, ntm->tmInternalLeading, size, cell_height - ntm->ntmSizeEM, cell_height, ntm->tmHeight);
+#undef SCALE_NTM
 
         version = GET_BE_WORD(tt_os2.version);
 

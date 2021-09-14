@@ -19,6 +19,7 @@
  */
 
 #include <stdarg.h>
+#include <stdlib.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -102,8 +103,9 @@ static const WCHAR Linked[] = {'L','i','n','k','e','d',0};
 static const WCHAR dotInterfaces[] = {'.','I','n','t','e','r','f','a','c','e','s',0};
 static const WCHAR AddInterface[] = {'A','d','d','I','n','t','e','r','f','a','c','e',0};
 static const WCHAR backslashW[] = {'\\',0};
-static const WCHAR hashW[] = {'#',0};
 static const WCHAR emptyW[] = {0};
+
+#define SERVICE_CONTROL_REENUMERATE_ROOT_DEVICES 128
 
 struct driver
 {
@@ -315,6 +317,7 @@ static WCHAR *get_iface_key_path(struct device_iface *iface)
 
 static WCHAR *get_refstr_key_path(struct device_iface *iface)
 {
+    static const WCHAR hashW[] = {'#',0};
     static const WCHAR slashW[] = {'\\',0};
     WCHAR *path, *ptr;
     size_t len = lstrlenW(DeviceClasses) + 1 + 38 + 1 + lstrlenW(iface->symlink) + 1 + 1;
@@ -403,9 +406,6 @@ static LPWSTR SETUPDI_CreateSymbolicLinkPath(LPCWSTR instanceId,
             lstrcpyW(ret + printed + 1, ReferenceString);
         }
     }
-
-    CharLowerW(ret);
-
     return ret;
 }
 
@@ -690,6 +690,81 @@ static void delete_device_iface(struct device_iface *iface)
     heap_free(iface);
 }
 
+/* remove all interfaces associated with the device, including those not
+ * enumerated in the set */
+static void remove_all_device_ifaces(struct device *device)
+{
+    HKEY classes_key;
+    DWORD i, len;
+    LONG ret;
+
+    if ((ret = RegOpenKeyExW(HKEY_LOCAL_MACHINE, DeviceClasses, 0, KEY_READ, &classes_key)))
+    {
+        WARN("Failed to open classes key, error %u.\n", ret);
+        return;
+    }
+
+    for (i = 0; ; ++i)
+    {
+        WCHAR class_name[40];
+        HKEY class_key;
+        DWORD j;
+
+        len = ARRAY_SIZE(class_name);
+        if ((ret = RegEnumKeyExW(classes_key, i, class_name, &len, NULL, NULL, NULL, NULL)))
+        {
+            if (ret != ERROR_NO_MORE_ITEMS) ERR("Failed to enumerate classes, error %u.\n", ret);
+            break;
+        }
+
+        if ((ret = RegOpenKeyExW(classes_key, class_name, 0, KEY_READ, &class_key)))
+        {
+            ERR("Failed to open class %s, error %u.\n", debugstr_w(class_name), ret);
+            continue;
+        }
+
+        for (j = 0; ; ++j)
+        {
+            WCHAR iface_name[MAX_DEVICE_ID_LEN + 39], device_name[MAX_DEVICE_ID_LEN];
+            HKEY iface_key;
+
+            len = ARRAY_SIZE(iface_name);
+            if ((ret = RegEnumKeyExW(class_key, j, iface_name, &len, NULL, NULL, NULL, NULL)))
+            {
+                if (ret != ERROR_NO_MORE_ITEMS) ERR("Failed to enumerate interfaces, error %u.\n", ret);
+                break;
+            }
+
+            if ((ret = RegOpenKeyExW(class_key, iface_name, 0, KEY_ALL_ACCESS, &iface_key)))
+            {
+                ERR("Failed to open interface %s, error %u.\n", debugstr_w(iface_name), ret);
+                continue;
+            }
+
+            len = sizeof(device_name);
+            if ((ret = RegQueryValueExW(iface_key, L"DeviceInstance", NULL, NULL, (BYTE *)device_name, &len)))
+            {
+                ERR("Failed to query device instance, error %u.\n", ret);
+                RegCloseKey(iface_key);
+                continue;
+            }
+
+            if (!wcsicmp(device_name, device->instanceId))
+            {
+                if ((ret = RegDeleteTreeW(iface_key, NULL)))
+                    ERR("Failed to delete interface %s subkeys, error %u.\n", debugstr_w(iface_name), ret);
+                if ((ret = RegDeleteKeyW(iface_key, L"")))
+                    ERR("Failed to delete interface %s, error %u.\n", debugstr_w(iface_name), ret);
+            }
+
+            RegCloseKey(iface_key);
+        }
+        RegCloseKey(class_key);
+    }
+
+    RegCloseKey(classes_key);
+}
+
 static void remove_device(struct device *device)
 {
     WCHAR id[MAX_DEVICE_ID_LEN], *p;
@@ -735,7 +810,10 @@ static void delete_device(struct device *device)
     SetupDiCallClassInstaller(DIF_DESTROYPRIVATEDATA, device->set, &device_data);
 
     if (device->phantom)
+    {
         remove_device(device);
+        remove_all_device_ifaces(device);
+    }
 
     RegCloseKey(device->key);
     heap_free(device->instanceId);
@@ -1693,14 +1771,40 @@ BOOL WINAPI SetupDiRegisterDeviceInfo(HDEVINFO devinfo, SP_DEVINFO_DATA *device_
  */
 BOOL WINAPI SetupDiRemoveDevice(HDEVINFO devinfo, SP_DEVINFO_DATA *device_data)
 {
+    SC_HANDLE manager = NULL, service = NULL;
     struct device *device;
+    WCHAR *service_name = NULL;
+    DWORD size;
 
     TRACE("devinfo %p, device_data %p.\n", devinfo, device_data);
 
     if (!(device = get_device(devinfo, device_data)))
         return FALSE;
 
+    if (!(manager = OpenSCManagerW(NULL, NULL, SC_MANAGER_CONNECT)))
+        return FALSE;
+
+    if (!RegGetValueW(device->key, NULL, L"Service", RRF_RT_REG_SZ, NULL, NULL, &size))
+    {
+        service_name = malloc(size);
+        if (!RegGetValueW(device->key, NULL, L"Service", RRF_RT_REG_SZ, NULL, service_name, &size))
+            service = OpenServiceW(manager, service_name, SERVICE_USER_DEFINED_CONTROL);
+    }
+
     remove_device(device);
+
+    if (service)
+    {
+        SERVICE_STATUS status;
+        if (!ControlService(service, SERVICE_CONTROL_REENUMERATE_ROOT_DEVICES, &status))
+            ERR("Failed to control service %s, error %u.\n", debugstr_w(service_name), GetLastError());
+        CloseServiceHandle(service);
+    }
+    CloseServiceHandle(manager);
+
+    free(service_name);
+
+    remove_all_device_ifaces(device);
 
     return TRUE;
 }
@@ -2315,80 +2419,6 @@ static void SETUPDI_EnumerateInterfaces(HDEVINFO DeviceInfoSet,
     }
 }
 
-
-/* iterate over all interfaces supported by this device instance. if any of
- * them are "linked", return TRUE */
-static BOOL is_device_instance_linked(HKEY interfacesKey, const WCHAR *deviceInstance)
-{
-    LONG l;
-    DWORD class_idx = 0, device_idx, len, type;
-    HKEY class_key, device_key, link_key;
-    WCHAR class_keyname[40], device_keyname[MAX_DEVICE_ID_LEN];
-    WCHAR interface_devinstance[MAX_DEVICE_ID_LEN];
-
-    while (1)
-    {
-        len = ARRAY_SIZE(class_keyname);
-        l = RegEnumKeyExW(interfacesKey, class_idx++, class_keyname, &len, NULL, NULL, NULL, NULL);
-        if (l)
-            break;
-
-        l = RegOpenKeyExW(interfacesKey, class_keyname, 0, KEY_READ, &class_key);
-        if (l)
-            continue;
-
-        device_idx = 0;
-        while (1)
-        {
-            len = ARRAY_SIZE(device_keyname);
-            l = RegEnumKeyExW(class_key, device_idx++, device_keyname, &len, NULL, NULL, NULL, NULL);
-            if (l)
-                break;
-
-            l = RegOpenKeyExW(class_key, device_keyname, 0, KEY_READ, &device_key);
-            if (l)
-                continue;
-
-            len = ARRAY_SIZE(interface_devinstance);
-            l = RegQueryValueExW(device_key, DeviceInstance, NULL, &type, (BYTE *)interface_devinstance, &len);
-            if (l || type != REG_SZ)
-            {
-                RegCloseKey(device_key);
-                continue;
-            }
-
-            if (lstrcmpiW(interface_devinstance, deviceInstance))
-            {
-                /* not our device instance */
-                RegCloseKey(device_key);
-                continue;
-            }
-
-            l = RegOpenKeyExW(device_key, hashW, 0, KEY_READ, &link_key);
-            if (l)
-            {
-                RegCloseKey(device_key);
-                continue;
-            }
-
-            if (is_linked(link_key))
-            {
-                RegCloseKey(link_key);
-                RegCloseKey(device_key);
-                RegCloseKey(class_key);
-                return TRUE;
-            }
-
-            RegCloseKey(link_key);
-            RegCloseKey(device_key);
-        }
-
-        RegCloseKey(class_key);
-    }
-
-    return FALSE;
-}
-
 static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
         LPCWSTR enumerator, LPCWSTR deviceName, HKEY deviceKey,
         const GUID *class, DWORD flags)
@@ -2397,7 +2427,6 @@ static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
     DWORD i, len;
     WCHAR deviceInstance[MAX_PATH];
     LONG l = ERROR_SUCCESS;
-    HKEY interfacesKey = SetupDiOpenClassRegKeyExW(NULL, KEY_READ, DIOCR_INTERFACE, NULL, NULL);
 
     TRACE("%s %s\n", debugstr_w(enumerator), debugstr_w(deviceName));
 
@@ -2434,9 +2463,7 @@ static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
                              {'%','s','\\','%','s','\\','%','s',0};
 
                             if (swprintf(id, ARRAY_SIZE(id), fmt, enumerator,
-                                        deviceName, deviceInstance) != -1 &&
-                                    (!(flags & DIGCF_PRESENT) ||
-                                     is_device_instance_linked(interfacesKey, id)))
+                                    deviceName, deviceInstance) != -1)
                             {
                                 create_device(set, &deviceClass, id, FALSE);
                             }
@@ -2449,8 +2476,6 @@ static void SETUPDI_EnumerateMatchingDeviceInstances(struct DeviceInfoSet *set,
             l = ERROR_SUCCESS;
         }
     }
-
-    RegCloseKey(interfacesKey);
 }
 
 static void SETUPDI_EnumerateMatchingDevices(HDEVINFO DeviceInfoSet,
@@ -5205,11 +5230,18 @@ BOOL WINAPI SetupDiInstallDevice(HDEVINFO devinfo, SP_DEVINFO_DATA *device_data)
     if (!wcsnicmp(device->instanceId, rootW, lstrlenW(rootW)) && svc_name[0]
             && (manager = OpenSCManagerW(NULL, NULL, SC_MANAGER_CONNECT)))
     {
-        if ((service = OpenServiceW(manager, svc_name, SERVICE_START)))
+        if ((service = OpenServiceW(manager, svc_name, SERVICE_START | SERVICE_USER_DEFINED_CONTROL)))
         {
+            SERVICE_STATUS status;
+
             if (!StartServiceW(service, 0, NULL) && GetLastError() != ERROR_SERVICE_ALREADY_RUNNING)
             {
                 ERR("Failed to start service %s for device %s, error %u.\n",
+                        debugstr_w(svc_name), debugstr_w(device->instanceId), GetLastError());
+            }
+            if (!ControlService(service, SERVICE_CONTROL_REENUMERATE_ROOT_DEVICES, &status))
+            {
+                ERR("Failed to control service %s for device %s, error %u.\n",
                         debugstr_w(svc_name), debugstr_w(device->instanceId), GetLastError());
             }
             CloseServiceHandle(service);

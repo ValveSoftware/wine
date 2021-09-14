@@ -21,8 +21,8 @@
 @ stdcall MFCreateVideoSampleAllocator(ptr ptr)
 @ stdcall MFCreateVideoSampleFromSurface(ptr ptr)
 @ stdcall -import MFGetPlaneSize(long long long ptr)
-@ stdcall -import MFGetStrideForBitmapInfoHeader(long long ptr)
+@ stub MFGetStrideForBitmapInfoHeader
 @ stub MFGetUncompressedVideoFormat
 @ stub MFInitVideoFormat
-@ stdcall -import MFInitVideoFormat_RGB(ptr long long long)
-@ stdcall MFIsFormatYUV(long)
+@ stub MFInitVideoFormat_RGB
+@ stub MFIsFormatYUV

@@ -119,8 +119,6 @@ static const struct object_ops named_pipe_ops =
     no_add_queue,                 /* add_queue */
     NULL,                         /* remove_queue */
     NULL,                         /* signaled */
-    NULL,                         /* get_esync_fd */
-    NULL,                         /* get_fsync_idx */
     NULL,                         /* satisfied */
     no_signal,                    /* signal */
     no_get_fd,                    /* get_fd */
@@ -169,8 +167,6 @@ static const struct object_ops pipe_server_ops =
     add_queue,                    /* add_queue */
     remove_queue,                 /* remove_queue */
     default_fd_signaled,          /* signaled */
-    default_fd_get_esync_fd,      /* get_esync_fd */
-    default_fd_get_fsync_idx,     /* get_fsync_idx */
     no_satisfied,                 /* satisfied */
     no_signal,                    /* signal */
     pipe_end_get_fd,              /* get_fd */
@@ -183,7 +179,7 @@ static const struct object_ops pipe_server_ops =
     NULL,                         /* unlink_name */
     pipe_server_open_file,        /* open_file */
     no_kernel_obj_list,           /* get_kernel_obj_list */
-    fd_close_handle,              /* close_handle */
+    no_close_handle,              /* close_handle */
     pipe_server_destroy           /* destroy */
 };
 
@@ -214,8 +210,6 @@ static const struct object_ops pipe_client_ops =
     add_queue,                    /* add_queue */
     remove_queue,                 /* remove_queue */
     default_fd_signaled,          /* signaled */
-    default_fd_get_esync_fd,      /* get_esync_fd */
-    default_fd_get_fsync_idx,     /* get_fsync_idx */
     no_satisfied,                 /* satisfied */
     no_signal,                    /* signal */
     pipe_end_get_fd,              /* get_fd */
@@ -228,7 +222,7 @@ static const struct object_ops pipe_client_ops =
     NULL,                         /* unlink_name */
     no_open_file,                 /* open_file */
     no_kernel_obj_list,           /* get_kernel_obj_list */
-    fd_close_handle,              /* close_handle */
+    no_close_handle,              /* close_handle */
     pipe_end_destroy              /* destroy */
 };
 
@@ -262,8 +256,6 @@ static const struct object_ops named_pipe_device_ops =
     no_add_queue,                     /* add_queue */
     NULL,                             /* remove_queue */
     NULL,                             /* signaled */
-    NULL,                             /* get_esync_fd */
-    NULL,                             /* get_fsync_idx */
     no_satisfied,                     /* satisfied */
     no_signal,                        /* signal */
     no_get_fd,                        /* get_fd */
@@ -295,8 +287,6 @@ static const struct object_ops named_pipe_device_file_ops =
     add_queue,                               /* add_queue */
     remove_queue,                            /* remove_queue */
     default_fd_signaled,                     /* signaled */
-    NULL,                                    /* get_esync_fd */
-    NULL,                                    /* get_fsync_idx */
     no_satisfied,                            /* satisfied */
     no_signal,                               /* signal */
     named_pipe_device_file_get_fd,           /* get_fd */
@@ -309,7 +299,7 @@ static const struct object_ops named_pipe_device_file_ops =
     NULL,                                    /* unlink_name */
     no_open_file,                            /* open_file */
     no_kernel_obj_list,                      /* get_kernel_obj_list */
-    fd_close_handle,                         /* close_handle */
+    no_close_handle,                         /* close_handle */
     named_pipe_device_file_destroy           /* destroy */
 };
 

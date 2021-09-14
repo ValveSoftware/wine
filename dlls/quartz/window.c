@@ -20,8 +20,6 @@
 
 #include "quartz_private.h"
 
-#define WM_QUARTZ_DESTROY (WM_USER + WM_DESTROY)
-
 WINE_DEFAULT_DEBUG_CHANNEL(quartz);
 
 static const WCHAR class_name[] = L"wine_quartz_window";
@@ -73,23 +71,6 @@ static LRESULT CALLBACK WndProcW(HWND hwnd, UINT message, WPARAM wparam, LPARAM 
         if (window->default_dst)
             GetClientRect(window->hwnd, &window->dst);
         break;
-    case WM_QUARTZ_DESTROY:
-        DestroyWindow(hwnd);
-        return 0;
-    case WM_CLOSE:
-    {
-        IFilterGraph *graph = window->pFilter->graph;
-        IMediaEventSink *event_sink;
-        IVideoWindow_put_Visible(&window->IVideoWindow_iface, OAFALSE);
-        if (graph && SUCCEEDED(IFilterGraph_QueryInterface(graph,
-                                                           &IID_IMediaEventSink,
-                                                           (void **)&event_sink)))
-        {
-            IMediaEventSink_Notify(event_sink, EC_USERABORT, 0, 0);
-            IMediaEventSink_Release(event_sink);
-        }
-        return 0;
-    }
     }
 
     return DefWindowProcW(hwnd, message, wparam, lparam);
@@ -1270,7 +1251,7 @@ void video_window_cleanup(struct video_window *window)
          * it would become top-level for a brief period before being destroyed. */
         SetWindowLongW(window->hwnd, GWL_STYLE, GetWindowLongW(window->hwnd, GWL_STYLE) & ~WS_CHILD);
 
-        SendMessageW(window->hwnd, WM_QUARTZ_DESTROY, 0, 0);
+        SendMessageW(window->hwnd, WM_CLOSE, 0, 0);
         window->hwnd = NULL;
     }
 }

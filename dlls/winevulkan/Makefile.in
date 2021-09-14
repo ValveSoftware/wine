@@ -1,8 +1,13 @@
 MODULE    = winevulkan.dll
 IMPORTLIB = winevulkan
 IMPORTS   = user32 gdi32 advapi32 setupapi
+EXTRALIBS = $(PTHREAD_LIBS)
+
+EXTRADLLFLAGS = -mno-cygwin
 
 C_SRCS = \
+	loader.c \
+	loader_thunks.c \
 	vulkan.c \
 	vulkan_thunks.c
 

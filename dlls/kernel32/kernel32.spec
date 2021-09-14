@@ -765,10 +765,8 @@
 @ stdcall -import GetOverlappedResultEx(long ptr ptr long long)
 @ stdcall -import GetUserDefaultGeoName(ptr long)
 @ stdcall -import GetUserPreferredUILanguages(long ptr ptr ptr)
-@ stdcall -import GetPackagesByPackageFamily(wstr ptr ptr ptr ptr)
 @ stdcall GetPackageFamilyName(long ptr ptr) kernelbase.GetPackageFamilyName
 @ stdcall GetPackageFullName(long ptr ptr) kernelbase.GetPackageFullName
-@ stdcall -import GetPackagePath(ptr long ptr ptr)
 @ stdcall -import GetPhysicallyInstalledSystemMemory(ptr)
 @ stdcall -import GetPriorityClass(long)
 @ stdcall GetPrivateProfileIntA(str str long str)
@@ -1154,7 +1152,6 @@
 @ stdcall -import PeekConsoleInputW(ptr ptr long ptr)
 @ stdcall -import PeekNamedPipe(long ptr long ptr ptr ptr)
 @ stdcall -import PostQueuedCompletionStatus(long long ptr ptr)
-@ stdcall -import PackageFullNameFromId(ptr ptr ptr)
 @ stdcall -import PackageIdFromFullName(wstr long ptr ptr)
 @ stdcall PowerClearRequest(long long)
 @ stdcall PowerCreateRequest(ptr)
@@ -1474,7 +1471,6 @@
 @ stdcall -import SetThreadPreferredUILanguages(long ptr ptr)
 @ stdcall -import SetThreadPriority(long long)
 @ stdcall -import SetThreadPriorityBoost(long long)
-@ stdcall -import SetThreadSelectedCpuSets(ptr ptr long)
 @ stdcall -import SetThreadStackGuarantee(ptr)
 # @ stub SetThreadToken
 @ stdcall -import SetThreadUILanguage(long)
@@ -1488,6 +1484,7 @@
 @ stdcall -arch=x86_64 SetUmsThreadInformation(ptr long ptr long)
 @ stdcall -import SetUnhandledExceptionFilter(ptr)
 @ stdcall -import SetUserGeoID(long)
+@ stdcall -import SetUserGeoName(wstr)
 @ stub SetVDMCurrentDirectories
 @ stdcall SetVolumeLabelA(str str)
 @ stdcall SetVolumeLabelW(wstr wstr)
@@ -1622,7 +1619,7 @@
 @ stdcall Wow64EnableWow64FsRedirection(long) KERNEL32_Wow64EnableWow64FsRedirection
 @ stdcall -import Wow64DisableWow64FsRedirection(ptr)
 @ stdcall Wow64GetThreadContext(long ptr)
-# @ stub Wow64GetThreadSelectorEntry
+@ stdcall Wow64GetThreadSelectorEntry(long long ptr)
 @ stdcall -import Wow64RevertWow64FsRedirection(ptr)
 @ stdcall Wow64SetThreadContext(long ptr)
 # @ stub Wow64SuspendThread

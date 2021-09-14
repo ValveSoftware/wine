@@ -1,5 +1,5 @@
 /*
- * Copyright 2020 Rémi Bernon for CodeWeavers
+ * Copyright 2021 Rémi Bernon for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,29 @@
 #endif
 
 import "inspectable.idl";
+import "asyncinfo.idl";
+import "eventtoken.idl";
+import "windowscontracts.idl";
 import "windows.foundation.idl";
 
 namespace Windows {
+    namespace Globalization {
+        typedef enum DayOfWeek DayOfWeek;
+    }
+}
+
+namespace Windows {
+    namespace Globalization {
+        [contract(Windows.Foundation.UniversalApiContract, 1.0)]
+        enum DayOfWeek
+        {
+            Sunday    = 0,
+            Monday    = 1,
+            Tuesday   = 2,
+            Wednesday = 3,
+            Thursday  = 4,
+            Friday    = 5,
+            Saturday  = 6
+        };
+    }
 }

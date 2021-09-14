@@ -16,9 +16,9 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+typedef struct _source_elements_t source_elements_t;
 typedef struct _expression_t expression_t;
 typedef struct _statement_t statement_t;
-
 struct _bytecode_t;
 
 typedef struct {
@@ -36,7 +36,7 @@ typedef struct _parser_ctx_t {
 
     script_ctx_t *script;
     struct _compiler_ctx_t *compiler;
-    statement_t *source;
+    source_elements_t *source;
     BOOL nl;
     BOOL implicit_nl_semicolon;
     BOOL is_html;
@@ -95,7 +95,6 @@ literal_t *new_boolean_literal(parser_ctx_t*,BOOL) DECLSPEC_HIDDEN;
 
 typedef struct _variable_declaration_t {
     const WCHAR *identifier;
-    BOOL block_scope, constant;
     expression_t *expr;
 
     struct _variable_declaration_t *next;
@@ -129,7 +128,6 @@ struct _statement_t {
 
 typedef struct {
     statement_t stat;
-    unsigned int scope_index;
     statement_t *stat_list;
 } block_statement_t;
 
@@ -166,7 +164,6 @@ typedef struct {
     expression_t *end_expr;
     unsigned end_loc;
     statement_t *statement;
-    unsigned int scope_index;
 } for_statement_t;
 
 typedef struct {
@@ -291,16 +288,21 @@ typedef struct _parameter_t {
     struct _parameter_t *next;
 } parameter_t;
 
+struct _source_elements_t {
+    statement_t *statement;
+    statement_t *statement_tail;
+};
+
 typedef struct _function_expression_t {
     expression_t expr;
     const WCHAR *identifier;
     const WCHAR *event_target;
     parameter_t *parameter_list;
-    statement_t *statement_list;
+    source_elements_t *source_elements;
     const WCHAR *src_str;
     DWORD src_len;
     unsigned func_id;
-    unsigned int scope_index;
+    BOOL is_statement;
 
     struct _function_expression_t *next; /* for compiler */
 } function_expression_t;

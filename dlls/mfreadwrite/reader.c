@@ -1608,7 +1608,7 @@ static HRESULT source_reader_set_compatible_media_type(struct source_reader *rea
         return MF_E_INVALIDMEDIATYPE;
 
     /* No need for a decoder or type change. */
-    if (flags & MF_MEDIATYPE_EQUAL_FORMAT_DATA)
+    if (flags & MF_MEDIATYPE_EQUAL_FORMAT_TYPES)
         return S_OK;
 
     if (FAILED(hr = source_reader_get_source_type_handler(reader, index, &type_handler)))
@@ -1616,7 +1616,7 @@ static HRESULT source_reader_set_compatible_media_type(struct source_reader *rea
 
     while (!type_set && IMFMediaTypeHandler_GetMediaTypeByIndex(type_handler, i++, &native_type) == S_OK)
     {
-        static const DWORD compare_flags = MF_MEDIATYPE_EQUAL_MAJOR_TYPES | MF_MEDIATYPE_EQUAL_FORMAT_DATA;
+        static const DWORD compare_flags = MF_MEDIATYPE_EQUAL_MAJOR_TYPES | MF_MEDIATYPE_EQUAL_FORMAT_TYPES;
 
         if (SUCCEEDED(IMFMediaType_IsEqual(native_type, type, &flags)) && (flags & compare_flags) == compare_flags)
         {
@@ -2051,19 +2051,9 @@ static HRESULT source_reader_flush_async(struct source_reader *reader, unsigned 
 static HRESULT WINAPI src_reader_Flush(IMFSourceReader *iface, DWORD index)
 {
     struct source_reader *reader = impl_from_IMFSourceReader(iface);
-    const char *sgi;
     HRESULT hr;
 
     TRACE("%p, %#x.\n", iface, index);
-
-    sgi = getenv("SteamGameId");
-    if (sgi && strcmp(sgi, "1293160") == 0)
-    {
-        /* In The Medium flushes sometimes lead to the callback
-           calling objects that have already been destroyed. */
-        WARN("ignoring flush\n");
-        return S_OK;
-    }
 
     EnterCriticalSection(&reader->cs);
 

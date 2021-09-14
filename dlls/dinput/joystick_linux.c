@@ -130,7 +130,7 @@ static const GUID DInput_Wine_Joystick_GUID = { /* 9e573ed9-7734-11d2-8d4a-23903
 static INT joystick_devices_count = -1;
 static struct JoyDev *joystick_devices;
 
-static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface);
+static void joy_polldev(LPDIRECTINPUTDEVICE8A iface);
 
 #define SYS_PATH_FORMAT "/sys/class/input/js%d/device/id/%s"
 static BOOL read_sys_id_variable(int index, const char *property, WORD *value)
@@ -850,7 +850,7 @@ static HRESULT WINAPI JoystickLinuxAImpl_Unacquire(LPDIRECTINPUTDEVICE8A iface)
     return JoystickLinuxWImpl_Unacquire(IDirectInputDevice8W_from_impl(This));
 }
 
-static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface)
+static void joy_polldev(LPDIRECTINPUTDEVICE8A iface)
 {
     struct pollfd plfd;
     struct js_event jse;
@@ -860,7 +860,7 @@ static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface)
 
     if (This->joyfd==-1) {
         WARN("no device\n");
-        return DIERR_INPUTLOST;
+        return;
     }
     while (1)
     {
@@ -870,16 +870,16 @@ static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface)
 	plfd.fd = This->joyfd;
 	plfd.events = POLLIN;
 	if (poll(&plfd,1,0) != 1)
-	    return DI_OK;
+	    return;
 	/* we have one event, so we can read */
 	if (sizeof(jse)!=read(This->joyfd,&jse,sizeof(jse))) {
-	    return DIERR_INPUTLOST;
+	    return;
 	}
         TRACE("js_event: type 0x%x, number %d, value %d\n",
               jse.type,jse.number,jse.value);
         if (jse.type & JS_EVENT_BUTTON)
         {
-            if (jse.number >= This->generic.devcaps.dwButtons) continue;
+            if (jse.number >= This->generic.devcaps.dwButtons) return;
 
             inst_id = DIDFT_MAKEINSTANCE(jse.number) | DIDFT_PSHBUTTON;
             This->generic.js.rgbButtons[jse.number] = value = jse.value ? 0x80 : 0x00;
@@ -888,7 +888,7 @@ static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface)
         {
             int number = This->generic.axis_map[jse.number];	/* wine format object index */
 
-            if (number < 0) continue;
+            if (number < 0) return;
             inst_id = number < 8 ?  DIDFT_MAKEINSTANCE(number) | DIDFT_ABSAXIS :
                                     DIDFT_MAKEINSTANCE(number - 8) | DIDFT_POV;
             value = joystick_map_axis(&This->generic.props[id_to_object(This->generic.base.data_format.wine_df, inst_id)], jse.value);
@@ -923,8 +923,6 @@ static HRESULT joy_polldev(LPDIRECTINPUTDEVICE8A iface)
         if (inst_id >= 0)
             queue_event(iface, inst_id, value, GetCurrentTime(), This->generic.base.dinput->evsequence++);
     }
-
-    return DI_OK;
 }
 
 static const IDirectInputDevice8AVtbl JoystickAvt =

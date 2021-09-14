@@ -609,7 +609,7 @@ static BOOL load_xul(WCHAR *gecko_path)
 
     len = wcslen(gecko_path);
     wcscpy(gecko_path + len, L"\\xul.dll");
-    xul_handle = LoadLibraryExW(gecko_path, 0, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR);
+    xul_handle = LoadLibraryExW(gecko_path, 0, LOAD_LIBRARY_SEARCH_DLL_LOAD_DIR | LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
     gecko_path[len] = 0;
     if(!xul_handle) {
         WARN("Could not load XUL: %d\n", GetLastError());
@@ -1659,7 +1659,7 @@ static nsresult NSAPI nsContextMenuListener_OnShowContextMenu(nsIContextMenuList
     if(FAILED(hres))
         return NS_ERROR_FAILURE;
 
-    hres = create_event_from_nsevent(aEvent, &event);
+    hres = create_event_from_nsevent(aEvent, dispex_compat_mode(&node->event_target.dispex), &event);
     if(SUCCEEDED(hres)) {
         dispatch_event(&node->event_target, event);
         IDOMEvent_Release(&event->IDOMEvent_iface);

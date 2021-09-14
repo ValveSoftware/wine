@@ -28,6 +28,8 @@
 #include "windef.h"
 #include "winbase.h"
 #include "objbase.h"
+#include "shellapi.h"
+#include "shlobj.h"
 
 #include "wine/test.h"
 
@@ -501,27 +503,13 @@ static HRESULT DataObjectImpl_CreateComplex(LPDATAOBJECT *lplpdataobj)
 
 static void test_get_clipboard_uninitialized(void)
 {
-    REFCLSID rclsid = &CLSID_InternetZoneManager;
-    IDataObject *pDObj;
-    IUnknown *pUnk;
     HRESULT hr;
+    IDataObject *pDObj;
 
     pDObj = (IDataObject *)0xdeadbeef;
     hr = OleGetClipboard(&pDObj);
-    ok(hr == S_OK, "OleGetClipboard() got 0x%08x instead of 0x%08x\n", hr, S_OK);
-    ok(!!pDObj && pDObj != (IDataObject *)0xdeadbeef, "Got unexpected pDObj %p.\n", pDObj);
-
-    /* COM is still not initialized. */
-    hr = CoCreateInstance(rclsid, NULL, 0x17, &IID_IUnknown, (void **)&pUnk);
-    ok(hr == CO_E_NOTINITIALIZED, "Got unexpected hr %#x.\n", hr);
-
-    hr = OleFlushClipboard();
-    ok(hr == E_FAIL, "Got unexpected hr %#x.\n", hr);
-
-    hr = OleIsCurrentClipboard(pDObj);
-    ok(hr == S_FALSE, "Got unexpected hr %#x.\n", hr);
-
-    IDataObject_Release(pDObj);
+    todo_wine ok(hr == S_OK, "OleGetClipboard() got 0x%08x instead of 0x%08x\n", hr, S_OK);
+    if (pDObj && pDObj != (IDataObject *)0xdeadbeef) IDataObject_Release(pDObj);
 }
 
 static void test_get_clipboard(void)
@@ -1300,15 +1288,6 @@ static void test_consumer_refs(void)
     refs = count_refs(src);
     ok(refs == 2, "%d\n", refs);
 
-    OleInitialize(NULL);
-    hr = OleSetClipboard(NULL);
-    ok(hr == S_OK, "Failed to clear clipboard, hr %#x.\n", hr);
-
-    OleUninitialize();
-
-    refs = count_refs(src);
-    ok(refs == 2, "%d\n", refs);
-
     IDataObject_Release(src);
 }
 
@@ -1536,6 +1515,24 @@ static HENHMETAFILE create_emf(void)
     return CloseEnhMetaFile(hdc);
 }
 
+static HDROP create_dropped_file(void)
+{
+    WCHAR path[] = L"C:\\testfile1\0";
+    DROPFILES *dropfiles;
+    DWORD offset;
+    HDROP hdrop;
+
+    offset = sizeof(DROPFILES);
+    hdrop = GlobalAlloc(GHND, offset + sizeof(path));
+    dropfiles = GlobalLock(hdrop);
+    dropfiles->pFiles = offset;
+    dropfiles->fWide = TRUE;
+    memcpy((char *)dropfiles + offset, path, sizeof(path));
+    GlobalUnlock(hdrop);
+
+    return hdrop;
+}
+
 static void test_nonole_clipboard(void)
 {
     HRESULT hr;
@@ -1547,6 +1544,7 @@ static void test_nonole_clipboard(void)
     HENHMETAFILE emf;
     STGMEDIUM med;
     DWORD obj_type;
+    HDROP hdrop;
 
     r = OpenClipboard(NULL);
     ok(r, "gle %d\n", GetLastError());
@@ -1575,6 +1573,7 @@ static void test_nonole_clipboard(void)
     hblob = GlobalAlloc(GMEM_DDESHARE|GMEM_MOVEABLE|GMEM_ZEROINIT, 10);
     emf = create_emf();
     hstorage = create_storage();
+    hdrop = create_dropped_file();
 
     r = OpenClipboard(NULL);
     ok(r, "gle %d\n", GetLastError());
@@ -1586,6 +1585,8 @@ static void test_nonole_clipboard(void)
     ok(h == emf, "got %p\n", h);
     h = SetClipboardData(cf_storage, hstorage);
     ok(h == hstorage, "got %p\n", h);
+    h = SetClipboardData(CF_HDROP, hdrop);
+    ok(h == hdrop, "got %p\n", h);
     r = CloseClipboard();
     ok(r, "gle %d\n", GetLastError());
 
@@ -1626,6 +1627,14 @@ static void test_nonole_clipboard(void)
     hr = IEnumFORMATETC_Next(enum_fmt, 1, &fmt, NULL);
     ok(hr == S_OK, "got %08x\n", hr);
     ok(fmt.cfFormat == cf_storage, "cf %04x\n", fmt.cfFormat);
+    ok(fmt.ptd == NULL, "ptd %p\n", fmt.ptd);
+    ok(fmt.dwAspect == DVASPECT_CONTENT, "aspect %x\n", fmt.dwAspect);
+    ok(fmt.lindex == -1, "lindex %d\n", fmt.lindex);
+    ok(fmt.tymed == (TYMED_ISTREAM | TYMED_HGLOBAL), "tymed %x\n", fmt.tymed);
+
+    hr = IEnumFORMATETC_Next(enum_fmt, 1, &fmt, NULL);
+    ok(hr == S_OK, "got %08x\n", hr);
+    ok(fmt.cfFormat == CF_HDROP, "cf %04x\n", fmt.cfFormat);
     ok(fmt.ptd == NULL, "ptd %p\n", fmt.ptd);
     ok(fmt.dwAspect == DVASPECT_CONTENT, "aspect %x\n", fmt.dwAspect);
     ok(fmt.lindex == -1, "lindex %d\n", fmt.lindex);

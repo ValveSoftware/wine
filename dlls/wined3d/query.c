@@ -476,7 +476,7 @@ HRESULT CDECL wined3d_query_get_data(struct wined3d_query *query,
                 || (query->buffer_object && !wined3d_query_buffer_is_valid(query)))
         {
             if (flags & WINED3DGETDATA_FLUSH && !query->device->cs->queries_flushed)
-                wined3d_cs_emit_flush(query->device->cs);
+                query->device->cs->c.ops->flush(&query->device->cs->c);
             return S_FALSE;
         }
         if (query->buffer_object)
@@ -504,15 +504,7 @@ HRESULT CDECL wined3d_query_issue(struct wined3d_query *query, DWORD flags)
 {
     TRACE("query %p, flags %#x.\n", query, flags);
 
-    if (flags & WINED3DISSUE_END)
-        ++query->counter_main;
-
-    wined3d_cs_emit_query_issue(query->device->cs, query, flags);
-
-    if (flags & WINED3DISSUE_BEGIN)
-        query->state = QUERY_BUILDING;
-    else
-        query->state = QUERY_SIGNALLED;
+    wined3d_device_context_issue_query(&query->device->cs->c, query, flags);
 
     return WINED3D_OK;
 }
@@ -1636,6 +1628,11 @@ static BOOL wined3d_query_vk_issue(struct wined3d_query *query, uint32_t flags)
             wined3d_context_vk_remove_pending_queries(context_vk, query_vk);
         memset((void *)query->data, 0, query->data_size);
         vk_command_buffer = wined3d_context_vk_get_command_buffer(context_vk);
+        if (query_vk->started)
+        {
+            wined3d_query_vk_end(query_vk, context_vk, vk_command_buffer);
+            list_remove(&query_vk->entry);
+        }
         wined3d_query_vk_begin(query_vk, context_vk, vk_command_buffer);
         list_add_head(&context_vk->active_queries, &query_vk->entry);
         query_vk->started = true;

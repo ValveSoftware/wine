@@ -38,6 +38,7 @@
 #include "lmcons.h"
 #include "lmapibuf.h"
 #include "winldap.h"
+#include "winber.h"
 
 #include "adsldp_private.h"
 
@@ -2135,9 +2136,6 @@ BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
 
     switch (reason)
     {
-    case DLL_WINE_PREATTACH:
-        return FALSE; /* prefer native version */
-
     case DLL_PROCESS_ATTACH:
         adsldp_hinst = hinst;
         DisableThreadLibraryCalls(hinst);

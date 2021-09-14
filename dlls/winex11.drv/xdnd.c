@@ -192,9 +192,8 @@ static long X11DRV_XDND_DROPEFFECTToXdndAction(DWORD effect)
  *
  * Handle an XdndEnter event.
  */
-void X11DRV_XDND_EnterEvent( HWND hWnd, XEvent *xev )
+void X11DRV_XDND_EnterEvent( HWND hWnd, XClientMessageEvent *event )
 {
-    XClientMessageEvent *event = &xev->xclient;
     int version;
     Atom *xdndtypes;
     unsigned long count = 0;
@@ -292,9 +291,8 @@ static HWND window_accepting_files(HWND hwnd)
  *
  * Handle an XdndPosition event.
  */
-void X11DRV_XDND_PositionEvent( HWND hWnd, XEvent *xev )
+void X11DRV_XDND_PositionEvent( HWND hWnd, XClientMessageEvent *event )
 {
-    XClientMessageEvent *event = &xev->xclient;
     XClientMessageEvent e;
     int accept = 0; /* Assume we're not accepting */
     IDropTarget *dropTarget = NULL;
@@ -407,9 +405,8 @@ void X11DRV_XDND_PositionEvent( HWND hWnd, XEvent *xev )
  *
  * Handle an XdndDrop event.
  */
-void X11DRV_XDND_DropEvent( HWND hWnd, XEvent *xev )
+void X11DRV_XDND_DropEvent( HWND hWnd, XClientMessageEvent *event )
 {
-    XClientMessageEvent *event = &xev->xclient;
     XClientMessageEvent e;
     IDropTarget *dropTarget;
     DWORD effect = XDNDDropEffect;
@@ -502,7 +499,7 @@ void X11DRV_XDND_DropEvent( HWND hWnd, XEvent *xev )
  *
  * Handle an XdndLeave event.
  */
-void X11DRV_XDND_LeaveEvent( HWND hWnd, XEvent *xev )
+void X11DRV_XDND_LeaveEvent( HWND hWnd, XClientMessageEvent *event )
 {
     IDropTarget *dropTarget;
 

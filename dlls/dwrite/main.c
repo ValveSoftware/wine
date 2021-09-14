@@ -34,6 +34,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(dwrite);
 
+HMODULE dwrite_module = 0;
 static IDWriteFactory7 *shared_factory;
 static void release_shared_factory(IDWriteFactory7 *factory);
 
@@ -42,14 +43,15 @@ BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, LPVOID reserved)
     switch (reason)
     {
     case DLL_PROCESS_ATTACH:
+        dwrite_module = hinstDLL;
         DisableThreadLibraryCalls( hinstDLL );
-        init_freetype();
+        init_font_backend();
         init_local_fontfile_loader();
         break;
     case DLL_PROCESS_DETACH:
         if (reserved) break;
         release_shared_factory(shared_factory);
-        release_freetype();
+        release_font_backend();
     }
     return TRUE;
 }
@@ -323,11 +325,9 @@ static ULONG WINAPI localizedstrings_Release(IDWriteLocalizedStrings *iface)
 
 static UINT32 WINAPI localizedstrings_GetCount(IDWriteLocalizedStrings *iface)
 {
-    struct localizedstrings *strings = impl_from_IDWriteLocalizedStrings(iface);
-
     TRACE("%p.\n", iface);
 
-    return strings->count;
+    return get_localizedstrings_count(iface);
 }
 
 static HRESULT WINAPI localizedstrings_FindLocaleName(IDWriteLocalizedStrings *iface,
@@ -343,7 +343,7 @@ static HRESULT WINAPI localizedstrings_FindLocaleName(IDWriteLocalizedStrings *i
 
     for (i = 0; i < strings->count; ++i)
     {
-        if (!strcmpiW(strings->data[i].locale, locale_name))
+        if (!wcsicmp(strings->data[i].locale, locale_name))
         {
             *exists = TRUE;
             *index = i;
@@ -366,7 +366,7 @@ static HRESULT WINAPI localizedstrings_GetLocaleNameLength(IDWriteLocalizedStrin
         return E_FAIL;
     }
 
-    *length = strlenW(strings->data[index].locale);
+    *length = wcslen(strings->data[index].locale);
     return S_OK;
 }
 
@@ -382,13 +382,13 @@ static HRESULT WINAPI localizedstrings_GetLocaleName(IDWriteLocalizedStrings *if
         return E_FAIL;
     }
 
-    if (size < strlenW(strings->data[index].locale) + 1)
+    if (size < wcslen(strings->data[index].locale) + 1)
     {
         if (buffer) *buffer = 0;
         return E_NOT_SUFFICIENT_BUFFER;
     }
 
-    strcpyW(buffer, strings->data[index].locale);
+    wcscpy(buffer, strings->data[index].locale);
     return S_OK;
 }
 
@@ -404,7 +404,7 @@ static HRESULT WINAPI localizedstrings_GetStringLength(IDWriteLocalizedStrings *
         return E_FAIL;
     }
 
-    *length = strlenW(strings->data[index].string);
+    *length = wcslen(strings->data[index].string);
     return S_OK;
 }
 
@@ -420,13 +420,13 @@ static HRESULT WINAPI localizedstrings_GetString(IDWriteLocalizedStrings *iface,
         return E_FAIL;
     }
 
-    if (size < strlenW(strings->data[index].string) + 1)
+    if (size < wcslen(strings->data[index].string) + 1)
     {
         if (buffer) *buffer = 0;
         return E_NOT_SUFFICIENT_BUFFER;
     }
 
-    strcpyW(buffer, strings->data[index].string);
+    wcscpy(buffer, strings->data[index].string);
     return S_OK;
 }
 
@@ -470,7 +470,7 @@ HRESULT add_localizedstring(IDWriteLocalizedStrings *iface, const WCHAR *locale,
     if (*locale)
     {
         for (i = 0; i < count; i++)
-            if (!strcmpW(strings->data[i].locale, locale))
+            if (!wcsicmp(strings->data[i].locale, locale))
                 return S_OK;
     }
 
@@ -485,6 +485,7 @@ HRESULT add_localizedstring(IDWriteLocalizedStrings *iface, const WCHAR *locale,
         heap_free(strings->data[count].string);
         return E_OUTOFMEMORY;
     }
+    wcslwr(strings->data[count].locale);
 
     strings->count++;
 
@@ -530,13 +531,12 @@ HRESULT clone_localizedstrings(IDWriteLocalizedStrings *iface, IDWriteLocalizedS
 
 void set_en_localizedstring(IDWriteLocalizedStrings *iface, const WCHAR *string)
 {
-    static const WCHAR enusW[] = {'e','n','-','U','S',0};
     struct localizedstrings *strings = impl_from_IDWriteLocalizedStrings(iface);
     UINT32 i;
 
     for (i = 0; i < strings->count; i++)
     {
-        if (!strcmpiW(strings->data[i].locale, enusW))
+        if (!wcsicmp(strings->data[i].locale, L"en-US"))
         {
             heap_free(strings->data[i].string);
             strings->data[i].string = heap_strdupW(string);
@@ -545,11 +545,11 @@ void set_en_localizedstring(IDWriteLocalizedStrings *iface, const WCHAR *string)
     }
 }
 
-static int localizedstrings_sorting_compare(const void *left, const void *right)
+static int __cdecl localizedstrings_sorting_compare(const void *left, const void *right)
 {
     const struct localizedpair *_l = left, *_r = right;
 
-    return strcmpW(_l->locale, _r->locale);
+    return wcscmp(_l->locale, _r->locale);
 };
 
 void sort_localizedstrings(IDWriteLocalizedStrings *iface)
@@ -557,6 +557,25 @@ void sort_localizedstrings(IDWriteLocalizedStrings *iface)
     struct localizedstrings *strings = impl_from_IDWriteLocalizedStrings(iface);
 
     qsort(strings->data, strings->count, sizeof(*strings->data), localizedstrings_sorting_compare);
+}
+
+unsigned int get_localizedstrings_count(IDWriteLocalizedStrings *iface)
+{
+    struct localizedstrings *strings = impl_from_IDWriteLocalizedStrings(iface);
+    return strings->count;
+}
+
+BOOL localizedstrings_contains(IDWriteLocalizedStrings *iface, const WCHAR *str)
+{
+    struct localizedstrings *strings = impl_from_IDWriteLocalizedStrings(iface);
+    unsigned int i;
+
+    for (i = 0; i < strings->count; ++i)
+    {
+        if (!wcsicmp(strings->data[i].string, str)) return TRUE;
+    }
+
+    return FALSE;
 }
 
 struct collectionloader
@@ -1033,9 +1052,8 @@ static HRESULT WINAPI dwritefactory_CreateFontFace(IDWriteFactory7 *iface, DWRIT
 
     desc.factory = iface;
     desc.face_type = req_facetype;
-    desc.files = font_files;
+    desc.file = *font_files;
     desc.stream = stream;
-    desc.files_number = files_number;
     desc.index = index;
     desc.simulations = simulations;
     desc.font_data = NULL;
@@ -1492,11 +1510,151 @@ static HRESULT WINAPI dwritefactory3_CreateFontFaceReference(IDWriteFactory7 *if
     return hr;
 }
 
+static HRESULT create_system_path_list(WCHAR ***ret, unsigned int *ret_count)
+{
+    unsigned int index = 0, value_size, name_count, max_name_count, type, data_size;
+    WCHAR **paths = NULL, *name, *value = NULL;
+    size_t capacity = 0, count = 0;
+    HKEY hkey;
+    LONG r;
+
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, "Software\\Microsoft\\Windows NT\\CurrentVersion\\Fonts",
+            0, GENERIC_READ, &hkey))
+    {
+        return E_UNEXPECTED;
+    }
+
+    value_size = MAX_PATH * sizeof(*value);
+    value = heap_alloc(value_size);
+
+    max_name_count = MAX_PATH;
+    name = heap_alloc(max_name_count * sizeof(*name));
+
+    for (;;)
+    {
+        if (!value)
+        {
+            value_size = MAX_PATH * sizeof(*value);
+            value = heap_alloc(value_size);
+        }
+
+        do
+        {
+            name_count = max_name_count;
+            data_size = value_size - sizeof(*value);
+
+            r = RegEnumValueW(hkey, index, name, &name_count, NULL, &type, (BYTE *)value, &data_size);
+            if (r == ERROR_MORE_DATA)
+            {
+                if (name_count >= max_name_count)
+                {
+                    max_name_count *= 2;
+                    heap_free(name);
+                    name = heap_alloc(max_name_count * sizeof(*name));
+                }
+
+                if (data_size > value_size - sizeof(*value))
+                {
+                    heap_free(value);
+                    value_size = max(data_size + sizeof(*value), value_size * 2);
+                    value = heap_alloc(value_size);
+                }
+            }
+        } while (r == ERROR_MORE_DATA);
+
+        if (r != ERROR_SUCCESS)
+            break;
+
+        value[data_size / sizeof(*value)] = 0;
+        if (type == REG_SZ && *name != '@')
+        {
+            if (dwrite_array_reserve((void **)&paths, &capacity, count + 1, sizeof(*paths)))
+            {
+                if (!wcschr(value, '\\'))
+                {
+                    WCHAR *ptrW;
+
+                    ptrW = heap_alloc((MAX_PATH + wcslen(value)) * sizeof(WCHAR));
+                    GetWindowsDirectoryW(ptrW, MAX_PATH);
+                    wcscat(ptrW, L"\\fonts\\");
+                    wcscat(ptrW, value);
+
+                    heap_free(value);
+                    value = ptrW;
+                }
+
+                paths[count++] = value;
+                value = NULL;
+            }
+        }
+        index++;
+    }
+
+    heap_free(name);
+
+    *ret = paths;
+    *ret_count = count;
+
+    RegCloseKey(hkey);
+
+    return S_OK;
+}
+
+static int __cdecl create_system_fontset_compare(const void *left, const void *right)
+{
+    const WCHAR *_l = *(WCHAR **)left, *_r = *(WCHAR **)right;
+    return wcsicmp(_l, _r);
+};
+
+static HRESULT create_system_fontset(IDWriteFactory7 *factory, REFIID riid, void **obj)
+{
+    IDWriteFontSetBuilder2 *builder;
+    IDWriteFontSet *fontset;
+    unsigned int i, j, count;
+    WCHAR **paths;
+    HRESULT hr;
+
+    *obj = NULL;
+
+    if (FAILED(hr = create_fontset_builder(factory, &builder))) return hr;
+
+    if (SUCCEEDED(hr = create_system_path_list(&paths, &count)))
+    {
+        /* Sort, skip duplicates. */
+
+        qsort(paths, count, sizeof(*paths), create_system_fontset_compare);
+
+        for (i = 0, j = 0; i < count; ++i)
+        {
+            if (i != j && !wcsicmp(paths[i], paths[j])) continue;
+
+            if (FAILED(hr = IDWriteFontSetBuilder2_AddFontFile(builder, paths[i])) && hr != DWRITE_E_FILEFORMAT)
+                WARN("Failed to add font file, hr %#x, path %s.\n", hr, debugstr_w(paths[i]));
+
+            j = i;
+        }
+
+        for (i = 0; i < count; ++i)
+            heap_free(paths[i]);
+        heap_free(paths);
+    }
+
+    if (SUCCEEDED(hr = IDWriteFontSetBuilder2_CreateFontSet(builder, &fontset)))
+    {
+        hr = IDWriteFontSet_QueryInterface(fontset, riid, obj);
+        IDWriteFontSet_Release(fontset);
+    }
+
+    IDWriteFontSetBuilder2_Release(builder);
+
+    return hr;
+}
+
 static HRESULT WINAPI dwritefactory3_GetSystemFontSet(IDWriteFactory7 *iface, IDWriteFontSet **fontset)
 {
-    FIXME("%p, %p: stub\n", iface, fontset);
+    TRACE("%p, %p.\n", iface, fontset);
 
-    return E_NOTIMPL;
+    return create_system_fontset(iface, &IID_IDWriteFontSet, (void **)fontset);
 }
 
 static HRESULT WINAPI dwritefactory3_CreateFontSetBuilder(IDWriteFactory7 *iface, IDWriteFontSetBuilder **builder)
@@ -1674,9 +1832,12 @@ static HRESULT WINAPI dwritefactory6_CreateFontResource(IDWriteFactory7 *iface, 
 static HRESULT WINAPI dwritefactory6_GetSystemFontSet(IDWriteFactory7 *iface, BOOL include_downloadable,
         IDWriteFontSet1 **fontset)
 {
-    FIXME("%p, %d, %p.\n", iface, include_downloadable, fontset);
+    TRACE("%p, %d, %p.\n", iface, include_downloadable, fontset);
 
-    return E_NOTIMPL;
+    if (include_downloadable)
+        FIXME("Downloadable fonts are not supported.\n");
+
+    return create_system_fontset(iface, &IID_IDWriteFontSet1, (void **)fontset);
 }
 
 static HRESULT WINAPI dwritefactory6_GetSystemFontCollection(IDWriteFactory7 *iface, BOOL include_downloadable,
@@ -1715,9 +1876,12 @@ static HRESULT WINAPI dwritefactory6_CreateTextFormat(IDWriteFactory7 *iface, co
 static HRESULT WINAPI dwritefactory7_GetSystemFontSet(IDWriteFactory7 *iface, BOOL include_downloadable,
         IDWriteFontSet2 **fontset)
 {
-    FIXME("%p, %d, %p.\n", iface, include_downloadable, fontset);
+    TRACE("%p, %d, %p.\n", iface, include_downloadable, fontset);
 
-    return E_NOTIMPL;
+    if (include_downloadable)
+        FIXME("Downloadable fonts are not supported.\n");
+
+    return create_system_fontset(iface, &IID_IDWriteFontSet2, (void **)fontset);
 }
 
 static HRESULT WINAPI dwritefactory7_GetSystemFontCollection(IDWriteFactory7 *iface, BOOL include_downloadable,

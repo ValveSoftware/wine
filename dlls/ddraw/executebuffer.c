@@ -74,7 +74,7 @@ HRESULT d3d_execute_buffer_execute(struct d3d_execute_buffer *buffer, struct d3d
             case D3DOP_POINT:
             {
                 const D3DPOINT *p = (D3DPOINT *)instr;
-                wined3d_device_set_primitive_type(device->wined3d_device, WINED3D_PT_POINTLIST, 0);
+                wined3d_device_context_set_primitive_type(device->immediate_context, WINED3D_PT_POINTLIST, 0);
                 wined3d_stateblock_set_stream_source(device->state, 0,
                         buffer->dst_vertex_buffer, 0, sizeof(D3DTLVERTEX));
                 wined3d_stateblock_set_vertex_declaration(device->state,
@@ -83,7 +83,7 @@ HRESULT d3d_execute_buffer_execute(struct d3d_execute_buffer *buffer, struct d3d
                 wined3d_device_apply_stateblock(device->wined3d_device, device->state);
                 d3d_device_sync_surfaces(device);
                 for (i = 0; i < count; ++i)
-                    wined3d_device_draw_primitive(device->wined3d_device, p[i].wFirst, p[i].wCount);
+                    wined3d_device_context_draw(device->immediate_context, p[i].wFirst, p[i].wCount, 0, 0);
 
                 instr += sizeof(*p) * count;
                 break;
@@ -91,7 +91,7 @@ HRESULT d3d_execute_buffer_execute(struct d3d_execute_buffer *buffer, struct d3d
 
             case D3DOP_LINE:
                 primitive_size = 2;
-                wined3d_device_set_primitive_type(device->wined3d_device, WINED3D_PT_LINELIST, 0);
+                wined3d_device_context_set_primitive_type(device->immediate_context, WINED3D_PT_LINELIST, 0);
                 /* Drop through. */
             case D3DOP_TRIANGLE:
             {
@@ -104,7 +104,7 @@ HRESULT d3d_execute_buffer_execute(struct d3d_execute_buffer *buffer, struct d3d
 
                 if (!primitive_size)
                 {
-                    wined3d_device_set_primitive_type(device->wined3d_device, WINED3D_PT_TRIANGLELIST, 0);
+                    wined3d_device_context_set_primitive_type(device->immediate_context, WINED3D_PT_TRIANGLELIST, 0);
                     primitive_size = 3;
                 }
 
@@ -191,7 +191,7 @@ HRESULT d3d_execute_buffer_execute(struct d3d_execute_buffer *buffer, struct d3d
                 wined3d_stateblock_set_index_buffer(device->state, buffer->index_buffer, WINED3DFMT_R16_UINT);
                 wined3d_device_apply_stateblock(device->wined3d_device, device->state);
                 d3d_device_sync_surfaces(device);
-                wined3d_device_draw_indexed_primitive(device->wined3d_device, index_pos, index_count);
+                wined3d_device_context_draw_indexed(device->immediate_context, 0, index_pos, index_count, 0, 0);
 
                 buffer->index_pos = index_pos + index_count;
                 break;
@@ -322,7 +322,7 @@ HRESULT d3d_execute_buffer_execute(struct d3d_execute_buffer *buffer, struct d3d
                             box.right = box.left + ci->dwCount * sizeof(D3DTLVERTEX);
                             box.top = box.front = 0;
                             box.bottom = box.back = 1;
-                            wined3d_device_copy_sub_resource_region(device->wined3d_device,
+                            wined3d_device_context_copy_sub_resource_region(device->immediate_context,
                                     wined3d_buffer_get_resource(buffer->dst_vertex_buffer), 0,
                                     ci->wDest * sizeof(D3DTLVERTEX), 0, 0,
                                     wined3d_buffer_get_resource(buffer->src_vertex_buffer), 0, &box, 0);

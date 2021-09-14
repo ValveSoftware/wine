@@ -2514,7 +2514,7 @@ static void EDIT_EM_ReplaceSel(EDITSTATE *es, BOOL can_undo, const WCHAR *lpsz_r
 				abs(es->selection_end - es->selection_start) - strl, hrgn);
 			strl = 0;
 			e = s;
-			hrgn = CreateRectRgn(0, 0, 0, 0);
+                        SetRectRgn(hrgn, 0, 0, 0, 0);
 			EDIT_NOTIFY_PARENT(es, EN_MAXTEXT);
 		}
 	}
@@ -3664,7 +3664,6 @@ static void EDIT_WM_NCPaint(HWND hwnd, HRGN region)
         OffsetRect(&r, -r.left, -r.top);
 
         dc = GetDCEx(hwnd, region, DCX_WINDOW|DCX_INTERSECTRGN);
-        OffsetRect(&r, -r.left, -r.top);
 
         if (IsThemeBackgroundPartiallyTransparent(theme, part, state))
             DrawThemeParentBackground(hwnd, dc, &r);
@@ -3674,6 +3673,8 @@ static void EDIT_WM_NCPaint(HWND hwnd, HRGN region)
 
     /* Call default proc to get the scrollbars etc. also painted */
     DefWindowProcW (hwnd, WM_NCPAINT, (WPARAM)cliprgn, 0);
+    if (cliprgn != region)
+        DeleteObject(cliprgn);
 }
 
 /*********************************************************************
@@ -4596,7 +4597,6 @@ static LRESULT EDIT_WM_NCDestroy(EDITSTATE *es)
 static LRESULT CALLBACK EDIT_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     EDITSTATE *es = (EDITSTATE *)GetWindowLongPtrW(hwnd, 0);
-    HTHEME theme = GetWindowTheme(hwnd);
     LRESULT result = 0;
     RECT *rect;
 
@@ -4904,7 +4904,7 @@ static LRESULT CALLBACK EDIT_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
     case WM_ENABLE:
         es->bEnableState = (BOOL) wParam;
         EDIT_UpdateText(es, NULL, TRUE);
-        if (theme)
+        if (GetWindowTheme(hwnd))
             RedrawWindow(hwnd, NULL, NULL, RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW);
         break;
 
@@ -4934,7 +4934,7 @@ static LRESULT CALLBACK EDIT_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         break;
 
     case WM_KILLFOCUS:
-        result = EDIT_WM_KillFocus(theme, es);
+        result = EDIT_WM_KillFocus(GetWindowTheme(hwnd), es);
         break;
 
     case WM_LBUTTONDBLCLK:
@@ -4971,7 +4971,7 @@ static LRESULT CALLBACK EDIT_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         break;
 
     case WM_SETFOCUS:
-        EDIT_WM_SetFocus(theme, es);
+        EDIT_WM_SetFocus(GetWindowTheme(hwnd), es);
         break;
 
     case WM_SETFONT:
@@ -5095,7 +5095,7 @@ static LRESULT CALLBACK EDIT_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
         break;
 
     case WM_THEMECHANGED:
-        CloseThemeData (theme);
+        CloseThemeData(GetWindowTheme(hwnd));
         OpenThemeData(hwnd, WC_EDITW);
         break;
 

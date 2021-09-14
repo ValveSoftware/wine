@@ -20,6 +20,7 @@
 
 #define COBJMACROS
 #include "dshow.h"
+#include "wine/heap.h"
 #include "wine/strmbase.h"
 #include "wine/test.h"
 
@@ -764,13 +765,13 @@ static DWORD WINAPI frame_thread(void *arg)
     hr = IMemInputPin_Receive(params->sink, params->sample);
     if (winetest_debug > 1) trace("%04x: Returned %#x.\n", GetCurrentThreadId(), hr);
     IMediaSample_Release(params->sample);
-    free(params);
+    heap_free(params);
     return hr;
 }
 
 static HANDLE send_frame_time(IMemInputPin *sink, REFERENCE_TIME start_time, unsigned char color)
 {
-    struct frame_thread_params *params = malloc(sizeof(*params));
+    struct frame_thread_params *params = heap_alloc(sizeof(*params));
     IMemAllocator *allocator;
     REFERENCE_TIME end_time;
     IMediaSample *sample;
@@ -971,7 +972,7 @@ static void test_flushing(IPin *pin, IMemInputPin *input, IMediaControl *control
     thread = send_frame(input);
     ok(WaitForSingleObject(thread, 100) == WAIT_TIMEOUT, "Thread should block in Receive().\n");
 
-    hr = IMediaControl_GetState(control, 1000, &state);
+    hr = IMediaControl_GetState(control, 0, &state);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
     hr = IPin_BeginFlush(pin);
@@ -1083,8 +1084,7 @@ static void test_sample_time(IBaseFilter *filter, IPin *pin, IMemInputPin *input
     hr = IPin_BeginFlush(pin);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     hr = join_thread(thread);
-    /* If the frame makes it to Receive() in time to be rendered, we get S_OK. */
-    ok(hr == S_OK || hr == E_FAIL, "Got hr %#x.\n", hr);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
     hr = IPin_EndFlush(pin);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
@@ -1094,13 +1094,12 @@ static void test_sample_time(IBaseFilter *filter, IPin *pin, IMemInputPin *input
     hr = IMediaControl_Stop(control);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     hr = join_thread(thread);
-    /* If the frame makes it to Receive() in time to be rendered, we get S_OK. */
-    ok(hr == S_OK || hr == E_FAIL, "Got hr %#x.\n", hr);
+    ok(hr == S_OK, "Got hr %#x.\n", hr);
 
     IMediaSeeking_Release(seeking);
 }
 
-static unsigned int check_event_code(IMediaEvent *eventsrc, DWORD timeout, LONG expected_code, LONG_PTR expected1, LONG_PTR expected2)
+static unsigned int check_ec_complete(IMediaEvent *eventsrc, DWORD timeout)
 {
     LONG_PTR param1, param2;
     unsigned int ret = 0;
@@ -1109,10 +1108,10 @@ static unsigned int check_event_code(IMediaEvent *eventsrc, DWORD timeout, LONG 
 
     while ((hr = IMediaEvent_GetEvent(eventsrc, &code, &param1, &param2, timeout)) == S_OK)
     {
-        if (code == expected_code)
+        if (code == EC_COMPLETE)
         {
-            ok(param1 == expected1, "Got param1 %#lx.\n", param1);
-            ok(param2 == expected2, "Got param2 %#lx.\n", param2);
+            ok(param1 == S_OK, "Got param1 %#lx.\n", param1);
+            ok(!param2, "Got param2 %#lx.\n", param2);
             ret++;
         }
         IMediaEvent_FreeEventParams(eventsrc, code, param1, param2);
@@ -1121,11 +1120,6 @@ static unsigned int check_event_code(IMediaEvent *eventsrc, DWORD timeout, LONG 
     ok(hr == E_ABORT, "Got hr %#x.\n", hr);
 
     return ret;
-}
-
-static inline unsigned int check_ec_complete(IMediaEvent *eventsrc, DWORD timeout)
-{
-    return check_event_code(eventsrc, timeout, EC_COMPLETE, S_OK, 0);
 }
 
 static void test_eos(IPin *pin, IMemInputPin *input, IMediaControl *control)
@@ -1156,7 +1150,7 @@ static void test_eos(IPin *pin, IMemInputPin *input, IMediaControl *control)
     hr = IMediaControl_Run(control);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = check_ec_complete(eventsrc, 0);
-    ok(ret == 1, "Expected EC_COMPLETE.\n");
+    todo_wine ok(ret == 1, "Expected EC_COMPLETE.\n");
 
     hr = IMediaControl_Stop(control);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
@@ -1178,7 +1172,7 @@ static void test_eos(IPin *pin, IMemInputPin *input, IMediaControl *control)
     hr = IPin_EndOfStream(pin);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = check_ec_complete(eventsrc, 0);
-    todo_wine ok(!ret, "Got unexpected EC_COMPLETE.\n");
+    ok(!ret, "Got unexpected EC_COMPLETE.\n");
     ret = check_ec_complete(eventsrc, 1600);
     todo_wine ok(ret == 1, "Expected EC_COMPLETE.\n");
 
@@ -1204,7 +1198,7 @@ static void test_eos(IPin *pin, IMemInputPin *input, IMediaControl *control)
     hr = IMediaControl_Stop(control);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = check_ec_complete(eventsrc, 0);
-    todo_wine ok(!ret, "Got unexpected EC_COMPLETE.\n");
+    ok(!ret, "Got unexpected EC_COMPLETE.\n");
 
     /* Test sending EOS and then flushing or stopping. */
 
@@ -1218,7 +1212,7 @@ static void test_eos(IPin *pin, IMemInputPin *input, IMediaControl *control)
     hr = IPin_EndOfStream(pin);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
     ret = check_ec_complete(eventsrc, 0);
-    todo_wine ok(!ret, "Got unexpected EC_COMPLETE.\n");
+    ok(!ret, "Got unexpected EC_COMPLETE.\n");
 
     hr = IPin_BeginFlush(pin);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
@@ -1310,90 +1304,6 @@ static void test_current_image(IBaseFilter *filter, IMemInputPin *input,
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
     IBasicVideo_Release(video);
-}
-
-static inline unsigned int check_ec_userabort(IMediaEvent *eventsrc, DWORD timeout)
-{
-    return check_event_code(eventsrc, timeout, EC_USERABORT, 0, 0);
-}
-
-static void test_window_close(IPin *pin, IMemInputPin *input, IMediaControl *control)
-{
-    IMediaEvent *eventsrc;
-    OAFilterState state;
-    IOverlay *overlay;
-    HANDLE thread;
-    HRESULT hr;
-    HWND hwnd;
-    BOOL ret;
-
-    IMediaControl_QueryInterface(control, &IID_IMediaEvent, (void **)&eventsrc);
-    IPin_QueryInterface(pin, &IID_IOverlay, (void **)&overlay);
-
-    hr = IOverlay_GetWindowHandle(overlay, &hwnd);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    IOverlay_Release(overlay);
-
-    hr = IMediaControl_Pause(control);
-    ok(hr == S_FALSE, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    SendMessageW(hwnd, WM_CLOSE, 0, 0);
-
-    hr = IMediaControl_GetState(control, 1000, &state);
-    ok(hr == VFW_S_STATE_INTERMEDIATE, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(ret == 1, "Expected EC_USERABORT.\n");
-
-    ok(IsWindow(hwnd), "Window should exist.\n");
-    ok(!IsWindowVisible(hwnd), "Window should be visible.\n");
-
-    thread = send_frame(input);
-    ret = WaitForSingleObject(thread, 1000);
-    todo_wine ok(ret == WAIT_OBJECT_0, "Wait failed\n");
-    if (ret == WAIT_OBJECT_0)
-    {
-        GetExitCodeThread(thread, (DWORD *)&hr);
-        ok(hr == E_UNEXPECTED, "Got hr %#x.\n", hr);
-    }
-    CloseHandle(thread);
-
-    hr = IMediaControl_Run(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    hr = IMediaControl_Stop(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    /* We receive an EC_USERABORT notification immediately. */
-
-    hr = IMediaControl_Run(control);
-    ok(hr == S_FALSE, "Got hr %#x.\n", hr);
-    hr = join_thread(send_frame(input));
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    hr = IMediaControl_GetState(control, 1000, &state);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    SendMessageW(hwnd, WM_CLOSE, 0, 0);
-
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(ret == 1, "Expected EC_USERABORT.\n");
-
-    ok(IsWindow(hwnd), "Window should exist.\n");
-    ok(!IsWindowVisible(hwnd), "Window should be visible.\n");
-
-    hr = IMediaControl_Stop(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ret = check_ec_userabort(eventsrc, 0);
-    ok(!ret, "Got unexpected EC_USERABORT.\n");
-
-    IMediaEvent_Release(eventsrc);
 }
 
 static void test_connect_pin(void)
@@ -1517,7 +1427,6 @@ static void test_connect_pin(void)
     test_sample_time(filter, pin, input, control);
     test_eos(pin, input, control);
     test_current_image(filter, input, control, &vih.bmiHeader);
-    test_window_close(pin, input, control);
 
     hr = IFilterGraph2_Disconnect(graph, pin);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
@@ -2201,55 +2110,37 @@ static void test_video_window_messages(IVideoWindow *window, HWND hwnd, HWND our
 
     flush_events();
 
-    /* Demonstrate that messages should be sent, not posted, and that only some
-     * messages should be forwarded. A previous implementation unconditionally
-     * posted all messages. */
-
     hr = IVideoWindow_NotifyOwnerMessage(window, (OAHWND)our_hwnd, WM_SYSCOLORCHANGE, 0, 0);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
-    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-    {
-        ok(msg.message != WM_SYSCOLORCHANGE, "WM_SYSCOLORCHANGE should not be posted.\n");
-        DispatchMessageA(&msg);
-    }
+    ret = GetQueueStatus(QS_SENDMESSAGE | QS_POSTMESSAGE);
+    ok(!ret, "Got unexpected status %#x.\n", ret);
 
-    hr = IVideoWindow_NotifyOwnerMessage(window, (OAHWND)our_hwnd, WM_FONTCHANGE, 0, 0);
+    hr = IVideoWindow_NotifyOwnerMessage(window, (OAHWND)our_hwnd, WM_SETCURSOR,
+            (WPARAM)hwnd, MAKELONG(HTCLIENT, WM_MOUSEMOVE));
     ok(hr == S_OK, "Got hr %#x.\n", hr);
 
-    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-    {
-        ok(msg.message != WM_FONTCHANGE, "WM_FONTCHANGE should not be posted.\n");
-        DispatchMessageA(&msg);
-    }
+    ret = GetQueueStatus(QS_SENDMESSAGE | QS_POSTMESSAGE);
+    ok(!ret, "Got unexpected status %#x.\n", ret);
 
     params.window = window;
     params.hwnd = our_hwnd;
     params.message = WM_SYSCOLORCHANGE;
     thread = CreateThread(NULL, 0, notify_message_proc, &params, 0, NULL);
     ok(WaitForSingleObject(thread, 100) == WAIT_TIMEOUT, "Thread should block.\n");
+    ret = GetQueueStatus(QS_SENDMESSAGE | QS_POSTMESSAGE);
+    ok(ret == ((QS_SENDMESSAGE << 16) | QS_SENDMESSAGE), "Got unexpected status %#x.\n", ret);
 
-    while ((ret = MsgWaitForMultipleObjects(1, &thread, FALSE, 1000, QS_ALLINPUT)) == 1)
-    {
-        while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-        {
-            ok(msg.message != WM_SYSCOLORCHANGE, "WM_SYSCOLORCHANGE should not be posted.\n");
-            DispatchMessageA(&msg);
-        }
-    }
-    ok(!ret, "Wait timed out.\n");
+    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE)) DispatchMessageA(&msg);
+    ok(!WaitForSingleObject(thread, 1000), "Wait timed out.\n");
     CloseHandle(thread);
 
-    params.message = WM_FONTCHANGE;
+    params.message = WM_SETCURSOR;
     thread = CreateThread(NULL, 0, notify_message_proc, &params, 0, NULL);
     ok(!WaitForSingleObject(thread, 1000), "Thread should not block.\n");
     CloseHandle(thread);
-
-    while (PeekMessageA(&msg, 0, 0, 0, PM_REMOVE))
-    {
-        ok(msg.message != WM_FONTCHANGE, "WM_FONTCHANGE should not be posted.\n");
-        DispatchMessageA(&msg);
-    }
+    ret = GetQueueStatus(QS_SENDMESSAGE | QS_POSTMESSAGE);
+    ok(!ret, "Got unexpected status %#x.\n", ret);
 
     hr = IVideoWindow_put_Owner(window, 0);
     ok(hr == S_OK, "Got hr %#x.\n", hr);

@@ -97,19 +97,9 @@ struct wg_format
                 WG_VIDEO_FORMAT_YVYU,
 
                 WG_VIDEO_FORMAT_CINEPAK,
-
-                WG_VIDEO_FORMAT_H264,
             } format;
             uint32_t width, height;
             uint32_t fps_n, fps_d;
-            union
-            {
-                struct
-                {
-                    uint32_t profile;
-                    uint32_t level;
-                } h264;
-            } compressed;
         } video;
         struct
         {
@@ -127,37 +117,13 @@ struct wg_format
                 WG_AUDIO_FORMAT_MPEG1_LAYER1,
                 WG_AUDIO_FORMAT_MPEG1_LAYER2,
                 WG_AUDIO_FORMAT_MPEG1_LAYER3,
-
-                WG_AUDIO_FORMAT_AAC,
             } format;
 
             uint32_t channels;
             uint32_t channel_mask; /* In WinMM format. */
             uint32_t rate;
-
-            union
-            {
-                struct
-                {
-                    uint32_t payload_type;
-                    uint32_t indication;
-                    /* The definition of this structure is found in ISO/IEC 14496-3,
-                       which we don't have access to, so we'll just keep
-                       the size set to the largest instance we've seen used. */
-                    unsigned char audio_specifc_config[2];
-                    uint32_t asp_size;
-                } aac;
-            } compressed;
         } audio;
     } u;
-};
-
-struct wg_rect
-{
-    uint32_t left;
-    uint32_t right;
-    uint32_t top;
-    uint32_t bottom;
 };
 
 enum wg_parser_event_type
@@ -189,26 +155,15 @@ struct wg_parser_event
 };
 C_ASSERT(sizeof(struct wg_parser_event) == 40);
 
-enum wg_read_result
-{
-    WG_READ_SUCCESS,
-    WG_READ_FAILURE,
-    WG_READ_FLUSHING,
-    WG_READ_EOS,
-};
-
 struct unix_funcs
 {
     struct wg_parser *(CDECL *wg_decodebin_parser_create)(void);
     struct wg_parser *(CDECL *wg_avi_parser_create)(void);
     struct wg_parser *(CDECL *wg_mpeg_audio_parser_create)(void);
     struct wg_parser *(CDECL *wg_wave_parser_create)(void);
-    struct wg_parser *(CDECL *wg_raw_media_converter_create)(void);
     void (CDECL *wg_parser_destroy)(struct wg_parser *parser);
 
     HRESULT (CDECL *wg_parser_connect)(struct wg_parser *parser, uint64_t file_size);
-    HRESULT (CDECL *wg_parser_connect_unseekable)(struct wg_parser *parser,
-            const struct wg_format *in_format, uint32_t stream_count, const struct wg_format *out_formats, const struct wg_rect *apertures);
     void (CDECL *wg_parser_disconnect)(struct wg_parser *parser);
 
     void (CDECL *wg_parser_begin_flush)(struct wg_parser *parser);
@@ -216,19 +171,15 @@ struct unix_funcs
 
     bool (CDECL *wg_parser_get_read_request)(struct wg_parser *parser,
             void **data, uint64_t *offset, uint32_t *size);
-    /* bytes_available indicates the actual size of the input packet, or 0 if the source source pad isn't aware of packets.
-       If this value is lower or equal to the requested buffer size, it signifies the number of valid bytes set, if this
-       value is higher than the requested buffer size, it means that a push mode pad should query for the rest of packet,
-       concatenate the result, then submit it downstream. */
-    void (CDECL *wg_parser_complete_read_request)(struct wg_parser *parser, enum wg_read_result ret, uint32_t bytes_available);
+    void (CDECL *wg_parser_complete_read_request)(struct wg_parser *parser, bool ret);
 
-    void (CDECL *wg_parser_set_large_buffering)(struct wg_parser *parser);
+    void (CDECL *wg_parser_set_unlimited_buffering)(struct wg_parser *parser);
 
     uint32_t (CDECL *wg_parser_get_stream_count)(struct wg_parser *parser);
     struct wg_parser_stream *(CDECL *wg_parser_get_stream)(struct wg_parser *parser, uint32_t index);
 
     void (CDECL *wg_parser_stream_get_preferred_format)(struct wg_parser_stream *stream, struct wg_format *format);
-    void (CDECL *wg_parser_stream_enable)(struct wg_parser_stream *stream, const struct wg_format *format, const struct wg_rect *aperture);
+    void (CDECL *wg_parser_stream_enable)(struct wg_parser_stream *stream, const struct wg_format *format);
     void (CDECL *wg_parser_stream_disable)(struct wg_parser_stream *stream);
 
     bool (CDECL *wg_parser_stream_get_event)(struct wg_parser_stream *stream, struct wg_parser_event *event);
@@ -240,12 +191,9 @@ struct unix_funcs
 
     /* Returns the duration in 100-nanosecond units. */
     uint64_t (CDECL *wg_parser_stream_get_duration)(struct wg_parser_stream *stream);
-    char * (CDECL *wg_parser_stream_get_language)(struct wg_parser_stream *stream);
     /* start_pos and stop_pos are in 100-nanosecond units. */
     bool (CDECL *wg_parser_stream_seek)(struct wg_parser_stream *stream, double rate,
             uint64_t start_pos, uint64_t stop_pos, DWORD start_flags, DWORD stop_flags);
-    /* true: The stream has fully drained or has been flushed. false: An event is available. */
-    bool (CDECL *wg_parser_stream_drain)(struct wg_parser_stream *stream);
 };
 
 extern const struct unix_funcs *unix_funcs;
@@ -270,13 +218,5 @@ void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format) DE
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj) DECLSPEC_HIDDEN;
 
 HRESULT audio_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
-HRESULT color_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
-
-enum decoder_type
-{
-    DECODER_TYPE_H264,
-    DECODER_TYPE_AAC,
-};
-HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type) DECLSPEC_HIDDEN;
 
 #endif /* __GST_PRIVATE_INCLUDED__ */

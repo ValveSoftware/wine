@@ -2094,6 +2094,22 @@ static void test_mbstowcs(void)
     ok(ret == 0, "wcstombs did not return 0, got %d\n", (int)ret);
     ok(!mOut[0], "mOut = %s\n", mOut);
 
+    if(pwcsrtombs) {
+        pwstr = wSimple;
+        err = -3;
+        ret = pwcsrtombs(mOut, &pwstr, 4, &err);
+        ok(ret == 4, "wcsrtombs did not return 4\n");
+        ok(err == 0, "err = %d\n", err);
+        ok(pwstr == wSimple+4, "pwstr = %p (wszSimple = %p)\n", pwstr, wSimple);
+        ok(!memcmp(mOut, mSimple, ret), "mOut = %s\n", mOut);
+
+        pwstr = wSimple;
+        ret = pwcsrtombs(mOut, &pwstr, 5, NULL);
+        ok(ret == 4, "wcsrtombs did not return 4\n");
+        ok(pwstr == NULL, "pwstr != NULL\n");
+        ok(!memcmp(mOut, mSimple, sizeof(mSimple)), "mOut = %s\n", mOut);
+    }
+
     if(!setlocale(LC_ALL, "Japanese_Japan.932")) {
         win_skip("Japanese_Japan.932 locale not available\n");
         return;
@@ -4441,6 +4457,17 @@ static void test__mbbtype(void)
     }
 }
 
+static void test_wcsncpy(void)
+{
+    wchar_t dst[6], *p;
+
+    memset(dst, 0xff, sizeof(dst));
+    p = wcsncpy(dst, L"1234567", 6);
+    ok(p == dst, "Unexpected return value.\n");
+    ok(!memcmp(dst, L"123456", sizeof(dst)), "unexpected buffer %s\n",
+            wine_dbgstr_wn(dst, ARRAY_SIZE(dst)));
+}
+
 START_TEST(string)
 {
     char mem[100];
@@ -4596,4 +4623,5 @@ START_TEST(string)
     test___STRINGTOLD();
     test_SpecialCasing();
     test__mbbtype();
+    test_wcsncpy();
 }

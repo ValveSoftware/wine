@@ -1447,8 +1447,6 @@ static void output_syscall_dispatcher( int count, const char *variant )
         output( "\tmovl %%esi,-0x04(%%ebp)\n" );
         output_cfi( ".cfi_rel_offset %%esi,-0x04\n" );
         output( "\tpushfl\n" );
-        output( "\tpushl $0x202\n" );
-        output( "\tpopfl\n" );
         output( "\tmovw %%gs,-0x1a(%%ebp)\n" );
         output( "\tmovw %%fs,-0x1c(%%ebp)\n" );
         output( "\tmovw %%es,-0x1e(%%ebp)\n" );
@@ -1607,7 +1605,6 @@ static void output_syscall_dispatcher( int count, const char *variant )
         /* Legends of Runeterra hooks the first system call return instruction, and
          * depends on us returning to it. Adjust the return address accordingly. */
         output( "\tsubq $0xb,0x8(%%rbp)\n" );
-        output( "\tsubq $0xf000,%%rax\n" );
         output( "\tmovq 0x8(%%rbp),%%rbx\n" );
         output( "\tmovq %%rbx,-0x28(%%rbp)\n" );
         output( "\tleaq 0x10(%%rbp),%%rbx\n" );
@@ -1868,13 +1865,6 @@ void output_syscalls( DLLSPEC *spec )
         output( ".Lsyscall_args:\n" );
         for (i = 0; i < count; i++)
             output( "\t.byte %u\n", get_args_size( syscalls[i] ));
-
-        for (i = 0; i < count; i++)
-        {
-            output( "\t.align %d\n", get_alignment( get_ptr_size() ) );
-            output( "%s\n", asm_globl(strmake( "__wine_syscall_nr_%s", get_link_name( syscalls[i] ) )) );
-            output( "\t.long %u\n", i + 0xf000 );
-        }
         return;
     }
 
@@ -1912,7 +1902,7 @@ void output_syscalls( DLLSPEC *spec )
              * validate that instruction, we can just put a jmp there instead. */
             output( "\t.byte 0x4c,0x8b,0xd1\n" ); /* movq %rcx,%r10 */
             output( "\t.byte 0xb8\n" );           /* movl $i,%eax */
-            output( "\t.long %u\n", 0xf000 + i );
+            output( "\t.long %u\n", i );
             output( "\t.byte 0xf6,0x04,0x25,0x08,0x03,0xfe,0x7f,0x01\n" ); /* testb $1,0x7ffe0308 */
             output( "\t.byte 0x75,0x03\n" );      /* jne 1f */
             output( "\t.byte 0x0f,0x05\n" );      /* syscall */

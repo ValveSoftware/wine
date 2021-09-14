@@ -804,8 +804,6 @@ static void NSAPI nsDocumentObserver_BindToDocument(nsIDocumentObserver *iface, 
 
     TRACE("(%p)->(%p %p)\n", This, aDocument, aContent);
 
-    TRACE("This->document_mode %d.\n", This->document_mode);
-
     if(This->document_mode < COMPAT_MODE_IE10) {
         nsres = nsIContent_QueryInterface(aContent, &IID_nsIDOMComment, (void**)&nscomment);
         if(NS_SUCCEEDED(nsres)) {
@@ -839,7 +837,7 @@ static void NSAPI nsDocumentObserver_BindToDocument(nsIDocumentObserver *iface, 
                  */
                 hres = IInternetSecurityManager_MapUrlToZone(get_security_manager(), window->url, &zone, 0);
                 if(SUCCEEDED(hres) && zone == URLZONE_INTERNET)
-                    mode = COMPAT_MODE_IE11;
+                    mode = COMPAT_MODE_IE8;
             }
 
             set_document_mode(This, mode, FALSE);

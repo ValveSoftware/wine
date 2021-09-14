@@ -122,7 +122,7 @@ HRESULT reg_create_key( IWbemClassObject *obj, IWbemContext *context, IWbemClass
     IWbemClassObject *sig, *out_params = NULL;
     HRESULT hr;
 
-    TRACE("%p, %p\n", in, out);
+    TRACE("%p, %p, %p, %p\n", obj, context, in, out);
 
     hr = IWbemClassObject_Get( in, L"hDefKey", 0, &defkey, NULL, NULL );
     if (hr != S_OK) return hr;
@@ -221,7 +221,7 @@ HRESULT reg_enum_key( IWbemClassObject *obj, IWbemContext *context, IWbemClassOb
     IWbemClassObject *sig, *out_params = NULL;
     HRESULT hr;
 
-    TRACE("%p, %p\n", in, out);
+    TRACE("%p, %p, %p, %p\n", obj, context, in, out);
 
     hr = IWbemClassObject_Get( in, L"hDefKey", 0, &defkey, NULL, NULL );
     if (hr != S_OK) return hr;
@@ -332,7 +332,7 @@ HRESULT reg_enum_values( IWbemClassObject *obj, IWbemContext *context, IWbemClas
     IWbemClassObject *sig, *out_params = NULL;
     HRESULT hr;
 
-    TRACE("%p, %p\n", in, out);
+    TRACE("%p, %p, %p, %p\n", obj, context, in, out);
 
     hr = IWbemClassObject_Get( in, L"hDefKey", 0, &defkey, NULL, NULL );
     if (hr != S_OK) return hr;
@@ -423,14 +423,18 @@ HRESULT reg_get_stringvalue( IWbemClassObject *obj, IWbemContext *context, IWbem
     IWbemClassObject *sig, *out_params = NULL;
     HRESULT hr;
 
-    TRACE("%p, %p\n", in, out);
+    TRACE("%p, %p, %p, %p\n", obj, context, in, out);
 
     hr = IWbemClassObject_Get( in, L"hDefKey", 0, &defkey, NULL, NULL );
     if (hr != S_OK) return hr;
     hr = IWbemClassObject_Get( in, L"sSubKeyName", 0, &subkey, NULL, NULL );
     if (hr != S_OK) return hr;
     hr = IWbemClassObject_Get( in, L"sValueName", 0, &name, NULL, NULL );
-    if (hr != S_OK) return hr;
+    if (hr != S_OK)
+    {
+        VariantClear( &subkey );
+        return hr;
+    }
 
     hr = create_signature( L"StdRegProv", L"GetStringValue", PARAM_OUT, &sig );
     if (hr != S_OK)
@@ -501,16 +505,25 @@ HRESULT reg_set_stringvalue( IWbemClassObject *obj, IWbemContext *context, IWbem
     IWbemClassObject *sig, *out_params = NULL;
     HRESULT hr;
 
-    TRACE("%p, %p\n", in, out);
+    TRACE("%p, %p, %p, %p\n", obj, context, in, out);
 
     hr = IWbemClassObject_Get( in, L"hDefKey", 0, &defkey, NULL, NULL );
     if (hr != S_OK) return hr;
     hr = IWbemClassObject_Get( in, L"sSubKeyName", 0, &subkey, NULL, NULL );
     if (hr != S_OK) return hr;
     hr = IWbemClassObject_Get( in, L"sValueName", 0, &name, NULL, NULL );
-    if (hr != S_OK) return hr;
+    if (hr != S_OK)
+    {
+        VariantClear( &subkey );
+        return hr;
+    }
     hr = IWbemClassObject_Get( in, L"sValue", 0, &value, NULL, NULL );
-    if (hr != S_OK) return hr;
+    if (hr != S_OK)
+    {
+        VariantClear( &name );
+        VariantClear( &subkey );
+        return hr;
+    }
 
     hr = create_signature( L"StdRegProv", L"SetStringValue", PARAM_OUT, &sig );
     if (hr != S_OK)
@@ -575,16 +588,25 @@ HRESULT reg_set_dwordvalue( IWbemClassObject *obj, IWbemContext *context, IWbemC
     IWbemClassObject *sig, *out_params = NULL;
     HRESULT hr;
 
-    TRACE("%p, %p\n", in, out);
+    TRACE("%p, %p, %p, %p\n", obj, context, in, out);
 
     hr = IWbemClassObject_Get( in, L"hDefKey", 0, &defkey, NULL, NULL );
     if (hr != S_OK) return hr;
     hr = IWbemClassObject_Get( in, L"sSubKeyName", 0, &subkey, NULL, NULL );
     if (hr != S_OK) return hr;
     hr = IWbemClassObject_Get( in, L"sValueName", 0, &name, NULL, NULL );
-    if (hr != S_OK) return hr;
+    if (hr != S_OK)
+    {
+        VariantClear( &subkey );
+        return hr;
+    }
     hr = IWbemClassObject_Get( in, L"uValue", 0, &value, NULL, NULL );
-    if (hr != S_OK) return hr;
+    if (hr != S_OK)
+    {
+        VariantClear( &name );
+        VariantClear( &subkey );
+        return hr;
+    }
 
     hr = create_signature( L"StdRegProv", L"SetDWORDValue", PARAM_OUT, &sig );
     if (hr != S_OK)
@@ -636,7 +658,7 @@ HRESULT reg_delete_key( IWbemClassObject *obj, IWbemContext *context, IWbemClass
     IWbemClassObject *sig, *out_params = NULL;
     HRESULT hr;
 
-    TRACE("%p, %p\n", in, out);
+    TRACE("%p, %p, %p, %p\n", obj, context, in, out);
 
     hr = IWbemClassObject_Get( in, L"hDefKey", 0, &defkey, NULL, NULL );
     if (hr != S_OK) return hr;

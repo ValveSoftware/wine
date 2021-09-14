@@ -18,27 +18,18 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "config.h"
-#include "wine/port.h"
-
-#include <stdio.h>
 #include <stdarg.h>
-#ifdef HAVE_LDAP_H
-#include <ldap.h>
-#endif
-
+#include <stdlib.h>
 #include "windef.h"
 #include "winbase.h"
 #include "winnls.h"
 #include "winternl.h"
+#include "winldap.h"
 
-#include "winldap_private.h"
-#include "wldap32.h"
 #include "wine/debug.h"
+#include "winldap_private.h"
 
-#ifdef HAVE_LDAP
-/* Should eventually be determined by the algorithm documented on MSDN. */
-static const WCHAR defaulthost[] = { 'l','o','c','a','l','h','o','s','t',0 };
+WINE_DEFAULT_DEBUG_CHANNEL(wldap32);
 
 /* Split a space separated string of hostnames into a string array */
 static char **split_hostnames( const char *hostnames )
@@ -63,9 +54,9 @@ static char **split_hostnames( const char *hostnames )
         p++;
     }
 
-    if (!(res = heap_alloc( (i + 1) * sizeof(char *) )))
+    if (!(res = malloc( (i + 1) * sizeof(char *) )))
     {
-        heap_free( str );
+        free( str );
         return NULL;
     }
 
@@ -100,15 +91,13 @@ static char **split_hostnames( const char *hostnames )
     }
     res[i] = NULL;
 
-    heap_free( str );
+    free( str );
     return res;
 
 oom:
-    while (i > 0) strfreeU( res[--i] );
-
-    heap_free( res );
-    heap_free( str );
-
+    while (i > 0) free( res[--i] );
+    free( res );
+    free( str );
     return NULL;
 }
 
@@ -128,11 +117,11 @@ static BOOL has_ldap_scheme( char *url )
 static char *join_hostnames( const char *scheme, char **hostnames, ULONG portnumber )
 {
     char *res, *p, *q, **v;
-    unsigned int i = 0, size = 0; 
+    unsigned int i = 0, size = 0;
     static const char sep[] = " ", fmt[] = ":%d";
     char port[7];
 
-    sprintf( port, fmt, portnumber ); 
+    sprintf( port, fmt, portnumber );
 
     for (v = hostnames; *v; v++)
     {
@@ -147,14 +136,14 @@ static char *join_hostnames( const char *scheme, char **hostnames, ULONG portnum
 
         size += strlen( *v );
 
-        if (!strchr( q, ':' )) 
+        if (!strchr( q, ':' ))
             size += strlen( port );
 
         i++;
     }
 
     size += (i - 1) * strlen( sep );
-    if (!(res = heap_alloc( size + 1 ))) return NULL;
+    if (!(res = malloc( size + 1 ))) return NULL;
 
     p = res;
     for (v = hostnames; *v; v++)
@@ -200,55 +189,41 @@ static char *urlify_hostnames( const char *scheme, char *hostnames, ULONG port )
     strarrayfreeU( strarray );
     return url;
 }
-#endif
 
-WINE_DEFAULT_DEBUG_CHANNEL(wldap32);
 
-#ifdef HAVE_LDAP
-static WLDAP32_LDAP *create_context( const char *url )
+static LDAP *create_context( const char *url )
 {
-    WLDAP32_LDAP *ld;
+    LDAP *ld;
     int version = LDAP_VERSION3;
 
-    ld = heap_alloc_zero( sizeof( *ld ));
-    if (!ld) return NULL;
-    if (ldap_initialize( &ld->ld, url ) != LDAP_SUCCESS)
+    if (!(ld = calloc( 1, sizeof( *ld )))) return NULL;
+    if (map_error( ldap_funcs->fn_ldap_initialize( &CTX(ld), url ) ) != LDAP_SUCCESS)
     {
-        heap_free( ld );
+        free( ld );
         return NULL;
     }
-    ldap_set_option( ld->ld, LDAP_OPT_PROTOCOL_VERSION, &version );
+    ldap_funcs->fn_ldap_set_option( CTX(ld), LDAP_OPT_PROTOCOL_VERSION, &version );
     return ld;
 }
-#endif
 
 /***********************************************************************
  *      cldap_openA     (WLDAP32.@)
  *
  * See cldap_openW.
  */
-WLDAP32_LDAP * CDECL cldap_openA( PCHAR hostname, ULONG portnumber )
+LDAP * CDECL cldap_openA( char *hostname, ULONG portnumber )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld = NULL;
+    LDAP *ld;
     WCHAR *hostnameW = NULL;
 
     TRACE( "(%s, %d)\n", debugstr_a(hostname), portnumber );
 
-    if (hostname) {
-        hostnameW = strAtoW( hostname );
-        if (!hostnameW) goto exit;
-    }
+    if (hostname && !(hostnameW = strAtoW( hostname ))) return NULL;
 
     ld = cldap_openW( hostnameW, portnumber );
 
-exit:
-    strfreeW( hostnameW );
+    free( hostnameW );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
@@ -272,42 +247,28 @@ exit:
  *  will take precedence over the port number supplied as a parameter
  *  to this function.
  */
-WLDAP32_LDAP * CDECL cldap_openW( PWCHAR hostname, ULONG portnumber )
+LDAP * CDECL cldap_openW( WCHAR *hostname, ULONG portnumber )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld = NULL;
-    char *hostnameU = NULL, *url = NULL;
+    LDAP *ld = NULL;
+    char *hostnameU, *url = NULL;
 
     TRACE( "(%s, %d)\n", debugstr_w(hostname), portnumber );
 
-    if (hostname) {
-        hostnameU = strWtoU( hostname );
-        if (!hostnameU) goto exit;
-    }
-    else {
-        hostnameU = strWtoU( defaulthost );
-        if (!hostnameU) goto exit;
-    }
-
-    url = urlify_hostnames( "cldap://", hostnameU, portnumber );
-    if (!url) goto exit;
+    if (!(hostnameU = strWtoU( hostname ? hostname : L"localhost" ))) return NULL;
+    if (!(url = urlify_hostnames( "cldap://", hostnameU, portnumber ))) goto exit;
 
     ld = create_context( url );
 
 exit:
-    strfreeU( hostnameU );
-    strfreeU( url );
+    free( hostnameU );
+    free( url );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
  *      ldap_connect     (WLDAP32.@)
  *
- * Connect to an LDAP server. 
+ * Connect to an LDAP server.
  *
  * PARAMS
  *  ld      [I] Pointer to an LDAP context.
@@ -322,12 +283,12 @@ exit:
  *  The timeout parameter may be NULL in which case a default timeout
  *  value will be used.
  */
-ULONG CDECL ldap_connect( WLDAP32_LDAP *ld, struct l_timeval *timeout )
+ULONG CDECL ldap_connect( LDAP *ld, struct l_timeval *timeout )
 {
     TRACE( "(%p, %p)\n", ld, timeout );
 
-    if (!ld) return WLDAP32_LDAP_PARAM_ERROR;
-    return WLDAP32_LDAP_SUCCESS; /* FIXME: do something, e.g. ping the host */
+    if (!ld) return LDAP_PARAM_ERROR;
+    return LDAP_SUCCESS; /* FIXME: do something, e.g. ping the host */
 }
 
 /***********************************************************************
@@ -335,28 +296,19 @@ ULONG CDECL ldap_connect( WLDAP32_LDAP *ld, struct l_timeval *timeout )
  *
  * See ldap_initW.
  */
-WLDAP32_LDAP *  CDECL ldap_initA( const PCHAR hostname, ULONG portnumber )
+LDAP *  CDECL ldap_initA( const PCHAR hostname, ULONG portnumber )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld = NULL;
+    LDAP *ld;
     WCHAR *hostnameW = NULL;
 
     TRACE( "(%s, %d)\n", debugstr_a(hostname), portnumber );
 
-    if (hostname) {
-        hostnameW = strAtoW( hostname );
-        if (!hostnameW) goto exit;
-    }
+    if (hostname && !(hostnameW = strAtoW( hostname ))) return NULL;
 
     ld = ldap_initW( hostnameW, portnumber );
 
-exit:
-    strfreeW( hostnameW );
+    free( hostnameW );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
@@ -381,36 +333,22 @@ exit:
  *  to this function. The connection will not be made until the first
  *  LDAP function that needs it is called.
  */
-WLDAP32_LDAP * CDECL ldap_initW( const PWCHAR hostname, ULONG portnumber )
+LDAP * CDECL ldap_initW( const PWCHAR hostname, ULONG portnumber )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld = NULL;
-    char *hostnameU = NULL, *url = NULL;
+    LDAP *ld = NULL;
+    char *hostnameU, *url = NULL;
 
     TRACE( "(%s, %d)\n", debugstr_w(hostname), portnumber );
 
-    if (hostname) {
-        hostnameU = strWtoU( hostname );
-        if (!hostnameU) goto exit;
-    }
-    else {
-        hostnameU = strWtoU( defaulthost );
-        if (!hostnameU) goto exit;
-    }
-
-    url = urlify_hostnames( "ldap://", hostnameU, portnumber );
-    if (!url) goto exit;
+    if (!(hostnameU = strWtoU( hostname ? hostname : L"localhost" ))) return NULL;
+    if (!(url = urlify_hostnames( "ldap://", hostnameU, portnumber ))) goto exit;
 
     ld = create_context( url );
 
 exit:
-    strfreeU( hostnameU );
-    strfreeU( url );
+    free( hostnameU );
+    free( url );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
@@ -418,28 +356,19 @@ exit:
  *
  * See ldap_openW.
  */
-WLDAP32_LDAP * CDECL ldap_openA( PCHAR hostname, ULONG portnumber )
+LDAP * CDECL ldap_openA( char *hostname, ULONG portnumber )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld = NULL;
+    LDAP *ld;
     WCHAR *hostnameW = NULL;
 
     TRACE( "(%s, %d)\n", debugstr_a(hostname), portnumber );
 
-    if (hostname) {
-        hostnameW = strAtoW( hostname );
-        if (!hostnameW) goto exit;
-    }
+    if (hostname && !(hostnameW = strAtoW( hostname ))) return NULL;
 
     ld = ldap_openW( hostnameW, portnumber );
 
-exit:
-    strfreeW( hostnameW );
+    free( hostnameW );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
@@ -463,36 +392,22 @@ exit:
  *  will take precedence over the port number supplied as a parameter
  *  to this function.
  */
-WLDAP32_LDAP * CDECL ldap_openW( PWCHAR hostname, ULONG portnumber )
+LDAP * CDECL ldap_openW( WCHAR *hostname, ULONG portnumber )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld = NULL;
-    char *hostnameU = NULL, *url = NULL;
+    LDAP *ld = NULL;
+    char *hostnameU, *url = NULL;
 
     TRACE( "(%s, %d)\n", debugstr_w(hostname), portnumber );
 
-    if (hostname) {
-        hostnameU = strWtoU( hostname );
-        if (!hostnameU) goto exit;
-    }
-    else {
-        hostnameU = strWtoU( defaulthost );
-        if (!hostnameU) goto exit;
-    }
-
-    url = urlify_hostnames( "ldap://", hostnameU, portnumber );
-    if (!url) goto exit;
+    if (!(hostnameU = strWtoU( hostname ? hostname : L"localhost" ))) return NULL;
+    if (!(url = urlify_hostnames( "ldap://", hostnameU, portnumber ))) goto exit;
 
     ld = create_context( url );
 
 exit:
-    strfreeU( hostnameU );
-    strfreeU( url );
+    free( hostnameU );
+    free( url );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
@@ -500,27 +415,19 @@ exit:
  *
  * See ldap_sslinitW.
  */
-WLDAP32_LDAP * CDECL ldap_sslinitA( PCHAR hostname, ULONG portnumber, int secure )
+LDAP * CDECL ldap_sslinitA( char *hostname, ULONG portnumber, int secure )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld;
+    LDAP *ld;
     WCHAR *hostnameW = NULL;
 
     TRACE( "(%s, %d, 0x%08x)\n", debugstr_a(hostname), portnumber, secure );
 
-    if (hostname) {
-        hostnameW = strAtoW( hostname );
-        if (!hostnameW) return NULL;
-    }
+    if (hostname && !(hostnameW = strAtoW( hostname ))) return NULL;
 
     ld  = ldap_sslinitW( hostnameW, portnumber, secure );
 
-    strfreeW( hostnameW );
+    free( hostnameW );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
@@ -546,22 +453,14 @@ WLDAP32_LDAP * CDECL ldap_sslinitA( PCHAR hostname, ULONG portnumber, int secure
  *  to this function. The connection will not be made until the first
  *  LDAP function that needs it is called.
  */
-WLDAP32_LDAP * CDECL ldap_sslinitW( PWCHAR hostname, ULONG portnumber, int secure )
+LDAP * CDECL ldap_sslinitW( WCHAR *hostname, ULONG portnumber, int secure )
 {
-#ifdef HAVE_LDAP
-    WLDAP32_LDAP *ld = NULL;
-    char *hostnameU = NULL, *url = NULL;
+    LDAP *ld = NULL;
+    char *hostnameU, *url = NULL;
 
     TRACE( "(%s, %d, 0x%08x)\n", debugstr_w(hostname), portnumber, secure );
 
-    if (hostname) {
-        hostnameU = strWtoU( hostname );
-        if (!hostnameU) goto exit;
-    }
-    else {
-        hostnameU = strWtoU( defaulthost );
-        if (!hostnameU) goto exit;
-    }
+    if (!(hostnameU = strWtoU( hostname ? hostname : L"localhost" ))) return NULL;
 
     if (secure)
         url = urlify_hostnames( "ldaps://", hostnameU, portnumber );
@@ -572,13 +471,9 @@ WLDAP32_LDAP * CDECL ldap_sslinitW( PWCHAR hostname, ULONG portnumber, int secur
     ld = create_context( url );
 
 exit:
-    strfreeU( hostnameU );
-    strfreeU( url );
+    free( hostnameU );
+    free( url );
     return ld;
-
-#else
-    return NULL;
-#endif
 }
 
 /***********************************************************************
@@ -586,35 +481,24 @@ exit:
  *
  * See ldap_start_tls_sW.
  */
-ULONG CDECL ldap_start_tls_sA( WLDAP32_LDAP *ld, PULONG retval, WLDAP32_LDAPMessage **result,
-    PLDAPControlA *serverctrls, PLDAPControlA *clientctrls )
+ULONG CDECL ldap_start_tls_sA( LDAP *ld, ULONG *retval, LDAPMessage **result, LDAPControlA **serverctrls,
+    LDAPControlA **clientctrls )
 {
-    ULONG ret = WLDAP32_LDAP_NOT_SUPPORTED;
-#ifdef HAVE_LDAP
+    ULONG ret = LDAP_NO_MEMORY;
     LDAPControlW **serverctrlsW = NULL, **clientctrlsW = NULL;
-
-    ret = WLDAP32_LDAP_NO_MEMORY;
 
     TRACE( "(%p, %p, %p, %p, %p)\n", ld, retval, result, serverctrls, clientctrls );
 
     if (!ld) return ~0u;
 
-    if (serverctrls) {
-        serverctrlsW = controlarrayAtoW( serverctrls );
-        if (!serverctrlsW) goto exit;
-    }
-    if (clientctrls) {
-        clientctrlsW = controlarrayAtoW( clientctrls );
-        if (!clientctrlsW) goto exit;
-    }
+    if (serverctrls && !(serverctrlsW = controlarrayAtoW( serverctrls ))) goto exit;
+    if (clientctrls && !(clientctrlsW = controlarrayAtoW( clientctrls ))) goto exit;
 
     ret = ldap_start_tls_sW( ld, retval, result, serverctrlsW, clientctrlsW );
 
 exit:
     controlarrayfreeW( serverctrlsW );
     controlarrayfreeW( clientctrlsW );
-
-#endif
     return ret;
 }
 
@@ -637,45 +521,39 @@ exit:
  * NOTES
  *  LDAP function that needs it is called.
  */
-ULONG CDECL ldap_start_tls_sW( WLDAP32_LDAP *ld, PULONG retval, WLDAP32_LDAPMessage **result,
-    PLDAPControlW *serverctrls, PLDAPControlW *clientctrls )
+ULONG CDECL ldap_start_tls_sW( LDAP *ld, ULONG *retval, LDAPMessage **result, LDAPControlW **serverctrls,
+    LDAPControlW **clientctrls )
 {
-    ULONG ret = WLDAP32_LDAP_NOT_SUPPORTED;
-#ifdef HAVE_LDAP
-    LDAPControl **serverctrlsU = NULL, **clientctrlsU = NULL;
-
-    ret = WLDAP32_LDAP_NO_MEMORY;
+    ULONG ret = LDAP_NO_MEMORY;
+    LDAPControlU **serverctrlsU = NULL, **clientctrlsU = NULL;
 
     TRACE( "(%p, %p, %p, %p, %p)\n", ld, retval, result, serverctrls, clientctrls );
+    if (result)
+    {
+        FIXME( "result message not supported\n" );
+        *result = NULL;
+    }
 
     if (!ld) return ~0u;
 
-    if (serverctrls) {
-        serverctrlsU = controlarrayWtoU( serverctrls );
-        if (!serverctrlsU) goto exit;
-    }
-    if (clientctrls) {
-        clientctrlsU = controlarrayWtoU( clientctrls );
-        if (!clientctrlsU) goto exit;
-    }
+    if (serverctrls && !(serverctrlsU = controlarrayWtoU( serverctrls ))) goto exit;
+    if (clientctrls && !(clientctrlsU = controlarrayWtoU( clientctrls ))) goto exit;
 
-    ret = map_error( ldap_start_tls_s( ld->ld, serverctrlsU, clientctrlsU ));
+    ret = map_error( ldap_funcs->fn_ldap_start_tls_s( CTX(ld), serverctrlsU, clientctrlsU ) );
 
 exit:
     controlarrayfreeU( serverctrlsU );
     controlarrayfreeU( clientctrlsU );
-
-#endif
     return ret;
 }
 
 /***********************************************************************
  *      ldap_startup     (WLDAP32.@)
  */
-ULONG CDECL ldap_startup( PLDAP_VERSION_INFO version, HANDLE *instance )
+ULONG CDECL ldap_startup( LDAP_VERSION_INFO *version, HANDLE *instance )
 {
     TRACE( "(%p, %p)\n", version, instance );
-    return WLDAP32_LDAP_SUCCESS;
+    return LDAP_SUCCESS;
 }
 
 /***********************************************************************
@@ -690,7 +568,7 @@ ULONG CDECL ldap_startup( PLDAP_VERSION_INFO version, HANDLE *instance )
  *  Success: TRUE
  *  Failure: FALSE
  */
-BOOLEAN CDECL ldap_stop_tls_s( WLDAP32_LDAP *ld )
+BOOLEAN CDECL ldap_stop_tls_s( LDAP *ld )
 {
     TRACE( "(%p)\n", ld );
     return TRUE; /* FIXME: find a way to stop tls on a connection */

@@ -20,7 +20,7 @@
 
 #include "strmbase_private.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(strmbase);
 
 enum {SAMPLE_PACKET, EOS_PACKET};
 

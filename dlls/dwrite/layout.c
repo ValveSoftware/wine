@@ -62,6 +62,9 @@ struct dwrite_textformat_data
 
     IDWriteFontCollection *collection;
     IDWriteFontFallback *fallback;
+
+    DWRITE_FONT_AXIS_VALUE *axis_values;
+    unsigned int axis_values_count;
 };
 
 enum layout_range_attr_kind {
@@ -328,6 +331,7 @@ static void release_format_data(struct dwrite_textformat_data *data)
     if (data->trimmingsign) IDWriteInlineObject_Release(data->trimmingsign);
     heap_free(data->family_name);
     heap_free(data->locale);
+    heap_free(data->axis_values);
 }
 
 static inline struct dwrite_textlayout *impl_from_IDWriteTextLayout4(IDWriteTextLayout4 *iface)
@@ -462,6 +466,41 @@ static inline HRESULT format_set_linespacing(struct dwrite_textformat_data *form
         *changed = memcmp(spacing, &format->spacing, sizeof(*spacing));
 
     format->spacing = *spacing;
+    return S_OK;
+}
+
+static HRESULT format_set_font_axisvalues(struct dwrite_textformat_data *format,
+        DWRITE_FONT_AXIS_VALUE const *axis_values, unsigned int num_values)
+{
+    heap_free(format->axis_values);
+    format->axis_values = NULL;
+    format->axis_values_count = 0;
+
+    if (num_values)
+    {
+        if (!(format->axis_values = heap_calloc(num_values, sizeof(*axis_values))))
+            return E_OUTOFMEMORY;
+        memcpy(format->axis_values, axis_values, num_values * sizeof(*axis_values));
+        format->axis_values_count = num_values;
+    }
+
+    return S_OK;
+}
+
+static HRESULT format_get_font_axisvalues(struct dwrite_textformat_data *format,
+        DWRITE_FONT_AXIS_VALUE *axis_values, unsigned int num_values)
+{
+    if (!format->axis_values_count)
+    {
+        if (num_values) memset(axis_values, 0, num_values * sizeof(*axis_values));
+        return S_OK;
+    }
+
+    if (num_values < format->axis_values_count)
+        return E_NOT_SUFFICIENT_BUFFER;
+
+    memcpy(axis_values, format->axis_values, min(num_values, format->axis_values_count) * sizeof(*axis_values));
+
     return S_OK;
 }
 
@@ -1935,7 +1974,7 @@ static void init_u_splitting_params_from_erun(struct layout_effective_run *erun,
 static BOOL is_same_u_splitting(struct layout_underline_splitting_params *left,
     struct layout_underline_splitting_params *right)
 {
-    return left->effect == right->effect && !strcmpiW(left->locale, right->locale);
+    return left->effect == right->effect && !wcsicmp(left->locale, right->locale);
 }
 
 static HRESULT layout_add_underline(struct dwrite_textlayout *layout, struct layout_effective_run *first,
@@ -2393,9 +2432,9 @@ static BOOL is_same_layout_attrvalue(struct layout_range_header const *h, enum l
     case LAYOUT_RANGE_ATTR_FONTCOLL:
         return range->collection == value->u.collection;
     case LAYOUT_RANGE_ATTR_LOCALE:
-        return strcmpiW(range->locale, value->u.locale) == 0;
+        return !wcsicmp(range->locale, value->u.locale);
     case LAYOUT_RANGE_ATTR_FONTFAMILY:
-        return strcmpW(range->fontfamily, value->u.fontfamily) == 0;
+        return !wcscmp(range->fontfamily, value->u.fontfamily);
     case LAYOUT_RANGE_ATTR_SPACING:
         return range_spacing->leading == value->u.spacing.leading &&
                range_spacing->trailing == value->u.spacing.trailing &&
@@ -2424,8 +2463,8 @@ static inline BOOL is_same_layout_attributes(struct layout_range_header const *h
                left->object == right->object &&
                left->pair_kerning == right->pair_kerning &&
                left->collection == right->collection &&
-              !strcmpiW(left->locale, right->locale) &&
-              !strcmpW(left->fontfamily, right->fontfamily);
+              !wcsicmp(left->locale, right->locale) &&
+              !wcscmp(left->fontfamily, right->fontfamily);
     }
     case LAYOUT_RANGE_UNDERLINE:
     case LAYOUT_RANGE_STRIKETHROUGH:
@@ -2490,7 +2529,7 @@ static struct layout_range_header *alloc_layout_range(struct dwrite_textlayout *
         range->collection = layout->format.collection;
         if (range->collection)
             IDWriteFontCollection_AddRef(range->collection);
-        strcpyW(range->locale, layout->format.locale);
+        wcscpy(range->locale, layout->format.locale);
 
         h = &range->h;
         break;
@@ -2753,15 +2792,17 @@ static BOOL set_layout_range_attrval(struct layout_range_header *h, enum layout_
         changed = set_layout_range_iface_attr((IUnknown**)&dest->collection, (IUnknown*)value->u.collection);
         break;
     case LAYOUT_RANGE_ATTR_LOCALE:
-        changed = strcmpiW(dest->locale, value->u.locale) != 0;
-        if (changed) {
-            strcpyW(dest->locale, value->u.locale);
-            strlwrW(dest->locale);
+        changed = !!wcsicmp(dest->locale, value->u.locale);
+        if (changed)
+        {
+            wcscpy(dest->locale, value->u.locale);
+            wcslwr(dest->locale);
         }
         break;
     case LAYOUT_RANGE_ATTR_FONTFAMILY:
-        changed = strcmpW(dest->fontfamily, value->u.fontfamily) != 0;
-        if (changed) {
+        changed = !!wcscmp(dest->fontfamily, value->u.fontfamily);
+        if (changed)
+        {
             heap_free(dest->fontfamily);
             dest->fontfamily = heap_strdupW(value->u.fontfamily);
         }
@@ -2994,7 +3035,7 @@ static HRESULT get_string_attribute_length(struct dwrite_textlayout *layout, enu
     }
 
     str = get_string_attribute_ptr(range, kind);
-    *length = strlenW(str);
+    *length = wcslen(str);
     return return_range(&range->h, r);
 }
 
@@ -3013,10 +3054,10 @@ static HRESULT get_string_attribute_value(struct dwrite_textlayout *layout, enum
         return E_INVALIDARG;
 
     str = get_string_attribute_ptr(range, kind);
-    if (length < strlenW(str) + 1)
+    if (length < wcslen(str) + 1)
         return E_NOT_SUFFICIENT_BUFFER;
 
-    strcpyW(ret, str);
+    wcscpy(ret, str);
     return return_range(&range->h, r);
 }
 
@@ -3449,7 +3490,7 @@ static HRESULT WINAPI dwritetextlayout_SetLocaleName(IDWriteTextLayout4 *iface, 
 
     TRACE("%p, %s, %s.\n", iface, debugstr_w(locale), debugstr_range(&range));
 
-    if (!locale || strlenW(locale) > LOCALE_NAME_MAX_LENGTH-1)
+    if (!locale || wcslen(locale) > LOCALE_NAME_MAX_LENGTH-1)
         return E_INVALIDARG;
 
     value.range = range;
@@ -3886,48 +3927,57 @@ static void layout_get_erun_bbox(struct dwrite_textlayout *layout, struct layout
 {
     const struct regular_layout_run *regular = &run->run->u.regular;
     UINT32 start_glyph = regular->clustermap[run->start];
-    const DWRITE_GLYPH_RUN *glyph_run = &regular->run;
-    D2D1_POINT_2F origin = { 0 };
-    float rtl_factor;
-    UINT32 i;
+    D2D1_POINT_2F baseline_origin = { 0 }, *origins;
+    DWRITE_GLYPH_RUN glyph_run;
+    unsigned int i;
+    HRESULT hr;
 
     if (run->bbox.top == run->bbox.bottom)
     {
         struct dwrite_glyphbitmap glyph_bitmap;
         RECT *bbox;
 
+        glyph_run = regular->run;
+        glyph_run.glyphCount = run->glyphcount;
+        glyph_run.glyphIndices = &regular->run.glyphIndices[start_glyph];
+        glyph_run.glyphAdvances = &regular->run.glyphAdvances[start_glyph];
+        glyph_run.glyphOffsets = &regular->run.glyphOffsets[start_glyph];
+
         memset(&glyph_bitmap, 0, sizeof(glyph_bitmap));
-        glyph_bitmap.fontface = (IDWriteFontFace4 *)glyph_run->fontFace;
-        glyph_bitmap.simulations = IDWriteFontFace_GetSimulations(glyph_run->fontFace);
-        glyph_bitmap.emsize = glyph_run->fontEmSize;
+        glyph_bitmap.key = glyph_run.fontFace;
+        glyph_bitmap.simulations = IDWriteFontFace_GetSimulations(glyph_run.fontFace);
+        glyph_bitmap.emsize = glyph_run.fontEmSize;
         glyph_bitmap.nohint = layout->measuringmode == DWRITE_MEASURING_MODE_NATURAL;
 
         bbox = &glyph_bitmap.bbox;
 
-        rtl_factor = glyph_run->bidiLevel & 1 ? -1.0f : 1.0f;
-        for (i = 0; i < run->glyphcount; i++) {
+        if (!(origins = heap_calloc(glyph_run.glyphCount, sizeof(*origins))))
+            return;
+
+        if (FAILED(hr = compute_glyph_origins(&glyph_run, layout->measuringmode, baseline_origin, &layout->transform, origins)))
+        {
+            WARN("Failed to compute glyph origins, hr %#x.\n", hr);
+            heap_free(origins);
+            return;
+        }
+
+        for (i = 0; i < glyph_run.glyphCount; ++i)
+        {
             D2D1_RECT_F glyph_bbox;
 
-            /* FIXME: take care of vertical/rtl */
-            if (glyph_run->bidiLevel & 1)
-                origin.x -= glyph_run->glyphAdvances[i + start_glyph];
-
-            glyph_bitmap.glyph = glyph_run->glyphIndices[i + start_glyph];
-            freetype_get_glyph_bbox(&glyph_bitmap);
+            glyph_bitmap.glyph = glyph_run.glyphIndices[i];
+            dwrite_fontface_get_glyph_bbox(&glyph_bitmap);
 
             glyph_bbox.left = bbox->left;
             glyph_bbox.top = bbox->top;
             glyph_bbox.right = bbox->right;
             glyph_bbox.bottom = bbox->bottom;
 
-            d2d_rect_offset(&glyph_bbox, origin.x + rtl_factor * glyph_run->glyphOffsets[i + start_glyph].advanceOffset,
-                    origin.y - glyph_run->glyphOffsets[i + start_glyph].ascenderOffset);
-
+            d2d_rect_offset(&glyph_bbox, origins[i].x, origins[i].y);
             d2d_rect_union(&run->bbox, &glyph_bbox);
+        }
 
-            if (!(glyph_run->bidiLevel & 1))
-                origin.x += glyph_run->glyphAdvances[i + start_glyph];
-       }
+        heap_free(origins);
     }
 
     *bbox = run->bbox;
@@ -4768,7 +4818,7 @@ static HRESULT WINAPI dwritetextformat_layout_GetFontFamilyName(IDWriteTextForma
     TRACE("%p, %p, %u.\n", iface, name, size);
 
     if (size <= layout->format.family_len) return E_NOT_SUFFICIENT_BUFFER;
-    strcpyW(name, layout->format.family_name);
+    wcscpy(name, layout->format.family_name);
     return S_OK;
 }
 
@@ -4824,7 +4874,7 @@ static HRESULT WINAPI dwritetextformat_layout_GetLocaleName(IDWriteTextFormat3 *
     TRACE("%p, %p, %u.\n", iface, name, size);
 
     if (size <= layout->format.locale_len) return E_NOT_SUFFICIENT_BUFFER;
-    strcpyW(name, layout->format.locale);
+    wcscpy(name, layout->format.locale);
     return S_OK;
 }
 
@@ -4922,24 +4972,30 @@ static HRESULT WINAPI dwritetextformat2_layout_GetLineSpacing(IDWriteTextFormat3
 static HRESULT WINAPI dwritetextformat3_layout_SetFontAxisValues(IDWriteTextFormat3 *iface,
         DWRITE_FONT_AXIS_VALUE const *axis_values, UINT32 num_values)
 {
-    FIXME("%p, %p, %u.\n", iface, axis_values, num_values);
+    struct dwrite_textlayout *layout = impl_layout_from_IDWriteTextFormat3(iface);
 
-    return E_NOTIMPL;
+    TRACE("%p, %p, %u.\n", iface, axis_values, num_values);
+
+    return format_set_font_axisvalues(&layout->format, axis_values, num_values);
 }
 
 static UINT32 WINAPI dwritetextformat3_layout_GetFontAxisValueCount(IDWriteTextFormat3 *iface)
 {
-    FIXME("%p.\n", iface);
+    struct dwrite_textlayout *layout = impl_layout_from_IDWriteTextFormat3(iface);
 
-    return 0;
+    TRACE("%p.\n", iface);
+
+    return layout->format.axis_values_count;
 }
 
 static HRESULT WINAPI dwritetextformat3_layout_GetFontAxisValues(IDWriteTextFormat3 *iface,
-        DWRITE_FONT_AXIS_VALUE const *axis_values, UINT32 num_values)
+        DWRITE_FONT_AXIS_VALUE *axis_values, UINT32 num_values)
 {
-    FIXME("%p, %p, %u.\n", iface, axis_values, num_values);
+    struct dwrite_textlayout *layout = impl_layout_from_IDWriteTextFormat3(iface);
 
-    return E_NOTIMPL;
+    TRACE("%p, %p, %u.\n", iface, axis_values, num_values);
+
+    return format_get_font_axisvalues(&layout->format, axis_values, num_values);
 }
 
 static DWRITE_AUTOMATIC_FONT_AXES WINAPI dwritetextformat3_layout_GetAutomaticFontAxes(IDWriteTextFormat3 *iface)
@@ -5231,7 +5287,8 @@ static HRESULT WINAPI dwritetextlayout_source_GetLocaleName(IDWriteTextAnalysisS
         *text_len = range->h.range.length - position;
 
         next = LIST_ENTRY(list_next(&layout->ranges, &range->h.entry), struct layout_range, h.entry);
-        while (next && next->h.range.startPosition < layout->len && !strcmpW(range->locale, next->locale)) {
+        while (next && next->h.range.startPosition < layout->len && !wcscmp(range->locale, next->locale))
+        {
             *text_len += next->h.range.length;
             next = LIST_ENTRY(list_next(&layout->ranges, &next->h.entry), struct layout_range, h.entry);
         }
@@ -5885,7 +5942,7 @@ static HRESULT WINAPI dwritetextformat_GetFontFamilyName(IDWriteTextFormat3 *ifa
 
     if (size <= format->format.family_len)
         return E_NOT_SUFFICIENT_BUFFER;
-    strcpyW(name, format->format.family_name);
+    wcscpy(name, format->format.family_name);
     return S_OK;
 }
 
@@ -5942,7 +5999,7 @@ static HRESULT WINAPI dwritetextformat_GetLocaleName(IDWriteTextFormat3 *iface, 
 
     if (size <= format->format.locale_len)
         return E_NOT_SUFFICIENT_BUFFER;
-    strcpyW(name, format->format.locale);
+    wcscpy(name, format->format.locale);
     return S_OK;
 }
 
@@ -6042,24 +6099,30 @@ static HRESULT WINAPI dwritetextformat2_GetLineSpacing(IDWriteTextFormat3 *iface
 static HRESULT WINAPI dwritetextformat3_SetFontAxisValues(IDWriteTextFormat3 *iface,
         DWRITE_FONT_AXIS_VALUE const *axis_values, UINT32 num_values)
 {
-    FIXME("%p, %p, %u.\n", iface, axis_values, num_values);
+    struct dwrite_textformat *format = impl_from_IDWriteTextFormat3(iface);
 
-    return E_NOTIMPL;
+    TRACE("%p, %p, %u.\n", iface, axis_values, num_values);
+
+    return format_set_font_axisvalues(&format->format, axis_values, num_values);
 }
 
 static UINT32 WINAPI dwritetextformat3_GetFontAxisValueCount(IDWriteTextFormat3 *iface)
 {
-    FIXME("%p.\n", iface);
+    struct dwrite_textformat *format = impl_from_IDWriteTextFormat3(iface);
 
-    return 0;
+    TRACE("%p.\n", iface);
+
+    return format->format.axis_values_count;
 }
 
 static HRESULT WINAPI dwritetextformat3_GetFontAxisValues(IDWriteTextFormat3 *iface,
-        DWRITE_FONT_AXIS_VALUE const *axis_values, UINT32 num_values)
+        DWRITE_FONT_AXIS_VALUE *axis_values, UINT32 num_values)
 {
-    FIXME("%p, %p, %u.\n", iface, axis_values, num_values);
+    struct dwrite_textformat *format = impl_from_IDWriteTextFormat3(iface);
 
-    return E_NOTIMPL;
+    TRACE("%p, %p, %u.\n", iface, axis_values, num_values);
+
+    return format_get_font_axisvalues(&format->format, axis_values, num_values);
 }
 
 static DWRITE_AUTOMATIC_FONT_AXES WINAPI dwritetextformat3_GetAutomaticFontAxes(IDWriteTextFormat3 *iface)
@@ -6156,11 +6219,11 @@ HRESULT create_textformat(const WCHAR *family_name, IDWriteFontCollection *colle
     object->IDWriteTextFormat3_iface.lpVtbl = &dwritetextformatvtbl;
     object->refcount = 1;
     object->format.family_name = heap_strdupW(family_name);
-    object->format.family_len = strlenW(family_name);
+    object->format.family_len = wcslen(family_name);
     object->format.locale = heap_strdupW(locale);
-    object->format.locale_len = strlenW(locale);
+    object->format.locale_len = wcslen(locale);
     /* Force locale name to lower case, layout will inherit this modified value. */
-    strlwrW(object->format.locale);
+    wcslwr(object->format.locale);
     object->format.weight = weight;
     object->format.style = style;
     object->format.fontsize = size;

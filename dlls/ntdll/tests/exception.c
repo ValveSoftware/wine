@@ -1624,7 +1624,7 @@ static void test_thread_context(void)
             x87_control;
     } expect;
     NTSTATUS (*func_ptr)( struct expected *res, void *func, void *arg1, void *arg2,
-            DWORD *new_x87_control ) = (void *)code_mem;
+            DWORD *new_x87_control ) = code_mem;
     DWORD new_x87_control;
 
     static const BYTE call_func[] =
@@ -2812,7 +2812,7 @@ static void test___C_specific_handler(void)
 /* This is heavily based on the i386 exception tests. */
 static const struct exception
 {
-    BYTE     code[18];      /* asm code */
+    BYTE     code[40];      /* asm code */
     BYTE     offset;        /* offset of faulting instruction */
     BYTE     length;        /* length of faulting instruction */
     NTSTATUS status;        /* expected status code */
@@ -2921,6 +2921,34 @@ static const struct exception
 /* 35 */
     { { 0xa3, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc3 },  /* movl %eax,0xffffffffffffffff; ret */
       0, 9, STATUS_ACCESS_VIOLATION, 2, { 1, 0xffffffffffffffff } },
+
+    /* test exception with cleared segment registers */
+    { {
+        0x8c, 0xc0, /* mov %es,%eax */
+        0x50,       /* push %rax */
+        0x8c, 0xd8, /* mov %ds,%eax */
+        0x50,       /* push %rax */
+        0x8c, 0xe0, /* mov %fs,%eax */
+        0x50,       /* push %rax */
+        0x8c, 0xe8, /* mov %gs,%eax */
+        0x50,       /* push %rax */
+        0x31, 0xc0, /* xor %eax,%eax */
+        0x8e, 0xc0, /* mov %eax,%es */
+        0x8e, 0xd8, /* mov %eax,%ds */
+        0x8e, 0xe0, /* mov %eax,%fs */
+        0x8e, 0xe8, /* mov %eax,%gs */
+        0xfa,       /* cli */
+        0x58,       /* pop %rax */
+        0x8e, 0xe8, /* mov %eax,%gs */
+        0x58,       /* pop %rax */
+        0x8e, 0xe0, /* mov %eax,%fs */
+        0x58,       /* pop %rax */
+        0x8e, 0xd8, /* mov %eax,%ds */
+        0x58,       /* pop %rax */
+        0x8e, 0xc0, /* mov %eax,%es */
+        0xc3,       /* retq */
+      }, 22, 1, STATUS_PRIVILEGED_INSTRUCTION, 0 },
+
     { { 0xf1, 0x90, 0xc3 },  /* icebp; nop; ret */
       1, 1, STATUS_SINGLE_STEP, 0 },
     { { 0xcd, 0x2c, 0xc3 },
@@ -2991,6 +3019,16 @@ static DWORD WINAPI handler( EXCEPTION_RECORD *rec, ULONG64 frame,
         (rec->ExceptionCode == STATUS_BREAKPOINT && rec->ExceptionAddress == (char*)context->Rip + 1),
         "%u: Unexpected exception address %p/%p\n", entry,
         rec->ExceptionAddress, (char*)context->Rip );
+
+    ok( context->SegDs == context->SegSs,
+        "%u: ds %#x does not match ss %#x\n", entry, context->SegDs, context->SegSs );
+    todo_wine ok( context->SegEs == context->SegSs,
+        "%u: es %#x does not match ss %#x\n", entry, context->SegEs, context->SegSs );
+    todo_wine ok( context->SegGs == context->SegSs,
+        "%u: ds %#x does not match ss %#x\n", entry, context->SegGs, context->SegSs );
+
+    todo_wine ok( context->SegFs && context->SegFs != context->SegSs,
+        "%u: got fs %#x\n", entry, context->SegFs );
 
     if (except->status == STATUS_BREAKPOINT && is_wow64)
         parameter_count = 1;
@@ -3525,7 +3563,7 @@ static void test_thread_context(void)
         WORD SegCs, SegDs, SegEs, SegFs, SegGs, SegSs;
     } expect;
     XMM_SAVE_AREA32 broken_fltsave;
-    NTSTATUS (*func_ptr)( void *arg1, void *arg2, struct expected *res, void *func ) = (void *)code_mem;
+    NTSTATUS (*func_ptr)( void *arg1, void *arg2, struct expected *res, void *func ) = code_mem;
 
     static const BYTE call_func[] =
     {
@@ -4157,7 +4195,7 @@ static void test_thread_context(void)
     {
         DWORD R0, R1, R2, R3, R4, R5, R6, R7, R8, R9, R10, R11, R12, Sp, Lr, Pc, Cpsr;
     } expect;
-    NTSTATUS (*func_ptr)( void *arg1, void *arg2, struct expected *res, void *func ) = (void *)code_mem;
+    NTSTATUS (*func_ptr)( void *arg1, void *arg2, struct expected *res, void *func ) = code_mem;
 
     static const DWORD call_func[] =
     {
@@ -5343,7 +5381,7 @@ static void test_thread_context(void)
             X17, X18, X19, X20, X21, X22, X23, X24, X25, X26, X27, X28, Fp, Lr, Sp, Pc;
         ULONG Cpsr;
     } expect;
-    NTSTATUS (*func_ptr)( void *arg1, void *arg2, struct expected *res, void *func ) = (void *)code_mem;
+    NTSTATUS (*func_ptr)( void *arg1, void *arg2, struct expected *res, void *func ) = code_mem;
 
     static const DWORD call_func[] =
     {
@@ -5815,6 +5853,111 @@ static void test_debug_registers(void)
     WaitForSingleObject(thread, 10000);
     CloseHandle(thread);
 }
+
+#if defined(__x86_64__)
+
+static void test_debug_registers_wow64(void)
+{
+    char cmdline[] = "C:\\windows\\syswow64\\notepad.exe";
+    PROCESS_INFORMATION pi;
+    STARTUPINFOA si = {0};
+    WOW64_CONTEXT wow64_ctx;
+    CONTEXT ctx;
+    BOOL is_wow64;
+    NTSTATUS ret;
+    BOOL bret;
+
+    si.cb = sizeof(si);
+    bret = CreateProcessA(cmdline, NULL, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    ok(bret, "CreateProcessA failed\n");
+
+    bret = pIsWow64Process(pi.hProcess, &is_wow64);
+    ok(bret && is_wow64, "expected Wow64 process\n");
+
+    SuspendThread(pi.hThread);
+
+    ZeroMemory(&ctx, sizeof(ctx));
+    ctx.ContextFlags = CONTEXT_ALL;
+    bret = GetThreadContext(pi.hThread, &ctx);
+    ok(bret, "GetThreadContext failed\n");
+
+    ctx.Dr0 = 0x12340000;
+    ctx.Dr1 = 0x12340001;
+    ctx.Dr2 = 0x12340002;
+    ctx.Dr3 = 0x12340003;
+    ctx.Dr7 = 0x155; /* enable all breakpoints (local) */
+    bret = SetThreadContext(pi.hThread, &ctx);
+    ok(bret, "SetThreadContext failed\n");
+
+    if (bret) {
+        ZeroMemory(&ctx, sizeof(ctx));
+        ctx.ContextFlags = CONTEXT_ALL;
+        bret = GetThreadContext(pi.hThread, &ctx);
+        ok(bret, "GetThreadContext failed\n");
+        if (bret)
+        {
+            ok(ctx.Dr0 == 0x12340000, "expected 0x12340000, got %lx\n", ctx.Dr0);
+            ok(ctx.Dr1 == 0x12340001, "expected 0x12340001, got %lx\n", ctx.Dr1);
+            ok(ctx.Dr2 == 0x12340002, "expected 0x12340002, got %lx\n", ctx.Dr2);
+            ok(ctx.Dr3 == 0x12340003, "expected 0x12340003, got %lx\n", ctx.Dr3);
+            ok(ctx.Dr7 == 0x155, "expected 0x155, got %lx\n", ctx.Dr7);
+        }
+
+        ZeroMemory(&wow64_ctx, sizeof(wow64_ctx));
+        wow64_ctx.ContextFlags = WOW64_CONTEXT_ALL;
+        ret = pRtlWow64GetThreadContext(pi.hThread, &wow64_ctx);
+        ok(ret == STATUS_SUCCESS, "Wow64GetThreadContext failed with %lx\n", ret);
+        if (ret == STATUS_SUCCESS)
+        {
+            ok(wow64_ctx.Dr0 == 0x12340000, "expected 0x12340000, got %lx\n", wow64_ctx.Dr0);
+            ok(wow64_ctx.Dr1 == 0x12340001, "expected 0x12340001, got %lx\n", wow64_ctx.Dr1);
+            ok(wow64_ctx.Dr2 == 0x12340002, "expected 0x12340002, got %lx\n", wow64_ctx.Dr2);
+            ok(wow64_ctx.Dr3 == 0x12340003, "expected 0x12340003, got %lx\n", wow64_ctx.Dr3);
+            ok(wow64_ctx.Dr7 == 0x155, "expected 0x155, got %lx\n", wow64_ctx.Dr7);
+        }
+    }
+
+    wow64_ctx.Dr0 = 0x56780000;
+    wow64_ctx.Dr1 = 0x56780001;
+    wow64_ctx.Dr2 = 0x56780002;
+    wow64_ctx.Dr3 = 0x56780003;
+    wow64_ctx.Dr7 = 0x101; /* enable only the first breakpoint */
+    ret = pRtlWow64SetThreadContext(pi.hThread, &wow64_ctx);
+    ok(ret == STATUS_SUCCESS, "Wow64SetThreadContext failed with %lx\n", ret);
+
+    ZeroMemory(&wow64_ctx, sizeof(wow64_ctx));
+    wow64_ctx.ContextFlags = WOW64_CONTEXT_ALL;
+    ret = pRtlWow64GetThreadContext(pi.hThread, &wow64_ctx);
+    ok(ret == STATUS_SUCCESS, "Wow64GetThreadContext failed with %lx\n", ret);
+    if (ret == STATUS_SUCCESS)
+    {
+        ok(wow64_ctx.Dr0 == 0x56780000, "expected 0x56780000, got %lx\n", wow64_ctx.Dr0);
+        ok(wow64_ctx.Dr1 == 0x56780001, "expected 0x56780001, got %lx\n", wow64_ctx.Dr1);
+        ok(wow64_ctx.Dr2 == 0x56780002, "expected 0x56780002, got %lx\n", wow64_ctx.Dr2);
+        ok(wow64_ctx.Dr3 == 0x56780003, "expected 0x56780003, got %lx\n", wow64_ctx.Dr3);
+        ok(wow64_ctx.Dr7 == 0x101, "expected 0x101, got %lx\n", wow64_ctx.Dr7);
+    }
+
+    ZeroMemory(&ctx, sizeof(ctx));
+    ctx.ContextFlags = CONTEXT_ALL;
+    bret = GetThreadContext(pi.hThread, &ctx);
+    ok(bret, "GetThreadContext failed\n");
+    if (bret)
+    {
+        ok(ctx.Dr0 == 0x56780000, "expected 0x56780000, got %lx\n", ctx.Dr0);
+        ok(ctx.Dr1 == 0x56780001, "expected 0x56780001, got %lx\n", ctx.Dr1);
+        ok(ctx.Dr2 == 0x56780002, "expected 0x56780002, got %lx\n", ctx.Dr2);
+        ok(ctx.Dr3 == 0x56780003, "expected 0x56780003, got %lx\n", ctx.Dr3);
+        ok(ctx.Dr7 == 0x101, "expected 0x101, got %lx\n", ctx.Dr7);
+    }
+
+    ResumeThread(pi.hThread);
+    TerminateProcess(pi.hProcess, 0);
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+}
+
+#endif
 
 static DWORD debug_service_exceptions;
 
@@ -8314,6 +8457,7 @@ START_TEST(exception)
 
     test_rtlraiseexception();
     test_debug_registers();
+    test_debug_registers_wow64();
     test_debug_service(1);
     test_virtual_unwind();
     test___C_specific_handler();

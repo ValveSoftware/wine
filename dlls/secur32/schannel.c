@@ -60,6 +60,7 @@ struct schan_context
     struct schan_transport transport;
     ULONG req_ctx_attr;
     const CERT_CONTEXT *cert;
+    SIZE_T header_size;
 };
 
 static struct schan_handle *schan_handle_table;
@@ -184,7 +185,9 @@ static void read_config(void)
         {{'S','S','L',' ','3','.','0',0}, SP_PROT_SSL3_CLIENT, TRUE, FALSE},
         {{'T','L','S',' ','1','.','0',0}, SP_PROT_TLS1_0_CLIENT, TRUE, FALSE},
         {{'T','L','S',' ','1','.','1',0}, SP_PROT_TLS1_1_CLIENT, TRUE, FALSE /* NOTE: not enabled by default on Windows */ },
-        {{'T','L','S',' ','1','.','2',0}, SP_PROT_TLS1_2_CLIENT, TRUE, FALSE /* NOTE: not enabled by default on Windows */ }
+        {{'T','L','S',' ','1','.','2',0}, SP_PROT_TLS1_2_CLIENT, TRUE, FALSE /* NOTE: not enabled by default on Windows */ },
+        {{'D','T','L','S',' ','1','.','0',0}, SP_PROT_DTLS1_0_CLIENT, TRUE, TRUE },
+        {{'D','T','L','S',' ','1','.','2',0}, SP_PROT_DTLS1_2_CLIENT, TRUE, TRUE },
     };
 
     /* No need for thread safety */
@@ -399,9 +402,16 @@ static SECURITY_STATUS schan_AcquireClientCredentials(const SCHANNEL_CRED *schan
 
     if (schanCred)
     {
+        const unsigned dtls_protocols = SP_PROT_DTLS_CLIENT | SP_PROT_DTLS1_2_CLIENT;
+        const unsigned tls_protocols = SP_PROT_TLS1_CLIENT | SP_PROT_TLS1_0_CLIENT | SP_PROT_TLS1_1_CLIENT |
+                                       SP_PROT_TLS1_2_CLIENT | SP_PROT_TLS1_3_CLIENT;
+
         status = get_cert(schanCred, &cert);
         if (status != SEC_E_OK && status != SEC_E_NO_CREDENTIALS)
             return status;
+
+        if ((schanCred->grbitEnabledProtocols & tls_protocols) &&
+            (schanCred->grbitEnabledProtocols & dtls_protocols)) return SEC_E_ALGORITHM_MISMATCH;
 
         status = SEC_E_OK;
     }
@@ -772,6 +782,19 @@ static void dump_buffer_desc(SecBufferDesc *desc)
     }
 }
 
+#define HEADER_SIZE_TLS  5
+#define HEADER_SIZE_DTLS 13
+
+static inline SIZE_T read_record_size(const BYTE *buf, SIZE_T header_size)
+{
+    return (buf[header_size - 2] << 8) | buf[header_size - 1];
+}
+
+static inline BOOL is_dtls_context(const struct schan_context *ctx)
+{
+    return (ctx->header_size == HEADER_SIZE_DTLS);
+}
+
 /***********************************************************************
  *              InitializeSecurityContextW
  */
@@ -829,6 +852,11 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
             return SEC_E_INTERNAL_ERROR;
         }
 
+        if (cred->enabled_protocols & (SP_PROT_DTLS1_0_CLIENT | SP_PROT_DTLS1_2_CLIENT))
+            ctx->header_size = HEADER_SIZE_DTLS;
+        else
+            ctx->header_size = HEADER_SIZE_TLS;
+
         ctx->transport.ctx = ctx;
         schan_imp_set_session_transport(ctx->session, &ctx->transport);
 
@@ -851,6 +879,13 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
             schan_imp_set_application_protocols(ctx->session, buffer->pvBuffer, buffer->cbBuffer);
         }
 
+        if (pInput && (idx = schan_find_sec_buffer_idx(pInput, 0, SECBUFFER_DTLS_MTU)) != -1)
+        {
+            buffer = &pInput->pBuffers[idx];
+            if (buffer->cbBuffer >= sizeof(WORD)) schan_imp_set_dtls_mtu(ctx->session, *(WORD *)buffer->pvBuffer);
+            else WARN("invalid buffer size %u\n", buffer->cbBuffer);
+        }
+
         phNewContext->dwLower = handle;
         phNewContext->dwUpper = 0;
     }
@@ -859,38 +894,38 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
         SIZE_T record_size = 0;
         unsigned char *ptr;
 
-        if (!pInput)
-            return SEC_E_INCOMPLETE_MESSAGE;
-
-        idx = schan_find_sec_buffer_idx(pInput, 0, SECBUFFER_TOKEN);
-        if (idx == -1)
-            return SEC_E_INCOMPLETE_MESSAGE;
-
-        buffer = &pInput->pBuffers[idx];
-        ptr = buffer->pvBuffer;
-        expected_size = 0;
-
-        while (buffer->cbBuffer > expected_size + 5)
+        ctx = schan_get_object(phContext->dwLower, SCHAN_HANDLE_CTX);
+        if (pInput)
         {
-            record_size = 5 + ((ptr[3] << 8) | ptr[4]);
+            idx = schan_find_sec_buffer_idx(pInput, 0, SECBUFFER_TOKEN);
+            if (idx == -1)
+                return SEC_E_INCOMPLETE_MESSAGE;
 
-            if (buffer->cbBuffer < expected_size + record_size)
-                break;
+            buffer = &pInput->pBuffers[idx];
+            ptr = buffer->pvBuffer;
+            expected_size = 0;
 
-            expected_size += record_size;
-            ptr += record_size;
+            while (buffer->cbBuffer > expected_size + ctx->header_size)
+            {
+                record_size = ctx->header_size + read_record_size(ptr, ctx->header_size);
+
+                if (buffer->cbBuffer < expected_size + record_size)
+                    break;
+
+                expected_size += record_size;
+                ptr += record_size;
+            }
+
+            if (!expected_size)
+            {
+                TRACE("Expected at least %lu bytes, but buffer only contains %u bytes.\n",
+                      max(6, record_size), buffer->cbBuffer);
+                return SEC_E_INCOMPLETE_MESSAGE;
+            }
         }
-
-        if (!expected_size && record_size)
-        {
-            TRACE("Expected at least %lu bytes, but buffer only contains %u bytes.\n",
-                    max(6, record_size), buffer->cbBuffer);
-            return SEC_E_INCOMPLETE_MESSAGE;
-        }
+        else if (!is_dtls_context(ctx)) return SEC_E_INCOMPLETE_MESSAGE;
 
         TRACE("Using expected_size %lu.\n", expected_size);
-
-        ctx = schan_get_object(phContext->dwLower, SCHAN_HANDLE_CTX);
     }
 
     ctx->req_ctx_attr = fContextReq;
@@ -912,8 +947,6 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
     {
         SecBuffer *buffer = &out_buffers->desc->pBuffers[0];
         buffer->cbBuffer = 0;
-        /* Nothing to read or to send, but we got SEC_I_CONTINUE_NEEDED, it means missing input */
-        if (!expected_size && ret == SEC_I_CONTINUE_NEEDED) ret = SEC_E_INCOMPLETE_MESSAGE;
     }
 
     if(ctx->transport.in.offset && ctx->transport.in.offset != pInput->pBuffers[0].cbBuffer) {
@@ -925,10 +958,11 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
     }
 
     *pfContextAttr = ISC_RET_REPLAY_DETECT | ISC_RET_SEQUENCE_DETECT | ISC_RET_CONFIDENTIALITY | ISC_RET_STREAM;
-    if (ctx->req_ctx_attr & ISC_REQ_ALLOCATE_MEMORY)
-        *pfContextAttr |= ISC_RET_ALLOCATED_MEMORY;
-    if (ctx->req_ctx_attr & ISC_REQ_USE_SUPPLIED_CREDS)
-        *pfContextAttr |= ISC_RET_USED_SUPPLIED_CREDS;
+    if (ctx->req_ctx_attr & ISC_REQ_EXTENDED_ERROR) *pfContextAttr |= ISC_RET_EXTENDED_ERROR;
+    if (ctx->req_ctx_attr & ISC_REQ_DATAGRAM) *pfContextAttr |= ISC_RET_DATAGRAM;
+    if (ctx->req_ctx_attr & ISC_REQ_ALLOCATE_MEMORY) *pfContextAttr |= ISC_RET_ALLOCATED_MEMORY;
+    if (ctx->req_ctx_attr & ISC_REQ_USE_SUPPLIED_CREDS) *pfContextAttr |= ISC_RET_USED_SUPPLIED_CREDS;
+    if (ctx->req_ctx_attr & ISC_REQ_MANUAL_CRED_VALIDATION) *pfContextAttr |= ISC_RET_MANUAL_CRED_VALIDATION;
 
     return ret;
 }
@@ -1033,11 +1067,11 @@ static SECURITY_STATUS SEC_ENTRY schan_QueryContextAttributesW(
                 unsigned int block_size = schan_imp_get_session_cipher_block_size(ctx->session);
                 unsigned int message_size = schan_imp_get_max_message_size(ctx->session);
 
-                TRACE("Using %lu mac bytes, message size %u, block size %u\n",
-                        mac_size, message_size, block_size);
+                TRACE("Using header size %lu mac bytes %lu, message size %u, block size %u\n",
+                      ctx->header_size, mac_size, message_size, block_size);
 
                 /* These are defined by the TLS RFC */
-                stream_sizes->cbHeader = 5;
+                stream_sizes->cbHeader = ctx->header_size;
                 stream_sizes->cbTrailer = mac_size + 256; /* Max 255 bytes padding + 1 for padding size */
                 stream_sizes->cbMaximumMessage = message_size;
                 stream_sizes->cbBuffers = 4;
@@ -1362,7 +1396,7 @@ static SECURITY_STATUS SEC_ENTRY schan_DecryptMessage(PCtxtHandle context_handle
     buffer = &message->pBuffers[idx];
     buf_ptr = buffer->pvBuffer;
 
-    expected_size = 5 + ((buf_ptr[3] << 8) | buf_ptr[4]);
+    expected_size = ctx->header_size + read_record_size(buf_ptr, ctx->header_size);
     if(buffer->cbBuffer < expected_size)
     {
         TRACE("Expected %u bytes, but buffer only contains %u bytes\n", expected_size, buffer->cbBuffer);
@@ -1379,7 +1413,7 @@ static SECURITY_STATUS SEC_ENTRY schan_DecryptMessage(PCtxtHandle context_handle
         return SEC_E_INCOMPLETE_MESSAGE;
     }
 
-    data_size = expected_size - 5;
+    data_size = expected_size - ctx->header_size;
     data = heap_alloc(data_size);
 
     init_schan_buffers(&ctx->transport.in, message, schan_decrypt_message_get_next_buffer);
@@ -1414,21 +1448,21 @@ static SECURITY_STATUS SEC_ENTRY schan_DecryptMessage(PCtxtHandle context_handle
 
     TRACE("Received %ld bytes\n", received);
 
-    memcpy(buf_ptr + 5, data, received);
+    memcpy(buf_ptr + ctx->header_size, data, received);
     heap_free(data);
 
     schan_decrypt_fill_buffer(message, SECBUFFER_DATA,
-        buf_ptr + 5, received);
+        buf_ptr + ctx->header_size, received);
 
     schan_decrypt_fill_buffer(message, SECBUFFER_STREAM_TRAILER,
-        buf_ptr + 5 + received, buffer->cbBuffer - 5 - received);
+        buf_ptr + ctx->header_size + received, buffer->cbBuffer - ctx->header_size - received);
 
     if(buffer->cbBuffer > expected_size)
         schan_decrypt_fill_buffer(message, SECBUFFER_EXTRA,
             buf_ptr + expected_size, buffer->cbBuffer - expected_size);
 
     buffer->BufferType = SECBUFFER_STREAM_HEADER;
-    buffer->cbBuffer = 5;
+    buffer->cbBuffer = ctx->header_size;
 
     return status;
 }

@@ -293,6 +293,14 @@ typedef struct berval
     PCHAR bv_val;
 } LDAP_BERVAL, *PLDAP_BERVAL, BERVAL, *PBERVAL, BerValue;
 
+#define LDAP_PAGED_RESULT_OID_STRING "1.2.840.113556.1.4.319"
+#define LDAP_SERVER_RESP_SORT_OID "1.2.840.113556.1.4.474"
+#define LDAP_CONTROL_VLVRESPONSE "2.16.840.1.113730.3.4.10"
+
+#define LDAP_PAGED_RESULT_OID_STRING_W L"1.2.840.113556.1.4.319"
+#define LDAP_SERVER_RESP_SORT_OID_W L"1.2.840.113556.1.4.474"
+#define LDAP_CONTROL_VLVRESPONSE_W L"2.16.840.1.113730.3.4.10"
+
 typedef struct ldapcontrolA
 {
     PCHAR ldctl_oid;
@@ -586,7 +594,7 @@ ULONG CDECL ldap_simple_bind_sW(LDAP*,PWCHAR,PWCHAR);
 #define    ldap_simple_bind_s WINELIB_NAME_AW(ldap_simple_bind_s)
 ULONG CDECL ldap_search_abandon_page(PLDAP,PLDAPSearch);
 ULONG CDECL ldap_searchA(LDAP*,PCHAR,ULONG,PCHAR,PCHAR[],ULONG);
-ULONG CDECL ldap_searchW(LDAP*,PWCHAR,ULONG,PWCHAR,PCHAR[],ULONG);
+ULONG CDECL ldap_searchW(LDAP*,PWCHAR,ULONG,PWCHAR,PWCHAR[],ULONG);
 #define    ldap_search WINELIB_NAME_AW(ldap_search)
 ULONG CDECL ldap_search_extA(LDAP*,PCHAR,ULONG,PCHAR,PCHAR[],ULONG,PLDAPControlA*,
     PLDAPControlA*,ULONG,ULONG,ULONG*);
@@ -632,19 +640,7 @@ ULONG CDECL ldap_value_freeW(PWCHAR*);
 #define    ldap_value_free WINELIB_NAME_AW(ldap_value_free)
 ULONG CDECL ldap_value_free_len(struct berval**);
 
-BerElement* CDECL ber_alloc_t(INT);
-BERVAL* CDECL ber_bvdup(BERVAL*);
-void CDECL ber_bvecfree(PBERVAL*);
 void CDECL ber_bvfree(BERVAL*);
-ULONG CDECL ber_first_element(BerElement*,ULONG*,CHAR**);
-INT CDECL ber_flatten(BerElement*,PBERVAL*);
-void CDECL ber_free(BerElement*,INT);
-BerElement* CDECL ber_init(BERVAL*);
-ULONG CDECL ber_next_element(BerElement*,ULONG*,CHAR*);
-ULONG CDECL ber_peek_tag(BerElement*,ULONG*);
-INT WINAPIV ber_printf(BerElement*,PCHAR,...);
-ULONG CDECL ber_skip_tag(BerElement*,ULONG*);
-INT WINAPIV ber_scanf(BerElement*,PCHAR,...);
 
 ULONG CDECL LdapGetLastError(void);
 ULONG CDECL LdapMapErrorToWin32(ULONG);

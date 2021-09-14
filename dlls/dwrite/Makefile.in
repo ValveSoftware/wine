@@ -2,7 +2,8 @@ MODULE    = dwrite.dll
 IMPORTLIB = dwrite
 IMPORTS   = user32 gdi32 advapi32
 EXTRAINCL = $(FREETYPE_CFLAGS)
-EXTRADEFS = -DWINE_NO_NAMELESS_EXTENSION
+
+EXTRADLLFLAGS = -mno-cygwin
 
 C_SRCS = \
 	analyzer.c \

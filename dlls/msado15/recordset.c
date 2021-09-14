@@ -488,6 +488,7 @@ static ULONG WINAPI fields_Release( Fields *iface )
     if (!refs)
     {
         if (fields->recordset) _Recordset_Release( &fields->recordset->Recordset_iface );
+        fields->recordset = NULL;
         WARN( "not destroying %p\n", fields );
         return InterlockedIncrement( &fields->refs );
     }
@@ -620,7 +621,7 @@ static HRESULT map_index( struct fields *fields, VARIANT *index, ULONG *ret )
         }
     }
 
-    return E_INVALIDARG;
+    return MAKE_ADO_HRESULT(adErrItemNotFound);
 }
 
 static HRESULT WINAPI fields_get_Item( Fields *iface, VARIANT index, Field **obj )
@@ -864,7 +865,6 @@ static void close_recordset( struct recordset *recordset )
     if (!recordset->fields) return;
     col_count = get_column_count( recordset );
 
-    recordset->fields->recordset = NULL;
     Fields_Release( &recordset->fields->Fields_iface );
     recordset->fields = NULL;
 
@@ -1029,14 +1029,28 @@ static HRESULT WINAPI recordset_get_BOF( _Recordset *iface, VARIANT_BOOL *bof )
 
 static HRESULT WINAPI recordset_get_Bookmark( _Recordset *iface, VARIANT *bookmark )
 {
-    FIXME( "%p, %p\n", iface, bookmark );
-    return E_NOTIMPL;
+    struct recordset *recordset = impl_from_Recordset( iface );
+    TRACE( "%p, %p\n", iface, bookmark );
+
+    if (recordset->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
+    if (recordset->index < 0) return MAKE_ADO_HRESULT( adErrNoCurrentRecord );
+
+    V_VT(bookmark) = VT_I4;
+    V_I4(bookmark) = recordset->index;
+    return S_OK;
 }
 
 static HRESULT WINAPI recordset_put_Bookmark( _Recordset *iface, VARIANT bookmark )
 {
-    FIXME( "%p, %s\n", iface, debugstr_variant(&bookmark) );
-    return E_NOTIMPL;
+    struct recordset *recordset = impl_from_Recordset( iface );
+    TRACE( "%p, %s\n", iface, debugstr_variant(&bookmark) );
+
+    if (recordset->state == adStateClosed) return MAKE_ADO_HRESULT( adErrObjectClosed );
+
+    if (V_VT(&bookmark) != VT_I4) return MAKE_ADO_HRESULT( adErrInvalidArgument );
+
+    recordset->index = V_I4(&bookmark);
+    return S_OK;
 }
 
 static HRESULT WINAPI recordset_get_CacheSize( _Recordset *iface, LONG *size )
@@ -1092,6 +1106,7 @@ static HRESULT WINAPI recordset_get_Fields( _Recordset *iface, Fields **obj )
     {
         /* yes, this adds a reference to the recordset instead of the fields object */
         _Recordset_AddRef( &recordset->Recordset_iface );
+        recordset->fields->recordset = recordset;
         *obj = &recordset->fields->Fields_iface;
         return S_OK;
     }

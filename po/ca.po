@@ -15,6 +15,33 @@ msgstr ""
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Poedit 2.4.1\n"
 
+#: dlls/aclui/aclui.rc:29 dlls/inetcpl.cpl/inetcpl.rc:90
+#: programs/winefile/winefile.rc:114
+msgid "Security"
+msgstr "Seguretat"
+
+#: dlls/aclui/aclui.rc:32
+#, fuzzy
+#| msgid "&User name:"
+msgid "&Group or user names:"
+msgstr "&Nom d'usuari:"
+
+#: dlls/aclui/aclui.rc:38
+#, fuzzy
+#| msgid "Yellow"
+msgid "Allow"
+msgstr "Groga"
+
+#: dlls/aclui/aclui.rc:39
+msgid "Deny"
+msgstr ""
+
+#: dlls/aclui/aclui.rc:47
+#, fuzzy
+#| msgid "Permission denied"
+msgid "Permissions for %1"
+msgstr "S'ha denegat el permís"
+
 #: dlls/appwiz.cpl/appwiz.rc:58
 msgid "Install/Uninstall"
 msgstr "Instal·la/desinstal·la"
@@ -3610,10 +3637,6 @@ msgstr ""
 msgid "Delete"
 msgstr "Suprimeix"
 
-#: dlls/inetcpl.cpl/inetcpl.rc:90 programs/winefile/winefile.rc:114
-msgid "Security"
-msgstr "Seguretat"
-
 #: dlls/inetcpl.cpl/inetcpl.rc:112
 msgid ""
 "Certificates are used for your personal identification and to identify "
@@ -3858,15 +3881,15 @@ msgstr "La compilació condicional està desactivada"
 msgid "Expected '@'"
 msgstr "S'esperava '@'"
 
-#: dlls/jscript/jscript.rc:78
+#: dlls/jscript/jscript.rc:79
 msgid "Microsoft JScript compilation error"
 msgstr "Error de compilació de Microsoft JScript"
 
-#: dlls/jscript/jscript.rc:79
+#: dlls/jscript/jscript.rc:80
 msgid "Microsoft JScript runtime error"
 msgstr "Error d'entorn d'execució de Microsoft JScript"
 
-#: dlls/jscript/jscript.rc:80 dlls/vbscript/vbscript.rc:64
+#: dlls/jscript/jscript.rc:81 dlls/vbscript/vbscript.rc:64
 msgid "Unknown runtime error"
 msgstr "Error d'entorn d'execució desconegut"
 
@@ -3959,14 +3982,18 @@ msgstr ""
 "'true' en aquest objecte"
 
 #: dlls/jscript/jscript.rc:74
+msgid "Cannot define property '|': object is not extensible"
+msgstr ""
+
+#: dlls/jscript/jscript.rc:75
 msgid "Cannot redefine non-configurable property '|'"
 msgstr "No es pot redefinir la propietat no configurable '|'"
 
-#: dlls/jscript/jscript.rc:75
+#: dlls/jscript/jscript.rc:76
 msgid "Cannot modify non-writable property '|'"
 msgstr "No es pot modificar la propietat no escrivible '|'"
 
-#: dlls/jscript/jscript.rc:76
+#: dlls/jscript/jscript.rc:77
 msgid "Property cannot have both accessors and a value"
 msgstr "La propietat no pot tenir ambdós mètodes d'accés i un valor"
 
@@ -9512,10 +9539,9 @@ msgstr "Voleu aturar la vostra sessió del Wine?"
 msgid "Programs"
 msgstr "Programes"
 
-#: dlls/shell32/shell32.rc:204 dlls/shell32/shell32.rc:219
-#: dlls/shell32/shell32.rc:150 dlls/shell32/shell32.rc:235
-msgid "Documents"
-msgstr "Documents"
+#: dlls/shell32/shell32.rc:204
+msgid "My Documents"
+msgstr "Els meus documents"
 
 #: dlls/shell32/shell32.rc:205
 msgid "Favorites"
@@ -9529,13 +9555,13 @@ msgstr "Inicialització"
 msgid "Start Menu"
 msgstr "Menú Inicia"
 
-#: dlls/shell32/shell32.rc:208 dlls/shell32/shell32.rc:221
-msgid "Music"
-msgstr "Música"
+#: dlls/shell32/shell32.rc:208
+msgid "My Music"
+msgstr "La meva música"
 
-#: dlls/shell32/shell32.rc:209 dlls/shell32/shell32.rc:223
-msgid "Videos"
-msgstr "Vídeos"
+#: dlls/shell32/shell32.rc:209
+msgid "My Videos"
+msgstr "Els meus vídeos"
 
 #: dlls/shell32/shell32.rc:210
 msgctxt "directory"
@@ -9565,18 +9591,35 @@ msgstr "Història"
 msgid "Program Files"
 msgstr "Program Files"
 
-#: dlls/shell32/shell32.rc:217 dlls/shell32/shell32.rc:222
-msgid "Pictures"
-msgstr "Imatges"
+#: dlls/shell32/shell32.rc:217
+msgid "My Pictures"
+msgstr "Les meves imatges"
 
 # Not translated in Catalan Windows
 #: dlls/shell32/shell32.rc:218
 msgid "Common Files"
 msgstr "Common Files"
 
+#: dlls/shell32/shell32.rc:219 dlls/shell32/shell32.rc:150
+#: dlls/shell32/shell32.rc:235
+msgid "Documents"
+msgstr "Documents"
+
 #: dlls/shell32/shell32.rc:220
 msgid "Administrative Tools"
 msgstr "Eines d'administració"
+
+#: dlls/shell32/shell32.rc:221
+msgid "Music"
+msgstr "Música"
+
+#: dlls/shell32/shell32.rc:222
+msgid "Pictures"
+msgstr "Imatges"
+
+#: dlls/shell32/shell32.rc:223
+msgid "Videos"
+msgstr "Vídeos"
 
 # Not translated in Catalan Windows
 #: dlls/shell32/shell32.rc:216
@@ -12445,7 +12488,7 @@ msgstr ""
 "llista, de manera que el paràmetre 2 es converteix en el paràmetre 1, etc.\n"
 "No té cap efecte si es truca des de la línia d'ordres.\n"
 
-#: programs/cmd/cmd.rc:212 programs/start/start.rc:56
+#: programs/cmd/cmd.rc:212
 msgid ""
 "Start a program, or open a document in the program normally used for files\n"
 "with that suffix.\n"
@@ -12764,12 +12807,12 @@ msgstr ""
 msgid "Are you sure?"
 msgstr "N'esteu segur?"
 
-#: programs/cmd/cmd.rc:366 programs/reg/reg.rc:50 programs/xcopy/xcopy.rc:43
+#: programs/cmd/cmd.rc:366 programs/reg/reg.rc:127 programs/xcopy/xcopy.rc:43
 msgctxt "Yes key"
 msgid "Y"
 msgstr "S"
 
-#: programs/cmd/cmd.rc:367 programs/reg/reg.rc:51 programs/xcopy/xcopy.rc:44
+#: programs/cmd/cmd.rc:367 programs/reg/reg.rc:128 programs/xcopy/xcopy.rc:44
 msgctxt "No key"
 msgid "N"
 msgstr "N"
@@ -12909,7 +12952,7 @@ msgstr "El volum en la unitat %1!c! és %2\n"
 msgid "Volume in drive %1!c! has no label.\n"
 msgstr "El volum en la unitat %1!c! no té etiqueta.\n"
 
-#: programs/cmd/cmd.rc:402 programs/reg/reg.rc:49
+#: programs/cmd/cmd.rc:402 programs/reg/reg.rc:126
 msgid " (Yes|No)"
 msgstr " (Sí|No)"
 
@@ -14290,12 +14333,23 @@ msgid "Icons (*.ico)"
 msgstr "Icones (*.ico)"
 
 #: programs/reg/reg.rc:35
+#, fuzzy
+#| msgid ""
+#| "Usage:\n"
+#| "  REG [operation] [parameters]\n"
+#| "\n"
+#| "Supported operations:\n"
+#| "  ADD | DELETE | IMPORT | EXPORT | QUERY\n"
+#| "\n"
+#| "For help on a specific operation, type:\n"
+#| "  REG [operation] /?\n"
+#| "\n"
 msgid ""
 "Usage:\n"
 "  REG [operation] [parameters]\n"
 "\n"
 "Supported operations:\n"
-"  ADD | DELETE | IMPORT | EXPORT | QUERY\n"
+"  ADD | DELETE | EXPORT | IMPORT | QUERY\n"
 "\n"
 "For help on a specific operation, type:\n"
 "  REG [operation] /?\n"
@@ -14311,90 +14365,206 @@ msgstr ""
 "  REG [operació] /?\n"
 "\n"
 
-#: programs/reg/reg.rc:36
+#: programs/reg/reg.rc:67
 msgid ""
-"REG ADD key_name [/v value_name | /ve] [/t type] [/s separator] [/d data] [/"
-"f]\n"
+"REG ADD <key> [/v value_name | /ve] [/t type] [/s separator] [/d data] [/f]\n"
+"\n"
+"  Adds a key to the registry or adds a new value to a given registry key.\n"
+"\n"
+"  <key>\n"
+"     The registry key to add or, if either [/v] or [/ve] is specified,\n"
+"     the key in which to add the new registry data.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to add.\n"
+"\n"
+"  /ve\n"
+"     Add an unnamed registry value. This option modifies the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /t <type>\n"
+"     The type of data to add to the registry. If [/t] is specified,\n"
+"     <type> must be one of the following:\n"
+"\n"
+"         REG_SZ    | REG_MULTI_SZ | REG_EXPAND_SZ\n"
+"         REG_DWORD | REG_BINARY   | REG_NONE\n"
+"\n"
+"     If [/t] is not specified, the default data type is REG_SZ.\n"
+"\n"
+"  /s <separator>\n"
+"     The character used to separate strings in REG_MULTI_SZ data.\n"
+"     If [/s] is not specified, the default separator is \\0.\n"
+"\n"
+"  /d <data>\n"
+"     The data to add to the new registry value.\n"
+"\n"
+"  /f\n"
+"     Modify the registry without prompting for confirmation.\n"
+"\n"
 msgstr ""
-"REG ADD nom_de_clau [/v nom_de_valor | /ve] [/t type] [/s separador] [/d "
-"data] [/f]\n"
 
-#: programs/reg/reg.rc:37
-msgid "REG DELETE key_name [/v value_name | /ve | /va] [/f]\n"
-msgstr "REG DELETE nom_de_clau [/v nom_de_valor | /ve | /va] [/f]\n"
+#: programs/reg/reg.rc:92
+msgid ""
+"REG DELETE <key> [/v value_name | /ve | /va] [/f]\n"
+"\n"
+"  Deletes a registry key (including all subkeys and values), or deletes\n"
+"  one or more values from a given registry key.\n"
+"\n"
+"  <key>\n"
+"     The registry key to delete or, if one of [/v], [/ve] or [/va] is\n"
+"     specified, the registry key in which to delete one or more values.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to delete.\n"
+"\n"
+"  /ve\n"
+"     Delete an unnamed registry value. This option deletes the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /va\n"
+"     Delete all values from a registry key.\n"
+"\n"
+"  /f\n"
+"     Delete a registry key (including all subkeys and values) without\n"
+"     prompting for confirmation.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:38
-msgid "REG QUERY key_name [/v value_name | /ve] [/s]\n"
-msgstr "REG QUERY nom_de_clau [/v nom_de_valor | /ve] [/s]\n"
+#: programs/reg/reg.rc:114
+msgid ""
+"REG QUERY <key> [/v value_name | /ve] [/s]\n"
+"\n"
+"  Queries a specified registry key and lists all immediate subkeys, values\n"
+"  and data within that key. Use [/s] to recursively query each subkey.\n"
+"\n"
+"  <key>\n"
+"     The registry key to query.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to query. If neither [/v] nor [/ve] is\n"
+"     specified, all values under <key> are listed.\n"
+"\n"
+"  /ve\n"
+"     Query an unnamed registry value. This option queries the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /s\n"
+"     List all registry entries under <key> and its subkeys.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:39
-msgid "The operation completed successfully\n"
+#: programs/reg/reg.rc:116
+#, fuzzy
+#| msgid "The operation completed successfully\n"
+msgid "reg: The operation completed successfully\n"
 msgstr "L'operació s'ha acabat amb èxit\n"
 
-#: programs/reg/reg.rc:40
-msgid "reg: Invalid key name\n"
+#: programs/reg/reg.rc:117
+#, fuzzy
+#| msgid "reg: Invalid key name\n"
+msgid "reg: Invalid registry key\n"
 msgstr "reg: Nom de clau no vàlid\n"
 
-#: programs/reg/reg.rc:41
+#: programs/reg/reg.rc:118
 msgid "reg: Invalid command line parameters\n"
 msgstr "reg: Paràmetres de línia d'ordres no vàlids\n"
 
-#: programs/reg/reg.rc:42
+#: programs/reg/reg.rc:119
 msgid "reg: Unable to access remote machine\n"
 msgstr "reg: No s'ha pogut accedir a la màquina remota\n"
 
-#: programs/reg/reg.rc:43
-msgid ""
-"reg: The system was unable to find the specified registry key or value\n"
+#: programs/reg/reg.rc:120
+#, fuzzy
+#| msgid ""
+#| "reg: The system was unable to find the specified registry key or value\n"
+msgid "reg: Unable to find the specified registry value\n"
 msgstr ""
 "reg: El sistema no ha pogut trobar la clau de registre especificada o el "
 "valor de registre especificat\n"
 
-#: programs/reg/reg.rc:44
+#: programs/reg/reg.rc:121
 msgid "reg: Unsupported registry data type [%1]\n"
 msgstr "reg: Tipus de dades de registre incompatible [%1]\n"
 
-#: programs/reg/reg.rc:45
+#: programs/reg/reg.rc:122
 msgid "reg: The option [/d] must be followed by a valid integer\n"
 msgstr "reg: Un nombre enter ha de seguir l'opció [/d]\n"
 
-#: programs/reg/reg.rc:46
+#: programs/reg/reg.rc:123
 msgid "reg: The option [/d] must be followed by a valid hexadecimal value\n"
 msgstr "reg: Un valor hexadecimal vàlid ha de seguir l'opció [/d]\n"
 
-#: programs/reg/reg.rc:47
+#: programs/reg/reg.rc:124
 msgid "reg: Unhandled registry data type [/t 0x%1!x!, /d %2]\n"
 msgstr "reg: Tipus de dada de registre no gestionat [/t 0x%1!x!, /d %2]\n"
 
-#: programs/reg/reg.rc:48
+#: programs/reg/reg.rc:125
 msgid "The registry value '%1' already exists. Do you want to overwrite it?"
 msgstr "El valor de registre '%1' ja existeix. El voleu sobreescriure?"
 
-#: programs/reg/reg.rc:52
-msgid "The registry operation was cancelled\n"
+#: programs/reg/reg.rc:129
+#, fuzzy
+#| msgid "The registry operation was cancelled\n"
+msgid "reg: The registry operation was cancelled\n"
 msgstr "S'ha cancel·lat l'operació de registre\n"
 
-#: programs/reg/reg.rc:53 programs/regedit/regedit.rc:239
+#: programs/reg/reg.rc:130 programs/regedit/regedit.rc:239
 msgid "(Default)"
 msgstr "(Per defecte)"
 
-#: programs/reg/reg.rc:54
+#: programs/reg/reg.rc:131
 msgid "Are you sure you want to delete the registry value '%1'?"
 msgstr "Esteu segur que voleu suprimir el valor de registre '%1'?"
 
-#: programs/reg/reg.rc:55
+#: programs/reg/reg.rc:132
 msgid "Are you sure you want to delete all registry values in '%1'?"
 msgstr "Esteu segur que voleu suprimir tots els valors de registre en '%1'?"
 
-#: programs/reg/reg.rc:56
+#: programs/reg/reg.rc:133
 msgid "Are you sure you want to delete the registry key '%1'?"
 msgstr "Esteu segur que voleu suprimir la clau de registre '%1'?"
 
-#: programs/reg/reg.rc:57
+#: programs/reg/reg.rc:134
 msgid "reg: The option [/d] must be followed by a valid string\n"
 msgstr "reg: Una cadena vàlida ha de seguir l'opció [/d]\n"
 
-#: programs/reg/reg.rc:58
+#: programs/reg/reg.rc:135
 msgid ""
 "reg: Unable to delete all registry values in '%1'. An unexpected error "
 "occurred.\n"
@@ -14402,7 +14572,7 @@ msgstr ""
 "reg: No s'ha pogut suprimir tots els valors de registre en '%1'. Ha "
 "ocorregut un error inesperat.\n"
 
-#: programs/reg/reg.rc:59
+#: programs/reg/reg.rc:136
 msgid ""
 "reg: Unable to complete the specified operation. An unexpected error "
 "occurred.\n"
@@ -14410,57 +14580,118 @@ msgstr ""
 "reg: No s'ha pogut completar l'operació especificada. Ha ocorregut un error "
 "inesperat.\n"
 
-#: programs/reg/reg.rc:60
+#: programs/reg/reg.rc:137
 msgid "Search complete. Number of matches found: %1!d!\n"
 msgstr "S'ha completat la cerca. Nombre de coincidències trobades: %1!d!\n"
 
-#: programs/reg/reg.rc:61
+#: programs/reg/reg.rc:138
 msgid "reg: Invalid syntax. "
 msgstr "reg: La sintaxi no és vàlida. "
 
-#: programs/reg/reg.rc:62
+#: programs/reg/reg.rc:139
 msgid "reg: Invalid option [%1]. "
 msgstr "reg: L'opció [%1] no és vàlida. "
 
-#: programs/reg/reg.rc:63
+#: programs/reg/reg.rc:140
 msgid "Type \"REG /?\" for help.\n"
 msgstr "Teclegeu \"REG /?\" per ajuda.\n"
 
-#: programs/reg/reg.rc:64
+#: programs/reg/reg.rc:141
 msgid "Type \"REG %1 /?\" for help.\n"
 msgstr "Teclegeu \"REG %1 /?\" per ajuda.\n"
 
-#: programs/reg/reg.rc:65 programs/regedit/regedit.rc:240
+#: programs/reg/reg.rc:142 programs/regedit/regedit.rc:240
 msgid "(value not set)"
 msgstr "(valor no definit)"
 
-#: programs/reg/reg.rc:66
-msgid "REG IMPORT file.reg\n"
-msgstr "REG IMPORT fitxer.reg\n"
+#: programs/reg/reg.rc:147
+msgid ""
+"REG IMPORT <file>\n"
+"\n"
+"  Imports keys, values and data from a given file into the registry.\n"
+"\n"
+"  <file>\n"
+"     The name and path of the registry file to import.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:67
+#: programs/reg/reg.rc:149
 msgid "reg: The file '%1' was not found.\n"
 msgstr "reg: No s'ha trobat el fitxer '%1'.\n"
 
-#: programs/reg/reg.rc:68
+#: programs/reg/reg.rc:150
 msgid "reg: Unable to open the registry key '%1'.\n"
 msgstr "reg: No s'ha pogut obrir la clau de registre '%1'.\n"
 
-#: programs/reg/reg.rc:69
+#: programs/reg/reg.rc:151
 msgid "reg: Unrecognized escape sequence [\\%1!c!]\n"
 msgstr "reg: Seqüència d'escapada no reconeguda [\\%1!c!]\n"
 
-#: programs/reg/reg.rc:70
-msgid "REG EXPORT key_name file.reg [/y]\n"
-msgstr "REG EXPORT nom_de_clau fitxer.reg [/y]\n"
+#: programs/reg/reg.rc:170
+msgid ""
+"REG EXPORT <key> <file> [/y]\n"
+"\n"
+"  Exports a specified registry key (including all subkeys and values)\n"
+"  to a file.\n"
+"\n"
+"  <key>\n"
+"     The registry key to export.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  <file>\n"
+"     The name and path of the registry file that will be created.\n"
+"     This file must have a .reg extension.\n"
+"\n"
+"  /y\n"
+"     Overwrite <file> without prompting for confirmation.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:71
-msgid "reg: Invalid system key [%1]\n"
+#: programs/reg/reg.rc:172
+#, fuzzy
+#| msgid "reg: Invalid system key [%1]\n"
+msgid "reg: Invalid system key\n"
 msgstr "reg: Nom de clau de sistema no vàlid [%1]\n"
 
-#: programs/reg/reg.rc:72
+#: programs/reg/reg.rc:173
 msgid "The file '%1' already exists. Do you want to overwrite it?"
 msgstr "El fitxer '%1' ja existeix. El voleu sobreescriure?"
+
+#: programs/reg/reg.rc:174
+#, fuzzy
+#| msgid ""
+#| "reg: The system was unable to find the specified registry key or value\n"
+msgid "reg: Unable to find the specified registry key\n"
+msgstr ""
+"reg: El sistema no ha pogut trobar la clau de registre especificada o el "
+"valor de registre especificat\n"
+
+#: programs/reg/reg.rc:175
+#, fuzzy
+#| msgid "reg: Unable to open the registry key '%1'.\n"
+msgid "reg: Unable to import the registry key '%1'\n"
+msgstr "reg: No s'ha pogut obrir la clau de registre '%1'.\n"
+
+#: programs/reg/reg.rc:179
+msgid ""
+"  /reg:32\n"
+"     Access the registry using the 32-bit view.\n"
+"\n"
+"  /reg:64\n"
+"     Access the registry using the 64-bit view.\n"
+"\n"
+msgstr ""
 
 #: programs/regedit/regedit.rc:34
 msgid "&Registry"
@@ -15140,7 +15371,99 @@ msgstr "regsvr32: S'ha fallat en desinstal·lar el DLL '%1'\n"
 msgid "regsvr32: Successfully uninstalled DLL '%1'\n"
 msgstr "regsvr32: S'ha desinstal·lat el DLL '%1' amb èxit\n"
 
-#: programs/start/start.rc:58
+#: programs/start/start.rc:57
+#, fuzzy
+#| msgid ""
+#| "Start a program, or open a document in the program normally used for "
+#| "files\n"
+#| "with that suffix.\n"
+#| "Usage:\n"
+#| "start [options] program_filename [...]\n"
+#| "start [options] document_filename\n"
+#| "\n"
+#| "Options:\n"
+#| "\"title\"        Specifies the title of the child windows.\n"
+#| "/d directory   Start the program in the specified directory.\n"
+#| "/b             Don't create a new console for the program.\n"
+#| "/i             Start the program with fresh environment variables.\n"
+#| "/min           Start the program minimized.\n"
+#| "/max           Start the program maximized.\n"
+#| "/low           Start the program in the idle priority class.\n"
+#| "/normal        Start the program in the normal priority class.\n"
+#| "/high          Start the program in the high priority class.\n"
+#| "/realtime      Start the program in the realtime priority class.\n"
+#| "/abovenormal   Start the program in the abovenormal priority class.\n"
+#| "/belownormal   Start the program in the belownormal priority class.\n"
+#| "/node n        Start the program on the specified NUMA node.\n"
+#| "/affinity mask Start the program with the specified affinity mask.\n"
+#| "/wait          Wait for the started program to finish, then exit with "
+#| "its\n"
+#| "exit code.\n"
+#| "/unix          Use a Unix filename and start the file like Windows\n"
+#| "Explorer.\n"
+#| "/ProgIDOpen    Open a document using the specified progID.\n"
+#| "/?             Display this help and exit.\n"
+msgid ""
+"Start a program, or open a document in the program normally used for files\n"
+"with that suffix.\n"
+"Usage:\n"
+"start [options] program_filename [...]\n"
+"start [options] document_filename\n"
+"\n"
+"Options:\n"
+"\"title\"        Specifies the title of the child windows.\n"
+"/d directory   Start the program in the specified directory.\n"
+"/b             Don't create a new console for the program.\n"
+"/i             Start the program with fresh environment variables.\n"
+"/min           Start the program minimized.\n"
+"/max           Start the program maximized.\n"
+"/low           Start the program in the idle priority class.\n"
+"/normal        Start the program in the normal priority class.\n"
+"/high          Start the program in the high priority class.\n"
+"/realtime      Start the program in the realtime priority class.\n"
+"/abovenormal   Start the program in the abovenormal priority class.\n"
+"/belownormal   Start the program in the belownormal priority class.\n"
+"/node n        Start the program on the specified NUMA node.\n"
+"/affinity mask Start the program with the specified affinity mask.\n"
+"/wait          Wait for the started program to finish, then exit with its\n"
+"exit code.\n"
+"/unix          Use a Unix filename and start the file like Windows\n"
+"Explorer.\n"
+"/exec          Exec the specified file (for internal Wine usage).\n"
+"/ProgIDOpen    Open a document using the specified progID.\n"
+"/?             Display this help and exit.\n"
+msgstr ""
+"Inicia un programa, o obre un document en el programa que normalment "
+"s'utilitza\n"
+"per als fitxers amb aquell sufix.\n"
+"Ús:\n"
+"start [opcions] nom_de_fitxer_de_programa [...]\n"
+"start [opcions] nom_de_fitxer_de_document\n"
+"\n"
+"Opcions:\n"
+"\"títol\"           Especifica el títol de les finestres filles.\n"
+"/d directori      Inicia el programa en el directori especificat.\n"
+"/b                No creïs una consola nova per al programa.\n"
+"/i                Inicia el programa amb variables d'entorn fresques.\n"
+"/min              Inicia el programa minimitzat.\n"
+"/max              Inicia el programa maximitzat.\n"
+"/low              Inicia el programa en la classe de prioritat idle.\n"
+"/normal           Inicia el programa en la classe de prioritat normal.\n"
+"/high             Inicia el programa en la classe de prioritat high.\n"
+"/realtime         Inicia el programa en la classe de prioritat realtime.\n"
+"/abovenormal      Inicia el programa en la classe de prioritat abovenormal.\n"
+"/belownormal      Inicia el programa en la classe de prioritat belownormal.\n"
+"/node n           Inicia el programa en el node NUMA especificat.\n"
+"/affinity màscara Inicia el programa amb la màscara d'afinitat\n"
+"                  especificada.\n"
+"/wait             Espera que el programa iniciat termini, llavors surt amb\n"
+"                  el seu codi de sortida.\n"
+"/unix             Utilitza un nom de fitxer d'Unix i inicia el fitxer com\n"
+"                  el Windows Explorer.\n"
+"/ProgIDOpen       Obre un document utilitzant el progID especificat.\n"
+"/?                Mostra aquesta ajuda i surt.\n"
+
+#: programs/start/start.rc:59
 msgid ""
 "Application could not be started, or no application associated with the "
 "specified file.\n"
@@ -15150,7 +15473,7 @@ msgstr ""
 "fitxer especificat.\n"
 "Ha fallat el ShellExecuteEx"
 
-#: programs/start/start.rc:60
+#: programs/start/start.rc:61
 msgid "Could not translate the specified Unix filename to a DOS filename."
 msgstr ""
 "No s'ha pogut traduir el nom de fitxer d'Unix especificat a un nom de fitxer "

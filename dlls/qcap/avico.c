@@ -20,7 +20,7 @@
 #include "vfw.h"
 #include "aviriff.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(qcap);
 
 typedef struct {
     struct strmbase_filter filter;

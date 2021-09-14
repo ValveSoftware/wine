@@ -207,58 +207,13 @@ const char *debugstr_sa_script(UINT16 script)
 }
 
 /* system font falback configuration */
-static const WCHAR simsunW[] = {'S','i','m','S','u','n',0};
-static const WCHAR meiryoW[] = {'M','e','i','r','y','o',0};
-static const WCHAR droidW[] = {'D','r','o','i','d',' ','S','a','n','s',' ','F','a','l','l','b','a','c','k',0};
-static const WCHAR notoW[] = {'N','o','t','o',' ','S','e','r','i','f',' ','C','J','K',' ','S','C',0};
-
-static const WCHAR *cjk_families[] = { simsunW, meiryoW, droidW, notoW };
+static const WCHAR *cjk_families[] = { L"Meiryo" };
 
 static const DWRITE_UNICODE_RANGE cjk_ranges[] =
 {
     { 0x3000, 0x30ff }, /* CJK Symbols and Punctuation, Hiragana, Katakana */
     { 0x31f0, 0x31ff }, /* Katakana Phonetic Extensions */
     { 0x4e00, 0x9fff }, /* CJK Unified Ideographs */
-};
-
-static const WCHAR malgunW[] = {'M','a','l','g','u','n',' ','G','o','t','h','i','c',0};
-
-static const WCHAR *hangul_families[] = { malgunW };
-
-static const DWRITE_UNICODE_RANGE hangul_ranges[] =
-{
-    { 0x1100, 0x11ff }, /* Hangul Jamo */
-    { 0x3130, 0x318f }, /* Hangul Compatibility Jamo */
-    { 0xa960, 0xa97f }, /* Hangul Jamo Extended-A */
-    { 0xac00, 0xd7ff }, /* Hangul Syllables, Hangul Jamo Extended-B */
-};
-
-static const WCHAR timesW[] = {'T','i','m','e','s',' ','N','e','w',' ','R','o','m','a','n',0};
-static const WCHAR liberationW[] = {'L','i','b','e','r','a','t','i','o','n',' ','S','e','r','i','f',0};
-static const WCHAR dejavuW[] = {'D','e','j','a','V','u',' ','S','e','r','i','f',0};
-
-static const WCHAR *latin_families[] = { timesW, liberationW, dejavuW };
-
-static const DWRITE_UNICODE_RANGE latin_ranges[] =
-{
-    { 0x0000, 0x05ff },
-    { 0x1d00, 0x2eff },
-    { 0xa700, 0xa7ff },
-    { 0xfb00, 0xfb4f },
-    { 0xfe20, 0xfe23 },
-};
-
-static const WCHAR noto_sans_arabicW[] = {'N','o','t','o',' ','S','a','n','s',' ','A','r','a','b','i','c',0};
-
-static const WCHAR *arabic_families[] = { noto_sans_arabicW };
-
-static const DWRITE_UNICODE_RANGE arabic_ranges[] =
-{
-    { 0x0600, 0x06ff }, /* Arabic */
-    { 0x0750, 0x077f }, /* Arabic Supplement */
-    { 0x08a0, 0x08ff }, /* Arabic Extended-A */
-    { 0xfb50, 0xfdff }, /* Arabic Presentation Forms-A */
-    { 0xfe70, 0xfeff }, /* Arabic Presentation Forms-B */
 };
 
 struct fallback_mapping {
@@ -277,9 +232,6 @@ static const struct fallback_mapping fontfallback_neutral_data[] = {
           (WCHAR **)families, ARRAY_SIZE(families) }
 
     MAPPING_RANGE(cjk_ranges, cjk_families),
-    MAPPING_RANGE(hangul_ranges, hangul_families),
-    MAPPING_RANGE(latin_ranges, latin_families),
-    MAPPING_RANGE(arabic_ranges, arabic_families),
 
 #undef MAPPING_RANGE
 };
@@ -304,9 +256,10 @@ struct dwrite_fontfallback_builder
     size_t count;
 };
 
-struct dwrite_numbersubstitution {
+struct dwrite_numbersubstitution
+{
     IDWriteNumberSubstitution IDWriteNumberSubstitution_iface;
-    LONG ref;
+    LONG refcount;
 
     DWRITE_NUMBER_SUBSTITUTION_METHOD method;
     WCHAR *locale;
@@ -512,7 +465,7 @@ static HRESULT analyze_linebreaks(const WCHAR *text, UINT32 count, DWRITE_LINE_B
 
         breakpoints[i].breakConditionBefore = DWRITE_BREAK_CONDITION_NEUTRAL;
         breakpoints[i].breakConditionAfter  = DWRITE_BREAK_CONDITION_NEUTRAL;
-        breakpoints[i].isWhitespace = !!isspaceW(text[i]);
+        breakpoints[i].isWhitespace = !!iswspace(text[i]);
         breakpoints[i].isSoftHyphen = text[i] == 0x00ad /* Unicode Soft Hyphen */;
         breakpoints[i].padding = 0;
 
@@ -1147,13 +1100,14 @@ static void get_number_substitutes(IDWriteNumberSubstitution *substitution, BOOL
         break;
     case DWRITE_NUMBER_SUBSTITUTION_METHOD_CONTEXTUAL:
     case DWRITE_NUMBER_SUBSTITUTION_METHOD_TRADITIONAL:
-        if (GetLocaleInfoEx(numbersubst->locale, LOCALE_SISO639LANGNAME, isolang, ARRAY_SIZE(isolang))) {
-             static const WCHAR arW[] = {'a','r',0};
+        if (GetLocaleInfoEx(numbersubst->locale, LOCALE_SISO639LANGNAME, isolang, ARRAY_SIZE(isolang)))
+        {
              static const WCHAR arabicW[] = {0x640,0x641,0x642,0x643,0x644,0x645,0x646,0x647,0x648,0x649,0};
 
              /* For some Arabic locales Latin digits are returned for SNATIVEDIGITS */
-             if (!strcmpW(arW, isolang)) {
-                 strcpyW(digits, arabicW);
+             if (!wcscmp(L"ar", isolang))
+             {
+                 wcscpy(digits, arabicW);
                  break;
              }
         }
@@ -1917,7 +1871,7 @@ static HRESULT WINAPI dwritenumbersubstitution_QueryInterface(IDWriteNumberSubst
 static ULONG WINAPI dwritenumbersubstitution_AddRef(IDWriteNumberSubstitution *iface)
 {
     struct dwrite_numbersubstitution *object = impl_from_IDWriteNumberSubstitution(iface);
-    ULONG refcount = InterlockedIncrement(&object->ref);
+    ULONG refcount = InterlockedIncrement(&object->refcount);
 
     TRACE("%p, refcount %d.\n", iface, refcount);
 
@@ -1927,7 +1881,7 @@ static ULONG WINAPI dwritenumbersubstitution_AddRef(IDWriteNumberSubstitution *i
 static ULONG WINAPI dwritenumbersubstitution_Release(IDWriteNumberSubstitution *iface)
 {
     struct dwrite_numbersubstitution *object = impl_from_IDWriteNumberSubstitution(iface);
-    ULONG refcount = InterlockedDecrement(&object->ref);
+    ULONG refcount = InterlockedDecrement(&object->refcount);
 
     TRACE("%p, refcount %d.\n", iface, refcount);
 
@@ -1972,7 +1926,7 @@ HRESULT create_numbersubstitution(DWRITE_NUMBER_SUBSTITUTION_METHOD method, cons
         return E_OUTOFMEMORY;
 
     substitution->IDWriteNumberSubstitution_iface.lpVtbl = &numbersubstitutionvtbl;
-    substitution->ref = 1;
+    substitution->refcount = 1;
     substitution->ignore_user_override = ignore_user_override;
     substitution->method = method;
     substitution->locale = heap_strdupW(locale);
@@ -2023,7 +1977,7 @@ static ULONG WINAPI fontfallback_Release(IDWriteFontFallback1 *iface)
     return IDWriteFactory7_Release(fallback->factory);
 }
 
-static int compare_mapping_range(const void *a, const void *b)
+static int __cdecl compare_mapping_range(const void *a, const void *b)
 {
     UINT32 ch = *(UINT32 *)a;
     DWRITE_UNICODE_RANGE *range = (DWRITE_UNICODE_RANGE *)b;
@@ -2094,7 +2048,7 @@ static HRESULT fallback_map_characters(IDWriteFont *font, const WCHAR *text, UIN
         /* stop on first unsupported character */
         exists = FALSE;
         hr = IDWriteFont_HasCharacter(font, text[i], &exists);
-        if (SUCCEEDED(hr) && exists)
+        if (hr == S_OK && exists)
             ++*mapped_length;
         else
             break;
@@ -2112,12 +2066,11 @@ static HRESULT fallback_get_fallback_font(struct dwrite_fontfallback *fallback, 
     UINT32 i;
 
     *mapped_font = NULL;
-    *mapped_length = 0;
 
     mapping = find_fallback_mapping(fallback, text[0]);
     if (!mapping) {
         WARN("No mapping range for %#x.\n", text[0]);
-        return S_OK;
+        return E_FAIL;
     }
 
     /* Now let's see what fallback can handle. Pick first font that could be created. */
@@ -2132,18 +2085,19 @@ static HRESULT fallback_get_fallback_font(struct dwrite_fontfallback *fallback, 
 
     if (!*mapped_font) {
         WARN("Failed to create fallback font.\n");
-        return S_OK;
+        return E_FAIL;
     }
 
     hr = fallback_map_characters(*mapped_font, text, length, mapped_length);
+    if (FAILED(hr))
+        WARN("Mapping with fallback family %s failed, hr %#x.\n", debugstr_w(mapping->families[i]), hr);
 
     if (!*mapped_length) {
-        WARN("Mapping with fallback family %s failed.\n", debugstr_w(mapping->families[i]));
         IDWriteFont_Release(*mapped_font);
         *mapped_font = NULL;
     }
 
-    return hr;
+    return *mapped_length ? S_OK : E_FAIL;
 }
 
 static HRESULT WINAPI fontfallback_MapCharacters(IDWriteFontFallback1 *iface, IDWriteTextAnalysisSource *source,
@@ -2178,37 +2132,30 @@ static HRESULT WINAPI fontfallback_MapCharacters(IDWriteFontFallback1 *iface, ID
 
     if (basefamily && *basefamily) {
         hr = create_matching_font(basecollection, basefamily, weight, style, stretch, ret_font);
+        if (FAILED(hr))
+            goto done;
 
-        /* It is not a fatal error for create_matching_font to
-           fail. We still have other fallbacks to try. */
-
-        if (SUCCEEDED(hr))
-        {
-            hr = fallback_map_characters(*ret_font, text, length, mapped_length);
-            if (FAILED(hr))
-                goto done;
-        }
-    }
-
-    if (!*mapped_length) {
-        if (*ret_font)
-        {
-            IDWriteFont_Release(*ret_font);
-            *ret_font = NULL;
-        }
-
-        hr = fallback_get_fallback_font(fallback, text, length, weight, style, stretch, mapped_length, ret_font);
+        hr = fallback_map_characters(*ret_font, text, length, mapped_length);
         if (FAILED(hr))
             goto done;
     }
 
-    if (!*mapped_length)
-    {
-        /* fallback wasn't found, ask the caller to skip one character
-           and try again; FIXME: skip the appropriate number of
-           characters instead of just one */
-        *mapped_length = 1;
-        hr = S_OK;
+    if (!*mapped_length) {
+        IDWriteFont *mapped_font;
+
+        hr = fallback_get_fallback_font(fallback, text, length, weight, style, stretch, mapped_length, &mapped_font);
+        if (FAILED(hr)) {
+            /* fallback wasn't found, keep base font if any, so we can get at least some visual output */
+            if (*ret_font) {
+                *mapped_length = length;
+                hr = S_OK;
+            }
+        }
+        else {
+            if (*ret_font)
+                IDWriteFont_Release(*ret_font);
+            *ret_font = mapped_font;
+        }
     }
 
 done:

@@ -50,8 +50,6 @@
 
 #include "x11drv.h"
 #include "xcomposite.h"
-#include "xfixes.h"
-#include "xpresent.h"
 #include "wine/server.h"
 #include "wine/unicode.h"
 #include "wine/debug.h"
@@ -68,13 +66,11 @@ Colormap default_colormap = None;
 XPixmapFormatValues **pixmap_formats;
 unsigned int screen_bpp;
 Window root_window;
-BOOL usexvidmode = FALSE;
+BOOL usexvidmode = TRUE;
 BOOL usexrandr = TRUE;
 BOOL usexcomposite = TRUE;
-BOOL use_xfixes = FALSE;
-BOOL use_xpresent = FALSE;
 BOOL use_xkb = TRUE;
-BOOL use_take_focus = FALSE;
+BOOL use_take_focus = TRUE;
 BOOL use_primary_selection = FALSE;
 BOOL use_system_cursors = TRUE;
 BOOL show_systray = TRUE;
@@ -89,14 +85,10 @@ BOOL client_side_with_render = TRUE;
 BOOL shape_layered_windows = TRUE;
 int copy_default_colors = 128;
 int alloc_system_colors = 256;
-int limit_number_of_resolutions = 0;
 DWORD thread_data_tls_index = TLS_OUT_OF_INDEXES;
 int xrender_error_base = 0;
-int xfixes_event_base = 0;
 HMODULE x11drv_module = 0;
 char *process_name = NULL;
-HANDLE steam_overlay_event;
-BOOL layered_window_client_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -145,7 +137,6 @@ static const char * const atom_names[NB_XATOMS - FIRST_XATOM] =
     "TEXT",
     "TIMESTAMP",
     "UTF8_STRING",
-    "STRING",
     "RAW_ASCENT",
     "RAW_DESCENT",
     "RAW_CAP_HEIGHT",
@@ -153,7 +144,6 @@ static const char * const atom_names[NB_XATOMS - FIRST_XATOM] =
     "Rel Y",
     "WM_PROTOCOLS",
     "WM_DELETE_WINDOW",
-    "WM_NAME",
     "WM_STATE",
     "WM_TAKE_FOCUS",
     "DndProtocol",
@@ -163,11 +153,9 @@ static const char * const atom_names[NB_XATOMS - FIRST_XATOM] =
     "_NET_STARTUP_INFO_BEGIN",
     "_NET_STARTUP_INFO",
     "_NET_SUPPORTED",
-    "_NET_SUPPORTING_WM_CHECK",
     "_NET_SYSTEM_TRAY_OPCODE",
     "_NET_SYSTEM_TRAY_S0",
     "_NET_SYSTEM_TRAY_VISUAL",
-    "_NET_WM_BYPASS_COMPOSITOR",
     "_NET_WM_ICON",
     "_NET_WM_MOVERESIZE",
     "_NET_WM_NAME",
@@ -215,7 +203,6 @@ static const char * const atom_names[NB_XATOMS - FIRST_XATOM] =
     "WCF_SYLK",
     "WCF_TIFF",
     "WCF_WAVE",
-    "WINDOW",
     "image/bmp",
     "image/gif",
     "image/jpeg",
@@ -317,9 +304,6 @@ static int error_handler( Display *display, XErrorEvent *error_evt )
              error_evt->serial, error_evt->request_code );
         DebugBreak();  /* force an entry in the debugger */
     }
-    TRACE("passing on error %d req %d:%d res 0x%lx\n",
-            error_evt->error_code, error_evt->request_code,
-            error_evt->minor_code, error_evt->resourceid);
     old_error_handler( display, error_evt );
     return 0;
 }
@@ -452,9 +436,6 @@ static void setup_options(void)
     if (!get_config_key( hkey, appkey, "AllocSystemColors", buffer, sizeof(buffer) ))
         alloc_system_colors = atoi(buffer);
 
-    if (!get_config_key( hkey, appkey, "LimitNumberOfResolutions", buffer, sizeof(buffer) ))
-        limit_number_of_resolutions = atoi(buffer);
-
     get_config_key( hkey, appkey, "InputStyle", input_style, sizeof(input_style) );
 
     if (appkey) RegCloseKey( appkey );
@@ -519,116 +500,6 @@ sym_not_found:
     usexcomposite = FALSE;
 }
 #endif /* defined(SONAME_LIBXCOMPOSITE) */
-
-#ifdef SONAME_LIBXFIXES
-
-#define MAKE_FUNCPTR(f) typeof(f) * p##f;
-MAKE_FUNCPTR(XFixesQueryExtension)
-MAKE_FUNCPTR(XFixesQueryVersion)
-MAKE_FUNCPTR(XFixesCreateRegion)
-MAKE_FUNCPTR(XFixesCreateRegionFromGC)
-MAKE_FUNCPTR(XFixesDestroyRegion)
-MAKE_FUNCPTR(XFixesSelectSelectionInput)
-#undef MAKE_FUNCPTR
-
-static void x11drv_load_xfixes(void)
-{
-    int event, error, major = 3, minor = 0;
-    void *xfixes;
-
-    if (!(xfixes = dlopen(SONAME_LIBXFIXES, RTLD_NOW)))
-    {
-        WARN("Xfixes library %s not found, disabled.\n", SONAME_LIBXFIXES);
-        return;
-    }
-
-#define LOAD_FUNCPTR(f) \
-    if (!(p##f = dlsym(xfixes, #f)))                          \
-    {                                                         \
-        WARN("Xfixes function %s not found, disabled\n", #f); \
-        dlclose(xfixes);                                      \
-        return;                                               \
-    }
-    LOAD_FUNCPTR(XFixesQueryExtension)
-    LOAD_FUNCPTR(XFixesQueryVersion)
-    LOAD_FUNCPTR(XFixesCreateRegion)
-    LOAD_FUNCPTR(XFixesCreateRegionFromGC)
-    LOAD_FUNCPTR(XFixesDestroyRegion)
-    LOAD_FUNCPTR(XFixesSelectSelectionInput)
-#undef LOAD_FUNCPTR
-
-    if (!pXFixesQueryExtension(gdi_display, &event, &error))
-    {
-        WARN("Xfixes extension not found, disabled.\n");
-        dlclose(xfixes);
-        return;
-    }
-
-    if (!pXFixesQueryVersion(gdi_display, &major, &minor) ||
-        major < 2)
-    {
-        WARN("Xfixes version 2.0 not found, disabled.\n");
-        dlclose(xfixes);
-        return;
-    }
-
-    TRACE("Xfixes, error %d, event %d, version %d.%d found\n",
-          error, event, major, minor);
-    use_xfixes = TRUE;
-    xfixes_event_base = event;
-}
-#endif /* SONAME_LIBXFIXES */
-
-#ifdef SONAME_LIBXPRESENT
-
-#define MAKE_FUNCPTR(f) typeof(f) * p##f;
-MAKE_FUNCPTR(XPresentQueryExtension)
-MAKE_FUNCPTR(XPresentQueryVersion)
-MAKE_FUNCPTR(XPresentPixmap)
-#undef MAKE_FUNCPTR
-
-static void x11drv_load_xpresent(void)
-{
-    int opcode, event, error, major = 1, minor = 0;
-    void *xpresent;
-
-    if (!(xpresent = dlopen( SONAME_LIBXPRESENT, RTLD_NOW )))
-    {
-        WARN( "Xpresent library %s not found, disabled.\n", SONAME_LIBXPRESENT );
-        return;
-    }
-
-#define LOAD_FUNCPTR(f) \
-    if (!(p##f = dlsym( xpresent, #f )))                          \
-    {                                                             \
-        WARN( "Xpresent function %s not found, disabled\n", #f ); \
-        dlclose( xpresent );                                      \
-        return;                                                   \
-    }
-    LOAD_FUNCPTR(XPresentQueryExtension)
-    LOAD_FUNCPTR(XPresentQueryVersion)
-    LOAD_FUNCPTR(XPresentPixmap)
-#undef LOAD_FUNCPTR
-
-    if (!pXPresentQueryExtension( gdi_display, &opcode, &event, &error ))
-    {
-        WARN("Xpresent extension not found, disabled.\n");
-        dlclose(xpresent);
-        return;
-    }
-
-    if (!pXPresentQueryVersion( gdi_display, &major, &minor ))
-    {
-        WARN("Xpresent version not found, disabled.\n");
-        dlclose(xpresent);
-        return;
-    }
-
-    TRACE( "Xpresent, opcode %d, error %d, event %d, version %d.%d found\n",
-           opcode, error, event, major, minor );
-    use_xpresent = TRUE;
-}
-#endif /* SONAME_LIBXPRESENT */
 
 static void init_visuals( Display *display, int screen )
 {
@@ -702,13 +573,6 @@ static BOOL process_attach(void)
     dlopen( SONAME_LIBXEXT, RTLD_NOW|RTLD_GLOBAL );
 #endif
 
-    {
-        const char *e = getenv("WINE_ALLOW_XIM");
-        if(e){
-            use_xim = IS_OPTION_TRUE(*e);
-        }
-    }
-
     setup_options();
 
     if ((thread_data_tls_index = TlsAlloc()) == TLS_OUT_OF_INDEXES) return FALSE;
@@ -743,12 +607,6 @@ static BOOL process_attach(void)
     X11DRV_XF86VM_Init();
     /* initialize XRandR */
     X11DRV_XRandR_Init();
-#ifdef SONAME_LIBXFIXES
-    x11drv_load_xfixes();
-#endif
-#ifdef SONAME_LIBXPRESENT
-    x11drv_load_xpresent();
-#endif
 #ifdef SONAME_LIBXCOMPOSITE
     X11DRV_XComposite_Init();
 #endif
@@ -758,22 +616,7 @@ static BOOL process_attach(void)
     if (use_xkb) use_xkb = XkbUseExtension( gdi_display, NULL, NULL );
 #endif
     X11DRV_InitKeyboard( gdi_display );
-    X11DRV_InitMouse( gdi_display );
     if (use_xim) use_xim = X11DRV_InitXIM( input_style );
-
-    fs_hack_init();
-
-    {
-        const char *sgi = getenv("SteamGameId");
-        const char *e = getenv("WINE_LAYERED_WINDOW_CLIENT_HACK");
-        layered_window_client_hack =
-            (sgi && (
-                strcmp(sgi, "435150") == 0 || /* Divinity: Original Sin 2 launcher */
-                strcmp(sgi, "227020") == 0 /* Rise of Venice launcher */
-            )) ||
-            (e && *e != '\0' && *e != '0');
-    }
-
 
     X11DRV_DisplayDevices_Init(FALSE);
     return TRUE;
@@ -789,8 +632,6 @@ void CDECL X11DRV_ThreadDetach(void)
 
     if (data)
     {
-        if (GetWindowThreadProcessId( GetDesktopWindow(), NULL ) == GetCurrentThreadId())
-            X11DRV_XInput2_Disable();
         if (data->xim) XCloseIM( data->xim );
         if (data->font_set) XFreeFontSet( data->display, data->font_set );
         XCloseDisplay( data->display );
@@ -860,8 +701,6 @@ struct x11drv_thread_data *x11drv_init_thread_data(void)
     TlsSetValue( thread_data_tls_index, data );
 
     if (use_xim) X11DRV_SetupXIM();
-    if (GetWindowThreadProcessId( GetDesktopWindow(), NULL ) == GetCurrentThreadId())
-        X11DRV_XInput2_Enable();
 
     return data;
 }
@@ -880,10 +719,6 @@ BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
         DisableThreadLibraryCalls( hinst );
         x11drv_module = hinst;
         ret = process_attach();
-        steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
-        break;
-    case DLL_PROCESS_DETACH:
-        CloseHandle(steam_overlay_event);
         break;
     }
     return ret;

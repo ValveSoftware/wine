@@ -99,7 +99,7 @@ int ME_GetTextLengthEx(ME_TextEditor *editor, const GETTEXTLENGTHEX *how)
   
   length = ME_GetTextLength(editor);
 
-  if ((editor->styleFlags & ES_MULTILINE)
+  if ((editor->props & TXTBIT_MULTILINE)
         && (how->flags & GTL_USECRLF)
         && !editor->bEmulateVersion10) /* Ignore GTL_USECRLF flag in 1.0 emulation */
     length += editor->nParagraphs - 1;
@@ -227,12 +227,13 @@ void cursor_coords( ME_TextEditor *editor, ME_Cursor *cursor,
   ME_Run *size_run = run, *prev;
   ME_Context c;
   int run_x;
+  HDC hdc = ITextHost_TxGetDC( editor->texthost );
 
   assert(~para->nFlags & MEPF_REWRAP);
 
   row = row_from_cursor( cursor );
 
-  ME_InitContext(&c, editor, ITextHost_TxGetDC(editor->texthost));
+  ME_InitContext( &c, editor, hdc );
 
   if (!cursor->nOffset && (prev = run_prev( run ))) size_run = prev;
 
@@ -243,6 +244,7 @@ void cursor_coords( ME_TextEditor *editor, ME_Cursor *cursor,
   *y = c.rcView.top + para->pt.y + row->nBaseline
        + run->pt.y - size_run->nAscent - editor->vert_si.nPos;
   ME_DestroyContext(&c);
+  ITextHost_TxReleaseDC( editor->texthost, hdc );
   return;
 }
 
@@ -549,7 +551,7 @@ void ME_InsertTextFromCursor(ME_TextEditor *editor, int nCursor,
       int eol_len = 0;
 
       /* Check if new line is allowed for this control */
-      if (!(editor->styleFlags & ES_MULTILINE))
+      if (!(editor->props & TXTBIT_MULTILINE))
         break;
 
       /* Find number of CR and LF in end of paragraph run */

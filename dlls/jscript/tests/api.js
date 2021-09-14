@@ -753,10 +753,14 @@ tmp = "test".toLowerCase(3);
 ok(tmp === "test", "''.toLowerCase(3) = " + tmp);
 tmp = "tEsT".toLowerCase();
 ok(tmp === "test", "''.toLowerCase() = " + tmp);
+tmp = "tEsT".toLocaleLowerCase();
+ok(tmp === "test", "''.toLocaleLowerCase() = " + tmp);
 tmp = "tEsT".toLowerCase(3);
 ok(tmp === "test", "''.toLowerCase(3) = " + tmp);
 tmp = ("tE" + String.fromCharCode(0) + "sT").toLowerCase();
 ok(tmp === "te" + String.fromCharCode(0) + "st", "''.toLowerCase() = " + tmp);
+ok(String.prototype.toLocaleLowerCase != String.prototype.toLowerCase,
+   "String.prototype.toLocaleLowerCase == String.prototype.toLowerCase");
 
 tmp = "".toUpperCase();
 ok(tmp === "", "''.toUpperCase() = " + tmp);
@@ -768,8 +772,12 @@ tmp = "tEsT".toUpperCase();
 ok(tmp === "TEST", "''.toUpperCase() = " + tmp);
 tmp = "tEsT".toUpperCase(3);
 ok(tmp === "TEST", "''.toUpperCase(3) = " + tmp);
+tmp = "tEsT".toLocaleUpperCase(3);
+ok(tmp === "TEST", "''.toLocaleUpperCase(3) = " + tmp);
 tmp = ("tE" + String.fromCharCode(0) + "sT").toUpperCase();
 ok(tmp === "TE" + String.fromCharCode(0) + "ST", "''.toUpperCase() = " + tmp);
+ok(String.prototype.toLocaleUpperCase != String.prototype.toUpperCase,
+   "String.prototype.toLocaleUpperCase == String.prototype.toUpperCase");
 
 tmp = "".anchor();
 ok(tmp === "<A NAME=\"undefined\"></A>", "''.anchor() = " + tmp);
@@ -1915,7 +1923,7 @@ ok(isNaN(tmp), "Math.tan(-Infinity) is not NaN");
         [[NaN], "null"],
         [[Infinity], "null"],
         [[-Infinity], "null"],
-        [[{prop1: true, prop2: "string"}], "{\"prop1\":true,\"prop2\":\"string\"}"],
+        [[{prop1: true, prop2: "string", func1: function() {}}], "{\"prop1\":true,\"prop2\":\"string\"}"],
         [[{prop1: true, prop2: testObj, prop3: undefined}], "{\"prop1\":true}"],
         [[{prop1: true, prop2: {prop: "string"}},undefined,"  "],
                 "{\n  \"prop1\": true,\n  \"prop2\": {\n    \"prop\": \"string\"\n  }\n}"],
@@ -1942,6 +1950,25 @@ ok(isNaN(tmp), "Math.tan(-Infinity) is not NaN");
     s = JSON.stringify(undefined);
     ok(s === undefined || s === "undefined" /* broken on some old versions */,
        "stringify(undefined) returned " + s + " expected undefined");
+
+    s = JSON.stringify(1, function(name, value) {
+        ok(name === "", "name = " + name);
+        ok(value === 1, "value = " + value);
+        ok(this[name] === value, "this[" + name + "] = " + this[name] + " expected " + value);
+        return 2;
+    });
+    ok(s == "2", "s = " + s);
+
+    var o = { prop: 1 };
+        s = JSON.stringify(1, function(name, value) {
+        ok(name === "" || name === "prop", "name = " + name);
+        ok(value === 1 || value === true, "value = " + value);
+        ok(this[name] === value, "this[" + name + "] = " + this[name] + " expected " + value);
+        if(name === "") return o;
+        ok(this === o, "this != o");
+        return value;
+    });
+    ok(s == "{\"prop\":1}", "s = " + s);
 
     var parse_tests = [
         ["true", true],

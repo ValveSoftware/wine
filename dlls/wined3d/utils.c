@@ -3071,7 +3071,9 @@ static void query_internal_format(struct wined3d_adapter *adapter,
     query_view_class(format);
 
     if (format->internal && format->f.flags[WINED3D_GL_RES_TYPE_RB]
-            & (WINED3DFMT_FLAG_RENDERTARGET | WINED3DFMT_FLAG_DEPTH_STENCIL))
+            & (WINED3DFMT_FLAG_RENDERTARGET | WINED3DFMT_FLAG_DEPTH_STENCIL)
+            && (gl_info->supported[ARB_FRAMEBUFFER_OBJECT] || gl_info->supported[EXT_FRAMEBUFFER_MULTISAMPLE])
+            && wined3d_settings.offscreen_rendering_mode == ORM_FBO)
     {
         if (gl_info->supported[ARB_INTERNALFORMAT_QUERY])
         {
@@ -3132,6 +3134,10 @@ static BOOL init_format_texture_info(struct wined3d_adapter *adapter, struct win
         /* ARB_texture_rg defines integer formats if EXT_texture_integer is also supported. */
         if (!gl_info->supported[EXT_TEXTURE_INTEGER]
                 && (format->f.flags[WINED3D_GL_RES_TYPE_TEX_2D] & WINED3DFMT_FLAG_INTEGER))
+            continue;
+
+        if (wined3d_settings.offscreen_rendering_mode != ORM_FBO
+                && (format->f.id == WINED3DFMT_D16_LOCKABLE || format->f.id == WINED3DFMT_NULL))
             continue;
 
         format->internal = format_texture_info[i].gl_internal;
@@ -4142,7 +4148,7 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
         {WINED3DFMT_D32_FLOAT_S8X24_UINT,       VK_FORMAT_D32_SFLOAT_S8_UINT,      },
         {WINED3DFMT_R32_FLOAT_X8X24_TYPELESS,   VK_FORMAT_D32_SFLOAT_S8_UINT,      },
         {WINED3DFMT_X32_TYPELESS_G8X24_UINT,    VK_FORMAT_D32_SFLOAT_S8_UINT,      },
-        {WINED3DFMT_D24_UNORM_S8_UINT,          VK_FORMAT_D32_SFLOAT_S8_UINT,      },
+        {WINED3DFMT_D24_UNORM_S8_UINT,          VK_FORMAT_D24_UNORM_S8_UINT,       },
     };
     VkFormat vk_format = VK_FORMAT_UNDEFINED;
     VkImageFormatProperties image_properties;
@@ -4177,6 +4183,17 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
         format->f.color_fixup = COLOR_FIXUP_IDENTITY;
 
     VK_CALL(vkGetPhysicalDeviceFormatProperties(vk_physical_device, vk_format, &properties));
+    if (vk_format == VK_FORMAT_D24_UNORM_S8_UINT)
+    {
+        if (~properties.optimalTilingFeatures & VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT)
+        {
+            /* AMD doesn't support VK_FORMAT_D24_UNORM_S8_UINT. */
+            WARN("Mapping VK_FORMAT_D24_UNORM_S8_UINT to VK_FORMAT_D32_SFLOAT_S8_UINT.\n");
+
+            format->vk_format = vk_format = VK_FORMAT_D32_SFLOAT_S8_UINT;
+            VK_CALL(vkGetPhysicalDeviceFormatProperties(vk_physical_device, vk_format, &properties));
+        }
+    }
 
     if (properties.bufferFeatures & VK_FORMAT_FEATURE_VERTEX_BUFFER_BIT)
         format->f.flags[WINED3D_GL_RES_TYPE_BUFFER] |= WINED3DFMT_FLAG_VERTEX_ATTRIBUTE;
@@ -4209,6 +4226,9 @@ static void init_vulkan_format_info(struct wined3d_format_vk *format,
     {
         flags |= WINED3DFMT_FLAG_UNORDERED_ACCESS;
     }
+
+    if (!(~flags & (WINED3DFMT_FLAG_RENDERTARGET | WINED3DFMT_FLAG_FILTERING)))
+        flags |= WINED3DFMT_FLAG_GEN_MIPMAP;
 
     format->f.flags[WINED3D_GL_RES_TYPE_TEX_1D] |= flags;
     format->f.flags[WINED3D_GL_RES_TYPE_TEX_2D] |= flags;
@@ -5977,17 +5997,19 @@ void wined3d_format_copy_data(const struct wined3d_format *format, const uint8_t
         unsigned int dst_slice_pitch, unsigned int w, unsigned int h, unsigned int d)
 {
     unsigned int row_block_count, row_count, row_size, slice, row;
-    unsigned int slice_count = d;
+    unsigned int slice_count = d, slice_size;
     const uint8_t *src_row;
     uint8_t *dst_row;
 
     row_block_count = (w + format->block_width - 1) / format->block_width;
     row_count = (h + format->block_height - 1) / format->block_height;
     row_size = row_block_count * format->block_byte_count;
+    slice_size = row_size * row_count;
 
-    if (src_row_pitch == row_size && dst_row_pitch == row_size && src_slice_pitch == dst_slice_pitch)
+    if (src_row_pitch == row_size && dst_row_pitch == row_size
+            && ((src_slice_pitch == slice_size && dst_slice_pitch == slice_size) || slice_count == 1))
     {
-        memcpy(dst, src, slice_count * row_count * row_size);
+        memcpy(dst, src, slice_count * slice_size);
         return;
     }
 

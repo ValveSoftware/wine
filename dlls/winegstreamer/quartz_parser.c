@@ -33,7 +33,7 @@
 #include "wmcodecdsp.h"
 #include "ksmedia.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(gstreamer);
 
 static const GUID MEDIASUBTYPE_CVID = {mmioFOURCC('c','v','i','d'), 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 static const GUID MEDIASUBTYPE_MP3  = {WAVE_FORMAT_MPEGLAYER3, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
@@ -49,6 +49,8 @@ struct parser
     struct parser_source **sources;
     unsigned int source_count;
     BOOL enum_sink_first;
+
+    LONGLONG file_size;
 
     struct wg_parser *wg_parser;
 
@@ -100,7 +102,6 @@ static bool amt_from_wg_format_audio(AM_MEDIA_TYPE *mt, const struct wg_format *
     switch (format->u.audio.format)
     {
     case WG_AUDIO_FORMAT_UNKNOWN:
-    case WG_AUDIO_FORMAT_AAC:
         return false;
 
     case WG_AUDIO_FORMAT_MPEG1_LAYER1:
@@ -269,7 +270,6 @@ static unsigned int get_image_size(const struct wg_format *format)
             return width * height * 3;
 
         case WG_VIDEO_FORMAT_UNKNOWN:
-        case WG_VIDEO_FORMAT_H264:
             break;
     }
 
@@ -597,8 +597,8 @@ static uint64_t scale_uint64(uint64_t value, uint32_t numerator, uint32_t denomi
         return 0;
 
     i.QuadPart = value;
-    low.QuadPart = (ULONGLONG)i.u.LowPart * numerator;
-    high.QuadPart = (ULONGLONG)i.u.HighPart * numerator + low.u.HighPart;
+    low.QuadPart = i.u.LowPart * numerator;
+    high.QuadPart = i.u.HighPart * numerator + low.u.HighPart;
     low.u.HighPart = 0;
 
     if (high.u.HighPart >= denominator)
@@ -800,7 +800,7 @@ static DWORD CALLBACK read_thread(void *arg)
         if (!unix_funcs->wg_parser_get_read_request(filter->wg_parser, &data, &offset, &size))
             continue;
         hr = IAsyncReader_SyncRead(filter->reader, offset, size, data);
-        unix_funcs->wg_parser_complete_read_request(filter->wg_parser, SUCCEEDED(hr) ? WG_READ_SUCCESS : WG_READ_FAILURE, size);
+        unix_funcs->wg_parser_complete_read_request(filter->wg_parser, SUCCEEDED(hr));
     }
 
     TRACE("Streaming stopped; exiting.\n");
@@ -875,7 +875,7 @@ static HRESULT parser_init_stream(struct strmbase_filter *iface)
      * it transitions from stopped -> paused. */
 
     seeking = &filter->sources[0]->seek;
-    if (seeking->llStop)
+    if (seeking->llStop && seeking->llStop != seeking->llDuration)
         stop_flags = AM_SEEKING_AbsolutePositioning;
     unix_funcs->wg_parser_stream_seek(filter->sources[0]->wg_stream, seeking->dRate,
             seeking->llCurrent, seeking->llStop, AM_SEEKING_AbsolutePositioning, stop_flags);
@@ -947,20 +947,20 @@ static HRESULT sink_query_accept(struct strmbase_pin *iface, const AM_MEDIA_TYPE
 static HRESULT parser_sink_connect(struct strmbase_sink *iface, IPin *peer, const AM_MEDIA_TYPE *pmt)
 {
     struct parser *filter = impl_from_strmbase_sink(iface);
-    LONGLONG file_size, unused;
     HRESULT hr = S_OK;
+    LONGLONG unused;
     unsigned int i;
 
     filter->reader = NULL;
     if (FAILED(hr = IPin_QueryInterface(peer, &IID_IAsyncReader, (void **)&filter->reader)))
         return hr;
 
-    IAsyncReader_Length(filter->reader, &file_size, &unused);
+    IAsyncReader_Length(filter->reader, &filter->file_size, &unused);
 
     filter->sink_connected = true;
     filter->read_thread = CreateThread(NULL, 0, read_thread, filter, 0, NULL);
 
-    if (FAILED(hr = unix_funcs->wg_parser_connect(filter->wg_parser, file_size)))
+    if (FAILED(hr = unix_funcs->wg_parser_connect(filter->wg_parser, filter->file_size)))
         goto err;
 
     if (!filter->init_gst(filter))
@@ -1448,7 +1448,7 @@ static HRESULT WINAPI GSTOutPin_DecideBufferSize(struct strmbase_source *iface,
 
     ret = amt_to_wg_format(&pin->pin.pin.mt, &format);
     assert(ret);
-    unix_funcs->wg_parser_stream_enable(pin->wg_stream, &format, NULL);
+    unix_funcs->wg_parser_stream_enable(pin->wg_stream, &format);
 
     /* We do need to drop any buffers that might have been sent with the old
      * caps, but this will be handled in parser_init_stream(). */

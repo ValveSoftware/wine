@@ -1954,6 +1954,7 @@ static void test_MoveFileA(void)
     char tempdir[MAX_PATH];
     char source[MAX_PATH], dest[MAX_PATH];
     static const char prefix[] = "pfx";
+    WIN32_FIND_DATAA find_data;
     HANDLE hfile;
     HANDLE hmapfile;
     DWORD ret;
@@ -2023,8 +2024,71 @@ static void test_MoveFileA(void)
     ok(ret, "MoveFileA: failed, error %d\n", GetLastError());
 
     lstrcatA(tempdir, "Remove Me");
+
+    /* test renaming a file "Remove Me" to itself but in lowercase "me" */
+    lstrcpyA(source, tempdir);
+    tempdir[lstrlenA(tempdir) - 2] = 'm';
+
+    hfile = CreateFileA(source, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, 0, 0);
+    ok(hfile != INVALID_HANDLE_VALUE, "failed to create %s\n", source);
+    CloseHandle(hfile);
+
+    ret = MoveFileA(source, tempdir);
+    ok(ret, "MoveFileA: failed, error %d\n", GetLastError());
+
+    hfile = FindFirstFileA(tempdir, &find_data);
+    ok(hfile != INVALID_HANDLE_VALUE, "FindFirstFileA: failed, error %d\n", GetLastError());
+    if (hfile != INVALID_HANDLE_VALUE)
+    {
+        todo_wine ok(!lstrcmpA(strrchr(tempdir, '\\') + 1, find_data.cFileName),
+           "MoveFile failed to change casing on same file: got %s\n", find_data.cFileName);
+    }
+    CloseHandle(hfile);
+
+    /* test renaming another file "Remove Be" to "Remove Me", which replaces the existing "Remove me" */
+    tempdir[lstrlenA(tempdir) - 2] = 'B';
+
+    hfile = CreateFileA(tempdir, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, CREATE_ALWAYS, 0, 0);
+    ok(hfile != INVALID_HANDLE_VALUE, "failed to create %s\n", tempdir);
+    CloseHandle(hfile);
+
+    ret = MoveFileA(tempdir, source);
+    ok(!ret, "MoveFileA: expected failure\n");
+    ok(GetLastError() == ERROR_ALREADY_EXISTS, "MoveFileA: expected ERROR_ALREADY_EXISTS, got %d\n", GetLastError());
+    ret = MoveFileExA(tempdir, source, MOVEFILE_REPLACE_EXISTING);
+    ok(ret, "MoveFileExA: failed, error %d\n", GetLastError());
+
+    tempdir[lstrlenA(tempdir) - 2] = 'm';
+
+    hfile = FindFirstFileA(tempdir, &find_data);
+    ok(hfile != INVALID_HANDLE_VALUE, "FindFirstFileA: failed, error %d\n", GetLastError());
+    if (hfile != INVALID_HANDLE_VALUE)
+    {
+        ok(!lstrcmpA(strrchr(source, '\\') + 1, find_data.cFileName),
+           "MoveFile failed to change casing on existing target file: got %s\n", find_data.cFileName);
+    }
+    CloseHandle(hfile);
+
+    ret = DeleteFileA(tempdir);
+    ok(ret, "DeleteFileA: error %d\n", GetLastError());
+
+    /* now test a directory from "Remove me" to uppercase "Me" */
     ret = CreateDirectoryA(tempdir, NULL);
     ok(ret == TRUE, "CreateDirectoryA failed\n");
+
+    lstrcpyA(source, tempdir);
+    tempdir[lstrlenA(tempdir) - 2] = 'M';
+    ret = MoveFileA(source, tempdir);
+    ok(ret, "MoveFileA: failed, error %d\n", GetLastError());
+
+    hfile = FindFirstFileA(tempdir, &find_data);
+    ok(hfile != INVALID_HANDLE_VALUE, "FindFirstFileA: failed, error %d\n", GetLastError());
+    if (hfile != INVALID_HANDLE_VALUE)
+    {
+        todo_wine ok(!lstrcmpA(strrchr(tempdir, '\\') + 1, find_data.cFileName),
+           "MoveFile failed to change casing on same directory: got %s\n", find_data.cFileName);
+    }
+    CloseHandle(hfile);
 
     lstrcpyA(source, dest);
     lstrcpyA(dest, tempdir);
@@ -5284,6 +5348,73 @@ todo_wine
     CloseHandle(file);
 }
 
+static void test_SetFileRenameInfo(void)
+{
+    WCHAR tempFileFrom[MAX_PATH], tempFileTo1[MAX_PATH], tempFileTo2[MAX_PATH];
+    WCHAR tempPath[MAX_PATH];
+    FILE_RENAME_INFORMATION *fri;
+    HANDLE file;
+    DWORD size;
+    BOOL ret;
+
+    if (!pSetFileInformationByHandle)
+    {
+        win_skip("SetFileInformationByHandle is not supported\n");
+        return;
+    }
+
+    ret = GetTempPathW(MAX_PATH, tempPath);
+    ok(ret, "GetTempPathW failed, got error %u.\n", GetLastError());
+
+    ret = GetTempFileNameW(tempPath, L"abc", 0, tempFileFrom);
+    ok(ret, "GetTempFileNameW failed, got error %u.\n", GetLastError());
+
+    ret = GetTempFileNameW(tempPath, L"abc", 0, tempFileTo1);
+    ok(ret, "GetTempFileNameW failed, got error %u.\n", GetLastError());
+
+    ret = GetTempFileNameW(tempPath, L"abc", 1, tempFileTo2);
+    ok(ret, "GetTempFileNameW failed, got error %u.\n", GetLastError());
+
+    file = CreateFileW(tempFileFrom, GENERIC_READ | GENERIC_WRITE | DELETE, 0, 0, OPEN_EXISTING, 0, 0);
+    ok(file != INVALID_HANDLE_VALUE, "failed to create temp file, error %u.\n", GetLastError());
+
+    size = sizeof(FILE_RENAME_INFORMATION) + MAX_PATH;
+    fri = HeapAlloc(GetProcessHeap(), 0, size);
+
+    fri->ReplaceIfExists = FALSE;
+    fri->RootDirectory = NULL;
+    fri->FileNameLength = wcslen(tempFileTo1) * sizeof(WCHAR);
+    memcpy(fri->FileName, tempFileTo1, fri->FileNameLength + sizeof(WCHAR));
+    ret = pSetFileInformationByHandle(file, FileRenameInfo, fri, size);
+    ok(!ret && GetLastError() == ERROR_ALREADY_EXISTS, "FileRenameInfo unexpected result %d\n", GetLastError());
+
+    fri->ReplaceIfExists = TRUE;
+    ret = pSetFileInformationByHandle(file, FileRenameInfo, fri, size);
+    ok(ret, "FileRenameInfo failed, error %d\n", GetLastError());
+
+    fri->ReplaceIfExists = FALSE;
+    fri->FileNameLength = wcslen(tempFileTo2) * sizeof(WCHAR);
+    memcpy(fri->FileName, tempFileTo2, fri->FileNameLength + sizeof(WCHAR));
+    ret = pSetFileInformationByHandle(file, FileRenameInfo, fri, size);
+    ok(ret, "FileRenameInfo failed, error %d\n", GetLastError());
+    CloseHandle(file);
+
+    file = CreateFileW(tempFileTo2, GENERIC_READ | GENERIC_WRITE, 0, 0, OPEN_EXISTING, 0, 0);
+    ok(file != INVALID_HANDLE_VALUE, "file not renamed, error %d\n", GetLastError());
+
+    fri->FileNameLength = wcslen(tempFileTo1) * sizeof(WCHAR);
+    memcpy(fri->FileName, tempFileTo1, fri->FileNameLength + sizeof(WCHAR));
+    ret = pSetFileInformationByHandle(file, FileRenameInfo, fri, size);
+todo_wine
+    ok(!ret && GetLastError() == ERROR_ACCESS_DENIED, "FileRenameInfo unexpected result %d\n", GetLastError());
+    CloseHandle(file);
+
+    HeapFree(GetProcessHeap(), 0, fri);
+    DeleteFileW(tempFileFrom);
+    DeleteFileW(tempFileTo1);
+    DeleteFileW(tempFileTo2);
+}
+
 static void test_GetFileAttributesExW(void)
 {
     static const WCHAR path1[] = {'\\','\\','?','\\',0};
@@ -5660,6 +5791,11 @@ static void test_hard_link(void)
     ok(GetLastError() == ERROR_ALREADY_EXISTS, "got error %u\n", GetLastError());
 
     SetLastError(0xdeadbeef);
+    ret = CreateHardLinkA( "WineTest_File1", "winetest_file1", NULL );
+    ok(!ret, "expected failure\n");
+    ok(GetLastError() == ERROR_ALREADY_EXISTS, "got error %u\n", GetLastError());
+
+    SetLastError(0xdeadbeef);
     ret = CreateHardLinkA( "winetest_file3", "winetest_dir1", NULL );
     ok(!ret, "expected failure\n");
     ok(GetLastError() == ERROR_ACCESS_DENIED, "got error %u\n", GetLastError());
@@ -5846,6 +5982,7 @@ START_TEST(file)
     test_GetFinalPathNameByHandleA();
     test_GetFinalPathNameByHandleW();
     test_SetFileInformationByHandle();
+    test_SetFileRenameInfo();
     test_GetFileAttributesExW();
     test_post_completion();
     test_overlapped_read();

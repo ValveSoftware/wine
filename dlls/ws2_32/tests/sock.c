@@ -71,6 +71,7 @@ static int   (WINAPI *pGetAddrInfoExW)(const WCHAR *name, const WCHAR *servname,
         struct timeval *timeout, OVERLAPPED *overlapped,
         LPLOOKUPSERVICE_COMPLETION_ROUTINE completion_routine, HANDLE *handle);
 static int   (WINAPI *pGetAddrInfoExOverlappedResult)(OVERLAPPED *overlapped);
+static int   (WINAPI *pGetHostNameW)(WCHAR *, int);
 static PCSTR (WINAPI *pInetNtop)(INT,LPVOID,LPSTR,ULONG);
 static PCWSTR(WINAPI *pInetNtopW)(INT,LPVOID,LPWSTR,ULONG);
 static int   (WINAPI *pInetPtonA)(INT,LPCSTR,LPVOID);
@@ -1203,6 +1204,7 @@ static void Init (void)
     pFreeAddrInfoExW = (void *)GetProcAddress(hws2_32, "FreeAddrInfoExW");
     pGetAddrInfoExW = (void *)GetProcAddress(hws2_32, "GetAddrInfoExW");
     pGetAddrInfoExOverlappedResult = (void *)GetProcAddress(hws2_32, "GetAddrInfoExOverlappedResult");
+    pGetHostNameW = (void *)GetProcAddress(hws2_32, "GetHostNameW");
     pInetNtop = (void *)GetProcAddress(hws2_32, "inet_ntop");
     pInetNtopW = (void *)GetProcAddress(hws2_32, "InetNtopW");
     pInetPtonA = (void *)GetProcAddress(hws2_32, "inet_pton");
@@ -4323,6 +4325,39 @@ static void test_gethostname(void)
     ok(he != NULL, "gethostbyname(\"%s\") failed: %d\n", name, WSAGetLastError());
 }
 
+static void test_GetHostNameW(void)
+{
+    WCHAR name[256];
+    int ret, len;
+
+    if (!pGetHostNameW)
+    {
+        win_skip("GetHostNameW() not present\n");
+        return;
+    }
+    WSASetLastError(0xdeadbeef);
+    ret = pGetHostNameW(NULL, 256);
+    ok(ret == -1, "GetHostNameW() returned %d\n", ret);
+    ok(WSAGetLastError() == WSAEFAULT, "GetHostNameW with null buffer "
+            "failed with %d, expected %d\n", WSAGetLastError(), WSAEFAULT);
+
+    ret = pGetHostNameW(name, sizeof(name));
+    ok(ret == 0, "GetHostNameW() call failed: %d\n", WSAGetLastError());
+
+    len = wcslen(name);
+    WSASetLastError(0xdeadbeef);
+    wcscpy(name, L"deadbeef");
+    ret = pGetHostNameW(name, len);
+    ok(ret == -1, "GetHostNameW() returned %d\n", ret);
+    ok(!wcscmp(name, L"deadbeef"), "name changed unexpected!\n");
+    ok(WSAGetLastError() == WSAEFAULT, "GetHostNameW with insufficient length "
+            "failed with %d, expected %d\n", WSAGetLastError(), WSAEFAULT);
+
+    len++;
+    ret = pGetHostNameW(name, len);
+    ok(ret == 0, "GetHostNameW() call failed: %d\n", WSAGetLastError());
+}
+
 static void test_inet_addr(void)
 {
     u_long addr;
@@ -7296,6 +7331,7 @@ static void test_ConnectEx(void)
     buffer[1] = '2';
     buffer[2] = '3';
     bret = pConnectEx(connector, (struct sockaddr*)&address, addrlen, buffer, 3, &bytesReturned, &overlapped);
+    memset(buffer, 0, 3);
     ok(bret == FALSE && WSAGetLastError() == ERROR_IO_PENDING, "ConnectEx failed: "
         "returned %d + errno %d\n", bret, WSAGetLastError());
     dwret = WaitForSingleObject(overlapped.hEvent, 15000);
@@ -10630,6 +10666,7 @@ START_TEST( sock )
     test_gethostbyname();
     test_gethostbyname_hack();
     test_gethostname();
+    test_GetHostNameW();
 
     test_WSASendMsg();
     test_WSASendTo();

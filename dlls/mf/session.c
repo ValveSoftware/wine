@@ -18,7 +18,6 @@
 
 #include <stdarg.h>
 #include <math.h>
-#include <float.h>
 
 #define COBJMACROS
 
@@ -28,6 +27,7 @@
 #include "evr.h"
 
 #include "wine/debug.h"
+#include "wine/heap.h"
 #include "wine/list.h"
 
 #include "mf_private.h"
@@ -246,6 +246,80 @@ struct media_session
     CRITICAL_SECTION cs;
 };
 
+struct clock_sink
+{
+    struct list entry;
+    IMFClockStateSink *state_sink;
+};
+
+enum clock_command
+{
+    CLOCK_CMD_START = 0,
+    CLOCK_CMD_STOP,
+    CLOCK_CMD_PAUSE,
+    CLOCK_CMD_SET_RATE,
+    CLOCK_CMD_MAX,
+};
+
+enum clock_notification
+{
+    CLOCK_NOTIFY_START,
+    CLOCK_NOTIFY_STOP,
+    CLOCK_NOTIFY_PAUSE,
+    CLOCK_NOTIFY_RESTART,
+    CLOCK_NOTIFY_SET_RATE,
+};
+
+struct clock_state_change_param
+{
+    union
+    {
+        LONGLONG offset;
+        float rate;
+    } u;
+};
+
+struct sink_notification
+{
+    IUnknown IUnknown_iface;
+    LONG refcount;
+    MFTIME system_time;
+    struct clock_state_change_param param;
+    enum clock_notification notification;
+    IMFClockStateSink *sink;
+};
+
+struct clock_timer
+{
+    IUnknown IUnknown_iface;
+    LONG refcount;
+    IMFAsyncResult *result;
+    IMFAsyncCallback *callback;
+    MFWORKITEM_KEY key;
+    struct list entry;
+};
+
+struct presentation_clock
+{
+    IMFPresentationClock IMFPresentationClock_iface;
+    IMFRateControl IMFRateControl_iface;
+    IMFTimer IMFTimer_iface;
+    IMFShutdown IMFShutdown_iface;
+    IMFAsyncCallback sink_callback;
+    IMFAsyncCallback timer_callback;
+    LONG refcount;
+    IMFPresentationTimeSource *time_source;
+    IMFClockStateSink *time_source_sink;
+    MFCLOCK_STATE state;
+    LONGLONG start_offset;
+    struct list sinks;
+    struct list timers;
+    float rate;
+    LONGLONG frequency;
+    CRITICAL_SECTION cs;
+    BOOL is_shut_down;
+};
+
 enum quality_manager_state
 {
     QUALITY_MANAGER_READY = 0,
@@ -307,6 +381,46 @@ static struct media_session *impl_session_from_IMFTopologyNodeAttributeEditor(IM
 static struct session_op *impl_op_from_IUnknown(IUnknown *iface)
 {
     return CONTAINING_RECORD(iface, struct session_op, IUnknown_iface);
+}
+
+static struct presentation_clock *impl_from_IMFPresentationClock(IMFPresentationClock *iface)
+{
+    return CONTAINING_RECORD(iface, struct presentation_clock, IMFPresentationClock_iface);
+}
+
+static struct presentation_clock *impl_from_IMFRateControl(IMFRateControl *iface)
+{
+    return CONTAINING_RECORD(iface, struct presentation_clock, IMFRateControl_iface);
+}
+
+static struct presentation_clock *impl_from_IMFTimer(IMFTimer *iface)
+{
+    return CONTAINING_RECORD(iface, struct presentation_clock, IMFTimer_iface);
+}
+
+static struct presentation_clock *impl_from_IMFShutdown(IMFShutdown *iface)
+{
+    return CONTAINING_RECORD(iface, struct presentation_clock, IMFShutdown_iface);
+}
+
+static struct presentation_clock *impl_from_sink_callback_IMFAsyncCallback(IMFAsyncCallback *iface)
+{
+    return CONTAINING_RECORD(iface, struct presentation_clock, sink_callback);
+}
+
+static struct presentation_clock *impl_from_timer_callback_IMFAsyncCallback(IMFAsyncCallback *iface)
+{
+    return CONTAINING_RECORD(iface, struct presentation_clock, timer_callback);
+}
+
+static struct clock_timer *impl_clock_timer_from_IUnknown(IUnknown *iface)
+{
+    return CONTAINING_RECORD(iface, struct clock_timer, IUnknown_iface);
+}
+
+static struct sink_notification *impl_sink_notification_from_IUnknown(IUnknown *iface)
+{
+    return CONTAINING_RECORD(iface, struct sink_notification, IUnknown_iface);
 }
 
 static struct quality_manager *impl_from_IMFQualityManager(IMFQualityManager *iface)
@@ -430,7 +544,7 @@ static ULONG WINAPI session_op_Release(IUnknown *iface)
             default:
                 ;
         }
-        free(op);
+        heap_free(op);
     }
 
     return refcount;
@@ -447,7 +561,7 @@ static HRESULT create_session_op(enum session_command command, struct session_op
 {
     struct session_op *op;
 
-    if (!(op = calloc(1, sizeof(*op))))
+    if (!(op = heap_alloc_zero(sizeof(*op))))
         return E_OUTOFMEMORY;
 
     op->IUnknown_iface.lpVtbl = &session_op_vtbl;
@@ -502,7 +616,7 @@ static HRESULT session_submit_simple_command(struct media_session *session, enum
     return hr;
 }
 
-static void session_clear_queued_topologies(struct media_session *session)
+static void session_clear_topologies(struct media_session *session)
 {
     struct queued_topology *ptr, *next;
 
@@ -510,7 +624,7 @@ static void session_clear_queued_topologies(struct media_session *session)
     {
         list_remove(&ptr->entry);
         IMFTopology_Release(ptr->topology);
-        free(ptr);
+        heap_free(ptr);
     }
 }
 
@@ -639,7 +753,7 @@ static void transform_release_sample(struct sample *sample)
     list_remove(&sample->entry);
     if (sample->sample)
         IMFSample_Release(sample->sample);
-    free(sample);
+    heap_free(sample);
 }
 
 static void transform_stream_drop_samples(struct transform_stream *stream)
@@ -665,10 +779,10 @@ static void release_topo_node(struct topo_node *node)
                 transform_stream_drop_samples(&node->u.transform.inputs[i]);
             for (i = 0; i < node->u.transform.output_count; ++i)
                 transform_stream_drop_samples(&node->u.transform.outputs[i]);
-            free(node->u.transform.inputs);
-            free(node->u.transform.outputs);
-            free(node->u.transform.input_map);
-            free(node->u.transform.output_map);
+            heap_free(node->u.transform.inputs);
+            heap_free(node->u.transform.outputs);
+            heap_free(node->u.transform.input_map);
+            heap_free(node->u.transform.output_map);
             break;
         case MF_TOPOLOGY_OUTPUT_NODE:
             if (node->u.sink.allocator)
@@ -687,7 +801,7 @@ static void release_topo_node(struct topo_node *node)
         IUnknown_Release(node->object.object);
     if (node->node)
         IMFTopologyNode_Release(node->node);
-    free(node);
+    heap_free(node);
 }
 
 static void session_shutdown_current_topology(struct media_session *session)
@@ -741,22 +855,12 @@ static void session_shutdown_current_topology(struct media_session *session)
     }
 }
 
-static void session_clear_command_list(struct media_session *session)
-{
-    struct session_op *op, *op2;
-
-    LIST_FOR_EACH_ENTRY_SAFE(op, op2, &session->commands, struct session_op, entry)
-    {
-        list_remove(&op->entry);
-        IUnknown_Release(&op->IUnknown_iface);
-    }
-}
-
 static void session_clear_presentation(struct media_session *session)
 {
     struct media_source *source, *source2;
     struct media_sink *sink, *sink2;
     struct topo_node *node, *node2;
+    struct session_op *op, *op2;
 
     session_shutdown_current_topology(session);
 
@@ -770,7 +874,7 @@ static void session_clear_presentation(struct media_session *session)
             IMFMediaSource_Release(source->source);
         if (source->pd)
             IMFPresentationDescriptor_Release(source->pd);
-        free(source);
+        heap_free(source);
     }
 
     LIST_FOR_EACH_ENTRY_SAFE(node, node2, &session->presentation.nodes, struct topo_node, entry)
@@ -789,7 +893,13 @@ static void session_clear_presentation(struct media_session *session)
             IMFMediaSinkPreroll_Release(sink->preroll);
         if (sink->event_generator)
             IMFMediaEventGenerator_Release(sink->event_generator);
-        free(sink);
+        heap_free(sink);
+    }
+
+    LIST_FOR_EACH_ENTRY_SAFE(op, op2, &session->commands, struct session_op, entry)
+    {
+        list_remove(&op->entry);
+        IUnknown_Release(&op->IUnknown_iface);
     }
 }
 
@@ -806,33 +916,6 @@ static struct topo_node *session_get_node_by_id(const struct media_session *sess
     return NULL;
 }
 
-static void session_command_complete(struct media_session *session)
-{
-    struct session_op *op;
-    struct list *e;
-
-    /* Pop current command, submit next. */
-    if ((e = list_head(&session->commands)))
-    {
-        op = LIST_ENTRY(e, struct session_op, entry);
-        list_remove(&op->entry);
-        IUnknown_Release(&op->IUnknown_iface);
-    }
-
-    if ((e = list_head(&session->commands)))
-    {
-        op = LIST_ENTRY(e, struct session_op, entry);
-        MFPutWorkItem(MFASYNC_CALLBACK_QUEUE_STANDARD, &session->commands_callback, &op->IUnknown_iface);
-    }
-}
-
-static void session_command_complete_with_event(struct media_session *session, MediaEventType event,
-        HRESULT status, const PROPVARIANT *param)
-{
-    IMFMediaEventQueue_QueueEventParamVar(session->event_queue, event, &GUID_NULL, status, param);
-    session_command_complete(session);
-}
-
 static void session_start(struct media_session *session, const GUID *time_format, const PROPVARIANT *start_position)
 {
     struct media_source *source;
@@ -841,15 +924,6 @@ static void session_start(struct media_session *session, const GUID *time_format
     switch (session->state)
     {
         case SESSION_STATE_STOPPED:
-
-            /* Start request with no current topology. */
-            if (session->presentation.topo_status == MF_TOPOSTATUS_INVALID)
-            {
-                session_command_complete_with_event(session, MESessionStarted, MF_E_INVALIDREQUEST, NULL);
-                break;
-            }
-
-            /* fallthrough */
         case SESSION_STATE_PAUSED:
 
             session->presentation.time_format = *time_format;
@@ -876,11 +950,33 @@ static void session_start(struct media_session *session, const GUID *time_format
             break;
         case SESSION_STATE_STARTED:
             FIXME("Seeking is not implemented.\n");
-            session_command_complete(session);
+            break;
+        case SESSION_STATE_CLOSED:
+            IMFMediaEventQueue_QueueEventParamVar(session->event_queue, MESessionStarted, &GUID_NULL,
+                    MF_E_INVALIDREQUEST, NULL);
             break;
         default:
-            session_command_complete_with_event(session, MESessionStarted, MF_E_INVALIDREQUEST, NULL);
-            break;
+            ;
+    }
+}
+
+static void session_command_complete(struct media_session *session)
+{
+    struct session_op *op;
+    struct list *e;
+
+    /* Pop current command, submit next. */
+    if ((e = list_head(&session->commands)))
+    {
+        op = LIST_ENTRY(e, struct session_op, entry);
+        list_remove(&op->entry);
+        IUnknown_Release(&op->IUnknown_iface);
+    }
+
+    if ((e = list_head(&session->commands)))
+    {
+        op = LIST_ENTRY(e, struct session_op, entry);
+        MFPutWorkItem(MFASYNC_CALLBACK_QUEUE_STANDARD, &session->commands_callback, &op->IUnknown_iface);
     }
 }
 
@@ -917,15 +1013,13 @@ static void session_set_started(struct media_session *session)
     session_command_complete(session);
 }
 
-static void session_set_paused(struct media_session *session, unsigned int state, HRESULT status)
+static void session_set_paused(struct media_session *session, HRESULT status)
 {
-    /* Failed event status could indicate a failure during normal transition to paused state,
-       or an attempt to pause from invalid initial state. To finalize failed transition in the former case,
-       state is still forced to PAUSED, otherwise previous state is retained. */
-    if (state != ~0u) session->state = state;
+    session->state = SESSION_STATE_PAUSED;
     if (SUCCEEDED(status))
         session_set_caps(session, session->caps & ~MFSESSIONCAP_PAUSE);
-    session_command_complete_with_event(session, MESessionPaused, status, NULL);
+    IMFMediaEventQueue_QueueEventParamVar(session->event_queue, MESessionPaused, &GUID_NULL, status, NULL);
+    session_command_complete(session);
 }
 
 static void session_set_closed(struct media_session *session, HRESULT status)
@@ -933,12 +1027,12 @@ static void session_set_closed(struct media_session *session, HRESULT status)
     session->state = SESSION_STATE_CLOSED;
     if (SUCCEEDED(status))
         session_set_caps(session, session->caps & ~(MFSESSIONCAP_START | MFSESSIONCAP_SEEK));
-    session_command_complete_with_event(session, MESessionClosed, status, NULL);
+    IMFMediaEventQueue_QueueEventParamVar(session->event_queue, MESessionClosed, &GUID_NULL, status, NULL);
+    session_command_complete(session);
 }
 
 static void session_pause(struct media_session *session)
 {
-    unsigned int state = ~0u;
     HRESULT hr;
 
     switch (session->state)
@@ -948,36 +1042,14 @@ static void session_pause(struct media_session *session)
             /* Transition in two steps - pause the clock, wait for sinks, then pause sources. */
             if (SUCCEEDED(hr = IMFPresentationClock_Pause(session->clock)))
                 session->state = SESSION_STATE_PAUSING_SINKS;
-            state = SESSION_STATE_PAUSED;
 
-            break;
-
-        case SESSION_STATE_STOPPED:
-            hr = MF_E_SESSION_PAUSEWHILESTOPPED;
             break;
         default:
             hr = MF_E_INVALIDREQUEST;
     }
 
     if (FAILED(hr))
-        session_set_paused(session, state, hr);
-}
-
-static void session_clear_end_of_presentation(struct media_session *session)
-{
-    struct media_source *source;
-    struct topo_node *node;
-
-    session->presentation.flags &= ~SESSION_FLAG_END_OF_PRESENTATION;
-    LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
-    {
-        source->flags &= ~SOURCE_FLAG_END_OF_PRESENTATION;
-    }
-    LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
-    {
-        node->flags &= ~TOPO_NODE_END_OF_STREAM;
-    }
-    session->presentation.topo_status = MF_TOPOSTATUS_READY;
+        session_set_paused(session, hr);
 }
 
 static void session_set_stopped(struct media_session *session, HRESULT status)
@@ -994,7 +1066,6 @@ static void session_set_stopped(struct media_session *session, HRESULT status)
         IMFMediaEventQueue_QueueEvent(session->event_queue, event);
         IMFMediaEvent_Release(event);
     }
-    session_clear_end_of_presentation(session);
     session_command_complete(session);
 }
 
@@ -1019,7 +1090,8 @@ static void session_stop(struct media_session *session)
             hr = S_OK;
             /* fallthrough */
         default:
-            session_command_complete_with_event(session, MESessionStopped, hr, NULL);
+            IMFMediaEventQueue_QueueEventParamVar(session->event_queue, MESessionStopped, &GUID_NULL, hr, NULL);
+            session_command_complete(session);
             break;
     }
 }
@@ -1075,20 +1147,8 @@ static void session_close(struct media_session *session)
             break;
     }
 
-    session_clear_queued_topologies(session);
     if (FAILED(hr))
         session_set_closed(session, hr);
-}
-
-static void session_clear_topologies(struct media_session *session)
-{
-    HRESULT hr = S_OK;
-
-    if (session->state == SESSION_STATE_CLOSED)
-        hr = MF_E_INVALIDREQUEST;
-    else
-        session_clear_queued_topologies(session);
-    session_command_complete_with_event(session, MESessionTopologiesCleared, hr, NULL);
 }
 
 static struct media_source *session_get_media_source(struct media_session *session, IMFMediaSource *source)
@@ -1109,7 +1169,7 @@ static void session_release_media_source(struct media_source *source)
     IMFMediaSource_Release(source->source);
     if (source->pd)
         IMFPresentationDescriptor_Release(source->pd);
-    free(source);
+    heap_free(source);
 }
 
 static HRESULT session_add_media_source(struct media_session *session, IMFTopologyNode *node, IMFMediaSource *source)
@@ -1120,7 +1180,7 @@ static HRESULT session_add_media_source(struct media_session *session, IMFTopolo
     if (session_get_media_source(session, source))
         return S_FALSE;
 
-    if (!(media_source = calloc(1, sizeof(*media_source))))
+    if (!(media_source = heap_alloc_zero(sizeof(*media_source))))
         return E_OUTOFMEMORY;
 
     media_source->source = source;
@@ -1181,7 +1241,7 @@ static HRESULT session_add_media_sink(struct media_session *session, IMFTopology
             return S_FALSE;
     }
 
-    if (!(media_sink = calloc(1, sizeof(*media_sink))))
+    if (!(media_sink = heap_alloc_zero(sizeof(*media_sink))))
         return E_OUTOFMEMORY;
 
     media_sink->sink = sink;
@@ -1219,14 +1279,14 @@ static HRESULT session_set_transform_stream_info(struct topo_node *node)
     hr = IMFTransform_GetStreamCount(node->object.transform, &input_count, &output_count);
     if (SUCCEEDED(hr) && (input_count > 1 || output_count > 1))
     {
-        input_map = calloc(input_count, sizeof(*input_map));
-        output_map = calloc(output_count, sizeof(*output_map));
+        input_map = heap_calloc(input_count, sizeof(*input_map));
+        output_map = heap_calloc(output_count, sizeof(*output_map));
         if (FAILED(IMFTransform_GetStreamIDs(node->object.transform, input_count, input_map,
                 output_count, output_map)))
         {
             /* Assume sequential identifiers. */
-            free(input_map);
-            free(output_map);
+            heap_free(input_map);
+            heap_free(output_map);
             input_map = output_map = NULL;
         }
     }
@@ -1236,13 +1296,13 @@ static HRESULT session_set_transform_stream_info(struct topo_node *node)
         node->u.transform.input_map = input_map;
         node->u.transform.output_map = output_map;
 
-        streams = calloc(input_count, sizeof(*streams));
+        streams = heap_calloc(input_count, sizeof(*streams));
         for (i = 0; i < input_count; ++i)
             list_init(&streams[i].samples);
         node->u.transform.inputs = streams;
         node->u.transform.input_count = input_count;
 
-        streams = calloc(output_count, sizeof(*streams));
+        streams = heap_calloc(output_count, sizeof(*streams));
         for (i = 0; i < output_count; ++i)
         {
             list_init(&streams[i].samples);
@@ -1337,7 +1397,7 @@ static HRESULT session_append_node(struct media_session *session, IMFTopologyNod
     IMFStreamDescriptor *sd;
     HRESULT hr = S_OK;
 
-    if (!(topo_node = calloc(1, sizeof(*topo_node))))
+    if (!(topo_node = heap_alloc_zero(sizeof(*topo_node))))
         return E_OUTOFMEMORY;
 
     IMFTopologyNode_GetNodeType(node, &topo_node->type);
@@ -1593,7 +1653,7 @@ static void session_set_topology(struct media_session *session, DWORD flags, IMF
     }
     else if (topology && flags & MFSESSION_SETTOPOLOGY_IMMEDIATE)
     {
-        session_clear_queued_topologies(session);
+        session_clear_topologies(session);
         session_clear_presentation(session);
     }
 
@@ -1604,7 +1664,7 @@ static void session_set_topology(struct media_session *session, DWORD flags, IMF
     {
         struct queued_topology *queued_topology;
 
-        if ((queued_topology = calloc(1, sizeof(*queued_topology))))
+        if ((queued_topology = heap_alloc_zero(sizeof(*queued_topology))))
         {
             queued_topology->topology = topology;
             IMFTopology_AddRef(queued_topology->topology);
@@ -1668,9 +1728,8 @@ static ULONG WINAPI mfsession_Release(IMFMediaSession *iface)
 
     if (!refcount)
     {
-        session_clear_queued_topologies(session);
+        session_clear_topologies(session);
         session_clear_presentation(session);
-        session_clear_command_list(session);
         if (session->presentation.current_topology)
             IMFTopology_Release(session->presentation.current_topology);
         if (session->event_queue)
@@ -1686,7 +1745,7 @@ static ULONG WINAPI mfsession_Release(IMFMediaSession *iface)
         if (session->quality_manager)
             IMFQualityManager_Release(session->quality_manager);
         DeleteCriticalSection(&session->cs);
-        free(session);
+        heap_free(session);
     }
 
     return refcount;
@@ -1788,6 +1847,7 @@ static HRESULT WINAPI mfsession_Start(IMFMediaSession *iface, const GUID *format
         hr = session_submit_command(session, op);
 
     IUnknown_Release(&op->IUnknown_iface);
+
     return hr;
 }
 
@@ -1836,7 +1896,6 @@ static HRESULT WINAPI mfsession_Shutdown(IMFMediaSession *iface)
         IMFPresentationClock_Release(session->clock);
         session->clock = NULL;
         session_clear_presentation(session);
-        session_clear_command_list(session);
     }
     LeaveCriticalSection(&session->cs);
 
@@ -1961,36 +2020,18 @@ static ULONG WINAPI session_get_service_Release(IMFGetService *iface)
     return IMFMediaSession_Release(&session->IMFMediaSession_iface);
 }
 
-typedef BOOL (*p_renderer_node_test_func)(IMFMediaSink *sink);
-
-static BOOL session_video_renderer_test_func(IMFMediaSink *sink)
+static HRESULT session_get_video_render_service(struct media_session *session, REFGUID service,
+        REFIID riid, void **obj)
 {
-    IUnknown *obj;
-    HRESULT hr;
-
-    /* Use first sink to support IMFVideoRenderer. */
-    hr = IMFMediaSink_QueryInterface(sink, &IID_IMFVideoRenderer, (void **)&obj);
-    if (obj)
-        IUnknown_Release(obj);
-
-    return hr == S_OK;
-}
-
-static BOOL session_audio_renderer_test_func(IMFMediaSink *sink)
-{
-    return mf_is_sar_sink(sink);
-}
-
-static HRESULT session_get_renderer_node_service(struct media_session *session,
-        p_renderer_node_test_func node_test_func, REFGUID service, REFIID riid, void **obj)
-{
-    HRESULT hr = E_NOINTERFACE;
     IMFStreamSink *stream_sink;
     IMFTopologyNode *node;
     IMFCollection *nodes;
     IMFMediaSink *sink;
     unsigned int i = 0;
+    IUnknown *vr;
+    HRESULT hr = E_FAIL;
 
+    /* Use first sink to support IMFVideoRenderer. */
     if (session->presentation.current_topology)
     {
         if (SUCCEEDED(IMFTopology_GetOutputNodeCollection(session->presentation.current_topology,
@@ -2002,10 +2043,11 @@ static HRESULT session_get_renderer_node_service(struct media_session *session,
                 {
                     if (SUCCEEDED(IMFStreamSink_GetMediaSink(stream_sink, &sink)))
                     {
-                        if (node_test_func(sink))
+                        if (SUCCEEDED(IMFMediaSink_QueryInterface(sink, &IID_IMFVideoRenderer, (void **)&vr)))
                         {
-                            if (FAILED(hr = MFGetService((IUnknown *)sink, service, riid, obj)))
-                                WARN("Failed to get service from renderer node, %#x.\n", hr);
+                            if (FAILED(hr = MFGetService(vr, service, riid, obj)))
+                                WARN("Failed to get service from video renderer %#x.\n", hr);
+                            IUnknown_Release(vr);
                         }
                     }
                     IMFStreamSink_Release(stream_sink);
@@ -2022,20 +2064,6 @@ static HRESULT session_get_renderer_node_service(struct media_session *session,
     }
 
     return hr;
-}
-
-static HRESULT session_get_audio_render_service(struct media_session *session, REFGUID service,
-        REFIID riid, void **obj)
-{
-    return session_get_renderer_node_service(session, session_audio_renderer_test_func,
-            service, riid, obj);
-}
-
-static HRESULT session_get_video_render_service(struct media_session *session, REFGUID service,
-        REFIID riid, void **obj)
-{
-    return session_get_renderer_node_service(session, session_video_renderer_test_func,
-            service, riid, obj);
 }
 
 static HRESULT WINAPI session_get_service_GetService(IMFGetService *iface, REFGUID service, REFIID riid, void **obj)
@@ -2079,10 +2107,6 @@ static HRESULT WINAPI session_get_service_GetService(IMFGetService *iface, REFGU
     else if (IsEqualGUID(service, &MR_VIDEO_RENDER_SERVICE))
     {
         hr = session_get_video_render_service(session, service, riid, obj);
-    }
-    else if (IsEqualGUID(service, &MR_POLICY_VOLUME_SERVICE))
-    {
-        hr = session_get_audio_render_service(session, service, riid, obj);
     }
     else
         FIXME("Unsupported service %s.\n", debugstr_guid(service));
@@ -2146,6 +2170,9 @@ static HRESULT WINAPI session_commands_callback_Invoke(IMFAsyncCallback *iface, 
     {
         case SESSION_CMD_CLEAR_TOPOLOGIES:
             session_clear_topologies(session);
+            IMFMediaEventQueue_QueueEventParamVar(session->event_queue, MESessionTopologiesCleared, &GUID_NULL,
+                    S_OK, NULL);
+            session_command_complete(session);
             break;
         case SESSION_CMD_SET_TOPOLOGY:
             session_set_topology(session, op->u.set_topology.flags, op->u.set_topology.topology);
@@ -2555,7 +2582,7 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
             if (!session_is_source_nodes_state(session, OBJ_STATE_PAUSED))
                 break;
 
-            session_set_paused(session, SESSION_STATE_PAUSED, S_OK);
+            session_set_paused(session, S_OK);
             break;
         case SESSION_STATE_STOPPING_SOURCES:
             if (!session_is_source_nodes_state(session, OBJ_STATE_STOPPED))
@@ -2631,7 +2658,7 @@ static void session_set_sink_stream_state(struct media_session *session, IMFStre
             }
 
             if (FAILED(hr))
-                session_set_paused(session, SESSION_STATE_PAUSED, hr);
+                session_set_paused(session, hr);
 
             break;
         case SESSION_STATE_STOPPING_SINKS:
@@ -2659,7 +2686,7 @@ static void session_set_sink_stream_state(struct media_session *session, IMFStre
 
 static struct sample *transform_create_sample(IMFSample *sample)
 {
-    struct sample *sample_entry = calloc(1, sizeof(*sample_entry));
+    struct sample *sample_entry = heap_alloc_zero(sizeof(*sample_entry));
 
     if (sample_entry)
     {
@@ -2723,7 +2750,7 @@ static HRESULT transform_node_pull_samples(const struct media_session *session, 
     unsigned int i;
     HRESULT hr = E_UNEXPECTED;
 
-    if (!(buffers = calloc(node->u.transform.output_count, sizeof(*buffers))))
+    if (!(buffers = heap_calloc(node->u.transform.output_count, sizeof(*buffers))))
         return E_OUTOFMEMORY;
 
     for (i = 0; i < node->u.transform.output_count; ++i)
@@ -2766,7 +2793,7 @@ static HRESULT transform_node_pull_samples(const struct media_session *session, 
             IMFSample_Release(buffers[i].pSample);
     }
 
-    free(buffers);
+    heap_free(buffers);
 
     return hr;
 }
@@ -3405,7 +3432,7 @@ static HRESULT WINAPI session_sink_finalizer_callback_Invoke(IMFAsyncCallback *i
         if (state == (IUnknown *)sink->sink)
         {
             if (FAILED(hr = IMFMediaSink_QueryInterface(sink->sink, &IID_IMFFinalizableMediaSink, (void **)&fin_sink)))
-                WARN("Unexpected, missing IMFFinalizableMediaSink, hr %#x.\n", hr);
+                WARN("Unexpected, missing IMFFinalizableSink, hr %#x.\n", hr);
         }
         else
         {
@@ -3504,9 +3531,8 @@ static HRESULT session_get_presentation_rate(struct media_session *session, MFRA
     struct media_source *source;
     struct media_sink *sink;
     HRESULT hr = E_POINTER;
-    float rate;
 
-    rate = fastest ? FLT_MAX : 0.0f;
+    *result = 0.0f;
 
     EnterCriticalSection(&session->cs);
 
@@ -3514,7 +3540,7 @@ static HRESULT session_get_presentation_rate(struct media_session *session, MFRA
     {
         LIST_FOR_EACH_ENTRY(source, &session->presentation.sources, struct media_source, entry)
         {
-            if (FAILED(hr = session_presentation_object_get_rate((IUnknown *)source->source, direction, thin, fastest, &rate)))
+            if (FAILED(hr = session_presentation_object_get_rate((IUnknown *)source->source, direction, thin, fastest, result)))
                 break;
         }
 
@@ -3522,16 +3548,13 @@ static HRESULT session_get_presentation_rate(struct media_session *session, MFRA
         {
             LIST_FOR_EACH_ENTRY(sink, &session->presentation.sinks, struct media_sink, entry)
             {
-                if (FAILED(hr = session_presentation_object_get_rate((IUnknown *)sink->sink, direction, thin, fastest, &rate)))
+                if (FAILED(hr = session_presentation_object_get_rate((IUnknown *)sink->sink, direction, thin, fastest, result)))
                     break;
             }
         }
     }
 
     LeaveCriticalSection(&session->cs);
-
-    if (SUCCEEDED(hr))
-        *result = direction == MFRATE_FORWARD ? rate : -rate;
 
     return hr;
 }
@@ -3674,7 +3697,8 @@ HRESULT WINAPI MFCreateMediaSession(IMFAttributes *config, IMFMediaSession **ses
 
     TRACE("%p, %p.\n", config, session);
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     object->IMFMediaSession_iface.lpVtbl = &mfmediasessionvtbl;
@@ -3761,6 +3785,1027 @@ failed:
     return hr;
 }
 
+static HRESULT WINAPI sink_notification_QueryInterface(IUnknown *iface, REFIID riid, void **out)
+{
+    if (IsEqualIID(riid, &IID_IUnknown))
+    {
+        *out = iface;
+        IUnknown_AddRef(iface);
+        return S_OK;
+    }
+
+    WARN("Unsupported %s.\n", debugstr_guid(riid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI sink_notification_AddRef(IUnknown *iface)
+{
+    struct sink_notification *notification = impl_sink_notification_from_IUnknown(iface);
+    ULONG refcount = InterlockedIncrement(&notification->refcount);
+
+    TRACE("%p, refcount %u.\n", iface, refcount);
+
+    return refcount;
+}
+
+static ULONG WINAPI sink_notification_Release(IUnknown *iface)
+{
+    struct sink_notification *notification = impl_sink_notification_from_IUnknown(iface);
+    ULONG refcount = InterlockedDecrement(&notification->refcount);
+
+    TRACE("%p, refcount %u.\n", iface, refcount);
+
+    if (!refcount)
+    {
+        IMFClockStateSink_Release(notification->sink);
+        heap_free(notification);
+    }
+
+    return refcount;
+}
+
+static const IUnknownVtbl sinknotificationvtbl =
+{
+    sink_notification_QueryInterface,
+    sink_notification_AddRef,
+    sink_notification_Release,
+};
+
+static void clock_notify_async_sink(struct presentation_clock *clock, MFTIME system_time,
+        struct clock_state_change_param param, enum clock_notification notification, IMFClockStateSink *sink)
+{
+    struct sink_notification *object;
+    IMFAsyncResult *result;
+    HRESULT hr;
+
+    object = heap_alloc(sizeof(*object));
+    if (!object)
+        return;
+
+    object->IUnknown_iface.lpVtbl = &sinknotificationvtbl;
+    object->refcount = 1;
+    object->system_time = system_time;
+    object->param = param;
+    object->notification = notification;
+    object->sink = sink;
+    IMFClockStateSink_AddRef(object->sink);
+
+    hr = MFCreateAsyncResult(&object->IUnknown_iface, &clock->sink_callback, NULL, &result);
+    IUnknown_Release(&object->IUnknown_iface);
+    if (SUCCEEDED(hr))
+    {
+        MFPutWorkItemEx(MFASYNC_CALLBACK_QUEUE_STANDARD, result);
+        IMFAsyncResult_Release(result);
+    }
+}
+
+static HRESULT WINAPI present_clock_QueryInterface(IMFPresentationClock *iface, REFIID riid, void **out)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+
+    TRACE("%p, %s, %p.\n", iface, debugstr_guid(riid), out);
+
+    if (IsEqualIID(riid, &IID_IMFPresentationClock) ||
+            IsEqualIID(riid, &IID_IMFClock) ||
+            IsEqualIID(riid, &IID_IUnknown))
+    {
+        *out = &clock->IMFPresentationClock_iface;
+    }
+    else if (IsEqualIID(riid, &IID_IMFRateControl))
+    {
+        *out = &clock->IMFRateControl_iface;
+    }
+    else if (IsEqualIID(riid, &IID_IMFTimer))
+    {
+        *out = &clock->IMFTimer_iface;
+    }
+    else if (IsEqualIID(riid, &IID_IMFShutdown))
+    {
+        *out = &clock->IMFShutdown_iface;
+    }
+    else
+    {
+        WARN("Unsupported %s.\n", debugstr_guid(riid));
+        *out = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown *)*out);
+    return S_OK;
+}
+
+static ULONG WINAPI present_clock_AddRef(IMFPresentationClock *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    ULONG refcount = InterlockedIncrement(&clock->refcount);
+
+    TRACE("%p, refcount %u.\n", iface, refcount);
+
+    return refcount;
+}
+
+static ULONG WINAPI present_clock_Release(IMFPresentationClock *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    ULONG refcount = InterlockedDecrement(&clock->refcount);
+    struct clock_timer *timer, *timer2;
+    struct clock_sink *sink, *sink2;
+
+    TRACE("%p, refcount %u.\n", iface, refcount);
+
+    if (!refcount)
+    {
+        if (clock->time_source)
+            IMFPresentationTimeSource_Release(clock->time_source);
+        if (clock->time_source_sink)
+            IMFClockStateSink_Release(clock->time_source_sink);
+        LIST_FOR_EACH_ENTRY_SAFE(sink, sink2, &clock->sinks, struct clock_sink, entry)
+        {
+            list_remove(&sink->entry);
+            IMFClockStateSink_Release(sink->state_sink);
+            heap_free(sink);
+        }
+        LIST_FOR_EACH_ENTRY_SAFE(timer, timer2, &clock->timers, struct clock_timer, entry)
+        {
+            list_remove(&timer->entry);
+            IUnknown_Release(&timer->IUnknown_iface);
+        }
+        DeleteCriticalSection(&clock->cs);
+        heap_free(clock);
+    }
+
+    return refcount;
+}
+
+static HRESULT WINAPI present_clock_GetClockCharacteristics(IMFPresentationClock *iface, DWORD *flags)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    HRESULT hr = MF_E_CLOCK_NO_TIME_SOURCE;
+
+    TRACE("%p, %p.\n", iface, flags);
+
+    EnterCriticalSection(&clock->cs);
+    if (clock->time_source)
+        hr = IMFPresentationTimeSource_GetClockCharacteristics(clock->time_source, flags);
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_GetCorrelatedTime(IMFPresentationClock *iface, DWORD reserved,
+        LONGLONG *clock_time, MFTIME *system_time)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    HRESULT hr = MF_E_CLOCK_NO_TIME_SOURCE;
+
+    TRACE("%p, %#x, %p, %p.\n", iface, reserved, clock_time, system_time);
+
+    EnterCriticalSection(&clock->cs);
+    if (clock->time_source)
+        hr = IMFPresentationTimeSource_GetCorrelatedTime(clock->time_source, reserved, clock_time, system_time);
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_GetContinuityKey(IMFPresentationClock *iface, DWORD *key)
+{
+    TRACE("%p, %p.\n", iface, key);
+
+    *key = 0;
+
+    return S_OK;
+}
+
+static HRESULT WINAPI present_clock_GetState(IMFPresentationClock *iface, DWORD reserved, MFCLOCK_STATE *state)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+
+    TRACE("%p, %#x, %p.\n", iface, reserved, state);
+
+    EnterCriticalSection(&clock->cs);
+    *state = clock->state;
+    LeaveCriticalSection(&clock->cs);
+
+    return S_OK;
+}
+
+static HRESULT WINAPI present_clock_GetProperties(IMFPresentationClock *iface, MFCLOCK_PROPERTIES *props)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    HRESULT hr = MF_E_CLOCK_NO_TIME_SOURCE;
+
+    TRACE("%p, %p.\n", iface, props);
+
+    EnterCriticalSection(&clock->cs);
+    if (clock->time_source)
+        hr = IMFPresentationTimeSource_GetProperties(clock->time_source, props);
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_SetTimeSource(IMFPresentationClock *iface,
+        IMFPresentationTimeSource *time_source)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    MFCLOCK_PROPERTIES props;
+    IMFClock *source_clock;
+    HRESULT hr;
+
+    TRACE("%p, %p.\n", iface, time_source);
+
+    EnterCriticalSection(&clock->cs);
+
+    if (clock->time_source)
+        IMFPresentationTimeSource_Release(clock->time_source);
+    if (clock->time_source_sink)
+        IMFClockStateSink_Release(clock->time_source_sink);
+    clock->time_source = NULL;
+    clock->time_source_sink = NULL;
+
+    hr = IMFPresentationTimeSource_QueryInterface(time_source, &IID_IMFClockStateSink, (void **)&clock->time_source_sink);
+    if (SUCCEEDED(hr))
+    {
+        clock->time_source = time_source;
+        IMFPresentationTimeSource_AddRef(clock->time_source);
+    }
+
+    if (SUCCEEDED(IMFPresentationTimeSource_GetUnderlyingClock(time_source, &source_clock)))
+    {
+        if (SUCCEEDED(IMFClock_GetProperties(source_clock, &props)))
+            clock->frequency = props.qwClockFrequency;
+        IMFClock_Release(source_clock);
+    }
+
+    if (!clock->frequency)
+        clock->frequency = MFCLOCK_FREQUENCY_HNS;
+
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_GetTimeSource(IMFPresentationClock *iface,
+        IMFPresentationTimeSource **time_source)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    HRESULT hr = S_OK;
+
+    TRACE("%p, %p.\n", iface, time_source);
+
+    if (!time_source)
+        return E_INVALIDARG;
+
+    EnterCriticalSection(&clock->cs);
+    if (clock->time_source)
+    {
+        *time_source = clock->time_source;
+        IMFPresentationTimeSource_AddRef(*time_source);
+    }
+    else
+        hr = MF_E_CLOCK_NO_TIME_SOURCE;
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_GetTime(IMFPresentationClock *iface, MFTIME *time)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    HRESULT hr = MF_E_CLOCK_NO_TIME_SOURCE;
+    MFTIME systime;
+
+    TRACE("%p, %p.\n", iface, time);
+
+    if (!time)
+        return E_POINTER;
+
+    EnterCriticalSection(&clock->cs);
+    if (clock->time_source)
+        hr = IMFPresentationTimeSource_GetCorrelatedTime(clock->time_source, 0, time, &systime);
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_AddClockStateSink(IMFPresentationClock *iface, IMFClockStateSink *state_sink)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    struct clock_sink *sink, *cur;
+    HRESULT hr = S_OK;
+
+    TRACE("%p, %p.\n", iface, state_sink);
+
+    if (!state_sink)
+        return E_INVALIDARG;
+
+    sink = heap_alloc(sizeof(*sink));
+    if (!sink)
+        return E_OUTOFMEMORY;
+
+    sink->state_sink = state_sink;
+    IMFClockStateSink_AddRef(sink->state_sink);
+
+    EnterCriticalSection(&clock->cs);
+    LIST_FOR_EACH_ENTRY(cur, &clock->sinks, struct clock_sink, entry)
+    {
+        if (cur->state_sink == state_sink)
+        {
+            hr = E_INVALIDARG;
+            break;
+        }
+    }
+    if (SUCCEEDED(hr))
+    {
+        static const enum clock_notification notifications[MFCLOCK_STATE_PAUSED + 1] =
+        {
+            /* MFCLOCK_STATE_INVALID */ 0, /* Does not apply */
+            /* MFCLOCK_STATE_RUNNING */ CLOCK_NOTIFY_START,
+            /* MFCLOCK_STATE_STOPPED */ CLOCK_NOTIFY_STOP,
+            /* MFCLOCK_STATE_PAUSED  */ CLOCK_NOTIFY_PAUSE,
+        };
+        struct clock_state_change_param param;
+
+        if (!clock->is_shut_down && clock->state != MFCLOCK_STATE_INVALID)
+        {
+            param.u.offset = clock->start_offset;
+            clock_notify_async_sink(clock, MFGetSystemTime(), param, notifications[clock->state], sink->state_sink);
+        }
+
+        list_add_tail(&clock->sinks, &sink->entry);
+    }
+    LeaveCriticalSection(&clock->cs);
+
+    if (FAILED(hr))
+    {
+        IMFClockStateSink_Release(sink->state_sink);
+        heap_free(sink);
+    }
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_RemoveClockStateSink(IMFPresentationClock *iface,
+        IMFClockStateSink *state_sink)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    struct clock_sink *sink;
+
+    TRACE("%p, %p.\n", iface, state_sink);
+
+    if (!state_sink)
+        return E_INVALIDARG;
+
+    EnterCriticalSection(&clock->cs);
+    LIST_FOR_EACH_ENTRY(sink, &clock->sinks, struct clock_sink, entry)
+    {
+        if (sink->state_sink == state_sink)
+        {
+            IMFClockStateSink_Release(sink->state_sink);
+            list_remove(&sink->entry);
+            heap_free(sink);
+            break;
+        }
+    }
+    LeaveCriticalSection(&clock->cs);
+
+    return S_OK;
+}
+
+static HRESULT clock_call_state_change(MFTIME system_time, struct clock_state_change_param param,
+        enum clock_notification notification, IMFClockStateSink *sink)
+{
+    HRESULT hr = S_OK;
+
+    switch (notification)
+    {
+        case CLOCK_NOTIFY_START:
+            hr = IMFClockStateSink_OnClockStart(sink, system_time, param.u.offset);
+            break;
+        case CLOCK_NOTIFY_STOP:
+            hr = IMFClockStateSink_OnClockStop(sink, system_time);
+            break;
+        case CLOCK_NOTIFY_PAUSE:
+            hr = IMFClockStateSink_OnClockPause(sink, system_time);
+            break;
+        case CLOCK_NOTIFY_RESTART:
+            hr = IMFClockStateSink_OnClockRestart(sink, system_time);
+            break;
+        case CLOCK_NOTIFY_SET_RATE:
+            /* System time source does not allow 0.0 rate, presentation clock allows it without raising errors. */
+            IMFClockStateSink_OnClockSetRate(sink, system_time, param.u.rate);
+            break;
+        default:
+            ;
+    }
+
+    return hr;
+}
+
+static HRESULT clock_change_state(struct presentation_clock *clock, enum clock_command command,
+        struct clock_state_change_param param)
+{
+    static const BYTE state_change_is_allowed[MFCLOCK_STATE_PAUSED+1][CLOCK_CMD_MAX] =
+    {   /*              S  S* P, R  */
+        /* INVALID */ { 1, 1, 1, 1 },
+        /* RUNNING */ { 1, 1, 1, 1 },
+        /* STOPPED */ { 1, 1, 0, 1 },
+        /* PAUSED  */ { 1, 1, 0, 1 },
+    };
+    static const MFCLOCK_STATE states[CLOCK_CMD_MAX] =
+    {
+        /* CLOCK_CMD_START    */ MFCLOCK_STATE_RUNNING,
+        /* CLOCK_CMD_STOP     */ MFCLOCK_STATE_STOPPED,
+        /* CLOCK_CMD_PAUSE    */ MFCLOCK_STATE_PAUSED,
+        /* CLOCK_CMD_SET_RATE */ 0, /* Unused */
+    };
+    static const enum clock_notification notifications[CLOCK_CMD_MAX] =
+    {
+        /* CLOCK_CMD_START    */ CLOCK_NOTIFY_START,
+        /* CLOCK_CMD_STOP     */ CLOCK_NOTIFY_STOP,
+        /* CLOCK_CMD_PAUSE    */ CLOCK_NOTIFY_PAUSE,
+        /* CLOCK_CMD_SET_RATE */ CLOCK_NOTIFY_SET_RATE,
+    };
+    enum clock_notification notification;
+    struct clock_sink *sink;
+    MFCLOCK_STATE old_state;
+    IMFAsyncResult *result;
+    MFTIME system_time;
+    HRESULT hr;
+
+    if (!clock->time_source)
+        return MF_E_CLOCK_NO_TIME_SOURCE;
+
+    if (command != CLOCK_CMD_SET_RATE && clock->state == states[command] && clock->state != MFCLOCK_STATE_RUNNING)
+        return MF_E_CLOCK_STATE_ALREADY_SET;
+
+    if (!state_change_is_allowed[clock->state][command])
+        return MF_E_INVALIDREQUEST;
+
+    system_time = MFGetSystemTime();
+
+    if (command == CLOCK_CMD_START && clock->state == MFCLOCK_STATE_PAUSED &&
+            param.u.offset == PRESENTATION_CURRENT_POSITION)
+    {
+        notification = CLOCK_NOTIFY_RESTART;
+    }
+    else
+        notification = notifications[command];
+
+    if (FAILED(hr = clock_call_state_change(system_time, param, notification, clock->time_source_sink)))
+        return hr;
+
+    old_state = clock->state;
+    if (command != CLOCK_CMD_SET_RATE)
+        clock->state = states[command];
+
+    /* Dump all pending timer requests immediately on start; otherwise try to cancel scheduled items when
+       transitioning from running state. */
+    if ((clock->state == MFCLOCK_STATE_RUNNING) ^ (old_state == MFCLOCK_STATE_RUNNING))
+    {
+        struct clock_timer *timer, *timer2;
+
+        if (clock->state == MFCLOCK_STATE_RUNNING)
+        {
+            LIST_FOR_EACH_ENTRY_SAFE(timer, timer2, &clock->timers, struct clock_timer, entry)
+            {
+                list_remove(&timer->entry);
+                hr = MFCreateAsyncResult(&timer->IUnknown_iface, &clock->timer_callback, NULL, &result);
+                IUnknown_Release(&timer->IUnknown_iface);
+                if (SUCCEEDED(hr))
+                {
+                    MFPutWorkItemEx(MFASYNC_CALLBACK_QUEUE_TIMER, result);
+                    IMFAsyncResult_Release(result);
+                }
+            }
+        }
+        else
+        {
+            LIST_FOR_EACH_ENTRY(timer, &clock->timers, struct clock_timer, entry)
+            {
+                if (timer->key)
+                {
+                    MFCancelWorkItem(timer->key);
+                    timer->key = 0;
+                }
+            }
+        }
+    }
+
+    LIST_FOR_EACH_ENTRY(sink, &clock->sinks, struct clock_sink, entry)
+    {
+        clock_notify_async_sink(clock, system_time, param, notification, sink->state_sink);
+    }
+
+    return S_OK;
+}
+
+static HRESULT WINAPI present_clock_Start(IMFPresentationClock *iface, LONGLONG start_offset)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    struct clock_state_change_param param = {{0}};
+    HRESULT hr;
+
+    TRACE("%p, %s.\n", iface, debugstr_time(start_offset));
+
+    EnterCriticalSection(&clock->cs);
+    clock->start_offset = param.u.offset = start_offset;
+    hr = clock_change_state(clock, CLOCK_CMD_START, param);
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_Stop(IMFPresentationClock *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    struct clock_state_change_param param = {{0}};
+    HRESULT hr;
+
+    TRACE("%p.\n", iface);
+
+    EnterCriticalSection(&clock->cs);
+    hr = clock_change_state(clock, CLOCK_CMD_STOP, param);
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_Pause(IMFPresentationClock *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFPresentationClock(iface);
+    struct clock_state_change_param param = {{0}};
+    HRESULT hr;
+
+    TRACE("%p.\n", iface);
+
+    EnterCriticalSection(&clock->cs);
+    hr = clock_change_state(clock, CLOCK_CMD_PAUSE, param);
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static const IMFPresentationClockVtbl presentationclockvtbl =
+{
+    present_clock_QueryInterface,
+    present_clock_AddRef,
+    present_clock_Release,
+    present_clock_GetClockCharacteristics,
+    present_clock_GetCorrelatedTime,
+    present_clock_GetContinuityKey,
+    present_clock_GetState,
+    present_clock_GetProperties,
+    present_clock_SetTimeSource,
+    present_clock_GetTimeSource,
+    present_clock_GetTime,
+    present_clock_AddClockStateSink,
+    present_clock_RemoveClockStateSink,
+    present_clock_Start,
+    present_clock_Stop,
+    present_clock_Pause,
+};
+
+static HRESULT WINAPI present_clock_rate_control_QueryInterface(IMFRateControl *iface, REFIID riid, void **out)
+{
+    struct presentation_clock *clock = impl_from_IMFRateControl(iface);
+    return IMFPresentationClock_QueryInterface(&clock->IMFPresentationClock_iface, riid, out);
+}
+
+static ULONG WINAPI present_clock_rate_control_AddRef(IMFRateControl *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFRateControl(iface);
+    return IMFPresentationClock_AddRef(&clock->IMFPresentationClock_iface);
+}
+
+static ULONG WINAPI present_clock_rate_control_Release(IMFRateControl *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFRateControl(iface);
+    return IMFPresentationClock_Release(&clock->IMFPresentationClock_iface);
+}
+
+static HRESULT WINAPI present_clock_rate_SetRate(IMFRateControl *iface, BOOL thin, float rate)
+{
+    struct presentation_clock *clock = impl_from_IMFRateControl(iface);
+    struct clock_state_change_param param;
+    HRESULT hr;
+
+    TRACE("%p, %d, %f.\n", iface, thin, rate);
+
+    if (thin)
+        return MF_E_THINNING_UNSUPPORTED;
+
+    EnterCriticalSection(&clock->cs);
+    param.u.rate = rate;
+    if (SUCCEEDED(hr = clock_change_state(clock, CLOCK_CMD_SET_RATE, param)))
+        clock->rate = rate;
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_rate_GetRate(IMFRateControl *iface, BOOL *thin, float *rate)
+{
+    struct presentation_clock *clock = impl_from_IMFRateControl(iface);
+
+    TRACE("%p, %p, %p.\n", iface, thin, rate);
+
+    if (!rate)
+        return E_INVALIDARG;
+
+    if (thin)
+        *thin = FALSE;
+
+    EnterCriticalSection(&clock->cs);
+    *rate = clock->rate;
+    LeaveCriticalSection(&clock->cs);
+
+    return S_OK;
+}
+
+static const IMFRateControlVtbl presentclockratecontrolvtbl =
+{
+    present_clock_rate_control_QueryInterface,
+    present_clock_rate_control_AddRef,
+    present_clock_rate_control_Release,
+    present_clock_rate_SetRate,
+    present_clock_rate_GetRate,
+};
+
+static HRESULT WINAPI present_clock_timer_QueryInterface(IMFTimer *iface, REFIID riid, void **out)
+{
+    struct presentation_clock *clock = impl_from_IMFTimer(iface);
+    return IMFPresentationClock_QueryInterface(&clock->IMFPresentationClock_iface, riid, out);
+}
+
+static ULONG WINAPI present_clock_timer_AddRef(IMFTimer *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFTimer(iface);
+    return IMFPresentationClock_AddRef(&clock->IMFPresentationClock_iface);
+}
+
+static ULONG WINAPI present_clock_timer_Release(IMFTimer *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFTimer(iface);
+    return IMFPresentationClock_Release(&clock->IMFPresentationClock_iface);
+}
+
+static HRESULT present_clock_schedule_timer(struct presentation_clock *clock, DWORD flags, LONGLONG time,
+        struct clock_timer *timer)
+{
+    IMFAsyncResult *result;
+    MFTIME systime, clocktime;
+    LONGLONG frequency;
+    HRESULT hr;
+
+    if (!(flags & MFTIMER_RELATIVE))
+    {
+        if (FAILED(hr = IMFPresentationTimeSource_GetCorrelatedTime(clock->time_source, 0, &clocktime, &systime)))
+        {
+            WARN("Failed to get clock time, hr %#x.\n", hr);
+            return hr;
+        }
+        time -= clocktime;
+    }
+
+    frequency = clock->frequency / 1000;
+    time /= frequency;
+
+    /* Scheduled item is using clock instance callback, with timer instance as an object. Clock callback will
+       call user callback and cleanup timer list. */
+
+    if (FAILED(hr = MFCreateAsyncResult(&timer->IUnknown_iface, &clock->timer_callback, NULL, &result)))
+        return hr;
+
+    hr = MFScheduleWorkItemEx(result, -time, &timer->key);
+    IMFAsyncResult_Release(result);
+
+    return hr;
+}
+
+static HRESULT WINAPI clock_timer_QueryInterface(IUnknown *iface, REFIID riid, void **obj)
+{
+    if (IsEqualIID(riid, &IID_IUnknown))
+    {
+        *obj = iface;
+        IUnknown_AddRef(iface);
+        return S_OK;
+    }
+
+    *obj = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI clock_timer_AddRef(IUnknown *iface)
+{
+    struct clock_timer *timer = impl_clock_timer_from_IUnknown(iface);
+    return InterlockedIncrement(&timer->refcount);
+}
+
+static ULONG WINAPI clock_timer_Release(IUnknown *iface)
+{
+    struct clock_timer *timer = impl_clock_timer_from_IUnknown(iface);
+    ULONG refcount = InterlockedDecrement(&timer->refcount);
+
+    if (!refcount)
+    {
+        IMFAsyncResult_Release(timer->result);
+        IMFAsyncCallback_Release(timer->callback);
+        heap_free(timer);
+    }
+
+    return refcount;
+}
+
+static const IUnknownVtbl clock_timer_vtbl =
+{
+    clock_timer_QueryInterface,
+    clock_timer_AddRef,
+    clock_timer_Release,
+};
+
+static HRESULT WINAPI present_clock_timer_SetTimer(IMFTimer *iface, DWORD flags, LONGLONG time,
+        IMFAsyncCallback *callback, IUnknown *state, IUnknown **cancel_key)
+{
+    struct presentation_clock *clock = impl_from_IMFTimer(iface);
+    struct clock_timer *clock_timer;
+    HRESULT hr;
+
+    TRACE("%p, %#x, %s, %p, %p, %p.\n", iface, flags, debugstr_time(time), callback, state, cancel_key);
+
+    if (!(clock_timer = heap_alloc_zero(sizeof(*clock_timer))))
+        return E_OUTOFMEMORY;
+
+    if (FAILED(hr = MFCreateAsyncResult(NULL, NULL, state, &clock_timer->result)))
+    {
+        heap_free(clock_timer);
+        return hr;
+    }
+
+    clock_timer->IUnknown_iface.lpVtbl = &clock_timer_vtbl;
+    clock_timer->refcount = 1;
+    clock_timer->callback = callback;
+    IMFAsyncCallback_AddRef(clock_timer->callback);
+
+    EnterCriticalSection(&clock->cs);
+
+    if (clock->state == MFCLOCK_STATE_RUNNING)
+        hr = present_clock_schedule_timer(clock, flags, time, clock_timer);
+    else if (clock->state == MFCLOCK_STATE_STOPPED)
+        hr = MF_S_CLOCK_STOPPED;
+
+    if (SUCCEEDED(hr))
+    {
+        list_add_tail(&clock->timers, &clock_timer->entry);
+        if (cancel_key)
+        {
+            *cancel_key = &clock_timer->IUnknown_iface;
+            IUnknown_AddRef(*cancel_key);
+        }
+    }
+
+    LeaveCriticalSection(&clock->cs);
+
+    if (FAILED(hr))
+        IUnknown_Release(&clock_timer->IUnknown_iface);
+
+    return hr;
+}
+
+static HRESULT WINAPI present_clock_timer_CancelTimer(IMFTimer *iface, IUnknown *cancel_key)
+{
+    struct presentation_clock *clock = impl_from_IMFTimer(iface);
+    struct clock_timer *timer;
+
+    TRACE("%p, %p.\n", iface, cancel_key);
+
+    EnterCriticalSection(&clock->cs);
+
+    LIST_FOR_EACH_ENTRY(timer, &clock->timers, struct clock_timer, entry)
+    {
+        if (&timer->IUnknown_iface == cancel_key)
+        {
+            list_remove(&timer->entry);
+            if (timer->key)
+            {
+                MFCancelWorkItem(timer->key);
+                timer->key = 0;
+            }
+            IUnknown_Release(&timer->IUnknown_iface);
+            break;
+        }
+    }
+
+    LeaveCriticalSection(&clock->cs);
+
+    return S_OK;
+}
+
+static const IMFTimerVtbl presentclocktimervtbl =
+{
+    present_clock_timer_QueryInterface,
+    present_clock_timer_AddRef,
+    present_clock_timer_Release,
+    present_clock_timer_SetTimer,
+    present_clock_timer_CancelTimer,
+};
+
+static HRESULT WINAPI present_clock_shutdown_QueryInterface(IMFShutdown *iface, REFIID riid, void **out)
+{
+    struct presentation_clock *clock = impl_from_IMFShutdown(iface);
+    return IMFPresentationClock_QueryInterface(&clock->IMFPresentationClock_iface, riid, out);
+}
+
+static ULONG WINAPI present_clock_shutdown_AddRef(IMFShutdown *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFShutdown(iface);
+    return IMFPresentationClock_AddRef(&clock->IMFPresentationClock_iface);
+}
+
+static ULONG WINAPI present_clock_shutdown_Release(IMFShutdown *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFShutdown(iface);
+    return IMFPresentationClock_Release(&clock->IMFPresentationClock_iface);
+}
+
+static HRESULT WINAPI present_clock_shutdown_Shutdown(IMFShutdown *iface)
+{
+    struct presentation_clock *clock = impl_from_IMFShutdown(iface);
+
+    TRACE("%p.\n", iface);
+
+    EnterCriticalSection(&clock->cs);
+    clock->is_shut_down = TRUE;
+    LeaveCriticalSection(&clock->cs);
+
+    return S_OK;
+}
+
+static HRESULT WINAPI present_clock_shutdown_GetShutdownStatus(IMFShutdown *iface, MFSHUTDOWN_STATUS *status)
+{
+    struct presentation_clock *clock = impl_from_IMFShutdown(iface);
+    HRESULT hr = S_OK;
+
+    TRACE("%p, %p.\n", iface, status);
+
+    if (!status)
+        return E_INVALIDARG;
+
+    EnterCriticalSection(&clock->cs);
+    if (clock->is_shut_down)
+        *status = MFSHUTDOWN_COMPLETED;
+    else
+        hr = MF_E_INVALIDREQUEST;
+    LeaveCriticalSection(&clock->cs);
+
+    return hr;
+}
+
+static const IMFShutdownVtbl presentclockshutdownvtbl =
+{
+    present_clock_shutdown_QueryInterface,
+    present_clock_shutdown_AddRef,
+    present_clock_shutdown_Release,
+    present_clock_shutdown_Shutdown,
+    present_clock_shutdown_GetShutdownStatus,
+};
+
+static HRESULT WINAPI present_clock_callback_QueryInterface(IMFAsyncCallback *iface, REFIID riid, void **out)
+{
+    if (IsEqualIID(riid, &IID_IMFAsyncCallback) ||
+            IsEqualIID(riid, &IID_IUnknown))
+    {
+        *out = iface;
+        IMFAsyncCallback_AddRef(iface);
+        return S_OK;
+    }
+
+    WARN("Unsupported %s.\n", wine_dbgstr_guid(riid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI present_clock_sink_callback_AddRef(IMFAsyncCallback *iface)
+{
+    struct presentation_clock *clock = impl_from_sink_callback_IMFAsyncCallback(iface);
+    return IMFPresentationClock_AddRef(&clock->IMFPresentationClock_iface);
+}
+
+static ULONG WINAPI present_clock_sink_callback_Release(IMFAsyncCallback *iface)
+{
+    struct presentation_clock *clock = impl_from_sink_callback_IMFAsyncCallback(iface);
+    return IMFPresentationClock_Release(&clock->IMFPresentationClock_iface);
+}
+
+static HRESULT WINAPI present_clock_callback_GetParameters(IMFAsyncCallback *iface, DWORD *flags, DWORD *queue)
+{
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI present_clock_sink_callback_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
+{
+    struct sink_notification *data;
+    IUnknown *object;
+    HRESULT hr;
+
+    if (FAILED(hr = IMFAsyncResult_GetObject(result, &object)))
+        return hr;
+
+    data = impl_sink_notification_from_IUnknown(object);
+
+    clock_call_state_change(data->system_time, data->param, data->notification, data->sink);
+
+    IUnknown_Release(object);
+
+    return S_OK;
+}
+
+static const IMFAsyncCallbackVtbl presentclocksinkcallbackvtbl =
+{
+    present_clock_callback_QueryInterface,
+    present_clock_sink_callback_AddRef,
+    present_clock_sink_callback_Release,
+    present_clock_callback_GetParameters,
+    present_clock_sink_callback_Invoke,
+};
+
+static ULONG WINAPI present_clock_timer_callback_AddRef(IMFAsyncCallback *iface)
+{
+    struct presentation_clock *clock = impl_from_timer_callback_IMFAsyncCallback(iface);
+    return IMFPresentationClock_AddRef(&clock->IMFPresentationClock_iface);
+}
+
+static ULONG WINAPI present_clock_timer_callback_Release(IMFAsyncCallback *iface)
+{
+    struct presentation_clock *clock = impl_from_timer_callback_IMFAsyncCallback(iface);
+    return IMFPresentationClock_Release(&clock->IMFPresentationClock_iface);
+}
+
+static HRESULT WINAPI present_clock_timer_callback_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
+{
+    struct presentation_clock *clock = impl_from_timer_callback_IMFAsyncCallback(iface);
+    struct clock_timer *timer;
+    IUnknown *object;
+    HRESULT hr;
+
+    if (FAILED(hr = IMFAsyncResult_GetObject(result, &object)))
+        return hr;
+
+    timer = impl_clock_timer_from_IUnknown(object);
+
+    EnterCriticalSection(&clock->cs);
+    list_remove(&timer->entry);
+    IUnknown_Release(&timer->IUnknown_iface);
+    LeaveCriticalSection(&clock->cs);
+
+    IMFAsyncCallback_Invoke(timer->callback, timer->result);
+
+    IUnknown_Release(object);
+
+    return S_OK;
+}
+
+static const IMFAsyncCallbackVtbl presentclocktimercallbackvtbl =
+{
+    present_clock_callback_QueryInterface,
+    present_clock_timer_callback_AddRef,
+    present_clock_timer_callback_Release,
+    present_clock_callback_GetParameters,
+    present_clock_timer_callback_Invoke,
+};
+
+/***********************************************************************
+ *      MFCreatePresentationClock (mf.@)
+ */
+HRESULT WINAPI MFCreatePresentationClock(IMFPresentationClock **clock)
+{
+    struct presentation_clock *object;
+
+    TRACE("%p.\n", clock);
+
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
+        return E_OUTOFMEMORY;
+
+    object->IMFPresentationClock_iface.lpVtbl = &presentationclockvtbl;
+    object->IMFRateControl_iface.lpVtbl = &presentclockratecontrolvtbl;
+    object->IMFTimer_iface.lpVtbl = &presentclocktimervtbl;
+    object->IMFShutdown_iface.lpVtbl = &presentclockshutdownvtbl;
+    object->sink_callback.lpVtbl = &presentclocksinkcallbackvtbl;
+    object->timer_callback.lpVtbl = &presentclocktimercallbackvtbl;
+    object->refcount = 1;
+    list_init(&object->sinks);
+    list_init(&object->timers);
+    object->rate = 1.0f;
+    InitializeCriticalSection(&object->cs);
+
+    *clock = &object->IMFPresentationClock_iface;
+
+    return S_OK;
+}
+
 static HRESULT WINAPI standard_quality_manager_QueryInterface(IMFQualityManager *iface, REFIID riid, void **out)
 {
     struct quality_manager *manager = impl_from_IMFQualityManager(iface);
@@ -3811,7 +4856,7 @@ static ULONG WINAPI standard_quality_manager_Release(IMFQualityManager *iface)
         if (manager->topology)
             IMFTopology_Release(manager->topology);
         DeleteCriticalSection(&manager->cs);
-        free(manager);
+        heap_free(manager);
     }
 
     return refcount;
@@ -4003,7 +5048,8 @@ HRESULT WINAPI MFCreateStandardQualityManager(IMFQualityManager **manager)
 
     TRACE("%p.\n", manager);
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     object->IMFQualityManager_iface.lpVtbl = &standard_quality_manager_vtbl;

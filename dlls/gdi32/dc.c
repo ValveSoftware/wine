@@ -364,7 +364,7 @@ void DC_UpdateXforms( DC *dc )
     /* Reselect the font and pen back into the dc so that the size
        gets updated. */
     if (linear_xform_cmp( &oldworld2vport, &dc->xformWorld2Vport ) &&
-        !GdiIsMetaFileDC(dc->hSelf))
+        GetObjectType( dc->hSelf ) != OBJ_METADC)
     {
         SelectObject(dc->hSelf, dc->hFont);
         SelectObject(dc->hSelf, dc->hPen);
@@ -1922,17 +1922,7 @@ DWORD WINAPI SetLayout(HDC hdc, DWORD layout)
     if (dc)
     {
         PHYSDEV physdev = GET_DC_PHYSDEV( dc, pSetLayout );
-        layout = physdev->funcs->pSetLayout( physdev, layout );
-        if (layout != GDI_ERROR)
-        {
-            oldlayout = dc->layout;
-            dc->layout = layout;
-            if (layout != oldlayout)
-            {
-                if (layout & LAYOUT_RTL) dc->MapMode = MM_ANISOTROPIC;
-                DC_UpdateXforms( dc );
-            }
-        }
+        oldlayout = physdev->funcs->pSetLayout( physdev, layout );
         release_dc_ptr( dc );
     }
 

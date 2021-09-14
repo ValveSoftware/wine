@@ -360,97 +360,12 @@ static void testfilter_init(struct testfilter *filter)
     strmbase_sink_init(&filter->sink, &filter->filter, L"sink", &testsink_ops, NULL);
 }
 
-static void test_filter_state(IMediaControl *control, IMemAllocator *allocator)
-{
-    IMediaSample *sample;
-    OAFilterState state;
-    HRESULT hr;
-
-    hr = IMediaControl_GetState(control, 0, &state);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ok(state == State_Stopped, "Got state %u.\n", state);
-
-    hr = IMemAllocator_GetBuffer(allocator, &sample, NULL, NULL, 0);
-    ok(hr == VFW_E_NOT_COMMITTED, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_Pause(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_GetState(control, 0, &state);
-    ok(hr == VFW_S_CANT_CUE, "Got hr %#x.\n", hr);
-    ok(state == State_Paused, "Got state %u.\n", state);
-
-    hr = IMemAllocator_GetBuffer(allocator, &sample, NULL, NULL, AM_GBF_NOWAIT);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    IMediaSample_Release(sample);
-
-    hr = IMediaControl_Run(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_GetState(control, 0, &state);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ok(state == State_Running, "Got state %u.\n", state);
-
-    hr = IMediaControl_Pause(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_GetState(control, 0, &state);
-    ok(hr == VFW_S_CANT_CUE, "Got hr %#x.\n", hr);
-    ok(state == State_Paused, "Got state %u.\n", state);
-
-    hr = IMediaControl_Stop(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_GetState(control, 0, &state);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ok(state == State_Stopped, "Got state %u.\n", state);
-
-    hr = IMemAllocator_GetBuffer(allocator, &sample, NULL, NULL, 0);
-    ok(hr == VFW_E_NOT_COMMITTED, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_Run(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_GetState(control, 0, &state);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ok(state == State_Running, "Got state %u.\n", state);
-
-    hr = IMemAllocator_GetBuffer(allocator, &sample, NULL, NULL, AM_GBF_NOWAIT);
-    todo_wine ok(hr == VFW_E_TIMEOUT, "Got hr %#x.\n", hr);
-    if (hr == S_OK) IMediaSample_Release(sample);
-
-    hr = IMediaControl_Stop(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_GetState(control, 0, &state);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-    ok(state == State_Stopped, "Got state %u.\n", state);
-
-    hr = IMemAllocator_GetBuffer(allocator, &sample, NULL, NULL, 0);
-    ok(hr == VFW_E_NOT_COMMITTED, "Got hr %#x.\n", hr);
-
-    /* Test committing the allocator before the capture filter does. */
-
-    hr = IMemAllocator_Commit(allocator);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_Pause(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMemAllocator_Decommit(allocator);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    hr = IMediaControl_Stop(control);
-    ok(hr == S_OK, "Got hr %#x.\n", hr);
-}
-
 static void test_connect_pin(IBaseFilter *filter, IPin *source)
 {
     AM_MEDIA_TYPE req_mt, default_mt, mt, *mts[2];
     IAMStreamConfig *stream_config;
     struct testfilter testsink;
     IEnumMediaTypes *enummt;
-    IMediaControl *control;
     IFilterGraph2 *graph;
     ULONG count, ref;
     HRESULT hr;
@@ -458,7 +373,6 @@ static void test_connect_pin(IBaseFilter *filter, IPin *source)
 
     CoCreateInstance(&CLSID_FilterGraph, NULL, CLSCTX_INPROC_SERVER,
             &IID_IFilterGraph2, (void **)&graph);
-    IFilterGraph2_QueryInterface(graph, &IID_IMediaControl, (void **)&control);
     testfilter_init(&testsink);
     IFilterGraph2_AddFilter(graph, &testsink.filter.IBaseFilter_iface, L"sink");
     IFilterGraph2_AddFilter(graph, filter, L"source");
@@ -491,10 +405,6 @@ static void test_connect_pin(IBaseFilter *filter, IPin *source)
 
     hr = IFilterGraph2_ConnectDirect(graph, source, &testsink.sink.pin.IPin_iface, &req_mt);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
-
-    ok(!!testsink.sink.pAllocator, "Expected to be assigned an allocator.\n");
-
-    test_filter_state(control, testsink.sink.pAllocator);
 
     hr = IPin_ConnectedTo(source, &peer);
     ok(hr == S_OK, "Got hr %#x.\n", hr);
@@ -535,7 +445,6 @@ static void test_connect_pin(IBaseFilter *filter, IPin *source)
     FreeMediaType(&req_mt);
     FreeMediaType(&default_mt);
     IAMStreamConfig_Release(stream_config);
-    IMediaControl_Release(control);
     ref = IFilterGraph2_Release(graph);
     ok(!ref, "Got outstanding refcount %d.\n", ref);
     ref = IBaseFilter_Release(&testsink.filter.IBaseFilter_iface);

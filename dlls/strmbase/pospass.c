@@ -22,7 +22,7 @@
 
 #include "strmbase_private.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(strmbase);
 
 static struct strmbase_passthrough *impl_from_ISeekingPassThru(ISeekingPassThru *iface)
 {

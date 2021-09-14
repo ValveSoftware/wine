@@ -368,7 +368,7 @@ static void test_loadlibraryshim(void)
     }
 
     hr = pLoadLibraryShim(fusion, vbogus, NULL, &hdll);
-    todo_wine ok(hr == E_HANDLE, "LoadLibraryShim failed, hr=%x\n", hr);
+    ok(hr == E_HANDLE, "LoadLibraryShim failed, hr=%x\n", hr);
     if (SUCCEEDED(hr))
         FreeLibrary(hdll);
 
@@ -406,7 +406,7 @@ static void test_loadlibraryshim(void)
         FreeLibrary(hdll);
 
     hr = pLoadLibraryShim(gdidll, latest, NULL, &hdll);
-    todo_wine ok(hr == E_HANDLE, "LoadLibraryShim failed, hr=%x\n", hr);
+    ok(hr == E_HANDLE, "LoadLibraryShim failed, hr=%x\n", hr);
     if (SUCCEEDED(hr))
         FreeLibrary(hdll);
 }
@@ -646,7 +646,7 @@ static void test_loadpaths_execute(const WCHAR *exe_name, const WCHAR *dll_name,
     ret = CreateProcessW(tmpexe, tmpexe, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
     ok(ret, "CreateProcessW(%s) failed: %u\n", debugstr_w(tmpexe), GetLastError());
 
-    if (expect_failure) ret = WaitForSingleObject(pi.hProcess, 500);
+    if (expect_failure) ret = WaitForSingleObject(pi.hProcess, 2000);
     else
     {
         ret = WaitForSingleObject(pi.hProcess, 5000);

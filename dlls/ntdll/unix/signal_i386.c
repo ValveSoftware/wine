@@ -1277,15 +1277,10 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
     struct syscall_frame *frame = x86_thread_data()->syscall_frame;
     DWORD needed_flags = context->ContextFlags & ~CONTEXT_i386;
     BOOL self = (handle == GetCurrentThread());
-    BOOL use_cached_debug_regs = FALSE;
     NTSTATUS ret;
 
-    if (self && needed_flags & CONTEXT_DEBUG_REGISTERS)
-    {
-        /* debug registers require a server call if hw breakpoints are enabled */
-        if (x86_thread_data()->dr7 & 0xff) self = FALSE;
-        else use_cached_debug_regs = TRUE;
-    }
+    /* debug registers require a server call */
+    if (needed_flags & CONTEXT_DEBUG_REGISTERS) self = FALSE;
 
     if (!self)
     {
@@ -1380,27 +1375,15 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
 
             context->ContextFlags |= CONTEXT_EXTENDED_REGISTERS;
         }
+        /* update the cached version of the debug registers */
         if (context->ContextFlags & (CONTEXT_DEBUG_REGISTERS & ~CONTEXT_i386))
         {
-            if (use_cached_debug_regs)
-            {
-                context->Dr0 = x86_thread_data()->dr0;
-                context->Dr1 = x86_thread_data()->dr1;
-                context->Dr2 = x86_thread_data()->dr2;
-                context->Dr3 = x86_thread_data()->dr3;
-                context->Dr6 = x86_thread_data()->dr6;
-                context->Dr7 = x86_thread_data()->dr7;
-            }
-            else
-            {
-                /* update the cached version of the debug registers */
-                x86_thread_data()->dr0 = context->Dr0;
-                x86_thread_data()->dr1 = context->Dr1;
-                x86_thread_data()->dr2 = context->Dr2;
-                x86_thread_data()->dr3 = context->Dr3;
-                x86_thread_data()->dr6 = context->Dr6;
-                x86_thread_data()->dr7 = context->Dr7;
-            }
+            x86_thread_data()->dr0 = context->Dr0;
+            x86_thread_data()->dr1 = context->Dr1;
+            x86_thread_data()->dr2 = context->Dr2;
+            x86_thread_data()->dr3 = context->Dr3;
+            x86_thread_data()->dr6 = context->Dr6;
+            x86_thread_data()->dr7 = context->Dr7;
         }
         if ((cpu_info.FeatureSet & CPU_FEATURE_AVX) && (xstate = xstate_from_context( context )))
         {
@@ -2016,7 +1999,6 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     struct xcontext xcontext;
     ucontext_t *ucontext = sigcontext;
     void *stack = setup_exception_record( sigcontext, &rec, &xcontext );
-    void *steamclient_addr = NULL;
 
     switch (TRAP_sig(ucontext))
     {
@@ -2051,12 +2033,6 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         }
         break;
     case TRAP_x86_PAGEFLT:  /* Page fault */
-        if ((steamclient_addr = steamclient_handle_fault( siginfo->si_addr, (ERROR_sig(ucontext) >> 1) & 0x09 )))
-        {
-            EIP_sig(ucontext) = (intptr_t)steamclient_addr;
-            return;
-        }
-
         rec.NumberParameters = 2;
         rec.ExceptionInformation[0] = (ERROR_sig(ucontext) >> 1) & 0x09;
         rec.ExceptionInformation[1] = (ULONG_PTR)siginfo->si_addr;
@@ -2645,15 +2621,6 @@ PCONTEXT DECLSPEC_HIDDEN get_initial_context( LPTHREAD_START_ROUTINE entry, void
         wait_suspend( &context );
         ctx = (CONTEXT *)((ULONG_PTR)context.Esp & ~15) - 1;
         *ctx = context;
-        if (context.ContextFlags & CONTEXT_DEBUG_REGISTERS & ~CONTEXT_i386)
-        {
-            x86_thread_data()->dr0 = context.Dr0;
-            x86_thread_data()->dr1 = context.Dr1;
-            x86_thread_data()->dr2 = context.Dr2;
-            x86_thread_data()->dr3 = context.Dr3;
-            x86_thread_data()->dr6 = context.Dr6;
-            x86_thread_data()->dr7 = context.Dr7;
-        }
     }
     else
     {

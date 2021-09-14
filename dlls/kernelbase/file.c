@@ -499,7 +499,8 @@ BOOL WINAPI CopyFileExW( const WCHAR *source, const WCHAR *dest, LPPROGRESS_ROUT
 {
     static const int buffer_size = 65536;
     HANDLE h1, h2;
-    BY_HANDLE_FILE_INFORMATION info;
+    FILE_BASIC_INFORMATION info;
+    IO_STATUS_BLOCK io;
     DWORD count;
     BOOL ret = FALSE;
     char *buffer;
@@ -525,7 +526,7 @@ BOOL WINAPI CopyFileExW( const WCHAR *source, const WCHAR *dest, LPPROGRESS_ROUT
         return FALSE;
     }
 
-    if (!GetFileInformationByHandle( h1, &info ))
+    if (!set_ntstatus( NtQueryInformationFile( h1, &io, &info, sizeof(info), FileBasicInformation )))
     {
         WARN("GetFileInformationByHandle returned error for %s\n", debugstr_w(source));
         HeapFree( GetProcessHeap(), 0, buffer );
@@ -553,7 +554,7 @@ BOOL WINAPI CopyFileExW( const WCHAR *source, const WCHAR *dest, LPPROGRESS_ROUT
 
     if ((h2 = CreateFileW( dest, GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE, NULL,
                            (flags & COPY_FILE_FAIL_IF_EXISTS) ? CREATE_NEW : CREATE_ALWAYS,
-                           info.dwFileAttributes, h1 )) == INVALID_HANDLE_VALUE)
+                           info.FileAttributes, h1 )) == INVALID_HANDLE_VALUE)
     {
         WARN("Unable to open dest %s\n", debugstr_w(dest));
         HeapFree( GetProcessHeap(), 0, buffer );
@@ -575,7 +576,8 @@ BOOL WINAPI CopyFileExW( const WCHAR *source, const WCHAR *dest, LPPROGRESS_ROUT
     ret =  TRUE;
 done:
     /* Maintain the timestamp of source file to destination file */
-    SetFileTime( h2, NULL, NULL, &info.ftLastWriteTime );
+    info.FileAttributes = 0;
+    NtSetInformationFile( h2, &io, &info, sizeof(info), FileBasicInformation );
     HeapFree( GetProcessHeap(), 0, buffer );
     CloseHandle( h1 );
     CloseHandle( h2 );
@@ -723,8 +725,6 @@ static UINT get_nt_file_options( DWORD attributes )
         options |= FILE_RANDOM_ACCESS;
     if (attributes & FILE_FLAG_WRITE_THROUGH)
         options |= FILE_WRITE_THROUGH;
-    if (attributes & FILE_FLAG_OPEN_REPARSE_POINT)
-        options |= FILE_OPEN_REPARSE_POINT;
     return options;
 }
 
@@ -3482,7 +3482,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH RemoveDirectoryW( LPCWSTR path )
     InitializeObjectAttributes( &attr, &nt_name, OBJ_CASE_INSENSITIVE, 0, NULL );
     status = NtOpenFile( &handle, DELETE | SYNCHRONIZE, &attr, &io,
                          FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-                         FILE_OPEN_REPARSE_POINT | FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT );
+                         FILE_DIRECTORY_FILE | FILE_SYNCHRONOUS_IO_NONALERT );
     RtlFreeUnicodeString( &nt_name );
 
     if (!status)
@@ -3528,7 +3528,6 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetFileInformationByHandle( HANDLE file, FILE_INFO
     switch (class)
     {
     case FileNameInfo:
-    case FileRenameInfo:
     case FileAllocationInfo:
     case FileStreamInfo:
     case FileIdBothDirectoryInfo:
@@ -3556,6 +3555,28 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetFileInformationByHandle( HANDLE file, FILE_INFO
     case FileIoPriorityHintInfo:
         status = NtSetInformationFile( file, &io, info, size, FileIoPriorityHintInformation );
         break;
+    case FileRenameInfo:
+        {
+            FILE_RENAME_INFORMATION *rename_info;
+            UNICODE_STRING nt_name;
+            ULONG size;
+
+            if ((status = RtlDosPathNameToNtPathName_U_WithStatus( ((FILE_RENAME_INFORMATION *)info)->FileName,
+                                                                   &nt_name, NULL, NULL )))
+                break;
+
+            size = sizeof(*rename_info) + nt_name.Length;
+            if ((rename_info = HeapAlloc( GetProcessHeap(), 0, size )))
+            {
+                memcpy( rename_info, info, sizeof(*rename_info) );
+                memcpy( rename_info->FileName, nt_name.Buffer, nt_name.Length + sizeof(WCHAR) );
+                rename_info->FileNameLength = nt_name.Length;
+                status = NtSetInformationFile( file, &io, rename_info, size, FileRenameInformation );
+                HeapFree( GetProcessHeap(), 0, rename_info );
+            }
+            RtlFreeUnicodeString( &nt_name );
+            break;
+        }
     case FileStandardInfo:
     case FileCompressionInfo:
     case FileAttributeTagInfo:

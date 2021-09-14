@@ -904,6 +904,7 @@ no_compat_defines:
         const char *incl_dirs[] = { INCLUDEDIR, "/usr/include", "/usr/local/include" };
         const char *root = opts->isysroot ? opts->isysroot : opts->sysroot ? opts->sysroot : "";
         const char *isystem = gcc_defs ? "-isystem" : "-I";
+        const char *idirafter = gcc_defs ? "-idirafter" : "-I";
 
         if (opts->use_msvcrt)
         {
@@ -917,14 +918,14 @@ no_compat_defines:
         }
         if (includedir)
         {
-            strarray_add( comp_args, strmake( "-I%s", includedir ));
             strarray_add( comp_args, strmake( "%s%s/wine/windows", isystem, includedir ));
+            strarray_add( comp_args, strmake( "%s%s", idirafter, includedir ));
         }
         for (j = 0; j < ARRAY_SIZE(incl_dirs); j++)
         {
             if (j && !strcmp( incl_dirs[0], incl_dirs[j] )) continue;
-            strarray_add(comp_args, strmake( "-I%s%s", root, incl_dirs[j] ));
             strarray_add(comp_args, strmake( "%s%s%s/wine/windows", isystem, root, incl_dirs[j] ));
+            strarray_add(comp_args, strmake( "%s%s%s", idirafter, root, incl_dirs[j] ));
         }
     }
     else if (opts->wine_objdir)
@@ -1393,7 +1394,7 @@ static void build(struct options* opts)
 		strarray_add(link_args, name);
 		break;
 	    case 'a':
-                if (is_pe && !opts->lib_suffix && strchr(name, '/'))
+                if (is_pe && !opts->use_msvcrt && !opts->lib_suffix && strchr(name, '/'))
                 {
                     /* turn the path back into -Ldir -lfoo options
                      * this makes sure that we use the specified libs even
@@ -1679,7 +1680,7 @@ int main(int argc, char **argv)
             strarray_add( opts.args, argv[i] );
             continue;
         }
-        if ((fstat( fd, &st ) == -1)) error( "Cannot stat %s", argv[i] + 1 );
+        if ((fstat( fd, &st ) == -1)) error( "Cannot stat %s\n", argv[i] + 1 );
         if (st.st_size)
         {
             input_buffer = xmalloc( st.st_size + 1 );

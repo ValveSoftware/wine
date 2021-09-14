@@ -1,6 +1,6 @@
 MODULE    = xinput1_3.dll
 IMPORTLIB = xinput
-DELAYIMPORTS = hid setupapi user32
+DELAYIMPORTS = hid setupapi
 
 EXTRADLLFLAGS = -mno-cygwin
 

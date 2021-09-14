@@ -24,7 +24,7 @@
 #include "wine/debug.h"
 #include "wine/strmbase.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(qedit);
 
 struct null_renderer
 {

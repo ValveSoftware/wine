@@ -112,11 +112,11 @@ struct gdb_context
 static void gdbctx_delete_xpoint(struct gdb_context *gdbctx, struct dbg_thread *thread,
                                  dbg_ctx_t *ctx, struct gdb_xpoint *x)
 {
-    struct dbg_process *process = thread->process;
+    struct dbg_process *process = gdbctx->process;
     struct backend_cpu *cpu = process->be_cpu;
 
     if (!cpu->remove_Xpoint(process->handle, process->process_io, ctx, x->type, x->addr, x->value, x->size))
-        ERR("%04x:%04x: Couldn't remove breakpoint at:%p/%x type:%d\n", process->pid, thread->tid, x->addr, x->size, x->type);
+        ERR("%04x:%04x: Couldn't remove breakpoint at:%p/%x type:%d\n", process->pid, thread ? thread->tid : ~0, x->addr, x->size, x->type);
 
     list_remove(&x->entry);
     HeapFree(GetProcessHeap(), 0, x);
@@ -404,6 +404,7 @@ static BOOL handle_debug_event(struct gdb_context* gdbctx)
         char                bufferA[256];
         WCHAR               buffer[256];
     } u;
+    DWORD size;
 
     gdbctx->exec_tid = de->dwThreadId;
     gdbctx->other_tid = de->dwThreadId;
@@ -417,10 +418,8 @@ static BOOL handle_debug_event(struct gdb_context* gdbctx)
         if (!gdbctx->process)
             return TRUE;
 
-        memory_get_string_indirect(gdbctx->process,
-                                   de->u.CreateProcessInfo.lpImageName,
-                                   de->u.CreateProcessInfo.fUnicode,
-                                   u.buffer, ARRAY_SIZE(u.buffer));
+        size = ARRAY_SIZE(u.buffer);
+        QueryFullProcessImageNameW( gdbctx->process->handle, 0, u.buffer, &size );
         dbg_set_process_name(gdbctx->process, u.buffer);
 
         fprintf(stderr, "%04x:%04x: create process '%s'/%p @%p (%u<%u>)\n",
@@ -444,10 +443,8 @@ static BOOL handle_debug_event(struct gdb_context* gdbctx)
         return TRUE;
 
     case LOAD_DLL_DEBUG_EVENT:
-        memory_get_string_indirect(gdbctx->process,
-                                   de->u.LoadDll.lpImageName,
-                                   de->u.LoadDll.fUnicode,
-                                   u.buffer, ARRAY_SIZE(u.buffer));
+        fetch_module_name( de->u.LoadDll.lpImageName, de->u.LoadDll.lpBaseOfDll,
+                           u.buffer, ARRAY_SIZE(u.buffer) );
         fprintf(stderr, "%04x:%04x: loads DLL %s @%p (%u<%u>)\n",
                 de->dwProcessId, de->dwThreadId,
                 dbg_W2A(u.buffer, -1),

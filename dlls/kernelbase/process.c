@@ -33,7 +33,6 @@
 
 #include "kernelbase.h"
 #include "wine/debug.h"
-#include "wine/heap.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(process);
 
@@ -145,9 +144,9 @@ static RTL_USER_PROCESS_PARAMETERS *create_process_params( const WCHAR *filename
                                                            const STARTUPINFOW *startup )
 {
     RTL_USER_PROCESS_PARAMETERS *params;
-    UNICODE_STRING imageW, dllpathW, curdirW, cmdlineW, titleW, desktopW, runtimeW, newdirW;
+    UNICODE_STRING imageW, curdirW, cmdlineW, titleW, desktopW, runtimeW, newdirW;
     WCHAR imagepath[MAX_PATH];
-    WCHAR *load_path, *dummy, *envW = env;
+    WCHAR *envW = env;
 
     if (!GetLongPathNameW( filename, imagepath, MAX_PATH )) lstrcpynW( imagepath, filename, MAX_PATH );
     if (!GetFullPathNameW( imagepath, MAX_PATH, imagepath, NULL )) lstrcpynW( imagepath, filename, MAX_PATH );
@@ -172,26 +171,22 @@ static RTL_USER_PROCESS_PARAMETERS *create_process_params( const WCHAR *filename
         else
             cur_dir = NULL;
     }
-    LdrGetDllPath( imagepath, LOAD_WITH_ALTERED_SEARCH_PATH, &load_path, &dummy );
     RtlInitUnicodeString( &imageW, imagepath );
-    RtlInitUnicodeString( &dllpathW, load_path );
     RtlInitUnicodeString( &curdirW, cur_dir );
     RtlInitUnicodeString( &cmdlineW, cmdline );
     RtlInitUnicodeString( &titleW, startup->lpTitle ? startup->lpTitle : imagepath );
     RtlInitUnicodeString( &desktopW, startup->lpDesktop );
     runtimeW.Buffer = (WCHAR *)startup->lpReserved2;
     runtimeW.Length = runtimeW.MaximumLength = startup->cbReserved2;
-    if (RtlCreateProcessParametersEx( &params, &imageW, &dllpathW, cur_dir ? &curdirW : NULL,
+    if (RtlCreateProcessParametersEx( &params, &imageW, NULL, cur_dir ? &curdirW : NULL,
                                       &cmdlineW, envW, &titleW, &desktopW,
                                       NULL, &runtimeW, PROCESS_PARAMS_FLAG_NORMALIZED ))
     {
         RtlFreeUnicodeString( &newdirW );
-        RtlReleasePath( load_path );
         if (envW != env) RtlFreeHeap( GetProcessHeap(), 0, envW );
         return NULL;
     }
     RtlFreeUnicodeString( &newdirW );
-    RtlReleasePath( load_path );
 
     if (flags & CREATE_NEW_PROCESS_GROUP) params->ConsoleFlags = 1;
     if (flags & CREATE_NEW_CONSOLE) params->ConsoleHandle = (HANDLE)1; /* KERNEL32_CONSOLE_ALLOC */
@@ -251,7 +246,7 @@ struct _PROC_THREAD_ATTRIBUTE_LIST
  *           create_nt_process
  */
 static NTSTATUS create_nt_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBUTES *psa,
-                                   SECURITY_ATTRIBUTES *tsa, BOOL inherit, DWORD flags,
+                                   SECURITY_ATTRIBUTES *tsa, DWORD process_flags,
                                    RTL_USER_PROCESS_PARAMETERS *params,
                                    RTL_USER_PROCESS_INFORMATION *info, HANDLE parent,
                                    const struct proc_thread_attr *handle_list )
@@ -268,8 +263,6 @@ static NTSTATUS create_nt_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBUT
     status = RtlDosPathNameToNtPathName_U_WithStatus( params->ImagePathName.Buffer, &nameW, NULL, NULL );
     if (!status)
     {
-        params->DebugFlags = flags;  /* hack, cf. RtlCreateUserProcess implementation */
-
         RtlNormalizeProcessParams( params );
 
         attr->Attributes[pos].Attribute    = PS_ATTRIBUTE_IMAGE_NAME;
@@ -295,7 +288,7 @@ static NTSTATUS create_nt_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBUT
             attr->Attributes[pos].ReturnLength = NULL;
             pos++;
         }
-        if (inherit && handle_list)
+        if ((process_flags & PROCESS_CREATE_FLAGS_INHERIT_HANDLES) && handle_list)
         {
             attr->Attributes[pos].Attribute    = PS_ATTRIBUTE_HANDLE_LIST;
             attr->Attributes[pos].Size         = handle_list->size;
@@ -325,8 +318,7 @@ static NTSTATUS create_nt_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBUT
         InitializeObjectAttributes( &thread_attr, NULL, 0, NULL, tsa ? tsa->lpSecurityDescriptor : NULL );
 
         status = NtCreateUserProcess( &info->Process, &info->Thread, PROCESS_ALL_ACCESS, THREAD_ALL_ACCESS,
-                                      &process_attr, &thread_attr,
-                                      inherit ? PROCESS_CREATE_FLAGS_INHERIT_HANDLES : 0,
+                                      &process_attr, &thread_attr, process_flags,
                                       THREAD_CREATE_FLAGS_CREATE_SUSPENDED, params,
                                       &create_info, attr );
 
@@ -340,7 +332,7 @@ static NTSTATUS create_nt_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBUT
  *           create_vdm_process
  */
 static NTSTATUS create_vdm_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBUTES *psa,
-                                    SECURITY_ATTRIBUTES *tsa, BOOL inherit, DWORD flags,
+                                    SECURITY_ATTRIBUTES *tsa, DWORD flags,
                                     RTL_USER_PROCESS_PARAMETERS *params,
                                     RTL_USER_PROCESS_INFORMATION *info )
 {
@@ -361,7 +353,7 @@ static NTSTATUS create_vdm_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBU
               winevdm, params->ImagePathName.Buffer, params->CommandLine.Buffer );
     RtlInitUnicodeString( &params->ImagePathName, winevdm );
     RtlInitUnicodeString( &params->CommandLine, newcmdline );
-    status = create_nt_process( token, debug, psa, tsa, inherit, flags, params, info, NULL, NULL );
+    status = create_nt_process( token, debug, psa, tsa, flags, params, info, NULL, NULL );
     HeapFree( GetProcessHeap(), 0, newcmdline );
     return status;
 }
@@ -371,7 +363,7 @@ static NTSTATUS create_vdm_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBU
  *           create_cmd_process
  */
 static NTSTATUS create_cmd_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBUTES *psa,
-                                    SECURITY_ATTRIBUTES *tsa, BOOL inherit, DWORD flags,
+                                    SECURITY_ATTRIBUTES *tsa, DWORD flags,
                                     RTL_USER_PROCESS_PARAMETERS *params,
                                     RTL_USER_PROCESS_INFORMATION *info )
 {
@@ -390,7 +382,7 @@ static NTSTATUS create_cmd_process( HANDLE token, HANDLE debug, SECURITY_ATTRIBU
     swprintf( newcmdline, len, L"%s /s/c \"%s\"", comspec, params->CommandLine.Buffer );
     RtlInitUnicodeString( &params->ImagePathName, comspec );
     RtlInitUnicodeString( &params->CommandLine, newcmdline );
-    status = create_nt_process( token, debug, psa, tsa, inherit, flags, params, info, NULL, NULL );
+    status = create_nt_process( token, debug, psa, tsa, flags, params, info, NULL, NULL );
     RtlFreeHeap( GetProcessHeap(), 0, newcmdline );
     return status;
 }
@@ -499,6 +491,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
     RTL_USER_PROCESS_PARAMETERS *params = NULL;
     RTL_USER_PROCESS_INFORMATION rtl_info;
     HANDLE parent = 0, debug = 0;
+    ULONG nt_flags = 0;
     NTSTATUS status;
 
     /* Process the AppName and/or CmdLine to get module name and path */
@@ -518,31 +511,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
     }
     else
     {
-        static const WCHAR *opt = L" --use-gl=swiftshader";
-        WCHAR *cmdline_new = NULL;
-
-        if (cmd_line && wcsstr( cmd_line, L"UplayWebCore.exe" ))
-        {
-            FIXME( "HACK: appending %s to command line %s.\n", debugstr_w(opt), debugstr_w(cmd_line) );
-
-            cmdline_new = heap_alloc( sizeof(WCHAR) * (lstrlenW(cmd_line) + lstrlenW(opt) + 1) );
-            lstrcpyW(cmdline_new, cmd_line);
-            lstrcatW(cmdline_new, opt);
-        }
-
-        tidy_cmdline = get_file_name( cmdline_new ? cmdline_new : cmd_line, name, ARRAY_SIZE(name) );
-
-        if (!tidy_cmdline)
-        {
-            heap_free( cmdline_new );
-            return FALSE;
-        }
-
-        if (cmdline_new)
-        {
-            if (cmdline_new == tidy_cmdline) cmd_line = NULL;
-            else heap_free( cmdline_new );
-        }
+        if (!(tidy_cmdline = get_file_name( cmd_line, name, ARRAY_SIZE(name) ))) return FALSE;
         app_name = name;
     }
 
@@ -619,8 +588,13 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
         }
     }
 
-    status = create_nt_process( token, debug, process_attr, thread_attr, inherit,
-                                flags, params, &rtl_info, parent, handle_list );
+    if (inherit) nt_flags |= PROCESS_CREATE_FLAGS_INHERIT_HANDLES;
+    if (flags & DEBUG_ONLY_THIS_PROCESS) nt_flags |= PROCESS_CREATE_FLAGS_NO_DEBUG_INHERIT;
+    if (flags & CREATE_BREAKAWAY_FROM_JOB) nt_flags |= PROCESS_CREATE_FLAGS_BREAKAWAY;
+    if (flags & CREATE_SUSPENDED) nt_flags |= PROCESS_CREATE_FLAGS_SUSPENDED;
+
+    status = create_nt_process( token, debug, process_attr, thread_attr,
+                                nt_flags, params, &rtl_info, parent, handle_list );
     switch (status)
     {
     case STATUS_SUCCESS:
@@ -630,7 +604,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
     case STATUS_INVALID_IMAGE_PROTECT:
         TRACE( "starting %s as Win16/DOS binary\n", debugstr_w(app_name) );
         status = create_vdm_process( token, debug, process_attr, thread_attr,
-                                     inherit, flags, params, &rtl_info );
+                                     nt_flags, params, &rtl_info );
         break;
     case STATUS_INVALID_IMAGE_NOT_MZ:
         /* check for .com or .bat extension */
@@ -639,13 +613,13 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
         {
             TRACE( "starting %s as DOS binary\n", debugstr_w(app_name) );
             status = create_vdm_process( token, debug, process_attr, thread_attr,
-                                         inherit, flags, params, &rtl_info );
+                                         nt_flags, params, &rtl_info );
         }
         else if (!wcsicmp( p, L".bat" ) || !wcsicmp( p, L".cmd" ))
         {
             TRACE( "starting %s as batch binary\n", debugstr_w(app_name) );
             status = create_cmd_process( token, debug, process_attr, thread_attr,
-                                         inherit, flags, params, &rtl_info );
+                                         nt_flags, params, &rtl_info );
         }
         break;
     }
@@ -1027,7 +1001,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH IsWow64Process2( HANDLE process, USHORT *machine, 
         *native_machine = IMAGE_FILE_MACHINE_I386;
         break;
     case PROCESSOR_ARCHITECTURE_ARM:
-        *native_machine = IMAGE_FILE_MACHINE_ARM;
+        *native_machine = IMAGE_FILE_MACHINE_ARMNT;
         break;
     case PROCESSOR_ARCHITECTURE_AMD64:
         *native_machine = IMAGE_FILE_MACHINE_AMD64;
@@ -1076,21 +1050,6 @@ HANDLE WINAPI DECLSPEC_HOTPATCH OpenProcess( DWORD access, BOOL inherit, DWORD i
     attr.ObjectName = NULL;
     attr.SecurityDescriptor = NULL;
     attr.SecurityQualityOfService = NULL;
-
-    /* PROTON HACK:
-     * On Windows, the Steam client puts its process ID into the registry
-     * at:
-     *
-     *   [HKCU\Software\Valve\Steam\ActiveProcess]
-     *   PID=dword:00000008
-     *
-     * Games get that pid from the registry and then query it with
-     * OpenProcess to ensure Steam is running. Since we aren't running the
-     * Windows Steam in Wine, instead we hack this magic number into the
-     * registry and then substitute the game's process itself in its place
-     * so it can query a valid process.
-     */
-    if (id == 0xfffe) id = GetCurrentProcessId();
 
     cid.UniqueProcess = ULongToHandle(id);
     cid.UniqueThread  = 0;
@@ -1790,10 +1749,6 @@ BOOL WINAPI DECLSPEC_HOTPATCH UpdateProcThreadAttribute( struct _PROC_THREAD_ATT
            return FALSE;
        }
        break;
-
-    case PROC_THREAD_ATTRIBUTE_JOB_LIST:
-        FIXME( "Unhandled attribute PROC_THREAD_ATTRIBUTE_JOB_LIST\n" );
-        break;
 
     default:
         SetLastError( ERROR_NOT_SUPPORTED );

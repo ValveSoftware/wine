@@ -23,7 +23,7 @@
 #include "rpcproxy.h"
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(qedit);
 
 static HINSTANCE qedit_instance;
 

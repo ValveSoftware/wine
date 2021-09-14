@@ -191,7 +191,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_EXPEDITED_DATA | XP1_GRACEFUL_CLOSE
                 | XP1_GUARANTEED_ORDER | XP1_GUARANTEED_DELIVERY,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
+        .ProviderId = {0xe70f1aa0, 0xab8b, 0x11cf, {0x8c, 0xa3, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}},
         .dwCatalogEntryId = 1001,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
@@ -206,7 +206,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_SUPPORT_BROADCAST
                 | XP1_SUPPORT_MULTIPOINT | XP1_MESSAGE_ORIENTED | XP1_CONNECTIONLESS,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
+        .ProviderId = {0xe70f1aa0, 0xab8b, 0x11cf, {0x8c, 0xa3, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}},
         .dwCatalogEntryId = 1002,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
@@ -222,7 +222,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_EXPEDITED_DATA | XP1_GRACEFUL_CLOSE
                 | XP1_GUARANTEED_ORDER | XP1_GUARANTEED_DELIVERY,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
+        .ProviderId = {0xf9eab0c0, 0x26d4, 0x11d0, {0xbb, 0xbf, 0x00, 0xaa, 0x00, 0x6c, 0x34, 0xe4}},
         .dwCatalogEntryId = 1004,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
@@ -237,7 +237,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
         .dwServiceFlags1 = XP1_IFS_HANDLES | XP1_SUPPORT_BROADCAST
                 | XP1_SUPPORT_MULTIPOINT | XP1_MESSAGE_ORIENTED | XP1_CONNECTIONLESS,
         .dwProviderFlags = PFL_MATCHES_PROTOCOL_ZERO,
-        .ProviderId = {0x2047fe24, 0x2c27, 0x460b, {0x95, 0xd3, 0x20, 0x1c, 0x4b, 0x73, 0xa5, 0xe8}},
+        .ProviderId = {0xf9eab0c0, 0x26d4, 0x11d0, {0xbb, 0xbf, 0x00, 0xaa, 0x00, 0x6c, 0x34, 0xe4}},
         .dwCatalogEntryId = 1005,
         .ProtocolChain.ChainLen = 1,
         .iVersion = 2,
@@ -1298,7 +1298,7 @@ static inline int get_sock_fd( SOCKET s, DWORD access, unsigned int *options )
 
 static inline void release_sock_fd( SOCKET s, int fd )
 {
-    wine_server_release_fd( SOCKET2HANDLE(s), fd );
+    close( fd );
 }
 
 static void _enable_event( HANDLE s, unsigned int event,
@@ -2450,7 +2450,7 @@ static NTSTATUS WS2_async_recv( void *user, IO_STATUS_BLOCK *iosb, NTSTATUS stat
             break;
 
         result = WS2_recv( fd, wsa, convert_flags(wsa->flags) );
-        wine_server_release_fd( wsa->hSocket, fd );
+        close( fd );
         if (result >= 0)
         {
             status = STATUS_SUCCESS;
@@ -2581,7 +2581,7 @@ static NTSTATUS WS2_async_send( void *user, IO_STATUS_BLOCK *iosb, NTSTATUS stat
 
         /* check to see if the data is ready (non-blocking) */
         result = WS2_send( fd, wsa, convert_flags(wsa->flags) );
-        wine_server_release_fd( wsa->hSocket, fd );
+        close( fd );
 
         if (result >= 0)
         {
@@ -2633,7 +2633,7 @@ static NTSTATUS WS2_async_shutdown( void *user, IO_STATUS_BLOCK *iosb, NTSTATUS 
         case ASYNC_TYPE_WRITE:  err = shutdown( fd, 1 );  break;
         }
         status = err ? wsaErrStatus() : STATUS_SUCCESS;
-        wine_server_release_fd( wsa->hSocket, fd );
+        close( fd );
         break;
     }
     iosb->u.Status = status;
@@ -2804,7 +2804,7 @@ static NTSTATUS WS2_ReadFile(HANDLE hFile, PIO_STATUS_BLOCK io_status, char* buf
     else
         status = STATUS_PENDING;
 
-    wine_server_release_fd( hFile, unix_handle );
+    close( unix_handle );
     TRACE("= 0x%08x (%d)\n", status, result);
     if (status == STATUS_SUCCESS || status == STATUS_END_OF_FILE)
     {
@@ -2929,7 +2929,7 @@ static NTSTATUS WS2_async_transmitfile( void *user, IO_STATUS_BLOCK *iosb, NTSTA
         if (!(status = wine_server_handle_to_fd( wsa->write.hSocket, FILE_WRITE_DATA, &fd, NULL )))
         {
             status = WS2_transmitfile_base( fd, wsa );
-            wine_server_release_fd( wsa->write.hSocket, fd );
+            close( fd );
         }
         if (status == STATUS_PENDING)
             return status;
@@ -3249,13 +3249,6 @@ int WINAPI WS_bind(SOCKET s, const struct WS_sockaddr* name, int namelen)
                     else if (interface_bind(s, fd, &uaddr.addr))
                         in4->sin_addr.s_addr = htonl(INADDR_ANY);
                 }
-
-                if(name->sa_family ==  WS_AF_IPX){
-                    /* Quake (and similar family) fails if we can't bind to an IPX address. This often
-                     * doesn't work on Linux, so just fake success. */
-                    return 0;
-                }
-
                 if (bind(fd, &uaddr.addr, uaddrlen) < 0)
                 {
                     int loc_errno = errno;
@@ -3454,14 +3447,18 @@ static BOOL WINAPI WS2_ConnectEx(SOCKET s, const struct WS_sockaddr* name, int n
     else if (ret == WSAEINPROGRESS)
     {
         struct ws2_async *wsa;
+        DWORD size;
+
         ULONG_PTR cvalue = (((ULONG_PTR)ov->hEvent & 1) == 0) ? (ULONG_PTR)ov : 0;
 
         _enable_event(SOCKET2HANDLE(s), FD_CONNECT|FD_READ|FD_WRITE,
                       FD_CONNECT,
                       FD_WINE_CONNECTED|FD_WINE_LISTENING);
 
+        size = offsetof( struct ws2_async, iovec[1] ) + sendBufLen;
+
         /* Indirectly call WSASend */
-        if (!(wsa = (struct ws2_async *)alloc_async_io( offsetof( struct ws2_async, iovec[1] ), WS2_async_send )))
+        if (!(wsa = (struct ws2_async *)alloc_async_io( size, WS2_async_send )))
         {
             SetLastError(WSAEFAULT);
         }
@@ -3480,8 +3477,11 @@ static BOOL WINAPI WS2_ConnectEx(SOCKET s, const struct WS_sockaddr* name, int n
             wsa->n_iovecs    = sendBuf ? 1 : 0;
             wsa->first_iovec = 0;
             wsa->completion_func = NULL;
-            wsa->iovec[0].iov_base = sendBuf;
+            wsa->iovec[0].iov_base = &wsa->iovec[1];
             wsa->iovec[0].iov_len  = sendBufLen;
+
+            if (sendBufLen)
+                memcpy( wsa->iovec[0].iov_base, sendBuf, sendBufLen );
 
             status = register_async( ASYNC_TYPE_WRITE, wsa->hSocket, &wsa->io, ov->hEvent,
                                       NULL, (void *)cvalue, iosb );
@@ -6304,13 +6304,6 @@ struct WS_hostent* WINAPI WS_gethostbyname(const char* name)
         extrabuf=HeapAlloc(GetProcessHeap(),0,ebufsize) ;
         while(extrabuf) {
             int res = gethostbyname_r(name, &hostentry, extrabuf, ebufsize, &host, &locerr);
-
-            if (!strcmp(name, "download-alt.easyanticheat.net"))
-            {
-                ERR("HACK: failing download-alt.easyanticheat.net resolution.\n");
-                res = HOST_NOT_FOUND;
-            }
-
             if( res != ERANGE) break;
             ebufsize *=2;
             extrabuf=HeapReAlloc(GetProcessHeap(),0,extrabuf,ebufsize) ;
@@ -6572,13 +6565,6 @@ int WINAPI WS_getaddrinfo(LPCSTR nodename, LPCSTR servname, const struct WS_addr
     *res = NULL;
     if (!nodename && !servname)
     {
-        SetLastError(WSAHOST_NOT_FOUND);
-        return WSAHOST_NOT_FOUND;
-    }
-
-    if (nodename && !strcmp(nodename, "download-alt.easyanticheat.net"))
-    {
-        ERR("HACK: failing download-alt.easyanticheat.net resolution.\n");
         SetLastError(WSAHOST_NOT_FOUND);
         return WSAHOST_NOT_FOUND;
     }
@@ -7238,6 +7224,36 @@ int WINAPI WS_gethostname(char *name, int namelen)
     return 0;
 }
 
+/***********************************************************************
+ *              GetHostNameW           (WS2_32.@)
+ */
+int WINAPI GetHostNameW(WCHAR *name, int namelen)
+{
+    char buf[256];
+    int len;
+
+    TRACE("name %p, len %d\n", name, namelen);
+
+    if (!name)
+    {
+        SetLastError(WSAEFAULT);
+        return SOCKET_ERROR;
+    }
+
+    if (gethostname(buf, sizeof(buf)))
+    {
+        SetLastError(wsaErrno());
+        return SOCKET_ERROR;
+    }
+
+    if ((len = MultiByteToWideChar(CP_ACP, 0, buf, -1, NULL, 0)) > namelen)
+    {
+        SetLastError(WSAEFAULT);
+        return SOCKET_ERROR;
+    }
+    MultiByteToWideChar(CP_ACP, 0, buf, -1, name, namelen);
+    return 0;
+}
 
 /* ------------------------------------- Windows sockets extensions -- *
  *								       *
@@ -7505,6 +7521,7 @@ SOCKET WINAPI WSASocketW(int af, int type, int protocol,
             if (!af) af = supported_protocols[i].iAddressFamily;
             if (!type) type = supported_protocols[i].iSocketType;
             if (!protocol) protocol = supported_protocols[i].iProtocol;
+            break;
         }
     }
 
@@ -7547,37 +7564,6 @@ SOCKET WINAPI WSASocketW(int af, int type, int protocol,
         CloseHandle(handle);
         return INVALID_SOCKET;
     }
-
-    /*
-     * msvcmon spawns new server instances for each connection, which conflicts
-     * with previous instance (which is no longer listening, but client connection
-     * is still active). This is allowed on Windows, but Linux handles it differently.
-     */
-    if (af == WS_AF_INET || af == WS_AF_INET6)
-    {
-        static int once, msvsmon;
-        if (!once++) {
-            char name[MAX_PATH], *p;
-            GetModuleFileNameA(GetModuleHandleA(NULL), name, ARRAY_SIZE(name));
-            p = strrchr(name, '\\');
-            p = p ? p+1 : name;
-            if (!strcasecmp(p, "msvsmon.exe")) {
-                FIXME("Using REUSESOCKET hack.\n");
-                msvsmon = 1;
-            }
-        }
-        if (msvsmon)
-        {
-            int fd = get_sock_fd(ret, 0, NULL);
-            if (fd != -1)
-            {
-                const int enable = 1;
-                setsockopt(fd, SOL_SOCKET, SO_REUSEPORT, &enable, sizeof(enable));
-                release_sock_fd(ret, fd);
-            }
-        }
-    }
-
     return ret;
 
 done:

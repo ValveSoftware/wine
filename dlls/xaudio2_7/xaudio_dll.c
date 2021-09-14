@@ -38,7 +38,6 @@
 #include "wine/asm.h"
 #include "wine/debug.h"
 #include "wine/heap.h"
-#include "wine/unicode.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
 
@@ -81,8 +80,6 @@ __ASM_GLOBAL_FUNC( call_on_voice_processing_pass_start,
 static HINSTANCE instance;
 
 static XA2VoiceImpl *impl_from_IXAudio2Voice(IXAudio2Voice *iface);
-
-static void stop_engine_thread(XA2VoiceImpl *This);
 
 BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD reason, void *pReserved)
 {
@@ -1306,7 +1303,13 @@ static void WINAPI XA2M_DestroyVoice(IXAudio2MasteringVoice *iface)
     EnterCriticalSection(&This->lock);
 
     destroy_voice(This);
-    stop_engine_thread(This);
+    pthread_mutex_lock(&This->engine_lock);
+    This->engine_params.proc = NULL;
+    pthread_cond_broadcast(&This->engine_ready);
+    pthread_mutex_unlock(&This->engine_lock);
+
+    WaitForSingleObject(This->engine_thread, INFINITE);
+    This->engine_thread = NULL;
 
     LeaveCriticalSection(&This->lock);
 }
@@ -1711,47 +1714,13 @@ DWORD WINAPI engine_thread(void *user)
         if(This->engine_params.proc){
             This->engine_params.proc(This->engine_params.faudio, This->engine_params.stream);
             This->engine_params.proc = NULL;
+            pthread_cond_broadcast(&This->engine_done);
         }
-
-        pthread_cond_broadcast(&This->engine_done);
-    }while(!This->stop_engine_thread);
+    }while(This->in_use);
 
     pthread_mutex_unlock(&This->engine_lock);
 
     return 0;
-}
-
-static void start_engine_thread(XA2VoiceImpl *This)
-{
-    pthread_mutex_lock(&This->engine_lock);
-
-    if(!This->engine_thread){
-        This->stop_engine_thread = FALSE;
-
-        This->engine_thread = CreateThread(NULL, 0, &engine_thread, This, 0, NULL);
-
-        pthread_cond_wait(&This->engine_done, &This->engine_lock);
-    }
-
-    pthread_mutex_unlock(&This->engine_lock);
-}
-
-static void stop_engine_thread(XA2VoiceImpl *This)
-{
-    pthread_mutex_lock(&This->engine_lock);
-
-    if(This->engine_thread){
-        This->stop_engine_thread = TRUE;
-
-        pthread_cond_broadcast(&This->engine_ready);
-
-        pthread_cond_wait(&This->engine_done, &This->engine_lock);
-
-        WaitForSingleObject(This->engine_thread, INFINITE);
-        This->engine_thread = NULL;
-    }
-
-    pthread_mutex_unlock(&This->engine_lock);
 }
 
 static HRESULT WINAPI IXAudio2Impl_CreateMasteringVoice(IXAudio2 *iface,
@@ -1787,7 +1756,13 @@ static HRESULT WINAPI IXAudio2Impl_CreateMasteringVoice(IXAudio2 *iface,
 
     This->mst.effect_chain = wrap_effect_chain(pEffectChain);
 
-    start_engine_thread(&This->mst);
+    pthread_mutex_lock(&This->mst.engine_lock);
+
+    This->mst.engine_thread = CreateThread(NULL, 0, &engine_thread, &This->mst, 0, NULL);
+
+    pthread_cond_wait(&This->mst.engine_done, &This->mst.engine_lock);
+
+    pthread_mutex_unlock(&This->mst.engine_lock);
 
     FAudio_SetEngineProcedureEXT(This->faudio, &engine_cb, &This->mst);
 
@@ -1808,8 +1783,6 @@ static HRESULT WINAPI IXAudio2Impl_StartEngine(IXAudio2 *iface)
 
     TRACE("(%p)->()\n", This);
 
-    start_engine_thread(&This->mst);
-
     return FAudio_StartEngine(This->faudio);
 }
 
@@ -1820,8 +1793,6 @@ static void WINAPI IXAudio2Impl_StopEngine(IXAudio2 *iface)
     TRACE("(%p)->()\n", This);
 
     FAudio_StopEngine(This->faudio);
-
-    stop_engine_thread(&This->mst);
 }
 
 static HRESULT WINAPI IXAudio2Impl_CommitChanges(IXAudio2 *iface,
@@ -1975,26 +1946,6 @@ static HRESULT WINAPI XAudio2CF_CreateInstance(IClassFactory *iface, IUnknown *p
     pthread_mutex_init(&object->mst.engine_lock, NULL);
     pthread_cond_init(&object->mst.engine_done, NULL);
     pthread_cond_init(&object->mst.engine_ready, NULL);
-
-    /* set PulseAudio's application.name in the environment since FAudio and
-     * SDL provide no way to pass this in */
-    {
-        WCHAR path[MAX_PATH], *name;
-        char *str;
-        DWORD len;
-
-        GetModuleFileNameW(NULL, path, ARRAY_SIZE(path));
-        name = strrchrW(path, '\\');
-        if (!name)
-            name = path;
-        else
-            name++;
-        len = WideCharToMultiByte(CP_UNIXCP, 0, name, -1, NULL, 0, NULL, NULL);
-        str = HeapAlloc(GetProcessHeap(), 0, len);
-        WideCharToMultiByte(CP_UNIXCP, 0, name, -1, str, len, NULL, NULL);
-        setenv("PULSE_PROP_application.name", str, 1);
-        HeapFree(GetProcessHeap(), 0, str);
-    }
 
     FAudioCOMConstructWithCustomAllocatorEXT(
         &object->faudio,

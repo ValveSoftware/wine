@@ -42,7 +42,6 @@
 #include "winuser.h"
 #include "imm.h"
 #include "ddk/imm.h"
-#include "wine/server.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(imm);
 
@@ -1428,10 +1427,10 @@ void macdrv_im_set_text(const macdrv_event *event)
             {
                 input.ki.wScan      = chars[i];
                 input.ki.dwFlags    = KEYEVENTF_UNICODE;
-                __wine_send_input(hwnd, &input, SEND_HWMSG_RAWINPUT|SEND_HWMSG_WINDOW);
+                __wine_send_input(hwnd, &input, NULL);
 
                 input.ki.dwFlags    = KEYEVENTF_UNICODE | KEYEVENTF_KEYUP;
-                __wine_send_input(hwnd, &input, SEND_HWMSG_RAWINPUT|SEND_HWMSG_WINDOW);
+                __wine_send_input(hwnd, &input, NULL);
             }
         }
 

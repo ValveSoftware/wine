@@ -21,7 +21,7 @@
 #endif
 
 import "inspectable.idl";
-/* import "asyncinfo.idl"; */
+import "asyncinfo.idl";
 import "windowscontracts.idl";
 /* import "eventtoken.idl"; */
 /* import "ivectorchangedeventargs.idl"; */
@@ -29,6 +29,13 @@ import "windows.foundation.collections.idl";
 
 namespace Windows {
     namespace Foundation {
+        typedef enum PropertyType PropertyType;
+        typedef struct Point Point;
+        typedef struct Size Size;
+        typedef struct Rect Rect;
+        typedef struct DateTime DateTime;
+        typedef struct TimeSpan TimeSpan;
+
         [contract(Windows.Foundation.FoundationContract, 1.0)]
         enum PropertyType {
             Empty       = 0,
@@ -111,6 +118,16 @@ namespace Windows {
         interface IStringable : IInspectable
         {
             HRESULT ToString([out, retval] HSTRING *value);
+        }
+    }
+}
+
+namespace Windows {
+    namespace Foundation {
+        declare {
+            interface Windows.Foundation.AsyncOperationCompletedHandler<boolean>;
+            interface Windows.Foundation.IAsyncOperation<boolean>;
+            interface Windows.Foundation.Collections.IVectorView<HSTRING>;
         }
     }
 }

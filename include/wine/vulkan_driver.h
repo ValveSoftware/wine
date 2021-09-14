@@ -21,8 +21,6 @@ struct vulkan_funcs
      * needs to provide. Other function calls will be provided indirectly by dispatch
      * tables part of dispatchable Vulkan objects such as VkInstance or vkDevice.
      */
-    VkResult (*p_vkAcquireNextImage2KHR)(VkDevice, const VkAcquireNextImageInfoKHR *, uint32_t *);
-    VkResult (*p_vkAcquireNextImageKHR)(VkDevice, VkSwapchainKHR, uint64_t, VkSemaphore, VkFence, uint32_t *);
     VkResult (*p_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *, VkInstance *);
     VkResult (*p_vkCreateSwapchainKHR)(VkDevice, const VkSwapchainCreateInfoKHR *, const VkAllocationCallbacks *, VkSwapchainKHR *);
     VkResult (*p_vkCreateWin32SurfaceKHR)(VkInstance, const VkWin32SurfaceCreateInfoKHR *, const VkAllocationCallbacks *, VkSurfaceKHR *);
@@ -46,17 +44,6 @@ struct vulkan_funcs
 
     /* winevulkan specific functions */
     VkSurfaceKHR (*p_wine_get_native_surface)(VkSurfaceKHR);
-
-    /* Optional. Returns TRUE if FS hack is active, otherwise returns FALSE. If
-     * it returns TRUE, then real_sz will contain the actual display
-     * resolution; user_sz will contain the app's requested mode; and dst_blit
-     * will contain the area to blit the user image to in real coordinates.
-     * All parameters are optional. */
-    VkBool32 (*query_fs_hack)(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit, VkFilter *filter);
-    VkResult (*create_vk_instance_with_callback)(const VkInstanceCreateInfo *create_info,
-            const VkAllocationCallbacks *allocator, VkInstance *instance,
-            VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,
-            VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context);
 };
 
 extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver(HDC hdc, UINT version);
@@ -68,10 +55,6 @@ static inline void *get_vulkan_driver_device_proc_addr(
 
     name += 2;
 
-    if (!strcmp(name, "AcquireNextImage2KHR"))
-        return vulkan_funcs->p_vkAcquireNextImage2KHR;
-    if (!strcmp(name, "AcquireNextImageKHR"))
-        return vulkan_funcs->p_vkAcquireNextImageKHR;
     if (!strcmp(name, "CreateSwapchainKHR"))
         return vulkan_funcs->p_vkCreateSwapchainKHR;
     if (!strcmp(name, "DestroySwapchainKHR"))

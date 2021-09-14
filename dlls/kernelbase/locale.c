@@ -42,8 +42,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(nls);
 
 #define CALINFO_MAX_YEAR 2029
 
-extern UINT CDECL __wine_get_unix_codepage(void);
-
 extern const unsigned int collation_table[] DECLSPEC_HIDDEN;
 
 static HANDLE kernel32_handle;
@@ -161,6 +159,7 @@ static const struct { UINT cp; const WCHAR *name; } codepage_names[] =
     { 20127, L"US-ASCII (7bit)" },
     { 20866, L"Russian KOI8" },
     { 20932, L"EUC-JP" },
+    { 20949, L"Korean Wansung" },
     { 21866, L"Ukrainian KOI8" },
     { 28591, L"ISO 8859-1 Latin 1" },
     { 28592, L"ISO 8859-2 Latin 2 (East European)" },
@@ -535,6 +534,7 @@ static const struct geoinfo geoinfodata[] =
     { 161832015, L"BL", L"BLM", 10039880, 652 }, /* Saint Barthélemy */
     { 161832256, L"UM", L"UMI", 27114, 581 }, /* U.S. Minor Outlying Islands */
     { 161832257, L"XX", L"XX", 10026358, 419, LOCATION_REGION }, /* Latin America and the Caribbean */
+    { 161832258, L"BG", L"BES", 10039880, 535 }, /* Bonaire, Sint Eustatius and Saba */
 };
 
 /* NLS normalization file */
@@ -568,6 +568,7 @@ struct norm_table
 };
 
 static NLSTABLEINFO nls_info;
+static UINT unix_cp = CP_UTF8;
 static UINT mac_cp = 10000;
 static HKEY intl_key;
 static HKEY nls_key;
@@ -697,6 +698,27 @@ done:
 }
 
 
+static LCID locale_to_lcid( WCHAR *win_name )
+{
+    WCHAR *p;
+    LCID lcid;
+
+    if (!RtlLocaleNameToLcid( win_name, &lcid, 0 )) return lcid;
+
+    /* try neutral name */
+    if ((p = wcsrchr( win_name, '-' )))
+    {
+        *p = 0;
+        if (!RtlLocaleNameToLcid( win_name, &lcid, 2 ))
+        {
+            if (SUBLANGID(lcid) == SUBLANG_NEUTRAL)
+                lcid = MAKELANGID( PRIMARYLANGID(lcid), SUBLANG_DEFAULT );
+            return lcid;
+        }
+    }
+    return 0;
+}
+
 /***********************************************************************
  *		init_locale
  */
@@ -705,13 +727,26 @@ void init_locale(void)
     UINT ansi_cp = 0, oem_cp = 0;
     USHORT *ansi_ptr, *oem_ptr;
     void *sort_ptr;
-    LCID lcid = GetUserDefaultLCID();
-    WCHAR bufferW[80];
+    LCID user_lcid = 0, system_lcid = 0;
+    WCHAR bufferW[LOCALE_NAME_MAX_LENGTH];
     DYNAMIC_TIME_ZONE_INFORMATION timezone;
     GEOID geoid = GEOID_NOT_AVAILABLE;
     DWORD count, dispos, i;
     SIZE_T size;
     HKEY hkey;
+
+    if (GetEnvironmentVariableW( L"WINEUNIXCP", bufferW, ARRAY_SIZE(bufferW) ))
+        unix_cp = wcstoul( bufferW, NULL, 10 );
+    if (GetEnvironmentVariableW( L"WINELOCALE", bufferW, ARRAY_SIZE(bufferW) ))
+        system_lcid = locale_to_lcid( bufferW );
+    if (GetEnvironmentVariableW( L"WINEUSERLOCALE", bufferW, ARRAY_SIZE(bufferW) ))
+        user_lcid = locale_to_lcid( bufferW );
+    if (!system_lcid) system_lcid = MAKELCID( MAKELANGID(LANG_ENGLISH,SUBLANG_DEFAULT), SORT_DEFAULT );
+    if (!user_lcid) user_lcid = system_lcid;
+
+    NtSetDefaultUILanguage( LANGIDFROMLCID(user_lcid) );
+    NtSetDefaultLocale( TRUE, user_lcid );
+    NtSetDefaultLocale( FALSE, system_lcid );
 
     kernel32_handle = GetModuleHandleW( L"kernel32.dll" );
 
@@ -773,11 +808,11 @@ void init_locale(void)
     count = sizeof(bufferW);
     if (!RegQueryValueExW( intl_key, L"Locale", NULL, NULL, (BYTE *)bufferW, &count ))
     {
-        if (wcstoul( bufferW, NULL, 16 ) == lcid) return;  /* already set correctly */
-        TRACE( "updating registry, locale changed %s -> %08x\n", debugstr_w(bufferW), lcid );
+        if (wcstoul( bufferW, NULL, 16 ) == user_lcid) return;  /* already set correctly */
+        TRACE( "updating registry, locale changed %s -> %08x\n", debugstr_w(bufferW), user_lcid );
     }
-    else TRACE( "updating registry, locale changed none -> %08x\n", lcid );
-    swprintf( bufferW, ARRAY_SIZE(bufferW), L"%08x", lcid );
+    else TRACE( "updating registry, locale changed none -> %08x\n", user_lcid );
+    swprintf( bufferW, ARRAY_SIZE(bufferW), L"%08x", user_lcid );
     RegSetValueExW( intl_key, L"Locale", 0, REG_SZ,
                     (BYTE *)bufferW, (lstrlenW(bufferW) + 1) * sizeof(WCHAR) );
 
@@ -3021,7 +3056,8 @@ INT WINAPI CompareStringEx( const WCHAR *locale, DWORD flags, const WCHAR *str1,
 {
     DWORD supported_flags = NORM_IGNORECASE | NORM_IGNORENONSPACE | NORM_IGNORESYMBOLS | SORT_STRINGSORT |
                             NORM_IGNOREKANATYPE | NORM_IGNOREWIDTH | LOCALE_USE_CP_ACP;
-    DWORD semistub_flags = NORM_LINGUISTIC_CASING | LINGUISTIC_IGNORECASE | 0x10000000;
+    DWORD semistub_flags = NORM_LINGUISTIC_CASING | LINGUISTIC_IGNORECASE | LINGUISTIC_IGNOREDIACRITIC |
+                           SORT_DIGITSASNUMBERS | 0x10000000;
     /* 0x10000000 is related to diacritics in Arabic, Japanese, and Hebrew */
     INT ret;
     static int once;
@@ -3080,6 +3116,13 @@ INT WINAPI DECLSPEC_HOTPATCH CompareStringA( LCID lcid, DWORD flags, const char 
         SetLastError( ERROR_INVALID_PARAMETER );
         return 0;
     }
+
+    if (flags & SORT_DIGITSASNUMBERS)
+    {
+        SetLastError( ERROR_INVALID_FLAGS );
+        return 0;
+    }
+
     if (len1 < 0) len1 = strlen(str1);
     if (len2 < 0) len2 = strlen(str2);
 
@@ -5532,8 +5575,7 @@ INT WINAPI DECLSPEC_HOTPATCH MultiByteToWideChar( UINT codepage, DWORD flags, co
         ret = mbstowcs_utf8( flags, src, srclen, dst, dstlen );
         break;
     case CP_UNIXCP:
-        codepage = __wine_get_unix_codepage();
-        if (codepage == CP_UTF8)
+        if (unix_cp == CP_UTF8)
         {
             ret = mbstowcs_utf8( flags, src, srclen, dst, dstlen );
 #ifdef __APPLE__  /* work around broken Mac OS X filesystem that enforces decomposed Unicode */
@@ -5541,6 +5583,7 @@ INT WINAPI DECLSPEC_HOTPATCH MultiByteToWideChar( UINT codepage, DWORD flags, co
 #endif
             break;
         }
+        codepage = unix_cp;
         /* fall through */
     default:
         ret = mbstowcs_codepage( codepage, flags, src, srclen, dst, dstlen );
@@ -5835,13 +5878,13 @@ INT WINAPI DECLSPEC_HOTPATCH WideCharToMultiByte( UINT codepage, DWORD flags, LP
         ret = wcstombs_utf8( flags, src, srclen, dst, dstlen, defchar, used );
         break;
     case CP_UNIXCP:
-        codepage = __wine_get_unix_codepage();
-        if (codepage == CP_UTF8)
+        if (unix_cp == CP_UTF8)
         {
             if (used) *used = FALSE;
             ret = wcstombs_utf8( flags, src, srclen, dst, dstlen, NULL, NULL );
             break;
         }
+        codepage = unix_cp;
         /* fall through */
     default:
         ret = wcstombs_codepage( codepage, flags, src, srclen, dst, dstlen, defchar, used );
@@ -5893,4 +5936,50 @@ INT WINAPI GetUserDefaultGeoName(LPWSTR geo_name, int count)
     }
     lstrcpyW( geo_name, buffer );
     return size;
+}
+
+
+/***********************************************************************
+ *	SetUserDefaultGeoName  (kernelbase.@)
+ */
+BOOL WINAPI SetUserGeoName(PWSTR geo_name)
+{
+    unsigned int i;
+    WCHAR *endptr;
+    int uncode;
+
+    TRACE( "geo_name %s.\n", debugstr_w( geo_name ));
+
+    if (!geo_name)
+    {
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+
+    if (lstrlenW( geo_name ) == 3)
+    {
+        uncode = wcstol( geo_name, &endptr, 10 );
+        if (!uncode || endptr != geo_name + 3)
+        {
+            SetLastError( ERROR_INVALID_PARAMETER );
+            return FALSE;
+        }
+        for (i = 0; i < ARRAY_SIZE(geoinfodata); ++i)
+            if (geoinfodata[i].uncode == uncode)
+                break;
+    }
+    else
+    {
+        if (!lstrcmpiW( geo_name, L"XX" ))
+            return SetUserGeoID( 39070 );
+        for (i = 0; i < ARRAY_SIZE(geoinfodata); ++i)
+            if (!lstrcmpiW( geo_name, geoinfodata[i].iso2W ))
+                break;
+    }
+    if (i == ARRAY_SIZE(geoinfodata))
+    {
+        SetLastError( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+    return SetUserGeoID( geoinfodata[i].id );
 }

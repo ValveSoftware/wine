@@ -20,6 +20,7 @@ SOURCES = \
 	appmodel.h \
 	asferr.h \
 	asptlb.idl \
+	asyncinfo.idl \
 	asynot.idl \
 	asysta.idl \
 	atlbase.h \
@@ -71,6 +72,7 @@ SOURCES = \
 	codecapi.h \
 	colinf.idl \
 	colordlg.h \
+	colrst.idl \
 	comcat.idl \
 	commctrl.h \
 	commctrl.rh \
@@ -282,6 +284,7 @@ SOURCES = \
 	errors.h \
 	errrec.idl \
 	evcode.h \
+	eventtoken.idl \
 	evntprov.h \
 	evntrace.h \
 	evr.idl \
@@ -526,6 +529,7 @@ SOURCES = \
 	nserror.h \
 	nspapi.h \
 	ntddcdrm.h \
+	ntddkbd.h \
 	ntddmou.h \
 	ntddndis.h \
 	ntddscsi.h \
@@ -533,7 +537,6 @@ SOURCES = \
 	ntddvdeo.h \
 	ntdef.h \
 	ntdsapi.h \
-	ntifs.h \
 	ntlsa.h \
 	ntquery.h \
 	ntsecapi.h \
@@ -739,6 +742,7 @@ SOURCES = \
 	wimgapi.h \
 	winapifamily.h \
 	winbase.h \
+	winber.h \
 	wincodec.idl \
 	wincodecsdk.idl \
 	wincon.h \
@@ -749,9 +753,14 @@ SOURCES = \
 	windns.h \
 	windows.foundation.collections.idl \
 	windows.foundation.idl \
+	windows.gaming.input.forcefeedback.idl \
+	windows.gaming.input.idl \
 	windows.globalization.idl \
 	windows.h \
+	windows.media.devices.idl \
 	windows.media.speechsynthesis.idl \
+	windows.system.idl \
+	windows.system.userprofile.idl \
 	windowscontracts.idl \
 	windowsx.h \
 	wine/debug.h \
@@ -760,7 +769,6 @@ SOURCES = \
 	wine/itss.idl \
 	wine/orpc.idl \
 	wine/svcctl.idl \
-	wine/wined3d-interop.idl \
 	wine/winedxgi.idl \
 	winerror.h \
 	winevt.h \
@@ -830,6 +838,8 @@ SOURCES = \
 	wtypes.idl \
 	wuapi.idl \
 	x3daudio.h \
+	xact.h \
+	xact2wb.h \
 	xact3.h \
 	xact3wb.h \
 	xapo.idl \

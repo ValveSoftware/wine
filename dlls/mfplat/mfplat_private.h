@@ -25,6 +25,7 @@
 #include "mferror.h"
 #include "d3d9types.h"
 
+#include "wine/heap.h"
 #include "wine/debug.h"
 
 struct attribute
@@ -105,7 +106,7 @@ static inline BOOL mf_array_reserve(void **elements, size_t *capacity, size_t co
     if (new_capacity < count)
         new_capacity = max_capacity;
 
-    if (!(new_elements = realloc(*elements, new_capacity * size)))
+    if (!(new_elements = heap_realloc(*elements, new_capacity * size)))
         return FALSE;
 
     *elements = new_elements;
@@ -131,8 +132,6 @@ static inline const char *debugstr_propvar(const PROPVARIANT *v)
             return wine_dbg_sprintf("%p {VT_UI4: %d}", v, v->ulVal);
         case VT_UI8:
             return wine_dbg_sprintf("%p {VT_UI8: %s}", v, wine_dbgstr_longlong(v->uhVal.QuadPart));
-        case VT_I8:
-            return wine_dbg_sprintf("%p {VT_I8: %s}", v, wine_dbgstr_longlong(v->hVal.QuadPart));
         case VT_R8:
             return wine_dbg_sprintf("%p {VT_R8: %lf}", v, v->dblVal);
         case VT_CLSID:

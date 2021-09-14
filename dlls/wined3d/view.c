@@ -656,7 +656,7 @@ VkImageViewType vk_image_view_type_from_wined3d(enum wined3d_resource_type type,
     }
 }
 
-static VkBufferView wined3d_view_vk_create_buffer_view(struct wined3d_context_vk *context_vk,
+static VkBufferView wined3d_view_vk_create_vk_buffer_view(struct wined3d_context_vk *context_vk,
         const struct wined3d_view_desc *desc, struct wined3d_buffer_vk *buffer_vk,
         const struct wined3d_format_vk *view_format_vk)
 {
@@ -688,7 +688,7 @@ static VkBufferView wined3d_view_vk_create_buffer_view(struct wined3d_context_vk
     return vk_buffer_view;
 }
 
-static VkImageView wined3d_view_vk_create_texture_view(struct wined3d_context_vk *context_vk,
+static VkImageView wined3d_view_vk_create_vk_image_view(struct wined3d_context_vk *context_vk,
         const struct wined3d_view_desc *desc, struct wined3d_texture_vk *texture_vk,
         const struct wined3d_format_vk *view_format_vk, struct color_fixup_desc fixup, bool rtv)
 {
@@ -730,7 +730,7 @@ static VkImageView wined3d_view_vk_create_texture_view(struct wined3d_context_vk
     create_info.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     create_info.pNext = NULL;
     create_info.flags = 0;
-    create_info.image = texture_vk->vk_image;
+    create_info.image = texture_vk->image.vk_image;
     create_info.viewType = vk_image_view_type_from_wined3d(resource->type, desc->flags);
     if (rtv && create_info.viewType == VK_IMAGE_VIEW_TYPE_3D)
     {
@@ -826,7 +826,7 @@ static void wined3d_render_target_view_vk_cs_init(void *object)
     }
 
     context = context_acquire(resource->device, NULL, 0);
-    view_vk->vk_image_view = wined3d_view_vk_create_texture_view(wined3d_context_vk(context),
+    view_vk->vk_image_view = wined3d_view_vk_create_vk_image_view(wined3d_context_vk(context),
             desc, texture_vk, format_vk, COLOR_FIXUP_IDENTITY, true);
     context_release(context);
 
@@ -1040,8 +1040,8 @@ void wined3d_shader_resource_view_vk_update(struct wined3d_shader_resource_view_
     VkBufferView vk_buffer_view;
 
     buffer_vk = wined3d_buffer_vk(buffer_from_resource(resource));
-    wined3d_context_vk_destroy_buffer_view(context_vk, view_vk->u.vk_buffer_view, view_vk->command_buffer_id);
-    if ((vk_buffer_view = wined3d_view_vk_create_buffer_view(context_vk, desc, buffer_vk, view_format_vk)))
+    wined3d_context_vk_destroy_vk_buffer_view(context_vk, view_vk->u.vk_buffer_view, view_vk->command_buffer_id);
+    if ((vk_buffer_view = wined3d_view_vk_create_vk_buffer_view(context_vk, desc, buffer_vk, view_format_vk)))
     {
         view_vk->u.vk_buffer_view = vk_buffer_view;
         view_vk->bo_user.valid = true;
@@ -1071,7 +1071,7 @@ static void wined3d_shader_resource_view_vk_cs_init(void *object)
         buffer_vk = wined3d_buffer_vk(buffer_from_resource(resource));
 
         context = context_acquire(resource->device, NULL, 0);
-        vk_buffer_view = wined3d_view_vk_create_buffer_view(wined3d_context_vk(context),
+        vk_buffer_view = wined3d_view_vk_create_vk_buffer_view(wined3d_context_vk(context),
                 desc, buffer_vk, wined3d_format_vk(format));
         context_release(context);
 
@@ -1105,7 +1105,7 @@ static void wined3d_shader_resource_view_vk_cs_init(void *object)
         FIXME("Swapchain shader resource views not supported.\n");
 
     context = context_acquire(resource->device, NULL, 0);
-    vk_image_view = wined3d_view_vk_create_texture_view(wined3d_context_vk(context),
+    vk_image_view = wined3d_view_vk_create_vk_image_view(wined3d_context_vk(context),
             desc, texture_vk, wined3d_format_vk(format), format->color_fixup, false);
     context_release(context);
 
@@ -1194,33 +1194,32 @@ static void shader_resource_view_gl_bind_and_dirtify(struct wined3d_shader_resou
     wined3d_context_gl_bind_texture(context_gl, view_gl->gl_view.target, view_gl->gl_view.name);
 }
 
-void shader_resource_view_generate_mipmaps(struct wined3d_shader_resource_view *view)
+void wined3d_shader_resource_view_gl_generate_mipmap(struct wined3d_shader_resource_view_gl *view_gl,
+        struct wined3d_context_gl *context_gl)
 {
-    struct wined3d_shader_resource_view_gl *view_gl = wined3d_shader_resource_view_gl(view);
-    unsigned int i, j, layer_count, level_count, base_level, max_level;
-    const struct wined3d_gl_info *gl_info;
+    unsigned int i, j, layer_count, level_count, base_level, base_layer;
+    const struct wined3d_gl_info *gl_info = context_gl->gl_info;
     struct wined3d_texture_gl *texture_gl;
-    struct wined3d_context_gl *context_gl;
-    struct wined3d_context *context;
     struct gl_texture *gl_tex;
     DWORD location;
     BOOL srgb;
 
-    TRACE("view %p.\n", view);
+    TRACE("view_gl %p.\n", view_gl);
 
-    context = context_acquire(view_gl->v.resource->device, NULL, 0);
-    context_gl = wined3d_context_gl(context);
-    gl_info = context_gl->gl_info;
     layer_count = view_gl->v.desc.u.texture.layer_count;
     level_count = view_gl->v.desc.u.texture.level_count;
     base_level = view_gl->v.desc.u.texture.level_idx;
-    max_level = base_level + level_count - 1;
+    base_layer = view_gl->v.desc.u.texture.layer_idx;
 
     texture_gl = wined3d_texture_gl(texture_from_resource(view_gl->v.resource));
     srgb = !!(texture_gl->t.flags & WINED3D_TEXTURE_IS_SRGB);
     location = srgb ? WINED3D_LOCATION_TEXTURE_SRGB : WINED3D_LOCATION_TEXTURE_RGB;
     for (i = 0; i < layer_count; ++i)
-        wined3d_texture_load_location(&texture_gl->t, i * level_count + base_level, context, location);
+    {
+        if (!wined3d_texture_load_location(&texture_gl->t,
+                (base_layer + i) * level_count + base_level, &context_gl->c, location))
+            ERR("Failed to load source layer %u.\n", base_layer + i);
+    }
 
     if (view_gl->gl_view.name)
     {
@@ -1230,13 +1229,13 @@ void shader_resource_view_generate_mipmaps(struct wined3d_shader_resource_view *
     {
         wined3d_texture_gl_bind_and_dirtify(texture_gl, context_gl, srgb);
         gl_info->gl_ops.gl.p_glTexParameteri(texture_gl->target, GL_TEXTURE_BASE_LEVEL, base_level);
-        gl_info->gl_ops.gl.p_glTexParameteri(texture_gl->target, GL_TEXTURE_MAX_LEVEL, max_level);
+        gl_info->gl_ops.gl.p_glTexParameteri(texture_gl->target, GL_TEXTURE_MAX_LEVEL, base_level + level_count - 1);
     }
 
     if (gl_info->supported[ARB_SAMPLER_OBJECTS])
         GL_EXTCALL(glBindSampler(context_gl->active_texture, 0));
     gl_tex = wined3d_texture_gl_get_gl_texture(texture_gl, srgb);
-    if (context->d3d_info->wined3d_creation_flags & WINED3D_SRGB_READ_WRITE_CONTROL)
+    if (context_gl->c.d3d_info->wined3d_creation_flags & WINED3D_SRGB_READ_WRITE_CONTROL)
     {
         gl_info->gl_ops.gl.p_glTexParameteri(texture_gl->target,
                 GL_TEXTURE_SRGB_DECODE_EXT, GL_SKIP_DECODE_EXT);
@@ -1248,10 +1247,12 @@ void shader_resource_view_generate_mipmaps(struct wined3d_shader_resource_view *
 
     for (i = 0; i < layer_count; ++i)
     {
-        for (j = base_level + 1; j <= max_level; ++j)
+        for (j = 1; j < level_count; ++j)
         {
-            wined3d_texture_validate_location(&texture_gl->t, i * level_count + j, location);
-            wined3d_texture_invalidate_location(&texture_gl->t, i * level_count + j, ~location);
+            wined3d_texture_validate_location(&texture_gl->t,
+                    (base_layer + i) * level_count + base_level + j, location);
+            wined3d_texture_invalidate_location(&texture_gl->t,
+                    (base_layer + i) * level_count + base_level + j, ~location);
         }
     }
 
@@ -1261,30 +1262,146 @@ void shader_resource_view_generate_mipmaps(struct wined3d_shader_resource_view *
         gl_info->gl_ops.gl.p_glTexParameteri(texture_gl->target,
                 GL_TEXTURE_MAX_LEVEL, texture_gl->t.level_count - 1);
     }
-
-    context_release(context);
 }
 
-void CDECL wined3d_shader_resource_view_generate_mipmaps(struct wined3d_shader_resource_view *view)
+void wined3d_shader_resource_view_vk_generate_mipmap(struct wined3d_shader_resource_view_vk *srv_vk,
+        struct wined3d_context_vk *context_vk)
 {
-    struct wined3d_texture *texture;
+    unsigned int i, j, layer_count, level_count, base_level, base_layer;
+    const struct wined3d_vk_info *vk_info = context_vk->vk_info;
+    VkImageSubresourceRange vk_src_range, vk_dst_range;
+    struct wined3d_texture_vk *texture_vk;
+    VkCommandBuffer vk_command_buffer;
+    VkImageBlit region;
 
-    TRACE("view %p.\n", view);
+    TRACE("srv_vk %p.\n", srv_vk);
 
-    if (view->resource->type == WINED3D_RTYPE_BUFFER)
+    layer_count = srv_vk->v.desc.u.texture.layer_count;
+    level_count = srv_vk->v.desc.u.texture.level_count;
+    base_level = srv_vk->v.desc.u.texture.level_idx;
+    base_layer = srv_vk->v.desc.u.texture.layer_idx;
+
+    texture_vk = wined3d_texture_vk(texture_from_resource(srv_vk->v.resource));
+    for (i = 0; i < layer_count; ++i)
     {
-        WARN("Called on buffer resource %p.\n", view->resource);
+        if (!wined3d_texture_load_location(&texture_vk->t,
+                (base_layer + i) * level_count + base_level, &context_vk->c, WINED3D_LOCATION_TEXTURE_RGB))
+            ERR("Failed to load source layer %u.\n", base_layer + i);
+    }
+
+    if (context_vk->c.d3d_info->wined3d_creation_flags & WINED3D_SRGB_READ_WRITE_CONTROL)
+        FIXME("Unhandled sRGB read/write control.\n");
+
+    if (wined3d_format_vk(srv_vk->v.format)->vk_format != wined3d_format_vk(texture_vk->t.resource.format)->vk_format)
+        FIXME("Ignoring view format %s.\n", debug_d3dformat(srv_vk->v.format->id));
+
+    if (wined3d_resource_get_sample_count(&texture_vk->t.resource) > 1)
+        FIXME("Unhandled multi-sampled resource.\n");
+
+    if (!(vk_command_buffer = wined3d_context_vk_get_command_buffer(context_vk)))
+    {
+        ERR("Failed to get command buffer.\n");
         return;
     }
 
-    texture = texture_from_resource(view->resource);
-    if (!(texture->flags & WINED3D_TEXTURE_GENERATE_MIPMAPS))
+    vk_src_range.aspectMask = vk_aspect_mask_from_format(texture_vk->t.resource.format);
+    vk_src_range.baseMipLevel = base_level;
+    vk_src_range.levelCount = 1;
+    vk_src_range.baseArrayLayer = base_layer;
+    vk_src_range.layerCount = layer_count;
+
+    vk_dst_range = vk_src_range;
+    ++vk_dst_range.baseMipLevel;
+
+    wined3d_context_vk_image_barrier(context_vk, vk_command_buffer,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            vk_access_mask_from_bind_flags(texture_vk->t.resource.bind_flags),
+            VK_ACCESS_TRANSFER_READ_BIT,
+            texture_vk->layout, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+            texture_vk->image.vk_image, &vk_src_range);
+    wined3d_context_vk_image_barrier(context_vk, vk_command_buffer,
+            VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+            vk_access_mask_from_bind_flags(texture_vk->t.resource.bind_flags),
+            VK_ACCESS_TRANSFER_WRITE_BIT,
+            texture_vk->layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            texture_vk->image.vk_image, &vk_dst_range);
+
+    region.srcSubresource.aspectMask = vk_src_range.aspectMask;
+    region.srcSubresource.mipLevel = vk_src_range.baseMipLevel;
+    region.srcSubresource.baseArrayLayer = vk_src_range.baseArrayLayer;
+    region.srcSubresource.layerCount = vk_src_range.layerCount;
+    region.srcOffsets[0].x = 0;
+    region.srcOffsets[0].y = 0;
+    region.srcOffsets[0].z = 0;
+
+    region.dstSubresource.aspectMask = vk_dst_range.aspectMask;
+    region.dstSubresource.mipLevel = vk_dst_range.baseMipLevel;
+    region.dstSubresource.baseArrayLayer = vk_dst_range.baseArrayLayer;
+    region.dstSubresource.layerCount = vk_dst_range.layerCount;
+    region.dstOffsets[0].x = 0;
+    region.dstOffsets[0].y = 0;
+    region.dstOffsets[0].z = 0;
+
+    for (i = 1; i < level_count; ++i)
     {
-        WARN("Texture without the WINED3D_TEXTURE_GENERATE_MIPMAPS flag, ignoring.\n");
-        return;
+        region.srcOffsets[1].x = wined3d_texture_get_level_width(&texture_vk->t, vk_src_range.baseMipLevel);
+        region.srcOffsets[1].y = wined3d_texture_get_level_height(&texture_vk->t, vk_src_range.baseMipLevel);
+        region.srcOffsets[1].z = wined3d_texture_get_level_depth(&texture_vk->t, vk_src_range.baseMipLevel);
+
+        region.dstOffsets[1].x = wined3d_texture_get_level_width(&texture_vk->t, vk_dst_range.baseMipLevel);
+        region.dstOffsets[1].y = wined3d_texture_get_level_height(&texture_vk->t, vk_dst_range.baseMipLevel);
+        region.dstOffsets[1].z = wined3d_texture_get_level_depth(&texture_vk->t, vk_dst_range.baseMipLevel);
+
+        VK_CALL(vkCmdBlitImage(vk_command_buffer, texture_vk->image.vk_image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                texture_vk->image.vk_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region, VK_FILTER_LINEAR));
+
+        wined3d_context_vk_image_barrier(context_vk, vk_command_buffer,
+                VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                VK_ACCESS_TRANSFER_READ_BIT,
+                vk_access_mask_from_bind_flags(texture_vk->t.resource.bind_flags),
+                VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, texture_vk->layout,
+                texture_vk->image.vk_image, &vk_src_range);
+
+        if (i == level_count - 1)
+        {
+            wined3d_context_vk_image_barrier(context_vk, vk_command_buffer,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                    VK_ACCESS_TRANSFER_WRITE_BIT,
+                    vk_access_mask_from_bind_flags(texture_vk->t.resource.bind_flags),
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture_vk->layout,
+                    texture_vk->image.vk_image, &vk_dst_range);
+        }
+        else
+        {
+            region.srcSubresource.mipLevel = ++vk_src_range.baseMipLevel;
+            region.dstSubresource.mipLevel = ++vk_dst_range.baseMipLevel;
+
+            wined3d_context_vk_image_barrier(context_vk, vk_command_buffer,
+                    VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT,
+                    VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+                    texture_vk->image.vk_image, &vk_src_range);
+            wined3d_context_vk_image_barrier(context_vk, vk_command_buffer,
+                    VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                    vk_access_mask_from_bind_flags(texture_vk->t.resource.bind_flags),
+                    VK_ACCESS_TRANSFER_WRITE_BIT,
+                    texture_vk->layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                    texture_vk->image.vk_image, &vk_dst_range);
+        }
     }
 
-    wined3d_cs_emit_generate_mipmaps(view->resource->device->cs, view);
+    for (i = 0; i < layer_count; ++i)
+    {
+        for (j = 1; j < level_count; ++j)
+        {
+            wined3d_texture_validate_location(&texture_vk->t,
+                    (base_layer + i) * level_count + base_level + j, WINED3D_LOCATION_TEXTURE_RGB);
+            wined3d_texture_invalidate_location(&texture_vk->t,
+                    (base_layer + i) * level_count + base_level + j, ~WINED3D_LOCATION_TEXTURE_RGB);
+        }
+    }
+
+    wined3d_context_vk_reference_texture(context_vk, texture_vk);
 }
 
 ULONG CDECL wined3d_unordered_access_view_incref(struct wined3d_unordered_access_view *view)
@@ -1582,8 +1699,8 @@ void wined3d_unordered_access_view_vk_update(struct wined3d_unordered_access_vie
     VkBufferView vk_buffer_view;
 
     buffer_vk = wined3d_buffer_vk(buffer_from_resource(resource));
-    wined3d_context_vk_destroy_buffer_view(context_vk, view_vk->u.vk_buffer_view, view_vk->command_buffer_id);
-    if ((vk_buffer_view = wined3d_view_vk_create_buffer_view(context_vk, desc, buffer_vk, view_format_vk)))
+    wined3d_context_vk_destroy_vk_buffer_view(context_vk, view_vk->u.vk_buffer_view, view_vk->command_buffer_id);
+    if ((vk_buffer_view = wined3d_view_vk_create_vk_buffer_view(context_vk, desc, buffer_vk, view_format_vk)))
     {
         view_vk->u.vk_buffer_view = vk_buffer_view;
         view_vk->bo_user.valid = true;
@@ -1621,7 +1738,7 @@ static void wined3d_unordered_access_view_vk_cs_init(void *object)
         context_vk = wined3d_context_vk(context_acquire(&device_vk->d, NULL, 0));
         vk_info = context_vk->vk_info;
 
-        if ((vk_buffer_view = wined3d_view_vk_create_buffer_view(context_vk, desc, buffer_vk, format_vk)))
+        if ((vk_buffer_view = wined3d_view_vk_create_vk_buffer_view(context_vk, desc, buffer_vk, format_vk)))
         {
             TRACE("Created buffer view 0x%s.\n", wine_dbgstr_longlong(vk_buffer_view));
 
@@ -1690,7 +1807,7 @@ static void wined3d_unordered_access_view_vk_cs_init(void *object)
         FIXME("Swapchain unordered access views not supported.\n");
 
     context_vk = wined3d_context_vk(context_acquire(&device_vk->d, NULL, 0));
-    vk_image_view = wined3d_view_vk_create_texture_view(context_vk, desc,
+    vk_image_view = wined3d_view_vk_create_vk_image_view(context_vk, desc,
             texture_vk, format_vk, format_vk->f.color_fixup, false);
     context_release(&context_vk->c);
 

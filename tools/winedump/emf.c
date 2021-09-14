@@ -93,7 +93,22 @@ static int dump_emfrecord(void)
 
     switch(type)
     {
-    EMRCASE(EMR_HEADER);
+    case EMR_HEADER:
+    {
+        const ENHMETAHEADER *header = PRD(offset, sizeof(*header));
+
+        printf("%-20s %08x\n", "EMR_HEADER", length);
+        printf("bounds (%d,%d - %d,%d) frame (%d,%d - %d,%d) signature %#x version %#x bytes %#x records %#x\n"
+               "handles %#x reserved %#x palette entries %#x px %dx%d mm %dx%d μm %dx%d opengl %d description %s\n",
+               header->rclBounds.left, header->rclBounds.top, header->rclBounds.right, header->rclBounds.bottom,
+               header->rclFrame.left, header->rclFrame.top, header->rclFrame.right, header->rclFrame.bottom,
+               header->dSignature, header->nVersion, header->nBytes, header->nRecords, header->nHandles, header->sReserved,
+               header->nPalEntries, header->szlDevice.cx, header->szlDevice.cy, header->szlMillimeters.cx,
+               header->szlMillimeters.cy, header->szlMicrometers.cx, header->szlMicrometers.cy, header->bOpenGL,
+               debugstr_wn((LPCWSTR)((const BYTE *)header + header->offDescription), header->nDescription));
+        break;
+    }
+
     EMRCASE(EMR_POLYBEZIER);
     EMRCASE(EMR_POLYGON);
     EMRCASE(EMR_POLYLINE);
@@ -310,7 +325,30 @@ static int dump_emfrecord(void)
     }
 
     EMRCASE(EMR_BITBLT);
-    EMRCASE(EMR_STRETCHBLT);
+
+    case EMR_STRETCHBLT:
+    {
+        const EMRSTRETCHBLT *blt = PRD(offset, sizeof(*blt));
+        const BITMAPINFOHEADER *bmih = (const BITMAPINFOHEADER *)((const unsigned char *)blt + blt->offBmiSrc);
+
+        printf("%-20s %08x\n", "EMR_STRETCHBLT", length);
+        printf("bounds (%d,%d - %d,%d) dst %d,%d %dx%d src %d,%d %dx%d rop %#x xform (%f, %f, %f, %f, %f, %f)\n"
+               "bk_color %#x usage %#x bmi_offset %#x bmi_size %#x bits_offset %#x bits_size %#x\n",
+               blt->rclBounds.left, blt->rclBounds.top, blt->rclBounds.right, blt->rclBounds.bottom,
+               blt->xDest, blt->yDest, blt->cxDest, blt->cyDest,
+               blt->xSrc, blt->ySrc, blt->cxSrc, blt->cySrc, blt->dwRop,
+               blt->xformSrc.eM11, blt->xformSrc.eM12, blt->xformSrc.eM21,
+               blt->xformSrc.eM22, blt->xformSrc.eDx, blt->xformSrc.eDy,
+               blt->crBkColorSrc, blt->iUsageSrc, blt->offBmiSrc, blt->cbBmiSrc,
+               blt->offBitsSrc, blt->cbBitsSrc);
+        printf("BITMAPINFOHEADER biSize %#x biWidth %d biHeight %d biPlanes %d biBitCount %d biCompression %#x\n"
+               "biSizeImage %#x biXPelsPerMeter %d biYPelsPerMeter %d biClrUsed %#x biClrImportant %#x\n",
+               bmih->biSize, bmih->biWidth, bmih->biHeight, bmih->biPlanes, bmih->biBitCount,
+               bmih->biCompression, bmih->biSizeImage, bmih->biXPelsPerMeter, bmih->biYPelsPerMeter,
+               bmih->biClrUsed, bmih->biClrImportant);
+        break;
+    }
+
     EMRCASE(EMR_MASKBLT);
     EMRCASE(EMR_PLGBLT);
     EMRCASE(EMR_SETDIBITSTODEVICE);
@@ -342,7 +380,9 @@ static int dump_emfrecord(void)
         const EMREXTTEXTOUTW *etoW = PRD(offset, sizeof(*etoW));
 
         printf("%-20s %08x\n", "EMR_EXTTEXTOUTW", length);
-        printf("pt (%d,%d) rect (%d,%d - %d,%d) flags %#x, %s\n",
+        printf("bounds (%d,%d - %d,%d) mode %#x x_scale %f y_scale %f pt (%d,%d) rect (%d,%d - %d,%d) flags %#x, %s\n",
+               etoW->rclBounds.left, etoW->rclBounds.top, etoW->rclBounds.right, etoW->rclBounds.bottom,
+               etoW->iGraphicsMode, etoW->exScale, etoW->eyScale,
                etoW->emrtext.ptlReference.x, etoW->emrtext.ptlReference.y,
                etoW->emrtext.rcl.left, etoW->emrtext.rcl.top,
                etoW->emrtext.rcl.right, etoW->emrtext.rcl.bottom,
@@ -380,7 +420,30 @@ static int dump_emfrecord(void)
     EMRCASE(EMR_COLORCORRECTPALETTE);
     EMRCASE(EMR_SETICMPROFILEA);
     EMRCASE(EMR_SETICMPROFILEW);
-    EMRCASE(EMR_ALPHABLEND);
+
+    case EMR_ALPHABLEND:
+    {
+        const EMRALPHABLEND *blend = PRD(offset, sizeof(*blend));
+        const BITMAPINFOHEADER *bmih = (const BITMAPINFOHEADER *)((const unsigned char *)blend + blend->offBmiSrc);
+
+        printf("%-20s %08x\n", "EMR_ALPHABLEND", length);
+        printf("bounds (%d,%d - %d,%d) dst %d,%d %dx%d src %d,%d %dx%d rop %#x xform (%f, %f, %f, %f, %f, %f)\n"
+               "bk_color %#x usage %#x bmi_offset %#x bmi_size %#x bits_offset %#x bits_size %#x\n",
+               blend->rclBounds.left, blend->rclBounds.top, blend->rclBounds.right, blend->rclBounds.bottom,
+               blend->xDest, blend->yDest, blend->cxDest, blend->cyDest,
+               blend->xSrc, blend->ySrc, blend->cxSrc, blend->cySrc, blend->dwRop,
+               blend->xformSrc.eM11, blend->xformSrc.eM12, blend->xformSrc.eM21,
+               blend->xformSrc.eM22, blend->xformSrc.eDx, blend->xformSrc.eDy,
+               blend->crBkColorSrc, blend->iUsageSrc, blend->offBmiSrc, blend->cbBmiSrc,
+               blend->offBitsSrc, blend->cbBitsSrc);
+        printf("BITMAPINFOHEADER biSize %#x biWidth %d biHeight %d biPlanes %d biBitCount %d biCompression %#x\n"
+               "biSizeImage %#x biXPelsPerMeter %d biYPelsPerMeter %d biClrUsed %#x biClrImportant %#x\n",
+               bmih->biSize, bmih->biWidth, bmih->biHeight, bmih->biPlanes, bmih->biBitCount,
+               bmih->biCompression, bmih->biSizeImage, bmih->biXPelsPerMeter, bmih->biYPelsPerMeter,
+               bmih->biClrUsed, bmih->biClrImportant);
+        break;
+    }
+
     EMRCASE(EMR_SETLAYOUT);
     EMRCASE(EMR_TRANSPARENTBLT);
     EMRCASE(EMR_RESERVED_117);

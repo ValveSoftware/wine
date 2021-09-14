@@ -111,7 +111,6 @@ static void test_device_manager(void)
         D3DFMT_A8R8G8B8,
         D3DFMT_X8R8G8B8,
         D3DFMT_YUY2,
-        MAKEFOURCC('A','Y','U','V'),
     };
     static const D3DFORMAT rt_unsupported_formats[] =
     {
@@ -353,12 +352,6 @@ static void test_device_manager(void)
     for (i = 0; i < ARRAY_SIZE(rt_formats); ++i)
     {
         init_video_desc(&video_desc, rt_formats[i]);
-
-        count = 0;
-        hr = IDirectXVideoProcessorService_GetVideoProcessorDeviceGuids(proc_service, &video_desc, &count, &guids);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-        ok(count > 0, "Unexpected device count.\n");
-        CoTaskMemFree(guids);
 
         count = 0;
         hr = IDirectXVideoProcessorService_GetVideoProcessorRenderTargets(proc_service, &DXVA2_VideoProcSoftwareDevice,

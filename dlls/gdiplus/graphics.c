@@ -114,6 +114,11 @@ static COLORREF get_gdi_brush_color(const GpBrush *brush)
     return ARGB2COLORREF(argb);
 }
 
+static BOOL is_metafile_graphics(const GpGraphics *graphics)
+{
+    return graphics->image && graphics->image_type == ImageTypeMetafile;
+}
+
 static ARGB blend_colors(ARGB start, ARGB end, REAL position);
 
 static void init_hatch_palette(ARGB *hatch_palette, ARGB fore_color, ARGB back_color)
@@ -556,7 +561,7 @@ static GpStatus alpha_blend_pixels_hrgn(GpGraphics *graphics, INT dst_x, INT dst
 
         return stat;
     }
-    else if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    else if (is_metafile_graphics(graphics))
     {
         ERR("This should not be used for metafiles; fix caller\n");
         return NotImplemented;
@@ -2241,7 +2246,7 @@ static GpStatus get_visible_clip_region(GpGraphics *graphics, GpRegion *rgn)
     GpRegion* tmp;
 
     /* Ignore graphics image bounds for metafiles */
-    if (graphics->image && graphics->image_type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
         return GdipCombineRegionRegion(rgn, graphics->clip, CombineModeReplace);
 
     if((stat = get_graphics_bounds(graphics, &rectf)) != Ok)
@@ -2550,7 +2555,7 @@ GpStatus WINGDIPAPI GdipDeleteGraphics(GpGraphics *graphics)
     if(!graphics) return InvalidParameter;
     if(graphics->busy) return ObjectBusy;
 
-    if (graphics->image && graphics->image_type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         stat = METAFILE_GraphicsDeleted((GpMetafile*)graphics->image);
         if (stat != Ok)
@@ -2590,6 +2595,7 @@ GpStatus WINGDIPAPI GdipDrawArc(GpGraphics *graphics, GpPen *pen, REAL x,
 {
     GpStatus status;
     GpPath *path;
+    GpRectF rect;
 
     TRACE("(%p, %p, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f)\n", graphics, pen, x, y,
           width, height, startAngle, sweepAngle);
@@ -2599,6 +2605,12 @@ GpStatus WINGDIPAPI GdipDrawArc(GpGraphics *graphics, GpPen *pen, REAL x,
 
     if(graphics->busy)
         return ObjectBusy;
+
+    if (is_metafile_graphics(graphics))
+    {
+        set_rect(&rect, x, y, width, height);
+        return METAFILE_DrawArc((GpMetafile *)graphics->image, pen, &rect, startAngle, sweepAngle);
+    }
 
     status = GdipCreatePath(FillModeAlternate, &path);
     if (status != Ok) return status;
@@ -2906,6 +2918,7 @@ GpStatus WINGDIPAPI GdipDrawEllipse(GpGraphics *graphics, GpPen *pen, REAL x,
 {
     GpPath *path;
     GpStatus status;
+    GpRectF rect;
 
     TRACE("(%p, %p, %.2f, %.2f, %.2f, %.2f)\n", graphics, pen, x, y, width, height);
 
@@ -2914,6 +2927,12 @@ GpStatus WINGDIPAPI GdipDrawEllipse(GpGraphics *graphics, GpPen *pen, REAL x,
 
     if(graphics->busy)
         return ObjectBusy;
+
+    if (is_metafile_graphics(graphics))
+    {
+        set_rect(&rect, x, y, width, height);
+        return METAFILE_DrawEllipse((GpMetafile *)graphics->image, pen, &rect);
+    }
 
     status = GdipCreatePath(FillModeAlternate, &path);
     if (status != Ok) return status;
@@ -3059,7 +3078,7 @@ GpStatus WINGDIPAPI GdipDrawImagePointsRect(GpGraphics *graphics, GpImage *image
     TRACE("%s %s %s\n", debugstr_pointf(&points[0]), debugstr_pointf(&points[1]),
         debugstr_pointf(&points[2]));
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         return METAFILE_DrawImagePointsRect((GpMetafile*)graphics->image,
                 image, points, count, srcx, srcy, srcwidth, srcheight,
@@ -3396,11 +3415,7 @@ GpStatus WINGDIPAPI GdipDrawImagePointsRect(GpGraphics *graphics, GpImage *image
     {
         GpRectF rc;
 
-        rc.X = srcx;
-        rc.Y = srcy;
-        rc.Width = srcwidth;
-        rc.Height = srcheight;
-
+        set_rect(&rc, srcx, srcy, srcwidth, srcheight);
         return GdipEnumerateMetafileSrcRectDestPoints(graphics, (GpMetafile*)image,
             points, count, &rc, srcUnit, play_metafile_proc, image, imageAttributes);
     }
@@ -4025,7 +4040,7 @@ GpStatus WINGDIPAPI GdipDrawPath(GpGraphics *graphics, GpPen *pen, GpPath *path)
     if (path->pathdata.Count == 0)
         return Ok;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
         retval = METAFILE_DrawPath((GpMetafile*)graphics->image, pen, path);
     else if (!graphics->hdc || graphics->alpha_hdc || !brush_can_fill_path(pen->brush, FALSE))
         retval = SOFTWARE_GdipDrawPath(graphics, pen, path);
@@ -4073,26 +4088,12 @@ GpStatus WINGDIPAPI GdipDrawPieI(GpGraphics *graphics, GpPen *pen, INT x,
 GpStatus WINGDIPAPI GdipDrawRectangle(GpGraphics *graphics, GpPen *pen, REAL x,
     REAL y, REAL width, REAL height)
 {
-    GpStatus status;
-    GpPath *path;
+    GpRectF rect;
 
     TRACE("(%p, %p, %.2f, %.2f, %.2f, %.2f)\n", graphics, pen, x, y, width, height);
 
-    if(!pen || !graphics)
-        return InvalidParameter;
-
-    if(graphics->busy)
-        return ObjectBusy;
-
-    status = GdipCreatePath(FillModeAlternate, &path);
-    if (status != Ok) return status;
-
-    status = GdipAddPathRectangle(path, x, y, width, height);
-    if (status == Ok)
-        status = GdipDrawPath(graphics, pen, path);
-
-    GdipDeletePath(path);
-    return status;
+    set_rect(&rect, x, y, width, height);
+    return GdipDrawRectangles(graphics, pen, &rect, 1);
 }
 
 GpStatus WINGDIPAPI GdipDrawRectangleI(GpGraphics *graphics, GpPen *pen, INT x,
@@ -4116,6 +4117,9 @@ GpStatus WINGDIPAPI GdipDrawRectangles(GpGraphics *graphics, GpPen *pen,
 
     if(graphics->busy)
         return ObjectBusy;
+
+    if (is_metafile_graphics(graphics))
+        return METAFILE_DrawRectangles((GpMetafile *)graphics->image, pen, rects, count);
 
     status = GdipCreatePath(FillModeAlternate, &path);
     if (status != Ok) return status;
@@ -4144,12 +4148,8 @@ GpStatus WINGDIPAPI GdipDrawRectanglesI(GpGraphics *graphics, GpPen *pen,
     if(!rectsF)
         return OutOfMemory;
 
-    for(i = 0;i < count;i++){
-        rectsF[i].X      = (REAL)rects[i].X;
-        rectsF[i].Y      = (REAL)rects[i].Y;
-        rectsF[i].Width  = (REAL)rects[i].Width;
-        rectsF[i].Height = (REAL)rects[i].Height;
-    }
+    for(i = 0;i < count;i++)
+        set_rect(&rectsF[i], rects[i].X, rects[i].Y, rects[i].Width, rects[i].Height);
 
     ret = GdipDrawRectangles(graphics, pen, rectsF, count);
     heap_free(rectsF);
@@ -4239,6 +4239,7 @@ GpStatus WINGDIPAPI GdipFillEllipse(GpGraphics *graphics, GpBrush *brush, REAL x
 {
     GpStatus stat;
     GpPath *path;
+    GpRectF rect;
 
     TRACE("(%p, %p, %.2f, %.2f, %.2f, %.2f)\n", graphics, brush, x, y, width, height);
 
@@ -4247,6 +4248,12 @@ GpStatus WINGDIPAPI GdipFillEllipse(GpGraphics *graphics, GpBrush *brush, REAL x
 
     if(graphics->busy)
         return ObjectBusy;
+
+    if (is_metafile_graphics(graphics))
+    {
+        set_rect(&rect, x, y, width, height);
+        return METAFILE_FillEllipse((GpMetafile *)graphics->image, brush, &rect);
+    }
 
     stat = GdipCreatePath(FillModeAlternate, &path);
 
@@ -4350,7 +4357,7 @@ GpStatus WINGDIPAPI GdipFillPath(GpGraphics *graphics, GpBrush *brush, GpPath *p
     if (!path->pathdata.Count)
         return Ok;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
         return METAFILE_FillPath((GpMetafile*)graphics->image, brush, path);
 
     if (!graphics->image && !graphics->alpha_hdc)
@@ -4373,6 +4380,7 @@ GpStatus WINGDIPAPI GdipFillPie(GpGraphics *graphics, GpBrush *brush, REAL x,
 {
     GpStatus stat;
     GpPath *path;
+    GpRectF rect;
 
     TRACE("(%p, %p, %.2f, %.2f, %.2f, %.2f, %.2f, %.2f)\n",
             graphics, brush, x, y, width, height, startAngle, sweepAngle);
@@ -4382,6 +4390,12 @@ GpStatus WINGDIPAPI GdipFillPie(GpGraphics *graphics, GpBrush *brush, REAL x,
 
     if(graphics->busy)
         return ObjectBusy;
+
+    if (is_metafile_graphics(graphics))
+    {
+        set_rect(&rect, x, y, width, height);
+        return METAFILE_FillPie((GpMetafile *)graphics->image, brush, &rect, startAngle, sweepAngle);
+    }
 
     stat = GdipCreatePath(FillModeAlternate, &path);
 
@@ -4488,11 +4502,7 @@ GpStatus WINGDIPAPI GdipFillRectangle(GpGraphics *graphics, GpBrush *brush,
 
     TRACE("(%p, %p, %.2f, %.2f, %.2f, %.2f)\n", graphics, brush, x, y, width, height);
 
-    rect.X = x;
-    rect.Y = y;
-    rect.Width = width;
-    rect.Height = height;
-
+    set_rect(&rect, x, y, width, height);
     return GdipFillRectangles(graphics, brush, &rect, 1);
 }
 
@@ -4503,11 +4513,7 @@ GpStatus WINGDIPAPI GdipFillRectangleI(GpGraphics *graphics, GpBrush *brush,
 
     TRACE("(%p, %p, %d, %d, %d, %d)\n", graphics, brush, x, y, width, height);
 
-    rect.X = (REAL)x;
-    rect.Y = (REAL)y;
-    rect.Width = (REAL)width;
-    rect.Height = (REAL)height;
-
+    set_rect(&rect, x, y, width, height);
     return GdipFillRectangles(graphics, brush, &rect, 1);
 }
 
@@ -4522,7 +4528,7 @@ GpStatus WINGDIPAPI GdipFillRectangles(GpGraphics *graphics, GpBrush *brush, GDI
     if(!graphics || !brush || !rects || count <= 0)
         return InvalidParameter;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         status = METAFILE_FillRectangles((GpMetafile*)graphics->image, brush, rects, count);
         /* FIXME: Add gdi32 drawing. */
@@ -4556,12 +4562,8 @@ GpStatus WINGDIPAPI GdipFillRectanglesI(GpGraphics *graphics, GpBrush *brush, GD
     if(!rectsF)
         return OutOfMemory;
 
-    for(i = 0; i < count; i++){
-        rectsF[i].X      = (REAL)rects[i].X;
-        rectsF[i].Y      = (REAL)rects[i].Y;
-        rectsF[i].Width  = (REAL)rects[i].Width;
-        rectsF[i].Height = (REAL)rects[i].Height;
-    }
+    for(i = 0; i < count; i++)
+        set_rect(&rectsF[i], rects[i].X, rects[i].Y, rects[i].Width, rects[i].Height);
 
     ret = GdipFillRectangles(graphics,brush,rectsF,count);
     heap_free(rectsF);
@@ -4715,7 +4717,7 @@ GpStatus WINGDIPAPI GdipFillRegion(GpGraphics* graphics, GpBrush* brush,
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
         stat = METAFILE_FillRegion((GpMetafile*)graphics->image, brush, region);
     else
     {
@@ -5055,7 +5057,7 @@ GpStatus WINGDIPAPI GdipGraphicsClear(GpGraphics *graphics, ARGB color)
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
         return METAFILE_GraphicsClear((GpMetafile*)graphics->image, color);
 
     if((stat = GdipCreateSolidFill(color, &brush)) != Ok)
@@ -5592,10 +5594,7 @@ GpStatus WINGDIPAPI GdipMeasureString(GpGraphics *graphics,
     get_font_hfont(graphics, font, format, &gdifont, NULL, NULL);
     oldfont = SelectObject(hdc, gdifont);
 
-    bounds->X = rect->X;
-    bounds->Y = rect->Y;
-    bounds->Width = 0.0;
-    bounds->Height = 0.0;
+    set_rect(bounds, rect->X, rect->Y, 0.0f, 0.0f);
 
     args.bounds = bounds;
     args.codepointsfitted = &glyphs;
@@ -5810,6 +5809,8 @@ GpStatus WINGDIPAPI GdipDrawString(GpGraphics *graphics, GDIPCONST WCHAR *string
 
 GpStatus WINGDIPAPI GdipResetClip(GpGraphics *graphics)
 {
+    GpStatus stat;
+
     TRACE("(%p)\n", graphics);
 
     if(!graphics)
@@ -5817,6 +5818,13 @@ GpStatus WINGDIPAPI GdipResetClip(GpGraphics *graphics)
 
     if(graphics->busy)
         return ObjectBusy;
+
+    if (is_metafile_graphics(graphics))
+    {
+        stat = METAFILE_ResetClip((GpMetafile *)graphics->image);
+        if (stat != Ok)
+            return stat;
+    }
 
     return GdipSetInfinite(graphics->clip);
 }
@@ -5833,7 +5841,8 @@ GpStatus WINGDIPAPI GdipResetWorldTransform(GpGraphics *graphics)
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics))
+    {
         stat = METAFILE_ResetWorldTransform((GpMetafile*)graphics->image);
 
         if (stat != Ok)
@@ -5856,7 +5865,8 @@ GpStatus WINGDIPAPI GdipRotateWorldTransform(GpGraphics *graphics, REAL angle,
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics))
+    {
         stat = METAFILE_RotateWorldTransform((GpMetafile*)graphics->image, angle, order);
 
         if (stat != Ok)
@@ -5882,7 +5892,7 @@ static GpStatus begin_container(GpGraphics *graphics,
     list_add_head(&graphics->containers, &container->entry);
     *state = graphics->contid = container->contid;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics)) {
         if (type == BEGIN_CONTAINER)
             METAFILE_BeginContainerNoParams((GpMetafile*)graphics->image, container->contid);
         else
@@ -5942,9 +5952,8 @@ GpStatus WINGDIPAPI GdipBeginContainer(GpGraphics *graphics, GDIPCONST GpRectF *
 
     GdipMultiplyMatrix(&graphics->worldtrans, &transform, MatrixOrderPrepend);
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics))
         METAFILE_BeginContainer((GpMetafile*)graphics->image, dstrect, srcrect, unit, container->contid);
-    }
 
     return Ok;
 }
@@ -6010,7 +6019,7 @@ static GpStatus end_container(GpGraphics *graphics, GraphicsContainerType type,
     list_remove(&container->entry);
     delete_container(container);
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics)) {
         if (type == BEGIN_CONTAINER)
             METAFILE_EndContainer((GpMetafile*)graphics->image, state);
         else
@@ -6045,7 +6054,7 @@ GpStatus WINGDIPAPI GdipScaleWorldTransform(GpGraphics *graphics, REAL sx,
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics)) {
         stat = METAFILE_ScaleWorldTransform((GpMetafile*)graphics->image, sx, sy, order);
 
         if (stat != Ok)
@@ -6080,7 +6089,7 @@ GpStatus WINGDIPAPI GdipSetCompositingMode(GpGraphics *graphics,
     if(graphics->compmode == mode)
         return Ok;
 
-    if(graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         GpStatus stat;
 
@@ -6109,7 +6118,7 @@ GpStatus WINGDIPAPI GdipSetCompositingQuality(GpGraphics *graphics,
     if(graphics->compqual == quality)
         return Ok;
 
-    if(graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         GpStatus stat;
 
@@ -6144,7 +6153,7 @@ GpStatus WINGDIPAPI GdipSetInterpolationMode(GpGraphics *graphics,
     if (mode == graphics->interpolation)
         return Ok;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         GpStatus stat;
 
@@ -6171,7 +6180,7 @@ GpStatus WINGDIPAPI GdipSetPageScale(GpGraphics *graphics, REAL scale)
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         stat = METAFILE_SetPageTransform((GpMetafile*)graphics->image, graphics->unit, scale);
         if (stat != Ok)
@@ -6198,7 +6207,7 @@ GpStatus WINGDIPAPI GdipSetPageUnit(GpGraphics *graphics, GpUnit unit)
     if(unit == UnitWorld)
         return InvalidParameter;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         stat = METAFILE_SetPageTransform((GpMetafile*)graphics->image, unit, graphics->scale);
         if (stat != Ok)
@@ -6224,7 +6233,7 @@ GpStatus WINGDIPAPI GdipSetPixelOffsetMode(GpGraphics *graphics, PixelOffsetMode
     if(graphics->pixeloffset == mode)
         return Ok;
 
-    if(graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         GpStatus stat;
 
@@ -6241,10 +6250,22 @@ GpStatus WINGDIPAPI GdipSetPixelOffsetMode(GpGraphics *graphics, PixelOffsetMode
 
 GpStatus WINGDIPAPI GdipSetRenderingOrigin(GpGraphics *graphics, INT x, INT y)
 {
+    GpStatus stat;
+
     TRACE("(%p,%i,%i)\n", graphics, x, y);
 
     if (!graphics)
         return InvalidParameter;
+
+    if (graphics->origin_x == x && graphics->origin_y == y)
+        return Ok;
+
+    if (is_metafile_graphics(graphics))
+    {
+         stat = METAFILE_SetRenderingOrigin((GpMetafile *)graphics->image, x, y);
+         if (stat != Ok)
+             return stat;
+    }
 
     graphics->origin_x = x;
     graphics->origin_y = y;
@@ -6278,7 +6299,8 @@ GpStatus WINGDIPAPI GdipSetSmoothingMode(GpGraphics *graphics, SmoothingMode mod
     if(graphics->smoothing == mode)
         return Ok;
 
-    if(graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics))
+    {
          GpStatus stat;
          BOOL antialias = (mode != SmoothingModeDefault &&
                  mode != SmoothingModeNone && mode != SmoothingModeHighSpeed);
@@ -6287,7 +6309,7 @@ GpStatus WINGDIPAPI GdipSetSmoothingMode(GpGraphics *graphics, SmoothingMode mod
                  EmfPlusRecordTypeSetAntiAliasMode, (mode << 1) + antialias);
          if(stat != Ok)
              return stat;
-     }
+    }
 
     graphics->smoothing = mode;
 
@@ -6320,7 +6342,7 @@ GpStatus WINGDIPAPI GdipSetTextRenderingHint(GpGraphics *graphics,
     if(graphics->texthint == hint)
         return Ok;
 
-    if(graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics)) {
         GpStatus stat;
 
         stat = METAFILE_AddSimpleProperty((GpMetafile*)graphics->image,
@@ -6350,7 +6372,7 @@ GpStatus WINGDIPAPI GdipSetWorldTransform(GpGraphics *graphics, GpMatrix *matrix
           matrix->matrix[0], matrix->matrix[1], matrix->matrix[2],
           matrix->matrix[3], matrix->matrix[4], matrix->matrix[5]);
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics)) {
         stat = METAFILE_SetWorldTransform((GpMetafile*)graphics->image, matrix);
 
         if (stat != Ok)
@@ -6375,7 +6397,7 @@ GpStatus WINGDIPAPI GdipTranslateWorldTransform(GpGraphics *graphics, REAL dx,
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics)) {
         stat = METAFILE_TranslateWorldTransform((GpMetafile*)graphics->image, dx, dy, order);
 
         if (stat != Ok)
@@ -6433,6 +6455,13 @@ GpStatus WINGDIPAPI GdipSetClipPath(GpGraphics *graphics, GpPath *path, CombineM
     if(graphics->busy)
         return ObjectBusy;
 
+    if (is_metafile_graphics(graphics))
+    {
+        status = METAFILE_SetClipPath((GpMetafile*)graphics->image, path, mode);
+        if (status != Ok)
+            return status;
+    }
+
     status = GdipClonePath(path, &clip_path);
     if (status == Ok)
     {
@@ -6465,17 +6494,14 @@ GpStatus WINGDIPAPI GdipSetClipRect(GpGraphics *graphics, REAL x, REAL y,
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         status = METAFILE_SetClipRect((GpMetafile*)graphics->image, x, y, width, height, mode);
         if (status != Ok)
             return status;
     }
 
-    rect.X = x;
-    rect.Y = y;
-    rect.Width  = width;
-    rect.Height = height;
+    set_rect(&rect, x, y, width, height);
     status = GdipCreateRegionRect(&rect, &region);
     if (status == Ok)
     {
@@ -6523,7 +6549,7 @@ GpStatus WINGDIPAPI GdipSetClipRegion(GpGraphics *graphics, GpRegion *region,
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         status = METAFILE_SetClipRegion((GpMetafile*)graphics->image, region, mode);
         if (status != Ok)
@@ -6640,7 +6666,8 @@ GpStatus WINGDIPAPI GdipMultiplyWorldTransform(GpGraphics *graphics, GDIPCONST G
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile) {
+    if (is_metafile_graphics(graphics))
+    {
         ret = METAFILE_MultiplyWorldTransform((GpMetafile*)graphics->image, matrix, order);
 
         if (ret != Ok)
@@ -6671,7 +6698,7 @@ GpStatus WINGDIPAPI GdipGetDC(GpGraphics *graphics, HDC *hdc)
     if(graphics->busy)
         return ObjectBusy;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         stat = METAFILE_GetDC((GpMetafile*)graphics->image, hdc);
     }
@@ -6752,7 +6779,7 @@ GpStatus WINGDIPAPI GdipReleaseDC(GpGraphics *graphics, HDC hdc)
     if(!graphics || !hdc || !graphics->busy)
         return InvalidParameter;
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
     {
         stat = METAFILE_ReleaseDC((GpMetafile*)graphics->image, hdc);
     }
@@ -7012,6 +7039,8 @@ HPALETTE WINGDIPAPI GdipCreateHalftonePalette(void)
  */
 GpStatus WINGDIPAPI GdipTranslateClip(GpGraphics *graphics, REAL dx, REAL dy)
 {
+    GpStatus stat;
+
     TRACE("(%p, %.2f, %.2f)\n", graphics, dx, dy);
 
     if(!graphics)
@@ -7019,6 +7048,13 @@ GpStatus WINGDIPAPI GdipTranslateClip(GpGraphics *graphics, REAL dx, REAL dy)
 
     if(graphics->busy)
         return ObjectBusy;
+
+    if (is_metafile_graphics(graphics))
+    {
+        stat = METAFILE_OffsetClip((GpMetafile *)graphics->image, dx, dy);
+        if (stat != Ok)
+            return stat;
+    }
 
     return GdipTranslateRegion(graphics->clip, dx, dy);
 }
@@ -7030,15 +7066,8 @@ GpStatus WINGDIPAPI GdipTranslateClipI(GpGraphics *graphics, INT dx, INT dy)
 {
     TRACE("(%p, %d, %d)\n", graphics, dx, dy);
 
-    if(!graphics)
-        return InvalidParameter;
-
-    if(graphics->busy)
-        return ObjectBusy;
-
-    return GdipTranslateRegion(graphics->clip, (REAL)dx, (REAL)dy);
+    return GdipTranslateClip(graphics, dx, dy);
 }
-
 
 /*****************************************************************************
  * GdipMeasureDriverString [GDIPLUS.@]
@@ -7067,12 +7096,7 @@ GpStatus WINGDIPAPI GdipMeasureDriverString(GpGraphics *graphics, GDIPCONST UINT
         length = lstrlenW(text);
 
     if (length == 0)
-    {
-        boundingBox->X = 0.0;
-        boundingBox->Y = 0.0;
-        boundingBox->Width = 0.0;
-        boundingBox->Height = 0.0;
-    }
+        set_rect(boundingBox, 0.0f, 0.0f, 0.0f, 0.0f);
 
     if (flags & unsupported_flags)
         FIXME("Ignoring flags %x\n", flags & unsupported_flags);
@@ -7468,7 +7492,7 @@ static GpStatus draw_driver_string(GpGraphics *graphics, GDIPCONST UINT16 *text,
     if (length == -1)
         length = lstrlenW(text);
 
-    if (graphics->image && graphics->image->type == ImageTypeMetafile)
+    if (is_metafile_graphics(graphics))
         return METAFILE_DrawDriverString((GpMetafile*)graphics->image, text, length, font,
             format, brush, positions, flags, matrix);
 

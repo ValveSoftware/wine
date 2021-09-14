@@ -1754,7 +1754,6 @@ int CDECL _fstat64(int fd, struct _stat64* buf)
   ioinfo *info = get_ioinfo(fd);
   DWORD dw;
   DWORD type;
-  BY_HANDLE_FILE_INFORMATION hfi;
 
   TRACE(":fd (%d) stat (%p)\n", fd, buf);
   if (info->handle == INVALID_HANDLE_VALUE)
@@ -1771,7 +1770,6 @@ int CDECL _fstat64(int fd, struct _stat64* buf)
     return -1;
   }
 
-  memset(&hfi, 0, sizeof(hfi));
   memset(buf, 0, sizeof(struct _stat64));
   type = GetFileType(info->handle);
   if (type == FILE_TYPE_PIPE)
@@ -1788,25 +1786,30 @@ int CDECL _fstat64(int fd, struct _stat64* buf)
   }
   else /* FILE_TYPE_DISK etc. */
   {
-    if (!GetFileInformationByHandle(info->handle, &hfi))
+    FILE_BASIC_INFORMATION basic_info;
+    FILE_STANDARD_INFORMATION std_info;
+    IO_STATUS_BLOCK io;
+    NTSTATUS status;
+
+    if ((status = NtQueryInformationFile( info->handle, &io, &basic_info, sizeof(basic_info), FileBasicInformation )) ||
+        (status = NtQueryInformationFile( info->handle, &io, &std_info, sizeof(std_info), FileStandardInformation )))
     {
-      WARN(":failed-last error (%d)\n",GetLastError());
+      WARN(":failed-error %x\n",status);
       msvcrt_set_errno(ERROR_INVALID_PARAMETER);
       release_ioinfo(info);
       return -1;
     }
     buf->st_mode = _S_IFREG | 0444;
-    if (!(hfi.dwFileAttributes & FILE_ATTRIBUTE_READONLY))
+    if (!(basic_info.FileAttributes & FILE_ATTRIBUTE_READONLY))
       buf->st_mode |= 0222;
-    buf->st_size  = ((__int64)hfi.nFileSizeHigh << 32) + hfi.nFileSizeLow;
-    RtlTimeToSecondsSince1970((LARGE_INTEGER *)&hfi.ftLastAccessTime, &dw);
+    buf->st_size  = std_info.EndOfFile.QuadPart;
+    RtlTimeToSecondsSince1970((LARGE_INTEGER *)&basic_info.LastAccessTime, &dw);
     buf->st_atime = dw;
-    RtlTimeToSecondsSince1970((LARGE_INTEGER *)&hfi.ftLastWriteTime, &dw);
+    RtlTimeToSecondsSince1970((LARGE_INTEGER *)&basic_info.LastWriteTime, &dw);
     buf->st_mtime = buf->st_ctime = dw;
-    buf->st_nlink = hfi.nNumberOfLinks;
+    buf->st_nlink = std_info.NumberOfLinks;
+    TRACE(":dwFileAttributes = 0x%x, mode set to 0x%x\n",basic_info.FileAttributes, buf->st_mode);
   }
-  TRACE(":dwFileAttributes = 0x%x, mode set to 0x%x\n",hfi.dwFileAttributes,
-   buf->st_mode);
   release_ioinfo(info);
   return 0;
 }
@@ -5255,6 +5258,20 @@ int CDECL _stdio_common_vfprintf(unsigned __int64 options, FILE *file, const cha
 }
 
 /*********************************************************************
+ *              __stdio_common_vfprintf_p (UCRTBASE.@)
+ */
+int CDECL __stdio_common_vfprintf_p(unsigned __int64 options, FILE *file, const char *format,
+                                          _locale_t locale, __ms_va_list valist)
+{
+    if (options & ~UCRTBASE_PRINTF_MASK)
+        FIXME("options %s not handled\n", wine_dbgstr_longlong(options));
+
+    return vfprintf_helper((options & UCRTBASE_PRINTF_MASK) | MSVCRT_PRINTF_POSITIONAL_PARAMS
+            | MSVCRT_PRINTF_INVOKE_INVALID_PARAM_HANDLER, file, format, locale, valist);
+}
+
+
+/*********************************************************************
  *              __stdio_common_vfprintf_s (UCRTBASE.@)
  */
 int CDECL __stdio_common_vfprintf_s(unsigned __int64 options, FILE *file, const char *format,
@@ -5278,6 +5295,20 @@ int CDECL __stdio_common_vfwprintf(unsigned __int64 options, FILE *file, const w
 
     return vfwprintf_helper(options & UCRTBASE_PRINTF_MASK, file, format, locale, valist);
 }
+
+/*********************************************************************
+ *              __stdio_common_vfwprintf_p (UCRTBASE.@)
+ */
+int CDECL __stdio_common_vfwprintf_p(unsigned __int64 options, FILE *file, const wchar_t *format,
+                                           _locale_t locale, __ms_va_list valist)
+{
+    if (options & ~UCRTBASE_PRINTF_MASK)
+        FIXME("options %s not handled\n", wine_dbgstr_longlong(options));
+
+    return vfwprintf_helper((options & UCRTBASE_PRINTF_MASK) | MSVCRT_PRINTF_POSITIONAL_PARAMS
+            | MSVCRT_PRINTF_INVOKE_INVALID_PARAM_HANDLER, file, format, locale, valist);
+}
+
 
 /*********************************************************************
  *              __stdio_common_vfwprintf_s (UCRTBASE.@)

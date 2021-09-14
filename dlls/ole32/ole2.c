@@ -133,9 +133,10 @@ static LRESULT CALLBACK OLEMenu_CallWndProc(INT code, WPARAM wParam, LPARAM lPar
 static LRESULT CALLBACK OLEMenu_GetMsgProc(INT code, WPARAM wParam, LPARAM lParam);
 
 /******************************************************************************
- * This is a prototype of the OLE Clipboard uninitialization method (in clipboard.c)
+ * These are the prototypes of the OLE Clipboard initialization methods (in clipboard.c)
  */
-extern void clipbrd_uninitialize(void);
+extern void OLEClipbrd_UnInitialize(void);
+extern void OLEClipbrd_Initialize(void);
 
 /******************************************************************************
  * These are the prototypes of the utility methods used for OLE Drag n Drop
@@ -197,6 +198,11 @@ HRESULT WINAPI DECLSPEC_HOTPATCH OleInitialize(LPVOID reserved)
     TRACE("() - Initializing the OLE libraries\n");
 
     /*
+     * OLE Clipboard
+     */
+    OLEClipbrd_Initialize();
+
+    /*
      * Drag and Drop
      */
     OLEDD_Initialize();
@@ -235,7 +241,7 @@ void WINAPI DECLSPEC_HOTPATCH OleUninitialize(void)
     /*
      * OLE Clipboard
      */
-    clipbrd_uninitialize();
+    OLEClipbrd_UnInitialize();
 
     /*
      * OLE shared menu

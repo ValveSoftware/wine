@@ -3,7 +3,6 @@
  *
  * Copyright 1996 Alexandre Julliard
  * Copyright 1998 Ulrich Weigand
- * Copyright 2017 Sebastian Lackner
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -36,7 +35,6 @@
 #include "winternl.h"
 #include "ntdll_misc.h"
 #include "wine/list.h"
-#include "wine/rbtree.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(heap);
@@ -57,11 +55,7 @@ typedef struct tagARENA_FREE
 {
     DWORD                 size;     /* Block size; must be the first field */
     DWORD                 magic;    /* Magic number */
-    union
-    {
-        struct list list;           /* Entry in free list */
-        struct wine_rb_entry tree;  /* Entry in free tree */
-    } entry;
+    struct list           entry;    /* Entry in free list */
 } ARENA_FREE;
 
 typedef struct
@@ -74,11 +68,9 @@ typedef struct
     DWORD                 magic;      /* these must remain at the end of the structure */
 } ARENA_LARGE;
 
-#define ARENA_FLAG_FREE_LIST   0x00000001  /* flags OR'ed with arena size */
-#define ARENA_FLAG_FREE_TREE   0x00000002
-#define ARENA_FLAG_FREE        (ARENA_FLAG_FREE_LIST | ARENA_FLAG_FREE_TREE)
-#define ARENA_FLAG_PREV_FREE   0x00000004
-#define ARENA_SIZE_MASK        (~7)
+#define ARENA_FLAG_FREE        0x00000001  /* flags OR'ed with arena size */
+#define ARENA_FLAG_PREV_FREE   0x00000002
+#define ARENA_SIZE_MASK        (~3)
 #define ARENA_LARGE_SIZE       0xfedcba90  /* magic value for 'size' field in large blocks */
 
 /* Value for arena 'magic' field */
@@ -96,8 +88,6 @@ typedef struct
 #define LARGE_ALIGNMENT        16  /* large blocks have stricter alignment */
 #define ARENA_OFFSET           (ALIGNMENT - sizeof(ARENA_INUSE))
 
-C_ASSERT( (sizeof(ARENA_INUSE) & ~ARENA_SIZE_MASK) == 0 );
-C_ASSERT( (sizeof(ARENA_FREE) & ~ARENA_SIZE_MASK) == 0 );
 C_ASSERT( sizeof(ARENA_LARGE) % LARGE_ALIGNMENT == 0 );
 
 #define ROUND_SIZE(size)       ((((size) + ALIGNMENT - 1) & ~(ALIGNMENT-1)) + ARENA_OFFSET)
@@ -106,22 +96,34 @@ C_ASSERT( sizeof(ARENA_LARGE) % LARGE_ALIGNMENT == 0 );
 #define NOISY                  0           /* Report all errors  */
 
 /* minimum data size (without arenas) of an allocated block */
-#define HEAP_MIN_DATA_SIZE    ROUND_SIZE(sizeof(ARENA_FREE) + sizeof(ARENA_FREE*) - sizeof(ARENA_INUSE))
+/* make sure that it's larger than a free list entry */
+#define HEAP_MIN_DATA_SIZE    ROUND_SIZE(2 * sizeof(struct list))
+#define HEAP_MIN_ARENA_SIZE   (HEAP_MIN_DATA_SIZE + sizeof(ARENA_INUSE))
 /* minimum size that must remain to shrink an allocated block */
 #define HEAP_MIN_SHRINK_SIZE  (HEAP_MIN_DATA_SIZE+sizeof(ARENA_FREE))
 /* minimum size to start allocating large blocks */
 #define HEAP_MIN_LARGE_BLOCK_SIZE  0x7f000
-/* extra size to add at the end of block to mitigate overruns and allow tail checking */
-#define HEAP_TAIL_EXTRA_SIZE ALIGNMENT
+/* extra size to add at the end of block for tail checking */
+#define HEAP_TAIL_EXTRA_SIZE(flags) \
+    ((flags & HEAP_TAIL_CHECKING_ENABLED) || RUNNING_ON_VALGRIND ? ALIGNMENT : 0)
 
-/* size of the blocks on the free lists */
-#define HEAP_FREELIST_SIZE(index) \
-    ((DWORD)(((index) * ALIGNMENT) + HEAP_MIN_DATA_SIZE + sizeof(ARENA_INUSE)))
-/* returns index for a given block size */
-#define HEAP_SIZE_TO_FREELIST_INDEX(size) \
-    (((size) - HEAP_MIN_DATA_SIZE - sizeof(ARENA_INUSE)) / ALIGNMENT)
-/* number of free lists */
-#define HEAP_NB_FREE_LISTS  128
+/* There will be a free list bucket for every arena size up to and including this value */
+#define HEAP_MAX_SMALL_FREE_LIST 0x100
+C_ASSERT( HEAP_MAX_SMALL_FREE_LIST % ALIGNMENT == 0 );
+#define HEAP_NB_SMALL_FREE_LISTS (((HEAP_MAX_SMALL_FREE_LIST - HEAP_MIN_ARENA_SIZE) / ALIGNMENT) + 1)
+
+/* Max size of the blocks on the free lists above HEAP_MAX_SMALL_FREE_LIST */
+static const SIZE_T HEAP_freeListSizes[] =
+{
+    0x200, 0x400, 0x1000, ~(SIZE_T)0
+};
+#define HEAP_NB_FREE_LISTS (ARRAY_SIZE( HEAP_freeListSizes ) + HEAP_NB_SMALL_FREE_LISTS)
+
+typedef union
+{
+    ARENA_FREE  arena;
+    void       *alignment[4];
+} FREE_LIST_ENTRY;
 
 struct tagHEAP;
 
@@ -160,16 +162,8 @@ typedef struct tagHEAP
     DWORD            pending_pos;   /* Position in pending free requests ring */
     ARENA_INUSE    **pending_free;  /* Ring buffer for pending free requests */
     RTL_CRITICAL_SECTION critSection; /* Critical section for serialization */
-    struct list     *freeList;      /* Free lists */
-    struct wine_rb_tree freeTree;   /* Free tree */
-    DWORD            freeMask[HEAP_NB_FREE_LISTS / (8 * sizeof(DWORD))];
+    FREE_LIST_ENTRY *freeList;      /* Free lists */
 } HEAP;
-
-#define HEAP_FREEMASK_BLOCK    (8 * sizeof(DWORD))
-#define HEAP_FREEMASK_INDEX(x) ((x) / HEAP_FREEMASK_BLOCK)
-#define HEAP_FREEMASK_BIT(x)   (1UL << ((x) & (HEAP_FREEMASK_BLOCK - 1)))
-
-C_ASSERT( HEAP_NB_FREE_LISTS % HEAP_FREEMASK_BLOCK == 0 );
 
 #define HEAP_MAGIC       ((DWORD)('H' | ('E'<<8) | ('A'<<16) | ('P'<<24)))
 
@@ -183,18 +177,9 @@ C_ASSERT( HEAP_NB_FREE_LISTS % HEAP_FREEMASK_BLOCK == 0 );
 #define HEAP_VALIDATE_ALL     0x20000000
 #define HEAP_VALIDATE_PARAMS  0x40000000
 
-BOOL delay_heap_free = FALSE;
-
 static HEAP *processHeap;  /* main process heap */
 
 static BOOL HEAP_IsRealArena( HEAP *heapPtr, DWORD flags, LPCVOID block, BOOL quiet );
-
-/* get arena size for an rb tree entry */
-static inline DWORD get_arena_size( const struct wine_rb_entry *entry )
-{
-    ARENA_FREE *arena = WINE_RB_ENTRY_VALUE( entry, ARENA_FREE, entry.tree );
-    return (arena->size & ARENA_SIZE_MASK);
-}
 
 /* mark a block of memory as free for debugging purposes */
 static inline void mark_block_free( void *ptr, SIZE_T size, DWORD flags )
@@ -317,6 +302,20 @@ static void subheap_notify_free_all(SUBHEAP const *subheap)
 #endif
 }
 
+/* locate a free list entry of the appropriate size */
+/* size is the size of the whole block including the arena header */
+static inline unsigned int get_freelist_index( SIZE_T size )
+{
+    unsigned int i;
+
+    if (size <= HEAP_MAX_SMALL_FREE_LIST)
+        return (size - HEAP_MIN_ARENA_SIZE) / ALIGNMENT;
+
+    for (i = HEAP_NB_SMALL_FREE_LISTS; i < HEAP_NB_FREE_LISTS - 1; i++)
+        if (size <= HEAP_freeListSizes[i - HEAP_NB_SMALL_FREE_LISTS]) break;
+    return i;
+}
+
 /* get the memory protection type to use for a given heap */
 static inline ULONG get_protection_type( DWORD flags )
 {
@@ -344,31 +343,13 @@ static void HEAP_Dump( HEAP *heap )
     TRACE( "Next: %p  Sub-heaps:", LIST_ENTRY( heap->entry.next, HEAP, entry ) );
     LIST_FOR_EACH_ENTRY( subheap, &heap->subheap_list, SUBHEAP, entry ) TRACE( " %p", subheap );
 
-    TRACE( "\nFree lists:\n" );
+    TRACE( "\nFree lists:\n Block   Stat   Size    Id\n" );
     for (i = 0; i < HEAP_NB_FREE_LISTS; i++)
-    {
-        BOOL empty = !(heap->freeMask[ HEAP_FREEMASK_INDEX( i ) ] & HEAP_FREEMASK_BIT( i ));
-
-        TRACE( "free %08x: ", HEAP_FREELIST_SIZE( i ) );
-        if (!empty && !list_empty( &heap->freeList[i] ))
-        {
-            TRACE( "head=%p tail=%p\n",
-                     LIST_ENTRY( heap->freeList[i].next, ARENA_FREE, entry.list ),
-                     LIST_ENTRY( heap->freeList[i].prev, ARENA_FREE, entry.list ));
-        }
-        else if (empty && list_empty( &heap->freeList[i] ))
-        {
-            TRACE( "(empty)\n" );
-        }
-        else
-        {
-            TRACE( "(corrupted)\n" );
-        }
-    }
-
-    TRACE( "free %08x: root=%p\n",
-             HEAP_FREELIST_SIZE( HEAP_NB_FREE_LISTS ),
-             heap->freeTree.root ? LIST_ENTRY( heap->freeTree.root, ARENA_FREE, entry.tree ) : NULL);
+        TRACE( "%p free %08lx prev=%p next=%p\n",
+                 &heap->freeList[i].arena, i < HEAP_NB_SMALL_FREE_LISTS ?
+                 HEAP_MIN_ARENA_SIZE + i * ALIGNMENT : HEAP_freeListSizes[i - HEAP_NB_SMALL_FREE_LISTS],
+                 LIST_ENTRY( heap->freeList[i].arena.entry.prev, ARENA_FREE, entry ),
+                 LIST_ENTRY( heap->freeList[i].arena.entry.next, ARENA_FREE, entry ));
 
     LIST_FOR_EACH_ENTRY( subheap, &heap->subheap_list, SUBHEAP, entry )
     {
@@ -383,32 +364,11 @@ static void HEAP_Dump( HEAP *heap )
             if (*(DWORD *)ptr & ARENA_FLAG_FREE)
             {
                 ARENA_FREE *pArena = (ARENA_FREE *)ptr;
-                if ((pArena->size & ARENA_FLAG_FREE) == ARENA_FLAG_FREE_LIST)
-                {
-                    TRACE( "%p %08x free %08x prev=%p next=%p\n",
-                              pArena, pArena->magic, pArena->size & ARENA_SIZE_MASK,
-                              LIST_ENTRY( pArena->entry.list.prev, ARENA_FREE, entry.list ),
-                              LIST_ENTRY( pArena->entry.list.next, ARENA_FREE, entry.list ) );
-                }
-                else if ((pArena->size & ARENA_FLAG_FREE) == ARENA_FLAG_FREE_TREE)
-                {
-                    ARENA_FREE *parent = NULL, *left = NULL, *right = NULL;
-
-                    if (pArena->entry.tree.parent)
-                        parent = WINE_RB_ENTRY_VALUE( pArena->entry.tree.parent, ARENA_FREE, entry.tree );
-                    if (pArena->entry.tree.left)
-                        left = WINE_RB_ENTRY_VALUE( pArena->entry.tree.left, ARENA_FREE, entry.tree );
-                    if (pArena->entry.tree.right)
-                        right = WINE_RB_ENTRY_VALUE( pArena->entry.tree.right, ARENA_FREE, entry.tree );
-
-                    TRACE( "%p %08x free %08x parent=%p left=%p right=%p\n",
-                             pArena, pArena->magic, pArena->size & ARENA_SIZE_MASK, parent, left, right );
-                }
-                else
-                {
-                    TRACE( "%p %08x free %08x corrupted\n",
-                             pArena, pArena->magic, pArena->size & ARENA_SIZE_MASK );
-                }
+                TRACE( "%p %08x free %08x prev=%p next=%p\n",
+                         pArena, pArena->magic,
+                         pArena->size & ARENA_SIZE_MASK,
+                         LIST_ENTRY( pArena->entry.prev, ARENA_FREE, entry ),
+                         LIST_ENTRY( pArena->entry.next, ARENA_FREE, entry ) );
                 ptr += sizeof(*pArena) + (pArena->size & ARENA_SIZE_MASK);
                 arenaSize += sizeof(ARENA_FREE);
                 freeSize += pArena->size & ARENA_SIZE_MASK;
@@ -516,42 +476,20 @@ static HEAP *HEAP_GetPtr(
  */
 static inline void HEAP_InsertFreeBlock( HEAP *heap, ARENA_FREE *pArena, BOOL last )
 {
-    SIZE_T index = HEAP_SIZE_TO_FREELIST_INDEX( pArena->size + sizeof(*pArena) );
-
-    if (index < HEAP_NB_FREE_LISTS)
+    FREE_LIST_ENTRY *pEntry = heap->freeList + get_freelist_index( pArena->size + sizeof(*pArena) );
+    if (last)
     {
-        list_add_tail( &heap->freeList[index], &pArena->entry.list );
-        heap->freeMask[ HEAP_FREEMASK_INDEX( index ) ] |= HEAP_FREEMASK_BIT( index );
-        pArena->size |= ARENA_FLAG_FREE_LIST;
+        /* insert at end of free list, i.e. before the next free list entry */
+        pEntry++;
+        if (pEntry == &heap->freeList[HEAP_NB_FREE_LISTS]) pEntry = heap->freeList;
+        list_add_before( &pEntry->arena.entry, &pArena->entry );
     }
     else
     {
-        wine_rb_put( &heap->freeTree, &pArena->size, &pArena->entry.tree );
-        pArena->size |= ARENA_FLAG_FREE_TREE;
+        /* insert at head of free list */
+        list_add_after( &pEntry->arena.entry, &pArena->entry );
     }
-}
-
-
-/***********************************************************************
- *           HEAP_DeleteFreeBlock
- *
- * Delete a free block from the free list.
- */
-static inline void HEAP_DeleteFreeBlock( HEAP *heap, ARENA_FREE *pArena )
-{
-    if ((pArena->size & ARENA_FLAG_FREE) == ARENA_FLAG_FREE_LIST)
-    {
-        if (pArena->entry.list.prev == pArena->entry.list.next)
-        {
-            SIZE_T index = HEAP_SIZE_TO_FREELIST_INDEX( (pArena->size & ARENA_SIZE_MASK) + sizeof(*pArena) );
-            heap->freeMask[ HEAP_FREEMASK_INDEX( index ) ] &= ~HEAP_FREEMASK_BIT( index );
-        }
-        list_remove( &pArena->entry.list );
-    }
-    else
-    {
-        wine_rb_remove( &heap->freeTree, &pArena->entry.tree );
-    }
+    pArena->size |= ARENA_FLAG_FREE;
 }
 
 
@@ -663,7 +601,7 @@ static void HEAP_CreateFreeBlock( SUBHEAP *subheap, void *ptr, SIZE_T size )
     {
         /* Remove the next arena from the free list */
         ARENA_FREE *pNext = (ARENA_FREE *)((char *)ptr + size);
-        HEAP_DeleteFreeBlock( subheap->heap, pNext );
+        list_remove( &pNext->entry );
         size += (pNext->size & ARENA_SIZE_MASK) + sizeof(*pNext);
         mark_block_free( pNext, sizeof(ARENA_FREE), flags );
     }
@@ -718,7 +656,7 @@ static void HEAP_MakeInUseBlockFree( SUBHEAP *subheap, ARENA_INUSE *pArena )
         pFree = *((ARENA_FREE **)pArena - 1);
         size += (pFree->size & ARENA_SIZE_MASK) + sizeof(ARENA_FREE);
         /* Remove it from the free list */
-        HEAP_DeleteFreeBlock( heap, pFree );
+        list_remove( &pFree->entry );
     }
     else pFree = (ARENA_FREE *)pArena;
 
@@ -738,7 +676,7 @@ static void HEAP_MakeInUseBlockFree( SUBHEAP *subheap, ARENA_INUSE *pArena )
 
         size = 0;
         /* Remove the free block from the list */
-        HEAP_DeleteFreeBlock( heap, pFree );
+        list_remove( &pFree->entry );
         /* Remove the subheap from the list */
         list_remove( &subheap->entry );
         /* Free the memory */
@@ -783,7 +721,7 @@ static void HEAP_ShrinkBlock(SUBHEAP *subheap, ARENA_INUSE *pArena, SIZE_T size)
 static void *allocate_large_block( HEAP *heap, DWORD flags, SIZE_T size )
 {
     ARENA_LARGE *arena;
-    SIZE_T block_size = sizeof(*arena) + ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE;
+    SIZE_T block_size = sizeof(*arena) + ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE(flags);
     LPVOID address = NULL;
 
     if (block_size < size) return NULL;  /* overflow */
@@ -931,15 +869,6 @@ static BOOL validate_large_arena( HEAP *heap, const ARENA_LARGE *arena, BOOL qui
 }
 
 
-static inline int arena_free_compare( const void *key, const struct wine_rb_entry *entry )
-{
-    DWORD arena_size = get_arena_size( entry );
-    if (*(DWORD *)key > arena_size) return 1;
-    else if (*(DWORD *)key < arena_size) return -1;
-    else return entry->left ? 1 : -1;
-}
-
-
 /***********************************************************************
  *           HEAP_CreateSubHeap
  */
@@ -947,6 +876,7 @@ static SUBHEAP *HEAP_CreateSubHeap( HEAP *heap, LPVOID address, DWORD flags,
                                     SIZE_T commitSize, SIZE_T totalSize )
 {
     SUBHEAP *subheap;
+    FREE_LIST_ENTRY *pEntry;
     unsigned int i;
 
     if (!address)
@@ -1007,21 +937,17 @@ static SUBHEAP *HEAP_CreateSubHeap( HEAP *heap, LPVOID address, DWORD flags,
         subheap->headerSize = ROUND_SIZE( sizeof(HEAP) );
         list_add_head( &heap->subheap_list, &subheap->entry );
 
-        /* Initialize the free tree */
+        /* Build the free lists */
 
-        heap->freeList = (struct list *)((char *)heap + subheap->headerSize);
-        subheap->headerSize += HEAP_NB_FREE_LISTS * sizeof(struct list);
-        for (i = 0; i < HEAP_NB_FREE_LISTS; i++)
-            list_init( &heap->freeList[i] );
-
-        /* Initialize the free tree */
-
-        wine_rb_init( &heap->freeTree, arena_free_compare );
-
-        /* Initialize the free mask */
-
-        for (i = 0; i < ARRAY_SIZE(heap->freeMask); i++)
-            heap->freeMask[i] = 0;
+        heap->freeList = (FREE_LIST_ENTRY *)((char *)heap + subheap->headerSize);
+        subheap->headerSize += HEAP_NB_FREE_LISTS * sizeof(FREE_LIST_ENTRY);
+        list_init( &heap->freeList[0].arena.entry );
+        for (i = 0, pEntry = heap->freeList; i < HEAP_NB_FREE_LISTS; i++, pEntry++)
+        {
+            pEntry->arena.size = 0 | ARENA_FLAG_FREE;
+            pEntry->arena.magic = ARENA_FREE_MAGIC;
+            if (i) list_add_after( &pEntry[-1].arena.entry, &pEntry->arena.entry );
+        }
 
         /* Initialize critical section */
 
@@ -1064,34 +990,6 @@ static SUBHEAP *HEAP_CreateSubHeap( HEAP *heap, LPVOID address, DWORD flags,
 }
 
 
-/* helper function for HEAP_FindFreeBlock */
-static struct wine_rb_entry *find_free_block( struct wine_rb_entry *entry, DWORD arena_size )
-{
-    for (;;)
-    {
-        if (!entry) return NULL;
-        if (get_arena_size( entry ) >= arena_size) break;
-        entry = entry->right;
-    }
-
-    for (;;)
-    {
-        if (!entry->left) return entry;
-        if (get_arena_size( entry->left ) < arena_size) break;
-        entry = entry->left;
-    }
-
-    if (entry->left->right)
-    {
-        struct wine_rb_entry *ret;
-        if ((ret = find_free_block( entry->left->right, arena_size )))
-            return ret;
-    }
-
-    return entry;
-}
-
-
 /***********************************************************************
  *           HEAP_FindFreeBlock
  *
@@ -1101,41 +999,26 @@ static struct wine_rb_entry *find_free_block( struct wine_rb_entry *entry, DWORD
 static ARENA_FREE *HEAP_FindFreeBlock( HEAP *heap, SIZE_T size,
                                        SUBHEAP **ppSubHeap )
 {
-    struct wine_rb_entry *ptr;
-    DWORD mask;
-    ARENA_FREE *arena;
     SUBHEAP *subheap;
+    struct list *ptr;
     SIZE_T total_size;
-    SIZE_T index = HEAP_SIZE_TO_FREELIST_INDEX( size + sizeof(ARENA_INUSE) );
+    FREE_LIST_ENTRY *pEntry = heap->freeList + get_freelist_index( size + sizeof(ARENA_INUSE) );
 
-    /* Find a suitable block from the free list */
+    /* Find a suitable free list, and in it find a block large enough */
 
-    while (index < HEAP_NB_FREE_LISTS)
+    ptr = &pEntry->arena.entry;
+    while ((ptr = list_next( &heap->freeList[0].arena.entry, ptr )))
     {
-        mask = heap->freeMask[ HEAP_FREEMASK_INDEX( index ) ] & ~(HEAP_FREEMASK_BIT( index ) - 1);
-        if (mask)
+        ARENA_FREE *pArena = LIST_ENTRY( ptr, ARENA_FREE, entry );
+        SIZE_T arena_size = (pArena->size & ARENA_SIZE_MASK) +
+                            sizeof(ARENA_FREE) - sizeof(ARENA_INUSE);
+        if (arena_size >= size)
         {
-            DWORD ctz;
-            BitScanForward( &ctz, mask );
-            index = (index & ~(HEAP_FREEMASK_BLOCK - 1)) | ctz;
-            arena = LIST_ENTRY( heap->freeList[index].next, ARENA_FREE, entry.list );
-            subheap = HEAP_FindSubHeap( heap, arena );
-            if (!HEAP_Commit( subheap, (ARENA_INUSE *)arena, size )) return NULL;
+            subheap = HEAP_FindSubHeap( heap, pArena );
+            if (!HEAP_Commit( subheap, (ARENA_INUSE *)pArena, size )) return NULL;
             *ppSubHeap = subheap;
-            return arena;
+            return pArena;
         }
-        index = (index + HEAP_FREEMASK_BLOCK) & ~(HEAP_FREEMASK_BLOCK - 1);
-    }
-
-    /* Find a suitable block from the free tree */
-
-    if ((ptr = find_free_block( heap->freeTree.root, size + sizeof(ARENA_INUSE) - sizeof(ARENA_FREE) )))
-    {
-        arena = WINE_RB_ENTRY_VALUE( ptr, ARENA_FREE, entry.tree );
-        subheap = HEAP_FindSubHeap( heap, arena );
-        if (!HEAP_Commit( subheap, (ARENA_INUSE *)arena, size )) return NULL;
-        *ppSubHeap = subheap;
-        return arena;
     }
 
     /* If no block was found, attempt to grow the heap */
@@ -1181,10 +1064,13 @@ static ARENA_FREE *HEAP_FindFreeBlock( HEAP *heap, SIZE_T size,
  */
 static BOOL HEAP_IsValidArenaPtr( const HEAP *heap, const ARENA_FREE *ptr )
 {
+    unsigned int i;
     const SUBHEAP *subheap = HEAP_FindSubHeap( heap, ptr );
     if (!subheap) return FALSE;
     if ((const char *)ptr >= (const char *)subheap->base + subheap->headerSize) return TRUE;
     if (subheap != &heap->subheap) return FALSE;
+    for (i = 0; i < HEAP_NB_FREE_LISTS; i++)
+        if (ptr == &heap->freeList[i].arena) return TRUE;
     return FALSE;
 }
 
@@ -1196,7 +1082,7 @@ static BOOL HEAP_ValidateFreeArena( SUBHEAP *subheap, ARENA_FREE *pArena )
 {
     DWORD flags = subheap->heap->flags;
     SIZE_T size;
-    ARENA_FREE *prev = NULL, *next = NULL;
+    ARENA_FREE *prev, *next;
     char *heapEnd = (char *)subheap->base + subheap->size;
 
     /* Check for unaligned pointers */
@@ -1213,8 +1099,7 @@ static BOOL HEAP_ValidateFreeArena( SUBHEAP *subheap, ARENA_FREE *pArena )
         return FALSE;
     }
     /* Check size flags */
-    if (((pArena->size & ARENA_FLAG_FREE) != ARENA_FLAG_FREE_LIST &&
-         (pArena->size & ARENA_FLAG_FREE) != ARENA_FLAG_FREE_TREE) ||
+    if (!(pArena->size & ARENA_FLAG_FREE) ||
         (pArena->size & ARENA_FLAG_PREV_FREE))
     {
         ERR("Heap %p: bad flags %08x for free arena %p\n",
@@ -1228,45 +1113,34 @@ static BOOL HEAP_ValidateFreeArena( SUBHEAP *subheap, ARENA_FREE *pArena )
         ERR("Heap %p: bad size %08lx for free arena %p\n", subheap->heap, size, pArena );
         return FALSE;
     }
-    if ((pArena->size & ARENA_FLAG_FREE) == ARENA_FLAG_FREE_LIST)
-    {
-        struct list *list = &subheap->heap->freeList[ HEAP_SIZE_TO_FREELIST_INDEX( size + sizeof(*pArena) ) ];
-        if (pArena->entry.list.prev != list)
-            prev = LIST_ENTRY( pArena->entry.list.prev, ARENA_FREE, entry.list );
-        if (pArena->entry.list.next != list)
-            next = LIST_ENTRY( pArena->entry.list.next, ARENA_FREE, entry.list );
-    }
-    else
-    {
-        if (pArena->entry.tree.left)
-            prev = WINE_RB_ENTRY_VALUE( pArena->entry.tree.left, ARENA_FREE, entry.tree );
-        if (pArena->entry.tree.right)
-            next = WINE_RB_ENTRY_VALUE( pArena->entry.tree.right, ARENA_FREE, entry.tree );
-    }
     /* Check that next pointer is valid */
-    if (next && !HEAP_IsValidArenaPtr( subheap->heap, next ))
+    next = LIST_ENTRY( pArena->entry.next, ARENA_FREE, entry );
+    if (!HEAP_IsValidArenaPtr( subheap->heap, next ))
     {
         ERR("Heap %p: bad next ptr %p for arena %p\n",
             subheap->heap, next, pArena );
         return FALSE;
     }
     /* Check that next arena is free */
-    if (next && (!(next->size & ARENA_FLAG_FREE) || (next->magic != ARENA_FREE_MAGIC)))
+    if (!(next->size & ARENA_FLAG_FREE) || (next->magic != ARENA_FREE_MAGIC))
     {
         ERR("Heap %p: next arena %p invalid for %p\n",
             subheap->heap, next, pArena );
         return FALSE;
     }
     /* Check that prev pointer is valid */
-    if (prev && !HEAP_IsValidArenaPtr( subheap->heap, prev ))
+    prev = LIST_ENTRY( pArena->entry.prev, ARENA_FREE, entry );
+    if (!HEAP_IsValidArenaPtr( subheap->heap, prev ))
     {
         ERR("Heap %p: bad prev ptr %p for arena %p\n",
             subheap->heap, prev, pArena );
         return FALSE;
     }
     /* Check that prev arena is free */
-    if (prev && (!(prev->size & ARENA_FLAG_FREE) || (prev->magic != ARENA_FREE_MAGIC)))
+    if (!(prev->size & ARENA_FLAG_FREE) || (prev->magic != ARENA_FREE_MAGIC))
     {
+	/* this often means that the prev arena got overwritten
+	 * by a memory write before that prev arena */
         ERR("Heap %p: prev arena %p invalid for %p\n",
             subheap->heap, prev, pArena );
         return FALSE;
@@ -1631,8 +1505,8 @@ void heap_set_debug_flags( HANDLE handle )
                              large->block_size - sizeof(*large) - large->data_size, flags );
     }
 
-    if (delay_heap_free || ((heap->flags & HEAP_GROWABLE) && !heap->pending_free &&
-        ((flags & HEAP_FREE_CHECKING_ENABLED) || RUNNING_ON_VALGRIND)))
+    if ((heap->flags & HEAP_GROWABLE) && !heap->pending_free &&
+        ((flags & HEAP_FREE_CHECKING_ENABLED) || RUNNING_ON_VALGRIND))
     {
         heap->pending_free = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY,
                                               MAX_FREE_PENDING * sizeof(*heap->pending_free) );
@@ -1787,7 +1661,7 @@ void * WINAPI DECLSPEC_HOTPATCH RtlAllocateHeap( HANDLE heap, ULONG flags, SIZE_
     if (!heapPtr) return NULL;
     flags &= HEAP_GENERATE_EXCEPTIONS | HEAP_NO_SERIALIZE | HEAP_ZERO_MEMORY;
     flags |= heapPtr->flags;
-    rounded_size = ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE;
+    rounded_size = ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE( flags );
     if (rounded_size < size)  /* overflow */
     {
         if (flags & HEAP_GENERATE_EXCEPTIONS) RtlRaiseStatus( STATUS_NO_MEMORY );
@@ -1819,7 +1693,7 @@ void * WINAPI DECLSPEC_HOTPATCH RtlAllocateHeap( HANDLE heap, ULONG flags, SIZE_
 
     /* Remove the arena from the free list */
 
-    HEAP_DeleteFreeBlock( heapPtr, pArena );
+    list_remove( &pArena->entry );
 
     /* Build the in-use arena */
 
@@ -1941,7 +1815,7 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
     flags |= heapPtr->flags;
     if (!(flags & HEAP_NO_SERIALIZE)) RtlEnterCriticalSection( &heapPtr->critSection );
 
-    rounded_size = ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE;
+    rounded_size = ROUND_SIZE(size) + HEAP_TAIL_EXTRA_SIZE(flags);
     if (rounded_size < size) goto oom;  /* overflow */
     if (rounded_size < HEAP_MIN_DATA_SIZE) rounded_size = HEAP_MIN_DATA_SIZE;
 
@@ -1976,7 +1850,7 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
         {
             /* The next block is free and large enough */
             ARENA_FREE *pFree = (ARENA_FREE *)pNext;
-            HEAP_DeleteFreeBlock( heapPtr, pFree );
+            list_remove( &pFree->entry );
             pArena->size += (pFree->size & ARENA_SIZE_MASK) + sizeof(*pFree);
             if (!HEAP_Commit( subheap, pArena, rounded_size )) goto oom;
             notify_realloc( pArena + 1, oldActualSize, size );
@@ -1994,7 +1868,7 @@ PVOID WINAPI RtlReAllocateHeap( HANDLE heap, ULONG flags, PVOID ptr, SIZE_T size
 
             /* Build the in-use arena */
 
-            HEAP_DeleteFreeBlock( heapPtr, pNew );
+            list_remove( &pNew->entry );
             pInUse = (ARENA_INUSE *)pNew;
             pInUse->size = (pInUse->size & ~ARENA_FLAG_FREE)
                            + sizeof(ARENA_FREE) - sizeof(ARENA_INUSE);

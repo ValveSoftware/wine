@@ -43,10 +43,6 @@
 #include "wine/heap.h"
 #include "wine/debug.h"
 
-#ifndef ARRAY_SIZE
-#define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
-#endif
-
 #ifdef SONAME_LIBGL
 
 WINE_DEFAULT_DEBUG_CHANNEL(wgl);
@@ -210,15 +206,6 @@ struct wgl_context
     struct gl_drawable *drawables[2];
     struct gl_drawable *new_drawables[2];
     BOOL refresh_drawables;
-    BOOL fs_hack;
-    BOOL fs_hack_integer;
-    BOOL is_core;
-    GLuint fs_hack_fbo, fs_hack_resolve_fbo;
-    GLuint fs_hack_color_texture, fs_hack_ds_texture;
-    GLuint fs_hack_color_renderbuffer, fs_hack_ds_renderbuffer;
-    GLuint fs_hack_gamma_pgm, ramp_ubo;
-    POINT setup_for;
-    GLuint current_draw_fbo, current_read_fbo;
     struct list entry;
 };
 
@@ -263,14 +250,6 @@ struct gl_drawable
     int                            swap_interval;
     BOOL                           refresh_swap_interval;
     BOOL                           mutable_pf;
-    BOOL                           fs_hack;
-    BOOL                           fs_hack_did_swapbuf;
-    BOOL                           fs_hack_context_set_up;
-    BOOL                           fs_hack_needs_resolve;
-    BOOL                           has_scissor_indexed;
-    BOOL                           has_clip_control;
-    BOOL                           has_ati_frag_shader;
-    LONG                           last_gamma_serial;
 };
 
 enum glx_swap_control_method
@@ -416,63 +395,6 @@ static const GLubyte *(*pglGetString)(GLenum name);
 static void wglFinish(void);
 static void wglFlush(void);
 static const GLubyte *wglGetString(GLenum name);
-
-/* Fullscreen hack */
-static void (*pglActiveTexture)( GLenum texture );
-static void (*pglAttachShader)( GLuint program, GLuint shader );
-static void (*pglBindBuffer)( GLenum target, GLuint buffer );
-static void (*pglBindBufferBase)( GLenum target, GLuint index, GLuint buffer );
-static void (*pglBindBufferRange)( GLenum target, GLuint index, GLuint buffer, GLintptr offset, GLsizeiptr size );
-static void (*pglBindFramebuffer)( GLenum target, GLuint framebuffer );
-static void (*pglBindFramebufferEXT)( GLenum target, GLuint framebuffer );
-static void (*pglBindRenderbuffer)( GLenum target, GLuint renderbuffer );
-static void (*pglBindSampler)( GLuint target, GLuint sampler );
-static void (*pglBlitFramebuffer)( GLint srcX0, GLint srcY0, GLint srcX1, GLint srcY1, GLint dstX0, GLint dstY0, GLint dstX1, GLint dstY1, GLbitfield mask, GLenum filter );
-static void (*pglBufferData)( GLenum target, GLsizeiptr size, const void *data, GLenum usage );
-static void (*pglClipControl)( GLenum origin, GLenum depth );
-static void (*pglColorMaski)( GLuint index, GLboolean r, GLboolean g, GLboolean b, GLboolean a );
-static void (*pglCompileShader)( GLuint shader );
-static GLuint (*pglCreateProgram)( void );
-static GLuint (*pglCreateShader)( GLenum type );
-static void (*pglDeleteBuffers)( GLsizei n, GLuint *buffers );
-static void (*pglDeleteFramebuffers)( GLsizei n, const GLuint *framebuffers );
-static void (*pglDeleteProgram)( GLuint program );
-static void (*pglDeleteRenderbuffers)( GLsizei n, const GLuint *renderbuffers );
-static void (*pglDeleteShader)( GLuint shader );
-static void (*pglDrawArrays)( GLenum mode, GLint first, GLsizei count );
-static void (*pglDrawBuffer)( GLenum buffer );
-static void (*pglFramebufferRenderbuffer)( GLenum target, GLenum attachment, GLenum renderbuffertarget, GLuint renderbuffer );
-static void (*pglFramebufferTexture2D)( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level );
-static void (*pglGenBuffers)( GLsizei n, GLuint *buffers );
-static void (*pglGenFramebuffers)( GLsizei n, GLuint *ids );
-static void (*pglGetBooleani_v )(GLenum target, GLuint index, GLboolean *data);
-static void (*pglGetInteger64i_v)(GLenum target, GLuint index, GLint64 *data);
-static void (*pglGetIntegeri_v)(GLenum, GLuint, GLint *);
-static void (*pglGetFloati_v)(GLenum, GLuint, GLfloat *);
-static void (*pglGenRenderbuffers)( GLsizei n, GLuint *renderbuffers );
-static void (*pglGetProgramiv)( GLuint program, GLenum pname, GLint *params );
-static void (*pglGetProgramInfoLog)( GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog );
-static void (*pglGetShaderiv)( GLuint shader, GLenum pname, GLint *params );
-static void (*pglGetShaderInfoLog)( GLuint shader, GLsizei bufSize, GLsizei *length, GLchar *infoLog );
-static GLuint (*pglGetUniformBlockIndex)( GLuint program, const GLchar *uniformBlockName );
-static GLint (*pglGetUniformLocation)( GLuint program, const GLchar *name );
-static void (*pglLinkProgram)( GLuint program );
-static void (*pglReadBuffer)( GLenum src );
-static void (*pglRenderbufferStorage)( GLenum target, GLenum internalformat, GLsizei width, GLsizei height );
-static void (*pglRenderbufferStorageMultisample)( GLenum target, GLsizei samples, GLenum internalformat, GLsizei width, GLsizei height );
-static void (*pglScissorIndexed)(GLuint, GLint, GLint, GLsizei, GLsizei);
-static void (*pglScissorIndexedv)(GLuint, const GLint *);
-static void (*pglShaderSource)( GLuint shader, GLsizei count, const GLchar *const *string, const GLint *length );
-static void (*pglUniformBlockBinding)( GLuint program, GLuint uniformBlockIndex, GLuint uniformBlockBinding );
-static void (*pglUniform1i)( GLint location, GLint v0 );
-static void (*pglUseProgram)( GLuint program );
-static void (*pglViewportIndexedf)( GLuint index, GLfloat x, GLfloat y, GLfloat w, GLfloat h );
-static void (*pglViewportIndexedfv)( GLuint index, const GLfloat *v );
-static void (*pglGetFramebufferAttachmentParameteriv)(GLenum target, GLenum attachment, GLenum pname, GLint *params);
-static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
-static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer );
-static void wglDrawBuffer( GLenum buffer );
-static void wglReadBuffer( GLenum src );
 
 /* check if the extension is present in the list */
 static BOOL has_extension( const char *list, const char *ext )
@@ -649,11 +571,9 @@ static BOOL WINAPI init_opengl( INIT_ONCE *once, void *param, void **context )
     /* redirect some standard OpenGL functions */
 #define REDIRECT(func) \
     do { p##func = opengl_funcs.gl.p_##func; opengl_funcs.gl.p_##func = w##func; } while(0)
-    REDIRECT( glDrawBuffer );
     REDIRECT( glFinish );
     REDIRECT( glFlush );
     REDIRECT( glGetString );
-    REDIRECT( glReadBuffer );
 #undef REDIRECT
 
     pglXGetProcAddressARB = dlsym(opengl_handle, "glXGetProcAddressARB");
@@ -661,59 +581,6 @@ static BOOL WINAPI init_opengl( INIT_ONCE *once, void *param, void **context )
         ERR("Could not find glXGetProcAddressARB in libGL, disabling OpenGL.\n");
         goto failed;
     }
-
-    /* Fullscreen hack */
-#define LOAD_FUNCPTR(func) p##func = (void *)pglXGetProcAddressARB((const unsigned char *)#func);
-    LOAD_FUNCPTR( glActiveTexture );
-    LOAD_FUNCPTR( glAttachShader );
-    LOAD_FUNCPTR( glBindBuffer );
-    LOAD_FUNCPTR( glBindBufferBase );
-    LOAD_FUNCPTR( glBindBufferRange );
-    LOAD_FUNCPTR( glBindFramebuffer );
-    LOAD_FUNCPTR( glBindFramebufferEXT );
-    LOAD_FUNCPTR( glBindRenderbuffer );
-    LOAD_FUNCPTR( glBindSampler );
-    LOAD_FUNCPTR( glBlitFramebuffer );
-    LOAD_FUNCPTR( glBufferData );
-    LOAD_FUNCPTR( glClipControl );
-    LOAD_FUNCPTR( glColorMaski );
-    LOAD_FUNCPTR( glCompileShader );
-    LOAD_FUNCPTR( glCreateProgram );
-    LOAD_FUNCPTR( glCreateShader );
-    LOAD_FUNCPTR( glDeleteBuffers );
-    LOAD_FUNCPTR( glDeleteFramebuffers );
-    LOAD_FUNCPTR( glDeleteProgram );
-    LOAD_FUNCPTR( glDeleteRenderbuffers );
-    LOAD_FUNCPTR( glDeleteShader );
-    LOAD_FUNCPTR( glDrawArrays );
-    LOAD_FUNCPTR( glFramebufferRenderbuffer );
-    LOAD_FUNCPTR( glFramebufferTexture2D );
-    LOAD_FUNCPTR( glGenBuffers );
-    LOAD_FUNCPTR( glGenFramebuffers );
-    LOAD_FUNCPTR( glGetBooleani_v );
-    LOAD_FUNCPTR( glGetInteger64i_v );
-    LOAD_FUNCPTR( glGetIntegeri_v );
-    LOAD_FUNCPTR( glGetFloati_v );
-    LOAD_FUNCPTR( glGenRenderbuffers );
-    LOAD_FUNCPTR( glGetProgramiv );
-    LOAD_FUNCPTR( glGetProgramInfoLog );
-    LOAD_FUNCPTR( glGetShaderiv );
-    LOAD_FUNCPTR( glGetShaderInfoLog );
-    LOAD_FUNCPTR( glGetUniformBlockIndex );
-    LOAD_FUNCPTR( glGetUniformLocation );
-    LOAD_FUNCPTR( glLinkProgram );
-    LOAD_FUNCPTR( glRenderbufferStorage );
-    LOAD_FUNCPTR( glRenderbufferStorageMultisample );
-    LOAD_FUNCPTR( glScissorIndexed );
-    LOAD_FUNCPTR( glScissorIndexedv );
-    LOAD_FUNCPTR( glShaderSource );
-    LOAD_FUNCPTR( glUniformBlockBinding );
-    LOAD_FUNCPTR( glUniform1i );
-    LOAD_FUNCPTR( glUseProgram );
-    LOAD_FUNCPTR( glViewportIndexedf );
-    LOAD_FUNCPTR( glViewportIndexedfv );
-    LOAD_FUNCPTR( glGetFramebufferAttachmentParameteriv );
-#undef LOAD_FUNCPTR
 
 #define LOAD_FUNCPTR(f) do if((p##f = (void*)pglXGetProcAddressARB((const unsigned char*)#f)) == NULL) \
     { \
@@ -1465,17 +1332,10 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
 
     if (!known_child && !GetWindow( hwnd, GW_CHILD ) && GetAncestor( hwnd, GA_PARENT ) == GetDesktopWindow())  /* childless top-level window */
     {
-        struct x11drv_win_data *data;
-
         gl->type = DC_GL_WINDOW;
         gl->window = create_client_window( hwnd, visual );
         if (gl->window)
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
-        data = get_win_data( hwnd );
-        gl->fs_hack = data->fs_hack || fs_hack_get_gamma_ramp(NULL);
-        if (gl->fs_hack)
-            TRACE( "Window %p has the fullscreen hack enabled\n", hwnd );
-        release_win_data( data );
         TRACE( "%p created client %lx drawable %lx\n", hwnd, gl->window, gl->drawable );
     }
 #ifdef SONAME_LIBXCOMPOSITE
@@ -1597,9 +1457,6 @@ static BOOL set_pixel_format(HDC hdc, int format, BOOL allow_change)
 void sync_gl_drawable( HWND hwnd, BOOL known_child )
 {
     struct gl_drawable *old, *new;
-    struct x11drv_win_data *data;
-
-    TRACE("%p\n", hwnd);
 
     if (!(old = get_gl_drawable( hwnd, 0 ))) return;
 
@@ -1618,15 +1475,6 @@ void sync_gl_drawable( HWND hwnd, BOOL known_child )
     default:
         break;
     }
-
-    if (DC_GL_PIXMAP_WIN != old->type) {
-        data = get_win_data( hwnd );
-        old->fs_hack = data->fs_hack || fs_hack_get_gamma_ramp(NULL) != NULL;
-        if (old->fs_hack)
-            TRACE( "Window %p has the fullscreen hack enabled\n", hwnd );
-        release_win_data( data );
-    }
-
     release_gl_drawable( old );
 }
 
@@ -1900,29 +1748,6 @@ static struct wgl_context * WINAPI glxdrv_wglCreateContext( HDC hdc )
     return ret;
 }
 
-static void fs_hack_destroy_context( struct wgl_context *ctx )
-{
-    pglDeleteBuffers(1, &ctx->ramp_ubo);
-    pglDeleteProgram(ctx->fs_hack_gamma_pgm);
-    ctx->fs_hack_gamma_pgm = 0;
-
-    if (ctx->fs_hack_ds_renderbuffer)
-        pglDeleteRenderbuffers( 1, &ctx->fs_hack_ds_renderbuffer );
-    if (ctx->fs_hack_color_renderbuffer)
-        pglDeleteRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
-    if (ctx->fs_hack_ds_texture)
-        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_ds_texture );
-    if (ctx->fs_hack_color_texture)
-        opengl_funcs.gl.p_glDeleteTextures( 1, &ctx->fs_hack_color_texture );
-    ctx->fs_hack_color_renderbuffer = ctx->fs_hack_ds_renderbuffer = 0;
-    ctx->fs_hack_color_texture = ctx->fs_hack_ds_texture = 0;
-    if (ctx->fs_hack_resolve_fbo)
-        pglDeleteFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
-    if (ctx->fs_hack_fbo)
-        pglDeleteFramebuffers( 1, &ctx->fs_hack_fbo );
-    ctx->fs_hack_resolve_fbo = ctx->fs_hack_fbo = 0;
-}
-
 /***********************************************************************
  *		glxdrv_wglDeleteContext
  */
@@ -1931,8 +1756,6 @@ static BOOL WINAPI glxdrv_wglDeleteContext(struct wgl_context *ctx)
     struct wgl_pbuffer *pb;
 
     TRACE("(%p)\n", ctx);
-
-    fs_hack_destroy_context( ctx );
 
     EnterCriticalSection( &context_section );
     list_remove( &ctx->entry );
@@ -1959,10 +1782,6 @@ static BOOL WINAPI glxdrv_wglDeleteContext(struct wgl_context *ctx)
 static PROC WINAPI glxdrv_wglGetProcAddress(LPCSTR lpszProc)
 {
     if (!strncmp(lpszProc, "wgl", 3)) return NULL;
-    if (!strcmp(lpszProc, "glBindFramebuffer"))
-        return (PROC)wglBindFramebuffer;
-    if (!strcmp(lpszProc, "glBindFramebufferEXT"))
-        return (PROC)wglBindFramebufferEXT;
     return pglXGetProcAddressARB((const GLubyte*)lpszProc);
 }
 
@@ -1982,423 +1801,12 @@ static void set_context_drawables( struct wgl_context *ctx, struct gl_drawable *
     for (i = 0; i < 4; i++) release_gl_drawable( prev[i] );
 }
 
-struct fs_hack_fbconfig_attribs
-{
-    int render_type;
-    int buffer_size;
-    int red_size;
-    int green_size;
-    int blue_size;
-    int alpha_size;
-    int depth_size;
-    int stencil_size;
-    int doublebuffer;
-    int samples;
-};
-
-struct fs_hack_fbo_attachments_config
-{
-    GLint color_internalformat;
-    GLenum color_format;
-    GLenum color_type;
-    GLint ds_internalformat;
-    GLenum ds_format;
-    GLenum ds_type;
-    int samples;
-};
-
-static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_hack_fbconfig_attribs *attribs,
-        struct fs_hack_fbo_attachments_config *config )
-{
-    if (attribs->render_type != GLX_RGBA_BIT)
-        FIXME( "Unsupported GLX_RENDER_TYPE %#x.\n", attribs->render_type );
-    if (attribs->red_size != 8 || attribs->green_size != 8 || attribs->blue_size != 8)
-        FIXME( "Unsupported RGBA color sizes {%u, %u, %u, %u}.\n",
-                attribs->red_size, attribs->green_size, attribs->blue_size, attribs->alpha_size );
-    config->color_internalformat = attribs->alpha_size ? GL_SRGB8_ALPHA8 : GL_SRGB8;
-    config->color_format = GL_BGRA;
-    config->color_type = GL_UNSIGNED_INT_8_8_8_8_REV;
-    if (attribs->depth_size || attribs->stencil_size)
-    {
-        if (attribs->depth_size != 24)
-            FIXME( "Unsupported depth buffer size %u.\n", attribs->depth_size );
-        if (attribs->stencil_size && attribs->stencil_size != 8)
-            FIXME( "Unsupported stencil buffer size %u.\n", attribs->stencil_size );
-        config->ds_internalformat = attribs->stencil_size ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT24;
-        config->ds_format = attribs->stencil_size ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT;
-        config->ds_type = attribs->stencil_size ? GL_UNSIGNED_INT_24_8 : GL_UNSIGNED_INT;
-    }
-    else
-    {
-        config->ds_internalformat = config->ds_format = config->ds_type = 0;
-    }
-    config->samples = attribs->samples;
-}
-
-static const float *fs_hack_get_default_gamma_ramp(void)
-{
-    static float default_gamma_ramp[GAMMA_RAMP_SIZE * 3];
-    static BOOL initialized;
-    unsigned int i;
-
-    if (!initialized)
-    {
-        for (i = 0; i < GAMMA_RAMP_SIZE; i++)
-            default_gamma_ramp[                      i] =
-            default_gamma_ramp[GAMMA_RAMP_SIZE     + i] =
-            default_gamma_ramp[GAMMA_RAMP_SIZE * 2 + i] =
-                i / (float)(GAMMA_RAMP_SIZE - 1);
-        initialized = TRUE;
-    }
-    return default_gamma_ramp;
-}
-
-static const char *fs_hack_gamma_vertex_shader_src =
-"#version 330\n"
-"\n"
-"const vec4 square[4] = vec4[4](\n"
-"    vec4(-1.0, -1.0, 0.0, 1.0),\n"
-"    vec4(-1.0, 1.0, 0.0, 1.0),\n"
-"    vec4(1.0, -1.0, 0.0, 1.0),\n"
-"    vec4(1.0, 1.0, 0.0, 1.0)\n"
-");\n"
-"const vec2 texsq[4] = vec2[4](\n"
-"    vec2(0.0, 0.0),\n"
-"    vec2(0.0, 1.0),\n"
-"    vec2(1.0, 0.0),\n"
-"    vec2(1.0, 1.0)\n"
-");\n"
-"\n"
-"out vec2 texCoord;\n"
-"\n"
-"void main(void)\n"
-"{\n"
-"    gl_Position = square[gl_VertexID];\n"
-"    texCoord = texsq[gl_VertexID];\n"
-"}\n"
-;
-
-static const char *fs_hack_gamma_frag_shader_src =
-"#version 330\n"
-"\n"
-"uniform sampler2D tex;\n"
-"in vec2 texCoord;\n"
-"uniform ramp {\n"
-"    float values[3 * 256];\n"
-"};\n"
-"\n"
-"layout(location = 0) out vec4 outColor;\n"
-"\n"
-"void main(void)\n"
-"{\n"
-"    vec4 lookup = texture(tex, texCoord) * 255.0;\n"
-"    outColor.r = values[          int(lookup.r)];\n"
-"    outColor.g = values[256     + int(lookup.g)];\n"
-"    outColor.b = values[256 * 2 + int(lookup.b)];\n"
-"    outColor.a = 1.0;\n"
-"}\n"
-;
-
-static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, struct gl_drawable *gl )
-{
-    GLint success;
-    GLuint vshader, fshader, program, ramp_index, tex_loc, prev_program;
-    char errstr[512];
-    const float *default_gamma_ramp = fs_hack_get_default_gamma_ramp();
-
-    gl->last_gamma_serial = 0;
-
-    if (ctx->fs_hack_gamma_pgm)
-        return;
-
-    opengl_funcs.gl.p_glGetIntegerv( GL_CURRENT_PROGRAM, (GLint *)&prev_program );
-    /* vertex shader */
-    vshader = pglCreateShader(GL_VERTEX_SHADER);
-    if(vshader == 0){
-        ERR("Failed to create gamma vertex shader\n");
-        return;
-    }
-    pglShaderSource(vshader, 1, &fs_hack_gamma_vertex_shader_src, NULL);
-    pglCompileShader(vshader);
-
-    pglGetShaderiv(vshader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        pglGetShaderInfoLog(vshader, sizeof(errstr), NULL, errstr);
-        ERR("Compiling gamma vertex shader failed: %s\n", errstr);
-        pglDeleteShader(vshader);
-        return;
-    }
-
-
-    /* fragment shader */
-    fshader = pglCreateShader(GL_FRAGMENT_SHADER);
-    if(fshader == 0){
-        ERR("Failed to create gamma fragment shader\n");
-        pglDeleteShader(vshader);
-        return;
-    }
-    pglShaderSource(fshader, 1, &fs_hack_gamma_frag_shader_src, NULL);
-    pglCompileShader(fshader);
-
-    pglGetShaderiv(fshader, GL_COMPILE_STATUS, &success);
-    if(!success){
-        pglGetShaderInfoLog(fshader, sizeof(errstr), NULL, errstr);
-        ERR("Compiling gamma fragment shader failed: %s\n", errstr);
-        pglDeleteShader(fshader);
-        pglDeleteShader(vshader);
-        return;
-    }
-
-
-    /* gamma program */
-    program = pglCreateProgram();
-    if(program == 0){
-        ERR("Failed to create gamma program\n");
-        pglDeleteShader(fshader);
-        pglDeleteShader(vshader);
-        return;
-    }
-
-    pglAttachShader(program, vshader);
-    pglAttachShader(program, fshader);
-
-    pglLinkProgram(program);
-
-    pglGetProgramiv(program, GL_LINK_STATUS, &success);
-    if(!success){
-        pglGetProgramInfoLog(program, sizeof(errstr), NULL, errstr);
-        ERR("Linking gamma shader failed: %s\n", errstr);
-        pglDeleteProgram(program);
-        pglDeleteShader(fshader);
-        pglDeleteShader(vshader);
-        return;
-    }
-
-    pglDeleteShader(fshader);
-    pglDeleteShader(vshader);
-
-    pglGenBuffers(1, &ctx->ramp_ubo);
-    pglBindBuffer(GL_UNIFORM_BUFFER, ctx->ramp_ubo);
-    pglBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 3 * GAMMA_RAMP_SIZE, default_gamma_ramp, GL_DYNAMIC_DRAW);
-
-    ramp_index = pglGetUniformBlockIndex(program, "ramp");
-    pglUniformBlockBinding(program, ramp_index, 0);
-
-    pglUseProgram( program );
-
-    tex_loc = pglGetUniformLocation(program, "tex");
-    pglUniform1i(tex_loc, 0);
-
-    ctx->fs_hack_gamma_pgm = program;
-
-    pglUseProgram( prev_program );
-}
-
-static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *gl )
-{
-    GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer;
-    float prev_clear_color[4], prev_clear_depth;
-    int prev_clear_stencil;
-    unsigned int i;
-    struct fs_hack_fbo_attachments_config config;
-    struct fs_hack_fbconfig_attribs attribs;
-    static const struct fbconfig_attribs_query
-    {
-        int attribute;
-        unsigned int offset;
-    }
-    queries[] =
-    {
-        {GLX_RENDER_TYPE, offsetof(struct fs_hack_fbconfig_attribs, render_type)},
-        {GLX_BUFFER_SIZE, offsetof(struct fs_hack_fbconfig_attribs, buffer_size)},
-        {GLX_RED_SIZE, offsetof(struct fs_hack_fbconfig_attribs, red_size)},
-        {GLX_GREEN_SIZE, offsetof(struct fs_hack_fbconfig_attribs, green_size)},
-        {GLX_BLUE_SIZE, offsetof(struct fs_hack_fbconfig_attribs, blue_size)},
-        {GLX_ALPHA_SIZE, offsetof(struct fs_hack_fbconfig_attribs, alpha_size)},
-        {GLX_DEPTH_SIZE, offsetof(struct fs_hack_fbconfig_attribs, depth_size)},
-        {GLX_STENCIL_SIZE, offsetof(struct fs_hack_fbconfig_attribs, stencil_size)},
-        {GLX_DOUBLEBUFFER, offsetof(struct fs_hack_fbconfig_attribs, doublebuffer)},
-        {GLX_SAMPLES_ARB, offsetof(struct fs_hack_fbconfig_attribs, samples)},
-    };
-    BYTE *ptr = (BYTE *)&attribs;
-
-    if (ctx->fs_hack)
-    {
-        int width, height;
-        RECT rect = {0};
-        GLuint profile;
-        HWND hwnd;
-
-        hwnd = WindowFromDC(ctx->hdc);
-        GetClientRect(hwnd, &rect);
-
-        width = rect.right - rect.left;
-        height = rect.bottom - rect.top;
-
-        TRACE("Render buffer width:%d height:%d\n", width, height);
-
-        opengl_funcs.gl.p_glGetIntegerv( GL_CONTEXT_PROFILE_MASK, (GLint *)&profile );
-        ctx->is_core = (profile & GL_CONTEXT_CORE_PROFILE_BIT) != 0;
-
-        opengl_funcs.gl.p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&prev_draw_fbo );
-        opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&prev_read_fbo );
-        opengl_funcs.gl.p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev_texture );
-        opengl_funcs.gl.p_glGetIntegerv( GL_RENDERBUFFER_BINDING, (GLint *)&prev_renderbuffer );
-        opengl_funcs.gl.p_glGetFloatv( GL_COLOR_CLEAR_VALUE, prev_clear_color );
-        opengl_funcs.gl.p_glGetFloatv( GL_DEPTH_CLEAR_VALUE, &prev_clear_depth );
-        opengl_funcs.gl.p_glGetIntegerv( GL_STENCIL_CLEAR_VALUE, &prev_clear_stencil );
-        TRACE( "Previous draw FBO %u, read FBO %u for ctx %p\n", prev_draw_fbo, prev_read_fbo, ctx);
-
-        if (!ctx->fs_hack_fbo)
-        {
-            pglGenFramebuffers( 1, &ctx->fs_hack_fbo );
-            TRACE( "Created FBO %u for fullscreen hack.\n", ctx->fs_hack_fbo );
-        }
-        pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0);
-
-        for (i = 0; i < ARRAY_SIZE(queries); ++i)
-            pglXGetFBConfigAttrib( gdi_display, gl->format->fbconfig, queries[i].attribute,
-                    (int *)&ptr[queries[i].offset] );
-
-        pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_fbo );
-
-        fs_hack_get_attachments_config( gl, &attribs, &config );
-
-        if (!ctx->fs_hack_color_texture)
-            opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_color_texture );
-        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_color_texture );
-        opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.color_internalformat, width, height,
-                0, config.color_format, config.color_type, NULL);
-        opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-        opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER,
-                ctx->fs_hack_integer ? GL_NEAREST : GL_LINEAR);
-        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
-        TRACE( "Created texture %u for fullscreen hack.\n", ctx->fs_hack_color_texture );
-
-        if (config.samples)
-        {
-            gl->fs_hack_needs_resolve = TRUE;
-
-            if (!ctx->fs_hack_resolve_fbo)
-            {
-                pglGenFramebuffers( 1, &ctx->fs_hack_resolve_fbo );
-                TRACE( "Created resolve FBO %u for fullscreen hack.\n", ctx->fs_hack_resolve_fbo );
-            }
-
-            if (!ctx->fs_hack_color_renderbuffer)
-                pglGenRenderbuffers( 1, &ctx->fs_hack_color_renderbuffer );
-            pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
-            pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
-                    config.color_internalformat, width, height );
-
-            pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                    GL_RENDERBUFFER, ctx->fs_hack_color_renderbuffer );
-            TRACE( "Created renderbuffer %u and FBO %u for fullscreen hack.\n", ctx->fs_hack_color_renderbuffer, ctx->fs_hack_resolve_fbo );
-            pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
-            pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                    GL_TEXTURE_2D, ctx->fs_hack_color_texture, 0 );
-            pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_fbo );
-            pglBindRenderbuffer( GL_RENDERBUFFER, prev_renderbuffer );
-        }
-        else
-        {
-            gl->fs_hack_needs_resolve = FALSE;
-            pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                    GL_TEXTURE_2D, ctx->fs_hack_color_texture, 0 );
-        }
-
-        if (config.ds_internalformat)
-        {
-            if (config.samples)
-            {
-                if (!ctx->fs_hack_ds_renderbuffer)
-                    pglGenRenderbuffers( 1, &ctx->fs_hack_ds_renderbuffer );
-                pglBindRenderbuffer( GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
-                pglRenderbufferStorageMultisample( GL_RENDERBUFFER, config.samples,
-                        config.ds_internalformat, width, height );
-
-                pglBindRenderbuffer( GL_RENDERBUFFER, prev_renderbuffer );
-                if (attribs.depth_size)
-                    pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                            GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
-                if (attribs.stencil_size)
-                    pglFramebufferRenderbuffer( GL_DRAW_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
-                            GL_RENDERBUFFER, ctx->fs_hack_ds_renderbuffer );
-                TRACE( "Created DS renderbuffer %u for fullscreen hack.\n", ctx->fs_hack_ds_renderbuffer );
-            }
-            else
-            {
-                if (!ctx->fs_hack_ds_texture)
-                    opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_ds_texture );
-                opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_ds_texture );
-                opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.ds_internalformat, width, height,
-                        0, config.ds_format, config.ds_type, NULL);
-                opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
-                opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
-                if (attribs.depth_size)
-                    pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
-                if (attribs.stencil_size)
-                    pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_STENCIL_ATTACHMENT, GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
-                TRACE( "Created DS texture %u for fullscreen hack.\n", ctx->fs_hack_ds_texture );
-            }
-        }
-
-        fs_hack_setup_gamma_shader(ctx, gl);
-
-        if (!ctx->has_been_current)
-            opengl_funcs.gl.p_glViewport(0, 0, width, height);
-
-        if(!gl->fs_hack_context_set_up)
-        {
-            opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
-            opengl_funcs.gl.p_glClearDepth( 1.0 );
-            opengl_funcs.gl.p_glClearStencil( 0 );
-            opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
-        }
-        pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
-        pglDrawBuffer( GL_BACK );
-        if(!gl->fs_hack_context_set_up)
-        {
-            opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
-            opengl_funcs.gl.p_glClearColor( prev_clear_color[0], prev_clear_color[1], prev_clear_color[2], prev_clear_color[3] );
-            opengl_funcs.gl.p_glClearDepth( prev_clear_depth );
-            opengl_funcs.gl.p_glClearStencil( prev_clear_stencil );
-        }
-        wglBindFramebuffer( GL_DRAW_FRAMEBUFFER, prev_draw_fbo );
-        wglBindFramebuffer( GL_READ_FRAMEBUFFER, prev_read_fbo );
-
-        ctx->setup_for.x = width;
-        ctx->setup_for.y = height;
-        gl->has_scissor_indexed = has_extension(glExtensions, "GL_ARB_viewport_array");
-        gl->has_clip_control = has_extension(glExtensions, "GL_ARB_clip_control");
-        gl->has_ati_frag_shader = has_extension(glExtensions, "GL_ATI_fragment_shader");
-        ctx->fs_hack_integer = fs_hack_is_integer();
-
-        gl->fs_hack_context_set_up = TRUE;
-    }
-    else
-    {
-        TRACE( "Releasing fullscreen hack texture %u and FBO %u\n", ctx->fs_hack_color_texture, ctx->fs_hack_fbo );
-        if (ctx->current_draw_fbo == ctx->fs_hack_fbo)
-        {
-            pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
-            ctx->current_draw_fbo = 0;
-        }
-        if (ctx->current_read_fbo == ctx->fs_hack_fbo)
-        {
-            pglBindFramebuffer( GL_READ_FRAMEBUFFER, 0 );
-            ctx->current_read_fbo = 0;
-        }
-        gl->fs_hack_context_set_up = FALSE;
-    }
-}
-
 /***********************************************************************
  *		glxdrv_wglMakeCurrent
  */
 static BOOL WINAPI glxdrv_wglMakeCurrent(HDC hdc, struct wgl_context *ctx)
 {
-    BOOL ret = FALSE, setup_fs_hack = FALSE;
+    BOOL ret = FALSE;
     struct gl_drawable *gl;
 
     TRACE("(%p,%p)\n", hdc, ctx);
@@ -2427,17 +1835,10 @@ static BOOL WINAPI glxdrv_wglMakeCurrent(HDC hdc, struct wgl_context *ctx)
         if (ret)
         {
             NtCurrentTeb()->glContext = ctx;
-            if (ctx->fs_hack != gl->fs_hack || (ctx->fs_hack && ctx->drawables[0] != gl))
-                setup_fs_hack = TRUE;
+            ctx->has_been_current = TRUE;
             ctx->hdc = hdc;
             set_context_drawables( ctx, gl, gl );
             ctx->refresh_drawables = FALSE;
-            if (setup_fs_hack)
-            {
-                ctx->fs_hack = gl->fs_hack;
-                fs_hack_setup_context( ctx, gl );
-            }
-            ctx->has_been_current = TRUE;
             LeaveCriticalSection( &context_section );
             goto done;
         }
@@ -2456,7 +1857,7 @@ done:
  */
 static BOOL X11DRV_wglMakeContextCurrentARB( HDC draw_hdc, HDC read_hdc, struct wgl_context *ctx )
 {
-    BOOL ret = FALSE, setup_fs_hack = FALSE;
+    BOOL ret = FALSE;
     struct gl_drawable *draw_gl, *read_gl = NULL;
 
     TRACE("(%p,%p,%p)\n", draw_hdc, read_hdc, ctx);
@@ -2479,18 +1880,11 @@ static BOOL X11DRV_wglMakeContextCurrentARB( HDC draw_hdc, HDC read_hdc, struct 
                                      read_gl ? read_gl->drawable : 0, ctx->ctx);
         if (ret)
         {
-            NtCurrentTeb()->glContext = ctx;
-            if (ctx->fs_hack != draw_gl->fs_hack || (ctx->fs_hack && ctx->drawables[0] != draw_gl))
-                setup_fs_hack = TRUE;
+            ctx->has_been_current = TRUE;
             ctx->hdc = draw_hdc;
             set_context_drawables( ctx, draw_gl, read_gl );
             ctx->refresh_drawables = FALSE;
-            if (setup_fs_hack)
-            {
-                ctx->fs_hack = draw_gl->fs_hack;
-                fs_hack_setup_context( ctx, draw_gl );
-            }
-            ctx->has_been_current = TRUE;
+            NtCurrentTeb()->glContext = ctx;
             LeaveCriticalSection( &context_section );
             goto done;
         }
@@ -2549,499 +1943,56 @@ static BOOL WINAPI glxdrv_wglShareLists(struct wgl_context *org, struct wgl_cont
     return FALSE;
 }
 
-static void wglBindFramebuffer( GLenum target, GLuint framebuffer )
-{
-    struct wgl_context *ctx = NtCurrentTeb()->glContext;
-
-    TRACE( "target %#x, framebuffer %u\n", target, framebuffer );
-    if (ctx->fs_hack && !framebuffer)
-        framebuffer = ctx->fs_hack_fbo;
-
-    if (target == GL_DRAW_FRAMEBUFFER || target == GL_FRAMEBUFFER)
-        ctx->current_draw_fbo = framebuffer;
-    if (target == GL_READ_FRAMEBUFFER || target == GL_FRAMEBUFFER)
-        ctx->current_read_fbo = framebuffer;
-
-    pglBindFramebuffer( target, framebuffer );
-}
-
-static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer )
-{
-    struct wgl_context *ctx = NtCurrentTeb()->glContext;
-
-    TRACE( "target %#x, framebuffer %u\n", target, framebuffer );
-    if (ctx->fs_hack && !framebuffer)
-        framebuffer = ctx->fs_hack_fbo;
-
-    if (target == GL_DRAW_FRAMEBUFFER || target == GL_FRAMEBUFFER)
-        ctx->current_draw_fbo = framebuffer;
-    if (target == GL_READ_FRAMEBUFFER || target == GL_FRAMEBUFFER)
-        ctx->current_read_fbo = framebuffer;
-
-    pglBindFramebufferEXT( target, framebuffer );
-}
-
-static void wglDrawBuffer( GLenum buffer )
-{
-    struct wgl_context *ctx = NtCurrentTeb()->glContext;
-
-    if (ctx->fs_hack && ctx->current_draw_fbo == ctx->fs_hack_fbo)
-    {
-        TRACE("Overriding %#x with GL_COLOR_ATTACHMENT0\n", buffer);
-        buffer = GL_COLOR_ATTACHMENT0;
-    }
-    pglDrawBuffer( buffer );
-}
-
-static void wglReadBuffer( GLenum buffer )
-{
-    struct wgl_context *ctx = NtCurrentTeb()->glContext;
-
-    if (ctx->fs_hack && ctx->current_read_fbo == ctx->fs_hack_fbo)
-    {
-        TRACE("Overriding %#x with GL_COLOR_ATTACHMENT0\n", buffer);
-        buffer = GL_COLOR_ATTACHMENT0;
-    }
-    pglReadBuffer( buffer );
-}
-
-struct fs_hack_gl_state {
-    GLuint draw_fbo;
-    GLuint read_fbo;
-    GLuint program;
-    GLuint bound_texture;
-    GLint active_texture;
-    GLint clip_origin, clip_depth_mode;
-    GLuint ubo;
-    GLint64 ubo_size, ubo_start;
-    GLint viewporti[4];
-    GLfloat viewportf[4];
-    float clear_color[4];
-    GLboolean scissor_test, cull_face, blend, alpha_test, depth_test, stencil_test;
-    GLboolean arb_frag, arb_vert, ati_frag, fb_srgb;
-    GLboolean clip_distance[8];
-    GLboolean color_mask[4];
-    GLuint sampler;
-};
-
-#define SET 0
-#define RESET 1
-
-static void fs_hack_handle_enable_switch(int mode, GLenum cap, GLboolean *b, BOOL new)
-{
-    if(mode == SET){
-        *b = opengl_funcs.gl.p_glIsEnabled(cap);
-        if(new)
-            opengl_funcs.gl.p_glEnable(cap);
-        else
-            opengl_funcs.gl.p_glDisable(cap);
-    }else{
-        if(*b)
-            opengl_funcs.gl.p_glEnable(cap);
-        else
-            opengl_funcs.gl.p_glDisable(cap);
-    }
-}
-
-static void fs_hack_handle_fbo_state(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    if(mode == SET){
-        opengl_funcs.gl.p_glGetIntegerv( GL_DRAW_FRAMEBUFFER_BINDING, (GLint *)&state->draw_fbo );
-        opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&state->read_fbo );
-        TRACE( "Previous draw FBO %u, read FBO %u\n", state->draw_fbo, state->read_fbo );
-
-    }else{
-        pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, state->draw_fbo );
-        pglBindFramebuffer( GL_READ_FRAMEBUFFER, state->read_fbo );
-    }
-}
-
-static void fs_hack_handle_clip_control(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    if(!gl->has_clip_control)
-        return;
-
-    if(mode == SET){
-        opengl_funcs.gl.p_glGetIntegerv(GL_CLIP_ORIGIN, (GLint *)&state->clip_origin);
-        opengl_funcs.gl.p_glGetIntegerv(GL_CLIP_DEPTH_MODE, (GLint *)&state->clip_depth_mode);
-
-
-        pglClipControl(GL_LOWER_LEFT, GL_NEGATIVE_ONE_TO_ONE);
-
-    }else{
-        pglClipControl(state->clip_origin, state->clip_depth_mode);
-    }
-}
-
-static void fs_hack_handle_shaders(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    fs_hack_handle_enable_switch(mode, GL_FRAGMENT_PROGRAM_ARB, &state->arb_frag, FALSE);
-    fs_hack_handle_enable_switch(mode, GL_VERTEX_PROGRAM_ARB, &state->arb_vert, FALSE);
-    fs_hack_handle_enable_switch(mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, TRUE);
-
-    if(gl->has_ati_frag_shader)
-        fs_hack_handle_enable_switch(mode, GL_FRAGMENT_SHADER_ATI, &state->ati_frag, FALSE);
-
-    if(mode == SET){
-        opengl_funcs.gl.p_glGetIntegerv( GL_CURRENT_PROGRAM, (GLint *)&state->program );
-
-        pglGetIntegeri_v( GL_UNIFORM_BUFFER_BINDING, 0, (GLint *)&state->ubo );
-        pglGetInteger64i_v( GL_UNIFORM_BUFFER_START, 0, &state->ubo_start );
-        pglGetInteger64i_v( GL_UNIFORM_BUFFER_SIZE, 0, &state->ubo_size );
-
-        opengl_funcs.gl.p_glGetIntegerv(GL_ACTIVE_TEXTURE, &state->active_texture);
-        pglActiveTexture(GL_TEXTURE0);
-        opengl_funcs.gl.p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&state->bound_texture );
-        pglGetIntegeri_v(GL_SAMPLER_BINDING, 0, (GLint *)&state->sampler);
-
-        pglBindBufferBase(GL_UNIFORM_BUFFER, 0, ctx->ramp_ubo);
-
-        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_color_texture );
-        pglBindSampler( 0, 0 );
-
-        pglUseProgram( ctx->fs_hack_gamma_pgm );
-
-    }else{
-        pglUseProgram( state->program );
-
-        pglBindSampler( 0, state->sampler );
-
-        opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, state->bound_texture );
-        pglActiveTexture(state->active_texture);
-
-        pglBindBufferRange(GL_UNIFORM_BUFFER, 0, state->ubo, state->ubo_start, state->ubo_size);
-    }
-}
-
-static void fs_hack_handle_viewport(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    if(mode == SET){
-        if(gl->has_scissor_indexed){
-            pglGetFloati_v(GL_VIEWPORT, 0, state->viewportf);
-            pglViewportIndexedf(0, scaled_origin->x, scaled_origin->y, scaled->cx, scaled->cy);
-        }else{
-            opengl_funcs.gl.p_glGetIntegerv(GL_VIEWPORT, state->viewporti);
-            opengl_funcs.gl.p_glViewport(scaled_origin->x, scaled_origin->y, scaled->cx, scaled->cy);
-        }
-
-    }else{
-        if(gl->has_scissor_indexed){
-            pglViewportIndexedfv(0, state->viewportf);
-        }else{
-            opengl_funcs.gl.p_glViewport(state->viewporti[0], state->viewporti[1],
-                    state->viewporti[2], state->viewporti[3]);
-        }
-    }
-}
-
-static void fs_hack_handle_clear_color(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    if(mode == SET){
-        opengl_funcs.gl.p_glGetFloatv( GL_COLOR_CLEAR_VALUE, state->clear_color );
-        opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
-    }else{
-        opengl_funcs.gl.p_glClearColor( state->clear_color[0], state->clear_color[1], state->clear_color[2], state->clear_color[3] );
-    }
-}
-
-static void fs_hack_handle_clip_distance(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    unsigned int i;
-    if(mode == SET){
-        for(i = 0; i < ARRAY_SIZE(state->clip_distance); ++i){
-            state->clip_distance[i] = opengl_funcs.gl.p_glIsEnabled(GL_CLIP_DISTANCE0 + i);
-            opengl_funcs.gl.p_glDisable(GL_CLIP_DISTANCE0 + i);
-        }
-    }else{
-        for(i = 0; i < ARRAY_SIZE(state->clip_distance); ++i){
-            if(state->clip_distance[i])
-                opengl_funcs.gl.p_glEnable(GL_CLIP_DISTANCE0 + i);
-        }
-    }
-}
-
-static void fs_hack_handle_color_mask(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    if(mode == SET){
-        pglGetBooleani_v(GL_COLOR_WRITEMASK, 0, state->color_mask);
-
-        pglColorMaski(0, GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-    }else{
-        pglColorMaski(0, state->color_mask[0],
-                state->color_mask[1], state->color_mask[2],
-                state->color_mask[3]);
-    }
-}
-
-static void fs_hack_handle_scissor(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state,
-        const SIZE *real, const SIZE *scaled, const POINT *scaled_origin)
-{
-    fs_hack_handle_enable_switch(mode, GL_SCISSOR_TEST, &state->scissor_test, FALSE);
-}
-
-static void fs_hack_handle_cull_face(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    fs_hack_handle_enable_switch(mode, GL_CULL_FACE, &state->cull_face, FALSE);
-}
-
-static void fs_hack_handle_blend(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    fs_hack_handle_enable_switch(mode, GL_BLEND, &state->blend, FALSE);
-}
-
-static void fs_hack_handle_alpha_test(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    if(ctx->is_core)
-        return;
-
-    fs_hack_handle_enable_switch(mode, GL_ALPHA_TEST, &state->alpha_test, FALSE);
-}
-
-static void fs_hack_handle_ds_test(int mode, struct gl_drawable *gl,
-        struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
-        const SIZE *scaled, const POINT *scaled_origin)
-{
-    fs_hack_handle_enable_switch(mode, GL_DEPTH_TEST, &state->depth_test, FALSE);
-    fs_hack_handle_enable_switch(mode, GL_STENCIL_TEST, &state->stencil_test, FALSE);
-}
-
-static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer )
-{
-    static const struct
-    {
-        void (*state_handler)(int mode, struct gl_drawable *gl, struct wgl_context *ctx,
-                struct fs_hack_gl_state *state, const SIZE *real,
-                const SIZE *scaled, const POINT *scaled_origin);
-    }
-    general_state_handlers[] =
-    {
-        {fs_hack_handle_fbo_state},
-        {fs_hack_handle_scissor},
-        {fs_hack_handle_clear_color},
-    },
-    draw_state_handlers[] =
-    {
-        {fs_hack_handle_clip_control},
-        {fs_hack_handle_shaders},
-        {fs_hack_handle_viewport},
-        {fs_hack_handle_cull_face},
-        {fs_hack_handle_clip_distance},
-        {fs_hack_handle_color_mask},
-        {fs_hack_handle_blend},
-        {fs_hack_handle_alpha_test},
-        {fs_hack_handle_ds_test},
-    };
-    struct wgl_context *ctx = NtCurrentTeb()->glContext;
-    SIZE scaled, src, real;
-    RECT user_rect = {0}, real_rect;
-    POINT scaled_origin;
-    HMONITOR monitor;
-    struct fs_hack_gl_state state;
-    const float *gamma_ramp;
-    LONG gamma_serial;
-    unsigned int i;
-    HWND hwnd;
-
-    hwnd = WindowFromDC(ctx->hdc);
-    monitor = fs_hack_monitor_from_hwnd(hwnd);
-
-    if (fs_hack_enabled(monitor))
-    {
-        user_rect = fs_hack_current_mode(monitor);
-        real_rect = fs_hack_real_mode(monitor);
-        scaled = fs_hack_get_scaled_screen_size(monitor);
-    }
-    else
-    {
-        GetClientRect(hwnd, &user_rect);
-        real_rect = user_rect;
-        scaled.cx = user_rect.right - user_rect.left;
-        scaled.cy = user_rect.bottom - user_rect.top;
-    }
-
-    src.cx = user_rect.right - user_rect.left;
-    src.cy = user_rect.bottom - user_rect.top;
-    real.cx = real_rect.right - real_rect.left;
-    real.cy = real_rect.bottom - real_rect.top;
-    scaled_origin.x = user_rect.left;
-    scaled_origin.y = user_rect.top;
-    fs_hack_point_user_to_real(&scaled_origin);
-    scaled_origin.x -= real_rect.left;
-    scaled_origin.y -= real_rect.top;
-
-    gamma_ramp = fs_hack_get_gamma_ramp(&gamma_serial);
-
-    TRACE("scaled:%dx%d src:%dx%d real:%dx%d user_rect:%s real_rect:%s scaled_origin:%s\n", scaled.cx, scaled.cy,
-          src.cx, src.cy, real.cx, real.cy, wine_dbgstr_rect(&user_rect), wine_dbgstr_rect(&real_rect),
-          wine_dbgstr_point(&scaled_origin));
-
-    if(ctx->setup_for.x != src.cx ||
-            ctx->setup_for.y != src.cy)
-        fs_hack_setup_context( ctx, gl );
-
-    /* Can't stretch blit with multisampled renderbuffers */
-    if (gl->fs_hack_needs_resolve && !gamma_ramp){
-        gamma_ramp = fs_hack_get_default_gamma_ramp();
-        gamma_serial = 0;
-    }
-
-    TRACE( "Stretching from FBO %u %ux%u to %ux%u\n", ctx->fs_hack_fbo, src.cx, src.cy, scaled.cx, scaled.cy );
-
-    for (i = 0; i < ARRAY_SIZE(general_state_handlers); i++)
-        general_state_handlers[i].state_handler(SET, gl, ctx, &state, &real, &scaled, &scaled_origin);
-
-    if(gamma_ramp){
-        for (i = 0; i < ARRAY_SIZE(draw_state_handlers); i++)
-            draw_state_handlers[i].state_handler(SET, gl, ctx, &state, &real, &scaled, &scaled_origin);
-    }
-
-    pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_fbo );
-
-    if (gl->fs_hack_needs_resolve)
-    {
-        pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
-
-        pglBlitFramebuffer( 0, 0, src.cx, src.cy, 0, 0, src.cx, src.cy, GL_COLOR_BUFFER_BIT, GL_NEAREST );
-
-        pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
-    }
-
-    pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
-
-    //HACK
-    //pglDrawBuffer( draw_buffer );
-    pglDrawBuffer( GL_BACK );
-
-    opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
-
-    if(gamma_ramp){
-        if(gamma_serial != gl->last_gamma_serial){
-            TRACE("updating gamma ramp (serial: %u)\n", gamma_serial);
-
-            pglBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 3 * GAMMA_RAMP_SIZE, gamma_ramp, GL_DYNAMIC_DRAW);
-
-            gl->last_gamma_serial = gamma_serial;
-        }
-
-        pglDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    }else{
-        pglBlitFramebuffer( 0, 0, src.cx, src.cy,
-                scaled_origin.x, scaled_origin.y, scaled_origin.x + scaled.cx, scaled_origin.y + scaled.cy,
-                GL_COLOR_BUFFER_BIT, ctx->fs_hack_integer ? GL_NEAREST : GL_LINEAR );
-    }
-
-    //HACK
-    if ( draw_buffer == GL_FRONT )
-        pglXSwapBuffers(gdi_display, gl->drawable);
-
-    if(gamma_ramp){
-        for (i = 0; i < ARRAY_SIZE(draw_state_handlers); i++)
-            draw_state_handlers[i].state_handler(RESET, gl, ctx, &state, NULL, NULL, NULL);
-    }
-
-    for (i = 0; i < ARRAY_SIZE(general_state_handlers); i++)
-        general_state_handlers[i].state_handler(RESET, gl, ctx, &state, NULL, NULL, NULL);
-}
-
 static void wglFinish(void)
 {
-    struct x11drv_escape_present_drawable escape;
+    struct x11drv_escape_flush_gl_drawable escape;
     struct gl_drawable *gl;
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
 
-    TRACE("\n");
-
-    escape.code = X11DRV_PRESENT_DRAWABLE;
-    escape.drawable = 0;
+    escape.code = X11DRV_FLUSH_GL_DRAWABLE;
+    escape.gl_drawable = 0;
     escape.flush = FALSE;
 
     if ((gl = get_gl_drawable( WindowFromDC( ctx->hdc ), 0 )))
     {
         switch (gl->type)
         {
-        case DC_GL_PIXMAP_WIN: escape.drawable = gl->pixmap; break;
-        case DC_GL_CHILD_WIN:  escape.drawable = gl->window; break;
+        case DC_GL_PIXMAP_WIN: escape.gl_drawable = gl->pixmap; break;
+        case DC_GL_CHILD_WIN:  escape.gl_drawable = gl->window; break;
         default: break;
         }
         sync_context(ctx);
-
-        if (gl->fs_hack) {
-            ctx->fs_hack = gl->fs_hack;
-            if(!gl->fs_hack_context_set_up)
-                fs_hack_setup_context( ctx, gl );
-            if(!gl->fs_hack_did_swapbuf)
-                fs_hack_blit_framebuffer( gl, GL_FRONT );
-        }else if(gl->fs_hack_context_set_up){
-            ctx->fs_hack = FALSE;
-            fs_hack_setup_context(ctx, gl);
-        }
-
         release_gl_drawable( gl );
     }
 
     pglFinish();
-    if (escape.drawable) ExtEscape( ctx->hdc, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
+    if (escape.gl_drawable) ExtEscape( ctx->hdc, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
 }
 
 static void wglFlush(void)
 {
-    struct x11drv_escape_present_drawable escape;
+    struct x11drv_escape_flush_gl_drawable escape;
     struct gl_drawable *gl;
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
 
-    TRACE("\n");
-
-    escape.code = X11DRV_PRESENT_DRAWABLE;
-    escape.drawable = 0;
+    escape.code = X11DRV_FLUSH_GL_DRAWABLE;
+    escape.gl_drawable = 0;
     escape.flush = FALSE;
 
     if ((gl = get_gl_drawable( WindowFromDC( ctx->hdc ), 0 )))
     {
         switch (gl->type)
         {
-        case DC_GL_PIXMAP_WIN: escape.drawable = gl->pixmap; break;
-        case DC_GL_CHILD_WIN:  escape.drawable = gl->window; break;
+        case DC_GL_PIXMAP_WIN: escape.gl_drawable = gl->pixmap; break;
+        case DC_GL_CHILD_WIN:  escape.gl_drawable = gl->window; break;
         default: break;
         }
         sync_context(ctx);
-
-        if (gl->fs_hack) {
-            ctx->fs_hack = gl->fs_hack;
-            if(!gl->fs_hack_context_set_up)
-                fs_hack_setup_context( ctx, gl );
-            if(!gl->fs_hack_did_swapbuf)
-                fs_hack_blit_framebuffer( gl, GL_FRONT );
-        }else if(gl->fs_hack_context_set_up){
-            ctx->fs_hack = FALSE;
-            fs_hack_setup_context(ctx, gl);
-        }
-
         release_gl_drawable( gl );
     }
 
     pglFlush();
-    if (escape.drawable) ExtEscape( ctx->hdc, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
+    if (escape.gl_drawable) ExtEscape( ctx->hdc, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
 }
 
 static const GLubyte *wglGetString(GLenum name)
@@ -4356,15 +3307,15 @@ static void X11DRV_WineGL_LoadExtensions(void)
  */
 static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
 {
-    struct x11drv_escape_present_drawable escape;
+    struct x11drv_escape_flush_gl_drawable escape;
     struct gl_drawable *gl;
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
     INT64 ust, msc, sbc, target_sbc = 0;
 
     TRACE("(%p)\n", hdc);
 
-    escape.code = X11DRV_PRESENT_DRAWABLE;
-    escape.drawable = 0;
+    escape.code = X11DRV_FLUSH_GL_DRAWABLE;
+    escape.gl_drawable = 0;
     escape.flush = !pglXWaitForSbcOML;
 
     if (!(gl = get_gl_drawable( WindowFromDC( hdc ), hdc )))
@@ -4385,7 +3336,7 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
     {
     case DC_GL_PIXMAP_WIN:
         if (ctx) sync_context( ctx );
-        escape.drawable = gl->pixmap;
+        escape.gl_drawable = gl->pixmap;
         if (pglXCopySubBufferMESA) {
             /* (glX)SwapBuffers has an implicit glFlush effect, however
              * GLX_MESA_copy_sub_buffer doesn't. Make sure GL is flushed before
@@ -4406,35 +3357,25 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
     case DC_GL_WINDOW:
     case DC_GL_CHILD_WIN:
         if (ctx) sync_context( ctx );
-        if (gl->type == DC_GL_CHILD_WIN) escape.drawable = gl->window;
+        if (gl->type == DC_GL_CHILD_WIN) escape.gl_drawable = gl->window;
         /* fall through */
     default:
-        if (escape.drawable && pglXSwapBuffersMscOML)
+        if (escape.gl_drawable && pglXSwapBuffersMscOML)
         {
             pglFlush();
             target_sbc = pglXSwapBuffersMscOML( gdi_display, gl->drawable, 0, 0, 0 );
             break;
         }
-        if (gl->fs_hack){
-            ctx->fs_hack = gl->fs_hack;
-            if(!gl->fs_hack_context_set_up)
-                fs_hack_setup_context( ctx, gl );
-            fs_hack_blit_framebuffer( gl, GL_BACK );
-            gl->fs_hack_did_swapbuf = TRUE;
-        }else if(gl->fs_hack_context_set_up){
-            ctx->fs_hack = FALSE;
-            fs_hack_setup_context(ctx, gl);
-        }
         pglXSwapBuffers(gdi_display, gl->drawable);
         break;
     }
 
-    if (escape.drawable && pglXWaitForSbcOML)
+    if (escape.gl_drawable && pglXWaitForSbcOML)
         pglXWaitForSbcOML( gdi_display, gl->drawable, target_sbc, &ust, &msc, &sbc );
 
     release_gl_drawable( gl );
 
-    if (escape.drawable) ExtEscape( ctx->hdc, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
+    if (escape.gl_drawable) ExtEscape( ctx->hdc, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
     return TRUE;
 }
 

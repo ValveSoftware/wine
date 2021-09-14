@@ -235,7 +235,6 @@ static const struct wined3d_extension_map gl_extension_map[] =
     {"GL_NV_vertex_program2_option",        NV_VERTEX_PROGRAM2_OPTION     },
     {"GL_NV_vertex_program3",               NV_VERTEX_PROGRAM3            },
     {"GL_NV_texture_barrier",               NV_TEXTURE_BARRIER            },
-    {"GL_NVX_gpu_memory_info",              NVX_GPU_MEMORY_INFO           },
 };
 
 static const struct wined3d_extension_map wgl_extension_map[] =
@@ -1023,17 +1022,6 @@ static const struct wined3d_gpu_description *query_gpu_description(const struct 
 
         TRACE("Card reports vendor PCI ID 0x%04x, device PCI ID 0x%04x, 0x%s bytes of video memory.\n",
                 vendor, device, wine_dbgstr_longlong(*vram_bytes));
-
-        gpu_description = wined3d_get_gpu_description(vendor, device);
-    }
-    else if (gl_info->supported[NVX_GPU_MEMORY_INFO])
-    {
-        GLint vram_kb;
-        gl_info->gl_ops.gl.p_glGetIntegerv(GL_GPU_MEMORY_INFO_DEDICATED_VIDMEM_NVX, &vram_kb);
-
-        *vram_bytes = (UINT64)vram_kb * 1024;
-        TRACE("Got 0x%s as video memory from NVX_GPU_MEMORY_INFO extension.\n",
-                wine_dbgstr_longlong(*vram_bytes));
 
         gpu_description = wined3d_get_gpu_description(vendor, device);
     }
@@ -4291,13 +4279,13 @@ static void adapter_gl_destroy_device(struct wined3d_device *device)
     heap_free(device_gl);
 }
 
-struct wined3d_context *adapter_gl_acquire_context(struct wined3d_device *device,
+static struct wined3d_context *adapter_gl_acquire_context(struct wined3d_device *device,
         struct wined3d_texture *texture, unsigned int sub_resource_idx)
 {
     return wined3d_context_gl_acquire(device, texture, sub_resource_idx);
 }
 
-void adapter_gl_release_context(struct wined3d_context *context)
+static void adapter_gl_release_context(struct wined3d_context *context)
 {
     return wined3d_context_gl_release(wined3d_context_gl(context));
 }
@@ -4819,7 +4807,7 @@ static void wined3d_view_gl_destroy(struct wined3d_device *device,
 
     wined3d_cs_destroy_object(device->cs, wined3d_view_gl_destroy_object, ctx);
     if (ctx == &c)
-        device->cs->ops->finish(device->cs, WINED3D_CS_QUEUE_DEFAULT);
+        wined3d_cs_finish(device->cs, WINED3D_CS_QUEUE_DEFAULT);
 }
 
 static void adapter_gl_destroy_rendertarget_view(struct wined3d_rendertarget_view *view)
@@ -5040,6 +5028,14 @@ static void adapter_gl_clear_uav(struct wined3d_context *context,
             clear_value, wined3d_context_gl(context));
 }
 
+static void adapter_gl_generate_mipmap(struct wined3d_context *context, struct wined3d_shader_resource_view *view)
+{
+    TRACE("context %p, view %p.\n", context, view);
+
+    wined3d_shader_resource_view_gl_generate_mipmap(wined3d_shader_resource_view_gl(view),
+            wined3d_context_gl(context));
+}
+
 static const struct wined3d_adapter_ops wined3d_adapter_gl_ops =
 {
     .adapter_destroy = adapter_gl_destroy,
@@ -5074,6 +5070,7 @@ static const struct wined3d_adapter_ops wined3d_adapter_gl_ops =
     .adapter_draw_primitive = draw_primitive,
     .adapter_dispatch_compute = dispatch_compute,
     .adapter_clear_uav = adapter_gl_clear_uav,
+    .adapter_generate_mipmap = adapter_gl_generate_mipmap,
 };
 
 static void wined3d_adapter_gl_init_d3d_info(struct wined3d_adapter_gl *adapter_gl, uint32_t wined3d_creation_flags)
@@ -5161,10 +5158,7 @@ static BOOL wined3d_adapter_gl_init(struct wined3d_adapter_gl *adapter_gl,
     TRACE("adapter_gl %p, ordinal %u, wined3d_creation_flags %#x.\n",
             adapter_gl, ordinal, wined3d_creation_flags);
 
-    if (ordinal > 0)
-        return FALSE;
-
-    if (wined3d_get_primary_adapter_luid(&primary_luid))
+    if (ordinal == 0 && wined3d_get_primary_adapter_luid(&primary_luid))
         luid = &primary_luid;
 
     if (!wined3d_adapter_init(&adapter_gl->a, ordinal, luid, &wined3d_adapter_gl_ops))

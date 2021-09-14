@@ -332,9 +332,9 @@ static HRESULT video_presenter_configure_output_type(struct video_presenter *pre
         if (SUCCEEDED(hr))
             hr = MFGetPlaneSize(subtype.Data1, aperture->Area.cx, aperture->Area.cy, &size);
         if (SUCCEEDED(hr))
-            hr = IMFMediaType_SetUINT32(media_type, &MF_MT_DEFAULT_STRIDE, abs(stride));
+            hr = IMFMediaType_SetUINT32(media_type, &MF_MT_DEFAULT_STRIDE, stride);
         if (SUCCEEDED(hr))
-            hr = IMFMediaType_SetUINT32(media_type, &MF_MT_SAMPLE_SIZE, size);
+            hr = IMFMediaType_SetUINT32(media_type, &MF_MT_SAMPLE_SIZE, stride);
     }
 
     return hr;

@@ -256,7 +256,7 @@ static void topology_clear(struct topology *topology)
         topology_node_disconnect(topology->nodes.nodes[i]);
         IMFTopologyNode_Release(&topology->nodes.nodes[i]->IMFTopologyNode_iface);
     }
-    free(topology->nodes.nodes);
+    heap_free(topology->nodes.nodes);
     topology->nodes.nodes = NULL;
     topology->nodes.count = 0;
     topology->nodes.size = 0;
@@ -274,7 +274,7 @@ static ULONG WINAPI topology_Release(IMFTopology *iface)
         if (topology->attributes)
             IMFAttributes_Release(topology->attributes);
         topology_clear(topology);
-        free(topology);
+        heap_free(topology);
     }
 
     return refcount;
@@ -885,7 +885,8 @@ HRESULT WINAPI MFCreateTopology(IMFTopology **topology)
     if (!topology)
         return E_POINTER;
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     object->IMFTopology_iface.lpVtbl = &topologyvtbl;
@@ -960,11 +961,11 @@ static ULONG WINAPI topology_node_Release(IMFTopologyNode *iface)
             if (node->outputs.streams[i].preferred_type)
                 IMFMediaType_Release(node->outputs.streams[i].preferred_type);
         }
-        free(node->inputs.streams);
-        free(node->outputs.streams);
+        heap_free(node->inputs.streams);
+        heap_free(node->outputs.streams);
         IMFAttributes_Release(node->attributes);
         DeleteCriticalSection(&node->cs);
-        free(node);
+        heap_free(node);
     }
 
     return refcount;
@@ -1766,7 +1767,8 @@ static HRESULT create_topology_node(MF_TOPOLOGY_TYPE node_type, struct topology_
 {
     HRESULT hr;
 
-    if (!(*node = calloc(1, sizeof(**node))))
+    *node = heap_alloc_zero(sizeof(**node));
+    if (!*node)
         return E_OUTOFMEMORY;
 
     (*node)->IMFTopologyNode_iface.lpVtbl = &topologynodevtbl;
@@ -1775,7 +1777,7 @@ static HRESULT create_topology_node(MF_TOPOLOGY_TYPE node_type, struct topology_
     hr = MFCreateAttributes(&(*node)->attributes, 0);
     if (FAILED(hr))
     {
-        free(*node);
+        heap_free(*node);
         return hr;
     }
     (*node)->id = ((TOPOID)GetCurrentProcessId() << 32) | InterlockedIncrement(&next_node_id);
@@ -1929,7 +1931,9 @@ static ULONG WINAPI topology_loader_Release(IMFTopoLoader *iface)
     TRACE("%p, refcount %u.\n", iface, refcount);
 
     if (!refcount)
-        free(loader);
+    {
+        heap_free(loader);
+    }
 
     return refcount;
 }
@@ -2006,10 +2010,7 @@ struct connect_context
     IMFTopologyNode *upstream_node;
     IMFTopologyNode *sink;
     IMFMediaTypeHandler *sink_handler;
-    unsigned int output_index;
-    unsigned int input_index;
-    GUID converter_category;
-    GUID decoder_category;
+    const GUID *converter_category;
 };
 
 typedef HRESULT (*p_connect_func)(struct transform_output_type *output_type, struct connect_context *context);
@@ -2122,7 +2123,8 @@ static HRESULT connect_to_sink(struct transform_output_type *output_type, struct
     hr = IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, output_type->type);
     if (SUCCEEDED(hr))
         hr = IMFTransform_SetOutputType(output_type->transform, 0, output_type->type, 0);
-    return hr;
+
+    return S_OK;
 }
 
 static HRESULT connect_to_converter(struct transform_output_type *output_type, struct connect_context *context)
@@ -2140,7 +2142,7 @@ static HRESULT connect_to_converter(struct transform_output_type *output_type, s
     sink_ctx = *context;
     sink_ctx.upstream_node = node;
 
-    if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&context->converter_category, output_type->type,
+    if (SUCCEEDED(hr = topology_loader_enumerate_output_types(context->converter_category, output_type->type,
             connect_to_sink, &sink_ctx)))
     {
         hr = IMFTopology_AddNode(context->context->output_topology, node);
@@ -2223,62 +2225,13 @@ static HRESULT topology_loader_get_mft_categories(IMFMediaTypeHandler *handler, 
     return S_OK;
 }
 
-static HRESULT topology_loader_connect(IMFMediaTypeHandler *sink_handler, unsigned int sink_method,
-        struct connect_context *sink_ctx, struct connect_context *convert_ctx, IMFMediaType *media_type)
-{
-    HRESULT hr;
-
-    if (SUCCEEDED(hr = IMFMediaTypeHandler_IsMediaTypeSupported(sink_handler, media_type, NULL))
-            && SUCCEEDED(hr = IMFMediaTypeHandler_SetCurrentMediaType(sink_handler, media_type)))
-    {
-        hr = IMFTopologyNode_ConnectOutput(sink_ctx->upstream_node, sink_ctx->output_index, sink_ctx->sink, sink_ctx->input_index);
-    }
-
-    if (FAILED(hr) && sink_method & MF_CONNECT_ALLOW_CONVERTER)
-    {
-        hr = topology_loader_enumerate_output_types(&convert_ctx->converter_category, media_type, connect_to_sink, sink_ctx);
-    }
-
-    if (FAILED(hr) && sink_method & MF_CONNECT_ALLOW_DECODER)
-    {
-        hr = topology_loader_enumerate_output_types(&convert_ctx->decoder_category, media_type,
-                connect_to_converter, convert_ctx);
-    }
-
-    return hr;
-}
-
-static HRESULT topology_loader_foreach_source_type(IMFMediaTypeHandler *sink_handler, IMFMediaTypeHandler *source_handler,
-        unsigned int sink_method, struct connect_context *sink_ctx, struct connect_context *convert_ctx)
-{
-    unsigned int index = 0;
-    IMFMediaType *media_type;
-    HRESULT hr;
-
-    while (SUCCEEDED(hr = IMFMediaTypeHandler_GetMediaTypeByIndex(source_handler, index++, &media_type)))
-    {
-        hr = topology_loader_connect(sink_handler, sink_method, sink_ctx, convert_ctx, media_type);
-        if (SUCCEEDED(hr)) break;
-        IMFMediaType_Release(media_type);
-        media_type = NULL;
-    }
-
-    if (media_type)
-    {
-        hr = IMFMediaTypeHandler_SetCurrentMediaType(source_handler, media_type);
-        IMFMediaType_Release(media_type);
-    }
-
-    return hr;
-}
-
 static HRESULT topology_loader_connect_source_to_sink(struct topoloader_context *context, IMFTopologyNode *source,
         unsigned int output_index, IMFTopologyNode *sink, unsigned int input_index)
 {
     IMFMediaTypeHandler *source_handler = NULL, *sink_handler = NULL;
     struct connect_context convert_ctx, sink_ctx;
     MF_CONNECT_METHOD source_method, sink_method;
-    unsigned int enumerate_source_types = 0;
+    GUID decode_cat, convert_cat;
     IMFMediaType *media_type;
     HRESULT hr;
 
@@ -2295,46 +2248,35 @@ static HRESULT topology_loader_connect_source_to_sink(struct topoloader_context 
     if (FAILED(IMFTopologyNode_GetUINT32(sink, &MF_TOPONODE_CONNECT_METHOD, &sink_method)))
         sink_method = MF_CONNECT_ALLOW_DECODER;
 
+    if (FAILED(hr = topology_loader_get_mft_categories(source_handler, &decode_cat, &convert_cat)))
+        goto done;
+
     sink_ctx.context = context;
     sink_ctx.upstream_node = source;
     sink_ctx.sink = sink;
     sink_ctx.sink_handler = sink_handler;
-    sink_ctx.output_index = output_index;
-    sink_ctx.input_index = input_index;
 
     convert_ctx = sink_ctx;
-    if (FAILED(hr = topology_loader_get_mft_categories(source_handler, &convert_ctx.decoder_category,
-            &convert_ctx.converter_category)))
-        goto done;
+    convert_ctx.converter_category = &convert_cat;
 
-    IMFTopology_GetUINT32(context->output_topology, &MF_TOPOLOGY_ENUMERATE_SOURCE_TYPES, &enumerate_source_types);
+    if (SUCCEEDED(hr = IMFMediaTypeHandler_GetCurrentMediaType(source_handler, &media_type)))
+    {
+        /* Direct connection. */
+        if (SUCCEEDED(hr = IMFMediaTypeHandler_IsMediaTypeSupported(sink_handler, media_type, NULL))
+                && SUCCEEDED(hr = IMFMediaTypeHandler_SetCurrentMediaType(sink_handler, media_type)))
+        {
+            hr = IMFTopologyNode_ConnectOutput(source, output_index, sink, input_index);
+        }
+        if (FAILED(hr) && sink_method & MF_CONNECT_ALLOW_CONVERTER)
+        {
+            hr = topology_loader_enumerate_output_types(&convert_cat, media_type, connect_to_sink, &sink_ctx);
+        }
+        if (FAILED(hr) && sink_method & MF_CONNECT_ALLOW_DECODER)
+        {
+            hr = topology_loader_enumerate_output_types(&decode_cat, media_type, connect_to_converter, &convert_ctx);
+        }
 
-    if (enumerate_source_types)
-    {
-        if (source_method & MF_CONNECT_RESOLVE_INDEPENDENT_OUTPUTTYPES)
-        {
-            hr = topology_loader_foreach_source_type(sink_handler, source_handler, MF_CONNECT_ALLOW_DECODER,
-                    &sink_ctx, &convert_ctx);
-        }
-        else
-        {
-            hr = topology_loader_foreach_source_type(sink_handler, source_handler, MF_CONNECT_DIRECT,
-                    &sink_ctx, &convert_ctx);
-            if (FAILED(hr))
-                hr = topology_loader_foreach_source_type(sink_handler, source_handler, MF_CONNECT_ALLOW_CONVERTER,
-                        &sink_ctx, &convert_ctx);
-            if (FAILED(hr))
-                hr = topology_loader_foreach_source_type(sink_handler, source_handler, MF_CONNECT_ALLOW_DECODER,
-                        &sink_ctx, &convert_ctx);
-        }
-    }
-    else
-    {
-        if (SUCCEEDED(hr = IMFMediaTypeHandler_GetCurrentMediaType(source_handler, &media_type)))
-        {
-            hr = topology_loader_connect(sink_handler, sink_method, &sink_ctx, &convert_ctx, media_type);
-            IMFMediaType_Release(media_type);
-        }
+        IMFMediaType_Release(media_type);
     }
 
 done:
@@ -2687,7 +2629,8 @@ HRESULT WINAPI MFCreateTopoLoader(IMFTopoLoader **loader)
     if (!loader)
         return E_POINTER;
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     object->IMFTopoLoader_iface.lpVtbl = &topologyloadervtbl;
@@ -2745,7 +2688,9 @@ static ULONG WINAPI seq_source_Release(IMFSequencerSource *iface)
     TRACE("%p, refcount %u.\n", iface, refcount);
 
     if (!refcount)
-        free(seq_source);
+    {
+        heap_free(seq_source);
+    }
 
     return refcount;
 }
@@ -2847,7 +2792,8 @@ HRESULT WINAPI MFCreateSequencerSource(IUnknown *reserved, IMFSequencerSource **
     if (!seq_source)
         return E_POINTER;
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     object->IMFSequencerSource_iface.lpVtbl = &seqsourcevtbl;

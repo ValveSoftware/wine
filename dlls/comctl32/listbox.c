@@ -1186,7 +1186,7 @@ static LRESULT LISTBOX_Paint( LB_DESCR *descr, HDC hdc )
     return 0;
 }
 
-static void LISTBOX_NCPaint( LB_DESCR *descr, HRGN region )
+static LRESULT LISTBOX_NCPaint( LB_DESCR *descr, HRGN region )
 {
     DWORD exstyle = GetWindowLongW( descr->self, GWL_EXSTYLE);
     HTHEME theme = GetWindowTheme( descr->self );
@@ -1196,7 +1196,7 @@ static void LISTBOX_NCPaint( LB_DESCR *descr, HRGN region )
     RECT r;
 
     if (!theme || !(exstyle & WS_EX_CLIENTEDGE))
-        return;
+        return DefWindowProcW(descr->self, WM_NCPAINT, (WPARAM)region, 0);
 
     cxEdge = GetSystemMetrics(SM_CXEDGE);
     cyEdge = GetSystemMetrics(SM_CYEDGE);
@@ -1211,12 +1211,16 @@ static void LISTBOX_NCPaint( LB_DESCR *descr, HRGN region )
     OffsetRect(&r, -r.left, -r.top);
 
     hdc = GetDCEx(descr->self, region, DCX_WINDOW|DCX_INTERSECTRGN);
-    OffsetRect(&r, -r.left, -r.top);
 
     if (IsThemeBackgroundPartiallyTransparent (theme, 0, 0))
         DrawThemeParentBackground(descr->self, hdc, &r);
     DrawThemeBackground (theme, hdc, 0, 0, &r, 0);
     ReleaseDC(descr->self, hdc);
+
+    /* Call default proc to get the scrollbars etc. also painted */
+    DefWindowProcW(descr->self, WM_NCPAINT, (WPARAM)cliprgn, 0);
+    DeleteObject(cliprgn);
+    return 0;
 }
 
 /***********************************************************************
@@ -2976,8 +2980,7 @@ static LRESULT CALLBACK LISTBOX_WindowProc( HWND hwnd, UINT msg, WPARAM wParam, 
         return ret;
 
     case WM_NCPAINT:
-        LISTBOX_NCPaint( descr, (HRGN)wParam );
-        break;
+        return LISTBOX_NCPaint( descr, (HRGN)wParam );
 
     case WM_SIZE:
         LISTBOX_UpdateSize( descr );

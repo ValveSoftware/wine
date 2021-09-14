@@ -37,13 +37,11 @@
 #include "thread.h"
 #include "request.h"
 #include "unicode.h"
-#include "esync.h"
-#include "fsync.h"
 
 /* command-line options */
 int debug_level = 0;
 int foreground = 0;
-timeout_t master_socket_timeout = 0; /* master socket timeout, default is 3 seconds */
+timeout_t master_socket_timeout = 3 * -TICKS_PER_SEC;  /* master socket timeout, default is 3 seconds */
 const char *server_argv0;
 
 /* parse-line args */
@@ -143,20 +141,10 @@ int main( int argc, char *argv[] )
     sock_init();
     open_master_socket();
 
-    if (do_fsync())
-        fsync_init();
-
-    if (do_esync())
-        esync_init();
-
-    if (!do_fsync() && !do_esync())
-        fprintf( stderr, "wineserver: using server-side synchronization.\n" );
-
     if (debug_level) fprintf( stderr, "wineserver: starting (pid=%ld)\n", (long) getpid() );
     set_current_time();
     init_signals();
     init_directories( load_intl_file() );
-    init_threading();
     init_registry();
     main_loop();
     return 0;

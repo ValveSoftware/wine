@@ -91,8 +91,8 @@ static void dump_minmax_info( const MINMAXINFO *minmax )
 static void flush_events( BOOL remove_messages )
 {
     MSG msg;
-    int diff = 500;
-    int min_timeout = 200;
+    int diff = 200;
+    int min_timeout = 100;
     DWORD time = GetTickCount() + diff;
 
     while (diff > 0)
@@ -101,6 +101,7 @@ static void flush_events( BOOL remove_messages )
         if (remove_messages)
             while (PeekMessageA( &msg, 0, 0, 0, PM_REMOVE )) DispatchMessageA( &msg );
         diff = time - GetTickCount();
+        min_timeout = 50;
     }
 }
 
@@ -3074,7 +3075,6 @@ todo_wine
     old_wnd_proc = (WNDPROC)SetWindowLongPtrA(hwnd, GWLP_WNDPROC, (LONG_PTR)set_focus_on_activate_proc);
     ShowWindow(hwnd, SW_RESTORE);
     ok( GetActiveWindow() == hwnd, "parent window %p should be active\n", hwnd);
-todo_wine
     ok( GetFocus() == child, "Focus should be on child %p, not %p\n", child, GetFocus() );
     SetWindowLongPtrA(hwnd, GWLP_WNDPROC, (LONG_PTR)old_wnd_proc);
 
@@ -8250,29 +8250,6 @@ static LRESULT CALLBACK fullscreen_wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPAR
     return DefWindowProcA(hwnd, msg, wp, lp);
 }
 
-struct monitor_info
-{
-    RECT first_monitor;
-    RECT second_monitor;
-};
-
-static BOOL CALLBACK enum_monitor_cb(HMONITOR monitor, HDC hdc, RECT *monitor_rect, LPARAM lparam)
-{
-    struct monitor_info *info = (struct monitor_info *)lparam;
-
-    if (IsRectEmpty(&info->first_monitor))
-    {
-        info->first_monitor = *monitor_rect;
-    }
-    else
-    {
-        info->second_monitor = *monitor_rect;
-        return FALSE;
-    }
-
-    return TRUE;
-}
-
 static void test_fullscreen(void)
 {
     static const DWORD t_style[] = {
@@ -8281,7 +8258,6 @@ static void test_fullscreen(void)
     static const DWORD t_ex_style[] = {
         0, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW
     };
-    struct monitor_info monitor_info;
     WNDCLASSA cls;
     int timeout;
     HWND hwnd;
@@ -8434,52 +8410,6 @@ static void test_fullscreen(void)
     DestroyWindow(hwnd);
 
     UnregisterClassA("fullscreen_class", GetModuleHandleA(NULL));
-
-    /* Test moving a full screen window to another monitor */
-    memset(&monitor_info, 0, sizeof(monitor_info));
-    EnumDisplayMonitors(NULL, NULL, enum_monitor_cb, (LPARAM)&monitor_info);
-    if (!IsRectEmpty(&monitor_info.first_monitor) && !IsRectEmpty(&monitor_info.second_monitor))
-    {
-        hwnd = CreateWindowA("static", "static1", WS_POPUP | WS_VISIBLE,
-                monitor_info.first_monitor.left, monitor_info.first_monitor.top,
-                monitor_info.first_monitor.right - monitor_info.first_monitor.left,
-                monitor_info.first_monitor.bottom - monitor_info.first_monitor.top, NULL, NULL,
-                GetModuleHandleA(NULL), NULL);
-        ok(!!hwnd, "CreateWindow failed, error %#x.\n", GetLastError());
-        flush_events(TRUE);
-
-        GetWindowRect(hwnd, &rc);
-        ok(EqualRect(&rc, &monitor_info.first_monitor), "Expected window rect %s, got %s.\n",
-                wine_dbgstr_rect(&monitor_info.first_monitor), wine_dbgstr_rect(&rc));
-
-        SetWindowPos(hwnd, 0, monitor_info.second_monitor.left, monitor_info.second_monitor.top,
-                monitor_info.second_monitor.right - monitor_info.second_monitor.left,
-                monitor_info.second_monitor.bottom - monitor_info.second_monitor.top, SWP_NOZORDER);
-        flush_events(TRUE);
-        GetWindowRect(hwnd, &rc);
-        ok(EqualRect(&rc, &monitor_info.second_monitor), "Expected window rect %s, got %s.\n",
-                wine_dbgstr_rect(&monitor_info.second_monitor), wine_dbgstr_rect(&rc));
-        DestroyWindow(hwnd);
-
-        hwnd = CreateWindowA("static", "static2", WS_POPUP | WS_VISIBLE,
-                monitor_info.second_monitor.left, monitor_info.second_monitor.top,
-                100, 100, NULL, NULL, NULL, NULL);
-        ok(!!hwnd, "CreateWindow failed, error %#x.\n", GetLastError());
-        flush_events(TRUE);
-
-        SetWindowPos(hwnd, 0, monitor_info.first_monitor.left, monitor_info.first_monitor.top,
-                monitor_info.first_monitor.right - monitor_info.first_monitor.left,
-                monitor_info.first_monitor.bottom - monitor_info.first_monitor.top, SWP_NOZORDER);
-        flush_events(TRUE);
-        GetWindowRect(hwnd, &rc);
-        ok(EqualRect(&rc, &monitor_info.first_monitor), "Expected window rect %s, got %s.\n",
-                wine_dbgstr_rect(&monitor_info.first_monitor), wine_dbgstr_rect(&rc));
-        DestroyWindow(hwnd);
-    }
-    else
-    {
-        skip("This test requires two monitors present.\n");
-    }
 }
 
 static BOOL test_thick_child_got_minmax;

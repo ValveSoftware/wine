@@ -22,6 +22,7 @@
 
 struct _RTF_Info;
 
+extern HINSTANCE dll_instance DECLSPEC_HIDDEN;
 extern HANDLE me_heap DECLSPEC_HIDDEN;
 
 #define RUN_IS_HIDDEN(run) ((run)->style->fmt.dwMask & CFM_HIDDEN \
@@ -201,6 +202,7 @@ void ME_DestroyContext(ME_Context *c) DECLSPEC_HIDDEN;
 BOOL ME_WrapMarkedParagraphs(ME_TextEditor *editor) DECLSPEC_HIDDEN;
 void para_range_invalidate( ME_TextEditor *editor, ME_Paragraph *start_para, ME_Paragraph *last_para ) DECLSPEC_HIDDEN;
 void ME_SendRequestResize(ME_TextEditor *editor, BOOL force) DECLSPEC_HIDDEN;
+BOOL wrap_marked_paras_dc( ME_TextEditor *editor, HDC hdc, BOOL invalidate ) DECLSPEC_HIDDEN;
 
 /* para.c */
 void editor_get_selection_paras(ME_TextEditor *editor, ME_Paragraph **para, ME_Paragraph **para_end ) DECLSPEC_HIDDEN;
@@ -236,7 +238,7 @@ static inline ME_DisplayItem *para_get_di(ME_Paragraph *para)
 }
 
 /* paint.c */
-void ME_PaintContent(ME_TextEditor *editor, HDC hDC, const RECT *rcUpdate) DECLSPEC_HIDDEN;
+void editor_draw( ME_TextEditor *editor, HDC hDC, const RECT *update ) DECLSPEC_HIDDEN;
 void ME_Repaint(ME_TextEditor *editor) DECLSPEC_HIDDEN;
 void ME_RewrapRepaint(ME_TextEditor *editor) DECLSPEC_HIDDEN;
 void ME_UpdateRepaint(ME_TextEditor *editor, BOOL update_now) DECLSPEC_HIDDEN;
@@ -248,9 +250,9 @@ int  ME_twips2pointsY(const ME_Context *c, int y) DECLSPEC_HIDDEN;
 
 /* scroll functions in paint.c */
 
-void ME_ScrollAbs(ME_TextEditor *editor, int x, int y) DECLSPEC_HIDDEN;
-void ME_HScrollAbs(ME_TextEditor *editor, int x) DECLSPEC_HIDDEN;
-void ME_VScrollAbs(ME_TextEditor *editor, int y) DECLSPEC_HIDDEN;
+void scroll_abs( ME_TextEditor *editor, int x, int y, BOOL notify ) DECLSPEC_HIDDEN;
+void scroll_h_abs( ME_TextEditor *editor, int x, BOOL notify ) DECLSPEC_HIDDEN;
+void scroll_v_abs( ME_TextEditor *editor, int y, BOOL notify ) DECLSPEC_HIDDEN;
 void ME_ScrollUp(ME_TextEditor *editor, int cy) DECLSPEC_HIDDEN;
 void ME_ScrollDown(ME_TextEditor *editor, int cy) DECLSPEC_HIDDEN;
 void ME_ScrollLeft(ME_TextEditor *editor, int cx) DECLSPEC_HIDDEN;
@@ -261,18 +263,19 @@ void ME_UpdateScrollBar(ME_TextEditor *editor) DECLSPEC_HIDDEN;
 int ME_GetParaBorderWidth(const ME_Context *c, int flags) DECLSPEC_HIDDEN;
 
 /* richole.c */
-LRESULT CreateIRichEditOle(IUnknown *outer_unk, ME_TextEditor *editor, LPVOID *ppvObj) DECLSPEC_HIDDEN;
 void draw_ole( ME_Context *c, int x, int y, ME_Run* run, BOOL selected ) DECLSPEC_HIDDEN;
 void ME_GetOLEObjectSize(const ME_Context *c, ME_Run *run, SIZE *pSize) DECLSPEC_HIDDEN;
 void ME_CopyReObject(REOBJECT *dst, const REOBJECT *src, DWORD flags) DECLSPEC_HIDDEN;
 void ME_DeleteReObject(struct re_object *re_object) DECLSPEC_HIDDEN;
+void richole_release_children( struct text_services *services ) DECLSPEC_HIDDEN;
+extern const IRichEditOleVtbl re_ole_vtbl DECLSPEC_HIDDEN;
+extern const ITextDocument2OldVtbl text_doc2old_vtbl DECLSPEC_HIDDEN;
 
 /* editor.c */
 ME_TextEditor *ME_MakeEditor(ITextHost *texthost, BOOL bEmulateVersion10) DECLSPEC_HIDDEN;
 void ME_DestroyEditor(ME_TextEditor *editor) DECLSPEC_HIDDEN;
-LRESULT ME_HandleMessage(ME_TextEditor *editor, UINT msg, WPARAM wParam,
-                         LPARAM lParam, BOOL unicode, HRESULT* phresult) DECLSPEC_HIDDEN;
-void ME_SendOldNotify(ME_TextEditor *editor, int nCode) DECLSPEC_HIDDEN;
+LRESULT editor_handle_message( ME_TextEditor *editor, UINT msg, WPARAM wParam,
+                               LPARAM lParam, HRESULT* phresult ) DECLSPEC_HIDDEN;
 int ME_GetTextW(ME_TextEditor *editor, WCHAR *buffer, int buflen,
                 const ME_Cursor *start, int srcChars, BOOL bCRLF, BOOL bEOP) DECLSPEC_HIDDEN;
 void ME_RTFCharAttrHook(struct _RTF_Info *info) DECLSPEC_HIDDEN;
@@ -287,6 +290,8 @@ HRESULT editor_copy_or_cut( ME_TextEditor *editor, BOOL cut, ME_Cursor *start, i
                             IDataObject **data_out ) DECLSPEC_HIDDEN;
 ME_Paragraph *editor_end_para( ME_TextEditor *editor ) DECLSPEC_HIDDEN;
 ME_Paragraph *editor_first_para( ME_TextEditor *editor ) DECLSPEC_HIDDEN;
+void editor_set_cursor( ME_TextEditor *editor, int x, int y ) DECLSPEC_HIDDEN;
+void link_notify( ME_TextEditor *editor, UINT msg, WPARAM wParam, LPARAM lParam ) DECLSPEC_HIDDEN;
 
 /* table.c */
 ME_Cell *cell_create( void ) DECLSPEC_HIDDEN;
@@ -316,12 +321,12 @@ static inline ME_DisplayItem *cell_get_di(ME_Cell *cell)
 
 
 /* txthost.c */
-ITextHost *ME_CreateTextHost(HWND hwnd, CREATESTRUCTW *cs, BOOL bEmulateVersion10) DECLSPEC_HIDDEN;
 #ifdef __ASM_USE_THISCALL_WRAPPER
-#define TXTHOST_VTABLE(This) (&itextHostStdcallVtbl)
-#else /* __i386__ */
+extern const struct ITextHost2Vtbl text_host2_stdcall_vtbl DECLSPEC_HIDDEN;
+#define TXTHOST_VTABLE(This) (&text_host2_stdcall_vtbl)
+#else
 #define TXTHOST_VTABLE(This) (This)->lpVtbl
-#endif /* __i386__ */
+#endif
  /*** ITextHost methods ***/
 #define ITextHost_TxGetDC(This) TXTHOST_VTABLE(This)->TxGetDC(This)
 #define ITextHost_TxReleaseDC(This,a) TXTHOST_VTABLE(This)->TxReleaseDC(This,a)
@@ -362,6 +367,19 @@ ITextHost *ME_CreateTextHost(HWND hwnd, CREATESTRUCTW *cs, BOOL bEmulateVersion1
 #define ITextHost_TxImmGetContext(This) TXTHOST_VTABLE(This)->TxImmGetContext(This)
 #define ITextHost_TxImmReleaseContext(This,a) TXTHOST_VTABLE(This)->TxImmReleaseContext(This,a)
 #define ITextHost_TxGetSelectionBarWidth(This,a) TXTHOST_VTABLE(This)->TxGetSelectionBarWidth(This,a)
+/* ITextHost2 */
+#define ITextHost2_TxIsDoubleClickPending(This) TXTHOST_VTABLE(This)->TxIsDoubleClickPending(This)
+#define ITextHost2_TxGetWindow(This,a) TXTHOST_VTABLE(This)->TxGetWindow(This,a)
+#define ITextHost2_TxSetForegroundWindow(This) TXTHOST_VTABLE(This)->TxSetForegroundWindow(This)
+#define ITextHost2_TxGetPalette(This) TXTHOST_VTABLE(This)->TxGetPalette(This)
+#define ITextHost2_TxGetEastAsianFlags(This,a) TXTHOST_VTABLE(This)->TxGetEastAsianFlags(This,a)
+#define ITextHost2_TxSetCursor2(This,a,b) TXTHOST_VTABLE(This)->TxSetCursor2(This,a,b)
+#define ITextHost2_TxFreeTextServicesNotification(This) TXTHOST_VTABLE(This)->TxFreeTextServicesNotification(This)
+#define ITextHost2_TxGetEditStyle(This,a,b) TXTHOST_VTABLE(This)->TxGetEditStyle(This,a,b)
+#define ITextHost2_TxGetWindowStyles(This,a,b) TXTHOST_VTABLE(This)->TxGetWindowStyles(This,a,b)
+#define ITextHost2_TxShowDropCaret(This,a,b,c) TXTHOST_VTABLE(This)->TxShowDropCaret(This,a,b,c)
+#define ITextHost2_TxDestroyCaret(This) TXTHOST_VTABLE(This)->TxDestroyCaret(This)
+#define ITextHost2_TxGetHorzExtent(This,a) TXTHOST_VTABLE(This)->TxGetHorzExtent(This,a)
 
 /* undo.c */
 BOOL add_undo_insert_run( ME_TextEditor *, int pos, const WCHAR *str, int len, int flags, ME_Style *style ) DECLSPEC_HIDDEN;
@@ -376,6 +394,33 @@ void ME_CommitCoalescingUndo(ME_TextEditor *editor) DECLSPEC_HIDDEN;
 BOOL ME_Undo(ME_TextEditor *editor) DECLSPEC_HIDDEN;
 BOOL ME_Redo(ME_TextEditor *editor) DECLSPEC_HIDDEN;
 void ME_EmptyUndoStack(ME_TextEditor *editor) DECLSPEC_HIDDEN;
+
+/* txtsrv.c */
+HRESULT create_text_services( IUnknown *outer, ITextHost *text_host, IUnknown **unk, BOOL emulate_10 ) DECLSPEC_HIDDEN;
+#ifdef __ASM_USE_THISCALL_WRAPPER
+extern const struct ITextServicesVtbl text_services_stdcall_vtbl DECLSPEC_HIDDEN;
+#define TXTSERV_VTABLE(This) (&text_services_stdcall_vtbl)
+#else
+#define TXTSERV_VTABLE(This) (This)->lpVtbl
+#endif
+#define ITextServices_TxSendMessage(This,a,b,c,d) TXTSERV_VTABLE(This)->TxSendMessage(This,a,b,c,d)
+#define ITextServices_TxDraw(This,a,b,c,d,e,f,g,h,i,j,k,l) TXTSERV_VTABLE(This)->TxDraw(This,a,b,c,d,e,f,g,h,i,j,k,l)
+#define ITextServices_TxGetHScroll(This,a,b,c,d,e) TXTSERV_VTABLE(This)->TxGetHScroll(This,a,b,c,d,e)
+#define ITextServices_TxGetVScroll(This,a,b,c,d,e) TXTSERV_VTABLE(This)->TxGetVScroll(This,a,b,c,d,e)
+#define ITextServices_OnTxSetCursor(This,a,b,c,d,e,f,g,h,i) TXTSERV_VTABLE(This)->OnTxSetCursor(This,a,b,c,d,e,f,g,h,i)
+#define ITextServices_TxQueryHitPoint(This,a,b,c,d,e,f,g,h,i,j) TXTSERV_VTABLE(This)->TxQueryHitPoint(This,a,b,c,d,e,f,g,h,i,j)
+#define ITextServices_OnTxInPlaceActivate(This,a) TXTSERV_VTABLE(This)->OnTxInPlaceActivate(This,a)
+#define ITextServices_OnTxInPlaceDeactivate(This) TXTSERV_VTABLE(This)->OnTxInPlaceDeactivate(This)
+#define ITextServices_OnTxUIActivate(This) TXTSERV_VTABLE(This)->OnTxUIActivate(This)
+#define ITextServices_OnTxUIDeactivate(This) TXTSERV_VTABLE(This)->OnTxUIDeactivate(This)
+#define ITextServices_TxGetText(This,a) TXTSERV_VTABLE(This)->TxGetText(This,a)
+#define ITextServices_TxSetText(This,a) TXTSERV_VTABLE(This)->TxSetText(This,a)
+#define ITextServices_TxGetCurTargetX(This,a) TXTSERV_VTABLE(This)->TxGetCurTargetX(This,a)
+#define ITextServices_TxGetBaseLinePos(This,a) TXTSERV_VTABLE(This)->TxGetBaseLinePos(This,a)
+#define ITextServices_TxGetNaturalSize(This,a,b,c,d,e,f,g,h) TXTSERV_VTABLE(This)->TxGetNaturalSize(This,a,b,c,d,e,f,g,h)
+#define ITextServices_TxGetDropTarget(This,a) TXTSERV_VTABLE(This)->TxGetDropTarget(This,a)
+#define ITextServices_OnTxPropertyBitsChange(This,a,b) TXTSERV_VTABLE(This)->OnTxPropertyBitsChange(This,a,b)
+#define ITextServices_TxGetCachedSize(This,a,b) TXTSERV_VTABLE(This)->TxGetCachedSize(This,a,b)
 
 /* writer.c */
 LRESULT ME_StreamOutRange(ME_TextEditor *editor, DWORD dwFormat, const ME_Cursor *start, int nChars, EDITSTREAM *stream) DECLSPEC_HIDDEN;

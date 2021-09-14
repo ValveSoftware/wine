@@ -4224,12 +4224,10 @@ static void test_evr(void)
     DWORD flags, count, value;
     IMFActivate *activate;
     HWND window, window2;
-    IMFRateSupport *rs;
     LONG sample_count;
     IMFSample *sample;
     IUnknown *unk;
     UINT64 window3;
-    float rate;
     HRESULT hr;
     GUID guid;
 
@@ -4265,17 +4263,12 @@ static void test_evr(void)
     check_interface(sink, &IID_IMFClockStateSink, TRUE);
     check_interface(sink, &IID_IMFGetService, TRUE);
     check_interface(sink, &IID_IMFQualityAdvise, TRUE);
-    check_interface(sink, &IID_IMFRateSupport, TRUE);
-    check_interface(sink, &IID_IMFRateControl, FALSE);
     check_service_interface(sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoProcessor, TRUE);
     check_service_interface(sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoMixerBitmap, TRUE);
     check_service_interface(sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoMixerControl, TRUE);
     check_service_interface(sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoMixerControl2, TRUE);
     check_service_interface(sink, &MR_VIDEO_RENDER_SERVICE, &IID_IMFVideoDisplayControl, TRUE);
     check_service_interface(sink, &MR_VIDEO_RENDER_SERVICE, &IID_IMFVideoPositionMapper, TRUE);
-    check_service_interface(sink, &MR_VIDEO_ACCELERATION_SERVICE, &IID_IMFVideoSampleAllocator, FALSE);
-    check_service_interface(sink, &MR_VIDEO_ACCELERATION_SERVICE, &IID_IDirect3DDeviceManager9, TRUE);
-    check_service_interface(sink, &MF_RATE_CONTROL_SERVICE, &IID_IMFRateSupport, TRUE);
 
     hr = MFGetService((IUnknown *)sink, &MR_VIDEO_RENDER_SERVICE, &IID_IMFVideoDisplayControl,
             (void **)&display_control);
@@ -4422,17 +4415,6 @@ static void test_evr(void)
     IMFMediaTypeHandler_Release(type_handler);
 
     /* Stream uses an allocator. */
-    check_service_interface(stream_sink, &MR_VIDEO_ACCELERATION_SERVICE, &IID_IMFVideoSampleAllocator, TRUE);
-    check_service_interface(stream_sink, &MR_VIDEO_ACCELERATION_SERVICE, &IID_IDirect3DDeviceManager9, TRUE);
-todo_wine {
-    check_service_interface(stream_sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoProcessor, TRUE);
-    check_service_interface(stream_sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoMixerBitmap, TRUE);
-    check_service_interface(stream_sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoMixerControl, TRUE);
-    check_service_interface(stream_sink, &MR_VIDEO_MIXER_SERVICE, &IID_IMFVideoMixerControl2, TRUE);
-    check_service_interface(stream_sink, &MR_VIDEO_RENDER_SERVICE, &IID_IMFVideoDisplayControl, TRUE);
-    check_service_interface(stream_sink, &MR_VIDEO_RENDER_SERVICE, &IID_IMFVideoPositionMapper, TRUE);
-    check_service_interface(stream_sink, &MF_RATE_CONTROL_SERVICE, &IID_IMFRateSupport, TRUE);
-}
     hr = MFGetService((IUnknown *)stream_sink, &MR_VIDEO_ACCELERATION_SERVICE, &IID_IMFVideoSampleAllocator,
             (void **)&allocator);
     ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
@@ -4520,50 +4502,6 @@ todo_wine
 
     hr = IMFMediaSink_SetPresentationClock(sink, clock);
     ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-    hr = IMFMediaSink_QueryInterface(sink, &IID_IMFRateSupport, (void **)&rs);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-    rate = 1.0f;
-    hr = IMFRateSupport_GetSlowestRate(rs, MFRATE_FORWARD, FALSE, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected rate %f.\n", rate);
-
-    rate = 1.0f;
-    hr = IMFRateSupport_GetSlowestRate(rs, MFRATE_REVERSE, FALSE, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected rate %f.\n", rate);
-
-    rate = 1.0f;
-    hr = IMFRateSupport_GetSlowestRate(rs, MFRATE_FORWARD, TRUE, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected rate %f.\n", rate);
-
-    rate = 1.0f;
-    hr = IMFRateSupport_GetSlowestRate(rs, MFRATE_REVERSE, TRUE, &rate);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-    ok(rate == 0.0f, "Unexpected rate %f.\n", rate);
-
-    hr = IMFRateSupport_GetFastestRate(rs, MFRATE_FORWARD, FALSE, &rate);
-    ok(hr == MF_E_INVALIDREQUEST, "Unexpected hr %#x.\n", hr);
-
-    hr = IMFRateSupport_GetFastestRate(rs, MFRATE_REVERSE, FALSE, &rate);
-    ok(hr == MF_E_INVALIDREQUEST, "Unexpected hr %#x.\n", hr);
-
-    hr = IMFRateSupport_GetFastestRate(rs, MFRATE_FORWARD, TRUE, &rate);
-    ok(hr == MF_E_INVALIDREQUEST, "Unexpected hr %#x.\n", hr);
-
-    hr = IMFRateSupport_GetFastestRate(rs, MFRATE_REVERSE, TRUE, &rate);
-    ok(hr == MF_E_INVALIDREQUEST, "Unexpected hr %#x.\n", hr);
-
-    hr = IMFMediaSink_Shutdown(sink);
-    ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
-
-    hr = IMFRateSupport_GetSlowestRate(rs, MFRATE_FORWARD, FALSE, &rate);
-    ok(hr == MF_E_SHUTDOWN, "Unexpected hr %#x.\n", hr);
-
-    hr = IMFRateSupport_GetFastestRate(rs, MFRATE_FORWARD, FALSE, &rate);
-    ok(hr == MF_E_SHUTDOWN, "Unexpected hr %#x.\n", hr);
 
     IMFPresentationClock_Release(clock);
 

@@ -177,6 +177,18 @@ static void release_display_device_init_mutex( HANDLE mutex )
     CloseHandle( mutex );
 }
 
+#ifdef __i386__
+static const WCHAR printer_env[] = L"w32x86";
+#elif defined __x86_64__
+static const WCHAR printer_env[] = L"x64";
+#elif defined __arm__
+static const WCHAR printer_env[] = L"arm";
+#elif defined __aarch64__
+static const WCHAR printer_env[] = L"arm64";
+#else
+#error not defined for this cpu
+#endif
+
 /**********************************************************************
  *	     DRIVER_load_driver
  */
@@ -200,7 +212,15 @@ const struct gdi_dc_funcs *DRIVER_load_driver( LPCWSTR name )
         LeaveCriticalSection( &driver_section );
     }
 
-    if (!(module = LoadLibraryW( name ))) return NULL;
+    if (!(module = LoadLibraryW( name )))
+    {
+        WCHAR path[MAX_PATH];
+
+        GetSystemDirectoryW( path, MAX_PATH );
+        swprintf( path + wcslen(path), MAX_PATH - wcslen(path), L"\\spool\\drivers\\%s\\3\\%s",
+                  printer_env, name );
+        if (!(module = LoadLibraryW( path ))) return NULL;
+    }
 
     if (!(new_driver = create_driver( module )))
     {
@@ -440,24 +460,7 @@ static INT CDECL nulldrv_GetDeviceCaps( PHYSDEV dev, INT cap )
 
         return pGetSystemMetrics ? pGetSystemMetrics( SM_CYSCREEN ) : 480;
     }
-    case BITSPIXEL:
-    {
-        DEVMODEW devmode;
-        WCHAR *display;
-        DC *dc;
-
-        if (GetDeviceCaps( dev->hdc, TECHNOLOGY ) == DT_RASDISPLAY && pEnumDisplaySettingsW)
-        {
-            dc = get_nulldrv_dc( dev );
-            display = dc->display[0] ? dc->display : NULL;
-            memset( &devmode, 0, sizeof(devmode) );
-            devmode.dmSize = sizeof(devmode);
-            if (pEnumDisplaySettingsW( display, ENUM_CURRENT_SETTINGS, &devmode )
-                && devmode.dmFields & DM_BITSPERPEL && devmode.dmBitsPerPel)
-                return devmode.dmBitsPerPel;
-        }
-        return 32;
-    }
+    case BITSPIXEL:       return 32;
     case PLANES:          return 1;
     case NUMBRUSHES:      return -1;
     case NUMPENS:         return -1;
@@ -792,7 +795,18 @@ static void CDECL nulldrv_SetDeviceClipping( PHYSDEV dev, HRGN rgn )
 
 static DWORD CDECL nulldrv_SetLayout( PHYSDEV dev, DWORD layout )
 {
-    return layout;
+    DC *dc = get_nulldrv_dc( dev );
+    DWORD old_layout;
+
+    old_layout = dc->layout;
+    dc->layout = layout;
+    if (layout != old_layout)
+    {
+        if (layout & LAYOUT_RTL) dc->MapMode = MM_ANISOTROPIC;
+        DC_UpdateXforms( dc );
+    }
+
+    return old_layout;
 }
 
 static BOOL CDECL nulldrv_SetDeviceGammaRamp( PHYSDEV dev, void *ramp )

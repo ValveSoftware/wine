@@ -1649,23 +1649,28 @@ static HRESULT shader_get_registers_used(struct wined3d_shader *shader, DWORD co
                     || (ins.handler_idx == WINED3DSIH_LD_RAW && ins.src[1].reg.type == WINED3DSPR_UAV)
                     || (ins.handler_idx == WINED3DSIH_LD_STRUCTURED && ins.src[2].reg.type == WINED3DSPR_UAV))
             {
-                unsigned int reg_idx;
+                const struct wined3d_shader_register *reg;
+
                 if (ins.handler_idx == WINED3DSIH_LD_UAV_TYPED || ins.handler_idx == WINED3DSIH_LD_RAW)
-                    reg_idx = ins.src[1].reg.idx[0].offset;
+                    reg = &ins.src[1].reg;
                 else if (ins.handler_idx == WINED3DSIH_LD_STRUCTURED)
-                    reg_idx = ins.src[2].reg.idx[0].offset;
+                    reg = &ins.src[2].reg;
                 else if (WINED3DSIH_ATOMIC_AND <= ins.handler_idx && ins.handler_idx <= WINED3DSIH_ATOMIC_XOR)
-                    reg_idx = ins.dst[0].reg.idx[0].offset;
+                    reg = &ins.dst[0].reg;
                 else if (ins.handler_idx == WINED3DSIH_BUFINFO)
-                    reg_idx = ins.src[0].reg.idx[0].offset;
+                    reg = &ins.src[0].reg;
                 else
-                    reg_idx = ins.dst[1].reg.idx[0].offset;
-                if (reg_idx >= MAX_UNORDERED_ACCESS_VIEWS)
+                    reg = &ins.dst[1].reg;
+
+                if (reg->type == WINED3DSPR_UAV)
                 {
-                    ERR("Invalid UAV index %u.\n", reg_idx);
-                    break;
+                    if (reg->idx[0].offset >= MAX_UNORDERED_ACCESS_VIEWS)
+                    {
+                        ERR("Invalid UAV index %u.\n", reg->idx[0].offset);
+                        break;
+                    }
+                    reg_maps->uav_read_mask |= (1u << reg->idx[0].offset);
                 }
-                reg_maps->uav_read_mask |= (1u << reg_idx);
             }
             else if (ins.handler_idx == WINED3DSIH_NRM)
             {
@@ -3349,7 +3354,7 @@ static HRESULT shader_set_function(struct wined3d_shader *shader, struct wined3d
         WARN("Wrong shader type %s.\n", debug_shader_type(reg_maps->shader_version.type));
         return WINED3DERR_INVALIDCALL;
     }
-    if (version->major > shader_max_version_from_feature_level(device->feature_level))
+    if (version->major > shader_max_version_from_feature_level(device->cs->c.state->feature_level))
     {
         WARN("Shader version %u not supported by this device.\n", version->major);
         return WINED3DERR_INVALIDCALL;
@@ -3661,7 +3666,7 @@ static HRESULT shader_init(struct wined3d_shader *shader, struct wined3d_device 
         memcpy(shader->byte_code, desc->byte_code, desc->byte_code_size);
         shader->byte_code_size = desc->byte_code_size;
 
-        max_version = shader_max_version_from_feature_level(device->feature_level);
+        max_version = shader_max_version_from_feature_level(device->cs->c.state->feature_level);
         if (FAILED(hr = shader_extract_from_dxbc(shader, max_version, &format)))
             goto fail;
 

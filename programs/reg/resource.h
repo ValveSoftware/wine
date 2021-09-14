@@ -29,7 +29,7 @@
 #define STRING_INVALID_KEY            106
 #define STRING_INVALID_CMDLINE        107
 #define STRING_NO_REMOTE              108
-#define STRING_CANNOT_FIND            109
+#define STRING_VALUE_NONEXIST         109
 #define STRING_UNSUPPORTED_TYPE       110
 #define STRING_MISSING_INTEGER        111
 #define STRING_MISSING_HEXDATA        112
@@ -59,3 +59,6 @@
 #define STRING_EXPORT_USAGE           136
 #define STRING_INVALID_SYSTEM_KEY     137
 #define STRING_OVERWRITE_FILE         138
+#define STRING_KEY_NONEXIST           139
+#define STRING_KEY_IMPORT_FAILED      140
+#define STRING_REG_VIEW_USAGE         141

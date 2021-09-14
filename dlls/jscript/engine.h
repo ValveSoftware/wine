@@ -75,8 +75,7 @@
     X(preinc,     1, ARG_INT,    0)        \
     X(push_acc,   1, 0,0)                  \
     X(push_except,1, ARG_ADDR,   ARG_UINT) \
-    X(push_block_scope, 1, ARG_UINT, 0)    \
-    X(push_with_scope,  1, 0,0)            \
+    X(push_scope, 1, 0,0)                  \
     X(regexp,     1, ARG_STR,    ARG_UINT) \
     X(rshift,     1, 0,0)                  \
     X(rshift2,    1, 0,0)                  \
@@ -91,8 +90,10 @@
     X(typeofident,1, 0,0)                  \
     X(refval,     1, 0,0)                  \
     X(ret,        0, ARG_UINT,   0)        \
+    X(set_member, 1, 0,0)                  \
     X(setret,     1, 0,0)                  \
     X(sub,        1, 0,0)                  \
+    X(to_string,  1, 0,0)                  \
     X(undefined,  1, 0,0)                  \
     X(void,       1, 0,0)                  \
     X(xor,        1, 0,0)
@@ -144,10 +145,7 @@ typedef struct {
     int ref;
 } local_ref_t;
 
-typedef struct {
-    unsigned locals_cnt;
-    local_ref_t *locals;
-} local_ref_scopes_t;
+#define INVALID_LOCAL_REF 0x7fffffff
 
 typedef struct _function_code_t {
     BSTR name;
@@ -170,16 +168,14 @@ typedef struct _function_code_t {
     unsigned param_cnt;
     BSTR *params;
 
-    local_ref_scopes_t *local_scopes;
-    unsigned local_scope_count;
-
-    unsigned int scope_index; /* index of scope in the parent function where the function is defined */
+    unsigned locals_cnt;
+    local_ref_t *locals;
 
     bytecode_t *bytecode;
 } function_code_t;
 
 IDispatch *lookup_global_host(script_ctx_t*) DECLSPEC_HIDDEN;
-local_ref_t *lookup_local(const function_code_t*,const WCHAR*,unsigned int) DECLSPEC_HIDDEN;
+local_ref_t *lookup_local(const function_code_t*,const WCHAR*) DECLSPEC_HIDDEN;
 
 struct _bytecode_t {
     LONG ref;
@@ -209,6 +205,8 @@ struct _bytecode_t {
 HRESULT compile_script(script_ctx_t*,const WCHAR*,UINT64,unsigned,const WCHAR*,const WCHAR*,BOOL,BOOL,named_item_t*,bytecode_t**) DECLSPEC_HIDDEN;
 void release_bytecode(bytecode_t*) DECLSPEC_HIDDEN;
 
+unsigned get_location_line(bytecode_t *code, unsigned loc, unsigned *char_pos) DECLSPEC_HIDDEN;
+
 static inline bytecode_t *bytecode_addref(bytecode_t *code)
 {
     code->ref++;
@@ -219,7 +217,6 @@ typedef struct _scope_chain_t {
     LONG ref;
     jsdisp_t *jsobj;
     IDispatch *obj;
-    unsigned int scope_index;
     struct _call_frame_t *frame;
     struct _scope_chain_t *next;
 } scope_chain_t;

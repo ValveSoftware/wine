@@ -58,9 +58,6 @@
 #ifdef HAVE_SYS_PRCTL_H
 # include <sys/prctl.h>
 #endif
-#ifdef HAVE_SYS_RESOURCE_H
-# include <sys/resource.h>
-#endif
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
@@ -91,8 +88,6 @@
 #include "wine/server.h"
 #include "wine/debug.h"
 #include "unix_private.h"
-#include "esync.h"
-#include "fsync.h"
 #include "ddk/wdm.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(server);
@@ -104,11 +99,10 @@ WINE_DEFAULT_DEBUG_CHANNEL(server);
 #define SOCKETNAME "socket"        /* name of the socket file */
 #define LOCKNAME   "lock"          /* name of the lock file */
 
-static const BOOL is_win64 = (sizeof(void *) > sizeof(int));
-
 static const char *server_dir;
 
-unsigned int server_cpus = 0;
+unsigned int supported_machines_count = 0;
+USHORT supported_machines[8] = { 0 };
 BOOL is_wow64 = FALSE;
 BOOL process_exiting = FALSE;
 
@@ -117,7 +111,7 @@ timeout_t server_start_time = 0;  /* time of server startup */
 sigset_t server_block_set;  /* signals to block during server calls */
 static int fd_socket = -1;  /* socket to exchange file descriptors with the server */
 static pid_t server_pid;
-pthread_mutex_t fd_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t fd_cache_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 /* atomically exchange a 64-bit value */
 static inline LONG64 interlocked_xchg64( LONG64 *dest, LONG64 val )
@@ -379,7 +373,7 @@ static void invoke_apc( CONTEXT *context, const user_apc_t *apc )
  * Invoke a single APC.
  *
  */
-static void invoke_system_apc( const apc_call_t *call, apc_result_t *result )
+static void invoke_system_apc( const apc_call_t *call, apc_result_t *result, BOOL self )
 {
     SIZE_T size, bits;
     void *addr;
@@ -538,7 +532,7 @@ static void invoke_system_apc( const apc_call_t *call, apc_result_t *result )
             result->map_view.size = size;
         }
         else result->map_view.status = STATUS_INVALID_PARAMETER;
-        NtClose( wine_server_ptr_handle(call->map_view.handle) );
+        if (!self) NtClose( wine_server_ptr_handle(call->map_view.handle) );
         break;
     case APC_UNMAP_VIEW:
         result->type = call->type;
@@ -583,6 +577,21 @@ static void invoke_system_apc( const apc_call_t *call, apc_result_t *result )
             result->create_thread.teb = wine_server_client_ptr( teb );
         }
         else result->create_thread.status = STATUS_INVALID_PARAMETER;
+        break;
+    }
+    case APC_DUP_HANDLE:
+    {
+        HANDLE dst_handle = NULL;
+
+        result->type = call->type;
+
+        result->dup_handle.status = NtDuplicateObject( NtCurrentProcess(),
+                                                       wine_server_ptr_handle(call->dup_handle.src_handle),
+                                                       wine_server_ptr_handle(call->dup_handle.dst_process),
+                                                       &dst_handle, call->dup_handle.access,
+                                                       call->dup_handle.attributes, call->dup_handle.options );
+        result->dup_handle.handle = wine_server_obj_handle( dst_handle );
+        if (!self) NtClose( wine_server_ptr_handle(call->dup_handle.dst_process) );
         break;
     }
     case APC_BREAK_PROCESS:
@@ -666,7 +675,7 @@ unsigned int server_select( const select_op_t *select_op, data_size_t size, UINT
             SERVER_END_REQ;
 
             if (ret != STATUS_KERNEL_APC) break;
-            invoke_system_apc( &call, &result );
+            invoke_system_apc( &call, &result, FALSE );
 
             /* don't signal multiple times */
             if (size >= sizeof(select_op->signal_and_wait) && select_op->op == SELECT_SIGNAL_AND_WAIT)
@@ -764,7 +773,7 @@ unsigned int server_queue_process_apc( HANDLE process, const apc_call_t *call, a
 
         if (self)
         {
-            invoke_system_apc( call, result );
+            invoke_system_apc( call, result, TRUE );
         }
         else
         {
@@ -789,7 +798,7 @@ unsigned int server_queue_process_apc( HANDLE process, const apc_call_t *call, a
  *
  * Send a file descriptor to the server.
  */
-void CDECL wine_server_send_fd( int fd )
+void wine_server_send_fd( int fd )
 {
     struct send_fd data;
     struct msghdr msghdr;
@@ -840,7 +849,7 @@ void CDECL wine_server_send_fd( int fd )
  *
  * Receive a file descriptor passed from the server.
  */
-int receive_fd( obj_handle_t *handle )
+static int receive_fd( obj_handle_t *handle )
 {
     struct iovec vec;
     struct msghdr msghdr;
@@ -1109,15 +1118,6 @@ NTSTATUS CDECL wine_server_handle_to_fd( HANDLE handle, unsigned int access, int
         if ((*unix_fd = dup(*unix_fd)) == -1) ret = STATUS_TOO_MANY_OPENED_FILES;
     }
     return ret;
-}
-
-
-/***********************************************************************
- *           wine_server_release_fd
- */
-void CDECL wine_server_release_fd( HANDLE handle, int unix_fd )
-{
-    close( unix_fd );
 }
 
 
@@ -1481,15 +1481,13 @@ void process_exit_wrapper( int status )
  */
 size_t server_init_process(void)
 {
-    static const char *cpu_names[] = { "x86", "x86_64", "PowerPC", "ARM", "ARM64" };
     const char *arch = getenv( "WINEARCH" );
     const char *env_socket = getenv( "WINESERVERSOCKET" );
     obj_handle_t version;
+    unsigned int i;
     int ret, reply_pipe;
     struct sigaction sig_act;
     size_t info_size;
-    struct rlimit rlimit;
-    int nice_limit = 0;
 
     server_pid = -1;
     if (env_socket)
@@ -1540,7 +1538,7 @@ size_t server_init_process(void)
                                (version > SERVER_PROTOCOL_VERSION) ? "wine" : "wineserver" );
 #if defined(__linux__) && defined(HAVE_PRCTL)
     /* work around Ubuntu's ptrace breakage */
-    if (server_pid != -1) prctl( 0x59616d61 /* PR_SET_PTRACER */, PR_SET_PTRACER_ANY );
+    if (server_pid != -1) prctl( 0x59616d61 /* PR_SET_PTRACER */, server_pid );
 #endif
 
     /* ignore SIGPIPE so that we get an EPIPE error instead  */
@@ -1551,19 +1549,10 @@ size_t server_init_process(void)
 
     reply_pipe = init_thread_pipe();
 
-#ifdef RLIMIT_NICE
-    if (!getrlimit( RLIMIT_NICE, &rlimit ))
-    {
-        if (rlimit.rlim_cur <= 40) nice_limit = 20 - rlimit.rlim_cur;
-        else if (rlimit.rlim_cur == -1 /* RLIMIT_INFINITY */) nice_limit = -20;
-    }
-#endif
-
     SERVER_START_REQ( init_first_thread )
     {
         req->unix_pid    = getpid();
         req->unix_tid    = get_unix_tid();
-        req->nice_limit  = nice_limit;
         req->teb         = wine_server_client_ptr( NtCurrentTeb() );
         req->peb         = wine_server_client_ptr( NtCurrentTeb()->Peb );
 #ifdef __i386__
@@ -1573,48 +1562,49 @@ size_t server_init_process(void)
         req->wait_fd     = ntdll_get_thread_data()->wait_fd[1];
         req->debug_level = (TRACE_ON(server) != 0);
         req->cpu         = client_cpu;
+        wine_server_set_reply( req, supported_machines, sizeof(supported_machines) );
         ret = wine_server_call( req );
         NtCurrentTeb()->ClientId.UniqueProcess = ULongToHandle(reply->pid);
         NtCurrentTeb()->ClientId.UniqueThread  = ULongToHandle(reply->tid);
         info_size         = reply->info_size;
         server_start_time = reply->server_start;
-        server_cpus       = reply->all_cpus;
+        supported_machines_count = wine_server_reply_size( reply ) / sizeof(*supported_machines);
     }
     SERVER_END_REQ;
     close( reply_pipe );
 
-#ifndef _WIN64
-    is_wow64 = (server_cpus & ((1 << CPU_x86_64) | (1 << CPU_ARM64))) != 0;
-    init_teb64( NtCurrentTeb() );
-#endif
+    if (ret) server_protocol_error( "init_first_thread failed with status %x\n", ret );
 
-    switch (ret)
+    if (!supported_machines_count)
+        fatal_error( "'%s' is a 64-bit installation, it cannot be used with a 32-bit wineserver.\n",
+                     config_dir );
+
+    switch (supported_machines[0])
     {
-    case STATUS_SUCCESS:
-        if (arch)
+    case IMAGE_FILE_MACHINE_AMD64:
+    case IMAGE_FILE_MACHINE_ARM64:
+        if (arch && !strcmp( arch, "win32" ))
+            fatal_error( "WINEARCH set to win32 but '%s' is a 64-bit installation.\n", config_dir );
+        if (!is_win64)
         {
-            if (!strcmp( arch, "win32" ) && (is_win64 || is_wow64))
-                fatal_error( "WINEARCH set to win32 but '%s' is a 64-bit installation.\n", config_dir );
-            if (!strcmp( arch, "win64" ) && !is_win64 && !is_wow64)
-                fatal_error( "WINEARCH set to win64 but '%s' is a 32-bit installation.\n", config_dir );
+            is_wow64 = TRUE;
+            init_teb64( NtCurrentTeb() );
         }
-        return info_size;
-    case STATUS_INVALID_IMAGE_WIN_64:
-        fatal_error( "'%s' is a 32-bit installation, it cannot support 64-bit applications.\n", config_dir );
-    case STATUS_NOT_SUPPORTED:
-        fatal_error( "'%s' is a 64-bit installation, it cannot be used with a 32-bit wineserver.\n", config_dir );
-    case STATUS_INVALID_IMAGE_FORMAT:
-        fatal_error( "wineserver doesn't support the %s architecture\n", cpu_names[client_cpu] );
+        break;
     default:
-        server_protocol_error( "init_first_thread failed with status %x\n", ret );
+        if (is_win64)
+            fatal_error( "'%s' is a 32-bit installation, it cannot support 64-bit applications.\n", config_dir );
+        if (arch && !strcmp( arch, "win64" ))
+            fatal_error( "WINEARCH set to win64 but '%s' is a 32-bit installation.\n", config_dir );
+        break;
     }
+
+    for (i = 0; i < supported_machines_count; i++)
+        if (supported_machines[i] == current_machine) return info_size;
+
+    fatal_error( "wineserver doesn't support the %04x architecture\n", current_machine );
 }
 
-static BOOL force_laa(void)
-{
-    const char *e = getenv("WINE_LARGE_ADDRESS_AWARE");
-    return (e != NULL) && (*e != '\0' && *e != '0');
-}
 
 /***********************************************************************
  *           server_init_process_done
@@ -1622,9 +1612,7 @@ static BOOL force_laa(void)
 void server_init_process_done(void)
 {
     PEB *peb = NtCurrentTeb()->Peb;
-    IMAGE_NT_HEADERS *nt = get_exe_nt_header();
     void *entry;
-    struct cpu_topology_override *cpu_override = get_cpu_topology_override();
     NTSTATUS status;
     int suspend, needs_close, unixdir;
 
@@ -1640,7 +1628,8 @@ void server_init_process_done(void)
 #ifdef __APPLE__
     send_server_task_port();
 #endif
-    if (force_laa() || (nt->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE)) virtual_set_large_address_space();
+    if (main_image_info.ImageCharacteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE)
+        virtual_set_large_address_space();
 
     /* Install signal handlers; this cannot be done earlier, since we cannot
      * send exceptions to the debugger before the create process event that
@@ -1650,8 +1639,6 @@ void server_init_process_done(void)
     /* Signal the parent process to continue */
     SERVER_START_REQ( init_process_done )
     {
-        if (cpu_override)
-            wine_server_add_data( req, cpu_override, sizeof(*cpu_override) );
         status = wine_server_call( req );
         suspend = reply->suspend;
         entry = wine_server_get_ptr( reply->entry );
@@ -1713,7 +1700,37 @@ NTSTATUS WINAPI DbgUiIssueRemoteBreakin( HANDLE process )
 NTSTATUS WINAPI NtDuplicateObject( HANDLE source_process, HANDLE source, HANDLE dest_process, HANDLE *dest,
                                    ACCESS_MASK access, ULONG attributes, ULONG options )
 {
+    sigset_t sigset;
     NTSTATUS ret;
+    int fd = -1;
+
+    if ((options & DUPLICATE_CLOSE_SOURCE) && source_process != NtCurrentProcess())
+    {
+        apc_call_t call;
+        apc_result_t result;
+
+        memset( &call, 0, sizeof(call) );
+
+        call.dup_handle.type        = APC_DUP_HANDLE;
+        call.dup_handle.src_handle  = wine_server_obj_handle( source );
+        call.dup_handle.dst_process = wine_server_obj_handle( dest_process );
+        call.dup_handle.access      = access;
+        call.dup_handle.attributes  = attributes;
+        call.dup_handle.options     = options;
+        ret = server_queue_process_apc( source_process, &call, &result );
+        if (ret != STATUS_SUCCESS) return ret;
+
+        if (!result.dup_handle.status)
+            *dest = wine_server_ptr_handle( result.dup_handle.handle );
+        return result.dup_handle.status;
+    }
+
+    server_enter_uninterrupted_section( &fd_cache_mutex, &sigset );
+
+    /* always remove the cached fd; if the server request fails we'll just
+     * retrieve it again */
+    if (options & DUPLICATE_CLOSE_SOURCE)
+        fd = remove_fd_from_cache( source );
 
     SERVER_START_REQ( dup_handle )
     {
@@ -1726,14 +1743,13 @@ NTSTATUS WINAPI NtDuplicateObject( HANDLE source_process, HANDLE source, HANDLE 
         if (!(ret = wine_server_call( req )))
         {
             if (dest) *dest = wine_server_ptr_handle( reply->handle );
-            if (reply->closed && reply->self)
-            {
-                int fd = remove_fd_from_cache( source );
-                if (fd != -1) close( fd );
-            }
         }
     }
     SERVER_END_REQ;
+
+    server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
+
+    if (fd != -1) close( fd );
     return ret;
 }
 
@@ -1743,15 +1759,16 @@ NTSTATUS WINAPI NtDuplicateObject( HANDLE source_process, HANDLE source, HANDLE 
  */
 NTSTATUS WINAPI NtClose( HANDLE handle )
 {
+    sigset_t sigset;
     HANDLE port;
     NTSTATUS ret;
-    int fd = remove_fd_from_cache( handle );
+    int fd;
 
-    if (do_fsync())
-        fsync_close( handle );
+    server_enter_uninterrupted_section( &fd_cache_mutex, &sigset );
 
-    if (do_esync())
-        esync_close( handle );
+    /* always remove the cached fd; if the server request fails we'll just
+     * retrieve it again */
+    fd = remove_fd_from_cache( handle );
 
     SERVER_START_REQ( close_handle )
     {
@@ -1759,6 +1776,9 @@ NTSTATUS WINAPI NtClose( HANDLE handle )
         ret = wine_server_call( req );
     }
     SERVER_END_REQ;
+
+    server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
+
     if (fd != -1) close( fd );
 
     if (ret != STATUS_INVALID_HANDLE || !handle) return ret;

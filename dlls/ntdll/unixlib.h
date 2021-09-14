@@ -26,7 +26,7 @@
 struct _DISPATCHER_CONTEXT;
 
 /* increment this when you change the function table */
-#define NTDLL_UNIXLIB_VERSION 113
+#define NTDLL_UNIXLIB_VERSION 120
 
 struct unix_funcs
 {
@@ -69,19 +69,13 @@ struct unix_funcs
     double        (CDECL *sqrt)( double d );
     double        (CDECL *tan)( double d );
 
-    /* environment functions */
-    USHORT *      (CDECL *get_unix_codepage_data)(void);
-    void          (CDECL *get_locales)( WCHAR *sys, WCHAR *user );
-
     /* virtual memory functions */
     void          (CDECL *virtual_release_address_space)(void);
 
     /* loader functions */
     NTSTATUS      (CDECL *load_so_dll)( UNICODE_STRING *nt_name, void **module );
-    NTSTATUS      (CDECL *load_builtin_dll)( UNICODE_STRING *name, void **module, void **unix_entry,
-                                             SECTION_IMAGE_INFORMATION *image_info, BOOL prefer_native );
-    NTSTATUS      (CDECL *unload_builtin_dll)( void *module );
     void          (CDECL *init_builtin_dll)( void *module );
+    NTSTATUS      (CDECL *init_unix_lib)( void *module, DWORD reason, const void *ptr_in, void *ptr_out );
     NTSTATUS      (CDECL *unwind_builtin_dll)( ULONG type, struct _DISPATCHER_CONTEXT *dispatch,
                                                CONTEXT *context );
 
@@ -91,11 +85,6 @@ struct unix_funcs
     int           (CDECL *dbg_output)( const char *str );
     int           (CDECL *dbg_header)( enum __wine_debug_class cls, struct __wine_debug_channel *channel,
                                        const char *function );
-
-    /* steamclient HACK */
-    void          (CDECL *steamclient_setup_trampolines)( HMODULE src_mod, HMODULE tgt_mod );
-    void          (CDECL *set_unix_env)( const char *var, const char *val );
-    void          (CDECL *write_crash_log)( const char *log_type, const char *log_msg );
 };
 
 #endif /* __NTDLL_UNIXLIB_H */

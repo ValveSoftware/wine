@@ -8,8 +8,6 @@ EXTRADLLFLAGS = -mno-cygwin
 
 C_SRCS = \
 	audioconvert.c \
-	colorconvert.c \
-	decode_transform.c \
 	main.c \
 	media_source.c \
 	mfplat.c \

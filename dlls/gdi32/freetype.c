@@ -1701,8 +1701,6 @@ static void fontconfig_add_fonts_from_dir_list( FcConfig *config, FcStrList *dir
     }
 
 done:
-    if (font_set) pFcFontSetDestroy( font_set );
-    if (subdir_list) pFcStrListDone( subdir_list );
     if (subdir_set) pFcStrSetDestroy( subdir_set );
     if (cache) pFcDirCacheUnload( cache );
 }
@@ -1921,6 +1919,11 @@ static BOOL init_freetype(void)
         FT_UInt interpreter_version = 35;
         pFT_Property_Set( library, "truetype", "interpreter-version", &interpreter_version );
     }
+
+#ifdef FT_LCD_FILTER_H
+    if (pFT_Library_SetLcdFilter)
+        pFT_Library_SetLcdFilter( library, FT_LCD_FILTER_DEFAULT );
+#endif
 
     return TRUE;
 
@@ -2491,6 +2494,7 @@ static BOOL CDECL freetype_load_font( struct gdi_font *font )
         TRACE( "height %d => ppem %d\n", font->lf.lfHeight, font->ppem );
         height = font->ppem;
         font->ttc_item_offset = get_ttc_offset( ft_face, font->face_index );
+        font->otm.otmEMSquare = ft_face->units_per_EM;
     }
     else
     {
@@ -2639,8 +2643,8 @@ enum matrices_index
     matrix_unrotated
 };
 
-static BOOL get_transform_matrices( struct gdi_font *font, BOOL vertical, const MAT2 *user_transform,
-                                    FT_Matrix matrices[3] )
+static FT_Matrix *get_transform_matrices( struct gdi_font *font, BOOL vertical, const MAT2 *user_transform,
+                                          FT_Matrix matrices[3] )
 {
     static const FT_Matrix identity_mat = { (1 << 16), 0, 0, (1 << 16) };
     BOOL needs_transform = FALSE;
@@ -2739,7 +2743,7 @@ static BOOL get_transform_matrices( struct gdi_font *font, BOOL vertical, const 
         needs_transform = TRUE;
     }
 
-    return needs_transform;
+    return needs_transform ? matrices : NULL;
 }
 
 static BOOL get_bold_glyph_outline(FT_GlyphSlot glyph, LONG ppem, FT_Glyph_Metrics *metrics)
@@ -2781,18 +2785,13 @@ static inline BYTE get_max_level( UINT format )
     return 255;
 }
 
-static FT_Vector get_advance_metric(struct gdi_font *incoming_font, struct gdi_font *font,
-                                    const FT_Glyph_Metrics *metrics,
-                                    const FT_Matrix *transMat, BOOL vertical_metrics)
+static FT_Vector get_advance_metric( struct gdi_font *font, FT_Pos base_advance,
+                                     const FT_Matrix *transMat )
 {
     FT_Vector adv;
-    FT_Fixed base_advance, em_scale = 0;
+    FT_Fixed em_scale = 0;
     BOOL fixed_pitch_full = FALSE;
-
-    if (vertical_metrics)
-        base_advance = metrics->vertAdvance;
-    else
-        base_advance = metrics->horiAdvance;
+    struct gdi_font *incoming_font = font->base_font ? font->base_font : font;
 
     adv.x = base_advance;
     adv.y = 0;
@@ -2841,12 +2840,11 @@ static FT_Vector get_advance_metric(struct gdi_font *incoming_font, struct gdi_f
     return adv;
 }
 
-static FT_BBox get_transformed_bbox( const FT_Glyph_Metrics *metrics,
-                                     BOOL needs_transform, const FT_Matrix metrices[3] )
+static FT_BBox get_transformed_bbox( const FT_Glyph_Metrics *metrics, const FT_Matrix *matrices )
 {
     FT_BBox bbox = { 0, 0, 0, 0 };
 
-    if (!needs_transform)
+    if (!matrices)
     {
         bbox.xMin = (metrics->horiBearingX) & -64;
         bbox.xMax = (metrics->horiBearingX + metrics->width + 63) & -64;
@@ -2864,8 +2862,8 @@ static FT_BBox get_transformed_bbox( const FT_Glyph_Metrics *metrics,
             {
                 vec.x = metrics->horiBearingX + xc * metrics->width;
                 vec.y = metrics->horiBearingY - yc * metrics->height;
-                TRACE( "Vec %ld,i %ld\n", vec.x, vec.y );
-                pFT_Vector_Transform( &vec, &metrices[matrix_vert] );
+                TRACE( "Vec %ld, %ld\n", vec.x, vec.y );
+                pFT_Vector_Transform( &vec, &matrices[matrix_vert] );
                 if (xc == 0 && yc == 0)
                 {
                     bbox.xMin = bbox.xMax = vec.x;
@@ -2890,17 +2888,16 @@ static FT_BBox get_transformed_bbox( const FT_Glyph_Metrics *metrics,
     return bbox;
 }
 
-static void compute_metrics( struct gdi_font *incoming_font, struct gdi_font *font,
-                             FT_BBox bbox, const FT_Glyph_Metrics *metrics,
-                             BOOL vertical, BOOL vertical_metrics,
-                             BOOL needs_transform, const FT_Matrix matrices[3],
+static void compute_metrics( struct gdi_font *font, FT_BBox bbox, const FT_Glyph_Metrics *metrics,
+                             BOOL vertical, BOOL vertical_metrics, const FT_Matrix *matrices,
                              GLYPHMETRICS *gm, ABC *abc )
 {
     FT_Vector adv, vec, origin;
+    FT_Fixed base_advance = vertical_metrics ? metrics->vertAdvance : metrics->horiAdvance;
 
-    if (!needs_transform)
+    if (!matrices)
     {
-        adv = get_advance_metric( incoming_font, font, metrics, NULL, vertical_metrics );
+        adv = get_advance_metric( font, base_advance, NULL );
         gm->gmCellIncX = adv.x >> 6;
         gm->gmCellIncY = 0;
         origin.x = bbox.xMin;
@@ -2933,13 +2930,11 @@ static void compute_metrics( struct gdi_font *incoming_font, struct gdi_font *fo
             lsb = metrics->horiBearingX;
         }
 
-        adv = get_advance_metric( incoming_font, font, metrics, &matrices[matrix_hori],
-                                  vertical_metrics );
+        adv = get_advance_metric( font, base_advance, &matrices[matrix_hori] );
         gm->gmCellIncX = adv.x >> 6;
         gm->gmCellIncY = adv.y >> 6;
 
-        adv = get_advance_metric( incoming_font, font, metrics, &matrices[matrix_unrotated],
-                                  vertical_metrics );
+        adv = get_advance_metric( font, base_advance, &matrices[matrix_unrotated] );
         adv.x = pFT_Vector_Length( &adv );
         adv.y = 0;
 
@@ -2974,7 +2969,7 @@ static void compute_metrics( struct gdi_font *incoming_font, struct gdi_font *fo
 static const BYTE masks[8] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
 
 static DWORD get_mono_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox,
-                                    BOOL fake_bold, BOOL needs_transform, FT_Matrix matrices[3],
+                                    BOOL fake_bold, const FT_Matrix *matrices,
                                     DWORD buflen, BYTE *buf )
 {
     DWORD width  = (bbox.xMax - bbox.xMin ) >> 6;
@@ -3022,7 +3017,7 @@ static DWORD get_mono_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox,
         ft_bitmap.pixel_mode = FT_PIXEL_MODE_MONO;
         ft_bitmap.buffer = buf;
 
-        if (needs_transform)
+        if (matrices)
             pFT_Outline_Transform( &glyph->outline, &matrices[matrix_vert] );
         pFT_Outline_Translate( &glyph->outline, -bbox.xMin, -bbox.yMin );
 
@@ -3040,7 +3035,7 @@ static DWORD get_mono_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox,
 }
 
 static DWORD get_antialias_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox, UINT format,
-                                         BOOL fake_bold, BOOL needs_transform, FT_Matrix matrices[3],
+                                         BOOL fake_bold, const FT_Matrix *matrices,
                                          DWORD buflen, BYTE *buf )
 {
     DWORD width  = (bbox.xMax - bbox.xMin ) >> 6;
@@ -3088,7 +3083,7 @@ static DWORD get_antialias_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox, UINT 
         ft_bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
         ft_bitmap.buffer = buf;
 
-        if (needs_transform)
+        if (matrices)
             pFT_Outline_Transform( &glyph->outline, &matrices[matrix_vert] );
         pFT_Outline_Translate( &glyph->outline, -bbox.xMin, -bbox.yMin );
 
@@ -3118,7 +3113,7 @@ static DWORD get_antialias_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox, UINT 
 }
 
 static DWORD get_subpixel_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox, UINT format,
-                                        BOOL fake_bold, BOOL needs_transform, FT_Matrix matrices[3],
+                                        BOOL fake_bold, const FT_Matrix *matrices,
                                         GLYPHMETRICS *gm, DWORD buflen, BYTE *buf )
 {
     DWORD width  = (bbox.xMax - bbox.xMin ) >> 6;
@@ -3196,13 +3191,9 @@ static DWORD get_subpixel_glyph_bitmap( FT_GlyphSlot glyph, FT_BBox bbox, UINT f
         if (!buf || !buflen) return needed;
         if (needed > buflen) return GDI_ERROR;
 
-        if (needs_transform)
+        if (matrices)
             pFT_Outline_Transform( &glyph->outline, &matrices[matrix_vert] );
 
-#ifdef FT_LCD_FILTER_H
-        if (pFT_Library_SetLcdFilter)
-            pFT_Library_SetLcdFilter( library, FT_LCD_FILTER_DEFAULT );
-#endif
         pFT_Render_Glyph( glyph, render_mode );
 
         src_pitch = glyph->bitmap.pitch;
@@ -3507,8 +3498,7 @@ static DWORD CDECL freetype_get_glyph_outline( struct gdi_font *font, UINT glyph
     FT_Error err;
     FT_BBox bbox;
     FT_Int load_flags = get_load_flags(format);
-    FT_Matrix matrices[3];
-    BOOL needsTransform = FALSE;
+    FT_Matrix transform_matrices[3], *matrices = NULL;
     BOOL vertical_metrics;
 
     TRACE("%p, %04x, %08x, %p, %08x, %p, %p\n", font, glyph, format, lpgm, buflen, buf, lpmat);
@@ -3519,7 +3509,7 @@ static DWORD CDECL freetype_get_glyph_outline( struct gdi_font *font, UINT glyph
 
     format &= ~GGO_UNHINTED;
 
-    needsTransform = get_transform_matrices( font, tategaki, lpmat, matrices );
+    matrices = get_transform_matrices( font, tategaki, lpmat, transform_matrices );
 
     vertical_metrics = (tategaki && FT_HAS_VERTICAL(ft_face));
     /* there is a freetype bug where vertical metrics are only
@@ -3527,7 +3517,7 @@ static DWORD CDECL freetype_get_glyph_outline( struct gdi_font *font, UINT glyph
     if (vertical_metrics && FT_SimpleVersion < FT_VERSION_VALUE(2, 4, 0))
         vertical_metrics = FALSE;
 
-    if (needsTransform || format != GGO_BITMAP) load_flags |= FT_LOAD_NO_BITMAP;
+    if (matrices || format != GGO_BITMAP) load_flags |= FT_LOAD_NO_BITMAP;
     if (vertical_metrics) load_flags |= FT_LOAD_VERTICAL_LAYOUT;
 
     err = pFT_Load_Glyph(ft_face, glyph, load_flags);
@@ -3564,9 +3554,8 @@ static DWORD CDECL freetype_get_glyph_outline( struct gdi_font *font, UINT glyph
         /* metrics.width = min( metrics.width, ptm->tmMaxCharWidth << 6 ); */
     }
 
-    bbox = get_transformed_bbox( &metrics, needsTransform, matrices );
-    compute_metrics( base_font, font, bbox, &metrics, tategaki,
-                     vertical_metrics, needsTransform, matrices, lpgm, abc );
+    bbox = get_transformed_bbox( &metrics, matrices );
+    compute_metrics( font, bbox, &metrics, tategaki, vertical_metrics, matrices, lpgm, abc );
 
     switch (format)
     {
@@ -3575,21 +3564,21 @@ static DWORD CDECL freetype_get_glyph_outline( struct gdi_font *font, UINT glyph
 
     case GGO_BITMAP:
         return get_mono_glyph_bitmap( ft_face->glyph, bbox, font->fake_bold,
-                                      needsTransform, matrices, buflen, buf );
+                                      matrices, buflen, buf );
 
     case GGO_GRAY2_BITMAP:
     case GGO_GRAY4_BITMAP:
     case GGO_GRAY8_BITMAP:
     case WINE_GGO_GRAY16_BITMAP:
         return get_antialias_glyph_bitmap( ft_face->glyph, bbox, format, font->fake_bold,
-                                           needsTransform, matrices, buflen, buf );
+                                           matrices, buflen, buf );
 
     case WINE_GGO_HRGB_BITMAP:
     case WINE_GGO_HBGR_BITMAP:
     case WINE_GGO_VRGB_BITMAP:
     case WINE_GGO_VBGR_BITMAP:
         return get_subpixel_glyph_bitmap( ft_face->glyph, bbox, format, font->fake_bold,
-                                          needsTransform, matrices, lpgm, buflen, buf );
+                                          matrices, lpgm, buflen, buf );
 
     case GGO_NATIVE:
         if (ft_face->glyph->format == ft_glyph_format_outline)
@@ -3599,7 +3588,7 @@ static DWORD CDECL freetype_get_glyph_outline( struct gdi_font *font, UINT glyph
 
             if (buflen == 0) buf = NULL;
 
-            if (needsTransform && buf)
+            if (matrices && buf)
                 pFT_Outline_Transform( outline, &matrices[matrix_vert] );
 
             needed = get_native_glyph_outline(outline, buflen, NULL);
@@ -3619,7 +3608,7 @@ static DWORD CDECL freetype_get_glyph_outline( struct gdi_font *font, UINT glyph
 
             if (buflen == 0) buf = NULL;
 
-            if (needsTransform && buf)
+            if (matrices && buf)
                 pFT_Outline_Transform( outline, &matrices[matrix_vert] );
 
             needed = get_bezier_glyph_outline(outline, buflen, NULL);
@@ -3784,7 +3773,6 @@ static BOOL CDECL freetype_set_outline_text_metrics( struct gdi_font *font )
         descent = windescent;
     }
 
-    font->ntmCellHeight = ascent + descent;
     font->ntmAvgWidth = pOS2->xAvgCharWidth;
 
 #define SCALE_X(x) (pFT_MulFix(x, em_scale))
@@ -3956,7 +3944,6 @@ static BOOL CDECL freetype_set_outline_text_metrics( struct gdi_font *font )
     font->otm.otmsCharSlopeRise = pHori->caret_Slope_Rise;
     font->otm.otmsCharSlopeRun = pHori->caret_Slope_Run;
     font->otm.otmItalicAngle = 0; /* POST table */
-    font->otm.otmEMSquare = ft_face->units_per_EM;
     font->otm.otmAscent = SCALE_Y(pOS2->sTypoAscender);
     font->otm.otmDescent = SCALE_Y(pOS2->sTypoDescender);
     font->otm.otmLineGap = SCALE_Y(pOS2->sTypoLineGap);

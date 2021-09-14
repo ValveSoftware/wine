@@ -157,7 +157,7 @@ static ULONG WINAPI mediatype_Release(IMFMediaType *iface)
         clear_attributes_object(&media_type->attributes);
         CoTaskMemFree(media_type->video_format);
         CoTaskMemFree(media_type->audio_format);
-        free(media_type);
+        heap_free(media_type);
     }
 
     return refcount;
@@ -1435,12 +1435,13 @@ static HRESULT create_media_type(struct media_type **ret)
     struct media_type *object;
     HRESULT hr;
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = init_attributes_object(&object->attributes, 0)))
     {
-        free(object);
+        heap_free(object);
         return hr;
     }
     object->IMFMediaType_iface.lpVtbl = &mediatypevtbl;
@@ -1518,11 +1519,11 @@ static ULONG WINAPI stream_descriptor_Release(IMFStreamDescriptor *iface)
             if (stream_desc->media_types[i])
                 IMFMediaType_Release(stream_desc->media_types[i]);
         }
-        free(stream_desc->media_types);
+        heap_free(stream_desc->media_types);
         if (stream_desc->current_type)
             IMFMediaType_Release(stream_desc->current_type);
         clear_attributes_object(&stream_desc->attributes);
-        free(stream_desc);
+        heap_free(stream_desc);
     }
 
     return refcount;
@@ -2051,18 +2052,19 @@ HRESULT WINAPI MFCreateStreamDescriptor(DWORD identifier, DWORD count,
     if (!count)
         return E_INVALIDARG;
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = init_attributes_object(&object->attributes, 0)))
     {
-        free(object);
+        heap_free(object);
         return hr;
     }
     object->IMFStreamDescriptor_iface.lpVtbl = &streamdescriptorvtbl;
     object->IMFMediaTypeHandler_iface.lpVtbl = &mediatypehandlervtbl;
     object->identifier = identifier;
-    object->media_types = calloc(count, sizeof(*object->media_types));
+    object->media_types = heap_alloc(count * sizeof(*object->media_types));
     if (!object->media_types)
     {
         IMFStreamDescriptor_Release(&object->IMFStreamDescriptor_iface);
@@ -2125,8 +2127,8 @@ static ULONG WINAPI presentation_descriptor_Release(IMFPresentationDescriptor *i
                 IMFStreamDescriptor_Release(presentation_desc->descriptors[i].descriptor);
         }
         clear_attributes_object(&presentation_desc->attributes);
-        free(presentation_desc->descriptors);
-        free(presentation_desc);
+        heap_free(presentation_desc->descriptors);
+        heap_free(presentation_desc);
     }
 
     return refcount;
@@ -2489,7 +2491,8 @@ static HRESULT WINAPI presentation_descriptor_Clone(IMFPresentationDescriptor *i
 
     TRACE("%p, %p.\n", iface, descriptor);
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     presentation_descriptor_init(object, presentation_desc->count);
@@ -2560,7 +2563,8 @@ static HRESULT presentation_descriptor_init(struct presentation_desc *object, DW
     if (FAILED(hr = init_attributes_object(&object->attributes, 0)))
         return hr;
     object->IMFPresentationDescriptor_iface.lpVtbl = &presentationdescriptorvtbl;
-    if (!(object->descriptors = calloc(count, sizeof(*object->descriptors))))
+    object->descriptors = heap_alloc_zero(count * sizeof(*object->descriptors));
+    if (!object->descriptors)
     {
         IMFPresentationDescriptor_Release(&object->IMFPresentationDescriptor_iface);
         return E_OUTOFMEMORY;
@@ -2591,12 +2595,13 @@ HRESULT WINAPI MFCreatePresentationDescriptor(DWORD count, IMFStreamDescriptor *
             return E_INVALIDARG;
     }
 
-    if (!(object = calloc(1, sizeof(*object))))
+    object = heap_alloc_zero(sizeof(*object));
+    if (!object)
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = presentation_descriptor_init(object, count)))
     {
-        free(object);
+        heap_free(object);
         return hr;
     }
 
@@ -2813,7 +2818,7 @@ HRESULT WINAPI MFWrapMediaType(IMFMediaType *original, REFGUID major, REFGUID su
     if (FAILED(hr = MFGetAttributesAsBlobSize((IMFAttributes *)original, &size)))
         return hr;
 
-    if (!(buffer = malloc(size)))
+    if (!(buffer = heap_alloc(size)))
         return E_OUTOFMEMORY;
 
     if (FAILED(hr = MFGetAttributesAsBlob((IMFAttributes *)original, buffer, size)))
@@ -2834,7 +2839,7 @@ HRESULT WINAPI MFWrapMediaType(IMFMediaType *original, REFGUID major, REFGUID su
     *ret = mediatype;
 
 failed:
-    free(buffer);
+    heap_free(buffer);
 
     return hr;
 }
@@ -3054,33 +3059,6 @@ HRESULT WINAPI MFCreateVideoMediaTypeFromSubtype(const GUID *subtype, IMFVideoMe
     IMFMediaType_SetGUID(&object->IMFMediaType_iface, &MF_MT_SUBTYPE, subtype);
 
     *media_type = &object->IMFVideoMediaType_iface;
-
-    return S_OK;
-}
-
-/***********************************************************************
- *      MFCreateAudioMediaType (mfplat.@)
- */
-HRESULT WINAPI MFCreateAudioMediaType(const WAVEFORMATEX *format, IMFAudioMediaType **media_type)
-{
-    struct media_type *object;
-    HRESULT hr;
-
-    TRACE("%p, %p.\n", format, media_type);
-
-    if (!media_type)
-        return E_INVALIDARG;
-
-    if (FAILED(hr = create_media_type(&object)))
-        return hr;
-
-    if (FAILED(hr = MFInitMediaTypeFromWaveFormatEx(&object->IMFMediaType_iface, format, sizeof(*format) + format->cbSize)))
-    {
-        IMFMediaType_Release(&object->IMFMediaType_iface);
-        return hr;
-    }
-
-    *media_type = &object->IMFAudioMediaType_iface;
 
     return S_OK;
 }
@@ -3442,56 +3420,4 @@ DXGI_FORMAT WINAPI MFMapDX9FormatToDXGIFormat(DWORD format)
         default:
             return DXGI_FORMAT_UNKNOWN;
     }
-}
-
-/***********************************************************************
- *      MFInitVideoFormat_RGB (mfplat.@)
- */
-HRESULT WINAPI MFInitVideoFormat_RGB(MFVIDEOFORMAT *format, DWORD width, DWORD height, DWORD d3dformat)
-{
-    unsigned int transfer_function;
-
-    TRACE("%p, %u, %u, %#x.\n", format, width, height, d3dformat);
-
-    if (!format)
-        return E_INVALIDARG;
-
-    if (!d3dformat) d3dformat = D3DFMT_X8R8G8B8;
-
-    switch (d3dformat)
-    {
-        case D3DFMT_X8R8G8B8:
-        case D3DFMT_R8G8B8:
-        case D3DFMT_A8R8G8B8:
-        case D3DFMT_R5G6B5:
-        case D3DFMT_X1R5G5B5:
-        case D3DFMT_A2B10G10R10:
-        case D3DFMT_P8:
-            transfer_function = MFVideoTransFunc_sRGB;
-            break;
-        default:
-            transfer_function = MFVideoTransFunc_10;
-    }
-
-    memset(format, 0, sizeof(*format));
-    format->dwSize = sizeof(*format);
-    format->videoInfo.dwWidth = width;
-    format->videoInfo.dwHeight = height;
-    format->videoInfo.PixelAspectRatio.Numerator = 1;
-    format->videoInfo.PixelAspectRatio.Denominator = 1;
-    format->videoInfo.InterlaceMode = MFVideoInterlace_Progressive;
-    format->videoInfo.TransferFunction = transfer_function;
-    format->videoInfo.ColorPrimaries = MFVideoPrimaries_BT709;
-    format->videoInfo.SourceLighting = MFVideoLighting_office;
-    format->videoInfo.FramesPerSecond.Numerator = 60;
-    format->videoInfo.FramesPerSecond.Denominator = 1;
-    format->videoInfo.NominalRange = MFNominalRange_Normal;
-    format->videoInfo.GeometricAperture.Area.cx = width;
-    format->videoInfo.GeometricAperture.Area.cy = height;
-    format->videoInfo.MinimumDisplayAperture = format->videoInfo.GeometricAperture;
-    memcpy(&format->guidFormat, &MFVideoFormat_Base, sizeof(format->guidFormat));
-    format->guidFormat.Data1 = d3dformat;
-    format->surfaceInfo.Format = d3dformat;
-
-    return S_OK;
 }

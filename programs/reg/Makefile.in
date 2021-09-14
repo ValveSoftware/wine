@@ -5,8 +5,11 @@ DELAYIMPORTS = user32
 EXTRADLLFLAGS = -mconsole -municode -mno-cygwin
 
 C_SRCS = \
+	add.c \
+	delete.c \
 	export.c \
 	import.c \
+	query.c \
 	reg.c
 
 RC_SRCS = reg.rc

@@ -2182,7 +2182,7 @@ static nsresult NSAPI nsCacheInfoChannel_GetCacheTokenCachedCharset(nsICacheInfo
 static nsresult NSAPI nsCacheInfoChannel_SetCacheTokenCachedCharset(nsICacheInfoChannel *iface, const nsACString *p)
 {
     nsChannel *This = impl_from_nsICacheInfoChannel(iface);
-    FIXME("(%p)->(%p)\n", This, debugstr_nsacstr(p));
+    FIXME("(%p)->(%s)\n", This, debugstr_nsacstr(p));
     return E_NOTIMPL;
 }
 
@@ -3800,7 +3800,7 @@ static nsresult NSAPI nsIOServiceHook_GetProtocolHandler(nsIIOServiceHook *iface
 
 static BOOL is_gecko_special_uri(const char *spec)
 {
-    static const char *special_schemes[] = {"chrome:", "data:", "jar:", "moz-safe-about", "resource://gre/", "resource://gre-resources/", "javascript:", "wyciwyg:"};
+    static const char *special_schemes[] = {"chrome:", "data:", "jar:", "moz-safe-about", "resource:", "javascript:", "wyciwyg:"};
     unsigned int i;
 
     for(i=0; i < ARRAY_SIZE(special_schemes); i++) {
@@ -3979,4 +3979,22 @@ void release_nsio(void)
         nsIIOService_Release(nsio);
         nsio = NULL;
     }
+}
+
+nsresult create_onload_blocker_request(nsIRequest **ret)
+{
+    nsIChannel *channel;
+    nsACString spec;
+    nsresult nsres;
+
+    nsACString_InitDepend(&spec, "about:wine-script-onload-blocker");
+    nsres = nsIIOService_NewChannel(nsio, &spec, NULL, NULL, &channel);
+    nsACString_Finish(&spec);
+    if(NS_FAILED(nsres)) {
+        ERR("Failed to create channel: %08x\n", nsres);
+        return nsres;
+    }
+
+    *ret = (nsIRequest *)channel;
+    return NS_OK;
 }

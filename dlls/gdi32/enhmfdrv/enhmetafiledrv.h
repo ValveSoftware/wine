@@ -41,6 +41,7 @@ typedef struct
     HBRUSH     dc_brush;
     HPEN       dc_pen;
     INT        restoring;          /* RestoreDC counter */
+    INT        modifying_transform;/* Counter for functions that can change world transform */
     BOOL       path;
     INT        dev_caps[COLORMGMTCAPS + 1];
 } EMFDRV_PDEVICE;
@@ -58,6 +59,8 @@ extern DWORD EMFDRV_CreateBrushIndirect( PHYSDEV dev, HBRUSH hBrush ) DECLSPEC_H
 
 /* Metafile driver functions */
 extern BOOL     CDECL EMFDRV_AbortPath( PHYSDEV dev ) DECLSPEC_HIDDEN;
+extern BOOL     CDECL EMFDRV_AlphaBlend( PHYSDEV dev_dst, struct bitblt_coords *dst,
+                                         PHYSDEV dev_src, struct bitblt_coords *src, BLENDFUNCTION func ) DECLSPEC_HIDDEN;
 extern BOOL     CDECL EMFDRV_AngleArc( PHYSDEV dev, INT x, INT y, DWORD radius, FLOAT start, FLOAT sweep ) DECLSPEC_HIDDEN;
 extern BOOL     CDECL EMFDRV_Arc( PHYSDEV dev, INT left, INT top, INT right,
                                   INT bottom, INT xstart, INT ystart, INT xend, INT yend ) DECLSPEC_HIDDEN;

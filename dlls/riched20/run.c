@@ -543,9 +543,9 @@ int ME_CharFromPointContext(ME_Context *c, int cx, ME_Run *run, BOOL closest, BO
       return closest ? cp + trailing : cp;
   }
 
-  if (c->editor->cPasswordMask)
+  if (c->editor->password_char)
   {
-    mask_text = ME_MakeStringR( c->editor->cPasswordMask, run->len );
+    mask_text = ME_MakeStringR( c->editor->password_char, run->len );
     str = mask_text->szData;
   }
   else
@@ -571,10 +571,12 @@ int ME_CharFromPoint(ME_TextEditor *editor, int cx, ME_Run *run, BOOL closest, B
 {
     ME_Context c;
     int ret;
+    HDC hdc = ITextHost_TxGetDC( editor->texthost );
 
-    ME_InitContext( &c, editor, ITextHost_TxGetDC( editor->texthost ) );
+    ME_InitContext( &c, editor, hdc );
     ret = ME_CharFromPointContext( &c, cx, run, closest, visual_order );
     ME_DestroyContext(&c);
+    ITextHost_TxReleaseDC( editor->texthost, hdc );
     return ret;
 }
 
@@ -626,9 +628,9 @@ int ME_PointFromCharContext(ME_Context *c, ME_Run *pRun, int nOffset, BOOL visua
       if (visual_order && pRun->script_analysis.fRTL) x = pRun->nWidth - x - 1;
       return x;
   }
-  if (c->editor->cPasswordMask)
+  if (c->editor->password_char)
   {
-    mask_text = ME_MakeStringR(c->editor->cPasswordMask, pRun->len);
+    mask_text = ME_MakeStringR( c->editor->password_char, pRun->len );
     str = mask_text->szData;
   }
   else
@@ -648,10 +650,12 @@ int ME_PointFromChar(ME_TextEditor *editor, ME_Run *pRun, int nOffset, BOOL visu
 {
     ME_Context c;
     int ret;
+    HDC hdc = ITextHost_TxGetDC( editor->texthost );
 
-    ME_InitContext(&c, editor, ITextHost_TxGetDC(editor->texthost));
+    ME_InitContext( &c, editor, hdc );
     ret = ME_PointFromCharContext( &c, pRun, nOffset, visual_order );
     ME_DestroyContext(&c);
+    ITextHost_TxReleaseDC( editor->texthost, hdc );
 
     return ret;
 }
@@ -678,9 +682,9 @@ SIZE ME_GetRunSizeCommon(ME_Context *c, const ME_Paragraph *para, ME_Run *run, i
   {
       size.cx = run->nWidth;
   }
-  else if (c->editor->cPasswordMask)
+  else if (c->editor->password_char)
   {
-    ME_String *szMasked = ME_MakeStringR(c->editor->cPasswordMask,nLen);
+    ME_String *szMasked = ME_MakeStringR( c->editor->password_char, nLen );
     ME_GetTextExtent(c, szMasked->szData, nLen,run->style, &size); 
     ME_DestroyString(szMasked);
   }

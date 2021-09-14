@@ -85,7 +85,7 @@
 @ stdcall CoCreateInstanceFromApp(ptr ptr long ptr long ptr)
 @ stub CoCreateObjectInContext
 @ stub CoDeactivateObject
-@ stdcall CoDecodeProxy(long int64 ptr)
+@ stub CoDecodeProxy
 @ stdcall CoDecrementMTAUsage(ptr)
 @ stdcall CoDisableCallCancellation(ptr)
 @ stub CoDisconnectContext
@@ -178,7 +178,7 @@
 @ stub DcomChannelSetHResult
 @ stdcall DllDebugObjectRPCHook(long ptr)
 @ stdcall DllGetActivationFactory(ptr ptr)
-@ stdcall -private DllGetClassObject(ptr ptr ptr) ole32.DllGetClassObject
+@ stdcall -private DllGetClassObject(ptr ptr ptr)
 @ stub EnableHookObject
 @ stdcall FreePropVariantArray(long ptr)
 @ stub FreePropVariantArrayWorker

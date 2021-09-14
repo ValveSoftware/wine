@@ -36,15 +36,14 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(x11settings);
 
-struct x11drv_display_depth
+struct x11drv_display_setting
 {
-    struct list entry;
-    ULONG_PTR display_id;
-    DWORD depth;
+    ULONG_PTR id;
+    BOOL placed;
+    RECT new_rect;
+    RECT desired_rect;
+    DEVMODEW desired_mode;
 };
-
-/* Display device emulated depth list, protected by modes_section */
-static struct list x11drv_display_depth_list = LIST_INIT(x11drv_display_depth_list);
 
 /* All Windows drivers seen so far either support 32 bit depths, or 24 bit depths, but never both. So if we have
  * a 32 bit framebuffer, report 32 bit bpps, otherwise 24 bit ones.
@@ -77,11 +76,6 @@ void X11DRV_Settings_SetHandler(const struct x11drv_settings_handler *new_handle
         handler = *new_handler;
         TRACE("Display settings are now handled by: %s.\n", handler.name);
     }
-}
-
-struct x11drv_settings_handler X11DRV_Settings_GetHandler(void)
-{
-    return handler;
 }
 
 /***********************************************************************
@@ -166,6 +160,7 @@ static LONG nores_set_current_mode(ULONG_PTR id, DEVMODEW *mode)
     return DISP_CHANGE_SUCCESSFUL;
 }
 
+/* default handler only gets the current X desktop resolution */
 void X11DRV_Settings_Init(void)
 {
     struct x11drv_settings_handler nores_handler;
@@ -173,13 +168,12 @@ void X11DRV_Settings_Init(void)
     depths = screen_bpp == 32 ? depths_32 : depths_24;
 
     nores_handler.name = "NoRes";
-    nores_handler.priority = 0;
+    nores_handler.priority = 1;
     nores_handler.get_id = nores_get_id;
     nores_handler.get_modes = nores_get_modes;
     nores_handler.free_modes = nores_free_modes;
     nores_handler.get_current_mode = nores_get_current_mode;
     nores_handler.set_current_mode = nores_set_current_mode;
-    nores_handler.convert_coordinates = NULL;
     X11DRV_Settings_SetHandler(&nores_handler);
 }
 
@@ -363,7 +357,7 @@ BOOL get_primary_adapter(WCHAR *name)
     return FALSE;
 }
 
-int mode_compare(const void *p1, const void *p2)
+static int mode_compare(const void *p1, const void *p2)
 {
     DWORD a_width, a_height, b_width, b_height;
     const DEVMODEW *a = p1, *b = p2;
@@ -411,54 +405,6 @@ int mode_compare(const void *p1, const void *p2)
     return a->u1.s2.dmDisplayOrientation - b->u1.s2.dmDisplayOrientation;
 }
 
-static void set_display_depth(ULONG_PTR display_id, DWORD depth)
-{
-    struct x11drv_display_depth *display_depth;
-
-    EnterCriticalSection(&modes_section);
-    LIST_FOR_EACH_ENTRY(display_depth, &x11drv_display_depth_list, struct x11drv_display_depth, entry)
-    {
-        if (display_depth->display_id == display_id)
-        {
-            display_depth->depth = depth;
-            LeaveCriticalSection(&modes_section);
-            return;
-        }
-    }
-
-    display_depth = heap_alloc(sizeof(*display_depth));
-    if (!display_depth)
-    {
-        ERR("Failed to allocate memory.\n");
-        LeaveCriticalSection(&modes_section);
-        return;
-    }
-
-    display_depth->display_id = display_id;
-    display_depth->depth = depth;
-    list_add_head(&x11drv_display_depth_list, &display_depth->entry);
-    LeaveCriticalSection(&modes_section);
-}
-
-static DWORD get_display_depth(ULONG_PTR display_id)
-{
-    struct x11drv_display_depth *display_depth;
-    DWORD depth;
-
-    EnterCriticalSection(&modes_section);
-    LIST_FOR_EACH_ENTRY(display_depth, &x11drv_display_depth_list, struct x11drv_display_depth, entry)
-    {
-        if (display_depth->display_id == display_id)
-        {
-            depth = display_depth->depth;
-            LeaveCriticalSection(&modes_section);
-            return depth;
-        }
-    }
-    LeaveCriticalSection(&modes_section);
-    return screen_bpp;
-}
-
 /***********************************************************************
  *		EnumDisplaySettingsEx  (X11DRV.@)
  *
@@ -488,10 +434,6 @@ BOOL CDECL X11DRV_EnumDisplaySettingsEx( LPCWSTR name, DWORD n, LPDEVMODEW devmo
             ERR("Failed to get %s current display settings.\n", wine_dbgstr_w(name));
             return FALSE;
         }
-
-        if (!is_detached_mode(devmode))
-            devmode->dmBitsPerPel = get_display_depth(id);
-
         goto done;
     }
 
@@ -638,15 +580,6 @@ static LONG get_display_settings(struct x11drv_display_setting **new_displays,
             goto done;
         }
 
-        current_mode.dmSize = sizeof(current_mode);
-        if (!EnumDisplaySettingsExW(display_device.DeviceName, ENUM_CURRENT_SETTINGS, &current_mode, 0))
-            goto done;
-
-        displays[display_idx].old_rect.left = current_mode.u1.s2.dmPosition.x;
-        displays[display_idx].old_rect.top = current_mode.u1.s2.dmPosition.y;
-        displays[display_idx].old_rect.right = displays[display_idx].old_rect.left + current_mode.dmPelsWidth;
-        displays[display_idx].old_rect.bottom = displays[display_idx].old_rect.top + current_mode.dmPelsHeight;
-
         if (!dev_mode)
         {
             memset(&registry_mode, 0, sizeof(registry_mode));
@@ -661,12 +594,22 @@ static LONG get_display_settings(struct x11drv_display_setting **new_displays,
             displays[display_idx].desired_mode = *dev_mode;
             if (!(dev_mode->dmFields & DM_POSITION))
             {
+                memset(&current_mode, 0, sizeof(current_mode));
+                current_mode.dmSize = sizeof(current_mode);
+                if (!EnumDisplaySettingsExW(display_device.DeviceName, ENUM_CURRENT_SETTINGS, &current_mode, 0))
+                    goto done;
+
                 displays[display_idx].desired_mode.dmFields |= DM_POSITION;
                 displays[display_idx].desired_mode.u1.s2.dmPosition = current_mode.u1.s2.dmPosition;
             }
         }
         else
         {
+            memset(&current_mode, 0, sizeof(current_mode));
+            current_mode.dmSize = sizeof(current_mode);
+            if (!EnumDisplaySettingsExW(display_device.DeviceName, ENUM_CURRENT_SETTINGS, &current_mode, 0))
+                goto done;
+
             displays[display_idx].desired_mode = current_mode;
         }
 
@@ -732,55 +675,6 @@ static POINT get_placement_offset(const struct x11drv_display_setting *displays,
 
     if (!has_placed)
         return min_offset;
-
-    /* Try to place this adapter next to a placed adapter it was next to */
-    if (EqualRect(&displays[placing_idx].desired_rect, &displays[placing_idx].old_rect))
-    {
-        for (display_idx = 0; display_idx < display_count; ++display_idx)
-        {
-            if (!displays[display_idx].placed ||
-                IsRectEmpty(&displays[display_idx].old_rect) ||
-                IsRectEmpty(&displays[display_idx].new_rect))
-                continue;
-
-            /* Left or right */
-            if (displays[placing_idx].old_rect.top <= displays[display_idx].old_rect.bottom &&
-                displays[placing_idx].old_rect.bottom >= displays[display_idx].old_rect.top)
-            {
-                offset.y = 0;
-                /* Right */
-                if (displays[placing_idx].old_rect.left == displays[display_idx].old_rect.right)
-                    offset.x = displays[display_idx].new_rect.right - displays[display_idx].old_rect.right;
-                /* Left */
-                else if (displays[placing_idx].old_rect.right == displays[display_idx].old_rect.left)
-                    offset.x = displays[display_idx].new_rect.left - displays[display_idx].old_rect.left;
-                else
-                    continue;
-            }
-            /* Top or bottom */
-            else if (displays[placing_idx].old_rect.left <= displays[display_idx].old_rect.right &&
-                     displays[placing_idx].old_rect.right >= displays[display_idx].old_rect.left)
-            {
-                offset.x = 0;
-                /* Bottom */
-                if (displays[placing_idx].old_rect.top == displays[display_idx].old_rect.bottom)
-                    offset.y = displays[display_idx].new_rect.bottom - displays[display_idx].old_rect.bottom;
-                /* Top */
-                else if (displays[placing_idx].old_rect.bottom == displays[display_idx].old_rect.top)
-                    offset.y = displays[display_idx].new_rect.top - displays[display_idx].old_rect.top;
-                else
-                    continue;
-            }
-            else
-                continue;
-
-            /* Check if this offset will cause overlapping */
-            rect = displays[placing_idx].desired_rect;
-            OffsetRect(&rect, offset.x, offset.y);
-            if (!overlap_placed_displays(&rect, displays, display_count))
-                return offset;
-        }
-    }
 
     /* Try to place this display with each of its four vertices at every vertex of the placed
      * displays and see which combination has the minimum offset length */
@@ -876,6 +770,7 @@ static POINT get_placement_offset(const struct x11drv_display_setting *displays,
 
 static void place_all_displays(struct x11drv_display_setting *displays, INT display_count)
 {
+    INT left_most = INT_MAX, top_most = INT_MAX;
     INT placing_idx, display_idx;
     POINT min_offset, offset;
 
@@ -910,6 +805,15 @@ static void place_all_displays(struct x11drv_display_setting *displays, INT disp
     {
         displays[display_idx].desired_mode.u1.s2.dmPosition.x = displays[display_idx].new_rect.left;
         displays[display_idx].desired_mode.u1.s2.dmPosition.y = displays[display_idx].new_rect.top;
+        left_most = min(left_most, displays[display_idx].new_rect.left);
+        top_most = min(top_most, displays[display_idx].new_rect.top);
+    }
+
+    /* Convert virtual screen coordinates to root coordinates */
+    for (display_idx = 0; display_idx < display_count; ++display_idx)
+    {
+        displays[display_idx].desired_mode.u1.s2.dmPosition.x -= left_most;
+        displays[display_idx].desired_mode.u1.s2.dmPosition.y -= top_most;
     }
 }
 
@@ -938,8 +842,6 @@ static LONG apply_display_settings(struct x11drv_display_setting *displays, INT 
               full_mode->u1.s2.dmDisplayOrientation);
 
         ret = handler.set_current_mode(displays[display_idx].id, full_mode);
-        if (attached_mode && ret == DISP_CHANGE_SUCCESSFUL)
-            set_display_depth(displays[display_idx].id, full_mode->dmBitsPerPel);
         free_full_mode(full_mode);
         if (ret != DISP_CHANGE_SUCCESSFUL)
             return ret;

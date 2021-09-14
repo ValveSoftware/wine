@@ -30,7 +30,7 @@
 static HINSTANCE winegstreamer_instance;
 LONG object_locks;
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(gstreamer);
 
 const struct unix_funcs *unix_funcs = NULL;
 
@@ -320,11 +320,6 @@ HRESULT WINAPI DllRegisterServer(void)
     HRESULT hr;
 
     TRACE(".\n");
-
-    init_gstreamer();
-
-    if (FAILED(hr = mfplat_DllRegisterServer()))
-        return hr;
 
     if (FAILED(hr = __wine_register_resources(winegstreamer_instance)))
         return hr;

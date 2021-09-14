@@ -81,10 +81,6 @@ struct object_ops
     void (*remove_queue)(struct object *,struct wait_queue_entry *);
     /* is object signaled? */
     int  (*signaled)(struct object *,struct wait_queue_entry *);
-    /* return the esync fd for this object */
-    int (*get_esync_fd)(struct object *, enum esync_type *type);
-    /* return the fsync shm idx for this object */
-    unsigned int (*get_fsync_idx)(struct object *, enum fsync_type *type);
     /* wait satisfied */
     void (*satisfied)(struct object *,struct wait_queue_entry *);
     /* signal an object */
@@ -219,7 +215,6 @@ extern struct keyed_event *create_keyed_event( struct object *root, const struct
                                                unsigned int attr, const struct security_descriptor *sd );
 extern struct event *get_event_obj( struct process *process, obj_handle_t handle, unsigned int access );
 extern struct keyed_event *get_keyed_event_obj( struct process *process, obj_handle_t handle, unsigned int access );
-extern void pulse_event( struct event *event );
 extern void set_event( struct event *event );
 extern void reset_event( struct event *event );
 
@@ -244,6 +239,8 @@ extern void generate_startup_debug_events( struct process *process );
 /* registry functions */
 
 extern unsigned int get_prefix_cpu_mask(void);
+extern unsigned int supported_machines_count;
+extern unsigned short supported_machines[8];
 extern void init_registry(void);
 extern void flush_registry(void);
 
@@ -267,10 +264,6 @@ extern struct object *get_root_directory(void);
 extern struct object *get_directory_obj( struct process *process, obj_handle_t handle );
 extern int directory_link_name( struct object *obj, struct object_name *name, struct object *parent );
 extern void init_directories( struct fd *intl_fd );
-
-/* thread functions */
-
-extern void init_threading(void);
 
 /* symbolic link functions */
 

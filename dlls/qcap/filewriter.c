@@ -20,7 +20,7 @@
 
 #include "qcap_private.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(qcap);
 
 struct file_writer
 {

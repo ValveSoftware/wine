@@ -18,45 +18,38 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#ifndef __WINE_CONFIG_H
-# error You must include config.h to use this header
-#endif
-
 #include "wine/heap.h"
 
-static inline LPSTR dns_strdup_a( LPCSTR src )
+static inline char *strdup_a( const char *src )
 {
-    LPSTR dst;
-
+    char *dst;
     if (!src) return NULL;
     dst = heap_alloc( (lstrlenA( src ) + 1) * sizeof(char) );
     if (dst) lstrcpyA( dst, src );
     return dst;
 }
 
-static inline char *dns_strdup_u( const char *src )
+static inline char *strdup_u( const char *src )
 {
     char *dst;
-
     if (!src) return NULL;
     dst = heap_alloc( (strlen( src ) + 1) * sizeof(char) );
     if (dst) strcpy( dst, src );
     return dst;
 }
 
-static inline LPWSTR dns_strdup_w( LPCWSTR src )
+static inline WCHAR *strdup_w( const WCHAR *src )
 {
-    LPWSTR dst;
-
+    WCHAR *dst;
     if (!src) return NULL;
     dst = heap_alloc( (lstrlenW( src ) + 1) * sizeof(WCHAR) );
     if (dst) lstrcpyW( dst, src );
     return dst;
 }
 
-static inline LPWSTR dns_strdup_aw( LPCSTR str )
+static inline WCHAR *strdup_aw( const char *str )
 {
-    LPWSTR ret = NULL;
+    WCHAR *ret = NULL;
     if (str)
     {
         DWORD len = MultiByteToWideChar( CP_ACP, 0, str, -1, NULL, 0 );
@@ -66,9 +59,9 @@ static inline LPWSTR dns_strdup_aw( LPCSTR str )
     return ret;
 }
 
-static inline LPWSTR dns_strdup_uw( const char *str )
+static inline WCHAR *strdup_uw( const char *str )
 {
-    LPWSTR ret = NULL;
+    WCHAR *ret = NULL;
     if (str)
     {
         DWORD len = MultiByteToWideChar( CP_UTF8, 0, str, -1, NULL, 0 );
@@ -78,9 +71,9 @@ static inline LPWSTR dns_strdup_uw( const char *str )
     return ret;
 }
 
-static inline LPSTR dns_strdup_wa( LPCWSTR str )
+static inline char *strdup_wa( const WCHAR *str )
 {
-    LPSTR ret = NULL;
+    char *ret = NULL;
     if (str)
     {
         DWORD len = WideCharToMultiByte( CP_ACP, 0, str, -1, NULL, 0, NULL, NULL );
@@ -90,9 +83,9 @@ static inline LPSTR dns_strdup_wa( LPCWSTR str )
     return ret;
 }
 
-static inline char *dns_strdup_wu( LPCWSTR str )
+static inline char *strdup_wu( const WCHAR *str )
 {
-    LPSTR ret = NULL;
+    char *ret = NULL;
     if (str)
     {
         DWORD len = WideCharToMultiByte( CP_UTF8, 0, str, -1, NULL, 0, NULL, NULL );
@@ -102,37 +95,41 @@ static inline char *dns_strdup_wu( LPCWSTR str )
     return ret;
 }
 
-static inline char *dns_strdup_au( LPCSTR src )
+static inline char *strdup_au( const char *src )
 {
     char *dst = NULL;
-    LPWSTR ret = dns_strdup_aw( src );
-
+    WCHAR *ret = strdup_aw( src );
     if (ret)
     {
-        dst = dns_strdup_wu( ret );
+        dst = strdup_wu( ret );
         heap_free( ret );
     }
     return dst;
 }
 
-static inline LPSTR dns_strdup_ua( const char *src )
+static inline char *strdup_ua( const char *src )
 {
-    LPSTR dst = NULL;
-    LPWSTR ret = dns_strdup_uw( src );
-
+    char *dst = NULL;
+    WCHAR *ret = strdup_uw( src );
     if (ret)
     {
-        dst = dns_strdup_wa( ret );
+        dst = strdup_wa( ret );
         heap_free( ret );
     }
     return dst;
 }
 
-const char *dns_type_to_str( unsigned short ) DECLSPEC_HIDDEN;
+extern const char *type_to_str( unsigned short ) DECLSPEC_HIDDEN;
 
-#ifdef HAVE_RESOLV
-int dns_ns_initparse( const u_char *, int, ns_msg * ) DECLSPEC_HIDDEN;
-int dns_ns_parserr( ns_msg *, ns_sect, int, ns_rr * ) DECLSPEC_HIDDEN;
-int dns_ns_name_skip( const u_char **, const u_char * ) DECLSPEC_HIDDEN;
-int dns_ns_name_uncompress( const u_char *, const u_char *, const u_char *, char *, size_t ) DECLSPEC_HIDDEN;
-#endif
+extern DNS_STATUS CDECL resolv_get_serverlist( IP4_ARRAY *, DWORD * ) DECLSPEC_HIDDEN;
+extern DNS_STATUS CDECL resolv_query( const char *, WORD, DWORD, DNS_RECORDA ** ) DECLSPEC_HIDDEN;
+extern DNS_STATUS CDECL resolv_set_serverlist( const IP4_ARRAY * ) DECLSPEC_HIDDEN;
+
+struct resolv_funcs
+{
+    DNS_STATUS (CDECL *get_serverlist)( IP4_ARRAY *addrs, DWORD *len );
+    DNS_STATUS (CDECL *query)( const char *name, WORD type, DWORD options, DNS_RECORDA **result );
+    DNS_STATUS (CDECL *set_serverlist)( const IP4_ARRAY *addrs );
+};
+
+extern const struct resolv_funcs *resolv_funcs;

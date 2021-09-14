@@ -102,8 +102,6 @@ AC_ARG_WITH(xinput,    AS_HELP_STRING([--without-xinput],[do not use the Xinput 
 AC_ARG_WITH(xinput2,   AS_HELP_STRING([--without-xinput2],[do not use the Xinput 2 extension]),
             [if test "x$withval" = "xno"; then ac_cv_header_X11_extensions_XInput2_h=no; fi])
 AC_ARG_WITH(xml,       AS_HELP_STRING([--without-xml],[do not use XML]))
-AC_ARG_WITH(xpresent,  AS_HELP_STRING([--without-xpresent],[do not use the Xpresent extension]),
-            [if test "x$withval" = "xno"; then ac_cv_header_X11_extensions_Xpresent_h=no; fi])
 AC_ARG_WITH(xrandr,    AS_HELP_STRING([--without-xrandr],[do not use Xrandr (multi-monitor support)]),
             [if test "x$withval" = "xno"; then ac_cv_header_X11_extensions_Xrandr_h=no; fi])
 AC_ARG_WITH(xrender,   AS_HELP_STRING([--without-xrender],[do not use the Xrender extension]),
@@ -142,7 +140,7 @@ case $host in
     ;;
 esac
 
-AC_SUBST(TARGETFLAGS,"")
+AC_SUBST(TARGETFLAGS)
 case $host in
   x86_64*|amd64*)
     if test "x$enable_win64" != "xyes" -a "$cross_compiling" != "yes"
@@ -154,12 +152,11 @@ case $host in
       test $wine_cv_cc_m32 != no || AC_MSG_ERROR([Cannot build a 32-bit program, you need to install 32-bit development libraries.])
       host_cpu="i386"
       notice_platform="32-bit "
-      TARGETFLAGS="-m32"
+      TARGETFLAGS="$TARGETFLAGS -m32"
       PKG_CONFIG_PATH=${PKG_CONFIG_PATH:-/usr/lib/i386-linux-gnu/pkgconfig:/usr/lib32/pkgconfig:/usr/lib/pkgconfig}
       export PKG_CONFIG_PATH
       enable_win16=${enable_win16:-yes}
       with_unwind=${with_unwind:-no}
-      AC_SUBST(XAUDIO_NATIVE_SWITCH,["-Wb,--prefer-native"])
     else
       if test "x${GCC}" = "xyes"
       then
@@ -172,8 +169,8 @@ case $host in
       CXX="$CXX -m64"
       host_cpu="x86_64"
       notice_platform="64-bit "
-      TARGETFLAGS="-m64"
-      AC_SUBST(XAUDIO_NATIVE_SWITCH,"")
+      TARGETFLAGS="$TARGETFLAGS -m64"
+      enable_wow64cpu=${enable_wow64cpu:-yes}
     fi
     ;;
   arm*)
@@ -183,10 +180,10 @@ case $host in
     if test x"$wine_cv_thumb2" = xyes
     then
         CFLAGS="$CFLAGS -mthumb"
-        TARGETFLAGS="-mthumb"
+        TARGETFLAGS="$TARGETFLAGS -mthumb"
     else
         CFLAGS="$CFLAGS -marm"
-        TARGETFLAGS="-marm"
+        TARGETFLAGS="$TARGETFLAGS -marm"
     fi
     case $with_float_abi in
       soft|softfp|hard)
@@ -228,6 +225,7 @@ esac
 dnl enable_win16 defaults to yes on x86, to no on other CPUs
 enable_win16=${enable_win16:-no}
 enable_win64=${enable_win64:-no}
+enable_wow64cpu=${enable_wow64cpu:-no}
 
 dnl Disable winetest too if tests are disabled
 enable_winetest=${enable_winetest:-$enable_tests}
@@ -471,7 +469,6 @@ AC_CHECK_HEADERS(\
 	linux/joystick.h \
 	linux/major.h \
 	linux/param.h \
-	linux/seccomp.h \
 	linux/serial.h \
 	linux/types.h \
 	linux/ucdrom.h \
@@ -503,7 +500,6 @@ AC_CHECK_HEADERS(\
 	sys/cdio.h \
 	sys/epoll.h \
 	sys/event.h \
-	sys/eventfd.h \
 	sys/filio.h \
 	sys/ioctl.h \
 	sys/ipc.h \
@@ -897,10 +893,6 @@ case $host_os in
                     [WINELOADER_LDFLAGS="-Wl,--export-dynamic"])
     WINEPRELOADER_LDFLAGS="-static -nostartfiles -nodefaultlibs -Wl,-Ttext=0x7d400000"
 
-    AC_SUBST(LIBWINE_SHAREDLIB,"libwine.so")
-    AC_SUBST(LIBWINE_LDFLAGS,["-shared -Wl,-soname,libwine.so"])
-    TOP_INSTALL_LIB="$TOP_INSTALL_LIB libs/wine/libwine.so"
-
     WINE_CHECK_SONAME(EGL,eglGetProcAddress)
     WINE_CHECK_SONAME(GLESv2,glFlush)
 
@@ -1048,6 +1040,7 @@ then
         WINE_TRY_CROSSCFLAGS([-Wdeclaration-after-statement])
         WINE_TRY_CROSSCFLAGS([-Wempty-body])
         WINE_TRY_CROSSCFLAGS([-Wignored-qualifiers])
+        WINE_TRY_CROSSCFLAGS([-Winit-self])
         WINE_TRY_CROSSCFLAGS([-Wpacked-not-aligned],[EXTRACROSSCFLAGS="$EXTRACROSSCFLAGS -Wno-packed-not-aligned"])
         WINE_TRY_CROSSCFLAGS([-Wpragma-pack],[EXTRACROSSCFLAGS="$EXTRACROSSCFLAGS -Wno-pragma-pack"])
         WINE_TRY_CROSSCFLAGS([-Wshift-overflow=2])
@@ -1141,7 +1134,6 @@ then
                       X11/extensions/Xcomposite.h \
                       X11/extensions/Xfixes.h \
                       X11/extensions/Xinerama.h \
-                      X11/extensions/Xpresent.h \
                       X11/extensions/Xrandr.h \
                       X11/extensions/Xrender.h \
                       X11/extensions/xf86vmode.h \
@@ -1258,16 +1250,6 @@ then
         fi
         WINE_NOTICE_WITH(xinerama,[test "x$ac_cv_lib_soname_Xinerama" = "x"],
                          [libxinerama ${notice_platform}development files not found, multi-monitor setups won't be supported.])
-
-        dnl *** Check for Xpresent extension
-        if test "$ac_cv_header_X11_extensions_Xpresent_h" = "yes"
-        then
-                AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[#include <X11/Xlib.h>
-#include <X11/extensions/Xpresent.h>]], [[static typeof(XPresentQueryVersion) * func; if (func) return 0;]])],
-                  [WINE_CHECK_SONAME(Xpresent,XPresentQueryVersion,,,[$X_LIBS $X_EXTRA_LIBS])])
-        fi
-        WINE_NOTICE_WITH(Xpresent,[test "x$ac_cv_lib_soname_Xpresent" = "x"],
-                         [libXpresent ${notice_platform}development files not found, Xpresent won't be supported.])
 
         dnl *** Check for X Composite extension
         if test "$ac_cv_header_X11_extensions_Xcomposite_h" = "yes"
@@ -1447,18 +1429,10 @@ fi
 WINE_WARNING_WITH(gnutls,[test "x$ac_cv_lib_soname_gnutls" = "x"],
                  [libgnutls ${notice_platform}development files not found, no schannel support.])
 
-dnl **** Check for libgmp ****
-if test "x$with_gnutls" != "xno"
-then
-    WINE_PACKAGE_FLAGS(GMP,[gmp],[-lgmp],,,
-        [AC_CHECK_HEADERS([gmp.h],
-            [WINE_CHECK_SONAME(gmp,__gmpz_init,,[GMP_CFLAGS=""],[$GMP_LIBS],[[libgmp-*]])])])
-fi
-
 dnl **** Check for SANE ****
 if test "x$with_sane" != "xno"
 then
-    WINE_PACKAGE_FLAGS(SANE,[libsane],,[`${SANE_CONFIG:-sane-config} --cflags 2>/dev/null`],[`${SANE_CONFIG:-sane-config} --ldflags 2>/dev/null`],
+    WINE_PACKAGE_FLAGS(SANE,[sane-backends],,[`${SANE_CONFIG:-sane-config} --cflags 2>/dev/null`],[`${SANE_CONFIG:-sane-config} --ldflags 2>/dev/null`],
         [AC_CHECK_HEADER(sane/sane.h,
             [WINE_CHECK_SONAME(sane,sane_init,,[SANE_CFLAGS=""],[$SANE_LIBS])],
             [SANE_CFLAGS=""])])
@@ -1937,6 +1911,10 @@ then
     enable_x3daudio1_5=${enable_x3daudio1_5:-no}
     enable_x3daudio1_6=${enable_x3daudio1_6:-no}
     enable_x3daudio1_7=${enable_x3daudio1_7:-no}
+    enable_xactengine2_0=${enable_xactengine2_0:-no}
+    enable_xactengine2_4=${enable_xactengine2_4:-no}
+    enable_xactengine2_7=${enable_xactengine2_7:-no}
+    enable_xactengine2_9=${enable_xactengine2_9:-no}
     enable_xactengine3_0=${enable_xactengine3_0:-no}
     enable_xactengine3_1=${enable_xactengine3_1:-no}
     enable_xactengine3_2=${enable_xactengine3_2:-no}
@@ -2038,6 +2016,7 @@ then
   WINE_TRY_CFLAGS([-Wdeclaration-after-statement])
   WINE_TRY_CFLAGS([-Wempty-body])
   WINE_TRY_CFLAGS([-Wignored-qualifiers])
+  WINE_TRY_CFLAGS([-Winit-self])
   WINE_TRY_CFLAGS([-Wpacked-not-aligned],[EXTRACFLAGS="$EXTRACFLAGS -Wno-packed-not-aligned"])
   WINE_TRY_CFLAGS([-Wpragma-pack],[EXTRACFLAGS="$EXTRACFLAGS -Wno-pragma-pack"])
   WINE_TRY_CFLAGS([-Wshift-overflow=2])
@@ -2212,22 +2191,18 @@ AC_CHECK_FUNCS(\
 	pipe2 \
 	poll \
 	port_create \
-	ppoll \
 	prctl \
 	pread \
 	proc_pidinfo \
 	pwrite \
 	readlink \
-	renameat \
-	renameat2 \
 	sched_yield \
 	setproctitle \
 	setprogname \
 	sigprocmask \
 	symlink \
 	tcdrain \
-	thr_kill2 \
-	utimensat
+	thr_kill2
 )
 CFLAGS="$ac_save_CFLAGS"
 
@@ -2267,16 +2242,6 @@ case $host_os in
     LIBS=$ac_save_LIBS
     ;;
 esac
-
-dnl Check for shm_open which may be in -lrt
-if test "$ac_cv_header_sys_mman_h" = "yes" -a "x$RT_LIBS" = "x"
-then
-    ac_save_LIBS=$LIBS
-    AC_SEARCH_LIBS(shm_open, rt,
-                   [AC_DEFINE(HAVE_SHM_OPEN, 1, [Define to 1 if you have the `shm_open' function.])
-                    test "$ac_res" = "none required" || AC_SUBST(RT_LIBS,"$ac_res")])
-fi
-LIBS=$ac_save_LIBS
 
 dnl **** Check for OpenLDAP ***
 if test "x$with_ldap" != "xno"
@@ -2320,16 +2285,6 @@ AC_CACHE_CHECK([for sched_setaffinity],wine_cv_have_sched_setaffinity,
 if test "$wine_cv_have_sched_setaffinity" = "yes"
 then
   AC_DEFINE(HAVE_SCHED_SETAFFINITY, 1, [Define to 1 if you have the `sched_setaffinity' function.])
-fi
-
-AC_CACHE_CHECK([for setpriority],wine_cv_have_setpriority,
-                AC_LINK_IFELSE([AC_LANG_PROGRAM(
-[[#define _GNU_SOURCE
-#include <sys/resource.h>
-#include <sys/time.h>]], [[setpriority(0, 0, 0);]])],[wine_cv_have_setpriority=yes],[wine_cv_have_setpriority=no]))
-if test "$wine_cv_have_setpriority" = "yes"
-then
-  AC_DEFINE(HAVE_SETPRIORITY, 1, [Define to 1 if you have the `setpriority' function.])
 fi
 
 AC_CACHE_CHECK([for fallocate],wine_cv_have_fallocate,
@@ -2836,7 +2791,6 @@ WINE_CONFIG_MAKEFILE(dlls/advapi32/tests)
 WINE_CONFIG_MAKEFILE(dlls/advpack)
 WINE_CONFIG_MAKEFILE(dlls/advpack/tests)
 WINE_CONFIG_MAKEFILE(dlls/amsi)
-WINE_CONFIG_MAKEFILE(dlls/amd_ags_x64)
 WINE_CONFIG_MAKEFILE(dlls/amstream)
 WINE_CONFIG_MAKEFILE(dlls/amstream/tests)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-appmodel-identity-l1-1-0)
@@ -3018,7 +2972,6 @@ WINE_CONFIG_MAKEFILE(dlls/api-ms-win-eventing-controller-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-eventing-legacy-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-eventing-provider-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-eventlog-legacy-l1-1-0)
-WINE_CONFIG_MAKEFILE(dlls/api-ms-win-gaming-tcui-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-gdi-dpiinfo-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-mm-joystick-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-mm-misc-l1-1-1)
@@ -3061,15 +3014,16 @@ WINE_CONFIG_MAKEFILE(dlls/api-ms-win-service-private-l1-1-1)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-service-winsvc-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-service-winsvc-l1-2-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shcore-obsolete-l1-1-0)
+WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shcore-scaling-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shcore-scaling-l1-1-1)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shcore-stream-l1-1-0)
+WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shcore-stream-winrt-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shcore-thread-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shell-shellcom-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/api-ms-win-shell-shellfolders-l1-1-0)
 WINE_CONFIG_MAKEFILE(dlls/apphelp)
 WINE_CONFIG_MAKEFILE(dlls/apphelp/tests)
 WINE_CONFIG_MAKEFILE(dlls/appwiz.cpl)
-WINE_CONFIG_MAKEFILE(dlls/atiadlxx)
 WINE_CONFIG_MAKEFILE(dlls/atl)
 WINE_CONFIG_MAKEFILE(dlls/atl/tests)
 WINE_CONFIG_MAKEFILE(dlls/atl100)
@@ -3361,7 +3315,6 @@ WINE_CONFIG_MAKEFILE(dlls/fusion/tests)
 WINE_CONFIG_MAKEFILE(dlls/fwpuclnt)
 WINE_CONFIG_MAKEFILE(dlls/gameux)
 WINE_CONFIG_MAKEFILE(dlls/gameux/tests)
-WINE_CONFIG_MAKEFILE(dlls/gamingtcui)
 WINE_CONFIG_MAKEFILE(dlls/gdi.exe16,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/gdi32)
 WINE_CONFIG_MAKEFILE(dlls/gdi32/tests)
@@ -3831,6 +3784,7 @@ WINE_CONFIG_MAKEFILE(dlls/wbemuuid)
 WINE_CONFIG_MAKEFILE(dlls/wdscore)
 WINE_CONFIG_MAKEFILE(dlls/webservices)
 WINE_CONFIG_MAKEFILE(dlls/webservices/tests)
+WINE_CONFIG_MAKEFILE(dlls/websocket)
 WINE_CONFIG_MAKEFILE(dlls/wer)
 WINE_CONFIG_MAKEFILE(dlls/wer/tests)
 WINE_CONFIG_MAKEFILE(dlls/wevtapi)
@@ -3843,14 +3797,18 @@ WINE_CONFIG_MAKEFILE(dlls/win32s16.dll16,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/win87em.dll16,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/winaspi.dll16,enable_win16)
 WINE_CONFIG_MAKEFILE(dlls/windebug.dll16,enable_win16)
-WINE_CONFIG_MAKEFILE(dlls/windows.globalization.dll)
+WINE_CONFIG_MAKEFILE(dlls/windows.gaming.input)
+WINE_CONFIG_MAKEFILE(dlls/windows.gaming.input/tests)
+WINE_CONFIG_MAKEFILE(dlls/windows.globalization)
+WINE_CONFIG_MAKEFILE(dlls/windows.globalization/tests)
+WINE_CONFIG_MAKEFILE(dlls/windows.media.devices)
+WINE_CONFIG_MAKEFILE(dlls/windows.media.devices/tests)
+WINE_CONFIG_MAKEFILE(dlls/windows.media.speech)
+WINE_CONFIG_MAKEFILE(dlls/windows.media.speech/tests)
 WINE_CONFIG_MAKEFILE(dlls/windowscodecs)
 WINE_CONFIG_MAKEFILE(dlls/windowscodecs/tests)
 WINE_CONFIG_MAKEFILE(dlls/windowscodecsext)
 WINE_CONFIG_MAKEFILE(dlls/windowscodecsext/tests)
-WINE_CONFIG_MAKEFILE(dlls/windows.gaming.input)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.speech.dll)
-WINE_CONFIG_MAKEFILE(dlls/windows.media.devices.dll)
 WINE_CONFIG_MAKEFILE(dlls/winealsa.drv)
 WINE_CONFIG_MAKEFILE(dlls/wineandroid.drv)
 WINE_CONFIG_MAKEFILE(dlls/winebus.sys)
@@ -3908,6 +3866,7 @@ WINE_CONFIG_MAKEFILE(dlls/wmvcore)
 WINE_CONFIG_MAKEFILE(dlls/wmvcore/tests)
 WINE_CONFIG_MAKEFILE(dlls/wnaspi32)
 WINE_CONFIG_MAKEFILE(dlls/wow32,enable_win16)
+WINE_CONFIG_MAKEFILE(dlls/wow64cpu)
 WINE_CONFIG_MAKEFILE(dlls/wpc)
 WINE_CONFIG_MAKEFILE(dlls/wpc/tests)
 WINE_CONFIG_MAKEFILE(dlls/wpcap)
@@ -3932,6 +3891,10 @@ WINE_CONFIG_MAKEFILE(dlls/x3daudio1_4)
 WINE_CONFIG_MAKEFILE(dlls/x3daudio1_5)
 WINE_CONFIG_MAKEFILE(dlls/x3daudio1_6)
 WINE_CONFIG_MAKEFILE(dlls/x3daudio1_7)
+WINE_CONFIG_MAKEFILE(dlls/xactengine2_0)
+WINE_CONFIG_MAKEFILE(dlls/xactengine2_4)
+WINE_CONFIG_MAKEFILE(dlls/xactengine2_7)
+WINE_CONFIG_MAKEFILE(dlls/xactengine2_9)
 WINE_CONFIG_MAKEFILE(dlls/xactengine3_0)
 WINE_CONFIG_MAKEFILE(dlls/xactengine3_1)
 WINE_CONFIG_MAKEFILE(dlls/xactengine3_2)
@@ -3991,7 +3954,6 @@ WINE_CONFIG_MAKEFILE(programs/control)
 WINE_CONFIG_MAKEFILE(programs/cscript)
 WINE_CONFIG_MAKEFILE(programs/dism)
 WINE_CONFIG_MAKEFILE(programs/dplaysvr)
-WINE_CONFIG_MAKEFILE(programs/dotnetfx35)
 WINE_CONFIG_MAKEFILE(programs/dpnsvr)
 WINE_CONFIG_MAKEFILE(programs/dpvsetup)
 WINE_CONFIG_MAKEFILE(programs/dxdiag)
@@ -4070,6 +4032,7 @@ WINE_CONFIG_MAKEFILE(programs/wineconsole)
 WINE_CONFIG_MAKEFILE(programs/winedbg)
 WINE_CONFIG_MAKEFILE(programs/winedevice)
 WINE_CONFIG_MAKEFILE(programs/winefile)
+WINE_CONFIG_MAKEFILE(programs/winemenubuilder)
 WINE_CONFIG_MAKEFILE(programs/winemine)
 WINE_CONFIG_MAKEFILE(programs/winemsibuilder)
 WINE_CONFIG_MAKEFILE(programs/winepath)

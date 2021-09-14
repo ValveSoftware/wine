@@ -1,5 +1,0 @@
-MODULE = windows.media.devices.dll
-IMPORTS = combase
-EXTRADLLFLAGS = -mno-cygwin
-C_SRCS = \
-	windows.media.devices_main.c

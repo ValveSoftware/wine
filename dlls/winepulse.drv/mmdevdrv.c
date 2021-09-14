@@ -38,6 +38,7 @@
 #include "winbase.h"
 #include "winnls.h"
 #include "winreg.h"
+#include "winternl.h"
 #include "wine/debug.h"
 #include "wine/unicode.h"
 #include "wine/list.h"
@@ -162,7 +163,6 @@ struct ACImpl {
     IAudioCaptureClient IAudioCaptureClient_iface;
     IAudioClock IAudioClock_iface;
     IAudioClock2 IAudioClock2_iface;
-    IAudioClockAdjustment IAudioClockAdjustment_iface;
     IAudioStreamVolume IAudioStreamVolume_iface;
     IUnknown *marshal;
     IMMDevice *parent;
@@ -207,7 +207,6 @@ static const ISimpleAudioVolumeVtbl SimpleAudioVolume_Vtbl;
 static const IChannelAudioVolumeVtbl ChannelAudioVolume_Vtbl;
 static const IAudioClockVtbl AudioClock_Vtbl;
 static const IAudioClock2Vtbl AudioClock2_Vtbl;
-static const IAudioClockAdjustmentVtbl AudioClockAdjustment_Vtbl;
 static const IAudioStreamVolumeVtbl AudioStreamVolume_Vtbl;
 
 static AudioSessionWrapper *AudioSessionWrapper_Create(ACImpl *client);
@@ -250,11 +249,6 @@ static inline ACImpl *impl_from_IAudioClock(IAudioClock *iface)
 static inline ACImpl *impl_from_IAudioClock2(IAudioClock2 *iface)
 {
     return CONTAINING_RECORD(iface, ACImpl, IAudioClock2_iface);
-}
-
-static inline ACImpl *impl_from_IAudioClockAdjustment(IAudioClockAdjustment *iface)
-{
-    return CONTAINING_RECORD(iface, ACImpl, IAudioClockAdjustment_iface);
 }
 
 static inline ACImpl *impl_from_IAudioStreamVolume(IAudioStreamVolume *iface)
@@ -493,7 +487,7 @@ static void pulse_probe_settings(int render, WAVEFORMATEXTENSIBLE *fmt) {
         ret = -1;
     else if (render)
         ret = pa_stream_connect_playback(stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_FIX_RATE|PA_STREAM_FIX_CHANNELS|PA_STREAM_EARLY_REQUESTS|PA_STREAM_VARIABLE_RATE, NULL, NULL);
+        PA_STREAM_START_CORKED|PA_STREAM_FIX_RATE|PA_STREAM_FIX_CHANNELS|PA_STREAM_EARLY_REQUESTS, NULL, NULL);
     else
         ret = pa_stream_connect_record(stream, NULL, &attr, PA_STREAM_START_CORKED|PA_STREAM_FIX_RATE|PA_STREAM_FIX_CHANNELS|PA_STREAM_EARLY_REQUESTS);
     if (ret >= 0) {
@@ -578,7 +572,6 @@ static HRESULT pulse_connect(void)
     WideCharToMultiByte(CP_UNIXCP, 0, name, -1, str, len, NULL, NULL);
     TRACE("Name: %s\n", str);
     pulse_ctx = pa_context_new(pa_mainloop_get_api(pulse_ml), str);
-    setenv("PULSE_PROP_application.name", str, 1);
     pa_xfree(str);
     if (!pulse_ctx) {
         ERR("Failed to create context\n");
@@ -1029,14 +1022,14 @@ static void pulse_read(ACImpl *This)
 
 static DWORD WINAPI pulse_timer_cb(void *user)
 {
-    DWORD delay;
+    LARGE_INTEGER delay;
     UINT32 adv_bytes;
     ACImpl *This = user;
     int success;
     pa_operation *o;
 
     pthread_mutex_lock(&pulse_lock);
-    delay = This->mmdev_period_usec / 1000;
+    delay.QuadPart = -This->mmdev_period_usec * 10;
     pa_stream_get_time(This->stream, &This->last_time);
     pthread_mutex_unlock(&pulse_lock);
 
@@ -1044,11 +1037,11 @@ static DWORD WINAPI pulse_timer_cb(void *user)
         pa_usec_t now, adv_usec = 0;
         int err;
 
-        Sleep(delay);
+        NtDelayExecution(FALSE, &delay);
 
         pthread_mutex_lock(&pulse_lock);
 
-        delay = This->mmdev_period_usec / 1000;
+        delay.QuadPart = -This->mmdev_period_usec * 10;
 
         o = pa_stream_update_timing_info(This->stream, pulse_op_cb, &success);
         if (o)
@@ -1084,7 +1077,7 @@ static DWORD WINAPI pulse_timer_cb(void *user)
                     else if(adjust < -((INT32)(This->mmdev_period_usec / 2)))
                         adjust = -1 * This->mmdev_period_usec / 2;
 
-                    delay = (This->mmdev_period_usec + adjust) / 1000;
+                    delay.QuadPart = -(This->mmdev_period_usec + adjust) * 10;
 
                     This->last_time += This->mmdev_period_usec;
                 }
@@ -1102,16 +1095,16 @@ static DWORD WINAPI pulse_timer_cb(void *user)
                 }
             }else{
                 This->last_time = now;
-                delay = This->mmdev_period_usec / 1000;
+                delay.QuadPart = -This->mmdev_period_usec * 10;
             }
         }
 
         if (This->event)
             SetEvent(This->event);
 
-        TRACE("%p after update, adv usec: %d, held: %u, delay: %u\n",
+        TRACE("%p after update, adv usec: %d, held: %u, delay usec: %u\n",
                 This, (int)adv_usec,
-                (int)(This->held_bytes/ pa_frame_size(&This->ss)), delay);
+                (int)(This->held_bytes/ pa_frame_size(&This->ss)), (unsigned int)(-delay.QuadPart / 10));
 
         pthread_mutex_unlock(&pulse_lock);
     }
@@ -1151,7 +1144,7 @@ static HRESULT pulse_stream_connect(ACImpl *This, UINT32 period_bytes) {
     dump_attr(&attr);
     if (This->dataflow == eRender)
         ret = pa_stream_connect_playback(This->stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY|PA_STREAM_VARIABLE_RATE, NULL, NULL);
+        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY, NULL, NULL);
     else
         ret = pa_stream_connect_record(This->stream, NULL, &attr,
         PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY);
@@ -1241,7 +1234,6 @@ HRESULT WINAPI AUDDRV_GetAudioEndpoint(GUID *guid, IMMDevice *dev, IAudioClient 
     This->IAudioCaptureClient_iface.lpVtbl = &AudioCaptureClient_Vtbl;
     This->IAudioClock_iface.lpVtbl = &AudioClock_Vtbl;
     This->IAudioClock2_iface.lpVtbl = &AudioClock2_Vtbl;
-    This->IAudioClockAdjustment_iface.lpVtbl = &AudioClockAdjustment_Vtbl;
     This->IAudioStreamVolume_iface.lpVtbl = &AudioStreamVolume_Vtbl;
     This->dataflow = dataflow;
     This->parent = dev;
@@ -1277,8 +1269,6 @@ static HRESULT WINAPI AudioClient_QueryInterface(IAudioClient3 *iface,
             IsEqualIID(riid, &IID_IAudioClient2) ||
             IsEqualIID(riid, &IID_IAudioClient3))
         *ppv = iface;
-    else if (IsEqualIID(riid, &IID_IAudioClockAdjustment))
-        *ppv = &This->IAudioClockAdjustment_iface;
     if (*ppv) {
         IUnknown_AddRef((IUnknown*)*ppv);
         return S_OK;
@@ -2056,8 +2046,10 @@ static HRESULT WINAPI AudioClient_Start(IAudioClient3 *iface)
         This->started = TRUE;
         This->just_started = TRUE;
 
-        if(!This->timer)
+        if(!This->timer) {
             This->timer = CreateThread(NULL, 0, pulse_timer_cb, This, 0, NULL);
+            SetThreadPriority(This->timer, THREAD_PRIORITY_TIME_CRITICAL);
+        }
     }
     pthread_mutex_unlock(&pulse_lock);
     return hr;
@@ -2826,75 +2818,6 @@ static const IAudioClock2Vtbl AudioClock2_Vtbl =
     AudioClock2_AddRef,
     AudioClock2_Release,
     AudioClock2_GetDevicePosition
-};
-
-static HRESULT WINAPI AudioClockAdjustment_QueryInterface(IAudioClockAdjustment *iface,
-        REFIID riid, void **ppv)
-{
-    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
-    return IAudioClock_QueryInterface(&This->IAudioClock_iface, riid, ppv);
-}
-
-static ULONG WINAPI AudioClockAdjustment_AddRef(IAudioClockAdjustment *iface)
-{
-    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
-    return IAudioClient_AddRef((IAudioClient *)&This->IAudioClient3_iface);
-}
-
-static ULONG WINAPI AudioClockAdjustment_Release(IAudioClockAdjustment *iface)
-{
-    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
-    return IAudioClient_Release((IAudioClient *)&This->IAudioClient3_iface);
-}
-
-static HRESULT WINAPI AudioClockAdjustment_SetSampleRate(IAudioClockAdjustment *iface,
-        float new_rate)
-{
-    ACImpl *This = impl_from_IAudioClockAdjustment(iface);
-    int success;
-    pa_operation *o;
-    HRESULT hr;
-
-    TRACE("(%p)->(%f)\n", This, new_rate);
-
-    pthread_mutex_lock(&pulse_lock);
-    hr = pulse_stream_valid(This);
-    if (FAILED(hr)) {
-        pthread_mutex_unlock(&pulse_lock);
-        return hr;
-    }
-
-    o = pa_stream_update_sample_rate(This->stream, new_rate, pulse_op_cb, &success);
-    if (o)
-    {
-        while (pa_operation_get_state(o) == PA_OPERATION_RUNNING)
-            pthread_cond_wait(&pulse_cond, &pulse_lock);
-        pa_operation_unref(o);
-    } else
-        success = 0;
-
-    if(!success){
-        WARN("Something went wrong during update_sample_rate\n");
-        pthread_mutex_unlock(&pulse_lock);
-        return E_FAIL;
-    }
-
-    This->ss.rate = new_rate;
-    This->period_bytes = pa_frame_size(&This->ss) * MulDiv(This->mmdev_period_usec, This->ss.rate, 1000000);
-
-    TRACE("period_bytes now: %u\n", This->period_bytes);
-
-    pthread_mutex_unlock(&pulse_lock);
-
-    return S_OK;
-}
-
-static const IAudioClockAdjustmentVtbl AudioClockAdjustment_Vtbl =
-{
-    AudioClockAdjustment_QueryInterface,
-    AudioClockAdjustment_AddRef,
-    AudioClockAdjustment_Release,
-    AudioClockAdjustment_SetSampleRate
 };
 
 static HRESULT WINAPI AudioStreamVolume_QueryInterface(
@@ -3781,9 +3704,9 @@ HRESULT WINAPI AUDDRV_GetPropValue(GUID *guid, const PROPERTYKEY *prop, PROPVARI
 
     if (IsEqualGUID(guid, &pulse_render_guid) && IsEqualPropertyKey(*prop, PKEY_AudioEndpoint_PhysicalSpeakers)) {
         out->vt = VT_UI4;
-        out->u.ulVal = g_phys_speakers_mask;
+        out->ulVal = g_phys_speakers_mask;
 
-        return out->u.ulVal ? S_OK : E_FAIL;
+        return out->ulVal ? S_OK : E_FAIL;
     }
 
     return E_NOTIMPL;

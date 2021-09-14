@@ -30,7 +30,7 @@
 #include "qedit_private.h"
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(qedit);
 
 typedef struct MediaDetImpl {
     IUnknown IUnknown_inner;

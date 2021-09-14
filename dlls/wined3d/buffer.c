@@ -193,7 +193,6 @@ static BOOL wined3d_buffer_gl_create_buffer_object(struct wined3d_buffer_gl *buf
         return FALSE;
     }
 
-    list_init(&buffer_gl->bo_user.entry);
     list_add_head(&buffer_gl->bo.users, &buffer_gl->bo_user.entry);
     buffer_gl->b.buffer_object = (uintptr_t)bo;
     buffer_invalidate_bo_range(&buffer_gl->b, 0, 0);
@@ -1048,7 +1047,7 @@ static void wined3d_buffer_init_data(struct wined3d_buffer *buffer,
     if (buffer->flags & WINED3D_BUFFER_USE_BO)
     {
         wined3d_box_set(&box, 0, 0, resource->size, 1, 0, 1);
-        wined3d_cs_emit_update_sub_resource(device->cs, resource,
+        wined3d_device_context_emit_update_sub_resource(&device->cs->c, resource,
                 0, &box, data->data, data->row_pitch, data->slice_pitch);
     }
     else

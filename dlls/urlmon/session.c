@@ -505,81 +505,116 @@ static BOOL get_url_encoding(HKEY root, DWORD *encoding)
 
 static LPWSTR user_agent;
 
-static void ensure_useragent(void)
+static size_t obtain_user_agent(unsigned int version, WCHAR *ret, size_t size)
 {
     OSVERSIONINFOW info = {sizeof(info)};
     const WCHAR *os_type, *is_nt;
-    WCHAR buf[512], *ret, *tmp;
-    DWORD res, idx=0;
-    size_t len, size;
-    BOOL is_wow;
+    BOOL is_wow, quirks = FALSE;
+    DWORD res;
+    size_t len = 0;
     HKEY key;
 
-    if(user_agent)
-        return;
+    if(version & UAS_EXACTLEGACY) {
+        version &= ~UAS_EXACTLEGACY;
+        if(version == 7)
+            quirks = TRUE;
+        else
+            version = 7;
+    }else if(version < 7) {
+        version = 7;
+    }
+    if(version > 11) {
+        FIXME("Unsupported version %u\n", version);
+        version = 11;
+    }
+
+    if(version < 7 || (version == 7 && !quirks)) {
+        EnterCriticalSection(&session_cs);
+        if(user_agent) {
+            len = wcslen(user_agent) + 1;
+            memcpy(ret, user_agent, min(size, len) * sizeof(WCHAR));
+        }
+        LeaveCriticalSection(&session_cs);
+        if(len) return len;
+    }
+
+    swprintf(ret, size, L"Mozilla/%s (", version < 9 ? L"4.0" : L"5.0");
+    len = lstrlenW(ret);
+    if(version < 11) {
+        swprintf(ret + len, size - len, L"compatible; MSIE %u.0; ", version);
+        len += wcslen(ret + len);
+    }
 
     GetVersionExW(&info);
     is_nt = info.dwPlatformId == VER_PLATFORM_WIN32_NT ? L"NT " : L"";
 
     if(sizeof(void*) == 8)
-        os_type = L"Win64; x64; ";
+#ifdef __x86_64__
+        os_type = L"; Win64; x64";
+#else
+        os_type = L"; Win64";
+#endif
     else if(IsWow64Process(GetCurrentProcess(), &is_wow) && is_wow)
-        os_type = L"WOW64; ";
+        os_type = L"; WOW64";
     else
         os_type = L"";
 
-    swprintf(buf, ARRAY_SIZE(buf), L"Mozilla/4.0 (compatible; MSIE 8.0; Windows %s%d.%d; %sTrident/5.0",
-             is_nt, info.dwMajorVersion, info.dwMinorVersion, os_type);
-    len = lstrlenW(buf);
+    swprintf(ret + len, size - len, L"Windows %s%d.%d%s", is_nt, info.dwMajorVersion,
+             info.dwMinorVersion, os_type);
+    len = lstrlenW(ret);
 
-    size = len+40;
-    ret = heap_alloc(size * sizeof(WCHAR));
-    if(!ret)
-        return;
-
-    memcpy(ret, buf, len*sizeof(WCHAR));
-
-    res = RegOpenKeyW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\"
-                      "Internet Settings\\5.0\\User Agent\\Post Platform", &key);
-    if(res == ERROR_SUCCESS) {
-        DWORD value_len;
-
-        while(1) {
-            value_len = ARRAY_SIZE(buf);
-            res = RegEnumValueW(key, idx, buf, &value_len, NULL, NULL, NULL, NULL);
-            if(res != ERROR_SUCCESS)
-                break;
-            idx++;
-
-            if(len + value_len + 2 /* strlen("; ") */ + 1 /* trailing ')' */ >= size) {
-                tmp = heap_realloc(ret, (size*2+value_len)*sizeof(WCHAR));
-                if(!tmp)
-                    break;
-                ret = tmp;
-                size = size*2+value_len;
-            }
-
-            ret[len++] = ';';
-            ret[len++] = ' ';
-            memcpy(ret+len, buf, value_len*sizeof(WCHAR));
-            len += value_len;
-        }
-
-        RegCloseKey(key);
+    if(!quirks) {
+        wcscpy(ret + len, L"; Trident/7.0");
+        len += ARRAY_SIZE(L"; Trident/7.0") - 1;
     }
 
-    ret[len++] = ')';
-    ret[len++] = 0;
+    if(version < 9) {
+        res = RegOpenKeyW(HKEY_LOCAL_MACHINE, L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\"
+                          "Internet Settings\\5.0\\User Agent\\Post Platform", &key);
+        if(res == ERROR_SUCCESS) {
+            DWORD value_len, idx;
 
-    user_agent = ret;
-    TRACE("Using user agent %s\n", debugstr_w(user_agent));
+            for(idx = 0;; idx++) {
+                ret[len++] = ';';
+                ret[len++] = ' ';
+
+                value_len = size - len - 2;
+                res = RegEnumValueW(key, idx, ret + len, &value_len, NULL, NULL, NULL, NULL);
+                if(res != ERROR_SUCCESS)
+                    break;
+
+                len += value_len;
+            }
+
+            RegCloseKey(key);
+            if(idx) len -= 2;
+        }
+    }
+    wcscpy(ret + len, version >= 11 ? L"; rv:11.0) like Gecko" : L")");
+    len += wcslen(ret + len) + 1;
+
+    TRACE("Using user agent %s\n", debugstr_w(ret));
+    return len;
+}
+
+static void ensure_user_agent(void)
+{
+    EnterCriticalSection(&session_cs);
+
+    if(!user_agent) {
+        WCHAR buf[1024];
+        obtain_user_agent(0, buf, ARRAY_SIZE(buf));
+        user_agent = heap_strdupW(buf);
+    }
+
+    LeaveCriticalSection(&session_cs);
 }
 
 LPWSTR get_useragent(void)
 {
     LPWSTR ret;
 
-    ensure_useragent();
+    ensure_user_agent();
 
     EnterCriticalSection(&session_cs);
     ret = heap_strdupW(user_agent);
@@ -606,7 +641,7 @@ HRESULT WINAPI UrlMkGetSessionOption(DWORD dwOption, LPVOID pBuffer, DWORD dwBuf
 
         EnterCriticalSection(&session_cs);
 
-        ensure_useragent();
+        ensure_user_agent();
         if(user_agent) {
             size = WideCharToMultiByte(CP_ACP, 0, user_agent, -1, NULL, 0, NULL, NULL);
             *pdwBufferLength = size;
@@ -691,33 +726,25 @@ HRESULT WINAPI UrlMkSetSessionOption(DWORD dwOption, LPVOID pBuffer, DWORD dwBuf
 /**************************************************************************
  *                 ObtainUserAgentString (URLMON.@)
  */
-HRESULT WINAPI ObtainUserAgentString(DWORD dwOption, LPSTR pcszUAOut, DWORD *cbSize)
+HRESULT WINAPI ObtainUserAgentString(DWORD option, char *ret, DWORD *ret_size)
 {
-    DWORD size;
-    HRESULT hres = E_FAIL;
+    DWORD size, len;
+    WCHAR buf[1024];
+    HRESULT hres = S_OK;
 
-    TRACE("(%d %p %p)\n", dwOption, pcszUAOut, cbSize);
+    TRACE("(%d %p %p)\n", option, ret, ret_size);
 
-    if(!pcszUAOut || !cbSize)
+    if(!ret || !ret_size)
         return E_INVALIDARG;
 
-    EnterCriticalSection(&session_cs);
+    len = obtain_user_agent(option, buf, ARRAY_SIZE(buf));
+    size = WideCharToMultiByte(CP_ACP, 0, buf, len, NULL, 0, NULL, NULL);
+    if(size <= *ret_size)
+        WideCharToMultiByte(CP_ACP, 0, buf, len, ret, *ret_size+1, NULL, NULL);
+    else
+        hres = E_OUTOFMEMORY;
 
-    ensure_useragent();
-    if(user_agent) {
-        size = WideCharToMultiByte(CP_ACP, 0, user_agent, -1, NULL, 0, NULL, NULL);
-
-        if(size <= *cbSize) {
-            WideCharToMultiByte(CP_ACP, 0, user_agent, -1, pcszUAOut, *cbSize, NULL, NULL);
-            hres = S_OK;
-        }else {
-            hres = E_OUTOFMEMORY;
-        }
-
-        *cbSize = size;
-    }
-
-    LeaveCriticalSection(&session_cs);
+    *ret_size = size;
     return hres;
 }
 

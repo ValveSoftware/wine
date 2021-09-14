@@ -1231,48 +1231,6 @@ interface IMFVideoProcessorControl2 : IMFVideoProcessorControl
     );
 }
 
-typedef enum _MFVideoSphericalFormat
-{
-    MFVideoSphericalFormat_Unsupported,
-    MFVideoSphericalFormat_Equirectangular,
-} MFVideoSphericalFormat;
-
-typedef enum MFVideoSphericalProjectionMode
-{
-    MFVideoSphericalProjectionMode_Spherical,
-    MFVideoSphericalProjectionMode_Flat,
-} MFVideoSphericalProjectionMode;
-
-[
-    object,
-    uuid(2424b3f2-eb23-40f1-91aa-74bddeea0883),
-    local
-]
-interface IMFVideoProcessorControl3 : IMFVideoProcessorControl2
-{
-    HRESULT GetNaturalOutputType(
-        [out] IMFMediaType **media_type
-    );
-
-    HRESULT EnableSphericalVideoProcessing(
-        [in] BOOL enable,
-        [in] MFVideoSphericalFormat format,
-        [in] MFVideoSphericalProjectionMode projection_mode
-    );
-
-    HRESULT SetSphericalVideoProperties(
-        [in] float x,
-        [in] float y,
-        [in] float z,
-        [in] float w,
-        [in] float fov
-    );
-
-    HRESULT SetOutputDevice(
-        [in] IUnknown *output_device
-    );
-}
-
 [
    object,
    uuid(2347d60b-3fb5-480c-8803-8df3adcd3ef0),
@@ -1309,165 +1267,6 @@ interface IMFRealTimeClientEx : IUnknown
     HRESULT SetWorkQueueEx(
         [in] DWORD mtqueue_id,
         [in] LONG base_priority
-    );
-}
-
-[
-    object,
-    uuid(35fe1bb8-a3a9-40fe-bbec-eb569c9ccca3),
-]
-interface IMFWorkQueueServices : IUnknown
-{
-    [local]
-    HRESULT BeginRegisterTopologyWorkQueuesWithMMCSS(
-        [in] IMFAsyncCallback *callback,
-        [in] IUnknown *state
-    );
-
-    [call_as(BeginRegisterTopologyWorkQueuesWithMMCSS)]
-    HRESULT RemoteBeginRegisterTopologyWorkQueuesWithMMCSS(
-        [in] IMFRemoteAsyncCallback *callback
-    );
-
-    [local]
-    HRESULT EndRegisterTopologyWorkQueuesWithMMCSS(
-        [in] IMFAsyncResult *result
-    );
-
-    [call_as(EndRegisterTopologyWorkQueuesWithMMCSS)]
-    HRESULT RemoteEndRegisterTopologyWorkQueuesWithMMCSS(
-        [in] IUnknown *result
-    );
-
-    [local]
-    HRESULT BeginUnregisterTopologyWorkQueuesWithMMCSS(
-        [in] IMFAsyncCallback *callback,
-        [in] IUnknown *state
-    );
-
-    [call_as(BeginUnregisterTopologyWorkQueuesWithMMCSS)]
-    HRESULT RemoteBeginUnregisterTopologyWorkQueuesWithMMCSS(
-        [in] IMFRemoteAsyncCallback *callback
-    );
-
-    [local]
-    HRESULT EndUnregisterTopologyWorkQueuesWithMMCSS(
-        [in] IMFAsyncResult *result
-    );
-
-    [call_as(EndUnregisterTopologyWorkQueuesWithMMCSS)]
-    HRESULT RemoteEndUnregisterTopologyWorkQueuesWithMMCSS(
-        [in] IUnknown *result
-    );
-
-    HRESULT GetTopologyWorkQueueMMCSSClass(
-        [in] DWORD queue,
-        [out, size_is(*classname_len)] LPWSTR classname,
-        [in, out] DWORD *classname_len
-    );
-
-    HRESULT GetTopologyWorkQueueMMCSSTaskId(
-         [in] DWORD queue,
-         [out] DWORD *taksid
-    );
-
-    [local]
-    HRESULT BeginRegisterPlatformWorkQueueWithMMCSS(
-        [in] DWORD platform_queue,
-        [in] LPCWSTR classname,
-        [in] DWORD taskid,
-        [in] IMFAsyncCallback *callback,
-        [in] IUnknown *state
-    );
-
-    [call_as(BeginRegisterPlatformWorkQueueWithMMCSS)]
-    HRESULT RemoteBeginRegisterPlatformWorkQueueWithMMCSS(
-        [in] DWORD platform_queue,
-        [in] LPCWSTR classname,
-        [in] DWORD taskid,
-        [in] IMFRemoteAsyncCallback *callback
-    );
-
-    [local]
-    HRESULT EndRegisterPlatformWorkQueueWithMMCSS(
-        [in] IMFAsyncResult *result,
-        [out] DWORD *taskid
-    );
-
-    [call_as(EndRegisterPlatformWorkQueueWithMMCSS)]
-    HRESULT RemoteEndRegisterPlatformWorkQueueWithMMCSS(
-        [in] IUnknown *result,
-        [out] DWORD *taskid
-    );
-
-    [local]
-    HRESULT BeginUnregisterPlatformWorkQueueWithMMCSS(
-        [in] DWORD platform_queue,
-        [in] IMFAsyncCallback *callback,
-        [in] IUnknown *state
-    );
-
-    [call_as(BeginUnregisterPlatformWorkQueueWithMMCSS)]
-    HRESULT RemoteBeginUnregisterPlatformWorkQueueWithMMCSS(
-        [in] DWORD platform_queue,
-        [in] IMFRemoteAsyncCallback *callback
-    );
-
-    [local]
-    HRESULT EndUnregisterPlatformWorkQueueWithMMCSS(
-        [in] IMFAsyncResult *result
-    );
-
-    [call_as(EndUnregisterPlatformWorkQueueWithMMCSS)]
-    HRESULT RemoteEndUnregisterPlatformWorkQueueWithMMCSS(
-        [in] IUnknown *result
-    );
-
-    HRESULT GetPlaftormWorkQueueMMCSSClass(
-        [in] DWORD platform_queue,
-        [out, size_is(*classname_len)] LPWSTR classname,
-        [in, out] DWORD *classname_len
-    );
-
-    HRESULT GetPlatformWorkQueueMMCSSTaskId(
-        [in] DWORD platform_queue,
-        [out] DWORD *taskid
-    );
-}
-
-[
-    object,
-    uuid(96bf961b-40fe-42f1-ba9d-320238b49700),
-]
-interface IMFWorkQueueServicesEx : IMFWorkQueueServices
-{
-    HRESULT GetTopologyWorkQueueMMCSSPriority(
-        [in] DWORD queueid,
-        [out] LONG *priority
-    );
-
-    [local]
-    HRESULT BeginRegisterPlatformWorkQueueWithMMCSSEx(
-        [in] DWORD platform_queue,
-        [in] LPCWSTR classname,
-        [in] DWORD taskid,
-        [in] LONG priority,
-        [in] IMFAsyncCallback *callback,
-        [in] IUnknown *state
-    );
-
-    [call_as(BeginRegisterPlatformWorkQueueWithMMCSSEx)]
-    HRESULT RemoteBeginRegisterPlatformWorkQueueWithMMCSSEx(
-        [in] DWORD platform_queue,
-        [in] LPCWSTR classname,
-        [in] DWORD taskid,
-        [in] LONG priority,
-        [in] IMFRemoteAsyncCallback *callback
-    );
-
-    HRESULT GetPlatformWorkQueueMMCSSPriority(
-        [in] DWORD platform_queue,
-        [out] LONG *priority
     );
 }
 
@@ -1587,7 +1386,6 @@ cpp_quote("EXTERN_GUID(MR_CAPTURE_POLICY_VOLUME_SERVICE, 0x24030acd, 0x107a, 0x4
 cpp_quote("EXTERN_GUID(MR_STREAM_VOLUME_SERVICE, 0xf8b5fa2f, 0x32ef, 0x46f5, 0xb1, 0x72, 0x13, 0x21, 0x21, 0x2f, 0xb2, 0xc4);")
 cpp_quote("EXTERN_GUID(MR_AUDIO_POLICY_SERVICE, 0x911fd737, 0x6775, 0x4ab0, 0xa6, 0x14, 0x29, 0x78, 0x62, 0xfd, 0xac, 0x88);")
 cpp_quote("EXTERN_GUID(MF_PROPERTY_HANDLER_SERVICE, 0xa3face02, 0x32b8, 0x41dd, 0x90, 0xe7, 0x5f, 0xef, 0x7c, 0x89, 0x91, 0xb5);")
-cpp_quote("EXTERN_GUID(MF_WORKQUEUE_SERVICES, 0x8e37d489, 0x41e0, 0x413a, 0x90, 0x68, 0x28, 0x7c, 0x88, 0x6d, 0x8d, 0xda);")
 
 cpp_quote("EXTERN_GUID(MF_SAMPLEGRABBERSINK_SAMPLE_TIME_OFFSET, 0x62e3d776, 0x8100, 0x4e03, 0xa6, 0xe8, 0xbd, 0x38, 0x57, 0xac, 0x9c, 0x47);")
 cpp_quote("EXTERN_GUID(MF_SAMPLEGRABBERSINK_IGNORE_CLOCK, 0x0efda2c0, 0x2b69, 0x4e2e, 0xab, 0x8d, 0x46, 0xdc, 0xbf, 0xf7, 0xd2, 0x5d);")
@@ -1615,11 +1413,4 @@ cpp_quote("EXTERN_GUID(MF_ACTIVATE_CUSTOM_VIDEO_PRESENTER_CLSID, 0xba491364, 0xb
 cpp_quote("EXTERN_GUID(MF_ACTIVATE_CUSTOM_VIDEO_PRESENTER_ACTIVATE, 0xba491365, 0xbe50, 0x451e, 0x95, 0xab, 0x6d, 0x4a, 0xcc, 0xc7, 0xda, 0xd8);")
 cpp_quote("EXTERN_GUID(MF_ACTIVATE_CUSTOM_VIDEO_PRESENTER_FLAGS, 0xba491366, 0xbe50, 0x451e, 0x95, 0xab, 0x6d, 0x4a, 0xcc, 0xc7, 0xda, 0xd8);")
 
-cpp_quote("EXTERN_GUID(MF_VIDEO_PROCESSOR_ALGORITHM, 0x4a0a1e1f, 0x272c, 0x4fb6, 0x9e, 0xb1, 0xdb, 0x33, 0x0c, 0xbc, 0x97, 0xca);")
-cpp_quote("EXTERN_GUID(MF_XVP_DISABLE_FRC, 0x2c0afa19, 0x7a97, 0x4d5a, 0x9e, 0xe8, 0x16, 0xd4, 0xfc, 0x51, 0x8d, 0x8c);")
-cpp_quote("EXTERN_GUID(MF_XVP_CALLER_ALLOCATES_OUTPUT, 0x4a2cabc, 0x0cab, 0x40b1, 0xa1, 0xb9, 0x75, 0xbc, 0x36, 0x58, 0xf0, 0x00);")
-cpp_quote("EXTERN_GUID(MF_XVP_SAMPLE_LOCK_TIMEOUT, 0xaa4ddb29, 0x5134, 0x4363, 0xac, 0x72, 0x83, 0xec, 0x4b, 0xc1, 0x04, 0x26);")
-
 cpp_quote("EXTERN_GUID(CLSID_VideoProcessorMFT, 0x88753b26, 0x5b24, 0x49bd, 0xb2, 0xe7, 0xc, 0x44, 0x5c, 0x78, 0xc9, 0x82);")
-cpp_quote("EXTERN_GUID(CLSID_CMSH264DecoderMFT, 0x62ce7e72, 0x4c71, 0x4d20, 0xb1, 0x5d, 0x45, 0x28, 0x31, 0xa8, 0x7d, 0x9d);")
-cpp_quote("EXTERN_GUID(CLSID_CMSAACDecMFT, 0x32d186a7, 0x218f, 0x4c75, 0x88, 0x76, 0xdd, 0x77, 0x27, 0x3a, 0x89, 0x99);")

@@ -20,7 +20,7 @@
 
 #include "qasf_private.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(qasf);
 
 static HINSTANCE qasf_instance;
 

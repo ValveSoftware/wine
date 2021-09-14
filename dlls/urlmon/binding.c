@@ -1126,8 +1126,7 @@ static void report_data(Binding *This, DWORD bscf, ULONG progress, ULONG progres
         HRESULT hres;
 
         if(!(This->state & BINDING_LOCKED)) {
-            HRESULT hres = IInternetProtocolEx_LockRequest(
-                    &This->protocol->IInternetProtocolEx_iface, 0);
+            hres = IInternetProtocolEx_LockRequest(&This->protocol->IInternetProtocolEx_iface, 0);
             if(SUCCEEDED(hres))
                 This->state |= BINDING_LOCKED;
         }
@@ -1177,14 +1176,6 @@ static HRESULT WINAPI InternetProtocolSink_ReportResult(IInternetProtocolSink *i
     Binding *This = impl_from_IInternetProtocolSink(iface);
 
     TRACE("(%p)->(%08x %d %s)\n", This, hrResult, dwError, debugstr_w(szResult));
-
-    /* Make sure we don't call stop_binding before available data has been reported,
-       as some custom protocol handlers call ReportResult within LockRequest */
-    if (!(This->state & BINDING_LOCKED) && hrResult == S_OK)
-    {
-        This->download_state = END_DOWNLOAD;
-        return S_OK;
-    }
 
     stop_binding(This, hrResult, szResult);
 

@@ -797,7 +797,7 @@ static void get_osx_device_elements_props(JoystickImpl *device)
     }
 }
 
-static HRESULT poll_osx_device_state(LPDIRECTINPUTDEVICE8A iface)
+static void poll_osx_device_state(LPDIRECTINPUTDEVICE8A iface)
 {
     JoystickImpl *device = impl_from_IDirectInputDevice8A(iface);
     IOHIDElementRef device_main_element;
@@ -806,13 +806,13 @@ static HRESULT poll_osx_device_state(LPDIRECTINPUTDEVICE8A iface)
     TRACE("device %p device->id %i\n", device, device->id);
 
     if (!device_main_elements || device->id >= CFArrayGetCount(device_main_elements))
-        return DIERR_INPUTLOST;
+        return;
 
     device_main_element = (IOHIDElementRef) CFArrayGetValueAtIndex(device_main_elements, device->id);
     hid_device = IOHIDElementGetDevice(device_main_element);
     TRACE("main element %s hid_device %s\n", debugstr_element(device_main_element), debugstr_device(hid_device));
     if (!hid_device)
-        return DIERR_INPUTLOST;
+        return;
 
     if (device->elements)
     {
@@ -839,9 +839,9 @@ static HRESULT poll_osx_device_state(LPDIRECTINPUTDEVICE8A iface)
                     {
                         valueRef = NULL;
                         if (IOHIDDeviceGetValue(hid_device, element, &valueRef) != kIOReturnSuccess)
-                            continue;
+                            return;
                         if (valueRef == NULL)
-                            continue;
+                            return;
                         val = IOHIDValueGetIntegerValue(valueRef);
                         newVal = val ? 0x80 : 0x0;
                         oldVal = device->generic.js.rgbButtons[button_idx];
@@ -866,9 +866,9 @@ static HRESULT poll_osx_device_state(LPDIRECTINPUTDEVICE8A iface)
                             TRACE("kIOHIDElementTypeInput_Misc / kHIDUsage_GD_Hatswitch\n");
                             valueRef = NULL;
                             if (IOHIDDeviceGetValue(hid_device, element, &valueRef) != kIOReturnSuccess)
-                                continue;
+                                return;
                             if (valueRef == NULL)
-                                continue;
+                                return;
                             val = IOHIDValueGetIntegerValue(valueRef);
                             oldVal = device->generic.js.rgdwPOV[pov_idx];
                             if ((val > device->generic.props[idx].lDevMax) || (val < device->generic.props[idx].lDevMin))
@@ -899,9 +899,9 @@ static HRESULT poll_osx_device_state(LPDIRECTINPUTDEVICE8A iface)
 
                             valueRef = NULL;
                             if (IOHIDDeviceGetValue(hid_device, element, &valueRef) != kIOReturnSuccess)
-                                continue;
+                                return;
                             if (valueRef == NULL)
-                                continue;
+                                return;
                             val = IOHIDValueGetIntegerValue(valueRef);
                             newVal = joystick_map_axis(&device->generic.props[idx], val);
                             switch (MAKEUINT64(usage_page, usage))
@@ -972,8 +972,6 @@ static HRESULT poll_osx_device_state(LPDIRECTINPUTDEVICE8A iface)
             }
         }
     }
-
-    return DI_OK;
 }
 
 static INT find_joystick_devices(void)

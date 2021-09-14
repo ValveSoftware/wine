@@ -129,7 +129,6 @@ enum alg_id
     ALG_ID_RSA,
 
     /* secret agreement */
-    ALG_ID_DH,
     ALG_ID_ECDH_P256,
 
     /* signature */
@@ -169,8 +168,6 @@ struct key_symmetric
 };
 
 #define KEY_FLAG_LEGACY_DSA_V2  0x00000001
-#define KEY_FLAG_DH_PARAMS_SET  0x00000002
-#define KEY_FLAG_FINALIZED      0x00000004
 
 struct key_asymmetric
 {
@@ -178,7 +175,6 @@ struct key_asymmetric
     ULONG             flags;
     UCHAR            *pubkey;
     ULONG             pubkey_len;
-    UCHAR            *privkey;    /* Used for DH private key only. */
     DSSSEED           dss_seed;
 };
 
@@ -197,8 +193,6 @@ struct key
 struct secret
 {
     struct object hdr;
-    UCHAR *data;
-    ULONG  data_len;
 };
 
 struct key_funcs
@@ -223,7 +217,6 @@ struct key_funcs
     NTSTATUS (CDECL *key_import_dsa_capi)( struct key *, UCHAR *, ULONG );
     NTSTATUS (CDECL *key_import_ecc)( struct key *, UCHAR *, ULONG );
     NTSTATUS (CDECL *key_import_rsa)( struct key *, UCHAR *, ULONG );
-    NTSTATUS (CDECL *key_secret_agreement)( struct key *, struct key *, struct secret * );
 };
 
 #endif /* __BCRYPT_INTERNAL_H */

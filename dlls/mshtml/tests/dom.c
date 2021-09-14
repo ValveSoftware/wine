@@ -375,6 +375,7 @@ static const IID * const html_iids[] = {
 static const IID * const head_iids[] = {
     ELEM_IFACES,
     &IID_IHTMLHeadElement,
+    &DIID_DispHTMLHeadElement,
     &IID_IConnectionPointContainer,
     NULL
 };
@@ -1298,11 +1299,14 @@ static void _test_elem_offset(unsigned line, IUnknown *unk, const WCHAR *parent_
 
     hres = IHTMLElement_get_offsetParent(elem, &off_parent);
     ok_(__FILE__,line) (hres == S_OK, "get_offsetParent failed: %08x\n", hres);
-
-    _test_elem_tag(line, (IUnknown*)off_parent, parent_tag);
-    IHTMLElement_Release(off_parent);
-
     IHTMLElement_Release(elem);
+
+    if(off_parent) {
+        _test_elem_tag(line, (IUnknown*)off_parent, parent_tag);
+        IHTMLElement_Release(off_parent);
+    }else {
+        ok_(__FILE__,line) (parent_tag == NULL, "Offset parent is NULL. %s expected\n", wine_dbgstr_w(parent_tag));
+    }
 }
 
 #define test_elem_source_index(a,b) _test_elem_source_index(__LINE__,a,b)
@@ -6296,12 +6300,13 @@ static void test_navigator(IHTMLDocument2 *doc)
 
     hres = IHTMLWindow2_get_navigator(window, &navigator2);
     ok(hres == S_OK, "get_navigator failed: %08x\n", hres);
+    todo_wine
     ok(navigator != navigator2, "navigator2 != navigator\n");
     IOmNavigator_Release(navigator2);
 
     hres = IHTMLWindow2_get_clientInformation(window, &navigator2);
     ok(hres == S_OK, "get_clientInformation failed: %08x\n", hres);
-    todo_wine ok(iface_cmp((IUnknown*)navigator, (IUnknown*)navigator2), "navigator2 != navigator\n");
+    ok(iface_cmp((IUnknown*)navigator, (IUnknown*)navigator2), "navigator2 != navigator\n");
     IOmNavigator_Release(navigator2);
 
     IHTMLWindow2_Release(window);
@@ -6385,16 +6390,6 @@ static void test_navigator(IHTMLDocument2 *doc)
     ok(!lstrcmpW(bstr, buf), "userAgent returned %s, expected \"%s\"\n", wine_dbgstr_w(bstr), wine_dbgstr_w(buf));
     SysFreeString(bstr);
 
-    if(!wcsncmp(buf, L"Mozilla/", 8)) {
-        bstr = NULL;
-        hres = IOmNavigator_get_appVersion(navigator, &bstr);
-        ok(hres == S_OK, "get_appVersion failed: %08x\n", hres);
-        ok(!lstrcmpW(bstr, buf+8), "appVersion returned %s, expected \"%s\"\n", wine_dbgstr_w(bstr), wine_dbgstr_w(buf+8));
-        SysFreeString(bstr);
-    }else {
-        skip("nonstandard user agent\n");
-    }
-
     hres = UrlMkSetSessionOption(URLMON_OPTION_USERAGENT, ua, sizeof(ua), 0);
     ok(hres == S_OK, "UrlMkSetSessionOption failed: %08x\n", hres);
     MultiByteToWideChar(CP_ACP, 0, ua, -1, buf, ARRAY_SIZE(buf));
@@ -6416,6 +6411,7 @@ static void test_navigator(IHTMLDocument2 *doc)
     test_mime_types_col(navigator);
 
     ref = IOmNavigator_Release(navigator);
+    todo_wine
     ok(!ref, "navigator should be destroyed here\n");
 }
 
@@ -8369,6 +8365,48 @@ static void test_iframe_elem(IHTMLElement *elem)
     IHTMLDocument2_Release(content_doc);
 }
 
+static void test_elem_spellcheck(IHTMLElement *iface)
+{
+    IHTMLElement7 *elem;
+    VARIANT v;
+    HRESULT hres;
+
+    hres = IUnknown_QueryInterface(iface, &IID_IHTMLElement7, (void**)&elem);
+    if(hres == E_NOINTERFACE) {
+        win_skip("IHTMLElement7 not supported\n");
+        return;
+    }
+    ok(hres == S_OK, "Could not get IHTMLElement7 interface: %08x\n", hres);
+
+    V_VT(&v) = VT_ERROR;
+    hres = IHTMLElement7_get_spellcheck(elem, &v);
+    ok(hres == S_OK, "get_spellcheck failed: %08x\n", hres);
+    ok(V_VT(&v) == VT_BOOL && !V_BOOL(&v), "spellcheck = %s\n", wine_dbgstr_variant(&v));
+
+    V_VT(&v) = VT_BOOL;
+    V_BOOL(&v) = VARIANT_TRUE;
+    hres = IHTMLElement7_put_spellcheck(elem, v);
+    ok(hres == S_OK, "put_spellcheck failed: %08x\n", hres);
+
+    V_VT(&v) = VT_ERROR;
+    hres = IHTMLElement7_get_spellcheck(elem, &v);
+    ok(hres == S_OK, "get_spellcheck failed: %08x\n", hres);
+    ok(V_VT(&v) == VT_BOOL && V_BOOL(&v) == VARIANT_TRUE, "spellcheck = %s\n",
+       wine_dbgstr_variant(&v));
+
+    V_VT(&v) = VT_BOOL;
+    V_BOOL(&v) = VARIANT_FALSE;
+    hres = IHTMLElement7_put_spellcheck(elem, v);
+    ok(hres == S_OK, "put_spellcheck failed: %08x\n", hres);
+
+    V_VT(&v) = VT_ERROR;
+    hres = IHTMLElement7_get_spellcheck(elem, &v);
+    ok(hres == S_OK, "get_spellcheck failed: %08x\n", hres);
+    ok(V_VT(&v) == VT_BOOL && !V_BOOL(&v), "spellcheck = %s\n", wine_dbgstr_variant(&v));
+
+    IHTMLElement7_Release(elem);
+}
+
 #define test_stylesheet_csstext(a,b,c) _test_stylesheet_csstext(__LINE__,a,b,c)
 static void _test_stylesheet_csstext(unsigned line, IHTMLStyleSheet *stylesheet, const WCHAR *exstr, BOOL is_todo)
 {
@@ -8902,6 +8940,10 @@ static void test_elems(IHTMLDocument2 *doc)
         IHTMLElement_Release(elem);
     }
 
+    elem = doc_get_body(doc);
+    test_elem_offset((IUnknown*)elem, NULL);
+    IHTMLElement_Release(elem);
+
     elem = get_elem_by_id(doc, L"sc", TRUE);
     if(elem) {
         IHTMLScriptElement *script;
@@ -8981,6 +9023,7 @@ static void test_elems(IHTMLDocument2 *doc)
         test_elem_client_size((IUnknown*)elem);
         test_input_type(input, L"text");
         test_elem_istextedit(elem, VARIANT_TRUE);
+        test_elem_spellcheck(elem);
 
         test_node_get_value_str((IUnknown*)elem, NULL);
         test_node_put_value_str((IUnknown*)elem, L"test");
@@ -10057,6 +10100,7 @@ static void test_null_write(IHTMLDocument2 *doc)
 static void test_create_stylesheet(IHTMLDocument2 *doc)
 {
     IHTMLStyleSheet *stylesheet, *stylesheet2;
+    IHTMLStyleElement2 *style_elem2;
     IHTMLStyleElement *style_elem;
     IHTMLElement *doc_elem, *elem;
     HRESULT hres;
@@ -10099,8 +10143,18 @@ static void test_create_stylesheet(IHTMLDocument2 *doc)
     ok(hres == S_OK, "get_styleSheet failed: %08x\n", hres);
     ok(stylesheet2 != NULL, "stylesheet2 == NULL\n");
     ok(iface_cmp((IUnknown*)stylesheet, (IUnknown*)stylesheet2), "stylesheet != stylesheet2\n");
-
     IHTMLStyleSheet_Release(stylesheet2);
+
+    hres = IHTMLStyleElement_QueryInterface(style_elem, &IID_IHTMLStyleElement2, (void**)&style_elem2);
+    ok(hres == S_OK, "Could not get IHTMLStyleElement2: %08x\n", hres);
+
+    hres = IHTMLStyleElement2_get_sheet(style_elem2, &stylesheet2);
+    ok(hres == S_OK, "get_styleSheet failed: %08x\n", hres);
+    ok(stylesheet2 != NULL, "stylesheet2 == NULL\n");
+    ok(iface_cmp((IUnknown*)stylesheet, (IUnknown*)stylesheet2), "stylesheet != stylesheet2\n");
+    IHTMLStyleSheet_Release(stylesheet2);
+
+    IHTMLStyleElement2_Release(style_elem2);
     IHTMLStyleSheet_Release(stylesheet);
 
     IHTMLStyleElement_Release(style_elem);

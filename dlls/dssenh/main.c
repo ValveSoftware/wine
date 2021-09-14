@@ -286,8 +286,7 @@ BOOL WINAPI CPAcquireContext( HCRYPTPROV *ret_prov, LPSTR container, DWORD flags
     {
     case 0:
     case 0 | CRYPT_MACHINE_KEYSET:
-        if (!(ret = read_key_container( name, flags )))
-            SetLastError( NTE_BAD_KEYSET );
+        ret = read_key_container( name, flags );
         break;
 
     case CRYPT_NEWKEYSET:
@@ -942,7 +941,7 @@ BOOL WINAPI CPGetHashParam( HCRYPTPROV hprov, HCRYPTHASH hhash, DWORD param, BYT
             SetLastError( ERROR_MORE_DATA );
             return FALSE;
         }
-        if (data) memcpy( data, hash->value, hash->len );
+        memcpy( data, hash->value, hash->len );
         *len = hash->len;
         return TRUE;
 

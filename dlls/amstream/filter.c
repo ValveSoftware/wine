@@ -23,7 +23,7 @@
 #include "wine/debug.h"
 #include "wine/list.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(amstream);
 
 struct enum_pins
 {
@@ -517,7 +517,7 @@ static HRESULT WINAPI filter_JoinFilterGraph(IMediaStreamFilter *iface,
     EnterCriticalSection(&filter->cs);
 
     if (name)
-        lstrcpynW(filter->name, name, ARRAY_SIZE(filter->name));
+        wcsncpy(filter->name, name, ARRAY_SIZE(filter->name));
     else
         filter->name[0] = 0;
     filter->graph = graph;

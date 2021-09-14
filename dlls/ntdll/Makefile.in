@@ -20,7 +20,6 @@ C_SRCS = \
 	heap.c \
 	large_int.c \
 	loader.c \
-	loadorder.c \
 	locale.c \
 	misc.c \
 	nt.c \
@@ -46,10 +45,9 @@ C_SRCS = \
 	unix/cdrom.c \
 	unix/debug.c \
 	unix/env.c \
-	unix/esync.c \
 	unix/file.c \
-	unix/fsync.c \
 	unix/loader.c \
+	unix/loadorder.c \
 	unix/process.c \
 	unix/registry.c \
 	unix/security.c \
@@ -71,11 +69,6 @@ C_SRCS = \
 RC_SRCS = version.rc
 
 EXTRA_OBJS = unix/version.o
-
-server_EXTRADEFS = \
-	-DBINDIR=\"${bindir}\" \
-	-DBIN_TO_DLLDIR=\"`${MAKEDEP} -R ${bindir} ${dlldir}`\" \
-	-DDLL_TO_BINDIR=\"`${MAKEDEP} -R ${dlldir} ${bindir}`\"
 
 unix_loader_EXTRADEFS = \
 	-DBINDIR=\"${bindir}\" \

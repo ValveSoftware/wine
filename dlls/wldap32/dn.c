@@ -18,49 +18,36 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "config.h"
-#include "wine/port.h"
-
 #include <stdarg.h>
-#ifdef HAVE_LDAP_H
-#include <ldap.h>
-#endif
-
 #include "windef.h"
 #include "winbase.h"
 #include "winnls.h"
+#include "winldap.h"
 
-#include "winldap_private.h"
-#include "wldap32.h"
 #include "wine/debug.h"
+#include "winldap_private.h"
 
-#ifdef HAVE_LDAP
 WINE_DEFAULT_DEBUG_CHANNEL(wldap32);
-#endif
 
 /***********************************************************************
  *      ldap_dn2ufnA     (WLDAP32.@)
  *
  * See ldap_dn2ufnW.
  */
-PCHAR CDECL ldap_dn2ufnA( PCHAR dn )
+char * CDECL ldap_dn2ufnA( char *dn )
 {
-    PCHAR ret = NULL;
-#ifdef HAVE_LDAP
+    char *ret;
     WCHAR *dnW, *retW;
 
     TRACE( "(%s)\n", debugstr_a(dn) );
 
-    dnW = strAtoW( dn );
-    if (!dnW) return NULL;
+    if (!(dnW = strAtoW( dn ))) return NULL;
 
     retW = ldap_dn2ufnW( dnW );
     ret = strWtoA( retW );
 
-    strfreeW( dnW );
+    free( dnW );
     ldap_memfreeW( retW );
-
-#endif
     return ret;
 }
 
@@ -73,30 +60,26 @@ PCHAR CDECL ldap_dn2ufnA( PCHAR dn )
  *  dn  [I] DN to convert.
  *
  * RETURNS
- *  Success: Pointer to a string containing the user-friendly name. 
+ *  Success: Pointer to a string containing the user-friendly name.
  *  Failure: NULL
  *
  * NOTES
  *  Free the string with ldap_memfree.
  */
-PWCHAR CDECL ldap_dn2ufnW( PWCHAR dn )
+WCHAR * CDECL ldap_dn2ufnW( WCHAR *dn )
 {
-    PWCHAR ret = NULL;
-#ifdef HAVE_LDAP
+    WCHAR *ret;
     char *dnU, *retU;
 
     TRACE( "(%s)\n", debugstr_w(dn) );
 
-    dnU = strWtoU( dn );
-    if (!dnU) return NULL;
+    if (!(dnU = strWtoU( dn ))) return NULL;
 
-    retU = ldap_dn2ufn( dnU );
+    retU = ldap_funcs->fn_ldap_dn2ufn( dnU );
     ret = strUtoW( retU );
 
-    strfreeU( dnU );
-    ldap_memfree( retU );
-
-#endif
+    free( dnU );
+    ldap_funcs->fn_ldap_memfree( retU );
     return ret;
 }
 
@@ -105,24 +88,20 @@ PWCHAR CDECL ldap_dn2ufnW( PWCHAR dn )
  *
  * See ldap_explode_dnW.
  */
-PCHAR * CDECL ldap_explode_dnA( PCHAR dn, ULONG notypes )
+char ** CDECL ldap_explode_dnA( char *dn, ULONG notypes )
 {
-    PCHAR *ret = NULL;
-#ifdef HAVE_LDAP
+    char **ret;
     WCHAR *dnW, **retW;
 
     TRACE( "(%s, 0x%08x)\n", debugstr_a(dn), notypes );
 
-    dnW = strAtoW( dn );
-    if (!dnW) return NULL;
+    if (!(dnW = strAtoW( dn ))) return NULL;
 
     retW = ldap_explode_dnW( dnW, notypes );
     ret = strarrayWtoA( retW );
 
-    strfreeW( dnW );
+    free( dnW );
     ldap_value_freeW( retW );
-
-#endif
     return ret;
 }
 
@@ -137,30 +116,26 @@ PCHAR * CDECL ldap_explode_dnA( PCHAR dn, ULONG notypes )
  *
  * RETURNS
  *  Success: Pointer to a NULL-terminated array that contains the DN
- *           components. 
+ *           components.
  *  Failure: NULL
  *
  * NOTES
  *  Free the string array with ldap_value_free.
  */
-PWCHAR * CDECL ldap_explode_dnW( PWCHAR dn, ULONG notypes )
+WCHAR ** CDECL ldap_explode_dnW( WCHAR *dn, ULONG notypes )
 {
-    PWCHAR *ret = NULL;
-#ifdef HAVE_LDAP
+    WCHAR **ret;
     char *dnU, **retU;
 
     TRACE( "(%s, 0x%08x)\n", debugstr_w(dn), notypes );
 
-    dnU = strWtoU( dn );
-    if (!dnU) return NULL;
+    if (!(dnU = strWtoU( dn ))) return NULL;
 
-    retU = ldap_explode_dn( dnU, notypes );
+    retU = ldap_funcs->fn_ldap_explode_dn( dnU, notypes );
     ret = strarrayUtoW( retU );
 
-    strfreeU( dnU );
-    ldap_memvfree( (void **)retU );
-
-#endif
+    free( dnU );
+    ldap_funcs->fn_ldap_memvfree( (void **)retU );
     return ret;
 }
 
@@ -169,11 +144,10 @@ PWCHAR * CDECL ldap_explode_dnW( PWCHAR dn, ULONG notypes )
  *
  * See ldap_get_dnW.
  */
-PCHAR CDECL ldap_get_dnA( WLDAP32_LDAP *ld, WLDAP32_LDAPMessage *entry )
+char * CDECL ldap_get_dnA( LDAP *ld, LDAPMessage *entry )
 {
-    PCHAR ret = NULL;
-#ifdef HAVE_LDAP
-    PWCHAR retW;
+    char *ret;
+    WCHAR *retW;
 
     TRACE( "(%p, %p)\n", ld, entry );
 
@@ -183,8 +157,6 @@ PCHAR CDECL ldap_get_dnA( WLDAP32_LDAP *ld, WLDAP32_LDAPMessage *entry )
 
     ret = strWtoA( retW );
     ldap_memfreeW( retW );
-
-#endif
     return ret;
 }
 
@@ -204,22 +176,19 @@ PCHAR CDECL ldap_get_dnA( WLDAP32_LDAP *ld, WLDAP32_LDAPMessage *entry )
  * NOTES
  *  Free the string with ldap_memfree.
  */
-PWCHAR CDECL ldap_get_dnW( WLDAP32_LDAP *ld, WLDAP32_LDAPMessage *entry )
+WCHAR * CDECL ldap_get_dnW( LDAP *ld, LDAPMessage *entry )
 {
-    PWCHAR ret = NULL;
-#ifdef HAVE_LDAP
+    WCHAR *ret;
     char *retU;
 
     TRACE( "(%p, %p)\n", ld, entry );
 
     if (!ld || !entry) return NULL;
 
-    retU = ldap_get_dn( ld->ld, entry );
+    retU = ldap_funcs->fn_ldap_get_dn( CTX(ld), MSG(entry) );
 
     ret = strUtoW( retU );
-    ldap_memfree( retU );
-
-#endif
+    ldap_funcs->fn_ldap_memfree( retU );
     return ret;
 }
 
@@ -228,34 +197,28 @@ PWCHAR CDECL ldap_get_dnW( WLDAP32_LDAP *ld, WLDAP32_LDAPMessage *entry )
  *
  * See ldap_ufn2dnW.
  */
-ULONG CDECL ldap_ufn2dnA( PCHAR ufn, PCHAR *dn )
+ULONG CDECL ldap_ufn2dnA( char *ufn, char **dn )
 {
-    ULONG ret = WLDAP32_LDAP_SUCCESS;
-#ifdef HAVE_LDAP
-    PWCHAR ufnW = NULL, dnW = NULL;
+    ULONG ret;
+    WCHAR *ufnW = NULL, *dnW = NULL;
 
     TRACE( "(%s, %p)\n", debugstr_a(ufn), dn );
 
-    if (!dn) return WLDAP32_LDAP_PARAM_ERROR;
+    if (!dn) return LDAP_PARAM_ERROR;
 
     *dn = NULL;
-
-    if (ufn) {
-        ufnW = strAtoW( ufn );
-        if (!ufnW) return WLDAP32_LDAP_NO_MEMORY;
-    }
+    if (ufn && !(ufnW = strAtoW( ufn ))) return LDAP_NO_MEMORY;
 
     ret = ldap_ufn2dnW( ufnW, &dnW );
-
-    if (dnW) {
-        *dn = strWtoA( dnW );
-        if (!*dn) ret = WLDAP32_LDAP_NO_MEMORY;
+    if (dnW)
+    {
+        char *str;
+        if (!(str = strWtoA( dnW ))) ret = LDAP_NO_MEMORY;
+        else *dn = str;
     }
 
-    strfreeW( ufnW );
+    free( ufnW );
     ldap_memfreeW( dnW );
-
-#endif
     return ret;
 }
 
@@ -266,7 +229,7 @@ ULONG CDECL ldap_ufn2dnA( PCHAR ufn, PCHAR *dn )
  *
  * PARAMS
  *  ufn  [I] User-friendly name to convert.
- *  dn   [O] Receives a pointer to a string containing the DN. 
+ *  dn   [O] Receives a pointer to a string containing the DN.
  *
  * RETURNS
  *  Success: LDAP_SUCCESS
@@ -275,29 +238,26 @@ ULONG CDECL ldap_ufn2dnA( PCHAR ufn, PCHAR *dn )
  * NOTES
  *  Free the string with ldap_memfree.
  */
-ULONG CDECL ldap_ufn2dnW( PWCHAR ufn, PWCHAR *dn )
+ULONG CDECL ldap_ufn2dnW( WCHAR *ufn, WCHAR **dn )
 {
-    ULONG ret = WLDAP32_LDAP_SUCCESS;
-#ifdef HAVE_LDAP
+    ULONG ret = LDAP_SUCCESS;
     char *ufnU = NULL;
 
     TRACE( "(%s, %p)\n", debugstr_w(ufn), dn );
 
-    if (!dn) return WLDAP32_LDAP_PARAM_ERROR;
+    if (!dn) return LDAP_PARAM_ERROR;
 
     *dn = NULL;
-
-    if (ufn) {
-        ufnU = strWtoU( ufn );
-        if (!ufnU) return WLDAP32_LDAP_NO_MEMORY;
+    if (ufn)
+    {
+        WCHAR *str;
+        if (!(ufnU = strWtoU( ufn ))) return LDAP_NO_MEMORY;
 
         /* FIXME: do more than just a copy */
-        *dn = strUtoW( ufnU );
-        if (!*dn) ret = WLDAP32_LDAP_NO_MEMORY;
+        if (!(str = strUtoW( ufnU ))) ret = LDAP_NO_MEMORY;
+        else *dn = str;
     }
 
-    strfreeU( ufnU );
-
-#endif
+    free( ufnU );
     return ret;
 }

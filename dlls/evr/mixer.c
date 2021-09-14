@@ -603,8 +603,8 @@ static HRESULT WINAPI video_mixer_transform_GetOutputAvailableType(IMFTransform 
         hr = MF_E_NO_MORE_TYPES;
     else
     {
-        if (SUCCEEDED(hr = MFCreateMediaType(type)))
-            hr = IMFMediaType_CopyAllItems(mixer->output.rt_formats[index].media_type, (IMFAttributes *)*type);
+        *type = mixer->output.rt_formats[index].media_type;
+        IMFMediaType_AddRef(*type);
     }
 
     LeaveCriticalSection(&mixer->cs);
@@ -642,46 +642,22 @@ done:
     return hr;
 }
 
-static void video_mixer_append_rt_format(struct rt_format *rt_formats, unsigned int *count,
-        const GUID *device, D3DFORMAT format)
+static int __cdecl rt_formats_sort_compare(const void *left, const void *right)
 {
-    unsigned int i;
+    const struct rt_format *format1 = left, *format2 = right;
 
-    for (i = 0; i < *count; ++i)
-    {
-        if (rt_formats[i].format == format) return;
-    }
-
-    rt_formats[*count].format = format;
-    rt_formats[*count].device = *device;
-    *count += 1;
-}
-
-static unsigned int video_mixer_get_interlace_mode_from_video_desc(const DXVA2_VideoDesc *video_desc)
-{
-    switch (video_desc->SampleFormat.SampleFormat)
-    {
-        case DXVA2_SampleFieldInterleavedEvenFirst:
-            return MFVideoInterlace_FieldInterleavedUpperFirst;
-        case DXVA2_SampleFieldInterleavedOddFirst:
-            return MFVideoInterlace_FieldInterleavedLowerFirst;
-        case DXVA2_SampleFieldSingleEven:
-            return MFVideoInterlace_FieldSingleUpper;
-        case DXVA2_SampleFieldSingleOdd:
-            return MFVideoInterlace_FieldSingleLower;
-        default:
-            return MFVideoInterlace_Progressive;
-    }
+    if (format1->format < format2->format) return -1;
+    if (format1->format > format2->format) return 1;
+    return 0;
 }
 
 static HRESULT video_mixer_collect_output_types(struct video_mixer *mixer, const DXVA2_VideoDesc *video_desc,
         IMFMediaType *media_type, IDirectXVideoProcessorService *service, unsigned int device_count,
         const GUID *devices, unsigned int flags)
 {
-    unsigned int i, j, format_count, count, interlace_mode;
+    unsigned int i, j, format_count, count;
     struct rt_format *rt_formats = NULL, *ptr;
     HRESULT hr = MF_E_INVALIDMEDIATYPE;
-    MFVideoArea aperture;
     D3DFORMAT *formats;
     GUID subtype;
 
@@ -701,7 +677,11 @@ static HRESULT video_mixer_collect_output_types(struct video_mixer *mixer, const
             rt_formats = ptr;
 
             for (j = 0; j < format_count; ++j)
-                video_mixer_append_rt_format(rt_formats, &count, &devices[i], formats[j]);
+            {
+                rt_formats[count + j].format = formats[j];
+                rt_formats[count + j].device = devices[i];
+            }
+            count += format_count;
 
             CoTaskMemFree(formats);
         }
@@ -709,34 +689,41 @@ static HRESULT video_mixer_collect_output_types(struct video_mixer *mixer, const
 
     if (count && !(flags & MFT_SET_TYPE_TEST_ONLY))
     {
-        if (!(mixer->output.rt_formats = calloc(count, sizeof(*mixer->output.rt_formats))))
+        qsort(rt_formats, count, sizeof(*rt_formats), rt_formats_sort_compare);
+
+        j = 0;
+        for (i = j + 1; i < count; ++i)
         {
-            free(rt_formats);
-            return E_OUTOFMEMORY;
+            if (rt_formats[i].format != rt_formats[j].format)
+            {
+                rt_formats[++j] = rt_formats[i];
+            }
         }
+        count = j + 1;
 
         memcpy(&subtype, &MFVideoFormat_Base, sizeof(subtype));
-        memset(&aperture, 0, sizeof(aperture));
-        aperture.Area.cx = video_desc->SampleWidth;
-        aperture.Area.cy = video_desc->SampleHeight;
-        interlace_mode = video_mixer_get_interlace_mode_from_video_desc(video_desc);
-        for (i = 0; i < count; ++i)
+        if ((mixer->output.rt_formats = calloc(count, sizeof(*mixer->output.rt_formats))))
         {
-            IMFMediaType *rt_media_type;
+            for (i = 0; i < count; ++i)
+            {
+                IMFMediaType *rt_media_type;
 
-            subtype.Data1 = rt_formats[i].format;
-            mixer->output.rt_formats[i] = rt_formats[i];
+                subtype.Data1 = rt_formats[i].format;
+                mixer->output.rt_formats[i] = rt_formats[i];
 
-            MFCreateMediaType(&rt_media_type);
-            IMFMediaType_CopyAllItems(media_type, (IMFAttributes *)rt_media_type);
-            IMFMediaType_SetGUID(rt_media_type, &MF_MT_SUBTYPE, &subtype);
-            IMFMediaType_SetBlob(rt_media_type, &MF_MT_GEOMETRIC_APERTURE, (const UINT8 *)&aperture, sizeof(aperture));
-            IMFMediaType_SetBlob(rt_media_type, &MF_MT_MINIMUM_DISPLAY_APERTURE, (const UINT8 *)&aperture, sizeof(aperture));
-            IMFMediaType_SetUINT32(rt_media_type, &MF_MT_INTERLACE_MODE, interlace_mode);
+                MFCreateMediaType(&rt_media_type);
+                IMFMediaType_CopyAllItems(media_type, (IMFAttributes *)rt_media_type);
+                IMFMediaType_SetGUID(rt_media_type, &MF_MT_SUBTYPE, &subtype);
 
-            mixer->output.rt_formats[i].media_type = rt_media_type;
+                mixer->output.rt_formats[i].media_type = rt_media_type;
+            }
+            mixer->output.rt_formats_count = count;
         }
-        mixer->output.rt_formats_count = count;
+        else
+        {
+            hr = E_OUTOFMEMORY;
+            count = 0;
+        }
     }
 
     free(rt_formats);
@@ -833,22 +820,16 @@ static HRESULT WINAPI video_mixer_transform_SetInputType(IMFTransform *iface, DW
 
 static HRESULT WINAPI video_mixer_transform_SetOutputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
 {
-    const unsigned int equality_flags = MF_MEDIATYPE_EQUAL_MAJOR_TYPES | MF_MEDIATYPE_EQUAL_FORMAT_TYPES;
+    const unsigned int equality_flags = MF_MEDIATYPE_EQUAL_MAJOR_TYPES |
+            MF_MEDIATYPE_EQUAL_FORMAT_TYPES | MF_MEDIATYPE_EQUAL_FORMAT_DATA;
     struct video_mixer *mixer = impl_from_IMFTransform(iface);
     HRESULT hr = MF_E_INVALIDMEDIATYPE;
     unsigned int i, compare_flags;
-    BOOL is_compressed = TRUE;
 
     TRACE("%p, %u, %p, %#x.\n", iface, id, type, flags);
 
     if (id)
         return MF_E_INVALIDSTREAMNUMBER;
-
-    if (!type)
-        return E_INVALIDARG;
-
-    if (FAILED(IMFMediaType_IsCompressedFormat(type, &is_compressed)) || is_compressed)
-        return MF_E_INVALIDMEDIATYPE;
 
     EnterCriticalSection(&mixer->cs);
 
@@ -1048,7 +1029,7 @@ static HRESULT WINAPI video_mixer_transform_ProcessMessage(IMFTransform *iface, 
     HRESULT hr = S_OK;
     unsigned int i;
 
-    TRACE("%p, %#x, %#lx.\n", iface, message, param);
+    TRACE("%p, %u, %#lx.\n", iface, message, param);
 
     switch (message)
     {

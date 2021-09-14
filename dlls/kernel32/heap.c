@@ -44,7 +44,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(globalmem);
 
 static HANDLE systemHeap;   /* globally shared heap */
 
-static BOOL is_win64 = sizeof(void *) == 8;
 
 /***********************************************************************
  *           HEAP_CreateSystemHeap
@@ -531,13 +530,6 @@ SIZE_T WINAPI LocalSize(
     return GlobalSize( handle );
 }
 
-static BOOL force_laa(void)
-{
-    WCHAR e[16];
-    e[0] = '\0';
-    GetEnvironmentVariableW(L"WINE_LARGE_ADDRESS_AWARE", e, ARRAY_SIZE(e));
-    return (*e != '\0' && *e != '0');
-}
 
 /***********************************************************************
  *           GlobalMemoryStatus   (KERNEL32.@)
@@ -552,10 +544,6 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
     MEMORYSTATUSEX memstatus;
     OSVERSIONINFOW osver;
     IMAGE_NT_HEADERS *nt = RtlImageNtHeader( GetModuleHandleW(0) );
-    static int force_large_address_aware = -1;
-
-    if (force_large_address_aware == -1)
-        force_large_address_aware = force_laa() ? 1 : 0;
 
     /* Because GlobalMemoryStatus is identical to GlobalMemoryStatusEX save
        for one extra field in the struct, and the lack of a bug, we simply
@@ -573,7 +561,7 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
     osver.dwOSVersionInfoSize = sizeof(osver);
     GetVersionExW(&osver);
 
-    if ( !is_win64 && (osver.dwMajorVersion >= 5 || osver.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS) )
+    if ( osver.dwMajorVersion >= 5 || osver.dwPlatformId == VER_PLATFORM_WIN32_WINDOWS )
     {
         lpBuffer->dwTotalPhys = min( memstatus.ullTotalPhys, MAXDWORD );
         lpBuffer->dwAvailPhys = min( memstatus.ullAvailPhys, MAXDWORD );
@@ -584,7 +572,7 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
         lpBuffer->dwAvailVirtual = min( memstatus.ullAvailVirtual, MAXDWORD );
 
     }
-    else /* 64 bit case, or duplicate NT bug */
+    else /* duplicate NT bug */
     {
         lpBuffer->dwTotalPhys = memstatus.ullTotalPhys;
         lpBuffer->dwAvailPhys = memstatus.ullAvailPhys;
@@ -596,8 +584,7 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
 
     /* values are limited to 2Gb unless the app has the IMAGE_FILE_LARGE_ADDRESS_AWARE flag */
     /* page file sizes are not limited (Adobe Illustrator 8 depends on this) */
-    if (!(nt->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE) &&
-        !force_large_address_aware)
+    if (!(nt->FileHeader.Characteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE))
     {
         if (lpBuffer->dwTotalPhys > MAXLONG) lpBuffer->dwTotalPhys = MAXLONG;
         if (lpBuffer->dwAvailPhys > MAXLONG) lpBuffer->dwAvailPhys = MAXLONG;
@@ -606,7 +593,7 @@ VOID WINAPI GlobalMemoryStatus( LPMEMORYSTATUS lpBuffer )
     }
 
     /* work around for broken photoshop 4 installer */
-    if ( !is_win64 && lpBuffer->dwAvailPhys +  lpBuffer->dwAvailPageFile >= 2U*1024*1024*1024 )
+    if ( lpBuffer->dwAvailPhys +  lpBuffer->dwAvailPageFile >= 2U*1024*1024*1024)
          lpBuffer->dwAvailPageFile = 2U*1024*1024*1024 -  lpBuffer->dwAvailPhys - 1;
 
     /* limit page file size for really old binaries */

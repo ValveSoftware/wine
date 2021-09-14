@@ -5,7 +5,7 @@ msgstr ""
 "Project-Id-Version: Wine\n"
 "Report-Msgid-Bugs-To: https://bugs.winehq.org\n"
 "POT-Creation-Date: N/A\n"
-"PO-Revision-Date: 2020-09-25 18:58-0300\n"
+"PO-Revision-Date: 2021-03-13 17:38-0300\n"
 "Last-Translator: Roberto Augusto Pungartnik <rpungartnik@gmail.com>\n"
 "Language-Team: Portuguese (Brazil)\n"
 "Language: pt_BR\n"
@@ -13,6 +13,27 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "X-Generator: Poedit 2.0.6\n"
+
+#: dlls/aclui/aclui.rc:29 dlls/inetcpl.cpl/inetcpl.rc:90
+#: programs/winefile/winefile.rc:114
+msgid "Security"
+msgstr "Segurança"
+
+#: dlls/aclui/aclui.rc:32
+msgid "&Group or user names:"
+msgstr "&Grupo ou nome dos usuários:"
+
+#: dlls/aclui/aclui.rc:38
+msgid "Allow"
+msgstr "Permitir"
+
+#: dlls/aclui/aclui.rc:39
+msgid "Deny"
+msgstr "Negado"
+
+#: dlls/aclui/aclui.rc:47
+msgid "Permissions for %1"
+msgstr "Permissões para %1"
 
 #: dlls/appwiz.cpl/appwiz.rc:58
 msgid "Install/Uninstall"
@@ -3606,10 +3627,6 @@ msgstr ""
 msgid "Delete"
 msgstr "Excluir"
 
-#: dlls/inetcpl.cpl/inetcpl.rc:90 programs/winefile/winefile.rc:114
-msgid "Security"
-msgstr "Segurança"
-
 #: dlls/inetcpl.cpl/inetcpl.rc:112
 msgid ""
 "Certificates are used for your personal identification and to identify "
@@ -3854,15 +3871,15 @@ msgstr "Compilação condicional está desligada"
 msgid "Expected '@'"
 msgstr "Esperado '@'"
 
-#: dlls/jscript/jscript.rc:78
+#: dlls/jscript/jscript.rc:79
 msgid "Microsoft JScript compilation error"
 msgstr "Microsoft JScript erro de compilação"
 
-#: dlls/jscript/jscript.rc:79
+#: dlls/jscript/jscript.rc:80
 msgid "Microsoft JScript runtime error"
 msgstr "Microsoft JScript erro de execução"
 
-#: dlls/jscript/jscript.rc:80 dlls/vbscript/vbscript.rc:64
+#: dlls/jscript/jscript.rc:81 dlls/vbscript/vbscript.rc:64
 msgid "Unknown runtime error"
 msgstr "Erro de execução desconhecido"
 
@@ -3955,14 +3972,18 @@ msgstr ""
 "'verdade' neste objeto"
 
 #: dlls/jscript/jscript.rc:74
+msgid "Cannot define property '|': object is not extensible"
+msgstr ""
+
+#: dlls/jscript/jscript.rc:75
 msgid "Cannot redefine non-configurable property '|'"
 msgstr "Não pode redefinir propriedade não configurável '|'"
 
-#: dlls/jscript/jscript.rc:75
+#: dlls/jscript/jscript.rc:76
 msgid "Cannot modify non-writable property '|'"
 msgstr "Não pode modificar propriedade não gravável '|'"
 
-#: dlls/jscript/jscript.rc:76
+#: dlls/jscript/jscript.rc:77
 msgid "Property cannot have both accessors and a value"
 msgstr "Propriedade não pode ter ambos acessores e valor"
 
@@ -6941,10 +6962,8 @@ msgid "Not implemented.\n"
 msgstr "Não implementado.\n"
 
 #: dlls/kernel32/winerror.mc:3788
-#, fuzzy
-#| msgid "RPC call failed.\n"
 msgid "Call failed.\n"
-msgstr "Falha na chamada RPC.\n"
+msgstr "Falha na chamada.\n"
 
 #: dlls/kernel32/winerror.mc:3760
 msgid "No Signature found in file.\n"
@@ -9504,10 +9523,9 @@ msgstr "Deseja finalizar a sessão do Wine?"
 msgid "Programs"
 msgstr "Programas"
 
-#: dlls/shell32/shell32.rc:204 dlls/shell32/shell32.rc:219
-#: dlls/shell32/shell32.rc:150 dlls/shell32/shell32.rc:235
-msgid "Documents"
-msgstr "Documentos"
+#: dlls/shell32/shell32.rc:204
+msgid "My Documents"
+msgstr "Meus Documentos"
 
 #: dlls/shell32/shell32.rc:205
 msgid "Favorites"
@@ -9521,13 +9539,13 @@ msgstr "Inicialização"
 msgid "Start Menu"
 msgstr "Menu Iniciar"
 
-#: dlls/shell32/shell32.rc:208 dlls/shell32/shell32.rc:221
-msgid "Music"
-msgstr "Documentos\\Minhas Músicas"
+#: dlls/shell32/shell32.rc:208
+msgid "My Music"
+msgstr "Minhas Músicas"
 
-#: dlls/shell32/shell32.rc:209 dlls/shell32/shell32.rc:223
-msgid "Videos"
-msgstr "Documentos\\Meus Vídeos"
+#: dlls/shell32/shell32.rc:209
+msgid "My Videos"
+msgstr "Meus Vídeos"
 
 #: dlls/shell32/shell32.rc:210
 msgctxt "directory"
@@ -9554,17 +9572,34 @@ msgstr "Histórico"
 msgid "Program Files"
 msgstr "Arquivos de programas"
 
-#: dlls/shell32/shell32.rc:217 dlls/shell32/shell32.rc:222
-msgid "Pictures"
-msgstr "Documentos\\Minhas Imagens"
+#: dlls/shell32/shell32.rc:217
+msgid "My Pictures"
+msgstr "Minhas Imagens"
 
 #: dlls/shell32/shell32.rc:218
 msgid "Common Files"
 msgstr "Arquivos Comuns"
 
+#: dlls/shell32/shell32.rc:219 dlls/shell32/shell32.rc:150
+#: dlls/shell32/shell32.rc:235
+msgid "Documents"
+msgstr "Documentos"
+
 #: dlls/shell32/shell32.rc:220
 msgid "Administrative Tools"
 msgstr "Ferramentas Administrativas"
+
+#: dlls/shell32/shell32.rc:221
+msgid "Music"
+msgstr "Documentos\\Minhas Músicas"
+
+#: dlls/shell32/shell32.rc:222
+msgid "Pictures"
+msgstr "Documentos\\Minhas Imagens"
+
+#: dlls/shell32/shell32.rc:223
+msgid "Videos"
+msgstr "Documentos\\Meus Vídeos"
 
 #: dlls/shell32/shell32.rc:216
 msgid "Program Files (x86)"
@@ -9910,16 +9945,12 @@ msgid "Iran Daylight Time"
 msgstr "Horário de verão do Irã"
 
 #: dlls/tzres/tzres.rc:204
-#, fuzzy
-#| msgid "Haiti Standard Time"
 msgid "Saint Pierre Standard Time"
-msgstr "Hora padrão do Haiti"
+msgstr "Hora padrão de São Pedro"
 
 #: dlls/tzres/tzres.rc:205
-#, fuzzy
-#| msgid "Haiti Daylight Time"
 msgid "Saint Pierre Daylight Time"
-msgstr "Horário de verão do Haiti"
+msgstr "Horário de verão de São Pedro"
 
 #: dlls/tzres/tzres.rc:170
 msgid "Namibia Standard Time"
@@ -9962,16 +9993,12 @@ msgid "Central Asia Daylight Time"
 msgstr "Horário de verão da Asia Central"
 
 #: dlls/tzres/tzres.rc:146
-#, fuzzy
-#| msgid "Korea Standard Time"
 msgid "Lord Howe Standard Time"
-msgstr "Hora padrão da Coreia"
+msgstr "Hora padrão de Lord Howe"
 
 #: dlls/tzres/tzres.rc:147
-#, fuzzy
-#| msgid "Korea Daylight Time"
 msgid "Lord Howe Daylight Time"
-msgstr "Horário de verão da Coreia"
+msgstr "Horário de verão de Lord Howe"
 
 #: dlls/tzres/tzres.rc:40
 msgid "Arabic Standard Time"
@@ -10022,16 +10049,12 @@ msgid "Azerbaijan Daylight Time"
 msgstr "Horário de verão do Azerbaijão"
 
 #: dlls/tzres/tzres.rc:150
-#, fuzzy
-#| msgid "Magadan Standard Time"
 msgid "Magallanes Standard Time"
-msgstr "Hora padrão de Magadan"
+msgstr "Hora padrão de Magalhães"
 
 #: dlls/tzres/tzres.rc:151
-#, fuzzy
-#| msgid "Magadan Daylight Time"
 msgid "Magallanes Daylight Time"
-msgstr "Horário de verão Magadan"
+msgstr "Horário de verão Magalhães"
 
 #: dlls/tzres/tzres.rc:206
 msgid "Samoa Standard Time"
@@ -10082,16 +10105,12 @@ msgid "Line Islands Daylight Time"
 msgstr "Horário de verão das Ilhas Equatoriais"
 
 #: dlls/tzres/tzres.rc:92
-#, fuzzy
-#| msgid "China Standard Time"
 msgid "Cuba Standard Time"
-msgstr "Hora padrão da China"
+msgstr "Hora padrão da Cuba"
 
 #: dlls/tzres/tzres.rc:93
-#, fuzzy
-#| msgid "China Daylight Time"
 msgid "Cuba Daylight Time"
-msgstr "Horário de verão da China"
+msgstr "Horário de verão da Cuba"
 
 #: dlls/tzres/tzres.rc:136
 msgid "Jordan Standard Time"
@@ -10290,16 +10309,12 @@ msgid "US Eastern Daylight Time"
 msgstr "Horário de verão do Leste EUA"
 
 #: dlls/tzres/tzres.rc:182
-#, fuzzy
-#| msgid "Korea Standard Time"
 msgid "North Korea Standard Time"
-msgstr "Hora padrão da Coreia"
+msgstr "Hora padrão da Coreia do Norte"
 
 #: dlls/tzres/tzres.rc:183
-#, fuzzy
-#| msgid "Korea Daylight Time"
 msgid "North Korea Daylight Time"
-msgstr "Horário de verão da Coreia"
+msgstr "Horário de verão da Coreia do Norte"
 
 #: dlls/tzres/tzres.rc:220
 msgid "Tasmania Standard Time"
@@ -10390,16 +10405,12 @@ msgid "Arabian Daylight Time"
 msgstr "Horário de verão da Arábia Saudita"
 
 #: dlls/tzres/tzres.rc:222
-#, fuzzy
-#| msgid "Mountain Standard Time"
 msgid "Tocantins Standard Time"
-msgstr "Hora padrão de Montanha"
+msgstr "Hora padrão de Tocantins"
 
 #: dlls/tzres/tzres.rc:223
-#, fuzzy
-#| msgid "Mountain Daylight Time"
 msgid "Tocantins Daylight Time"
-msgstr "Horário de verão de Montanha"
+msgstr "Horário de verão de Tocantins"
 
 #: dlls/tzres/tzres.rc:196
 msgid "Russian Standard Time"
@@ -10410,16 +10421,12 @@ msgid "Russian Daylight Time"
 msgstr "Horário de verão da Rússia"
 
 #: dlls/tzres/tzres.rc:48
-#, fuzzy
-#| msgid "AUS Central Standard Time"
 msgid "Aus Central W. Standard Time"
-msgstr "Hora padrão da Austrália Central"
+msgstr "Hora padrão da Austrália Ocidental"
 
 #: dlls/tzres/tzres.rc:49
-#, fuzzy
-#| msgid "AUS Central Daylight Time"
 msgid "Aus Central W. Daylight Time"
-msgstr "Horário de verão da Austrália Central"
+msgstr "Horário de verão da Austrália Ocidental"
 
 #: dlls/tzres/tzres.rc:194
 msgid "Romance Standard Time"
@@ -10638,16 +10645,12 @@ msgid "Egypt Daylight Time"
 msgstr "Horário de verão do Egito"
 
 #: dlls/tzres/tzres.rc:106
-#, fuzzy
-#| msgid "Central Standard Time (Mexico)"
 msgid "Eastern Standard Time (Mexico)"
-msgstr "Hora padrão Central(México)"
+msgstr "Hora padrão Oriental(México)"
 
 #: dlls/tzres/tzres.rc:107
-#, fuzzy
-#| msgid "Central Daylight Time (Mexico)"
 msgid "Eastern Daylight Time (Mexico)"
-msgstr "Horário de verão Central(México)"
+msgstr "Horário de verão Oriental(México)"
 
 #: dlls/tzres/tzres.rc:154
 msgid "Mauritius Standard Time"
@@ -12442,7 +12445,7 @@ msgstr ""
 "lista, de forma que o parâmetro 2 sobrepõe o parâmetro 1 e assim por\n"
 "diante. Isto não tem efeito se chamado a partir da linha de comandos.\n"
 
-#: programs/cmd/cmd.rc:212 programs/start/start.rc:56
+#: programs/cmd/cmd.rc:212
 msgid ""
 "Start a program, or open a document in the program normally used for files\n"
 "with that suffix.\n"
@@ -12759,12 +12762,12 @@ msgstr ""
 msgid "Are you sure?"
 msgstr "Tem certeza?"
 
-#: programs/cmd/cmd.rc:366 programs/reg/reg.rc:50 programs/xcopy/xcopy.rc:43
+#: programs/cmd/cmd.rc:366 programs/reg/reg.rc:127 programs/xcopy/xcopy.rc:43
 msgctxt "Yes key"
 msgid "Y"
 msgstr "S"
 
-#: programs/cmd/cmd.rc:367 programs/reg/reg.rc:51 programs/xcopy/xcopy.rc:44
+#: programs/cmd/cmd.rc:367 programs/reg/reg.rc:128 programs/xcopy/xcopy.rc:44
 msgctxt "No key"
 msgid "N"
 msgstr "N"
@@ -12903,7 +12906,7 @@ msgstr "O volume na unidade %1!c! é %2\n"
 msgid "Volume in drive %1!c! has no label.\n"
 msgstr "O volume na unidade %1!c! não tem rótulo.\n"
 
-#: programs/cmd/cmd.rc:402 programs/reg/reg.rc:49
+#: programs/cmd/cmd.rc:402 programs/reg/reg.rc:126
 msgid " (Yes|No)"
 msgstr " (Sim|Não)"
 
@@ -14278,12 +14281,23 @@ msgid "Icons (*.ico)"
 msgstr "Ícones (*.ico)"
 
 #: programs/reg/reg.rc:35
+#, fuzzy
+#| msgid ""
+#| "Usage:\n"
+#| "  REG [operation] [parameters]\n"
+#| "\n"
+#| "Supported operations:\n"
+#| "  ADD | DELETE | IMPORT | EXPORT | QUERY\n"
+#| "\n"
+#| "For help on a specific operation, type:\n"
+#| "  REG [operation] /?\n"
+#| "\n"
 msgid ""
 "Usage:\n"
 "  REG [operation] [parameters]\n"
 "\n"
 "Supported operations:\n"
-"  ADD | DELETE | IMPORT | EXPORT | QUERY\n"
+"  ADD | DELETE | EXPORT | IMPORT | QUERY\n"
 "\n"
 "For help on a specific operation, type:\n"
 "  REG [operation] /?\n"
@@ -14299,90 +14313,206 @@ msgstr ""
 "  REG [operação] /?\n"
 "\n"
 
-#: programs/reg/reg.rc:36
+#: programs/reg/reg.rc:67
 msgid ""
-"REG ADD key_name [/v value_name | /ve] [/t type] [/s separator] [/d data] [/"
-"f]\n"
+"REG ADD <key> [/v value_name | /ve] [/t type] [/s separator] [/d data] [/f]\n"
+"\n"
+"  Adds a key to the registry or adds a new value to a given registry key.\n"
+"\n"
+"  <key>\n"
+"     The registry key to add or, if either [/v] or [/ve] is specified,\n"
+"     the key in which to add the new registry data.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to add.\n"
+"\n"
+"  /ve\n"
+"     Add an unnamed registry value. This option modifies the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /t <type>\n"
+"     The type of data to add to the registry. If [/t] is specified,\n"
+"     <type> must be one of the following:\n"
+"\n"
+"         REG_SZ    | REG_MULTI_SZ | REG_EXPAND_SZ\n"
+"         REG_DWORD | REG_BINARY   | REG_NONE\n"
+"\n"
+"     If [/t] is not specified, the default data type is REG_SZ.\n"
+"\n"
+"  /s <separator>\n"
+"     The character used to separate strings in REG_MULTI_SZ data.\n"
+"     If [/s] is not specified, the default separator is \\0.\n"
+"\n"
+"  /d <data>\n"
+"     The data to add to the new registry value.\n"
+"\n"
+"  /f\n"
+"     Modify the registry without prompting for confirmation.\n"
+"\n"
 msgstr ""
-"REG ADD nome_chave [/v nome_valor | /ve] [/t tipo] [/s separador] [/d dados] "
-"[/f]\n"
 
-#: programs/reg/reg.rc:37
-msgid "REG DELETE key_name [/v value_name | /ve | /va] [/f]\n"
-msgstr "REG DELETE nome_chave [/v nome_valor | /ve | /va] [/f]\n"
+#: programs/reg/reg.rc:92
+msgid ""
+"REG DELETE <key> [/v value_name | /ve | /va] [/f]\n"
+"\n"
+"  Deletes a registry key (including all subkeys and values), or deletes\n"
+"  one or more values from a given registry key.\n"
+"\n"
+"  <key>\n"
+"     The registry key to delete or, if one of [/v], [/ve] or [/va] is\n"
+"     specified, the registry key in which to delete one or more values.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to delete.\n"
+"\n"
+"  /ve\n"
+"     Delete an unnamed registry value. This option deletes the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /va\n"
+"     Delete all values from a registry key.\n"
+"\n"
+"  /f\n"
+"     Delete a registry key (including all subkeys and values) without\n"
+"     prompting for confirmation.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:38
-msgid "REG QUERY key_name [/v value_name | /ve] [/s]\n"
-msgstr "REG QUERY nome_chave [/v nome_valor | /ve] [/s]\n"
+#: programs/reg/reg.rc:114
+msgid ""
+"REG QUERY <key> [/v value_name | /ve] [/s]\n"
+"\n"
+"  Queries a specified registry key and lists all immediate subkeys, values\n"
+"  and data within that key. Use [/s] to recursively query each subkey.\n"
+"\n"
+"  <key>\n"
+"     The registry key to query.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  /v <value_name>\n"
+"     The name of the registry value to query. If neither [/v] nor [/ve] is\n"
+"     specified, all values under <key> are listed.\n"
+"\n"
+"  /ve\n"
+"     Query an unnamed registry value. This option queries the (Default)\n"
+"     registry value.\n"
+"\n"
+"  /s\n"
+"     List all registry entries under <key> and its subkeys.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:39
-msgid "The operation completed successfully\n"
+#: programs/reg/reg.rc:116
+#, fuzzy
+#| msgid "The operation completed successfully\n"
+msgid "reg: The operation completed successfully\n"
 msgstr "A operação foi completada com sucesso\n"
 
-#: programs/reg/reg.rc:40
-msgid "reg: Invalid key name\n"
+#: programs/reg/reg.rc:117
+#, fuzzy
+#| msgid "reg: Invalid key name\n"
+msgid "reg: Invalid registry key\n"
 msgstr "reg: Nome de chave inválido\n"
 
-#: programs/reg/reg.rc:41
+#: programs/reg/reg.rc:118
 msgid "reg: Invalid command line parameters\n"
 msgstr "reg: Parâmetros da linha de comandos inválidos\n"
 
-#: programs/reg/reg.rc:42
+#: programs/reg/reg.rc:119
 msgid "reg: Unable to access remote machine\n"
 msgstr "reg: Não foi possível acessar a máquina remota\n"
 
-#: programs/reg/reg.rc:43
-msgid ""
-"reg: The system was unable to find the specified registry key or value\n"
+#: programs/reg/reg.rc:120
+#, fuzzy
+#| msgid ""
+#| "reg: The system was unable to find the specified registry key or value\n"
+msgid "reg: Unable to find the specified registry value\n"
 msgstr ""
 "reg: O sistema foi incapaz de encontrar a chave de registo ou valor "
 "especificado\n"
 
-#: programs/reg/reg.rc:44
+#: programs/reg/reg.rc:121
 msgid "reg: Unsupported registry data type [%1]\n"
 msgstr "reg: Tipo de dado de registro não suportado [%1]\n"
 
-#: programs/reg/reg.rc:45
+#: programs/reg/reg.rc:122
 msgid "reg: The option [/d] must be followed by a valid integer\n"
 msgstr "reg: A opção [/d] precisa ser seguida de um inteiro válido\n"
 
-#: programs/reg/reg.rc:46
+#: programs/reg/reg.rc:123
 msgid "reg: The option [/d] must be followed by a valid hexadecimal value\n"
 msgstr "reg: A opção [/d] precisa ser seguida de um valor hexadecimal válido\n"
 
-#: programs/reg/reg.rc:47
+#: programs/reg/reg.rc:124
 msgid "reg: Unhandled registry data type [/t 0x%1!x!, /d %2]\n"
 msgstr "reg: Tipo de dado de registro não suportado [/t 0x%1!x!, /d %2]\n"
 
-#: programs/reg/reg.rc:48
+#: programs/reg/reg.rc:125
 msgid "The registry value '%1' already exists. Do you want to overwrite it?"
 msgstr "O valor do registro '%1' já existe. Deseja sobrescrevê-lo?"
 
-#: programs/reg/reg.rc:52
-msgid "The registry operation was cancelled\n"
+#: programs/reg/reg.rc:129
+#, fuzzy
+#| msgid "The registry operation was cancelled\n"
+msgid "reg: The registry operation was cancelled\n"
 msgstr "A operação de registro foi cancelada\n"
 
-#: programs/reg/reg.rc:53 programs/regedit/regedit.rc:239
+#: programs/reg/reg.rc:130 programs/regedit/regedit.rc:239
 msgid "(Default)"
 msgstr "(Padrão)"
 
-#: programs/reg/reg.rc:54
+#: programs/reg/reg.rc:131
 msgid "Are you sure you want to delete the registry value '%1'?"
 msgstr "Tem certeza que deseja excluir o valor do registro '%1'?"
 
-#: programs/reg/reg.rc:55
+#: programs/reg/reg.rc:132
 msgid "Are you sure you want to delete all registry values in '%1'?"
 msgstr "Tem certeza que deseja excluir todos os valores em '%1'?"
 
-#: programs/reg/reg.rc:56
+#: programs/reg/reg.rc:133
 msgid "Are you sure you want to delete the registry key '%1'?"
 msgstr "Você tem certeza que deseja excluir a chave de registro '%1'?"
 
-#: programs/reg/reg.rc:57
+#: programs/reg/reg.rc:134
 msgid "reg: The option [/d] must be followed by a valid string\n"
 msgstr "reg: A opção [/d] precisa ser seguida de uma string válida\n"
 
-#: programs/reg/reg.rc:58
+#: programs/reg/reg.rc:135
 msgid ""
 "reg: Unable to delete all registry values in '%1'. An unexpected error "
 "occurred.\n"
@@ -14390,7 +14520,7 @@ msgstr ""
 "reg: Não foi possível remover todos os valores de registro em '%1'. Um erro "
 "inesperado aconteceu.\n"
 
-#: programs/reg/reg.rc:59
+#: programs/reg/reg.rc:136
 msgid ""
 "reg: Unable to complete the specified operation. An unexpected error "
 "occurred.\n"
@@ -14398,57 +14528,118 @@ msgstr ""
 "reg: Não foi possível completar a operação especificada. Um erro inesperado "
 "aconteceu.\n"
 
-#: programs/reg/reg.rc:60
+#: programs/reg/reg.rc:137
 msgid "Search complete. Number of matches found: %1!d!\n"
 msgstr "Busca terminada. Número de ocorrências encontradas: %1!d!\n"
 
-#: programs/reg/reg.rc:61
+#: programs/reg/reg.rc:138
 msgid "reg: Invalid syntax. "
 msgstr "reg: Sintaxe inválida. "
 
-#: programs/reg/reg.rc:62
+#: programs/reg/reg.rc:139
 msgid "reg: Invalid option [%1]. "
 msgstr "reg: Opção inválida [%1]. "
 
-#: programs/reg/reg.rc:63
+#: programs/reg/reg.rc:140
 msgid "Type \"REG /?\" for help.\n"
 msgstr "Digite \"REG /?\" para ajuda.\n"
 
-#: programs/reg/reg.rc:64
+#: programs/reg/reg.rc:141
 msgid "Type \"REG %1 /?\" for help.\n"
 msgstr "Digite \"REG %1 /?\" para ajuda.\n"
 
-#: programs/reg/reg.rc:65 programs/regedit/regedit.rc:240
+#: programs/reg/reg.rc:142 programs/regedit/regedit.rc:240
 msgid "(value not set)"
 msgstr "(valor não dado)"
 
-#: programs/reg/reg.rc:66
-msgid "REG IMPORT file.reg\n"
-msgstr "REG IMPORT arquivo.reg\n"
+#: programs/reg/reg.rc:147
+msgid ""
+"REG IMPORT <file>\n"
+"\n"
+"  Imports keys, values and data from a given file into the registry.\n"
+"\n"
+"  <file>\n"
+"     The name and path of the registry file to import.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:67
+#: programs/reg/reg.rc:149
 msgid "reg: The file '%1' was not found.\n"
 msgstr "reg: O arquivo '%1' não foi encontrado.\n"
 
-#: programs/reg/reg.rc:68
+#: programs/reg/reg.rc:150
 msgid "reg: Unable to open the registry key '%1'.\n"
 msgstr "reg: Não foi possível abrir a chave de registro '%1'.\n"
 
-#: programs/reg/reg.rc:69
+#: programs/reg/reg.rc:151
 msgid "reg: Unrecognized escape sequence [\\%1!c!]\n"
 msgstr "reg: Sequência de escape não reconhecida [\\%1!c!]\n"
 
-#: programs/reg/reg.rc:70
-msgid "REG EXPORT key_name file.reg [/y]\n"
-msgstr "REG EXPORT nome_chave [/y]\n"
+#: programs/reg/reg.rc:170
+msgid ""
+"REG EXPORT <key> <file> [/y]\n"
+"\n"
+"  Exports a specified registry key (including all subkeys and values)\n"
+"  to a file.\n"
+"\n"
+"  <key>\n"
+"     The registry key to export.\n"
+"\n"
+"     Format: ROOT\\Subkey\n"
+"\n"
+"     ROOT: A predefined registry key. This must be one of the following:\n"
+"\n"
+"         HKEY_LOCAL_MACHINE  | HKLM\n"
+"         HKEY_CURRENT_USER   | HKCU\n"
+"         HKEY_CLASSES_ROOT   | HKCR\n"
+"         HKEY_USERS          | HKU\n"
+"         HKEY_CURRENT_CONFIG | HKCC\n"
+"\n"
+"     Subkey: The full path to a registry key under a given ROOT key.\n"
+"\n"
+"  <file>\n"
+"     The name and path of the registry file that will be created.\n"
+"     This file must have a .reg extension.\n"
+"\n"
+"  /y\n"
+"     Overwrite <file> without prompting for confirmation.\n"
+"\n"
+msgstr ""
 
-#: programs/reg/reg.rc:71
-msgid "reg: Invalid system key [%1]\n"
+#: programs/reg/reg.rc:172
+#, fuzzy
+#| msgid "reg: Invalid system key [%1]\n"
+msgid "reg: Invalid system key\n"
 msgstr "reg: Chave de sistema inválido[%1]\n"
 
-#: programs/reg/reg.rc:72
+#: programs/reg/reg.rc:173
 msgid "The file '%1' already exists. Do you want to overwrite it?"
 msgstr "O arquivo '%1' já existe. Deseja sobrescrevê-lo?"
+
+#: programs/reg/reg.rc:174
+#, fuzzy
+#| msgid ""
+#| "reg: The system was unable to find the specified registry key or value\n"
+msgid "reg: Unable to find the specified registry key\n"
+msgstr ""
+"reg: O sistema foi incapaz de encontrar a chave de registo ou valor "
+"especificado\n"
+
+#: programs/reg/reg.rc:175
+#, fuzzy
+#| msgid "reg: Unable to open the registry key '%1'.\n"
+msgid "reg: Unable to import the registry key '%1'\n"
+msgstr "reg: Não foi possível abrir a chave de registro '%1'.\n"
+
+#: programs/reg/reg.rc:179
+msgid ""
+"  /reg:32\n"
+"     Access the registry using the 32-bit view.\n"
+"\n"
+"  /reg:64\n"
+"     Access the registry using the 64-bit view.\n"
+"\n"
+msgstr ""
 
 #: programs/regedit/regedit.rc:34
 msgid "&Registry"
@@ -15130,7 +15321,97 @@ msgstr "regsvr32: Falha ao desinstalar DLL '%1'\n"
 msgid "regsvr32: Successfully uninstalled DLL '%1'\n"
 msgstr "regsvr32: DLL '%1' desinstalada com sucesso\n"
 
-#: programs/start/start.rc:58
+#: programs/start/start.rc:57
+#, fuzzy
+#| msgid ""
+#| "Start a program, or open a document in the program normally used for "
+#| "files\n"
+#| "with that suffix.\n"
+#| "Usage:\n"
+#| "start [options] program_filename [...]\n"
+#| "start [options] document_filename\n"
+#| "\n"
+#| "Options:\n"
+#| "\"title\"        Specifies the title of the child windows.\n"
+#| "/d directory   Start the program in the specified directory.\n"
+#| "/b             Don't create a new console for the program.\n"
+#| "/i             Start the program with fresh environment variables.\n"
+#| "/min           Start the program minimized.\n"
+#| "/max           Start the program maximized.\n"
+#| "/low           Start the program in the idle priority class.\n"
+#| "/normal        Start the program in the normal priority class.\n"
+#| "/high          Start the program in the high priority class.\n"
+#| "/realtime      Start the program in the realtime priority class.\n"
+#| "/abovenormal   Start the program in the abovenormal priority class.\n"
+#| "/belownormal   Start the program in the belownormal priority class.\n"
+#| "/node n        Start the program on the specified NUMA node.\n"
+#| "/affinity mask Start the program with the specified affinity mask.\n"
+#| "/wait          Wait for the started program to finish, then exit with "
+#| "its\n"
+#| "exit code.\n"
+#| "/unix          Use a Unix filename and start the file like Windows\n"
+#| "Explorer.\n"
+#| "/ProgIDOpen    Open a document using the specified progID.\n"
+#| "/?             Display this help and exit.\n"
+msgid ""
+"Start a program, or open a document in the program normally used for files\n"
+"with that suffix.\n"
+"Usage:\n"
+"start [options] program_filename [...]\n"
+"start [options] document_filename\n"
+"\n"
+"Options:\n"
+"\"title\"        Specifies the title of the child windows.\n"
+"/d directory   Start the program in the specified directory.\n"
+"/b             Don't create a new console for the program.\n"
+"/i             Start the program with fresh environment variables.\n"
+"/min           Start the program minimized.\n"
+"/max           Start the program maximized.\n"
+"/low           Start the program in the idle priority class.\n"
+"/normal        Start the program in the normal priority class.\n"
+"/high          Start the program in the high priority class.\n"
+"/realtime      Start the program in the realtime priority class.\n"
+"/abovenormal   Start the program in the abovenormal priority class.\n"
+"/belownormal   Start the program in the belownormal priority class.\n"
+"/node n        Start the program on the specified NUMA node.\n"
+"/affinity mask Start the program with the specified affinity mask.\n"
+"/wait          Wait for the started program to finish, then exit with its\n"
+"exit code.\n"
+"/unix          Use a Unix filename and start the file like Windows\n"
+"Explorer.\n"
+"/exec          Exec the specified file (for internal Wine usage).\n"
+"/ProgIDOpen    Open a document using the specified progID.\n"
+"/?             Display this help and exit.\n"
+msgstr ""
+"Inicia um programa ou abre um arquivo no programa normalmente usado para a\n"
+"extensão determinada.\n"
+"Uso:\n"
+"start [opções] endereço_do_programa [...]\n"
+"start [opções] endereço_do_documento\n"
+"\n"
+"Opções:\n"
+"\"title\"        Especifica o título da janela da janela filha.\n"
+"/d diretório   Inicia o programa no diretório especificado.\n"
+"/b             Não criar um console novo para o programa.\n"
+"/i             Inicia o programa com variáveis de ambiente novas.\n"
+"/min           Inicia o programa minimizado.\n"
+"/max           Inicia o programa maximizado.\n"
+"/low           Inicia o programa com prioridade baixa.\n"
+"/normal        Inicia o programa com prioridade normal.\n"
+"/high          Inicia o programa com prioridade alta.\n"
+"/realtime      Inicia o programa com prioridade de tempo real.\n"
+"/abovenormal   Inicia o programa com prioridade acima do normal.\n"
+"/belownormal   Inicia o programa com prioridade abaixo do normal.\n"
+"/node n        Inicia o programa no nó NUMA especificado.\n"
+"/affinity mask Inicia o programa com a máscara de afinidade especificada.\n"
+"/wait          Aguarda o fim do programa iniciado e retorna com seu código\n"
+"               de saída.\n"
+"/unix          Usa o caminho Unix do arquivo e inicia-o como o windows\n"
+"               explorer.\n"
+"/ProgIDOpen    Abre um documento usando o progID especificado.\n"
+"/?             Exibe essa ajuda e retorna.\n"
+
+#: programs/start/start.rc:59
 msgid ""
 "Application could not be started, or no application associated with the "
 "specified file.\n"
@@ -15140,7 +15421,7 @@ msgstr ""
 "arquivo especificado.\n"
 "ShellExecuteEx falhou"
 
-#: programs/start/start.rc:60
+#: programs/start/start.rc:61
 msgid "Could not translate the specified Unix filename to a DOS filename."
 msgstr ""
 "Não foi possível traduzir o nome de arquivo Unix para um nome de arquivo DOS."

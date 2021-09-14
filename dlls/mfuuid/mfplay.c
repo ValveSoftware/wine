@@ -17,9 +17,5 @@
  */
 
 #include "evr.h"
-
-#undef EXTERN_GUID
-#define EXTERN_GUID DEFINE_GUID
-
 #include "initguid.h"
 #include "mfplay.h"

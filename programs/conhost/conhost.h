@@ -132,7 +132,7 @@ struct screen_buffer
 
 BOOL init_window( struct console *console );
 void update_window_region( struct console *console, const RECT *update );
-void update_window_config( struct console *console );
+void update_window_config( struct console *console, BOOL delay );
 
 NTSTATUS write_console_input( struct console *console, const INPUT_RECORD *records,
                               unsigned int count, BOOL flush );
@@ -143,6 +143,11 @@ NTSTATUS change_screen_buffer_size( struct screen_buffer *screen_buffer, int new
 static inline void empty_update_rect( struct screen_buffer *screen_buffer, RECT *rect )
 {
     SetRect( rect, screen_buffer->width, screen_buffer->height, 0, 0 );
+}
+
+static inline unsigned int get_bounded_cursor_x( struct screen_buffer *screen_buffer )
+{
+    return min( screen_buffer->cursor_x, screen_buffer->width - 1 );
 }
 
 #endif /* RC_INVOKED */

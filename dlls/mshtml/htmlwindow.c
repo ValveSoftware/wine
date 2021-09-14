@@ -294,6 +294,8 @@ static void release_inner_window(HTMLInnerWindow *This)
         IOmHistory_Release(&This->history->IOmHistory_iface);
     }
 
+    if(This->navigator)
+        IOmNavigator_Release(This->navigator);
     if(This->session_storage)
         IHTMLStorage_Release(This->session_storage);
     if(This->local_storage)
@@ -918,11 +920,19 @@ static HRESULT WINAPI HTMLWindow2_get_opener(IHTMLWindow2 *iface, VARIANT *p)
 static HRESULT WINAPI HTMLWindow2_get_navigator(IHTMLWindow2 *iface, IOmNavigator **p)
 {
     HTMLWindow *This = impl_from_IHTMLWindow2(iface);
+    HTMLInnerWindow *window = This->inner_window;
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    *p = OmNavigator_Create();
-    return *p ? S_OK : E_OUTOFMEMORY;
+    if(!window->navigator) {
+        HRESULT hres;
+        hres = create_navigator(dispex_compat_mode(&window->event_target.dispex), &window->navigator);
+        if(FAILED(hres))
+            return hres;
+    }
+
+    IOmNavigator_AddRef(*p = window->navigator);
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLWindow2_put_name(IHTMLWindow2 *iface, BSTR v)
@@ -1305,7 +1315,7 @@ static HRESULT WINAPI HTMLWindow2_get_screen(IHTMLWindow2 *iface, IHTMLScreen **
     if(!window->screen) {
         HRESULT hres;
 
-        hres = HTMLScreen_Create(&window->screen);
+        hres = create_html_screen(dispex_compat_mode(&window->event_target.dispex), &window->screen);
         if(FAILED(hres))
             return hres;
     }
@@ -1724,7 +1734,7 @@ static HRESULT WINAPI HTMLWindow3_detachEvent(IHTMLWindow3 *iface, BSTR event, I
 }
 
 static HRESULT window_set_timer(HTMLInnerWindow *This, VARIANT *expr, LONG msec, VARIANT *language,
-        BOOL interval, LONG *timer_id)
+        enum timer_type timer_type, LONG *timer_id)
 {
     IDispatch *disp = NULL;
     HRESULT hres;
@@ -1747,7 +1757,7 @@ static HRESULT window_set_timer(HTMLInnerWindow *This, VARIANT *expr, LONG msec,
     if(!disp)
         return E_FAIL;
 
-    hres = set_task_timer(This, msec, interval, disp, timer_id);
+    hres = set_task_timer(This, msec, timer_type, disp, timer_id);
     IDispatch_Release(disp);
 
     return hres;
@@ -1760,7 +1770,7 @@ static HRESULT WINAPI HTMLWindow3_setTimeout(IHTMLWindow3 *iface, VARIANT *expre
 
     TRACE("(%p)->(%s %d %s %p)\n", This, debugstr_variant(expression), msec, debugstr_variant(language), timerID);
 
-    return window_set_timer(This->inner_window, expression, msec, language, FALSE, timerID);
+    return window_set_timer(This->inner_window, expression, msec, language, TIMER_TIMEOUT, timerID);
 }
 
 static HRESULT WINAPI HTMLWindow3_setInterval(IHTMLWindow3 *iface, VARIANT *expression, LONG msec,
@@ -1770,7 +1780,7 @@ static HRESULT WINAPI HTMLWindow3_setInterval(IHTMLWindow3 *iface, VARIANT *expr
 
     TRACE("(%p)->(%p %d %p %p)\n", This, expression, msec, language, timerID);
 
-    return window_set_timer(This->inner_window, expression, msec, language, TRUE, timerID);
+    return window_set_timer(This->inner_window, expression, msec, language, TIMER_INTERVAL, timerID);
 }
 
 static HRESULT WINAPI HTMLWindow3_print(IHTMLWindow3 *iface)
@@ -2127,7 +2137,8 @@ static HRESULT WINAPI HTMLWindow6_get_sessionStorage(IHTMLWindow6 *iface, IHTMLS
     if(!This->inner_window->session_storage) {
         HRESULT hres;
 
-        hres = create_storage(&This->inner_window->session_storage);
+        hres = create_html_storage(dispex_compat_mode(&This->inner_window->event_target.dispex),
+                                   &This->inner_window->session_storage);
         if(FAILED(hres))
             return hres;
     }
@@ -2146,7 +2157,8 @@ static HRESULT WINAPI HTMLWindow6_get_localStorage(IHTMLWindow6 *iface, IHTMLSto
     if(!This->inner_window->local_storage) {
         HRESULT hres;
 
-        hres = create_storage(&This->inner_window->local_storage);
+        hres = create_html_storage(dispex_compat_mode(&This->inner_window->event_target.dispex),
+                                   &This->inner_window->local_storage);
         if(FAILED(hres))
             return hres;
     }
@@ -2352,13 +2364,6 @@ static HRESULT WINAPI HTMLWindow7_getComputedStyle(IHTMLWindow7 *iface, IHTMLDOM
         return E_FAIL;
     }
 
-    if (!nsstyle)
-    {
-        FIXME("nsIDOMWindow_GetComputedStyle returned NULL nsstyle.\n");
-        *p = NULL;
-        return S_OK;
-    }
-
     hres = create_computed_style(nsstyle, dispex_compat_mode(&This->inner_window->event_target.dispex), p);
     nsIDOMCSSStyleDeclaration_Release(nsstyle);
     return hres;
@@ -2395,7 +2400,7 @@ static HRESULT WINAPI HTMLWindow7_get_performance(IHTMLWindow7 *iface, VARIANT *
     if(!This->performance_initialized) {
         IHTMLPerformance *performance;
 
-        hres = create_performance(&performance);
+        hres = create_performance(dispex_compat_mode(&This->event_target.dispex), &performance);
         if(FAILED(hres))
             return hres;
 
@@ -3165,6 +3170,9 @@ HRESULT search_window_props(HTMLInnerWindow *This, BSTR bstrName, DWORD grfdex, 
     return DISP_E_UNKNOWNNAME;
 }
 
+/* DISPIDs not exposed by interfaces */
+#define DISPID_IHTMLWINDOW_IE10_REQUESTANIMATIONFRAME 1300
+
 static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
 {
     HTMLWindow *This = impl_from_IDispatchEx(iface);
@@ -3180,6 +3188,13 @@ static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, 
     hres = IDispatchEx_GetDispID(&window->base.inner_window->event_target.dispex.IDispatchEx_iface, bstrName, grfdex, pid);
     if(hres != DISP_E_UNKNOWNNAME)
         return hres;
+
+    if(dispex_compat_mode(&window->event_target.dispex) >= COMPAT_MODE_IE10 &&
+       !wcscmp(bstrName, L"requestAnimationFrame")) {
+        TRACE("requestAnimationFrame\n");
+        *pid = DISPID_IHTMLWINDOW_IE10_REQUESTANIMATIONFRAME;
+        return S_OK;
+    }
 
     if(This->outer_window) {
         HTMLOuterWindow *frame;
@@ -3266,6 +3281,25 @@ static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID 
         args[1] = *pdp->rgvarg;
         return IDispatchEx_InvokeEx(&window->event_target.dispex.IDispatchEx_iface, id, lcid,
                 wFlags, &dp, pvarRes, pei, pspCaller);
+    }
+    case DISPID_IHTMLWINDOW_IE10_REQUESTANIMATIONFRAME: {
+        HRESULT hres;
+        LONG r;
+
+        FIXME("requestAnimationFrame: semi-stub\n");
+
+        if(!(wFlags & DISPATCH_METHOD) || pdp->cArgs != 1 || pdp->cNamedArgs) {
+            FIXME("unsupported args\n");
+            return E_INVALIDARG;
+        }
+
+        hres = window_set_timer(window, pdp->rgvarg, 50, NULL, TIMER_ANIMATION_FRAME, &r);
+        if(SUCCEEDED(hres) && pvarRes) {
+            V_VT(pvarRes) = VT_I4;
+            V_I4(pvarRes) = r;
+        }
+
+        return hres;
     }
     }
 

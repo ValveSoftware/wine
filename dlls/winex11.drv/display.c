@@ -21,7 +21,6 @@
 #include "config.h"
 
 #include <stdarg.h>
-#include <stdlib.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -31,7 +30,6 @@
 #include "initguid.h"
 #include "devguid.h"
 #include "devpkey.h"
-#include "ntddvdeo.h"
 #include "setupapi.h"
 #define WIN32_NO_STATUS
 #include "winternl.h"
@@ -202,33 +200,21 @@ fail:
 
 POINT virtual_screen_to_root(INT x, INT y)
 {
-    RECT virtual = fs_hack_get_real_virtual_screen();
+    RECT virtual = get_virtual_screen_rect();
     POINT pt;
 
-    TRACE("from %d,%d\n", x, y);
-
-    pt.x = x;
-    pt.y = y;
-    fs_hack_point_user_to_real(&pt);
-    TRACE("to real %d,%d\n", pt.x, pt.y);
-
-    pt.x -= virtual.left;
-    pt.y -= virtual.top;
-    TRACE("to root %d,%d\n", pt.x, pt.y);
+    pt.x = x - virtual.left;
+    pt.y = y - virtual.top;
     return pt;
 }
 
 POINT root_to_virtual_screen(INT x, INT y)
 {
-    RECT virtual = fs_hack_get_real_virtual_screen();
+    RECT virtual = get_virtual_screen_rect();
     POINT pt;
 
-    TRACE("from root %d,%d\n", x, y);
     pt.x = x + virtual.left;
     pt.y = y + virtual.top;
-    TRACE("to real %d,%d\n", pt.x, pt.y);
-    fs_hack_point_real_to_user(&pt);
-    TRACE("to user %d,%d\n", pt.x, pt.y);
     return pt;
 }
 
@@ -358,11 +344,6 @@ void X11DRV_DisplayDevices_SetHandler(const struct x11drv_display_device_handler
     }
 }
 
-struct x11drv_display_device_handler X11DRV_DisplayDevices_GetHandler(void)
-{
-    return host_handler;
-}
-
 void X11DRV_DisplayDevices_RegisterEventHandlers(void)
 {
     struct x11drv_display_device_handler *handler = is_virtual_desktop() ? &desktop_handler : &host_handler;
@@ -371,116 +352,26 @@ void X11DRV_DisplayDevices_RegisterEventHandlers(void)
         handler->register_event_handlers();
 }
 
-BOOL CALLBACK fs_hack_update_child_window_client_surface(HWND hwnd, LPARAM enable_fs_hack)
-{
-    struct x11drv_win_data *data;
-    RECT client_rect;
-
-    if (!(data = get_win_data( hwnd )))
-        return TRUE;
-
-    if (enable_fs_hack && data->client_window)
-    {
-        client_rect = data->client_rect;
-        ClientToScreen( hwnd, (POINT *)&client_rect.left );
-        ClientToScreen( hwnd, (POINT *)&client_rect.right );
-        fs_hack_rect_user_to_real( &client_rect );
-
-        FIXME( "Enabling child fshack, resizing window %p to %s.\n", hwnd, wine_dbgstr_rect( &client_rect ) );
-        XMoveResizeWindow( gdi_display, data->client_window,
-                           client_rect.left, client_rect.top,
-                           client_rect.right - client_rect.left,
-                           client_rect.bottom - client_rect.top );
-        data->fs_hack = TRUE;
-    }
-    else if (!enable_fs_hack && data->client_window)
-    {
-        FIXME( "Disabling child fshack, restoring window %p.\n", hwnd );
-        XMoveResizeWindow( gdi_display, data->client_window,
-                           data->client_rect.left - data->whole_rect.left,
-                           data->client_rect.top - data->whole_rect.top,
-                           data->client_rect.right - data->client_rect.left,
-                           data->client_rect.bottom - data->client_rect.top );
-        data->fs_hack = FALSE;
-    }
-
-    if (data->client_window) sync_gl_drawable( hwnd, TRUE );
-    release_win_data( data );
-    return TRUE;
-}
-
 static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
 {
     struct x11drv_win_data *data;
     UINT mask = (UINT)lparam;
-    HMONITOR monitor;
 
     if (!(data = get_win_data(hwnd)))
         return TRUE;
 
-    monitor = fs_hack_monitor_from_hwnd( hwnd );
-    if (fs_hack_mapping_required( monitor ) &&
-            fs_hack_matches_current_mode( monitor,
-                data->whole_rect.right - data->whole_rect.left,
-                data->whole_rect.bottom - data->whole_rect.top)){
-        if(!data->fs_hack){
-            RECT real_rect = fs_hack_real_mode( monitor );
-            MONITORINFO monitor_info;
-            UINT width, height;
-            POINT tl;
+    /* update the full screen state */
+    update_net_wm_states(data);
 
-            monitor_info.cbSize = sizeof(monitor_info);
-            GetMonitorInfoW( monitor, &monitor_info );
-            tl = virtual_screen_to_root( monitor_info.rcMonitor.left, monitor_info.rcMonitor.top );
-            width = real_rect.right - real_rect.left;
-            height = real_rect.bottom - real_rect.top;
-
-            TRACE("Enabling fs hack, resizing window %p to (%u,%u)-(%u,%u)\n", hwnd, tl.x, tl.y, width, height);
-            data->fs_hack = TRUE;
-            set_wm_hints( data );
-            XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, width, height);
-            if(data->client_window)
-                XMoveResizeWindow(gdi_display, data->client_window, 0, 0, width, height);
-            sync_gl_drawable(hwnd, FALSE);
-            update_net_wm_states( data );
-            EnumChildWindows( hwnd, fs_hack_update_child_window_client_surface, TRUE );
-        }
-    } else {
-        /* update the full screen state */
-        update_net_wm_states(data);
-
-        if (data->fs_hack)
-            mask |= CWX | CWY;
-
-        if (mask && data->whole_window)
-        {
-            POINT pos = virtual_screen_to_root(data->whole_rect.left, data->whole_rect.top);
-            XWindowChanges changes;
-            changes.x = pos.x;
-            changes.y = pos.y;
-            XReconfigureWMWindow(data->display, data->whole_window, data->vis.screen, mask, &changes);
-        }
-
-        if(data->fs_hack && (!fs_hack_mapping_required(monitor) ||
-            !fs_hack_matches_current_mode(monitor,
-                data->whole_rect.right - data->whole_rect.left,
-                data->whole_rect.bottom - data->whole_rect.top))){
-            TRACE("Disabling fs hack\n");
-            data->fs_hack = FALSE;
-            if(data->client_window){
-                XMoveResizeWindow(gdi_display, data->client_window,
-                        data->client_rect.left - data->whole_rect.left,
-                        data->client_rect.top - data->whole_rect.top,
-                        data->client_rect.right - data->client_rect.left,
-                        data->client_rect.bottom - data->client_rect.top);
-            }
-            sync_gl_drawable(hwnd, FALSE);
-            EnumChildWindows( hwnd, fs_hack_update_child_window_client_surface, FALSE );
-        }
+    if (mask && data->whole_window)
+    {
+        POINT pos = virtual_screen_to_root(data->whole_rect.left, data->whole_rect.top);
+        XWindowChanges changes;
+        changes.x = pos.x;
+        changes.y = pos.y;
+        XReconfigureWMWindow(data->display, data->whole_window, data->vis.screen, mask, &changes);
     }
     release_win_data(data);
-    if (hwnd == GetForegroundWindow())
-        clip_fullscreen_window(hwnd, TRUE);
     return TRUE;
 }
 
@@ -512,72 +403,12 @@ void X11DRV_DisplayDevices_Update(BOOL send_display_change)
     }
 }
 
-/* This function sets device interface link state to enabled.
- * The link state should be set via IoSetDeviceInterfaceState(),
- * but IoSetDeviceInterfaceState() requires a PnP driver, which
- * currently doesn't exist for display devices. */
-static BOOL link_device(const WCHAR *instance, const GUID *guid)
-{
-    static const WCHAR device_instanceW[] = {'D','e','v','i','c','e','I','n','s','t','a','n','c','e',0};
-    static const WCHAR hash_controlW[] = {'#','\\','C','o','n','t','r','o','l',0};
-    static const WCHAR linkedW[] = {'L','i','n','k','e','d',0};
-    static const DWORD enabled = 1;
-    WCHAR device_key_name[MAX_PATH], device_instance[MAX_PATH];
-    HKEY iface_key, device_key, control_key;
-    DWORD length, type, index = 0;
-    BOOL ret = FALSE;
-    LSTATUS lr;
-
-    iface_key = SetupDiOpenClassRegKeyExW(guid, KEY_ALL_ACCESS, DIOCR_INTERFACE, NULL, NULL);
-    while (1)
-    {
-        length = ARRAY_SIZE(device_key_name);
-        lr = RegEnumKeyExW(iface_key, index++, device_key_name, &length, NULL, NULL, NULL, NULL);
-        if (lr)
-            break;
-
-        lr = RegOpenKeyExW(iface_key, device_key_name, 0, KEY_ALL_ACCESS, &device_key);
-        if (lr)
-            continue;
-
-        length = ARRAY_SIZE(device_instance);
-        lr = RegQueryValueExW(device_key, device_instanceW, NULL, &type, (BYTE *)device_instance, &length);
-        if (lr || type != REG_SZ)
-        {
-            RegCloseKey(device_key);
-            continue;
-        }
-
-        if (lstrcmpiW(device_instance, instance))
-        {
-            RegCloseKey(device_key);
-            continue;
-        }
-
-        lr = RegCreateKeyExW(device_key, hash_controlW, 0, NULL, REG_OPTION_VOLATILE, KEY_ALL_ACCESS, NULL, &control_key, NULL);
-        RegCloseKey(device_key);
-        if (lr)
-            continue;
-
-        lr = RegSetValueExW(control_key, linkedW, 0, REG_DWORD, (const BYTE *)&enabled, sizeof(enabled));
-        RegCloseKey(control_key);
-        if (!lr)
-        {
-            ret = TRUE;
-            break;
-        }
-    }
-    RegCloseKey(iface_key);
-    return ret;
-}
-
 /* Initialize a GPU instance.
  * Return its GUID string in guid_string, driver value in driver parameter and LUID in gpu_luid */
 static BOOL X11DRV_InitGpu(HDEVINFO devinfo, const struct x11drv_gpu *gpu, INT gpu_index, WCHAR *guid_string,
                            WCHAR *driver, LUID *gpu_luid)
 {
     static const BOOL present = TRUE;
-    SP_DEVICE_INTERFACE_DATA iface_data = {sizeof(iface_data)};
     SP_DEVINFO_DATA device_data = {sizeof(device_data)};
     WCHAR instanceW[MAX_PATH];
     DEVPROPTYPE property_type;
@@ -600,13 +431,6 @@ static BOOL X11DRV_InitGpu(HDEVINFO devinfo, const struct x11drv_gpu *gpu, INT g
         if (!SetupDiRegisterDeviceInfo(devinfo, &device_data, 0, NULL, NULL, NULL))
             goto done;
     }
-
-    /* Register GUID_DEVINTERFACE_DISPLAY_ADAPTER */
-    if (!SetupDiCreateDeviceInterfaceW(devinfo, &device_data, &GUID_DEVINTERFACE_DISPLAY_ADAPTER, NULL, 0, &iface_data))
-        goto done;
-
-    if (!link_device(instanceW, &GUID_DEVINTERFACE_DISPLAY_ADAPTER))
-        goto done;
 
     /* Write HardwareID registry property, REG_MULTI_SZ */
     written = sprintfW(bufferW, gpu_hardware_id_fmtW, gpu->vendor_id, gpu->device_id);
@@ -760,7 +584,6 @@ done:
 static BOOL X11DRV_InitMonitor(HDEVINFO devinfo, const struct x11drv_monitor *monitor, int monitor_index,
                                int video_index, const LUID *gpu_luid, UINT output_id)
 {
-    SP_DEVICE_INTERFACE_DATA iface_data = {sizeof(iface_data)};
     SP_DEVINFO_DATA device_data = {sizeof(SP_DEVINFO_DATA)};
     WCHAR bufferW[MAX_PATH];
     HKEY hkey;
@@ -770,13 +593,6 @@ static BOOL X11DRV_InitMonitor(HDEVINFO devinfo, const struct x11drv_monitor *mo
     sprintfW(bufferW, monitor_instance_fmtW, video_index, monitor_index);
     SetupDiCreateDeviceInfoW(devinfo, bufferW, &GUID_DEVCLASS_MONITOR, monitor->name, NULL, 0, &device_data);
     if (!SetupDiRegisterDeviceInfo(devinfo, &device_data, 0, NULL, NULL, NULL))
-        goto done;
-
-    /* Register GUID_DEVINTERFACE_MONITOR */
-    if (!SetupDiCreateDeviceInterfaceW(devinfo, &device_data, &GUID_DEVINTERFACE_MONITOR, NULL, 0, &iface_data))
-        goto done;
-
-    if (!link_device(bufferW, &GUID_DEVINTERFACE_MONITOR))
         goto done;
 
     /* Write HardwareID registry property */
@@ -925,18 +741,6 @@ void X11DRV_DisplayDevices_Init(BOOL force)
 
     for (gpu = 0; gpu < gpu_count; gpu++)
     {
-        {
-            const char *sgi = getenv("WINE_HIDE_NVIDIA_GPU");
-            if (sgi && *sgi != '0')
-            {
-                if (gpus[gpu].vendor_id == 0x10de /* NVIDIA */)
-                {
-                    gpus[gpu].vendor_id = 0x1002; /* AMD */
-                    gpus[gpu].device_id = 0x67df; /* RX 480 */
-                }
-            }
-        }
-
         if (!X11DRV_InitGpu(gpu_devinfo, &gpus[gpu], gpu, guidW, driverW, &gpu_luid))
             goto done;
 

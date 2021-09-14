@@ -2590,38 +2590,6 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
        in the WM_SETCURSOR message even if it's non-client mouse message */
     SendMessageW( msg->hwnd, WM_SETCURSOR, (WPARAM)msg->hwnd, MAKELONG( hittest, msg->message ));
 
-    if (enable_mouse_in_pointer) switch (msg->message)
-    {
-    case WM_MOUSEMOVE:
-    case WM_LBUTTONDOWN:
-    case WM_LBUTTONUP:
-    case WM_RBUTTONDOWN:
-    case WM_RBUTTONUP:
-    case WM_MBUTTONDOWN:
-    case WM_MBUTTONUP:
-    case WM_XBUTTONDOWN:
-    case WM_XBUTTONUP:
-    {
-        WORD flags = POINTER_MESSAGE_FLAG_INRANGE|POINTER_MESSAGE_FLAG_INCONTACT|POINTER_MESSAGE_FLAG_PRIMARY;
-        if (msg->message == WM_LBUTTONDOWN) flags |= POINTER_MESSAGE_FLAG_FIRSTBUTTON;
-        if (msg->message == WM_RBUTTONDOWN) flags |= POINTER_MESSAGE_FLAG_SECONDBUTTON;
-        if (msg->message == WM_MBUTTONDOWN) flags |= POINTER_MESSAGE_FLAG_THIRDBUTTON;
-        if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_LBUTTON) flags |= POINTER_MESSAGE_FLAG_FIRSTBUTTON;
-        if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_RBUTTON) flags |= POINTER_MESSAGE_FLAG_SECONDBUTTON;
-        if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_MBUTTON) flags |= POINTER_MESSAGE_FLAG_THIRDBUTTON;
-        if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_XBUTTON1) flags |= POINTER_MESSAGE_FLAG_FOURTHBUTTON;
-        if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_XBUTTON2) flags |= POINTER_MESSAGE_FLAG_FIFTHBUTTON;
-        SendMessageW( msg->hwnd, WM_POINTERUPDATE, MAKELONG( 1, flags ), MAKELONG( msg->pt.x, msg->pt.y ) );
-        break;
-    }
-    case WM_MOUSEWHEEL:
-        SendMessageW( msg->hwnd, WM_POINTERWHEEL, MAKELONG( 1, HIWORD( msg->wParam ) ), MAKELONG( msg->pt.x, msg->pt.y ) );
-        break;
-    case WM_MOUSEHWHEEL:
-        SendMessageW( msg->hwnd, WM_POINTERHWHEEL, MAKELONG( 1, HIWORD( msg->wParam ) ), MAKELONG( msg->pt.x, msg->pt.y ) );
-        break;
-    }
-
     msg->message = message;
     return !eatMsg;
 }
@@ -2645,26 +2613,13 @@ static BOOL process_hardware_message( MSG *msg, UINT hw_id, const struct hardwar
     context = SetThreadDpiAwarenessContext( DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE );
 
     if (msg->message == WM_INPUT)
-    {
         ret = process_rawinput_message( msg, hw_id, msg_data );
-    }
-    else if (msg->message == WM_INPUT_DEVICE_CHANGE)
-    {
-        ret = TRUE;
-        msg->pt = point_phys_to_win_dpi( msg->hwnd, msg->pt );
-    }
     else if (is_keyboard_message( msg->message ))
-    {
         ret = process_keyboard_message( msg, hw_id, hwnd_filter, first, last, remove );
-    }
     else if (is_mouse_message( msg->message ))
-    {
         ret = process_mouse_message( msg, hw_id, msg_data->info, hwnd_filter, first, last, remove );
-    }
     else
-    {
         ERR( "unknown message type %x\n", msg->message );
-    }
     SetThreadDpiAwarenessContext( context );
     return ret;
 }
@@ -3272,7 +3227,7 @@ static BOOL send_message( struct send_message_info *info, DWORD_PTR *res_ptr, BO
 /***********************************************************************
  *		send_hardware_message
  */
-NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags )
+NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *rawinput, UINT flags )
 {
     struct user_key_state_info *key_state_info = get_user_thread_info()->key_state;
     struct send_message_info info;
@@ -3291,10 +3246,10 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags )
     {
         req->win        = wine_server_user_handle( hwnd );
         req->flags      = flags;
+        req->input.type = input->type;
         switch (input->type)
         {
         case INPUT_MOUSE:
-            req->input.type        = HW_INPUT_MOUSE;
             req->input.mouse.x     = input->u.mi.dx;
             req->input.mouse.y     = input->u.mi.dy;
             req->input.mouse.data  = input->u.mi.mouseData;
@@ -3303,7 +3258,6 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags )
             req->input.mouse.info  = input->u.mi.dwExtraInfo;
             break;
         case INPUT_KEYBOARD:
-            req->input.type      = HW_INPUT_KEYBOARD;
             req->input.kbd.vkey  = input->u.ki.wVk;
             req->input.kbd.scan  = input->u.ki.wScan;
             req->input.kbd.flags = input->u.ki.dwFlags;
@@ -3311,7 +3265,6 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags )
             req->input.kbd.info  = input->u.ki.dwExtraInfo;
             break;
         case INPUT_HARDWARE:
-            req->input.type      = HW_INPUT_HARDWARE;
             req->input.hw.msg    = input->u.hi.uMsg;
             req->input.hw.lparam = MAKELONG( input->u.hi.wParamL, input->u.hi.wParamH );
             break;

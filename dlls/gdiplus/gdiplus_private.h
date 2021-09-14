@@ -110,6 +110,17 @@ extern GpStatus METAFILE_DrawDriverString(GpMetafile *metafile, GDIPCONST UINT16
 extern GpStatus METAFILE_FillRegion(GpMetafile* metafile, GpBrush* brush,
     GpRegion* region) DECLSPEC_HIDDEN;
 extern void METAFILE_Free(GpMetafile *metafile) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_DrawEllipse(GpMetafile *metafile, GpPen *pen, GpRectF *rect) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_FillEllipse(GpMetafile *metafile, GpBrush *brush, GpRectF *rect) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_DrawRectangles(GpMetafile *metafile, GpPen *pen, const GpRectF *rects, INT count) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_FillPie(GpMetafile *metafile, GpBrush *brush, const GpRectF *rect,
+    REAL startAngle, REAL sweepAngle) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_DrawArc(GpMetafile *metafile, GpPen *pen, const GpRectF *rect,
+    REAL startAngle, REAL sweepAngle) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_OffsetClip(GpMetafile *metafile, REAL dx, REAL dy) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_ResetClip(GpMetafile *metafile) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_SetClipPath(GpMetafile *metafile, GpPath *path, CombineMode mode) DECLSPEC_HIDDEN;
+extern GpStatus METAFILE_SetRenderingOrigin(GpMetafile *metafile, INT x, INT y) DECLSPEC_HIDDEN;
 
 extern void calc_curve_bezier(const GpPointF *pts, REAL tension, REAL *x1,
     REAL *y1, REAL *x2, REAL *y2) DECLSPEC_HIDDEN;
@@ -611,6 +622,14 @@ static inline BOOL image_lock(GpImage *image, BOOL *unlock)
 static inline void image_unlock(GpImage *image, BOOL unlock)
 {
     if (unlock) image->busy = 0;
+}
+
+static inline void set_rect(GpRectF *rect, REAL x, REAL y, REAL width, REAL height)
+{
+    rect->X = x;
+    rect->Y = y;
+    rect->Width = width;
+    rect->Height = height;
 }
 
 #endif

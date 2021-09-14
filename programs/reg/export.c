@@ -16,12 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include <windows.h>
 #include <stdio.h>
-#include <stdlib.h>
-
-#include <wine/heap.h>
-
 #include "reg.h"
 
 static void write_file(HANDLE hFile, const WCHAR *str)
@@ -46,7 +41,7 @@ static WCHAR *escape_string(WCHAR *str, size_t str_len, size_t *line_len)
             escape_count++;
     }
 
-    buf = heap_xalloc((str_len + escape_count + 1) * sizeof(WCHAR));
+    buf = malloc((str_len + escape_count + 1) * sizeof(WCHAR));
 
     for (i = 0, pos = 0; i < str_len; i++, pos++)
     {
@@ -84,18 +79,17 @@ static WCHAR *escape_string(WCHAR *str, size_t str_len, size_t *line_len)
 
 static size_t export_value_name(HANDLE hFile, WCHAR *name, size_t len)
 {
-    static const WCHAR quoted_fmt[] = {'"','%','s','"','=',0};
-    static const WCHAR default_name[] = {'@','=',0};
+    static const WCHAR *default_name = L"@=";
     size_t line_len;
 
     if (name && *name)
     {
         WCHAR *str = escape_string(name, len, &line_len);
-        WCHAR *buf = heap_xalloc((line_len + 4) * sizeof(WCHAR));
-        line_len = swprintf(buf, line_len + 4, quoted_fmt, str);
+        WCHAR *buf = malloc((line_len + 4) * sizeof(WCHAR));
+        line_len = swprintf(buf, line_len + 4, L"\"%s\"=", str);
         write_file(hFile, buf);
-        heap_free(buf);
-        heap_free(str);
+        free(buf);
+        free(str);
     }
     else
     {
@@ -110,28 +104,24 @@ static void export_string_data(WCHAR **buf, WCHAR *data, size_t size)
 {
     size_t len = 0, line_len;
     WCHAR *str;
-    static const WCHAR fmt[] = {'"','%','s','"',0};
 
     if (size)
         len = size / sizeof(WCHAR) - 1;
     str = escape_string(data, len, &line_len);
-    *buf = heap_xalloc((line_len + 3) * sizeof(WCHAR));
-    swprintf(*buf, line_len + 3, fmt, str);
-    heap_free(str);
+    *buf = malloc((line_len + 3) * sizeof(WCHAR));
+    swprintf(*buf, line_len + 3, L"\"%s\"", str);
+    free(str);
 }
 
 static void export_dword_data(WCHAR **buf, DWORD *data)
 {
-    static const WCHAR fmt[] = {'d','w','o','r','d',':','%','0','8','x',0};
-
-    *buf = heap_xalloc(15 * sizeof(WCHAR));
-    swprintf(*buf, 15, fmt, *data);
+    *buf = malloc(15 * sizeof(WCHAR));
+    swprintf(*buf, 15, L"dword:%08x", *data);
 }
 
 static size_t export_hex_data_type(HANDLE hFile, DWORD type)
 {
-    static const WCHAR hex[] = {'h','e','x',':',0};
-    static const WCHAR hexp_fmt[] = {'h','e','x','(','%','x',')',':',0};
+    static const WCHAR *hex = L"hex:";
     size_t line_len;
 
     if (type == REG_BINARY)
@@ -141,10 +131,10 @@ static size_t export_hex_data_type(HANDLE hFile, DWORD type)
     }
     else
     {
-        WCHAR *buf = heap_xalloc(15 * sizeof(WCHAR));
-        line_len = swprintf(buf, 15, hexp_fmt, type);
+        WCHAR *buf = malloc(15 * sizeof(WCHAR));
+        line_len = swprintf(buf, 15, L"hex(%x):", type);
         write_file(hFile, buf);
-        heap_free(buf);
+        free(buf);
     }
 
     return line_len;
@@ -155,8 +145,6 @@ static size_t export_hex_data_type(HANDLE hFile, DWORD type)
 static void export_hex_data(HANDLE hFile, WCHAR **buf, DWORD type,
                             DWORD line_len, void *data, DWORD size)
 {
-    static const WCHAR fmt[] = {'%','0','2','x',0};
-    static const WCHAR hex_concat[] = {'\\','\r','\n',' ',' ',0};
     size_t num_commas, i, pos;
 
     line_len += export_hex_data_type(hFile, type);
@@ -164,11 +152,11 @@ static void export_hex_data(HANDLE hFile, WCHAR **buf, DWORD type,
     if (!size) return;
 
     num_commas = size - 1;
-    *buf = heap_xalloc(size * 3 * sizeof(WCHAR));
+    *buf = malloc(size * 3 * sizeof(WCHAR));
 
     for (i = 0, pos = 0; i < size; i++)
     {
-        pos += swprintf(*buf + pos, 3, fmt, ((BYTE *)data)[i]);
+        pos += swprintf(*buf + pos, 3, L"%02x", ((BYTE *)data)[i]);
         if (i == num_commas) break;
         (*buf)[pos++] = ',';
         (*buf)[pos] = 0;
@@ -177,7 +165,7 @@ static void export_hex_data(HANDLE hFile, WCHAR **buf, DWORD type,
         if (line_len >= MAX_HEX_CHARS)
         {
             write_file(hFile, *buf);
-            write_file(hFile, hex_concat);
+            write_file(hFile, L"\\\r\n  ");
             line_len = 2;
             pos = 0;
         }
@@ -186,7 +174,7 @@ static void export_hex_data(HANDLE hFile, WCHAR **buf, DWORD type,
 
 static void export_newline(HANDLE hFile)
 {
-    static const WCHAR newline[] = {'\r','\n',0};
+    static const WCHAR *newline = L"\r\n";
 
     write_file(hFile, newline);
 }
@@ -221,7 +209,7 @@ static void export_data(HANDLE hFile, WCHAR *value_name, DWORD value_len,
     if (size || type == REG_SZ)
     {
         write_file(hFile, buf);
-        heap_free(buf);
+        free(buf);
     }
 
     export_newline(hFile);
@@ -229,13 +217,12 @@ static void export_data(HANDLE hFile, WCHAR *value_name, DWORD value_len,
 
 static void export_key_name(HANDLE hFile, WCHAR *name)
 {
-    static const WCHAR fmt[] = {'\r','\n','[','%','s',']','\r','\n',0};
     WCHAR *buf;
 
-    buf = heap_xalloc((lstrlenW(name) + 7) * sizeof(WCHAR));
-    swprintf(buf, lstrlenW(name) + 7, fmt, name);
+    buf = malloc((lstrlenW(name) + 7) * sizeof(WCHAR));
+    swprintf(buf, lstrlenW(name) + 7, L"\r\n[%s]\r\n", name);
     write_file(hFile, buf);
-    heap_free(buf);
+    free(buf);
 }
 
 static int export_registry_data(HANDLE hFile, HKEY key, WCHAR *path)
@@ -251,8 +238,8 @@ static int export_registry_data(HANDLE hFile, HKEY key, WCHAR *path)
 
     export_key_name(hFile, path);
 
-    value_name = heap_xalloc(max_value_len * sizeof(WCHAR));
-    data = heap_xalloc(max_data_bytes);
+    value_name = malloc(max_value_len * sizeof(WCHAR));
+    data = malloc(max_data_bytes);
 
     i = 0;
     for (;;)
@@ -271,21 +258,21 @@ static int export_registry_data(HANDLE hFile, HKEY key, WCHAR *path)
             if (data_size > max_data_bytes)
             {
                 max_data_bytes = data_size;
-                data = heap_xrealloc(data, max_data_bytes);
+                data = realloc(data, max_data_bytes);
             }
             else
             {
                 max_value_len *= 2;
-                value_name = heap_xrealloc(value_name, max_value_len * sizeof(WCHAR));
+                value_name = realloc(value_name, max_value_len * sizeof(WCHAR));
             }
         }
         else break;
     }
 
-    heap_free(data);
-    heap_free(value_name);
+    free(data);
+    free(value_name);
 
-    subkey_name = heap_xalloc(MAX_SUBKEY_LEN * sizeof(WCHAR));
+    subkey_name = malloc(MAX_SUBKEY_LEN * sizeof(WCHAR));
 
     path_len = lstrlenW(path);
 
@@ -302,21 +289,19 @@ static int export_registry_data(HANDLE hFile, HKEY key, WCHAR *path)
                 export_registry_data(hFile, subkey, subkey_path);
                 RegCloseKey(subkey);
             }
-            heap_free(subkey_path);
+            free(subkey_path);
             i++;
         }
         else break;
     }
 
-    heap_free(subkey_name);
+    free(subkey_name);
     return 0;
 }
 
 static void export_file_header(HANDLE hFile)
 {
-    static const WCHAR header[] = { 0xfeff,'W','i','n','d','o','w','s',' ',
-                                   'R','e','g','i','s','t','r','y',' ','E','d','i','t','o','r',' ',
-                                   'V','e','r','s','i','o','n',' ','5','.','0','0','\r','\n',0};
+    static const WCHAR header[] = L"\xFEFFWindows Registry Editor Version 5.00\r\n";
 
     write_file(hFile, header);
 }
@@ -359,43 +344,47 @@ static HANDLE get_file_handle(WCHAR *filename, BOOL overwrite_file)
     return hFile;
 }
 
-static BOOL is_overwrite_switch(const WCHAR *s)
-{
-    if (lstrlenW(s) > 2)
-        return FALSE;
-
-    if ((s[0] == '/' || s[0] == '-') && (s[1] == 'y' || s[1] == 'Y'))
-        return TRUE;
-
-    return FALSE;
-}
-
-int reg_export(int argc, WCHAR *argv[])
+int reg_export(int argc, WCHAR *argvW[])
 {
     HKEY root, hkey;
-    WCHAR *path, *long_key;
+    WCHAR *path, *key_name;
     BOOL overwrite_file = FALSE;
     HANDLE hFile;
-    int ret;
+    int i, ret;
 
-    if (argc == 3 || argc > 5)
-        goto error;
+    if (argc < 4) goto invalid;
 
-    if (!parse_registry_key(argv[2], &root, &path, &long_key))
+    if (!parse_registry_key(argvW[2], &root, &path))
         return 1;
 
-    if (argc == 5 && !(overwrite_file = is_overwrite_switch(argv[4])))
-        goto error;
+    for (i = 4; i < argc; i++)
+    {
+        WCHAR *str;
+
+        if (argvW[i][0] != '/' && argvW[i][0] != '-')
+            goto invalid;
+
+        str = &argvW[i][1];
+
+        if (is_char(*str, 'y') && !str[1])
+            overwrite_file = TRUE;
+        else if (!lstrcmpiW(str, L"reg:32") || !lstrcmpiW(str, L"reg:64"))
+            continue;
+        else
+            goto invalid;
+    }
 
     if (RegOpenKeyExW(root, path, 0, KEY_READ, &hkey))
     {
-        output_message(STRING_INVALID_KEY);
+        output_message(STRING_KEY_NONEXIST);
         return 1;
     }
 
-    hFile = get_file_handle(argv[3], overwrite_file);
+    key_name = get_long_key(root, path);
+
+    hFile = get_file_handle(argvW[3], overwrite_file);
     export_file_header(hFile);
-    ret = export_registry_data(hFile, hkey, long_key);
+    ret = export_registry_data(hFile, hkey, key_name);
     export_newline(hFile);
     CloseHandle(hFile);
 
@@ -403,8 +392,8 @@ int reg_export(int argc, WCHAR *argv[])
 
     return ret;
 
-error:
+invalid:
     output_message(STRING_INVALID_SYNTAX);
-    output_message(STRING_FUNC_HELP, wcsupr(argv[1]));
+    output_message(STRING_FUNC_HELP, wcsupr(argvW[1]));
     return 1;
 }

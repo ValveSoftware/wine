@@ -148,7 +148,7 @@ void shape_start_next_stage(struct shaping_features *features, stage_func func)
     features->stage++;
 }
 
-static int features_sorting_compare(const void *a, const void *b)
+static int __cdecl features_sorting_compare(const void *a, const void *b)
 {
     const struct shaping_feature *left = a, *right = b;
     return left->tag != right->tag ? (left->tag < right->tag ? -1 : 1) : 0;
@@ -352,7 +352,7 @@ HRESULT shape_get_glyphs(struct scriptshaping_context *context, const unsigned i
     return (context->glyph_count <= context->u.subst.max_glyph_count) ? S_OK : E_NOT_SUFFICIENT_BUFFER;
 }
 
-static int tag_array_sorting_compare(const void *a, const void *b)
+static int __cdecl tag_array_sorting_compare(const void *a, const void *b)
 {
     unsigned int left = GET_BE_DWORD(*(unsigned int *)a), right = GET_BE_DWORD(*(unsigned int *)b);
     return left != right ? (left < right ? -1 : 1) : 0;
@@ -371,6 +371,12 @@ HRESULT shape_get_typographic_features(struct scriptshaping_context *context, co
 
     shape_get_script_lang_index(context, scripts, MS_GPOS_TAG, &script_index, &language_index);
     opentype_get_typographic_features(&context->cache->gpos, script_index, language_index, &t);
+
+    if (t.count == 0)
+    {
+        *actual_tagcount = 0;
+        return S_OK;
+    }
 
     /* Sort and remove duplicates. */
     qsort(t.tags, t.count, sizeof(*t.tags), tag_array_sorting_compare);

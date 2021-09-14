@@ -102,16 +102,10 @@
 #include "handle.h"
 #include "process.h"
 #include "request.h"
-#include "esync.h"
-#include "fsync.h"
 
 #include "winternl.h"
 #include "winioctl.h"
 #include "ddk/wdm.h"
-
-#if !defined(O_SYMLINK) && defined(O_PATH)
-# define O_SYMLINK (O_NOFOLLOW | O_PATH)
-#endif
 
 #if defined(HAVE_SYS_EPOLL_H) && defined(HAVE_EPOLL_CREATE)
 # include <sys/epoll.h>
@@ -175,8 +169,7 @@ struct closed_fd
     struct list entry;       /* entry in inode closed list */
     int         unix_fd;     /* the unix file descriptor */
     int         unlink;      /* whether to unlink on close: -1 - implicit FILE_DELETE_ON_CLOSE, 1 - explicit disposition */
-    char       *unlink_name; /* name to unlink on close, points to parent fd unix_name */
-    char       *unix_name;   /* name to real file path, points to parent fd unix_name */
+    char       *unix_name;   /* name to unlink on close, points to parent fd unix_name */
 };
 
 struct fd
@@ -191,7 +184,6 @@ struct fd
     unsigned int         access;      /* file access (FILE_READ_DATA etc.) */
     unsigned int         options;     /* file options (FILE_DELETE_ON_CLOSE, FILE_SYNCHRONOUS...) */
     unsigned int         sharing;     /* file sharing mode */
-    char                *unlink_name; /* file name to unlink on close */
     char                *unix_name;   /* unix file name */
     WCHAR               *nt_name;     /* NT file name */
     data_size_t          nt_namelen;  /* length of NT file name */
@@ -207,8 +199,6 @@ struct fd
     struct completion   *completion;  /* completion object attached to this fd */
     apc_param_t          comp_key;    /* completion key to set in completion events */
     unsigned int         comp_flags;  /* completion flags */
-    int                  esync_fd;    /* esync file descriptor */
-    unsigned int         fsync_idx;   /* fsync shm index */
 };
 
 static void fd_dump( struct object *obj, int verbose );
@@ -222,8 +212,6 @@ static const struct object_ops fd_ops =
     no_add_queue,             /* add_queue */
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
-    NULL,                     /* get_esync_fd */
-    NULL,                     /* get_fsync_idx */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -265,8 +253,6 @@ static const struct object_ops device_ops =
     no_add_queue,             /* add_queue */
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
-    NULL,                     /* get_esync_fd */
-    NULL,                     /* get_fsync_idx */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -307,8 +293,6 @@ static const struct object_ops inode_ops =
     no_add_queue,             /* add_queue */
     NULL,                     /* remove_queue */
     NULL,                     /* signaled */
-    NULL,                     /* get_esync_fd */
-    NULL,                     /* get_fsync_idx */
     NULL,                     /* satisfied */
     no_signal,                /* signal */
     no_get_fd,                /* get_fd */
@@ -351,8 +335,6 @@ static const struct object_ops file_lock_ops =
     add_queue,                  /* add_queue */
     remove_queue,               /* remove_queue */
     file_lock_signaled,         /* signaled */
-    NULL,                       /* get_esync_fd */
-    NULL,                       /* get_fsync_idx */
     no_satisfied,               /* satisfied */
     no_signal,                  /* signal */
     no_get_fd,                  /* get_fd */
@@ -1139,7 +1121,6 @@ static void inode_close_pending( struct inode *inode, int keep_unlinks )
         if (!keep_unlinks || !fd->unlink)  /* get rid of it unless there's an unlink pending on that file */
         {
             list_remove( ptr );
-            free( fd->unlink_name );
             free( fd->unix_name );
             free( fd );
         }
@@ -1174,13 +1155,12 @@ static void inode_destroy( struct object *obj )
         {
             /* make sure it is still the same file */
             struct stat st;
-            if (!lstat( fd->unlink_name, &st ) && st.st_dev == inode->device->dev && st.st_ino == inode->ino)
+            if (!stat( fd->unix_name, &st ) && st.st_dev == inode->device->dev && st.st_ino == inode->ino)
             {
-                if (S_ISDIR(st.st_mode)) rmdir( fd->unlink_name );
-                else unlink( fd->unlink_name );
+                if (S_ISDIR(st.st_mode)) rmdir( fd->unix_name );
+                else unlink( fd->unix_name );
             }
         }
-        free( fd->unlink_name );
         free( fd->unix_name );
         free( fd );
     }
@@ -1601,12 +1581,8 @@ static void fd_destroy( struct object *obj )
     else  /* no inode, close it right away */
     {
         if (fd->unix_fd != -1) close( fd->unix_fd );
-        free( fd->unlink_name );
         free( fd->unix_name );
     }
-
-    if (do_esync())
-        close( fd->esync_fd );
 }
 
 /* check if the desired access is possible without violating */
@@ -1714,7 +1690,6 @@ static struct fd *alloc_fd_object(void)
     fd->options    = 0;
     fd->sharing    = 0;
     fd->unix_fd    = -1;
-    fd->unlink_name  = NULL;
     fd->unix_name  = NULL;
     fd->nt_name    = NULL;
     fd->nt_namelen = 0;
@@ -1724,20 +1699,11 @@ static struct fd *alloc_fd_object(void)
     fd->poll_index = -1;
     fd->completion = NULL;
     fd->comp_flags = 0;
-    fd->esync_fd   = -1;
-    fd->fsync_idx  = 0;
-    fd->unlink_name = NULL;
     init_async_queue( &fd->read_q );
     init_async_queue( &fd->write_q );
     init_async_queue( &fd->wait_q );
     list_init( &fd->inode_entry );
     list_init( &fd->locks );
-
-    if (do_esync())
-        fd->esync_fd = esync_create_fd( 1, 0 );
-
-    if (do_fsync())
-        fd->fsync_idx = fsync_alloc_shm( 1, 0 );
 
     if ((fd->poll_index = add_poll_user( fd )) == -1)
     {
@@ -1761,7 +1727,6 @@ struct fd *alloc_pseudo_fd( const struct fd_ops *fd_user_ops, struct object *use
     fd->access     = 0;
     fd->options    = options;
     fd->sharing    = 0;
-    fd->unlink_name  = NULL;
     fd->unix_name  = NULL;
     fd->nt_name    = NULL;
     fd->nt_namelen = 0;
@@ -1773,20 +1738,11 @@ struct fd *alloc_pseudo_fd( const struct fd_ops *fd_user_ops, struct object *use
     fd->completion = NULL;
     fd->comp_flags = 0;
     fd->no_fd_status = STATUS_BAD_DEVICE_TYPE;
-    fd->esync_fd   = -1;
-    fd->fsync_idx  = 0;
     init_async_queue( &fd->read_q );
     init_async_queue( &fd->write_q );
     init_async_queue( &fd->wait_q );
     list_init( &fd->inode_entry );
     list_init( &fd->locks );
-
-    if (do_fsync())
-        fd->fsync_idx = fsync_alloc_shm( 0, 0 );
-
-    if (do_esync())
-        fd->esync_fd = esync_create_fd( 0, 0 );
-
     return fd;
 }
 
@@ -1812,18 +1768,6 @@ struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sha
         fd->nt_namelen = orig->nt_namelen;
     }
 
-    if (orig->unlink_name)
-    {
-        if (!(fd->unlink_name = mem_alloc( strlen(orig->unlink_name) + 1 ))) goto failed;
-        strcpy( fd->unlink_name, orig->unlink_name );
-    }
-
-    if (orig->unlink_name)
-    {
-        if (!(fd->unlink_name = mem_alloc( strlen(orig->unlink_name) + 1 ))) goto failed;
-        strcpy( fd->unlink_name, orig->unlink_name );
-    }
-
     if (orig->inode)
     {
         struct closed_fd *closed = mem_alloc( sizeof(*closed) );
@@ -1836,7 +1780,6 @@ struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sha
         }
         closed->unix_fd = fd->unix_fd;
         closed->unlink = 0;
-        closed->unlink_name = fd->unlink_name;
         closed->unix_name = fd->unix_name;
         fd->closed = closed;
         fd->inode = (struct inode *)grab_object( orig->inode );
@@ -1941,55 +1884,6 @@ void get_nt_name( struct fd *fd, struct unicode_str *name )
     name->len = fd->nt_namelen;
 }
 
-static void decode_symlink(char *name, int *is_dir)
-{
-    char link[MAX_PATH], *p;
-    ULONG reparse_tag;
-    int len, i;
-
-    len = readlink( name, link, sizeof(link) );
-    if (len == -1)
-        return;
-    link[len] = 0;
-    p = link;
-    /* skip past relative/absolute indication */
-    if (*p == '.')
-        p++;
-    if (*p++ != '/')
-    {
-        return;
-    }
-    /* decode the reparse tag */
-    reparse_tag = 0;
-    for (i = 0; i < sizeof(ULONG)*8; i++)
-    {
-        char c = *p++;
-        int val;
-
-        if (c == '/')
-            val = 0;
-        else if (c == '.' && *p++ == '/')
-            val = 1;
-        else
-            return;
-        reparse_tag |= (val << i);
-    }
-    /* decode the directory/file flag */
-    if (reparse_tag == IO_REPARSE_TAG_SYMLINK)
-    {
-        char c = *p++;
-
-        if (c == '/')
-            *is_dir = FALSE;
-        else if (c == '.' && *p++ == '/')
-            *is_dir = TRUE;
-        else
-            return;
-    }
-    else
-        *is_dir = TRUE;
-}
-
 /* open() wrapper that returns a struct fd with no fd user set */
 struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_name,
                     int flags, mode_t *mode, unsigned int access,
@@ -2001,8 +1895,6 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     int root_fd = -1;
     int rw_mode;
     char *path;
-    int do_chmod = 0;
-    int created = (flags & O_CREAT);
 
     if (((options & FILE_DELETE_ON_CLOSE) && !(access & DELETE)) ||
         ((options & FILE_DIRECTORY_FILE) && (flags & O_TRUNC)))
@@ -2034,19 +1926,13 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     /* create the directory if needed */
     if ((options & FILE_DIRECTORY_FILE) && (flags & O_CREAT))
     {
-        if (mkdir( name, *mode | S_IRUSR ) != -1)
-        {
-            /* remove S_IRUSR later, after we have opened the directory */
-            do_chmod = !(*mode & S_IRUSR);
-        }
-        else
+        if (mkdir( name, *mode ) == -1)
         {
             if (errno != EEXIST || (flags & O_EXCL))
             {
                 file_set_error();
                 goto error;
             }
-            created = 0;
         }
         flags &= ~(O_CREAT | O_EXCL | O_TRUNC);
     }
@@ -2058,11 +1944,6 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     }
     else rw_mode = O_RDONLY;
 
-#if defined(O_SYMLINK)
-    if ((options & FILE_OPEN_REPARSE_POINT) && !(flags & O_CREAT))
-        flags |= O_SYMLINK;
-#endif
-
     if ((fd->unix_fd = open( name, rw_mode | (flags & ~O_TRUNC), *mode )) == -1)
     {
         /* if we tried to open a directory for write access, retry read-only */
@@ -2071,28 +1952,10 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
             if ((access & FILE_UNIX_WRITE_ACCESS) || (flags & O_CREAT))
                 fd->unix_fd = open( name, O_RDONLY | (flags & ~(O_TRUNC | O_CREAT | O_EXCL)), *mode );
         }
-        else if (errno == EACCES)
-        {
-            /* try to change permissions temporarily to open a file descriptor */
-            if (!(access & ((FILE_UNIX_WRITE_ACCESS | FILE_UNIX_READ_ACCESS | DELETE) & ~FILE_WRITE_ATTRIBUTES)) &&
-                !stat( name, &st ) && st.st_uid == getuid() &&
-                !chmod( name, st.st_mode | S_IRUSR ))
-            {
-                fd->unix_fd = open( name, O_RDONLY | (flags & ~(O_TRUNC | O_CREAT | O_EXCL)), *mode );
-                *mode = st.st_mode;
-                do_chmod = 1;
-            }
-            else
-            {
-                set_error( STATUS_ACCESS_DENIED );
-                goto error;
-            }
-        }
 
         if (fd->unix_fd == -1)
         {
             file_set_error();
-            if (do_chmod) chmod( name, *mode );
             goto error;
         }
     }
@@ -2101,25 +1964,21 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
     fd->unix_name = NULL;
     if ((path = dup_fd_name( root, name )))
     {
-        fd->unlink_name = path;
         fd->unix_name = realpath( path, NULL );
-        if (!fd->unix_name) fd->unix_name = dup_fd_name( root, name ); /* dangling symlink */
+        free( path );
     }
 
     closed_fd->unix_fd = fd->unix_fd;
     closed_fd->unlink = 0;
-    closed_fd->unlink_name = fd->unlink_name;
     closed_fd->unix_name = fd->unix_name;
-    if (do_chmod) chmod( name, *mode );
-    lstat( fd->unlink_name, &st );
+    fstat( fd->unix_fd, &st );
     *mode = st.st_mode;
 
     /* only bother with an inode for normal files and directories */
-    if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode) || S_ISLNK(st.st_mode))
+    if (S_ISREG(st.st_mode) || S_ISDIR(st.st_mode))
     {
         unsigned int err;
         struct inode *inode = get_inode( st.st_dev, st.st_ino, fd->unix_fd );
-        int is_link = S_ISLNK(st.st_mode), is_dir;
 
         if (!inode)
         {
@@ -2134,20 +1993,13 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
         list_add_head( &inode->open, &fd->inode_entry );
         closed_fd = NULL;
 
-        /* decode symlink type */
-        fstat( fd->unix_fd, &st );
-        *mode = st.st_mode;
-        is_dir = S_ISDIR(st.st_mode);
-        if (is_link)
-            decode_symlink(fd->unlink_name, &is_dir);
-
         /* check directory options */
-        if ((options & FILE_DIRECTORY_FILE) && !is_dir)
+        if ((options & FILE_DIRECTORY_FILE) && !S_ISDIR(st.st_mode))
         {
             set_error( STATUS_NOT_A_DIRECTORY );
             goto error;
         }
-        if ((options & FILE_NON_DIRECTORY_FILE) && is_dir)
+        if ((options & FILE_NON_DIRECTORY_FILE) && S_ISDIR(st.st_mode))
         {
             set_error( STATUS_FILE_IS_A_DIRECTORY );
             goto error;
@@ -2159,7 +2011,7 @@ struct fd *open_fd( struct fd *root, const char *name, struct unicode_str nt_nam
         }
 
         /* can't unlink files if we don't have permission to access */
-        if ((options & FILE_DELETE_ON_CLOSE) && !created &&
+        if ((options & FILE_DELETE_ON_CLOSE) && !(flags & O_CREAT) &&
             !(st.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)))
         {
             set_error( STATUS_CANNOT_DELETE );
@@ -2215,45 +2067,6 @@ struct fd *create_anonymous_fd( const struct fd_ops *fd_user_ops, int unix_fd, s
     return NULL;
 }
 
-void set_unix_name_of_fd( struct fd *fd, const struct stat *fd_st )
-{
-#ifdef __linux__
-    static const char procfs_fmt[] = "/proc/self/fd/%d";
-
-    char path[PATH_MAX], procfs_path[sizeof(procfs_fmt) - 2 /* %d */ + 11];
-    struct stat path_st;
-    ssize_t len;
-
-    sprintf( procfs_path, procfs_fmt, fd->unix_fd );
-    len = readlink( procfs_path, path, sizeof(path) );
-    if (len == -1 || len >= sizeof(path) )
-        return;
-    path[len] = '\0';
-
-    /* Make sure it's an absolute path, has at least one hardlink, and the same inode */
-    if (path[0] != '/' || stat( path, &path_st ) || path_st.st_nlink < 1 ||
-        path_st.st_dev != fd_st->st_dev || path_st.st_ino != fd_st->st_ino)
-        return;
-
-    if (!(fd->unix_name = mem_alloc( len + 1 )))
-        return;
-    memcpy( fd->unix_name, path, len + 1 );
-
-#elif defined(F_GETPATH)
-    char path[PATH_MAX];
-    size_t size;
-
-    if (fcntl( fd->unix_fd, F_GETPATH, path ) == -1 || path[0] != '/')
-        return;
-
-    size = strlen(path) + 1;
-    if (!(fd->unix_name = mem_alloc( size )))
-        return;
-    memcpy( fd->unix_name, path, size );
-
-#endif
-}
-
 /* retrieve the object that is using an fd */
 void *get_fd_user( struct fd *fd )
 {
@@ -2303,18 +2116,6 @@ void set_fd_signaled( struct fd *fd, int signaled )
     if (fd->comp_flags & FILE_SKIP_SET_EVENT_ON_HANDLE) return;
     fd->signaled = signaled;
     if (signaled) wake_up( fd->user, 0 );
-
-    if (do_fsync() && !signaled)
-        fsync_clear( fd->user );
-
-    if (do_esync() && !signaled)
-        esync_clear( fd->esync_fd );
-}
-
-/* handler for close_handle that refuses to close fd-associated handles in other processes */
-int fd_close_handle( struct object *obj, struct process *process, obj_handle_t handle )
-{
-    return (!current || current->process == process);
 }
 
 /* check if events are pending and if yes return which one(s) */
@@ -2336,24 +2137,6 @@ int default_fd_signaled( struct object *obj, struct wait_queue_entry *entry )
 {
     struct fd *fd = get_obj_fd( obj );
     int ret = fd->signaled;
-    release_object( fd );
-    return ret;
-}
-
-int default_fd_get_esync_fd( struct object *obj, enum esync_type *type )
-{
-    struct fd *fd = get_obj_fd( obj );
-    int ret = fd->esync_fd;
-    *type = ESYNC_MANUAL_SERVER;
-    release_object( fd );
-    return ret;
-}
-
-unsigned int default_fd_get_fsync_idx( struct object *obj, enum fsync_type *type )
-{
-    struct fd *fd = get_obj_fd( obj );
-    unsigned int ret = fd->fsync_idx;
-    *type = FSYNC_MANUAL_SERVER;
     release_object( fd );
     return ret;
 }
@@ -2624,7 +2407,6 @@ static struct fd *get_handle_fd_obj( struct process *process, obj_handle_t handl
 
 static int is_dir_empty( int fd )
 {
-    int dir_fd;
     DIR *dir;
     int empty;
     struct dirent *de;
@@ -2632,13 +2414,8 @@ static int is_dir_empty( int fd )
     if ((fd = dup( fd )) == -1)
         return -1;
 
-    /* use openat() so that if 'fd' was opened with O_SYMLINK we can still check the contents */
-    dir_fd = openat( fd, ".", O_RDONLY | O_DIRECTORY | O_NONBLOCK );
-    if (dir_fd == -1)
-        return -1;
-    if (!(dir = fdopendir( dir_fd )))
+    if (!(dir = fdopendir( fd )))
     {
-        close( dir_fd );
         close( fd );
         return -1;
     }
@@ -2650,7 +2427,6 @@ static int is_dir_empty( int fd )
         empty = 0;
     }
     closedir( dir );
-    close( dir_fd );
     return empty;
 }
 
@@ -2678,7 +2454,7 @@ static void set_fd_disposition( struct fd *fd, int unlink )
             file_set_error();
             return;
         }
-        if (S_ISREG( st.st_mode ) || S_ISLNK( st.st_mode ))  /* can't unlink files we don't have permission to write */
+        if (S_ISREG( st.st_mode ))  /* can't unlink files we don't have permission to write */
         {
             if (!(st.st_mode & (S_IWUSR | S_IWGRP | S_IWOTH)))
             {
@@ -2829,11 +2605,10 @@ static void set_fd_name( struct fd *fd, struct fd *root, const char *nameptr, da
 
     free( fd->nt_name );
     fd->nt_name = dup_nt_name( root, nt_name, &fd->nt_namelen );
-    free( fd->unlink_name );
     free( fd->unix_name );
-    fd->closed->unlink_name = fd->unlink_name = name;
     fd->closed->unix_name = fd->unix_name = realpath( name, NULL );
-    if (!fd->unlink_name || !fd->unix_name)
+    free( name );
+    if (!fd->unix_name)
         set_error( STATUS_NO_MEMORY );
     return;
 

@@ -26,6 +26,7 @@
 #include "audioclient.h"
 
 #include "wine/debug.h"
+#include "wine/heap.h"
 #include "wine/list.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
@@ -101,8 +102,6 @@ struct audio_renderer
     HANDLE buffer_ready_event;
     MFWORKITEM_KEY buffer_ready_key;
     unsigned int frame_size;
-    unsigned int queued_frames;
-    unsigned int max_frames;
     struct list queue;
     enum stream_state state;
     unsigned int flags;
@@ -122,7 +121,7 @@ static void release_pending_object(struct queued_object *object)
             PropVariantClear(&object->u.marker.context);
             break;
     }
-    free(object);
+    heap_free(object);
 }
 
 static struct audio_renderer *impl_from_IMFMediaSink(IMFMediaSink *iface)
@@ -236,7 +235,6 @@ static void audio_renderer_release_audio_client(struct audio_renderer *renderer)
     {
         release_pending_object(obj);
     }
-    renderer->queued_frames = 0;
     renderer->buffer_ready_key = 0;
     if (renderer->audio_client)
     {
@@ -281,7 +279,7 @@ static ULONG WINAPI audio_renderer_sink_Release(IMFMediaSink *iface)
         audio_renderer_release_audio_client(renderer);
         CloseHandle(renderer->buffer_ready_event);
         DeleteCriticalSection(&renderer->cs);
-        free(renderer);
+        heap_free(renderer);
     }
 
     return refcount;
@@ -1333,15 +1331,8 @@ static HRESULT WINAPI audio_renderer_stream_GetMediaTypeHandler(IMFStreamSink *i
 static HRESULT stream_queue_sample(struct audio_renderer *renderer, IMFSample *sample)
 {
     struct queued_object *object;
-    DWORD sample_len, sample_frames;
-    HRESULT hr;
 
-    if (FAILED(hr = IMFSample_GetTotalLength(sample, &sample_len)))
-        return hr;
-
-    sample_frames = sample_len / renderer->frame_size;
-
-    if (!(object = calloc(1, sizeof(*object))))
+    if (!(object = heap_alloc_zero(sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->type = OBJECT_TYPE_SAMPLE;
@@ -1349,7 +1340,6 @@ static HRESULT stream_queue_sample(struct audio_renderer *renderer, IMFSample *s
     IMFSample_AddRef(object->u.sample.sample);
 
     list_add_tail(&renderer->queue, &object->entry);
-    renderer->queued_frames += sample_frames;
 
     return S_OK;
 }
@@ -1368,17 +1358,9 @@ static HRESULT WINAPI audio_renderer_stream_ProcessSample(IMFStreamSink *iface, 
         return MF_E_STREAMSINK_REMOVED;
 
     EnterCriticalSection(&renderer->cs);
-
     if (renderer->state == STREAM_STATE_RUNNING)
         hr = stream_queue_sample(renderer, sample);
     renderer->flags &= ~SAR_SAMPLE_REQUESTED;
-
-    if (renderer->queued_frames < renderer->max_frames && renderer->state == STREAM_STATE_RUNNING)
-    {
-        IMFMediaEventQueue_QueueEventParamVar(renderer->stream_event_queue, MEStreamSinkRequestSample, &GUID_NULL, S_OK, NULL);
-        renderer->flags |= SAR_SAMPLE_REQUESTED;
-    }
-
     LeaveCriticalSection(&renderer->cs);
 
     return hr;
@@ -1390,7 +1372,7 @@ static HRESULT stream_place_marker(struct audio_renderer *renderer, MFSTREAMSINK
     struct queued_object *marker;
     HRESULT hr = S_OK;
 
-    if (!(marker = calloc(1, sizeof(*marker))))
+    if (!(marker = heap_alloc_zero(sizeof(*marker))))
         return E_OUTOFMEMORY;
 
     marker->type = OBJECT_TYPE_MARKER;
@@ -1447,7 +1429,6 @@ static HRESULT WINAPI audio_renderer_stream_Flush(IMFStreamSink *iface)
             release_pending_object(obj);
         }
     }
-    renderer->queued_frames = 0;
     LeaveCriticalSection(&renderer->cs);
 
     return hr;
@@ -1593,12 +1574,6 @@ static HRESULT audio_renderer_create_audio_client(struct audio_renderer *rendere
     if (FAILED(hr = IAudioClient_SetEventHandle(renderer->audio_client, renderer->buffer_ready_event)))
     {
         WARN("Failed to set event handle, hr %#x.\n", hr);
-        return hr;
-    }
-
-    if (FAILED(hr = IAudioClient_GetBufferSize(renderer->audio_client, &renderer->max_frames)))
-    {
-        WARN("Failed to get buffer size, hr %#x.\n", hr);
         return hr;
     }
 
@@ -1777,7 +1752,7 @@ static HRESULT WINAPI audio_renderer_render_callback_GetParameters(IMFAsyncCallb
 
 static void audio_renderer_render(struct audio_renderer *renderer, IMFAsyncResult *result)
 {
-    unsigned int src_frames, dst_frames, max_frames, pad_frames, src_len;
+    unsigned int src_frames, dst_frames, max_frames, src_len;
     struct queued_object *obj, *obj2;
     BOOL keep_sample = FALSE;
     IMFMediaBuffer *buffer;
@@ -1801,25 +1776,20 @@ static void audio_renderer_render(struct audio_renderer *renderer, IMFAsyncResul
                     {
                         if (SUCCEEDED(IAudioClient_GetBufferSize(renderer->audio_client, &max_frames)))
                         {
-                            if (SUCCEEDED(IAudioClient_GetCurrentPadding(renderer->audio_client, &pad_frames)))
+                            src_frames -= obj->u.sample.frame_offset;
+                            dst_frames = min(src_frames, max_frames);
+
+                            if (SUCCEEDED(hr = IAudioRenderClient_GetBuffer(renderer->audio_render_client, dst_frames, &dst)))
                             {
-                                max_frames -= pad_frames;
-                                src_frames -= obj->u.sample.frame_offset;
-                                dst_frames = min(src_frames, max_frames);
+                                memcpy(dst, src + obj->u.sample.frame_offset * renderer->frame_size,
+                                        dst_frames * renderer->frame_size);
 
-                                if (SUCCEEDED(hr = IAudioRenderClient_GetBuffer(renderer->audio_render_client, dst_frames, &dst)))
-                                {
-                                    memcpy(dst, src + obj->u.sample.frame_offset * renderer->frame_size,
-                                            dst_frames * renderer->frame_size);
+                                IAudioRenderClient_ReleaseBuffer(renderer->audio_render_client, dst_frames, 0);
 
-                                    IAudioRenderClient_ReleaseBuffer(renderer->audio_render_client, dst_frames, 0);
-
-                                    obj->u.sample.frame_offset += dst_frames;
-                                    renderer->queued_frames -= dst_frames;
-                                }
-
-                                keep_sample = FAILED(hr) || src_frames > max_frames;
+                                obj->u.sample.frame_offset += dst_frames;
                             }
+
+                            keep_sample = FAILED(hr) || src_frames > max_frames;
                         }
                     }
                     IMFMediaBuffer_Unlock(buffer);
@@ -1873,7 +1843,7 @@ static HRESULT sar_create_object(IMFAttributes *attributes, void *user_context, 
 
     TRACE("%p, %p, %p.\n", attributes, user_context, obj);
 
-    if (!(renderer = calloc(1, sizeof(*renderer))))
+    if (!(renderer = heap_alloc_zero(sizeof(*renderer))))
         return E_OUTOFMEMORY;
 
     renderer->IMFMediaSink_iface.lpVtbl = &audio_renderer_sink_vtbl;
@@ -1913,11 +1883,6 @@ failed:
     IMFMediaSink_Release(&renderer->IMFMediaSink_iface);
 
     return hr;
-}
-
-BOOL mf_is_sar_sink(IMFMediaSink *sink)
-{
-    return sink->lpVtbl == &audio_renderer_sink_vtbl;
 }
 
 static void sar_shutdown_object(void *user_context, IUnknown *obj)

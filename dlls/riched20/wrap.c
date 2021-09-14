@@ -829,7 +829,7 @@ static void ME_WrapTextParagraph( ME_TextEditor *editor, ME_Context *c, ME_Parag
   para_num_init( c, para );
 
   /* For now treating all non-password text as complex for better testing */
-  if (!c->editor->cPasswordMask /* &&
+  if (!c->editor->password_char /* &&
       ScriptIsComplex( tp->member.para.text->szData, tp->member.para.text->nLen, SIC_COMPLEX ) == S_OK */)
   {
       if (SUCCEEDED( itemize_para( c, para ) ))
@@ -1020,7 +1020,7 @@ static void adjust_para_y( ME_Paragraph *para, ME_Context *c, struct repaint_ran
     }
 }
 
-BOOL ME_WrapMarkedParagraphs(ME_TextEditor *editor)
+BOOL wrap_marked_paras_dc( ME_TextEditor *editor, HDC hdc, BOOL invalidate )
 {
   ME_Paragraph *para, *next;
   struct wine_rb_entry *entry, *next_entry = NULL;
@@ -1030,7 +1030,7 @@ BOOL ME_WrapMarkedParagraphs(ME_TextEditor *editor)
 
   if (!editor->marked_paras.root) return FALSE;
 
-  ME_InitContext(&c, editor, ITextHost_TxGetDC(editor->texthost));
+  ME_InitContext( &c, editor, hdc );
 
   entry = wine_rb_head( editor->marked_paras.root );
   while (entry)
@@ -1086,9 +1086,17 @@ BOOL ME_WrapMarkedParagraphs(ME_TextEditor *editor)
 
   ME_DestroyContext(&c);
 
-  if (repaint.start || editor->nTotalLength < editor->nLastTotalLength)
+  if (invalidate && (repaint.start || editor->nTotalLength < editor->nLastTotalLength))
     para_range_invalidate( editor, repaint.start, repaint.end);
   return !!repaint.start;
+}
+
+BOOL ME_WrapMarkedParagraphs( ME_TextEditor *editor )
+{
+    HDC hdc = ITextHost_TxGetDC( editor->texthost );
+    BOOL ret = wrap_marked_paras_dc( editor, hdc, TRUE );
+    ITextHost_TxReleaseDC( editor->texthost, hdc );
+    return ret;
 }
 
 void para_range_invalidate( ME_TextEditor *editor, ME_Paragraph *start_para,

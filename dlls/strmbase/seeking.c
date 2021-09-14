@@ -21,7 +21,7 @@
 
 #include "strmbase_private.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(quartz);
+WINE_DEFAULT_DEBUG_CHANNEL(strmbase);
 
 static inline SourceSeeking *impl_from_IMediaSeeking(IMediaSeeking *iface)
 {

@@ -209,7 +209,6 @@ C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo)
 extern INT global_key_state_counter DECLSPEC_HIDDEN;
 extern BOOL (WINAPI *imm_register_window)(HWND) DECLSPEC_HIDDEN;
 extern void (WINAPI *imm_unregister_window)(HWND) DECLSPEC_HIDDEN;
-extern void (WINAPI *imm_activate_window)(HWND) DECLSPEC_HIDDEN;
 
 struct user_key_state_info
 {
@@ -236,7 +235,6 @@ static inline BOOL is_broadcast( HWND hwnd )
 }
 
 extern HMODULE user32_module DECLSPEC_HIDDEN;
-extern BOOL enable_mouse_in_pointer DECLSPEC_HIDDEN;
 
 struct dce;
 struct tagWND;
@@ -260,13 +258,12 @@ extern void move_window_bits( HWND hwnd, struct window_surface *old_surface,
 extern void move_window_bits_parent( HWND hwnd, HWND parent, const RECT *window_rect,
                                      const RECT *valid_rects ) DECLSPEC_HIDDEN;
 extern void update_window_state( HWND hwnd ) DECLSPEC_HIDDEN;
-extern void wait_graphics_driver_ready(void) DECLSPEC_HIDDEN;
 extern void *get_hook_proc( void *proc, const WCHAR *module, HMODULE *free_module ) DECLSPEC_HIDDEN;
 extern RECT get_virtual_screen_rect(void) DECLSPEC_HIDDEN;
 extern LRESULT call_current_hook( HHOOK hhook, INT code, WPARAM wparam, LPARAM lparam ) DECLSPEC_HIDDEN;
 extern DWORD get_input_codepage( void ) DECLSPEC_HIDDEN;
 extern BOOL map_wparam_AtoW( UINT message, WPARAM *wparam, enum wm_char_mapping mapping ) DECLSPEC_HIDDEN;
-extern NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, UINT flags ) DECLSPEC_HIDDEN;
+extern NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *rawinput, UINT flags ) DECLSPEC_HIDDEN;
 extern LRESULT MSG_SendInternalMessageTimeout( DWORD dest_pid, DWORD dest_tid,
                                                UINT msg, WPARAM wparam, LPARAM lparam,
                                                UINT flags, UINT timeout, PDWORD_PTR res_ptr ) DECLSPEC_HIDDEN;
@@ -383,15 +380,5 @@ struct png_funcs
 #undef assert
 #define assert(expr) ((void)0)
 #endif
-
-static inline WCHAR *heap_strdupW(const WCHAR *src)
-{
-    WCHAR *dst;
-    unsigned len;
-    if (!src) return NULL;
-    len = (lstrlenW(src) + 1) * sizeof(WCHAR);
-    if ((dst = heap_alloc(len))) memcpy(dst, src, len);
-    return dst;
-}
 
 #endif /* __WINE_USER_PRIVATE_H */

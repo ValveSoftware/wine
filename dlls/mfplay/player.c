@@ -63,8 +63,6 @@ struct media_item
     DWORD_PTR user_data;
     WCHAR *url;
     IUnknown *object;
-    LONGLONG start_position;
-    LONGLONG stop_position;
 };
 
 struct media_player
@@ -420,92 +418,21 @@ static HRESULT WINAPI media_item_SetUserData(IMFPMediaItem *iface, DWORD_PTR use
     return S_OK;
 }
 
-static HRESULT media_item_set_position(const GUID *format, const PROPVARIANT *position, LARGE_INTEGER *ret)
-{
-    ret->QuadPart = 0;
-
-    if (format && !IsEqualGUID(format, &MFP_POSITIONTYPE_100NS))
-        return E_INVALIDARG;
-
-    if ((format != NULL) ^ (position != NULL))
-        return E_POINTER;
-
-    if (position && position->vt != VT_EMPTY && position->vt != VT_I8)
-        return E_INVALIDARG;
-
-    if ((!format && !position) || position->vt == VT_EMPTY)
-        return S_OK;
-
-    if (position->hVal.QuadPart == 0)
-        return MF_E_OUT_OF_RANGE;
-
-    ret->QuadPart = position->hVal.QuadPart;
-
-    return S_OK;
-}
-
-static void media_item_get_position(LONGLONG value, GUID *format, PROPVARIANT *position)
-{
-    if (!format)
-        return;
-
-    memcpy(format, &MFP_POSITIONTYPE_100NS, sizeof(*format));
-
-    if (value)
-    {
-        position->vt = VT_I8;
-        position->hVal.QuadPart = value;
-    }
-}
-
 static HRESULT WINAPI media_item_GetStartStopPosition(IMFPMediaItem *iface, GUID *start_format,
         PROPVARIANT *start_position, GUID *stop_format, PROPVARIANT *stop_position)
 {
-    struct media_item *item = impl_from_IMFPMediaItem(iface);
+    FIXME("%p, %p, %p, %p, %p.\n", iface, start_format, start_position, stop_format, stop_position);
 
-    TRACE("%p, %p, %p, %p, %p.\n", iface, start_format, start_position, stop_format, stop_position);
-
-    if (start_position)
-        start_position->vt = VT_EMPTY;
-    if (stop_position)
-        stop_position->vt = VT_EMPTY;
-
-    if (((start_format != NULL) ^ (start_position != NULL)) ||
-            ((stop_format != NULL) ^ (stop_position != NULL)))
-    {
-        return E_POINTER;
-    }
-
-    media_item_get_position(item->start_position, start_format, start_position);
-    media_item_get_position(item->stop_position, stop_format, stop_position);
-
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI media_item_SetStartStopPosition(IMFPMediaItem *iface, const GUID *start_format,
         const PROPVARIANT *start_position, const GUID *stop_format, const PROPVARIANT *stop_position)
 {
-    struct media_item *item = impl_from_IMFPMediaItem(iface);
-    LARGE_INTEGER start, stop;
-    HRESULT hr;
-
-    TRACE("%p, %s, %p, %s, %p.\n", iface, debugstr_guid(start_format), start_position,
+    FIXME("%p, %s, %p, %s, %p.\n", iface, debugstr_guid(start_format), start_position,
             debugstr_guid(stop_format), stop_position);
 
-    hr = media_item_set_position(start_format, start_position, &start);
-    if (SUCCEEDED(hr))
-        hr = media_item_set_position(stop_format, stop_position, &stop);
-
-    if (FAILED(hr))
-        return hr;
-
-    if (start.QuadPart > stop.QuadPart)
-        return MF_E_OUT_OF_RANGE;
-
-    item->start_position = start.QuadPart;
-    item->stop_position = stop.QuadPart;
-
-    return hr;
+    return E_NOTIMPL;
 }
 
 static HRESULT media_item_get_stream_type(IMFStreamDescriptor *sd, GUID *major)
@@ -1128,10 +1055,6 @@ static HRESULT media_item_create_source_node(struct media_item *item, IMFStreamD
         IMFTopologyNode_SetUnknown(*node, &MF_TOPONODE_SOURCE, (IUnknown *)item->source);
         IMFTopologyNode_SetUnknown(*node, &MF_TOPONODE_PRESENTATION_DESCRIPTOR, (IUnknown *)item->pd);
         IMFTopologyNode_SetUnknown(*node, &MF_TOPONODE_STREAM_DESCRIPTOR, (IUnknown *)sd);
-        if (item->start_position)
-            IMFTopologyNode_SetUINT64(*node, &MF_TOPONODE_MEDIASTART, item->start_position);
-        if (item->stop_position)
-            IMFTopologyNode_SetUINT64(*node, &MF_TOPONODE_MEDIASTOP, item->stop_position);
     }
 
     return hr;
@@ -1213,8 +1136,6 @@ static HRESULT media_item_create_topology(struct media_player *player, struct me
 
         IMFStreamDescriptor_Release(sd);
     }
-
-    IMFTopology_SetUINT32(topology, &MF_TOPOLOGY_ENUMERATE_SOURCE_TYPES, TRUE);
 
     *out = topology;
 
@@ -1988,25 +1909,13 @@ static const IMFAsyncCallbackVtbl media_player_session_events_callback_vtbl =
     media_player_session_events_callback_Invoke,
 };
 
-/***********************************************************************
- *      MFPCreateMediaPlayer (mfplay.@)
- */
 HRESULT WINAPI MFPCreateMediaPlayer(const WCHAR *url, BOOL start_playback, MFP_CREATION_OPTIONS options,
         IMFPMediaPlayerCallback *callback, HWND window, IMFPMediaPlayer **player)
 {
     struct media_player *object;
-    IMFPMediaItem *item;
     HRESULT hr;
 
     TRACE("%s, %d, %#x, %p, %p, %p.\n", debugstr_w(url), start_playback, options, callback, window, player);
-
-    if (!player)
-        return E_POINTER;
-
-    *player = NULL;
-
-    if (!url && start_playback)
-        return E_INVALIDARG;
 
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
@@ -2037,26 +1946,6 @@ HRESULT WINAPI MFPCreateMediaPlayer(const WCHAR *url, BOOL start_playback, MFP_C
     {
         object->event_window = CreateWindowW(eventclassW, NULL, 0, 0, 0, 0, 0, HWND_MESSAGE,
                 0, mfplay_instance, NULL);
-    }
-
-    if (url)
-    {
-        if (FAILED(hr = media_player_create_item_from_url(object, url, TRUE, 0, &item)))
-        {
-            WARN("Failed to create media item, hr %#x.\n", hr);
-            goto failed;
-        }
-
-        hr = IMFPMediaPlayer_SetMediaItem(&object->IMFPMediaPlayer_iface, item);
-        IMFPMediaItem_Release(item);
-        if (FAILED(hr))
-        {
-            WARN("Failed to set media item, hr %#x.\n", hr);
-            goto failed;
-        }
-
-        if (start_playback)
-            IMFPMediaPlayer_Play(&object->IMFPMediaPlayer_iface);
     }
 
     *player = &object->IMFPMediaPlayer_iface;
