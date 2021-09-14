@@ -5620,8 +5620,8 @@ HKLM,%CurrentVersionNT%,"CurrentVersion",2,"10.0"
 HKLM,%CurrentVersionNT%,"CurrentMajorVersionNumber",0x10001,10
 HKLM,%CurrentVersionNT%,"CurrentMinorVersionNumber",0x10001,0
 HKLM,%CurrentVersionNT%,"CSDVersion",2,""
-HKLM,%CurrentVersionNT%,"CurrentBuild",2,"17763"
-HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"17763"
+HKLM,%CurrentVersionNT%,"CurrentBuild",2,"18363"
+HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"18363"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
 HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
@@ -5638,8 +5638,8 @@ HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
 [VersionInfo.ntamd64]
 HKLM,%CurrentVersionNT%,"CurrentVersion",2,"10.0"
 HKLM,%CurrentVersionNT%,"CSDVersion",2,""
-HKLM,%CurrentVersionNT%,"CurrentBuild",2,"17763"
-HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"17763"
+HKLM,%CurrentVersionNT%,"CurrentBuild",2,"18363"
+HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"18363"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
 HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
