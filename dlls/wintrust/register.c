@@ -835,6 +835,17 @@ error_close_key:
     return Func;
 }
 
+static CRITICAL_SECTION cache_cs;
+static CRITICAL_SECTION_DEBUG cache_cs_debug =
+{
+    0, 0, &cache_cs,
+    { &cache_cs_debug.ProcessLocksList, &cache_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": cs") }
+};
+static CRITICAL_SECTION cache_cs = { &cache_cs_debug, -1, 0, 0, 0, 0 };
+static GUID cached_guid;
+static CRYPT_PROVIDER_FUNCTIONS cached_provider_functions;
+
 /***********************************************************************
  *              WintrustLoadFunctionPointers (WINTRUST.@)
  */
@@ -842,6 +853,7 @@ BOOL WINAPI WintrustLoadFunctionPointers( GUID* pgActionID,
                                           CRYPT_PROVIDER_FUNCTIONS* pPfns )
 {
     WCHAR GuidString[39];
+    BOOL cached;
 
     TRACE("(%s %p)\n", debugstr_guid(pgActionID), pPfns);
 
@@ -852,6 +864,16 @@ BOOL WINAPI WintrustLoadFunctionPointers( GUID* pgActionID,
         return FALSE;
     }
     if (pPfns->cbStruct != sizeof(CRYPT_PROVIDER_FUNCTIONS)) return FALSE;
+
+    EnterCriticalSection( &cache_cs );
+    if (IsEqualGUID( &cached_guid, pgActionID ))
+    {
+        TRACE( "Using cached data.\n" );
+        *pPfns = cached_provider_functions;
+        cached = TRUE;
+    } else cached = FALSE;
+    LeaveCriticalSection( &cache_cs );
+    if (cached) return TRUE;
 
     /* Create this string only once, instead of in the helper function */
     WINTRUST_Guid2Wstr( pgActionID, GuidString);
@@ -872,6 +894,11 @@ BOOL WINAPI WintrustLoadFunctionPointers( GUID* pgActionID,
     pPfns->pfnFinalPolicy = (PFN_PROVIDER_FINALPOLICY_CALL)WINTRUST_ReadProviderFromReg(GuidString, FinalPolicy);
     pPfns->pfnTestFinalPolicy = (PFN_PROVIDER_TESTFINALPOLICY_CALL)WINTRUST_ReadProviderFromReg(GuidString, DiagnosticPolicy);
     pPfns->pfnCleanupPolicy = (PFN_PROVIDER_CLEANUP_CALL)WINTRUST_ReadProviderFromReg(GuidString, Cleanup);
+
+    EnterCriticalSection( &cache_cs );
+    cached_guid = *pgActionID;
+    cached_provider_functions = *pPfns;
+    LeaveCriticalSection( &cache_cs );
 
     return TRUE;
 }
