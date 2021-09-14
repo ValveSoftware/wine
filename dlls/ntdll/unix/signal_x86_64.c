@@ -2469,7 +2469,7 @@ syscall_nr_translation[] =
 {
     {0x19, ~0u, NtQueryInformationProcess},
     {0x36, ~0u, NtQuerySystemInformation},
-    {0xec, ~0u, NtGetContextThread},
+    {0xed, ~0u, NtGetContextThread},
     {0x55, ~0u, NtCreateFile},
     {0x08, ~0u, NtWriteFile},
     {0x06, ~0u, NtReadFile},
