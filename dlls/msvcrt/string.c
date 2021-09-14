@@ -2722,6 +2722,13 @@ __ASM_GLOBAL_FUNC( sse2_memmove,
         MEMMOVE_CLEANUP
         "ret" )
 
+#undef MEMMOVE_INIT
+#undef MEMMOVE_CLEANUP
+#undef DEST_REG
+#undef SRC_REG
+#undef LEN_REG
+#undef TMP_REG
+
 #endif
 
 /*********************************************************************
@@ -2845,6 +2852,56 @@ void * __cdecl memcpy(void *dst, const void *src, size_t n)
     return memmove(dst, src, n);
 }
 
+#if defined(__i386__) || defined(__x86_64__)
+
+#ifdef __i386__
+#define DEST_REG "%edi"
+#define LEN_REG "%ecx"
+#define VAL_REG "%eax"
+
+#define MEMSET_INIT \
+    "movl " DEST_REG ", %edx\n\t" \
+    "movl 4(%esp), " DEST_REG "\n\t" \
+    "movl 8(%esp), " VAL_REG "\n\t" \
+    "movl 12(%esp), " LEN_REG "\n\t"
+
+#define MEMSET_RET \
+    "movl %edx, " DEST_REG "\n\t" \
+    "ret"
+
+#else
+
+#define DEST_REG "%rdi"
+#define LEN_REG "%rcx"
+#define VAL_REG "%eax"
+
+#define MEMSET_INIT \
+    "movq " DEST_REG ", %r9\n\t" \
+    "movq %rcx, " DEST_REG "\n\t" \
+    "movl %edx, " VAL_REG "\n\t" \
+    "movq %r8, " LEN_REG "\n\t"
+
+#define MEMSET_RET \
+    "movq %r9, " DEST_REG "\n\t" \
+    "ret"
+
+#endif
+
+void __cdecl erms_memset_aligned_32(unsigned char *d, unsigned int c, size_t n);
+__ASM_GLOBAL_FUNC( erms_memset_aligned_32,
+        MEMSET_INIT
+        "rep\n\t"
+        "stosb\n\t"
+        MEMSET_RET )
+
+#undef MEMSET_INIT
+#undef MEMSET_RET
+#undef DEST_REG
+#undef LEN_REG
+#undef VAL_REG
+
+#endif
+
 static inline void memset_aligned_32(unsigned char *d, uint64_t v, size_t n)
 {
     while (n >= 32)
@@ -2880,6 +2937,13 @@ void *__cdecl memset(void *dst, int c, size_t n)
         if (n <= 64) return dst;
 
         n = (n - a) & ~0x1f;
+#if defined(__i386__) || defined(__x86_64__)
+        if (n >= 2048 && erms_supported)
+        {
+            erms_memset_aligned_32(d + a, v, n);
+            return dst;
+        }
+#endif
         memset_aligned_32(d + a, v, n);
         return dst;
     }
