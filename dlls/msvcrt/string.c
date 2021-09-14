@@ -2894,6 +2894,27 @@ __ASM_GLOBAL_FUNC( erms_memset_aligned_32,
         "stosb\n\t"
         MEMSET_RET )
 
+void __cdecl sse2_memset_aligned_32(unsigned char *d, unsigned int c, size_t n);
+__ASM_GLOBAL_FUNC( sse2_memset_aligned_32,
+        MEMSET_INIT
+        "movd " VAL_REG ", %xmm0\n\t"
+        "pshufd $0, %xmm0, %xmm0\n\t"
+        "test $0x20, " LEN_REG "\n\t"
+        "je 1f\n\t"
+        "sub $0x20, " LEN_REG "\n\t"
+        "movdqa %xmm0, 0x00(" DEST_REG ", " LEN_REG ")\n\t"
+        "movdqa %xmm0, 0x10(" DEST_REG ", " LEN_REG ")\n\t"
+        "je 2f\n\t"
+        "1:\n\t"
+        "sub $0x40, " LEN_REG "\n\t"
+        "movdqa %xmm0, 0x00(" DEST_REG ", " LEN_REG ")\n\t"
+        "movdqa %xmm0, 0x10(" DEST_REG ", " LEN_REG ")\n\t"
+        "movdqa %xmm0, 0x20(" DEST_REG ", " LEN_REG ")\n\t"
+        "movdqa %xmm0, 0x30(" DEST_REG ", " LEN_REG ")\n\t"
+        "ja 1b\n\t"
+        "2:\n\t"
+        MEMSET_RET )
+
 #undef MEMSET_INIT
 #undef MEMSET_RET
 #undef DEST_REG
@@ -2943,9 +2964,21 @@ void *__cdecl memset(void *dst, int c, size_t n)
             erms_memset_aligned_32(d + a, v, n);
             return dst;
         }
+#ifdef __x86_64__
+        sse2_memset_aligned_32(d + a, v, n);
+        return dst;
+#else
+        if (sse2_supported)
+        {
+            sse2_memset_aligned_32(d + a, v, n);
+            return dst;
+        }
 #endif
+#endif
+#ifndef __x86_64__
         memset_aligned_32(d + a, v, n);
         return dst;
+#endif
     }
     if (n >= 8)
     {
