@@ -2040,6 +2040,7 @@ static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
 
     parser->start_offset = parser->next_offset = parser->stop_offset = 0;
     parser->next_pull_offset = 0;
+    parser->error = false;
 
     return S_OK;
 }
@@ -2048,6 +2049,7 @@ static HRESULT CDECL wg_parser_connect(struct wg_parser *parser, uint64_t file_s
 {
     unsigned int i;
     HRESULT hr;
+    int ret;
 
     parser->seekable = true;
     parser->file_size = file_size;
@@ -2058,7 +2060,25 @@ static HRESULT CDECL wg_parser_connect(struct wg_parser *parser, uint64_t file_s
     if (!parser->init_gst(parser))
         return E_FAIL;
 
+    gst_element_set_state(parser->container, GST_STATE_PAUSED);
+    if (!parser->pull_mode)
+        gst_pad_set_active(parser->my_src, 1);
+    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
+    if (ret == GST_STATE_CHANGE_FAILURE)
+    {
+        GST_ERROR("Failed to play stream.\n");
+        return E_FAIL;
+    }
+
     pthread_mutex_lock(&parser->mutex);
+
+    while (!parser->no_more_pads && !parser->error)
+        pthread_cond_wait(&parser->init_cond, &parser->mutex);
+    if (parser->error)
+    {
+        pthread_mutex_unlock(&parser->mutex);
+        return E_FAIL;
+    }
 
     for (i = 0; i < parser->stream_count; ++i)
     {
@@ -2269,7 +2289,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     parser->their_sink = gst_element_get_static_pad(element, "sink");
 
     pthread_mutex_lock(&parser->mutex);
-    parser->no_more_pads = parser->error = false;
+    parser->no_more_pads = false;
     pthread_mutex_unlock(&parser->mutex);
 
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
@@ -2277,26 +2297,6 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
         GST_ERROR("Failed to link pads, error %d.\n", ret);
         return FALSE;
     }
-
-    gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    if (!parser->pull_mode)
-        gst_pad_set_active(parser->my_src, 1);
-    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
-    if (ret == GST_STATE_CHANGE_FAILURE)
-    {
-        GST_ERROR("Failed to play stream.\n");
-        return FALSE;
-    }
-
-    pthread_mutex_lock(&parser->mutex);
-    while (!parser->no_more_pads && !parser->error)
-        pthread_cond_wait(&parser->init_cond, &parser->mutex);
-    if (parser->error)
-    {
-        pthread_mutex_unlock(&parser->mutex);
-        return FALSE;
-    }
-    pthread_mutex_unlock(&parser->mutex);
 
     return TRUE;
 }
@@ -2318,7 +2318,7 @@ static BOOL avi_parser_init_gst(struct wg_parser *parser)
     parser->their_sink = gst_element_get_static_pad(element, "sink");
 
     pthread_mutex_lock(&parser->mutex);
-    parser->no_more_pads = parser->error = false;
+    parser->no_more_pads = false;
     pthread_mutex_unlock(&parser->mutex);
 
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
@@ -2326,26 +2326,6 @@ static BOOL avi_parser_init_gst(struct wg_parser *parser)
         GST_ERROR("Failed to link pads, error %d.\n", ret);
         return FALSE;
     }
-
-    gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    if (!parser->pull_mode)
-        gst_pad_set_active(parser->my_src, 1);
-    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
-    if (ret == GST_STATE_CHANGE_FAILURE)
-    {
-        GST_ERROR("Failed to play stream.\n");
-        return FALSE;
-    }
-
-    pthread_mutex_lock(&parser->mutex);
-    while (!parser->no_more_pads && !parser->error)
-        pthread_cond_wait(&parser->init_cond, &parser->mutex);
-    if (parser->error)
-    {
-        pthread_mutex_unlock(&parser->mutex);
-        return FALSE;
-    }
-    pthread_mutex_unlock(&parser->mutex);
 
     return TRUE;
 }
@@ -2377,17 +2357,8 @@ static BOOL mpeg_audio_parser_init_gst(struct wg_parser *parser)
         GST_ERROR("Failed to link source pads, error %d.\n", ret);
         return FALSE;
     }
-
     gst_pad_set_active(stream->my_sink, 1);
-    gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    if (!parser->pull_mode)
-        gst_pad_set_active(parser->my_src, 1);
-    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
-    if (ret == GST_STATE_CHANGE_FAILURE)
-    {
-        GST_ERROR("Failed to play stream.\n");
-        return FALSE;
-    }
+    parser->no_more_pads = true;
 
     return TRUE;
 }
@@ -2420,17 +2391,8 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
         GST_ERROR("Failed to link source pads, error %d.\n", ret);
         return FALSE;
     }
-
     gst_pad_set_active(stream->my_sink, 1);
-    gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    if (!parser->pull_mode)
-        gst_pad_set_active(parser->my_src, 1);
-    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
-    if (ret == GST_STATE_CHANGE_FAILURE)
-    {
-        GST_ERROR("Failed to play stream.\n");
-        return FALSE;
-    }
+    parser->no_more_pads = true;
 
     return TRUE;
 }
@@ -2506,14 +2468,8 @@ static BOOL raw_media_converter_init_gst(struct wg_parser *parser)
     }
 
     gst_pad_set_active(stream->my_sink, 1);
-    gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    gst_pad_set_active(parser->my_src, 1);
-    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
-    if (ret == GST_STATE_CHANGE_FAILURE)
-    {
-        GST_ERROR("Failed to play stream.\n");
-        return FALSE;
-    }
+
+    parser->no_more_pads = true;
 
     return TRUE;
 }
