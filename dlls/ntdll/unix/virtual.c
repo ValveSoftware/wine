@@ -753,16 +753,85 @@ static BYTE get_page_vprot( const void *addr )
  *           get_vprot_range_size
  *
  * Return the size of the region with equal masked protection byte.
+ * base and size should be page aligned.
  */
 static SIZE_T get_vprot_range_size( BYTE *base, SIZE_T size, BYTE mask, BYTE *vprot )
 {
-    BYTE *addr;
+#define BYTES_IN_WORD sizeof(UINT64)
+    SIZE_T i, start_idx, end_idx, aligned_start_idx, aligned_end_idx, count;
+    static const UINT_PTR index_align_mask = BYTES_IN_WORD - 1;
+    UINT64 vprot_word, mask_word, changed_word;
+    const BYTE *vprot_ptr;
+    unsigned int j;
+#ifdef _WIN64
+    size_t idx_page;
+#endif
+    size_t idx;
 
-    *vprot = get_page_vprot( base );
-    for (addr = base + page_size; addr != base + size; addr += page_size)
-        if ((*vprot ^ get_page_vprot( addr )) & mask) break;
 
-    return addr - base;
+    TRACE("base %p, size %p, mask %#x.\n", base, (void *)size, mask);
+
+    start_idx = (size_t)base >> page_shift;
+    end_idx = start_idx + (size >> page_shift);
+    idx = start_idx;
+#ifdef _WIN64
+    end_idx = min( end_idx, pages_vprot_size << pages_vprot_shift );
+    if (end_idx <= start_idx) return size;
+    idx_page = idx >> pages_vprot_shift;
+    idx &= pages_vprot_mask;
+    vprot_ptr = pages_vprot[idx_page];
+#else
+    vprot_ptr = pages_vprot;
+#endif
+
+    aligned_start_idx = (start_idx + index_align_mask) & ~index_align_mask;
+    if (aligned_start_idx > end_idx) aligned_start_idx = end_idx;
+
+    aligned_end_idx = end_idx & ~index_align_mask;
+    if (aligned_end_idx < aligned_start_idx) aligned_end_idx = aligned_start_idx;
+
+    /* Page count in zero level page table on x64 is at least the multiples of BYTES_IN_WORD
+     * so we don't have to worry about crossing the boundary on unaligned idx values. */
+    *vprot = vprot_ptr[idx];
+    count = aligned_start_idx - start_idx;
+
+    for (i = 0; i < count; ++i)
+        if ((*vprot ^ vprot_ptr[idx++]) & mask) return i << page_shift;
+
+    count += aligned_end_idx - aligned_start_idx;
+    vprot_word = 0x101010101010101ull * *vprot;
+    mask_word = 0x101010101010101ull * mask;
+    for (; i < count; i += 8)
+    {
+#ifdef _WIN64
+        if (idx >> pages_vprot_shift)
+        {
+            idx = 0;
+            vprot_ptr = pages_vprot[idx_page++];
+        }
+#endif
+        changed_word = (vprot_word ^ *(UINT64 *)(vprot_ptr + idx)) & mask_word;
+        if (changed_word)
+        {
+            for (j = 0; !((BYTE *)&changed_word)[j]; ++j) ++i;
+            return i << page_shift;
+        }
+        idx += 8;
+    }
+
+#ifdef _WIN64
+    if (aligned_end_idx != end_idx && (idx >> pages_vprot_shift))
+    {
+        idx = 0;
+        vprot_ptr = pages_vprot[idx_page++];
+    }
+#endif
+    count += end_idx - aligned_end_idx;
+    for (; i < count; ++i)
+        if ((*vprot ^ vprot_ptr[idx++]) & mask) return i << page_shift;
+
+    return *vprot & mask ? count << page_shift : size;
+#undef BYTES_IN_WORD
 }
 
 /***********************************************************************
