@@ -4004,7 +4004,7 @@ static NTSTATUS get_basic_memory_info( HANDLE process, LPCVOID addr,
         {
             /* not in a reserved area at all, pretend it's allocated */
 #ifdef __i386__
-            if (base >= (char *)address_space_start)
+            if (base >= (BYTE *)address_space_start)
             {
                 info->State             = MEM_RESERVE;
                 info->Protect           = PAGE_NOACCESS;
@@ -4025,7 +4025,13 @@ static NTSTATUS get_basic_memory_info( HANDLE process, LPCVOID addr,
     else
     {
         BYTE vprot;
-        SIZE_T range_size = get_committed_size( view, base, &vprot );
+        SIZE_T range_size;
+
+        if (view->protect & SEC_RESERVE)
+            range_size = get_committed_size( view, base, &vprot );
+        else
+            range_size = view->size - (base - (BYTE *)view->base);
+        info->RegionSize = get_vprot_range_size( base, range_size, ~VPROT_WRITEWATCH, &vprot );
 
         info->State = (vprot & VPROT_COMMITTED) ? MEM_COMMIT : MEM_RESERVE;
         info->Protect = (vprot & VPROT_COMMITTED) ? get_win32_prot( vprot, view->protect ) : 0;
@@ -4033,8 +4039,6 @@ static NTSTATUS get_basic_memory_info( HANDLE process, LPCVOID addr,
         if (view->protect & SEC_IMAGE) info->Type = MEM_IMAGE;
         else if (view->protect & (SEC_FILE | SEC_RESERVE | SEC_COMMIT)) info->Type = MEM_MAPPED;
         else info->Type = MEM_PRIVATE;
-
-        info->RegionSize = get_vprot_range_size( base, range_size, ~VPROT_WRITEWATCH, &vprot );
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
 
