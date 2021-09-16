@@ -779,7 +779,7 @@ static SIZE_T get_vprot_range_size( BYTE *base, SIZE_T size, BYTE mask, BYTE *vp
     if (end_idx <= start_idx) return size;
     idx_page = idx >> pages_vprot_shift;
     idx &= pages_vprot_mask;
-    vprot_ptr = pages_vprot[idx_page];
+    vprot_ptr = pages_vprot[idx_page++];
 #else
     vprot_ptr = pages_vprot;
 #endif
@@ -823,7 +823,7 @@ static SIZE_T get_vprot_range_size( BYTE *base, SIZE_T size, BYTE mask, BYTE *vp
     if (aligned_end_idx != end_idx && (idx >> pages_vprot_shift))
     {
         idx = 0;
-        vprot_ptr = pages_vprot[idx_page++];
+        vprot_ptr = pages_vprot[idx_page];
     }
 #endif
     count += end_idx - aligned_end_idx;
