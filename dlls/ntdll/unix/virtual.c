@@ -750,6 +750,22 @@ static BYTE get_page_vprot( const void *addr )
 
 
 /***********************************************************************
+ *           get_vprot_range_size
+ *
+ * Return the size of the region with equal masked protection byte.
+ */
+static SIZE_T get_vprot_range_size( BYTE *base, SIZE_T size, BYTE mask, BYTE *vprot )
+{
+    BYTE *addr;
+
+    *vprot = get_page_vprot( base );
+    for (addr = base + page_size; addr != base + size; addr += page_size)
+        if ((*vprot ^ get_page_vprot( addr )) & mask) break;
+
+    return addr - base;
+}
+
+/***********************************************************************
  *           set_page_vprot
  *
  * Set a range of page protection bytes.
@@ -1960,18 +1976,21 @@ done:
  */
 static SIZE_T get_committed_size( struct file_view *view, void *base, BYTE *vprot )
 {
-    SIZE_T i, start;
+    SIZE_T offset;
 
-    start = ((char *)base - (char *)view->base) >> page_shift;
-    *vprot = get_page_vprot( base );
+    base = ROUND_ADDR( base, page_mask );
+    offset = (BYTE *)base - (BYTE *)view->base;
 
     if (view->protect & SEC_RESERVE)
     {
         SIZE_T ret = 0;
+
+        *vprot = get_page_vprot( base );
+
         SERVER_START_REQ( get_mapping_committed_range )
         {
             req->base   = wine_server_client_ptr( view->base );
-            req->offset = start << page_shift;
+            req->offset = offset;
             if (!wine_server_call( req ))
             {
                 ret = reply->size;
@@ -1985,9 +2004,8 @@ static SIZE_T get_committed_size( struct file_view *view, void *base, BYTE *vpro
         SERVER_END_REQ;
         return ret;
     }
-    for (i = start + 1; i < view->size >> page_shift; i++)
-        if ((*vprot ^ get_page_vprot( (char *)view->base + (i << page_shift) )) & VPROT_COMMITTED) break;
-    return (i - start) << page_shift;
+
+    return get_vprot_range_size( base, view->size - offset, VPROT_COMMITTED, vprot );
 }
 
 
@@ -3909,7 +3927,7 @@ static NTSTATUS get_basic_memory_info( HANDLE process, LPCVOID addr,
                                        SIZE_T len, SIZE_T *res_len )
 {
     struct file_view *view;
-    char *base, *alloc_base = 0, *alloc_end = working_set_limit;
+    BYTE *base, *alloc_base = 0, *alloc_end = working_set_limit;
     struct wine_rb_entry *ptr;
     sigset_t sigset;
 
@@ -3956,20 +3974,20 @@ static NTSTATUS get_basic_memory_info( HANDLE process, LPCVOID addr,
     while (ptr)
     {
         view = WINE_RB_ENTRY_VALUE( ptr, struct file_view, entry );
-        if ((char *)view->base > base)
+        if ((BYTE *)view->base > base)
         {
             alloc_end = view->base;
             ptr = ptr->left;
         }
-        else if ((char *)view->base + view->size <= base)
+        else if ((BYTE *)view->base + view->size <= base)
         {
-            alloc_base = (char *)view->base + view->size;
+            alloc_base = (BYTE *)view->base + view->size;
             ptr = ptr->right;
         }
         else
         {
             alloc_base = view->base;
-            alloc_end = (char *)view->base + view->size;
+            alloc_end = (BYTE *)view->base + view->size;
             break;
         }
     }
@@ -4007,7 +4025,6 @@ static NTSTATUS get_basic_memory_info( HANDLE process, LPCVOID addr,
     else
     {
         BYTE vprot;
-        char *ptr;
         SIZE_T range_size = get_committed_size( view, base, &vprot );
 
         info->State = (vprot & VPROT_COMMITTED) ? MEM_COMMIT : MEM_RESERVE;
@@ -4016,9 +4033,8 @@ static NTSTATUS get_basic_memory_info( HANDLE process, LPCVOID addr,
         if (view->protect & SEC_IMAGE) info->Type = MEM_IMAGE;
         else if (view->protect & (SEC_FILE | SEC_RESERVE | SEC_COMMIT)) info->Type = MEM_MAPPED;
         else info->Type = MEM_PRIVATE;
-        for (ptr = base; ptr < base + range_size; ptr += page_size)
-            if ((get_page_vprot( ptr ) ^ vprot) & ~VPROT_WRITEWATCH) break;
-        info->RegionSize = ptr - base;
+
+        info->RegionSize = get_vprot_range_size( base, range_size, ~VPROT_WRITEWATCH, &vprot );
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
 
