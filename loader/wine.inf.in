@@ -714,8 +714,6 @@ HKLM,%MciExtStr%,"wmx",,"MPEGVideo"
 HKLM,%MciExtStr%,"wvx",,"MPEGVideo"
 
 [Misc]
-HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.Gaming.Input.Gamepad,"DllPath",2,"Windows.Gaming.Input.dll"
-HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.Gaming.Input.RawGameController,"DllPath",2,"Windows.Gaming.Input.dll"
 HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.Media.SpeechSynthesis.SpeechSynthesizer,"DllPath",2,"Windows.Media.Speech.dll"
 HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.Media.Devices.MediaDevice,"DllPath",2,"Windows.Media.Devices.dll"
 HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.System.UserProfile.GlobalizationPreferences,"DllPath",2,"Windows.Globalization.dll"
