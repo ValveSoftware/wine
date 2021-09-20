@@ -1669,8 +1669,6 @@ enable_wiaservc
 enable_wimgapi
 enable_windowscodecs
 enable_windowscodecsext
-enable_windows_media_speech_dll
-enable_windows_media_devices_dll
 enable_winealsa_drv
 enable_wineandroid_drv
 enable_winebus_sys
@@ -21362,8 +21360,6 @@ wine_fn_config_makefile dlls/windowscodecs enable_windowscodecs
 wine_fn_config_makefile dlls/windowscodecs/tests enable_tests
 wine_fn_config_makefile dlls/windowscodecsext enable_windowscodecsext
 wine_fn_config_makefile dlls/windowscodecsext/tests enable_tests
-wine_fn_config_makefile dlls/windows.media.speech.dll enable_windows_media_speech_dll
-wine_fn_config_makefile dlls/windows.media.devices.dll enable_windows_media_devices_dll
 wine_fn_config_makefile dlls/winealsa.drv enable_winealsa_drv
 wine_fn_config_makefile dlls/wineandroid.drv enable_wineandroid_drv
 wine_fn_config_makefile dlls/winebus.sys enable_winebus_sys
