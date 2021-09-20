@@ -715,8 +715,6 @@ HKLM,%MciExtStr%,"wvx",,"MPEGVideo"
 
 [Misc]
 HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.Media.SpeechSynthesis.SpeechSynthesizer,"DllPath",2,"Windows.Media.Speech.dll"
-HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.Media.Devices.MediaDevice,"DllPath",2,"Windows.Media.Devices.dll"
-HKLM,Software\Microsoft\WindowsRuntime\ActivatableClassId\Windows.System.UserProfile.GlobalizationPreferences,"DllPath",2,"Windows.Globalization.dll"
 HKLM,Software\Borland\Database Engine\Settings\SYSTEM\INIT,SHAREDMEMLOCATION,,9000
 HKLM,Software\Clients\Mail,,2,"Native Mail Client"
 HKLM,Software\Clients\Mail\Native Mail Client,,2,"Native Mail Client"
