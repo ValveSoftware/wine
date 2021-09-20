@@ -50,6 +50,7 @@ struct object_header
     LONG refs;
     WINHTTP_STATUS_CALLBACK callback;
     DWORD notify_mask;
+    unsigned int recursion_count;
     struct list entry;
 };
 
