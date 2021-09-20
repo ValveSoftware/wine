@@ -1,5 +1,0 @@
-MODULE = windows.globalization.dll
-IMPORTS = combase uuid
-EXTRADLLFLAGS = -mno-cygwin
-C_SRCS = \
-	windows.globalization_main.c
