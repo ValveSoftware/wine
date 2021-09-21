@@ -1902,6 +1902,15 @@ static struct wgl_context * WINAPI glxdrv_wglCreateContext( HDC hdc )
 
 static void fs_hack_destroy_context( struct wgl_context *ctx )
 {
+    GLXContext prev_context;
+    GLXDrawable prev_drawable;
+
+    if (!ctx->drawables[0]) return;
+
+    prev_context = pglXGetCurrentContext();
+    prev_drawable = pglXGetCurrentDrawable();
+    pglXMakeCurrent(gdi_display, ctx->drawables[0]->drawable, ctx->ctx);
+
     pglDeleteBuffers(1, &ctx->ramp_ubo);
     pglDeleteProgram(ctx->fs_hack_gamma_pgm);
     ctx->fs_hack_gamma_pgm = 0;
@@ -1921,6 +1930,8 @@ static void fs_hack_destroy_context( struct wgl_context *ctx )
     if (ctx->fs_hack_fbo)
         pglDeleteFramebuffers( 1, &ctx->fs_hack_fbo );
     ctx->fs_hack_resolve_fbo = ctx->fs_hack_fbo = 0;
+
+    pglXMakeCurrent(gdi_display, prev_drawable, prev_context);
 }
 
 /***********************************************************************
