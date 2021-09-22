@@ -70,6 +70,7 @@ struct object_token
     LONG ref;
 
     HKEY token_key;
+    WCHAR *token_id;
 };
 
 static struct object_token *impl_from_ISpObjectToken( ISpObjectToken *iface )
@@ -765,7 +766,6 @@ static HRESULT WINAPI token_enum_Item( ISpObjectTokenEnumBuilder *iface,
     ret = RegOpenKeyExW (This->key, subkey, 0, KEY_READ, &key);
     if (ret != ERROR_SUCCESS)
         return HRESULT_FROM_WIN32(ret);
-    heap_free(subkey);
 
     hr = token_create( NULL, &IID_ISpObjectToken, (void**)&subtoken );
     if (FAILED(hr))
@@ -773,6 +773,7 @@ static HRESULT WINAPI token_enum_Item( ISpObjectTokenEnumBuilder *iface,
 
     object = impl_from_ISpObjectToken( subtoken );
     object->token_key = key;
+    object->token_id = subkey;
 
     *token = subtoken;
 
@@ -928,6 +929,7 @@ static ULONG WINAPI token_Release( ISpObjectToken *iface )
     if (!ref)
     {
         if (This->token_key) RegCloseKey( This->token_key );
+        heap_free(This->token_id);
         heap_free( This );
     }
 
@@ -1054,8 +1056,27 @@ static HRESULT WINAPI token_SetId( ISpObjectToken *iface,
 static HRESULT WINAPI token_GetId( ISpObjectToken *iface,
                                    LPWSTR *token_id )
 {
-    FIXME( "stub\n" );
-    return E_NOTIMPL;
+    struct object_token *This = impl_from_ISpObjectToken( iface );
+
+    TRACE( "%p, %p\n", This, token_id);
+
+    if (!This->token_key)
+        return SPERR_UNINITIALIZED;
+
+    if (!token_id)
+        return E_POINTER;
+
+    if (!This->token_id)
+    {
+        FIXME("Loading default category not supported.\n");
+        return E_POINTER;
+    }
+    *token_id = CoTaskMemAlloc( (wcslen(This->token_id) + 1) * sizeof(WCHAR));
+    if (!*token_id)
+        return E_OUTOFMEMORY;
+
+    wcscpy(*token_id, This->token_id);
+    return S_OK;
 }
 
 static HRESULT WINAPI token_GetCategory( ISpObjectToken *iface,
