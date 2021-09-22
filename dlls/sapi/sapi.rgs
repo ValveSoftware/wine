@@ -19,6 +19,13 @@ HKLM
                 }
                 NoRemove Voices
                 {
+                    NoRemove Tokens
+                    {
+                        NoRemove 'Wine Default Voice'
+                        {
+                            NoRemove Attributes
+                        }
+                    }
                 }
             }
         }
