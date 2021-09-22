@@ -64,6 +64,19 @@ static struct token_enum *impl_from_ISpObjectTokenEnumBuilder( ISpObjectTokenEnu
     return CONTAINING_RECORD( iface, struct token_enum, ISpObjectTokenEnumBuilder_iface );
 }
 
+struct object_token
+{
+    ISpObjectToken ISpObjectToken_iface;
+    LONG ref;
+
+    HKEY token_key;
+};
+
+static struct object_token *impl_from_ISpObjectToken( ISpObjectToken *iface )
+{
+    return CONTAINING_RECORD( iface, struct object_token, ISpObjectToken_iface );
+}
+
 static HRESULT WINAPI data_key_QueryInterface( ISpRegDataKey *iface, REFIID iid, void **obj )
 {
     struct data_key *This = impl_from_ISpRegDataKey( iface );
@@ -725,8 +738,45 @@ static HRESULT WINAPI token_enum_Clone( ISpObjectTokenEnumBuilder *iface,
 static HRESULT WINAPI token_enum_Item( ISpObjectTokenEnumBuilder *iface,
                                        ULONG index, ISpObjectToken **token )
 {
-    FIXME( "stub\n" );
-    return E_NOTIMPL;
+    struct token_enum *This = impl_from_ISpObjectTokenEnumBuilder( iface );
+    struct object_token *object;
+    ISpObjectToken *subtoken;
+    HRESULT hr;
+    WCHAR *subkey;
+    DWORD size;
+    LONG ret;
+    HKEY key;
+
+    TRACE( "%p, %ld, %p\n", This, index, token );
+
+    if (!This->init)
+        return SPERR_UNINITIALIZED;
+
+    RegQueryInfoKeyW(This->key, NULL, NULL, NULL, NULL, &size, NULL, NULL, NULL, NULL, NULL, NULL);
+    size = (size+1) * sizeof(WCHAR);
+    subkey = heap_alloc(size);
+    if (!subkey)
+        return E_OUTOFMEMORY;
+
+    ret = RegEnumKeyExW(This->key, index, subkey, &size, NULL, NULL, NULL, NULL);
+    if (ret != ERROR_SUCCESS)
+        return HRESULT_FROM_WIN32(ret);
+
+    ret = RegOpenKeyExW (This->key, subkey, 0, KEY_READ, &key);
+    if (ret != ERROR_SUCCESS)
+        return HRESULT_FROM_WIN32(ret);
+    heap_free(subkey);
+
+    hr = token_create( NULL, &IID_ISpObjectToken, (void**)&subtoken );
+    if (FAILED(hr))
+        return hr;
+
+    object = impl_from_ISpObjectToken( subtoken );
+    object->token_key = key;
+
+    *token = subtoken;
+
+    return hr;
 }
 
 static HRESULT WINAPI token_enum_GetCount( ISpObjectTokenEnumBuilder *iface,
@@ -836,19 +886,6 @@ HRESULT token_enum_create( IUnknown *outer, REFIID iid, void **obj )
 
     ISpObjectTokenEnumBuilder_Release( &This->ISpObjectTokenEnumBuilder_iface );
     return hr;
-}
-
-struct object_token
-{
-    ISpObjectToken ISpObjectToken_iface;
-    LONG ref;
-
-    HKEY token_key;
-};
-
-static struct object_token *impl_from_ISpObjectToken( ISpObjectToken *iface )
-{
-    return CONTAINING_RECORD( iface, struct object_token, ISpObjectToken_iface );
 }
 
 static HRESULT WINAPI token_QueryInterface( ISpObjectToken *iface,
