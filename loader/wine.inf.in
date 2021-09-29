@@ -5648,6 +5648,7 @@ HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
 HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 10"
+HKLM,%CurrentVersionNT%,"ReleaseId",,"1909"
 HKLM,%Control%\ProductOptions,"ProductType",2,"WinNT"
 HKLM,%Control%\Windows,"CSDVersion",0x10003,0x0
 HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
@@ -5666,6 +5667,7 @@ HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
 HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 10"
+HKLM,%CurrentVersionNT%,"ReleaseId",,"1909"
 HKLM,%Control%\ProductOptions,"ProductType",2,"WinNT"
 HKLM,%Control%\Windows,"CSDVersion",0x10003,0x0
 HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
