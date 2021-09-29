@@ -2547,8 +2547,10 @@ HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+HKLM,%CurrentVersionNT%,"DisplayVersion",2,"21H1"
 HKLM,%CurrentVersionNT%,"EditionId",2,"Professional"
 HKLM,%CurrentVersionNT%,"ProductName",2,"Windows 10 Pro"
+HKLM,%CurrentVersionNT%,"ReleaseId",,"2009"
 HKLM,%Control%\ProductOptions,"ProductType",2,"WinNT"
 HKLM,%Control%\Windows,"CSDVersion",0x10003,0
 HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
