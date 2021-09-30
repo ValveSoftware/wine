@@ -35,8 +35,22 @@
 #include "wine/debug.h"
 #include "wine/list.h"
 #include "wine/unixlib.h"
+#include "wine/js_blacklist.h" /* for wine_js_blacklist */
 
 #include "unix_private.h"
+
+BOOL is_wine_blacklisted(DWORD vid, DWORD pid)
+{
+    int i;
+
+    for (i = 0; i < ARRAY_SIZE(wine_js_blacklist); ++i)
+    {
+        if (vid != wine_js_blacklist[i].vid) continue;
+        if (!wine_js_blacklist[i].pid || wine_js_blacklist[i].pid == pid) return TRUE;
+    }
+
+    return FALSE;
+}
 
 /* logic from SDL2's SDL_ShouldIgnoreGameController */
 BOOL is_sdl_blacklisted(DWORD vid, DWORD pid)

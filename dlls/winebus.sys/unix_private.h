@@ -265,6 +265,7 @@ extern void hid_device_drop_report(struct unix_device *iface) DECLSPEC_HIDDEN;
 extern void hid_device_set_effect_state(struct unix_device *iface, BYTE index, BYTE flags) DECLSPEC_HIDDEN;
 
 BOOL is_sdl_blacklisted(DWORD vid, DWORD pid) DECLSPEC_HIDDEN;
+BOOL is_wine_blacklisted(DWORD vid, DWORD pid) DECLSPEC_HIDDEN;
 BOOL is_steam_controller(WORD vid, WORD pid) DECLSPEC_HIDDEN;
 BOOL is_xbox_gamepad(WORD vid, WORD pid) DECLSPEC_HIDDEN;
 BOOL is_dualshock4_gamepad(WORD vid, WORD pid) DECLSPEC_HIDDEN;
