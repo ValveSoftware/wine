@@ -38,6 +38,19 @@
 
 #include "unix_private.h"
 
+BOOL is_steam_controller(WORD vid, WORD pid)
+{
+    if (vid != 0x28de) return FALSE;
+    if (pid == 0x1101) return TRUE; /* Valve Legacy Steam Controller */
+    if (pid == 0x1102) return TRUE; /* Valve wired Steam Controller */
+    if (pid == 0x1105) return TRUE; /* Valve Bluetooth Steam Controller */
+    if (pid == 0x1106) return TRUE; /* Valve Bluetooth Steam Controller */
+    if (pid == 0x1142) return TRUE; /* Valve wireless Steam Controller */
+    if (pid == 0x1201) return TRUE; /* Valve wired Steam Controller */
+    if (pid == 0x1202) return TRUE; /* Valve Bluetooth Steam Controller */
+    return FALSE;
+}
+
 BOOL is_xbox_gamepad(WORD vid, WORD pid)
 {
     if (vid != 0x045e) return FALSE;
