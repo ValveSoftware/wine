@@ -248,9 +248,9 @@ static const DWRITE_UNICODE_RANGE latin_ranges[] =
     { 0xfe20, 0xfe23 },
 };
 
-static const WCHAR noto_sans_arabicW[] = {'N','o','t','o',' ','S','a','n','s',' ','A','r','a','b','i','c',0};
+static const WCHAR microsoft_sans_serifW[] = {'M','i','c','r','o','s','o','f','t',' ','S','a','n','s',' ','S','e','r','i','f',0};
 
-static const WCHAR *arabic_families[] = { noto_sans_arabicW };
+static const WCHAR *arabic_families[] = { microsoft_sans_serifW };
 
 static const DWRITE_UNICODE_RANGE arabic_ranges[] =
 {
