@@ -71,6 +71,7 @@ struct device_extension
 {
     struct list entry;
     DEVICE_OBJECT *device;
+    const WCHAR *bus_name;
 
     CRITICAL_SECTION cs;
     enum device_state state;
@@ -284,7 +285,7 @@ static void remove_pending_irps(DEVICE_OBJECT *device)
     }
 }
 
-static DEVICE_OBJECT *bus_create_hid_device(struct device_desc *desc, struct unix_device *unix_device)
+static DEVICE_OBJECT *bus_create_hid_device(const WCHAR *bus_name, struct device_desc *desc, struct unix_device *unix_device)
 {
     struct device_extension *ext;
     DEVICE_OBJECT *device;
@@ -307,6 +308,7 @@ static DEVICE_OBJECT *bus_create_hid_device(struct device_desc *desc, struct uni
 
     /* fill out device_extension struct */
     ext = (struct device_extension *)device->DeviceExtension;
+    ext->bus_name           = bus_name;
     ext->device             = device;
     ext->desc               = *desc;
     ext->index              = get_device_index(desc);
@@ -329,6 +331,17 @@ static DEVICE_OBJECT *bus_find_unix_device(struct unix_device *unix_device)
 
     LIST_FOR_EACH_ENTRY(ext, &device_list, struct device_extension, entry)
         if (ext->unix_device == unix_device) return ext->device;
+
+    return NULL;
+}
+
+static DEVICE_OBJECT *bus_find_device_from_vid_pid(const WCHAR *bus_name, struct device_desc *desc)
+{
+    struct device_extension *ext;
+
+    LIST_FOR_EACH_ENTRY(ext, &device_list, struct device_extension, entry)
+        if (!wcscmp(ext->bus_name, bus_name) && ext->desc.vid == desc->vid &&
+            ext->desc.pid == desc->pid) return ext->device;
 
     return NULL;
 }
@@ -519,7 +532,7 @@ static void mouse_device_create(void)
     struct device_create_params params = {{0}};
 
     if (winebus_call(mouse_create, &params)) return;
-    mouse_obj = bus_create_hid_device(&params.desc, params.device);
+    mouse_obj = bus_create_hid_device(L"WINEBUS", &params.desc, params.device);
     IoInvalidateDeviceRelations(bus_pdo, BusRelations);
 }
 
@@ -528,7 +541,7 @@ static void keyboard_device_create(void)
     struct device_create_params params = {{0}};
 
     if (winebus_call(keyboard_create, &params)) return;
-    keyboard_obj = bus_create_hid_device(&params.desc, params.device);
+    keyboard_obj = bus_create_hid_device(L"WINEBUS", &params.desc, params.device);
     IoInvalidateDeviceRelations(bus_pdo, BusRelations);
 }
 
@@ -574,7 +587,20 @@ static DWORD CALLBACK bus_main_thread(void *args)
             IoInvalidateDeviceRelations(bus_pdo, BusRelations);
             break;
         case BUS_EVENT_TYPE_DEVICE_CREATED:
-            device = bus_create_hid_device(&event->device_created.desc, event->device);
+            RtlEnterCriticalSection(&device_list_cs);
+            if (!wcscmp(bus.name, L"SDL"))
+            {
+                if (bus_find_device_from_vid_pid(L"UDEV", &event->device_created.desc)) device = NULL;
+                else device = bus_create_hid_device(bus.name, &event->device_created.desc, event->device);
+            }
+            else if (!wcscmp(bus.name, L"UDEV"))
+            {
+                if ((device = bus_find_device_from_vid_pid(L"SDL", &event->device_created.desc)))
+                    bus_unlink_hid_device(device);
+                device = bus_create_hid_device(bus.name, &event->device_created.desc, event->device);
+            }
+            else device = bus_create_hid_device(bus.name, &event->device_created.desc, event->device);
+            RtlLeaveCriticalSection(&device_list_cs);
             if (device) IoInvalidateDeviceRelations(bus_pdo, BusRelations);
             else
             {
@@ -778,11 +804,9 @@ static NTSTATUS fdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
         mouse_device_create();
         keyboard_device_create();
 
-        if (!check_bus_option(L"Enable SDL", 1) || sdl_driver_init())
-        {
-            udev_driver_init();
-            iohid_driver_init();
-        }
+        udev_driver_init();
+        iohid_driver_init();
+        sdl_driver_init();
 
         irp->IoStatus.Status = STATUS_SUCCESS;
         break;
