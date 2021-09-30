@@ -882,6 +882,13 @@ static void sdl_add_device(unsigned int index)
         return;
     }
 
+    if (is_wine_blacklisted(desc.vid, desc.pid))
+    {
+        /* this device is blacklisted */
+        TRACE("ignoring %s, in Wine blacklist\n", debugstr_device_desc(&desc));
+        return;
+    }
+
     if (desc.vid == 0x28de && desc.pid == 0x11ff)
     {
         TRACE("Steam virtual controller, pretending it's an Xbox 360 controller\n");
