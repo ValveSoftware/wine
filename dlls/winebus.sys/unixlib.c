@@ -38,6 +38,12 @@
 
 #include "unix_private.h"
 
+BOOL is_wine_blacklisted(WORD vid, WORD pid)
+{
+    if (vid == 0x056a) return TRUE; /* all Wacom devices */
+    return FALSE;
+}
+
 /* logic from SDL2's SDL_ShouldIgnoreGameController */
 BOOL is_sdl_blacklisted(WORD vid, WORD pid)
 {
