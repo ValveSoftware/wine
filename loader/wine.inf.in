@@ -2797,3 +2797,10 @@ HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynt
 HKCU,Software\Wine\AppDefaults\rayne1.exe\DllOverrides,"d3d8",,"native"
 HKCU,Software\Wine\AppDefaults\rayne2.exe\DllOverrides,"d3d8",,"native"
 HKCU,Software\Wine\AppDefaults\RDR2.exe\DllOverrides,"vulkan-1",,"native"
+;;App-specific overrides for atiadlxx.dll.
+HKCU,Software\Wine\AppDefaults\s2_sp64_ship.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\s2_mp64_ship.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\h1_sp64_ship.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\h1_mp64_ship.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\iw7_ship.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\BlackOps3.exe\DllOverrides,"atiadlxx",,"builtin"
