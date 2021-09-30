@@ -1286,6 +1286,13 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
+    if (is_steam_controller(desc.vid, desc.pid))
+    {
+        /* this device is being used as a virtual Steam controller */
+        TRACE("hidraw %s: ignoring %s, steam controller\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+        close(fd);
+        return;
+    }
     if (is_xbox_gamepad(desc.vid, desc.pid))
     {
         /* SDL handles xbox (and steam) controllers */
