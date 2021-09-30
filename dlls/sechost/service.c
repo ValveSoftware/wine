@@ -314,12 +314,22 @@ SC_HANDLE WINAPI DECLSPEC_HOTPATCH OpenServiceW( SC_HANDLE manager, const WCHAR 
     SC_RPC_HANDLE handle = NULL;
     DWORD err;
 
+    char str[64];
+
     TRACE( "%p %s %#x\n", manager, debugstr_w(name), access );
 
     if (!manager)
     {
         SetLastError( ERROR_INVALID_HANDLE );
         return NULL;
+    }
+
+    /* HACK for ARK: Survivial Evolved checking the status of BEService to determine whether BE is enabled. */
+    if(GetEnvironmentVariableA("SteamGameId", str, sizeof(str)) && !strcmp(str, "346110") &&
+        !wcscmp(name, L"BEService"))
+    {
+        WARN("HACK: returning fake service handle for BEService.\n");
+        return (void *)0xdeadbeef;
     }
 
     __TRY
@@ -1106,6 +1116,8 @@ BOOL WINAPI DECLSPEC_HOTPATCH QueryServiceStatusEx( SC_HANDLE service, SC_STATUS
 {
     DWORD err;
 
+    char str[64];
+
     TRACE( "%p %d %p %d %p\n", service, level, buffer, size, ret_size );
 
     if (level != SC_STATUS_PROCESS_INFO) return set_error( ERROR_INVALID_LEVEL );
@@ -1114,6 +1126,24 @@ BOOL WINAPI DECLSPEC_HOTPATCH QueryServiceStatusEx( SC_HANDLE service, SC_STATUS
     {
         *ret_size = sizeof(SERVICE_STATUS_PROCESS);
         return set_error( ERROR_INSUFFICIENT_BUFFER );
+    }
+
+    /* HACK for ARK: Survivial Evolved checking the status of BEService to determine whether BE is enabled. */
+    if(GetEnvironmentVariableA("SteamGameId", str, sizeof(str)) && !strcmp(str, "346110") &&
+        service == (void *)0xdeadbeef)
+    {
+        SERVICE_STATUS_PROCESS *status = (SERVICE_STATUS_PROCESS *)buffer;
+        WARN("HACK: returning fake data for BEService.\n");
+        status->dwServiceType = SERVICE_WIN32_OWN_PROCESS;
+        status->dwCurrentState = SERVICE_RUNNING;
+        status->dwControlsAccepted = SERVICE_ACCEPT_SHUTDOWN | SERVICE_ACCEPT_STOP;
+        status->dwWin32ExitCode = NO_ERROR;
+        status->dwServiceSpecificExitCode = 0;
+        status->dwCheckPoint = 0;
+        status->dwWaitHint = 0;
+        status->dwProcessId = 0xdeadbee0;
+        status->dwServiceFlags = 0;
+        return TRUE;
     }
 
     __TRY
