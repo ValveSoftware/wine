@@ -203,6 +203,35 @@ static inline BOOL contains_path( LPCWSTR name )
     return ((*name && (name[1] == ':')) || wcschr(name, '/') || wcschr(name, '\\'));
 }
 
+static char *crash_log;
+static size_t crash_log_len;
+
+static void append_to_crash_log(const char *fmt, ...)
+{
+    char buf[1024];
+    size_t len;
+    va_list ap;
+
+    va_start(ap, fmt);
+
+    vsnprintf(buf, sizeof(buf), fmt, ap);
+
+    va_end(ap);
+
+    len = (crash_log ? strlen(crash_log) : 0) + strlen(buf) + 1;
+
+    if(len > crash_log_len){
+        if(crash_log){
+            crash_log = RtlReAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, crash_log, len );
+        }else{
+            crash_log = RtlAllocateHeap( GetProcessHeap(), HEAP_ZERO_MEMORY, len );
+        }
+        crash_log_len = len;
+    }
+
+    strcat(crash_log, buf);
+}
+
 #define RTL_UNLOAD_EVENT_TRACE_NUMBER 64
 
 typedef struct _RTL_UNLOAD_EVENT_TRACE
@@ -960,11 +989,19 @@ static BOOL import_dll( HMODULE module, const IMAGE_IMPORT_DESCRIPTOR *descr, LP
     if (status)
     {
         if (status == STATUS_DLL_NOT_FOUND)
+        {
             ERR("Library %s (which is needed by %s) not found\n",
                 name, debugstr_w(current_modref->ldr.FullDllName.Buffer));
+            append_to_crash_log("Library %s (which is needed by %s) not found\n",
+                name, debugstr_w(current_modref->ldr.FullDllName.Buffer));
+        }
         else
+        {
             ERR("Loading library %s (which is needed by %s) failed (error %x).\n",
                 name, debugstr_w(current_modref->ldr.FullDllName.Buffer), status);
+            append_to_crash_log("Loading library %s (which is needed by %s) failed (error %x).\n",
+                name, debugstr_w(current_modref->ldr.FullDllName.Buffer), status);
+        }
         return FALSE;
     }
 
@@ -4120,6 +4157,9 @@ void WINAPI LdrInitializeThunk( CONTEXT *context, ULONG_PTR unknown2, ULONG_PTR 
         {
             ERR( "Importing dlls for %s failed, status %x\n",
                  debugstr_w(NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer), status );
+            append_to_crash_log( "Importing dlls for %s failed, status %x\n",
+                 debugstr_w(NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer), status );
+            unix_funcs->write_crash_log("missingmodule", crash_log);
             NtTerminateProcess( GetCurrentProcess(), status );
         }
         imports_fixup_done = TRUE;
