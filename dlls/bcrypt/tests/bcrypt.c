@@ -2305,7 +2305,6 @@ static void test_rsa_encrypt(void)
     ret = BCryptImportKeyPair(rsa, NULL, BCRYPT_RSAPRIVATE_BLOB, &key, rsaPrivateBlob, sizeof(rsaPrivateBlob), 0);
     ok(ret == STATUS_SUCCESS, "got %#lx\n", ret);
 
-    todo_wine {
     /*   No padding    */
     memset(input_no_padding, 0, sizeof(input_no_padding));
     strcpy((char *)input_no_padding, "Hello World");
@@ -2334,9 +2333,8 @@ static void test_rsa_encrypt(void)
     BCryptDecrypt(key, encrypted_a, encrypted_size, NULL, NULL, 0, NULL, 0, &decrypted_size, BCRYPT_PAD_NONE);
     decrypted = malloc(decrypted_size);
     BCryptDecrypt(key, encrypted_a, encrypted_size, NULL, NULL, 0, decrypted, decrypted_size, &decrypted_size, BCRYPT_PAD_NONE);
-    ok(!memcmp(decrypted, input_no_padding, sizeof(input_no_padding)), "Decrypted output it's not what expected\n");
+    todo_wine ok(!memcmp(decrypted, input_no_padding, sizeof(input_no_padding)), "Decrypted output it's not what expected\n");
     free(decrypted);
-    }
 
     encrypted_size = 60;
     /*  PKCS1 Padding  */
@@ -2362,7 +2360,6 @@ static void test_rsa_encrypt(void)
     ok(!memcmp(decrypted, input, sizeof(input)), "Decrypted output it's not what expected\n");
     free(decrypted);
 
-    todo_wine {
     encrypted_size = 60;
     /*  OAEP Padding  */
     ret = BCryptEncrypt(key, input, sizeof(input), &oaep_pad, NULL, 0, NULL, 0, &encrypted_size, BCRYPT_PAD_OAEP);
@@ -2383,8 +2380,8 @@ static void test_rsa_encrypt(void)
     BCryptDecrypt(key, encrypted_a, encrypted_size, &oaep_pad, NULL, 0, NULL, 0, &decrypted_size, BCRYPT_PAD_OAEP);
     decrypted = malloc(decrypted_size);
     BCryptDecrypt(key, encrypted_a, encrypted_size, &oaep_pad, NULL, 0, decrypted, decrypted_size, &decrypted_size, BCRYPT_PAD_OAEP);
-    ok(!memcmp(decrypted, input, sizeof(input)), "Decrypted output it's not what expected\n");
-    }
+    todo_wine ok(!memcmp(decrypted, input, sizeof(input)), "Decrypted output it's not what expected\n");
+
     free(decrypted);
 
     free(encrypted_a);
