@@ -2158,6 +2158,7 @@ static struct unix_funcs unix_funcs =
 #endif
     steamclient_setup_trampolines,
     set_unix_env,
+    write_crash_log,
 };
 
 
