@@ -475,7 +475,7 @@ static void pulse_probe_settings(int render, WAVEFORMATEXTENSIBLE *fmt) {
         ret = -1;
     else if (render)
         ret = pa_stream_connect_playback(stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_FIX_RATE|PA_STREAM_FIX_CHANNELS|PA_STREAM_EARLY_REQUESTS, NULL, NULL);
+        PA_STREAM_START_CORKED|PA_STREAM_FIX_RATE|PA_STREAM_FIX_CHANNELS|PA_STREAM_EARLY_REQUESTS|PA_STREAM_VARIABLE_RATE, NULL, NULL);
     else
         ret = pa_stream_connect_record(stream, NULL, &attr, PA_STREAM_START_CORKED|PA_STREAM_FIX_RATE|PA_STREAM_FIX_CHANNELS|PA_STREAM_EARLY_REQUESTS);
     if (ret >= 0) {
@@ -800,7 +800,7 @@ static HRESULT pulse_stream_connect(struct pulse_stream *stream, UINT32 period_b
     dump_attr(&attr);
     if (stream->dataflow == eRender)
         ret = pa_stream_connect_playback(stream->stream, NULL, &attr,
-        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY, NULL, NULL);
+        PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY|PA_STREAM_VARIABLE_RATE, NULL, NULL);
     else
         ret = pa_stream_connect_record(stream->stream, NULL, &attr,
         PA_STREAM_START_CORKED|PA_STREAM_START_UNMUTED|PA_STREAM_ADJUST_LATENCY);
@@ -1941,6 +1941,41 @@ static NTSTATUS pulse_set_event_handle(void *args)
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS pulse_set_sample_rate(void *args)
+{
+    struct set_sample_rate_params *params = args;
+    struct pulse_stream *stream = params->stream;
+    HRESULT hr = S_OK;
+    pa_operation *o;
+    int success;
+
+    pulse_lock();
+    if (!pulse_stream_valid(stream))
+        hr = AUDCLNT_E_DEVICE_INVALIDATED;
+    else
+    {
+        if (!(o = pa_stream_update_sample_rate(stream->stream, params->new_rate, pulse_op_cb, &success)))
+            success = 0;
+        else
+        {
+            while (pa_operation_get_state(o) == PA_OPERATION_RUNNING)
+                pthread_cond_wait(&pulse_cond, &pulse_mutex);
+            pa_operation_unref(o);
+        }
+
+        if (!success) hr = E_FAIL;
+        else
+        {
+            stream->ss.rate = params->new_rate;
+            stream->period_bytes = pa_frame_size(&stream->ss) * muldiv(stream->mmdev_period_usec, stream->ss.rate, 1000000);
+        }
+    }
+    pulse_unlock();
+
+    params->result = hr;
+    return STATUS_SUCCESS;
+}
+
 static NTSTATUS pulse_is_started(void *args)
 {
     struct is_started_params *params = args;
@@ -1976,6 +2011,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     pulse_get_position,
     pulse_set_volumes,
     pulse_set_event_handle,
+    pulse_set_sample_rate,
     pulse_test_connect,
     pulse_is_started,
 };
