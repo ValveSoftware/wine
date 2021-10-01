@@ -2478,7 +2478,6 @@ static void test_rsa_encrypt(void)
     ret = BCryptImportKeyPair(rsa, NULL, BCRYPT_RSAPRIVATE_BLOB, &key, rsaPrivateBlob, sizeof(rsaPrivateBlob), 0);
     ok(ret == STATUS_SUCCESS, "got %#lx\n", ret);
 
-    todo_wine {
     /*   No padding    */
     memset(input_no_padding, 0, sizeof(input_no_padding));
     strcpy((char *)input_no_padding, "Hello World");
@@ -2504,11 +2503,11 @@ static void test_rsa_encrypt(void)
     ok(!memcmp(encrypted_a, encrypted_b, encrypted_size), "Both outputs should be the same\n");
     ok(!memcmp(encrypted_b, rsa_encrypted_no_padding, encrypted_size), "Data mismatch.\n");
 
+    decrypted_size = 0xdeadbeef;
     BCryptDecrypt(key, encrypted_a, encrypted_size, NULL, NULL, 0, NULL, 0, &decrypted_size, BCRYPT_PAD_NONE);
-    ok(decrypted_size == sizeof(input_no_padding), "got %lu\n", decrypted_size);
+    todo_wine ok(decrypted_size == sizeof(input_no_padding), "got %lu\n", decrypted_size);
     BCryptDecrypt(key, encrypted_a, encrypted_size, NULL, NULL, 0, decrypted, decrypted_size, &decrypted_size, BCRYPT_PAD_NONE);
-    ok(!memcmp(decrypted, input_no_padding, sizeof(input_no_padding)), "Decrypted output it's not what expected\n");
-    }
+    todo_wine ok(!memcmp(decrypted, input_no_padding, sizeof(input_no_padding)), "Decrypted output it's not what expected\n");
 
     encrypted_size = 60;
     /*  PKCS1 Padding  */
@@ -2532,7 +2531,6 @@ static void test_rsa_encrypt(void)
     BCryptDecrypt(key, encrypted_a, encrypted_size, NULL, NULL, 0, decrypted, decrypted_size, &decrypted_size, BCRYPT_PAD_PKCS1);
     ok(!memcmp(decrypted, input, sizeof(input)), "Decrypted output it's not what expected\n");
 
-    todo_wine {
     encrypted_size = 60;
     /*  OAEP Padding  */
     ret = BCryptEncrypt(key, input, sizeof(input), &oaep_pad, NULL, 0, NULL, 0, &encrypted_size, BCRYPT_PAD_OAEP);
@@ -2553,10 +2551,10 @@ static void test_rsa_encrypt(void)
     decrypted_size = 0;
     memset(decrypted, 0, sizeof(decrypted));
     BCryptDecrypt(key, encrypted_a, encrypted_size, &oaep_pad, NULL, 0, NULL, 0, &decrypted_size, BCRYPT_PAD_OAEP);
-    ok(decrypted_size == sizeof(input), "got %lu\n", decrypted_size);
+    todo_wine ok(decrypted_size == sizeof(input), "got %lu\n", decrypted_size);
     BCryptDecrypt(key, encrypted_a, encrypted_size, &oaep_pad, NULL, 0, decrypted, decrypted_size, &decrypted_size, BCRYPT_PAD_OAEP);
-    ok(!memcmp(decrypted, input, sizeof(input)), "Decrypted output it's not what expected\n");
-    }
+    todo_wine ok(!memcmp(decrypted, input, sizeof(input)), "Decrypted output it's not what expected\n");
+
 
     free(encrypted_a);
     free(encrypted_b);
