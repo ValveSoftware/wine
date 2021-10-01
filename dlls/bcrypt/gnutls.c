@@ -190,6 +190,7 @@ MAKE_FUNCPTR(gcry_strsource);
 MAKE_FUNCPTR(gcry_strerror);
 MAKE_FUNCPTR(gcry_sexp_find_token);
 MAKE_FUNCPTR(gcry_sexp_nth_mpi);
+MAKE_FUNCPTR(gcry_sexp_nth_data);
 #endif
 
 #undef MAKE_FUNCPTR
@@ -387,6 +388,7 @@ static NTSTATUS gnutls_process_attach( void *args )
         LOAD_FUNCPTR(gcry_strerror);
         LOAD_FUNCPTR(gcry_sexp_find_token);
         LOAD_FUNCPTR(gcry_sexp_nth_mpi);
+        LOAD_FUNCPTR(gcry_sexp_nth_data);
     }
     else
         WARN("failed to load gcrypt, no support for ECC secret agreement\n");
@@ -2170,6 +2172,151 @@ static NTSTATUS key_asymmetric_duplicate( void *args )
     return STATUS_SUCCESS;
 }
 
+#if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
+const char * gcrypt_hash_algorithm_name(LPCWSTR alg_id)
+{
+    if (!wcscmp( alg_id, BCRYPT_SHA1_ALGORITHM ))   return "sha1";
+    if (!wcscmp( alg_id, BCRYPT_SHA256_ALGORITHM )) return "sha256";
+    if (!wcscmp( alg_id, BCRYPT_SHA384_ALGORITHM )) return "sha384";
+    if (!wcscmp( alg_id, BCRYPT_SHA512_ALGORITHM )) return "sha512";
+    if (!wcscmp( alg_id, BCRYPT_MD2_ALGORITHM ))    return "md2";
+    if (!wcscmp( alg_id, BCRYPT_MD5_ALGORITHM ))    return "md5";
+    return NULL;
+}
+
+static NTSTATUS key_asymmetric_encrypt( void *args )
+{
+    const struct key_asymmetric_encrypt_params *params = args;
+    struct key *key = params->key;
+    UCHAR *input = params->input;
+    ULONG input_len = params->input_len;
+    UCHAR *output = params->output;
+    ULONG output_len = params->output_len;
+    ULONG *ret_len = params->ret_len;
+    void *padding = params->padding;
+    ULONG flags = params->flags;
+    BCRYPT_OAEP_PADDING_INFO *oaep_info = padding;
+    NTSTATUS status = STATUS_SUCCESS;
+    gcry_sexp_t sexp_pubkey = NULL;
+    gcry_sexp_t sexp_result = NULL;
+    gcry_sexp_t sexp_input = NULL;
+    BCRYPT_RSAKEY_BLOB *rsa_blob;
+    gcry_sexp_t mpi_a = NULL;
+    const void *result;
+    size_t result_len;
+    gcry_error_t err;
+
+    if (!gcrypt_available)
+    {
+        ERR("Asymmetric encryption not available.\n");
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    if (key->alg_id != ALG_ID_RSA)
+    {
+        FIXME("Unsupported algorithm id: %u\n", key->alg_id);
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    /* import RSA key */
+    rsa_blob = (BCRYPT_RSAKEY_BLOB *) key->u.a.pubkey;
+    err = pgcry_sexp_build(&sexp_pubkey, NULL,
+                        "(public-key(rsa (e %b)(n %b)))",
+                        rsa_blob->cbPublicExp,
+                        (UCHAR *)(rsa_blob + 1),
+                        rsa_blob->cbModulus,
+                        (UCHAR *)(rsa_blob + 1) + rsa_blob->cbPublicExp);
+    if (err)
+    {
+        ERR("Failed to build gcrypt public key\n");
+        goto done;
+    }
+
+    /* import input data with necessary padding */
+    if (flags == BCRYPT_PAD_PKCS1)
+    {
+        err = pgcry_sexp_build(&sexp_input, NULL,
+                            "(data(flags pksc1)(value %b))",
+                            input_len,
+                            input);
+    }
+    else if (flags == BCRYPT_PAD_OAEP)
+    {
+        if (oaep_info->pbLabel)
+            err = pgcry_sexp_build(&sexp_input, NULL,
+                                "(data(flags oaep)(hash-algo %s)(label %b)(value %b))",
+                                gcrypt_hash_algorithm_name(oaep_info->pszAlgId),
+                                oaep_info->cbLabel,
+                                oaep_info->pbLabel,
+                                input_len,
+                                input);
+        else
+            err = pgcry_sexp_build(&sexp_input, NULL,
+                                "(data(flags oaep)(hash-algo %s)(value %b))",
+                                gcrypt_hash_algorithm_name(oaep_info->pszAlgId),
+                                input_len,
+                                input);
+    }
+    else if (flags == BCRYPT_PAD_NONE)
+    {
+        err = pgcry_sexp_build(&sexp_input, NULL,
+                            "(data(flags raw)(value %b))",
+                            input_len,
+                            input);
+    }
+    else
+    {
+        status = STATUS_INVALID_PARAMETER;
+        goto done;
+    }
+
+    if (err)
+    {
+        ERR("Failed to build gcrypt padded input data\n");
+        goto done;
+    }
+
+    if ((err = pgcry_pk_encrypt(&sexp_result, sexp_input, sexp_pubkey)))
+    {
+        ERR("Failed to encrypt data\n");
+        goto done;
+    }
+
+    mpi_a = pgcry_sexp_find_token(sexp_result, "a", 0);
+    result = pgcry_sexp_nth_data(mpi_a, 1, &result_len);
+
+    *ret_len = result_len;
+
+    if (output_len < result_len)
+        status = STATUS_BUFFER_TOO_SMALL;
+    else if (output)
+        memcpy(output, result, result_len);
+
+done:
+    pgcry_sexp_release(sexp_input);
+    pgcry_sexp_release(sexp_pubkey);
+    pgcry_sexp_release(sexp_result);
+    pgcry_sexp_release(mpi_a);
+
+    if (status)
+        return status;
+
+    if (err)
+    {
+        ERR("Error = %s/%s\n", pgcry_strsource (err), pgcry_strerror (err));
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    return STATUS_SUCCESS;
+}
+#else
+static NTSTATUS key_asymmetric_encrypt( void *args )
+{
+    ERR("Asymmetric key encryption not supported without gcrypt.\n");
+    return STATUS_NOT_IMPLEMENTED;
+}
+#endif
+
 static NTSTATUS key_asymmetric_decrypt( void *args )
 {
     const struct key_asymmetric_decrypt_params *params = args;
@@ -2450,6 +2597,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     key_symmetric_get_tag,
     key_symmetric_destroy,
     key_asymmetric_generate,
+    key_asymmetric_encrypt,
     key_asymmetric_decrypt,
     key_asymmetric_duplicate,
     key_asymmetric_sign,
@@ -2674,6 +2822,40 @@ static NTSTATUS wow64_key_asymmetric_generate( void *args )
     NTSTATUS ret;
 
     ret = key_asymmetric_generate( get_asymmetric_key( key32, &key ));
+    put_asymmetric_key32( &key, key32 );
+    return ret;
+}
+
+static NTSTATUS wow64_key_asymmetric_encrypt( void *args )
+{
+    struct
+    {
+        PTR32 key;
+        PTR32 input;
+        ULONG input_len;
+        PTR32 output;
+        ULONG output_len;
+        PTR32 ret_len;
+        PTR32 padding;
+        ULONG flags;
+    } const *params32 = args;
+
+    NTSTATUS ret;
+    struct key key;
+    struct key32 *key32 = ULongToPtr( params32->key );
+    struct key_asymmetric_encrypt_params params =
+    {
+        get_asymmetric_key( key32, &key ),
+        ULongToPtr(params32->input),
+        params32->input_len,
+        ULongToPtr(params32->output),
+        params32->output_len,
+        ULongToPtr(params32->ret_len),
+        ULongToPtr(params32->padding),
+        params32->flags,
+    };
+
+    ret = key_asymmetric_encrypt( &params );
     put_asymmetric_key32( &key, key32 );
     return ret;
 }
@@ -2986,6 +3168,7 @@ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
     wow64_key_symmetric_get_tag,
     wow64_key_symmetric_destroy,
     wow64_key_asymmetric_generate,
+    wow64_key_asymmetric_encrypt,
     wow64_key_asymmetric_decrypt,
     wow64_key_asymmetric_duplicate,
     wow64_key_asymmetric_sign,
