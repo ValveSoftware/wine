@@ -133,6 +133,7 @@ enum alg_id
     /* secret agreement */
     ALG_ID_DH,
     ALG_ID_ECDH_P256,
+    ALG_ID_ECDH_P384,
 
     /* signature */
     ALG_ID_RSA_SIGN,

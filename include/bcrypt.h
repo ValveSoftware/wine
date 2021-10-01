@@ -88,6 +88,7 @@ typedef LONG NTSTATUS;
 #define BCRYPT_DH_ALGORITHM         L"DH"
 #define BCRYPT_DSA_ALGORITHM        L"DSA"
 #define BCRYPT_ECDH_P256_ALGORITHM  L"ECDH_P256"
+#define BCRYPT_ECDH_P384_ALGORITHM  L"ECDH_P384"
 #define BCRYPT_ECDSA_P256_ALGORITHM L"ECDSA_P256"
 #define BCRYPT_ECDSA_P384_ALGORITHM L"ECDSA_P384"
 #define BCRYPT_ECDSA_P521_ALGORITHM L"ECDSA_P521"
@@ -166,6 +167,7 @@ static const WCHAR BCRYPT_DES_ALGORITHM[] = {'D','E','S',0};
 static const WCHAR BCRYPT_DH_ALGORITHM[] = {'D','H',0};
 static const WCHAR BCRYPT_DSA_ALGORITHM[] = {'D','S','A',0};
 static const WCHAR BCRYPT_ECDH_P256_ALGORITHM[] = {'E','C','D','H','_','P','2','5','6',0};
+static const WCHAR BCRYPT_ECDH_P384_ALGORITHM[] =  {'E','C','D','H','_','P','3','8','4',0};
 static const WCHAR BCRYPT_ECDSA_P256_ALGORITHM[] = {'E','C','D','S','A','_','P','2','5','6',0};
 static const WCHAR BCRYPT_ECDSA_P384_ALGORITHM[] = {'E','C','D','S','A','_','P','3','8','4',0};
 static const WCHAR BCRYPT_ECDSA_P521_ALGORITHM[] = {'E','C','D','S','A','_','P','5','2','1',0};
