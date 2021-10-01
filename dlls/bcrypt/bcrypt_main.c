@@ -574,7 +574,7 @@ static NTSTATUS get_rsa_property( enum mode_id mode, const WCHAR *prop, UCHAR *b
     {
         *ret_size = sizeof(ULONG);
         if (size < sizeof(ULONG)) return STATUS_BUFFER_TOO_SMALL;
-        if (buf) *(ULONG *)buf = BCRYPT_SUPPORTED_PAD_PKCS1_SIG;
+        if (buf) *(ULONG *)buf = BCRYPT_SUPPORTED_PAD_PKCS1_SIG | BCRYPT_SUPPORTED_PAD_OAEP;
         return STATUS_SUCCESS;
     }
 
@@ -1170,6 +1170,12 @@ static NTSTATUS key_symmetric_encrypt( struct key *key,  UCHAR *input, ULONG inp
     ULONG bytes_left = input_len;
     UCHAR *buf, *src, *dst;
     NTSTATUS status;
+
+    if (flags & ~BCRYPT_BLOCK_PADDING)
+    {
+        FIXME( "flags %08x not implemented\n", flags );
+        return STATUS_NOT_IMPLEMENTED;
+    }
 
     if (key->u.s.mode == MODE_ID_GCM)
     {
@@ -1827,21 +1833,16 @@ NTSTATUS WINAPI BCryptEncrypt( BCRYPT_KEY_HANDLE handle, UCHAR *input, ULONG inp
            output_len, ret_len, flags );
 
     if (!key || key->hdr.magic != MAGIC_KEY) return STATUS_INVALID_HANDLE;
-    if (!key_is_symmetric( key ))
+
+    if (key_is_symmetric( key ))
     {
-        FIXME( "encryption with asymmetric keys not yet supported\n" );
-        return STATUS_NOT_IMPLEMENTED;
-    }
-    if (flags & ~BCRYPT_BLOCK_PADDING)
-    {
-        FIXME( "flags %08x not implemented\n", flags );
-        return STATUS_NOT_IMPLEMENTED;
+        EnterCriticalSection( &key->u.s.cs );
+        ret = key_symmetric_encrypt( key, input, input_len, padding, iv, iv_len, output, output_len, ret_len, flags );
+        LeaveCriticalSection( &key->u.s.cs );
+        return ret;
     }
 
-    EnterCriticalSection( &key->u.s.cs );
-    ret = key_symmetric_encrypt( key, input, input_len, padding, iv, iv_len, output, output_len, ret_len, flags );
-    LeaveCriticalSection( &key->u.s.cs );
-    return ret;
+    return key_funcs->key_asymmetric_encrypt( key, input, input_len, output, output_len, ret_len, padding, flags );
 }
 
 NTSTATUS WINAPI BCryptDecrypt( BCRYPT_KEY_HANDLE handle, UCHAR *input, ULONG input_len, void *padding, UCHAR *iv,
