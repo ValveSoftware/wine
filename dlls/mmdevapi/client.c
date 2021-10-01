@@ -1163,10 +1163,19 @@ static HRESULT WINAPI AudioClockAdjustment_SetSampleRate(IAudioClockAdjustment *
         float new_rate)
 {
     ACImpl *This = impl_from_IAudioClockAdjustment(iface);
+    struct set_sample_rate_params params;
 
     TRACE("(%p)->(%f)\n", This, new_rate);
 
-    return E_NOTIMPL;
+    if (!This->stream)
+        return AUDCLNT_E_NOT_INITIALIZED;
+
+    params.stream = This->stream;
+    params.new_rate = new_rate;
+
+    wine_unix_call(set_sample_rate, &params);
+
+    return params.result;
 }
 
 const IAudioClockAdjustmentVtbl AudioClockAdjustment_Vtbl =
