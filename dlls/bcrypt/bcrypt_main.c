@@ -113,6 +113,7 @@ builtin_algorithms[] =
     {  BCRYPT_RSA_ALGORITHM,        BCRYPT_ASYMMETRIC_ENCRYPTION_INTERFACE, 0,      0,    0 },
     {  BCRYPT_DH_ALGORITHM,         BCRYPT_SECRET_AGREEMENT_INTERFACE,      0,      0,    0 },
     {  BCRYPT_ECDH_P256_ALGORITHM,  BCRYPT_SECRET_AGREEMENT_INTERFACE,      0,      0,    0 },
+    {  BCRYPT_ECDH_P384_ALGORITHM,  BCRYPT_SECRET_AGREEMENT_INTERFACE,      0,      0,    0 },
     {  BCRYPT_RSA_SIGN_ALGORITHM,   BCRYPT_SIGNATURE_INTERFACE,             0,      0,    0 },
     {  BCRYPT_ECDSA_P256_ALGORITHM, BCRYPT_SIGNATURE_INTERFACE,             0,      0,    0 },
     {  BCRYPT_ECDSA_P384_ALGORITHM, BCRYPT_SIGNATURE_INTERFACE,             0,      0,    0 },
@@ -1403,6 +1404,11 @@ static NTSTATUS key_import_pair( struct algorithm *alg, const WCHAR *type, BCRYP
         case ALG_ID_ECDH_P256:
             key_size = 32;
             magic = BCRYPT_ECDH_PUBLIC_P256_MAGIC;
+            break;
+
+        case ALG_ID_ECDH_P384:
+            key_size = 48;
+            magic = BCRYPT_ECDH_PUBLIC_P384_MAGIC;
             break;
 
         case ALG_ID_ECDSA_P256:
