@@ -1276,9 +1276,8 @@ BOOL WINAPI UnregisterDeviceNotification( HDEVNOTIFY handle )
  */
 BOOL WINAPI CloseTouchInputHandle( HTOUCHINPUT handle )
 {
-    FIXME( "handle %p stub!\n", handle );
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    TRACE( "handle %p.\n", handle );
+    return TRUE;
 }
 
 /*****************************************************************************
@@ -1286,9 +1285,9 @@ BOOL WINAPI CloseTouchInputHandle( HTOUCHINPUT handle )
  */
 BOOL WINAPI GetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size )
 {
-    FIXME( "handle %p, count %u, ptr %p, size %u stub!\n", handle, count, ptr, size );
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    TRACE( "handle %p, count %u, ptr %p, size %u.\n", handle, count, ptr, size );
+    *ptr = *(TOUCHINPUT *)handle;
+    return TRUE;
 }
 
 /**********************************************************************
@@ -1296,8 +1295,9 @@ BOOL WINAPI GetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, 
  */
 BOOL WINAPI IsTouchWindow( HWND hwnd, ULONG *flags )
 {
-    FIXME( "hwnd %p, flags %p stub!\n", hwnd, flags );
-    return FALSE;
+    DWORD win_flags = win_set_flags( hwnd, 0, 0 );
+    TRACE( "hwnd %p, flags %p.\n", hwnd, flags );
+    return (win_flags & WIN_IS_TOUCH) != 0;
 }
 
 /*****************************************************************************
@@ -1305,9 +1305,9 @@ BOOL WINAPI IsTouchWindow( HWND hwnd, ULONG *flags )
  */
 BOOL WINAPI RegisterTouchWindow( HWND hwnd, ULONG flags )
 {
-    FIXME( "hwnd %p, flags %#x stub!\n", hwnd, flags );
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    DWORD win_flags = win_set_flags( hwnd, WIN_IS_TOUCH, 0 );
+    TRACE( "hwnd %p, flags %#x.\n", hwnd, flags );
+    return (win_flags & WIN_IS_TOUCH) == 0;
 }
 
 /*****************************************************************************
@@ -1315,9 +1315,9 @@ BOOL WINAPI RegisterTouchWindow( HWND hwnd, ULONG flags )
  */
 BOOL WINAPI UnregisterTouchWindow( HWND hwnd )
 {
-    FIXME( "hwnd %p stub!\n", hwnd );
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    DWORD win_flags = win_set_flags( hwnd, 0, WIN_IS_TOUCH );
+    TRACE( "hwnd %p.\n", hwnd );
+    return (win_flags & WIN_IS_TOUCH) != 0;
 }
 
 /*****************************************************************************
