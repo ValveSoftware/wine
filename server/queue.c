@@ -635,6 +635,7 @@ static inline int get_hardware_msg_bit( unsigned int message )
     if (message >= WM_KEYFIRST && message <= WM_KEYLAST) return QS_KEY;
     if (message == WM_WINE_CLIPCURSOR) return QS_RAWINPUT;
     if (message == WM_WINE_SETCURSOR) return QS_RAWINPUT;
+    if (message == WM_POINTERDOWN || message == WM_POINTERUP || message == WM_POINTERUPDATE) return QS_POINTER;
     return QS_MOUSEBUTTON;
 }
 
@@ -1611,6 +1612,7 @@ static user_handle_t find_hardware_message_window( struct desktop *desktop, stru
     *msg_code = msg->msg;
     switch (get_hardware_msg_bit( msg->msg ))
     {
+    case QS_POINTER:
     case QS_RAWINPUT:
         if (!(win = msg->win) && input) win = input->focus;
         break;
@@ -1680,6 +1682,13 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
         if (desktop->keystate[VK_MENU] & 0x80) msg->lparam |= KF_ALTDOWN << 16;
         if (msg->wparam == VK_SHIFT || msg->wparam == VK_LSHIFT || msg->wparam == VK_RSHIFT)
             msg->lparam &= ~(KF_EXTENDED << 16);
+        break;
+    case QS_POINTER:
+        if (IS_POINTER_PRIMARY_WPARAM( msg_data->rawinput.mouse.data ))
+        {
+            prepend_cursor_history( msg->x, msg->y, msg->time, msg_data->info );
+            if (update_desktop_cursor_pos( desktop, msg->win, msg->x, msg->y )) always_queue = 1;
+        }
         break;
     case QS_MOUSEMOVE:
         prepend_cursor_history( msg->x, msg->y, msg->time, msg_data->info );
@@ -2153,14 +2162,28 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
         return;
     }
 
+    if (input->hw.msg == WM_POINTERDOWN || input->hw.msg == WM_POINTERUP ||
+        input->hw.msg == WM_POINTERUPDATE)
+        source.device = IMDT_TOUCH;
+
     if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
+
+    if (input->hw.msg == WM_POINTERDOWN || input->hw.msg == WM_POINTERUP ||
+        input->hw.msg == WM_POINTERUPDATE)
+    {
+        msg_data = msg->data;
+        msg_data->info     = 0;
+        msg_data->size     = sizeof(*msg_data);
+        msg_data->flags    = input->hw.lparam;
+        msg_data->rawinput = input->hw.rawinput;
+    }
 
     msg->win       = get_user_full_handle( win );
     msg->msg       = input->hw.msg;
     msg->wparam    = 0;
     msg->lparam    = input->hw.lparam;
-    msg->x         = desktop->cursor.x;
-    msg->y         = desktop->cursor.y;
+    msg->x         = input->hw.rawinput.mouse.x;
+    msg->y         = input->hw.rawinput.mouse.y;
 
     queue_hardware_message( desktop, msg, 1 );
 }
@@ -2301,7 +2324,7 @@ static int get_hardware_message( struct thread *thread, unsigned int hw_id, user
 
         data->hw_id = msg->unique_id;
         set_reply_data( msg->data, msg->data_size );
-        if ((get_hardware_msg_bit( msg->msg ) == QS_RAWINPUT && (flags & PM_REMOVE)) ||
+        if ((get_hardware_msg_bit( msg->msg ) & (QS_RAWINPUT | QS_POINTER) && (flags & PM_REMOVE)) ||
             is_internal_hardware_message( msg->msg ))
             release_hardware_message( current->queue, data->hw_id );
         return 1;
