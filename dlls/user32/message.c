@@ -2304,6 +2304,16 @@ static BOOL process_rawinput_message( MSG *msg, UINT hw_id, const struct hardwar
     return TRUE;
 }
 
+
+static BOOL process_pointer_message( MSG *msg, UINT hw_id, const struct hardware_msg_data *msg_data )
+{
+    msg->lParam = MAKELONG( msg_data->rawinput.mouse.x, msg_data->rawinput.mouse.y );
+    msg->wParam = msg_data->rawinput.mouse.data;
+    msg->pt = point_phys_to_win_dpi( msg->hwnd, msg->pt );
+    return TRUE;
+}
+
+
 /***********************************************************************
  *          process_keyboard_message
  *
@@ -2653,6 +2663,9 @@ static BOOL process_hardware_message( MSG *msg, UINT hw_id, const struct hardwar
 
     if (msg->message == WM_INPUT || msg->message == WM_INPUT_DEVICE_CHANGE)
         ret = process_rawinput_message( msg, hw_id, msg_data );
+    else if (msg->message == WM_POINTERDOWN || msg->message == WM_POINTERUP ||
+             msg->message == WM_POINTERUPDATE)
+        ret = process_pointer_message( msg, hw_id, msg_data );
     else if (is_keyboard_message( msg->message ))
         ret = process_keyboard_message( msg, hw_id, hwnd_filter, first, last, remove );
     else if (is_mouse_message( msg->message ))
@@ -3386,6 +3399,9 @@ NTSTATUS send_hardware_message( HWND hwnd, const INPUT *input, const RAWINPUT *r
             {
             case WM_INPUT:
             case WM_INPUT_DEVICE_CHANGE:
+            case WM_POINTERDOWN:
+            case WM_POINTERUP:
+            case WM_POINTERUPDATE:
                 req->input.hw.rawinput.type = rawinput->header.dwType;
                 switch (rawinput->header.dwType)
                 {
