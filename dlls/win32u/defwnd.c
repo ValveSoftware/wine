@@ -30,6 +30,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(win);
 
+#define WINE_MOUSE_HANDLE       ((HANDLE)1)
+#define WINE_KEYBOARD_HANDLE    ((HANDLE)2)
 
 #define DRAG_FILE  0x454c4946
 
@@ -2953,6 +2955,36 @@ LRESULT default_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam, 
                                             0, NtUserSendMessage, ansi );
         }
         break;
+
+    case WM_POINTERDOWN:
+    case WM_POINTERUP:
+    case WM_POINTERUPDATE:
+    {
+        TOUCHINPUT touchinput;
+
+        if (!NtUserIsTouchWindow( hwnd, NULL )) return 0;
+        touchinput.x = LOWORD( lparam ) * 100;
+        touchinput.y = HIWORD( lparam ) * 100;
+        touchinput.hSource = WINE_MOUSE_HANDLE;
+        touchinput.dwID = GET_POINTERID_WPARAM( wparam );
+        touchinput.dwFlags = TOUCHEVENTF_NOCOALESCE | TOUCHEVENTF_PALM;
+        if (msg == WM_POINTERDOWN) touchinput.dwFlags |= TOUCHEVENTF_DOWN;
+        if (msg == WM_POINTERUP) touchinput.dwFlags |= TOUCHEVENTF_UP;
+        if (msg == WM_POINTERUPDATE) touchinput.dwFlags |= TOUCHEVENTF_MOVE;
+        if (IS_POINTER_PRIMARY_WPARAM( wparam )) touchinput.dwFlags |= TOUCHEVENTF_PRIMARY;
+        touchinput.dwMask = 0;
+        touchinput.dwTime = NtGetTickCount();
+        touchinput.dwExtraInfo = 0;
+        touchinput.cxContact = 0;
+        touchinput.cyContact = 0;
+
+        send_message( hwnd, WM_TOUCH, MAKELONG( 1, 0 ), (LPARAM)&touchinput );
+        break;
+    }
+
+    case WM_TOUCH:
+        /* FIXME: CloseTouchInputHandle( (HTOUCHINPUT)lparam ); */
+        return 0;
     }
 
     return result;

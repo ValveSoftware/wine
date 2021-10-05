@@ -712,15 +712,6 @@ BOOL WINAPI GetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, 
     return FALSE;
 }
 
-/**********************************************************************
- * IsTouchWindow (USER32.@)
- */
-BOOL WINAPI IsTouchWindow( HWND hwnd, ULONG *flags )
-{
-    FIXME( "hwnd %p, flags %p stub!\n", hwnd, flags );
-    return FALSE;
-}
-
 /*****************************************************************************
  * RegisterTouchWindow (USER32.@)
  */
