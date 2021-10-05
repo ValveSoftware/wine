@@ -752,6 +752,36 @@ static LRESULT DEFWND_DefWinProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
             break;
         }
 
+    case WM_POINTERDOWN:
+    case WM_POINTERUP:
+    case WM_POINTERUPDATE:
+    {
+        TOUCHINPUT touchinput;
+
+        if (!IsTouchWindow( hwnd, NULL )) return 0;
+        touchinput.x = LOWORD( lParam ) * 100;
+        touchinput.y = HIWORD( lParam ) * 100;
+        touchinput.hSource = WINE_MOUSE_HANDLE;
+        touchinput.dwID = GET_POINTERID_WPARAM( wParam );
+        touchinput.dwFlags = TOUCHEVENTF_NOCOALESCE | TOUCHEVENTF_PALM;
+        if (msg == WM_POINTERDOWN) touchinput.dwFlags |= TOUCHEVENTF_DOWN;
+        if (msg == WM_POINTERUP) touchinput.dwFlags |= TOUCHEVENTF_UP;
+        if (msg == WM_POINTERUPDATE) touchinput.dwFlags |= TOUCHEVENTF_MOVE;
+        if (IS_POINTER_PRIMARY_WPARAM( wParam )) touchinput.dwFlags |= TOUCHEVENTF_PRIMARY;
+        touchinput.dwMask = 0;
+        touchinput.dwTime = GetTickCount();
+        touchinput.dwExtraInfo = 0;
+        touchinput.cxContact = 0;
+        touchinput.cyContact = 0;
+
+        SendMessageW( hwnd, WM_TOUCH, MAKELONG( 1, 0 ), (LPARAM)&touchinput );
+        break;
+    }
+
+    case WM_TOUCH:
+        CloseTouchInputHandle( (HTOUCHINPUT)lParam );
+        return 0;
+
     }
 
     return 0;
