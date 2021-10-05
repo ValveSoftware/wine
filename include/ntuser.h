@@ -795,6 +795,7 @@ BOOL    WINAPI NtUserIsClipboardFormatAvailable( UINT format );
 BOOL    WINAPI NtUserIsMouseInPointerEnabled(void);
 BOOL    WINAPI NtUserInvalidateRect( HWND hwnd, const RECT *rect, BOOL erase );
 BOOL    WINAPI NtUserInvalidateRgn( HWND hwnd, HRGN hrgn, BOOL erase );
+BOOL    WINAPI NtUserIsTouchWindow( HWND hwnd, ULONG *flags );
 BOOL    WINAPI NtUserKillTimer( HWND hwnd, UINT_PTR id );
 BOOL    WINAPI NtUserLockWindowUpdate( HWND hwnd );
 BOOL    WINAPI NtUserLogicalToPerMonitorDPIPhysicalPoint( HWND hwnd, POINT *pt );

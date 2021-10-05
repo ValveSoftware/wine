@@ -2444,6 +2444,15 @@ BOOL WINAPI NtUserIsMouseInPointerEnabled(void)
 }
 
 /**********************************************************************
+ *       NtUserIsTouchWindow    (win32u.@)
+ */
+BOOL WINAPI NtUserIsTouchWindow( HWND hwnd, ULONG *flags )
+{
+    FIXME( "hwnd %p, flags %p stub!\n", hwnd, flags );
+    return FALSE;
+}
+
+/**********************************************************************
  *       NtUserGetPointerInfoList    (win32u.@)
  */
 BOOL WINAPI NtUserGetPointerInfoList( UINT32 id, POINTER_INPUT_TYPE type, UINT_PTR unk0, UINT_PTR unk1, SIZE_T size,
