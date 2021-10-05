@@ -798,7 +798,7 @@
 # @ stub IsThreadDesktopComposited
 # @ stub IsThreadTSFEventAware
 # @ stub IsTopLevelWindow
-@ stdcall IsTouchWindow(long ptr)
+@ stdcall IsTouchWindow(long ptr) NtUserIsTouchWindow
 @ stdcall IsValidDpiAwarenessContext(long)
 @ stdcall IsWinEventHookInstalled(long)
 @ stdcall IsWindow(long)

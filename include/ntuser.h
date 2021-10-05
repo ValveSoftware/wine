@@ -925,6 +925,7 @@ W32KAPI BOOL    WINAPI NtUserIsClipboardFormatAvailable( UINT format );
 W32KAPI BOOL    WINAPI NtUserIsMouseInPointerEnabled(void);
 W32KAPI BOOL    WINAPI NtUserInvalidateRect( HWND hwnd, const RECT *rect, BOOL erase );
 W32KAPI BOOL    WINAPI NtUserInvalidateRgn( HWND hwnd, HRGN hrgn, BOOL erase );
+W32KAPI BOOL    WINAPI NtUserIsTouchWindow( HWND hwnd, ULONG *flags );
 W32KAPI BOOL    WINAPI NtUserKillSystemTimer( HWND hwnd, UINT_PTR id );
 W32KAPI BOOL    WINAPI NtUserKillTimer( HWND hwnd, UINT_PTR id );
 W32KAPI BOOL    WINAPI NtUserLockWindowUpdate( HWND hwnd );
