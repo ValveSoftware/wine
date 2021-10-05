@@ -246,6 +246,9 @@ static Bool filter_event( Display *display, XEvent *event, char *arg )
             case XI_RawButtonRelease:
                 return (mask & QS_MOUSEBUTTON) != 0;
             case XI_RawMotion:
+            case XI_RawTouchBegin:
+            case XI_RawTouchUpdate:
+            case XI_RawTouchEnd:
                 return (mask & QS_INPUT) != 0;
             case XI_DeviceChanged:
                 return (mask & (QS_INPUT|QS_MOUSEBUTTON)) != 0;

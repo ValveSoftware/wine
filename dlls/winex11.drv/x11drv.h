@@ -383,6 +383,8 @@ struct x11drv_thread_data
     XIValuatorClassInfo y_valuator;
     int      xi2_core_pointer;     /* XInput2 core pointer id */
     int      xi2_rawinput_only;
+    int      xi2_active_touches;
+    int      xi2_primary_touchid;
 #endif /* HAVE_X11_EXTENSIONS_XINPUT2_H */
 };
 
