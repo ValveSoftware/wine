@@ -14,7 +14,7 @@
 @ stub agsDriverExtensionsDX11_EndUAVOverlap
 @ stub agsDriverExtensionsDX11_GetMaxClipRects
 @ stub agsDriverExtensionsDX11_IASetPrimitiveTopology
-@ stub agsDriverExtensionsDX11_Init
+@ stdcall agsDriverExtensionsDX11_Init(ptr ptr long ptr)
 @ stub agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirect
 @ stub agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect
 @ stub agsDriverExtensionsDX11_MultiDrawInstancedIndirect

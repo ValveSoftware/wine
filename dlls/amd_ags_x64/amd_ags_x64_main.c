@@ -663,6 +663,14 @@ int WINAPI agsGetVersionNumber(void)
     return AGS_MAKE_VERSION(amd_ags_info[version].major, amd_ags_info[version].minor, amd_ags_info[version].patch);
 }
 
+AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext* context, ID3D11Device* device, unsigned int uavSlot, unsigned int* extensionsSupported )
+{
+    FIXME("context %p, device %p, uavSlot %u, extensionsSupported %p stub.\n", context, device, uavSlot, extensionsSupported);
+
+    *extensionsSupported = 0;
+    return AGS_SUCCESS;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p.\n", instance, reason, reserved);
