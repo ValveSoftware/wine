@@ -397,6 +397,13 @@ RECT get_virtual_screen_rect(void)
     return info.virtual_rect;
 }
 
+RECT get_primary_screen_rect(void)
+{
+    struct monitor_info info;
+    get_monitors_info( &info );
+    return info.primary_rect;
+}
+
 static BOOL get_primary_adapter(WCHAR *name)
 {
     DISPLAY_DEVICEW dd;

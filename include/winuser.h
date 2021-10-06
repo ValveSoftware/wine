@@ -4432,7 +4432,7 @@ static inline BOOL WINAPI SetRectEmpty(LPRECT rect)
 WORD        WINAPI SYSTEM_KillSystemTimer( WORD );
 
 #ifdef __WINESRC__
-WINUSERAPI BOOL CDECL __wine_send_input( HWND hwnd, const INPUT *input, UINT flags );
+WINUSERAPI BOOL CDECL __wine_send_input( HWND hwnd, const INPUT *input, const RAWINPUT *rawinput );
 #endif
 
 #ifdef __cplusplus

@@ -73,23 +73,25 @@ static NTSTATUS get_device_id(DEVICE_OBJECT *device, BUS_QUERY_ID_TYPE type, WCH
 static void HID_PNP_SendDeviceChange(DEVICE_OBJECT *device, WPARAM wparam)
 {
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
+    RAWINPUT rawinput;
+    INPUT input;
 
     if (ext->xinput_hack) return;
 
-    SERVER_START_REQ(send_hardware_message)
-    {
-        req->win                  = 0;
-        req->flags                = 0;
-        req->input.type           = HW_INPUT_HID;
-        req->input.hid.msg        = WM_INPUT_DEVICE_CHANGE;
-        req->input.hid.device     = wine_server_obj_handle(ext->rawinput_handle);
-        req->input.hid.wparam     = wparam;
-        req->input.hid.usage_page = ext->preparseData->caps.UsagePage;
-        req->input.hid.usage      = ext->preparseData->caps.Usage;
+    rawinput.header.dwType = RIM_TYPEHID;
+    rawinput.header.dwSize = offsetof(RAWINPUT, data.hid.bRawData[2 * sizeof(USAGE)]);
+    rawinput.header.hDevice = ext->rawinput_handle;
+    rawinput.header.wParam = wparam;
+    rawinput.data.hid.dwCount = 0;
+    rawinput.data.hid.dwSizeHid = 0;
+    ((USAGE *)rawinput.data.hid.bRawData)[0] = ext->preparseData->caps.UsagePage;
+    ((USAGE *)rawinput.data.hid.bRawData)[1] = ext->preparseData->caps.Usage;
 
-        wine_server_call(req);
-    }
-    SERVER_END_REQ;
+    input.type = INPUT_HARDWARE;
+    input.u.hi.uMsg = WM_INPUT_DEVICE_CHANGE;
+    input.u.hi.wParamH = 0;
+    input.u.hi.wParamL = 0;
+    __wine_send_input(0, &input, &rawinput);
 }
 
 NTSTATUS WINAPI PNP_AddDevice(DRIVER_OBJECT *driver, DEVICE_OBJECT *PDO)
