@@ -145,7 +145,7 @@ NTSTATUS HID_LinkDevice(DEVICE_OBJECT *device)
 
     handle = alloc_new_handle();
     status = IoSetDevicePropertyData(device, &DEVPROPKEY_HID_HANDLE, LOCALE_NEUTRAL,
-                                     PLUGPLAY_PROPERTY_PERSISTENT, DEVPROP_TYPE_INT32,
+                                     PLUGPLAY_PROPERTY_PERSISTENT, DEVPROP_TYPE_UINT32,
                                      sizeof(handle), &handle);
     if (status != STATUS_SUCCESS)
     {
@@ -282,30 +282,30 @@ static NTSTATUS copy_packet_into_buffer(HID_XFER_PACKET *packet, BYTE* buffer, U
 static void HID_Device_sendRawInput(DEVICE_OBJECT *device, HID_XFER_PACKET *packet)
 {
     BASE_DEVICE_EXTENSION *ext = device->DeviceExtension;
+    RAWINPUT *rawinput;
+    INPUT input;
+    ULONG size;
 
     if (ext->xinput_hack) return;
 
-    SERVER_START_REQ(send_hardware_message)
+    size = offsetof( RAWINPUT, data.hid.bRawData[packet->reportBufferLen] );
+    if (!(rawinput = HeapAlloc( GetProcessHeap(), 0, size ))) ERR( "Failed to allocate rawinput data!\n" );
+    else
     {
-        req->win                  = 0;
-        req->flags                = 0;
-        req->input.type           = HW_INPUT_HID;
-        req->input.hid.msg        = WM_INPUT;
-        req->input.hid.device     = wine_server_obj_handle(ext->rawinput_handle);
-        req->input.hid.usage_page = ext->preparseData->caps.UsagePage;
-        req->input.hid.usage      = ext->preparseData->caps.Usage;
-        req->input.hid.length     = packet->reportBufferLen;
+        rawinput->header.dwType = RIM_TYPEHID;
+        rawinput->header.dwSize = size;
+        rawinput->header.hDevice = ext->rawinput_handle;
+        rawinput->header.wParam = RIM_INPUT;
+        rawinput->data.hid.dwCount = 1;
+        rawinput->data.hid.dwSizeHid = packet->reportBufferLen;
+        memcpy( rawinput->data.hid.bRawData, packet->reportBuffer, packet->reportBufferLen );
 
-        if (ext->preparseData->reports[0].reportID == 0) {
-            BYTE zero_byte = 0;
-            req->input.hid.length++;
-            wine_server_add_data(req, &zero_byte, sizeof(zero_byte));
-        }
-
-        wine_server_add_data(req, packet->reportBuffer, packet->reportBufferLen);
-        wine_server_call(req);
+        input.type = INPUT_HARDWARE;
+        input.u.hi.uMsg = WM_INPUT;
+        input.u.hi.wParamH = 0;
+        input.u.hi.wParamL = 0;
+        __wine_send_input( 0, &input, rawinput );
     }
-    SERVER_END_REQ;
 }
 
 static void HID_Device_processQueue(DEVICE_OBJECT *device)

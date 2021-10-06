@@ -400,31 +400,56 @@ static void dump_irp_params( const char *prefix, const irp_params_t *data )
     }
 }
 
+static void dump_rawinput( const char *prefix, const union rawinput *rawinput )
+{
+    switch (rawinput->type)
+    {
+    case RIM_TYPEMOUSE:
+        fprintf( stderr, "%s{type=MOUSE,x=%d,y=%d,data=%08x}", prefix, rawinput->mouse.x,
+                 rawinput->mouse.y, rawinput->mouse.data );
+        break;
+    case RIM_TYPEKEYBOARD:
+        fprintf( stderr, "%s{type=KEYBOARD,message=%04x,vkey=%04hx,scan=%04hx}", prefix,
+                 rawinput->kbd.message, rawinput->kbd.vkey, rawinput->kbd.scan );
+        break;
+    case RIM_TYPEHID:
+        fprintf( stderr, "%s{type=HID,device=%04x,param=%04x,page=%04hx,usage=%04hx,count=%u,length=%u}",
+                 prefix, rawinput->hid.device, rawinput->hid.param, rawinput->hid.usage_page,
+                 rawinput->hid.usage, rawinput->hid.count, rawinput->hid.length );
+        break;
+    default:
+        fprintf( stderr, "%s{type=%04x}", prefix, rawinput->type );
+        break;
+    }
+}
+
 static void dump_hw_input( const char *prefix, const hw_input_t *input )
 {
     switch (input->type)
     {
-    case HW_INPUT_MOUSE:
+    case INPUT_MOUSE:
         fprintf( stderr, "%s{type=MOUSE,x=%d,y=%d,data=%08x,flags=%08x,time=%u",
                  prefix, input->mouse.x, input->mouse.y, input->mouse.data, input->mouse.flags,
                  input->mouse.time );
         dump_uint64( ",info=", &input->mouse.info );
         fputc( '}', stderr );
         break;
-    case HW_INPUT_KEYBOARD:
+    case INPUT_KEYBOARD:
         fprintf( stderr, "%s{type=KEYBOARD,vkey=%04hx,scan=%04hx,flags=%08x,time=%u",
                  prefix, input->kbd.vkey, input->kbd.scan, input->kbd.flags, input->kbd.time );
         dump_uint64( ",info=", &input->kbd.info );
         fputc( '}', stderr );
         break;
-    case HW_INPUT_HARDWARE:
+    case INPUT_HARDWARE:
         fprintf( stderr, "%s{type=HARDWARE,msg=%04x", prefix, input->hw.msg );
         dump_uint64( ",lparam=", &input->hw.lparam );
+        switch (input->hw.msg)
+        {
+        case WM_INPUT:
+        case WM_INPUT_DEVICE_CHANGE:
+            dump_rawinput( ",rawinput=", &input->hw.rawinput );
+        }
         fputc( '}', stderr );
-        break;
-    case HW_INPUT_HID:
-        fprintf( stderr, "%s{type=HID,device=%04x,usage_page=%02x,usage=%02x,length=%04x}",
-                 prefix, input->hid.device, input->hid.usage_page, input->hid.usage, input->hid.length );
         break;
     default:
         fprintf( stderr, "%s{type=%04x}", prefix, input->type );
