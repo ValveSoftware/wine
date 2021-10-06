@@ -1616,12 +1616,8 @@ NTSTATUS WINAPI NtSignalAndWaitForSingleObject( HANDLE signal, HANDLE wait,
  */
 NTSTATUS WINAPI NtYieldExecution(void)
 {
-#ifdef HAVE_SCHED_YIELD
-    sched_yield();
+    usleep(0);
     return STATUS_SUCCESS;
-#else
-    return STATUS_NO_YIELD_PERFORMED;
-#endif
 }
 
 

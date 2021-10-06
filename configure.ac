@@ -2220,7 +2220,6 @@ AC_CHECK_FUNCS(\
 	readlink \
 	renameat \
 	renameat2 \
-	sched_yield \
 	setproctitle \
 	setprogname \
 	sigprocmask \
