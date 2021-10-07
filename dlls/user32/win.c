@@ -1094,7 +1094,6 @@ void destroy_thread_windows(void)
     while ((wndPtr = next_thread_window( &hwnd )))
     {
         /* destroy the client-side storage */
-
         list = WIN_ListChildren( hwnd );
         menu = ((wndPtr->dwStyle & (WS_CHILD | WS_POPUP)) != WS_CHILD) ? (HMENU)wndPtr->wIDmenu : 0;
         sys_menu = wndPtr->hSysMenu;
@@ -1110,6 +1109,8 @@ void destroy_thread_windows(void)
             register_window_surface( surface, NULL );
             window_surface_release( surface );
         }
+
+        USER_Driver->pDestroyWindow( hwnd );
 
         /* free child windows */
 

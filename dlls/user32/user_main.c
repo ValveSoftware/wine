@@ -354,9 +354,11 @@ static void thread_detach(void)
     exiting_thread_id = GetCurrentThreadId();
 
     WDML_NotifyThreadDetach();
-    USER_Driver->pThreadDetach();
 
     destroy_thread_windows();
+
+    USER_Driver->pThreadDetach();
+
     CloseHandle( thread_info->server_queue );
     HeapFree( GetProcessHeap(), 0, thread_info->wmchar_data );
     HeapFree( GetProcessHeap(), 0, thread_info->rawinput );
