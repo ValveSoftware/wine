@@ -38,6 +38,24 @@
 
 #include "unix_private.h"
 
+/* logic from SDL2's SDL_ShouldIgnoreGameController */
+BOOL is_sdl_blacklisted(DWORD vid, DWORD pid)
+{
+    const char *allow_virtual = getenv("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD");
+    const char *whitelist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT");
+    const char *blacklist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES");
+    char needle[16];
+
+    if (vid == 0x28de && pid == 0x11ff && allow_virtual && *allow_virtual &&
+        *allow_virtual != '0' && strcasecmp(allow_virtual, "false"))
+        return FALSE;
+
+    sprintf(needle, "0x%04x/0x%04x", vid, pid);
+    if (whitelist) return strcasestr(whitelist, needle) == NULL;
+    if (blacklist) return strcasestr(blacklist, needle) != NULL;
+    return FALSE;
+}
+
 BOOL is_steam_controller(WORD vid, WORD pid)
 {
     if (vid != 0x28de) return FALSE;
