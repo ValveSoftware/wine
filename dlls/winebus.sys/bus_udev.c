@@ -1286,6 +1286,13 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
+    if (is_sdl_blacklisted(desc.vid, desc.pid))
+    {
+        /* this device is blacklisted */
+        TRACE("hidraw %s: ignoring %s, in SDL blacklist\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+        close(fd);
+        return;
+    }
     if (is_steam_controller(desc.vid, desc.pid))
     {
         /* this device is being used as a virtual Steam controller */

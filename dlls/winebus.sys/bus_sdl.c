@@ -862,16 +862,8 @@ static void sdl_add_device(unsigned int index)
         return;
     }
 
-    if (options.map_controllers && pSDL_IsGameController(index))
-        controller = pSDL_GameControllerOpen(index);
-
-    if (controller) str = pSDL_GameControllerName(controller);
-    else str = pSDL_JoystickName(joystick);
-    if (str) ntdll_umbstowcs(str, strlen(str) + 1, desc.product, ARRAY_SIZE(desc.product));
-
-    id = pSDL_JoystickInstanceID(joystick);
-
-    if (pSDL_JoystickGetProductVersion != NULL) {
+    if (pSDL_JoystickGetProductVersion != NULL)
+    {
         desc.vid = pSDL_JoystickGetVendor(joystick);
         desc.pid = pSDL_JoystickGetProduct(joystick);
         desc.version = pSDL_JoystickGetProductVersion(joystick);
@@ -883,6 +875,21 @@ static void sdl_add_device(unsigned int index)
         desc.version = 0;
     }
 
+    if (is_sdl_blacklisted(desc.vid, desc.pid))
+    {
+        /* this device is blacklisted */
+        TRACE("ignoring %s, in SDL blacklist\n", debugstr_device_desc(&desc));
+        return;
+    }
+
+    if (options.map_controllers && pSDL_IsGameController(index))
+        controller = pSDL_GameControllerOpen(index);
+
+    if (controller) str = pSDL_GameControllerName(controller);
+    else str = pSDL_JoystickName(joystick);
+    if (str) ntdll_umbstowcs(str, strlen(str) + 1, desc.product, ARRAY_SIZE(desc.product));
+
+    id = pSDL_JoystickInstanceID(joystick);
     guid = pSDL_JoystickGetGUID(joystick);
     pSDL_JoystickGetGUIDString(guid, guid_str, sizeof(guid_str));
     ntdll_umbstowcs(guid_str, strlen(guid_str) + 1, desc.serialnumber, ARRAY_SIZE(desc.serialnumber));
