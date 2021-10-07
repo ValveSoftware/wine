@@ -1378,6 +1378,13 @@ static void udev_add_device(struct udev_device *dev, int fd)
         close(fd);
         return;
     }
+    if (is_sdl_blacklisted(desc.vid, desc.pid))
+    {
+        /* this device is blacklisted */
+        TRACE("hidraw %s: ignoring %s, in SDL blacklist\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+        close(fd);
+        return;
+    }
 #ifdef HAS_PROPER_INPUT_HEADER
     else
     {
