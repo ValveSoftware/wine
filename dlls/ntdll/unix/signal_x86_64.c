@@ -1820,6 +1820,46 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     ctx->uc_mcontext.gregs[REG_EFL] &= ~0x100;  /* clear single-step flag */
     ctx->uc_mcontext.gregs[REG_RIP] = (ULONG64)__wine_syscall_dispatcher_prolog_end_ptr;
 }
+
+/* syscall numbers are for Windows 10 2009 (build 19043) */
+static struct
+{
+    unsigned int win_syscall_nr;
+    unsigned int wine_syscall_nr;
+    void *function;
+}
+syscall_nr_translation[] =
+{
+    {0x19, ~0u, NtQueryInformationProcess},
+    {0x36, ~0u, NtQuerySystemInformation},
+    {0xf2, ~0u, NtGetContextThread},
+    {0x55, ~0u, NtCreateFile},
+    {0x08, ~0u, NtWriteFile},
+    {0x06, ~0u, NtReadFile},
+    {0x0f, ~0u, NtClose},
+    {0x23, ~0u, NtQueryVirtualMemory},
+};
+
+static void sigsys_handler_rdr2( int signal, siginfo_t *siginfo, void *sigcontext )
+{
+    ucontext_t *ctx = sigcontext;
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(syscall_nr_translation); ++i)
+    {
+        if (ctx->uc_mcontext.gregs[REG_RAX] == syscall_nr_translation[i].win_syscall_nr)
+        {
+            ctx->uc_mcontext.gregs[REG_RAX] = syscall_nr_translation[i].wine_syscall_nr;
+            sigsys_handler( signal, siginfo, sigcontext );
+            return;
+        }
+    }
+
+    if (ctx->uc_mcontext.gregs[REG_RAX] == 0xffff)
+        sigsys_handler( signal, siginfo, sigcontext );
+    else
+        FIXME_(seh)("Unhandled syscall %#llx.\n", ctx->uc_mcontext.gregs[REG_RAX]);
+}
 #endif
 
 #ifdef HAVE_SECCOMP
@@ -1899,6 +1939,7 @@ static void install_bpf(struct sigaction *sig_act)
     long (*test_syscall)(long sc_number);
     struct syscall_frame *frame = amd64_thread_data()->syscall_frame;
     struct sock_fprog prog;
+    unsigned int i, j;
     NTSTATUS status;
 
     if ((ULONG_PTR)sc_seccomp < NATIVE_SYSCALL_ADDRESS_START
@@ -1912,6 +1953,28 @@ static void install_bpf(struct sigaction *sig_act)
 
     sig_act->sa_sigaction = sigsys_handler;
     memset(&prog, 0, sizeof(prog));
+
+    {
+        const char *sgi = getenv("SteamGameId");
+        if (sgi && (!strcmp(sgi, "1174180") || !strcmp(sgi, "1404210")))
+        {
+            /* Use specific signal handler. */
+            sig_act->sa_sigaction = sigsys_handler_rdr2;
+
+            for (i = 0; i < KeServiceDescriptorTable->ServiceLimit; ++i)
+            {
+                for (j = 0; j < ARRAY_SIZE(syscall_nr_translation); ++j)
+                    if ((void *)KeServiceDescriptorTable->ServiceTable[i] == syscall_nr_translation[j].function)
+                    {
+                        syscall_nr_translation[j].wine_syscall_nr = i;
+                        break;
+                    }
+            }
+
+            for (j = 0; j < ARRAY_SIZE(syscall_nr_translation); ++j)
+                assert( syscall_nr_translation[j].wine_syscall_nr != ~0u );
+        }
+    }
 
     sigaction(SIGSYS, sig_act, NULL);
 
