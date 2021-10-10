@@ -368,11 +368,69 @@ static void wine_vk_device_free_create_info(VkDeviceCreateInfo *create_info)
     free_VkDeviceCreateInfo_struct_chain(create_info);
 }
 
-static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src,
-        VkDeviceCreateInfo *dst)
+static char **parse_xr_extensions(unsigned int *len)
 {
-    unsigned int i;
+    char *xr_str, *iter, *start, **list;
+    unsigned int extension_count = 0, o = 0;
+
+    xr_str = getenv("__WINE_OPENXR_VK_DEVICE_EXTENSIONS");
+    if (!xr_str)
+    {
+        *len = 0;
+        return NULL;
+    }
+    xr_str = strdup(xr_str);
+
+    TRACE("got var: %s\n", xr_str);
+
+    iter = xr_str;
+    while(*iter){
+        if(*iter++ == ' ')
+            extension_count++;
+    }
+    /* count the one ending in NUL */
+    if(iter != xr_str)
+        extension_count++;
+    if(!extension_count){
+        *len = 0;
+        return NULL;
+    }
+
+    TRACE("counted %u extensions\n", extension_count);
+
+    list = malloc(extension_count * sizeof(char *));
+
+    start = iter = xr_str;
+    do{
+        if(*iter == ' '){
+            *iter = 0;
+            list[o++] = strdup(start);
+            TRACE("added %s to list\n", list[o-1]);
+            iter++;
+            start = iter;
+        }else if(*iter == 0){
+            list[o++] = strdup(start);
+            TRACE("added %s to list\n", list[o-1]);
+            break;
+        }else{
+            iter++;
+        }
+    }while(1);
+
+    free(xr_str);
+
+    *len = extension_count;
+
+    return list;
+}
+
+static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src,
+        VkDeviceCreateInfo *dst, BOOL *must_free_extensions)
+{
+    unsigned int i, append_xr = 0, wine_extension_count;
     VkResult res;
+
+    static const char *wine_xr_extension_name = "VK_WINE_openxr_device_extensions";
 
     *dst = *src;
 
@@ -386,14 +444,69 @@ static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src
     dst->enabledLayerCount = 0;
     dst->ppEnabledLayerNames = NULL;
 
-    TRACE("Enabled extensions: %u.\n", dst->enabledExtensionCount);
     for (i = 0; i < dst->enabledExtensionCount; i++)
+    {
+        const char *extension_name = dst->ppEnabledExtensionNames[i];
+        if (!strcmp(extension_name, wine_xr_extension_name))
+        {
+            append_xr = 1;
+            break;
+        }
+    }
+
+    if (append_xr)
+    {
+        unsigned int xr_extensions_len, o = 0;
+        char **xr_extensions_list = parse_xr_extensions(&xr_extensions_len);
+
+        char **new_extensions_list = malloc(sizeof(char *) * (dst->enabledExtensionCount + xr_extensions_len));
+
+        if(!xr_extensions_list)
+            WARN("Requested to use XR extensions, but none are set!\n");
+
+        for (i = 0; i < dst->enabledExtensionCount; i++)
+        {
+            if (strcmp(dst->ppEnabledExtensionNames[i], wine_xr_extension_name) != 0)
+            {
+                new_extensions_list[o++] = strdup(dst->ppEnabledExtensionNames[i]);
+            }
+        }
+
+        TRACE("appending XR extensions:\n");
+        for (i = 0; i < xr_extensions_len; ++i)
+        {
+            TRACE("\t%s\n", xr_extensions_list[i]);
+            new_extensions_list[o++] = xr_extensions_list[i];
+        }
+        dst->enabledExtensionCount = o;
+        dst->ppEnabledExtensionNames = (const char * const *)new_extensions_list;
+
+        free(xr_extensions_list);
+
+        *must_free_extensions = TRUE;
+        wine_extension_count = dst->enabledExtensionCount - xr_extensions_len;
+    }else{
+        *must_free_extensions = FALSE;
+        wine_extension_count = dst->enabledExtensionCount;
+    }
+
+    TRACE("Enabled %u extensions.\n", dst->enabledExtensionCount);
+    for (i = 0; i < wine_extension_count; i++)
     {
         TRACE("Extension %u: %s.\n", i, debugstr_a(dst->ppEnabledExtensionNames[i]));
     }
 
     return VK_SUCCESS;
 }
+
+static void wine_vk_device_free_create_info_extensions(VkDeviceCreateInfo *create_info)
+{
+    unsigned int i;
+    for(i = 0; i < create_info->enabledExtensionCount; ++i)
+        free((void*)create_info->ppEnabledExtensionNames[i]);
+    free((void*)create_info->ppEnabledExtensionNames);
+}
+
 
 /* Helper function used for freeing a device structure. This function supports full
  * and partial object cleanups and can thus be used for vkCreateDevice failures.
@@ -684,6 +797,7 @@ NTSTATUS wine_vkCreateDevice(void *args)
     struct VkQueue_T *next_queue;
     struct VkDevice_T *object;
     unsigned int i;
+    BOOL create_info_free_extensions;
     VkResult res;
 
     TRACE("%p, %p, %p, %p\n", phys_dev, create_info, allocator, device);
@@ -708,13 +822,15 @@ NTSTATUS wine_vkCreateDevice(void *args)
     object->base.base.loader_magic = VULKAN_ICD_MAGIC_VALUE;
     object->phys_dev = phys_dev;
 
-    res = wine_vk_device_convert_create_info(create_info, &create_info_host);
+    res = wine_vk_device_convert_create_info(create_info, &create_info_host, &create_info_free_extensions);
     if (res != VK_SUCCESS)
         goto fail;
 
     res = phys_dev->instance->funcs.p_vkCreateDevice(phys_dev->phys_dev,
             &create_info_host, NULL /* allocator */, &object->device);
     wine_vk_device_free_create_info(&create_info_host);
+    if(create_info_free_extensions)
+        wine_vk_device_free_create_info_extensions(&create_info_host);
     WINE_VK_ADD_DISPATCHABLE_MAPPING(phys_dev->instance, object, object->device);
     if (res != VK_SUCCESS)
     {
