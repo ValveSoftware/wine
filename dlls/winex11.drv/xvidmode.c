@@ -313,6 +313,7 @@ void X11DRV_XF86VM_Init(void)
   xf86vm_handler.free_modes = xf86vm_free_modes;
   xf86vm_handler.get_current_mode = xf86vm_get_current_mode;
   xf86vm_handler.set_current_mode = xf86vm_set_current_mode;
+  xf86vm_handler.convert_coordinates = NULL;
   X11DRV_Settings_SetHandler(&xf86vm_handler);
   return;
 
