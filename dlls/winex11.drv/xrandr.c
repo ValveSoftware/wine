@@ -1647,6 +1647,24 @@ done:
 
 #endif
 
+static void xrandr14_convert_coordinates( struct x11drv_display_setting *displays, UINT display_count )
+{
+    INT left_most = INT_MAX, top_most = INT_MAX;
+    UINT display_idx;
+
+    for (display_idx = 0; display_idx < display_count; ++display_idx)
+    {
+        left_most = min( left_most, displays[display_idx].desired_mode.u1.s2.dmPosition.x );
+        top_most = min( top_most, displays[display_idx].desired_mode.u1.s2.dmPosition.y );
+    }
+
+    for (display_idx = 0; display_idx < display_count; ++display_idx)
+    {
+        displays[display_idx].desired_mode.u1.s2.dmPosition.x -= left_most;
+        displays[display_idx].desired_mode.u1.s2.dmPosition.y -= top_most;
+    }
+}
+
 void X11DRV_XRandR_Init(void)
 {
     struct x11drv_display_device_handler display_handler;
@@ -1675,6 +1693,7 @@ void X11DRV_XRandR_Init(void)
     settings_handler.free_modes = xrandr10_free_modes;
     settings_handler.get_current_mode = xrandr10_get_current_mode;
     settings_handler.set_current_mode = xrandr10_set_current_mode;
+    settings_handler.convert_coordinates = NULL;
     X11DRV_Settings_SetHandler( &settings_handler );
 
 #ifdef HAVE_XRRGETPROVIDERRESOURCES
@@ -1733,6 +1752,7 @@ void X11DRV_XRandR_Init(void)
         settings_handler.free_modes = xrandr14_free_modes;
         settings_handler.get_current_mode = xrandr14_get_current_mode;
         settings_handler.set_current_mode = xrandr14_set_current_mode;
+        settings_handler.convert_coordinates = xrandr14_convert_coordinates;
         X11DRV_Settings_SetHandler( &settings_handler );
     }
 #endif
