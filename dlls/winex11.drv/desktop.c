@@ -317,6 +317,7 @@ void X11DRV_init_desktop( Window win, unsigned int width, unsigned int height )
     settings_handler.free_modes = X11DRV_desktop_free_modes;
     settings_handler.get_current_mode = X11DRV_desktop_get_current_mode;
     settings_handler.set_current_mode = X11DRV_desktop_set_current_mode;
+    settings_handler.convert_coordinates = NULL;
     X11DRV_Settings_SetHandler( &settings_handler );
 }
 
