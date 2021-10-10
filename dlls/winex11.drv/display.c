@@ -139,21 +139,33 @@ fail:
 
 POINT virtual_screen_to_root(INT x, INT y)
 {
-    RECT virtual = get_virtual_screen_rect();
+    RECT virtual = fs_hack_get_real_virtual_screen();
     POINT pt;
 
-    pt.x = x - virtual.left;
-    pt.y = y - virtual.top;
+    TRACE("from %d,%d\n", x, y);
+
+    pt.x = x;
+    pt.y = y;
+    fs_hack_point_user_to_real(&pt);
+    TRACE("to real %d,%d\n", pt.x, pt.y);
+
+    pt.x -= virtual.left;
+    pt.y -= virtual.top;
+    TRACE("to root %d,%d\n", pt.x, pt.y);
     return pt;
 }
 
 POINT root_to_virtual_screen(INT x, INT y)
 {
-    RECT virtual = get_virtual_screen_rect();
+    RECT virtual = fs_hack_get_real_virtual_screen();
     POINT pt;
 
+    TRACE("from root %d,%d\n", x, y);
     pt.x = x + virtual.left;
     pt.y = y + virtual.top;
+    TRACE("to real %d,%d\n", pt.x, pt.y);
+    fs_hack_point_real_to_user(&pt);
+    TRACE("to user %d,%d\n", pt.x, pt.y);
     return pt;
 }
 
@@ -283,6 +295,11 @@ void X11DRV_DisplayDevices_SetHandler(const struct x11drv_display_device_handler
     }
 }
 
+struct x11drv_display_device_handler X11DRV_DisplayDevices_GetHandler(void)
+{
+    return host_handler;
+}
+
 void X11DRV_DisplayDevices_RegisterEventHandlers(void)
 {
     struct x11drv_display_device_handler *handler = is_virtual_desktop() ? &desktop_handler : &host_handler;
@@ -295,22 +312,72 @@ static BOOL CALLBACK update_windows_on_display_change(HWND hwnd, LPARAM lparam)
 {
     struct x11drv_win_data *data;
     UINT mask = (UINT)lparam;
+    HMONITOR monitor;
 
     if (!(data = get_win_data(hwnd)))
         return TRUE;
 
-    /* update the full screen state */
-    update_net_wm_states(data);
+    monitor = fs_hack_monitor_from_hwnd( hwnd );
+    if (fs_hack_mapping_required( monitor ) &&
+            fs_hack_matches_current_mode( monitor,
+                data->whole_rect.right - data->whole_rect.left,
+                data->whole_rect.bottom - data->whole_rect.top)){
+        if(!data->fs_hack){
+            RECT real_rect = fs_hack_real_mode( monitor );
+            MONITORINFO monitor_info;
+            UINT width, height;
+            POINT tl;
 
-    if (mask && data->whole_window)
-    {
-        POINT pos = virtual_screen_to_root(data->whole_rect.left, data->whole_rect.top);
-        XWindowChanges changes;
-        changes.x = pos.x;
-        changes.y = pos.y;
-        XReconfigureWMWindow(data->display, data->whole_window, data->vis.screen, mask, &changes);
+            monitor_info.cbSize = sizeof(monitor_info);
+            GetMonitorInfoW( monitor, &monitor_info );
+            tl = virtual_screen_to_root( monitor_info.rcMonitor.left, monitor_info.rcMonitor.top );
+            width = real_rect.right - real_rect.left;
+            height = real_rect.bottom - real_rect.top;
+
+            TRACE("Enabling fs hack, resizing window %p to (%u,%u)-(%u,%u)\n", hwnd, tl.x, tl.y, width, height);
+            data->fs_hack = TRUE;
+            set_wm_hints( data );
+            XMoveResizeWindow(data->display, data->whole_window, tl.x, tl.y, width, height);
+            if(data->client_window)
+                XMoveResizeWindow(gdi_display, data->client_window, 0, 0, width, height);
+            sync_gl_drawable(hwnd, FALSE);
+            update_net_wm_states( data );
+        }
+    } else {
+        /* update the full screen state */
+        update_net_wm_states(data);
+
+        if (data->fs_hack)
+            mask |= CWX | CWY;
+
+        if (mask && data->whole_window)
+        {
+            POINT pos = virtual_screen_to_root(data->whole_rect.left, data->whole_rect.top);
+            XWindowChanges changes;
+            changes.x = pos.x;
+            changes.y = pos.y;
+            XReconfigureWMWindow(data->display, data->whole_window, data->vis.screen, mask, &changes);
+        }
+
+        if(data->fs_hack && (!fs_hack_mapping_required(monitor) ||
+            !fs_hack_matches_current_mode(monitor,
+                data->whole_rect.right - data->whole_rect.left,
+                data->whole_rect.bottom - data->whole_rect.top))){
+            TRACE("Disabling fs hack\n");
+            data->fs_hack = FALSE;
+            if(data->client_window){
+                XMoveResizeWindow(gdi_display, data->client_window,
+                        data->client_rect.left - data->whole_rect.left,
+                        data->client_rect.top - data->whole_rect.top,
+                        data->client_rect.right - data->client_rect.left,
+                        data->client_rect.bottom - data->client_rect.top);
+            }
+            sync_gl_drawable(hwnd, FALSE);
+        }
     }
     release_win_data(data);
+    if (hwnd == GetForegroundWindow())
+        clip_fullscreen_window(hwnd, TRUE);
     return TRUE;
 }
 
