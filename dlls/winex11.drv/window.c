@@ -1339,7 +1339,7 @@ static void update_net_wm_fullscreen_monitors( struct x11drv_win_data *data )
 
 static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_state )
 {
-    UINT i, count, old_state = data->pending_state.net_wm_state;
+    UINT i, count, old_state = data->pending_state.net_wm_state, net_wm_bypass_compositor = 0;
 
     new_state &= x11drv_init_thread_data()->net_wm_state_mask;
     data->desired_state.net_wm_state = new_state;
@@ -1406,6 +1406,15 @@ static void window_set_net_wm_state( struct x11drv_win_data *data, UINT new_stat
                         SubstructureRedirectMask | SubstructureNotifyMask, &xev );
         }
     }
+
+    if (new_state & (1 << NET_WM_STATE_FULLSCREEN))
+    {
+        RECT virtual_screen = NtUserGetVirtualScreenRect( MDT_RAW_DPI );
+        net_wm_bypass_compositor = EqualRect( &data->rects.visible, &virtual_screen );
+    }
+
+    XChangeProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_BYPASS_COMPOSITOR), XA_CARDINAL,
+                     32, PropModeReplace, (unsigned char *)&net_wm_bypass_compositor, 1 );
 }
 
 static void window_set_config( struct x11drv_win_data *data, RECT rect, BOOL above )
