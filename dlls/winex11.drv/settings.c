@@ -36,15 +36,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(x11settings);
 
-struct x11drv_display_setting
-{
-    ULONG_PTR id;
-    BOOL placed;
-    RECT new_rect;
-    RECT desired_rect;
-    DEVMODEW desired_mode;
-};
-
 struct x11drv_display_depth
 {
     struct list entry;
@@ -86,6 +77,11 @@ void X11DRV_Settings_SetHandler(const struct x11drv_settings_handler *new_handle
         handler = *new_handler;
         TRACE("Display settings are now handled by: %s.\n", handler.name);
     }
+}
+
+struct x11drv_settings_handler X11DRV_Settings_GetHandler(void)
+{
+    return handler;
 }
 
 /***********************************************************************
@@ -170,7 +166,6 @@ static LONG nores_set_current_mode(ULONG_PTR id, DEVMODEW *mode)
     return DISP_CHANGE_SUCCESSFUL;
 }
 
-/* default handler only gets the current X desktop resolution */
 void X11DRV_Settings_Init(void)
 {
     struct x11drv_settings_handler nores_handler;
@@ -184,6 +179,7 @@ void X11DRV_Settings_Init(void)
     nores_handler.free_modes = nores_free_modes;
     nores_handler.get_current_mode = nores_get_current_mode;
     nores_handler.set_current_mode = nores_set_current_mode;
+    nores_handler.convert_coordinates = NULL;
     X11DRV_Settings_SetHandler(&nores_handler);
 }
 
@@ -367,7 +363,7 @@ BOOL get_primary_adapter(WCHAR *name)
     return FALSE;
 }
 
-static int mode_compare(const void *p1, const void *p2)
+int mode_compare(const void *p1, const void *p2)
 {
     DWORD a_width, a_height, b_width, b_height;
     const DEVMODEW *a = p1, *b = p2;
@@ -832,7 +828,6 @@ static POINT get_placement_offset(const struct x11drv_display_setting *displays,
 
 static void place_all_displays(struct x11drv_display_setting *displays, INT display_count)
 {
-    INT left_most = INT_MAX, top_most = INT_MAX;
     INT placing_idx, display_idx;
     POINT min_offset, offset;
 
@@ -867,15 +862,6 @@ static void place_all_displays(struct x11drv_display_setting *displays, INT disp
     {
         displays[display_idx].desired_mode.u1.s2.dmPosition.x = displays[display_idx].new_rect.left;
         displays[display_idx].desired_mode.u1.s2.dmPosition.y = displays[display_idx].new_rect.top;
-        left_most = min(left_most, displays[display_idx].new_rect.left);
-        top_most = min(top_most, displays[display_idx].new_rect.top);
-    }
-
-    /* Convert virtual screen coordinates to root coordinates */
-    for (display_idx = 0; display_idx < display_count; ++display_idx)
-    {
-        displays[display_idx].desired_mode.u1.s2.dmPosition.x -= left_most;
-        displays[display_idx].desired_mode.u1.s2.dmPosition.y -= top_most;
     }
 }
 

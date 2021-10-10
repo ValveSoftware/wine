@@ -1186,14 +1186,38 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
     }
     else pos = root_to_virtual_screen( x, y );
 
-    X11DRV_X_to_window_rect( data, &rect, pos.x, pos.y, event->width, event->height );
-    if (root_coords) MapWindowPoints( 0, parent, (POINT *)&rect, 2 );
+    if(data->fs_hack){
+        MONITORINFO monitor_info;
+        HMONITOR monitor;
+
+        monitor = fs_hack_monitor_from_hwnd( hwnd );
+        monitor_info.cbSize = sizeof(monitor_info);
+        GetMonitorInfoW( monitor, &monitor_info );
+        rect = monitor_info.rcMonitor;
+        TRACE( "monitor %p rect: %s\n", monitor, wine_dbgstr_rect(&rect) );
+    }else{
+        X11DRV_X_to_window_rect( data, &rect, pos.x, pos.y, event->width, event->height );
+        if (root_coords) MapWindowPoints( 0, parent, (POINT *)&rect, 2 );
+    }
 
     TRACE( "win %p/%lx new X rect %d,%d,%dx%d (event %d,%d,%dx%d)\n",
            hwnd, data->whole_window, rect.left, rect.top, rect.right-rect.left, rect.bottom-rect.top,
            event->x, event->y, event->width, event->height );
 
     /* Compare what has changed */
+
+    {
+        const char *steamgameid = getenv("SteamGameId");
+        if(steamgameid && !strcmp(steamgameid, "590380")){
+            /* Into The Breach is extremely picky about the size of its window. */
+            if(is_window_rect_full_screen(&data->whole_rect) &&
+                    is_window_rect_full_screen(&rect)){
+                TRACE("window is fullscreen and new size is also fullscreen, so preserving window size\n");
+                rect.right = rect.left + (data->whole_rect.right - data->whole_rect.left);
+                rect.bottom = rect.top + (data->whole_rect.bottom - data->whole_rect.top);
+            }
+        }
+    }
 
     x     = rect.left;
     y     = rect.top;
@@ -1596,6 +1620,7 @@ static void EVENT_DropFromOffiX( HWND hWnd, XClientMessageEvent *event )
     Window		win, w_aux_root, w_aux_child;
 
     if (!(data = get_win_data( hWnd ))) return;
+    ERR("TODO: fs hack\n");
     cx = data->whole_rect.right - data->whole_rect.left;
     cy = data->whole_rect.bottom - data->whole_rect.top;
     win = data->whole_window;
