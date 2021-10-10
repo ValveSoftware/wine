@@ -63,7 +63,7 @@ Colormap default_colormap = None;
 XPixmapFormatValues **pixmap_formats;
 unsigned int screen_bpp;
 Window root_window;
-BOOL usexvidmode = TRUE;
+BOOL usexvidmode = FALSE;
 BOOL usexrandr = TRUE;
 BOOL usexcomposite = TRUE;
 BOOL use_xfixes = FALSE;
@@ -83,6 +83,7 @@ BOOL client_side_with_render = TRUE;
 BOOL shape_layered_windows = TRUE;
 int copy_default_colors = 128;
 int alloc_system_colors = 256;
+int limit_number_of_resolutions = 0;
 DWORD thread_data_tls_index = TLS_OUT_OF_INDEXES;
 int xrender_error_base = 0;
 int xfixes_event_base = 0;
@@ -456,6 +457,9 @@ static void setup_options(void)
     if (!get_config_key( hkey, appkey, "AllocSystemColors", buffer, sizeof(buffer) ))
         alloc_system_colors = atoi(buffer);
 
+    if (!get_config_key( hkey, appkey, "LimitNumberOfResolutions", buffer, sizeof(buffer) ))
+        limit_number_of_resolutions = atoi(buffer);
+
     get_config_key( hkey, appkey, "InputStyle", input_style, sizeof(input_style) );
 
     if (appkey) RegCloseKey( appkey );
@@ -705,6 +709,8 @@ static BOOL process_attach(void)
     X11DRV_InitKeyboard( gdi_display );
     X11DRV_InitMouse( gdi_display );
     if (use_xim) use_xim = X11DRV_InitXIM( input_style );
+
+    fs_hack_init();
 
     init_user_driver();
     X11DRV_DisplayDevices_Init(FALSE);
