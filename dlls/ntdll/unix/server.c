@@ -1552,6 +1552,11 @@ size_t server_init_process(void)
     fatal_error( "wineserver doesn't support the %04x architecture\n", current_machine );
 }
 
+static BOOL force_laa(void)
+{
+    const char *e = getenv("WINE_LARGE_ADDRESS_AWARE");
+    return (e != NULL) && (*e != '\0' && *e != '0');
+}
 
 /***********************************************************************
  *           server_init_process_done
@@ -1570,7 +1575,7 @@ void server_init_process_done(void)
 #ifdef __APPLE__
     send_server_task_port();
 #endif
-    if (main_image_info.ImageCharacteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE)
+    if (force_laa() || (main_image_info.ImageCharacteristics & IMAGE_FILE_LARGE_ADDRESS_AWARE))
         virtual_set_large_address_space();
 
     /* Install signal handlers; this cannot be done earlier, since we cannot
