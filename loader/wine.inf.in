@@ -2867,6 +2867,7 @@ HKCU,Software\Wine\DllOverrides,"ucrtbase",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcomp140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"vcruntime140",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"atiadlxx",,"disabled"
+HKCU,Software\Wine\DllOverrides,"nvcuda",0x2,"disabled"
 ;;App-specific overrides to limit the number of resolutions
 HKCU,Software\Wine\AppDefaults\DarkSoulsIII.exe\X11 Driver,"LimitNumberOfResolutions",0x2,"32"
 HKCU,Software\Wine\AppDefaults\sekiro.exe\X11 Driver,"LimitNumberOfResolutions",0x2,"32"
