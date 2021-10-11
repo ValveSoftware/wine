@@ -741,3 +741,10 @@ static HRESULT uia_evm_add_uia_event(struct uia_evl *evl,
 
     return S_OK;
 }
+
+HRESULT WINAPI UiaRaiseAutomationPropertyChangedEvent(IRawElementProviderSimple *provider, PROPERTYID id, VARIANT old, VARIANT new)
+{
+    FIXME("provider %p, id %u, old %s, new %s stub.\n", provider, id, debugstr_variant(&old), debugstr_variant(&new));
+
+    return S_OK;
+}
