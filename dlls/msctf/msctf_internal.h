@@ -36,7 +36,6 @@
 #define COOKIE_MAGIC_INPUTPROCESSORPROFILEACTIVATIONSINK 0x00b0
 #define COOKIE_MAGIC_ACTIVELANGSINK 0x00c0
 
-extern DWORD tlsIndex;
 extern TfClientId processId;
 extern ITfCompartmentMgr *globalCompartmentMgr;
 
