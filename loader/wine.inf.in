@@ -96,6 +96,7 @@ AddReg=\
     ThemeManager,\
     VersionInfo,\
     LicenseInformation,\
+    NVIDIANGX, \
     ProtonOverrides,\
     SteamClient
 
@@ -123,6 +124,7 @@ AddReg=\
     ThemeManager,\
     VersionInfo,\
     LicenseInformation,\
+    NVIDIANGX, \
     ProtonOverrides,\
     SteamClient.ntamd64
 
@@ -165,6 +167,7 @@ AddReg=\
     Tapi,\
     VersionInfo,\
     LicenseInformation,\
+    NVIDIANGX, \
     ProtonOverrides,\
     SteamClient.ntamd64
 
@@ -2748,6 +2751,9 @@ HKCU,Software\Valve\Steam\ActiveProcess,"SteamClientDll",,"%16426%\Steam\steamcl
 HKCU,Software\Valve\Steam\ActiveProcess,"SteamClientDll64",,"%16426%\Steam\steamclient64.dll"
 HKCU,Software\Valve\Steam\ActiveProcess,"SteamPath",,"%16426%\Steam"
 HKLM,Software\Wow6432Node\Valve\Steam,"InstallPath",,"%16422%\Steam"
+
+[NVIDIANGX]
+HKLM,Software\NVIDIA Corporation\Global\NGXCore,"FullPath",,"C:\Windows\System32"
 
 [ProtonOverrides]
 HKLM,Software\Khronos\OpenXR\1,"ActiveRuntime",,"C:\openxr\wineopenxr64.json"
