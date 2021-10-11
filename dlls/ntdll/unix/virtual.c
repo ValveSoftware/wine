@@ -71,6 +71,7 @@
 #include "windef.h"
 #include "winnt.h"
 #include "winternl.h"
+#include "ddk/wdm.h"
 #include "wine/list.h"
 #include "wine/rbtree.h"
 #include "unix_private.h"
@@ -4472,6 +4473,82 @@ static NTSTATUS get_working_set_ex( HANDLE process, LPCVOID addr,
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS read_nt_symlink( UNICODE_STRING *name, WCHAR *target, DWORD size )
+{
+    NTSTATUS status;
+    OBJECT_ATTRIBUTES attr;
+    HANDLE handle;
+
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = 0;
+    attr.Attributes = OBJ_CASE_INSENSITIVE;
+    attr.ObjectName = name;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+
+    if (!(status = NtOpenSymbolicLinkObject( &handle, SYMBOLIC_LINK_QUERY, &attr )))
+    {
+        UNICODE_STRING targetW;
+        targetW.Buffer = target;
+        targetW.MaximumLength = (size - 1) * sizeof(WCHAR);
+        status = NtQuerySymbolicLinkObject( handle, &targetW, NULL );
+        if (!status) target[targetW.Length / sizeof(WCHAR)] = 0;
+        NtClose( handle );
+    }
+    return status;
+}
+
+static NTSTATUS resolve_drive_symlink( UNICODE_STRING *name, SIZE_T max_name_len, SIZE_T *ret_len )
+{
+    static int enabled = -1;
+
+    static const WCHAR dosprefixW[] = {'\\','?','?','\\'};
+    UNICODE_STRING device_name;
+    SIZE_T required_length, symlink_len;
+    WCHAR symlink[256];
+    size_t offset = 0;
+    NTSTATUS status;
+
+    if (enabled == -1)
+    {
+        const char *sgi = getenv("SteamGameId");
+
+        enabled = sgi && !strcmp(sgi, "284160");
+    }
+    if (!enabled)
+        return STATUS_SUCCESS;
+
+    if (name->Length < sizeof(dosprefixW) ||
+            memcmp( name->Buffer, dosprefixW, sizeof(dosprefixW) ))
+        return STATUS_SUCCESS;
+
+    offset = ARRAY_SIZE(dosprefixW);
+    while (offset * sizeof(WCHAR) < name->Length && name->Buffer[ offset ] != '\\') offset++;
+
+    device_name = *name;
+    device_name.Length = offset * sizeof(WCHAR);
+    if ((status = read_nt_symlink( &device_name, symlink, ARRAY_SIZE( symlink ))))
+    {
+        ERR("read_nt_symlink failed, status %#x.\n", status);
+        return status;
+    }
+    symlink_len = wcslen( symlink );
+    required_length = symlink_len * sizeof(WCHAR) +
+           name->Length - offset * sizeof(WCHAR) + sizeof(WCHAR);
+    if (ret_len)
+        *ret_len = sizeof(MEMORY_SECTION_NAME) + required_length;
+    if (required_length > max_name_len)
+        return STATUS_BUFFER_OVERFLOW;
+
+    memmove( name->Buffer + symlink_len, name->Buffer + offset, name->Length - offset * sizeof(WCHAR) );
+    memcpy( name->Buffer, symlink, symlink_len * sizeof(WCHAR) );
+    name->MaximumLength = required_length;
+    name->Length = required_length - sizeof(WCHAR);
+    name->Buffer[name->Length] = 0;
+
+    return STATUS_SUCCESS;
+}
+
 static NTSTATUS get_memory_section_name( HANDLE process, LPCVOID addr,
                                          MEMORY_SECTION_NAME *info, SIZE_T len, SIZE_T *ret_len )
 {
@@ -4500,6 +4577,9 @@ static NTSTATUS get_memory_section_name( HANDLE process, LPCVOID addr,
         }
     }
     SERVER_END_REQ;
+
+    if (!status)
+        status = resolve_drive_symlink( &info->SectionFileName, len - sizeof(*info), ret_len );
     return status;
 }
 
