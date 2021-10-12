@@ -152,6 +152,22 @@ enum ZoomUnit {
     ZoomUnit_SmallIncrement = 0x0004,
 };
 
+enum NotificationProcessing {
+    NotificationProcessing_ImportantAll          = 0x0000,
+    NotificationProcessing_ImportantMostRecent   = 0x0001,
+    NotificationProcessing_All                   = 0x0002,
+    NotificationProcessing_MostRecent            = 0x0003,
+    NotificationProcessing_CurrentThenMostRecent = 0x0004,
+};
+
+enum NotificationKind {
+    NotificationKind_ItemAdded       = 0x0000,
+    NotificationKind_ItemRemoved     = 0x0001,
+    NotificationKind_ActionCompleted = 0x0002,
+    NotificationKind_ActionAborted   = 0x0003,
+    NotificationKind_Other           = 0x0004,
+};
+
 typedef int PROPERTYID;
 typedef int PATTERNID;
 typedef int EVENTID;
