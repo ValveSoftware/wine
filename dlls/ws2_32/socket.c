@@ -302,7 +302,7 @@ static const WSAPROTOCOL_INFOW supported_protocols[] =
 
 #define IS_IPX_PROTO(X) ((X) >= WS_NSPROTO_IPX && (X) <= WS_NSPROTO_IPX + 255)
 
-#if defined(IP_UNICAST_IF) && defined(SO_ATTACH_FILTER)
+#if defined(IP_UNICAST_IF) && defined(SO_ATTACH_FILTER) && defined(SO_BINDTODEVICE)
 # define LINUX_BOUND_IF
 struct interface_filter {
     struct sock_filter iface_memaddr;
@@ -3122,7 +3122,7 @@ static BOOL interface_bind( SOCKET s, int fd, struct sockaddr *addr )
     struct sockaddr_in *in_sock = (struct sockaddr_in *) addr;
     in_addr_t bind_addr = in_sock->sin_addr.s_addr;
     PIP_ADAPTER_INFO adapters = NULL, adapter;
-    BOOL ret = FALSE;
+    BOOL ret = FALSE, need_reuseaddr = TRUE;
     DWORD adap_size;
     int enable = 1;
 
@@ -3152,16 +3152,26 @@ static BOOL interface_bind( SOCKET s, int fd, struct sockaddr *addr )
             struct interface_filter specific_interface_filter;
             struct sock_fprog filter_prog;
 
-            if (setsockopt(fd, IPPROTO_IP, IP_UNICAST_IF, &ifindex, sizeof(ifindex)) != 0)
-                goto cleanup; /* Failed to suggest egress interface */
-            specific_interface_filter = generic_interface_filter;
-            specific_interface_filter.iface_rule.k = adapter->Index;
-            specific_interface_filter.ip_rule.k = htonl(adapter_addr);
-            filter_prog.len = sizeof(generic_interface_filter)/sizeof(struct sock_filter);
-            filter_prog.filter = (struct sock_filter *) &specific_interface_filter;
-            if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &filter_prog, sizeof(filter_prog)) != 0)
-                goto cleanup; /* Failed to specify incoming packet filter */
-            ret = TRUE;
+            if (!setsockopt(fd, SOL_SOCKET, SO_BINDTODEVICE, adapter->AdapterName, sizeof(adapter->AdapterName)))
+            {
+                ret = TRUE;
+                need_reuseaddr = FALSE;
+            }
+            else
+            {
+                WARN("setsockopt(SO_BINDTODEVICE, %s) failed, errno %d, falling back to SO_ATTACH_FILTER.\n",
+                        debugstr_a(adapter->AdapterName), errno);
+                if (setsockopt(fd, IPPROTO_IP, IP_UNICAST_IF, &ifindex, sizeof(ifindex)) != 0)
+                    goto cleanup; /* Failed to suggest egress interface */
+                specific_interface_filter = generic_interface_filter;
+                specific_interface_filter.iface_rule.k = adapter->Index;
+                specific_interface_filter.ip_rule.k = htonl(adapter_addr);
+                filter_prog.len = sizeof(generic_interface_filter)/sizeof(struct sock_filter);
+                filter_prog.filter = (struct sock_filter *) &specific_interface_filter;
+                if (setsockopt(fd, SOL_SOCKET, SO_ATTACH_FILTER, &filter_prog, sizeof(filter_prog)) != 0)
+                    goto cleanup; /* Failed to specify incoming packet filter */
+                ret = TRUE;
+            }
 #else
             FIXME("Broadcast packets on interface-bound sockets are not currently supported on this platform, "
                   "receiving broadcast packets will not work on socket %04lx.\n", s);
@@ -3197,10 +3207,10 @@ static BOOL interface_bind( SOCKET s, int fd, struct sockaddr *addr )
         }
     }
     /* Will soon be switching to INADDR_ANY: permit address reuse */
-    if (ret && setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) == 0)
+    if (ret && need_reuseaddr)
+        ret = !setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable));
+    if (ret)
         TRACE("Socket %04lx bound to interface index %d\n", s, adapter->Index);
-    else
-        ret = FALSE;
 
 cleanup:
     if(!ret)
