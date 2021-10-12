@@ -75,6 +75,8 @@ HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *provider, EVEN
 HRESULT WINAPI UiaRaiseAutomationPropertyChangedEvent(IRawElementProviderSimple *provider, PROPERTYID id, VARIANT old, VARIANT new);
 HRESULT WINAPI UiaRaiseAsyncContentLoadedEvent(IRawElementProviderSimple *provider,
                                                 enum AsyncContentLoadedState async_content_loaded_state, double percent_complete);
+HRESULT WINAPI UiaRaiseTextEditTextChangedEvent(IRawElementProviderSimple *provider, enum TextEditChangeType text_edit_change_type,
+                                                SAFEARRAY *changed_data);
 HRESULT WINAPI UiaRaiseStructureChangedEvent(IRawElementProviderSimple *provider, enum StructureChangeType struct_change_type,
                                              int *runtime_id, int runtime_id_len);
 void WINAPI UiaRegisterProviderCallback(UiaProviderCallback *pCallback);
