@@ -76,6 +76,8 @@ HRESULT WINAPI UiaRaiseAsyncContentLoadedEvent(IRawElementProviderSimple *provid
                                                 enum AsyncContentLoadedState async_content_loaded_state, double percent_complete);
 HRESULT WINAPI UiaRaiseStructureChangedEvent(IRawElementProviderSimple *provider, enum StructureChangeType structureChangeType,
                                              int *pRuntimeId, int cRuntimeIdLen);
+HRESULT WINAPI UiaRaiseTextEditTextChangedEvent(IRawElementProviderSimple *provider, enum TextEditChangeType text_edit_change_type,
+                                                SAFEARRAY *changed_data);
 void WINAPI UiaRegisterProviderCallback(UiaProviderCallback *pCallback);
 LRESULT WINAPI UiaReturnRawElementProvider(HWND hwnd, WPARAM wParam, LPARAM lParam, IRawElementProviderSimple *elprov);
 BOOL WINAPI UiaTextRangeRelease(HUIATEXTRANGE hobj);
