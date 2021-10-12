@@ -440,6 +440,8 @@ int WINAPI UiaLookupId(enum AutomationIdentifierType type, const GUID *guid);
 BOOL WINAPI UiaPatternRelease(HUIAPATTERNOBJECT hobj);
 HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *provider, EVENTID id);
 HRESULT WINAPI UiaRaiseAutomationPropertyChangedEvent(IRawElementProviderSimple *, PROPERTYID, VARIANT, VARIANT);
+HRESULT WINAPI UiaRaiseAsyncContentLoadedEvent(IRawElementProviderSimple *provider,
+                                                enum AsyncContentLoadedState async_content_loaded_state, double percent_complete);
 HRESULT WINAPI UiaRaiseStructureChangedEvent(IRawElementProviderSimple *provider, enum StructureChangeType struct_change_type,
                                              int *runtime_id, int runtime_id_len);
 void WINAPI UiaRegisterProviderCallback(UiaProviderCallback *pCallback);
