@@ -459,6 +459,18 @@ HRESULT WINAPI UiaRaiseTextEditTextChangedEvent(IRawElementProviderSimple *provi
     return S_OK;
 }
 
+/***********************************************************************
+ *          UiaRaiseNotificationEvent (uiautomationcore.@)
+ */
+HRESULT WINAPI UiaRaiseNotificationEvent(IRawElementProviderSimple *provider,
+        enum NotificationKind notification_kind, enum NotificationProcessing notification_processing,
+        BSTR display_str, BSTR activity_id)
+{
+    FIXME("(%p, %d, %d, %s, %s): stub\n", provider, notification_kind, notification_processing,
+            debugstr_w(display_str), debugstr_w(activity_id));
+    return S_OK;
+}
+
 void WINAPI UiaRegisterProviderCallback(UiaProviderCallback *callback)
 {
     FIXME("(%p): stub\n", callback);
