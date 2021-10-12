@@ -84,7 +84,7 @@
 @ stub UiaPatternRelease
 #@ stub UiaProviderForNonClient
 #@ stub UiaProviderFromIAccessible
-@ stub UiaRaiseAsyncContentLoadedEvent
+@ stdcall UiaRaiseAsyncContentLoadedEvent(ptr long double)
 @ stdcall UiaRaiseAutomationEvent(ptr long)
 @ stdcall UiaRaiseAutomationPropertyChangedEvent(ptr long int128 int128)
 #@ stub UiaRaiseChangesEvent

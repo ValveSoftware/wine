@@ -438,6 +438,17 @@ HRESULT WINAPI UiaRaiseStructureChangedEvent(IRawElementProviderSimple *provider
     return S_OK;
 }
 
+/***********************************************************************
+ *          UiaRaiseAsyncContentLoadedEvent (uiautomationcore.@)
+ */
+HRESULT WINAPI UiaRaiseAsyncContentLoadedEvent(IRawElementProviderSimple *provider,
+                                                enum AsyncContentLoadedState async_content_loaded_state,
+                                                double percent_complete)
+{
+    FIXME("(%p, %d, %f): stub\n", provider, async_content_loaded_state, percent_complete);
+    return S_OK;
+}
+
 void WINAPI UiaRegisterProviderCallback(UiaProviderCallback *callback)
 {
     FIXME("(%p): stub\n", callback);
