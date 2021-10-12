@@ -59,6 +59,12 @@ enum ProviderType
     ProviderType_NonClientArea,
 };
 
+enum AsyncContentLoadedState {
+    AsyncContentLoadedState_Beginning,
+    AsyncContentLoadedState_Progress,
+    AsyncContentLoadedState_Completed,
+};
+
 typedef SAFEARRAY * WINAPI UiaProviderCallback(HWND hwnd,enum ProviderType providerType);
 
 HRESULT WINAPI UiaGetReservedMixedAttributeValue(IUnknown **value);
@@ -66,6 +72,8 @@ HRESULT WINAPI UiaGetReservedNotSupportedValue(IUnknown **value);
 int WINAPI UiaLookupId(enum AutomationIdentifierType type, const GUID *guid);
 BOOL WINAPI UiaPatternRelease(HUIAPATTERNOBJECT hobj);
 HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *provider, EVENTID id);
+HRESULT WINAPI UiaRaiseAsyncContentLoadedEvent(IRawElementProviderSimple *provider,
+                                                enum AsyncContentLoadedState async_content_loaded_state, double percent_complete);
 HRESULT WINAPI UiaRaiseStructureChangedEvent(IRawElementProviderSimple *provider, enum StructureChangeType structureChangeType,
                                              int *pRuntimeId, int cRuntimeIdLen);
 void WINAPI UiaRegisterProviderCallback(UiaProviderCallback *pCallback);
