@@ -23,6 +23,8 @@ struct shared_resource
     unsigned int ref_count;
     void *unix_resource;
     WCHAR *name;
+    void *metadata;
+    SIZE_T metadata_size;
 };
 
 static struct shared_resource *resource_pool;
@@ -246,6 +248,33 @@ static NTSTATUS shared_resource_get_unix_resource(struct shared_resource *res, v
     return STATUS_SUCCESS;
 }
 
+#define IOCTL_SHARED_GPU_RESOURCE_SET_METADATA           CTL_CODE(FILE_DEVICE_VIDEO, 4, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+
+static NTSTATUS shared_resource_set_metadata(struct shared_resource *res, void *buff, SIZE_T insize, IO_STATUS_BLOCK *iosb)
+{
+    res->metadata = ExAllocatePoolWithTag(NonPagedPool, insize, 0);
+    memcpy(res->metadata, buff, insize);
+    res->metadata_size = insize;
+
+    iosb->Information = 0;
+    return STATUS_SUCCESS;
+}
+
+#define IOCTL_SHARED_GPU_RESOURCE_GET_METADATA           CTL_CODE(FILE_DEVICE_VIDEO, 5, METHOD_BUFFERED, FILE_READ_ACCESS)
+
+static NTSTATUS shared_resource_get_metadata(struct shared_resource *res, void *buff, SIZE_T outsize, IO_STATUS_BLOCK *iosb)
+{
+    if (!res->metadata)
+        return STATUS_NOT_FOUND;
+
+    if (res->metadata_size > outsize)
+        return STATUS_BUFFER_TOO_SMALL;
+
+    memcpy(buff, res->metadata, res->metadata_size);
+    iosb->Information = res->metadata_size;
+    return STATUS_SUCCESS;
+}
+
 static NTSTATUS WINAPI dispatch_create(DEVICE_OBJECT *device, IRP *irp)
 {
     irp->IoStatus.u.Status = STATUS_SUCCESS;
@@ -263,11 +292,19 @@ static NTSTATUS WINAPI dispatch_close(DEVICE_OBJECT *device, IRP *irp)
     if (res)
     {
         res->ref_count--;
-        if (!res->ref_count && res->unix_resource)
+        if (!res->ref_count)
         {
-            /* TODO: see if its possible to destroy the object here (unlink?) */
-            ObDereferenceObject(res->unix_resource);
-            res->unix_resource = NULL;
+            if (res->unix_resource)
+            {
+                /* TODO: see if its possible to destroy the object here (unlink?) */
+                ObDereferenceObject(res->unix_resource);
+                res->unix_resource = NULL;
+            }
+            if (res->metadata)
+            {
+                ExFreePoolWithTag(res->metadata, 0);
+                res->metadata = NULL;
+            }
         }
     }
 
@@ -309,6 +346,18 @@ static NTSTATUS WINAPI dispatch_ioctl(DEVICE_OBJECT *device, IRP *irp)
             break;
         case IOCTL_SHARED_GPU_RESOURCE_GET_UNIX_RESOURCE:
             status = shared_resource_get_unix_resource( *res,
+                                      irp->AssociatedIrp.SystemBuffer,
+                                      stack->Parameters.DeviceIoControl.OutputBufferLength,
+                                      &irp->IoStatus );
+            break;
+        case IOCTL_SHARED_GPU_RESOURCE_SET_METADATA:
+            status = shared_resource_set_metadata( *res,
+                                      irp->AssociatedIrp.SystemBuffer,
+                                      stack->Parameters.DeviceIoControl.InputBufferLength,
+                                      &irp->IoStatus );
+            break;
+        case IOCTL_SHARED_GPU_RESOURCE_GET_METADATA:
+            status = shared_resource_get_metadata( *res,
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.OutputBufferLength,
                                       &irp->IoStatus );
