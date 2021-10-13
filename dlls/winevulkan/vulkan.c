@@ -29,6 +29,9 @@
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
+#include "windef.h"
+#include "winnt.h"
+#include "winioctl.h"
 #include "wine/server.h"
 
 #include "vulkan_private.h"
@@ -1454,6 +1457,10 @@ static inline void wine_vk_normalize_handle_types_host(VkExternalMemoryHandleTyp
         VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_MAPPED_FOREIGN_MEMORY_BIT_EXT;
 }
 
+static const VkExternalMemoryHandleTypeFlagBits wine_vk_handle_over_fd_types =
+                VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT |
+                VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
+
 static void wine_vk_get_physical_device_external_buffer_properties(VkPhysicalDevice phys_dev,
         void (*p_vkGetPhysicalDeviceExternalBufferProperties)(VkPhysicalDevice, const VkPhysicalDeviceExternalBufferInfo *, VkExternalBufferProperties *),
         const VkPhysicalDeviceExternalBufferInfo *buffer_info, VkExternalBufferProperties *properties)
@@ -1461,7 +1468,7 @@ static void wine_vk_get_physical_device_external_buffer_properties(VkPhysicalDev
     VkPhysicalDeviceExternalBufferInfo buffer_info_dup = *buffer_info;
 
     wine_vk_normalize_handle_types_win(&buffer_info_dup.handleType);
-    if (buffer_info_dup.handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+    if (buffer_info_dup.handleType & wine_vk_handle_over_fd_types)
         buffer_info_dup.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
     wine_vk_normalize_handle_types_host(&buffer_info_dup.handleType);
 
@@ -1474,11 +1481,11 @@ static void wine_vk_get_physical_device_external_buffer_properties(VkPhysicalDev
     p_vkGetPhysicalDeviceExternalBufferProperties(phys_dev->phys_dev, &buffer_info_dup, properties);
 
     if (properties->externalMemoryProperties.exportFromImportedHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
-        properties->externalMemoryProperties.exportFromImportedHandleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        properties->externalMemoryProperties.exportFromImportedHandleTypes |= wine_vk_handle_over_fd_types;
     wine_vk_normalize_handle_types_win(&properties->externalMemoryProperties.exportFromImportedHandleTypes);
 
     if (properties->externalMemoryProperties.compatibleHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
-        properties->externalMemoryProperties.compatibleHandleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+        properties->externalMemoryProperties.compatibleHandleTypes |= wine_vk_handle_over_fd_types;
     wine_vk_normalize_handle_types_win(&properties->externalMemoryProperties.compatibleHandleTypes);
 }
 
@@ -1529,7 +1536,7 @@ static VkResult wine_vk_get_physical_device_image_format_properties_2(VkPhysical
 
         wine_vk_normalize_handle_types_win(&external_image_info_dup->handleType);
 
-        if (external_image_info_dup->handleType == VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+        if (external_image_info_dup->handleType & wine_vk_handle_over_fd_types)
             external_image_info_dup->handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
 
         wine_vk_normalize_handle_types_host(&external_image_info_dup->handleType);
@@ -1549,11 +1556,11 @@ static VkResult wine_vk_get_physical_device_image_format_properties_2(VkPhysical
     {
         VkExternalMemoryProperties *p = &external_image_properties->externalMemoryProperties;
         if (p->exportFromImportedHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
-            p->exportFromImportedHandleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            p->exportFromImportedHandleTypes |= wine_vk_handle_over_fd_types;
         wine_vk_normalize_handle_types_win(&p->exportFromImportedHandleTypes);
 
         if (p->compatibleHandleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
-            p->compatibleHandleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+            p->compatibleHandleTypes |= wine_vk_handle_over_fd_types;
         wine_vk_normalize_handle_types_win(&p->compatibleHandleTypes);
     }
 
@@ -3550,18 +3557,154 @@ VkPhysicalDevice WINAPI __wine_get_wrapped_VkPhysicalDevice(VkInstance instance,
     return NULL;
 }
 
+#define IOCTL_SHARED_GPU_RESOURCE_CREATE           CTL_CODE(FILE_DEVICE_VIDEO, 0, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+
+struct shared_resource_create
+{
+    obj_handle_t unix_handle;
+    WCHAR name[1];
+};
+
 static HANDLE create_gpu_resource(int fd, LPCWSTR name)
 {
-    HANDLE ret = INVALID_HANDLE_VALUE;
+    static const WCHAR shared_gpu_resourceW[] = {'\\','?','?','\\','S','h','a','r','e','d','G','p','u','R','e','s','o','u','r','c','e',0};
+    HANDLE unix_resource = INVALID_HANDLE_VALUE;
+    struct shared_resource_create *inbuff;
+    UNICODE_STRING shared_gpu_resource_us;
+    HANDLE shared_resource;
+    OBJECT_ATTRIBUTES attr;
+    IO_STATUS_BLOCK iosb;
+    NTSTATUS status;
+    DWORD in_size;
 
     TRACE("Creating shared vulkan resource fd %d name %s.\n", fd, debugstr_w(name));
 
+    if (wine_server_fd_to_handle(fd, GENERIC_ALL, 0, &unix_resource) != STATUS_SUCCESS)
+        return INVALID_HANDLE_VALUE;
+
+    init_unicode_string(&shared_gpu_resource_us, shared_gpu_resourceW);
+
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = 0;
+    attr.Attributes = 0;
+    attr.ObjectName = &shared_gpu_resource_us;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+
+    if ((status = NtCreateFile(&shared_resource, GENERIC_READ | GENERIC_WRITE, &attr, &iosb, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0)))
+    {
+        ERR("Failed to load open a shared resource handle, status %#x.\n", status);
+        NtClose(unix_resource);
+        return INVALID_HANDLE_VALUE;
+    }
+
+    in_size = sizeof(*inbuff) + (name ? lstrlenW(name) * sizeof(WCHAR) : 0);
+    inbuff = calloc(1, in_size);
+    inbuff->unix_handle = wine_server_obj_handle(unix_resource);
     if (name)
-        FIXME("Naming gpu resources not supported.\n");
+        lstrcpyW(&inbuff->name[0], name);
 
-    wine_server_fd_to_handle(fd, GENERIC_ALL, 0, &ret);
+    if ((status = NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_CREATE,
+            inbuff, in_size, NULL, 0)))
 
-    return ret;
+    free(inbuff);
+    NtClose(unix_resource);
+
+    if (status)
+    {
+        ERR("Failed to create video resource, status %#x.\n", status);
+        NtClose(shared_resource);
+        return INVALID_HANDLE_VALUE;
+    }
+
+    return shared_resource;
+}
+
+#define IOCTL_SHARED_GPU_RESOURCE_OPEN             CTL_CODE(FILE_DEVICE_VIDEO, 1, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+
+struct shared_resource_open
+{
+    obj_handle_t kmt_handle;
+    WCHAR name[1];
+};
+
+static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
+{
+    static const WCHAR shared_gpu_resourceW[] = {'\\','?','?','\\','S','h','a','r','e','d','G','p','u','R','e','s','o','u','r','c','e',0};
+    UNICODE_STRING shared_gpu_resource_us;
+    struct shared_resource_open *inbuff;
+    HANDLE shared_resource;
+    OBJECT_ATTRIBUTES attr;
+    IO_STATUS_BLOCK iosb;
+    NTSTATUS status;
+    DWORD in_size;
+
+    init_unicode_string(&shared_gpu_resource_us, shared_gpu_resourceW);
+
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = 0;
+    attr.Attributes = 0;
+    attr.ObjectName = &shared_gpu_resource_us;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+
+    if ((status = NtCreateFile(&shared_resource, GENERIC_READ | GENERIC_WRITE, &attr, &iosb, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0)))
+    {
+        ERR("Failed to load open a shared resource handle, status %#x.\n", status);
+        return INVALID_HANDLE_VALUE;
+    }
+
+    in_size = sizeof(*inbuff) + (name ? lstrlenW(name) * sizeof(WCHAR) : 0);
+    inbuff = calloc(1, in_size);
+    inbuff->kmt_handle = wine_server_obj_handle(kmt_handle);
+    if (name)
+        lstrcpyW(&inbuff->name[0], name);
+
+    status = NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_OPEN,
+            inbuff, in_size, NULL, 0);
+
+    free(inbuff);
+
+    if (status)
+    {
+        ERR("Failed to open video resource, status %#x.\n", status);
+        NtClose(shared_resource);
+        return INVALID_HANDLE_VALUE;
+    }
+
+    return shared_resource;
+}
+
+#define IOCTL_SHARED_GPU_RESOURCE_GET_UNIX_RESOURCE           CTL_CODE(FILE_DEVICE_VIDEO, 3, METHOD_BUFFERED, FILE_READ_ACCESS)
+
+static int get_shared_resource_fd(HANDLE shared_resource)
+{
+    IO_STATUS_BLOCK iosb;
+    obj_handle_t unix_resource;
+    NTSTATUS status;
+    int ret;
+
+    if (NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_GET_UNIX_RESOURCE,
+            NULL, 0, &unix_resource, sizeof(unix_resource)))
+        return -1;
+
+    status = wine_server_handle_to_fd(wine_server_ptr_handle(unix_resource), FILE_READ_DATA, &ret, NULL);
+    NtClose(wine_server_ptr_handle(unix_resource));
+    return status == STATUS_SUCCESS ? ret : -1;
+}
+
+#define IOCTL_SHARED_GPU_RESOURCE_GETKMT           CTL_CODE(FILE_DEVICE_VIDEO, 2, METHOD_BUFFERED, FILE_READ_ACCESS)
+
+static HANDLE get_shared_resource_kmt_handle(HANDLE shared_resource)
+{
+    IO_STATUS_BLOCK iosb;
+    obj_handle_t kmt_handle;
+
+    if (NtDeviceIoControlFile(shared_resource, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_GETKMT,
+            NULL, 0, &kmt_handle, sizeof(kmt_handle)))
+        return INVALID_HANDLE_VALUE;
+
+    return wine_server_ptr_handle(kmt_handle);
 }
 
 NTSTATUS wine_vkAllocateMemory(void *args)
@@ -3620,7 +3763,7 @@ NTSTATUS wine_vkAllocateMemory(void *args)
     if ((export_info = wine_vk_find_struct(&allocate_info_dup, EXPORT_MEMORY_ALLOCATE_INFO)))
     {
         object->handle_types = export_info->handleTypes;
-        if (export_info->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+        if (export_info->handleTypes & wine_vk_handle_over_fd_types)
             export_info->handleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
         wine_vk_normalize_handle_types_host(&export_info->handleTypes);
     }
@@ -3638,7 +3781,16 @@ NTSTATUS wine_vkAllocateMemory(void *args)
                 if (handle_import_info->handle)
                     NtDuplicateObject( NtCurrentProcess(), handle_import_info->handle, NtCurrentProcess(), &object->handle, 0, 0, DUPLICATE_SAME_ACCESS );
                 else if (handle_import_info->name)
-                    FIXME("Importing device memory by resource name not supported.\n");
+                    object->handle = open_shared_resource( 0, handle_import_info->name );
+                break;
+            case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
+                /* FIXME: the spec says that device memory imported from a KMT handle doesn't keep a reference to the underyling payload.
+                   This means that in cases where on windows an application leaks VkDeviceMemory objects, we leak the full payload.  To
+                   fix this, we would need wine_dev_mem objects to store no reference to the payload, that means no host VkDeviceMemory
+                   object (as objects imported from FDs hold a reference to the payload), and no win32 handle to the object. We would then
+                   extend make_vulkan to have the thunks converting wine_dev_mem to native handles open the VkDeviceMemory from the KMT
+                   handle, use it in the host function, then close it again. */
+                object->handle = open_shared_resource( handle_import_info->handle, NULL );
                 break;
             default:
                 WARN("Invalid handle type %08x passed in.\n", handle_import_info->handleType);
@@ -3647,7 +3799,7 @@ NTSTATUS wine_vkAllocateMemory(void *args)
         }
 
         if (object->handle != INVALID_HANDLE_VALUE)
-            wine_server_handle_to_fd(object->handle, FILE_READ_DATA, &fd_import_info.fd, NULL);
+            fd_import_info.fd = get_shared_resource_fd(object->handle);
 
         if (fd_import_info.fd == -1)
         {
@@ -3720,6 +3872,7 @@ NTSTATUS wine_vkGetMemoryWin32HandleKHR(void *args)
 
     struct wine_dev_mem *dev_mem = wine_dev_mem_from_handle(handle_info->memory);
     const VkBaseInStructure *chain;
+    HANDLE ret;
 
     TRACE("%p, %p %p\n", device, handle_info, handle);
 
@@ -3734,6 +3887,13 @@ NTSTATUS wine_vkGetMemoryWin32HandleKHR(void *args)
         case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT:
             return !NtDuplicateObject( NtCurrentProcess(), dev_mem->handle, NtCurrentProcess(), handle, dev_mem->access, dev_mem->inherit ? OBJ_INHERIT : 0, 0) ?
                 VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY;
+        case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
+        {
+            if ((ret = get_shared_resource_kmt_handle(dev_mem->handle)) == INVALID_HANDLE_VALUE)
+                return VK_ERROR_OUT_OF_HOST_MEMORY;
+            *handle = ret;
+            return VK_SUCCESS;
+        }
         default:
             FIXME("Unable to get handle of type %x, did the application ignore the capabilities?\n", handle_info->handleType);
             return VK_ERROR_UNKNOWN;
@@ -3810,7 +3970,7 @@ NTSTATUS wine_vkCreateBuffer(void *args)
 
     if ((external_memory_info = wine_vk_find_struct(&create_info_host, EXTERNAL_MEMORY_BUFFER_CREATE_INFO)))
     {
-        if (external_memory_info->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+        if (external_memory_info->handleTypes & wine_vk_handle_over_fd_types)
             external_memory_info->handleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
         wine_vk_normalize_handle_types_host(&external_memory_info->handleTypes);
     }
@@ -3855,7 +4015,7 @@ NTSTATUS wine_vkCreateImage(void *args)
 
     if ((external_memory_info = wine_vk_find_struct(&create_info_host, EXTERNAL_MEMORY_IMAGE_CREATE_INFO)))
     {
-        if (external_memory_info->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT_KHR)
+        if (external_memory_info->handleTypes & wine_vk_handle_over_fd_types)
             external_memory_info->handleTypes |= VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT_KHR;
         wine_vk_normalize_handle_types_host(&external_memory_info->handleTypes);
     }
