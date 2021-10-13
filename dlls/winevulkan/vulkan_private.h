@@ -290,4 +290,11 @@ extern VkResult WINAPI __wine_create_vk_instance_with_callback(const VkInstanceC
 extern VkResult WINAPI __wine_create_vk_device_with_callback(VkPhysicalDevice phys_dev, const VkDeviceCreateInfo *create_info,
         const VkAllocationCallbacks *allocator, VkDevice *device, PFN_native_vkCreateDevice callback, void *context) DECLSPEC_HIDDEN;
 
+static inline void init_unicode_string( UNICODE_STRING *str, const WCHAR *data )
+{
+    str->Length = lstrlenW(data) * sizeof(WCHAR);
+    str->MaximumLength = str->Length + sizeof(WCHAR);
+    str->Buffer = (WCHAR *)data;
+}
+
 #endif /* __WINE_VULKAN_PRIVATE_H */
