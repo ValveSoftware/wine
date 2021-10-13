@@ -401,4 +401,11 @@ static inline void *find_next_struct(const void *s, VkStructureType t)
     return NULL;
 }
 
+static inline void init_unicode_string( UNICODE_STRING *str, const WCHAR *data )
+{
+    str->Length = lstrlenW(data) * sizeof(WCHAR);
+    str->MaximumLength = str->Length + sizeof(WCHAR);
+    str->Buffer = (WCHAR *)data;
+}
+
 #endif /* __WINE_VULKAN_PRIVATE_H */
