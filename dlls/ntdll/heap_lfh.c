@@ -917,7 +917,7 @@ static FORCEINLINE LFH_ptr *LFH_allocate(ULONG flags, size_t size)
     {
         arena = LFH_allocate_huge_arena(heap, class_size);
         if (arena) block = LFH_arena_get_block(arena, ARENA_HEADER_SIZE);
-        if (block) LFH_block_initialize(block, flags, 0, size, LFH_block_get_class_size(block));
+        if (block) LFH_block_initialize(block, flags & ~HEAP_ZERO_MEMORY, 0, size, LFH_block_get_class_size(block));
     }
 
     LFH_deallocated_cached_arenas(heap);
