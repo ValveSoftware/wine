@@ -1792,13 +1792,11 @@ static void finished_reading( struct request *request )
         if (!wcsicmp( connection, L"close" )) close = TRUE;
     }
     else if (!wcscmp( request->version, L"HTTP/1.0" )) close = TRUE;
-    if (close)
-    {
-        close_connection( request );
-        return;
-    }
 
-    cache_connection( request->netconn );
+    if (close)
+        netconn_close( request->netconn );
+    else
+        cache_connection( request->netconn );
     request->netconn = NULL;
 }
 
