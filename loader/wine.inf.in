@@ -4239,6 +4239,7 @@ HKCU,Software\Wine\AppDefaults\WRC9.exe\DllOverrides,"xinput1_3",,"native"
 HKCU,Software\Wine\AppDefaults\WRC10.exe\DllOverrides,"xinput1_3",,"native"
 HKCU,Software\Wine\AppDefaults\Paradox Launcher.exe\DllOverrides,"libglesv2",,"disabled"
 HKCU,Software\Wine\AppDefaults\Nickelodeon All-Star Brawl.exe\DllOverrides,"winusb",,"disabled"
+HKCU,Software\Wine\AppDefaults\nw.exe\DllOverrides,"libglesv2",,"disabled"
 ;;Likely want *80 and *90 too, but those require removing Wine's manifest files.
 HKCU,Software\Wine\DllOverrides,"atl100",0x2,"native,builtin"
 HKCU,Software\Wine\DllOverrides,"msvcp100",0x2,"native,builtin"
