@@ -250,7 +250,7 @@ static BOOL get_display_device_reg_key(const WCHAR *device_name, WCHAR *key, uns
     return TRUE;
 }
 
-static BOOL read_registry_settings(const WCHAR *device_name, DEVMODEW *dm, BOOL default_settings)
+static BOOL read_registry_settings(const WCHAR *device_name, DEVMODEW *dm)
 {
     WCHAR wine_x11_reg_key[MAX_PATH];
     HANDLE mutex;
@@ -279,22 +279,22 @@ static BOOL read_registry_settings(const WCHAR *device_name, DEVMODEW *dm, BOOL 
         type != REG_DWORD || size != sizeof(DWORD)) \
         ret = FALSE
 
-    query_value(default_settings ? "DefaultSettings.BitsPerPel" : "CurrentSettings.BitsPerPel", &dm->dmBitsPerPel);
+    query_value("DefaultSettings.BitsPerPel", &dm->dmBitsPerPel);
     dm->dmFields |= DM_BITSPERPEL;
-    query_value(default_settings ? "DefaultSettings.XResolution" : "CurrentSettings.XResolution", &dm->dmPelsWidth);
+    query_value("DefaultSettings.XResolution", &dm->dmPelsWidth);
     dm->dmFields |= DM_PELSWIDTH;
-    query_value(default_settings ? "DefaultSettings.YResolution" : "CurrentSettings.YResolution", &dm->dmPelsHeight);
+    query_value("DefaultSettings.YResolution", &dm->dmPelsHeight);
     dm->dmFields |= DM_PELSHEIGHT;
-    query_value(default_settings ? "DefaultSettings.VRefresh" : "CurrentSettings.VRefresh", &dm->dmDisplayFrequency);
+    query_value("DefaultSettings.VRefresh", &dm->dmDisplayFrequency);
     dm->dmFields |= DM_DISPLAYFREQUENCY;
-    query_value(default_settings ? "DefaultSettings.Flags" : "CurrentSettings.Flags", &dm->u2.dmDisplayFlags);
+    query_value("DefaultSettings.Flags", &dm->u2.dmDisplayFlags);
     dm->dmFields |= DM_DISPLAYFLAGS;
-    query_value(default_settings ? "DefaultSettings.XPanning" : "CurrentSettings.XPanning", &dm->u1.s2.dmPosition.x);
-    query_value(default_settings ? "DefaultSettings.YPanning" : "CurrentSettings.YPanning", &dm->u1.s2.dmPosition.y);
+    query_value("DefaultSettings.XPanning", &dm->u1.s2.dmPosition.x);
+    query_value("DefaultSettings.YPanning", &dm->u1.s2.dmPosition.y);
     dm->dmFields |= DM_POSITION;
-    query_value(default_settings ? "DefaultSettings.Orientation" : "CurrentSettings.Orientation", &dm->u1.s2.dmDisplayOrientation);
+    query_value("DefaultSettings.Orientation", &dm->u1.s2.dmDisplayOrientation);
     dm->dmFields |= DM_DISPLAYORIENTATION;
-    query_value(default_settings ? "DefaultSettings.FixedOutput" : "CurrentSettings.FixedOutput", &dm->u1.s2.dmDisplayFixedOutput);
+    query_value("DefaultSettings.FixedOutput", &dm->u1.s2.dmDisplayFixedOutput);
 
 #undef query_value
 
@@ -303,7 +303,7 @@ static BOOL read_registry_settings(const WCHAR *device_name, DEVMODEW *dm, BOOL 
     return ret;
 }
 
-static BOOL write_registry_settings(const WCHAR *device_name, const DEVMODEW *dm, BOOL default_settings)
+static BOOL write_registry_settings(const WCHAR *device_name, const DEVMODEW *dm)
 {
     WCHAR wine_x11_reg_key[MAX_PATH];
     HANDLE mutex;
@@ -328,15 +328,15 @@ static BOOL write_registry_settings(const WCHAR *device_name, const DEVMODEW *dm
     if (RegSetValueExA(hkey, name, 0, REG_DWORD, (const BYTE*)(data), sizeof(DWORD))) \
         ret = FALSE
 
-    set_value(default_settings ? "DefaultSettings.BitsPerPel" : "CurrentSettings.BitsPerPel", &dm->dmBitsPerPel);
-    set_value(default_settings ? "DefaultSettings.XResolution" : "CurrentSettings.XResolution", &dm->dmPelsWidth);
-    set_value(default_settings ? "DefaultSettings.YResolution" : "CurrentSettings.YResolution", &dm->dmPelsHeight);
-    set_value(default_settings ? "DefaultSettings.VRefresh" : "CurrentSettings.VRefresh", &dm->dmDisplayFrequency);
-    set_value(default_settings ? "DefaultSettings.Flags" : "CurrentSettings.Flags", &dm->u2.dmDisplayFlags);
-    set_value(default_settings ? "DefaultSettings.XPanning" : "CurrentSettings.XPanning", &dm->u1.s2.dmPosition.x);
-    set_value(default_settings ? "DefaultSettings.YPanning" : "CurrentSettings.YPanning", &dm->u1.s2.dmPosition.y);
-    set_value(default_settings ? "DefaultSettings.Orientation" : "CurrentSettings.Orientation", &dm->u1.s2.dmDisplayOrientation);
-    set_value(default_settings ? "DefaultSettings.FixedOutput" : "CurrentSettings.FixedOutput", &dm->u1.s2.dmDisplayFixedOutput);
+    set_value("DefaultSettings.BitsPerPel", &dm->dmBitsPerPel);
+    set_value("DefaultSettings.XResolution", &dm->dmPelsWidth);
+    set_value("DefaultSettings.YResolution", &dm->dmPelsHeight);
+    set_value("DefaultSettings.VRefresh", &dm->dmDisplayFrequency);
+    set_value("DefaultSettings.Flags", &dm->u2.dmDisplayFlags);
+    set_value("DefaultSettings.XPanning", &dm->u1.s2.dmPosition.x);
+    set_value("DefaultSettings.YPanning", &dm->u1.s2.dmPosition.y);
+    set_value("DefaultSettings.Orientation", &dm->u1.s2.dmDisplayOrientation);
+    set_value("DefaultSettings.FixedOutput", &dm->u1.s2.dmDisplayFixedOutput);
 
 #undef set_value
 
@@ -473,7 +473,7 @@ BOOL CDECL X11DRV_EnumDisplaySettingsEx( LPCWSTR name, DWORD n, LPDEVMODEW devmo
 
     if (n == ENUM_REGISTRY_SETTINGS)
     {
-        if (!read_registry_settings(name, devmode, TRUE))
+        if (!read_registry_settings(name, devmode))
         {
             ERR("Failed to get %s registry display settings.\n", wine_dbgstr_w(name));
             return FALSE;
@@ -483,8 +483,7 @@ BOOL CDECL X11DRV_EnumDisplaySettingsEx( LPCWSTR name, DWORD n, LPDEVMODEW devmo
 
     if (n == ENUM_CURRENT_SETTINGS)
     {
-        if (!read_registry_settings(name, devmode, FALSE) &&
-            (!handler.get_id(name, &id) || !handler.get_current_mode(id, devmode)))
+        if (!handler.get_id(name, &id) || !handler.get_current_mode(id, devmode))
         {
             ERR("Failed to get %s current display settings.\n", wine_dbgstr_w(name));
             return FALSE;
@@ -938,9 +937,6 @@ static LONG apply_display_settings(struct x11drv_display_setting *displays, INT 
               full_mode->dmPelsHeight, full_mode->dmDisplayFrequency, full_mode->dmBitsPerPel,
               full_mode->u1.s2.dmDisplayOrientation);
 
-        if (!write_registry_settings(displays[display_idx].desired_mode.dmDeviceName, full_mode, FALSE))
-            WARN("Failed to write %s display settings to registry.\n", wine_dbgstr_w(displays[display_idx].desired_mode.dmDeviceName));
-
         ret = handler.set_current_mode(displays[display_idx].id, full_mode);
         if (attached_mode && ret == DISP_CHANGE_SUCCESSFUL)
             set_display_depth(displays[display_idx].id, full_mode->dmBitsPerPel);
@@ -994,7 +990,7 @@ LONG CDECL X11DRV_ChangeDisplaySettingsEx( LPCWSTR devname, LPDEVMODEW devmode,
                     return DISP_CHANGE_BADMODE;
                 }
 
-                if (!write_registry_settings(devname, full_mode, TRUE))
+                if (!write_registry_settings(devname, full_mode))
                 {
                     ERR("Failed to write %s display settings to registry.\n", wine_dbgstr_w(devname));
                     free_full_mode(full_mode);
