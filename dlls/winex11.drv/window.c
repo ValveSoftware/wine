@@ -1258,9 +1258,6 @@ void update_net_wm_states( struct x11drv_win_data *data )
     }
     data->net_wm_state = new_state;
 
-    if(new_state & (1 << NET_WM_STATE_FULLSCREEN))
-        XSetInputFocus( data->display, data->whole_window, RevertToParent, CurrentTime );
-
     XChangeProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_BYPASS_COMPOSITOR), XA_CARDINAL,
                      32, PropModeReplace, (unsigned char *)&net_wm_bypass_compositor, 1 );
 }
