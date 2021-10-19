@@ -2906,6 +2906,15 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
                                          &info.msg.lParam, &buffer, size ))
                     continue;  /* ignore it */
 	    }
+            /* CXHACK 19488 */
+            if (info.msg.message == WM_PAINT &&
+                    flags == (PM_REMOVE | PM_QS_INPUT | PM_QS_POSTMESSAGE | PM_QS_PAINT | PM_QS_SENDMESSAGE) &&
+                    (GetWindowLongW( info.msg.hwnd, GWL_EXSTYLE ) & WS_EX_COMPOSITED ))
+            {
+                SendMessageW( info.msg.hwnd, info.msg.message, info.msg.wParam, info.msg.lParam );
+                flags &= ~PM_QS_PAINT;
+                continue;
+            }
             *msg = info.msg;
             msg->pt = point_phys_to_win_dpi( info.msg.hwnd, info.msg.pt );
             thread_info->GetMessagePosVal = MAKELONG( msg->pt.x, msg->pt.y );
