@@ -741,9 +741,15 @@ static void CDECL wg_parser_stream_enable(struct wg_parser_stream *stream, const
                 gst_util_set_object_arg(G_OBJECT(stream->flip), "method", "vertical-flip");
                 break;
 
+            case WG_VIDEO_FORMAT_NV12:
+                if (!aperture)
+                {
+                    stream->aperture.bottom = stream->current_format.u.video.height & ~0xf;
+                    stream->current_format.u.video.height = (stream->current_format.u.video.height + 0xf) & ~0xf;
+                }
+                /* fallthrough */
             case WG_VIDEO_FORMAT_AYUV:
             case WG_VIDEO_FORMAT_I420:
-            case WG_VIDEO_FORMAT_NV12:
             case WG_VIDEO_FORMAT_UYVY:
             case WG_VIDEO_FORMAT_YUY2:
             case WG_VIDEO_FORMAT_YV12:
