@@ -171,10 +171,10 @@ BOOL init_dib_info_from_bitmapobj(dib_info *dib, BITMAPOBJ *bmp)
 {
     if (!is_bitmapobj_dib( bmp ))
     {
-        DWORD buffer[offsetof(BITMAPINFO, bmiColors[3]) / sizeof(DWORD)];
+        BITMAPINFO info;
 
-        get_ddb_bitmapinfo( bmp, (BITMAPINFO *)buffer );
-        init_dib_info_from_bitmapinfo( dib, (BITMAPINFO *)buffer, bmp->dib.dsBm.bmBits );
+        get_ddb_bitmapinfo( bmp, &info );
+        init_dib_info_from_bitmapinfo( dib, &info, bmp->dib.dsBm.bmBits );
     }
     else init_dib_info( dib, &bmp->dib.dsBmih, bmp->dib.dsBm.bmWidthBytes,
                         bmp->dib.dsBitfields, bmp->color_table, bmp->dib.dsBm.bmBits );

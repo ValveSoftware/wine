@@ -96,22 +96,13 @@ HBITMAP WINAPI CreateCompatibleBitmap( HDC hdc, INT width, INT height)
 {
     char buffer[FIELD_OFFSET( BITMAPINFO, bmiColors[256] )];
     BITMAPINFO *bi = (BITMAPINFO *)buffer;
-    HBITMAP hbitmap;
-    BITMAPOBJ *bmp;
     DIBSECTION dib;
 
     TRACE("(%p,%d,%d)\n", hdc, width, height);
 
     if (GetObjectType( hdc ) != OBJ_MEMDC)
-    {
-        if (!(hbitmap = CreateBitmap( width, height,
-                                      GetDeviceCaps(hdc, PLANES), GetDeviceCaps(hdc, BITSPIXEL), NULL )))
-            return 0;
-        bmp = GDI_GetObjPtr( hbitmap, OBJ_BITMAP );
-        bmp->no_alpha = TRUE;
-        GDI_ReleaseObj( hbitmap );
-        return hbitmap;
-    }
+        return CreateBitmap( width, height,
+                             GetDeviceCaps(hdc, PLANES), GetDeviceCaps(hdc, BITSPIXEL), NULL );
 
     switch (GetObjectW( GetCurrentObject( hdc, OBJ_BITMAP ), sizeof(dib), &dib ))
     {
