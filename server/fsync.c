@@ -63,13 +63,6 @@ static inline int futex_wait_multiple( const struct futex_wait_block *futexes,
     return syscall( __NR_futex, futexes, 31, count, timeout, 0, 0 );
 }
 
-/* futex2 experimental interface */
-
-static long nr_futex2_wake;
-
-#define FUTEX_32 2
-#define FUTEX_SHARED_FLAG 8
-
 int do_fsync(void)
 {
 #ifdef __linux__
@@ -77,29 +70,9 @@ int do_fsync(void)
 
     if (do_fsync_cached == -1)
     {
-        int use_futex2 = 1;
-        FILE *f;
-
-        if (getenv( "WINEFSYNC_FUTEX2" ))
-            use_futex2 = atoi( getenv( "WINEFSYNC_FUTEX2" ) );
-
-        if (use_futex2 && (f = fopen( "/sys/kernel/futex2/wake", "r" )))
-        {
-            char buffer[13];
-
-            fgets( buffer, sizeof(buffer), f );
-            nr_futex2_wake = atoi( buffer );
-            fclose(f);
-
-            do_fsync_cached = 1;
-        }
-        else
-        {
-            static const struct timespec zero;
-            futex_wait_multiple( NULL, 0, &zero );
-            do_fsync_cached = (errno != ENOSYS);
-        }
-        do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && do_fsync_cached;
+        static const struct timespec zero;
+        futex_wait_multiple( NULL, 0, &zero );
+        do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS;
     }
 
     return do_fsync_cached;
@@ -355,11 +328,9 @@ struct fsync *create_fsync( struct object *root, const struct unicode_str *name,
 #endif
 }
 
-static inline int futex_wake( int *addr, int count )
+static inline int futex_wake( int *addr, int val )
 {
-    if (nr_futex2_wake)
-        return syscall( nr_futex2_wake, addr, count, FUTEX_32 | FUTEX_SHARED_FLAG );
-    return syscall( __NR_futex, addr, 1, count, NULL, 0, 0 );
+    return syscall( __NR_futex, addr, 1, val, NULL, 0, 0 );
 }
 
 /* shm layout for events or event-like objects. */
