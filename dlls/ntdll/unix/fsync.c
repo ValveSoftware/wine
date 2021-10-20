@@ -74,10 +74,32 @@ static inline void small_pause(void)
 #endif
 }
 
-static inline int futex_wait_multiple( const struct futex_wait_block *futexes,
-        int count, const struct timespec *timeout )
+static LONGLONG update_timeout( ULONGLONG end )
 {
-    return syscall( __NR_futex, futexes, 31, count, timeout, 0, 0 );
+    LARGE_INTEGER now;
+    LONGLONG timeleft;
+
+    NtQuerySystemTime( &now );
+    timeleft = end - now.QuadPart;
+    if (timeleft < 0) timeleft = 0;
+    return timeleft;
+}
+
+static inline int futex_wait_multiple( const struct futex_wait_block *futexes,
+        int count, const ULONGLONG *end )
+{
+   if (end)
+   {
+        LONGLONG timeleft = update_timeout( *end );
+        struct timespec timeout;
+        timeout.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+        timeout.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+        return syscall( __NR_futex, futexes, 31, count, timeout, 0, 0 );
+   }
+   else
+   {
+        return syscall( __NR_futex, futexes, 31, count, NULL, 0, 0 );
+   }
 }
 
 static inline int futex_wake( int *addr, int val )
@@ -85,9 +107,20 @@ static inline int futex_wake( int *addr, int val )
     return syscall( __NR_futex, addr, 1, val, NULL, 0, 0 );
 }
 
-static inline int futex_wait( int *addr, int val, struct timespec *timeout )
+static inline int futex_wait( int *addr, int val, const ULONGLONG *end )
 {
-    return syscall( __NR_futex, addr, 0, val, timeout, 0, 0 );
+    if (end)
+    {
+        LONGLONG timeleft = update_timeout( *end );
+        struct timespec timeout;
+        timeout.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
+        timeout.tv_nsec = (timeleft % TICKSPERSEC) * 100;
+        return syscall( __NR_futex, addr, 0, val, &timeout, 0, 0 );
+    }
+    else
+    {
+        return syscall( __NR_futex, addr, 0, val, NULL, 0, 0 );
+    }
 }
 
 static unsigned int spincount = 100;
@@ -643,17 +676,6 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
     return STATUS_SUCCESS;
 }
 
-static LONGLONG update_timeout( ULONGLONG end )
-{
-    LARGE_INTEGER now;
-    LONGLONG timeleft;
-
-    NtQuerySystemTime( &now );
-    timeleft = end - now.QuadPart;
-    if (timeleft < 0) timeleft = 0;
-    return timeleft;
-}
-
 static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN alertable )
 {
     int ret;
@@ -675,32 +697,14 @@ static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN aler
 #endif
         futexes[0].bitset = futexes[1].bitset = ~0;
 
-        if (end)
-        {
-            LONGLONG timeleft = update_timeout( *end );
-            struct timespec tmo_p;
-            tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
-            tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
-            ret = futex_wait_multiple( futexes, 2, &tmo_p );
-        }
-        else
-            ret = futex_wait_multiple( futexes, 2, NULL );
+        ret = futex_wait_multiple( futexes, 2, end );
 
         if (__atomic_load_n( apc_futex, __ATOMIC_SEQ_CST ))
             return STATUS_USER_APC;
     }
     else
     {
-        if (end)
-        {
-            LONGLONG timeleft = update_timeout( *end );
-            struct timespec tmo_p;
-            tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
-            tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
-            ret = futex_wait( addr, val, &tmo_p );
-        }
-        else
-            ret = futex_wait( addr, val, NULL );
+        ret = futex_wait( addr, val, end );
     }
 
     if (!ret)
@@ -962,25 +966,11 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                 TRACE("Wait timed out.\n");
                 return STATUS_TIMEOUT;
             }
-            else if (timeout)
-            {
-                LONGLONG timeleft = update_timeout( end );
-                struct timespec tmo_p;
-                tmo_p.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
-                tmo_p.tv_nsec = (timeleft % TICKSPERSEC) * 100;
 
-                if (waitcount == 1)
-                    ret = futex_wait( futexes[0].addr, futexes[0].val, &tmo_p );
-                else
-                    ret = futex_wait_multiple( futexes, waitcount, &tmo_p );
-            }
+            if (waitcount == 1)
+                ret = futex_wait( futexes[0].addr, futexes[0].val, timeout ? &end : NULL );
             else
-            {
-                if (waitcount == 1)
-                    ret = futex_wait( futexes[0].addr, futexes[0].val, NULL );
-                else
-                    ret = futex_wait_multiple( futexes, waitcount, NULL );
-            }
+                ret = futex_wait_multiple( futexes, waitcount, timeout ? &end : NULL );
 
             /* FUTEX_WAIT_MULTIPLE can succeed or return -EINTR, -EAGAIN,
              * -EFAULT/-EACCES, -ETIMEDOUT. In the first three cases we need to
