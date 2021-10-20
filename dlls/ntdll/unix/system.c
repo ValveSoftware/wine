@@ -2977,7 +2977,7 @@ C_ASSERT( sizeof(struct process_info) <= sizeof(SYSTEM_PROCESS_INFORMATION) );
 
         len = sizeof(SYSTEM_CODEINTEGRITY_INFORMATION);
 
-        if (size < len)
+        if (size >= len)
             integrity_info->CodeIntegrityOptions = CODEINTEGRITY_OPTION_ENABLED;
         else
             ret = STATUS_INFO_LENGTH_MISMATCH;
