@@ -288,6 +288,18 @@ static BOOL wine_vk_surface_set_offscreen(struct wine_vk_surface *surface, BOOL 
     return !offscreen;
 }
 
+void resize_vk_surfaces(HWND hwnd, Window active, int mask, XWindowChanges *changes)
+{
+    struct wine_vk_surface *surface;
+    pthread_mutex_lock(&vulkan_mutex);
+    LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd) continue;
+        if (surface->window != active) XConfigureWindow(gdi_display, surface->window, mask, changes);
+    }
+    pthread_mutex_unlock(&vulkan_mutex);
+}
+
 void sync_vk_surface(HWND hwnd, BOOL known_child)
 {
     struct wine_vk_surface *surface;
@@ -910,6 +922,10 @@ const struct vulkan_funcs *get_vulkan_driver(UINT version)
 }
 
 void destroy_vk_surface(HWND hwnd)
+{
+}
+
+void resize_vk_surfaces(HWND hwnd, Window active, int mask, XWindowChanges changes)
 {
 }
 
