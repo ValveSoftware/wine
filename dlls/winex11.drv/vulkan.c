@@ -50,7 +50,6 @@ WINE_DECLARE_DEBUG_CHANNEL(fps);
 
 static pthread_mutex_t vulkan_mutex;
 
-static XContext vulkan_hwnd_context;
 static XContext vulkan_swapchain_context;
 
 #define VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR 1000004000
@@ -153,7 +152,6 @@ static void wine_vk_init(void)
 #undef LOAD_FUNCPTR
 #undef LOAD_OPTIONAL_FUNCPTR
 
-    vulkan_hwnd_context = XUniqueContext();
     vulkan_swapchain_context = XUniqueContext();
 
     return;
@@ -239,23 +237,30 @@ static void wine_vk_surface_release(struct wine_vk_surface *surface)
     free(surface);
 }
 
-void wine_vk_surface_destroy(HWND hwnd)
+void wine_vk_surface_destroy(struct wine_vk_surface *surface)
 {
-    struct wine_vk_surface *surface;
-    HDC hdc = 0;
+    TRACE("Detaching surface %p, hwnd %p.\n", surface, surface->hwnd);
+    XReparentWindow(gdi_display, surface->window, get_dummy_parent(), 0, 0);
+    XSync(gdi_display, False);
 
+    if (surface->hdc) NtUserReleaseDC(surface->hwnd, surface->hdc);
+    surface->hwnd_thread_id = 0;
+    surface->hwnd = 0;
+    surface->hdc = 0;
+    wine_vk_surface_release(surface);
+}
+
+void destroy_vk_surface(HWND hwnd)
+{
+    struct wine_vk_surface *surface, *next;
     pthread_mutex_lock(&vulkan_mutex);
-    if (!XFindContext(gdi_display, (XID)hwnd, vulkan_hwnd_context, (char **)&surface))
+    LIST_FOR_EACH_ENTRY_SAFE(surface, next, &surface_list, struct wine_vk_surface, entry)
     {
-        hdc = surface->hdc;
-        surface->hwnd_thread_id = 0;
-        surface->hwnd = 0;
-        surface->hdc = 0;
-        wine_vk_surface_release(surface);
+        if (surface->hwnd != hwnd)
+            continue;
+        wine_vk_surface_destroy(surface);
     }
-    XDeleteContext(gdi_display, (XID)hwnd, vulkan_hwnd_context);
     pthread_mutex_unlock(&vulkan_mutex);
-    if (hdc) NtUserReleaseDC(hwnd, hdc);
 }
 
 static BOOL wine_vk_surface_set_offscreen(struct wine_vk_surface *surface, BOOL offscreen)
@@ -287,8 +292,12 @@ void sync_vk_surface(HWND hwnd, BOOL known_child)
 {
     struct wine_vk_surface *surface;
     pthread_mutex_lock(&vulkan_mutex);
-    if (!XFindContext(gdi_display, (XID)hwnd, vulkan_hwnd_context, (char **)&surface))
+    LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd)
+            continue;
         wine_vk_surface_set_offscreen(surface, known_child);
+    }
     pthread_mutex_unlock(&vulkan_mutex);
 }
 
@@ -302,11 +311,7 @@ void vulkan_thread_detach(void)
     {
         if (surface->hwnd_thread_id != thread_id)
             continue;
-
-        TRACE("Detaching surface %p, hwnd %p.\n", surface, surface->hwnd);
-        XReparentWindow(gdi_display, surface->window, get_dummy_parent(), 0, 0);
-        XSync(gdi_display, False);
-        wine_vk_surface_destroy(surface->hwnd);
+        wine_vk_surface_destroy(surface);
     }
     pthread_mutex_unlock(&vulkan_mutex);
 }
@@ -430,6 +435,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
         TRACE("Creation window not provided\n");
     else if (NtUserGetWindowRelative( parent, GW_CHILD ) || NtUserGetAncestor( parent, GA_PARENT ) != NtUserGetDesktopWindow())
     {
+        TRACE("hwnd %p creating offscreen child window surface\n", x11_surface->hwnd);
         if (!wine_vk_surface_set_offscreen(x11_surface, TRUE))
         {
             res = VK_ERROR_INCOMPATIBLE_DRIVER;
@@ -451,11 +457,6 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     }
 
     pthread_mutex_lock(&vulkan_mutex);
-    if (x11_surface->hwnd)
-    {
-        wine_vk_surface_destroy( x11_surface->hwnd );
-        XSaveContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char *)wine_vk_surface_grab(x11_surface));
-    }
     list_add_tail(&surface_list, &x11_surface->entry);
     pthread_mutex_unlock(&vulkan_mutex);
 
@@ -908,7 +909,7 @@ const struct vulkan_funcs *get_vulkan_driver(UINT version)
     return NULL;
 }
 
-void wine_vk_surface_destroy(HWND hwnd)
+void destroy_vk_surface(HWND hwnd)
 {
 }
 
