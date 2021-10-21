@@ -44,21 +44,11 @@
 #include "fsync.h"
 
 #include "pshpack4.h"
-struct futex_wait_block
-{
-    int *addr;
-#if __SIZEOF_POINTER__ == 4
-    int pad;
-#endif
-    int val;
-};
 #include "poppack.h"
 
-static inline int futex_wait_multiple( const struct futex_wait_block *futexes,
-        int count, const struct timespec *timeout )
-{
-    return syscall( __NR_futex, futexes, 31, count, timeout, 0, 0 );
-}
+#ifndef __NR_futex_waitv
+#define __NR_futex_waitv 449
+#endif
 
 int do_fsync(void)
 {
@@ -67,8 +57,7 @@ int do_fsync(void)
 
     if (do_fsync_cached == -1)
     {
-        static const struct timespec zero;
-        futex_wait_multiple( NULL, 0, &zero );
+        syscall( __NR_futex_waitv, 0, 0, 0, 0, 0);
         do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS;
     }
 
