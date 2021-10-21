@@ -338,7 +338,7 @@ enum x11drv_escape_codes
     X11DRV_GET_DRAWABLE,     /* get current drawable for a DC */
     X11DRV_START_EXPOSURES,  /* start graphics exposures */
     X11DRV_END_EXPOSURES,    /* end graphics exposures */
-    X11DRV_FLUSH_GL_DRAWABLE /* flush changes made to the gl drawable */
+    X11DRV_PRESENT_DRAWABLE, /* present the drawable on screen */
 };
 
 struct x11drv_escape_set_drawable
@@ -357,10 +357,10 @@ struct x11drv_escape_get_drawable
     int                      pixel_format; /* internal GL pixel format */
 };
 
-struct x11drv_escape_flush_gl_drawable
+struct x11drv_escape_present_drawable
 {
-    enum x11drv_escape_codes code;         /* escape code (X11DRV_FLUSH_GL_DRAWABLE) */
-    Drawable                 gl_drawable;  /* GL drawable */
+    enum x11drv_escape_codes code;         /* escape code (X11DRV_PRESENT_DRAWABLE) */
+    Drawable                 drawable;     /* GL / VK drawable */
     BOOL                     flush;        /* flush X11 before copying */
 };
 
