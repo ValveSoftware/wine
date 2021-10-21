@@ -1733,6 +1733,22 @@ Window get_dummy_parent(void)
 
 
 /**********************************************************************
+ *		update_client_window
+ */
+void update_client_window( HWND hwnd )
+{
+    struct x11drv_win_data *data;
+    if ((data = get_win_data( hwnd )))
+    {
+        data->client_window = wine_vk_active_surface( hwnd );
+        /* make sure any request that could use old client window has been flushed */
+        XFlush( data->display );
+        release_win_data( data );
+    }
+}
+
+
+/**********************************************************************
  *		create_dummy_client_window
  */
 Window create_dummy_client_window(void)
