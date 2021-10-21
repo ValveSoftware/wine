@@ -57,6 +57,10 @@ WINE_DEFAULT_DEBUG_CHANNEL(fsync);
 #include "pshpack4.h"
 #include "poppack.h"
 
+#define FUTEX_WAIT_BITSET	9
+#define FUTEX_CLOCK_REALTIME	256
+#define FUTEX_BITSET_MATCH_ANY	0xffffffff
+
 /* futex_waitv interface */
 
 #ifndef __NR_futex_waitv
@@ -135,11 +139,13 @@ static inline int futex_wait( int *addr, int val, const ULONGLONG *end )
 {
     if (end)
     {
-        LONGLONG timeleft = update_timeout( *end );
         struct timespec timeout;
-        timeout.tv_sec = timeleft / (ULONGLONG)TICKSPERSEC;
-        timeout.tv_nsec = (timeleft % TICKSPERSEC) * 100;
-        return syscall( __NR_futex, addr, 0, val, &timeout, 0, 0 );
+        ULONGLONG tmp = *end - SECS_1601_TO_1970 * TICKSPERSEC;
+        timeout.tv_sec = tmp / (ULONGLONG)TICKSPERSEC;
+        timeout.tv_nsec = (tmp % TICKSPERSEC) * 100;
+
+        return syscall( __NR_futex, addr, FUTEX_WAIT_BITSET | FUTEX_CLOCK_REALTIME,
+			val, &timeout, 0, FUTEX_BITSET_MATCH_ANY );
     }
     else
     {
