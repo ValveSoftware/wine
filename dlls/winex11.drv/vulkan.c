@@ -54,7 +54,6 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 };
 static CRITICAL_SECTION context_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
-static XContext vulkan_hwnd_context;
 static XContext vulkan_swapchain_context;
 
 #define VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR 1000004000
@@ -155,7 +154,6 @@ static BOOL WINAPI wine_vk_init(INIT_ONCE *once, void *param, void **context)
 #undef LOAD_FUNCPTR
 #undef LOAD_OPTIONAL_FUNCPTR
 
-    vulkan_hwnd_context = XUniqueContext();
     vulkan_swapchain_context = XUniqueContext();
 
     return TRUE;
@@ -238,23 +236,30 @@ static void wine_vk_surface_release(struct wine_vk_surface *surface)
     heap_free(surface);
 }
 
-void wine_vk_surface_destroy(HWND hwnd)
+void wine_vk_surface_destroy(struct wine_vk_surface *surface)
 {
-    struct wine_vk_surface *surface;
-    HDC hdc = 0;
+    TRACE("Detaching surface %p, hwnd %p.\n", surface, surface->hwnd);
+    XReparentWindow(gdi_display, surface->window, get_dummy_parent(), 0, 0);
+    XSync(gdi_display, False);
 
+    if (surface->hdc) ReleaseDC(surface->hwnd, surface->hdc);
+    surface->hwnd_thread_id = 0;
+    surface->hwnd = 0;
+    surface->hdc = 0;
+    wine_vk_surface_release(surface);
+}
+
+void destroy_vk_surface(HWND hwnd)
+{
+    struct wine_vk_surface *surface, *next;
     EnterCriticalSection(&context_section);
-    if (!XFindContext(gdi_display, (XID)hwnd, vulkan_hwnd_context, (char **)&surface))
+    LIST_FOR_EACH_ENTRY_SAFE(surface, next, &surface_list, struct wine_vk_surface, entry)
     {
-        hdc = surface->hdc;
-        surface->hwnd_thread_id = 0;
-        surface->hwnd = 0;
-        surface->hdc = 0;
-        wine_vk_surface_release(surface);
+        if (surface->hwnd != hwnd)
+            continue;
+        wine_vk_surface_destroy(surface);
     }
-    XDeleteContext(gdi_display, (XID)hwnd, vulkan_hwnd_context);
     LeaveCriticalSection(&context_section);
-    if (hdc) ReleaseDC(hwnd, hdc);
 }
 
 static BOOL wine_vk_surface_set_offscreen(struct wine_vk_surface *surface, BOOL offscreen)
@@ -286,8 +291,12 @@ void sync_vk_surface(HWND hwnd, BOOL known_child)
 {
     struct wine_vk_surface *surface;
     EnterCriticalSection(&context_section);
-    if (!XFindContext(gdi_display, (XID)hwnd, vulkan_hwnd_context, (char **)&surface))
+    LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd)
+            continue;
         wine_vk_surface_set_offscreen(surface, known_child);
+    }
     LeaveCriticalSection(&context_section);
 }
 
@@ -301,11 +310,7 @@ void vulkan_thread_detach(void)
     {
         if (surface->hwnd_thread_id != thread_id)
             continue;
-
-        TRACE("Detaching surface %p, hwnd %p.\n", surface, surface->hwnd);
-        XReparentWindow(gdi_display, surface->window, get_dummy_parent(), 0, 0);
-        XSync(gdi_display, False);
-        wine_vk_surface_destroy(surface->hwnd);
+        wine_vk_surface_destroy(surface);
     }
     LeaveCriticalSection(&context_section);
 }
@@ -486,6 +491,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
 
     if (create_info->hwnd && (GetWindow( create_info->hwnd, GW_CHILD ) || GetAncestor( create_info->hwnd, GA_PARENT ) != GetDesktopWindow()))
     {
+        TRACE("hwnd %p creating offscreen child window surface\n", x11_surface->hwnd);
         if (!wine_vk_surface_set_offscreen(x11_surface, TRUE))
         {
             res = VK_ERROR_INCOMPATIBLE_DRIVER;
@@ -507,11 +513,6 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     }
 
     EnterCriticalSection(&context_section);
-    if (x11_surface->hwnd)
-    {
-        wine_vk_surface_destroy( x11_surface->hwnd );
-        XSaveContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char *)wine_vk_surface_grab(x11_surface));
-    }
     list_add_tail(&surface_list, &x11_surface->entry);
     LeaveCriticalSection(&context_section);
 
@@ -992,7 +993,7 @@ const struct vulkan_funcs *get_vulkan_driver(UINT version)
     return NULL;
 }
 
-void wine_vk_surface_destroy(HWND hwnd)
+void destroy_vk_surface(HWND hwnd)
 {
 }
 
