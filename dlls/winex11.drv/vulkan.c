@@ -313,6 +313,24 @@ void sync_vk_surface(HWND hwnd, BOOL known_child)
     pthread_mutex_unlock(&vulkan_mutex);
 }
 
+Window wine_vk_active_surface( HWND hwnd )
+{
+    struct wine_vk_surface *surface, *active = NULL;
+    Window window;
+
+    pthread_mutex_lock(&vulkan_mutex);
+    LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd) continue;
+        active = surface;
+    }
+    if (!active) window = None;
+    else window = active->window;
+    pthread_mutex_unlock(&vulkan_mutex);
+
+    return window;
+}
+
 void vulkan_thread_detach(void)
 {
     struct wine_vk_surface *surface, *next;
@@ -496,6 +514,7 @@ static void X11DRV_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface
         const VkAllocationCallbacks *allocator)
 {
     struct wine_vk_surface *x11_surface = surface_from_handle(surface);
+    HWND hwnd = x11_surface->hwnd;
 
     TRACE("%p 0x%s %p\n", instance, wine_dbgstr_longlong(surface), allocator);
 
@@ -508,6 +527,7 @@ static void X11DRV_vkDestroySurfaceKHR(VkInstance instance, VkSurfaceKHR surface
         pvkDestroySurfaceKHR(instance, x11_surface->surface, NULL /* allocator */);
 
         wine_vk_surface_release(x11_surface);
+        update_client_window(hwnd);
     }
 }
 
