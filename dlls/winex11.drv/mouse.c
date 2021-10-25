@@ -390,6 +390,11 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
     mask.deviceid = XIAllMasterDevices;
     memset( mask_bits, 0, sizeof(mask_bits) );
 
+    if (GetWindowThreadProcessId( GetDesktopWindow(), NULL ) == GetCurrentThreadId())
+        data->xi2_rawinput_only = TRUE;
+    else
+        data->xi2_rawinput_only = FALSE;
+
     /* FIXME: steam overlay doesn't like if we use XI2 for non-raw events */
 
     if (event_mask & PointerMotionMask)
@@ -689,7 +694,6 @@ static void map_event_coords( HWND hwnd, Window window, Window event_root, int x
 static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPUT *input )
 {
     struct x11drv_win_data *data;
-    RAWINPUT rawinput;
 
     input->type = INPUT_MOUSE;
 
@@ -706,7 +710,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
             sync_window_cursor( window );
             last_cursor_change = input->u.mi.time;
         }
-        __wine_send_input( hwnd, input, &rawinput );
+        __wine_send_input( hwnd, input, NULL );
         return;
     }
 
@@ -746,7 +750,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
         SERVER_END_REQ;
     }
 
-    __wine_send_input( hwnd, input, &rawinput );
+    __wine_send_input( hwnd, input, NULL );
 }
 
 #ifdef SONAME_LIBXCURSOR
@@ -1701,7 +1705,6 @@ void move_resize_window( HWND hwnd, int dir )
     {
         MSG msg;
         INPUT input;
-        RAWINPUT rawinput;
         int x, y, rootX, rootY;
 
         if (!XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &x, &y, &xstate )) break;
@@ -1717,7 +1720,7 @@ void move_resize_window( HWND hwnd, int dir )
             input.u.mi.dwFlags     = button_up_flags[button - 1] | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
             input.u.mi.time        = GetTickCount();
             input.u.mi.dwExtraInfo = 0;
-            __wine_send_input( hwnd, &input, &rawinput );
+            __wine_send_input( hwnd, &input, NULL );
         }
 
         while (PeekMessageW( &msg, 0, 0, 0, PM_REMOVE ))
@@ -1928,6 +1931,7 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
  */
 static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 {
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
     XIRawEvent *event = xev->data;
     RAWINPUT rawinput;
     INPUT input;
@@ -1947,7 +1951,84 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.u.mi.dy          = 0;
     if (!map_raw_event_coords( event, &input )) return FALSE;
 
-    __wine_send_input( 0, &input, &rawinput );
+    if (!thread_data->xi2_rawinput_only)
+        __wine_send_input( 0, &input, NULL );
+    else
+    {
+        rawinput.header.dwType = RIM_TYPEMOUSE;
+        rawinput.header.dwSize = offsetof(RAWINPUT, data) + sizeof(RAWMOUSE);
+        rawinput.header.hDevice = ULongToHandle(1); /* WINE_MOUSE_HANDLE */
+        rawinput.header.wParam = RIM_INPUT;
+        rawinput.data.mouse.usFlags = input.u.mi.dwFlags;
+        rawinput.data.mouse.ulRawButtons = 0;
+        rawinput.data.mouse.u.usButtonData = 0;
+        rawinput.data.mouse.u.usButtonFlags = 0;
+        rawinput.data.mouse.lLastX = input.u.mi.dx;
+        rawinput.data.mouse.lLastY = input.u.mi.dy;
+        rawinput.data.mouse.ulExtraInformation = 0;
+
+        input.type = INPUT_HARDWARE;
+        input.u.hi.uMsg = WM_INPUT;
+        input.u.hi.wParamH = 0;
+        input.u.hi.wParamL = 0;
+        if (rawinput.data.mouse.lLastX || rawinput.data.mouse.lLastY)
+            __wine_send_input( 0, &input, &rawinput );
+    }
+
+    return TRUE;
+}
+
+/***********************************************************************
+ *           X11DRV_RawButtonEvent
+ */
+static BOOL X11DRV_RawButtonEvent( XGenericEventCookie *cookie )
+{
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
+    XIRawEvent *event = cookie->data;
+    int button = event->detail - 1;
+    RAWINPUT rawinput;
+    INPUT input;
+
+    if (!device_mapping || device_mapping->deviceid != event->sourceid)
+        update_device_mapping( event->display, event->sourceid );
+
+    if (button >= 0 && device_mapping)
+        button = device_mapping->buttons[button] - 1;
+
+    if (button >= 0 && pointer_mapping)
+        button = pointer_mapping->buttons[button] - 1;
+
+    if (button < 0 || button >= NB_BUTTONS) return FALSE;
+    if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
+
+    TRACE( "raw button %u (raw: %u) %s\n", button, event->detail, event->evtype == XI_RawButtonRelease ? "up" : "down" );
+
+    rawinput.header.dwType = RIM_TYPEMOUSE;
+    rawinput.header.dwSize = offsetof(RAWINPUT, data) + sizeof(RAWMOUSE);
+    rawinput.header.hDevice = ULongToHandle(1); /* WINE_MOUSE_HANDLE */
+    rawinput.header.wParam = RIM_INPUT;
+    if (event->evtype == XI_RawButtonRelease)
+    {
+        rawinput.data.mouse.usFlags = button_up_flags[button];
+        rawinput.data.mouse.ulRawButtons = button_up_data[button];
+    }
+    else
+    {
+        rawinput.data.mouse.usFlags = button_down_flags[button];
+        rawinput.data.mouse.ulRawButtons = button_down_data[button];
+    }
+    rawinput.data.mouse.u.usButtonData = 0;
+    rawinput.data.mouse.u.usButtonFlags = 0;
+    rawinput.data.mouse.lLastX = 0;
+    rawinput.data.mouse.lLastY = 0;
+    rawinput.data.mouse.ulExtraInformation = 0;
+
+    input.type = INPUT_HARDWARE;
+    input.u.hi.uMsg = WM_INPUT;
+    input.u.hi.wParamH = 0;
+    input.u.hi.wParamL = 0;
+    if (rawinput.data.mouse.usFlags || rawinput.data.mouse.ulRawButtons)
+        __wine_send_input( 0, &input, &rawinput );
     return TRUE;
 }
 
@@ -2067,6 +2148,10 @@ BOOL X11DRV_GenericEvent( HWND hwnd, XEvent *xev )
         return X11DRV_XIDeviceChangedEvent( event->data );
     case XI_RawMotion:
         ret = X11DRV_RawMotion( event );
+        break;
+    case XI_RawButtonPress:
+    case XI_RawButtonRelease:
+        ret = X11DRV_RawButtonEvent( event );
         break;
     case XI_Motion:
     case XI_ButtonPress:
