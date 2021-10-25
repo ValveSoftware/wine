@@ -376,7 +376,9 @@ BOOL rawinput_from_hardware_message(RAWINPUT *rawinput, const struct hardware_ms
         rawinput->header.hDevice = WINE_MOUSE_HANDLE;
         rawinput->header.wParam  = 0;
 
-        rawinput->data.mouse.usFlags           = MOUSE_MOVE_RELATIVE;
+        rawinput->data.mouse.usFlags = msg_data->flags & MOUSEEVENTF_ABSOLUTE ? MOUSE_MOVE_ABSOLUTE : MOUSE_MOVE_RELATIVE;
+        if (msg_data->flags & MOUSEEVENTF_VIRTUALDESK) rawinput->data.mouse.usFlags |= MOUSE_VIRTUAL_DESKTOP;
+
         rawinput->data.mouse.usButtonFlags = 0;
         rawinput->data.mouse.usButtonData  = 0;
         for (i = 1; i < ARRAY_SIZE(button_flags); ++i)
