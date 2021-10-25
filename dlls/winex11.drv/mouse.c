@@ -343,6 +343,7 @@ static void update_relative_valuators( XIAnyClassInfo **classes, int num_classes
  */
 void x11drv_xinput2_enable( Display *display, Window window )
 {
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
     XIEventMask mask;
     unsigned char mask_bits[XIMaskLen(XI_LASTEVENT)];
 
@@ -357,7 +358,13 @@ void x11drv_xinput2_enable( Display *display, Window window )
     {
         XISetMask( mask_bits, XI_DeviceChanged );
         XISetMask( mask_bits, XI_RawMotion );
-        XISetMask( mask_bits, XI_ButtonPress );
+        if (!thread_data->xinput2_rawinput)
+            XISetMask( mask_bits, XI_ButtonPress );
+        else
+        {
+            XISetMask( mask_bits, XI_RawButtonPress );
+            XISetMask( mask_bits, XI_RawButtonRelease );
+        }
     }
     else
     {
@@ -375,10 +382,12 @@ void x11drv_xinput2_enable( Display *display, Window window )
  */
 void x11drv_xinput2_disable( Display *display, Window window )
 {
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
     unsigned char mask_bits[XIMaskLen(XI_LASTEVENT)];
     XIEventMask mask;
 
     if (!xinput2_available) return;
+    if (thread_data->xinput2_rawinput) return;
 
     mask.mask     = mask_bits;
     mask.mask_len = sizeof(mask_bits);
@@ -629,7 +638,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
     {
         struct x11drv_thread_data *thread_data = x11drv_thread_data();
         if (!thread_data->clipping_cursor || thread_data->clip_window != window) return;
-        NtUserSendHardwareInput( hwnd, 0, input, 0 );
+        NtUserSendHardwareInput( hwnd, SEND_HWMSG_NO_RAW, input, 0 );
         return;
     }
 
@@ -653,7 +662,7 @@ static void send_mouse_input( HWND hwnd, Window window, unsigned int state, INPU
         SERVER_END_REQ;
     }
 
-    NtUserSendHardwareInput( hwnd, 0, input, 0 );
+    NtUserSendHardwareInput( hwnd, SEND_HWMSG_NO_RAW, input, 0 );
 }
 
 #ifdef SONAME_LIBXCURSOR
@@ -1592,7 +1601,7 @@ void move_resize_window( HWND hwnd, int dir, POINT pos )
             input.mi.dwFlags     = button_up_flags[button - 1] | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_MOVE;
             input.mi.time        = NtGetTickCount();
             input.mi.dwExtraInfo = 0;
-            NtUserSendHardwareInput( hwnd, 0, &input, 0 );
+            NtUserSendHardwareInput( hwnd, SEND_HWMSG_NO_RAW, &input, 0 );
         }
 
         while (NtUserPeekMessage( &msg, 0, 0, 0, PM_REMOVE ))
@@ -1833,6 +1842,8 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
  */
 static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 {
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
+    UINT flags = thread_data->xinput2_rawinput ? SEND_HWMSG_NO_MSG : SEND_HWMSG_NO_RAW;
     XIRawEvent *event = xev->data;
     INPUT input;
 
@@ -1852,7 +1863,55 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     if (!map_raw_event_coords( event, &input )) return FALSE;
     if (!(input.mi.dwFlags & MOUSEEVENTF_MOVE)) return FALSE;
 
-    NtUserSendHardwareInput( 0, 0, &input, 0 );
+    NtUserSendHardwareInput( 0, flags, &input, 0 );
+    return TRUE;
+}
+
+/***********************************************************************
+ *           X11DRV_RawButtonEvent
+ */
+static BOOL X11DRV_RawButtonEvent( XGenericEventCookie *cookie )
+{
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
+    const UINT *button_data, *button_flags;
+    XIRawEvent *event = cookie->data;
+    int button = event->detail - 1;
+    INPUT input;
+
+    if (!thread_data->xinput2_rawinput) return FALSE;
+
+    if (!device_mapping || device_mapping->deviceid != event->sourceid)
+        update_device_mapping( event->display, event->sourceid );
+
+    if (button >= 0 && device_mapping)  button = device_mapping->buttons[button] - 1;
+    if (button >= 0 && pointer_mapping) button = pointer_mapping->buttons[button] - 1;
+
+    if (button < 0 || button >= NB_BUTTONS) return FALSE;
+    if (event->deviceid != thread_data->xinput2_pointer) return FALSE;
+
+    TRACE( "raw button %u (raw: %u) %s\n", button, event->detail, event->evtype == XI_RawButtonRelease ? "up" : "down" );
+
+    if (event->evtype == XI_RawButtonRelease)
+    {
+        button_data = button_up_data;
+        button_flags = button_up_flags;
+    }
+    else
+    {
+        button_data = button_down_data;
+        button_flags = button_down_flags;
+    }
+
+    input.type = INPUT_MOUSE;
+    input.mi.mouseData   = button_data[button];
+    input.mi.dwFlags     = button_flags[button] | MOUSEEVENTF_MOVE;
+    input.mi.time        = EVENT_x11_time_to_win32_time( event->time );
+    input.mi.dwExtraInfo = 0;
+    input.mi.dx          = 0;
+    input.mi.dy          = 0;
+    map_raw_event_coords( event, &input );
+
+    NtUserSendHardwareInput( 0, SEND_HWMSG_NO_MSG, &input, 0 );
     return TRUE;
 }
 
@@ -1966,6 +2025,10 @@ BOOL X11DRV_GenericEvent( HWND hwnd, XEvent *xev )
         break;
     case XI_RawMotion:
         ret = X11DRV_RawMotion( event );
+        break;
+    case XI_RawButtonPress:
+    case XI_RawButtonRelease:
+        ret = X11DRV_RawButtonEvent( event );
         break;
 
     case XI_TouchBegin:
