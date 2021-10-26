@@ -113,6 +113,7 @@ WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
 typedef struct {
     int sid;
+    int type;
     IP_OPTION_INFORMATION default_opts;
 } icmp_t;
 
@@ -152,14 +153,14 @@ static int in_cksum(u_short *addr, int len)
 }
 
 /* Receive a reply (IPv4); this function uses, takes ownership of and will always free `buffer` */
-static DWORD icmp_get_reply(int sid, unsigned char *buffer, DWORD send_time, void *reply_buf, DWORD reply_size, DWORD timeout)
+static DWORD icmp_get_reply(int sid, int type, unsigned char *buffer, DWORD send_time, void *reply_buf, DWORD reply_size, DWORD timeout)
 {
     int repsize = MAXIPLEN + MAXICMPLEN + min(65535, reply_size);
     struct icmp *icmp_header = (struct icmp*)buffer;
     char *endbuf = (char*)reply_buf + reply_size;
     struct ip *ip_header = (struct ip*)buffer;
     struct icmp_echo_reply *ier = reply_buf;
-    unsigned short id, seq, cksum;
+    unsigned short id, seq, cksum, icmp_type;
     struct sockaddr_in addr;
     int ip_header_len = 0;
     socklen_t addrlen;
@@ -170,6 +171,7 @@ static DWORD icmp_get_reply(int sid, unsigned char *buffer, DWORD send_time, voi
     id = icmp_header->icmp_id;
     seq = icmp_header->icmp_seq;
     cksum = icmp_header->icmp_cksum;
+    icmp_type = icmp_header->icmp_type;
     fdr.fd = sid;
     fdr.events = POLLIN;
     addrlen = sizeof(addr);
@@ -179,6 +181,17 @@ static DWORD icmp_get_reply(int sid, unsigned char *buffer, DWORD send_time, voi
         res=recvfrom(sid, buffer, repsize, 0, (struct sockaddr*)&addr, &addrlen);
         TRACE("received %d bytes from %s\n",res, inet_ntoa(addr.sin_addr));
         ier->Status=IP_REQ_TIMED_OUT;
+
+        if (type == SOCK_DGRAM && icmp_type==ICMP_ECHO) {
+            C_ASSERT(sizeof(struct ip) == 20);
+            memmove(buffer + sizeof(struct ip), buffer, res);
+            memset(buffer, 0, sizeof(struct ip));
+            ip_header_len=sizeof(struct ip);
+            ip_header->ip_p=IPPROTO_ICMP;
+            ip_header->ip_hl=sizeof(struct ip) >> 2;
+            icmp_header=(struct icmp*)(ip_header+1);
+            id=icmp_header->icmp_id;
+        }
 
         /* Check whether we should ignore this packet */
         if ((ip_header->ip_p==IPPROTO_ICMP) && (res>=sizeof(struct ip)+ICMP_MINLEN)) {
@@ -368,11 +381,13 @@ HANDLE WINAPI Icmp6CreateFile(VOID)
     icmp_t* icp;
 
     int sid=socket(AF_INET6,SOCK_RAW,IPPROTO_ICMPV6);
+    int type=SOCK_RAW;
     if (sid < 0)
     {
         /* Some systems (e.g. Linux 3.0+ and Mac OS X) support
            non-privileged ICMP via SOCK_DGRAM type. */
         sid=socket(AF_INET6,SOCK_DGRAM,IPPROTO_ICMPV6);
+        type=SOCK_DGRAM;
     }
     if (sid < 0) {
         ERR_(winediag)("Failed to use ICMPV6 (network ping), this requires special permissions.\n");
@@ -387,6 +402,7 @@ HANDLE WINAPI Icmp6CreateFile(VOID)
         return INVALID_HANDLE_VALUE;
     }
     icp->sid=sid;
+    icp->type=type;
     icp->default_opts.OptionsSize=IP_OPTS_UNKNOWN;
     return (HANDLE)icp;
 }
@@ -427,11 +443,13 @@ HANDLE WINAPI IcmpCreateFile(VOID)
     icmp_t* icp;
 
     int sid=socket(AF_INET,SOCK_RAW,IPPROTO_ICMP);
+    int type=SOCK_RAW;
     if (sid < 0)
     {
         /* Some systems (e.g. Linux 3.0+ and Mac OS X) support
            non-privileged ICMP via SOCK_DGRAM type. */
         sid=socket(AF_INET,SOCK_DGRAM,IPPROTO_ICMP);
+        type=SOCK_DGRAM;
     }
     if (sid < 0 && !once++) {
         FIXME_(winediag)("Failed to use ICMP (network ping), this requires special permissions.\n");
@@ -445,6 +463,7 @@ HANDLE WINAPI IcmpCreateFile(VOID)
         return INVALID_HANDLE_VALUE;
     }
     icp->sid=sid;
+    icp->type=type;
     icp->default_opts.OptionsSize=IP_OPTS_UNKNOWN;
     return (HANDLE)icp;
 }
@@ -908,7 +927,7 @@ DWORD WINAPI IcmpSendEcho2Ex(
         return 0;
     }
 
-    return icmp_get_reply(icp->sid, buffer, send_time, ReplyBuffer, ReplySize, Timeout);
+    return icmp_get_reply(icp->sid, icp->type, buffer, send_time, ReplyBuffer, ReplySize, Timeout);
 }
 
 /*
