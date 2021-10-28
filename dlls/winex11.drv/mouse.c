@@ -707,6 +707,60 @@ static void map_event_coords( HWND hwnd, Window window, Window event_root, int x
     input->u.mi.dy = pt.y;
 }
 
+static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
+{
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
+    const double *values = event->valuators.values;
+    double dx = 0, dy = 0, val, user_to_real_scale;
+    struct x11drv_valuator_data *x_rel, *y_rel;
+    RECT virtual_rect;
+    HMONITOR monitor;
+    POINT pt;
+    int i;
+
+    if (thread_data->x_rel_valuator.number < 0 || thread_data->y_rel_valuator.number < 0) return FALSE;
+    if (!event->valuators.mask_len) return FALSE;
+    if (thread_data->xi2_state != xi_enabled) return FALSE;
+    if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
+
+    x_rel = &thread_data->x_rel_valuator;
+    y_rel = &thread_data->y_rel_valuator;
+
+    virtual_rect = get_virtual_screen_rect();
+
+    for (i = 0; i <= max( x_rel->number, y_rel->number ); i++)
+    {
+        if (!XIMaskIsSet( event->valuators.mask, i )) continue;
+        val = *values++;
+        if (i == x_rel->number)
+        {
+            input->u.mi.dx = dx = val;
+            if (x_rel->min < x_rel->max)
+                input->u.mi.dx = val * (virtual_rect.right - virtual_rect.left) / (x_rel->max - x_rel->min);
+        }
+        if (i == y_rel->number)
+        {
+            input->u.mi.dy = dy = val;
+            if (y_rel->min < y_rel->max)
+                input->u.mi.dy = val * (virtual_rect.bottom - virtual_rect.top) / (y_rel->max - y_rel->min);
+        }
+    }
+
+    if (input->u.mi.dwFlags & MOUSEEVENTF_ABSOLUTE)
+        fs_hack_point_real_to_user((POINT *)&input->u.mi.dx);
+    else
+    {
+        GetCursorPos(&pt);
+        monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
+        user_to_real_scale = fs_hack_get_user_to_real_scale(monitor);
+        input->u.mi.dx = lround((double)input->u.mi.dx / user_to_real_scale);
+        input->u.mi.dy = lround((double)input->u.mi.dy / user_to_real_scale);
+    }
+
+    TRACE( "pos %d,%d (event %f,%f)\n", input->u.mi.dx, input->u.mi.dy, dx, dy );
+    return TRUE;
+}
+
 
 /***********************************************************************
  *		send_mouse_input
@@ -1895,78 +1949,30 @@ static BOOL X11DRV_DeviceChanged( XGenericEventCookie *xev )
  */
 static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
 {
+    struct x11drv_thread_data *thread_data = x11drv_thread_data();
     XIRawEvent *event = xev->data;
-    const double *values = event->valuators.values;
-    RECT virtual_rect;
     RAWINPUT rawinput;
     INPUT input;
-    int i;
-    double dx = 0, dy = 0, val;
-    struct x11drv_thread_data *thread_data = x11drv_thread_data();
-    struct x11drv_valuator_data *x_rel, *y_rel;
-    POINT pt;
-    HMONITOR monitor;
-    double user_to_real_scale;
 
-    if (thread_data->x_rel_valuator.number < 0 || thread_data->y_rel_valuator.number < 0) return FALSE;
-    if (!event->valuators.mask_len) return FALSE;
-    if (thread_data->xi2_state != xi_enabled) return FALSE;
-    if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
+    if (broken_rawevents && is_old_motion_event( xev->serial ))
+    {
+        TRACE( "old serial %lu, ignoring\n", xev->serial );
+        return FALSE;
+    }
 
-    x_rel = &thread_data->x_rel_valuator;
-    y_rel = &thread_data->y_rel_valuator;
-
-    input.type             = INPUT_MOUSE;
+    input.type = INPUT_MOUSE;
     input.u.mi.mouseData   = 0;
     input.u.mi.dwFlags     = MOUSEEVENTF_MOVE;
     input.u.mi.time        = EVENT_x11_time_to_win32_time( event->time );
     input.u.mi.dwExtraInfo = 0;
     input.u.mi.dx          = 0;
     input.u.mi.dy          = 0;
-
-    virtual_rect = get_virtual_screen_rect();
-
-    for (i = 0; i <= max ( x_rel->number, y_rel->number ); i++)
-    {
-        if (!XIMaskIsSet( event->valuators.mask, i )) continue;
-        val = *values++;
-        if (i == x_rel->number)
-        {
-            input.u.mi.dx = dx = val;
-            if (x_rel->min < x_rel->max)
-                input.u.mi.dx = val * (virtual_rect.right - virtual_rect.left)
-                                    / (x_rel->max - x_rel->min);
-        }
-        if (i == y_rel->number)
-        {
-            input.u.mi.dy = dy = val;
-            if (y_rel->min < y_rel->max)
-                input.u.mi.dy = val * (virtual_rect.bottom - virtual_rect.top)
-                                    / (y_rel->max - y_rel->min);
-        }
-    }
-
-    if (broken_rawevents && is_old_motion_event( xev->serial ))
-    {
-        TRACE( "pos %d,%d old serial %lu, ignoring\n", input.u.mi.dx, input.u.mi.dy, xev->serial );
-        return FALSE;
-    }
-
-    GetCursorPos(&pt);
-    monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
-    user_to_real_scale = fs_hack_get_user_to_real_scale(monitor);
-    input.u.mi.dx = lround((double)input.u.mi.dx / user_to_real_scale);
-    input.u.mi.dy = lround((double)input.u.mi.dy / user_to_real_scale);
+    if (!map_raw_event_coords( event, &input )) return FALSE;
 
     if (!thread_data->xi2_rawinput_only)
-    {
-        TRACE( "pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
         __wine_send_input( 0, &input, NULL );
-    }
     else
     {
-        TRACE( "raw pos %d,%d (event %f,%f)\n", input.u.mi.dx, input.u.mi.dy, dx, dy );
-
         rawinput.header.dwType = RIM_TYPEMOUSE;
         rawinput.header.dwSize = offsetof(RAWINPUT, data) + sizeof(RAWMOUSE);
         rawinput.header.hDevice = ULongToHandle(1); /* WINE_MOUSE_HANDLE */
