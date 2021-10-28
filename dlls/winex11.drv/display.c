@@ -55,6 +55,7 @@ struct x11drv_display_device_handler desktop_handler;
 
 /* Cached screen information, protected by screen_section */
 static HKEY video_key;
+static RECT native_screen_rect;
 static RECT virtual_screen_rect;
 static RECT primary_monitor_rect;
 static FILETIME last_query_screen_time;
@@ -125,6 +126,7 @@ static BOOL update_screen_cache(void)
     }
 
     EnterCriticalSection(&screen_section);
+    if (!native_screen_rect.bottom) native_screen_rect = virtual_rect;
     virtual_screen_rect = virtual_rect;
     primary_monitor_rect = primary_rect;
     last_query_screen_time = filetime;
@@ -168,6 +170,17 @@ POINT root_to_virtual_screen(INT x, INT y)
     fs_hack_point_real_to_user(&pt);
     TRACE("to user %d,%d\n", pt.x, pt.y);
     return pt;
+}
+
+RECT get_native_screen_rect(void)
+{
+    RECT rect;
+
+    update_screen_cache();
+    EnterCriticalSection(&screen_section);
+    rect = native_screen_rect;
+    LeaveCriticalSection(&screen_section);
+    return rect;
 }
 
 RECT get_virtual_screen_rect(void)
