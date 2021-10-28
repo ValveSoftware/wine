@@ -761,6 +761,7 @@ extern BOOL is_window_rect_full_virtual_screen( const RECT *rect );
 
 #define DEPTH_COUNT 3
 extern const unsigned int *depths;
+extern RECT native_screen_rect;
 
 /* Use a distinct type for the settings id, to avoid mixups other types of ids */
 typedef struct { ULONG_PTR id; } x11drv_settings_id;

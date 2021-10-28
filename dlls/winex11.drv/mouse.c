@@ -1730,6 +1730,7 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input, RAWINPUT *raw
         FIXME( "Unsupported relative/absolute X/Y axis mismatch\n." );
 
     if (input->mi.dwFlags & MOUSEEVENTF_VIRTUALDESK) SetRect( &virtual_rect, 0, 0, 65535, 65535 );
+    else if (wm_is_steamcompmgr( event->display )) virtual_rect = native_screen_rect;
     else virtual_rect = NtUserGetVirtualScreenRect();
 
     if (x->max <= x->min) x_scale = 1;

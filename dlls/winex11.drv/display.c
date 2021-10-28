@@ -30,6 +30,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(x11drv);
 
 static struct x11drv_display_device_handler host_handler;
 static struct x11drv_settings_handler settings_handler;
+RECT native_screen_rect;
 
 #define NEXT_DEVMODEW(mode) ((DEVMODEW *)((char *)((mode) + 1) + (mode)->dmDriverExtra))
 
@@ -616,4 +617,6 @@ void X11DRV_DisplayDevices_Init(BOOL force)
     if (force) force_display_devices_refresh = TRUE;
     /* trigger refresh in win32u */
     NtUserGetDisplayConfigBufferSizes( QDC_ONLY_ACTIVE_PATHS, &num_path, &num_mode );
+
+    if (!native_screen_rect.bottom) native_screen_rect = NtUserGetVirtualScreenRect();
 }
