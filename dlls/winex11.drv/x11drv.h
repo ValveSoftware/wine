@@ -730,6 +730,7 @@ extern void init_recursive_mutex( pthread_mutex_t *mutex ) DECLSPEC_HIDDEN;
 
 #define DEPTH_COUNT 3
 extern const unsigned int *depths DECLSPEC_HIDDEN;
+extern RECT native_screen_rect DECLSPEC_HIDDEN;
 
 /* Required functions for changing and enumerating display settings */
 struct x11drv_settings_handler
