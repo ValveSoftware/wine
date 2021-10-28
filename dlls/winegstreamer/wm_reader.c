@@ -1484,7 +1484,7 @@ static HRESULT init_stream(struct wm_reader *reader, QWORD file_size)
     {
         struct wm_stream *stream = &reader->streams[i];
 
-        stream->wg_stream = wg_parser_get_stream(reader->wg_parser, i);
+        stream->wg_stream = wg_parser_get_stream(reader->wg_parser, reader->stream_count - i - 1);
         stream->reader = reader;
         stream->index = i;
         stream->selection = WMT_ON;
