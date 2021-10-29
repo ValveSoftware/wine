@@ -634,8 +634,7 @@ void set_thread_context( struct thread *thread, const context_t *context, unsign
     switch (context->cpu)
     {
     case CPU_x86:
-        /* Linux 2.6.33+ does DR0-DR3 alignment validation, so it has to know LEN bits first */
-        if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(7), context->debug.i386_regs.dr7 & 0xffff0000 ) == -1) goto error;
+        if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(7), 0 ) == -1) goto error;
         if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(0), context->debug.i386_regs.dr0 ) == -1) goto error;
         if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(1), context->debug.i386_regs.dr1 ) == -1) goto error;
         if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(2), context->debug.i386_regs.dr2 ) == -1) goto error;
@@ -647,7 +646,7 @@ void set_thread_context( struct thread *thread, const context_t *context, unsign
         thread->system_regs |= SERVER_CTX_DEBUG_REGISTERS;
         break;
     case CPU_x86_64:
-        if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(7), context->debug.x86_64_regs.dr7 & 0xffff0000 ) == -1) goto error;
+        if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(7), 0 ) == -1) goto error;
         if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(0), context->debug.x86_64_regs.dr0 ) == -1) goto error;
         if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(1), context->debug.x86_64_regs.dr1 ) == -1) goto error;
         if (ptrace( PTRACE_POKEUSER, pid, DR_OFFSET(2), context->debug.x86_64_regs.dr2 ) == -1) goto error;
