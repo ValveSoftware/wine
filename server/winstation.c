@@ -335,6 +335,7 @@ static void close_desktop_timeout( void *private )
     desktop->close_timeout = NULL;
     unlink_named_object( &desktop->obj );  /* make sure no other process can open it */
     post_desktop_message( desktop, WM_CLOSE, 0, 0 );  /* and signal the owner to quit */
+    fprintf( stderr, "wineserver: closed desktop\n" );
 }
 
 /* add a user of the desktop and cancel the close timeout */
@@ -357,7 +358,10 @@ static void remove_desktop_user( struct desktop *desktop )
 
     /* if we have one remaining user, it has to be the manager of the desktop window */
     if ((process = get_top_window_owner( desktop )) && desktop->users == process->running_threads && !desktop->close_timeout)
-        desktop->close_timeout = add_timeout_user( -TICKS_PER_SEC, close_desktop_timeout, desktop );
+    {
+        fprintf( stderr, "wineserver: closing desktop\n" );
+        desktop->close_timeout = add_timeout_user( -TICKS_PER_SEC / 10, close_desktop_timeout, desktop );
+    }
 }
 
 /* set the thread default desktop handle */
