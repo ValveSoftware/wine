@@ -57,6 +57,15 @@ int do_fsync(void)
 
     if (do_fsync_cached == -1)
     {
+        FILE *f;
+        if ((f = fopen( "/sys/kernel/futex2/wait", "r" )))
+        {
+            fclose(f);
+            do_fsync_cached = 0;
+            fprintf( stderr, "fsync: old futex2 patches detected, disabling.\n" );
+            return do_fsync_cached;
+        }
+
         syscall( __NR_futex_waitv, 0, 0, 0, 0, 0);
         do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS;
     }
