@@ -162,6 +162,14 @@ int do_fsync(void)
 
     if (do_fsync_cached == -1)
     {
+        FILE *f;
+        if ((f = fopen( "/sys/kernel/futex2/wait", "r" )))
+        {
+            fclose(f);
+            do_fsync_cached = 0;
+            return do_fsync_cached;
+        }
+
         syscall( __NR_futex_waitv, NULL, 0, 0, NULL, 0 );
         do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS;
         if (getenv("WINEFSYNC_SPINCOUNT"))
