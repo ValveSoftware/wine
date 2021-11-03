@@ -2201,6 +2201,7 @@ static void hacks_init(void)
     static const char ac_odyssey_exe[] = "ACOdyssey.exe";
     char cur_exe[MAX_PATH];
     DWORD cur_exe_len;
+    const char *sgi;
     int fd;
 
     fd = open("/proc/self/comm", O_RDONLY);
@@ -2216,7 +2217,12 @@ static void hacks_init(void)
             ERR("Not enabling AC Odyssey sync tweak as esync and fsync are disabled.\n");
 
         ac_odyssey = TRUE;
+        return;
     }
+
+    sgi = getenv("SteamGameId");
+    if (sgi && !strcmp(sgi, "50130"))
+        setenv("WINESTEAMNOEXEC", "1", 0);
 }
 
 /***********************************************************************
