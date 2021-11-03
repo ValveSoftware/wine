@@ -1918,6 +1918,18 @@ static ULONG_PTR get_image_address(void)
     return 0;
 }
 
+static void hacks_init(void)
+{
+    const char *sgi = getenv( "SteamGameId" );
+
+    switch (sgi ? atoi( sgi ) : -1)
+    {
+    case 50130: /* Mafia II */
+        setenv( "WINESTEAMNOEXEC", "1", 0 );
+        break;
+    }
+}
+
 /***********************************************************************
  *           start_main_thread
  */
@@ -1929,6 +1941,7 @@ static void start_main_thread(void)
     signal_alloc_thread( teb );
     dbg_init();
     startup_info_size = server_init_process();
+    hacks_init();
     virtual_map_user_shared_data();
     init_cpu_info();
     init_files();
