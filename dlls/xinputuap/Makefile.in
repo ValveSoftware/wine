@@ -1,0 +1,11 @@
+MODULE    = xinputuap.dll
+IMPORTS   = hid setupapi advapi32 user32
+PARENTSRC = ../xinput1_3
+
+EXTRADLLFLAGS = -mno-cygwin
+
+C_SRCS = \
+	hid.c \
+	xinput_main.c
+
+RC_SRCS = version.rc
