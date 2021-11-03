@@ -2184,12 +2184,18 @@ BOOL ac_odyssey;
 static void hacks_init(void)
 {
     static const char ac_odyssey_exe[] = "ACOdyssey.exe";
+    const char *sgi;
 
     if (main_argc > 1 && strstr(main_argv[1], ac_odyssey_exe))
     {
         ERR("HACK: AC Odyssey sync tweak on.\n");
         ac_odyssey = TRUE;
+        return;
     }
+
+    sgi = getenv("SteamGameId");
+    if (sgi && !strcmp(sgi, "50130"))
+        setenv("WINESTEAMNOEXEC", "1", 0);
 }
 
 #ifdef _WIN64
