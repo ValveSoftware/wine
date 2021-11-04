@@ -34,46 +34,39 @@ static HRESULT uia_evm_add_uia_event(struct uia_evl *evl,
 /*
  * FIXME: Need to keep track of each UIA provider window, and be able to
  * dynamically use the IRawElementProviderAdviseEvents interface to add/remove
- * events as they are added/removed.
- * Commented out for now, as wine-mono still needs to be fixed. Without the
- * fix, this code will cause a crash when trying to marshal a SAFEARRAY(type)
- * to/from type[] arrays in mono.
+ * events as they are added/removed. For now, we're just adding the
+ * UIA_AutomationFocusChangedEventId event if the fragment root exposes
+ * an IRawElementProviderAdviseEvents interface.
  */
-/*
 static void uia_get_advise_events_iface(IRawElementProviderSimple *elprov)
 {
-    IRawElementProviderAdviseEvents *elem_events;
-    IRawElementProviderFragmentRoot *frag_root;
-    IRawElementProviderFragment *elem_frag;
+    IRawElementProviderAdviseEvents *elem_events = NULL;
+    IRawElementProviderFragmentRoot *frag_root = NULL;
+    IRawElementProviderFragment *elem_frag = NULL;
     HRESULT hr;
 
     hr = IRawElementProviderSimple_QueryInterface(elprov, &IID_IRawElementProviderFragment, (void **)&elem_frag);
-    if (FAILED(hr))
+    if (FAILED(hr) || !elem_frag)
         return;
 
     hr = IRawElementProviderFragment_get_FragmentRoot(elem_frag, &frag_root);
-    if (FAILED(hr))
-    {
-        IRawElementProviderFragment_Release(elem_frag);
-        return;
-    }
+    if (FAILED(hr) || !frag_root)
+        goto exit;
 
     hr = IRawElementProviderFragmentRoot_QueryInterface(frag_root, &IID_IRawElementProviderAdviseEvents, (void **)&elem_events);
-    if (FAILED(hr))
-    {
-        IRawElementProviderFragment_Release(elem_frag);
-        IRawElementProviderFragmentRoot_Release(frag_root);
-        return;
-    }
+    if (FAILED(hr) || !elem_events)
+        goto exit;
 
     IRawElementProviderAdviseEvents_AdviseEventAdded(elem_events, UIA_AutomationFocusChangedEventId, NULL);
 
-    IRawElementProviderFragment_Release(elem_frag);
-    IRawElementProviderFragmentRoot_Release(frag_root);
-    IRawElementProviderAdviseEvents_Release(elem_events);
-
+exit:
+    if (elem_frag)
+        IRawElementProviderFragment_Release(elem_frag);
+    if (frag_root)
+        IRawElementProviderFragmentRoot_Release(frag_root);
+    if (elem_events)
+        IRawElementProviderAdviseEvents_Release(elem_events);
 }
-*/
 
 /*
  * Check if a window responds to a request for a UI Automation object, and if
@@ -98,7 +91,7 @@ static BOOL uia_evl_attempt_evlc_connect(HWND hwnd, IUIAEvlConnection *iface)
     if (FAILED(hr))
         return FALSE;
 
-/*    uia_get_advise_events_iface(elem_prov);*/
+    uia_get_advise_events_iface(elem_prov);
     IRawElementProviderSimple_Release(elem_prov);
 
     /* FIXME: Probably a less hacky way to do this. Revisit later. */
