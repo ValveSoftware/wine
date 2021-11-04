@@ -192,6 +192,7 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
             if (keyboard_up)
             {
                 WINE_TRACE("Keyboard down!\n");
+                ShellExecuteW(NULL, NULL, L"steam://close/keyboard", NULL, NULL, SW_SHOWNOACTIVATE);
                 keyboard_up = FALSE;
             }
         }
