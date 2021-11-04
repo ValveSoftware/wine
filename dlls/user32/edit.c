@@ -5231,6 +5231,12 @@ LRESULT EditWndProc_common( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam, B
 		}
 		break;
 
+        case WM_GETOBJECT:
+                if (lParam == (DWORD)OBJID_QUERYCLASSNAMEIDX)
+                    result = 0x10004;
+
+                break;
+
 	default:
 		result = DefWindowProcT(hwnd, msg, wParam, lParam, unicode);
 		break;
