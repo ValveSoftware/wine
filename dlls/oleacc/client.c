@@ -19,8 +19,6 @@
 #define COBJMACROS
 
 #include "oleacc_private.h"
-#include "ole2.h"
-#include "commctrl.h"
 
 #include "wine/debug.h"
 #include "wine/heap.h"
@@ -36,58 +34,7 @@ typedef struct {
 
     HWND hwnd;
     HWND enum_pos;
-    UINT role;
 } Client;
-
-static struct {
-    const WCHAR *name;
-    UINT role;
-} builtin_class_roles[] = {
-    {WC_LISTBOXW,         ROLE_SYSTEM_LIST },
-    {L"#32768",           ROLE_SYSTEM_MENUPOPUP },
-    {WC_BUTTONW,          ROLE_SYSTEM_PUSHBUTTON },
-    {WC_STATICW,          ROLE_SYSTEM_STATICTEXT },
-    {WC_EDITW,            ROLE_SYSTEM_TEXT },
-    {WC_COMBOBOXW,        ROLE_SYSTEM_COMBOBOX },
-    {L"#32770",           ROLE_SYSTEM_DIALOG },
-    {L"#32771",           ROLE_SYSTEM_LIST },
-    {L"#32769",           ROLE_SYSTEM_CLIENT },
-    {WC_SCROLLBARW,       ROLE_SYSTEM_SCROLLBAR },
-    {STATUSCLASSNAMEW,    ROLE_SYSTEM_STATUSBAR },
-    {TOOLBARCLASSNAMEW,   ROLE_SYSTEM_TOOLBAR },
-    {PROGRESS_CLASSW,     ROLE_SYSTEM_PROGRESSBAR },
-    {ANIMATE_CLASSW,      ROLE_SYSTEM_ANIMATION },
-    {WC_TABCONTROLW,      ROLE_SYSTEM_CLOCK },
-    {HOTKEY_CLASSW,       ROLE_SYSTEM_HOTKEYFIELD },
-    {WC_HEADERW,          ROLE_SYSTEM_LIST },
-    {TRACKBAR_CLASSW,     ROLE_SYSTEM_SLIDER },
-    {WC_LISTVIEWW,        ROLE_SYSTEM_LIST },
-    {UPDOWN_CLASSW,       ROLE_SYSTEM_SPINBUTTON},
-    {TOOLTIPS_CLASSW,     ROLE_SYSTEM_TOOLTIP },
-    {WC_TREEVIEWW,        ROLE_SYSTEM_OUTLINE },
-    {MONTHCAL_CLASSW,     ROLE_SYSTEM_CLIENT },
-    {DATETIMEPICK_CLASSW, ROLE_SYSTEM_DROPLIST },
-    {WC_IPADDRESSW,       ROLE_SYSTEM_OUTLINEBUTTON },
-};
-
-static UINT get_acc_role_from_window_class(HWND hwnd)
-{
-    WCHAR class[60];
-    UINT i, role;
-
-    role = ROLE_SYSTEM_CLIENT;
-    GetClassNameW(hwnd, class, sizeof(class));
-    for (i = 0; i < ARRAY_SIZE(builtin_class_roles); i++)
-    {
-        if(!wcsicmp(class, builtin_class_roles[i].name))
-        {
-            role = builtin_class_roles[i].role;
-            break;
-        }
-    }
-
-    return role;
-}
 
 static inline Client* impl_from_Client(IAccessible *iface)
 {
@@ -273,8 +220,7 @@ static HRESULT WINAPI Client_get_accRole(IAccessible *iface, VARIANT varID, VARI
     }
 
     V_VT(pvarRole) = VT_I4;
-    V_I4(pvarRole) = This->role;
-
+    V_I4(pvarRole) = ROLE_SYSTEM_CLIENT;
     return S_OK;
 }
 
@@ -697,7 +643,6 @@ HRESULT create_client_object(HWND hwnd, const IID *iid, void **obj)
     client->ref = 1;
     client->hwnd = hwnd;
     client->enum_pos = 0;
-    client->role = get_acc_role_from_window_class(hwnd);
 
     hres = IAccessible_QueryInterface(&client->IAccessible_iface, iid, obj);
     IAccessible_Release(&client->IAccessible_iface);
