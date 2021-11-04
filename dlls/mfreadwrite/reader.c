@@ -2125,6 +2125,7 @@ static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader
 {
     struct media_stream *stream = &reader->streams[index];
     IMFVideoSampleAllocatorCallback *callback;
+    IMFAttributes *attributes;
     GUID major = { 0 };
     HRESULT hr;
 
@@ -2151,8 +2152,39 @@ static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader
         return hr;
     }
 
-    if (FAILED(hr = IMFVideoSampleAllocatorEx_InitializeSampleAllocatorEx(stream->allocator, 2, 8, NULL, stream->current)))
+    if (FAILED(hr = MFCreateAttributes(&attributes, 8)))
+    {
+        WARN("Failed to create attributes object, hr %#x.\n", hr);
+        return hr;
+    }
+
+    if (reader->attributes)
+    {
+        if (FAILED(hr = IMFAttributes_CopyAllItems(reader->attributes, attributes)))
+            WARN("Failed to copy reader attributes, hr %#x.\n", hr);
+    }
+
+    if (stream->decoder.transform)
+    {
+        IMFAttributes *output_attributes;
+
+        if (FAILED(hr = IMFTransform_GetOutputStreamAttributes(stream->decoder.transform, 0, &output_attributes)))
+        {
+            WARN("Failed to get output stream attributes, hr %#x.\n", hr);
+        }
+        else
+        {
+            if (FAILED(hr = IMFAttributes_CopyAllItems(output_attributes, attributes)))
+                WARN("Failed to copy transform output attributes, hr %#x.\n", hr);
+
+            IMFAttributes_Release(output_attributes);
+        }
+    }
+
+    if (FAILED(hr = IMFVideoSampleAllocatorEx_InitializeSampleAllocatorEx(stream->allocator, 2, 8, attributes, stream->current)))
         WARN("Failed to initialize sample allocator, hr %#x.\n", hr);
+
+    IMFAttributes_Release(attributes);
 
     if (SUCCEEDED(IMFVideoSampleAllocatorEx_QueryInterface(stream->allocator, &IID_IMFVideoSampleAllocatorCallback, (void **)&callback)))
     {
