@@ -2000,12 +2000,16 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
                               DWORD flags, BOOL system, WINE_MODREF **pwm )
 {
     static const char builtin_signature[] = "Wine builtin DLL";
+    static HMODULE lsteamclient = NULL;
     char *signature = (char *)((IMAGE_DOS_HEADER *)*module + 1);
+    UNICODE_STRING lsteamclient_us;
     BOOL is_builtin;
     IMAGE_NT_HEADERS *nt;
     WINE_MODREF *wm;
     NTSTATUS status;
     SIZE_T map_size;
+    WCHAR *basename, *tmp;
+    ULONG basename_len;
 
     if (!(nt = RtlImageNtHeader( *module ))) return STATUS_INVALID_IMAGE_FORMAT;
 
@@ -2025,6 +2029,24 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
     wm->system = system;
 
     set_security_cookie( *module, map_size );
+
+    basename = nt_name->Buffer;
+    if ((tmp = wcsrchr(basename, '\\'))) basename = tmp + 1;
+    if ((tmp = wcsrchr(basename, '/'))) basename = tmp + 1;
+    basename_len = wcslen(basename);
+    if (basename_len >= 4 && !wcscmp(basename + basename_len - 4, L".dll")) basename_len -= 4;
+
+    if ((!RtlCompareUnicodeStrings(basename, basename_len, L"steamclient", 11, TRUE) ||
+         !RtlCompareUnicodeStrings(basename, basename_len, L"steamclient64", 13, TRUE) ||
+         !RtlCompareUnicodeStrings(basename, basename_len, L"gameoverlayrenderer", 19, TRUE) ||
+         !RtlCompareUnicodeStrings(basename, basename_len, L"gameoverlayrenderer64", 21, TRUE)) &&
+        RtlCreateUnicodeStringFromAsciiz(&lsteamclient_us, "lsteamclient.dll") &&
+        (lsteamclient || LdrLoadDll(load_path, 0, &lsteamclient_us, &lsteamclient) == STATUS_SUCCESS))
+    {
+        unix_funcs->steamclient_setup_trampolines( *module, lsteamclient );
+        wm->ldr.Flags |= LDR_DONT_RESOLVE_REFS;
+        flags |= DONT_RESOLVE_DLL_REFERENCES;
+    }
 
     /* fixup imports */
 

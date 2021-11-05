@@ -1781,6 +1781,7 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     struct xcontext xcontext;
     ucontext_t *ucontext = sigcontext;
     void *stack = setup_exception_record( sigcontext, &rec, &xcontext );
+    void *steamclient_addr = NULL;
 
     switch (TRAP_sig(ucontext))
     {
@@ -1815,6 +1816,12 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         }
         break;
     case TRAP_x86_PAGEFLT:  /* Page fault */
+        if ((steamclient_addr = steamclient_handle_fault( siginfo->si_addr, (ERROR_sig(ucontext) >> 1) & 0x09 )))
+        {
+            EIP_sig(ucontext) = (intptr_t)steamclient_addr;
+            return;
+        }
+
         rec.NumberParameters = 2;
         rec.ExceptionInformation[0] = (ERROR_sig(ucontext) >> 1) & 0x09;
         rec.ExceptionInformation[1] = (ULONG_PTR)siginfo->si_addr;
