@@ -195,6 +195,9 @@ extern NTSTATUS alloc_object_attributes( const OBJECT_ATTRIBUTES *attr, struct o
 
 extern void *anon_mmap_fixed( void *start, size_t size, int prot, int flags ) DECLSPEC_HIDDEN;
 extern void *anon_mmap_alloc( size_t size, int prot ) DECLSPEC_HIDDEN;
+
+extern void *steamclient_handle_fault( LPCVOID addr, DWORD err ) DECLSPEC_HIDDEN;
+
 extern void virtual_init(void) DECLSPEC_HIDDEN;
 extern ULONG_PTR get_system_affinity_mask(void) DECLSPEC_HIDDEN;
 extern void virtual_get_system_info( SYSTEM_BASIC_INFORMATION *info, BOOL wow64 ) DECLSPEC_HIDDEN;
