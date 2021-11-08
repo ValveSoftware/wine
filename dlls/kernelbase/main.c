@@ -146,8 +146,11 @@ LONG WINAPI AppPolicyGetWindowingModel(HANDLE token, AppPolicyWindowingModel *po
 PPERF_COUNTERSET_INSTANCE WINAPI PerfCreateInstance(HANDLE handle, LPCGUID guid,
                                                     const WCHAR *name, ULONG id)
 {
+    static PERF_COUNTERSET_INSTANCE instance;
+
     FIXME("%p %s %s %u: stub\n", handle, debugstr_guid(guid), debugstr_w(name), id);
-    return NULL;
+
+    return &instance;
 }
 
 /***********************************************************************
@@ -165,7 +168,8 @@ ULONG WINAPI PerfDeleteInstance(HANDLE provider, PPERF_COUNTERSET_INSTANCE block
 ULONG WINAPI PerfSetCounterSetInfo(HANDLE handle, PPERF_COUNTERSET_INFO template, ULONG size)
 {
     FIXME("%p %p %u: stub\n", handle, template, size);
-    return ERROR_CALL_NOT_IMPLEMENTED;
+
+    return ERROR_SUCCESS;
 }
 
 /***********************************************************************
@@ -175,7 +179,8 @@ ULONG WINAPI PerfSetCounterRefValue(HANDLE provider, PPERF_COUNTERSET_INSTANCE i
                                     ULONG counterid, void *address)
 {
     FIXME("%p %p %u %p: stub\n", provider, instance, counterid, address);
-    return ERROR_CALL_NOT_IMPLEMENTED;
+
+    return ERROR_SUCCESS;
 }
 
 /***********************************************************************
@@ -193,7 +198,9 @@ ULONG WINAPI PerfStartProvider(GUID *guid, PERFLIBREQUEST callback, HANDLE *prov
 ULONG WINAPI PerfStartProviderEx(GUID *guid, PPERF_PROVIDER_CONTEXT context, HANDLE *provider)
 {
     FIXME("%s %p %p: stub\n", debugstr_guid(guid), context, provider);
-    return ERROR_CALL_NOT_IMPLEMENTED;
+
+    *provider = (HANDLE)0xdeadbeef;
+    return ERROR_SUCCESS;
 }
 
 /***********************************************************************
