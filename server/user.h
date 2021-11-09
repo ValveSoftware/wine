@@ -62,6 +62,7 @@ struct desktop
     struct window                         *msg_window;       /* HWND_MESSAGE top window */
     struct hook_table                     *global_hooks;     /* table of global hooks on this desktop */
     struct list                            hotkeys;          /* list of registered hotkeys */
+    struct list                            touches;          /* list of active touches */
     struct timeout_user                   *close_timeout;    /* timeout before closing the desktop */
     struct thread_input                   *foreground_input; /* thread input of foreground thread */
     unsigned int                           users;            /* processes and threads using this desktop */
@@ -112,6 +113,7 @@ extern void post_win_event( struct thread *thread, unsigned int event,
                             const WCHAR *module, data_size_t module_size,
                             user_handle_t handle );
 extern void free_hotkeys( struct desktop *desktop, user_handle_t window );
+extern void free_touches( struct desktop *desktop, user_handle_t window );
 extern void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int send_clip_msg );
 
 /* region functions */
