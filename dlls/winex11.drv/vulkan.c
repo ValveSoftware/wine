@@ -223,9 +223,12 @@ static void wine_vk_surface_release(struct wine_vk_surface *surface)
     if (InterlockedDecrement(&surface->ref))
         return;
 
-    EnterCriticalSection(&context_section);
-    list_remove(&surface->entry);
-    LeaveCriticalSection(&context_section);
+    if (surface->entry.next)
+    {
+        EnterCriticalSection(&context_section);
+        list_remove(&surface->entry);
+        LeaveCriticalSection(&context_section);
+    }
 
     if (surface->window)
         XDestroyWindow(gdi_display, surface->window);
