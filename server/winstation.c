@@ -260,6 +260,7 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->last_press_alt = 0;
             list_add_tail( &winstation->desktops, &desktop->entry );
             list_init( &desktop->hotkeys );
+            list_init( &desktop->touches );
             if (!init_desktop_mapping( desktop, name ))
             {
                 release_object( desktop );
@@ -313,6 +314,7 @@ static void desktop_destroy( struct object *obj )
     struct desktop *desktop = (struct desktop *)obj;
 
     free_hotkeys( desktop, 0 );
+    free_touches( desktop, 0 );
     if (desktop->top_window) destroy_window( desktop->top_window );
     if (desktop->msg_window) destroy_window( desktop->msg_window );
     if (desktop->global_hooks) release_object( desktop->global_hooks );
