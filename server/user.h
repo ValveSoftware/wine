@@ -72,6 +72,7 @@ struct desktop
     struct hook_table   *global_hooks;     /* table of global hooks on this desktop */
     struct list          hotkeys;          /* list of registered hotkeys */
     struct timeout_user *close_timeout;    /* timeout before closing the desktop */
+    struct list          touches;          /* list of active touches */
     struct thread_input *foreground_input; /* thread input of foreground thread */
     unsigned int         users;            /* processes and threads using this desktop */
     struct global_cursor cursor;           /* global cursor information */
@@ -121,6 +122,7 @@ extern void post_win_event( struct thread *thread, unsigned int event,
                             const WCHAR *module, data_size_t module_size,
                             user_handle_t handle );
 extern void free_hotkeys( struct desktop *desktop, user_handle_t window );
+extern void free_touches( struct desktop *desktop, user_handle_t window );
 
 /* region functions */
 

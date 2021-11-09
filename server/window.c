@@ -2026,6 +2026,7 @@ void free_window_handle( struct window *win )
     if (win == progman_window) progman_window = NULL;
     if (win == taskman_window) taskman_window = NULL;
     free_hotkeys( win->desktop, win->handle );
+    free_touches( win->desktop, win->handle );
     cleanup_clipboard_window( win->desktop, win->handle );
     destroy_properties( win );
     if (is_desktop_window(win))

@@ -655,6 +655,36 @@ static inline unsigned int get_unique_id(void)
     return id;
 }
 
+static int merge_pointer_update_message( struct thread_input *input, const struct message *msg )
+{
+    struct hardware_msg_data *prev_data, *msg_data = msg->data;
+    struct message *prev;
+    struct list *ptr;
+
+    for (ptr = list_tail( &input->msg_list ); ptr; ptr = list_prev( &input->msg_list, ptr ))
+    {
+        prev = LIST_ENTRY( ptr, struct message, entry );
+        if (prev->msg != WM_POINTERUPDATE || !(prev_data = prev->data)) continue;
+        if (LOWORD(prev_data->rawinput.mouse.data) == LOWORD(msg_data->rawinput.mouse.data)) break;
+    }
+    if (!ptr) return 0;
+    if (prev->result) return 0;
+    if (prev->win && msg->win && prev->win != msg->win) return 0;
+    if (prev->type != msg->type) return 0;
+    /* now we can merge it */
+    prev->wparam  = msg->wparam;
+    prev->lparam  = msg->lparam;
+    prev->x       = msg->x;
+    prev->y       = msg->y;
+    prev->time    = msg->time;
+    prev_data->rawinput.mouse.data |= msg_data->rawinput.mouse.data;
+    prev_data->rawinput.mouse.x = msg_data->rawinput.mouse.x;
+    prev_data->rawinput.mouse.y = msg_data->rawinput.mouse.y;
+    list_remove( ptr );
+    list_add_tail( &input->msg_list, ptr );
+    return 1;
+}
+
 /* try to merge a WM_MOUSEMOVE message with the last in the list; return 1 if successful */
 static int merge_mousemove( struct thread_input *input, const struct message *msg )
 {
@@ -664,7 +694,7 @@ static int merge_mousemove( struct thread_input *input, const struct message *ms
     for (ptr = list_tail( &input->msg_list ); ptr; ptr = list_prev( &input->msg_list, ptr ))
     {
         prev = LIST_ENTRY( ptr, struct message, entry );
-        if (prev->msg != WM_INPUT) break;
+        if (prev->msg != WM_INPUT && prev->msg != WM_POINTERUPDATE) break;
     }
     if (!ptr) return 0;
     if (prev->result) return 0;
@@ -719,6 +749,7 @@ static int merge_message( struct thread_input *input, const struct message *msg 
     if (msg->msg == WM_MOUSEMOVE) return merge_mousemove( input, msg );
     if (msg->msg == WM_WINE_CLIPCURSOR) return merge_unique_message( input, WM_WINE_CLIPCURSOR, msg );
     if (msg->msg == WM_WINE_SETCURSOR) return merge_unique_message( input, WM_WINE_SETCURSOR, msg );
+    if (msg->msg == WM_POINTERUPDATE) return merge_pointer_update_message( input, msg );
     return 0;
 }
 
@@ -2122,6 +2153,58 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
     return wait;
 }
 
+struct touch
+{
+    struct list entry;
+    struct desktop *desktop;
+    user_handle_t win;
+    hw_input_t input;
+    struct timeout_user *timeout;
+};
+
+static void queue_touch_input_message( void *private )
+{
+    struct hw_msg_source source = { IMDT_UNAVAILABLE, IMDT_TOUCH };
+    struct touch *touch = private;
+    struct desktop *desktop = touch->desktop;
+    const hw_input_t *input = &touch->input;
+    user_handle_t win = touch->win;
+    struct hardware_msg_data *msg_data;
+    struct message *msg;
+
+    if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
+
+    msg_data = msg->data;
+    msg_data->info     = 0;
+    msg_data->size     = sizeof(*msg_data);
+    msg_data->flags    = input->hw.lparam;
+    msg_data->rawinput = input->hw.rawinput;
+
+    msg->win       = get_user_full_handle( win );
+    msg->msg       = input->hw.msg;
+    msg->wparam    = 0;
+    msg->lparam    = input->hw.lparam;
+    msg->x         = input->hw.rawinput.mouse.x;
+    msg->y         = input->hw.rawinput.mouse.y;
+
+    queue_hardware_message( desktop, msg, 1 );
+    touch->timeout = add_timeout_user( -160000, queue_touch_input_message, touch );
+}
+
+static struct touch *find_touch_input( struct desktop *desktop, unsigned int id )
+{
+    struct touch *touch;
+
+    LIST_FOR_EACH_ENTRY( touch, &desktop->touches, struct touch, entry )
+        if (LOWORD(touch->input.hw.rawinput.mouse.data) == id) return touch;
+
+    touch = mem_alloc( sizeof(struct touch) );
+    list_add_tail( &desktop->touches, &touch->entry );
+    touch->desktop = desktop;
+    touch->timeout = NULL;
+    return touch;
+}
+
 /* queue a hardware message for a custom type of event */
 static void queue_custom_hardware_message( struct desktop *desktop, user_handle_t win,
                                            unsigned int origin, const hw_input_t *input )
@@ -2129,6 +2212,7 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
     struct hw_msg_source source = { IMDT_UNAVAILABLE, origin };
     struct hardware_msg_data *msg_data;
     struct rawinput_message raw_msg;
+    struct touch *touch;
     struct message *msg;
     data_size_t report_size = 0;
 
@@ -2178,6 +2262,21 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
         msg_data->size     = sizeof(*msg_data);
         msg_data->flags    = input->hw.lparam;
         msg_data->rawinput = input->hw.rawinput;
+        touch = find_touch_input( desktop, LOWORD(input->hw.rawinput.mouse.data) );
+        if (touch->timeout) remove_timeout_user( touch->timeout );
+        if (input->hw.msg != WM_POINTERUP)
+        {
+            touch->win = win;
+            touch->input = *input;
+            touch->input.hw.msg = WM_POINTERUPDATE;
+            touch->input.hw.rawinput.mouse.data &= ~(POINTER_MESSAGE_FLAG_NEW << 16);
+            touch->timeout = add_timeout_user( -160000, queue_touch_input_message, touch );
+        }
+        else
+        {
+            list_remove( &touch->entry );
+            free( touch );
+        }
     }
 
     msg->win       = get_user_full_handle( win );
@@ -2501,6 +2600,21 @@ void post_win_event( struct thread *thread, unsigned int event,
         }
         else
             free( msg );
+    }
+}
+
+void free_touches( struct desktop *desktop, user_handle_t window )
+{
+    struct touch *touch, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE( touch, next, &desktop->touches, struct touch, entry )
+    {
+        if (!window || touch->win == window)
+        {
+            list_remove( &touch->entry );
+            if (touch->timeout) remove_timeout_user( touch->timeout );
+            free( touch );
+        }
     }
 }
 
