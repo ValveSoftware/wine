@@ -2212,6 +2212,58 @@ static int queue_keyboard_message( struct desktop *desktop, user_handle_t win, c
     return wait;
 }
 
+struct touch
+{
+    struct list entry;
+    struct desktop *desktop;
+    user_handle_t win;
+    hw_input_t input;
+    struct timeout_user *timeout;
+};
+
+static void queue_touch_input_message( void *private )
+{
+    struct hw_msg_source source = { IMDT_UNAVAILABLE, IMDT_TOUCH };
+    struct touch *touch = private;
+    struct desktop *desktop = touch->desktop;
+    const hw_input_t *input = &touch->input;
+    user_handle_t win = touch->win;
+    struct hardware_msg_data *msg_data;
+    struct message *msg;
+
+    if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
+
+    msg_data = msg->data;
+    msg_data->info     = 0;
+    msg_data->size     = sizeof(*msg_data);
+    msg_data->flags    = input->hw.lparam;
+    msg_data->rawinput = input->hw.rawinput;
+
+    msg->win       = get_user_full_handle( win );
+    msg->msg       = input->hw.msg;
+    msg->wparam    = 0;
+    msg->lparam    = input->hw.lparam;
+    msg->x         = desktop->shared->cursor.x;
+    msg->y         = desktop->shared->cursor.y;
+
+    queue_hardware_message( desktop, msg, 1 );
+    touch->timeout = add_timeout_user( -160000, queue_touch_input_message, touch );
+}
+
+static struct touch *find_touch_input( struct desktop *desktop, unsigned int id )
+{
+    struct touch *touch;
+
+    LIST_FOR_EACH_ENTRY( touch, &desktop->touches, struct touch, entry )
+        if (LOWORD(touch->input.hw.rawinput.mouse.data) == id) return touch;
+
+    touch = mem_alloc( sizeof(struct touch) );
+    list_add_tail( &desktop->touches, &touch->entry );
+    touch->desktop = desktop;
+    touch->timeout = NULL;
+    return touch;
+}
+
 /* queue a hardware message for a custom type of event */
 static void queue_custom_hardware_message( struct desktop *desktop, user_handle_t win,
                                            unsigned int origin, const hw_input_t *input )
@@ -2219,6 +2271,7 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
     struct hw_msg_source source = { IMDT_UNAVAILABLE, origin };
     struct hardware_msg_data *msg_data;
     struct rawinput_message raw_msg;
+    struct touch *touch;
     struct message *msg;
     data_size_t report_size = 0;
 
@@ -2270,6 +2323,20 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
         msg_data->size     = sizeof(*msg_data);
         msg_data->flags    = input->hw.lparam;
         msg_data->rawinput = input->hw.rawinput;
+        touch = find_touch_input( desktop, LOWORD(input->hw.rawinput.mouse.data) );
+        if (touch->timeout) remove_timeout_user( touch->timeout );
+        if (input->hw.msg != WM_POINTERUP)
+        {
+            touch->win = win;
+            touch->input = *input;
+            touch->input.hw.msg = WM_POINTERUPDATE;
+            touch->timeout = add_timeout_user( -160000, queue_touch_input_message, touch );
+        }
+        else
+        {
+            list_remove( &touch->entry );
+            free( touch );
+        }
     }
 
     msg->win       = get_user_full_handle( win );
@@ -2586,6 +2653,21 @@ void post_win_event( struct thread *thread, unsigned int event,
         }
         else
             free( msg );
+    }
+}
+
+void free_touches( struct desktop *desktop, user_handle_t window )
+{
+    struct touch *touch, *next;
+
+    LIST_FOR_EACH_ENTRY_SAFE( touch, next, &desktop->touches, struct touch, entry )
+    {
+        if (!window || touch->win == window)
+        {
+            list_remove( &touch->entry );
+            if (touch->timeout) remove_timeout_user( touch->timeout );
+            free( touch );
+        }
     }
 }
 
