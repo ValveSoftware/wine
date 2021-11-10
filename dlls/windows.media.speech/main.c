@@ -175,6 +175,7 @@ struct windows_media_speech
 {
     IActivationFactory IActivationFactory_iface;
     IInstalledVoicesStatic IInstalledVoicesStatic_iface;
+    ISpeechSynthesizer ISpeechSynthesizer_iface;
     LONG ref;
 };
 
@@ -186,6 +187,11 @@ static inline struct windows_media_speech *impl_from_IActivationFactory(IActivat
 static inline struct windows_media_speech *impl_from_IInstalledVoicesStatic(IInstalledVoicesStatic *iface)
 {
     return CONTAINING_RECORD(iface, struct windows_media_speech, IInstalledVoicesStatic_iface);
+}
+
+static inline struct windows_media_speech *impl_from_ISpeechSynthesizer(ISpeechSynthesizer *iface)
+{
+    return CONTAINING_RECORD(iface, struct windows_media_speech, ISpeechSynthesizer_iface);
 }
 
 static HRESULT STDMETHODCALLTYPE windows_media_speech_QueryInterface(
@@ -209,6 +215,13 @@ static HRESULT STDMETHODCALLTYPE windows_media_speech_QueryInterface(
     {
         IUnknown_AddRef(iface);
         *out = &impl->IInstalledVoicesStatic_iface;
+        return S_OK;
+    }
+
+    if (IsEqualGUID(iid, &IID_ISpeechSynthesizer))
+    {
+        IUnknown_AddRef(iface);
+        *out = &impl->ISpeechSynthesizer_iface;
         return S_OK;
     }
 
@@ -260,7 +273,11 @@ static HRESULT STDMETHODCALLTYPE windows_media_speech_ActivateInstance(
         IActivationFactory *iface, IInspectable **instance)
 {
     FIXME("iface %p, instance %p stub!\n", iface, instance);
-    return E_NOTIMPL;
+
+    IActivationFactory_AddRef(iface);
+    *instance = (IInspectable *)iface;
+
+    return S_OK;
 }
 
 static const struct IActivationFactoryVtbl activation_factory_vtbl =
@@ -348,10 +365,105 @@ static const struct IInstalledVoicesStaticVtbl installed_voices_static_vtbl =
     installed_voices_static_get_DefaultVoice,
 };
 
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_QueryInterface(
+        ISpeechSynthesizer *iface, REFIID iid, void **out)
+{
+    struct windows_media_speech *impl = impl_from_ISpeechSynthesizer(iface);
+
+    return windows_media_speech_QueryInterface(&impl->IActivationFactory_iface, iid, out);
+}
+
+static ULONG STDMETHODCALLTYPE speech_synthesizer_AddRef(
+        ISpeechSynthesizer *iface)
+{
+    struct windows_media_speech *impl = impl_from_ISpeechSynthesizer(iface);
+
+    return windows_media_speech_AddRef(&impl->IActivationFactory_iface);
+}
+
+static ULONG STDMETHODCALLTYPE speech_synthesizer_Release(
+        ISpeechSynthesizer *iface)
+{
+    struct windows_media_speech *impl = impl_from_ISpeechSynthesizer(iface);
+
+    return windows_media_speech_Release(&impl->IActivationFactory_iface);
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_GetIids(
+        ISpeechSynthesizer *iface, ULONG *iid_count, IID **iids)
+{
+    FIXME("iface %p, iid_count %p, iids %p stub.\n", iface, iid_count, iids);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_GetRuntimeClassName(
+        ISpeechSynthesizer *iface, HSTRING *class_name)
+{
+    FIXME("iface %p, class_name %p stub.\n", iface, class_name);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_GetTrustLevel(
+        ISpeechSynthesizer *iface, TrustLevel *trust_level)
+{
+    FIXME("iface %p, trust_level %p stub.\n", iface, trust_level);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_SynthesizeTextToStreamAsync(ISpeechSynthesizer *iface,
+        HSTRING text, IUnknown **operation)
+{
+    FIXME("iface %p, text %p, operation %p stub.\n", iface, text, operation);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_SynthesizeSsmlToStreamAsync(ISpeechSynthesizer *iface,
+        HSTRING ssml, IUnknown **operation)
+{
+    FIXME("iface %p, text %p, operation %p stub.\n", iface, ssml, operation);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_put_Voice(ISpeechSynthesizer *iface, IVoiceInformation *value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer_get_Voice(ISpeechSynthesizer *iface, IVoiceInformation **value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    return E_NOTIMPL;
+}
+
+static const struct ISpeechSynthesizerVtbl speech_synthesizer_vtbl =
+{
+    speech_synthesizer_QueryInterface,
+    speech_synthesizer_AddRef,
+    speech_synthesizer_Release,
+    /* IInspectable methods */
+    speech_synthesizer_GetIids,
+    speech_synthesizer_GetRuntimeClassName,
+    speech_synthesizer_GetTrustLevel,
+    /* ISpeechSynthesizer methods */
+    speech_synthesizer_SynthesizeTextToStreamAsync,
+    speech_synthesizer_SynthesizeSsmlToStreamAsync,
+    speech_synthesizer_put_Voice,
+    speech_synthesizer_get_Voice,
+};
+
 static struct windows_media_speech windows_media_speech =
 {
     {&activation_factory_vtbl},
     {&installed_voices_static_vtbl},
+    {&speech_synthesizer_vtbl},
     1
 };
 
