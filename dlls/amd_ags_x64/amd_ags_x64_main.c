@@ -518,8 +518,8 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     gpu_info->agsVersionMajor = amd_ags_info[object->version].major;
     gpu_info->agsVersionMinor = amd_ags_info[object->version].minor;
     gpu_info->agsVersionPatch = amd_ags_info[object->version].patch;
-    gpu_info->driverVersion = "20.50.03.05-210326a-365573E-RadeonSoftwareAdrenalin2020";
-    gpu_info->radeonSoftwareVersion  = "21.3.2";
+    gpu_info->driverVersion = "21.30.25.05-211005a-372402E-RadeonSoftware";
+    gpu_info->radeonSoftwareVersion  = "21.10.2";
     gpu_info->numDevices = object->device_count;
     gpu_info->devices = object->devices;
 
@@ -553,8 +553,8 @@ AGSReturnCode WINAPI agsInitialize(int ags_version, const AGSConfiguration *conf
     }
 
     memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->driverVersion = "20.50.03.05-210326a-365573E-RadeonSoftwareAdrenalin2020";
-    gpu_info->radeonSoftwareVersion  = "21.3.2";
+    gpu_info->driverVersion = "21.30.25.05-211005a-372402E-RadeonSoftware";
+    gpu_info->radeonSoftwareVersion  = "21.10.2";
     gpu_info->numDevices = object->device_count;
     gpu_info->devices = object->devices;
 
