@@ -65,6 +65,19 @@ namespace Windows {
 
             [
                 contract(Windows.Foundation.UniversalApiContract, 1.0),
+                exclusiveto(Windows.Media.SpeechSynthesis.SpeechSynthesizer),
+                uuid(ce9f7c76-97f4-4ced-ad68-d51c458e45c6)
+            ]
+            interface ISpeechSynthesizer : IInspectable
+            {
+                HRESULT SynthesizeTextToStreamAsync([in] HSTRING text, [out] IUnknown **operation);
+                HRESULT SynthesizeSsmlToStreamAsync([in] HSTRING Ssml, [out] IUnknown **operation);
+                [propput] HRESULT Voice(VoiceInformation *value);
+                [propget] HRESULT Voice(VoiceInformation **value);
+            }
+
+            [
+                contract(Windows.Foundation.UniversalApiContract, 1.0),
                 exclusiveto(Windows.Media.SpeechSynthesis.VoiceInformation),
                 uuid(b127d6a4-1291-4604-aa9c-83134083352c)
             ]
