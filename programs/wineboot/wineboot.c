@@ -243,7 +243,7 @@ static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
     TRACE("XSAVE feature 2 %#x, %#x, %#x, %#x.\n", regs[0], regs[1], regs[2], regs[3]);
 }
 
-static UINT64 read_tsc_frequency(BOOL use_rdtscp)
+static UINT64 read_tsc_frequency(void)
 {
     UINT64 freq = 0;
 
@@ -287,30 +287,16 @@ static UINT64 read_tsc_frequency(BOOL use_rdtscp)
         LONGLONG time0, time1, tsc0, tsc1, tsc2, tsc3, freq0, freq1, error;
         unsigned int aux;
         UINT retries = 50;
-        int regs[4];
 
         do
         {
-            if (use_rdtscp)
-            {
-                tsc0 = __rdtscp(&aux);
-                time0 = RtlGetSystemTimePrecise();
-                tsc1 = __rdtscp(&aux);
-                Sleep(1);
-                tsc2 = __rdtscp(&aux);
-                time1 = RtlGetSystemTimePrecise();
-                tsc3 = __rdtscp(&aux);
-            }
-            else
-            {
-                tsc0 = __rdtsc(); __cpuid(regs, 0);
-                time0 = RtlGetSystemTimePrecise();
-                tsc1 = __rdtsc(); __cpuid(regs, 0);
-                Sleep(1);
-                tsc2 = __rdtsc(); __cpuid(regs, 0);
-                time1 = RtlGetSystemTimePrecise();
-                tsc3 = __rdtsc(); __cpuid(regs, 0);
-            }
+            tsc0 = __rdtscp(&aux);
+            time0 = RtlGetSystemTimePrecise();
+            tsc1 = __rdtscp(&aux);
+            Sleep(1);
+            tsc2 = __rdtscp(&aux);
+            time1 = RtlGetSystemTimePrecise();
+            tsc3 = __rdtscp(&aux);
 
             freq0 = (tsc2 - tsc0) * 10000000 / (time1 - time0);
             freq1 = (tsc3 - tsc1) * 10000000 / (time1 - time0);
@@ -353,7 +339,7 @@ static BOOL is_tsc_trusted_by_the_kernel(void)
     return ret;
 }
 
-static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data, UINT64 *tsc_frequency)
+static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data, UINT64 tsc_frequency)
 {
     int regs[4];
 
@@ -402,9 +388,7 @@ static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data, UINT64 *tsc
     else
         data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_MFENCE;
 
-    *tsc_frequency = read_tsc_frequency((regs[3] & (1 << 27)) != 0);
-
-    if ((data->QpcFrequency = (*tsc_frequency >> 10)))
+    if ((data->QpcFrequency = (tsc_frequency >> 10)))
     {
         data->QpcShift = 10;
         data->QpcBias = 0;
@@ -426,13 +410,12 @@ static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
 {
 }
 
-static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data, UINT64 *tsc_frequency)
+static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
 {
     data->QpcBypassEnabled = 0;
     data->QpcFrequency = TICKSPERSEC;
     data->QpcShift = 0;
     data->QpcBias = 0;
-    *tsc_frequency = 0;
 }
 
 #endif
@@ -495,7 +478,7 @@ static void create_hypervisor_shared_data(UINT64 tsc_frequency)
     hypervisor_shared_data->QpcMultiplier = 0;
     hypervisor_shared_data->QpcBias = 0;
 
-    if ((user_shared_data->QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_ENABLED) && tsc_frequency)
+    if (user_shared_data->QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_ENABLED)
     {
         hypervisor_shared_data->QpcMultiplier = muldiv_tsc((UINT64)5000 << 32, (UINT64)2000 << 32, tsc_frequency);
         user_shared_data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_HV_PAGE;
@@ -512,7 +495,7 @@ static void create_hypervisor_shared_data(UINT64 tsc_frequency)
     UnmapViewOfFile( hypervisor_shared_data );
 }
 
-static void create_user_shared_data(UINT64 *tsc_frequency)
+static void create_user_shared_data(UINT64 tsc_frequency)
 {
     struct _KUSER_SHARED_DATA *data;
     RTL_OSVERSIONINFOEXW version;
@@ -987,7 +970,6 @@ static void create_hardware_registry_keys(UINT64 tsc_frequency)
                               KEY_ALL_ACCESS, NULL, &hkey, NULL ))
         {
             DWORD tsc_freq_mhz = (DWORD)(tsc_frequency / 1000000ull); /* Hz -> Mhz */
-            if (!tsc_freq_mhz) tsc_freq_mhz = power_info[i].MaxMhz;
 
             RegSetValueExW( hkey, L"FeatureSet", 0, REG_DWORD, (BYTE *)&sci.FeatureSet, sizeof(DWORD) );
             set_reg_value( hkey, L"Identifier", id );
@@ -1947,9 +1929,11 @@ int __cdecl main( int argc, char *argv[] )
     BOOL end_session, force, init, kill, restart, shutdown, update;
     HANDLE event;
     OBJECT_ATTRIBUTES attr;
-    UINT64 tsc_frequency = 0;
+    UINT64 tsc_frequency;
     UNICODE_STRING nameW;
     BOOL is_wow64;
+
+    tsc_frequency = read_tsc_frequency();
 
     end_session = force = init = kill = restart = shutdown = update = FALSE;
     GetWindowsDirectoryW( windowsdir, MAX_PATH );
@@ -2033,7 +2017,7 @@ int __cdecl main( int argc, char *argv[] )
 
     ResetEvent( event );  /* in case this is a restart */
 
-    create_user_shared_data(&tsc_frequency);
+    create_user_shared_data(tsc_frequency);
     create_hypervisor_shared_data(tsc_frequency);
     create_hardware_registry_keys(tsc_frequency);
     create_dynamic_registry_keys();
