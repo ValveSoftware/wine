@@ -161,6 +161,8 @@ static ULONG WINAPI mf_decoder_Release(IMFTransform *iface)
         {
             /* NULL wg_parser is possible if the wg_parser creation failed. */
 
+            unix_funcs->wg_parser_disconnect(decoder->wg_parser);
+
             EnterCriticalSection(&decoder->event_cs);
             decoder->helper_thread_shutdown = TRUE;
             WakeAllConditionVariable(&decoder->event_cv);
@@ -169,9 +171,6 @@ static ULONG WINAPI mf_decoder_Release(IMFTransform *iface)
             EnterCriticalSection(&decoder->help_cs);
             WakeAllConditionVariable(&decoder->help_cv);
             LeaveCriticalSection(&decoder->help_cs);
-
-            if (decoder->wg_stream)
-                unix_funcs->wg_parser_disconnect(decoder->wg_parser);
 
             if (WaitForSingleObject(decoder->helper_thread, 10000) != WAIT_OBJECT_0)
                 FIXME("Failed waiting for helper thread to terminate.\n");
