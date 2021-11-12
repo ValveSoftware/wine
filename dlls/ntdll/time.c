@@ -389,7 +389,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceCounter( LARGE_INTEGER *counter
  */
 BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceFrequency( LARGE_INTEGER *frequency )
 {
-    frequency->QuadPart = user_shared_data->QpcFrequency;
+    frequency->QuadPart = TICKSPERSEC;
     return TRUE;
 }
 
