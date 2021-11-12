@@ -245,98 +245,10 @@ static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
 
 static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
 {
-    int regs[4], cpuid_level, denom, numer, freq, tmp;
-
-    if (data->QpcBypassEnabled) return;
-
     data->QpcBypassEnabled = 0;
     data->QpcFrequency = TICKSPERSEC;
     data->QpcShift = 0;
     data->QpcBias = 0;
-
-    if (!data->ProcessorFeatures[PF_RDTSC_INSTRUCTION_AVAILABLE])
-    {
-        WARN("No RDTSC support, disabling QpcBypass\n");
-        return;
-    }
-
-    __cpuid(regs, 0x80000000);
-    if (regs[0] < 0x80000007)
-    {
-        WARN("Unable to check invariant TSC, disabling QpcBypass\n");
-        return;
-    }
-
-    /* check for invariant tsc bit */
-    __cpuid(regs, 0x80000007);
-    if (!(regs[3] & (1 << 8)))
-    {
-        WARN("No invariant TSC, disabling QpcBypass\n");
-        return;
-    }
-    data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_ENABLED;
-
-    /* check for rdtscp support bit */
-    __cpuid(regs, 0x80000001);
-    if ((regs[3] & (1 << 27)))
-        data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_RDTSCP;
-    else if (data->ProcessorFeatures[PF_XMMI64_INSTRUCTIONS_AVAILABLE])
-        data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_LFENCE;
-    else
-        data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_MFENCE;
-
-    __cpuid(regs, 0);
-    tmp = regs[2];
-    regs[2] = regs[3];
-    regs[3] = tmp;
-
-    data->QpcFrequency = 0;
-
-    if (!data->QpcFrequency)
-    {
-        LONGLONG time0, time1, tsc0, tsc1, tsc2, tsc3, freq0, freq1, error;
-        unsigned int aux;
-        UINT retries = 50;
-
-        data->QpcShift = 0;
-        data->QpcBias = 0;
-
-        do
-        {
-            tsc0 = __rdtscp(&aux);
-            time0 = RtlGetSystemTimePrecise();
-            tsc1 = __rdtscp(&aux);
-            Sleep(1);
-            tsc2 = __rdtscp(&aux);
-            time1 = RtlGetSystemTimePrecise();
-            tsc3 = __rdtscp(&aux);
-
-            freq0 = (tsc2 - tsc0) * 10000000 / (time1 - time0);
-            freq1 = (tsc3 - tsc1) * 10000000 / (time1 - time0);
-            error = llabs((freq1 - freq0) * 1000000 / min(freq1, freq0));
-        }
-        while (error > 100 && retries--);
-
-        if (!retries) WARN("TSC frequency calibration failed, unstable TSC?\n");
-        else
-        {
-            data->QpcFrequency = (freq0 + freq1 + (1 << 10) - 1) >> 11;
-            data->QpcShift = 10;
-            data->QpcBias = 0;
-
-            TRACE("TSC frequency calibration complete, freq %I64d, shift %d, bias %I64d\n",
-                  data->QpcFrequency, data->QpcShift, data->QpcBias);
-        }
-    }
-
-    if (!data->QpcFrequency)
-    {
-        WARN("Unable to calibrate TSC frequency, disabling QpcBypass.\n");
-        data->QpcBypassEnabled = 0;
-        data->QpcFrequency = TICKSPERSEC;
-        data->QpcShift = 0;
-        data->QpcBias = 0;
-    }
 }
 
 #else
