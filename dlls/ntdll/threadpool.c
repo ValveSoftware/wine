@@ -592,10 +592,8 @@ static DWORD WINAPI timer_callback_wrapper(LPVOID p)
 
 static inline ULONGLONG queue_current_time(void)
 {
-    static LARGE_INTEGER freq;
-    LARGE_INTEGER now;
-    if (!freq.QuadPart) RtlQueryPerformanceFrequency(&freq);
-    RtlQueryPerformanceCounter(&now);
+    LARGE_INTEGER now, freq;
+    NtQueryPerformanceCounter(&now, &freq);
     return now.QuadPart * 1000 / freq.QuadPart;
 }
 
