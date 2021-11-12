@@ -4237,6 +4237,7 @@ HKCU,Software\Wine\AppDefaults\ShadowOfWar.exe\DllOverrides,"amd_ags_x64",,""
 HKCU,Software\Wine\AppDefaults\DIRT5.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\Nickelodeon All-Star Brawl.exe\DllOverrides,"winusb",,"disabled"
 HKCU,Software\Wine\AppDefaults\gotg.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\RelicCardinal.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\msedgewebview2.exe,"Version",,"win81"
 HKCU,Software\Wine\AppDefaults\ForzaHorizon5.exe\DllOverrides,"amd_ags_x64",0x2,"builtin"
 ;;Likely want *80 and *90 too, but those require removing Wine's manifest files.
