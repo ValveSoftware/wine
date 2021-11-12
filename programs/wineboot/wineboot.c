@@ -315,30 +315,6 @@ static UINT64 read_tsc_frequency(void)
     return freq;
 }
 
-static BOOL is_tsc_trusted_by_the_kernel(void)
-{
-    char buf[4] = {};
-    DWORD num_read;
-    HANDLE handle;
-    BOOL ret = TRUE;
-
-    handle = CreateFileA( "\\??\\unix\\sys\\bus\\clocksource\\devices\\clocksource0\\current_clocksource",
-                          GENERIC_READ, FILE_SHARE_READ, NULL, OPEN_EXISTING, 0, 0 );
-
-    if (handle == INVALID_HANDLE_VALUE)
-        return TRUE;
-
-    if (ReadFile( handle, buf, sizeof(buf)-1, &num_read, NULL ))
-    {
-        if (!!strcmp( "tsc", buf ))
-            ret = FALSE;
-    }
-
-    CloseHandle( handle );
-
-    return ret;
-}
-
 static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
 {
     int regs[4];
@@ -370,13 +346,6 @@ static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
         WARN("No invariant TSC, disabling QpcBypass\n");
         return;
     }
-
-    if (!is_tsc_trusted_by_the_kernel())
-    {
-        WARN("TSC is not trusted by the kernel, disabling QpcBypass.\n");
-        return;
-    }
-
     data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_ENABLED;
 
     /* check for rdtscp support bit */
