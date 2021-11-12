@@ -969,15 +969,12 @@ static void create_hardware_registry_keys(void)
         if (!RegCreateKeyExW( cpu_key, numW, 0, NULL, REG_OPTION_VOLATILE,
                               KEY_ALL_ACCESS, NULL, &hkey, NULL ))
         {
-            UINT64 tsc_freq = read_tsc_frequency(); /* Hz */
-            DWORD tsc_freq_mhz = (DWORD)(tsc_freq / 1000000ull);
-
             RegSetValueExW( hkey, L"FeatureSet", 0, REG_DWORD, (BYTE *)&sci.FeatureSet, sizeof(DWORD) );
             set_reg_value( hkey, L"Identifier", id );
             /* TODO: report ARM properly */
             set_reg_value( hkey, L"ProcessorNameString", namestr );
             set_reg_value( hkey, L"VendorIdentifier", vendorid );
-            RegSetValueExW( hkey, L"~MHz", 0, REG_DWORD, (BYTE *)&tsc_freq_mhz, sizeof(DWORD) );
+            RegSetValueExW( hkey, L"~MHz", 0, REG_DWORD, (BYTE *)&power_info[i].MaxMhz, sizeof(DWORD) );
             RegCloseKey( hkey );
         }
         if (sci.Architecture != PROCESSOR_ARCHITECTURE_ARM &&
