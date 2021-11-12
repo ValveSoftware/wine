@@ -94,9 +94,6 @@
 #ifdef HAVE_SYS_SYSCALL_H
 #include <sys/syscall.h>
 #endif
-#if defined(__i386__) || defined(__x86_64__)
-#include <x86intrin.h>
-#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -409,26 +406,6 @@ static const int user_shared_data_timeout = 16;
 static void set_user_shared_data_time(void)
 {
     timeout_t tick_count = monotonic_time / 10000;
-    unsigned __int64 tsc, qpc_bias, qpc_freq = user_shared_data->QpcFrequency;
-    unsigned int aux, qpc_shift = user_shared_data->QpcShift;
-    unsigned int qpc_bypass = user_shared_data->QpcBypassEnabled;
-
-    if (!(qpc_bypass & SHARED_GLOBAL_FLAGS_QPC_BYPASS_ENABLED))
-        tsc = 0;
-#if defined(__i386__) || defined(__x86_64__)
-    else if (qpc_bypass & SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_RDTSCP)
-        tsc = __rdtscp(&aux);
-    else
-    {
-        if (qpc_bypass & SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_MFENCE)
-            __asm__ __volatile__ ( "mfence" : : : "memory" );
-        if (qpc_bypass & SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_LFENCE)
-            __asm__ __volatile__ ( "lfence" : : : "memory" );
-        tsc = __rdtsc();
-    }
-#endif
-
-    qpc_bias = ((monotonic_time * qpc_freq / 10000000) << qpc_shift) - tsc;
 
     /* on X86 there should be total store order guarantees, so volatile is enough
      * to ensure the stores aren't reordered by the compiler, and then they will
@@ -447,7 +424,6 @@ static void set_user_shared_data_time(void)
     user_shared_data->TickCount.LowPart   = tick_count;
     user_shared_data->TickCount.High1Time = tick_count >> 32;
     *(volatile ULONG *)&user_shared_data->TickCountLowDeprecated = tick_count;
-    user_shared_data->QpcBias = qpc_bias;
 #else
     __atomic_store_n(&user_shared_data->SystemTime.High2Time, current_time >> 32, __ATOMIC_SEQ_CST);
     __atomic_store_n(&user_shared_data->SystemTime.LowPart, current_time, __ATOMIC_SEQ_CST);
@@ -461,7 +437,6 @@ static void set_user_shared_data_time(void)
     __atomic_store_n(&user_shared_data->TickCount.LowPart, tick_count, __ATOMIC_SEQ_CST);
     __atomic_store_n(&user_shared_data->TickCount.High1Time, tick_count >> 32, __ATOMIC_SEQ_CST);
     __atomic_store_n(&user_shared_data->TickCountLowDeprecated, tick_count, __ATOMIC_SEQ_CST);
-    __atomic_store_n(&user_shared_data->QpcBias, qpc_bias, __ATOMIC_SEQ_CST);
 #endif
 }
 
