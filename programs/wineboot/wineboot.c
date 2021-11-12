@@ -243,81 +243,9 @@ static void initialize_xstate_features(struct _KUSER_SHARED_DATA *data)
     TRACE("XSAVE feature 2 %#x, %#x, %#x, %#x.\n", regs[0], regs[1], regs[2], regs[3]);
 }
 
-static UINT64 read_tsc_frequency(void)
-{
-    UINT64 freq = 0;
-
-/* FIXME: Intel provides TSC freq in some CPUID but it's been slightly broken,
-   fix it properly and test it on real Intel hardware */
-
-#if 0
-    int regs[4], cpuid_level, tmp;
-    UINT64 denom, numer;
-
-    __cpuid(regs, 0);
-    tmp = regs[2];
-    regs[2] = regs[3];
-    regs[3] = tmp;
-
-    /* only available on some intel CPUs */
-    if (memcmp(regs + 1, "GenuineIntel", 12)) freq = 0;
-    else if ((cpuid_level = regs[0]) < 0x15) freq = 0;
-    else
-    {
-        __cpuid(regs, 0x15);
-        if (!(denom = regs[0]) || !(numer = regs[1])) freq = 0;
-        else
-        {
-            if ((freq = regs[2])) freq = freq * numer / denom;
-            else if (cpuid_level >= 0x16)
-            {
-                __cpuid(regs, 0x16); /* eax is base freq in MHz */
-                freq = regs[0] * (UINT64)1000000;
-            }
-            else freq = 0;
-        }
-
-        if (!freq) WARN("Failed to read TSC frequency from CPUID, falling back to calibration.\n");
-        else TRACE("TSC frequency read from CPUID, found %I64u Hz\n", freq);
-    }
-#endif
-
-    if (freq == 0)
-    {
-        LONGLONG time0, time1, tsc0, tsc1, tsc2, tsc3, freq0, freq1, error;
-        unsigned int aux;
-        UINT retries = 50;
-
-        do
-        {
-            tsc0 = __rdtscp(&aux);
-            time0 = RtlGetSystemTimePrecise();
-            tsc1 = __rdtscp(&aux);
-            Sleep(1);
-            tsc2 = __rdtscp(&aux);
-            time1 = RtlGetSystemTimePrecise();
-            tsc3 = __rdtscp(&aux);
-
-            freq0 = (tsc2 - tsc0) * 10000000 / (time1 - time0);
-            freq1 = (tsc3 - tsc1) * 10000000 / (time1 - time0);
-            error = llabs((freq1 - freq0) * 1000000 / min(freq1, freq0));
-        }
-        while (error > 100 && retries--);
-
-        if (!retries) WARN("TSC frequency calibration failed, unstable TSC?\n");
-        else
-        {
-            freq = (freq0 + freq1) / 2;
-            TRACE("TSC frequency calibration complete, found %I64u Hz\n", freq);
-        }
-    }
-
-    return freq;
-}
-
 static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
 {
-    int regs[4];
+    int regs[4], cpuid_level, denom, numer, freq, tmp;
 
     if (data->QpcBypassEnabled) return;
 
@@ -357,10 +285,48 @@ static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
     else
         data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_MFENCE;
 
-    if ((data->QpcFrequency = (read_tsc_frequency() >> 10)))
+    __cpuid(regs, 0);
+    tmp = regs[2];
+    regs[2] = regs[3];
+    regs[3] = tmp;
+
+    data->QpcFrequency = 0;
+
+    if (!data->QpcFrequency)
     {
-        data->QpcShift = 10;
+        LONGLONG time0, time1, tsc0, tsc1, tsc2, tsc3, freq0, freq1, error;
+        unsigned int aux;
+        UINT retries = 50;
+
+        data->QpcShift = 0;
         data->QpcBias = 0;
+
+        do
+        {
+            tsc0 = __rdtscp(&aux);
+            time0 = RtlGetSystemTimePrecise();
+            tsc1 = __rdtscp(&aux);
+            Sleep(1);
+            tsc2 = __rdtscp(&aux);
+            time1 = RtlGetSystemTimePrecise();
+            tsc3 = __rdtscp(&aux);
+
+            freq0 = (tsc2 - tsc0) * 10000000 / (time1 - time0);
+            freq1 = (tsc3 - tsc1) * 10000000 / (time1 - time0);
+            error = llabs((freq1 - freq0) * 1000000 / min(freq1, freq0));
+        }
+        while (error > 100 && retries--);
+
+        if (!retries) WARN("TSC frequency calibration failed, unstable TSC?\n");
+        else
+        {
+            data->QpcFrequency = (freq0 + freq1 + (1 << 10) - 1) >> 11;
+            data->QpcShift = 10;
+            data->QpcBias = 0;
+
+            TRACE("TSC frequency calibration complete, freq %I64d, shift %d, bias %I64d\n",
+                  data->QpcFrequency, data->QpcShift, data->QpcBias);
+        }
     }
 
     if (!data->QpcFrequency)
@@ -388,81 +354,6 @@ static void initialize_qpc_features(struct _KUSER_SHARED_DATA *data)
 }
 
 #endif
-
-struct hypervisor_shared_data
-{
-    UINT64 unknown;
-    UINT64 QpcMultiplier;
-    UINT64 QpcBias;
-};
-
-static UINT64 muldiv_tsc(UINT64 a, UINT64 b, UINT64 c)
-{
-    UINT64 ka = a / c, ra = a % c, kb = b / c, rb = b % c;
-    return ka * kb * c + kb * ra + ka * rb + (ra * rb + c / 2) / c;
-}
-
-static void create_hypervisor_shared_data(void)
-{
-    struct _KUSER_SHARED_DATA *user_shared_data = (void *)0x7ffe0000;
-    struct hypervisor_shared_data *hypervisor_shared_data;
-    OBJECT_ATTRIBUTES attr = {sizeof(attr)};
-    UNICODE_STRING name;
-    NTSTATUS status;
-    HANDLE handle;
-
-    RtlInitUnicodeString( &name, L"\\KernelObjects\\__wine_hypervisor_shared_data" );
-    InitializeObjectAttributes( &attr, &name, OBJ_OPENIF, NULL, NULL );
-    if ((status = NtOpenSection( &handle, SECTION_ALL_ACCESS, &attr )))
-    {
-        ERR( "cannot open __wine_hypervisor_shared_data: %x\n", status );
-        return;
-    }
-    hypervisor_shared_data = MapViewOfFile( handle, FILE_MAP_WRITE, 0, 0, sizeof(*hypervisor_shared_data) );
-    CloseHandle( handle );
-    if (!hypervisor_shared_data)
-    {
-        ERR( "cannot map __wine_hypervisor_shared_data\n" );
-        return;
-    }
-
-    RtlInitUnicodeString( &name, L"\\KernelObjects\\__wine_user_shared_data" );
-    InitializeObjectAttributes( &attr, &name, OBJ_OPENIF, NULL, NULL );
-    if ((status = NtOpenSection( &handle, SECTION_ALL_ACCESS, &attr )))
-    {
-        ERR( "cannot open __wine_user_shared_data: %x\n", status );
-        UnmapViewOfFile( hypervisor_shared_data );
-        return;
-    }
-    user_shared_data = MapViewOfFile( handle, FILE_MAP_WRITE, 0, 0, sizeof(*user_shared_data) );
-    CloseHandle( handle );
-    if (!user_shared_data)
-    {
-        ERR( "cannot map __wine_user_shared_data\n" );
-        UnmapViewOfFile( hypervisor_shared_data );
-        return;
-    }
-
-    hypervisor_shared_data->unknown = 0;
-    hypervisor_shared_data->QpcMultiplier = 0;
-    hypervisor_shared_data->QpcBias = 0;
-
-    if (user_shared_data->QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_ENABLED)
-    {
-        hypervisor_shared_data->QpcMultiplier = muldiv_tsc((UINT64)5000 << 32, (UINT64)2000 << 32, read_tsc_frequency());
-        user_shared_data->QpcBypassEnabled |= SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_HV_PAGE;
-        user_shared_data->QpcInterruptTimeIncrement = (ULONGLONG)1 << 63;
-        user_shared_data->QpcInterruptTimeIncrementShift = 1;
-        user_shared_data->QpcSystemTimeIncrement = (ULONGLONG)1 << 63;
-        user_shared_data->QpcSystemTimeIncrementShift = 1;
-        user_shared_data->QpcFrequency = 10000000;
-        user_shared_data->QpcShift = 0;
-        user_shared_data->QpcBias = 0;
-    }
-
-    UnmapViewOfFile( user_shared_data );
-    UnmapViewOfFile( hypervisor_shared_data );
-}
 
 static void create_user_shared_data(void)
 {
@@ -1982,7 +1873,6 @@ int __cdecl main( int argc, char *argv[] )
     ResetEvent( event );  /* in case this is a restart */
 
     create_user_shared_data();
-    create_hypervisor_shared_data();
     create_hardware_registry_keys();
     create_dynamic_registry_keys();
     create_environment_registry_keys();

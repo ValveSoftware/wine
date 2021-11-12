@@ -131,7 +131,6 @@ extern BOOL process_exiting DECLSPEC_HIDDEN;
 extern HANDLE keyed_event DECLSPEC_HIDDEN;
 extern timeout_t server_start_time DECLSPEC_HIDDEN;
 extern sigset_t server_block_set DECLSPEC_HIDDEN;
-extern void *hypervisor_shared_data DECLSPEC_HIDDEN;
 extern struct _KUSER_SHARED_DATA *user_shared_data DECLSPEC_HIDDEN;
 extern SYSTEM_CPU_INFORMATION cpu_info DECLSPEC_HIDDEN;
 #ifdef __i386__
@@ -196,7 +195,6 @@ extern NTSTATUS virtual_clear_tls_index( ULONG index ) DECLSPEC_HIDDEN;
 extern NTSTATUS virtual_alloc_thread_stack( INITIAL_TEB *stack, SIZE_T reserve_size, SIZE_T commit_size,
                                             SIZE_T *pthread_size ) DECLSPEC_HIDDEN;
 extern void virtual_map_user_shared_data(void) DECLSPEC_HIDDEN;
-extern void virtual_map_hypervisor_shared_data(void) DECLSPEC_HIDDEN;
 extern NTSTATUS virtual_handle_fault( void *addr, DWORD err, void *stack ) DECLSPEC_HIDDEN;
 extern unsigned int virtual_locked_server_call( void *req_ptr ) DECLSPEC_HIDDEN;
 extern ssize_t virtual_locked_read( int fd, void *addr, size_t size ) DECLSPEC_HIDDEN;

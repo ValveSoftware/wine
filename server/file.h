@@ -134,14 +134,6 @@ static inline struct fd *get_obj_fd( struct object *obj ) { return obj->ops->get
 struct timeout_user;
 extern timeout_t current_time;
 extern timeout_t monotonic_time;
-
-struct hypervisor_shared_data
-{
-    UINT64 unknown;
-    UINT64 QpcMultiplier;
-    UINT64 QpcBias;
-};
-extern struct hypervisor_shared_data *hypervisor_shared_data;
 extern struct _KUSER_SHARED_DATA *user_shared_data;
 
 #define TICKS_PER_SEC 10000000
@@ -196,8 +188,6 @@ extern struct mapping *create_fd_mapping( struct object *root, const struct unic
                                           unsigned int attr, const struct security_descriptor *sd );
 extern struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
                                                 unsigned int attr, const struct security_descriptor *sd );
-extern struct object *create_hypervisor_data_mapping( struct object *root, const struct unicode_str *name,
-                                                      unsigned int attr, const struct security_descriptor *sd );
 extern struct object *create_shared_mapping( struct object *root, const struct unicode_str *name,
                                              mem_size_t size, const struct security_descriptor *sd, void **ptr );
 

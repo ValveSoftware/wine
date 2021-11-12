@@ -376,14 +376,6 @@ LONGLONG WINAPI RtlGetSystemTimePrecise( void )
     return unix_funcs->RtlGetSystemTimePrecise();
 }
 
-/* 128-bit multiply a by b and return the high 64 bits, same as __umulh */
-static UINT64 multiply_tsc(UINT64 a, UINT64 b)
-{
-    UINT64 ah = a >> 32, al = (UINT32)a, bh = b >> 32, bl = (UINT32)b, m;
-    m = (ah * bl) + (bh * al) + ((al * bl) >> 32);
-    return (ah * bh) + (m >> 32);
-}
-
 /******************************************************************************
  *  RtlQueryPerformanceCounter   [NTDLL.@]
  */
@@ -404,9 +396,6 @@ BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceCounter( LARGE_INTEGER *counter
                 __asm__ __volatile__ ( "lfence" : : : "memory" );
             tsc = __rdtsc();
         }
-
-        if (user_shared_data->u3.QpcBypassEnabled & SHARED_GLOBAL_FLAGS_QPC_BYPASS_USE_HV_PAGE)
-            tsc = multiply_tsc(tsc, hypervisor_shared_data->QpcMultiplier) + hypervisor_shared_data->QpcBias;
 
         counter->QuadPart = (tsc + user_shared_data->QpcBias) >> user_shared_data->u3.QpcShift;
         return TRUE;
