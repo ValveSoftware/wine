@@ -358,6 +358,7 @@ BOOL CDECL X11DRV_create_desktop( UINT width, UINT height )
                          0, 0, width, height, 0, default_visual.depth, InputOutput, default_visual.visual,
                          CWEventMask | CWCursor | CWColormap, &win_attr );
     if (!win) return FALSE;
+    X11DRV_XInput2_Enable( display, win, win_attr.event_mask );
     if (!create_desktop_win_data( win )) return FALSE;
 
     X11DRV_init_desktop( win, width, height );
