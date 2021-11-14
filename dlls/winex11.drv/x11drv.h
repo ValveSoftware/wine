@@ -375,7 +375,6 @@ struct x11drv_thread_data
     HWND     clip_hwnd;            /* message window stored in desktop while clipping is active */
     DWORD    clip_reset;           /* time when clipping was last reset */
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
-    enum { xi_unavailable = -1, xi_unknown, xi_disabled, xi_enabled } xi2_state; /* XInput2 state */
     XIValuatorClassInfo x_valuator;
     XIValuatorClassInfo y_valuator;
     int      xi2_core_pointer;     /* XInput2 core pointer id */
