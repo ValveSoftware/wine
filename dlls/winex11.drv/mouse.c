@@ -264,14 +264,10 @@ void X11DRV_XInput2_Init(void)
 
     if (xinput2_available && pXIQueryVersion( data->display, &major, &minor ) == Success &&
         pXIGetClientPointer( data->display, None, &data->xi2_core_pointer ))
-    {
         TRACE( "XInput2 %d.%d available\n", major, minor );
-        data->xi2_state = xi_disabled;
-    }
     else
     {
         data->xi2_core_pointer = 0;
-        data->xi2_state = xi_unavailable;
         WARN( "XInput 2.1 not available\n" );
     }
 #endif
@@ -289,8 +285,6 @@ static void enable_xinput2(void)
     unsigned char mask_bits[XIMaskLen(XI_LASTEVENT)];
     int count;
 
-    if (data->xi2_state != xi_disabled) return;
-
     mask.mask     = mask_bits;
     mask.mask_len = sizeof(mask_bits);
     mask.deviceid = XIAllMasterDevices;
@@ -304,8 +298,6 @@ static void enable_xinput2(void)
     pointer_info = pXIQueryDevice( data->display, data->xi2_core_pointer, &count );
     update_relative_valuators( pointer_info->classes, pointer_info->num_classes );
     pXIFreeDeviceInfo( pointer_info );
-
-    data->xi2_state = xi_enabled;
 }
 
 #endif
@@ -318,11 +310,6 @@ static void disable_xinput2(void)
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
     struct x11drv_thread_data *data = x11drv_thread_data();
     XIEventMask mask;
-
-    if (data->xi2_state != xi_enabled) return;
-
-    TRACE( "disabling\n" );
-    data->xi2_state = xi_disabled;
 
     mask.mask = NULL;
     mask.mask_len = 0;
@@ -363,13 +350,6 @@ static BOOL grab_clipping_window( const RECT *clip )
 
     /* enable XInput2 unless we are already clipping */
     if (!data->clipping_cursor) enable_xinput2();
-
-    if (data->xi2_state != xi_enabled)
-    {
-        WARN( "XInput2 not supported, refusing to clip to %s\n", wine_dbgstr_rect(clip) );
-        NtUserClipCursor( NULL );
-        return TRUE;
-    }
 
     TRACE( "clipping to %s win %lx\n", wine_dbgstr_rect(clip), clip_window );
 
@@ -1682,7 +1662,6 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
 
     if (x->number < 0 || y->number < 0) return FALSE;
     if (!event->valuators.mask_len) return FALSE;
-    if (thread_data->xi2_state != xi_enabled) return FALSE;
     if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
 
     virtual_rect = NtUserGetVirtualScreenRect();

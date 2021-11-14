@@ -398,7 +398,6 @@ struct x11drv_thread_data
     Window   clip_window;          /* window used for cursor clipping */
     BOOL     clipping_cursor;      /* whether thread is currently clipping the cursor */
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
-    enum { xi_unavailable = -1, xi_unknown, xi_disabled, xi_enabled } xi2_state; /* XInput2 state */
     XIValuatorClassInfo x_valuator;
     XIValuatorClassInfo y_valuator;
     int      xi2_core_pointer;     /* XInput2 core pointer id */
