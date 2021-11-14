@@ -362,6 +362,7 @@ static void sync_window_style( struct x11drv_win_data *data )
         int mask = get_window_attributes( data, &attr );
 
         XChangeWindowAttributes( data->display, data->whole_window, mask, &attr );
+        X11DRV_XInput2_Enable( data->display, data->whole_window, attr.event_mask );
     }
 }
 
@@ -1658,6 +1659,7 @@ static void create_whole_window( struct x11drv_win_data *data )
                                         data->vis.visual, mask, &attr );
     if (!data->whole_window) goto done;
 
+    X11DRV_XInput2_Enable( data->display, data->whole_window, attr.event_mask );
     set_initial_wm_hints( data->display, data->whole_window );
     set_wm_hints( data );
 
@@ -1973,6 +1975,7 @@ BOOL X11DRV_CreateWindow( HWND hwnd )
         data->clip_window = XCreateWindow( data->display, root_window, 0, 0, 1, 1, 0, 0,
                                            InputOnly, default_visual.visual,
                                            CWOverrideRedirect | CWEventMask, &attr );
+        X11DRV_XInput2_Enable( data->display, data->clip_window, attr.event_mask );
         XFlush( data->display );
         NtUserSetProp( hwnd, clip_window_prop, (HANDLE)data->clip_window );
         X11DRV_DisplayDevices_RegisterEventHandlers();
