@@ -286,14 +286,15 @@ void X11DRV_XInput2_Init(void)
     struct x11drv_thread_data *data = x11drv_thread_data();
     int major = 2, minor = 1;
 
-    if (xinput2_available &&
-        !pXIQueryVersion( data->display, &major, &minor ))
+    if (xinput2_available && pXIQueryVersion( data->display, &major, &minor ) == Success &&
+        pXIGetClientPointer( data->display, None, &data->xi2_core_pointer ))
     {
         TRACE( "XInput2 %d.%d available\n", major, minor );
         data->xi2_state = xi_disabled;
     }
     else
     {
+        data->xi2_core_pointer = 0;
         data->xi2_state = xi_unavailable;
         WARN( "XInput 2.1 not available\n" );
     }
@@ -313,7 +314,6 @@ static void enable_xinput2(void)
     int count;
 
     if (data->xi2_state != xi_disabled) return;
-    if (!pXIGetClientPointer( data->display, None, &data->xi2_core_pointer )) return;
 
     mask.mask     = mask_bits;
     mask.mask_len = sizeof(mask_bits);
@@ -358,7 +358,6 @@ static void disable_xinput2(void)
     data->y_valuator.number = -1;
     data->x_valuator.value = 0;
     data->y_valuator.value = 0;
-    data->xi2_core_pointer = 0;
 #endif
 }
 
