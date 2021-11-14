@@ -238,6 +238,22 @@ static Bool filter_event( Display *display, XEvent *event, char *arg )
         return (mask & QS_MOUSEBUTTON) != 0;
 #ifdef GenericEvent
     case GenericEvent:
+#ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
+        if (event->xcookie.extension == xinput2_opcode)
+        {
+            switch (event->xcookie.evtype)
+            {
+            case XI_RawButtonPress:
+            case XI_RawButtonRelease:
+                return (mask & QS_MOUSEBUTTON) != 0;
+            case XI_RawMotion:
+                return (mask & QS_INPUT) != 0;
+            case XI_DeviceChanged:
+                return (mask & (QS_INPUT|QS_MOUSEBUTTON)) != 0;
+            }
+        }
+#endif
+        return (mask & QS_SENDMESSAGE) != 0;
 #endif
     case MotionNotify:
     case EnterNotify:
