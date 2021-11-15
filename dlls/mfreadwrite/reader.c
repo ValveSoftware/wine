@@ -1695,6 +1695,8 @@ static HRESULT source_reader_flush(struct source_reader *reader, unsigned int in
     return hr;
 }
 
+static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader, unsigned int index);
+
 static HRESULT WINAPI source_reader_async_commands_callback_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
 {
     struct source_reader *reader = impl_from_async_commands_callback_IMFAsyncCallback(iface);
@@ -1724,7 +1726,15 @@ static HRESULT WINAPI source_reader_async_commands_callback_Invoke(IMFAsyncCallb
                 {
                     stream = &reader->streams[stream_index];
 
-                    if (!(report_sample = source_reader_get_read_result(reader, stream, command->u.read.flags, &status,
+                    if (!stream->allocator)
+                    {
+                        hr = source_reader_setup_sample_allocator(reader, stream_index);
+
+                        if (FAILED(hr))
+                            WARN("Failed to setup the sample allocator, hr %#x.\n", hr);
+                    }
+
+                    if (SUCCEEDED(hr) && !(report_sample = source_reader_get_read_result(reader, stream, command->u.read.flags, &status,
                             &stream_index, &stream_flags, &timestamp, &sample)))
                     {
                         stream->requests++;
@@ -2385,8 +2395,12 @@ static HRESULT WINAPI src_reader_SetCurrentMediaType(IMFSourceReader *iface, DWO
         hr = source_reader_create_decoder_for_stream(reader, index, type);
     else if (hr == S_OK)
         hr = source_reader_add_passthrough_transform(reader, index, reader->streams[index].current);
-    if (SUCCEEDED(hr))
-        hr = source_reader_setup_sample_allocator(reader, index);
+
+    if (reader->streams[index].allocator)
+    {
+        IMFVideoSampleAllocatorEx_Release(reader->streams[index].allocator);
+        reader->streams[index].allocator = NULL;
+    }
 
     LeaveCriticalSection(&reader->cs);
 
@@ -2484,7 +2498,15 @@ static HRESULT source_reader_read_sample(struct source_reader *reader, DWORD ind
 
             stream = &reader->streams[stream_index];
 
-            if (!source_reader_get_read_result(reader, stream, flags, &hr, actual_index, stream_flags,
+            if (!stream->allocator)
+            {
+                hr = source_reader_setup_sample_allocator(reader, stream_index);
+
+                if (FAILED(hr))
+                    WARN("Failed to setup the sample allocator, hr %#x.\n", hr);
+            }
+
+            if (SUCCEEDED(hr) && !source_reader_get_read_result(reader, stream, flags, &hr, actual_index, stream_flags,
                    timestamp, sample))
             {
                 while (!source_reader_got_response_for_stream(reader, stream) && stream->state != STREAM_STATE_EOS)
