@@ -136,15 +136,15 @@ typedef struct ADLMemoryInfo
 } ADLMemoryInfo, *LPADLMemoryInfo;
 
 static const ADLVersionsInfo version = {
-    "20.10.1",
-    "20.10.1",
+    "21.20.01",
+    "21.20.01",
     "",
 };
 
 static const ADLVersionsInfoX2 version2 = {
-    "20.10.1",
-    "20.10.1",
-    "20.10.1",
+    "21.20.01",
+    "21.20.01",
+    "21.20.01",
     "",
 };
 
