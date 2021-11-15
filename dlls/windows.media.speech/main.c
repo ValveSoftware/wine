@@ -28,6 +28,7 @@
 
 #include "initguid.h"
 #include "activation.h"
+#include "asyncinfo.h"
 
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
@@ -45,6 +46,268 @@ static const char *debugstr_hstring(HSTRING hstr)
     str = WindowsGetStringRawBuffer(hstr, &len);
     return wine_dbgstr_wn(str, len);
 }
+
+static ISpeechSynthesisStream SpeechSynthesisDummyStream_iface;
+static IAsyncOperation_SpeechSynthesisStream AsyncOp_SpeechSynthDummyStream_iface;
+static IAsyncInfo AsyncInfoDummyStream_iface;
+
+/*
+ * IAsyncInfo interface for dummy stream.
+ */
+static HRESULT WINAPI async_info_dummy_stream_QueryInterface(IAsyncInfo *iface,
+        REFIID iid, void **out)
+{
+    FIXME("iface %p stub!\n", iface);
+    return IAsyncOperation_SpeechSynthesisStream_QueryInterface(&AsyncOp_SpeechSynthDummyStream_iface, iid, out);
+}
+
+static ULONG WINAPI async_info_dummy_stream_AddRef(IAsyncInfo *iface)
+{
+    FIXME("\n");
+    return 2;
+}
+
+static ULONG WINAPI async_info_dummy_stream_Release(IAsyncInfo *iface)
+{
+    FIXME("\n");
+    return 2;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_GetIids(IAsyncInfo *iface,
+        ULONG *iid_count, IID **iids)
+{
+    FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_GetRuntimeClassName(IAsyncInfo *iface,
+        HSTRING *class_name)
+{
+    FIXME("iface %p, class_name %p stub!\n", iface, class_name);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_GetTrustLevel(IAsyncInfo *iface,
+        TrustLevel *trust_level)
+{
+    FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_get_Id(IAsyncInfo *iface,
+        UINT32 *id)
+{
+    FIXME("iface %p, id %p stub!\n", iface, id);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_get_Status(IAsyncInfo *iface,
+        AsyncStatus *status)
+{
+    FIXME("iface %p, status %p stub!\n", iface, status);
+    *status = 0;
+    return S_OK;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_get_ErrorCode(IAsyncInfo *iface,
+        HRESULT *error_code)
+{
+    FIXME("iface %p, error code %p stub!\n", iface, error_code);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_Cancel(IAsyncInfo *iface)
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI async_info_dummy_stream_Close(IAsyncInfo *iface)
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static const IAsyncInfoVtbl async_info_dummy_stream_vtbl = {
+    async_info_dummy_stream_QueryInterface,
+    async_info_dummy_stream_AddRef,
+    async_info_dummy_stream_Release,
+    async_info_dummy_stream_GetIids,
+    async_info_dummy_stream_GetRuntimeClassName,
+    async_info_dummy_stream_GetTrustLevel,
+    async_info_dummy_stream_get_Id,
+    async_info_dummy_stream_get_Status,
+    async_info_dummy_stream_get_ErrorCode,
+    async_info_dummy_stream_Cancel,
+    async_info_dummy_stream_Close,
+};
+
+/*
+ * ISpeechSynthesisStream interface for dummy stream.
+ */
+static HRESULT WINAPI speech_synth_dummy_stream_QueryInterface(ISpeechSynthesisStream *iface,
+        REFIID iid, void **out)
+{
+    FIXME("iface %p stub!\n", iface);
+    return IAsyncOperation_SpeechSynthesisStream_QueryInterface(&AsyncOp_SpeechSynthDummyStream_iface, iid, out);
+}
+
+static ULONG WINAPI speech_synth_dummy_stream_AddRef(ISpeechSynthesisStream *iface)
+{
+    FIXME("\n");
+    return 2;
+}
+
+static ULONG WINAPI speech_synth_dummy_stream_Release(ISpeechSynthesisStream *iface)
+{
+    FIXME("\n");
+    return 1;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_GetIids(ISpeechSynthesisStream *iface,
+        ULONG *iid_count, IID **iids)
+{
+    FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_GetRuntimeClassName(ISpeechSynthesisStream *iface,
+        HSTRING *class_name)
+{
+    FIXME("iface %p, class_name %p stub!\n", iface, class_name);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_GetTrustLevel(ISpeechSynthesisStream *iface,
+        TrustLevel *trust_level)
+{
+    FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_get_Markers(ISpeechSynthesisStream *iface, IVectorView_IMediaMarker **value)
+{
+    FIXME("iface %p, value %p stub!\n", iface, value);
+
+    *value = NULL;
+
+    return S_OK;
+}
+
+static const ISpeechSynthesisStreamVtbl speech_synth_dummy_stream_vtbl = {
+    speech_synth_dummy_stream_QueryInterface,
+    speech_synth_dummy_stream_AddRef,
+    speech_synth_dummy_stream_Release,
+    speech_synth_dummy_stream_GetIids,
+    speech_synth_dummy_stream_GetRuntimeClassName,
+    speech_synth_dummy_stream_GetTrustLevel,
+    speech_synth_dummy_stream_get_Markers,
+};
+
+/*
+ * IAsyncOperation_SpeechSynthesisStream interface for dummy stream.
+ */
+static HRESULT WINAPI speech_synth_dummy_stream_async_op_QueryInterface(IAsyncOperation_SpeechSynthesisStream *iface,
+        REFIID iid, void **out)
+{
+    TRACE("iface %p, iid %s, out %p stub!\n", iface, debugstr_guid(iid), out);
+
+    if (IsEqualGUID(iid, &IID_IUnknown) ||
+        IsEqualGUID(iid, &IID_IInspectable) ||
+        IsEqualGUID(iid, &IID_IAgileObject))
+    {
+        IUnknown_AddRef(iface);
+        *out = iface;
+        return S_OK;
+    }
+
+    if (IsEqualGUID(iid, &IID_ISpeechSynthesisStream))
+    {
+        *out = &SpeechSynthesisDummyStream_iface;
+        return S_OK;
+    }
+
+    if (IsEqualGUID(iid, &IID_IAsyncInfo))
+    {
+        *out = &AsyncInfoDummyStream_iface;
+        return S_OK;
+    }
+
+    FIXME("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI speech_synth_dummy_stream_async_op_AddRef(IAsyncOperation_SpeechSynthesisStream *iface)
+{
+    FIXME("\n");
+    return 2;
+}
+
+static ULONG WINAPI speech_synth_dummy_stream_async_op_Release(IAsyncOperation_SpeechSynthesisStream *iface)
+{
+    FIXME("\n");
+    return 1;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_async_op_GetIids(IAsyncOperation_SpeechSynthesisStream *iface,
+        ULONG *iid_count, IID **iids)
+{
+    FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_async_op_GetRuntimeClassName(IAsyncOperation_SpeechSynthesisStream *iface,
+        HSTRING *class_name)
+{
+    FIXME("iface %p, class_name %p stub!\n", iface, class_name);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_async_op_GetTrustLevel(IAsyncOperation_SpeechSynthesisStream *iface,
+        TrustLevel *trust_level)
+{
+    FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_async_op_put_Completed(IAsyncOperation_SpeechSynthesisStream *iface,
+        IAsyncOperationCompletedHandler_SpeechSynthesisStream *handler)
+{
+    FIXME("iface %p, handler %p stub!\n", iface, handler);
+    return S_OK;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_async_op_get_Completed(IAsyncOperation_SpeechSynthesisStream *iface,
+        IAsyncOperationCompletedHandler_SpeechSynthesisStream **handler)
+{
+    FIXME("iface %p, handler %p stub!\n", iface, handler);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI speech_synth_dummy_stream_async_op_GetResults(IAsyncOperation_SpeechSynthesisStream *iface,
+        ISpeechSynthesisStream ***results)
+{
+    FIXME("iface %p, results %p stub!\n", iface, results);
+    **results = &SpeechSynthesisDummyStream_iface;
+    return S_OK;
+}
+
+static const IAsyncOperation_SpeechSynthesisStreamVtbl speech_synth_dummy_stream_async_op_vtbl = {
+    speech_synth_dummy_stream_async_op_QueryInterface,
+    speech_synth_dummy_stream_async_op_AddRef,
+    speech_synth_dummy_stream_async_op_Release,
+    speech_synth_dummy_stream_async_op_GetIids,
+    speech_synth_dummy_stream_async_op_GetRuntimeClassName,
+    speech_synth_dummy_stream_async_op_GetTrustLevel,
+    speech_synth_dummy_stream_async_op_put_Completed,
+    speech_synth_dummy_stream_async_op_get_Completed,
+    speech_synth_dummy_stream_async_op_GetResults,
+};
+
+static ISpeechSynthesisStream SpeechSynthesisDummyStream_iface = {&speech_synth_dummy_stream_vtbl};
+static IAsyncOperation_SpeechSynthesisStream SpeechSynthesisDummyStream_AsyncOp_iface = {&speech_synth_dummy_stream_async_op_vtbl};
+static IAsyncInfo AsyncInfoDummyStream_iface = {&async_info_dummy_stream_vtbl};
 
 struct voice_information_vector
 {
@@ -268,17 +531,21 @@ static HRESULT STDMETHODCALLTYPE speech_synthesizer_GetTrustLevel(
 static HRESULT STDMETHODCALLTYPE speech_synthesizer_SynthesizeTextToStreamAsync(ISpeechSynthesizer *iface,
         HSTRING text, IAsyncOperation_SpeechSynthesisStream **operation)
 {
-    FIXME("iface %p, text %p, operation %p stub.\n", iface, text, operation);
+    FIXME("iface %p, text %s, operation %p stub.\n", iface, debugstr_hstring(text), operation);
 
-    return E_NOTIMPL;
+    *operation = &SpeechSynthesisDummyStream_AsyncOp_iface;
+
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE speech_synthesizer_SynthesizeSsmlToStreamAsync(ISpeechSynthesizer *iface,
         HSTRING ssml, IAsyncOperation_SpeechSynthesisStream **operation)
 {
-    FIXME("iface %p, text %p, operation %p stub.\n", iface, ssml, operation);
+    FIXME("iface %p, text %s, operation %p stub.\n", iface, debugstr_hstring(ssml), operation);
 
-    return E_NOTIMPL;
+    *operation = &SpeechSynthesisDummyStream_AsyncOp_iface;
+
+    return S_OK;
 }
 
 static HRESULT STDMETHODCALLTYPE speech_synthesizer_put_Voice(ISpeechSynthesizer *iface, IVoiceInformation *value)
