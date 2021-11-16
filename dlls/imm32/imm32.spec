@@ -117,4 +117,3 @@
 @ stdcall __wine_get_ui_window(ptr)
 @ stdcall __wine_register_window(long)
 @ stdcall __wine_unregister_window(long)
-@ stdcall __wine_activate_window(long)
