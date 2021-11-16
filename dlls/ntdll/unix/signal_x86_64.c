@@ -2691,6 +2691,7 @@ static BOOL handle_syscall_fault( ucontext_t *sigcontext, EXCEPTION_RECORD *rec,
         R15_sig(sigcontext) = frame->r15;
         RSP_sig(sigcontext) = frame->rsp;
         RIP_sig(sigcontext) = frame->rip;
+        RCX_sig(sigcontext) = frame->rip;
         if (fpu) *fpu = get_syscall_xsave( frame )->xsave;
         amd64_thread_data()->syscall_frame = NULL;
     }
