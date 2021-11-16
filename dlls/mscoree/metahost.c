@@ -1687,6 +1687,44 @@ static MonoAssembly* mono_assembly_try_load(WCHAR *path)
     return result;
 }
 
+static BOOL compile_assembly(const char *source, const char *target, char *target_path, DWORD target_path_len)
+{
+    static const char *csc = "C:\\windows\\Microsoft.NET\\Framework\\v2.0.50727\\csc.exe";
+    char cmdline[2 * MAX_PATH + 74], tmp[MAX_PATH], tmpdir[MAX_PATH], source_path[MAX_PATH];
+    STARTUPINFOA si = {.cb = sizeof(STARTUPINFOA)};
+    PROCESS_INFORMATION pi;
+    HANDLE file;
+    DWORD size;
+    BOOL ret;
+    LUID id;
+
+    if (!PathFileExistsA(csc)) return FALSE;
+    if (!AllocateLocallyUniqueId(&id)) return FALSE;
+
+    GetTempPathA(MAX_PATH, tmp);
+    if (!GetTempFileNameA(tmp, "assembly", id.LowPart, tmpdir)) return FALSE;
+    if (!CreateDirectoryA(tmpdir, NULL)) return FALSE;
+
+    snprintf(source_path, MAX_PATH, "%s\\source.cs", tmpdir);
+    snprintf(target_path, target_path_len, "%s\\%s", tmpdir, target);
+
+    file = CreateFileA(source_path, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, 0);
+    if (file == INVALID_HANDLE_VALUE) return FALSE;
+    ret = WriteFile(file, source, strlen(source), &size, NULL);
+    CloseHandle(file);
+    if (!ret) return FALSE;
+
+    snprintf(cmdline, ARRAY_SIZE(cmdline), "%s /t:library /out:\"%s\" \"%s\"", csc, target_path, source_path);
+    ret = CreateProcessA(csc, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
+    if (!ret) return FALSE;
+
+    WaitForSingleObject(pi.hProcess, INFINITE);
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+
+    return PathFileExistsA(target_path);
+}
+
 static MonoAssembly* CDECL mono_assembly_preload_hook_fn(MonoAssemblyName *aname, char **assemblies_path, void *user_data)
 {
     HRESULT hr;
@@ -1783,6 +1821,30 @@ static MonoAssembly* CDECL mono_assembly_preload_hook_fn(MonoAssemblyName *aname
             {
                 ERR("Bannerlord.exe failed to load\n");
             }
+        }
+    }
+
+    if (!strcmp(assemblyname, "CameraQuakeViewer"))
+    {
+        /* HACK for Nights of Azure which references type from a non-existing DLL.
+         * Native .NET framework normally gets away with it but Mono cannot
+         * due to some deeply rooted differences. */
+        const char* sgi = getenv("SteamGameId");
+        if (sgi && !strcmp(sgi, "527280"))
+        {
+            char assembly_path[MAX_PATH];
+
+            FIXME("HACK: Building CameraQuakeViewer.dll\n");
+
+            if (compile_assembly("namespace CQViewer { class CQMgr {} }", "CameraQuakeViewer.dll", assembly_path, MAX_PATH))
+                result = mono_assembly_open(assembly_path, &stat);
+            else
+                ERR("HACK: Failed to build CameraQuakeViewer.dll\n");
+
+            if (result)
+                goto done;
+            else
+                ERR("HACK: Failed to load CameraQuakeViewer.dll\n");
         }
     }
 
