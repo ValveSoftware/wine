@@ -2808,12 +2808,12 @@ TEB *virtual_alloc_first_teb(void)
 
     NtAllocateVirtualMemory( NtCurrentProcess(), &teb_block, 0, &total,
                              MEM_RESERVE | MEM_TOP_DOWN, PAGE_READWRITE );
-    teb_block_pos = 30;
-    ptr = ((char *)teb_block + 30 * block_size);
-    teb = (TEB *)((char *)ptr + teb_offset);
-    peb = (PEB *)((char *)teb_block + 32 * block_size - peb_size);
-    NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&ptr, 0, &block_size, MEM_COMMIT, PAGE_READWRITE );
-    NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&peb, 0, &peb_size, MEM_COMMIT, PAGE_READWRITE );
+    teb_block_pos = 2;
+    ptr = (char *)teb_block;
+    data_size = 2 * block_size;
+    NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&ptr, 0, &data_size, MEM_COMMIT, PAGE_READWRITE );
+    teb = (TEB *)((char *)ptr + block_size + teb_offset);
+    peb = (PEB *)((char *)ptr + block_size - peb_size);
     init_teb( teb, peb );
     *(ULONG_PTR *)&peb->CloudFileFlags = get_image_address();
     return teb;
@@ -2840,7 +2840,7 @@ NTSTATUS virtual_alloc_teb( TEB **ret_teb )
     }
     else
     {
-        if (!teb_block_pos)
+        if (teb_block_pos == 32)
         {
             SIZE_T total = 32 * block_size;
 
@@ -2851,9 +2851,9 @@ NTSTATUS virtual_alloc_teb( TEB **ret_teb )
                 return status;
             }
             teb_block = ptr;
-            teb_block_pos = 32;
+            teb_block_pos = 0;
         }
-        ptr = ((char *)teb_block + --teb_block_pos * block_size);
+        ptr = ((char *)teb_block + teb_block_pos++ * block_size);
         NtAllocateVirtualMemory( NtCurrentProcess(), (void **)&ptr, 0, &block_size,
                                  MEM_COMMIT, PAGE_READWRITE );
     }
