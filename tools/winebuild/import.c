@@ -1678,6 +1678,9 @@ static void output_syscall_dispatcher( int count, const char *variant )
             output( "\txrstor64 (%%r12)\n" );
             output( "\tmovq %%r11,%%rax\n" );
         }
+
+        output( "\tmovq 8(%%rbp),%%rcx\n" );
+
         output( "\tmovq -0x30(%%rbp),%%r15\n" );
         output( "\tmovq -0x38(%%rbp),%%r14\n" );
         output( "\tmovq -0x40(%%rbp),%%r13\n" );
