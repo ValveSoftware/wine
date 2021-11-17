@@ -28,7 +28,11 @@
 
 #include "activation.h"
 
+#define WIDL_using_Windows_Foundation
+#define WIDL_using_Windows_Foundation_Collections
 #include "windows.foundation.h"
+#define WIDL_using_Windows_Security_ExchangeActiveSyncProvisioning
+#include "windows.security.exchangeactivesyncprovisioning.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(twinapi);
 
@@ -44,8 +48,14 @@ static const char *debugstr_hstring(HSTRING hstr)
 struct twinapi_appcore
 {
     IActivationFactory IActivationFactory_iface;
+    IEasClientDeviceInformation IEasClientDeviceInformation_iface;
     LONG ref;
 };
+
+static inline struct twinapi_appcore *impl_from_IEasClientDeviceInformation(IEasClientDeviceInformation *iface)
+{
+    return CONTAINING_RECORD(iface, struct twinapi_appcore, IEasClientDeviceInformation_iface);
+}
 
 static inline struct twinapi_appcore *impl_from_IActivationFactory(IActivationFactory *iface)
 {
@@ -55,6 +65,8 @@ static inline struct twinapi_appcore *impl_from_IActivationFactory(IActivationFa
 static HRESULT STDMETHODCALLTYPE twinapi_appcore_QueryInterface(
         IActivationFactory *iface, REFIID iid, void **out)
 {
+    struct twinapi_appcore *impl = impl_from_IActivationFactory(iface);
+
     TRACE("iface %p, iid %s, out %p stub!\n", iface, debugstr_guid(iid), out);
 
     if (IsEqualGUID(iid, &IID_IUnknown) ||
@@ -64,6 +76,13 @@ static HRESULT STDMETHODCALLTYPE twinapi_appcore_QueryInterface(
     {
         IUnknown_AddRef(iface);
         *out = iface;
+        return S_OK;
+    }
+
+    if (IsEqualGUID(iid, &IID_IEasClientDeviceInformation))
+    {
+        IUnknown_AddRef(iface);
+        *out = &impl->IEasClientDeviceInformation_iface;
         return S_OK;
     }
 
@@ -114,8 +133,12 @@ static HRESULT STDMETHODCALLTYPE twinapi_appcore_GetTrustLevel(
 static HRESULT STDMETHODCALLTYPE twinapi_appcore_ActivateInstance(
         IActivationFactory *iface, IInspectable **instance)
 {
-    FIXME("iface %p, instance %p stub!\n", iface, instance);
-    return E_NOTIMPL;
+    FIXME("iface %p, instance %p semi-stub!\n", iface, instance);
+
+    IActivationFactory_AddRef(iface);
+    *instance = (IInspectable *)iface;
+
+    return S_OK;
 }
 
 static const struct IActivationFactoryVtbl activation_factory_vtbl =
@@ -131,9 +154,124 @@ static const struct IActivationFactoryVtbl activation_factory_vtbl =
     twinapi_appcore_ActivateInstance,
 };
 
+static HRESULT WINAPI eas_client_devinfo_QueryInterface(IEasClientDeviceInformation *iface,
+        REFIID riid, void **ppvObject)
+{
+    struct twinapi_appcore *This = impl_from_IEasClientDeviceInformation(iface);
+    return twinapi_appcore_QueryInterface(&This->IActivationFactory_iface, riid, ppvObject);
+}
+
+static ULONG WINAPI eas_client_devinfo_AddRef(IEasClientDeviceInformation *iface)
+{
+    struct twinapi_appcore *This = impl_from_IEasClientDeviceInformation(iface);
+    return twinapi_appcore_AddRef(&This->IActivationFactory_iface);
+}
+
+static ULONG WINAPI eas_client_devinfo_Release(IEasClientDeviceInformation *iface)
+{
+    struct twinapi_appcore *This = impl_from_IEasClientDeviceInformation(iface);
+    return twinapi_appcore_Release(&This->IActivationFactory_iface);
+}
+
+static HRESULT WINAPI eas_client_devinfo_GetIids(IEasClientDeviceInformation *iface,
+        ULONG *iidCount, IID **iids)
+{
+    struct twinapi_appcore *This = impl_from_IEasClientDeviceInformation(iface);
+    return twinapi_appcore_GetIids(&This->IActivationFactory_iface, iidCount, iids);
+}
+
+static HRESULT WINAPI eas_client_devinfo_GetRuntimeClassName(IEasClientDeviceInformation *iface,
+        HSTRING *className)
+{
+    struct twinapi_appcore *This = impl_from_IEasClientDeviceInformation(iface);
+    return twinapi_appcore_GetRuntimeClassName(&This->IActivationFactory_iface, className);
+}
+
+static HRESULT WINAPI eas_client_devinfo_GetTrustLevel(IEasClientDeviceInformation *iface,
+        TrustLevel *trustLevel)
+{
+    struct twinapi_appcore *This = impl_from_IEasClientDeviceInformation(iface);
+    return twinapi_appcore_GetTrustLevel(&This->IActivationFactory_iface, trustLevel);
+}
+
+static HRESULT WINAPI eas_client_devinfo_get_Id(IEasClientDeviceInformation *iface, GUID* value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI eas_client_devinfo_get_OperatingSystem(IEasClientDeviceInformation *iface,
+        HSTRING* value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    WindowsCreateString(NULL, 0, value);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI eas_client_devinfo_get_FriendlyName(IEasClientDeviceInformation *iface,
+        HSTRING* value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    WindowsCreateString(NULL, 0, value);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI eas_client_devinfo_get_SystemManufacturer(IEasClientDeviceInformation *iface,
+        HSTRING* value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    WindowsCreateString(NULL, 0, value);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI eas_client_devinfo_get_SystemProductName(IEasClientDeviceInformation *iface,
+        HSTRING* value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    WindowsCreateString(NULL, 0, value);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI eas_client_devinfo_get_SystemSku(IEasClientDeviceInformation *iface,
+        HSTRING* value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    WindowsCreateString(NULL, 0, value);
+
+    return E_NOTIMPL;
+}
+
+static IEasClientDeviceInformationVtbl eas_client_devinfo_vtbl = {
+    eas_client_devinfo_QueryInterface,
+    eas_client_devinfo_AddRef,
+    eas_client_devinfo_Release,
+    /* IInspectable methods */
+    eas_client_devinfo_GetIids,
+    eas_client_devinfo_GetRuntimeClassName,
+    eas_client_devinfo_GetTrustLevel,
+    /* IEasClientDeviceInformation methods */
+    eas_client_devinfo_get_Id,
+    eas_client_devinfo_get_OperatingSystem,
+    eas_client_devinfo_get_FriendlyName,
+    eas_client_devinfo_get_SystemManufacturer,
+    eas_client_devinfo_get_SystemProductName,
+    eas_client_devinfo_get_SystemSku,
+};
+
 static struct twinapi_appcore twinapi_appcore =
 {
     {&activation_factory_vtbl},
+    {&eas_client_devinfo_vtbl},
     1
 };
 
