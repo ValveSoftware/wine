@@ -212,7 +212,7 @@ NTSTATUS WINAPI NtCreateThreadEx( HANDLE *handle, ACCESS_MASK access, OBJECT_ATT
     {
         req->process    = wine_server_obj_handle( process );
         req->access     = access;
-        req->suspend    = flags & THREAD_CREATE_FLAGS_CREATE_SUSPENDED;
+        req->flags      = flags;
         req->request_fd = request_pipe[0];
         wine_server_add_data( req, objattr, len );
         if (!(status = wine_server_call( req )))

@@ -994,7 +994,7 @@ NTSTATUS WINAPI NtCreateUserProcess( HANDLE *process_handle_ptr, HANDLE *thread_
     {
         req->process    = wine_server_obj_handle( process_handle );
         req->access     = thread_access;
-        req->suspend    = !!(thread_flags & THREAD_CREATE_FLAGS_CREATE_SUSPENDED);
+        req->flags      = thread_flags & THREAD_CREATE_FLAGS_CREATE_SUSPENDED;
         req->request_fd = -1;
         wine_server_add_data( req, objattr, attr_len );
         if (!(status = wine_server_call( req )))
