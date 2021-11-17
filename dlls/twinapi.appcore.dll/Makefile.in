@@ -1,0 +1,7 @@
+MODULE = twinapi.appcore.dll
+IMPORTS = combase
+
+EXTRADLLFLAGS = -mno-cygwin
+
+C_SRCS = \
+       main.c
