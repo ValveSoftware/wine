@@ -4,3 +4,5 @@ IMPORTS = combase
 
 C_SRCS = \
        main.c
+
+IDL_SRCS = classes.idl

@@ -815,6 +815,7 @@ SOURCES = \
 	windows.media.speechrecognition.idl \
 	windows.media.speechsynthesis.idl \
 	windows.security.cryptography.idl \
+	windows.security.exchangeactivesyncprovisioning.idl \
 	windows.storage.streams.idl \
 	windows.system.idl \
 	windows.system.power.idl \
