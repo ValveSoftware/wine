@@ -8907,13 +8907,10 @@ HRESULT WINAPI MFCreateDXGIDeviceManager(UINT *token, IMFDXGIDeviceManager **man
 
     TRACE("%p, %p.\n", token, manager);
 
-    /* Returning a device manager is known to break some games,
-       e.g. The Long Dark and Trailmakers. On the other hand, not
-       returning it breaks other games, e.g. CONTRA: ROGUE CORPS and
-       NieR Replicant. So we error out on all games except these last
-       two. This should be removed once CW bug #19126 is solved. */
-    if (sgi && !(strcmp(sgi, "1020540") == 0 || strcmp(sgi, "1113560") == 0 || strcmp(sgi, "1449280") == 0
-            || strcmp(sgi, "1240440") == 0))
+    /* Returning a DXGI device manager triggers a bug and breaks The
+     * Long Dark and Trailmakers. This should be removed once CW bug
+     * #19126 is solved. */
+    if (sgi && (strcmp(sgi, "305620") == 0 || strcmp(sgi, "585420") == 0))
     {
         FIXME("stubbing out\n");
         return E_NOTIMPL;
