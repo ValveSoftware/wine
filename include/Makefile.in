@@ -758,6 +758,7 @@ SOURCES = \
 	windows.h \
 	windows.media.devices.idl \
 	windows.media.speechsynthesis.idl \
+	windows.security.exchangeactivesyncprovisioning.idl \
 	windows.system.idl \
 	windows.system.userprofile.idl \
 	windowscontracts.idl \
