@@ -223,6 +223,7 @@ case $host in
   i[[3456789]]86*)
     enable_win16=${enable_win16:-yes}
     with_unwind=${with_unwind:-no}
+    AC_SUBST(XAUDIO_NATIVE_SWITCH,["-Wb,--prefer-native"])
     ;;
 esac
 
