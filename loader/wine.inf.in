@@ -4237,6 +4237,7 @@ HKCU,Software\Wine\AppDefaults\ShadowOfWar.exe\DllOverrides,"atiadlxx",,"builtin
 HKCU,Software\Wine\AppDefaults\ShadowOfWar.exe\DllOverrides,"amd_ags_x64",,""
 HKCU,Software\Wine\AppDefaults\DIRT5.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\Nickelodeon All-Star Brawl.exe\DllOverrides,"winusb",,"disabled"
+HKCU,Software\Wine\AppDefaults\Paradox Launcher.exe\DllOverrides,,4,
 HKCU,Software\Wine\AppDefaults\gotg.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\RelicCardinal.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\msedgewebview2.exe,"Version",,"win81"
