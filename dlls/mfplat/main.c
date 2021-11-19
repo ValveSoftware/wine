@@ -8912,7 +8912,8 @@ HRESULT WINAPI MFCreateDXGIDeviceManager(UINT *token, IMFDXGIDeviceManager **man
        returning it breaks other games, e.g. CONTRA: ROGUE CORPS and
        NieR Replicant. So we error out on all games except these last
        two. This should be removed once CW bug #19126 is solved. */
-    if (sgi && !(strcmp(sgi, "1020540") == 0 || strcmp(sgi, "1113560") == 0 || strcmp(sgi, "1449280") == 0))
+    if (sgi && !(strcmp(sgi, "1020540") == 0 || strcmp(sgi, "1113560") == 0 || strcmp(sgi, "1449280") == 0
+            || strcmp(sgi, "1240440") == 0))
     {
         FIXME("stubbing out\n");
         return E_NOTIMPL;
