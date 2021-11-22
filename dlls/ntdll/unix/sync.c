@@ -1988,7 +1988,7 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
         SERVER_START_REQ( remove_completion )
         {
             req->handle = wine_server_obj_handle( wait_handle );
-            req->alloc_wait_handle = wait_handle == handle;
+            req->alloc_wait_handle = wait_handle == handle && (!timeout || timeout->QuadPart != 0);
             if (!(status = wine_server_call( req )))
             {
                 *key            = reply->ckey;
@@ -2003,7 +2003,10 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
         }
         SERVER_END_REQ;
         if (status != STATUS_PENDING) goto exit;
-        status = NtWaitForSingleObject( wait_handle, FALSE, timeout );
+        if (wait_handle != handle)
+            status = NtWaitForSingleObject( wait_handle, FALSE, timeout );
+        else
+            status = STATUS_TIMEOUT;
         if (status != WAIT_OBJECT_0) goto exit;
     }
 
@@ -2034,7 +2037,7 @@ NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORM
             SERVER_START_REQ( remove_completion )
             {
                 req->handle = wine_server_obj_handle( wait_handle );
-                req->alloc_wait_handle = wait_handle == handle;
+                req->alloc_wait_handle = wait_handle == handle && (!timeout || timeout->QuadPart != 0);
                 if (!(status = wine_server_call( req )))
                 {
                     info[i].CompletionKey             = reply->ckey;
@@ -2056,7 +2059,12 @@ NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORM
             if (status == STATUS_PENDING) status = STATUS_SUCCESS;
             break;
         }
-        status = NtWaitForSingleObject( wait_handle, alertable, timeout );
+        if (wait_handle != handle)
+            status = NtWaitForSingleObject( wait_handle, alertable, timeout );
+        else if (alertable)
+            status = NtWaitForMultipleObjects( 0, NULL, TRUE, TRUE, timeout );
+        else
+            status = STATUS_TIMEOUT;
         if (status != WAIT_OBJECT_0) break;
     }
     *written = i ? i : 1;
