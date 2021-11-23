@@ -447,18 +447,22 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
 {
     XEvent event, prev_event;
     int count = 0;
-    BOOL queued = FALSE, overlay_enabled = FALSE;
+    BOOL queued = FALSE, overlay_enabled = FALSE, steam_keyboard_opened = FALSE;
     enum event_merge_action action = MERGE_DISCARD;
     ULONG_PTR overlay_filter = QS_KEY | QS_MOUSEBUTTON | QS_MOUSEMOVE;
+    ULONG_PTR keyboard_filter = QS_MOUSEBUTTON | QS_MOUSEMOVE;
 
     if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
         overlay_enabled = TRUE;
+    if (WaitForSingleObject(steam_keyboard_event, 0) == WAIT_OBJECT_0)
+        steam_keyboard_opened = TRUE;
 
     prev_event.type = 0;
     while (XCheckIfEvent( display, &event, filter, (char *)arg ))
     {
         count++;
         if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
+        if (steam_keyboard_opened && filter_event( display, &event, (char *)keyboard_filter )) continue;
         if (XFilterEvent( &event, None ))
         {
             /*
@@ -1459,9 +1463,11 @@ static int handle_gamescope_focused_app_error( Display *dpy, XErrorEvent *event,
 static void handle_gamescope_focused_app( XPropertyEvent *event )
 {
     static const char *sgi = NULL;
+    static BOOL steam_keyboard_opened;
 
     unsigned long count, remaining, *property;
     int format, app_id, focused_app_id;
+    BOOL keyboard_opened;
     Atom type;
 
     if (!sgi && !(sgi = getenv( "SteamGameId" ))) return;
@@ -1478,7 +1484,21 @@ static void handle_gamescope_focused_app( XPropertyEvent *event )
         XFree( property );
     }
 
+    keyboard_opened = app_id != focused_app_id;
+    if (steam_keyboard_opened == keyboard_opened) return;
+    steam_keyboard_opened = keyboard_opened;
+
     TRACE( "Got app id %u, focused app %u\n", app_id, focused_app_id );
+    if (keyboard_opened)
+    {
+        TRACE( "Steam Keyboard is opened, filtering events.\n" );
+        SetEvent( steam_keyboard_event );
+    }
+    else
+    {
+        TRACE( "Steam Keyboard is closed, stopping events filter.\n" );
+        ResetEvent( steam_keyboard_event );
+    }
 }
 
 /***********************************************************************
