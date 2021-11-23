@@ -90,6 +90,7 @@ int xfixes_event_base = 0;
 HMODULE x11drv_module = 0;
 char *process_name = NULL;
 HANDLE steam_overlay_event;
+HANDLE steam_keyboard_event;
 BOOL layered_window_client_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
@@ -834,9 +835,11 @@ BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
         x11drv_module = hinst;
         ret = process_attach();
         steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
+        steam_keyboard_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_KeyboardActivated");
         break;
     case DLL_PROCESS_DETACH:
         CloseHandle(steam_overlay_event);
+        CloseHandle(steam_keyboard_event);
         break;
     }
     return ret;

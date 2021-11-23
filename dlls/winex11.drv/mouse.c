@@ -1554,6 +1554,7 @@ BOOL CDECL X11DRV_GetCursorPos(LPPOINT pos)
     BOOL ret;
 
     if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0) return FALSE;
+    if (WaitForSingleObject(steam_keyboard_event, 0) == WAIT_OBJECT_0) return FALSE;
 
     ret = XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &winX, &winY, &xstate );
     if (ret)
