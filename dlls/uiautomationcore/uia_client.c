@@ -758,6 +758,79 @@ static void uia_create_bounding_rect_variant(double left, double top,
     V_ARRAY(arr_out) = lpsa;
 }
 
+struct uia_pattern_id_info {
+    PATTERNID pattern_id;
+    REFIID pattern_iid;
+};
+
+static const struct uia_pattern_id_info uia_pattern_ids[] = {
+    { UIA_AnnotationPatternId, &IID_IAnnotationProvider },
+    { UIA_CustomNavigationPatternId, &IID_ICustomNavigationProvider },
+    { UIA_DockPatternId, &IID_IDockProvider },
+    { UIA_DragPatternId, &IID_IDragProvider },
+    { UIA_DropTargetPatternId, &IID_IDropTargetProvider },
+    { UIA_ExpandCollapsePatternId, &IID_IExpandCollapseProvider },
+    { UIA_GridItemPatternId, &IID_IGridItemProvider },
+    { UIA_GridPatternId, &IID_IGridProvider },
+    { UIA_InvokePatternId, &IID_IInvokeProvider },
+    { UIA_ItemContainerPatternId, &IID_IItemContainerProvider },
+    { UIA_LegacyIAccessiblePatternId, &IID_ILegacyIAccessibleProvider },
+    { UIA_MultipleViewPatternId, &IID_IMultipleViewProvider },
+    { UIA_ObjectModelPatternId, &IID_IObjectModelProvider },
+    { UIA_RangeValuePatternId, &IID_IRangeValueProvider },
+    { UIA_ScrollItemPatternId, &IID_IScrollItemProvider },
+    { UIA_ScrollPatternId, &IID_IScrollProvider },
+    { UIA_SelectionItemPatternId, &IID_ISelectionItemProvider, },
+    { UIA_SelectionPatternId, &IID_ISelectionProvider, },
+    { UIA_SpreadsheetPatternId, &IID_ISpreadsheetProvider, },
+    { UIA_SpreadsheetItemPatternId, &IID_ISpreadsheetItemProvider, },
+    { UIA_StylesPatternId, &IID_IStylesProvider, },
+    { UIA_SynchronizedInputPatternId, &IID_ISynchronizedInputProvider, },
+    { UIA_TableItemPatternId, &IID_ITableItemProvider, },
+    /* GridPattern should also be checked if TablePattern is. */
+    { UIA_TablePatternId,  &IID_ITableProvider, },
+    { UIA_TextChildPatternId, &IID_ITextChildProvider, },
+    { UIA_TextEditPatternId, &IID_ITextEditProvider, },
+    { UIA_TextPatternId, &IID_ITextProvider, },
+    { UIA_TextPattern2Id, &IID_ITextProvider2, },
+    { UIA_TogglePatternId, &IID_IToggleProvider, },
+    { UIA_TransformPatternId, &IID_ITransformProvider, },
+    { UIA_TransformPattern2Id, &IID_ITransformProvider2, },
+    { UIA_ValuePatternId, &IID_IValueProvider, },
+    { UIA_VirtualizedItemPatternId, &IID_IVirtualizedItemProvider, },
+    { UIA_WindowPatternId, &IID_IWindowProvider, },
+};
+
+static const struct uia_pattern_id_info *uia_get_pattern_id_info(PATTERNID pattern_id)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(uia_pattern_ids); i++)
+    {
+        if (uia_pattern_ids[i].pattern_id == pattern_id)
+            return &uia_pattern_ids[i];
+    }
+
+    return NULL;
+}
+
+static HRESULT uia_get_pattern_provider(IRawElementProviderSimple *elem_prov,
+        PATTERNID pattern_id, void **pattern_prov_iface)
+{
+    const struct uia_pattern_id_info *pattern_info = uia_get_pattern_id_info(pattern_id);
+    IUnknown *pattern_unk = NULL;
+    HRESULT hr;
+
+    *pattern_prov_iface = NULL;
+    if (!pattern_info)
+        return E_FAIL;
+
+    hr = IRawElementProviderSimple_GetPatternProvider(elem_prov, pattern_id, &pattern_unk);
+    if (FAILED(hr) || !pattern_unk) return hr;
+
+    return IUnknown_QueryInterface(pattern_unk, pattern_info->pattern_iid, pattern_prov_iface);
+}
+
 static void uia_get_default_property_val(PROPERTYID propertyId, VARIANT *retVal)
 {
     switch (propertyId)
@@ -780,6 +853,11 @@ static void uia_get_default_property_val(PROPERTYID propertyId, VARIANT *retVal)
 
     case UIA_BoundingRectanglePropertyId:
         uia_create_bounding_rect_variant(0, 0, 0, 0, retVal);
+        break;
+
+    case UIA_ValueIsReadOnlyPropertyId:
+        V_VT(retVal) = VT_BOOL;
+        V_BOOL(retVal) = VARIANT_TRUE;
         break;
 
     default:
@@ -818,6 +896,29 @@ static HRESULT uia_get_uia_elem_prov_property_val(IRawElementProviderSimple *ele
             }
         }
         hr = IRawElementProviderSimple_GetPropertyValue(elem_prov, propertyId, &res);
+    }
+        break;
+
+    case UIA_ValueIsReadOnlyPropertyId:
+    {
+        IValueProvider *val_prov;
+        BOOL ret;
+
+        hr = uia_get_pattern_provider(elem_prov, UIA_ValuePatternId, (void **)&val_prov);
+        if (FAILED(hr) || !val_prov)
+            break;
+
+        hr = IValueProvider_get_IsReadOnly(val_prov, &ret);
+        if (FAILED(hr))
+            break;
+
+        V_VT(&res) = VT_BOOL;
+        if (ret)
+            V_BOOL(&res) = VARIANT_TRUE;
+        else
+            V_BOOL(&res) = VARIANT_FALSE;
+
+        IValueProvider_Release(val_prov);
     }
         break;
 
@@ -906,6 +1007,22 @@ static HRESULT uia_get_msaa_acc_property_val(IAccessible *acc,
         {
             uia_create_bounding_rect_variant((double)left, (double)top,
                     (double)width, (double)height, retVal);
+            *use_default = FALSE;
+        }
+    }
+        break;
+
+    case UIA_ValueIsReadOnlyPropertyId:
+    {
+        hr = IAccessible_get_accState(acc, child_id, &res);
+        if (SUCCEEDED(hr) && V_VT(&res) == VT_I4)
+        {
+            V_VT(retVal) = VT_BOOL;
+            if (V_I4(&res) & STATE_SYSTEM_READONLY)
+                V_BOOL(retVal) = VARIANT_TRUE;
+            else
+                V_BOOL(retVal) = VARIANT_FALSE;
+
             *use_default = FALSE;
         }
     }
