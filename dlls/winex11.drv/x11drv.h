@@ -450,6 +450,7 @@ extern HMODULE x11drv_module DECLSPEC_HIDDEN;
 extern char *process_name DECLSPEC_HIDDEN;
 extern Display *clipboard_display DECLSPEC_HIDDEN;
 extern HANDLE steam_overlay_event DECLSPEC_HIDDEN;
+extern HANDLE steam_keyboard_event DECLSPEC_HIDDEN;
 
 /* atoms */
 
