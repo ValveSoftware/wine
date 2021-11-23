@@ -53,7 +53,6 @@ typedef struct {
     LONG ref;
 } event_data;
 
-DWORD last_keyup_event;
 BOOL keyboard_up;
 BOOL use_steam_osk;
 
@@ -175,26 +174,21 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
         IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_IsKeyboardFocusablePropertyId, &var);
         IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_ValueIsReadOnlyPropertyId, &var2);
 
-        if (use_steam_osk && (last_keyup_event < (GetTickCount() - 5000)) &&
-                (ct_id == UIA_EditControlTypeId) && variant_to_bool(&var) && !variant_to_bool(&var2))
+        if (use_steam_osk && (ct_id == UIA_EditControlTypeId) && variant_to_bool(&var) &&
+                !variant_to_bool(&var2))
         {
-            if (!keyboard_up)
+            WINE_TRACE("Keyboard up!\n");
+            keyboard_up = TRUE;
+            if (rect.left || rect.top || rect.right || rect.bottom)
             {
-                WINE_TRACE("Keyboard up!\n");
-                keyboard_up = TRUE;
-                if (rect.left || rect.top || rect.right || rect.bottom)
-                {
-                    WCHAR link_buf[1024];
+                WCHAR link_buf[1024];
 
-                    wsprintfW(link_buf, L"steam://open/keyboard?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
-                            rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
-                    ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
-                }
-                else
-                    ShellExecuteW(NULL, NULL, L"steam://open/keyboard", NULL, NULL, SW_SHOWNOACTIVATE);
-
-                last_keyup_event = GetTickCount();
+                wsprintfW(link_buf, L"steam://open/keyboard?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
+                        rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
+                ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
             }
+            else
+                ShellExecuteW(NULL, NULL, L"steam://open/keyboard", NULL, NULL, SW_SHOWNOACTIVATE);
         }
         else
         {
@@ -297,7 +291,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     HWND hwnd;
 
     wine_exit_event = pgm_exit_event = started_event = NULL;
-    last_keyup_event = 0;
     keyboard_up = FALSE;
     tabtip_use_osk_check();
 
