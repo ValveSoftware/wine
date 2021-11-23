@@ -2262,6 +2262,7 @@ BOOL CDECL X11DRV_CreateWindow( HWND hwnd )
                                            InputOnly, default_visual.visual,
                                            CWOverrideRedirect | CWEventMask, &attr );
         X11DRV_XInput2_Enable( data->display, data->clip_window, attr.event_mask );
+        XSelectInput( data->display, DefaultRootWindow( data->display ), PropertyChangeMask );
         XFlush( data->display );
         SetPropA( hwnd, clip_window_prop, (HANDLE)data->clip_window );
         X11DRV_InitClipboard();
