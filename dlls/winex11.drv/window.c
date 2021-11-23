@@ -2139,6 +2139,7 @@ BOOL X11DRV_CreateWindow( HWND hwnd )
                                            InputOnly, default_visual.visual,
                                            CWOverrideRedirect | CWEventMask, &attr );
         X11DRV_XInput2_Enable( data->display, data->clip_window, attr.event_mask );
+        XSelectInput( data->display, DefaultRootWindow( data->display ), PropertyChangeMask );
         XFlush( data->display );
         NtUserSetProp( hwnd, clip_window_prop, (HANDLE)data->clip_window );
         X11DRV_DisplayDevices_RegisterEventHandlers();
@@ -2326,7 +2327,7 @@ NTSTATUS x11drv_systray_init( void *arg )
         sprintf( systray_buffer, "_NET_SYSTEM_TRAY_S%u", DefaultScreen( display ) );
         systray_atom = XInternAtom( display, systray_buffer, False );
     }
-    XSelectInput( display, root_window, StructureNotifyMask );
+    XSelectInput( display, root_window, StructureNotifyMask | PropertyChangeMask );
 
     return TRUE;
 }
