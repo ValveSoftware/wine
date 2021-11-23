@@ -333,8 +333,9 @@ Window wine_vk_active_surface(HWND hwnd)
     LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
     {
         if (surface->hwnd != hwnd) continue;
-        if (surface->swapchain_count) surface_with_swapchain_count++;
+        if (!surface->swapchain_count) continue;
         active = surface;
+        surface_with_swapchain_count++;
     }
     if (!active) window = None;
     else
