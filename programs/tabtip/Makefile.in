@@ -1,5 +1,5 @@
 MODULE    = tabtip.exe
-IMPORTS   = uuid ole32 user32 oleacc uiautomationcore rpcrt4 shell32
+IMPORTS   = uuid ole32 user32 oleacc uiautomationcore rpcrt4 shell32 oleaut32
 
 EXTRADLLFLAGS = -mconsole -municode -mno-cygwin
 
