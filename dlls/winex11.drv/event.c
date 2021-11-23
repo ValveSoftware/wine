@@ -450,6 +450,7 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
     BOOL queued = FALSE, overlay_enabled = FALSE;
     enum event_merge_action action = MERGE_DISCARD;
     ULONG_PTR overlay_filter = QS_KEY | QS_MOUSEBUTTON | QS_MOUSEMOVE;
+    ULONG_PTR keyboard_filter = QS_MOUSEBUTTON | QS_MOUSEMOVE;
 
     if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
         overlay_enabled = TRUE;
@@ -459,6 +460,7 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
     {
         count++;
         if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
+        if (steam_keyboard_opened && filter_event( display, &event, (char *)keyboard_filter )) continue;
         if (XFilterEvent( &event, None ))
         {
             /*
@@ -1462,6 +1464,7 @@ static void handle_gamescope_focused_app( XPropertyEvent *event )
 
     unsigned long count, remaining, *property;
     int format, app_id, focused_app_id;
+    BOOL keyboard_opened;
     Atom type;
 
     if (!sgi && !(sgi = getenv( "SteamGameId" ))) return;
@@ -1478,7 +1481,12 @@ static void handle_gamescope_focused_app( XPropertyEvent *event )
         XFree( property );
     }
 
+    keyboard_opened = app_id != focused_app_id;
+    if (steam_keyboard_opened == keyboard_opened) return;
+
     TRACE( "Got app id %u, focused app %u\n", app_id, focused_app_id );
+    if ((steam_keyboard_opened = keyboard_opened)) TRACE( "Steam Keyboard is opened, filtering events.\n" );
+    else TRACE( "Steam Keyboard is closed, stopping events filter.\n" );
 }
 
 /***********************************************************************
