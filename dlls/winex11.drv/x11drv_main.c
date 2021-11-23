@@ -90,6 +90,7 @@ int xfixes_event_base = 0;
 HMODULE x11drv_module = 0;
 char *process_name = NULL;
 HANDLE steam_overlay_event;
+BOOL steam_keyboard_opened = FALSE;
 BOOL layered_window_client_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
