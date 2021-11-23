@@ -213,6 +213,7 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
 
         WINE_TRACE("element name: %s, ct_id %s, rect { %d, %d } - { %d, %d }\n", wine_dbgstr_w(name), ct_id_str[ct_id],
                 rect.left, rect.top, rect.right, rect.bottom);
+        SysFreeString(name);
     }
 
     return S_OK;
