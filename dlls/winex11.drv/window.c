@@ -2250,6 +2250,7 @@ BOOL CDECL X11DRV_CreateWindow( HWND hwnd )
         data->clip_window = XCreateWindow( data->display, root_window, 0, 0, 1, 1, 0, 0,
                                            InputOnly, default_visual.visual,
                                            CWOverrideRedirect | CWEventMask, &attr );
+        XSelectInput( data->display, DefaultRootWindow( data->display ), PropertyChangeMask );
         XFlush( data->display );
         SetPropA( hwnd, clip_window_prop, (HANDLE)data->clip_window );
         X11DRV_InitClipboard();
