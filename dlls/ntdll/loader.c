@@ -3943,7 +3943,7 @@ NTSTATUS WINAPI LdrGetDllPath( PCWSTR module, ULONG flags, PWSTR *path, PWSTR *u
     else
     {
         const WCHAR *dlldir = dll_directory.Length ? dll_directory.Buffer : NULL;
-        if (!(flags & LOAD_WITH_ALTERED_SEARCH_PATH) || !wcschr( module, L'\\' ))
+        if (!(flags & LOAD_WITH_ALTERED_SEARCH_PATH))
             module = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
         status = get_dll_load_path( module, dlldir, dll_safe_mode, path );
     }
