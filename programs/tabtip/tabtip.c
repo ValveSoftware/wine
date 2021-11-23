@@ -147,6 +147,14 @@ ULONG WINAPI uia_focus_event_Release(IUIAutomationFocusChangedEventHandler* ifac
     return ref;
 }
 
+static BOOL variant_to_bool(VARIANT *v)
+{
+    if (V_VT(v) == VT_BOOL && (V_BOOL(v) == VARIANT_TRUE))
+        return TRUE;
+
+    return FALSE;
+}
+
 /*** IUIAutomationFocusChangedEventHandler methods ***/
 HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChangedEventHandler *iface,
         IUIAutomationElement *sender)
@@ -157,7 +165,7 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
     if (sender)
     {
         RECT rect = { 0 };
-        VARIANT var;
+        VARIANT var, var2;
         INT ct_id;
         BSTR name;
 
@@ -165,9 +173,10 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
         IUIAutomationElement_get_CurrentName(sender, &name);
         IUIAutomationElement_get_CurrentBoundingRectangle(sender, &rect);
         IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_IsKeyboardFocusablePropertyId, &var);
+        IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_ValueIsReadOnlyPropertyId, &var2);
 
         if (use_steam_osk && (last_keyup_event < (GetTickCount() - 5000)) &&
-                ct_id == UIA_EditControlTypeId && (V_VT(&var) == VT_BOOL && V_BOOL(&var)))
+                (ct_id == UIA_EditControlTypeId) && variant_to_bool(&var) && !variant_to_bool(&var2))
         {
             if (!keyboard_up)
             {
