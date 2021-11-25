@@ -135,6 +135,40 @@ typedef struct ADLMemoryInfo
     long long iMemoryBandwidth;
 } ADLMemoryInfo, *LPADLMemoryInfo;
 
+typedef struct ADLDisplayTarget
+{
+    ADLDisplayID displayID;
+    int iDisplayMapIndex;
+    int iDisplayTargetMask;
+    int iDisplayTargetValue;
+} ADLDisplayTarget, *LPADLDisplayTarget;
+
+typedef struct ADLMode
+{
+    int iAdapterIndex;
+    ADLDisplayID displayID;
+    int iXPos;
+    int iYPos;
+    int iXRes;
+    int iYRes;
+    int iColourDepth;
+    float fRefreshRate;
+    int iOrientation;
+    int iModeFlag;
+    int iModeMask;
+    int iModeValue;
+} ADLMode, *LPADLMode;
+
+typedef struct ADLDisplayMap
+{
+    int iDisplayMapIndex;
+    ADLMode displayMode;
+    int iNumDisplayTarget;
+    int iFirstDisplayTargetArrayIndex;
+    int iDisplayMapMask;
+    int iDisplayMapValue;
+} ADLDisplayMap, *LPADLDisplayMap;
+
 static const ADLVersionsInfo version = {
     "21.20.01",
     "21.20.01",
@@ -431,4 +465,16 @@ int WINAPI ADL_Graphics_Platform_Get(int *platform)
      */
 
     return ADL_OK;
+}
+
+
+int WINAPI ADL_Display_DisplayMapConfig_Get(int adapter_index, int *display_map_count, ADLDisplayMap **display_maps,
+        int *display_target_count, ADLDisplayTarget **display_targets, int options)
+{
+    FIXME("adapter_index %d, display_map_count %p, display_maps %p, "
+            "display_target_count %p, display_targets %p, options %d stub.\n",
+            adapter_index, display_map_count, display_maps, display_target_count,
+            display_targets, options);
+
+    return ADL_ERR;
 }
