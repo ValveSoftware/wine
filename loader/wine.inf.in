@@ -2810,3 +2810,4 @@ HKCU,Software\Wine\AppDefaults\ShadowOfWar.exe\DllOverrides,"atiadlxx",,"builtin
 HKCU,Software\Wine\AppDefaults\DIRT5.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\gotg.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\RelicCardinal.exe\DllOverrides,"atiadlxx",,"builtin"
+HKCU,Software\Wine\AppDefaults\Avengers.exe\DllOverrides,"atiadlxx",,"builtin"
