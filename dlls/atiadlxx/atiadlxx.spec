@@ -845,7 +845,7 @@
 @ stub ADL_Display_DisplayContent_Get
 @ stub ADL_Display_DisplayContent_Set
 @ stdcall ADL_Display_DisplayInfo_Get(long long ptr long)
-@ stub ADL_Display_DisplayMapConfig_Get
+@ stdcall ADL_Display_DisplayMapConfig_Get(long ptr ptr ptr ptr long)
 @ stub ADL_Display_DisplayMapConfig_PossibleAddAndRemove
 @ stub ADL_Display_DisplayMapConfig_Set
 @ stub ADL_Display_DisplayMapConfig_Validate
