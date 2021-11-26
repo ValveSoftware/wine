@@ -161,7 +161,8 @@ static ULONG WINAPI mf_decoder_Release(IMFTransform *iface)
         {
             /* NULL wg_parser is possible if the wg_parser creation failed. */
 
-            unix_funcs->wg_parser_disconnect(decoder->wg_parser);
+            if (decoder->wg_stream)
+                unix_funcs->wg_parser_disconnect(decoder->wg_parser);
 
             EnterCriticalSection(&decoder->event_cs);
             decoder->helper_thread_shutdown = TRUE;
