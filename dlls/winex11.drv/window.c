@@ -1259,6 +1259,13 @@ void update_net_wm_states( struct x11drv_win_data *data )
                         SubstructureRedirectMask | SubstructureNotifyMask, &xev );
         }
     }
+
+    /* HACK: Force input focus on windows becoming fullscreen, working around some
+     * issues where the desktop shell sometimes stays over the game window. For
+     * instance on KDE, with Far Cry Primal.
+     */
+    if (!(data->net_wm_state & (1 << NET_WM_STATE_FULLSCREEN)) && (new_state & (1 << NET_WM_STATE_FULLSCREEN)))
+        XSetInputFocus( data->display, data->whole_window, RevertToParent, CurrentTime );
     data->net_wm_state = new_state;
 
     XChangeProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_BYPASS_COMPOSITOR), XA_CARDINAL,
