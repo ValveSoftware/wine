@@ -136,19 +136,23 @@ static void WINAPI apc( void *arg, IO_STATUS_BLOCK *iosb, ULONG reserved )
 
 static void create_file_test(void)
 {
+    static const WCHAR notepadW[] = {'n','o','t','e','p','a','d','.','e','x','e',0};
     static const WCHAR systemrootW[] = {'\\','S','y','s','t','e','m','R','o','o','t',
                                         '\\','f','a','i','l','i','n','g',0};
+    static const WCHAR systemrootExplorerW[] = {'\\','S','y','s','t','e','m','R','o','o','t',
+                                               '\\','e','x','p','l','o','r','e','r','.','e','x','e',0};
     static const WCHAR questionmarkInvalidNameW[] = {'a','f','i','l','e','?',0};
     static const WCHAR pipeInvalidNameW[]  = {'a','|','b',0};
     static const WCHAR pathInvalidNtW[] = {'\\','\\','?','\\',0};
     static const WCHAR pathInvalidNt2W[] = {'\\','?','?','\\',0};
     static const WCHAR pathInvalidDosW[] = {'\\','D','o','s','D','e','v','i','c','e','s','\\',0};
     static const char testdata[] = "Hello World";
+    static const WCHAR sepW[] = {'\\',0};
     FILE_NETWORK_OPEN_INFORMATION info;
     UNICODE_STRING nameW, null_string;
     NTSTATUS status;
     HANDLE dir, file;
-    WCHAR path[MAX_PATH];
+    WCHAR path[MAX_PATH], temp[MAX_PATH];
     OBJECT_ATTRIBUTES attr;
     IO_STATUS_BLOCK io;
     LARGE_INTEGER offset;
@@ -347,6 +351,25 @@ static void create_file_test(void)
     status = pNtQueryFullAttributesFile( &attr, &info );
     ok( status == STATUS_OBJECT_NAME_INVALID,
         "query %s failed %lx\n", wine_dbgstr_w(nameW.Buffer), status );
+
+    GetWindowsDirectoryW( path, MAX_PATH );
+    path[2] = 0;
+    ok( QueryDosDeviceW( path, temp, MAX_PATH ),
+        "QueryDosDeviceW failed with error %u\n", GetLastError() );
+    lstrcatW( temp, sepW );
+    lstrcatW( temp, path+3 );
+    lstrcatW( temp, sepW );
+    lstrcatW( temp, notepadW );
+
+    pRtlInitUnicodeString( &nameW, temp );
+    status = pNtQueryFullAttributesFile( &attr, &info );
+    ok( status == STATUS_SUCCESS,
+        "query %s failed %x\n", wine_dbgstr_w(nameW.Buffer), status );
+
+    pRtlInitUnicodeString( &nameW, systemrootExplorerW );
+    status = pNtQueryFullAttributesFile( &attr, &info );
+    ok( status == STATUS_SUCCESS,
+        "query %s failed %x\n", wine_dbgstr_w(nameW.Buffer), status );
 }
 
 static void open_file_test(void)
