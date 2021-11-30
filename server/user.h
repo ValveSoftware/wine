@@ -63,7 +63,6 @@ struct desktop
     struct hook_table                     *global_hooks;     /* table of global hooks on this desktop */
     struct list                            hotkeys;          /* list of registered hotkeys */
     struct list                            touches;          /* list of active touches */
-    struct timeout_user                   *close_timeout;    /* timeout before closing the desktop */
     struct thread_input                   *foreground_input; /* thread input of foreground thread */
     unsigned int                           users;            /* processes and threads using this desktop */
     unsigned int                           cursor_clip_msg;  /* message to post for cursor clip changes */
