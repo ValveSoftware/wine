@@ -303,6 +303,21 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         goto exit;
     }
 
+    if (FAILED(CoInitializeEx(NULL, COINIT_MULTITHREADED)))
+    {
+        ERR("CoInitialize failed!\n");
+        ret = -1;
+        goto exit;
+    }
+
+    if (FAILED(create_uia_event_handler(&uia_iface, &data)))
+    {
+        ret = -1;
+        goto exit;
+    }
+
+    SetEvent(started_event);
+
     wc.lpfnWndProc   = WindowProc;
     wc.hInstance     = hInstance;
     wc.lpszClassName = CLASS_NAME;
@@ -320,24 +335,9 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         goto exit;
     }
 
-    if (FAILED(CoInitializeEx(NULL, COINIT_MULTITHREADED)))
-    {
-        ERR("CoInitialize failed!\n");
-        ret = -1;
-        goto exit;
-    }
-
-    if (FAILED(create_uia_event_handler(&uia_iface, &data)))
-    {
-        ret = -1;
-        goto exit;
-    }
-
     t_data.events[EVENT_WINE_EXIT] = wine_exit_event;
     t_data.events[EVENT_PGM_EXIT]  = pgm_exit_event;
     t_data.main_hwnd = hwnd;
-
-    SetEvent(started_event);
     CreateThread(NULL, 0, tabtip_exit_watcher, &t_data, 0, NULL);
 
     while (GetMessageW(&msg, NULL, 0, 0))
