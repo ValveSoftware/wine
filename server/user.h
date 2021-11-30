@@ -62,7 +62,6 @@ struct desktop
     struct window                         *msg_window;       /* HWND_MESSAGE top window */
     struct hook_table                     *global_hooks;     /* table of global hooks on this desktop */
     struct list                            hotkeys;          /* list of registered hotkeys */
-    struct timeout_user                   *close_timeout;    /* timeout before closing the desktop */
     struct list                            touches;          /* list of active touches */
     struct thread_input                   *foreground_input; /* thread input of foreground thread */
     unsigned int                           users;            /* processes and threads using this desktop */
