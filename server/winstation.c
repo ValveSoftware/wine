@@ -252,7 +252,6 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->top_window = NULL;
             desktop->msg_window = NULL;
             desktop->global_hooks = NULL;
-            desktop->close_timeout = NULL;
             desktop->foreground_input = NULL;
             desktop->users = 0;
             desktop->cursor_clip_msg = 0;
@@ -318,7 +317,6 @@ static void desktop_destroy( struct object *obj )
     if (desktop->top_window) destroy_window( desktop->top_window );
     if (desktop->msg_window) destroy_window( desktop->msg_window );
     if (desktop->global_hooks) release_object( desktop->global_hooks );
-    if (desktop->close_timeout) remove_timeout_user( desktop->close_timeout );
     list_remove( &desktop->entry );
     release_object( desktop->shared_mapping );
     release_object( desktop->winstation );
@@ -334,7 +332,6 @@ static void close_desktop_timeout( void *private )
 {
     struct desktop *desktop = private;
 
-    desktop->close_timeout = NULL;
     unlink_named_object( &desktop->obj );  /* make sure no other process can open it */
     post_desktop_message( desktop, WM_CLOSE, 0, 0 );  /* and signal the owner to quit */
 }
@@ -343,11 +340,6 @@ static void close_desktop_timeout( void *private )
 static void add_desktop_user( struct desktop *desktop )
 {
     desktop->users++;
-    if (desktop->close_timeout)
-    {
-        remove_timeout_user( desktop->close_timeout );
-        desktop->close_timeout = NULL;
-    }
 }
 
 /* remove a user of the desktop and start the close timeout if necessary */
@@ -358,8 +350,8 @@ static void remove_desktop_user( struct desktop *desktop )
     desktop->users--;
 
     /* if we have one remaining user, it has to be the manager of the desktop window */
-    if ((process = get_top_window_owner( desktop )) && desktop->users == process->running_threads && !desktop->close_timeout)
-        desktop->close_timeout = add_timeout_user( -TICKS_PER_SEC, close_desktop_timeout, desktop );
+    if ((process = get_top_window_owner( desktop )) && desktop->users == process->running_threads)
+        close_desktop_timeout( desktop );
 }
 
 /* set the thread default desktop handle */
