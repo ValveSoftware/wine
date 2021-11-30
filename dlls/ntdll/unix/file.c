@@ -3887,7 +3887,7 @@ static NTSTATUS nt_to_unix_file_name_no_root( OBJECT_ATTRIBUTES *attr, UNICODE_S
 
 
 /******************************************************************************
- *           nt_to_unix_file_name
+ *           nt_to_unix_file_name_internal
  *
  * Convert a file name from NT namespace to Unix namespace.
  *
@@ -3895,8 +3895,8 @@ static NTSTATUS nt_to_unix_file_name_no_root( OBJECT_ATTRIBUTES *attr, UNICODE_S
  * element doesn't have to exist; in that case STATUS_NO_SUCH_FILE is
  * returned, but the unix name is still filled in properly.
  */
-static NTSTATUS nt_to_unix_file_name( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *nt_name,
-                                      char **name_ret, UINT disposition, BOOL open_reparse )
+static NTSTATUS nt_to_unix_file_name_internal( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *nt_name,
+                                               char **name_ret, UINT disposition, BOOL open_reparse )
 {
     enum server_fd_type type;
     int root_fd, needs_close;
@@ -3947,6 +3947,133 @@ static NTSTATUS nt_to_unix_file_name( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *n
         free( unix_name );
     }
     return status;
+}
+
+
+/* read the contents of an NT symlink object */
+static NTSTATUS read_nt_symlink( HANDLE root, UNICODE_STRING *name, WCHAR *target, size_t length )
+{
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING targetW;
+    NTSTATUS status;
+    HANDLE handle;
+
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = root;
+    attr.Attributes = OBJ_CASE_INSENSITIVE;
+    attr.ObjectName = name;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+
+    if (!(status = NtOpenSymbolicLinkObject( &handle, SYMBOLIC_LINK_QUERY, &attr )))
+    {
+        targetW.Buffer = target;
+        targetW.MaximumLength = (length - 1) * sizeof(WCHAR);
+        status = NtQuerySymbolicLinkObject( handle, &targetW, NULL );
+        NtClose( handle );
+    }
+
+    return status;
+}
+
+/* try to find dos device based on nt device name */
+static NTSTATUS nt_to_dos_device( WCHAR *name, size_t length, WCHAR *device_ret )
+{
+    static const WCHAR dosdevicesW[] = {'\\','D','o','s','D','e','v','i','c','e','s',0};
+    UNICODE_STRING dosdevW = { sizeof(dosdevicesW) - sizeof(WCHAR), sizeof(dosdevicesW), (WCHAR *)dosdevicesW };
+    WCHAR symlinkW[MAX_DIR_ENTRY_LEN];
+    OBJECT_ATTRIBUTES attr;
+    NTSTATUS status;
+    char data[1024];
+    HANDLE handle;
+    ULONG ctx = 0;
+
+    DIRECTORY_BASIC_INFORMATION *info = (DIRECTORY_BASIC_INFORMATION *)data;
+
+    attr.Length = sizeof(attr);
+    attr.RootDirectory = 0;
+    attr.ObjectName = &dosdevW;
+    attr.Attributes = OBJ_CASE_INSENSITIVE;
+    attr.SecurityDescriptor = NULL;
+    attr.SecurityQualityOfService = NULL;
+
+    status = NtOpenDirectoryObject( &handle, FILE_LIST_DIRECTORY, &attr );
+    if (status) return STATUS_BAD_DEVICE_TYPE;
+
+    while (!NtQueryDirectoryObject( handle, info, sizeof(data), TRUE, FALSE, &ctx, NULL ))
+    {
+        if (read_nt_symlink( handle, &info->ObjectName, symlinkW, MAX_DIR_ENTRY_LEN )) continue;
+        if (wcsnicmp( symlinkW, name, length )) continue;
+        if (info->ObjectName.Length != 2 * sizeof(WCHAR) || info->ObjectName.Buffer[1] != ':') continue;
+
+        *device_ret = info->ObjectName.Buffer[0];
+        NtClose( handle );
+        return STATUS_SUCCESS;
+    }
+
+    NtClose( handle );
+    return STATUS_BAD_DEVICE_TYPE;
+}
+
+/******************************************************************************
+ *           nt_to_unix_file_name
+ *
+ * Convert a file name from NT namespace to Unix namespace.
+ *
+ * If disposition is not FILE_OPEN or FILE_OVERWRITE, the last path
+ * element doesn't have to exist; in that case STATUS_NO_SUCH_FILE is
+ * returned, but the unix name is still filled in properly.
+ */
+NTSTATUS nt_to_unix_file_name( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *nt_name,
+                               char **name_ret, UINT disposition, BOOL open_reparse )
+{
+    static const WCHAR systemrootW[] = {'\\','S','y','s','t','e','m','R','o','o','t','\\',0};
+    static const WCHAR dosprefixW[] = {'\\','?','?','\\'};
+    static const WCHAR deviceW[] = {'\\','D','e','v','i','c','e','\\',0};
+    WCHAR *name, *ptr, *prefix, buffer[3] = {'c',':',0};
+    UNICODE_STRING *nameW;
+    size_t offset, name_len;
+    NTSTATUS status;
+
+    if (attr->RootDirectory) return nt_to_unix_file_name_internal( attr, nt_name, name_ret, disposition, open_reparse );
+
+    nameW = attr->ObjectName;
+
+    if (nameW->Length >= sizeof(deviceW) - sizeof(WCHAR)
+        && !wcsnicmp( nameW->Buffer, deviceW, ARRAY_SIZE(deviceW) - 1 ))
+    {
+        offset = sizeof(deviceW) / sizeof(WCHAR);
+        while (offset * sizeof(WCHAR) < nameW->Length && nameW->Buffer[ offset ] != '\\') offset++;
+        if ((status = nt_to_dos_device( nameW->Buffer, offset, buffer ))) return status;
+        prefix = buffer;
+    }
+    else if (nameW->Length >= sizeof(systemrootW) - sizeof(WCHAR) &&
+             !wcsnicmp( nameW->Buffer, systemrootW, ARRAY_SIZE(systemrootW) - 1 ))
+    {
+        offset = (sizeof(systemrootW) - 1) / sizeof(WCHAR);
+        prefix = user_shared_data->NtSystemRoot;
+    }
+    else
+        return nt_to_unix_file_name_internal( attr, nt_name, name_ret, disposition, open_reparse );
+
+    name_len = sizeof(dosprefixW) + wcslen(prefix) * sizeof(WCHAR)
+               + sizeof(WCHAR) /* '\\' */ + nameW->Length - offset * sizeof(WCHAR) + sizeof(WCHAR);
+    if (!(name = malloc( name_len )))
+        return STATUS_NO_MEMORY;
+
+    ptr = name;
+    memcpy( ptr, dosprefixW, sizeof(dosprefixW) );
+    ptr += sizeof(dosprefixW) / sizeof(WCHAR);
+    wcscpy( ptr, prefix );
+    ptr += wcslen(ptr);
+    *ptr++ = '\\';
+    memcpy( ptr, nameW->Buffer + offset, nameW->Length - offset * sizeof(WCHAR) );
+    ptr[ nameW->Length / sizeof(WCHAR) - offset ] = 0;
+
+    nt_name->Buffer = name;
+    nt_name->Length = wcslen( name ) * sizeof(WCHAR);
+    attr->ObjectName = nt_name;
+    return nt_to_unix_file_name_internal( attr, nt_name, name_ret, disposition, open_reparse );
 }
 
 
