@@ -3551,13 +3551,11 @@ struct handle_info
 /* get completion from completion port queue */
 @REQ(remove_completion)
     obj_handle_t handle;          /* port handle */
-    unsigned int  alloc_wait_handle;
 @REPLY
     apc_param_t   ckey;           /* completion key */
     apc_param_t   cvalue;         /* completion value */
     apc_param_t   information;    /* IO_STATUS_BLOCK Information */
     unsigned int  status;         /* completion result */
-    obj_handle_t  wait_handle;
 @END
 
 

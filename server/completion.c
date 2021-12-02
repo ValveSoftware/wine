@@ -242,14 +242,7 @@ DECL_HANDLER(remove_completion)
 
     entry = list_head( &completion->queue );
     if (!entry)
-    {
-        if (req->alloc_wait_handle)
-            reply->wait_handle = duplicate_handle( current->process,
-                    req->handle, current->process, 0, 0, DUPLICATE_SAME_ACCESS );
-        else
-            reply->wait_handle = req->handle;
         set_error( STATUS_PENDING );
-    }
     else
     {
         list_remove( entry );
