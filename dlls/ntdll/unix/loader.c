@@ -340,12 +340,15 @@ static const char *get_pe_dir( WORD machine )
 
 static void set_dll_path(void)
 {
-    char *p, *path = getenv( "WINEDLLPATH" ), *be_runtime = getenv( "PROTON_BATTLEYE_RUNTIME" );
+    char *p, *path = getenv( "WINEDLLPATH" ), *be_runtime = getenv( "PROTON_BATTLEYE_RUNTIME" ), *eac_runtime = getenv( "PROTON_EAC_RUNTIME" );
     int i, count = 0;
 
     if (path) for (p = path, count = 1; *p; p++) if (*p == ':') count++;
 
     if (be_runtime)
+        count += 2;
+
+    if (eac_runtime)
         count += 2;
 
     dll_paths = malloc( (count + 2) * sizeof(*dll_paths) );
@@ -373,6 +376,24 @@ static void set_dll_path(void)
 
         p = malloc( strlen(be_runtime) + strlen(lib64) + 1 );
         strcpy(p, be_runtime);
+        strcat(p, lib64);
+
+        dll_paths[count++] = p;
+    }
+
+    if (eac_runtime)
+    {
+        const char lib32[] = "/v2/lib32/";
+        const char lib64[] = "/v2/lib64/";
+
+        p = malloc( strlen(eac_runtime) + strlen(lib32) + 1 );
+        strcpy(p, eac_runtime);
+        strcat(p, lib32);
+
+        dll_paths[count++] = p;
+
+        p = malloc( strlen(eac_runtime) + strlen(lib64) + 1 );
+        strcpy(p, eac_runtime);
         strcat(p, lib64);
 
         dll_paths[count++] = p;
