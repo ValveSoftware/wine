@@ -95,6 +95,7 @@ struct thread
     struct list            kernel_object; /* list of kernel object pointers */
     data_size_t            desc_len;      /* thread description length in bytes */
     WCHAR                 *desc;          /* thread description string */
+    struct object         *locked_completion; /* completion port wait object successfully waited by the thread */
 };
 
 extern struct thread *current;
