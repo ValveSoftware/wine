@@ -173,9 +173,16 @@ static int completion_wait_signaled( struct object *obj, struct wait_queue_entry
 static void completion_wait_satisfied( struct object *obj, struct wait_queue_entry *entry )
 {
     struct completion_wait *wait = (struct completion_wait *)obj;
+    struct thread *thread;
 
     assert( obj->ops == &completion_wait_ops );
-    if (!wait->completion) make_wait_abandoned( entry );
+    if (wait->completion)
+    {
+        thread = get_wait_queue_thread( entry );
+        if (thread->locked_completion) release_object( thread->locked_completion );
+        thread->locked_completion = grab_object( obj );
+    }
+    else make_wait_abandoned( entry );
 }
 
 static void completion_dump( struct object *obj, int verbose )
@@ -301,19 +308,36 @@ DECL_HANDLER(add_completion)
 /* get completion from completion port */
 DECL_HANDLER(remove_completion)
 {
-    struct completion* completion = get_completion_obj( current->process, req->handle, IO_COMPLETION_MODIFY_STATE );
+    struct completion* completion;
+    struct completion_wait *wait;
     struct list *entry;
     struct comp_msg *msg;
 
-    if (!completion) return;
+    if (req->waited && (wait = (struct completion_wait *)current->locked_completion))
+        current->locked_completion = NULL;
+    else
+    {
+        if (current->locked_completion)
+        {
+            release_object( current->locked_completion );
+            current->locked_completion = NULL;
+        }
+        completion = get_completion_obj( current->process, req->handle, IO_COMPLETION_MODIFY_STATE );
+        if (!completion) return;
 
-    entry = list_head( &completion->wait->queue );
+        wait = (struct completion_wait *)grab_object( completion->wait );
+        release_object( completion );
+    }
+
+    assert( wait->obj.ops == &completion_wait_ops );
+
+    entry = list_head( &wait->queue );
     if (!entry)
         set_error( STATUS_PENDING );
     else
     {
         list_remove( entry );
-        completion->wait->depth--;
+        wait->depth--;
         msg = LIST_ENTRY( entry, struct comp_msg, queue_entry );
         reply->ckey = msg->ckey;
         reply->cvalue = msg->cvalue;
@@ -322,7 +346,7 @@ DECL_HANDLER(remove_completion)
         free( msg );
     }
 
-    release_object( completion );
+    release_object( wait );
 }
 
 /* get queue depth for completion port */
