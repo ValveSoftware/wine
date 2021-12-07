@@ -1979,6 +1979,7 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
                                       IO_STATUS_BLOCK *io, LARGE_INTEGER *timeout )
 {
     NTSTATUS status;
+    int waited = 0;
 
     TRACE( "(%p, %p, %p, %p, %p)\n", handle, key, value, io, timeout );
 
@@ -1987,6 +1988,7 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
         SERVER_START_REQ( remove_completion )
         {
             req->handle = wine_server_obj_handle( handle );
+            req->waited = waited;
             if (!(status = wine_server_call( req )))
             {
                 *key            = reply->ckey;
@@ -1999,6 +2001,7 @@ NTSTATUS WINAPI NtRemoveIoCompletion( HANDLE handle, ULONG_PTR *key, ULONG_PTR *
         if (status != STATUS_PENDING) return status;
         status = NtWaitForSingleObject( handle, FALSE, timeout );
         if (status != WAIT_OBJECT_0) return status;
+        waited = 1;
     }
 }
 
@@ -2010,6 +2013,7 @@ NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORM
                                         ULONG *written, LARGE_INTEGER *timeout, BOOLEAN alertable )
 {
     NTSTATUS status;
+    int waited = 0;
     ULONG i = 0;
 
     TRACE( "%p %p %u %p %p %u\n", handle, info, count, written, timeout, alertable );
@@ -2021,6 +2025,7 @@ NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORM
             SERVER_START_REQ( remove_completion )
             {
                 req->handle = wine_server_obj_handle( handle );
+                req->waited = waited;
                 if (!(status = wine_server_call( req )))
                 {
                     info[i].CompletionKey             = reply->ckey;
@@ -2040,6 +2045,7 @@ NTSTATUS WINAPI NtRemoveIoCompletionEx( HANDLE handle, FILE_IO_COMPLETION_INFORM
         }
         status = NtWaitForSingleObject( handle, alertable, timeout );
         if (status != WAIT_OBJECT_0) break;
+        waited = 1;
     }
     *written = i ? i : 1;
     return status;
