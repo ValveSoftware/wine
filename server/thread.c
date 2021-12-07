@@ -295,6 +295,7 @@ static inline void init_thread_structure( struct thread *thread )
 
     thread->creation_time = current_time;
     thread->exit_time     = 0;
+    thread->locked_completion = NULL;
 
     list_init( &thread->mutex_list );
     list_init( &thread->system_apc );
@@ -512,6 +513,7 @@ static void destroy_thread( struct object *obj )
     release_object( thread->process );
     if (thread->id) free_ptid( thread->id );
     if (thread->token) release_object( thread->token );
+    if (thread->locked_completion) release_object( thread->locked_completion );
 
     if (do_esync())
         close( thread->esync_fd );
