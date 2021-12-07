@@ -56,15 +56,52 @@ struct type_descr completion_type =
     },
 };
 
-struct completion
+struct completion_wait
 {
     struct object  obj;
     struct list    queue;
     unsigned int   depth;
 };
 
+struct completion
+{
+    struct object           obj;
+    struct completion_wait *wait;
+};
+
+static void completion_wait_dump( struct object*, int );
+static int completion_wait_signaled( struct object *obj, struct wait_queue_entry *entry );
+static void completion_wait_destroy( struct object * );
+
+static const struct object_ops completion_wait_ops =
+{
+    sizeof(struct completion_wait), /* size */
+    &no_type,                       /* type */
+    completion_wait_dump,           /* dump */
+    add_queue,                      /* add_queue */
+    remove_queue,                   /* remove_queue */
+    completion_wait_signaled,       /* signaled */
+    NULL,                           /* get_esync_fd */
+    NULL,                           /* get_fsync_idx */
+    no_satisfied,                   /* satisfied */
+    no_signal,                      /* signal */
+    no_get_fd,                      /* get_fd */
+    default_map_access,             /* map_access */
+    default_get_sd,                 /* get_sd */
+    default_set_sd,                 /* set_sd */
+    no_get_full_name,               /* get_full_name */
+    no_lookup_name,                 /* lookup_name */
+    no_link_name,                   /* link_name */
+    NULL,                           /* unlink_name */
+    no_open_file,                   /* open_file */
+    no_kernel_obj_list,             /* get_kernel_obj_list */
+    no_close_handle,                /* close_handle */
+    completion_wait_destroy         /* destroy */
+};
+
 static void completion_dump( struct object*, int );
-static int completion_signaled( struct object *obj, struct wait_queue_entry *entry );
+static int completion_add_queue( struct object *obj, struct wait_queue_entry *entry );
+static void completion_remove_queue( struct object *obj, struct wait_queue_entry *entry );
 static void completion_destroy( struct object * );
 
 static const struct object_ops completion_ops =
@@ -72,9 +109,9 @@ static const struct object_ops completion_ops =
     sizeof(struct completion), /* size */
     &completion_type,          /* type */
     completion_dump,           /* dump */
-    add_queue,                 /* add_queue */
-    remove_queue,              /* remove_queue */
-    completion_signaled,       /* signaled */
+    completion_add_queue,      /* add_queue */
+    completion_remove_queue,   /* remove_queue */
+    NULL,                      /* signaled */
     NULL,                      /* get_esync_fd */
     NULL,                      /* get_fsync_idx */
     no_satisfied,              /* satisfied */
@@ -102,30 +139,63 @@ struct comp_msg
     unsigned int  status;
 };
 
-static void completion_destroy( struct object *obj)
+static void completion_wait_destroy( struct object *obj)
 {
-    struct completion *completion = (struct completion *) obj;
+    struct completion_wait *wait = (struct completion_wait *)obj;
     struct comp_msg *tmp, *next;
 
-    LIST_FOR_EACH_ENTRY_SAFE( tmp, next, &completion->queue, struct comp_msg, queue_entry )
+    LIST_FOR_EACH_ENTRY_SAFE( tmp, next, &wait->queue, struct comp_msg, queue_entry )
     {
         free( tmp );
     }
 }
 
-static void completion_dump( struct object *obj, int verbose )
+static void completion_wait_dump( struct object *obj, int verbose )
 {
-    struct completion *completion = (struct completion *) obj;
+    struct completion_wait *wait = (struct completion_wait *)obj;
 
-    assert( obj->ops == &completion_ops );
-    fprintf( stderr, "Completion depth=%u\n", completion->depth );
+    assert( obj->ops == &completion_wait_ops );
+    fprintf( stderr, "Completion depth=%u\n", wait->depth );
 }
 
-static int completion_signaled( struct object *obj, struct wait_queue_entry *entry )
+static int completion_wait_signaled( struct object *obj, struct wait_queue_entry *entry )
+{
+    struct completion_wait *wait = (struct completion_wait *)obj;
+
+    assert( obj->ops == &completion_wait_ops );
+    return !list_empty( &wait->queue );
+}
+
+static void completion_dump( struct object *obj, int verbose )
 {
     struct completion *completion = (struct completion *)obj;
 
-    return !list_empty( &completion->queue );
+    assert( obj->ops == &completion_ops );
+    completion->wait->obj.ops->dump( &completion->wait->obj, verbose );
+}
+
+static int completion_add_queue( struct object *obj, struct wait_queue_entry *entry )
+{
+    struct completion *completion = (struct completion *)obj;
+
+    assert( obj->ops == &completion_ops );
+    return completion->wait->obj.ops->add_queue( &completion->wait->obj, entry );
+}
+
+static void completion_remove_queue( struct object *obj, struct wait_queue_entry *entry )
+{
+    struct completion *completion = (struct completion *)obj;
+
+    assert( obj->ops == &completion_ops );
+    completion->wait->obj.ops->remove_queue( &completion->wait->obj, entry );
+}
+
+static void completion_destroy( struct object *obj )
+{
+    struct completion *completion = (struct completion *)obj;
+
+    assert( obj->ops == &completion_ops );
+    release_object( &completion->wait->obj );
 }
 
 static struct completion *create_completion( struct object *root, const struct unicode_str *name,
@@ -134,15 +204,17 @@ static struct completion *create_completion( struct object *root, const struct u
 {
     struct completion *completion;
 
-    if ((completion = create_named_object( root, &completion_ops, name, attr, sd )))
+    if (!(completion = create_named_object( root, &completion_ops, name, attr, sd ))) return NULL;
+    if (get_error() == STATUS_OBJECT_NAME_EXISTS) return completion;
+    if (!(completion->wait = alloc_object( &completion_wait_ops )))
     {
-        if (get_error() != STATUS_OBJECT_NAME_EXISTS)
-        {
-            list_init( &completion->queue );
-            completion->depth = 0;
-        }
+        release_object( completion );
+        set_error( STATUS_NO_MEMORY );
+        return NULL;
     }
 
+    list_init( &completion->wait->queue );
+    completion->wait->depth = 0;
     return completion;
 }
 
@@ -164,9 +236,9 @@ void add_completion( struct completion *completion, apc_param_t ckey, apc_param_
     msg->status = status;
     msg->information = information;
 
-    list_add_tail( &completion->queue, &msg->queue_entry );
-    completion->depth++;
-    wake_up( &completion->obj, 1 );
+    list_add_tail( &completion->wait->queue, &msg->queue_entry );
+    completion->wait->depth++;
+    wake_up( &completion->wait->obj, 1 );
 }
 
 /* create a completion */
@@ -220,13 +292,13 @@ DECL_HANDLER(remove_completion)
 
     if (!completion) return;
 
-    entry = list_head( &completion->queue );
+    entry = list_head( &completion->wait->queue );
     if (!entry)
         set_error( STATUS_PENDING );
     else
     {
         list_remove( entry );
-        completion->depth--;
+        completion->wait->depth--;
         msg = LIST_ENTRY( entry, struct comp_msg, queue_entry );
         reply->ckey = msg->ckey;
         reply->cvalue = msg->cvalue;
@@ -245,7 +317,7 @@ DECL_HANDLER(query_completion)
 
     if (!completion) return;
 
-    reply->depth = completion->depth;
+    reply->depth = completion->wait->depth;
 
     release_object( completion );
 }
