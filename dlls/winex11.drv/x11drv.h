@@ -580,7 +580,8 @@ enum x11drv_window_messages
     WM_X11DRV_CLIP_CURSOR_NOTIFY,
     WM_X11DRV_CLIP_CURSOR_REQUEST,
     WM_X11DRV_DELETE_TAB,
-    WM_X11DRV_ADD_TAB
+    WM_X11DRV_ADD_TAB,
+    WM_X11DRV_RELEASE_CURSOR,
 };
 
 /* _NET_WM_STATE properties that we keep track of */
