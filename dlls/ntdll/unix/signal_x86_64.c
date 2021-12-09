@@ -2133,6 +2133,30 @@ static void setup_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec )
 
 
 /***********************************************************************
+ *           raise_second_chance_exception
+ *
+ * Raise a second chance exception.
+ */
+static void raise_second_chance_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec, struct xcontext *xcontext )
+{
+    rec->ExceptionAddress = (void *)RIP_sig(sigcontext);
+    if (amd64_thread_data()->syscall_frame)
+    {
+        /* Windows would bug check here */
+        ERR("Direct second chance exception code %x flags %x addr %p (inside syscall)\n",
+            rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress );
+        NtTerminateProcess( NtCurrentProcess(), rec->ExceptionCode );
+    }
+    else
+    {
+        save_context( xcontext, sigcontext );
+        NtRaiseException( rec, &xcontext->c, FALSE );
+        restore_context( xcontext, sigcontext );
+    }
+}
+
+
+/***********************************************************************
  *           call_user_apc_dispatcher
  */
 struct apc_stack_layout * WINAPI setup_user_apc_dispatcher_stack( CONTEXT *context, struct apc_stack_layout *stack )
@@ -2710,6 +2734,17 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     struct xcontext context;
     ucontext_t *ucontext = sigcontext;
     void *steamclient_addr = NULL;
+
+    if (TRAP_sig(ucontext) == TRAP_x86_PROTFLT && ERROR_sig(ucontext) == ((0x29 << 3) | 2))
+    {
+        /* __fastfail: process state is corrupted */
+        rec.ExceptionCode = STATUS_STACK_BUFFER_OVERRUN;
+        rec.ExceptionFlags = EH_NONCONTINUABLE;
+        rec.NumberParameters = 1;
+        rec.ExceptionInformation[0] = RCX_sig( ucontext );
+        raise_second_chance_exception( ucontext, &rec, &context );
+        return;
+    }
 
     rec.ExceptionAddress = (void *)RIP_sig(ucontext);
     save_context( &context, sigcontext );

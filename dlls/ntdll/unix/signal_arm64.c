@@ -697,6 +697,32 @@ static void setup_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec )
 
 
 /***********************************************************************
+ *           raise_second_chance_exception
+ *
+ * Raise a second chance exception.
+ */
+static void raise_second_chance_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec )
+{
+    CONTEXT context;
+
+    rec->ExceptionAddress = (void *)PC_sig(sigcontext);
+    if (arm64_thread_data()->syscall_frame)
+    {
+        /* Windows would bug check here */
+        ERR("Direct second chance exception code %x flags %x addr %p (inside syscall)\n",
+            rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress );
+        NtTerminateProcess( NtCurrentProcess(), rec->ExceptionCode );
+    }
+    else
+    {
+        save_context( &context, sigcontext );
+        NtRaiseException( rec, &context, FALSE );
+        restore_context( &context, sigcontext );
+    }
+}
+
+
+/***********************************************************************
  *           call_user_apc_dispatcher
  */
 __ASM_GLOBAL_FUNC( call_user_apc_dispatcher,
@@ -896,6 +922,7 @@ static void bus_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 static void trap_handler( int signal, siginfo_t *siginfo, void *sigcontext )
 {
     EXCEPTION_RECORD rec = { 0 };
+    ucontext_t *context = sigcontext;
 
     switch (siginfo->si_code)
     {
@@ -904,6 +931,19 @@ static void trap_handler( int signal, siginfo_t *siginfo, void *sigcontext )
         break;
     case TRAP_BRKPT:
     default:
+        /* debug exceptions do not update ESR on Linux, so we fetch the instruction directly. */
+        if (!(PSTATE_sig( context ) & 0x10) && /* AArch64 (not WoW) */
+            !(PC_sig( context ) & 3) &&
+            *(ULONG *)PC_sig( context ) == 0xd43e0060UL) /* brk #0xf003 */
+        {
+            /* __fastfail */
+            rec.ExceptionCode = STATUS_STACK_BUFFER_OVERRUN;
+            rec.ExceptionFlags = EH_NONCONTINUABLE;
+            rec.NumberParameters = 1;
+            rec.ExceptionInformation[0] = REGn_sig( 0, context );
+            raise_second_chance_exception( context, &rec );
+            return;
+        }
         rec.ExceptionCode = EXCEPTION_BREAKPOINT;
         rec.NumberParameters = 1;
         break;

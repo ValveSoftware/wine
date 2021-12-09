@@ -1780,6 +1780,30 @@ static void setup_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec )
     setup_raise_exception( sigcontext, stack, rec, &xcontext );
 }
 
+/***********************************************************************
+ *           raise_second_chance_exception
+ *
+ * Raise a second chance exception.
+ */
+static void raise_second_chance_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec, struct xcontext *xcontext )
+{
+    rec->ExceptionAddress = (void *)EIP_sig( sigcontext );
+    if (x86_thread_data()->syscall_frame)
+    {
+        /* Windows would bug check here */
+        WINE_ERR("Direct second chance exception code %x flags %x addr %p (inside syscall)\n",
+                 rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress );
+        NtTerminateProcess( NtCurrentProcess(), rec->ExceptionCode );
+    }
+    else
+    {
+        save_context( xcontext, sigcontext );
+        NtRaiseException( rec, &xcontext->c, FALSE );
+        restore_context( xcontext, sigcontext );
+    }
+}
+
+
 /* stack layout when calling an user apc function.
  * FIXME: match Windows ABI. */
 struct apc_stack_layout
@@ -2015,9 +2039,21 @@ static void segv_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     EXCEPTION_RECORD rec = { 0 };
     struct xcontext xcontext;
     ucontext_t *ucontext = sigcontext;
-    void *stack = setup_exception_record( sigcontext, &rec, &xcontext );
     void *steamclient_addr = NULL;
+    void *stack;
 
+    if (TRAP_sig(ucontext) == TRAP_x86_PROTFLT && ERROR_sig(ucontext) == ((0x29 << 3) | 2))
+    {
+        /* __fastfail: process state is corrupted - skip setup_exception_record */
+        rec.ExceptionCode = STATUS_STACK_BUFFER_OVERRUN;
+        rec.ExceptionFlags = EH_NONCONTINUABLE;
+        rec.NumberParameters = 1;
+        rec.ExceptionInformation[0] = ECX_sig( ucontext );
+        raise_second_chance_exception( ucontext, &rec, &xcontext );
+        return;
+    }
+
+    stack = setup_exception_record( sigcontext, &rec, &xcontext );
     switch (TRAP_sig(ucontext))
     {
     case TRAP_x86_OFLOW:   /* Overflow exception */
