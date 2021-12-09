@@ -638,6 +638,8 @@ static void set_focus( XEvent *xev, HWND hwnd, Time time )
 
     if (!try_grab_pointer( xev->xany.display ))
     {
+        /* ask the foreground window to release its grab before trying to get ours */
+        SendMessageW( GetForegroundWindow(), WM_X11DRV_RELEASE_CURSOR, 0, 0 );
         XSendEvent( xev->xany.display, xev->xany.window, False, 0, xev );
         return;
     }
