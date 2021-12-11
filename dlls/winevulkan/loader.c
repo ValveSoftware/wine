@@ -405,6 +405,31 @@ static BOOL WINAPI call_vulkan_debug_utils_callback( struct wine_vk_debug_utils_
     return params->user_callback(params->severity, params->message_types, &params->data, params->user_data);
 }
 
+VkDevice WINAPI __wine_get_native_VkDevice(VkDevice device)
+{
+    return unix_funcs->p_wine_get_native_VkDevice(device);
+}
+
+VkInstance WINAPI __wine_get_native_VkInstance(VkInstance instance)
+{
+    return unix_funcs->p_wine_get_native_VkInstance(instance);
+}
+
+VkPhysicalDevice WINAPI __wine_get_native_VkPhysicalDevice(VkPhysicalDevice phys_dev)
+{
+    return unix_funcs->p_wine_get_native_VkPhysicalDevice(phys_dev);
+}
+
+VkQueue WINAPI __wine_get_native_VkQueue(VkQueue queue)
+{
+    return unix_funcs->p_wine_get_native_VkQueue(queue);
+}
+
+VkPhysicalDevice WINAPI __wine_get_wrapped_VkPhysicalDevice(VkInstance instance, VkPhysicalDevice native_phys_dev)
+{
+    return unix_funcs->p_wine_get_wrapped_VkPhysicalDevice(instance, native_phys_dev);
+}
+
 BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
 {
     void **kernel_callback_table;
