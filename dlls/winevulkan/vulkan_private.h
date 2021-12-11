@@ -223,4 +223,9 @@ extern VkPhysicalDevice WINAPI __wine_get_native_VkPhysicalDevice(VkPhysicalDevi
 extern VkQueue WINAPI __wine_get_native_VkQueue(VkQueue queue) DECLSPEC_HIDDEN;
 extern VkPhysicalDevice WINAPI __wine_get_wrapped_VkPhysicalDevice(VkInstance instance, VkPhysicalDevice native_phys_dev) DECLSPEC_HIDDEN;
 
+extern VkResult WINAPI __wine_create_vk_instance_with_callback(const VkInstanceCreateInfo *create_info, const VkAllocationCallbacks *allocator,
+        VkInstance *instance, PFN_native_vkCreateInstance callback, void *context) DECLSPEC_HIDDEN;
+extern VkResult WINAPI __wine_create_vk_device_with_callback(VkPhysicalDevice phys_dev, const VkDeviceCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkDevice *device, PFN_native_vkCreateDevice callback, void *context) DECLSPEC_HIDDEN;
+
 #endif /* __WINE_VULKAN_PRIVATE_H */
