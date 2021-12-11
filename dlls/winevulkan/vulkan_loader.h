@@ -108,6 +108,12 @@ struct unix_funcs
     NTSTATUS (WINAPI *p_vk_call)(enum unix_call, void *);
     BOOL (WINAPI *p_is_available_instance_function)(VkInstance, const char *);
     BOOL (WINAPI *p_is_available_device_function)(VkDevice, const char *);
+
+    VkDevice (WINAPI *p_wine_get_native_VkDevice)(VkDevice);
+    VkInstance (WINAPI *p_wine_get_native_VkInstance)(VkInstance);
+    VkPhysicalDevice (WINAPI *p_wine_get_native_VkPhysicalDevice)(VkPhysicalDevice);
+    VkQueue (WINAPI *p_wine_get_native_VkQueue)(VkQueue);
+    VkPhysicalDevice (WINAPI *p_wine_get_wrapped_VkPhysicalDevice)(VkInstance, VkPhysicalDevice);
 };
 
 #endif /* __WINE_VULKAN_LOADER_H */
