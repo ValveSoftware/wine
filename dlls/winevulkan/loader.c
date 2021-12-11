@@ -368,6 +368,30 @@ static void fill_luid_property(VkPhysicalDeviceProperties2 *properties2)
             id->deviceNodeMask);
 }
 
+void WINAPI vkGetPhysicalDeviceProperties(VkPhysicalDevice physical_device,
+        VkPhysicalDeviceProperties *properties)
+{
+    struct vkGetPhysicalDeviceProperties_params params;
+
+    TRACE("%p, %p\n", physical_device, properties);
+
+    params.physicalDevice = physical_device;
+    params.pProperties = properties;
+    vk_unix_call(unix_vkGetPhysicalDeviceProperties, &params);
+
+    {
+        const char *sgi = getenv("WINE_HIDE_NVIDIA_GPU");
+        if (sgi && *sgi != '0')
+        {
+            if (properties->vendorID == 0x10de /* NVIDIA */)
+            {
+                properties->vendorID = 0x1002; /* AMD */
+                properties->deviceID = 0x67df; /* RX 480 */
+            }
+        }
+    }
+}
+
 void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
         VkPhysicalDeviceProperties2 *properties2)
 {
@@ -379,6 +403,18 @@ void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
     params.pProperties = properties2;
     vk_unix_call(unix_vkGetPhysicalDeviceProperties2, &params);
     fill_luid_property(properties2);
+
+    {
+        const char *sgi = getenv("WINE_HIDE_NVIDIA_GPU");
+        if (sgi && *sgi != '0')
+        {
+            if (properties2->properties.vendorID == 0x10de /* NVIDIA */)
+            {
+                properties2->properties.vendorID = 0x1002; /* AMD */
+                properties2->properties.deviceID = 0x67df; /* RX 480 */
+            }
+        }
+    }
 }
 
 void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
@@ -392,6 +428,18 @@ void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
     params.pProperties = properties2;
     vk_unix_call(unix_vkGetPhysicalDeviceProperties2KHR, &params);
     fill_luid_property(properties2);
+
+    {
+        const char *sgi = getenv("WINE_HIDE_NVIDIA_GPU");
+        if (sgi && *sgi != '0')
+        {
+            if (properties2->properties.vendorID == 0x10de /* NVIDIA */)
+            {
+                properties2->properties.vendorID = 0x1002; /* AMD */
+                properties2->properties.deviceID = 0x67df; /* RX 480 */
+            }
+        }
+    }
 }
 
 static BOOL WINAPI call_vulkan_debug_report_callback( struct wine_vk_debug_report_params *params, ULONG size )

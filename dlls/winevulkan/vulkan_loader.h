@@ -20,6 +20,9 @@
 #ifndef __WINE_VULKAN_LOADER_H
 #define __WINE_VULKAN_LOADER_H
 
+#include <stdarg.h>
+#include <stdlib.h>
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include <stdarg.h>
