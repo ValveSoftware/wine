@@ -1885,3 +1885,43 @@ NTSTATUS vk_is_available_device_function32(void *arg)
     struct wine_device *device = wine_device_from_handle(UlongToPtr(params->device));
     return !!vk_funcs->p_vkGetDeviceProcAddr(device->device, UlongToPtr(params->name));
 }
+
+VkDevice WINAPI __wine_get_native_VkDevice(VkDevice handle)
+{
+    struct wine_device *device = wine_device_from_handle(handle);
+
+    return device->device;
+}
+
+VkInstance WINAPI __wine_get_native_VkInstance(VkInstance handle)
+{
+    struct wine_instance *instance = wine_instance_from_handle(handle);;
+
+    return instance->instance;
+}
+
+VkPhysicalDevice WINAPI __wine_get_native_VkPhysicalDevice(VkPhysicalDevice handle)
+{
+    struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(handle);
+
+    return phys_dev->phys_dev;
+}
+
+VkQueue WINAPI __wine_get_native_VkQueue(VkQueue handle)
+{
+    struct wine_queue *queue = wine_queue_from_handle(handle);
+
+    return queue->queue;
+}
+
+VkPhysicalDevice WINAPI __wine_get_wrapped_VkPhysicalDevice(VkInstance handle, VkPhysicalDevice native_phys_dev)
+{
+    struct wine_instance *instance = wine_instance_from_handle(handle);
+    uint32_t i;
+    for(i = 0; i < instance->phys_dev_count; ++i){
+        if(instance->phys_devs[i]->phys_dev == native_phys_dev)
+            return instance->phys_devs[i]->handle;
+    }
+    WARN("Unknown native physical device: %p\n", native_phys_dev);
+    return NULL;
+}
