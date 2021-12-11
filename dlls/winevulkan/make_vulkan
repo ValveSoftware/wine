@@ -2852,6 +2852,8 @@ class VkGenerator(object):
         f.write("    __wine_get_native_VkPhysicalDevice,\n")
         f.write("    __wine_get_native_VkQueue,\n")
         f.write("    __wine_get_wrapped_VkPhysicalDevice,\n")
+        f.write("    __wine_create_vk_instance_with_callback,\n")
+        f.write("    __wine_create_vk_device_with_callback,\n")
         f.write("};\n")
 
     def generate_thunks_h(self, f, prefix):
@@ -3194,6 +3196,12 @@ class VkGenerator(object):
         f.write("\n")
         f.write("    /* winevulkan specific functions */\n")
         f.write("    VkSurfaceKHR (*p_wine_get_native_surface)(VkSurfaceKHR);\n")
+
+        f.write("    VkResult (*create_vk_instance_with_callback)(const VkInstanceCreateInfo *create_info,\n")
+        f.write("            const VkAllocationCallbacks *allocator, VkInstance *instance,\n")
+        f.write("            VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,\n")
+        f.write("            VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context);\n")
+
         f.write("};\n\n")
 
         f.write("extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver(UINT version);\n\n")
@@ -3239,6 +3247,8 @@ class VkGenerator(object):
         f.write("@ stdcall __wine_get_native_VkPhysicalDevice(ptr)\n")
         f.write("@ stdcall __wine_get_native_VkQueue(ptr)\n")
         f.write("@ stdcall __wine_get_wrapped_VkPhysicalDevice(ptr ptr)\n")
+        f.write("@ stdcall __wine_create_vk_instance_with_callback(ptr ptr ptr ptr ptr)\n")
+        f.write("@ stdcall __wine_create_vk_device_with_callback(ptr ptr ptr ptr ptr ptr)\n")
 
         # Export symbols for all Vulkan Core functions.
         for func in self.registry.funcs.values():

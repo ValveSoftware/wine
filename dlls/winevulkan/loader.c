@@ -430,6 +430,26 @@ VkPhysicalDevice WINAPI __wine_get_wrapped_VkPhysicalDevice(VkInstance instance,
     return unix_funcs->p_wine_get_wrapped_VkPhysicalDevice(instance, native_phys_dev);
 }
 
+VkResult WINAPI __wine_create_vk_instance_with_callback(const VkInstanceCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkInstance *instance,
+        VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,
+        VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context)
+{
+    return unix_funcs->p_wine_create_vk_instance_with_callback(create_info, allocator, instance,
+            native_vkCreateInstance, native_vkCreateInstance_context);
+}
+
+VkResult WINAPI __wine_create_vk_device_with_callback(VkPhysicalDevice phys_dev,
+        const VkDeviceCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkDevice *device,
+        VkResult (WINAPI *native_vkCreateDevice)(VkPhysicalDevice, const VkDeviceCreateInfo *, const VkAllocationCallbacks *,
+        VkDevice *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateDevice_context)
+{
+    return unix_funcs->p_wine_create_vk_device_with_callback(phys_dev, create_info, allocator, device,
+            native_vkCreateDevice, native_vkCreateDevice_context);
+}
+
+
 BOOL WINAPI DllMain(HINSTANCE hinst, DWORD reason, void *reserved)
 {
     void **kernel_callback_table;

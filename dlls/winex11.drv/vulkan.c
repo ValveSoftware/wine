@@ -257,12 +257,15 @@ void vulkan_thread_detach(void)
     LeaveCriticalSection(&context_section);
 }
 
-static VkResult X11DRV_vkCreateInstance(const VkInstanceCreateInfo *create_info,
-        const VkAllocationCallbacks *allocator, VkInstance *instance)
+static VkResult X11DRV_create_vk_instance_with_callback(const VkInstanceCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkInstance *instance,
+        VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,
+        VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context)
 {
     VkInstanceCreateInfo create_info_host;
     VkResult res;
-    TRACE("create_info %p, allocator %p, instance %p\n", create_info, allocator, instance);
+    TRACE("create_info %p, allocator %p, instance %p, native_vkCreateInstance %p, context %p.\n",
+            create_info, allocator, instance, native_vkCreateInstance, native_vkCreateInstance_context);
 
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
@@ -278,10 +281,20 @@ static VkResult X11DRV_vkCreateInstance(const VkInstanceCreateInfo *create_info,
         return res;
     }
 
-    res = pvkCreateInstance(&create_info_host, NULL /* allocator */, instance);
+    if (native_vkCreateInstance)
+        res = native_vkCreateInstance(&create_info_host, NULL /* allocator */, instance,
+                pvkGetInstanceProcAddr, native_vkCreateInstance_context);
+    else
+        res = pvkCreateInstance(&create_info_host, NULL /* allocator */, instance);
 
     heap_free((void *)create_info_host.ppEnabledExtensionNames);
     return res;
+}
+
+static VkResult X11DRV_vkCreateInstance(const VkInstanceCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkInstance *instance)
+{
+    return X11DRV_create_vk_instance_with_callback(create_info, allocator, instance, NULL, NULL);
 }
 
 static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
@@ -709,6 +722,7 @@ static const struct vulkan_funcs vulkan_funcs =
     X11DRV_vkQueuePresentKHR,
 
     X11DRV_wine_get_native_surface,
+    X11DRV_create_vk_instance_with_callback,
 };
 
 static void *X11DRV_get_vk_device_proc_addr(const char *name)

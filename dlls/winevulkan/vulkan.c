@@ -793,6 +793,15 @@ NTSTATUS wine_vkCreateDevice(void *args)
     const VkDeviceCreateInfo *create_info = params->pCreateInfo;
     const VkAllocationCallbacks *allocator = params->pAllocator;
     VkDevice *device = params->pDevice;
+    return __wine_create_vk_device_with_callback(phys_dev, create_info, allocator, device, NULL, NULL);
+}
+
+VkResult WINAPI __wine_create_vk_device_with_callback(VkPhysicalDevice phys_dev,
+        const VkDeviceCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkDevice *device,
+        VkResult (WINAPI *native_vkCreateDevice)(VkPhysicalDevice, const VkDeviceCreateInfo *, const VkAllocationCallbacks *,
+        VkDevice *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateDevice_context)
+{
     VkDeviceCreateInfo create_info_host;
     struct VkQueue_T *next_queue;
     struct VkDevice_T *object;
@@ -826,8 +835,14 @@ NTSTATUS wine_vkCreateDevice(void *args)
     if (res != VK_SUCCESS)
         goto fail;
 
-    res = phys_dev->instance->funcs.p_vkCreateDevice(phys_dev->phys_dev,
-            &create_info_host, NULL /* allocator */, &object->device);
+    if (native_vkCreateDevice)
+        res = native_vkCreateDevice(phys_dev->phys_dev,
+                &create_info_host, NULL /* allocator */, &object->device,
+                vk_funcs->p_vkGetInstanceProcAddr, native_vkCreateDevice_context);
+    else
+        res = phys_dev->instance->funcs.p_vkCreateDevice(phys_dev->phys_dev,
+                &create_info_host, NULL /* allocator */, &object->device);
+
     wine_vk_device_free_create_info(&create_info_host);
     if(create_info_free_extensions)
         wine_vk_device_free_create_info_extensions(&create_info_host);
@@ -893,10 +908,21 @@ NTSTATUS wine_vkCreateInstance(void *args)
     const VkInstanceCreateInfo *create_info = params->pCreateInfo;
     const VkAllocationCallbacks *allocator = params->pAllocator;
     VkInstance *instance = params->pInstance;
+    return __wine_create_vk_instance_with_callback(create_info, allocator, instance, NULL, NULL);
+}
+
+VkResult WINAPI __wine_create_vk_instance_with_callback(const VkInstanceCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkInstance *instance,
+        VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,
+        VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context)
+{
     VkInstanceCreateInfo create_info_host;
     const VkApplicationInfo *app_info;
     struct VkInstance_T *object;
     VkResult res;
+
+    TRACE("create_info %p, allocator %p, instance %p, native_vkCreateInstance %p, context %p.\n",
+            create_info, allocator, instance, native_vkCreateInstance, native_vkCreateInstance_context);
 
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
@@ -917,7 +943,14 @@ NTSTATUS wine_vkCreateInstance(void *args)
         return res;
     }
 
-    res = vk_funcs->p_vkCreateInstance(&create_info_host, NULL /* allocator */, &object->instance);
+    if (native_vkCreateInstance && !vk_funcs->create_vk_instance_with_callback)
+        ERR("Driver create_vk_instance_with_callback is not available.\n");
+
+    if (native_vkCreateInstance && vk_funcs->create_vk_instance_with_callback)
+        res = vk_funcs->create_vk_instance_with_callback(&create_info_host, NULL /* allocator */, &object->instance,
+                native_vkCreateInstance, native_vkCreateInstance_context);
+    else
+        res = vk_funcs->p_vkCreateInstance(&create_info_host, NULL /* allocator */, &object->instance);
     free_VkInstanceCreateInfo_struct_chain(&create_info_host);
     if (res != VK_SUCCESS)
     {
