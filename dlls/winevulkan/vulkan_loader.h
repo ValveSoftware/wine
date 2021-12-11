@@ -103,6 +103,11 @@ static inline NTSTATUS vk_unix_call(enum unix_call code, void *params)
     return __wine_unix_call(unix_handle, code, params);
 }
 
+typedef VkResult (WINAPI *PFN_native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *, VkInstance *,
+                                                       void * (*)(VkInstance, const char *), void *);
+typedef VkResult (WINAPI *PFN_native_vkCreateDevice)(VkPhysicalDevice, const VkDeviceCreateInfo *, const VkAllocationCallbacks *, VkDevice *,
+                                                     void * (*)(VkInstance, const char *), void *);
+
 struct unix_funcs
 {
     NTSTATUS (WINAPI *p_vk_call)(enum unix_call, void *);
@@ -114,6 +119,11 @@ struct unix_funcs
     VkPhysicalDevice (WINAPI *p_wine_get_native_VkPhysicalDevice)(VkPhysicalDevice);
     VkQueue (WINAPI *p_wine_get_native_VkQueue)(VkQueue);
     VkPhysicalDevice (WINAPI *p_wine_get_wrapped_VkPhysicalDevice)(VkInstance, VkPhysicalDevice);
+
+    VkResult (WINAPI *p_wine_create_vk_instance_with_callback)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *, VkInstance *,
+                                                               PFN_native_vkCreateInstance, void *);
+    VkResult (WINAPI *p_wine_create_vk_device_with_callback)(VkPhysicalDevice, const VkDeviceCreateInfo *, const VkAllocationCallbacks *, VkDevice *,
+                                                             PFN_native_vkCreateDevice, void *);
 };
 
 #endif /* __WINE_VULKAN_LOADER_H */
