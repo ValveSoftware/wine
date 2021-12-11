@@ -30,6 +30,10 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <sys/types.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <dlfcn.h>
 #include <gnutls/gnutls.h>
 #include <gnutls/crypto.h>
@@ -47,6 +51,13 @@
 #include "bcrypt_internal.h"
 
 #include "wine/debug.h"
+
+#include <assert.h>
+
+#ifdef HAVE_GMP_H
+#include <gmp.h>
+#endif
+
 
 WINE_DEFAULT_DEBUG_CHANNEL(bcrypt);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
@@ -80,8 +91,6 @@ static union key_data *key_data( struct key *key )
 {
     return (union key_data *)key->private;
 }
-
-static BOOL dh_supported;
 
 /* Not present in gnutls version < 3.0 */
 static int (*pgnutls_cipher_tag)(gnutls_cipher_hd_t, void *, size_t);
@@ -125,11 +134,9 @@ static int (*pgnutls_dh_params_import_raw2)(gnutls_dh_params_t dh_params, const 
         const gnutls_datum_t * generator, unsigned key_bits);
 static int (*pgnutls_dh_params_export_raw)(gnutls_dh_params_t params, gnutls_datum_t * prime,
         gnutls_datum_t * generator, unsigned int *bits);
-static int (*pgnutls_dh_generate_key)(gnutls_dh_params_t dh_params, gnutls_datum_t *priv_key, gnutls_datum_t *pub_key);
-static int (*pgnutls_dh_compute_key)(gnutls_dh_params_t dh_params, const gnutls_datum_t *priv_key,
-        const gnutls_datum_t *pub_key, const gnutls_datum_t *peer_key, gnutls_datum_t *Z);
 
 static void *libgnutls_handle;
+
 #define MAKE_FUNCPTR(f) static typeof(f) * p##f
 MAKE_FUNCPTR(gnutls_cipher_decrypt2);
 MAKE_FUNCPTR(gnutls_cipher_deinit);
@@ -147,6 +154,22 @@ MAKE_FUNCPTR(gnutls_privkey_init);
 MAKE_FUNCPTR(gnutls_privkey_sign_hash);
 MAKE_FUNCPTR(gnutls_pubkey_deinit);
 MAKE_FUNCPTR(gnutls_pubkey_init);
+
+#if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
+static BOOL dh_supported;
+static void *libgmp_handle;
+
+MAKE_FUNCPTR(mpz_init);
+MAKE_FUNCPTR(mpz_clear);
+MAKE_FUNCPTR(mpz_cmp);
+MAKE_FUNCPTR(_mpz_cmp_ui);
+MAKE_FUNCPTR(mpz_sizeinbase);
+MAKE_FUNCPTR(mpz_import);
+MAKE_FUNCPTR(mpz_export);
+MAKE_FUNCPTR(mpz_mod);
+MAKE_FUNCPTR(mpz_powm);
+MAKE_FUNCPTR(mpz_sub_ui);
+#endif
 #undef MAKE_FUNCPTR
 
 static int compat_gnutls_cipher_tag(gnutls_cipher_hd_t handle, void *tag, size_t tag_size)
@@ -288,6 +311,37 @@ static NTSTATUS gnutls_process_attach( void *args )
     LOAD_FUNCPTR(gnutls_pubkey_init);
 #undef LOAD_FUNCPTR
 
+#if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
+#define LOAD_FUNCPTR_STR(f) #f
+#define LOAD_FUNCPTR(f) \
+    if (!(p##f = dlsym( libgmp_handle, LOAD_FUNCPTR_STR(f) ))) \
+    { \
+        ERR( "failed to load %s\n", LOAD_FUNCPTR_STR(f) ); \
+        goto fail; \
+    }
+
+    if ((libgmp_handle = dlopen( SONAME_LIBGMP, RTLD_NOW )))
+    {
+        LOAD_FUNCPTR(mpz_init);
+        LOAD_FUNCPTR(mpz_clear);
+        LOAD_FUNCPTR(mpz_cmp);
+        LOAD_FUNCPTR(_mpz_cmp_ui);
+        LOAD_FUNCPTR(mpz_sizeinbase);
+        LOAD_FUNCPTR(mpz_import);
+        LOAD_FUNCPTR(mpz_export);
+        LOAD_FUNCPTR(mpz_mod);
+        LOAD_FUNCPTR(mpz_powm);
+        LOAD_FUNCPTR(mpz_sub_ui);
+    }
+    else
+    {
+        ERR_(winediag)( "failed to load libgmp, no support for DH\n" );
+        goto fail;
+    }
+#undef LOAD_FUNCPTR
+#undef LOAD_FUNCPTR_STR
+#endif
+
 #define LOAD_FUNCPTR_OPT(f) \
     if (!(p##f = dlsym( libgnutls_handle, #f ))) \
     { \
@@ -337,19 +391,13 @@ static NTSTATUS gnutls_process_attach( void *args )
     {
         WARN("gnutls_dh_params_export_raw not found\n");
     }
-    if (!(pgnutls_dh_generate_key = dlsym( libgnutls_handle, "_gnutls_dh_generate_key" ))
-            && !(pgnutls_dh_generate_key = dlsym( libgnutls_handle, "gnutls_dh_generate_key" )))
-    {
-        WARN("gnutls_dh_generate_key not found\n");
-    }
-    if (!(pgnutls_dh_compute_key = dlsym( libgnutls_handle, "_gnutls_dh_compute_key" ))
-            && !(pgnutls_dh_compute_key = dlsym( libgnutls_handle, "gnutls_dh_compute_key" )))
-    {
-        WARN("gnutls_dh_compute_key not found\n");
-    }
 
+#if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
     dh_supported = pgnutls_dh_params_init && pgnutls_dh_params_generate2 && pgnutls_dh_params_import_raw2
-            && pgnutls_dh_generate_key && pgnutls_dh_compute_key;
+            && libgmp_handle;
+#else
+    ERR_(winediag)("Compiled without DH support.\n");
+#endif
 
     if (TRACE_ON( bcrypt ))
     {
@@ -362,6 +410,14 @@ static NTSTATUS gnutls_process_attach( void *args )
 fail:
     dlclose( libgnutls_handle );
     libgnutls_handle = NULL;
+
+#if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
+    if (libgmp_handle)
+    {
+        dlclose( libgmp_handle );
+        libgmp_handle = NULL;
+    }
+#endif
     return STATUS_DLL_NOT_FOUND;
 }
 
@@ -374,6 +430,11 @@ static NTSTATUS gnutls_process_detach( void *args )
         libgnutls_handle = NULL;
     }
     return STATUS_SUCCESS;
+
+#if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
+    dlclose( libgmp_handle );
+    libgmp_handle = NULL;
+#endif
 }
 
 struct buffer
@@ -882,12 +943,61 @@ static NTSTATUS export_gnutls_pubkey_dsa_capi( gnutls_privkey_t gnutls_key, cons
     return STATUS_SUCCESS;
 }
 
+#if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
+static NTSTATUS CDECL gen_random(void *buffer, unsigned int length)
+{
+    unsigned int read_size;
+    int dev_random;
+
+    dev_random = open("/dev/urandom", O_RDONLY);
+    if (dev_random == -1)
+    {
+        FIXME("couldn't open /dev/urandom.\n");
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    read_size = read(dev_random, buffer, length);
+    close(dev_random);
+    if (read_size != length)
+    {
+        FIXME("Could not read from /dev/urandom.");
+        return STATUS_INTERNAL_ERROR;
+    }
+    return STATUS_SUCCESS;
+}
+
+static void import_mpz(mpz_t value, const void *input, unsigned int length)
+{
+    pmpz_import(value, length, 1, 1, 0, 0, input);
+}
+
+static void export_mpz(void *output, unsigned int length, const mpz_t value)
+{
+    size_t export_length;
+    unsigned int offset;
+
+    export_length = (pmpz_sizeinbase(value, 2) + 7) / 8;
+    assert(export_length <= length);
+    offset = length - export_length;
+    memset(output, 0, offset);
+    pmpz_export((BYTE *)output + offset, &export_length, 1, 1, 0, 0, value);
+    if (!export_length)
+    {
+        ERR("Zero export length, value bits %u.\n", (unsigned)pmpz_sizeinbase(value, 2));
+        memset((BYTE *)output + offset, 0, length - offset);
+    }
+    else
+    {
+        assert(export_length + offset == length);
+    }
+}
+
 static NTSTATUS CDECL key_dh_generate( struct key *key )
 {
-    gnutls_datum_t prime, generator, privkey, pubkey;
     NTSTATUS status = STATUS_SUCCESS;
-    gnutls_dh_params_t dh_params;
+    mpz_t p, psub1, g, privkey, pubkey;
     ULONG key_length;
+    unsigned int i;
     int ret;
 
     if (!dh_supported)
@@ -896,22 +1006,18 @@ static NTSTATUS CDECL key_dh_generate( struct key *key )
         return STATUS_NOT_IMPLEMENTED;
     }
 
-    if ((ret = pgnutls_dh_params_init( &dh_params )))
-    {
-        pgnutls_perror( ret );
-        return STATUS_INTERNAL_ERROR;
-    }
-
     key_length = key->u.a.bitlen / 8;
 
     if (!(key->u.a.flags & KEY_FLAG_DH_PARAMS_SET))
     {
-        /* Generate parameters, export and then import them back below.
-         * The bitlen in dh parameters (which is later used for keys generation)
-         * is not set to gnutls_dh_params_generate2 'bits' parameter as one
-         * could expect. gnutls_dh_params_generate2 generates 'q' (which is not
-         * actually needed for DH) with the estimated bit length and then
-         * sets the bit length to the 'q' bitlength. */
+        gnutls_datum_t prime, generator;
+        gnutls_dh_params_t dh_params;
+
+        if ((ret = pgnutls_dh_params_init( &dh_params )))
+        {
+            pgnutls_perror( ret );
+            return STATUS_INTERNAL_ERROR;
+        }
         if ((ret = pgnutls_dh_params_generate2( dh_params, key->u.a.bitlen )))
         {
             pgnutls_perror( ret );
@@ -924,6 +1030,8 @@ static NTSTATUS CDECL key_dh_generate( struct key *key )
             pgnutls_dh_params_deinit( dh_params );
             return STATUS_INTERNAL_ERROR;
         }
+        pgnutls_dh_params_deinit( dh_params );
+
 
         export_gnutls_datum( (UCHAR *)((BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1), key_length, &prime, 1 );
         export_gnutls_datum( (UCHAR *)((BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1) + key_length,
@@ -934,34 +1042,73 @@ static NTSTATUS CDECL key_dh_generate( struct key *key )
         key->u.a.flags |= KEY_FLAG_DH_PARAMS_SET;
     }
 
-    prime.size = generator.size = key_length;
-    prime.data = (UCHAR *)((BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1);
-    generator.data = (BYTE *)((BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1) + key_length;
+    pmpz_init(p);
+    pmpz_init(psub1);
+    pmpz_init(g);
+    pmpz_init(pubkey);
+    pmpz_init(privkey);
 
-    if ((ret = pgnutls_dh_params_import_raw2( dh_params, &prime, &generator, key->u.a.bitlen )))
+    import_mpz(p, (BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1, key_length);
+    if (!mpz_sgn(p))
     {
-        pgnutls_perror( ret );
-        pgnutls_dh_params_deinit( dh_params );
-        return STATUS_INTERNAL_ERROR;
+        ERR("Got zero modulus.\n");
+        status = STATUS_INTERNAL_ERROR;
+        goto done;
+    }
+    pmpz_sub_ui(psub1, p, 1);
+
+    import_mpz(g, (UCHAR *)((BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1) + key_length, key_length);
+    if (!mpz_sgn(g))
+    {
+        ERR("Got zero generator.\n");
+        status = STATUS_INTERNAL_ERROR;
+        goto done;
+    }
+    for (i = 0; i < 3; ++i)
+    {
+        if ((status = gen_random(key->u.a.privkey, key_length)))
+        {
+            goto done;
+        }
+        import_mpz(privkey, key->u.a.privkey, key_length);
+
+        pmpz_mod(privkey, privkey, p);
+        pmpz_powm(pubkey, g, privkey, p);
+        if (p_mpz_cmp_ui(pubkey, 1))
+            break;
+    }
+    if (i == 3)
+    {
+        ERR("Could not generate key after 3 iterations.\n");
+        status = STATUS_INTERNAL_ERROR;
+        goto done;
     }
 
-    if ((ret = pgnutls_dh_generate_key( dh_params, &privkey, &pubkey )))
+    if (pmpz_cmp(pubkey, psub1) >= 0)
     {
-        pgnutls_perror( ret );
-        pgnutls_dh_params_deinit( dh_params );
-        return STATUS_INTERNAL_ERROR;
+        ERR("pubkey > p - 1.\n");
+        status = STATUS_INTERNAL_ERROR;
+        goto done;
     }
 
-    export_gnutls_datum( (BYTE *)((BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1) + 2 * key_length,
-            key_length, &pubkey, 1 );
-    export_gnutls_datum( key->u.a.privkey, key_length, &privkey, 1 );
+    export_mpz(key->u.a.privkey, key_length, privkey);
+    export_mpz((UCHAR *)((BCRYPT_DH_KEY_BLOB *)key->u.a.pubkey + 1) + 2 * key_length, key_length, pubkey);
 
-    free( privkey.data );
-    free( pubkey.data );
-    pgnutls_dh_params_deinit( dh_params );
-
+done:
+    pmpz_clear(psub1);
+    pmpz_clear(p);
+    pmpz_clear(g);
+    pmpz_clear(pubkey);
+    pmpz_clear(privkey);
     return status;
 }
+#else
+static NTSTATUS CDECL key_dh_generate( struct key *key )
+{
+    ERR("Compiled without DH support.\n");
+    return STATUS_NOT_IMPLEMENTED;
+}
+#endif
 
 static NTSTATUS key_asymmetric_generate( void *args )
 {
@@ -1982,8 +2129,6 @@ static NTSTATUS key_secret_agreement( void *args )
     struct secret *secret;
     struct key *priv_key;
     struct key *peer_key;
-    int ret;
-
     priv_key = params->privkey;
     peer_key = params->pubkey;
     secret = params->secret;
@@ -1991,9 +2136,9 @@ static NTSTATUS key_secret_agreement( void *args )
     switch (priv_key->alg_id)
     {
         case ALG_ID_DH:
+#if defined(HAVE_GMP_H) && defined(SONAME_LIBGMP)
         {
-            gnutls_datum_t prime, generator, priv, peer, secret_datum;
-            gnutls_dh_params_t dh_params;
+            mpz_t p, priv, peer, k;
             ULONG key_length;
 
             if (!dh_supported)
@@ -2002,51 +2147,46 @@ static NTSTATUS key_secret_agreement( void *args )
                 return STATUS_NOT_IMPLEMENTED;
             }
 
-            if ((ret = pgnutls_dh_params_init( &dh_params )))
-            {
-                pgnutls_perror( ret );
-                return STATUS_INTERNAL_ERROR;
-            }
-
             key_length = priv_key->u.a.bitlen / 8;
-
-            prime.size = generator.size = key_length;
-            prime.data = (UCHAR *)((BCRYPT_DH_KEY_BLOB *)priv_key->u.a.pubkey + 1);
-            generator.data = (BYTE *)((BCRYPT_DH_KEY_BLOB *)priv_key->u.a.pubkey + 1) + key_length;
-
-            if ((ret = pgnutls_dh_params_import_raw2( dh_params, &prime, &generator, priv_key->u.a.bitlen )))
-            {
-                pgnutls_perror( ret );
-                pgnutls_dh_params_deinit( dh_params );
-                return STATUS_INTERNAL_ERROR;
-            }
-
-            priv.size = peer.size = key_length;
-            priv.data = priv_key->u.a.privkey;
-            peer.data = peer_key->u.a.pubkey + sizeof(BCRYPT_DH_KEY_BLOB) + key_length * 2;
 
             if (memcmp((BCRYPT_DH_KEY_BLOB *)priv_key->u.a.pubkey + 1,
                     peer_key->u.a.pubkey + sizeof(BCRYPT_DH_KEY_BLOB), key_length * 2))
             {
                 ERR("peer DH paramaters do not match.\n");
-                pgnutls_dh_params_deinit( dh_params );
                 return STATUS_INTERNAL_ERROR;
             }
 
-            if ((ret = pgnutls_dh_compute_key( dh_params, &priv, NULL, &peer, &secret_datum )))
+            pmpz_init(p);
+            pmpz_init(priv);
+            pmpz_init(peer);
+            pmpz_init(k);
+
+            import_mpz(p, (BCRYPT_DH_KEY_BLOB *)priv_key->u.a.pubkey + 1, key_length);
+            if (pmpz_sizeinbase(p, 2) < 2)
             {
-                ERR("Error computing shared key.\n");
-                pgnutls_perror( ret );
-                pgnutls_dh_params_deinit( dh_params );
+                ERR("Invalid prime.\n");
+                pmpz_clear(p);
+                pmpz_clear(priv);
+                pmpz_clear(peer);
+                pmpz_clear(k);
                 return STATUS_INTERNAL_ERROR;
             }
-
-            TRACE("secret_datum.size %u, key_length %u.\n", secret_datum.size, key_length);
-            export_gnutls_datum( secret->data, key_length, &secret_datum, 1 );
+            import_mpz(priv, priv_key->u.a.privkey, key_length);
+            import_mpz(peer, peer_key->u.a.pubkey + sizeof(BCRYPT_DH_KEY_BLOB) + key_length * 2, key_length);
+            pmpz_powm(k, peer, priv, p);
+            export_mpz(secret->data, key_length, k);
             secret->data_len = key_length;
-            free( secret_datum.data );
+
+            pmpz_clear(p);
+            pmpz_clear(priv);
+            pmpz_clear(peer);
+            pmpz_clear(k);
             break;
         }
+#else
+            ERR_(winediag)("Compiled without DH support.\n");
+            return STATUS_NOT_IMPLEMENTED;
+#endif
 
         case ALG_ID_ECDH_P256:
             FIXME("ECDH is not supported.\n");
