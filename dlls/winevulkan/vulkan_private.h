@@ -217,4 +217,10 @@ extern const struct unix_funcs loader_funcs;
 BOOL WINAPI wine_vk_is_available_instance_function(VkInstance instance, const char *name) DECLSPEC_HIDDEN;
 BOOL WINAPI wine_vk_is_available_device_function(VkDevice device, const char *name) DECLSPEC_HIDDEN;
 
+extern VkDevice WINAPI __wine_get_native_VkDevice(VkDevice device) DECLSPEC_HIDDEN;
+extern VkInstance WINAPI __wine_get_native_VkInstance(VkInstance instance) DECLSPEC_HIDDEN;
+extern VkPhysicalDevice WINAPI __wine_get_native_VkPhysicalDevice(VkPhysicalDevice phys_dev) DECLSPEC_HIDDEN;
+extern VkQueue WINAPI __wine_get_native_VkQueue(VkQueue queue) DECLSPEC_HIDDEN;
+extern VkPhysicalDevice WINAPI __wine_get_wrapped_VkPhysicalDevice(VkInstance instance, VkPhysicalDevice native_phys_dev) DECLSPEC_HIDDEN;
+
 #endif /* __WINE_VULKAN_PRIVATE_H */
