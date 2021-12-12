@@ -856,6 +856,10 @@ struct queue_shared_memory
 {
     unsigned int         seq;              /* sequence number - server updating if (seq_no & SEQUENCE_MASK) != 0 */
     int                  created;          /* queue has been created */
+    unsigned int         wake_bits;
+    unsigned int         changed_bits;
+    unsigned int         wake_mask;
+    unsigned int         changed_mask;
 };
 
 /* Bits that must be clear for client to read */
