@@ -345,14 +345,15 @@ BOOL WINAPI SetForegroundWindow( HWND hwnd )
  */
 HWND WINAPI GetActiveWindow(void)
 {
+    volatile struct input_shared_memory *shared = get_input_shared_memory();
     HWND ret = 0;
 
-    SERVER_START_REQ( get_thread_input )
+    if (!shared) return 0;
+    SHARED_READ_BEGIN( &shared->seq )
     {
-        req->tid = GetCurrentThreadId();
-        if (!wine_server_call_err( req )) ret = wine_server_ptr_handle( reply->active );
+        ret = wine_server_ptr_handle( shared->active );
     }
-    SERVER_END_REQ;
+    SHARED_READ_END( &shared->seq );
     return ret;
 }
 
