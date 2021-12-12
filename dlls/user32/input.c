@@ -701,6 +701,33 @@ BOOL WINAPI GetKeyboardLayoutNameA(LPSTR pszKLID)
 }
 
 /**********************************************************************
+ *       GetKeyState    (USER32.@)
+ *
+ * An application calls the GetKeyState function in response to a
+ * keyboard-input message.  This function retrieves the state of the key
+ * at the time the input message was generated.
+ */
+SHORT WINAPI GetKeyState( INT vkey )
+{
+    volatile struct input_shared_memory *shared = get_input_shared_memory();
+    SHORT retval = 0;
+    BOOL skip = TRUE;
+
+    if (!shared) skip = FALSE;
+    else SHARED_READ_BEGIN( &shared->seq )
+    {
+        if (!shared->created) skip = FALSE; /* server needs to create the queue */
+        else if (!shared->keystate_lock) skip = FALSE; /* server needs to call sync_input_keystate */
+        else retval = (signed char)(shared->keystate[vkey & 0xff] & 0x81);
+    }
+    SHARED_READ_END( &shared->seq );
+
+    if (!skip) retval = NtUserGetKeyState( vkey );
+    TRACE("key (0x%x) -> %x\n", vkey, retval);
+    return retval;
+}
+
+/**********************************************************************
  *       GetKeyboardState    (USER32.@)
  */
 BOOL WINAPI GetKeyboardState( BYTE *state )
