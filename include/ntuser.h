@@ -80,6 +80,7 @@ struct user_thread_info
     DWORD                         wake_mask;              /* Current queue wake mask */
     DWORD                         changed_mask;           /* Current queue changed mask */
     DWORD                         last_driver_time;       /* Get/PeekMessage driver event time */
+    DWORD                         last_getmsg_time;       /* Get/PeekMessage last request time */
     WORD                          recursion_count;        /* SendMessage recursion counter */
     WORD                          message_count;          /* Get/PeekMessage loop counter */
     WORD                          hook_call_depth;        /* Number of recursively called hook procs */
