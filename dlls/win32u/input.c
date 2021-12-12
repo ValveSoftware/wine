@@ -417,10 +417,25 @@ SHORT WINAPI NtUserGetKeyState( INT vkey )
  */
 BOOL WINAPI NtUserGetKeyboardState( BYTE *state )
 {
-    BOOL ret;
+    volatile struct input_shared_memory *shared = get_input_shared_memory();
+    BOOL ret, skip = TRUE;
     UINT i;
 
     TRACE("(%p)\n", state);
+
+    if (!shared) skip = FALSE;
+    else SHARED_READ_BEGIN( &shared->seq )
+    {
+        if (!shared->created) skip = FALSE; /* server needs to create the queue */
+        else memcpy( state, (const void *)shared->keystate, 256 );
+    }
+    SHARED_READ_END( &shared->seq );
+
+    if (skip)
+    {
+        for (i = 0; i < 256; i++) state[i] &= 0x81;
+        return TRUE;
+    }
 
     memset( state, 0, 256 );
     SERVER_START_REQ( get_key_state )
@@ -431,6 +446,7 @@ BOOL WINAPI NtUserGetKeyboardState( BYTE *state )
         for (i = 0; i < 256; i++) state[i] &= 0x81;
     }
     SERVER_END_REQ;
+
     return ret;
 }
 
