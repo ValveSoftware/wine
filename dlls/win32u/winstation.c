@@ -634,6 +634,22 @@ volatile struct desktop_shared_memory *get_desktop_shared_memory( void )
     return thread_info->desktop_shared_memory;
 }
 
+volatile struct queue_shared_memory *get_queue_shared_memory( void )
+{
+    struct user_thread_info *thread_info = get_user_thread_info();
+    UINT tid = GetCurrentThreadId();
+    WCHAR bufferW[MAX_PATH];
+    char buffer[MAX_PATH];
+
+    if (thread_info->queue_shared_memory) return thread_info->queue_shared_memory;
+
+    snprintf( buffer, ARRAY_SIZE(buffer), "\\KernelObjects\\__wine_thread_mappings\\%08x-queue", tid );
+    asciiz_to_unicode( bufferW, buffer );
+    map_shared_memory_section( bufferW, sizeof(struct queue_shared_memory), NULL,
+                               &thread_info->queue_shared_map, (void **)&thread_info->queue_shared_memory );
+    return thread_info->queue_shared_memory;
+}
+
 /***********************************************************************
  *           winstation_init
  *

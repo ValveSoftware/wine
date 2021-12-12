@@ -137,6 +137,8 @@ struct user_thread_info
     UINT                          spy_indent;             /* Current spy indent */
     HANDLE                        desktop_shared_map;     /* HANDLE to server's desktop shared memory */
     struct desktop_shared_memory *desktop_shared_memory;  /* Ptr to server's desktop shared memory */
+    HANDLE                        queue_shared_map;       /* HANDLE to server's thread queue shared memory */
+    struct queue_shared_memory   *queue_shared_memory;    /* Ptr to server's thread queue shared memory */
 };
 
 C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
@@ -245,6 +247,7 @@ UINT win_set_flags( HWND hwnd, UINT set_mask, UINT clear_mask ) DECLSPEC_HIDDEN;
 
 /* winstation.c */
 extern volatile struct desktop_shared_memory *get_desktop_shared_memory( void ) DECLSPEC_HIDDEN;
+extern volatile struct queue_shared_memory *get_queue_shared_memory( void ) DECLSPEC_HIDDEN;
 
 static inline UINT win_get_flags( HWND hwnd )
 {

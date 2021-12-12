@@ -5442,6 +5442,13 @@ static void thread_detach(void)
         thread_info->desktop_shared_memory = NULL;
     }
 
+    if (thread_info->queue_shared_map)
+    {
+        NtClose( thread_info->queue_shared_map );
+        thread_info->queue_shared_map = NULL;
+        thread_info->queue_shared_memory = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 
