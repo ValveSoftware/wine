@@ -67,6 +67,7 @@ struct wine_vk_surface
     Window window;
     VkSurfaceKHR surface; /* native surface */
     VkPresentModeKHR present_mode;
+    BOOL known_child; /* hwnd is or has a child */
     BOOL offscreen; /* drawable is offscreen */
     HDC hdc;
     HWND hwnd;
@@ -302,12 +303,21 @@ void resize_vk_surfaces(HWND hwnd, Window active, int mask, XWindowChanges *chan
 void sync_vk_surface(HWND hwnd, BOOL known_child)
 {
     struct wine_vk_surface *surface;
+    DWORD surface_count = 0;
+
     EnterCriticalSection(&context_section);
     LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
     {
-        if (surface->hwnd != hwnd)
-            continue;
-        wine_vk_surface_set_offscreen(surface, known_child);
+        if (surface->hwnd != hwnd) continue;
+        surface->known_child = known_child;
+        surface_count++;
+    }
+    TRACE("hwnd %p surface_count %u known_child %u\n", hwnd, surface_count, known_child);
+    LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd) continue;
+        if (surface_count > 1) wine_vk_surface_set_offscreen(surface, TRUE);
+        else wine_vk_surface_set_offscreen(surface, known_child);
     }
     LeaveCriticalSection(&context_section);
 }
@@ -315,6 +325,7 @@ void sync_vk_surface(HWND hwnd, BOOL known_child)
 Window wine_vk_active_surface( HWND hwnd )
 {
     struct wine_vk_surface *surface, *active = NULL;
+    DWORD surface_count = 0;
     Window window;
 
     EnterCriticalSection(&context_section);
@@ -322,9 +333,16 @@ Window wine_vk_active_surface( HWND hwnd )
     {
         if (surface->hwnd != hwnd) continue;
         active = surface;
+        surface_count++;
     }
     if (!active) window = None;
-    else window = active->window;
+    else
+    {
+        TRACE("hwnd %p surface_count %u known_child %u\n", hwnd, surface_count, active->known_child);
+        if (surface_count > 1) wine_vk_surface_set_offscreen(active, TRUE);
+        else wine_vk_surface_set_offscreen(active, active->known_child);
+        window = active->window;
+    }
     LeaveCriticalSection(&context_section);
 
     return window;
@@ -486,7 +504,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
 {
     VkResult res;
     VkXlibSurfaceCreateInfoKHR create_info_host;
-    struct wine_vk_surface *x11_surface;
+    struct wine_vk_surface *x11_surface, *other;
 
     TRACE("%p %p %p %p\n", instance, create_info, allocator, surface);
 
@@ -499,6 +517,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
 
     x11_surface->ref = 1;
     x11_surface->hwnd = create_info->hwnd;
+    x11_surface->known_child = FALSE;
     if (x11_surface->hwnd)
     {
         x11_surface->hdc = GetDC(create_info->hwnd);
@@ -521,6 +540,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
 
     if (create_info->hwnd && (GetWindow( create_info->hwnd, GW_CHILD ) || GetAncestor( create_info->hwnd, GA_PARENT ) != GetDesktopWindow()))
     {
+        x11_surface->known_child = TRUE;
         TRACE("hwnd %p creating offscreen child window surface\n", x11_surface->hwnd);
         if (!wine_vk_surface_set_offscreen(x11_surface, TRUE))
         {
@@ -543,6 +563,13 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     }
 
     EnterCriticalSection(&context_section);
+    LIST_FOR_EACH_ENTRY(other, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (other->hwnd != x11_surface->hwnd) continue;
+        TRACE("hwnd %p already has a swapchain, moving surface offscreen\n", x11_surface->hwnd);
+        wine_vk_surface_set_offscreen(other, TRUE);
+        wine_vk_surface_set_offscreen(x11_surface, TRUE);
+    }
     list_add_tail(&surface_list, &x11_surface->entry);
     LeaveCriticalSection(&context_section);
 
