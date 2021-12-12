@@ -2176,7 +2176,8 @@ static HANDLE get_server_queue_handle(void)
 /* check for driver events if we detect that the app is not properly consuming messages */
 static inline void check_for_driver_events( UINT msg )
 {
-    if (get_user_thread_info()->message_count > 200)
+    struct user_thread_info *thread_info = get_user_thread_info();
+    if (thread_info->message_count > 200)
     {
         LARGE_INTEGER zero = { .QuadPart = 0 };
         flush_window_surfaces( FALSE );
@@ -2185,9 +2186,9 @@ static inline void check_for_driver_events( UINT msg )
     else if (msg == WM_TIMER || msg == WM_SYSTIMER)
     {
         /* driver events should have priority over timers, so make sure we'll check for them soon */
-        get_user_thread_info()->message_count += 100;
+        thread_info->message_count += 100;
     }
-    else get_user_thread_info()->message_count++;
+    else thread_info->message_count++;
 }
 
 /* helper for kernel32->ntdll timeout format conversion */
@@ -2360,17 +2361,21 @@ BOOL WINAPI NtUserWaitMessage(void)
  */
 BOOL WINAPI NtUserPeekMessage( MSG *msg_out, HWND hwnd, UINT first, UINT last, UINT flags )
 {
+    struct user_thread_info *thread_info = get_user_thread_info();
     MSG msg;
     int ret;
 
     user_check_not_lock();
-    check_for_driver_events( 0 );
+    if (thread_info->last_driver_time != NtGetTickCount())
+        check_for_driver_events( 0 );
 
     ret = peek_message( &msg, hwnd, first, last, flags, 0 );
     if (ret < 0) return FALSE;
 
     if (!ret)
     {
+        if (thread_info->last_driver_time == NtGetTickCount()) return FALSE;
+        thread_info->last_driver_time = NtGetTickCount();
         flush_window_surfaces( TRUE );
         ret = wait_message( 0, NULL, 0, QS_ALLINPUT, 0 );
         /* if we received driver events, check again for a pending message */
@@ -2378,6 +2383,7 @@ BOOL WINAPI NtUserPeekMessage( MSG *msg_out, HWND hwnd, UINT first, UINT last, U
     }
 
     check_for_driver_events( msg.message );
+    thread_info->last_driver_time = NtGetTickCount() - 1;
 
     /* copy back our internal safe copy of message data to msg_out.
      * msg_out is a variable from the *program*, so it can't be used
