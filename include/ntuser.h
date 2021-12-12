@@ -100,6 +100,8 @@ struct user_thread_info
     struct rawinput_thread_data  *rawinput;               /* RawInput thread local data / buffer */
     HANDLE                        desktop_shared_map;     /* HANDLE to server's desktop shared memory */
     struct desktop_shared_memory *desktop_shared_memory;  /* Ptr to server's desktop shared memory */
+    HANDLE                        queue_shared_map;       /* HANDLE to server's thread queue shared memory */
+    struct queue_shared_memory   *queue_shared_memory;     /* Ptr to server's thread queue shared memory */
 };
 
 C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
