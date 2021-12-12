@@ -321,7 +321,7 @@
 @ stdcall GetKeyboardLayoutList(long ptr) NtUserGetKeyboardLayoutList
 @ stdcall GetKeyboardLayoutNameA(ptr)
 @ stdcall GetKeyboardLayoutNameW(ptr) NtUserGetKeyboardLayoutName
-@ stdcall -import GetKeyboardState(ptr) NtUserGetKeyboardState
+@ stdcall GetKeyboardState(ptr)
 @ stdcall GetKeyboardType(long)
 @ stdcall GetLastActivePopup(long)
 @ stdcall GetLastInputInfo(ptr)
