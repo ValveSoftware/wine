@@ -700,6 +700,28 @@ BOOL WINAPI GetKeyboardLayoutNameA(LPSTR pszKLID)
     return FALSE;
 }
 
+/**********************************************************************
+ *       GetKeyboardState    (USER32.@)
+ */
+BOOL WINAPI GetKeyboardState( BYTE *state )
+{
+    volatile struct input_shared_memory *shared = get_input_shared_memory();
+    BOOL skip = TRUE;
+
+    TRACE("(%p)\n", state);
+
+    if (!shared) skip = FALSE;
+    else SHARED_READ_BEGIN( &shared->seq )
+    {
+        if (!shared->created) skip = FALSE; /* server needs to create the queue */
+        else memcpy( state, (const void *)shared->keystate, 256 );
+    }
+    SHARED_READ_END( &shared->seq );
+
+    if (skip) return TRUE;
+    return NtUserGetKeyboardState( state );
+}
+
 /****************************************************************************
  *		GetKeyNameTextA (USER32.@)
  */
