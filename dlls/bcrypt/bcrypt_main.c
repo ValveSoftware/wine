@@ -265,7 +265,7 @@ NTSTATUS WINAPI BCryptCloseAlgorithmProvider( BCRYPT_ALG_HANDLE handle, DWORD fl
     TRACE( "%p, %08x\n", handle, flags );
 
     if (!alg || alg->hdr.magic != MAGIC_ALG) return STATUS_INVALID_HANDLE;
-    alg->hdr.magic = 0;
+    *(volatile int *)&alg->hdr.magic = 0;
     free( alg );
     return STATUS_SUCCESS;
 }
@@ -905,7 +905,7 @@ NTSTATUS WINAPI BCryptDuplicateHash( BCRYPT_HASH_HANDLE handle, BCRYPT_HASH_HAND
 static void hash_destroy( struct hash *hash )
 {
     if (!hash) return;
-    hash->hdr.magic = 0;
+    *(volatile int *)&hash->hdr.magic = 0;
     free( hash->secret );
     free( hash );
 }
@@ -1837,7 +1837,7 @@ static void key_destroy( struct key *key )
         free( key->u.a.pubkey );
         free( key->u.a.privkey );
     }
-    key->hdr.magic = 0;
+    *(volatile int *)&key->hdr.magic = 0;
     free( key );
 }
 
@@ -2253,7 +2253,7 @@ NTSTATUS WINAPI BCryptDestroySecret(BCRYPT_SECRET_HANDLE handle)
     TRACE( "%p\n", handle );
 
     if (!secret || secret->hdr.magic != MAGIC_SECRET) return STATUS_INVALID_HANDLE;
-    secret->hdr.magic = 0;
+    *(volatile int *)&secret->hdr.magic = 0;
     free( secret->data );
     free( secret );
     return STATUS_SUCCESS;
