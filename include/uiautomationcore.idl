@@ -40,6 +40,118 @@ enum ProviderOptions {
     ProviderOptions_UseClientCoordinates   = 0x0100,
 };
 
+enum StructureChangeType {
+    StructureChangeType_ChildAdded          = 0x0000,
+    StructureChangeType_ChildRemoved        = 0x0001,
+    StructureChangeType_ChildrenInvalidated = 0x0002,
+    StructureChangeType_ChildrenBulkAdded   = 0x0003,
+    StructureChangeType_ChildrenBulkRemoved = 0x0004,
+    StructureChangeType_ChildrenReordered   = 0x0005,
+};
+
+enum TextEditChangeType {
+    TextEditChangeType_None                 = 0x0000,
+    TextEditChangeType_AutoCorrect          = 0x0001,
+    TextEditChangeType_Composition          = 0x0002,
+    TextEditChangeType_CompositionFinalized = 0x0003,
+    TextEditChangeType_AutoComplete         = 0x0004,
+};
+
+enum OrientationType {
+    OrientationType_None       = 0x0000,
+    OrientationType_Horizontal = 0x0001,
+    OrientationType_Vertical   = 0x0002,
+};
+
+enum DockPosition
+{
+    DockPosition_Top    = 0x0000,
+    DockPosition_Left   = 0x0001,
+    DockPosition_Bottom = 0x0002,
+    DockPosition_Right  = 0x0003,
+    DockPosition_Fill   = 0x0004,
+    DockPosition_None   = 0x0005,
+};
+
+enum ExpandCollapseState {
+    ExpandCollapseState_Collapsed         = 0x0000,
+    ExpandCollapseState_Expanded          = 0x0001,
+    ExpandCollapseState_PartiallyExpanded = 0x0002,
+    ExpandCollapseState_LeafNode          = 0x0003,
+};
+
+enum ScrollAmount {
+    ScrollAmount_LargeDecrement = 0x0000,
+    ScrollAmount_SmallDecrement = 0x0001,
+    ScrollAmount_NoAmount       = 0x0002,
+    ScrollAmount_LargeIncrement = 0x0003,
+    ScrollAmount_SmallIncrement = 0x0004,
+};
+
+enum RowOrColumnMajor {
+    RowOrColumnMajor_RowMajor      = 0x0000,
+    RowOrColumnMajor_ColumnMajor   = 0x0001,
+    RowOrColumnMajor_Indeterminate = 0x0002,
+};
+
+enum ToggleState {
+    ToggleState_Off           = 0x0000,
+    ToggleState_On            = 0x0001,
+    ToggleState_Indeterminate = 0x0002,
+};
+
+enum WindowVisualState {
+    WindowVisualState_Normal    = 0x0000,
+    WindowVisualState_Maximized = 0x0001,
+    WindowVisualState_Minimized = 0x0002,
+};
+
+enum SynchronizedInputType {
+    SynchronizedInputType_KeyUp          = 0x0001,
+    SynchronizedInputType_KeyDown        = 0x0002,
+    SynchronizedInputType_LeftMouseUp    = 0x0004,
+    SynchronizedInputType_LeftMouseDown  = 0x0008,
+    SynchronizedInputType_RightMouseUp   = 0x0010,
+    SynchronizedInputType_RightMouseDown = 0x0020,
+};
+
+enum WindowInteractionState {
+    WindowInteractionState_Running                 = 0x0000,
+    WindowInteractionState_Closing                 = 0x0001,
+    WindowInteractionState_ReadyForUserInteraction = 0x0002,
+    WindowInteractionState_BlockedByModalWindow    = 0x0003,
+    WindowInteractionState_NotResponding           = 0x0004,
+};
+
+enum TextUnit {
+    TextUnit_Character = 0x0000,
+    TextUnit_Format    = 0x0001,
+    TextUnit_Word      = 0x0002,
+    TextUnit_Line      = 0x0003,
+    TextUnit_Paragraph = 0x0004,
+    TextUnit_Page      = 0x0005,
+    TextUnit_Document  = 0x0006,
+};
+
+enum TextPatternRangeEndpoint {
+    TextPatternRangeEndpoint_Start = 0x0000,
+    TextPatternRangeEndpoint_End   = 0x0001,
+};
+
+enum SupportedTextSelection {
+    SupportedTextSelection_None     = 0x0000,
+    SupportedTextSelection_Single   = 0x0001,
+    SupportedTextSelection_Multiple = 0x0002,
+};
+
+enum ZoomUnit {
+    ZoomUnit_NoAmount       = 0x0000,
+    ZoomUnit_LargeDecrement = 0x0001,
+    ZoomUnit_SmallDecrement = 0x0002,
+    ZoomUnit_LargeIncrement = 0x0003,
+    ZoomUnit_SmallIncrement = 0x0004,
+};
+
 typedef int PROPERTYID;
 typedef int PATTERNID;
 typedef int EVENTID;
@@ -51,6 +163,17 @@ struct UiaRect {
     double top;
     double width;
     double height;
+};
+
+struct UiaPoint {
+    double x;
+    double y;
+};
+
+struct UiaChangeInfo {
+    int uiaId;
+    VARIANT payload;
+    VARIANT extraInfo;
 };
 
 [
@@ -134,6 +257,19 @@ library UIA
         HRESULT SetFocus();
 
         [propget] HRESULT FragmentRoot([out, retval] IRawElementProviderFragmentRoot **pRetVal);
+    }
+
+    [
+        object,
+        uuid(a407b27b-0f6d-4427-9292-473c7bf93258),
+        pointer_default(unique)
+    ]
+    interface IRawElementProviderAdviseEvents : IUnknown {
+        HRESULT AdviseEventAdded([in]EVENTID eventId,
+                                 [in]SAFEARRAY(PROPERTYID) propertyIDs);
+
+        HRESULT AdviseEventRemoved([in]EVENTID eventId,
+                                   [in]SAFEARRAY(PROPERTYID) propertyIDs);
     }
 
     [
