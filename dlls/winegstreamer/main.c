@@ -252,6 +252,11 @@ void wg_parser_stream_seek(struct wg_parser_stream *stream, double rate,
     __wine_unix_call(unix_handle, unix_wg_parser_stream_seek, &params);
 }
 
+bool wg_parser_stream_drain(struct wg_parser_stream *stream)
+{
+    return !__wine_unix_call(unix_handle, unix_wg_parser_stream_drain, stream);
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     if (reason == DLL_PROCESS_ATTACH)
