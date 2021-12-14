@@ -2978,7 +2978,11 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
         if (check_addr_usage( sock, &bind_addr, v6only ))
             return;
 
-        if (bind( unix_fd, &bind_addr.addr, unix_len ) < 0)
+        /* Quake (and similar family) fails if we can't bind to an IPX address. This often
+         * doesn't work on Linux, so just fake success. */
+        if (unix_addr.addr.sa_family == AF_IPX)
+            fprintf( stderr, "wine: HACK: Faking AF_IPX bind success.\n" );
+        else if (bind( unix_fd, &bind_addr.addr, unix_len ) < 0)
         {
             if (errno == EADDRINUSE && sock->reuseaddr)
                 errno = EACCES;
