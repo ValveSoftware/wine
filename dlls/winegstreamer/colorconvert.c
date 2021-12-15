@@ -423,7 +423,7 @@ static HRESULT WINAPI color_converter_SetInputType(IMFTransform *iface, DWORD id
         struct wg_format output_format;
         mf_media_type_to_wg_format(converter->output_type, &output_format);
 
-        if (SUCCEEDED(hr = wg_parser_connect_unseekable(converter->parser, &format, 1, &output_format)))
+        if (SUCCEEDED(hr = wg_parser_connect_unseekable(converter->parser, &format, 1, &output_format, NULL)))
             converter->stream = wg_parser_get_stream(converter->parser, 0);
     }
 
@@ -533,7 +533,7 @@ static HRESULT WINAPI color_converter_SetOutputType(IMFTransform *iface, DWORD i
         struct wg_format input_format;
         mf_media_type_to_wg_format(converter->input_type, &input_format);
 
-        if (SUCCEEDED(hr = wg_parser_connect_unseekable(converter->parser, &input_format, 1, &format)))
+        if (SUCCEEDED(hr = wg_parser_connect_unseekable(converter->parser, &input_format, 1, &format, NULL)))
             converter->stream = wg_parser_get_stream(converter->parser, 0);
     }
 
