@@ -1509,7 +1509,7 @@ static HRESULT init_stream(struct wm_reader *reader, QWORD file_size)
              * video type will be BGR. */
             stream->format.u.video.format = WG_VIDEO_FORMAT_BGR;
         }
-        wg_parser_stream_enable(stream->wg_stream, &stream->format);
+        wg_parser_stream_enable(stream->wg_stream, &stream->format, NULL);
     }
 
     wg_parser_end_flush(reader->wg_parser);
@@ -1776,7 +1776,7 @@ HRESULT wm_reader_set_output_props(struct wm_reader *reader, DWORD output,
     }
 
     stream->format = format;
-    wg_parser_stream_enable(stream->wg_stream, &format);
+    wg_parser_stream_enable(stream->wg_stream, &format, NULL);
 
     /* Re-decode any buffers that might have been generated with the old format.
      *
@@ -1989,7 +1989,7 @@ HRESULT wm_reader_set_streams_selected(struct wm_reader *reader, WORD count,
                 FIXME("Ignoring selection %#x for stream %u; treating as enabled.\n",
                         selections[i], stream_numbers[i]);
             TRACE("Enabling stream %u.\n", stream_numbers[i]);
-            wg_parser_stream_enable(stream->wg_stream, &stream->format);
+            wg_parser_stream_enable(stream->wg_stream, &stream->format, NULL);
         }
     }
 
