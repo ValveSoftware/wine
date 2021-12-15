@@ -89,6 +89,20 @@ HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size)
     return __wine_unix_call(unix_handle, unix_wg_parser_connect, &params);
 }
 
+HRESULT wg_parser_connect_unseekable(struct wg_parser *parser, const struct wg_format *in_format,
+        uint32_t stream_count, const struct wg_format *out_formats)
+{
+    struct wg_parser_connect_unseekable_params params =
+    {
+        .parser = parser,
+        .in_format = in_format,
+        .stream_count = stream_count,
+        .out_formats = out_formats,
+    };
+
+    return __wine_unix_call(unix_handle, unix_wg_parser_connect_unseekable, &params);
+}
+
 void wg_parser_disconnect(struct wg_parser *parser)
 {
     __wine_unix_call(unix_handle, unix_wg_parser_disconnect, parser);
