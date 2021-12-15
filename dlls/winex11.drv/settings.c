@@ -638,15 +638,6 @@ static LONG get_display_settings(struct x11drv_display_setting **new_displays,
             goto done;
         }
 
-        current_mode.dmSize = sizeof(current_mode);
-        if (!EnumDisplaySettingsExW(display_device.DeviceName, ENUM_CURRENT_SETTINGS, &current_mode, 0))
-            goto done;
-
-        displays[display_idx].old_rect.left = current_mode.u1.s2.dmPosition.x;
-        displays[display_idx].old_rect.top = current_mode.u1.s2.dmPosition.y;
-        displays[display_idx].old_rect.right = displays[display_idx].old_rect.left + current_mode.dmPelsWidth;
-        displays[display_idx].old_rect.bottom = displays[display_idx].old_rect.top + current_mode.dmPelsHeight;
-
         if (!dev_mode)
         {
             memset(&registry_mode, 0, sizeof(registry_mode));
@@ -661,12 +652,22 @@ static LONG get_display_settings(struct x11drv_display_setting **new_displays,
             displays[display_idx].desired_mode = *dev_mode;
             if (!(dev_mode->dmFields & DM_POSITION))
             {
+                memset(&current_mode, 0, sizeof(current_mode));
+                current_mode.dmSize = sizeof(current_mode);
+                if (!EnumDisplaySettingsExW(display_device.DeviceName, ENUM_CURRENT_SETTINGS, &current_mode, 0))
+                    goto done;
+
                 displays[display_idx].desired_mode.dmFields |= DM_POSITION;
                 displays[display_idx].desired_mode.u1.s2.dmPosition = current_mode.u1.s2.dmPosition;
             }
         }
         else
         {
+            memset(&current_mode, 0, sizeof(current_mode));
+            current_mode.dmSize = sizeof(current_mode);
+            if (!EnumDisplaySettingsExW(display_device.DeviceName, ENUM_CURRENT_SETTINGS, &current_mode, 0))
+                goto done;
+
             displays[display_idx].desired_mode = current_mode;
         }
 
@@ -732,55 +733,6 @@ static POINT get_placement_offset(const struct x11drv_display_setting *displays,
 
     if (!has_placed)
         return min_offset;
-
-    /* Try to place this adapter next to a placed adapter it was next to */
-    if (EqualRect(&displays[placing_idx].desired_rect, &displays[placing_idx].old_rect))
-    {
-        for (display_idx = 0; display_idx < display_count; ++display_idx)
-        {
-            if (!displays[display_idx].placed ||
-                IsRectEmpty(&displays[display_idx].old_rect) ||
-                IsRectEmpty(&displays[display_idx].new_rect))
-                continue;
-
-            /* Left or right */
-            if (displays[placing_idx].old_rect.top <= displays[display_idx].old_rect.bottom &&
-                displays[placing_idx].old_rect.bottom >= displays[display_idx].old_rect.top)
-            {
-                offset.y = 0;
-                /* Right */
-                if (displays[placing_idx].old_rect.left == displays[display_idx].old_rect.right)
-                    offset.x = displays[display_idx].new_rect.right - displays[display_idx].old_rect.right;
-                /* Left */
-                else if (displays[placing_idx].old_rect.right == displays[display_idx].old_rect.left)
-                    offset.x = displays[display_idx].new_rect.left - displays[display_idx].old_rect.left;
-                else
-                    continue;
-            }
-            /* Top or bottom */
-            else if (displays[placing_idx].old_rect.left <= displays[display_idx].old_rect.right &&
-                     displays[placing_idx].old_rect.right >= displays[display_idx].old_rect.left)
-            {
-                offset.x = 0;
-                /* Bottom */
-                if (displays[placing_idx].old_rect.top == displays[display_idx].old_rect.bottom)
-                    offset.y = displays[display_idx].new_rect.bottom - displays[display_idx].old_rect.bottom;
-                /* Top */
-                else if (displays[placing_idx].old_rect.bottom == displays[display_idx].old_rect.top)
-                    offset.y = displays[display_idx].new_rect.top - displays[display_idx].old_rect.top;
-                else
-                    continue;
-            }
-            else
-                continue;
-
-            /* Check if this offset will cause overlapping */
-            rect = displays[placing_idx].desired_rect;
-            OffsetRect(&rect, offset.x, offset.y);
-            if (!overlap_placed_displays(&rect, displays, display_count))
-                return offset;
-        }
-    }
 
     /* Try to place this display with each of its four vertices at every vertex of the placed
      * displays and see which combination has the minimum offset length */
