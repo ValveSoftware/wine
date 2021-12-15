@@ -69,7 +69,7 @@ void wg_parser_destroy(struct wg_parser *parser) DECLSPEC_HIDDEN;
 
 HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size) DECLSPEC_HIDDEN;
 HRESULT wg_parser_connect_unseekable(struct wg_parser *parser, const struct wg_format *in_format,
-            uint32_t stream_count, const struct wg_format *out_formats) DECLSPEC_HIDDEN;
+            uint32_t stream_count, const struct wg_format *out_formats, const struct wg_rect *apertures) DECLSPEC_HIDDEN;
 void wg_parser_disconnect(struct wg_parser *parser) DECLSPEC_HIDDEN;
 
 void wg_parser_begin_flush(struct wg_parser *parser) DECLSPEC_HIDDEN;
@@ -82,7 +82,7 @@ uint32_t wg_parser_get_stream_count(struct wg_parser *parser) DECLSPEC_HIDDEN;
 struct wg_parser_stream *wg_parser_get_stream(struct wg_parser *parser, uint32_t index) DECLSPEC_HIDDEN;
 
 void wg_parser_stream_get_preferred_format(struct wg_parser_stream *stream, struct wg_format *format) DECLSPEC_HIDDEN;
-void wg_parser_stream_enable(struct wg_parser_stream *stream, const struct wg_format *format) DECLSPEC_HIDDEN;
+void wg_parser_stream_enable(struct wg_parser_stream *stream, const struct wg_format *format, const struct wg_rect *aperture) DECLSPEC_HIDDEN;
 void wg_parser_stream_disable(struct wg_parser_stream *stream) DECLSPEC_HIDDEN;
 
 bool wg_parser_stream_get_event(struct wg_parser_stream *stream, struct wg_parser_event *event) DECLSPEC_HIDDEN;

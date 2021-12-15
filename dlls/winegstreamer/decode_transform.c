@@ -641,6 +641,9 @@ static DWORD CALLBACK helper_thread_func(PVOID ctx)
             case HELP_REQ_START_PARSER:
             {
                 struct wg_format input_format, output_format;
+                struct wg_rect wg_aperture = {0};
+                MFVideoArea *aperture = NULL;
+                UINT32 aperture_size;
 
                 decoder->help_request.type = HELP_REQ_NONE;
                 LeaveCriticalSection(&decoder->help_cs);
@@ -648,7 +651,25 @@ static DWORD CALLBACK helper_thread_func(PVOID ctx)
                 mf_media_type_to_wg_format(decoder->input_type, &input_format);
                 mf_media_type_to_wg_format(decoder->output_type, &output_format);
 
-                wg_parser_connect_unseekable(decoder->wg_parser, &input_format, 1, &output_format);
+                if (SUCCEEDED(IMFMediaType_GetAllocatedBlob(decoder->output_type,
+                    &MF_MT_MINIMUM_DISPLAY_APERTURE, (UINT8 **) &aperture, &aperture_size)))
+                {
+                    TRACE("Decoded media's aperture: x: %u %u/65536, y: %u %u/65536, area: %u x %u\n",
+                        aperture->OffsetX.value, aperture->OffsetX.fract,
+                        aperture->OffsetY.value, aperture->OffsetY.fract, aperture->Area.cx, aperture->Area.cy);
+
+                    /* TODO: verify aperture params? */
+
+                    wg_aperture.left = aperture->OffsetX.value;
+                    wg_aperture.top = aperture->OffsetY.value;
+                    wg_aperture.right = aperture->Area.cx;
+                    wg_aperture.bottom = aperture->Area.cy;
+
+                    CoTaskMemFree(aperture);
+                }
+
+                wg_parser_connect_unseekable(decoder->wg_parser,
+                    &input_format, 1, &output_format, aperture ? &wg_aperture : NULL);
 
                 EnterCriticalSection(&decoder->event_cs);
                 while (!decoder->helper_thread_shutdown && decoder->event.type != PIPELINE_EVENT_NONE)
