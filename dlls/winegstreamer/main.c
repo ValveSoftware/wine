@@ -118,11 +118,12 @@ bool wg_parser_get_next_read_offset(struct wg_parser *parser, uint64_t *offset, 
     return true;
 }
 
-void wg_parser_push_data(struct wg_parser *parser, const void *data, uint32_t size)
+void wg_parser_push_data(struct wg_parser *parser, enum wg_read_result result, const void *data, uint32_t size)
 {
     struct wg_parser_push_data_params params =
     {
         .parser = parser,
+        .result = result,
         .data = data,
         .size = size,
     };

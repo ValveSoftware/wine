@@ -84,7 +84,7 @@ struct wg_parser
         uint64_t offset;
         uint32_t size;
         bool done;
-        bool ret;
+        enum wg_read_result result;
     } read_request;
 
     bool flushing, sink_connected, draining;
@@ -713,14 +713,15 @@ static NTSTATUS wg_parser_push_data(void *args)
 {
     const struct wg_parser_push_data_params *params = args;
     struct wg_parser *parser = params->parser;
+    enum wg_read_result result = params->result;
     const void *data = params->data;
     uint32_t size = params->size;
 
     pthread_mutex_lock(&parser->mutex);
     parser->read_request.size = size;
     parser->read_request.done = true;
-    parser->read_request.ret = !!data;
-    if (data)
+    parser->read_request.result = result;
+    if (result == WG_READ_SUCCESS)
         memcpy(parser->read_request.data, data, size);
     parser->read_request.data = NULL;
     pthread_mutex_unlock(&parser->mutex);
@@ -1510,14 +1511,26 @@ static void pad_removed_cb(GstElement *element, GstPad *pad, gpointer user)
     g_free(name);
 }
 
+static GstFlowReturn wg_read_result_to_gst(enum wg_read_result result)
+{
+    switch (result)
+    {
+    case WG_READ_SUCCESS: return GST_FLOW_OK;
+    case WG_READ_FAILURE: return GST_FLOW_ERROR;
+    case WG_READ_FLUSHING: return GST_FLOW_FLUSHING;
+    case WG_READ_EOS: return GST_FLOW_EOS;
+    }
+    return GST_FLOW_ERROR;
+}
+
 static GstFlowReturn src_getrange_cb(GstPad *pad, GstObject *parent,
         guint64 offset, guint size, GstBuffer **buffer)
 {
     struct wg_parser *parser = gst_pad_get_element_private(pad);
     GstBuffer *new_buffer = NULL;
+    enum wg_read_result result;
     GstMapInfo map_info;
     unsigned int i;
-    bool ret;
 
     GST_LOG("pad %p, offset %" G_GINT64_MODIFIER "u, size %u, buffer %p.", pad, offset, size, *buffer);
 
@@ -1573,21 +1586,21 @@ static GstFlowReturn src_getrange_cb(GstPad *pad, GstObject *parent,
         }
     }
 
-    ret = parser->read_request.ret;
+    result = parser->read_request.result;
     gst_buffer_set_size(*buffer, parser->read_request.size);
 
     pthread_mutex_unlock(&parser->mutex);
 
     gst_buffer_unmap(*buffer, &map_info);
 
-    GST_LOG("Request returned %d.", ret);
+    GST_LOG("Request returned %d.", result);
 
-    if ((!ret || !size) && new_buffer)
+    if ((result != WG_READ_SUCCESS || !size) && new_buffer)
         gst_buffer_unref(new_buffer);
 
-    if (ret)
-        return size ? GST_FLOW_OK : GST_FLOW_EOS;
-    return GST_FLOW_ERROR;
+    if (result == WG_READ_SUCCESS && !size)
+        return GST_FLOW_EOS;
+    return wg_read_result_to_gst(result);
 }
 
 static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)

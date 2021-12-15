@@ -125,6 +125,14 @@ enum wg_parser_event_type
     WG_PARSER_EVENT_SEGMENT,
 };
 
+enum wg_read_result
+{
+    WG_READ_SUCCESS,
+    WG_READ_FAILURE,
+    WG_READ_FLUSHING,
+    WG_READ_EOS,
+};
+
 struct wg_parser_event
 {
     enum wg_parser_event_type type;
@@ -177,6 +185,7 @@ struct wg_parser_get_next_read_offset_params
 struct wg_parser_push_data_params
 {
     struct wg_parser *parser;
+    enum wg_read_result result;
     const void *data;
     UINT32 size;
 };
