@@ -1704,7 +1704,7 @@ static void *push_data(void *arg)
             break;
         }
 
-        parser->next_offset += size;
+        parser->next_offset += gst_buffer_get_size(buffer);
 
         buffer->duration = buffer->pts = -1;
         if ((ret = gst_pad_push(parser->my_src, buffer)) < 0)
