@@ -693,7 +693,7 @@ static NTSTATUS wg_parser_get_next_read_offset(void *args)
 
     pthread_mutex_lock(&parser->mutex);
 
-    while (parser->sink_connected && !parser->read_request.size)
+    while (parser->sink_connected && (!parser->read_request.size || parser->read_request.done))
         pthread_cond_wait(&parser->read_cond, &parser->mutex);
 
     if (!parser->sink_connected)
