@@ -2389,6 +2389,66 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
     return TRUE;
 }
 
+static BOOL audio_convert_init_gst(struct wg_parser *parser)
+{
+    struct wg_parser_stream *stream;
+    GstElement *convert, *resampler;
+    int ret;
+
+    if (parser->seekable)
+        return FALSE;
+
+    if (parser->expected_stream_count != 1)
+        return FALSE;
+
+    if (parser->input_format.major_type != WG_MAJOR_TYPE_AUDIO)
+        return FALSE;
+
+    if (!(convert = create_element("audioconvert", "base")))
+        return FALSE;
+
+    gst_bin_add(GST_BIN(parser->container), convert);
+
+    if (!(resampler = create_element("audioresample", "base")))
+        return FALSE;
+
+    gst_bin_add(GST_BIN(parser->container), resampler);
+
+    gst_element_link(convert, resampler);
+
+    parser->their_sink = gst_element_get_static_pad(convert, "sink");
+    if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
+    {
+        GST_ERROR("Failed to link sink pads, error %d.\n", ret);
+        return FALSE;
+    }
+
+    if (!(stream = create_stream(parser)))
+        return FALSE;
+
+    stream->their_src = gst_element_get_static_pad(resampler, "src");
+    gst_object_ref(stream->their_src);
+    if ((ret = gst_pad_link(stream->their_src, stream->my_sink)) < 0)
+    {
+        GST_ERROR("Failed to link source pads, error %d.\n", ret);
+        return FALSE;
+    }
+    gst_pad_set_active(stream->my_sink, 1);
+
+    parser->no_more_pads = true;
+
+    gst_element_set_state(parser->container, GST_STATE_PAUSED);
+    gst_pad_set_active(parser->my_src, 1);
+    ret = gst_element_get_state(parser->container, NULL, NULL, -1);
+    if (ret == GST_STATE_CHANGE_FAILURE)
+    {
+        GST_ERROR("Failed to play stream.\n");
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 static void init_gstreamer_once(void)
 {
     char arg0[] = "wine";
@@ -2435,6 +2495,7 @@ static NTSTATUS wg_parser_create(void *args)
         [WG_PARSER_AVIDEMUX] = avi_parser_init_gst,
         [WG_PARSER_MPEGAUDIOPARSE] = mpeg_audio_parser_init_gst,
         [WG_PARSER_WAVPARSE] = wave_parser_init_gst,
+        [WG_PARSER_AUDIOCONV] = audio_convert_init_gst,
     };
 
     static pthread_once_t once = PTHREAD_ONCE_INIT;
