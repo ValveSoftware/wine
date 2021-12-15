@@ -709,16 +709,33 @@ static NTSTATUS wg_parser_get_next_read_offset(void *args)
     return S_OK;
 }
 
+static GstFlowReturn wg_read_result_to_gst(enum wg_read_result result)
+{
+    switch (result)
+    {
+    case WG_READ_SUCCESS: return GST_FLOW_OK;
+    case WG_READ_FAILURE: return GST_FLOW_ERROR;
+    case WG_READ_FLUSHING: return GST_FLOW_FLUSHING;
+    case WG_READ_EOS: return GST_FLOW_EOS;
+    }
+    return GST_FLOW_ERROR;
+}
+
 static NTSTATUS wg_parser_push_data(void *args)
 {
     const struct wg_parser_push_data_params *params = args;
     struct wg_parser *parser = params->parser;
+    enum wg_read_result result = params->result;
     const void *data = params->data;
     uint32_t size = params->size;
 
     pthread_mutex_lock(&parser->mutex);
 
-    if (data)
+    if (result != WG_READ_SUCCESS)
+    {
+            parser->read_request.ret = wg_read_result_to_gst(result);
+    }
+    else if (data)
     {
         if (size)
         {
