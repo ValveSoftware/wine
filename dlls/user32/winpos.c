@@ -1530,6 +1530,11 @@ BOOL WINAPI SetWindowPlacement( HWND hwnd, const WINDOWPLACEMENT *wpl )
 {
     UINT flags = PLACE_MAX | PLACE_RECT;
     if (!wpl) return FALSE;
+    if (wpl->length != sizeof(*wpl))
+    {
+        SetLastError(ERROR_INVALID_PARAMETER);
+        return FALSE;
+    }
     if (wpl->flags & WPF_SETMINPOSITION) flags |= PLACE_MIN;
     return WINPOS_SetPlacement( hwnd, wpl, flags );
 }
