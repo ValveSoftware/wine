@@ -549,7 +549,7 @@ HKCU,%CurrentVersion%\Run,,16
 HKCU,%CurrentVersionNT%\Winlogon,,16
 HKLM,%CurrentVersion%,"CommonFilesDir",,"%16427%"
 HKLM,%CurrentVersion%,"FirstInstallDateTime",1,21,81,7c,23
-HKLM,%CurrentVersion%,"ProductId",,"12345-oem-0000001-54321"
+HKLM,%CurrentVersion%,"ProductId",,"00330-50000-00000-AAOEM"
 HKLM,%CurrentVersion%,"ProgramFilesDir",,"%16422%"
 HKLM,%CurrentVersion%,"ProgramFilesPath",0x20000,"%%ProgramFiles%%"
 HKLM,%CurrentVersion%,"RegisteredOrganization",2,""
@@ -573,7 +573,7 @@ HKLM,%CurrentVersion%\Setup\WindowsFeatures\WindowsMediaVersion,,,"12.0.7601.188
 HKLM,%CurrentVersion%\Shell Extensions\Approved,,16
 HKLM,%CurrentVersion%\Uninstall,,16
 HKLM,%CurrentVersionNT%,"InstallDate",0x10003,1273299354
-HKLM,%CurrentVersionNT%,"ProductId",,"12345-oem-0000001-54321"
+HKLM,%CurrentVersionNT%,"ProductId",,"00330-50000-00000-AAOEM"
 HKLM,%CurrentVersionNT%,"RegisteredOrganization",2,""
 HKLM,%CurrentVersionNT%,"RegisteredOwner",2,""
 HKLM,%CurrentVersionNT%,"SystemRoot",,"%10%"
