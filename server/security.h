@@ -53,6 +53,7 @@ extern const PSID security_domain_users_sid;
 extern const PSID security_high_label_sid;
 
 
+
 /* token functions */
 
 extern struct token *get_token_obj( struct process *process, obj_handle_t handle, unsigned int access );
@@ -89,6 +90,7 @@ static inline int security_equal_sid( const SID *sid1, const SID *sid2 )
 
 extern void security_set_thread_token( struct thread *thread, obj_handle_t handle );
 extern const SID *security_unix_uid_to_sid( uid_t uid );
+extern void init_user_sid(void);
 extern int check_object_access( struct token *token, struct object *obj, unsigned int *access );
 
 static inline int thread_single_check_privilege( struct thread *thread, const LUID *priv)
