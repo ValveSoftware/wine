@@ -23,11 +23,15 @@
 #include "config.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
 #include <sys/types.h>
 #include <unistd.h>
+#ifdef HAVE_STDINT_H
+#include <stdint.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -79,7 +83,7 @@ static const SID anonymous_logon_sid = { SID_REVISION, 1, { SECURITY_NT_AUTHORIT
 static const SID authenticated_user_sid = { SID_REVISION, 1, { SECURITY_NT_AUTHORITY }, { SECURITY_AUTHENTICATED_USER_RID } };
 static const SID local_system_sid = { SID_REVISION, 1, { SECURITY_NT_AUTHORITY }, { SECURITY_LOCAL_SYSTEM_RID } };
 static const SID high_label_sid = { SID_REVISION, 1, { SECURITY_MANDATORY_LABEL_AUTHORITY }, { SECURITY_MANDATORY_HIGH_RID } };
-static const SID_N(5) local_user_sid = { SID_REVISION, 5, { SECURITY_NT_AUTHORITY }, { SECURITY_NT_NON_UNIQUE, 0, 0, 0, 1000 } };
+static       SID_N(5) local_user_sid = { SID_REVISION, 5, { SECURITY_NT_AUTHORITY }, { SECURITY_NT_NON_UNIQUE, 0, 0, 0, 1000 } };
 static const SID_N(2) builtin_admins_sid = { SID_REVISION, 2, { SECURITY_NT_AUTHORITY }, { SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_ADMINS } };
 static const SID_N(2) builtin_users_sid = { SID_REVISION, 2, { SECURITY_NT_AUTHORITY }, { SECURITY_BUILTIN_DOMAIN_RID, DOMAIN_ALIAS_RID_USERS } };
 static const SID_N(3) builtin_logon_sid = { SID_REVISION, 3, { SECURITY_NT_AUTHORITY }, { SECURITY_LOGON_IDS_RID, 0, 0 } };
@@ -232,6 +236,35 @@ const SID *security_unix_uid_to_sid( uid_t uid )
         return (const SID *)&local_user_sid;
     else
         return &anonymous_logon_sid;
+}
+
+void init_user_sid(void)
+{
+    char machine_id[17];
+    uint64_t id;
+    size_t n;
+    FILE *f;
+
+    f = fopen( "/etc/machine-id", "r" );
+    if (!f)
+    {
+        fprintf( stderr, "Failed to open /etc/machine-id, error %s.\n", strerror( errno ));
+        return;
+    }
+
+    n = fread( machine_id, sizeof(*machine_id), 16, f );
+    fclose(f);
+
+    if (n != 16)
+    {
+        fprintf( stderr, "Failed to read /etc/machine-id, error %s.\n", strerror( errno ));
+        return;
+    }
+    machine_id[n] = 0;
+    id = strtoull( machine_id, NULL, 0x10 );
+    local_user_sid.SubAuthority[1] = id >> 32;
+    local_user_sid.SubAuthority[2] = id & 0xffffffff;
+    local_user_sid.SubAuthority[3] = getuid();
 }
 
 static int acl_is_valid( const ACL *acl, data_size_t size )
