@@ -421,8 +421,6 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
 
     if (!surface || !surface->offscreen)
         wait_fence = FALSE;
-    else if (use_xpresent && use_xfixes && usexcomposite) /* X11DRV_PRESENT_DRAWABLE will use XPresentPixmap */
-        wait_fence = FALSE;
     else if (surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR ||
              surface->present_mode == VK_PRESENT_MODE_FIFO_KHR)
         wait_fence = TRUE;
@@ -445,7 +443,7 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
         escape.drawable = surface->window;
         escape.flush = TRUE;
         ExtEscape(hdc, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL);
-        if (wait_fence && surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+        if (surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
             if (once++) FIXME("Application requires child window rendering with mailbox present mode, expect possible tearing!\n");
     }
 
@@ -487,9 +485,8 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
     create_info_host = *create_info;
     create_info_host.surface = x11_surface->surface;
 
-    /* unless we use XPresentPixmap, force fifo when running offscreen so the acquire fence is more likely to be vsynced */
-    if (x11_surface->offscreen && create_info->presentMode == VK_PRESENT_MODE_MAILBOX_KHR &&
-        !(use_xpresent && use_xfixes && usexcomposite))
+    /* force fifo when running offscreen so the acquire fence is more likely to be vsynced */
+    if (x11_surface->offscreen && create_info->presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
         create_info_host.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     x11_surface->present_mode = create_info->presentMode;
 

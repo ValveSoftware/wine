@@ -27,9 +27,6 @@
 #include "winbase.h"
 #include "winreg.h"
 #include "x11drv.h"
-#include "xfixes.h"
-#include "xpresent.h"
-#include "xcomposite.h"
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(x11drv);
@@ -235,33 +232,10 @@ static INT CDECL X11DRV_ExtEscape( PHYSDEV dev, INT escape, INT in_count, LPCVOI
                     fs_hack_rect_user_to_real( &real_rect );
                     OffsetRect( &rect, -physDev->dc_rect.left, -physDev->dc_rect.top );
                     if (data->flush) XFlush( gdi_display );
-
-#if defined(SONAME_LIBXPRESENT) && defined(SONAME_LIBXFIXES)
-                    if (use_xpresent && use_xfixes && usexcomposite)
-                    {
-                        XserverRegion update, valid;
-                        XRectangle xrect = {0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top};
-                        Drawable drawable = data->drawable;
-                        update = pXFixesCreateRegionFromGC( gdi_display, physDev->gc );
-                        valid = pXFixesCreateRegion( gdi_display, &xrect, 1 );
-#ifdef SONAME_LIBXCOMPOSITE
-                        if (usexcomposite) drawable = pXCompositeNameWindowPixmap( gdi_display, drawable );
-#endif
-                        pXPresentPixmap( gdi_display, physDev->drawable, drawable, XNextRequest( gdi_display ),
-                                         valid, update, real_rect.left, real_rect.top, None, None,
-                                         None, 0, 0, 0, 0, NULL, 0 );
-                        pXFixesDestroyRegion( gdi_display, update );
-                        pXFixesDestroyRegion( gdi_display, valid );
-                    }
-                    else
-#endif
-                    {
-                        XSetFunction( gdi_display, physDev->gc, GXcopy );
-                        XCopyArea( gdi_display, data->drawable, physDev->drawable, physDev->gc,
-                                   0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top,
-                                   real_rect.left, real_rect.top );
-                    }
-
+                    XSetFunction( gdi_display, physDev->gc, GXcopy );
+                    XCopyArea( gdi_display, data->drawable, physDev->drawable, physDev->gc,
+                               0, 0, real_rect.right - real_rect.left, real_rect.bottom - real_rect.top,
+                               real_rect.left, real_rect.top );
                     add_device_bounds( physDev, &rect );
                     return TRUE;
                 }

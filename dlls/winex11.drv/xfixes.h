@@ -29,9 +29,6 @@
 #define MAKE_FUNCPTR(f) extern typeof(f) * p##f DECLSPEC_HIDDEN;
 MAKE_FUNCPTR(XFixesQueryExtension)
 MAKE_FUNCPTR(XFixesQueryVersion)
-MAKE_FUNCPTR(XFixesCreateRegion)
-MAKE_FUNCPTR(XFixesCreateRegionFromGC)
-MAKE_FUNCPTR(XFixesDestroyRegion)
 MAKE_FUNCPTR(XFixesSelectSelectionInput)
 #undef MAKE_FUNCPTR
 #endif /* defined(SONAME_LIBXFIXES) */
