@@ -5640,7 +5640,7 @@ HKLM,%CurrentVersionNT%,"CSDVersion",2,""
 HKLM,%CurrentVersionNT%,"CurrentBuild",2,"19043"
 HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"19043"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
-HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
+HKLM,%CurrentVersionNT%,"DigitalProductId",2,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
@@ -5660,7 +5660,7 @@ HKLM,%CurrentVersionNT%,"CSDVersion",2,""
 HKLM,%CurrentVersionNT%,"CurrentBuild",2,"19043"
 HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"19043"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
-HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
+HKLM,%CurrentVersionNT%,"DigitalProductId",2,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
