@@ -34,6 +34,7 @@
 #include "thread.h"
 #include "request.h"
 #include "unicode.h"
+#include "security.h"
 #include "esync.h"
 #include "fsync.h"
 
@@ -244,6 +245,7 @@ int main( int argc, char *argv[] )
     set_current_time();
     init_signals();
     init_memory();
+    init_user_sid();
     init_directories( load_intl_file() );
     init_threading();
     init_registry();
