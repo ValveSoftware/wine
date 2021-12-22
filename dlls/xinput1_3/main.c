@@ -277,7 +277,7 @@ static BOOL controller_check_caps(struct xinput_controller *controller, HANDLE d
     return TRUE;
 }
 
-static DWORD HID_set_state(struct xinput_controller *controller, XINPUT_VIBRATION *state)
+static DWORD HID_set_state(struct xinput_controller *controller, XINPUT_VIBRATION *state, BOOL force)
 {
     ULONG report_len = controller->hid.caps.OutputReportByteLength;
     PHIDP_PREPARSED_DATA preparsed = controller->hid.preparsed;
@@ -286,6 +286,7 @@ static DWORD HID_set_state(struct xinput_controller *controller, XINPUT_VIBRATIO
     NTSTATUS status;
 
     if (!(controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED)) return ERROR_SUCCESS;
+    if (!memcmp( &controller->vibration, state, sizeof(*state) ) && !force) return ERROR_SUCCESS;
 
     controller->vibration.wLeftMotorSpeed = state->wLeftMotorSpeed;
     controller->vibration.wRightMotorSpeed = state->wRightMotorSpeed;
@@ -335,7 +336,7 @@ static void controller_enable(struct xinput_controller *controller)
     BOOL ret;
 
     if (controller->enabled) return;
-    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
+    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state, TRUE);
     controller->enabled = TRUE;
 
     memset(&controller->hid.read_ovl, 0, sizeof(controller->hid.read_ovl));
@@ -350,7 +351,7 @@ static void controller_disable(struct xinput_controller *controller)
     XINPUT_VIBRATION state = {0};
 
     if (!controller->enabled) return;
-    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
+    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state, TRUE);
     controller->enabled = FALSE;
 
     CancelIoEx(controller->device, &controller->hid.read_ovl);
@@ -816,7 +817,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputSetState(DWORD index, XINPUT_VIBRATION *vib
     if (!controller_lock(&controllers[index])) return ERROR_DEVICE_NOT_CONNECTED;
 
     if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0) ret = ERROR_SUCCESS;
-    else ret = HID_set_state(&controllers[index], vibration);
+    else ret = HID_set_state(&controllers[index], vibration, FALSE);
 
     controller_unlock(&controllers[index]);
 
