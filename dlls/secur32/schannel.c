@@ -718,6 +718,24 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
     dump_buffer_desc(pInput);
     dump_buffer_desc(pOutput);
 
+    /*
+     * Find any SECBUFFER_ALERT output buffers and set their count values to
+     * 0. If we don't do this, and the initial count is non-zero, applications
+     * will think we've returned error data in the provided buffer.
+     */
+    if (pOutput && (pOutput->cBuffers > 1))
+    {
+        int i;
+
+        for (i = 0; i < pOutput->cBuffers; i++)
+        {
+            SecBuffer *b = &pOutput->pBuffers[i];
+
+            if (b->BufferType == SECBUFFER_ALERT)
+                b->cbBuffer = 0;
+        }
+    }
+
     if (ptsExpiry)
     {
         ptsExpiry->LowPart = 0;
