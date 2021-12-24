@@ -44,6 +44,7 @@
 
 #define COBJMACROS
 #include "wingdi.h"
+#include "dbt.h"
 #include "dinput.h"
 #include "dinputd.h"
 #include "mmsystem.h"
@@ -9965,6 +9966,372 @@ done:
     SetCurrentDirectoryW( cwd );
 }
 
+static int device_change_count;
+static int device_change_expect;
+static HWND device_change_hwnd;
+static BOOL device_change_all;
+
+static BOOL all_upper( const WCHAR *str, const WCHAR *end )
+{
+    while (str++ != end) if (towupper( str[-1] ) != str[-1]) return FALSE;
+    return TRUE;
+}
+
+static BOOL all_lower( const WCHAR *str, const WCHAR *end )
+{
+    while (str++ != end) if (towlower( str[-1] ) != str[-1]) return FALSE;
+    return TRUE;
+}
+
+static LRESULT CALLBACK devnotify_wndproc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
+{
+    if (msg == WM_DEVICECHANGE)
+    {
+        DEV_BROADCAST_HDR *header = (DEV_BROADCAST_HDR *)lparam;
+        DEV_BROADCAST_DEVICEINTERFACE_W *iface = (DEV_BROADCAST_DEVICEINTERFACE_W *)lparam;
+        const WCHAR *upper_end, *name_end, *expect_prefix;
+        GUID expect_guid;
+
+        if (device_change_all && (device_change_count == 0 || device_change_count == 3))
+        {
+            expect_guid = control_class;
+            expect_prefix = L"\\\\?\\ROOT#";
+        }
+        else
+        {
+            expect_guid = GUID_DEVINTERFACE_HID;
+            expect_prefix = L"\\\\?\\HID#";
+        }
+
+        ok( hwnd == device_change_hwnd, "got hwnd %p\n", hwnd );
+        ok( header->dbch_devicetype == DBT_DEVTYP_DEVICEINTERFACE, "got dbch_devicetype %u\n",
+            header->dbch_devicetype );
+
+        winetest_push_context( "%u", device_change_count );
+
+        todo_wine_if( IsEqualGUID( &iface->dbcc_classguid, &control_class ) && !device_change_all )
+        ok( IsEqualGUID( &iface->dbcc_classguid, &expect_guid ), "got dbch_classguid %s\n",
+            debugstr_guid( &iface->dbcc_classguid ) );
+        ok( iface->dbcc_size >= offsetof( DEV_BROADCAST_DEVICEINTERFACE_W, dbcc_name[wcslen( iface->dbcc_name ) + 1] ),
+            "got dbcc_size %u\n", iface->dbcc_size );
+        todo_wine
+        ok( !wcsncmp( iface->dbcc_name, expect_prefix, wcslen( expect_prefix ) ),
+            "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
+
+        upper_end = wcschr( iface->dbcc_name + wcslen( expect_prefix ), '#' );
+        name_end = iface->dbcc_name + wcslen( iface->dbcc_name ) + 1;
+        ok( !!upper_end, "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
+        todo_wine
+        ok( all_upper( iface->dbcc_name, upper_end ), "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
+        ok( all_lower( upper_end, name_end ), "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
+
+        if (device_change_count++ >= device_change_expect / 2)
+            ok( wparam == DBT_DEVICEREMOVECOMPLETE, "got wparam %#x\n", (DWORD)wparam );
+        else
+            ok( wparam == DBT_DEVICEARRIVAL, "got wparam %#x\n", (DWORD)wparam );
+
+        winetest_pop_context();
+    }
+
+    return DefWindowProcW( hwnd, msg, wparam, lparam );
+}
+
+static DWORD WINAPI test_gamepad_driver_thread( void *arg )
+{
+#include "psh_hid_macros.h"
+    static const unsigned char gamepad_desc[] =
+    {
+        USAGE_PAGE(1, HID_USAGE_PAGE_GENERIC),
+        USAGE(1, HID_USAGE_GENERIC_GAMEPAD),
+        COLLECTION(1, Application),
+            USAGE(1, HID_USAGE_GENERIC_GAMEPAD),
+            COLLECTION(1, Physical),
+                USAGE(1, HID_USAGE_GENERIC_X),
+                USAGE(1, HID_USAGE_GENERIC_Y),
+                LOGICAL_MINIMUM(1, 0),
+                LOGICAL_MAXIMUM(1, 127),
+                PHYSICAL_MINIMUM(1, 0),
+                PHYSICAL_MAXIMUM(1, 127),
+                REPORT_SIZE(1, 8),
+                REPORT_COUNT(1, 2),
+                INPUT(1, Data|Var|Abs),
+
+                USAGE_PAGE(1, HID_USAGE_PAGE_BUTTON),
+                USAGE_MINIMUM(1, 1),
+                USAGE_MAXIMUM(1, 6),
+                LOGICAL_MINIMUM(1, 0),
+                LOGICAL_MAXIMUM(1, 1),
+                PHYSICAL_MINIMUM(1, 0),
+                PHYSICAL_MAXIMUM(1, 1),
+                REPORT_SIZE(1, 1),
+                REPORT_COUNT(1, 8),
+                INPUT(1, Data|Var|Abs),
+            END_COLLECTION,
+        END_COLLECTION,
+    };
+#include "pop_hid_macros.h"
+    static const HID_DEVICE_ATTRIBUTES attributes =
+    {
+        .Size = sizeof(HID_DEVICE_ATTRIBUTES),
+        .VendorID = LOWORD( EXPECT_VIDPID ),
+        .ProductID = HIWORD( EXPECT_VIDPID ),
+        .VersionNumber = 0x0100,
+    };
+    static const HIDP_CAPS caps =
+    {
+        .InputReportByteLength = 3,
+    };
+
+    WCHAR cwd[MAX_PATH], tempdir[MAX_PATH];
+    DWORD report_id = 1, polled = 0;
+    HANDLE stop_event = arg;
+    char context[64];
+    LSTATUS status;
+    HKEY hkey;
+
+    GetCurrentDirectoryW( ARRAY_SIZE(cwd), cwd );
+    GetTempPathW( ARRAY_SIZE(tempdir), tempdir );
+    SetCurrentDirectoryW( tempdir );
+
+    status = RegCreateKeyExW( HKEY_LOCAL_MACHINE, L"System\\CurrentControlSet\\Services\\winetest",
+                              0, NULL, REG_OPTION_VOLATILE, KEY_ALL_ACCESS, NULL, &hkey, NULL );
+    ok( !status, "RegCreateKeyExW returned %#x\n", status );
+    status = RegSetValueExW( hkey, L"ReportID", 0, REG_DWORD, (void *)&report_id, sizeof(report_id) );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+    status = RegSetValueExW( hkey, L"PolledMode", 0, REG_DWORD, (void *)&polled, sizeof(polled) );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+    status = RegSetValueExW( hkey, L"Descriptor", 0, REG_BINARY, (void *)gamepad_desc, sizeof(gamepad_desc) );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+    status = RegSetValueExW( hkey, L"Attributes", 0, REG_BINARY, (void *)&attributes, sizeof(attributes) );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+    status = RegSetValueExW( hkey, L"Caps", 0, REG_BINARY, (void *)&caps, sizeof(caps) );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+    status = RegSetValueExW( hkey, L"Expect", 0, REG_BINARY, (void *)NULL, 0 );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+    status = RegSetValueExW( hkey, L"Input", 0, REG_BINARY, NULL, 0 );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+    fill_context( __LINE__, context, ARRAY_SIZE(context) );
+    status = RegSetValueExW( hkey, L"Context", 0, REG_BINARY, (void *)context, sizeof(context) );
+    ok( !status, "RegSetValueExW returned %#x\n", status );
+
+    pnp_driver_start( L"driver_hid.dll" );
+    WaitForSingleObject( stop_event, INFINITE );
+    pnp_driver_stop();
+
+    SetCurrentDirectoryW( cwd );
+
+    return 0;
+}
+
+static void test_RegisterDeviceNotification(void)
+{
+    DEV_BROADCAST_DEVICEINTERFACE_A iface_filter_a =
+    {
+        .dbcc_size = sizeof(DEV_BROADCAST_DEVICEINTERFACE_A),
+        .dbcc_devicetype = DBT_DEVTYP_DEVICEINTERFACE,
+        .dbcc_classguid = GUID_DEVINTERFACE_HID,
+    };
+    WNDCLASSEXW class =
+    {
+        .cbSize = sizeof(WNDCLASSEXW),
+        .hInstance = GetModuleHandleW( NULL ),
+        .lpszClassName = L"devnotify",
+        .lpfnWndProc = devnotify_wndproc,
+    };
+    char buffer[1024] = {0};
+    DEV_BROADCAST_HDR *header = (DEV_BROADCAST_HDR *)buffer;
+    HANDLE hwnd, thread, stop_event;
+    HDEVNOTIFY devnotify;
+    MSG msg;
+
+    RegisterClassExW( &class );
+
+    hwnd = CreateWindowW( class.lpszClassName, NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL );
+    ok( !!hwnd, "CreateWindowW failed, error %u\n", GetLastError() );
+
+    SetLastError( 0xdeadbeef );
+    devnotify = RegisterDeviceNotificationA( NULL, NULL, 0 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    SetLastError( 0xdeadbeef );
+    devnotify = RegisterDeviceNotificationA( (HWND)0xdeadbeef, NULL, 0 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    SetLastError( 0xdeadbeef );
+    devnotify = RegisterDeviceNotificationA( hwnd, NULL, 2 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    SetLastError( 0xdeadbeef );
+    memset( header, 0, sizeof(DEV_BROADCAST_OEM) );
+    header->dbch_size = sizeof(DEV_BROADCAST_OEM);
+    header->dbch_devicetype = DBT_DEVTYP_OEM;
+    devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
+        "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    SetLastError( 0xdeadbeef );
+    memset( header, 0, sizeof(DEV_BROADCAST_DEVNODE) );
+    header->dbch_size = sizeof(DEV_BROADCAST_DEVNODE);
+    header->dbch_devicetype = DBT_DEVTYP_DEVNODE;
+    devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
+        "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    SetLastError( 0xdeadbeef );
+    memset( header, 0, sizeof(DEV_BROADCAST_VOLUME) );
+    header->dbch_size = sizeof(DEV_BROADCAST_VOLUME);
+    header->dbch_devicetype = DBT_DEVTYP_VOLUME;
+    devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
+        "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    SetLastError( 0xdeadbeef );
+    memset( header, 0, sizeof(DEV_BROADCAST_PORT_A) );
+    header->dbch_size = sizeof(DEV_BROADCAST_PORT_A);
+    header->dbch_devicetype = DBT_DEVTYP_PORT;
+    devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
+        "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    SetLastError( 0xdeadbeef );
+    memset( header, 0, sizeof(DEV_BROADCAST_NET) );
+    header->dbch_size = sizeof(DEV_BROADCAST_NET);
+    header->dbch_devicetype = DBT_DEVTYP_NET;
+    devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
+    ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
+    ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
+        "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
+
+    devnotify = RegisterDeviceNotificationA( hwnd, &iface_filter_a, DEVICE_NOTIFY_WINDOW_HANDLE );
+    ok( !!devnotify, "RegisterDeviceNotificationA failed, error %u\n", GetLastError() );
+    while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE )) DispatchMessageW( &msg );
+
+    device_change_count = 0;
+    if (!strcmp( winetest_platform, "wine" )) device_change_expect = 4;
+    else device_change_expect = 2;
+    device_change_hwnd = hwnd;
+    device_change_all = FALSE;
+    stop_event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    ok( !!stop_event, "CreateEventW failed, error %u\n", GetLastError() );
+    thread = CreateThread( NULL, 0, test_gamepad_driver_thread, stop_event, 0, NULL );
+    ok( !!thread, "CreateThread failed, error %u\n", GetLastError() );
+
+    while (device_change_count < device_change_expect)
+    {
+        while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE ))
+        {
+            TranslateMessage( &msg );
+            ok( msg.message != WM_DEVICECHANGE, "got WM_DEVICECHANGE\n" );
+            DispatchMessageW( &msg );
+        }
+        if (device_change_count == device_change_expect / 2) SetEvent( stop_event );
+    }
+
+    WaitForSingleObject( thread, INFINITE );
+    CloseHandle( thread );
+    CloseHandle( stop_event );
+
+    UnregisterDeviceNotification( devnotify );
+
+    memcpy( buffer, &iface_filter_a, sizeof(iface_filter_a) );
+    strcpy( ((DEV_BROADCAST_DEVICEINTERFACE_A *)buffer)->dbcc_name, "device name" );
+    ((DEV_BROADCAST_DEVICEINTERFACE_A *)buffer)->dbcc_size += strlen( "device name" ) + 1;
+    devnotify = RegisterDeviceNotificationA( hwnd, buffer, DEVICE_NOTIFY_WINDOW_HANDLE );
+    ok( !!devnotify, "RegisterDeviceNotificationA failed, error %u\n", GetLastError() );
+    while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE )) DispatchMessageW( &msg );
+
+    device_change_count = 0;
+    if (!strcmp( winetest_platform, "wine" )) device_change_expect = 4;
+    else device_change_expect = 2;
+    device_change_hwnd = hwnd;
+    device_change_all = FALSE;
+    stop_event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    ok( !!stop_event, "CreateEventW failed, error %u\n", GetLastError() );
+    thread = CreateThread( NULL, 0, test_gamepad_driver_thread, stop_event, 0, NULL );
+    ok( !!thread, "CreateThread failed, error %u\n", GetLastError() );
+
+    while (device_change_count < device_change_expect)
+    {
+        while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE ))
+        {
+            TranslateMessage( &msg );
+            ok( msg.message != WM_DEVICECHANGE, "got WM_DEVICECHANGE\n" );
+            DispatchMessageW( &msg );
+        }
+        if (device_change_count == device_change_expect / 2) SetEvent( stop_event );
+    }
+
+    WaitForSingleObject( thread, INFINITE );
+    CloseHandle( thread );
+    CloseHandle( stop_event );
+
+    UnregisterDeviceNotification( devnotify );
+
+    devnotify = RegisterDeviceNotificationA( hwnd, &iface_filter_a, DEVICE_NOTIFY_ALL_INTERFACE_CLASSES );
+    ok( !!devnotify, "RegisterDeviceNotificationA failed, error %u\n", GetLastError() );
+    while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE )) DispatchMessageW( &msg );
+
+    device_change_count = 0;
+    device_change_expect = 4;
+    device_change_hwnd = hwnd;
+    device_change_all = TRUE;
+    stop_event = CreateEventW( NULL, FALSE, FALSE, NULL );
+    ok( !!stop_event, "CreateEventW failed, error %u\n", GetLastError() );
+    thread = CreateThread( NULL, 0, test_gamepad_driver_thread, stop_event, 0, NULL );
+    ok( !!thread, "CreateThread failed, error %u\n", GetLastError() );
+
+    while (device_change_count < device_change_expect)
+    {
+        while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE ))
+        {
+            TranslateMessage( &msg );
+            ok( msg.message != WM_DEVICECHANGE, "got WM_DEVICECHANGE\n" );
+            DispatchMessageW( &msg );
+        }
+        if (device_change_count == device_change_expect / 2) SetEvent( stop_event );
+    }
+
+    WaitForSingleObject( thread, INFINITE );
+    CloseHandle( thread );
+    CloseHandle( stop_event );
+
+    UnregisterDeviceNotification( devnotify );
+
+    DestroyWindow( hwnd );
+    UnregisterClassW( class.lpszClassName, class.hInstance );
+}
+
 START_TEST( hid )
 {
     HANDLE mapping;
@@ -10020,6 +10387,8 @@ START_TEST( hid )
         test_force_feedback_joystick( 0x800 );
 
         test_device_managed_effect();
+
+        test_RegisterDeviceNotification();
     }
     CoUninitialize();
 
