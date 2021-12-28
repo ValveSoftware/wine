@@ -1406,6 +1406,7 @@ static BOOL add_service( SC_HANDLE scm, HINF hinf, const WCHAR *name, const WCHA
     }
     iterate_section_fields( hinf, section, L"BitReg", bitreg_callback, NULL );
 
+    if (start_type < SERVICE_DEMAND_START) flags |= SPSVCINST_STARTSERVICE;
     if (flags & SPSVCINST_STARTSERVICE) StartServiceW( service, 0, NULL );
     CloseServiceHandle( service );
 
