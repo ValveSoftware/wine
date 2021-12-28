@@ -1083,8 +1083,8 @@ static NTSTATUS WINAPI pnp_manager_driver_entry( DRIVER_OBJECT *driver, UNICODE_
 void pnp_manager_start(void)
 {
     static const WCHAR driver_nameW[] = {'\\','D','r','i','v','e','r','\\','P','n','p','M','a','n','a','g','e','r',0};
-    WCHAR endpoint[] = L"\\pipe\\wine_plugplay";
-    WCHAR protseq[] = L"ncalrpc";
+    WCHAR transport[] = PLUGPLAY_TRANSPORT;
+    WCHAR endpoint[] = PLUGPLAY_ENDPOINT;
     UNICODE_STRING driver_nameU;
     RPC_WSTR binding_str;
     NTSTATUS status;
@@ -1094,7 +1094,7 @@ void pnp_manager_start(void)
     if ((status = IoCreateDriver( &driver_nameU, pnp_manager_driver_entry )))
         ERR("Failed to create PnP manager driver, status %#x.\n", status);
 
-    if ((err = RpcStringBindingComposeW( NULL, protseq, NULL, endpoint, NULL, &binding_str )))
+    if ((err = RpcStringBindingComposeW( NULL, transport, NULL, endpoint, NULL, &binding_str )))
     {
         ERR("RpcStringBindingCompose() failed, error %#x\n", err);
         return;
