@@ -18,8 +18,15 @@
 
 import "wtypes.idl";
 
+cpp_quote("#include \"winsvc.h\"")
+cpp_quote("#define PLUGPLAY_TRANSPORT {'n','c','a','c','n','_','n','p',0}")
+cpp_quote("#define PLUGPLAY_TRANSPORTA \"ncacn_np\"")
+cpp_quote("#define PLUGPLAY_ENDPOINT {'\\\\','p','i','p','e','\\\\','w','i','n','e','_','p','l','u','g','p','l','a','y',0}")
+cpp_quote("#define PLUGPLAY_ENDPOINTA \"\\\\pipe\\\\wine_plugplay\"")
+
 [
     uuid(57c680ac-7bce-4f39-97fd-ffea566754d5),
+    endpoint("ncacn_np:[\\pipe\\wine_plugplay]"),
     implicit_handle(handle_t plugplay_binding_handle)
 ]
 interface plugplay
