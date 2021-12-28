@@ -3,6 +3,8 @@ MODULE    = xaudio2_7.dll
 IMPORTS   = $(FAUDIO_PE_LIBS) advapi32 ole32 user32 uuid
 EXTRAINCL = $(FAUDIO_PE_CFLAGS)
 
+EXTRADLLFLAGS = -Wb,--prefer-native
+
 SOURCES = \
 	x3daudio.c \
 	xapo.c \

@@ -4,6 +4,8 @@ IMPORTS   = $(FAUDIO_PE_LIBS) advapi32 ole32 user32 uuid
 EXTRAINCL = $(FAUDIO_PE_CFLAGS)
 PARENTSRC = ../xaudio2_7
 
+EXTRADLLFLAGS = -Wb,--prefer-native
+
 SOURCES = \
 	version.rc \
 	x3daudio.c \
