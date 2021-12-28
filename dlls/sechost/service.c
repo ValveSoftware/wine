@@ -2039,8 +2039,8 @@ static BOOL notification_filter_matches( DEV_BROADCAST_HDR *filter, DEV_BROADCAS
 
 static DWORD WINAPI device_notify_proc( void *arg )
 {
-    WCHAR endpoint[] = L"\\pipe\\wine_plugplay";
-    WCHAR protseq[] = L"ncalrpc";
+    WCHAR transport[] = PLUGPLAY_TRANSPORT;
+    WCHAR endpoint[] = PLUGPLAY_ENDPOINT;
     RPC_WSTR binding_str;
     DWORD err = ERROR_SUCCESS;
     struct device_notify_registration *registration;
@@ -2051,7 +2051,7 @@ static DWORD WINAPI device_notify_proc( void *arg )
     unsigned int i, size;
     BYTE *buf;
 
-    if ((err = RpcStringBindingComposeW( NULL, protseq, NULL, endpoint, NULL, &binding_str )))
+    if ((err = RpcStringBindingComposeW( NULL, transport, NULL, endpoint, NULL, &binding_str )))
     {
         ERR("RpcStringBindingCompose() failed, error %#x\n", err);
         return err;
