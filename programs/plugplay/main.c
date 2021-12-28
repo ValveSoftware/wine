@@ -199,14 +199,14 @@ static DWORD WINAPI service_handler( DWORD ctrl, DWORD event_type, LPVOID event_
 
 static void WINAPI ServiceMain( DWORD argc, LPWSTR *argv )
 {
-    unsigned char endpoint[] = "\\pipe\\wine_plugplay";
-    unsigned char protseq[] = "ncalrpc";
+    unsigned char transport[] = PLUGPLAY_TRANSPORTA;
+    unsigned char endpoint[] = PLUGPLAY_ENDPOINTA;
     SERVICE_STATUS status;
     RPC_STATUS err;
 
     WINE_TRACE( "starting service\n" );
 
-    if ((err = RpcServerUseProtseqEpA( protseq, 0, endpoint, NULL )))
+    if ((err = RpcServerUseProtseqEpA( transport, 0, endpoint, NULL )))
     {
         ERR("RpcServerUseProtseqEp() failed, error %u\n", err);
         return;
