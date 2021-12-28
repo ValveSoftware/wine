@@ -4,6 +4,8 @@ EXTRAINCL = $(FAUDIO_PE_CFLAGS)
 EXTRADEFS = -DXACT3_VER=0x0303
 PARENTSRC = ../xactengine3_7
 
+EXTRADLLFLAGS = -Wb,--prefer-native
+
 C_SRCS = \
 	xact_dll.c
 
