@@ -5950,10 +5950,3 @@ void CDECL wined3d_device_run_cs_callback(struct wined3d_device *device,
 
     wined3d_cs_emit_user_callback(device->cs, callback, data, size);
 }
-
-void CDECL wined3d_device_wait_idle(struct wined3d_device *device)
-{
-    TRACE("device %p.\n", device);
-
-    wined3d_cs_emit_wait_idle(device->cs);
-}
