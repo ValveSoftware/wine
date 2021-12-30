@@ -1527,55 +1527,10 @@ HRESULT wined3d_output_get_gamma_ramp(struct wined3d_output *output, struct wine
     return WINED3D_OK;
 }
 
-/* from dxvk_config.h, not available at wine build time in Proton */
-struct DXVKOptions {
-    int32_t customVendorId;
-    int32_t customDeviceId;
-    int32_t nvapiHack;
-};
-static HMODULE dxvk_config_mod;
-static struct DXVKOptions dxvk_opts;
-static BOOL loaded_dxvk_opts;
-
-static BOOL WINAPI load_dxvk_config(INIT_ONCE *once, void *param, void **context)
-{
-    HRESULT (WINAPI *pDXVKGetOptions)(struct DXVKOptions *out_opts);
-
-    dxvk_config_mod = LoadLibraryA("dxvk_config.dll");
-    if(!dxvk_config_mod)
-    {
-        ERR_(winediag)("Couldn't load dxvk_config.dll, won't apply default DXVK config options\n");
-        return TRUE;
-    }
-
-    pDXVKGetOptions = (void*)GetProcAddress(dxvk_config_mod, "DXVKGetOptions");
-    if(!pDXVKGetOptions)
-    {
-        ERR_(winediag)("dxvk_config doesn't have DXVKGetOptions?!\n");
-        return TRUE;
-    }
-
-    if (pDXVKGetOptions(&dxvk_opts) == S_OK)
-    {
-        TRACE("got dxvk options:\n");
-        TRACE("\tnvapiHack: %u\n", dxvk_opts.nvapiHack);
-        TRACE("\tcustomVendorId: 0x%04x\n", dxvk_opts.customVendorId);
-        TRACE("\tcustomDeviceId: 0x%04x\n", dxvk_opts.customDeviceId);
-        loaded_dxvk_opts = TRUE;
-    }
-    else
-        WARN("failed to get DXVK options!\n");
-    return TRUE;
-}
-
 HRESULT CDECL wined3d_adapter_get_identifier(const struct wined3d_adapter *adapter,
         DWORD flags, struct wined3d_adapter_identifier *identifier)
 {
-    static INIT_ONCE init_once = INIT_ONCE_STATIC_INIT;
-
     TRACE("adapter %p, flags %#x, identifier %p.\n", adapter, flags, identifier);
-
-    InitOnceExecuteOnce(&init_once, load_dxvk_config, NULL, NULL);
 
     wined3d_mutex_lock();
 
@@ -1586,24 +1541,6 @@ HRESULT CDECL wined3d_adapter_get_identifier(const struct wined3d_adapter *adapt
     identifier->driver_version.u.LowPart = adapter->driver_info.version_low;
     identifier->vendor_id = adapter->driver_info.vendor;
     identifier->device_id = adapter->driver_info.device;
-
-    if(loaded_dxvk_opts)
-    {
-        /* logic from dxvk/src/dxgi/dxgi_adapter.cpp:DxgiAdapter::GetDesc2 */
-        if (dxvk_opts.customVendorId >= 0)
-            identifier->vendor_id = dxvk_opts.customVendorId;
-
-        if (dxvk_opts.customDeviceId >= 0)
-            identifier->device_id = dxvk_opts.customDeviceId;
-
-        if (dxvk_opts.customVendorId < 0 && dxvk_opts.customDeviceId < 0 &&
-                dxvk_opts.nvapiHack && adapter->driver_info.vendor == HW_VENDOR_NVIDIA) {
-            TRACE("NvAPI workaround enabled, reporting AMD GPU\n");
-            identifier->vendor_id = HW_VENDOR_AMD;
-            identifier->device_id = CARD_AMD_RADEON_RX_480;
-        }
-    }
-
     identifier->subsystem_id = 0;
     identifier->revision = 0;
     identifier->device_identifier = IID_D3DDEVICE_D3DUID;
