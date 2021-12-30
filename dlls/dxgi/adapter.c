@@ -203,25 +203,6 @@ skip_description:
     desc->GraphicsPreemptionGranularity = 0; /* FIXME */
     desc->ComputePreemptionGranularity = 0; /* FIXME */
 
-    {
-        /* HACK
-         *
-         * Grand Theft Auto IV first tries to get VRAM size using nvapi/atiadlxx,
-         * after that fails it falls back to the Intel integrated codepath which
-         * uses DXGI.
-         *
-         * DedicatedVideoMemory must be a dummy value less than 200 MB, then
-         * SharedSystemMemory will be used as the VRAM size.
-         * In case of failure, the game will just use 512 MB as VRAM size.
-         */
-        const char *sgi = getenv("SteamGameId");
-        if(sgi && !strcmp(sgi, "12210"))
-        {
-            desc->SharedSystemMemory = adapter_id.video_memory;
-            desc->DedicatedVideoMemory = 32 * 1024 * 1024;
-        }
-    }
-
     return hr;
 }
 
