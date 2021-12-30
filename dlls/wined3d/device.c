@@ -213,8 +213,6 @@ void wined3d_device_cleanup(struct wined3d_device *device)
     if (device->swapchain_count)
         wined3d_device_uninit_3d(device);
 
-    wined3d_destroy_gl_vr_context(&device->vr_context);
-
     wined3d_cs_destroy(device->cs);
 
     for (i = 0; i < ARRAY_SIZE(device->multistate_funcs); ++i)
