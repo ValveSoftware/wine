@@ -2561,7 +2561,6 @@ static void shader_generate_glsl_declarations(const struct wined3d_context_gl *c
             shader_addline(buffer, ";\n");
         }
     }
-    shader_addline(buffer, "const float FLT_MAX = 1e38;\n");
 }
 
 /* Prototypes */
@@ -4215,10 +4214,9 @@ static void shader_glsl_scalar_op(const struct wined3d_shader_instruction *ins)
 {
     DWORD shader_version = WINED3D_SHADER_VERSION(ins->ctx->reg_maps->shader_version.major,
             ins->ctx->reg_maps->shader_version.minor);
-    struct shader_glsl_ctx_priv *priv = ins->ctx->backend_data;
     struct wined3d_string_buffer *buffer = ins->ctx->buffer;
-    struct wined3d_string_buffer *prefix, *suffix;
     struct glsl_src_param src0_param;
+    const char *prefix, *suffix;
     unsigned int dst_size;
     DWORD dst_write_mask;
 
@@ -4230,50 +4228,41 @@ static void shader_glsl_scalar_op(const struct wined3d_shader_instruction *ins)
 
     shader_glsl_add_src_param(ins, &ins->src[0], dst_write_mask, &src0_param);
 
-    prefix = string_buffer_get(priv->string_buffers);
-    suffix = string_buffer_get(priv->string_buffers);
-
     switch (ins->handler_idx)
     {
         case WINED3DSIH_EXP:
         case WINED3DSIH_EXPP:
-            string_buffer_sprintf(prefix, "exp2(");
-            string_buffer_sprintf(suffix, ")");
+            prefix = "exp2(";
+            suffix = ")";
             break;
 
         case WINED3DSIH_LOG:
         case WINED3DSIH_LOGP:
-            string_buffer_sprintf(prefix, "log2(abs(");
-            string_buffer_sprintf(suffix, "))");
+            prefix = "log2(abs(";
+            suffix = "))";
             break;
 
         case WINED3DSIH_RCP:
-            if (shader_version <= WINED3D_SHADER_VERSION(3, 0))
-                string_buffer_sprintf(prefix, "%s == 0.0 ? FLT_MAX : 1.0 / ", src0_param.param_str);
-            else
-                string_buffer_sprintf(prefix, "1.0 / ");
+            prefix = "1.0 / ";
+            suffix = "";
             break;
 
         case WINED3DSIH_RSQ:
-            if (shader_version <= WINED3D_SHADER_VERSION(3, 0))
-                string_buffer_sprintf(prefix, "%s == 0.0 ? FLT_MAX : inversesqrt(abs(", src0_param.param_str);
-            else
-                string_buffer_sprintf(prefix, "inversesqrt(abs(");
-            string_buffer_sprintf(suffix, "))");
+            prefix = "inversesqrt(abs(";
+            suffix = "))";
             break;
 
         default:
+            prefix = "";
+            suffix = "";
             FIXME("Unhandled instruction %#x.\n", ins->handler_idx);
             break;
     }
 
     if (dst_size > 1 && shader_version < WINED3D_SHADER_VERSION(4, 0))
-        shader_addline(buffer, "vec%u(%s%s%s));\n", dst_size, prefix->buffer, src0_param.param_str, suffix->buffer);
+        shader_addline(buffer, "vec%u(%s%s%s));\n", dst_size, prefix, src0_param.param_str, suffix);
     else
-        shader_addline(buffer, "%s%s%s);\n", prefix->buffer, src0_param.param_str, suffix->buffer);
-
-    string_buffer_release(priv->string_buffers, prefix);
-    string_buffer_release(priv->string_buffers, suffix);
+        shader_addline(buffer, "%s%s%s);\n", prefix, src0_param.param_str, suffix);
 }
 
 /** Process the WINED3DSIO_EXPP instruction in GLSL:
