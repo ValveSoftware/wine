@@ -2902,11 +2902,6 @@ ULONG __cdecl wined3d_vertex_declaration_incref(struct wined3d_vertex_declaratio
 HRESULT __cdecl wined3d_extract_shader_input_signature_from_dxbc(struct wined3d_shader_signature *signature,
         const void *byte_code, SIZE_T byte_code_size);
 
-typedef void (__cdecl *wined3d_gl_texture_callback)(unsigned int gl_texture, const void *data, unsigned int size);
-
-void __cdecl wined3d_access_gl_texture(struct wined3d_texture *texture,
-        wined3d_gl_texture_callback callback, const void *data, unsigned int size);
-
 /* Return the integer base-2 logarithm of x. Undefined for x == 0. */
 static inline unsigned int wined3d_log2i(unsigned int x)
 {
