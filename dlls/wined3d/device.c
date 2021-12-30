@@ -5942,11 +5942,3 @@ LRESULT device_process_message(struct wined3d_device *device, HWND window, BOOL 
     else
         return CallWindowProcA(proc, window, message, wparam, lparam);
 }
-
-void CDECL wined3d_device_run_cs_callback(struct wined3d_device *device,
-        wined3d_cs_callback callback, const void *data, unsigned int size)
-{
-    TRACE("device %p, callback %p, data %p, size %u.\n", device, callback, data, size);
-
-    wined3d_cs_emit_user_callback(device->cs, callback, data, size);
-}

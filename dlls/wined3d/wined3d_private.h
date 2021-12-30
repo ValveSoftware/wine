@@ -4945,8 +4945,6 @@ static inline void wined3d_cs_finish(struct wined3d_cs *cs, enum wined3d_cs_queu
 
 void wined3d_cs_emit_gl_texture_callback(struct wined3d_cs *cs, struct wined3d_texture *texture,
         wined3d_gl_texture_callback callback, const void *data, unsigned int size) DECLSPEC_HIDDEN;
-void wined3d_cs_emit_user_callback(struct wined3d_cs *cs,
-        wined3d_cs_callback callback, const void *data, unsigned int size) DECLSPEC_HIDDEN;
 
 static inline void wined3d_device_context_push_constants(struct wined3d_device_context *context,
         enum wined3d_push_constants p, unsigned int start_idx, unsigned int count, const void *constants)

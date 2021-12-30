@@ -317,4 +317,3 @@
 @ cdecl wined3d_extract_shader_input_signature_from_dxbc(ptr ptr long)
 
 @ cdecl wined3d_access_gl_texture(ptr ptr ptr long)
-@ cdecl wined3d_device_run_cs_callback(ptr ptr ptr long)
