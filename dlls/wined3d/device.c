@@ -5955,5 +5955,5 @@ void CDECL wined3d_device_wait_idle(struct wined3d_device *device)
 {
     TRACE("device %p.\n", device);
 
-    wined3d_cs_finish(device->cs, WINED3D_CS_QUEUE_DEFAULT);
+    wined3d_cs_emit_wait_idle(device->cs);
 }
