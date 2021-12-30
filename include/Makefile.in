@@ -795,7 +795,6 @@ SOURCES = \
 	wine/itss.idl \
 	wine/orpc.idl \
 	wine/svcctl.idl \
-	wine/wined3d-interop.idl \
 	wine/winedxgi.idl \
 	winerror.h \
 	winevt.h \

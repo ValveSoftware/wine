@@ -39,8 +39,6 @@
 #include "wine/winedxgi.h"
 #include "wine/rbtree.h"
 
-#include "wine/wined3d-interop.h"
-
 #define MAKE_TAG(ch0, ch1, ch2, ch3) \
     ((DWORD)(ch0) | ((DWORD)(ch1) << 8) | \
     ((DWORD)(ch2) << 16) | ((DWORD)(ch3) << 24 ))
@@ -146,7 +144,7 @@ struct d3d_texture1d *unsafe_impl_from_ID3D10Texture1D(ID3D10Texture1D *iface) D
 /* ID3D11Texture2D, ID3D10Texture2D */
 struct d3d_texture2d
 {
-    IWineD3D11Texture2D ID3D11Texture2D_iface;
+    ID3D11Texture2D ID3D11Texture2D_iface;
     ID3D10Texture2D ID3D10Texture2D_iface;
     LONG refcount;
 
