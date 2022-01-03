@@ -10008,16 +10008,19 @@ static LRESULT CALLBACK devnotify_wndproc( HWND hwnd, UINT msg, WPARAM wparam, L
 
         winetest_push_context( "%u", device_change_count );
 
+        todo_wine_if( IsEqualGUID( &iface->dbcc_classguid, &control_class ) && !device_change_all )
         ok( IsEqualGUID( &iface->dbcc_classguid, &expect_guid ), "got dbch_classguid %s\n",
             debugstr_guid( &iface->dbcc_classguid ) );
         ok( iface->dbcc_size >= offsetof( DEV_BROADCAST_DEVICEINTERFACE_W, dbcc_name[wcslen( iface->dbcc_name ) + 1] ),
             "got dbcc_size %u\n", iface->dbcc_size );
+        todo_wine
         ok( !wcsncmp( iface->dbcc_name, expect_prefix, wcslen( expect_prefix ) ),
             "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
 
         upper_end = wcschr( iface->dbcc_name + wcslen( expect_prefix ), '#' );
         name_end = iface->dbcc_name + wcslen( iface->dbcc_name ) + 1;
         ok( !!upper_end, "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
+        todo_wine
         ok( all_upper( iface->dbcc_name, upper_end ), "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
         ok( all_lower( upper_end, name_end ), "got dbcc_name %s\n", debugstr_w(iface->dbcc_name) );
 
@@ -10147,70 +10150,95 @@ static void test_RegisterDeviceNotification(void)
 
     SetLastError( 0xdeadbeef );
     devnotify = RegisterDeviceNotificationA( NULL, NULL, 0 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     SetLastError( 0xdeadbeef );
     devnotify = RegisterDeviceNotificationA( (HWND)0xdeadbeef, NULL, 0 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     SetLastError( 0xdeadbeef );
     devnotify = RegisterDeviceNotificationA( hwnd, NULL, 2 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_PARAMETER, "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     SetLastError( 0xdeadbeef );
     memset( header, 0, sizeof(DEV_BROADCAST_OEM) );
     header->dbch_size = sizeof(DEV_BROADCAST_OEM);
     header->dbch_devicetype = DBT_DEVTYP_OEM;
     devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
         "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     SetLastError( 0xdeadbeef );
     memset( header, 0, sizeof(DEV_BROADCAST_DEVNODE) );
     header->dbch_size = sizeof(DEV_BROADCAST_DEVNODE);
     header->dbch_devicetype = DBT_DEVTYP_DEVNODE;
     devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
         "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     SetLastError( 0xdeadbeef );
     memset( header, 0, sizeof(DEV_BROADCAST_VOLUME) );
     header->dbch_size = sizeof(DEV_BROADCAST_VOLUME);
     header->dbch_devicetype = DBT_DEVTYP_VOLUME;
     devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
         "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     SetLastError( 0xdeadbeef );
     memset( header, 0, sizeof(DEV_BROADCAST_PORT_A) );
     header->dbch_size = sizeof(DEV_BROADCAST_PORT_A);
     header->dbch_devicetype = DBT_DEVTYP_PORT;
     devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
         "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     SetLastError( 0xdeadbeef );
     memset( header, 0, sizeof(DEV_BROADCAST_NET) );
     header->dbch_size = sizeof(DEV_BROADCAST_NET);
     header->dbch_devicetype = DBT_DEVTYP_NET;
     devnotify = RegisterDeviceNotificationA( hwnd, header, 0 );
+    todo_wine
     ok( !devnotify, "RegisterDeviceNotificationA succeeded\n" );
+    todo_wine
     ok( GetLastError() == ERROR_INVALID_DATA || GetLastError() == ERROR_SERVICE_SPECIFIC_ERROR,
         "got error %u\n", GetLastError() );
+    if (devnotify) UnregisterDeviceNotification( devnotify );
 
     devnotify = RegisterDeviceNotificationA( hwnd, &iface_filter_a, DEVICE_NOTIFY_WINDOW_HANDLE );
     ok( !!devnotify, "RegisterDeviceNotificationA failed, error %u\n", GetLastError() );
     while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE )) DispatchMessageW( &msg );
 
     device_change_count = 0;
-    device_change_expect = 2;
+    if (!strcmp( winetest_platform, "wine" )) device_change_expect = 4;
+    else device_change_expect = 2;
     device_change_hwnd = hwnd;
     device_change_all = FALSE;
     stop_event = CreateEventW( NULL, FALSE, FALSE, NULL );
@@ -10243,7 +10271,8 @@ static void test_RegisterDeviceNotification(void)
     while (PeekMessageW( &msg, hwnd, 0, 0, PM_REMOVE )) DispatchMessageW( &msg );
 
     device_change_count = 0;
-    device_change_expect = 2;
+    if (!strcmp( winetest_platform, "wine" )) device_change_expect = 4;
+    else device_change_expect = 2;
     device_change_hwnd = hwnd;
     device_change_all = FALSE;
     stop_event = CreateEventW( NULL, FALSE, FALSE, NULL );
