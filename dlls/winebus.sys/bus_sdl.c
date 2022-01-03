@@ -186,14 +186,12 @@ static BOOL descriptor_add_haptic(struct sdl_device *impl)
         !(impl->sdl_haptic = pSDL_HapticOpenFromJoystick(impl->sdl_joystick)))
         impl->effect_support = 0;
     else
-    {
         impl->effect_support = pSDL_HapticQuery(impl->sdl_haptic);
-        if (pSDL_HapticRumbleSupported(impl->sdl_haptic))
-            impl->effect_support |= WINE_SDL_HAPTIC_RUMBLE;
 
-        pSDL_HapticStopAll(impl->sdl_haptic);
-        pSDL_HapticRumbleInit(impl->sdl_haptic);
-    }
+    if (!(impl->effect_support & EFFECT_SUPPORT_HAPTICS) &&
+        pSDL_HapticRumbleSupported(impl->sdl_haptic) &&
+        pSDL_HapticRumbleInit(impl->sdl_haptic) == 0)
+        impl->effect_support |= WINE_SDL_HAPTIC_RUMBLE;
 
     if (!(impl->effect_support & EFFECT_SUPPORT_HAPTICS) && pSDL_JoystickRumble &&
         !pSDL_JoystickRumble(impl->sdl_joystick, 0, 0, 0))
