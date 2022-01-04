@@ -579,9 +579,39 @@ BOOL WINAPI DECLSPEC_HOTPATCH ConvertSecurityDescriptorToStringSecurityDescripto
     return TRUE;
 }
 
+static BOOL WINAPI init_computer_sid( INIT_ONCE *init_once, void *parameter, void **context )
+{
+    DWORD *sub_authority = parameter;
+    unsigned int i, count;
+    DWORD len, index;
+    BOOL found = FALSE;
+    DWORD values[3];
+    char buffer[64];
+    LSTATUS status;
+
+    len = ARRAY_SIZE(buffer);
+    index = 0;
+    while (!(status = RegEnumKeyExA( HKEY_USERS, index, buffer, &len, NULL, NULL, NULL, NULL )))
+    {
+        count = sscanf(buffer, "S-1-5-21-%u-%u-%u", &values[0], &values[1], &values[2]);
+        if (count == 3)
+        {
+            if (found)
+                ERR( "Multiple users are not supported.\n" );
+            for (i = 0; i < 3; ++i)
+                sub_authority[i] = values[i];
+            found = TRUE;
+        }
+        ++index;
+        len = ARRAY_SIZE(buffer);
+    }
+    return found;
+}
+
 static BOOL get_computer_sid( PSID sid )
 {
-    static const struct /* same fields as struct SID */
+    static INIT_ONCE init_once = INIT_ONCE_STATIC_INIT;
+    static struct /* same fields as struct SID */
     {
         BYTE Revision;
         BYTE SubAuthorityCount;
@@ -589,6 +619,9 @@ static BOOL get_computer_sid( PSID sid )
         DWORD SubAuthority[4];
     } computer_sid =
     { SID_REVISION, 4, { SECURITY_NT_AUTHORITY }, { SECURITY_NT_NON_UNIQUE, 0, 0, 0 } };
+
+    if (!InitOnceExecuteOnce( &init_once, init_computer_sid, computer_sid.SubAuthority + 1, NULL ))
+        ERR( "Could not initialize computer sid.\n" );
 
     memcpy( sid, &computer_sid, sizeof(computer_sid) );
     return TRUE;
