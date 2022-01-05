@@ -227,4 +227,9 @@ struct hid_preparsed_data
 #define PID_USAGE_CREATE_NEW_EFFECT_REPORT         ((USAGE) 0xab)
 #define PID_USAGE_RAM_POOL_AVAILABLE               ((USAGE) 0xac)
 
+static inline BOOL is_logitech_g920(WORD vid, WORD pid)
+{
+    return vid == 0x046D && pid == 0xC262;
+}
+
 #endif /* __WINE_PARSE_H */
