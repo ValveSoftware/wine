@@ -780,7 +780,24 @@ BOOL process_rawinput_message( MSG *msg, UINT hw_id, const struct hardware_msg_d
     if (msg->message == WM_INPUT_DEVICE_CHANGE)
     {
         pthread_mutex_lock( &rawinput_mutex );
-        rawinput_update_device_list();
+        if (msg_data->rawinput.type != RIM_TYPEHID || msg_data->rawinput.hid.param != GIDC_REMOVAL)
+            rawinput_update_device_list();
+        else
+        {
+            struct device *device;
+
+            LIST_FOR_EACH_ENTRY( device, &devices, struct device, entry )
+            {
+                if (device->handle == UlongToHandle(msg_data->rawinput.hid.device))
+                {
+                    list_remove( &device->entry );
+                    NtClose( device->file );
+                    free( device->data );
+                    free( device );
+                    break;
+                }
+            }
+        }
         pthread_mutex_unlock( &rawinput_mutex );
     }
     else
