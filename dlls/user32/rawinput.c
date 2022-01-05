@@ -172,6 +172,46 @@ static struct device *add_device(HDEVINFO set, SP_DEVICE_INTERFACE_DATA *iface)
     return device;
 }
 
+void rawinput_add_device(const WCHAR *device_path)
+{
+    ULONG i;
+
+    EnterCriticalSection(&rawinput_devices_cs);
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+        if (!wcsicmp(rawinput_devices[i].detail->DevicePath, device_path))
+            break;
+
+    /* not there yet, force refresh the list, we cannot just add the device
+       here because it may not have its rawinput handle property assigned yet */
+    if (i == rawinput_devices_count) rawinput_devices_count = 0;
+
+    LeaveCriticalSection(&rawinput_devices_cs);
+}
+
+void rawinput_remove_device(const WCHAR *device_path)
+{
+    UINT i;
+
+    EnterCriticalSection(&rawinput_devices_cs);
+
+    for (i = 0; i < rawinput_devices_count; ++i)
+        if (!wcsicmp(rawinput_devices[i].detail->DevicePath, device_path))
+            break;
+
+    if (i < rawinput_devices_count)
+    {
+        HidD_FreePreparsedData(rawinput_devices[i].data);
+        CloseHandle(rawinput_devices[i].file);
+        free(rawinput_devices[i].detail);
+
+        rawinput_devices_count--;
+        memmove(rawinput_devices + i, rawinput_devices + i + 1, rawinput_devices_count - i);
+    }
+
+    LeaveCriticalSection(&rawinput_devices_cs);
+}
+
 void rawinput_update_device_list(void)
 {
     SP_DEVICE_INTERFACE_DATA iface = { sizeof(iface) };
@@ -454,7 +494,7 @@ UINT WINAPI GetRawInputDeviceList(RAWINPUTDEVICELIST *devices, UINT *device_coun
     }
 
     EnterCriticalSection(&rawinput_devices_cs);
-    if (ticks - last_check > 2000)
+    if (ticks - last_check > 2000 || !rawinput_devices_count)
     {
         last_check = ticks;
         rawinput_update_device_list();
