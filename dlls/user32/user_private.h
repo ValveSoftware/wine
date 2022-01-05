@@ -154,6 +154,8 @@ extern BOOL rawinput_from_hardware_message(RAWINPUT *rawinput, const struct hard
 extern BOOL rawinput_device_get_usages(HANDLE handle, USAGE *usage_page, USAGE *usage);
 extern struct rawinput_thread_data *rawinput_thread_data(void);
 extern void rawinput_update_device_list(void);
+extern void rawinput_add_device(const WCHAR *device_path);
+extern void rawinput_remove_device(const WCHAR *device_path);
 
 extern void create_offscreen_window_surface( const RECT *visible_rect, struct window_surface **surface ) DECLSPEC_HIDDEN;
 
