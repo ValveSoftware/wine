@@ -1166,6 +1166,10 @@ BOOL WINAPI EnableMouseInPointer(BOOL enable)
 
 static DWORD CALLBACK devnotify_window_callback(HANDLE handle, DWORD flags, DEV_BROADCAST_HDR *header)
 {
+    DEV_BROADCAST_DEVICEINTERFACE_W *iface = (DEV_BROADCAST_DEVICEINTERFACE_W *)header;
+    if (flags == DBT_DEVICEARRIVAL) rawinput_add_device(iface->dbcc_name);
+    if (flags == DBT_DEVICEREMOVECOMPLETE) rawinput_remove_device(iface->dbcc_name);
+
     SendMessageTimeoutW(handle, WM_DEVICECHANGE, flags, (LPARAM)header, SMTO_ABORTIFHUNG, 2000, NULL);
     return 0;
 }
