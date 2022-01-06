@@ -42,9 +42,15 @@ BOOL WINAPI DllMain(HINSTANCE hInstDLL, DWORD fdwReason, LPVOID lpv)
     switch(fdwReason)
     {
     case DLL_PROCESS_ATTACH:
+    {
+        char str[64];
+
         winhttp_instance = hInstDLL;
         DisableThreadLibraryCalls(hInstDLL);
+        if ((reuse_threadpool = GetEnvironmentVariableA( "SteamGameId", str, sizeof(str)) && !strcmp(str, "1446780" )))
+            ERR( "HACK: setting reuse_threadpool.\n" );
         break;
+    }
     case DLL_PROCESS_DETACH:
         if (lpv) break;
         netconn_unload();
