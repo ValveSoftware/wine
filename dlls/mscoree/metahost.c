@@ -1675,7 +1675,7 @@ static BOOL compile_assembly(const char *source, const char *target, char *targe
 
     GetTempPathA(MAX_PATH, tmp);
     if (!GetTempFileNameA(tmp, "assembly", id.LowPart, tmpdir)) return FALSE;
-    if (!CreateDirectoryA(tmpdir, NULL)) return FALSE;
+    if (!CreateDirectoryA(tmpdir, NULL) && GetLastError() != ERROR_ALREADY_EXISTS) return FALSE;
 
     snprintf(source_path, MAX_PATH, "%s\\source.cs", tmpdir);
     snprintf(target_path, target_path_len, "%s\\%s", tmpdir, target);
