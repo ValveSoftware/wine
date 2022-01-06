@@ -43,6 +43,24 @@ WINE_DEFAULT_DEBUG_CHANNEL(winhttp);
 
 #define DEFAULT_KEEP_ALIVE_TIMEOUT 30000
 
+BOOL reuse_threadpool;
+
+static struct
+{
+    TP_POOL *pool;
+    LONG ref;
+}
+thread_pool_cache;
+
+static CRITICAL_SECTION thread_pool_cache_cs;
+static CRITICAL_SECTION_DEBUG thread_pool_cache_debug =
+{
+    0, 0, &thread_pool_cache_cs,
+    { &thread_pool_cache_debug.ProcessLocksList, &thread_pool_cache_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": thread_pool_cache_cs") }
+};
+static CRITICAL_SECTION thread_pool_cache_cs = { &thread_pool_cache_debug, -1, 0, 0, 0, 0 };
+
 static const WCHAR *attribute_table[] =
 {
     L"Mime-Version",                /* WINHTTP_QUERY_MIME_VERSION               = 0  */
@@ -122,13 +140,37 @@ static const WCHAR *attribute_table[] =
     NULL                            /* WINHTTP_QUERY_PASSPORT_CONFIG            = 78 */
 };
 
+static TP_POOL *create_thread_pool(void)
+{
+    TP_POOL *pool;
+
+    if (!(pool = CreateThreadpool( NULL ))) return NULL;
+    SetThreadpoolThreadMinimum( pool, 1 );
+    SetThreadpoolThreadMaximum( pool, 1 );
+
+    return pool;
+}
+
 static DWORD start_queue( struct queue *queue )
 {
     if (queue->pool) return ERROR_SUCCESS;
 
-    if (!(queue->pool = CreateThreadpool( NULL ))) return GetLastError();
-    SetThreadpoolThreadMinimum( queue->pool, 1 );
-    SetThreadpoolThreadMaximum( queue->pool, 1 );
+    if (reuse_threadpool)
+    {
+        EnterCriticalSection( &thread_pool_cache_cs );
+        if (!thread_pool_cache.pool)
+        {
+            assert( !thread_pool_cache.ref );
+            thread_pool_cache.pool = create_thread_pool();
+        }
+        ++thread_pool_cache.ref;
+        queue->pool = thread_pool_cache.pool;
+        LeaveCriticalSection( &thread_pool_cache_cs );
+    }
+    else
+    {
+        if (!(queue->pool = create_thread_pool())) return GetLastError();
+    }
 
     memset( &queue->env, 0, sizeof(queue->env) );
     queue->env.Version = 1;
@@ -141,7 +183,21 @@ static DWORD start_queue( struct queue *queue )
 void stop_queue( struct queue *queue )
 {
     if (!queue->pool) return;
-    CloseThreadpool( queue->pool );
+    if (reuse_threadpool)
+    {
+        EnterCriticalSection( &thread_pool_cache_cs );
+        assert(thread_pool_cache.ref);
+        if (!--thread_pool_cache.ref)
+        {
+            CloseThreadpool( thread_pool_cache.pool );
+            thread_pool_cache.pool = NULL;
+        }
+        LeaveCriticalSection( &thread_pool_cache_cs );
+    }
+    else
+    {
+        CloseThreadpool( queue->pool );
+    }
     queue->pool = NULL;
     TRACE("stopped %p\n", queue);
 }
