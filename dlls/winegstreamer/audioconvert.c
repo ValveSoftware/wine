@@ -685,19 +685,14 @@ static HRESULT WINAPI audio_converter_ProcessInput(IMFTransform *iface, DWORD id
     if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &buffer_data, NULL, &buffer_size)))
         goto done;
 
-    for (;;)
+    if (!wg_parser_get_next_read_offset(converter->parser, &offset, &size))
     {
-        if (!wg_parser_get_next_read_offset(converter->parser, &offset, &size))
-            continue;
-
-        wg_parser_push_data(converter->parser, WG_READ_SUCCESS, buffer_data, min(buffer_size, size));
-
-        if (buffer_size <= size)
-            break;
-
-        buffer_data += size;
-        buffer_size -= size;
+        hr = MF_E_UNEXPECTED;
+        IMFMediaBuffer_Unlock(buffer);
+        goto done;
     }
+
+    wg_parser_push_data(converter->parser, WG_READ_SUCCESS, buffer_data, buffer_size);
 
     IMFMediaBuffer_Unlock(buffer);
     converter->buffer_inflight = TRUE;
