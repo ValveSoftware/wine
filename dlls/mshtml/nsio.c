@@ -1031,6 +1031,7 @@ static nsresult NSAPI nsChannel_AsyncOpen(nsIHttpChannel *iface, nsIStreamListen
     BOOL is_document_channel;
     BOOL cancel = FALSE;
     nsresult nsres = NS_OK;
+    BOOL navigate = FALSE;
 
     TRACE("(%p)->(%p %p)\n", This, aListener, aContext);
 
@@ -1064,7 +1065,22 @@ static nsresult NSAPI nsChannel_AsyncOpen(nsIHttpChannel *iface, nsIStreamListen
             cancel = TRUE;
         }
 
-        if(is_main_content_window(window)) {
+        if (is_main_content_window(window))
+        {
+            navigate = TRUE;
+        }
+        else if (window->browser && window->frame_element)
+        {
+            IUnknown *unk;
+
+            if (SUCCEEDED(IHTMLFrameBase_QueryInterface(&window->frame_element->IHTMLFrameBase_iface,
+                    &IID_IHTMLIFrameElement, (void **)&unk)))
+            {
+                IUnknown_Release(unk);
+                navigate = TRUE;
+            }
+        }
+        if (navigate) {
             if(!This->uri->channel_bsc) {
                 /* top window navigation initiated by Gecko */
                 nsres = before_async_open(This, window->browser, &cancel);
