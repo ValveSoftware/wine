@@ -336,12 +336,18 @@ static void update_relative_valuators( XIAnyClassInfo **classes, int num_classes
     {
         valuator = (XIValuatorClassInfo *)classes[num_classes];
         if (classes[num_classes]->type != XIValuatorClass) continue;
-        if (valuator->number == 0 && valuator->mode == XIModeRelative) thread_data->x_valuator = *valuator;
-        if (valuator->number == 1 && valuator->mode == XIModeRelative) thread_data->y_valuator = *valuator;
+        if (valuator->number == 0) thread_data->x_valuator = *valuator;
+        if (valuator->number == 1) thread_data->y_valuator = *valuator;
     }
 
     if (thread_data->x_valuator.number < 0 || thread_data->y_valuator.number < 0)
         WARN( "X/Y axis valuators not found, ignoring RawMotion events\n" );
+    else if (thread_data->x_valuator.mode != thread_data->y_valuator.mode)
+    {
+        WARN( "Relative/Absolute mismatch between X/Y axis, ignoring RawMotion events\n" );
+        thread_data->x_valuator.number = -1;
+        thread_data->y_valuator.number = -1;
+    }
 
     thread_data->x_valuator.value = 0;
     thread_data->y_valuator.value = 0;
@@ -1875,7 +1881,15 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
     if (!event->valuators.mask_len) return FALSE;
     if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
 
-    virtual_rect = get_virtual_screen_rect();
+    if (x->mode == XIModeRelative && y->mode == XIModeRelative)
+        input->u.mi.dwFlags &= ~(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK);
+    else if (x->mode == XIModeAbsolute && y->mode == XIModeAbsolute)
+        input->u.mi.dwFlags |= MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
+    else
+        FIXME( "Unsupported relative/absolute X/Y axis mismatch\n." );
+
+    if (input->u.mi.dwFlags & MOUSEEVENTF_VIRTUALDESK) SetRect( &virtual_rect, 0, 0, 65535, 65535 );
+    else virtual_rect = get_virtual_screen_rect();
 
     if (x->max <= x->min) x_scale = 1;
     else x_scale = (virtual_rect.right - virtual_rect.left) / (x->max - x->min);
@@ -1888,12 +1902,14 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
         if (i == x->number)
         {
             x_value = *values;
-            x->value += x_value * x_scale;
+            if (x->mode == XIModeRelative) x->value += x_value * x_scale;
+            else x->value = (x_value - x->min) * x_scale;
         }
         if (i == y->number)
         {
             y_value = *values;
-            y->value += y_value * y_scale;
+            if (y->mode == XIModeRelative) y->value += y_value * y_scale;
+            else y->value = (y_value - y->min) * y_scale;
         }
         values++;
     }
@@ -1906,7 +1922,7 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
     x->value -= input->u.mi.dx;
     y->value -= input->u.mi.dy;
 
-    if (!input->u.mi.dx && !input->u.mi.dy)
+    if (!(input->u.mi.dwFlags & MOUSEEVENTF_ABSOLUTE) && !input->u.mi.dx && !input->u.mi.dy)
     {
         TRACE( "accumulating motion\n" );
         return FALSE;
