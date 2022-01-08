@@ -734,6 +734,7 @@ BOOL WINAPI GetKeyboardState( BYTE *state )
 {
     volatile struct input_shared_memory *shared = get_input_shared_memory();
     BOOL skip = TRUE;
+    int i;
 
     TRACE("(%p)\n", state);
 
@@ -745,8 +746,9 @@ BOOL WINAPI GetKeyboardState( BYTE *state )
     }
     SHARED_READ_END( &shared->seq );
 
-    if (skip) return TRUE;
-    return NtUserGetKeyboardState( state );
+    if (!skip) return NtUserGetKeyboardState( state );
+    for (i = 0; i < 256; i++) state[i] &= 0x81;
+    return TRUE;
 }
 
 /****************************************************************************
