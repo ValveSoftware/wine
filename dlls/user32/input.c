@@ -571,7 +571,11 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetKeyboardState( LPBYTE state )
     }
     SHARED_READ_END( &shared->seq );
 
-    if (skip) return TRUE;
+    if (skip)
+    {
+        for (i = 0; i < 256; i++) state[i] &= 0x81;
+        return TRUE;
+    }
 
     memset( state, 0, 256 );
     SERVER_START_REQ( get_key_state )
