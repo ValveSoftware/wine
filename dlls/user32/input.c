@@ -734,6 +734,7 @@ BOOL WINAPI GetKeyboardState( BYTE *state )
 {
     volatile struct input_shared_memory *shared = get_input_shared_memory();
     BOOL skip = TRUE;
+    int i;
 
     TRACE("(%p)\n", state);
 
