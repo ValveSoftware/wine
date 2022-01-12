@@ -1686,6 +1686,12 @@ static const WCHAR batangW[] =
     {'B','a','t','a','n','g',0};
 static const WCHAR arialW[] =
     {'A','r','i','a','l',0};
+static const WCHAR arial_boldW[] =
+    {'A','r','i','a','l',' ','B','o','l','d',0};
+static const WCHAR courier_newW[] =
+    {'C','o','u','r','i','e','r',' ','N','e','w',0};
+static const WCHAR courier_new_boldW[] =
+    {'C','o','u','r','i','e','r',' ','N','e','w',' ','B','o','l','d',0};
 
 static const WCHAR * const font_links_list[] =
 {
@@ -2882,6 +2888,9 @@ static void update_font_system_link_info(UINT current_ansi_codepage)
         set_multi_value_key(hkey, microsoft_sans_serifW, link, len);
         set_multi_value_key(hkey, tahomaW, link, len);
         set_multi_value_key(hkey, arialW, link, len);
+        set_multi_value_key(hkey, arial_boldW, link, len);
+        set_multi_value_key(hkey, courier_newW, link, len);
+        set_multi_value_key(hkey, courier_new_boldW, link, len);
         NtClose( hkey );
     }
 }
