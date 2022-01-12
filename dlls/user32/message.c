@@ -2697,8 +2697,8 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
     INPUT_MESSAGE_SOURCE prev_source = thread_info->msg_source;
     struct received_message_info info, *old_info;
     unsigned int hw_id = 0;  /* id of previous hardware message */
-    char buffer_init[256];
-    size_t buffer_size = 256;
+    char buffer_init[1024];
+    size_t buffer_size = 1024;
     void *buffer = buffer_init;
     BOOL skip = FALSE;
 
