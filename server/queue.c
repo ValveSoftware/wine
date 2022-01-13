@@ -1221,6 +1221,7 @@ static void msg_queue_destroy( struct object *obj )
     release_object( queue->input );
     if (queue->hooks) release_object( queue->hooks );
     if (queue->fd) release_object( queue->fd );
+    if (do_esync()) close( queue->esync_fd );
 }
 
 static void msg_queue_poll_event( struct fd *fd, int event )
