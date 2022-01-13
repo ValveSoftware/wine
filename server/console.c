@@ -850,6 +850,7 @@ static void console_server_destroy( struct object *obj )
     assert( obj->ops == &console_server_ops );
     disconnect_console_server( server );
     if (server->fd) release_object( server->fd );
+    if (do_esync()) close( server->esync_fd );
 }
 
 static struct object *console_server_lookup_name( struct object *obj, struct unicode_str *name,
