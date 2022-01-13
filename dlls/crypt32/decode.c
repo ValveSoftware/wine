@@ -47,7 +47,7 @@
 #include "crypt32_private.h"
 
 /* This is a bit arbitrary, but to set some limit: */
-#define MAX_ENCODED_LEN 0x02000000
+#define MAX_ENCODED_LEN 0x04000000
 
 #define ASN_FLAGS_MASK 0xe0
 #define ASN_TYPE_MASK  0x1f
