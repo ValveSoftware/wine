@@ -45,15 +45,6 @@ static DWORD process_layout = ~0u;
 
 static struct list window_surfaces = LIST_INIT( window_surfaces );
 
-static CRITICAL_SECTION desktop_section;
-static CRITICAL_SECTION_DEBUG desktop_critsect_debug =
-{
-    0, 0, &desktop_section,
-    { &desktop_critsect_debug.ProcessLocksList, &desktop_critsect_debug.ProcessLocksList },
-      0, 0, { (DWORD_PTR)(__FILE__ ": desktop_section") }
-};
-static CRITICAL_SECTION desktop_section = { &desktop_critsect_debug, -1, 0, 0, 0, 0 };
-
 static CRITICAL_SECTION surfaces_section;
 static CRITICAL_SECTION_DEBUG critsect_debug =
 {
@@ -2109,7 +2100,6 @@ HWND WINAPI GetDesktopWindow(void)
         WCHAR app[MAX_PATH + ARRAY_SIZE( L"\\explorer.exe" )];
         WCHAR cmdline[MAX_PATH + ARRAY_SIZE( L"\\explorer.exe /desktop" )];
         WCHAR desktop[MAX_PATH];
-        char *ld_preload;
         void *redir;
 
         SERVER_START_REQ( set_user_object_info )
@@ -2142,46 +2132,6 @@ HWND WINAPI GetDesktopWindow(void)
         lstrcpyW( cmdline, app );
         lstrcatW( cmdline, L" /desktop" );
 
-        EnterCriticalSection( &desktop_section);
-
-        /* HACK: Unset LD_PRELOAD before executing explorer.exe to disable buggy gameoverlayrenderer.so
-         * It's not going to work through the CreateProcessW env parameter, as it will not be used for the loader execv.
-         */
-        if ((ld_preload = getenv("LD_PRELOAD")))
-        {
-            static char const gorso[] = "gameoverlayrenderer.so";
-            static unsigned int gorso_len = ARRAY_SIZE(gorso) - 1;
-            char *env, *next, *tmp;
-
-            env = HeapAlloc(GetProcessHeap(), 0, strlen(ld_preload) + 1);
-            strcpy(env, ld_preload);
-
-            tmp = env;
-            do
-            {
-                if (!(next = strchr(tmp, ':')))
-                    next = tmp + strlen(tmp);
-
-                if (next - tmp >= gorso_len &&
-                    strncmp(next - gorso_len, gorso, gorso_len) == 0)
-                {
-                    if (*next)
-                        memmove(tmp, next + 1, strlen(next));
-                    else
-                        *tmp = 0;
-                    next = tmp;
-                }
-                else
-                {
-                    tmp = next + 1;
-                }
-            }
-            while (*next);
-
-            __wine_set_unix_env("LD_PRELOAD", env);
-            HeapFree(GetProcessHeap(), 0, env);
-        }
-
         Wow64DisableWow64FsRedirection( &redir );
         if (CreateProcessW( app, cmdline, NULL, NULL, FALSE, DETACHED_PROCESS,
                             NULL, windir, &si, &pi ))
@@ -2193,11 +2143,6 @@ HWND WINAPI GetDesktopWindow(void)
         }
         else WARN( "failed to start explorer, err %d\n", GetLastError() );
         Wow64RevertWow64FsRedirection( redir );
-
-        /* HACK: Restore the previous value, just in case */
-        if (ld_preload) __wine_set_unix_env("LD_PRELOAD", ld_preload);
-
-        LeaveCriticalSection( &desktop_section );
 
         SERVER_START_REQ( get_desktop_window )
         {
