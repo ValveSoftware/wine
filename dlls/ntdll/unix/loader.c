@@ -746,6 +746,7 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const pe_image_info_t *pe_i
     ULONGLONG res_end = pe_info->base + pe_info->map_size;
     const char *loader = argv0;
     const char *loader_env = getenv( "WINELOADER" );
+    const char *ld_preload = getenv( "LD_PRELOAD" );
     char preloader_reserve[64], socket_env[64];
     BOOL is_child_64bit;
 
@@ -778,6 +779,36 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const pe_image_info_t *pe_i
             putenv( env );
         }
         else loader = is_child_64bit ? "wine64" : "wine";
+    }
+
+    /* HACK: Unset LD_PRELOAD before executing explorer.exe to disable buggy gameoverlayrenderer.so */
+    if (ld_preload && argv[2] && !strcmp( argv[2], "C:\\windows\\system32\\explorer.exe" ) &&
+        argv[3] && !strcmp( argv[3], "/desktop" ))
+    {
+        static char const gorso[] = "gameoverlayrenderer.so";
+        static int gorso_len = sizeof(gorso) - 1;
+        int len = strlen( ld_preload );
+        char *next, *tmp, *env = malloc( sizeof("LD_PRELOAD=") + len );
+
+        if (!env) return STATUS_NO_MEMORY;
+        strcpy( env, "LD_PRELOAD=" );
+        strcat( env, ld_preload );
+
+        tmp = env + 11;
+        do
+        {
+            if (!(next = strchr( tmp, ':' ))) next = tmp + strlen( tmp );
+            if (next - tmp >= gorso_len && strncmp( next - gorso_len, gorso, gorso_len ) == 0)
+            {
+                if (*next) memmove( tmp, next + 1, strlen(next) );
+                else *tmp = 0;
+                next = tmp;
+            }
+            else tmp = next + 1;
+        }
+        while (*next);
+
+        putenv( env );
     }
 
     signal( SIGPIPE, SIG_DFL );
