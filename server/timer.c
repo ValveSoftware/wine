@@ -260,6 +260,7 @@ static void timer_destroy( struct object *obj )
 
     if (timer->timeout) remove_timeout_user( timer->timeout );
     if (timer->thread) release_object( timer->thread );
+    if (do_esync()) close( timer->esync_fd );
 }
 
 /* create a timer */
