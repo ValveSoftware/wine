@@ -2435,7 +2435,7 @@ static void sigsys_handler_rdr2( int signal, siginfo_t *siginfo, void *sigcontex
 
     ctx->uc_mcontext.gregs[REG_RIP] = *dispatcher_address;
 
-    /* syscall numbers are for Windows 10 1909 (build 18363) */
+    /* syscall numbers are for Windows 10 2009 (build 19043) */
     switch (ctx->uc_mcontext.gregs[REG_RAX])
     {
         case 0x19:
@@ -2444,7 +2444,7 @@ static void sigsys_handler_rdr2( int signal, siginfo_t *siginfo, void *sigcontex
         case 0x36:
             ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtQuerySystemInformation;
             break;
-        case 0xed:
+        case 0xf2:
             ctx->uc_mcontext.gregs[REG_RAX] = __wine_syscall_nr_NtGetContextThread;
             break;
         case 0x55:

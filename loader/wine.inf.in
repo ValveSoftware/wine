@@ -3968,8 +3968,8 @@ HKLM,%CurrentVersionNT%,"CurrentVersion",2,"10.0"
 HKLM,%CurrentVersionNT%,"CurrentMajorVersionNumber",0x10001,10
 HKLM,%CurrentVersionNT%,"CurrentMinorVersionNumber",0x10001,0
 HKLM,%CurrentVersionNT%,"CSDVersion",2,""
-HKLM,%CurrentVersionNT%,"CurrentBuild",2,"18363"
-HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"18363"
+HKLM,%CurrentVersionNT%,"CurrentBuild",2,"19043"
+HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"19043"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
 HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
@@ -3978,8 +3978,9 @@ HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+HKLM,%CurrentVersionNT%,"DisplayVersion",2,"21H1"
 HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 10"
-HKLM,%CurrentVersionNT%,"ReleaseId",,"1909"
+HKLM,%CurrentVersionNT%,"ReleaseId",,"2009"
 HKLM,%Control%\ProductOptions,"ProductType",2,"WinNT"
 HKLM,%Control%\Windows,"CSDVersion",0x10003,0x0
 HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
@@ -3987,8 +3988,8 @@ HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
 [VersionInfo.ntamd64]
 HKLM,%CurrentVersionNT%,"CurrentVersion",2,"10.0"
 HKLM,%CurrentVersionNT%,"CSDVersion",2,""
-HKLM,%CurrentVersionNT%,"CurrentBuild",2,"18363"
-HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"18363"
+HKLM,%CurrentVersionNT%,"CurrentBuild",2,"19043"
+HKLM,%CurrentVersionNT%,"CurrentBuildNumber",2,"19043"
 HKLM,%CurrentVersionNT%,"CurrentType",2,"Uniprocessor Free"
 HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
@@ -3997,8 +3998,9 @@ HKLM,%CurrentVersionNT%,"DigitalProductId",1,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,\
 00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00,00
+HKLM,%CurrentVersionNT%,"DisplayVersion",2,"21H1"
 HKLM,%CurrentVersionNT%,"ProductName",2,"Microsoft Windows 10"
-HKLM,%CurrentVersionNT%,"ReleaseId",,"1909"
+HKLM,%CurrentVersionNT%,"ReleaseId",,"2009"
 HKLM,%Control%\ProductOptions,"ProductType",2,"WinNT"
 HKLM,%Control%\Windows,"CSDVersion",0x10003,0x0
 HKLM,%Control%\Session Manager\Environment,"OS",2,"Windows_NT"
