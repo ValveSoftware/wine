@@ -3570,6 +3570,20 @@ LRESULT editor_handle_message( ME_TextEditor *editor, UINT msg, WPARAM wParam,
     CHARFORMAT2W fmt;
     HDC hDC;
     BOOL bRepaint = LOWORD(lParam);
+    const char *sgi = getenv("STEAM_COMPAT_APP_ID");
+
+    /* Grand Theft Auto V installer tries to set font for license
+     * richedit to Arial, which breaks CJK languages. Given that the
+     * RTF already has reasonable fonts set, we can just ignore the
+     * message. This can be removed once our richedit is able to do
+     * font substitution properly. CW bug #19917.
+     *
+     * It's important that STEAM_COMPAT_APP_ID environment variable is
+     * used instead of the usual SteamGameId, because the latter is
+     * not available during the configuration stage, when the
+     * installer is run. */
+    if (sgi && strcmp(sgi, "271590") == 0)
+        return 0;
 
     if (!wParam)
       wParam = (WPARAM)GetStockObject(SYSTEM_FONT);
