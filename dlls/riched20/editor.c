@@ -3570,6 +3570,15 @@ LRESULT editor_handle_message( ME_TextEditor *editor, UINT msg, WPARAM wParam,
     CHARFORMAT2W fmt;
     HDC hDC;
     BOOL bRepaint = LOWORD(lParam);
+    const char *sgi = getenv("SteamGameId");
+
+    /* Grand Theft Auto V launcher tries to set font for license
+     * richedit to Arial, which breaks CJK languages. Given that the
+     * RTF already has reasonable fonts set, we can just ignore the
+     * message. This can be removed once our richedit is able to do
+     * font substitution properly. CW bug #19917. */
+    if (sgi && strcmp(sgi, "271590") == 0)
+        return 0;
 
     if (!wParam)
       wParam = (WPARAM)GetStockObject(SYSTEM_FONT);
