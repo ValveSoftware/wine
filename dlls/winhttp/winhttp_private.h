@@ -248,6 +248,8 @@ struct socket
     USHORT status;
     char reason[123];
     DWORD reason_len;
+    void *send_frame_buffer;
+    unsigned int send_frame_buffer_size;
 };
 
 struct send_request
