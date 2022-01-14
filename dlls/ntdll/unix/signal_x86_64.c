@@ -2500,6 +2500,7 @@ static void sigsys_handler( int signal, siginfo_t *siginfo, void *sigcontext )
     ctx->uc_mcontext.gregs[REG_RIP] = (ULONG64)__wine_syscall_dispatcher;
 }
 
+/* syscall numbers are for Windows 10 2009 (build 19043) */
 static struct
 {
     unsigned int win_syscall_nr;
@@ -2510,7 +2511,7 @@ syscall_nr_translation[] =
 {
     {0x19, ~0u, NtQueryInformationProcess},
     {0x36, ~0u, NtQuerySystemInformation},
-    {0xed, ~0u, NtGetContextThread},
+    {0xf2, ~0u, NtGetContextThread},
     {0x55, ~0u, NtCreateFile},
     {0x08, ~0u, NtWriteFile},
     {0x06, ~0u, NtReadFile},
