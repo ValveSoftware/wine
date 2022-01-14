@@ -937,7 +937,7 @@ static DWORD MIDI_player(WINE_MCIMIDI* wmm, DWORD dwFlags)
 	    switch (HIBYTE(LOWORD(mmt->dwEventData))) {
 	    case 0x00: /* 16-bit sequence number */
 		if (TRACE_ON(mcimidi)) {
-		    WORD	twd;
+		    WORD	twd = 0;
 
 		    MIDI_mciReadWord(wmm, &twd);	/* == 0 */
 		    TRACE("Got sequence number %u\n", twd);
