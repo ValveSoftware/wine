@@ -297,8 +297,17 @@ static void HID_Device_sendRawInput(DEVICE_OBJECT *device, HID_XFER_PACKET *pack
         rawinput->header.hDevice = ext->rawinput_handle;
         rawinput->header.wParam = RIM_INPUT;
         rawinput->data.hid.dwCount = 1;
-        rawinput->data.hid.dwSizeHid = packet->reportBufferLen;
-        memcpy( rawinput->data.hid.bRawData, packet->reportBuffer, packet->reportBufferLen );
+        rawinput->data.hid.dwSizeHid = 0;
+
+        if (ext->preparseData->reports[0].reportID == 0)
+        {
+            rawinput->data.hid.dwSizeHid = 1;
+            rawinput->data.hid.bRawData[0] = 0;
+        }
+
+        memcpy( rawinput->data.hid.bRawData + rawinput->data.hid.dwSizeHid,
+                packet->reportBuffer, packet->reportBufferLen );
+        rawinput->data.hid.dwSizeHid += packet->reportBufferLen;
 
         input.type = INPUT_HARDWARE;
         input.u.hi.uMsg = WM_INPUT;
