@@ -213,7 +213,7 @@ static HRESULT WINAPI wma_decoder_ProcessEvent(IMFTransform *iface, DWORD id, IM
 static HRESULT WINAPI wma_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
     FIXME("iface %p, message %#x, param %p stub!\n", iface, message, (void *)param);
-    return E_NOTIMPL;
+    return S_OK;
 }
 
 static HRESULT WINAPI wma_decoder_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
