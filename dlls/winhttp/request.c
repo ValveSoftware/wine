@@ -3455,9 +3455,14 @@ static DWORD receive_frame( struct socket *socket, DWORD *ret_len, enum socket_o
 static void CALLBACK task_socket_send_pong( TP_CALLBACK_INSTANCE *instance, void *ctx, TP_WORK *work )
 {
     struct socket_send *s = ctx;
+    DWORD len, retflags;
 
     TRACE("running %p\n", work);
-    send_frame( s->socket, SOCKET_OPCODE_PONG, 0, NULL, 0, TRUE, NULL );
+
+    if (s->complete_only)
+        WSAGetOverlappedResult( s->socket->request->netconn->socket, &s->ovr, &len, TRUE, &retflags );
+    else
+        send_frame( s->socket, SOCKET_OPCODE_PONG, 0, NULL, 0, TRUE, NULL );
     send_io_complete( &s->socket->hdr );
 
     release_object( &s->socket->hdr );
@@ -3472,15 +3477,31 @@ static DWORD socket_send_pong( struct socket *socket )
         DWORD ret;
 
         if (!(s = malloc( sizeof(*s) ))) return ERROR_OUTOFMEMORY;
-        s->socket = socket;
 
-        addref_object( &socket->hdr );
         AcquireSRWLockExclusive( &socket->hdr.lock );
-        if ((ret = queue_task( &socket->send_q, task_socket_send_pong, s )))
+
+        if (socket->hdr.pending_sends)
         {
-            release_object( &socket->hdr );
-            free( s );
-        } else ++socket->hdr.pending_sends;
+            ret = WSAEWOULDBLOCK;
+        }
+        else
+        {
+            memset( &s->ovr, 0, sizeof(s->ovr) );
+            ret = send_frame( socket, SOCKET_OPCODE_PONG, 0, NULL, 0, TRUE, &s->ovr );
+        }
+
+        if (ret == WSAEWOULDBLOCK || ret == WSA_IO_PENDING)
+        {
+            s->complete_only = (ret == WSA_IO_PENDING);
+            s->socket = socket;
+            addref_object( &socket->hdr );
+            if ((ret = queue_task( &socket->send_q, task_socket_send_pong, s )))
+            {
+                release_object( &socket->hdr );
+                free( s );
+            } else ++socket->hdr.pending_sends;
+        }
+
         ReleaseSRWLockExclusive( &socket->hdr.lock );
         return ret;
     }
