@@ -532,6 +532,8 @@ static BOOL enum_objects( struct hid_joystick *impl, const DIPROPHEADER *filter,
     struct hid_collection_node *node, *node_end;
     WORD version = impl->base.dinput->dwVersion;
     BOOL ret, seen_axis[6] = {0};
+    const GUID *hack_guid;
+    const WCHAR *hack_name;
     const WCHAR *tmp;
 
     button_ofs += impl->caps.NumberInputValueCaps * sizeof(LONG);
@@ -551,6 +553,8 @@ static BOOL enum_objects( struct hid_joystick *impl, const DIPROPHEADER *filter,
             value_ofs += (caps->usage_max - caps->usage_min + 1) * sizeof(LONG);
         else for (j = caps->usage_min; j <= caps->usage_max; ++j)
         {
+            hack_name = NULL;
+            hack_guid = NULL;
             instance.dwOfs = value_ofs;
             switch (MAKELONG(j, caps->usage_page))
             {
@@ -597,12 +601,16 @@ static BOOL enum_objects( struct hid_joystick *impl, const DIPROPHEADER *filter,
             }
             instance.wUsagePage = caps->usage_page;
             instance.wUsage = j;
-            instance.guidType = *object_usage_to_guid( instance.wUsagePage, instance.wUsage );
+            if (hack_guid)
+                instance.guidType = *hack_guid;
+            else
+                instance.guidType = *object_usage_to_guid( instance.wUsagePage, instance.wUsage );
             instance.wReportId = caps->report_id;
             instance.wCollectionNumber = caps->link_collection;
             instance.dwDimension = caps->units;
             instance.wExponent = caps->units_exp;
-            if ((tmp = object_usage_to_string( &instance ))) lstrcpynW( instance.tszName, tmp, MAX_PATH );
+            if (hack_name) lstrcpynW( instance.tszName, hack_name, MAX_PATH );
+            else if ((tmp = object_usage_to_string( &instance ))) lstrcpynW( instance.tszName, tmp, MAX_PATH );
             else swprintf( instance.tszName, MAX_PATH, L"Unknown %u", DIDFT_GETINSTANCE( instance.dwType ) );
             check_pid_effect_axis_caps( impl, &instance );
             ret = enum_object( impl, filter, flags, callback, caps, &instance, data );
