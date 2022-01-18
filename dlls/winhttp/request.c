@@ -3666,7 +3666,11 @@ static DWORD socket_receive( struct socket *socket, void *buf, DWORD len, DWORD 
             {
                 if (!(socket->opcode & CONTROL_BIT) || (ret = handle_control_frame( socket ))) break;
             }
-            else if (ret == WSAETIMEDOUT) ret = socket_send_pong( socket );
+            else if (ret == WSAETIMEDOUT)
+            {
+                WARN( "timeout, retrying.\n" );
+                continue;
+            }
             if (ret) break;
         }
     }
