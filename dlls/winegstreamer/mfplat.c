@@ -400,11 +400,6 @@ static const GUID CLSID_GStreamerByteStreamHandler = {0x317df618, 0x5e5a, 0x468a
 
 static const GUID CLSID_WINEAudioConverter = {0x6a170414,0xaad9,0x4693,{0xb8,0x06,0x3a,0x0c,0x47,0xc5,0x70,0xd6}};
 
-static HRESULT h264_decoder_create(REFIID riid, void **ret)
-{
-    return decode_transform_create(riid, ret, DECODER_TYPE_H264);
-}
-
 static HRESULT aac_decoder_create(REFIID riid, void **ret)
 {
     return decode_transform_create(riid, ret, DECODER_TYPE_AAC);
@@ -566,7 +561,7 @@ mfts[] =
         color_converter_supported_types,
     },
     {
-        &CLSID_MSAACDecMFT,
+        &CLSID_MSH264DecoderMFT,
         &MFT_CATEGORY_VIDEO_DECODER,
         h264_decoderW,
         MFT_ENUM_FLAG_SYNCMFT,
