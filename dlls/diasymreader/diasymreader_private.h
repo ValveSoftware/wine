@@ -19,6 +19,7 @@
 #include "corhdr.h"
 #include "cordebug.h"
 #include "corsym.h"
+#include "diasymreader.h"
 
 HRESULT SymWriter_CreateInstance(REFIID iid, void **ppv) DECLSPEC_HIDDEN;
 
