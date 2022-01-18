@@ -225,8 +225,20 @@ static HRESULT WINAPI h264_decoder_GetStreamIDs(IMFTransform *iface, DWORD input
 
 static HRESULT WINAPI h264_decoder_GetInputStreamInfo(IMFTransform *iface, DWORD id, MFT_INPUT_STREAM_INFO *info)
 {
-    FIXME("iface %p, id %u, info %p stub!\n", iface, id, info);
-    return E_NOTIMPL;
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
+
+    TRACE("iface %p, id %u, info %p.\n", iface, id, info);
+
+    if (!decoder->input_type)
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+
+    info->hnsMaxLatency = 0;
+    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER | MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE;
+    info->cbSize = 0x1000;
+    info->cbMaxLookahead = 0;
+    info->cbAlignment = 0;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI h264_decoder_GetOutputStreamInfo(IMFTransform *iface, DWORD id, MFT_OUTPUT_STREAM_INFO *info)
