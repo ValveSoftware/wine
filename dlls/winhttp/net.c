@@ -461,8 +461,6 @@ DWORD netconn_send( struct netconn *conn, const void *msg, size_t len, int *sent
         size_t chunk_size;
         DWORD res;
 
-        if (ovr && len > conn->ssl_sizes.cbMaximumMessage) return WSAEWOULDBLOCK;
-
         *sent = 0;
         while (len)
         {

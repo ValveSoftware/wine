@@ -3188,11 +3188,16 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
     return hsocket;
 }
 
-static DWORD send_bytes( struct socket *socket, char *bytes, int len, WSAOVERLAPPED *ovr )
+static DWORD send_bytes( struct socket *socket, char *bytes, int len, int *sent, WSAOVERLAPPED *ovr )
 {
     int count;
     DWORD err;
     if ((err = netconn_send( socket->request->netconn, bytes, len, &count, ovr ))) return err;
+    if (sent && count)
+    {
+        *sent = count;
+        return ERROR_SUCCESS;
+    }
     return (count == len) ? ERROR_SUCCESS : ERROR_INTERNAL_ERROR;
 }
 
@@ -3269,7 +3274,10 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
     for (j = 0; j < buflen; j++)
         *ptr++ = buf[j] ^ mask[i++ % 4];
 
-    return send_bytes( socket, socket->send_frame_buffer, (char *)ptr - (char *)socket->send_frame_buffer, ovr );
+    socket->send_size = (char *)ptr - (char *)socket->send_frame_buffer;
+    socket->bytes_sent = 0;
+    return send_bytes( socket, socket->send_frame_buffer, socket->send_size,
+                      ovr ? &socket->bytes_sent : NULL, ovr );
 }
 
 static void send_io_complete( struct object_header *hdr )
@@ -3346,6 +3354,12 @@ static void CALLBACK task_socket_send( TP_CALLBACK_INSTANCE *instance, void *ctx
             ret = ERROR_SUCCESS;
         else
             ret = WSAGetLastError();
+
+        if (!ret && s->socket->bytes_sent < s->socket->send_size)
+        {
+            ret = send_bytes( s->socket, (char *)s->socket->send_frame_buffer + s->socket->bytes_sent,
+                              s->socket->send_size - s->socket->bytes_sent, NULL, NULL );
+        }
     } else ret = socket_send( s->socket, s->type, s->buf, s->len, NULL );
 
     send_io_complete( &s->socket->hdr );
@@ -3407,6 +3421,7 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
         if (ret == WSAEWOULDBLOCK || ret == WSA_IO_PENDING)
         {
             s->complete_only = (ret == WSA_IO_PENDING);
+            TRACE("queueing, s->complete_only %#x.\n", s->complete_only);
             s->socket = socket;
             s->type   = type;
             s->buf    = buf;
@@ -3423,6 +3438,7 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
         }
         else
         {
+            TRACE("sent sync.\n");
             ReleaseSRWLockExclusive( &socket->hdr.lock );
             free( s );
             socket_send_complete( socket, ret, type, len );
