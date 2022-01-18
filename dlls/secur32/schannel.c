@@ -900,7 +900,7 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
     SIZE_T expected_size = ~0UL;
     SECURITY_STATUS ret;
     SecBuffer *buffer;
-    int idx;
+    int idx, i;
 
     TRACE("%p %p %s 0x%08x %d %d %p %d %p %p %p %p\n", phCredential, phContext,
      debugstr_w(pszTargetName), fContextReq, Reserved1, TargetDataRep, pInput,
@@ -913,6 +913,17 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
     {
         ptsExpiry->LowPart = 0;
         ptsExpiry->HighPart = 0;
+    }
+
+    if (!pOutput || !pOutput->cBuffers) return SEC_E_INVALID_TOKEN;
+    for (i = 0; i < pOutput->cBuffers; i++)
+    {
+        ULONG buf_type = pOutput->pBuffers[i].BufferType;
+
+        if ((buf_type != SECBUFFER_TOKEN) && (buf_type != SECBUFFER_ALERT))
+            continue;
+        if (!pOutput->pBuffers[i].cbBuffer && !(fContextReq & ISC_REQ_ALLOCATE_MEMORY))
+            return SEC_E_INSUFFICIENT_MEMORY;
     }
 
     if (!phContext)
