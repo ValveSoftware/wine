@@ -42,6 +42,14 @@ static MONITORINFOEXW default_monitor =
     { '\\','\\','.','\\','D','I','S','P','L','A','Y','1',0 }   /* szDevice */
 };
 
+static CRITICAL_SECTION xinerama_section;
+static CRITICAL_SECTION_DEBUG xinerama_critsect_debug =
+{
+    0, 0, &xinerama_section,
+    {&xinerama_critsect_debug.ProcessLocksList, &xinerama_critsect_debug.ProcessLocksList},
+     0, 0, {(DWORD_PTR)(__FILE__ ": xinerama_section")}
+};
+static CRITICAL_SECTION xinerama_section = {&xinerama_critsect_debug, -1, 0, 0, 0, 0};
 static MONITORINFOEXW *monitors;
 static int nb_monitors;
 
@@ -119,6 +127,85 @@ static inline int query_screens(void)
 
 #endif  /* SONAME_LIBXINERAMA */
 
+struct xinerama_fullscreen_monitor_info
+{
+    const RECT *rect;
+    POINT real_virtual_screen_offset;
+    POINT xinerama_virtual_screen_offset;
+    long *indices;
+};
+
+static BOOL CALLBACK xinerama_enum_monitor_proc( HMONITOR monitor, HDC hdc, RECT *monitor_rect, LPARAM lparam )
+{
+    struct xinerama_fullscreen_monitor_info *info = (struct xinerama_fullscreen_monitor_info *)lparam;
+    RECT real_root_screen_rect, xinerama_root_screen_rect;
+    int i;
+
+    /* Window rect has to cover the entire monitor to be considered as fullscreen */
+    if (info->rect->left > monitor_rect->left || info->rect->right < monitor_rect->right
+            || info->rect->top > monitor_rect->top || info->rect->bottom < monitor_rect->bottom)
+        return TRUE;
+
+    /* Convert to root coordinates for comparison because xinerama may have a different primary screen */
+    real_root_screen_rect = fs_hack_real_mode(monitor);
+    OffsetRect(&real_root_screen_rect, info->real_virtual_screen_offset.x, info->real_virtual_screen_offset.y);
+
+    /* Find the xinerama screen the current monitor corresponds to because the backend may not be
+     * xinerama but the indices must be xinerama screen indices */
+    for (i = 0; i < nb_monitors; ++i)
+    {
+        /* Convert to root coordinates for comparison because xinerama may use a different primary screen */
+        xinerama_root_screen_rect = monitors[i].rcMonitor;
+        OffsetRect(&xinerama_root_screen_rect, info->xinerama_virtual_screen_offset.x, info->xinerama_virtual_screen_offset.y);
+        if (!EqualRect(&real_root_screen_rect, &xinerama_root_screen_rect))
+            continue;
+
+        if (info->indices[0] == -1 || monitors[i].rcMonitor.top < monitors[info->indices[0]].rcMonitor.top)
+            info->indices[0] = i;
+        if (info->indices[1] == -1 || monitors[i].rcMonitor.bottom > monitors[info->indices[1]].rcMonitor.bottom)
+            info->indices[1] = i;
+        if (info->indices[2] == -1 || monitors[i].rcMonitor.left < monitors[info->indices[2]].rcMonitor.left)
+            info->indices[2] = i;
+        if (info->indices[3] == -1 || monitors[i].rcMonitor.right > monitors[info->indices[3]].rcMonitor.right)
+            info->indices[3] = i;
+    }
+
+    return TRUE;
+}
+
+/* Get xinerama monitor indices required for _NET_WM_FULLSCREEN_MONITORS */
+void xinerama_get_fullscreen_monitors( const RECT *rect, long *indices )
+{
+    struct xinerama_fullscreen_monitor_info info;
+    RECT real_virtual_rect;
+    POINT xinerama_offset;
+    int i;
+
+    EnterCriticalSection( &xinerama_section );
+
+    memset( indices, -1, sizeof(*indices) * 4 );
+    info.rect = rect;
+    info.indices = indices;
+
+    real_virtual_rect = fs_hack_get_real_virtual_screen();
+    info.real_virtual_screen_offset.x = -real_virtual_rect.left;
+    info.real_virtual_screen_offset.y = -real_virtual_rect.top;
+
+    xinerama_offset.x = INT_MAX;
+    xinerama_offset.y = INT_MAX;
+    for (i = 0; i < nb_monitors; ++i)
+    {
+        xinerama_offset.x = min( xinerama_offset.x, monitors[i].rcMonitor.left );
+        xinerama_offset.y = min( xinerama_offset.y, monitors[i].rcMonitor.top );
+    }
+    info.xinerama_virtual_screen_offset.x = -xinerama_offset.x;
+    info.xinerama_virtual_screen_offset.y = -xinerama_offset.y;
+
+    EnumDisplayMonitors( NULL, NULL, xinerama_enum_monitor_proc, (LPARAM)&info );
+    LeaveCriticalSection( &xinerama_section );
+    TRACE( "fullsceen monitors: %ld,%ld,%ld,%ld.\n", indices[0], indices[1], indices[2], indices[3] );
+}
+
 static BOOL xinerama_get_gpus( struct gdi_gpu **new_gpus, int *count )
 {
     static const WCHAR wine_adapterW[] = {'W','i','n','e',' ','A','d','a','p','t','e','r',0};
@@ -154,9 +241,13 @@ static BOOL xinerama_get_adapters( ULONG_PTR gpu_id, struct gdi_adapter **new_ad
         return FALSE;
 
     /* Being lazy, actual adapter count may be less */
+    EnterCriticalSection( &xinerama_section );
     adapters = heap_calloc( nb_monitors, sizeof(*adapters) );
     if (!adapters)
+    {
+        LeaveCriticalSection( &xinerama_section );
         return FALSE;
+    }
 
     primary_index = primary_monitor;
     if (primary_index >= nb_monitors)
@@ -201,6 +292,7 @@ static BOOL xinerama_get_adapters( ULONG_PTR gpu_id, struct gdi_adapter **new_ad
 
     *new_adapters = adapters;
     *count = index;
+    LeaveCriticalSection( &xinerama_section );
     return TRUE;
 }
 
@@ -220,6 +312,8 @@ static BOOL xinerama_get_monitors( ULONG_PTR adapter_id, struct gdi_monitor **ne
     INT index = 0;
     INT i;
 
+    EnterCriticalSection( &xinerama_section );
+
     for (i = first; i < nb_monitors; i++)
     {
         if (i == first
@@ -230,7 +324,10 @@ static BOOL xinerama_get_monitors( ULONG_PTR adapter_id, struct gdi_monitor **ne
 
     monitor = heap_calloc( monitor_count, sizeof(*monitor) );
     if (!monitor)
+    {
+        LeaveCriticalSection( &xinerama_section );
         return FALSE;
+    }
 
     for (i = first; i < nb_monitors; i++)
     {
@@ -254,6 +351,7 @@ static BOOL xinerama_get_monitors( ULONG_PTR adapter_id, struct gdi_monitor **ne
 
     *new_monitors = monitor;
     *count = monitor_count;
+    LeaveCriticalSection( &xinerama_section );
     return TRUE;
 }
 
@@ -271,6 +369,8 @@ void xinerama_init( unsigned int width, unsigned int height )
 
     if (is_virtual_desktop())
         return;
+
+    EnterCriticalSection( &xinerama_section );
 
     SetRect( &rect, 0, 0, width, height );
     if (!query_screens())
@@ -294,6 +394,8 @@ void xinerama_init( unsigned int width, unsigned int height )
                wine_dbgstr_rect(&monitors[i].rcWork),
                (monitors[i].dwFlags & MONITORINFOF_PRIMARY) ? " (primary)" : "" );
     }
+
+    LeaveCriticalSection( &xinerama_section );
 
     handler.name = "Xinerama";
     handler.priority = 100;
