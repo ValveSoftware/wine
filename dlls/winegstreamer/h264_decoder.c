@@ -86,6 +86,7 @@ static HRESULT try_create_wg_transform(struct h264_decoder *decoder)
 static HRESULT fill_output_media_type(IMFMediaType *media_type, IMFMediaType *default_type)
 {
     UINT32 value, width, height;
+    MFVideoArea aperture = {0};
     UINT64 value64;
     GUID subtype;
     HRESULT hr;
@@ -175,6 +176,17 @@ static HRESULT fill_output_media_type(IMFMediaType *media_type, IMFMediaType *de
             value = 1;
         if (FAILED(hr = IMFMediaType_SetUINT32(media_type, &MF_MT_FIXED_SIZE_SAMPLES, value)))
             return hr;
+    }
+
+    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_MINIMUM_DISPLAY_APERTURE, NULL)))
+    {
+        if (default_type && SUCCEEDED(hr = IMFMediaType_GetBlob(default_type, &MF_MT_MINIMUM_DISPLAY_APERTURE,
+                (BYTE *)&aperture, sizeof(aperture), NULL)))
+        {
+            if (FAILED(hr = IMFMediaType_SetBlob(media_type, &MF_MT_MINIMUM_DISPLAY_APERTURE,
+                    (BYTE *)&aperture, sizeof(aperture))))
+                return hr;
+        }
     }
 
     return S_OK;
@@ -549,7 +561,9 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
     struct wg_sample wg_sample = {0};
     IMFMediaBuffer *media_buffer;
     MFT_OUTPUT_STREAM_INFO info;
+    MFVideoArea aperture = {0};
     IMFMediaType *media_type;
+    UINT32 align, offset;
     HRESULT hr;
 
     TRACE("iface %p, flags %#x, count %u, samples %p, status %p.\n", iface, flags, count, samples, status);
@@ -589,6 +603,17 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
             IMFSample_SetSampleTime(samples[0].pSample, wg_sample.pts);
         if (wg_sample.flags & WG_SAMPLE_FLAG_HAS_DURATION)
             IMFSample_SetSampleDuration(samples[0].pSample, wg_sample.duration);
+
+        if (decoder->wg_format.u.video.format == WG_VIDEO_FORMAT_NV12 &&
+                (align = decoder->wg_format.u.video.height & 15))
+        {
+            offset = decoder->wg_format.u.video.width * decoder->wg_format.u.video.height;
+            align = (16 - align) * decoder->wg_format.u.video.width;
+            memmove(wg_sample.data + offset + align, wg_sample.data + offset,
+                    wg_sample.size - offset);
+            wg_sample.size += align;
+        }
+
         hr = IMFMediaBuffer_SetCurrentLength(media_buffer, wg_sample.size);
     }
     else if (hr == MF_E_TRANSFORM_STREAM_CHANGE)
@@ -598,6 +623,21 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
         IMFMediaType_DeleteItem(media_type, &MF_MT_FRAME_RATE);
         IMFMediaType_DeleteItem(decoder->output_type, &MF_MT_DEFAULT_STRIDE);
         fill_output_media_type(media_type, decoder->output_type);
+
+        if (decoder->wg_format.u.video.format == WG_VIDEO_FORMAT_NV12 &&
+                (align = decoder->wg_format.u.video.height & 15))
+        {
+            aperture.Area.cx = decoder->wg_format.u.video.width;
+            aperture.Area.cy = decoder->wg_format.u.video.height;
+            IMFMediaType_SetBlob(media_type, &MF_MT_MINIMUM_DISPLAY_APERTURE,
+                    (BYTE *)&aperture, sizeof(aperture));
+
+            aperture.Area.cy += 16 - align;
+            IMFMediaType_SetUINT64(media_type, &MF_MT_FRAME_SIZE,
+                    (UINT64)aperture.Area.cx << 32 | aperture.Area.cy);
+            IMFMediaType_SetUINT32(media_type, &MF_MT_SAMPLE_SIZE,
+                    aperture.Area.cx * aperture.Area.cy * 3 / 2);
+        }
 
         IMFMediaType_Release(decoder->output_type);
         decoder->output_type = media_type;
