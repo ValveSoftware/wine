@@ -378,6 +378,10 @@ void set_load_order_app_name( const WCHAR *app_name )
  */
 enum loadorder get_load_order( const UNICODE_STRING *nt_name )
 {
+    static const WCHAR easyanticheat_x86W[] = {'e','a','s','y','a','n','t','i','c','h','e','a','t','_','x','8','6','.','d','l','l',0};
+    static const WCHAR easyanticheat_x64W[] = {'e','a','s','y','a','n','t','i','c','h','e','a','t','_','x','6','4','.','d','l','l',0};
+    static const WCHAR soW[] = {'s','o',0};
+
     static const WCHAR prefixW[] = {'\\','?','?','\\'};
     enum loadorder ret = LO_INVALID;
     const WCHAR *path = nt_name->Buffer;
@@ -390,6 +394,41 @@ enum loadorder get_load_order( const UNICODE_STRING *nt_name )
     if (!wcsncmp( path, prefixW, 4 )) path += 4;
 
     TRACE("looking for %s\n", debugstr_w(path));
+
+    /* HACK: special logic for easyanticheat bridge: only load the bridge (builtin) if there exists a native version of the library next to the windows version */
+    basename = get_basename((WCHAR *)path);
+    if (!wcsicmp(basename, easyanticheat_x86W) || !wcsicmp(basename, easyanticheat_x64W))
+    {
+        UNICODE_STRING eac_unix_name;
+        OBJECT_ATTRIBUTES attr;
+        char *unix_path = NULL;
+        NTSTATUS status;
+
+        len = wcslen(nt_name->Buffer);
+        eac_unix_name.Buffer = malloc( (len + 1) * sizeof(WCHAR) );
+        wcscpy(eac_unix_name.Buffer, nt_name->Buffer);
+
+        basename = get_basename(eac_unix_name.Buffer);
+        wcscpy(&basename[18], soW);
+        eac_unix_name.Length = eac_unix_name.MaximumLength = wcslen(eac_unix_name.Buffer) * sizeof(WCHAR);
+        InitializeObjectAttributes(&attr, &eac_unix_name, 0, NULL, NULL);
+
+        if (!(status = nt_to_unix_file_name(&attr, &unix_path, FILE_OPEN)))
+        {
+            free(unix_path);
+            free(eac_unix_name.Buffer);
+            ret = LO_BUILTIN;
+            TRACE( "got hardcoded %s for %s, as the eac unix library is present\n", debugstr_loadorder(ret), debugstr_w(path) );
+            return ret;
+        }
+        else
+        {
+            ret = LO_NATIVE;
+            TRACE( "got hardcoded %s for %s, as the eac unix library (%s) is not present. status %x\n", debugstr_loadorder(ret), debugstr_w(path), debugstr_w(eac_unix_name.Buffer), (int)status );
+            free(eac_unix_name.Buffer);
+            return ret;
+        }
+    }
 
     /* Strip path information if the module resides in the system directory
      */
