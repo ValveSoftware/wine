@@ -3280,6 +3280,19 @@ static void send_io_complete( struct object_header *hdr )
     ReleaseSRWLockExclusive( &hdr->lock );
 }
 
+static enum socket_state receive_io_complete( struct socket *socket )
+{
+    enum socket_state state;
+
+    AcquireSRWLockExclusive( &socket->hdr.lock );
+    assert( socket->hdr.pending_receives );
+    --socket->hdr.pending_receives;
+    state = socket->state;
+    ReleaseSRWLockExclusive( &socket->hdr.lock );
+
+    return state;
+}
+
 static enum socket_opcode map_buffer_type( WINHTTP_WEB_SOCKET_BUFFER_TYPE type )
 {
     switch (type)
@@ -3639,6 +3652,7 @@ static void CALLBACK task_socket_receive( TP_CALLBACK_INSTANCE *instance, void *
 
     TRACE("running %p\n", work);
     ret = socket_receive( r->socket, r->buf, r->len, &count, &type );
+    receive_io_complete( r->socket );
 
     if (!ret)
     {
@@ -3691,12 +3705,14 @@ DWORD WINAPI WinHttpWebSocketReceive( HINTERNET hsocket, void *buf, DWORD len, D
         r->buf    = buf;
         r->len    = len;
 
+        AcquireSRWLockExclusive( &socket->hdr.lock );
         addref_object( &socket->hdr );
         if ((ret = queue_task( &socket->recv_q, task_socket_receive, r )))
         {
             release_object( &socket->hdr );
             free( r );
-        }
+        } else ++socket->hdr.pending_receives;
+        ReleaseSRWLockExclusive( &socket->hdr.lock );
     }
     else ret = socket_receive( socket, buf, len, ret_len, ret_type );
 
@@ -3813,6 +3829,7 @@ static void CALLBACK task_socket_close( TP_CALLBACK_INSTANCE *instance, void *ct
     DWORD ret;
 
     ret = socket_close( s->socket );
+    receive_io_complete( s->socket );
 
     if (!ret) send_callback( &s->socket->hdr, WINHTTP_CALLBACK_STATUS_CLOSE_COMPLETE, NULL, 0 );
     else
@@ -3861,11 +3878,13 @@ DWORD WINAPI WinHttpWebSocketClose( HINTERNET hsocket, USHORT status, void *reas
         s->socket = socket;
 
         addref_object( &socket->hdr );
+        AcquireSRWLockExclusive( &socket->hdr.lock );
         if ((ret = queue_task( &socket->recv_q, task_socket_close, s )))
         {
             release_object( &socket->hdr );
             free( s );
-        }
+        } else ++socket->hdr.pending_receives;
+        ReleaseSRWLockExclusive( &socket->hdr.lock );
     }
     else ret = socket_close( socket );
 
