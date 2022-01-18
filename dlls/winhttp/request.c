@@ -3669,22 +3669,25 @@ static void CALLBACK task_socket_receive( TP_CALLBACK_INSTANCE *instance, void *
 
     TRACE("running %p\n", work);
     ret = socket_receive( r->socket, r->buf, r->len, &count, &type );
-    receive_io_complete( r->socket );
 
-    if (!ret)
+    if (receive_io_complete( r->socket ) <= SOCKET_STATE_SHUTDOWN)
     {
-        WINHTTP_WEB_SOCKET_STATUS status;
-        status.dwBytesTransferred = count;
-        status.eBufferType        = type;
-        send_callback( &r->socket->hdr, WINHTTP_CALLBACK_STATUS_READ_COMPLETE, &status, sizeof(status) );
-    }
-    else
-    {
-        WINHTTP_WEB_SOCKET_ASYNC_RESULT result;
-        result.AsyncResult.dwResult = API_READ_DATA;
-        result.AsyncResult.dwError  = ret;
-        result.Operation = WINHTTP_WEB_SOCKET_RECEIVE_OPERATION;
-        send_callback( &r->socket->hdr, WINHTTP_CALLBACK_STATUS_REQUEST_ERROR, &result, sizeof(result) );
+        /* If websocket was closed during receive WinHttpWebSocketClose() should've sent the error callback. */
+        if (!ret)
+        {
+            WINHTTP_WEB_SOCKET_STATUS status;
+            status.dwBytesTransferred = count;
+            status.eBufferType        = type;
+            send_callback( &r->socket->hdr, WINHTTP_CALLBACK_STATUS_READ_COMPLETE, &status, sizeof(status) );
+        }
+        else
+        {
+            WINHTTP_WEB_SOCKET_ASYNC_RESULT result;
+            result.AsyncResult.dwResult = API_READ_DATA;
+            result.AsyncResult.dwError  = ret;
+            result.Operation = WINHTTP_WEB_SOCKET_RECEIVE_OPERATION;
+            send_callback( &r->socket->hdr, WINHTTP_CALLBACK_STATUS_REQUEST_ERROR, &result, sizeof(result) );
+        }
     }
 
     release_object( &r->socket->hdr );
@@ -3891,10 +3894,22 @@ DWORD WINAPI WinHttpWebSocketClose( HINTERNET hsocket, USHORT status, void *reas
     if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         struct socket_shutdown *s;
+        LONG pending_receives;
 
         AcquireSRWLockExclusive( &socket->hdr.lock );
         socket->state = SOCKET_STATE_CLOSED;
+        pending_receives = socket->hdr.pending_receives;
         ReleaseSRWLockExclusive( &socket->hdr.lock );
+
+        if (pending_receives)
+        {
+            WINHTTP_WEB_SOCKET_ASYNC_RESULT result;
+
+            result.AsyncResult.dwResult = 0;
+            result.AsyncResult.dwError = ERROR_WINHTTP_OPERATION_CANCELLED;
+            result.Operation = WINHTTP_WEB_SOCKET_RECEIVE_OPERATION;
+            send_callback( &socket->hdr, WINHTTP_CALLBACK_STATUS_REQUEST_ERROR, &result, sizeof(result) );
+        }
 
         if (!(s = calloc( 1, sizeof(*s) ))) return FALSE;
         s->socket = socket;
