@@ -51,6 +51,8 @@ struct object_header
     DWORD notify_mask;
     LONG recursion_count;
     struct list entry;
+    LONG pending_sends;
+    SRWLOCK lock;
 };
 
 struct hostdata
