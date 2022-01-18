@@ -120,7 +120,8 @@ static HRESULT WINAPI h264_decoder_GetOutputStreamInfo(IMFTransform *iface, DWOR
 static HRESULT WINAPI h264_decoder_GetAttributes(IMFTransform *iface, IMFAttributes **attributes)
 {
     FIXME("iface %p, attributes %p stub!\n", iface, attributes);
-    return E_NOTIMPL;
+
+    return MFCreateAttributes(attributes, 0);
 }
 
 static HRESULT WINAPI h264_decoder_GetInputStreamAttributes(IMFTransform *iface, DWORD id,
