@@ -47,6 +47,9 @@
 #include "wine/debug.h"
 #include "wine/hid.h"
 
+#define VID_LOGITECH 0x046D
+#define PID_LOGITECH_G920 0xC262
+
 WINE_DEFAULT_DEBUG_CHANNEL(dinput);
 
 DEFINE_GUID( GUID_DEVINTERFACE_WINEXINPUT,0x6c53d5fd,0x6480,0x440f,0xb6,0x18,0x47,0x67,0x50,0xc5,0xe1,0xa6 );
@@ -572,7 +575,38 @@ static BOOL enum_objects( struct hid_joystick *impl, const DIPROPHEADER *filter,
             case MAKELONG(HID_USAGE_GENERIC_RX, HID_USAGE_PAGE_GENERIC):
             case MAKELONG(HID_USAGE_GENERIC_RY, HID_USAGE_PAGE_GENERIC):
             case MAKELONG(HID_USAGE_GENERIC_RZ, HID_USAGE_PAGE_GENERIC):
-                set_axis_type( &instance, seen_axis, j - HID_USAGE_GENERIC_X, &axis );
+                if (impl->attrs.VendorID == VID_LOGITECH && impl->attrs.ProductID == PID_LOGITECH_G920)
+                {
+                    if (j == HID_USAGE_GENERIC_X)
+                    {
+                        set_axis_type( &instance, seen_axis, 0, &axis );
+                        hack_guid = &GUID_XAxis;
+                        hack_name = L"Wheel axis";
+                    }
+                    else if (j == HID_USAGE_GENERIC_Y)
+                    {
+                        set_axis_type( &instance, seen_axis, 2, &axis );
+                        hack_guid = &GUID_YAxis;
+                        hack_name = L"Accelerator";
+                    }
+                    else if (j == HID_USAGE_GENERIC_Z)
+                    {
+                        set_axis_type( &instance, seen_axis, 5, &axis );
+                        hack_guid = &GUID_RzAxis;
+                        hack_name = L"Brake";
+                    }
+                    else if (j == HID_USAGE_GENERIC_RZ)
+                    {
+                        instance.dwType = DIDFT_ABSAXIS | DIDFT_MAKEINSTANCE( 6 + axis++ );
+                        hack_guid = &GUID_Slider;
+                        hack_name = L"Clutch";
+                    }
+                    else WARN("unknown axis usage page %x usage %lx for Logitech G920\n", caps->usage_page, j);
+                }
+                else
+                {
+                    set_axis_type( &instance, seen_axis, j - HID_USAGE_GENERIC_X, &axis );
+                }
                 instance.dwFlags = DIDOI_ASPECTPOSITION;
                 break;
             case MAKELONG(HID_USAGE_SIMULATION_STEERING, HID_USAGE_PAGE_SIMULATION):
@@ -1538,6 +1572,9 @@ static HRESULT hid_joystick_device_try_open( const WCHAR *path, HANDLE *device, 
         type |= (DI8DEVTYPEFLIGHT_STICK << 8);
         break;
     }
+
+    if (attrs->VendorID == VID_LOGITECH && attrs->ProductID == PID_LOGITECH_G920)
+        type = DI8DEVTYPE_DRIVING | (DI8DEVTYPEDRIVING_DUALPEDALS << 8);
 
     instance->dwDevType = device_type_for_version( type, version ) | DIDEVTYPE_HID;
     TRACE("detected device type %#lx\n", instance->dwDevType);
