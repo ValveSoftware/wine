@@ -504,8 +504,34 @@ static HRESULT WINAPI h264_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSA
 
 static HRESULT WINAPI h264_decoder_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
 {
-    FIXME("iface %p, id %u, sample %p, flags %#x stub!\n", iface, id, sample, flags);
-    return E_NOTIMPL;
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
+    IMFMediaBuffer *media_buffer;
+    MFT_INPUT_STREAM_INFO info;
+    UINT32 buffer_size;
+    BYTE *buffer;
+    HRESULT hr;
+
+    TRACE("iface %p, id %u, sample %p, flags %#x.\n", iface, id, sample, flags);
+
+    if (FAILED(hr = IMFTransform_GetInputStreamInfo(iface, 0, &info)))
+        return hr;
+
+    if (!decoder->wg_transform)
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+
+    if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(sample, &media_buffer)))
+        return hr;
+
+    if (FAILED(hr = IMFMediaBuffer_Lock(media_buffer, &buffer, NULL, &buffer_size)))
+        goto done;
+
+    hr = wg_transform_push_data(decoder->wg_transform, buffer, buffer_size);
+
+    IMFMediaBuffer_Unlock(media_buffer);
+
+done:
+    IMFMediaBuffer_Release(media_buffer);
+    return hr;
 }
 
 static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
