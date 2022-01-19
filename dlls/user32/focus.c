@@ -40,7 +40,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(win);
  *
  * Change the focus window, sending the WM_SETFOCUS and WM_KILLFOCUS messages
  */
-static HWND set_focus_window( HWND hwnd )
+static HWND set_focus_window( HWND hwnd, BOOL from_active )
 {
     HWND previous = 0, ime_default;
     BOOL ret;
@@ -57,6 +57,9 @@ static HWND set_focus_window( HWND hwnd )
 
     if (previous)
     {
+        if (!IsWindow(hwnd) && !from_active)
+            NotifyWinEvent( EVENT_OBJECT_FOCUS, previous, OBJID_CLIENT, CHILDID_SELF );
+
         SendMessageW( previous, WM_KILLFOCUS, (WPARAM)hwnd, 0 );
 
         ime_default = ImmGetDefaultIMEWnd( previous );
@@ -68,7 +71,8 @@ static HWND set_focus_window( HWND hwnd )
     if (IsWindow(hwnd))
     {
         USER_Driver->pSetFocus(hwnd);
-        NotifyWinEvent( EVENT_OBJECT_FOCUS, hwnd, OBJID_CLIENT, CHILDID_SELF );
+        if (!from_active)
+            NotifyWinEvent( EVENT_OBJECT_FOCUS, hwnd, OBJID_CLIENT, CHILDID_SELF );
 
         ime_default = ImmGetDefaultIMEWnd( hwnd );
         if (ime_default)
@@ -184,7 +188,7 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
         if (hwnd == info.hwndActive)
         {
             if (!info.hwndFocus || !hwnd || GetAncestor( info.hwndFocus, GA_ROOT ) != hwnd)
-                set_focus_window( hwnd );
+                set_focus_window( hwnd, TRUE );
         }
     }
 
@@ -325,7 +329,7 @@ HWND WINAPI SetFocus( HWND hwnd )
     }
 
     /* change focus and send messages */
-    return set_focus_window( hwnd );
+    return set_focus_window( hwnd, FALSE );
 }
 
 
