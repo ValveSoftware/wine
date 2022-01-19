@@ -361,7 +361,7 @@ void X11DRV_XInput2_Init(void)
 {
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
     struct x11drv_thread_data *data = x11drv_thread_data();
-    int major = 2, minor = 1;
+    int major = 2, minor = 2;
 
     if (xinput2_available && pXIQueryVersion( data->display, &major, &minor ) == Success &&
         pXIGetClientPointer( data->display, None, &data->xi2_core_pointer ))
@@ -369,7 +369,7 @@ void X11DRV_XInput2_Init(void)
     else
     {
         data->xi2_core_pointer = 0;
-        WARN( "XInput 2.1 not available\n" );
+        WARN( "XInput 2.2 not available\n" );
     }
 #endif
 }
@@ -393,12 +393,7 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
     memset( mask_bits, 0, sizeof(mask_bits) );
 
     if (GetWindowThreadProcessId( GetDesktopWindow(), NULL ) == GetCurrentThreadId())
-    {
-        XISetMask( mask_bits, XI_RawTouchBegin );
-        XISetMask( mask_bits, XI_RawTouchUpdate );
-        XISetMask( mask_bits, XI_RawTouchEnd );
         data->xi2_rawinput_only = TRUE;
-    }
     else
         data->xi2_rawinput_only = FALSE;
 
@@ -407,7 +402,13 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
     if (event_mask & PointerMotionMask)
     {
         XISetMask( mask_bits, XI_DeviceChanged );
-        if (raw) XISetMask( mask_bits, XI_RawMotion );
+        if (raw)
+        {
+            XISetMask( mask_bits, XI_RawMotion );
+            XISetMask( mask_bits, XI_RawTouchBegin );
+            XISetMask( mask_bits, XI_RawTouchUpdate );
+            XISetMask( mask_bits, XI_RawTouchEnd );
+        }
     }
     if (event_mask & ButtonPressMask)
     {
