@@ -64,7 +64,7 @@ static inline const char *debugstr_time(REFERENCE_TIME time)
 
 #define MEDIATIME_FROM_BYTES(x) ((LONGLONG)(x) * 10000000)
 
-struct wg_parser *wg_parser_create(enum wg_parser_type type, bool unlimited_buffering) DECLSPEC_HIDDEN;
+struct wg_parser *wg_parser_create(enum wg_parser_type type, bool unlimited_buffering, bool use_wine_allocator) DECLSPEC_HIDDEN;
 void wg_parser_destroy(struct wg_parser *parser) DECLSPEC_HIDDEN;
 
 HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size) DECLSPEC_HIDDEN;
@@ -77,6 +77,10 @@ void wg_parser_end_flush(struct wg_parser *parser) DECLSPEC_HIDDEN;
 
 bool wg_parser_get_next_read_offset(struct wg_parser *parser, uint64_t *offset, uint32_t *size) DECLSPEC_HIDDEN;
 void wg_parser_push_data(struct wg_parser *parser, enum wg_read_result result, const void *data, uint32_t size) DECLSPEC_HIDDEN;
+
+bool wg_parser_get_next_alloc_req(struct wg_parser *parser, enum wg_parser_alloc_req_type *type,
+        DWORD *size, DWORD *align, void **user) DECLSPEC_HIDDEN;
+void wg_parser_provide_alloc_buffer(struct wg_parser *parser, void *data, void *user) DECLSPEC_HIDDEN;
 
 uint32_t wg_parser_get_stream_count(struct wg_parser *parser) DECLSPEC_HIDDEN;
 struct wg_parser_stream *wg_parser_get_stream(struct wg_parser *parser, uint32_t index) DECLSPEC_HIDDEN;
@@ -216,5 +220,22 @@ HRESULT wm_reader_set_read_compressed(struct wm_reader *reader,
         WORD stream_number, BOOL compressed);
 HRESULT wm_reader_set_streams_selected(struct wm_reader *reader, WORD count,
         const WORD *stream_numbers, const WMT_STREAM_SELECTION *selections);
+
+struct wg_mf_buffer
+{
+    IMFMediaBuffer IMFMediaBuffer_iface;
+    LONG refcount;
+
+    BYTE *data;
+    DWORD max_length;
+    DWORD current_length;
+};
+
+struct allocator_thread_data {
+    BOOL done;
+    struct wg_parser *wg_parser;
+};
+
+HANDLE start_allocator_thread(struct allocator_thread_data *) DECLSPEC_HIDDEN;
 
 #endif /* __GST_PRIVATE_INCLUDED__ */

@@ -916,7 +916,7 @@ HRESULT audio_converter_create(REFIID riid, void **ret)
         return hr;
     }
 
-    if (!(object->parser = wg_parser_create(WG_PARSER_AUDIOCONV, true)))
+    if (!(object->parser = wg_parser_create(WG_PARSER_AUDIOCONV, true, false)))
     {
         ERR("Failed to create audio converter due to GStreamer error.\n");
         IMFTransform_Release(&object->IMFTransform_iface);

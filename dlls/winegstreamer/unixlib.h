@@ -192,6 +192,7 @@ struct wg_parser_create_params
     struct wg_parser *parser;
     enum wg_parser_type type;
     bool unlimited_buffering;
+    bool use_wine_allocator;
 };
 
 struct wg_parser_connect_params
@@ -214,6 +215,29 @@ struct wg_parser_get_next_read_offset_params
     struct wg_parser *parser;
     UINT32 size;
     UINT64 offset;
+};
+
+enum wg_parser_alloc_req_type
+{
+    WG_PARSER_ALLOC_NONE,
+    WG_PARSER_ALLOC_NEW,
+    WG_PARSER_ALLOC_FREE,
+};
+
+struct wg_parser_get_next_alloc_req_params
+{
+    struct wg_parser *parser;
+    enum wg_parser_alloc_req_type type;
+    DWORD size;
+    DWORD align;
+    void *user;
+};
+
+struct wg_parser_provide_alloc_buffer_params
+{
+    struct wg_parser *parser;
+    void *data;
+    void *user;
 };
 
 struct wg_parser_push_data_params
@@ -345,6 +369,9 @@ enum unix_funcs
 
     unix_wg_parser_get_next_read_offset,
     unix_wg_parser_push_data,
+
+    unix_wg_parser_get_next_alloc_req,
+    unix_wg_parser_provide_alloc_buffer,
 
     unix_wg_parser_get_stream_count,
     unix_wg_parser_get_stream,

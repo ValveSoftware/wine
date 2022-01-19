@@ -907,7 +907,7 @@ HRESULT color_converter_create(REFIID riid, void **ret)
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": color_converter_lock");
 
-    if (!(object->parser = wg_parser_create(WG_PARSER_VIDEOCONV, true)))
+    if (!(object->parser = wg_parser_create(WG_PARSER_VIDEOCONV, true, false)))
     {
         ERR("Failed to create video converter due to GStreamer error.\n");
         IMFTransform_Release(&object->IMFTransform_iface);
