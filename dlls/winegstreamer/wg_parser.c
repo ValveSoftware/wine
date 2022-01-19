@@ -121,7 +121,6 @@ struct wg_parser_stream
     pthread_cond_t event_cond, event_empty_cond;
     struct wg_parser_event event;
     GstBuffer *buffer;
-    GstMapInfo map_info;
 
     bool flushing, eos, enabled, has_caps;
 
@@ -142,6 +141,11 @@ struct wine_memory {
     GstMemory mem;
     void *data;
     void *user;
+};
+
+struct wg_buffer_cookie_data {
+    GstBuffer *gstbuf;
+    GstMapInfo map_info;
 };
 
 static enum wg_audio_format wg_audio_format_from_gst(GstAudioFormat format)
@@ -836,13 +840,14 @@ static NTSTATUS wg_parser_stream_get_event(void *args)
     return S_OK;
 }
 
-static NTSTATUS wg_parser_stream_copy_buffer(void *args)
+/* TODO: can we just put this in wg_parser_event::buffer? */
+static NTSTATUS wg_parser_stream_retrieve_buffer(void *args)
 {
-    const struct wg_parser_stream_copy_buffer_params *params = args;
+    struct wg_parser_stream_retrieve_buffer_params *params = args;
     struct wg_parser_stream *stream = params->stream;
     struct wg_parser *parser = stream->parser;
-    uint32_t offset = params->offset;
-    uint32_t size = params->size;
+    struct wine_memory *winemem = NULL;
+    struct wg_buffer_cookie_data *cookie;
 
     pthread_mutex_lock(&parser->mutex);
 
@@ -853,9 +858,54 @@ static NTSTATUS wg_parser_stream_copy_buffer(void *args)
     }
 
     assert(stream->event.type == WG_PARSER_EVENT_BUFFER);
-    assert(offset < stream->map_info.size);
-    assert(offset + size <= stream->map_info.size);
-    memcpy(params->data, stream->map_info.data + offset, size);
+
+    cookie = calloc(1, sizeof(*cookie));
+
+    if (!gst_buffer_map(stream->buffer, &cookie->map_info, GST_MAP_READ))
+    {
+        pthread_mutex_unlock(&parser->mutex);
+        free(cookie);
+        GST_ERROR("Failed to map buffer.\n");
+        return E_FAIL;
+    }
+
+    /* transfer ownership */
+    cookie->gstbuf = stream->buffer;
+    stream->buffer = NULL;
+
+    if (params->user)
+    {
+        if (!strcmp(cookie->map_info.memory->allocator->mem_type, "wine_memory"))
+            winemem = (struct wine_memory *)cookie->map_info.memory;
+
+        *params->user = winemem ? winemem->user : NULL;
+        *params->offset = cookie->map_info.memory->offset;
+    }
+
+    *params->cookie = cookie;
+
+    stream->event.type = WG_PARSER_EVENT_NONE;
+
+    pthread_cond_signal(&stream->event_empty_cond);
+    pthread_mutex_unlock(&parser->mutex);
+
+    return S_OK;
+}
+
+static NTSTATUS wg_parser_stream_copy_buffer(void *args)
+{
+    const struct wg_parser_stream_copy_buffer_params *params = args;
+    struct wg_parser_stream *stream = params->stream;
+    struct wg_parser *parser = stream->parser;
+    struct wg_buffer_cookie_data *cookie = params->cookie;
+    uint32_t offset = params->offset;
+    uint32_t size = params->size;
+
+    pthread_mutex_lock(&parser->mutex);
+
+    assert(offset < cookie->map_info.size);
+    assert(offset + size <= cookie->map_info.size);
+    memcpy(params->data, cookie->map_info.data + offset, size);
 
     pthread_mutex_unlock(&parser->mutex);
     return S_OK;
@@ -863,20 +913,28 @@ static NTSTATUS wg_parser_stream_copy_buffer(void *args)
 
 static NTSTATUS wg_parser_stream_release_buffer(void *args)
 {
-    struct wg_parser_stream *stream = args;
+    const struct wg_parser_stream_release_buffer_params *params = args;
+    struct wg_parser_stream *stream = params->stream;
     struct wg_parser *parser = stream->parser;
+    struct wg_buffer_cookie_data *cookie = params->cookie;
 
-    pthread_mutex_lock(&parser->mutex);
+    if (cookie)
+    {
+        gst_buffer_unmap(cookie->gstbuf, &cookie->map_info);
+        gst_buffer_unref(cookie->gstbuf);
+        free(cookie);
+    }
+    else
+    {
+        pthread_mutex_lock(&parser->mutex);
 
-    assert(stream->event.type == WG_PARSER_EVENT_BUFFER);
+        gst_buffer_unref(stream->buffer);
+        stream->buffer = NULL;
+        stream->event.type = WG_PARSER_EVENT_NONE;
 
-    gst_buffer_unmap(stream->buffer, &stream->map_info);
-    gst_buffer_unref(stream->buffer);
-    stream->buffer = NULL;
-    stream->event.type = WG_PARSER_EVENT_NONE;
-
-    pthread_mutex_unlock(&parser->mutex);
-    pthread_cond_signal(&stream->event_empty_cond);
+        pthread_cond_signal(&stream->event_empty_cond);
+        pthread_mutex_unlock(&parser->mutex);
+    }
 
     return S_OK;
 }
@@ -1073,16 +1131,6 @@ static GstFlowReturn queue_stream_event(struct wg_parser_stream *stream,
         GST_DEBUG("Filter is flushing; discarding event.");
         return GST_FLOW_FLUSHING;
     }
-    if (buffer)
-    {
-        assert(GST_IS_BUFFER(buffer));
-        if (!gst_buffer_map(buffer, &stream->map_info, GST_MAP_READ))
-        {
-            pthread_mutex_unlock(&parser->mutex);
-            GST_ERROR("Failed to map buffer.\n");
-            return GST_FLOW_ERROR;
-        }
-    }
     stream->event = *event;
     stream->buffer = buffer;
     pthread_mutex_unlock(&parser->mutex);
@@ -1151,7 +1199,6 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
 
                 if (stream->event.type == WG_PARSER_EVENT_BUFFER)
                 {
-                    gst_buffer_unmap(stream->buffer, &stream->map_info);
                     gst_buffer_unref(stream->buffer);
                     stream->buffer = NULL;
                 }
@@ -2931,6 +2978,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     X(wg_parser_stream_disable),
 
     X(wg_parser_stream_get_event),
+    X(wg_parser_stream_retrieve_buffer),
     X(wg_parser_stream_copy_buffer),
     X(wg_parser_stream_release_buffer),
     X(wg_parser_stream_notify_qos),
