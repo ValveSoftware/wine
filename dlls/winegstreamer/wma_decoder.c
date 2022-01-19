@@ -49,11 +49,26 @@ struct wma_decoder
     LONG refcount;
     IMFMediaType *input_type;
     IMFMediaType *output_type;
+
+    struct wg_transform *wg_transform;
 };
 
 static struct wma_decoder *impl_from_IMFTransform(IMFTransform *iface)
 {
     return CONTAINING_RECORD(iface, struct wma_decoder, IMFTransform_iface);
+}
+
+static HRESULT try_create_wg_transform(struct wma_decoder *decoder)
+{
+    if (decoder->wg_transform)
+        wg_transform_destroy(decoder->wg_transform);
+
+    decoder->wg_transform = wg_transform_create();
+    if (decoder->wg_transform)
+        return S_OK;
+
+    WARN("Failed to create wg_transform.\n");
+    return E_FAIL;
 }
 
 static HRESULT WINAPI wma_decoder_QueryInterface(IMFTransform *iface, REFIID iid, void **out)
@@ -94,6 +109,8 @@ static ULONG WINAPI wma_decoder_Release(IMFTransform *iface)
 
     if (!refcount)
     {
+        if (decoder->wg_transform)
+            wg_transform_destroy(decoder->wg_transform);
         if (decoder->input_type)
             IMFMediaType_Release(decoder->input_type);
         if (decoder->output_type)
@@ -393,6 +410,9 @@ static HRESULT WINAPI wma_decoder_SetOutputType(IMFTransform *iface, DWORD id, I
         return hr;
 
     if (FAILED(hr = IMFMediaType_CopyAllItems(type, (IMFAttributes *)decoder->output_type)))
+        goto failed;
+
+    if (FAILED(hr = try_create_wg_transform(decoder)))
         goto failed;
 
     return S_OK;
