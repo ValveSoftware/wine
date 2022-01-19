@@ -2330,6 +2330,7 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
             touch->win = win;
             touch->input = *input;
             touch->input.hw.msg = WM_POINTERUPDATE;
+            touch->input.mouse.data &= ~(POINTER_MESSAGE_FLAG_NEW << 16);
             touch->timeout = add_timeout_user( -160000, queue_touch_input_message, touch );
         }
         else
