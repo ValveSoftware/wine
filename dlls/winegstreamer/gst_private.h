@@ -90,9 +90,10 @@ void wg_parser_stream_enable(struct wg_parser_stream *stream, const struct wg_fo
 void wg_parser_stream_disable(struct wg_parser_stream *stream) DECLSPEC_HIDDEN;
 
 bool wg_parser_stream_get_event(struct wg_parser_stream *stream, struct wg_parser_event *event) DECLSPEC_HIDDEN;
+void wg_parser_stream_retrieve_buffer(struct wg_parser_stream *stream, void **user, uint32_t *offset, void **cookie) DECLSPEC_HIDDEN;
 bool wg_parser_stream_copy_buffer(struct wg_parser_stream *stream,
-        void *data, uint32_t offset, uint32_t size) DECLSPEC_HIDDEN;
-void wg_parser_stream_release_buffer(struct wg_parser_stream *stream) DECLSPEC_HIDDEN;
+        void *cookie, void *data, uint32_t offset, uint32_t size) DECLSPEC_HIDDEN;
+void wg_parser_stream_release_buffer(struct wg_parser_stream *stream, void *cookie) DECLSPEC_HIDDEN;
 void wg_parser_stream_notify_qos(struct wg_parser_stream *stream,
         bool underflow, double proportion, int64_t diff, uint64_t timestamp) DECLSPEC_HIDDEN;
 
@@ -229,6 +230,10 @@ struct wg_mf_buffer
     BYTE *data;
     DWORD max_length;
     DWORD current_length;
+    DWORD offset;
+
+    void *gstcookie;
+    struct wg_parser_stream *wg_stream;
 };
 
 struct allocator_thread_data {

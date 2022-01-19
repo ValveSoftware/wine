@@ -629,7 +629,7 @@ static HRESULT WINAPI color_converter_ProcessMessage(IMFTransform *iface, MFT_ME
             while (event.type != WG_PARSER_EVENT_BUFFER)
                 wg_parser_stream_get_event(converter->stream, &event);
 
-            wg_parser_stream_release_buffer(converter->stream);
+            wg_parser_stream_release_buffer(converter->stream, NULL);
             converter->buffer_inflight = FALSE;
 
             LeaveCriticalSection(&converter->cs);
@@ -721,6 +721,7 @@ static HRESULT WINAPI color_converter_ProcessOutput(IMFTransform *iface, DWORD f
     struct wg_parser_event event;
     unsigned char *buffer_data;
     DWORD buffer_len;
+    void *gstcookie;
     HRESULT hr = S_OK;
 
     TRACE("%p, %#x, %u, %p, %p.\n", iface, flags, count, samples, status);
@@ -829,7 +830,9 @@ static HRESULT WINAPI color_converter_ProcessOutput(IMFTransform *iface, DWORD f
         goto done;
     }
 
-    if (!wg_parser_stream_copy_buffer(converter->stream, buffer_data, 0, event.u.buffer.size))
+    wg_parser_stream_retrieve_buffer(converter->stream, NULL, NULL, &gstcookie);
+
+    if (!wg_parser_stream_copy_buffer(converter->stream, gstcookie, buffer_data, 0, event.u.buffer.size))
     {
         ERR("Failed to copy buffer.\n");
         IMFMediaBuffer_Unlock(buffer);
@@ -839,7 +842,7 @@ static HRESULT WINAPI color_converter_ProcessOutput(IMFTransform *iface, DWORD f
 
     IMFMediaBuffer_Unlock(buffer);
 
-    wg_parser_stream_release_buffer(converter->stream);
+    wg_parser_stream_release_buffer(converter->stream, gstcookie);
     converter->buffer_inflight = FALSE;
 
     if (converter->buffer_pts != -1)

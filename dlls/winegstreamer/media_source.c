@@ -459,6 +459,9 @@ static void send_buffer(struct media_stream *stream, const struct wg_parser_even
     IMFSample *sample;
     HRESULT hr;
     BYTE *data;
+    struct wg_mf_buffer *ourbuf = NULL;
+    void *gstcookie;
+    uint32_t offset;
 
     if (FAILED(hr = MFCreateSample(&sample)))
     {
@@ -466,42 +469,71 @@ static void send_buffer(struct media_stream *stream, const struct wg_parser_even
         return;
     }
 
-    if (FAILED(hr = MFCreateMemoryBuffer(event->u.buffer.size, &buffer)))
+    wg_parser_stream_retrieve_buffer(stream->wg_stream, (void **)&ourbuf, &offset, &gstcookie);
+    if (ourbuf)
     {
-        ERR("Failed to create buffer, hr %#x.\n", hr);
-        IMFSample_Release(sample);
-        return;
+        TRACE("fast path\n");
+        /* fast path. using our memory, so return straight to app */
+        ourbuf->gstcookie = gstcookie;
+        ourbuf->wg_stream = stream->wg_stream;
+
+        /* technically, we should spawn a new MediaBuf with this one as parent;
+         * a different view into the same buffer. hopefully this is good
+         * enough... */
+        ourbuf->offset = offset;
+
+        buffer = &ourbuf->IMFMediaBuffer_iface;
+        IMFMediaBuffer_AddRef(buffer);
+        assert(ourbuf->refcount == 2);
+
+        if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event->u.buffer.size)))
+        {
+            ERR("Failed to set size, hr %#x.\n", hr);
+            goto out;
+        }
+    }
+    else
+    {
+        TRACE("slow path: %u bytes\n", event->u.buffer.size);
+        /* slow path. gst allocated its own memory, so copy it out */
+        if (FAILED(hr = MFCreateMemoryBuffer(event->u.buffer.size, &buffer)))
+        {
+            ERR("Failed to create buffer, hr %#x.\n", hr);
+            IMFSample_Release(sample);
+            return;
+        }
+
+        if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event->u.buffer.size)))
+        {
+            ERR("Failed to set size, hr %#x.\n", hr);
+            goto out;
+        }
+
+        if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &data, NULL, NULL)))
+        {
+            ERR("Failed to lock buffer, hr %#x.\n", hr);
+            goto out;
+        }
+
+        if (!wg_parser_stream_copy_buffer(stream->wg_stream, gstcookie, data, 0, event->u.buffer.size))
+        {
+            wg_parser_stream_release_buffer(stream->wg_stream, gstcookie);
+            IMFMediaBuffer_Unlock(buffer);
+            goto out;
+        }
+
+        wg_parser_stream_release_buffer(stream->wg_stream, gstcookie);
+
+        if (FAILED(hr = IMFMediaBuffer_Unlock(buffer)))
+        {
+            ERR("Failed to unlock buffer, hr %#x.\n", hr);
+            goto out;
+        }
     }
 
     if (FAILED(hr = IMFSample_AddBuffer(sample, buffer)))
     {
         ERR("Failed to add buffer, hr %#x.\n", hr);
-        goto out;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event->u.buffer.size)))
-    {
-        ERR("Failed to set size, hr %#x.\n", hr);
-        goto out;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &data, NULL, NULL)))
-    {
-        ERR("Failed to lock buffer, hr %#x.\n", hr);
-        goto out;
-    }
-
-    if (!wg_parser_stream_copy_buffer(stream->wg_stream, data, 0, event->u.buffer.size))
-    {
-        wg_parser_stream_release_buffer(stream->wg_stream);
-        IMFMediaBuffer_Unlock(buffer);
-        goto out;
-    }
-    wg_parser_stream_release_buffer(stream->wg_stream);
-
-    if (FAILED(hr = IMFMediaBuffer_Unlock(buffer)))
-    {
-        ERR("Failed to unlock buffer, hr %#x.\n", hr);
         goto out;
     }
 

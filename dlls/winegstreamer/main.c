@@ -76,7 +76,12 @@ static ULONG WINAPI memory_buffer_Release(IMFMediaBuffer *iface)
 
     TRACE("%p, refcount %u.\n", iface, refcount);
 
-    if (!refcount)
+    if (refcount == 1 && buffer->wg_stream && buffer->gstcookie)
+    {
+        wg_parser_stream_release_buffer(buffer->wg_stream, buffer->gstcookie);
+        /* above call may free buffer obj, don't deref past this */
+    }
+    else if (!refcount)
     {
         free(buffer->data);
         free(buffer);
@@ -94,7 +99,7 @@ static HRESULT WINAPI memory_buffer_Lock(IMFMediaBuffer *iface, BYTE **data, DWO
     if (!data)
         return E_INVALIDARG;
 
-    *data = buffer->data;
+    *data = buffer->data + buffer->offset;
     if (max_length)
         *max_length = buffer->max_length;
     if (current_length)
@@ -434,12 +439,25 @@ bool wg_parser_stream_get_event(struct wg_parser_stream *stream, struct wg_parse
     return !__wine_unix_call(unix_handle, unix_wg_parser_stream_get_event, &params);
 }
 
+void wg_parser_stream_retrieve_buffer(struct wg_parser_stream *stream, void **user, uint32_t *offset, void **cookie)
+{
+    struct wg_parser_stream_retrieve_buffer_params params =
+    {
+        .stream = stream,
+        .user = user,
+        .cookie = cookie,
+        .offset = offset,
+    };
+    __wine_unix_call(unix_handle, unix_wg_parser_stream_retrieve_buffer, &params);
+}
+
 bool wg_parser_stream_copy_buffer(struct wg_parser_stream *stream,
-        void *data, uint32_t offset, uint32_t size)
+        void *cookie, void *data, uint32_t offset, uint32_t size)
 {
     struct wg_parser_stream_copy_buffer_params params =
     {
         .stream = stream,
+        .cookie = cookie,
         .data = data,
         .offset = offset,
         .size = size,
@@ -448,9 +466,14 @@ bool wg_parser_stream_copy_buffer(struct wg_parser_stream *stream,
     return !__wine_unix_call(unix_handle, unix_wg_parser_stream_copy_buffer, &params);
 }
 
-void wg_parser_stream_release_buffer(struct wg_parser_stream *stream)
+void wg_parser_stream_release_buffer(struct wg_parser_stream *stream, void *cookie)
 {
-    __wine_unix_call(unix_handle, unix_wg_parser_stream_release_buffer, stream);
+    struct wg_parser_stream_release_buffer_params params =
+    {
+        .stream = stream,
+        .cookie = cookie,
+    };
+    __wine_unix_call(unix_handle, unix_wg_parser_stream_release_buffer, &params);
 }
 
 void wg_parser_stream_notify_qos(struct wg_parser_stream *stream,
