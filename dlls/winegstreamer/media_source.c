@@ -106,7 +106,8 @@ struct media_source
         SOURCE_SHUTDOWN,
     } state;
 
-    HANDLE read_thread;
+    HANDLE read_thread, alloc_thread;
+    struct allocator_thread_data alloc_thread_data;
     bool read_thread_shutdown;
 };
 
@@ -665,7 +666,7 @@ static DWORD CALLBACK read_thread(void *arg)
     }
 
     free(data);
-    TRACE("Media source is shutting down; exiting.\n");
+    TRACE("Media source is shutting down; exiting read thread.\n");
     return 0;
 }
 
@@ -1345,6 +1346,10 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
     WaitForSingleObject(source->read_thread, INFINITE);
     CloseHandle(source->read_thread);
 
+    source->alloc_thread_data.done = true;
+    WaitForSingleObject(source->alloc_thread, INFINITE);
+    CloseHandle(source->alloc_thread);
+
     IMFPresentationDescriptor_Release(source->pres_desc);
     IMFMediaEventQueue_Shutdown(source->event_queue);
     IMFByteStream_Release(source->byte_stream);
@@ -1440,7 +1445,7 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
      * never deselects it). Remove buffering limits from decodebin in order to
      * account for this. Note that this does leak memory, but the same memory
      * leak occurs with native. */
-    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, true)))
+    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, true, true)))
     {
         hr = E_OUTOFMEMORY;
         goto fail;
@@ -1448,6 +1453,10 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
     object->wg_parser = parser;
 
     object->read_thread = CreateThread(NULL, 0, read_thread, object, 0, NULL);
+
+    object->alloc_thread_data.done = FALSE;
+    object->alloc_thread_data.wg_parser = parser;
+    object->alloc_thread = start_allocator_thread(&object->alloc_thread_data);
 
     object->state = SOURCE_OPENING;
 
@@ -1574,6 +1583,12 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
         object->read_thread_shutdown = true;
         WaitForSingleObject(object->read_thread, INFINITE);
         CloseHandle(object->read_thread);
+    }
+    if (object->alloc_thread)
+    {
+        object->alloc_thread_data.done = true;
+        WaitForSingleObject(object->alloc_thread, INFINITE);
+        CloseHandle(object->alloc_thread);
     }
     if (object->wg_parser)
         wg_parser_destroy(object->wg_parser);

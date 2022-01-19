@@ -63,6 +63,7 @@ struct wg_parser
     struct wg_parser_stream **streams;
     unsigned int stream_count, expected_stream_count;
 
+    GstAllocator *allocator;
     GstElement *container, *decodebin;
     GstBus *bus;
     GstPad *my_src, *their_sink;
@@ -87,9 +88,21 @@ struct wg_parser
         GstFlowReturn ret;
     } read_request;
 
+    pthread_mutex_t alloc_req_lock, alloc_lock;
+    pthread_cond_t alloc_cond, alloc_done_cond;
+    struct
+    {
+        enum wg_parser_alloc_req_type type;
+        DWORD size;
+        DWORD align;
+        void *data;
+        void *user;
+        bool done;
+    } alloc_request;
+
     bool flushing, sink_connected, draining;
 
-    bool unlimited_buffering;
+    bool unlimited_buffering, use_wine_allocator;
     struct wg_format input_format;
 
     bool use_mediaconv;
@@ -114,6 +127,21 @@ struct wg_parser_stream
 
     uint64_t duration;
     gchar *language_code;
+};
+
+GType WineMemoryAllocator_get_type (void);
+
+typedef struct
+{
+    GstAllocator parent;
+
+    struct wg_parser *parser;
+} WineMemoryAllocator;
+
+struct wine_memory {
+    GstMemory mem;
+    void *data;
+    void *user;
 };
 
 static enum wg_audio_format wg_audio_format_from_gst(GstAudioFormat format)
@@ -639,6 +667,46 @@ static NTSTATUS wg_parser_push_data(void *args)
 
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->read_done_cond);
+
+    return S_OK;
+}
+
+static NTSTATUS wg_parser_get_next_alloc_req(void *args)
+{
+    struct wg_parser_get_next_alloc_req_params *params = args;
+    struct wg_parser *parser = params->parser;
+
+    pthread_mutex_lock(&parser->alloc_req_lock);
+
+    while (parser->sink_connected && parser->alloc_request.type == WG_PARSER_ALLOC_NONE)
+        pthread_cond_wait(&parser->alloc_cond, &parser->alloc_req_lock);
+
+    if (!parser->sink_connected)
+    {
+        pthread_mutex_unlock(&parser->alloc_req_lock);
+        return VFW_E_WRONG_STATE;
+    }
+
+    params->type = parser->alloc_request.type;
+    params->size = parser->alloc_request.size;
+    params->align = parser->alloc_request.align;
+    params->user = parser->alloc_request.user;
+
+    pthread_mutex_unlock(&parser->alloc_req_lock);
+    return S_OK;
+}
+
+static NTSTATUS wg_parser_provide_alloc_buffer(void *args)
+{
+    const struct wg_parser_provide_alloc_buffer_params *params = args;
+    struct wg_parser *parser = params->parser;
+
+    parser->alloc_request.type = WG_PARSER_ALLOC_NONE;
+    parser->alloc_request.data = params->data;
+    parser->alloc_request.user = params->user;
+    parser->alloc_request.done = true;
+
+    pthread_cond_signal(&parser->alloc_done_cond);
 
     return S_OK;
 }
@@ -1227,6 +1295,55 @@ static gboolean sink_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
             }
             gst_query_set_accept_caps_result(query, ret);
             return TRUE;
+        }
+
+        case GST_QUERY_ALLOCATION:
+        {
+            GstCaps *caps;
+            gboolean need_pool;
+
+            if (stream->parser->allocator)
+            {
+                gst_query_parse_allocation(query, &caps, &need_pool);
+                GST_DEBUG("allocation query, need-pool: %u", need_pool);
+
+                if (need_pool)
+                {
+                    if (gst_query_get_n_allocation_pools(query) > 0)
+                    {
+                        /* pool exists, so set our allocator on it */
+                        GstAllocator *old_alloc;
+                        GstAllocationParams old_params;
+                        GstBufferPool *pool;
+                        GstStructure *config;
+
+                        GST_DEBUG("adding our alloc to extant pool");
+
+                        gst_query_parse_nth_allocation_pool(query, 0, &pool, NULL, NULL, NULL);
+
+                        config = gst_buffer_pool_get_config(pool);
+
+                        gst_buffer_pool_config_get_allocator(config, &old_alloc, &old_params);
+
+                        gst_buffer_pool_config_set_allocator(config, stream->parser->allocator, &old_params);
+
+                        gst_buffer_pool_set_config(pool, config);
+                    }
+                    else
+                    {
+                        /* no pool exists, so return allocator directly for upstream to use */
+                        GST_DEBUG("no pool, so returning our alloc");
+
+                        assert(gst_query_get_n_allocation_params(query) == 0); /* check that we're using this API correctly */
+
+                        gst_query_add_allocation_param(query, stream->parser->allocator, NULL);
+                    }
+                }
+
+                return TRUE;
+            }
+
+            return gst_pad_query_default (pad, parent, query);
         }
 
         default:
@@ -2170,6 +2287,7 @@ out:
     parser->sink_connected = false;
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->read_cond);
+    pthread_cond_signal(&parser->alloc_cond);
 
     if (use_mediaconv)
     {
@@ -2254,6 +2372,7 @@ static NTSTATUS wg_parser_disconnect(void *args)
     parser->sink_connected = false;
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->read_cond);
+    pthread_cond_signal(&parser->alloc_cond);
 
     for (i = 0; i < parser->stream_count; ++i)
         free_stream(parser->streams[i]);
@@ -2276,6 +2395,14 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
 
     if (!(element = create_element("decodebin", "base")))
         return FALSE;
+
+    if (parser->use_wine_allocator)
+    {
+        WineMemoryAllocator *alloc;
+        parser->allocator = g_object_new(WineMemoryAllocator_get_type(), NULL);
+        alloc = (WineMemoryAllocator *)parser->allocator;
+        alloc->parser = parser;
+    }
 
     if (parser->input_format.major_type)
         g_object_set(G_OBJECT(element), "sink-caps", wg_format_to_caps(&parser->input_format), NULL);
@@ -2522,6 +2649,148 @@ static BOOL video_convert_init_gst(struct wg_parser *parser)
     return TRUE;
 }
 
+static GstMemory *
+wine_memory_alloc (GstAllocator * allocator, gsize size, GstAllocationParams * params)
+{
+    WineMemoryAllocator *alloc = (WineMemoryAllocator *)allocator;
+    struct wg_parser *parser = alloc->parser;
+    SIZE_T maxsize = size + params->prefix + params->padding;
+    struct wine_memory *winemem;
+    void *data, *user;
+
+    pthread_mutex_lock(&parser->alloc_lock);
+    pthread_mutex_lock(&parser->alloc_req_lock);
+
+    /* get memory from win32 thread */
+    parser->alloc_request.type = WG_PARSER_ALLOC_NEW;
+    parser->alloc_request.size = maxsize;
+    parser->alloc_request.align = params ? params->align : 1;
+    parser->alloc_request.data = NULL;
+    parser->alloc_request.user = NULL;
+    pthread_cond_signal(&parser->alloc_cond);
+
+    while (!parser->alloc_request.done)
+        pthread_cond_wait(&parser->alloc_done_cond, &parser->alloc_req_lock);
+
+    data = parser->alloc_request.data;
+    user = parser->alloc_request.user;
+
+    parser->alloc_request.done = false;
+
+    pthread_mutex_unlock(&parser->alloc_req_lock);
+    pthread_mutex_unlock(&parser->alloc_lock);
+
+    if (!data) {
+        GST_WARNING("Allocating %u bytes failed!", (int)size);
+        return NULL;
+    }
+
+    winemem = malloc(sizeof(*winemem));
+    winemem->user = user;
+    winemem->data = data;
+
+    gst_memory_init(&winemem->mem, params->flags, allocator, NULL,
+            maxsize, params->align, params->prefix, size);
+
+    return &winemem->mem;
+}
+
+static void
+wine_memory_free (GstAllocator * allocator, GstMemory * mem)
+{
+    WineMemoryAllocator *alloc = (WineMemoryAllocator *)allocator;
+    struct wg_parser *parser = alloc->parser;
+    struct wine_memory *winemem = (struct wine_memory *)mem;
+
+    if (winemem->user)
+    {
+        /* free memory in win32 thread */
+        pthread_mutex_lock(&parser->alloc_lock);
+        pthread_mutex_lock(&parser->alloc_req_lock);
+
+        parser->alloc_request.type = WG_PARSER_ALLOC_FREE;
+        parser->alloc_request.user = winemem->user;
+        pthread_cond_signal(&parser->alloc_cond);
+
+        while (!parser->alloc_request.done)
+            pthread_cond_wait(&parser->alloc_done_cond, &parser->alloc_req_lock);
+
+        parser->alloc_request.type = WG_PARSER_ALLOC_NONE;
+        parser->alloc_request.done = false;
+
+        pthread_mutex_unlock(&parser->alloc_req_lock);
+        pthread_mutex_unlock(&parser->alloc_lock);
+    }
+
+    free(winemem);
+}
+
+static gpointer
+wine_memory_mem_map (GstMemory *mem, gsize maxsize, GstMapFlags flags)
+{
+    struct wine_memory *winemem = (struct wine_memory *)mem;
+    return winemem->data;
+}
+
+static void
+wine_memory_mem_unmap (GstMemory * mem)
+{
+    /* noop */
+}
+
+static GstMemory *
+wine_memory_mem_share (GstMemory *mem, gssize offset, gssize size)
+{
+    struct wine_memory *ret = NULL, *winemem = (struct wine_memory *)mem;
+    GstMemory *parent;
+    SIZE_T maxsize = sizeof(struct wine_memory);
+
+    ret = malloc(maxsize);
+
+    parent = winemem->mem.parent;
+    if (!parent)
+        parent = &winemem->mem;
+
+    ret->user = NULL;
+    ret->data = winemem->data;
+
+    gst_memory_init(&ret->mem,
+            GST_MINI_OBJECT_FLAGS(parent) | GST_MINI_OBJECT_FLAG_LOCK_READONLY,
+            winemem->mem.allocator, parent,
+            winemem->mem.maxsize, winemem->mem.align, winemem->mem.offset + offset,
+            size);
+
+    return &ret->mem;
+}
+
+typedef struct
+{
+    GstAllocatorClass parent_class;
+} WineMemoryAllocatorClass;
+
+G_DEFINE_TYPE (WineMemoryAllocator, WineMemoryAllocator, GST_TYPE_ALLOCATOR);
+
+static void
+WineMemoryAllocator_class_init (WineMemoryAllocatorClass * klass)
+{
+    GstAllocatorClass *allocator_class;
+
+    allocator_class = (GstAllocatorClass *) klass;
+
+    allocator_class->alloc = wine_memory_alloc;
+    allocator_class->free = wine_memory_free;
+}
+
+static void
+WineMemoryAllocator_init (WineMemoryAllocator * allocator)
+{
+    GstAllocator *alloc = GST_ALLOCATOR_CAST (allocator);
+    alloc->mem_type = "wine_memory";
+    alloc->mem_map = wine_memory_mem_map;
+    alloc->mem_unmap = wine_memory_mem_unmap;
+    alloc->mem_share = wine_memory_mem_share;
+}
+
 static void init_gstreamer_once(void)
 {
     char arg0[] = "wine";
@@ -2592,12 +2861,17 @@ static NTSTATUS wg_parser_create(void *args)
         return E_OUTOFMEMORY;
 
     pthread_mutex_init(&parser->mutex, NULL);
+    pthread_mutex_init(&parser->alloc_req_lock, NULL);
+    pthread_mutex_init(&parser->alloc_lock, NULL);
     pthread_cond_init(&parser->init_cond, NULL);
     pthread_cond_init(&parser->read_cond, NULL);
     pthread_cond_init(&parser->read_done_cond, NULL);
+    pthread_cond_init(&parser->alloc_cond, NULL);
+    pthread_cond_init(&parser->alloc_done_cond, NULL);
     parser->flushing = true;
     parser->init_gst = init_funcs[params->type];
     parser->unlimited_buffering = params->unlimited_buffering;
+    parser->use_wine_allocator = params->use_wine_allocator;
 
     GST_DEBUG("Created winegstreamer parser %p.\n", parser);
     params->parser = parser;
@@ -2614,10 +2888,17 @@ static NTSTATUS wg_parser_destroy(void *args)
         gst_object_unref(parser->bus);
     }
 
+    if (parser->allocator)
+        g_object_unref(parser->allocator);
+
     pthread_mutex_destroy(&parser->mutex);
+    pthread_mutex_destroy(&parser->alloc_req_lock);
+    pthread_mutex_destroy(&parser->alloc_lock);
     pthread_cond_destroy(&parser->init_cond);
     pthread_cond_destroy(&parser->read_cond);
     pthread_cond_destroy(&parser->read_done_cond);
+    pthread_cond_destroy(&parser->alloc_cond);
+    pthread_cond_destroy(&parser->alloc_done_cond);
 
     free(parser);
     return S_OK;
@@ -2638,6 +2919,9 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
 
     X(wg_parser_get_next_read_offset),
     X(wg_parser_push_data),
+
+    X(wg_parser_get_next_alloc_req),
+    X(wg_parser_provide_alloc_buffer),
 
     X(wg_parser_get_stream_count),
     X(wg_parser_get_stream),

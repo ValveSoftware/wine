@@ -1216,7 +1216,7 @@ HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type type)
     InitializeConditionVariable(&object->help_cv);
     InitializeConditionVariable(&object->event_cv);
 
-    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, TRUE)))
+    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, TRUE, FALSE)))
     {
         ERR("Failed to create Decoder MFT type %u: Unspecified GStreamer error\n", type);
         IMFTransform_Release(&object->IMFTransform_iface);
