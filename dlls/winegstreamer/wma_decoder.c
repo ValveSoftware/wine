@@ -30,10 +30,19 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
+static const GUID *wma_decoder_input_types[] =
+{
+    &MEDIASUBTYPE_MSAUDIO1,
+    &MFAudioFormat_WMAudioV8,
+    &MFAudioFormat_WMAudioV9,
+    &MFAudioFormat_WMAudio_Lossless,
+};
+
 struct wma_decoder
 {
     IMFTransform IMFTransform_iface;
     LONG refcount;
+    IMFMediaType *input_type;
 };
 
 static struct wma_decoder *impl_from_IMFTransform(IMFTransform *iface)
@@ -78,7 +87,11 @@ static ULONG WINAPI wma_decoder_Release(IMFTransform *iface)
     TRACE("iface %p decreasing refcount to %u.\n", decoder, refcount);
 
     if (!refcount)
+    {
+        if (decoder->input_type)
+            IMFMediaType_Release(decoder->input_type);
         free(decoder);
+    }
 
     return refcount;
 }
@@ -163,8 +176,50 @@ static HRESULT WINAPI wma_decoder_GetOutputAvailableType(IMFTransform *iface, DW
 
 static HRESULT WINAPI wma_decoder_SetInputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
 {
-    FIXME("iface %p, id %u, type %p, flags %#x stub!\n", iface, id, type, flags);
-    return E_NOTIMPL;
+    struct wma_decoder *decoder = impl_from_IMFTransform(iface);
+    MF_ATTRIBUTE_TYPE item_type;
+    GUID major, subtype;
+    HRESULT hr;
+    ULONG i;
+
+    TRACE("iface %p, id %u, type %p, flags %#x.\n", iface, id, type, flags);
+
+    if (FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_MAJOR_TYPE, &major)) ||
+        FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &subtype)))
+        return hr;
+
+    if (!IsEqualGUID(&major, &MFMediaType_Audio))
+        return MF_E_INVALIDMEDIATYPE;
+
+    for (i = 0; i < ARRAY_SIZE(wma_decoder_input_types); ++i)
+        if (IsEqualGUID(&subtype, wma_decoder_input_types[i]))
+            break;
+    if (i == ARRAY_SIZE(wma_decoder_input_types))
+        return MF_E_INVALIDMEDIATYPE;
+
+    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_USER_DATA, &item_type)) ||
+        item_type != MF_ATTRIBUTE_BLOB)
+        return MF_E_INVALIDMEDIATYPE;
+    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &item_type)) ||
+        item_type != MF_ATTRIBUTE_UINT32)
+        return MF_E_INVALIDMEDIATYPE;
+    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_SAMPLES_PER_SECOND, &item_type)) ||
+        item_type != MF_ATTRIBUTE_UINT32)
+        return MF_E_INVALIDMEDIATYPE;
+    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_NUM_CHANNELS, &item_type)) ||
+        item_type != MF_ATTRIBUTE_UINT32)
+        return MF_E_INVALIDMEDIATYPE;
+
+    if (!decoder->input_type && FAILED(hr = MFCreateMediaType(&decoder->input_type)))
+        return hr;
+
+    if (FAILED(hr = IMFMediaType_CopyAllItems(type, (IMFAttributes *)decoder->input_type)))
+    {
+        IMFMediaType_Release(decoder->input_type);
+        decoder->input_type = NULL;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI wma_decoder_SetOutputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
