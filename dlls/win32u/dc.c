@@ -63,25 +63,6 @@ static const struct gdi_obj_funcs dc_funcs =
 };
 
 
-static inline DC *get_dc_obj( HDC hdc )
-{
-    DWORD type;
-    DC *dc = get_any_obj_ptr( hdc, &type );
-    if (!dc) return NULL;
-
-    switch (type)
-    {
-    case NTGDI_OBJ_DC:
-    case NTGDI_OBJ_MEMDC:
-    case NTGDI_OBJ_ENHMETADC:
-        return dc;
-    default:
-        GDI_ReleaseObj( hdc );
-        SetLastError( ERROR_INVALID_HANDLE );
-        return NULL;
-    }
-}
-
 /* alloc DC_ATTR from a pool of memory accessible from client */
 static DC_ATTR *alloc_dc_attr(void)
 {
