@@ -757,6 +757,26 @@ static inline void copy_bitmapinfo( BITMAPINFO *dst, const BITMAPINFO *src )
     memcpy( dst, src, get_dib_info_size( src, DIB_RGB_COLORS ));
 }
 
+static inline DC *get_dc_obj( HDC hdc )
+{
+    WORD type;
+    DC *dc = get_any_obj_ptr( hdc, &type );
+    if (!dc) return NULL;
+
+    switch (type)
+    {
+    case OBJ_DC:
+    case OBJ_MEMDC:
+    case OBJ_METADC:
+    case OBJ_ENHMETADC:
+        return dc;
+    default:
+        GDI_ReleaseObj( hdc );
+        SetLastError( ERROR_INVALID_HANDLE );
+        return NULL;
+    }
+}
+
 extern void CDECL free_heap_bits( struct gdi_image_bits *bits ) DECLSPEC_HIDDEN;
 
 extern HMODULE gdi32_module DECLSPEC_HIDDEN;

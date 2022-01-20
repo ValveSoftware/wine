@@ -46,27 +46,6 @@ static const struct gdi_obj_funcs dc_funcs =
 };
 
 
-static inline DC *get_dc_obj( HDC hdc )
-{
-    WORD type;
-    DC *dc = get_any_obj_ptr( hdc, &type );
-    if (!dc) return NULL;
-
-    switch (type)
-    {
-    case OBJ_DC:
-    case OBJ_MEMDC:
-    case OBJ_METADC:
-    case OBJ_ENHMETADC:
-        return dc;
-    default:
-        GDI_ReleaseObj( hdc );
-        SetLastError( ERROR_INVALID_HANDLE );
-        return NULL;
-    }
-}
-
-
 /***********************************************************************
  *           set_initial_dc_state
  */
