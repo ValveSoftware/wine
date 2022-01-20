@@ -280,7 +280,7 @@ DC *get_dc_ptr( HDC hdc )
     }
     else if (dc->thread != GetCurrentThreadId())
     {
-        WARN( "dc %p belongs to thread %04x\n", hdc, dc->thread );
+        WARN( "dc %p belongs to thread %04x, refcount %d\n", hdc, dc->thread, dc->refcount );
         GDI_ReleaseObj( hdc );
         return NULL;
     }
@@ -1025,13 +1025,18 @@ BOOL WINAPI SetDCHook( HDC hdc, DCHOOKPROC hookProc, DWORD_PTR dwHookData )
  */
 DWORD_PTR WINAPI GetDCHook( HDC hdc, DCHOOKPROC *proc )
 {
-    DC *dc = get_dc_ptr( hdc );
+    DC *dc = get_dc_obj( hdc );
     DWORD_PTR ret;
 
     if (!dc) return 0;
+    if (dc->attr->disabled)
+    {
+        GDI_ReleaseObj( hdc );
+        return 0;
+    }
     if (proc) *proc = dc->hookProc;
     ret = dc->dwHookData;
-    release_dc_ptr( dc );
+    GDI_ReleaseObj( hdc );
     return ret;
 }
 
