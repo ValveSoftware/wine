@@ -239,6 +239,7 @@ struct wg_mf_buffer
 struct allocator_thread_data {
     BOOL done;
     struct wg_parser *wg_parser;
+    const char *log_pfx;
 };
 
 HANDLE start_allocator_thread(struct allocator_thread_data *) DECLSPEC_HIDDEN;
