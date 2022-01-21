@@ -60,8 +60,20 @@ static struct wma_decoder *impl_from_IMFTransform(IMFTransform *iface)
 
 static HRESULT try_create_wg_transform(struct wma_decoder *decoder)
 {
+    struct wg_encoded_format input_format;
+    struct wg_format output_format;
+
     if (decoder->wg_transform)
         wg_transform_destroy(decoder->wg_transform);
+    decoder->wg_transform = NULL;
+
+    mf_media_type_to_wg_encoded_format(decoder->input_type, &input_format);
+    if (input_format.encoded_type == WG_ENCODED_TYPE_UNKNOWN)
+        return MF_E_INVALIDMEDIATYPE;
+
+    mf_media_type_to_wg_format(decoder->output_type, &output_format);
+    if (output_format.major_type == WG_MAJOR_TYPE_UNKNOWN)
+        return MF_E_INVALIDMEDIATYPE;
 
     decoder->wg_transform = wg_transform_create();
     if (decoder->wg_transform)
