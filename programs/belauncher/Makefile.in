@@ -1,0 +1,7 @@
+MODULE    = belauncher.exe
+IMPORTS   =
+
+EXTRADLLFLAGS = -mwindows -municode
+
+SOURCES = \
+        main.c \
