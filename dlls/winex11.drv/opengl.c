@@ -2100,16 +2100,16 @@ static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_ha
 
 static const float *fs_hack_get_default_gamma_ramp(void)
 {
-    static float default_gamma_ramp[GAMMA_RAMP_SIZE * 3];
+    static float default_gamma_ramp[GAMMA_RAMP_SIZE * 4];
     static BOOL initialized;
     unsigned int i;
 
     if (!initialized)
     {
         for (i = 0; i < GAMMA_RAMP_SIZE; i++)
-            default_gamma_ramp[                      i] =
-            default_gamma_ramp[GAMMA_RAMP_SIZE     + i] =
-            default_gamma_ramp[GAMMA_RAMP_SIZE * 2 + i] =
+            default_gamma_ramp[i * 4    ] =
+            default_gamma_ramp[i * 4 + 1] =
+            default_gamma_ramp[i * 4 + 2] =
                 i / (float)(GAMMA_RAMP_SIZE - 1);
         initialized = TRUE;
     }
@@ -2146,8 +2146,8 @@ static const char *fs_hack_gamma_frag_shader_src =
 "\n"
 "uniform sampler2D tex;\n"
 "in vec2 texCoord;\n"
-"uniform ramp {\n"
-"    float values[3 * 256];\n"
+"layout (std140) uniform ramp {\n"
+"    vec3 values[256];\n"
 "};\n"
 "\n"
 "layout(location = 0) out vec4 outColor;\n"
@@ -2155,9 +2155,9 @@ static const char *fs_hack_gamma_frag_shader_src =
 "void main(void)\n"
 "{\n"
 "    vec4 lookup = texture(tex, texCoord) * 255.0;\n"
-"    outColor.r = values[          int(lookup.r)];\n"
-"    outColor.g = values[256     + int(lookup.g)];\n"
-"    outColor.b = values[256 * 2 + int(lookup.b)];\n"
+"    outColor.r = values[int(lookup.r)].r;\n"
+"    outColor.g = values[int(lookup.g)].g;\n"
+"    outColor.b = values[int(lookup.b)].b;\n"
 "    outColor.a = 1.0;\n"
 "}\n"
 ;
@@ -2242,7 +2242,7 @@ static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, struct gl_drawa
 
     pglGenBuffers(1, &ctx->ramp_ubo);
     pglBindBuffer(GL_UNIFORM_BUFFER, ctx->ramp_ubo);
-    pglBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 3 * GAMMA_RAMP_SIZE, default_gamma_ramp, GL_DYNAMIC_DRAW);
+    pglBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 4 * GAMMA_RAMP_SIZE, default_gamma_ramp, GL_DYNAMIC_DRAW);
 
     ramp_index = pglGetUniformBlockIndex(program, "ramp");
     pglUniformBlockBinding(program, ramp_index, 0);
@@ -3006,7 +3006,7 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
         if(gamma_serial != gl->last_gamma_serial){
             TRACE("updating gamma ramp (serial: %u)\n", gamma_serial);
 
-            pglBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 3 * GAMMA_RAMP_SIZE, gamma_ramp, GL_DYNAMIC_DRAW);
+            pglBufferData(GL_UNIFORM_BUFFER, sizeof(float) * 4 * GAMMA_RAMP_SIZE, gamma_ramp, GL_DYNAMIC_DRAW);
 
             gl->last_gamma_serial = gamma_serial;
         }

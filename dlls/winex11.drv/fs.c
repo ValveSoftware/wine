@@ -40,7 +40,7 @@ static struct x11drv_settings_handler real_settings_handler;
 static struct list fs_monitors = LIST_INIT(fs_monitors);
 
 static WORD gamma_ramp_i[GAMMA_RAMP_SIZE * 3];
-static float gamma_ramp[GAMMA_RAMP_SIZE * 3];
+static float gamma_ramp[GAMMA_RAMP_SIZE * 4];
 static LONG gamma_serial;
 
 /* Access to fs_monitors is protected by fs_section */
@@ -918,8 +918,10 @@ void fs_hack_set_gamma_ramp(const WORD *ramp)
         /* identical */
         return;
     }
-    for(i = 0; i < GAMMA_RAMP_SIZE * 3; ++i){
-        gamma_ramp[i] = ramp[i] / 65535.f;
+    for(i = 0; i < GAMMA_RAMP_SIZE; ++i){
+        gamma_ramp[i * 4    ] = ramp[i                      ] / 65535.f;
+        gamma_ramp[i * 4 + 1] = ramp[i +     GAMMA_RAMP_SIZE] / 65535.f;
+        gamma_ramp[i * 4 + 2] = ramp[i + 2 * GAMMA_RAMP_SIZE] / 65535.f;
     }
     memcpy(gamma_ramp_i, ramp, sizeof(gamma_ramp_i));
     InterlockedIncrement(&gamma_serial);
