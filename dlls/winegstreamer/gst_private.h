@@ -103,6 +103,7 @@ bool wg_parser_stream_drain(struct wg_parser_stream *stream) DECLSPEC_HIDDEN;
 struct wg_transform *wg_transform_create(const struct wg_encoded_format *input_format,
                 const struct wg_format *output_format) DECLSPEC_HIDDEN;
 void wg_transform_destroy(struct wg_transform *transform) DECLSPEC_HIDDEN;
+HRESULT wg_transform_push_data(struct wg_transform *transform, const void *data, uint32_t size) DECLSPEC_HIDDEN;
 
 unsigned int wg_format_get_max_size(const struct wg_format *format);
 
