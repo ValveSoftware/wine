@@ -38,14 +38,24 @@
 
 #include "unix_private.h"
 
+#include "wine/list.h"
+
 GST_DEBUG_CATEGORY_EXTERN(wine);
 #define GST_CAT_DEFAULT wine
+
+struct wg_transform_sample
+{
+    struct list entry;
+    GstSample *sample;
+};
 
 struct wg_transform
 {
     GstElement *container;
     GstPad *my_src, *my_sink;
     GstPad *their_sink, *their_src;
+    pthread_mutex_t mutex;
+    struct list samples;
 };
 
 static GstCaps *wg_format_to_caps_xwma(const struct wg_encoded_format *format)
@@ -99,17 +109,29 @@ static GstCaps *wg_encoded_format_to_caps(const struct wg_encoded_format *format
 static GstFlowReturn transform_sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *buffer)
 {
     struct wg_transform *transform = gst_pad_get_element_private(pad);
+    struct wg_transform_sample *sample;
 
     GST_INFO("transform %p, buffer %p.", transform, buffer);
 
-    gst_buffer_unref(buffer);
+    if (!(sample = malloc(sizeof(*sample))))
+        GST_ERROR("Failed to allocate transform sample entry");
+    else
+    {
+        pthread_mutex_lock(&transform->mutex);
+        if (!(sample->sample = gst_sample_new(buffer, NULL, NULL, NULL)))
+            GST_ERROR("Failed to allocate transform sample");
+        list_add_tail(&transform->samples, &sample->entry);
+        pthread_mutex_unlock(&transform->mutex);
+    }
 
+    gst_buffer_unref(buffer);
     return GST_FLOW_OK;
 }
 
 NTSTATUS wg_transform_destroy(void *args)
 {
     struct wg_transform *transform = args;
+    struct wg_transform_sample *sample, *next;
 
     if (transform->container)
         gst_element_set_state(transform->container, GST_STATE_NULL);
@@ -131,6 +153,13 @@ NTSTATUS wg_transform_destroy(void *args)
         g_object_unref(transform->my_sink);
     if (transform->my_src)
         g_object_unref(transform->my_src);
+
+    LIST_FOR_EACH_ENTRY_SAFE(sample, next, &transform->samples, struct wg_transform_sample, entry)
+    {
+        gst_sample_unref(sample->sample);
+        list_remove(&sample->entry);
+        free(sample);
+    }
 
     free(transform);
     return S_OK;
@@ -223,6 +252,8 @@ NTSTATUS wg_transform_create(void *args)
 
     if (!(transform = calloc(1, sizeof(*transform))))
         return E_OUTOFMEMORY;
+
+    list_init(&transform->samples);
 
     src_caps = wg_encoded_format_to_caps(&input_format);
     assert(src_caps);
@@ -360,5 +391,48 @@ NTSTATUS wg_transform_push_data(void *args)
     }
 
     GST_INFO("Pushed %u bytes", params->size);
+    return S_OK;
+}
+
+NTSTATUS wg_transform_read_data(void *args)
+{
+    struct wg_transform_read_data_params *params = args;
+    struct wg_transform *transform = params->transform;
+    struct wg_sample *read_sample = params->sample;
+    struct wg_transform_sample *transform_sample;
+    GstBuffer *buffer;
+    struct list *head;
+    GstMapInfo info;
+
+    pthread_mutex_lock(&transform->mutex);
+    if (!(head = list_head(&transform->samples)))
+    {
+        pthread_mutex_unlock(&transform->mutex);
+        return MF_E_TRANSFORM_NEED_MORE_INPUT;
+    }
+
+    transform_sample = LIST_ENTRY(head, struct wg_transform_sample, entry);
+    buffer = gst_sample_get_buffer(transform_sample->sample);
+
+    gst_buffer_map(buffer, &info, GST_MAP_READ);
+    if (read_sample->size > info.size)
+        read_sample->size = info.size;
+    memcpy(read_sample->data, info.data, read_sample->size);
+    gst_buffer_unmap(buffer, &info);
+
+    if (info.size > read_sample->size)
+    {
+        read_sample->flags |= WG_SAMPLE_FLAG_INCOMPLETE;
+        gst_buffer_resize(buffer, read_sample->size, -1);
+    }
+    else
+    {
+        gst_sample_unref(transform_sample->sample);
+        list_remove(&transform_sample->entry);
+        free(transform_sample);
+    }
+    pthread_mutex_unlock(&transform->mutex);
+
+    GST_INFO("Read %u bytes, flags %#x", read_sample->size, read_sample->flags);
     return S_OK;
 }
