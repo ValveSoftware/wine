@@ -117,6 +117,31 @@ struct wg_format
     } u;
 };
 
+struct wg_encoded_format
+{
+    enum wg_encoded_type
+    {
+        WG_ENCODED_TYPE_UNKNOWN,
+        WG_ENCODED_TYPE_WMA,
+        WG_ENCODED_TYPE_XMA,
+    } encoded_type;
+
+    union
+    {
+        struct
+        {
+            uint32_t version;
+            uint32_t bitrate;
+            uint32_t rate;
+            uint32_t depth;
+            uint32_t channels;
+            uint32_t block_align;
+            uint32_t codec_data_len;
+            unsigned char codec_data[64];
+        } xwma;
+    } u;
+};
+
 struct wg_rect
 {
     uint32_t left;
