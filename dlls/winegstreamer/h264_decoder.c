@@ -49,11 +49,37 @@ struct h264_decoder
     LONG refcount;
     IMFMediaType *input_type;
     IMFMediaType *output_type;
+
+    struct wg_transform *wg_transform;
 };
 
 static struct h264_decoder *impl_from_IMFTransform(IMFTransform *iface)
 {
     return CONTAINING_RECORD(iface, struct h264_decoder, IMFTransform_iface);
+}
+
+static HRESULT try_create_wg_transform(struct h264_decoder *decoder)
+{
+    struct wg_encoded_format input_format;
+    struct wg_format output_format;
+
+    if (decoder->wg_transform)
+        wg_transform_destroy(decoder->wg_transform);
+
+    mf_media_type_to_wg_encoded_format(decoder->input_type, &input_format);
+    if (input_format.encoded_type == WG_ENCODED_TYPE_UNKNOWN)
+        return MF_E_INVALIDMEDIATYPE;
+
+    mf_media_type_to_wg_format(decoder->output_type, &output_format);
+    if (output_format.major_type == WG_MAJOR_TYPE_UNKNOWN)
+        return MF_E_INVALIDMEDIATYPE;
+
+    decoder->wg_transform = wg_transform_create(&input_format, &output_format);
+    if (decoder->wg_transform)
+        return S_OK;
+
+    WARN("Failed to create H264 wg_transform.\n");
+    return E_FAIL;
 }
 
 static HRESULT fill_output_media_type(IMFMediaType *media_type, IMFMediaType *default_type)
@@ -191,6 +217,8 @@ static ULONG WINAPI h264_decoder_Release(IMFTransform *iface)
 
     if (!refcount)
     {
+        if (decoder->wg_transform)
+            wg_transform_destroy(decoder->wg_transform);
         if (decoder->input_type)
             IMFMediaType_Release(decoder->input_type);
         if (decoder->output_type)
@@ -422,7 +450,13 @@ static HRESULT WINAPI h264_decoder_SetOutputType(IMFTransform *iface, DWORD id, 
         IMFMediaType_Release(decoder->output_type);
     IMFMediaType_AddRef((decoder->output_type = type));
 
-    return S_OK;
+    if (FAILED(hr = try_create_wg_transform(decoder)))
+    {
+        IMFMediaType_Release(decoder->output_type);
+        decoder->output_type = NULL;
+    }
+
+    return hr;
 }
 
 static HRESULT WINAPI h264_decoder_GetInputCurrentType(IMFTransform *iface, DWORD id, IMFMediaType **type)
