@@ -210,9 +210,10 @@ NTSTATUS wg_transform_create(void *args)
     struct wg_encoded_format input_format = *params->input_format;
     struct wg_format output_format = *params->output_format;
     GstElement *first = NULL, *last = NULL, *element;
+    GstCaps *raw_caps, *src_caps, *sink_caps;
     struct wg_transform *transform;
-    GstCaps *src_caps, *sink_caps;
     GstPadTemplate *template;
+    const gchar *media_type;
     GstSegment *segment;
     int ret;
 
@@ -226,13 +227,30 @@ NTSTATUS wg_transform_create(void *args)
     assert(src_caps);
     sink_caps = wg_format_to_caps(&output_format);
     assert(sink_caps);
+    media_type = gst_structure_get_name(gst_caps_get_structure(sink_caps, 0));
+    raw_caps = gst_caps_new_empty_simple(media_type);
+    assert(raw_caps);
 
     transform->container = gst_bin_new("wg_transform");
     assert(transform->container);
 
-    if (!(element = try_create_transform(src_caps, sink_caps)) ||
+    if (!(element = try_create_transform(src_caps, raw_caps)) ||
             !transform_append_element(transform, element, &first, &last))
         goto failed;
+
+    switch (output_format.major_type)
+    {
+    case WG_MAJOR_TYPE_AUDIO:
+        if (!(element = create_element("audioconvert", "base")) ||
+                !transform_append_element(transform, element, &first, &last))
+            goto failed;
+        if (!(element = create_element("audioresample", "base")) ||
+                !transform_append_element(transform, element, &first, &last))
+            goto failed;
+        break;
+    default:
+        break;
+    }
 
     if (!(transform->their_sink = gst_element_get_static_pad(first, "sink")))
     {
@@ -312,6 +330,7 @@ NTSTATUS wg_transform_create(void *args)
     params->transform = transform;
 
 failed:
+    gst_caps_unref(raw_caps);
     gst_caps_unref(src_caps);
     gst_caps_unref(sink_caps);
 
