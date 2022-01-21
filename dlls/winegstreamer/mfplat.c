@@ -637,7 +637,6 @@ video_formats[] =
     {&MFVideoFormat_YUY2,   WG_VIDEO_FORMAT_YUY2},
     {&MFVideoFormat_YV12,   WG_VIDEO_FORMAT_YV12},
     {&MFVideoFormat_YVYU,   WG_VIDEO_FORMAT_YVYU},
-    {&MFVideoFormat_H264,   WG_VIDEO_FORMAT_H264},
 };
 
 static const struct
@@ -885,17 +884,6 @@ static void mf_media_type_to_wg_format_video(IMFMediaType *type, struct wg_forma
     }
     if (i == ARRAY_SIZE(video_formats))
         FIXME("Unrecognized video subtype %s.\n", debugstr_guid(&subtype));
-
-    if (format->u.video.format == WG_VIDEO_FORMAT_H264)
-    {
-        UINT32 profile, level;
-
-        if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_MPEG2_PROFILE, &profile)))
-            format->u.video.compressed.h264.profile = profile;
-
-        if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_MPEG2_LEVEL, &level)))
-            format->u.video.compressed.h264.level = level;
-    }
 }
 
 void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
@@ -966,6 +954,36 @@ static void mf_media_type_to_wg_encoded_format_xwma(IMFMediaType *type, struct w
     memcpy(format->u.xwma.codec_data, codec_data, codec_data_len);
 }
 
+static void mf_media_type_to_wg_encoded_format_h264(IMFMediaType *type, struct wg_encoded_format *format)
+{
+    UINT64 frame_rate, frame_size;
+    UINT32 profile, level;
+
+    format->encoded_type = WG_ENCODED_TYPE_H264;
+    format->u.h264.width = 0;
+    format->u.h264.height = 0;
+    format->u.h264.fps_n = 1;
+    format->u.h264.fps_d = 1;
+
+    if (SUCCEEDED(IMFMediaType_GetUINT64(type, &MF_MT_FRAME_SIZE, &frame_size)))
+    {
+        format->u.h264.width = (UINT32)(frame_size >> 32);
+        format->u.h264.height = (UINT32)frame_size;
+    }
+
+    if (SUCCEEDED(IMFMediaType_GetUINT64(type, &MF_MT_FRAME_RATE, &frame_rate)) && (UINT32)frame_rate)
+    {
+        format->u.h264.fps_n = (UINT32)(frame_rate >> 32);
+        format->u.h264.fps_d = (UINT32)frame_rate;
+    }
+
+    if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_MPEG2_PROFILE, &profile)))
+        format->u.h264.profile = profile;
+
+    if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_MPEG2_LEVEL, &level)))
+        format->u.h264.level = level;
+}
+
 void mf_media_type_to_wg_encoded_format(IMFMediaType *type, struct wg_encoded_format *format)
 {
     GUID major_type, subtype;
@@ -995,6 +1013,13 @@ void mf_media_type_to_wg_encoded_format(IMFMediaType *type, struct wg_encoded_fo
             mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_WMA, 4);
         else if (IsEqualGUID(&subtype, &MFAudioFormat_XMAudio2))
             mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_XMA, 2);
+        else
+            FIXME("Unimplemented audio subtype %s.\n", debugstr_guid(&subtype));
+    }
+    else if (IsEqualGUID(&major_type, &MFMediaType_Video))
+    {
+        if (IsEqualGUID(&subtype, &MFVideoFormat_H264))
+            mf_media_type_to_wg_encoded_format_h264(type, format);
         else
             FIXME("Unimplemented audio subtype %s.\n", debugstr_guid(&subtype));
     }
