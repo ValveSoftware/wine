@@ -311,7 +311,7 @@ static void wg_format_from_caps_video_cinepak(struct wg_format *format, const Gs
     format->u.video.fps_d = fps_d;
 }
 
-static void wg_format_from_caps(struct wg_format *format, const GstCaps *caps)
+void wg_format_from_caps(struct wg_format *format, const GstCaps *caps)
 {
     const GstStructure *structure = gst_caps_get_structure(caps, 0);
     const char *name = gst_structure_get_name(structure);
@@ -559,7 +559,7 @@ GstCaps *wg_format_to_caps(const struct wg_format *format)
     return NULL;
 }
 
-static bool wg_format_compare(const struct wg_format *a, const struct wg_format *b)
+bool wg_format_compare(const struct wg_format *a, const struct wg_format *b)
 {
     if (a->major_type != b->major_type)
         return false;
