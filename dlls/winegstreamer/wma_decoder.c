@@ -30,12 +30,15 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
+DEFINE_MEDIATYPE_GUID(MFAudioFormat_XMAudio2, 0x0166);
+
 static const GUID *wma_decoder_input_types[] =
 {
     &MEDIASUBTYPE_MSAUDIO1,
     &MFAudioFormat_WMAudioV8,
     &MFAudioFormat_WMAudioV9,
     &MFAudioFormat_WMAudio_Lossless,
+    &MFAudioFormat_XMAudio2,
 };
 static const GUID *wma_decoder_output_types[] =
 {
