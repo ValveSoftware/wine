@@ -120,6 +120,7 @@ extern HRESULT mfplat_DllRegisterServer(void) DECLSPEC_HIDDEN;
 
 IMFMediaType *mf_media_type_from_wg_format(const struct wg_format *format) DECLSPEC_HIDDEN;
 void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format) DECLSPEC_HIDDEN;
+void mf_media_type_to_wg_encoded_format(IMFMediaType *type, struct wg_encoded_format *format) DECLSPEC_HIDDEN;
 
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj) DECLSPEC_HIDDEN;
 
