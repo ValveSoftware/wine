@@ -104,6 +104,7 @@ struct wg_transform *wg_transform_create(const struct wg_encoded_format *input_f
                 const struct wg_format *output_format) DECLSPEC_HIDDEN;
 void wg_transform_destroy(struct wg_transform *transform) DECLSPEC_HIDDEN;
 HRESULT wg_transform_push_data(struct wg_transform *transform, const void *data, uint32_t size) DECLSPEC_HIDDEN;
+HRESULT wg_transform_read_data(struct wg_transform *transform, struct wg_sample *sample) DECLSPEC_HIDDEN;
 
 unsigned int wg_format_get_max_size(const struct wg_format *format);
 
