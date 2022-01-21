@@ -400,11 +400,6 @@ static const GUID CLSID_GStreamerByteStreamHandler = {0x317df618, 0x5e5a, 0x468a
 
 static const GUID CLSID_WINEAudioConverter = {0x6a170414,0xaad9,0x4693,{0xb8,0x06,0x3a,0x0c,0x47,0xc5,0x70,0xd6}};
 
-static HRESULT aac_decoder_create(REFIID riid, void **ret)
-{
-    return decode_transform_create(riid, ret, DECODER_TYPE_AAC);
-}
-
 static const struct class_object
 {
     const GUID *clsid;
@@ -782,58 +777,6 @@ static void mf_media_type_to_wg_format_audio(IMFMediaType *type, struct wg_forma
     format->u.audio.channel_mask = channel_mask;
     format->u.audio.rate = rate;
 
-    if (IsEqualGUID(&subtype, &MFAudioFormat_AAC))
-    {
-        UINT32 payload_type, indication, user_data_size;
-        unsigned char *user_data;
-
-        format->u.audio.format = WG_AUDIO_FORMAT_AAC;
-
-        if (SUCCEEDED(IMFMediaType_GetBlobSize(type, &MF_MT_USER_DATA, &user_data_size)))
-        {
-            user_data = malloc(user_data_size);
-            if (SUCCEEDED(IMFMediaType_GetBlob(type, &MF_MT_USER_DATA, user_data, user_data_size, NULL)))
-            {
-                struct {
-                    WORD payload_type;
-                    WORD indication;
-                    WORD type;
-                    WORD reserved1;
-                    DWORD reserved2;
-                } *aac_info = (void *) user_data;
-
-                format->u.audio.compressed.aac.payload_type = aac_info->payload_type;
-                format->u.audio.compressed.aac.indication = aac_info->indication;
-
-                /* Audio specific config is stored at after HEAACWAVEINFO in MF_MT_USER_DATA
-                    https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-heaacwaveformat */
-                if (user_data_size > 12)
-                {
-                    user_data += 12;
-                    user_data_size -= 12;
-
-                    if (user_data_size > sizeof(format->u.audio.compressed.aac.audio_specifc_config))
-                    {
-                        FIXME("Encountered Audio-Specific-Config with a size larger than we support %u\n", user_data_size);
-                        user_data_size = sizeof(format->u.audio.compressed.aac.audio_specifc_config);
-                    }
-
-                    memcpy(format->u.audio.compressed.aac.audio_specifc_config, user_data, user_data_size);
-                    format->u.audio.compressed.aac.asp_size = user_data_size;
-                }
-
-            }
-        }
-
-        if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_AAC_PAYLOAD_TYPE, &payload_type)))
-            format->u.audio.compressed.aac.payload_type = payload_type;
-
-        if (SUCCEEDED(IMFMediaType_GetUINT32(type, &MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, &indication)))
-            format->u.audio.compressed.aac.indication = indication;
-
-        return;
-    }
-
     for (i = 0; i < ARRAY_SIZE(audio_formats); ++i)
     {
         if (IsEqualGUID(&subtype, audio_formats[i].subtype) && depth == audio_formats[i].depth)
@@ -954,6 +897,51 @@ static void mf_media_type_to_wg_encoded_format_xwma(IMFMediaType *type, struct w
     memcpy(format->u.xwma.codec_data, codec_data, codec_data_len);
 }
 
+static void mf_media_type_to_wg_encoded_format_aac(IMFMediaType *type, struct wg_encoded_format *format)
+{
+    UINT32 codec_data_len, payload_type, profile_level_indication;
+    BYTE codec_data[64];
+
+    /* Audio specific config is stored at after HEAACWAVEINFO in MF_MT_USER_DATA
+     * https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-heaacwaveformat
+     */
+    struct
+    {
+        WORD payload_type;
+        WORD profile_level_indication;
+        WORD type;
+        WORD reserved1;
+        DWORD reserved2;
+    } *aac_info = (void *)codec_data;
+
+    if (FAILED(IMFMediaType_GetBlob(type, &MF_MT_USER_DATA, codec_data, sizeof(codec_data), &codec_data_len)))
+    {
+        FIXME("Codec data is not set.\n");
+        return;
+    }
+    if (FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AAC_PAYLOAD_TYPE, &payload_type)))
+    {
+        FIXME("AAC payload type is not set.\n");
+        payload_type = aac_info->payload_type;
+    }
+    if (FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, &profile_level_indication)))
+    {
+        FIXME("AAC provile level indication is not set.\n");
+        profile_level_indication = aac_info->profile_level_indication;
+    }
+
+    format->encoded_type = WG_ENCODED_TYPE_AAC;
+    format->u.aac.payload_type = payload_type;
+    format->u.aac.profile_level_indication = profile_level_indication;
+    format->u.aac.codec_data_len = 0;
+
+    if (codec_data_len > sizeof(*aac_info))
+    {
+        format->u.aac.codec_data_len = codec_data_len - sizeof(*aac_info);
+        memcpy(format->u.aac.codec_data, codec_data + sizeof(*aac_info), codec_data_len - sizeof(*aac_info));
+    }
+}
+
 static void mf_media_type_to_wg_encoded_format_h264(IMFMediaType *type, struct wg_encoded_format *format)
 {
     UINT64 frame_rate, frame_size;
@@ -1013,6 +1001,8 @@ void mf_media_type_to_wg_encoded_format(IMFMediaType *type, struct wg_encoded_fo
             mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_WMA, 4);
         else if (IsEqualGUID(&subtype, &MFAudioFormat_XMAudio2))
             mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_XMA, 2);
+        else if (IsEqualGUID(&subtype, &MFAudioFormat_AAC))
+            mf_media_type_to_wg_encoded_format_aac(type, format);
         else
             FIXME("Unimplemented audio subtype %s.\n", debugstr_guid(&subtype));
     }
