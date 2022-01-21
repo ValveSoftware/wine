@@ -742,6 +742,14 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetConsoleScreenBufferInfoEx( HANDLE handle,
 }
 
 
+BOOL WINAPI DECLSPEC_HOTPATCH GetConsoleSelectionInfo(CONSOLE_SELECTION_INFO *info)
+{
+    FIXME("stub (%p)\n", info);
+    info->dwFlags = CONSOLE_NO_SELECTION;
+    return TRUE;
+}
+
+
 /******************************************************************************
  *	GetConsoleTitleW   (kernelbase.@)
  */
