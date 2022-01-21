@@ -39,6 +39,8 @@ struct audio_converter
     LONGLONG buffer_pts, buffer_dur;
     struct wg_parser *parser;
     struct wg_parser_stream *stream;
+    HANDLE read_thread, alloc_thread;
+    struct allocator_thread_data alloc_thread_data;
     IMFAttributes *attributes, *output_attributes;
 };
 
@@ -91,6 +93,11 @@ static ULONG WINAPI audio_converter_Release(IMFTransform *iface)
             IMFAttributes_Release(transform->output_attributes);
         if (transform->stream)
             wg_parser_disconnect(transform->parser);
+
+        transform->alloc_thread_data.done = true;
+        WaitForSingleObject(transform->alloc_thread, INFINITE);
+        CloseHandle(transform->alloc_thread);
+
         if (transform->parser)
             wg_parser_destroy(transform->parser);
         free(transform);
@@ -718,6 +725,8 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
     unsigned char *buffer_data;
     DWORD buffer_len;
     void *gstcookie;
+    struct wg_mf_buffer *ourbuf;
+    uint32_t offset;
     HRESULT hr = S_OK;
 
     TRACE("%p, %#x, %u, %p, %p.\n", iface, flags, count, samples, status);
@@ -767,11 +776,98 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
         break;
     }
 
-    if (!samples[0].pSample)
+    wg_parser_stream_retrieve_buffer(converter->stream, (void **)&ourbuf, &offset, &gstcookie);
+    if (samples[0].pSample || !ourbuf)
     {
-        if (FAILED(hr = MFCreateMemoryBuffer(event.u.buffer.size, &buffer)))
+        TRACE("slow path: %u bytes\n", event.u.buffer.size);
+
+        if (samples[0].pSample)
         {
-            ERR("Failed to create buffer, hr %#x.\n", hr);
+            if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(samples[0].pSample, &buffer)))
+            {
+                ERR("Failed to get buffer from sample, hr %#x.\n", hr);
+                goto done;
+            }
+
+            if (FAILED(hr = IMFMediaBuffer_GetMaxLength(buffer, &buffer_len)))
+            {
+                ERR("Failed to get buffer size, hr %#x.\n", hr);
+                goto done;
+            }
+
+            if (buffer_len < event.u.buffer.size)
+            {
+                WARN("Client's buffer is smaller (%u bytes) than the output sample (%u bytes)\n",
+                    buffer_len, event.u.buffer.size);
+
+                hr = MF_E_BUFFERTOOSMALL;
+                goto done;
+            }
+        }
+        else
+        {
+            if (FAILED(hr = MFCreateMemoryBuffer(event.u.buffer.size, &buffer)))
+            {
+                ERR("Failed to create buffer, hr %#x.\n", hr);
+                goto done;
+            }
+
+            if (FAILED(hr = MFCreateSample(&allocated_sample)))
+            {
+                ERR("Failed to create sample, hr %#x.\n", hr);
+                goto done;
+            }
+
+            if (FAILED(hr = IMFSample_AddBuffer(allocated_sample, buffer)))
+            {
+                ERR("Failed to add buffer, hr %#x.\n", hr);
+                goto done;
+            }
+
+            samples[0].pSample = allocated_sample;
+        }
+
+        if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event.u.buffer.size)))
+        {
+            ERR("Failed to set size, hr %#x.\n", hr);
+            goto done;
+        }
+
+        if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &buffer_data, NULL, NULL)))
+        {
+            ERR("Failed to lock buffer hr %#x.\n", hr);
+            goto done;
+        }
+
+        if (!wg_parser_stream_copy_buffer(converter->stream, gstcookie, buffer_data, 0, event.u.buffer.size))
+        {
+            ERR("Failed to copy buffer.\n");
+            IMFMediaBuffer_Unlock(buffer);
+            hr = E_FAIL;
+            goto done;
+        }
+
+        IMFMediaBuffer_Unlock(buffer);
+        IMFMediaBuffer_Release(buffer);
+        buffer = NULL;
+
+        wg_parser_stream_release_buffer(converter->stream, gstcookie);
+    }
+    else
+    {
+        TRACE("fast path\n");
+
+        ourbuf->gstcookie = gstcookie;
+        ourbuf->wg_stream = converter->stream;
+        ourbuf->offset = offset;
+
+        buffer = &ourbuf->IMFMediaBuffer_iface;
+        IMFMediaBuffer_AddRef(buffer);
+        assert(ourbuf->refcount == 2);
+
+        if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event.u.buffer.size)))
+        {
+            ERR("Failed to set size, hr %#x.\n", hr);
             goto done;
         }
 
@@ -781,64 +877,15 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
             goto done;
         }
 
-        samples[0].pSample = allocated_sample;
-
-        if (FAILED(hr = IMFSample_AddBuffer(samples[0].pSample, buffer)))
+        if (FAILED(hr = IMFSample_AddBuffer(allocated_sample, buffer)))
         {
             ERR("Failed to add buffer, hr %#x.\n", hr);
             goto done;
         }
 
-        IMFMediaBuffer_Release(buffer);
-        buffer = NULL;
+        samples[0].pSample = allocated_sample;
     }
 
-    if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(samples[0].pSample, &buffer)))
-    {
-        ERR("Failed to get buffer from sample, hr %#x.\n", hr);
-        goto done;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_GetMaxLength(buffer, &buffer_len)))
-    {
-        ERR("Failed to get buffer size, hr %#x.\n", hr);
-        goto done;
-    }
-
-    if (buffer_len < event.u.buffer.size)
-    {
-        WARN("Client's buffer is smaller (%u bytes) than the output sample (%u bytes)\n",
-            buffer_len, event.u.buffer.size);
-
-        hr = MF_E_BUFFERTOOSMALL;
-        goto done;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event.u.buffer.size)))
-    {
-        ERR("Failed to set size, hr %#x.\n", hr);
-        goto done;
-    }
-
-    if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &buffer_data, NULL, NULL)))
-    {
-        ERR("Failed to lock buffer hr %#x.\n", hr);
-        goto done;
-    }
-
-    wg_parser_stream_retrieve_buffer(converter->stream, NULL, NULL, &gstcookie);
-
-    if (!wg_parser_stream_copy_buffer(converter->stream, gstcookie, buffer_data, 0, event.u.buffer.size))
-    {
-        ERR("Failed to copy buffer.\n");
-        IMFMediaBuffer_Unlock(buffer);
-        hr = E_FAIL;
-        goto done;
-    }
-
-    IMFMediaBuffer_Unlock(buffer);
-
-    wg_parser_stream_release_buffer(converter->stream, gstcookie);
     converter->buffer_inflight = FALSE;
 
     if (converter->buffer_pts != -1)
@@ -852,7 +899,7 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
     done:
     if (buffer)
         IMFMediaBuffer_Release(buffer);
-    if (allocated_sample && FAILED(hr))
+    if (FAILED(hr) && allocated_sample)
     {
         IMFSample_Release(allocated_sample);
         samples[0].pSample = NULL;
@@ -919,12 +966,17 @@ HRESULT audio_converter_create(REFIID riid, void **ret)
         return hr;
     }
 
-    if (!(object->parser = wg_parser_create(WG_PARSER_AUDIOCONV, true, false)))
+    if (!(object->parser = wg_parser_create(WG_PARSER_AUDIOCONV, true, true)))
     {
         ERR("Failed to create audio converter due to GStreamer error.\n");
         IMFTransform_Release(&object->IMFTransform_iface);
         return E_OUTOFMEMORY;
     }
+
+    object->alloc_thread_data.done = FALSE;
+    object->alloc_thread_data.wg_parser = object->parser;
+    object->alloc_thread_data.log_pfx = "audio_converter";
+    object->alloc_thread = start_allocator_thread(&object->alloc_thread_data);
 
     *ret = &object->IMFTransform_iface;
     return S_OK;

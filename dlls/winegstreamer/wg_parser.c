@@ -2609,6 +2609,14 @@ static BOOL audio_convert_init_gst(struct wg_parser *parser)
     if (parser->input_format.major_type != WG_MAJOR_TYPE_AUDIO)
         return FALSE;
 
+    if (parser->use_wine_allocator)
+    {
+        WineMemoryAllocator *alloc;
+        parser->allocator = g_object_new(WineMemoryAllocator_get_type(), NULL);
+        alloc = (WineMemoryAllocator *)parser->allocator;
+        alloc->parser = parser;
+    }
+
     if (!(convert = create_element("audioconvert", "base")))
         return FALSE;
 
