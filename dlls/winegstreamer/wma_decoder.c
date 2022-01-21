@@ -50,6 +50,7 @@ struct wma_decoder
     IMFMediaType *input_type;
     IMFMediaType *output_type;
 
+    IMFSample *input_sample;
     struct wg_transform *wg_transform;
 };
 
@@ -121,6 +122,8 @@ static ULONG WINAPI wma_decoder_Release(IMFTransform *iface)
 
     if (!refcount)
     {
+        if (decoder->input_sample)
+            IMFSample_Release(decoder->input_sample);
         if (decoder->wg_transform)
             wg_transform_destroy(decoder->wg_transform);
         if (decoder->input_type)
@@ -480,8 +483,44 @@ static HRESULT WINAPI wma_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAG
 
 static HRESULT WINAPI wma_decoder_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
 {
-    FIXME("iface %p, id %u, sample %p, flags %#x stub!\n", iface, id, sample, flags);
-    return E_NOTIMPL;
+    struct wma_decoder *decoder = impl_from_IMFTransform(iface);
+    IMFMediaBuffer *media_buffer;
+    MFT_INPUT_STREAM_INFO info;
+    UINT32 buffer_size;
+    BYTE *buffer;
+    HRESULT hr;
+
+    TRACE("iface %p, id %u, sample %p, flags %#x.\n", iface, id, sample, flags);
+
+    if (FAILED(hr = IMFTransform_GetInputStreamInfo(iface, 0, &info)))
+        return hr;
+
+    if (!decoder->wg_transform)
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+
+    if (decoder->input_sample)
+        return MF_E_NOTACCEPTING;
+
+    if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(sample, &media_buffer)))
+        return hr;
+
+    if (FAILED(hr = IMFMediaBuffer_GetCurrentLength(media_buffer, &buffer_size)))
+        return hr;
+
+    if (!(buffer_size = (buffer_size / info.cbSize) * info.cbSize))
+        return S_OK;
+
+    if (FAILED(hr = IMFMediaBuffer_Lock(media_buffer, &buffer, NULL, NULL)))
+        goto done;
+
+    if (SUCCEEDED(hr = wg_transform_push_data(decoder->wg_transform, buffer, buffer_size)))
+        IMFSample_AddRef((decoder->input_sample = sample));
+
+    IMFMediaBuffer_Unlock(media_buffer);
+
+done:
+    IMFMediaBuffer_Release(media_buffer);
+    return hr;
 }
 
 static HRESULT WINAPI wma_decoder_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
