@@ -279,6 +279,8 @@ struct gl_drawable
     BOOL                           has_scissor_indexed;
     BOOL                           has_clip_control;
     BOOL                           has_ati_frag_shader;
+    BOOL                           has_fragment_program;
+    BOOL                           has_vertex_program;
     LONG                           last_gamma_serial;
 };
 
@@ -2432,7 +2434,9 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         ctx->setup_for.y = height;
         gl->has_scissor_indexed = has_extension(glExtensions, "GL_ARB_viewport_array");
         gl->has_clip_control = has_extension(glExtensions, "GL_ARB_clip_control");
-        gl->has_ati_frag_shader = has_extension(glExtensions, "GL_ATI_fragment_shader");
+        gl->has_ati_frag_shader = !ctx->is_core && has_extension(glExtensions, "GL_ATI_fragment_shader");
+        gl->has_fragment_program = !ctx->is_core && has_extension(glExtensions, "GL_ARB_fragment_program");
+        gl->has_vertex_program = !ctx->is_core && has_extension(glExtensions, "GL_ARB_vertex_program");
         ctx->fs_hack_integer = fs_hack_is_integer();
 
         gl->fs_hack_context_set_up = TRUE;
@@ -2742,8 +2746,10 @@ static void fs_hack_handle_shaders(int mode, struct gl_drawable *gl,
         struct wgl_context *ctx, struct fs_hack_gl_state *state, const SIZE *real,
         const SIZE *scaled, const POINT *scaled_origin)
 {
-    fs_hack_handle_enable_switch(mode, GL_FRAGMENT_PROGRAM_ARB, &state->arb_frag, FALSE);
-    fs_hack_handle_enable_switch(mode, GL_VERTEX_PROGRAM_ARB, &state->arb_vert, FALSE);
+    if (gl->has_fragment_program)
+        fs_hack_handle_enable_switch(mode, GL_FRAGMENT_PROGRAM_ARB, &state->arb_frag, FALSE);
+    if (gl->has_vertex_program)
+        fs_hack_handle_enable_switch(mode, GL_VERTEX_PROGRAM_ARB, &state->arb_vert, FALSE);
     fs_hack_handle_enable_switch(mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, TRUE);
 
     if(gl->has_ati_frag_shader)
