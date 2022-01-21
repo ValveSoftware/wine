@@ -76,7 +76,7 @@ void wg_parser_begin_flush(struct wg_parser *parser) DECLSPEC_HIDDEN;
 void wg_parser_end_flush(struct wg_parser *parser) DECLSPEC_HIDDEN;
 
 bool wg_parser_get_next_read_offset(struct wg_parser *parser, uint64_t *offset, uint32_t *size) DECLSPEC_HIDDEN;
-void wg_parser_push_data(struct wg_parser *parser, enum wg_read_result result, const void *data, uint32_t size) DECLSPEC_HIDDEN;
+void wg_parser_push_data(struct wg_parser *parser, enum wg_read_result result, const void *data, uint32_t size, bool need_copy) DECLSPEC_HIDDEN;
 
 bool wg_parser_get_next_alloc_req(struct wg_parser *parser, enum wg_parser_alloc_req_type *type,
         DWORD *size, DWORD *align, void **user) DECLSPEC_HIDDEN;

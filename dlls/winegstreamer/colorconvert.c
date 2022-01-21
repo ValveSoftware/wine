@@ -51,7 +51,8 @@ struct color_converter
     IMFMediaType *input_type;
     IMFMediaType *output_type;
     CRITICAL_SECTION cs;
-    BOOL buffer_inflight;
+    IMFSample *inflight_sample;
+    IMFMediaBuffer *inflight_buffer;
     LONGLONG buffer_pts, buffer_dur;
     struct wg_parser *parser;
     struct wg_parser_stream *stream;
@@ -157,7 +158,7 @@ static HRESULT WINAPI color_converter_GetInputStreamInfo(IMFTransform *iface, DW
     if (id != 0)
         return MF_E_INVALIDSTREAMNUMBER;
 
-    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_DOES_NOT_ADDREF | MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE;
+    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE;
     info->cbMaxLookahead = 0;
     info->cbAlignment = 0;
     info->hnsMaxLatency = 0;
@@ -627,7 +628,7 @@ static HRESULT WINAPI color_converter_ProcessMessage(IMFTransform *iface, MFT_ME
         case MFT_MESSAGE_COMMAND_FLUSH:
         {
             EnterCriticalSection(&converter->cs);
-            if (!converter->buffer_inflight)
+            if (!converter->inflight_sample)
             {
                 LeaveCriticalSection(&converter->cs);
                 return S_OK;
@@ -637,7 +638,11 @@ static HRESULT WINAPI color_converter_ProcessMessage(IMFTransform *iface, MFT_ME
                 wg_parser_stream_get_event(converter->stream, &event);
 
             wg_parser_stream_release_buffer(converter->stream, NULL);
-            converter->buffer_inflight = FALSE;
+            IMFMediaBuffer_Unlock(converter->inflight_buffer);
+            IMFMediaBuffer_Release(converter->inflight_buffer);
+            converter->inflight_buffer = NULL;
+            IMFSample_Release(converter->inflight_sample);
+            converter->inflight_sample = NULL;
 
             LeaveCriticalSection(&converter->cs);
             return S_OK;
@@ -676,7 +681,7 @@ static HRESULT WINAPI color_converter_ProcessInput(IMFTransform *iface, DWORD id
         goto done;
     }
 
-    if (converter->buffer_inflight)
+    if (converter->inflight_sample)
     {
         hr = MF_E_NOTACCEPTING;
         goto done;
@@ -696,7 +701,7 @@ static HRESULT WINAPI color_converter_ProcessInput(IMFTransform *iface, DWORD id
             continue;
         }
 
-        wg_parser_push_data(converter->parser, WG_READ_SUCCESS, buffer_data, min(buffer_size, size));
+        wg_parser_push_data(converter->parser, WG_READ_SUCCESS, buffer_data, min(buffer_size, size), false);
 
         if (buffer_size <= size)
             break;
@@ -705,14 +710,19 @@ static HRESULT WINAPI color_converter_ProcessInput(IMFTransform *iface, DWORD id
         buffer_size -= size;
     }
 
-    IMFMediaBuffer_Unlock(buffer);
-    converter->buffer_inflight = TRUE;
+    IMFSample_AddRef(sample);
+    converter->inflight_sample = sample;
+    converter->inflight_buffer = buffer;
     if (FAILED(IMFSample_GetSampleTime(sample, &converter->buffer_pts)))
         converter->buffer_pts = -1;
     if (FAILED(IMFSample_GetSampleDuration(sample, &converter->buffer_dur)))
         converter->buffer_dur = -1;
+    sample = NULL;
+    buffer = NULL;
 
 done:
+    if (sample)
+        IMFSample_Release(sample);
     if (buffer)
         IMFMediaBuffer_Release(buffer);
     LeaveCriticalSection(&converter->cs);
@@ -755,7 +765,7 @@ static HRESULT WINAPI color_converter_ProcessOutput(IMFTransform *iface, DWORD f
         goto done;
     }
 
-    if (!converter->buffer_inflight)
+    if (!converter->inflight_sample)
     {
         hr = MF_E_TRANSFORM_NEED_MORE_INPUT;
         goto done;
@@ -890,7 +900,11 @@ static HRESULT WINAPI color_converter_ProcessOutput(IMFTransform *iface, DWORD f
         samples[0].pSample = allocated_sample;
     }
 
-    converter->buffer_inflight = FALSE;
+    IMFMediaBuffer_Unlock(converter->inflight_buffer);
+    IMFMediaBuffer_Release(converter->inflight_buffer);
+    converter->inflight_buffer = NULL;
+    IMFSample_Release(converter->inflight_sample);
+    converter->inflight_sample = NULL;
 
     if (converter->buffer_pts != -1)
         IMFSample_SetSampleTime(samples[0].pSample, converter->buffer_pts);
