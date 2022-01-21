@@ -286,9 +286,14 @@ bool wg_parser_stream_drain(struct wg_parser_stream *stream)
     return !__wine_unix_call(unix_handle, unix_wg_parser_stream_drain, stream);
 }
 
-struct wg_transform *wg_transform_create(void)
+struct wg_transform *wg_transform_create(const struct wg_encoded_format *input_format,
+        const struct wg_format *output_format)
 {
-    struct wg_transform_create_params params = {0};
+    struct wg_transform_create_params params =
+    {
+        .input_format = input_format,
+        .output_format = output_format,
+    };
 
     if (__wine_unix_call(unix_handle, unix_wg_transform_create, &params))
         return NULL;
