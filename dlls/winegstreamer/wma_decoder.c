@@ -526,8 +526,60 @@ done:
 static HRESULT WINAPI wma_decoder_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
         MFT_OUTPUT_DATA_BUFFER *samples, DWORD *status)
 {
-    FIXME("iface %p, flags %#x, count %u, samples %p, status %p stub!\n", iface, flags, count, samples, status);
-    return E_NOTIMPL;
+    struct wma_decoder *decoder = impl_from_IMFTransform(iface);
+    struct wg_sample wg_sample = {0};
+    IMFMediaBuffer *media_buffer;
+    MFT_OUTPUT_STREAM_INFO info;
+    HRESULT hr;
+
+    TRACE("iface %p, flags %#x, count %u, samples %p, status %p.\n", iface, flags, count, samples, status);
+
+    if (count > 1)
+    {
+        FIXME("Not implemented count %u\n", count);
+        return E_NOTIMPL;
+    }
+
+    if (FAILED(hr = IMFTransform_GetOutputStreamInfo(iface, 0, &info)))
+        return hr;
+
+    if (!decoder->wg_transform)
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+
+    *status = 0;
+    samples[0].dwStatus = 0;
+    if (!samples[0].pSample)
+    {
+        samples[0].dwStatus = MFT_OUTPUT_DATA_BUFFER_NO_SAMPLE;
+        return MF_E_TRANSFORM_NEED_MORE_INPUT;
+    }
+
+    if (FAILED(hr = IMFSample_ConvertToContiguousBuffer(samples[0].pSample, &media_buffer)))
+        return hr;
+
+    if (FAILED(hr = IMFMediaBuffer_Lock(media_buffer, &wg_sample.data, &wg_sample.size, NULL)))
+        goto done;
+
+    if (wg_sample.size < info.cbSize)
+        hr = MF_E_BUFFERTOOSMALL;
+    else if (SUCCEEDED(hr = wg_transform_read_data(decoder->wg_transform, &wg_sample)))
+    {
+        if (wg_sample.flags & WG_SAMPLE_FLAG_INCOMPLETE)
+            samples[0].dwStatus |= MFT_OUTPUT_DATA_BUFFER_INCOMPLETE;
+    }
+    else
+    {
+        if (decoder->input_sample)
+            IMFSample_Release(decoder->input_sample);
+        decoder->input_sample = NULL;
+    }
+
+    IMFMediaBuffer_Unlock(media_buffer);
+
+done:
+    IMFMediaBuffer_SetCurrentLength(media_buffer, wg_sample.size);
+    IMFMediaBuffer_Release(media_buffer);
+    return hr;
 }
 
 static const IMFTransformVtbl wma_decoder_vtbl =
