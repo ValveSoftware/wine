@@ -318,6 +318,24 @@ struct wg_transform_push_data_params
     UINT32 size;
 };
 
+enum wg_sample_flags
+{
+    WG_SAMPLE_FLAG_INCOMPLETE = 1,
+};
+
+struct wg_sample
+{
+    UINT32 flags;
+    BYTE *data;
+    UINT32 size;
+};
+
+struct wg_transform_read_data_params
+{
+    struct wg_transform *transform;
+    struct wg_sample *sample;
+};
+
 enum unix_funcs
 {
     unix_wg_parser_create,
@@ -355,6 +373,7 @@ enum unix_funcs
     unix_wg_transform_destroy,
 
     unix_wg_transform_push_data,
+    unix_wg_transform_read_data,
 };
 
 #endif /* __WINE_WINEGSTREAMER_UNIXLIB_H */
