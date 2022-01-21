@@ -574,7 +574,13 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
     if (wg_sample.size < info.cbSize)
         hr = MF_E_BUFFERTOOSMALL;
     else if (SUCCEEDED(hr = wg_transform_read_data(decoder->wg_transform, &wg_sample)))
+    {
+        if (wg_sample.flags & WG_SAMPLE_FLAG_HAS_PTS)
+            IMFSample_SetSampleTime(samples[0].pSample, wg_sample.pts);
+        if (wg_sample.flags & WG_SAMPLE_FLAG_HAS_DURATION)
+            IMFSample_SetSampleDuration(samples[0].pSample, wg_sample.duration);
         hr = IMFMediaBuffer_SetCurrentLength(media_buffer, wg_sample.size);
+    }
 
     IMFMediaBuffer_Unlock(media_buffer);
 
