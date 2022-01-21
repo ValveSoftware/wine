@@ -414,6 +414,17 @@ NTSTATUS wg_transform_create(void *args)
     transform->container = gst_bin_new("wg_transform");
     assert(transform->container);
 
+    switch (input_format.encoded_type)
+    {
+    case WG_ENCODED_TYPE_H264:
+        if ((element = create_element("h264parse", "base")) &&
+                !transform_append_element(transform, element, &first, &last))
+            goto failed;
+        break;
+    default:
+        break;
+    }
+
     if (!(element = try_create_transform(src_caps, raw_caps)) ||
             !transform_append_element(transform, element, &first, &last))
         goto failed;
