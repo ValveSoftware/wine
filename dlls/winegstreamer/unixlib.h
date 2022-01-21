@@ -319,6 +319,8 @@ struct wg_transform_push_data_params
 enum wg_sample_flags
 {
     WG_SAMPLE_FLAG_INCOMPLETE = 1,
+    WG_SAMPLE_FLAG_HAS_PTS = 2,
+    WG_SAMPLE_FLAG_HAS_DURATION = 4,
 };
 
 struct wg_sample
@@ -326,6 +328,8 @@ struct wg_sample
     UINT32 flags;
     BYTE *data;
     UINT32 size;
+    /* pts and duration are in 100-nanosecond units. */
+    ULONGLONG pts, duration;
 };
 
 struct wg_transform_read_data_params
