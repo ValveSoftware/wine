@@ -56,6 +56,7 @@ struct wg_transform
     GstPad *their_sink, *their_src;
     pthread_mutex_t mutex;
     struct list samples;
+    GstCaps *sink_caps;
 };
 
 static GstCaps *wg_format_to_caps_xwma(const struct wg_encoded_format *format)
@@ -194,6 +195,38 @@ static GstFlowReturn transform_sink_chain_cb(GstPad *pad, GstObject *parent, Gst
     return GST_FLOW_OK;
 }
 
+static gboolean transform_sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+    struct wg_transform *transform = gst_pad_get_element_private(pad);
+
+    GST_INFO("transform %p, type \"%s\".", transform, GST_EVENT_TYPE_NAME(event));
+
+    switch (event->type)
+    {
+    case GST_EVENT_CAPS:
+    {
+        GstCaps *caps;
+        gchar *str;
+
+        gst_event_parse_caps(event, &caps);
+        str = gst_caps_to_string(caps);
+        GST_WARNING("Got caps \"%s\".", str);
+        g_free(str);
+
+        pthread_mutex_lock(&transform->mutex);
+        gst_caps_unref(transform->sink_caps);
+        transform->sink_caps = gst_caps_ref(caps);
+        pthread_mutex_unlock(&transform->mutex);
+        break;
+    }
+    default:
+        GST_WARNING("Ignoring \"%s\" event.", GST_EVENT_TYPE_NAME(event));
+    }
+
+    gst_event_unref(event);
+    return TRUE;
+}
+
 NTSTATUS wg_transform_destroy(void *args)
 {
     struct wg_transform *transform = args;
@@ -311,7 +344,7 @@ NTSTATUS wg_transform_create(void *args)
     GstPadTemplate *template;
     const gchar *media_type;
     GstSegment *segment;
-    int ret;
+    int i, ret;
 
     if (!init_gstreamer())
         return E_FAIL;
@@ -329,6 +362,7 @@ NTSTATUS wg_transform_create(void *args)
     raw_caps = gst_caps_new_empty_simple(media_type);
     assert(raw_caps);
 
+    transform->sink_caps = gst_caps_copy(sink_caps);
     transform->container = gst_bin_new("wg_transform");
     assert(transform->container);
 
@@ -347,6 +381,12 @@ NTSTATUS wg_transform_create(void *args)
             goto failed;
         break;
     case WG_MAJOR_TYPE_VIDEO:
+        if (!(element = create_element("videoconvert", "base")) ||
+                !transform_append_element(transform, element, &first, &last))
+            goto failed;
+        for (i = 0; i < gst_caps_get_size(sink_caps); ++i)
+            gst_structure_remove_fields(gst_caps_get_structure(sink_caps, i),
+                    "width", "height", NULL);
         break;
     default:
         assert(0);
@@ -377,6 +417,7 @@ NTSTATUS wg_transform_create(void *args)
     assert(transform->my_sink);
 
     gst_pad_set_element_private(transform->my_sink, transform);
+    gst_pad_set_event_function(transform->my_sink, transform_sink_event_cb);
     gst_pad_set_chain_function(transform->my_sink, transform_sink_chain_cb);
 
     if ((ret = gst_pad_link(transform->my_src, transform->their_sink)) < 0)
@@ -469,9 +510,11 @@ NTSTATUS wg_transform_read_data(void *args)
     struct wg_transform *transform = params->transform;
     struct wg_sample *read_sample = params->sample;
     struct wg_transform_sample *transform_sample;
+    struct wg_format buffer_format;
     GstBuffer *buffer;
     struct list *head;
     GstMapInfo info;
+    GstCaps *caps;
 
     pthread_mutex_lock(&transform->mutex);
     if (!(head = list_head(&transform->samples)))
@@ -482,6 +525,20 @@ NTSTATUS wg_transform_read_data(void *args)
 
     transform_sample = LIST_ENTRY(head, struct wg_transform_sample, entry);
     buffer = gst_sample_get_buffer(transform_sample->sample);
+
+    if (read_sample->format)
+    {
+        if (!(caps = gst_sample_get_caps(transform_sample->sample)))
+            caps = transform->sink_caps;
+        wg_format_from_caps(&buffer_format, caps);
+        if (!wg_format_compare(read_sample->format, &buffer_format))
+        {
+            *read_sample->format = buffer_format;
+            read_sample->size = gst_buffer_get_size(buffer);
+            pthread_mutex_unlock(&transform->mutex);
+            return MF_E_TRANSFORM_STREAM_CHANGE;
+        }
+    }
 
     gst_buffer_map(buffer, &info, GST_MAP_READ);
     if (read_sample->size > info.size)
