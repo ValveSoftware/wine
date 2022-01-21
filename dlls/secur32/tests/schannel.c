@@ -582,6 +582,12 @@ static void init_buffers(SecBufferDesc *desc, unsigned count, unsigned size)
     desc->pBuffers[0].pvBuffer = HeapAlloc(GetProcessHeap(), 0, size);
 }
 
+static void init_sec_buffer(SecBuffer *sec_buf, ULONG count, void *buf)
+{
+    sec_buf->cbBuffer = count;
+    sec_buf->pvBuffer = buf;
+}
+
 static void reset_buffers(SecBufferDesc *desc)
 {
     unsigned i;
@@ -640,6 +646,67 @@ static int receive_data(SOCKET sock, SecBuffer *buf)
     buf->cbBuffer = received;
 
     return received;
+}
+
+static void test_context_output_buffer_size(DWORD protocol, DWORD flags, ULONG ctxt_flags_req)
+{
+    SCHANNEL_CRED cred;
+    CredHandle cred_handle;
+    CtxtHandle context;
+    SECURITY_STATUS status;
+    SecBuffer in_buffer = {0, SECBUFFER_EMPTY, NULL};
+    SecBufferDesc in_buffers  = {SECBUFFER_VERSION, 1, &in_buffer};
+    SecBufferDesc out_buffers;
+    unsigned buf_size = 8192;
+    void *buf, *buf2;
+    ULONG attrs;
+    int i;
+
+    init_cred(&cred);
+    cred.grbitEnabledProtocols = protocol;
+    cred.dwFlags = flags;
+    status = AcquireCredentialsHandleA(NULL, (SEC_CHAR *)UNISP_NAME_A, SECPKG_CRED_OUTBOUND, NULL,
+        &cred, NULL, NULL, &cred_handle, NULL);
+    ok( status == SEC_E_OK, "got %08x\n", status );
+    if (status != SEC_E_OK) return;
+
+    init_buffers(&out_buffers, 4, buf_size);
+    out_buffers.pBuffers[0].BufferType = SECBUFFER_TOKEN;
+    buf = out_buffers.pBuffers[0].pvBuffer;
+    buf2 = out_buffers.pBuffers[1].pvBuffer = HeapAlloc(GetProcessHeap(), 0, buf_size);
+    for (i = 0; i < 2; i++)
+    {
+        SecBuffer *buffer = !i ? &out_buffers.pBuffers[0] : &out_buffers.pBuffers[1];
+
+        init_sec_buffer(&out_buffers.pBuffers[0], buf_size, buf);
+        if (i) buffer->BufferType = SECBUFFER_ALERT;
+
+        buffer->cbBuffer = 0;
+        status = InitializeSecurityContextA(&cred_handle, NULL, (SEC_CHAR *)"localhost", ctxt_flags_req,
+                0, 0, &in_buffers, 0, &context, &out_buffers, &attrs, NULL);
+        ok(status == SEC_E_INSUFFICIENT_MEMORY, "%d: Expected SEC_E_INSUFFICIENT_MEMORY, got %08x\n", i, status);
+
+        if (i) init_sec_buffer(&out_buffers.pBuffers[0], buf_size, NULL);
+        init_sec_buffer(buffer, 0, NULL);
+        status = InitializeSecurityContextA(&cred_handle, NULL, (SEC_CHAR *)"localhost",
+                ctxt_flags_req | ISC_REQ_ALLOCATE_MEMORY, 0, 0, &in_buffers, 0, &context, &out_buffers, &attrs, NULL);
+        ok(status == SEC_I_CONTINUE_NEEDED, "%d: Expected SEC_I_CONTINUE_NEEDED, got %08x\n", i, status);
+        if (i) FreeContextBuffer(out_buffers.pBuffers[0].pvBuffer);
+        FreeContextBuffer(buffer->pvBuffer);
+        DeleteSecurityContext(&context);
+
+        if (i) init_sec_buffer(&out_buffers.pBuffers[0], buf_size, buf);
+        init_sec_buffer(buffer, buf_size, !i ? buf : buf2);
+        status = InitializeSecurityContextA(&cred_handle, NULL, (SEC_CHAR *)"localhost", ctxt_flags_req,
+                0, 0, &in_buffers, 0, &context, &out_buffers, &attrs, NULL);
+        ok(status == SEC_I_CONTINUE_NEEDED, "%d: Expected SEC_I_CONTINUE_NEEDED, got %08x\n", i, status);
+        if (i) todo_wine ok(!buffer->cbBuffer, "Expected SECBUFFER_ALERT buffer to be empty\n");
+        DeleteSecurityContext(&context);
+    }
+
+    HeapFree(GetProcessHeap(), 0, buf2);
+    free_buffers(&out_buffers);
+    FreeCredentialsHandle(&cred_handle);
 }
 
 static void test_InitializeSecurityContext(void)
@@ -973,6 +1040,9 @@ static void test_communication(void)
         win_skip("Required secur32 functions not available\n");
         return;
     }
+
+    test_context_output_buffer_size(SP_PROT_TLS1_CLIENT, SCH_CRED_NO_DEFAULT_CREDS|SCH_CRED_MANUAL_CRED_VALIDATION,
+            ISC_REQ_CONFIDENTIALITY|ISC_REQ_STREAM);
 
     /* Create a socket and connect to test.winehq.org */
     if ((sock = create_ssl_socket( "test.winehq.org" )) == -1) return;
@@ -1569,6 +1639,7 @@ static void test_dtls(void)
 
     flags_req = ISC_REQ_MANUAL_CRED_VALIDATION | ISC_REQ_EXTENDED_ERROR | ISC_REQ_DATAGRAM | ISC_REQ_USE_SUPPLIED_CREDS |
                 ISC_REQ_CONFIDENTIALITY | ISC_REQ_SEQUENCE_DETECT | ISC_REQ_REPLAY_DETECT;
+    test_context_output_buffer_size(SP_PROT_DTLS_CLIENT | SP_PROT_DTLS1_2_CLIENT, SCH_CRED_NO_DEFAULT_CREDS, flags_req);
 
     init_buffers( &buffers[0], 1, 128 );
     buffers[0].pBuffers[0].BufferType = SECBUFFER_DTLS_MTU;
