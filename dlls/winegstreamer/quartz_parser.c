@@ -885,7 +885,7 @@ static DWORD CALLBACK read_thread(void *arg)
         if (FAILED(hr))
             ERR("Failed to read %u bytes at offset %I64u, hr %#x.\n", size, offset, hr);
 
-        wg_parser_push_data(filter->wg_parser, SUCCEEDED(hr) ? WG_READ_SUCCESS : WG_READ_FAILURE, data, size);
+        wg_parser_push_data(filter->wg_parser, SUCCEEDED(hr) ? WG_READ_SUCCESS : WG_READ_FAILURE, data, size, true);
     }
 
     free(data);

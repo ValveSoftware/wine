@@ -650,11 +650,22 @@ static NTSTATUS wg_parser_push_data(void *args)
             /* Note that we don't allocate the buffer until we have a size.
              * midiparse passes a NULL buffer and a size of UINT_MAX, in an
              * apparent attempt to read the whole input stream at once. */
-            if (!parser->read_request.buffer)
-                parser->read_request.buffer = gst_buffer_new_and_alloc(size);
-            gst_buffer_map(parser->read_request.buffer, &map_info, GST_MAP_WRITE);
-            memcpy(map_info.data, data, size);
-            gst_buffer_unmap(parser->read_request.buffer, &map_info);
+            if (parser->read_request.buffer || params->need_copy)
+            {
+                GST_DEBUG("slow path: %u bytes", size);
+                if (!parser->read_request.buffer)
+                    parser->read_request.buffer = gst_buffer_new_and_alloc(size);
+                gst_buffer_map(parser->read_request.buffer, &map_info, GST_MAP_WRITE);
+                memcpy(map_info.data, data, size);
+                gst_buffer_unmap(parser->read_request.buffer, &map_info);
+            }
+            else
+            {
+                GST_DEBUG("fast path");
+                parser->read_request.buffer = gst_buffer_new_wrapped_full(
+                        GST_MEMORY_FLAG_READONLY, (void*)data, size, 0, size, NULL, NULL);
+            }
+
             parser->read_request.ret = GST_FLOW_OK;
         }
         else
