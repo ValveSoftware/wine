@@ -489,6 +489,17 @@ NTSTATUS wg_transform_read_data(void *args)
     memcpy(read_sample->data, info.data, read_sample->size);
     gst_buffer_unmap(buffer, &info);
 
+    if (buffer->pts != GST_CLOCK_TIME_NONE)
+    {
+        read_sample->flags |= WG_SAMPLE_FLAG_HAS_PTS;
+        read_sample->pts = buffer->pts / 100;
+    }
+    if (buffer->duration != GST_CLOCK_TIME_NONE)
+    {
+        read_sample->flags |= WG_SAMPLE_FLAG_HAS_DURATION;
+        read_sample->duration = buffer->duration / 100;
+    }
+
     if (info.size > read_sample->size)
     {
         read_sample->flags |= WG_SAMPLE_FLAG_INCOMPLETE;
