@@ -1670,6 +1670,12 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
+    if (is_logitech_g920(desc.vid, desc.pid))
+    {
+        TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+        close(fd);
+        return;
+    }
     if (is_sdl_blacklisted(desc.vid, desc.pid))
     {
         /* this device is blacklisted */
