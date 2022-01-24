@@ -76,6 +76,8 @@ struct wg_parser
     bool flushing, sink_connected, draining;
 
     struct wg_format input_format;
+
+    bool use_mediaconv;
 };
 
 struct wg_parser_stream
@@ -971,6 +973,34 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
         return GST_AUTOPLUG_SELECT_SKIP;
     }
     return GST_AUTOPLUG_SELECT_TRY;
+}
+
+static gint find_videoconv_cb(gconstpointer a, gconstpointer b)
+{
+    const GValue *val_a = a, *val_b = b;
+    GstElementFactory *factory_a = g_value_get_object(val_a), *factory_b = g_value_get_object(val_b);
+    const char *name_a = gst_element_factory_get_longname(factory_a), *name_b = gst_element_factory_get_longname(factory_b);
+
+    if (!strcmp(name_a, "Proton video converter"))
+        return -1;
+    if (!strcmp(name_b, "Proton video converter"))
+        return 1;
+    return 0;
+}
+
+static GValueArray *autoplug_sort_cb(GstElement *bin, GstPad *pad,
+        GstCaps *caps, GValueArray *factories, gpointer user)
+{
+    struct wg_parser *parser = user;
+    GValueArray *ret = g_value_array_copy(factories);
+
+    if (!parser->use_mediaconv)
+        return NULL;
+
+    GST_DEBUG("parser %p.", parser);
+
+    g_value_array_sort(ret, find_videoconv_cb);
+    return ret;
 }
 
 static void no_more_pads_cb(GstElement *element, gpointer user)
@@ -2072,8 +2102,11 @@ static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
     return S_OK;
 }
 
+static BOOL decodebin_parser_init_gst(struct wg_parser *parser);
+
 static HRESULT CDECL wg_parser_connect(struct wg_parser *parser, uint64_t file_size)
 {
+    bool use_mediaconv = false;
     unsigned int i;
     HRESULT hr;
     int ret;
@@ -2091,9 +2124,16 @@ static HRESULT CDECL wg_parser_connect(struct wg_parser *parser, uint64_t file_s
     if (!parser->pull_mode)
         gst_pad_set_active(parser->my_src, 1);
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
+
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        GST_ERROR("Failed to play stream.\n");
+        if (!parser->use_mediaconv && parser->init_gst == decodebin_parser_init_gst && parser->pull_mode)
+        {
+            GST_WARNING("Failed to play media, trying again with protonvideoconvert.");
+            use_mediaconv = true;
+        }
+        else 
+            GST_ERROR("Failed to play stream.\n");
         goto out;
     }
 
@@ -2211,6 +2251,14 @@ out:
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->read_cond);
 
+    if (use_mediaconv)
+    {
+        parser->use_mediaconv = true;
+        hr = wg_parser_connect(parser, file_size);
+        parser->use_mediaconv = false;
+        return hr;
+    }
+
     return E_FAIL;
 }
 
@@ -2310,6 +2358,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), parser);
     g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
     g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
+    g_signal_connect(element, "autoplug-sort", G_CALLBACK(autoplug_sort_cb), parser);
     g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
 
     g_object_set(G_OBJECT(element), "max-size-buffers", G_MAXUINT, NULL);
