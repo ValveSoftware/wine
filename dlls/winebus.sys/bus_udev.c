@@ -414,6 +414,13 @@ static void hidraw_device_get_feature_report(struct unix_device *iface, HID_XFER
     {
         io->Information = count;
         io->Status = STATUS_SUCCESS;
+
+        /* disable DS4 report quirk when we get calibration feature report */
+        if ((impl->quirks & QUIRK_DS4_BT) && packet->reportId == 0x5)
+        {
+            TRACE("Disabling report quirk for Bluetooth DualShock4 controller iface %p\n", iface);
+            impl->quirks &= ~QUIRK_DS4_BT;
+        }
     }
     else
     {
