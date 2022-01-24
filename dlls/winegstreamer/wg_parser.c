@@ -865,7 +865,7 @@ static NTSTATUS wg_parser_stream_drain(void *args)
 
     pthread_mutex_lock(&parser->mutex);
 
-    /* Sanity check making sure caller didn't try to drain an already-EOS or unselected stream.
+     /* Sanity check making sure caller didn't try to drain an already-EOS or unselected stream.
        There's no reason for a caller to do this, but it could be an accident in which case we
        should indicate that the stream is drained instead of locking-up. */
     if (!stream->enabled || stream->eos)
@@ -941,6 +941,31 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
         return GST_AUTOPLUG_SELECT_SKIP;
     }
     return GST_AUTOPLUG_SELECT_TRY;
+}
+
+static gint find_videoconv_cb(gconstpointer a, gconstpointer b)
+{
+    const GValue *val_a = a, *val_b = b;
+    GstElementFactory *factory_a = g_value_get_object(val_a), *factory_b = g_value_get_object(val_b);
+    const char *name_a = gst_element_factory_get_longname(factory_a), *name_b = gst_element_factory_get_longname(factory_b);
+
+    if (!strcmp(name_a, "Proton video converter"))
+        return -1;
+    if (!strcmp(name_b, "Proton video converter"))
+        return 1;
+    return 0;
+}
+
+static GValueArray *autoplug_sort_cb(GstElement *bin, GstPad *pad,
+        GstCaps *caps, GValueArray *factories, gpointer user)
+{
+    struct wg_parser *parser = user;
+    GValueArray *ret = g_value_array_copy(factories);
+
+    GST_DEBUG("parser %p.", parser);
+
+    g_value_array_sort(ret, find_videoconv_cb);
+    return ret;
 }
 
 static void no_more_pads_cb(GstElement *element, gpointer user)
@@ -1972,6 +1997,8 @@ static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
     return S_OK;
 }
 
+static BOOL decodebin_parser_init_gst(struct wg_parser *parser);
+
 static NTSTATUS wg_parser_connect(void *args)
 {
     const struct wg_parser_connect_params *params = args;
@@ -1979,7 +2006,9 @@ static NTSTATUS wg_parser_connect(void *args)
     unsigned int i;
     HRESULT hr;
     int ret;
+    bool use_mediaconv = false;
 
+again:
     parser->seekable = true;
     parser->file_size = params->file_size;
 
@@ -1989,13 +2018,23 @@ static NTSTATUS wg_parser_connect(void *args)
     if (!parser->init_gst(parser))
         goto out;
 
+    if (use_mediaconv)
+        g_signal_connect(parser->decodebin, "autoplug-sort", G_CALLBACK(autoplug_sort_cb), parser);
+
     gst_element_set_state(parser->container, GST_STATE_PAUSED);
     if (!parser->pull_mode)
         gst_pad_set_active(parser->my_src, 1);
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
+
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        GST_ERROR("Failed to play stream.\n");
+        if (!use_mediaconv && parser->init_gst == decodebin_parser_init_gst && parser->pull_mode)
+        {
+            GST_WARNING("Failed to play media, trying again with protonvideoconvert.");
+            use_mediaconv = true;
+        }
+        else 
+            GST_ERROR("Failed to play stream.\n");
         goto out;
     }
 
@@ -2112,6 +2151,9 @@ out:
     parser->sink_connected = false;
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->read_cond);
+
+    if (use_mediaconv)
+        goto again;
 
     return E_FAIL;
 }
