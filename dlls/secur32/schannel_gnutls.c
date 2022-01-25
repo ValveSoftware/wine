@@ -466,7 +466,8 @@ static int pull_timeout(gnutls_transport_ptr_t transport, unsigned int timeout)
 
     TRACE("\n");
 
-    if (!t->in.limit || get_buffer(t, &t->in, &count)) return 1;
+    if (t->in.limit == (~0UL)) return 0;
+    if (get_buffer(t, &t->in, &count)) return 1;
     pgnutls_transport_set_errno(s, EAGAIN);
     return -1;
 }
@@ -483,7 +484,7 @@ static NTSTATUS schan_create_session( void *args )
 
     if (cred->enabled_protocols & (SP_PROT_DTLS1_0_CLIENT | SP_PROT_DTLS1_2_CLIENT))
     {
-        flags |= GNUTLS_DATAGRAM;
+        flags |= GNUTLS_DATAGRAM | GNUTLS_NONBLOCK;
     }
 
     err = pgnutls_init(s, flags);
@@ -568,7 +569,7 @@ static NTSTATUS schan_handshake( void *args )
     int err;
 
     init_schan_buffers(&t->in, params->input, handshake_get_next_buffer);
-    t->in.limit = params->input_size;
+    t->in.limit = params->input_size >= UINT_MAX ? (~0UL) : params->input_size;
     init_schan_buffers(&t->out, params->output, handshake_get_next_buffer_alloc );
     t->out.alloc_buffer = params->alloc_buffer;
 

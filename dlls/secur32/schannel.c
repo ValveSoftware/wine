@@ -813,7 +813,6 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
         {
             struct set_dtls_timeouts_params params = { ctx->transport.session, 0, 60000 };
             GNUTLS_CALL( set_dtls_timeouts, &params );
-            expected_size = 0;
         }
 
         phNewContext->dwLower = handle;
@@ -826,7 +825,6 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
 
         if (!(ctx = schan_get_object(phContext->dwLower, SCHAN_HANDLE_CTX))) return SEC_E_INVALID_HANDLE;
         if (!pInput && !is_dtls_context(ctx)) return SEC_E_INCOMPLETE_MESSAGE;
-        expected_size = 0;
 
         if (pInput)
         {
@@ -834,6 +832,7 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
 
             buffer = &pInput->pBuffers[idx];
             ptr = buffer->pvBuffer;
+            expected_size = 0;
 
             while (buffer->cbBuffer > expected_size + ctx->header_size)
             {
