@@ -305,7 +305,9 @@ static int pull_timeout(gnutls_transport_ptr_t transport, unsigned int timeout)
 
     TRACE("\n");
 
-    if (!t->in.limit || callbacks->get_buffer(t, &t->in, &count)) return 1;
+    if (t->in.limit >= 0xffffffff) t->in.limit = (~0UL);
+    if (t->in.limit == (~0UL)) return 0;
+    if (callbacks->get_buffer(t, &t->in, &count)) return 1;
     pgnutls_transport_set_errno(s, EAGAIN);
     return -1;
 }
@@ -320,7 +322,7 @@ static BOOL CDECL schan_create_session(schan_session *session, schan_credentials
 
     if (cred->enabled_protocols & (SP_PROT_DTLS1_0_CLIENT | SP_PROT_DTLS1_2_CLIENT))
     {
-        flags |= GNUTLS_DATAGRAM;
+        flags |= GNUTLS_DATAGRAM | GNUTLS_NONBLOCK;
     }
 
     err = pgnutls_init(s, flags);
