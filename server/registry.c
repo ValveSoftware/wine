@@ -2305,7 +2305,7 @@ DECL_HANDLER(load_registry)
 
     if (!objattr) return;
 
-    if (!thread_single_check_privilege( current, &SeRestorePrivilege ))
+    if (!thread_single_check_privilege( current, SeRestorePrivilege ))
     {
         set_error( STATUS_PRIVILEGE_NOT_HELD );
         return;
@@ -2336,7 +2336,7 @@ DECL_HANDLER(unload_registry)
     struct unicode_str name;
     unsigned int access = 0;
 
-    if (!thread_single_check_privilege( current, &SeRestorePrivilege ))
+    if (!thread_single_check_privilege( current, SeRestorePrivilege ))
     {
         set_error( STATUS_PRIVILEGE_NOT_HELD );
         return;
@@ -2364,7 +2364,7 @@ DECL_HANDLER(save_registry)
 {
     struct key *key;
 
-    if (!thread_single_check_privilege( current, &SeBackupPrivilege ))
+    if (!thread_single_check_privilege( current, SeBackupPrivilege ))
     {
         set_error( STATUS_PRIVILEGE_NOT_HELD );
         return;
