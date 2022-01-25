@@ -1010,7 +1010,6 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
         if (!(ctx = schan_get_object(phContext->dwLower, SCHAN_HANDLE_CTX))) return SEC_E_INVALID_HANDLE;
         if (!pInput) return is_dtls_context(ctx) ? SEC_E_INSUFFICIENT_MEMORY : SEC_E_INCOMPLETE_MESSAGE;
         if ((idx = schan_find_sec_buffer_idx(pInput, 0, SECBUFFER_TOKEN)) == -1) return SEC_E_INCOMPLETE_MESSAGE;
-        if (phNewContext) *phNewContext = *phContext;
 
         buffer = &pInput->pBuffers[idx];
         ptr = buffer->pvBuffer;
