@@ -992,6 +992,9 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
             else WARN("invalid buffer size %u\n", buffer->cbBuffer);
         }
 
+        if (is_dtls_context(ctx))
+            schan_funcs->set_dtls_timeouts(ctx->session, 0, 60000);
+
         phNewContext->dwLower = handle;
         phNewContext->dwUpper = 0;
     }

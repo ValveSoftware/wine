@@ -61,6 +61,7 @@ static int (*pgnutls_cipher_get_block_size)(gnutls_cipher_algorithm_t);
 static void (*pgnutls_transport_set_pull_timeout_function)(gnutls_session_t,
                                                            int (*)(gnutls_transport_ptr_t, unsigned int));
 static void (*pgnutls_dtls_set_mtu)(gnutls_session_t, unsigned int);
+static void (*pgnutls_dtls_set_timeouts)(gnutls_session_t, unsigned int, unsigned int);
 
 /* Not present in gnutls version < 3.2.0. */
 static int (*pgnutls_alpn_get_selected_protocol)(gnutls_session_t, gnutls_datum_t *);
@@ -195,6 +196,12 @@ static int compat_gnutls_alpn_set_protocols(gnutls_session_t session, const gnut
 }
 
 static void compat_gnutls_dtls_set_mtu(gnutls_session_t session, unsigned int mtu)
+{
+    FIXME("\n");
+}
+
+static void compat_gnutls_dtls_set_timeouts(gnutls_session_t session, unsigned int retrans_timeout,
+        unsigned int total_timeout)
 {
     FIXME("\n");
 }
@@ -793,6 +800,15 @@ static SECURITY_STATUS CDECL schan_set_dtls_mtu(schan_session session, unsigned 
     return SEC_E_OK;
 }
 
+static SECURITY_STATUS CDECL schan_set_dtls_timeouts(schan_session session, unsigned int retrans_timeout,
+        unsigned int total_timeout)
+{
+    gnutls_session_t s = (gnutls_session_t)session;
+
+    pgnutls_dtls_set_timeouts(s, retrans_timeout, total_timeout);
+    return SEC_E_OK;
+}
+
 static inline void reverse_bytes(BYTE *buf, ULONG len)
 {
     BYTE tmp;
@@ -1047,6 +1063,11 @@ static BOOL gnutls_initialize(void)
         WARN("gnutls_dtls_set_mtu not found\n");
         pgnutls_dtls_set_mtu = compat_gnutls_dtls_set_mtu;
     }
+    if (!(pgnutls_dtls_set_timeouts = dlsym(libgnutls_handle, "gnutls_dtls_set_timeouts")))
+    {
+        WARN("gnutls_dtls_set_timeouts not found\n");
+        pgnutls_dtls_set_timeouts = compat_gnutls_dtls_set_timeouts;
+    }
     if (!(pgnutls_privkey_export_x509 = dlsym(libgnutls_handle, "gnutls_privkey_export_x509")))
     {
         WARN("gnutls_privkey_export_x509 not found\n");
@@ -1108,6 +1129,7 @@ static const struct schan_funcs funcs =
     schan_set_dtls_mtu,
     schan_set_session_target,
     schan_set_session_transport,
+    schan_set_dtls_timeouts,
 };
 
 NTSTATUS CDECL __wine_init_unix_lib( HMODULE module, DWORD reason, const void *ptr_in, void *ptr_out )

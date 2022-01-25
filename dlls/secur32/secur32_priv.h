@@ -134,6 +134,7 @@ struct schan_funcs
     SECURITY_STATUS (CDECL *set_dtls_mtu)(schan_session, unsigned int);
     void (CDECL *set_session_target)(schan_session, const char *);
     void (CDECL *set_session_transport)(schan_session, struct schan_transport *);
+    SECURITY_STATUS (CDECL *set_dtls_timeouts)(schan_session, unsigned int, unsigned int);
 };
 
 struct schan_callbacks
