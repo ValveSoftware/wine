@@ -440,13 +440,6 @@ struct object_type_info
 
 };
 
-struct token_groups
-{
-    unsigned int count;
-
-
-};
-
 enum select_op
 {
     SELECT_NONE,
@@ -4592,9 +4585,10 @@ struct get_token_groups_request
 struct get_token_groups_reply
 {
     struct reply_header __header;
-    data_size_t     user_len;
-    /* VARARG(user,token_groups); */
-    char __pad_12[4];
+    data_size_t     attr_len;
+    data_size_t     sid_len;
+    /* VARARG(attrs,uints,attr_len); */
+    /* VARARG(sids,sids); */
 };
 
 struct get_token_default_dacl_request
