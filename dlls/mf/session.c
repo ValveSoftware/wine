@@ -1866,6 +1866,8 @@ static void session_set_topology(struct media_session *session, DWORD flags, IMF
         {
             hr = session_bind_output_nodes(topology);
 
+            IMFTopology_SetUINT32(topology, &MF_TOPOLOGY_ENUMERATE_SOURCE_TYPES, TRUE);
+
             if (SUCCEEDED(hr))
                 hr = IMFTopoLoader_Load(session->topo_loader, topology, &resolved_topology, NULL /* FIXME? */);
             if (SUCCEEDED(hr))
