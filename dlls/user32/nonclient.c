@@ -61,7 +61,7 @@ static void adjust_window_rect( RECT *rect, DWORD style, BOOL menu, DWORD exStyl
 {
     int adjust = 0;
 
-    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR)
+    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR && !((style & WS_POPUP) && (exStyle & WS_EX_TOOLWINDOW)))
         return;
 
     if ((exStyle & (WS_EX_STATICEDGE|WS_EX_DLGMODALFRAME)) == WS_EX_STATICEDGE)
@@ -361,7 +361,7 @@ LRESULT NC_HandleNCCalcSize( HWND hwnd, WPARAM wparam, RECT *winRect )
     if (winRect == NULL)
         return 0;
 
-    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR)
+    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR && !((style & WS_POPUP) && (exStyle & WS_EX_TOOLWINDOW)))
         return 0;
 
     if (cls_style & CS_VREDRAW) result |= WVR_VREDRAW;
