@@ -377,6 +377,15 @@ struct luid_attr
     unsigned int attrs;
 };
 
+struct acl
+{
+    unsigned char  revision;
+    unsigned char  pad1;
+    unsigned short size;
+    unsigned short count;
+    unsigned short pad2;
+};
+
 typedef struct
 {
     unsigned int read;
@@ -4589,7 +4598,7 @@ struct get_token_default_dacl_reply
 {
     struct reply_header __header;
     data_size_t     acl_len;
-    /* VARARG(acl,ACL); */
+    /* VARARG(acl,acl); */
     char __pad_12[4];
 };
 
@@ -4597,7 +4606,7 @@ struct set_token_default_dacl_request
 {
     struct request_header __header;
     obj_handle_t    handle;
-    /* VARARG(acl,ACL); */
+    /* VARARG(acl,acl); */
 };
 struct set_token_default_dacl_reply
 {
@@ -6611,7 +6620,7 @@ union generic_reply
 
 /* ### protocol_version begin ### */
 
-#define SERVER_PROTOCOL_VERSION 740
+#define SERVER_PROTOCOL_VERSION 741
 
 /* ### protocol_version end ### */
 
