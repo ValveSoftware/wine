@@ -305,7 +305,7 @@ static int pull_timeout(gnutls_transport_ptr_t transport, unsigned int timeout)
 
     TRACE("\n");
 
-    if (callbacks->get_buffer(t, &t->in, &count)) return 1;
+    if (!t->in.limit || callbacks->get_buffer(t, &t->in, &count)) return 1;
     pgnutls_transport_set_errno(s, EAGAIN);
     return -1;
 }

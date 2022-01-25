@@ -993,7 +993,10 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
         }
 
         if (is_dtls_context(ctx))
+        {
             schan_funcs->set_dtls_timeouts(ctx->session, 0, 60000);
+            expected_size = 0;
+        }
 
         phNewContext->dwLower = handle;
         phNewContext->dwUpper = 0;
@@ -1004,30 +1007,34 @@ static SECURITY_STATUS SEC_ENTRY schan_InitializeSecurityContextW(
         unsigned char *ptr;
 
         if (!(ctx = schan_get_object(phContext->dwLower, SCHAN_HANDLE_CTX))) return SEC_E_INVALID_HANDLE;
-        if (!pInput) return is_dtls_context(ctx) ? SEC_E_INSUFFICIENT_MEMORY : SEC_E_INCOMPLETE_MESSAGE;
-        if ((idx = schan_find_sec_buffer_idx(pInput, 0, SECBUFFER_TOKEN)) == -1) return SEC_E_INCOMPLETE_MESSAGE;
-
-        buffer = &pInput->pBuffers[idx];
-        ptr = buffer->pvBuffer;
+        if (!pInput && !is_dtls_context(ctx)) return SEC_E_INCOMPLETE_MESSAGE;
         expected_size = 0;
 
-        while (buffer->cbBuffer > expected_size + ctx->header_size)
+        if (pInput)
         {
-            record_size = ctx->header_size + read_record_size(ptr, ctx->header_size);
+            if ((idx = schan_find_sec_buffer_idx(pInput, 0, SECBUFFER_TOKEN)) == -1) return SEC_E_INCOMPLETE_MESSAGE;
 
-            if (buffer->cbBuffer < expected_size + record_size) break;
-            expected_size += record_size;
-            ptr += record_size;
+            buffer = &pInput->pBuffers[idx];
+            ptr = buffer->pvBuffer;
+
+            while (buffer->cbBuffer > expected_size + ctx->header_size)
+            {
+                record_size = ctx->header_size + read_record_size(ptr, ctx->header_size);
+
+                if (buffer->cbBuffer < expected_size + record_size) break;
+                expected_size += record_size;
+                ptr += record_size;
+            }
+
+            if (!expected_size && record_size)
+            {
+                TRACE("Expected at least %lu bytes, but buffer only contains %u bytes.\n",
+                      max(ctx->header_size + 1, record_size), buffer->cbBuffer);
+                return SEC_E_INCOMPLETE_MESSAGE;
+            }
+
+            TRACE("Using expected_size %lu.\n", expected_size);
         }
-
-        if (!expected_size && record_size)
-        {
-            TRACE("Expected at least %lu bytes, but buffer only contains %u bytes.\n",
-                  max(ctx->header_size + 1, record_size), buffer->cbBuffer);
-            return SEC_E_INCOMPLETE_MESSAGE;
-        }
-
-        TRACE("Using expected_size %lu.\n", expected_size);
 
         if (phNewContext) *phNewContext = *phContext;
     }
