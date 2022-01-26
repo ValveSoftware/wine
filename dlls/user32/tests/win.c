@@ -8522,6 +8522,7 @@ static void test_fullscreen(void)
         flush_events(TRUE);
 
         GetWindowRect(hwnd, &rc);
+        todo_wine
         ok(EqualRect(&rc, &virtual_rect), "Expected %s, got %s.\n",
            wine_dbgstr_rect(&virtual_rect), wine_dbgstr_rect(&rc));
         DestroyWindow(hwnd);

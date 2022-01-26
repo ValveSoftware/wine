@@ -1293,8 +1293,6 @@ static void xrandr14_free_monitors( struct x11drv_monitor *monitors, int count )
 
 static BOOL xrandr14_device_change_handler( HWND hwnd, XEvent *event )
 {
-    RECT rect;
-
     xrandr14_invalidate_current_mode_cache();
     if (hwnd == GetDesktopWindow() && GetWindowThreadProcessId( hwnd, NULL ) == GetCurrentThreadId())
     {
@@ -1305,9 +1303,6 @@ static BOOL xrandr14_device_change_handler( HWND hwnd, XEvent *event )
 
         init_registry_display_settings();
     }
-    /* Update xinerama monitors for xinerama_get_fullscreen_monitors() */
-    rect = get_primary_monitor_rect();
-    xinerama_init( rect.right - rect.left, rect.bottom - rect.top );
     return FALSE;
 }
 

@@ -447,7 +447,6 @@ enum x11drv_atoms
     XATOM__NET_SYSTEM_TRAY_S0,
     XATOM__NET_SYSTEM_TRAY_VISUAL,
     XATOM__NET_WM_BYPASS_COMPOSITOR,
-    XATOM__NET_WM_FULLSCREEN_MONITORS,
     XATOM__NET_WM_ICON,
     XATOM__NET_WM_MOVERESIZE,
     XATOM__NET_WM_NAME,
@@ -697,7 +696,6 @@ extern RECT get_virtual_screen_rect(void) DECLSPEC_HIDDEN;
 extern RECT get_primary_monitor_rect(void) DECLSPEC_HIDDEN;
 extern RECT get_host_primary_monitor_rect(void) DECLSPEC_HIDDEN;
 extern RECT get_work_area( const RECT *monitor_rect ) DECLSPEC_HIDDEN;
-extern void xinerama_get_fullscreen_monitors( const RECT *rect, long *indices ) DECLSPEC_HIDDEN;
 extern void xinerama_init( unsigned int width, unsigned int height ) DECLSPEC_HIDDEN;
 
 #define DEPTH_COUNT 3
