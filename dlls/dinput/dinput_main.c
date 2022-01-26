@@ -1465,6 +1465,7 @@ void check_dinput_events(void)
 }
 
 HANDLE steam_overlay_event;
+HANDLE steam_keyboard_event;
 
 BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, LPVOID reserved)
 {
@@ -1473,6 +1474,7 @@ BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, LPVOID reserved)
       case DLL_PROCESS_ATTACH:
         DisableThreadLibraryCalls(inst);
         steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
+        steam_keyboard_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_KeyboardActivated");
         DINPUT_instance = inst;
         register_di_em_win_class();
         break;
@@ -1482,6 +1484,7 @@ BOOL WINAPI DllMain( HINSTANCE inst, DWORD reason, LPVOID reserved)
         unregister_di_em_win_class();
         DeleteCriticalSection(&dinput_hook_crit);
         CloseHandle(steam_overlay_event);
+        CloseHandle(steam_keyboard_event);
         break;
     }
     return TRUE;
