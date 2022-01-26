@@ -1252,7 +1252,8 @@ static HRESULT hid_joystick_read( IDirectInputDevice8W *iface )
         }
     }
 
-    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0) /* steam overlay is enabled */
+    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0 || /* steam overlay is enabled */
+        WaitForSingleObject(steam_keyboard_event, 0) == WAIT_OBJECT_0) /* steam keyboard is enabled */
         params.reset_state = TRUE;
     else
         params.reset_state = FALSE;
