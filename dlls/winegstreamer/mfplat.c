@@ -410,7 +410,6 @@ class_objects[] =
     { &CLSID_VideoProcessorMFT, &video_processor_create },
     { &CLSID_GStreamerByteStreamHandler, &winegstreamer_stream_handler_create },
     { &CLSID_WINEAudioConverter, &audio_converter_create },
-    { &CLSID_WMADecMediaObject, &wma_decoder_create },
     { &CLSID_CColorConvertDMO, &color_converter_create },
     { &CLSID_MSH264DecoderMFT, &h264_decoder_create },
     { &CLSID_MSAACDecMFT, &aac_decoder_create },
