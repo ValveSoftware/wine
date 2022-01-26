@@ -3183,12 +3183,14 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
     return hsocket;
 }
 
-static DWORD send_bytes( struct socket *socket, char *bytes, int len, WSAOVERLAPPED *ovr )
+static DWORD send_bytes( struct socket *socket, char *bytes, int len, int *sent, WSAOVERLAPPED *ovr )
 {
     int count;
     DWORD err;
-    if ((err = netconn_send( socket->request->netconn, bytes, len, &count, ovr ))) return err;
-    return (count == len) ? ERROR_SUCCESS : ERROR_INTERNAL_ERROR;
+    err = netconn_send( socket->request->netconn, bytes, len, &count, ovr );
+    if (sent) *sent = count;
+    if (err) return err;
+    return (count == len || (ovr && count)) ? ERROR_SUCCESS : ERROR_INTERNAL_ERROR;
 }
 
 #define FIN_BIT (1 << 7)
@@ -3202,6 +3204,7 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
     DWORD i = 0, j, offset = 2, len = buflen;
     DWORD buffer_size, ret = 0, send_size;
     char hdr[14], *mask = NULL;
+    int sent_size;
     char *ptr;
 
     TRACE( "sending %02x frame, len %u.\n", opcode, len );
@@ -3271,8 +3274,17 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
         while (j < buflen && offset < MAX_FRAME_BUFFER_SIZE)
             socket->send_frame_buffer[offset++] = buf[j++] ^ mask[i++ % 4];
 
-        if ((ret = send_bytes( socket, socket->send_frame_buffer, offset, ovr ))) return ret;
-
+        sent_size = 0;
+        ret = send_bytes( socket, socket->send_frame_buffer, offset, &sent_size, ovr );
+        if (ret)
+        {
+            if (ovr && ret == WSA_IO_PENDING)
+            {
+                memmove( socket->send_frame_buffer, socket->send_frame_buffer + sent_size, offset - sent_size );
+                socket->bytes_in_send_frame_buffer = offset - sent_size;
+            }
+            return ret;
+        }
         if (!(send_size -= offset)) break;
         offset = 0;
         buf += j;
@@ -3281,13 +3293,18 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
     return ERROR_SUCCESS;
 }
 
-static DWORD complete_send_frame( struct socket *socket, WSAOVERLAPPED *ovr )
+static DWORD complete_send_frame( struct socket *socket, WSAOVERLAPPED *ovr, const char *buf )
 {
-    DWORD retflags, len;
+    DWORD ret, retflags, len;
 
     if (!WSAGetOverlappedResult( socket->request->netconn->socket, ovr, &len, TRUE, &retflags ))
         return WSAGetLastError();
 
+    if (socket->bytes_in_send_frame_buffer)
+    {
+        ret = send_bytes( socket, socket->send_frame_buffer, socket->bytes_in_send_frame_buffer, NULL, NULL );
+        if (ret) return ret;
+    }
     return ERROR_SUCCESS;
 }
 
@@ -3354,7 +3371,7 @@ static void CALLBACK task_socket_send( TP_CALLBACK_INSTANCE *instance, void *ctx
 
     TRACE("running %p\n", work);
 
-    if (s->complete_async) ret = complete_send_frame( s->socket, &s->ovr );
+    if (s->complete_async) ret = complete_send_frame( s->socket, &s->ovr, s->buf );
     else                   ret = socket_send( s->socket, s->type, s->buf, s->len, NULL );
 
     send_io_complete( &s->socket->hdr );
@@ -3416,6 +3433,7 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
         if (async_send)
         {
             s->complete_async = complete_async;
+            TRACE("queueing, complete_async %#x.\n", complete_async);
             s->socket = socket;
             s->type   = type;
             s->buf    = buf;
@@ -3431,6 +3449,7 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
         }
         else
         {
+            TRACE("sent sync.\n");
             InterlockedDecrement( &socket->hdr.pending_sends );
             free( s );
             socket_send_complete( socket, ret, type, len );
