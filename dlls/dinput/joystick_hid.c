@@ -1238,7 +1238,8 @@ static HRESULT hid_joystick_read( IDirectInputDevice8W *iface )
         }
     }
 
-    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0) /* steam overlay is enabled */
+    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0 || /* steam overlay is enabled */
+        WaitForSingleObject(steam_keyboard_event, 0) == WAIT_OBJECT_0) /* steam keyboard is enabled */
     {
         memset(report_buf, 0, report_len);
         report_buf[0] = impl->base.device_state_report_id;
