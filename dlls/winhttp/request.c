@@ -3431,7 +3431,6 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
                 release_object( &socket->hdr );
                 free( s );
             }
-            else ++socket->hdr.pending_sends;
         }
         else
         {
