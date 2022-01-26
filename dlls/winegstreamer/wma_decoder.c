@@ -48,13 +48,84 @@ static const GUID *wma_decoder_output_types[] =
 
 struct wma_decoder
 {
+    IUnknown IUnknown_inner;
     IMFTransform IMFTransform_iface;
+    IMediaObject IMediaObject_iface;
+    IUnknown *outer;
     LONG refcount;
     IMFMediaType *input_type;
     IMFMediaType *output_type;
 
     IMFSample *input_sample;
     struct wg_transform *wg_transform;
+};
+
+static inline struct wma_decoder *impl_from_IUnknown(IUnknown *iface)
+{
+    return CONTAINING_RECORD(iface, struct wma_decoder, IUnknown_inner);
+}
+
+static HRESULT WINAPI wma_unknown_QueryInterface(IUnknown *iface, REFIID iid, void **out)
+{
+    struct wma_decoder *decoder = impl_from_IUnknown(iface);
+
+    TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
+
+    if (IsEqualGUID(iid, &IID_IUnknown))
+        *out = &decoder->IUnknown_inner;
+    else if (IsEqualGUID(iid, &IID_IMFTransform))
+        *out = &decoder->IMFTransform_iface;
+    else if (IsEqualGUID(iid, &IID_IMediaObject))
+        *out = &decoder->IMediaObject_iface;
+    else
+    {
+        *out = NULL;
+        WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown *)*out);
+    return S_OK;
+}
+
+static ULONG WINAPI wma_unknown_AddRef(IUnknown *iface)
+{
+    struct wma_decoder *decoder = impl_from_IUnknown(iface);
+    ULONG refcount = InterlockedIncrement(&decoder->refcount);
+
+    TRACE("iface %p increasing refcount to %u.\n", decoder, refcount);
+
+    return refcount;
+}
+
+static ULONG WINAPI wma_unknown_Release(IUnknown *iface)
+{
+    struct wma_decoder *decoder = impl_from_IUnknown(iface);
+    ULONG refcount = InterlockedDecrement(&decoder->refcount);
+
+    TRACE("iface %p decreasing refcount to %u.\n", decoder, refcount);
+
+    if (!refcount)
+    {
+        if (decoder->input_sample)
+            IMFSample_Release(decoder->input_sample);
+        if (decoder->wg_transform)
+            wg_transform_destroy(decoder->wg_transform);
+        if (decoder->input_type)
+            IMFMediaType_Release(decoder->input_type);
+        if (decoder->output_type)
+            IMFMediaType_Release(decoder->output_type);
+        free(decoder);
+    }
+
+    return refcount;
+}
+
+static const IUnknownVtbl wma_unknown_vtbl =
+{
+    wma_unknown_QueryInterface,
+    wma_unknown_AddRef,
+    wma_unknown_Release,
 };
 
 static struct wma_decoder *impl_from_IMFTransform(IMFTransform *iface)
@@ -90,53 +161,19 @@ static HRESULT try_create_wg_transform(struct wma_decoder *decoder)
 static HRESULT WINAPI wma_decoder_QueryInterface(IMFTransform *iface, REFIID iid, void **out)
 {
     struct wma_decoder *decoder = impl_from_IMFTransform(iface);
-
-    TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
-
-    if (IsEqualGUID(iid, &IID_IUnknown) || IsEqualGUID(iid, &IID_IMFTransform))
-        *out = &decoder->IMFTransform_iface;
-    else
-    {
-        *out = NULL;
-        WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
-        return E_NOINTERFACE;
-    }
-
-    IUnknown_AddRef((IUnknown *)*out);
-    return S_OK;
+    return IUnknown_QueryInterface(decoder->outer, iid, out);
 }
 
 static ULONG WINAPI wma_decoder_AddRef(IMFTransform *iface)
 {
     struct wma_decoder *decoder = impl_from_IMFTransform(iface);
-    ULONG refcount = InterlockedIncrement(&decoder->refcount);
-
-    TRACE("iface %p increasing refcount to %u.\n", decoder, refcount);
-
-    return refcount;
+    return IUnknown_AddRef(decoder->outer);
 }
 
 static ULONG WINAPI wma_decoder_Release(IMFTransform *iface)
 {
     struct wma_decoder *decoder = impl_from_IMFTransform(iface);
-    ULONG refcount = InterlockedDecrement(&decoder->refcount);
-
-    TRACE("iface %p decreasing refcount to %u.\n", decoder, refcount);
-
-    if (!refcount)
-    {
-        if (decoder->input_sample)
-            IMFSample_Release(decoder->input_sample);
-        if (decoder->wg_transform)
-            wg_transform_destroy(decoder->wg_transform);
-        if (decoder->input_type)
-            IMFMediaType_Release(decoder->input_type);
-        if (decoder->output_type)
-            IMFMediaType_Release(decoder->output_type);
-        free(decoder);
-    }
-
-    return refcount;
+    return IUnknown_Release(decoder->outer);
 }
 
 static HRESULT WINAPI wma_decoder_GetStreamLimits(IMFTransform *iface, DWORD *input_minimum,
@@ -585,7 +622,7 @@ done:
     return hr;
 }
 
-static const IMFTransformVtbl wma_decoder_vtbl =
+static const IMFTransformVtbl mf_transform_vtbl =
 {
     wma_decoder_QueryInterface,
     wma_decoder_AddRef,
@@ -615,19 +652,209 @@ static const IMFTransformVtbl wma_decoder_vtbl =
     wma_decoder_ProcessOutput,
 };
 
-HRESULT wma_decoder_create(REFIID riid, void **ret)
+static inline struct wma_decoder *impl_from_IMediaObject(IMediaObject *iface)
+{
+    return CONTAINING_RECORD(iface, struct wma_decoder, IMediaObject_iface);
+}
+
+static HRESULT WINAPI wma_media_object_QueryInterface(IMediaObject *iface, REFIID iid, void **obj)
+{
+    struct wma_decoder *decoder = impl_from_IMediaObject(iface);
+    return IUnknown_QueryInterface(decoder->outer, iid, obj);
+}
+
+static ULONG WINAPI wma_media_object_AddRef(IMediaObject *iface)
+{
+    struct wma_decoder *decoder = impl_from_IMediaObject(iface);
+    return IUnknown_AddRef(decoder->outer);
+}
+
+static ULONG WINAPI wma_media_object_Release(IMediaObject *iface)
+{
+    struct wma_decoder *decoder = impl_from_IMediaObject(iface);
+    return IUnknown_Release(decoder->outer);
+}
+
+static HRESULT WINAPI wma_media_object_GetStreamCount(IMediaObject *iface, DWORD *input, DWORD *output)
+{
+    FIXME("iface %p, input %p, output %p stub!\n", iface, input, output);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetInputStreamInfo(IMediaObject *iface, DWORD index, DWORD *flags)
+{
+    FIXME("iface %p, index %u, flags %p stub!\n", iface, index, flags);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetOutputStreamInfo(IMediaObject *iface, DWORD index, DWORD *flags)
+{
+    FIXME("iface %p, index %u, flags %p stub!\n", iface, index, flags);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetInputType(IMediaObject *iface, DWORD index,
+        DWORD type_index, DMO_MEDIA_TYPE *type)
+{
+    FIXME("iface %p, index %u, type_index %u, type %p stub!\n", iface, index, type_index, type);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetOutputType(IMediaObject *iface, DWORD index,
+        DWORD type_index, DMO_MEDIA_TYPE *type)
+{
+    FIXME("iface %p, index %u, type_index %u, type %p stub!\n", iface, index, type_index, type);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_SetInputType(IMediaObject *iface, DWORD index,
+        const DMO_MEDIA_TYPE *type, DWORD flags)
+{
+    FIXME("iface %p, index %u, type %p, flags %#x stub!\n", iface, index, type, flags);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_SetOutputType(IMediaObject *iface, DWORD index,
+        const DMO_MEDIA_TYPE *type, DWORD flags)
+{
+    FIXME("iface %p, index %u, type %p, flags %#x stub!\n", iface, index, type, flags);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetInputCurrentType(IMediaObject *iface, DWORD index, DMO_MEDIA_TYPE *type)
+{
+    FIXME("iface %p, index %u, type %p stub!\n", iface, index, type);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetOutputCurrentType(IMediaObject *iface, DWORD index, DMO_MEDIA_TYPE *type)
+{
+    FIXME("iface %p, index %u, type %p stub!\n", iface, index, type);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetInputSizeInfo(IMediaObject *iface, DWORD index,
+        DWORD *size, DWORD *lookahead, DWORD *alignment)
+{
+    FIXME("iface %p, index %u, size %p, lookahead %p, alignment %p stub!\n", iface, index, size,
+            lookahead, alignment);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetOutputSizeInfo(IMediaObject *iface, DWORD index,
+        DWORD *size, DWORD *alignment)
+{
+    FIXME("iface %p, index %u, size %p, alignment %p stub!\n", iface, index, size, alignment);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetInputMaxLatency(IMediaObject *iface, DWORD index, REFERENCE_TIME *latency)
+{
+    FIXME("iface %p, index %u, latency %p stub!\n", iface, index, latency);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_SetInputMaxLatency(IMediaObject *iface, DWORD index, REFERENCE_TIME latency)
+{
+    FIXME("iface %p, index %u, latency %s stub!\n", iface, index, wine_dbgstr_longlong(latency));
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_Flush(IMediaObject *iface)
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_Discontinuity(IMediaObject *iface, DWORD index)
+{
+    FIXME("iface %p, index %u stub!\n", iface, index);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_AllocateStreamingResources(IMediaObject *iface)
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_FreeStreamingResources(IMediaObject *iface)
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_GetInputStatus(IMediaObject *iface, DWORD index, DWORD *flags)
+{
+    FIXME("iface %p, index %u, flags %p stub!\n", iface, index, flags);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_ProcessInput(IMediaObject *iface, DWORD index,
+        IMediaBuffer *buffer, DWORD flags, REFERENCE_TIME timestamp, REFERENCE_TIME timelength)
+{
+    FIXME("iface %p, index %u, buffer %p, flags %#x, timestamp %s, timelength %s stub!\n", iface,
+            index, buffer, flags, wine_dbgstr_longlong(timestamp), wine_dbgstr_longlong(timelength));
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_ProcessOutput(IMediaObject *iface, DWORD flags, DWORD count,
+        DMO_OUTPUT_DATA_BUFFER *buffers, DWORD *status)
+{
+    FIXME("iface %p, flags %#x, count %u, buffers %p, status %p stub!\n", iface, flags, count, buffers, status);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI wma_media_object_Lock(IMediaObject *iface, LONG lock)
+{
+    FIXME("iface %p, lock %d stub!\n", iface, lock);
+    return E_NOTIMPL;
+}
+
+static const IMediaObjectVtbl wma_media_object_vtbl =
+{
+    wma_media_object_QueryInterface,
+    wma_media_object_AddRef,
+    wma_media_object_Release,
+    wma_media_object_GetStreamCount,
+    wma_media_object_GetInputStreamInfo,
+    wma_media_object_GetOutputStreamInfo,
+    wma_media_object_GetInputType,
+    wma_media_object_GetOutputType,
+    wma_media_object_SetInputType,
+    wma_media_object_SetOutputType,
+    wma_media_object_GetInputCurrentType,
+    wma_media_object_GetOutputCurrentType,
+    wma_media_object_GetInputSizeInfo,
+    wma_media_object_GetOutputSizeInfo,
+    wma_media_object_GetInputMaxLatency,
+    wma_media_object_SetInputMaxLatency,
+    wma_media_object_Flush,
+    wma_media_object_Discontinuity,
+    wma_media_object_AllocateStreamingResources,
+    wma_media_object_FreeStreamingResources,
+    wma_media_object_GetInputStatus,
+    wma_media_object_ProcessInput,
+    wma_media_object_ProcessOutput,
+    wma_media_object_Lock,
+};
+
+HRESULT wma_decoder_create(IUnknown *outer, IUnknown **out)
 {
     struct wma_decoder *decoder;
 
-    TRACE("riid %s, ret %p.\n", debugstr_guid(riid), ret);
+    TRACE("outer %p, out %p.\n", outer, out);
 
     if (!(decoder = calloc(1, sizeof(*decoder))))
         return E_OUTOFMEMORY;
 
-    decoder->IMFTransform_iface.lpVtbl = &wma_decoder_vtbl;
+    decoder->IUnknown_inner.lpVtbl = &wma_unknown_vtbl;
+    decoder->IMFTransform_iface.lpVtbl = &mf_transform_vtbl;
+    decoder->IMediaObject_iface.lpVtbl = &wma_media_object_vtbl;
     decoder->refcount = 1;
+    decoder->outer = outer ? outer : &decoder->IUnknown_inner;
 
-    *ret = &decoder->IMFTransform_iface;
-    TRACE("Created decoder %p\n", *ret);
+    *out = &decoder->IUnknown_inner;
+    TRACE("Created decoder %p\n", *out);
     return S_OK;
 }
