@@ -8305,13 +8305,13 @@ static void test_fullscreen(void)
     static const DWORD t_ex_style[] = {
         0, WS_EX_APPWINDOW, WS_EX_TOOLWINDOW
     };
-    RECT rc, virtual_rect, expected_rect;
     struct monitor_info monitor_info;
     WNDCLASSA cls;
     int timeout;
     HWND hwnd;
     int i, j;
     POINT pt;
+    RECT rc;
     HMONITOR hmon;
     LRESULT ret;
 
@@ -8503,50 +8503,6 @@ static void test_fullscreen(void)
     else
     {
         skip("This test requires two monitors present.\n");
-    }
-
-    /* Test fullscreen windows spanning multiple monitors */
-    if (GetSystemMetrics(SM_CMONITORS) > 1)
-    {
-        /* Test windows covering all monitors */
-        virtual_rect.left = GetSystemMetrics(SM_XVIRTUALSCREEN);
-        virtual_rect.top = GetSystemMetrics(SM_YVIRTUALSCREEN);
-        virtual_rect.right = virtual_rect.left + GetSystemMetrics(SM_CXVIRTUALSCREEN);
-        virtual_rect.bottom = virtual_rect.top + GetSystemMetrics(SM_CYVIRTUALSCREEN);
-
-        hwnd = CreateWindowA("static", NULL, WS_POPUP | WS_VISIBLE, virtual_rect.left,
-                             virtual_rect.top, virtual_rect.right - virtual_rect.left,
-                             virtual_rect.bottom - virtual_rect.top, NULL, NULL, GetModuleHandleA(NULL),
-                             NULL);
-        ok(!!hwnd, "CreateWindow failed, error %#x.\n", GetLastError());
-        flush_events(TRUE);
-
-        GetWindowRect(hwnd, &rc);
-        todo_wine
-        ok(EqualRect(&rc, &virtual_rect), "Expected %s, got %s.\n",
-           wine_dbgstr_rect(&virtual_rect), wine_dbgstr_rect(&rc));
-        DestroyWindow(hwnd);
-
-        /* Test windows covering one monitor and 1 pixel larger */
-        expected_rect = mi.rcMonitor;
-        InflateRect(&expected_rect, 1, 1);
-        IntersectRect(&expected_rect, &expected_rect, &virtual_rect);
-        hwnd = CreateWindowA("static", NULL, WS_POPUP | WS_VISIBLE, expected_rect.left,
-                             expected_rect.top, expected_rect.right - expected_rect.left,
-                             expected_rect.bottom - expected_rect.top, NULL, NULL,
-                             GetModuleHandleA(NULL), NULL);
-        ok(!!hwnd, "CreateWindow failed, error %#x.\n", GetLastError());
-        flush_events(TRUE);
-
-        GetWindowRect(hwnd, &rc);
-        todo_wine
-        ok(EqualRect(&rc, &expected_rect), "Expected %s, got %s.\n",
-           wine_dbgstr_rect(&expected_rect), wine_dbgstr_rect(&rc));
-        DestroyWindow(hwnd);
-    }
-    else
-    {
-        skip("This test requires at least two monitors.\n");
     }
 }
 
