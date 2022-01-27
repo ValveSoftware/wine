@@ -104,6 +104,7 @@ typedef struct tagWND
 #define WIN_NEEDS_SHOW_OWNEDPOPUP 0x0020 /* WM_SHOWWINDOW:SC_SHOW must be sent in the next ShowOwnedPopup call */
 #define WIN_CHILDREN_MOVED        0x0040 /* children may have moved, ignore stored positions */
 #define WIN_HAS_IME_WIN           0x0080 /* the window has been registered with imm32 */
+#define WIN_IS_ACTIVATING         0x0100 /* the window is being activated */
 
 #define WND_OTHER_PROCESS ((WND *)1)  /* returned by get_win_ptr on unknown window handles */
 #define WND_DESKTOP       ((WND *)2)  /* returned by get_win_ptr on the desktop window */
