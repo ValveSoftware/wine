@@ -2102,7 +2102,8 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
         if (is_desktop_window( hwnd )) return 0;
         return set_window_style( hwnd, wparam, lparam );
     case WM_WINE_SETACTIVEWINDOW:
-        if (!wparam && NtUserGetForegroundWindow() == hwnd) return 0;
+        if (!wparam && NtUserGetWindowThread( NtUserGetForegroundWindow(), NULL ) == GetCurrentThreadId())
+            return 0;
         return (LRESULT)NtUserSetActiveWindow( (HWND)wparam );
     case WM_WINE_KEYBOARD_LL_HOOK:
     case WM_WINE_MOUSE_LL_HOOK:
