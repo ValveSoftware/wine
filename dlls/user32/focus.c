@@ -40,7 +40,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(win);
  *
  * Change the focus window, sending the WM_SETFOCUS and WM_KILLFOCUS messages
  */
-static HWND set_focus_window( HWND hwnd, BOOL from_active )
+static HWND set_focus_window( HWND hwnd, BOOL from_active, BOOL force )
 {
     HWND previous = 0, ime_default;
     BOOL ret;
@@ -53,7 +53,7 @@ static HWND set_focus_window( HWND hwnd, BOOL from_active )
     }
     SERVER_END_REQ;
     if (!ret) return 0;
-    if (previous == hwnd) return previous;
+    if (!force && hwnd == previous) return previous;
 
     if (previous)
     {
@@ -187,7 +187,7 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
         if (hwnd == info.hwndActive)
         {
             if (!info.hwndFocus || !hwnd || GetAncestor( info.hwndFocus, GA_ROOT ) != hwnd)
-                set_focus_window( hwnd, TRUE );
+                set_focus_window( hwnd, TRUE, FALSE );
         }
     }
 
@@ -334,7 +334,7 @@ HWND WINAPI SetFocus( HWND hwnd )
     }
 
     /* change focus and send messages */
-    return set_focus_window( hwnd, FALSE );
+    return set_focus_window( hwnd, FALSE, hwnd != previous );
 }
 
 
