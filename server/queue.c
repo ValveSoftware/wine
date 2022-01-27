@@ -3264,7 +3264,11 @@ DECL_HANDLER(set_focus_window)
 /* set the current thread active window */
 DECL_HANDLER(set_active_window)
 {
+    struct message *msg, *next;
     struct msg_queue *queue = get_current_queue();
+    struct desktop *desktop;
+
+    if (!(desktop = get_thread_desktop( current, 0 ))) return;
 
     reply->previous = 0;
     if (queue && check_queue_input_window( queue, req->handle ))
@@ -3273,9 +3277,17 @@ DECL_HANDLER(set_active_window)
         {
             reply->previous = queue->input->active;
             queue->input->active = get_user_full_handle( req->handle );
+
+            if (desktop->foreground_input == queue->input && req->handle != reply->previous)
+            {
+                LIST_FOR_EACH_ENTRY_SAFE( msg, next, &queue->msg_list[POST_MESSAGE], struct message, entry )
+                    if (msg->msg == req->internal_msg) remove_queue_message( queue, msg, POST_MESSAGE );
+            }
         }
         else set_error( STATUS_INVALID_HANDLE );
     }
+
+    release_object( desktop );
 }
 
 

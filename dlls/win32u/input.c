@@ -1896,6 +1896,7 @@ static BOOL set_active_window( HWND hwnd, HWND *prev, BOOL mouse, BOOL focus )
     SERVER_START_REQ( set_active_window )
     {
         req->handle = wine_server_user_handle( hwnd );
+        req->internal_msg = WM_WINE_SETACTIVEWINDOW;
         if ((ret = !wine_server_call_err( req )))
             previous = wine_server_ptr_handle( reply->previous );
     }

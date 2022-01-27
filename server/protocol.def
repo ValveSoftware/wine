@@ -2917,6 +2917,7 @@ enum coords_relative
 /* Set the current thread active window */
 @REQ(set_active_window)
     user_handle_t  handle;        /* handle to the active window */
+    unsigned int   internal_msg;  /* set active window internal message */
 @REPLY
     user_handle_t  previous;      /* handle to the previous active window */
 @END
