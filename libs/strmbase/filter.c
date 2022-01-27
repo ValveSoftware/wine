@@ -226,6 +226,8 @@ static HRESULT WINAPI filter_inner_QueryInterface(IUnknown *iface, REFIID iid, v
     {
         *out = &filter->IBaseFilter_iface;
     }
+    else if (IsEqualIID(iid, &IID_IPropertyBag))
+        *out = &filter->IPropertyBag_iface;
     else
     {
         WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
@@ -509,6 +511,51 @@ static const IBaseFilterVtbl filter_vtbl =
     filter_QueryVendorInfo,
 };
 
+static inline struct strmbase_filter *impl_from_IPropertyBag(IPropertyBag *iface)
+{
+    return CONTAINING_RECORD(iface, struct strmbase_filter, IPropertyBag_iface);
+}
+
+static HRESULT WINAPI property_bag_QueryInterface(IPropertyBag *iface, REFIID iid, void **out)
+{
+    struct strmbase_filter *filter = impl_from_IPropertyBag(iface);
+    return IUnknown_QueryInterface(filter->outer_unk, iid, out);
+}
+
+static ULONG WINAPI property_bag_AddRef(IPropertyBag *iface)
+{
+    struct strmbase_filter *filter = impl_from_IPropertyBag(iface);
+    return IUnknown_AddRef(filter->outer_unk);
+}
+
+static ULONG WINAPI property_bag_Release(IPropertyBag *iface)
+{
+    struct strmbase_filter *filter = impl_from_IPropertyBag(iface);
+    return IUnknown_Release(filter->outer_unk);
+}
+
+static HRESULT WINAPI property_bag_Read(IPropertyBag *iface, const WCHAR *prop_name, VARIANT *value,
+        IErrorLog *error_log)
+{
+    FIXME("iface %p, prop_name %s, value %p, error_log %p stub!\n", iface, debugstr_w(prop_name), value, error_log);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI property_bag_Write(IPropertyBag *iface, const WCHAR *prop_name, VARIANT *value)
+{
+    FIXME("iface %p, prop_name %s, value %p stub!\n", iface, debugstr_w(prop_name), value);
+    return E_NOTIMPL;
+}
+
+static const IPropertyBagVtbl property_bag_vtbl =
+{
+    property_bag_QueryInterface,
+    property_bag_AddRef,
+    property_bag_Release,
+    property_bag_Read,
+    property_bag_Write,
+};
+
 VOID WINAPI BaseFilterImpl_IncrementPinVersion(struct strmbase_filter *filter)
 {
     InterlockedIncrement(&filter->pin_version);
@@ -520,6 +567,7 @@ void strmbase_filter_init(struct strmbase_filter *filter, IUnknown *outer,
     memset(filter, 0, sizeof(*filter));
 
     filter->IBaseFilter_iface.lpVtbl = &filter_vtbl;
+    filter->IPropertyBag_iface.lpVtbl = &property_bag_vtbl;
     filter->IUnknown_inner.lpVtbl = &filter_inner_vtbl;
     filter->outer_unk = outer ? outer : &filter->IUnknown_inner;
     filter->refcount = 1;
