@@ -2087,14 +2087,12 @@ BOOL set_foreground_window( HWND hwnd, BOOL mouse )
     if (ret && previous != hwnd)
     {
         if (send_msg_old)  /* old window belongs to other thread */
-            NtUserMessageCall( previous, WM_WINE_SETACTIVEWINDOW, 0, 0,
-                               0, NtUserSendNotifyMessage, FALSE );
+            NtUserPostMessage( previous, WM_WINE_SETACTIVEWINDOW, 0, 0 );
         else if (send_msg_new)  /* old window belongs to us but new one to other thread */
             ret = set_active_window( 0, NULL, mouse, TRUE );
 
         if (send_msg_new)  /* new window belongs to other thread */
-            NtUserMessageCall( hwnd, WM_WINE_SETACTIVEWINDOW, (WPARAM)hwnd, 0,
-                               0, NtUserSendNotifyMessage, FALSE );
+            NtUserPostMessage( hwnd, WM_WINE_SETACTIVEWINDOW, (WPARAM)hwnd, 0 );
         else  /* new window belongs to us */
             ret = set_active_window( hwnd, NULL, mouse, TRUE );
     }
