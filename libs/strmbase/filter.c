@@ -544,7 +544,7 @@ static HRESULT WINAPI property_bag_Read(IPropertyBag *iface, const WCHAR *prop_n
 static HRESULT WINAPI property_bag_Write(IPropertyBag *iface, const WCHAR *prop_name, VARIANT *value)
 {
     FIXME("iface %p, prop_name %s, value %p stub!\n", iface, debugstr_w(prop_name), value);
-    return E_NOTIMPL;
+    return S_OK;
 }
 
 static const IPropertyBagVtbl property_bag_vtbl =
