@@ -1931,9 +1931,12 @@ static gboolean src_activate_mode_cb(GstPad *pad, GstObject *parent, GstPadMode 
     return FALSE;
 }
 
+static BOOL decodebin_parser_init_gst(struct wg_parser *parser);
+
 static GstBusSyncReply bus_handler_cb(GstBus *bus, GstMessage *msg, gpointer user)
 {
     struct wg_parser *parser = user;
+    const GstStructure *structure;
     gchar *dbg_info = NULL;
     GError *err = NULL;
 
@@ -1966,6 +1969,21 @@ static GstBusSyncReply bus_handler_cb(GstBus *bus, GstMessage *msg, gpointer use
         parser->has_duration = true;
         pthread_mutex_unlock(&parser->mutex);
         pthread_cond_signal(&parser->init_cond);
+        break;
+
+    case GST_MESSAGE_ELEMENT:
+        structure = gst_message_get_structure(msg);
+        if (gst_structure_has_name(structure, "missing-plugin"))
+        {
+            pthread_mutex_lock(&parser->mutex);
+            if (!parser->use_mediaconv && parser->init_gst == decodebin_parser_init_gst)
+            {
+                GST_WARNING("Autoplugged element failed to initialise, trying again with protonvideoconvert.");
+                parser->error = true;
+                pthread_cond_signal(&parser->init_cond);
+            }
+            pthread_mutex_unlock(&parser->mutex);
+        }
         break;
 
     default:
@@ -2102,8 +2120,6 @@ static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
     return S_OK;
 }
 
-static BOOL decodebin_parser_init_gst(struct wg_parser *parser);
-
 static HRESULT CDECL wg_parser_connect(struct wg_parser *parser, uint64_t file_size)
 {
     bool use_mediaconv = false;
@@ -2143,6 +2159,8 @@ static HRESULT CDECL wg_parser_connect(struct wg_parser *parser, uint64_t file_s
         pthread_cond_wait(&parser->init_cond, &parser->mutex);
     if (parser->error)
     {
+        if (!parser->use_mediaconv && parser->init_gst == decodebin_parser_init_gst)
+            use_mediaconv = true;
         pthread_mutex_unlock(&parser->mutex);
         goto out;
     }
