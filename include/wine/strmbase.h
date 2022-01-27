@@ -122,6 +122,7 @@ void strmbase_sink_cleanup(struct strmbase_sink *pin);
 struct strmbase_filter
 {
     IBaseFilter IBaseFilter_iface;
+    IPropertyBag IPropertyBag_iface;
     IUnknown IUnknown_inner;
     IUnknown *outer_unk;
     LONG refcount;
