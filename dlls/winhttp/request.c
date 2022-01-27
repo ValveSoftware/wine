@@ -3343,6 +3343,16 @@ static BOOL receive_io_complete( struct socket *socket )
     return count >= 0;
 }
 
+static BOOL socket_can_send( struct socket *socket )
+{
+    return socket->state == SOCKET_STATE_OPEN && !socket->close_frame_received;
+}
+
+static BOOL socket_can_receive( struct socket *socket )
+{
+    return socket->state <= SOCKET_STATE_SHUTDOWN && !socket->close_frame_received;
+}
+
 static enum socket_opcode map_buffer_type( WINHTTP_WEB_SOCKET_BUFFER_TYPE type )
 {
     switch (type)
@@ -3420,7 +3430,7 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
         release_object( &socket->hdr );
         return ERROR_WINHTTP_INCORRECT_HANDLE_TYPE;
     }
-    if (socket->state != SOCKET_STATE_OPEN)
+    if (!socket_can_send( socket ))
     {
         release_object( &socket->hdr );
         return ERROR_INVALID_OPERATION;
@@ -3779,7 +3789,7 @@ DWORD WINAPI WinHttpWebSocketReceive( HINTERNET hsocket, void *buf, DWORD len, D
         release_object( &socket->hdr );
         return ERROR_WINHTTP_INCORRECT_HANDLE_TYPE;
     }
-    if (socket->state > SOCKET_STATE_SHUTDOWN)
+    if (!socket_can_receive( socket ))
     {
         release_object( &socket->hdr );
         return ERROR_INVALID_OPERATION;
