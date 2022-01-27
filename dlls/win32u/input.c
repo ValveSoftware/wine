@@ -2091,6 +2091,10 @@ BOOL set_foreground_window( HWND hwnd, BOOL mouse )
         else if (send_msg_new)  /* old window belongs to us but new one to other thread */
             ret = set_active_window( 0, NULL, mouse, TRUE );
 
+        /* already active, set_active_window will do no nothing */
+        if (!send_msg_new && hwnd == get_active_window())
+            send_message( hwnd, WM_NCACTIVATE, TRUE, (LPARAM)hwnd );
+
         if (send_msg_new)  /* new window belongs to other thread */
             NtUserPostMessage( hwnd, WM_WINE_SETACTIVEWINDOW, (WPARAM)hwnd, 0 );
         else  /* new window belongs to us */
