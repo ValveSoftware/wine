@@ -3372,11 +3372,11 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
     return ret;
 }
 
-static DWORD receive_bytes( struct socket *socket, char *buf, DWORD len, DWORD *ret_len, BOOL read_full_buffer )
+static DWORD receive_bytes( struct socket *socket, char *buf, DWORD len, DWORD *ret_len )
 {
     DWORD err, size = 0, needed = len;
     char *ptr = buf;
-    int received, recv_size;
+    int received;
 
     if (socket->request->read_size)
     {
@@ -3386,18 +3386,8 @@ static DWORD receive_bytes( struct socket *socket, char *buf, DWORD len, DWORD *
         needed -= size;
         ptr += size;
     }
-    received = 0;
-    while (size + received != len)
-    {
-        if ((err = netconn_recv( socket->request->netconn, ptr, needed, 0, &recv_size ))) return err;
-        if (!recv_size) break;
-        received += recv_size;
-        if (!read_full_buffer) break;
-        needed -= recv_size;
-        ptr += recv_size;
-    }
-    *ret_len = size + received;
-    if (read_full_buffer && *ret_len != len) return ERROR_WINHTTP_INVALID_SERVER_RESPONSE;
+    if ((err = netconn_recv( socket->request->netconn, ptr, needed, 0, &received ))) return err;
+    if ((*ret_len = size + received) != len) return ERROR_WINHTTP_INVALID_SERVER_RESPONSE;
     return ERROR_SUCCESS;
 }
 
@@ -3422,7 +3412,7 @@ static DWORD receive_frame( struct socket *socket, DWORD *ret_len, enum socket_o
     DWORD ret, len, count;
     char hdr[2];
 
-    if ((ret = receive_bytes( socket, hdr, sizeof(hdr), &count, TRUE ))) return ret;
+    if ((ret = receive_bytes( socket, hdr, sizeof(hdr), &count ))) return ret;
     if ((hdr[0] & RESERVED_BIT) || (hdr[1] & MASK_BIT) || !is_supported_opcode( hdr[0] & 0xf ))
     {
         return ERROR_WINHTTP_INVALID_SERVER_RESPONSE;
@@ -3434,13 +3424,13 @@ static DWORD receive_frame( struct socket *socket, DWORD *ret_len, enum socket_o
     if (len == 126)
     {
         USHORT len16;
-        if ((ret = receive_bytes( socket, (char *)&len16, sizeof(len16), &count, TRUE ))) return ret;
+        if ((ret = receive_bytes( socket, (char *)&len16, sizeof(len16), &count ))) return ret;
         len = RtlUshortByteSwap( len16 );
     }
     else if (len == 127)
     {
         ULONGLONG len64;
-        if ((ret = receive_bytes( socket, (char *)&len64, sizeof(len64), &count, TRUE ))) return ret;
+        if ((ret = receive_bytes( socket, (char *)&len64, sizeof(len64), &count ))) return ret;
         if ((len64 = RtlUlonglongByteSwap( len64 )) > ~0u) return ERROR_NOT_SUPPORTED;
         len = len64;
     }
@@ -3488,7 +3478,7 @@ static DWORD socket_drain( struct socket *socket )
     while (socket->read_size)
     {
         char buf[1024];
-        if ((ret = receive_bytes( socket, buf, min(socket->read_size, sizeof(buf)), &count, TRUE ))) return ret;
+        if ((ret = receive_bytes( socket, buf, min(socket->read_size, sizeof(buf)), &count ))) return ret;
         socket->read_size -= count;
     }
     return ERROR_SUCCESS;
@@ -3550,12 +3540,9 @@ static DWORD socket_receive( struct socket *socket, void *buf, DWORD len, DWORD 
             if (ret) break;
         }
     }
-    if (!ret) ret = receive_bytes( socket, buf, min(len, socket->read_size), &count, FALSE );
+    if (!ret) ret = receive_bytes( socket, buf, min(len, socket->read_size), &count );
     if (!ret)
     {
-        if (count < socket->read_size)
-            WARN("Short read.\n");
-
         socket->read_size -= count;
         if (!async)
         {
@@ -3742,9 +3729,9 @@ static DWORD socket_close( struct socket *socket, USHORT status, const void *rea
     if (count)
     {
         DWORD reason_len = count - sizeof(socket->status);
-        if ((ret = receive_bytes( socket, (char *)&socket->status, sizeof(socket->status), &count, TRUE ))) goto done;
+        if ((ret = receive_bytes( socket, (char *)&socket->status, sizeof(socket->status), &count ))) goto done;
         socket->status = RtlUshortByteSwap( socket->status );
-        if ((ret = receive_bytes( socket, socket->reason, reason_len, &socket->reason_len, TRUE ))) goto done;
+        if ((ret = receive_bytes( socket, socket->reason, reason_len, &socket->reason_len ))) goto done;
     }
     socket->state = SOCKET_STATE_CLOSED;
 
