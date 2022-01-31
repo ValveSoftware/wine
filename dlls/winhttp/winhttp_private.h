@@ -52,7 +52,6 @@ struct object_header
     LONG recursion_count;
     struct list entry;
     LONG pending_sends;
-    LONG pending_receives;
     SRWLOCK lock;
 };
 
