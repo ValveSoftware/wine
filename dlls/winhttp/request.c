@@ -3740,37 +3740,28 @@ DWORD WINAPI WinHttpWebSocketReceive( HINTERNET hsocket, void *buf, DWORD len, D
     return ret;
 }
 
-static void socket_shutdown_complete( struct socket *socket, DWORD ret )
-{
-    if (!ret) send_callback( &socket->hdr, WINHTTP_CALLBACK_STATUS_SHUTDOWN_COMPLETE, NULL, 0 );
-    else
-    {
-        WINHTTP_WEB_SOCKET_ASYNC_RESULT result;
-        result.AsyncResult.dwResult = API_WRITE_DATA;
-        result.AsyncResult.dwError  = ret;
-        result.Operation = WINHTTP_WEB_SOCKET_SHUTDOWN_OPERATION;
-        send_callback( &socket->hdr, WINHTTP_CALLBACK_STATUS_REQUEST_ERROR, &result, sizeof(result) );
-    }
-}
-
 static void CALLBACK task_socket_shutdown( TP_CALLBACK_INSTANCE *instance, void *ctx, TP_WORK *work )
 {
     struct socket_shutdown *s = ctx;
-    DWORD ret, len, retflags;
+    DWORD ret;
 
     TRACE("running %p\n", work);
 
-    if (s->complete_only)
-    {
-        if (WSAGetOverlappedResult( s->socket->request->netconn->socket, &s->ovr, &len, TRUE, &retflags ))
-            ret = ERROR_SUCCESS;
-        else
-            ret = WSAGetLastError();
-    }
-    else ret = send_frame( s->socket, SOCKET_OPCODE_CLOSE, s->status, s->reason, s->len, TRUE, NULL );
+    ret = send_frame( s->socket, SOCKET_OPCODE_CLOSE, s->status, s->reason, s->len, TRUE, NULL );
     send_io_complete( &s->socket->hdr );
 
-    if (s->send_callback) socket_shutdown_complete( s->socket, ret );
+    if (s->send_callback)
+    {
+        if (!ret) send_callback( &s->socket->hdr, WINHTTP_CALLBACK_STATUS_SHUTDOWN_COMPLETE, NULL, 0 );
+        else
+        {
+            WINHTTP_WEB_SOCKET_ASYNC_RESULT result;
+            result.AsyncResult.dwResult = API_WRITE_DATA;
+            result.AsyncResult.dwError  = ret;
+            result.Operation = WINHTTP_WEB_SOCKET_SHUTDOWN_OPERATION;
+            send_callback( &s->socket->hdr, WINHTTP_CALLBACK_STATUS_REQUEST_ERROR, &result, sizeof(result) );
+        }
+    }
     release_object( &s->socket->hdr );
     free( s );
 }
@@ -3778,7 +3769,6 @@ static void CALLBACK task_socket_shutdown( TP_CALLBACK_INSTANCE *instance, void 
 static DWORD send_socket_shutdown( struct socket *socket, USHORT status, const void *reason, DWORD len,
                                    BOOL send_callback)
 {
-    BOOL async_only;
     DWORD ret;
 
     socket->state = SOCKET_STATE_SHUTDOWN;
@@ -3788,44 +3778,20 @@ static DWORD send_socket_shutdown( struct socket *socket, USHORT status, const v
         struct socket_shutdown *s;
 
         if (!(s = malloc( sizeof(*s) ))) return FALSE;
+        s->socket = socket;
+        s->status = status;
+        memcpy( s->reason, reason, len );
+        s->len    = len;
+        s->send_callback = send_callback;
 
+        addref_object( &socket->hdr );
         AcquireSRWLockExclusive( &socket->hdr.lock );
-
-        async_only = socket->hdr.recursion_count >= 3 || socket->hdr.pending_sends;
-        if (async_only)
+        if ((ret = queue_task( &socket->send_q, task_socket_shutdown, s )))
         {
-            ret = WSAEWOULDBLOCK;
-        }
-        else
-        {
-            memset( &s->ovr, 0, sizeof(s->ovr) );
-            ret = send_frame( socket, SOCKET_OPCODE_CLOSE, status, reason, len, TRUE, &s->ovr );
-        }
-
-        if (ret == WSAEWOULDBLOCK || ret == WSA_IO_PENDING)
-        {
-            s->complete_only = (ret == WSA_IO_PENDING);
-            s->socket = socket;
-            s->status = status;
-            memcpy( s->reason, reason, len );
-            s->len    = len;
-            s->send_callback = send_callback;
-
-            addref_object( &socket->hdr );
-            if ((ret = queue_task( &socket->send_q, task_socket_shutdown, s )))
-            {
-                release_object( &socket->hdr );
-                free( s );
-            } else ++socket->hdr.pending_sends;
-            ReleaseSRWLockExclusive( &socket->hdr.lock );
-        }
-        else
-        {
-            ReleaseSRWLockExclusive( &socket->hdr.lock );
+            release_object( &socket->hdr );
             free( s );
-            if (send_callback) socket_shutdown_complete( socket, ret );
-            ret = ERROR_SUCCESS;
-        }
+        } else ++socket->hdr.pending_sends;
+        ReleaseSRWLockExclusive( &socket->hdr.lock );
     }
     else ret = send_frame( socket, SOCKET_OPCODE_CLOSE, status, reason, len, TRUE, NULL );
 
