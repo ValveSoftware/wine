@@ -80,7 +80,7 @@ struct device_extension
     DWORD index;
 
     BYTE *report_desc;
-    ULONG report_desc_length;
+    UINT report_desc_length;
     HIDP_DEVICE_DESC collection_desc;
 
     struct hid_report *last_reports[256];
@@ -121,7 +121,7 @@ static NTSTATUS unix_device_start(DEVICE_OBJECT *device)
     return winebus_call(device_start, ext->unix_device);
 }
 
-static NTSTATUS unix_device_get_report_descriptor(DEVICE_OBJECT *device, BYTE *buffer, DWORD length, DWORD *out_length)
+static NTSTATUS unix_device_get_report_descriptor(DEVICE_OBJECT *device, BYTE *buffer, UINT length, UINT *out_length)
 {
     struct device_extension *ext = (struct device_extension *)device->DeviceExtension;
     struct device_descriptor_params params =
@@ -300,7 +300,7 @@ static DEVICE_OBJECT *bus_create_hid_device(const WCHAR *bus_name, struct device
     status = IoCreateDevice(driver_obj, sizeof(struct device_extension), &nameW, 0, 0, FALSE, &device);
     if (status)
     {
-        FIXME("failed to create device error %x\n", status);
+        FIXME("failed to create device error %#lx\n", status);
         return NULL;
     }
 
@@ -426,7 +426,7 @@ static BOOL deliver_next_report(struct device_extension *ext, IRP *irp)
 
     if (TRACE_ON(hid))
     {
-        TRACE("read input report length %u:\n", report->length);
+        TRACE("read input report length %lu:\n", report->length);
         for (i = 0; i < report->length;)
         {
             char buffer[256], *buf = buffer;
@@ -571,7 +571,7 @@ static DWORD CALLBACK bus_main_thread(void *args)
     TRACE("%s main loop started\n", debugstr_w(bus.name));
 
     bus.bus_event->type = BUS_EVENT_TYPE_NONE;
-    if (status) WARN("%s bus init returned status %#x\n", debugstr_w(bus.name), status);
+    if (status) WARN("%s bus init returned status %#lx\n", debugstr_w(bus.name), status);
     else while ((status = winebus_call(bus.wait_code, bus.bus_event)) == STATUS_PENDING)
     {
         struct bus_event *event = bus.bus_event;
@@ -618,7 +618,7 @@ static DWORD CALLBACK bus_main_thread(void *args)
         }
     }
 
-    if (status) WARN("%s bus wait returned status %#x\n", debugstr_w(bus.name), status);
+    if (status) WARN("%s bus wait returned status %#lx\n", debugstr_w(bus.name), status);
     else TRACE("%s main loop exited\n", debugstr_w(bus.name));
     RtlFreeHeap(GetProcessHeap(), 0, bus.bus_event);
     return status;
@@ -861,20 +861,20 @@ static NTSTATUS pdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
             if (ext->state != DEVICE_STATE_STOPPED) status = STATUS_SUCCESS;
             else if (ext->state == DEVICE_STATE_REMOVED) status = STATUS_DELETE_PENDING;
             else if ((status = unix_device_start(device)))
-                ERR("Failed to start device %p, status %#x\n", device, status);
+                ERR("Failed to start device %p, status %#lx\n", device, status);
             else
             {
                 status = unix_device_get_report_descriptor(device, NULL, 0, &ext->report_desc_length);
                 if (status != STATUS_SUCCESS && status != STATUS_BUFFER_TOO_SMALL)
-                    ERR("Failed to get device %p report descriptor, status %#x\n", device, status);
+                    ERR("Failed to get device %p report descriptor, status %#lx\n", device, status);
                 else if (!(ext->report_desc = RtlAllocateHeap(GetProcessHeap(), 0, ext->report_desc_length)))
                     status = STATUS_NO_MEMORY;
                 else if ((status = unix_device_get_report_descriptor(device, ext->report_desc, ext->report_desc_length,
                                                                      &ext->report_desc_length)))
-                    ERR("Failed to get device %p report descriptor, status %#x\n", device, status);
+                    ERR("Failed to get device %p report descriptor, status %#lx\n", device, status);
                 else if ((status = HidP_GetCollectionDescription(ext->report_desc, ext->report_desc_length,
                                                                  PagedPool, &ext->collection_desc)) != HIDP_STATUS_SUCCESS)
-                    ERR("Failed to parse device %p report descriptor, status %#x\n", device, status);
+                    ERR("Failed to parse device %p report descriptor, status %#lx\n", device, status);
                 else
                 {
                     status = STATUS_SUCCESS;
@@ -1056,7 +1056,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             break;
         case IOCTL_HID_GET_STRING:
         {
-            DWORD index = (ULONG_PTR)irpsp->Parameters.DeviceIoControl.Type3InputBuffer;
+            UINT index = (UINT_PTR)irpsp->Parameters.DeviceIoControl.Type3InputBuffer;
             TRACE("IOCTL_HID_GET_STRING[%08x]\n", index);
 
             irp->IoStatus.Status = hid_get_device_string(device, index, (WCHAR *)irp->UserBuffer, buffer_len);
@@ -1074,7 +1074,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             irp->IoStatus.Status = STATUS_SUCCESS;
             if (TRACE_ON(hid))
             {
-                TRACE("read input report id %u length %u:\n", packet->reportId, packet->reportBufferLen);
+                TRACE("read input report id %u length %lu:\n", packet->reportId, packet->reportBufferLen);
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
@@ -1104,7 +1104,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             HID_XFER_PACKET *packet = (HID_XFER_PACKET *)irp->UserBuffer;
             if (TRACE_ON(hid))
             {
-                TRACE("write output report id %u length %u:\n", packet->reportId, packet->reportBufferLen);
+                TRACE("write output report id %u length %lu:\n", packet->reportId, packet->reportBufferLen);
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
@@ -1123,7 +1123,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             unix_device_get_feature_report(device, packet, &irp->IoStatus);
             if (!irp->IoStatus.Status && TRACE_ON(hid))
             {
-                TRACE("read feature report id %u length %u:\n", packet->reportId, packet->reportBufferLen);
+                TRACE("read feature report id %u length %lu:\n", packet->reportId, packet->reportBufferLen);
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
@@ -1140,7 +1140,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             HID_XFER_PACKET *packet = (HID_XFER_PACKET *)irp->UserBuffer;
             if (TRACE_ON(hid))
             {
-                TRACE("write feature report id %u length %u:\n", packet->reportId, packet->reportBufferLen);
+                TRACE("write feature report id %u length %lu:\n", packet->reportId, packet->reportBufferLen);
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
@@ -1154,7 +1154,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
             break;
         }
         default:
-            FIXME("Unsupported ioctl %x (device=%x access=%x func=%x method=%x)\n",
+            FIXME("Unsupported ioctl %lx (device=%lx access=%lx func=%lx method=%lx)\n",
                   code, code >> 16, (code >> 14) & 3, (code >> 2) & 0xfff, code & 3);
             break;
     }
@@ -1174,7 +1174,7 @@ static NTSTATUS WINAPI driver_add_device(DRIVER_OBJECT *driver, DEVICE_OBJECT *p
 
     if ((ret = IoCreateDevice(driver, 0, NULL, FILE_DEVICE_BUS_EXTENDER, 0, FALSE, &bus_fdo)))
     {
-        ERR("Failed to create FDO, status %#x.\n", ret);
+        ERR("Failed to create FDO, status %#lx.\n", ret);
         return ret;
     }
 
@@ -1207,7 +1207,7 @@ NTSTATUS WINAPI DriverEntry( DRIVER_OBJECT *driver, UNICODE_STRING *path )
     attr.ObjectName = path;
     attr.Attributes = OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE;
     if ((ret = NtOpenKey(&driver_key, KEY_ALL_ACCESS, &attr)) != STATUS_SUCCESS)
-        ERR("Failed to open driver key, status %#x.\n", ret);
+        ERR("Failed to open driver key, status %#lx.\n", ret);
 
     driver_obj = driver;
 
