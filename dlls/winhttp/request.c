@@ -3171,7 +3171,6 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
     socket->hdr.callback = request->hdr.callback;
     socket->hdr.notify_mask = request->hdr.notify_mask;
     socket->hdr.context = context;
-    InitializeSRWLock( &socket->hdr.lock );
 
     addref_object( &request->hdr );
     socket->request = request;
@@ -3272,14 +3271,6 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
     return send_bytes( socket, socket->send_frame_buffer, (char *)ptr - (char *)socket->send_frame_buffer );
 }
 
-static void send_io_complete( struct object_header *hdr )
-{
-    AcquireSRWLockExclusive( &hdr->lock );
-    assert( hdr->pending_sends );
-    --hdr->pending_sends;
-    ReleaseSRWLockExclusive( &hdr->lock );
-}
-
 static enum socket_opcode map_buffer_type( WINHTTP_WEB_SOCKET_BUFFER_TYPE type )
 {
     switch (type)
@@ -3312,22 +3303,23 @@ static void socket_send_complete( struct socket *socket, DWORD ret, WINHTTP_WEB_
     }
 }
 
-static DWORD socket_send( struct socket *socket, WINHTTP_WEB_SOCKET_BUFFER_TYPE type, const void *buf, DWORD len )
+static DWORD socket_send( struct socket *socket, WINHTTP_WEB_SOCKET_BUFFER_TYPE type, const void *buf, DWORD len,
+                          BOOL async )
 {
     enum socket_opcode opcode = map_buffer_type( type );
+    DWORD ret;
 
-    return send_frame( socket, opcode, 0, buf, len, TRUE );
+    ret = send_frame( socket, opcode, 0, buf, len, TRUE );
+    if (async) socket_send_complete( socket, ret, type, len );
+    return ret;
 }
 
 static void CALLBACK task_socket_send( TP_CALLBACK_INSTANCE *instance, void *ctx, TP_WORK *work )
 {
     struct socket_send *s = ctx;
-    DWORD ret;
 
     TRACE("running %p\n", work);
-    ret = socket_send( s->socket, s->type, s->buf, s->len );
-    send_io_complete( &s->socket->hdr );
-    socket_send_complete( s->socket, ret, s->type, s->len );
+    socket_send( s->socket, s->type, s->buf, s->len, TRUE );
 
     release_object( &s->socket->hdr );
     free( s );
@@ -3370,15 +3362,13 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
         s->len    = len;
 
         addref_object( &socket->hdr );
-        AcquireSRWLockExclusive( &socket->hdr.lock );
         if ((ret = queue_task( &socket->send_q, task_socket_send, s )))
         {
             release_object( &socket->hdr );
             free( s );
-        } else ++socket->hdr.pending_sends;
-        ReleaseSRWLockExclusive( &socket->hdr.lock );
+        }
     }
-    else ret = socket_send( socket, type, buf, len );
+    else ret = socket_send( socket, type, buf, len, FALSE );
 
     release_object( &socket->hdr );
     return ret;
@@ -3467,7 +3457,6 @@ static void CALLBACK task_socket_send_pong( TP_CALLBACK_INSTANCE *instance, void
 
     TRACE("running %p\n", work);
     send_frame( s->socket, SOCKET_OPCODE_PONG, 0, NULL, 0, TRUE );
-    send_io_complete( &s->socket->hdr );
 
     release_object( &s->socket->hdr );
     free( s );
@@ -3484,13 +3473,11 @@ static DWORD socket_send_pong( struct socket *socket )
         s->socket = socket;
 
         addref_object( &socket->hdr );
-        AcquireSRWLockExclusive( &socket->hdr.lock );
         if ((ret = queue_task( &socket->send_q, task_socket_send_pong, s )))
         {
             release_object( &socket->hdr );
             free( s );
-        } else ++socket->hdr.pending_sends;
-        ReleaseSRWLockExclusive( &socket->hdr.lock );
+        }
         return ret;
     }
     return send_frame( socket, SOCKET_OPCODE_PONG, 0, NULL, 0, TRUE );
@@ -3654,7 +3641,7 @@ DWORD WINAPI WinHttpWebSocketReceive( HINTERNET hsocket, void *buf, DWORD len, D
     return ret;
 }
 
-static DWORD socket_shutdown( struct socket *socket, USHORT status, const void *reason, DWORD len )
+static DWORD socket_shutdown( struct socket *socket, USHORT status, const void *reason, DWORD len, BOOL async )
 {
     DWORD ret;
 
@@ -3663,29 +3650,28 @@ static DWORD socket_shutdown( struct socket *socket, USHORT status, const void *
     {
         socket->state = SOCKET_STATE_SHUTDOWN;
     }
+    if (async)
+    {
+        if (!ret) send_callback( &socket->hdr, WINHTTP_CALLBACK_STATUS_SHUTDOWN_COMPLETE, NULL, 0 );
+        else
+        {
+            WINHTTP_WEB_SOCKET_ASYNC_RESULT result;
+            result.AsyncResult.dwResult = API_WRITE_DATA;
+            result.AsyncResult.dwError  = ret;
+            result.Operation = WINHTTP_WEB_SOCKET_SHUTDOWN_OPERATION;
+            send_callback( &socket->hdr, WINHTTP_CALLBACK_STATUS_REQUEST_ERROR, &result, sizeof(result) );
+        }
+    }
     return ret;
 }
 
 static void CALLBACK task_socket_shutdown( TP_CALLBACK_INSTANCE *instance, void *ctx, TP_WORK *work )
 {
     struct socket_shutdown *s = ctx;
-    DWORD ret;
+
+    socket_shutdown( s->socket, s->status, s->reason, s->len, TRUE );
 
     TRACE("running %p\n", work);
-
-    ret = socket_shutdown( s->socket, s->status, s->reason, s->len );
-    send_io_complete( &s->socket->hdr );
-
-    if (!ret) send_callback( &s->socket->hdr, WINHTTP_CALLBACK_STATUS_SHUTDOWN_COMPLETE, NULL, 0 );
-    else
-    {
-        WINHTTP_WEB_SOCKET_ASYNC_RESULT result;
-        result.AsyncResult.dwResult = API_WRITE_DATA;
-        result.AsyncResult.dwError  = ret;
-        result.Operation = WINHTTP_WEB_SOCKET_SHUTDOWN_OPERATION;
-        send_callback( &s->socket->hdr, WINHTTP_CALLBACK_STATUS_REQUEST_ERROR, &result, sizeof(result) );
-    }
-
     release_object( &s->socket->hdr );
     free( s );
 }
@@ -3722,15 +3708,13 @@ DWORD WINAPI WinHttpWebSocketShutdown( HINTERNET hsocket, USHORT status, void *r
         s->len    = len;
 
         addref_object( &socket->hdr );
-        AcquireSRWLockExclusive( &socket->hdr.lock );
         if ((ret = queue_task( &socket->send_q, task_socket_shutdown, s )))
         {
             release_object( &socket->hdr );
             free( s );
-        } else ++socket->hdr.pending_sends;
-        ReleaseSRWLockExclusive( &socket->hdr.lock );
+        }
     }
-    else ret = socket_shutdown( socket, status, reason, len );
+    else ret = socket_shutdown( socket, status, reason, len, FALSE );
 
     release_object( &socket->hdr );
     return ret;
