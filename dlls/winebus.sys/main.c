@@ -432,7 +432,7 @@ static BOOL deliver_next_report(struct device_extension *ext, IRP *irp)
         for (i = 0; i < report->length;)
         {
             char buffer[256], *buf = buffer;
-            buf += sprintf(buf, "%08x ", i);
+            buf += sprintf(buf, "%08lx ", i);
             do { buf += sprintf(buf, " %02x", report->buffer[i]); }
             while (++i % 16 && i < report->length);
             TRACE("%s\n", buffer);
@@ -1080,7 +1080,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
-                    buf += sprintf(buf, "%08x ", i);
+                    buf += sprintf(buf, "%08lx ", i);
                     do { buf += sprintf(buf, " %02x", packet->reportBuffer[i]); }
                     while (++i % 16 && i < packet->reportBufferLen);
                     TRACE("%s\n", buffer);
@@ -1110,7 +1110,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
-                    buf += sprintf(buf, "%08x ", i);
+                    buf += sprintf(buf, "%08lx ", i);
                     do { buf += sprintf(buf, " %02x", packet->reportBuffer[i]); }
                     while (++i % 16 && i < packet->reportBufferLen);
                     TRACE("%s\n", buffer);
@@ -1129,7 +1129,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
-                    buf += sprintf(buf, "%08x ", i);
+                    buf += sprintf(buf, "%08lx ", i);
                     do { buf += sprintf(buf, " %02x", packet->reportBuffer[i]); }
                     while (++i % 16 && i < packet->reportBufferLen);
                     TRACE("%s\n", buffer);
@@ -1146,7 +1146,7 @@ static NTSTATUS WINAPI hid_internal_dispatch(DEVICE_OBJECT *device, IRP *irp)
                 for (i = 0; i < packet->reportBufferLen;)
                 {
                     char buffer[256], *buf = buffer;
-                    buf += sprintf(buf, "%08x ", i);
+                    buf += sprintf(buf, "%08lx ", i);
                     do { buf += sprintf(buf, " %02x", packet->reportBuffer[i]); }
                     while (++i % 16 && i < packet->reportBufferLen);
                     TRACE("%s\n", buffer);
