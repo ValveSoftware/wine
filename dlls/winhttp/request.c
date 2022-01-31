@@ -3123,7 +3123,6 @@ static void socket_destroy( struct object_header *hdr )
     stop_queue( &socket->recv_q );
 
     release_object( &socket->request->hdr );
-    free( socket->send_frame_buffer );
     free( socket );
 }
 
@@ -3203,12 +3202,10 @@ static DWORD send_bytes( struct socket *socket, char *bytes, int len )
 static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHORT status, const char *buf,
                          DWORD buflen, BOOL final )
 {
-    DWORD i = 0, j, offset = 2, len = buflen;
-    char hdr[14], *mask = NULL;
-    DWORD buffer_size;
-    char *ptr;
+    DWORD i = 0, j, ret, offset = 2, len = buflen;
+    char hdr[14], byte, *mask = NULL;
 
-    TRACE( "sending %02x frame, len %u.\n", opcode, len );
+    TRACE("sending %02x frame\n", opcode);
 
     if (opcode == SOCKET_OPCODE_CLOSE) len += sizeof(status);
 
@@ -3234,41 +3231,30 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
         offset += 8;
     }
 
-    buffer_size = len + offset;
-    if (len) buffer_size += 4;
-    if (buffer_size > socket->send_frame_buffer_size)
-    {
-        void *new;
-
-        if (!(new = realloc( socket->send_frame_buffer, buffer_size )))
-        {
-            ERR("Out of memory, buffer_size %u.\n", buffer_size);
-            return ERROR_OUTOFMEMORY;
-        }
-        socket->send_frame_buffer = new;
-        socket->send_frame_buffer_size = buffer_size;
-    }
-    ptr = socket->send_frame_buffer;
-
-    memcpy(ptr, hdr, offset);
-    ptr += offset;
+    if ((ret = send_bytes( socket, hdr, offset ))) return ret;
     if (len)
     {
-        mask = ptr;
-        RtlGenRandom( ptr, 4 );
-        ptr += 4;
+        mask = &hdr[offset];
+        RtlGenRandom( mask, 4 );
+        if ((ret = send_bytes( socket, mask, 4 ))) return ret;
     }
 
     if (opcode == SOCKET_OPCODE_CLOSE) /* prepend status code */
     {
-        *ptr++ = (status >> 8) ^ mask[i++ % 4];
-        *ptr++ = (status & 0xff) ^ mask[i++ % 4];
+        byte = (status >> 8) ^ mask[i++ % 4];
+        if ((ret = send_bytes( socket, &byte, 1 ))) return ret;
+
+        byte = (status & 0xff) ^ mask[i++ % 4];
+        if ((ret = send_bytes( socket, &byte, 1 ))) return ret;
     }
 
     for (j = 0; j < buflen; j++)
-        *ptr++ = buf[j] ^ mask[i++ % 4];
+    {
+        byte = buf[j] ^ mask[i++ % 4];
+        if ((ret = send_bytes( socket, &byte, 1 ))) return ret;
+    }
 
-    return send_bytes( socket, socket->send_frame_buffer, (char *)ptr - (char *)socket->send_frame_buffer );
+    return ERROR_SUCCESS;
 }
 
 static enum socket_opcode map_buffer_type( WINHTTP_WEB_SOCKET_BUFFER_TYPE type )
