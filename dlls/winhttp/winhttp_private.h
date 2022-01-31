@@ -248,7 +248,6 @@ struct socket
     struct queue recv_q;
     enum socket_opcode opcode;
     DWORD read_size;
-    int send_size, bytes_sent;
     BOOL close_frame_received;
     DWORD close_frame_receive_err;
     USHORT status;
