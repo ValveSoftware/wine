@@ -3838,6 +3838,7 @@ static DWORD socket_close( struct socket *socket )
         if ((ret = socket_drain( socket ))) return ret;
     }
 
+    socket->state = SOCKET_STATE_CLOSED;
     return receive_close_status( socket, count );
 }
 
@@ -3892,10 +3893,6 @@ DWORD WINAPI WinHttpWebSocketClose( HINTERNET hsocket, USHORT status, void *reas
     {
         struct socket_shutdown *s;
 
-        AcquireSRWLockExclusive( &socket->hdr.lock );
-        socket->state = SOCKET_STATE_CLOSED;
-        ReleaseSRWLockExclusive( &socket->hdr.lock );
-
         if (!(s = calloc( 1, sizeof(*s) ))) return FALSE;
         s->socket = socket;
 
@@ -3908,11 +3905,7 @@ DWORD WINAPI WinHttpWebSocketClose( HINTERNET hsocket, USHORT status, void *reas
         } else ++socket->hdr.pending_receives;
         ReleaseSRWLockExclusive( &socket->hdr.lock );
     }
-    else
-    {
-        socket->state = SOCKET_STATE_CLOSED;
-        ret = socket_close( socket );
-    }
+    else ret = socket_close( socket );
 
 done:
     release_object( &socket->hdr );
