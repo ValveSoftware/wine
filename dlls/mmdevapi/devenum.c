@@ -497,6 +497,7 @@ static HRESULT set_format(MMDevice *dev)
     HRESULT hr;
     IAudioClient *client;
     WAVEFORMATEX *fmt;
+    WAVEFORMATEXTENSIBLE *fmtex;
     PROPVARIANT pv = { VT_EMPTY };
 
     hr = AudioClient_Create(&dev->devguid, &dev->IMMDevice_iface, &client);
@@ -510,6 +511,24 @@ static HRESULT set_format(MMDevice *dev)
     }
 
     IAudioClient_Release(client);
+
+    /* for most devices, native Windows only allows PCM formats for
+     * DeviceFormat. GetMixFormat often returns float. */
+    if(fmt->wFormatTag == WAVE_FORMAT_EXTENSIBLE){
+        fmtex = (WAVEFORMATEXTENSIBLE *)fmt;
+        if(IsEqualGUID(&fmtex->SubFormat, &KSDATAFORMAT_SUBTYPE_IEEE_FLOAT)){
+            fmt->wBitsPerSample = 16;
+            fmt->nBlockAlign = fmt->wBitsPerSample * fmt->nChannels / 8;
+            fmt->nAvgBytesPerSec = fmt->nSamplesPerSec * fmt->nBlockAlign;
+            fmtex->SubFormat = KSDATAFORMAT_SUBTYPE_PCM;
+            fmtex->Samples.wValidBitsPerSample = fmt->wBitsPerSample;
+        }
+    }else if(fmt->wFormatTag == WAVE_FORMAT_IEEE_FLOAT){
+        fmt->wFormatTag = WAVE_FORMAT_PCM;
+        fmt->wBitsPerSample = 16;
+        fmt->nBlockAlign = fmt->wBitsPerSample * fmt->nChannels / 8;
+        fmt->nAvgBytesPerSec = fmt->nSamplesPerSec * fmt->nBlockAlign;
+    }
 
     pv.vt = VT_BLOB;
     pv.blob.cbSize = sizeof(WAVEFORMATEX) + fmt->cbSize;
