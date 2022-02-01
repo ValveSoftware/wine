@@ -1,6 +1,6 @@
 MODULE    = hnetcfg.dll
 IMPORTS   = oleaut32 ole32 advapi32 mpr uuid
-DELAYIMPORTS = ws2_32 winhttp
+DELAYIMPORTS = ws2_32 winhttp shcore xmllite
 EXTRADLLFLAGS = -mno-cygwin -Wb,--prefer-native
 
 C_SRCS = \
