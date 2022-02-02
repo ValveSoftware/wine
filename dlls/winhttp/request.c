@@ -3171,6 +3171,7 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
     socket->hdr.callback = request->hdr.callback;
     socket->hdr.notify_mask = request->hdr.notify_mask;
     socket->hdr.context = context;
+    InitializeSRWLock( &socket->send_lock );
 
     addref_object( &request->hdr );
     socket->request = request;
@@ -3451,6 +3452,7 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
             return ERROR_OUTOFMEMORY;
         }
 
+        AcquireSRWLockExclusive( &socket->send_lock );
         async_send = InterlockedIncrement( &socket->hdr.pending_sends ) > 1 || socket->hdr.recursion_count >= 3;
         if (!async_send)
         {
@@ -3479,10 +3481,11 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
                 free( s );
             }
         }
-        else
+        else InterlockedDecrement( &socket->hdr.pending_sends );
+        ReleaseSRWLockExclusive( &socket->send_lock );
+        if (!async_send)
         {
             TRACE("sent sync.\n");
-            InterlockedDecrement( &socket->hdr.pending_sends );
             free( s );
             socket_send_complete( socket, ret, type, len );
             ret = ERROR_SUCCESS;
@@ -3595,6 +3598,7 @@ static DWORD socket_send_pong( struct socket *socket )
 
         if (!(s = malloc( sizeof(*s) ))) return ERROR_OUTOFMEMORY;
 
+        AcquireSRWLockExclusive( &socket->send_lock );
         async_send = InterlockedIncrement( &socket->hdr.pending_sends ) > 1;
         if (!async_send)
         {
@@ -3623,6 +3627,7 @@ static DWORD socket_send_pong( struct socket *socket )
             InterlockedDecrement( &socket->hdr.pending_sends );
             free( s );
         }
+        ReleaseSRWLockExclusive( &socket->send_lock );
         return ret;
     }
     return send_frame( socket, SOCKET_OPCODE_PONG, 0, NULL, 0, TRUE, NULL );
@@ -3877,6 +3882,7 @@ static DWORD send_socket_shutdown( struct socket *socket, USHORT status, const v
 
         if (!(s = malloc( sizeof(*s) ))) return FALSE;
 
+        AcquireSRWLockExclusive( &socket->send_lock );
         async_send = InterlockedIncrement( &socket->hdr.pending_sends ) > 1 || socket->hdr.recursion_count >= 3;
         if (!async_send)
         {
@@ -3905,9 +3911,10 @@ static DWORD send_socket_shutdown( struct socket *socket, USHORT status, const v
                 free( s );
             }
         }
-        else
+        else InterlockedDecrement( &socket->hdr.pending_sends );
+        ReleaseSRWLockExclusive( &socket->send_lock );
+        if (!async_send)
         {
-            InterlockedDecrement( &socket->hdr.pending_sends );
             free( s );
             if (send_callback)
             {
