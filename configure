@@ -10585,6 +10585,9 @@ fi
 
 printf "%s\n" "#define _GNU_SOURCE 1" >>confdefs.h
 
+
+printf "%s\n" "#define _TIME_BITS 64" >>confdefs.h
+
     case $host_cpu in
       *i[3456789]86*)
         DLLFLAGS="$DLLFLAGS -fno-PIC"
