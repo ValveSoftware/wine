@@ -3,7 +3,7 @@
 @ stdcall agsCheckDriverVersion(ptr long)
 @ stub agsDriverExtensionsDX11_BeginUAVOverlap
 @ stub agsDriverExtensionsDX11_CreateBuffer
-@ stub agsDriverExtensionsDX11_CreateDevice
+@ stdcall agsDriverExtensionsDX11_CreateDevice(ptr ptr ptr ptr)
 @ stub agsDriverExtensionsDX11_CreateFromDevice
 @ stub agsDriverExtensionsDX11_CreateTexture1D
 @ stub agsDriverExtensionsDX11_CreateTexture2D
