@@ -9103,7 +9103,12 @@ HRESULT WINAPI MFCreateDXGIDeviceManager(UINT *token, IMFDXGIDeviceManager **man
      * #19126 is solved. Returning a DXGI device manager also breaks 
      * Age of Empires Definitive Edition - this gameid should be removed 
      * once CW bug #19741 is solved.*/
-    if (sgi && (strcmp(sgi, "305620") == 0 || strcmp(sgi, "585420") == 0 || strcmp(sgi, "1017900") == 0))
+    if (sgi && (
+                strcmp(sgi, "305620") == 0 || /* The Long Dark */
+                strcmp(sgi, "585420") == 0 || /* Trailmakers */
+                strcmp(sgi, "684450") == 0 || /* Surviving the Aftermath */
+                strcmp(sgi, "1017900") == 0 /* Age of Empires: Definitive Edition */
+               ))
     {
         FIXME("stubbing out\n");
         return E_NOTIMPL;
