@@ -8,6 +8,7 @@
 #include "wine/heap.h"
 
 #include "wine/vulkan.h"
+#include "wine/asm.h"
 
 #define COBJMACROS
 #include "d3d11.h"
@@ -770,3 +771,32 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 
     return TRUE;
 }
+
+#ifdef __x86_64__
+AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds(AGSContext* context, bool enabled,
+        float minDepth, float maxDepth )
+{
+    static int once;
+
+    if (!once++)
+        FIXME("context %p, enabled %#x, minDepth %f, maxDepth %f stub.\n", context, enabled, minDepth, maxDepth);
+    return AGS_EXTENSION_NOT_SUPPORTED;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds_530(AGSContext* context,
+        ID3D11DeviceContext* dxContext, bool enabled, float minDepth, float maxDepth )
+{
+    static int once;
+
+    if (!once++)
+        FIXME("context %p, enabled %#x, minDepth %f, maxDepth %f stub.\n", context, enabled, minDepth, maxDepth);
+    return AGS_EXTENSION_NOT_SUPPORTED;
+}
+
+__ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
+                   "mov (%rcx),%eax\n\t" /* version */
+                   "cmp $3,%eax\n\t"
+                   "jge 1f\n\t"
+                   "jmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds") "\n\t"
+                   "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds_530") )
+#endif
