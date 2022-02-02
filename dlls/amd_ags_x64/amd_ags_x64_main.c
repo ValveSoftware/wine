@@ -38,18 +38,19 @@ static const struct
     int minor;
     int patch;
     unsigned int device_size;
+    unsigned int dx11_returned_params_size;
 }
 amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
-    {5, 1, 1, sizeof(AGSDeviceInfo_511)},
-    {5, 2, 0, sizeof(AGSDeviceInfo_520)},
-    {5, 2, 1, sizeof(AGSDeviceInfo_520)},
-    {5, 3, 0, sizeof(AGSDeviceInfo_520)},
-    {5, 4, 0, sizeof(AGSDeviceInfo_540)},
-    {5, 4, 1, sizeof(AGSDeviceInfo_541)},
-    {5, 4, 2, sizeof(AGSDeviceInfo_542)},
-    {6, 0, 0, sizeof(AGSDeviceInfo_600)},
-    {6, 0, 1, sizeof(AGSDeviceInfo_600)},
+    {5, 1, 1, sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511)},
+    {5, 2, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520)},
+    {5, 2, 1, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520)},
+    {5, 3, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520)},
+    {5, 4, 0, sizeof(AGSDeviceInfo_540), sizeof(AGSDX11ReturnedParams_520)},
+    {5, 4, 1, sizeof(AGSDeviceInfo_541), sizeof(AGSDX11ReturnedParams_520)},
+    {5, 4, 2, sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520)},
+    {6, 0, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600)},
+    {6, 0, 1, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600)},
 };
 
 #define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
@@ -117,8 +118,10 @@ struct AGSContext
     VkPhysicalDeviceMemoryProperties *memory_properties;
 };
 
-static HMODULE hd3d12;
+static HMODULE hd3d11, hd3d12;
 static typeof(D3D12CreateDevice) *pD3D12CreateDevice;
+static typeof(D3D11CreateDevice) *pD3D11CreateDevice;
+static typeof(D3D11CreateDeviceAndSwapChain) *pD3D11CreateDeviceAndSwapChain;
 
 static BOOL load_d3d12_functions(void)
 {
@@ -129,6 +132,19 @@ static BOOL load_d3d12_functions(void)
         return FALSE;
 
     pD3D12CreateDevice = (void *)GetProcAddress(hd3d12, "D3D12CreateDevice");
+    return TRUE;
+}
+
+static BOOL load_d3d11_functions(void)
+{
+    if (hd3d11)
+        return TRUE;
+
+    if (!(hd3d11 = LoadLibraryA("d3d11.dll")))
+        return FALSE;
+
+    pD3D11CreateDevice = (void *)GetProcAddress(hd3d11, "D3D11CreateDevice");
+    pD3D11CreateDeviceAndSwapChain = (void *)GetProcAddress(hd3d11, "D3D11CreateDeviceAndSwapChain");
     return TRUE;
 }
 
@@ -602,6 +618,76 @@ AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count
         return AGS_INVALID_ARGS;
 
     *gpu_count = 1;
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_CreateDevice( AGSContext* context,
+        const AGSDX11DeviceCreationParams* creation_params, const AGSDX11ExtensionParams* extension_params,
+        AGSDX11ReturnedParams* returned_params )
+{
+    ID3D11DeviceContext *device_context;
+    IDXGISwapChain *swapchain = NULL;
+    D3D_FEATURE_LEVEL feature_level;
+    ID3D11Device *device;
+    HRESULT hr;
+
+    TRACE("feature levels %u, pSwapChainDesc %p, app %s, engine %s %#x %#x.\n", creation_params->FeatureLevels,
+            creation_params->pSwapChainDesc,
+            debugstr_w(extension_params->agsDX11ExtensionParams511.pAppName),
+            debugstr_w(extension_params->agsDX11ExtensionParams511.pEngineName),
+            extension_params->agsDX11ExtensionParams511.appVersion,
+            extension_params->agsDX11ExtensionParams511.engineVersion);
+
+    if (!load_d3d11_functions())
+    {
+        ERR("Could not load d3d11.dll.\n");
+        return AGS_MISSING_D3D_DLL;
+    }
+    memset( returned_params, 0, amd_ags_info[context->version].dx11_returned_params_size );
+    if (creation_params->pSwapChainDesc)
+    {
+        hr = pD3D11CreateDeviceAndSwapChain(creation_params->pAdapter, creation_params->DriverType,
+                creation_params->Software, creation_params->Flags, creation_params->pFeatureLevels,
+                creation_params->FeatureLevels, creation_params->SDKVersion, creation_params->pSwapChainDesc,
+                &swapchain, &device, &feature_level, &device_context);
+    }
+    else
+    {
+        hr = pD3D11CreateDevice(creation_params->pAdapter, creation_params->DriverType,
+                creation_params->Software, creation_params->Flags, creation_params->pFeatureLevels,
+                creation_params->FeatureLevels, creation_params->SDKVersion,
+                &device, &feature_level, &device_context);
+    }
+    if (FAILED(hr))
+    {
+        ERR("Device creation failed, hr %#x.\n", hr);
+        return AGS_DX_FAILURE;
+    }
+    if (context->version < AMD_AGS_VERSION_5_2_0)
+    {
+        AGSDX11ReturnedParams_511 *r = &returned_params->agsDX11ReturnedParams511;
+        r->pDevice = device;
+        r->pImmediateContext = device_context;
+        r->pSwapChain = swapchain;
+        r->FeatureLevel = feature_level;
+    }
+    else if (context->version < AMD_AGS_VERSION_6_0_0)
+    {
+        AGSDX11ReturnedParams_520 *r = &returned_params->agsDX11ReturnedParams520;
+        r->pDevice = device;
+        r->pImmediateContext = device_context;
+        r->pSwapChain = swapchain;
+        r->FeatureLevel = feature_level;
+    }
+    else
+    {
+        AGSDX11ReturnedParams_600 *r = &returned_params->agsDX11ReturnedParams600;
+        r->pDevice = device;
+        r->pImmediateContext = device_context;
+        r->pSwapChain = swapchain;
+        r->featureLevel = feature_level;
+    }
+
     return AGS_SUCCESS;
 }
 
