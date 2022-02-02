@@ -1506,8 +1506,10 @@ AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_EndUAVOverlap( AGSContext* con
 /// \param [in] minDepth                            The near depth range to clip against.
 /// \param [in] maxDepth                            The far depth range to clip against.
 ///
-AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_SetDepthBounds_520( AGSContext* context, bool enabled, float minDepth, float maxDepth );
-AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_SetDepthBounds( AGSContext* context, ID3D11DeviceContext* dxContext, bool enabled, float minDepth, float maxDepth );
+AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_SetDepthBounds( AGSContext* context, bool enabled, float minDepth, float maxDepth );
+
+/* Since 5.3.0 */
+AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_SetDepthBounds_530( AGSContext* context, ID3D11DeviceContext* dxContext, bool enabled, float minDepth, float maxDepth );
 
 /// @}
 
