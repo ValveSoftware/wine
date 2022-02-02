@@ -799,4 +799,43 @@ __ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds_530") )
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_DestroyDevice_520(AGSContext *context, ID3D11Device* device,
+        unsigned int *device_ref, ID3D11DeviceContext *device_context,
+        unsigned int *context_ref)
+{
+    ULONG ref;
+
+    TRACE("context %p, device %p, device_ref %p, device_context %p, context_ref %p.\n",
+            context, device, device_ref, device_context, context_ref);
+
+    if (!device)
+        return AGS_SUCCESS;
+
+    ref = ID3D11Device_Release(device);
+    if (device_ref)
+        *device_ref = ref;
+
+    if (!device_context)
+        return AGS_SUCCESS;
+
+    ref = ID3D11DeviceContext_Release(device_context);
+    if (context_ref)
+        *context_ref = ref;
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_DestroyDevice_511(AGSContext *context, ID3D11Device *device,
+        unsigned int *references )
+{
+    TRACE("context %p, device %p, references %p.\n", context, device, references);
+
+    return agsDriverExtensionsDX11_DestroyDevice_520(context, device, references, NULL, NULL);
+}
+__ASM_GLOBAL_FUNC( agsDriverExtensionsDX11_DestroyDevice,
+                   "mov (%rcx),%eax\n\t" /* version */
+                   "cmp $1,%eax\n\t"
+                   "jge 1f\n\t"
+                   "jmp "     __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_511") "\n\t"
+                   "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_520") )
 #endif

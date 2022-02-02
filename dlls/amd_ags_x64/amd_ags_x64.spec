@@ -10,7 +10,7 @@
 @ stub agsDriverExtensionsDX11_CreateTexture3D
 @ stub agsDriverExtensionsDX11_DeInit
 @ stub agsDriverExtensionsDX11_Destroy
-@ stub agsDriverExtensionsDX11_DestroyDevice
+@ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_DestroyDevice()
 @ stub agsDriverExtensionsDX11_EndUAVOverlap
 @ stub agsDriverExtensionsDX11_GetMaxClipRects
 @ stub agsDriverExtensionsDX11_IASetPrimitiveTopology
