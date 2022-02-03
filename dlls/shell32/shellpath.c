@@ -3112,6 +3112,23 @@ static HRESULT create_extra_folders(void)
         hr = SHGetFolderPathAndSubDirW(0, CSIDL_APPDATA | CSIDL_FLAG_CREATE, NULL,
                                        SHGFP_TYPE_DEFAULT, L"Microsoft\\Windows\\Themes", path);
     }
+
+
+    /* Proton HACK: In older Proton versions, duplicate Stuff directories were
+     * created at both %PROFILE%\Music and %PROFILE\Documents\Music. Due to
+     * some bugs when downgrading to those older Proton versions, create those
+     * missing Documents directories here, too. */
+    SHGetFolderPathAndSubDirW(0, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL,
+                                   SHGFP_TYPE_DEFAULT, L"Downloads", path);
+    SHGetFolderPathAndSubDirW(0, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL,
+                                   SHGFP_TYPE_DEFAULT, L"Music", path);
+    SHGetFolderPathAndSubDirW(0, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL,
+                                   SHGFP_TYPE_DEFAULT, L"Pictures", path);
+    SHGetFolderPathAndSubDirW(0, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL,
+                                   SHGFP_TYPE_DEFAULT, L"Templates", path);
+    SHGetFolderPathAndSubDirW(0, CSIDL_PERSONAL | CSIDL_FLAG_CREATE, NULL,
+                                   SHGFP_TYPE_DEFAULT, L"Videos", path);
+
     return hr;
 }
 
