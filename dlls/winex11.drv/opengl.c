@@ -3578,6 +3578,21 @@ static struct wgl_context *X11DRV_wglCreateContextAttribsARB( HDC hdc, struct wg
                 case WGL_CONTEXT_LAYER_PLANE_ARB:
                     break;
                 case WGL_CONTEXT_FLAGS_ARB:
+                    /* HACK: The Last Campfire sometimes uses an
+                     * invalid value for WGL_CONTEXT_FLAGS_ARB, which
+                     * triggers
+                     * https://gitlab.freedesktop.org/xorg/lib/libx11/-/issues/152
+                     * on the Deck. If we see the invalid value we
+                     * directly return an error, so that Wine doesn't
+                     * crash. This hack can be removed once that issue
+                     * is fixed. */
+                    if (attribList[1] == 0x31b3)
+                    {
+                        WARN("return early to avoid triggering a libX11 bug\n");
+                        free(ret);
+                        release_gl_drawable(gl);
+                        return NULL;
+                    }
                     pContextAttribList[0] = GLX_CONTEXT_FLAGS_ARB;
                     pContextAttribList[1] = attribList[1];
                     pContextAttribList += 2;
