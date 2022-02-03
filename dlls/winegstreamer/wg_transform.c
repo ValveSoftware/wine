@@ -498,7 +498,8 @@ NTSTATUS wg_transform_create(void *args)
         goto failed;
     }
 
-    if (!gst_pad_push_event(transform->my_src, gst_event_new_caps(src_caps)))
+    if (!gst_pad_push_event(transform->my_src, gst_event_new_caps(src_caps)) ||
+        !gst_pad_has_current_caps(transform->their_sink))
     {
         GST_ERROR("Failed to set stream caps.");
         goto failed;
