@@ -2435,10 +2435,23 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
         if (!gl->fs_hack_context_set_up)
         {
-            opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
-            opengl_funcs.gl.p_glClearDepth( 1.0 );
-            opengl_funcs.gl.p_glClearStencil( 0 );
-            opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
+            if (ctx->has_been_current)
+            {
+                GLbitfield mask = GL_COLOR_BUFFER_BIT;
+
+                if (attribs.depth_size) mask |= GL_DEPTH_BUFFER_BIT;
+                if (attribs.stencil_size) mask |= GL_STENCIL_BUFFER_BIT;
+
+                pglBindFramebuffer( GL_READ_FRAMEBUFFER, 0 );
+                pglBlitFramebuffer( 0, 0, width, height, 0, 0, width, height, mask, GL_NEAREST );
+            }
+            else
+            {
+                opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
+                opengl_funcs.gl.p_glClearDepth( 1.0 );
+                opengl_funcs.gl.p_glClearStencil( 0 );
+                opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT );
+            }
         }
         pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
         pglDrawBuffer( GL_BACK );
