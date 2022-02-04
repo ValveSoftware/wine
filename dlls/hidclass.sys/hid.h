@@ -84,6 +84,9 @@ typedef struct _BASE_DEVICE_EXTENSION
     WCHAR container_id[MAX_GUID_STRING_LEN];
     const GUID *class_guid;
 
+    HANDLE steam_overlay_event;
+    HANDLE steam_keyboard_event;
+
     BOOL is_fdo;
 } BASE_DEVICE_EXTENSION;
 
@@ -115,6 +118,9 @@ typedef struct _minidriver
 
     PDRIVER_ADD_DEVICE AddDevice;
     PDRIVER_DISPATCH PNPDispatch;
+
+    HANDLE steam_overlay_event;
+    HANDLE steam_keyboard_event;
 } minidriver;
 
 void call_minidriver( ULONG code, DEVICE_OBJECT *device, void *in_buff, ULONG in_size,

@@ -223,6 +223,7 @@ static void hid_device_queue_input( DEVICE_OBJECT *device, HID_XFER_PACKET *pack
     const BOOL polled = ext->u.pdo.information.Polled;
     ULONG size, report_len = polled ? packet->reportBufferLen : desc->InputLength;
     struct hid_report *last_report, *report;
+    BOOL steam_overlay_open = FALSE;
     struct hid_queue *queue;
     LIST_ENTRY completed, *entry;
     RAWINPUT *rawinput;
@@ -231,7 +232,11 @@ static void hid_device_queue_input( DEVICE_OBJECT *device, HID_XFER_PACKET *pack
 
     TRACE("device %p, packet %p\n", device, packet);
 
-    if (IsEqualGUID( ext->class_guid, &GUID_DEVINTERFACE_HID ))
+    if (WaitForSingleObject(ext->steam_overlay_event, 0) == WAIT_OBJECT_0 || /* steam overlay is open */
+        WaitForSingleObject(ext->steam_keyboard_event, 0) == WAIT_OBJECT_0) /* steam keyboard is open */
+        steam_overlay_open = TRUE;
+
+    if (IsEqualGUID( ext->class_guid, &GUID_DEVINTERFACE_HID ) && !steam_overlay_open)
     {
         size = offsetof( RAWINPUT, data.hid.bRawData[report_len] );
         if (!(rawinput = malloc( size ))) ERR( "Failed to allocate rawinput data!\n" );
