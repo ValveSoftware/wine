@@ -1510,6 +1510,18 @@ static HRESULT init_stream(struct wm_reader *reader)
             /* API consumers expect RGB video to be bottom-up. */
             if (stream->format.u.video.height > 0)
                 stream->format.u.video.height = -stream->format.u.video.height;
+
+            {
+                /* HACK: Persona 4 Golden tries to read compressed samples, and
+                 * then autoplug them via quartz to a filter that only accepts
+                 * BGRx. This is not trivial to implement. Return BGRx from the
+                 * wmvcore reader for now. */
+
+                const char *id = getenv("SteamGameId");
+
+                if (id && !strcmp(id, "1113000"))
+                    stream->format.u.video.format = WG_VIDEO_FORMAT_BGRx;
+            }
         }
         wg_parser_stream_enable(stream->wg_stream, &stream->format, STREAM_ENABLE_FLAG_FLIP_RGB);
     }
