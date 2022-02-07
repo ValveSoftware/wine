@@ -2766,6 +2766,9 @@ DECL_HANDLER(set_queue_mask)
             }
             else wake_up( &queue->obj, 0 );
         }
+
+        if (do_esync() && !is_signaled( queue ))
+            esync_clear( queue->esync_fd );
     }
 }
 
@@ -3032,6 +3035,9 @@ DECL_HANDLER(get_message)
     SHARED_WRITE_END( &queue->shared->seq );
 
     set_error( STATUS_PENDING );  /* FIXME */
+
+    if (do_esync() && !is_signaled( queue ))
+        esync_clear( queue->esync_fd );
 }
 
 
