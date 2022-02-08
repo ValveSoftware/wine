@@ -758,8 +758,21 @@ affinity_t get_thread_affinity( struct thread *thread )
         unsigned int i;
 
         if (!sched_getaffinity( thread->unix_tid, sizeof(set), &set ))
+        {
             for (i = 0; i < 8 * sizeof(mask); i++)
-                if (CPU_ISSET( i, &set )) mask |= (affinity_t)1 << i;
+                if (CPU_ISSET( i, &set ))
+                {
+                    if (thread->process->cpu_override.cpu_count)
+                    {
+                        if (i < ARRAY_SIZE(thread->process->wine_cpu_id_from_host))
+                            mask |= (affinity_t)1 << thread->process->wine_cpu_id_from_host[i];
+                    }
+                    else
+                    {
+                        mask |= (affinity_t)1 << i;
+                    }
+                }
+        }
     }
 #endif
     if (!mask) mask = ~(affinity_t)0;
@@ -1672,8 +1685,7 @@ DECL_HANDLER(init_first_thread)
     else
     {
         set_thread_priority( current, current->process->priority, current->priority );
-        if (!process->cpu_override.cpu_count)
-            set_thread_affinity( current, current->affinity );
+        set_thread_affinity( current, current->affinity );
     }
 
     debug_level = max( debug_level, req->debug_level );
@@ -1706,8 +1718,7 @@ DECL_HANDLER(init_thread)
     init_thread_context( current );
     generate_debug_event( current, DbgCreateThreadStateChange, &req->entry );
     set_thread_priority( current, current->process->priority, current->priority );
-    if (!current->process->cpu_override.cpu_count)
-        set_thread_affinity( current, current->affinity );
+    set_thread_affinity( current, current->affinity );
 
     reply->suspend = (current->suspend || current->process->suspend || current->context != NULL);
 }
