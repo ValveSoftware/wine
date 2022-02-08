@@ -768,8 +768,8 @@ affinity_t get_thread_affinity( struct thread *thread )
                 {
                     if (thread->process->cpu_override.cpu_count)
                     {
-                        if (i > ARRAY_SIZE(thread->process->wine_cpu_id_from_host)) return ~(affinity_t)0;
-                        mask |= (affinity_t)1 << thread->process->wine_cpu_id_from_host[i];
+                        if (i < ARRAY_SIZE(thread->process->wine_cpu_id_from_host))
+                            mask |= (affinity_t)1 << thread->process->wine_cpu_id_from_host[i];
                     }
                     else
                     {
