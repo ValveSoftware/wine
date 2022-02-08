@@ -1331,6 +1331,24 @@ DECL_HANDLER(init_process_done)
     const pe_image_info_t *image_info;
     const struct cpu_topology_override *cpu_override = get_req_data();
     unsigned int have_cpu_override = get_req_data_size() / sizeof(*cpu_override);
+    unsigned int i;
+
+    if (have_cpu_override)
+    {
+        if (cpu_override->cpu_count > ARRAY_SIZE(process->wine_cpu_id_from_host))
+        {
+            set_error( STATUS_INVALID_PARAMETER );
+            return;
+        }
+        for (i = 0; i < cpu_override->cpu_count; ++i)
+        {
+            if (cpu_override->host_cpu_id[i] >= ARRAY_SIZE(process->wine_cpu_id_from_host))
+            {
+                set_error( STATUS_INVALID_PARAMETER );
+                return;
+            }
+        }
+    }
 
     if (is_process_init_done(process))
     {
@@ -1358,7 +1376,12 @@ DECL_HANDLER(init_process_done)
     reply->suspend = (current->suspend || process->suspend);
 
     if (have_cpu_override)
+    {
         process->cpu_override = *cpu_override;
+        memset( process->wine_cpu_id_from_host, 0, sizeof(process->wine_cpu_id_from_host) );
+        for (i = 0; i < process->cpu_override.cpu_count; ++i)
+            process->wine_cpu_id_from_host[process->cpu_override.host_cpu_id[i]] = i;
+    }
 }
 
 /* open a handle to a process */
