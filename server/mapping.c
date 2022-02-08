@@ -268,6 +268,7 @@ int grow_file( int unix_fd, file_pos_t new_size )
     return 0;
 }
 
+#ifndef HAVE_MEMFD_CREATE
 /* simplified version of mkstemps() */
 static int make_temp_file( char name[16] )
 {
@@ -301,10 +302,23 @@ static int check_current_dir_for_exec(void)
     unlink( tmpfn );
     return (ret != MAP_FAILED);
 }
+#endif
 
 /* create a temp file for anonymous mappings */
 static int create_temp_file( file_pos_t size )
 {
+#ifdef HAVE_MEMFD_CREATE
+    int fd = memfd_create( "wine-mapping", MFD_ALLOW_SEALING );
+    if (fd != -1)
+    {
+        if (!grow_file( fd, size ))
+        {
+            close( fd );
+            fd = -1;
+        }
+    }
+    else file_set_error();
+#else
     static int temp_dir_fd = -1;
     char tmpfn[16];
     int fd;
@@ -337,6 +351,7 @@ static int create_temp_file( file_pos_t size )
     else file_set_error();
 
     if (temp_dir_fd != server_dir_fd) fchdir( server_dir_fd );
+#endif
     return fd;
 }
 
@@ -1103,6 +1118,10 @@ int get_page_size(void)
     return page_mask + 1;
 }
 
+#ifndef F_SEAL_FUTURE_WRITE
+#define F_SEAL_FUTURE_WRITE 0x0010  /* prevent future writes while mapped */
+#endif
+
 struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,
                                          unsigned int attr, const struct security_descriptor *sd )
 {
@@ -1112,6 +1131,7 @@ struct object *create_user_data_mapping( struct object *root, const struct unico
     if (!(mapping = create_mapping( root, name, attr, sizeof(KSHARED_USER_DATA),
                                     SEC_COMMIT, 0, FILE_READ_DATA | FILE_WRITE_DATA, sd ))) return NULL;
     ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
+
     if (ptr != MAP_FAILED)
     {
         user_shared_data = ptr;
@@ -1123,11 +1143,15 @@ struct object *create_user_data_mapping( struct object *root, const struct unico
 struct object *create_shared_mapping( struct object *root, const struct unicode_str *name,
                                       mem_size_t size, const struct security_descriptor *sd, void **ptr )
 {
+    static int seals = F_SEAL_FUTURE_WRITE | F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL;
     struct mapping *mapping;
 
     if (!(mapping = create_mapping( root, name, OBJ_OPENIF, size, SEC_COMMIT, 0,
                                     FILE_READ_DATA | FILE_WRITE_DATA, sd ))) return NULL;
     *ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
+
+    fcntl( get_unix_fd( mapping->fd ), F_ADD_SEALS, seals );
+
     if (*ptr == MAP_FAILED)
     {
         release_object( &mapping->obj );
