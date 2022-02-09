@@ -153,6 +153,7 @@ struct source_reader
     IMFAsyncCallback source_events_callback;
     IMFAsyncCallback stream_events_callback;
     IMFAsyncCallback async_commands_callback;
+    LONG internal_refcount;
     LONG refcount;
     IMFMediaSource *source;
     IMFPresentationDescriptor *descriptor;
@@ -202,6 +203,9 @@ static struct media_stream *impl_stream_from_IMFVideoSampleAllocatorNotify(IMFVi
 {
     return CONTAINING_RECORD(iface, struct media_stream, notify_cb);
 }
+
+static ULONG WINAPI src_reader_internal_addref(struct source_reader *reader);
+static ULONG WINAPI src_reader_internal_release(struct source_reader *reader);
 
 static HRESULT WINAPI source_reader_async_command_QueryInterface(IUnknown *iface, REFIID riid, void **obj)
 {
@@ -325,13 +329,13 @@ static HRESULT WINAPI source_reader_callback_QueryInterface(IMFAsyncCallback *if
 static ULONG WINAPI source_reader_source_events_callback_AddRef(IMFAsyncCallback *iface)
 {
     struct source_reader *reader = impl_from_source_callback_IMFAsyncCallback(iface);
-    return IMFSourceReader_AddRef(&reader->IMFSourceReader_iface);
+    return src_reader_internal_addref(reader);
 }
 
 static ULONG WINAPI source_reader_source_events_callback_Release(IMFAsyncCallback *iface)
 {
     struct source_reader *reader = impl_from_source_callback_IMFAsyncCallback(iface);
-    return IMFSourceReader_Release(&reader->IMFSourceReader_iface);
+    return src_reader_internal_release(reader);
 }
 
 static HRESULT WINAPI source_reader_callback_GetParameters(IMFAsyncCallback *iface,
@@ -611,13 +615,13 @@ static const IMFAsyncCallbackVtbl source_events_callback_vtbl =
 static ULONG WINAPI source_reader_stream_events_callback_AddRef(IMFAsyncCallback *iface)
 {
     struct source_reader *reader = impl_from_stream_callback_IMFAsyncCallback(iface);
-    return IMFSourceReader_AddRef(&reader->IMFSourceReader_iface);
+    return src_reader_internal_addref(reader);
 }
 
 static ULONG WINAPI source_reader_stream_events_callback_Release(IMFAsyncCallback *iface)
 {
     struct source_reader *reader = impl_from_stream_callback_IMFAsyncCallback(iface);
-    return IMFSourceReader_Release(&reader->IMFSourceReader_iface);
+    return src_reader_internal_release(reader);
 }
 
 static HRESULT source_reader_pull_stream_samples(struct source_reader *reader, struct media_stream *stream)
@@ -888,13 +892,13 @@ static const IMFAsyncCallbackVtbl stream_events_callback_vtbl =
 static ULONG WINAPI source_reader_async_commands_callback_AddRef(IMFAsyncCallback *iface)
 {
     struct source_reader *reader = impl_from_async_commands_callback_IMFAsyncCallback(iface);
-    return IMFSourceReader_AddRef(&reader->IMFSourceReader_iface);
+    return src_reader_internal_addref(reader);
 }
 
 static ULONG WINAPI source_reader_async_commands_callback_Release(IMFAsyncCallback *iface)
 {
     struct source_reader *reader = impl_from_async_commands_callback_IMFAsyncCallback(iface);
-    return IMFSourceReader_Release(&reader->IMFSourceReader_iface);
+    return src_reader_internal_release(reader);
 }
 
 static struct stream_response * media_stream_detach_response(struct source_reader *reader, struct stream_response *response)
@@ -1337,16 +1341,34 @@ static ULONG WINAPI src_reader_Release(IMFSourceReader *iface)
 {
     struct source_reader *reader = impl_from_IMFSourceReader(iface);
     ULONG refcount = InterlockedDecrement(&reader->refcount);
-    unsigned int i;
 
     TRACE("%p, refcount %u.\n", iface, refcount);
 
     if (!refcount)
     {
-        if (reader->async_callback)
-            IMFSourceReaderCallback_Release(reader->async_callback);
         if (reader->flags & SOURCE_READER_SHUTDOWN_ON_RELEASE)
             IMFMediaSource_Shutdown(reader->source);
+        src_reader_internal_release(reader);
+    }
+
+    return refcount;
+}
+
+static ULONG WINAPI src_reader_internal_addref(struct source_reader *reader)
+{
+    ULONG refcount = InterlockedIncrement(&reader->internal_refcount);
+    return refcount;
+}
+
+static ULONG WINAPI src_reader_internal_release(struct source_reader *reader)
+{
+    ULONG refcount = InterlockedDecrement(&reader->internal_refcount);
+    unsigned int i;
+
+    if (!refcount)
+    {
+        if (reader->async_callback)
+            IMFSourceReaderCallback_Release(reader->async_callback);
         if (reader->descriptor)
             IMFPresentationDescriptor_Release(reader->descriptor);
         if (reader->attributes)
@@ -2277,6 +2299,7 @@ static HRESULT create_source_reader_from_source(IMFMediaSource *source, IMFAttri
     object->source_events_callback.lpVtbl = &source_events_callback_vtbl;
     object->stream_events_callback.lpVtbl = &stream_events_callback_vtbl;
     object->async_commands_callback.lpVtbl = &async_commands_callback_vtbl;
+    object->internal_refcount = 1;
     object->refcount = 1;
     list_init(&object->responses);
     if (shutdown_on_release)
