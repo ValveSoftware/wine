@@ -28,8 +28,6 @@
 #include "d3d9.h"
 #include "evr.h"
 
-#include "wine/debug.h"
-
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
 #define ALIGN_SIZE(size, alignment) (((size) + (alignment)) & ~((alignment)))
