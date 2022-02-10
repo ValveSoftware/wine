@@ -127,7 +127,8 @@ static const SIZE_T teb_size = 0x3800;  /* TEB64 + TEB32 + debug info */
 static const SIZE_T signal_stack_mask = 0xffff;
 static const SIZE_T signal_stack_size = 0x10000 - 0x3800;
 static const SIZE_T kernel_stack_size = 0x100000;
-static const SIZE_T min_kernel_stack  = 0x2000;
+static const SIZE_T kernel_stack_guard_size = 0x1000;
+static const SIZE_T min_kernel_stack  = 0x3000;
 static const LONG teb_offset = 0x2000;
 
 #define FILE_WRITE_TO_END_OF_FILE      ((LONGLONG)-1)
@@ -386,6 +387,13 @@ static inline BOOL is_inside_signal_stack( void *ptr )
 {
     return ((char *)ptr >= (char *)get_signal_stack() &&
             (char *)ptr < (char *)get_signal_stack() + signal_stack_size);
+}
+
+static inline BOOL is_inside_syscall_stack_guard( const char *stack_ptr )
+{
+    const char *kernel_stack = ntdll_get_thread_data()->kernel_stack;
+
+    return (stack_ptr >= kernel_stack && stack_ptr < kernel_stack + kernel_stack_guard_size);
 }
 
 static inline void mutex_lock( pthread_mutex_t *mutex )

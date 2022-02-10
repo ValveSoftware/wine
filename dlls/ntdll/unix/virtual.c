@@ -3929,6 +3929,12 @@ NTSTATUS virtual_alloc_thread_stack( INITIAL_TEB *stack, ULONG_PTR limit_low, UL
                         VPROT_READ | VPROT_WRITE | VPROT_COMMITTED | VPROT_GUARD );
         mprotect_range( view->base, 2 * page_size , 0, 0 );
     }
+    else
+    {
+        /* setup kernel stack no access guard page */
+        set_page_vprot( view->base, kernel_stack_guard_size, VPROT_COMMITTED | VPROT_READ );
+        mprotect_range( view->base, kernel_stack_guard_size, 0, 0 );
+    }
     VIRTUAL_DEBUG_DUMP_VIEW( view );
 
     /* note: limit is lower than base since the stack grows down */
