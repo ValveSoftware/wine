@@ -3225,6 +3225,7 @@ NTSTATUS virtual_alloc_thread_stack( INITIAL_TEB *stack, ULONG_PTR zero_bits, SI
                                      SIZE_T commit_size, SIZE_T extra_size )
 {
     struct file_view *view;
+    char *kernel_stack;
     NTSTATUS status;
     sigset_t sigset;
     SIZE_T size;
@@ -3268,6 +3269,10 @@ NTSTATUS virtual_alloc_thread_stack( INITIAL_TEB *stack, ULONG_PTR zero_bits, SI
             delete_view( view );
             goto done;
         }
+        /* setup kernel stack no access guard page */
+        kernel_stack = (char *)view->base + view->size;
+        set_page_vprot( kernel_stack, kernel_stack_guard_size, VPROT_COMMITTED );
+        mprotect_range( kernel_stack, kernel_stack_guard_size, 0, 0 );
     }
 
     /* note: limit is lower than base since the stack grows down */
