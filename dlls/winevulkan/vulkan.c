@@ -2187,6 +2187,7 @@ NTSTATUS wine_vkCreateSwapchainKHR(void *args)
     {
         uint32_t count;
         VkSurfaceCapabilitiesKHR caps = {0};
+        VkFormatProperties formatProperties = {0};
 
         device->phys_dev->instance->funcs.p_vkGetPhysicalDeviceQueueFamilyProperties(device->phys_dev->phys_dev, &count, NULL);
 
@@ -2215,6 +2216,11 @@ NTSTATUS wine_vkCreateSwapchainKHR(void *args)
         if(native_info.imageFormat != VK_FORMAT_B8G8R8A8_UNORM &&
                 native_info.imageFormat != VK_FORMAT_B8G8R8A8_SRGB){
             FIXME("swapchain image format is not BGRA8 UNORM/SRGB. Things may go badly. %d\n", native_info.imageFormat);
+        }
+
+        device->phys_dev->instance->funcs.p_vkGetPhysicalDeviceFormatProperties(device->phys_dev->phys_dev, native_info.imageFormat, &formatProperties);
+        if(!(formatProperties.optimalTilingFeatures & VK_FORMAT_FEATURE_STORAGE_IMAGE_BIT)){
+            native_info.imageFormat = VK_FORMAT_B8G8R8A8_UNORM;
         }
 
         object->fs_hack_enabled = TRUE;
