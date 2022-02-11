@@ -2208,6 +2208,10 @@ NTSTATUS wine_vkCreateSwapchainKHR(void *args)
         native_info.imageExtent = object->real_extent;
         native_info.imageUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT; /* XXX: check if supported by surface */
 
+        if (caps.supportedUsageFlags & VK_IMAGE_USAGE_STORAGE_BIT){
+            native_info.imageUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
+        }
+
         if(native_info.imageFormat != VK_FORMAT_B8G8R8A8_UNORM &&
                 native_info.imageFormat != VK_FORMAT_B8G8R8A8_SRGB){
             FIXME("swapchain image format is not BGRA8 UNORM/SRGB. Things may go badly. %d\n", native_info.imageFormat);
