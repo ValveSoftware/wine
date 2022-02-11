@@ -682,9 +682,17 @@ extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
 extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
 extern BOOL wm_is_steamcompmgr(Display *) DECLSPEC_HIDDEN;
 
+enum fs_hack_upscaler
+{
+    X11_DRV_UPSCALER_NONE,
+    X11_DRV_UPSCALER_BLIT,
+    X11_DRV_UPSCALER_NIS
+};
+
 extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_enabled(HMONITOR monitor) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_mapping_required(HMONITOR monitor) DECLSPEC_HIDDEN;
+enum fs_hack_upscaler fs_hack_upscaler(void) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_is_integer(void) DECLSPEC_HIDDEN;
 extern HMONITOR fs_hack_monitor_from_hwnd(HWND hwnd) DECLSPEC_HIDDEN;
 extern HMONITOR fs_hack_monitor_from_rect(const RECT *rect) DECLSPEC_HIDDEN;

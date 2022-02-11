@@ -535,6 +535,31 @@ BOOL fs_hack_is_integer(void)
     return is_int;
 }
 
+enum fs_hack_upscaler fs_hack_upscaler()
+{
+    static enum fs_hack_upscaler upscaler = X11_DRV_UPSCALER_NONE;
+
+    if (upscaler == X11_DRV_UPSCALER_NONE)
+    {
+        const char *e = getenv("WINE_FULLSCREEN_UPSCALER");
+        if (e && !strcmp(e, "NIS"))
+        {
+            upscaler = X11_DRV_UPSCALER_NIS;
+        }
+        else if (e == NULL || !strcmp(e, "BLIT"))
+        {
+            upscaler = X11_DRV_UPSCALER_BLIT;
+        }
+        else
+        {
+            WARN("WINE_FULLSCREEN_UPSCALER is not a valid name defaulting to BLIT upscaler\n");
+            upscaler = X11_DRV_UPSCALER_BLIT;
+        }
+    }
+    TRACE("upscaler: %s", (upscaler == X11_DRV_UPSCALER_NIS) ? "NIS" : "BLIT");
+    return upscaler;
+}
+
 HMONITOR fs_hack_monitor_from_rect(const RECT *in_rect)
 {
     RECT rect = *in_rect;

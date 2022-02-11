@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+#
+# Copyright 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+#
+# This library is free software; you can redistribute it and/or
+# modify it under the terms of the GNU Lesser General Public
+#  License as published by the Free Software Foundation; either
+# version 2.1 of the License, or (at your option) any later version.
+#
+# This library is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+# Lesser General Public License for more details.
+#
+# You should have received a copy of the GNU Lesser General Public
+# License along with this library; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+#
+
+import re
+
+header = """/*
+ * Copyright 2022 NVIDIA CORPORATION & AFFILIATES. All rights reserved. 
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+/*
+ * This file has been generated from the generate_nis script
+ * DO NOT EDIT!
+ */
+
+#include <stdint.h>
+
+"""
+
+def update_whitespace(string):
+    update = ""
+    for line in string.splitlines():
+        updated_line = line.lstrip()
+        if line != updated_line and updated_line != "};":
+            update += "\t" + updated_line + "\n"
+        else:
+            update += updated_line + "\n"
+    return update
+
+def extract_fp32_coeffs(nis_conf_header):
+    m = re.search("float coef_scale\[kPhaseCount\]\[kFilterSize\].*?\=.*?\{.*?\};", nis_conf_header, flags=re.DOTALL)
+    if m is None:
+        print("Failed to find coef_scale array")
+        exit(-1)
+
+    scaler_coeffs = "const " + m.group(0)
+    scaler_coeffs = update_whitespace(scaler_coeffs)
+    
+    m = re.search("float coef_usm\[kPhaseCount\]\[kFilterSize\].*?\=.*?\{.*?\};", nis_conf_header, flags=re.DOTALL)
+    if m is None:
+        print("Failed to find coef_usm array")
+        exit(-1)
+
+    usm_coeffs = "const " + m.group(0)
+    usm_coeffs = update_whitespace(usm_coeffs)
+
+    return scaler_coeffs + "\n" + usm_coeffs + "\n"
+
+def extract_fp16_coeffs(nis_conf_header):
+    m = re.search("uint16_t coef_scale_fp16\[kPhaseCount\]\[kFilterSize\].*?\=.*?\{.*?\};", nis_conf_header, flags=re.DOTALL)
+    if m is None:
+        print("Failed to find coef_scale_fp16 array")
+        exit(-1)
+
+    scaler_coeffs = "const " + m.group(0)
+    scaler_coeffs = update_whitespace(scaler_coeffs)
+
+    m = re.search("uint16_t coef_usm_fp16\[kPhaseCount\]\[kFilterSize\].*?\=.*?\{.*?\};", nis_conf_header, flags=re.DOTALL)
+    if m is None:
+        print("Failed to find coef_usm_fp16 array")
+        exit(-1)
+
+    usm_coeffs = "const " + m.group(0)
+    usm_coeffs = update_whitespace(usm_coeffs)
+
+    return scaler_coeffs + "\n" + usm_coeffs + "\n"
+
+def extract_coeffs_size(nis_conf_header):
+    m = re.search("kPhaseCount = [0-9]+", nis_conf_header)
+    if m is None:
+        print("Failed to find kPhaseCount value")
+        exit(-1)
+
+    phase_count = int(''.join(filter(str.isdigit, m.group(0))))
+
+    m = re.search("kFilterSize = [0-9]+", nis_conf_header)
+    if m is None:
+        print("Failed to find kFilterSize value")
+        exit(-1)
+
+    filter_size = int(''.join(filter(str.isdigit, m.group(0))))
+
+    return "#define kPhaseCount {0}\n#define kFilterSize {1}\n\n".format(phase_count, filter_size)
+
+def extract_config_struct(nis_conf_header):
+    m = re.search("struct.*?NISConfig.*?\{.*?\};", nis_conf_header, flags=re.DOTALL)
+    if m is None:
+        print("Failed to find NISConfig struct")
+        exit(-1)
+
+    nis_struct = update_whitespace(m.group(0))
+    nis_struct = nis_struct.replace("NISConfig", "nis_config")
+    nis_struct = nis_struct.replace("NIS_ALIGNED(256)", "__attribute__ ((aligned(256)))")
+
+    return nis_struct + "\n"
+
+def main():
+    nis_conf_header = ""
+    with open("../../libs/nis/NIS/NIS_Config.h", 'r') as f:
+        nis_conf_header = f.read()
+
+    nis_header = header
+    nis_header += "#ifndef __WINE_NIS_H\n"
+    nis_header += "#define __WINE_NIS_H\n\n"
+    nis_header += extract_config_struct(nis_conf_header)
+    nis_header += extract_coeffs_size(nis_conf_header)
+    nis_header += extract_fp32_coeffs(nis_conf_header)
+    nis_header += extract_fp16_coeffs(nis_conf_header)
+    nis_header += "#endif\n"
+
+    # Write everything out to the C89 nis.h
+    with open("nis.h", 'w') as f:
+        f.write(nis_header)
+
+if __name__ == "__main__":
+    main()

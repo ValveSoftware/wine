@@ -906,9 +906,10 @@ static VkSurfaceKHR X11DRV_wine_get_native_surface(VkSurfaceKHR surface)
 }
 
 static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz,
-        VkRect2D *dst_blit, VkFilter *filter)
+        VkRect2D *dst_blit, VkFilter *filter, BOOL *is_nis)
 {
     struct wine_vk_surface *x11_surface = surface_from_handle(surface);
+    enum fs_hack_upscaler upscaler;
     HMONITOR monitor;
     HWND hwnd;
 
@@ -957,6 +958,11 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
         if (filter)
             *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
 
+        if (is_nis){
+            upscaler = fs_hack_upscaler();
+            *is_nis = (upscaler == X11_DRV_UPSCALER_NIS);
+        }
+
         return VK_TRUE;
     }
     else if (fs_hack_enabled(monitor))
@@ -988,6 +994,11 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
 
         if(filter)
             *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
+
+        if (is_nis){
+            upscaler = fs_hack_upscaler();
+            *is_nis = (upscaler == X11_DRV_UPSCALER_NIS);
+        }
 
         return VK_TRUE;
     }

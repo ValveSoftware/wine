@@ -39,6 +39,7 @@
 #include "ntuser.h"
 
 extern struct upscaler_implementation blit_upscaler;
+extern struct upscaler_implementation nis_upscaler;
 
 WINE_DEFAULT_DEBUG_CHANNEL(vulkan);
 
@@ -2166,6 +2167,7 @@ NTSTATUS wine_vkCreateSwapchainKHR(void *args)
     VkResult result;
     VkExtent2D user_sz;
     struct VkSwapchainKHR_T *object;
+    BOOL is_nis;
 
     TRACE("%p, %p, %p, %p\n", device, create_info, allocator, swapchain);
 
@@ -2181,7 +2183,7 @@ NTSTATUS wine_vkCreateSwapchainKHR(void *args)
         native_info.oldSwapchain = ((struct VkSwapchainKHR_T *)(UINT_PTR)native_info.oldSwapchain)->swapchain;
 
     if(vk_funcs->query_fs_hack &&
-            vk_funcs->query_fs_hack(native_info.surface, &object->real_extent, &user_sz, &object->blit_dst, &object->fs_hack_filter) &&
+            vk_funcs->query_fs_hack(native_info.surface, &object->real_extent, &user_sz, &object->blit_dst, &object->fs_hack_filter, &is_nis) &&
             native_info.imageExtent.width == user_sz.width &&
             native_info.imageExtent.height == user_sz.height)
     {
@@ -2248,7 +2250,11 @@ NTSTATUS wine_vkCreateSwapchainKHR(void *args)
             return result;
         }
 
-        object->upscaler = &blit_upscaler;
+        if (is_nis){
+            object->upscaler = &nis_upscaler;
+        }else{
+            object->upscaler = &blit_upscaler;
+        }
 
         /* FIXME: would be nice to do this on-demand, but games can use up all
          * memory so we fail to allocate later */
@@ -2357,7 +2363,7 @@ NTSTATUS wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(void *args)
         adjust_max_image_count(phys_dev, capabilities);
 
     if (res == VK_SUCCESS && vk_funcs->query_fs_hack &&
-            vk_funcs->query_fs_hack(wine_surface_from_handle(surface)->driver_surface, NULL, &user_res, NULL, NULL)){
+            vk_funcs->query_fs_hack(wine_surface_from_handle(surface)->driver_surface, NULL, &user_res, NULL, NULL, NULL)){
         capabilities->currentExtent = user_res;
         capabilities->minImageExtent = user_res;
         capabilities->maxImageExtent = user_res;
@@ -2383,7 +2389,7 @@ NTSTATUS wine_vkGetPhysicalDeviceSurfaceCapabilities2KHR(void *args)
         adjust_max_image_count(phys_dev, &capabilities->surfaceCapabilities);
 
     if (res == VK_SUCCESS && vk_funcs->query_fs_hack &&
-            vk_funcs->query_fs_hack(wine_surface_from_handle(surface_info->surface)->driver_surface, NULL, &user_res, NULL, NULL)){
+            vk_funcs->query_fs_hack(wine_surface_from_handle(surface_info->surface)->driver_surface, NULL, &user_res, NULL, NULL, NULL)){
         capabilities->surfaceCapabilities.currentExtent = user_res;
         capabilities->surfaceCapabilities.minImageExtent = user_res;
         capabilities->surfaceCapabilities.maxImageExtent = user_res;
