@@ -9,6 +9,7 @@ C_SRCS = \
 	loader.c \
 	loader_thunks.c \
 	vulkan.c \
+	blit.c \
 	vulkan_thunks.c
 
 RC_SRCS = winevulkan.rc

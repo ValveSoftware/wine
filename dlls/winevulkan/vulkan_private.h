@@ -77,7 +77,7 @@ struct fs_hack_image
     VkImage user_image;
     VkSemaphore blit_finished;
     VkImageView user_view, blit_view;
-    VkDescriptorSet descriptor_set;
+    void* upscaler_data;
 };
 
 struct VkSwapchainKHR_T
@@ -95,13 +95,17 @@ struct VkSwapchainKHR_T
     uint32_t n_images;
     struct fs_hack_image *fs_hack_images; /* struct fs_hack_image[n_images] */
     VkFilter fs_hack_filter;
-    VkSampler sampler;
-    VkDescriptorPool descriptor_pool;
-    VkDescriptorSetLayout descriptor_set_layout;
-    VkPipelineLayout pipeline_layout;
-    VkPipeline pipeline;
+    struct upscaler_implementation *upscaler;
+    void* upscaler_data;
 
     struct wine_vk_mapping mapping;
+};
+
+struct upscaler_implementation
+{
+    VkResult (*init)(VkDevice device, struct VkSwapchainKHR_T *swapchain);
+    VkResult (*record_cmd)(VkDevice device, struct VkSwapchainKHR_T *swapchain, struct fs_hack_image *hack, uint32_t queue_idx);
+    void (*destroy)(VkDevice device, struct VkSwapchainKHR_T *swapchain);
 };
 
 struct wine_debug_utils_messenger;
