@@ -576,6 +576,9 @@ NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
     if ((ret = get_object( handle, &obj ))) return ret;
     event = obj->shm;
 
+    if (obj->type != FSYNC_MANUAL_EVENT && obj->type != FSYNC_AUTO_EVENT)
+        return STATUS_OBJECT_TYPE_MISMATCH;
+
     if (!(current = __atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST )))
         futex_wake( &event->signaled, INT_MAX );
 
