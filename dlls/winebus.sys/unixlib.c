@@ -39,7 +39,7 @@
 
 #include "unix_private.h"
 
-BOOL is_wine_blacklisted(DWORD vid, DWORD pid)
+BOOL is_wine_blacklisted(WORD vid, WORD pid)
 {
     int i;
 
