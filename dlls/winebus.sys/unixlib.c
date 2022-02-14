@@ -53,7 +53,7 @@ BOOL is_wine_blacklisted(DWORD vid, DWORD pid)
 }
 
 /* logic from SDL2's SDL_ShouldIgnoreGameController */
-BOOL is_sdl_blacklisted(DWORD vid, DWORD pid)
+BOOL is_sdl_blacklisted(WORD vid, WORD pid)
 {
     const char *allow_virtual = getenv("SDL_GAMECONTROLLER_ALLOW_STEAM_VIRTUAL_GAMEPAD");
     const char *whitelist = getenv("SDL_GAMECONTROLLER_IGNORE_DEVICES_EXCEPT");
