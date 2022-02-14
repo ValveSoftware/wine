@@ -2241,23 +2241,11 @@ BOOL ac_odyssey;
 static void hacks_init(void)
 {
     static const char ac_odyssey_exe[] = "ACOdyssey.exe";
-    char cur_exe[MAX_PATH];
-    DWORD cur_exe_len;
     const char *sgi;
-    int fd;
 
-    fd = open("/proc/self/comm", O_RDONLY);
-    cur_exe_len = read(fd, cur_exe, sizeof(cur_exe));
-    close(fd);
-    cur_exe[cur_exe_len - 1] = 0;
-
-    if (!strcasecmp(cur_exe, ac_odyssey_exe))
+    if (main_argc > 1 && strstr(main_argv[1], ac_odyssey_exe))
     {
-        if (do_esync() || do_fsync())
-            ERR("HACK: AC Odyssey sync tweak on.\n");
-        else
-            ERR("Not enabling AC Odyssey sync tweak as esync and fsync are disabled.\n");
-
+        ERR("HACK: AC Odyssey sync tweak on.\n");
         ac_odyssey = TRUE;
         return;
     }
