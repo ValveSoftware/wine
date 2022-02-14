@@ -1,3 +1,4 @@
+EXTRADEFS = -DWINE_NO_LONG_TYPES
 MODULE    = tabtip.exe
 IMPORTS   = uuid ole32 user32 oleacc uiautomationcore rpcrt4 shell32 oleaut32
 
