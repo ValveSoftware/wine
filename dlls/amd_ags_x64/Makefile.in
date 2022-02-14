@@ -1,3 +1,4 @@
+EXTRADEFS = -DWINE_NO_LONG_TYPES
 MODULE    = amd_ags_x64.dll
 IMPORTS   = version vulkan-1 user32
 IMPORTLIB = amd_ags_x64
