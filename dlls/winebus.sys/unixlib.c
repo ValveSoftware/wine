@@ -72,6 +72,7 @@ BOOL is_sdl_blacklisted(DWORD vid, DWORD pid)
 
 BOOL is_steam_controller(WORD vid, WORD pid)
 {
+    if (vid == 0x2808 && pid == 0x1015) return TRUE; /* Steam Deck touchscreen */
     if (vid != 0x28de) return FALSE;
     if (pid == 0x1101) return TRUE; /* Valve Legacy Steam Controller */
     if (pid == 0x1102) return TRUE; /* Valve wired Steam Controller */
@@ -80,6 +81,7 @@ BOOL is_steam_controller(WORD vid, WORD pid)
     if (pid == 0x1142) return TRUE; /* Valve wireless Steam Controller */
     if (pid == 0x1201) return TRUE; /* Valve wired Steam Controller */
     if (pid == 0x1202) return TRUE; /* Valve Bluetooth Steam Controller */
+    if (pid == 0x1205) return TRUE; /* Valve Steam Deck Mouse / Keyboard */
     return FALSE;
 }
 
