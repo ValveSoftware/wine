@@ -114,14 +114,11 @@ static inline void futex_vector_set( struct futex_waitv *waitv, int *addr, int v
 
 static void simulate_sched_quantum(void)
 {
-    LARGE_INTEGER now;
-    ULONG64 wait_end;
-
     if (!fsync_simulate_sched_quantum) return;
-
-    NtQuerySystemTime( &now );
-    wait_end = (now.QuadPart / 10 + 499) / 500;
-    usleep( wait_end * 500 - (now.QuadPart / 10) );
+    /* futex wait is often very quick to resume a waiting thread when woken.
+     * That reveals synchonization bugs in some games which happen to work on
+     * Windows due to the waiting threads having some minimal delay to wake up. */
+    usleep(0);
 }
 
 static inline int futex_wait_multiple( const struct futex_waitv *futexes,
