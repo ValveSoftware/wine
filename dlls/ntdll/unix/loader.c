@@ -2262,6 +2262,7 @@ SIZE_T kernel_stack_size = 0x100000;
 long long ram_reporting_bias;
 char *release_reserved_memory_low_bound;
 BOOL alert_simulate_sched_quantum;
+BOOL fsync_simulate_sched_quantum;
 
 static void hacks_init(void)
 {
@@ -2289,6 +2290,14 @@ static void hacks_init(void)
     }
     if (alert_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in NtWaitForAlertByThreadId.\n");
+
+    env_str = getenv("WINE_FSYNC_SIMULATE_SCHED_QUANTUM");
+    if (env_str)
+        fsync_simulate_sched_quantum = !!atoi(env_str);
+    else if (main_argc > 1)
+        fsync_simulate_sched_quantum = !!strstr(main_argv[1], "Ubisoft Game Launcher\\upc.exe");
+    if (fsync_simulate_sched_quantum)
+        ERR("HACK: Simulating sched quantum in fsync.\n");
 
     switch (sgi ? atoi( sgi ) : -1)
     {
