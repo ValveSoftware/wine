@@ -179,6 +179,7 @@ extern struct ldt_copy __wine_ldt_copy;
 #endif
 
 extern BOOL ac_odyssey;
+extern BOOL fsync_simulate_sched_quantum;
 
 extern void init_environment(void);
 extern void init_startup_info(void);

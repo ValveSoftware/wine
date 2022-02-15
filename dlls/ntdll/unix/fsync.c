@@ -111,6 +111,15 @@ static inline void futex_vector_set( struct futex_waitv *waitv, int *addr, int v
     waitv->__reserved = 0;
 }
 
+static void simulate_sched_quantum(void)
+{
+    if (!fsync_simulate_sched_quantum) return;
+    /* futex wait is often very quick to resume a waiting thread when woken.
+     * That reveals synchonization bugs in some games which happen to work on
+     * Windows due to the waiting threads having some minimal delay to wake up. */
+    usleep(0);
+}
+
 static inline int futex_wait_multiple( const struct futex_waitv *futexes,
         int count, const ULONGLONG *end )
 {
@@ -744,8 +753,8 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
     struct futex_waitv futexes[MAXIMUM_WAIT_OBJECTS + 1];
     struct fsync *objs[MAXIMUM_WAIT_OBJECTS];
+    BOOL msgwait = FALSE, waited = FALSE;
     int has_fsync = 0, has_server = 0;
-    BOOL msgwait = FALSE;
     int dummy_futex = 0;
     unsigned int spin;
     LONGLONG timeleft;
@@ -867,6 +876,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                                     && __sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) == current)
                             {
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                if (waited) simulate_sched_quantum();
                                 return i;
                             }
                             small_pause();
@@ -884,6 +894,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         {
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             mutex->count++;
+                            if (waited) simulate_sched_quantum();
                             return i;
                         }
 
@@ -893,6 +904,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             {
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                                 mutex->count = 1;
+                                if (waited) simulate_sched_quantum();
                                 return i;
                             }
                             else if (tid == ~0 && (tid = __sync_val_compare_and_swap( &mutex->tid, ~0, GetCurrentThreadId() )) == ~0)
@@ -920,6 +932,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                                     usleep( 0 );
 
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                if (waited) simulate_sched_quantum();
                                 return i;
                             }
                             small_pause();
@@ -942,6 +955,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                                     usleep( 0 );
 
                                 TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                if (waited) simulate_sched_quantum();
                                 return i;
                             }
                             small_pause();
@@ -996,6 +1010,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                 TRACE("Wait timed out.\n");
                 return STATUS_TIMEOUT;
             }
+            else waited = TRUE;
         } /* while (1) */
     }
     else

@@ -1921,16 +1921,25 @@ static ULONG_PTR get_image_address(void)
 }
 
 BOOL ac_odyssey;
+BOOL fsync_simulate_sched_quantum;
 
 static void hacks_init(void)
 {
     const char *sgi = getenv( "SteamGameId" );
+    const char *env_str;
 
     if (main_argc > 1 && strstr(main_argv[1], "ACOdyssey.exe"))
     {
         ERR("HACK: AC Odyssey sync tweak on.\n");
         ac_odyssey = TRUE;
     }
+    env_str = getenv("WINE_FSYNC_SIMULATE_SCHED_QUANTUM");
+    if (env_str)
+        fsync_simulate_sched_quantum = !!atoi(env_str);
+    else if (main_argc > 1)
+        fsync_simulate_sched_quantum = !!strstr(main_argv[1], "Ubisoft Game Launcher\\upc.exe");
+    if (fsync_simulate_sched_quantum)
+        ERR("HACK: Simulating sched quantum in fsync.\n");
 
     switch (sgi ? atoi( sgi ) : -1)
     {
