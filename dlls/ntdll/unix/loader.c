@@ -1877,13 +1877,15 @@ static struct unix_funcs unix_funcs =
 };
 
 BOOL ac_odyssey;
+BOOL fsync_simulate_sched_quantum;
 
 static void hacks_init(void)
 {
     static const char ac_odyssey_exe[] = "ACOdyssey.exe";
+    static const char upc_exe[] = "upc.exe";
     char cur_exe[MAX_PATH];
     DWORD cur_exe_len;
-    const char *sgi;
+    const char *env_str;
     int fd;
 
     fd = open("/proc/self/comm", O_RDONLY);
@@ -1901,9 +1903,16 @@ static void hacks_init(void)
         ac_odyssey = TRUE;
         return;
     }
+    env_str = getenv("WINE_FSYNC_SIMULATE_SCHED_QUANTUM");
+    if (env_str)
+        fsync_simulate_sched_quantum = !!atoi(env_str);
+    else
+        fsync_simulate_sched_quantum = !strcmp(cur_exe, upc_exe);
+    if (fsync_simulate_sched_quantum)
+        ERR("HACK: Simulating sched quantum in fsync.\n");
 
-    sgi = getenv("SteamGameId");
-    if (sgi && !strcmp(sgi, "50130"))
+    env_str = getenv("SteamGameId");
+    if (env_str && !strcmp(env_str, "50130"))
         setenv("WINESTEAMNOEXEC", "1", 0);
 }
 
