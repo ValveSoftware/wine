@@ -73,7 +73,8 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
         *(strchr(game_exe, '\n')) = 0;
     game_exe_len = MultiByteToWideChar(CP_ACP, 0, game_exe, -1, NULL, 0) - 1;
 
-    if (be_arg)
+    if (!be_arg) arg_len = 0;
+    else
     {
         if (strchr(be_arg, '\r'))
             *(strchr(be_arg, '\r')) = 0;
