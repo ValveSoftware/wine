@@ -407,15 +407,25 @@ static GstCaps *wg_format_to_caps_video(const struct wg_format *format)
     return caps;
 }
 
-static GstCaps *wg_format_to_caps_wma(const struct wg_format *format)
+static GstCaps *wg_format_to_caps_xwma(const struct wg_format *format)
 {
     GstBuffer *buffer;
     GstCaps *caps;
 
-    if (!(caps = gst_caps_new_empty_simple("audio/x-wma")))
-        return NULL;
-    if (format->u.wma.version)
-        gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, format->u.wma.version, NULL);
+    if (format->u.wma.is_xma)
+    {
+        if (!(caps = gst_caps_new_empty_simple("audio/x-xma")))
+            return NULL;
+        if (format->u.wma.version)
+            gst_caps_set_simple(caps, "xmaversion", G_TYPE_INT, format->u.wma.version, NULL);
+    }
+    else
+    {
+        if (!(caps = gst_caps_new_empty_simple("audio/x-wma")))
+            return NULL;
+        if (format->u.wma.version)
+            gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, format->u.wma.version, NULL);
+    }
 
     if (format->u.wma.bitrate)
         gst_caps_set_simple(caps, "bitrate", G_TYPE_INT, format->u.wma.bitrate, NULL);
@@ -516,7 +526,7 @@ GstCaps *wg_format_to_caps(const struct wg_format *format)
         case WG_MAJOR_TYPE_MPEG1_AUDIO:
             return wg_format_to_caps_mpeg1_audio(format);
         case WG_MAJOR_TYPE_WMA:
-            return wg_format_to_caps_wma(format);
+            return wg_format_to_caps_xwma(format);
         case WG_MAJOR_TYPE_H264:
             return wg_format_to_caps_h264(format);
         case WG_MAJOR_TYPE_AUDIO:
