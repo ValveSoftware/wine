@@ -104,6 +104,7 @@ struct wg_format
             uint32_t block_align;
             uint32_t codec_data_len;
             unsigned char codec_data[64];
+            bool is_xma;
         } wma;
         struct
         {
