@@ -1854,7 +1854,6 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
             {
                 DWORD size, capacity;
                 INSSBuffer *sample;
-                void *gstcookie;
                 HRESULT hr;
                 BYTE *data;
 
@@ -1864,6 +1863,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
                             stream->index + 1, event.u.buffer.size, &sample, NULL)))
                     {
                         ERR("Failed to allocate stream sample of %u bytes, hr %#x.\n", event.u.buffer.size, hr);
+                        wg_parser_stream_release_buffer(wg_stream);
                         return hr;
                     }
                 }
@@ -1873,6 +1873,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
                             stream->index, event.u.buffer.size, &sample, NULL)))
                     {
                         ERR("Failed to allocate output sample of %u bytes, hr %#x.\n", event.u.buffer.size, hr);
+                        wg_parser_stream_release_buffer(wg_stream);
                         return hr;
                     }
                 }
@@ -1883,6 +1884,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
                     /* FIXME: Should these be pooled? */
                     if (!(object = calloc(1, offsetof(struct buffer, data[event.u.buffer.size]))))
                     {
+                        wg_parser_stream_release_buffer(wg_stream);
                         return E_OUTOFMEMORY;
                     }
 
@@ -1902,12 +1904,9 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
                     ERR("Returned capacity %u is less than requested capacity %u.\n",
                             capacity, event.u.buffer.size);
 
-                wg_parser_stream_retrieve_buffer(wg_stream, NULL, NULL, &gstcookie);
-
-                if (!wg_parser_stream_copy_buffer(wg_stream, gstcookie, data, 0, event.u.buffer.size))
+                if (!wg_parser_stream_copy_buffer(wg_stream, data, 0, event.u.buffer.size))
                 {
                     /* The GStreamer pin has been flushed. */
-                    wg_parser_stream_release_buffer(wg_stream, gstcookie);
                     INSSBuffer_Release(sample);
                     break;
                 }
@@ -1915,7 +1914,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
                 if (FAILED(hr = INSSBuffer_SetLength(sample, event.u.buffer.size)))
                     ERR("Failed to set size %u, hr %#x.\n", event.u.buffer.size, hr);
 
-                wg_parser_stream_release_buffer(wg_stream, gstcookie);
+                wg_parser_stream_release_buffer(wg_stream);
 
                 if (!event.u.buffer.has_pts)
                     FIXME("Missing PTS.\n");

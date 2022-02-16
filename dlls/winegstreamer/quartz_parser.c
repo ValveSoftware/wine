@@ -673,7 +673,6 @@ static HRESULT send_sample(struct parser_source *pin, IMediaSample *sample,
 {
     HRESULT hr;
     BYTE *ptr = NULL;
-    void *gstcookie;
 
     TRACE("offset %u, size %u, sample size %u\n", offset, size, IMediaSample_GetSize(sample));
 
@@ -685,16 +684,11 @@ static HRESULT send_sample(struct parser_source *pin, IMediaSample *sample,
 
     IMediaSample_GetPointer(sample, &ptr);
 
-    wg_parser_stream_retrieve_buffer(pin->wg_stream, NULL, NULL, &gstcookie);
-
-    if (!wg_parser_stream_copy_buffer(pin->wg_stream, gstcookie, ptr, offset, size))
+    if (!wg_parser_stream_copy_buffer(pin->wg_stream, ptr, offset, size))
     {
-        wg_parser_stream_release_buffer(pin->wg_stream, gstcookie);
         /* The GStreamer pin has been flushed. */
         return S_OK;
     }
-
-    wg_parser_stream_release_buffer(pin->wg_stream, gstcookie);
 
     if (event->u.buffer.has_pts)
     {
@@ -798,6 +792,8 @@ static void send_buffer(struct parser_source *pin, const struct wg_parser_event 
             IMediaSample_Release(sample);
         }
     }
+
+    wg_parser_stream_release_buffer(pin->wg_stream);
 }
 
 static DWORD CALLBACK stream_thread(void *arg)
