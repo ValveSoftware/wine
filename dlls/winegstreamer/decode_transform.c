@@ -804,7 +804,7 @@ static HRESULT WINAPI mf_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAGE
             pip_event = get_pipeline_event(decoder);
             assert(pip_event.type == PIPELINE_EVENT_READ_REQUEST);
 
-            wg_parser_push_data(decoder->wg_parser, WG_READ_EOS, NULL, 0, true);
+            wg_parser_push_data(decoder->wg_parser, WG_READ_EOS, NULL, 0);
 
             EnterCriticalSection(&decoder->event_cs);
             decoder->event.type = PIPELINE_EVENT_NONE;
@@ -829,7 +829,7 @@ static HRESULT WINAPI mf_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAGE
             pip_event = get_pipeline_event(decoder);
             assert(pip_event.type == PIPELINE_EVENT_READ_REQUEST);
 
-            wg_parser_push_data(decoder->wg_parser, WG_READ_FLUSHING, NULL, 0, true);
+            wg_parser_push_data(decoder->wg_parser, WG_READ_FLUSHING, NULL, 0);
 
             EnterCriticalSection(&decoder->event_cs);
             decoder->event.type = PIPELINE_EVENT_NONE;
@@ -929,13 +929,13 @@ static HRESULT WINAPI mf_decoder_ProcessInput(IMFTransform *iface, DWORD id, IMF
         if (offset != decoder->offset_tracker)
         {
             ERR("A seek is needed, MFTs don't support this!\n");
-            wg_parser_push_data(decoder->wg_parser, WG_READ_FAILURE, NULL, 0, true);
+            wg_parser_push_data(decoder->wg_parser, WG_READ_FAILURE, NULL, 0);
             IMFMediaBuffer_Unlock(buffer);
             hr = E_FAIL;
             goto done;
         }
 
-        wg_parser_push_data(decoder->wg_parser, WG_READ_SUCCESS, buffer_data, buffer_size, true);
+        wg_parser_push_data(decoder->wg_parser, WG_READ_SUCCESS, buffer_data, buffer_size);
 
         decoder->offset_tracker += copy_size;
 

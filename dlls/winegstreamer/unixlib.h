@@ -246,7 +246,6 @@ struct wg_parser_push_data_params
     enum wg_read_result result;
     const void *data;
     UINT32 size;
-    bool need_copy;
 };
 
 struct wg_parser_get_stream_count_params
