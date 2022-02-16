@@ -692,7 +692,7 @@ static HRESULT WINAPI audio_converter_ProcessInput(IMFTransform *iface, DWORD id
         goto done;
     }
 
-    wg_parser_push_data(converter->parser, WG_READ_SUCCESS, buffer_data, buffer_size, true);
+    wg_parser_push_data(converter->parser, WG_READ_SUCCESS, buffer_data, buffer_size);
 
     IMFMediaBuffer_Unlock(buffer);
     converter->buffer_inflight = TRUE;
