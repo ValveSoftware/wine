@@ -33,202 +33,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(quartz);
 
 DEFINE_GUID(GUID_NULL, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
 
-#define ALIGN_SIZE(size, alignment) (((size) + (alignment)) & ~((alignment)))
-
-static inline struct wg_mf_buffer *impl_from_IMFMediaBuffer(IMFMediaBuffer *iface)
-{
-    return CONTAINING_RECORD(iface, struct wg_mf_buffer, IMFMediaBuffer_iface);
-}
-
-static HRESULT WINAPI memory_buffer_QueryInterface(IMFMediaBuffer *iface, REFIID riid, void **out)
-{
-    struct wg_mf_buffer *buffer = impl_from_IMFMediaBuffer(iface);
-
-    TRACE("%p, %s, %p.\n", iface, debugstr_guid(riid), out);
-
-    if (IsEqualIID(riid, &IID_IMFMediaBuffer) ||
-            IsEqualIID(riid, &IID_IUnknown))
-    {
-        *out = &buffer->IMFMediaBuffer_iface;
-        IMFMediaBuffer_AddRef(iface);
-        return S_OK;
-    }
-
-    FIXME("Unsupported %s.\n", debugstr_guid(riid));
-    *out = NULL;
-    return E_NOINTERFACE;
-}
-
-static ULONG WINAPI memory_buffer_AddRef(IMFMediaBuffer *iface)
-{
-    struct wg_mf_buffer *buffer = impl_from_IMFMediaBuffer(iface);
-    ULONG refcount = InterlockedIncrement(&buffer->refcount);
-
-    TRACE("%p, refcount %u.\n", buffer, refcount);
-
-    return refcount;
-}
-
-static ULONG WINAPI memory_buffer_Release(IMFMediaBuffer *iface)
-{
-    struct wg_mf_buffer *buffer = impl_from_IMFMediaBuffer(iface);
-    ULONG refcount = InterlockedDecrement(&buffer->refcount);
-
-    TRACE("%p, refcount %u.\n", iface, refcount);
-
-    if (!refcount)
-    {
-        free(buffer->data);
-        free(buffer);
-    }
-
-    return refcount;
-}
-
-static HRESULT WINAPI memory_buffer_Lock(IMFMediaBuffer *iface, BYTE **data, DWORD *max_length, DWORD *current_length)
-{
-    struct wg_mf_buffer *buffer = impl_from_IMFMediaBuffer(iface);
-
-    TRACE("%p, %p %p, %p.\n", iface, data, max_length, current_length);
-
-    if (!data)
-        return E_INVALIDARG;
-
-    *data = buffer->data;
-    if (max_length)
-        *max_length = buffer->max_length;
-    if (current_length)
-        *current_length = buffer->current_length;
-
-    return S_OK;
-}
-
-static HRESULT WINAPI memory_buffer_Unlock(IMFMediaBuffer *iface)
-{
-    TRACE("%p.\n", iface);
-
-    return S_OK;
-}
-
-static HRESULT WINAPI memory_buffer_GetCurrentLength(IMFMediaBuffer *iface, DWORD *current_length)
-{
-    struct wg_mf_buffer *buffer = impl_from_IMFMediaBuffer(iface);
-
-    TRACE("%p.\n", iface);
-
-    if (!current_length)
-        return E_INVALIDARG;
-
-    *current_length = buffer->current_length;
-
-    return S_OK;
-}
-
-static HRESULT WINAPI memory_buffer_SetCurrentLength(IMFMediaBuffer *iface, DWORD current_length)
-{
-    struct wg_mf_buffer *buffer = impl_from_IMFMediaBuffer(iface);
-
-    TRACE("%p, %u.\n", iface, current_length);
-
-    if (current_length > buffer->max_length)
-        return E_INVALIDARG;
-
-    buffer->current_length = current_length;
-
-    return S_OK;
-}
-
-static HRESULT WINAPI memory_buffer_GetMaxLength(IMFMediaBuffer *iface, DWORD *max_length)
-{
-    struct wg_mf_buffer *buffer = impl_from_IMFMediaBuffer(iface);
-
-    TRACE("%p, %p.\n", iface, max_length);
-
-    if (!max_length)
-        return E_INVALIDARG;
-
-    *max_length = buffer->max_length;
-
-    return S_OK;
-}
-
-static const IMFMediaBufferVtbl memory_buffer_vtbl =
-{
-    memory_buffer_QueryInterface,
-    memory_buffer_AddRef,
-    memory_buffer_Release,
-    memory_buffer_Lock,
-    memory_buffer_Unlock,
-    memory_buffer_GetCurrentLength,
-    memory_buffer_SetCurrentLength,
-    memory_buffer_GetMaxLength,
-};
-
-struct wg_mf_buffer *create_memory_buffer(DWORD max_length, DWORD alignment)
-{
-    struct wg_mf_buffer *buffer;
-
-    if (!(buffer = calloc(1, sizeof(*buffer))))
-        return NULL;
-
-    if (!(buffer->data = calloc(1, ALIGN_SIZE(max_length, alignment))))
-    {
-        free(buffer);
-        return NULL;
-    }
-
-    buffer->IMFMediaBuffer_iface.lpVtbl = &memory_buffer_vtbl;
-    buffer->refcount = 1;
-    buffer->max_length = max_length;
-    buffer->current_length = 0;
-
-    return buffer;
-}
-
-DWORD CALLBACK allocator_thread(void *arg)
-{
-    struct allocator_thread_data *data = arg;
-    enum wg_parser_alloc_req_type type;
-
-    TRACE("Starting alloc thread for parser %p.\n", data->wg_parser);
-
-    while (!data->done)
-    {
-        DWORD size, align;
-        void *user;
-
-        if (!wg_parser_get_next_alloc_req(data->wg_parser, &type, &size, &align, &user))
-            continue;
-
-        switch (type)
-        {
-            case WG_PARSER_ALLOC_NEW:
-            {
-                struct wg_mf_buffer *buf = create_memory_buffer(size, align ? align : 1);
-                wg_parser_provide_alloc_buffer(data->wg_parser, buf ? buf->data : NULL, buf);
-                break;
-            }
-            case WG_PARSER_ALLOC_FREE:
-            {
-                struct wg_mf_buffer *buf = user;
-                IMFMediaBuffer_Release(&buf->IMFMediaBuffer_iface);
-                wg_parser_provide_alloc_buffer(data->wg_parser, NULL, NULL); /* mark done */
-                break;
-            }
-            default:
-                break;
-        }
-    }
-
-    TRACE("Media source is shutting down; exiting alloc thread.\n");
-    return 0;
-}
-
-HANDLE start_allocator_thread(struct allocator_thread_data *data)
-{
-    return CreateThread(NULL, 0, allocator_thread, data, 0, NULL);
-}
-
 bool array_reserve(void **elements, size_t *capacity, size_t count, size_t size)
 {
     unsigned int new_capacity, max_capacity;
@@ -256,14 +60,12 @@ bool array_reserve(void **elements, size_t *capacity, size_t count, size_t size)
     return TRUE;
 }
 
-struct wg_parser *wg_parser_create(enum wg_parser_type type, bool unlimited_buffering,
-        bool use_wine_allocator)
+struct wg_parser *wg_parser_create(enum wg_parser_type type, bool unlimited_buffering)
 {
     struct wg_parser_create_params params =
     {
         .type = type,
         .unlimited_buffering = unlimited_buffering,
-        .use_wine_allocator = use_wine_allocator,
     };
 
     if (__wine_unix_call(unix_handle, unix_wg_parser_create, &params))
@@ -342,34 +144,6 @@ void wg_parser_push_data(struct wg_parser *parser, enum wg_read_result result, c
     };
 
     __wine_unix_call(unix_handle, unix_wg_parser_push_data, &params);
-}
-
-bool wg_parser_get_next_alloc_req(struct wg_parser *parser, enum wg_parser_alloc_req_type *type,
-        DWORD *size, DWORD *align, void **user)
-{
-    struct wg_parser_get_next_alloc_req_params params =
-    {
-        .parser = parser,
-    };
-    if (__wine_unix_call(unix_handle, unix_wg_parser_get_next_alloc_req, &params))
-        return false;
-    *type = params.type;
-    *size = params.size;
-    *align = params.align;
-    *user = params.user;
-    return true;
-}
-
-void wg_parser_provide_alloc_buffer(struct wg_parser *parser, void *data, void *user)
-{
-    struct wg_parser_provide_alloc_buffer_params params =
-    {
-        .parser = parser,
-        .data = data,
-        .user = user,
-    };
-
-    __wine_unix_call(unix_handle, unix_wg_parser_provide_alloc_buffer, &params);
 }
 
 uint32_t wg_parser_get_stream_count(struct wg_parser *parser)
