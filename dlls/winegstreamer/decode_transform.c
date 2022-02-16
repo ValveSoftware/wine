@@ -971,7 +971,6 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
     struct pipeline_event pip_event;
     IMFMediaBuffer *buffer;
     DWORD buffer_len;
-    void *gstcookie;
     unsigned int i;
     BYTE *data;
     HRESULT hr;
@@ -1121,9 +1120,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
         goto out;
     }
 
-    wg_parser_stream_retrieve_buffer(decoder->wg_stream, NULL, NULL, &gstcookie);
-
-    if (!wg_parser_stream_copy_buffer(decoder->wg_stream, gstcookie, data, 0, min(buffer_len, event.u.buffer.size)))
+    if (!wg_parser_stream_copy_buffer(decoder->wg_stream, data, 0, min(buffer_len, event.u.buffer.size)))
     {
         hr = E_FAIL;
         goto out;
@@ -1153,7 +1150,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
 
     out:
     if (SUCCEEDED(hr))
-        wg_parser_stream_release_buffer(decoder->wg_stream, gstcookie);
+        wg_parser_stream_release_buffer(decoder->wg_stream);
     LeaveCriticalSection(&decoder->cs);
 
     if (FAILED(hr))
