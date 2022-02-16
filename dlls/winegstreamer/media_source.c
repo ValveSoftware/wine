@@ -676,7 +676,7 @@ static DWORD CALLBACK read_thread(void *arg)
          * an error when reading past the file size. */
         if (!size)
         {
-            wg_parser_push_data(source->wg_parser, WG_READ_SUCCESS, data, 0, true);
+            wg_parser_push_data(source->wg_parser, WG_READ_SUCCESS, data, 0);
             continue;
         }
 
@@ -694,7 +694,7 @@ static DWORD CALLBACK read_thread(void *arg)
             ERR("Failed to read %u bytes at offset %I64u, hr %#x.\n", size, offset, hr);
         else if (ret_size != size)
             ERR("Unexpected short read: requested %u bytes, got %u.\n", size, ret_size);
-        wg_parser_push_data(source->wg_parser, SUCCEEDED(hr) ? WG_READ_SUCCESS : WG_READ_FAILURE, data, ret_size, true);
+        wg_parser_push_data(source->wg_parser, SUCCEEDED(hr) ? WG_READ_SUCCESS : WG_READ_FAILURE, data, ret_size);
     }
 
     free(data);
