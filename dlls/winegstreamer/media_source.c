@@ -1489,7 +1489,6 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
 
     object->alloc_thread_data.done = FALSE;
     object->alloc_thread_data.wg_parser = parser;
-    object->alloc_thread_data.log_pfx = "media_source";
     object->alloc_thread = start_allocator_thread(&object->alloc_thread_data);
 
     object->state = SOURCE_OPENING;
