@@ -195,7 +195,7 @@ DWORD CALLBACK allocator_thread(void *arg)
     struct allocator_thread_data *data = arg;
     enum wg_parser_alloc_req_type type;
 
-    TRACE("%s: Starting alloc thread for parser %p.\n", data->log_pfx, data->wg_parser);
+    TRACE("Starting alloc thread for parser %p.\n", data->wg_parser);
 
     while (!data->done)
     {
@@ -211,24 +211,21 @@ DWORD CALLBACK allocator_thread(void *arg)
             {
                 struct wg_mf_buffer *buf = create_memory_buffer(size, align ? align : 1);
                 wg_parser_provide_alloc_buffer(data->wg_parser, buf ? buf->data : NULL, buf);
-                TRACE("%s: Alloc req for %u bytes --> %p\n", data->log_pfx, size, buf);
                 break;
             }
             case WG_PARSER_ALLOC_FREE:
             {
                 struct wg_mf_buffer *buf = user;
-                TRACE("%s: Free req for %p\n", data->log_pfx, buf);
                 IMFMediaBuffer_Release(&buf->IMFMediaBuffer_iface);
                 wg_parser_provide_alloc_buffer(data->wg_parser, NULL, NULL); /* mark done */
                 break;
             }
             default:
-                FIXME("%s: Invalid alloc req?!\n", data->log_pfx);
                 break;
         }
     }
 
-    TRACE("%s: Media source is shutting down; exiting alloc thread.\n", data->log_pfx);
+    TRACE("Media source is shutting down; exiting alloc thread.\n");
     return 0;
 }
 
