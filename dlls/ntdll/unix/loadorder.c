@@ -394,6 +394,7 @@ enum loadorder get_load_order( const UNICODE_STRING *nt_name )
 {
     static const WCHAR easyanticheat_x86W[] = {'e','a','s','y','a','n','t','i','c','h','e','a','t','_','x','8','6','.','d','l','l',0};
     static const WCHAR easyanticheat_x64W[] = {'e','a','s','y','a','n','t','i','c','h','e','a','t','_','x','6','4','.','d','l','l',0};
+    static const WCHAR easyanticheatW[] = {'e','a','s','y','a','n','t','i','c','h','e','a','t','.','d','l','l',0};
     static const WCHAR soW[] = {'s','o',0};
 
     static const WCHAR prefixW[] = {'\\','?','?','\\'};
@@ -411,7 +412,7 @@ enum loadorder get_load_order( const UNICODE_STRING *nt_name )
 
     /* HACK: special logic for easyanticheat bridge: only load the bridge (builtin) if there exists a native version of the library next to the windows version */
     basename = get_basename((WCHAR *)path);
-    if (!wcsicmp(basename, easyanticheat_x86W) || !wcsicmp(basename, easyanticheat_x64W))
+    if (!wcsicmp(basename, easyanticheat_x86W) || !wcsicmp(basename, easyanticheat_x64W) || !wcsicmp(basename, easyanticheatW))
     {
         UNICODE_STRING eac_unix_name;
         OBJECT_ATTRIBUTES attr;
@@ -426,10 +427,12 @@ enum loadorder get_load_order( const UNICODE_STRING *nt_name )
         }
 
         len = wcslen(nt_name->Buffer);
-        eac_unix_name.Buffer = malloc( (len + 1) * sizeof(WCHAR) );
+        eac_unix_name.Buffer = malloc( (len + 5) * sizeof(WCHAR) );
         wcscpy(eac_unix_name.Buffer, nt_name->Buffer);
 
         basename = get_basename(eac_unix_name.Buffer);
+        if (!wcsicmp(basename, easyanticheatW))
+            wcscpy(basename, easyanticheat_x64W);
         wcscpy(&basename[18], soW);
         eac_unix_name.Length = eac_unix_name.MaximumLength = wcslen(eac_unix_name.Buffer) * sizeof(WCHAR);
         InitializeObjectAttributes(&attr, &eac_unix_name, 0, NULL, NULL);
