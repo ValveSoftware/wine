@@ -283,27 +283,12 @@ struct wg_parser_stream_get_event_params
     struct wg_parser_event *event;
 };
 
-struct wg_parser_stream_retrieve_buffer_params
-{
-    struct wg_parser_stream *stream;
-    void **user;
-    uint32_t *offset;
-    void **cookie;
-};
-
 struct wg_parser_stream_copy_buffer_params
 {
     struct wg_parser_stream *stream;
-    void *cookie;
     void *data;
     UINT32 offset;
     UINT32 size;
-};
-
-struct wg_parser_stream_release_buffer_params
-{
-    struct wg_parser_stream *stream;
-    void *cookie;
 };
 
 struct wg_parser_stream_notify_qos_params
@@ -399,7 +384,6 @@ enum unix_funcs
     unix_wg_parser_stream_disable,
 
     unix_wg_parser_stream_get_event,
-    unix_wg_parser_stream_retrieve_buffer,
     unix_wg_parser_stream_copy_buffer,
     unix_wg_parser_stream_release_buffer,
     unix_wg_parser_stream_notify_qos,
