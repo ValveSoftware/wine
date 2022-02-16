@@ -506,39 +506,35 @@ done:
     return ret;
 }
 
-static int battleye_launcher_redirect_hack(const WCHAR *app_name, WCHAR *new_name, DWORD new_name_len, WCHAR **cmd_line)
+/* Returns TRUE if the product name of the app matches the parameter */
+static BOOL product_name_matches(const WCHAR *app_name, const char *match)
 {
-    static const WCHAR belauncherW[] = L"c:\\windows\\system32\\belauncher.exe";
-
     WCHAR full_path[MAX_PATH];
-    WCHAR *p;
-    UINT size;
-    void *block;
     DWORD *translation;
-    char buf[100];
     char *product_name;
-    WCHAR *new_cmd_line;
+    char buf[100];
+    void *block;
+    UINT size;
 
     if (!GetLongPathNameW( app_name, full_path, MAX_PATH )) lstrcpynW( full_path, app_name, MAX_PATH );
     if (!GetFullPathNameW( full_path, MAX_PATH, full_path, NULL )) lstrcpynW( full_path, app_name, MAX_PATH );
 
-    /* We detect the BattlEye launcher executable through the product name property, as the executable name varies */
     size = GetFileVersionInfoSizeExW(0, full_path, NULL);
     if (!size)
-        return 0;
+        return FALSE;
 
     block = HeapAlloc( GetProcessHeap(), 0, size );
 
     if (!GetFileVersionInfoExW(0, full_path, 0, size, block))
     {
         HeapFree( GetProcessHeap(), 0, block );
-        return 0;
+        return FALSE;
     }
 
     if (!VerQueryValueA(block, "\\VarFileInfo\\Translation", (void **) &translation, &size) || size != 4)
     {
         HeapFree( GetProcessHeap(), 0, block );
-        return 0;
+        return FALSE;
     }
 
     sprintf(buf, "\\StringFileInfo\\%08lx\\ProductName", MAKELONG(HIWORD(*translation), LOWORD(*translation)));
@@ -546,16 +542,28 @@ static int battleye_launcher_redirect_hack(const WCHAR *app_name, WCHAR *new_nam
     if (!VerQueryValueA(block, buf, (void **) &product_name, &size))
     {
         HeapFree( GetProcessHeap(), 0, block );
-        return 0;
+        return FALSE;
     }
 
-    if (strcmp(product_name, "BattlEye Launcher"))
+    if (strcmp(product_name, match))
     {
         HeapFree( GetProcessHeap(), 0, block);
-        return 0;
+        return FALSE;
     }
 
     HeapFree( GetProcessHeap(), 0, block );
+    return TRUE;
+}
+
+static int battleye_launcher_redirect_hack(const WCHAR *app_name, WCHAR *new_name, DWORD new_name_len, WCHAR **cmd_line)
+{
+    static const WCHAR belauncherW[] = L"c:\\windows\\system32\\belauncher.exe";
+    WCHAR *new_cmd_line;
+    WCHAR *p;
+
+    /* We detect the BattlEye launcher executable through the product name property, as the executable name varies */
+    if (!product_name_matches(app_name, "BattlEye Launcher"))
+        return 0;
 
     TRACE("Detected launch of a BattlEye Launcher, redirecting to Proton version.\n");
 
@@ -722,6 +730,32 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
     {
         status = STATUS_NO_MEMORY;
         goto done;
+    }
+
+    /* Set PROTON_EAC_LAUNCHER_PROCESS when launching the EAC launcher to let ntdll know to load the native EAC client library.
+      - We don't do this check in ntdll itself because it's harder to get the product name there
+      - we don't overwrite WINEDLLOVERRIDES because it's fetched from the unix environment */
+    {
+        UNICODE_STRING is_eac_launcher_us;
+        UNICODE_STRING one_us;
+
+        WCHAR *new_env = RtlAllocateHeap( GetProcessHeap(), 0, params->EnvironmentSize );
+        memcpy(new_env, params->Environment, params->EnvironmentSize);
+
+        RtlDestroyProcessParameters( params );
+
+        RtlInitUnicodeString( &is_eac_launcher_us, L"PROTON_EAC_LAUNCHER_PROCESS" );
+        RtlInitUnicodeString( &one_us, L"1" );
+        RtlSetEnvironmentVariable( &new_env, &is_eac_launcher_us, product_name_matches(app_name, "EasyAntiCheat Launcher") ? &one_us : NULL );
+
+        params = create_process_params( app_name, tidy_cmdline, cur_dir, new_env, flags | CREATE_UNICODE_ENVIRONMENT, startup_info );
+
+        RtlFreeHeap(GetProcessHeap(), 0, new_env);
+        if (!params)
+        {
+            status = STATUS_NO_MEMORY;
+            goto done;
+        }
     }
 
     if (flags & (DEBUG_PROCESS | DEBUG_ONLY_THIS_PROCESS))
