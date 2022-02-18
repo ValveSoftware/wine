@@ -23,6 +23,12 @@
 
 struct pulse_stream;
 
+enum phys_device_bus_type {
+    phys_device_bus_invalid = -1,
+    phys_device_bus_pci,
+    phys_device_bus_usb
+};
+
 struct pulse_config
 {
     struct
@@ -212,6 +218,21 @@ struct is_started_params
     BOOL started;
 };
 
+struct get_prop_value_params
+{
+    const char *pulse_name;
+    const GUID *guid;
+    const PROPERTYKEY *prop;
+    EDataFlow flow;
+    HRESULT result;
+    VARTYPE vt;
+    union
+    {
+        WCHAR wstr[128];
+        ULONG ulVal;
+    };
+};
+
 enum unix_funcs
 {
     process_attach,
@@ -239,4 +260,5 @@ enum unix_funcs
     set_sample_rate,
     test_connect,
     is_started,
+    get_prop_value,
 };
