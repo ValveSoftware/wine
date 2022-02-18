@@ -1137,7 +1137,10 @@ tryagain:
                 case FSYNC_SEMAPHORE:
                 {
                     struct semaphore *semaphore = obj->shm;
-                    if (__sync_fetch_and_sub( &semaphore->count, 1 ) <= 0)
+                    int current;
+
+                    if (!(current = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST ))
+                            || __sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) != current)
                         goto tooslow;
                     break;
                 }
