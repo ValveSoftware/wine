@@ -1119,6 +1119,7 @@ tryagain:
             for (i = 0; i < count; i++)
             {
                 struct fsync *obj = objs[i];
+                if (!obj) continue;
                 switch (obj->type)
                 {
                 case FSYNC_MUTEX:
@@ -1183,6 +1184,7 @@ tooslow:
             for (--i; i >= 0; i--)
             {
                 struct fsync *obj = objs[i];
+                if (!obj) continue;
                 switch (obj->type)
                 {
                 case FSYNC_MUTEX:
