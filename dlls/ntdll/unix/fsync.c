@@ -83,15 +83,6 @@ struct timespec64
     long long tv_nsec;
 };
 
-static inline void small_pause(void)
-{
-#if defined(__i386__) || defined(__x86_64__)
-    __asm__ __volatile__( "rep;nop" : : : "memory" );
-#else
-    __asm__ __volatile__( "" : : : "memory" );
-#endif
-}
-
 static LONGLONG update_timeout( ULONGLONG end )
 {
     LARGE_INTEGER now;
@@ -153,15 +144,13 @@ static inline int futex_wait( int *addr, int val, const ULONGLONG *end )
         timeout.tv_nsec = (tmp % TICKSPERSEC) * 100;
 
         return syscall( __NR_futex, addr, FUTEX_WAIT_BITSET | FUTEX_CLOCK_REALTIME,
-			val, &timeout, 0, FUTEX_BITSET_MATCH_ANY );
+                       val, &timeout, 0, FUTEX_BITSET_MATCH_ANY );
     }
     else
     {
         return syscall( __NR_futex, addr, 0, val, NULL, 0, 0 );
     }
 }
-
-static unsigned int spincount = 100;
 
 int do_fsync(void)
 {
@@ -172,8 +161,6 @@ int do_fsync(void)
     {
         syscall( __NR_futex_waitv, NULL, 0, 0, NULL, 0 );
         do_fsync_cached = getenv("WINEFSYNC") && atoi(getenv("WINEFSYNC")) && errno != ENOSYS;
-        if (getenv("WINEFSYNC_SPINCOUNT"))
-            spincount = atoi(getenv("WINEFSYNC_SPINCOUNT"));
     }
 
     return do_fsync_cached;
@@ -759,7 +746,6 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     BOOL msgwait = FALSE, waited = FALSE;
     int has_fsync = 0, has_server = 0;
     int dummy_futex = 0;
-    unsigned int spin;
     LONGLONG timeleft;
     LARGE_INTEGER now;
     DWORD waitcount;
@@ -869,22 +855,13 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         struct semaphore *semaphore = obj->shm;
                         int current;
 
-                        /* It would be a little clearer (and less error-prone)
-                         * to use a dedicated interlocked_dec_if_nonzero()
-                         * helper, but nesting loops like that is probably not
-                         * great for performance... */
-                        for (spin = 0; spin <= spincount || current; ++spin)
+                        if ((current = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST ))
+                                && __sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) == current)
                         {
-                            if ((current = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST ))
-                                    && __sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) == current)
-                            {
-                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                                if (waited) simulate_sched_quantum();
-                                return i;
-                            }
-                            small_pause();
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            if (waited) simulate_sched_quantum();
+                            return i;
                         }
-
                         futex_vector_set( &futexes[i], &semaphore->count, 0 );
                         break;
                     }
@@ -901,22 +878,18 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             return i;
                         }
 
-                        for (spin = 0; spin <= spincount; ++spin)
+                        if (!(tid = __sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() )))
                         {
-                            if (!(tid = __sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() )))
-                            {
-                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                                mutex->count = 1;
-                                if (waited) simulate_sched_quantum();
-                                return i;
-                            }
-                            else if (tid == ~0 && (tid = __sync_val_compare_and_swap( &mutex->tid, ~0, GetCurrentThreadId() )) == ~0)
-                            {
-                                TRACE("Woken up by abandoned mutex %p [%d].\n", handles[i], i);
-                                mutex->count = 1;
-                                return STATUS_ABANDONED_WAIT_0 + i;
-                            }
-                            small_pause();
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            mutex->count = 1;
+                            if (waited) simulate_sched_quantum();
+                            return i;
+                        }
+                        else if (tid == ~0 && (tid = __sync_val_compare_and_swap( &mutex->tid, ~0, GetCurrentThreadId() )) == ~0)
+                        {
+                            TRACE("Woken up by abandoned mutex %p [%d].\n", handles[i], i);
+                            mutex->count = 1;
+                            return STATUS_ABANDONED_WAIT_0 + i;
                         }
 
                         futex_vector_set( &futexes[i], &mutex->tid, tid );
@@ -927,20 +900,15 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                     {
                         struct event *event = obj->shm;
 
-                        for (spin = 0; spin <= spincount; ++spin)
+                        if (__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
                         {
-                            if (__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
-                            {
-                                if (ac_odyssey && alertable)
-                                    usleep( 0 );
+                            if (ac_odyssey && alertable)
+                                usleep( 0 );
 
-                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                                if (waited) simulate_sched_quantum();
-                                return i;
-                            }
-                            small_pause();
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            if (waited) simulate_sched_quantum();
+                            return i;
                         }
-
                         futex_vector_set( &futexes[i], &event->signaled, 0 );
                         break;
                     }
@@ -950,20 +918,15 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                     {
                         struct event *event = obj->shm;
 
-                        for (spin = 0; spin <= spincount; ++spin)
+                        if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
                         {
-                            if (__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
-                            {
-                                if (ac_odyssey && alertable)
-                                    usleep( 0 );
+                            if (ac_odyssey && alertable)
+                                usleep( 0 );
 
-                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                                if (waited) simulate_sched_quantum();
-                                return i;
-                            }
-                            small_pause();
+                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                            if (waited) simulate_sched_quantum();
+                            return i;
                         }
-
                         futex_vector_set( &futexes[i], &event->signaled, 0 );
                         break;
                     }
