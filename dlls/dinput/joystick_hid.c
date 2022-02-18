@@ -1287,20 +1287,6 @@ static HRESULT hid_joystick_read( IDirectInputDevice8W *iface )
     BOOL ret;
 
     ret = GetOverlappedResult( impl->device, &impl->read_ovl, &count, FALSE );
-    if (ret && TRACE_ON(dinput))
-    {
-        TRACE( "read size %lu report:\n", count );
-        for (i = 0; i < count;)
-        {
-            char buffer[256], *buf = buffer;
-            buf += sprintf(buf, "%08lx ", i);
-            do
-            {
-                buf += sprintf(buf, " %02x", (BYTE)report_buf[i] );
-            } while (++i % 16 && i < count);
-            TRACE("%s\n", buffer);
-        }
-    }
 
     if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0 || /* steam overlay is enabled */
         WaitForSingleObject(steam_keyboard_event, 0) == WAIT_OBJECT_0) /* steam keyboard is enabled */
@@ -1311,6 +1297,19 @@ static HRESULT hid_joystick_read( IDirectInputDevice8W *iface )
     EnterCriticalSection( &impl->base.crit );
     while (ret)
     {
+        if (TRACE_ON(dinput))
+        {
+            TRACE( "iface %p, size %lu, report:\n", iface, count );
+            for (i = 0; i < count;)
+            {
+                char buffer[256], *buf = buffer;
+                buf += sprintf(buf, "%08lx ", i);
+                do { buf += sprintf(buf, " %02x", (BYTE)report_buf[i] ); }
+                while (++i % 16 && i < count);
+                TRACE("%s\n", buffer);
+            }
+        }
+
         count = impl->usages_count;
         memset( impl->usages_buf, 0, count * sizeof(*impl->usages_buf) );
         status = HidP_GetUsagesEx( HidP_Input, 0, impl->usages_buf, &count,
