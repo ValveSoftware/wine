@@ -56,10 +56,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(fsync);
 #include "pshpack4.h"
 #include "poppack.h"
 
-#define FUTEX_WAIT_BITSET	9
-#define FUTEX_CLOCK_REALTIME	256
-#define FUTEX_BITSET_MATCH_ANY	0xffffffff
-
 /* futex_waitv interface */
 
 #ifndef __NR_futex_waitv
@@ -132,24 +128,6 @@ static inline int futex_wait_multiple( const struct futex_waitv *futexes,
 static inline int futex_wake( int *addr, int val )
 {
     return syscall( __NR_futex, addr, 1, val, NULL, 0, 0 );
-}
-
-static inline int futex_wait( int *addr, int val, const ULONGLONG *end )
-{
-    if (end)
-    {
-        struct timespec timeout;
-        ULONGLONG tmp = *end - SECS_1601_TO_1970 * TICKSPERSEC;
-        timeout.tv_sec = tmp / (ULONGLONG)TICKSPERSEC;
-        timeout.tv_nsec = (tmp % TICKSPERSEC) * 100;
-
-        return syscall( __NR_futex, addr, FUTEX_WAIT_BITSET | FUTEX_CLOCK_REALTIME,
-                       val, &timeout, 0, FUTEX_BITSET_MATCH_ANY );
-    }
-    else
-    {
-        return syscall( __NR_futex, addr, 0, val, NULL, 0, 0 );
-    }
 }
 
 int do_fsync(void)
@@ -705,17 +683,18 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
 
 static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN alertable )
 {
+    struct futex_waitv futexes[2];
     int ret;
+
+    futex_vector_set( &futexes[0], addr, val );
 
     if (alertable)
     {
         int *apc_futex = ntdll_get_thread_data()->fsync_apc_futex;
-        struct futex_waitv futexes[2];
 
         if (__atomic_load_n( apc_futex, __ATOMIC_SEQ_CST ))
             return STATUS_USER_APC;
 
-        futex_vector_set( &futexes[0], addr, val );
         futex_vector_set( &futexes[1], apc_futex, 0 );
 
         ret = futex_wait_multiple( futexes, 2, end );
@@ -725,7 +704,7 @@ static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN aler
     }
     else
     {
-        ret = futex_wait( addr, val, end );
+        ret = futex_wait_multiple( futexes, 1, end );
     }
 
     if (!ret)
@@ -962,10 +941,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                 return STATUS_TIMEOUT;
             }
 
-            if (waitcount == 1)
-                ret = futex_wait( u64_to_ptr(futexes[0].uaddr), futexes[0].val, timeout ? &end : NULL );
-            else
-                ret = futex_wait_multiple( futexes, waitcount, timeout ? &end : NULL );
+            ret = futex_wait_multiple( futexes, waitcount, timeout ? &end : NULL );
 
             /* FUTEX_WAIT_MULTIPLE can succeed or return -EINTR, -EAGAIN,
              * -EFAULT/-EACCES, -ETIMEDOUT. In the first three cases we need to
