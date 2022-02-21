@@ -60,10 +60,6 @@ WINE_DEFAULT_DEBUG_CHANNEL(fsync);
 #include "pshpack4.h"
 #include "poppack.h"
 
-#define FUTEX_WAIT_BITSET	9
-#define FUTEX_CLOCK_REALTIME	256
-#define FUTEX_BITSET_MATCH_ANY	0xffffffff
-
 /* futex_waitv interface */
 
 #ifndef __NR_futex_waitv
