@@ -38,6 +38,9 @@
 #ifdef HAVE_SYS_SYSCALL_H
 # include <sys/syscall.h>
 #endif
+#ifdef HAVE_LINUX_FUTEX_H
+# include <linux/futex.h>
+#endif
 #include <unistd.h>
 #include <stdint.h>
 
