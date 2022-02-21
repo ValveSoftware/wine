@@ -419,6 +419,7 @@ AC_CHECK_HEADERS(\
 	link.h \
 	linux/cdrom.h \
 	linux/filter.h \
+	linux/futex.h \
 	linux/hdreg.h \
 	linux/hidraw.h \
 	linux/input.h \
