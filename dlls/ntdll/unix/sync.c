@@ -77,46 +77,6 @@ static const char *debugstr_timeout( const LARGE_INTEGER *timeout )
     return wine_dbgstr_longlong( timeout->QuadPart );
 }
 
-#ifndef __NR_clock_gettime64
-#define __NR_clock_gettime64 403
-#endif
-
-struct timespec64
-{
-    long long tv_sec;
-    long long tv_nsec;
-};
-
-static inline int do_clock_gettime( clockid_t clock_id, ULONGLONG *ticks )
-{
-    static int clock_gettime64_supported = -1;
-    struct timespec64 ts64;
-    struct timespec ts;
-    int ret;
-
-    if (clock_gettime64_supported < 0)
-    {
-        if (!syscall( __NR_clock_gettime64, clock_id, &ts64 ))
-        {
-            clock_gettime64_supported = 1;
-            *ticks = ts64.tv_sec * (ULONGLONG)TICKSPERSEC + ts64.tv_nsec / 100;
-            return 0;
-        }
-        clock_gettime64_supported = 0;
-    }
-
-    if (clock_gettime64_supported)
-    {
-        if (!(ret = syscall( __NR_clock_gettime64, clock_id, &ts64 )))
-            *ticks = ts64.tv_sec * (ULONGLONG)TICKSPERSEC + ts64.tv_nsec / 100;
-        return ret;
-    }
-
-    if (!(ret = clock_gettime( clock_id, &ts )))
-        *ticks = ts.tv_sec * (ULONGLONG)TICKSPERSEC + ts.tv_nsec / 100;
-    return ret;
-}
-
 /* return a monotonic time counter, in Win32 ticks */
 static inline ULONGLONG monotonic_counter(void)
 {
@@ -131,13 +91,13 @@ static inline ULONGLONG monotonic_counter(void)
 #endif
     return mach_absolute_time() * timebase.numer / timebase.denom / 100;
 #elif defined(HAVE_CLOCK_GETTIME)
-    ULONGLONG ticks;
+    struct timespec ts;
 #if 0
-    if (!do_clock_gettime( CLOCK_MONOTONIC_RAW, &ticks ))
-        return ticks;
+    if (!clock_gettime( CLOCK_MONOTONIC_RAW, &ts ))
+        return ts.tv_sec * (ULONGLONG)TICKSPERSEC + ts.tv_nsec / 100;
 #endif
-    if (!do_clock_gettime( CLOCK_MONOTONIC, &ticks ))
-        return ticks;
+    if (!clock_gettime( CLOCK_MONOTONIC, &ts ))
+        return ts.tv_sec * (ULONGLONG)TICKSPERSEC + ts.tv_nsec / 100;
 #endif
     gettimeofday( &now, 0 );
     return ticks_from_time_t( now.tv_sec ) + now.tv_usec * 10 - server_start_time;
