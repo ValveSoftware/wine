@@ -118,6 +118,7 @@ static int (*pSDL_JoystickRumble)(SDL_Joystick *joystick, Uint16 low_frequency_r
 static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick);
 static Uint16 (*pSDL_JoystickGetProductVersion)(SDL_Joystick * joystick);
 static Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick * joystick);
+static SDL_JoystickType (*pSDL_JoystickGetDeviceType)(SDL_Joystick * joystick);
 
 /* internal bits for extended rumble support, SDL_Haptic types are 16-bits */
 #define WINE_SDL_JOYSTICK_RUMBLE  0x40000000 /* using SDL_JoystickRumble API */
@@ -251,12 +252,34 @@ static const USAGE_AND_PAGE generic_absolute_usages[] =
     {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_BRAKE},
 };
 
+static const USAGE_AND_PAGE wheel_absolute_usages[] =
+{
+    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_STEERING},
+    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_ACCELERATOR},
+    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_BRAKE},
+    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_RUDDER},
+    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_CLUTCH},
+    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_THROTTLE},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_X},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_Y},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_Z},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_RX},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_RY},
+    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_RZ},
+};
+
 static int get_absolute_usages(struct sdl_device *impl, const USAGE_AND_PAGE **absolute_usages)
 {
     if (is_logitech_g920(pSDL_JoystickGetVendor(impl->sdl_joystick), pSDL_JoystickGetProduct(impl->sdl_joystick)))
     {
         *absolute_usages = g920_absolute_usages;
         return ARRAY_SIZE(g920_absolute_usages);
+    }
+
+    if (pSDL_JoystickGetDeviceType && pSDL_JoystickGetDeviceType(impl->sdl_joystick) == SDL_JOYSTICK_TYPE_WHEEL)
+    {
+        *absolute_usages = wheel_absolute_usages;
+        return ARRAY_SIZE(wheel_absolute_usages);
     }
 
     *absolute_usages = generic_absolute_usages;
@@ -1067,6 +1090,7 @@ NTSTATUS sdl_bus_init(void *args)
     pSDL_JoystickGetProduct = dlsym(sdl_handle, "SDL_JoystickGetProduct");
     pSDL_JoystickGetProductVersion = dlsym(sdl_handle, "SDL_JoystickGetProductVersion");
     pSDL_JoystickGetVendor = dlsym(sdl_handle, "SDL_JoystickGetVendor");
+    pSDL_JoystickGetDeviceType = dlsym(sdl_handle, "SDL_JoystickGetDeviceType");
 
     if (pSDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) < 0)
     {
