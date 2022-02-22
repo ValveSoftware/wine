@@ -512,6 +512,10 @@ NTSTATUS wg_transform_create(void *args)
             || !gst_pad_push_event(transform->my_src, event))
         goto out;
 
+    /* Check that the caps event have been accepted */
+    if (!gst_pad_has_current_caps(transform->their_sink))
+        goto out;
+
     /* We need to use GST_FORMAT_TIME here because it's the only format
      * some elements such avdec_wmav2 correctly support. */
     gst_segment_init(&transform->segment, GST_FORMAT_TIME);
