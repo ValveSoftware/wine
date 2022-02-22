@@ -118,7 +118,7 @@ static int (*pSDL_JoystickRumble)(SDL_Joystick *joystick, Uint16 low_frequency_r
 static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick);
 static Uint16 (*pSDL_JoystickGetProductVersion)(SDL_Joystick * joystick);
 static Uint16 (*pSDL_JoystickGetVendor)(SDL_Joystick * joystick);
-static SDL_JoystickType (*pSDL_JoystickGetDeviceType)(SDL_Joystick * joystick);
+static SDL_JoystickType (*pSDL_JoystickGetType)(SDL_Joystick * joystick);
 
 /* internal bits for extended rumble support, SDL_Haptic types are 16-bits */
 #define WINE_SDL_JOYSTICK_RUMBLE  0x40000000 /* using SDL_JoystickRumble API */
@@ -276,7 +276,7 @@ static int get_absolute_usages(struct sdl_device *impl, const USAGE_AND_PAGE **a
         return ARRAY_SIZE(g920_absolute_usages);
     }
 
-    if (pSDL_JoystickGetDeviceType && pSDL_JoystickGetDeviceType(impl->sdl_joystick) == SDL_JOYSTICK_TYPE_WHEEL)
+    if (pSDL_JoystickGetType && pSDL_JoystickGetType(impl->sdl_joystick) == SDL_JOYSTICK_TYPE_WHEEL)
     {
         *absolute_usages = wheel_absolute_usages;
         return ARRAY_SIZE(wheel_absolute_usages);
@@ -1090,7 +1090,7 @@ NTSTATUS sdl_bus_init(void *args)
     pSDL_JoystickGetProduct = dlsym(sdl_handle, "SDL_JoystickGetProduct");
     pSDL_JoystickGetProductVersion = dlsym(sdl_handle, "SDL_JoystickGetProductVersion");
     pSDL_JoystickGetVendor = dlsym(sdl_handle, "SDL_JoystickGetVendor");
-    pSDL_JoystickGetDeviceType = dlsym(sdl_handle, "SDL_JoystickGetDeviceType");
+    pSDL_JoystickGetType = dlsym(sdl_handle, "SDL_JoystickGetType");
 
     if (pSDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) < 0)
     {
