@@ -845,7 +845,7 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
     }
 
     result = pvkAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, image_index);
-    if (result == VK_SUCCESS && hdc && surface && surface->offscreen)
+    if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && hdc && surface && surface->offscreen)
     {
         if (wait_fence) pvkWaitForFences(device, 1, &fence, 0, timeout);
         escape.code = X11DRV_PRESENT_DRAWABLE;
