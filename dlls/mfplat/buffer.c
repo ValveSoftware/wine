@@ -638,11 +638,52 @@ static HRESULT WINAPI memory_2d_buffer_Lock2DSize(IMF2DBuffer2 *iface, MF2DBuffe
     return hr;
 }
 
-static HRESULT WINAPI memory_2d_buffer_Copy2DTo(IMF2DBuffer2 *iface, IMF2DBuffer2 *dest_buffer)
+static HRESULT WINAPI memory_2d_buffer_Copy2DTo(IMF2DBuffer2 *iface, IMF2DBuffer2 *dst_buffer)
 {
-    FIXME("%p, %p.\n", iface, dest_buffer);
+    struct buffer *buffer = impl_from_IMF2DBuffer2(iface);
+    BYTE *src_scanline0, *dst_scanline0, *src_buffer_start, *dst_buffer_start;
+    DWORD src_length, dst_length;
+    LONG src_pitch, dst_pitch;
+    BOOL src_locked = FALSE, dst_locked = FALSE;
+    HRESULT hr, hr2;
 
-    return E_NOTIMPL;
+    TRACE("%p, %p.\n", iface, dst_buffer);
+
+    hr = IMF2DBuffer2_Lock2DSize(iface, MF2DBuffer_LockFlags_Read, &src_scanline0,
+            &src_pitch, &src_buffer_start, &src_length);
+    if (FAILED(hr))
+        goto end;
+    src_locked = TRUE;
+
+    hr = IMF2DBuffer2_Lock2DSize(dst_buffer, MF2DBuffer_LockFlags_Write, &dst_scanline0,
+            &dst_pitch, &dst_buffer_start, &dst_length);
+    if (FAILED(hr))
+        goto end;
+    dst_locked = TRUE;
+
+    hr = copy_image(buffer, dst_scanline0, dst_pitch, src_scanline0, src_pitch,
+            buffer->_2d.width, buffer->_2d.height, dst_length);
+
+end:
+    if (src_locked)
+    {
+        hr2 = IMF2DBuffer2_Unlock2D(iface);
+        if (FAILED(hr2))
+            WARN("Unlocking source buffer %p failed with hr %#lx.\n", iface, hr2);
+        if (FAILED(hr2) && SUCCEEDED(hr))
+            hr = hr2;
+    }
+
+    if (dst_locked)
+    {
+        hr2 = IMF2DBuffer2_Unlock2D(dst_buffer);
+        if (FAILED(hr2))
+            WARN("Unlocking destination buffer %p failed with hr %#lx.\n", dst_buffer, hr2);
+        if (FAILED(hr2) && SUCCEEDED(hr))
+            hr = hr2;
+    }
+
+    return hr;
 }
 
 static const IMF2DBuffer2Vtbl memory_2d_buffer_vtbl =
@@ -1293,7 +1334,7 @@ static p_copy_image_func get_2d_buffer_copy_func(DWORD fourcc)
         return copy_image_nv12;
     if (fourcc == MAKEFOURCC('I','M','C','1') || fourcc == MAKEFOURCC('I','M','C','3'))
         return copy_image_imc1;
-    if (fourcc == MAKEFOURCC('I','M','C','2') || fourcc == MAKEFOURCC('I','M','C','4'))
+    if (fourcc == MAKEFOURCC('I','M','C','2') || fourcc == MAKEFOURCC('I','M','C','4') || fourcc == MAKEFOURCC('Y','V','1', '2'))
         return copy_image_imc2;
     return NULL;
 }
