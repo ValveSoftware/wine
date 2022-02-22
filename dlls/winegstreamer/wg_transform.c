@@ -448,6 +448,20 @@ NTSTATUS wg_transform_create(void *args)
             || !push_event(transform->my_src, event))
         goto out;
 
+    /* Check that the caps event have been accepted */
+    if (input_format.major_type == WG_MAJOR_TYPE_VIDEO_H264)
+    {
+        GstPad *peer;
+        if (!(peer = gst_pad_get_peer(transform->my_src)))
+            goto out;
+        else if (!gst_pad_has_current_caps(peer))
+        {
+            gst_object_unref(peer);
+            goto out;
+        }
+        gst_object_unref(peer);
+    }
+
     /* We need to use GST_FORMAT_TIME here because it's the only format
      * some elements such avdec_wmav2 correctly support. */
     gst_segment_init(&transform->segment, GST_FORMAT_TIME);
