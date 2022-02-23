@@ -252,34 +252,12 @@ static const USAGE_AND_PAGE generic_absolute_usages[] =
     {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_BRAKE},
 };
 
-static const USAGE_AND_PAGE wheel_absolute_usages[] =
-{
-    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_STEERING},
-    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_ACCELERATOR},
-    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_BRAKE},
-    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_RUDDER},
-    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_CLUTCH},
-    {.UsagePage = HID_USAGE_PAGE_SIMULATION, .Usage = HID_USAGE_SIMULATION_THROTTLE},
-    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_X},
-    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_Y},
-    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_Z},
-    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_RX},
-    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_RY},
-    {.UsagePage = HID_USAGE_PAGE_GENERIC,    .Usage = HID_USAGE_GENERIC_RZ},
-};
-
 static int get_absolute_usages(struct sdl_device *impl, const USAGE_AND_PAGE **absolute_usages)
 {
     if (is_logitech_g920(pSDL_JoystickGetVendor(impl->sdl_joystick), pSDL_JoystickGetProduct(impl->sdl_joystick)))
     {
         *absolute_usages = g920_absolute_usages;
         return ARRAY_SIZE(g920_absolute_usages);
-    }
-
-    if (pSDL_JoystickGetType && pSDL_JoystickGetType(impl->sdl_joystick) == SDL_JOYSTICK_TYPE_WHEEL)
-    {
-        *absolute_usages = wheel_absolute_usages;
-        return ARRAY_SIZE(wheel_absolute_usages);
     }
 
     *absolute_usages = generic_absolute_usages;
