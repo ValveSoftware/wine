@@ -9241,6 +9241,7 @@ HRESULT WINAPI MFCreateDXGIDeviceManager(UINT *token, IMFDXGIDeviceManager **man
                 strcmp(sgi, "684450") == 0 || /* Surviving the Aftermath */
                 strcmp(sgi, "1017900") == 0 || /* Age of Empires: Definitive Edition */
                 strcmp(sgi, "1331440") == 0 || /* FUSER */
+                strcmp(sgi, "1075200") == 0 || /* TOHU */
                 (do_not_create && do_not_create[0] != '\0')
                ))
     {
