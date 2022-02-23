@@ -1030,27 +1030,17 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
         return MF_E_TRANSFORM_NEED_MORE_INPUT;
     }
 
-    for (;;)
+    if (!wg_parser_stream_get_event(decoder->wg_stream, &event))
     {
-        wg_parser_stream_get_event(decoder->wg_stream, &event);
-
-        if (event.type == WG_PARSER_EVENT_BUFFER)
-            break;
-
-        if (event.type == WG_PARSER_EVENT_EOS)
+        if (!decoder->draining)
         {
-            if (!decoder->draining)
-            {
-                LeaveCriticalSection(&decoder->cs);
-                WARN("Received EOS event while not draining\n");
-                return E_FAIL;
-            }
-            decoder->draining = FALSE;
             LeaveCriticalSection(&decoder->cs);
-            return MF_E_TRANSFORM_NEED_MORE_INPUT;
+            WARN("Received EOS event while not draining\n");
+            return E_FAIL;
         }
-
-        assert(event.type != WG_PARSER_EVENT_NONE);
+        decoder->draining = FALSE;
+        LeaveCriticalSection(&decoder->cs);
+        return MF_E_TRANSFORM_NEED_MORE_INPUT;
     }
 
     if (relevant_buffer->pSample)
