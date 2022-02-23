@@ -677,6 +677,8 @@ static const struct notification websocket_test[] =
     { winhttp_websocket_complete_upgrade, WINHTTP_CALLBACK_STATUS_HANDLE_CREATED, NF_SIGNAL },
     { winhttp_websocket_send,             WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE, NF_MAIN_THREAD | NF_SIGNAL },
     { winhttp_websocket_send,             WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE, NF_MAIN_THREAD | NF_SIGNAL },
+    { winhttp_websocket_send,             WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE, NF_MAIN_THREAD | NF_SIGNAL },
+    { winhttp_websocket_send,             WINHTTP_CALLBACK_STATUS_WRITE_COMPLETE, NF_MAIN_THREAD | NF_SIGNAL },
     { winhttp_websocket_shutdown,         WINHTTP_CALLBACK_STATUS_SHUTDOWN_COMPLETE, NF_MAIN_THREAD | NF_SIGNAL },
     { winhttp_websocket_receive,          WINHTTP_CALLBACK_STATUS_READ_COMPLETE, NF_SAVE_BUFFER | NF_SIGNAL },
     { winhttp_websocket_receive,          WINHTTP_CALLBACK_STATUS_READ_COMPLETE, NF_SAVE_BUFFER | NF_SIGNAL },
@@ -869,8 +871,7 @@ static void test_websocket(BOOL secure)
         big_buffer[i] = (i & 0xff) ^ 0xcc;
 
     setup_test( &info, winhttp_websocket_send, __LINE__ );
-    err = pWinHttpWebSocketSend( socket, WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE,
-                                 big_buffer, BIG_BUFFER_SIZE );
+    err = pWinHttpWebSocketSend( socket, WINHTTP_WEB_SOCKET_BINARY_FRAGMENT_BUFFER_TYPE, big_buffer, BIG_BUFFER_SIZE / 2 );
     ok( err == ERROR_SUCCESS, "got %u\n", err );
     WaitForSingleObject( info.wait, INFINITE );
 
