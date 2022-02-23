@@ -99,14 +99,16 @@ BOOL hid_device_end_report_descriptor(struct unix_device *iface)
     return hid_report_descriptor_append(desc, template, sizeof(template));
 }
 
-BOOL hid_device_begin_input_report(struct unix_device *iface)
+BOOL hid_device_begin_input_report(struct unix_device *iface, const USAGE_AND_PAGE *physical_usage)
 {
     struct hid_report_descriptor *desc = &iface->hid_report_descriptor;
     struct hid_device_state *state = &iface->hid_device_state;
     const BYTE report_id = ++desc->next_report_id[HidP_Input];
     const BYTE template[] =
     {
-        COLLECTION(1, Report),
+        USAGE_PAGE(2, physical_usage->UsagePage),
+        USAGE(2, physical_usage->Usage),
+        COLLECTION(1, Physical),
             REPORT_ID(1, report_id),
     };
 
