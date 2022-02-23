@@ -140,11 +140,14 @@ struct wg_rect
     uint32_t bottom;
 };
 
-enum wg_parser_event_type
+struct wg_parser_buffer
 {
-    WG_PARSER_EVENT_NONE = 0,
-    WG_PARSER_EVENT_BUFFER,
+    /* pts and duration are in 100-nanosecond units. */
+    UINT64 pts, duration;
+    UINT32 size;
+    bool discontinuity, preroll, delta, has_pts, has_duration;
 };
+C_ASSERT(sizeof(struct wg_parser_buffer) == 32);
 
 enum wg_read_result
 {
@@ -153,22 +156,6 @@ enum wg_read_result
     WG_READ_FLUSHING,
     WG_READ_EOS,
 };
-
-struct wg_parser_event
-{
-    enum wg_parser_event_type type;
-    union
-    {
-        struct
-        {
-            /* pts and duration are in 100-nanosecond units. */
-            ULONGLONG pts, duration;
-            uint32_t size;
-            bool discontinuity, preroll, delta, has_pts, has_duration;
-        } buffer;
-    } u;
-};
-C_ASSERT(sizeof(struct wg_parser_event) == 40);
 
 enum wg_parser_type
 {
@@ -246,10 +233,10 @@ struct wg_parser_stream_enable_params
     uint32_t flags;
 };
 
-struct wg_parser_stream_get_event_params
+struct wg_parser_stream_get_buffer_params
 {
     struct wg_parser_stream *stream;
-    struct wg_parser_event *event;
+    struct wg_parser_buffer *buffer;
 };
 
 struct wg_parser_stream_copy_buffer_params
@@ -346,7 +333,7 @@ enum unix_funcs
     unix_wg_parser_stream_enable,
     unix_wg_parser_stream_disable,
 
-    unix_wg_parser_stream_get_event,
+    unix_wg_parser_stream_get_buffer,
     unix_wg_parser_stream_copy_buffer,
     unix_wg_parser_stream_release_buffer,
     unix_wg_parser_stream_notify_qos,
