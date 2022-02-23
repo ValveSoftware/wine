@@ -238,6 +238,13 @@ enum socket_opcode
     SOCKET_OPCODE_INVALID   = 0xff,
 };
 
+enum fragment_type
+{
+    SOCKET_FRAGMENT_NONE,
+    SOCKET_FRAGMENT_BINARY,
+    SOCKET_FRAGMENT_UTF8,
+};
+
 struct socket
 {
     struct object_header hdr;
@@ -260,6 +267,7 @@ struct socket
     unsigned int bytes_in_send_frame_buffer;
     unsigned int client_buffer_offset;
     SRWLOCK send_lock;
+    enum fragment_type sending_fragment_type;
 };
 
 struct send_request
