@@ -852,16 +852,16 @@ _srt_evdev_capabilities_guess_type (const SrtEvdevCapabilities *caps)
   return flags;
 }
 
-static const BYTE* what_am_I(struct udev_device *dev, int fd)
+static const USAGE_AND_PAGE *what_am_I(struct udev_device *dev, int fd)
 {
-    static const BYTE Unknown[2]     = {HID_USAGE_PAGE_GENERIC, 0};
-    static const BYTE Mouse[2]       = {HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_MOUSE};
-    static const BYTE Keyboard[2]    = {HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_KEYBOARD};
-    static const BYTE Gamepad[2]     = {HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_GAMEPAD};
-    static const BYTE Keypad[2]      = {HID_USAGE_PAGE_GENERIC, HID_USAGE_GENERIC_KEYPAD};
-    static const BYTE Tablet[2]      = {HID_USAGE_PAGE_DIGITIZER, HID_USAGE_DIGITIZER_PEN};
-    static const BYTE Touchscreen[2] = {HID_USAGE_PAGE_DIGITIZER, HID_USAGE_DIGITIZER_TOUCH_SCREEN};
-    static const BYTE Touchpad[2]    = {HID_USAGE_PAGE_DIGITIZER, HID_USAGE_DIGITIZER_TOUCH_PAD};
+    static const USAGE_AND_PAGE Unknown     = {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = 0};
+    static const USAGE_AND_PAGE Mouse       = {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_MOUSE};
+    static const USAGE_AND_PAGE Keyboard    = {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_KEYBOARD};
+    static const USAGE_AND_PAGE Gamepad     = {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_GAMEPAD};
+    static const USAGE_AND_PAGE Keypad      = {.UsagePage = HID_USAGE_PAGE_GENERIC, .Usage = HID_USAGE_GENERIC_KEYPAD};
+    static const USAGE_AND_PAGE Tablet      = {.UsagePage = HID_USAGE_PAGE_DIGITIZER, .Usage = HID_USAGE_DIGITIZER_PEN};
+    static const USAGE_AND_PAGE Touchscreen = {.UsagePage = HID_USAGE_PAGE_DIGITIZER, .Usage = HID_USAGE_DIGITIZER_TOUCH_SCREEN};
+    static const USAGE_AND_PAGE Touchpad    = {.UsagePage = HID_USAGE_PAGE_DIGITIZER, .Usage = HID_USAGE_DIGITIZER_TOUCH_PAD};
     SrtEvdevCapabilities caps;
 
     struct udev_device *parent = dev;
@@ -870,19 +870,19 @@ static const BYTE* what_am_I(struct udev_device *dev, int fd)
     while (parent)
     {
         if (udev_device_get_property_value(parent, "ID_INPUT_MOUSE"))
-            return Mouse;
+            return &Mouse;
         else if (udev_device_get_property_value(parent, "ID_INPUT_KEYBOARD"))
-            return Keyboard;
+            return &Keyboard;
         else if (udev_device_get_property_value(parent, "ID_INPUT_JOYSTICK"))
-            return Gamepad;
+            return &Gamepad;
         else if (udev_device_get_property_value(parent, "ID_INPUT_KEY"))
-            return Keypad;
+            return &Keypad;
         else if (udev_device_get_property_value(parent, "ID_INPUT_TOUCHPAD"))
-            return Touchpad;
+            return &Touchpad;
         else if (udev_device_get_property_value(parent, "ID_INPUT_TOUCHSCREEN"))
-            return Touchscreen;
+            return &Touchscreen;
         else if (udev_device_get_property_value(parent, "ID_INPUT_TABLET"))
-            return Tablet;
+            return &Tablet;
 
         parent = udev_device_get_parent_with_subsystem_devtype(parent, "input", NULL);
     }
@@ -897,24 +897,24 @@ static const BYTE* what_am_I(struct udev_device *dev, int fd)
 
         if (guessed_type & (SRT_INPUT_DEVICE_TYPE_FLAGS_MOUSE
                             | SRT_INPUT_DEVICE_TYPE_FLAGS_POINTING_STICK))
-            return Mouse;
+            return &Mouse;
         else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_KEYBOARD)
-            return Keyboard;
+            return &Keyboard;
         else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_JOYSTICK)
-            return Gamepad;
+            return &Gamepad;
         else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_HAS_KEYS)
-            return Keypad;
+            return &Keypad;
         else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHPAD)
-            return Touchpad;
+            return &Touchpad;
         else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_TOUCHSCREEN)
-            return Touchscreen;
+            return &Touchscreen;
         else if (guessed_type & SRT_INPUT_DEVICE_TYPE_FLAGS_TABLET)
-            return Tablet;
+            return &Tablet;
 
         /* Mapped to Unknown: ACCELEROMETER, TABLET_PAD, SWITCH. */
     }
 
-    return Unknown;
+    return &Unknown;
 }
 
 static INT count_buttons(int device_fd, BYTE *map)
@@ -969,7 +969,7 @@ static NTSTATUS build_report_descriptor(struct unix_device *iface, struct udev_d
     USAGE usages[16];
     INT i, button_count, abs_count, rel_count, hat_count;
     struct lnxev_device *impl = lnxev_impl_from_unix_device(iface);
-    const BYTE *device_usage = what_am_I(dev, impl->base.device_fd);
+    const USAGE_AND_PAGE device_usage = *what_am_I(dev, impl->base.device_fd);
 
     if (ioctl(impl->base.device_fd, EVIOCGBIT(EV_REL, sizeof(relbits)), relbits) == -1)
     {
@@ -987,7 +987,7 @@ static NTSTATUS build_report_descriptor(struct unix_device *iface, struct udev_d
         memset(ffbits, 0, sizeof(ffbits));
     }
 
-    if (!hid_device_begin_report_descriptor(iface, device_usage[0], device_usage[1]))
+    if (!hid_device_begin_report_descriptor(iface, &device_usage))
         return STATUS_NO_MEMORY;
 
     if (!hid_device_begin_input_report(iface))
