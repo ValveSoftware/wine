@@ -1032,11 +1032,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
 
     for (;;)
     {
-        if (!wg_parser_stream_get_event(decoder->wg_stream, &event))
-        {
-            LeaveCriticalSection(&decoder->cs);
-            return E_FAIL;
-        }
+        wg_parser_stream_get_event(decoder->wg_stream, &event);
 
         if (event.type == WG_PARSER_EVENT_BUFFER)
             break;
