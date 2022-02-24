@@ -3619,8 +3619,6 @@ static DWORD receive_frame( struct socket *socket, DWORD *ret_len, enum socket_o
     *opcode = hdr[0] & 0xf;
     *final = hdr[0] & FIN_BIT;
     TRACE("received %02x frame, final %#x\n", *opcode, *final);
-    if (!*final)
-        FIXME( "Received fragment, untested.\n" );
 
     len = hdr[1] & ~MASK_BIT;
     if (len == 126)
@@ -3851,8 +3849,10 @@ static DWORD socket_receive( struct socket *socket, void *buf, DWORD len, DWORD 
         socket->read_size -= count;
         *ret_len = count;
         *ret_type = map_opcode( socket, socket->opcode, !final || socket->read_size != 0 );
+        TRACE( "len %u, *ret_len %u, *ret_type %u.\n", len, *ret_len, *ret_type );
         if (*ret_type == ~0u)
         {
+            FIXME( "Unexpected opcode %u.\n", socket->opcode );
             socket->read_size = 0;
             return ERROR_WINHTTP_INVALID_SERVER_RESPONSE;
         }
