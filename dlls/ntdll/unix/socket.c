@@ -153,6 +153,8 @@ struct async_transmit_ioctl
     LARGE_INTEGER offset;
 };
 
+static int get_sock_type( HANDLE handle );
+
 static NTSTATUS sock_errno_to_status( int err )
 {
     switch (err)
@@ -1062,6 +1064,21 @@ static NTSTATUS try_send( int fd, struct async_send_ioctl *async )
     return STATUS_SUCCESS;
 }
 
+static void hack_update_status( HANDLE handle, unsigned int *status )
+{
+    /* HACK: VRChat relies on send() reporting STATUS_SUCCESS for dropped UDP sockets when the
+     * network is actually lost but network adapters are still up on Windows. Fix VRChat internal
+     * error bug when resuming from sleep */
+    const char *appid;
+
+    if (*status == STATUS_NETWORK_UNREACHABLE && get_sock_type( handle ) == SOCK_DGRAM
+        && (appid = getenv( "SteamAppId" )) && !strcmp( appid, "438100" ))
+    {
+        WARN( "Replacing STATUS_NETWORK_UNREACHABLE with STATUS_SUCCESS for VRChat.\n" );
+        *status = STATUS_SUCCESS;
+    }
+}
+
 static BOOL async_send_proc( void *user, ULONG_PTR *info, unsigned int *status )
 {
     struct async_send_ioctl *async = user;
@@ -1076,6 +1093,7 @@ static BOOL async_send_proc( void *user, ULONG_PTR *info, unsigned int *status )
 
         *status = try_send( fd, async );
         TRACE( "got status %#x\n", *status );
+        hack_update_status( async->io.handle, status );
 
         if (needs_close) close( fd );
 
@@ -1142,6 +1160,8 @@ static NTSTATUS sock_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
         ULONG_PTR information;
 
         status = try_send( fd, async );
+        hack_update_status( handle, &status );
+
         if (status == STATUS_DEVICE_NOT_READY && (force_async || !nonblocking))
             status = STATUS_PENDING;
 
@@ -1211,7 +1231,6 @@ static NTSTATUS sock_ioctl_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE ap
 
     return sock_send( handle, event, apc, apc_user, io, fd, async, force_async );
 }
-
 
 NTSTATUS sock_write( HANDLE handle, int fd, HANDLE event, PIO_APC_ROUTINE apc,
                      void *apc_user, IO_STATUS_BLOCK *io, const void *buffer, ULONG length )
