@@ -24,6 +24,17 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(input);
 
+static CRITICAL_SECTION manager_cs;
+static CRITICAL_SECTION_DEBUG manager_cs_debug =
+{
+    0, 0, &manager_cs,
+    { &manager_cs_debug.ProcessLocksList, &manager_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": manager_cs") }
+};
+static CRITICAL_SECTION manager_cs = { &manager_cs_debug, -1, 0, 0, 0, 0 };
+
+static struct list controller_list = LIST_INIT( controller_list );
+
 struct manager_statics
 {
     IActivationFactory IActivationFactory_iface;
@@ -199,3 +210,13 @@ static struct manager_statics manager_statics =
 };
 
 IActivationFactory *manager_factory = &manager_statics.IActivationFactory_iface;
+
+void manager_on_provider_created( IGameControllerProvider *provider )
+{
+    FIXME( "provider %p stub!\n", provider );
+}
+
+void manager_on_provider_removed( IGameControllerProvider *provider )
+{
+    FIXME( "provider %p stub!\n", provider );
+}
