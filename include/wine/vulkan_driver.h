@@ -46,6 +46,16 @@ struct vulkan_funcs
 
     /* winevulkan specific functions */
     VkSurfaceKHR (*p_wine_get_native_surface)(VkSurfaceKHR);
+    VkResult (*create_vk_instance_with_callback)(const VkInstanceCreateInfo *create_info,
+            const VkAllocationCallbacks *allocator, VkInstance *instance,
+            VkResult (WINAPI *native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *,
+            VkInstance *, void * (*)(VkInstance, const char *), void *), void *native_vkCreateInstance_context);
+    /* Optional. Returns TRUE if FS hack is active, otherwise returns FALSE. If
+     * it returns TRUE, then real_sz will contain the actual display
+     * resolution; user_sz will contain the app's requested mode; and dst_blit
+     * will contain the area to blit the user image to in real coordinates.
+     * All parameters are optional. */
+    VkBool32 (*query_fs_hack)(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit, VkFilter *filter);
 };
 
 extern const struct vulkan_funcs * CDECL __wine_get_vulkan_driver(UINT version);

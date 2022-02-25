@@ -15,12 +15,17 @@
 #define WINE_VK_VERSION VK_API_VERSION_1_2
 
 /* Functions for which we have custom implementations outside of the thunks. */
+NTSTATUS wine_vkAcquireNextImage2KHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkAllocateCommandBuffers(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkAllocateMemory(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkCreateBuffer(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkCreateCommandPool(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkCreateDebugReportCallbackEXT(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkCreateDebugUtilsMessengerEXT(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkCreateDevice(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkCreateImage(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkCreateInstance(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkCreateSwapchainKHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkCreateWin32SurfaceKHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkDestroyCommandPool(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkDestroyDebugReportCallbackEXT(void *args) DECLSPEC_HIDDEN;
@@ -28,6 +33,7 @@ NTSTATUS wine_vkDestroyDebugUtilsMessengerEXT(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkDestroyDevice(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkDestroyInstance(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkDestroySurfaceKHR(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkDestroySwapchainKHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkEnumerateDeviceExtensionProperties(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkEnumerateDeviceLayerProperties(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkEnumerateInstanceExtensionProperties(void *args) DECLSPEC_HIDDEN;
@@ -37,11 +43,14 @@ NTSTATUS wine_vkEnumeratePhysicalDeviceGroups(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkEnumeratePhysicalDeviceGroupsKHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkEnumeratePhysicalDevices(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkFreeCommandBuffers(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkFreeMemory(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetCalibratedTimestampsEXT(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetDeviceProcAddr(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetDeviceQueue(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetDeviceQueue2(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetInstanceProcAddr(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkGetMemoryWin32HandleKHR(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkGetMemoryWin32HandlePropertiesKHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetPhysicalDeviceExternalBufferProperties(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetPhysicalDeviceExternalBufferPropertiesKHR(void *args) DECLSPEC_HIDDEN;
@@ -53,6 +62,8 @@ NTSTATUS wine_vkGetPhysicalDeviceImageFormatProperties2(void *args) DECLSPEC_HID
 NTSTATUS wine_vkGetPhysicalDeviceImageFormatProperties2KHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetPhysicalDeviceSurfaceCapabilities2KHR(void *args) DECLSPEC_HIDDEN;
 NTSTATUS wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkGetSwapchainImagesKHR(void *args) DECLSPEC_HIDDEN;
+NTSTATUS wine_vkQueuePresentKHR(void *args) DECLSPEC_HIDDEN;
 
 /* Private thunks */
 VkResult thunk_vkGetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2 *pImageFormatInfo, VkImageFormatProperties2 *pImageFormatProperties) DECLSPEC_HIDDEN;
@@ -1295,6 +1306,18 @@ typedef VkImageViewHandleInfoNVX VkImageViewHandleInfoNVX_host;
 #endif
 
 #if defined(USE_STRUCT_CONVERSION)
+typedef struct VkMemoryGetFdInfoKHR_host
+{
+    VkStructureType sType;
+    const void *pNext;
+    VkDeviceMemory memory;
+    VkExternalMemoryHandleTypeFlagBits handleType;
+} VkMemoryGetFdInfoKHR_host;
+#else
+typedef VkMemoryGetFdInfoKHR VkMemoryGetFdInfoKHR_host;
+#endif
+
+#if defined(USE_STRUCT_CONVERSION)
 typedef struct VkMemoryGetWin32HandleInfoKHR_host
 {
     VkStructureType sType;
@@ -1623,6 +1646,22 @@ typedef VkBindSparseInfo VkBindSparseInfo_host;
 #endif
 
 #if defined(USE_STRUCT_CONVERSION)
+typedef struct VkPresentInfoKHR_host
+{
+    VkStructureType sType;
+    const void *pNext;
+    uint32_t waitSemaphoreCount;
+    const VkSemaphore *pWaitSemaphores;
+    uint32_t swapchainCount;
+    const VkSwapchainKHR *pSwapchains;
+    const uint32_t *pImageIndices;
+    VkResult *pResults;
+} VkPresentInfoKHR_host;
+#else
+typedef VkPresentInfoKHR VkPresentInfoKHR_host;
+#endif
+
+#if defined(USE_STRUCT_CONVERSION)
 typedef struct VkSubmitInfo_host
 {
     VkStructureType sType;
@@ -1761,10 +1800,18 @@ typedef VkCopyDescriptorSet VkCopyDescriptorSet_host;
 #endif
 
 
+VkResult convert_VkBufferCreateInfo_struct_chain(const void *pNext, VkBufferCreateInfo *out_struct) DECLSPEC_HIDDEN;
+void free_VkBufferCreateInfo_struct_chain(VkBufferCreateInfo *s) DECLSPEC_HIDDEN;
 VkResult convert_VkDeviceCreateInfo_struct_chain(const void *pNext, VkDeviceCreateInfo *out_struct) DECLSPEC_HIDDEN;
 void free_VkDeviceCreateInfo_struct_chain(VkDeviceCreateInfo *s) DECLSPEC_HIDDEN;
+VkResult convert_VkImageCreateInfo_struct_chain(const void *pNext, VkImageCreateInfo *out_struct) DECLSPEC_HIDDEN;
+void free_VkImageCreateInfo_struct_chain(VkImageCreateInfo *s) DECLSPEC_HIDDEN;
 VkResult convert_VkInstanceCreateInfo_struct_chain(const void *pNext, VkInstanceCreateInfo *out_struct) DECLSPEC_HIDDEN;
 void free_VkInstanceCreateInfo_struct_chain(VkInstanceCreateInfo *s) DECLSPEC_HIDDEN;
+VkResult convert_VkMemoryAllocateInfo_struct_chain(const void *pNext, VkMemoryAllocateInfo *out_struct) DECLSPEC_HIDDEN;
+void free_VkMemoryAllocateInfo_struct_chain(VkMemoryAllocateInfo *s) DECLSPEC_HIDDEN;
+VkResult convert_VkPhysicalDeviceImageFormatInfo2_struct_chain(const void *pNext, VkPhysicalDeviceImageFormatInfo2 *out_struct) DECLSPEC_HIDDEN;
+void free_VkPhysicalDeviceImageFormatInfo2_struct_chain(VkPhysicalDeviceImageFormatInfo2 *s) DECLSPEC_HIDDEN;
 
 /* For use by vkDevice and children */
 struct vulkan_device_funcs
@@ -2057,6 +2104,8 @@ struct vulkan_device_funcs
     void (*p_vkGetImageSubresourceLayout)(VkDevice, VkImage, const VkImageSubresource *, VkSubresourceLayout_host *);
     VkResult (*p_vkGetImageViewAddressNVX)(VkDevice, VkImageView, VkImageViewAddressPropertiesNVX_host *);
     uint32_t (*p_vkGetImageViewHandleNVX)(VkDevice, const VkImageViewHandleInfoNVX_host *);
+    VkResult (*p_vkGetMemoryFdKHR)(VkDevice, const VkMemoryGetFdInfoKHR_host *, int *);
+    VkResult (*p_vkGetMemoryFdPropertiesKHR)(VkDevice, VkExternalMemoryHandleTypeFlagBits, int, VkMemoryFdPropertiesKHR *);
     VkResult (*p_vkGetMemoryHostPointerPropertiesEXT)(VkDevice, VkExternalMemoryHandleTypeFlagBits, const void *, VkMemoryHostPointerPropertiesEXT *);
     VkResult (*p_vkGetMemoryWin32HandleKHR)(VkDevice, const VkMemoryGetWin32HandleInfoKHR_host *, HANDLE *);
     VkResult (*p_vkGetMemoryWin32HandlePropertiesKHR)(VkDevice, VkExternalMemoryHandleTypeFlagBits, HANDLE, VkMemoryWin32HandlePropertiesKHR *);
@@ -2143,6 +2192,8 @@ struct vulkan_instance_funcs
     VkResult (*p_vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR)(VkPhysicalDevice, uint32_t, uint32_t *, VkPerformanceCounterKHR *, VkPerformanceCounterDescriptionKHR *);
     VkResult (*p_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT)(VkPhysicalDevice, uint32_t *, VkTimeDomainEXT *);
     VkResult (*p_vkGetPhysicalDeviceCooperativeMatrixPropertiesNV)(VkPhysicalDevice, uint32_t *, VkCooperativeMatrixPropertiesNV *);
+    void (*p_vkGetPhysicalDeviceExternalBufferProperties)(VkPhysicalDevice, const VkPhysicalDeviceExternalBufferInfo *, VkExternalBufferProperties *);
+    void (*p_vkGetPhysicalDeviceExternalBufferPropertiesKHR)(VkPhysicalDevice, const VkPhysicalDeviceExternalBufferInfo *, VkExternalBufferProperties *);
     void (*p_vkGetPhysicalDeviceFeatures)(VkPhysicalDevice, VkPhysicalDeviceFeatures *);
     void (*p_vkGetPhysicalDeviceFeatures2)(VkPhysicalDevice, VkPhysicalDeviceFeatures2 *);
     void (*p_vkGetPhysicalDeviceFeatures2KHR)(VkPhysicalDevice, VkPhysicalDeviceFeatures2 *);
@@ -2468,6 +2519,8 @@ struct vulkan_instance_funcs
     USE_VK_FUNC(vkGetImageSubresourceLayout) \
     USE_VK_FUNC(vkGetImageViewAddressNVX) \
     USE_VK_FUNC(vkGetImageViewHandleNVX) \
+    USE_VK_FUNC(vkGetMemoryFdKHR) \
+    USE_VK_FUNC(vkGetMemoryFdPropertiesKHR) \
     USE_VK_FUNC(vkGetMemoryHostPointerPropertiesEXT) \
     USE_VK_FUNC(vkGetMemoryWin32HandleKHR) \
     USE_VK_FUNC(vkGetMemoryWin32HandlePropertiesKHR) \
@@ -2551,6 +2604,8 @@ struct vulkan_instance_funcs
     USE_VK_FUNC(vkEnumeratePhysicalDeviceQueueFamilyPerformanceQueryCountersKHR) \
     USE_VK_FUNC(vkGetPhysicalDeviceCalibrateableTimeDomainsEXT) \
     USE_VK_FUNC(vkGetPhysicalDeviceCooperativeMatrixPropertiesNV) \
+    USE_VK_FUNC(vkGetPhysicalDeviceExternalBufferProperties) \
+    USE_VK_FUNC(vkGetPhysicalDeviceExternalBufferPropertiesKHR) \
     USE_VK_FUNC(vkGetPhysicalDeviceFeatures) \
     USE_VK_FUNC(vkGetPhysicalDeviceFeatures2) \
     USE_VK_FUNC(vkGetPhysicalDeviceFeatures2KHR) \
