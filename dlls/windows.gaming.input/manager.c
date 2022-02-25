@@ -18,6 +18,7 @@
  */
 
 #include "private.h"
+#include "provider.h"
 
 #include "wine/debug.h"
 #include "wine/list.h"
@@ -34,6 +35,193 @@ static CRITICAL_SECTION_DEBUG manager_cs_debug =
 static CRITICAL_SECTION manager_cs = { &manager_cs_debug, -1, 0, 0, 0, 0 };
 
 static struct list controller_list = LIST_INIT( controller_list );
+
+struct controller
+{
+    IGameController IGameController_iface;
+    IGameControllerBatteryInfo IGameControllerBatteryInfo_iface;
+    IInspectable *IInspectable_inner;
+    LONG ref;
+
+    struct list entry;
+    IGameControllerProvider *provider;
+    ICustomGameControllerFactory *factory;
+};
+
+static inline struct controller *impl_from_IGameController( IGameController *iface )
+{
+    return CONTAINING_RECORD( iface, struct controller, IGameController_iface );
+}
+
+static HRESULT WINAPI controller_QueryInterface( IGameController *iface, REFIID iid, void **out )
+{
+    struct controller *impl = impl_from_IGameController( iface );
+
+    TRACE( "iface %p, iid %s, out %p.\n", iface, debugstr_guid( iid ), out );
+
+    if (IsEqualGUID( iid, &IID_IUnknown ) ||
+        IsEqualGUID( iid, &IID_IInspectable ) ||
+        IsEqualGUID( iid, &IID_IAgileObject ) ||
+        IsEqualGUID( iid, &IID_IGameController ))
+    {
+        IInspectable_AddRef( (*out = &impl->IGameController_iface) );
+        return S_OK;
+    }
+
+    if (IsEqualGUID( iid, &IID_IGameControllerBatteryInfo ))
+    {
+        IInspectable_AddRef( (*out = &impl->IGameControllerBatteryInfo_iface) );
+        return S_OK;
+    }
+
+    return IInspectable_QueryInterface( impl->IInspectable_inner, iid, out );
+}
+
+static ULONG WINAPI controller_AddRef( IGameController *iface )
+{
+    struct controller *impl = impl_from_IGameController( iface );
+    ULONG ref = InterlockedIncrement( &impl->ref );
+    TRACE( "iface %p increasing refcount to %lu.\n", iface, ref );
+    return ref;
+}
+
+static ULONG WINAPI controller_Release( IGameController *iface )
+{
+    struct controller *impl = impl_from_IGameController( iface );
+    ULONG ref = InterlockedDecrement( &impl->ref );
+
+    TRACE( "iface %p decreasing refcount to %lu.\n", iface, ref );
+
+    if (!ref)
+    {
+        InterlockedIncrement( &impl->ref );
+        IInspectable_Release( impl->IInspectable_inner );
+        ICustomGameControllerFactory_Release( impl->factory );
+        IGameControllerProvider_Release( impl->provider );
+        list_remove( &impl->entry );
+        free( impl );
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI controller_GetIids( IGameController *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME( "iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_GetRuntimeClassName( IGameController *iface, HSTRING *class_name )
+{
+    struct controller *impl = impl_from_IGameController( iface );
+    return IInspectable_GetRuntimeClassName( impl->IInspectable_inner, class_name );
+}
+
+static HRESULT WINAPI controller_GetTrustLevel( IGameController *iface, TrustLevel *trust_level )
+{
+    struct controller *impl = impl_from_IGameController( iface );
+    return IInspectable_GetTrustLevel( impl->IInspectable_inner, trust_level );
+}
+
+static HRESULT WINAPI controller_add_HeadsetConnected( IGameController *iface, ITypedEventHandler_IGameController_Headset *handler,
+                                                       EventRegistrationToken *token )
+{
+    FIXME( "iface %p, handler %p, token %p stub!\n", iface, handler, token );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_remove_HeadsetConnected( IGameController *iface, EventRegistrationToken token )
+{
+    FIXME( "iface %p, token %I64x stub!\n", iface, token.value );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_add_HeadsetDisconnected( IGameController *iface, ITypedEventHandler_IGameController_Headset *handler,
+                                                          EventRegistrationToken *token )
+{
+    FIXME( "iface %p, handler %p, token %p stub!\n", iface, handler, token );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_remove_HeadsetDisconnected( IGameController *iface, EventRegistrationToken token )
+{
+    FIXME( "iface %p, token %I64x stub!\n", iface, token.value );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_add_UserChanged( IGameController *iface,
+                                                  ITypedEventHandler_IGameController_UserChangedEventArgs *handler,
+                                                  EventRegistrationToken *token )
+{
+    FIXME( "iface %p, handler %p, token %p stub!\n", iface, handler, token );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_remove_UserChanged( IGameController *iface, EventRegistrationToken token )
+{
+    FIXME( "iface %p, token %I64x stub!\n", iface, token.value );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_get_Headset( IGameController *iface, IHeadset **value )
+{
+    FIXME( "iface %p, value %p stub!\n", iface, value );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_get_IsWireless( IGameController *iface, boolean *value )
+{
+    FIXME( "iface %p, value %p stub!\n", iface, value );
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI controller_get_User( IGameController *iface, __x_ABI_CWindows_CSystem_CIUser **value )
+{
+    FIXME( "iface %p, value %p stub!\n", iface, value );
+    return E_NOTIMPL;
+}
+
+static const struct IGameControllerVtbl controller_vtbl =
+{
+    controller_QueryInterface,
+    controller_AddRef,
+    controller_Release,
+    /* IInspectable methods */
+    controller_GetIids,
+    controller_GetRuntimeClassName,
+    controller_GetTrustLevel,
+    /* IGameController methods */
+    controller_add_HeadsetConnected,
+    controller_remove_HeadsetConnected,
+    controller_add_HeadsetDisconnected,
+    controller_remove_HeadsetDisconnected,
+    controller_add_UserChanged,
+    controller_remove_UserChanged,
+    controller_get_Headset,
+    controller_get_IsWireless,
+    controller_get_User,
+};
+
+DEFINE_IINSPECTABLE( battery, IGameControllerBatteryInfo, struct controller, IGameController_iface )
+
+static HRESULT WINAPI battery_TryGetBatteryReport( IGameControllerBatteryInfo *iface, IBatteryReport **value )
+{
+    FIXME( "iface %p, value %p stub!\n", iface, value );
+    return E_NOTIMPL;
+}
+
+static const struct IGameControllerBatteryInfoVtbl battery_vtbl =
+{
+    battery_QueryInterface,
+    battery_AddRef,
+    battery_Release,
+    /* IInspectable methods */
+    battery_GetIids,
+    battery_GetRuntimeClassName,
+    battery_GetTrustLevel,
+    /* IGameControllerBatteryInfo methods */
+    battery_TryGetBatteryReport,
+};
 
 struct manager_statics
 {
@@ -211,12 +399,85 @@ static struct manager_statics manager_statics =
 
 IActivationFactory *manager_factory = &manager_statics.IActivationFactory_iface;
 
+static HRESULT controller_create( ICustomGameControllerFactory *factory, IGameControllerProvider *provider,
+                                  struct controller **out )
+{
+    IGameControllerImpl *inner_impl;
+    struct controller *impl;
+    HRESULT hr;
+
+    if (!(impl = malloc(sizeof(*impl)))) return E_OUTOFMEMORY;
+    impl->IGameController_iface.lpVtbl = &controller_vtbl;
+    impl->IGameControllerBatteryInfo_iface.lpVtbl = &battery_vtbl;
+    impl->ref = 1;
+
+    if (FAILED(hr = ICustomGameControllerFactory_CreateGameController( factory, provider, &impl->IInspectable_inner )))
+        WARN( "Failed to create game controller, hr %#lx\n", hr );
+    else if (FAILED(hr = IInspectable_QueryInterface( impl->IInspectable_inner, &IID_IGameControllerImpl, (void **)&inner_impl )))
+        WARN( "Failed to find IGameControllerImpl iface, hr %#lx\n", hr );
+    else
+    {
+        if (FAILED(hr = IGameControllerImpl_Initialize( inner_impl, &impl->IGameController_iface, provider )))
+            WARN( "Failed to initialize game controller, hr %#lx\n", hr );
+        IGameControllerImpl_Release( inner_impl );
+    }
+
+    if (FAILED(hr))
+    {
+        if (impl->IInspectable_inner) IInspectable_Release( impl->IInspectable_inner );
+        free( impl );
+        return hr;
+    }
+
+    ICustomGameControllerFactory_AddRef( (impl->factory = factory) );
+    IGameControllerProvider_AddRef( (impl->provider = provider) );
+
+    EnterCriticalSection( &manager_cs );
+    list_add_tail( &controller_list, &impl->entry );
+    LeaveCriticalSection( &manager_cs );
+
+    *out = impl;
+    return S_OK;
+}
+
 void manager_on_provider_created( IGameControllerProvider *provider )
 {
-    FIXME( "provider %p stub!\n", provider );
+    struct controller *entries[16];
+    ULONG i, count = 0;
+    HRESULT hr;
+
+    TRACE( "provider %p\n", provider );
+
+    if (SUCCEEDED(controller_create( controller_factory, provider, entries + count ))) count++;
+
+    EnterCriticalSection( &manager_cs );
+    for (i = 0; i < count; ++i)
+    {
+        hr = ICustomGameControllerFactory_OnGameControllerAdded( entries[i]->factory,
+                                                                 &entries[i]->IGameController_iface );
+        if (FAILED(hr)) IGameController_Release( &entries[i]->IGameController_iface );
+    }
+    LeaveCriticalSection( &manager_cs );
 }
 
 void manager_on_provider_removed( IGameControllerProvider *provider )
 {
-    FIXME( "provider %p stub!\n", provider );
+    struct controller *entry, *next;
+
+    TRACE( "provider %p\n", provider );
+
+    EnterCriticalSection( &manager_cs );
+    LIST_FOR_EACH_ENTRY( entry, &controller_list, struct controller, entry )
+    {
+        if (entry->provider != provider) continue;
+        ICustomGameControllerFactory_OnGameControllerRemoved( entry->factory,
+                                                              &entry->IGameController_iface );
+    }
+
+    LIST_FOR_EACH_ENTRY_SAFE( entry, next, &controller_list, struct controller, entry )
+    {
+        if (entry->provider != provider) continue;
+        IGameController_Release( &entry->IGameController_iface );
+    }
+    LeaveCriticalSection( &manager_cs );
 }
