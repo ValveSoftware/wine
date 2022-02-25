@@ -65,6 +65,7 @@ struct gamepad
     LONG ref;
 
     IGameControllerProvider *provider;
+    IWineGameControllerProvider *wine_provider;
 };
 
 static inline struct gamepad *impl_from_IGameControllerImpl( IGameControllerImpl *iface )
@@ -120,6 +121,7 @@ static ULONG WINAPI controller_Release( IGameControllerImpl *iface )
 
     if (!ref)
     {
+        IWineGameControllerProvider_Release( impl->wine_provider );
         IGameControllerProvider_Release( impl->provider );
         free( impl );
     }
@@ -216,8 +218,68 @@ static HRESULT WINAPI gamepad_put_Vibration( IGamepad *iface, struct GamepadVibr
 
 static HRESULT WINAPI gamepad_GetCurrentReading( IGamepad *iface, struct GamepadReading *value )
 {
-    FIXME( "iface %p, value %p stub!\n", iface, value );
-    return E_NOTIMPL;}
+    struct gamepad *impl = impl_from_IGamepad( iface );
+    struct WineGameControllerState state;
+    HRESULT hr;
+
+    TRACE( "iface %p, value %p.\n", iface, value );
+
+    if (FAILED(hr = IWineGameControllerProvider_get_State( impl->wine_provider, &state ))) return hr;
+
+    if (state.buttons[0]) value->Buttons |= GamepadButtons_A;
+    if (state.buttons[1]) value->Buttons |= GamepadButtons_B;
+    if (state.buttons[2]) value->Buttons |= GamepadButtons_X;
+    if (state.buttons[3]) value->Buttons |= GamepadButtons_Y;
+    if (state.buttons[4]) value->Buttons |= GamepadButtons_LeftShoulder;
+    if (state.buttons[5]) value->Buttons |= GamepadButtons_RightShoulder;
+    if (state.buttons[6]) value->Buttons |= GamepadButtons_Menu;
+    if (state.buttons[7]) value->Buttons |= GamepadButtons_View;
+    if (state.buttons[8]) value->Buttons |= GamepadButtons_LeftThumbstick;
+    if (state.buttons[9]) value->Buttons |= GamepadButtons_RightThumbstick;
+
+    switch (state.switches[0])
+    {
+    case GameControllerSwitchPosition_Up:
+    case GameControllerSwitchPosition_UpRight:
+    case GameControllerSwitchPosition_UpLeft:
+        value->Buttons |= GamepadButtons_DPadUp;
+        break;
+    case GameControllerSwitchPosition_Down:
+    case GameControllerSwitchPosition_DownRight:
+    case GameControllerSwitchPosition_DownLeft:
+        value->Buttons |= GamepadButtons_DPadDown;
+        break;
+    default:
+        break;
+    }
+
+    switch (state.switches[0])
+    {
+    case GameControllerSwitchPosition_Right:
+    case GameControllerSwitchPosition_UpRight:
+    case GameControllerSwitchPosition_DownRight:
+        value->Buttons |= GamepadButtons_DPadRight;
+        break;
+    case GameControllerSwitchPosition_Left:
+    case GameControllerSwitchPosition_UpLeft:
+    case GameControllerSwitchPosition_DownLeft:
+        value->Buttons |= GamepadButtons_DPadLeft;
+        break;
+    default:
+        break;
+    }
+
+    value->LeftThumbstickX = 2. * state.axes[0] - 1.;
+    value->LeftThumbstickY = 1. - 2. * state.axes[1];
+    value->LeftTrigger = state.axes[2];
+    value->RightThumbstickX = 2. * state.axes[3] - 1.;
+    value->RightThumbstickY = 1. - 2. * state.axes[4];
+    value->RightTrigger = state.axes[5];
+
+    value->Timestamp = state.timestamp;
+
+    return hr;
+}
 
 static const struct IGamepadVtbl gamepad_vtbl =
 {
@@ -438,6 +500,7 @@ static HRESULT WINAPI controller_factory_CreateGameController( ICustomGameContro
                                                                IInspectable **value )
 {
     struct gamepad *impl;
+    HRESULT hr;
 
     TRACE( "iface %p, provider %p, value %p.\n", iface, provider, value );
 
@@ -447,10 +510,19 @@ static HRESULT WINAPI controller_factory_CreateGameController( ICustomGameContro
     impl->IGamepad_iface.lpVtbl = &gamepad_vtbl;
     impl->ref = 1;
 
+    hr = IGameControllerProvider_QueryInterface( provider, &IID_IWineGameControllerProvider,
+                                                 (void **)&impl->wine_provider );
+    if (FAILED(hr)) goto failed;
+
     TRACE( "created Gamepad %p\n", impl );
 
     *value = (IInspectable *)&impl->IGameControllerImpl_iface;
     return S_OK;
+
+failed:
+    TRACE( "failed to create Gamepad, hr %#lx\n", hr );
+    free( impl );
+    return hr;
 }
 
 static HRESULT WINAPI controller_factory_OnGameControllerAdded( ICustomGameControllerFactory *iface, IGameController *value )
