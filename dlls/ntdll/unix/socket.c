@@ -150,6 +150,8 @@ struct async_transmit_ioctl
     LARGE_INTEGER offset;
 };
 
+static int get_sock_type( HANDLE handle );
+
 static NTSTATUS sock_errno_to_status( int err )
 {
     switch (err)
@@ -904,6 +906,20 @@ static NTSTATUS sock_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
     async->sent_len = 0;
 
     status = try_send( fd, async );
+
+    /* HACK: VRChat relies on send() reporting STATUS_SUCCESS for dropped UDP sockets when the
+     * network is actually lost but network adapters are still up on Windows. Fix VRChat internal
+     * error bug when resuming from sleep */
+    {
+        const char *appid;
+
+        if (status == STATUS_NETWORK_UNREACHABLE && get_sock_type(handle) == SOCK_DGRAM
+            && (appid = getenv("SteamAppId")) && !strcmp(appid, "438100"))
+        {
+            WARN("Replacing STATUS_NETWORK_UNREACHABLE with STATUS_SUCCESS for VRChat.\n");
+            status = STATUS_SUCCESS;
+        }
+    }
 
     if (status != STATUS_SUCCESS && status != STATUS_DEVICE_NOT_READY)
     {
