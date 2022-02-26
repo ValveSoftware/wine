@@ -50,6 +50,8 @@ struct h264_decoder
     IMFMediaType *input_type;
     IMFMediaType *output_type;
 
+    UINT64 last_pts;
+
     struct wg_format wg_format;
     struct wg_transform *wg_transform;
     struct wg_sample_queue *wg_sample_queue;
@@ -65,6 +67,7 @@ static HRESULT try_create_wg_transform(struct h264_decoder *decoder)
     struct wg_format input_format;
     struct wg_format output_format;
 
+    decoder->last_pts = 0;
     if (decoder->wg_transform)
         wg_transform_destroy(decoder->wg_transform);
     decoder->wg_transform = NULL;
@@ -582,9 +585,9 @@ static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, 
 {
     struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     struct wg_sample *wg_sample;
+    UINT64 frame_rate, duration;
     struct wg_format wg_format;
     UINT32 sample_size;
-    UINT64 frame_rate;
     GUID subtype;
     HRESULT hr;
 
@@ -617,8 +620,18 @@ static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, 
 
     if (SUCCEEDED(hr = wg_transform_read_mf(decoder->wg_transform, wg_sample, &wg_format,
             &samples[0].dwStatus)))
+    {
         wg_sample_queue_flush(decoder->wg_sample_queue, false);
 
+        if (!(wg_sample->flags & (WG_SAMPLE_FLAG_HAS_PTS|WG_SAMPLE_FLAG_HAS_DURATION)))
+        {
+            frame_rate = (UINT64)decoder->wg_format.u.video.fps_n << 32 | decoder->wg_format.u.video.fps_d;
+            duration = (UINT64)10000000 * (UINT32)frame_rate / (frame_rate >> 32);
+            IMFSample_SetSampleTime(samples[0].pSample, decoder->last_pts);
+            IMFSample_SetSampleDuration(samples[0].pSample, duration);
+            decoder->last_pts += duration;
+        }
+    }
     wg_sample_release(wg_sample);
 
     if (hr == MF_E_TRANSFORM_STREAM_CHANGE)

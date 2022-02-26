@@ -62,6 +62,7 @@ struct wg_transform
     GstSample *output_sample;
     bool output_caps_changed;
     GstCaps *output_caps;
+    bool broken_timestamps;
 };
 
 static bool is_caps_video(GstCaps *caps)
@@ -419,9 +420,10 @@ NTSTATUS wg_transform_create(void *args)
              */
             transform->input_max_length = 16;
             transform->output_plane_align = 15;
-            if (!(element = create_element("h264parse", "base"))
-                    || !append_element(GST_BIN(transform->container), element, &first, &last))
+            if ((element = create_element("h264parse", "base"))
+                    && !append_element(GST_BIN(transform->container), element, &first, &last))
                 goto out;
+            transform->broken_timestamps = !element;
             /* fallthrough */
         case WG_MAJOR_TYPE_AAC:
         case WG_MAJOR_TYPE_MPEG1_AUDIO:
@@ -921,6 +923,9 @@ NTSTATUS wg_transform_read_data(void *args)
         gst_sample_unref(transform->output_sample);
         transform->output_sample = NULL;
     }
+
+    if (transform->broken_timestamps)
+        sample->flags &= ~(WG_SAMPLE_FLAG_HAS_PTS|WG_SAMPLE_FLAG_HAS_DURATION);
 
     params->result = S_OK;
     wg_allocator_release_sample(transform->allocator, sample, discard_data);
