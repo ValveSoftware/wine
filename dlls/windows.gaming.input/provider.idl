@@ -36,6 +36,17 @@ namespace Windows.Gaming.Input.Custom {
 
     [
         contract(Windows.Foundation.UniversalApiContract, 3.0),
+        uuid(06e58977-7684-4dc5-bad1-cda52a4aa06d)
+    ]
+    interface IGameControllerImpl : IInspectable
+        requires Windows.Gaming.Input.Custom.IGameControllerInputSink
+    {
+        HRESULT Initialize([in] Windows.Gaming.Input.IGameController *outer,
+                           [in] Windows.Gaming.Input.Custom.IGameControllerProvider *provider);
+    }
+
+    [
+        contract(Windows.Foundation.UniversalApiContract, 3.0),
         exclusiveto(Windows.Gaming.Input.Custom.WineGameControllerProvider),
         uuid(8967b6ef-a4de-4b9a-984a-9f920b4d1b26)
     ]
