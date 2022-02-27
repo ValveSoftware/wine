@@ -442,13 +442,36 @@ static HRESULT controller_create( ICustomGameControllerFactory *factory, IGameCo
 
 void manager_on_provider_created( IGameControllerProvider *provider )
 {
+    IWineGameControllerProvider *wine_provider;
     struct controller *entries[16];
+    WineGameControllerType type;
     ULONG i, count = 0;
     HRESULT hr;
 
     TRACE( "provider %p\n", provider );
 
+    if (FAILED(IGameControllerProvider_QueryInterface( provider, &IID_IWineGameControllerProvider,
+                                                       (void **)&wine_provider )))
+    {
+        FIXME( "IWineGameControllerProvider isn't implemented by provider %p\n", provider );
+        return;
+    }
+    if (FAILED(hr = IWineGameControllerProvider_get_Type( wine_provider, &type )))
+    {
+        WARN( "Failed to get controller type, hr %#lx\n", hr );
+        type = WineGameControllerType_Joystick;
+    }
+    IWineGameControllerProvider_Release( wine_provider );
+
     if (SUCCEEDED(controller_create( controller_factory, provider, entries + count ))) count++;
+    switch (type)
+    {
+    case WineGameControllerType_Joystick:
+        break;
+    case WineGameControllerType_Gamepad:
+        if (SUCCEEDED(controller_create( gamepad_factory, provider, entries + count ))) count++;
+        break;
+    }
 
     EnterCriticalSection( &manager_cs );
     for (i = 0; i < count; ++i)
