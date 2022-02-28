@@ -3606,6 +3606,7 @@ static BOOL is_supported_opcode( enum socket_opcode opcode )
 {
     switch (opcode)
     {
+    case SOCKET_OPCODE_CONTINUE:
     case SOCKET_OPCODE_TEXT:
     case SOCKET_OPCODE_BINARY:
     case SOCKET_OPCODE_CLOSE:
@@ -3618,7 +3619,7 @@ static BOOL is_supported_opcode( enum socket_opcode opcode )
     }
 }
 
-static DWORD receive_frame( struct socket *socket, DWORD *ret_len, enum socket_opcode *opcode )
+static DWORD receive_frame( struct socket *socket, DWORD *ret_len, enum socket_opcode *opcode, BOOL *final )
 {
     DWORD ret, len, count;
     char hdr[2];
@@ -3629,7 +3630,8 @@ static DWORD receive_frame( struct socket *socket, DWORD *ret_len, enum socket_o
         return ERROR_WINHTTP_INVALID_SERVER_RESPONSE;
     }
     *opcode = hdr[0] & 0xf;
-    TRACE("received %02x frame\n", *opcode);
+    *final = hdr[0] & FIN_BIT;
+    TRACE("received %02x frame, final %#x\n", *opcode, *final);
 
     len = hdr[1] & ~MASK_BIT;
     if (len == 126)
@@ -3776,17 +3778,48 @@ static DWORD handle_control_frame( struct socket *socket )
     return ERROR_SUCCESS;
 }
 
-static WINHTTP_WEB_SOCKET_BUFFER_TYPE map_opcode( enum socket_opcode opcode, BOOL fragment )
+static WINHTTP_WEB_SOCKET_BUFFER_TYPE map_opcode( struct socket *socket, enum socket_opcode opcode, BOOL fragment )
 {
+    enum fragment_type frag_type = socket->receiving_fragment_type;
+
     switch (opcode)
     {
     case SOCKET_OPCODE_TEXT:
-        if (fragment) return WINHTTP_WEB_SOCKET_UTF8_FRAGMENT_BUFFER_TYPE;
+        if (frag_type && frag_type != SOCKET_FRAGMENT_UTF8)
+            FIXME( "Received SOCKET_OPCODE_TEXT with prev fragment %u.\n", frag_type );
+        if (fragment)
+        {
+            socket->receiving_fragment_type = SOCKET_FRAGMENT_UTF8;
+            return WINHTTP_WEB_SOCKET_UTF8_FRAGMENT_BUFFER_TYPE;
+        }
+        socket->receiving_fragment_type = SOCKET_FRAGMENT_NONE;
         return WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE;
 
     case SOCKET_OPCODE_BINARY:
-        if (fragment) return WINHTTP_WEB_SOCKET_BINARY_FRAGMENT_BUFFER_TYPE;
+        if (frag_type && frag_type != SOCKET_FRAGMENT_BINARY)
+            FIXME( "Received SOCKET_OPCODE_BINARY with prev fragment %u.\n", frag_type );
+        if (fragment)
+        {
+            socket->receiving_fragment_type = SOCKET_FRAGMENT_BINARY;
+            return WINHTTP_WEB_SOCKET_BINARY_FRAGMENT_BUFFER_TYPE;
+        }
+        socket->receiving_fragment_type = SOCKET_FRAGMENT_NONE;
         return WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE;
+
+    case SOCKET_OPCODE_CONTINUE:
+        if (!frag_type)
+        {
+            FIXME( "Received SOCKET_OPCODE_CONTINUE without starting fragment.\n" );
+            return ~0u;
+        }
+        if (fragment)
+        {
+            return frag_type == SOCKET_FRAGMENT_BINARY ? WINHTTP_WEB_SOCKET_BINARY_FRAGMENT_BUFFER_TYPE
+                                                       : WINHTTP_WEB_SOCKET_UTF8_FRAGMENT_BUFFER_TYPE;
+        }
+        socket->receiving_fragment_type = SOCKET_FRAGMENT_NONE;
+        return frag_type == SOCKET_FRAGMENT_BINARY ? WINHTTP_WEB_SOCKET_BINARY_MESSAGE_BUFFER_TYPE
+                                                   : WINHTTP_WEB_SOCKET_UTF8_MESSAGE_BUFFER_TYPE;
 
     case SOCKET_OPCODE_CLOSE:
         return WINHTTP_WEB_SOCKET_CLOSE_BUFFER_TYPE;
@@ -3800,13 +3833,14 @@ static WINHTTP_WEB_SOCKET_BUFFER_TYPE map_opcode( enum socket_opcode opcode, BOO
 static DWORD socket_receive( struct socket *socket, void *buf, DWORD len, DWORD *ret_len,
                              WINHTTP_WEB_SOCKET_BUFFER_TYPE *ret_type )
 {
+    BOOL final = socket->last_receive_final;
     DWORD count, ret = ERROR_SUCCESS;
 
     if (!socket->read_size)
     {
         for (;;)
         {
-            if (!(ret = receive_frame( socket, &socket->read_size, &socket->opcode )))
+            if (!(ret = receive_frame( socket, &socket->read_size, &socket->opcode, &final )))
             {
                 if (!(socket->opcode & CONTROL_BIT) || (ret = handle_control_frame( socket ))
                     || socket->opcode == SOCKET_OPCODE_CLOSE) break;
@@ -3815,7 +3849,11 @@ static DWORD socket_receive( struct socket *socket, void *buf, DWORD len, DWORD 
             if (ret) break;
         }
     }
-    if (!ret) ret = receive_bytes( socket, buf, min(len, socket->read_size), &count, FALSE );
+    if (!ret)
+    {
+        socket->last_receive_final = final;
+        ret = receive_bytes( socket, buf, min(len, socket->read_size), &count, FALSE );
+    }
     if (!ret)
     {
         if (count < socket->read_size)
@@ -3823,7 +3861,14 @@ static DWORD socket_receive( struct socket *socket, void *buf, DWORD len, DWORD 
 
         socket->read_size -= count;
         *ret_len = count;
-        *ret_type = map_opcode( socket->opcode, socket->read_size != 0 );
+        *ret_type = map_opcode( socket, socket->opcode, !final || socket->read_size != 0 );
+        TRACE( "len %lu, *ret_len %lu, *ret_type %u.\n", len, *ret_len, *ret_type );
+        if (*ret_type == ~0u)
+        {
+            FIXME( "Unexpected opcode %u.\n", socket->opcode );
+            socket->read_size = 0;
+            return ERROR_WINHTTP_INVALID_SERVER_RESPONSE;
+        }
     }
     return ret;
 }
@@ -4033,6 +4078,7 @@ DWORD WINAPI WinHttpWebSocketShutdown( HINTERNET hsocket, USHORT status, void *r
 
 static DWORD socket_close( struct socket *socket )
 {
+    BOOL final = FALSE;
     DWORD ret, count;
 
     if (socket->close_frame_received) return socket->close_frame_receive_err;
@@ -4041,12 +4087,14 @@ static DWORD socket_close( struct socket *socket )
 
     while (1)
     {
-        if ((ret = receive_frame( socket, &count, &socket->opcode ))) return ret;
+        if ((ret = receive_frame( socket, &count, &socket->opcode, &final ))) return ret;
         if (socket->opcode == SOCKET_OPCODE_CLOSE) break;
 
         socket->read_size = count;
         if ((ret = socket_drain( socket ))) return ret;
     }
+    if (!final)
+        FIXME( "Received close opcode without FIN bit.\n" );
 
     return receive_close_status( socket, count );
 }
