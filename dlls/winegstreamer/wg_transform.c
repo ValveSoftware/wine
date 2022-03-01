@@ -64,18 +64,12 @@ static GstCaps *wg_format_to_caps_xwma(const struct wg_encoded_format *format)
     GstCaps *caps;
 
     if (format->encoded_type == WG_ENCODED_TYPE_WMA)
-    {
         caps = gst_caps_new_empty_simple("audio/x-wma");
-        if (format->u.xwma.version)
-            gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, format->u.xwma.version, NULL);
-    }
     else
-    {
         caps = gst_caps_new_empty_simple("audio/x-xma");
-        if (format->u.xwma.version)
-            gst_caps_set_simple(caps, "xmaversion", G_TYPE_INT, format->u.xwma.version, NULL);
-    }
 
+    if (format->u.xwma.version)
+        gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, format->u.xwma.version, NULL);
     if (format->u.xwma.bitrate)
         gst_caps_set_simple(caps, "bitrate", G_TYPE_INT, format->u.xwma.bitrate, NULL);
     if (format->u.xwma.rate)
