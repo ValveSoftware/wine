@@ -493,33 +493,9 @@ static HRESULT WINAPI color_converter_GetInputCurrentType(IMFTransform *iface, D
 
 static HRESULT WINAPI color_converter_GetOutputCurrentType(IMFTransform *iface, DWORD id, IMFMediaType **type)
 {
-    struct color_converter *converter = impl_color_converter_from_IMFTransform(iface);
-    IMFMediaType *ret;
-    HRESULT hr;
+    FIXME("%p, %u, %p.\n", iface, id, type);
 
-    TRACE("%p, %u, %p.\n", converter, id, type);
-
-    if (id != 0)
-        return MF_E_INVALIDSTREAMNUMBER;
-
-    if (FAILED(hr = MFCreateMediaType(&ret)))
-        return hr;
-
-    EnterCriticalSection(&converter->cs);
-
-    if (converter->output_type)
-        hr = IMFMediaType_CopyAllItems(converter->output_type, (IMFAttributes *)ret);
-    else
-        hr = MF_E_TRANSFORM_TYPE_NOT_SET;
-
-    LeaveCriticalSection(&converter->cs);
-
-    if (SUCCEEDED(hr))
-        *type = ret;
-    else
-        IMFMediaType_Release(ret);
-
-    return hr;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI color_converter_GetInputStatus(IMFTransform *iface, DWORD id, DWORD *flags)
