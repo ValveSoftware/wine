@@ -128,7 +128,6 @@ void mf_media_type_to_wg_encoded_format(IMFMediaType *type, struct wg_encoded_fo
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj) DECLSPEC_HIDDEN;
 
 HRESULT wma_decoder_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
-HRESULT h264_decoder_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 HRESULT audio_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 HRESULT color_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
