@@ -415,7 +415,6 @@ static struct class_factory avi_splitter_cf = {{&class_factory_vtbl}, avi_splitt
 static struct class_factory decodebin_parser_cf = {{&class_factory_vtbl}, decodebin_parser_create};
 static struct class_factory mpeg_splitter_cf = {{&class_factory_vtbl}, mpeg_splitter_create};
 static struct class_factory wave_parser_cf = {{&class_factory_vtbl}, wave_parser_create};
-static struct class_factory wma_decoder_cf = {{&class_factory_vtbl}, wma_decoder_create};
 
 HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID iid, void **out)
 {
@@ -438,8 +437,6 @@ HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID iid, void **out)
         factory = &mpeg_splitter_cf;
     else if (IsEqualGUID(clsid, &CLSID_WAVEParser))
         factory = &wave_parser_cf;
-    else if (IsEqualGUID(clsid, &CLSID_WMADecMediaObject))
-        factory = &wma_decoder_cf;
     else
     {
         FIXME("%s not implemented, returning CLASS_E_CLASSNOTAVAILABLE.\n", debugstr_guid(clsid));
