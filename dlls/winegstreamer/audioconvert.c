@@ -756,6 +756,9 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
             case WG_PARSER_EVENT_BUFFER:
                 break;
 
+            case WG_PARSER_EVENT_SEGMENT:
+                continue;
+
             default:
                 WARN("Unexpected event, %u\n", event.type);
                 continue;
