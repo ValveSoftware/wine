@@ -62,9 +62,19 @@ struct wg_format
                 WG_VIDEO_FORMAT_YVYU,
 
                 WG_VIDEO_FORMAT_CINEPAK,
+
+                WG_VIDEO_FORMAT_H264,
             } format;
             int32_t width, height;
             uint32_t fps_n, fps_d;
+            union
+            {
+                struct
+                {
+                    uint32_t profile;
+                    uint32_t level;
+                } h264;
+            } compressed;
         } video;
         struct
         {
@@ -114,7 +124,6 @@ struct wg_encoded_format
         WG_ENCODED_TYPE_UNKNOWN,
         WG_ENCODED_TYPE_WMA,
         WG_ENCODED_TYPE_XMA,
-        WG_ENCODED_TYPE_H264,
     } encoded_type;
 
     union
@@ -130,13 +139,6 @@ struct wg_encoded_format
             uint32_t codec_data_len;
             unsigned char codec_data[64];
         } xwma;
-        struct
-        {
-            int32_t width, height;
-            uint32_t fps_n, fps_d;
-            uint32_t profile;
-            uint32_t level;
-        } h264;
     } u;
 };
 
