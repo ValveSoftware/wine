@@ -615,7 +615,7 @@ static HRESULT WINAPI audio_converter_ProcessEvent(IMFTransform *iface, DWORD id
 static HRESULT WINAPI audio_converter_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
     struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
-    struct wg_parser_buffer wg_buffer;
+    struct wg_parser_event event;
 
     TRACE("%p, %u %lu.\n", iface, message, param);
 
@@ -630,7 +630,7 @@ static HRESULT WINAPI audio_converter_ProcessMessage(IMFTransform *iface, MFT_ME
                 return S_OK;
             }
 
-            wg_parser_stream_get_buffer(converter->stream, &wg_buffer);
+            wg_parser_stream_get_event(converter->stream, &event);
             wg_parser_stream_release_buffer(converter->stream);
             converter->buffer_inflight = FALSE;
 
@@ -711,8 +711,8 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
 {
     struct audio_converter *converter = impl_audio_converter_from_IMFTransform(iface);
     IMFSample *allocated_sample = NULL;
-    struct wg_parser_buffer wg_buffer;
     IMFMediaBuffer *buffer = NULL;
+    struct wg_parser_event event;
     unsigned char *buffer_data;
     DWORD buffer_len;
     HRESULT hr = S_OK;
@@ -745,12 +745,12 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
         goto done;
     }
 
-    if (!wg_parser_stream_get_buffer(converter->stream, &wg_buffer))
+    if (!wg_parser_stream_get_event(converter->stream, &event))
         assert(0);
 
     if (!samples[0].pSample)
     {
-        if (FAILED(hr = MFCreateMemoryBuffer(wg_buffer.size, &buffer)))
+        if (FAILED(hr = MFCreateMemoryBuffer(event.u.buffer.size, &buffer)))
         {
             ERR("Failed to create buffer, hr %#x.\n", hr);
             goto done;
@@ -786,16 +786,16 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
         goto done;
     }
 
-    if (buffer_len < wg_buffer.size)
+    if (buffer_len < event.u.buffer.size)
     {
         WARN("Client's buffer is smaller (%u bytes) than the output sample (%u bytes)\n",
-            buffer_len, wg_buffer.size);
+            buffer_len, event.u.buffer.size);
 
         hr = MF_E_BUFFERTOOSMALL;
         goto done;
     }
 
-    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, wg_buffer.size)))
+    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event.u.buffer.size)))
     {
         ERR("Failed to set size, hr %#x.\n", hr);
         goto done;
@@ -807,7 +807,7 @@ static HRESULT WINAPI audio_converter_ProcessOutput(IMFTransform *iface, DWORD f
         goto done;
     }
 
-    if (!wg_parser_stream_copy_buffer(converter->stream, buffer_data, 0, wg_buffer.size))
+    if (!wg_parser_stream_copy_buffer(converter->stream, buffer_data, 0, event.u.buffer.size))
     {
         ERR("Failed to copy buffer.\n");
         IMFMediaBuffer_Unlock(buffer);

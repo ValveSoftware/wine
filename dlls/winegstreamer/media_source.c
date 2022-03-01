@@ -449,7 +449,7 @@ static void dispatch_end_of_presentation(struct media_source *source)
     IMFMediaEventQueue_QueueEventParamVar(source->event_queue, MEEndOfPresentation, &GUID_NULL, S_OK, &empty);
 }
 
-static void send_buffer(struct media_stream *stream, const struct wg_parser_buffer *wg_buffer, IUnknown *token)
+static void send_buffer(struct media_stream *stream, const struct wg_parser_event *event, IUnknown *token)
 {
     IMFMediaBuffer *buffer;
     IMFSample *sample;
@@ -462,7 +462,7 @@ static void send_buffer(struct media_stream *stream, const struct wg_parser_buff
         return;
     }
 
-    if (FAILED(hr = MFCreateMemoryBuffer(wg_buffer->size, &buffer)))
+    if (FAILED(hr = MFCreateMemoryBuffer(event->u.buffer.size, &buffer)))
     {
         ERR("Failed to create buffer, hr %#x.\n", hr);
         IMFSample_Release(sample);
@@ -475,7 +475,7 @@ static void send_buffer(struct media_stream *stream, const struct wg_parser_buff
         goto out;
     }
 
-    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, wg_buffer->size)))
+    if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event->u.buffer.size)))
     {
         ERR("Failed to set size, hr %#x.\n", hr);
         goto out;
@@ -487,7 +487,7 @@ static void send_buffer(struct media_stream *stream, const struct wg_parser_buff
         goto out;
     }
 
-    if (!wg_parser_stream_copy_buffer(stream->wg_stream, data, 0, wg_buffer->size))
+    if (!wg_parser_stream_copy_buffer(stream->wg_stream, data, 0, event->u.buffer.size))
     {
         wg_parser_stream_release_buffer(stream->wg_stream);
         IMFMediaBuffer_Unlock(buffer);
@@ -501,13 +501,13 @@ static void send_buffer(struct media_stream *stream, const struct wg_parser_buff
         goto out;
     }
 
-    if (FAILED(hr = IMFSample_SetSampleTime(sample, wg_buffer->pts)))
+    if (FAILED(hr = IMFSample_SetSampleTime(sample, event->u.buffer.pts)))
     {
         ERR("Failed to set sample time, hr %#x.\n", hr);
         goto out;
     }
 
-    if (FAILED(hr = IMFSample_SetSampleDuration(sample, wg_buffer->duration)))
+    if (FAILED(hr = IMFSample_SetSampleDuration(sample, event->u.buffer.duration)))
     {
         ERR("Failed to set sample duration, hr %#x.\n", hr);
         goto out;
@@ -527,13 +527,13 @@ out:
 static void wait_on_sample(struct media_stream *stream, IUnknown *token)
 {
     PROPVARIANT empty_var = {.vt = VT_EMPTY};
-    struct wg_parser_buffer buffer;
+    struct wg_parser_event event;
 
     TRACE("%p, %p\n", stream, token);
 
-    if (wg_parser_stream_get_buffer(stream->wg_stream, &buffer))
+    if (wg_parser_stream_get_event(stream->wg_stream, &event))
     {
-        send_buffer(stream, &buffer, token);
+        send_buffer(stream, &event, token);
     }
     else
     {
