@@ -330,7 +330,6 @@ struct wg_sample
     UINT32 size;
     /* pts and duration are in 100-nanosecond units. */
     ULONGLONG pts, duration;
-    struct wg_format *format;
 };
 
 struct wg_transform_read_data_params
