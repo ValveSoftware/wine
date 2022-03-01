@@ -52,7 +52,6 @@ struct h264_decoder
 
     struct wg_transform *wg_transform;
     struct wg_format wg_format;
-    ULONGLONG last_pts;
 };
 
 static struct h264_decoder *impl_from_IMFTransform(IMFTransform *iface)
@@ -76,7 +75,6 @@ static HRESULT try_create_wg_transform(struct h264_decoder *decoder)
     if (output_format.major_type == WG_MAJOR_TYPE_UNKNOWN)
         return MF_E_INVALIDMEDIATYPE;
 
-    decoder->last_pts = 0;
     decoder->wg_transform = wg_transform_create(&input_format, &output_format);
     if (decoder->wg_transform)
         return S_OK;
@@ -566,7 +564,6 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
     MFVideoArea aperture = {0};
     IMFMediaType *media_type;
     UINT32 align, offset;
-    UINT64 framerate;
     HRESULT hr;
 
     TRACE("iface %p, flags %#x, count %u, samples %p, status %p.\n", iface, flags, count, samples, status);
@@ -602,15 +599,6 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
         hr = MF_E_BUFFERTOOSMALL;
     else if (SUCCEEDED(hr = wg_transform_read_data(decoder->wg_transform, &wg_sample)))
     {
-        if (!(wg_sample.flags & (WG_SAMPLE_FLAG_HAS_PTS|WG_SAMPLE_FLAG_HAS_DURATION)))
-        {
-            IMFMediaType_GetUINT64(decoder->output_type, &MF_MT_FRAME_RATE, &framerate);
-            wg_sample.pts = decoder->last_pts;
-            wg_sample.duration = (UINT64)10000000 * (UINT32)framerate / (framerate >> 32);
-            wg_sample.flags |= (WG_SAMPLE_FLAG_HAS_PTS|WG_SAMPLE_FLAG_HAS_DURATION);
-            decoder->last_pts += wg_sample.duration;
-        }
-
         if (wg_sample.flags & WG_SAMPLE_FLAG_HAS_PTS)
             IMFSample_SetSampleTime(samples[0].pSample, wg_sample.pts);
         if (wg_sample.flags & WG_SAMPLE_FLAG_HAS_DURATION)
