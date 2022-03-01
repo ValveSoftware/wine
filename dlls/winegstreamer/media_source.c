@@ -387,6 +387,7 @@ static void start_pipeline(struct media_source *source, struct source_async_comm
     if (position->vt == VT_I8)
         wg_parser_stream_seek(source->streams[0]->wg_stream, 1.0, position->hVal.QuadPart, 0,
                 AM_SEEKING_AbsolutePositioning, AM_SEEKING_NoPositioning);
+    wg_parser_end_flush(source->wg_parser);
 
     for (i = 0; i < source->stream_count; i++)
         flush_token_queue(source->streams[i], position->vt == VT_EMPTY);
@@ -413,6 +414,8 @@ static void pause_pipeline(struct media_source *source)
 static void stop_pipeline(struct media_source *source)
 {
     unsigned int i;
+
+    wg_parser_begin_flush(source->wg_parser);
 
     for (i = 0; i < source->stream_count; i++)
     {
@@ -539,7 +542,8 @@ static void wait_on_sample(struct media_stream *stream, IUnknown *token)
 
     for (;;)
     {
-        wg_parser_stream_get_event(stream->wg_stream, &event);
+        if (!wg_parser_stream_get_event(stream->wg_stream, &event))
+            return;
 
         TRACE("Got event of type %#x.\n", event.type);
 
