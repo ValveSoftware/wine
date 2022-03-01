@@ -161,7 +161,6 @@ enum wg_parser_type
     WG_PARSER_MPEGAUDIOPARSE,
     WG_PARSER_WAVPARSE,
     WG_PARSER_AUDIOCONV,
-    WG_PARSER_VIDEOCONV,
 };
 
 struct wg_parser_create_params
