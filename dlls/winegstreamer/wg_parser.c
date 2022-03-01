@@ -37,7 +37,7 @@
 #include "winternl.h"
 #include "dshow.h"
 
-#include "unix_private.h"
+#include "unixlib.h"
 
 typedef enum
 {
@@ -51,7 +51,7 @@ typedef enum
  * debug logging instead of Wine debug logging. In order to be safe we forbid
  * any use of Wine debug logging in this entire file. */
 
-GST_DEBUG_CATEGORY(wine);
+GST_DEBUG_CATEGORY_STATIC(wine);
 #define GST_CAT_DEFAULT wine
 
 typedef BOOL (*init_gst_cb)(struct wg_parser *parser);
@@ -2634,16 +2634,6 @@ static void init_gstreamer_once(void)
             gst_version_string(), GST_VERSION_MAJOR, GST_VERSION_MINOR, GST_VERSION_MICRO);
 }
 
-bool init_gstreamer(void)
-{
-    static pthread_once_t init_once = PTHREAD_ONCE_INIT;
-
-    if (pthread_once(&init_once, init_gstreamer_once))
-        return false;
-
-    return true;
-}
-
 static NTSTATUS wg_parser_create(void *args)
 {
     static const init_gst_cb init_funcs[] =
@@ -2656,10 +2646,11 @@ static NTSTATUS wg_parser_create(void *args)
         [WG_PARSER_VIDEOCONV] = video_convert_init_gst,
     };
 
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
     struct wg_parser_create_params *params = args;
     struct wg_parser *parser;
 
-    if (!init_gstreamer())
+    if (pthread_once(&once, init_gstreamer_once))
         return E_FAIL;
 
     if (!(parser = calloc(1, sizeof(*parser))))
@@ -2730,7 +2721,4 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     X(wg_parser_stream_seek),
 
     X(wg_parser_stream_drain),
-
-    X(wg_transform_create),
-    X(wg_transform_destroy),
 };
