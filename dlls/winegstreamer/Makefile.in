@@ -9,7 +9,6 @@ EXTRALIBS = $(GSTREAMER_LIBS) $(PTHREAD_LIBS)
 
 C_SRCS = \
 	audioconvert.c \
-	colorconvert.c \
 	decode_transform.c \
 	main.c \
 	media_source.c \
