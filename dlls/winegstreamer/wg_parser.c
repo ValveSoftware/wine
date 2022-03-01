@@ -91,8 +91,6 @@ struct wg_parser
 
     bool unlimited_buffering;
     struct wg_format input_format;
-
-    bool use_mediaconv;
 };
 
 struct wg_parser_stream
@@ -946,34 +944,6 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
         return GST_AUTOPLUG_SELECT_SKIP;
     }
     return GST_AUTOPLUG_SELECT_TRY;
-}
-
-static gint find_videoconv_cb(gconstpointer a, gconstpointer b)
-{
-    const GValue *val_a = a, *val_b = b;
-    GstElementFactory *factory_a = g_value_get_object(val_a), *factory_b = g_value_get_object(val_b);
-    const char *name_a = gst_element_factory_get_longname(factory_a), *name_b = gst_element_factory_get_longname(factory_b);
-
-    if (!strcmp(name_a, "Proton video converter"))
-        return -1;
-    if (!strcmp(name_b, "Proton video converter"))
-        return 1;
-    return 0;
-}
-
-static GValueArray *autoplug_sort_cb(GstElement *bin, GstPad *pad,
-        GstCaps *caps, GValueArray *factories, gpointer user)
-{
-    struct wg_parser *parser = user;
-    GValueArray *ret = g_value_array_copy(factories);
-
-    if (!parser->use_mediaconv)
-        return NULL;
-
-    GST_DEBUG("parser %p.", parser);
-
-    g_value_array_sort(ret, find_videoconv_cb);
-    return ret;
 }
 
 static void no_more_pads_cb(GstElement *element, gpointer user)
@@ -1834,12 +1804,9 @@ static gboolean src_activate_mode_cb(GstPad *pad, GstObject *parent, GstPadMode 
     return FALSE;
 }
 
-static BOOL decodebin_parser_init_gst(struct wg_parser *parser);
-
 static GstBusSyncReply bus_handler_cb(GstBus *bus, GstMessage *msg, gpointer user)
 {
     struct wg_parser *parser = user;
-    const GstStructure *structure;
     gchar *dbg_info = NULL;
     GError *err = NULL;
 
@@ -1872,21 +1839,6 @@ static GstBusSyncReply bus_handler_cb(GstBus *bus, GstMessage *msg, gpointer use
         parser->has_duration = true;
         pthread_mutex_unlock(&parser->mutex);
         pthread_cond_signal(&parser->init_cond);
-        break;
-
-    case GST_MESSAGE_ELEMENT:
-        structure = gst_message_get_structure(msg);
-        if (gst_structure_has_name(structure, "missing-plugin"))
-        {
-            pthread_mutex_lock(&parser->mutex);
-            if (!parser->use_mediaconv && parser->init_gst == decodebin_parser_init_gst)
-            {
-                GST_WARNING("Autoplugged element failed to initialise, trying again with protonvideoconvert.");
-                parser->error = true;
-                pthread_cond_signal(&parser->init_cond);
-            }
-            pthread_mutex_unlock(&parser->mutex);
-        }
         break;
 
     default:
@@ -2027,7 +1979,6 @@ static NTSTATUS wg_parser_connect(void *args)
 {
     const struct wg_parser_connect_params *params = args;
     struct wg_parser *parser = params->parser;
-    bool use_mediaconv = false;
     unsigned int i;
     HRESULT hr;
     int ret;
@@ -2045,16 +1996,9 @@ static NTSTATUS wg_parser_connect(void *args)
     if (!parser->pull_mode)
         gst_pad_set_active(parser->my_src, 1);
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
-
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
-        if (!parser->use_mediaconv && parser->init_gst == decodebin_parser_init_gst && parser->pull_mode)
-        {
-            GST_WARNING("Failed to play media, trying again with protonvideoconvert.");
-            use_mediaconv = true;
-        }
-        else
-            GST_ERROR("Failed to play stream.\n");
+        GST_ERROR("Failed to play stream.\n");
         goto out;
     }
 
@@ -2064,8 +2008,6 @@ static NTSTATUS wg_parser_connect(void *args)
         pthread_cond_wait(&parser->init_cond, &parser->mutex);
     if (parser->error)
     {
-        if (!parser->use_mediaconv && parser->init_gst == decodebin_parser_init_gst)
-            use_mediaconv = true;
         pthread_mutex_unlock(&parser->mutex);
         goto out;
     }
@@ -2173,14 +2115,6 @@ out:
     parser->sink_connected = false;
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->read_cond);
-
-    if (use_mediaconv)
-    {
-        parser->use_mediaconv = true;
-        hr = wg_parser_connect(args);
-        parser->use_mediaconv = false;
-        return hr;
-    }
 
     return E_FAIL;
 }
@@ -2296,7 +2230,6 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), parser);
     g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
     g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
-    g_signal_connect(element, "autoplug-sort", G_CALLBACK(autoplug_sort_cb), parser);
     g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
 
     parser->their_sink = gst_element_get_static_pad(element, "sink");
