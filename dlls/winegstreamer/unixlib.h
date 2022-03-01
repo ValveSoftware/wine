@@ -92,27 +92,11 @@ struct wg_format
                 WG_AUDIO_FORMAT_MPEG1_LAYER1,
                 WG_AUDIO_FORMAT_MPEG1_LAYER2,
                 WG_AUDIO_FORMAT_MPEG1_LAYER3,
-
-                WG_AUDIO_FORMAT_AAC,
             } format;
 
             uint32_t channels;
             uint32_t channel_mask; /* In WinMM format. */
             uint32_t rate;
-
-            union
-            {
-                struct
-                {
-                    uint32_t payload_type;
-                    uint32_t indication;
-                    /* The definition of this structure is found in ISO/IEC 14496-3,
-                       which we don't have access to, so we'll just keep
-                       the size set to the largest instance we've seen used. */
-                    unsigned char audio_specifc_config[2];
-                    uint32_t asp_size;
-                } aac;
-            } compressed;
         } audio;
     } u;
 };
