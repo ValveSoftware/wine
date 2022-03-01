@@ -98,64 +98,6 @@ static GstCaps *wg_format_to_caps_xwma(const struct wg_encoded_format *format)
     return caps;
 }
 
-static GstCaps *wg_format_to_caps_h264(const struct wg_encoded_format *format)
-{
-    const char *profile, *level;
-    GstCaps *caps;
-
-    caps = gst_caps_new_empty_simple("video/x-h264");
-    gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "byte-stream", NULL);
-    gst_caps_set_simple(caps, "alignment", G_TYPE_STRING, "au", NULL);
-
-    if (format->u.h264.width)
-        gst_caps_set_simple(caps, "width", G_TYPE_INT, format->u.h264.width, NULL);
-    if (format->u.h264.height)
-        gst_caps_set_simple(caps, "height", G_TYPE_INT, format->u.h264.height, NULL);
-    if (format->u.h264.fps_n || format->u.h264.fps_d)
-        gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, format->u.h264.fps_n, format->u.h264.fps_d, NULL);
-
-    switch (format->u.h264.profile)
-    {
-        case /* eAVEncH264VProfile_Main */ 77:  profile = "main"; break;
-        case /* eAVEncH264VProfile_High */ 100: profile = "high"; break;
-        case /* eAVEncH264VProfile_444 */  244: profile = "high-4:4:4"; break;
-        default:
-            GST_ERROR("Unrecognized H.264 profile attribute %u.", format->u.h264.profile);
-            /* fallthrough */
-        case 0: profile = NULL;
-    }
-    if (profile)
-        gst_caps_set_simple(caps, "profile", G_TYPE_STRING, profile, NULL);
-
-    switch (format->u.h264.level)
-    {
-        case /* eAVEncH264VLevel1 */   10: level = "1";   break;
-        case /* eAVEncH264VLevel1_1 */ 11: level = "1.1"; break;
-        case /* eAVEncH264VLevel1_2 */ 12: level = "1.2"; break;
-        case /* eAVEncH264VLevel1_3 */ 13: level = "1.3"; break;
-        case /* eAVEncH264VLevel2 */   20: level = "2";   break;
-        case /* eAVEncH264VLevel2_1 */ 21: level = "2.1"; break;
-        case /* eAVEncH264VLevel2_2 */ 22: level = "2.2"; break;
-        case /* eAVEncH264VLevel3 */   30: level = "3";   break;
-        case /* eAVEncH264VLevel3_1 */ 31: level = "3.1"; break;
-        case /* eAVEncH264VLevel3_2 */ 32: level = "3.2"; break;
-        case /* eAVEncH264VLevel4 */   40: level = "4";   break;
-        case /* eAVEncH264VLevel4_1 */ 41: level = "4.1"; break;
-        case /* eAVEncH264VLevel4_2 */ 42: level = "4.2"; break;
-        case /* eAVEncH264VLevel5 */   50: level = "5";   break;
-        case /* eAVEncH264VLevel5_1 */ 51: level = "5.1"; break;
-        case /* eAVEncH264VLevel5_2 */ 52: level = "5.2"; break;
-        default:
-            GST_ERROR("Unrecognized H.264 level attribute %u.", format->u.h264.level);
-            /* fallthrough */
-        case 0: level = NULL;
-    }
-    if (level)
-        gst_caps_set_simple(caps, "level", G_TYPE_STRING, level, NULL);
-
-    return caps;
-}
-
 static GstCaps *wg_encoded_format_to_caps(const struct wg_encoded_format *format)
 {
     switch (format->encoded_type)
@@ -165,8 +107,6 @@ static GstCaps *wg_encoded_format_to_caps(const struct wg_encoded_format *format
         case WG_ENCODED_TYPE_WMA:
         case WG_ENCODED_TYPE_XMA:
             return wg_format_to_caps_xwma(format);
-        case WG_ENCODED_TYPE_H264:
-            return wg_format_to_caps_h264(format);
     }
     assert(0);
     return NULL;
@@ -346,10 +286,7 @@ NTSTATUS wg_transform_create(void *args)
                 !transform_append_element(transform, element, &first, &last))
             goto failed;
         break;
-    case WG_MAJOR_TYPE_VIDEO:
-        break;
     default:
-        assert(0);
         break;
     }
 
