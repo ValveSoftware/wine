@@ -573,7 +573,7 @@ static DWORD CALLBACK read_thread(void *arg)
 
         if (!size)
         {
-            wg_parser_push_data(reader->wg_parser, WG_READ_SUCCESS, data, 0);
+            wg_parser_push_data(reader->wg_parser, data, 0);
             continue;
         }
 
@@ -592,7 +592,7 @@ static DWORD CALLBACK read_thread(void *arg)
                     || !ReadFile(file, data, size, &ret_size, NULL))
             {
                 ERR("Failed to read %u bytes at offset %I64u, error %u.\n", size, offset, GetLastError());
-                wg_parser_push_data(reader->wg_parser, WG_READ_FAILURE, NULL, 0);
+                wg_parser_push_data(reader->wg_parser, NULL, 0);
                 continue;
             }
         }
@@ -603,14 +603,14 @@ static DWORD CALLBACK read_thread(void *arg)
             if (FAILED(hr))
             {
                 ERR("Failed to read %u bytes at offset %I64u, hr %#x.\n", size, offset, hr);
-                wg_parser_push_data(reader->wg_parser, WG_READ_FAILURE, NULL, 0);
+                wg_parser_push_data(reader->wg_parser, NULL, 0);
                 continue;
             }
         }
 
         if (ret_size != size)
             ERR("Unexpected short read: requested %u bytes, got %u.\n", size, ret_size);
-        wg_parser_push_data(reader->wg_parser, WG_READ_SUCCESS, data, ret_size);
+        wg_parser_push_data(reader->wg_parser, data, ret_size);
     }
 
     free(data);
