@@ -311,13 +311,6 @@ struct wg_transform_create_params
     const struct wg_format *output_format;
 };
 
-struct wg_transform_push_data_params
-{
-    struct wg_transform *transform;
-    const void *data;
-    UINT32 size;
-};
-
 enum unix_funcs
 {
     unix_wg_parser_create,
@@ -353,8 +346,6 @@ enum unix_funcs
 
     unix_wg_transform_create,
     unix_wg_transform_destroy,
-
-    unix_wg_transform_push_data,
 };
 
 #endif /* __WINE_WINEGSTREAMER_UNIXLIB_H */

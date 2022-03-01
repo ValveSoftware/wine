@@ -34,7 +34,6 @@
 
 #include "winternl.h"
 #include "dshow.h"
-#include "mferror.h"
 
 #include "unix_private.h"
 
@@ -340,25 +339,4 @@ failed:
 
     wg_transform_destroy(transform);
     return E_FAIL;
-}
-
-NTSTATUS wg_transform_push_data(void *args)
-{
-    struct wg_transform_push_data_params *params = args;
-    struct wg_transform *transform = params->transform;
-    GstBuffer *buffer;
-    GstFlowReturn ret;
-
-    buffer = gst_buffer_new_and_alloc(params->size);
-    gst_buffer_fill(buffer, 0, params->data, params->size);
-
-    ret = gst_pad_push(transform->my_src, buffer);
-    if (ret)
-    {
-        GST_ERROR("Failed to push buffer %d", ret);
-        return MF_E_NOTACCEPTING;
-    }
-
-    GST_INFO("Pushed %u bytes", params->size);
-    return S_OK;
 }
