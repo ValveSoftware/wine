@@ -418,7 +418,6 @@ class_objects[] =
     { &CLSID_VideoProcessorMFT, &video_processor_create },
     { &CLSID_GStreamerByteStreamHandler, &winegstreamer_stream_handler_create },
     { &CLSID_WINEAudioConverter, &audio_converter_create },
-    { &CLSID_WMADecMediaObject, &wma_decoder_create },
     { &CLSID_CColorConvertDMO, &color_converter_create },
     { &CLSID_MSH264DecoderMFT, &h264_decoder_create },
     { &CLSID_MSAACDecMFT, &aac_decoder_create },
@@ -452,20 +451,6 @@ HRESULT mfplat_get_class_object(REFCLSID rclsid, REFIID riid, void **obj)
 
 static WCHAR audio_converterW[] = L"Audio Converter";
 static const GUID *audio_converter_supported_types[] =
-{
-    &MFAudioFormat_PCM,
-    &MFAudioFormat_Float,
-};
-
-static WCHAR wma_decoderW[] = L"WMAudio Decoder MFT";
-static const GUID *wma_decoder_input_types[] =
-{
-    &MEDIASUBTYPE_MSAUDIO1,
-    &MFAudioFormat_WMAudioV8,
-    &MFAudioFormat_WMAudioV9,
-    &MFAudioFormat_WMAudio_Lossless,
-};
-static const GUID *wma_decoder_output_types[] =
 {
     &MFAudioFormat_PCM,
     &MFAudioFormat_Float,
@@ -540,17 +525,6 @@ mfts[] =
         audio_converter_supported_types,
         ARRAY_SIZE(audio_converter_supported_types),
         audio_converter_supported_types,
-    },
-    {
-        &CLSID_WMADecMediaObject,
-        &MFT_CATEGORY_AUDIO_DECODER,
-        wma_decoderW,
-        MFT_ENUM_FLAG_SYNCMFT,
-        &MFMediaType_Audio,
-        ARRAY_SIZE(wma_decoder_input_types),
-        wma_decoder_input_types,
-        ARRAY_SIZE(wma_decoder_output_types),
-        wma_decoder_output_types,
     },
     {
         &CLSID_CColorConvertDMO,
