@@ -56,7 +56,7 @@ struct mf_decoder
     IMFTransform IMFTransform_iface;
     LONG refcount;
     enum decoder_type type;
-    IMFMediaType *input_type, *output_type;
+    IMFMediaType *input_type;
     CRITICAL_SECTION cs;
 };
 
@@ -105,12 +105,6 @@ static ULONG WINAPI mf_decoder_Release(IMFTransform *iface)
         {
             IMFMediaType_Release(decoder->input_type);
             decoder->input_type = NULL;
-        }
-
-        if (decoder->output_type)
-        {
-            IMFMediaType_Release(decoder->output_type);
-            decoder->output_type = NULL;
         }
 
         DeleteCriticalSection(&decoder->cs);
@@ -342,73 +336,9 @@ static HRESULT WINAPI mf_decoder_SetInputType(IMFTransform *iface, DWORD id, IMF
 
 static HRESULT WINAPI mf_decoder_SetOutputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
 {
-    struct mf_decoder *decoder = impl_mf_decoder_from_IMFTransform(iface);
-    struct wg_format output_format;
-    GUID major_type, subtype;
-    HRESULT hr;
-    unsigned int i;
+    FIXME("%p, %u, %p, %#x.\n", iface, id, type, flags);
 
-    TRACE("%p, %u, %p, %#x.\n", decoder, id, type, flags);
-
-    if (id != 0)
-        return MF_E_INVALIDSTREAMNUMBER;
-
-    if (!type)
-    {
-        if (flags & MFT_SET_TYPE_TEST_ONLY)
-            return S_OK;
-
-        EnterCriticalSection(&decoder->cs);
-
-        if (decoder->output_type)
-        {
-            IMFMediaType_Release(decoder->output_type);
-            decoder->output_type = NULL;
-        }
-
-        LeaveCriticalSection(&decoder->cs);
-
-        return S_OK;
-    }
-
-    if (FAILED(IMFMediaType_GetGUID(type, &MF_MT_MAJOR_TYPE, &major_type)))
-        return MF_E_INVALIDTYPE;
-    if (FAILED(IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &subtype)))
-        return MF_E_INVALIDTYPE;
-
-    if (!(IsEqualGUID(&major_type, decoder_descs[decoder->type].major_type)))
-        return MF_E_INVALIDTYPE;
-
-    for (i = 0; i < decoder_descs[decoder->type].output_types_count; i++)
-    {
-        if (IsEqualGUID(&subtype, decoder_descs[decoder->type].output_types[i]))
-            break;
-        if (i == decoder_descs[decoder->type].output_types_count)
-            return MF_E_INVALIDTYPE;
-    }
-
-    mf_media_type_to_wg_format(type, &output_format);
-    if (!output_format.major_type)
-        return MF_E_INVALIDTYPE;
-
-    if (flags & MFT_SET_TYPE_TEST_ONLY)
-        return S_OK;
-
-    EnterCriticalSection(&decoder->cs);
-
-    hr = S_OK;
-
-    if (!decoder->output_type)
-        hr = MFCreateMediaType(&decoder->output_type);
-
-    if (SUCCEEDED(hr) && FAILED(hr = IMFMediaType_CopyAllItems(type, (IMFAttributes*) decoder->output_type)))
-    {
-        IMFMediaType_Release(decoder->output_type);
-        decoder->output_type = NULL;
-    }
-
-    LeaveCriticalSection(&decoder->cs);
-    return hr;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI mf_decoder_GetInputCurrentType(IMFTransform *iface, DWORD id, IMFMediaType **type)
