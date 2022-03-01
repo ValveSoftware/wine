@@ -626,7 +626,9 @@ static HRESULT WINAPI color_converter_ProcessMessage(IMFTransform *iface, MFT_ME
                 return S_OK;
             }
 
-            wg_parser_stream_get_event(converter->stream, &event);
+            while (event.type != WG_PARSER_EVENT_BUFFER)
+                wg_parser_stream_get_event(converter->stream, &event);
+
             wg_parser_stream_release_buffer(converter->stream);
             converter->buffer_inflight = FALSE;
 
@@ -749,8 +751,21 @@ static HRESULT WINAPI color_converter_ProcessOutput(IMFTransform *iface, DWORD f
         goto done;
     }
 
-    if (!wg_parser_stream_get_event(converter->stream, &event))
-        assert(0);
+    for (;;)
+    {
+        wg_parser_stream_get_event(converter->stream, &event);
+
+        switch (event.type)
+        {
+            case WG_PARSER_EVENT_BUFFER:
+                break;
+
+            default:
+                WARN("Unexpected event, %u\n", event.type);
+                continue;
+        }
+        break;
+    }
 
     if (!samples[0].pSample)
     {
