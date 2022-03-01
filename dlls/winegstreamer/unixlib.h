@@ -279,11 +279,6 @@ struct wg_parser_stream_seek_params
     DWORD start_flags, stop_flags;
 };
 
-struct wg_transform_create_params
-{
-    struct wg_transform *transform;
-};
-
 enum unix_funcs
 {
     unix_wg_parser_create,
@@ -316,9 +311,6 @@ enum unix_funcs
     unix_wg_parser_stream_seek,
 
     unix_wg_parser_stream_drain,
-
-    unix_wg_transform_create,
-    unix_wg_transform_destroy,
 };
 
 #endif /* __WINE_WINEGSTREAMER_UNIXLIB_H */

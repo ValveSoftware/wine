@@ -100,9 +100,6 @@ void wg_parser_stream_seek(struct wg_parser_stream *stream, double rate,
         uint64_t start_pos, uint64_t stop_pos, DWORD start_flags, DWORD stop_flags) DECLSPEC_HIDDEN;
 bool wg_parser_stream_drain(struct wg_parser_stream *stream) DECLSPEC_HIDDEN;
 
-struct wg_transform *wg_transform_create(void) DECLSPEC_HIDDEN;
-void wg_transform_destroy(struct wg_transform *transform) DECLSPEC_HIDDEN;
-
 unsigned int wg_format_get_max_size(const struct wg_format *format);
 
 HRESULT avi_splitter_create(IUnknown *outer, IUnknown **out) DECLSPEC_HIDDEN;
