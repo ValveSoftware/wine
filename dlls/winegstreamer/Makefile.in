@@ -11,7 +11,6 @@ C_SRCS = \
 	audioconvert.c \
 	colorconvert.c \
 	decode_transform.c \
-	h264_decoder.c \
 	main.c \
 	media_source.c \
 	mfplat.c \
