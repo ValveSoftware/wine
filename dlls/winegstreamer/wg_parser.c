@@ -417,13 +417,6 @@ static void wg_set_caps_from_wg_format(GstCaps *caps, const struct wg_format *fo
             gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, format->u.video.fps_n, format->u.video.fps_d, NULL);
             break;
         }
-        case WG_MAJOR_TYPE_AUDIO:
-        {
-            gst_caps_set_simple(caps, "rate", G_TYPE_INT, format->u.audio.rate, NULL);
-            gst_caps_set_simple(caps, "channels", G_TYPE_INT, format->u.audio.channels, NULL);
-            if (format->u.audio.channel_mask)
-                gst_caps_set_simple(caps, "channel-mask", G_TYPE_INT, format->u.audio.channel_mask, NULL);
-        }
         default:
             break;
     }
@@ -434,61 +427,6 @@ static GstCaps *wg_format_to_caps_audio(const struct wg_format *format)
     GstAudioChannelPosition positions[32];
     GstAudioFormat audio_format;
     GstAudioInfo info;
-
-    /* compressed types */
-
-    if (format->u.audio.format == WG_AUDIO_FORMAT_AAC)
-    {
-        const char *profile, *level;
-        GstBuffer *audio_specific_config;
-        GstCaps *caps = gst_caps_new_empty_simple("audio/mpeg");
-        wg_set_caps_from_wg_format(caps, format);
-
-        gst_caps_set_simple(caps, "mpegversion", G_TYPE_INT, 4, NULL);
-
-        switch (format->u.audio.compressed.aac.payload_type)
-        {
-            case 0:
-                gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "raw", NULL);
-                break;
-            case 1:
-                gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "adts", NULL);
-                break;
-            case 2:
-                gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "adif", NULL);
-                break;
-            case 3:
-                gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "loas", NULL);
-                break;
-            default:
-                gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, "raw", NULL);
-        };
-
-        switch (format->u.audio.compressed.aac.indication)
-        {
-            case 0x29: profile = "lc"; level = "2";  break;
-            case 0x2A: profile = "lc"; level = "4"; break;
-            case 0x2B: profile = "lc"; level = "5"; break;
-            default:
-                GST_FIXME("Unrecognized profile-level-indication %u\n", format->u.audio.compressed.aac.indication);
-                /* fallthrough */
-            case 0x00: case 0xFE: profile = level = NULL; break; /* unspecified */
-        }
-
-        if (profile)
-            gst_caps_set_simple(caps, "profile", G_TYPE_STRING, profile, NULL);
-        if (level)
-            gst_caps_set_simple(caps, "level", G_TYPE_STRING, level, NULL);
-
-        audio_specific_config = gst_buffer_new_allocate(NULL, format->u.audio.compressed.aac.asp_size, NULL);
-        gst_buffer_fill(audio_specific_config, 0, format->u.audio.compressed.aac.audio_specifc_config, format->u.audio.compressed.aac.asp_size);
-        gst_caps_set_simple(caps, "codec_data", GST_TYPE_BUFFER, audio_specific_config, NULL);
-        gst_buffer_unref(audio_specific_config);
-
-        return caps;
-    }
-
-    /* uncompressed_types */
 
     if ((audio_format = wg_audio_format_to_gst(format->u.audio.format)) == GST_AUDIO_FORMAT_UNKNOWN)
         return NULL;
