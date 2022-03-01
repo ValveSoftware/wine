@@ -180,14 +180,13 @@ void wg_parser_stream_get_preferred_format(struct wg_parser_stream *stream, stru
     __wine_unix_call(unix_handle, unix_wg_parser_stream_get_preferred_format, &params);
 }
 
-void wg_parser_stream_enable(struct wg_parser_stream *stream, const struct wg_format *format, const struct wg_rect *aperture, uint32_t flags)
+void wg_parser_stream_enable(struct wg_parser_stream *stream, const struct wg_format *format, const struct wg_rect *aperture)
 {
     struct wg_parser_stream_enable_params params =
     {
         .stream = stream,
         .format = format,
         .aperture = aperture,
-        .flags = flags,
     };
 
     __wine_unix_call(unix_handle, unix_wg_parser_stream_enable, &params);

@@ -668,34 +668,31 @@ static NTSTATUS wg_parser_stream_enable(void *args)
 
     if (format->major_type == WG_MAJOR_TYPE_VIDEO)
     {
-        if (params->flags & STREAM_ENABLE_FLAG_FLIP_RGB)
+        bool flip = (format->u.video.height < 0);
+
+        switch (format->u.video.format)
         {
-            bool flip = (format->u.video.height < 0);
+            case WG_VIDEO_FORMAT_BGRA:
+            case WG_VIDEO_FORMAT_BGRx:
+            case WG_VIDEO_FORMAT_BGR:
+            case WG_VIDEO_FORMAT_RGB15:
+            case WG_VIDEO_FORMAT_RGB16:
+                flip = !flip;
+                break;
 
-            switch (format->u.video.format)
-            {
-                case WG_VIDEO_FORMAT_BGRA:
-                case WG_VIDEO_FORMAT_BGRx:
-                case WG_VIDEO_FORMAT_BGR:
-                case WG_VIDEO_FORMAT_RGB15:
-                case WG_VIDEO_FORMAT_RGB16:
-                    flip = !flip;
-                    break;
-
-                case WG_VIDEO_FORMAT_AYUV:
-                case WG_VIDEO_FORMAT_I420:
-                case WG_VIDEO_FORMAT_NV12:
-                case WG_VIDEO_FORMAT_UYVY:
-                case WG_VIDEO_FORMAT_YUY2:
-                case WG_VIDEO_FORMAT_YV12:
-                case WG_VIDEO_FORMAT_YVYU:
-                case WG_VIDEO_FORMAT_UNKNOWN:
-                case WG_VIDEO_FORMAT_CINEPAK:
-                    break;
-            }
-
-            gst_util_set_object_arg(G_OBJECT(stream->flip), "method", flip ? "vertical-flip" : "none");
+            case WG_VIDEO_FORMAT_AYUV:
+            case WG_VIDEO_FORMAT_I420:
+            case WG_VIDEO_FORMAT_NV12:
+            case WG_VIDEO_FORMAT_UYVY:
+            case WG_VIDEO_FORMAT_YUY2:
+            case WG_VIDEO_FORMAT_YV12:
+            case WG_VIDEO_FORMAT_YVYU:
+            case WG_VIDEO_FORMAT_UNKNOWN:
+            case WG_VIDEO_FORMAT_CINEPAK:
+                break;
         }
+
+        gst_util_set_object_arg(G_OBJECT(stream->flip), "method", flip ? "vertical-flip" : "none");
 
         if (aperture)
         {
