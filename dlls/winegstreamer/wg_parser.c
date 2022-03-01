@@ -88,7 +88,7 @@ struct wg_parser
         GstFlowReturn ret;
     } read_request;
 
-    bool sink_connected, draining;
+    bool flushing, sink_connected, draining;
 
     bool unlimited_buffering;
     struct wg_format input_format;
@@ -526,6 +526,41 @@ static NTSTATUS wg_parser_get_stream(void *args)
     return S_OK;
 }
 
+static NTSTATUS wg_parser_begin_flush(void *args)
+{
+    struct wg_parser *parser = args;
+    unsigned int i;
+
+    if (!parser->seekable)
+        return S_OK;
+
+    pthread_mutex_lock(&parser->mutex);
+    parser->flushing = true;
+    pthread_mutex_unlock(&parser->mutex);
+
+    for (i = 0; i < parser->stream_count; ++i)
+    {
+        if (parser->streams[i]->enabled)
+            pthread_cond_signal(&parser->streams[i]->event_cond);
+    }
+
+    return S_OK;
+}
+
+static NTSTATUS wg_parser_end_flush(void *args)
+{
+    struct wg_parser *parser = args;
+
+    if (!parser->seekable)
+        return S_OK;
+
+    pthread_mutex_lock(&parser->mutex);
+    parser->flushing = false;
+    pthread_mutex_unlock(&parser->mutex);
+
+    return S_OK;
+}
+
 static NTSTATUS wg_parser_get_next_read_offset(void *args)
 {
     struct wg_parser_get_next_read_offset_params *params = args;
@@ -705,8 +740,15 @@ static NTSTATUS wg_parser_stream_get_event(void *args)
 
     pthread_mutex_lock(&parser->mutex);
 
-    while (stream->event.type == WG_PARSER_EVENT_NONE)
+    while (!parser->flushing && stream->event.type == WG_PARSER_EVENT_NONE)
         pthread_cond_wait(&stream->event_cond, &parser->mutex);
+
+    if (parser->flushing)
+    {
+        pthread_mutex_unlock(&parser->mutex);
+        GST_DEBUG("Filter is flushing.\n");
+        return VFW_E_WRONG_STATE;
+    }
 
     *params->event = stream->event;
 
@@ -848,7 +890,7 @@ static NTSTATUS wg_parser_stream_drain(void *args)
        buffer, the chain callback blocks on the wg_parser_stream_buffer_release
        for the first buffer, which would never be called if the drain function
        hadn't completed. */
-    while (parser->draining && stream->event.type == WG_PARSER_EVENT_NONE)
+    while (!parser->flushing && parser->draining && stream->event.type == WG_PARSER_EVENT_NONE)
         pthread_cond_wait(&stream->event_cond, &parser->mutex);
 
     ret = stream->event.type == WG_PARSER_EVENT_NONE;
@@ -1707,6 +1749,11 @@ static void *push_data(void *arg)
                     parser->streams[i]->eos = false;
                 }
 
+                if (parser->flushing)
+                {
+                    pthread_mutex_unlock(&parser->mutex);
+                    continue;
+                }
                 pthread_mutex_unlock(&parser->mutex);
 
                 segment = gst_segment_new();
@@ -2147,6 +2194,7 @@ static NTSTATUS wg_parser_connect_unseekable(void *args)
     HRESULT hr;
 
     parser->seekable = false;
+    parser->flushing = false;
     /* since typefind is not available here, we must have an input_format */
     parser->input_format = *in_format;
 
@@ -2183,6 +2231,7 @@ static NTSTATUS wg_parser_disconnect(void *args)
 
     /* Unblock all of our streams. */
     pthread_mutex_lock(&parser->mutex);
+    parser->flushing = true;
     parser->no_more_pads = true;
     pthread_cond_signal(&parser->init_cond);
     for (i = 0; i < parser->stream_count; ++i)
@@ -2546,6 +2595,7 @@ static NTSTATUS wg_parser_create(void *args)
     pthread_cond_init(&parser->init_cond, NULL);
     pthread_cond_init(&parser->read_cond, NULL);
     pthread_cond_init(&parser->read_done_cond, NULL);
+    parser->flushing = true;
     parser->init_gst = init_funcs[params->type];
     parser->unlimited_buffering = params->unlimited_buffering;
 
@@ -2582,6 +2632,9 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     X(wg_parser_connect),
     X(wg_parser_connect_unseekable),
     X(wg_parser_disconnect),
+
+    X(wg_parser_begin_flush),
+    X(wg_parser_end_flush),
 
     X(wg_parser_get_next_read_offset),
     X(wg_parser_push_data),
