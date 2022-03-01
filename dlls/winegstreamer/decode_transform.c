@@ -33,9 +33,6 @@ const GUID *h264_input_types[] = {&MFVideoFormat_H264};
 /* NV12 comes first https://docs.microsoft.com/en-us/windows/win32/medfound/mft-decoder-expose-output-types-in-native-order . thanks to @vitorhnn */
 const GUID *h264_output_types[] = {&MFVideoFormat_NV12, &MFVideoFormat_I420, &MFVideoFormat_IYUV, &MFVideoFormat_YUY2, &MFVideoFormat_YV12};
 
-const GUID *aac_input_types[] = {&MFAudioFormat_AAC};
-const GUID *aac_output_types[] = {&MFAudioFormat_Float};
-
 static struct decoder_desc
 {
     const GUID *major_type;
@@ -52,13 +49,6 @@ static struct decoder_desc
         h264_output_types,
         ARRAY_SIZE(h264_output_types),
     },
-    { /* DECODER_TYPE_AAC */
-        &MFMediaType_Audio,
-        aac_input_types,
-        ARRAY_SIZE(aac_input_types),
-        aac_output_types,
-        ARRAY_SIZE(aac_output_types),
-    }
 };
 
 struct mf_decoder
