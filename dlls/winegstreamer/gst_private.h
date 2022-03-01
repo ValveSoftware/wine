@@ -95,7 +95,6 @@ uint64_t wg_parser_stream_get_duration(struct wg_parser_stream *stream) DECLSPEC
 /* start_pos and stop_pos are in 100-nanosecond units. */
 void wg_parser_stream_seek(struct wg_parser_stream *stream, double rate,
         uint64_t start_pos, uint64_t stop_pos, DWORD start_flags, DWORD stop_flags) DECLSPEC_HIDDEN;
-bool wg_parser_stream_drain(struct wg_parser_stream *stream) DECLSPEC_HIDDEN;
 
 unsigned int wg_format_get_max_size(const struct wg_format *format);
 
