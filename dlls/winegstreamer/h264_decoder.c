@@ -51,7 +51,6 @@ struct h264_decoder
     IMFMediaType *output_type;
 
     struct wg_transform *wg_transform;
-    struct wg_format wg_format;
 };
 
 static struct h264_decoder *impl_from_IMFTransform(IMFTransform *iface)
@@ -377,7 +376,7 @@ static HRESULT WINAPI h264_decoder_GetOutputAvailableType(IMFTransform *iface, D
     if (FAILED(hr = IMFMediaType_SetGUID(media_type, &MF_MT_SUBTYPE, output_type)))
         goto done;
 
-    hr = fill_output_media_type(media_type, decoder->output_type);
+    hr = fill_output_media_type(media_type, NULL);
 
 done:
     if (SUCCEEDED(hr))
@@ -426,7 +425,6 @@ static HRESULT WINAPI h264_decoder_SetOutputType(IMFTransform *iface, DWORD id, 
 {
     struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     GUID major, subtype;
-    BOOL identical;
     HRESULT hr;
     ULONG i;
 
@@ -449,13 +447,7 @@ static HRESULT WINAPI h264_decoder_SetOutputType(IMFTransform *iface, DWORD id, 
         return MF_E_INVALIDMEDIATYPE;
 
     if (decoder->output_type)
-    {
-        if (SUCCEEDED(hr = IMFMediaType_Compare(decoder->output_type, (IMFAttributes *)type,
-                MF_ATTRIBUTES_MATCH_THEIR_ITEMS, &identical)) && identical)
-            return S_OK;
         IMFMediaType_Release(decoder->output_type);
-    }
-
     IMFMediaType_AddRef((decoder->output_type = type));
 
     if (FAILED(hr = try_create_wg_transform(decoder)))
@@ -549,7 +541,6 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
     struct wg_sample wg_sample = {0};
     IMFMediaBuffer *media_buffer;
     MFT_OUTPUT_STREAM_INFO info;
-    IMFMediaType *media_type;
     HRESULT hr;
 
     TRACE("iface %p, flags %#x, count %u, samples %p, status %p.\n", iface, flags, count, samples, status);
@@ -580,7 +571,6 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
     if (FAILED(hr = IMFMediaBuffer_Lock(media_buffer, &wg_sample.data, &wg_sample.size, NULL)))
         goto done;
 
-    wg_sample.format = &decoder->wg_format;
     if (wg_sample.size < info.cbSize)
         hr = MF_E_BUFFERTOOSMALL;
     else if (SUCCEEDED(hr = wg_transform_read_data(decoder->wg_transform, &wg_sample)))
@@ -590,20 +580,6 @@ static HRESULT WINAPI h264_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
         if (wg_sample.flags & WG_SAMPLE_FLAG_HAS_DURATION)
             IMFSample_SetSampleDuration(samples[0].pSample, wg_sample.duration);
         hr = IMFMediaBuffer_SetCurrentLength(media_buffer, wg_sample.size);
-    }
-    else if (hr == MF_E_TRANSFORM_STREAM_CHANGE)
-    {
-        media_type = mf_media_type_from_wg_format(&decoder->wg_format);
-        IMFMediaType_SetUINT32(media_type, &MF_MT_SAMPLE_SIZE, wg_sample.size);
-        IMFMediaType_DeleteItem(media_type, &MF_MT_FRAME_RATE);
-        IMFMediaType_DeleteItem(decoder->output_type, &MF_MT_DEFAULT_STRIDE);
-        fill_output_media_type(media_type, decoder->output_type);
-
-        IMFMediaType_Release(decoder->output_type);
-        decoder->output_type = media_type;
-
-        samples[0].dwStatus |= MFT_OUTPUT_DATA_BUFFER_FORMAT_CHANGE;
-        *status |= MFT_OUTPUT_DATA_BUFFER_FORMAT_CHANGE;
     }
 
     IMFMediaBuffer_Unlock(media_buffer);
