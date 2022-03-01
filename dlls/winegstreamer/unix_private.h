@@ -24,7 +24,6 @@
 #include "unixlib.h"
 
 extern bool init_gstreamer(void) DECLSPEC_HIDDEN;
-extern GstElement *create_element(const char *name, const char *plugin_set) DECLSPEC_HIDDEN;
 extern GstCaps *wg_format_to_caps(const struct wg_format *format) DECLSPEC_HIDDEN;
 
 extern NTSTATUS wg_transform_create(void *args) DECLSPEC_HIDDEN;
