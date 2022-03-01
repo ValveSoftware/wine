@@ -118,11 +118,7 @@ HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj) DECLSPEC_HI
 
 HRESULT audio_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
-enum decoder_type
-{
-    DECODER_TYPE_H264,
-};
-HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type) DECLSPEC_HIDDEN;
+HRESULT decode_transform_create(REFIID riid, void **obj) DECLSPEC_HIDDEN;
 
 struct wm_stream
 {

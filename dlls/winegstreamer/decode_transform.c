@@ -29,33 +29,10 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
-const GUID *h264_input_types[] = {&MFVideoFormat_H264};
-/* NV12 comes first https://docs.microsoft.com/en-us/windows/win32/medfound/mft-decoder-expose-output-types-in-native-order . thanks to @vitorhnn */
-const GUID *h264_output_types[] = {&MFVideoFormat_NV12, &MFVideoFormat_I420, &MFVideoFormat_IYUV, &MFVideoFormat_YUY2, &MFVideoFormat_YV12};
-
-static struct decoder_desc
-{
-    const GUID *major_type;
-    const GUID **input_types;
-    unsigned int input_types_count;
-    const GUID **output_types;
-    unsigned int output_types_count;
-} decoder_descs[] =
-{
-    { /* DECODER_TYPE_H264 */
-        &MFMediaType_Video,
-        h264_input_types,
-        ARRAY_SIZE(h264_input_types),
-        h264_output_types,
-        ARRAY_SIZE(h264_output_types),
-    },
-};
-
 struct mf_decoder
 {
     IMFTransform IMFTransform_iface;
     LONG refcount;
-    enum decoder_type type;
 };
 
 static struct mf_decoder *impl_mf_decoder_from_IMFTransform(IMFTransform *iface)
@@ -186,36 +163,9 @@ static HRESULT WINAPI mf_decoder_AddInputStreams(IMFTransform *iface, DWORD stre
 static HRESULT WINAPI mf_decoder_GetInputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
         IMFMediaType **type)
 {
-    struct mf_decoder *decoder = impl_mf_decoder_from_IMFTransform(iface);
-    IMFMediaType *input_type;
-    HRESULT hr;
+    FIXME("%p, %u, %u, %p.\n", iface, id, index, type);
 
-    TRACE("%p, %u, %u, %p\n", decoder, id, index, type);
-
-    if (id != 0)
-        return MF_E_INVALIDSTREAMNUMBER;
-
-    if (index >= decoder_descs[decoder->type].input_types_count)
-        return MF_E_NO_MORE_TYPES;
-
-    if (FAILED(hr = MFCreateMediaType(&input_type)))
-        return hr;
-
-    if (FAILED(hr = IMFMediaType_SetGUID(input_type, &MF_MT_MAJOR_TYPE, decoder_descs[decoder->type].major_type)))
-    {
-        IMFMediaType_Release(input_type);
-        return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_SetGUID(input_type, &MF_MT_SUBTYPE, decoder_descs[decoder->type].input_types[index])))
-    {
-        IMFMediaType_Release(input_type);
-        return hr;
-    }
-
-    *type = input_type;
-
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI mf_decoder_GetOutputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
@@ -334,19 +284,17 @@ static const IMFTransformVtbl mf_decoder_vtbl =
     mf_decoder_ProcessOutput,
 };
 
-HRESULT decode_transform_create(REFIID riid, void **obj, enum decoder_type type)
+HRESULT decode_transform_create(REFIID riid, void **obj)
 {
     struct mf_decoder *object;
 
-    TRACE("%s, %p %u.\n", debugstr_guid(riid), obj, type);
+    TRACE("%s, %p.\n", debugstr_guid(riid), obj);
 
     if (!(object = heap_alloc_zero(sizeof(*object))))
         return E_OUTOFMEMORY;
 
     object->IMFTransform_iface.lpVtbl = &mf_decoder_vtbl;
     object->refcount = 1;
-
-    object->type = type;
 
     *obj = &object->IMFTransform_iface;
     return S_OK;
