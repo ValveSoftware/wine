@@ -175,14 +175,6 @@ struct wg_parser_connect_params
     UINT64 file_size;
 };
 
-struct wg_parser_connect_unseekable_params
-{
-    struct wg_parser *parser;
-    const struct wg_format *in_format;
-    UINT32 stream_count;
-    const struct wg_format *out_formats;
-};
-
 struct wg_parser_get_next_read_offset_params
 {
     struct wg_parser *parser;
@@ -266,7 +258,6 @@ enum unix_funcs
     unix_wg_parser_destroy,
 
     unix_wg_parser_connect,
-    unix_wg_parser_connect_unseekable,
     unix_wg_parser_disconnect,
 
     unix_wg_parser_begin_flush,
