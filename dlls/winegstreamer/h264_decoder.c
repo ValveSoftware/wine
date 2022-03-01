@@ -520,19 +520,7 @@ static HRESULT WINAPI h264_decoder_ProcessEvent(IMFTransform *iface, DWORD id, I
 
 static HRESULT WINAPI h264_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
-    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
-
     FIXME("iface %p, message %#x, param %p stub!\n", iface, message, (void *)param);
-
-    switch (message)
-    {
-    case MFT_MESSAGE_NOTIFY_BEGIN_STREAMING:
-        memset(&decoder->wg_format, 0, sizeof(decoder->wg_format));
-        break;
-    default:
-        break;
-    }
-
     return S_OK;
 }
 
