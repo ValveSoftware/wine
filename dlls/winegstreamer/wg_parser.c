@@ -2215,13 +2215,9 @@ static NTSTATUS wg_parser_disconnect(void *args)
 
     /* Unblock all of our streams. */
     pthread_mutex_lock(&parser->mutex);
-    parser->flushing = true;
-    parser->no_more_pads = true;
-    pthread_cond_signal(&parser->init_cond);
     for (i = 0; i < parser->stream_count; ++i)
     {
         parser->streams[i]->flushing = true;
-        pthread_cond_signal(&parser->streams[i]->event_cond);
         pthread_cond_signal(&parser->streams[i]->event_empty_cond);
     }
     pthread_mutex_unlock(&parser->mutex);
