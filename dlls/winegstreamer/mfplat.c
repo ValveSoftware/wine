@@ -29,8 +29,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
-DEFINE_MEDIATYPE_GUID(MFAudioFormat_XMAudio2, 0x0166);
-
 struct video_processor
 {
     IMFTransform IMFTransform_iface;
@@ -923,8 +921,8 @@ void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
         FIXME("Unrecognized major type %s.\n", debugstr_guid(&major_type));
 }
 
-static void mf_media_type_to_wg_encoded_format_xwma(IMFMediaType *type, struct wg_encoded_format *format,
-        enum wg_encoded_type encoded_type, UINT32 version)
+static void mf_media_type_to_wg_encoded_format_wma(IMFMediaType *type, struct wg_encoded_format *format,
+        UINT32 version)
 {
     UINT32 rate, depth, channels, block_align, bytes_per_second, codec_data_len;
     BYTE codec_data[64];
@@ -960,7 +958,7 @@ static void mf_media_type_to_wg_encoded_format_xwma(IMFMediaType *type, struct w
         return;
     }
 
-    format->encoded_type = encoded_type;
+    format->encoded_type = WG_ENCODED_TYPE_WMA;
     format->u.xwma.version = version;
     format->u.xwma.bitrate = bytes_per_second * 8;
     format->u.xwma.rate = rate;
@@ -991,15 +989,13 @@ void mf_media_type_to_wg_encoded_format(IMFMediaType *type, struct wg_encoded_fo
     if (IsEqualGUID(&major_type, &MFMediaType_Audio))
     {
         if (IsEqualGUID(&subtype, &MEDIASUBTYPE_MSAUDIO1))
-            mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_WMA, 1);
+            mf_media_type_to_wg_encoded_format_wma(type, format, 1);
         else if (IsEqualGUID(&subtype, &MFAudioFormat_WMAudioV8))
-            mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_WMA, 2);
+            mf_media_type_to_wg_encoded_format_wma(type, format, 2);
         else if (IsEqualGUID(&subtype, &MFAudioFormat_WMAudioV9))
-            mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_WMA, 3);
+            mf_media_type_to_wg_encoded_format_wma(type, format, 3);
         else if (IsEqualGUID(&subtype, &MFAudioFormat_WMAudio_Lossless))
-            mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_WMA, 4);
-        else if (IsEqualGUID(&subtype, &MFAudioFormat_XMAudio2))
-            mf_media_type_to_wg_encoded_format_xwma(type, format, WG_ENCODED_TYPE_XMA, 2);
+            mf_media_type_to_wg_encoded_format_wma(type, format, 4);
         else
             FIXME("Unimplemented audio subtype %s.\n", debugstr_guid(&subtype));
     }
