@@ -179,12 +179,13 @@ void wg_parser_stream_get_preferred_format(struct wg_parser_stream *stream, stru
     __wine_unix_call(unix_handle, unix_wg_parser_stream_get_preferred_format, &params);
 }
 
-void wg_parser_stream_enable(struct wg_parser_stream *stream, const struct wg_format *format)
+void wg_parser_stream_enable(struct wg_parser_stream *stream, const struct wg_format *format, uint32_t flags)
 {
     struct wg_parser_stream_enable_params params =
     {
         .stream = stream,
         .format = format,
+        .flags = flags,
     };
 
     TRACE("stream %p, format %p.\n", stream, format);
