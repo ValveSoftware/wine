@@ -30,16 +30,10 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
-static const GUID *h264_decoder_input_types[] =
-{
-    &MFVideoFormat_H264,
-};
-
 struct h264_decoder
 {
     IMFTransform IMFTransform_iface;
     LONG refcount;
-    IMFMediaType *input_type;
 };
 
 static struct h264_decoder *impl_from_IMFTransform(IMFTransform *iface)
@@ -84,11 +78,7 @@ static ULONG WINAPI h264_decoder_Release(IMFTransform *iface)
     TRACE("iface %p decreasing refcount to %u.\n", decoder, refcount);
 
     if (!refcount)
-    {
-        if (decoder->input_type)
-            IMFMediaType_Release(decoder->input_type);
         free(decoder);
-    }
 
     return refcount;
 }
@@ -176,31 +166,8 @@ static HRESULT WINAPI h264_decoder_GetOutputAvailableType(IMFTransform *iface, D
 
 static HRESULT WINAPI h264_decoder_SetInputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
 {
-    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
-    GUID major, subtype;
-    HRESULT hr;
-    ULONG i;
-
-    TRACE("iface %p, id %u, type %p, flags %#x.\n", iface, id, type, flags);
-
-    if (FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_MAJOR_TYPE, &major)) ||
-        FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &subtype)))
-        return E_INVALIDARG;
-
-    if (!IsEqualGUID(&major, &MFMediaType_Video))
-        return MF_E_INVALIDMEDIATYPE;
-
-    for (i = 0; i < ARRAY_SIZE(h264_decoder_input_types); ++i)
-        if (IsEqualGUID(&subtype, h264_decoder_input_types[i]))
-            break;
-    if (i == ARRAY_SIZE(h264_decoder_input_types))
-        return MF_E_INVALIDMEDIATYPE;
-
-    if (decoder->input_type)
-        IMFMediaType_Release(decoder->input_type);
-    IMFMediaType_AddRef((decoder->input_type = type));
-
-    return S_OK;
+    FIXME("iface %p, id %u, type %p, flags %#x stub!\n", iface, id, type, flags);
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI h264_decoder_SetOutputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
