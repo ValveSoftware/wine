@@ -559,7 +559,6 @@ NTSTATUS wg_transform_read_data(void *args)
     struct wg_sample *read_sample = params->sample;
     struct wg_transform_sample *transform_sample;
     struct wg_format buffer_format;
-    bool broken_timestamp = false;
     GstBuffer *buffer;
     struct list *head;
     GstMapInfo info;
@@ -587,11 +586,6 @@ NTSTATUS wg_transform_read_data(void *args)
             pthread_mutex_unlock(&transform->mutex);
             return MF_E_TRANSFORM_STREAM_CHANGE;
         }
-
-        if (buffer_format.major_type == WG_MAJOR_TYPE_VIDEO
-                && buffer_format.u.video.fps_n <= 1
-                && buffer_format.u.video.fps_d <= 1)
-            broken_timestamp = true;
     }
 
     gst_buffer_map(buffer, &info, GST_MAP_READ);
@@ -600,12 +594,12 @@ NTSTATUS wg_transform_read_data(void *args)
     memcpy(read_sample->data, info.data, read_sample->size);
     gst_buffer_unmap(buffer, &info);
 
-    if (buffer->pts != GST_CLOCK_TIME_NONE && !broken_timestamp)
+    if (buffer->pts != GST_CLOCK_TIME_NONE)
     {
         read_sample->flags |= WG_SAMPLE_FLAG_HAS_PTS;
         read_sample->pts = buffer->pts / 100;
     }
-    if (buffer->duration != GST_CLOCK_TIME_NONE && !broken_timestamp)
+    if (buffer->duration != GST_CLOCK_TIME_NONE)
     {
         read_sample->flags |= WG_SAMPLE_FLAG_HAS_DURATION;
         read_sample->duration = buffer->duration / 100;
