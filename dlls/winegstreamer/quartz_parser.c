@@ -1543,7 +1543,7 @@ static HRESULT WINAPI GSTOutPin_DecideBufferSize(struct strmbase_source *iface,
 
     ret = amt_to_wg_format(&pin->pin.pin.mt, &format);
     assert(ret);
-    wg_parser_stream_enable(pin->wg_stream, &format, NULL);
+    wg_parser_stream_enable(pin->wg_stream, &format);
 
     /* We do need to drop any buffers that might have been sent with the old
      * caps, but this will be handled in parser_init_stream(). */
