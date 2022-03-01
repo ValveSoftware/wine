@@ -563,7 +563,6 @@ static HRESULT WINAPI audio_converter_ProcessMessage(IMFTransform *iface, MFT_ME
 
     switch(message)
     {
-        case MFT_MESSAGE_COMMAND_FLUSH:
         case MFT_MESSAGE_NOTIFY_BEGIN_STREAMING:
             return S_OK;
         default:
