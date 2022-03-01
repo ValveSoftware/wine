@@ -34,14 +34,6 @@ static const GUID *h264_decoder_input_types[] =
 {
     &MFVideoFormat_H264,
 };
-static const GUID *h264_decoder_output_types[] =
-{
-    &MFVideoFormat_NV12,
-    &MFVideoFormat_YV12,
-    &MFVideoFormat_IYUV,
-    &MFVideoFormat_I420,
-    &MFVideoFormat_YUY2,
-};
 
 struct h264_decoder
 {
@@ -53,103 +45,6 @@ struct h264_decoder
 static struct h264_decoder *impl_from_IMFTransform(IMFTransform *iface)
 {
     return CONTAINING_RECORD(iface, struct h264_decoder, IMFTransform_iface);
-}
-
-static HRESULT fill_output_media_type(IMFMediaType *media_type, IMFMediaType *default_type)
-{
-    UINT32 value, width, height;
-    UINT64 value64;
-    GUID subtype;
-    HRESULT hr;
-
-    if (FAILED(hr = IMFMediaType_GetGUID(media_type, &MF_MT_SUBTYPE, &subtype)))
-        return hr;
-
-    if (FAILED(hr = IMFMediaType_GetUINT64(media_type, &MF_MT_FRAME_SIZE, &value64)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT64(default_type, &MF_MT_FRAME_SIZE, &value64)))
-            value64 = (UINT64)1920 << 32 | 1080;
-        if (FAILED(hr = IMFMediaType_SetUINT64(media_type, &MF_MT_FRAME_SIZE, value64)))
-            return hr;
-    }
-    width = value64 >> 32;
-    height = value64;
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_FRAME_RATE, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT64(default_type, &MF_MT_FRAME_RATE, &value64)))
-            value64 = (UINT64)30000 << 32 | 1001;
-        if (FAILED(hr = IMFMediaType_SetUINT64(media_type, &MF_MT_FRAME_RATE, value64)))
-            return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_PIXEL_ASPECT_RATIO, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT64(default_type, &MF_MT_PIXEL_ASPECT_RATIO, &value64)))
-            value64 = (UINT64)1 << 32 | 1;
-        if (FAILED(hr = IMFMediaType_SetUINT64(media_type, &MF_MT_PIXEL_ASPECT_RATIO, value64)))
-            return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_SAMPLE_SIZE, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT32(default_type, &MF_MT_SAMPLE_SIZE, &value)))
-        {
-            if (IsEqualGUID(&subtype, &MFVideoFormat_YUY2))
-                value = width * height * 2;
-            else
-                value = width * height * 3 / 2;
-        }
-        if (FAILED(hr = IMFMediaType_SetUINT32(media_type, &MF_MT_SAMPLE_SIZE, value)))
-            return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_DEFAULT_STRIDE, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT32(default_type, &MF_MT_DEFAULT_STRIDE, &value)))
-        {
-            if (IsEqualGUID(&subtype, &MFVideoFormat_YUY2))
-                value = width * 2;
-            else
-                value = width;
-        }
-        if (FAILED(hr = IMFMediaType_SetUINT32(media_type, &MF_MT_DEFAULT_STRIDE, value)))
-            return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_INTERLACE_MODE, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT32(default_type, &MF_MT_INTERLACE_MODE, &value)))
-            value = MFVideoInterlace_MixedInterlaceOrProgressive;
-        if (FAILED(hr = IMFMediaType_SetUINT32(media_type, &MF_MT_INTERLACE_MODE, value)))
-            return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_ALL_SAMPLES_INDEPENDENT, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT32(default_type, &MF_MT_ALL_SAMPLES_INDEPENDENT, &value)))
-            value = 1;
-        if (FAILED(hr = IMFMediaType_SetUINT32(media_type, &MF_MT_ALL_SAMPLES_INDEPENDENT, value)))
-            return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_VIDEO_ROTATION, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT32(default_type, &MF_MT_VIDEO_ROTATION, &value)))
-            value = 0;
-        if (FAILED(hr = IMFMediaType_SetUINT32(media_type, &MF_MT_VIDEO_ROTATION, value)))
-            return hr;
-    }
-
-    if (FAILED(hr = IMFMediaType_GetItem(media_type, &MF_MT_FIXED_SIZE_SAMPLES, NULL)))
-    {
-        if (!default_type || FAILED(hr = IMFMediaType_GetUINT32(default_type, &MF_MT_FIXED_SIZE_SAMPLES, &value)))
-            value = 1;
-        if (FAILED(hr = IMFMediaType_SetUINT32(media_type, &MF_MT_FIXED_SIZE_SAMPLES, value)))
-            return hr;
-    }
-
-    return S_OK;
 }
 
 static HRESULT WINAPI h264_decoder_QueryInterface(IMFTransform *iface, REFIID iid, void **out)
@@ -275,38 +170,8 @@ static HRESULT WINAPI h264_decoder_GetInputAvailableType(IMFTransform *iface, DW
 static HRESULT WINAPI h264_decoder_GetOutputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
         IMFMediaType **type)
 {
-    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
-    IMFMediaType *media_type;
-    const GUID *output_type;
-    HRESULT hr;
-
-    TRACE("iface %p, id %u, index %u, type %p.\n", iface, id, index, type);
-
-    if (!decoder->input_type)
-        return MF_E_TRANSFORM_TYPE_NOT_SET;
-
-    *type = NULL;
-
-    if (index >= ARRAY_SIZE(h264_decoder_output_types))
-        return MF_E_NO_MORE_TYPES;
-    output_type = h264_decoder_output_types[index];
-
-    if (FAILED(hr = MFCreateMediaType(&media_type)))
-        return hr;
-
-    if (FAILED(hr = IMFMediaType_SetGUID(media_type, &MF_MT_MAJOR_TYPE, &MFMediaType_Video)))
-        goto done;
-    if (FAILED(hr = IMFMediaType_SetGUID(media_type, &MF_MT_SUBTYPE, output_type)))
-        goto done;
-
-    hr = fill_output_media_type(media_type, NULL);
-
-done:
-    if (SUCCEEDED(hr))
-        IMFMediaType_AddRef((*type = media_type));
-
-    IMFMediaType_Release(media_type);
-    return hr;
+    FIXME("iface %p, id %u, index %u, type %p stub!\n", iface, id, index, type);
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI h264_decoder_SetInputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
@@ -319,7 +184,7 @@ static HRESULT WINAPI h264_decoder_SetInputType(IMFTransform *iface, DWORD id, I
     TRACE("iface %p, id %u, type %p, flags %#x.\n", iface, id, type, flags);
 
     if (FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_MAJOR_TYPE, &major)) ||
-            FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &subtype)))
+        FAILED(hr = IMFMediaType_GetGUID(type, &MF_MT_SUBTYPE, &subtype)))
         return E_INVALIDARG;
 
     if (!IsEqualGUID(&major, &MFMediaType_Video))
