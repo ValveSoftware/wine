@@ -357,7 +357,7 @@ static void start_pipeline(struct media_source *source, struct source_async_comm
             IMFMediaTypeHandler_GetCurrentMediaType(mth, &current_mt);
 
             mf_media_type_to_wg_format(current_mt, &format);
-            wg_parser_stream_enable(stream->wg_stream, &format, NULL);
+            wg_parser_stream_enable(stream->wg_stream, &format);
 
             IMFMediaType_Release(current_mt);
             IMFMediaTypeHandler_Release(mth);
