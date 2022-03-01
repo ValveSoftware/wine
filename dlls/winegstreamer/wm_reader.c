@@ -1828,7 +1828,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
 {
     IWMReaderCallbackAdvanced *callback_advanced = stream->reader->callback_advanced;
     struct wg_parser_stream *wg_stream = stream->wg_stream;
-    struct wg_parser_buffer wg_buffer;
+    struct wg_parser_event event;
     DWORD size, capacity;
     INSSBuffer *sample;
     HRESULT hr;
@@ -1842,7 +1842,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
 
     for (;;)
     {
-        if (!wg_parser_stream_get_buffer(wg_stream, &wg_buffer))
+        if (!wg_parser_stream_get_event(wg_stream, &event))
         {
             stream->eos = true;
             TRACE("End of stream.\n");
@@ -1854,9 +1854,9 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
         if (callback_advanced && stream->read_compressed && stream->allocate_stream)
         {
             if (FAILED(hr = IWMReaderCallbackAdvanced_AllocateForStream(callback_advanced,
-                    stream->index + 1, wg_buffer.size, &sample, NULL)))
+                    stream->index + 1, event.u.buffer.size, &sample, NULL)))
             {
-                ERR("Failed to allocate stream sample of %u bytes, hr %#x.\n", wg_buffer.size, hr);
+                ERR("Failed to allocate stream sample of %u bytes, hr %#x.\n", event.u.buffer.size, hr);
                 wg_parser_stream_release_buffer(wg_stream);
                 return hr;
             }
@@ -1864,9 +1864,9 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
         else if (callback_advanced && !stream->read_compressed && stream->allocate_output)
         {
             if (FAILED(hr = IWMReaderCallbackAdvanced_AllocateForOutput(callback_advanced,
-                    stream->index, wg_buffer.size, &sample, NULL)))
+                    stream->index, event.u.buffer.size, &sample, NULL)))
             {
-                ERR("Failed to allocate output sample of %u bytes, hr %#x.\n", wg_buffer.size, hr);
+                ERR("Failed to allocate output sample of %u bytes, hr %#x.\n", event.u.buffer.size, hr);
                 wg_parser_stream_release_buffer(wg_stream);
                 return hr;
             }
@@ -1876,7 +1876,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
             struct buffer *object;
 
             /* FIXME: Should these be pooled? */
-            if (!(object = calloc(1, offsetof(struct buffer, data[wg_buffer.size]))))
+            if (!(object = calloc(1, offsetof(struct buffer, data[event.u.buffer.size]))))
             {
                 wg_parser_stream_release_buffer(wg_stream);
                 return E_OUTOFMEMORY;
@@ -1884,7 +1884,7 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
 
             object->INSSBuffer_iface.lpVtbl = &buffer_vtbl;
             object->refcount = 1;
-            object->capacity = wg_buffer.size;
+            object->capacity = event.u.buffer.size;
 
             TRACE("Created buffer %p.\n", object);
             sample = &object->INSSBuffer_iface;
@@ -1894,32 +1894,32 @@ HRESULT wm_reader_get_stream_sample(struct wm_stream *stream,
             ERR("Failed to get data pointer, hr %#x.\n", hr);
         if (FAILED(hr = INSSBuffer_GetMaxLength(sample, &capacity)))
             ERR("Failed to get capacity, hr %#x.\n", hr);
-        if (wg_buffer.size > capacity)
-            ERR("Returned capacity %u is less than requested capacity %u.\n", capacity, wg_buffer.size);
+        if (event.u.buffer.size > capacity)
+            ERR("Returned capacity %u is less than requested capacity %u.\n", capacity, event.u.buffer.size);
 
-        if (!wg_parser_stream_copy_buffer(wg_stream, data, 0, wg_buffer.size))
+        if (!wg_parser_stream_copy_buffer(wg_stream, data, 0, event.u.buffer.size))
         {
             /* The GStreamer pin has been flushed. */
             INSSBuffer_Release(sample);
             continue;
         }
 
-        if (FAILED(hr = INSSBuffer_SetLength(sample, wg_buffer.size)))
-            ERR("Failed to set size %u, hr %#x.\n", wg_buffer.size, hr);
+        if (FAILED(hr = INSSBuffer_SetLength(sample, event.u.buffer.size)))
+            ERR("Failed to set size %u, hr %#x.\n", event.u.buffer.size, hr);
 
         wg_parser_stream_release_buffer(wg_stream);
 
-        if (!wg_buffer.has_pts)
+        if (!event.u.buffer.has_pts)
             FIXME("Missing PTS.\n");
-        if (!wg_buffer.has_duration)
+        if (!event.u.buffer.has_duration)
             FIXME("Missing duration.\n");
 
-        *pts = wg_buffer.pts;
-        *duration = wg_buffer.duration;
+        *pts = event.u.buffer.pts;
+        *duration = event.u.buffer.duration;
         *flags = 0;
-        if (wg_buffer.discontinuity)
+        if (event.u.buffer.discontinuity)
             *flags |= WM_SF_DISCONTINUITY;
-        if (!wg_buffer.delta)
+        if (!event.u.buffer.delta)
             *flags |= WM_SF_CLEANPOINT;
 
         *ret_sample = sample;
