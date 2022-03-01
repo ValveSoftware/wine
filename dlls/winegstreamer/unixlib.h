@@ -117,14 +117,6 @@ struct wg_format
     } u;
 };
 
-struct wg_rect
-{
-    uint32_t left;
-    uint32_t right;
-    uint32_t top;
-    uint32_t bottom;
-};
-
 enum wg_parser_event_type
 {
     WG_PARSER_EVENT_NONE = 0,
@@ -191,7 +183,6 @@ struct wg_parser_connect_unseekable_params
     const struct wg_format *in_format;
     UINT32 stream_count;
     const struct wg_format *out_formats;
-    const struct wg_rect *apertures;
 };
 
 struct wg_parser_get_next_read_offset_params
@@ -232,7 +223,6 @@ struct wg_parser_stream_enable_params
 {
     struct wg_parser_stream *stream;
     const struct wg_format *format;
-    const struct wg_rect *aperture;
 };
 
 struct wg_parser_stream_get_event_params

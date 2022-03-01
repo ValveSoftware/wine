@@ -98,10 +98,9 @@ struct wg_parser_stream
     struct wg_parser *parser;
 
     GstPad *their_src, *post_sink, *post_src, *my_sink;
-    GstElement *flip, *box;
+    GstElement *flip;
     GstSegment segment;
     struct wg_format preferred_format, current_format;
-    struct wg_rect aperture;
 
     pthread_cond_t event_cond, event_empty_cond;
     struct wg_parser_event event;
@@ -793,7 +792,6 @@ static NTSTATUS wg_parser_stream_enable(void *args)
     const struct wg_parser_stream_enable_params *params = args;
     struct wg_parser_stream *stream = params->stream;
     const struct wg_format *format = params->format;
-    const struct wg_rect *aperture = params->aperture;
 
     if (!stream->parser->seekable)
         return S_OK;
@@ -829,18 +827,6 @@ static NTSTATUS wg_parser_stream_enable(void *args)
         }
 
         gst_util_set_object_arg(G_OBJECT(stream->flip), "method", flip ? "vertical-flip" : "none");
-
-        if (aperture)
-        {
-            if (aperture->left)
-                g_object_set(G_OBJECT(stream->box), "left", -aperture->left, NULL);
-            if (aperture->top)
-                g_object_set(G_OBJECT(stream->box), "top", -aperture->top, NULL);
-            if (aperture->right)
-                g_object_set(G_OBJECT(stream->box), "right", aperture->right - format->u.video.width, NULL);
-            if (aperture->bottom)
-                g_object_set(G_OBJECT(stream->box), "bottom", aperture->bottom - format->u.video.height, NULL);
-        }
     }
 
     gst_pad_push_event(stream->my_sink, gst_event_new_reconfigure());
@@ -1433,7 +1419,7 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
 
     if (!strcmp(name, "video/x-raw"))
     {
-        GstElement *capssetter, *deinterlace, *vconv, *flip, *box, *vconv2;
+        GstElement *capssetter, *deinterlace, *vconv, *flip, *vconv2;
 
         /* Hack?: Flatten down the colorimetry to default values, without
          * actually modifying the video at all.
@@ -1499,25 +1485,10 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
         if (!(flip = create_element("videoflip", "good")))
             goto out;
 
-        if (!(box = create_element("videbox", "base")))
-            goto out;
-
         /* videoflip does not support 15 and 16-bit RGB so add a second videoconvert
          * to do the final conversion. */
         if (!(vconv2 = create_element("videoconvert", "base")))
             goto out;
-
-        if (!parser->seekable)
-        {
-            if (stream->aperture.left)
-                g_object_set(G_OBJECT(box), "left", -stream->aperture.left, NULL);
-            if (stream->aperture.bottom)
-                g_object_set(G_OBJECT(box), "top", -stream->aperture.top, NULL);
-            if (stream->aperture.right)
-                g_object_set(G_OBJECT(box), "right", stream->aperture.right - stream->current_format.u.video.width, NULL);
-            if (stream->aperture.bottom)
-                g_object_set(G_OBJECT(box), "bottom", stream->aperture.bottom - stream->current_format.u.video.height, NULL);
-        }
 
         /* The bin takes ownership of these elements. */
         gst_bin_add(GST_BIN(parser->container), capssetter);
@@ -1528,21 +1499,17 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
         gst_element_sync_state_with_parent(vconv);
         gst_bin_add(GST_BIN(parser->container), flip);
         gst_element_sync_state_with_parent(flip);
-        gst_bin_add(GST_BIN(parser->container), box);
-        gst_element_sync_state_with_parent(box);
         gst_bin_add(GST_BIN(parser->container), vconv2);
         gst_element_sync_state_with_parent(vconv2);
 
         gst_element_link(capssetter, deinterlace);
         gst_element_link(deinterlace, vconv);
         gst_element_link(vconv, flip);
-        gst_element_link(flip, box);
-        gst_element_link(box, vconv2);
+        gst_element_link(flip, vconv2);
 
         stream->post_sink = gst_element_get_static_pad(capssetter, "sink");
         stream->post_src = gst_element_get_static_pad(vconv2, "src");
         stream->flip = flip;
-        stream->box = box;
     }
     else if (!strcmp(name, "audio/x-raw"))
     {
@@ -2233,7 +2200,6 @@ static NTSTATUS wg_parser_connect_unseekable(void *args)
     const struct wg_parser_connect_unseekable_params *params = args;
     const struct wg_format *out_formats = params->out_formats;
     const struct wg_format *in_format = params->in_format;
-    const struct wg_rect *apertures = params->apertures;
     uint32_t stream_count = params->stream_count;
     struct wg_parser *parser = params->parser;
     unsigned int i;
@@ -2256,8 +2222,6 @@ static NTSTATUS wg_parser_connect_unseekable(void *args)
     {
         parser->streams[i] = calloc(1, sizeof(*parser->streams[i]));
         parser->streams[i]->current_format = out_formats[i];
-        if (apertures)
-            parser->streams[i]->aperture = apertures[i];
         parser->streams[i]->enabled = true;
     }
 
