@@ -678,8 +678,7 @@ static ULONG WINAPI wma_media_object_Release(IMediaObject *iface)
 static HRESULT WINAPI wma_media_object_GetStreamCount(IMediaObject *iface, DWORD *input, DWORD *output)
 {
     FIXME("iface %p, input %p, output %p stub!\n", iface, input, output);
-    *input = *output = 1;
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI wma_media_object_GetInputStreamInfo(IMediaObject *iface, DWORD index, DWORD *flags)
