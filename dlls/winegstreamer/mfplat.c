@@ -397,11 +397,6 @@ static const GUID CLSID_GStreamerByteStreamHandler = {0x317df618, 0x5e5a, 0x468a
 
 static const GUID CLSID_WINEAudioConverter = {0x6a170414,0xaad9,0x4693,{0xb8,0x06,0x3a,0x0c,0x47,0xc5,0x70,0xd6}};
 
-static HRESULT h264_decoder_create(REFIID riid, void **ret)
-{
-    return decode_transform_create(riid, ret, DECODER_TYPE_H264);
-}
-
 static const struct class_object
 {
     const GUID *clsid;
@@ -412,7 +407,7 @@ class_objects[] =
     { &CLSID_VideoProcessorMFT, &video_processor_create },
     { &CLSID_GStreamerByteStreamHandler, &winegstreamer_stream_handler_create },
     { &CLSID_WINEAudioConverter, &audio_converter_create },
-    { &CLSID_MSH264DecoderMFT, &h264_decoder_create },
+    { &CLSID_MSH264DecoderMFT, &decode_transform_create },
 };
 
 HRESULT mfplat_get_class_object(REFCLSID rclsid, REFIID riid, void **obj)
