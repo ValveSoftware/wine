@@ -241,6 +241,13 @@ struct wg_parser_stream_get_duration_params
     UINT64 duration;
 };
 
+struct wg_parser_stream_get_language_params
+{
+    struct wg_parser_stream *stream;
+    char *buffer;
+    UINT32 size;
+};
+
 struct wg_parser_stream_seek_params
 {
     struct wg_parser_stream *stream;
@@ -301,6 +308,7 @@ enum unix_funcs
     unix_wg_parser_stream_notify_qos,
 
     unix_wg_parser_stream_get_duration,
+    unix_wg_parser_stream_get_language,
     unix_wg_parser_stream_seek,
 
     unix_wg_transform_create,
