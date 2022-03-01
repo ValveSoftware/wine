@@ -271,8 +271,6 @@ enum unix_funcs
 
     unix_wg_parser_stream_get_duration,
     unix_wg_parser_stream_seek,
-
-    unix_wg_parser_stream_drain,
 };
 
 #endif /* __WINE_WINEGSTREAMER_UNIXLIB_H */
