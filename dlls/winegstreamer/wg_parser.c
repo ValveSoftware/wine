@@ -1411,9 +1411,6 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
         if (!(vconv2 = create_element("videoconvert", "base")))
             goto out;
 
-        /* Let GStreamer choose a default number of threads. */
-        gst_util_set_object_arg(G_OBJECT(vconv2), "n-threads", "0");
-
         if (!parser->seekable)
         {
             if (!box && (stream->aperture.left || stream->aperture.top ||
