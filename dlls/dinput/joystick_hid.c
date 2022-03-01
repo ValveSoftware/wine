@@ -1610,7 +1610,7 @@ static BOOL hid_joystick_device_try_open( UINT32 handle, const WCHAR *path, HAND
         type = DI8DEVTYPE_DRIVING | (DI8DEVTYPEDRIVING_DUALPEDALS << 8) | DIDEVTYPE_HID;
 
     instance->dwDevType = device_type_for_version( type, version );
-    TRACE("detected device type %#x\n", instance->dwDevType);
+    TRACE("detected device type %#lx\n", instance->dwDevType);
 
     *device = device_file;
     *preparsed = preparsed_data;
