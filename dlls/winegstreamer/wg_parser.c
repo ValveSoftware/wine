@@ -1449,7 +1449,6 @@ static void *push_data(void *arg)
 {
     struct wg_parser *parser = arg;
     GstBuffer *buffer;
-    GstSegment *segment;
     guint max_size;
 
     GST_DEBUG("Starting push thread.");
@@ -1461,12 +1460,6 @@ static void *push_data(void *arg)
     }
 
     max_size = parser->stop_offset ? parser->stop_offset : parser->file_size;
-
-    gst_pad_push_event(parser->my_src, gst_event_new_stream_start("wg_stream"));
-
-    segment = gst_segment_new();
-    gst_segment_init(segment, GST_FORMAT_BYTES);
-    gst_pad_push_event(parser->my_src, gst_event_new_segment(segment));
 
     for (;;)
     {
@@ -1602,7 +1595,6 @@ static gboolean src_perform_seek(struct wg_parser *parser, GstEvent *event)
     GstEvent *flush_event;
     GstSeekFlags flags;
     gint64 cur, stop;
-    GstSegment *seg;
     guint32 seqnum;
     gdouble rate;
 
@@ -1636,12 +1628,7 @@ static gboolean src_perform_seek(struct wg_parser *parser, GstEvent *event)
         gst_event_set_seqnum(flush_event, seqnum);
         gst_pad_push_event(parser->my_src, flush_event);
         if (thread)
-        {
             gst_pad_set_active(parser->my_src, 1);
-            seg = gst_segment_new();
-            gst_segment_init(seg, GST_FORMAT_BYTES);
-            gst_pad_push_event(parser->my_src, gst_event_new_segment(seg));
-        }
     }
 
     return TRUE;
