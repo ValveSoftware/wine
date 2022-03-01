@@ -1669,11 +1669,17 @@ static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
 static void *push_data(void *arg)
 {
     struct wg_parser *parser = arg;
-    GstSegment *segment;
     GstBuffer *buffer;
+    GstSegment *segment;
     guint max_size;
 
     GST_DEBUG("Starting push thread.");
+
+    if (!(buffer = gst_buffer_new_allocate(NULL, 16384, NULL)))
+    {
+        GST_ERROR("Failed to allocate memory.");
+        return NULL;
+    }
 
     max_size = parser->stop_offset ? parser->stop_offset : parser->file_size;
 
@@ -1692,7 +1698,6 @@ static void *push_data(void *arg)
             break;
         size = min(16384, max_size - parser->next_offset);
 
-        buffer = NULL;
         if ((ret = src_getrange_cb(parser->my_src, NULL, parser->next_offset, size, &buffer)) < 0)
         {
             GST_ERROR("Failed to read data, ret %s.", gst_flow_get_name(ret));
@@ -1708,6 +1713,8 @@ static void *push_data(void *arg)
             break;
         }
     }
+
+    gst_buffer_unref(buffer);
 
     gst_pad_push_event(parser->my_src, gst_event_new_eos());
 
