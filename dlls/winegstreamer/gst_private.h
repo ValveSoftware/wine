@@ -74,7 +74,7 @@ void wg_parser_begin_flush(struct wg_parser *parser) DECLSPEC_HIDDEN;
 void wg_parser_end_flush(struct wg_parser *parser) DECLSPEC_HIDDEN;
 
 bool wg_parser_get_next_read_offset(struct wg_parser *parser, uint64_t *offset, uint32_t *size) DECLSPEC_HIDDEN;
-void wg_parser_push_data(struct wg_parser *parser, enum wg_read_result result, const void *data, uint32_t size) DECLSPEC_HIDDEN;
+void wg_parser_push_data(struct wg_parser *parser, const void *data, uint32_t size) DECLSPEC_HIDDEN;
 
 uint32_t wg_parser_get_stream_count(struct wg_parser *parser) DECLSPEC_HIDDEN;
 struct wg_parser_stream *wg_parser_get_stream(struct wg_parser *parser, uint32_t index) DECLSPEC_HIDDEN;
