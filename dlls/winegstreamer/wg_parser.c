@@ -603,7 +603,7 @@ static GstCaps *wg_format_to_caps_video(const struct wg_format *format)
     return caps;
 }
 
-GstCaps *wg_format_to_caps(const struct wg_format *format)
+static GstCaps *wg_format_to_caps(const struct wg_format *format)
 {
     switch (format->major_type)
     {
