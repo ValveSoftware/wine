@@ -87,7 +87,7 @@ struct wg_parser
         GstFlowReturn ret;
     } read_request;
 
-    bool flushing, sink_connected, draining;
+    bool flushing, sink_connected;
 
     bool unlimited_buffering;
 };
@@ -831,16 +831,6 @@ static NTSTATUS wg_parser_stream_get_event(void *args)
 
     *params->event = stream->event;
 
-    /* Set to ensure that drain isn't called on an EOS stream, causing a lock-up
-       due to pull_data never being called again */
-    if (stream->event.type == WG_PARSER_EVENT_EOS)
-        stream->eos = true;
-
-    /* Set to ensure that drain isn't called on an EOS stream, causing a lock-up
-       due to pull_data never being called again */
-    if (stream->event.type == WG_PARSER_EVENT_EOS)
-        stream->eos = true;
-
     if (stream->event.type != WG_PARSER_EVENT_BUFFER)
     {
         stream->event.type = WG_PARSER_EVENT_NONE;
@@ -929,44 +919,6 @@ static NTSTATUS wg_parser_stream_seek(void *args)
         GST_ERROR("Failed to seek.\n");
 
     return S_OK;
-}
-
-static NTSTATUS wg_parser_stream_drain(void *args)
-{
-    struct wg_parser_stream *stream = args;
-    struct wg_parser *parser = stream->parser;
-    bool ret;
-
-    pthread_mutex_lock(&parser->mutex);
-
-    /* Sanity check making sure caller didn't try to drain an already-EOS or unselected stream.
-       There's no reason for a caller to do this, but it could be an accident in which case we
-       should indicate that the stream is drained instead of locking-up. */
-    if (!stream->enabled || stream->eos)
-    {
-        pthread_mutex_unlock(&parser->mutex);
-        return true;
-    }
-
-    parser->draining = true;
-    pthread_cond_signal(&parser->read_done_cond);
-
-    /* We must wait for either an event to occur or the drain to complete.
-       Since drains are blocking, we assign this responsibility to the thread
-       pulling data, as the pipeline will not need to pull more data until
-       the drain completes.  If one input buffer yields more than one output
-       buffer, the chain callback blocks on the wg_parser_stream_buffer_release
-       for the first buffer, which would never be called if the drain function
-       hadn't completed. */
-    while (!parser->flushing && parser->draining && stream->event.type == WG_PARSER_EVENT_NONE)
-        pthread_cond_wait(&stream->event_cond, &parser->mutex);
-
-    ret = stream->event.type == WG_PARSER_EVENT_NONE;
-    parser->draining = false;
-
-    pthread_mutex_unlock(&stream->parser->mutex);
-
-    return ret;
 }
 
 static NTSTATUS wg_parser_stream_notify_qos(void *args)
@@ -1544,7 +1496,6 @@ static GstFlowReturn src_getrange_cb(GstPad *pad, GstObject *parent,
 {
     struct wg_parser *parser = gst_pad_get_element_private(pad);
     GstFlowReturn ret;
-    unsigned int i;
 
     GST_LOG("pad %p, offset %" G_GINT64_MODIFIER "u, size %u, buffer %p.", pad, offset, size, *buffer);
 
@@ -1566,14 +1517,6 @@ static GstFlowReturn src_getrange_cb(GstPad *pad, GstObject *parent,
 
     pthread_mutex_lock(&parser->mutex);
 
-    if (parser->draining)
-    {
-        gst_pad_peer_query(parser->my_src, gst_query_new_drain());
-        parser->draining = false;
-        for (i = 0; i < parser->stream_count; i++)
-            pthread_cond_signal(&parser->streams[i]->event_cond);
-    }
-
     assert(!parser->read_request.size);
     parser->read_request.buffer = *buffer;
     parser->read_request.offset = offset;
@@ -1586,16 +1529,7 @@ static GstFlowReturn src_getrange_cb(GstPad *pad, GstObject *parent,
      * read_thread() not running. */
 
     while (!parser->read_request.done)
-    {
         pthread_cond_wait(&parser->read_done_cond, &parser->mutex);
-        if (parser->draining)
-        {
-            gst_pad_peer_query(parser->my_src, gst_query_new_drain());
-            parser->draining = false;
-            for (i = 0; i < parser->stream_count; i++)
-                pthread_cond_signal(&parser->streams[i]->event_cond);
-        }
-    }
 
     *buffer = parser->read_request.buffer;
     ret = parser->read_request.ret;
@@ -2339,6 +2273,4 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
 
     X(wg_parser_stream_get_duration),
     X(wg_parser_stream_seek),
-
-    X(wg_parser_stream_drain),
 };
