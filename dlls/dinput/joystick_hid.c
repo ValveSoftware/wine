@@ -598,7 +598,7 @@ static BOOL enum_objects( struct hid_joystick *impl, const DIPROPHEADER *filter,
                         hack_guid = &GUID_Slider;
                         hack_name = L"Clutch";
                     }
-                    else WARN("unknown axis usage page %x usage %x for Logitech G920\n", caps->usage_page, j);
+                    else WARN("unknown axis usage page %x usage %lx for Logitech G920\n", caps->usage_page, j);
                 }
                 else
                 {
