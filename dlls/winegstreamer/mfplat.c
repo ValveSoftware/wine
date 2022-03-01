@@ -462,12 +462,6 @@ static const GUID *wma_decoder_output_types[] =
     &MFAudioFormat_Float,
 };
 
-static WCHAR video_processorW[] = L"Video Processor MFT";
-static const GUID *video_processor_supported_types[] =
-{
-    &MFVideoFormat_IYUV,
-};
-
 static WCHAR color_converterW[] = L"Color Converter";
 static const GUID *color_converter_supported_types[] =
 {
@@ -548,17 +542,6 @@ mfts[] =
         wma_decoder_input_types,
         ARRAY_SIZE(wma_decoder_output_types),
         wma_decoder_output_types,
-    },
-    {
-        &CLSID_VideoProcessorMFT,
-        &MFT_CATEGORY_VIDEO_PROCESSOR,
-        video_processorW,
-        0,
-        &MFMediaType_Video,
-        ARRAY_SIZE(video_processor_supported_types),
-        video_processor_supported_types,
-        ARRAY_SIZE(video_processor_supported_types),
-        video_processor_supported_types,
     },
     {
         &CLSID_CColorConvertDMO,
