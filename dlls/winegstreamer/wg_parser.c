@@ -30,7 +30,6 @@
 #include <stdarg.h>
 #include <stdio.h>
 
-#define GLIB_VERSION_MIN_REQUIRED GLIB_VERSION_2_30
 #include <gst/gst.h>
 #include <gst/video/video.h>
 #include <gst/audio/audio.h>
