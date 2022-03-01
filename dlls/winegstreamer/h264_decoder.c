@@ -216,7 +216,7 @@ static HRESULT WINAPI h264_decoder_ProcessEvent(IMFTransform *iface, DWORD id, I
 static HRESULT WINAPI h264_decoder_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
     FIXME("iface %p, message %#x, param %p stub!\n", iface, message, (void *)param);
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI h264_decoder_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
