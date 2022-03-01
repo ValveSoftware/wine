@@ -108,6 +108,7 @@ struct wg_parser_stream
     bool flushing, eos, enabled, has_caps;
 
     uint64_t duration;
+    gchar *language_code;
 };
 
 static NTSTATUS wg_parser_get_stream_count(void *args)
@@ -348,6 +349,14 @@ static NTSTATUS wg_parser_stream_get_duration(void *args)
 
     params->duration = params->stream->duration;
     return S_OK;
+}
+
+static NTSTATUS wg_parser_stream_get_language(void *args)
+{
+    struct wg_parser_stream_get_language_params *params = args;
+    if (params->stream->language_code)
+        lstrcpynA(params->buffer, params->stream->language_code, params->size);
+    return params->stream->language_code ? S_OK : E_FAIL;
 }
 
 static NTSTATUS wg_parser_stream_seek(void *args)
@@ -722,6 +731,9 @@ static void free_stream(struct wg_parser_stream *stream)
 
     pthread_cond_destroy(&stream->event_cond);
     pthread_cond_destroy(&stream->event_empty_cond);
+
+    if (stream->language_code)
+        g_free(stream->language_code);
 
     free(stream);
 }
@@ -1223,6 +1235,22 @@ static gboolean src_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
     return ret;
 }
 
+static gchar *query_language(GstPad *pad)
+{
+    GstTagList *tag_list;
+    GstEvent *tag_event;
+    gchar *ret = NULL;
+
+    if ((tag_event = gst_pad_get_sticky_event(pad, GST_EVENT_TAG, 0)))
+    {
+        gst_event_parse_tag(tag_event, &tag_list);
+        gst_tag_list_get_string(tag_list, "language-code", &ret);
+        gst_event_unref(tag_event);
+    }
+
+    return ret;
+}
+
 static NTSTATUS wg_parser_connect(void *args)
 {
     GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("quartz_src",
@@ -1351,6 +1379,8 @@ static NTSTATUS wg_parser_connect(void *args)
          * attempting to read anything), but we don't want to waste CPU time
          * trying to decode them. */
         stream->enabled = true;
+
+        stream->language_code = query_language(stream->their_src);
     }
 
     pthread_mutex_unlock(&parser->mutex);
@@ -1682,6 +1712,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     X(wg_parser_stream_notify_qos),
 
     X(wg_parser_stream_get_duration),
+    X(wg_parser_stream_get_language),
     X(wg_parser_stream_seek),
 
     X(wg_transform_create),
