@@ -145,6 +145,7 @@ enum wg_parser_event_type
     WG_PARSER_EVENT_NONE = 0,
     WG_PARSER_EVENT_BUFFER,
     WG_PARSER_EVENT_EOS,
+    WG_PARSER_EVENT_SEGMENT,
 };
 
 enum wg_read_result
@@ -167,6 +168,11 @@ struct wg_parser_event
             uint32_t size;
             bool discontinuity, preroll, delta, has_pts, has_duration;
         } buffer;
+        struct
+        {
+            ULONGLONG position, stop;
+            DOUBLE rate;
+        } segment;
     } u;
 };
 C_ASSERT(sizeof(struct wg_parser_event) == 40);
