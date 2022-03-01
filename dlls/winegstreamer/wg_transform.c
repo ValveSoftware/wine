@@ -99,52 +99,6 @@ static GstCaps *wg_format_to_caps_xwma(const struct wg_encoded_format *format)
     return caps;
 }
 
-static GstCaps *wg_format_to_caps_aac(const struct wg_encoded_format *format)
-{
-    const char *profile, *level, *stream_format;
-    GstBuffer *buffer;
-    GstCaps *caps;
-
-    caps = gst_caps_new_empty_simple("audio/mpeg");
-    gst_caps_set_simple(caps, "mpegversion", G_TYPE_INT, 4, NULL);
-
-    switch (format->u.aac.payload_type)
-    {
-        case 0: stream_format = "raw"; break;
-        case 1: stream_format = "adts"; break;
-        case 2: stream_format = "adif"; break;
-        case 3: stream_format = "loas"; break;
-        default: stream_format = "raw"; break;
-    }
-    if (stream_format)
-        gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, stream_format, NULL);
-
-    switch (format->u.aac.profile_level_indication)
-    {
-        case 0x29: profile = "lc"; level = "2";  break;
-        case 0x2A: profile = "lc"; level = "4"; break;
-        case 0x2B: profile = "lc"; level = "5"; break;
-        default:
-            GST_FIXME("Unrecognized profile-level-indication %u\n", format->u.aac.profile_level_indication);
-            /* fallthrough */
-        case 0x00: case 0xFE: profile = level = NULL; break; /* unspecified */
-    }
-    if (profile)
-        gst_caps_set_simple(caps, "profile", G_TYPE_STRING, profile, NULL);
-    if (level)
-        gst_caps_set_simple(caps, "level", G_TYPE_STRING, level, NULL);
-
-    if (format->u.aac.codec_data_len)
-    {
-        buffer = gst_buffer_new_and_alloc(format->u.aac.codec_data_len);
-        gst_buffer_fill(buffer, 0, format->u.aac.codec_data, format->u.aac.codec_data_len);
-        gst_caps_set_simple(caps, "codec_data", GST_TYPE_BUFFER, buffer, NULL);
-        gst_buffer_unref(buffer);
-    }
-
-    return caps;
-}
-
 static GstCaps *wg_format_to_caps_h264(const struct wg_encoded_format *format)
 {
     const char *profile, *level;
@@ -212,8 +166,6 @@ static GstCaps *wg_encoded_format_to_caps(const struct wg_encoded_format *format
         case WG_ENCODED_TYPE_WMA:
         case WG_ENCODED_TYPE_XMA:
             return wg_format_to_caps_xwma(format);
-        case WG_ENCODED_TYPE_AAC:
-            return wg_format_to_caps_aac(format);
         case WG_ENCODED_TYPE_H264:
             return wg_format_to_caps_h264(format);
     }
