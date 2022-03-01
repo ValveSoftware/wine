@@ -967,7 +967,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
 {
     struct mf_decoder *decoder = impl_mf_decoder_from_IMFTransform(iface);
     MFT_OUTPUT_DATA_BUFFER *relevant_buffer = NULL;
-    struct wg_parser_buffer wg_buffer;
+    struct wg_parser_event event;
     struct pipeline_event pip_event;
     IMFMediaBuffer *buffer;
     DWORD buffer_len;
@@ -1030,7 +1030,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
         return MF_E_TRANSFORM_NEED_MORE_INPUT;
     }
 
-    if (!wg_parser_stream_get_buffer(decoder->wg_stream, &wg_buffer))
+    if (!wg_parser_stream_get_event(decoder->wg_stream, &event))
     {
         if (!decoder->draining)
         {
@@ -1054,7 +1054,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
     }
     else
     {
-        if (FAILED(hr = MFCreateMemoryBuffer(wg_buffer.size, &buffer)))
+        if (FAILED(hr = MFCreateMemoryBuffer(event.u.buffer.size, &buffer)))
         {
             ERR("Failed to create buffer, hr %#x.\n", hr);
             LeaveCriticalSection(&decoder->cs);
@@ -1082,10 +1082,10 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
         goto out;
     }
 
-    if (buffer_len < wg_buffer.size)
+    if (buffer_len < event.u.buffer.size)
     {
         WARN("Client's buffer is smaller (%u bytes) than the output sample (%u bytes)\n",
-            buffer_len, wg_buffer.size);
+            buffer_len, event.u.buffer.size);
 
         if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, buffer_len)))
         {
@@ -1093,7 +1093,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
             goto out;
         }
     }
-    else if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, wg_buffer.size)))
+    else if (FAILED(hr = IMFMediaBuffer_SetCurrentLength(buffer, event.u.buffer.size)))
     {
         ERR("Failed to set size, hr %#x.\n", hr);
         goto out;
@@ -1106,7 +1106,7 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
         goto out;
     }
 
-    if (!wg_parser_stream_copy_buffer(decoder->wg_stream, data, 0, min(buffer_len, wg_buffer.size)))
+    if (!wg_parser_stream_copy_buffer(decoder->wg_stream, data, 0, min(buffer_len, event.u.buffer.size)))
     {
         hr = E_FAIL;
         goto out;
@@ -1118,13 +1118,13 @@ static HRESULT WINAPI mf_decoder_ProcessOutput(IMFTransform *iface, DWORD flags,
         goto out;
     }
 
-    if (FAILED(hr = IMFSample_SetSampleTime(relevant_buffer->pSample, wg_buffer.pts)))
+    if (FAILED(hr = IMFSample_SetSampleTime(relevant_buffer->pSample, event.u.buffer.pts)))
     {
         ERR("Failed to set sample time, hr %#x.\n", hr);
         goto out;
     }
 
-    if (FAILED(hr = IMFSample_SetSampleDuration(relevant_buffer->pSample, wg_buffer.duration)))
+    if (FAILED(hr = IMFSample_SetSampleDuration(relevant_buffer->pSample, event.u.buffer.duration)))
     {
         ERR("Failed to set sample duration, hr %#x.\n", hr);
         goto out;
