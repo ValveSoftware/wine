@@ -213,7 +213,6 @@ NTSTATUS wg_transform_create(void *args)
     struct wg_transform *transform;
     GstCaps *src_caps, *sink_caps;
     GstPadTemplate *template;
-    GstSegment *segment;
     int ret;
 
     if (!init_gstreamer())
@@ -281,30 +280,6 @@ NTSTATUS wg_transform_create(void *args)
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
         GST_ERROR("Failed to play stream.\n");
-        goto failed;
-    }
-
-    if (!gst_pad_push_event(transform->my_src, gst_event_new_stream_start("stream")))
-    {
-        GST_ERROR("Failed to send stream-start.");
-        goto failed;
-    }
-
-    if (!gst_pad_push_event(transform->my_src, gst_event_new_caps(src_caps)))
-    {
-        GST_ERROR("Failed to set stream caps.");
-        goto failed;
-    }
-
-    segment = gst_segment_new();
-    gst_segment_init(segment, GST_FORMAT_TIME);
-    segment->start = 0;
-    segment->stop = -1;
-    ret = gst_pad_push_event(transform->my_src, gst_event_new_segment(segment));
-    gst_segment_free(segment);
-    if (!ret)
-    {
-        GST_ERROR("Failed to start new segment.");
         goto failed;
     }
 
