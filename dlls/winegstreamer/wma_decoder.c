@@ -128,25 +128,8 @@ static HRESULT WINAPI wma_decoder_GetStreamIDs(IMFTransform *iface, DWORD input_
 
 static HRESULT WINAPI wma_decoder_GetInputStreamInfo(IMFTransform *iface, DWORD id, MFT_INPUT_STREAM_INFO *info)
 {
-    struct wma_decoder *decoder = impl_from_IMFTransform(iface);
-    UINT32 block_alignment;
-    HRESULT hr;
-
-    TRACE("iface %p, id %u, info %p.\n", iface, id, info);
-
-    if (!decoder->input_type || !decoder->output_type)
-        return MF_E_TRANSFORM_TYPE_NOT_SET;
-
-    if (FAILED(hr = IMFMediaType_GetUINT32(decoder->input_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &block_alignment)))
-        return hr;
-
-    info->hnsMaxLatency = 0;
-    info->dwFlags = 0;
-    info->cbSize = block_alignment;
-    info->cbMaxLookahead = 0;
-    info->cbAlignment = 1;
-
-    return S_OK;
+    FIXME("iface %p, id %u, info %p stub!\n", iface, id, info);
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI wma_decoder_GetOutputStreamInfo(IMFTransform *iface, DWORD id, MFT_OUTPUT_STREAM_INFO *info)
