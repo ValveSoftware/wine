@@ -8,7 +8,6 @@ EXTRAINCL = $(GSTREAMER_CFLAGS)
 EXTRALIBS = $(GSTREAMER_LIBS) $(PTHREAD_LIBS)
 
 C_SRCS = \
-	aac_decoder.c \
 	audioconvert.c \
 	colorconvert.c \
 	decode_transform.c \
