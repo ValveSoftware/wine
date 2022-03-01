@@ -75,7 +75,7 @@ struct wg_parser
     pthread_mutex_t mutex;
 
     pthread_cond_t init_cond;
-    bool no_more_pads, has_duration, error, pull_mode;
+    bool no_more_pads, has_duration, error;
 
     pthread_cond_t read_cond, read_done_cond;
     struct
@@ -1528,12 +1528,9 @@ static gboolean src_activate_mode_cb(GstPad *pad, GstObject *parent, GstPadMode 
     GST_DEBUG("%s source pad for parser %p in %s mode.",
             activate ? "Activating" : "Deactivating", parser, gst_pad_mode_get_name(mode));
 
-    parser->pull_mode = false;
-
     switch (mode)
     {
         case GST_PAD_MODE_PULL:
-            parser->pull_mode = activate;
             return TRUE;
         case GST_PAD_MODE_PUSH:
             return activate_push(pad, activate);
@@ -1698,8 +1695,6 @@ static NTSTATUS wg_parser_connect(void *args)
         goto out;
 
     gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    if (!parser->pull_mode)
-        gst_pad_set_active(parser->my_src, 1);
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
     if (ret == GST_STATE_CHANGE_FAILURE)
     {
@@ -1838,8 +1833,6 @@ static NTSTATUS wg_parser_disconnect(void *args)
     pthread_mutex_unlock(&parser->mutex);
 
     gst_element_set_state(parser->container, GST_STATE_NULL);
-    if (!parser->pull_mode)
-        gst_pad_set_active(parser->my_src, 0);
     gst_pad_unlink(parser->my_src, parser->their_sink);
     gst_object_unref(parser->my_src);
     gst_object_unref(parser->their_sink);
