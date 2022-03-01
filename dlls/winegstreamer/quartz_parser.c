@@ -986,7 +986,7 @@ static HRESULT parser_init_stream(struct strmbase_filter *iface)
         {
             ret = amt_to_wg_format(&source->pin.pin.mt, &format);
             assert(ret);
-            wg_parser_stream_enable(source->wg_stream, &format);
+            wg_parser_stream_enable(source->wg_stream, &format, STREAM_ENABLE_FLAG_FLIP_RGB);
         }
         else
         {
