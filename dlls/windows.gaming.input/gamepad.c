@@ -34,6 +34,8 @@ static CRITICAL_SECTION_DEBUG gamepad_cs_debug =
 static CRITICAL_SECTION gamepad_cs = { &gamepad_cs_debug, -1, 0, 0, 0, 0 };
 
 static IVector_Gamepad *gamepads;
+static struct list gamepad_added_handlers = LIST_INIT( gamepad_added_handlers );
+static struct list gamepad_removed_handlers = LIST_INIT( gamepad_removed_handlers );
 
 static HRESULT init_gamepads(void)
 {
@@ -339,34 +341,32 @@ static const struct IActivationFactoryVtbl factory_vtbl =
 
 DEFINE_IINSPECTABLE( statics, IGamepadStatics, struct gamepad_statics, IActivationFactory_iface )
 
-static HRESULT WINAPI statics_add_GamepadAdded( IGamepadStatics *iface, IEventHandler_Gamepad *value,
+static HRESULT WINAPI statics_add_GamepadAdded( IGamepadStatics *iface, IEventHandler_Gamepad *handler,
                                                 EventRegistrationToken *token )
 {
-    FIXME( "iface %p, value %p, token %p stub!\n", iface, value, token );
-    if (!value) return E_INVALIDARG;
-    token->value = 0;
-    return S_OK;
+    TRACE( "iface %p, handler %p, token %p.\n", iface, handler, token );
+    if (!handler) return E_INVALIDARG;
+    return event_handlers_append( &gamepad_added_handlers, (IEventHandler_IInspectable *)handler, token );
 }
 
 static HRESULT WINAPI statics_remove_GamepadAdded( IGamepadStatics *iface, EventRegistrationToken token )
 {
-    FIXME( "iface %p, token %#I64x stub!\n", iface, token.value );
-    return S_OK;
+    TRACE( "iface %p, token %#I64x.\n", iface, token.value );
+    return event_handlers_remove( &gamepad_added_handlers, &token );
 }
 
-static HRESULT WINAPI statics_add_GamepadRemoved( IGamepadStatics *iface, IEventHandler_Gamepad *value,
+static HRESULT WINAPI statics_add_GamepadRemoved( IGamepadStatics *iface, IEventHandler_Gamepad *handler,
                                                   EventRegistrationToken *token )
 {
-    FIXME( "iface %p, value %p, token %p stub!\n", iface, value, token );
-    if (!value) return E_INVALIDARG;
-    token->value = 0;
-    return S_OK;
+    TRACE( "iface %p, handler %p, token %p.\n", iface, handler, token );
+    if (!handler) return E_INVALIDARG;
+    return event_handlers_append( &gamepad_removed_handlers, (IEventHandler_IInspectable *)handler, token );
 }
 
 static HRESULT WINAPI statics_remove_GamepadRemoved( IGamepadStatics *iface, EventRegistrationToken token )
 {
-    FIXME( "iface %p, token %#I64x stub!\n", iface, token.value );
-    return S_OK;
+    TRACE( "iface %p, token %#I64x.\n", iface, token.value );
+    return event_handlers_remove( &gamepad_removed_handlers, &token );
 }
 
 static HRESULT WINAPI statics_get_Gamepads( IGamepadStatics *iface, IVectorView_Gamepad **value )
@@ -471,7 +471,10 @@ static HRESULT WINAPI controller_factory_OnGameControllerAdded( ICustomGameContr
     if (FAILED(hr))
         WARN( "Could not append gamepad %p, hr %lx!\n", gamepad, hr );
     else
+    {
+        event_handlers_notify( &gamepad_added_handlers, (IInspectable *)gamepad );
         TRACE( "Added gamepad %p.\n", gamepad );
+    }
     IGamepad_Release( gamepad );
 
     return S_OK;
@@ -502,7 +505,10 @@ static HRESULT WINAPI controller_factory_OnGameControllerRemoved( ICustomGameCon
     if (FAILED(hr))
         WARN( "Failed to remove gamepad %p, hr %#lx!\n", gamepad, hr );
     else if (found)
+    {
         TRACE( "Removed gamepad %p.\n", gamepad );
+        event_handlers_notify( &gamepad_removed_handlers, (IInspectable *)gamepad );
+    }
     IGamepad_Release( gamepad );
 
     return S_OK;
