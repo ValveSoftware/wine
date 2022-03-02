@@ -148,9 +148,6 @@ struct hid_haptics_feature
 
 struct hid_haptics_features
 {
-    WORD waveform_list[HAPTICS_WAVEFORM_LAST_ORDINAL - HAPTICS_WAVEFORM_FIRST_ORDINAL + 1];
-    WORD duration_list[HAPTICS_WAVEFORM_LAST_ORDINAL - HAPTICS_WAVEFORM_FIRST_ORDINAL + 1];
-    UINT waveform_cutoff_time_ms;
     struct hid_haptics_feature rumble;
     struct hid_haptics_feature buzz;
 };
@@ -159,9 +156,7 @@ struct hid_haptics_features
 struct hid_haptics
 {
     struct hid_haptics_features features;
-    UINT16 waveform_intensity[HAPTICS_WAVEFORM_LAST_ORDINAL + 1];
     BYTE features_report;
-    BYTE waveform_report;
     BYTE intensity_report;
 };
 
