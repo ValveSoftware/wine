@@ -3206,6 +3206,7 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
                 return SOCKET_ERROR;
             }
             memcpy( &value, optval, min( optlen, sizeof(value) ));
+            value = !!value;
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_MULTICAST_LOOP, (char *)&value, sizeof(value) );
 
         case IPV6_PKTINFO:
