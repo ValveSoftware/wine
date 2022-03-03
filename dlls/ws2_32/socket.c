@@ -1409,7 +1409,9 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             return server_getsockopt( s, IOCTL_AFD_WINE_GET_SO_ACCEPTCONN, optval, optlen );
 
         case SO_BROADCAST:
-            return server_getsockopt( s, IOCTL_AFD_WINE_GET_SO_BROADCAST, optval, optlen );
+            ret = server_getsockopt( s, IOCTL_AFD_WINE_GET_SO_BROADCAST, optval, optlen );
+            if (!ret && *optlen < sizeof(DWORD)) *optlen = 1;
+            return ret;
 
         case SO_BSP_STATE:
         {
@@ -2766,6 +2768,8 @@ static int server_setsockopt( SOCKET s, ULONG code, const char *optval, int optl
  */
 int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int optlen )
 {
+    DWORD value = 0;
+
     TRACE( "socket %#Ix, %s, optval %s, optlen %d\n",
            s, debugstr_sockopt(level, optname), debugstr_optval(optval, optlen), optlen );
 
@@ -2782,8 +2786,13 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
         switch(optname)
         {
         case SO_BROADCAST:
-            return server_setsockopt( s, IOCTL_AFD_WINE_SET_SO_BROADCAST, optval, optlen );
-
+            if (optlen <= 0 || !optval)
+            {
+                SetLastError(WSAEFAULT);
+                return SOCKET_ERROR;
+            }
+            memcpy( &value, optval, min( optlen, sizeof(value) ));
+            return server_setsockopt( s, IOCTL_AFD_WINE_SET_SO_BROADCAST, (char *)&value, sizeof(value) );
         case SO_DONTLINGER:
         {
             struct linger linger;
