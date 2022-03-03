@@ -1169,6 +1169,7 @@ static void test_set_getsockopt(void)
     {
         {AF_INET, SOCK_DGRAM, SOL_SOCKET, SO_BROADCAST,  TRUE, {1, 1, 4}, {0, 0xdead0001, 0}},
         {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_DONTLINGER, TRUE, {1, 1, 4}, {0, 0xdead0001, 0}},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_KEEPALIVE, TRUE, {1, 1, 1}},
         {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_DONTROUTE, TRUE, {1, 1, 1}},
         {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_RCVTIMEO, FALSE, {1, 2, 4}},
         {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_SNDTIMEO, FALSE, {1, 2, 4}},
