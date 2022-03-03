@@ -2174,6 +2174,7 @@ static BOOL X11DRV_RawTouchEvent( XGenericEventCookie *xev )
     DWORD flags = 0;
     POINT pos;
 
+    if (!thread_data->xi2_rawinput_only) return FALSE;
     if (!map_raw_event_coords( event, &input )) return FALSE;
     if (!(input.u.mi.dwFlags & MOUSEEVENTF_ABSOLUTE)) return FALSE;
     pos.x = input.u.mi.dx;
