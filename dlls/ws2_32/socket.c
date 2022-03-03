@@ -1718,6 +1718,12 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
         switch(optname)
         {
         case TCP_NODELAY:
+            if (!optlen || *optlen < 1 || !optval)
+            {
+                SetLastError(WSAEFAULT);
+                return SOCKET_ERROR;
+            }
+            *optlen = 1;
             return server_getsockopt( s, IOCTL_AFD_WINE_GET_TCP_NODELAY, optval, optlen );
 
         default:
@@ -2983,11 +2989,13 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
         {
         case TCP_NODELAY:
         {
-            INT nodelay = *optval;
-            if (optlen <= 0) {
+            INT nodelay;
+            if (optlen <= 0 || !optval)
+            {
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
             }
+            nodelay = *optval;
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_TCP_NODELAY, (char*)&nodelay, sizeof(nodelay) );
         }
         default:
