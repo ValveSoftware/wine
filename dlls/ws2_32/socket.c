@@ -1531,6 +1531,8 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             /* struct linger and LINGER have different sizes */
             if (!optlen || *optlen < sizeof(LINGER) || !optval)
             {
+                if (optlen && *optlen > 0 && optval)
+                    memset( optval, 0, *optlen );
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
             }
@@ -2832,6 +2834,11 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_SO_KEEPALIVE, (char *)&value, sizeof(value) );
 
         case SO_LINGER:
+            if (!optlen || optlen < sizeof(LINGER) || !optval)
+            {
+                SetLastError(WSAEFAULT);
+                return SOCKET_ERROR;
+            }
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_SO_LINGER, optval, optlen );
 
         case SO_OOBINLINE:
