@@ -1478,11 +1478,12 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
 
         case SO_DONTLINGER:
         {
-            struct linger linger;
+            LINGER linger;
             int len = sizeof(linger);
+            BOOL value;
             int ret;
 
-            if (!optlen || *optlen < sizeof(BOOL)|| !optval)
+            if (!optlen || *optlen < 1 || !optval)
             {
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
@@ -1490,8 +1491,9 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
 
             if (!(ret = getsockopt( s, SOL_SOCKET, SO_LINGER, (char *)&linger, &len )))
             {
-                *(BOOL *)optval = !linger.l_onoff;
-                *optlen = sizeof(BOOL);
+                value = !linger.l_onoff;
+                memcpy( optval, &value, min( sizeof(BOOL), *optlen ));
+                *optlen = *optlen >= sizeof(BOOL) ? sizeof(BOOL) : 1;
             }
             return ret;
         }
@@ -2795,7 +2797,7 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_SO_BROADCAST, (char *)&value, sizeof(value) );
         case SO_DONTLINGER:
         {
-            struct linger linger;
+            LINGER linger;
 
             if (!optval)
             {
