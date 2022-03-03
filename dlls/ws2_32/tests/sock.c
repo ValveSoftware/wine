@@ -1164,37 +1164,39 @@ static void test_set_getsockopt(void)
         BOOL accepts_short_len;
         unsigned int sizes[3];
         DWORD values[3];
+        BOOL accepts_large_value;
+        BOOL bool_value;
     }
     test_optsize[] =
     {
-        {AF_INET, SOCK_DGRAM, SOL_SOCKET, SO_BROADCAST,  TRUE, {1, 1, 4}, {0, 0xdead0001, 0}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_DONTLINGER, TRUE, {1, 1, 4}, {0, 0xdead0001, 0}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_KEEPALIVE, TRUE, {1, 1, 1}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_DONTROUTE, TRUE, {1, 1, 1}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_LINGER, FALSE, {1, 2, 4}, {0xdeadbe00, 0xdead0000}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_OOBINLINE, TRUE, {1, 1, 4}, {0, 0xdead0001, 0}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_RCVBUF, FALSE, {1, 2, 4}, {0xdeadbe00, 0xdead0000}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_RCVTIMEO, FALSE, {1, 2, 4}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, TRUE, {1, 1, 4}, {0, 0xdead0001, 0}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_SNDBUF, FALSE, {1, 2, 4}, {0xdeadbe00, 0xdead0000}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_SNDTIMEO, FALSE, {1, 2, 4}},
-        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_OPENTYPE, FALSE, {1, 2, 4}},
-        {AF_INET, SOCK_STREAM, IPPROTO_TCP, TCP_NODELAY, TRUE, {1, 1, 1}},
-        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_MULTICAST_LOOP, TRUE, {1, 1, 4}},
-        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_MULTICAST_TTL, TRUE, {1, 1, 4}},
-        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_PKTINFO, FALSE, {0, 0, 4}},
-        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_RECVTOS, FALSE, {0, 0, 4}},
-        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_RECVTTL, FALSE, {0, 0, 4}},
-        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_TOS, TRUE, {1, 1, 4}},
-        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_TTL, TRUE, {1, 1, 4}},
-        {AF_INET6, SOCK_STREAM, IPPROTO_IPV6, IPV6_DONTFRAG, TRUE, {1, 1, 4}},
-        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_HOPLIMIT, FALSE, {0, 0, 4}},
-        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, TRUE, {1, 1, 4}},
-        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, TRUE, {1, 1, 4}},
-        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_PKTINFO, FALSE, {0, 0, 4}},
-        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_RECVTCLASS, FALSE, {0, 0, 4}},
-        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_UNICAST_HOPS, TRUE, {1, 1, 4}},
-        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_V6ONLY, TRUE, {1, 1, 1}},
+        {AF_INET, SOCK_DGRAM, SOL_SOCKET, SO_BROADCAST,  TRUE, {1, 1, 4}, {0, 0xdead0001, 0}, TRUE, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_DONTLINGER, TRUE, {1, 1, 4}, {0, 0xdead0001, 0}, TRUE, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_KEEPALIVE, TRUE, {1, 1, 1}, {0}, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_DONTROUTE, TRUE, {1, 1, 1}, {0}, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_LINGER, FALSE, {1, 2, 4}, {0xdeadbe00, 0xdead0000}, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_OOBINLINE, TRUE, {1, 1, 4}, {0, 0xdead0001, 0}, TRUE, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_RCVBUF, FALSE, {1, 2, 4}, {0xdeadbe00, 0xdead0000}, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_RCVTIMEO, FALSE, {1, 2, 4}, {0}, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_REUSEADDR, TRUE, {1, 1, 4}, {0, 0xdead0001, 0}, TRUE, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_SNDBUF, FALSE, {1, 2, 4}, {0xdeadbe00, 0xdead0000}, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_SNDTIMEO, FALSE, {1, 2, 4}, {0}, TRUE},
+        {AF_INET, SOCK_STREAM, SOL_SOCKET, SO_OPENTYPE, FALSE, {1, 2, 4}, {0}, TRUE},
+        {AF_INET, SOCK_STREAM, IPPROTO_TCP, TCP_NODELAY, TRUE, {1, 1, 1}, {0}, TRUE},
+        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_MULTICAST_LOOP, TRUE, {1, 1, 4}, {0}, TRUE, TRUE},
+        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_MULTICAST_TTL, TRUE, {1, 1, 4}, {0}, FALSE},
+        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_PKTINFO, FALSE, {0, 0, 4}, {0}, TRUE, TRUE},
+        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_RECVTOS, FALSE, {0, 0, 4}, {0}, TRUE, TRUE},
+        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_RECVTTL, FALSE, {0, 0, 4}, {0}, TRUE, TRUE},
+        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_TOS, TRUE, {1, 1, 4}, {0}, FALSE},
+        {AF_INET, SOCK_DGRAM, IPPROTO_IP, IP_TTL, TRUE, {1, 1, 4}, {0}, FALSE},
+        {AF_INET6, SOCK_STREAM, IPPROTO_IPV6, IPV6_DONTFRAG, TRUE, {1, 1, 4}, {0}, TRUE, TRUE},
+        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_HOPLIMIT, FALSE, {0, 0, 4}, {0}, TRUE, TRUE},
+        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, TRUE, {1, 1, 4}, {0}, FALSE},
+        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, TRUE, {1, 1, 4}, {0}, TRUE, TRUE},
+        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_PKTINFO, FALSE, {0, 0, 4}, {0}, TRUE, TRUE},
+        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_RECVTCLASS, FALSE, {0, 0, 4}, {0}, TRUE, TRUE},
+        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_UNICAST_HOPS, TRUE, {1, 1, 4}, {0}, FALSE},
+        {AF_INET6, SOCK_DGRAM, IPPROTO_IPV6, IPV6_V6ONLY, TRUE, {1, 1, 1}, {0}, TRUE},
     };
     SOCKET s, s2;
     int i, j, err, lasterr;
@@ -1204,7 +1206,10 @@ static void test_set_getsockopt(void)
     WSAPROTOCOL_INFOA infoA;
     WSAPROTOCOL_INFOW infoW;
     char providername[WSAPROTOCOL_LEN + 1];
-    DWORD value;
+    DWORD expected_last_error, expected_value, expected_size;
+    DWORD value, save_value;
+    int expected_err;
+
     struct _prottest
     {
         int family, type, proto;
@@ -1422,22 +1427,20 @@ todo_wine
     {
         s2 = socket( test_optsize[i].af, test_optsize[i].type, 0 );
         ok(s2 != INVALID_SOCKET, "socket() failed error %d\n", WSAGetLastError());
+
+        size = sizeof(save_value);
+        err = getsockopt(s2, test_optsize[i].level, test_optsize[i].optname, (char*)&save_value, &size);
+        ok(!err, "Unexpected getsockopt result %d.\n", err);
+
         for (j = 0; j < 3; ++j)
         {
-            DWORD expected_last_error, expected_value, expected_size, save_value;
-            int expected_err;
-
             winetest_push_context("i %u, level %d, optname %d, len %u",
                     i, test_optsize[i].level, test_optsize[i].optname, 1 << j);
-
-            size = sizeof(save_value);
-            err = getsockopt(s2, test_optsize[i].level, test_optsize[i].optname, (char*)&save_value, &size);
-            ok(!err, "Unexpected getsockopt result %d.\n", err);
 
             if (test_optsize[i].accepts_short_len || j == 2)
             {
                 expected_err = 0;
-                expected_last_error = ERROR_SUCCESS;
+                expected_last_error = 0;
                 expected_size = test_optsize[i].sizes[j] ? test_optsize[i].sizes[j] : 4;
                 if (test_optsize[i].values[j])
                     expected_value = test_optsize[i].values[j];
@@ -1472,12 +1475,49 @@ todo_wine
             ok(value == expected_value, "Got unexpected value %#x, expected %#x.\n", value, expected_value);
             ok(size == expected_size, "Got unexpected size %u, expected %u.\n", size, expected_size);
 
+            winetest_pop_context();
+        }
+
+        winetest_push_context("i %u, level %d, optname %d", i, test_optsize[i].level, test_optsize[i].optname);
+
+        expected_size = test_optsize[i].sizes[2];
+        if (expected_size == 1)
+            expected_value = 0xdeadbe00;
+        else
+            expected_value = test_optsize[i].bool_value ? 0x1 : 0x100;
+        if (test_optsize[i].accepts_large_value)
+        {
+            expected_err = 0;
+            expected_last_error = 0;
+        }
+        else
+        {
+            expected_err = -1;
+            expected_last_error = WSAEINVAL;
+        }
+
+        value = 0x100;
+        SetLastError(0xdeadbeef);
+        err = setsockopt(s2, test_optsize[i].level, test_optsize[i].optname, (char*)&value, 4);
+        ok(err == expected_err, "Unexpected setsockopt result %d.\n", err);
+        ok(WSAGetLastError() == expected_last_error, "Unexpected WSAGetLastError() %u.\n", WSAGetLastError());
+
+        if (test_optsize[i].accepts_large_value)
+        {
+            value = 0xdeadbeef;
+            SetLastError(0xdeadbeef);
+            size = 4;
+            err = getsockopt(s2, test_optsize[i].level, test_optsize[i].optname, (char*)&value, &size);
+            ok(err == expected_err, "Unexpected getsockopt result %d.\n", err);
+            ok(WSAGetLastError() == expected_last_error, "Unexpected WSAGetLastError() %u.\n", WSAGetLastError());
+            todo_wine_if(test_optsize[i].optname == SO_DONTROUTE || test_optsize[i].optname == SO_LINGER)
+            ok(value == expected_value, "Got unexpected value %#x, expected %#x.\n", value, expected_value);
+            ok(size == expected_size, "Got unexpected size %u, expected %u.\n", size, expected_size);
             err = setsockopt(s2, test_optsize[i].level, test_optsize[i].optname,
                     (char*)&save_value, sizeof(save_value));
             ok(!err, "Unexpected getsockopt result %d.\n", err);
-
-            winetest_pop_context();
         }
+        winetest_pop_context();
         closesocket(s2);
     }
 
