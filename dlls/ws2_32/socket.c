@@ -1803,6 +1803,12 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
         switch(optname)
         {
         case IPV6_DONTFRAG:
+            if (!optlen || *optlen < 1 || !optval)
+            {
+                SetLastError(WSAEFAULT);
+                return SOCKET_ERROR;
+            }
+            if (*optlen < sizeof(DWORD)) *optlen = 1;
             return server_getsockopt( s, IOCTL_AFD_WINE_GET_IPV6_DONTFRAG, optval, optlen );
 
         case IPV6_HOPLIMIT:
@@ -3109,7 +3115,13 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_ADD_MEMBERSHIP, optval, optlen );
 
         case IPV6_DONTFRAG:
-            return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_DONTFRAG, optval, optlen );
+            if (optlen <= 0 || !optval)
+            {
+                SetLastError(WSAEFAULT);
+                return SOCKET_ERROR;
+            }
+            memcpy( &value, optval, min( optlen, sizeof(value) ));
+            return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_DONTFRAG, (char *)&value, sizeof(value) );
 
         case IPV6_DROP_MEMBERSHIP:
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_DROP_MEMBERSHIP, optval, optlen );
