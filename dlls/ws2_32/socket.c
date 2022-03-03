@@ -1600,6 +1600,13 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
         }
 
         case SO_RCVBUF:
+            if (!optlen || *optlen < sizeof(DWORD) || !optval)
+            {
+                if (optlen && *optlen > 0 && optval)
+                    memset( optval, 0, *optlen );
+                SetLastError(WSAEFAULT);
+                return SOCKET_ERROR;
+            }
             return server_getsockopt( s, IOCTL_AFD_WINE_GET_SO_RCVBUF, optval, optlen );
 
         case SO_RCVTIMEO:
