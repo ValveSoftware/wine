@@ -3247,7 +3247,7 @@ int WINAPI setsockopt( SOCKET s, int level, int optname, const char *optval, int
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
             }
-            memcpy( &value, optval, min( optlen, sizeof(value) ));
+            value = *optval;
             return server_setsockopt( s, IOCTL_AFD_WINE_SET_IPV6_V6ONLY, (char *)&value, sizeof(value) );
 
         default:
