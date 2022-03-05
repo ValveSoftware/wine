@@ -1392,11 +1392,18 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
     TRACE( "socket %#Ix, %s, optval %p, optlen %p (%d)\n",
            s, debugstr_sockopt(level, optname), optval, optlen, optlen ? *optlen : 0 );
 
-    if ((level != SOL_SOCKET || optname != SO_OPENTYPE) &&
-        !socket_list_find( s ))
+    if ((level != SOL_SOCKET || optname != SO_OPENTYPE))
     {
-        SetLastError( WSAENOTSOCK );
-        return SOCKET_ERROR;
+        if (!socket_list_find( s ))
+        {
+            SetLastError( WSAENOTSOCK );
+            return SOCKET_ERROR;
+        }
+        if (!optlen || *optlen <= 0)
+        {
+            SetLastError( WSAEFAULT );
+            return -1;
+        }
     }
 
     switch(level)
@@ -1461,7 +1468,7 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
         }
 
         case SO_CONNECT_TIME:
-            if (!optlen || !optval)
+            if (!optval)
             {
                 SetLastError( WSAEFAULT );
                 return -1;
@@ -1480,7 +1487,7 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             int len = sizeof(linger);
             int ret;
 
-            if (!optlen || *optlen < sizeof(BOOL)|| !optval)
+            if (*optlen < sizeof(BOOL)|| !optval)
             {
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
@@ -1497,7 +1504,7 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
         /* As mentioned in setsockopt, Windows ignores this, so we
          * always return true here */
         case SO_DONTROUTE:
-            if (!optlen || *optlen < sizeof(BOOL) || !optval)
+            if (*optlen < sizeof(BOOL) || !optval)
             {
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
@@ -1518,7 +1525,7 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             int size;
 
             /* struct linger and LINGER have different sizes */
-            if (!optlen || *optlen < sizeof(LINGER) || !optval)
+            if (*optlen < sizeof(LINGER) || !optval)
             {
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
@@ -1537,7 +1544,7 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
         }
 
         case SO_MAX_MSG_SIZE:
-            if (!optlen || *optlen < sizeof(int) || !optval)
+            if (*optlen < sizeof(int) || !optval)
             {
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
@@ -1571,9 +1578,9 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             ret = ws_protocol_info(s, optname == SO_PROTOCOL_INFOW, &infow, &size);
             if (ret)
             {
-                if (!optlen || !optval || *optlen < size)
+                if (!optval || *optlen < size)
                 {
-                    if(optlen) *optlen = size;
+                    *optlen = size;
                     ret = 0;
                     SetLastError(WSAEFAULT);
                 }
@@ -1603,7 +1610,7 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             WSAPROTOCOL_INFOW info;
             int size;
 
-            if (!optlen || *optlen < sizeof(int) || !optval)
+            if (*optlen < sizeof(int) || !optval)
             {
                 SetLastError(WSAEFAULT);
                 return SOCKET_ERROR;
@@ -1762,7 +1769,7 @@ int WINAPI getsockopt( SOCKET s, int level, int optname, char *optval, int *optl
             return server_getsockopt( s, IOCTL_AFD_WINE_GET_IPV6_MULTICAST_LOOP, optval, optlen );
 
         case IPV6_PROTECTION_LEVEL:
-            if (!optlen || *optlen < sizeof(UINT) || !optval)
+            if (*optlen < sizeof(UINT) || !optval)
             {
                 SetLastError( WSAEFAULT );
                 return -1;
