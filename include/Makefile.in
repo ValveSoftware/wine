@@ -791,6 +791,7 @@ SOURCES = \
 	windows.security.exchangeactivesyncprovisioning.idl \
 	windows.storage.streams.idl \
 	windows.system.idl \
+	windows.system.power.idl \
 	windows.system.userprofile.idl \
 	windowscontracts.idl \
 	windowsx.h \
