@@ -318,7 +318,7 @@ static void desktop_destroy( struct object *obj )
     if (desktop->msg_window) destroy_window( desktop->msg_window );
     if (desktop->global_hooks) release_object( desktop->global_hooks );
     list_remove( &desktop->entry );
-    release_object( desktop->shared_mapping );
+    if (desktop->shared_mapping) release_object( desktop->shared_mapping );
     release_object( desktop->winstation );
 }
 

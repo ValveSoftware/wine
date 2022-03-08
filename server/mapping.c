@@ -165,6 +165,7 @@ struct mapping
     pe_image_info_t image;           /* image info (for PE image mapping) */
     struct ranges  *committed;       /* list of committed ranges in this mapping */
     struct shared_map *shared;       /* temp file for shared PE mapping */
+    void *shared_ptr;                /* mmaped pointer for shared mappings */
 };
 
 static void mapping_dump( struct object *obj, int verbose );
@@ -905,6 +906,7 @@ static struct mapping *create_mapping( struct object *root, const struct unicode
     mapping->fd          = NULL;
     mapping->shared      = NULL;
     mapping->committed   = NULL;
+    mapping->shared_ptr  = NULL;
 
     if (!(mapping->flags = get_mapping_flags( handle, flags ))) goto error;
 
@@ -1148,15 +1150,22 @@ struct object *create_shared_mapping( struct object *root, const struct unicode_
 
     if (!(mapping = create_mapping( root, name, OBJ_OPENIF, size, SEC_COMMIT, 0,
                                     FILE_READ_DATA | FILE_WRITE_DATA, sd ))) return NULL;
-    *ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
+
+    if (mapping->shared_ptr)
+        *ptr = mapping->shared_ptr;
+    else
+        *ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, get_unix_fd( mapping->fd ), 0 );
 
     fcntl( get_unix_fd( mapping->fd ), F_ADD_SEALS, seals );
 
     if (*ptr == MAP_FAILED)
     {
+        *ptr = NULL;
         release_object( &mapping->obj );
         return NULL;
     }
+
+    mapping->shared_ptr = *ptr;
 
     return &mapping->obj;
 }
