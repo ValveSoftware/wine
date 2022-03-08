@@ -32,6 +32,8 @@ enum D3DCOMPILER_SIGNATURE_ELEMENT_SIZE
 
 #define D3DCOMPILER_SHADER_TARGET_VERSION_MASK 0xffff
 #define D3DCOMPILER_SHADER_TARGET_SHADERTYPE_MASK 0xffff0000
+#define D3DCOMPILER_SHADER_TARGET_SHADERTYPE_SHIFT 16
+#define D3DCOMPILER_SHADER_TYPE_CS 0x5
 
 struct d3dcompiler_shader_signature
 {
@@ -1480,7 +1482,8 @@ static HRESULT d3dcompiler_parse_rdef(struct d3dcompiler_shader_reflection *r, c
     target_version = r->target & D3DCOMPILER_SHADER_TARGET_VERSION_MASK;
 
 #if D3D_COMPILER_VERSION < 47
-    if (target_version >= 0x501)
+    if (target_version >= 0x501 && (!D3D_COMPILER_VERSION || ((r->target & D3DCOMPILER_SHADER_TARGET_SHADERTYPE_MASK)
+            >> D3DCOMPILER_SHADER_TARGET_SHADERTYPE_SHIFT) != 0x4353 /* CS */))
     {
         WARN("Target version %#x is not supported in d3dcompiler %u.\n", target_version, D3D_COMPILER_VERSION);
         return E_INVALIDARG;
@@ -1764,15 +1767,18 @@ enum sm4_opcode
 static HRESULT d3dcompiler_parse_shdr(struct d3dcompiler_shader_reflection *r, const char *data, DWORD data_size)
 {
     DWORD opcode_token, opcode;
+    unsigned int size, shader_type;
     const char *ptr = data;
     const unsigned int *u_ptr;
     unsigned int len;
-    unsigned int size;
 
     r->version = read_dword(&ptr);
     TRACE("Shader version: %u\n", r->version);
 
-    if (r->version < 0x050000)
+    shader_type = (r->version & D3DCOMPILER_SHADER_TARGET_SHADERTYPE_MASK)
+            >> D3DCOMPILER_SHADER_TARGET_SHADERTYPE_SHIFT;
+
+    if (shader_type != D3DCOMPILER_SHADER_TYPE_CS)
     {
         /* todo: Check if anything else is needed from the shdr or shex blob. */
         return S_OK;
