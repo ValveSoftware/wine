@@ -2289,8 +2289,25 @@ static void test_system_memory_buffer(void)
     ok(hr == S_OK, "got 0x%08x\n", hr);
 
     IMFMediaBuffer_Release(buffer);
+}
 
-    /* Aligned buffer. */
+static void test_system_memory_aligned_buffer(void)
+{
+    static const DWORD alignments[] =
+    {
+        MF_16_BYTE_ALIGNMENT,
+        MF_32_BYTE_ALIGNMENT,
+        MF_64_BYTE_ALIGNMENT,
+        MF_128_BYTE_ALIGNMENT,
+        MF_256_BYTE_ALIGNMENT,
+        MF_512_BYTE_ALIGNMENT,
+    };
+    IMFMediaBuffer *buffer;
+    DWORD length, max;
+    unsigned int i;
+    BYTE *data;
+    HRESULT hr;
+
     hr = MFCreateAlignedMemoryBuffer(16, MF_8_BYTE_ALIGNMENT, NULL);
     ok(FAILED(hr), "Unexpected hr %#x.\n", hr);
 
@@ -2325,6 +2342,25 @@ static void test_system_memory_buffer(void)
     hr = IMFMediaBuffer_Unlock(buffer);
     ok(hr == S_OK, "Failed to unlock, hr %#x.\n", hr);
 
+    IMFMediaBuffer_Release(buffer);
+
+    for (i = 0; i < ARRAY_SIZE(alignments); ++i)
+    {
+        hr = MFCreateAlignedMemoryBuffer(200, alignments[i], &buffer);
+        ok(hr == S_OK, "Failed to create memory buffer, hr %#lx.\n", hr);
+
+        hr = IMFMediaBuffer_Lock(buffer, &data, &max, &length);
+        ok(hr == S_OK, "Failed to lock, hr %#lx.\n", hr);
+        ok(max == 200 && !length, "Unexpected length.\n");
+        ok(!((uintptr_t)data & alignments[i]), "Data at %p is misaligned.\n", data);
+        hr = IMFMediaBuffer_Unlock(buffer);
+        ok(hr == S_OK, "Failed to unlock, hr %#lx.\n", hr);
+
+        IMFMediaBuffer_Release(buffer);
+    }
+
+    hr = MFCreateAlignedMemoryBuffer(200, 0, &buffer);
+    ok(hr == S_OK, "Failed to create memory buffer, hr %#lx.\n", hr);
     IMFMediaBuffer_Release(buffer);
 }
 
@@ -7882,6 +7918,7 @@ START_TEST(mfplat)
     test_file_stream();
     test_MFCreateMFByteStreamOnStream();
     test_system_memory_buffer();
+    test_system_memory_aligned_buffer();
     test_source_resolver();
     test_MFCreateAsyncResult();
     test_allocate_queue();
