@@ -218,6 +218,8 @@ FUNCTION_OVERRIDES = {
     "vkCreateCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkCreateComputePipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
     "vkCreateGraphicsPipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
+    "vkCreateComputePipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
+    "vkCreateGraphicsPipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
     "vkDestroyCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyDevice" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkFreeCommandBuffers" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
@@ -279,6 +281,9 @@ FUNCTION_OVERRIDES = {
     # VK_EXT_debug_report
     "vkCreateDebugReportCallbackEXT" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyDebugReportCallbackEXT" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
+
+    # VK_NV_ray_tracing
+    "vkCreateRayTracingPipelinesNV" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
 
     # VK_NV_ray_tracing
     "vkCreateRayTracingPipelinesNV" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
