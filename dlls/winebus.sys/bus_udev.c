@@ -1695,7 +1695,7 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
-    if (is_logitech_g920(desc.vid, desc.pid))
+    if (!is_dualshock4_gamepad(desc.vid, desc.pid) && !is_dualsense_gamepad(desc.vid, desc.pid))
     {
         TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
         close(fd);
@@ -1704,22 +1704,7 @@ static void udev_add_device(struct udev_device *dev, int fd)
     if (is_sdl_blacklisted(desc.vid, desc.pid))
     {
         /* this device is blacklisted */
-        TRACE("hidraw %s: ignoring %s, in SDL blacklist\n", debugstr_a(devnode), debugstr_device_desc(&desc));
-        close(fd);
-        return;
-    }
-    if (is_steam_controller(desc.vid, desc.pid))
-    {
-        /* this device is being used as a virtual Steam controller */
-        TRACE("hidraw %s: ignoring %s, steam controller\n", debugstr_a(devnode), debugstr_device_desc(&desc));
-        close(fd);
-        return;
-    }
-    if (is_xbox_gamepad(desc.vid, desc.pid))
-    {
-        /* SDL handles xbox (and steam) controllers */
-        TRACE("hidraw %s: ignoring %s, xbox gamepad\n", debugstr_a(devnode), debugstr_device_desc(&desc));
-        close(fd);
+        TRACE("ignoring %s, in SDL blacklist\n", debugstr_device_desc(&desc));
         return;
     }
 #ifdef HAS_PROPER_INPUT_HEADER
