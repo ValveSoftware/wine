@@ -35,20 +35,12 @@
 #include "wine/debug.h"
 #include "wine/list.h"
 #include "wine/unixlib.h"
-#include "wine/js_blacklist.h" /* for wine_js_blacklist */
 
 #include "unix_private.h"
 
 BOOL is_wine_blacklisted(WORD vid, WORD pid)
 {
-    int i;
-
-    for (i = 0; i < ARRAY_SIZE(wine_js_blacklist); ++i)
-    {
-        if (vid != wine_js_blacklist[i].vid) continue;
-        if (!wine_js_blacklist[i].pid || wine_js_blacklist[i].pid == pid) return TRUE;
-    }
-
+    if (vid == 0x056a) return TRUE; /* all Wacom devices */
     return FALSE;
 }
 
@@ -67,21 +59,6 @@ BOOL is_sdl_blacklisted(WORD vid, WORD pid)
     sprintf(needle, "0x%04x/0x%04x", vid, pid);
     if (whitelist) return strcasestr(whitelist, needle) == NULL;
     if (blacklist) return strcasestr(blacklist, needle) != NULL;
-    return FALSE;
-}
-
-BOOL is_steam_controller(WORD vid, WORD pid)
-{
-    if (vid == 0x2808 && pid == 0x1015) return TRUE; /* Steam Deck touchscreen */
-    if (vid != 0x28de) return FALSE;
-    if (pid == 0x1101) return TRUE; /* Valve Legacy Steam Controller */
-    if (pid == 0x1102) return TRUE; /* Valve wired Steam Controller */
-    if (pid == 0x1105) return TRUE; /* Valve Bluetooth Steam Controller */
-    if (pid == 0x1106) return TRUE; /* Valve Bluetooth Steam Controller */
-    if (pid == 0x1142) return TRUE; /* Valve wireless Steam Controller */
-    if (pid == 0x1201) return TRUE; /* Valve wired Steam Controller */
-    if (pid == 0x1202) return TRUE; /* Valve Bluetooth Steam Controller */
-    if (pid == 0x1205) return TRUE; /* Valve Steam Deck Mouse / Keyboard */
     return FALSE;
 }
 
@@ -121,6 +98,11 @@ BOOL is_dualsense_gamepad(WORD vid, WORD pid)
 {
     if (vid == 0x054c && pid == 0x0ce6) return TRUE;
     return FALSE;
+}
+
+BOOL is_logitech_g920(WORD vid, WORD pid)
+{
+    return vid == 0x046D && pid == 0xC262;
 }
 
 struct mouse_device
