@@ -522,6 +522,13 @@ static IBaseFilter *find_filter_by_name(struct filter_graph *graph, const WCHAR 
 {
     struct filter *filter;
 
+    /* King of Fighters XIII requests the WMV decoder filter by name to
+     * connect it to a Sample Grabber filter, return our custom decoder
+     * filter instance instead.
+     */
+    if (!wcscmp(name, L"WMVideo Decoder DMO"))
+        name = L"GStreamer splitter filter";
+
     LIST_FOR_EACH_ENTRY(filter, &graph->filters, struct filter, entry)
     {
         if (!wcscmp(filter->name, name))
