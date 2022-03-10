@@ -169,6 +169,7 @@ namespace Windows {
             interface Windows.Foundation.Collections.IMapView<HSTRING, Windows.Foundation.Collections.IVectorView<HSTRING>*>;
             interface Windows.Foundation.AsyncOperationCompletedHandler<IInspectable*>;
             interface Windows.Foundation.IAsyncOperation<IInspectable*>;
+            interface Windows.Foundation.EventHandler<IInspectable *>;
             interface Windows.Foundation.AsyncOperationCompletedHandler<boolean>;
             interface Windows.Foundation.IAsyncOperation<boolean>;
             interface Windows.Foundation.IReference<INT32>;
