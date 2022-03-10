@@ -912,7 +912,11 @@ int suspend_thread( struct thread *thread )
     int old_count = thread->suspend;
     if (thread->suspend < MAXIMUM_SUSPEND_COUNT)
     {
-        if (!(thread->process->suspend + thread->suspend++)) stop_thread( thread );
+        if (!(thread->process->suspend + thread->suspend++))
+        {
+            stop_thread( thread );
+            if (thread == current) return old_count | 0x80000000;
+        }
     }
     else set_error( STATUS_SUSPEND_COUNT_EXCEEDED );
     return old_count;
