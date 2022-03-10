@@ -994,7 +994,7 @@ int suspend_thread( struct thread *thread )
         thread->suspend++;
     }
     else set_error( STATUS_SUSPEND_COUNT_EXCEEDED );
-    return old_count;
+    return thread == current ? old_count | 0x80000000 : old_count;
 }
 
 /* resume a thread */
