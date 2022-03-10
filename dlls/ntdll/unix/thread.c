@@ -1588,6 +1588,7 @@ NTSTATUS WINAPI NtOpenThread( HANDLE *handle, ACCESS_MASK access,
  */
 NTSTATUS WINAPI NtSuspendThread( HANDLE handle, ULONG *count )
 {
+    BOOL self = FALSE;
     unsigned int ret;
 
     SERVER_START_REQ( suspend_thread )
@@ -1595,10 +1596,12 @@ NTSTATUS WINAPI NtSuspendThread( HANDLE handle, ULONG *count )
         req->handle = wine_server_obj_handle( handle );
         if (!(ret = wine_server_call( req )))
         {
-            if (count) *count = reply->count;
+            self = reply->count & 0x80000000;
+            if (count) *count = reply->count & 0x7fffffff;
         }
     }
     SERVER_END_REQ;
+    if (self) usleep( 0 );
     return ret;
 }
 
