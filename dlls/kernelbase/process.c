@@ -598,6 +598,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     options[] =
     {
         {L"Paradox Launcher.exe", L" --use-gl=swiftshader --in-process-gpu"},
+        {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
     };
     unsigned int i;
 
