@@ -1106,7 +1106,7 @@ static BOOL decodebin_parser_filter_init_gst(struct parser *filter)
     /* King of Fighters XIII requests the WMV decoder filter pins by name
      * to connect them to a Sample Grabber filter.
      */
-    format = !strcmp(sgi, "222940") ? L"out%u" : L"Stream %02u";
+    format = (sgi && !strcmp(sgi, "222940")) ? L"out%u" : L"Stream %02u";
 
     stream_count = wg_parser_get_stream_count(parser);
     for (i = 0; i < stream_count; ++i)
