@@ -261,6 +261,7 @@ typedef struct
 } event;
 
 #if _MSVCR_VER >= 110
+#define CV_WAKE (void*)1
 typedef struct cv_queue {
     struct cv_queue *next;
     BOOL expired;
@@ -2297,18 +2298,20 @@ void __thiscall _Condition_variable_dtor(_Condition_variable *this)
 DEFINE_THISCALL_WRAPPER(_Condition_variable_wait, 8)
 void __thiscall _Condition_variable_wait(_Condition_variable *this, critical_section *cs)
 {
-    cv_queue q;
+    cv_queue q, *next;
 
     TRACE("(%p, %p)\n", this, cs);
 
     critical_section_lock(&this->lock);
     q.next = this->queue;
     q.expired = FALSE;
+    next = q.next;
     this->queue = &q;
     critical_section_unlock(&this->lock);
 
     critical_section_unlock(cs);
-    NtWaitForKeyedEvent(keyed_event, &q, 0, NULL);
+    while (q.next != CV_WAKE)
+        RtlWaitOnAddress(&q.next, &next, sizeof(next), NULL);
     critical_section_lock(cs);
 }
 
@@ -2321,7 +2324,7 @@ bool __thiscall _Condition_variable_wait_for(_Condition_variable *this,
     LARGE_INTEGER to;
     NTSTATUS status;
     FILETIME ft;
-    cv_queue *q;
+    cv_queue *q, *next;
 
     TRACE("(%p %p %d)\n", this, cs, timeout);
 
@@ -2329,6 +2332,7 @@ bool __thiscall _Condition_variable_wait_for(_Condition_variable *this,
     critical_section_lock(&this->lock);
     q->next = this->queue;
     q->expired = FALSE;
+    next = q->next;
     this->queue = q;
     critical_section_unlock(&this->lock);
 
@@ -2337,14 +2341,15 @@ bool __thiscall _Condition_variable_wait_for(_Condition_variable *this,
     GetSystemTimeAsFileTime(&ft);
     to.QuadPart = ((LONGLONG)ft.dwHighDateTime << 32) +
         ft.dwLowDateTime + (LONGLONG)timeout * 10000;
-    status = NtWaitForKeyedEvent(keyed_event, q, 0, &to);
-    if(status == STATUS_TIMEOUT) {
-        if(!InterlockedExchange(&q->expired, TRUE)) {
-            critical_section_lock(cs);
-            return FALSE;
+    while (q->next != CV_WAKE) {
+        status = RtlWaitOnAddress(&q->next, &next, sizeof(next), &to);
+        if(status == STATUS_TIMEOUT) {
+            if(!InterlockedExchange(&q->expired, TRUE)) {
+                critical_section_lock(cs);
+                return FALSE;
+            }
+            break;
         }
-        else
-            NtWaitForKeyedEvent(keyed_event, q, 0, 0);
     }
 
     operator_delete(q);
@@ -2374,8 +2379,9 @@ void __thiscall _Condition_variable_notify_one(_Condition_variable *this)
         this->queue = node->next;
         critical_section_unlock(&this->lock);
 
+        node->next = CV_WAKE;
         if(!InterlockedExchange(&node->expired, TRUE)) {
-            NtReleaseKeyedEvent(keyed_event, node, 0, NULL);
+            RtlWakeAddressSingle(&node->next);
             return;
         } else {
             HeapFree(GetProcessHeap(), 0, node);
@@ -2403,8 +2409,9 @@ void __thiscall _Condition_variable_notify_all(_Condition_variable *this)
     while(ptr) {
         cv_queue *next = ptr->next;
 
+        ptr->next = CV_WAKE;
         if(!InterlockedExchange(&ptr->expired, TRUE))
-            NtReleaseKeyedEvent(keyed_event, ptr, 0, NULL);
+            RtlWakeAddressSingle(&ptr->next);
         else
             HeapFree(GetProcessHeap(), 0, ptr);
         ptr = next;
