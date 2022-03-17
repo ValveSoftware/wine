@@ -232,7 +232,7 @@ static volatile void *init_desktop_mapping( struct desktop *desktop, const struc
     desktop->shared_mapping = create_shared_mapping( dir, name, sizeof(struct desktop_shared_memory),
                                                      NULL, (void **)&desktop->shared );
     release_object( dir );
-    if (desktop->shared) memset( (void *)desktop->shared, 0, sizeof(*desktop->shared) );
+    if (desktop->shared_mapping) memset( (void *)desktop->shared, 0, sizeof(*desktop->shared) );
     return desktop->shared;
 }
 
@@ -319,6 +319,7 @@ static void desktop_destroy( struct object *obj )
     if (desktop->global_hooks) release_object( desktop->global_hooks );
     list_remove( &desktop->entry );
     if (desktop->shared_mapping) release_object( desktop->shared_mapping );
+    desktop->shared_mapping = NULL;
     release_object( desktop->winstation );
 }
 
