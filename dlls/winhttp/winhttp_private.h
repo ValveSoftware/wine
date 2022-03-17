@@ -425,7 +425,6 @@ static inline char *strdupWA_sized( const WCHAR *src, DWORD size )
 }
 
 extern HINSTANCE winhttp_instance DECLSPEC_HIDDEN;
-extern BOOL reuse_threadpool DECLSPEC_HIDDEN;
 
 #define MAX_FRAME_BUFFER_SIZE 65536
 
