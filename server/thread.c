@@ -363,7 +363,7 @@ static volatile void *init_queue_mapping( struct thread *thread )
     thread->queue_shared_mapping = create_shared_mapping( dir, &name, sizeof(struct queue_shared_memory),
                                                           NULL, (void **)&thread->queue_shared );
     release_object( dir );
-    if (thread->queue_shared)
+    if (thread->queue_shared_mapping)
     {
         memset( (void *)thread->queue_shared, 0, sizeof(*thread->queue_shared) );
         thread->queue_shared->input_tid = thread->id;
@@ -389,7 +389,7 @@ static volatile void *init_input_mapping( struct thread *thread )
     thread->input_shared_mapping = create_shared_mapping( dir, &name, sizeof(struct input_shared_memory),
                                                           NULL, (void **)&thread->input_shared );
     release_object( dir );
-    if (thread->input_shared)
+    if (thread->input_shared_mapping)
     {
         memset( (void *)thread->input_shared, 0, sizeof(*thread->input_shared) );
         thread->input_shared->tid = thread->id;
