@@ -243,7 +243,7 @@ static NTSTATUS ntlm_check_version( void *args )
         }
     }
 
-    if (status) ERR_(winediag)( "ntlm_auth was not found or is outdated. "
+    if (status) WARN( "ntlm_auth was not found or is outdated. "
                               "Make sure that ntlm_auth >= %d.%d.%d is in your path. "
                               "Usually, you can find it in the winbind package of your distribution.\n",
                               NTLM_AUTH_MAJOR_VERSION, NTLM_AUTH_MINOR_VERSION, NTLM_AUTH_MICRO_VERSION );
