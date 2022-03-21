@@ -43,7 +43,6 @@
 extern char **environ;
 
 WINE_DEFAULT_DEBUG_CHANNEL(ntlm);
-WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
 #define INITIAL_BUFFER_SIZE 200
 
@@ -233,7 +232,7 @@ static NTSTATUS ntlm_check_version( void *args )
         status = STATUS_SUCCESS;
     }
 
-    if (status) ERR_(winediag)( "ntlm_auth was not found. Make sure that ntlm_auth >= 3.0.25 is in your path. "
+    if (status) WARN( "ntlm_auth was not found. Make sure that ntlm_auth >= 3.0.25 is in your path. "
                                 "Usually, you can find it in the winbind package of your distribution.\n" );
     ntlm_cleanup( &ctx );
     return status;
