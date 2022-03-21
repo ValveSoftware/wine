@@ -47,7 +47,7 @@
   extern char **environ;
 #endif
 
-WINE_DECLARE_DEBUG_CHANNEL(winediag);
+WINE_DECLARE_DEBUG_CHANNEL(ntlm);
 
 #define INITIAL_BUFFER_SIZE 200
 
@@ -202,7 +202,7 @@ static NTSTATUS ntlm_fork( void *args )
     {
         ctx->pid = -1;
         write( pipe_in[1], "BH\n", 3 );
-        ERR_(winediag)( "Can't start ntlm_auth (%s). "
+        WARN_(ntlm)( "Can't start ntlm_auth (%s). "
                         "Usually you can find it in the winbind package of your distribution.\n",
                         strerror(err) );
         status = STATUS_UNSUCCESSFUL;
