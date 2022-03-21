@@ -153,6 +153,13 @@ DIRECT_CALL_FUNCTIONS = [
     "vkEnumerateInstanceVersion",
     "vkUpdateDescriptorSets",
     "vkUpdateDescriptorSetWithTemplate",
+# These functions involving shader compilation might require large stack
+# (more than we have in syscall stack) and it is not entirely clear how large,
+# so add them here too for now.
+    "vkCreateComputePipelines",
+    "vkCreateGraphicsPipelines",
+    "vkCreateRaytracingPipelinesKHR",
+    "vkCreateRayTracingPipelinesNV",
 ]
 
 # Functions part of our winevulkan graphics driver interface.
