@@ -371,6 +371,7 @@ DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD secur
     const DWORD isc_req_flags = ISC_REQ_ALLOCATE_MEMORY|ISC_REQ_USE_SESSION_KEY|ISC_REQ_CONFIDENTIALITY
         |ISC_REQ_SEQUENCE_DETECT|ISC_REQ_REPLAY_DETECT|ISC_REQ_MANUAL_CRED_VALIDATION;
 
+    memset( &ctx, 0, sizeof(ctx) );
     status = netconn_negotiate(conn, cred_handle, NULL, hostname, isc_req_flags, NULL, &ctx);
     if(status != SEC_E_OK)
         goto failed;
