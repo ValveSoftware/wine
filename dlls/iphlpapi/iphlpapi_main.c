@@ -3091,13 +3091,20 @@ static DWORD get_extended_tcp_table( void *table, DWORD *size, BOOL sort, ULONG 
     DWORD err, count, needed, i, num = 0, row_size = 0;
     struct nsi_tcp_conn_key *key;
     struct nsi_tcp_conn_dynamic *dyn;
-    struct nsi_tcp_conn_static *stat;
+    struct nsi_tcp_conn_static *stat = NULL;
 
     if (!size) return ERROR_INVALID_PARAMETER;
 
-    err = NsiAllocateAndGetTable( 1, &NPI_MS_TCP_MODULEID, tcp_table_id( table_class ), (void **)&key, sizeof(*key),
-                                  NULL, 0, (void **)&dyn, sizeof(*dyn),
-                                  (void **)&stat, sizeof(*stat), &count, 0 );
+
+    if (table_class >= TCP_TABLE_OWNER_PID_LISTENER)
+        err = NsiAllocateAndGetTable( 1, &NPI_MS_TCP_MODULEID, tcp_table_id( table_class ), (void **)&key, sizeof(*key),
+                                      NULL, 0, (void **)&dyn, sizeof(*dyn),
+                                      (void **)&stat, sizeof(*stat), &count, 0 );
+    else
+        err = NsiAllocateAndGetTable( 1, &NPI_MS_TCP_MODULEID, tcp_table_id( table_class ), (void **)&key, sizeof(*key),
+                                      NULL, 0, (void **)&dyn, sizeof(*dyn),
+                                      NULL, 0, &count, 0 );
+
     if (err) return err;
 
     for (i = 0; i < count; i++)
