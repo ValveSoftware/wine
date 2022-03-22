@@ -122,6 +122,7 @@ struct msg_queue
     int                    quit_message;    /* is there a pending quit message? */
     int                    exit_code;       /* exit code of pending quit message */
     int                    cursor_count;    /* per-queue cursor show count */
+    int                    destroyed;       /* queue has been cleaned up */
     struct list            msg_list[NB_MSG_KINDS];  /* lists of messages */
     struct list            send_result;     /* stack of sent messages waiting for result */
     struct list            callback_result; /* list of callback messages waiting for result */
@@ -357,6 +358,7 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
         queue->hotkey_count    = 0;
         queue->quit_message    = 0;
         queue->cursor_count    = 0;
+        queue->destroyed       = 0;
         queue->recv_result     = NULL;
         queue->next_timer_id   = 0x7fff;
         queue->timeout         = NULL;
@@ -1213,14 +1215,14 @@ static void cleanup_msg_queue( struct msg_queue *queue )
     release_object( queue->input );
     if (queue->hooks) release_object( queue->hooks );
     if (queue->fd) release_object( queue->fd );
-    queue->fd = NULL;
     if (do_esync()) close( queue->esync_fd );
+    queue->destroyed = 1;
 }
 
 static void msg_queue_destroy( struct object *obj )
 {
     struct msg_queue *queue = (struct msg_queue *)obj;
-    if (queue->fd) cleanup_msg_queue( queue );
+    if (!queue->destroyed) cleanup_msg_queue( queue );
 }
 
 /* free the message queue of a thread at thread exit */
