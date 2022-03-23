@@ -384,9 +384,6 @@ static void wine_vk_device_get_queues(struct VkDevice_T *device,
 static void wine_vk_device_free_create_info(VkDeviceCreateInfo *create_info)
 {
     free_VkDeviceCreateInfo_struct_chain(create_info);
-
-    if (create_info->enabledExtensionCount)
-        free((void *)create_info->ppEnabledExtensionNames);
 }
 
 static char **parse_xr_extensions(unsigned int *len)
@@ -448,8 +445,7 @@ static char **parse_xr_extensions(unsigned int *len)
 static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src,
         VkDeviceCreateInfo *dst, BOOL *must_free_extensions)
 {
-    unsigned int i, append_xr = 0, wine_extension_count;
-    const char **enabled_extensions;
+    unsigned int i, append_xr = 0, replace_win32 = 0, wine_extension_count;
     VkResult res;
 
     static const char *wine_xr_extension_name = "VK_WINE_openxr_device_extensions";
@@ -475,23 +471,38 @@ static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src
             break;
         }
     }
-
-    if (append_xr)
+    for (i = 0; i < src->enabledExtensionCount; i++)
     {
-        unsigned int xr_extensions_len, o = 0;
-        char **xr_extensions_list = parse_xr_extensions(&xr_extensions_len);
+        if (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
+        {
+            replace_win32 = 1;
+            break;
+        }
+    }
+    if (append_xr || replace_win32)
+    {
+        unsigned int xr_extensions_len = 0, o = 0;
+        char **xr_extensions_list = NULL;
+        char **new_extensions_list;
 
-        char **new_extensions_list = malloc(sizeof(char *) * (dst->enabledExtensionCount + xr_extensions_len));
+        if (append_xr)
+            xr_extensions_list = parse_xr_extensions(&xr_extensions_len);
 
-        if(!xr_extensions_list)
+        new_extensions_list = malloc(sizeof(char *) * (dst->enabledExtensionCount + xr_extensions_len));
+
+        if(append_xr && !xr_extensions_list)
             WARN("Requested to use XR extensions, but none are set!\n");
 
         for (i = 0; i < dst->enabledExtensionCount; i++)
         {
-            if (strcmp(dst->ppEnabledExtensionNames[i], wine_xr_extension_name) != 0)
-            {
-                new_extensions_list[o++] = strdup(dst->ppEnabledExtensionNames[i]);
-            }
+            if (append_xr && !strcmp(dst->ppEnabledExtensionNames[i], wine_xr_extension_name))
+                continue;
+
+            if (replace_win32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
+                new_extensions_list[o] = strdup("VK_KHR_external_memory_fd");
+            else
+                new_extensions_list[o] = strdup(dst->ppEnabledExtensionNames[i]);
+            ++o;
         }
 
         TRACE("appending XR extensions:\n");
@@ -516,29 +527,6 @@ static VkResult wine_vk_device_convert_create_info(const VkDeviceCreateInfo *src
     for (i = 0; i < wine_extension_count; i++)
     {
         TRACE("Extension %u: %s.\n", i, debugstr_a(dst->ppEnabledExtensionNames[i]));
-    }
-
-    if (src->enabledExtensionCount > 0)
-    {
-        enabled_extensions = calloc(src->enabledExtensionCount, sizeof(*src->ppEnabledExtensionNames));
-        if (!enabled_extensions)
-        {
-            free_VkDeviceCreateInfo_struct_chain(dst);
-            return VK_ERROR_OUT_OF_HOST_MEMORY;
-        }
-
-        for (i = 0; i < src->enabledExtensionCount; i++)
-        {
-            if (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
-            {
-                enabled_extensions[i] = "VK_KHR_external_memory_fd";
-            }
-            else
-            {
-                enabled_extensions[i] = src->ppEnabledExtensionNames[i];
-            }
-        }
-        dst->ppEnabledExtensionNames = enabled_extensions;
     }
 
     return VK_SUCCESS;
