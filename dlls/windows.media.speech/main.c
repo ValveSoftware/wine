@@ -437,6 +437,7 @@ static struct voice_information_vector all_voices =
 struct speech_synthesizer
 {
     ISpeechSynthesizer ISpeechSynthesizer_iface;
+    ISpeechSynthesizer2 ISpeechSynthesizer2_iface;
     IClosable IClosable_iface;
     LONG ref;
 };
@@ -444,6 +445,11 @@ struct speech_synthesizer
 static inline struct speech_synthesizer *impl_from_ISpeechSynthesizer(ISpeechSynthesizer *iface)
 {
     return CONTAINING_RECORD(iface, struct speech_synthesizer, ISpeechSynthesizer_iface);
+}
+
+static inline struct speech_synthesizer *impl_from_ISpeechSynthesizer2(ISpeechSynthesizer2 *iface)
+{
+    return CONTAINING_RECORD(iface, struct speech_synthesizer, ISpeechSynthesizer2_iface);
 }
 
 static inline struct speech_synthesizer *impl_from_IClosable(IClosable *iface)
@@ -464,6 +470,13 @@ static HRESULT STDMETHODCALLTYPE speech_synthesizer_QueryInterface(
     {
         IUnknown_AddRef(iface);
         *out = iface;
+        return S_OK;
+    }
+
+    if (IsEqualGUID(iid, &IID_ISpeechSynthesizer2))
+    {
+        IUnknown_AddRef(iface);
+        *out = &impl->ISpeechSynthesizer2_iface;
         return S_OK;
     }
 
@@ -577,6 +590,70 @@ static const struct ISpeechSynthesizerVtbl speech_synthesizer_vtbl =
     speech_synthesizer_SynthesizeSsmlToStreamAsync,
     speech_synthesizer_put_Voice,
     speech_synthesizer_get_Voice,
+};
+
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer2_QueryInterface(
+        ISpeechSynthesizer2 *iface, REFIID iid, void **out)
+{
+    struct speech_synthesizer *impl = impl_from_ISpeechSynthesizer2(iface);
+    return speech_synthesizer_QueryInterface(&impl->ISpeechSynthesizer_iface, iid, out);
+}
+
+static ULONG STDMETHODCALLTYPE speech_synthesizer2_AddRef(
+        ISpeechSynthesizer2 *iface)
+{
+    struct speech_synthesizer *impl = impl_from_ISpeechSynthesizer2(iface);
+    return speech_synthesizer_AddRef(&impl->ISpeechSynthesizer_iface);
+}
+
+static ULONG STDMETHODCALLTYPE speech_synthesizer2_Release(
+        ISpeechSynthesizer2 *iface)
+{
+    struct speech_synthesizer *impl = impl_from_ISpeechSynthesizer2(iface);
+    return speech_synthesizer_Release(&impl->ISpeechSynthesizer_iface);
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer2_GetIids(
+        ISpeechSynthesizer2 *iface, ULONG *iid_count, IID **iids)
+{
+    struct speech_synthesizer *impl = impl_from_ISpeechSynthesizer2(iface);
+    return speech_synthesizer_GetIids(&impl->ISpeechSynthesizer_iface, iid_count, iids);
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer2_GetRuntimeClassName(
+        ISpeechSynthesizer2 *iface, HSTRING *class_name)
+{
+    struct speech_synthesizer *impl = impl_from_ISpeechSynthesizer2(iface);
+    return speech_synthesizer_GetRuntimeClassName(&impl->ISpeechSynthesizer_iface, class_name);
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer2_GetTrustLevel(
+        ISpeechSynthesizer2 *iface, TrustLevel *trust_level)
+{
+    struct speech_synthesizer *impl = impl_from_ISpeechSynthesizer2(iface);
+    return speech_synthesizer_GetTrustLevel(&impl->ISpeechSynthesizer_iface, trust_level);
+}
+
+static HRESULT STDMETHODCALLTYPE speech_synthesizer2_get_Options(ISpeechSynthesizer2 *iface, ISpeechSynthesizerOptions **value)
+{
+    FIXME("iface %p, value %p stub.\n", iface, value);
+
+    return E_NOTIMPL;
+}
+
+static const struct ISpeechSynthesizer2Vtbl speech_synthesizer2_vtbl =
+{
+    /* IUnknown methods */
+    speech_synthesizer2_QueryInterface,
+    speech_synthesizer2_AddRef,
+    speech_synthesizer2_Release,
+    /* IInspectable methods */
+    speech_synthesizer2_GetIids,
+    speech_synthesizer2_GetRuntimeClassName,
+    speech_synthesizer2_GetTrustLevel,
+    /* ISpeechSynthesizer2 methods */
+    speech_synthesizer2_get_Options,
 };
 
 static HRESULT STDMETHODCALLTYPE closable_QueryInterface(
@@ -757,6 +834,7 @@ static HRESULT STDMETHODCALLTYPE windows_media_speech_ActivateInstance(
     }
 
     obj->ISpeechSynthesizer_iface.lpVtbl = &speech_synthesizer_vtbl;
+    obj->ISpeechSynthesizer2_iface.lpVtbl = &speech_synthesizer2_vtbl;
     obj->IClosable_iface.lpVtbl = &closable_vtbl;
     obj->ref = 1;
     *instance = (IInspectable *)&obj->ISpeechSynthesizer_iface;
