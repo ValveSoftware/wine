@@ -116,8 +116,12 @@ static HRESULT WINAPI output_props_GetMediaType(IWMOutputMediaProps *iface, WM_M
 
 static HRESULT WINAPI output_props_SetMediaType(IWMOutputMediaProps *iface, WM_MEDIA_TYPE *mt)
 {
-    FIXME("iface %p, mt %p, stub!\n", iface, mt);
-    return E_NOTIMPL;
+    const struct output_props *props = impl_from_IWMOutputMediaProps(iface);
+
+    TRACE("iface %p, mt %p.\n", iface, mt);
+
+    FreeMediaType((AM_MEDIA_TYPE *)&props->mt);
+    return CopyMediaType((AM_MEDIA_TYPE *)&props->mt, (AM_MEDIA_TYPE *)mt);
 }
 
 static HRESULT WINAPI output_props_GetStreamGroupName(IWMOutputMediaProps *iface, WCHAR *name, WORD *len)
