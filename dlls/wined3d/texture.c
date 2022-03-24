@@ -3826,11 +3826,14 @@ static HRESULT wined3d_texture_init(struct wined3d_texture *texture, const struc
             texture->flags |= WINED3D_TEXTURE_GENERATE_MIPMAPS;
     }
 
-    if (flags & WINED3D_TEXTURE_CREATE_RECORD_DIRTY_REGIONS
-            && !(texture->dirty_regions = heap_calloc(texture->layer_count, sizeof(*texture->dirty_regions))))
+    if (flags & WINED3D_TEXTURE_CREATE_RECORD_DIRTY_REGIONS)
     {
-        wined3d_texture_cleanup_sync(texture);
-        return E_OUTOFMEMORY;
+        if (!(texture->dirty_regions = heap_calloc(texture->layer_count, sizeof(*texture->dirty_regions))))
+        {
+            wined3d_texture_cleanup_sync(texture);
+            return E_OUTOFMEMORY;
+        }
+        wined3d_texture_dirty_region_add(texture, 0, NULL);
     }
 
     /* Precalculated scaling for 'faked' non power of two texture coords. */
