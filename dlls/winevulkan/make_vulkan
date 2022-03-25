@@ -158,7 +158,7 @@ DIRECT_CALL_FUNCTIONS = [
 # so add them here too for now.
     "vkCreateComputePipelines",
     "vkCreateGraphicsPipelines",
-    "vkCreateRaytracingPipelinesKHR",
+    "vkCreateRayTracingPipelinesKHR",
     "vkCreateRayTracingPipelinesNV",
 ]
 
