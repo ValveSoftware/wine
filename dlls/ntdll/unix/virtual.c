@@ -4529,7 +4529,7 @@ static NTSTATUS read_nt_symlink( UNICODE_STRING *name, WCHAR *target, DWORD size
     return status;
 }
 
-static NTSTATUS resolve_drive_symlink( UNICODE_STRING *name, SIZE_T max_name_len, SIZE_T *ret_len )
+static NTSTATUS resolve_drive_symlink( UNICODE_STRING *name, SIZE_T max_name_len, SIZE_T *ret_len, NTSTATUS status )
 {
     static int enabled = -1;
 
@@ -4538,7 +4538,6 @@ static NTSTATUS resolve_drive_symlink( UNICODE_STRING *name, SIZE_T max_name_len
     SIZE_T required_length, symlink_len;
     WCHAR symlink[256];
     size_t offset = 0;
-    NTSTATUS status;
 
     if (enabled == -1)
     {
@@ -4546,8 +4545,14 @@ static NTSTATUS resolve_drive_symlink( UNICODE_STRING *name, SIZE_T max_name_len
 
         enabled = sgi && !strcmp(sgi, "284160");
     }
-    if (!enabled)
-        return STATUS_SUCCESS;
+    if (!enabled) return status;
+    if (status == STATUS_INFO_LENGTH_MISMATCH)
+    {
+        /* FIXME */
+        *ret_len += 64;
+        return status;
+    }
+    if (status) return status;
 
     if (name->Length < sizeof(dosprefixW) ||
             memcmp( name->Buffer, dosprefixW, sizeof(dosprefixW) ))
@@ -4569,14 +4574,13 @@ static NTSTATUS resolve_drive_symlink( UNICODE_STRING *name, SIZE_T max_name_len
     if (ret_len)
         *ret_len = sizeof(MEMORY_SECTION_NAME) + required_length;
     if (required_length > max_name_len)
-        return STATUS_BUFFER_OVERFLOW;
+        return STATUS_INFO_LENGTH_MISMATCH;
 
     memmove( name->Buffer + symlink_len, name->Buffer + offset, name->Length - offset * sizeof(WCHAR) );
     memcpy( name->Buffer, symlink, symlink_len * sizeof(WCHAR) );
     name->MaximumLength = required_length;
     name->Length = required_length - sizeof(WCHAR);
-    name->Buffer[name->Length] = 0;
-
+    name->Buffer[name->Length / sizeof(WCHAR)] = 0;
     return STATUS_SUCCESS;
 }
 
@@ -4609,9 +4613,7 @@ static NTSTATUS get_memory_section_name( HANDLE process, LPCVOID addr,
     }
     SERVER_END_REQ;
 
-    if (!status)
-        status = resolve_drive_symlink( &info->SectionFileName, len - sizeof(*info), ret_len );
-    return status;
+    return resolve_drive_symlink( &info->SectionFileName, len - sizeof(*info), ret_len, status );
 }
 
 
