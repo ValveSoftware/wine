@@ -2371,6 +2371,13 @@ static NTSTATUS gcrypt_extract_result_into_secret(gcry_sexp_t result, struct sec
         goto done;
     }
 
+    if (secret->data_len != size / 2)
+    {
+        ERR("Incorrect size %lu, secret->data_len %u.\n", size, secret->data_len);
+        status = STATUS_INTERNAL_ERROR;
+        goto done;
+    }
+
     tmp_buffer = malloc(size);
     if ((err = pgcry_mpi_print(GCRYMPI_FMT_STD, tmp_buffer, size, NULL, fullcoords)))
     {
@@ -2379,9 +2386,7 @@ static NTSTATUS gcrypt_extract_result_into_secret(gcry_sexp_t result, struct sec
         goto done;
     }
 
-    secret->data = malloc(size / 2);
     memcpy(secret->data, tmp_buffer + size % 2, size / 2);
-    secret->data_len = size / 2;
 
 done:
     free(tmp_buffer);
@@ -2559,6 +2564,12 @@ static NTSTATUS key_secret_agreement( void *args )
                 return STATUS_INTERNAL_ERROR;
             }
 
+            if (secret->data_len != key_size)
+            {
+                ERR("secret->data_len %u, expected %u.\n", secret->data_len, key_size);
+                return STATUS_INTERNAL_ERROR;
+            }
+
             status = gcrypt_extract_result_into_secret(xchg_result, secret);
 
             pgcry_sexp_release(xchg_result);
@@ -2568,14 +2579,6 @@ static NTSTATUS key_secret_agreement( void *args )
                 ERR("Failed to extract secret key.\n");
                 return status;
             }
-
-            if (secret->data_len != key_size)
-            {
-                ERR("got secret size %u, expected %u.\n", secret->data_len, key_size);
-                free(secret->data);
-                return STATUS_INTERNAL_ERROR;
-            }
-
             break;
         }
 #else
