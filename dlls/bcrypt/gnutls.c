@@ -2418,6 +2418,11 @@ static NTSTATUS key_secret_agreement( void *args )
             }
 
             key_length = priv_key->u.a.bitlen / 8;
+            if (secret->data_len != key_length)
+            {
+                ERR("secret->data_len %u, expected %u.\n", secret->data_len, key_length);
+                return STATUS_INTERNAL_ERROR;
+            }
 
             if (memcmp((BCRYPT_DH_KEY_BLOB *)priv_key->u.a.pubkey + 1,
                     peer_key->u.a.pubkey + sizeof(BCRYPT_DH_KEY_BLOB), key_length * 2))
@@ -2445,7 +2450,6 @@ static NTSTATUS key_secret_agreement( void *args )
             import_mpz(peer, peer_key->u.a.pubkey + sizeof(BCRYPT_DH_KEY_BLOB) + key_length * 2, key_length);
             pmpz_powm(k, peer, priv, p);
             export_mpz(secret->data, key_length, k);
-            secret->data_len = key_length;
 
             pmpz_clear(p);
             pmpz_clear(priv);
