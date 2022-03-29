@@ -2239,7 +2239,8 @@ NTSTATUS WINAPI BCryptSecretAgreement(BCRYPT_KEY_HANDLE privatekey, BCRYPT_KEY_H
     if (privkey->u.a.bitlen != pubkey->u.a.bitlen) return STATUS_INVALID_PARAMETER;
 
     if (!(secret = calloc( 1, sizeof(*secret) ))) return STATUS_NO_MEMORY;
-    if (!(secret->data = malloc( privkey->u.a.bitlen / 8 )))
+    secret->data_len = privkey->u.a.bitlen / 8;
+    if (!(secret->data = malloc( secret->data_len )))
     {
         free( secret );
         return STATUS_NO_MEMORY;
@@ -2251,8 +2252,8 @@ NTSTATUS WINAPI BCryptSecretAgreement(BCRYPT_KEY_HANDLE privatekey, BCRYPT_KEY_H
 
     if ((status = UNIX_CALL( key_secret_agreement, &params )))
     {
-        free( secret );
         free( secret->data );
+        free( secret );
     }
     else
     {
