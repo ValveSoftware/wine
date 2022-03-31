@@ -1,6 +1,6 @@
 EXTRADEFS = -DWINE_NO_LONG_TYPES
 MODULE    = qasf.dll
-IMPORTS   = strmbase dmoguids strmiids uuid ole32 oleaut32 kernelbase
+IMPORTS   = strmbase dmoguids strmiids uuid ole32 oleaut32
 
 C_SRCS = \
 	asfreader.c \
