@@ -1138,6 +1138,7 @@ BOOLEAN WINAPI GetUserNameExW(
 
             DWORD needed = GetEnvironmentVariableW(wineusernameW, NULL, 0);
             if (*nSize < needed) {
+                *nSize = needed;
                 SetLastError(ERROR_MORE_DATA);
                 return FALSE;
             }
