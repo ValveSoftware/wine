@@ -44,6 +44,7 @@
 #include "mtdll.h"
 #include "wine/asm.h"
 #include "wine/debug.h"
+#include "wine/asm.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(msvcrt);
 
@@ -855,12 +856,30 @@ static int msvcrt_flush_buffer(FILE* file)
 /*********************************************************************
  *		_isatty (MSVCRT.@)
  */
+#if defined(__x86_64__) && !defined(__arm64ec__)
+int CDECL MSVCRT__isatty(int fd)
+{
+    TRACE(":fd (%d)\n",fd);
+
+    return get_ioinfo_nolock(fd)->wxflag & WX_TTY;
+}
+__ASM_GLOBAL_FUNC( _isatty,
+        "sub $0x30,%rsp\n\t"
+        __ASM_SEH(".seh_stackalloc 0x30\n\t")
+        __ASM_SEH(".seh_endprologue\n\t")
+        "lea MSVCRT___pioinfo(%rip),%rdx\n\t"
+        "nop;nop;nop;nop;nop;nop;nop;nop;nop\n\t"
+        "add $0x30,%rsp\n\t"
+        "jmp " __ASM_NAME( "MSVCRT__isatty" ) )
+#else
 int CDECL _isatty(int fd)
 {
     TRACE(":fd (%d)\n",fd);
 
     return get_ioinfo_nolock(fd)->wxflag & WX_TTY;
 }
+#endif
+
 
 /* INTERNAL: Allocate stdio file buffer */
 static BOOL msvcrt_alloc_buffer(FILE* file)
