@@ -714,7 +714,10 @@ static BOOL process_attach(void)
     X11DRV_InitMouse( gdi_display );
     if (use_xim) use_xim = X11DRV_InitXIM( input_style );
 
-    fs_hack_init();
+    {
+        const char *e = getenv("WINE_DISABLE_FULLSCREEN_HACK");
+        if (!e || *e == '\0' || *e == '0') fs_hack_init();
+    }
 
     {
         const char *sgi = getenv("SteamGameId");
