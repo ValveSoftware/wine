@@ -368,15 +368,6 @@ static void fill_luid_property(VkPhysicalDeviceProperties2 *properties2)
             id->deviceNodeMask);
 }
 
-static void update_driver_version( VkPhysicalDeviceProperties *properties )
-{
-    if (properties->vendorID == 0x1002 && properties->deviceID == 0x163f)
-    {
-        /* AMD VANGOGH */
-        properties->driverVersion = VK_MAKE_VERSION(21, 20, 1);
-    }
-}
-
 void WINAPI vkGetPhysicalDeviceProperties(VkPhysicalDevice physical_device,
         VkPhysicalDeviceProperties *properties)
 {
@@ -399,7 +390,6 @@ void WINAPI vkGetPhysicalDeviceProperties(VkPhysicalDevice physical_device,
             }
         }
     }
-    update_driver_version(properties);
 }
 
 void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
@@ -425,7 +415,6 @@ void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
             }
         }
     }
-    update_driver_version(&properties2->properties);
 }
 
 void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
@@ -451,7 +440,6 @@ void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
             }
         }
     }
-    update_driver_version(&properties2->properties);
 }
 
 VkResult WINAPI vkGetCalibratedTimestampsEXT(VkDevice device, uint32_t timestampCount, const VkCalibratedTimestampInfoEXT *pTimestampInfos, uint64_t *pTimestamps, uint64_t *pMaxDeviation)
