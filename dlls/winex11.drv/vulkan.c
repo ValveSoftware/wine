@@ -962,14 +962,17 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
     else if (fs_hack_enabled(monitor))
     {
         double scale = fs_hack_get_user_to_real_scale( monitor );
+        RECT real_rect = fs_hack_real_mode(monitor);
         RECT client_rect;
 
         GetClientRect( hwnd, &client_rect );
 
+        TRACE("rect %s, scale %lf.\n", wine_dbgstr_rect(&client_rect), scale);
+
         if (real_sz)
         {
-            real_sz->width = (client_rect.right - client_rect.left) * scale;
-            real_sz->height = (client_rect.bottom - client_rect.top) * scale;
+            real_sz->width = real_rect.right - real_rect.left;
+            real_sz->height = real_rect.bottom - real_rect.top;
         }
 
         if (user_sz)
@@ -980,6 +983,8 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz, 
 
         if (dst_blit)
         {
+            /* FIXME: The non-fullscreen Windows are not scaled by fs_hack, so X window position and size
+             * is not scaled in this case. */
             dst_blit->offset.x = client_rect.left * scale;
             dst_blit->offset.y = client_rect.top * scale;
             dst_blit->extent.width = (client_rect.right - client_rect.left) * scale;
