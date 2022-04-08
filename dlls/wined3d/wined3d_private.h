@@ -2785,6 +2785,10 @@ struct wined3d
 BOOL wined3d_filter_messages(HWND window, BOOL filter);
 HRESULT wined3d_init(struct wined3d *wined3d, uint32_t flags);
 void wined3d_unregister_window(HWND window);
+BOOL wined3d_get_activate_processed(HWND window);
+void wined3d_set_activate_processed(HWND window, BOOL activate_processed);
+BOOL wined3d_get_inside_mode_change(HWND window);
+BOOL wined3d_set_inside_mode_change(HWND window, BOOL inside_mode_change);
 
 BOOL wined3d_get_app_name(char *app_name, unsigned int app_name_size);
 
