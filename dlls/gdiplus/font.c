@@ -1402,7 +1402,8 @@ static WCHAR *load_ttf_name_id( const BYTE *mem, DWORD_PTR size, DWORD id )
     header = (const tt_header*)mem;
     count = GET_BE_WORD(header->tables_no);
 
-    if (GET_BE_WORD(header->major_version) != 1 || GET_BE_WORD(header->minor_version) != 0)
+    if ((GET_BE_WORD(header->major_version) != 1 || GET_BE_WORD(header->minor_version) != 0)
+        && (GET_BE_WORD(header->major_version) != 0x4f54 || GET_BE_WORD(header->minor_version) != 0x544f))
         return NULL;
 
     pos = sizeof(*header);
