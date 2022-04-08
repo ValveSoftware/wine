@@ -36,6 +36,7 @@ struct wined3d_wndproc
     HWND window;
     BOOL unicode;
     BOOL filter;
+    BOOL activate_processed;
     WNDPROC proc;
     struct wined3d_device *device;
     uint32_t flags;
@@ -536,6 +537,38 @@ BOOL wined3d_filter_messages(HWND window, BOOL filter)
     return ret;
 }
 
+BOOL wined3d_get_activate_processed(HWND window)
+{
+    struct wined3d_wndproc *entry;
+    BOOL ret;
+
+    wined3d_wndproc_mutex_lock();
+
+    if (!(entry = wined3d_find_wndproc(window, NULL)))
+    {
+        wined3d_wndproc_mutex_unlock();
+        return FALSE;
+    }
+    ret = entry->activate_processed;
+    wined3d_wndproc_mutex_unlock();
+    return ret;
+}
+
+void wined3d_set_activate_processed(HWND window, BOOL activate_processed)
+{
+    struct wined3d_wndproc *entry;
+
+    wined3d_wndproc_mutex_lock();
+
+    if (!(entry = wined3d_find_wndproc(window, NULL)))
+    {
+        wined3d_wndproc_mutex_unlock();
+        return;
+    }
+    entry->activate_processed = activate_processed;
+    wined3d_wndproc_mutex_unlock();
+}
+
 static LRESULT CALLBACK wined3d_wndproc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
     struct wined3d_wndproc *entry;
@@ -672,6 +705,7 @@ BOOL CDECL wined3d_register_window(struct wined3d *wined3d, HWND window,
     entry->device = device;
     entry->wined3d = wined3d;
     entry->flags = flags;
+    entry->activate_processed = FALSE;
 
     wined3d_wndproc_mutex_unlock();
 
