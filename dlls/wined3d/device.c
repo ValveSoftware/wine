@@ -5369,6 +5369,11 @@ LRESULT device_process_message(struct wined3d_device *device, HWND window, BOOL 
                 DefWindowProcA(window, message, wparam, lparam);
         }
     }
+    else if (message == WM_SIZE)
+    {
+        if (!IsIconic(window))
+            PostMessageW(window, WM_ACTIVATEAPP, 1, GetCurrentThreadId());
+    }
 
     if (unicode)
         return CallWindowProcW(proc, window, message, wparam, lparam);
