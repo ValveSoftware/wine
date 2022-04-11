@@ -1293,7 +1293,6 @@ todo_wine
     ok(hr == MF_E_TRANSFORM_TYPE_NOT_SET, "Unexpected hr %#x.\n", hr);
 
     hr = IMFVideoProcessor_GetVideoProcessorCaps(processor, (GUID *)&DXVA2_VideoProcSoftwareDevice, &caps);
-todo_wine
     ok(hr == MF_E_TRANSFORM_TYPE_NOT_SET, "Unexpected hr %#x.\n", hr);
 
     hr = IMFTransform_GetInputCurrentType(transform, 0, &media_type);
@@ -1325,6 +1324,9 @@ todo_wine
     ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
     ok(count > 0 && !!guids, "Unexpected modes data.\n");
     CoTaskMemFree(guids);
+
+    hr = IMFVideoProcessor_GetVideoProcessorCaps(processor, (GUID *)&DXVA2_VideoProcSoftwareDevice, &caps);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
     hr = IMFTransform_GetOutputCurrentType(transform, 0, &media_type2);
     ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
