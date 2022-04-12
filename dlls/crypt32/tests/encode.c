@@ -8497,7 +8497,7 @@ static void test_encodeOCSPRequestInfo(DWORD dwEncoding)
 
     size = 0;
     SetLastError(0xdeadbeef);
-    ret = pCryptEncodeObjectEx(dwEncoding, OCSP_REQUEST, &info, CRYPT_ENCODE_ALLOC_FLAG, NULL, &buf, &size);
+    ret = CryptEncodeObjectEx(dwEncoding, OCSP_REQUEST, &info, CRYPT_ENCODE_ALLOC_FLAG, NULL, &buf, &size);
     ok(ret, "got %08lx\n", GetLastError());
     ok(size == sizeof(expected), "got %lu\n", size);
     ok(!memcmp(buf, expected, sizeof(expected)), "unexpected value\n");
@@ -8508,7 +8508,7 @@ static void test_encodeOCSPRequestInfo(DWORD dwEncoding)
     info_signed.pOptionalSignatureInfo = NULL;
     size = 0;
     SetLastError(0xdeadbeef);
-    ret = pCryptEncodeObjectEx(dwEncoding, OCSP_SIGNED_REQUEST, &info_signed, CRYPT_ENCODE_ALLOC_FLAG, NULL,
+    ret = CryptEncodeObjectEx(dwEncoding, OCSP_SIGNED_REQUEST, &info_signed, CRYPT_ENCODE_ALLOC_FLAG, NULL,
                                &buf2, &size);
     ok(ret, "got %08lx\n", GetLastError());
     ok(size == sizeof(expected4), "got %lu\n", size);
@@ -8528,7 +8528,7 @@ static void test_encodeOCSPRequestInfo(DWORD dwEncoding)
 
     size = 0;
     SetLastError(0xdeadbeef);
-    ret = pCryptEncodeObjectEx(dwEncoding, OCSP_REQUEST, &info, CRYPT_ENCODE_ALLOC_FLAG, NULL, &buf, &size);
+    ret = CryptEncodeObjectEx(dwEncoding, OCSP_REQUEST, &info, CRYPT_ENCODE_ALLOC_FLAG, NULL, &buf, &size);
     ok(ret, "got %08lx\n", GetLastError());
     ok(size == sizeof(expected2), "got %lu\n", size);
     ok(!memcmp(buf, expected2, sizeof(expected2)), "unexpected value\n");
@@ -8538,7 +8538,7 @@ static void test_encodeOCSPRequestInfo(DWORD dwEncoding)
     info.pRequestorName = NULL;
     size = 0;
     SetLastError(0xdeadbeef);
-    ret = pCryptEncodeObjectEx(dwEncoding, OCSP_REQUEST, &info, CRYPT_ENCODE_ALLOC_FLAG, NULL, &buf, &size);
+    ret = CryptEncodeObjectEx(dwEncoding, OCSP_REQUEST, &info, CRYPT_ENCODE_ALLOC_FLAG, NULL, &buf, &size);
     ok(ret, "got %08lx\n", GetLastError());
     ok(size == sizeof(expected3), "got %lu\n", size);
     ok(!memcmp(buf, expected3, sizeof(expected3)), "unexpected value\n");
@@ -8598,7 +8598,7 @@ static void test_decodeOCSPResponseInfo(DWORD dwEncoding)
     DWORD size;
     BOOL ret;
 
-    ret = pCryptDecodeObjectEx(dwEncoding, OCSP_RESPONSE, ocsp_response, sizeof(ocsp_response),
+    ret = CryptDecodeObjectEx(dwEncoding, OCSP_RESPONSE, ocsp_response, sizeof(ocsp_response),
                                CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
     ok(ret, "got %08lx\n", GetLastError());
     ok(info->dwStatus == OCSP_UNAUTHORIZED_RESPONSE, "got %lu\n", info->dwStatus);
@@ -8607,7 +8607,7 @@ static void test_decodeOCSPResponseInfo(DWORD dwEncoding)
     ok(info->Value.pbData == NULL, "got %p\n", info->Value.pbData);
     LocalFree(info);
 
-    ret = pCryptDecodeObjectEx(dwEncoding, OCSP_RESPONSE, ocsp_response2, sizeof(ocsp_response2),
+    ret = CryptDecodeObjectEx(dwEncoding, OCSP_RESPONSE, ocsp_response2, sizeof(ocsp_response2),
                                CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
     ok(ret, "got %08lx\n", GetLastError());
     ok(info->dwStatus == OCSP_SUCCESSFUL_RESPONSE, "got %lu\n", info->dwStatus);
@@ -8724,7 +8724,7 @@ static void test_decodeOCSPBasicSignedResponseInfo(DWORD dwEncoding)
     BOOL ret;
 
     size = 0;
-    ret = pCryptDecodeObjectEx(dwEncoding, OCSP_BASIC_SIGNED_RESPONSE, ocsp_basic_signed_response,
+    ret = CryptDecodeObjectEx(dwEncoding, OCSP_BASIC_SIGNED_RESPONSE, ocsp_basic_signed_response,
                                sizeof(ocsp_basic_signed_response), CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
     ok(ret, "got %08lx\n", GetLastError());
     if (sizeof(void *) == 4) todo_wine ok(size == 496, "got %lu\n", size);
@@ -8783,8 +8783,8 @@ static void test_decodeOCSPBasicResponseInfo(DWORD dwEncoding)
 
     /* good cert */
     size = 0;
-    ret = pCryptDecodeObjectEx(dwEncoding, OCSP_BASIC_RESPONSE, ocsp_basic_response,
-                               sizeof(ocsp_basic_response), CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
+    ret = CryptDecodeObjectEx(dwEncoding, OCSP_BASIC_RESPONSE, ocsp_basic_response,
+                              sizeof(ocsp_basic_response), CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
     ok(ret, "got %08lx\n", GetLastError());
 
     ok(!info->dwVersion, "got %lu\n", info->dwVersion);
@@ -8822,8 +8822,8 @@ static void test_decodeOCSPBasicResponseInfo(DWORD dwEncoding)
 
     /* revoked cert */
     size = 0;
-    ret = pCryptDecodeObjectEx(dwEncoding, OCSP_BASIC_RESPONSE, ocsp_basic_response_revoked,
-                               sizeof(ocsp_basic_response_revoked), CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
+    ret = CryptDecodeObjectEx(dwEncoding, OCSP_BASIC_RESPONSE, ocsp_basic_response_revoked,
+                              sizeof(ocsp_basic_response_revoked), CRYPT_DECODE_ALLOC_FLAG, NULL, &info, &size);
     todo_wine ok(ret, "got %08lx\n", GetLastError());
 
     if (ret) {
