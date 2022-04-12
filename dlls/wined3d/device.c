@@ -5923,12 +5923,8 @@ LRESULT device_process_message(struct wined3d_device *device, HWND window, BOOL 
          * (e.g. Deus Ex: GOTY) to destroy the device, so take care to
          * deactivate the implicit swapchain last, and to avoid accessing the
          * "device" pointer afterwards. */
-        if (!wparam || !wined3d_get_activate_processed(window))
-        {
-            wined3d_set_activate_processed(window, !!wparam);
-            while (i--)
-                wined3d_swapchain_activate(device->swapchains[i], wparam);
-        }
+        while (i--)
+            wined3d_swapchain_activate(device->swapchains[i], wparam);
     }
     else if (message == WM_SYSCOMMAND)
     {
