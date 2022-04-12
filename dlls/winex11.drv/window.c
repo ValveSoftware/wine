@@ -1246,8 +1246,7 @@ void update_net_wm_states( struct x11drv_win_data *data )
 
             if(i == NET_WM_STATE_FULLSCREEN)
             {
-                data->pending_fullscreen = (new_state & (1 << i))
-                                            && !(data->net_wm_state & (1 << NET_WM_STATE_FULLSCREEN));
+                data->pending_fullscreen = (new_state & (1 << i)) != 0;
                 TRACE("set pending_fullscreen to: %u\n", data->pending_fullscreen);
             }
 
