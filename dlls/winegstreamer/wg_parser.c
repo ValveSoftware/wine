@@ -70,6 +70,7 @@ struct wg_parser
 
     guint64 file_size, start_offset, next_offset, stop_offset;
     guint64 next_pull_offset;
+    gchar *uri;
 
     pthread_t push_thread;
 
@@ -1919,12 +1920,31 @@ static gchar *query_language(GstPad *pad)
     return ret;
 }
 
-static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
+static void wg_parser_create_my_src(struct wg_parser *parser)
 {
     GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("wine_src",
             GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS_ANY);
 
+    parser->my_src = gst_pad_new_from_static_template(&src_template, "wine-src");
+    gst_pad_set_getrange_function(parser->my_src, src_getrange_cb);
+    gst_pad_set_query_function(parser->my_src, src_query_cb);
+    gst_pad_set_activatemode_function(parser->my_src, src_activate_mode_cb);
+    gst_pad_set_event_function(parser->my_src, src_event_cb);
+    gst_pad_set_element_private(parser->my_src, parser);
+}
+
+static HRESULT wg_parser_connect_inner(struct wg_parser *parser, const WCHAR *uri)
+{
     parser->sink_connected = true;
+    if (uri)
+    {
+        parser->uri = malloc(wcslen(uri) * 3 + 1);
+        ntdll_wcstoumbs(uri, wcslen(uri) + 1, parser->uri, wcslen(uri) * 3 + 1, FALSE);
+    }
+    else
+    {
+        parser->uri = NULL;
+    }
 
     if (!parser->bus)
     {
@@ -1934,13 +1954,6 @@ static HRESULT wg_parser_connect_inner(struct wg_parser *parser)
 
     parser->container = gst_bin_new(NULL);
     gst_element_set_bus(parser->container, parser->bus);
-
-    parser->my_src = gst_pad_new_from_static_template(&src_template, "wine-src");
-    gst_pad_set_getrange_function(parser->my_src, src_getrange_cb);
-    gst_pad_set_query_function(parser->my_src, src_query_cb);
-    gst_pad_set_activatemode_function(parser->my_src, src_activate_mode_cb);
-    gst_pad_set_event_function(parser->my_src, src_event_cb);
-    gst_pad_set_element_private(parser->my_src, parser);
 
     parser->start_offset = parser->next_offset = parser->stop_offset = 0;
     parser->next_pull_offset = 0;
@@ -1961,14 +1974,14 @@ static NTSTATUS wg_parser_connect(void *args)
     parser->seekable = true;
     parser->file_size = params->file_size;
 
-    if ((hr = wg_parser_connect_inner(parser)))
+    if ((hr = wg_parser_connect_inner(parser, params->uri)))
         return hr;
 
     if (!parser->init_gst(parser))
         goto out;
 
     gst_element_set_state(parser->container, GST_STATE_PAUSED);
-    if (!parser->pull_mode)
+    if (!parser->pull_mode && parser->my_src)
         gst_pad_set_active(parser->my_src, 1);
     ret = gst_element_get_state(parser->container, NULL, NULL, -1);
 
@@ -2126,7 +2139,7 @@ static NTSTATUS wg_parser_connect_unseekable(void *args)
     /* since typefind is not available here, we must have an input_format */
     parser->input_format = *in_format;
 
-    if ((hr = wg_parser_connect_inner(parser)))
+    if ((hr = wg_parser_connect_inner(parser, NULL)))
         return hr;
 
     parser->stop_offset = -1;
@@ -2172,9 +2185,12 @@ static NTSTATUS wg_parser_disconnect(void *args)
     gst_element_set_state(parser->container, GST_STATE_NULL);
     if (!parser->pull_mode)
         gst_pad_set_active(parser->my_src, 0);
-    gst_pad_unlink(parser->my_src, parser->their_sink);
-    gst_object_unref(parser->my_src);
-    gst_object_unref(parser->their_sink);
+    if (parser->my_src && parser->their_sink)
+        gst_pad_unlink(parser->my_src, parser->their_sink);
+    if (parser->my_src)
+        gst_object_unref(parser->my_src);
+    if (parser->their_sink)
+        gst_object_unref(parser->their_sink);
     parser->my_src = parser->their_sink = NULL;
 
     pthread_mutex_lock(&parser->mutex);
@@ -2229,11 +2245,41 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     parser->no_more_pads = false;
     pthread_mutex_unlock(&parser->mutex);
 
+    wg_parser_create_my_src(parser);
+
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
         GST_ERROR("Failed to link pads, error %d.\n", ret);
         return FALSE;
     }
+
+    return TRUE;
+}
+
+static BOOL uridecodebin_parser_init_gst(struct wg_parser *parser)
+{
+    GstElement *element;
+
+    if (!(element = create_element("uridecodebin", "base")))
+        return FALSE;
+
+    gst_bin_add(GST_BIN(parser->container), element);
+    parser->decodebin = element;
+
+    if (parser->unlimited_buffering)
+    {
+        g_object_set(parser->decodebin, "buffer-duration", G_MAXINT64, NULL);
+        g_object_set(parser->decodebin, "buffer-size", G_MAXINT, NULL);
+    }
+    g_object_set(parser->decodebin, "uri", parser->uri, NULL);
+
+    parser->no_more_pads = false;
+
+    g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), parser);
+    g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
+    g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
+    g_signal_connect(element, "autoplug-sort", G_CALLBACK(autoplug_sort_cb), parser);
+    g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
 
     return TRUE;
 }
@@ -2258,6 +2304,8 @@ static BOOL avi_parser_init_gst(struct wg_parser *parser)
     parser->no_more_pads = false;
     pthread_mutex_unlock(&parser->mutex);
 
+    wg_parser_create_my_src(parser);
+
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
         GST_ERROR("Failed to link pads, error %d.\n", ret);
@@ -2278,6 +2326,7 @@ static BOOL mpeg_audio_parser_init_gst(struct wg_parser *parser)
 
     gst_bin_add(GST_BIN(parser->container), element);
 
+    wg_parser_create_my_src(parser);
     parser->their_sink = gst_element_get_static_pad(element, "sink");
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
@@ -2312,6 +2361,7 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
 
     gst_bin_add(GST_BIN(parser->container), element);
 
+    wg_parser_create_my_src(parser);
     parser->their_sink = gst_element_get_static_pad(element, "sink");
     if ((ret = gst_pad_link(parser->my_src, parser->their_sink)) < 0)
     {
@@ -2507,6 +2557,7 @@ static NTSTATUS wg_parser_create(void *args)
         [WG_PARSER_WAVPARSE] = wave_parser_init_gst,
         [WG_PARSER_AUDIOCONV] = audio_convert_init_gst,
         [WG_PARSER_VIDEOCONV] = video_convert_init_gst,
+        [WG_PARSER_URIDECODEBIN] = uridecodebin_parser_init_gst,
     };
 
     struct wg_parser_create_params *params = args;
@@ -2545,6 +2596,7 @@ static NTSTATUS wg_parser_destroy(void *args)
     pthread_cond_destroy(&parser->read_cond);
     pthread_cond_destroy(&parser->read_done_cond);
 
+    free(parser->uri);
     free(parser);
     return S_OK;
 }
