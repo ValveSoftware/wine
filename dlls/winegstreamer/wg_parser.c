@@ -228,6 +228,7 @@ static NTSTATUS wg_parser_stream_enable(void *args)
                 case WG_VIDEO_FORMAT_BGRA:
                 case WG_VIDEO_FORMAT_BGRx:
                 case WG_VIDEO_FORMAT_BGR:
+                case WG_VIDEO_FORMAT_RGBA:
                 case WG_VIDEO_FORMAT_RGB15:
                 case WG_VIDEO_FORMAT_RGB16:
                     flip = !flip;
