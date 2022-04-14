@@ -1692,7 +1692,7 @@ static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader
         return hr;
     }
 
-    if (FAILED(hr = IMFVideoSampleAllocatorEx_InitializeSampleAllocatorEx(stream->allocator, 2, 8, NULL, stream->current)))
+    if (FAILED(hr = IMFVideoSampleAllocatorEx_InitializeSampleAllocatorEx(stream->allocator, 2, 8, reader->attributes, stream->current)))
         WARN("Failed to initialize sample allocator, hr %#x.\n", hr);
 
     if (SUCCEEDED(IMFVideoSampleAllocatorEx_QueryInterface(stream->allocator, &IID_IMFVideoSampleAllocatorCallback, (void **)&callback)))
