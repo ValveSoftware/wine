@@ -3574,7 +3574,7 @@ static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
 static int get_shared_resource_fd(HANDLE shared_resource)
 {
     IO_STATUS_BLOCK iosb;
-    HANDLE unix_resource;
+    obj_handle_t unix_resource;
     NTSTATUS status;
     int ret;
 
@@ -3582,10 +3582,8 @@ static int get_shared_resource_fd(HANDLE shared_resource)
             NULL, 0, &unix_resource, sizeof(unix_resource)))
         return -1;
 
-    status = wine_server_handle_to_fd(unix_resource, FILE_READ_DATA, &ret, NULL);
-
-    NtClose(unix_resource);
-
+    status = wine_server_handle_to_fd(wine_server_ptr_handle(unix_resource), FILE_READ_DATA, &ret, NULL);
+    NtClose(wine_server_ptr_handle(unix_resource));
     return status == STATUS_SUCCESS ? ret : -1;
 }
 
