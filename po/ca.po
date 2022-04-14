@@ -4001,7 +4001,7 @@ msgid "Cannot modify non-writable property '|'"
 msgstr "No es pot modificar la propietat no escrivible '|'"
 
 #: dlls/jscript/jscript.rc:77
-msgid "'this' is not a Map object"
+msgid "'this' is not a | object"
 msgstr "'this' no és un objecte de Map"
 
 #: dlls/jscript/jscript.rc:78
