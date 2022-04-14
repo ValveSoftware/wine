@@ -27,6 +27,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
+DEFINE_MEDIATYPE_GUID(MFVideoFormat_ABGR32, D3DFMT_A8B8G8R8);
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_IMC1, MAKEFOURCC('I','M','C','1'));
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_IMC2, MAKEFOURCC('I','M','C','2'));
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_IMC3, MAKEFOURCC('I','M','C','3'));
@@ -2633,6 +2634,7 @@ static const struct uncompressed_video_format video_formats[] =
     { &MFVideoFormat_RGB565,        2, 3, 1, 0 },
     { &MFVideoFormat_RGB555,        2, 3, 1, 0 },
     { &MFVideoFormat_A2R10G10B10,   4, 3, 1, 0 },
+    { &MFVideoFormat_ABGR32,        4, 3, 1, 0 },
     { &MFVideoFormat_RGB8,          1, 3, 1, 0 },
     { &MFVideoFormat_L8,            1, 3, 1, 0 },
     { &MFVideoFormat_AYUV,          4, 3, 0, 1 },
@@ -3441,6 +3443,8 @@ DXGI_FORMAT WINAPI MFMapDX9FormatToDXGIFormat(DWORD format)
             return DXGI_FORMAT_P8;
         case D3DFMT_A8P8:
             return DXGI_FORMAT_A8P8;
+        case D3DFMT_A8B8G8R8:
+            return DXGI_FORMAT_R8G8B8A8_UNORM;
         default:
             return DXGI_FORMAT_UNKNOWN;
     }
