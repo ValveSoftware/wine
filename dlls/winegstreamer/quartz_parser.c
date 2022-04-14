@@ -250,6 +250,7 @@ unsigned int wg_format_get_max_size(const struct wg_format *format)
 
             switch (format->u.video.format)
             {
+                case WG_VIDEO_FORMAT_RGBA:
                 case WG_VIDEO_FORMAT_BGRA:
                 case WG_VIDEO_FORMAT_BGRx:
                 case WG_VIDEO_FORMAT_AYUV:
