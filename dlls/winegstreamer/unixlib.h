@@ -55,6 +55,7 @@ struct wg_format
                 WG_VIDEO_FORMAT_BGRA,
                 WG_VIDEO_FORMAT_BGRx,
                 WG_VIDEO_FORMAT_BGR,
+                WG_VIDEO_FORMAT_RGBA,
                 WG_VIDEO_FORMAT_RGB15,
                 WG_VIDEO_FORMAT_RGB16,
 
