@@ -4096,7 +4096,7 @@ msgstr ""
 #: dlls/jscript/jscript.rc:77
 #, fuzzy
 #| msgid "'[object]' is not a date object"
-msgid "'this' is not a Map object"
+msgid "'this' is not a | object"
 msgstr "'[oggetto]' non è un oggetto data"
 
 #: dlls/jscript/jscript.rc:78
