@@ -136,6 +136,13 @@ struct shared_resource_open
     WCHAR name[1];
 };
 
+static unsigned int kmt_to_index(obj_handle_t kmt)
+{
+    if (!(kmt & 0x40000000) || (kmt - 2) % 4)
+        return -1;
+    return (((unsigned int) kmt & ~0x40000000) - 2) / 4;
+}
+
 static NTSTATUS shared_resource_open(struct shared_resource **res, void *buff, SIZE_T insize, IO_STATUS_BLOCK *iosb)
 {
     struct shared_resource_open *input = buff;
@@ -144,22 +151,18 @@ static NTSTATUS shared_resource_open(struct shared_resource **res, void *buff, S
     if (insize < sizeof(*input))
         return STATUS_INFO_LENGTH_MISMATCH;
 
-    if (input->name[ ((insize - offsetof(struct shared_resource_open, name)) / sizeof(WCHAR)) - 1 ])
-        return STATUS_INVALID_PARAMETER;
-
-    if (insize == sizeof(*input))
+    if (input->kmt_handle)
     {
-        /* KMT lookup */
-        if (!input->kmt_handle)
+        if (kmt_to_index(input->kmt_handle) >= resource_pool_size)
             return STATUS_INVALID_HANDLE;
 
-        if ((input->kmt_handle - 1) >= resource_pool_size)
-            return STATUS_INVALID_HANDLE;
-
-        *res = &resource_pool[input->kmt_handle - 1];
+        *res = &resource_pool[kmt_to_index(input->kmt_handle)];
     }
     else
     {
+        if (input->name[ ((insize - offsetof(struct shared_resource_open, name)) / sizeof(WCHAR)) - 1 ])
+            return STATUS_INVALID_PARAMETER;
+
         /* name lookup */
         for (i = 0; i < resource_pool_size; i++)
         {
@@ -181,12 +184,17 @@ static NTSTATUS shared_resource_open(struct shared_resource **res, void *buff, S
 
 #define IOCTL_SHARED_GPU_RESOURCE_GETKMT           CTL_CODE(FILE_DEVICE_VIDEO, 2, METHOD_BUFFERED, FILE_READ_ACCESS)
 
+static obj_handle_t index_to_kmt(unsigned int idx)
+{
+    return (idx * 4 + 2) | 0x40000000;
+}
+
 static NTSTATUS shared_resource_getkmt(struct shared_resource *res, void *buff, SIZE_T outsize, IO_STATUS_BLOCK *iosb)
 {
     if (outsize < sizeof(unsigned int))
         return STATUS_INFO_LENGTH_MISMATCH;
 
-    *((unsigned int *)buff) = (res - resource_pool) + 1;
+    *((unsigned int *)buff) = index_to_kmt(res - resource_pool);
 
     iosb->Information = sizeof(unsigned int);
     return STATUS_SUCCESS;
