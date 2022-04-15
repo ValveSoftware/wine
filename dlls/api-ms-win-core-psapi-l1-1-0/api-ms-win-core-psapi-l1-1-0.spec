@@ -2,10 +2,12 @@
 @ stdcall K32EnumDeviceDrivers(ptr long ptr) kernel32.K32EnumDeviceDrivers
 @ stdcall K32EnumPageFilesW(ptr ptr) kernel32.K32EnumPageFilesW
 @ stdcall K32EnumProcesses(ptr long ptr) kernel32.K32EnumProcesses
+@ stdcall K32EnumProcessModulesEx(long ptr long ptr long) kernel32.K32EnumProcessModulesEx
 @ stdcall K32GetDeviceDriverBaseNameW(ptr ptr long) kernel32.K32GetDeviceDriverBaseNameW
 @ stdcall K32GetDeviceDriverFileNameW(ptr ptr long) kernel32.K32GetDeviceDriverFileNameW
 @ stdcall K32GetMappedFileNameW(long ptr ptr long) kernel32.K32GetMappedFileNameW
 @ stdcall K32GetModuleBaseNameW(long long ptr long) kernel32.K32GetModuleBaseNameW
+@ stdcall K32GetModuleFileNameExW(long long ptr long) kernel32.K32GetModuleFileNameExW
 @ stdcall K32GetModuleInformation(long long ptr long) kernel32.K32GetModuleInformation
 @ stdcall K32GetPerformanceInfo(ptr long) kernel32.K32GetPerformanceInfo
 @ stdcall K32GetProcessImageFileNameW(long ptr long) kernel32.K32GetProcessImageFileNameW
