@@ -16,6 +16,7 @@ C_SRCS = \
 	quartz_parser.c \
 	quartz_transform.c \
 	resampler.c \
+	scheme_handler.c \
 	wg_allocator.c \
 	wg_format.c \
 	wg_parser.c \

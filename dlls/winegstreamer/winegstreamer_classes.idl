@@ -104,3 +104,10 @@ coclass CResamplerMediaObject {}
     uuid(98230571-0087-4204-b020-3282538e57d3)
 ]
 coclass CColorConvertDMO {}
+
+[
+    helpstring("GStreamer scheme handler"),
+    threading(both),
+    uuid(587eeb6a-7336-4ebd-a4f2-91c948de622c)
+]
+coclass GStreamerSchemePlugin { }

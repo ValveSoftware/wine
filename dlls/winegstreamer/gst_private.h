@@ -142,9 +142,11 @@ HRESULT wg_transform_read_mf(struct wg_transform *transform, struct wg_sample *s
 HRESULT wg_transform_read_quartz(struct wg_transform *transform, struct wg_sample *sample);
 
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj);
+HRESULT winegstreamer_create_media_source_from_uri(const WCHAR *uri, IUnknown **out_media_source) DECLSPEC_HIDDEN;
 
 HRESULT aac_decoder_create(REFIID riid, void **ret);
 HRESULT h264_decoder_create(REFIID riid, void **ret);
+HRESULT gstreamer_scheme_handler_construct(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
 struct wm_stream
 {
