@@ -107,6 +107,11 @@ BOOL is_logitech_g920(WORD vid, WORD pid)
     return vid == 0x046D && pid == 0xC262;
 }
 
+BOOL is_thrustmaster_rudder_pedals(WORD vid, WORD pid)
+{
+    return vid == 0x044F && pid == 0xB679;
+}
+
 struct mouse_device
 {
     struct unix_device unix_device;
