@@ -508,6 +508,17 @@ static BOOL find_opened_device(const WCHAR *device_path, int *free_slot)
         if (!controllers[i - 1].device) *free_slot = i - 1;
         else if (!wcsicmp(device_path, controllers[i - 1].device_path)) return TRUE;
     }
+
+    /* CW-Bug-Id: #20528 Keep steam virtual controller ordered, swap existing controllers out of the slot */
+    if ((swscanf(device_path, L"\\\\?\\hid#vid_045e&pid_028e&xi_%02x#", &i) == 1 ||
+         swscanf(device_path, L"\\\\?\\HID#VID_045E&PID_028E&XI_%02X#", &i) == 1) &&
+        i > 0 && i <= XUSER_MAX_COUNT && *free_slot != i - 1)
+    {
+        controller_destroy(&controllers[i - 1], TRUE);
+        if (*free_slot != XUSER_MAX_COUNT) open_device_at_index(controllers[i - 1].device_path, *free_slot);
+        *free_slot = i - 1;
+    }
+
     return FALSE;
 }
 
