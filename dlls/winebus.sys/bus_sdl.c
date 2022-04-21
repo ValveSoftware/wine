@@ -978,6 +978,10 @@ static void sdl_add_device(unsigned int index)
     else str = pSDL_JoystickName(joystick);
     if (str) ntdll_umbstowcs(str, strlen(str) + 1, desc.product, ARRAY_SIZE(desc.product));
 
+    /* CW-Bug-Id: #20528 Check steam virtual controller indexes to keep them ordered */
+    if ((str = pSDL_JoystickName(joystick)) && sscanf(str, "Microsoft X-Box 360 pad %u", &desc.input) == 1) desc.input++;
+    else desc.input = -1;
+
     id = pSDL_JoystickInstanceID(joystick);
     guid = pSDL_JoystickGetGUID(joystick);
     pSDL_JoystickGetGUIDString(guid, guid_str, sizeof(guid_str));
