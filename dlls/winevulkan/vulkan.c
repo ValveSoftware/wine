@@ -288,6 +288,14 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
                     VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
             host_properties[i].specVersion = VK_KHR_EXTERNAL_MEMORY_WIN32_SPEC_VERSION;
         }
+        if (!strcmp(host_properties[i].extensionName, "VK_KHR_external_semaphore_fd"))
+        {
+            TRACE("Substituting VK_KHR_external_semaphore_fd for VK_KHR_external_semaphore_win32\n");
+
+            snprintf(host_properties[i].extensionName, sizeof(host_properties[i].extensionName),
+                    VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
+            host_properties[i].specVersion = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_SPEC_VERSION;
+        }
 
         if (wine_vk_device_extension_supported(host_properties[i].extensionName))
         {
@@ -490,7 +498,7 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
 
         if (!strcmp(extension_name, wine_xr_extension_name))
             append_xr = 1;
-        else if (!strcmp(extension_name, "VK_KHR_external_memory_win32"))
+        else if (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32") || !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_semaphore_win32"))
             replace_win32 = 1;
     }
 
@@ -514,6 +522,8 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
                 continue;
             if (replace_win32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
                 new_extensions[o++] = "VK_KHR_external_memory_fd";
+            else if (replace_win32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_semaphore_win32"))
+                new_extensions[o++] = "VK_KHR_external_semaphore_fd";
             else
                 new_extensions[o++] = src->ppEnabledExtensionNames[i];
         }
@@ -1649,22 +1659,69 @@ VkResult wine_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice ha
     return res;
 }
 
-void wine_vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice phys_dev,
+static inline void wine_vk_normalize_semaphore_handle_types_win(VkExternalSemaphoreHandleTypeFlags *types)
+{
+    *types &=
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT |
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT |
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT;
+}
+
+static inline void wine_vk_normalize_semaphore_handle_types_host(VkExternalSemaphoreHandleTypeFlags *types)
+{
+    *types &=
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT |
+        VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_SYNC_FD_BIT;
+}
+
+static void wine_vk_get_physical_device_external_semaphore_properties(struct wine_phys_dev *phys_dev,
+    void (*p_vkGetPhysicalDeviceExternalSemaphoreProperties)(VkPhysicalDevice, const VkPhysicalDeviceExternalSemaphoreInfo *, VkExternalSemaphoreProperties *),
+    const VkPhysicalDeviceExternalSemaphoreInfo *semaphore_info, VkExternalSemaphoreProperties *properties)
+{
+    VkPhysicalDeviceExternalSemaphoreInfo semaphore_info_dup = *semaphore_info;
+
+    wine_vk_normalize_semaphore_handle_types_win(&semaphore_info_dup.handleType);
+    if (semaphore_info_dup.handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+        semaphore_info_dup.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+    wine_vk_normalize_semaphore_handle_types_host(&semaphore_info_dup.handleType);
+
+    if (semaphore_info->handleType && !semaphore_info_dup.handleType)
+    {
+        properties->exportFromImportedHandleTypes = 0;
+        properties->compatibleHandleTypes = 0;
+        properties->externalSemaphoreFeatures = 0;
+        return;
+    }
+
+    p_vkGetPhysicalDeviceExternalSemaphoreProperties(phys_dev->host_physical_device, &semaphore_info_dup, properties);
+
+    if (properties->exportFromImportedHandleTypes & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT)
+        properties->exportFromImportedHandleTypes |= VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    wine_vk_normalize_semaphore_handle_types_win(&properties->exportFromImportedHandleTypes);
+
+    if (properties->compatibleHandleTypes & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT)
+        properties->compatibleHandleTypes |= VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT;
+    wine_vk_normalize_semaphore_handle_types_win(&properties->compatibleHandleTypes);
+}
+
+void wine_vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice phys_dev_handle,
                                                          const VkPhysicalDeviceExternalSemaphoreInfo *info,
                                                          VkExternalSemaphoreProperties *properties)
 {
-    properties->exportFromImportedHandleTypes = 0;
-    properties->compatibleHandleTypes = 0;
-    properties->externalSemaphoreFeatures = 0;
+    struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(phys_dev_handle);
+
+    TRACE("%p, %p, %p\n", phys_dev, info, properties);
+    wine_vk_get_physical_device_external_semaphore_properties(phys_dev, phys_dev->instance->funcs.p_vkGetPhysicalDeviceExternalSemaphoreProperties, info, properties);
 }
 
-void wine_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice phys_dev,
+void wine_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice phys_dev_handle,
                                                             const VkPhysicalDeviceExternalSemaphoreInfo *info,
                                                             VkExternalSemaphoreProperties *properties)
 {
-    properties->exportFromImportedHandleTypes = 0;
-    properties->compatibleHandleTypes = 0;
-    properties->externalSemaphoreFeatures = 0;
+    struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(phys_dev_handle);
+
+    TRACE("%p, %p, %p\n", phys_dev, info, properties);
+    wine_vk_get_physical_device_external_semaphore_properties(phys_dev, phys_dev->instance->funcs.p_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR, info, properties);
 }
 
 /*
@@ -3434,6 +3491,10 @@ NTSTATUS vk_is_available_device_function(void *arg)
     struct wine_device *device = wine_device_from_handle(params->device);
     if (!strcmp(params->name, "vkGetMemoryWin32HandleKHR") || !strcmp(params->name, "vkGetMemoryWin32HandlePropertiesKHR"))
         params->name = "vkGetMemoryFdKHR";
+    else if (!strcmp(params->name, "vkGetSemaphoreWin32HandleKHR"))
+        params->name = "vkGetSemaphoreFdKHR";
+    else if (!strcmp(params->name, "vkImportSemaphoreWin32HandleKHR"))
+        params->name = "vkImportSemaphoreFdKHR";
     return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, params->name);
 }
 
@@ -3461,6 +3522,10 @@ NTSTATUS vk_is_available_device_function32(void *arg)
     char *name = UlongToPtr(params->name);
     if (!strcmp(name, "vkGetMemoryWin32HandleKHR") || !strcmp(name, "vkGetMemoryWin32HandlePropertiesKHR"))
         return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, "vkGetMemoryFdKHR");
+    if (!strcmp(name, "vkGetSemaphoreWin32HandleKHR"))
+        return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, "vkGetSemaphoreFdKHR");
+    if (!strcmp(name, "vkImportSemaphoreWin32HandleKHR"))
+        return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, "vkImportSemaphoreFdKHR");
     return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, UlongToPtr(params->name));
 }
 
@@ -3545,4 +3610,97 @@ VkResult wine_vkGetMemoryWin32HandlePropertiesKHR(VkDevice device, VkExternalMem
     /* VUID-vkGetMemoryWin32HandlePropertiesKHR-handleType-00666
        handleType must not be one of the handle types defined as opaque */
     return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+}
+
+
+VkResult wine_vkCreateSemaphore(VkDevice device_handle, const VkSemaphoreCreateInfo *create_info,
+        const VkAllocationCallbacks *allocator, VkSemaphore *semaphore, void *win_create_info)
+{
+    struct wine_device *device = wine_device_from_handle(device_handle);
+    VkExportSemaphoreCreateInfo *export_semaphore_info;
+
+    TRACE("%p %p %p %p", device, create_info, allocator, semaphore);
+
+    if ((export_semaphore_info = wine_vk_find_struct(create_info, EXPORT_SEMAPHORE_CREATE_INFO)))
+    {
+        if (export_semaphore_info->handleTypes & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+            export_semaphore_info->handleTypes |= VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+        wine_vk_normalize_semaphore_handle_types_host(&export_semaphore_info->handleTypes);
+    }
+
+    if (wine_vk_find_struct(win_create_info, EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR))
+        FIXME("VkExportSemaphoreWin32HandleInfoKHR unhandled.\n");
+
+    return device->funcs.p_vkCreateSemaphore(device->host_device, create_info, NULL, semaphore);
+}
+
+VkResult wine_vkGetSemaphoreWin32HandleKHR(VkDevice device_handle, const VkSemaphoreGetWin32HandleInfoKHR *handle_info,
+        HANDLE *handle)
+{
+    struct wine_device *device = wine_device_from_handle(device_handle);
+    VkSemaphoreGetFdInfoKHR fd_info;
+    VkResult res;
+    int fd;
+
+    fd_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+    fd_info.pNext = handle_info->pNext;
+    fd_info.semaphore = handle_info->semaphore;
+    fd_info.handleType = handle_info->handleType;
+    if (fd_info.handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+        fd_info.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+    wine_vk_normalize_semaphore_handle_types_host(&fd_info.handleType);
+
+    res = device->funcs.p_vkGetSemaphoreFdKHR(device->host_device, &fd_info, &fd);
+
+    if (res != VK_SUCCESS)
+        return res;
+
+    if (wine_server_fd_to_handle(fd, GENERIC_ALL, 0, handle) != STATUS_SUCCESS)
+    {
+        close(fd);
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    return VK_SUCCESS;
+}
+
+VkResult wine_vkImportSemaphoreWin32HandleKHR(VkDevice device_handle,
+        const VkImportSemaphoreWin32HandleInfoKHR *handle_info)
+{
+    struct wine_device *device = wine_device_from_handle(device_handle);
+    VkImportSemaphoreFdInfoKHR fd_info;
+    VkResult res;
+    int fd;
+
+    fd_info.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
+    fd_info.pNext = handle_info->pNext;
+    fd_info.semaphore = handle_info->semaphore;
+    fd_info.flags = handle_info->flags;
+    fd_info.handleType = handle_info->handleType;
+
+    if (fd_info.handleType == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_WIN32_BIT)
+    {
+        if (handle_info->name)
+        {
+            FIXME("Importing win32 semaphore by name not supported.\n");
+            return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+        }
+
+        fd_info.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+        if (wine_server_handle_to_fd(handle_info->handle, GENERIC_ALL, &fd, NULL) != STATUS_SUCCESS)
+            return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+    }
+    wine_vk_normalize_semaphore_handle_types_host(&fd_info.handleType);
+
+    if (!fd_info.handleType)
+    {
+        FIXME("Importing win32 semaphore with handle type %#x not supported.\n", handle_info->handleType);
+        return VK_ERROR_INVALID_EXTERNAL_HANDLE;
+    }
+
+    /* importing FDs transfers ownership, importing NT handles does not  */
+    if ((res = device->funcs.p_vkImportSemaphoreFdKHR(device->host_device, &fd_info)) != VK_SUCCESS)
+        close(fd);
+
+    return res;
 }
