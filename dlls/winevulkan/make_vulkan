@@ -98,7 +98,6 @@ UNSUPPORTED_EXTENSIONS = [
     "VK_EXT_hdr_metadata", # Needs WSI work.
     "VK_GOOGLE_display_timing",
     "VK_KHR_external_fence_win32",
-    "VK_KHR_external_semaphore_win32",
     # Relates to external_semaphore and needs type conversions in bitflags.
     "VK_KHR_shared_presentable_image", # Needs WSI work.
     "VK_KHR_win32_keyed_mutex",
@@ -111,7 +110,6 @@ UNSUPPORTED_EXTENSIONS = [
     "VK_EXT_physical_device_drm",
     "VK_GOOGLE_surfaceless_query",
     "VK_KHR_external_fence_fd",
-    "VK_KHR_external_semaphore_fd",
     "VK_SEC_amigo_profiling", # Angle specific.
 
     # Extensions which require callback handling
@@ -127,6 +125,7 @@ UNSUPPORTED_EXTENSIONS = [
 # but not expose to applications (useful for test commits)
 UNEXPOSED_EXTENSIONS = {
     "VK_KHR_external_memory_fd",
+    "VK_KHR_external_semaphore_fd",
 }
 
 # The Vulkan loader provides entry-points for core functionality and important
@@ -204,7 +203,7 @@ FUNCTION_OVERRIDES = {
     "vkEnumeratePhysicalDevices" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkGetPhysicalDeviceExternalBufferProperties" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkGetPhysicalDeviceExternalFenceProperties" : {"dispatch" : False, "driver" : False, "thunk" : ThunkType.NONE},
-    "vkGetPhysicalDeviceExternalSemaphoreProperties" : {"dispatch" : False, "driver" : False, "thunk" : ThunkType.NONE},
+    "vkGetPhysicalDeviceExternalSemaphoreProperties" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkGetPhysicalDeviceImageFormatProperties2" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.PRIVATE},
     "vkGetPhysicalDeviceProperties" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.PUBLIC, "loader_thunk" : ThunkType.PRIVATE},
     "vkGetPhysicalDeviceProperties2" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.PUBLIC, "loader_thunk" : ThunkType.PRIVATE},
@@ -222,6 +221,7 @@ FUNCTION_OVERRIDES = {
     "vkCreateImage" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkCreateComputePipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
     "vkCreateGraphicsPipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
+    "vkCreateSemaphore" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyDevice" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkFreeCommandBuffers" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
@@ -261,7 +261,7 @@ FUNCTION_OVERRIDES = {
     "vkGetPhysicalDeviceImageFormatProperties2KHR" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.PRIVATE},
 
     # VK_KHR_external_semaphore_capabilities
-    "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR" : {"dispatch" : False, "driver" : False, "thunk" : ThunkType.NONE},
+    "vkGetPhysicalDeviceExternalSemaphorePropertiesKHR" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
 
     # VK_KHR_device_group_creation
     "vkEnumeratePhysicalDeviceGroupsKHR" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
@@ -297,6 +297,10 @@ FUNCTION_OVERRIDES = {
 
     # VK_NV_ray_tracing
     "vkCreateRayTracingPipelinesNV" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
+
+    # VK_KHR_external_semaphore_win32
+    "vkGetSemaphoreWin32HandleKHR" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
+    "vkImportSemaphoreWin32HandleKHR" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
 }
 
 STRUCT_CHAIN_CONVERSIONS = {
@@ -309,6 +313,7 @@ STRUCT_CHAIN_CONVERSIONS = {
     "VkImageCreateInfo": [],
     "VkMemoryAllocateInfo": ["VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR", "VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR"],
     "VkPhysicalDeviceImageFormatInfo2": [],
+    "VkSemaphoreCreateInfo": ["VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR"],
 }
 
 
