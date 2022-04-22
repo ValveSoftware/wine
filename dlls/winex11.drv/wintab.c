@@ -589,7 +589,7 @@ BOOL CDECL X11DRV_LoadTabletInfo(HWND hwnddefault)
 
             X11DRV_expect_error(data->display, Tablet_ErrorHandler, NULL);
             opendevice = pXOpenDevice(data->display,target->id);
-            if (!X11DRV_check_error() && opendevice)
+            if (!X11DRV_check_error(data->display) && opendevice)
             {
                 unsigned char map[32];
                 int i;
@@ -597,7 +597,7 @@ BOOL CDECL X11DRV_LoadTabletInfo(HWND hwnddefault)
 
                 X11DRV_expect_error(data->display,Tablet_ErrorHandler,NULL);
                 cursor.BUTTONS = pXGetDeviceButtonMapping(data->display, opendevice, map, 32);
-                if (X11DRV_check_error() || cursor.BUTTONS <= 0)
+                if (X11DRV_check_error(data->display) || cursor.BUTTONS <= 0)
                 {
                     TRACE("No buttons, Non Tablet Device\n");
                     pXCloseDevice(data->display, opendevice);
@@ -1086,7 +1086,7 @@ int CDECL X11DRV_AttachEventQueueToTablet(HWND hOwner)
         }
     }
     XSync(data->display, False);
-    X11DRV_check_error();
+    X11DRV_check_error(data->display);
 
     if (NULL != devices) pXFreeDeviceList(devices);
     return 0;

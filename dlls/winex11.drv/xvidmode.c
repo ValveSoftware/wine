@@ -126,7 +126,7 @@ static BOOL xf86vm_get_modes(ULONG_PTR id, DWORD flags, DEVMODEW **new_modes, UI
 
     X11DRV_expect_error(gdi_display, XVidModeErrorHandler, NULL);
     ret = pXF86VidModeGetAllModeLines(gdi_display, DefaultScreen(gdi_display), &xf86vm_mode_count, &xf86vm_modes);
-    if (X11DRV_check_error() || !ret || !xf86vm_mode_count)
+    if (X11DRV_check_error(gdi_display) || !ret || !xf86vm_mode_count)
         return FALSE;
 
     /* Put a XF86VidModeModeInfo ** at the start to store the XF86VidMode modes pointer */
@@ -196,7 +196,7 @@ static BOOL xf86vm_get_current_mode(ULONG_PTR id, DEVMODEW *mode)
 
     X11DRV_expect_error(gdi_display, XVidModeErrorHandler, NULL);
     ret = pXF86VidModeGetModeLine(gdi_display, DefaultScreen(gdi_display), &dotclock, &xf86vm_mode);
-    if (X11DRV_check_error() || !ret)
+    if (X11DRV_check_error(gdi_display) || !ret)
         return FALSE;
 
     mode->dmBitsPerPel = screen_bpp;
@@ -236,7 +236,7 @@ static LONG xf86vm_set_current_mode(ULONG_PTR id, DEVMODEW *mode)
     memcpy(&xf86vm_mode, (BYTE *)mode + sizeof(*mode), sizeof(xf86vm_mode));
     X11DRV_expect_error(gdi_display, XVidModeErrorHandler, NULL);
     ret = pXF86VidModeSwitchToMode(gdi_display, DefaultScreen(gdi_display), xf86vm_mode);
-    if (X11DRV_check_error() || !ret)
+    if (X11DRV_check_error(gdi_display) || !ret)
         return DISP_CHANGE_FAILED;
 #if 0 /* it is said that SetViewPort causes problems with some X servers */
     pXF86VidModeSetViewPort(gdi_display, DefaultScreen(gdi_display), 0, 0);
@@ -288,7 +288,7 @@ void X11DRV_XF86VM_Init(void)
 
   X11DRV_expect_error(gdi_display, XVidModeErrorHandler, NULL);
   ok = pXF86VidModeQueryVersion(gdi_display, &xf86vm_major, &xf86vm_minor);
-  if (X11DRV_check_error() || !ok) return;
+  if (X11DRV_check_error(gdi_display) || !ok) return;
 
 #ifdef X_XF86VidModeSetGammaRamp
   if (xf86vm_major > 2 || (xf86vm_major == 2 && xf86vm_minor >= 1))
@@ -296,7 +296,7 @@ void X11DRV_XF86VM_Init(void)
       X11DRV_expect_error(gdi_display, XVidModeErrorHandler, NULL);
       pXF86VidModeGetGammaRampSize(gdi_display, DefaultScreen(gdi_display),
                                    &xf86vm_gammaramp_size);
-      if (X11DRV_check_error()) xf86vm_gammaramp_size = 0;
+      if (X11DRV_check_error(gdi_display)) xf86vm_gammaramp_size = 0;
       TRACE("Gamma ramp size %d.\n", xf86vm_gammaramp_size);
       if (xf86vm_gammaramp_size >= GAMMA_RAMP_SIZE)
           xf86vm_use_gammaramp = TRUE;
@@ -497,7 +497,7 @@ static BOOL xf86vm_set_gamma_ramp(struct x11drv_gamma_ramp *ramp)
     ret = pXF86VidModeSetGammaRamp(gdi_display, DefaultScreen(gdi_display),
                                    xf86vm_gammaramp_size, red, green, blue);
     if (ret) XSync( gdi_display, FALSE );
-    if (X11DRV_check_error()) ret = FALSE;
+    if (X11DRV_check_error( gdi_display )) ret = FALSE;
 
     if (red != ramp->red)
         heap_free(red);
