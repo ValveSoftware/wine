@@ -1396,7 +1396,7 @@ static BOOL set_swap_interval(GLXDrawable drawable, int interval)
         X11DRV_expect_error(gdi_display, GLXErrorHandler, NULL);
         pglXSwapIntervalEXT(gdi_display, drawable, interval);
         XSync(gdi_display, False);
-        ret = !X11DRV_check_error();
+        ret = !X11DRV_check_error(gdi_display);
         break;
 
     case GLX_SWAP_CONTROL_MESA:
@@ -1918,7 +1918,7 @@ static BOOL WINAPI glxdrv_wglCopyContext(struct wgl_context *src, struct wgl_con
     X11DRV_expect_error( gdi_display, GLXErrorHandler, NULL );
     pglXCopyContext( gdi_display, src->ctx, dst->ctx, mask );
     XSync( gdi_display, False );
-    if (X11DRV_check_error())
+    if (X11DRV_check_error( gdi_display ))
     {
         ERR( "glXCopyContext failed. glXCopyContext() for direct rendering contexts not "
              "implemented in the host graphics driver?\n" );
@@ -3349,7 +3349,7 @@ static struct wgl_context *X11DRV_wglCreateContextAttribsARB( HDC hdc, struct wg
         X11DRV_expect_error(gdi_display, GLXErrorHandler, NULL);
         ret->ctx = create_glxcontext(gdi_display, ret, hShareContext ? hShareContext->ctx : NULL);
         XSync(gdi_display, False);
-        if ((err = X11DRV_check_error()) || !ret->ctx)
+        if ((err = X11DRV_check_error(gdi_display)) || !ret->ctx)
         {
             /* In the future we should convert the GLX error to a win32 one here if needed */
             WARN("Context creation failed (error %#x).\n", err);

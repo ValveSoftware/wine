@@ -1449,7 +1449,7 @@ BOOL CDECL X11DRV_ExtFloodFill( PHYSDEV dev, INT x, INT y, COLORREF color, UINT 
                        physDev->dc_rect.left + rect.left, physDev->dc_rect.top + rect.top,
                        rect.right - rect.left, rect.bottom - rect.top,
                        AllPlanes, ZPixmap );
-    if(X11DRV_check_error()) image = NULL;
+    if(X11DRV_check_error( gdi_display )) image = NULL;
     if (!image) return FALSE;
 
     if (X11DRV_SetupGCForBrush( physDev ))

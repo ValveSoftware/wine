@@ -1480,7 +1480,7 @@ static void handle_gamescope_focused_app( XPropertyEvent *event )
     X11DRV_expect_error( event->display, handle_gamescope_focused_app_error, NULL );
     XGetWindowProperty( event->display, DefaultRootWindow( event->display ), x11drv_atom( GAMESCOPE_FOCUSED_APP ),
                         0, ~0UL, False, XA_CARDINAL, &type, &format, &count, &remaining, (unsigned char **)&property );
-    if (X11DRV_check_error()) focused_app_id = app_id;
+    if (X11DRV_check_error( event->display )) focused_app_id = app_id;
     else
     {
         if (!property) focused_app_id = app_id;

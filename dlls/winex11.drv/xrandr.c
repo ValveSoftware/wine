@@ -895,7 +895,7 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
             vr = pvkGetRandROutputDisplayEXT( vk_physical_devices[device_idx], gdi_display,
                                               provider_info->outputs[output_idx], &vk_display );
             XSync( gdi_display, FALSE );
-            if (X11DRV_check_error() || vr != VK_SUCCESS || vk_display == VK_NULL_HANDLE)
+            if (X11DRV_check_error( gdi_display ) || vr != VK_SUCCESS || vk_display == VK_NULL_HANDLE)
                 continue;
 
             memset( &id, 0, sizeof(id) );
@@ -1886,7 +1886,7 @@ void X11DRV_XRandR_Init(void)
     if (!pXRRQueryExtension( gdi_display, &event_base, &error_base )) return;
     X11DRV_expect_error( gdi_display, XRandRErrorHandler, NULL );
     ok = pXRRQueryVersion( gdi_display, &major, &minor );
-    if (X11DRV_check_error() || !ok) return;
+    if (X11DRV_check_error( gdi_display ) || !ok) return;
 
     TRACE("Found XRandR %d.%d.\n", major, minor);
 
