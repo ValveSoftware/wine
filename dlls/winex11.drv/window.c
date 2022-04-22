@@ -710,6 +710,11 @@ failed:
 }
 
 
+static HICON get_icon_info( HICON icon, ICONINFO *ii )
+{
+    return icon && GetIconInfo( icon, ii ) ? icon : NULL;
+}
+
 /***********************************************************************
  *              fetch_icon_data
  */
@@ -724,21 +729,24 @@ static void fetch_icon_data( HWND hwnd, HICON icon_big, HICON icon_small )
 
     if (!icon_big)
     {
-        icon_big = (HICON)SendMessageW( hwnd, WM_GETICON, ICON_BIG, 0 );
-        if (!icon_big) icon_big = (HICON)GetClassLongPtrW( hwnd, GCLP_HICON );
-        if (!icon_big) icon_big = LoadIconW( 0, (LPWSTR)IDI_WINLOGO );
+        icon_big = get_icon_info( (HICON)SendMessageW( hwnd, WM_GETICON, ICON_BIG, 0 ), &ii );
+        if (!icon_big)
+            icon_big = get_icon_info( (HICON)GetClassLongPtrW( hwnd, GCLP_HICON ), &ii );
+        if (!icon_big)
+            icon_big = get_icon_info( LoadIconW( 0, (LPWSTR)IDI_WINLOGO ), &ii);
     }
     if (!icon_small)
     {
-        icon_small = (HICON)SendMessageW( hwnd, WM_GETICON, ICON_SMALL, 0 );
-        if (!icon_small) icon_small = (HICON)GetClassLongPtrW( hwnd, GCLP_HICONSM );
+        icon_small = get_icon_info( (HICON)SendMessageW( hwnd, WM_GETICON, ICON_SMALL, 0 ), &ii_small );
+        if (!icon_small)
+            icon_small = get_icon_info( (HICON)GetClassLongPtrW( hwnd, GCLP_HICONSM ), &ii_small );
     }
 
-    if (!GetIconInfo(icon_big, &ii)) return;
+    if (!icon_big) return;
 
     hDC = CreateCompatibleDC(0);
     bits = get_bitmap_argb( hDC, ii.hbmColor, ii.hbmMask, &size );
-    if (bits && GetIconInfo( icon_small, &ii_small ))
+    if (bits && icon_small)
     {
         unsigned int size_small;
         unsigned long *bits_small, *new;
