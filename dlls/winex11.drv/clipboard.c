@@ -390,7 +390,7 @@ static void register_x11_formats( const Atom *atoms, UINT size )
 
         X11DRV_expect_error( display, is_atom_error, NULL );
         if (!XGetAtomNames( display, new_atoms, count, names )) count = 0;
-        if (X11DRV_check_error())
+        if (X11DRV_check_error( display ))
         {
             WARN( "got some bad atoms, ignoring\n" );
             count = 0;

@@ -1359,7 +1359,7 @@ DWORD CDECL X11DRV_GetImage( PHYSDEV dev, BITMAPINFO *info,
     image = XGetImage( gdi_display, physdev->drawable,
                        physdev->dc_rect.left + x, physdev->dc_rect.top + y,
                        width, height, AllPlanes, ZPixmap );
-    if (X11DRV_check_error())
+    if (X11DRV_check_error( gdi_display ))
     {
         /* use a temporary pixmap to avoid the BadMatch error */
         Pixmap pixmap = XCreatePixmap( gdi_display, root_window, width, height, vis.depth );
@@ -1810,7 +1810,7 @@ static XImage *create_shm_image( const XVisualInfo *vis, int width, int height, 
         X11DRV_expect_error( gdi_display, xshm_error_handler, NULL );
         ok = (XShmAttach( gdi_display, shminfo ) != 0);
         XSync( gdi_display, False );
-        if (!X11DRV_check_error() && ok)
+        if (!X11DRV_check_error( gdi_display ) && ok)
         {
             image->data = shminfo->shmaddr;
             shmctl( shminfo->shmid, IPC_RMID, 0 );
