@@ -278,6 +278,7 @@ static inline BOOL ignore_error( Display *display, XErrorEvent *event )
 void X11DRV_expect_error( Display *display, x11drv_error_callback callback, void *arg )
 {
     EnterCriticalSection( &x11drv_error_section );
+    XLockDisplay( display );
     err_callback         = callback;
     err_callback_display = display;
     err_callback_arg     = arg;
@@ -292,10 +293,11 @@ void X11DRV_expect_error( Display *display, x11drv_error_callback callback, void
  * Check if an expected X11 error occurred; return non-zero if yes.
  * The caller is responsible for calling XSync first if necessary.
  */
-int X11DRV_check_error(void)
+int X11DRV_check_error( Display *display )
 {
     int res = err_callback_result;
     err_callback = NULL;
+    XUnlockDisplay( display );
     LeaveCriticalSection( &x11drv_error_section );
     return res;
 }

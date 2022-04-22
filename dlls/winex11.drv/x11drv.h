@@ -739,7 +739,7 @@ extern DWORD CDECL X11DRV_MsgWaitForMultipleObjectsEx( DWORD count, const HANDLE
 typedef int (*x11drv_error_callback)( Display *display, XErrorEvent *event, void *arg );
 
 extern void X11DRV_expect_error( Display *display, x11drv_error_callback callback, void *arg ) DECLSPEC_HIDDEN;
-extern int X11DRV_check_error(void) DECLSPEC_HIDDEN;
+extern int X11DRV_check_error( Display *display ) DECLSPEC_HIDDEN;
 extern void X11DRV_X_to_window_rect( struct x11drv_win_data *data, RECT *rect, int x, int y, int cx, int cy ) DECLSPEC_HIDDEN;
 extern BOOL is_window_rect_full_screen( const RECT *rect ) DECLSPEC_HIDDEN;
 extern BOOL is_window_rect_full_virtual_screen( const RECT *rect ) DECLSPEC_HIDDEN;
