@@ -119,6 +119,7 @@ static struct timer *create_timer( struct object *root, const struct unicode_str
             timer->timeout  = NULL;
             timer->thread   = NULL;
             timer->esync_fd = -1;
+            timer->fsync_idx = 0;
 
             if (do_fsync())
                 timer->fsync_idx = fsync_alloc_shm( 0, 0 );
@@ -258,6 +259,7 @@ static void timer_destroy( struct object *obj )
     if (timer->timeout) remove_timeout_user( timer->timeout );
     if (timer->thread) release_object( timer->thread );
     if (do_esync()) close( timer->esync_fd );
+    if (timer->fsync_idx) fsync_free_shm_idx( timer->fsync_idx );
 }
 
 /* create a timer */
