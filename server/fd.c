@@ -1580,6 +1580,7 @@ static void fd_destroy( struct object *obj )
 
     if (do_esync())
         close( fd->esync_fd );
+    if (fd->fsync_idx) fsync_free_shm_idx( fd->fsync_idx );
 }
 
 /* check if the desired access is possible without violating */

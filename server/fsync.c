@@ -26,6 +26,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <sys/mman.h>
+#include <stdint.h>
 #ifdef HAVE_SYS_STAT_H
 # include <sys/stat.h>
 #endif
@@ -76,6 +77,12 @@ static long pagesize;
 
 static int is_fsync_initialized;
 
+static uint64_t *shm_idx_free_map;
+static uint32_t shm_idx_free_map_size; /* uint64_t word count */
+static uint32_t shm_idx_free_search_start_hint;
+
+#define BITS_IN_FREE_MAP_WORD (8 * sizeof(*shm_idx_free_map))
+
 static void shm_cleanup(void)
 {
     close( shm_fd );
@@ -114,6 +121,11 @@ void fsync_init(void)
     is_fsync_initialized = 1;
 
     fprintf( stderr, "fsync: up and running.\n" );
+
+    shm_idx_free_map_size = 256;
+    shm_idx_free_map = malloc( shm_idx_free_map_size * sizeof(*shm_idx_free_map) );
+    memset( shm_idx_free_map, 0xff, shm_idx_free_map_size * sizeof(*shm_idx_free_map) );
+    shm_idx_free_map[0] &= ~(uint64_t)1; /* Avoid allocating shm_index 0. */
 
     atexit( shm_cleanup );
 }
@@ -188,6 +200,7 @@ static void fsync_destroy( struct object *obj )
     struct fsync *fsync = (struct fsync *)obj;
     if (fsync->type == FSYNC_MUTEX)
         list_remove( &fsync->mutex_entry );
+    fsync_free_shm_idx( fsync->shm_idx );
 }
 
 static void *get_shm( unsigned int idx )
@@ -226,12 +239,22 @@ static void *get_shm( unsigned int idx )
     return (void *)((unsigned long)shm_addrs[entry] + offset);
 }
 
-/* FIXME: This is rather inefficient... */
-static unsigned int shm_idx_counter = 1;
+static int alloc_shm_idx_from_word( unsigned int word_index )
+{
+    int ret;
+
+    if (!shm_idx_free_map[word_index]) return 0;
+
+    ret = __builtin_ctzll( shm_idx_free_map[word_index] );
+    shm_idx_free_map[word_index] &= ~((uint64_t)1 << ret);
+    shm_idx_free_search_start_hint = shm_idx_free_map[word_index] ? word_index : word_index + 1;
+    return word_index * BITS_IN_FREE_MAP_WORD + ret;
+}
 
 unsigned int fsync_alloc_shm( int low, int high )
 {
 #ifdef __linux__
+    unsigned int i;
     int shm_idx;
     int *shm;
 
@@ -240,7 +263,29 @@ unsigned int fsync_alloc_shm( int low, int high )
     if (!is_fsync_initialized)
         return 0;
 
-    shm_idx = shm_idx_counter++;
+    /* shm_idx_free_search_start_hint is always at the first word with a free index or before that. */
+    for (i = shm_idx_free_search_start_hint; i < shm_idx_free_map_size; ++i)
+        if ((shm_idx = alloc_shm_idx_from_word( i ))) break;
+
+    if (!shm_idx)
+    {
+        uint32_t old_size, new_size;
+        uint64_t *new_alloc;
+
+        old_size = shm_idx_free_map_size;
+        new_size = old_size + 256;
+        new_alloc = realloc( shm_idx_free_map, new_size * sizeof(*new_alloc) );
+        if (!new_alloc)
+        {
+            fprintf( stderr, "fsync: couldn't expand shm_idx_free_map to size %zd.",
+                new_size * sizeof(*new_alloc) );
+            return 0;
+        }
+        memset( new_alloc + old_size, 0xff, (new_size - old_size) * sizeof(*new_alloc) );
+        shm_idx_free_map = new_alloc;
+        shm_idx_free_map_size = new_size;
+        shm_idx = alloc_shm_idx_from_word( old_size );
+    }
 
     while (shm_idx * 8 >= shm_size)
     {
@@ -263,6 +308,21 @@ unsigned int fsync_alloc_shm( int low, int high )
 #else
     return 0;
 #endif
+}
+
+void fsync_free_shm_idx( int shm_idx )
+{
+    unsigned int idx;
+    uint64_t mask;
+
+    assert( shm_idx );
+    assert( shm_idx < shm_idx_free_map_size * BITS_IN_FREE_MAP_WORD );
+    idx = shm_idx / BITS_IN_FREE_MAP_WORD;
+    mask = (uint64_t)1 << (shm_idx % BITS_IN_FREE_MAP_WORD);
+    assert( !(shm_idx_free_map[idx] & mask) );
+    shm_idx_free_map[idx] |= mask;
+    if (idx < shm_idx_free_search_start_hint)
+        shm_idx_free_search_start_hint = idx;
 }
 
 static int type_matches( enum fsync_type type1, enum fsync_type type2 )

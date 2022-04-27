@@ -897,6 +897,7 @@ static void console_server_destroy( struct object *obj )
     disconnect_console_server( server );
     if (server->fd) release_object( server->fd );
     if (do_esync()) close( server->esync_fd );
+    if (server->fsync_idx) fsync_free_shm_idx( server->fsync_idx );
 }
 
 static struct object *console_server_lookup_name( struct object *obj, struct unicode_str *name,

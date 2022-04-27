@@ -853,6 +853,7 @@ static void device_manager_destroy( struct object *obj )
 
     if (do_esync())
         close( manager->esync_fd );
+    if (manager->fsync_idx) fsync_free_shm_idx( manager->fsync_idx );
 }
 
 static struct device_manager *create_device_manager(void)
@@ -865,6 +866,7 @@ static struct device_manager *create_device_manager(void)
         list_init( &manager->devices );
         list_init( &manager->requests );
         wine_rb_init( &manager->kernel_objects, compare_kernel_object );
+        manager->fsync_idx = 0;
 
         if (do_fsync())
             manager->fsync_idx = fsync_alloc_shm( 0, 0 );

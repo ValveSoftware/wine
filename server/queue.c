@@ -1374,6 +1374,7 @@ static void msg_queue_destroy( struct object *obj )
 {
     struct msg_queue *queue = (struct msg_queue *)obj;
     if (!queue->destroyed) cleanup_msg_queue( queue );
+    if (queue->fsync_idx) fsync_free_shm_idx( queue->fsync_idx );
 }
 
 /* free the message queue of a thread at thread exit */
