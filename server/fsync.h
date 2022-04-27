@@ -21,6 +21,7 @@
 extern int do_fsync(void);
 extern void fsync_init(void);
 extern unsigned int fsync_alloc_shm( int low, int high );
+extern void fsync_free_shm_idx( int shm_idx );
 extern void fsync_wake_futex( unsigned int shm_idx );
 extern void fsync_clear_futex( unsigned int shm_idx );
 extern void fsync_wake_up( struct object *obj );
