@@ -2941,6 +2941,11 @@ __ASM_GLOBAL_FUNC( sse2_memmove,
         MEMMOVE_CLEANUP
         "ret" )
 
+#undef DEST_REG
+#undef SRC_REG
+#undef LEN_REG
+#undef TMP_REG
+
 #endif
 
 /*********************************************************************
