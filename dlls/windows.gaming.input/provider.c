@@ -154,6 +154,7 @@ static HRESULT WINAPI wine_provider_get_Type( IWineGameControllerProvider *iface
     switch (GET_DIDEVICE_TYPE( instance.dwDevType ))
     {
     case DI8DEVTYPE_GAMEPAD: *value = WineGameControllerType_Gamepad; break;
+    case DI8DEVTYPE_DRIVING: *value = WineGameControllerType_RacingWheel; break;
     default: *value = WineGameControllerType_Joystick; break;
     }
 
