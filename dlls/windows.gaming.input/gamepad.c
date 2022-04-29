@@ -484,10 +484,9 @@ static HRESULT WINAPI statics2_FromGameController( IGamepadStatics2 *iface, IGam
 
     TRACE( "iface %p, game_controller %p, value %p.\n", iface, game_controller, value );
 
-    *value = NULL;
     hr = IGameControllerFactoryManagerStatics2_TryGetFactoryControllerFromGameController( manager_factory, &impl->ICustomGameControllerFactory_iface,
                                                                                           game_controller, &controller );
-    if (FAILED(hr) || !controller) return hr;
+    if (FAILED(hr)) return hr;
 
     hr = IGameController_QueryInterface( controller, &IID_IGamepad, (void **)value );
     IGameController_Release( controller );
