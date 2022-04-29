@@ -82,13 +82,50 @@ struct timespec64
     long long tv_nsec;
 };
 
-static LONGLONG update_timeout( ULONGLONG end )
+static LONGLONG nt_time_from_ts( struct timespec *ts )
 {
-    LARGE_INTEGER now;
+    return ticks_from_time_t( ts->tv_sec ) + (ts->tv_nsec + 50) / 100;
+}
+
+static void get_wait_end_time( const LARGE_INTEGER **timeout, struct timespec64 *end, clockid_t *clock_id )
+{
+    ULONGLONG nt_end;
+
+    if (!*timeout) return;
+    if ((*timeout)->QuadPart == TIMEOUT_INFINITE)
+    {
+        *timeout = NULL;
+        return;
+    }
+
+    if ((*timeout)->QuadPart > 0)
+    {
+        nt_end = (*timeout)->QuadPart;
+        *clock_id = CLOCK_REALTIME;
+    }
+    else
+    {
+        struct timespec ts;
+
+        clock_gettime( CLOCK_MONOTONIC, &ts );
+        nt_end = nt_time_from_ts( &ts ) - (*timeout)->QuadPart;
+        *clock_id = CLOCK_MONOTONIC;
+    }
+
+    nt_end -= SECS_1601_TO_1970 * TICKSPERSEC;
+    end->tv_sec = nt_end / (ULONGLONG)TICKSPERSEC;
+    end->tv_nsec = (nt_end % TICKSPERSEC) * 100;
+}
+
+static LONGLONG update_timeout( const struct timespec64 *end, clockid_t clock_id )
+{
+    struct timespec end_ts, ts;
     LONGLONG timeleft;
 
-    NtQuerySystemTime( &now );
-    timeleft = end - now.QuadPart;
+    clock_gettime( clock_id, &ts );
+    end_ts.tv_sec = end->tv_sec;
+    end_ts.tv_nsec = end->tv_nsec;
+    timeleft = nt_time_from_ts( &end_ts ) - nt_time_from_ts( &ts );
     if (timeleft < 0) timeleft = 0;
     return timeleft;
 }
@@ -111,21 +148,12 @@ static void simulate_sched_quantum(void)
 }
 
 static inline int futex_wait_multiple( const struct futex_waitv *futexes,
-        int count, const ULONGLONG *end )
+        int count, const struct timespec64 *end, clockid_t clock_id )
 {
    if (end)
-   {
-        struct timespec64 timeout;
-        ULONGLONG tmp = *end - SECS_1601_TO_1970 * TICKSPERSEC;
-        timeout.tv_sec = tmp / (ULONGLONG)TICKSPERSEC;
-        timeout.tv_nsec = (tmp % TICKSPERSEC) * 100;
-
-        return syscall( __NR_futex_waitv, futexes, count, 0, &timeout, CLOCK_REALTIME );
-   }
+        return syscall( __NR_futex_waitv, futexes, count, 0, end, clock_id );
    else
-   {
         return syscall( __NR_futex_waitv, futexes, count, 0, NULL, 0 );
-   }
 }
 
 static inline int futex_wake( int *addr, int val )
@@ -684,7 +712,8 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
     return STATUS_SUCCESS;
 }
 
-static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN alertable )
+static NTSTATUS do_single_wait( int *addr, int val, const struct timespec64 *end, clockid_t clock_id,
+                                BOOLEAN alertable )
 {
     struct futex_waitv futexes[2];
     int ret;
@@ -700,14 +729,14 @@ static NTSTATUS do_single_wait( int *addr, int val, ULONGLONG *end, BOOLEAN aler
 
         futex_vector_set( &futexes[1], apc_futex, 0 );
 
-        ret = futex_wait_multiple( futexes, 2, end );
+        ret = futex_wait_multiple( futexes, 2, end, clock_id );
 
         if (__atomic_load_n( apc_futex, __ATOMIC_SEQ_CST ))
             return STATUS_USER_APC;
     }
     else
     {
-        ret = futex_wait_multiple( futexes, 1, end );
+        ret = futex_wait_multiple( futexes, 1, end, clock_id );
     }
 
     if (!ret)
@@ -727,11 +756,11 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     struct fsync *objs[MAXIMUM_WAIT_OBJECTS];
     BOOL msgwait = FALSE, waited = FALSE;
     int has_fsync = 0, has_server = 0;
+    clockid_t clock_id = 0;
+    struct timespec64 end;
     int dummy_futex = 0;
     LONGLONG timeleft;
-    LARGE_INTEGER now;
     DWORD waitcount;
-    ULONGLONG end;
     int i, ret;
 
     /* Grab the APC futex if we don't already have it. */
@@ -752,16 +781,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
         }
     }
 
-    NtQuerySystemTime( &now );
-    if (timeout)
-    {
-        if (timeout->QuadPart == TIMEOUT_INFINITE)
-            timeout = NULL;
-        else if (timeout->QuadPart > 0)
-            end = timeout->QuadPart;
-        else
-            end = now.QuadPart - timeout->QuadPart;
-    }
+    get_wait_end_time( &timeout, &end, &clock_id );
 
     for (i = 0; i < count; i++)
     {
@@ -797,7 +817,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
             TRACE(", timeout = INFINITE.\n");
         else
         {
-            timeleft = update_timeout( end );
+            timeleft = update_timeout( &end, clock_id );
             TRACE(", timeout = %ld.%07ld sec.\n",
                 (long) (timeleft / TICKSPERSEC), (long) (timeleft % TICKSPERSEC));
         }
@@ -944,7 +964,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                 return STATUS_TIMEOUT;
             }
 
-            ret = futex_wait_multiple( futexes, waitcount, timeout ? &end : NULL );
+            ret = futex_wait_multiple( futexes, waitcount, timeout ? &end : NULL, clock_id );
 
             /* FUTEX_WAIT_MULTIPLE can succeed or return -EINTR, -EAGAIN,
              * -EFAULT/-EACCES, -ETIMEDOUT. In the first three cases we need to
@@ -1006,7 +1026,7 @@ tryagain:
 
                     while ((current = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST )))
                     {
-                        status = do_single_wait( &mutex->tid, current, timeout ? &end : NULL, alertable );
+                        status = do_single_wait( &mutex->tid, current, timeout ? &end : NULL, clock_id, alertable );
                         if (status != STATUS_PENDING)
                             break;
                     }
@@ -1018,7 +1038,7 @@ tryagain:
 
                     while (!__atomic_load_n( &event->signaled, __ATOMIC_SEQ_CST ))
                     {
-                        status = do_single_wait( &event->signaled, 0, timeout ? &end : NULL, alertable );
+                        status = do_single_wait( &event->signaled, 0, timeout ? &end : NULL, clock_id, alertable );
                         if (status != STATUS_PENDING)
                             break;
                     }
