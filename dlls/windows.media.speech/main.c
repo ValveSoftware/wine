@@ -286,10 +286,10 @@ static HRESULT WINAPI speech_synth_dummy_stream_async_op_get_Completed(IAsyncOpe
 }
 
 static HRESULT WINAPI speech_synth_dummy_stream_async_op_GetResults(IAsyncOperation_SpeechSynthesisStream *iface,
-        ISpeechSynthesisStream ***results)
+        ISpeechSynthesisStream **results)
 {
     FIXME("iface %p, results %p stub!\n", iface, results);
-    **results = &SpeechSynthesisDummyStream_iface;
+    *results = &SpeechSynthesisDummyStream_iface;
     return S_OK;
 }
 
