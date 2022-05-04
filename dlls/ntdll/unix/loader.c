@@ -208,6 +208,7 @@ static void * const syscalls[] =
     NtLockVirtualMemory,
     NtMakeTemporaryObject,
     NtMapViewOfSection,
+    NtMapViewOfSectionEx,
     NtNotifyChangeDirectoryFile,
     NtNotifyChangeKey,
     NtNotifyChangeMultipleKeys,
