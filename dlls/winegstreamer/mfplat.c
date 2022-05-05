@@ -38,6 +38,7 @@ DEFINE_GUID(DMOVideoFormat_RGB555,D3DFMT_X1R5G5B5,0x524f,0x11ce,0x9f,0x53,0x00,0
 DEFINE_GUID(DMOVideoFormat_RGB8,D3DFMT_P8,0x524f,0x11ce,0x9f,0x53,0x00,0x20,0xaf,0x0b,0xa7,0x70);
 
 DEFINE_MEDIATYPE_GUID(MFAudioFormat_XMAudio2, 0x0166);
+DEFINE_MEDIATYPE_GUID(MFAudioFormat_RAW_AAC, WAVE_FORMAT_RAW_AAC1);
 
 struct video_processor
 {
@@ -415,6 +416,7 @@ class_objects[] =
 {
     { &CLSID_VideoProcessorMFT, &video_processor_create },
     { &CLSID_GStreamerByteStreamHandler, &winegstreamer_stream_handler_create },
+    { &CLSID_MSAACDecMFT, &aac_decoder_create },
     { &CLSID_MSH264DecoderMFT, &h264_decoder_create },
 };
 
@@ -450,6 +452,18 @@ HRESULT mfplat_DllRegisterServer(void)
     {
         {MFMediaType_Audio, MFAudioFormat_PCM},
         {MFMediaType_Audio, MFAudioFormat_Float},
+    };
+
+    MFT_REGISTER_TYPE_INFO aac_decoder_input_types[] =
+    {
+        {MFMediaType_Audio, MFAudioFormat_AAC},
+        {MFMediaType_Audio, MFAudioFormat_RAW_AAC},
+        {MFMediaType_Audio, MFAudioFormat_ADTS},
+    };
+    MFT_REGISTER_TYPE_INFO aac_decoder_output_types[] =
+    {
+        {MFMediaType_Audio, MFAudioFormat_Float},
+        {MFMediaType_Audio, MFAudioFormat_PCM},
     };
 
     MFT_REGISTER_TYPE_INFO wma_decoder_input_types[] =
@@ -585,6 +599,16 @@ HRESULT mfplat_DllRegisterServer(void)
     }
     mfts[] =
     {
+        {
+            CLSID_MSAACDecMFT,
+            MFT_CATEGORY_AUDIO_DECODER,
+            L"AAC Audio Decoder MFT",
+            MFT_ENUM_FLAG_SYNCMFT,
+            ARRAY_SIZE(aac_decoder_input_types),
+            aac_decoder_input_types,
+            ARRAY_SIZE(aac_decoder_output_types),
+            aac_decoder_output_types,
+        },
         {
             CLSID_WMADecMediaObject,
             MFT_CATEGORY_AUDIO_DECODER,
@@ -774,6 +798,7 @@ IMFMediaType *mf_media_type_from_wg_format(const struct wg_format *format)
     switch (format->major_type)
     {
         case WG_MAJOR_TYPE_H264:
+        case WG_MAJOR_TYPE_AAC:
         case WG_MAJOR_TYPE_WMA:
         case WG_MAJOR_TYPE_MPEG1_AUDIO:
             FIXME("Format %u not implemented!\n", format->major_type);
@@ -955,6 +980,51 @@ static void mf_media_type_to_wg_format_wma(IMFMediaType *type, const GUID *subty
     format->u.wma.is_xma = is_xma;
 }
 
+static void mf_media_type_to_wg_format_aac(IMFMediaType *type, struct wg_format *format)
+{
+    UINT32 codec_data_len, payload_type, profile_level_indication;
+    BYTE codec_data[64];
+
+    /* Audio specific config is stored at after HEAACWAVEINFO in MF_MT_USER_DATA
+     * https://docs.microsoft.com/en-us/windows/win32/api/mmreg/ns-mmreg-heaacwaveformat
+     */
+    struct
+    {
+        WORD payload_type;
+        WORD profile_level_indication;
+        WORD type;
+        WORD reserved1;
+        DWORD reserved2;
+    } *aac_info = (void *)codec_data;
+
+    if (FAILED(IMFMediaType_GetBlob(type, &MF_MT_USER_DATA, codec_data, sizeof(codec_data), &codec_data_len)))
+    {
+        FIXME("Codec data is not set.\n");
+        return;
+    }
+    if (FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AAC_PAYLOAD_TYPE, &payload_type)))
+    {
+        FIXME("AAC payload type is not set.\n");
+        payload_type = aac_info->payload_type;
+    }
+    if (FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, &profile_level_indication)))
+    {
+        FIXME("AAC provile level indication is not set.\n");
+        profile_level_indication = aac_info->profile_level_indication;
+    }
+
+    format->major_type = WG_MAJOR_TYPE_AAC;
+    format->u.aac.payload_type = payload_type;
+    format->u.aac.profile_level_indication = profile_level_indication;
+    format->u.aac.codec_data_len = 0;
+
+    if (codec_data_len > sizeof(*aac_info))
+    {
+        format->u.aac.codec_data_len = codec_data_len - sizeof(*aac_info);
+        memcpy(format->u.aac.codec_data, codec_data + sizeof(*aac_info), codec_data_len - sizeof(*aac_info));
+    }
+}
+
 static void mf_media_type_to_wg_format_h264(IMFMediaType *type, struct wg_format *format)
 {
     UINT64 frame_rate, frame_size;
@@ -1012,6 +1082,8 @@ void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
                 IsEqualGUID(&subtype, &MFAudioFormat_WMAudio_Lossless) ||
                 IsEqualGUID(&subtype, &MFAudioFormat_XMAudio2))
             mf_media_type_to_wg_format_wma(type, &subtype, format);
+        else if (IsEqualGUID(&subtype, &MFAudioFormat_AAC))
+            mf_media_type_to_wg_format_aac(type, format);
         else
             mf_media_type_to_wg_format_audio(type, &subtype, format);
     }
