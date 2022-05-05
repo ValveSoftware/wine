@@ -4381,7 +4381,6 @@ static HRESULT WINAPI bytestream_stream_read_callback_Invoke(IRtwqAsyncCallback 
 {
     struct bytestream *stream = impl_from_read_callback_IRtwqAsyncCallback(iface);
     struct async_stream_op *op;
-    LARGE_INTEGER position;
     IUnknown *object;
     HRESULT hr;
 
@@ -4392,13 +4391,8 @@ static HRESULT WINAPI bytestream_stream_read_callback_Invoke(IRtwqAsyncCallback 
 
     EnterCriticalSection(&stream->cs);
 
-    position.QuadPart = op->position;
-    if (SUCCEEDED(hr = IStream_Seek(stream->stream, position, STREAM_SEEK_SET, NULL)))
-    {
-        if (SUCCEEDED(hr = IStream_Read(stream->stream, op->u.dest, op->requested_length, &op->actual_length)))
-            stream->position += op->actual_length;
-    }
-
+    hr = IMFByteStream_Read(&stream->IMFByteStream_iface, op->u.dest, op->requested_length, &op->actual_length);
+    if(FAILED(hr)) TRACE("Read failed: %#lx\n", hr);
     IMFAsyncResult_SetStatus(op->caller, hr);
     list_add_tail(&stream->pending, &op->entry);
 
@@ -4413,7 +4407,6 @@ static HRESULT WINAPI bytestream_stream_write_callback_Invoke(IRtwqAsyncCallback
 {
     struct bytestream *stream = impl_from_read_callback_IRtwqAsyncCallback(iface);
     struct async_stream_op *op;
-    LARGE_INTEGER position;
     IUnknown *object;
     HRESULT hr;
 
@@ -4424,13 +4417,8 @@ static HRESULT WINAPI bytestream_stream_write_callback_Invoke(IRtwqAsyncCallback
 
     EnterCriticalSection(&stream->cs);
 
-    position.QuadPart = op->position;
-    if (SUCCEEDED(hr = IStream_Seek(stream->stream, position, STREAM_SEEK_SET, NULL)))
-    {
-        if (SUCCEEDED(hr = IStream_Write(stream->stream, op->u.src, op->requested_length, &op->actual_length)))
-            stream->position += op->actual_length;
-    }
-
+    hr = IMFByteStream_Write(&stream->IMFByteStream_iface, op->u.src, op->requested_length, &op->actual_length);
+    if(FAILED(hr)) TRACE("Write failed: %#lx\n", hr);
     IMFAsyncResult_SetStatus(op->caller, hr);
     list_add_tail(&stream->pending, &op->entry);
 
