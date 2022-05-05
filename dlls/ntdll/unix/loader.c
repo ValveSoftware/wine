@@ -337,6 +337,7 @@ static void * const syscalls[] =
     NtUnlockFile,
     NtUnlockVirtualMemory,
     NtUnmapViewOfSection,
+    NtUnmapViewOfSectionEx,
     NtWaitForAlertByThreadId,
     NtWaitForDebugEvent,
     NtWaitForKeyedEvent,
