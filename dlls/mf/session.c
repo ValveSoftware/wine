@@ -3702,6 +3702,9 @@ static HRESULT WINAPI session_rate_control_SetRate(IMFRateControl *iface, BOOL t
 {
     FIXME("%p, %d, %f.\n", iface, thin, rate);
 
+    if (rate == 1.f)
+        return S_OK;
+
     return E_NOTIMPL;
 }
 
