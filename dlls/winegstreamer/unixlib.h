@@ -37,6 +37,7 @@ struct wg_format
         WG_MAJOR_TYPE_UNKNOWN,
         WG_MAJOR_TYPE_VIDEO,
         WG_MAJOR_TYPE_AUDIO,
+        WG_MAJOR_TYPE_AAC,
         WG_MAJOR_TYPE_MPEG1_AUDIO,
         WG_MAJOR_TYPE_WMA,
         WG_MAJOR_TYPE_H264,
@@ -106,6 +107,13 @@ struct wg_format
             unsigned char codec_data[64];
             bool is_xma;
         } wma;
+        struct
+        {
+            uint32_t payload_type;
+            uint32_t profile_level_indication;
+            uint32_t codec_data_len;
+            unsigned char codec_data[64];
+        } aac;
         struct
         {
             int32_t width, height;
