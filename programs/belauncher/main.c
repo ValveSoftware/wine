@@ -5,6 +5,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(belauncher);
 
+extern int _write(int, void *, int);
+
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cmdshow)
 {
     char *configs, *config, *arch_32_exe = NULL, *arch_64_exe = NULL, *game_exe, *be_arg = NULL;
