@@ -40,7 +40,6 @@
 #include "unixlib.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(ntlm);
-WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
 #define INITIAL_BUFFER_SIZE 200
 
