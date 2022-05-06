@@ -1212,6 +1212,22 @@ BOOL WINAPI LockWindowUpdate( HWND hwnd )
 }
 
 
+static void order_rect( RECT *rect )
+{
+    if (rect->left > rect->right)
+    {
+        int tmp = rect->left;
+        rect->left = rect->right;
+        rect->right = tmp;
+    }
+    if (rect->top > rect->bottom)
+    {
+        int tmp = rect->top;
+        rect->top = rect->bottom;
+        rect->bottom = tmp;
+    }
+}
+
 /***********************************************************************
  *		RedrawWindow (USER32.@)
  */
@@ -1241,8 +1257,11 @@ BOOL WINAPI RedrawWindow( HWND hwnd, const RECT *rect, HRGN hrgn, UINT flags )
 
     if (rect && !hrgn)
     {
-        if (IsRectEmpty( rect )) rect = &empty;
-        ret = redraw_window_rects( hwnd, flags, rect, 1 );
+        RECT ordered = *rect;
+
+        order_rect( &ordered );
+        if (IsRectEmpty( &ordered )) ordered = empty;
+        ret = redraw_window_rects( hwnd, flags, &ordered, 1 );
     }
     else if (!hrgn)
     {
