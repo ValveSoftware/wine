@@ -1768,9 +1768,19 @@ Window get_dummy_parent(void)
 void update_client_window( HWND hwnd )
 {
     struct x11drv_win_data *data;
+    Window old_active;
+
     if ((data = get_win_data( hwnd )))
     {
+        old_active = data->client_window;
         data->client_window = wine_vk_active_surface( hwnd );
+        if (data->client_window && data->whole_window && old_active != data->client_window)
+        {
+            TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
+            XReparentWindow( data->display, data->client_window, data->whole_window,
+                     data->client_rect.left - data->whole_rect.left,
+                     data->client_rect.top - data->whole_rect.top );
+        }
         /* make sure any request that could use old client window has been flushed */
         XFlush( data->display );
         release_win_data( data );
