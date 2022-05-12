@@ -38,6 +38,8 @@ DEFINE_GUID(DMOVideoFormat_RGB555,D3DFMT_X1R5G5B5,0x524f,0x11ce,0x9f,0x53,0x00,0
 DEFINE_GUID(DMOVideoFormat_RGB8,D3DFMT_P8,0x524f,0x11ce,0x9f,0x53,0x00,0x20,0xaf,0x0b,0xa7,0x70);
 DEFINE_MEDIATYPE_GUID(MFAudioFormat_RAW_AAC, WAVE_FORMAT_RAW_AAC1);
 
+extern GUID MEDIASUBTYPE_VC1S;
+
 struct class_factory
 {
     IClassFactory IClassFactory_iface;
@@ -252,6 +254,33 @@ HRESULT mfplat_DllRegisterServer(void)
         {MFMediaType_Video, MFVideoFormat_YVYU},
     };
 
+    MFT_REGISTER_TYPE_INFO wmv_decoder_input_types[] =
+    {
+        {MFMediaType_Video, MFVideoFormat_WMV1},
+        {MFMediaType_Video, MFVideoFormat_WMV2},
+        {MFMediaType_Video, MFVideoFormat_WMV3},
+        {MFMediaType_Video, MEDIASUBTYPE_WMVP},
+        {MFMediaType_Video, MEDIASUBTYPE_WVP2},
+        {MFMediaType_Video, MEDIASUBTYPE_WMVR},
+        {MFMediaType_Video, MEDIASUBTYPE_WMVA},
+        {MFMediaType_Video, MFVideoFormat_WVC1},
+        {MFMediaType_Video, MEDIASUBTYPE_VC1S},
+    };
+    MFT_REGISTER_TYPE_INFO wmv_decoder_output_types[] =
+    {
+        {MFMediaType_Video, MFVideoFormat_YV12},
+        {MFMediaType_Video, MFVideoFormat_YUY2},
+        {MFMediaType_Video, MFVideoFormat_UYVY},
+        {MFMediaType_Video, MFVideoFormat_YVYU},
+        {MFMediaType_Video, MFVideoFormat_NV11},
+        {MFMediaType_Video, MFVideoFormat_NV12},
+        {MFMediaType_Video, DMOVideoFormat_RGB32},
+        {MFMediaType_Video, DMOVideoFormat_RGB24},
+        {MFMediaType_Video, DMOVideoFormat_RGB565},
+        {MFMediaType_Video, DMOVideoFormat_RGB555},
+        {MFMediaType_Video, DMOVideoFormat_RGB8},
+    };
+
     MFT_REGISTER_TYPE_INFO color_convert_input_types[] =
     {
         {MFMediaType_Video, MFVideoFormat_YV12},
@@ -337,6 +366,16 @@ HRESULT mfplat_DllRegisterServer(void)
             h264_decoder_input_types,
             ARRAY_SIZE(h264_decoder_output_types),
             h264_decoder_output_types,
+        },
+        {
+            CLSID_WMVDecoderMFT,
+            MFT_CATEGORY_VIDEO_DECODER,
+            L"WMVideo Decoder MFT",
+            MFT_ENUM_FLAG_SYNCMFT,
+            ARRAY_SIZE(wmv_decoder_input_types),
+            wmv_decoder_input_types,
+            ARRAY_SIZE(wmv_decoder_output_types),
+            wmv_decoder_output_types,
         },
         {
             CLSID_VideoProcessorMFT,
@@ -513,6 +552,7 @@ IMFMediaType *mf_media_type_from_wg_format(const struct wg_format *format)
         case WG_MAJOR_TYPE_AAC:
         case WG_MAJOR_TYPE_WMA:
         case WG_MAJOR_TYPE_MPEG1_AUDIO:
+        case WG_MAJOR_TYPE_WMV:
             FIXME("Format %u not implemented!\n", format->major_type);
             /* fallthrough */
         case WG_MAJOR_TYPE_UNKNOWN:
@@ -762,6 +802,47 @@ static void mf_media_type_to_wg_format_h264(IMFMediaType *type, struct wg_format
         format->u.h264.level = level;
 }
 
+static void mf_media_type_to_wg_format_wmv(IMFMediaType *type, const GUID *subtype, struct wg_format *format)
+{
+    UINT64 frame_rate, frame_size;
+
+    format->major_type = WG_MAJOR_TYPE_WMV;
+    format->u.wmv.width = 0;
+    format->u.wmv.height = 0;
+    format->u.wmv.fps_n = 1;
+    format->u.wmv.fps_d = 1;
+
+    if (SUCCEEDED(IMFMediaType_GetUINT64(type, &MF_MT_FRAME_SIZE, &frame_size)))
+    {
+        format->u.wmv.width = (UINT32)(frame_size >> 32);
+        format->u.wmv.height = (UINT32)frame_size;
+    }
+
+    if (SUCCEEDED(IMFMediaType_GetUINT64(type, &MF_MT_FRAME_RATE, &frame_rate)) && (UINT32)frame_rate)
+    {
+        format->u.wmv.fps_n = (UINT32)(frame_rate >> 32);
+        format->u.wmv.fps_d = (UINT32)frame_rate;
+    }
+
+    if (IsEqualGUID(subtype, &MFVideoFormat_WMV1))
+        format->u.wmv.version = 1;
+    else if (IsEqualGUID(subtype, &MFVideoFormat_WMV2))
+        format->u.wmv.version = 2;
+    else if (IsEqualGUID(subtype, &MFVideoFormat_WMV3)
+            || IsEqualGUID(subtype, &MEDIASUBTYPE_WMVP)
+            || IsEqualGUID(subtype, &MEDIASUBTYPE_WVP2)
+            || IsEqualGUID(subtype, &MEDIASUBTYPE_WMVR)
+            || IsEqualGUID(subtype, &MEDIASUBTYPE_WMVA)
+            || IsEqualGUID(subtype, &MFVideoFormat_WVC1)
+            || IsEqualGUID(subtype, &MEDIASUBTYPE_VC1S))
+        format->u.wmv.version = 3;
+    else
+    {
+        assert(0);
+        return;
+    }
+}
+
 void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
 {
     GUID major_type, subtype;
@@ -795,6 +876,16 @@ void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
     {
         if (IsEqualGUID(&subtype, &MFVideoFormat_H264))
             mf_media_type_to_wg_format_h264(type, format);
+        else if (IsEqualGUID(&subtype, &MFVideoFormat_WMV1)
+                || IsEqualGUID(&subtype, &MFVideoFormat_WMV2)
+                || IsEqualGUID(&subtype, &MFVideoFormat_WMV3)
+                || IsEqualGUID(&subtype, &MEDIASUBTYPE_WMVP)
+                || IsEqualGUID(&subtype, &MEDIASUBTYPE_WVP2)
+                || IsEqualGUID(&subtype, &MEDIASUBTYPE_WMVR)
+                || IsEqualGUID(&subtype, &MEDIASUBTYPE_WMVA)
+                || IsEqualGUID(&subtype, &MFVideoFormat_WVC1)
+                || IsEqualGUID(&subtype, &MEDIASUBTYPE_VC1S))
+            mf_media_type_to_wg_format_wmv(type, &subtype, format);
         else
             mf_media_type_to_wg_format_video(type, &subtype, format);
     }
