@@ -41,6 +41,7 @@ struct wg_format
         WG_MAJOR_TYPE_MPEG1_AUDIO,
         WG_MAJOR_TYPE_WMA,
         WG_MAJOR_TYPE_H264,
+        WG_MAJOR_TYPE_WMV,
     } major_type;
 
     union
@@ -122,6 +123,12 @@ struct wg_format
             uint32_t profile;
             uint32_t level;
         } h264;
+        struct
+        {
+            uint32_t version;
+            int32_t width, height;
+            uint32_t fps_n, fps_d;
+        } wmv;
     } u;
 };
 

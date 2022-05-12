@@ -349,6 +349,7 @@ unsigned int wg_format_get_max_size(const struct wg_format *format)
         case WG_MAJOR_TYPE_H264:
         case WG_MAJOR_TYPE_AAC:
         case WG_MAJOR_TYPE_WMA:
+        case WG_MAJOR_TYPE_WMV:
             FIXME("Format %u not implemented!\n", format->major_type);
             return 0;
 
@@ -445,6 +446,7 @@ bool amt_from_wg_format(AM_MEDIA_TYPE *mt, const struct wg_format *format, bool 
     {
     case WG_MAJOR_TYPE_AAC:
     case WG_MAJOR_TYPE_WMA:
+    case WG_MAJOR_TYPE_WMV:
     case WG_MAJOR_TYPE_H264:
         FIXME("Format %u not implemented!\n", format->major_type);
         /* fallthrough */
