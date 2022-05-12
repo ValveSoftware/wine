@@ -553,6 +553,24 @@ static GstCaps *wg_format_to_caps_h264(const struct wg_format *format)
     return caps;
 }
 
+static GstCaps *wg_format_to_caps_wmv(const struct wg_format *format)
+{
+    GstCaps *caps;
+
+    caps = gst_caps_new_empty_simple("video/x-wmv");
+    if (format->u.wmv.version)
+        gst_caps_set_simple(caps, "wmvversion", G_TYPE_INT, format->u.wmv.version, NULL);
+
+    if (format->u.wmv.width)
+        gst_caps_set_simple(caps, "width", G_TYPE_INT, format->u.wmv.width, NULL);
+    if (format->u.wmv.height)
+        gst_caps_set_simple(caps, "height", G_TYPE_INT, format->u.wmv.height, NULL);
+    if (format->u.wmv.fps_n || format->u.wmv.fps_d)
+        gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, format->u.wmv.fps_n, format->u.wmv.fps_d, NULL);
+
+    return caps;
+}
+
 GstCaps *wg_format_to_caps(const struct wg_format *format)
 {
     switch (format->major_type)
@@ -565,6 +583,8 @@ GstCaps *wg_format_to_caps(const struct wg_format *format)
             return wg_format_to_caps_mpeg1_audio(format);
         case WG_MAJOR_TYPE_WMA:
             return wg_format_to_caps_wma(format);
+        case WG_MAJOR_TYPE_WMV:
+            return wg_format_to_caps_wmv(format);
         case WG_MAJOR_TYPE_H264:
             return wg_format_to_caps_h264(format);
         case WG_MAJOR_TYPE_AUDIO:
@@ -586,6 +606,7 @@ bool wg_format_compare(const struct wg_format *a, const struct wg_format *b)
         case WG_MAJOR_TYPE_AAC:
         case WG_MAJOR_TYPE_MPEG1_AUDIO:
         case WG_MAJOR_TYPE_WMA:
+        case WG_MAJOR_TYPE_WMV:
         case WG_MAJOR_TYPE_H264:
             GST_FIXME("Format %u not implemented!", a->major_type);
             /* fallthrough */
