@@ -957,6 +957,15 @@ static HCRYPTKEY new_key(HCRYPTPROV hProv, ALG_ID aiAlgid, DWORD dwFlags, CRYPTK
              */
             break;
 
+        case CALG_RC2:
+            if (dwKeyLen % 8 || dwKeyLen < peaAlgidInfo->dwMinLen)
+            {
+                WARN("Invalid RC2 key len %ld.\n", dwKeyLen);
+                SetLastError(NTE_BAD_DATA);
+                return (HCRYPTKEY)INVALID_HANDLE_VALUE;
+            }
+            break;
+
         default:
             if (dwKeyLen % 8 || 
                 dwKeyLen > peaAlgidInfo->dwMaxLen || 
@@ -1016,6 +1025,9 @@ static HCRYPTKEY new_key(HCRYPTPROV hProv, ALG_ID aiAlgid, DWORD dwFlags, CRYPTK
                 break;
 
             case CALG_RC2:
+                if (peaAlgidInfo->dwDefaultLen == 40 && dwKeyLen > peaAlgidInfo->dwMaxLen)
+                    pCryptKey->dwEffectiveKeyLen = 40;
+                /* fallthrough */
             case CALG_DES:
             case CALG_3DES_112:
             case CALG_3DES:
@@ -2619,6 +2631,23 @@ BOOL WINAPI RSAENH_CPEncrypt(HCRYPTPROV hProv, HCRYPTKEY hKey, HCRYPTHASH hHash,
         return FALSE;
     }
 
+    if (pCryptKey->aiAlgid == CALG_RC2)
+    {
+        const PROV_ENUMALGS_EX *info;
+
+        if (!(info = get_algid_info(hProv, pCryptKey->aiAlgid)))
+        {
+            FIXME("Can't get algid info.\n");
+            SetLastError(NTE_BAD_KEY);
+            return FALSE;
+        }
+        if (pCryptKey->dwKeyLen > info->dwMaxLen / 8)
+        {
+            SetLastError(NTE_BAD_KEY);
+            return FALSE;
+        }
+    }
+
     if (pCryptKey->dwState == RSAENH_KEYSTATE_IDLE) 
         pCryptKey->dwState = RSAENH_KEYSTATE_ENCRYPTING;
 
@@ -3561,6 +3590,24 @@ BOOL WINAPI RSAENH_CPGenKey(HCRYPTPROV hProv, ALG_ID Algid, DWORD dwFlags, HCRYP
             break;
             
         case CALG_RC2:
+        {
+            const PROV_ENUMALGS_EX *info;
+            DWORD key_len = HIWORD(dwFlags);
+
+            if (!(info = get_algid_info(hProv, Algid)))
+            {
+                SetLastError(NTE_BAD_ALGID);
+                *phKey = (HCRYPTKEY)INVALID_HANDLE_VALUE;
+                break;
+            }
+            if (key_len > info->dwMaxLen)
+            {
+                SetLastError(NTE_BAD_FLAGS);
+                *phKey = (HCRYPTKEY)INVALID_HANDLE_VALUE;
+                break;
+            }
+        }
+        /* fallthrough */
         case CALG_RC4:
         case CALG_DES:
         case CALG_3DES_112:
