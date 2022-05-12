@@ -101,6 +101,7 @@ static void test_MapViewOfFile3(void)
     static const char testfile[] = "testfile.xxx";
     HANDLE file, mapping;
     void *ptr;
+    BOOL ret;
 
     if (!pMapViewOfFile3)
     {
@@ -123,8 +124,10 @@ static void test_MapViewOfFile3(void)
     ok( ptr != NULL, "MapViewOfFile FILE_MAP_READ error %lu\n", GetLastError() );
     UnmapViewOfFile( ptr );
 
+    CloseHandle( mapping );
     CloseHandle( file );
-    DeleteFileA( testfile );
+    ret = DeleteFileA( testfile );
+    ok(ret, "Failed to delete a test file.\n");
 }
 
 static void test_OpenFileMappingFromApp(void)
