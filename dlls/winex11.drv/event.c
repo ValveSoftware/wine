@@ -1492,15 +1492,15 @@ static void handle_gamescope_focused_app( XPropertyEvent *event )
     if (steam_keyboard_opened == keyboard_opened) return;
     steam_keyboard_opened = keyboard_opened;
 
-    TRACE( "Got app id %u, focused app %u\n", app_id, focused_app_id );
+    FIXME( "HACK: Got app id %u, focused app %u\n", app_id, focused_app_id );
     if (keyboard_opened)
     {
-        TRACE( "Steam Keyboard is opened, filtering events.\n" );
+        FIXME( "HACK: Steam Keyboard is opened, filtering events.\n" );
         SetEvent( steam_keyboard_event );
     }
     else
     {
-        TRACE( "Steam Keyboard is closed, stopping events filter.\n" );
+        FIXME( "HACK: Steam Keyboard is closed, stopping events filter.\n" );
         ResetEvent( steam_keyboard_event );
     }
 }
