@@ -1,0 +1,45 @@
+/*
+ * Resources for mf test suite.
+ *
+ * Copyright 2022 Rémi Bernon for CodeWeavers
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+#include "windef.h"
+
+/* @makedep: audiodata.bin */
+audiodata.bin RCDATA audiodata.bin
+
+/* @makedep: audioconvdata.bin */
+audioconvdata.bin RCDATA audioconvdata.bin
+
+/* @makedep: wmaencdata.bin */
+wmaencdata.bin RCDATA wmaencdata.bin
+
+/* @makedep: wmadecdata.bin */
+wmadecdata.bin RCDATA wmadecdata.bin
+
+/* @makedep: h264data.bin */
+h264data.bin RCDATA h264data.bin
+
+/* @makedep: nv12frame.bin */
+nv12frame.bin RCDATA nv12frame.bin
+
+/* @makedep: i420frame.bin */
+i420frame.bin RCDATA i420frame.bin
+
+/* @makedep: rgb32frame.bin */
+rgb32frame.bin RCDATA rgb32frame.bin
