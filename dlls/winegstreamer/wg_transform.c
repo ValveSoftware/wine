@@ -173,6 +173,31 @@ static gboolean transform_sink_query_cb(GstPad *pad, GstObject *parent, GstQuery
             g_object_unref(pool);
             return true;
         }
+
+        case GST_QUERY_CAPS:
+        {
+            GstCaps *caps, *filter, *temp;
+            gchar *str;
+
+            gst_query_parse_caps(query, &filter);
+            caps = gst_caps_ref(transform->output_caps);
+
+            if (filter)
+            {
+                temp = gst_caps_intersect(caps, filter);
+                gst_caps_unref(caps);
+                caps = temp;
+            }
+
+            str = gst_caps_to_string(caps);
+            GST_INFO("Returning caps %s", str);
+            g_free(str);
+
+            gst_query_set_caps_result(query, caps);
+            gst_caps_unref(caps);
+            return true;
+        }
+
         default:
             GST_WARNING("Ignoring \"%s\" query.", gst_query_type_get_name(query->type));
             break;
@@ -518,6 +543,51 @@ out:
     free(transform);
     GST_ERROR("Failed to create winegstreamer transform.");
     return status;
+}
+
+NTSTATUS wg_transform_set_format(void *args)
+{
+    struct wg_transform_set_format_params *params = args;
+    struct wg_transform *transform = params->transform;
+    GstSample *sample;
+    GstEvent *event;
+    GstCaps *caps;
+    gchar *str;
+
+    if (!(caps = wg_format_to_caps(params->format)))
+    {
+        GST_ERROR("Failed to convert format to caps.");
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    if (gst_caps_is_always_compatible(transform->output_caps, caps))
+    {
+        gst_caps_unref(caps);
+        return STATUS_SUCCESS;
+    }
+
+    gst_caps_unref(transform->output_caps);
+    transform->output_caps = caps;
+
+    if (!gst_pad_set_caps(transform->my_sink, caps)
+            || !(event = gst_event_new_reconfigure())
+            || !gst_pad_push_event(transform->my_sink, event))
+    {
+        GST_ERROR("Failed to reconfigure transform.");
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    str = gst_caps_to_string(caps);
+    GST_INFO("Configured new caps %s.", str);
+    g_free(str);
+
+    if (transform->output_sample)
+        gst_sample_unref(transform->output_sample);
+    while ((sample = gst_atomic_queue_pop(transform->output_queue)))
+        gst_sample_unref(sample);
+    transform->output_sample = NULL;
+
+    return STATUS_SUCCESS;
 }
 
 static void wg_sample_free_notify(void *arg)
