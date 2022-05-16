@@ -616,8 +616,6 @@ BOOL convert_unix_name_to_luid( const char *unix_name, NET_LUID *luid )
 
     pthread_mutex_lock( &if_list_lock );
 
-    update_if_table();
-
     LIST_FOR_EACH_ENTRY( entry, &if_list, struct if_entry, entry )
         if (!strcmp( entry->if_unix_name, unix_name ))
         {
@@ -625,6 +623,20 @@ BOOL convert_unix_name_to_luid( const char *unix_name, NET_LUID *luid )
             ret = TRUE;
             break;
         }
+    if (!ret)
+    {
+        update_if_table();
+        while (&entry->entry != &if_list)
+        {
+            if (!strcmp( entry->if_unix_name, unix_name ))
+            {
+                *luid = entry->if_luid;
+                ret = TRUE;
+                break;
+            }
+            entry = LIST_ENTRY(entry->entry.next, struct if_entry, entry);
+        }
+    }
     pthread_mutex_unlock( &if_list_lock );
 
     return ret;
