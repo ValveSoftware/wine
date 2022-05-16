@@ -637,8 +637,6 @@ BOOL convert_luid_to_unix_name( const NET_LUID *luid, const char **unix_name )
 
     pthread_mutex_lock( &if_list_lock );
 
-    update_if_table();
-
     LIST_FOR_EACH_ENTRY( entry, &if_list, struct if_entry, entry )
         if (entry->if_luid.Value == luid->Value)
         {
@@ -646,6 +644,21 @@ BOOL convert_luid_to_unix_name( const NET_LUID *luid, const char **unix_name )
             ret = TRUE;
             break;
         }
+
+    if (!ret)
+    {
+        update_if_table();
+        while (&entry->entry != &if_list)
+        {
+            if (entry->if_luid.Value == luid->Value)
+            {
+                *unix_name = entry->if_unix_name;
+                ret = TRUE;
+                break;
+            }
+            entry = LIST_ENTRY(entry->entry.next, struct if_entry, entry);
+        }
+    }
     pthread_mutex_unlock( &if_list_lock );
 
     return ret;
