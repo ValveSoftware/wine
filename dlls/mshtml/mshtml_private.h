@@ -434,9 +434,9 @@ extern const tid_t no_iface_tids[1];
     X(Console,                        "Console",                      console_dispex,                         Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
-    X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                Object) \
+    X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                DOMUIEvent) \
     X(DOMMessageEvent,                "MessageEvent",                 DOMMessageEvent_dispex,                 DOMEvent) \
-    X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   Object) \
+    X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   DOMUIEvent) \
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
     X(DOMTokenList,                   "DOMTokenList",                 DOMTokenList_dispex,                    Object) \
