@@ -633,9 +633,9 @@ static const tid_t HTMLOptionElementFactory_iface_tids[] = {
 
 static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
     HTMLOptionElementFactory_value,
-    NULL,
-    NULL,
-    NULL
+    compat_ctor_get_dispid,
+    compat_ctor_invoke,
+    compat_ctor_delete
 };
 
 dispex_static_data_t HTMLOptionElementFactory_dispex = {
