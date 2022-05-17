@@ -397,7 +397,7 @@ extern const tid_t no_iface_tids[1];
     X(HTMLStorage,                    "Storage",                      HTMLStorage_dispex,                     Object) \
     X(HTMLTextRange,                  "TextRange",                    HTMLTxtRange_dispex,                    Object) \
     X(HTMLXMLHttpRequest,             "XMLHttpRequest",               HTMLXMLHttpRequest_dispex,              Object) \
-    X(HTMLCurrentStyle,               "MSCurrentStyleCSSProperties",  HTMLCurrentStyle_dispex,                Object) \
+    X(HTMLCurrentStyle,               "MSCurrentStyleCSSProperties",  HTMLCurrentStyle_dispex,                HTMLCSSProperties) \
     X(HTMLW3CComputedStyle,           "CSSStyleDeclaration",          HTMLW3CComputedStyle_dispex,            Object) \
     X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  Object) \
     X(HTMLStyleSheetRule,             "CSSStyleRule",                 HTMLStyleSheetRule_dispex,              Object) \
@@ -448,7 +448,8 @@ extern const tid_t no_iface_tids[1];
     X(HTMLPerformance,                "Performance",                  HTMLPerformance_dispex,                 Object) \
     X(HTMLPerformanceNavigation,      "PerformanceNavigation",        HTMLPerformanceNavigation_dispex,       Object) \
     X(HTMLPerformanceTiming,          "PerformanceTiming",            HTMLPerformanceTiming_dispex,           Object) \
-    X(HTMLStyle,                      "MSStyleCSSProperties",         HTMLStyle_dispex,                       Object) \
+    X(HTMLCSSProperties,              "MSCSSProperties",              HTMLCSSProperties_dispex,               HTMLW3CComputedStyle) \
+    X(HTMLStyle,                      "MSStyleCSSProperties",         HTMLStyle_dispex,                       HTMLCSSProperties) \
     X(HTMLTableCellProt,              "HTMLTableCellElement",         HTMLTableCellProt_dispex,               HTMLElement)
 
 typedef enum {
