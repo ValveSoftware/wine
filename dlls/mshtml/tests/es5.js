@@ -3031,6 +3031,7 @@ sync_test("DOMParser", function() {
         r = r[0];
         ok(r.nodeName === "#text", "child of child nodeName of XML document with mime type " + m + " = " + r.nodeName);
         ok(r.nodeValue === "wine", "child of child nodeValue of XML document with mime type " + m + " = " + r.nodeValue);
+        ok(!("test" in xml), "'test' in XML document with mime type " + m);
 
         // test HTMLDocument specific props, which are available in DocumentPrototype,
         // so they are shared in XMLDocument since they both have the same prototype
