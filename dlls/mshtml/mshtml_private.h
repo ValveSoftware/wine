@@ -166,6 +166,7 @@ typedef struct EventTarget EventTarget;
     XDIID(DispDOMMessageEvent) \
     XDIID(DispDOMMouseEvent) \
     XDIID(DispDOMUIEvent) \
+    XDIID(DispDOMParser) \
     XDIID(DispHTMLAnchorElement) \
     XDIID(DispHTMLAreaElement) \
     XDIID(DispHTMLAttributeCollection) \
@@ -227,6 +228,7 @@ typedef struct EventTarget EventTarget;
     XIID(IDOMMessageEvent) \
     XIID(IDOMMouseEvent) \
     XIID(IDOMUIEvent) \
+    XIID(IDOMParser) \
     XIID(IDocumentEvent) \
     XIID(IDocumentRange) \
     XIID(IDocumentSelector) \
@@ -376,6 +378,7 @@ extern const tid_t no_iface_tids[1];
     X(HTMLUnknownElement,             "HTMLUnknownElement",           HTMLUnknownElement_dispex,              NULL)
 
 #define COMPAT_PROTOTYPE_LIST \
+    X(DOMParser,                      "DOMParser",                    DOMParser_dispex,                       Object) \
     X(History,                        "History",                      OmHistory_dispex,                       Object) \
     X(Navigator,                      "Navigator",                    OmNavigator_dispex,                     Object) \
     X(HTMLDOMAttribute,               "Attr",                         HTMLDOMAttribute_dispex,                HTMLDOMNode) \
@@ -1644,6 +1647,7 @@ extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLImageCtor_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLOptionCtor_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLXMLHttpRequestCtor_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t DOMParserCtor_dispex DECLSPEC_HIDDEN;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex DECLSPEC_HIDDEN;
 COMPAT_ONLY_PROTOTYPE_LIST

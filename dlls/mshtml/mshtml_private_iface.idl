@@ -76,6 +76,10 @@ interface IWineMSHTMLConsole : IDispatch
     HRESULT warn([in, optional] VARIANT *varargStart);
 }
 
+const long DISPID_IWINEHTMLWINDOWPRIVATE_REQUESTANIMATIONFRAME = 50;
+const long DISPID_IWINEHTMLWINDOWPRIVATE_CANCELANIMATIONFRAME = 51;
+const long DISPID_IWINEHTMLWINDOWPRIVATE_CONSOLE = 52;
+const long DISPID_IWINEHTMLWINDOWPRIVATE_DOMPARSER = 53;
 [
     odl,
     oleautomation,
@@ -85,12 +89,14 @@ interface IWineMSHTMLConsole : IDispatch
 ]
 interface IWineHTMLWindowPrivate : IDispatch
 {
-    [id(50)]
+    [id(DISPID_IWINEHTMLWINDOWPRIVATE_REQUESTANIMATIONFRAME)]
     HRESULT requestAnimationFrame([in] VARIANT *expr, [retval, out] VARIANT *timer_id);
-    [id(51)]
+    [id(DISPID_IWINEHTMLWINDOWPRIVATE_CANCELANIMATIONFRAME)]
     HRESULT cancelAnimationFrame([in] VARIANT timer_id);
-    [propget, id(52)]
+    [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_CONSOLE)]
     HRESULT console([retval, out] IDispatch **console);
+    [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_DOMPARSER)]
+    HRESULT DOMParser([retval, out] IDispatch **dom_parser);
 }
 
 [
