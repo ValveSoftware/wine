@@ -749,9 +749,10 @@ static const tid_t HTMLEventObj_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLEventObj_dispex = {
+dispex_static_data_t HTMLEventObj_dispex = {
     L"MSEventObj",
     NULL,
+    PROTO_ID_HTMLEventObj,
     DispCEventObj_tid,
     HTMLEventObj_iface_tids
 };
@@ -2305,9 +2306,10 @@ static const tid_t DOMEvent_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t DOMEvent_dispex = {
+dispex_static_data_t DOMEvent_dispex = {
     L"Event",
     NULL,
+    PROTO_ID_DOMEvent,
     DispDOMEvent_tid,
     DOMEvent_iface_tids
 };
@@ -2318,9 +2320,10 @@ static const tid_t DOMUIEvent_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t DOMUIEvent_dispex = {
+dispex_static_data_t DOMUIEvent_dispex = {
     L"UIEvent",
     NULL,
+    PROTO_ID_DOMUIEvent,
     DispDOMUIEvent_tid,
     DOMUIEvent_iface_tids
 };
@@ -2332,9 +2335,10 @@ static const tid_t DOMMouseEvent_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t DOMMouseEvent_dispex = {
+dispex_static_data_t DOMMouseEvent_dispex = {
     L"MouseEvent",
     NULL,
+    PROTO_ID_DOMMouseEvent,
     DispDOMMouseEvent_tid,
     DOMMouseEvent_iface_tids
 };
@@ -2346,9 +2350,10 @@ static const tid_t DOMKeyboardEvent_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t DOMKeyboardEvent_dispex = {
+dispex_static_data_t DOMKeyboardEvent_dispex = {
     L"KeyboardEvent",
     NULL,
+    PROTO_ID_DOMKeyboardEvent,
     DispDOMKeyboardEvent_tid,
     DOMKeyboardEvent_iface_tids
 };
@@ -2359,9 +2364,10 @@ static const tid_t DOMCustomEvent_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t DOMCustomEvent_dispex = {
+dispex_static_data_t DOMCustomEvent_dispex = {
     L"CustomEvent",
     NULL,
+    PROTO_ID_DOMCustomEvent,
     DispDOMCustomEvent_tid,
     DOMCustomEvent_iface_tids
 };
@@ -2374,6 +2380,7 @@ static const tid_t DOMMessageEvent_iface_tids[] = {
 dispex_static_data_t DOMMessageEvent_dispex = {
     L"MessageEvent",
     NULL,
+    PROTO_ID_DOMMessageEvent,
     DispDOMMessageEvent_tid,
     DOMMessageEvent_iface_tids,
     DOMMessageEvent_init_dispex_info

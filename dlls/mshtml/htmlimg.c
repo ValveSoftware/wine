@@ -729,9 +729,10 @@ static const tid_t HTMLImgElement_iface_tids[] = {
     IHTMLImgElement_tid,
     0
 };
-static dispex_static_data_t HTMLImgElement_dispex = {
+dispex_static_data_t HTMLImgElement_dispex = {
     L"HTMLImageElement",
     NULL,
+    PROTO_ID_HTMLImgElement,
     DispHTMLImg_tid,
     HTMLImgElement_iface_tids,
     HTMLElement_init_dispex_info
@@ -977,6 +978,7 @@ static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
 static dispex_static_data_t HTMLImageElementFactory_dispex = {
     L"Function",
     &HTMLImageElementFactory_dispex_vtbl,
+    PROTO_ID_NULL,
     IHTMLImageElementFactory_tid,
     HTMLImageElementFactory_iface_tids
 };
