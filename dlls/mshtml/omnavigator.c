@@ -309,9 +309,10 @@ static const tid_t HTMLDOMImplementation_iface_tids[] = {
     IHTMLDOMImplementation_tid,
     0
 };
-static dispex_static_data_t HTMLDOMImplementation_dispex = {
+dispex_static_data_t HTMLDOMImplementation_dispex = {
     L"DOMImplementation",
     NULL,
+    PROTO_ID_HTMLDOMImplementation,
     DispHTMLDOMImplementation_tid,
     HTMLDOMImplementation_iface_tids,
     HTMLDOMImplementation_init_dispex_info
@@ -562,9 +563,10 @@ static const tid_t HTMLScreen_iface_tids[] = {
     IHTMLScreen_tid,
     0
 };
-static dispex_static_data_t HTMLScreen_dispex = {
+dispex_static_data_t HTMLScreen_dispex = {
     L"Screen",
     NULL,
+    PROTO_ID_HTMLScreen,
     DispHTMLScreen_tid,
     HTMLScreen_iface_tids
 };
@@ -726,9 +728,10 @@ static const tid_t OmHistory_iface_tids[] = {
     IOmHistory_tid,
     0
 };
-static dispex_static_data_t OmHistory_dispex = {
+dispex_static_data_t OmHistory_dispex = {
     L"History",
     NULL,
+    PROTO_ID_History,
     DispHTMLHistory_tid,
     OmHistory_iface_tids
 };
@@ -883,9 +886,10 @@ static const tid_t HTMLPluginsCollection_iface_tids[] = {
     IHTMLPluginsCollection_tid,
     0
 };
-static dispex_static_data_t HTMLPluginsCollection_dispex = {
+dispex_static_data_t HTMLPluginsCollection_dispex = {
     L"PluginArray",
     NULL,
+    PROTO_ID_HTMLPluginsCollection,
     DispCPlugins_tid,
     HTMLPluginsCollection_iface_tids
 };
@@ -1028,9 +1032,10 @@ static const tid_t HTMLMimeTypesCollection_iface_tids[] = {
     IHTMLMimeTypesCollection_tid,
     0
 };
-static dispex_static_data_t HTMLMimeTypesCollection_dispex = {
+dispex_static_data_t HTMLMimeTypesCollection_dispex = {
     L"MimeTypeArray",
     NULL,
+    PROTO_ID_HTMLMimeTypesCollection,
     IHTMLMimeTypesCollection_tid,
     HTMLMimeTypesCollection_iface_tids
 };
@@ -1478,9 +1483,10 @@ static const tid_t OmNavigator_iface_tids[] = {
     IOmNavigator_tid,
     0
 };
-static dispex_static_data_t OmNavigator_dispex = {
+dispex_static_data_t OmNavigator_dispex = {
     L"Navigator",
     NULL,
+    PROTO_ID_Navigator,
     DispHTMLNavigator_tid,
     OmNavigator_iface_tids
 };
@@ -1861,9 +1867,10 @@ static const tid_t HTMLPerformanceTiming_iface_tids[] = {
     IHTMLPerformanceTiming_tid,
     0
 };
-static dispex_static_data_t HTMLPerformanceTiming_dispex = {
+dispex_static_data_t HTMLPerformanceTiming_dispex = {
     L"PerformanceTiming",
     NULL,
+    PROTO_ID_HTMLPerformanceTiming,
     IHTMLPerformanceTiming_tid,
     HTMLPerformanceTiming_iface_tids
 };
@@ -2013,9 +2020,10 @@ static const tid_t HTMLPerformanceNavigation_iface_tids[] = {
     IHTMLPerformanceNavigation_tid,
     0
 };
-static dispex_static_data_t HTMLPerformanceNavigation_dispex = {
+dispex_static_data_t HTMLPerformanceNavigation_dispex = {
     L"PerformanceNavigation",
     NULL,
+    PROTO_ID_HTMLPerformanceNavigation,
     IHTMLPerformanceNavigation_tid,
     HTMLPerformanceNavigation_iface_tids
 };
@@ -2206,9 +2214,10 @@ static const tid_t HTMLPerformance_iface_tids[] = {
     IHTMLPerformance_tid,
     0
 };
-static dispex_static_data_t HTMLPerformance_dispex = {
+dispex_static_data_t HTMLPerformance_dispex = {
     L"Performance",
     NULL,
+    PROTO_ID_HTMLPerformance,
     IHTMLPerformance_tid,
     HTMLPerformance_iface_tids
 };
@@ -2365,9 +2374,10 @@ static const tid_t HTMLNamespaceCollection_iface_tids[] = {
     IHTMLNamespaceCollection_tid,
     0
 };
-static dispex_static_data_t HTMLNamespaceCollection_dispex = {
+dispex_static_data_t HTMLNamespaceCollection_dispex = {
     L"MSNamespaceInfoCollection",
     NULL,
+    PROTO_ID_HTMLNamespaceCollection,
     DispHTMLNamespaceCollection_tid,
     HTMLNamespaceCollection_iface_tids
 };
@@ -2621,9 +2631,10 @@ static const tid_t console_iface_tids[] = {
     IWineMSHTMLConsole_tid,
     0
 };
-static dispex_static_data_t console_dispex = {
+dispex_static_data_t console_dispex = {
     L"Console",
     NULL,
+    PROTO_ID_Console,
     IWineMSHTMLConsole_tid,
     console_iface_tids
 };

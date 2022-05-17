@@ -57,6 +57,12 @@ DEFINE_GUID(IID_IWineDispatchProxyPrivate, 0xd359f2fe,0x5531,0x741b,0xa4,0x1a,0x
 typedef struct _IWineDispatchProxyPrivate IWineDispatchProxyPrivate;
 typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
 
+struct proxy_prototypes
+{
+    unsigned int num;
+    IDispatch *prototype[];
+};
+
 struct proxy_func_invoker
 {
     HRESULT (STDMETHODCALLTYPE *invoke)(IDispatch*,void*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
@@ -67,6 +73,8 @@ struct proxy_func_invoker
 typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
+    IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
+    BOOL (STDMETHODCALLTYPE *IsPrototype)(IWineDispatchProxyPrivate *This);
     DWORD (STDMETHODCALLTYPE *PropFlags)(IWineDispatchProxyPrivate *This, DISPID id);
     HRESULT (STDMETHODCALLTYPE *PropGetID)(IWineDispatchProxyPrivate *This, WCHAR *name, DISPID *id);
     HRESULT (STDMETHODCALLTYPE *PropInvoke)(IWineDispatchProxyPrivate *This, IDispatch *this_obj, DISPID id, LCID lcid,
@@ -95,6 +103,9 @@ struct _IWineDispatchProxyPrivate {
 struct _IWineDispatchProxyCbPrivate {
     const IWineDispatchProxyCbPrivateVtbl *lpVtbl;
 };
+
+#define WINE_DISP_PROXY_NULL_PROTOTYPE ((IDispatch*)(INT_PTR)-2)
+#define WINE_DISP_PROXY_OBJECT_PROTOTYPE ((IDispatch*)(INT_PTR)-1)
 
 
 
@@ -493,6 +504,8 @@ struct _script_ctx_t {
     jsdisp_t *vbarray_constr;
     jsdisp_t *map_prototype;
     jsdisp_t *set_prototype;
+
+    struct proxy_prototypes *proxy_prototypes;
 };
 
 void script_release(script_ctx_t*) DECLSPEC_HIDDEN;
