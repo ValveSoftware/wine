@@ -351,7 +351,7 @@ static HRESULT WINAPI HTMLDocument_get_images(IHTMLDocument2 *iface, IHTMLElemen
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->doc_node->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This->doc_node);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -383,7 +383,7 @@ static HRESULT WINAPI HTMLDocument_get_applets(IHTMLDocument2 *iface, IHTMLEleme
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->doc_node->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This->doc_node);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -415,7 +415,7 @@ static HRESULT WINAPI HTMLDocument_get_links(IHTMLDocument2 *iface, IHTMLElement
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->doc_node->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This->doc_node);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -447,7 +447,7 @@ static HRESULT WINAPI HTMLDocument_get_forms(IHTMLDocument2 *iface, IHTMLElement
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->doc_node->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This->doc_node);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -479,7 +479,7 @@ static HRESULT WINAPI HTMLDocument_get_anchors(IHTMLDocument2 *iface, IHTMLEleme
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->doc_node->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This->doc_node);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -564,7 +564,7 @@ static HRESULT WINAPI HTMLDocument_get_scripts(IHTMLDocument2 *iface, IHTMLEleme
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->doc_node->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This->doc_node);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -1674,8 +1674,7 @@ static HRESULT WINAPI HTMLDocument_get_styleSheets(IHTMLDocument2 *iface,
         return map_nsresult(nsres);
     }
 
-    hres = create_style_sheet_collection(nsstylelist,
-                                         dispex_compat_mode(&This->doc_node->node.event_target.dispex), p);
+    hres = create_style_sheet_collection(nsstylelist, This->doc_node, p);
     nsIDOMStyleSheetList_Release(nsstylelist);
     return hres;
 }
@@ -1739,8 +1738,7 @@ static HRESULT WINAPI HTMLDocument_createStyleSheet(IHTMLDocument2 *iface, BSTR 
 
     if(bstrHref && *bstrHref) {
         FIXME("semi-stub for href %s\n", debugstr_w(bstrHref));
-        return create_style_sheet(NULL, dispex_compat_mode(&This->doc_node->node.event_target.dispex),
-                                  ppnewStyleSheet);
+        return create_style_sheet(NULL, This->doc_node, ppnewStyleSheet);
     }
 
     hres = create_element(This->doc_node, L"style", &elem);
@@ -2385,7 +2383,7 @@ static HRESULT WINAPI HTMLDocument3_getElementsByName(IHTMLDocument3 *iface, BST
         return E_FAIL;
     }
 
-    *ppelColl = create_collection_from_nodelist(node_list, This->doc_node->document_mode);
+    *ppelColl = create_collection_from_nodelist(node_list, This->doc_node);
     nsIDOMNodeList_Release(node_list);
     return S_OK;
 }
@@ -2460,7 +2458,7 @@ static HRESULT WINAPI HTMLDocument3_getElementsByTagName(IHTMLDocument3 *iface, 
     }
 
 
-    *pelColl = create_collection_from_nodelist(nslist, This->doc_node->document_mode);
+    *pelColl = create_collection_from_nodelist(nslist, This->doc_node);
     nsIDOMNodeList_Release(nslist);
 
     return S_OK;
@@ -2643,8 +2641,7 @@ static HRESULT WINAPI HTMLDocument4_get_namespaces(IHTMLDocument4 *iface, IDispa
     if(!This->doc_node->namespaces) {
         HRESULT hres;
 
-        hres = create_namespace_collection(dispex_compat_mode(&This->doc_node->node.event_target.dispex),
-                                           &This->doc_node->namespaces);
+        hres = create_namespace_collection(This->doc_node, &This->doc_node->namespaces);
         if(FAILED(hres))
             return hres;
     }
@@ -2688,7 +2685,7 @@ static HRESULT WINAPI HTMLDocument4_createEventObject(IHTMLDocument4 *iface,
         return E_NOTIMPL;
     }
 
-    return create_event_obj(dispex_compat_mode(&This->doc_node->node.event_target.dispex), ppEventObj);
+    return create_event_obj(This->doc_node, ppEventObj);
 }
 
 static HRESULT WINAPI HTMLDocument4_fireEvent(IHTMLDocument4 *iface, BSTR bstrEventName,
@@ -2862,7 +2859,8 @@ static HRESULT WINAPI HTMLDocument5_createAttribute(IHTMLDocument5 *iface, BSTR 
 
     TRACE("(%p)->(%s %p)\n", This, debugstr_w(bstrattrName), ppattribute);
 
-    hres = HTMLDOMAttribute_Create(bstrattrName, NULL, 0, dispex_compat_mode(&This->doc_node->node.event_target.dispex), &attr);
+    hres = HTMLDOMAttribute_Create(bstrattrName, This->doc_node, NULL, 0,
+                                   dispex_compat_mode(&This->doc_node->node.event_target.dispex), &attr);
     if(FAILED(hres))
         return hres;
 
@@ -3423,7 +3421,7 @@ static HRESULT WINAPI HTMLDocument7_getElementsByClassName(IHTMLDocument7 *iface
     }
 
 
-    *pel = create_collection_from_nodelist(nslist, This->doc_node->document_mode);
+    *pel = create_collection_from_nodelist(nslist, This->doc_node);
     nsIDOMNodeList_Release(nslist);
     return S_OK;
 }
@@ -4366,7 +4364,7 @@ static HRESULT WINAPI DocumentSelector_querySelectorAll(IDocumentSelector *iface
         return hres;
     }
 
-    hres = create_child_collection(node_list, dispex_compat_mode(&This->doc_node->node.event_target.dispex), pel);
+    hres = create_child_collection(node_list, This->doc_node, pel);
     nsIDOMNodeList_Release(node_list);
     return hres;
 }
@@ -6238,7 +6236,7 @@ static HRESULT create_document_object(BOOL is_mhtml, IUnknown *outer, REFIID rii
 
     doc->basedoc.doc_obj = doc;
 
-    init_dispatch(&doc->dispex, (IUnknown*)&doc->ICustomDoc_iface, &HTMLDocumentObj_dispex, COMPAT_MODE_QUIRKS);
+    init_dispatch(&doc->dispex, (IUnknown*)&doc->ICustomDoc_iface, &HTMLDocumentObj_dispex, NULL, COMPAT_MODE_QUIRKS);
     init_doc(&doc->basedoc, outer ? outer : &doc->IUnknown_inner, &doc->dispex);
     TargetContainer_Init(doc);
     doc->is_mhtml = is_mhtml;

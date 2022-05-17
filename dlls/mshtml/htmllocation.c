@@ -661,7 +661,7 @@ HRESULT HTMLLocation_Create(HTMLInnerWindow *window, HTMLLocation **ret)
 
     init_dispatch(&location->dispex, (IUnknown*)&location->IHTMLLocation_iface,
                   compat_mode < COMPAT_MODE_IE9 ? &HTMLLocation_compat_dispex : &HTMLLocation_dispex,
-                  compat_mode);
+                  NULL, compat_mode);
 
     *ret = location;
     return S_OK;

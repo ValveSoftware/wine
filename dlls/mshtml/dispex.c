@@ -1183,7 +1183,7 @@ static func_disp_t *create_func_disp(DispatchEx *obj, func_info_t *info)
         return NULL;
 
     ret->IUnknown_iface.lpVtbl = &FunctionUnkVtbl;
-    init_dispatch(&ret->dispex, &ret->IUnknown_iface,  &function_dispex, dispex_compat_mode(obj));
+    init_dispatch(&ret->dispex, &ret->IUnknown_iface,  &function_dispex, NULL, dispex_compat_mode(obj));
     ret->ref = 1;
     ret->obj = obj;
     ret->info = info;
@@ -1961,7 +1961,7 @@ static struct compat_prototype *get_compat_prototype(HTMLInnerWindow *window, pr
         prot->ref = 1;
         window->compat_prototypes[prot_id] = prot;
 
-        init_dispatch(&prot->dispex, &prot->IUnknown_iface, &compat_prototype_dispex[prot_id], compat_mode);
+        init_dispatch(&prot->dispex, &prot->IUnknown_iface, &compat_prototype_dispex[prot_id], NULL, compat_mode);
     }
 
     IUnknown_AddRef(&prot->IUnknown_iface);
@@ -2182,7 +2182,7 @@ static IDispatch *get_default_prototype(prototype_id_t prot_id, compat_mode_t co
     prot->IUnknown_iface.lpVtbl = &proxy_prototype_vtbl;
     prot->ref = 2;  /* the script's ctx also holds one ref */
 
-    init_dispatch(&prot->dispex, &prot->IUnknown_iface, &prototype_static_data[prot_id].dispex, compat_mode);
+    init_dispatch(&prot->dispex, &prot->IUnknown_iface, &prototype_static_data[prot_id].dispex, NULL, compat_mode);
 
     *entry = (IDispatch*)&prot->dispex.IDispatchEx_iface;
     return *entry;
@@ -2942,6 +2942,9 @@ void release_dispex(DispatchEx *This)
     if(This->proxy)
         This->proxy->lpVtbl->Unlinked(This->proxy);
 
+    if(This->prototype)
+        IUnknown_Release(&This->prototype->IUnknown_iface);
+
     if(!This->dynamic_data)
         return;
 
@@ -2969,13 +2972,21 @@ void release_dispex(DispatchEx *This)
     heap_free(This->dynamic_data);
 }
 
-void init_dispatch(DispatchEx *dispex, IUnknown *outer, dispex_static_data_t *data, compat_mode_t compat_mode)
+void update_dispex(DispatchEx *dispex, dispex_static_data_t *data, HTMLDocumentNode *doc, compat_mode_t compat_mode)
+{
+    if(doc && doc->window && data->prototype_id < ARRAY_SIZE(doc->window->compat_prototypes))
+        dispex->prototype = get_compat_prototype(doc->window, data->prototype_id, compat_mode);
+}
+
+void init_dispatch(DispatchEx *dispex, IUnknown *outer, dispex_static_data_t *data, HTMLDocumentNode *doc,
+        compat_mode_t compat_mode)
 {
     assert(compat_mode < COMPAT_MODE_CNT);
 
     dispex->IDispatchEx_iface.lpVtbl = (const IDispatchExVtbl*)&WineDispatchProxyPrivateVtbl;
     dispex->outer = outer;
     dispex->proxy = NULL;
+    dispex->prototype = NULL;
     dispex->dynamic_data = NULL;
 
     if(data->vtbl && data->vtbl->get_compat_mode) {
@@ -2995,4 +3006,6 @@ void init_dispatch(DispatchEx *dispex, IUnknown *outer, dispex_static_data_t *da
     }else {
         dispex->info = ensure_dispex_info(data, compat_mode);
     }
+
+    update_dispex(dispex, data, doc, compat_mode);
 }

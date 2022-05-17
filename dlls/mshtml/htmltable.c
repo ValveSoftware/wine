@@ -816,7 +816,7 @@ static HRESULT WINAPI HTMLTableRow_get_cells(IHTMLTableRow *iface, IHTMLElementC
         return E_FAIL;
     }
 
-    *p = create_collection_from_htmlcol(nscol, dispex_compat_mode(&This->element.node.event_target.dispex));
+    *p = create_collection_from_htmlcol(nscol, This->element.node.doc);
 
     nsIDOMHTMLCollection_Release(nscol);
     return S_OK;
@@ -1420,7 +1420,7 @@ static HRESULT WINAPI HTMLTable_get_rows(IHTMLTable *iface, IHTMLElementCollecti
         return E_FAIL;
     }
 
-    *p = create_collection_from_htmlcol(nscol, dispex_compat_mode(&This->element.node.event_target.dispex));
+    *p = create_collection_from_htmlcol(nscol, This->element.node.doc);
 
     nsIDOMHTMLCollection_Release(nscol);
     return S_OK;
@@ -1535,7 +1535,7 @@ static HRESULT WINAPI HTMLTable_get_tBodies(IHTMLTable *iface, IHTMLElementColle
         return E_FAIL;
     }
 
-    *p = create_collection_from_htmlcol(nscol, dispex_compat_mode(&This->element.node.event_target.dispex));
+    *p = create_collection_from_htmlcol(nscol, This->element.node.doc);
 
     nsIDOMHTMLCollection_Release(nscol);
     return S_OK;
