@@ -808,6 +808,6 @@ async_test("message event", function() {
         next_test();
     });
 
-    window.postMessage("test", "http://winetest.example.org");
+    window.postMessage("test", "httP://wineTest.example.org");
     ok(listener_called == false, "listener already called");
 });
