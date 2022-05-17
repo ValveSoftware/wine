@@ -93,6 +93,7 @@ typedef struct {
     DISPID (STDMETHODCALLTYPE *GetUnderlyingDispID)(IWineDispatchProxyCbPrivate *This, DISPID id);
     IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, DISPID id, const WCHAR *name);
     HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const WCHAR *name, IDispatch *prot, DISPID);
+    HRESULT (STDMETHODCALLTYPE *GetRandomValues)(IDispatch *typedarr);
     void (STDMETHODCALLTYPE *Traverse)(IWineDispatchProxyCbPrivate *This,
                                        void (STDMETHODCALLTYPE *note_cc_edge)(IDispatch*,void*), void *cb);
 } IWineDispatchProxyCbPrivateVtbl;
