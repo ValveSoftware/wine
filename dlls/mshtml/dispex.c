@@ -1028,8 +1028,8 @@ static HRESULT function_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, D
     return DISP_E_UNKNOWNNAME;
 }
 
-static HRESULT function_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     func_disp_t *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
@@ -1084,7 +1084,7 @@ static func_disp_t *create_func_disp(DispatchEx *obj, func_info_t *info)
     return ret;
 }
 
-static HRESULT invoke_disp_value(DispatchEx *This, IDispatch *func_disp, LCID lcid, WORD flags, DISPPARAMS *dp,
+static HRESULT invoke_disp_value(IDispatch *this_obj, IDispatch *func_disp, LCID lcid, WORD flags, DISPPARAMS *dp,
         VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     DISPID named_arg = DISPID_THIS;
@@ -1105,7 +1105,7 @@ static HRESULT invoke_disp_value(DispatchEx *This, IDispatch *func_disp, LCID lc
     memcpy(new_dp.rgvarg+1, dp->rgvarg, dp->cArgs*sizeof(VARIANTARG));
 
     V_VT(new_dp.rgvarg) = VT_DISPATCH;
-    V_DISPATCH(new_dp.rgvarg) = (IDispatch*)&This->IDispatchEx_iface;
+    V_DISPATCH(new_dp.rgvarg) = this_obj;
 
     hres = IDispatch_QueryInterface(func_disp, &IID_IDispatchEx, (void**)&dispex);
     TRACE(">>>\n");
@@ -1440,7 +1440,7 @@ static HRESULT invoke_builtin_function(IDispatch *this_obj, func_info_t *func, D
     return V_ERROR(&vhres);
 }
 
-static HRESULT func_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
+static HRESULT func_invoke(DispatchEx *This, IDispatch *this_obj, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
     HRESULT hres;
@@ -1466,12 +1466,12 @@ static HRESULT func_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISP
                     return E_FAIL;
                 }
 
-                hres = invoke_disp_value(This, V_DISPATCH(&entry->val), 0, flags, dp, res, ei, NULL);
+                hres = invoke_disp_value(this_obj, V_DISPATCH(&entry->val), 0, flags, dp, res, ei, NULL);
                 break;
             }
         }
 
-        hres = invoke_builtin_function((IDispatch*)&This->IDispatchEx_iface, func, dp, res, ei, caller);
+        hres = invoke_builtin_function(this_obj, func, dp, res, ei, caller);
         break;
     case DISPATCH_PROPERTYGET: {
         func_obj_entry_t *entry;
@@ -1524,9 +1524,10 @@ static HRESULT func_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISP
     return hres;
 }
 
-static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD flags, DISPPARAMS *dp,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT invoke_builtin_prop(DispatchEx *This, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *dp, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
+    DispatchEx *dispex;
     func_info_t *func;
     IUnknown *iface;
     HRESULT hres;
@@ -1538,14 +1539,15 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD 
         return hres;
 
     if(func->func_disp_idx != -1)
-        return func_invoke(This, func, flags, dp, res, ei, caller);
+        return func_invoke(This, this_obj, func, flags, dp, res, ei, caller);
 
-    hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
+    hres = IDispatch_QueryInterface(this_obj, tid_ids[func->tid], (void**)&iface);
     if(FAILED(hres) || !iface)
         return E_UNEXPECTED;
 
-    if(func->hook) {
-        hres = func->hook(This, flags, dp, res, ei, caller);
+    if(func->hook && (dispex = get_dispex_for_hook(iface))) {
+        hres = func->hook(dispex, flags, dp, res, ei, caller);
+        IDispatchEx_Release(&dispex->IDispatchEx_iface);
         if(hres != S_FALSE) {
             IUnknown_Release(iface);
             return hres;
@@ -1579,7 +1581,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD 
                     break;
                 }
 
-                hres = invoke_disp_value(This, V_DISPATCH(&v), lcid, flags, dp, res, ei, caller);
+                hres = invoke_disp_value(this_obj, V_DISPATCH(&v), lcid, flags, dp, res, ei, caller);
                 IDispatch_Release(V_DISPATCH(&v));
             }else if(res) {
                 *res = v;
@@ -1817,7 +1819,7 @@ static HRESULT WINAPI DispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMember,
     TRACE("(%p)->(%ld %s %ld %d %p %p %p %p)\n", This, dispIdMember, debugstr_guid(riid),
           lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 
-    return dispex_invoke(This, dispIdMember, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, NULL);
+    return dispex_invoke(This, (IDispatch*)iface, dispIdMember, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, NULL);
 }
 
 static HRESULT WINAPI DispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
@@ -1853,7 +1855,7 @@ static HRESULT WINAPI DispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID lc
 
     TRACE("(%p)->(%lx %lx %x %p %p %p %p)\n", This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 
-    return dispex_invoke(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    return dispex_invoke(This, (IDispatch*)iface, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI DispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR name, DWORD grfdex)
@@ -2060,8 +2062,8 @@ BOOL dispex_query_interface(DispatchEx *This, REFIID riid, void **ppv)
     return TRUE;
 }
 
-HRESULT dispex_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp, VARIANT *res,
-        EXCEPINFO *pei, IServiceProvider *caller)
+HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp,
+        VARIANT *res, EXCEPINFO *pei, IServiceProvider *caller)
 {
     HRESULT hres;
 
@@ -2075,7 +2077,7 @@ HRESULT dispex_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD wFlags, DIS
     case DISPEXPROP_CUSTOM:
         if(!dispex->info->desc->vtbl || !dispex->info->desc->vtbl->invoke)
             return DISP_E_UNKNOWNNAME;
-        return dispex->info->desc->vtbl->invoke(dispex, id, lcid, wFlags, pdp, res, pei, caller);
+        return dispex->info->desc->vtbl->invoke(dispex, this_obj, id, lcid, wFlags, pdp, res, pei, caller);
 
     case DISPEXPROP_DYNAMIC: {
         DWORD idx = id - DISPID_DYNPROP_0;
@@ -2097,7 +2099,7 @@ HRESULT dispex_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD wFlags, DIS
                 return E_NOTIMPL;
             }
 
-            return invoke_disp_value(dispex, V_DISPATCH(&prop->var), lcid, wFlags, pdp, res, pei, caller);
+            return invoke_disp_value(this_obj, V_DISPATCH(&prop->var), lcid, wFlags, pdp, res, pei, caller);
         case DISPATCH_PROPERTYGET:
             if(prop->flags & DYNPROP_DELETED)
                 return DISP_E_UNKNOWNNAME;
@@ -2136,7 +2138,7 @@ HRESULT dispex_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD wFlags, DIS
             return E_FAIL;
         }
 
-        return invoke_builtin_prop(dispex, id, lcid, wFlags, pdp, res, pei, caller);
+        return invoke_builtin_prop(dispex, this_obj, id, lcid, wFlags, pdp, res, pei, caller);
     default:
         assert(0);
         return E_FAIL;

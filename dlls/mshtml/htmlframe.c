@@ -942,7 +942,7 @@ static HRESULT HTMLFrameElement_get_dispid(HTMLDOMNode *iface, BSTR name,
     return search_window_props(This->framebase.content_window->base.inner_window, name, grfdex, pid);
 }
 
-static HRESULT HTMLFrameElement_invoke(HTMLDOMNode *iface, DISPID id, LCID lcid,
+static HRESULT HTMLFrameElement_invoke(HTMLDOMNode *iface, IDispatch *this_obj, DISPID id, LCID lcid,
         WORD flags, DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLFrameElement *This = frame_from_HTMLDOMNode(iface);
@@ -952,7 +952,7 @@ static HRESULT HTMLFrameElement_invoke(HTMLDOMNode *iface, DISPID id, LCID lcid,
         return E_FAIL;
     }
 
-    return window_invoke(&This->framebase.content_window->base, id, lcid, flags,
+    return window_invoke(&This->framebase.content_window->base, this_obj, id, lcid, flags,
             params, res, ei, caller);
 }
 
@@ -1514,7 +1514,7 @@ static HRESULT HTMLIFrame_get_dispid(HTMLDOMNode *iface, BSTR name,
     return search_window_props(This->framebase.content_window->base.inner_window, name, grfdex, pid);
 }
 
-static HRESULT HTMLIFrame_invoke(HTMLDOMNode *iface, DISPID id, LCID lcid,
+static HRESULT HTMLIFrame_invoke(HTMLDOMNode *iface, IDispatch *this_obj, DISPID id, LCID lcid,
         WORD flags, DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLIFrame *This = iframe_from_HTMLDOMNode(iface);
@@ -1524,7 +1524,7 @@ static HRESULT HTMLIFrame_invoke(HTMLDOMNode *iface, DISPID id, LCID lcid,
         return E_FAIL;
     }
 
-    return window_invoke(&This->framebase.content_window->base, id, lcid, flags,
+    return window_invoke(&This->framebase.content_window->base, this_obj, id, lcid, flags,
             params, res, ei, caller);
 }
 
