@@ -25,6 +25,7 @@
 #include "hlink.h"
 #include "perhist.h"
 #include "dispex.h"
+#include "activscp.h"
 #include "objsafe.h"
 #include "htiframe.h"
 #include "tlogstg.h"
@@ -43,6 +44,63 @@
 #include "mshtml_private_iface.h"
 
 #include <assert.h>
+
+/* NOTE: Keep in sync with jscript.h in jscript.dll */
+DEFINE_GUID(IID_IWineDispatchProxyPrivate, 0xd359f2fe,0x5531,0x741b,0xa4,0x1a,0x5c,0xf9,0x2e,0xdc,0x97,0x1b);
+typedef struct _IWineDispatchProxyPrivate IWineDispatchProxyPrivate;
+typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
+
+struct proxy_func_invoker
+{
+    HRESULT (STDMETHODCALLTYPE *invoke)(IDispatch*,void*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+    void *context;
+    const WCHAR *name;
+};
+
+typedef struct {
+    IDispatchExVtbl dispex;
+    IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
+    DWORD (STDMETHODCALLTYPE *PropFlags)(IWineDispatchProxyPrivate *This, DISPID id);
+    HRESULT (STDMETHODCALLTYPE *PropGetID)(IWineDispatchProxyPrivate *This, WCHAR *name, DISPID *id);
+    HRESULT (STDMETHODCALLTYPE *PropInvoke)(IWineDispatchProxyPrivate *This, IDispatch *this_obj, DISPID id, LCID lcid,
+                                            DWORD flags, DISPPARAMS *dp, VARIANT *ret, EXCEPINFO *ei, IServiceProvider *caller);
+    HRESULT (STDMETHODCALLTYPE *PropDelete)(IWineDispatchProxyPrivate *This, DISPID id);
+    HRESULT (STDMETHODCALLTYPE *FuncInfo)(IWineDispatchProxyPrivate *This, DISPID id, struct proxy_func_invoker *ret);
+    HRESULT (STDMETHODCALLTYPE *AccessorInfo)(IWineDispatchProxyPrivate *This, DISPID id, struct proxy_func_invoker *ret);
+    HRESULT (STDMETHODCALLTYPE *ToString)(IWineDispatchProxyPrivate *This, BSTR *string);
+    BOOL (STDMETHODCALLTYPE *CanGC)(IWineDispatchProxyPrivate *This);
+} IWineDispatchProxyPrivateVtbl;
+
+typedef struct {
+    IDispatchExVtbl dispex;
+    void (STDMETHODCALLTYPE *Unlinked)(IWineDispatchProxyCbPrivate *This);
+    void (STDMETHODCALLTYPE *Relinked)(IWineDispatchProxyCbPrivate *This, IWineDispatchProxyPrivate *proxy);
+    HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
+    DISPID (STDMETHODCALLTYPE *GetUnderlyingDispID)(IWineDispatchProxyCbPrivate *This, DISPID id);
+    void (STDMETHODCALLTYPE *Traverse)(IWineDispatchProxyCbPrivate *This,
+                                       void (STDMETHODCALLTYPE *note_cc_edge)(IDispatch*,void*), void *cb);
+} IWineDispatchProxyCbPrivateVtbl;
+
+struct _IWineDispatchProxyPrivate {
+    const IWineDispatchProxyPrivateVtbl *lpVtbl;
+};
+
+struct _IWineDispatchProxyCbPrivate {
+    const IWineDispatchProxyCbPrivateVtbl *lpVtbl;
+};
+
+#define PROPF_ARGMASK       0x00ff
+#define PROPF_METHOD        0x0100
+#define PROPF_CONSTR        0x0200
+
+#define PROPF_ENUMERABLE    0x0400
+#define PROPF_WRITABLE      0x0800
+#define PROPF_CONFIGURABLE  0x1000
+#define PROPF_ALL           (PROPF_ENUMERABLE | PROPF_WRITABLE | PROPF_CONFIGURABLE)
+
+#define PROPF_PROXY_ACCESSOR 0x8000
+
+
 
 #define NS_ERROR_GENERATE_FAILURE(module,code) \
     ((nsresult) (((UINT32)(1u<<31)) | ((UINT32)(module+0x45)<<16) | ((UINT32)(code))))
@@ -352,6 +410,7 @@ struct DispatchEx {
     IDispatchEx IDispatchEx_iface;
 
     IUnknown *outer;
+    IWineDispatchProxyCbPrivate *proxy;
 
     dispex_data_t *info;
     dispex_dynamic_data_t *dynamic_data;
@@ -524,6 +583,7 @@ struct HTMLOuterWindow {
     mozIDOMWindowProxy *window_proxy;
     HTMLOuterWindow *parent;
     HTMLFrameBase *frame_element;
+    IWineDispatchProxyCbPrivate *saved_proxy;
 
     GeckoBrowser *browser;
     struct list browser_entry;

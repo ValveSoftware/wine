@@ -186,6 +186,18 @@ static BOOL init_script_engine(ScriptHost *script_host)
         return FALSE;
     }
 
+    if(script_mode & SCRIPTLANGUAGEVERSION_HTML) {
+        IWineDispatchProxyCbPrivate *proxy = script_host->window->event_target.dispex.proxy;
+        if(proxy) {
+            hres = proxy->lpVtbl->HostUpdated(proxy, script_host->script);
+            if(FAILED(hres)) {
+                WARN("Proxy->HostUpdated failed: %08lx\n", hres);
+                IActiveScript_Close(script_host->script);
+                return FALSE;
+            }
+        }
+    }
+
     hres = IActiveScript_GetScriptState(script_host->script, &state);
     if(FAILED(hres))
         WARN("GetScriptState failed: %08lx\n", hres);

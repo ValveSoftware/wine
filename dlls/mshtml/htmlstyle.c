@@ -2980,6 +2980,7 @@ static HRESULT WINAPI HTMLStyle_removeAttribute(IHTMLStyle *iface, BSTR strAttri
     style_entry = lookup_style_tbl(&This->css_style, strAttributeName);
     if(!style_entry) {
         compat_mode_t compat_mode = dispex_compat_mode(&This->css_style.dispex);
+        IWineDispatchProxyCbPrivate *proxy = This->css_style.dispex.proxy;
         DISPID dispid;
         unsigned i;
 
@@ -2988,6 +2989,18 @@ static HRESULT WINAPI HTMLStyle_removeAttribute(IHTMLStyle *iface, BSTR strAttri
         if(hres != S_OK) {
             *pfSuccess = VARIANT_FALSE;
             return S_OK;
+        }
+
+        if(proxy) {
+            DISPID underlying = proxy->lpVtbl->GetUnderlyingDispID(proxy, dispid);
+            hres = IDispatchEx_DeleteMemberByDispID((IDispatchEx*)proxy, dispid);
+            if(underlying == DISPID_UNKNOWN) {
+                if(FAILED(hres))
+                    return hres;
+                *pfSuccess = (hres == S_OK);
+                return S_OK;
+            }
+            dispid = underlying;
         }
 
         for(i=0; i < ARRAY_SIZE(style_tbl); i++) {
