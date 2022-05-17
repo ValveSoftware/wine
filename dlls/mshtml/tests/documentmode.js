@@ -287,6 +287,7 @@ sync_test("builtin_toString", function() {
     }
     if(v >= 11) {
         test("crypto", window.msCrypto, "Crypto");
+        test("crypto.subtle", window.msCrypto.subtle, "SubtleCrypto");
     }
     if(v >= 9) {
         document.body.innerHTML = "<!--...-->";
@@ -834,6 +835,7 @@ sync_test("builtin_prototypes", function() {
     }
     if(v >= 11) {
         set_obj("Crypto");
+        set_obj("SubtleCrypto");
     }
 
     if(v >= 8 && v < 11) {
@@ -1262,6 +1264,7 @@ sync_test("builtin_prototypes", function() {
             [ "Storage",                        "Object" ],
             [ "StyleSheet",                     "Object" ],
             [ "StyleSheetList",                 "Object" ],
+            [ "SubtleCrypto",                   "Object" ],
             [ "Text",                           "CharacterData" ],
             [ "TextRange",                      "Object" ],
             [ "UIEvent",                        "Event" ],
