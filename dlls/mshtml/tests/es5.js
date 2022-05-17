@@ -21,6 +21,7 @@ var JS_E_NUMBER_EXPECTED = 0x800a1389;
 var JS_E_FUNCTION_EXPECTED = 0x800a138a;
 var JS_E_DATE_EXPECTED = 0x800a138e;
 var JS_E_OBJECT_EXPECTED = 0x800a138f;
+var JS_E_UNDEFINED_VARIABLE = 0x800a1391;
 var JS_E_BOOLEAN_EXPECTED = 0x800a1392;
 var JS_E_VBARRAY_EXPECTED = 0x800a1395;
 var JS_E_ENUMERATOR_EXPECTED = 0x800a1397;
@@ -1647,6 +1648,98 @@ sync_test("builtin_context", function() {
     ok(obj === window, "obj = " + obj);
     obj = (function() { return this; }).call(42);
     ok(obj.valueOf() === 42, "obj = " + obj);
+});
+
+sync_test("builtin override", function() {
+    /* configurable */
+    var builtins = [
+        "ActiveXObject",
+        "Array",
+        "Boolean",
+        "CollectGarbage",
+        "Date",
+        "decodeURI",
+        "decodeURIComponent",
+        "encodeURI",
+        "encodeURIComponent",
+        "Enumerator",
+        "Error",
+        "escape",
+        "EvalError",
+        "Function",
+        "isFinite",
+        "isNaN",
+        "JSON",
+        "Map",
+        "Math",
+        "Number",
+        "parseFloat",
+        "parseInt",
+        "RangeError",
+        "ReferenceError",
+        "RegExp",
+        "ScriptEngine",
+        "ScriptEngineBuildVersion",
+        "ScriptEngineMajorVersion",
+        "ScriptEngineMinorVersion",
+        "Set",
+        "String",
+        "SyntaxError",
+        "TypeError",
+        "unescape",
+        "URIError",
+        "VBArray"
+    ];
+
+    var override = {
+        value: 12,
+        configurable: true,
+        writable: true
+    };
+    for(var i = 0; i < builtins.length; i++) {
+        var desc = Object.getOwnPropertyDescriptor(window, builtins[i]), r;
+        ok(desc !== undefined, "getOwnPropertyDescriptor('" + builtins[i] + "' returned undefined");
+        ok(desc.configurable === true, builtins[i] + " not configurable");
+        ok(desc.enumerable === false, builtins[i] + " is enumerable");
+        ok(desc.writable === true, builtins[i] + " not writable");
+
+        r = Object.defineProperty(window, builtins[i], override);
+        ok(r === window, "defineProperty('" + builtins[i] + "' returned " + r);
+        r = Object.getOwnPropertyDescriptor(window, builtins[i]);
+        ok(r !== undefined, "getOwnPropertyDescriptor('" + builtins[i] + "' after override returned undefined");
+        ok(r.value === 12, builtins[i] + " value = " + r.value);
+
+        r = eval(builtins[i]);
+        ok(r === window[builtins[i]], "Global " + builtins[i] + " does not match redefined window." + builtins[i]);
+        r = (delete window[builtins[i]]);
+        ok(r === true, "delete window." + builtins[i] + " returned " + r);
+        ok(!(builtins[i] in window), builtins[i] + " in window after delete");
+        try {
+            eval(builtins[i]);
+            ok(false, "expected exception retrieving global " + builtins[i] + " after delete.");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_UNDEFINED_VARIABLE, "retrieving global " + builtins[i] + " after delete threw " + n);
+        }
+
+        r = Object.defineProperty(window, builtins[i], desc);
+        ok(r === window, "defineProperty('" + builtins[i] + "' to restore returned " + r);
+    }
+
+    /* non-configurable */
+    builtins = [
+        "undefined",
+        "Infinity",
+        "NaN"
+    ];
+
+    for(var i = 0; i < builtins.length; i++) {
+        var desc = Object.getOwnPropertyDescriptor(window, builtins[i]), r;
+        ok(desc !== undefined, "getOwnPropertyDescriptor('" + builtins[i] + "' returned undefined");
+        ok(desc.configurable === false, builtins[i] + " is configurable");
+        ok(desc.enumerable === false, builtins[i] + " is enumerable");
+        ok(desc.writable === false, builtins[i] + " is writable");
+    }
 });
 
 sync_test("head_setter", function() {
