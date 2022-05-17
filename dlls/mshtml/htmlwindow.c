@@ -3485,26 +3485,15 @@ HRESULT search_window_props(HTMLInnerWindow *This, BSTR bstrName, DWORD grfdex, 
     return DISP_E_UNKNOWNNAME;
 }
 
-static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
+static HRESULT lookup_custom_prop(HTMLWindow *html_window, BSTR bstrName, DISPID *pid)
 {
-    HTMLWindow *This = impl_from_IDispatchEx(iface);
-    HTMLInnerWindow *window = This->inner_window;
+    HTMLInnerWindow *window = html_window->inner_window;
     HRESULT hres;
 
-    TRACE("(%p)->(%s %lx %p)\n", This, debugstr_w(bstrName), grfdex, pid);
-
-    hres = search_window_props(window, bstrName, grfdex, pid);
-    if(hres != DISP_E_UNKNOWNNAME)
-        return hres;
-
-    hres = IDispatchEx_GetDispID(&window->base.inner_window->event_target.dispex.IDispatchEx_iface, bstrName, grfdex, pid);
-    if(hres != DISP_E_UNKNOWNNAME)
-        return hres;
-
-    if(This->outer_window) {
+    if(html_window->outer_window) {
         HTMLOuterWindow *frame;
 
-        hres = get_frame_by_name(This->outer_window, bstrName, FALSE, &frame);
+        hres = get_frame_by_name(html_window->outer_window, bstrName, FALSE, &frame);
         if(SUCCEEDED(hres) && frame) {
             global_prop_t *prop;
 
@@ -3540,13 +3529,10 @@ static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, 
     return DISP_E_UNKNOWNNAME;
 }
 
-static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp,
-        VARIANT *pvarRes, EXCEPINFO *pei, IServiceProvider *pspCaller)
+HRESULT window_invoke(HTMLWindow *html_window, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp, VARIANT *res,
+        EXCEPINFO *pei, IServiceProvider *caller)
 {
-    HTMLWindow *This = impl_from_IDispatchEx(iface);
-    HTMLInnerWindow *window = This->inner_window;
-
-    TRACE("(%p)->(%lx %lx %x %p %p %p %p)\n", This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    HTMLInnerWindow *window = html_window->inner_window;
 
     switch(id) {
     case DISPID_IHTMLWINDOW2_LOCATION: {
@@ -3562,7 +3548,7 @@ static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID 
         if(FAILED(hres))
             return hres;
 
-        hres = dispex_invoke(&location->dispex, DISPID_VALUE, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+        hres = dispex_invoke(&location->dispex, DISPID_VALUE, lcid, wFlags, pdp, res, pei, caller);
         IHTMLLocation_Release(&location->IHTMLLocation_iface);
         return hres;
     }
@@ -3583,11 +3569,40 @@ static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID 
         V_VT(args) = VT_I4;
         V_I4(args) = 0;
         args[1] = *pdp->rgvarg;
-        return dispex_invoke(&window->event_target.dispex, id, lcid, wFlags, &dp, pvarRes, pei, pspCaller);
+        return dispex_invoke(&window->event_target.dispex, id, lcid, wFlags, &dp, res, pei, caller);
     }
     }
 
-    return dispex_invoke(&window->event_target.dispex, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    return dispex_invoke(&window->event_target.dispex, id, lcid, wFlags, pdp, res, pei, caller);
+}
+
+static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
+{
+    HTMLWindow *This = impl_from_IDispatchEx(iface);
+    HTMLInnerWindow *window = This->inner_window;
+    HRESULT hres;
+
+    TRACE("(%p)->(%s %lx %p)\n", This, debugstr_w(bstrName), grfdex, pid);
+
+    hres = search_window_props(window, bstrName, grfdex, pid);
+    if(hres != DISP_E_UNKNOWNNAME)
+        return hres;
+
+    hres = IDispatchEx_GetDispID(&window->base.inner_window->event_target.dispex.IDispatchEx_iface, bstrName, grfdex, pid);
+    if(hres != DISP_E_UNKNOWNNAME)
+        return hres;
+
+    return lookup_custom_prop(This, bstrName, pid);
+}
+
+static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp,
+        VARIANT *pvarRes, EXCEPINFO *pei, IServiceProvider *pspCaller)
+{
+    HTMLWindow *This = impl_from_IDispatchEx(iface);
+
+    TRACE("(%p)->(%lx %lx %x %p %p %p %p)\n", This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+
+    return window_invoke(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI WindowDispEx_DeleteMemberByName(IDispatchEx *iface, BSTR bstrName, DWORD grfdex)
