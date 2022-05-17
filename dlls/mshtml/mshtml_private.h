@@ -139,6 +139,7 @@ struct _IWineDispatchProxyCbPrivate {
 #define NSAPI WINAPI
 
 #define MSHTML_E_INVALID_PROPERTY 0x800a01b6
+#define MSHTML_E_INVALID_ACTION   0x800a01bd
 #define MSHTML_E_NODOC            0x800a025c
 
 typedef struct HTMLDOMNode HTMLDOMNode;
@@ -496,6 +497,7 @@ typedef struct {
     HRESULT (*value)(DispatchEx*,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
     HRESULT (*get_dispid)(DispatchEx*,BSTR,DWORD,DISPID*);
     HRESULT (*invoke)(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+    HRESULT (*delete)(DispatchEx*,DISPID);
     HRESULT (*get_static_dispid)(compat_mode_t,BSTR,DWORD,DISPID*);
     compat_mode_t (*get_compat_mode)(DispatchEx*);
     HRESULT (*populate_props)(DispatchEx*);
@@ -608,7 +610,14 @@ struct compat_ctor {
 
     LONG ref;
 
+    prototype_id_t prot_id;
     HTMLInnerWindow *window;
+};
+
+struct compat_prototype {
+    IUnknown IUnknown_iface;
+    DispatchEx dispex;
+    LONG ref;
 };
 
 typedef enum {
@@ -740,6 +749,7 @@ struct HTMLInnerWindow {
     struct list bindings;
 
     struct compat_ctor *compat_ctors[COMPAT_CTOR_COUNT];
+    struct compat_prototype *compat_prototypes[COMPAT_PROTOTYPE_COUNT];
 };
 
 typedef enum {
@@ -1093,6 +1103,9 @@ HRESULT create_outer_window(GeckoBrowser*,mozIDOMWindowProxy*,HTMLOuterWindow*,H
 HRESULT update_window_doc(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 HTMLOuterWindow *mozwindow_to_window(const mozIDOMWindowProxy*) DECLSPEC_HIDDEN;
 void get_top_window(HTMLOuterWindow*,HTMLOuterWindow**) DECLSPEC_HIDDEN;
+HRESULT compat_ctor_get_dispid(DispatchEx*,BSTR,DWORD,DISPID*) DECLSPEC_HIDDEN;
+HRESULT compat_ctor_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*) DECLSPEC_HIDDEN;
+HRESULT compat_ctor_delete(DispatchEx*,DISPID) DECLSPEC_HIDDEN;
 HRESULT HTMLLocation_Create(HTMLInnerWindow*,HTMLLocation**) DECLSPEC_HIDDEN;
 HRESULT create_navigator(compat_mode_t,IOmNavigator**) DECLSPEC_HIDDEN;
 HRESULT create_html_screen(compat_mode_t,IHTMLScreen**) DECLSPEC_HIDDEN;

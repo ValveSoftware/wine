@@ -10017,6 +10017,7 @@ const dispex_static_data_vtbl_t CSSStyle_dispex_vtbl = {
     NULL,
     NULL,
     NULL,
+    NULL,
     CSSStyle_get_static_dispid
 };
 

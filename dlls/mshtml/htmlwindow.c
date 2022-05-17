@@ -152,8 +152,8 @@ static void detach_inner_window(HTMLInnerWindow *window)
     }
 }
 
-static HRESULT get_compat_ctor(HTMLInnerWindow *window, compat_ctor_id_t ctor_id, dispex_static_data_t *dispex,
-        const void *vtbl, IDispatch **ret)
+static HRESULT get_compat_ctor(HTMLInnerWindow *window, compat_ctor_id_t ctor_id, prototype_id_t prot_id,
+        dispex_static_data_t *dispex, const void *vtbl, IDispatch **ret)
 {
     struct compat_ctor *ctor = window->compat_ctors[ctor_id];
 
@@ -164,6 +164,7 @@ static HRESULT get_compat_ctor(HTMLInnerWindow *window, compat_ctor_id_t ctor_id
 
         ctor->IUnknown_iface.lpVtbl = vtbl;
         ctor->ref = 1;
+        ctor->prot_id = prot_id;
         ctor->window = window;
         window->compat_ctors[ctor_id] = ctor;
 
@@ -321,6 +322,10 @@ static void release_inner_window(HTMLInnerWindow *This)
             IUnknown_Release(&This->compat_ctors[i]->IUnknown_iface);
         }
     }
+
+    for(i = 0; i < ARRAY_SIZE(This->compat_prototypes); i++)
+        if(This->compat_prototypes[i])
+            IUnknown_Release(&This->compat_prototypes[i]->IUnknown_iface);
 
     if(This->screen)
         IHTMLScreen_Release(This->screen);
@@ -815,8 +820,8 @@ static HRESULT WINAPI HTMLWindow2_get_Image(IHTMLWindow2 *iface, IHTMLImageEleme
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    hres = get_compat_ctor(window, COMPAT_CTOR_ID_Image, &HTMLImageElementFactory_dispex,
-                           &HTMLImageElementFactoryVtbl, &disp);
+    hres = get_compat_ctor(window, COMPAT_CTOR_ID_Image, PROTO_ID_HTMLImgElement,
+                           &HTMLImageElementFactory_dispex, &HTMLImageElementFactoryVtbl, &disp);
     if(SUCCEEDED(hres))
         *p = &compat_ctor_from_IDispatch(disp)->IHTMLImageElementFactory_iface;
     return hres;
@@ -1368,8 +1373,8 @@ static HRESULT WINAPI HTMLWindow2_get_Option(IHTMLWindow2 *iface, IHTMLOptionEle
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    hres = get_compat_ctor(window, COMPAT_CTOR_ID_Option, &HTMLOptionElementFactory_dispex,
-                           &HTMLOptionElementFactoryVtbl, &disp);
+    hres = get_compat_ctor(window, COMPAT_CTOR_ID_Option, PROTO_ID_HTMLOptionElement,
+                           &HTMLOptionElementFactory_dispex, &HTMLOptionElementFactoryVtbl, &disp);
     if(SUCCEEDED(hres))
         *p = &compat_ctor_from_IDispatch(disp)->IHTMLOptionElementFactory_iface;
     return hres;
@@ -2056,8 +2061,8 @@ static HRESULT WINAPI HTMLWindow5_get_XMLHttpRequest(IHTMLWindow5 *iface, VARIAN
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    hres = get_compat_ctor(window, COMPAT_CTOR_ID_HTMLXMLHttpRequest, &HTMLXMLHttpRequestFactory_dispex,
-                           &HTMLXMLHttpRequestFactoryVtbl, &disp);
+    hres = get_compat_ctor(window, COMPAT_CTOR_ID_HTMLXMLHttpRequest, PROTO_ID_HTMLXMLHttpRequest,
+                           &HTMLXMLHttpRequestFactory_dispex, &HTMLXMLHttpRequestFactoryVtbl, &disp);
     if(SUCCEEDED(hres)) {
         V_VT(p) = VT_DISPATCH;
         V_DISPATCH(p) = (IDispatch*)&compat_ctor_from_IDispatch(disp)->IHTMLXMLHttpRequestFactory_iface;
@@ -4126,6 +4131,7 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
         NULL,
         NULL,
         HTMLWindow_invoke,
+        NULL,
         NULL,
         HTMLWindow_get_compat_mode,
         NULL
