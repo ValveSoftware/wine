@@ -269,11 +269,9 @@ static dispex_prop_t *alloc_protref(jsdisp_t *This, const WCHAR *name, DWORD ref
     return ret;
 }
 
-static HRESULT find_prop_name(jsdisp_t *This, unsigned hash, const WCHAR *name, dispex_prop_t **ret)
+static dispex_prop_t *find_prop_name_raw(jsdisp_t *This, unsigned hash, const WCHAR *name)
 {
-    const builtin_prop_t *builtin;
     unsigned bucket, pos, prev = ~0;
-    dispex_prop_t *prop;
 
     bucket = get_props_idx(This, hash);
     pos = This->props[bucket].bucket_head;
@@ -285,12 +283,23 @@ static HRESULT find_prop_name(jsdisp_t *This, unsigned hash, const WCHAR *name, 
                 This->props[bucket].bucket_head = pos;
             }
 
-            *ret = &This->props[pos];
-            return S_OK;
+            return &This->props[pos];
         }
 
         prev = pos;
         pos = This->props[pos].bucket_next;
+    }
+    return NULL;
+}
+
+static HRESULT find_prop_name(jsdisp_t *This, unsigned hash, const WCHAR *name, dispex_prop_t **ret)
+{
+    dispex_prop_t *prop = find_prop_name_raw(This, hash, name);
+    const builtin_prop_t *builtin;
+
+    if(prop) {
+        *ret = prop;
+        return S_OK;
     }
 
     if(This->proxy) {
