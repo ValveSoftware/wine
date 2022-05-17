@@ -31,6 +31,10 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
+const WCHAR *const content_type_from_document_type[DOCTYPE_COUNT] = {
+    [DOCTYPE_HTML]  = L"text/html",
+};
+
 typedef struct HTMLPluginsCollection HTMLPluginsCollection;
 typedef struct HTMLMimeTypesCollection HTMLMimeTypesCollection;
 
