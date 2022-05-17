@@ -3557,23 +3557,6 @@ HRESULT window_invoke(HTMLWindow *html_window, IDispatch *this_obj, DISPID id, L
     HTMLInnerWindow *window = html_window->inner_window;
 
     switch(id) {
-    case DISPID_IHTMLWINDOW2_LOCATION: {
-        HTMLLocation *location;
-        HRESULT hres;
-
-        if(!(wFlags & DISPATCH_PROPERTYPUT))
-            break;
-
-        TRACE("forwarding to location.href\n");
-
-        hres = get_location(window, &location);
-        if(FAILED(hres))
-            return hres;
-
-        hres = dispex_invoke(&location->dispex, this_obj, DISPID_VALUE, lcid, wFlags, pdp, res, pei, caller);
-        IHTMLLocation_Release(&location->IHTMLLocation_iface);
-        return hres;
-    }
     case DISPID_IHTMLWINDOW2_SETTIMEOUT:
     case DISPID_IHTMLWINDOW3_SETTIMEOUT: {
         VARIANT args[2];
@@ -3987,6 +3970,28 @@ static void HTMLWindow_bind_event(DispatchEx *dispex, eventid_t eid)
     ensure_doc_nsevent_handler(This->doc, NULL, eid);
 }
 
+static HRESULT IHTMLWindow2_location_hook(DispatchEx *dispex, WORD flags, DISPPARAMS *dp, VARIANT *res,
+        EXCEPINFO *ei, IServiceProvider *caller)
+{
+    HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
+    HTMLLocation *location;
+    HRESULT hres;
+
+    if(!(flags & DISPATCH_PROPERTYPUT))
+        return S_FALSE;
+
+    TRACE("forwarding to location.href\n");
+
+    hres = get_location(This, &location);
+    if(FAILED(hres))
+        return hres;
+
+    hres = dispex_invoke(&location->dispex, (IDispatch*)&This->base.IHTMLWindow2_iface,
+                         DISPID_VALUE, 0, flags, dp, res, ei, caller);
+    IHTMLLocation_Release(&location->IHTMLLocation_iface);
+    return hres;
+}
+
 static HRESULT IHTMLWindow6_postMessage_hook(DispatchEx *dispex, WORD flags, DISPPARAMS *dp, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
@@ -4073,6 +4078,13 @@ static HRESULT IHTMLWindow6_postMessage_hook(DispatchEx *dispex, WORD flags, DIS
 
 static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
 {
+    static const dispex_hook_t window2_hooks[] = {
+        {DISPID_IHTMLWINDOW2_LOCATION, IHTMLWindow2_location_hook},
+        /* DispHTMLWindow2 uses these from IHTMLWindow3 */
+        {DISPID_IHTMLWINDOW2_SETTIMEOUT},
+        {DISPID_IHTMLWINDOW2_SETINTERVAL},
+        {DISPID_UNKNOWN}
+    };
     static const dispex_hook_t window6_ie10_hooks[] = {
         {DISPID_IHTMLWINDOW6_POSTMESSAGE, IHTMLWindow6_postMessage_hook},
         {DISPID_UNKNOWN}
@@ -4086,6 +4098,7 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         dispex_info_add_interface(info, IWineHTMLWindowPrivate_tid, NULL);
 
     dispex_info_add_interface(info, IHTMLWindow5_tid, NULL);
+    dispex_info_add_interface(info, IHTMLWindow2_tid, window2_hooks);
     dispex_info_add_interface(info, IHTMLWindow6_tid, compat_mode >= COMPAT_MODE_IE10 ? window6_ie10_hooks : NULL);
     EventTarget_init_dispex_info(info, compat_mode);
 }
@@ -4113,7 +4126,6 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
 };
 
 static const tid_t HTMLWindow_iface_tids[] = {
-    IHTMLWindow2_tid,
     IHTMLWindow3_tid,
     IHTMLWindow4_tid,
     0
