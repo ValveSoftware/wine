@@ -2218,6 +2218,7 @@ static HRESULT WINAPI HTMLWindow6_postMessage(IHTMLWindow6 *iface, BSTR msg, VAR
     HTMLWindow *This = impl_from_IHTMLWindow6(iface);
     DOMEvent *event;
     HRESULT hres;
+    VARIANT var;
 
     FIXME("(%p)->(%s %s) semi-stub\n", This, debugstr_w(msg), debugstr_variant(&targetOrigin));
 
@@ -2226,7 +2227,9 @@ static HRESULT WINAPI HTMLWindow6_postMessage(IHTMLWindow6 *iface, BSTR msg, VAR
         return E_FAIL;
     }
 
-    hres = create_message_event(This->inner_window->doc, msg, &event);
+    V_VT(&var) = VT_BSTR;
+    V_BSTR(&var) = msg;
+    hres = create_message_event(This->inner_window->doc, &var, &event);
     if(FAILED(hres))
         return hres;
 
@@ -3782,8 +3785,84 @@ static void HTMLWindow_bind_event(DispatchEx *dispex, eventid_t eid)
     ensure_doc_nsevent_handler(This->doc, NULL, eid);
 }
 
+static HRESULT IHTMLWindow6_postMessage_hook(DispatchEx *dispex, WORD flags, DISPPARAMS *dp, VARIANT *res,
+        EXCEPINFO *ei, IServiceProvider *caller)
+{
+    HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
+    VARIANT msg, *targetOrigin, *transfer;
+    struct post_message_task *task;
+    DOMEvent *event;
+    HRESULT hres;
+
+    if(!(flags & DISPATCH_METHOD) || dp->cArgs < 2 || dp->cNamedArgs)
+        return S_FALSE;
+    msg = dp->rgvarg[dp->cArgs - 1];
+    targetOrigin = &dp->rgvarg[dp->cArgs - 2];
+    transfer = (dp->cArgs > 2) ? &dp->rgvarg[dp->cArgs - 3] : NULL;
+
+    TRACE("(%p)->(%s %s %s)\n", This, debugstr_variant(&msg), debugstr_variant(targetOrigin), debugstr_variant(transfer));
+
+    if(transfer)
+        FIXME("transfer not implemented, ignoring\n");
+
+    switch(V_VT(&msg)) {
+        case VT_EMPTY:
+        case VT_NULL:
+        case VT_VOID:
+        case VT_I1:
+        case VT_I2:
+        case VT_I4:
+        case VT_I8:
+        case VT_UI1:
+        case VT_UI2:
+        case VT_UI4:
+        case VT_UI8:
+        case VT_INT:
+        case VT_UINT:
+        case VT_R4:
+        case VT_R8:
+        case VT_BOOL:
+        case VT_BSTR:
+        case VT_CY:
+        case VT_DATE:
+        case VT_DECIMAL:
+        case VT_HRESULT:
+            break;
+        case VT_ERROR:
+            V_VT(&msg) = VT_EMPTY;
+            break;
+        default:
+            FIXME("Unsupported vt %d\n", V_VT(&msg));
+            return E_NOTIMPL;
+    }
+
+    if(!This->doc) {
+        FIXME("No document\n");
+        return E_FAIL;
+    }
+
+    hres = create_message_event(This->doc, &msg, &event);
+    if(FAILED(hres))
+        return hres;
+
+    if(!(task = heap_alloc(sizeof(*task)))) {
+        IDOMEvent_Release(&event->IDOMEvent_iface);
+        return E_OUTOFMEMORY;
+    }
+
+    task->event = event;
+    task->window = This;
+    IHTMLWindow2_AddRef(&task->window->base.IHTMLWindow2_iface);
+    return push_task(&task->header, post_message_proc, post_message_destr, This->task_magic);
+}
+
 static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
 {
+    static const dispex_hook_t window6_ie10_hooks[] = {
+        {DISPID_IHTMLWINDOW6_POSTMESSAGE, IHTMLWindow6_postMessage_hook},
+        {DISPID_UNKNOWN}
+    };
+
     if(compat_mode >= COMPAT_MODE_IE9)
         dispex_info_add_interface(info, IHTMLWindow7_tid, NULL);
     else
@@ -3792,6 +3871,7 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         dispex_info_add_interface(info, IWineHTMLWindowPrivate_tid, NULL);
 
     dispex_info_add_interface(info, IHTMLWindow5_tid, NULL);
+    dispex_info_add_interface(info, IHTMLWindow6_tid, compat_mode >= COMPAT_MODE_IE10 ? window6_ie10_hooks : NULL);
     EventTarget_init_dispex_info(info, compat_mode);
 }
 
@@ -3821,7 +3901,6 @@ static const tid_t HTMLWindow_iface_tids[] = {
     IHTMLWindow2_tid,
     IHTMLWindow3_tid,
     IHTMLWindow4_tid,
-    IHTMLWindow6_tid,
     0
 };
 
