@@ -1067,6 +1067,7 @@ sync_test("builtin_prototypes", function() {
             [ "Event",                          "Object" ],
             [ "History",                        "Object" ],
             [ "HTMLCollection",                 "Object" ],
+            [ "MessageEvent",                   "Event" ],
             [ "MimeTypeArray",                  "Object" ],
             [ "MSCSSRuleList",                  "Object" ],
             [ "MSEventObj",                     "Object" ],
@@ -1111,6 +1112,7 @@ sync_test("builtin_prototypes", function() {
             [ "CharacterData", ["data","length","appendData"], Node_props ],
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
             [ "CustomEvent", ["detail","initCustomEvent"], Event_props ],
+            [ "MessageEvent", ["data","initMessageEvent","origin","source"], Event_props ],
             [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ],
             [ "UIEvent", ["detail","initUIEvent","view"], Event_props ]
         ];
