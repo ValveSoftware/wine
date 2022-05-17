@@ -359,7 +359,8 @@ typedef struct EventTarget EventTarget;
     XIID(IWineHTMLElementPrivate) \
     XIID(IWineHTMLWindowPrivate) \
     XIID(IWineHTMLWindowCompatPrivate) \
-    XIID(IWineMSHTMLConsole)
+    XIID(IWineMSHTMLConsole) \
+    XIID(IWineMSHTMLCrypto)
 
 typedef enum {
 #define XIID(iface) iface ## _tid,
@@ -437,6 +438,7 @@ extern const tid_t no_iface_tids[1];
 
 #define PROXY_PROTOTYPE_LIST \
     X(Console,                        "Console",                      console_dispex,                         Object) \
+    X(Crypto,                         "Crypto",                       crypto_dispex,                          Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
     X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                DOMUIEvent) \
@@ -713,6 +715,7 @@ struct HTMLWindow {
     IWineHTMLWindowCompatPrivate IWineHTMLWindowCompatPrivate_iface;
 
     IWineMSHTMLConsole *console;
+    IWineMSHTMLCrypto *crypto;
 
     LONG ref;
 
@@ -1659,6 +1662,7 @@ IInternetSecurityManager *get_security_manager(void) DECLSPEC_HIDDEN;
 
 extern HINSTANCE hInst DECLSPEC_HIDDEN;
 void create_console(compat_mode_t compat_mode, IWineMSHTMLConsole **ret) DECLSPEC_HIDDEN;
+void create_crypto(compat_mode_t compat_mode, IWineMSHTMLCrypto **ret) DECLSPEC_HIDDEN;
 
 extern const IHTMLImageElementFactoryVtbl HTMLImageElementFactoryVtbl DECLSPEC_HIDDEN;
 extern const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl DECLSPEC_HIDDEN;
