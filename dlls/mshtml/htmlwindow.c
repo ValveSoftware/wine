@@ -3551,36 +3551,6 @@ static HRESULT lookup_custom_prop(HTMLWindow *html_window, BSTR bstrName, DISPID
     return DISP_E_UNKNOWNNAME;
 }
 
-HRESULT window_invoke(HTMLWindow *html_window, IDispatch *this_obj, DISPID id, LCID lcid, WORD wFlags,
-        DISPPARAMS *pdp, VARIANT *res, EXCEPINFO *pei, IServiceProvider *caller)
-{
-    HTMLInnerWindow *window = html_window->inner_window;
-
-    switch(id) {
-    case DISPID_IHTMLWINDOW2_SETTIMEOUT:
-    case DISPID_IHTMLWINDOW3_SETTIMEOUT: {
-        VARIANT args[2];
-        DISPPARAMS dp = {args, NULL, 2, 0};
-
-        /*
-         * setTimeout calls should use default value 0 for the second argument if only one is provided,
-         * but IDL file does not reflect that. We fixup arguments here instead.
-         */
-        if(!(wFlags & DISPATCH_METHOD) || pdp->cArgs != 1 || pdp->cNamedArgs)
-            break;
-
-        TRACE("Fixing args\n");
-
-        V_VT(args) = VT_I4;
-        V_I4(args) = 0;
-        args[1] = *pdp->rgvarg;
-        return dispex_invoke(&window->event_target.dispex, this_obj, id, lcid, wFlags, &dp, res, pei, caller);
-    }
-    }
-
-    return dispex_invoke(&window->event_target.dispex, this_obj, id, lcid, wFlags, pdp, res, pei, caller);
-}
-
 static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
 {
     HTMLWindow *This = impl_from_IDispatchEx(iface);
@@ -3608,15 +3578,8 @@ static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID 
         VARIANT *pvarRes, EXCEPINFO *pei, IServiceProvider *pspCaller)
 {
     HTMLWindow *This = impl_from_IDispatchEx(iface);
-    IWineDispatchProxyCbPrivate *proxy = This->inner_window->event_target.dispex.proxy;
 
-    if(proxy)
-        return IDispatchEx_InvokeEx((IDispatchEx*)proxy, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
-
-    TRACE("(%p)->(%lx %lx %x %p %p %p %p)\n", This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
-
-    return window_invoke(This, (IDispatch*)&This->inner_window->base.IHTMLWindow2_iface, id, lcid, wFlags, pdp,
-                         pvarRes, pei, pspCaller);
+    return IDispatchEx_InvokeEx(&This->inner_window->event_target.dispex.IDispatchEx_iface, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI WindowDispEx_DeleteMemberByName(IDispatchEx *iface, BSTR bstrName, DWORD grfdex)
@@ -3720,7 +3683,7 @@ static HRESULT WINAPI WindowWineDispProxyPrivate_PropInvoke(IWineDispatchProxyPr
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
 
-    return window_invoke(This, this_obj, id, lcid, flags, dp, ret, ei, caller);
+    return dispex_invoke(&This->inner_window->event_target.dispex, this_obj, id, lcid, flags, dp, ret, ei, caller);
 }
 
 static HRESULT WINAPI WindowWineDispProxyPrivate_PropDelete(IWineDispatchProxyPrivate *iface, DISPID id)
@@ -3992,6 +3955,27 @@ static HRESULT IHTMLWindow2_location_hook(DispatchEx *dispex, WORD flags, DISPPA
     return hres;
 }
 
+static HRESULT IHTMLWindow3_setTimeout_hook(DispatchEx *dispex, WORD flags, DISPPARAMS *dp, VARIANT *res,
+        EXCEPINFO *ei, IServiceProvider *caller)
+{
+    VARIANT args[2];
+    DISPPARAMS new_dp = { args, NULL, 2, 0 };
+
+    /*
+     * setTimeout calls should use default value 0 for the second argument if only one is provided,
+     * but IDL file does not reflect that. We fixup arguments here instead.
+     */
+    if(!(flags & DISPATCH_METHOD) || dp->cArgs != 1 || dp->cNamedArgs)
+        return S_FALSE;
+
+    TRACE("Fixing args\n");
+
+    V_VT(args) = VT_I4;
+    V_I4(args) = 0;
+    args[1] = dp->rgvarg[0];
+    return dispex_call_builtin(dispex, DISPID_IHTMLWINDOW3_SETTIMEOUT, &new_dp, res, ei, caller);
+}
+
 static HRESULT IHTMLWindow6_postMessage_hook(DispatchEx *dispex, WORD flags, DISPPARAMS *dp, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
@@ -4085,6 +4069,10 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         {DISPID_IHTMLWINDOW2_SETINTERVAL},
         {DISPID_UNKNOWN}
     };
+    static const dispex_hook_t window3_hooks[] = {
+        {DISPID_IHTMLWINDOW3_SETTIMEOUT, IHTMLWindow3_setTimeout_hook},
+        {DISPID_UNKNOWN}
+    };
     static const dispex_hook_t window6_ie10_hooks[] = {
         {DISPID_IHTMLWINDOW6_POSTMESSAGE, IHTMLWindow6_postMessage_hook},
         {DISPID_UNKNOWN}
@@ -4099,6 +4087,7 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
 
     dispex_info_add_interface(info, IHTMLWindow5_tid, NULL);
     dispex_info_add_interface(info, IHTMLWindow2_tid, window2_hooks);
+    dispex_info_add_interface(info, IHTMLWindow3_tid, window3_hooks);
     dispex_info_add_interface(info, IHTMLWindow6_tid, compat_mode >= COMPAT_MODE_IE10 ? window6_ie10_hooks : NULL);
     EventTarget_init_dispex_info(info, compat_mode);
 }
@@ -4126,7 +4115,6 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
 };
 
 static const tid_t HTMLWindow_iface_tids[] = {
-    IHTMLWindow3_tid,
     IHTMLWindow4_tid,
     0
 };
