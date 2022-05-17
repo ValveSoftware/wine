@@ -5757,6 +5757,7 @@ static const event_target_vtbl_t HTMLDocumentNode_event_target_vtbl = {
         NULL,
         HTMLDocumentNode_invoke,
         NULL,
+        NULL,
         HTMLDocumentNode_get_compat_mode,
         NULL
     },
