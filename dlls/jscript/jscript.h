@@ -47,6 +47,57 @@
 #define SCRIPTLANGUAGEVERSION_ES5  0x102
 #define SCRIPTLANGUAGEVERSION_ES6  0x103
 
+/*
+ * These are Wine jscript extensions, used for mshtml objects so they act like JS objects.
+ * Both extend IDispatchEx. IWineDispatchProxyCbPrivate is always available on jscript side.
+ *
+ * NOTE: Keep in sync with mshtml_private.h in mshtml.dll
+ */
+DEFINE_GUID(IID_IWineDispatchProxyPrivate, 0xd359f2fe,0x5531,0x741b,0xa4,0x1a,0x5c,0xf9,0x2e,0xdc,0x97,0x1b);
+typedef struct _IWineDispatchProxyPrivate IWineDispatchProxyPrivate;
+typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
+
+struct proxy_func_invoker
+{
+    HRESULT (STDMETHODCALLTYPE *invoke)(IDispatch*,void*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+    void *context;
+    const WCHAR *name;
+};
+
+typedef struct {
+    IDispatchExVtbl dispex;
+    IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
+    DWORD (STDMETHODCALLTYPE *PropFlags)(IWineDispatchProxyPrivate *This, DISPID id);
+    HRESULT (STDMETHODCALLTYPE *PropGetID)(IWineDispatchProxyPrivate *This, WCHAR *name, DISPID *id);
+    HRESULT (STDMETHODCALLTYPE *PropInvoke)(IWineDispatchProxyPrivate *This, IDispatch *this_obj, DISPID id, LCID lcid,
+                                            DWORD flags, DISPPARAMS *dp, VARIANT *ret, EXCEPINFO *ei, IServiceProvider *caller);
+    HRESULT (STDMETHODCALLTYPE *PropDelete)(IWineDispatchProxyPrivate *This, DISPID id);
+    HRESULT (STDMETHODCALLTYPE *FuncInfo)(IWineDispatchProxyPrivate *This, DISPID id, struct proxy_func_invoker *ret);
+    HRESULT (STDMETHODCALLTYPE *AccessorInfo)(IWineDispatchProxyPrivate *This, DISPID id, struct proxy_func_invoker *ret);
+    HRESULT (STDMETHODCALLTYPE *ToString)(IWineDispatchProxyPrivate *This, BSTR *string);
+    BOOL (STDMETHODCALLTYPE *CanGC)(IWineDispatchProxyPrivate *This);
+} IWineDispatchProxyPrivateVtbl;
+
+typedef struct {
+    IDispatchExVtbl dispex;
+    void (STDMETHODCALLTYPE *Unlinked)(IWineDispatchProxyCbPrivate *This);
+    void (STDMETHODCALLTYPE *Relinked)(IWineDispatchProxyCbPrivate *This, IWineDispatchProxyPrivate *proxy);
+    HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
+    DISPID (STDMETHODCALLTYPE *GetUnderlyingDispID)(IWineDispatchProxyCbPrivate *This, DISPID id);
+    void (STDMETHODCALLTYPE *Traverse)(IWineDispatchProxyCbPrivate *This,
+                                       void (STDMETHODCALLTYPE *note_cc_edge)(IDispatch*,void*), void *cb);
+} IWineDispatchProxyCbPrivateVtbl;
+
+struct _IWineDispatchProxyPrivate {
+    const IWineDispatchProxyPrivateVtbl *lpVtbl;
+};
+
+struct _IWineDispatchProxyCbPrivate {
+    const IWineDispatchProxyCbPrivateVtbl *lpVtbl;
+};
+
+
+
 typedef struct _jsval_t jsval_t;
 typedef struct _jsstr_t jsstr_t;
 typedef struct _jsexcept_t jsexcept_t;
@@ -107,6 +158,7 @@ typedef struct jsdisp_t jsdisp_t;
 extern HINSTANCE jscript_hinstance DECLSPEC_HIDDEN;
 HRESULT get_dispatch_typeinfo(ITypeInfo**) DECLSPEC_HIDDEN;
 
+/* NOTE: Keep in sync with mshtml_private.h in mshtml.dll */
 #define PROPF_ARGMASK       0x00ff
 #define PROPF_METHOD        0x0100
 #define PROPF_CONSTR        0x0200
@@ -115,6 +167,8 @@ HRESULT get_dispatch_typeinfo(ITypeInfo**) DECLSPEC_HIDDEN;
 #define PROPF_WRITABLE      0x0800
 #define PROPF_CONFIGURABLE  0x1000
 #define PROPF_ALL           (PROPF_ENUMERABLE | PROPF_WRITABLE | PROPF_CONFIGURABLE)
+
+#define PROPF_PROXY_ACCESSOR 0x8000
 
 #define PROPF_VERSION_MASK  0x01ff0000
 #define PROPF_VERSION_SHIFT 16
@@ -209,6 +263,7 @@ struct jsdisp_t {
     script_ctx_t *ctx;
 
     jsdisp_t *prototype;
+    IWineDispatchProxyPrivate *proxy;
 
     const builtin_info_t *builtin_info;
     struct list entry;
@@ -221,6 +276,7 @@ static inline IDispatch *to_disp(jsdisp_t *jsdisp)
 
 jsdisp_t *as_jsdisp(IDispatch*) DECLSPEC_HIDDEN;
 jsdisp_t *to_jsdisp(IDispatch*) DECLSPEC_HIDDEN;
+void jsdisp_reacquire(jsdisp_t*) DECLSPEC_HIDDEN;
 void jsdisp_free(jsdisp_t*) DECLSPEC_HIDDEN;
 
 #ifndef TRACE_REFCNT
@@ -233,7 +289,8 @@ void jsdisp_free(jsdisp_t*) DECLSPEC_HIDDEN;
  */
 static inline jsdisp_t *jsdisp_addref(jsdisp_t *jsdisp)
 {
-    jsdisp->ref++;
+    if(!jsdisp->ref++)
+        jsdisp_reacquire(jsdisp);
     return jsdisp;
 }
 
@@ -259,6 +316,7 @@ enum jsdisp_enum_type {
 HRESULT create_dispex(script_ctx_t*,const builtin_info_t*,jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
 HRESULT init_dispex(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
 HRESULT init_dispex_from_constr(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
+HRESULT convert_to_proxy(script_ctx_t*,jsval_t*) DECLSPEC_HIDDEN;
 
 void disp_fill_exception(script_ctx_t*,EXCEPINFO*) DECLSPEC_HIDDEN;
 HRESULT disp_call(script_ctx_t*,IDispatch*,DISPID,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
@@ -293,6 +351,8 @@ HRESULT create_builtin_function(script_ctx_t*,builtin_invoke_t,const WCHAR*,cons
         jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
 HRESULT create_builtin_constructor(script_ctx_t*,builtin_invoke_t,const WCHAR*,const builtin_info_t*,DWORD,
         jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
+HRESULT create_proxy_function(jsdisp_t*,DISPID,DWORD,jsdisp_t**) DECLSPEC_HIDDEN;
+HRESULT create_proxy_accessor(jsdisp_t*,DISPID,property_desc_t*) DECLSPEC_HIDDEN;
 HRESULT Function_invoke(jsdisp_t*,IDispatch*,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
 
 HRESULT Function_value(script_ctx_t*,jsval_t,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
@@ -621,6 +681,7 @@ static inline BOOL is_jscript_error(HRESULT hres)
 const char *debugstr_jsval(const jsval_t) DECLSPEC_HIDDEN;
 
 HRESULT create_jscript_object(BOOL,REFIID,void**) DECLSPEC_HIDDEN;
+script_ctx_t *get_script_ctx(IActiveScript*) DECLSPEC_HIDDEN;
 
 extern LONG module_ref DECLSPEC_HIDDEN;
 
