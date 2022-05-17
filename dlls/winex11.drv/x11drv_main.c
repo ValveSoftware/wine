@@ -307,7 +307,7 @@ int X11DRV_check_error( Display *display )
 static int error_handler( Display *display, XErrorEvent *error_evt )
 {
     if (err_callback && display == err_callback_display &&
-        (long)(error_evt->serial - err_serial) >= 0)
+        (!error_evt->serial || error_evt->serial >= err_serial))
     {
         if ((err_callback_result = err_callback( display, error_evt, err_callback_arg )))
         {
