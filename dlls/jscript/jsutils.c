@@ -179,6 +179,41 @@ heap_pool_t *heap_pool_mark(heap_pool_t *heap)
     return heap;
 }
 
+enum { HEAP_STACK_CHUNK_SIZE = 1020 };
+
+HRESULT heap_stack_push(struct heap_stack *heap_stack, void *value)
+{
+    if(!heap_stack->idx) {
+        if(heap_stack->next)
+            heap_stack->chunk = heap_stack->next;
+        else {
+            void **prev, **tmp = heap_alloc((HEAP_STACK_CHUNK_SIZE + 1) * sizeof(void*));
+            if(!tmp)
+                return E_OUTOFMEMORY;
+            prev = heap_stack->chunk;
+            heap_stack->chunk = tmp;
+            heap_stack->chunk[HEAP_STACK_CHUNK_SIZE] = prev;
+        }
+        heap_stack->idx = HEAP_STACK_CHUNK_SIZE;
+        heap_stack->next = NULL;
+    }
+    heap_stack->chunk[--heap_stack->idx] = value;
+    return S_OK;
+}
+
+void *heap_stack_pop(struct heap_stack *heap_stack)
+{
+    void *ret = heap_stack->chunk[heap_stack->idx];
+
+    if(++heap_stack->idx == HEAP_STACK_CHUNK_SIZE) {
+        free(heap_stack->next);
+        heap_stack->next = heap_stack->chunk;
+        heap_stack->chunk = heap_stack->chunk[HEAP_STACK_CHUNK_SIZE];
+        heap_stack->idx = 0;
+    }
+    return ret;
+}
+
 void jsval_release(jsval_t val)
 {
     switch(jsval_type(val)) {
