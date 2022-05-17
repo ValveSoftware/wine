@@ -639,8 +639,33 @@ static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
 };
 
 dispex_static_data_t HTMLOptionElementFactory_dispex = {
-    L"Function",
+    L"HTMLOptionElement",
     &HTMLOptionElementFactory_dispex_vtbl,
+    PROTO_ID_NULL,
+    IHTMLOptionElementFactory_tid,
+    HTMLOptionElementFactory_iface_tids,
+    HTMLElement_init_dispex_info
+};
+
+static HRESULT HTMLOptionCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    if(flags == DISPATCH_CONSTRUCT)
+        return HTMLOptionElementFactory_value(iface, lcid, flags, params, res, ei, caller);
+
+    return compat_ctor_value(iface, lcid, flags, params, res, ei, caller);
+}
+
+static const dispex_static_data_vtbl_t HTMLOptionCtor_dispex_vtbl = {
+    HTMLOptionCtor_value,
+    compat_ctor_get_dispid,
+    compat_ctor_invoke,
+    compat_ctor_delete
+};
+
+dispex_static_data_t HTMLOptionCtor_dispex = {
+    L"HTMLOptionElement",
+    &HTMLOptionCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLOptionElementFactory_tid,
     HTMLOptionElementFactory_iface_tids,
