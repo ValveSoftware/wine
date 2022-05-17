@@ -181,7 +181,7 @@ static const tag_desc_t *get_tag_desc(const WCHAR *tag_name)
     return NULL;
 }
 
-HRESULT replace_node_by_html(nsIDOMHTMLDocument *nsdoc, nsIDOMNode *nsnode, const WCHAR *html)
+HRESULT replace_node_by_html(nsIDOMDocument *nsdoc, nsIDOMNode *nsnode, const WCHAR *html)
 {
     nsIDOMDocumentFragment *nsfragment;
     nsIDOMNode *nsparent;
@@ -190,7 +190,7 @@ HRESULT replace_node_by_html(nsIDOMHTMLDocument *nsdoc, nsIDOMNode *nsnode, cons
     nsresult nsres;
     HRESULT hres = S_OK;
 
-    nsres = nsIDOMHTMLDocument_CreateRange(nsdoc, &range);
+    nsres = nsIDOMDocument_CreateRange(nsdoc, &range);
     if(NS_FAILED(nsres)) {
         ERR("CreateRange failed: %08lx\n", nsres);
         return E_FAIL;
@@ -430,7 +430,7 @@ static HRESULT create_nselem_parse(HTMLDocumentNode *doc, const WCHAR *tag, nsID
     size = (p + 2 - (tag + 1 + name_len)) * sizeof(WCHAR);
 
     /* Parse the input via a contextual fragment, using a dummy unknown tag */
-    nsres = nsIDOMHTMLDocument_CreateRange(doc->nsdoc, &nsrange);
+    nsres = nsIDOMDocument_CreateRange(doc->nsdoc, &nsrange);
     if(NS_FAILED(nsres))
         return map_nsresult(nsres);
 
@@ -467,7 +467,7 @@ static HRESULT create_nselem_parse(HTMLDocumentNode *doc, const WCHAR *tag, nsID
         p[name_len] = '\0';
 
         nsAString_InitDepend(&str, p);
-        nsres = nsIDOMHTMLDocument_CreateElement(doc->nsdoc, &str, ret);
+        nsres = nsIDOMDocument_CreateElement(doc->nsdoc, &str, ret);
         nsAString_Finish(&str);
         heap_free(p);
 
@@ -494,7 +494,7 @@ HRESULT create_nselem(HTMLDocumentNode *doc, const WCHAR *tag, nsIDOMElement **r
     }
 
     nsAString_InitDepend(&tag_str, tag);
-    nsres = nsIDOMHTMLDocument_CreateElement(doc->nsdoc, &tag_str, ret);
+    nsres = nsIDOMDocument_CreateElement(doc->nsdoc, &tag_str, ret);
     nsAString_Finish(&tag_str);
     if(NS_FAILED(nsres)) {
         ERR("CreateElement failed: %08lx\n", nsres);
@@ -2257,7 +2257,7 @@ static HRESULT WINAPI HTMLElement_put_innerText(IHTMLElement *iface, BSTR v)
     }
 
     nsAString_InitDepend(&text_str, v);
-    nsres = nsIDOMHTMLDocument_CreateTextNode(This->node.doc->nsdoc, &text_str, &text_node);
+    nsres = nsIDOMDocument_CreateTextNode(This->node.doc->nsdoc, &text_str, &text_node);
     nsAString_Finish(&text_str);
     if(NS_FAILED(nsres)) {
         ERR("CreateTextNode failed: %08lx\n", nsres);
@@ -2338,14 +2338,14 @@ static HRESULT WINAPI HTMLElement_put_outerText(IHTMLElement *iface, BSTR v)
     }
 
     nsAString_InitDepend(&nsstr, v);
-    nsres = nsIDOMHTMLDocument_CreateTextNode(This->node.doc->nsdoc, &nsstr, &text_node);
+    nsres = nsIDOMDocument_CreateTextNode(This->node.doc->nsdoc, &nsstr, &text_node);
     nsAString_Finish(&nsstr);
     if(NS_FAILED(nsres)) {
         ERR("CreateTextNode failed\n");
         return E_FAIL;
     }
 
-    nsres = nsIDOMHTMLDocument_CreateRange(This->node.doc->nsdoc, &range);
+    nsres = nsIDOMDocument_CreateRange(This->node.doc->nsdoc, &range);
     if(NS_SUCCEEDED(nsres)) {
         nsres = nsIDOMRange_SelectNode(range, This->node.nsnode);
         if(NS_SUCCEEDED(nsres))
@@ -2461,7 +2461,7 @@ static HRESULT WINAPI HTMLElement_insertAdjacentHTML(IHTMLElement *iface, BSTR w
         return E_UNEXPECTED;
     }
 
-    nsres = nsIDOMHTMLDocument_CreateRange(This->node.doc->nsdoc, &range);
+    nsres = nsIDOMDocument_CreateRange(This->node.doc->nsdoc, &range);
     if(NS_FAILED(nsres))
     {
         ERR("CreateRange failed: %08lx\n", nsres);
@@ -2504,7 +2504,7 @@ static HRESULT WINAPI HTMLElement_insertAdjacentText(IHTMLElement *iface, BSTR w
 
 
     nsAString_InitDepend(&ns_text, text);
-    nsres = nsIDOMHTMLDocument_CreateTextNode(This->node.doc->nsdoc, &ns_text, (nsIDOMText **)&nsnode);
+    nsres = nsIDOMDocument_CreateTextNode(This->node.doc->nsdoc, &ns_text, (nsIDOMText **)&nsnode);
     nsAString_Finish(&ns_text);
 
     if(NS_FAILED(nsres) || !nsnode)

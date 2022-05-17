@@ -954,7 +954,7 @@ void init_document_mutation(HTMLDocumentNode *doc)
 
     doc->nsIDocumentObserver_iface.lpVtbl = &nsDocumentObserverVtbl;
 
-    nsres = nsIDOMHTMLDocument_QueryInterface(doc->nsdoc, &IID_nsIDocument, (void**)&nsdoc);
+    nsres = nsIDOMDocument_QueryInterface(doc->nsdoc, &IID_nsIDocument, (void**)&nsdoc);
     if(NS_FAILED(nsres)) {
         ERR("Could not get nsIDocument: %08lx\n", nsres);
         return;
@@ -969,7 +969,7 @@ void release_document_mutation(HTMLDocumentNode *doc)
     nsIDocument *nsdoc;
     nsresult nsres;
 
-    nsres = nsIDOMHTMLDocument_QueryInterface(doc->nsdoc, &IID_nsIDocument, (void**)&nsdoc);
+    nsres = nsIDOMDocument_QueryInterface(doc->nsdoc, &IID_nsIDocument, (void**)&nsdoc);
     if(NS_FAILED(nsres)) {
         ERR("Could not get nsIDocument: %08lx\n", nsres);
         return;
@@ -979,13 +979,13 @@ void release_document_mutation(HTMLDocumentNode *doc)
     nsIDocument_Release(nsdoc);
 }
 
-JSContext *get_context_from_document(nsIDOMHTMLDocument *nsdoc)
+JSContext *get_context_from_document(nsIDOMDocument *nsdoc)
 {
     nsIDocument *doc;
     JSContext *ctx;
     nsresult nsres;
 
-    nsres = nsIDOMHTMLDocument_QueryInterface(nsdoc, &IID_nsIDocument, (void**)&doc);
+    nsres = nsIDOMDocument_QueryInterface(nsdoc, &IID_nsIDocument, (void**)&doc);
     assert(nsres == NS_OK);
 
     ctx = nsIContentUtils_GetContextFromDocument(content_utils, doc);
