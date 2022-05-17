@@ -898,7 +898,7 @@ static HRESULT HTMLFormElement_get_dispid(HTMLDOMNode *iface,
     return hres;
 }
 
-static HRESULT HTMLFormElement_invoke(HTMLDOMNode *iface,
+static HRESULT HTMLFormElement_invoke(HTMLDOMNode *iface, IDispatch *this_obj,
         DISPID id, LCID lcid, WORD flags, DISPPARAMS *params, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
