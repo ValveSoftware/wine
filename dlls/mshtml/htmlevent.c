@@ -757,7 +757,7 @@ dispex_static_data_t HTMLEventObj_dispex = {
     HTMLEventObj_iface_tids
 };
 
-static HTMLEventObj *alloc_event_obj(DOMEvent *event, compat_mode_t compat_mode)
+static HTMLEventObj *alloc_event_obj(DOMEvent *event, HTMLDocumentNode *doc, compat_mode_t compat_mode)
 {
     HTMLEventObj *event_obj;
 
@@ -771,15 +771,15 @@ static HTMLEventObj *alloc_event_obj(DOMEvent *event, compat_mode_t compat_mode)
     if(event)
         IDOMEvent_AddRef(&event->IDOMEvent_iface);
 
-    init_dispatch(&event_obj->dispex, (IUnknown*)&event_obj->IHTMLEventObj_iface, &HTMLEventObj_dispex, compat_mode);
+    init_dispatch(&event_obj->dispex, (IUnknown*)&event_obj->IHTMLEventObj_iface, &HTMLEventObj_dispex, doc, compat_mode);
     return event_obj;
 }
 
-HRESULT create_event_obj(compat_mode_t compat_mode, IHTMLEventObj **ret)
+HRESULT create_event_obj(HTMLDocumentNode *doc, IHTMLEventObj **ret)
 {
     HTMLEventObj *event_obj;
 
-    event_obj = alloc_event_obj(NULL, compat_mode);
+    event_obj = alloc_event_obj(NULL, doc, dispex_compat_mode(&doc->node.event_target.dispex));
     if(!event_obj)
         return E_OUTOFMEMORY;
 
@@ -855,6 +855,7 @@ static ULONG WINAPI DOMEvent_Release(IDOMEvent *iface)
             nsIDOMKeyEvent_Release(This->keyboard_event);
         if(This->target)
             IEventTarget_Release(&This->target->IEventTarget_iface);
+        htmldoc_release(&This->doc->basedoc);
         nsIDOMEvent_Release(This->nsevent);
         release_dispex(&This->dispex);
         heap_free(This->type);
@@ -2399,7 +2400,8 @@ static BOOL check_event_iface(nsIDOMEvent *event, REFIID riid)
     return TRUE;
 }
 
-static DOMEvent *alloc_event(nsIDOMEvent *nsevent, compat_mode_t compat_mode, eventid_t event_id)
+static DOMEvent *alloc_event(nsIDOMEvent *nsevent, HTMLDocumentNode *doc, compat_mode_t compat_mode,
+        eventid_t event_id)
 {
     dispex_static_data_t *dispex_data = &DOMEvent_dispex;
     DOMEvent *event = NULL;
@@ -2436,6 +2438,10 @@ static DOMEvent *alloc_event(nsIDOMEvent *nsevent, compat_mode_t compat_mode, ev
     event->IDOMMouseEvent_iface.lpVtbl = &DOMMouseEventVtbl;
     event->IDOMKeyboardEvent_iface.lpVtbl = &DOMKeyboardEventVtbl;
     event->ref = 1;
+    event->doc = doc;
+    if(doc)
+        htmldoc_addref(&doc->basedoc);
+
     event->event_id = event_id;
     if(event_id != EVENTID_LAST) {
         event->type = heap_strdupW(event_info[event_id].name);
@@ -2468,11 +2474,12 @@ static DOMEvent *alloc_event(nsIDOMEvent *nsevent, compat_mode_t compat_mode, ev
     else
         event->keyboard_event = NULL;
 
-    init_dispatch(&event->dispex, (IUnknown*)&event->IDOMEvent_iface, dispex_data, compat_mode);
+    init_dispatch(&event->dispex, (IUnknown*)&event->IDOMEvent_iface, dispex_data, NULL, compat_mode);
     return event;
 }
 
-HRESULT create_event_from_nsevent(nsIDOMEvent *nsevent, compat_mode_t compat_mode, DOMEvent **ret_event)
+HRESULT create_event_from_nsevent(nsIDOMEvent *nsevent, HTMLDocumentNode *doc, compat_mode_t compat_mode,
+        DOMEvent **ret_event)
 {
     eventid_t event_id = EVENTID_LAST;
     DOMEvent *event;
@@ -2492,7 +2499,7 @@ HRESULT create_event_from_nsevent(nsIDOMEvent *nsevent, compat_mode_t compat_mod
     }
     nsAString_Finish(&nsstr);
 
-    event = alloc_event(nsevent, compat_mode, event_id);
+    event = alloc_event(nsevent, doc, compat_mode, event_id);
     if(!event)
         return E_OUTOFMEMORY;
 
@@ -2516,7 +2523,7 @@ HRESULT create_document_event_str(HTMLDocumentNode *doc, const WCHAR *type, IDOM
         return E_FAIL;
     }
 
-    event = alloc_event(nsevent, dispex_compat_mode(&doc->node.event_target.dispex), EVENTID_LAST);
+    event = alloc_event(nsevent, doc, dispex_compat_mode(&doc->node.event_target.dispex), EVENTID_LAST);
     nsIDOMEvent_Release(nsevent);
     if(!event)
         return E_OUTOFMEMORY;
@@ -2540,7 +2547,7 @@ HRESULT create_document_event(HTMLDocumentNode *doc, eventid_t event_id, DOMEven
         return E_FAIL;
     }
 
-    event = alloc_event(nsevent, doc->document_mode, event_id);
+    event = alloc_event(nsevent, doc, doc->document_mode, event_id);
     if(!event)
         return E_OUTOFMEMORY;
 
@@ -2908,7 +2915,7 @@ static HRESULT dispatch_event_object(EventTarget *event_target, DOMEvent *event,
     } while(iter);
 
     if(!event->event_obj && !event->no_event_obj) {
-        event_obj_ref = alloc_event_obj(event, dispex_compat_mode(&event->dispex));
+        event_obj_ref = alloc_event_obj(event, event->doc, dispex_compat_mode(&event->dispex));
         if(event_obj_ref)
             event->event_obj = &event_obj_ref->IHTMLEventObj_iface;
     }
@@ -3026,7 +3033,7 @@ HRESULT fire_event(HTMLDOMNode *node, const WCHAR *event_name, VARIANT *event_va
     }
 
     if(!event_obj) {
-        event_obj = alloc_event_obj(NULL, dispex_compat_mode(&node->event_target.dispex));
+        event_obj = alloc_event_obj(NULL, node->doc, dispex_compat_mode(&node->event_target.dispex));
         if(!event_obj)
             return E_OUTOFMEMORY;
     }
@@ -3651,9 +3658,9 @@ static int event_id_cmp(const void *key, const struct wine_rb_entry *entry)
 }
 
 void EventTarget_Init(EventTarget *event_target, IUnknown *outer, dispex_static_data_t *dispex_data,
-                      compat_mode_t compat_mode)
+                      HTMLDocumentNode *doc)
 {
-    init_dispatch(&event_target->dispex, outer, dispex_data, compat_mode);
+    init_dispatch(&event_target->dispex, outer, dispex_data, doc, doc ? doc->document_mode : COMPAT_MODE_NONE);
     event_target->IEventTarget_iface.lpVtbl = &EventTargetVtbl;
     wine_rb_init(&event_target->handler_map, event_id_cmp);
 }
