@@ -557,6 +557,8 @@ static ULONG WINAPI HTMLWindow2_Release(IHTMLWindow2 *iface)
     if(!ref) {
         if (This->console)
             IWineMSHTMLConsole_Release(This->console);
+        if (This->crypto)
+            IWineMSHTMLCrypto_Release(This->crypto);
 
         if(is_outer_window(This))
             release_outer_window(This->outer_window);
@@ -3474,6 +3476,21 @@ static HRESULT WINAPI window_private_get_DOMParser(IWineHTMLWindowPrivate *iface
                            &DOMParserCtor_dispex, &compat_ctor_vtbl, dom_parser);
 }
 
+static HRESULT WINAPI window_private_get_msCrypto(IWineHTMLWindowPrivate *iface, IDispatch **crypto)
+{
+    HTMLWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface);
+
+    TRACE("iface %p, crypto %p.\n", iface, crypto);
+
+    if(!This->crypto)
+        create_crypto(dispex_compat_mode(&This->inner_window->event_target.dispex), &This->crypto);
+
+    *crypto = (IDispatch*)This->crypto;
+    if(This->crypto)
+        IWineMSHTMLCrypto_AddRef(This->crypto);
+    return S_OK;
+}
+
 static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_QueryInterface,
     window_private_AddRef,
@@ -3486,6 +3503,7 @@ static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_cancelAnimationFrame,
     window_private_get_console,
     window_private_get_DOMParser,
+    window_private_get_msCrypto,
 };
 
 static inline HTMLWindow *impl_from_IWineHTMLWindowCompatPrivateVtbl(IWineHTMLWindowCompatPrivate *iface)
@@ -4440,13 +4458,18 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         {DISPID_IWINEHTMLWINDOWPRIVATE_REQUESTANIMATIONFRAME},
         {DISPID_IWINEHTMLWINDOWPRIVATE_CANCELANIMATIONFRAME},
         {DISPID_IWINEHTMLWINDOWPRIVATE_CONSOLE},
+
+        /* IE10 only */
+        {DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO},
         {DISPID_UNKNOWN}
     };
+    const dispex_hook_t *const private_ie10_hooks = private_ie9_hooks + 3;
 
     if(compat_mode >= COMPAT_MODE_IE9) {
         dispex_info_add_interface(info, IHTMLWindow7_tid, NULL);
         dispex_info_add_interface(info, IWineHTMLWindowPrivate_tid,
-                                  compat_mode == COMPAT_MODE_IE9 ? private_ie9_hooks : NULL);
+                                  compat_mode == COMPAT_MODE_IE9  ? private_ie9_hooks  :
+                                  compat_mode == COMPAT_MODE_IE10 ? private_ie10_hooks : NULL);
     }else
         dispex_info_add_interface(info, IWineHTMLWindowCompatPrivate_tid, NULL);
 
