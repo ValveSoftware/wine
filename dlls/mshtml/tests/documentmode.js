@@ -1060,7 +1060,9 @@ sync_test("builtin_prototypes", function() {
             [ "ClientRectList",                 "Object" ],
             [ "Comment",                        "CharacterData" ],
             [ "Console",                        "Object" ],
+            [ "CSSRule",                        "Object" ],
             [ "CSSStyleDeclaration",            "Object" ],
+            [ "CSSStyleRule",                   "CSSRule" ],
             [ "CSSStyleSheet",                  "StyleSheet" ],
             [ "CustomEvent",                    "Event" ],
             [ "DOMImplementation",              "Object" ],
@@ -1175,6 +1177,7 @@ sync_test("builtin_prototypes", function() {
         protos = [
             [ "CharacterData", ["data","length","appendData"], Node_props ],
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
+            [ "CSSStyleRule", ["readOnly","selectorText","style"], ["cssText","parentRule","parentStyleSheet","type" ] ],
             [ "CSSStyleSheet", ["addRule","cssRules","ownerRule","rules"], ["disabled","media","ownerNode","parentStyleSheet","title","type"] ],
             [ "CustomEvent", ["detail","initCustomEvent"], Event_props ],
             [ "Element", Elem_props, Node_props ],
