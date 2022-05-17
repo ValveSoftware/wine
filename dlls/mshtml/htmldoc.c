@@ -4551,6 +4551,33 @@ static HRESULT dispid_from_elem_name(HTMLDocumentNode *This, BSTR name, DISPID *
     return S_OK;
 }
 
+static HRESULT document_invoke(HTMLDocument *doc, DISPID id, LCID lcid, WORD wFlags,
+        DISPPARAMS *pdp, VARIANT *res, EXCEPINFO *pei, IServiceProvider *caller)
+{
+    if(doc->window) {
+        switch(id) {
+        case DISPID_READYSTATE:
+            TRACE("DISPID_READYSTATE\n");
+
+            if(!(wFlags & DISPATCH_PROPERTYGET))
+                return E_INVALIDARG;
+
+            V_VT(res) = VT_I4;
+            V_I4(res) = doc->window->readystate;
+            return S_OK;
+        case DISPID_IHTMLDOCUMENT2_LOCATION:
+            if(wFlags & DISPATCH_PROPERTYPUT)
+                return window_invoke(&doc->window->base, DISPID_IHTMLWINDOW2_LOCATION, lcid, wFlags,
+                                     pdp, res, pei, caller);
+            break;
+        default:
+            break;
+        }
+    }
+
+    return dispex_invoke(doc->dispex, id, lcid, wFlags, pdp, res, pei, caller);
+}
+
 static HRESULT WINAPI DocDispatchEx_QueryInterface(IDispatchEx *iface, REFIID riid, void **ppv)
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
@@ -4576,7 +4603,7 @@ static HRESULT WINAPI DocDispatchEx_GetTypeInfoCount(IDispatchEx *iface, UINT *p
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_GetTypeInfoCount(This->dispex, pctinfo);
+    return IDispatchEx_GetTypeInfoCount(&This->dispex->IDispatchEx_iface, pctinfo);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetTypeInfo(IDispatchEx *iface, UINT iTInfo,
@@ -4584,7 +4611,7 @@ static HRESULT WINAPI DocDispatchEx_GetTypeInfo(IDispatchEx *iface, UINT iTInfo,
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_GetTypeInfo(This->dispex, iTInfo, lcid, ppTInfo);
+    return IDispatchEx_GetTypeInfo(&This->dispex->IDispatchEx_iface, iTInfo, lcid, ppTInfo);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetIDsOfNames(IDispatchEx *iface, REFIID riid,
@@ -4593,7 +4620,7 @@ static HRESULT WINAPI DocDispatchEx_GetIDsOfNames(IDispatchEx *iface, REFIID rii
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_GetIDsOfNames(This->dispex, riid, rgszNames, cNames, lcid, rgDispId);
+    return IDispatchEx_GetIDsOfNames(&This->dispex->IDispatchEx_iface, riid, rgszNames, cNames, lcid, rgDispId);
 }
 
 static HRESULT WINAPI DocDispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMember,
@@ -4605,20 +4632,8 @@ static HRESULT WINAPI DocDispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMemb
     TRACE("(%p)->(%ld %s %ld %d %p %p %p %p)\n", This, dispIdMember, debugstr_guid(riid),
           lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 
-    switch(dispIdMember) {
-    case DISPID_READYSTATE:
-        TRACE("DISPID_READYSTATE\n");
-
-        if(!(wFlags & DISPATCH_PROPERTYGET))
-            return E_INVALIDARG;
-
-        V_VT(pVarResult) = VT_I4;
-        V_I4(pVarResult) = This->window->readystate;
-        return S_OK;
-    }
-
-    return IDispatchEx_Invoke(This->dispex, dispIdMember, riid, lcid, wFlags, pDispParams,
-                              pVarResult, pExcepInfo, puArgErr);
+    return document_invoke(This, dispIdMember, lcid, wFlags, pDispParams,
+                           pVarResult, pExcepInfo, NULL);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
@@ -4626,7 +4641,7 @@ static HRESULT WINAPI DocDispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName,
     HTMLDocument *This = impl_from_IDispatchEx(iface);
     HRESULT hres;
 
-    hres = IDispatchEx_GetDispID(This->dispex, bstrName, grfdex, pid);
+    hres = IDispatchEx_GetDispID(&This->dispex->IDispatchEx_iface, bstrName, grfdex, pid);
     if(hres != DISP_E_UNKNOWNNAME)
         return hres;
 
@@ -4638,54 +4653,49 @@ static HRESULT WINAPI DocDispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    if(This->window && id == DISPID_IHTMLDOCUMENT2_LOCATION && (wFlags & DISPATCH_PROPERTYPUT))
-        return window_invoke(&This->window->base, DISPID_IHTMLWINDOW2_LOCATION, lcid, wFlags, pdp,
-                pvarRes, pei, pspCaller);
-
-
-    return IDispatchEx_InvokeEx(This->dispex, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    return document_invoke(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI DocDispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR bstrName, DWORD grfdex)
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_DeleteMemberByName(This->dispex, bstrName, grfdex);
+    return IDispatchEx_DeleteMemberByName(&This->dispex->IDispatchEx_iface, bstrName, grfdex);
 }
 
 static HRESULT WINAPI DocDispatchEx_DeleteMemberByDispID(IDispatchEx *iface, DISPID id)
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_DeleteMemberByDispID(This->dispex, id);
+    return IDispatchEx_DeleteMemberByDispID(&This->dispex->IDispatchEx_iface, id);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetMemberProperties(IDispatchEx *iface, DISPID id, DWORD grfdexFetch, DWORD *pgrfdex)
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_GetMemberProperties(This->dispex, id, grfdexFetch, pgrfdex);
+    return IDispatchEx_GetMemberProperties(&This->dispex->IDispatchEx_iface, id, grfdexFetch, pgrfdex);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetMemberName(IDispatchEx *iface, DISPID id, BSTR *pbstrName)
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_GetMemberName(This->dispex, id, pbstrName);
+    return IDispatchEx_GetMemberName(&This->dispex->IDispatchEx_iface, id, pbstrName);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetNextDispID(IDispatchEx *iface, DWORD grfdex, DISPID id, DISPID *pid)
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_GetNextDispID(This->dispex, grfdex, id, pid);
+    return IDispatchEx_GetNextDispID(&This->dispex->IDispatchEx_iface, grfdex, id, pid);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnknown **ppunk)
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return IDispatchEx_GetNameSpaceParent(This->dispex, ppunk);
+    return IDispatchEx_GetNameSpaceParent(&This->dispex->IDispatchEx_iface, ppunk);
 }
 
 const IDispatchExVtbl DocDispatchExVtbl = {
@@ -5331,7 +5341,7 @@ static const cpc_entry_t HTMLDocument_cpc[] = {
     {NULL}
 };
 
-static void init_doc(HTMLDocument *doc, IUnknown *outer, IDispatchEx *dispex)
+static void init_doc(HTMLDocument *doc, IUnknown *outer, DispatchEx *dispex)
 {
     doc->IHTMLDocument2_iface.lpVtbl = &HTMLDocumentVtbl;
     doc->IHTMLDocument3_iface.lpVtbl = &HTMLDocument3Vtbl;
@@ -5671,7 +5681,7 @@ static HTMLDocumentNode *alloc_doc_node(HTMLDocumentObj *doc_obj, HTMLInnerWindo
     doc->window = window;
 
     init_doc(&doc->basedoc, (IUnknown*)&doc->node.IHTMLDOMNode_iface,
-            &doc->node.event_target.dispex.IDispatchEx_iface);
+             &doc->node.event_target.dispex);
     HTMLDocumentNode_SecMgr_Init(doc);
 
     list_init(&doc->selection_list);
@@ -6057,7 +6067,7 @@ static HRESULT create_document_object(BOOL is_mhtml, IUnknown *outer, REFIID rii
     doc->basedoc.doc_obj = doc;
 
     init_dispatch(&doc->dispex, (IUnknown*)&doc->ICustomDoc_iface, &HTMLDocumentObj_dispex, COMPAT_MODE_QUIRKS);
-    init_doc(&doc->basedoc, outer ? outer : &doc->IUnknown_inner, &doc->dispex.IDispatchEx_iface);
+    init_doc(&doc->basedoc, outer ? outer : &doc->IUnknown_inner, &doc->dispex);
     TargetContainer_Init(doc);
     doc->is_mhtml = is_mhtml;
 
