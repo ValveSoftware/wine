@@ -1319,6 +1319,9 @@ sync_test("attr_props", function() {
     else
         todo_wine_if(v === 8).
         ok(attr === null, "tabIndex attr not null.");
+
+    attr = document.createAttribute("winetest");
+    test_attr(false, v >= 9);
 });
 
 sync_test("doc_props", function() {
