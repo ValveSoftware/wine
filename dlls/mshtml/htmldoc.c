@@ -1005,10 +1005,8 @@ static HRESULT WINAPI HTMLDocument_get_mimeType(IHTMLDocument2 *iface, BSTR *p)
 
     *p = NULL;
 
-    if(!This->window) {
-        FIXME("No window\n");
-        return E_NOTIMPL;
-    }
+    if(!This->window)
+        return get_mime_type_display_name(content_type_from_document_type[This->doc_type], p);
 
     if(!This->window->base.inner_window->bscallback ||
        !(content_type = This->window->base.inner_window->bscallback->nschannel->content_type))
