@@ -26,9 +26,11 @@
 #include "winuser.h"
 #include "wininet.h"
 #include "ole2.h"
+#include "objsafe.h"
 #include "perhist.h"
 #include "mshtmdid.h"
 #include "mshtmcid.h"
+#include "msxml6.h"
 
 #include "wine/debug.h"
 
@@ -6125,6 +6127,37 @@ HRESULT get_document_node(nsIDOMDocument *dom_document, HTMLDocumentNode **ret)
 
     assert(node->vtbl == &HTMLDocumentNodeImplVtbl);
     *ret = impl_from_HTMLDOMNode(node);
+    return S_OK;
+}
+
+HRESULT create_xml_document(BSTR content, IDispatch **ret)
+{
+    IXMLDOMDocument *xmldoc;
+    IObjectSafety *safety;
+    VARIANT_BOOL vbool;
+    HRESULT hres;
+
+    hres = CoCreateInstance(&CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER, &IID_IXMLDOMDocument, (void**)&xmldoc);
+    if(FAILED(hres)) {
+        ERR("CoCreateInstance failed: %08lx\n", hres);
+        return hres;
+    }
+
+    if(content) {
+        hres = IXMLDOMDocument_loadXML(xmldoc, content, &vbool);
+        if(hres != S_OK || vbool != VARIANT_TRUE)
+            WARN("loadXML failed: %08lx, returning an empty xmldoc\n", hres);
+    }
+
+    hres = IXMLDOMDocument_QueryInterface(xmldoc, &IID_IObjectSafety, (void**)&safety);
+    if(SUCCEEDED(hres)) {
+        IObjectSafety_SetInterfaceSafetyOptions(safety, NULL,
+            INTERFACESAFE_FOR_UNTRUSTED_CALLER | INTERFACESAFE_FOR_UNTRUSTED_DATA | INTERFACE_USES_SECURITY_MANAGER,
+            INTERFACESAFE_FOR_UNTRUSTED_CALLER | INTERFACESAFE_FOR_UNTRUSTED_DATA | INTERFACE_USES_SECURITY_MANAGER);
+        IObjectSafety_Release(safety);
+    }
+
+    *ret = (IDispatch*)xmldoc;
     return S_OK;
 }
 
