@@ -471,6 +471,10 @@ COMPAT_PROTOTYPE_LIST
     COMPAT_CTOR_ID_Image,
     COMPAT_CTOR_ID_Option,
 
+    COMPAT_CTOR_ID_Image_builtin,
+    COMPAT_CTOR_ID_Option_builtin,
+    COMPAT_CTOR_ID_HTMLXMLHttpRequest_builtin,
+
     COMPAT_CTOR_COUNT
 } compat_ctor_id_t;
 
@@ -1619,6 +1623,9 @@ extern const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl DECLSP
 extern dispex_static_data_t HTMLImageElementFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLOptionElementFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLImageCtor_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLOptionCtor_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLXMLHttpRequestCtor_dispex DECLSPEC_HIDDEN;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex DECLSPEC_HIDDEN;
 COMPAT_ONLY_PROTOTYPE_LIST
