@@ -2837,6 +2837,12 @@ static BOOL WINAPI WineDispatchProxyPrivate_IsPrototype(IWineDispatchProxyPrivat
     return to_proxy_prototype(This) != NULL;
 }
 
+static BOOL WINAPI WineDispatchProxyPrivate_IsConstructor(IWineDispatchProxyPrivate *iface)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    return This->outer->lpVtbl == &proxy_ctor_vtbl;
+}
+
 static DWORD WINAPI WineDispatchProxyPrivate_PropFlags(IWineDispatchProxyPrivate *iface, DISPID id)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -3000,6 +3006,7 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     WineDispatchProxyPrivate_GetDefaultConstructor,
     WineDispatchProxyPrivate_DefineConstructors,
     WineDispatchProxyPrivate_IsPrototype,
+    WineDispatchProxyPrivate_IsConstructor,
     WineDispatchProxyPrivate_PropFlags,
     WineDispatchProxyPrivate_PropGetID,
     WineDispatchProxyPrivate_PropInvoke,
