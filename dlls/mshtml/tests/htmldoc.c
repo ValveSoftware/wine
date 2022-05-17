@@ -7670,6 +7670,23 @@ static void test_QueryInterface(IHTMLDocument2 *htmldoc)
     IUnknown_Release(qi);
 }
 
+static void test_mimeType(IHTMLDocument2 *doc, const WCHAR *expected)
+{
+    BSTR mime_type = (BSTR)0xdeadbeef;
+    HRESULT hres;
+
+    hres = IHTMLDocument2_get_mimeType(doc, &mime_type);
+    if(expected) {
+        ok(hres == S_OK, "get_mimeType returned %08lx\n", hres);
+        ok(!lstrcmpW(mime_type, expected), "mime type = %s, expected %s\n",
+            debugstr_w(mime_type), debugstr_w(expected));
+    }else {
+        ok(hres == E_FAIL, "get_mimeType returned %08lx\n", hres);
+        ok(!mime_type, "mime type = %s, expected (null)\n", debugstr_w(mime_type));
+    }
+    SysFreeString(mime_type);
+}
+
 static void init_test(enum load_state_t ls) {
     doc_unk = NULL;
     doc_hwnd = last_hwnd = NULL;
@@ -7723,6 +7740,7 @@ static void test_HTMLDocument(BOOL do_load, BOOL mime)
         test_GetCurMoniker((IUnknown*)doc, &Moniker, NULL, FALSE);
         test_elem_from_point(doc);
     }
+    test_mimeType(doc, do_load ? L"HTML Document" : NULL);
 
     test_MSHTML_QueryStatus(doc, OLECMDF_SUPPORTED);
     test_OleCommandTarget_fail(doc);
@@ -7834,6 +7852,7 @@ static void test_MHTMLDocument(void)
     set_custom_uihandler(doc, &CustomDocHostUIHandler);
     test_GetCurMoniker((IUnknown*)doc, NULL, L"mhtml:winetest:doc", FALSE);
     test_download(0);
+    test_mimeType(doc, L"HTML Document");
 
     test_exec_onunload(doc);
     test_UIDeactivate();
