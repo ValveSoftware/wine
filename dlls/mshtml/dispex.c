@@ -760,9 +760,6 @@ static HRESULT dispex_value(DispatchEx *This, LCID lcid, WORD flags, DISPPARAMS 
 {
     HRESULT hres;
 
-    if(This->info->desc->vtbl && This->info->desc->vtbl->value)
-        return This->info->desc->vtbl->value(This, lcid, flags, params, res, ei, caller);
-
     switch(flags) {
     case DISPATCH_PROPERTYGET:
         V_VT(res) = VT_BSTR;
@@ -1631,6 +1628,12 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, IDispatch *this_obj, DISPID
     func_info_t *func;
     IUnknown *iface;
     HRESULT hres;
+
+    if(id == DISPID_VALUE && This->info->desc->vtbl && This->info->desc->vtbl->value) {
+        hres = This->info->desc->vtbl->value(This, lcid, flags, dp, res, ei, caller);
+        if(hres != S_FALSE)
+            return hres;
+    }
 
     hres = get_builtin_func_prot(This, id, &func);
     if(id == DISPID_VALUE && hres == DISP_E_MEMBERNOTFOUND)
