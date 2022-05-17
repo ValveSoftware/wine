@@ -10029,9 +10029,10 @@ static const tid_t HTMLStyle_iface_tids[] = {
     IHTMLStyle_tid,
     0
 };
-static dispex_static_data_t HTMLStyle_dispex = {
+dispex_static_data_t HTMLStyle_dispex = {
     L"MSStyleCSSProperties",
     &CSSStyle_dispex_vtbl,
+    PROTO_ID_HTMLStyle,
     DispHTMLStyle_tid,
     HTMLStyle_iface_tids,
     CSSStyle_init_dispex_info
@@ -10124,9 +10125,10 @@ HRESULT HTMLStyle_Create(HTMLElement *elem, HTMLStyle **ret)
 static const tid_t HTMLW3CComputedStyle_iface_tids[] = {
     0
 };
-static dispex_static_data_t HTMLW3CComputedStyle_dispex = {
+dispex_static_data_t HTMLW3CComputedStyle_dispex = {
     L"CSSStyleDeclaration",
     &CSSStyle_dispex_vtbl,
+    PROTO_ID_HTMLW3CComputedStyle,
     DispHTMLW3CComputedStyle_tid,
     HTMLW3CComputedStyle_iface_tids,
     CSSStyle_init_dispex_info
