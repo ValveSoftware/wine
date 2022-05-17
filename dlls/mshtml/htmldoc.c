@@ -982,8 +982,29 @@ static HRESULT WINAPI HTMLDocument_get_defaultCharset(IHTMLDocument2 *iface, BST
 static HRESULT WINAPI HTMLDocument_get_mimeType(IHTMLDocument2 *iface, BSTR *p)
 {
     HTMLDocument *This = impl_from_IHTMLDocument2(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+    const char *content_type;
+    WCHAR *content_typeW;
+    HRESULT hres;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    *p = NULL;
+
+    if(!This->window) {
+        FIXME("No window\n");
+        return E_NOTIMPL;
+    }
+
+    if(!This->window->base.inner_window->bscallback ||
+       !(content_type = This->window->base.inner_window->bscallback->nschannel->content_type))
+        return E_FAIL;
+
+    if(!(content_typeW = heap_strdupAtoW(content_type)))
+        return E_OUTOFMEMORY;
+
+    hres = get_mime_type_display_name(content_typeW, p);
+    heap_free(content_typeW);
+    return hres;
 }
 
 static HRESULT WINAPI HTMLDocument_get_fileSize(IHTMLDocument2 *iface, BSTR *p)
