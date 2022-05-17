@@ -2239,6 +2239,7 @@ static void compat_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t
         DISPID_IHTMLWINDOW2_IMAGE,
         DISPID_IHTMLWINDOW2_OPTION,
         DISPID_IHTMLWINDOW5_XMLHTTPREQUEST,
+        DISPID_IWINEHTMLWINDOWPRIVATE_DOMPARSER,
         DISPID_UNKNOWN
     };
     prototype_id_t prot_id = info->desc - compat_prototype_dispex;
@@ -2993,11 +2994,19 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultPrototype(IWineDispa
 
 static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface, struct proxy_prototypes *prots)
 {
+    static const struct {
+        prototype_id_t prot_id;
+        DISPID dispid;
+    } special_ctors[] = {
+        { PROTO_ID_DOMParser,           DISPID_IWINEHTMLWINDOWPRIVATE_DOMPARSER },
+        { PROTO_ID_HTMLXMLHttpRequest,  DISPID_IHTMLWINDOW5_XMLHTTPREQUEST },
+    };
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
     struct proxy_prototype *prot = proxy_prototype_from_IUnknown(This->outer);
     struct proxy_ctor *ctor;
     prototype_id_t prot_id;
     IDispatch **entry;
+    unsigned i;
 
     prot_id = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex) - prototype_static_data;
 
@@ -3007,9 +3016,10 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDis
         return *entry;
     }
 
-    /* XMLHttpRequest is a special case */
-    if(prot_id == PROTO_ID_HTMLXMLHttpRequest) {
-        *entry = This->proxy->lpVtbl->CreateConstructor(This->proxy, DISPID_IHTMLWINDOW5_XMLHTTPREQUEST,
+    for(i = 0; i < ARRAY_SIZE(special_ctors); i++) {
+        if(prot_id != special_ctors[i].prot_id)
+            continue;
+        *entry = This->proxy->lpVtbl->CreateConstructor(This->proxy, special_ctors[i].dispid,
                                                         proxy_ctor_dispex[prot_id - COMPAT_ONLY_PROTOTYPE_COUNT].name);
         if(*entry) {
             IDispatch_AddRef(*entry);

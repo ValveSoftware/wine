@@ -3464,6 +3464,16 @@ static HRESULT WINAPI window_private_get_console(IWineHTMLWindowPrivate *iface, 
     return S_OK;
 }
 
+static HRESULT WINAPI window_private_get_DOMParser(IWineHTMLWindowPrivate *iface, IDispatch **dom_parser)
+{
+    HTMLWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface);
+
+    TRACE("iface %p, dom_parser %p.\n", iface, dom_parser);
+
+    return get_compat_ctor(This->inner_window, COMPAT_CTOR_ID_DOMParser, PROTO_ID_DOMParser,
+                           &DOMParserCtor_dispex, &compat_ctor_vtbl, dom_parser);
+}
+
 static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_QueryInterface,
     window_private_AddRef,
@@ -3475,6 +3485,7 @@ static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_requestAnimationFrame,
     window_private_cancelAnimationFrame,
     window_private_get_console,
+    window_private_get_DOMParser,
 };
 
 static inline HTMLWindow *impl_from_IWineHTMLWindowCompatPrivateVtbl(IWineHTMLWindowCompatPrivate *iface)
@@ -4425,13 +4436,19 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         {DISPID_IHTMLWINDOW6_POSTMESSAGE, IHTMLWindow6_postMessage_hook},
         {DISPID_UNKNOWN}
     };
+    static const dispex_hook_t private_ie9_hooks[] = {
+        {DISPID_IWINEHTMLWINDOWPRIVATE_REQUESTANIMATIONFRAME},
+        {DISPID_IWINEHTMLWINDOWPRIVATE_CANCELANIMATIONFRAME},
+        {DISPID_IWINEHTMLWINDOWPRIVATE_CONSOLE},
+        {DISPID_UNKNOWN}
+    };
 
-    if(compat_mode >= COMPAT_MODE_IE9)
+    if(compat_mode >= COMPAT_MODE_IE9) {
         dispex_info_add_interface(info, IHTMLWindow7_tid, NULL);
-    else
+        dispex_info_add_interface(info, IWineHTMLWindowPrivate_tid,
+                                  compat_mode == COMPAT_MODE_IE9 ? private_ie9_hooks : NULL);
+    }else
         dispex_info_add_interface(info, IWineHTMLWindowCompatPrivate_tid, NULL);
-    if(compat_mode >= COMPAT_MODE_IE10)
-        dispex_info_add_interface(info, IWineHTMLWindowPrivate_tid, NULL);
 
     dispex_info_add_interface(info, IHTMLWindow5_tid, NULL);
     dispex_info_add_interface(info, IHTMLWindow2_tid, window2_hooks);

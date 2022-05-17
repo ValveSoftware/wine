@@ -2971,3 +2971,14 @@ sync_test("console", function() {
     }
     ok(except, "console.timeLog: expected exception");
 });
+
+sync_test("DOMParser", function() {
+    var p, r = DOMParser.length;
+    ok(r === 0, "length = " + r);
+
+    p = DOMParser();
+    r = Object.getPrototypeOf(p);
+    ok(r === DOMParser.prototype, "prototype of instance created without new = " + r);
+    ok(p !== new DOMParser(), "DOMParser() == new DOMParser()");
+    ok(new DOMParser() !== new DOMParser(), "new DOMParser() == new DOMParser()");
+});
