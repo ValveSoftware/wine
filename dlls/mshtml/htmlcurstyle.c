@@ -4156,7 +4156,7 @@ HRESULT HTMLCurrentStyle_Create(HTMLElement *elem, IHTMLCurrentStyle **p)
         return E_UNEXPECTED;
     }
 
-    nsres = nsIDOMHTMLDocument_GetDefaultView(elem->node.doc->nsdoc, &nsview);
+    nsres = nsIDOMDocument_GetDefaultView(elem->node.doc->nsdoc, &nsview);
     if(NS_FAILED(nsres)) {
         ERR("GetDefaultView failed: %08lx\n", nsres);
         return E_FAIL;

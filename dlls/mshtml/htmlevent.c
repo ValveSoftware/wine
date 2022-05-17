@@ -2516,7 +2516,7 @@ HRESULT create_document_event_str(HTMLDocumentNode *doc, const WCHAR *type, IDOM
     nsresult nsres;
 
     nsAString_InitDepend(&nsstr, type);
-    nsres = nsIDOMHTMLDocument_CreateEvent(doc->nsdoc, &nsstr, &nsevent);
+    nsres = nsIDOMDocument_CreateEvent(doc->nsdoc, &nsstr, &nsevent);
     nsAString_Finish(&nsstr);
     if(NS_FAILED(nsres)) {
         FIXME("CreateEvent(%s) failed: %08lx\n", debugstr_w(type), nsres);
@@ -2540,7 +2540,7 @@ HRESULT create_document_event(HTMLDocumentNode *doc, eventid_t event_id, DOMEven
     nsresult nsres;
 
     nsAString_InitDepend(&nsstr, event_types[event_info[event_id].type]);
-    nsres = nsIDOMHTMLDocument_CreateEvent(doc->nsdoc, &nsstr, &nsevent);
+    nsres = nsIDOMDocument_CreateEvent(doc->nsdoc, &nsstr, &nsevent);
     nsAString_Finish(&nsstr);
     if(NS_FAILED(nsres)) {
         FIXME("CreateEvent(%s) failed: %08lx\n", debugstr_w(event_types[event_info[event_id].type]), nsres);
