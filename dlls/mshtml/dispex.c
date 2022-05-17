@@ -1207,7 +1207,7 @@ static HRESULT get_builtin_func(dispex_data_t *data, DISPID id, func_info_t **re
     }
 
     WARN("invalid id %lx\n", id);
-    return DISP_E_UNKNOWNNAME;
+    return DISP_E_MEMBERNOTFOUND;
 }
 
 static HRESULT get_builtin_id(DispatchEx *This, BSTR name, DWORD grfdex, DISPID *ret)
@@ -1578,7 +1578,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, IDispatch *this_obj, DISPID
     HRESULT hres;
 
     hres = get_builtin_func(This->info, id, &func);
-    if(id == DISPID_VALUE && hres == DISP_E_UNKNOWNNAME)
+    if(id == DISPID_VALUE && hres == DISP_E_MEMBERNOTFOUND)
         return dispex_value(This, lcid, flags, dp, res, ei, caller);
     if(FAILED(hres))
         return hres;
@@ -2219,7 +2219,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_FuncInfo(IWineDispatchProxyPrivat
 
     hres = get_builtin_func(This->info, id, &func);
     if(FAILED(hres))
-        return (hres == DISP_E_UNKNOWNNAME) ? E_UNEXPECTED : hres;
+        return (hres == DISP_E_MEMBERNOTFOUND) ? E_UNEXPECTED : hres;
     if(func->func_disp_idx == -1)
         return E_UNEXPECTED;
 
@@ -2237,7 +2237,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_AccessorInfo(IWineDispatchProxyPr
 
     hres = get_builtin_func(This->info, id, &func);
     if(FAILED(hres))
-        return (hres == DISP_E_UNKNOWNNAME) ? E_UNEXPECTED : hres;
+        return (hres == DISP_E_MEMBERNOTFOUND) ? E_UNEXPECTED : hres;
     if(func->func_disp_idx != -1)
         return E_UNEXPECTED;
 
