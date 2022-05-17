@@ -368,6 +368,8 @@ PRIVATE_TID_LIST
     LAST_tid
 } tid_t;
 
+extern const tid_t no_iface_tids[1];
+
 #define COMPAT_ONLY_PROTOTYPE_LIST \
     X(HTMLLocation,                   "Location",                     HTMLLocation_compat_dispex,             NULL) \
     X(HTMLUnknownElement,             "HTMLUnknownElement",           HTMLUnknownElement_dispex,              NULL)
@@ -1114,6 +1116,7 @@ HRESULT create_outer_window(GeckoBrowser*,mozIDOMWindowProxy*,HTMLOuterWindow*,H
 HRESULT update_window_doc(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 HTMLOuterWindow *mozwindow_to_window(const mozIDOMWindowProxy*) DECLSPEC_HIDDEN;
 void get_top_window(HTMLOuterWindow*,HTMLOuterWindow**) DECLSPEC_HIDDEN;
+HRESULT compat_ctor_value(DispatchEx*,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 HRESULT compat_ctor_get_dispid(DispatchEx*,BSTR,DWORD,DISPID*) DECLSPEC_HIDDEN;
 HRESULT compat_ctor_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*) DECLSPEC_HIDDEN;
 HRESULT compat_ctor_delete(DispatchEx*,DISPID) DECLSPEC_HIDDEN;
