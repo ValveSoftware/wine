@@ -1515,7 +1515,7 @@ static HRESULT WINAPI OmNavigator_javaEnabled(IOmNavigator *iface, VARIANT_BOOL 
 
     FIXME("(%p)->(%p) semi-stub\n", This, enabled);
 
-    *enabled = VARIANT_TRUE;
+    *enabled = VARIANT_FALSE;
     return S_OK;
 }
 
