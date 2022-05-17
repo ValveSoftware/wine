@@ -358,6 +358,9 @@ typedef struct EventTarget EventTarget;
 #define PRIVATE_TID_LIST \
     XIID(IWineDOMTokenList) \
     XIID(IWineHTMLElementPrivate) \
+    XIID(IWineHTMLInputPrivate) \
+    XIID(IWineHTMLFormPrivate) \
+    XIID(IWineHTMLParentFormPrivate) \
     XIID(IWineHTMLWindowPrivate) \
     XIID(IWineHTMLWindowCompatPrivate) \
     XIID(IWineMSHTMLConsole) \
