@@ -360,7 +360,8 @@ typedef struct EventTarget EventTarget;
     XIID(IWineHTMLWindowPrivate) \
     XIID(IWineHTMLWindowCompatPrivate) \
     XIID(IWineMSHTMLConsole) \
-    XIID(IWineMSHTMLCrypto)
+    XIID(IWineMSHTMLCrypto) \
+    XIID(IWineMSHTMLSubtleCrypto)
 
 typedef enum {
 #define XIID(iface) iface ## _tid,
@@ -439,6 +440,7 @@ extern const tid_t no_iface_tids[1];
 #define PROXY_PROTOTYPE_LIST \
     X(Console,                        "Console",                      console_dispex,                         Object) \
     X(Crypto,                         "Crypto",                       crypto_dispex,                          Object) \
+    X(SubtleCrypto,                   "SubtleCrypto",                 crypto_subtle_dispex,                   Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
     X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                DOMUIEvent) \
