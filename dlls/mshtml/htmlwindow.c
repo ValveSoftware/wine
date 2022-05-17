@@ -3668,6 +3668,22 @@ static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultPrototype(IWineDis
     return itf->lpVtbl->GetDefaultPrototype(itf, prots_ref);
 }
 
+static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface, struct proxy_prototypes *prots)
+{
+    HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->GetDefaultConstructor(itf, prots);
+}
+
+static HRESULT WINAPI WindowWineDispProxyPrivate_DefineConstructors(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
+{
+    HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->DefineConstructors(itf, prots_ref);
+}
+
 static BOOL WINAPI WindowWineDispProxyPrivate_IsPrototype(IWineDispatchProxyPrivate *iface)
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -3775,6 +3791,8 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     /* IWineDispatchProxyPrivate extension */
     WindowWineDispProxyPrivate_GetProxyFieldRef,
     WindowWineDispProxyPrivate_GetDefaultPrototype,
+    WindowWineDispProxyPrivate_GetDefaultConstructor,
+    WindowWineDispProxyPrivate_DefineConstructors,
     WindowWineDispProxyPrivate_IsPrototype,
     WindowWineDispProxyPrivate_PropFlags,
     WindowWineDispProxyPrivate_PropGetID,

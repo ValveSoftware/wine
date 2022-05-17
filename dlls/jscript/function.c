@@ -17,6 +17,7 @@
  */
 
 #include <assert.h>
+#include <mshtmdid.h>
 
 #include "jscript.h"
 #include "engine.h"
@@ -62,6 +63,12 @@ typedef struct {
 
 typedef struct {
     FunctionInstance function;
+    IDispatch *disp;
+    const WCHAR *name;
+} ProxyConstructor;
+
+typedef struct {
+    FunctionInstance function;
     FunctionInstance *target;
     IDispatch *this;
     unsigned argc;
@@ -75,6 +82,8 @@ typedef struct {
     call_frame_t *frame;
     unsigned argc;
 } ArgumentsInstance;
+
+static const WCHAR ProxyConstructor_createW[] = L"create";
 
 static HRESULT create_bind_function(script_ctx_t*,FunctionInstance*,IDispatch*,unsigned,jsval_t*,jsdisp_t**r);
 
@@ -896,6 +905,118 @@ HRESULT create_proxy_accessor(jsdisp_t *jsdisp, DISPID id, property_desc_t *desc
         desc->setter = &function->function.dispex;
     }
 
+    return S_OK;
+}
+
+static HRESULT ProxyConstructor_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
+        unsigned argc, jsval_t *argv, jsval_t *r)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+
+    if(constructor->name == ProxyConstructor_createW) {
+        /* only allow calls since it's a method */
+        if(!(flags & DISPATCH_METHOD))
+            return E_UNEXPECTED;
+    }
+
+    return disp_call_value(ctx, constructor->disp, NULL, flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK, argc, argv, r);
+}
+
+static HRESULT ProxyConstructor_toString(FunctionInstance *func, jsstr_t **ret)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+    return native_code_toString(constructor->name, ret);
+}
+
+static function_code_t *ProxyConstructor_get_code(FunctionInstance *func)
+{
+    return NULL;
+}
+
+static void ProxyConstructor_destructor(FunctionInstance *func)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+    IDispatch_Release(constructor->disp);
+}
+
+static const function_vtbl_t ProxyConstructorVtbl = {
+    ProxyConstructor_call,
+    ProxyConstructor_toString,
+    ProxyConstructor_get_code,
+    ProxyConstructor_destructor,
+    no_gc_traverse
+};
+
+static const builtin_prop_t ProxyConstructor_props[] = {
+    {L"arguments",           NULL, 0,                        Function_get_arguments}
+};
+
+static const builtin_info_t ProxyConstructor_info = {
+    JSCLASS_FUNCTION,
+    Function_value,
+    ARRAY_SIZE(ProxyConstructor_props),
+    ProxyConstructor_props,
+    Function_destructor,
+    NULL
+};
+
+HRESULT create_proxy_constructor(DISPID id, const WCHAR *name, jsdisp_t *prototype, jsdisp_t **ret)
+{
+    IWineDispatchProxyPrivate *proxy = prototype->ctx->global->prototype->proxy;
+    script_ctx_t *ctx = prototype->ctx;
+    ProxyConstructor *constructor;
+    DISPPARAMS dp = { 0 };
+    EXCEPINFO ei = { 0 };
+    HRESULT hres;
+    VARIANT var;
+
+    hres = proxy->lpVtbl->PropInvoke(proxy, (IDispatch*)ctx->global->proxy, id, ctx->lcid, DISPATCH_PROPERTYGET,
+                                     &dp, &var, &ei, &ctx->jscaller->IServiceProvider_iface);
+    if(hres == DISP_E_EXCEPTION)
+        disp_fill_exception(ctx, &ei);
+    if(FAILED(hres))
+        return hres;
+    if(V_VT(&var) != VT_DISPATCH) {
+        VariantClear(&var);
+        return E_UNEXPECTED;
+    }
+
+    /* create wrapper constructor function over the disp's value */
+    hres = create_function(ctx, &ProxyConstructor_info, &ProxyConstructorVtbl, sizeof(ProxyConstructor),
+                           PROPF_CONSTR, FALSE, NULL, (void**)&constructor);
+    if(FAILED(hres)) {
+        IDispatch_Release(V_DISPATCH(&var));
+        return hres;
+    }
+
+    constructor->disp = V_DISPATCH(&var);
+    constructor->name = name;
+
+    hres = jsdisp_define_data_property(&constructor->function.dispex, L"prototype", 0, jsval_obj(prototype));
+
+    if(SUCCEEDED(hres) && id == DISPID_IHTMLWINDOW5_XMLHTTPREQUEST) {
+        ProxyConstructor *create;
+
+        hres = create_function(ctx, &ProxyConstructor_info, &ProxyConstructorVtbl, sizeof(ProxyConstructor),
+                               PROPF_METHOD, FALSE, NULL, (void**)&create);
+        if(SUCCEEDED(hres)) {
+            IDispatch_AddRef(V_DISPATCH(&var));
+            create->disp = V_DISPATCH(&var);
+            create->name = ProxyConstructor_createW;
+
+            hres = jsdisp_define_data_property(&create->function.dispex, L"prototype", 0, jsval_null());
+            if(SUCCEEDED(hres))
+                hres = jsdisp_define_data_property(&constructor->function.dispex, ProxyConstructor_createW,
+                                                   0, jsval_obj(&create->function.dispex));
+            jsdisp_release(&create->function.dispex);
+        }
+    }
+    if(FAILED(hres)) {
+        jsdisp_release(&constructor->function.dispex);
+        return hres;
+    }
+
+    *ret = &constructor->function.dispex;
     return S_OK;
 }
 
