@@ -952,8 +952,8 @@ static HRESULT HTMLFrameElement_invoke(HTMLDOMNode *iface, IDispatch *this_obj, 
         return E_FAIL;
     }
 
-    return window_invoke(&This->framebase.content_window->base, this_obj, id, lcid, flags,
-            params, res, ei, caller);
+    return dispex_invoke(&This->framebase.content_window->base.inner_window->event_target.dispex,
+                         this_obj, id, lcid, flags, params, res, ei, caller);
 }
 
 static HRESULT HTMLFrameElement_bind_to_tree(HTMLDOMNode *iface)
@@ -1524,8 +1524,8 @@ static HRESULT HTMLIFrame_invoke(HTMLDOMNode *iface, IDispatch *this_obj, DISPID
         return E_FAIL;
     }
 
-    return window_invoke(&This->framebase.content_window->base, this_obj, id, lcid, flags,
-            params, res, ei, caller);
+    return dispex_invoke(&This->framebase.content_window->base.inner_window->event_target.dispex,
+                         this_obj, id, lcid, flags, params, res, ei, caller);
 }
 
 static HRESULT HTMLIFrame_get_readystate(HTMLDOMNode *iface, BSTR *p)
