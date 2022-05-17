@@ -76,10 +76,26 @@ interface IWineMSHTMLConsole : IDispatch
     HRESULT warn([in, optional] VARIANT *varargStart);
 }
 
+[
+    odl,
+    oleautomation,
+    dual,
+    hidden,
+    uuid(fd55b4b6-2813-4fb4-829d-380099474ab2)
+]
+interface IWineMSHTMLCrypto : IDispatch
+{
+    [propget, id(1)]
+    HRESULT subtle([retval, out] IDispatch **subtle);
+    [id(2)]
+    HRESULT getRandomValues([in] VARIANT *typedArray, [retval, out] IDispatch **ret);
+}
+
 const long DISPID_IWINEHTMLWINDOWPRIVATE_REQUESTANIMATIONFRAME = 50;
 const long DISPID_IWINEHTMLWINDOWPRIVATE_CANCELANIMATIONFRAME = 51;
 const long DISPID_IWINEHTMLWINDOWPRIVATE_CONSOLE = 52;
 const long DISPID_IWINEHTMLWINDOWPRIVATE_DOMPARSER = 53;
+const long DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO = 54;
 [
     odl,
     oleautomation,
@@ -97,6 +113,8 @@ interface IWineHTMLWindowPrivate : IDispatch
     HRESULT console([retval, out] IDispatch **console);
     [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_DOMPARSER)]
     HRESULT DOMParser([retval, out] IDispatch **dom_parser);
+    [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO)]
+    HRESULT msCrypto([retval, out] IDispatch **crypto);
 }
 
 [
