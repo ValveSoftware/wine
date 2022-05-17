@@ -831,7 +831,11 @@ struct  ConnectionPoint {
 };
 
 typedef enum {
+    DOCTYPE_INVALID = -1,
     DOCTYPE_HTML,
+    DOCTYPE_XHTML,
+    DOCTYPE_XML,
+    DOCTYPE_SVG,
     DOCTYPE_COUNT
 } document_type_t;
 
