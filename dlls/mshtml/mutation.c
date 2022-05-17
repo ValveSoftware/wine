@@ -374,6 +374,7 @@ compat_mode_t lock_document_mode(HTMLDocumentNode *doc)
 
 static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode, BOOL lock)
 {
+    dispex_static_data_t *dispex_data = &HTMLDocumentNode_dispex;
     compat_mode_t max_compat_mode;
 
     if(doc->document_mode_locked) {
@@ -396,7 +397,7 @@ static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode
     if(lock)
         lock_document_mode(doc);
 
-    /* The prototype needs to be changed since it depends on mode */
+    /* The prototype and dispex need to be changed since they depend on mode */
     if(doc->window && doc->window->compat_prototypes[PROTO_ID_HTMLDocument]) {
         IUnknown_Release(&doc->window->compat_prototypes[PROTO_ID_HTMLDocument]->IUnknown_iface);
         doc->window->compat_prototypes[PROTO_ID_HTMLDocument] = NULL;
@@ -407,7 +408,10 @@ static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode
         doc->node.event_target.dispex.prototype = NULL;
     }
 
-    update_dispex(&doc->node.event_target.dispex, &HTMLDocumentNode_dispex, doc, document_mode);
+    if(COMPAT_MODE_IE9 <= document_mode && document_mode < COMPAT_MODE_IE11)
+        dispex_data = &DocumentNode_dispex;
+
+    update_dispex(&doc->node.event_target.dispex, dispex_data, doc, document_mode);
 }
 
 BOOL parse_compat_version(const WCHAR *version_string, compat_mode_t *r)

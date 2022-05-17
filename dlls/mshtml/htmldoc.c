@@ -5929,6 +5929,7 @@ HRESULT create_document_node(nsIDOMHTMLDocument *nsdoc, GeckoBrowser *browser, H
 
 static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *doc_node, HTMLDocumentNode **ret)
 {
+    dispex_static_data_t *dispex_data = &HTMLDocumentNode_dispex;
     HTMLDocumentNode *doc_frag;
 
     doc_frag = alloc_doc_node(doc_node->basedoc.doc_obj, doc_node->window);
@@ -5937,7 +5938,10 @@ static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *do
 
     IHTMLWindow2_AddRef(&doc_frag->window->base.IHTMLWindow2_iface);
 
-    HTMLDOMNode_Init(doc_node, &doc_frag->node, nsnode, &HTMLDocumentNode_dispex);
+    if(COMPAT_MODE_IE9 <= doc_node->document_mode && doc_node->document_mode < COMPAT_MODE_IE11)
+        dispex_data = &DocumentNode_dispex;
+
+    HTMLDOMNode_Init(doc_node, &doc_frag->node, nsnode, dispex_data);
     doc_frag->node.vtbl = &HTMLDocumentFragmentImplVtbl;
     doc_frag->document_mode = lock_document_mode(doc_node);
 
