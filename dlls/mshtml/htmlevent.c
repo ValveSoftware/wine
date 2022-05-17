@@ -3497,6 +3497,9 @@ static HRESULT WINAPI EventTarget_addEventListener(IEventTarget *iface, BSTR typ
 
     TRACE("(%p)->(%s %p %x)\n", This, debugstr_w(type), function, capture);
 
+    if(!function)
+        return S_OK;
+
     container = get_listener_container(This, type, TRUE);
     if(!container)
         return E_OUTOFMEMORY;
