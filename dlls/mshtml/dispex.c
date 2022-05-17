@@ -91,6 +91,7 @@ struct proxy_prototype {
 };
 
 #define DYNPROP_DELETED    0x01
+#define DYNPROP_PROTREF    0x02  /* V_VT(var) == VT_EMPTY and V_UI4(var) == the ref */
 
 typedef struct {
     DispatchEx dispex;
@@ -184,6 +185,7 @@ static inline dispex_data_t *proxy_prototype_object_info(struct proxy_prototype 
 }
 
 static func_disp_t *create_func_disp(DispatchEx*,func_info_t*);
+static HRESULT get_dynamic_prop(DispatchEx*,const WCHAR*,DWORD,dynamic_prop_t**);
 static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 static inline struct proxy_prototype *to_proxy_prototype(DispatchEx*);
 
@@ -703,6 +705,26 @@ static HRESULT variant_copy(VARIANT *dest, VARIANT *src)
     return VariantCopy(dest, src);
 }
 
+static void fixup_prop_ref(DispatchEx *This, dynamic_prop_t *prop)
+{
+    dynamic_prop_t *prot_prop;
+
+    if(prop->flags & DYNPROP_DELETED) {
+        if(!This->prototype ||
+           FAILED(get_dynamic_prop(&This->prototype->dispex, prop->name, fdexNameCaseSensitive, &prot_prop)))
+            return;
+        if(!(prot_prop->flags & DYNPROP_DELETED)) {
+            prop->flags = DYNPROP_PROTREF;
+            V_UI4(&prop->var) = prot_prop - This->prototype->dispex.dynamic_data->props;
+        }
+        return;
+    }
+
+    if((prop->flags & DYNPROP_PROTREF) &&
+       (This->prototype->dispex.dynamic_data->props[V_UI4(&prop->var)].flags & DYNPROP_DELETED))
+        prop->flags = DYNPROP_DELETED;
+}
+
 static inline dispex_dynamic_data_t *get_dynamic_data(DispatchEx *This)
 {
     if(This->dynamic_data)
@@ -721,8 +743,8 @@ static inline dispex_dynamic_data_t *get_dynamic_data(DispatchEx *This)
 static HRESULT get_dynamic_prop(DispatchEx *This, const WCHAR *name, DWORD flags, dynamic_prop_t **ret)
 {
     const BOOL alloc = flags & fdexNameEnsure;
+    dynamic_prop_t *prop, *prot_prop = NULL;
     dispex_dynamic_data_t *data;
-    dynamic_prop_t *prop;
 
     data = get_dynamic_data(This);
     if(!data)
@@ -730,6 +752,7 @@ static HRESULT get_dynamic_prop(DispatchEx *This, const WCHAR *name, DWORD flags
 
     for(prop = data->props; prop < data->props+data->prop_cnt; prop++) {
         if(flags & fdexNameCaseInsensitive ? !wcsicmp(prop->name, name) : !wcscmp(prop->name, name)) {
+            fixup_prop_ref(This, prop);
             if(prop->flags & DYNPROP_DELETED) {
                 if(!alloc)
                     return DISP_E_UNKNOWNNAME;
@@ -740,7 +763,17 @@ static HRESULT get_dynamic_prop(DispatchEx *This, const WCHAR *name, DWORD flags
         }
     }
 
-    if(!alloc)
+    if(This->prototype) {
+        HRESULT hres = get_dynamic_prop(&This->prototype->dispex, name, fdexNameCaseSensitive, &prot_prop);
+        if(hres != DISP_E_UNKNOWNNAME) {
+            if(FAILED(hres))
+                return hres;
+            if(prot_prop->flags & DYNPROP_DELETED)
+                prot_prop = NULL;
+        }
+    }
+
+    if(!alloc && !prot_prop)
         return DISP_E_UNKNOWNNAME;
 
     TRACE("creating dynamic prop %s\n", debugstr_w(name));
@@ -769,6 +802,10 @@ static HRESULT get_dynamic_prop(DispatchEx *This, const WCHAR *name, DWORD flags
 
     VariantInit(&prop->var);
     prop->flags = 0;
+    if(prot_prop) {
+        prop->flags = DYNPROP_PROTREF;
+        V_UI4(&prop->var) = prot_prop - This->prototype->dispex.dynamic_data->props;
+    }
     data->prop_cnt++;
     *ret = prop;
     return S_OK;
@@ -783,6 +820,7 @@ HRESULT dispex_get_dprop_ref(DispatchEx *This, const WCHAR *name, BOOL alloc, VA
     if(FAILED(hres))
         return hres;
 
+    prop->flags &= ~DYNPROP_PROTREF;
     *ret = &prop->var;
     return S_OK;
 }
@@ -796,6 +834,7 @@ HRESULT dispex_get_dynid(DispatchEx *This, const WCHAR *name, DISPID *id)
     if(FAILED(hres))
         return hres;
 
+    prop->flags &= ~DYNPROP_PROTREF;
     *id = DISPID_DYNPROP_0 + (prop - This->dynamic_data->props);
     return S_OK;
 }
@@ -1232,10 +1271,32 @@ static HRESULT invoke_disp_value(IDispatch *this_obj, IDispatch *func_disp, LCID
     return hres;
 }
 
-static HRESULT get_func_obj_entry(DispatchEx *This, func_info_t *func, func_obj_entry_t **ret)
+static HRESULT get_func_obj_entry(DispatchEx *This, struct compat_prototype *prototype, func_info_t *func,
+        func_obj_entry_t **ret)
 {
     dispex_dynamic_data_t *dynamic_data;
     func_obj_entry_t *entry;
+
+    /* Use the prototype's if it's not the default while ours is */
+    if(prototype && prototype->dispex.dynamic_data && prototype->dispex.dynamic_data->func_disps &&
+       prototype->dispex.dynamic_data->func_disps[func->func_disp_idx].func_obj) {
+        func_obj_entry_t *prot_entry = prototype->dispex.dynamic_data->func_disps + func->func_disp_idx;
+
+        if(V_VT(&prot_entry->val) != VT_DISPATCH ||
+           V_DISPATCH(&prot_entry->val) != (IDispatch*)&prot_entry->func_obj->dispex.IDispatchEx_iface) {
+            entry = NULL;
+            if(This->dynamic_data && This->dynamic_data->func_disps &&
+               This->dynamic_data->func_disps[func->func_disp_idx].func_obj) {
+                entry = This->dynamic_data->func_disps + func->func_disp_idx;
+
+                if(V_VT(&entry->val) == VT_DISPATCH &&
+                   V_DISPATCH(&entry->val) == (IDispatch*)&entry->func_obj->dispex.IDispatchEx_iface)
+                    entry = NULL;
+            }
+            *ret = entry ? entry : prot_entry;
+            return S_OK;
+        }
+    }
 
     dynamic_data = get_dynamic_data(This);
     if(!dynamic_data)
@@ -1585,6 +1646,7 @@ static HRESULT invoke_builtin_function(IDispatch *this_obj, func_info_t *func, D
 static HRESULT func_invoke(DispatchEx *This, IDispatch *this_obj, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
+    func_obj_entry_t *entry;
     HRESULT hres;
 
     switch(flags) {
@@ -1593,10 +1655,24 @@ static HRESULT func_invoke(DispatchEx *This, IDispatch *this_obj, func_info_t *f
             return E_INVALIDARG;
         /* fall through */
     case DISPATCH_METHOD:
-        if(This->dynamic_data && This->dynamic_data->func_disps
-           && This->dynamic_data->func_disps[func->func_disp_idx].func_obj) {
-            func_obj_entry_t *entry = This->dynamic_data->func_disps + func->func_disp_idx;
+        entry = NULL;
 
+        if(This->dynamic_data && This->dynamic_data->func_disps &&
+           This->dynamic_data->func_disps[func->func_disp_idx].func_obj) {
+            entry = This->dynamic_data->func_disps + func->func_disp_idx;
+
+            if(V_VT(&entry->val) == VT_DISPATCH &&
+               V_DISPATCH(&entry->val) == (IDispatch*)&entry->func_obj->dispex.IDispatchEx_iface)
+                entry = NULL;
+        }
+
+        if(!entry && This->prototype) {
+            if(This->prototype->dispex.dynamic_data && This->prototype->dispex.dynamic_data->func_disps &&
+               This->prototype->dispex.dynamic_data->func_disps[func->func_disp_idx].func_obj)
+                entry = This->prototype->dispex.dynamic_data->func_disps + func->func_disp_idx;
+        }
+
+        if(entry) {
             if(V_VT(&entry->val) != VT_DISPATCH) {
                 FIXME("calling %s not supported\n", debugstr_variant(&entry->val));
                 return E_NOTIMPL;
@@ -1617,9 +1693,7 @@ static HRESULT func_invoke(DispatchEx *This, IDispatch *this_obj, func_info_t *f
         if(hres == E_UNEXPECTED && dispex_compat_mode(This) < COMPAT_MODE_IE9)
             hres = MSHTML_E_INVALID_PROPERTY;
         break;
-    case DISPATCH_PROPERTYGET: {
-        func_obj_entry_t *entry;
-
+    case DISPATCH_PROPERTYGET:
         if(func->id == DISPID_VALUE) {
             BSTR ret;
 
@@ -1632,16 +1706,13 @@ static HRESULT func_invoke(DispatchEx *This, IDispatch *this_obj, func_info_t *f
             return S_OK;
         }
 
-        hres = get_func_obj_entry(This, func, &entry);
+        hres = get_func_obj_entry(This, This->prototype, func, &entry);
         if(FAILED(hres))
             return hres;
 
         V_VT(res) = VT_EMPTY;
         return VariantCopy(res, &entry->val);
-    }
-    case DISPATCH_PROPERTYPUT: {
-        func_obj_entry_t *entry;
-
+    case DISPATCH_PROPERTYPUT:
         if(dp->cArgs != 1 || (dp->cNamedArgs == 1 && *dp->rgdispidNamedArgs != DISPID_PROPERTYPUT)
            || dp->cNamedArgs > 1) {
             FIXME("invalid args\n");
@@ -1654,12 +1725,11 @@ static HRESULT func_invoke(DispatchEx *This, IDispatch *this_obj, func_info_t *f
          * Native probably uses some undocumented interface in this case, but it should
          * be fine for us to allow IDispatchEx handle that.
          */
-        hres = get_func_obj_entry(This, func, &entry);
+        hres = get_func_obj_entry(This, NULL, func, &entry);
         if(FAILED(hres))
             return hres;
 
         return VariantCopy(&entry->val, dp->rgvarg);
-    }
     default:
         FIXME("Unimplemented flags %x\n", flags);
         hres = E_NOTIMPL;
@@ -1795,8 +1865,10 @@ HRESULT remove_attribute(DispatchEx *This, DISPID id, VARIANT_BOOL *success)
         dynamic_prop_t *prop;
 
         prop = This->dynamic_data->props+idx;
-        VariantClear(&prop->var);
-        prop->flags |= DYNPROP_DELETED;
+        if(!(prop->flags & DYNPROP_PROTREF)) {
+            VariantClear(&prop->var);
+            prop->flags |= DYNPROP_DELETED;
+        }
         *success = VARIANT_TRUE;
         return S_OK;
     }
@@ -2472,7 +2544,9 @@ static HRESULT WINAPI DispatchEx_GetMemberName(IDispatchEx *iface, DISPID id, BS
 
 static HRESULT next_dynamic_id(DispatchEx *dispex, DWORD idx, DISPID *ret_id)
 {
-    while(idx < dispex->dynamic_data->prop_cnt && dispex->dynamic_data->props[idx].flags & DYNPROP_DELETED)
+    /* FIXME: Go through PROTREFs? (must exclude props with same name as builtins) */
+    while(idx < dispex->dynamic_data->prop_cnt &&
+          dispex->dynamic_data->props[idx].flags & (DYNPROP_DELETED | DYNPROP_PROTREF))
         idx++;
 
     if(idx == dispex->dynamic_data->prop_cnt) {
@@ -2797,6 +2871,12 @@ HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID l
                 return E_INVALIDARG;
             /* fall through */
         case DISPATCH_METHOD:
+            fixup_prop_ref(dispex, prop);
+            if(prop->flags & DYNPROP_DELETED)
+                return DISP_E_UNKNOWNNAME;
+            if(prop->flags & DYNPROP_PROTREF)
+                prop = &dispex->prototype->dispex.dynamic_data->props[V_UI4(&prop->var)];
+
             if(V_VT(&prop->var) != VT_DISPATCH) {
                 FIXME("invoke %s\n", debugstr_variant(&prop->var));
                 return E_NOTIMPL;
@@ -2804,8 +2884,11 @@ HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID l
 
             return invoke_disp_value(this_obj, V_DISPATCH(&prop->var), lcid, wFlags, pdp, res, pei, caller);
         case DISPATCH_PROPERTYGET:
+            fixup_prop_ref(dispex, prop);
             if(prop->flags & DYNPROP_DELETED)
                 return DISP_E_UNKNOWNNAME;
+            if(prop->flags & DYNPROP_PROTREF)
+                prop = &dispex->prototype->dispex.dynamic_data->props[V_UI4(&prop->var)];
             V_VT(res) = VT_EMPTY;
             return variant_copy(res, &prop->var);
         case DISPATCH_PROPERTYPUT:
@@ -2821,7 +2904,7 @@ HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID l
             if(FAILED(hres))
                 return hres;
 
-            prop->flags &= ~DYNPROP_DELETED;
+            prop->flags &= ~(DYNPROP_DELETED | DYNPROP_PROTREF);
             return S_OK;
         default:
             FIXME("unhandled wFlags %x\n", wFlags);
@@ -2865,8 +2948,10 @@ HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
             return S_OK;
 
         prop = dispex->dynamic_data->props + idx;
-        VariantClear(&prop->var);
-        prop->flags |= DYNPROP_DELETED;
+        if(!(prop->flags & DYNPROP_PROTREF)) {
+            VariantClear(&prop->var);
+            prop->flags |= DYNPROP_DELETED;
+        }
         return S_OK;
     }
     case DISPEXPROP_BUILTIN: {
