@@ -401,7 +401,7 @@ extern const tid_t no_iface_tids[1];
     X(HTMLW3CComputedStyle,           "CSSStyleDeclaration",          HTMLW3CComputedStyle_dispex,            Object) \
     X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  Object) \
     X(HTMLStyleSheetRule,             "CSSStyleRule",                 HTMLStyleSheetRule_dispex,              Object) \
-    X(HTMLElement,                    "HTMLElement",                  HTMLElement_dispex,                     Object) \
+    X(HTMLElement,                    "HTMLElement",                  HTMLElement_dispex,                     DOMElement) \
     X(HTMLGenericElement,             "HTMLUnknownElement",           HTMLGenericElement_dispex,              Object) \
     X(HTMLAnchorElement,              "HTMLAnchorElement",            HTMLAnchorElement_dispex,               Object) \
     X(HTMLAreaElement,                "HTMLAreaElement",              HTMLAreaElement_dispex,                 Object) \
@@ -439,6 +439,7 @@ extern const tid_t no_iface_tids[1];
     X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   DOMUIEvent) \
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
+    X(DOMElement,                     "Element",                      DOMElement_dispex,                      HTMLDOMNode) \
     X(DOMTokenList,                   "DOMTokenList",                 DOMTokenList_dispex,                    Object) \
     X(HTMLDOMNode,                    "Node",                         HTMLDOMNode_dispex,                     Object) \
     X(HTMLDOMRange,                   "Range",                        HTMLDOMRange_dispex,                    Object) \
