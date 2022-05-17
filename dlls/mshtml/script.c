@@ -1612,7 +1612,7 @@ void bind_event_scripts(HTMLDocumentNode *doc)
         return;
 
     nsAString_InitDepend(&selector_str, L"script[event]");
-    nsres = nsIDOMHTMLDocument_QuerySelectorAll(doc->nsdoc, &selector_str, &node_list);
+    nsres = nsIDOMDocument_QuerySelectorAll(doc->nsdoc, &selector_str, &node_list);
     nsAString_Finish(&selector_str);
     if(NS_FAILED(nsres)) {
         ERR("QuerySelectorAll failed: %08lx\n", nsres);
