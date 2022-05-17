@@ -46,8 +46,8 @@ static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *do
 HRESULT get_doc_elem_by_id(HTMLDocumentNode *doc, const WCHAR *id, HTMLElement **ret)
 {
     nsIDOMNodeList *nsnode_list;
+    nsIDOMNode *nsnode = NULL;
     nsIDOMElement *nselem;
-    nsIDOMNode *nsnode;
     nsAString id_str;
     nsresult nsres;
     HRESULT hres;
@@ -55,11 +55,6 @@ HRESULT get_doc_elem_by_id(HTMLDocumentNode *doc, const WCHAR *id, HTMLElement *
     if(!doc->nsdoc) {
         WARN("NULL nsdoc\n");
         return E_UNEXPECTED;
-    }
-
-    if(!doc->nshtmldoc) {
-        FIXME("Not implemented for XML document\n");
-        return DISP_E_UNKNOWNNAME;
     }
 
     nsAString_InitDepend(&id_str, id);
@@ -72,18 +67,20 @@ HRESULT get_doc_elem_by_id(HTMLDocumentNode *doc, const WCHAR *id, HTMLElement *
     }
 
     /* get first element by name attribute */
-    nsres = nsIDOMHTMLDocument_GetElementsByName(doc->nshtmldoc, &id_str, &nsnode_list);
-    nsAString_Finish(&id_str);
-    if(FAILED(nsres)) {
-        ERR("getElementsByName failed: %08lx\n", nsres);
-        if(nselem)
-            nsIDOMElement_Release(nselem);
-        return E_FAIL;
-    }
+    if(doc->nshtmldoc) {
+        nsres = nsIDOMHTMLDocument_GetElementsByName(doc->nshtmldoc, &id_str, &nsnode_list);
+        nsAString_Finish(&id_str);
+        if(FAILED(nsres)) {
+            ERR("getElementsByName failed: %08lx\n", nsres);
+            if(nselem)
+                nsIDOMElement_Release(nselem);
+            return E_FAIL;
+        }
 
-    nsres = nsIDOMNodeList_Item(nsnode_list, 0, &nsnode);
-    nsIDOMNodeList_Release(nsnode_list);
-    assert(nsres == NS_OK);
+        nsres = nsIDOMNodeList_Item(nsnode_list, 0, &nsnode);
+        nsIDOMNodeList_Release(nsnode_list);
+        assert(nsres == NS_OK);
+    }
 
     if(nsnode && nselem) {
         UINT16 pos;
@@ -4655,13 +4652,8 @@ static HRESULT dispid_from_elem_name(HTMLDocumentNode *This, BSTR name, DISPID *
     unsigned i;
     nsresult nsres;
 
-    if(!This->nsdoc)
+    if(!This->nshtmldoc)
         return DISP_E_UNKNOWNNAME;
-
-    if(!This->nshtmldoc) {
-        FIXME("Not implemented for XML document\n");
-        return DISP_E_UNKNOWNNAME;
-    }
 
     nsAString_InitDepend(&name_str, name);
     nsres = nsIDOMHTMLDocument_GetElementsByName(This->nshtmldoc, &name_str, &node_list);
@@ -5853,13 +5845,8 @@ static HRESULT HTMLDocumentNode_invoke(DispatchEx *dispex, IDispatch *this_obj, 
 
     i = id - MSHTML_DISPID_CUSTOM_MIN;
 
-    if(!This->nsdoc || i >= This->elem_vars_cnt)
+    if(!This->nshtmldoc || i >= This->elem_vars_cnt)
         return DISP_E_UNKNOWNNAME;
-
-    if(!This->nshtmldoc) {
-        FIXME("Not implemented for XML document\n");
-        return DISP_E_UNKNOWNNAME;
-    }
 
     nsAString_InitDepend(&name_str, This->elem_vars[i]);
     nsres = nsIDOMHTMLDocument_GetElementsByName(This->nshtmldoc, &name_str, &node_list);
