@@ -2190,6 +2190,56 @@ static HRESULT WINAPI DispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnknown
     return E_NOTIMPL;
 }
 
+/* ECMA-262 5.1 Edition    15.1 */
+HRESULT set_js_globals(jsdisp_t *obj)
+{
+    jsdisp_t *js_global = obj->ctx->js_global;
+    const builtin_prop_t *bprop, *bend;
+    dispex_prop_t *prop, *end, *dst;
+    HRESULT hres;
+    BOOL b;
+
+    /* Reset builtins first */
+    obj->builtin_info = js_global->builtin_info;
+    for(bprop = obj->builtin_info->props, bend = bprop + obj->builtin_info->props_cnt; bprop != bend; bprop++) {
+        if(!(prop = find_prop_name_raw(obj, string_hash(bprop->name), bprop->name)) || prop->type == PROP_BUILTIN)
+            continue;
+        prop->flags |= PROPF_CONFIGURABLE;
+        delete_prop(obj, prop, &b);
+        prop->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE;
+        prop->type = PROP_BUILTIN;
+        prop->u.p = bprop;
+    }
+
+    /* Copy the rest of the props */
+    for(prop = js_global->props, end = prop + js_global->prop_cnt; prop != end; prop++) {
+        if(prop->type != PROP_JSVAL && prop->type != PROP_ACCESSOR)
+            continue;
+
+        /* Alloc it ourselves so we don't look into proxy props when defining it */
+        if(!(dst = find_prop_name_raw(obj, prop->hash, prop->name))) {
+            if(!(dst = alloc_prop(obj, prop->name, PROP_DELETED, 0)))
+               return E_OUTOFMEMORY;
+        }else {
+            dst->flags |= PROPF_CONFIGURABLE;
+            delete_prop(obj, dst, &b);
+        }
+
+        dst->flags = prop->flags;
+        dst->type = prop->type;
+        if(prop->type == PROP_JSVAL) {
+            hres = jsval_copy(prop->u.val, &dst->u.val);
+            if(FAILED(hres))
+                return hres;
+        }else {
+            dst->u.accessor.getter = prop->u.accessor.getter ? jsdisp_addref(prop->u.accessor.getter) : NULL;
+            dst->u.accessor.setter = prop->u.accessor.setter ? jsdisp_addref(prop->u.accessor.setter) : NULL;
+        }
+    }
+
+    return S_OK;
+}
+
 static HRESULT get_proxy_default_prototype(script_ctx_t *ctx, IWineDispatchProxyPrivate *proxy, jsdisp_t **prot)
 {
     IDispatch *disp = proxy->lpVtbl->GetDefaultPrototype(proxy, &ctx->proxy_prototypes);

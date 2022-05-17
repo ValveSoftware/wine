@@ -328,6 +328,7 @@ HRESULT create_dispex(script_ctx_t*,const builtin_info_t*,jsdisp_t*,jsdisp_t**) 
 HRESULT init_dispex(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
 HRESULT init_dispex_from_constr(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
 HRESULT convert_to_proxy(script_ctx_t*,jsval_t*) DECLSPEC_HIDDEN;
+HRESULT set_js_globals(jsdisp_t*) DECLSPEC_HIDDEN;
 
 void disp_fill_exception(script_ctx_t*,EXCEPINFO*) DECLSPEC_HIDDEN;
 HRESULT disp_call(script_ctx_t*,IDispatch*,DISPID,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
@@ -483,6 +484,7 @@ struct _script_ctx_t {
     DWORD last_match_length;
 
     jsdisp_t *global;
+    jsdisp_t *js_global;
     jsdisp_t *function_constr;
     jsdisp_t *array_constr;
     jsdisp_t *bool_constr;
