@@ -709,7 +709,7 @@ static HRESULT HTMLObjectElement_get_dispid(HTMLDOMNode *iface, BSTR name,
     return get_plugin_dispid(&This->plugin_container, name, pid);
 }
 
-static HRESULT HTMLObjectElement_invoke(HTMLDOMNode *iface, DISPID id, LCID lcid,
+static HRESULT HTMLObjectElement_invoke(HTMLDOMNode *iface, IDispatch *this_obj, DISPID id, LCID lcid,
         WORD flags, DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLObjectElement *This = impl_from_HTMLDOMNode(iface);
