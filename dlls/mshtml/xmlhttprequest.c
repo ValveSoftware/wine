@@ -364,7 +364,8 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_responseXML(IHTMLXMLHttpRequest *if
         ERR("get_responseText failed: %08lx\n", hres);
         return hres;
     }
-    hres = create_xml_document(str, p);
+    hres = create_xml_document(str, This->doc, DOCTYPE_XML,
+                               dispex_compat_mode(&This->event_target.dispex) >= COMPAT_MODE_IE10, p);
     SysFreeString(str);
 
     return hres;

@@ -6003,6 +6003,15 @@ dispex_static_data_t HTMLDocumentNode_dispex = {
     HTMLDocumentNode_init_dispex_info
 };
 
+dispex_static_data_t XMLDocumentNode_dispex = {
+    L"XMLDocument",
+    &HTMLDocumentNode_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_XMLDocument,
+    DispHTMLDocument_tid,
+    HTMLDocumentNode_iface_tids,
+    HTMLDocumentNode_init_dispex_info
+};
+
 dispex_static_data_t DocumentNode_dispex = {
     L"Document",
     &HTMLDocumentNode_event_target_vtbl.dispex_vtbl,
@@ -6038,19 +6047,24 @@ static HTMLDocumentNode *alloc_doc_node(HTMLDocumentObj *doc_obj, HTMLInnerWindo
 }
 
 HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLInnerWindow *window,
-                             compat_mode_t parent_mode, HTMLDocumentNode **ret)
+                             document_type_t doc_type, compat_mode_t parent_mode, HTMLDocumentNode **ret)
 {
+    dispex_static_data_t *dispex_data = dispex_from_document_type[doc_type];
     HTMLDocumentObj *doc_obj = browser->doc;
     HTMLDocumentNode *doc;
 
     doc = alloc_doc_node(doc_obj, window);
     if(!doc)
         return E_OUTOFMEMORY;
+    doc->basedoc.doc_type = doc_type;
 
     if(parent_mode >= COMPAT_MODE_IE9) {
         TRACE("using parent mode %u\n", parent_mode);
         doc->document_mode = parent_mode;
         lock_document_mode(doc);
+
+        if(parent_mode < COMPAT_MODE_IE11)
+            dispex_data = &DocumentNode_dispex;
     }
 
     if(!doc_obj->basedoc.window || (window && is_main_content_window(window->base.outer_window)))
@@ -6064,7 +6078,7 @@ HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLI
         doc->nshtmldoc = NULL;
     }
 
-    HTMLDOMNode_Init(doc, &doc->node, (nsIDOMNode*)doc->nsdoc, &HTMLDocumentNode_dispex);
+    HTMLDOMNode_Init(doc, &doc->node, (nsIDOMNode*)doc->nsdoc, dispex_data);
 
     init_document_mutation(doc);
     doc_init_events(doc);
@@ -6091,7 +6105,7 @@ HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLI
 
 static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *doc_node, HTMLDocumentNode **ret)
 {
-    dispex_static_data_t *dispex_data = &HTMLDocumentNode_dispex;
+    dispex_static_data_t *dispex_data = dispex_from_document_type[doc_node->basedoc.doc_type];
     HTMLDocumentNode *doc_frag;
 
     doc_frag = alloc_doc_node(doc_node->basedoc.doc_obj, doc_node->window);
@@ -6130,12 +6144,58 @@ HRESULT get_document_node(nsIDOMDocument *dom_document, HTMLDocumentNode **ret)
     return S_OK;
 }
 
-HRESULT create_xml_document(BSTR content, IDispatch **ret)
+HRESULT create_xml_document(BSTR content, HTMLDocumentNode *doc_node, document_type_t doc_type,
+        BOOL use_htmldoc_iface, IDispatch **ret)
 {
     IXMLDOMDocument *xmldoc;
     IObjectSafety *safety;
     VARIANT_BOOL vbool;
     HRESULT hres;
+
+    if(use_htmldoc_iface) {
+        nsAString errns, errtag;
+        HTMLDocumentNode *doc;
+        nsIDOMDocument *nsdoc;
+        nsIDOMNodeList *nodes;
+        nsIDOMParser *parser;
+        nsresult nsres;
+
+        if(!(parser = create_nsdomparser(doc_node)))
+            return E_FAIL;
+        nsres = nsIDOMParser_ParseFromString(parser, content ? content : L"",
+                doc_type == DOCTYPE_SVG   ? "image/svg+xml" :
+                doc_type == DOCTYPE_XHTML ? "application/xhtml+xml" :
+                                            "text/xml", &nsdoc);
+        nsIDOMParser_Release(parser);
+        if(NS_FAILED(nsres)) {
+            ERR("ParseFromString failed: 0x%08lx\n", nsres);
+            return map_nsresult(nsres);
+        }
+
+        nsAString_InitDepend(&errns, L"http://www.mozilla.org/newlayout/xml/parsererror.xml");
+        nsAString_InitDepend(&errtag, L"parsererror");
+        nsres = nsIDOMDocument_GetElementsByTagNameNS(nsdoc, &errns, &errtag, &nodes);
+        nsAString_Finish(&errtag);
+        nsAString_Finish(&errns);
+        if(NS_SUCCEEDED(nsres)) {
+            UINT32 length;
+            nsres = nsIDOMNodeList_GetLength(nodes, &length);
+            nsIDOMNodeList_Release(nodes);
+            if(NS_SUCCEEDED(nsres) && length) {
+                nsIDOMDocument_Release(nsdoc);
+                return MSHTML_E_SYNTAX;
+            }
+        }
+
+        hres = create_document_node(nsdoc, doc_node->browser, NULL, doc_type, doc_node->document_mode, &doc);
+        /* FIXME HACK: in FFXIV launcher, cycle collector crashes due to some bad refcount somewhere (gecko bug?) */
+        /* nsIDOMDocument_Release(nsdoc); */
+        if(FAILED(hres))
+            return hres;
+
+        *ret = (IDispatch*)&doc->basedoc.IHTMLDocument2_iface;
+        return S_OK;
+    }
 
     hres = CoCreateInstance(&CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER, &IID_IXMLDOMDocument, (void**)&xmldoc);
     if(FAILED(hres)) {
