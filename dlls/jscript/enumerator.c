@@ -88,6 +88,11 @@ static void Enumerator_destructor(jsdisp_t *dispex)
     heap_free(dispex);
 }
 
+static HRESULT Enumerator_gc_traverse(jsdisp_t *dispex, void *arg)
+{
+    return gc_process_linked_val(dispex, &enumerator_from_jsdisp(dispex)->item, arg);
+}
+
 static HRESULT Enumerator_atEnd(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
         jsval_t *r)
 {
@@ -189,7 +194,11 @@ static const builtin_info_t EnumeratorInst_info = {
     0,
     NULL,
     Enumerator_destructor,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Enumerator_gc_traverse
 };
 
 static HRESULT alloc_enumerator(script_ctx_t *ctx, jsdisp_t *object_prototype, EnumeratorInstance **ret)
