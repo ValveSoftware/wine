@@ -73,6 +73,7 @@ typedef struct {
     IDispatch* (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, struct proxy_prototypes *prots);
     HRESULT (STDMETHODCALLTYPE *DefineConstructors)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
     BOOL (STDMETHODCALLTYPE *IsPrototype)(IWineDispatchProxyPrivate *This);
+    BOOL (STDMETHODCALLTYPE *IsConstructor)(IWineDispatchProxyPrivate *This);
     DWORD (STDMETHODCALLTYPE *PropFlags)(IWineDispatchProxyPrivate *This, DISPID id);
     HRESULT (STDMETHODCALLTYPE *PropGetID)(IWineDispatchProxyPrivate *This, WCHAR *name, DISPID *id);
     HRESULT (STDMETHODCALLTYPE *PropInvoke)(IWineDispatchProxyPrivate *This, IDispatch *this_obj, DISPID id, LCID lcid,

@@ -4762,6 +4762,14 @@ static BOOL WINAPI DocWineDispProxyPrivate_IsPrototype(IWineDispatchProxyPrivate
     return itf->lpVtbl->IsPrototype(itf);
 }
 
+static BOOL WINAPI DocWineDispProxyPrivate_IsConstructor(IWineDispatchProxyPrivate *iface)
+{
+    HTMLDocument *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->dispex->IDispatchEx_iface;
+
+    return itf->lpVtbl->IsConstructor(itf);
+}
+
 static DWORD WINAPI DocWineDispProxyPrivate_PropFlags(IWineDispatchProxyPrivate *iface, DISPID id)
 {
     HTMLDocument *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -4861,6 +4869,7 @@ static const IWineDispatchProxyPrivateVtbl DocDispatchExVtbl = {
     DocWineDispProxyPrivate_GetDefaultConstructor,
     DocWineDispProxyPrivate_DefineConstructors,
     DocWineDispProxyPrivate_IsPrototype,
+    DocWineDispProxyPrivate_IsConstructor,
     DocWineDispProxyPrivate_PropFlags,
     DocWineDispProxyPrivate_PropGetID,
     DocWineDispProxyPrivate_PropInvoke,
