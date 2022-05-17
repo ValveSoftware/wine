@@ -499,21 +499,20 @@ static HRESULT WINAPI HTMLDocument_get_anchors(IHTMLDocument2 *iface, IHTMLEleme
         return E_UNEXPECTED;
     }
 
-    if(!This->doc_node->nshtmldoc) {
-        FIXME("Not implemented for XML document\n");
-        return E_NOTIMPL;
+    if(This->doc_type == DOCTYPE_XHTML)
+        FIXME("Not implemented for XHTML Document, returning empty list\n");
+
+    if(This->doc_node->nshtmldoc) {
+        nsres = nsIDOMHTMLDocument_GetAnchors(This->doc_node->nshtmldoc, &nscoll);
+        if(NS_FAILED(nsres)) {
+            ERR("GetAnchors failed: %08lx\n", nsres);
+            return E_FAIL;
+        }
     }
 
-    nsres = nsIDOMHTMLDocument_GetAnchors(This->doc_node->nshtmldoc, &nscoll);
-    if(NS_FAILED(nsres)) {
-        ERR("GetAnchors failed: %08lx\n", nsres);
-        return E_FAIL;
-    }
-
-    if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->doc_node);
+    *p = create_collection_from_htmlcol(nscoll, This->doc_node);
+    if(nscoll)
         nsIDOMHTMLCollection_Release(nscoll);
-    }
 
     return S_OK;
 }
