@@ -674,7 +674,7 @@ static HRESULT WINAPI HTMLBodyElement_createTextRange(IHTMLBodyElement *iface, I
         return E_UNEXPECTED;
     }
 
-    nsres = nsIDOMHTMLDocument_CreateRange(This->element.node.doc->nsdoc, &nsrange);
+    nsres = nsIDOMDocument_CreateRange(This->element.node.doc->nsdoc, &nsrange);
     if(NS_SUCCEEDED(nsres)) {
         nsres = nsIDOMRange_SelectNodeContents(nsrange, This->element.node.nsnode);
         if(NS_FAILED(nsres))
