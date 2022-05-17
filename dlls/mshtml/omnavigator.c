@@ -486,6 +486,7 @@ static HRESULT WINAPI DOMParser_parseFromString(IDOMParser *iface, BSTR string, 
 {
     struct dom_parser *This = impl_from_IDOMParser(iface);
     document_type_t doc_type;
+    IDispatch *disp;
     HRESULT hres;
 
     TRACE("(%p)->(%s %s %p)\n", This, debugstr_w(string), debugstr_w(mimeType), ppNode);
@@ -528,8 +529,13 @@ static HRESULT WINAPI DOMParser_parseFromString(IDOMParser *iface, BSTR string, 
         return hres;
     }
 
-    FIXME("Not implemented for XML Document\n");
-    return E_NOTIMPL;
+    hres = create_xml_document(string, This->doc, doc_type, TRUE, &disp);
+    if(FAILED(hres))
+        return hres;
+
+    hres = IDispatch_QueryInterface(disp, &IID_IHTMLDocument2, (void**)ppNode);
+    IDispatch_Release(disp);
+    return hres;
 }
 
 static const IDOMParserVtbl DOMParserVtbl = {
