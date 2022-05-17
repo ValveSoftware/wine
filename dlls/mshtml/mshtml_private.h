@@ -382,7 +382,7 @@ extern const tid_t no_iface_tids[1];
     X(HTMLDOMChildrenCollection,      "NodeList",                     HTMLDOMChildrenCollection_dispex,       Object) \
     X(HTMLDOMImplementation,          "DOMImplementation",            HTMLDOMImplementation_dispex,           Object) \
     X(HTMLDOMTextNode,                "Text",                         HTMLDOMTextNode_dispex,                 DOMCharacterData) \
-    X(HTMLDocument,                   "HTMLDocument",                 HTMLDocumentNode_dispex,                Object) \
+    X(HTMLDocument,                   "HTMLDocument",                 HTMLDocumentNode_dispex,                Document) \
     X(HTMLWindow,                     "Window",                       HTMLWindow_dispex,                      Object) \
     X(HTMLAttributeCollection,        "NamedNodeMap",                 HTMLAttributeCollection_dispex,         Object) \
     X(HTMLElementCollection,          "HTMLCollection",               HTMLElementCollection_dispex,           Object) \
@@ -440,6 +440,7 @@ extern const tid_t no_iface_tids[1];
     X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   DOMUIEvent) \
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
+    X(Document,                       "Document",                     DocumentNode_dispex,                    HTMLDOMNode) \
     X(DOMElement,                     "Element",                      DOMElement_dispex,                      HTMLDOMNode) \
     X(CSSRule,                        "CSSRule",                      CSSRule_dispex,                         Object) \
     X(StyleSheet,                     "StyleSheet",                   StyleSheet_dispex,                      Object) \
