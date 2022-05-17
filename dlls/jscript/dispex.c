@@ -2080,8 +2080,7 @@ static HRESULT delete_prop(jsdisp_t *prop_obj, dispex_prop_t *prop, BOOL *ret)
         HRESULT hres = prop_obj->proxy->lpVtbl->PropDelete(prop_obj->proxy, prop->u.proxy.id);
         if(FAILED(hres))
             return hres;
-        if(hres == S_OK)
-            prop->type = PROP_DELETED;
+        prop->type = PROP_DELETED;
         return S_OK;
     }
     if(prop->type == PROP_JSVAL)
@@ -2182,6 +2181,28 @@ static HRESULT WINAPI DispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnknown
     return E_NOTIMPL;
 }
 
+static HRESULT get_proxy_default_prototype(script_ctx_t *ctx, IWineDispatchProxyPrivate *proxy, jsdisp_t **prot)
+{
+    IDispatch *disp = proxy->lpVtbl->GetDefaultPrototype(proxy, &ctx->proxy_prototypes);
+    HRESULT hres;
+
+    if(!disp)
+        return E_OUTOFMEMORY;
+
+    if(disp == WINE_DISP_PROXY_NULL_PROTOTYPE)
+        *prot = NULL;
+    else if(disp == WINE_DISP_PROXY_OBJECT_PROTOTYPE)
+        *prot = jsdisp_addref(ctx->object_prototype);
+    else {
+        jsval_t tmp = jsval_disp(disp);
+        hres = convert_to_proxy(ctx, &tmp);
+        if(FAILED(hres))
+            return hres;
+        *prot = as_jsdisp(get_object(tmp));
+    }
+    return S_OK;
+}
+
 static inline jsdisp_t *impl_from_IWineDispatchProxyCbPrivate(IWineDispatchProxyCbPrivate *iface)
 {
     return impl_from_IDispatchEx((IDispatchEx*)iface);
@@ -2223,6 +2244,7 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
     jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
     script_ctx_t *ctx = script ? get_script_ctx(script) : This->ctx;
     dispex_prop_t *prop, *end;
+    jsdisp_t *prot;
     HRESULT hres;
     DISPID id;
     BOOL b;
@@ -2238,6 +2260,10 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
             return S_OK;
         }
 
+        hres = get_proxy_default_prototype(ctx, This->proxy, &prot);
+        if(FAILED(hres))
+            return hres;
+
         if(This->ref) {
             list_remove(&This->entry);
             list_add_tail(&ctx->objects, &This->entry);
@@ -2246,7 +2272,9 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
         script_addref(ctx);
         This->ctx = ctx;
 
-        hres = jsdisp_change_prototype(This, ctx->object_prototype);
+        hres = jsdisp_change_prototype(This, prot);
+        if(prot)
+            jsdisp_release(prot);
         if(FAILED(hres))
             return hres;
     }
@@ -2428,7 +2456,7 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
 {
     IWineDispatchProxyCbPrivate **proxy_ref;
     IWineDispatchProxyPrivate *proxy;
-    jsdisp_t *jsdisp;
+    jsdisp_t *jsdisp, *prot;
     IDispatch *obj;
     HRESULT hres;
 
@@ -2457,16 +2485,37 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
         return S_OK;
     }
 
-    hres = create_dispex(ctx, &proxy_dispex_info, ctx->object_prototype, &jsdisp);
-    if(FAILED(hres)) {
-        IDispatchEx_Release((IDispatchEx*)proxy);
-        return hres;
-    }
+    hres = get_proxy_default_prototype(ctx, proxy, &prot);
+    if(FAILED(hres))
+        goto fail;
+
+    hres = create_dispex(ctx, &proxy_dispex_info, prot, &jsdisp);
+    if(prot)
+        jsdisp_release(prot);
+    if(FAILED(hres))
+        goto fail;
+
     *proxy_ref = (IWineDispatchProxyCbPrivate*)&jsdisp->IDispatchEx_iface;
     jsdisp->proxy = proxy;
+    if(proxy->lpVtbl->IsPrototype(proxy)) {
+        /* FIXME: use proper constructor */
+        jsval_t ctor = jsval_null();
+
+        hres = jsdisp_define_data_property(jsdisp, L"constructor", PROPF_WRITABLE | PROPF_CONFIGURABLE, ctor);
+    }
+    if(FAILED(hres)) {
+        *proxy_ref = NULL;
+        jsdisp->proxy = NULL;
+        jsdisp_release(jsdisp);
+        goto fail;
+    }
 
     *val = jsval_obj(jsdisp);
     return S_OK;
+
+fail:
+    IDispatchEx_Release((IDispatchEx*)proxy);
+    return hres;
 }
 
 void jsdisp_free(jsdisp_t *obj)
@@ -2613,7 +2662,9 @@ HRESULT jsdisp_call_value(jsdisp_t *jsfunc, IDispatch *jsthis, WORD flags, unsig
     if(is_class(jsfunc, JSCLASS_FUNCTION)) {
         hres = Function_invoke(jsfunc, jsthis, flags, argc, argv, r);
     }else if(jsfunc->proxy) {
-        hres = proxy_disp_call(jsfunc, jsthis, DISPID_VALUE, flags, argc, argv, r);
+        /* We have to distinguish default value of prototypes from a builtin with DISPID_VALUE */
+        DISPID id = jsfunc->proxy->lpVtbl->IsPrototype(jsfunc->proxy) ? DISPID_UNKNOWN : DISPID_VALUE;
+        hres = proxy_disp_call(jsfunc, jsthis, id, flags, argc, argv, r);
     }else {
         if(!jsfunc->builtin_info->call) {
             WARN("Not a function\n");

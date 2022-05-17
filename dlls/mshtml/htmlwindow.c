@@ -3649,6 +3649,22 @@ static IWineDispatchProxyCbPrivate** WINAPI WindowWineDispProxyPrivate_GetProxyF
     return &This->inner_window->event_target.dispex.proxy;
 }
 
+static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
+{
+    HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->GetDefaultPrototype(itf, prots_ref);
+}
+
+static BOOL WINAPI WindowWineDispProxyPrivate_IsPrototype(IWineDispatchProxyPrivate *iface)
+{
+    HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->IsPrototype(itf);
+}
+
 static DWORD WINAPI WindowWineDispProxyPrivate_PropFlags(IWineDispatchProxyPrivate *iface, DISPID id)
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -3747,6 +3763,8 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
 
     /* IWineDispatchProxyPrivate extension */
     WindowWineDispProxyPrivate_GetProxyFieldRef,
+    WindowWineDispProxyPrivate_GetDefaultPrototype,
+    WindowWineDispProxyPrivate_IsPrototype,
     WindowWineDispProxyPrivate_PropFlags,
     WindowWineDispProxyPrivate_PropGetID,
     WindowWineDispProxyPrivate_PropInvoke,
@@ -4120,9 +4138,10 @@ static const tid_t HTMLWindow_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLWindow_dispex = {
+dispex_static_data_t HTMLWindow_dispex = {
     L"Window",
     &HTMLWindow_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLWindow,
     DispHTMLWindow2_tid,
     HTMLWindow_iface_tids,
     HTMLWindow_init_dispex_info
