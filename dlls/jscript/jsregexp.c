@@ -548,6 +548,11 @@ static void RegExp_destructor(jsdisp_t *dispex)
     heap_free(This);
 }
 
+static HRESULT RegExp_gc_traverse(jsdisp_t *dispex, void *arg)
+{
+    return gc_process_linked_val(dispex, &regexp_from_jsdisp(dispex)->last_index_val, arg);
+}
+
 static const builtin_prop_t RegExp_props[] = {
     {L"exec",                RegExp_exec,                  PROPF_METHOD|1},
     {L"global",              NULL,0,                       RegExp_get_global},
@@ -565,7 +570,11 @@ static const builtin_info_t RegExp_info = {
     ARRAY_SIZE(RegExp_props),
     RegExp_props,
     RegExp_destructor,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    RegExp_gc_traverse
 };
 
 static const builtin_prop_t RegExpInst_props[] = {
@@ -582,7 +591,11 @@ static const builtin_info_t RegExpInst_info = {
     ARRAY_SIZE(RegExpInst_props),
     RegExpInst_props,
     RegExp_destructor,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    RegExp_gc_traverse
 };
 
 static HRESULT alloc_regexp(script_ctx_t *ctx, jsdisp_t *object_prototype, RegExpInstance **ret)

@@ -655,6 +655,237 @@ static HRESULT fill_protrefs(jsdisp_t *This)
     return S_OK;
 }
 
+static void unlink_props(jsdisp_t *jsdisp)
+{
+    dispex_prop_t *prop = jsdisp->props, *end;
+
+    for(end = prop + jsdisp->prop_cnt; prop < end; prop++) {
+        switch(prop->type) {
+        case PROP_DELETED:
+        case PROP_PROTREF:
+            continue;
+        case PROP_JSVAL:
+            jsval_release(prop->u.val);
+            break;
+        case PROP_ACCESSOR:
+            if(prop->u.accessor.getter)
+                jsdisp_release(prop->u.accessor.getter);
+            if(prop->u.accessor.setter)
+                jsdisp_release(prop->u.accessor.setter);
+            break;
+        default:
+            break;
+        }
+        prop->type = PROP_JSVAL;
+        prop->flags &= PROPF_ALL;
+        prop->flags |= PROPF_CONFIGURABLE | PROPF_WRITABLE;
+        prop->u.val = jsval_undefined();
+    }
+}
+
+
+
+/*
+ * To deal with circular refcounts, a basic Garbage Collector is used with a variant of the
+ * mark-and-sweep algorithm that doesn't require knowing or traversing any specific "roots".
+ * This works based on the assumption that circular references can only happen when objects
+ * end up pointing to each other, and each other alone, without any external refs.
+ *
+ * An "external ref" is a ref to the object that's not from any other object. Example of such
+ * refs can be local variables, the script ctx (which keeps a ref to the global object), etc.
+ *
+ * Broadly, there are 3 passes done on the entire list of objects:
+ *
+ * 1. Speculatively decrease refcounts of each linked-to-object from each object. This ensures
+ *    that the only remaining refcount on each object is the number of "external refs" to it.
+ *    At the same time, mark all of the objects so that they can be potentially collected.
+ *
+ * 2. For each object with a non-zero "external refcount", clear the mark from step 1, and
+ *    recursively traverse all linked objects from it, clearing their marks as well (regardless
+ *    of their refcount), stopping a given path when the object is unmarked (and then going back
+ *    up the heap stack). This basically unmarks all of the objects with "external refcounts"
+ *    and those accessible from them, and only the leaked dangling objects will still be marked.
+ *
+ * 3. For each object that is marked, unlink all of the objects linked from it, because they
+ *    are dangling in a circular refcount and not accessible. This should release them.
+ *
+ * This collection process has to be done periodically, but can be pretty expensive so there
+ * has to be a balance between reclaiming dangling objects and performance.
+ */
+static void gc_run(script_ctx_t *ctx)
+{
+    /* Save original refcounts in a linked list of chunks,
+       so we don't bloat object size unnecessarily. */
+    struct chunk
+    {
+        struct chunk *next;
+        LONG ref[1020];
+    } *head, *chunk;
+    jsdisp_t *obj, *obj2, *link, *link2;
+    struct heap_stack heap_stack = { 0 };
+    dispex_prop_t *prop, *props_end;
+    unsigned chunk_idx = 0;
+    HRESULT hres;
+
+    if(!(head = heap_alloc(sizeof(*head))))
+        return;
+    head->next = NULL;
+    chunk = head;
+
+    /* 1. Save actual refcounts and decrease them speculatively as-if we unlinked the objects */
+    LIST_FOR_EACH_ENTRY(obj, &ctx->objects, jsdisp_t, entry) {
+        if(chunk_idx == ARRAY_SIZE(chunk->ref)) {
+            if(!(chunk->next = heap_alloc(sizeof(*chunk)))) {
+                do {
+                    chunk = head->next;
+                    free(head);
+                    head = chunk;
+                } while(head);
+                return;
+            }
+            chunk = chunk->next, chunk_idx = 0;
+            chunk->next = NULL;
+        }
+        chunk->ref[chunk_idx++] = obj->ref;
+    }
+    LIST_FOR_EACH_ENTRY(obj, &ctx->objects, jsdisp_t, entry) {
+        for(prop = obj->props, props_end = prop + obj->prop_cnt; prop < props_end; prop++) {
+            switch(prop->type) {
+            case PROP_JSVAL:
+                if(is_object_instance(prop->u.val) && (link = to_jsdisp(get_object(prop->u.val))) && link->ctx == ctx)
+                    link->ref--;
+                break;
+            case PROP_ACCESSOR:
+                if(prop->u.accessor.getter && prop->u.accessor.getter->ctx == ctx)
+                    prop->u.accessor.getter->ref--;
+                if(prop->u.accessor.setter && prop->u.accessor.setter->ctx == ctx)
+                    prop->u.accessor.setter->ref--;
+                break;
+            default:
+                break;
+            }
+        }
+
+        if(obj->prototype && obj->prototype->ctx == ctx)
+            obj->prototype->ref--;
+        if(obj->builtin_info->gc_traverse)
+            obj->builtin_info->gc_traverse(obj, GC_TRAVERSE_SPECULATIVELY);
+        obj->gc_marked = TRUE;
+    }
+
+    /* 2. Clear mark on objects with non-zero "external refcount" and all objects accessible from them */
+    chunk = head, chunk_idx = 0;
+    LIST_FOR_EACH_ENTRY(obj, &ctx->objects, jsdisp_t, entry) {
+        LONG external_ref = obj->ref;
+
+        obj->ref = chunk->ref[chunk_idx++];  /* restore */
+        if(chunk_idx == ARRAY_SIZE(chunk->ref)) {
+            struct chunk *next = chunk->next;
+            free(chunk);
+            chunk = next, chunk_idx = 0;
+        }
+        if(!external_ref || !obj->gc_marked)
+            continue;
+
+        hres = heap_stack_push(&heap_stack, NULL);
+        if(FAILED(hres))
+            goto unwind;
+
+        obj2 = obj;
+        do
+        {
+            obj2->gc_marked = FALSE;
+
+            for(prop = obj2->props, props_end = prop + obj2->prop_cnt; prop < props_end; prop++) {
+                switch(prop->type) {
+                case PROP_JSVAL:
+                    if(!is_object_instance(prop->u.val))
+                        continue;
+                    link = to_jsdisp(get_object(prop->u.val));
+                    link2 = NULL;
+                    break;
+                case PROP_ACCESSOR:
+                    link = prop->u.accessor.getter;
+                    link2 = prop->u.accessor.setter;
+                    break;
+                default:
+                    continue;
+                }
+                if(link && link->gc_marked && link->ctx == ctx) {
+                    hres = heap_stack_push(&heap_stack, link);
+                    if(FAILED(hres))
+                        goto unwind2;
+                }
+                if(link2 && link2->gc_marked && link2->ctx == ctx) {
+                    hres = heap_stack_push(&heap_stack, link2);
+                    if(FAILED(hres))
+                        goto unwind2;
+                }
+            }
+
+            if(obj2->prototype && obj2->prototype->gc_marked && obj2->prototype->ctx == ctx) {
+                hres = heap_stack_push(&heap_stack, obj2->prototype);
+                if(FAILED(hres))
+                    goto unwind2;
+            }
+
+            if(obj2->builtin_info->gc_traverse) {
+                hres = obj2->builtin_info->gc_traverse(obj2, &heap_stack);
+                if(FAILED(hres))
+                    goto unwind2;
+            }
+
+            do obj2 = heap_stack_pop(&heap_stack); while(obj2 && !obj2->gc_marked);
+        } while(obj2);
+    }
+    heap_stack_free(&heap_stack);
+    free(chunk);
+
+    /* 3. Remove all the links from the marked objects, since they are dangling */
+    LIST_FOR_EACH_ENTRY_SAFE(obj, obj2, &ctx->objects, jsdisp_t, entry) {
+        if(!obj->gc_marked)
+            continue;
+
+        /* Grab it since it gets removed when unlinked */
+        jsdisp_addref(obj);
+        unlink_props(obj);
+
+        if(obj->prototype) {
+            jsdisp_release(obj->prototype);
+            obj->prototype = NULL;
+        }
+
+        if(obj->builtin_info->gc_traverse)
+            obj->builtin_info->gc_traverse(obj, GC_TRAVERSE_UNLINK);
+
+        /* Unlinking possibly removed the next object from the list, so grab it here */
+        obj2 = LIST_ENTRY(obj->entry.next, jsdisp_t, entry);
+        jsdisp_release(obj);
+    }
+
+    ctx->gc_last_tick = GetTickCount();
+    return;
+
+unwind2:
+    do obj2 = heap_stack_pop(&heap_stack); while(obj2);
+unwind:
+    heap_stack_free(&heap_stack);
+
+    while(&(obj = LIST_ENTRY(obj->entry.next, jsdisp_t, entry))->entry != &ctx->objects) {
+        obj->ref = chunk->ref[chunk_idx++];
+        if(chunk_idx == ARRAY_SIZE(chunk->ref)) {
+            struct chunk *next = chunk->next;
+            free(chunk);
+            chunk = next, chunk_idx = 0;
+        }
+    }
+    free(chunk);
+    LIST_FOR_EACH_ENTRY(obj, &ctx->objects, jsdisp_t, entry)
+        obj->gc_marked = FALSE;
+}
+
+
+
 struct typeinfo_func {
     dispex_prop_t *prop;
     function_code_t *code;
@@ -1811,6 +2042,10 @@ HRESULT init_dispex(jsdisp_t *dispex, script_ctx_t *ctx, const builtin_info_t *b
 {
     unsigned i;
 
+    /* FIXME: Use better heuristics to decide when to run the GC */
+    if(GetTickCount() - ctx->gc_last_tick > 30000)
+        gc_run(ctx);
+
     TRACE("%p (%p)\n", dispex, prototype);
 
     dispex->IDispatchEx_iface.lpVtbl = &DispatchExVtbl;
@@ -1835,6 +2070,7 @@ HRESULT init_dispex(jsdisp_t *dispex, script_ctx_t *ctx, const builtin_info_t *b
     script_addref(ctx);
     dispex->ctx = ctx;
 
+    list_add_tail(&ctx->objects, &dispex->entry);
     return S_OK;
 }
 
@@ -1868,6 +2104,8 @@ HRESULT create_dispex(script_ctx_t *ctx, const builtin_info_t *builtin_info, jsd
 void jsdisp_free(jsdisp_t *obj)
 {
     dispex_prop_t *prop;
+
+    list_remove(&obj->entry);
 
     TRACE("(%p)\n", obj);
 
