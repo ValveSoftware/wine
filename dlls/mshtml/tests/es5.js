@@ -3010,6 +3010,42 @@ sync_test("DOMParser", function() {
         ok(r === html_elem, "body parent of HTML document with mime type " + m + " = " + r);
     }
 
+    // XML mime types
+    mimeType = [
+        [ "text/xmL",                "XML Document" ],
+        [ "aPPlication/xml",         "XML Document" ],
+        [ "application/xhtml+xml",   "XHTML Document" ],
+        [ "image/svg+xml",           "SVG Document" ]
+    ];
+    for(var i = 0; i < mimeType.length; i++) {
+        var m = mimeType[i][0], xml = p.parseFromString(teststr, m);
+        r = xml.mimeType;
+        ok(r === mimeType[i][1], "mimeType of XML document with mime type " + m + " = " + r);
+        r = xml.childNodes;
+        ok(r.length === 1, "childNodes.length of XML document with mime type " + m + " = " + r.length);
+        r = r[0];
+        ok(r.nodeName === "a", "child nodeName of XML document with mime type " + m + " = " + r.nodeName);
+        ok(r.nodeValue === null, "child nodeValue of XML document with mime type " + m + " = " + r.nodeValue);
+        r = r.childNodes;
+        ok(r.length === 1, "childNodes of child.length of XML document with mime type " + m + " = " + r.length);
+        r = r[0];
+        ok(r.nodeName === "#text", "child of child nodeName of XML document with mime type " + m + " = " + r.nodeName);
+        ok(r.nodeValue === "wine", "child of child nodeValue of XML document with mime type " + m + " = " + r.nodeValue);
+
+        // test HTMLDocument specific props, which are available in DocumentPrototype,
+        // so they are shared in XMLDocument since they both have the same prototype
+        r = xml.anchors;
+        if(mimeType[i][1] === "XHTML Document") {
+            todo_wine.
+            ok(r.length === 1, "anchors.length of XML document with mime type " + m + " = " + r.length);
+            r = r[0];
+            todo_wine.
+            ok(r === xml.childNodes[0], "anchor of XML document with mime type " + m + " = " + r);
+        }else {
+            ok(r.length === 0, "anchors.length of XML document with mime type " + m + " = " + r.length);
+        }
+    }
+
     // Invalid mime types
     mimeType = [
         "application/html",
@@ -3028,4 +3064,12 @@ sync_test("DOMParser", function() {
             ok(n === E_INVALIDARG, "parseFromString with mime type " + mimeType[i] + " threw " + n);
         }
     }
+
+    try {
+        r = p.parseFromString("<invalid>xml", "text/xml");
+        ok(false, "expected exception calling parseFromString with invalid xml");
+    }catch(ex) {
+        ok(ex.name === "SyntaxError", "parseFromString with invalid xml threw " + ex.name);
+    }
+    p.parseFromString("<parsererror></parsererror>", "text/xml");
 });
