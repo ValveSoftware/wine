@@ -53,7 +53,10 @@ typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
 struct proxy_prototypes
 {
     unsigned int num;
-    IDispatch *prototype[];
+    struct {
+        IDispatch *prototype;
+        IDispatch *ctor;
+    } disp[];
 };
 
 struct proxy_func_invoker
@@ -67,6 +70,8 @@ typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
     IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
+    IDispatch* (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, struct proxy_prototypes *prots);
+    HRESULT (STDMETHODCALLTYPE *DefineConstructors)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
     BOOL (STDMETHODCALLTYPE *IsPrototype)(IWineDispatchProxyPrivate *This);
     DWORD (STDMETHODCALLTYPE *PropFlags)(IWineDispatchProxyPrivate *This, DISPID id);
     HRESULT (STDMETHODCALLTYPE *PropGetID)(IWineDispatchProxyPrivate *This, WCHAR *name, DISPID *id);
@@ -85,6 +90,8 @@ typedef struct {
     void (STDMETHODCALLTYPE *Relinked)(IWineDispatchProxyCbPrivate *This, IWineDispatchProxyPrivate *proxy);
     HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
     DISPID (STDMETHODCALLTYPE *GetUnderlyingDispID)(IWineDispatchProxyCbPrivate *This, DISPID id);
+    IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, DISPID id, const WCHAR *name);
+    HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const WCHAR *name, IDispatch *prot, DISPID);
     void (STDMETHODCALLTYPE *Traverse)(IWineDispatchProxyCbPrivate *This,
                                        void (STDMETHODCALLTYPE *note_cc_edge)(IDispatch*,void*), void *cb);
 } IWineDispatchProxyCbPrivateVtbl;
