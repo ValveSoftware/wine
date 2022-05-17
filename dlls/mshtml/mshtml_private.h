@@ -660,7 +660,7 @@ struct HTMLDocument {
     IDocumentRange              IDocumentRange_iface;
 
     IUnknown *outer_unk;
-    IDispatchEx *dispex;
+    DispatchEx *dispex;
 
     HTMLDocumentObj *doc_obj;
     HTMLDocumentNode *doc_node;
