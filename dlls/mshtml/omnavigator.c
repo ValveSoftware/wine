@@ -31,6 +31,13 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
+dispex_static_data_t *const dispex_from_document_type[DOCTYPE_COUNT] = {
+    [DOCTYPE_HTML]  = &HTMLDocumentNode_dispex,
+    [DOCTYPE_XHTML] = &XMLDocumentNode_dispex,
+    [DOCTYPE_XML]   = &XMLDocumentNode_dispex,
+    [DOCTYPE_SVG]   = &XMLDocumentNode_dispex,
+};
+
 const WCHAR *const content_type_from_document_type[DOCTYPE_COUNT] = {
     [DOCTYPE_HTML]  = L"text/html",
     [DOCTYPE_XHTML] = L"application/xhtml+xml",
@@ -293,7 +300,7 @@ static HRESULT WINAPI HTMLDOMImplementation2_createHTMLDocument(IHTMLDOMImplemen
         return E_FAIL;
     }
 
-    hres = create_document_node(doc, This->browser, NULL, dispex_compat_mode(&This->dispex), &new_document_node);
+    hres = create_document_node(doc, This->browser, NULL, DOCTYPE_HTML, dispex_compat_mode(&This->dispex), &new_document_node);
     nsIDOMDocument_Release(doc);
     if(FAILED(hres))
         return hres;
