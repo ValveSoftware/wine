@@ -824,12 +824,32 @@ static HRESULT WINAPI HTMLDocument_get_vlinkColor(IHTMLDocument2 *iface, VARIANT
 static HRESULT WINAPI HTMLDocument_get_referrer(IHTMLDocument2 *iface, BSTR *p)
 {
     HTMLDocument *This = impl_from_IHTMLDocument2(iface);
+    nsACString spec_str;
+    const char *spec;
+    nsIURI *referrer;
+    WCHAR *specW;
 
-    FIXME("(%p)->(%p)\n", This, p);
+    TRACE("(%p)->(%p)\n", This, p);
 
     *p = NULL;
-    return S_OK;
- }
+    if(!This->window || !This->window->base.inner_window->bscallback ||
+       !(referrer = This->window->base.inner_window->bscallback->nschannel->referrer))
+        return S_OK;
+
+    nsACString_Init(&spec_str, NULL);
+    if(NS_FAILED(nsIURI_GetSpec(referrer, &spec_str))) {
+        WARN("GetSpec failed, returning NULL\n");
+        return S_OK;
+    }
+    nsACString_GetData(&spec_str, &spec);
+    if(spec && (specW = heap_strdupAtoW(spec))) {
+        *p = SysAllocString(specW);
+        heap_free(specW);
+    }
+    nsACString_Finish(&spec_str);
+
+    return *p || !spec ? S_OK : E_OUTOFMEMORY;
+}
 
 static HRESULT WINAPI HTMLDocument_get_location(IHTMLDocument2 *iface, IHTMLLocation **p)
 {
