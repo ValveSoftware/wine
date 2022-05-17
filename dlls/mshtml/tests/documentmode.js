@@ -1009,7 +1009,6 @@ sync_test("delete_prop", function() {
         ok(r, "did not get an expected globalprop2 exception");
     }else {
         ok(!r, "got an unexpected exception");
-        todo_wine.
         ok(!("globalprop2" in obj), "globalprop2 is still in obj");
     }
 
@@ -1033,7 +1032,6 @@ sync_test("delete_prop", function() {
     ok(obj.globalprop4, "globalprop4 = " + globalprop4);
     r = (delete globalprop4);
     ok(r, "delete returned " + r);
-    todo_wine.
     ok(!("globalprop4" in obj), "globalprop4 is still in obj");
 });
 
