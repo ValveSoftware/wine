@@ -60,7 +60,10 @@ typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
 struct proxy_prototypes
 {
     unsigned int num;
-    IDispatch *prototype[];
+    struct {
+        IDispatch *prototype;
+        IDispatch *ctor;
+    } disp[];
 };
 
 struct proxy_func_invoker
@@ -74,6 +77,8 @@ typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
     IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
+    IDispatch* (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, struct proxy_prototypes *prots);
+    HRESULT (STDMETHODCALLTYPE *DefineConstructors)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
     BOOL (STDMETHODCALLTYPE *IsPrototype)(IWineDispatchProxyPrivate *This);
     DWORD (STDMETHODCALLTYPE *PropFlags)(IWineDispatchProxyPrivate *This, DISPID id);
     HRESULT (STDMETHODCALLTYPE *PropGetID)(IWineDispatchProxyPrivate *This, WCHAR *name, DISPID *id);
@@ -92,6 +97,8 @@ typedef struct {
     void (STDMETHODCALLTYPE *Relinked)(IWineDispatchProxyCbPrivate *This, IWineDispatchProxyPrivate *proxy);
     HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
     DISPID (STDMETHODCALLTYPE *GetUnderlyingDispID)(IWineDispatchProxyCbPrivate *This, DISPID id);
+    IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, DISPID id, const WCHAR *name);
+    HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const WCHAR *name, IDispatch *prot, DISPID);
     void (STDMETHODCALLTYPE *Traverse)(IWineDispatchProxyCbPrivate *This,
                                        void (STDMETHODCALLTYPE *note_cc_edge)(IDispatch*,void*), void *cb);
 } IWineDispatchProxyCbPrivateVtbl;
@@ -328,7 +335,6 @@ HRESULT create_dispex(script_ctx_t*,const builtin_info_t*,jsdisp_t*,jsdisp_t**) 
 HRESULT init_dispex(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
 HRESULT init_dispex_from_constr(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
 HRESULT convert_to_proxy(script_ctx_t*,jsval_t*) DECLSPEC_HIDDEN;
-HRESULT set_js_globals(jsdisp_t*) DECLSPEC_HIDDEN;
 
 void disp_fill_exception(script_ctx_t*,EXCEPINFO*) DECLSPEC_HIDDEN;
 HRESULT disp_call(script_ctx_t*,IDispatch*,DISPID,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
@@ -365,6 +371,7 @@ HRESULT create_builtin_constructor(script_ctx_t*,builtin_invoke_t,const WCHAR*,c
         jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
 HRESULT create_proxy_function(jsdisp_t*,DISPID,DWORD,jsdisp_t**) DECLSPEC_HIDDEN;
 HRESULT create_proxy_accessor(jsdisp_t*,DISPID,property_desc_t*) DECLSPEC_HIDDEN;
+HRESULT create_proxy_constructor(DISPID,const WCHAR*,jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
 HRESULT Function_invoke(jsdisp_t*,IDispatch*,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
 
 HRESULT Function_value(script_ctx_t*,jsval_t,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
