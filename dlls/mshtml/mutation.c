@@ -395,6 +395,19 @@ static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode
     doc->document_mode = document_mode;
     if(lock)
         lock_document_mode(doc);
+
+    /* The prototype needs to be changed since it depends on mode */
+    if(doc->window && doc->window->compat_prototypes[PROTO_ID_HTMLDocument]) {
+        IUnknown_Release(&doc->window->compat_prototypes[PROTO_ID_HTMLDocument]->IUnknown_iface);
+        doc->window->compat_prototypes[PROTO_ID_HTMLDocument] = NULL;
+    }
+
+    if(doc->node.event_target.dispex.prototype) {
+        IUnknown_Release(&doc->node.event_target.dispex.prototype->IUnknown_iface);
+        doc->node.event_target.dispex.prototype = NULL;
+    }
+
+    update_dispex(&doc->node.event_target.dispex, &HTMLDocumentNode_dispex, doc, document_mode);
 }
 
 BOOL parse_compat_version(const WCHAR *version_string, compat_mode_t *r)

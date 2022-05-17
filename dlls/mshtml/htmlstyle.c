@@ -10078,7 +10078,7 @@ static HRESULT get_style_from_elem(HTMLElement *elem, nsIDOMCSSStyleDeclaration 
 }
 
 void init_css_style(CSSStyle *style, nsIDOMCSSStyleDeclaration *nsstyle, style_qi_t qi,
-                    dispex_static_data_t *dispex_info, compat_mode_t compat_mode)
+                    dispex_static_data_t *dispex_info, HTMLDocumentNode *doc, compat_mode_t compat_mode)
 {
     style->IHTMLCSSStyleDeclaration_iface.lpVtbl = &HTMLCSSStyleDeclarationVtbl;
     style->IHTMLCSSStyleDeclaration2_iface.lpVtbl = &HTMLCSSStyleDeclaration2Vtbl;
@@ -10088,7 +10088,7 @@ void init_css_style(CSSStyle *style, nsIDOMCSSStyleDeclaration *nsstyle, style_q
     nsIDOMCSSStyleDeclaration_AddRef(nsstyle);
 
     init_dispatch(&style->dispex, (IUnknown*)&style->IHTMLCSSStyleDeclaration_iface,
-                  dispex_info, compat_mode);
+                  dispex_info, doc, compat_mode);
 }
 
 HRESULT HTMLStyle_Create(HTMLElement *elem, HTMLStyle **ret)
@@ -10117,7 +10117,7 @@ HRESULT HTMLStyle_Create(HTMLElement *elem, HTMLStyle **ret)
     style->elem = elem;
 
     init_css_style(&style->css_style, nsstyle, HTMLStyle_QI, &HTMLStyle_dispex,
-                   dispex_compat_mode(&elem->node.event_target.dispex));
+                   elem->node.doc, dispex_compat_mode(&elem->node.event_target.dispex));
 
     *ret = style;
     return S_OK;
@@ -10135,14 +10135,15 @@ dispex_static_data_t HTMLW3CComputedStyle_dispex = {
     CSSStyle_init_dispex_info
 };
 
-HRESULT create_computed_style(nsIDOMCSSStyleDeclaration *nsstyle, compat_mode_t compat_mode, IHTMLCSSStyleDeclaration **p)
+HRESULT create_computed_style(nsIDOMCSSStyleDeclaration *nsstyle, HTMLDocumentNode *doc,
+        compat_mode_t compat_mode, IHTMLCSSStyleDeclaration **p)
 {
     CSSStyle *style;
 
     if(!(style = heap_alloc_zero(sizeof(*style))))
         return E_OUTOFMEMORY;
 
-    init_css_style(style, nsstyle, NULL, &HTMLW3CComputedStyle_dispex, compat_mode);
+    init_css_style(style, nsstyle, NULL, &HTMLW3CComputedStyle_dispex, doc, compat_mode);
     *p = &style->IHTMLCSSStyleDeclaration_iface;
     return S_OK;
 }

@@ -107,6 +107,7 @@ struct HTMLXMLHttpRequest {
     IHTMLXMLHttpRequest IHTMLXMLHttpRequest_iface;
     IProvideClassInfo2 IProvideClassInfo2_iface;
     LONG ref;
+    HTMLDocumentNode *doc;
     nsIXMLHttpRequest *nsxhr;
     XMLHttpReqEventListener *event_listener;
 };
@@ -204,7 +205,7 @@ static nsresult NSAPI XMLHttpReqEventListener_HandleEvent(nsIDOMEventListener *i
     if(!This->xhr)
         return NS_OK;
 
-    hres = create_event_from_nsevent(nsevent, dispex_compat_mode(&This->xhr->event_target.dispex), &event);
+    hres = create_event_from_nsevent(nsevent, This->xhr->doc, dispex_compat_mode(&This->xhr->event_target.dispex), &event);
     if(SUCCEEDED(hres) ){
         dispatch_event(&This->xhr->event_target, event);
         IDOMEvent_Release(&event->IDOMEvent_iface);
@@ -268,6 +269,7 @@ static ULONG WINAPI HTMLXMLHttpRequest_Release(IHTMLXMLHttpRequest *iface)
     if(!ref) {
         if(This->event_listener)
             detach_xhr_event_listener(This->event_listener);
+        htmldoc_release(&This->doc->basedoc);
         release_event_target(&This->event_target);
         release_dispex(&This->event_target.dispex);
         nsIXMLHttpRequest_Release(This->nsxhr);
@@ -1012,11 +1014,14 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactor
         return E_OUTOFMEMORY;
     }
     ret->nsxhr = nsxhr;
+    ret->doc = This->window->doc;
+    if(ret->doc)
+        htmldoc_addref(&ret->doc->basedoc);
 
     ret->IHTMLXMLHttpRequest_iface.lpVtbl = &HTMLXMLHttpRequestVtbl;
     ret->IProvideClassInfo2_iface.lpVtbl = &ProvideClassInfo2Vtbl;
     EventTarget_Init(&ret->event_target, (IUnknown*)&ret->IHTMLXMLHttpRequest_iface,
-                     &HTMLXMLHttpRequest_dispex, This->window->doc->document_mode);
+                     &HTMLXMLHttpRequest_dispex, ret->doc);
     ret->ref = 1;
 
     *p = &ret->IHTMLXMLHttpRequest_iface;
