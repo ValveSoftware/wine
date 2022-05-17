@@ -25,6 +25,7 @@
 #include "winuser.h"
 #include "ole2.h"
 #include "mshtmdid.h"
+#include "wininet.h"
 #include "shlguid.h"
 #include "shobjidl.h"
 #include "exdispid.h"
@@ -2213,6 +2214,58 @@ static void post_message_destr(task_t *_task)
     IHTMLWindow2_Release(&task->window->base.IHTMLWindow2_iface);
 }
 
+static HRESULT check_target_origin(HTMLInnerWindow *window, const VARIANT *target_origin)
+{
+    URL_COMPONENTSW url = { sizeof(URL_COMPONENTSW) };
+    HRESULT hres;
+    DWORD port;
+    IUri *uri;
+    BSTR bstr;
+
+    if(V_VT(target_origin) != VT_BSTR)
+        return E_INVALIDARG;
+
+    if(!wcscmp(V_BSTR(target_origin), L"*"))
+        return S_OK;
+
+    url.dwSchemeLength = 1;
+    url.dwHostNameLength = 1;
+    if(!InternetCrackUrlW(V_BSTR(target_origin), 0, 0, &url)) {
+        SetLastError(ERROR_SUCCESS);
+        return E_INVALIDARG;
+    }
+
+    if(!window->base.outer_window || !(uri = window->base.outer_window->uri))
+        return S_OK;
+
+    hres = IUri_GetSchemeName(uri, &bstr);
+    if(FAILED(hres))
+        return hres;
+    if(SysStringLen(bstr) != url.dwSchemeLength || wcsnicmp(bstr, url.lpszScheme, url.dwSchemeLength))
+        hres = S_FALSE;
+    SysFreeString(bstr);
+    if(hres != S_OK)
+        return hres;
+
+    hres = IUri_GetHost(uri, &bstr);
+    if(FAILED(hres))
+        return hres;
+    if(SysStringLen(bstr) != url.dwHostNameLength || wcsnicmp(bstr, url.lpszHostName, url.dwHostNameLength))
+        hres = S_FALSE;
+    SysFreeString(bstr);
+    if(hres != S_OK)
+        return hres;
+
+    /* Legacy modes ignore port */
+    if(dispex_compat_mode(&window->event_target.dispex) < COMPAT_MODE_IE9)
+        return S_OK;
+
+    hres = IUri_GetPort(uri, &port);
+    if(FAILED(hres))
+        return hres;
+    return (port != url.nPort) ? S_FALSE : S_OK;
+}
+
 static HRESULT WINAPI HTMLWindow6_postMessage(IHTMLWindow6 *iface, BSTR msg, VARIANT targetOrigin)
 {
     HTMLWindow *This = impl_from_IHTMLWindow6(iface);
@@ -2220,7 +2273,11 @@ static HRESULT WINAPI HTMLWindow6_postMessage(IHTMLWindow6 *iface, BSTR msg, VAR
     HRESULT hres;
     VARIANT var;
 
-    FIXME("(%p)->(%s %s) semi-stub\n", This, debugstr_w(msg), debugstr_variant(&targetOrigin));
+    TRACE("(%p)->(%s %s)\n", This, debugstr_w(msg), debugstr_variant(&targetOrigin));
+
+    hres = check_target_origin(This->inner_window, &targetOrigin);
+    if(hres != S_OK)
+        return SUCCEEDED(hres) ? S_OK : hres;
 
     if(!This->inner_window->doc) {
         FIXME("No document\n");
@@ -3789,7 +3846,7 @@ static HRESULT IHTMLWindow6_postMessage_hook(DispatchEx *dispex, WORD flags, DIS
         EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
-    VARIANT msg, *targetOrigin, *transfer;
+    VARIANT msg, targetOrigin_var, *targetOrigin, *transfer;
     struct post_message_task *task;
     DOMEvent *event;
     HRESULT hres;
@@ -3804,6 +3861,19 @@ static HRESULT IHTMLWindow6_postMessage_hook(DispatchEx *dispex, WORD flags, DIS
 
     if(transfer)
         FIXME("transfer not implemented, ignoring\n");
+
+    V_VT(&targetOrigin_var) = VT_EMPTY;
+    if(V_VT(targetOrigin) != VT_BSTR) {
+        hres = change_type(&targetOrigin_var, targetOrigin, VT_BSTR, caller);
+        if(FAILED(hres))
+            return hres;
+        targetOrigin = &targetOrigin_var;
+    }
+
+    hres = check_target_origin(This, targetOrigin);
+    VariantClear(&targetOrigin_var);
+    if(hres != S_OK)
+        return SUCCEEDED(hres) ? S_OK : hres;
 
     switch(V_VT(&msg)) {
         case VT_EMPTY:
