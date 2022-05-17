@@ -168,7 +168,7 @@ static HRESULT get_compat_ctor(HTMLInnerWindow *window, compat_ctor_id_t ctor_id
         ctor->window = window;
         window->compat_ctors[ctor_id] = ctor;
 
-        init_dispatch(&ctor->dispex, &ctor->IUnknown_iface, dispex, dispex_compat_mode(&window->event_target.dispex));
+        init_dispatch(&ctor->dispex, &ctor->IUnknown_iface, dispex, NULL, dispex_compat_mode(&window->event_target.dispex));
     }
 
     *ret = (IDispatch*)&ctor->dispex.IDispatchEx_iface;
@@ -965,7 +965,7 @@ static HRESULT WINAPI HTMLWindow2_get_navigator(IHTMLWindow2 *iface, IOmNavigato
 
     if(!window->navigator) {
         HRESULT hres;
-        hres = create_navigator(dispex_compat_mode(&window->event_target.dispex), &window->navigator);
+        hres = create_navigator(window->doc, dispex_compat_mode(&window->event_target.dispex), &window->navigator);
         if(FAILED(hres))
             return hres;
     }
@@ -1354,7 +1354,7 @@ static HRESULT WINAPI HTMLWindow2_get_screen(IHTMLWindow2 *iface, IHTMLScreen **
     if(!window->screen) {
         HRESULT hres;
 
-        hres = create_html_screen(dispex_compat_mode(&window->event_target.dispex), &window->screen);
+        hres = create_html_screen(window->doc, dispex_compat_mode(&window->event_target.dispex), &window->screen);
         if(FAILED(hres))
             return hres;
     }
@@ -2167,7 +2167,7 @@ static HRESULT WINAPI HTMLWindow6_get_sessionStorage(IHTMLWindow6 *iface, IHTMLS
         HRESULT hres;
 
         hres = create_html_storage(dispex_compat_mode(&This->inner_window->event_target.dispex),
-                                   &This->inner_window->session_storage);
+                                   This->inner_window->doc, &This->inner_window->session_storage);
         if(FAILED(hres))
             return hres;
     }
@@ -2187,7 +2187,7 @@ static HRESULT WINAPI HTMLWindow6_get_localStorage(IHTMLWindow6 *iface, IHTMLSto
         HRESULT hres;
 
         hres = create_html_storage(dispex_compat_mode(&This->inner_window->event_target.dispex),
-                                   &This->inner_window->local_storage);
+                                   This->inner_window->doc, &This->inner_window->local_storage);
         if(FAILED(hres))
             return hres;
     }
@@ -2492,7 +2492,8 @@ static HRESULT WINAPI HTMLWindow7_getComputedStyle(IHTMLWindow7 *iface, IHTMLDOM
         return S_OK;
     }
 
-    hres = create_computed_style(nsstyle, dispex_compat_mode(&This->inner_window->event_target.dispex), p);
+    hres = create_computed_style(nsstyle, This->inner_window->doc,
+                                 dispex_compat_mode(&This->inner_window->event_target.dispex), p);
     nsIDOMCSSStyleDeclaration_Release(nsstyle);
     return hres;
 }
@@ -4202,7 +4203,7 @@ static HRESULT create_inner_window(HTMLOuterWindow *outer_window, IMoniker *mon,
     window->base.inner_window = window;
 
     EventTarget_Init(&window->event_target, (IUnknown*)&window->base.IHTMLWindow2_iface,
-                     &HTMLWindow_dispex, COMPAT_MODE_NONE);
+                     &HTMLWindow_dispex, NULL);
 
     window->task_magic = get_task_target_magic();
 
