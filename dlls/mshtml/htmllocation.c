@@ -633,6 +633,14 @@ static const tid_t HTMLLocation_iface_tids[] = {
 static dispex_static_data_t HTMLLocation_dispex = {
     L"Object",
     NULL,
+    PROTO_ID_NULL,
+    DispHTMLLocation_tid,
+    HTMLLocation_iface_tids
+};
+dispex_static_data_t HTMLLocation_compat_dispex = {
+    L"Location",
+    NULL,
+    PROTO_ID_HTMLLocation,
     DispHTMLLocation_tid,
     HTMLLocation_iface_tids
 };
@@ -640,6 +648,7 @@ static dispex_static_data_t HTMLLocation_dispex = {
 
 HRESULT HTMLLocation_Create(HTMLInnerWindow *window, HTMLLocation **ret)
 {
+    compat_mode_t compat_mode = dispex_compat_mode(&window->event_target.dispex);
     HTMLLocation *location;
 
     location = heap_alloc(sizeof(*location));
@@ -650,8 +659,9 @@ HRESULT HTMLLocation_Create(HTMLInnerWindow *window, HTMLLocation **ret)
     location->ref = 1;
     location->window = window;
 
-    init_dispatch(&location->dispex, (IUnknown*)&location->IHTMLLocation_iface, &HTMLLocation_dispex,
-                  dispex_compat_mode(&window->event_target.dispex));
+    init_dispatch(&location->dispex, (IUnknown*)&location->IHTMLLocation_iface,
+                  compat_mode < COMPAT_MODE_IE9 ? &HTMLLocation_compat_dispex : &HTMLLocation_dispex,
+                  compat_mode);
 
     *ret = location;
     return S_OK;

@@ -4732,6 +4732,22 @@ static IWineDispatchProxyCbPrivate** WINAPI DocWineDispProxyPrivate_GetProxyFiel
     return &This->dispex->proxy;
 }
 
+static IDispatch* WINAPI DocWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
+{
+    HTMLDocument *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->dispex->IDispatchEx_iface;
+
+    return itf->lpVtbl->GetDefaultPrototype(itf, prots_ref);
+}
+
+static BOOL WINAPI DocWineDispProxyPrivate_IsPrototype(IWineDispatchProxyPrivate *iface)
+{
+    HTMLDocument *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->dispex->IDispatchEx_iface;
+
+    return itf->lpVtbl->IsPrototype(itf);
+}
+
 static DWORD WINAPI DocWineDispProxyPrivate_PropFlags(IWineDispatchProxyPrivate *iface, DISPID id)
 {
     HTMLDocument *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -4827,6 +4843,8 @@ static const IWineDispatchProxyPrivateVtbl DocDispatchExVtbl = {
 
     /* IWineDispatchProxyPrivate extension */
     DocWineDispProxyPrivate_GetProxyFieldRef,
+    DocWineDispProxyPrivate_GetDefaultPrototype,
+    DocWineDispProxyPrivate_IsPrototype,
     DocWineDispProxyPrivate_PropFlags,
     DocWineDispProxyPrivate_PropGetID,
     DocWineDispProxyPrivate_PropInvoke,
@@ -5793,9 +5811,10 @@ static void HTMLDocumentNode_init_dispex_info(dispex_data_t *info, compat_mode_t
     dispex_info_add_interface(info, IHTMLDocument2_tid, document2_hooks);
 }
 
-static dispex_static_data_t HTMLDocumentNode_dispex = {
+dispex_static_data_t HTMLDocumentNode_dispex = {
     L"HTMLDocument",
     &HTMLDocumentNode_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLDocument,
     DispHTMLDocument_tid,
     HTMLDocumentNode_iface_tids,
     HTMLDocumentNode_init_dispex_info
@@ -6107,6 +6126,7 @@ static void HTMLDocumentObj_init_dispex_info(dispex_data_t *info, compat_mode_t 
 static dispex_static_data_t HTMLDocumentObj_dispex = {
     L"HTMLDocumentObj",
     NULL,
+    PROTO_ID_NULL,
     DispHTMLDocument_tid,
     HTMLDocumentObj_iface_tids,
     HTMLDocumentObj_init_dispex_info
