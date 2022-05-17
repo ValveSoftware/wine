@@ -2566,6 +2566,7 @@ static IWineDispatchProxyCbPrivateVtbl WineDispatchProxyCbPrivateVtbl = {
     WineDispatchProxyCbPrivate_GetUnderlyingDispID,
     WineDispatchProxyCbPrivate_CreateConstructor,
     WineDispatchProxyCbPrivate_DefineConstructor,
+    WineDispatchProxyCbPrivate_GetRandomValues,
     WineDispatchProxyCbPrivate_Traverse
 };
 
