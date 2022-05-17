@@ -3529,8 +3529,8 @@ static HRESULT lookup_custom_prop(HTMLWindow *html_window, BSTR bstrName, DISPID
     return DISP_E_UNKNOWNNAME;
 }
 
-HRESULT window_invoke(HTMLWindow *html_window, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp, VARIANT *res,
-        EXCEPINFO *pei, IServiceProvider *caller)
+HRESULT window_invoke(HTMLWindow *html_window, IDispatch *this_obj, DISPID id, LCID lcid, WORD wFlags,
+        DISPPARAMS *pdp, VARIANT *res, EXCEPINFO *pei, IServiceProvider *caller)
 {
     HTMLInnerWindow *window = html_window->inner_window;
 
@@ -3548,7 +3548,7 @@ HRESULT window_invoke(HTMLWindow *html_window, DISPID id, LCID lcid, WORD wFlags
         if(FAILED(hres))
             return hres;
 
-        hres = dispex_invoke(&location->dispex, DISPID_VALUE, lcid, wFlags, pdp, res, pei, caller);
+        hres = dispex_invoke(&location->dispex, this_obj, DISPID_VALUE, lcid, wFlags, pdp, res, pei, caller);
         IHTMLLocation_Release(&location->IHTMLLocation_iface);
         return hres;
     }
@@ -3569,11 +3569,11 @@ HRESULT window_invoke(HTMLWindow *html_window, DISPID id, LCID lcid, WORD wFlags
         V_VT(args) = VT_I4;
         V_I4(args) = 0;
         args[1] = *pdp->rgvarg;
-        return dispex_invoke(&window->event_target.dispex, id, lcid, wFlags, &dp, res, pei, caller);
+        return dispex_invoke(&window->event_target.dispex, this_obj, id, lcid, wFlags, &dp, res, pei, caller);
     }
     }
 
-    return dispex_invoke(&window->event_target.dispex, id, lcid, wFlags, pdp, res, pei, caller);
+    return dispex_invoke(&window->event_target.dispex, this_obj, id, lcid, wFlags, pdp, res, pei, caller);
 }
 
 static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
@@ -3602,7 +3602,8 @@ static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID 
 
     TRACE("(%p)->(%lx %lx %x %p %p %p %p)\n", This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 
-    return window_invoke(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    return window_invoke(This, (IDispatch*)&This->inner_window->base.IHTMLWindow2_iface, id, lcid, wFlags, pdp,
+                         pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI WindowDispEx_DeleteMemberByName(IDispatchEx *iface, BSTR bstrName, DWORD grfdex)
@@ -3732,8 +3733,8 @@ static inline HTMLInnerWindow *impl_from_DispatchEx(DispatchEx *iface)
     return CONTAINING_RECORD(iface, HTMLInnerWindow, event_target.dispex);
 }
 
-static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLWindow_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
     global_prop_t *prop;
@@ -3797,7 +3798,7 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
 
             prop->type = GLOBAL_DISPEXVAR;
             prop->id = dispex_id;
-            return dispex_invoke(&This->event_target.dispex, dispex_id, 0, flags, params, res, ei, caller);
+            return dispex_invoke(&This->event_target.dispex, this_obj, dispex_id, 0, flags, params, res, ei, caller);
         }
         default:
             FIXME("Not supported flags: %x\n", flags);
@@ -3828,7 +3829,7 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
             return E_NOTIMPL;
         }
     case GLOBAL_DISPEXVAR:
-        return dispex_invoke(&This->event_target.dispex, prop->id, 0, flags, params, res, ei, caller);
+        return dispex_invoke(&This->event_target.dispex, this_obj, prop->id, 0, flags, params, res, ei, caller);
     default:
         ERR("invalid type %d\n", prop->type);
         hres = DISP_E_MEMBERNOTFOUND;

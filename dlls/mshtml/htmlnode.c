@@ -386,8 +386,8 @@ static HRESULT HTMLDOMChildrenCollection_get_dispid(DispatchEx *dispex, BSTR nam
     return S_OK;
 }
 
-static HRESULT HTMLDOMChildrenCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLDOMChildrenCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLDOMChildrenCollection *This = impl_from_DispatchEx(dispex);
 
