@@ -4567,7 +4567,8 @@ static HRESULT document_invoke(HTMLDocument *doc, IDispatch *this_obj, DISPID id
             return S_OK;
         case DISPID_IHTMLDOCUMENT2_LOCATION:
             if(wFlags & DISPATCH_PROPERTYPUT)
-                return window_invoke(&doc->window->base, (IDispatch*)&doc->window->base.IHTMLWindow2_iface,
+                return dispex_invoke(&doc->window->base.inner_window->event_target.dispex,
+                                     (IDispatch*)&doc->window->base.IHTMLWindow2_iface,
                                      DISPID_IHTMLWINDOW2_LOCATION, lcid, wFlags, pdp, res, pei, caller);
             break;
         default:
