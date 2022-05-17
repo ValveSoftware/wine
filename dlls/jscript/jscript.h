@@ -70,6 +70,22 @@ void heap_pool_clear(heap_pool_t*) DECLSPEC_HIDDEN;
 void heap_pool_free(heap_pool_t*) DECLSPEC_HIDDEN;
 heap_pool_t *heap_pool_mark(heap_pool_t*) DECLSPEC_HIDDEN;
 
+/* Initialize to zero before use */
+struct heap_stack {
+    void **chunk;
+    void **next;
+    unsigned idx;
+};
+
+HRESULT heap_stack_push(struct heap_stack*,void*) DECLSPEC_HIDDEN;
+void *heap_stack_pop(struct heap_stack*) DECLSPEC_HIDDEN;
+
+/* Make sure the stack is completely popped before calling this */
+static inline void heap_stack_free(struct heap_stack *heap_stack)
+{
+    free(heap_stack->next);
+}
+
 static inline LPWSTR heap_strdupW(LPCWSTR str)
 {
     LPWSTR ret = NULL;
@@ -176,6 +192,7 @@ typedef struct {
     unsigned (*idx_length)(jsdisp_t*);
     HRESULT (*idx_get)(jsdisp_t*,unsigned,jsval_t*);
     HRESULT (*idx_put)(jsdisp_t*,unsigned,jsval_t);
+    HRESULT (*gc_traverse)(jsdisp_t*,void*);
 } builtin_info_t;
 
 struct jsdisp_t {
@@ -183,15 +200,18 @@ struct jsdisp_t {
 
     LONG ref;
 
+    BOOLEAN extensible;
+    BOOLEAN gc_marked;
+
     DWORD buf_size;
     DWORD prop_cnt;
     dispex_prop_t *props;
     script_ctx_t *ctx;
-    BOOL extensible;
 
     jsdisp_t *prototype;
 
     const builtin_info_t *builtin_info;
+    struct list entry;
 };
 
 static inline IDispatch *to_disp(jsdisp_t *jsdisp)
@@ -367,6 +387,7 @@ struct _script_ctx_t {
 
     struct _call_frame_t *call_ctx;
     struct list named_items;
+    struct list objects;
     IActiveScriptSite *site;
     IInternetHostSecurityManager *secmgr;
     DWORD safeopt;
@@ -381,6 +402,7 @@ struct _script_ctx_t {
 
     jsval_t *stack;
     unsigned stack_top;
+    DWORD gc_last_tick;
     jsval_t acc;
 
     jsstr_t *last_match;
@@ -470,6 +492,66 @@ static inline BOOL is_int32(double d)
 static inline DWORD make_grfdex(script_ctx_t *ctx, DWORD flags)
 {
     return ((ctx->version & 0xff) << 28) | flags;
+}
+
+#define GC_TRAVERSE_SPECULATIVELY NULL
+#define GC_TRAVERSE_UNLINK ((void*)(INT_PTR)-1)
+
+/*
+ * During unlinking (GC_TRAVERSE_UNLINK), it is important that we unlink *all* linked objects from the
+ * object, to be certain that releasing the object later will not release any other objects. Otherwise
+ * calculating the "next" object in the list becomes impossible and can lead to already freed objects.
+ */
+static inline HRESULT gc_process_linked_obj(jsdisp_t *obj, jsdisp_t *link, void **unlink_ref, void *arg)
+{
+    if(arg == GC_TRAVERSE_UNLINK) {
+        *unlink_ref = NULL;
+        jsdisp_release(link);
+        return S_OK;
+    }
+
+    if(link->ctx != obj->ctx)
+        return S_OK;
+    if(arg == GC_TRAVERSE_SPECULATIVELY)
+        link->ref--;
+    else if(link->gc_marked)
+        return heap_stack_push(arg, link);
+    return S_OK;
+}
+
+static inline HRESULT gc_process_linked_val(jsdisp_t *obj, jsval_t *link, void *arg)
+{
+    jsdisp_t *jsdisp;
+
+    if(arg == GC_TRAVERSE_UNLINK) {
+        jsval_t val = *link;
+        *link = jsval_undefined();
+        jsval_release(val);
+        return S_OK;
+    }
+
+    if(!is_object_instance(*link) || !(jsdisp = to_jsdisp(get_object(*link))) || jsdisp->ctx != obj->ctx)
+        return S_OK;
+    if(arg == GC_TRAVERSE_SPECULATIVELY)
+        jsdisp->ref--;
+    else if(jsdisp->gc_marked)
+        return heap_stack_push(arg, jsdisp);
+    return S_OK;
+}
+
+static inline HRESULT gc_process_linked_disp(jsdisp_t *obj, IDispatch **link, void *arg)
+{
+    jsdisp_t *jsdisp;
+
+    if(arg == GC_TRAVERSE_UNLINK) {
+        IDispatch *disp = *link;
+        *link = NULL;
+        IDispatch_Release(disp);
+        return S_OK;
+    }
+
+    jsdisp = to_jsdisp(*link);
+    return jsdisp ? gc_process_linked_obj(obj, jsdisp, (void**)link, arg) : S_OK;
 }
 
 #define FACILITY_JSCRIPT 10
