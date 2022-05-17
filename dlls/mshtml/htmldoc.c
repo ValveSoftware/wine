@@ -4551,7 +4551,7 @@ static HRESULT dispid_from_elem_name(HTMLDocumentNode *This, BSTR name, DISPID *
     return S_OK;
 }
 
-static HRESULT document_invoke(HTMLDocument *doc, DISPID id, LCID lcid, WORD wFlags,
+static HRESULT document_invoke(HTMLDocument *doc, IDispatch *this_obj, DISPID id, LCID lcid, WORD wFlags,
         DISPPARAMS *pdp, VARIANT *res, EXCEPINFO *pei, IServiceProvider *caller)
 {
     if(doc->window) {
@@ -4567,15 +4567,15 @@ static HRESULT document_invoke(HTMLDocument *doc, DISPID id, LCID lcid, WORD wFl
             return S_OK;
         case DISPID_IHTMLDOCUMENT2_LOCATION:
             if(wFlags & DISPATCH_PROPERTYPUT)
-                return window_invoke(&doc->window->base, DISPID_IHTMLWINDOW2_LOCATION, lcid, wFlags,
-                                     pdp, res, pei, caller);
+                return window_invoke(&doc->window->base, (IDispatch*)&doc->window->base.IHTMLWindow2_iface,
+                                     DISPID_IHTMLWINDOW2_LOCATION, lcid, wFlags, pdp, res, pei, caller);
             break;
         default:
             break;
         }
     }
 
-    return dispex_invoke(doc->dispex, id, lcid, wFlags, pdp, res, pei, caller);
+    return dispex_invoke(doc->dispex, this_obj, id, lcid, wFlags, pdp, res, pei, caller);
 }
 
 static HRESULT WINAPI DocDispatchEx_QueryInterface(IDispatchEx *iface, REFIID riid, void **ppv)
@@ -4632,8 +4632,8 @@ static HRESULT WINAPI DocDispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMemb
     TRACE("(%p)->(%ld %s %ld %d %p %p %p %p)\n", This, dispIdMember, debugstr_guid(riid),
           lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 
-    return document_invoke(This, dispIdMember, lcid, wFlags, pDispParams,
-                           pVarResult, pExcepInfo, NULL);
+    return document_invoke(This, (IDispatch*)&This->IHTMLDocument2_iface, dispIdMember, lcid, wFlags,
+                           pDispParams, pVarResult, pExcepInfo, NULL);
 }
 
 static HRESULT WINAPI DocDispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
@@ -4653,7 +4653,7 @@ static HRESULT WINAPI DocDispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID
 {
     HTMLDocument *This = impl_from_IDispatchEx(iface);
 
-    return document_invoke(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    return document_invoke(This, (IDispatch*)&This->IHTMLDocument2_iface, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI DocDispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR bstrName, DWORD grfdex)
@@ -5517,8 +5517,8 @@ static inline HTMLDocumentNode *impl_from_DispatchEx(DispatchEx *iface)
     return CONTAINING_RECORD(iface, HTMLDocumentNode, node.event_target.dispex);
 }
 
-static HRESULT HTMLDocumentNode_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLDocumentNode_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLDocumentNode *This = impl_from_DispatchEx(dispex);
     nsIDOMNodeList *node_list;
