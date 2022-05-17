@@ -591,6 +591,7 @@ BOOL dispex_query_interface(DispatchEx*,REFIID,void**) DECLSPEC_HIDDEN;
 HRESULT change_type(VARIANT*,VARIANT*,VARTYPE,IServiceProvider*) DECLSPEC_HIDDEN;
 HRESULT dispex_get_dprop_ref(DispatchEx*,const WCHAR*,BOOL,VARIANT**) DECLSPEC_HIDDEN;
 HRESULT get_dispids(tid_t,DWORD*,DISPID**) DECLSPEC_HIDDEN;
+BOOL is_custom_attribute(DispatchEx*,const WCHAR*) DECLSPEC_HIDDEN;
 HRESULT remove_attribute(DispatchEx*,DISPID,VARIANT_BOOL*) DECLSPEC_HIDDEN;
 HRESULT dispex_get_dynid(DispatchEx*,const WCHAR*,DISPID*) DECLSPEC_HIDDEN;
 HRESULT dispex_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*) DECLSPEC_HIDDEN;
@@ -1276,12 +1277,15 @@ struct HTMLAttributeCollection {
 
     LONG ref;
 
+    nsIDOMMozNamedAttrMap *nsattrs;
     HTMLElement *elem;
     struct list attrs;
 };
 
 typedef struct {
-    DispatchEx dispex;
+    /* valid only when attribute nodes are used (node.nsnode) */
+    HTMLDOMNode node;
+
     IHTMLDOMAttribute IHTMLDOMAttribute_iface;
     IHTMLDOMAttribute2 IHTMLDOMAttribute2_iface;
 
@@ -1299,7 +1303,8 @@ typedef struct {
 
 HTMLDOMAttribute *unsafe_impl_from_IHTMLDOMAttribute(IHTMLDOMAttribute*) DECLSPEC_HIDDEN;
 
-HRESULT HTMLDOMAttribute_Create(const WCHAR*,HTMLDocumentNode*,HTMLElement*,DISPID,compat_mode_t,HTMLDOMAttribute**) DECLSPEC_HIDDEN;
+HRESULT HTMLDOMAttribute_Create(const WCHAR*,HTMLDocumentNode*,HTMLElement*,DISPID,nsIDOMAttr*,
+                                compat_mode_t,HTMLDOMAttribute**) DECLSPEC_HIDDEN;
 
 HRESULT HTMLElement_Create(HTMLDocumentNode*,nsIDOMNode*,BOOL,HTMLElement**) DECLSPEC_HIDDEN;
 HRESULT HTMLCommentElement_Create(HTMLDocumentNode*,nsIDOMNode*,HTMLElement**) DECLSPEC_HIDDEN;
