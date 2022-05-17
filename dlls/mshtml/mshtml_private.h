@@ -830,6 +830,13 @@ struct  ConnectionPoint {
     cp_static_data_t *data;
 };
 
+typedef enum {
+    DOCTYPE_HTML,
+    DOCTYPE_COUNT
+} document_type_t;
+
+extern const WCHAR *const content_type_from_document_type[DOCTYPE_COUNT] DECLSPEC_HIDDEN;
+
 struct HTMLDocument {
     IHTMLDocument2              IHTMLDocument2_iface;
     IHTMLDocument3              IHTMLDocument3_iface;
@@ -862,6 +869,8 @@ struct HTMLDocument {
     IMarkupContainer            IMarkupContainer_iface;
     IDisplayServices            IDisplayServices_iface;
     IDocumentRange              IDocumentRange_iface;
+
+    document_type_t doc_type;
 
     IUnknown *outer_unk;
     DispatchEx *dispex;
