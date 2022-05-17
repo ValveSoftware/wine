@@ -149,6 +149,7 @@ struct _IWineDispatchProxyCbPrivate {
 #define MSHTML_E_INVALID_PROPERTY 0x800a01b6
 #define MSHTML_E_INVALID_ACTION   0x800a01bd
 #define MSHTML_E_NODOC            0x800a025c
+#define MSHTML_E_SYNTAX           0x800a03ea
 
 typedef struct HTMLDOMNode HTMLDOMNode;
 typedef struct ConnectionPoint ConnectionPoint;
@@ -444,6 +445,7 @@ extern const tid_t no_iface_tids[1];
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
     X(Document,                       "Document",                     DocumentNode_dispex,                    HTMLDOMNode) \
+    X(XMLDocument,                    "XMLDocument",                  XMLDocumentNode_dispex,                 Document) \
     X(DOMElement,                     "Element",                      DOMElement_dispex,                      HTMLDOMNode) \
     X(CSSRule,                        "CSSRule",                      CSSRule_dispex,                         Object) \
     X(StyleSheet,                     "StyleSheet",                   StyleSheet_dispex,                      Object) \
@@ -839,6 +841,7 @@ typedef enum {
     DOCTYPE_COUNT
 } document_type_t;
 
+extern dispex_static_data_t *const dispex_from_document_type[DOCTYPE_COUNT] DECLSPEC_HIDDEN;
 extern const WCHAR *const content_type_from_document_type[DOCTYPE_COUNT] DECLSPEC_HIDDEN;
 
 struct HTMLDocument {
@@ -1144,8 +1147,8 @@ HRESULT HTMLDocument_Create(IUnknown*,REFIID,void**) DECLSPEC_HIDDEN;
 HRESULT MHTMLDocument_Create(IUnknown*,REFIID,void**) DECLSPEC_HIDDEN;
 HRESULT HTMLLoadOptions_Create(IUnknown*,REFIID,void**) DECLSPEC_HIDDEN;
 HRESULT create_document_node(nsIDOMDocument*,GeckoBrowser*,HTMLInnerWindow*,
-                             compat_mode_t,HTMLDocumentNode**) DECLSPEC_HIDDEN;
-HRESULT create_xml_document(BSTR,IDispatch**) DECLSPEC_HIDDEN;
+                             document_type_t,compat_mode_t,HTMLDocumentNode**) DECLSPEC_HIDDEN;
+HRESULT create_xml_document(BSTR,HTMLDocumentNode*,document_type_t,BOOL,IDispatch**) DECLSPEC_HIDDEN;
 HRESULT create_marshaled_doc(HWND,REFIID,void**) DECLSPEC_HIDDEN;
 
 HRESULT create_outer_window(GeckoBrowser*,mozIDOMWindowProxy*,HTMLOuterWindow*,HTMLOuterWindow**) DECLSPEC_HIDDEN;
@@ -1249,6 +1252,7 @@ HRESULT nsnode_to_nsstring(nsIDOMNode*,nsAString*) DECLSPEC_HIDDEN;
 void setup_editor_controller(GeckoBrowser*) DECLSPEC_HIDDEN;
 nsresult get_nsinterface(nsISupports*,REFIID,void**) DECLSPEC_HIDDEN;
 nsIWritableVariant *create_nsvariant(void) DECLSPEC_HIDDEN;
+nsIDOMParser *create_nsdomparser(HTMLDocumentNode*) DECLSPEC_HIDDEN;
 nsIXMLHttpRequest *create_nsxhr(nsIDOMWindow *nswindow) DECLSPEC_HIDDEN;
 nsresult create_nsfile(const PRUnichar*,nsIFile**) DECLSPEC_HIDDEN;
 char *get_nscategory_entry(const char*,const char*) DECLSPEC_HIDDEN;

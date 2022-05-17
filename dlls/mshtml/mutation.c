@@ -397,6 +397,9 @@ static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode
     if(lock)
         lock_document_mode(doc);
 
+    if(doc->basedoc.doc_type != DOCTYPE_HTML)
+        return;
+
     /* The prototype and dispex need to be changed since they depend on mode */
     if(doc->window && doc->window->compat_prototypes[PROTO_ID_HTMLDocument]) {
         IUnknown_Release(&doc->window->compat_prototypes[PROTO_ID_HTMLDocument]->IUnknown_iface);
