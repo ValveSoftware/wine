@@ -72,7 +72,8 @@
 
 #define NSAPI WINAPI
 
-#define MSHTML_E_NODOC    0x800a025c
+#define MSHTML_E_INVALID_PROPERTY 0x800a01b6
+#define MSHTML_E_NODOC            0x800a025c
 
 typedef struct HTMLDOMNode HTMLDOMNode;
 typedef struct ConnectionPoint ConnectionPoint;
