@@ -425,7 +425,7 @@ extern const tid_t no_iface_tids[1];
     X(HTMLSelectElement,              "HTMLSelectElement",            HTMLSelectElement_dispex,               HTMLElement) \
     X(HTMLStyleElement,               "HTMLStyleElement",             HTMLStyleElement_dispex,                HTMLElement) \
     X(HTMLTableElement,               "HTMLTableElement",             HTMLTable_dispex,                       HTMLElement) \
-    X(HTMLTableCellElement,           "HTMLTableDataCellElement",     HTMLTableCell_dispex,                   HTMLElement) \
+    X(HTMLTableCellElement,           "HTMLTableDataCellElement",     HTMLTableCell_dispex,                   HTMLTableCellProt) \
     X(HTMLTableRowElement,            "HTMLTableRowElement",          HTMLTableRow_dispex,                    HTMLElement) \
     X(HTMLTextAreaElement,            "HTMLTextAreaElement",          HTMLTextAreaElement_dispex,             HTMLElement) \
     X(HTMLTitleElement,               "HTMLTitleElement",             HTMLTitleElement_dispex,                HTMLElement)
@@ -448,7 +448,8 @@ extern const tid_t no_iface_tids[1];
     X(HTMLPerformance,                "Performance",                  HTMLPerformance_dispex,                 Object) \
     X(HTMLPerformanceNavigation,      "PerformanceNavigation",        HTMLPerformanceNavigation_dispex,       Object) \
     X(HTMLPerformanceTiming,          "PerformanceTiming",            HTMLPerformanceTiming_dispex,           Object) \
-    X(HTMLStyle,                      "MSStyleCSSProperties",         HTMLStyle_dispex,                       Object)
+    X(HTMLStyle,                      "MSStyleCSSProperties",         HTMLStyle_dispex,                       Object) \
+    X(HTMLTableCellProt,              "HTMLTableCellElement",         HTMLTableCellProt_dispex,               HTMLElement)
 
 typedef enum {
     PROTO_ID_NULL = -2,
