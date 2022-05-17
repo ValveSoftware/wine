@@ -741,6 +741,7 @@ static HRESULT WINAPI JScript_SetScriptSite(IActiveScript *iface,
         ctx->html_mode = This->html_mode;
         ctx->acc = jsval_undefined();
         list_init(&ctx->named_items);
+        list_init(&ctx->objects);
         heap_pool_init(&ctx->tmp_heap);
 
         hres = create_jscaller(ctx);

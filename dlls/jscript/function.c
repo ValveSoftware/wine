@@ -39,6 +39,7 @@ struct _function_vtbl_t {
     HRESULT (*toString)(FunctionInstance*,jsstr_t**);
     function_code_t* (*get_code)(FunctionInstance*);
     void (*destructor)(FunctionInstance*);
+    HRESULT (*gc_traverse)(FunctionInstance*,void*);
 };
 
 typedef struct {
@@ -71,6 +72,11 @@ typedef struct {
 } ArgumentsInstance;
 
 static HRESULT create_bind_function(script_ctx_t*,FunctionInstance*,IDispatch*,unsigned,jsval_t*,jsdisp_t**r);
+
+static HRESULT no_gc_traverse(FunctionInstance *function, void *arg)
+{
+    return S_OK;
+}
 
 static inline FunctionInstance *function_from_jsdisp(jsdisp_t *jsdisp)
 {
@@ -108,7 +114,8 @@ static void Arguments_destructor(jsdisp_t *jsdisp)
         heap_free(arguments->buf);
     }
 
-    jsdisp_release(&arguments->function->function.dispex);
+    if(arguments->function)
+        jsdisp_release(&arguments->function->function.dispex);
     heap_free(arguments);
 }
 
@@ -166,6 +173,23 @@ static HRESULT Arguments_idx_put(jsdisp_t *jsdisp, unsigned idx, jsval_t val)
                                arguments->function->func_code->params[idx], val);
 }
 
+static HRESULT Arguments_gc_traverse(jsdisp_t *jsdisp, void *arg)
+{
+    ArgumentsInstance *arguments = arguments_from_jsdisp(jsdisp);
+    HRESULT hres;
+    unsigned i;
+
+    if(arguments->buf) {
+        for(i = 0; i < arguments->argc; i++) {
+            hres = gc_process_linked_val(jsdisp, &arguments->buf[i], arg);
+            if(FAILED(hres))
+                return hres;
+        }
+    }
+
+    return gc_process_linked_obj(jsdisp, &arguments->function->function.dispex, (void**)&arguments->function, arg);
+}
+
 static const builtin_info_t Arguments_info = {
     JSCLASS_ARGUMENTS,
     Arguments_value,
@@ -174,7 +198,8 @@ static const builtin_info_t Arguments_info = {
     NULL,
     Arguments_idx_length,
     Arguments_idx_get,
-    Arguments_idx_put
+    Arguments_idx_put,
+    Arguments_gc_traverse
 };
 
 HRESULT setup_arguments_object(script_ctx_t *ctx, call_frame_t *frame)
@@ -548,6 +573,12 @@ static void Function_destructor(jsdisp_t *dispex)
     heap_free(function);
 }
 
+static HRESULT Function_gc_traverse(jsdisp_t *dispex, void *arg)
+{
+    FunctionInstance *function = function_from_jsdisp(dispex);
+    return function->vtbl->gc_traverse(function, arg);
+}
+
 static const builtin_prop_t Function_props[] = {
     {L"apply",               Function_apply,                 PROPF_METHOD|2},
     {L"arguments",           NULL, 0,                        Function_get_arguments},
@@ -563,7 +594,11 @@ static const builtin_info_t Function_info = {
     ARRAY_SIZE(Function_props),
     Function_props,
     Function_destructor,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Function_gc_traverse
 };
 
 static const builtin_prop_t FunctionInst_props[] = {
@@ -577,7 +612,11 @@ static const builtin_info_t FunctionInst_info = {
     ARRAY_SIZE(FunctionInst_props),
     FunctionInst_props,
     Function_destructor,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Function_gc_traverse
 };
 
 static HRESULT create_function(script_ctx_t *ctx, const builtin_info_t *builtin_info, const function_vtbl_t *vtbl, size_t size,
@@ -655,7 +694,8 @@ static const function_vtbl_t NativeFunctionVtbl = {
     NativeFunction_call,
     NativeFunction_toString,
     NativeFunction_get_code,
-    NativeFunction_destructor
+    NativeFunction_destructor,
+    no_gc_traverse
 };
 
 HRESULT create_builtin_function(script_ctx_t *ctx, builtin_invoke_t value_proc, const WCHAR *name,
@@ -771,16 +811,40 @@ static void InterpretedFunction_destructor(FunctionInstance *func)
 {
     InterpretedFunction *function = (InterpretedFunction*)func;
 
-    release_bytecode(function->code);
+    if(function->code)
+        release_bytecode(function->code);
     if(function->scope_chain)
         scope_release(function->scope_chain);
+}
+
+static HRESULT InterpretedFunction_gc_traverse(FunctionInstance *func, void *arg)
+{
+    InterpretedFunction *function = (InterpretedFunction*)func;
+
+    /* Make sure to unlink everything during unlink, including deeper scopes, so
+       that releasing the function itself won't release any additional objects. */
+    if(arg == GC_TRAVERSE_UNLINK) {
+        release_bytecode(function->code);
+        function->code = NULL;
+        if(function->scope_chain) {
+            scope_release(function->scope_chain);
+            function->scope_chain = NULL;
+        }
+        return S_OK;
+    }
+
+    /* FIXME: Process the code->named_item->script_obj and scope_chain->obj somehow. The issue
+       is that the function keeps a ref to the bytecode or scope itself, not the actual obj...
+       For now, this will possibly leak. */
+    return S_OK;
 }
 
 static const function_vtbl_t InterpretedFunctionVtbl = {
     InterpretedFunction_call,
     InterpretedFunction_toString,
     InterpretedFunction_get_code,
-    InterpretedFunction_destructor
+    InterpretedFunction_destructor,
+    InterpretedFunction_gc_traverse
 };
 
 HRESULT create_source_function(script_ctx_t *ctx, bytecode_t *code, function_code_t *func_code,
@@ -871,16 +935,37 @@ static void BindFunction_destructor(FunctionInstance *func)
 
     for(i = 0; i < function->argc; i++)
         jsval_release(function->args[i]);
-    jsdisp_release(&function->target->dispex);
+    if(function->target)
+        jsdisp_release(&function->target->dispex);
     if(function->this)
         IDispatch_Release(function->this);
+}
+
+static HRESULT BindFunction_gc_traverse(FunctionInstance *func, void *arg)
+{
+    BindFunction *function = (BindFunction*)func;
+    HRESULT hres;
+    unsigned i;
+
+    for(i = 0; i < function->argc; i++) {
+        hres = gc_process_linked_val(&function->function.dispex, &function->args[i], arg);
+        if(FAILED(hres))
+            return hres;
+    }
+
+    hres = gc_process_linked_obj(&function->function.dispex, &function->target->dispex, (void**)&function->target, arg);
+    if(FAILED(hres))
+        return hres;
+
+    return function->this ? gc_process_linked_disp(&function->function.dispex, &function->this, arg) : S_OK;
 }
 
 static const function_vtbl_t BindFunctionVtbl = {
     BindFunction_call,
     BindFunction_toString,
     BindFunction_get_code,
-    BindFunction_destructor
+    BindFunction_destructor,
+    BindFunction_gc_traverse
 };
 
 static HRESULT create_bind_function(script_ctx_t *ctx, FunctionInstance *target, IDispatch *bound_this, unsigned argc,

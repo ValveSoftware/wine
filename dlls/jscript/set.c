@@ -363,6 +363,33 @@ static void Map_destructor(jsdisp_t *dispex)
 
     heap_free(map);
 }
+
+static HRESULT Map_gc_traverse(jsdisp_t *dispex, void *arg)
+{
+    MapInstance *map = (MapInstance*)dispex;
+    struct jsval_map_entry *entry;
+    HRESULT hres;
+
+    if(arg == GC_TRAVERSE_UNLINK) {
+        while(!list_empty(&map->entries)) {
+            entry = LIST_ENTRY(list_head(&map->entries), struct jsval_map_entry, list_entry);
+            release_map_entry(entry);
+        }
+        wine_rb_destroy(&map->map, NULL, NULL);
+        return S_OK;
+    }
+
+    LIST_FOR_EACH_ENTRY(entry, &map->entries, struct jsval_map_entry, list_entry) {
+        hres = gc_process_linked_val(dispex, &entry->key, arg);
+        if(FAILED(hres))
+            return hres;
+        hres = gc_process_linked_val(dispex, &entry->value, arg);
+        if(FAILED(hres))
+            return hres;
+    }
+    return S_OK;
+}
+
 static const builtin_prop_t Map_prototype_props[] = {
     {L"clear",      Map_clear,     PROPF_METHOD},
     {L"delete" ,    Map_delete,    PROPF_METHOD|1},
@@ -391,7 +418,11 @@ static const builtin_info_t Map_info = {
     ARRAY_SIZE(Map_props),
     Map_props,
     Map_destructor,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Map_gc_traverse
 };
 
 static HRESULT Map_constructor(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
@@ -544,7 +575,11 @@ static const builtin_info_t Set_info = {
     ARRAY_SIZE(Map_props),
     Map_props,
     Map_destructor,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Map_gc_traverse
 };
 
 static HRESULT Set_constructor(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
