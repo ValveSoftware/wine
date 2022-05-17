@@ -1460,6 +1460,7 @@ sync_test("doc_props", function() {
     }
 
     var v = document.documentMode;
+    ok(document.mimeType === "HTML Document", "mimeType = " + document.mimeType);
 
     test_exposed("textContent", v >= 9);
     test_exposed("prefix", v >= 9);
