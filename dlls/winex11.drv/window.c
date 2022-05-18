@@ -1885,6 +1885,19 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual )
 }
 
 
+void set_hwnd_style_props( Display *display, Window window, HWND hwnd )
+{
+    DWORD style = GetWindowLongW( hwnd, GWL_STYLE ), exstyle = GetWindowLongW( hwnd, GWL_EXSTYLE );
+
+    TRACE( "display %p, window %lx, hwnd %p\n", display, window, hwnd );
+
+    XChangeProperty( display, window, x11drv_atom(_WINE_HWND_STYLE), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&style, sizeof(style) / 4 );
+    XChangeProperty( display, window, x11drv_atom(_WINE_HWND_EXSTYLE), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&exstyle, sizeof(exstyle) / 4 );
+}
+
+
 /**********************************************************************
  *		create_whole_window
  *
@@ -1950,6 +1963,8 @@ static void create_whole_window( struct x11drv_win_data *data )
 
     XSaveContext( data->display, data->whole_window, winContext, (char *)data->hwnd );
     SetPropA( data->hwnd, whole_window_prop, (HANDLE)data->whole_window );
+
+    set_hwnd_style_props( data->display, data->whole_window, data->hwnd );
 
     /* set the window text */
     if (!InternalGetWindowText( data->hwnd, text, ARRAY_SIZE( text ))) text[0] = 0;
@@ -2909,6 +2924,8 @@ void CDECL X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags
         if (needs_resize) sync_gl_drawable( hwnd, FALSE );
         return;
     }
+
+    set_hwnd_style_props( data->display, data->whole_window, data->hwnd );
 
     if (data->fs_hack)
         sync_gl_drawable( hwnd, FALSE );
