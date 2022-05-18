@@ -168,6 +168,8 @@ const char * const X11DRV_atom_names[NB_XATOMS - FIRST_XATOM] =
     "_GTK_WORKAREAS_D0",
     "_XEMBED",
     "_XEMBED_INFO",
+    "_WINE_HWND_STYLE",
+    "_WINE_HWND_EXSTYLE",
     "XdndAware",
     "XdndEnter",
     "XdndPosition",

@@ -1148,6 +1148,12 @@ static void set_style_hints( struct x11drv_win_data *data, DWORD style, DWORD ex
     }
 
     window_set_net_wm_icon( data, data->icon_bits, data->icon_size );
+
+    if (!data->whole_window) return;
+    XChangeProperty( data->display, data->whole_window, x11drv_atom(_WINE_HWND_STYLE), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&style, sizeof(style) / 4 );
+    XChangeProperty( data->display, data->whole_window, x11drv_atom(_WINE_HWND_EXSTYLE), XA_CARDINAL, 32,
+                     PropModeReplace, (unsigned char *)&ex_style, sizeof(ex_style) / 4 );
 }
 
 
