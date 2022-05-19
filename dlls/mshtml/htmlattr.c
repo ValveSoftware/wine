@@ -318,6 +318,7 @@ static HRESULT WINAPI HTMLDOMAttribute2_get_name(IHTMLDOMAttribute2 *iface, BSTR
     TRACE("(%p)->(%p)\n", This, p);
 
     if(This->node.nsnode) {
+        nsAString_InitDepend(&nsstr, NULL);
         nsres = nsIDOMAttr_GetName((nsIDOMAttr*)This->node.nsnode, &nsstr);
         return return_nsstr(nsres, &nsstr, p);
     }
@@ -357,6 +358,7 @@ static HRESULT WINAPI HTMLDOMAttribute2_get_value(IHTMLDOMAttribute2 *iface, BST
     TRACE("(%p)->(%p)\n", This, p);
 
     if(This->node.nsnode) {
+        nsAString_InitDepend(&nsstr, NULL);
         nsres = nsIDOMAttr_GetValue((nsIDOMAttr*)This->node.nsnode, &nsstr);
         return return_nsstr(nsres, &nsstr, p);
     }
