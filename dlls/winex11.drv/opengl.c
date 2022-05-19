@@ -481,6 +481,7 @@ static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer );
 static void wglDrawBuffer( GLenum buffer );
 static void wglReadBuffer( GLenum src );
+static void wglFramebufferTexture2D( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level );
 
 /* check if the extension is present in the list */
 static BOOL has_extension( const char *list, const char *ext )
@@ -2030,6 +2031,8 @@ static PROC WINAPI glxdrv_wglGetProcAddress(LPCSTR lpszProc)
         return (PROC)wglBindFramebuffer;
     if (!strcmp(lpszProc, "glBindFramebufferEXT"))
         return (PROC)wglBindFramebufferEXT;
+    if (!strcmp(lpszProc, "glFramebufferTexture2D"))
+        return (PROC)wglFramebufferTexture2D;
     return pglXGetProcAddressARB((const GLubyte*)lpszProc);
 }
 
@@ -2738,6 +2741,32 @@ static void wglReadBuffer( GLenum buffer )
         buffer = GL_COLOR_ATTACHMENT0;
     }
     pglReadBuffer( buffer );
+}
+
+static void wglFramebufferTexture2D( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level )
+{
+    struct wgl_context *ctx = NtCurrentTeb()->glContext;
+
+    TRACE( "target %#x, attachment %#x, textarget %#x, texture %u, level %u.\n", target, attachment, textarget,
+            texture, level );
+
+    if (ctx->fs_hack)
+    {
+        /* glFramebufferTexture2D should fail for default framebuffer 0.
+         * Let it fail and relay appropriate error instead of breaking fs_hack FBO. */
+        if (ctx->current_read_fbo == ctx->fs_hack_fbo)
+            pglBindFramebuffer( GL_READ_FRAMEBUFFER, 0 );
+        if (ctx->current_draw_fbo == ctx->fs_hack_fbo)
+            pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
+    }
+    pglFramebufferTexture2D( target, attachment, textarget, texture, level );
+    if (ctx->fs_hack)
+    {
+        if (ctx->current_read_fbo == ctx->fs_hack_fbo)
+            pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_fbo );
+        if (ctx->current_draw_fbo == ctx->fs_hack_fbo)
+            pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_fbo );
+    }
 }
 
 struct fs_hack_gl_state {
