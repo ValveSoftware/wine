@@ -559,6 +559,7 @@ static DISPID get_dispid_for_nsattr(HTMLElement *elem, nsIDOMAttr *nsattr)
     DISPID dispid = 0;
     nsAString nsstr;
 
+    nsAString_InitDepend(&nsstr, NULL);
     if(SUCCEEDED(nsIDOMAttr_GetName(nsattr, &nsstr))) {
         const PRUnichar *name;
         nsAString_GetData(&nsstr, &name);
@@ -4674,9 +4675,9 @@ static HRESULT WINAPI HTMLElement4_setAttributeNode(IHTMLElement4 *iface, IHTMLD
         IHTMLDOMAttribute **ppretAttribute)
 {
     HTMLElement *This = impl_from_IHTMLElement4(iface);
+    nsIDOMAttr *nsattr, *oldnsattr = NULL;
     HTMLDOMAttribute *attr, *replace;
     HTMLAttributeCollection *attrs;
-    nsIDOMAttr *nsattr, *oldnsattr;
     DISPID dispid;
     HRESULT hres;
 
@@ -8367,6 +8368,7 @@ static inline HRESULT get_attr_dispid_by_name(HTMLAttributeCollection *This, BST
 
     if(This->nsattrs) {
         nsAString_InitDepend(&nsstr, name);
+        *nsattr = NULL;
         nsres = nsIDOMMozNamedAttrMap_GetNamedItem(This->nsattrs, &nsstr, nsattr);
         nsAString_Finish(&nsstr);
         if(NS_FAILED(nsres))
