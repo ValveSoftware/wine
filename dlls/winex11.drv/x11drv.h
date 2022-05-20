@@ -664,6 +664,7 @@ extern void destroy_vk_surface( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void sync_vk_surface( HWND hwnd, BOOL known_child ) DECLSPEC_HIDDEN;
 extern void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes ) DECLSPEC_HIDDEN;
 extern Window wine_vk_active_surface( HWND hwnd ) DECLSPEC_HIDDEN;
+extern BOOL wine_vk_direct_window_draw( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void vulkan_thread_detach(void) DECLSPEC_HIDDEN;
 
 extern void wait_for_withdrawn_state( HWND hwnd, BOOL set ) DECLSPEC_HIDDEN;
@@ -904,5 +905,6 @@ static inline BOOL is_window_rect_mapped( const RECT *rect )
 }
 
 extern BOOL layered_window_client_hack;
+extern BOOL vulkan_gdi_blit_source_hack;
 
 #endif  /* __WINE_X11DRV_H */
