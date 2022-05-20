@@ -866,11 +866,14 @@ static VkResult X11DRV_vkGetSwapchainImagesKHR(VkDevice device,
 
 static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *present_info)
 {
+    static SRWLOCK lock = SRWLOCK_INIT;
     VkResult res;
 
     TRACE("%p, %p\n", queue, present_info);
 
+    AcquireSRWLockExclusive( &lock );
     res = pvkQueuePresentKHR(queue, present_info);
+    ReleaseSRWLockExclusive( &lock );
 
     if (TRACE_ON(fps))
     {
