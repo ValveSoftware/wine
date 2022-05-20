@@ -2075,6 +2075,7 @@ void X11DRV_SetWindowStyle( HWND hwnd, INT offset, STYLESTRUCT *style )
             sync_vk_surface( parent, TRUE );
         else
             sync_vk_surface( parent, FALSE );
+        sync_vk_surface( hwnd, style->styleNew & WS_CHILD );
     }
 
     if (hwnd == NtUserGetDesktopWindow()) return;
