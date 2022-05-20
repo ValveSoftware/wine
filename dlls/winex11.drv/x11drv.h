@@ -660,6 +660,7 @@ extern void destroy_vk_surface( HWND hwnd );
 extern void sync_vk_surface( HWND hwnd, BOOL known_child );
 extern void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes );
 extern void vulkan_thread_detach(void);
+extern BOOL wine_vk_direct_window_draw( HWND hwnd );
 
 extern void wait_for_withdrawn_state( HWND hwnd, BOOL set );
 extern Window init_clip_window(void);
@@ -938,5 +939,6 @@ static inline UINT asciiz_to_unicode( WCHAR *dst, const char *src )
 }
 
 extern BOOL vulkan_disable_child_window_rendering_hack;
+extern BOOL vulkan_gdi_blit_source_hack;
 
 #endif  /* __WINE_X11DRV_H */

@@ -66,6 +66,7 @@ struct wine_vk_surface
     DWORD hwnd_thread_id;
     BOOL offscreen; /* drawable is offscreen */
     VkPresentModeKHR present_mode;
+    BOOL gdi_blit_source; /* HACK: gdi blits from the window should work with Vulkan rendered contents. */
 };
 
 typedef struct VkXlibSurfaceCreateInfoKHR
@@ -264,6 +265,17 @@ void destroy_vk_surface( HWND hwnd )
     pthread_mutex_unlock( &vulkan_mutex );
 }
 
+static void set_dc_drawable( HDC hdc, Drawable drawable, const RECT *rect )
+{
+    struct x11drv_escape_set_drawable escape;
+
+    escape.code = X11DRV_SET_DRAWABLE;
+    escape.mode = IncludeInferiors;
+    escape.drawable = drawable;
+    escape.dc_rect = *rect;
+    NtGdiExtEscape( hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
+}
+
 static BOOL wine_vk_surface_set_offscreen( struct wine_vk_surface *surface, BOOL offscreen )
 {
 #ifdef SONAME_LIBXCOMPOSITE
@@ -328,9 +340,28 @@ void sync_vk_surface( HWND hwnd, BOOL known_child )
     LIST_FOR_EACH_ENTRY( surface, &surface_list, struct wine_vk_surface, entry )
     {
         if (surface->hwnd != hwnd) continue;
-        wine_vk_surface_set_offscreen( surface, known_child );
+        wine_vk_surface_set_offscreen( surface, known_child || surface->gdi_blit_source );
     }
     pthread_mutex_unlock( &vulkan_mutex );
+}
+
+BOOL wine_vk_direct_window_draw( HWND hwnd )
+{
+    struct wine_vk_surface *surface;
+    BOOL ret = FALSE;
+
+    pthread_mutex_lock(&vulkan_mutex);
+    LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd) continue;
+        if (surface->gdi_blit_source)
+        {
+            ret = TRUE;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&vulkan_mutex);
+    return ret;
 }
 
 void vulkan_thread_detach(void)
@@ -460,12 +491,32 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
         goto err;
     }
 
-    if (NtUserGetAncestor( create_info->hwnd, GA_PARENT ) != NtUserGetDesktopWindow() ||
-        NtUserGetWindowRelative( create_info->hwnd, GW_CHILD ))
+    if (vulkan_gdi_blit_source_hack)
     {
-        TRACE( "hwnd %p creating offscreen child window surface\n", x11_surface->hwnd );
+        RECT rect;
 
-        if (!wine_vk_surface_set_offscreen( x11_surface, TRUE ))
+        NtUserGetWindowRect( create_info->hwnd, &rect );
+        if (!is_window_rect_mapped( &rect ))
+        {
+            struct x11drv_win_data *data;
+
+            FIXME("HACK: setting gdi_blit_source for hwnd %p, surface %p.\n", x11_surface->hwnd, x11_surface);
+            x11_surface->gdi_blit_source = TRUE;
+
+            if ((data = get_win_data( x11_surface->hwnd )))
+            {
+                detach_client_window( data, x11_surface->window, TRUE );
+                release_win_data( data );
+            }
+        }
+    }
+
+    if (NtUserGetAncestor( create_info->hwnd, GA_PARENT ) != NtUserGetDesktopWindow() ||
+        NtUserGetWindowRelative( create_info->hwnd, GW_CHILD ) ||
+        x11_surface->gdi_blit_source)
+    {
+        TRACE("hwnd %p creating offscreen child window surface\n", x11_surface->hwnd);
+        if (!wine_vk_surface_set_offscreen(x11_surface, TRUE))
         {
             res = VK_ERROR_INCOMPATIBLE_DRIVER;
             goto err;
@@ -491,6 +542,13 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
 
     *surface = (uintptr_t)x11_surface;
 
+    if (x11_surface->gdi_blit_source)
+    {
+        /* Make sure window gets surface destroyed. */
+        UINT flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_NOREDRAW |
+                     SWP_DEFERERASE | SWP_NOSENDCHANGING | SWP_STATECHANGED;
+        NtUserSetWindowPos( x11_surface->hwnd, 0, 0, 0, 0, 0, flags );
+    }
     TRACE("Created surface=0x%s\n", wine_dbgstr_longlong(*surface));
     return VK_SUCCESS;
 
@@ -776,6 +834,7 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
     VkResult result;
     BOOL wait_fence;
     HDC hdc = 0;
+    RECT rect;
 
     if (XFindContext( gdi_display, (XID)swapchain, swapchain_context, (char **)&surface ))
         return VK_ERROR_SURFACE_LOST_KHR;
@@ -793,19 +852,32 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
     result = pvkAcquireNextImageKHR( device, swapchain, timeout, semaphore, fence, image_index );
 
     if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && surface->offscreen)
-        hdc = NtUserGetDCEx( surface->hwnd, 0, DCX_USESTYLE | DCX_CACHE );
+    {
+        DWORD dc_flags = DCX_USESTYLE;
+        if (!surface->gdi_blit_source) dc_flags |= DCX_CACHE;
+        hdc = NtUserGetDCEx( surface->hwnd, 0, dc_flags );
+    }
 
     if (hdc)
     {
-        struct x11drv_escape_present_drawable escape =
-        {
-            .code = X11DRV_PRESENT_DRAWABLE,
-            .drawable = surface->window,
-            .flush = TRUE,
-        };
-
         if (wait_fence) pvkWaitForFences( device, 1, &fence, 0, timeout );
-        NtGdiExtEscape( hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL );
+
+        if (surface->gdi_blit_source)
+        {
+            NtUserGetClientRect( surface->hwnd, &rect );
+            set_dc_drawable( hdc, surface->window, &rect );
+        }
+        else
+        {
+            struct x11drv_escape_present_drawable escape =
+            {
+                .code = X11DRV_PRESENT_DRAWABLE,
+                .drawable = surface->window,
+                .flush = TRUE,
+            };
+            NtGdiExtEscape( hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL );
+        }
+
         NtUserReleaseDC( surface->hwnd, hdc );
     }
 
@@ -837,7 +909,7 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
         struct x11drv_win_data *data;
 
         if (!XFindContext( gdi_display, (XID)swapchain, swapchain_context, (char **)&surface ) &&
-            (data = get_win_data( surface->hwnd )))
+            !surface->gdi_blit_source && (data = get_win_data( surface->hwnd )))
         {
             attach_client_window( data, surface->window );
             release_win_data( data );
