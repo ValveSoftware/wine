@@ -41,6 +41,10 @@ struct asf_reader
     AM_MEDIA_TYPE media_type;
     WCHAR *file_name;
 
+    HRESULT result;
+    WMT_STATUS status;
+    CONDITION_VARIABLE status_cv;
+
     IWMReaderCallback *callback;
     IWMReader *reader;
 
@@ -269,17 +273,32 @@ static HRESULT WINAPI file_source_Load(IFileSourceFilter *iface, LPCOLESTR file_
     if (!file_name)
         return E_POINTER;
 
-    if (filter->file_name)
+    EnterCriticalSection(&filter->filter.filter_cs);
+
+    if (filter->file_name || !(filter->file_name = wcsdup(file_name)))
+    {
+        LeaveCriticalSection(&filter->filter.filter_cs);
         return E_FAIL;
+    }
 
-    if (!(filter->file_name = wcsdup(file_name)))
-        return E_OUTOFMEMORY;
+    if (media_type && FAILED(hr = CopyMediaType(&filter->media_type, media_type)))
+    {
+        LeaveCriticalSection(&filter->filter.filter_cs);
+        return hr;
+    }
 
-    if (media_type)
-        CopyMediaType(&filter->media_type, media_type);
+    if (SUCCEEDED(hr = IWMReader_Open(filter->reader, filter->file_name, filter->callback, NULL)))
+    {
+        filter->status = -1;
+        while (filter->status != WMT_OPENED)
+            SleepConditionVariableCS(&filter->status_cv, &filter->filter.filter_cs, INFINITE);
+        hr = filter->result;
+    }
 
-    if (FAILED(hr = IWMReader_Open(filter->reader, filter->file_name, filter->callback, NULL)))
+    if (FAILED(hr))
         WARN("Failed to open WM reader, hr %#lx.\n", hr);
+
+    LeaveCriticalSection(&filter->filter.filter_cs);
 
     return S_OK;
 }
@@ -378,29 +397,25 @@ static ULONG WINAPI reader_callback_Release(IWMReaderCallback *iface)
     return ref;
 }
 
-static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STATUS status, HRESULT hr,
+static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STATUS status, HRESULT result,
         WMT_ATTR_DATATYPE type, BYTE *value, void *context)
 {
     struct asf_reader *filter = impl_from_IWMReaderCallback(iface)->filter;
     AM_MEDIA_TYPE stream_media_type = {0};
     DWORD i, stream_count;
     WCHAR name[MAX_PATH];
+    HRESULT hr;
 
-    TRACE("iface %p, status %d, hr %#lx, type %d, value %p, context %p.\n",
-            iface, status, hr, type, value, context);
+    TRACE("iface %p, status %d, result %#lx, type %d, value %p, context %p.\n",
+            iface, status, result, type, value, context);
 
     switch (status)
     {
         case WMT_OPENED:
-            if (FAILED(hr))
-            {
-                ERR("Failed to open WMReader, hr %#lx.\n", hr);
-                break;
-            }
             if (FAILED(hr = IWMReader_GetOutputCount(filter->reader, &stream_count)))
             {
                 ERR("Failed to get WMReader output count, hr %#lx.\n", hr);
-                break;
+                stream_count = 0;
             }
             if (stream_count > ARRAY_SIZE(filter->streams))
             {
@@ -424,9 +439,14 @@ static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STA
                 strmbase_source_init(&stream->source, &filter->filter, name, &source_ops);
             }
             filter->stream_count = stream_count;
-            LeaveCriticalSection(&filter->filter.filter_cs);
+
+            filter->result = result;
+            filter->status = WMT_OPENED;
+            WakeConditionVariable(&filter->status_cv);
 
             BaseFilterImpl_IncrementPinVersion(&filter->filter);
+
+            LeaveCriticalSection(&filter->filter.filter_cs);
             break;
 
         default:
