@@ -660,11 +660,14 @@ static VkResult X11DRV_vkGetSwapchainImagesKHR(VkDevice device,
 
 static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *present_info)
 {
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     VkResult res;
 
     TRACE("%p, %p\n", queue, present_info);
 
+    pthread_mutex_lock( &lock );
     res = pvkQueuePresentKHR(queue, present_info);
+    pthread_mutex_unlock( &lock );
 
     if (TRACE_ON(fps))
     {
