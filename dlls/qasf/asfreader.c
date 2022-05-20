@@ -150,11 +150,66 @@ static HRESULT asf_reader_query_interface(struct strmbase_filter *iface, REFIID 
     return E_NOINTERFACE;
 }
 
+static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
+{
+    struct asf_reader *filter = impl_from_strmbase_filter(iface);
+    HRESULT hr;
+    int i;
+
+    TRACE("iface %p\n", iface);
+
+    for (i = 0; i < filter->stream_count; ++i)
+    {
+        struct asf_stream *stream = filter->streams + i;
+
+        if (!stream->source.pin.peer)
+            continue;
+
+        hr = IMemAllocator_Commit(stream->source.pAllocator);
+        if (FAILED(hr))
+        {
+            WARN("Failed to commit stream %u allocator, hr %#lx\n", i, hr);
+            continue;
+        }
+
+        hr = IPin_NewSegment(stream->source.pin.peer, 0, 0, 1);
+        if (FAILED(hr))
+        {
+            WARN("Failed to start stream %u new segment, hr %#lx\n", i, hr);
+            continue;
+        }
+    }
+
+    return IWMReader_Start(filter->reader, 0, 0, 1, NULL);
+}
+
+static HRESULT asf_reader_cleanup_stream(struct strmbase_filter *iface)
+{
+    struct asf_reader *filter = impl_from_strmbase_filter(iface);
+    int i;
+
+    TRACE("iface %p\n", iface);
+
+    for (i = 0; i < filter->stream_count; ++i)
+    {
+        struct asf_stream *stream = filter->streams + i;
+
+        if (!stream->source.pin.peer)
+            continue;
+
+        IMemAllocator_Decommit(stream->source.pAllocator);
+    }
+
+    return S_OK;
+}
+
 static const struct strmbase_filter_ops filter_ops =
 {
     .filter_get_pin = asf_reader_get_pin,
     .filter_destroy = asf_reader_destroy,
     .filter_query_interface = asf_reader_query_interface,
+    .filter_init_stream = asf_reader_init_stream,
+    .filter_cleanup_stream = asf_reader_cleanup_stream,
 };
 
 static HRESULT WINAPI asf_reader_DecideBufferSize(struct strmbase_source *iface,
@@ -388,6 +443,20 @@ static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STA
             LeaveCriticalSection(&filter->filter.filter_cs);
 
             BaseFilterImpl_IncrementPinVersion(&filter->filter);
+            break;
+
+        case WMT_END_OF_STREAMING:
+            EnterCriticalSection(&filter->filter.filter_cs);
+            for (i = 0; i < filter->stream_count; ++i)
+            {
+                struct asf_stream *stream = filter->streams + i;
+
+                if (!stream->source.pin.peer)
+                    continue;
+
+                IPin_EndOfStream(stream->source.pin.peer);
+            }
+            LeaveCriticalSection(&filter->filter.filter_cs);
             break;
 
         default:
