@@ -1035,6 +1035,7 @@ static VkResult X11DRV_vkAcquireNextImage2KHR( VkDevice device, const VkAcquireN
 
 static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *present_info)
 {
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
     VkResult res;
     UINT i;
 
@@ -1054,7 +1055,9 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
         }
     }
 
+    pthread_mutex_lock( &lock );
     res = pvkQueuePresentKHR(queue, present_info);
+    pthread_mutex_unlock( &lock );
 
     if (TRACE_ON(fps))
     {
