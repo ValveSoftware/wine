@@ -406,6 +406,7 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
     WMT_STREAM_SELECTION selections[ARRAY_SIZE(filter->streams)];
     WORD stream_numbers[ARRAY_SIZE(filter->streams)];
     IWMReaderAdvanced *reader_advanced;
+    IMediaSample *sample;
     HRESULT hr = S_OK;
     int i;
 
@@ -463,6 +464,17 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
         }
 
         selections[i] = WMT_ON;
+
+        /* FIXME: Push a preroll buffer to unblock DSound renderer, video renderer more usually blocks even on preroll buffers */
+        if (!wcsncmp(stream->source.pin.name, L"Raw Audio", 9)
+                && SUCCEEDED(hr = IMemAllocator_GetBuffer(stream->source.pAllocator, &sample, NULL, NULL, 0)))
+        {
+            REFERENCE_TIME time = 0;
+            IMediaSample_SetTime(sample, &time, &time);
+            IMediaSample_SetPreroll(sample, TRUE);
+            IMemInputPin_Receive(stream->source.pMemInputPin, sample);
+            IMediaSample_Release(sample);
+        }
     }
 
     if (SUCCEEDED(hr) && FAILED(hr = IWMReaderAdvanced_SetStreamsSelected(reader_advanced,
