@@ -2851,6 +2851,8 @@ static VkResult record_compute_cmd( struct vulkan_device *device, struct swapcha
 
 static VkResult win32u_vkQueuePresentKHR( VkQueue client_queue, const VkPresentInfoKHR *client_present_info )
 {
+    static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+
     VkPresentInfoKHR *present_info = (VkPresentInfoKHR *)client_present_info; /* cast away const, it has been copied in the thunks */
     struct vulkan_queue *queue = vulkan_queue_from_handle( client_queue );
     struct vulkan_device *device = queue->device;
@@ -2938,7 +2940,9 @@ static VkResult win32u_vkQueuePresentKHR( VkQueue client_queue, const VkPresentI
         present_info->pWaitSemaphores = &blit_sema;
     }
 
+    pthread_mutex_lock( &lock );
     res = device->p_vkQueuePresentKHR( queue->host.queue, present_info );
+    pthread_mutex_unlock( &lock );
 
     for (uint32_t i = 0; i < present_info->swapchainCount; i++)
     {
