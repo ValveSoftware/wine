@@ -2813,6 +2813,13 @@ BOOL CDECL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flag
     if (!data->whole_window && !data->embedded) goto done;
     if (swp_flags & SWP_HIDEWINDOW) goto done;
     if (data->use_alpha) goto done;
+
+    if (wine_vk_direct_window_draw( hwnd ))
+    {
+        if (*surface) window_surface_release( *surface );
+        *surface = NULL;
+        goto done;
+    }
     if (!get_surface_rect( visible_rect, &surface_rect )) goto done;
 
     if (*surface) window_surface_release( *surface );
