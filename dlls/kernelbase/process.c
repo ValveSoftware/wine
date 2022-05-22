@@ -599,7 +599,6 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
         {L"EOSOverlayRenderer-Win64-Shipping.exe", L" --use-gl=swiftshader --in-process-gpu"},
         {L"Succubus x Saint\\Game.exe", L" --use-gl=swiftshader"},
-        {L"\x8bc5\x5492\x94e0\x7532\\Game.exe", L" --use-gl=swiftshader"},
     };
     unsigned int i;
     char sgi[64];
