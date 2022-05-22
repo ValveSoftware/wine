@@ -67,6 +67,10 @@ struct wine_vk_surface
     BOOL offscreen; /* drawable is offscreen */
     VkPresentModeKHR present_mode;
     BOOL gdi_blit_source; /* HACK: gdi blits from the window should work with Vulkan rendered contents. */
+    BOOL other_process;
+    Colormap client_colormap;
+    HDC draw_dc;
+    unsigned int width, height;
 };
 
 typedef struct VkXlibSurfaceCreateInfoKHR
@@ -232,6 +236,10 @@ static void wine_vk_surface_release( struct wine_vk_surface *surface )
         pthread_mutex_unlock(&vulkan_mutex);
     }
 
+    if (surface->draw_dc)
+        NtGdiDeleteObjectApp( surface->draw_dc );
+    if (surface->client_colormap)
+        XFreeColormap( gdi_display, surface->client_colormap );
     destroy_client_window( surface->hwnd, surface->window );
     free(surface);
 }
@@ -354,7 +362,7 @@ BOOL wine_vk_direct_window_draw( HWND hwnd )
     LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
     {
         if (surface->hwnd != hwnd) continue;
-        if (surface->gdi_blit_source)
+        if (surface->gdi_blit_source && !surface->other_process)
         {
             ret = TRUE;
             break;
@@ -439,7 +447,9 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
     create_info_host.surface = x11_surface->host_surface;
 
     /* force fifo when running offscreen so the acquire fence is more likely to be vsynced */
-    if (x11_surface->offscreen && create_info->presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+    if (x11_surface->gdi_blit_source)
+        create_info_host.presentMode = VK_PRESENT_MODE_IMMEDIATE_KHR;
+    else if (x11_surface->offscreen && create_info->presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
         create_info_host.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     x11_surface->present_mode = create_info->presentMode;
 
@@ -460,6 +470,8 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     VkResult res;
     VkXlibSurfaceCreateInfoKHR create_info_host;
     struct wine_vk_surface *x11_surface;
+    DWORD hwnd_pid;
+    RECT rect;
 
     TRACE("%p %p %p %p\n", instance, create_info, allocator, surface);
 
@@ -474,8 +486,49 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     x11_surface->hwnd = create_info->hwnd;
     if (x11_surface->hwnd)
     {
-        x11_surface->window = create_client_window(create_info->hwnd, &default_visual, default_colormap);
-        x11_surface->hwnd_thread_id = NtUserGetWindowThread(x11_surface->hwnd, NULL);
+        x11_surface->hwnd_thread_id = NtUserGetWindowThread(x11_surface->hwnd, &hwnd_pid);
+        if (x11_surface->hwnd_thread_id && hwnd_pid != GetCurrentProcessId())
+        {
+            XSetWindowAttributes attr;
+
+            WARN("Other process window %p.\n", x11_surface->hwnd);
+            NtUserGetClientRect( x11_surface->hwnd, &rect );
+            x11_surface->width = max( rect.right - rect.left, 1 );
+            x11_surface->height = max( rect.bottom - rect.top, 1 );
+            x11_surface->client_colormap = XCreateColormap( gdi_display, get_dummy_parent(), default_visual.visual,
+                    (default_visual.class == PseudoColor || default_visual.class == GrayScale
+                    || default_visual.class == DirectColor) ? AllocAll : AllocNone );
+            attr.colormap = x11_surface->client_colormap;
+            attr.bit_gravity = NorthWestGravity;
+            attr.win_gravity = NorthWestGravity;
+            attr.backing_store = NotUseful;
+            attr.border_pixel = 0;
+            x11_surface->window = XCreateWindow( gdi_display,
+                                                 get_dummy_parent(),
+                                                 0, 0, x11_surface->width, x11_surface->height, 0,
+                                                 default_visual.depth, InputOutput,
+                                                 default_visual.visual, CWBitGravity | CWWinGravity |
+                                                 CWBackingStore | CWColormap | CWBorderPixel, &attr );
+            if (x11_surface->window)
+            {
+                const WCHAR displayW[] = {'D','I','S','P','L','A','Y',0};
+                UNICODE_STRING device_str;
+
+                XMapWindow( gdi_display, x11_surface->window );
+                XSync( gdi_display, False );
+                x11_surface->gdi_blit_source = TRUE;
+                x11_surface->other_process = TRUE;
+
+                RtlInitUnicodeString( &device_str, displayW );
+                x11_surface->draw_dc = NtGdiOpenDCW( &device_str, NULL, NULL, 0, TRUE, NULL, NULL, NULL );
+
+                set_dc_drawable( x11_surface->draw_dc, x11_surface->window, &rect );
+            }
+        }
+        else
+        {
+            x11_surface->window = create_client_window(create_info->hwnd, &default_visual, default_colormap);
+        }
     }
     else
     {
@@ -491,7 +544,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
         goto err;
     }
 
-    if (vulkan_gdi_blit_source_hack)
+    if (!x11_surface->gdi_blit_source && vulkan_gdi_blit_source_hack)
     {
         RECT rect;
 
@@ -542,7 +595,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
 
     *surface = (uintptr_t)x11_surface;
 
-    if (x11_surface->gdi_blit_source)
+    if (x11_surface->gdi_blit_source && !x11_surface->other_process)
     {
         /* Make sure window gets surface destroyed. */
         UINT flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE | SWP_NOMOVE | SWP_NOREDRAW |
@@ -840,7 +893,8 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
         return VK_ERROR_SURFACE_LOST_KHR;
 
     wait_fence = surface->offscreen && (surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR ||
-                                        surface->present_mode == VK_PRESENT_MODE_FIFO_KHR);
+                                        surface->present_mode == VK_PRESENT_MODE_FIFO_KHR ||
+                                        surface->other_process);
 
     orig_fence = fence;
     if (wait_fence && !fence)
@@ -854,7 +908,7 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
     if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && surface->offscreen)
     {
         DWORD dc_flags = DCX_USESTYLE;
-        if (!surface->gdi_blit_source) dc_flags |= DCX_CACHE;
+        if (!surface->gdi_blit_source || surface->other_process) dc_flags |= DCX_CACHE;
         hdc = NtUserGetDCEx( surface->hwnd, 0, dc_flags );
     }
 
@@ -864,8 +918,30 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
 
         if (surface->gdi_blit_source)
         {
+            unsigned int width, height;
+
             NtUserGetClientRect( surface->hwnd, &rect );
-            set_dc_drawable( hdc, surface->window, &rect );
+            if (surface->other_process)
+            {
+                width = max( rect.right - rect.left, 1 );
+                height = max( rect.bottom - rect.top, 1 );
+                if (!NtGdiStretchBlt(hdc, rect.left, rect.top, width,
+                        height, surface->draw_dc, 0, 0,
+                        width, height, SRCCOPY, 0))
+                    ERR("StretchBlt failed.\n");
+                if (width != surface->width || height != surface->height)
+                {
+                    TRACE("Resizing.\n");
+                    XMoveResizeWindow( gdi_display, surface->window, 0, 0, width, height);
+                    set_dc_drawable( surface->draw_dc, surface->window, &rect );
+                    surface->width = width;
+                    surface->height = height;
+                }
+            }
+            else
+            {
+                set_dc_drawable( hdc, surface->window, &rect );
+            }
         }
         else
         {
