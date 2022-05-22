@@ -305,6 +305,7 @@ struct x11drv_client_surface
 
     HDC hdc_src;
     HDC hdc_dst;
+    BOOL other_process;
 };
 
 static struct x11drv_client_surface *impl_from_client_surface( struct client_surface *client )
@@ -385,6 +386,8 @@ static void client_surface_update_offscreen( HWND hwnd, struct x11drv_client_sur
 {
     BOOL offscreen = needs_offscreen_rendering( hwnd );
     struct x11drv_win_data *data;
+
+    if (surface->other_process) offscreen = TRUE;
 
     TRACE( "%s offscreen %u\n", debugstr_client_surface( &surface->client ), offscreen );
 
@@ -515,6 +518,7 @@ Window x11drv_client_surface_create( HWND hwnd, BOOL raw, int format, struct cli
     UINT dpi = raw ? NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
     struct x11drv_client_surface *surface;
     XVisualInfo visual = default_visual;
+    DWORD hwnd_pid, hwnd_thread_id;
     Colormap colormap;
 
     if (format && !visual_from_pixel_format( format, &visual )) return None;
@@ -528,7 +532,32 @@ Window x11drv_client_surface_create( HWND hwnd, BOOL raw, int format, struct cli
     surface->raw = raw;
 
     if (!get_surface_rect( hwnd, &surface->rect, dpi )) goto failed;
-    if (!(surface->window = create_client_window( hwnd, surface->rect, &visual, colormap ))) goto failed;
+    hwnd_thread_id = NtUserGetWindowThread(hwnd, &hwnd_pid);
+    if (hwnd_thread_id && hwnd_pid != GetCurrentProcessId())
+    {
+        XSetWindowAttributes attr;
+        RECT rect = surface->rect;
+        unsigned int width, height;
+
+        width = max( rect.right - rect.left, 1 );
+        height = max( rect.bottom - rect.top, 1 );
+        attr.colormap = default_colormap;
+        attr.bit_gravity = NorthWestGravity;
+        attr.win_gravity = NorthWestGravity;
+        attr.backing_store = NotUseful;
+        attr.border_pixel = 0;
+        surface->window = XCreateWindow( gdi_display, get_dummy_parent(), 0, 0, width, height, 0, default_visual.depth, InputOutput,
+                                         default_visual.visual, CWBitGravity | CWWinGravity | CWBackingStore | CWColormap | CWBorderPixel, &attr );
+        if (surface->window)
+        {
+            XMapWindow( gdi_display, surface->window );
+            XSync( gdi_display, False );
+            surface->other_process = TRUE;
+        }
+        WARN( "Other process window %p / %#lx.\n", hwnd, surface->window );
+    }
+
+    if (!surface->window && !(surface->window = create_client_window( hwnd, surface->rect, &visual, colormap ))) goto failed;
 
     TRACE( "Created %s for client window %lx\n", debugstr_client_surface( &surface->client ), surface->window );
     *client = &surface->client;
