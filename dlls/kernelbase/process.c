@@ -588,18 +588,16 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     {
         const WCHAR *exe_name;
         const WCHAR *append;
-        const char *steamgameid;
     }
     options[] =
     {
         {L"UplayWebCore.exe", L" --use-gl=swiftshader"},
         {L"Paradox Launcher.exe", L" --use-gl=swiftshader --in-process-gpu"},
-        {L"UnrealCEFSubProcess.exe", L" --use-gl=swiftshader", "1233550"},
+        {L"UnrealCEFSubProcess.exe", L" --use-gl=swiftshader"},
         {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
         {L"EOSOverlayRenderer-Win64-Shipping.exe", L" --use-gl=swiftshader --in-process-gpu"},
     };
     unsigned int i;
-    char sgi[64];
 
     if (!cmd) return NULL;
 
@@ -607,9 +605,6 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     {
         if (wcsstr( cmd, options[i].exe_name ))
         {
-            if (options[i].steamgameid && !(GetEnvironmentVariableA( "SteamGameId", sgi, sizeof(sgi) )
-                && !strcmp( sgi, options[i].steamgameid )))
-                break;
             FIXME( "HACK: appending %s to command line.\n", debugstr_w(options[i].append) );
             return options[i].append;
         }
