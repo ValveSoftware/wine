@@ -70,7 +70,6 @@ struct wine_vk_surface
     BOOL known_child; /* hwnd is or has a child */
     BOOL offscreen; /* drawable is offscreen */
     LONG swapchain_count; /* surface can have one active an many retired swapchains */
-    HDC hdc;
     HWND hwnd;
     DWORD hwnd_thread_id;
 };
@@ -244,10 +243,8 @@ void wine_vk_surface_destroy(struct wine_vk_surface *surface)
     XReparentWindow(gdi_display, surface->window, get_dummy_parent(), 0, 0);
     XSync(gdi_display, False);
 
-    if (surface->hdc) ReleaseDC(surface->hwnd, surface->hdc);
     surface->hwnd_thread_id = 0;
     surface->hwnd = 0;
-    surface->hdc = 0;
     wine_vk_surface_release(surface);
 }
 
@@ -413,10 +410,7 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
 
     EnterCriticalSection(&context_section);
     if (!XFindContext(gdi_display, (XID)swapchain, vulkan_swapchain_context, (char **)&surface))
-    {
         wine_vk_surface_grab(surface);
-        hdc = surface->hdc;
-    }
     LeaveCriticalSection(&context_section);
 
     if (!surface || !surface->offscreen)
@@ -436,7 +430,11 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
     }
 
     result = pvkAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, image_index);
-    if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && hdc && surface && surface->offscreen)
+
+    if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && surface && surface->offscreen)
+        hdc = GetDCEx(surface->hwnd, 0, DCX_USESTYLE | DCX_CACHE);
+
+    if (hdc)
     {
         if (wait_fence) pvkWaitForFences(device, 1, &fence, 0, timeout);
         escape.code = X11DRV_PRESENT_DRAWABLE;
@@ -445,6 +443,7 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
         ExtEscape(hdc, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL);
         if (surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
             if (once++) FIXME("Application requires child window rendering with mailbox present mode, expect possible tearing!\n");
+        ReleaseDC(surface->hwnd, hdc);
     }
 
     if (fence != orig_fence) pvkDestroyFence(device, fence, NULL);
@@ -532,7 +531,6 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     x11_surface->swapchain_count = 0;
     if (x11_surface->hwnd)
     {
-        x11_surface->hdc = GetDC(create_info->hwnd);
         x11_surface->window = create_client_window(create_info->hwnd, &default_visual);
         x11_surface->hwnd_thread_id = GetWindowThreadProcessId(x11_surface->hwnd, NULL);
     }
