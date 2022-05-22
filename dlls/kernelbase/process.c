@@ -593,7 +593,6 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     {
         {L"UplayWebCore.exe", L" --use-gl=swiftshader"},
         {L"Paradox Launcher.exe", L" --use-gl=swiftshader --in-process-gpu"},
-        {L"UnrealCEFSubProcess.exe", L" --use-gl=swiftshader"},
         {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
         {L"EOSOverlayRenderer-Win64-Shipping.exe", L" --use-gl=swiftshader --in-process-gpu"},
     };
