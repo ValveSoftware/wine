@@ -586,7 +586,7 @@ NTSTATUS WINAPI RtlCreateProcessParametersEx( RTL_USER_PROCESS_PARAMETERS **resu
     if (!DllPath) DllPath = &null_str;
     if (!CurrentDirectoryName)
     {
-        if (NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
+        if (0 && NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
             curdir = ((WIN16_SUBSYSTEM_TIB *)NtCurrentTeb()->Tib.SubSystemTib)->curdir.DosPath;
         else
             curdir = cur_params->CurrentDirectory.DosPath;
