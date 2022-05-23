@@ -301,7 +301,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetModuleFileNameW( HMODULE module, LPWSTR filena
     UNICODE_STRING name;
     NTSTATUS status;
 
-    if (!module && ((win16_tib = NtCurrentTeb()->Tib.SubSystemTib)) && win16_tib->exe_name)
+    if (!module && (0 && (win16_tib = NtCurrentTeb()->Tib.SubSystemTib)) && win16_tib->exe_name)
     {
         len = min( size, win16_tib->exe_name->Length / sizeof(WCHAR) );
         memcpy( filename, win16_tib->exe_name->Buffer, len * sizeof(WCHAR) );

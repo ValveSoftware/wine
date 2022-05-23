@@ -603,7 +603,7 @@ static ULONG get_full_path_helper(LPCWSTR name, LPWSTR buffer, ULONG size, RTL_P
 
     RtlAcquirePebLock();
 
-    if (NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
+    if (0 && NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
         cd = &((WIN16_SUBSYSTEM_TIB *)NtCurrentTeb()->Tib.SubSystemTib)->curdir.DosPath;
     else
         cd = &NtCurrentTeb()->Peb->ProcessParameters->CurrentDirectory.DosPath;
@@ -953,7 +953,7 @@ ULONG WINAPI RtlGetCurrentDirectory_U(ULONG buflen, LPWSTR buf)
 
     RtlAcquirePebLock();
 
-    if (NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
+    if (0 && NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
         us = &((WIN16_SUBSYSTEM_TIB *)NtCurrentTeb()->Tib.SubSystemTib)->curdir.DosPath;
     else
         us = &NtCurrentTeb()->Peb->ProcessParameters->CurrentDirectory.DosPath;
@@ -997,7 +997,7 @@ NTSTATUS WINAPI RtlSetCurrentDirectory_U(const UNICODE_STRING* dir)
 
     RtlAcquirePebLock();
 
-    if (NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
+    if (0 && NtCurrentTeb()->Tib.SubSystemTib)  /* FIXME: hack */
         curdir = &((WIN16_SUBSYSTEM_TIB *)NtCurrentTeb()->Tib.SubSystemTib)->curdir;
     else
         curdir = &NtCurrentTeb()->Peb->ProcessParameters->CurrentDirectory;
