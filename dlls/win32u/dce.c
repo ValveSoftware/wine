@@ -1020,6 +1020,9 @@ HDC WINAPI NtUserGetDCEx( HWND hwnd, HRGN clip_rgn, DWORD flags )
  */
 INT WINAPI NtUserReleaseDC( HWND hwnd, HDC hdc )
 {
+    if (hwnd && !is_current_process_window( hwnd ))
+        user_driver->pProcessEvents( 0 );
+
     return release_dc( hwnd, hdc, FALSE );
 }
 
