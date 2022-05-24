@@ -153,10 +153,22 @@ static HRESULT asf_reader_query_interface(struct strmbase_filter *iface, REFIID 
 static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
 {
     struct asf_reader *filter = impl_from_strmbase_filter(iface);
+    WMT_STREAM_SELECTION selections[ARRAY_SIZE(filter->streams)];
+    WORD stream_numbers[ARRAY_SIZE(filter->streams)];
+    IWMReaderAdvanced *reader_advanced;
     HRESULT hr;
     int i;
 
     TRACE("iface %p\n", iface);
+
+    if (FAILED(hr = IWMReader_QueryInterface(filter->reader, &IID_IWMReaderAdvanced, (void **)&reader_advanced)))
+        return hr;
+
+    for (i = 0; i < ARRAY_SIZE(selections); ++i)
+    {
+        stream_numbers[i] = i + 1;
+        selections[i] = WMT_OFF;
+    }
 
     for (i = 0; i < filter->stream_count; ++i)
     {
@@ -196,7 +208,17 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
             WARN("Failed to set stream %u output format, hr %#lx\n", i, hr);
             continue;
         }
+
+        selections[i] = WMT_ON;
     }
+
+    hr = IWMReaderAdvanced_SetStreamsSelected(reader_advanced, filter->stream_count, stream_numbers, selections);
+    if (FAILED(hr))
+    {
+        WARN("Failed to set stream selection, hr %#lx\n", hr);
+    }
+
+    IWMReaderAdvanced_Release(reader_advanced);
 
     return IWMReader_Start(filter->reader, 0, 0, 1, NULL);
 }
