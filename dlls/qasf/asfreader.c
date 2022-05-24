@@ -150,6 +150,12 @@ static HRESULT buffer_create(IMediaSample *sample, INSSBuffer **out)
     return S_OK;
 }
 
+static struct buffer *unsafe_impl_from_INSSBuffer(INSSBuffer *iface)
+{
+    if (iface->lpVtbl != &buffer_vtbl) return NULL;
+    return impl_from_INSSBuffer(iface);
+}
+
 struct asf_stream
 {
     struct strmbase_source source;
@@ -753,9 +759,45 @@ static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STA
 static HRESULT WINAPI reader_callback_OnSample(IWMReaderCallback *iface, DWORD output, QWORD time,
         QWORD duration, DWORD flags, INSSBuffer *sample, void *context)
 {
-    FIXME("iface %p, output %lu, time %I64u, duration %I64u, flags %#lx, sample %p, context %p stub!\n",
+    struct asf_reader *filter = impl_from_IWMReaderCallback(iface)->filter;
+    REFERENCE_TIME start_time = time, end_time = time + duration;
+    struct asf_stream *stream = filter->streams + output;
+    struct buffer *buffer;
+    IMemInputPin *input;
+    HRESULT hr = S_OK;
+
+    TRACE("iface %p, output %lu, time %I64u, duration %I64u, flags %#lx, sample %p, context %p.\n",
             iface, output, time, duration, flags, sample, context);
-    return E_NOTIMPL;
+
+    EnterCriticalSection(&filter->filter.filter_cs);
+
+    if (!stream->source.pin.peer)
+    {
+        LeaveCriticalSection(&filter->filter.filter_cs);
+        WARN("pin is not connected, discarding %p\n", sample);
+        return S_OK;
+    }
+
+    IMemInputPin_AddRef((input = stream->source.pMemInputPin));
+    LeaveCriticalSection(&filter->filter.filter_cs);
+
+    if (!(buffer = unsafe_impl_from_INSSBuffer(sample)))
+        WARN("unexpected buffer iface %p, discarding\n", sample);
+    else
+    {
+        IMediaSample_SetTime(buffer->sample, &start_time, &end_time);
+        IMediaSample_SetDiscontinuity(buffer->sample, !!(flags & WM_SF_DISCONTINUITY));
+        IMediaSample_SetSyncPoint(buffer->sample, !!(flags & WM_SF_CLEANPOINT));
+        IMediaSample_SetPreroll(buffer->sample, FALSE);
+
+        hr = IMemInputPin_Receive(input, buffer->sample);
+
+        TRACE("Receive returned hr %#lx.\n", hr);
+    }
+
+    IMemInputPin_Release(input);
+
+    return hr;
 }
 
 static const IWMReaderCallbackVtbl reader_callback_vtbl =
