@@ -3422,6 +3422,11 @@ static void test_listen(void)
     ok (ret == 0, "closesocket failed unexpectedly: %d\n", ret);
 }
 
+static void WINAPI apc_func(ULONG_PTR apc_called)
+{
+    *(BOOL *)apc_called = TRUE;
+}
+
 #define FD_ZERO_ALL() { FD_ZERO(&readfds); FD_ZERO(&writefds); FD_ZERO(&exceptfds); }
 #define FD_SET_ALL(s) { FD_SET(s, &readfds); FD_SET(s, &writefds); FD_SET(s, &exceptfds); }
 static void test_select(void)
@@ -3439,6 +3444,7 @@ static void test_select(void)
     DWORD ticks, id, old_protect;
     unsigned int maxfd, i;
     char *page_pair;
+    BOOL apc_called;
 
     fdRead = socket(AF_INET, SOCK_STREAM, 0);
     ok( (fdRead != INVALID_SOCKET), "socket failed unexpectedly: %d\n", WSAGetLastError() );
@@ -3540,14 +3546,24 @@ static void test_select(void)
 
     FD_ZERO(&readfds);
     FD_SET(fdRead, &readfds);
+    apc_called = FALSE;
+    ret = QueueUserAPC(apc_func, GetCurrentThread(), (ULONG_PTR)&apc_called);
+    ok(ret, "QueueUserAPC returned %d\n", ret);
     ret = select(fdRead+1, &readfds, NULL, NULL, &select_timeout);
     ok(!ret, "select returned %d\n", ret);
+    ok(apc_called, "APC was not called\n");
 
     FD_ZERO(&writefds);
     FD_SET(fdWrite, &writefds);
+    apc_called = FALSE;
+    ret = QueueUserAPC(apc_func, GetCurrentThread(), (ULONG_PTR)&apc_called);
+    ok(ret, "QueueUserAPC returned %d\n", ret);
     ret = select(fdWrite+1, NULL, &writefds, NULL, &select_timeout);
     ok(ret == 1, "select returned %d\n", ret);
     ok(FD_ISSET(fdWrite, &writefds), "fdWrite socket is not in the set\n");
+    ok(!apc_called, "APC was called\n");
+    SleepEx(0, TRUE);
+    ok(apc_called, "APC was not called\n");
 
     /* select the same socket twice */
     writefds.fd_count = 2;
