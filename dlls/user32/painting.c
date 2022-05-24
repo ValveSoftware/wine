@@ -1143,6 +1143,9 @@ HDC WINAPI GetWindowDC( HWND hwnd )
  */
 INT WINAPI ReleaseDC( HWND hwnd, HDC hdc )
 {
+    if (hwnd && !WIN_IsCurrentProcess( hwnd ))
+        USER_Driver->pMsgWaitForMultipleObjectsEx( 0, NULL, 0, 0, 0 );
+
     return release_dc( hwnd, hdc, FALSE );
 }
 
