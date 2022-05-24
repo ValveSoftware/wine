@@ -1143,12 +1143,6 @@ HDC WINAPI GetWindowDC( HWND hwnd )
  */
 INT WINAPI ReleaseDC( HWND hwnd, HDC hdc )
 {
-    /*
-     * HACK: If we're releasing a DC for an HWND that belongs to another
-     * process, invalidate the entire window to force a redraw. This helps CEF
-     * applications.
-     */
-    if (hwnd && !WIN_IsCurrentProcess( hwnd )) redraw_window_rects( hwnd, RDW_INVALIDATE, NULL, 0 );
     return release_dc( hwnd, hdc, FALSE );
 }
 
