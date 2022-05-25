@@ -192,18 +192,105 @@ static inline struct session *impl_from_ISpeechContinuousRecognitionSession( ISp
     return CONTAINING_RECORD(iface, struct session, ISpeechContinuousRecognitionSession_iface);
 }
 
+static HRESULT session_find_constraint_by_string(struct session *session, WCHAR *str, HSTRING *hstr_out, ISpeechRecognitionConstraint **out)
+{
+    ISpeechRecognitionListConstraint *list_constraint;
+    IIterable_IInspectable *constraints_iterable;
+    IIterator_IInspectable *constraints_iterator;
+    ISpeechRecognitionConstraint *constraint;
+    IIterable_HSTRING *commands_iterable;
+    IIterator_HSTRING *commands_iterator;
+    BOOL has_constraint, has_command;
+    IVector_HSTRING *commands;
+    const WCHAR *command_str;
+    HSTRING command;
+    HRESULT hr;
+
+    TRACE("session %p, str %s, out %p.\n", session, debugstr_w(str), out);
+
+    if (FAILED(hr = IVector_ISpeechRecognitionConstraint_QueryInterface(session->constraints, &IID_IIterable_ISpeechRecognitionConstraint, (void **)&constraints_iterable)))
+        return hr;
+
+    if (FAILED(hr = IIterable_IInspectable_First(constraints_iterable, &constraints_iterator)))
+    {
+        IIterable_IInspectable_Release(constraints_iterable);
+        return hr;
+    }
+
+    *out = NULL;
+
+    for (hr = IIterator_IInspectable_get_HasCurrent(constraints_iterator, &has_constraint); SUCCEEDED(hr) && has_constraint && !(*out); hr = IIterator_IInspectable_MoveNext(constraints_iterator, &has_constraint))
+    {
+        list_constraint = NULL;
+        commands_iterable = NULL;
+        commands_iterator = NULL;
+        commands = NULL;
+
+        if (FAILED(IIterator_IInspectable_get_Current(constraints_iterator, (IInspectable **)&constraint)))
+            goto skip;
+
+        if (FAILED(ISpeechRecognitionConstraint_QueryInterface(constraint, &IID_ISpeechRecognitionListConstraint, (void**)&list_constraint)))
+            goto skip;
+
+        if (FAILED(ISpeechRecognitionListConstraint_get_Commands(list_constraint, &commands)))
+            goto skip;
+
+        if (FAILED(IVector_HSTRING_QueryInterface(commands, &IID_IIterable_HSTRING, (void **)&commands_iterable)))
+            goto skip;
+
+        if (FAILED(IIterable_HSTRING_First(commands_iterable, &commands_iterator)))
+            goto skip;
+
+        for (hr = IIterator_HSTRING_get_HasCurrent(commands_iterator, &has_command); SUCCEEDED(hr) && has_command && !(*out); hr = IIterator_HSTRING_MoveNext(commands_iterator, &has_command))
+        {
+            if (FAILED(IIterator_HSTRING_get_Current(commands_iterator, &command)))
+                continue;
+
+            command_str = WindowsGetStringRawBuffer(command, NULL);
+
+            TRACE("Comparing str %s to command_str %s.\n", debugstr_w(str), debugstr_w(command_str));
+
+            if (!wcsicmp(str, command_str))
+            {
+                TRACE("constraint %p has str %s.\n", constraint, debugstr_w(str));
+                ISpeechRecognitionConstraint_AddRef((*out = constraint));
+                WindowsDuplicateString(command, hstr_out);
+            }
+
+            WindowsDeleteString(command);
+        }
+
+skip:
+        if (commands_iterator) IIterator_HSTRING_Release(commands_iterator);
+        if (commands_iterable) IIterable_HSTRING_Release(commands_iterable);
+        if (commands) IVector_HSTRING_Release(commands);
+
+        if (list_constraint) ISpeechRecognitionListConstraint_Release(list_constraint);
+        if (constraint) ISpeechRecognitionConstraint_Release(constraint);
+    }
+
+    IIterator_IInspectable_Release(constraints_iterator);
+    IIterable_IInspectable_Release(constraints_iterable);
+
+    hr = (*out) ? S_OK : COR_E_KEYNOTFOUND;
+    return hr;
+}
+
 static DWORD CALLBACK session_worker_thread_cb( void *args )
 {
     ISpeechContinuousRecognitionSession *iface = args;
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
     struct speech_get_recognition_result_params recognition_result_params;
     struct speech_recognize_audio_params recognize_audio_params;
+    ISpeechRecognitionConstraint *constraint;
     BOOLEAN running = TRUE, paused = FALSE;
     UINT32 frame_count, tmp_buf_size;
     BYTE *audio_buf, *tmp_buf;
+    WCHAR *recognized_text;
     DWORD flags, status;
     NTSTATUS nt_status;
     HANDLE events[2];
+    HSTRING hstring;
     HRESULT hr;
 
     SetThreadDescription(GetCurrentThread(), L"wine_speech_recognition_session_worker");
@@ -253,6 +340,7 @@ static DWORD CALLBACK session_worker_thread_cb( void *args )
         {
             SIZE_T packet_size = 0, tmp_buf_offset = 0;
             UINT32 frames_available = 0;
+            INT recognized_text_len = 0;
 
             while (tmp_buf_offset < tmp_buf_size
                    && IAudioCaptureClient_GetBuffer(impl->capture_client, &audio_buf, &frames_available, &flags, NULL, NULL) == S_OK)
@@ -300,8 +388,33 @@ static DWORD CALLBACK session_worker_thread_cb( void *args )
                 break;
             }
 
-            /* TODO: Compare recognized text to available options. */
+            /* Silence was recognized. */
+            if (!strcmp(recognition_result_params.result_buf, ""))
+            {
+                free(recognition_result_params.result_buf);
+                continue;
+            }
 
+            recognized_text_len = MultiByteToWideChar(CP_UTF8, 0, recognition_result_params.result_buf, -1, NULL, 0);
+
+            if (!(recognized_text = malloc(recognized_text_len * sizeof(WCHAR))))
+            {
+                free(recognition_result_params.result_buf);
+                WARN("memory allocation failed.\n");
+                break;
+            }
+
+            MultiByteToWideChar(CP_UTF8, 0, recognition_result_params.result_buf, -1, recognized_text, recognized_text_len);
+
+            if (SUCCEEDED(hr = session_find_constraint_by_string(impl, recognized_text, &hstring, &constraint)))
+            {
+                /* TODO: Send event. */
+
+                WindowsDeleteString(hstring);
+                ISpeechRecognitionConstraint_Release(constraint);
+            }
+
+            free(recognized_text);
             free(recognition_result_params.result_buf);
         }
         else
