@@ -157,6 +157,57 @@ DECLARE_CRITICAL_SECTION(cs_socket_list);
 static SOCKET *socket_list;
 static unsigned int socket_list_size;
 
+struct io_buf
+{
+    struct io_buf *next;
+    IO_STATUS_BLOCK io;
+};
+static struct io_buf *io_freelist;
+
+static IO_STATUS_BLOCK *alloc_io(void)
+{
+    struct io_buf *io, *ret, *next;
+
+    if (!(io = InterlockedExchangePointer( (void **)&io_freelist, NULL )))
+    {
+        if (!(io = malloc(sizeof(*io))))
+        {
+            ERR( "No memory.\n" );
+            return NULL;
+        }
+        return &io->io;
+    }
+
+    ret = io;
+    next = io->next;
+    if (next && InterlockedCompareExchangePointer( (void **)&io_freelist, next, NULL ))
+    {
+        while ((io = next))
+        {
+            next = io->next;
+            free( io );
+        }
+    }
+    return &ret->io;
+}
+
+static void free_io(IO_STATUS_BLOCK *io_data)
+{
+    struct io_buf *io, *next;
+
+    if (!io_data) return;
+
+    io = CONTAINING_RECORD(io_data, struct io_buf, io);
+
+    while (1)
+    {
+        next = io_freelist;
+        io->next = next;
+        if (InterlockedCompareExchangePointer( (void **)&io_freelist, io, next ) == next)
+            return;
+    }
+}
+
 const char *debugstr_sockaddr( const struct sockaddr *a )
 {
     if (!a) return "(nil)";
@@ -2514,7 +2565,7 @@ int WINAPI select( int count, fd_set *read_ptr, fd_set *write_ptr,
     unsigned int poll_count = 0;
     ULONG params_size, i, j;
     SOCKET poll_socket = 0;
-    IO_STATUS_BLOCK io;
+    IO_STATUS_BLOCK *io;
     HANDLE sync_event;
     int ret_count = 0;
     NTSTATUS status;
@@ -2590,7 +2641,8 @@ int WINAPI select( int count, fd_set *read_ptr, fd_set *write_ptr,
 
     assert( params->count == poll_count );
 
-    status = NtDeviceIoControlFile( (HANDLE)poll_socket, sync_event, NULL, NULL, &io,
+    io = alloc_io();
+    status = NtDeviceIoControlFile( (HANDLE)poll_socket, sync_event, NULL, NULL, io,
                                     IOCTL_AFD_POLL, params, params_size, params, params_size );
     if (status == STATUS_PENDING)
     {
@@ -2598,10 +2650,13 @@ int WINAPI select( int count, fd_set *read_ptr, fd_set *write_ptr,
         {
             free( read_input );
             free( params );
+            free_io( io );
             return -1;
         }
-        status = io.u.Status;
+        status = io->u.Status;
     }
+    free_io( io );
+
     if (status == STATUS_TIMEOUT) status = STATUS_SUCCESS;
     if (!status)
     {
