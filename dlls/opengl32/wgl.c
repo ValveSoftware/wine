@@ -454,6 +454,7 @@ INT WINAPI wglChoosePixelFormat(HDC hdc, const PIXELFORMATDESCRIPTOR* ppfd)
     PIXELFORMATDESCRIPTOR format, best;
     int i, count, best_format;
     int bestDBuffer = -1, bestStereo = -1;
+    BYTE cDepthBits;
 
     TRACE_(wgl)( "%p %p: size %u version %u flags %u type %u color %u %u,%u,%u,%u "
                  "accum %u depth %u stencil %u aux %u\n",
@@ -463,6 +464,15 @@ INT WINAPI wglChoosePixelFormat(HDC hdc, const PIXELFORMATDESCRIPTOR* ppfd)
 
     count = wglDescribePixelFormat( hdc, 0, 0, NULL );
     if (!count) return 0;
+
+    cDepthBits = ppfd->cDepthBits;
+    if (ppfd->dwFlags & PFD_DEPTH_DONTCARE) cDepthBits = 0;
+    else if (ppfd->cStencilBits && cDepthBits <= 16)
+    {
+        /* Even if, e. g., depth 16, stencil 8 is available Window / AMD may return 24x8 (and not 16x0).
+         * Adjust to 24 as 24x8 is universally available and we won't end up without stencil. */
+        cDepthBits = 24;
+    }
 
     best_format = 0;
     best.dwFlags = 0;
@@ -564,10 +574,10 @@ INT WINAPI wglChoosePixelFormat(HDC hdc, const PIXELFORMATDESCRIPTOR* ppfd)
                 continue;
             }
         }
-        if (ppfd->cDepthBits && !(ppfd->dwFlags & PFD_DEPTH_DONTCARE))
+        if (cDepthBits)
         {
-            if (((ppfd->cDepthBits > best.cDepthBits) && (format.cDepthBits > best.cDepthBits)) ||
-                ((format.cDepthBits >= ppfd->cDepthBits) && (format.cDepthBits < best.cDepthBits)))
+            if (((cDepthBits > best.cDepthBits) && (format.cDepthBits > best.cDepthBits)) ||
+                ((format.cDepthBits >= cDepthBits) && (format.cDepthBits < best.cDepthBits)))
                 goto found;
 
             if (best.cDepthBits != format.cDepthBits)

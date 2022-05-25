@@ -342,6 +342,27 @@ static void test_choosepixelformat(void)
     pfd.cDepthBits = 0;
     pfd.cStencilBits = 0;
     pfd.dwFlags &= ~PFD_DEPTH_DONTCARE;
+
+    pfd.cDepthBits = 16;
+    ok( test_pfd(&pfd, &ret_fmt), "depth 16 failed.\n" );
+    ok( ret_fmt.cDepthBits >= 16, "Got unexpected cDepthBits %u.\n", ret_fmt.cDepthBits );
+    pfd.cDepthBits = 0;
+
+    pfd.cDepthBits = 16;
+    pfd.cStencilBits = 8;
+    ok( test_pfd(&pfd, &ret_fmt), "depth 16, stencil 8 failed.\n" );
+    ok( ret_fmt.cDepthBits >= 16, "Got unexpected cDepthBits %u.\n", ret_fmt.cDepthBits );
+    ok( ret_fmt.cStencilBits == 8, "Got unexpected cStencilBits %u.\n", ret_fmt.cStencilBits );
+    pfd.cDepthBits = 0;
+    pfd.cStencilBits = 0;
+
+    pfd.cDepthBits = 8;
+    pfd.cStencilBits = 8;
+    ok( test_pfd(&pfd, &ret_fmt), "depth 8, stencil 8 failed.\n" );
+    ok( ret_fmt.cDepthBits >= 16, "Got unexpected cDepthBits %u.\n", ret_fmt.cDepthBits );
+    ok( ret_fmt.cStencilBits == 8, "Got unexpected cStencilBits %u.\n", ret_fmt.cStencilBits );
+    pfd.cDepthBits = 0;
+    pfd.cStencilBits = 0;
 }
 
 static void WINAPI gl_debug_message_callback(GLenum source, GLenum type, GLuint id, GLenum severity,
