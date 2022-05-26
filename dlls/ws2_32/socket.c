@@ -965,9 +965,9 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
                           struct sockaddr *addr, int *addr_len, OVERLAPPED *overlapped,
                           LPWSAOVERLAPPED_COMPLETION_ROUTINE completion, WSABUF *control )
 {
-    IO_STATUS_BLOCK iosb, *piosb = &iosb;
     struct afd_recvmsg_params params;
     PIO_APC_ROUTINE apc = NULL;
+    IO_STATUS_BLOCK *piosb;
     HANDLE event = NULL;
     void *cvalue = NULL;
     NTSTATUS status;
@@ -984,6 +984,7 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
     }
     else
     {
+        piosb = alloc_io();
         if (!(event = get_sync_event())) return -1;
     }
     piosb->u.Status = STATUS_PENDING;
@@ -1007,11 +1008,17 @@ static int WS2_recv_base( SOCKET s, WSABUF *buffers, DWORD buffer_count, DWORD *
                                     IOCTL_AFD_WINE_RECVMSG, &params, sizeof(params), NULL, 0 );
     if (status == STATUS_PENDING && !overlapped)
     {
-        if (WaitForSingleObject( event, INFINITE ) == WAIT_FAILED)
+        if (wait_event_alertable( event ) == WAIT_FAILED)
+        {
+            if (piosb != (IO_STATUS_BLOCK *)overlapped)
+                free_io( piosb );
             return -1;
+        }
         status = piosb->u.Status;
     }
     if (!status && ret_size) *ret_size = piosb->Information;
+    if (piosb != (IO_STATUS_BLOCK *)overlapped)
+        free_io( piosb );
     SetLastError( NtStatusToWSAError( status ) );
     TRACE( "status %#lx.\n", status );
     return status ? -1 : 0;
