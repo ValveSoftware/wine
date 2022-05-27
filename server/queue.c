@@ -1818,9 +1818,15 @@ static void queue_hardware_message( struct desktop *desktop, struct message *msg
         if (msg->wparam == VK_SHIFT || msg->wparam == VK_LSHIFT || msg->wparam == VK_RSHIFT)
             msg->lparam &= ~(KF_EXTENDED << 16);
     }
-    else if (msg->msg != WM_INPUT && msg->msg != WM_INPUT_DEVICE_CHANGE &&
-             msg->msg != WM_POINTERDOWN && msg->msg != WM_POINTERUP &&
-             msg->msg != WM_POINTERUPDATE)
+    else if (msg->msg == WM_POINTERDOWN || msg->msg == WM_POINTERUP || msg->msg == WM_POINTERUPDATE)
+    {
+        if (IS_POINTER_PRIMARY_WPARAM( msg_data->rawinput.mouse.data ))
+        {
+            prepend_cursor_history( msg->x, msg->y, msg->time, msg_data->info );
+            if (update_desktop_cursor_pos( desktop, msg->x, msg->y )) always_queue = 1;
+        }
+    }
+    else if (msg->msg != WM_INPUT && msg->msg != WM_INPUT_DEVICE_CHANGE)
     {
         if (msg->msg == WM_MOUSEMOVE)
         {
@@ -2284,8 +2290,8 @@ static void queue_touch_input_message( void *private )
     msg->msg       = input->hw.msg;
     msg->wparam    = 0;
     msg->lparam    = input->hw.lparam;
-    msg->x         = desktop->shared->cursor.x;
-    msg->y         = desktop->shared->cursor.y;
+    msg->x         = input->hw.rawinput.mouse.x;
+    msg->y         = input->hw.rawinput.mouse.y;
 
     queue_hardware_message( desktop, msg, 1 );
     touch->timeout = add_timeout_user( -160000, queue_touch_input_message, touch );
@@ -2385,8 +2391,8 @@ static void queue_custom_hardware_message( struct desktop *desktop, user_handle_
     msg->msg       = input->hw.msg;
     msg->wparam    = 0;
     msg->lparam    = input->hw.lparam;
-    msg->x         = desktop->shared->cursor.x;
-    msg->y         = desktop->shared->cursor.y;
+    msg->x         = input->hw.rawinput.mouse.x;
+    msg->y         = input->hw.rawinput.mouse.y;
 
     queue_hardware_message( desktop, msg, 1 );
 }
