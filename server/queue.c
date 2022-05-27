@@ -694,17 +694,48 @@ static inline unsigned int get_unique_id(void)
     return id;
 }
 
+static int merge_pointer_update_message( struct thread_input *input, const struct message *msg )
+{
+    struct hardware_msg_data *prev_data, *msg_data = msg->data;
+    struct message *prev;
+    struct list *ptr;
+
+    for (ptr = list_tail( &input->msg_list ); ptr; ptr = list_prev( &input->msg_list, ptr ))
+    {
+        prev = LIST_ENTRY( ptr, struct message, entry );
+        if (prev->msg != WM_POINTERUPDATE || !(prev_data = prev->data)) continue;
+        if (LOWORD(prev_data->rawinput.mouse.data) == LOWORD(msg_data->rawinput.mouse.data)) break;
+    }
+    if (!ptr) return 0;
+    if (prev->result) return 0;
+    if (prev->win && msg->win && prev->win != msg->win) return 0;
+    if (prev->type != msg->type) return 0;
+    /* now we can merge it */
+    prev->wparam  = msg->wparam;
+    prev->lparam  = msg->lparam;
+    prev->x       = msg->x;
+    prev->y       = msg->y;
+    prev->time    = msg->time;
+    prev_data->rawinput.mouse.data |= msg_data->rawinput.mouse.data;
+    prev_data->rawinput.mouse.x = msg_data->rawinput.mouse.x;
+    prev_data->rawinput.mouse.y = msg_data->rawinput.mouse.y;
+    list_remove( ptr );
+    list_add_tail( &input->msg_list, ptr );
+    return 1;
+}
+
 /* try to merge a message with the last in the list; return 1 if successful */
 static int merge_message( struct thread_input *input, const struct message *msg )
 {
     struct message *prev;
     struct list *ptr;
 
+    if (msg->msg == WM_POINTERUPDATE) return merge_pointer_update_message( input, msg );
     if (msg->msg != WM_MOUSEMOVE) return 0;
     for (ptr = list_tail( &input->msg_list ); ptr; ptr = list_prev( &input->msg_list, ptr ))
     {
         prev = LIST_ENTRY( ptr, struct message, entry );
-        if (prev->msg != WM_INPUT) break;
+        if (prev->msg != WM_INPUT && prev->msg != WM_POINTERUPDATE) break;
     }
     if (!ptr) return 0;
     if (prev->result) return 0;
