@@ -2228,8 +2228,8 @@ static BOOL X11DRV_RawTouchEvent( XGenericEventCookie *xev )
     {
         static const char *sgi;
         if (!sgi && !(sgi = getenv( "SteamGameId" ))) return TRUE;
-        if (strcmp( sgi, "288160" /* The Room */ )) return TRUE;
-        if (strcmp( sgi, "1761390" /* Hatsune Miku */ )) return TRUE;
+        if (strcmp( sgi, "288160" /* The Room */ ) &&
+            strcmp( sgi, "1761390" /* Hatsune Miku */ )) return TRUE;
     }
 
     input.type             = INPUT_MOUSE;
