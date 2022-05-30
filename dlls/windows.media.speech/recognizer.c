@@ -30,6 +30,116 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(speech);
 
+struct semantic_interpretation
+{
+    ISpeechRecognitionSemanticInterpretation ISpeechRecognitionSemanticInterpretation_iface;
+    LONG ref;
+};
+
+static inline struct semantic_interpretation *impl_from_ISpeechRecognitionSemanticInterpretation( ISpeechRecognitionSemanticInterpretation *iface )
+{
+    return CONTAINING_RECORD(iface, struct semantic_interpretation, ISpeechRecognitionSemanticInterpretation_iface);
+}
+
+HRESULT WINAPI semantic_interpretation_QueryInterface( ISpeechRecognitionSemanticInterpretation *iface, REFIID iid, void **out )
+{
+    struct semantic_interpretation *impl = impl_from_ISpeechRecognitionSemanticInterpretation(iface);
+
+    TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
+
+    if (IsEqualGUID(iid, &IID_IUnknown) ||
+        IsEqualGUID(iid, &IID_IInspectable) ||
+        IsEqualGUID(iid, &IID_ISpeechRecognitionSemanticInterpretation))
+    {
+        IInspectable_AddRef((*out = &impl->ISpeechRecognitionSemanticInterpretation_iface));
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI semantic_interpretation_AddRef( ISpeechRecognitionSemanticInterpretation *iface )
+{
+    struct semantic_interpretation *impl = impl_from_ISpeechRecognitionSemanticInterpretation(iface);
+    ULONG ref = InterlockedIncrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+    return ref;
+}
+
+ULONG WINAPI semantic_interpretation_Release( ISpeechRecognitionSemanticInterpretation *iface )
+{
+    struct semantic_interpretation *impl = impl_from_ISpeechRecognitionSemanticInterpretation(iface);
+
+    ULONG ref = InterlockedDecrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+
+    if(!ref)
+        free(impl);
+
+    return ref;
+}
+
+HRESULT WINAPI semantic_interpretation_GetIids( ISpeechRecognitionSemanticInterpretation *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI semantic_interpretation_GetRuntimeClassName( ISpeechRecognitionSemanticInterpretation *iface, HSTRING *class_name )
+{
+    FIXME("iface %p, class_name %p stub!\n", iface, class_name);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI semantic_interpretation_GetTrustLevel( ISpeechRecognitionSemanticInterpretation *iface, TrustLevel *trust_level )
+{
+    FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI semantic_interpretation_get_Properties( ISpeechRecognitionSemanticInterpretation *iface, IMapView_HSTRING_IVectorView_HSTRING **value )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static const struct ISpeechRecognitionSemanticInterpretationVtbl semantic_interpretation_vtbl =
+{
+    /* IUnknown methods */
+    semantic_interpretation_QueryInterface,
+    semantic_interpretation_AddRef,
+    semantic_interpretation_Release,
+    /* IInspectable methods */
+    semantic_interpretation_GetIids,
+    semantic_interpretation_GetRuntimeClassName,
+    semantic_interpretation_GetTrustLevel,
+    /* ISpeechRecognitionSemanticInterpretation methods */
+    semantic_interpretation_get_Properties
+};
+
+
+static HRESULT semantic_interpretation_create( ISpeechRecognitionSemanticInterpretation **out )
+{
+    struct semantic_interpretation *impl;
+
+    TRACE("out %p.\n", out);
+
+    if (!(impl = calloc(1, sizeof(*impl))))
+    {
+        *out = NULL;
+        return E_OUTOFMEMORY;
+    }
+
+    impl->ISpeechRecognitionSemanticInterpretation_iface.lpVtbl = &semantic_interpretation_vtbl;
+    impl->ref = 1;
+
+    *out = &impl->ISpeechRecognitionSemanticInterpretation_iface;
+    TRACE("created %p\n", *out);
+    return S_OK;
+}
+
 struct recognition_result
 {
     ISpeechRecognitionResult ISpeechRecognitionResult_iface;
@@ -139,7 +249,7 @@ static HRESULT WINAPI recognition_result_get_SemanticInterpretation( ISpeechReco
                                                                      ISpeechRecognitionSemanticInterpretation **value )
 {
     FIXME("iface %p, operation %p stub!\n", iface, value);
-    return E_NOTIMPL;
+    return semantic_interpretation_create(value);
 }
 
 static HRESULT WINAPI recognition_result_GetAlternates( ISpeechRecognitionResult *iface,
