@@ -30,6 +30,372 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(speech);
 
+static const char *debugstr_hstring(HSTRING hstr)
+{
+    const WCHAR *str;
+    UINT32 len;
+    if (hstr && !((ULONG_PTR)hstr >> 16)) return "(invalid)";
+    str = WindowsGetStringRawBuffer(hstr, &len);
+    return wine_dbgstr_wn(str, len);
+}
+
+struct recognition_result
+{
+    ISpeechRecognitionResult ISpeechRecognitionResult_iface;
+    ISpeechRecognitionResult2 ISpeechRecognitionResult2_iface;
+    LONG ref;
+
+    ISpeechRecognitionConstraint *constraint;
+    HSTRING text;
+};
+
+static inline struct recognition_result *impl_from_ISpeechRecognitionResult( ISpeechRecognitionResult *iface )
+{
+    return CONTAINING_RECORD(iface, struct recognition_result, ISpeechRecognitionResult_iface);
+}
+
+static HRESULT WINAPI recognition_result_QueryInterface( ISpeechRecognitionResult *iface, REFIID iid, void **out )
+{
+    struct recognition_result *impl = impl_from_ISpeechRecognitionResult(iface);
+
+    TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
+
+    if (IsEqualGUID(iid, &IID_IUnknown) ||
+        IsEqualGUID(iid, &IID_IInspectable) ||
+        IsEqualGUID(iid, &IID_IAgileObject) ||
+        IsEqualGUID(iid, &IID_ISpeechRecognitionResult))
+    {
+        IInspectable_AddRef((*out = &impl->ISpeechRecognitionResult_iface));
+        return S_OK;
+    }
+
+    if (IsEqualGUID(iid, &IID_ISpeechRecognitionResult2))
+    {
+        IInspectable_AddRef((*out = &impl->ISpeechRecognitionResult2_iface));
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI recognition_result_AddRef( ISpeechRecognitionResult *iface )
+{
+    struct recognition_result *impl = impl_from_ISpeechRecognitionResult(iface);
+    ULONG ref = InterlockedIncrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+    return ref;
+}
+
+static ULONG WINAPI recognition_result_Release( ISpeechRecognitionResult *iface )
+{
+    struct recognition_result *impl = impl_from_ISpeechRecognitionResult(iface);
+
+    ULONG ref = InterlockedDecrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+
+    if(!ref)
+    {
+        ISpeechRecognitionConstraint_Release(impl->constraint);
+        WindowsDeleteString(impl->text);
+        free(impl);
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI recognition_result_GetIids( ISpeechRecognitionResult *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_GetRuntimeClassName( ISpeechRecognitionResult *iface, HSTRING *class_name )
+{
+    FIXME("iface %p, class_name %p stub!\n", iface, class_name);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_GetTrustLevel( ISpeechRecognitionResult *iface, TrustLevel *trust_level )
+{
+    FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_get_Status( ISpeechRecognitionResult *iface, SpeechRecognitionResultStatus *value )
+{
+    FIXME("iface %p, operation %p stub!\n", iface, value);
+    *value = SpeechRecognitionResultStatus_Success;
+    return S_OK;
+}
+
+static HRESULT WINAPI recognition_result_get_Text( ISpeechRecognitionResult *iface, HSTRING *value )
+{
+    struct recognition_result *impl = impl_from_ISpeechRecognitionResult(iface);
+    TRACE("iface %p, operation %p, text: %s.\n", iface, value, debugstr_hstring(impl->text));
+    return WindowsDuplicateString(impl->text, value);
+}
+
+static HRESULT WINAPI recognition_result_get_Confidence( ISpeechRecognitionResult *iface, SpeechRecognitionConfidence *value )
+{
+    FIXME("iface %p, operation %p semi stub!\n", iface, value);
+    *value = SpeechRecognitionConfidence_High;
+    return S_OK;
+}
+
+static HRESULT WINAPI recognition_result_get_SemanticInterpretation( ISpeechRecognitionResult *iface,
+                                                                     ISpeechRecognitionSemanticInterpretation **value )
+{
+    FIXME("iface %p, operation %p stub!\n", iface, value);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_GetAlternates( ISpeechRecognitionResult *iface,
+                                                        UINT32 max_amount,
+                                                        IVectorView_SpeechRecognitionResult **results )
+{
+    IVector_IInspectable *vector;
+    struct vector_iids constraints_iids =
+    {
+        .iterable = &IID_IVectorView_SpeechRecognitionResult,
+        .iterator = &IID_IVectorView_SpeechRecognitionResult,
+        .vector = &IID_IVector_IInspectable,
+        .view = &IID_IVectorView_SpeechRecognitionResult,
+    };
+
+    FIXME("iface %p, max_amount %u, results %p stub!\n", iface, max_amount, results);
+
+    vector_inspectable_create(&constraints_iids, (IVector_IInspectable **)&vector);
+    IVector_IInspectable_GetView(vector, (IVectorView_IInspectable **)results);
+    IVector_IInspectable_Release(vector);
+    return S_OK;
+}
+
+static HRESULT WINAPI recognition_result_get_Constraint( ISpeechRecognitionResult *iface, ISpeechRecognitionConstraint **value )
+{
+    struct recognition_result *impl = impl_from_ISpeechRecognitionResult(iface);
+    TRACE("iface %p, operation %p.\n", iface, value);
+    ISpeechRecognitionConstraint_AddRef((*value = impl->constraint));
+    return S_OK;
+}
+
+static HRESULT WINAPI recognition_result_get_RulePath( ISpeechRecognitionResult *iface, IVectorView_HSTRING **value )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_get_RawConfidence( ISpeechRecognitionResult *iface, DOUBLE *value )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static const struct ISpeechRecognitionResultVtbl recognition_result_vtbl =
+{
+    /* IUnknown methods */
+    recognition_result_QueryInterface,
+    recognition_result_AddRef,
+    recognition_result_Release,
+    /* IInspectable methods */
+    recognition_result_GetIids,
+    recognition_result_GetRuntimeClassName,
+    recognition_result_GetTrustLevel,
+    /* ISpeechRecognitionResult methods */
+    recognition_result_get_Status,
+    recognition_result_get_Text,
+    recognition_result_get_Confidence,
+    recognition_result_get_SemanticInterpretation,
+    recognition_result_GetAlternates,
+    recognition_result_get_Constraint,
+    recognition_result_get_RulePath,
+    recognition_result_get_RawConfidence
+};
+
+DEFINE_IINSPECTABLE(recognition_result2, ISpeechRecognitionResult2, struct recognition_result, ISpeechRecognitionResult_iface)
+
+static HRESULT WINAPI recognition_result2_get_PhraseStartTime( ISpeechRecognitionResult2 *iface, DateTime *value )
+{
+    DateTime dt = { .UniversalTime = 0 };
+    FIXME("iface %p, value %p stub!\n", iface, value);
+    *value = dt;
+    return S_OK;
+}
+
+
+static HRESULT WINAPI recognition_result2_get_PhraseDuration( ISpeechRecognitionResult2 *iface, TimeSpan *value )
+{
+    TimeSpan ts = { .Duration = 50000000LL }; /* Use 5 seconds as stub value. */
+    FIXME("iface %p, value %p stub!\n", iface, value);
+    *value = ts;
+    return S_OK;
+}
+
+static const struct ISpeechRecognitionResult2Vtbl recognition_result2_vtbl =
+{
+    /* IUnknown methods */
+    recognition_result2_QueryInterface,
+    recognition_result2_AddRef,
+    recognition_result2_Release,
+    /* IInspectable methods */
+    recognition_result2_GetIids,
+    recognition_result2_GetRuntimeClassName,
+    recognition_result2_GetTrustLevel,
+    /* ISpeechRecognitionResult2 methods */
+    recognition_result2_get_PhraseStartTime,
+    recognition_result2_get_PhraseDuration
+};
+
+static HRESULT WINAPI recognition_result_create( ISpeechRecognitionConstraint *constraint,
+                                                 HSTRING result_text,
+                                                 ISpeechRecognitionResult **out )
+{
+    struct recognition_result *impl;
+
+    TRACE("out %p.\n", out);
+
+    if (!(impl = calloc(1, sizeof(*impl))))
+    {
+        *out = NULL;
+        return E_OUTOFMEMORY;
+    }
+
+    impl->ISpeechRecognitionResult_iface.lpVtbl = &recognition_result_vtbl;
+    impl->ISpeechRecognitionResult2_iface.lpVtbl = &recognition_result2_vtbl;
+    impl->ref = 1;
+
+    if (constraint) ISpeechRecognitionConstraint_AddRef((impl->constraint = constraint));
+    WindowsDuplicateString(result_text, &impl->text);
+
+    *out = &impl->ISpeechRecognitionResult_iface;
+
+    TRACE("created %p.\n", *out);
+
+    return S_OK;
+}
+
+struct recognition_result_event_args
+{
+    ISpeechContinuousRecognitionResultGeneratedEventArgs ISpeechContinuousRecognitionResultGeneratedEventArgs_iface;
+    LONG ref;
+
+    ISpeechRecognitionResult *result;
+};
+
+static inline struct recognition_result_event_args *impl_from_ISpeechContinuousRecognitionResultGeneratedEventArgs( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface )
+{
+    return CONTAINING_RECORD(iface, struct recognition_result_event_args, ISpeechContinuousRecognitionResultGeneratedEventArgs_iface);
+}
+
+static HRESULT WINAPI recognition_result_event_args_QueryInterface( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface, REFIID iid, void **out )
+{
+    struct recognition_result_event_args *impl = impl_from_ISpeechContinuousRecognitionResultGeneratedEventArgs(iface);
+
+    TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
+
+    if (IsEqualGUID(iid, &IID_IUnknown) ||
+        IsEqualGUID(iid, &IID_IInspectable) ||
+        IsEqualGUID(iid, &IID_IAgileObject) ||
+        IsEqualGUID(iid, &IID_ISpeechContinuousRecognitionResultGeneratedEventArgs))
+    {
+        IInspectable_AddRef((*out = &impl->ISpeechContinuousRecognitionResultGeneratedEventArgs_iface));
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI recognition_result_event_args_AddRef( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface )
+{
+    struct recognition_result_event_args *impl = impl_from_ISpeechContinuousRecognitionResultGeneratedEventArgs(iface);
+    ULONG ref = InterlockedIncrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+    return ref;
+}
+
+static ULONG WINAPI recognition_result_event_args_Release( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface )
+{
+    struct recognition_result_event_args *impl = impl_from_ISpeechContinuousRecognitionResultGeneratedEventArgs(iface);
+
+    ULONG ref = InterlockedDecrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+
+    if (!ref)
+    {
+        if (impl->result) ISpeechRecognitionResult_Release(impl->result);
+        free(impl);
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI recognition_result_event_args_GetIids( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_event_args_GetRuntimeClassName( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface, HSTRING *class_name )
+{
+    FIXME("iface %p, class_name %p stub!\n", iface, class_name);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_event_args_GetTrustLevel( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface, TrustLevel *trust_level )
+{
+    FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI recognition_result_event_args_get_Result( ISpeechContinuousRecognitionResultGeneratedEventArgs *iface,
+                                                                ISpeechRecognitionResult **value )
+{
+    struct recognition_result_event_args *impl = impl_from_ISpeechContinuousRecognitionResultGeneratedEventArgs(iface);
+    FIXME("iface %p value %p stub!\n", iface, value);
+    ISpeechRecognitionResult_AddRef((*value = impl->result));
+    return S_OK;
+}
+
+static const struct ISpeechContinuousRecognitionResultGeneratedEventArgsVtbl recognition_result_event_args_vtbl =
+{
+    /* IUnknown methods */
+    recognition_result_event_args_QueryInterface,
+    recognition_result_event_args_AddRef,
+    recognition_result_event_args_Release,
+    /* IInspectable methods */
+    recognition_result_event_args_GetIids,
+    recognition_result_event_args_GetRuntimeClassName,
+    recognition_result_event_args_GetTrustLevel,
+    /* ISpeechContinuousRecognitionResultGeneratedEventArgs methods */
+    recognition_result_event_args_get_Result
+};
+
+static HRESULT WINAPI recognition_result_event_args_create( ISpeechRecognitionResult *result,
+                                                            ISpeechContinuousRecognitionResultGeneratedEventArgs **out )
+{
+    struct recognition_result_event_args *impl;
+
+    TRACE("out %p.\n", out);
+
+    if (!(impl = calloc(1, sizeof(*impl))))
+    {
+        *out = NULL;
+        return E_OUTOFMEMORY;
+    }
+
+    impl->ISpeechContinuousRecognitionResultGeneratedEventArgs_iface.lpVtbl = &recognition_result_event_args_vtbl;
+    impl->ref = 1;
+    if (result) ISpeechRecognitionResult_AddRef((impl->result = result));
+
+    *out = &impl->ISpeechContinuousRecognitionResultGeneratedEventArgs_iface;
+
+    TRACE("created %p.\n", *out);
+    return S_OK;
+}
+
 /*
  *
  * ISpeechRecognitionCompilationResult
@@ -282,7 +648,9 @@ static DWORD CALLBACK session_worker_thread_cb( void *args )
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
     struct speech_get_recognition_result_params recognition_result_params;
     struct speech_recognize_audio_params recognize_audio_params;
+    ISpeechContinuousRecognitionResultGeneratedEventArgs *event_args;
     ISpeechRecognitionConstraint *constraint;
+    ISpeechRecognitionResult *result;
     BOOLEAN running = TRUE, paused = FALSE;
     UINT32 frame_count, tmp_buf_size;
     BYTE *audio_buf, *tmp_buf;
@@ -408,8 +776,15 @@ static DWORD CALLBACK session_worker_thread_cb( void *args )
 
             if (SUCCEEDED(hr = session_find_constraint_by_string(impl, recognized_text, &hstring, &constraint)))
             {
-                /* TODO: Send event. */
+                recognition_result_create(constraint, hstring, &result);
+                recognition_result_event_args_create(result, &event_args);
 
+                typed_event_handlers_notify(&impl->result_handlers,
+                                            (IInspectable *)&impl->ISpeechContinuousRecognitionSession_iface,
+                                            (IInspectable *)event_args);
+
+                ISpeechContinuousRecognitionResultGeneratedEventArgs_Release(event_args);
+                ISpeechRecognitionResult_Release(result);
                 WindowsDeleteString(hstring);
                 ISpeechRecognitionConstraint_Release(constraint);
             }
