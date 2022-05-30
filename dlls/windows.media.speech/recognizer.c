@@ -39,6 +39,138 @@ static const char *debugstr_hstring(HSTRING hstr)
     return wine_dbgstr_wn(str, len);
 }
 
+struct map_view_hstring_vector_view_hstring
+{
+    IMapView_HSTRING_IVectorView_HSTRING IMapView_HSTRING_IVectorView_HSTRING_iface;
+    LONG ref;
+};
+
+static inline struct map_view_hstring_vector_view_hstring *impl_from_IMapView_HSTRING_IVectorView_HSTRING( IMapView_HSTRING_IVectorView_HSTRING *iface )
+{
+    return CONTAINING_RECORD(iface, struct map_view_hstring_vector_view_hstring, IMapView_HSTRING_IVectorView_HSTRING_iface);
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_QueryInterface( IMapView_HSTRING_IVectorView_HSTRING *iface, REFIID iid, void **out )
+{
+    struct map_view_hstring_vector_view_hstring *impl = impl_from_IMapView_HSTRING_IVectorView_HSTRING(iface);
+
+    TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
+
+    if (IsEqualGUID(iid, &IID_IUnknown) ||
+        IsEqualGUID(iid, &IID_IInspectable) ||
+        IsEqualGUID(iid, &IID_IMapView_HSTRING_IVectorView_HSTRING))
+    {
+        IInspectable_AddRef((*out = &impl->IMapView_HSTRING_IVectorView_HSTRING_iface));
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+    *out = NULL;
+    return E_NOINTERFACE;
+}
+
+ULONG WINAPI map_view_hstring_vector_view_hstring_AddRef( IMapView_HSTRING_IVectorView_HSTRING *iface )
+{
+    struct map_view_hstring_vector_view_hstring *impl = impl_from_IMapView_HSTRING_IVectorView_HSTRING(iface);
+    ULONG ref = InterlockedIncrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+    return ref;
+}
+
+ULONG WINAPI map_view_hstring_vector_view_hstring_Release( IMapView_HSTRING_IVectorView_HSTRING *iface )
+{
+    struct map_view_hstring_vector_view_hstring *impl = impl_from_IMapView_HSTRING_IVectorView_HSTRING(iface);
+
+    ULONG ref = InterlockedDecrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+
+    if(!ref)
+        free(impl);
+
+    return ref;
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_GetIids( IMapView_HSTRING_IVectorView_HSTRING *iface, ULONG *iidCount, IID **iids )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_GetRuntimeClassName( IMapView_HSTRING_IVectorView_HSTRING *iface, HSTRING *className )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_GetTrustLevel( IMapView_HSTRING_IVectorView_HSTRING *iface, TrustLevel *trustLevel )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_Lookup( IMapView_HSTRING_IVectorView_HSTRING *iface, HSTRING key, IVectorView_HSTRING **value )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_get_Size( IMapView_HSTRING_IVectorView_HSTRING *iface, unsigned int *size )
+{
+    FIXME("iface %p stub!\n", iface);
+    *size = 0;
+    return S_OK;
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_HasKey( IMapView_HSTRING_IVectorView_HSTRING *iface, HSTRING key, boolean *found )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI map_view_hstring_vector_view_hstring_Split( IMapView_HSTRING_IVectorView_HSTRING *iface, IMapView_HSTRING_IVectorView_HSTRING **first, IMapView_HSTRING_IVectorView_HSTRING **second )
+{
+    FIXME("iface %p stub!\n", iface);
+    return E_NOTIMPL;
+}
+
+static const struct IMapView_HSTRING_IVectorView_HSTRINGVtbl map_view_hstring_vector_view_hstring_vtbl =
+{
+    /* IUnknown methods */
+    map_view_hstring_vector_view_hstring_QueryInterface,
+    map_view_hstring_vector_view_hstring_AddRef,
+    map_view_hstring_vector_view_hstring_Release,
+    /* IInspectable methods */
+    map_view_hstring_vector_view_hstring_GetIids,
+    map_view_hstring_vector_view_hstring_GetRuntimeClassName,
+    map_view_hstring_vector_view_hstring_GetTrustLevel,
+    /* IMapView<HSTRING,IVectorView<HSTRING >* > methods */
+    map_view_hstring_vector_view_hstring_Lookup,
+    map_view_hstring_vector_view_hstring_get_Size,
+    map_view_hstring_vector_view_hstring_HasKey,
+    map_view_hstring_vector_view_hstring_Split
+};
+
+
+static HRESULT map_view_hstring_vector_view_hstring_create( IMapView_HSTRING_IVectorView_HSTRING **out )
+{
+    struct map_view_hstring_vector_view_hstring *impl;
+
+    TRACE("out %p.\n", out);
+
+    if (!(impl = calloc(1, sizeof(*impl))))
+    {
+        *out = NULL;
+        return E_OUTOFMEMORY;
+    }
+
+    impl->IMapView_HSTRING_IVectorView_HSTRING_iface.lpVtbl = &map_view_hstring_vector_view_hstring_vtbl;
+    impl->ref = 1;
+
+    *out = &impl->IMapView_HSTRING_IVectorView_HSTRING_iface;
+    TRACE("created %p\n", *out);
+    return S_OK;
+}
+
 struct semantic_interpretation
 {
     ISpeechRecognitionSemanticInterpretation ISpeechRecognitionSemanticInterpretation_iface;
@@ -111,7 +243,7 @@ HRESULT WINAPI semantic_interpretation_GetTrustLevel( ISpeechRecognitionSemantic
 HRESULT WINAPI semantic_interpretation_get_Properties( ISpeechRecognitionSemanticInterpretation *iface, IMapView_HSTRING_IVectorView_HSTRING **value )
 {
     FIXME("iface %p stub!\n", iface);
-    return E_NOTIMPL;
+    return map_view_hstring_vector_view_hstring_create(value);
 }
 
 static const struct ISpeechRecognitionSemanticInterpretationVtbl semantic_interpretation_vtbl =
