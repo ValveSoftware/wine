@@ -818,7 +818,8 @@ done:
 
 VK_DEFINE_NON_DISPATCHABLE_HANDLE(VkDisplayKHR)
 
-static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProviderInfo *provider_info )
+static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProviderInfo *provider_info,
+                                            struct gdi_gpu *prev_gpus, int prev_gpu_count )
 {
     static const char *extensions[] =
     {
@@ -833,7 +834,7 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
     VkResult (*pvkGetRandROutputDisplayEXT)( VkPhysicalDevice, Display *, RROutput, VkDisplayKHR * );
     PFN_vkGetPhysicalDeviceProperties2KHR pvkGetPhysicalDeviceProperties2KHR;
     PFN_vkEnumeratePhysicalDevices pvkEnumeratePhysicalDevices;
-    uint32_t device_count, device_idx, output_idx;
+    uint32_t device_count, device_idx, output_idx, i;
     VkPhysicalDevice *vk_physical_devices = NULL;
     VkPhysicalDeviceProperties2 properties2;
     VkInstanceCreateInfo create_info;
@@ -887,6 +888,8 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
         goto done;
     }
 
+    TRACE("provider name %s.\n", debugstr_a(provider_info->name));
+
     for (device_idx = 0; device_idx < device_count; ++device_idx)
     {
         for (output_idx = 0; output_idx < provider_info->noutputs; ++output_idx)
@@ -904,7 +907,19 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
             properties2.pNext = &id;
 
             pvkGetPhysicalDeviceProperties2KHR( vk_physical_devices[device_idx], &properties2 );
+            for (i = 0; i < prev_gpu_count; ++i)
+            {
+                if (!memcmp( &prev_gpus[i].vulkan_uuid, &id.deviceUUID, sizeof(id.deviceUUID) ))
+                {
+                    WARN( "device UUID %#x:%#x already assigned to GPU %u.\n", *((uint32_t *)id.deviceUUID + 1),
+                          *(uint32_t *)id.deviceUUID, i );
+                    break;
+                }
+            }
+            if (i < prev_gpu_count) continue;
+
             memcpy( &gpu->vulkan_uuid, id.deviceUUID, sizeof(id.deviceUUID) );
+
             /* Ignore Khronos vendor IDs */
             if (properties2.properties.vendorID < 0x10000)
             {
@@ -986,7 +1001,7 @@ static BOOL xrandr14_get_gpus2( struct gdi_gpu **new_gpus, int *count, BOOL get_
         gpus[i].id = provider_resources->providers[i];
         if (get_properties)
         {
-            if (!get_gpu_properties_from_vulkan( &gpus[i], provider_info ))
+            if (!get_gpu_properties_from_vulkan( &gpus[i], provider_info, gpus, i ))
                 MultiByteToWideChar( CP_UTF8, 0, provider_info->name, -1, gpus[i].name, ARRAY_SIZE(gpus[i].name) );
             /* FIXME: Add an alternate method of getting PCI IDs, for systems that don't support Vulkan */
         }
