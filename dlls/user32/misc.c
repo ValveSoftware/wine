@@ -444,24 +444,6 @@ BOOL WINAPI UnregisterPowerSettingNotification(HPOWERNOTIFY handle)
 }
 
 /**********************************************************************
- * RegisterSuspendResumeNotification (USER32.@)
- */
-HPOWERNOTIFY WINAPI RegisterSuspendResumeNotification(HANDLE recipient, DWORD flags)
-{
-    FIXME("%p, %#x: stub.\n", recipient, flags);
-    return (HPOWERNOTIFY)0xdeadbeef;
-}
-
-/**********************************************************************
- * UnregisterSuspendResumeNotification (USER32.@)
- */
-BOOL WINAPI UnregisterSuspendResumeNotification(HPOWERNOTIFY handle)
-{
-    FIXME("%p: stub.\n", handle);
-    return TRUE;
-}
-
-/**********************************************************************
  * IsWindowRedirectedForPrint [USER32.@]
  */
 BOOL WINAPI IsWindowRedirectedForPrint( HWND hwnd )
