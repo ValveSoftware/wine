@@ -2685,6 +2685,12 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
         return S_OK;
     }
 
+    if(!ctx->global) {
+        FIXME("Script is not initialized?\n");
+        IDispatchEx_Release((IDispatchEx*)proxy);
+        return E_UNEXPECTED;
+    }
+
     hres = get_proxy_default_prototype(ctx, proxy, &prot);
     if(FAILED(hres))
         goto fail;
