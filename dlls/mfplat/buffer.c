@@ -82,6 +82,9 @@ static HRESULT copy_image(const struct buffer *buffer, BYTE *dest, LONG dest_str
 {
     HRESULT hr = S_OK;
 
+    if (width > abs(dest_stride) || abs(dest_stride) * lines > dest_size)
+        return E_NOT_SUFFICIENT_BUFFER;
+
     hr = MFCopyImage(dest, dest_stride, src, src_stride, width, lines);
 
     if (SUCCEEDED(hr) && buffer->_2d.copy_image)
@@ -97,18 +100,27 @@ static HRESULT copy_image(const struct buffer *buffer, BYTE *dest, LONG dest_str
 static HRESULT copy_image_nv12(BYTE *dest, LONG dest_stride, const BYTE *src,
         LONG src_stride, DWORD width, DWORD lines, DWORD dest_size)
 {
+    if (abs(dest_stride) * (lines + lines / 2) > dest_size)
+        return E_NOT_SUFFICIENT_BUFFER;
+
     return MFCopyImage(dest, dest_stride, src, src_stride, width, lines / 2);
 }
 
 static HRESULT copy_image_imc1(BYTE *dest, LONG dest_stride, const BYTE *src,
         LONG src_stride, DWORD width, DWORD lines, DWORD dest_size)
 {
+    if (abs(dest_stride) * (2 * lines) > dest_size)
+        return E_NOT_SUFFICIENT_BUFFER;
+
     return MFCopyImage(dest, dest_stride, src, src_stride, width / 2, lines);
 }
 
 static HRESULT copy_image_imc2(BYTE *dest, LONG dest_stride, const BYTE *src,
         LONG src_stride, DWORD width, DWORD lines, DWORD dest_size)
 {
+    if (abs(dest_stride) * 3 * lines / 2 > dest_size)
+        return E_NOT_SUFFICIENT_BUFFER;
+
     return MFCopyImage(dest, dest_stride / 2, src, src_stride / 2, width / 2, lines);
 }
 
