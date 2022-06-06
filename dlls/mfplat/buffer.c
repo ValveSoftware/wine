@@ -603,9 +603,34 @@ static HRESULT WINAPI memory_2d_buffer_ContiguousCopyTo(IMF2DBuffer2 *iface, BYT
 
 static HRESULT WINAPI memory_2d_buffer_ContiguousCopyFrom(IMF2DBuffer2 *iface, const BYTE *src_buffer, DWORD src_length)
 {
-    FIXME("%p, %p, %u.\n", iface, src_buffer, src_length);
+    struct buffer *buffer = impl_from_IMF2DBuffer2(iface);
+    BYTE *dst_scanline0, *dst_buffer_start;
+    DWORD dst_length;
+    HRESULT hr, hr2;
+    LONG dst_pitch;
 
-    return E_NOTIMPL;
+    TRACE("%p, %p, %lu.\n", iface, src_buffer, src_length);
+
+    if (src_length != buffer->_2d.plane_size)
+    {
+        WARN("truncating contiguous copy not implemented\n");
+        return E_NOTIMPL;
+    }
+
+    hr = IMF2DBuffer2_Lock2DSize(iface, MF2DBuffer_LockFlags_Write, &dst_scanline0, &dst_pitch, &dst_buffer_start, &dst_length);
+
+    if (SUCCEEDED(hr))
+    {
+        hr = copy_image(buffer, dst_scanline0, dst_pitch, src_buffer, buffer->_2d.width, buffer->_2d.width, buffer->_2d.height, buffer->max_length);
+    }
+
+    hr2 = IMF2DBuffer2_Unlock2D(iface);
+    if (FAILED(hr2))
+        WARN("Unlocking destination buffer %p failed with hr %#lx.\n", iface, hr2);
+    if (FAILED(hr2) && SUCCEEDED(hr))
+        hr = hr2;
+
+    return hr;
 }
 
 static HRESULT WINAPI memory_2d_buffer_Lock2DSize(IMF2DBuffer2 *iface, MF2DBuffer_LockFlags flags, BYTE **scanline0,
