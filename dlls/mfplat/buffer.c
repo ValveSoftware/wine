@@ -937,7 +937,26 @@ static HRESULT dxgi_surface_buffer_create_readback_texture(struct buffer *buffer
 {
     D3D11_TEXTURE2D_DESC texture_desc;
     ID3D11Device *device;
+    UINT cpu_usage;
     HRESULT hr;
+
+    switch (buffer->_2d.lock_flags)
+    {
+        case MF2DBuffer_LockFlags_Read:
+            cpu_usage = D3D11_CPU_ACCESS_READ;
+            break;
+
+        case MF2DBuffer_LockFlags_Write:
+            cpu_usage = D3D11_CPU_ACCESS_WRITE;
+            break;
+
+        case MF2DBuffer_LockFlags_ReadWrite:
+            cpu_usage = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+            break;
+
+        default:
+            return E_INVALIDARG;
+    }
 
     if (buffer->dxgi_surface.rb_texture)
         return S_OK;
@@ -947,7 +966,7 @@ static HRESULT dxgi_surface_buffer_create_readback_texture(struct buffer *buffer
     ID3D11Texture2D_GetDesc(buffer->dxgi_surface.texture, &texture_desc);
     texture_desc.Usage = D3D11_USAGE_STAGING;
     texture_desc.BindFlags = 0;
-    texture_desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ | D3D11_CPU_ACCESS_WRITE;
+    texture_desc.CPUAccessFlags = cpu_usage;
     texture_desc.MiscFlags = 0;
     texture_desc.MipLevels = 1;
     if (FAILED(hr = ID3D11Device_CreateTexture2D(device, &texture_desc, NULL, &buffer->dxgi_surface.rb_texture)))
@@ -962,7 +981,30 @@ static HRESULT dxgi_surface_buffer_map(struct buffer *buffer)
 {
     ID3D11DeviceContext *immediate_context;
     ID3D11Device *device;
+    D3D11_MAP map_type;
     HRESULT hr;
+    BOOL copy;
+
+    switch (buffer->_2d.lock_flags)
+    {
+        case MF2DBuffer_LockFlags_Read:
+            map_type = D3D11_MAP_READ;
+            copy = TRUE;
+            break;
+
+        case MF2DBuffer_LockFlags_Write:
+            map_type = D3D11_MAP_WRITE;
+            copy = FALSE;
+            break;
+
+        case MF2DBuffer_LockFlags_ReadWrite:
+            map_type = D3D11_MAP_READ_WRITE;
+            copy = TRUE;
+            break;
+
+        default:
+            return E_INVALIDARG;
+    }
 
     if (FAILED(hr = dxgi_surface_buffer_create_readback_texture(buffer)))
         return hr;
@@ -970,16 +1012,15 @@ static HRESULT dxgi_surface_buffer_map(struct buffer *buffer)
     ID3D11Texture2D_GetDevice(buffer->dxgi_surface.texture, &device);
     ID3D11Device_GetImmediateContext(device, &immediate_context);
 
-    if (buffer->_2d.lock_flags == MF2DBuffer_LockFlags_Read || buffer->_2d.lock_flags == MF2DBuffer_LockFlags_ReadWrite)
+    if (copy)
     {
         ID3D11DeviceContext_CopySubresourceRegion(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.rb_texture,
                 0, 0, 0, 0, (ID3D11Resource *)buffer->dxgi_surface.texture, buffer->dxgi_surface.sub_resource_idx, NULL);
     }
 
-    // TODO: fix _Map flags
     memset(&buffer->dxgi_surface.map_desc, 0, sizeof(buffer->dxgi_surface.map_desc));
     if (FAILED(hr = ID3D11DeviceContext_Map(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.rb_texture,
-            0, D3D11_MAP_READ_WRITE, 0, &buffer->dxgi_surface.map_desc)))
+            0, map_type, 0, &buffer->dxgi_surface.map_desc)))
     {
         WARN("Failed to map readback texture, hr %#x.\n", hr);
     }
@@ -994,13 +1035,32 @@ static void dxgi_surface_buffer_unmap(struct buffer *buffer)
 {
     ID3D11DeviceContext *immediate_context;
     ID3D11Device *device;
+    BOOL copy;
+
+    switch (buffer->_2d.lock_flags)
+    {
+        case MF2DBuffer_LockFlags_Read:
+            copy = FALSE;
+            break;
+
+        case MF2DBuffer_LockFlags_Write:
+            copy = TRUE;
+            break;
+
+        case MF2DBuffer_LockFlags_ReadWrite:
+            copy = TRUE;
+            break;
+
+        default:
+            copy = FALSE;
+    }
 
     ID3D11Texture2D_GetDevice(buffer->dxgi_surface.texture, &device);
     ID3D11Device_GetImmediateContext(device, &immediate_context);
     ID3D11DeviceContext_Unmap(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.rb_texture, 0);
     memset(&buffer->dxgi_surface.map_desc, 0, sizeof(buffer->dxgi_surface.map_desc));
 
-    if (buffer->_2d.lock_flags == MF2DBuffer_LockFlags_Write || buffer->_2d.lock_flags == MF2DBuffer_LockFlags_ReadWrite)
+    if (copy)
     {
         ID3D11DeviceContext_CopySubresourceRegion(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.texture,
                 buffer->dxgi_surface.sub_resource_idx, 0, 0, 0, (ID3D11Resource *)buffer->dxgi_surface.rb_texture, 0, NULL);
