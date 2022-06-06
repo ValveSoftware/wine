@@ -791,6 +791,28 @@ static HRESULT WINAPI sample_GetTotalLength(IMFSample *iface, DWORD *total_lengt
     return S_OK;
 }
 
+static HRESULT copy_2d_buffer(IMFMediaBuffer *src, IMFMediaBuffer *dst)
+{
+    IMF2DBuffer2 *src2d = NULL, *dst2d = NULL;
+    HRESULT hr = S_OK;
+
+    hr = IMFMediaBuffer_QueryInterface(src, &IID_IMF2DBuffer2, (void **)&src2d);
+
+    if (SUCCEEDED(hr))
+        hr = IMFMediaBuffer_QueryInterface(dst, &IID_IMF2DBuffer2, (void **)&dst2d);
+
+    if (SUCCEEDED(hr))
+        hr = IMF2DBuffer2_Copy2DTo(src2d, dst2d);
+
+    if (src2d)
+        IMF2DBuffer2_Release(src2d);
+
+    if (dst2d)
+        IMF2DBuffer2_Release(dst2d);
+
+    return hr;
+}
+
 static HRESULT WINAPI sample_CopyToBuffer(IMFSample *iface, IMFMediaBuffer *buffer)
 {
     struct sample *sample = impl_from_IMFSample(iface);
@@ -803,6 +825,15 @@ static HRESULT WINAPI sample_CopyToBuffer(IMFSample *iface, IMFMediaBuffer *buff
     TRACE("%p, %p.\n", iface, buffer);
 
     EnterCriticalSection(&sample->attributes.cs);
+
+    if (sample->buffer_count == 1)
+    {
+        if (SUCCEEDED(hr = copy_2d_buffer(sample->buffers[0], buffer)))
+        {
+            LeaveCriticalSection(&sample->attributes.cs);
+            return hr;
+        }
+    }
 
     total_length = sample_get_total_length(sample);
     dst_current_length = 0;
