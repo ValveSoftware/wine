@@ -1766,6 +1766,8 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_fn(MonoAssemblyName *
     static const WCHAR dotdllW[] = {'.','d','l','l',0};
     static const WCHAR dotexeW[] = {'.','e','x','e',0};
 
+    const char *sgi = getenv("SteamGameId");
+
     stringname = mono_stringify_assembly_name(aname);
     assemblyname = mono_assembly_name_get_name(aname);
     culture = mono_assembly_name_get_culture(aname);
@@ -1832,7 +1834,6 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_fn(MonoAssemblyName *
          * to load ManagedStarter before executing the static constructor
          * that adds this event handler. We work around this by doing the
          * same thing in our own assembly load hook. */
-        const char* sgi = getenv("SteamGameId");
         if (sgi && !strcmp(sgi, "261550"))
         {
             FIXME("hack, using Bannerlord.exe\n");
@@ -1848,27 +1849,52 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_fn(MonoAssemblyName *
         }
     }
 
-    if (!strcmp(assemblyname, "CameraQuakeViewer"))
+    /* HACK for games which reference a type from a non-existing DLL.
+     * Native .NET framework normally gets away with it but Mono cannot
+     * due to some deeply rooted differences. */
+    if (sgi)
     {
-        /* HACK for Nights of Azure which references type from a non-existing DLL.
-         * Native .NET framework normally gets away with it but Mono cannot
-         * due to some deeply rooted differences. */
-        const char* sgi = getenv("SteamGameId");
-        if (sgi && !strcmp(sgi, "527280"))
+        size_t i;
+
+        static const struct {
+            const char *assembly_name;
+            const char *module_name;
+            const char *appid;
+            const char *source;
+        } assembly_hacks[] = {
+            {
+                "CameraQuakeViewer",
+                "CameraQuakeViewer.dll",
+                "527280", /* Nights of Azure */
+                "namespace CQViewer { class CQMgr {} }"
+            },
+            {
+                "UnrealEdCSharp",
+                "UnrealEdCSharp.dll",
+                "317940", /* Karmaflow */
+                "namespace ContentBrowser { class IContentBrowserBackendInterface {} class Package {} } "
+            },
+        };
+
+        for (i = 0; i < ARRAY_SIZE(assembly_hacks); ++i)
         {
-            char assembly_path[MAX_PATH];
+            if (!strcmp(assemblyname, assembly_hacks[i].assembly_name) &&
+                    !strcmp(sgi, assembly_hacks[i].appid))
+            {
+                char assembly_path[MAX_PATH];
 
-            FIXME("HACK: Building CameraQuakeViewer.dll\n");
+                FIXME("HACK: Building %s\n", assembly_hacks[i].module_name);
 
-            if (compile_assembly("namespace CQViewer { class CQMgr {} }", "CameraQuakeViewer.dll", assembly_path, MAX_PATH))
-                result = mono_assembly_open(assembly_path, &stat);
-            else
-                ERR("HACK: Failed to build CameraQuakeViewer.dll\n");
+                if (compile_assembly(assembly_hacks[i].source, assembly_hacks[i].module_name, assembly_path, MAX_PATH))
+                    result = mono_assembly_open(assembly_path, &stat);
+                else
+                    ERR("HACK: Failed to build %s\n", assembly_hacks[i].assembly_name);
 
-            if (result)
-                goto done;
-            else
-                ERR("HACK: Failed to load CameraQuakeViewer.dll\n");
+                if (result)
+                    goto done;
+
+                ERR("HACK: Failed to load %s\n", assembly_hacks[i].assembly_name);
+            }
         }
     }
 
