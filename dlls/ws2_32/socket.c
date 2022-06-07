@@ -3530,6 +3530,12 @@ BOOL WINAPI WSAGetOverlappedResult( SOCKET s, LPWSAOVERLAPPED lpOverlapped,
         return FALSE;
     }
 
+    if (!socket_list_find( s ))
+    {
+        SetLastError( WSAENOTSOCK );
+        return FALSE;
+    }
+
     status = lpOverlapped->Internal;
     if (status == STATUS_PENDING)
     {
