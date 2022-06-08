@@ -212,24 +212,24 @@ static HRESULT WINAPI test_media_stream_RequestSample(IMFMediaStream *iface, IUn
         return E_NOTIMPL;
 
     hr = MFCreateSample(&sample);
-    ok(hr == S_OK, "Failed to create a sample, hr %#x.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     if (stream->sample_duration)
     {
         hr = IMFSample_SetSampleDuration(sample, stream->sample_duration);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
         hr = IMFSample_SetSampleTime(sample, stream->sample_time);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
         stream->sample_time += stream->sample_duration;
     }
     else
     {
         hr = IMFSample_SetSampleTime(sample, 123);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
 
         hr = IMFSample_SetSampleDuration(sample, 1);
-        ok(hr == S_OK, "Unexpected hr %#x.\n", hr);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     }
 
     if (token)
