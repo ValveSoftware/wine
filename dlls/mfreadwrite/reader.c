@@ -164,7 +164,7 @@ struct source_reader
     IUnknown *device_manager;
     unsigned int first_audio_stream_index;
     unsigned int first_video_stream_index;
-    unsigned int stream_count;
+    DWORD stream_count;
     unsigned int flags;
     unsigned int queue;
     enum media_source_state source_state;
