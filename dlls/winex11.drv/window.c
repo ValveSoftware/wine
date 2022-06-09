@@ -22,6 +22,7 @@
 
 #include "config.h"
 
+#include <poll.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -833,12 +834,21 @@ static void set_size_hints( struct x11drv_win_data *data, DWORD style )
     XFree( size_hints );
 }
 
+struct is_unmap_notify_param
+{
+    struct x11drv_win_data *data;
+    BOOL found;
+};
+
 static Bool is_unmap_notify( Display *display, XEvent *event, XPointer arg )
 {
-    struct x11drv_win_data *data = (struct x11drv_win_data *)arg;
-    return event->xany.serial >= data->unmapnotify_serial &&
-           event->xany.window == data->whole_window &&
-           event->type == UnmapNotify;
+    struct is_unmap_notify_param *p = (struct is_unmap_notify_param *)arg;
+
+    if (!p->found)
+        p->found = event->type == UnmapNotify &&
+                   event->xany.serial >= p->data->unmapnotify_serial &&
+                   event->xany.window == p->data->whole_window;
+    return False;
 }
 
 /***********************************************************************
@@ -926,18 +936,33 @@ static void set_mwm_hints( struct x11drv_win_data *data, DWORD style, DWORD ex_s
                      x11drv_atom(_MOTIF_WM_HINTS), 32, PropModeReplace,
                      (unsigned char*)&mwm_hints, sizeof(mwm_hints)/sizeof(long) );
 
-    if (enable_mutter_workaround)
+    if (enable_mutter_workaround && mapped)
     {
+        DWORD end = GetTickCount() + 100;
+        struct is_unmap_notify_param p;
+        struct pollfd pfd;
         XEvent event;
+        int timeout;
 
         /* workaround for mutter gitlab bug #649, wait for the map notify
          * event each time the decorations are modified before modifying
          * them again.
          */
-        if (mapped)
+        p.data = data;
+        p.found = FALSE;
+        TRACE("workaround mutter bug #649, waiting for UnmapNotify\n");
+        pfd.fd = ConnectionNumber(data->display);
+        pfd.events = POLLIN;
+        for (;;)
         {
-            TRACE("workaround mutter bug #649, waiting for UnmapNotify\n");
-            XPeekIfEvent( data->display, &event, is_unmap_notify, (XPointer)data );
+            XCheckIfEvent( data->display, &event, is_unmap_notify, (XPointer)&p );
+            if (p.found) break;
+            timeout = end - GetTickCount();
+            if (timeout <= 0 || poll( &pfd, 1, timeout ) != 1)
+            {
+                WARN( "window %p/%lx unmap_notify wait timed out.\n", data->hwnd, data->whole_window );
+                break;
+            }
         }
     }
 
