@@ -2315,6 +2315,13 @@ DWORD WINAPI GetIpNetTable( MIB_IPNETTABLE *table, ULONG *size, BOOL sort )
                                   NULL, 0, &count, 0 );
     if (err) return err;
 
+    if (!count)
+    {
+        *size = 0;
+        err = ERROR_NO_DATA;
+        goto err;
+    }
+
     needed = FIELD_OFFSET( MIB_IPNETTABLE, table[count] );
 
     if (!table || *size < needed)
