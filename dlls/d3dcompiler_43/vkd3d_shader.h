@@ -38,6 +38,15 @@ extern "C" {
  * compilation, transformation, and reflection of GPU shaders.
  */
 
+/** \since 1.3 */
+enum vkd3d_shader_api_version
+{
+    VKD3D_SHADER_API_VERSION_1_0,
+    VKD3D_SHADER_API_VERSION_1_1,
+    VKD3D_SHADER_API_VERSION_1_2,
+    VKD3D_SHADER_API_VERSION_1_3,
+};
+
 /** The type of a chained structure. */
 enum vkd3d_shader_structure_type
 {
@@ -64,6 +73,11 @@ enum vkd3d_shader_structure_type
      * \since 1.3
      */
     VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO,
+    /**
+     * The structure is a vkd3d_shader_descriptor_offset_info structure.
+     * \since 1.3
+     */
+    VKD3D_SHADER_STRUCTURE_TYPE_DESCRIPTOR_OFFSET_INFO,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_STRUCTURE_TYPE),
 };
@@ -110,6 +124,8 @@ enum vkd3d_shader_compile_option_name
     VKD3D_SHADER_COMPILE_OPTION_BUFFER_UAV  = 0x00000002,
     /** \a value is a member of enum vkd3d_shader_compile_option_formatting_flags. */
     VKD3D_SHADER_COMPILE_OPTION_FORMATTING  = 0x00000003,
+    /** \a value is a member of enum vkd3d_shader_api_version. \since 1.3 */
+    VKD3D_SHADER_COMPILE_OPTION_API_VERSION = 0x00000004,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_COMPILE_OPTION_NAME),
 };
@@ -208,8 +224,9 @@ struct vkd3d_shader_descriptor_binding
     /** The binding index of the descriptor. */
     unsigned int binding;
     /**
-     * The size of this descriptor array. Descriptor arrays are not supported in
-     * this version of vkd3d-shader, and therefore this value must be 1.
+     * The size of this descriptor array. If an offset is specified for this
+     * binding by the vkd3d_shader_descriptor_offset_info structure, counting
+     * starts at that offset.
      */
     unsigned int count;
 };
@@ -452,6 +469,90 @@ struct vkd3d_shader_transform_feedback_info
     unsigned int buffer_stride_count;
 };
 
+struct vkd3d_shader_descriptor_offset
+{
+    unsigned int static_offset;
+    unsigned int dynamic_offset_index;
+};
+
+/**
+ * A chained structure containing descriptor offsets.
+ *
+ * This structure is optional.
+ *
+ * This structure extends vkd3d_shader_interface_info.
+ *
+ * This structure contains only input parameters.
+ *
+ * \since 1.3
+ */
+struct vkd3d_shader_descriptor_offset_info
+{
+    /** Must be set to VKD3D_SHADER_STRUCTURE_TYPE_DESCRIPTOR_OFFSET_INFO. */
+    enum vkd3d_shader_structure_type type;
+    /** Optional pointer to a structure containing further parameters. */
+    const void *next;
+
+    /**
+     * Byte offset within the push constants of an array of 32-bit
+     * descriptor array offsets. See the description of 'binding_offsets'
+     * below.
+     */
+    unsigned int descriptor_table_offset;
+    /** Size, in elements, of the descriptor table push constant array. */
+    unsigned int descriptor_table_count;
+
+    /**
+     * Pointer to an array of struct vkd3d_shader_descriptor_offset objects.
+     * The 'static_offset' field contains an offset into the descriptor arrays
+     * referenced by the 'bindings' array in struct vkd3d_shader_interface_info.
+     * This allows mapping multiple shader resource arrays to a single binding
+     * point in the target environment.
+     *
+     * 'dynamic_offset_index' in struct vkd3d_shader_descriptor_offset allows
+     * offsets to be set at runtime. The 32-bit descriptor table push constant
+     * at this index will be added to 'static_offset' to calculate the final
+     * binding offset.
+     *
+     * If runtime offsets are not required, set all 'dynamic_offset_index'
+     * values to \c ~0u and 'descriptor_table_count' to zero.
+     *
+     * For example, to map Direct3D constant buffer registers 'cb0[0:3]' and
+     * 'cb1[6:7]' to descriptors 8-12 and 4-5 in the Vulkan descriptor array in
+     * descriptor set 3 and with binding 2, set the following values in the
+     * 'bindings' array in struct vkd3d_shader_interface_info:
+     *
+     * \code
+     * type = VKD3D_SHADER_DESCRIPTOR_TYPE_CBV
+     * register_space = 0
+     * register_index = 0
+     * binding.set = 3
+     * binding.binding = 2
+     * binding.count = 4
+     *
+     * type = VKD3D_SHADER_DESCRIPTOR_TYPE_CBV
+     * register_space = 0
+     * register_index = 6
+     * binding.set = 3
+     * binding.binding = 2
+     * binding.count = 2
+     * \endcode
+     *
+     * and then pass \c {8, \c 4} as static binding offsets here.
+     *
+     * This field may be NULL, in which case the corresponding offsets are
+     * specified to be 0.
+     */
+    const struct vkd3d_shader_descriptor_offset *binding_offsets;
+
+    /**
+     * Pointer to an array of offsets into the descriptor arrays referenced by
+     * the 'uav_counters' array in struct vkd3d_shader_interface_info. This
+     * works the same way as \ref binding_offsets above.
+     */
+    const struct vkd3d_shader_descriptor_offset *uav_counter_offsets;
+};
+
 /** The format of a shader to be compiled or scanned. */
 enum vkd3d_shader_source_type
 {
@@ -465,8 +566,13 @@ enum vkd3d_shader_source_type
      * the format used for Direct3D shader model 4 and 5 shaders.
      */
     VKD3D_SHADER_SOURCE_DXBC_TPF,
-    /** High-Level Shader Language source code. */
+    /** High-Level Shader Language source code. \since 1.3 */
     VKD3D_SHADER_SOURCE_HLSL,
+    /**
+     * Legacy Direct3D byte-code. This is the format used for Direct3D shader
+     * model 1, 2, and 3 shaders. \since 1.3
+     */
+    VKD3D_SHADER_SOURCE_D3D_BYTECODE,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SOURCE_TYPE),
 };
@@ -485,14 +591,22 @@ enum vkd3d_shader_target_type
      */
     VKD3D_SHADER_TARGET_SPIRV_BINARY,
     VKD3D_SHADER_TARGET_SPIRV_TEXT,
+    /**
+     * Direct3D shader assembly. \since 1.3
+     */
     VKD3D_SHADER_TARGET_D3D_ASM,
     /**
+     * Legacy Direct3D byte-code. This is the format used for Direct3D shader
+     * model 1, 2, and 3 shaders. \since 1.3
+     */
+    VKD3D_SHADER_TARGET_D3D_BYTECODE,
+    /**
      * A 'Tokenized Program Format' shader embedded in a DXBC container. This is
-     * the format used for Direct3D shader model 4 and 5 shaders.
+     * the format used for Direct3D shader model 4 and 5 shaders. \since 1.3
      */
     VKD3D_SHADER_TARGET_DXBC_TPF,
     /**
-     * An 'OpenGL Shading Language' shader.
+     * An 'OpenGL Shading Language' shader. \since 1.3
      */
     VKD3D_SHADER_TARGET_GLSL,
 
@@ -577,7 +691,10 @@ enum vkd3d_shader_spirv_extension
 {
     VKD3D_SHADER_SPIRV_EXTENSION_NONE,
     VKD3D_SHADER_SPIRV_EXTENSION_EXT_DEMOTE_TO_HELPER_INVOCATION,
+    /** \since 1.3 */
     VKD3D_SHADER_SPIRV_EXTENSION_EXT_DESCRIPTOR_INDEXING,
+    /** \since 1.3 */
+    VKD3D_SHADER_SPIRV_EXTENSION_EXT_STENCIL_EXPORT,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_SPIRV_EXTENSION),
 };
@@ -691,8 +808,7 @@ typedef int (*PFN_vkd3d_shader_open_include)(const char *filename, bool local,
  * vkd3d_shader_preprocess_info.
  *
  * \param code Contents of the included file, which were allocated by the
- * \ref PFN_vkd3d_shader_open_include callback. The source code was allocated by
- * the user and thus need not be freed by vkd3d_shader_free_shader_code().
+ * \ref pfn_open_include callback. The user must free them.
  *
  * \param context The user-defined pointer passed to struct
  * vkd3d_shader_preprocess_info.
@@ -1086,15 +1202,25 @@ enum vkd3d_shader_resource_type
 enum vkd3d_shader_resource_data_type
 {
     /** Unsigned normalized integer. */
-    VKD3D_SHADER_RESOURCE_DATA_UNORM = 0x1,
+    VKD3D_SHADER_RESOURCE_DATA_UNORM     = 0x1,
     /** Signed normalized integer. */
-    VKD3D_SHADER_RESOURCE_DATA_SNORM = 0x2,
+    VKD3D_SHADER_RESOURCE_DATA_SNORM     = 0x2,
     /** Signed integer. */
-    VKD3D_SHADER_RESOURCE_DATA_INT   = 0x3,
+    VKD3D_SHADER_RESOURCE_DATA_INT       = 0x3,
     /** Unsigned integer. */
-    VKD3D_SHADER_RESOURCE_DATA_UINT  = 0x4,
-    /** IEEE floating-point. */
-    VKD3D_SHADER_RESOURCE_DATA_FLOAT = 0x5,
+    VKD3D_SHADER_RESOURCE_DATA_UINT      = 0x4,
+    /** IEEE single-precision floating-point. */
+    VKD3D_SHADER_RESOURCE_DATA_FLOAT     = 0x5,
+    /** Undefined/type-less. \since 1.3 */
+    VKD3D_SHADER_RESOURCE_DATA_MIXED     = 0x6,
+    /** IEEE double-precision floating-point. \since 1.3 */
+    VKD3D_SHADER_RESOURCE_DATA_DOUBLE    = 0x7,
+    /** Continuation of the previous component. For example, 64-bit
+     * double-precision floating-point data may be returned as two 32-bit
+     * components, with the first component (containing the LSB) specified as
+     * VKD3D_SHADER_RESOURCE_DATA_DOUBLE, and the second component specified
+     * as VKD3D_SHADER_RESOURCE_DATA_CONTINUED. \since 1.3 */
+    VKD3D_SHADER_RESOURCE_DATA_CONTINUED = 0x8,
 
     VKD3D_FORCE_32_BIT_ENUM(VKD3D_SHADER_RESOURCE_DATA_TYPE),
 };
@@ -1366,7 +1492,8 @@ static inline uint32_t vkd3d_shader_create_swizzle(enum vkd3d_shader_swizzle_com
 VKD3D_SHADER_API const char *vkd3d_shader_get_version(unsigned int *major, unsigned int *minor);
 /**
  * Returns the source types supported, with any target type, by
- * vkd3d_shader_compile().
+ * vkd3d_shader_compile(). Future versions of the library may introduce
+ * additional source types; callers should ignore unrecognised source types.
  *
  * Use vkd3d_shader_get_supported_target_types() to determine which target types
  * are supported for each source type.
@@ -1381,7 +1508,8 @@ VKD3D_SHADER_API const char *vkd3d_shader_get_version(unsigned int *major, unsig
 VKD3D_SHADER_API const enum vkd3d_shader_source_type *vkd3d_shader_get_supported_source_types(unsigned int *count);
 /**
  * Returns the target types supported, with the given source type, by
- * vkd3d_shader_compile().
+ * vkd3d_shader_compile(). Future versions of the library may introduce
+ * additional target types; callers should ignore unrecognised target types.
  *
  * \param source_type Source type for which to enumerate supported target types.
  *
@@ -1678,6 +1806,18 @@ VKD3D_SHADER_API void vkd3d_shader_free_shader_signature(struct vkd3d_shader_sig
 VKD3D_SHADER_API int vkd3d_shader_preprocess(const struct vkd3d_shader_compile_info *compile_info,
         struct vkd3d_shader_code *out, char **messages);
 
+/**
+ * Set a callback to be called when vkd3d-shader outputs debug logging.
+ *
+ * If NULL, or if this function has not been called, libvkd3d-shader will print
+ * all enabled log output to stderr.
+ *
+ * \param callback Callback function to set.
+ *
+ * \since 1.4
+ */
+VKD3D_SHADER_API void vkd3d_shader_set_log_callback(PFN_vkd3d_log callback);
+
 #endif  /* VKD3D_SHADER_NO_PROTOTYPES */
 
 /** Type of vkd3d_shader_get_version(). */
@@ -1726,6 +1866,13 @@ typedef struct vkd3d_shader_signature_element * (*PFN_vkd3d_shader_find_signatur
         unsigned int semantic_index, unsigned int stream_index);
 /** Type of vkd3d_shader_free_shader_signature(). */
 typedef void (*PFN_vkd3d_shader_free_shader_signature)(struct vkd3d_shader_signature *signature);
+
+/** Type of vkd3d_shader_preprocess(). \since 1.3 */
+typedef void (*PFN_vkd3d_shader_preprocess)(struct vkd3d_shader_compile_info *compile_info,
+        struct vkd3d_shader_code *out, char **messages);
+
+/** Type of vkd3d_shader_set_log_callback(). \since 1.4 */
+typedef void (*PFN_vkd3d_shader_set_log_callback)(PFN_vkd3d_log callback);
 
 #ifdef __cplusplus
 }
