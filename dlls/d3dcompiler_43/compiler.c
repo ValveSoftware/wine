@@ -825,9 +825,33 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     struct vkd3d_shader_compile_info compile_info;
     struct vkd3d_shader_code byte_code;
     const D3D_SHADER_MACRO *macro;
+    size_t profile_len, i;
     char *messages;
     HRESULT hr;
     int ret;
+
+    static const char * const d3dbc_profiles[] =
+    {
+        "fx_2_",
+
+        "ps.1.",
+        "ps.2.",
+        "ps.3.",
+
+        "ps_1_",
+        "ps_2_",
+        "ps_3_",
+
+        "vs.1.",
+        "vs.2.",
+        "vs.3.",
+
+        "vs_1_",
+        "vs_2_",
+        "vs_3_",
+
+        "tx_1_",
+    };
 
     TRACE("data %p, data_size %lu, filename %s, macros %p, include %p, entry_point %s, "
             "profile %s, flags %#x, effect_flags %#x, secondary_flags %#x, secondary_data %p, "
@@ -862,6 +886,18 @@ HRESULT WINAPI D3DCompile2(const void *data, SIZE_T data_size, const char *filen
     compile_info.option_count = 0;
     compile_info.log_level = VKD3D_SHADER_LOG_INFO;
     compile_info.source_name = filename;
+
+    profile_len = strlen(profile);
+    for (i = 0; i < ARRAY_SIZE(d3dbc_profiles); ++i)
+    {
+        size_t len = strlen(d3dbc_profiles[i]);
+
+        if (len <= profile_len && !memcmp(profile, d3dbc_profiles[i], len))
+        {
+            compile_info.target_type = VKD3D_SHADER_TARGET_D3D_BYTECODE;
+            break;
+        }
+    }
 
     preprocess_info.type = VKD3D_SHADER_STRUCTURE_TYPE_PREPROCESS_INFO;
     preprocess_info.next = &hlsl_info;
