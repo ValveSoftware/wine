@@ -362,13 +362,56 @@ static NTSTATUS get_object( HANDLE handle, struct fsync **obj )
 NTSTATUS fsync_close( HANDLE handle )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
+    int *addr;
 
     TRACE("%p.\n", handle);
 
     if (entry < FSYNC_LIST_ENTRIES && fsync_list[entry])
     {
+        switch (fsync_list[entry][idx].type)
+        {
+            case FSYNC_AUTO_EVENT:
+            case FSYNC_MANUAL_EVENT:
+            case FSYNC_AUTO_SERVER:
+            case FSYNC_MANUAL_SERVER:
+            case FSYNC_QUEUE:
+            {
+                struct event *event = fsync_list[entry][idx].shm;
+
+                addr = &event->signaled;
+                break;
+            }
+
+            case FSYNC_SEMAPHORE:
+            {
+                struct semaphore *semaphore = fsync_list[entry][idx].shm;
+
+                addr = &semaphore->count;
+                break;
+            }
+
+            case FSYNC_MUTEX:
+            {
+                struct mutex *mutex = fsync_list[entry][idx].shm;
+
+                addr = &mutex->tid;
+                break;
+            }
+
+            default:
+                addr = NULL;
+                break;
+        }
         if (__atomic_exchange_n( &fsync_list[entry][idx].type, 0, __ATOMIC_SEQ_CST ))
+        {
+            if (addr)
+            {
+                /* Wake current waiters and let them handle destroyed wait object,
+                 * hopefully before it is reused by newly created handle. */
+                futex_wake( addr, INT_MAX );
+            }
             return STATUS_SUCCESS;
+        }
     }
 
     return STATUS_INVALID_HANDLE;
@@ -974,6 +1017,14 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
             }
 
             ret = futex_wait_multiple( futexes, waitcount, timeout ? &end : NULL, clock_id );
+            for (i = 0; i < count; ++i)
+            {
+                if (objs[i] && !objs[i]->type)
+                {
+                    WARN( "Object handle %p (obj %u) was closed during wait.\n", handles[i], i );
+                    objs[i] = NULL;
+                }
+            }
 
             /* FUTEX_WAIT_MULTIPLE can succeed or return -EINTR, -EAGAIN,
              * -EFAULT/-EACCES, -ETIMEDOUT. In the first three cases we need to
@@ -1051,6 +1102,12 @@ tryagain:
                         if (status != STATUS_PENDING)
                             break;
                     }
+                }
+
+                if (obj && !obj->type)
+                {
+                    FIXME( "Object handle %p (obj %u) was closed during wait, not handled for wait_multuple.\n",
+                           handles[i], i );
                 }
 
                 if (status == STATUS_TIMEOUT)
