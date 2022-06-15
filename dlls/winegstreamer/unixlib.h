@@ -173,7 +173,6 @@ struct wg_parser_create_params
 {
     struct wg_parser *parser;
     enum wg_parser_type type;
-    bool unlimited_buffering;
 };
 
 struct wg_parser_connect_params
