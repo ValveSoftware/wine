@@ -424,7 +424,7 @@ HRESULT create_marshaled_doc(HWND main_thread_hwnd, REFIID riid, void **ppv)
     res = SendMessageW(main_thread_hwnd, WM_CREATEDOC, 0, (LPARAM)&params);
     TRACE("SendMessage ret %x\n", res);
     if(FAILED(params.hres)) {
-        WARN("EM_CREATEDOC failed: %08x\n", params.hres);
+        WARN("EM_CREATEDOC failed: %08lx\n", params.hres);
         IStream_Release(params.stream);
         return hres;
     }
@@ -435,7 +435,7 @@ HRESULT create_marshaled_doc(HWND main_thread_hwnd, REFIID riid, void **ppv)
         hres = CoUnmarshalInterface(params.stream, riid, ppv);
     IStream_Release(params.stream);
     if(FAILED(hres))
-        WARN("CoUnmarshalInterface failed: %08x\n", hres);
+        WARN("CoUnmarshalInterface failed: %08lx\n", hres);
     return hres;
 }
 
