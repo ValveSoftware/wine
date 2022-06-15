@@ -1233,7 +1233,7 @@ HRESULT decodebin_parser_create(IUnknown *outer, IUnknown **out)
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
-    if (!(object->wg_parser = wg_parser_create(WG_PARSER_DECODEBIN, true)))
+    if (!(object->wg_parser = wg_parser_create(WG_PARSER_DECODEBIN)))
     {
         free(object);
         return E_OUTOFMEMORY;
@@ -1753,7 +1753,7 @@ HRESULT wave_parser_create(IUnknown *outer, IUnknown **out)
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
-    if (!(object->wg_parser = wg_parser_create(WG_PARSER_WAVPARSE, false)))
+    if (!(object->wg_parser = wg_parser_create(WG_PARSER_WAVPARSE)))
     {
         free(object);
         return E_OUTOFMEMORY;
@@ -1839,7 +1839,7 @@ HRESULT avi_splitter_create(IUnknown *outer, IUnknown **out)
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
-    if (!(object->wg_parser = wg_parser_create(WG_PARSER_AVIDEMUX, false)))
+    if (!(object->wg_parser = wg_parser_create(WG_PARSER_AVIDEMUX)))
     {
         free(object);
         return E_OUTOFMEMORY;
@@ -1946,7 +1946,7 @@ HRESULT mpeg_splitter_create(IUnknown *outer, IUnknown **out)
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
-    if (!(object->wg_parser = wg_parser_create(WG_PARSER_MPEGAUDIOPARSE, false)))
+    if (!(object->wg_parser = wg_parser_create(WG_PARSER_MPEGAUDIOPARSE)))
     {
         free(object);
         return E_OUTOFMEMORY;
