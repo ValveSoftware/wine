@@ -285,7 +285,7 @@ static nsresult fire_before_navigate(nsChannel *channel, HTMLOuterWindow *window
     hres = IUri_GetDisplayUri(channel->uri->uri, &uri_str);
     if(FAILED(hres))
     {
-        ERR("IUri_GetDisplayUri failed, hres %#x.\n", hres);
+        ERR("IUri_GetDisplayUri failed, hres %08lx.\n", hres);
         return NS_ERROR_FAILURE;
     }
     if(window->browser->doc->hostui)
@@ -1140,7 +1140,7 @@ static nsresult NSAPI nsChannel_AsyncOpen(nsIHttpChannel *iface, nsIStreamListen
                 }
                 else
                 {
-                    FIXME("fire_before_navigate returned error %#x.\n", nsres);
+                    FIXME("fire_before_navigate returned error %08lx.\n", nsres);
                     nsres = NS_OK;
                 }
             }
