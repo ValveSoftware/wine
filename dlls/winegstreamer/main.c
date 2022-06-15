@@ -63,15 +63,14 @@ bool array_reserve(void **elements, size_t *capacity, size_t count, size_t size)
     return TRUE;
 }
 
-struct wg_parser *wg_parser_create(enum wg_parser_type type, bool unlimited_buffering)
+struct wg_parser *wg_parser_create(enum wg_parser_type type)
 {
     struct wg_parser_create_params params =
     {
         .type = type,
-        .unlimited_buffering = unlimited_buffering,
     };
 
-    TRACE("type %#x, unlimited_buffering %d.\n", type, unlimited_buffering);
+    TRACE("type %#x.\n", type);
 
     if (__wine_unix_call(unix_handle, unix_wg_parser_create, &params))
         return NULL;

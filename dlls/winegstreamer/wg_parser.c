@@ -89,8 +89,6 @@ struct wg_parser
     } read_request;
 
     bool sink_connected;
-
-    bool unlimited_buffering;
     bool use_mediaconv;
 };
 
@@ -1538,13 +1536,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     gst_bin_add(GST_BIN(parser->container), element);
     parser->decodebin = element;
 
-    if (parser->unlimited_buffering)
-    {
-        g_object_set(parser->decodebin, "max-size-buffers", G_MAXUINT, NULL);
-        g_object_set(parser->decodebin, "max-size-time", G_MAXUINT64, NULL);
-        g_object_set(parser->decodebin, "max-size-bytes", G_MAXUINT, NULL);
-    }
-
+    g_object_set(element, "max-size-bytes", G_MAXUINT, NULL);
     g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), parser);
     g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
     g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
@@ -1733,7 +1725,6 @@ static NTSTATUS wg_parser_create(void *args)
     pthread_cond_init(&parser->read_cond, NULL);
     pthread_cond_init(&parser->read_done_cond, NULL);
     parser->init_gst = init_funcs[params->type];
-    parser->unlimited_buffering = params->unlimited_buffering;
 
     GST_DEBUG("Created winegstreamer parser %p.", parser);
     params->parser = parser;
