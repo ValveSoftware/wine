@@ -1675,6 +1675,7 @@ static const enum wg_video_format video_formats[] =
     WG_VIDEO_FORMAT_YUY2,
     WG_VIDEO_FORMAT_UYVY,
     WG_VIDEO_FORMAT_YVYU,
+    WG_VIDEO_FORMAT_BGRA,
     WG_VIDEO_FORMAT_BGRx,
     WG_VIDEO_FORMAT_BGR,
     WG_VIDEO_FORMAT_RGB16,
