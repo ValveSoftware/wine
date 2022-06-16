@@ -166,6 +166,8 @@ BOOL validate_context_xstate( CONTEXT *context )
 {
     CONTEXT_EX *context_ex;
 
+    if (!((context->ContextFlags & 0x40) && (cpu_info.ProcessorFeatureBits & CPU_FEATURE_AVX))) return TRUE;
+
     context_ex = (CONTEXT_EX *)(context + 1);
 
     if (context_ex->XState.Length < offsetof(XSTATE, YmmContext)
