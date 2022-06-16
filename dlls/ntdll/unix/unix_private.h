@@ -192,6 +192,7 @@ extern void DECLSPEC_NORETURN abort_process( int status ) DECLSPEC_HIDDEN;
 extern void DECLSPEC_NORETURN exit_process( int status ) DECLSPEC_HIDDEN;
 extern void wait_suspend( CONTEXT *context ) DECLSPEC_HIDDEN;
 extern NTSTATUS send_debug_event( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL first_chance ) DECLSPEC_HIDDEN;
+extern BOOL validate_context_xstate( CONTEXT *context ) DECLSPEC_HIDDEN;
 extern NTSTATUS set_thread_context( HANDLE handle, const void *context, BOOL *self, USHORT machine ) DECLSPEC_HIDDEN;
 extern NTSTATUS get_thread_context( HANDLE handle, void *context, BOOL *self, USHORT machine ) DECLSPEC_HIDDEN;
 extern NTSTATUS alloc_object_attributes( const OBJECT_ATTRIBUTES *attr, struct object_attributes **ret,
