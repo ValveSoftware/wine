@@ -9403,6 +9403,7 @@ static void test_extended_context(void)
     CONTEXT_EX *context_ex;
     CONTEXT *context;
     unsigned data[8];
+    NTSTATUS status;
     HANDLE thread;
     ULONG64 mask;
     XSTATE *xs;
@@ -10184,6 +10185,19 @@ static void test_extended_context(void)
     /* Test GetThreadContext for the other thread. */
     thread = CreateThread(NULL, 0, test_extended_context_thread, 0, CREATE_SUSPENDED, NULL);
     ok(!!thread, "Failed to create thread.\n");
+
+    /* Unaligned xstate. */
+    length = sizeof(context_buffer);
+    memset(context_buffer, 0xcc, sizeof(context_buffer));
+    bret = pInitializeContext(context_buffer, CONTEXT_FULL | CONTEXT_XSTATE | CONTEXT_FLOATING_POINT,
+            &context, &length);
+    ok(bret, "Got unexpected bret %#x.\n", bret);
+    context_ex = (CONTEXT_EX *)(context + 1);
+    context_ex->XState.Offset += 0x10;
+    status = pNtGetContextThread(thread, context);
+    ok(status == STATUS_INVALID_PARAMETER, "Unexpected status %#lx.\n", status);
+    status = pNtGetContextThread(GetCurrentThread(), context);
+    ok(status == STATUS_INVALID_PARAMETER, "Unexpected status %#lx.\n", status);
 
     bret = pInitializeContext(context_buffer, CONTEXT_FULL | CONTEXT_XSTATE | CONTEXT_FLOATING_POINT,
             &context, &length);
