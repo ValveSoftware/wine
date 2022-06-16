@@ -1085,6 +1085,8 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
     BOOL use_cached_debug_regs = FALSE;
     BOOL self = (handle == GetCurrentThread());
 
+    if (!validate_context_xstate( context )) return STATUS_INVALID_PARAMETER;
+
     if (self && needed_flags & CONTEXT_DEBUG_REGISTERS)
     {
         /* debug registers require a server call if hw breakpoints are enabled */
@@ -1174,8 +1176,6 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
         CONTEXT_EX *context_ex = (CONTEXT_EX *)(context + 1);
         XSAVE_AREA_HEADER *xstate = (XSAVE_AREA_HEADER *)((char *)context_ex + context_ex->XState.Offset);
         UINT64 mask;
-
-        if (!validate_context_xstate( context )) return STATUS_INVALID_PARAMETER;
 
         if (xstate_compaction_enabled) frame->xstate.CompactionMask |= xstate_extended_features();
         mask = (xstate_compaction_enabled ? xstate->CompactionMask : xstate->Mask) & xstate_extended_features();

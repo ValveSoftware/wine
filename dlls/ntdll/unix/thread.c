@@ -165,6 +165,8 @@ BOOL validate_context_xstate( CONTEXT *context )
 {
     CONTEXT_EX *context_ex;
 
+    if (!((context->ContextFlags & 0x40) && xstate_extended_features())) return TRUE;
+
     context_ex = (CONTEXT_EX *)(context + 1);
 
     if (context_ex->XState.Length < sizeof(XSAVE_AREA_HEADER) ||
