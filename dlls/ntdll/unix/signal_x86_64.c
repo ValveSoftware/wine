@@ -1175,9 +1175,7 @@ NTSTATUS WINAPI NtGetContextThread( HANDLE handle, CONTEXT *context )
         XSAVE_AREA_HEADER *xstate = (XSAVE_AREA_HEADER *)((char *)context_ex + context_ex->XState.Offset);
         UINT64 mask;
 
-        if (context_ex->XState.Length < sizeof(XSAVE_AREA_HEADER) ||
-            context_ex->XState.Length > sizeof(XSAVE_AREA_HEADER) + xstate_features_size)
-            return STATUS_INVALID_PARAMETER;
+        if (!validate_context_xstate( context )) return STATUS_INVALID_PARAMETER;
 
         if (xstate_compaction_enabled) frame->xstate.CompactionMask |= xstate_extended_features();
         mask = (xstate_compaction_enabled ? xstate->CompactionMask : xstate->Mask) & xstate_extended_features();
