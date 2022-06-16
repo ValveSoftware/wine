@@ -174,6 +174,8 @@ BOOL validate_context_xstate( CONTEXT *context )
         || context_ex->XState.Length > sizeof(XSTATE))
         return FALSE;
 
+    if (((ULONG_PTR)context_ex + context_ex->XState.Offset) & 63) return FALSE;
+
     return TRUE;
 }
 
