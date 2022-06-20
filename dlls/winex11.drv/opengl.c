@@ -1947,7 +1947,7 @@ static GLXContext get_common_context( GLXFBConfig fbconfig )
         if (e)
             share_all_contexts = !!atoi(e);
         else
-            share_all_contexts = sgi && !strcmp( sgi, "232050" );
+            share_all_contexts = sgi && (!strcmp( sgi, "232050" ) || !strcmp( sgi, "333420" ));
 
         if (share_all_contexts)
             FIXME( "HACK: sharing all the GL contexts.\n" );
