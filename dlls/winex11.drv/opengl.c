@@ -1933,6 +1933,34 @@ static BOOL WINAPI glxdrv_wglCopyContext(struct wgl_context *src, struct wgl_con
     return TRUE;
 }
 
+static int share_all_contexts = -1;
+
+static GLXContext get_common_context( GLXFBConfig fbconfig )
+{
+    static GLXContext common_context;
+
+    if (share_all_contexts == -1)
+    {
+        const char *e = getenv( "WINE_SHARE_ALL_GL_CONTEXTS" );
+        const char *sgi = getenv( "SteamGameId" );
+
+        if (e)
+            share_all_contexts = !!atoi(e);
+        else
+            share_all_contexts = sgi && !strcmp( sgi, "232050" );
+
+        if (share_all_contexts)
+            FIXME( "HACK: sharing all the GL contexts.\n" );
+    }
+
+    if (!share_all_contexts) return NULL;
+
+    if (!common_context)
+        common_context = pglXCreateNewContext( gdi_display, fbconfig, GLX_RGBA_TYPE, NULL, TRUE );
+
+    return common_context;
+}
+
 /***********************************************************************
  *		glxdrv_wglCreateContext
  */
@@ -1951,7 +1979,7 @@ static struct wgl_context * WINAPI glxdrv_wglCreateContext( HDC hdc )
     {
         ret->hdc = hdc;
         ret->fmt = gl->format;
-        ret->ctx = create_glxcontext(gdi_display, ret, NULL);
+        ret->ctx = create_glxcontext(gdi_display, ret, get_common_context( ret->fmt->fbconfig ));
         EnterCriticalSection( &context_section );
         list_add_head( &context_list, &ret->entry );
         LeaveCriticalSection( &context_section );
@@ -2664,6 +2692,8 @@ static BOOL WINAPI glxdrv_wglShareLists(struct wgl_context *org, struct wgl_cont
      * and when a program requests sharing we recreate the destination context if it hasn't been made
      * current or when it hasn't shared display lists before.
      */
+
+    if (share_all_contexts == 1) return TRUE;
 
     if((org->has_been_current && dest->has_been_current) || dest->has_been_current)
     {
@@ -3380,7 +3410,8 @@ static struct wgl_context *X11DRV_wglCreateContextAttribsARB( HDC hdc, struct wg
         }
 
         X11DRV_expect_error(gdi_display, GLXErrorHandler, NULL);
-        ret->ctx = create_glxcontext(gdi_display, ret, hShareContext ? hShareContext->ctx : NULL);
+        ret->ctx = create_glxcontext(gdi_display, ret,
+                                     hShareContext ? hShareContext->ctx : get_common_context( ret->fmt->fbconfig ));
         XSync(gdi_display, False);
         if ((err = X11DRV_check_error(gdi_display)) || !ret->ctx)
         {
