@@ -2,6 +2,7 @@
 
 #include "config.h"
 #include <stdarg.h>
+#include <stdlib.h>
 #include "winternl.h"
 #include "opengl_ext.h"
 #include "wine/debug.h"
@@ -13240,6 +13241,71 @@ static void WINAPI glShaderOp3EXT( GLenum op, GLuint res, GLuint arg1, GLuint ar
   funcs->ext.p_glShaderOp3EXT( op, res, arg1, arg2, arg3 );
 }
 
+static BOOL fixup_shader( GLhandleARB shaderObj, GLsizei count, const GLcharARB **string, const GLint *length )
+{
+  static int needs_fixup = -1;
+  static unsigned int once;
+
+  const struct opengl_funcs *funcs;
+  const char add_ext[] = "#version 120\r\n"
+                         "#extension GL_ARB_explicit_uniform_location : enable\r\n"
+                         "#extension GL_ARB_explicit_attrib_location : enable\r\n";
+  const char search_str[] = "uniform mat4 boneMatrices[NBONES];";
+  const char prepend_str[] = "layout(location = 2) ";
+  unsigned int search_len, new_len;
+  const char *p, *next;
+  BOOL found = FALSE;
+  char *new, *out;
+
+  if (needs_fixup == -1)
+  {
+      const char *sgi = getenv("SteamGameId");
+
+      needs_fixup = sgi && !strcmp( sgi, "333420" );
+  }
+
+  if (!needs_fixup) return FALSE;
+
+  if (length || count != 1) return FALSE;
+
+  if (!once++)
+      FIXME( "HACK: Fixing up shader.\n" );
+
+  TRACE( "Appending extension string.\n" );
+  new_len = strlen( *string ) + sizeof(prepend_str) - 1 + sizeof(add_ext);
+  new = out = malloc( new_len );
+  memcpy( out, add_ext, sizeof(add_ext) - 1 );
+  out += sizeof(add_ext) - 1;
+
+  search_len = sizeof(search_str) - 1;
+  next = *string;
+  while (*(p = next))
+  {
+      while (*next && *next != '\r' && *next != '\n') ++next;
+
+      if (next - p == search_len && !memcmp( p, search_str, search_len ))
+      {
+          TRACE( "Adding explicit location.\n" );
+          memcpy( out, *string, p - *string );
+          out += p - *string;
+          memcpy( out, prepend_str, sizeof(prepend_str) - 1 );
+          out += sizeof(prepend_str) - 1;
+          strcpy( out, p );
+          found = TRUE;
+          break;
+      }
+
+      while (*next == '\n' || *next == '\r') ++next;
+  }
+  if (!found)
+      strcpy( out, *string );
+
+  funcs = NtCurrentTeb()->glTable;
+  funcs->ext.p_glShaderSourceARB( shaderObj, 1, (const GLcharARB **)&new, NULL );
+  free( new );
+  return TRUE;
+}
+
 static void WINAPI glShaderSource( GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length )
 {
   const struct opengl_funcs *funcs = NtCurrentTeb()->glTable;
@@ -13251,6 +13317,8 @@ static void WINAPI glShaderSourceARB( GLhandleARB shaderObj, GLsizei count, cons
 {
   const struct opengl_funcs *funcs = NtCurrentTeb()->glTable;
   TRACE( "(%d, %d, %p, %p)\n", shaderObj, count, string, length );
+
+  if (fixup_shader( shaderObj, count, string, length )) return;
   funcs->ext.p_glShaderSourceARB( shaderObj, count, string, length );
 }
 
