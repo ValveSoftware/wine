@@ -23,6 +23,7 @@
 #include "config.h"
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <dlfcn.h>
 
@@ -585,6 +586,17 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
     return result;
 }
 
+static BOOL disable_opwr(void)
+{
+    static int disable = -1;
+    if (disable == -1)
+    {
+        const char *e = getenv("WINE_DISABLE_VULKAN_OPWR");
+        disable = e && atoi(e);
+    }
+    return disable;
+}
+
 static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
         const VkWin32SurfaceCreateInfoKHR *create_info,
         const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface)
@@ -616,6 +628,14 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
             XSetWindowAttributes attr;
 
             WARN("Other process window %p.\n", x11_surface->hwnd);
+
+            if (disable_opwr() && x11_surface->hwnd != GetDesktopWindow())
+            {
+                ERR("HACK: Failing surface creation for other process window %p.\n", create_info->hwnd);
+                res = VK_ERROR_OUT_OF_HOST_MEMORY;
+                goto err;
+            }
+
             GetClientRect( x11_surface->hwnd, &rect );
             x11_surface->width = max( rect.right - rect.left, 1 );
             x11_surface->height = max( rect.bottom - rect.top, 1 );
