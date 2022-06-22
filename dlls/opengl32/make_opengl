@@ -182,6 +182,8 @@ my %manual_win_thunks =
      "wglGetProcAddress" => 1,
      "wglQueryCurrentRendererStringWINE" => 1,
      "wglQueryRendererStringWINE" => 1,
+     "glShaderSource" => 1,
+     "glShaderSourceARB" => 1,
      "wglSwapBuffers" => 1,
     );
 my %manual_unix_thunks =

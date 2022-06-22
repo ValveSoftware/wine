@@ -18432,22 +18432,6 @@ static void WINAPI glShaderOp3EXT( GLenum op, GLuint res, GLuint arg1, GLuint ar
     if ((status = UNIX_CALL( glShaderOp3EXT, &args ))) WARN( "glShaderOp3EXT returned %#lx\n", status );
 }
 
-static void WINAPI glShaderSource( GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length )
-{
-    struct glShaderSource_params args = { .teb = NtCurrentTeb(), .shader = shader, .count = count, .string = string, .length = length };
-    NTSTATUS status;
-    TRACE( "shader %d, count %d, string %p, length %p\n", shader, count, string, length );
-    if ((status = UNIX_CALL( glShaderSource, &args ))) WARN( "glShaderSource returned %#lx\n", status );
-}
-
-static void WINAPI glShaderSourceARB( GLhandleARB shaderObj, GLsizei count, const GLcharARB **string, const GLint *length )
-{
-    struct glShaderSourceARB_params args = { .teb = NtCurrentTeb(), .shaderObj = shaderObj, .count = count, .string = string, .length = length };
-    NTSTATUS status;
-    TRACE( "shaderObj %d, count %d, string %p, length %p\n", shaderObj, count, string, length );
-    if ((status = UNIX_CALL( glShaderSourceARB, &args ))) WARN( "glShaderSourceARB returned %#lx\n", status );
-}
-
 static void WINAPI glShaderStorageBlockBinding( GLuint program, GLuint storageBlockIndex, GLuint storageBlockBinding )
 {
     struct glShaderStorageBlockBinding_params args = { .teb = NtCurrentTeb(), .program = program, .storageBlockIndex = storageBlockIndex, .storageBlockBinding = storageBlockBinding };
@@ -24877,6 +24861,8 @@ static BOOL WINAPI wglSwapIntervalEXT( int interval )
 }
 
 extern const GLubyte * WINAPI glGetStringi( GLenum name, GLuint index );
+extern void WINAPI glShaderSource( GLuint shader, GLsizei count, const GLchar *const*string, const GLint *length );
+extern void WINAPI glShaderSourceARB( GLhandleARB shaderObj, GLsizei count, const GLcharARB **string, const GLint *length );
 extern BOOL WINAPI wglChoosePixelFormatARB( HDC hdc, const int *piAttribIList, const FLOAT *pfAttribFList, UINT nMaxFormats, int *piFormats, UINT *nNumFormats );
 extern HDC WINAPI wglGetCurrentReadDCARB(void);
 extern const char * WINAPI wglGetExtensionsStringARB( HDC hdc );
