@@ -513,6 +513,18 @@ static int visual_class_alloc( int class )
     return class == PseudoColor || class == GrayScale || class == DirectColor ? AllocAll : AllocNone;
 }
 
+static BOOL disable_opwr(void)
+{
+    static int disable = -1;
+
+    if (disable == -1)
+    {
+        const char *e = getenv( "WINE_DISABLE_VULKAN_OPWR" );
+        disable = e && atoi( e );
+    }
+    return disable;
+}
+
 Window x11drv_client_surface_create( HWND hwnd, BOOL raw, int format, struct client_surface **client )
 {
     UINT dpi = raw ? NtUserGetWinMonitorDpi( hwnd, MDT_RAW_DPI ) : NtUserGetDpiForWindow( hwnd );
@@ -538,6 +550,12 @@ Window x11drv_client_surface_create( HWND hwnd, BOOL raw, int format, struct cli
         XSetWindowAttributes attr;
         RECT rect = surface->rect;
         unsigned int width, height;
+
+        if (disable_opwr() && hwnd != NtUserGetDesktopWindow())
+        {
+            ERR( "HACK: Failing surface creation for other process window %p.\n", hwnd );
+            goto failed;
+        }
 
         width = max( rect.right - rect.left, 1 );
         height = max( rect.bottom - rect.top, 1 );
