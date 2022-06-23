@@ -3682,6 +3682,17 @@ BOOL WINAPI SendMessageCallbackW( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lpa
 }
 
 
+static BOOL is_ffxiv_launcher_msg(const MSG *msg)
+{
+    static const WCHAR ffxiv_class[] = L"FFXIVLauncher";
+    WCHAR class[ARRAY_SIZE(ffxiv_class)];
+
+    if(msg->message < WM_USER || msg->message >= WM_APP)
+        return FALSE;
+    return (GetClassNameW(msg->hwnd, class, ARRAY_SIZE(class)) == ARRAY_SIZE(ffxiv_class) - 1) &&
+           !wcscmp(class, ffxiv_class);
+}
+
 /***********************************************************************
  *		ReplyMessage  (USER32.@)
  */
@@ -3690,6 +3701,7 @@ BOOL WINAPI ReplyMessage( LRESULT result )
     struct received_message_info *info = get_user_thread_info()->receive_info;
 
     if (!info) return FALSE;
+    if (is_ffxiv_launcher_msg(&info->msg)) return FALSE;  /* FIXME HACK */
     reply_message( info, result, FALSE );
     return TRUE;
 }
