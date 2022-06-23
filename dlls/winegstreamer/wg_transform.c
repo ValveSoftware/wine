@@ -51,10 +51,10 @@ struct wg_transform
     GstPad *my_src, *my_sink;
     GstPad *their_sink, *their_src;
     GstSegment segment;
-    GstBufferList *input;
     guint input_max_length;
     guint output_plane_align;
     struct wg_sample *output_wg_sample;
+    GstAtomicQueue *input_queue;
     GstAtomicQueue *output_queue;
     GstSample *output_sample;
     bool output_caps_changed;
@@ -240,9 +240,11 @@ NTSTATUS wg_transform_destroy(void *args)
 {
     struct wg_transform *transform = args;
     GstSample *sample;
+    GstBuffer *buffer;
 
-    if (transform->input)
-        gst_buffer_list_unref(transform->input);
+    while ((buffer = gst_atomic_queue_pop(transform->input_queue)))
+        gst_buffer_unref(buffer);
+    gst_atomic_queue_unref(transform->input_queue);
 
     gst_element_set_state(transform->container, GST_STATE_NULL);
 
@@ -366,7 +368,7 @@ NTSTATUS wg_transform_create(void *args)
         return STATUS_NO_MEMORY;
     if (!(transform->container = gst_bin_new("wg_transform")))
         goto out;
-    if (!(transform->input = gst_buffer_list_new()))
+    if (!(transform->input_queue = gst_atomic_queue_new(8)))
         goto out;
     if (!(transform->output_queue = gst_atomic_queue_new(8)))
         goto out;
@@ -533,8 +535,8 @@ out:
         wg_allocator_destroy(transform->allocator);
     if (transform->output_queue)
         gst_atomic_queue_unref(transform->output_queue);
-    if (transform->input)
-        gst_buffer_list_unref(transform->input);
+    if (transform->input_queue)
+        gst_atomic_queue_unref(transform->input_queue);
     if (transform->container)
     {
         gst_element_set_state(transform->container, GST_STATE_NULL);
@@ -605,7 +607,7 @@ NTSTATUS wg_transform_push_data(void *args)
     GstBuffer *buffer;
     guint length;
 
-    length = gst_buffer_list_length(transform->input);
+    length = gst_atomic_queue_length(transform->input_queue);
     if (length >= transform->input_max_length)
     {
         GST_INFO("Refusing %u bytes, %u buffers already queued", sample->size, length);
@@ -631,7 +633,7 @@ NTSTATUS wg_transform_push_data(void *args)
         GST_BUFFER_DURATION(buffer) = sample->duration * 100;
     if (!(sample->flags & WG_SAMPLE_FLAG_SYNC_POINT))
         GST_BUFFER_FLAG_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT);
-    gst_buffer_list_insert(transform->input, -1, buffer);
+    gst_atomic_queue_push(transform->input_queue, buffer);
 
     params->result = S_OK;
     return STATUS_SUCCESS;
@@ -786,9 +788,8 @@ NTSTATUS wg_transform_read_data(void *args)
     struct wg_transform *transform = params->transform;
     struct wg_sample *sample = params->sample;
     struct wg_format *format = params->format;
+    GstBuffer *output_buffer, *input_buffer;
     GstFlowReturn ret = GST_FLOW_OK;
-    GstBuffer *output_buffer;
-    GstBufferList *input;
     GstCaps *output_caps;
     bool discard_data;
     NTSTATUS status;
@@ -797,17 +798,14 @@ NTSTATUS wg_transform_read_data(void *args)
     InterlockedIncrement(&sample->refcount);
     InterlockedExchangePointer((void **)&transform->output_wg_sample, sample);
 
-    if (!gst_buffer_list_length(transform->input))
-        GST_DEBUG("Not input buffer queued");
-    else if ((input = gst_buffer_list_new()))
+    while (!transform->output_sample && ret == GST_FLOW_OK)
     {
-        ret = gst_pad_push_list(transform->my_src, transform->input);
-        transform->input = input;
-    }
-    else
-    {
-        GST_ERROR("Failed to allocate new input queue");
-        ret = GST_FLOW_ERROR;
+        if ((input_buffer = gst_atomic_queue_pop(transform->input_queue)))
+            ret = gst_pad_push(transform->my_src, input_buffer);
+        transform->output_sample = gst_atomic_queue_pop(transform->output_queue);
+
+        if (!input_buffer)
+            break;
     }
 
     /* Remove the sample so transform_request_sample cannot use it */
@@ -821,7 +819,7 @@ NTSTATUS wg_transform_read_data(void *args)
         return STATUS_UNSUCCESSFUL;
     }
 
-    if (!transform->output_sample && !(transform->output_sample = gst_atomic_queue_pop(transform->output_queue)))
+    if (!transform->output_sample)
     {
         sample->size = 0;
         params->result = MF_E_TRANSFORM_NEED_MORE_INPUT;
