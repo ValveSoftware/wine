@@ -1189,6 +1189,19 @@ static void reply_message( struct received_message_info *info, LRESULT result, M
     SERVER_END_REQ;
 }
 
+static BOOL is_ffxiv_launcher_msg(const MSG *msg)
+{
+    static const WCHAR ffxiv_class[] = u"FFXIVLauncher";
+    WCHAR class[ARRAY_SIZE(ffxiv_class)];
+    UNICODE_STRING name = { .Buffer = class, .MaximumLength = sizeof(class) };
+
+    if(msg->message < WM_USER || msg->message >= WM_APP)
+        return FALSE;
+    return (NtUserGetClassName( msg->hwnd, FALSE, &name ) == ARRAY_SIZE(ffxiv_class) - 1) &&
+           !wcscmp( class, ffxiv_class );
+}
+
+
 /***********************************************************************
  *           reply_message_result
  *
@@ -1201,6 +1214,7 @@ BOOL reply_message_result( LRESULT result )
 
     while (info && info->type == MSG_CLIENT_MESSAGE) info = info->prev;
     if (!info) return FALSE;
+    if (is_ffxiv_launcher_msg( &info->msg )) return FALSE;  /* FIXME HACK */
     reply_message( info, result, NULL );
     return TRUE;
 }
