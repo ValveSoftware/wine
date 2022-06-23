@@ -6670,6 +6670,9 @@ static void test_h264_decoder(void)
             ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_H264_ES),
         },
     };
+    static const DWORD input_width = 120, input_height = 248;
+    static const DWORD align_input_width = (input_width + 15) & ~15;
+    static const DWORD align_input_height = (input_height + 15) & ~15;
     static const media_type_desc default_outputs[] =
     {
         {
@@ -6677,7 +6680,7 @@ static void test_h264_decoder(void)
             ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_NV12),
             ATTR_RATIO(MF_MT_PIXEL_ASPECT_RATIO, 1, 1),
             ATTR_RATIO(MF_MT_FRAME_RATE, 30000, 1001),
-            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, 1920),
+            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, input_width),
             ATTR_UINT32(MF_MT_INTERLACE_MODE, 7),
             ATTR_UINT32(MF_MT_FIXED_SIZE_SAMPLES, 1),
             ATTR_UINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 1),
@@ -6687,7 +6690,7 @@ static void test_h264_decoder(void)
             ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_YV12),
             ATTR_RATIO(MF_MT_PIXEL_ASPECT_RATIO, 1, 1),
             ATTR_RATIO(MF_MT_FRAME_RATE, 30000, 1001),
-            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, 1920),
+            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, input_width),
             ATTR_UINT32(MF_MT_INTERLACE_MODE, 7),
             ATTR_UINT32(MF_MT_FIXED_SIZE_SAMPLES, 1),
             ATTR_UINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 1),
@@ -6697,7 +6700,7 @@ static void test_h264_decoder(void)
             ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_IYUV),
             ATTR_RATIO(MF_MT_PIXEL_ASPECT_RATIO, 1, 1),
             ATTR_RATIO(MF_MT_FRAME_RATE, 30000, 1001),
-            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, 1920),
+            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, input_width),
             ATTR_UINT32(MF_MT_INTERLACE_MODE, 7),
             ATTR_UINT32(MF_MT_FIXED_SIZE_SAMPLES, 1),
             ATTR_UINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 1),
@@ -6707,7 +6710,7 @@ static void test_h264_decoder(void)
             ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_I420),
             ATTR_RATIO(MF_MT_PIXEL_ASPECT_RATIO, 1, 1),
             ATTR_RATIO(MF_MT_FRAME_RATE, 30000, 1001),
-            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, 1920),
+            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, input_width),
             ATTR_UINT32(MF_MT_INTERLACE_MODE, 7),
             ATTR_UINT32(MF_MT_FIXED_SIZE_SAMPLES, 1),
             ATTR_UINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 1),
@@ -6717,7 +6720,7 @@ static void test_h264_decoder(void)
             ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_YUY2),
             ATTR_RATIO(MF_MT_PIXEL_ASPECT_RATIO, 1, 1),
             ATTR_RATIO(MF_MT_FRAME_RATE, 30000, 1001),
-            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, 3840),
+            ATTR_UINT32(MF_MT_DEFAULT_STRIDE, input_width * 2),
             ATTR_UINT32(MF_MT_INTERLACE_MODE, 7),
             ATTR_UINT32(MF_MT_FIXED_SIZE_SAMPLES, 1),
             ATTR_UINT32(MF_MT_ALL_SAMPLES_INDEPENDENT, 1),
@@ -6726,76 +6729,77 @@ static void test_h264_decoder(void)
     static const media_type_desc default_outputs_extra[] =
     {
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1080),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3110400),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, input_width * input_height * 3 / 2),
             ATTR_UINT32(MF_MT_VIDEO_ROTATION, 0),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1080),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3110400),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, input_width * input_height * 3 / 2),
             ATTR_UINT32(MF_MT_VIDEO_ROTATION, 0),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1080),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3110400),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, input_width * input_height * 3 / 2),
             ATTR_UINT32(MF_MT_VIDEO_ROTATION, 0),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1080),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3110400),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, input_width * input_height * 3 / 2),
             ATTR_UINT32(MF_MT_VIDEO_ROTATION, 0),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1080),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 4147200),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, input_width * input_height * 2),
             ATTR_UINT32(MF_MT_VIDEO_ROTATION, 0),
         },
     };
     static const media_type_desc default_outputs_win7[] =
     {
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1088),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3133440),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, align_input_width, align_input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, align_input_width * align_input_height * 3 / 2),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1088),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3133440),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, align_input_width, align_input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, align_input_width * align_input_height * 3 / 2),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1088),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3133440),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, align_input_width, align_input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, align_input_width * align_input_height * 3 / 2),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1088),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3133440),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, align_input_width, align_input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, align_input_width * align_input_height * 3 / 2),
         },
         {
-            ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1088),
-            ATTR_UINT32(MF_MT_SAMPLE_SIZE, 4177920),
+            ATTR_RATIO(MF_MT_FRAME_SIZE, align_input_width, align_input_height),
+            ATTR_UINT32(MF_MT_SAMPLE_SIZE, align_input_width * align_input_height * 2),
         },
     };
     static const struct attribute_desc input_type_desc[] =
     {
         ATTR_GUID(MF_MT_MAJOR_TYPE, MFMediaType_Video),
         ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_H264),
+        ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
         {0},
     };
     static const struct attribute_desc minimal_output_type_desc[] =
     {
         ATTR_GUID(MF_MT_MAJOR_TYPE, MFMediaType_Video),
         ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_NV12),
-        ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1080),
+        ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
         {0},
     };
     static const struct attribute_desc output_type_desc[] =
     {
         ATTR_GUID(MF_MT_MAJOR_TYPE, MFMediaType_Video),
         ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_NV12),
-        ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1080),
+        ATTR_RATIO(MF_MT_FRAME_SIZE, input_width, input_height),
         ATTR_RATIO(MF_MT_FRAME_RATE, 60000, 1000),
         ATTR_RATIO(MF_MT_PIXEL_ASPECT_RATIO, 2, 1),
         ATTR_UINT32(MF_MT_DEFAULT_STRIDE, 3840),
-        ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3840 * 1080 * 3 / 2),
+        ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3840 * input_height * 3 / 2),
         ATTR_UINT32(MF_MT_VIDEO_ROTATION, 0),
         {0},
     };
@@ -6803,11 +6807,11 @@ static void test_h264_decoder(void)
     {
         ATTR_GUID(MF_MT_MAJOR_TYPE, MFMediaType_Video),
         ATTR_GUID(MF_MT_SUBTYPE, MFVideoFormat_NV12),
-        ATTR_RATIO(MF_MT_FRAME_SIZE, 1920, 1088),
+        ATTR_RATIO(MF_MT_FRAME_SIZE, align_input_width, align_input_height),
         ATTR_RATIO(MF_MT_FRAME_RATE, 60000, 1000),
         ATTR_RATIO(MF_MT_PIXEL_ASPECT_RATIO, 2, 1),
         ATTR_UINT32(MF_MT_DEFAULT_STRIDE, 3840),
-        ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3840 * 1088 * 3 / 2),
+        ATTR_UINT32(MF_MT_SAMPLE_SIZE, 3840 * align_input_height * 3 / 2),
         ATTR_UINT32(MF_MT_VIDEO_ROTATION, 0),
         {0},
     };
@@ -7013,6 +7017,9 @@ static void test_h264_decoder(void)
     init_media_type(media_type, input_type_desc, 2);
     hr = IMFTransform_SetInputType(transform, 0, media_type, 0);
     ok(hr == S_OK, "SetInputType returned %#lx.\n", hr);
+    init_media_type(media_type, input_type_desc, -1);
+    hr = IMFTransform_SetInputType(transform, 0, media_type, 0);
+    ok(hr == S_OK, "SetInputType returned %#lx.\n", hr);
     ret = IMFMediaType_Release(media_type);
     ok(ret == 1, "Release returned %lu\n", ret);
 
@@ -7022,7 +7029,8 @@ static void test_h264_decoder(void)
     ok(hr == S_OK, "GetOutputStreamInfo returned %#lx\n", hr);
     ok(output_info.dwFlags == flags, "got dwFlags %#lx\n", output_info.dwFlags);
     todo_wine
-    ok(output_info.cbSize == 1920 * 1080 * 2 || broken(output_info.cbSize == 1920 * 1088 * 2) /* Win7 */,
+    ok(output_info.cbSize == input_width * input_height * 2
+            || broken(output_info.cbSize == align_input_width * align_input_height * 2) /* Win7 */,
             "got cbSize %#lx\n", output_info.cbSize);
     ok(output_info.cbAlignment == 0, "got cbAlignment %#lx\n", output_info.cbAlignment);
 
@@ -7109,7 +7117,8 @@ static void test_h264_decoder(void)
     ok(hr == S_OK, "GetOutputStreamInfo returned %#lx\n", hr);
     ok(output_info.dwFlags == flags, "got dwFlags %#lx\n", output_info.dwFlags);
     todo_wine
-    ok(output_info.cbSize == 1920 * 1080 * 2 || broken(output_info.cbSize == 1920 * 1088 * 2) /* Win7 */,
+    ok(output_info.cbSize == input_width * input_height * 2
+            || broken(output_info.cbSize == align_input_width * align_input_height * 2) /* Win7 */,
             "got cbSize %#lx\n", output_info.cbSize);
     ok(output_info.cbAlignment == 0, "got cbAlignment %#lx\n", output_info.cbAlignment);
 
