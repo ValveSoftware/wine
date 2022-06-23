@@ -341,9 +341,14 @@ static struct wg_sample *transform_request_sample(gsize size, void *context)
 
     GST_LOG("size %#zx, context %p", size, transform);
 
-    sample = InterlockedExchangePointer((void **)&transform->output_wg_sample, NULL);
-    if (!sample || sample->max_size < size)
+    if (!(sample = InterlockedExchangePointer((void **)&transform->output_wg_sample, NULL)))
         return NULL;
+
+    if (sample->max_size < size)
+    {
+        InterlockedDecrement(&sample->refcount);
+        return NULL;
+    }
 
     return sample;
 }
