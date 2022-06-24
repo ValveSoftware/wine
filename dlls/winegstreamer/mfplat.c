@@ -691,6 +691,7 @@ video_formats[] =
     {&MFVideoFormat_RGB24,  WG_VIDEO_FORMAT_BGR},
     {&MFVideoFormat_RGB555, WG_VIDEO_FORMAT_RGB15},
     {&MFVideoFormat_RGB565, WG_VIDEO_FORMAT_RGB16},
+    {&MFVideoFormat_ABGR32, WG_VIDEO_FORMAT_RGBA},
     {&MFVideoFormat_AYUV,   WG_VIDEO_FORMAT_AYUV},
     {&MFVideoFormat_I420,   WG_VIDEO_FORMAT_I420},
     {&MFVideoFormat_IYUV,   WG_VIDEO_FORMAT_I420},
