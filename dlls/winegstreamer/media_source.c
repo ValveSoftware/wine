@@ -1333,13 +1333,17 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
 
     wg_parser_disconnect(source->wg_parser);
 
-    source->read_thread_shutdown = true;
-    WaitForSingleObject(source->read_thread, INFINITE);
-    CloseHandle(source->read_thread);
+    if (source->read_thread != NULL)
+    {
+        source->read_thread_shutdown = true;
+        WaitForSingleObject(source->read_thread, INFINITE);
+        CloseHandle(source->read_thread);
+    }
 
     IMFPresentationDescriptor_Release(source->pres_desc);
     IMFMediaEventQueue_Shutdown(source->event_queue);
-    IMFByteStream_Release(source->byte_stream);
+    if (source->byte_stream)
+        IMFByteStream_Release(source->byte_stream);
 
     for (i = 0; i < source->stream_count; i++)
     {
@@ -1380,36 +1384,14 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
     media_source_Shutdown,
 };
 
-static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_source **out_media_source)
+static HRESULT media_source_init_from_parser(struct wg_parser *parser, uint64_t file_size, const WCHAR *uri, struct media_source *object)
 {
     BOOL video_selected = FALSE, audio_selected = FALSE;
     IMFStreamDescriptor **descriptors = NULL;
     unsigned int stream_count = UINT_MAX;
-    struct media_source *object;
     UINT64 total_pres_time = 0;
-    struct wg_parser *parser;
-    DWORD bytestream_caps;
-    uint64_t file_size;
     unsigned int i;
     HRESULT hr;
-
-    if (FAILED(hr = IMFByteStream_GetCapabilities(bytestream, &bytestream_caps)))
-        return hr;
-
-    if (!(bytestream_caps & MFBYTESTREAM_IS_SEEKABLE))
-    {
-        FIXME("Non-seekable bytestreams not supported.\n");
-        return MF_E_BYTESTREAM_NOT_SEEKABLE;
-    }
-
-    if (FAILED(hr = IMFByteStream_GetLength(bytestream, &file_size)))
-    {
-        FIXME("Failed to get byte stream length, hr %#lx.\n", hr);
-        return hr;
-    }
-
-    if (!(object = calloc(1, sizeof(*object))))
-        return E_OUTOFMEMORY;
 
     object->IMFMediaSource_iface.lpVtbl = &IMFMediaSource_vtbl;
     object->IMFGetService_iface.lpVtbl = &media_source_get_service_vtbl;
@@ -1417,8 +1399,6 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
     object->IMFRateControl_iface.lpVtbl = &media_source_rate_control_vtbl;
     object->async_commands_callback.lpVtbl = &source_async_commands_callback_vtbl;
     object->ref = 1;
-    object->byte_stream = bytestream;
-    IMFByteStream_AddRef(bytestream);
     object->rate = 1.0f;
 
     if (FAILED(hr = MFCreateEventQueue(&object->event_queue)))
@@ -1426,19 +1406,11 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
 
     if (FAILED(hr = MFAllocateWorkQueue(&object->async_commands_queue)))
         goto fail;
-
-    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN)))
-    {
-        hr = E_OUTOFMEMORY;
-        goto fail;
-    }
     object->wg_parser = parser;
-
-    object->read_thread = CreateThread(NULL, 0, read_thread, object, 0, NULL);
 
     object->state = SOURCE_OPENING;
 
-    if (FAILED(hr = wg_parser_connect(parser, file_size)))
+    if (FAILED(hr = wg_parser_connect(parser, file_size, uri)))
         goto fail;
 
     stream_count = wg_parser_get_stream_count(parser);
@@ -1531,7 +1503,6 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
 
     object->state = SOURCE_STOPPED;
 
-    *out_media_source = object;
     return S_OK;
 
     fail:
@@ -1556,18 +1527,91 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
     free(object->streams);
     if (stream_count != UINT_MAX)
         wg_parser_disconnect(object->wg_parser);
-    if (object->read_thread)
-    {
-        object->read_thread_shutdown = true;
-        WaitForSingleObject(object->read_thread, INFINITE);
-        CloseHandle(object->read_thread);
-    }
     if (object->wg_parser)
         wg_parser_destroy(object->wg_parser);
     if (object->async_commands_queue)
         MFUnlockWorkQueue(object->async_commands_queue);
     if (object->event_queue)
         IMFMediaEventQueue_Release(object->event_queue);
+    return hr;
+}
+
+HRESULT winegstreamer_create_media_source_from_uri(const WCHAR *uri, IUnknown **out_media_source)
+{
+    struct media_source *object;
+    struct wg_parser *parser;
+    HRESULT hr;
+
+    if (!(object = calloc(1, sizeof(*object))))
+        return E_OUTOFMEMORY;
+
+    if (!(parser = wg_parser_create(WG_PARSER_URIDECODEBIN)))
+    {
+        hr = E_OUTOFMEMORY;
+        goto fail;
+    }
+
+    if (FAILED(hr = media_source_init_from_parser(parser, 0, uri, object)))
+        goto fail;
+
+    *out_media_source = (IUnknown *)&object->IMFMediaSource_iface;
+    return S_OK;
+    fail:
+    free(object);
+    return hr;
+}
+
+static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_source **out_media_source)
+{
+    struct wg_parser *parser;
+    struct media_source *object;
+    DWORD bytestream_caps;
+    uint64_t file_size;
+    HRESULT hr;
+
+    if (!(object = calloc(1, sizeof(*object))))
+        return E_OUTOFMEMORY;
+
+    if (FAILED(hr = IMFByteStream_GetCapabilities(bytestream, &bytestream_caps)))
+        return hr;
+
+    if (!(bytestream_caps & MFBYTESTREAM_IS_SEEKABLE))
+    {
+        FIXME("Non-seekable bytestreams not supported.\n");
+        return MF_E_BYTESTREAM_NOT_SEEKABLE;
+    }
+
+    if (FAILED(hr = IMFByteStream_GetLength(bytestream, &file_size)))
+    {
+        FIXME("Failed to get byte stream length, hr %#lx.\n", hr);
+        return hr;
+    }
+
+    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN)))
+    {
+        hr = E_OUTOFMEMORY;
+        goto fail;
+    }
+
+    object->byte_stream = bytestream;
+    IMFByteStream_AddRef(bytestream);
+
+    object->read_thread = CreateThread(NULL, 0, read_thread, object, 0, NULL);
+
+    if (FAILED(hr = media_source_init_from_parser(parser, file_size, NULL, object)))
+    {
+        goto fail;
+    }
+    *out_media_source = object;
+
+    return S_OK;
+    fail:
+    if (object->read_thread)
+    {
+        object->read_thread_shutdown = true;
+        WaitForSingleObject(object->read_thread, INFINITE);
+        CloseHandle(object->read_thread);
+    }
     IMFByteStream_Release(object->byte_stream);
     free(object);
     return hr;
