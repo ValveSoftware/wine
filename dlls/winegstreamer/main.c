@@ -93,12 +93,13 @@ void wg_parser_destroy(struct wg_parser *parser)
     WINE_UNIX_CALL(unix_wg_parser_destroy, parser);
 }
 
-HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size)
+HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size, const WCHAR *uri)
 {
     struct wg_parser_connect_params params =
     {
         .parser = parser,
         .file_size = file_size,
+        .uri = uri,
     };
 
     TRACE("parser %p, file_size %I64u.\n", parser, file_size);
