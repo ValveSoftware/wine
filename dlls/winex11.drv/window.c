@@ -2844,6 +2844,20 @@ done:
     return TRUE;
 }
 
+static BOOL option_increament_configure_serial(void)
+{
+    static int increment = -1;
+    if (increment == -1)
+    {
+        const char *e = getenv( "WINE_INCREMENT_CONFIGURE_SERIAL" );
+
+        if (e)
+            increment = atoi( e );
+        else
+            increment = (e = getenv( "SteamGameId" )) && !strcmp( e, "1689910" );
+    }
+    return increment;
+}
 
 static void restack_windows( struct x11drv_win_data *data, HWND prev )
 {
@@ -2981,9 +2995,13 @@ void CDECL X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags
     }
 
     /* don't change position if we are about to minimize or maximize a managed window */
-    if ((!event_type || event_type == PropertyNotify) &&
-            !(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE))))
-        prev_window = sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
+    if (!event_type || event_type == PropertyNotify)
+    {
+        if (!(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE))))
+            prev_window = sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
+        else if (option_increament_configure_serial())
+            data->configure_serial = NextRequest( data->display );
+    }
 
     if ((new_style & WS_VISIBLE) &&
         ((new_style & WS_MINIMIZE) || is_window_rect_mapped( rectWindow )))
