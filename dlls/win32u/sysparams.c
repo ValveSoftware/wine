@@ -220,6 +220,7 @@ struct monitor
     unsigned int flags;
     RECT rc_monitor;
     RECT rc_work;
+    BOOL is_clone;
 };
 
 static struct list adapters = LIST_INIT(adapters);
@@ -1220,7 +1221,7 @@ static BOOL update_display_cache_from_registry(void)
     DWORD adapter_id, monitor_id, monitor_count = 0, size;
     KEY_FULL_INFORMATION key;
     struct adapter *adapter;
-    struct monitor *monitor;
+    struct monitor *monitor, *monitor2;
     HANDLE mutex = NULL;
     NTSTATUS status;
     BOOL ret;
@@ -1263,6 +1264,15 @@ static BOOL update_display_cache_from_registry(void)
             {
                 free( monitor );
                 break;
+            }
+
+            LIST_FOR_EACH_ENTRY(monitor2, &monitors, struct monitor, entry)
+            {
+                if (EqualRect(&monitor2->rc_monitor, &monitor->rc_monitor))
+                {
+                    monitor->is_clone = TRUE;
+                    break;
+                }
             }
 
             monitor->handle = UlongToHandle( ++monitor_count );
@@ -1871,6 +1881,7 @@ BOOL WINAPI NtUserEnumDisplayMonitors( HDC hdc, RECT *rect, MONITORENUMPROC proc
                                 get_thread_dpi() );
         offset_rect( &monrect, -origin.x, -origin.y );
         if (!intersect_rect( &monrect, &monrect, &limit )) continue;
+        if (monitor->is_clone) continue;
 
         enum_info[count].handle = monitor->handle;
         enum_info[count].rect = monrect;
