@@ -858,8 +858,8 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
     IMFMediaType *stream_types[8];
     struct wg_format format;
     DWORD type_count = 0;
+    HRESULT hr = S_OK;
     unsigned int i;
-    HRESULT hr;
 
     wg_parser_stream_get_preferred_format(stream->wg_stream, &format);
 
@@ -1379,7 +1379,7 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
     media_source_Shutdown,
 };
 
-static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_source **out_media_source)
+static HRESULT media_source_constructor(IMFByteStream *bytestream, const WCHAR *uri, struct media_source **out_media_source)
 {
     BOOL video_selected = FALSE, audio_selected = FALSE;
     IMFStreamDescriptor **descriptors = NULL;
@@ -1426,7 +1426,7 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
     if (FAILED(hr = MFAllocateWorkQueue(&object->async_commands_queue)))
         goto fail;
 
-    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, false)))
+    if (!(parser = wg_parser_create(uri ? WG_PARSER_URIDECODEBIN : WG_PARSER_DECODEBIN, false)))
     {
         hr = E_OUTOFMEMORY;
         goto fail;
@@ -1437,7 +1437,7 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
 
     object->state = SOURCE_OPENING;
 
-    if (FAILED(hr = wg_parser_connect(parser, file_size)))
+    if (FAILED(hr = wg_parser_connect(parser, file_size, uri)))
         goto fail;
 
     stream_count = wg_parser_get_stream_count(parser);
@@ -1569,6 +1569,28 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, struct media_
         IMFMediaEventQueue_Release(object->event_queue);
     IMFByteStream_Release(object->byte_stream);
     free(object);
+    return hr;
+}
+
+HRESULT winegstreamer_create_media_source_from_uri(const WCHAR *uri, IUnknown **out_object)
+{
+    struct media_source *object;
+    IMFByteStream *bytestream;
+    IStream *stream;
+    HRESULT hr;
+
+    if (FAILED(hr = CreateStreamOnHGlobal(0, TRUE, &stream)))
+        return hr;
+
+    hr = MFCreateMFByteStreamOnStream(stream, &bytestream);
+    IStream_Release(stream);
+    if (FAILED(hr))
+        return hr;
+
+    if (SUCCEEDED(hr = media_source_constructor(bytestream, uri, &object)))
+        *out_object = (IUnknown*)&object->IMFMediaSource_iface;
+
+    IMFByteStream_Release(bytestream);
     return hr;
 }
 
@@ -1912,7 +1934,7 @@ static HRESULT winegstreamer_stream_handler_create_object(struct winegstreamer_s
         HRESULT hr;
         struct media_source *new_source;
 
-        if (FAILED(hr = media_source_constructor(stream, &new_source)))
+        if (FAILED(hr = media_source_constructor(stream, NULL, &new_source)))
             return hr;
 
         TRACE("->(%p)\n", new_source);
