@@ -1925,6 +1925,8 @@ static void hacks_init(void)
     switch (sgi ? atoi( sgi ) : -1)
     {
     case 50130: /* Mafia II */
+    case 202990: /* CoD Black Ops II Multiplayer */
+    case 212910: /* CoD Black Ops II Zombies */
         setenv( "WINESTEAMNOEXEC", "1", 0 );
         break;
     }
