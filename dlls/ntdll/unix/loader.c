@@ -2260,7 +2260,7 @@ static void hacks_init(void)
         ERR("HACK: Simulating sched quantum in fsync.\n");
 
     env_str = getenv("SteamGameId");
-    if (env_str && !strcmp(env_str, "50130"))
+    if (env_str && (!strcmp(env_str, "50130") || !strcmp(env_str, "202990") || !strcmp(env_str, "212910")))
         setenv("WINESTEAMNOEXEC", "1", 0);
 }
 
