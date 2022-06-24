@@ -225,6 +225,7 @@ static NTSTATUS wg_parser_stream_enable(void *args)
 
             switch (format->u.video.format)
             {
+                case WG_VIDEO_FORMAT_RGBA:
                 case WG_VIDEO_FORMAT_BGRA:
                 case WG_VIDEO_FORMAT_BGRx:
                 case WG_VIDEO_FORMAT_BGR:
