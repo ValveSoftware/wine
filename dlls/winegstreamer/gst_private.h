@@ -67,7 +67,7 @@ static inline const char *debugstr_time(REFERENCE_TIME time)
 struct wg_parser *wg_parser_create(enum wg_parser_type type, bool unlimited_buffering) DECLSPEC_HIDDEN;
 void wg_parser_destroy(struct wg_parser *parser) DECLSPEC_HIDDEN;
 
-HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size, const WCHAR *uri) DECLSPEC_HIDDEN;
+HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size) DECLSPEC_HIDDEN;
 HRESULT wg_parser_connect_unseekable(struct wg_parser *parser, const struct wg_format *in_format,
             uint32_t stream_count, const struct wg_format *out_formats, const struct wg_rect *apertures) DECLSPEC_HIDDEN;
 void wg_parser_disconnect(struct wg_parser *parser) DECLSPEC_HIDDEN;

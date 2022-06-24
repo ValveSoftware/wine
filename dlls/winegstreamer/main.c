@@ -78,13 +78,12 @@ void wg_parser_destroy(struct wg_parser *parser)
     __wine_unix_call(unix_handle, unix_wg_parser_destroy, parser);
 }
 
-HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size, const WCHAR *uri)
+HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size)
 {
     struct wg_parser_connect_params params =
     {
         .parser = parser,
         .file_size = file_size,
-        .uri = uri,
     };
 
     return __wine_unix_call(unix_handle, unix_wg_parser_connect, &params);

@@ -165,7 +165,6 @@ enum wg_parser_type
     WG_PARSER_WAVPARSE,
     WG_PARSER_AUDIOCONV,
     WG_PARSER_VIDEOCONV,
-    WG_PARSER_URIDECODEBIN,
 };
 
 struct wg_parser_create_params
@@ -178,7 +177,6 @@ struct wg_parser_create_params
 struct wg_parser_connect_params
 {
     struct wg_parser *parser;
-    const WCHAR *uri;
     UINT64 file_size;
 };
 
