@@ -124,13 +124,11 @@ void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format) DE
 void mf_media_type_to_wg_encoded_format(IMFMediaType *type, struct wg_encoded_format *format) DECLSPEC_HIDDEN;
 
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj) DECLSPEC_HIDDEN;
-HRESULT winegstreamer_create_media_source_from_uri(const WCHAR *uri, IUnknown **out_media_source) DECLSPEC_HIDDEN;
 
 HRESULT aac_decoder_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 HRESULT h264_decoder_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 HRESULT audio_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 HRESULT color_converter_create(REFIID riid, void **ret) DECLSPEC_HIDDEN;
-HRESULT gstreamer_scheme_handler_construct(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
 enum decoder_type
 {
