@@ -2061,7 +2061,8 @@ static HRESULT topology_loader_enumerate_output_types(const GUID *category, IMFM
             transform_ctx.activate = activates[i];
             while (SUCCEEDED(IMFTransform_GetOutputAvailableType(transform, 0, output_count++, &transform_ctx.type)))
             {
-                hr = connect_func(&transform_ctx, context);
+                if (SUCCEEDED(hr = IMFTransform_SetOutputType(transform, 0, transform_ctx.type, 0)))
+                    hr = connect_func(&transform_ctx, context);
                 IMFMediaType_Release(transform_ctx.type);
                 if (SUCCEEDED(hr))
                 {
@@ -2107,7 +2108,8 @@ static HRESULT connect_to_sink(struct transform_context *transform_ctx, struct c
     IMFTopologyNode *node;
     HRESULT hr;
 
-    if (FAILED(IMFMediaTypeHandler_IsMediaTypeSupported(context->sink_handler, transform_ctx->type, NULL)))
+    if (FAILED(IMFMediaTypeHandler_IsMediaTypeSupported(context->sink_handler, transform_ctx->type, NULL))
+            || FAILED(IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, transform_ctx->type)))
         return MF_E_TRANSFORM_NOT_POSSIBLE_FOR_CURRENT_MEDIATYPE_COMBINATION;
 
     if (FAILED(hr = topology_loader_create_transform(transform_ctx, &node)))
@@ -2118,10 +2120,6 @@ static HRESULT connect_to_sink(struct transform_context *transform_ctx, struct c
     IMFTopologyNode_ConnectOutput(node, 0, context->sink, 0);
 
     IMFTopologyNode_Release(node);
-
-    hr = IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, transform_ctx->type);
-    if (SUCCEEDED(hr))
-        hr = IMFTransform_SetOutputType(transform_ctx->transform, 0, transform_ctx->type, 0);
     return hr;
 }
 
