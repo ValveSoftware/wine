@@ -2115,9 +2115,11 @@ static HRESULT connect_to_sink(struct transform_context *transform_ctx, struct c
     if (FAILED(hr = topology_loader_create_transform(transform_ctx, &node)))
         return hr;
 
-    IMFTopology_AddNode(context->context->output_topology, node);
-    IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
-    IMFTopologyNode_ConnectOutput(node, 0, context->sink, 0);
+    hr = IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
+    if (SUCCEEDED(hr))
+        hr = IMFTopologyNode_ConnectOutput(node, 0, context->sink, 0);
+    if (SUCCEEDED(hr))
+        hr = IMFTopology_AddNode(context->context->output_topology, node);
 
     IMFTopologyNode_Release(node);
     return hr;
@@ -2137,22 +2139,14 @@ static HRESULT connect_to_converter(struct transform_context *transform_ctx, str
 
     sink_ctx = *context;
     sink_ctx.upstream_node = node;
-
-    if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&context->converter_category, transform_ctx->type,
-            connect_to_sink, &sink_ctx)))
-    {
-        hr = IMFTopology_AddNode(context->context->output_topology, node);
-    }
-    IMFTopologyNode_Release(node);
-
+    hr = topology_loader_enumerate_output_types(&context->converter_category, transform_ctx->type,
+            connect_to_sink, &sink_ctx);
     if (SUCCEEDED(hr))
-    {
-        IMFTopology_AddNode(context->context->output_topology, node);
-        IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
+        hr = IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
+    if (SUCCEEDED(hr))
+        hr = IMFTopology_AddNode(context->context->output_topology, node);
 
-        hr = IMFTransform_SetOutputType(transform_ctx->transform, 0, transform_ctx->type, 0);
-    }
-
+    IMFTopologyNode_Release(node);
     return hr;
 }
 
