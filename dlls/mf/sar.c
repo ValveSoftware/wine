@@ -1737,6 +1737,8 @@ static HRESULT audio_renderer_collect_supported_types(struct audio_renderer *ren
     }
 
     IMFMediaType_DeleteItem(renderer->media_type, &MF_MT_AUDIO_PREFER_WAVEFORMATEX);
+    IMFMediaType_DeleteItem(renderer->media_type, &MF_MT_AUDIO_VALID_BITS_PER_SAMPLE);
+    IMFMediaType_DeleteItem(renderer->media_type, &MF_MT_AUDIO_CHANNEL_MASK);
 
     return hr;
 }
