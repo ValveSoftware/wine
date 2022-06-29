@@ -2240,6 +2240,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
 BOOL alert_simulate_sched_quantum;
+BOOL no_priv_elevation;
 
 static void hacks_init(void)
 {
@@ -2278,6 +2279,10 @@ static void hacks_init(void)
     sgi = getenv("SteamGameId");
     if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910")))
         setenv("WINESTEAMNOEXEC", "1", 0);
+
+    env_str = getenv("WINE_NO_PRIV_ELEVATION");
+    if (env_str)  no_priv_elevation = atoi(env_str);
+    else if (sgi) no_priv_elevation = !strcmp(sgi, "1584660");
 
     env_str = getenv("WINE_UNIX_PC_AS_NTDLL");
     if (env_str)  report_native_pc_as_ntdll = atoi(env_str);

@@ -405,6 +405,8 @@ NTSTATUS WINAPI NtQueryInformationToken( HANDLE token, TOKEN_INFORMATION_CLASS c
             if (!status) *type = reply->elevation;
         }
         SERVER_END_REQ;
+        if (!status && no_priv_elevation)
+            *(TOKEN_ELEVATION_TYPE *)info = TokenElevationTypeLimited;
         break;
 
     case TokenElevation:
@@ -415,6 +417,7 @@ NTSTATUS WINAPI NtQueryInformationToken( HANDLE token, TOKEN_INFORMATION_CLASS c
             req->handle = wine_server_obj_handle( token );
             status = wine_server_call( req );
             if (!status) elevation->TokenIsElevated = (reply->elevation == TokenElevationTypeFull);
+            if (!status && no_priv_elevation) elevation->TokenIsElevated = 0;
         }
         SERVER_END_REQ;
         break;
