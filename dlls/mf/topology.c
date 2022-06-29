@@ -2115,14 +2115,13 @@ static HRESULT connect_to_sink(struct transform_output_type *output_type, struct
     if (FAILED(hr = topology_loader_create_transform(output_type, &node)))
         return hr;
 
-    hr = IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
-    if (SUCCEEDED(hr))
-        hr = IMFTopologyNode_ConnectOutput(node, 0, context->sink, 0);
-    if (SUCCEEDED(hr))
-        hr = IMFTopology_AddNode(context->context->output_topology, node);
+    IMFTopology_AddNode(context->context->output_topology, node);
+    IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
+    IMFTopologyNode_ConnectOutput(node, 0, context->sink, 0);
 
     IMFTopologyNode_Release(node);
-    return hr;
+
+    return IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, output_type->type);
 }
 
 static HRESULT connect_to_converter(struct transform_output_type *output_type, struct connect_context *context)
@@ -2139,14 +2138,22 @@ static HRESULT connect_to_converter(struct transform_output_type *output_type, s
 
     sink_ctx = *context;
     sink_ctx.upstream_node = node;
-    hr = topology_loader_enumerate_output_types(&context->converter_category, output_type->type,
-            connect_to_sink, &sink_ctx);
-    if (SUCCEEDED(hr))
-        hr = IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
-    if (SUCCEEDED(hr))
-        hr = IMFTopology_AddNode(context->context->output_topology, node);
 
+    if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&context->converter_category, output_type->type,
+            connect_to_sink, &sink_ctx)))
+    {
+        hr = IMFTopology_AddNode(context->context->output_topology, node);
+    }
     IMFTopologyNode_Release(node);
+
+    if (SUCCEEDED(hr))
+    {
+        IMFTopology_AddNode(context->context->output_topology, node);
+        IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
+
+        hr = IMFTransform_SetOutputType(output_type->transform, 0, output_type->type, 0);
+    }
+
     return hr;
 }
 
