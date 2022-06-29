@@ -2223,6 +2223,28 @@ static HRESULT topology_loader_get_mft_categories(IMFMediaTypeHandler *handler, 
     return S_OK;
 }
 
+static HRESULT topology_loader_connect_indirect(unsigned int sink_method, struct connect_context *sink_ctx,
+        struct connect_context *convert_ctx, IMFMediaType *input_type)
+{
+    HRESULT hr;
+
+    if (sink_method & MF_CONNECT_ALLOW_CONVERTER)
+    {
+        if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&convert_ctx->converter_category, input_type,
+                connect_to_sink, sink_ctx)))
+            return hr;
+    }
+
+    if (sink_method & MF_CONNECT_ALLOW_DECODER)
+    {
+        if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&convert_ctx->decoder_category, input_type,
+                connect_to_converter, convert_ctx)))
+            return hr;
+    }
+
+    return MF_E_TRANSFORM_NOT_POSSIBLE_FOR_CURRENT_MEDIATYPE_COMBINATION;
+}
+
 static HRESULT topology_loader_connect(IMFMediaTypeHandler *sink_handler, unsigned int sink_method,
         struct connect_context *sink_ctx, struct connect_context *convert_ctx, IMFMediaType *media_type)
 {
@@ -2230,20 +2252,10 @@ static HRESULT topology_loader_connect(IMFMediaTypeHandler *sink_handler, unsign
 
     if (SUCCEEDED(hr = IMFMediaTypeHandler_IsMediaTypeSupported(sink_handler, media_type, NULL))
             && SUCCEEDED(hr = IMFMediaTypeHandler_SetCurrentMediaType(sink_handler, media_type)))
-    {
         hr = IMFTopologyNode_ConnectOutput(sink_ctx->upstream_node, sink_ctx->output_index, sink_ctx->sink, sink_ctx->input_index);
-    }
 
-    if (FAILED(hr) && sink_method & MF_CONNECT_ALLOW_CONVERTER)
-    {
-        hr = topology_loader_enumerate_output_types(&convert_ctx->converter_category, media_type, connect_to_sink, sink_ctx);
-    }
-
-    if (FAILED(hr) && sink_method & MF_CONNECT_ALLOW_DECODER)
-    {
-        hr = topology_loader_enumerate_output_types(&convert_ctx->decoder_category, media_type,
-                connect_to_converter, convert_ctx);
-    }
+    if (FAILED(hr))
+        hr = topology_loader_connect_indirect(sink_method, sink_ctx, convert_ctx, media_type);
 
     return hr;
 }
