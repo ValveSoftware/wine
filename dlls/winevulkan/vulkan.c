@@ -3593,7 +3593,7 @@ static HANDLE create_gpu_resource(int fd, LPCWSTR name)
 
     if ((status = NtCreateFile(&shared_resource, GENERIC_READ | GENERIC_WRITE, &attr, &iosb, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0)))
     {
-        ERR("Failed to load open a shared resource handle, status %#x.\n", status);
+        ERR("Failed to load open a shared resource handle, status %#lx.\n", (long int)status);
         NtClose(unix_resource);
         return INVALID_HANDLE_VALUE;
     }
@@ -3612,7 +3612,7 @@ static HANDLE create_gpu_resource(int fd, LPCWSTR name)
 
     if (status)
     {
-        ERR("Failed to create video resource, status %#x.\n", status);
+        ERR("Failed to create video resource, status %#lx.\n", (long int)status);
         NtClose(shared_resource);
         return INVALID_HANDLE_VALUE;
     }
@@ -3650,7 +3650,7 @@ static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
 
     if ((status = NtCreateFile(&shared_resource, GENERIC_READ | GENERIC_WRITE, &attr, &iosb, NULL, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ | FILE_SHARE_WRITE, FILE_OPEN, 0, NULL, 0)))
     {
-        ERR("Failed to load open a shared resource handle, status %#x.\n", status);
+        ERR("Failed to load open a shared resource handle, status %#lx.\n", (long int)status);
         return INVALID_HANDLE_VALUE;
     }
 
@@ -3667,7 +3667,7 @@ static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
 
     if (status)
     {
-        ERR("Failed to open video resource, status %#x.\n", status);
+        ERR("Failed to open video resource, status %#lx.\n", (long int)status);
         NtClose(shared_resource);
         return INVALID_HANDLE_VALUE;
     }
