@@ -2107,9 +2107,7 @@ static HRESULT connect_to_sink(struct transform_output_type *output_type, struct
     IMFTopologyNode *node;
     HRESULT hr;
 
-    if (FAILED(IMFMediaTypeHandler_IsMediaTypeSupported(context->sink_handler, output_type->type, NULL))
-            || FAILED(IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, output_type->type))
-            || FAILED(IMFTransform_SetOutputType(output_type->transform, 0, output_type->type, 0)))
+    if (FAILED(IMFMediaTypeHandler_IsMediaTypeSupported(context->sink_handler, output_type->type, NULL)))
         return MF_E_TRANSFORM_NOT_POSSIBLE_FOR_CURRENT_MEDIATYPE_COMBINATION;
 
     if (FAILED(hr = topology_loader_create_transform(output_type, &node)))
@@ -2121,7 +2119,10 @@ static HRESULT connect_to_sink(struct transform_output_type *output_type, struct
 
     IMFTopologyNode_Release(node);
 
-    return IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, output_type->type);
+    hr = IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, output_type->type);
+    if (SUCCEEDED(hr))
+        hr = IMFTransform_SetOutputType(output_type->transform, 0, output_type->type, 0);
+    return hr;
 }
 
 static HRESULT connect_to_converter(struct transform_output_type *output_type, struct connect_context *context)
