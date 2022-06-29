@@ -2242,12 +2242,10 @@ static BOOL get_device_path(PhysDevice *dev, struct get_prop_value_params *param
 
     switch (dev->bus_type) {
     case phys_device_bus_pci:
-        len = sprintf(path,  "{1}.HDAUDIO\\FUNC_01&VEN_%04X&DEV_%04X\\%u&%08X",
-                dev->vendor_id, dev->product_id, dev->index, serial_number);
+        len = sprintf(path, "{1}.HDAUDIO\\FUNC_01&VEN_%04X&DEV_%04X\\%u&%08X", dev->vendor_id, dev->product_id, dev->index, serial_number);
         break;
     case phys_device_bus_usb:
-        len = sprintf(path, "{1}.USB\\VID_%04X&PID_%04X\\%u&%08X",
-                dev->vendor_id, dev->product_id, dev->index, serial_number);
+        len = sprintf(path, "{1}.USB\\VID_%04X&PID_%04X\\%u&%08X", dev->vendor_id, dev->product_id, dev->index, serial_number);
         break;
     default:
         len = sprintf(path, "{1}.ROOT\\MEDIA\\%04u", dev->index);
