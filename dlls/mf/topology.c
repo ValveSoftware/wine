@@ -2023,7 +2023,7 @@ static void topology_loader_release_transforms(IMFActivate **activates, unsigned
     CoTaskMemFree(activates);
 }
 
-static HRESULT topology_loader_enumerate_output_types(const GUID *category, IMFMediaType *input_type,
+static HRESULT topology_loader_enumerate_output_types(const GUID *category, IMFMediaType *input_type, IMFMediaType *output_type,
         p_connect_func connect_func, struct connect_context *context)
 {
     MFT_REGISTER_TYPE_INFO mft_typeinfo;
@@ -2059,7 +2059,17 @@ static HRESULT topology_loader_enumerate_output_types(const GUID *category, IMFM
 
             transform_ctx.transform = transform;
             transform_ctx.activate = activates[i];
-            while (SUCCEEDED(IMFTransform_GetOutputAvailableType(transform, 0, output_count++, &transform_ctx.type)))
+            if ((transform_ctx.type = output_type))
+            {
+                if (SUCCEEDED(hr = IMFTransform_SetOutputType(transform, 0, transform_ctx.type, 0)))
+                    hr = connect_func(&transform_ctx, context);
+                if (SUCCEEDED(hr))
+                {
+                    topology_loader_release_transforms(activates, count);
+                    return hr;
+                }
+            }
+            else while (SUCCEEDED(IMFTransform_GetOutputAvailableType(transform, 0, output_count++, &transform_ctx.type)))
             {
                 if (SUCCEEDED(hr = IMFTransform_SetOutputType(transform, 0, transform_ctx.type, 0)))
                     hr = connect_func(&transform_ctx, context);
@@ -2139,7 +2149,7 @@ static HRESULT connect_to_converter(struct transform_context *transform_ctx, str
 
     sink_ctx = *context;
     sink_ctx.upstream_node = node;
-    hr = topology_loader_enumerate_output_types(&context->converter_category, transform_ctx->type,
+    hr = topology_loader_enumerate_output_types(&context->converter_category, transform_ctx->type, NULL,
             connect_to_sink, &sink_ctx);
     if (SUCCEEDED(hr))
         hr = IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
@@ -2216,20 +2226,20 @@ static HRESULT topology_loader_get_mft_categories(IMFMediaTypeHandler *handler, 
 }
 
 static HRESULT topology_loader_connect_indirect(unsigned int sink_method, struct connect_context *sink_ctx,
-        struct connect_context *convert_ctx, IMFMediaType *input_type)
+        struct connect_context *convert_ctx, IMFMediaType *input_type, IMFMediaType *output_type)
 {
     HRESULT hr;
 
     if (sink_method & MF_CONNECT_ALLOW_CONVERTER)
     {
-        if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&convert_ctx->converter_category, input_type,
+        if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&convert_ctx->converter_category, input_type, output_type,
                 connect_to_sink, sink_ctx)))
             return hr;
     }
 
     if (sink_method & MF_CONNECT_ALLOW_DECODER)
     {
-        if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&convert_ctx->decoder_category, input_type,
+        if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&convert_ctx->decoder_category, input_type, output_type,
                 connect_to_converter, convert_ctx)))
             return hr;
     }
@@ -2240,14 +2250,28 @@ static HRESULT topology_loader_connect_indirect(unsigned int sink_method, struct
 static HRESULT topology_loader_connect(IMFMediaTypeHandler *sink_handler, unsigned int sink_method,
         struct connect_context *sink_ctx, struct connect_context *convert_ctx, IMFMediaType *media_type)
 {
+    unsigned int output_count = 0;
+    IMFMediaType *output_type;
     HRESULT hr;
 
     if (SUCCEEDED(hr = IMFMediaTypeHandler_IsMediaTypeSupported(sink_handler, media_type, NULL))
             && SUCCEEDED(hr = IMFMediaTypeHandler_SetCurrentMediaType(sink_handler, media_type)))
         hr = IMFTopologyNode_ConnectOutput(sink_ctx->upstream_node, sink_ctx->output_index, sink_ctx->sink, sink_ctx->input_index);
 
+    if (FAILED(hr) && SUCCEEDED(IMFMediaTypeHandler_GetCurrentMediaType(sink_handler, &output_type)))
+    {
+        hr = topology_loader_connect_indirect(sink_method, sink_ctx, convert_ctx, media_type, output_type);
+        IMFMediaType_Release(output_type);
+    }
+
+    while (FAILED(hr) && SUCCEEDED(IMFMediaTypeHandler_GetMediaTypeByIndex(sink_handler, output_count++, &output_type)))
+    {
+        hr = topology_loader_connect_indirect(sink_method, sink_ctx, convert_ctx, media_type, output_type);
+        IMFMediaType_Release(output_type);
+    }
+
     if (FAILED(hr))
-        hr = topology_loader_connect_indirect(sink_method, sink_ctx, convert_ctx, media_type);
+        hr = topology_loader_connect_indirect(sink_method, sink_ctx, convert_ctx, media_type, NULL);
 
     return hr;
 }
