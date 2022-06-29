@@ -149,6 +149,7 @@ extern struct ldt_copy __wine_ldt_copy DECLSPEC_HIDDEN;
 
 extern BOOL ac_odyssey DECLSPEC_HIDDEN;
 extern BOOL fsync_simulate_sched_quantum DECLSPEC_HIDDEN;
+extern BOOL no_priv_elevation DECLSPEC_HIDDEN;
 
 extern void init_environment( int argc, char *argv[], char *envp[] ) DECLSPEC_HIDDEN;
 extern void init_startup_info(void) DECLSPEC_HIDDEN;

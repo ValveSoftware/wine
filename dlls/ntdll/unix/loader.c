@@ -2238,12 +2238,13 @@ static struct unix_funcs unix_funcs =
 
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
+BOOL no_priv_elevation;
 
 static void hacks_init(void)
 {
     static const char upc_exe[] = "Ubisoft Game Launcher\\upc.exe";
     static const char ac_odyssey_exe[] = "ACOdyssey.exe";
-    const char *env_str;
+    const char *env_str, *sgi;
 
     if (main_argc > 1 && strstr(main_argv[1], ac_odyssey_exe))
     {
@@ -2259,9 +2260,13 @@ static void hacks_init(void)
     if (fsync_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in fsync.\n");
 
-    env_str = getenv("SteamGameId");
-    if (env_str && (!strcmp(env_str, "50130") || !strcmp(env_str, "202990") || !strcmp(env_str, "212910")))
+    sgi = getenv("SteamGameId");
+    if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910")))
         setenv("WINESTEAMNOEXEC", "1", 0);
+
+    env_str = getenv("WINE_NO_PRIV_ELEVATION");
+    if (env_str)  no_priv_elevation = atoi(env_str);
+    else if (sgi) no_priv_elevation = !strcmp(sgi, "1584660");
 }
 
 /***********************************************************************
