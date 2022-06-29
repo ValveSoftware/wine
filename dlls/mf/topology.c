@@ -1993,7 +1993,7 @@ static HRESULT topology_loader_clone_node(struct topoloader_context *context, IM
     return hr;
 }
 
-struct transform_output_type
+struct transform_context
 {
     IMFMediaType *type;
     IMFTransform *transform;
@@ -2012,7 +2012,7 @@ struct connect_context
     GUID decoder_category;
 };
 
-typedef HRESULT (*p_connect_func)(struct transform_output_type *output_type, struct connect_context *context);
+typedef HRESULT (*p_connect_func)(struct transform_context *transform_ctx, struct connect_context *context);
 
 static void topology_loader_release_transforms(IMFActivate **activates, unsigned int count)
 {
@@ -2054,15 +2054,15 @@ static HRESULT topology_loader_enumerate_output_types(const GUID *category, IMFM
 
         if (SUCCEEDED(hr = IMFTransform_SetInputType(transform, 0, input_type, 0)))
         {
-            struct transform_output_type output_type;
+            struct transform_context transform_ctx;
             unsigned int output_count = 0;
 
-            output_type.transform = transform;
-            output_type.activate = activates[i];
-            while (SUCCEEDED(IMFTransform_GetOutputAvailableType(transform, 0, output_count++, &output_type.type)))
+            transform_ctx.transform = transform;
+            transform_ctx.activate = activates[i];
+            while (SUCCEEDED(IMFTransform_GetOutputAvailableType(transform, 0, output_count++, &transform_ctx.type)))
             {
-                hr = connect_func(&output_type, context);
-                IMFMediaType_Release(output_type.type);
+                hr = connect_func(&transform_ctx, context);
+                IMFMediaType_Release(transform_ctx.type);
                 if (SUCCEEDED(hr))
                 {
                     topology_loader_release_transforms(activates, count);
@@ -2079,7 +2079,7 @@ static HRESULT topology_loader_enumerate_output_types(const GUID *category, IMFM
     return hr;
 }
 
-static HRESULT topology_loader_create_transform(const struct transform_output_type *output_type,
+static HRESULT topology_loader_create_transform(const struct transform_context *transform_ctx,
         IMFTopologyNode **node)
 {
     HRESULT hr;
@@ -2088,29 +2088,29 @@ static HRESULT topology_loader_create_transform(const struct transform_output_ty
     if (FAILED(hr = MFCreateTopologyNode(MF_TOPOLOGY_TRANSFORM_NODE, node)))
         return hr;
 
-    IMFTopologyNode_SetObject(*node, (IUnknown *)output_type->transform);
+    IMFTopologyNode_SetObject(*node, (IUnknown *)transform_ctx->transform);
 
-    if (SUCCEEDED(IMFActivate_GetGUID(output_type->activate, &MF_TRANSFORM_CATEGORY_Attribute, &guid)) &&
+    if (SUCCEEDED(IMFActivate_GetGUID(transform_ctx->activate, &MF_TRANSFORM_CATEGORY_Attribute, &guid)) &&
             (IsEqualGUID(&guid, &MFT_CATEGORY_AUDIO_DECODER) || IsEqualGUID(&guid, &MFT_CATEGORY_VIDEO_DECODER)))
     {
         IMFTopologyNode_SetUINT32(*node, &MF_TOPONODE_DECODER, 1);
     }
 
-    if (SUCCEEDED(IMFActivate_GetGUID(output_type->activate, &MFT_TRANSFORM_CLSID_Attribute, &guid)))
+    if (SUCCEEDED(IMFActivate_GetGUID(transform_ctx->activate, &MFT_TRANSFORM_CLSID_Attribute, &guid)))
         IMFTopologyNode_SetGUID(*node, &MF_TOPONODE_TRANSFORM_OBJECTID, &guid);
 
     return hr;
 }
 
-static HRESULT connect_to_sink(struct transform_output_type *output_type, struct connect_context *context)
+static HRESULT connect_to_sink(struct transform_context *transform_ctx, struct connect_context *context)
 {
     IMFTopologyNode *node;
     HRESULT hr;
 
-    if (FAILED(IMFMediaTypeHandler_IsMediaTypeSupported(context->sink_handler, output_type->type, NULL)))
+    if (FAILED(IMFMediaTypeHandler_IsMediaTypeSupported(context->sink_handler, transform_ctx->type, NULL)))
         return MF_E_TRANSFORM_NOT_POSSIBLE_FOR_CURRENT_MEDIATYPE_COMBINATION;
 
-    if (FAILED(hr = topology_loader_create_transform(output_type, &node)))
+    if (FAILED(hr = topology_loader_create_transform(transform_ctx, &node)))
         return hr;
 
     IMFTopology_AddNode(context->context->output_topology, node);
@@ -2119,28 +2119,28 @@ static HRESULT connect_to_sink(struct transform_output_type *output_type, struct
 
     IMFTopologyNode_Release(node);
 
-    hr = IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, output_type->type);
+    hr = IMFMediaTypeHandler_SetCurrentMediaType(context->sink_handler, transform_ctx->type);
     if (SUCCEEDED(hr))
-        hr = IMFTransform_SetOutputType(output_type->transform, 0, output_type->type, 0);
+        hr = IMFTransform_SetOutputType(transform_ctx->transform, 0, transform_ctx->type, 0);
     return hr;
 }
 
-static HRESULT connect_to_converter(struct transform_output_type *output_type, struct connect_context *context)
+static HRESULT connect_to_converter(struct transform_context *transform_ctx, struct connect_context *context)
 {
     struct connect_context sink_ctx;
     IMFTopologyNode *node;
     HRESULT hr;
 
-    if (SUCCEEDED(connect_to_sink(output_type, context)))
+    if (SUCCEEDED(connect_to_sink(transform_ctx, context)))
         return S_OK;
 
-    if (FAILED(hr = topology_loader_create_transform(output_type, &node)))
+    if (FAILED(hr = topology_loader_create_transform(transform_ctx, &node)))
         return hr;
 
     sink_ctx = *context;
     sink_ctx.upstream_node = node;
 
-    if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&context->converter_category, output_type->type,
+    if (SUCCEEDED(hr = topology_loader_enumerate_output_types(&context->converter_category, transform_ctx->type,
             connect_to_sink, &sink_ctx)))
     {
         hr = IMFTopology_AddNode(context->context->output_topology, node);
@@ -2152,7 +2152,7 @@ static HRESULT connect_to_converter(struct transform_output_type *output_type, s
         IMFTopology_AddNode(context->context->output_topology, node);
         IMFTopologyNode_ConnectOutput(context->upstream_node, 0, node, 0);
 
-        hr = IMFTransform_SetOutputType(output_type->transform, 0, output_type->type, 0);
+        hr = IMFTransform_SetOutputType(transform_ctx->transform, 0, transform_ctx->type, 0);
     }
 
     return hr;
