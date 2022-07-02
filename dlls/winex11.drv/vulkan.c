@@ -60,6 +60,8 @@ static XContext vulkan_swapchain_context;
 
 static struct list surface_list = LIST_INIT( surface_list );
 
+#define NO_IMAGE_INDEX UINT32_MAX
+
 struct wine_vk_surface
 {
     LONG ref;
@@ -73,6 +75,8 @@ struct wine_vk_surface
     HDC hdc;
     HWND hwnd;
     DWORD hwnd_thread_id;
+    VkDevice device;
+    uint32_t next_image_index;
 };
 
 typedef struct VkXlibSurfaceCreateInfoKHR
@@ -108,6 +112,8 @@ static VkResult (*pvkQueuePresentKHR)(VkQueue, const VkPresentInfoKHR *);
 static VkResult (*pvkWaitForFences)(VkDevice device, uint32_t fenceCount, const VkFence *pFences, VkBool32 waitAll, uint64_t timeout);
 static VkResult (*pvkCreateFence)(VkDevice device, const VkFenceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkFence *pFence);
 static void (*pvkDestroyFence)(VkDevice device, VkFence fence, const VkAllocationCallbacks *pAllocator);
+static void (*pvkGetDeviceQueue)(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue);
+static VkResult (*pvkQueueSubmit)(VkQueue queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence);
 
 static void *X11DRV_get_vk_device_proc_addr(const char *name);
 static void *X11DRV_get_vk_instance_proc_addr(VkInstance instance, const char *name);
@@ -153,6 +159,8 @@ static BOOL WINAPI wine_vk_init(INIT_ONCE *once, void *param, void **context)
     LOAD_FUNCPTR(vkWaitForFences);
     LOAD_FUNCPTR(vkCreateFence);
     LOAD_FUNCPTR(vkDestroyFence);
+    LOAD_FUNCPTR(vkGetDeviceQueue);
+    LOAD_FUNCPTR(vkQueueSubmit);
 #undef LOAD_FUNCPTR
 #undef LOAD_OPTIONAL_FUNCPTR
 
@@ -403,19 +411,14 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
         VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore,
         VkFence fence, uint32_t *image_index)
 {
-    static int once;
-    struct x11drv_escape_present_drawable escape;
     struct wine_vk_surface *surface = NULL;
     VkResult result;
-    VkFence orig_fence;
     BOOL wait_fence = FALSE;
-    HDC hdc = 0;
 
     EnterCriticalSection(&context_section);
     if (!XFindContext(gdi_display, (XID)swapchain, vulkan_swapchain_context, (char **)&surface))
     {
         wine_vk_surface_grab(surface);
-        hdc = surface->hdc;
     }
     LeaveCriticalSection(&context_section);
 
@@ -425,31 +428,44 @@ static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
              surface->present_mode == VK_PRESENT_MODE_FIFO_KHR)
         wait_fence = TRUE;
 
-    orig_fence = fence;
-    if (wait_fence && !fence)
+    if(wait_fence && surface->next_image_index != NO_IMAGE_INDEX) 
     {
-        VkFenceCreateInfo create_info;
-        create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        create_info.pNext = NULL;
-        create_info.flags = 0;
-        pvkCreateFence(device, &create_info, NULL, &fence);
-    }
+        //the app expets the fence and the semaphore to be signaled
+        VkSubmitInfo submit_info;
+        submit_info.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+        submit_info.pNext = NULL;
+        submit_info.waitSemaphoreCount = 0;
+        submit_info.pWaitSemaphores = NULL;
+        submit_info.pWaitDstStageMask = NULL;
+        submit_info.commandBufferCount = 0;
+        submit_info.pCommandBuffers = NULL;
+        submit_info.signalSemaphoreCount = semaphore != VK_NULL_HANDLE;
+        submit_info.pSignalSemaphores = &semaphore;
 
-    result = pvkAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, image_index);
-    if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && hdc && surface && surface->offscreen)
+        VkQueue queue = NULL;
+        pvkGetDeviceQueue(device, 0, 0, &queue);
+        if(!queue) 
+        {
+            return VK_NOT_READY; //random error
+        }
+
+        VkResult submit_result = pvkQueueSubmit(queue, 1, &submit_info, fence);
+        if(submit_result != VK_SUCCESS) 
+        {
+            return submit_result;
+        }
+
+        *image_index = surface->next_image_index;
+
+
+        if (surface) wine_vk_surface_release(surface);
+
+        return VK_SUCCESS;
+    }
+    else 
     {
-        if (wait_fence) pvkWaitForFences(device, 1, &fence, 0, timeout);
-        escape.code = X11DRV_PRESENT_DRAWABLE;
-        escape.drawable = surface->window;
-        escape.flush = TRUE;
-        ExtEscape(hdc, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL);
-        if (surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
-            if (once++) FIXME("Application requires child window rendering with mailbox present mode, expect possible tearing!\n");
+        return pvkAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, image_index);
     }
-
-    if (fence != orig_fence) pvkDestroyFence(device, fence, NULL);
-    if (surface) wine_vk_surface_release(surface);
-    return result;
 }
 
 static VkResult X11DRV_vkAcquireNextImage2KHR(VkDevice device,
@@ -473,6 +489,9 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
     struct wine_vk_surface *other, *x11_surface = surface_from_handle(create_info->surface);
     VkSwapchainCreateInfoKHR create_info_host;
     VkResult result;
+
+    x11_surface->next_image_index = NO_IMAGE_INDEX;
+    x11_surface->device = device;
 
     TRACE("%p %p %p %p\n", device, create_info, allocator, swapchain);
 
@@ -868,6 +887,15 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
 {
     VkResult res;
 
+    VkSwapchainKHR swapchain;
+
+    static int once;
+    struct x11drv_escape_present_drawable escape;
+    struct wine_vk_surface *surface = NULL;
+    VkFence acquire_fence;
+    BOOL wait_fence = FALSE;
+    HDC hdc = 0;
+
     TRACE("%p, %p\n", queue, present_info);
 
     res = pvkQueuePresentKHR(queue, present_info);
@@ -890,6 +918,49 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
             frames = 0;
             if (!start_time)
                 start_time = time;
+        }
+    }
+
+    if(res == VK_SUCCESS) 
+    {
+        for(uint32_t i = 0; i < present_info->swapchainCount; i++) 
+        {
+            swapchain = present_info->pSwapchains[i];
+
+            EnterCriticalSection(&context_section);
+            if (!XFindContext(gdi_display, (XID)swapchain, vulkan_swapchain_context, (char **)&surface))
+            {
+                wine_vk_surface_grab(surface);
+                hdc = surface->hdc;
+            }
+            LeaveCriticalSection(&context_section);
+
+            BOOL needs_sync = surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR ||
+                 surface->present_mode == VK_PRESENT_MODE_FIFO_KHR;
+
+            //if needed wait fence to avoid tearing
+            if (hdc && surface && surface->offscreen && needs_sync)
+            {
+                VkFenceCreateInfo create_info;
+                create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+                create_info.pNext = NULL;
+                create_info.flags = 0;
+                pvkCreateFence(surface->device, &create_info, NULL, &acquire_fence);
+
+                pvkAcquireNextImageKHR(surface->device, swapchain, UINT64_MAX, VK_NULL_HANDLE, acquire_fence, &surface->next_image_index);
+
+                pvkWaitForFences(surface->device, 1, &acquire_fence, 0, UINT64_MAX);
+            }
+
+            if (hdc && surface && surface->offscreen)
+            {
+                escape.code = X11DRV_PRESENT_DRAWABLE;
+                escape.drawable = surface->window;
+                escape.flush = TRUE;
+                ExtEscape(hdc, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL);
+                if (surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR)
+                    if (once++) FIXME("Application requires child window rendering with mailbox present mode, expect possible tearing!\n");
+            }
         }
     }
 
