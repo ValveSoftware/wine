@@ -3928,3 +3928,8 @@ enum fsync_type
 @REPLY
     unsigned int shm_idx;
 @END
+
+@REQ(fsync_free_shm_idx)
+    unsigned int shm_idx;
+@REPLY
+@END
