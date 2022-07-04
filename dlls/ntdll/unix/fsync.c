@@ -269,14 +269,14 @@ static inline UINT_PTR handle_to_index( HANDLE handle, UINT_PTR *entry )
     return idx % FSYNC_LIST_BLOCK_SIZE;
 }
 
-static struct fsync *add_to_list( HANDLE handle, enum fsync_type type, void *shm )
+static void add_to_list( HANDLE handle, enum fsync_type type, void *shm )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
 
     if (entry >= FSYNC_LIST_ENTRIES)
     {
         FIXME( "too many allocated handles, not caching %p\n", handle );
-        return FALSE;
+        return;
     }
 
     if (!fsync_list[entry])  /* do we need to allocate a new block of entries? */
@@ -286,38 +286,37 @@ static struct fsync *add_to_list( HANDLE handle, enum fsync_type type, void *shm
         {
             void *ptr = anon_mmap_alloc( FSYNC_LIST_BLOCK_SIZE * sizeof(struct fsync),
                                          PROT_READ | PROT_WRITE );
-            if (ptr == MAP_FAILED) return FALSE;
+            if (ptr == MAP_FAILED) return;
             fsync_list[entry] = ptr;
         }
     }
 
     if (!__sync_val_compare_and_swap((int *)&fsync_list[entry][idx].type, 0, type ))
         fsync_list[entry][idx].shm = shm;
-
-    return &fsync_list[entry][idx];
 }
 
-static struct fsync *get_cached_object( HANDLE handle )
+static BOOL get_cached_object( HANDLE handle, struct fsync *obj )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
 
-    if (entry >= FSYNC_LIST_ENTRIES || !fsync_list[entry]) return NULL;
-    if (!fsync_list[entry][idx].type) return NULL;
+    if (entry >= FSYNC_LIST_ENTRIES || !fsync_list[entry]) return FALSE;
+    if (!fsync_list[entry][idx].type) return FALSE;
 
-    return &fsync_list[entry][idx];
+    *obj = fsync_list[entry][idx];
+    return TRUE;
 }
 
 /* Gets an object. This is either a proper fsync object (i.e. an event,
  * semaphore, etc. created using create_fsync) or a generic synchronizable
  * server-side object which the server will signal (e.g. a process, thread,
  * message queue, etc.) */
-static NTSTATUS get_object( HANDLE handle, struct fsync **obj )
+static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
 {
     NTSTATUS ret = STATUS_SUCCESS;
     unsigned int shm_idx = 0;
     enum fsync_type type;
 
-    if ((*obj = get_cached_object( handle ))) return STATUS_SUCCESS;
+    if (get_cached_object( handle, obj )) return STATUS_SUCCESS;
 
     if ((INT_PTR)handle < 0)
     {
@@ -340,13 +339,14 @@ static NTSTATUS get_object( HANDLE handle, struct fsync **obj )
     if (ret)
     {
         WARN("Failed to retrieve shm index for handle %p, status %#x.\n", handle, (unsigned int)ret);
-        *obj = NULL;
         return ret;
     }
 
     TRACE("Got shm index %d for handle %p.\n", shm_idx, handle);
 
-    *obj = add_to_list( handle, type, get_shm( shm_idx ) );
+    obj->type = type;
+    obj->shm = get_shm( shm_idx );
+    add_to_list( handle, type, obj->shm );
     return ret;
 }
 
@@ -497,7 +497,7 @@ NTSTATUS fsync_open_semaphore( HANDLE *handle, ACCESS_MASK access,
 
 NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
 {
-    struct fsync *obj;
+    struct fsync obj;
     struct semaphore *semaphore;
     ULONG current;
     NTSTATUS ret;
@@ -505,7 +505,7 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     TRACE("%p, %d, %p.\n", handle, (int)count, prev);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    semaphore = obj->shm;
+    semaphore = obj.shm;
 
     do
     {
@@ -523,7 +523,7 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
 
 NTSTATUS fsync_query_semaphore( HANDLE handle, void *info, ULONG *ret_len )
 {
-    struct fsync *obj;
+    struct fsync obj;
     struct semaphore *semaphore;
     SEMAPHORE_BASIC_INFORMATION *out = info;
     NTSTATUS ret;
@@ -531,7 +531,7 @@ NTSTATUS fsync_query_semaphore( HANDLE handle, void *info, ULONG *ret_len )
     TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    semaphore = obj->shm;
+    semaphore = obj.shm;
 
     out->CurrentCount = semaphore->count;
     out->MaximumCount = semaphore->max;
@@ -563,16 +563,16 @@ NTSTATUS fsync_open_event( HANDLE *handle, ACCESS_MASK access,
 NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
 {
     struct event *event;
-    struct fsync *obj;
+    struct fsync obj;
     LONG current;
     NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    event = obj->shm;
+    event = obj.shm;
 
-    if (obj->type != FSYNC_MANUAL_EVENT && obj->type != FSYNC_AUTO_EVENT)
+    if (obj.type != FSYNC_MANUAL_EVENT && obj.type != FSYNC_AUTO_EVENT)
         return STATUS_OBJECT_TYPE_MISMATCH;
 
     if (!(current = __atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST )))
@@ -586,14 +586,14 @@ NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
 NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
 {
     struct event *event;
-    struct fsync *obj;
+    struct fsync obj;
     LONG current;
     NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    event = obj->shm;
+    event = obj.shm;
 
     current = __atomic_exchange_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 
@@ -605,14 +605,14 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
 NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
 {
     struct event *event;
-    struct fsync *obj;
+    struct fsync obj;
     LONG current;
     NTSTATUS ret;
 
     TRACE("%p.\n", handle);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    event = obj->shm;
+    event = obj.shm;
 
     /* This isn't really correct; an application could miss the write.
      * Unfortunately we can't really do much better. Fortunately this is rarely
@@ -634,17 +634,17 @@ NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
 NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len )
 {
     struct event *event;
-    struct fsync *obj;
+    struct fsync obj;
     EVENT_BASIC_INFORMATION *out = info;
     NTSTATUS ret;
 
     TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    event = obj->shm;
+    event = obj.shm;
 
     out->EventState = event->signaled;
-    out->EventType = (obj->type == FSYNC_AUTO_EVENT ? SynchronizationEvent : NotificationEvent);
+    out->EventType = (obj.type == FSYNC_AUTO_EVENT ? SynchronizationEvent : NotificationEvent);
     if (ret_len) *ret_len = sizeof(*out);
 
     return STATUS_SUCCESS;
@@ -671,13 +671,13 @@ NTSTATUS fsync_open_mutex( HANDLE *handle, ACCESS_MASK access,
 NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
 {
     struct mutex *mutex;
-    struct fsync *obj;
+    struct fsync obj;
     NTSTATUS ret;
 
     TRACE("%p, %p.\n", handle, prev);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    mutex = obj->shm;
+    mutex = obj.shm;
 
     if (mutex->tid != GetCurrentThreadId()) return STATUS_MUTANT_NOT_OWNED;
 
@@ -694,7 +694,7 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
 
 NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
 {
-    struct fsync *obj;
+    struct fsync obj;
     struct mutex *mutex;
     MUTANT_BASIC_INFORMATION *out = info;
     NTSTATUS ret;
@@ -702,7 +702,7 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
     TRACE("handle %p, info %p, ret_len %p.\n", handle, info, ret_len);
 
     if ((ret = get_object( handle, &obj ))) return ret;
-    mutex = obj->shm;
+    mutex = obj.shm;
 
     out->CurrentCount = 1 - mutex->count;
     out->OwnedByCaller = (mutex->tid == GetCurrentThreadId());
@@ -753,7 +753,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     static const LARGE_INTEGER zero = {0};
 
     struct futex_waitv futexes[MAXIMUM_WAIT_OBJECTS + 1];
-    struct fsync *objs[MAXIMUM_WAIT_OBJECTS];
+    struct fsync objs[MAXIMUM_WAIT_OBJECTS];
     BOOL msgwait = FALSE, waited = FALSE;
     int has_fsync = 0, has_server = 0;
     clockid_t clock_id = 0;
@@ -787,14 +787,28 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     {
         ret = get_object( handles[i], &objs[i] );
         if (ret == STATUS_SUCCESS)
+        {
+            if (!objs[i].type)
+            {
+                /* Someone probably closed an object while waiting on it. */
+                WARN("Handle %p has type 0; was it closed?\n", handles[i]);
+                return STATUS_INVALID_HANDLE;
+            }
             has_fsync = 1;
+        }
         else if (ret == STATUS_NOT_IMPLEMENTED)
+        {
+            objs[i].type = 0;
+            objs[i].shm = NULL;
             has_server = 1;
+        }
         else
+        {
             return ret;
+        }
     }
 
-    if (count && objs[count - 1] && objs[count - 1]->type == FSYNC_QUEUE)
+    if (count && objs[count - 1].type == FSYNC_QUEUE)
         msgwait = TRUE;
 
     if (has_fsync && has_server)
@@ -839,17 +853,10 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
             for (i = 0; i < count; i++)
             {
-                struct fsync *obj = objs[i];
+                struct fsync *obj = &objs[i];
 
-                if (obj)
+                if (obj->type)
                 {
-                    if (!obj->type) /* gcc complains if we put this in the switch */
-                    {
-                        /* Someone probably closed an object while waiting on it. */
-                        WARN("Handle %p has type 0; was it closed?\n", handles[i]);
-                        return STATUS_INVALID_HANDLE;
-                    }
-
                     switch (obj->type)
                     {
                     case FSYNC_SEMAPHORE:
@@ -1015,9 +1022,9 @@ tryagain:
 
             for (i = 0; i < count; i++)
             {
-                struct fsync *obj = objs[i];
+                struct fsync *obj = &objs[i];
 
-                if (obj && obj->type == FSYNC_MUTEX)
+                if (obj->type == FSYNC_MUTEX)
                 {
                     struct mutex *mutex = obj->shm;
 
@@ -1031,7 +1038,7 @@ tryagain:
                             break;
                     }
                 }
-                else if (obj)
+                else if (obj->type)
                 {
                     /* this works for semaphores too */
                     struct event *event = obj->shm;
@@ -1057,9 +1064,9 @@ tryagain:
              * handles were signaled. Check to make sure they still are. */
             for (i = 0; i < count; i++)
             {
-                struct fsync *obj = objs[i];
+                struct fsync *obj = &objs[i];
 
-                if (obj && obj->type == FSYNC_MUTEX)
+                if (obj->type == FSYNC_MUTEX)
                 {
                     struct mutex *mutex = obj->shm;
                     int tid = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST );
@@ -1067,7 +1074,7 @@ tryagain:
                     if (tid && tid != ~0 && tid != GetCurrentThreadId())
                         goto tryagain;
                 }
-                else if (obj)
+                else if (obj->type)
                 {
                     struct event *event = obj->shm;
 
@@ -1079,8 +1086,8 @@ tryagain:
             /* Yep, still signaled. Now quick, grab everything. */
             for (i = 0; i < count; i++)
             {
-                struct fsync *obj = objs[i];
-                if (!obj) continue;
+                struct fsync *obj = &objs[i];
+                if (!obj->type) continue;
                 switch (obj->type)
                 {
                 case FSYNC_MUTEX:
@@ -1126,9 +1133,9 @@ tryagain:
              * Make sure to let ourselves know that we grabbed the mutexes. */
             for (i = 0; i < count; i++)
             {
-                if (objs[i] && objs[i]->type == FSYNC_MUTEX)
+                if (objs[i].type == FSYNC_MUTEX)
                 {
-                    struct mutex *mutex = objs[i]->shm;
+                    struct mutex *mutex = objs[i].shm;
                     mutex->count++;
                 }
             }
@@ -1144,8 +1151,8 @@ tryagain:
 tooslow:
             for (--i; i >= 0; i--)
             {
-                struct fsync *obj = objs[i];
-                if (!obj) continue;
+                struct fsync *obj = &objs[i];
+                if (!obj->type) continue;
                 switch (obj->type)
                 {
                 case FSYNC_MUTEX:
@@ -1219,10 +1226,10 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
                              BOOLEAN alertable, const LARGE_INTEGER *timeout )
 {
     BOOL msgwait = FALSE;
-    struct fsync *obj;
+    struct fsync obj;
     NTSTATUS ret;
 
-    if (count && !get_object( handles[count - 1], &obj ) && obj->type == FSYNC_QUEUE)
+    if (count && !get_object( handles[count - 1], &obj ) && obj.type == FSYNC_QUEUE)
     {
         msgwait = TRUE;
         server_set_msgwait( 1 );
@@ -1239,12 +1246,12 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
 NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
     const LARGE_INTEGER *timeout )
 {
-    struct fsync *obj;
+    struct fsync obj;
     NTSTATUS ret;
 
     if ((ret = get_object( signal, &obj ))) return ret;
 
-    switch (obj->type)
+    switch (obj.type)
     {
     case FSYNC_SEMAPHORE:
         ret = fsync_release_semaphore( signal, 1, NULL );
