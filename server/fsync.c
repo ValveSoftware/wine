@@ -214,8 +214,8 @@ static void fsync_destroy( struct object *obj )
 
 static void *get_shm( unsigned int idx )
 {
-    int entry  = (idx * 8) / pagesize;
-    int offset = (idx * 8) % pagesize;
+    int entry  = (idx * 16) / pagesize;
+    int offset = (idx * 16) % pagesize;
 
     if (entry >= shm_addrs_size)
     {
@@ -296,7 +296,7 @@ unsigned int fsync_alloc_shm( int low, int high )
         shm_idx = alloc_shm_idx_from_word( old_size );
     }
 
-    while (shm_idx * 8 >= shm_size)
+    while (shm_idx * 16 >= shm_size)
     {
         /* Better expand the shm section. */
         shm_size += pagesize;
@@ -312,6 +312,8 @@ unsigned int fsync_alloc_shm( int low, int high )
     assert(shm);
     shm[0] = low;
     shm[1] = high;
+    shm[2] = 1; /* Reference count. */
+    shm[3] = 0; /* Last reference process id. */
 
     return shm_idx;
 #else
@@ -323,15 +325,55 @@ void fsync_free_shm_idx( int shm_idx )
 {
     unsigned int idx;
     uint64_t mask;
+    int *shm;
 
     assert( shm_idx );
     assert( shm_idx < shm_idx_free_map_size * BITS_IN_FREE_MAP_WORD );
+
+    shm = get_shm( shm_idx );
+    if (shm[2] <= 0)
+    {
+        fprintf( stderr, "wineserver: fsync err: shm refcount is %d.\n", shm[2] );
+        return;
+    }
+
+    if (__atomic_sub_fetch( &shm[2], 1, __ATOMIC_SEQ_CST ))
+    {
+        /* Sync object is still referenced in a process. */
+        return;
+    }
+
     idx = shm_idx / BITS_IN_FREE_MAP_WORD;
     mask = (uint64_t)1 << (shm_idx % BITS_IN_FREE_MAP_WORD);
     assert( !(shm_idx_free_map[idx] & mask) );
     shm_idx_free_map[idx] |= mask;
     if (idx < shm_idx_free_search_start_hint)
         shm_idx_free_search_start_hint = idx;
+}
+
+/* Try to cleanup the shared mem indices locked by the wait on the killed processes.
+ * This is not fully reliable but should avoid leaking the majority of indices on
+ * process kill. */
+void fsync_cleanup_process_shm_indices( process_id_t id )
+{
+    uint64_t free_word;
+    unsigned int i, j;
+    void *shmbase;
+    int *shm;
+
+    for (i = 0; i < shm_idx_free_map_size; ++i)
+    {
+        free_word = shm_idx_free_map[i];
+        if (free_word == ~(uint64_t)0) continue;
+        shmbase = get_shm( i * BITS_IN_FREE_MAP_WORD );
+        for (j = !i; j < BITS_IN_FREE_MAP_WORD; ++j)
+        {
+            shm = (int *)((char *)shmbase + j * 16);
+            if (!(free_word & ((uint64_t)1 << j)) && shm[3] == id
+                  && __atomic_load_n( &shm[2], __ATOMIC_SEQ_CST ) == 1)
+                fsync_free_shm_idx( i * BITS_IN_FREE_MAP_WORD + j );
+        }
+    }
 }
 
 static int type_matches( enum fsync_type type1, enum fsync_type type2 )
@@ -393,6 +435,8 @@ struct fsync_event
 {
     int signaled;
     int unused;
+    int ref;
+    int last_pid;
 };
 
 void fsync_wake_futex( unsigned int shm_idx )
@@ -560,8 +604,12 @@ DECL_HANDLER(get_fsync_idx)
 
     if (obj->ops->get_fsync_idx)
     {
+        int *shm;
+
         reply->shm_idx = obj->ops->get_fsync_idx( obj, &type );
         reply->type = type;
+        shm = get_shm( reply->shm_idx );
+        __atomic_add_fetch( &shm[2], 1, __ATOMIC_SEQ_CST );
     }
     else
     {
@@ -579,4 +627,14 @@ DECL_HANDLER(get_fsync_idx)
 DECL_HANDLER(get_fsync_apc_idx)
 {
     reply->shm_idx = current->fsync_apc_idx;
+}
+
+DECL_HANDLER(fsync_free_shm_idx)
+{
+    if (!req->shm_idx || req->shm_idx >= shm_idx_free_map_size * BITS_IN_FREE_MAP_WORD)
+    {
+        set_error( STATUS_INVALID_PARAMETER );
+        return;
+    }
+    fsync_free_shm_idx( req->shm_idx );
 }
