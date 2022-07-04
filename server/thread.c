@@ -590,7 +590,11 @@ static void destroy_thread( struct object *obj )
 
     if (do_esync())
         close( thread->esync_fd );
-    if (thread->fsync_idx) fsync_free_shm_idx( thread->fsync_idx );
+    if (thread->fsync_idx)
+    {
+        fsync_free_shm_idx( thread->fsync_idx );
+        fsync_free_shm_idx( thread->fsync_apc_idx );
+    }
 }
 
 /* dump a thread on stdout for debugging purposes */
