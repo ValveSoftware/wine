@@ -192,22 +192,28 @@ struct semaphore
 {
     int count;
     int max;
+    int ref;
+    int last_pid;
 };
-C_ASSERT(sizeof(struct semaphore) == 8);
+C_ASSERT(sizeof(struct semaphore) == 16);
 
 struct event
 {
     int signaled;
     int unused;
+    int ref;
+    int last_pid;
 };
-C_ASSERT(sizeof(struct event) == 8);
+C_ASSERT(sizeof(struct event) == 16);
 
 struct mutex
 {
     int tid;
     int count;  /* recursion count */
+    int ref;
+    int last_pid;
 };
-C_ASSERT(sizeof(struct mutex) == 8);
+C_ASSERT(sizeof(struct mutex) == 16);
 
 static char shm_name[29];
 static int shm_fd;
@@ -219,8 +225,8 @@ static pthread_mutex_t shm_addrs_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void *get_shm( unsigned int idx )
 {
-    int entry  = (idx * 8) / pagesize;
-    int offset = (idx * 8) % pagesize;
+    int entry  = (idx * 16) / pagesize;
+    int offset = (idx * 16) % pagesize;
     void *ret;
 
     pthread_mutex_lock( &shm_addrs_mutex );
@@ -307,6 +313,59 @@ static void add_to_list( HANDLE handle, enum fsync_type type, unsigned int shm_i
     __atomic_store_n( (uint64_t *)&fsync_list[entry][idx], *(uint64_t *)&cache, __ATOMIC_SEQ_CST );
 }
 
+static void grab_object( struct fsync *obj )
+{
+    int *shm = obj->shm;
+
+    __atomic_add_fetch( &shm[2], 1, __ATOMIC_SEQ_CST );
+}
+
+static unsigned int shm_index_from_shm( char *shm )
+{
+    unsigned int count = shm_addrs_size;
+    unsigned int i, idx_offset;
+
+    for (i = 0; i < count; ++i)
+    {
+        if (shm >= (char *)shm_addrs[i] && shm < (char *)shm_addrs[i] + pagesize)
+        {
+            idx_offset = (shm - (char *)shm_addrs[i]) / 16;
+            return i * (pagesize / 16) + idx_offset;
+        }
+    }
+
+    ERR( "Index for shm %p not found.\n", shm );
+    return ~0u;
+}
+
+static void put_object( struct fsync *obj )
+{
+    int *shm = obj->shm;
+
+    if (__atomic_load_n( &shm[2], __ATOMIC_SEQ_CST ) == 1)
+    {
+        /* We are holding the last reference, it should be released on server so shm idx get freed. */
+        SERVER_START_REQ( fsync_free_shm_idx )
+        {
+            req->shm_idx = shm_index_from_shm( obj->shm );
+            wine_server_call( req );
+        }
+        SERVER_END_REQ;
+    }
+    else
+    {
+        __atomic_sub_fetch( &shm[2], 1, __ATOMIC_SEQ_CST );
+    }
+}
+
+static void put_object_from_wait( struct fsync *obj )
+{
+    int *shm = obj->shm;
+
+    __sync_val_compare_and_swap( &shm[3], GetCurrentProcessId(), 0 );
+    put_object( obj );
+}
+
 static BOOL get_cached_object( HANDLE handle, struct fsync *obj )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
@@ -321,10 +380,13 @@ again:
 
     obj->type = cache.type;
     obj->shm = get_shm( cache.shm_idx );
-    if (*(uint64_t *)&cache != __atomic_load_n( (uint64_t *)&fsync_list[entry][idx], __ATOMIC_SEQ_CST ))
+    grab_object( obj );
+    if (((int *)obj->shm)[2] < 2 ||
+        *(uint64_t *)&cache != __atomic_load_n( (uint64_t *)&fsync_list[entry][idx], __ATOMIC_SEQ_CST ))
     {
         /* This check does not strictly guarantee that we avoid the potential race but is supposed to greatly
          * reduce the probability of that. */
+        put_object( obj );
         FIXME( "Cache changed while getting object.\n" );
         goto again;
     }
@@ -372,7 +434,22 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
     obj->type = type;
     obj->shm = get_shm( shm_idx );
     add_to_list( handle, type, shm_idx );
+    /* get_fsync_idx server request increments shared mem refcount, so not grabbing object here. */
     return ret;
+}
+
+static NTSTATUS get_object_for_wait( HANDLE handle, struct fsync *obj )
+{
+    NTSTATUS ret;
+    int *shm;
+
+    if ((ret = get_object( handle, obj ))) return ret;
+
+    shm = obj->shm;
+    /* Give wineserver a chance to cleanup shm index if the process
+     * is killed while we are waiting on the object. */
+    __atomic_store_n( &shm[3], GetCurrentProcessId(), __ATOMIC_SEQ_CST );
+    return STATUS_SUCCESS;
 }
 
 NTSTATUS fsync_close( HANDLE handle )
@@ -541,13 +618,17 @@ NTSTATUS fsync_release_semaphore( HANDLE handle, ULONG count, ULONG *prev )
     {
         current = semaphore->count;
         if (count + current > semaphore->max)
+        {
+            put_object( &obj );
             return STATUS_SEMAPHORE_LIMIT_EXCEEDED;
+        }
     } while (__sync_val_compare_and_swap( &semaphore->count, current, count + current ) != current);
 
     if (prev) *prev = current;
 
     futex_wake( &semaphore->count, INT_MAX );
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -567,6 +648,7 @@ NTSTATUS fsync_query_semaphore( HANDLE handle, void *info, ULONG *ret_len )
     out->MaximumCount = semaphore->max;
     if (ret_len) *ret_len = sizeof(*out);
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -603,13 +685,17 @@ NTSTATUS fsync_set_event( HANDLE handle, LONG *prev )
     event = obj.shm;
 
     if (obj.type != FSYNC_MANUAL_EVENT && obj.type != FSYNC_AUTO_EVENT)
+    {
+        put_object( &obj );
         return STATUS_OBJECT_TYPE_MISMATCH;
+    }
 
     if (!(current = __atomic_exchange_n( &event->signaled, 1, __ATOMIC_SEQ_CST )))
         futex_wake( &event->signaled, INT_MAX );
 
     if (prev) *prev = current;
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -629,6 +715,7 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
 
     if (prev) *prev = current;
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -658,6 +745,7 @@ NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
 
     if (prev) *prev = current;
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -677,6 +765,7 @@ NTSTATUS fsync_query_event( HANDLE handle, void *info, ULONG *ret_len )
     out->EventType = (obj.type == FSYNC_AUTO_EVENT ? SynchronizationEvent : NotificationEvent);
     if (ret_len) *ret_len = sizeof(*out);
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -709,7 +798,11 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
     if ((ret = get_object( handle, &obj ))) return ret;
     mutex = obj.shm;
 
-    if (mutex->tid != GetCurrentThreadId()) return STATUS_MUTANT_NOT_OWNED;
+    if (mutex->tid != GetCurrentThreadId())
+    {
+        put_object( &obj );
+        return STATUS_MUTANT_NOT_OWNED;
+    }
 
     if (prev) *prev = mutex->count;
 
@@ -719,6 +812,7 @@ NTSTATUS fsync_release_mutex( HANDLE handle, LONG *prev )
         futex_wake( &mutex->tid, INT_MAX );
     }
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -739,6 +833,7 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
     out->AbandonedState = (mutex->tid == ~0);
     if (ret_len) *ret_len = sizeof(*out);
 
+    put_object( &obj );
     return STATUS_SUCCESS;
 }
 
@@ -775,6 +870,14 @@ static NTSTATUS do_single_wait( int *addr, int val, const struct timespec64 *end
         return STATUS_TIMEOUT;
     else
         return STATUS_PENDING;
+}
+
+static void put_objects( struct fsync *objs, unsigned int count )
+{
+    unsigned int i;
+
+    for (i = 0; i < count; ++i)
+        if (objs[i].type) put_object_from_wait( &objs[i] );
 }
 
 static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
@@ -815,7 +918,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
     for (i = 0; i < count; i++)
     {
-        ret = get_object( handles[i], &objs[i] );
+        ret = get_object_for_wait( handles[i], &objs[i] );
         if (ret == STATUS_SUCCESS)
         {
             assert( objs[i].type );
@@ -829,6 +932,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
         }
         else
         {
+            put_objects( objs, i );
             return ret;
         }
     }
@@ -839,7 +943,10 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     if (has_fsync && has_server)
         FIXME("Can't wait on fsync and server objects at the same time!\n");
     else if (has_server)
+    {
+        put_objects( objs, count );
         return STATUS_NOT_IMPLEMENTED;
+    }
 
     if (TRACE_ON(fsync))
     {
@@ -894,6 +1001,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         {
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             if (waited) simulate_sched_quantum();
+                            put_objects( objs, count );
                             return i;
                         }
                         futex_vector_set( &futexes[i], &semaphore->count, 0 );
@@ -909,6 +1017,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             mutex->count++;
                             if (waited) simulate_sched_quantum();
+                            put_objects( objs, count );
                             return i;
                         }
 
@@ -917,12 +1026,14 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             mutex->count = 1;
                             if (waited) simulate_sched_quantum();
+                            put_objects( objs, count );
                             return i;
                         }
                         else if (tid == ~0 && (tid = __sync_val_compare_and_swap( &mutex->tid, ~0, GetCurrentThreadId() )) == ~0)
                         {
                             TRACE("Woken up by abandoned mutex %p [%d].\n", handles[i], i);
                             mutex->count = 1;
+                            put_objects( objs, count );
                             return STATUS_ABANDONED_WAIT_0 + i;
                         }
 
@@ -941,6 +1052,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             if (waited) simulate_sched_quantum();
+                            put_objects( objs, count );
                             return i;
                         }
                         futex_vector_set( &futexes[i], &event->signaled, 0 );
@@ -959,6 +1071,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             if (waited) simulate_sched_quantum();
+                            put_objects( objs, count );
                             return i;
                         }
                         futex_vector_set( &futexes[i], &event->signaled, 0 );
@@ -993,6 +1106,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                 /* Unlike esync, we already know that we've timed out, so we
                  * can avoid a syscall. */
                 TRACE("Wait timed out.\n");
+                put_objects( objs, count );
                 return STATUS_TIMEOUT;
             }
 
@@ -1005,6 +1119,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
             if (ret == -1 && errno == ETIMEDOUT)
             {
                 TRACE("Wait timed out.\n");
+                put_objects( objs, count );
                 return STATUS_TIMEOUT;
             }
             else waited = TRUE;
@@ -1079,6 +1194,7 @@ tryagain:
                 if (status == STATUS_TIMEOUT)
                 {
                     TRACE("Wait timed out.\n");
+                    put_objects( objs, count );
                     return status;
                 }
                 else if (status == STATUS_USER_APC)
@@ -1168,9 +1284,11 @@ tryagain:
             if (abandoned)
             {
                 TRACE("Wait successful, but some object(s) were abandoned.\n");
+                put_objects( objs, count );
                 return STATUS_ABANDONED;
             }
             TRACE("Wait successful.\n");
+            put_objects( objs, count );
             return STATUS_SUCCESS;
 
 tooslow:
@@ -1215,6 +1333,8 @@ tooslow:
 userapc:
     TRACE("Woken up by user APC.\n");
 
+    put_objects( objs, count );
+
     /* We have to make a server call anyway to get the APC to execute, so just
      * delegate down to server_wait(). */
     ret = server_wait( NULL, 0, SELECT_INTERRUPTIBLE | SELECT_ALERTABLE, &zero );
@@ -1254,10 +1374,14 @@ NTSTATUS fsync_wait_objects( DWORD count, const HANDLE *handles, BOOLEAN wait_an
     struct fsync obj;
     NTSTATUS ret;
 
-    if (count && !get_object( handles[count - 1], &obj ) && obj.type == FSYNC_QUEUE)
+    if (count && !get_object( handles[count - 1], &obj ))
     {
-        msgwait = TRUE;
-        server_set_msgwait( 1 );
+        if (obj.type == FSYNC_QUEUE)
+        {
+            msgwait = TRUE;
+            server_set_msgwait( 1 );
+        }
+        put_object( &obj );
     }
 
     ret = __fsync_wait_objects( count, handles, wait_any, alertable, timeout );
@@ -1289,8 +1413,10 @@ NTSTATUS fsync_signal_and_wait( HANDLE signal, HANDLE wait, BOOLEAN alertable,
         ret = fsync_release_mutex( signal, NULL );
         break;
     default:
-        return STATUS_OBJECT_TYPE_MISMATCH;
+        ret = STATUS_OBJECT_TYPE_MISMATCH;
+        break;
     }
+    put_object( &obj );
     if (ret) return ret;
 
     return fsync_wait_objects( 1, &wait, TRUE, alertable, timeout );
