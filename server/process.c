@@ -805,7 +805,11 @@ static void process_destroy( struct object *obj )
     free( process->dir_cache );
     free( process->image );
     if (do_esync()) close( process->esync_fd );
-    if (process->fsync_idx) fsync_free_shm_idx( process->fsync_idx );
+    if (process->fsync_idx)
+    {
+        fsync_cleanup_process_shm_indices( process->id );
+        fsync_free_shm_idx( process->fsync_idx );
+    }
 }
 
 /* dump a process on stdout for debugging purposes */
