@@ -270,12 +270,33 @@ static void *get_shm( unsigned int idx )
 
 static struct fsync *fsync_list[FSYNC_LIST_ENTRIES];
 static struct fsync fsync_list_initial_block[FSYNC_LIST_BLOCK_SIZE];
+static int cache_locked;
 
 static inline UINT_PTR handle_to_index( HANDLE handle, UINT_PTR *entry )
 {
     UINT_PTR idx = (((UINT_PTR)handle) >> 2) - 1;
     *entry = idx / FSYNC_LIST_BLOCK_SIZE;
     return idx % FSYNC_LIST_BLOCK_SIZE;
+}
+
+static void small_pause(void)
+{
+#ifdef __i386__
+    __asm__ __volatile__( "rep;nop" : : : "memory" );
+#else
+    __asm__ __volatile__( "" : : : "memory" );
+#endif
+}
+
+static void lock_obj_cache(void)
+{
+    while (__sync_val_compare_and_swap( &cache_locked, 0, 1 ))
+        small_pause();
+}
+
+static void unlock_obj_cache(void)
+{
+    __atomic_store_n( &cache_locked, 0, __ATOMIC_SEQ_CST );
 }
 
 static void add_to_list( HANDLE handle, enum fsync_type type, void *shm )
@@ -296,23 +317,29 @@ static void add_to_list( HANDLE handle, enum fsync_type type, void *shm )
             void *ptr = anon_mmap_alloc( FSYNC_LIST_BLOCK_SIZE * sizeof(struct fsync),
                                          PROT_READ | PROT_WRITE );
             if (ptr == MAP_FAILED) return;
-            fsync_list[entry] = ptr;
+            if (__sync_val_compare_and_swap( &fsync_list[entry], NULL, ptr ))
+                munmap( ptr, FSYNC_LIST_BLOCK_SIZE * sizeof(struct fsync) );
         }
     }
 
-    if (!__sync_val_compare_and_swap((int *)&fsync_list[entry][idx].type, 0, type ))
-        fsync_list[entry][idx].shm = shm;
+    lock_obj_cache();
+    fsync_list[entry][idx].type = type;
+    fsync_list[entry][idx].shm = shm;
+    unlock_obj_cache();
 }
 
 static BOOL get_cached_object( HANDLE handle, struct fsync *obj )
 {
+    BOOL ret = TRUE;
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
 
     if (entry >= FSYNC_LIST_ENTRIES || !fsync_list[entry]) return FALSE;
-    if (!fsync_list[entry][idx].type) return FALSE;
 
-    *obj = fsync_list[entry][idx];
-    return TRUE;
+    lock_obj_cache();
+    if (!fsync_list[entry][idx].type) ret = FALSE;
+    else                              *obj = fsync_list[entry][idx];
+    unlock_obj_cache();
+    return ret;
 }
 
 /* Gets an object. This is either a proper fsync object (i.e. an event,
@@ -367,7 +394,16 @@ NTSTATUS fsync_close( HANDLE handle )
 
     if (entry < FSYNC_LIST_ENTRIES && fsync_list[entry])
     {
-        if (__atomic_exchange_n( &fsync_list[entry][idx].type, 0, __ATOMIC_SEQ_CST ))
+        enum fsync_type type;
+
+        lock_obj_cache();
+        if ((type = fsync_list[entry][idx].type))
+        {
+            fsync_list[entry][idx].type = 0;
+            fsync_list[entry][idx].shm = NULL;
+        }
+        unlock_obj_cache();
+        if (type)
             return STATUS_SUCCESS;
     }
 
@@ -797,12 +833,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
         ret = get_object( handles[i], &objs[i] );
         if (ret == STATUS_SUCCESS)
         {
-            if (!objs[i].type)
-            {
-                /* Someone probably closed an object while waiting on it. */
-                WARN("Handle %p has type 0; was it closed?\n", handles[i]);
-                return STATUS_INVALID_HANDLE;
-            }
+            assert( objs[i].type );
             has_fsync = 1;
         }
         else if (ret == STATUS_NOT_IMPLEMENTED)
