@@ -582,6 +582,49 @@ struct ip_hdr
     ULONG daddr;
 };
 
+struct icmp_hdr
+{
+    BYTE type;
+    BYTE code;
+    UINT16 checksum;
+    union
+    {
+        struct
+        {
+            UINT16 id;
+            UINT16 sequence;
+        } echo;
+    } un;
+};
+
+/* rfc 1071 checksum */
+static unsigned short chksum(BYTE *data, unsigned int count)
+{
+    unsigned int sum = 0, carry = 0;
+    unsigned short check, s;
+
+    while (count > 1)
+    {
+        s = *(unsigned short *)data;
+        data += 2;
+        sum += carry;
+        sum += s;
+        carry = s > sum;
+        count -= 2;
+    }
+    sum += carry; /* This won't produce another carry */
+    sum = (sum & 0xffff) + (sum >> 16);
+
+    if (count) sum += *data; /* LE-only */
+
+    sum = (sum & 0xffff) + (sum >> 16);
+    /* fold in any carry */
+    sum = (sum & 0xffff) + (sum >> 16);
+
+    check = ~sum;
+    return check;
+}
+
 static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *size )
 {
 #ifndef HAVE_STRUCT_MSGHDR_MSG_ACCRIGHTS
@@ -629,6 +672,8 @@ static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *siz
         unsigned int tot_len = sizeof(struct ip_hdr) + ret;
         size_t len = hdr.msg_iov[0].iov_len;
         char *buf = hdr.msg_iov[0].iov_base;
+        struct icmp_hdr *icmp_h = NULL;
+        NTSTATUS fixup_status;
         struct cmsghdr *cmsg;
         struct ip_hdr ip_h;
 
@@ -643,6 +688,8 @@ static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *siz
         {
             ret = min( ret, len - sizeof(ip_h) );
             memmove( buf + sizeof(ip_h), buf, ret );
+            if (ret >= sizeof(struct icmp_hdr))
+                icmp_h = (struct icmp_hdr *)(buf + sizeof(ip_h));
             ret += sizeof(ip_h);
         }
         memset( &ip_h, 0, sizeof(ip_h) );
@@ -676,6 +723,24 @@ static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *siz
                     break;
                 }
 #endif
+            }
+        }
+        if (icmp_h)
+        {
+            SERVER_START_REQ( socket_get_fixup_data )
+            {
+                req->handle = wine_server_obj_handle( async->io.handle );
+                req->icmp_seq = icmp_h->un.echo.sequence;
+                if (!(fixup_status = wine_server_call( req )))
+                    icmp_h->un.echo.id = reply->icmp_id;
+                else
+                    WARN( "socket_get_fixup_data returned %#x.\n", fixup_status );
+            }
+            SERVER_END_REQ;
+            if (!fixup_status)
+            {
+                icmp_h->checksum = 0;
+                icmp_h->checksum = chksum( (BYTE *)icmp_h, ret - sizeof(ip_h) );
             }
         }
         memcpy( buf, &ip_h, min( sizeof(ip_h), len ));
@@ -951,6 +1016,7 @@ static NTSTATUS sock_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
                            IO_STATUS_BLOCK *io, int fd, const void *buffers_ptr, unsigned int count,
                            const struct WS_sockaddr *addr, unsigned int addr_len, int unix_flags, int force_async )
 {
+    enum sock_prot_fixup_type fixup_type;
     struct async_send_ioctl *async;
     HANDLE wait_handle;
     DWORD async_size;
@@ -1023,6 +1089,7 @@ static NTSTATUS sock_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
         status = wine_server_call( req );
         wait_handle = wine_server_ptr_handle( reply->wait );
         options     = reply->options;
+        fixup_type  = reply->fixup_type;
         if ((!NT_ERROR(status) || wait_handle) && status != STATUS_PENDING)
         {
             io->Status = status;
@@ -1030,6 +1097,36 @@ static NTSTATUS sock_send( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
         }
     }
     SERVER_END_REQ;
+
+    if (fixup_type == SOCK_PROT_FIXUP_ICMP_OVER_DGRAM && async->count
+        && (!status || status == STATUS_ALERTED || status == STATUS_PENDING))
+    {
+        unsigned short id, seq;
+        struct icmp_hdr *h;
+        NTSTATUS ret;
+
+        WARN( "Performing ICMP over DGRAM fixup.\n" );
+
+        if (async->iov[0].iov_len < sizeof(*h))
+        {
+            FIXME( "ICMP over DGRAM fixup is not supported for count %u, len %zu.\n", count, async->iov[0].iov_len );
+        }
+        else
+        {
+            h = async->iov[0].iov_base;
+            id = h->un.echo.id;
+            seq = h->un.echo.sequence;
+            SERVER_START_REQ( socket_fixup_send_data )
+            {
+                req->handle = wine_server_obj_handle( handle );
+                req->icmp_id = id;
+                req->icmp_seq = seq;
+                ret = wine_server_call( req );
+            }
+            SERVER_END_REQ;
+            if (ret) WARN( "socket_fixup_send_data returned %#x.\n", ret );
+        }
+    }
 
     if (status != STATUS_PENDING) release_fileio( &async->io );
 
