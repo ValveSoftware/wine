@@ -115,6 +115,7 @@ struct async_recv_ioctl
     DWORD *ret_flags;
     int unix_flags;
     unsigned int count;
+    enum sock_prot_fixup_type fixup_type;
     struct iovec iov[1];
 };
 
@@ -567,6 +568,20 @@ static int wow64_translate_control( const WSABUF *control64, struct afd_wsabuf_3
     return 1;
 }
 
+struct ip_hdr
+{
+    BYTE v_hl; /* version << 4 | hdr_len */
+    BYTE tos;
+    UINT16 tot_len;
+    UINT16 id;
+    UINT16 frag_off;
+    BYTE ttl;
+    BYTE protocol;
+    UINT16 checksum;
+    ULONG saddr;
+    ULONG daddr;
+};
+
 static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *size )
 {
 #ifndef HAVE_STRUCT_MSGHDR_MSG_ACCRIGHTS
@@ -577,8 +592,14 @@ static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *siz
     NTSTATUS status;
     ssize_t ret;
 
+    if (async->fixup_type == SOCK_PROT_FIXUP_ICMP_OVER_DGRAM && async->count != 1)
+    {
+        FIXME( "async->count %d not supported for ICMP fixup.\n", async->count );
+        async->fixup_type = SOCK_PROT_FIXUP_NONE;
+    }
+
     memset( &hdr, 0, sizeof(hdr) );
-    if (async->addr)
+    if (async->addr || async->fixup_type == SOCK_PROT_FIXUP_ICMP_OVER_DGRAM)
     {
         hdr.msg_name = &unix_addr.addr;
         hdr.msg_namelen = sizeof(unix_addr);
@@ -603,9 +624,68 @@ static NTSTATUS try_recv( int fd, struct async_recv_ioctl *async, ULONG_PTR *siz
     }
 
     status = (hdr.msg_flags & MSG_TRUNC) ? STATUS_BUFFER_OVERFLOW : STATUS_SUCCESS;
+    if (async->fixup_type == SOCK_PROT_FIXUP_ICMP_OVER_DGRAM)
+    {
+        unsigned int tot_len = sizeof(struct ip_hdr) + ret;
+        size_t len = hdr.msg_iov[0].iov_len;
+        char *buf = hdr.msg_iov[0].iov_base;
+        struct cmsghdr *cmsg;
+        struct ip_hdr ip_h;
+
+        if (ret + sizeof(ip_h) > len)
+            status = STATUS_BUFFER_OVERFLOW;
+
+        if (len < sizeof(ip_h))
+        {
+            ret = len;
+        }
+        else
+        {
+            ret = min( ret, len - sizeof(ip_h) );
+            memmove( buf + sizeof(ip_h), buf, ret );
+            ret += sizeof(ip_h);
+        }
+        memset( &ip_h, 0, sizeof(ip_h) );
+        ip_h.v_hl = (4 << 4) | (sizeof(ip_h) >> 2);
+        ip_h.tot_len = htons( tot_len );
+        ip_h.protocol = 1;
+        ip_h.saddr = unix_addr.in.sin_addr.s_addr;
+
+        for (cmsg = CMSG_FIRSTHDR( &hdr ); cmsg; cmsg = CMSG_NXTHDR( &hdr, cmsg ))
+        {
+            if (cmsg->cmsg_level != IPPROTO_IP) continue;
+            switch (cmsg->cmsg_type)
+            {
+#if defined(IP_TTL)
+                case IP_TTL:
+                    ip_h.ttl = *(BYTE *)CMSG_DATA( cmsg );
+                    break;
+#endif
+#if defined(IP_TOS)
+                case IP_TOS:
+                    ip_h.tos = *(BYTE *)CMSG_DATA( cmsg );
+                    break;
+#endif
+#if defined(IP_PKTINFO)
+                case IP_PKTINFO:
+                {
+                    struct in_pktinfo *info;
+
+                    info = (struct in_pktinfo *)CMSG_DATA( cmsg );
+                    ip_h.daddr = info->ipi_addr.s_addr;
+                    break;
+                }
+#endif
+            }
+        }
+        memcpy( buf, &ip_h, min( sizeof(ip_h), len ));
+    }
 
     if (async->control)
     {
+        if (async->fixup_type == SOCK_PROT_FIXUP_ICMP_OVER_DGRAM)
+            FIXME( "May return extra control headers.\n" );
+
         if (in_wow64_call())
         {
             char control_buffer64[512];
@@ -678,7 +758,8 @@ static BOOL async_recv_proc( void *user, ULONG_PTR *info, NTSTATUS *status )
 
 static NTSTATUS sock_recv( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc_user, IO_STATUS_BLOCK *io,
                            int fd, const void *buffers_ptr, unsigned int count, WSABUF *control,
-                           struct WS_sockaddr *addr, int *addr_len, DWORD *ret_flags, int unix_flags, int force_async )
+                           struct WS_sockaddr *addr, int *addr_len, DWORD *ret_flags, int unix_flags, int force_async,
+                           unsigned int fd_options )
 {
     struct async_recv_ioctl *async;
     ULONG_PTR information;
@@ -727,6 +808,10 @@ static NTSTATUS sock_recv( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, voi
     async->addr = addr;
     async->addr_len = addr_len;
     async->ret_flags = ret_flags;
+    async->fixup_type = (fd_options & 0x10000) ? SOCK_PROT_FIXUP_ICMP_OVER_DGRAM : SOCK_PROT_FIXUP_NONE;
+
+    if (async->fixup_type)
+        WARN( "Performing ICMP over DGRAM fixup.\n" );
 
     for (i = 0; i < count; ++i)
     {
@@ -1259,9 +1344,10 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
         case IOCTL_AFD_RECV:
         {
             struct afd_recv_params params;
+            unsigned int options;
             int unix_flags = 0;
 
-            if ((status = server_get_unix_fd( handle, 0, &fd, &needs_close, NULL, NULL )))
+            if ((status = server_get_unix_fd( handle, 0, &fd, &needs_close, NULL, &options )))
                 return status;
 
             if (out_size) FIXME( "unexpected output size %u\n", out_size );
@@ -1311,7 +1397,8 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
             if (params.msg_flags & AFD_MSG_WAITALL)
                 FIXME( "MSG_WAITALL is not supported\n" );
             status = sock_recv( handle, event, apc, apc_user, io, fd, params.buffers, params.count, NULL,
-                                NULL, NULL, NULL, unix_flags, !!(params.recv_flags & AFD_RECV_FORCE_ASYNC) );
+                                NULL, NULL, NULL, unix_flags, !!(params.recv_flags & AFD_RECV_FORCE_ASYNC),
+                                options );
             if (needs_close) close( fd );
             return status;
         }
@@ -1320,9 +1407,10 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
         {
             struct afd_recvmsg_params *params = in_buffer;
             unsigned int *ws_flags = u64_to_user_ptr(params->ws_flags_ptr);
+            unsigned int options;
             int unix_flags = 0;
 
-            if ((status = server_get_unix_fd( handle, 0, &fd, &needs_close, NULL, NULL )))
+            if ((status = server_get_unix_fd( handle, 0, &fd, &needs_close, NULL, &options )))
                 return status;
 
             if (in_size < sizeof(*params))
@@ -1340,7 +1428,7 @@ NTSTATUS sock_ioctl( HANDLE handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc
             status = sock_recv( handle, event, apc, apc_user, io, fd, u64_to_user_ptr(params->buffers_ptr),
                                 params->count, u64_to_user_ptr(params->control_ptr),
                                 u64_to_user_ptr(params->addr_ptr), u64_to_user_ptr(params->addr_len_ptr),
-                                ws_flags, unix_flags, params->force_async );
+                                ws_flags, unix_flags, params->force_async, options );
             if (needs_close) close( fd );
             return status;
         }

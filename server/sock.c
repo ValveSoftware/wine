@@ -210,6 +210,7 @@ struct sock
     unsigned int        sndbuf;      /* advisory send buffer size */
     unsigned int        rcvtimeo;    /* receive timeout in ms */
     unsigned int        sndtimeo;    /* send timeout in ms */
+    enum sock_prot_fixup_type fixup_type; /* protocol fixup performed */
     unsigned int        rd_shutdown : 1; /* is the read end shut down? */
     unsigned int        wr_shutdown : 1; /* is the write end shut down? */
     unsigned int        wr_shutdown_pending : 1; /* is a write shutdown pending? */
@@ -1492,6 +1493,7 @@ static struct sock *create_socket(void)
     sock->sndbuf = 0;
     sock->rcvtimeo = 0;
     sock->sndtimeo = 0;
+    sock->fixup_type = SOCK_PROT_FIXUP_NONE;
     init_async_queue( &sock->read_q );
     init_async_queue( &sock->write_q );
     init_async_queue( &sock->ifchange_q );
@@ -1608,6 +1610,25 @@ static int init_socket( struct sock *sock, int family, int type, int protocol, u
     }
 
     sockfd = socket( unix_family, unix_type, unix_protocol );
+
+#ifdef linux
+    if (sockfd == -1 && errno == EPERM && unix_family == AF_INET
+        && unix_type == SOCK_RAW && unix_protocol == IPPROTO_ICMP)
+    {
+        sockfd = socket( unix_family, SOCK_DGRAM, unix_protocol );
+        if (sockfd != -1)
+        {
+            const int val = 1;
+
+            sock->fixup_type = SOCK_PROT_FIXUP_ICMP_OVER_DGRAM;
+            options |= 0x10000;
+            setsockopt( sockfd, IPPROTO_IP, IP_RECVTTL, (const char *)&val, sizeof(val) );
+            setsockopt( sockfd, IPPROTO_IP, IP_RECVTOS, (const char *)&val, sizeof(val) );
+            setsockopt( sockfd, IPPROTO_IP, IP_PKTINFO, (const char *)&val, sizeof(val) );
+        }
+    }
+#endif
+
     if (sockfd == -1)
     {
         if (errno == EINVAL) set_win32_error( WSAESOCKTNOSUPPORT );
@@ -1666,7 +1687,7 @@ static int init_socket( struct sock *sock, int family, int type, int protocol, u
 
     if (sock->fd)
     {
-        options = get_fd_options( sock->fd );
+        options |= get_fd_options( sock->fd );
         release_object( sock->fd );
     }
 
@@ -3413,6 +3434,7 @@ DECL_HANDLER(recv_socket)
     struct fd *fd;
 
     if (!sock) return;
+
     fd = sock->fd;
 
     /* recv() returned EWOULDBLOCK, i.e. no data available yet */

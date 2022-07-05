@@ -1503,7 +1503,6 @@ enum server_fd_type
     file_pos_t   count;         /* count of bytes to unlock */
 @END
 
-
 /* Perform a recv on a socket */
 @REQ(recv_socket)
     int          oob;           /* are we receiving OOB data? */
@@ -1514,6 +1513,11 @@ enum server_fd_type
     obj_handle_t wait;          /* handle to wait on for blocking recv */
     unsigned int options;       /* device open options */
 @END
+enum sock_prot_fixup_type
+{
+    SOCK_PROT_FIXUP_NONE,
+    SOCK_PROT_FIXUP_ICMP_OVER_DGRAM,
+};
 
 
 /* Perform a send on a socket */
