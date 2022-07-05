@@ -1528,6 +1528,25 @@ enum sock_prot_fixup_type
 @REPLY
     obj_handle_t wait;          /* handle to wait on for blocking send */
     unsigned int options;       /* device open options */
+    int          fixup_type;    /* socket protocol fixup */
+@END
+
+
+/* Store info needed for protocol fixup */
+@REQ(socket_fixup_send_data)
+    obj_handle_t   handle;        /* socket handle */
+    unsigned short icmp_id;       /* ICMP packet id */
+    unsigned short icmp_seq;      /* ICMP packed sequence */
+@REPLY
+@END
+
+
+/* Retrieve protocol fixup info */
+@REQ(socket_get_fixup_data)
+    obj_handle_t   handle;        /* socket handle */
+    unsigned short icmp_seq;      /* ICMP packed sequence */
+@REPLY
+    unsigned short icmp_id;       /* ICMP packet id */
 @END
 
 

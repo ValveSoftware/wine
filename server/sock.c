@@ -162,6 +162,8 @@ enum connection_state
     SOCK_CONNECTIONLESS,
 };
 
+#define MAX_ICMP_HISTORY_LENGTH 8
+
 struct sock
 {
     struct object       obj;         /* object header */
@@ -211,6 +213,13 @@ struct sock
     unsigned int        rcvtimeo;    /* receive timeout in ms */
     unsigned int        sndtimeo;    /* send timeout in ms */
     enum sock_prot_fixup_type fixup_type; /* protocol fixup performed */
+    struct
+    {
+        unsigned short icmp_id;
+        unsigned short icmp_seq;
+    }
+    icmp_fixup_data[MAX_ICMP_HISTORY_LENGTH]; /* Sent ICMP packets history used to fixup reply id. */
+    unsigned int        icmp_fixup_data_len;  /* Sent ICMP packets history length. */
     unsigned int        rd_shutdown : 1; /* is the read end shut down? */
     unsigned int        wr_shutdown : 1; /* is the write end shut down? */
     unsigned int        wr_shutdown_pending : 1; /* is a write shutdown pending? */
@@ -1494,6 +1503,7 @@ static struct sock *create_socket(void)
     sock->rcvtimeo = 0;
     sock->sndtimeo = 0;
     sock->fixup_type = SOCK_PROT_FIXUP_NONE;
+    sock->icmp_fixup_data_len = 0;
     init_async_queue( &sock->read_q );
     init_async_queue( &sock->write_q );
     init_async_queue( &sock->ifchange_q );
@@ -3495,6 +3505,8 @@ DECL_HANDLER(send_socket)
     if (!sock) return;
     fd = sock->fd;
 
+    reply->fixup_type = sock->fixup_type;
+
     if (sock->type == WS_SOCK_DGRAM)
     {
         /* sendto() and sendmsg() implicitly binds a socket */
@@ -3561,5 +3573,63 @@ DECL_HANDLER(send_socket)
         reply->options = get_fd_options( fd );
         release_object( async );
     }
+    release_object( sock );
+}
+
+DECL_HANDLER(socket_fixup_send_data)
+{
+    struct sock *sock = (struct sock *)get_handle_obj( current->process, req->handle, 0, &sock_ops );
+
+    if (!sock) return;
+
+    if (sock->fixup_type != SOCK_PROT_FIXUP_ICMP_OVER_DGRAM)
+    {
+        set_error( STATUS_INVALID_PARAMETER );
+        release_object( sock );
+        return;
+    }
+
+    if (sock->icmp_fixup_data_len == MAX_ICMP_HISTORY_LENGTH)
+    {
+        set_error( STATUS_BUFFER_OVERFLOW );
+        release_object( sock );
+        return;
+    }
+
+    sock->icmp_fixup_data[sock->icmp_fixup_data_len].icmp_id = req->icmp_id;
+    sock->icmp_fixup_data[sock->icmp_fixup_data_len].icmp_seq = req->icmp_seq;
+    ++sock->icmp_fixup_data_len;
+
+    release_object( sock );
+}
+
+DECL_HANDLER(socket_get_fixup_data)
+{
+    struct sock *sock = (struct sock *)get_handle_obj( current->process, req->handle, 0, &sock_ops );
+    unsigned int i;
+
+    if (!sock) return;
+
+    if (sock->fixup_type != SOCK_PROT_FIXUP_ICMP_OVER_DGRAM)
+    {
+        set_error( STATUS_INVALID_PARAMETER );
+        release_object( sock );
+        return;
+    }
+
+    for (i = 0; i < sock->icmp_fixup_data_len; ++i)
+    {
+        if (sock->icmp_fixup_data[i].icmp_seq == req->icmp_seq)
+        {
+            reply->icmp_id = sock->icmp_fixup_data[i].icmp_id;
+            --sock->icmp_fixup_data_len;
+            memmove( &sock->icmp_fixup_data[i], &sock->icmp_fixup_data[i + 1],
+                     (sock->icmp_fixup_data_len - i) * sizeof(*sock->icmp_fixup_data) );
+            release_object( sock );
+            return;
+        }
+    }
+
+    set_error( STATUS_NOT_FOUND );
     release_object( sock );
 }
