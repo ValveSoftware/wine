@@ -254,6 +254,8 @@ MAKE_FUNCPTR(FcStrSetMember);
 #define GET_BE_DWORD(x) RtlUlongByteSwap(x)
 #endif
 
+#define MS_EBDT_TAG MS_MAKE_TAG('E','B','D','T')
+
 /* 'gasp' flags */
 #define GASP_GRIDFIT 0x01
 #define GASP_DOGRAY  0x02
@@ -1197,6 +1199,8 @@ static struct unix_face *unix_face_create( const char *unix_name, void *data_ptr
     struct stat st;
     DWORD face_count;
     int fd, length;
+    FT_Error error;
+    FT_ULong len;
 
     TRACE( "unix_name %s, face_index %u, data_ptr %p, data_size %u, flags %#x\n",
            unix_name, face_index, data_ptr, data_size, flags );
@@ -1288,7 +1292,20 @@ static struct unix_face *unix_face_create( const char *unix_name, void *data_ptr
 
         This->ntm_flags = get_ntm_flags( This->ft_face );
         This->font_version = get_font_version( This->ft_face );
-        if (!This->scalable) get_bitmap_size( This->ft_face, &This->size );
+        if (!This->scalable)
+        {
+            error = pFT_Load_Sfnt_Table( This->ft_face, RtlUlongByteSwap(MS_EBDT_TAG), 0, NULL, &len );
+            if (error == FT_Err_Table_Missing)
+            {
+                WARN( "EBDT table is missing in bitmap only font %s.\n",
+                      debugstr_w(ft_face_get_family_name( This->ft_face, system_lcid )));
+                pFT_Done_Face( This->ft_face );
+                free( This );
+                This = NULL;
+                goto done;
+            }
+            get_bitmap_size( This->ft_face, &This->size );
+        }
         get_fontsig( This->ft_face, &This->fs );
     }
     else
