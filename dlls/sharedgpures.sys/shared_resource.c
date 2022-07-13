@@ -285,7 +285,7 @@ static NTSTATUS WINAPI dispatch_create(DEVICE_OBJECT *device, IRP *irp)
 static NTSTATUS WINAPI dispatch_close(DEVICE_OBJECT *device, IRP *irp)
 {
     IO_STACK_LOCATION *stack = IoGetCurrentIrpStackLocation(irp);
-    struct shared_resource *res = stack->FileObject->FsContext;
+    struct shared_resource *res = &resource_pool[ (UINT_PTR) stack->FileObject->FsContext ];
 
     TRACE("Freeing shared resouce %p.\n", res);
 
@@ -316,7 +316,7 @@ static NTSTATUS WINAPI dispatch_close(DEVICE_OBJECT *device, IRP *irp)
 static NTSTATUS WINAPI dispatch_ioctl(DEVICE_OBJECT *device, IRP *irp)
 {
     IO_STACK_LOCATION *stack = IoGetCurrentIrpStackLocation( irp );
-    struct shared_resource **res = (struct shared_resource **) &stack->FileObject->FsContext;
+    struct shared_resource *res = &resource_pool[ (UINT_PTR) stack->FileObject->FsContext ];
     NTSTATUS status;
 
     TRACE( "ioctl %lx insize %lu outsize %lu\n",
@@ -327,37 +327,37 @@ static NTSTATUS WINAPI dispatch_ioctl(DEVICE_OBJECT *device, IRP *irp)
     switch (stack->Parameters.DeviceIoControl.IoControlCode)
     {
         case IOCTL_SHARED_GPU_RESOURCE_CREATE:
-            status = shared_resource_create( res,
+            status = shared_resource_create( &res,
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.InputBufferLength,
                                       &irp->IoStatus );
             break;
         case IOCTL_SHARED_GPU_RESOURCE_OPEN:
-            status = shared_resource_open( res,
+            status = shared_resource_open( &res,
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.InputBufferLength,
                                       &irp->IoStatus );
             break;
         case IOCTL_SHARED_GPU_RESOURCE_GETKMT:
-            status = shared_resource_getkmt( *res,
+            status = shared_resource_getkmt( res,
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.OutputBufferLength,
                                       &irp->IoStatus );
             break;
         case IOCTL_SHARED_GPU_RESOURCE_GET_UNIX_RESOURCE:
-            status = shared_resource_get_unix_resource( *res,
+            status = shared_resource_get_unix_resource( res,
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.OutputBufferLength,
                                       &irp->IoStatus );
             break;
         case IOCTL_SHARED_GPU_RESOURCE_SET_METADATA:
-            status = shared_resource_set_metadata( *res,
+            status = shared_resource_set_metadata( res,
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.InputBufferLength,
                                       &irp->IoStatus );
             break;
         case IOCTL_SHARED_GPU_RESOURCE_GET_METADATA:
-            status = shared_resource_get_metadata( *res,
+            status = shared_resource_get_metadata( res,
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.OutputBufferLength,
                                       &irp->IoStatus );
@@ -367,6 +367,9 @@ static NTSTATUS WINAPI dispatch_ioctl(DEVICE_OBJECT *device, IRP *irp)
         status = STATUS_NOT_SUPPORTED;
         break;
     }
+
+    if (!status)
+        stack->FileObject->FsContext = (UINT_PTR)(res - resource_pool);
 
     irp->IoStatus.u.Status = status;
     IoCompleteRequest( irp, IO_NO_INCREMENT );
