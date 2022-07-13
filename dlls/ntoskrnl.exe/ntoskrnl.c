@@ -260,6 +260,15 @@ POBJECT_TYPE WINAPI ObGetObjectType( void *object )
     return header->type;
 }
 
+static const WCHAR section_type_name[] = {'S','e','c','t','i','o','n',0};
+
+static struct _OBJECT_TYPE section_type =
+{
+    section_type_name
+};
+
+static POBJECT_TYPE p_section_type = &section_type;
+
 static const POBJECT_TYPE *known_types[] =
 {
     &ExEventObjectType,
@@ -269,7 +278,8 @@ static const POBJECT_TYPE *known_types[] =
     &IoFileObjectType,
     &PsProcessType,
     &PsThreadType,
-    &SeTokenObjectType
+    &SeTokenObjectType,
+    &p_section_type,
 };
 
 DECLARE_CRITICAL_SECTION(handle_map_cs);
