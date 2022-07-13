@@ -25,6 +25,8 @@ struct shared_resource
     WCHAR *name;
     void *metadata;
     SIZE_T metadata_size;
+    void **object_pool;
+    unsigned int object_pool_count;
 };
 
 static struct shared_resource *resource_pool;
@@ -275,6 +277,70 @@ static NTSTATUS shared_resource_get_metadata(struct shared_resource *res, void *
     return STATUS_SUCCESS;
 }
 
+#define IOCTL_SHARED_GPU_RESOURCE_SET_OBJECT           CTL_CODE(FILE_DEVICE_VIDEO, 6, METHOD_BUFFERED, FILE_WRITE_ACCESS)
+
+struct shared_resource_set_object
+{
+    unsigned int index;
+    obj_handle_t handle;
+};
+
+static NTSTATUS shared_resource_set_object(struct shared_resource *res, void *buff, SIZE_T insize, IO_STATUS_BLOCK *iosb)
+{
+    struct shared_resource_set_object *params = buff;
+    void *object;
+
+    if (insize < sizeof(*params))
+        return STATUS_INFO_LENGTH_MISMATCH;
+
+    if (!(object = reference_client_handle(params->handle)))
+        return STATUS_INVALID_HANDLE;
+
+    if (params->index >= res->object_pool_count)
+    {
+        void **expanded_pool = ExAllocatePoolWithTag(NonPagedPool, (params->index + 1) * sizeof(void *), 0);
+
+        if (res->object_pool)
+        {
+            memcpy(expanded_pool, res->object_pool, res->object_pool_count * sizeof(void *));
+            ExFreePoolWithTag(res->object_pool, 0);
+        }
+
+        memset(&expanded_pool[res->object_pool_count], 0, (params->index + 1 - res->object_pool_count) * sizeof (void *));
+
+        res->object_pool = expanded_pool;
+        res->object_pool_count = params->index + 1;
+    }
+
+    if (res->object_pool[params->index])
+        ObDereferenceObject(res->object_pool[params->index]);
+
+    res->object_pool[params->index] = object;
+
+    iosb->Information = 0;
+    return STATUS_SUCCESS;
+}
+
+#define IOCTL_SHARED_GPU_RESOURCE_GET_OBJECT           CTL_CODE(FILE_DEVICE_VIDEO, 6, METHOD_BUFFERED, FILE_READ_ACCESS)
+
+static NTSTATUS shared_resource_get_object(struct shared_resource *res, void *buff, SIZE_T insize, SIZE_T outsize, IO_STATUS_BLOCK *iosb)
+{
+    unsigned int index;
+
+    if (insize < sizeof(unsigned int) || outsize < sizeof(obj_handle_t))
+        return STATUS_INFO_LENGTH_MISMATCH;
+
+    index = *(unsigned int *)buff;
+
+    if (index >= res->object_pool_count || !res->object_pool[index])
+        return STATUS_INVALID_PARAMETER;
+
+    *((obj_handle_t *)buff) = open_client_handle(res->object_pool[index]);
+
+    iosb->Information = sizeof(obj_handle_t);
+    return STATUS_SUCCESS;
+}
+
 static NTSTATUS WINAPI dispatch_create(DEVICE_OBJECT *device, IRP *irp)
 {
     irp->IoStatus.u.Status = STATUS_SUCCESS;
@@ -304,6 +370,18 @@ static NTSTATUS WINAPI dispatch_close(DEVICE_OBJECT *device, IRP *irp)
             {
                 ExFreePoolWithTag(res->metadata, 0);
                 res->metadata = NULL;
+            }
+            if (res->object_pool)
+            {
+                unsigned int i;
+                for (i = 0; i < res->object_pool_count; i++)
+                {
+                    if (res->object_pool[i])
+                        ObDereferenceObject(res->object_pool[i]);
+                }
+                ExFreePoolWithTag(res->object_pool, 0);
+                res->object_pool = NULL;
+                res->object_pool_count = 0;
             }
         }
     }
@@ -361,6 +439,19 @@ static NTSTATUS WINAPI dispatch_ioctl(DEVICE_OBJECT *device, IRP *irp)
                                       irp->AssociatedIrp.SystemBuffer,
                                       stack->Parameters.DeviceIoControl.OutputBufferLength,
                                       &irp->IoStatus );
+            break;
+        case IOCTL_SHARED_GPU_RESOURCE_SET_OBJECT:
+            status = shared_resource_set_object( res,
+                                      irp->AssociatedIrp.SystemBuffer,
+                                      stack->Parameters.DeviceIoControl.InputBufferLength,
+                                      &irp->IoStatus );
+            break;
+        case IOCTL_SHARED_GPU_RESOURCE_GET_OBJECT:
+            status = shared_resource_get_object( res,
+                                      irp->AssociatedIrp.SystemBuffer,
+                                      stack->Parameters.DeviceIoControl.InputBufferLength,
+                                      stack->Parameters.DeviceIoControl.OutputBufferLength,
+                                      &irp->IoStatus);
             break;
     default:
         FIXME( "ioctl %lx not supported\n", stack->Parameters.DeviceIoControl.IoControlCode );
