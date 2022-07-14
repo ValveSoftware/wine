@@ -1533,7 +1533,7 @@ class VkMember(object):
 class VkParam(object):
     """ Helper class which describes a parameter to a function call. """
 
-    def __init__(self, type_info, const=None, pointer=None, name=None, array_len=None, dyn_array_len=None, object_type=None):
+    def __init__(self, type_info, const=None, pointer=None, name=None, array_len=None, dyn_array_len=None, object_type=None, optional=False):
         self.const = const
         self.name = name
         self.array_len = array_len
@@ -1541,6 +1541,7 @@ class VkParam(object):
         self.pointer = pointer
         self.object_type = object_type
         self.type_info = type_info
+        self.optional = optional
         self.type = type_info["name"] # For convenience
         self.handle = type_info["data"] if type_info["category"] == "handle" else None
         self.struct = type_info["data"] if type_info["category"] == "struct" else None
@@ -1580,12 +1581,14 @@ class VkParam(object):
         # Some uint64_t are actually handles with a separate type param
         object_type = param.get("objecttype", None)
 
+        optional = param.get("optional", False)
+
         # Since we have parsed all types before hand, this should not happen.
         type_info = types.get(type_elem.text, None)
         if type_info is None:
             LOGGER.err("type info not found for: {0}".format(type_elem.text))
 
-        return VkParam(type_info, const=const, pointer=pointer, name=name, array_len=array_len, dyn_array_len=dyn_array_len, object_type=object_type)
+        return VkParam(type_info, const=const, pointer=pointer, name=name, array_len=array_len, dyn_array_len=dyn_array_len, object_type=object_type, optional=optional)
 
     def _set_conversions(self):
         """ Internal helper function to configure any needed conversion functions. """
@@ -1922,7 +1925,10 @@ class VkParam(object):
             # the wine driver's handle to calls which are wrapped by the driver.
             p = "{0}{1}".format(params_prefix, self.name)
             driver_handle = self.handle.driver_handle(p) if self.is_handle() else None
-            return driver_handle if driver_handle else p
+            if driver_handle and self.optional:
+                return "{0} ? {1} : VK_NULL_HANDLE".format(p, driver_handle)
+            else:
+                return driver_handle if driver_handle else p
 
 
 class VkStruct(Sequence):
