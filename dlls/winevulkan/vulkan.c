@@ -27,6 +27,8 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <stdbool.h>
+#include <stdio.h>
+#include <assert.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -4176,6 +4178,73 @@ static void d3d12_semaphore_unlock(struct wine_semaphore *semaphore)
     pthread_mutex_unlock(&semaphore->d3d12_fence_shm->mutex);
 }
 
+/* returns -1 when there is no queued update that would satisfy the wait */
+static uint64_t d3d12_semaphore_try_get_wait_value_locked(struct wine_semaphore *semaphore, uint64_t virtual_value,
+        struct VkQueue_T *waiting_queue)
+{
+    struct pending_update *update;
+    uint64_t ret = -1;
+    unsigned int i;
+
+    if (semaphore->d3d12_fence_shm->virtual_value >= virtual_value)
+        return 0;
+
+    return ret;
+}
+
+static struct pending_wait *d3d12_semaphore_push_wait_locked(struct wine_semaphore *semaphore, uint64_t virtual_value)
+{
+    struct pending_wait *wait;
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(semaphore->d3d12_fence_shm->pending_waits); i++)
+    {
+        wait = &semaphore->d3d12_fence_shm->pending_waits[i];
+        if (!wait->present)
+            break;
+    }
+
+    if (i == ARRAY_SIZE(semaphore->d3d12_fence_shm->pending_waits))
+    {
+        FIXME("Failed to wait on semaphore %p, maximum waits exceeded.\n", semaphore);
+        return NULL;
+    }
+
+    wait->present = true;
+    wait->satisfied = false;
+    wait->virtual_value = virtual_value;
+    wait->physical_value = 0;
+
+    return wait;
+}
+
+static uint64_t d3d12_semaphore_pop_wait_locked(struct wine_semaphore *semaphore, struct pending_wait *wait)
+{
+    wait->satisfied = false;
+    wait->present = false;
+
+    return wait->physical_value;
+}
+
+static void d3d12_semaphore_satisfy_waits_locked(struct wine_semaphore *semaphore, uint64_t virtual_value,
+        uint64_t physical_value)
+{
+    struct pending_wait *wait;
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(semaphore->d3d12_fence_shm->pending_waits); i++)
+    {
+        wait = &semaphore->d3d12_fence_shm->pending_waits[i];
+
+        if (wait->present && !wait->satisfied && wait->virtual_value <= virtual_value)
+        {
+            wait->satisfied = true;
+            wait->physical_value = physical_value;
+            pthread_cond_signal(&wait->cond);
+        }
+    }
+}
+
 NTSTATUS wine_vkCreateSemaphore(void *args)
 {
     struct vkCreateSemaphore_params *params = args;
@@ -4194,6 +4263,7 @@ NTSTATUS wine_vkCreateSemaphore(void *args)
     OBJECT_ATTRIBUTES attr;
     HANDLE section_handle;
     LARGE_INTEGER li;
+    unsigned int i;
     VkResult res;
     SIZE_T size;
     int fd;
@@ -4287,6 +4357,14 @@ NTSTATUS wine_vkCreateSemaphore(void *args)
                     goto done;
                 }
                 pthread_mutexattr_destroy(&mutex_attr);
+
+                for (i = 0; i < ARRAY_SIZE(object->d3d12_fence_shm->pending_waits); i++)
+                {
+                    pthread_condattr_init(&cond_attr);
+                    pthread_condattr_setpshared(&cond_attr, PTHREAD_PROCESS_SHARED);
+                    pthread_cond_init(&object->d3d12_fence_shm->pending_waits[i].cond, &cond_attr);
+                    pthread_condattr_destroy(&cond_attr);
+                }
             }
         }
 
@@ -4505,14 +4583,40 @@ NTSTATUS wine_vkGetSemaphoreCounterValueKHR(void *args)
 static NTSTATUS vk_signal_semaphore(VkDevice device, const VkSemaphoreSignalInfo *signal_info, bool khr);
 static NTSTATUS wine_vk_signal_semaphore(VkDevice device, const VkSemaphoreSignalInfo *signal_info, bool khr)
 {
+    VkResult vr;
+
     struct wine_semaphore *semaphore = wine_semaphore_from_handle(signal_info->semaphore);
 
     TRACE("(%p, %p)\n", device, signal_info);
 
     if (semaphore->handle_types & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
     {
-        FIXME("Signalling D3D12-Fence compatible timeline semaphore not supported.\n");
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
+        VkSemaphoreSignalInfo step_signal_info;
+
+        d3d12_semaphore_lock(semaphore);
+
+        assert(semaphore->d3d12_fence_shm->counter == phys_val);
+        phys_val++;
+
+        semaphore->d3d12_fence_shm->counter = semaphore->d3d12_fence_shm->physical_value = phys_val;
+
+        step_signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+        step_signal_info.pNext = NULL;
+        step_signal_info.semaphore = signal_info->semaphore;
+        step_signal_info.value = phys_val;
+
+        vr = vk_signal_semaphore(device, &step_signal_info, khr);
+        if (vr != VK_SUCCESS)
+        {
+            d3d12_semaphore_unlock(semaphore);
+            return vr;
+        }
+
+        d3d12_semaphore_satisfy_waits_locked(semaphore, signal_info->value, 0);
+        semaphore->d3d12_fence_shm->virtual_value = signal_info->value;
+
+        d3d12_semaphore_unlock(semaphore);
+        return VK_SUCCESS;
     }
 
     return vk_signal_semaphore(device, signal_info, khr);
@@ -4547,22 +4651,144 @@ NTSTATUS wine_vkSignalSemaphoreKHR(void *args)
 static NTSTATUS vk_wait_semaphores(VkDevice device, const VkSemaphoreWaitInfo *wait_info, uint64_t timeout, bool khr);
 static NTSTATUS wine_vk_wait_semaphores(VkDevice device, const VkSemaphoreWaitInfo *wait_info, uint64_t timeout, bool khr)
 {
-    unsigned int i;
+    VkSemaphoreWaitInfo wait_info_dup = *wait_info;
+    struct timespec abs_timeout, start_time;
+    struct pending_wait **pending_waits;
+    struct pending_wait *pending_wait;
+    unsigned int i, remaining_waits;
+    VkSemaphore* semaphores_dup;
+    uint64_t *values_dup;
+    uint64_t phys_val;
+    int wait_stat;
+    VkResult res;
 
     TRACE("(%p, %p, 0x%s)\n", device, wait_info, wine_dbgstr_longlong(timeout));
+
+    if (timeout)
+    {
+        clock_gettime(CLOCK_REALTIME, &start_time);
+
+        abs_timeout.tv_sec = start_time.tv_sec + (timeout / NANOSECONDS_IN_A_SECOND);
+        abs_timeout.tv_nsec = start_time.tv_nsec + (timeout % NANOSECONDS_IN_A_SECOND);
+        if (abs_timeout.tv_nsec >= NANOSECONDS_IN_A_SECOND)
+        {
+            abs_timeout.tv_sec++;
+            abs_timeout.tv_nsec-=NANOSECONDS_IN_A_SECOND;
+        }
+    }
+
+    wait_info_dup.pSemaphores = semaphores_dup = calloc(wait_info->semaphoreCount, sizeof(VkSemaphore));
+    wait_info_dup.pValues = values_dup = calloc(wait_info->semaphoreCount, sizeof(uint64_t));
+    pending_waits = calloc(wait_info->semaphoreCount, sizeof(struct pending_wait *));
 
     for (i = 0; i < wait_info->semaphoreCount; i++)
     {
         struct wine_semaphore *semaphore = wine_semaphore_from_handle(wait_info->pSemaphores[i]);
 
+        semaphores_dup[i] = wait_info->pSemaphores[i];
+        values_dup[i] = wait_info->pValues[i];
+
         if (semaphore->handle_types & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
         {
-            FIXME("Waiting on D3D12-Fence compatible timeline semaphores not supported.");
-            return return VK_ERROR_OUT_OF_HOST_MEMORY;
+            d3d12_semaphore_lock(semaphore);
+            if ((values_dup[i] = d3d12_semaphore_try_get_wait_value_locked(semaphore, wait_info->pValues[i], NULL)) == -1)
+            {
+                if (!timeout)
+                {
+                    d3d12_semaphore_unlock(semaphore);
+                    continue;
+                }
+
+                pending_wait = d3d12_semaphore_push_wait_locked(semaphore, wait_info->pValues[i]);
+
+                if (wait_info->flags & VK_SEMAPHORE_WAIT_ANY_BIT)
+                {
+                    /* Keep scheduling a wait of current physical_value+1 until the desired virtual value is signaled */
+                    values_dup[i] = semaphore->d3d12_fence_shm->physical_value + 1;
+                    pending_waits[i] = pending_wait;
+                }
+                else
+                {
+                    while (!pending_wait->satisfied && wait_stat != ETIMEDOUT)
+                        wait_stat = pthread_cond_timedwait(&pending_wait->cond, &semaphore->d3d12_fence_shm->mutex, &abs_timeout);
+
+                    values_dup[i] = d3d12_semaphore_pop_wait_locked(semaphore, pending_wait);
+
+                    if (wait_stat == ETIMEDOUT)
+                    {
+                        d3d12_semaphore_unlock(semaphore);
+                        free(semaphores_dup);
+                        free(values_dup);
+                        free(pending_waits);
+                        return VK_TIMEOUT;
+                    }
+                }
+            }
+            d3d12_semaphore_unlock(semaphore);
         }
     }
 
-    return vk_wait_semaphores(device, wait_info, timeout, khr);
+    do
+    {
+        if (timeout)
+        {
+            clock_gettime(CLOCK_REALTIME, &start_time);
+
+            if (start_time.tv_sec > abs_timeout.tv_sec ||
+                    (start_time.tv_sec == abs_timeout.tv_sec && start_time.tv_nsec >= abs_timeout.tv_nsec))
+                timeout = 0;
+            else
+                timeout = ((abs_timeout.tv_sec - start_time.tv_sec) * NANOSECONDS_IN_A_SECOND) +
+                    (abs_timeout.tv_nsec - start_time.tv_nsec);
+        }
+
+        remaining_waits = 0;
+        res = vk_wait_semaphores(device, &wait_info_dup, timeout, khr);
+
+        for (i = 0; i < wait_info->semaphoreCount; i++)
+        {
+            struct wine_semaphore * semaphore = wine_semaphore_from_handle(wait_info->pSemaphores[i]);
+
+            if (pending_waits[i])
+            {
+                remaining_waits++;
+
+                d3d12_semaphore_lock(semaphore);
+                if (res != VK_SUCCESS || pending_waits[i]->satisfied)
+                {
+                    values_dup[i] = pending_waits[i]->physical_value;
+                    d3d12_semaphore_pop_wait_locked(semaphore, pending_waits[i]);
+                    pending_waits[i] = NULL;
+                }
+                d3d12_semaphore_unlock(semaphore);
+            }
+        }
+    }
+    while (res == VK_SUCCESS && remaining_waits);
+
+    /* Make sure the physical value we waited on is processed before returning */
+    for (i = 0; i < wait_info_dup.semaphoreCount; i++)
+    {
+        struct wine_semaphore *semaphore = wine_semaphore_from_handle(wait_info_dup.pSemaphores[i]);
+
+        if (semaphore->handle_types & VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
+        {
+            d3d12_semaphore_lock(semaphore);
+            if (wait_info->flags & VK_SEMAPHORE_WAIT_ANY_BIT)
+            {
+                if (!vk_get_semaphore_counter_value(device, semaphores_dup[i], &phys_val, khr))
+                    d3d12_semaphore_update_phys_val_locked(semaphore, phys_val);
+            }
+            else
+                d3d12_semaphore_update_phys_val_locked(semaphore, values_dup[i]);
+            d3d12_semaphore_unlock(semaphore);
+        }
+    }
+
+    free(semaphores_dup);
+    free(values_dup);
+    free(pending_waits);
+    return res;
 }
 
 static NTSTATUS vk_wait_semaphores(VkDevice device, const VkSemaphoreWaitInfo *wait_info, uint64_t timeout, bool khr)
