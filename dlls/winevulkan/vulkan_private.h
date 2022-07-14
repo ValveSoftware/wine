@@ -266,6 +266,33 @@ static inline VkDeviceMemory wine_dev_mem_to_handle(struct wine_dev_mem *dev_mem
     return (VkDeviceMemory)(uintptr_t)dev_mem;
 }
 
+struct wine_semaphore
+{
+    VkSemaphore semaphore;
+
+    VkExternalSemaphoreHandleTypeFlagBits handle_types;
+    VkExternalSemaphoreHandleTypeFlagBits current_type;
+    HANDLE handle;
+
+    struct wine_vk_mapping mapping;
+
+    struct
+    {
+        pthread_mutex_t mutex;
+        uint64_t virtual_value;
+    } *d3d12_fence_shm;
+};
+
+static inline struct wine_semaphore *wine_semaphore_from_handle(VkSemaphore handle)
+{
+    return (struct wine_semaphore *)(uintptr_t)handle;
+}
+
+static inline VkSemaphore wine_semaphore_to_handle(struct wine_semaphore *semaphore)
+{
+    return (VkSemaphore)(uintptr_t)semaphore;
+}
+
 BOOL wine_vk_device_extension_supported(const char *name) DECLSPEC_HIDDEN;
 BOOL wine_vk_instance_extension_supported(const char *name) DECLSPEC_HIDDEN;
 

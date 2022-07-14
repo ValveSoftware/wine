@@ -223,11 +223,18 @@ FUNCTION_OVERRIDES = {
     "vkCreateSemaphore" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyDevice" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
+    "vkDestroySemaphore" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkFreeCommandBuffers" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkFreeMemory" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkGetDeviceProcAddr" : {"dispatch" : False, "driver" : True, "thunk" : ThunkType.NONE, "loader_thunk" : ThunkType.NONE},
     "vkGetDeviceQueue" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkGetDeviceQueue2" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
+    "vkGetSemaphoreCounterValue" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkSignalSemaphore" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkWaitSemaphores" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkQueueBindSparse" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkQueueSubmit" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkQueueSubmit2" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
 
     # VK_KHR_surface
     "vkDestroySurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
@@ -250,7 +257,7 @@ FUNCTION_OVERRIDES = {
     "vkCreateSwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
     "vkDestroySwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
     "vkGetSwapchainImagesKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
-    "vkQueuePresentKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
+    "vkQueuePresentKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PRIVATE},
 
     # VK_KHR_external_fence_capabilities
     "vkGetPhysicalDeviceExternalFencePropertiesKHR" : {"dispatch" : False, "driver" : False, "thunk" : ThunkType.NONE},
@@ -300,6 +307,14 @@ FUNCTION_OVERRIDES = {
     # VK_KHR_external_semaphore_win32
     "vkGetSemaphoreWin32HandleKHR" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkImportSemaphoreWin32HandleKHR" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
+
+    # VK_KHR_timeline_semaphore
+    "vkGetSemaphoreCounterValueKHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkSignalSemaphoreKHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkWaitSemaphoresKHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+
+    # VK_KHR_synchronization2
+    "vkQueueSubmit2KHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
 }
 
 STRUCT_CHAIN_CONVERSIONS = {
@@ -312,8 +327,8 @@ STRUCT_CHAIN_CONVERSIONS = {
     "VkImageCreateInfo": [],
     "VkMemoryAllocateInfo": ["VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR", "VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR"],
     "VkPhysicalDeviceImageFormatInfo2": [],
+    "VkPhysicalDeviceExternalSemaphoreInfo": [],
     "VkSemaphoreCreateInfo": ["VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR"],
-    "VkD3D12FenceSubmitInfoKHR": ["VK_STRUCTURE_TYPE_D3D12_FENCE_SUBMIT_INFO_KHR"],
 }
 
 
@@ -1141,6 +1156,8 @@ class VkHandle(object):
             return "wine_surface_from_handle({0})->surface".format(name)
         if self.name == "VkDeviceMemory":
             return "wine_dev_mem_from_handle({0})->dev_mem".format(name)
+        if self.name == "VkSemaphore":
+            return "wine_semaphore_from_handle({0})->semaphore".format(name)
 
         native_handle_name = None
 
@@ -1793,9 +1810,6 @@ class VkParam(object):
         # 'parent' param requiring conversion.
         if self.is_struct():
             for m in self.struct:
-                if not m.is_struct():
-                    continue
-
                 if not m.needs_conversion() and not m.needs_unwrapping():
                     continue
 
