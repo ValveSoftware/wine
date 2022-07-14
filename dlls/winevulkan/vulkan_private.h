@@ -324,6 +324,42 @@ static inline void free_conversion_context(struct conversion_context *pool)
         free(entry);
 }
 
+struct wine_semaphore
+{
+    VkSemaphore semaphore;
+    VkSemaphore fence_timeline_semaphore;
+
+    VkExternalSemaphoreHandleTypeFlagBits export_types;
+
+    struct wine_vk_mapping mapping;
+
+    /* mutable members */
+    VkExternalSemaphoreHandleTypeFlagBits handle_type;
+    HANDLE handle;
+    struct
+    {
+        pthread_mutex_t mutex;
+        uint64_t virtual_value;
+    } *d3d12_fence_shm;
+};
+
+static inline struct wine_semaphore *wine_semaphore_from_handle(VkSemaphore handle)
+{
+    return (struct wine_semaphore *)(uintptr_t)handle;
+}
+
+static inline VkSemaphore wine_semaphore_to_handle(struct wine_semaphore *semaphore)
+{
+    return (VkSemaphore)(uintptr_t)semaphore;
+}
+
+static inline VkSemaphore wine_semaphore_host_handle(struct wine_semaphore *semaphore)
+{
+    if (semaphore->handle_type == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
+        return semaphore->fence_timeline_semaphore;
+    return semaphore->semaphore;
+}
+
 static inline void *conversion_context_alloc(struct conversion_context *pool, size_t size)
 {
     if (pool->used + size <= sizeof(pool->buffer))
@@ -407,5 +443,8 @@ static inline void init_unicode_string( UNICODE_STRING *str, const WCHAR *data )
     str->MaximumLength = str->Length + sizeof(WCHAR);
     str->Buffer = (WCHAR *)data;
 }
+
+#define MEMDUP(ctx, dst, src, count) dst = conversion_context_alloc((ctx), sizeof(*(dst)) * (count)); \
+    memcpy((void *)(dst), (src), sizeof(*(dst)) * (count));
 
 #endif /* __WINE_VULKAN_PRIVATE_H */

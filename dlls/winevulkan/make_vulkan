@@ -178,6 +178,13 @@ FUNCTION_OVERRIDES = {
     "vkCreateCommandPool" : {"extra_param" : "client_ptr"},
     "vkGetDeviceProcAddr" : {"dispatch" : False},
     "vkAllocateMemory" : {"extra_param" : "pAllocateInfo"},
+    "vkGetSemaphoreCounterValue" : {"dispatch" : True},
+    "vkSignalSemaphore" : {"dispatch" : True},
+    "vkWaitSemaphores" : {"dispatch" : True},
+    "vkQueueBindSparse" : {"dispatch" : True},
+    "vkQueueSubmit" : {"dispatch" : True},
+    "vkQueueSubmit2" : {"dispatch" : True},
+    "vkDestroySemaphore" : {"dispatch" : True},
 
     # VK_KHR_external_fence_capabilities
     "vkGetPhysicalDeviceExternalFencePropertiesKHR" : {"dispatch" : False},
@@ -196,6 +203,14 @@ FUNCTION_OVERRIDES = {
     # VK_KHR_external_memory_win32
     "vkGetMemoryWin32HandleKHR" : {"dispatch" : True},
     "vkGetMemoryWin32HandlePropertiesKHR" : {"dispatch" : True},
+
+    # VK_KHR_timeline_semaphore
+    "vkGetSemaphoreCounterValueKHR" : {"dispatch" : True},
+    "vkSignalSemaphoreKHR" : {"dispatch" : True},
+    "vkWaitSemaphoresKHR" : {"dispatch" : True},
+
+    # VK_KHR_synchronization2
+    "vkQueueSubmit2KHR" : {"dispatch" : True},
 }
 
 # functions for which a user driver entry must be generated
@@ -283,6 +298,17 @@ MANUAL_UNIX_THUNKS = {
     "vkMapMemory2KHR",
     "vkUnmapMemory",
     "vkUnmapMemory2KHR",
+    "vkGetSemaphoreCounterValue",
+    "vkSignalSemaphore",
+    "vkWaitSemaphores",
+    "vkQueueBindSparse",
+    "vkQueueSubmit",
+    "vkQueueSubmit2",
+    "vkDestroySemaphore",
+    "vkGetSemaphoreCounterValueKHR",
+    "vkSignalSemaphoreKHR",
+    "vkWaitSemaphoresKHR",
+    "vkQueueSubmit2KHR",
 }
 
 # loader functions which are entirely manually implemented
@@ -319,7 +345,11 @@ STRUCT_CHAIN_CONVERSIONS = {
     "VkImageCreateInfo": [],
     "VkMemoryAllocateInfo": ["VK_STRUCTURE_TYPE_EXPORT_MEMORY_WIN32_HANDLE_INFO_KHR", "VK_STRUCTURE_TYPE_IMPORT_MEMORY_WIN32_HANDLE_INFO_KHR"],
     "VkPhysicalDeviceImageFormatInfo2": [],
+    "VkPhysicalDeviceExternalSemaphoreInfo": [],
     "VkSemaphoreCreateInfo": ["VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR"],
+    "VkSubmitInfo": [],
+    "VkSubmitInfo2": [],
+    "VkBindSparseInfo" : [],
 }
 
 # Some struct members are conditionally ignored and callers are free to leave them uninitialized.
@@ -1215,6 +1245,8 @@ class VkHandle(object):
             return "wine_instance_from_handle({0})->host_instance".format(name)
         if self.name == "VkDeviceMemory":
             return "wine_device_memory_from_handle({0})->host_memory".format(name)
+        if self.name == "VkSemaphore":
+            return "wine_semaphore_host_handle( wine_semaphore_from_handle({0}) )".format(name)
         if self.name == "VkPhysicalDevice":
             return "wine_phys_dev_from_handle({0})->host_physical_device".format(name)
         if self.name == "VkQueue":
