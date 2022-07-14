@@ -27,6 +27,7 @@
 #define VK_NO_PROTOTYPES
 
 #include <pthread.h>
+#include <stdbool.h>
 
 #include "wine/list.h"
 
@@ -279,7 +280,15 @@ struct wine_semaphore
     struct
     {
         pthread_mutex_t mutex;
-        uint64_t virtual_value;
+        uint64_t virtual_value, physical_value, counter;
+
+        struct pending_wait
+        {
+            bool present, satisfied;
+            uint64_t virtual_value;
+            uint64_t physical_value;
+            pthread_cond_t cond;
+        } pending_waits[100];
     } *d3d12_fence_shm;
 };
 
