@@ -891,13 +891,6 @@ HRESULT wma_decoder_create(IUnknown *outer, IUnknown **out)
 
     TRACE("outer %p, out %p.\n", outer, out);
 
-    if (!(transform = wg_transform_create(&input_format, &output_format)))
-    {
-        ERR_(winediag)("GStreamer doesn't support WMA decoding, please install appropriate plugins\n");
-        return E_FAIL;
-    }
-    wg_transform_destroy(transform);
-
     if (!(decoder = calloc(1, sizeof(*decoder))))
         return E_OUTOFMEMORY;
 
