@@ -342,4 +342,16 @@ static inline void init_unicode_string( UNICODE_STRING *str, const WCHAR *data )
     str->Buffer = (WCHAR *)data;
 }
 
+static inline void *memdup(const void *in, size_t number, size_t size)
+{
+    void *out;
+
+    if (!in)
+        return NULL;
+
+    out = malloc(number * size);
+    memcpy(out, in, number * size);
+    return out;
+}
+
 #endif /* __WINE_VULKAN_PRIVATE_H */
