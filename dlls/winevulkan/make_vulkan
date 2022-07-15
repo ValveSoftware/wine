@@ -236,6 +236,7 @@ FUNCTION_OVERRIDES = {
     "vkQueueBindSparse" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueSubmit" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueSubmit2" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkQueueWaitIdle" : {"dispatch": True, "driver": False, "thunk" : ThunkType.NONE},
 
     # VK_KHR_surface
     "vkDestroySurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
