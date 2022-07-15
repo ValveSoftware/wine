@@ -891,6 +891,8 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
             goto done;
         }
 
+        IMFMediaType_SetUINT32(base_type, &MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_Normal);
+
         IMFMediaType_GetGUID(base_type, &MF_MT_SUBTYPE, &base_subtype);
 
         stream_types[0] = base_type;
