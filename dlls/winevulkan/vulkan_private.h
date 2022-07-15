@@ -331,6 +331,26 @@ static inline VkSemaphore wine_semaphore_to_handle(struct wine_semaphore *semaph
     return (VkSemaphore)(uintptr_t)semaphore;
 }
 
+struct wine_fence
+{
+    VkFence fence;
+
+    struct VkQueue_T *queue;
+    struct VkSwapchainKHR_T *swapchain;
+    bool wait_assist;
+    int eventfd;
+};
+
+static inline struct wine_fence *wine_fence_from_handle(VkFence handle)
+{
+    return (struct wine_fence *)(uintptr_t)handle;
+}
+
+static inline VkFence wine_fence_to_handle(struct wine_fence *fence)
+{
+    return (VkFence)(uintptr_t)fence;
+}
+
 BOOL wine_vk_device_extension_supported(const char *name) DECLSPEC_HIDDEN;
 BOOL wine_vk_instance_extension_supported(const char *name) DECLSPEC_HIDDEN;
 
