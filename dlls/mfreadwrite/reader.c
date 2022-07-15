@@ -2154,7 +2154,9 @@ static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader
     struct media_stream *stream = &reader->streams[index];
     IMFVideoSampleAllocatorCallback *callback;
     IMFAttributes *attributes;
-    GUID major = { 0 };
+    GUID major = { 0 }, key;
+    PROPVARIANT attr_item;
+    unsigned int i;
     HRESULT hr;
 
     IMFMediaType_GetMajorType(stream->current, &major);
@@ -2202,10 +2204,28 @@ static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader
         }
         else
         {
-            if (FAILED(hr = IMFAttributes_CopyAllItems(output_attributes, attributes)))
-                WARN("Failed to copy transform output attributes, hr %#x.\n", hr);
+            UINT32 item_count = 0;
+
+            if (SUCCEEDED(hr = IMFAttributes_LockStore(output_attributes)))
+            {
+                IMFAttributes_GetCount(output_attributes, &item_count);
+                for (i = 0; i < item_count; i++)
+                {
+                    if (FAILED(hr = IMFAttributes_GetItemByIndex(output_attributes, i, &key, &attr_item)))
+                        break;
+
+                    IMFAttributes_SetItem(output_attributes, &key, &attr_item);
+                    PropVariantClear(&attr_item);
+                }
+
+                IMFAttributes_UnlockStore(output_attributes);
+            }
 
             IMFAttributes_Release(output_attributes);
+            if (FAILED(hr))
+            {
+                WARN("Failed to copy output stream attributes, hr %#x.\n");
+            }
         }
     }
 
