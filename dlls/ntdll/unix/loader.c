@@ -2239,6 +2239,7 @@ static struct unix_funcs unix_funcs =
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
 BOOL no_priv_elevation;
+BOOL localsystem_sid;
 
 static void hacks_init(void)
 {
@@ -2267,6 +2268,13 @@ static void hacks_init(void)
     env_str = getenv("WINE_NO_PRIV_ELEVATION");
     if (env_str)  no_priv_elevation = atoi(env_str);
     else if (sgi) no_priv_elevation = !strcmp(sgi, "1584660");
+
+    if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
+    {
+        ERR("HACK: reporting LocalSystem account SID.\n");
+        localsystem_sid = TRUE;
+        return;
+    }
 }
 
 /***********************************************************************
