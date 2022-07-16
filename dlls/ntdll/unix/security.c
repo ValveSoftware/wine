@@ -209,6 +209,28 @@ NTSTATUS WINAPI NtQueryInformationToken( HANDLE token, TOKEN_INFORMATION_CLASS c
     switch (class)
     {
     case TokenUser:
+        if (localsystem_sid)
+        {
+            static const struct sid local_system_sid = { SID_REVISION, 1, SECURITY_NT_AUTHORITY, { SECURITY_LOCAL_SYSTEM_RID } };
+            DWORD sid_len = offsetof( struct sid, sub_auth[local_system_sid.sub_count] );
+            TOKEN_USER *tuser;
+            PSID sid;
+
+            if (retlen) *retlen = sid_len + sizeof(TOKEN_USER);
+            if (sid_len + sizeof(TOKEN_USER) > length)
+            {
+                status = STATUS_BUFFER_TOO_SMALL;
+            }
+            else
+            {
+                tuser = info;
+                sid = tuser + 1;
+                tuser->User.Sid = sid;
+                tuser->User.Attributes = 0;
+                memcpy( sid, &local_system_sid, sid_len );
+            }
+            break;
+        }
         SERVER_START_REQ( get_token_sid )
         {
             TOKEN_USER *tuser = info;
