@@ -2226,6 +2226,8 @@ static ULONG_PTR get_image_address(void)
     return 0;
 }
 
+BOOL localsystem_sid;
+
 static void hacks_init(void)
 {
     const char *sgi = getenv( "SteamGameId" );
@@ -2239,6 +2241,13 @@ static void hacks_init(void)
     case 247910: /* Sniper Elite: Nazi Zombie Army 2 */
         setenv( "WINESTEAMNOEXEC", "1", 0 );
         break;
+    }
+
+    if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
+    {
+        ERR("HACK: reporting LocalSystem account SID.\n");
+        localsystem_sid = TRUE;
+        return;
     }
 
     if (sgi && (0
