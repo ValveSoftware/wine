@@ -2149,6 +2149,52 @@ static HRESULT source_reader_set_compatible_media_type(struct source_reader *rea
     return type_set ? S_OK : S_FALSE;
 }
 
+static HRESULT copy_attributes_items(IMFAttributes *dst, IMFAttributes *src)
+{
+    BOOL dst_locked = FALSE, src_locked = FALSE;
+    UINT32 count, i;
+    HRESULT hr;
+
+    if (FAILED(hr = IMFAttributes_LockStore(dst)))
+        goto end;
+    dst_locked = TRUE;
+
+    if (FAILED(hr = IMFAttributes_LockStore(src)))
+        goto end;
+    src_locked = TRUE;
+
+    if (FAILED(hr = IMFAttributes_GetCount(src, &count)))
+        goto end;
+
+    for (i = 0; i < count; i++)
+    {
+        PROPVARIANT propvar;
+        GUID guid;
+
+        if (FAILED(hr = IMFAttributes_GetItemByIndex(src, i, &guid, &propvar)))
+            goto end;
+
+        if (FAILED(hr = IMFAttributes_SetItem(dst, &guid, &propvar)))
+        {
+            if (FAILED(PropVariantClear(&propvar)))
+                WARN("Cannot clear propvariant.\n");
+            goto end;
+        }
+
+        if (FAILED(hr = PropVariantClear(&propvar)))
+            goto end;
+    }
+
+end:
+    if (dst_locked && FAILED(IMFAttributes_UnlockStore(dst)))
+        WARN("Cannot unlock destination attributes object %p.\n", dst);
+
+    if (src_locked && FAILED(IMFAttributes_UnlockStore(src)))
+        WARN("Cannot unlock source attributes object %p.\n", src);
+
+    return hr;
+}
+
 static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader, unsigned int index)
 {
     struct media_stream *stream = &reader->streams[index];
@@ -2202,7 +2248,7 @@ static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader
         }
         else
         {
-            if (FAILED(hr = IMFAttributes_CopyAllItems(output_attributes, attributes)))
+            if (FAILED(hr = copy_attributes_items(attributes, output_attributes)))
                 WARN("Failed to copy transform output attributes, hr %#x.\n", hr);
 
             IMFAttributes_Release(output_attributes);
