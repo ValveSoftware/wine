@@ -411,6 +411,7 @@ SOURCES = \
 	mcx.h \
 	mediaerr.h \
 	mediaobj.idl \
+	medparam.idl \
 	metahost.idl \
 	mfapi.h \
 	mfd3d12.idl \
