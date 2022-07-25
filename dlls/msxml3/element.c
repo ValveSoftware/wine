@@ -456,6 +456,19 @@ static inline HRESULT variant_from_dt(XDR_DT dt, xmlChar* str, VARIANT* v)
     switch (dt)
     {
     case DT_INVALID:
+        {
+            xmlChar *p;
+
+            while (isspace(*str))
+                ++str;
+
+            p = str + strlen((char *)str);
+            while (p != str && isspace(p[-1]))
+                --p;
+            *p = 0;
+        }
+        /* fallthrough */
+
     case DT_STRING:
     case DT_NMTOKEN:
     case DT_NMTOKENS:

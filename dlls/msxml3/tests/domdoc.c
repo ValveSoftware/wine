@@ -910,7 +910,10 @@ static const CHAR szTypeValueXML[] =
 "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n"
 "<root xmlns:dt=\"urn:schemas-microsoft-com:datatypes\">\n"
 "   <string>Wine</string>\n"
-"   <string2 dt:dt=\"string\">String</string2>\n"
+"   <string2 dt:dt=\"string\">String </string2>\n"
+"   <string3> Wine Wine </string3>\n"
+"   <string4>\nWine Wine\t</string4>\n"
+"   <string5>   </string5>\n"
 "   <number dt:dt=\"number\">12.44</number>\n"
 "   <number2 dt:dt=\"NUMbEr\">-3.71e3</number2>\n"
 "   <int dt:dt=\"int\">-13</int>\n"
@@ -6859,7 +6862,10 @@ typedef struct _nodetypedvalue_t {
 
 static const nodetypedvalue_t get_nodetypedvalue[] = {
     { "root/string",    VT_BSTR, "Wine" },
-    { "root/string2",   VT_BSTR, "String" },
+    { "root/string2",   VT_BSTR, "String " },
+    { "root/string3",   VT_BSTR, "Wine Wine" },
+    { "root/string4",   VT_BSTR, "Wine Wine" },
+    { "root/string5",   VT_BSTR, "" },
     { "root/number",    VT_BSTR, "12.44" },
     { "root/number2",   VT_BSTR, "-3.71e3" },
     { "root/int",       VT_I4,   "-13" },
@@ -6935,6 +6941,10 @@ static void test_nodeTypedValue(void)
 
     hr = IXMLDOMNode_get_nodeTypedValue(node, NULL);
     ok(hr == E_INVALIDARG, "ret %08x\n", hr );
+
+
+    hr = IXMLDOMNode_get_nodeTypedValue(node, &value);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr );
 
     IXMLDOMNode_Release(node);
 
