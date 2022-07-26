@@ -2682,7 +2682,8 @@ NTSTATUS WINAPI NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class,
 
     case SystemTimeOfDayInformation:  /* 3 */
     {
-        static time_t last_utc, last_bias;
+        static LONGLONG last_bias;
+        static time_t last_utc;
         struct tm *tm;
         time_t utc;
         SYSTEM_TIMEOFDAY_INFORMATION sti = {{{ 0 }}};
