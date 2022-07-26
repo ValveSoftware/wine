@@ -1695,7 +1695,7 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
-    if (!is_dualshock4_gamepad(desc.vid, desc.pid) && !is_dualsense_gamepad(desc.vid, desc.pid) && !is_thrustmaster_rudder_pedals(desc.vid, desc.pid))
+    if (!is_dualshock4_gamepad(desc.vid, desc.pid) && !is_dualsense_gamepad(desc.vid, desc.pid) && !is_thrustmaster_hotas(desc.vid, desc.pid))
     {
         TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
         close(fd);
