@@ -22,7 +22,6 @@
 #include "mmsystem.h"
 #include "uuids.h"
 #include "initguid.h"
-#include "medparam.h"
 #include "dsound.h"
 #include "rpcproxy.h"
 
@@ -437,7 +436,6 @@ struct eq
 {
     struct effect effect;
     IDirectSoundFXParamEq IDirectSoundFXParamEq_iface;
-    IMediaParamInfo IMediaParamInfo_iface;
     DSFXParamEq params;
 };
 
@@ -497,78 +495,6 @@ static const IDirectSoundFXParamEqVtbl eq_params_vtbl =
     eq_params_GetAllParameters,
 };
 
-static struct eq *impl_from_IMediaParamInfo(IMediaParamInfo *iface)
-{
-    return CONTAINING_RECORD(iface, struct eq, IMediaParamInfo_iface);
-}
-
-static HRESULT WINAPI eq_media_param_info_QueryInterface(IMediaParamInfo *iface, REFIID iid, void **out)
-{
-    struct eq *effect = impl_from_IMediaParamInfo(iface);
-    return IUnknown_QueryInterface(effect->effect.outer_unk, iid, out);
-}
-
-static ULONG WINAPI eq_media_param_info_AddRef(IMediaParamInfo *iface)
-{
-    struct eq *effect = impl_from_IMediaParamInfo(iface);
-    return IUnknown_AddRef(effect->effect.outer_unk);
-}
-
-static ULONG WINAPI eq_media_param_info_Release(IMediaParamInfo *iface)
-{
-    struct eq *effect = impl_from_IMediaParamInfo(iface);
-    return IUnknown_Release(effect->effect.outer_unk);
-}
-
-static HRESULT WINAPI eq_media_param_info_GetParamCount(IMediaParamInfo *iface, DWORD *count)
-{
-    FIXME("iface %p, count %p, stub!\n", iface, count);
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI eq_media_param_info_GetParamInfo(IMediaParamInfo *iface, DWORD index, MP_PARAMINFO *info)
-{
-    FIXME("iface %p, index %lu, info %p, stub!\n", iface, index, info);
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI eq_media_param_info_GetParamText(IMediaParamInfo *iface, DWORD index, WCHAR **text)
-{
-    FIXME("iface %p, index %lu, text %p, stub!\n", iface, index, text);
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI eq_media_param_info_GetNumTimeFormats(IMediaParamInfo *iface, DWORD *count)
-{
-    FIXME("iface %p, count %p, stub!\n", iface, count);
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI eq_media_param_info_GetSupportedTimeFormat(IMediaParamInfo *iface, DWORD index, GUID *guid)
-{
-    FIXME("iface %p, index %lu, guid %p, stub!\n", iface, index, guid);
-    return E_NOTIMPL;
-}
-
-static HRESULT WINAPI eq_media_param_info_GetCurrentTimeFormat(IMediaParamInfo *iface, GUID *guid, MP_TIMEDATA *time_data)
-{
-    FIXME("iface %p, guid %p, time_data %p, stub!\n", iface, guid, time_data);
-    return E_NOTIMPL;
-}
-
-static const IMediaParamInfoVtbl eq_media_param_info_vtbl =
-{
-    eq_media_param_info_QueryInterface,
-    eq_media_param_info_AddRef,
-    eq_media_param_info_Release,
-    eq_media_param_info_GetParamCount,
-    eq_media_param_info_GetParamInfo,
-    eq_media_param_info_GetParamText,
-    eq_media_param_info_GetNumTimeFormats,
-    eq_media_param_info_GetSupportedTimeFormat,
-    eq_media_param_info_GetCurrentTimeFormat,
-};
-
 static struct eq *impl_eq_from_effect(struct effect *iface)
 {
     return CONTAINING_RECORD(iface, struct eq, effect);
@@ -580,9 +506,6 @@ static void *eq_query_interface(struct effect *iface, REFIID iid)
 
     if (IsEqualGUID(iid, &IID_IDirectSoundFXParamEq))
         return &effect->IDirectSoundFXParamEq_iface;
-    else if (IsEqualGUID(iid, &IID_IMediaParamInfo))
-        return &effect->IMediaParamInfo_iface;
-
     return NULL;
 }
 
@@ -608,7 +531,6 @@ static HRESULT eq_create(IUnknown *outer, IUnknown **out)
 
     effect_init(&object->effect, outer, &eq_ops);
     object->IDirectSoundFXParamEq_iface.lpVtbl = &eq_params_vtbl;
-    object->IMediaParamInfo_iface.lpVtbl = &eq_media_param_info_vtbl;
 
     object->params.fCenter = 8000.0f;
     object->params.fBandwidth = 12.0f;
