@@ -319,7 +319,13 @@ static UINT64 read_tsc_frequency( BOOL has_rdtscp )
         }
         while (error > 500 && --retries);
 
-        if (!retries) WARN( "TSC frequency calibration failed, unstable TSC?\n" );
+        if (!retries)
+        {
+            FIXME( "TSC frequency calibration failed, unstable TSC?");
+            FIXME( "time0 %I64u ns, time1 %I64u ns\n", time0 * 100, time1 * 100 );
+            FIXME( "tsc2 - tsc0 %I64u, tsc3 - tsc1 %I64u\n", tsc2 - tsc0, tsc3 - tsc1 );
+            FIXME( "freq0 %I64u Hz, freq2 %I64u Hz, error %I64u ppm\n", freq0, freq1, error );
+        }
         else
         {
             freq = (freq0 + freq1) / 2;
