@@ -853,7 +853,9 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     }
 
     /* ask the foreground window to re-apply the current ClipCursor rect */
-    SendMessageW( GetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, 0, 0 );
+    if (!SendMessageTimeoutW( GetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, 0, 0,
+                              SMTO_NOTIMEOUTIFNOTHUNG, 500, NULL ) && GetLastError() == ERROR_TIMEOUT)
+        ERR( "WM_X11DRV_CLIP_CURSOR_REQUEST timed out.\n" );
 
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
     if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
