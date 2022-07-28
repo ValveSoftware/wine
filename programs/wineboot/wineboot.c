@@ -317,7 +317,7 @@ static UINT64 read_tsc_frequency( BOOL has_rdtscp )
             freq1 = (tsc3 - tsc1) * 10000000 / (time1 - time0);
             error = llabs( (freq1 - freq0) * 1000000 / min( freq1, freq0 ) );
         }
-        while (error > 100 && --retries);
+        while (error > 500 && --retries);
 
         if (!retries) WARN( "TSC frequency calibration failed, unstable TSC?\n" );
         else
