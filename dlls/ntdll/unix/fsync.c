@@ -225,27 +225,18 @@ C_ASSERT(sizeof(struct mutex) == 16);
 
 static char shm_name[29];
 static int shm_fd;
-static void **shm_addrs;
-static int shm_addrs_size;  /* length of the allocated shm_addrs array */
-
-static pthread_mutex_t shm_addrs_mutex = PTHREAD_MUTEX_INITIALIZER;
+static volatile void *shm_addrs[8192];
 
 static void *get_shm( unsigned int idx )
 {
     int entry  = (idx * 16) / FSYNC_SHM_PAGE_SIZE;
     int offset = (idx * 16) % FSYNC_SHM_PAGE_SIZE;
-    void *ret;
 
-    pthread_mutex_lock( &shm_addrs_mutex );
-
-    if (entry >= shm_addrs_size)
+    if (entry >= ARRAY_SIZE(shm_addrs))
     {
-        int new_size = max(shm_addrs_size * 2, entry + 1);
-
-        if (!(shm_addrs = realloc( shm_addrs, new_size * sizeof(shm_addrs[0]) )))
-            ERR("Failed to grow shm_addrs array to size %d.\n", shm_addrs_size);
-        memset( shm_addrs + shm_addrs_size, 0, (new_size - shm_addrs_size) * sizeof(shm_addrs[0]) );
-        shm_addrs_size = new_size;
+        ERR( "idx %u exceeds maximum of %u.\n", idx,
+             (unsigned int)ARRAY_SIZE(shm_addrs) * (FSYNC_SHM_PAGE_SIZE / 16) );
+        return NULL;
     }
 
     if (!shm_addrs[entry])
@@ -262,11 +253,7 @@ static void *get_shm( unsigned int idx )
             munmap( addr, FSYNC_SHM_PAGE_SIZE ); /* someone beat us to it */
     }
 
-    ret = (void *)((unsigned long)shm_addrs[entry] + offset);
-
-    pthread_mutex_unlock( &shm_addrs_mutex );
-
-    return ret;
+    return (char *)shm_addrs[entry] + offset;
 }
 
 /* We'd like lookup to be fast. To that end, we use a static list indexed by handle.
@@ -344,10 +331,9 @@ static void grab_object( struct fsync *obj )
 
 static unsigned int shm_index_from_shm( char *shm )
 {
-    unsigned int count = shm_addrs_size;
     unsigned int i, idx_offset;
 
-    for (i = 0; i < count; ++i)
+    for (i = 0; i < ARRAY_SIZE(shm_addrs); ++i)
     {
         if (shm >= (char *)shm_addrs[i] && shm < (char *)shm_addrs[i] + FSYNC_SHM_PAGE_SIZE)
         {
@@ -597,9 +583,6 @@ void fsync_init(void)
             ERR("Failed to initialize shared memory: %s\n", strerror( errno ));
         exit(1);
     }
-
-    shm_addrs = calloc( 128, sizeof(shm_addrs[0]) );
-    shm_addrs_size = 128;
 }
 
 NTSTATUS fsync_create_semaphore( HANDLE *handle, ACCESS_MASK access,
