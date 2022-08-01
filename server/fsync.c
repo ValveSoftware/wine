@@ -82,7 +82,6 @@ static int shm_fd;
 static off_t shm_size;
 static void **shm_addrs;
 static int shm_addrs_size;  /* length of the allocated shm_addrs array */
-static long pagesize;
 
 static int is_fsync_initialized;
 
@@ -118,12 +117,10 @@ void fsync_init(void)
     if (shm_fd == -1)
         perror( "shm_open" );
 
-    pagesize = sysconf( _SC_PAGESIZE );
-
     shm_addrs = calloc( 128, sizeof(shm_addrs[0]) );
     shm_addrs_size = 128;
 
-    shm_size = pagesize;
+    shm_size = FSYNC_SHM_PAGE_SIZE;
     if (ftruncate( shm_fd, shm_size ) == -1)
         perror( "ftruncate" );
 
@@ -214,8 +211,8 @@ static void fsync_destroy( struct object *obj )
 
 static void *get_shm( unsigned int idx )
 {
-    int entry  = (idx * 16) / pagesize;
-    int offset = (idx * 16) % pagesize;
+    int entry  = (idx * 16) / FSYNC_SHM_PAGE_SIZE;
+    int offset = (idx * 16) % FSYNC_SHM_PAGE_SIZE;
 
     if (entry >= shm_addrs_size)
     {
@@ -231,10 +228,12 @@ static void *get_shm( unsigned int idx )
 
     if (!shm_addrs[entry])
     {
-        void *addr = mmap( NULL, pagesize, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, entry * pagesize );
+        void *addr = mmap( NULL, FSYNC_SHM_PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd,
+                          (off_t)entry * FSYNC_SHM_PAGE_SIZE );
         if (addr == (void *)-1)
         {
-            fprintf( stderr, "fsync: failed to map page %d (offset %#lx): ", entry, entry * pagesize );
+            fprintf( stderr, "fsync: failed to map page %d (offset %#lx): ",
+                     entry, (off_t)entry * FSYNC_SHM_PAGE_SIZE );
             perror( "mmap" );
         }
 
@@ -242,7 +241,7 @@ static void *get_shm( unsigned int idx )
             fprintf( stderr, "fsync: Mapping page %d at %p.\n", entry, addr );
 
         if (__sync_val_compare_and_swap( &shm_addrs[entry], 0, addr ))
-            munmap( addr, pagesize ); /* someone beat us to it */
+            munmap( addr, FSYNC_SHM_PAGE_SIZE ); /* someone beat us to it */
     }
 
     return (void *)((unsigned long)shm_addrs[entry] + offset);
@@ -299,7 +298,7 @@ unsigned int fsync_alloc_shm( int low, int high )
     while (shm_idx * 16 >= shm_size)
     {
         /* Better expand the shm section. */
-        shm_size += pagesize;
+        shm_size += FSYNC_SHM_PAGE_SIZE;
         if (ftruncate( shm_fd, shm_size ) == -1)
         {
             fprintf( stderr, "fsync: couldn't expand %s to size %jd: ",

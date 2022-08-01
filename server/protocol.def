@@ -3870,6 +3870,8 @@ enum esync_type
 @REQ(get_esync_apc_fd)
 @END
 
+#define FSYNC_SHM_PAGE_SIZE 0x10000
+
 enum fsync_type
 {
     FSYNC_SEMAPHORE = 1,
