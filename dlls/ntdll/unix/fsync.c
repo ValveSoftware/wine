@@ -227,14 +227,13 @@ static char shm_name[29];
 static int shm_fd;
 static void **shm_addrs;
 static int shm_addrs_size;  /* length of the allocated shm_addrs array */
-static long pagesize;
 
 static pthread_mutex_t shm_addrs_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static void *get_shm( unsigned int idx )
 {
-    int entry  = (idx * 16) / pagesize;
-    int offset = (idx * 16) % pagesize;
+    int entry  = (idx * 16) / FSYNC_SHM_PAGE_SIZE;
+    int offset = (idx * 16) % FSYNC_SHM_PAGE_SIZE;
     void *ret;
 
     pthread_mutex_lock( &shm_addrs_mutex );
@@ -251,14 +250,16 @@ static void *get_shm( unsigned int idx )
 
     if (!shm_addrs[entry])
     {
-        void *addr = mmap( NULL, pagesize, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, entry * pagesize );
+        void *addr = mmap( NULL, FSYNC_SHM_PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd,
+                           (off_t)entry * FSYNC_SHM_PAGE_SIZE );
         if (addr == (void *)-1)
-            ERR("Failed to map page %d (offset %#lx).\n", entry, entry * pagesize);
+            ERR("Failed to map page %d (offset %s).\n", entry,
+                 wine_dbgstr_longlong((off_t)entry * FSYNC_SHM_PAGE_SIZE));
 
         TRACE("Mapping page %d at %p.\n", entry, addr);
 
         if (__sync_val_compare_and_swap( &shm_addrs[entry], 0, addr ))
-            munmap( addr, pagesize ); /* someone beat us to it */
+            munmap( addr, FSYNC_SHM_PAGE_SIZE ); /* someone beat us to it */
     }
 
     ret = (void *)((unsigned long)shm_addrs[entry] + offset);
@@ -348,10 +349,10 @@ static unsigned int shm_index_from_shm( char *shm )
 
     for (i = 0; i < count; ++i)
     {
-        if (shm >= (char *)shm_addrs[i] && shm < (char *)shm_addrs[i] + pagesize)
+        if (shm >= (char *)shm_addrs[i] && shm < (char *)shm_addrs[i] + FSYNC_SHM_PAGE_SIZE)
         {
             idx_offset = (shm - (char *)shm_addrs[i]) / 16;
-            return i * (pagesize / 16) + idx_offset;
+            return i * (FSYNC_SHM_PAGE_SIZE / 16) + idx_offset;
         }
     }
 
@@ -596,8 +597,6 @@ void fsync_init(void)
             ERR("Failed to initialize shared memory: %s\n", strerror( errno ));
         exit(1);
     }
-
-    pagesize = sysconf( _SC_PAGESIZE );
 
     shm_addrs = calloc( 128, sizeof(shm_addrs[0]) );
     shm_addrs_size = 128;
