@@ -1254,7 +1254,13 @@ static void test_sequencer_source(void)
 struct test_callback
 {
     IMFAsyncCallback IMFAsyncCallback_iface;
+    HANDLE event;
 };
+
+static struct test_callback *test_callback_from_IMFAsyncCallback(IMFAsyncCallback *iface)
+{
+    return CONTAINING_RECORD(iface, struct test_callback, IMFAsyncCallback_iface);
+}
 
 static HRESULT WINAPI testcallback_QueryInterface(IMFAsyncCallback *iface, REFIID riid, void **obj)
 {
@@ -1288,7 +1294,11 @@ static HRESULT WINAPI testcallback_GetParameters(IMFAsyncCallback *iface, DWORD 
 
 static HRESULT WINAPI testcallback_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
 {
+    struct test_callback *test = test_callback_from_IMFAsyncCallback(iface);
     ok(result != NULL, "Unexpected result object.\n");
+
+    if (test->event)
+        SetEvent(test->event);
 
     return E_NOTIMPL;
 }
@@ -1305,6 +1315,7 @@ static const IMFAsyncCallbackVtbl testcallbackvtbl =
 static void init_test_callback(struct test_callback *callback)
 {
     callback->IMFAsyncCallback_iface.lpVtbl = &testcallbackvtbl;
+    callback->event = NULL;
 }
 
 static void test_session_events(IMFMediaSession *session)
@@ -2618,15 +2629,19 @@ static void test_presentation_clock(void)
     };
     IMFClockStateSink test_sink = { &test_clock_sink_vtbl };
     IMFPresentationTimeSource *time_source;
+    struct test_callback timer_callback;
     MFCLOCK_PROPERTIES props, props2;
     IMFRateControl *rate_control;
     IMFPresentationClock *clock;
+    IUnknown *timer_cancel_key;
     MFSHUTDOWN_STATUS status;
     IMFShutdown *shutdown;
     MFTIME systime, time;
     LONGLONG clock_time;
     MFCLOCK_STATE state;
+    IMFTimer *timer;
     unsigned int i;
+    DWORD t1, t2;
     DWORD value;
     float rate;
     HRESULT hr;
@@ -2849,6 +2864,33 @@ static void test_presentation_clock(void)
     ok(!thin, "Unexpected thinning.\n");
 
     IMFRateControl_Release(rate_control);
+
+
+    hr = IMFPresentationClock_QueryInterface(clock, &IID_IMFTimer, (void **)&timer);
+    ok(hr == S_OK, "got hr %#lx.\n", hr);
+
+    hr = IMFPresentationClock_Start(clock, 200000);
+    ok(hr == S_OK, "got hr %#lx.\n", hr);
+
+    hr = IMFPresentationClock_GetCorrelatedTime(clock, 0, &time, &systime);
+    ok(hr == S_OK, "got hr %#lx.\n", hr);
+
+    init_test_callback(&timer_callback);
+    timer_callback.event = CreateEventW(NULL, FALSE, FALSE, NULL);
+    hr = IMFTimer_SetTimer(timer, 0, 100000,
+            &timer_callback.IMFAsyncCallback_iface, NULL, &timer_cancel_key);
+    ok(hr == S_OK, "got hr %#lx.\n", hr);
+
+    t1 = GetTickCount();
+    ok(WaitForSingleObject(timer_callback.event, INFINITE) == WAIT_OBJECT_0, "WaitForSingleObject failed.\n");
+    t2 = GetTickCount();
+
+    ok(t2 - t1 < 100, "unexpected time difference %lu.\n", t2 - t1);
+
+    CloseHandle(timer_callback.event);
+    IUnknown_Release(timer_cancel_key);
+    IMFTimer_Release(timer);
+
 
     hr = IMFPresentationClock_QueryInterface(clock, &IID_IMFShutdown, (void **)&shutdown);
     ok(hr == S_OK, "Failed to get shutdown interface, hr %#lx.\n", hr);
