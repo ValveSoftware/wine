@@ -259,9 +259,16 @@ static void *get_shm( unsigned int idx )
 #define FSYNC_LIST_BLOCK_SIZE  (65536 / sizeof(struct fsync))
 #define FSYNC_LIST_ENTRIES     256
 
-static struct fsync *fsync_list[FSYNC_LIST_ENTRIES];
-static struct fsync fsync_list_initial_block[FSYNC_LIST_BLOCK_SIZE];
-static int cache_locked;
+struct fsync_cache
+{
+    enum fsync_type type;
+    unsigned int shm_idx;
+};
+
+C_ASSERT(sizeof(struct fsync_cache) == sizeof(uint64_t));
+
+static struct fsync_cache *fsync_list[FSYNC_LIST_ENTRIES];
+static struct fsync_cache fsync_list_initial_block[FSYNC_LIST_BLOCK_SIZE];
 
 static inline UINT_PTR handle_to_index( HANDLE handle, UINT_PTR *entry )
 {
@@ -270,29 +277,10 @@ static inline UINT_PTR handle_to_index( HANDLE handle, UINT_PTR *entry )
     return idx % FSYNC_LIST_BLOCK_SIZE;
 }
 
-static void small_pause(void)
-{
-#ifdef __i386__
-    __asm__ __volatile__( "rep;nop" : : : "memory" );
-#else
-    __asm__ __volatile__( "" : : : "memory" );
-#endif
-}
-
-static void lock_obj_cache(void)
-{
-    while (__sync_val_compare_and_swap( &cache_locked, 0, 1 ))
-        small_pause();
-}
-
-static void unlock_obj_cache(void)
-{
-    __atomic_store_n( &cache_locked, 0, __ATOMIC_SEQ_CST );
-}
-
-static void add_to_list( HANDLE handle, enum fsync_type type, void *shm )
+static void add_to_list( HANDLE handle, enum fsync_type type, unsigned int shm_idx )
 {
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
+    struct fsync_cache cache;
 
     if (entry >= FSYNC_LIST_ENTRIES)
     {
@@ -305,32 +293,41 @@ static void add_to_list( HANDLE handle, enum fsync_type type, void *shm )
         if (!entry) fsync_list[0] = fsync_list_initial_block;
         else
         {
-            void *ptr = anon_mmap_alloc( FSYNC_LIST_BLOCK_SIZE * sizeof(struct fsync),
+            void *ptr = anon_mmap_alloc( FSYNC_LIST_BLOCK_SIZE * sizeof(*fsync_list[entry]),
                                          PROT_READ | PROT_WRITE );
             if (ptr == MAP_FAILED) return;
             if (__sync_val_compare_and_swap( &fsync_list[entry], NULL, ptr ))
-                munmap( ptr, FSYNC_LIST_BLOCK_SIZE * sizeof(struct fsync) );
+                munmap( ptr, FSYNC_LIST_BLOCK_SIZE * sizeof(*fsync_list[entry]) );
         }
     }
 
-    lock_obj_cache();
-    fsync_list[entry][idx].type = type;
-    fsync_list[entry][idx].shm = shm;
-    unlock_obj_cache();
+    cache.type = type;
+    cache.shm_idx = shm_idx;
+    __atomic_store_n( (uint64_t *)&fsync_list[entry][idx], *(uint64_t *)&cache, __ATOMIC_SEQ_CST );
 }
 
 static BOOL get_cached_object( HANDLE handle, struct fsync *obj )
 {
-    BOOL ret = TRUE;
     UINT_PTR entry, idx = handle_to_index( handle, &entry );
+    struct fsync_cache cache;
 
     if (entry >= FSYNC_LIST_ENTRIES || !fsync_list[entry]) return FALSE;
 
-    lock_obj_cache();
-    if (!fsync_list[entry][idx].type) ret = FALSE;
-    else                              *obj = fsync_list[entry][idx];
-    unlock_obj_cache();
-    return ret;
+again:
+    *(uint64_t *)&cache = __atomic_load_n( (uint64_t *)&fsync_list[entry][idx], __ATOMIC_SEQ_CST );
+
+    if (!cache.type || !cache.shm_idx) return FALSE;
+
+    obj->type = cache.type;
+    obj->shm = get_shm( cache.shm_idx );
+    if (*(uint64_t *)&cache != __atomic_load_n( (uint64_t *)&fsync_list[entry][idx], __ATOMIC_SEQ_CST ))
+    {
+        /* This check does not strictly guarantee that we avoid the potential race but is supposed to greatly
+         * reduce the probability of that. */
+        FIXME( "Cache changed while getting object.\n" );
+        goto again;
+    }
+    return TRUE;
 }
 
 /* Gets an object. This is either a proper fsync object (i.e. an event,
@@ -373,7 +370,7 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
 
     obj->type = type;
     obj->shm = get_shm( shm_idx );
-    add_to_list( handle, type, obj->shm );
+    add_to_list( handle, type, shm_idx );
     return ret;
 }
 
@@ -385,17 +382,13 @@ NTSTATUS fsync_close( HANDLE handle )
 
     if (entry < FSYNC_LIST_ENTRIES && fsync_list[entry])
     {
-        enum fsync_type type;
+        struct fsync_cache cache;
 
-        lock_obj_cache();
-        if ((type = fsync_list[entry][idx].type))
-        {
-            fsync_list[entry][idx].type = 0;
-            fsync_list[entry][idx].shm = NULL;
-        }
-        unlock_obj_cache();
-        if (type)
-            return STATUS_SUCCESS;
+        cache.type = 0;
+        cache.shm_idx = 0;
+        *(uint64_t *)&cache = __atomic_exchange_n( (uint64_t *)&fsync_list[entry][idx],
+                                                   *(uint64_t *)&cache, __ATOMIC_SEQ_CST );
+        if (cache.type) return STATUS_SUCCESS;
     }
 
     return STATUS_INVALID_HANDLE;
@@ -430,7 +423,7 @@ static NTSTATUS create_fsync( enum fsync_type type, HANDLE *handle,
 
     if (!ret || ret == STATUS_OBJECT_NAME_EXISTS)
     {
-        add_to_list( *handle, type, get_shm( shm_idx ));
+        add_to_list( *handle, type, shm_idx );
         TRACE("-> handle %p, shm index %d.\n", *handle, shm_idx);
     }
 
@@ -463,7 +456,7 @@ static NTSTATUS open_fsync( enum fsync_type type, HANDLE *handle,
 
     if (!ret)
     {
-        add_to_list( *handle, type, get_shm( shm_idx ) );
+        add_to_list( *handle, type, shm_idx );
 
         TRACE("-> handle %p, shm index %u.\n", *handle, shm_idx);
     }
