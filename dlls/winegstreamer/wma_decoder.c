@@ -748,7 +748,8 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
     if (!amt_to_wg_format((const AM_MEDIA_TYPE *)type, &wg_format))
         return VFW_E_INVALIDMEDIATYPE;
 
-    if (wg_format.major_type != WG_MAJOR_TYPE_AUDIO)
+    if (wg_format.major_type != WG_MAJOR_TYPE_WMA
+            && wg_format.major_type != WG_MAJOR_TYPE_AUDIO)
         return VFW_E_INVALIDMEDIATYPE;
     if (!(flags & DMO_SET_TYPEF_TEST_ONLY))
     {
