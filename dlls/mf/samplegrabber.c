@@ -85,6 +85,7 @@ struct sample_grabber
     UINT64 sample_time_offset;
     enum sink_state state;
     CRITICAL_SECTION cs;
+    UINT32 sample_request_on_start_count;
 };
 
 static IMFSampleGrabberSinkCallback *sample_grabber_get_callback(const struct sample_grabber *sink)
@@ -441,6 +442,11 @@ static HRESULT WINAPI sample_grabber_stream_ProcessSample(IMFStreamSink *iface, 
             else
                 hr = stream_queue_sample(grabber, sample);
         }
+    }
+    else if (grabber->state == SINK_STATE_PAUSED)
+    {
+        if (grabber->sample_request_on_start_count < 4)
+            ++grabber->sample_request_on_start_count;
     }
 
     LeaveCriticalSection(&grabber->cs);
@@ -1130,14 +1136,19 @@ static HRESULT sample_grabber_set_state(struct sample_grabber *grabber, enum sin
         else
         {
             if (state == SINK_STATE_STOPPED)
+            {
                 sample_grabber_cancel_timer(grabber);
+                grabber->sample_request_on_start_count = 4;
+            }
 
-            if (state == SINK_STATE_RUNNING && grabber->state == SINK_STATE_STOPPED)
+            if (state == SINK_STATE_RUNNING && grabber->state != SINK_STATE_RUNNING)
             {
                 /* Every transition to running state sends a bunch requests to build up initial queue. */
-                for (i = 0; i < 4; ++i)
+                for (i = 0; i < grabber->sample_request_on_start_count; ++i)
                     sample_grabber_stream_request_sample(grabber);
+                grabber->sample_request_on_start_count = 0;
             }
+
             do_callback = state != grabber->state || state != SINK_STATE_PAUSED;
             if (do_callback)
                 IMFStreamSink_QueueEvent(&grabber->IMFStreamSink_iface, events[state], &GUID_NULL, S_OK, NULL);
@@ -1421,6 +1432,7 @@ static HRESULT sample_grabber_create_object(IMFAttributes *attributes, void *use
     object->IMFStreamSink_iface.lpVtbl = &sample_grabber_stream_vtbl;
     object->IMFMediaTypeHandler_iface.lpVtbl = &sample_grabber_stream_type_handler_vtbl;
     object->timer_callback.lpVtbl = &sample_grabber_stream_timer_callback_vtbl;
+    object->sample_request_on_start_count = 4;
     object->refcount = 1;
     if (FAILED(IMFSampleGrabberSinkCallback_QueryInterface(context->callback, &IID_IMFSampleGrabberSinkCallback2,
             (void **)&object->callback2)))
