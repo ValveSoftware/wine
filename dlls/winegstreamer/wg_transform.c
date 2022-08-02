@@ -531,7 +531,10 @@ static bool transform_create_decoder_elements(struct wg_transform *transform,
     char *str;
 
     if (!strcmp(input_mime, "audio/x-raw") || !strcmp(input_mime, "video/x-raw"))
+    {
+        transform->attrs.input_queue_length = 16;
         return true;
+    }
 
     if (!(parsed_caps = transform_get_parsed_caps(transform->input_caps, input_mime)))
         return false;
