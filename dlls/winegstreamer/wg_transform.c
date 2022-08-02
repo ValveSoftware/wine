@@ -437,6 +437,7 @@ NTSTATUS wg_transform_create(void *args)
 
         case WG_MAJOR_TYPE_AUDIO:
         case WG_MAJOR_TYPE_VIDEO:
+            transform->input_max_length = 16;
             break;
         case WG_MAJOR_TYPE_UNKNOWN:
             GST_FIXME("Format %u not implemented!", input_format.major_type);
