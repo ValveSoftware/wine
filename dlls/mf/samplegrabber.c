@@ -19,6 +19,7 @@
 #define COBJMACROS
 
 #include <float.h>
+#include <assert.h>
 
 #include "mfidl.h"
 #include "mf_private.h"
@@ -85,6 +86,8 @@ struct sample_grabber
     UINT64 sample_time_offset;
     enum sink_state state;
     CRITICAL_SECTION cs;
+    UINT32 sample_request_on_start_count;
+    IMFSample *samples_queued_while_paused[4];
 };
 
 static IMFSampleGrabberSinkCallback *sample_grabber_get_callback(const struct sample_grabber *sink)
@@ -440,6 +443,14 @@ static HRESULT WINAPI sample_grabber_stream_ProcessSample(IMFStreamSink *iface, 
             }
             else
                 hr = stream_queue_sample(grabber, sample);
+        }
+    }
+    else if (grabber->state == SINK_STATE_PAUSED)
+    {
+        if (grabber->sample_request_on_start_count < 4)
+        {
+            IMFSample_AddRef(sample);
+            grabber->samples_queued_while_paused[grabber->sample_request_on_start_count++] = sample;
         }
     }
 
@@ -826,6 +837,20 @@ static void sample_grabber_release_pending_items(struct sample_grabber *grabber)
     }
 }
 
+static void release_samples_queued_while_paused(struct sample_grabber *grabber)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(grabber->samples_queued_while_paused); ++i)
+    {
+        if (grabber->samples_queued_while_paused[i])
+        {
+            IMFSample_Release(grabber->samples_queued_while_paused[i]);
+            grabber->samples_queued_while_paused[i] = NULL;
+        }
+    }
+}
+
 static ULONG WINAPI sample_grabber_sink_Release(IMFMediaSink *iface)
 {
     struct sample_grabber *grabber = impl_from_IMFMediaSink(iface);
@@ -857,6 +882,7 @@ static ULONG WINAPI sample_grabber_sink_Release(IMFMediaSink *iface)
         if (grabber->sample_attributes)
             IMFAttributes_Release(grabber->sample_attributes);
         sample_grabber_release_pending_items(grabber);
+        release_samples_queued_while_paused(grabber);
         DeleteCriticalSection(&grabber->cs);
         free(grabber);
     }
@@ -1128,14 +1154,31 @@ static HRESULT sample_grabber_set_state(struct sample_grabber *grabber, enum sin
         else
         {
             if (state == SINK_STATE_STOPPED)
+            {
                 sample_grabber_cancel_timer(grabber);
+                release_samples_queued_while_paused(grabber);
+                grabber->sample_request_on_start_count = 4;
+            }
 
-            if (state == SINK_STATE_RUNNING && grabber->state == SINK_STATE_STOPPED)
+            if (state == SINK_STATE_RUNNING && grabber->state != SINK_STATE_RUNNING)
             {
                 /* Every transition to running state sends a bunch requests to build up initial queue. */
-                for (i = 0; i < 4; ++i)
-                    sample_grabber_stream_request_sample(grabber);
+                for (i = 0; i < grabber->sample_request_on_start_count; ++i)
+                {
+                    if (grabber->state == SINK_STATE_PAUSED && offset == PRESENTATION_CURRENT_POSITION)
+                    {
+                        assert(grabber->samples_queued_while_paused[i]);
+                        stream_queue_sample(grabber, grabber->samples_queued_while_paused[i]);
+                    }
+                    else
+                    {
+                        sample_grabber_stream_request_sample(grabber);
+                    }
+                }
+                release_samples_queued_while_paused(grabber);
+                grabber->sample_request_on_start_count = 0;
             }
+
             do_callback = state != grabber->state || state != SINK_STATE_PAUSED;
             if (do_callback)
                 IMFStreamSink_QueueEvent(&grabber->IMFStreamSink_iface, events[state], &GUID_NULL, S_OK, NULL);
@@ -1419,6 +1462,7 @@ static HRESULT sample_grabber_create_object(IMFAttributes *attributes, void *use
     object->IMFStreamSink_iface.lpVtbl = &sample_grabber_stream_vtbl;
     object->IMFMediaTypeHandler_iface.lpVtbl = &sample_grabber_stream_type_handler_vtbl;
     object->timer_callback.lpVtbl = &sample_grabber_stream_timer_callback_vtbl;
+    object->sample_request_on_start_count = 4;
     object->refcount = 1;
     if (FAILED(IMFSampleGrabberSinkCallback_QueryInterface(context->callback, &IID_IMFSampleGrabberSinkCallback2,
             (void **)&object->callback2)))
