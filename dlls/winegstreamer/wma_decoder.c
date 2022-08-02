@@ -29,7 +29,6 @@
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(wmadec);
-WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
 static const GUID *const wma_decoder_input_types[] =
 {
@@ -700,7 +699,6 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
 {
     struct wma_decoder *decoder = impl_from_IMediaObject(iface);
     struct wg_format wg_format;
-    unsigned int i;
 
     TRACE("iface %p, index %lu, type %p, flags %#lx.\n", iface, index, type, flags);
 
@@ -727,15 +725,8 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
     if (!IsEqualGUID(&type->majortype, &MEDIATYPE_Audio))
         return DMO_E_TYPE_NOT_ACCEPTED;
 
-    for (i = 0; i < ARRAY_SIZE(wma_decoder_input_types); ++i)
-        if (IsEqualGUID(&type->subtype, wma_decoder_input_types[i]))
-            break;
-    if (i == ARRAY_SIZE(wma_decoder_input_types))
-        return DMO_E_TYPE_NOT_ACCEPTED;
-
     if (!amt_to_wg_format((const AM_MEDIA_TYPE *)type, &wg_format))
         return DMO_E_TYPE_NOT_ACCEPTED;
-    assert(wg_format.major_type == WG_MAJOR_TYPE_AUDIO_WMA);
 
     if (flags & DMO_SET_TYPEF_TEST_ONLY)
         return S_OK;
@@ -1026,31 +1017,10 @@ static const IPropertyBagVtbl property_bag_vtbl =
 
 HRESULT wma_decoder_create(IUnknown *outer, IUnknown **out)
 {
-    static const struct wg_format output_format =
-    {
-        .major_type = WG_MAJOR_TYPE_AUDIO,
-        .u.audio =
-        {
-            .format = WG_AUDIO_FORMAT_F32LE,
-            .channel_mask = 1,
-            .channels = 1,
-            .rate = 44100,
-        },
-    };
-    static const struct wg_format input_format = {.major_type = WG_MAJOR_TYPE_AUDIO_WMA};
-    struct wg_transform_attrs attrs = {0};
-    wg_transform_t transform;
     struct wma_decoder *decoder;
     HRESULT hr;
 
     TRACE("outer %p, out %p.\n", outer, out);
-
-    if (!(transform = wg_transform_create(&input_format, &output_format, &attrs)))
-    {
-        ERR_(winediag)("GStreamer doesn't support WMA decoding, please install appropriate plugins\n");
-        return E_FAIL;
-    }
-    wg_transform_destroy(transform);
 
     if (!(decoder = calloc(1, sizeof(*decoder))))
         return E_OUTOFMEMORY;
