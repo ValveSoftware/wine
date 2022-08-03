@@ -2219,6 +2219,21 @@ static void CDECL steamclient_setup_trampolines(HMODULE src_mod, HMODULE tgt_mod
     else steamclient_count++;
 }
 
+static BOOL report_native_pc_as_ntdll;
+
+static BOOL CDECL is_pc_in_native_so(void *pc)
+{
+    Dl_info info;
+
+    if (!report_native_pc_as_ntdll || !dladdr( pc, &info )) return FALSE;
+
+    TRACE( "pc %p, module %s.\n", pc, debugstr_a(info.dli_fname) );
+
+    if (strstr( info.dli_fname, ".dll.so")) return FALSE;
+
+    return TRUE;
+}
+
 /***********************************************************************
  *           unix_funcs
  */
@@ -2234,6 +2249,7 @@ static struct unix_funcs unix_funcs =
     steamclient_setup_trampolines,
     set_unix_env,
     write_crash_log,
+    is_pc_in_native_so,
 };
 
 BOOL ac_odyssey;
@@ -2268,6 +2284,10 @@ static void hacks_init(void)
     env_str = getenv("WINE_NO_PRIV_ELEVATION");
     if (env_str)  no_priv_elevation = atoi(env_str);
     else if (sgi) no_priv_elevation = !strcmp(sgi, "1584660");
+
+    env_str = getenv("WINE_UNIX_PC_AS_NTDLL");
+    if (env_str)  report_native_pc_as_ntdll = atoi(env_str);
+    else if (sgi) report_native_pc_as_ntdll = !strcmp(sgi, "700330");
 
     if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
     {
