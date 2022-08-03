@@ -2210,6 +2210,21 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
     return STATUS_SUCCESS;
 }
 
+static BOOL report_native_pc_as_ntdll;
+
+static NTSTATUS is_pc_in_native_so(void *pc)
+{
+    Dl_info info;
+
+    if (!report_native_pc_as_ntdll || !dladdr( pc, &info )) return FALSE;
+
+    TRACE( "pc %p, module %s.\n", pc, debugstr_a(info.dli_fname) );
+
+    if (strstr( info.dli_fname, ".dll.so")) return FALSE;
+
+    return TRUE;
+}
+
 /***********************************************************************
  *           __wine_unix_call_funcs
  */
@@ -2219,6 +2234,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     unwind_builtin_dll,
     system_time_precise,
     steamclient_setup_trampolines,
+    is_pc_in_native_so,
 };
 
 BOOL ac_odyssey;
@@ -2228,7 +2244,7 @@ static void hacks_init(void)
 {
     static const char upc_exe[] = "Ubisoft Game Launcher\\upc.exe";
     static const char ac_odyssey_exe[] = "ACOdyssey.exe";
-    const char *env_str;
+    const char *env_str, *sgi;
 
     if (main_argc > 1 && strstr(main_argv[1], ac_odyssey_exe))
     {
@@ -2244,9 +2260,13 @@ static void hacks_init(void)
     if (fsync_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in fsync.\n");
 
-    env_str = getenv("SteamGameId");
-    if (env_str && (!strcmp(env_str, "50130") || !strcmp(env_str, "202990") || !strcmp(env_str, "212910")))
+    sgi = getenv("SteamGameId");
+    if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910")))
         setenv("WINESTEAMNOEXEC", "1", 0);
+
+    env_str = getenv("WINE_UNIX_PC_AS_NTDLL");
+    if (env_str)  report_native_pc_as_ntdll = atoi(env_str);
+    else if (sgi) report_native_pc_as_ntdll = !strcmp(sgi, "700330");
 }
 
 #ifdef _WIN64

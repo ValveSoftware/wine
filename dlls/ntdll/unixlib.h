@@ -50,6 +50,7 @@ enum ntdll_unix_funcs
     unix_unwind_builtin_dll,
     unix_system_time_precise,
     unix_steamclient_setup_trampolines,
+    unix_is_pc_in_native_so,
 };
 
 extern unixlib_handle_t ntdll_unix_handle;
