@@ -35,6 +35,8 @@
 #include <gst/video/video.h>
 #include <gst/audio/audio.h>
 
+#include <gst/gl/gl.h>
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "winternl.h"
@@ -50,6 +52,8 @@ typedef enum
 } GstAutoplugSelectResult;
 
 typedef BOOL (*init_gst_cb)(struct wg_parser *parser);
+
+extern GstGLDisplay *gl_display;
 
 struct wg_parser
 {
@@ -85,6 +89,9 @@ struct wg_parser
 
     bool sink_connected;
     bool use_mediaconv;
+    bool use_opengl;
+
+    GstContext *context;
     bool using_qtdemux;
 };
 
@@ -896,7 +903,32 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
     if (!(stream = create_stream(parser, gst_pad_get_stream_id(pad))))
         goto out;
 
-    if (!strcmp(name, "video/x-raw"))
+    if (!strcmp(name, "video/x-raw") && parser->use_opengl)
+    {
+        if (!(element = create_element("glupload", "base"))
+                || !append_element(parser->container, element, &first, &last))
+            goto out;
+        if (!(element = create_element("glcolorconvert", "base"))
+                || !append_element(parser->container, element, &first, &last))
+            goto out;
+        if (!(element = create_element("glvideoflip", "base"))
+                || !append_element(parser->container, element, &first, &last))
+            goto out;
+        stream->flip = element;
+        if (!(element = create_element("gldeinterlace", "base"))
+                || !append_element(parser->container, element, &first, &last))
+            goto out;
+        if (!(element = create_element("glcolorconvert", "base"))
+                || !append_element(parser->container, element, &first, &last))
+            goto out;
+        if (!(element = create_element("gldownload", "base"))
+                || !append_element(parser->container, element, &first, &last))
+            goto out;
+
+        if (!link_src_to_element(pad, first) || !link_element_to_sink(last, stream->my_sink))
+            goto out;
+    }
+    else if (!strcmp(name, "video/x-raw"))
     {
         /* DirectShow can express interlaced video, but downstream filters can't
          * necessarily consume it. In particular, the video renderer can't. */
@@ -1370,6 +1402,8 @@ static NTSTATUS wg_parser_connect(void *args)
 
     parser->container = gst_bin_new(NULL);
     gst_element_set_bus(parser->container, parser->bus);
+    if (parser->context)
+        gst_element_set_context(parser->container, parser->context);
 
     parser->my_src = gst_pad_new_from_static_template(&src_template, "quartz-src");
     gst_pad_set_getrange_function(parser->my_src, src_getrange_cb);
@@ -1720,6 +1754,16 @@ static NTSTATUS wg_parser_create(void *args)
 
     if (!(parser = calloc(1, sizeof(*parser))))
         return E_OUTOFMEMORY;
+    if ((parser->use_opengl = params->use_opengl && gl_display))
+    {
+        if ((parser->context = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, false)))
+            gst_context_set_gl_display(parser->context, gl_display);
+        else
+        {
+            GST_ERROR("Failed to create parser context");
+            parser->use_opengl = FALSE;
+        }
+    }
 
     pthread_mutex_init(&parser->mutex, NULL);
     pthread_cond_init(&parser->init_cond, NULL);
@@ -1742,6 +1786,9 @@ static NTSTATUS wg_parser_destroy(void *args)
         gst_bus_set_sync_handler(parser->bus, NULL, NULL, NULL);
         gst_object_unref(parser->bus);
     }
+
+    if (parser->context)
+        gst_context_unref(parser->context);
 
     pthread_mutex_destroy(&parser->mutex);
     pthread_cond_destroy(&parser->init_cond);
