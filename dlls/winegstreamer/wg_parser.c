@@ -90,6 +90,7 @@ struct wg_parser
 
     bool sink_connected;
     bool use_mediaconv;
+    bool use_opengl;
 };
 
 struct wg_parser_stream
@@ -792,7 +793,34 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
     if (!(stream = create_stream(parser)))
         goto out;
 
-    if (!strcmp(name, "video/x-raw"))
+    if (!strcmp(name, "video/x-raw") && parser->use_opengl)
+    {
+        GstElement *first = NULL, *last = NULL, *element;
+
+        if (!(element = create_element("glupload", "base"))
+                || !append_element(GST_BIN(parser->container), element, &first, &last))
+            goto out;
+        if (!(element = create_element("glcolorconvert", "base"))
+                || !append_element(GST_BIN(parser->container), element, &first, &last))
+            goto out;
+        if (!(element = create_element("glvideoflip", "base"))
+                || !append_element(GST_BIN(parser->container), element, &first, &last))
+            goto out;
+        stream->flip = element;
+        if (!(element = create_element("gldeinterlace", "base"))
+                || !append_element(GST_BIN(parser->container), element, &first, &last))
+            goto out;
+        if (!(element = create_element("glcolorconvert", "base"))
+                || !append_element(GST_BIN(parser->container), element, &first, &last))
+            goto out;
+        if (!(element = create_element("gldownload", "base"))
+                || !append_element(GST_BIN(parser->container), element, &first, &last))
+            goto out;
+
+        stream->post_sink = gst_element_get_static_pad(first, "sink");
+        stream->post_src = gst_element_get_static_pad(last, "src");
+    }
+    else if (!strcmp(name, "video/x-raw"))
     {
         /* DirectShow can express interlaced video, but downstream filters can't
          * necessarily consume it. In particular, the video renderer can't. */
@@ -1654,6 +1682,7 @@ static NTSTATUS wg_parser_create(void *args)
 
     if (!(parser = calloc(1, sizeof(*parser))))
         return E_OUTOFMEMORY;
+    parser->use_opengl = params->use_opengl;
 
     pthread_mutex_init(&parser->mutex, NULL);
     pthread_cond_init(&parser->init_cond, NULL);
