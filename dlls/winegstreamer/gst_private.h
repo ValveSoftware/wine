@@ -71,7 +71,7 @@ HRESULT wg_sample_queue_create(struct wg_sample_queue **out);
 void wg_sample_queue_destroy(struct wg_sample_queue *queue);
 void wg_sample_queue_flush(struct wg_sample_queue *queue, bool all);
 
-struct wg_parser *wg_parser_create(enum wg_parser_type type);
+struct wg_parser *wg_parser_create(enum wg_parser_type type, bool use_opengl);
 void wg_parser_destroy(struct wg_parser *parser);
 
 HRESULT wg_parser_connect(struct wg_parser *parser, uint64_t file_size);
