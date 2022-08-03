@@ -83,6 +83,7 @@ enum ntdll_unix_funcs
     unix_wine_spawnvp,
     unix_system_time_precise,
     unix_steamclient_setup_trampolines,
+    unix_is_pc_in_native_so,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;
