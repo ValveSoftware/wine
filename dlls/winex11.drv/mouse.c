@@ -126,7 +126,6 @@ static const UINT button_up_data[NB_BUTTONS] =
 XContext cursor_context = 0;
 
 static HWND cursor_window;
-static HCURSOR last_cursor;
 static DWORD last_cursor_change;
 static RECT clip_rect;
 static Cursor create_cursor( HANDLE handle );
@@ -1527,11 +1526,13 @@ void CDECL X11DRV_DestroyCursorIcon( HCURSOR handle )
  */
 void CDECL X11DRV_SetCursor( HCURSOR handle )
 {
-    if (InterlockedExchangePointer( (void **)&last_cursor, handle ) != handle ||
-        GetTickCount() - last_cursor_change > 100)
+    struct x11drv_thread_data *thread_data = x11drv_init_thread_data();
+
+    if (thread_data->last_cursor != handle || GetTickCount() - last_cursor_change > 100)
     {
         last_cursor_change = GetTickCount();
-        if (cursor_window) SendNotifyMessageW( cursor_window, WM_X11DRV_SET_CURSOR, 0, (LPARAM)handle );
+        thread_data->last_cursor = handle;
+        if (cursor_window) SendNotifyMessageW( cursor_window, WM_X11DRV_SET_CURSOR, 0, 0 );
     }
 }
 
