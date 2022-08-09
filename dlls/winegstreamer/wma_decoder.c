@@ -24,6 +24,8 @@
 #include "mfobjects.h"
 #include "mftransform.h"
 #include "wmcodecdsp.h"
+#include "mediaerr.h"
+#include "dmort.h"
 
 #include "wine/debug.h"
 #include "wine/heap.h"
@@ -55,6 +57,7 @@ struct wma_decoder
     IMFMediaType *input_type;
     IMFMediaType *output_type;
 
+    struct wg_format input_format, output_format;
     struct wg_transform *wg_transform;
     struct wg_sample_queue *wg_sample_queue;
 };
@@ -671,29 +674,133 @@ static HRESULT WINAPI media_object_GetOutputStreamInfo(IMediaObject *iface, DWOR
 static HRESULT WINAPI media_object_GetInputType(IMediaObject *iface, DWORD index, DWORD type_index,
         DMO_MEDIA_TYPE *type)
 {
-    FIXME("iface %p, index %lu, type_index %lu, type %p stub!\n", iface, index, type_index, type);
-    return E_NOTIMPL;
+    struct wma_decoder *impl = impl_from_IMediaObject(iface);
+    struct wg_format format = impl->input_format;
+
+    FIXME("iface %p, index %lu, type_index %lu, type %p semi-stub!\n", iface, index, type_index, type);
+
+    if (type_index >= 5)
+        return VFW_E_NO_TYPES;
+
+    format.major_type = WG_MAJOR_TYPE_WMA;
+    format.u.wma.version = index + 1;
+
+    if (!amt_from_wg_format((AM_MEDIA_TYPE *)type, &format, false))
+        return VFW_E_NO_TYPES;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI media_object_GetOutputType(IMediaObject *iface, DWORD index, DWORD type_index,
         DMO_MEDIA_TYPE *type)
 {
-    FIXME("iface %p, index %lu, type_index %lu, type %p stub!\n", iface, index, type_index, type);
-    return E_NOTIMPL;
+    static enum wg_audio_format const audio_formats[] =
+    {
+        WG_AUDIO_FORMAT_S16LE,
+        WG_AUDIO_FORMAT_F32LE,
+    };
+
+    struct wma_decoder *impl = impl_from_IMediaObject(iface);
+    struct wg_format format = impl->output_format;
+
+    FIXME("iface %p, index %lu, type_index %lu, type %p semi-stub!\n", iface, index, type_index, type);
+
+    if (type_index >= ARRAY_SIZE(audio_formats))
+        return VFW_E_NO_TYPES;
+
+    format.major_type = WG_MAJOR_TYPE_AUDIO;
+    format.u.audio.format = audio_formats[index];
+    if (!format.u.audio.channels)
+    {
+        if (impl->input_format.major_type == WG_MAJOR_TYPE_WMA)
+            format.u.audio.channels = impl->input_format.u.wma.channels;
+        if (impl->input_format.major_type == WG_MAJOR_TYPE_AUDIO)
+            format.u.audio.channels = impl->input_format.u.audio.channels;
+    }
+    if (!format.u.audio.rate)
+    {
+        if (impl->input_format.major_type == WG_MAJOR_TYPE_WMA)
+            format.u.audio.rate = impl->input_format.u.wma.rate;
+        if (impl->input_format.major_type == WG_MAJOR_TYPE_AUDIO)
+            format.u.audio.rate = impl->input_format.u.audio.rate;
+    }
+
+    if (!amt_from_wg_format((AM_MEDIA_TYPE *)type, &format, false))
+        return VFW_E_NO_TYPES;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index,
         const DMO_MEDIA_TYPE *type, DWORD flags)
 {
-    FIXME("iface %p, index %lu, type %p, flags %#lx stub!\n", iface, index, type, flags);
-    return E_NOTIMPL;
+    struct wma_decoder *impl = impl_from_IMediaObject(iface);
+    struct wg_format wg_format;
+
+    FIXME("iface %p, index %lu, type %p, flags %#lx semi-stub!\n", iface, index, type, flags);
+
+    if (flags & DMO_SET_TYPEF_CLEAR)
+    {
+        memset(&impl->input_format, 0, sizeof(impl->input_format));
+        return S_OK;
+    }
+
+    if (!amt_to_wg_format((const AM_MEDIA_TYPE *)type, &wg_format))
+        return VFW_E_INVALIDMEDIATYPE;
+
+    if (wg_format.major_type != WG_MAJOR_TYPE_AUDIO)
+        return VFW_E_INVALIDMEDIATYPE;
+    if (!(flags & DMO_SET_TYPEF_TEST_ONLY))
+    {
+        impl->input_format = wg_format;
+        if (!impl->output_format.major_type)
+            return S_OK;
+
+        if (impl->wg_transform)
+            wg_transform_destroy(impl->wg_transform);
+        impl->wg_transform = NULL;
+
+        if (!(impl->wg_transform = wg_transform_create(&impl->input_format, &impl->output_format)))
+            return E_FAIL;
+    }
+
+    return S_OK;
 }
 
 static HRESULT WINAPI media_object_SetOutputType(IMediaObject *iface, DWORD index,
         const DMO_MEDIA_TYPE *type, DWORD flags)
 {
-    FIXME("iface %p, index %lu, type %p, flags %#lx stub!\n", iface, index, type, flags);
-    return E_NOTIMPL;
+    struct wma_decoder *impl = impl_from_IMediaObject(iface);
+    struct wg_format wg_format;
+
+    FIXME("iface %p, index %lu, type %p, flags %#lx semi-stub!\n", iface, index, type, flags);
+
+    if (flags & DMO_SET_TYPEF_CLEAR)
+    {
+        memset(&impl->output_format, 0, sizeof(impl->output_format));
+        return S_OK;
+    }
+
+    if (!amt_to_wg_format((const AM_MEDIA_TYPE *)type, &wg_format))
+        return VFW_E_INVALIDMEDIATYPE;
+
+    if (wg_format.major_type != WG_MAJOR_TYPE_AUDIO)
+        return VFW_E_INVALIDMEDIATYPE;
+    if (!(flags & DMO_SET_TYPEF_TEST_ONLY))
+    {
+        impl->output_format = wg_format;
+        if (!impl->input_format.major_type)
+            return S_OK;
+
+        if (impl->wg_transform)
+            wg_transform_destroy(impl->wg_transform);
+        impl->wg_transform = NULL;
+
+        if (!(impl->wg_transform = wg_transform_create(&impl->input_format, &impl->output_format)))
+            return E_FAIL;
+    }
+
+    return S_OK;
 }
 
 static HRESULT WINAPI media_object_GetInputCurrentType(IMediaObject *iface, DWORD index, DMO_MEDIA_TYPE *type)
@@ -718,8 +825,14 @@ static HRESULT WINAPI media_object_GetInputSizeInfo(IMediaObject *iface, DWORD i
 
 static HRESULT WINAPI media_object_GetOutputSizeInfo(IMediaObject *iface, DWORD index, DWORD *size, DWORD *alignment)
 {
-    FIXME("iface %p, index %lu, size %p, alignment %p stub!\n", iface, index, size, alignment);
-    return E_NOTIMPL;
+    struct wma_decoder *impl = impl_from_IMediaObject(iface);
+
+    TRACE("iface %p, index %lu, size %p, alignment %p semi-stub!\n", iface, index, size, alignment);
+
+    *size = impl->output_format.u.audio.rate * impl->output_format.u.audio.channels * 16;
+    *alignment = 1;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI media_object_GetInputMaxLatency(IMediaObject *iface, DWORD index, REFERENCE_TIME *latency)
@@ -736,14 +849,14 @@ static HRESULT WINAPI media_object_SetInputMaxLatency(IMediaObject *iface, DWORD
 
 static HRESULT WINAPI media_object_Flush(IMediaObject *iface)
 {
-    FIXME("iface %p stub!\n", iface);
-    return E_NOTIMPL;
+    TRACE("iface %p.\n", iface);
+    return S_OK;
 }
 
 static HRESULT WINAPI media_object_Discontinuity(IMediaObject *iface, DWORD index)
 {
-    FIXME("iface %p, index %lu stub!\n", iface, index);
-    return E_NOTIMPL;
+    FIXME("iface %p, index %lu semi-stub!\n", iface, index);
+    return S_OK;
 }
 
 static HRESULT WINAPI media_object_AllocateStreamingResources(IMediaObject *iface)
@@ -767,16 +880,49 @@ static HRESULT WINAPI media_object_GetInputStatus(IMediaObject *iface, DWORD ind
 static HRESULT WINAPI media_object_ProcessInput(IMediaObject *iface, DWORD index,
         IMediaBuffer *buffer, DWORD flags, REFERENCE_TIME timestamp, REFERENCE_TIME timelength)
 {
-    FIXME("iface %p, index %lu, buffer %p, flags %#lx, timestamp %s, timelength %s stub!\n", iface,
+    struct wma_decoder *impl = impl_from_IMediaObject(iface);
+    struct wg_sample *wg_sample;
+    HRESULT hr;
+
+    TRACE("iface %p, index %lu, buffer %p, flags %#lx, timestamp %s, timelength %s.\n", iface,
             index, buffer, flags, wine_dbgstr_longlong(timestamp), wine_dbgstr_longlong(timelength));
-    return E_NOTIMPL;
+
+    if (!impl->wg_transform)
+        return DMO_E_NOTACCEPTING;
+
+    if (FAILED(hr = wg_sample_create_dmo(buffer, &wg_sample)))
+        return hr;
+
+    return wg_transform_push_dmo(impl->wg_transform, wg_sample, impl->wg_sample_queue, timestamp, timelength);
 }
 
 static HRESULT WINAPI media_object_ProcessOutput(IMediaObject *iface, DWORD flags, DWORD count,
         DMO_OUTPUT_DATA_BUFFER *buffers, DWORD *status)
 {
-    FIXME("iface %p, flags %#lx, count %lu, buffers %p, status %p stub!\n", iface, flags, count, buffers, status);
-    return E_NOTIMPL;
+    struct wma_decoder *impl = impl_from_IMediaObject(iface);
+    struct wg_sample *wg_sample;
+    HRESULT hr;
+
+    TRACE("iface %p, flags %#lx, count %lu, buffers %p, status %p.\n", iface, flags, count, buffers, status);
+
+    if (!impl->wg_transform)
+        return MF_E_TRANSFORM_TYPE_NOT_SET;
+
+    *status = 0;
+    buffers[0].dwStatus = 0;
+    if (!buffers[0].pBuffer)
+        return DMO_E_NO_MORE_ITEMS;
+
+    if (FAILED(hr = wg_sample_create_dmo(buffers[0].pBuffer, &wg_sample)))
+        return hr;
+
+    if (SUCCEEDED(hr = wg_transform_read_dmo(impl->wg_transform, wg_sample,
+            &buffers[0].dwStatus, &buffers[0].rtTimestamp, &buffers[0].rtTimelength)))
+        wg_sample_queue_flush(impl->wg_sample_queue, false);
+
+    wg_sample_release(wg_sample);
+
+    return hr;
 }
 
 static HRESULT WINAPI media_object_Lock(IMediaObject *iface, LONG lock)
