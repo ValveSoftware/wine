@@ -573,12 +573,6 @@ static HRESULT WINAPI video_processor_ProcessOutput(IMFTransform *iface, DWORD f
 
     wg_sample_release(wg_sample);
 
-    if (hr == MF_E_TRANSFORM_STREAM_CHANGE)
-    {
-        FIXME("Unexpected stream format change!\n");
-        samples[0].dwStatus |= MFT_OUTPUT_DATA_BUFFER_FORMAT_CHANGE;
-    }
-
     return hr;
 }
 
