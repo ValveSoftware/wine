@@ -38,6 +38,7 @@ DEFINE_GUID(DMOVideoFormat_RGB555,D3DFMT_X1R5G5B5,0x524f,0x11ce,0x9f,0x53,0x00,0
 DEFINE_GUID(DMOVideoFormat_RGB8,D3DFMT_P8,0x524f,0x11ce,0x9f,0x53,0x00,0x20,0xaf,0x0b,0xa7,0x70);
 DEFINE_MEDIATYPE_GUID(MFVideoFormat_ABGR32,D3DFMT_A8B8G8R8);
 DEFINE_MEDIATYPE_GUID(MFAudioFormat_RAW_AAC, WAVE_FORMAT_RAW_AAC1);
+DEFINE_MEDIATYPE_GUID(MFAudioFormat_XMAudio2, 0x0166);
 
 extern GUID MEDIASUBTYPE_VC1S;
 
@@ -672,6 +673,7 @@ static void mf_media_type_to_wg_format_wma(IMFMediaType *type, const GUID *subty
 {
     UINT32 rate, depth, channels, block_align, bytes_per_second, codec_data_len;
     BYTE codec_data[64];
+    bool is_xma = false;
     UINT32 version;
 
     if (FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_SAMPLES_PER_SECOND, &rate)))
@@ -713,6 +715,11 @@ static void mf_media_type_to_wg_format_wma(IMFMediaType *type, const GUID *subty
         version = 3;
     else if (IsEqualGUID(subtype, &MFAudioFormat_WMAudio_Lossless))
         version = 4;
+    else if (IsEqualGUID(subtype, &MFAudioFormat_XMAudio2))
+    {
+        version = 2;
+        is_xma = true;
+    }
     else
     {
         assert(0);
@@ -728,6 +735,7 @@ static void mf_media_type_to_wg_format_wma(IMFMediaType *type, const GUID *subty
     format->u.wma.block_align = block_align;
     format->u.wma.codec_data_len = codec_data_len;
     memcpy(format->u.wma.codec_data, codec_data, codec_data_len);
+    format->u.wma.is_xma = is_xma;
 }
 
 static void mf_media_type_to_wg_format_aac(IMFMediaType *type, struct wg_format *format)
@@ -870,7 +878,8 @@ void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
         if (IsEqualGUID(&subtype, &MEDIASUBTYPE_MSAUDIO1) ||
                 IsEqualGUID(&subtype, &MFAudioFormat_WMAudioV8) ||
                 IsEqualGUID(&subtype, &MFAudioFormat_WMAudioV9) ||
-                IsEqualGUID(&subtype, &MFAudioFormat_WMAudio_Lossless))
+                IsEqualGUID(&subtype, &MFAudioFormat_WMAudio_Lossless) ||
+                IsEqualGUID(&subtype, &MFAudioFormat_XMAudio2))
             mf_media_type_to_wg_format_wma(type, &subtype, format);
         else if (IsEqualGUID(&subtype, &MFAudioFormat_AAC))
             mf_media_type_to_wg_format_aac(type, format);
