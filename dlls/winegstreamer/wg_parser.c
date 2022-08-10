@@ -1192,9 +1192,6 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
         if (!(vconv = create_element("videoconvert", "base")))
             goto out;
 
-        /* Let GStreamer choose a default number of threads. */
-        gst_util_set_object_arg(G_OBJECT(vconv), "n-threads", "0");
-
         /* GStreamer outputs RGB video top-down, but DirectShow expects bottom-up. */
         if (!(flip = create_element("videoflip", "good")))
             goto out;
