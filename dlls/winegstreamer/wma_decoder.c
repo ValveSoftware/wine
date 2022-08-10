@@ -33,12 +33,15 @@
 WINE_DEFAULT_DEBUG_CHANNEL(wmadec);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
+extern const GUID MFAudioFormat_XMAudio2;
+
 static const GUID *const wma_decoder_input_types[] =
 {
     &MEDIASUBTYPE_MSAUDIO1,
     &MFAudioFormat_WMAudioV8,
     &MFAudioFormat_WMAudioV9,
     &MFAudioFormat_WMAudio_Lossless,
+    &MFAudioFormat_XMAudio2,
 };
 static const GUID *const wma_decoder_output_types[] =
 {
@@ -684,6 +687,12 @@ static HRESULT WINAPI media_object_GetInputType(IMediaObject *iface, DWORD index
 
     format.major_type = WG_MAJOR_TYPE_WMA;
     format.u.wma.version = index + 1;
+    format.u.wma.is_xma = 0;
+    if (index == 4)
+    {
+        format.u.wma.version = 2;
+        format.u.wma.is_xma = 1;
+    }
 
     if (!amt_from_wg_format((AM_MEDIA_TYPE *)type, &format, false))
         return VFW_E_NO_TYPES;

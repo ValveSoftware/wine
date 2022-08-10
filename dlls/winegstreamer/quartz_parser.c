@@ -39,6 +39,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(quartz);
 
 static const GUID MEDIASUBTYPE_CVID = {mmioFOURCC('c','v','i','d'), 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 static const GUID MEDIASUBTYPE_MP3  = {WAVE_FORMAT_MPEGLAYER3, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
+static const GUID MEDIASUBTYPE_XMAUDIO2 = {0x0166, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 extern const GUID MFVideoFormat_ABGR32;
 
 struct parser
@@ -291,6 +292,11 @@ static bool amt_from_wg_format_wma(AM_MEDIA_TYPE *mt, const struct wg_format *fo
         case 2:
             mt->subtype = MEDIASUBTYPE_WMAUDIO2;
             wave_format->wFormatTag = WAVE_FORMAT_WMAUDIO2;
+            if (format->u.wma.is_xma)
+            {
+                mt->subtype = MEDIASUBTYPE_XMAUDIO2;
+                wave_format->wFormatTag = 0x0166;
+            }
             break;
         case 3:
             mt->subtype = MEDIASUBTYPE_WMAUDIO3;
@@ -697,7 +703,7 @@ static bool amt_to_wg_format_audio_mpeg1_layer3(const AM_MEDIA_TYPE *mt, struct 
 }
 
 static bool amt_to_wg_format_audio_wma(const AM_MEDIA_TYPE *mt, struct wg_format *format,
-        uint32_t version)
+        uint32_t version, bool is_xma)
 {
     const WAVEFORMATEX *audio_format = (const WAVEFORMATEX *)mt->pbFormat;
 
@@ -714,6 +720,7 @@ static bool amt_to_wg_format_audio_wma(const AM_MEDIA_TYPE *mt, struct wg_format
 
     format->major_type = WG_MAJOR_TYPE_WMA;
     format->u.wma.version = version;
+    format->u.wma.is_xma = is_xma;
     format->u.wma.channels = audio_format->nChannels;
     format->u.wma.depth = audio_format->wBitsPerSample;
     format->u.wma.block_align = audio_format->nBlockAlign;
@@ -795,13 +802,15 @@ bool amt_to_wg_format(const AM_MEDIA_TYPE *mt, struct wg_format *format)
         if (IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_MP3))
             return amt_to_wg_format_audio_mpeg1_layer3(mt, format);
         if (IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_MSAUDIO1))
-            return amt_to_wg_format_audio_wma(mt, format, 1);
+            return amt_to_wg_format_audio_wma(mt, format, 1, false);
         if (IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_WMAUDIO2))
-            return amt_to_wg_format_audio_wma(mt, format, 2);
+            return amt_to_wg_format_audio_wma(mt, format, 2, false);
         if (IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_WMAUDIO3))
-            return amt_to_wg_format_audio_wma(mt, format, 3);
+            return amt_to_wg_format_audio_wma(mt, format, 3, false);
         if (IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_WMAUDIO_LOSSLESS))
-            return amt_to_wg_format_audio_wma(mt, format, 4);
+            return amt_to_wg_format_audio_wma(mt, format, 4, false);
+        if (IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_XMAUDIO2))
+            return amt_to_wg_format_audio_wma(mt, format, 2, true);
         return amt_to_wg_format_audio(mt, format);
     }
 
