@@ -100,7 +100,6 @@ UNSUPPORTED_EXTENSIONS = [
     "VK_KHR_external_fence_win32",
     # Relates to external_semaphore and needs type conversions in bitflags.
     "VK_KHR_shared_presentable_image", # Needs WSI work.
-    "VK_KHR_win32_keyed_mutex",
     "VK_NV_external_memory_rdma", # Needs shared resources work.
 
     # Extensions for other platforms
@@ -335,8 +334,8 @@ STRUCT_CHAIN_CONVERSIONS = {
     "VkPhysicalDeviceImageFormatInfo2": [],
     "VkPhysicalDeviceExternalSemaphoreInfo": [],
     "VkSemaphoreCreateInfo": ["VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR"],
-    "VkSubmitInfo": ["VK_STRUCTURE_TYPE_D3D12_FENCE_SUBMIT_INFO_KHR"],
-    "VkSubmitInfo2" : [],
+    "VkSubmitInfo": ["VK_STRUCTURE_TYPE_D3D12_FENCE_SUBMIT_INFO_KHR", "VK_STRUCTURE_TYPE_WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR"],
+    "VkSubmitInfo2" : ["VK_STRUCTURE_TYPE_WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR"],
 }
 
 
