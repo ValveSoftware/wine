@@ -215,7 +215,6 @@ FUNCTION_OVERRIDES = {
     "vkCreateBuffer" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkCreateCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkCreateComputePipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
-    "vkCreateFence" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkCreateGraphicsPipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
     "vkCreateComputePipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
     "vkCreateGraphicsPipelines" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.PRIVATE},
@@ -225,7 +224,6 @@ FUNCTION_OVERRIDES = {
     "vkCreateSemaphore" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyCommandPool" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkDestroyDevice" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
-    "vkDestroyFence" : {"dispatch" : True, "driver" : False, "thunk": ThunkType.NONE},
     "vkDestroySemaphore" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkFreeCommandBuffers" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkFreeMemory" : {"dispatch" : True, "driver" : False, "thunk" : ThunkType.NONE},
@@ -233,9 +231,7 @@ FUNCTION_OVERRIDES = {
     "vkGetDeviceQueue" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkGetDeviceQueue2" : {"dispatch": True, "driver" : False, "thunk" : ThunkType.NONE},
     "vkGetSemaphoreCounterValue" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
-    "vkResetFences" : {"dispatch" : True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkSignalSemaphore" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
-    "vkWaitForFences" : {"dispatch": True, "driver": False, "thunk": ThunkType.PRIVATE},
     "vkWaitSemaphores" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueBindSparse" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueSubmit" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
@@ -1166,8 +1162,6 @@ class VkHandle(object):
             return "wine_dev_mem_from_handle({0})->dev_mem".format(name)
         if self.name == "VkSemaphore":
             return "wine_semaphore_from_handle({0})->semaphore".format(name)
-        if self.name == "VkFence":
-            return "wine_fence_from_handle({0})->fence".format(name)
 
         native_handle_name = None
 
