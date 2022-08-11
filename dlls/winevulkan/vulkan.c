@@ -251,6 +251,7 @@ static struct VkPhysicalDevice_T *wine_vk_physical_device_alloc(struct VkInstanc
 #endif
     VkResult res;
     unsigned int i, j;
+    bool has_memory_priority = false;
 
     if (!(object = calloc(1, sizeof(*object))))
         return NULL;
@@ -308,6 +309,10 @@ static struct VkPhysicalDevice_T *wine_vk_physical_device_alloc(struct VkInstanc
                     VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
             host_properties[i].specVersion = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_SPEC_VERSION;
         }
+        if (!strcmp(host_properties[i].extensionName, "VK_EXT_memory_priority"))
+        {
+            has_memory_priority = true;
+        }
 
         if (wine_vk_device_extension_supported(host_properties[i].extensionName))
         {
@@ -319,6 +324,12 @@ static struct VkPhysicalDevice_T *wine_vk_physical_device_alloc(struct VkInstanc
             TRACE("Skipping extension '%s', no implementation found in winevulkan.\n", host_properties[i].extensionName);
         }
     }
+
+    if (instance->quirks & WINEVULKAN_QUIRK_EXPOSE_KEYED_MUTEX)
+        num_properties++;
+
+    if (!has_memory_priority && (instance->quirks & WINEVULKAN_QUIRK_EXPOSE_MEM_PRIORITY))
+        num_properties++;
 
     TRACE("Host supported extensions %u, Wine supported extensions %u\n", num_host_properties, num_properties);
 
@@ -336,6 +347,27 @@ static struct VkPhysicalDevice_T *wine_vk_physical_device_alloc(struct VkInstanc
             j++;
         }
     }
+
+    if (instance->quirks & WINEVULKAN_QUIRK_EXPOSE_KEYED_MUTEX)
+    {
+        TRACE("Faking VK_KHR_win32_keyed_mutex extension.\n");
+        snprintf(object->extensions[j].extensionName, sizeof(object->extensions[j].extensionName),
+                VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME);
+        object->extensions[j].specVersion = VK_KHR_WIN32_KEYED_MUTEX_SPEC_VERSION;
+        j++;
+    }
+
+    if (!has_memory_priority && (instance->quirks & WINEVULKAN_QUIRK_EXPOSE_MEM_PRIORITY))
+    {
+        TRACE("Faking VK_EXT_memory_priority extension.\n");
+        snprintf(object->extensions[j].extensionName, sizeof(object->extensions[j].extensionName),
+                VK_EXT_MEMORY_PRIORITY_EXTENSION_NAME);
+        object->extensions[j].specVersion = VK_EXT_MEMORY_PRIORITY_SPEC_VERSION;
+        j++;
+
+        object->fake_memory_priority = true;
+    }
+
     object->extension_count = num_properties;
 
     free(host_properties);
@@ -476,7 +508,7 @@ static char **parse_xr_extensions(unsigned int *len)
 static VkResult wine_vk_device_convert_create_info(VkPhysicalDevice phys_dev, const VkDeviceCreateInfo *src,
         VkDeviceCreateInfo *dst, BOOL *must_free_extensions)
 {
-    unsigned int i, append_xr = 0, replace_win32 = 0, timeline_enabled = 0, wine_extension_count;
+    unsigned int i, append_xr = 0, replace_win32 = 0, timeline_enabled = 0, drop_extension = 0, wine_extension_count;
     VkResult res;
 
     static const char *wine_xr_extension_name = "VK_WINE_openxr_device_extensions";
@@ -487,6 +519,23 @@ static VkResult wine_vk_device_convert_create_info(VkPhysicalDevice phys_dev, co
     {
         WARN("Failed to convert VkDeviceCreateInfo pNext chain, res=%d.\n", res);
         return res;
+    }
+
+    if (phys_dev->fake_memory_priority)
+    {
+        VkBaseOutStructure *header;
+
+        for (header = (void *) dst; header; header = header->pNext)
+        {
+            if (header->pNext && header->pNext->sType == VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MEMORY_PRIORITY_FEATURES_EXT)
+            {
+                VkBaseOutStructure *memory_priority = header->pNext;
+
+                header->pNext = memory_priority->pNext;
+                free(memory_priority);
+                break;
+            }
+        }
     }
 
     /* Should be filtered out by loader as ICDs don't support layers. */
@@ -500,11 +549,13 @@ static VkResult wine_vk_device_convert_create_info(VkPhysicalDevice phys_dev, co
             append_xr = 1;
         else if (!strcmp(extension_name, "VK_KHR_external_memory_win32") || !strcmp(extension_name, "VK_KHR_external_semaphore_win32"))
             replace_win32 = 1;
+        else if (!strcmp(extension_name, "VK_KHR_win32_keyed_mutex") || (phys_dev->fake_memory_priority && !strcmp(extension_name, "VK_EXT_memory_priority")))
+            drop_extension = 1;
         else if (!strcmp(extension_name, "VK_KHR_timeline_semaphore"))
             timeline_enabled = 1;
     }
 
-    if (append_xr || replace_win32)
+    if (append_xr || replace_win32 || drop_extension)
     {
         unsigned int xr_extensions_len = 0, o = 0, j;
         char **xr_extensions_list = NULL;
@@ -522,6 +573,13 @@ static VkResult wine_vk_device_convert_create_info(VkPhysicalDevice phys_dev, co
         {
             if (append_xr && !strcmp(dst->ppEnabledExtensionNames[i], wine_xr_extension_name))
                 continue;
+
+            if (drop_extension && (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_win32_keyed_mutex") ||
+                (phys_dev->fake_memory_priority && !strcmp(src->ppEnabledExtensionNames[i], "VK_EXT_memory_priority"))))
+            {
+                TRACE("Ignoring active extension %s.\n", src->ppEnabledExtensionNames[i]);
+                continue;
+            }
 
             if (replace_win32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
                 new_extensions_list[o] = strdup("VK_KHR_external_memory_fd");
@@ -1072,19 +1130,6 @@ VkResult WINAPI __wine_create_vk_instance_with_callback(const VkInstanceCreateIn
     ALL_VK_INSTANCE_FUNCS()
 #undef USE_VK_FUNC
 
-    /* Cache physical devices for vkEnumeratePhysicalDevices within the instance as
-     * each vkPhysicalDevice is a dispatchable object, which means we need to wrap
-     * the native physical devices and present those to the application.
-     * Cleanup happens as part of wine_vkDestroyInstance.
-     */
-    res = wine_vk_instance_load_physical_devices(object);
-    if (res != VK_SUCCESS)
-    {
-        ERR("Failed to load physical devices, res=%d\n", res);
-        wine_vk_instance_free(object);
-        return res;
-    }
-
     if ((app_info = create_info->pApplicationInfo))
     {
         TRACE("Application name %s, application version %#x.\n",
@@ -1097,6 +1142,22 @@ VkResult WINAPI __wine_create_vk_instance_with_callback(const VkInstanceCreateIn
 
         if (app_info->pEngineName && !strcmp(app_info->pEngineName, "idTech"))
             object->quirks |= WINEVULKAN_QUIRK_GET_DEVICE_PROC_ADDR;
+
+        if (app_info->pEngineName && !strcmp(app_info->pEngineName, "nvpro-sample"))
+            object->quirks |= (WINEVULKAN_QUIRK_EXPOSE_MEM_PRIORITY | WINEVULKAN_QUIRK_EXPOSE_KEYED_MUTEX);
+    }
+
+    /* Cache physical devices for vkEnumeratePhysicalDevices within the instance as
+     * each vkPhysicalDevice is a dispatchable object, which means we need to wrap
+     * the native physical devices and present those to the application.
+     * Cleanup happens as part of wine_vkDestroyInstance.
+     */
+    res = wine_vk_instance_load_physical_devices(object);
+    if (res != VK_SUCCESS)
+    {
+        ERR("Failed to load physical devices, res=%d\n", res);
+        wine_vk_instance_free(object);
+        return res;
     }
 
     object->quirks |= WINEVULKAN_QUIRK_ADJUST_MAX_IMAGE_COUNT;
@@ -3930,6 +3991,23 @@ NTSTATUS wine_vkAllocateMemory(void *args)
         return res;
     }
 
+    if (device->phys_dev->fake_memory_priority)
+    {
+        VkBaseOutStructure *header;
+
+        for (header = (void *) &allocate_info_dup; header; header = header->pNext)
+        {
+            if (header->pNext && header->pNext->sType == VK_STRUCTURE_TYPE_MEMORY_PRIORITY_ALLOCATE_INFO_EXT)
+            {
+                VkBaseOutStructure *memory_priority = header->pNext;
+
+                header->pNext = memory_priority->pNext;
+                free(memory_priority);
+                break;
+            }
+        }
+    }
+
     if (!(object = calloc(1, sizeof(*object))))
     {
         free_VkMemoryAllocateInfo_struct_chain(&allocate_info_dup);
@@ -5641,6 +5719,9 @@ NTSTATUS wine_vkQueueSubmit(void *args)
 
     for (i = 0; i < submit_count; i++)
     {
+        if (wine_vk_find_struct(&submits[i], WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR))
+            FIXME("VkWin32KeyedMutexAcquireReleaseInfoKHR structure unhandled.\n");
+
         for (k = 0; k < submits[i].waitSemaphoreCount; k++)
         {
             if (wine_semaphore_from_handle(submits[i].pWaitSemaphores[k])->handle_type ==
@@ -5743,6 +5824,9 @@ static NTSTATUS vk_queue_submit_2(VkQueue queue, uint32_t submit_count, const Vk
 
     for (i = 0; i < submit_count; i++)
     {
+        if (wine_vk_find_struct(&submits[i], WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR))
+            FIXME("VkWin32KeyedMutexAcquireReleaseInfoKHR structure unhandled.\n");
+
         for (k = 0; k < submits[i].waitSemaphoreInfoCount; k++)
         {
             if (wine_semaphore_from_handle(submits[i].pWaitSemaphoreInfos[k].semaphore)->handle_type ==
