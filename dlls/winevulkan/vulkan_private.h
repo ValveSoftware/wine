@@ -158,6 +158,8 @@ struct VkPhysicalDevice_T
     VkExtensionProperties *extensions;
     uint32_t extension_count;
 
+    bool fake_memory_priority;
+
     struct wine_vk_mapping mapping;
 };
 

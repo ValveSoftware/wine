@@ -42,6 +42,8 @@
 #define WINEVULKAN_QUIRK_GET_DEVICE_PROC_ADDR 0x00000001
 #define WINEVULKAN_QUIRK_ADJUST_MAX_IMAGE_COUNT 0x00000002
 #define WINEVULKAN_QUIRK_IGNORE_EXPLICIT_LAYERS 0x00000004
+#define WINEVULKAN_QUIRK_EXPOSE_MEM_PRIORITY 0x00000008
+#define WINEVULKAN_QUIRK_EXPOSE_KEYED_MUTEX 0x00000010
 
 /* Base 'class' for our Vulkan dispatchable objects such as VkDevice and VkInstance.
  * This structure MUST be the first element of a dispatchable object as the ICD
