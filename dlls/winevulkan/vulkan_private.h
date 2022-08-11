@@ -125,8 +125,6 @@ struct VkInstance_T
     struct vulkan_instance_funcs funcs;
     VkInstance instance; /* native instance */
 
-    uint32_t api_version;
-
     /* We cache devices as we need to wrap them as they are
      * dispatchable objects.
      */
@@ -153,8 +151,6 @@ struct VkPhysicalDevice_T
     struct VkInstance_T *instance; /* parent */
     VkPhysicalDevice phys_dev; /* native physical device */
 
-    uint32_t api_version;
-
     VkExtensionProperties *extensions;
     uint32_t extension_count;
 
@@ -170,22 +166,6 @@ struct VkQueue_T
     uint32_t family_index;
     uint32_t queue_index;
     VkDeviceQueueCreateFlags flags;
-
-    bool virtual_queue;
-    bool processing;
-    bool device_lost;
-
-    pthread_t virtual_queue_thread;
-    pthread_mutex_t submissions_mutex;
-    pthread_cond_t submissions_cond;
-    struct list submissions;
-
-    pthread_t signal_thread;
-    pthread_mutex_t signaller_mutex;
-    pthread_cond_t signaller_cond;
-    struct list signal_ops;
-
-    bool stop;
 
     struct wine_vk_mapping mapping;
 };
@@ -309,15 +289,6 @@ struct wine_semaphore
             uint64_t physical_value;
             pthread_cond_t cond;
         } pending_waits[100];
-
-        struct pending_update
-        {
-            uint64_t virtual_value;
-            uint64_t physical_value;
-            pid_t signalling_pid;
-            struct VkQueue_T *signalling_queue;
-        } pending_updates[100];
-        uint32_t pending_updates_count;
     } *d3d12_fence_shm;
 };
 
