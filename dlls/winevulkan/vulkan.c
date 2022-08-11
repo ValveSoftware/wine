@@ -3719,15 +3719,6 @@ VkPhysicalDevice WINAPI __wine_get_native_VkPhysicalDevice(VkPhysicalDevice phys
 
 VkQueue WINAPI __wine_get_native_VkQueue(VkQueue queue)
 {
-    if (is_virtual_queue(queue))
-    {
-        FIXME("STEAMVR IS USING NATIVE HANDLE OF VIRTUALIZED QUEUE, THIS IS UNTESTED.\n");
-        pthread_mutex_lock(&queue->submissions_mutex);
-        while (queue->processing)
-            pthread_cond_wait(&queue->submissions_cond, &queue->submissions_mutex);
-        pthread_mutex_unlock(&queue->submissions_mutex);
-    }
-
     return queue->queue;
 }
 
