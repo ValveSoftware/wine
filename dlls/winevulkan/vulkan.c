@@ -1530,7 +1530,9 @@ static inline void wine_vk_normalize_handle_types_host(VkExternalMemoryHandleTyp
 
 static const VkExternalMemoryHandleTypeFlagBits wine_vk_handle_over_fd_types =
                 VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT |
-                VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT;
+                VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT |
+                VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT |
+                VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT;
 
 static void wine_vk_get_physical_device_external_buffer_properties(VkPhysicalDevice phys_dev,
         void (*p_vkGetPhysicalDeviceExternalBufferProperties)(VkPhysicalDevice, const VkPhysicalDeviceExternalBufferInfo *, VkExternalBufferProperties *),
@@ -3963,12 +3965,14 @@ NTSTATUS wine_vkAllocateMemory(void *args)
         switch (handle_import_info->handleType)
         {
             case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT:
+            case VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT:
                 if (handle_import_info->handle)
                     NtDuplicateObject( NtCurrentProcess(), handle_import_info->handle, NtCurrentProcess(), &object->handle, 0, 0, DUPLICATE_SAME_ACCESS );
                 else if (handle_import_info->name)
                     object->handle = open_shared_resource( 0, handle_import_info->name );
                 break;
             case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
+            case VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT:
                 /* FIXME: the spec says that device memory imported from a KMT handle doesn't keep a reference to the underyling payload.
                    This means that in cases where on windows an application leaks VkDeviceMemory objects, we leak the full payload.  To
                    fix this, we would need wine_dev_mem objects to store no reference to the payload, that means no host VkDeviceMemory
@@ -4070,9 +4074,11 @@ NTSTATUS wine_vkGetMemoryWin32HandleKHR(void *args)
     switch(handle_info->handleType)
     {
         case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_BIT:
+        case VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT:
             return !NtDuplicateObject( NtCurrentProcess(), dev_mem->handle, NtCurrentProcess(), handle, dev_mem->access, dev_mem->inherit ? OBJ_INHERIT : 0, 0) ?
                 VK_SUCCESS : VK_ERROR_OUT_OF_HOST_MEMORY;
         case VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_WIN32_KMT_BIT:
+        case VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT:
         {
             if ((ret = get_shared_resource_kmt_handle(dev_mem->handle)) == INVALID_HANDLE_VALUE)
                 return VK_ERROR_OUT_OF_HOST_MEMORY;
