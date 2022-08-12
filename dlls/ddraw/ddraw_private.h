@@ -19,6 +19,10 @@
 #ifndef __WINE_DLLS_DDRAW_DDRAW_PRIVATE_H
 #define __WINE_DLLS_DDRAW_DDRAW_PRIVATE_H
 
+#ifdef __i386__
+#pragma GCC target ("fpmath=387")
+#endif
+
 #include <assert.h>
 #include <limits.h>
 #include <math.h>
