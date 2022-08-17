@@ -518,6 +518,19 @@ static HRESULT WINAPI enumDevicesCallback(GUID *Guid, char *DeviceDescription,
 
         ok(hal->dwFlags == 0, "RGB Device %u hal caps has hardware flags %x\n", ver, hal->dwFlags);
         ok(hel->dwFlags != 0, "RGB Device %u hel caps has hardware flags %x\n", ver, hel->dwFlags);
+
+        todo_wine
+        ok((hal->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "RGB Device %d hal device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        todo_wine
+        ok((hel->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "RGB Device %d hel device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        todo_wine
+        ok((hal->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "RGB Device %d hal device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
+        todo_wine
+        ok((hel->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "RGB Device %d hel device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
     }
     else if(IsEqualGUID(&IID_IDirect3DHALDevice, Guid))
     {
@@ -527,6 +540,17 @@ static HRESULT WINAPI enumDevicesCallback(GUID *Guid, char *DeviceDescription,
 
         ok(hal->dwFlags != 0, "HAL Device %u hal caps has hardware flags %x\n", ver, hal->dwFlags);
         ok(hel->dwFlags != 0, "HAL Device %u hel caps has hardware flags %x\n", ver, hel->dwFlags);
+
+        ok(hal->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT,
+           "HAL Device %d hal device caps does not have D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        todo_wine
+        ok((hel->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "RGB Device %d hel device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        ok(hal->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX,
+           "HAL Device %d hal device caps does not have D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
+        todo_wine
+        ok((hel->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "RGB Device %d hel device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
     }
     else if(IsEqualGUID(&IID_IDirect3DRefDevice, Guid))
     {
@@ -547,6 +571,15 @@ static HRESULT WINAPI enumDevicesCallback(GUID *Guid, char *DeviceDescription,
            "REF Device %d hel tri caps does not have D3DPTEXTURECAPS_PERSPECTIVE set\n", ver);
         ok(hel->dpcTriCaps.dwTextureCaps & D3DPTEXTURECAPS_PERSPECTIVE,
            "REF Device %d hel tri caps does not have D3DPTEXTURECAPS_PERSPECTIVE set\n", ver);
+
+        ok((hal->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "REF Device %d hal device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        ok((hel->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "REF Device %d hel device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        ok((hal->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "REF Device %d hal device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
+        ok((hel->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "REF Device %d hel device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
     }
     else if(IsEqualGUID(&IID_IDirect3DRampDevice, Guid))
     {
@@ -574,6 +607,15 @@ static HRESULT WINAPI enumDevicesCallback(GUID *Guid, char *DeviceDescription,
 
         ok(hal->dwFlags == 0, "Ramp Device %u hal caps has hardware flags %x\n", ver, hal->dwFlags);
         ok(hel->dwFlags != 0, "Ramp Device %u hel caps has hardware flags %x\n", ver, hel->dwFlags);
+
+        ok((hal->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "Ramp Device %d hal device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        ok((hel->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "Ramp Device %d hel device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        ok((hal->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "Ramp Device %d hal device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
+        ok((hel->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "Ramp Device %d hel device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
     }
     else if(IsEqualGUID(&IID_IDirect3DMMXDevice, Guid))
     {
@@ -600,6 +642,15 @@ static HRESULT WINAPI enumDevicesCallback(GUID *Guid, char *DeviceDescription,
 
         ok(hal->dwFlags == 0, "MMX Device %u hal caps has hardware flags %x\n", ver, hal->dwFlags);
         ok(hel->dwFlags != 0, "MMX Device %u hel caps has hardware flags %x\n", ver, hel->dwFlags);
+
+        ok((hal->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "MMX Device %d hal device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        ok((hel->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "MMX Device %d hel device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n", ver);
+        ok((hal->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "MMX Device %d hal device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
+        ok((hel->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "MMX Device %d hel device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n", ver);
     }
     else
     {
@@ -661,6 +712,41 @@ static HRESULT WINAPI enumDevicesLifetimeTest7(char *DeviceDescription, char *De
     strcpy(ctx->callback_name_strings[ctx->count], DeviceName);
 
     ctx->count++;
+    return DDENUMRET_OK;
+}
+
+static HRESULT WINAPI enumDevicesCapsTest7(char *DeviceDescription, char *DeviceName,
+        D3DDEVICEDESC7 *lpdd7, void *Context)
+{
+    if (IsEqualGUID(&lpdd7->deviceGUID, &IID_IDirect3DTnLHalDevice))
+    {
+        ok(lpdd7->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT,
+           "TnLHal Device device caps does not have D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n");
+        ok(lpdd7->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX,
+           "TnLHal Device device caps does not have D3DDEVCAPS_DRAWPRIMITIVES2EX set\n");
+    }
+    else if (IsEqualGUID(&lpdd7->deviceGUID, &IID_IDirect3DHALDevice))
+    {
+        todo_wine
+        ok((lpdd7->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "HAL Device device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n");
+        ok(lpdd7->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX,
+           "HAL Device device caps does not have D3DDEVCAPS_DRAWPRIMITIVES2EX set\n");
+    }
+    else if (IsEqualGUID(&lpdd7->deviceGUID, &IID_IDirect3DRGBDevice))
+    {
+        todo_wine
+        ok((lpdd7->dwDevCaps & D3DDEVCAPS_HWTRANSFORMANDLIGHT) == 0,
+           "RGB Device device caps has D3DDEVCAPS_HWTRANSFORMANDLIGHT set\n");
+        todo_wine
+        ok((lpdd7->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
+           "RGB Device device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n");
+    }
+    else
+    {
+        ok(FALSE, "Unexpected device enumerated: \"%s\" \"%s\"\n", DeviceDescription, DeviceName);
+    }
+
     return DDENUMRET_OK;
 }
 
@@ -782,6 +868,9 @@ static void CapsTest(void)
     IDirectDraw *dd1;
     HRESULT hr;
     UINT ver;
+
+    hr = IDirect3D7_EnumDevices(lpD3D, enumDevicesCapsTest7, NULL);
+    ok(hr == D3D_OK, "Got hr %#lx.\n", hr);
 
     hr = DirectDrawCreate(NULL, &dd1, NULL);
     ok(hr == DD_OK, "Cannot create a DirectDraw 1 interface, hr = %08x\n", hr);
