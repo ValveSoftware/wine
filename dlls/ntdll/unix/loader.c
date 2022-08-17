@@ -2273,7 +2273,10 @@ static void hacks_init(void)
     if (env_str)
         fsync_simulate_sched_quantum = !!atoi(env_str);
     else if (main_argc > 1)
+    {
         fsync_simulate_sched_quantum = !!strstr(main_argv[1], upc_exe);
+        fsync_simulate_sched_quantum = fsync_simulate_sched_quantum || !!strstr(main_argv[1], "PlanetZoo.exe");
+    }
     if (fsync_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in fsync.\n");
 
