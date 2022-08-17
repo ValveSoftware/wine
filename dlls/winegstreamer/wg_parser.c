@@ -35,6 +35,8 @@
 #include <gst/video/video.h>
 #include <gst/audio/audio.h>
 
+#include <gst/gl/gl.h>
+
 #include "winternl.h"
 #include "dshow.h"
 
@@ -56,6 +58,9 @@ GST_DEBUG_CATEGORY(wine);
 #define GST_CAT_DEFAULT wine
 
 typedef BOOL (*init_gst_cb)(struct wg_parser *parser);
+
+static GstGLDisplay *gl_display;
+static GstGLContext *gl_context;
 
 struct wg_parser
 {
@@ -92,6 +97,8 @@ struct wg_parser
     bool sink_connected;
     bool use_mediaconv;
     bool use_opengl;
+
+    GstContext *context;
 };
 
 struct wg_parser_stream
@@ -1343,6 +1350,8 @@ static NTSTATUS wg_parser_connect(void *args)
 
     parser->container = gst_bin_new(NULL);
     gst_element_set_bus(parser->container, parser->bus);
+    if (parser->context)
+        gst_element_set_context(parser->container, parser->context);
 
     parser->my_src = gst_pad_new_from_static_template(&src_template, "quartz-src");
     gst_pad_set_getrange_function(parser->my_src, src_getrange_cb);
@@ -1738,6 +1747,28 @@ static void init_gstreamer_once(void)
 
     GST_INFO("GStreamer library version %s; wine built with %d.%d.%d.",
             gst_version_string(), GST_VERSION_MAJOR, GST_VERSION_MINOR, GST_VERSION_MICRO);
+
+    if (!(gl_display = gst_gl_display_new()))
+        GST_ERROR("Failed to create OpenGL display");
+    else
+    {
+        GError *error = NULL;
+        gboolean ret;
+
+        GST_OBJECT_LOCK(gl_display);
+        ret = gst_gl_display_create_context(gl_display, NULL, &gl_context, &error);
+        GST_OBJECT_UNLOCK(gl_display);
+        g_clear_error(&error);
+
+        if (ret)
+            gst_gl_display_add_context(gl_display, gl_context);
+        else
+        {
+            GST_ERROR("Failed to create OpenGL context");
+            gst_object_unref(gl_display);
+            gl_display = NULL;
+        }
+    }
 }
 
 bool init_gstreamer(void)
@@ -1766,7 +1797,16 @@ static NTSTATUS wg_parser_create(void *args)
 
     if (!(parser = calloc(1, sizeof(*parser))))
         return E_OUTOFMEMORY;
-    parser->use_opengl = params->use_opengl;
+    if ((parser->use_opengl = params->use_opengl && gl_display))
+    {
+        if ((parser->context = gst_context_new(GST_GL_DISPLAY_CONTEXT_TYPE, false)))
+            gst_context_set_gl_display(parser->context, gl_display);
+        else
+        {
+            GST_ERROR("Failed to create parser context");
+            parser->use_opengl = FALSE;
+        }
+    }
 
     pthread_mutex_init(&parser->mutex, NULL);
     pthread_cond_init(&parser->init_cond, NULL);
@@ -1788,6 +1828,9 @@ static NTSTATUS wg_parser_destroy(void *args)
         gst_bus_set_sync_handler(parser->bus, NULL, NULL, NULL);
         gst_object_unref(parser->bus);
     }
+
+    if (parser->context)
+        gst_context_unref(parser->context);
 
     pthread_mutex_destroy(&parser->mutex);
     pthread_cond_destroy(&parser->init_cond);
