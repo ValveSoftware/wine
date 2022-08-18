@@ -481,13 +481,15 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
             filter->stream_count, stream_numbers, selections)))
         WARN("Failed to set reader %p stream selection, hr %#lx\n", filter->reader, hr);
 
-    hr = IWMReaderAdvanced_SetUserProvidedClock(reader_advanced, TRUE);
+    hr = IWMReaderAdvanced_SetUserProvidedClock(reader_advanced, !filter->filter.clock);
     if (FAILED(hr))
         WARN("Failed to set user provided clock, hr %#lx\n", hr);
-
-    hr = IWMReaderAdvanced_DeliverTime(reader_advanced, -1);
-    if (FAILED(hr))
-        WARN("Failed to set user time, hr %#lx\n", hr);
+    else if (!filter->filter.clock)
+    {
+        hr = IWMReaderAdvanced_DeliverTime(reader_advanced, -1);
+        if (FAILED(hr))
+            WARN("Failed to set user time, hr %#lx\n", hr);
+    }
 
     IWMReaderAdvanced_Release(reader_advanced);
 
