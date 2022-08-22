@@ -1930,7 +1930,8 @@ static HRESULT WINAPI reader_GetNextSample(IWMSyncReader2 *iface,
     if (!stream_number && !output_number && !ret_stream_number)
         return E_INVALIDARG;
 
-    EnterCriticalSection(&reader->cs);
+    if (reader->outer == &reader->IUnknown_inner)
+        EnterCriticalSection(&reader->cs);
 
     hr = wm_reader_get_stream_sample(reader, stream_number, sample, pts, duration, flags, &stream_number);
     if (output_number && hr == S_OK)
@@ -1938,7 +1939,8 @@ static HRESULT WINAPI reader_GetNextSample(IWMSyncReader2 *iface,
     if (ret_stream_number && (hr == S_OK || stream_number))
         *ret_stream_number = stream_number;
 
-    LeaveCriticalSection(&reader->cs);
+    if (reader->outer == &reader->IUnknown_inner)
+        LeaveCriticalSection(&reader->cs);
     return hr;
 }
 
