@@ -154,6 +154,4 @@ HRESULT h264_decoder_create(REFIID riid, void **ret);
 HRESULT video_processor_create(REFIID riid, void **ret);
 HRESULT gstreamer_scheme_handler_construct(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
-HRESULT WINAPI winegstreamer_create_wm_sync_reader(IUnknown *outer, void **out);
-
 #endif /* __GST_PRIVATE_INCLUDED__ */
