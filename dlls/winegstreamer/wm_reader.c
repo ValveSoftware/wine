@@ -1572,6 +1572,13 @@ HRESULT wm_reader_open_stream(struct wm_reader *reader, IStream *stream)
 
     EnterCriticalSection(&reader->cs);
 
+    if (reader->wg_parser)
+    {
+        LeaveCriticalSection(&reader->cs);
+        WARN("Stream is already open; returning E_UNEXPECTED.\n");
+        return E_UNEXPECTED;
+    }
+
     IStream_AddRef(reader->source_stream = stream);
     if (FAILED(hr = init_stream(reader, stat.cbSize.QuadPart)))
     {
@@ -1604,6 +1611,14 @@ HRESULT wm_reader_open_file(struct wm_reader *reader, const WCHAR *filename)
     }
 
     EnterCriticalSection(&reader->cs);
+
+    if (reader->wg_parser)
+    {
+        LeaveCriticalSection(&reader->cs);
+        WARN("Stream is already open; returning E_UNEXPECTED.\n");
+        CloseHandle(file);
+        return E_UNEXPECTED;
+    }
 
     reader->file = file;
 
