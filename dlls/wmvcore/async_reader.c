@@ -16,8 +16,22 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include "gst_private.h"
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdbool.h>
 
+#define COBJMACROS
+#include "windef.h"
+#include "winbase.h"
+
+#define EXTERN_GUID DEFINE_GUID
+#include "initguid.h"
+#include "wmvcore.h"
+
+#include "dshow.h"
+#include "wmsdk.h"
+
+#include "wine/debug.h"
 #include "wine/list.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(wmvcore);
@@ -669,8 +683,8 @@ static HRESULT WINAPI WMReader_Start(IWMReader *iface,
     struct async_reader *reader = impl_from_IWMReader(iface);
     HRESULT hr;
 
-    TRACE("reader %p, start %s, duration %s, rate %.8e, context %p.\n",
-            reader, debugstr_time(start), debugstr_time(duration), rate, context);
+    TRACE("reader %p, start %I64d, duration %I64d, rate %.8e, context %p.\n",
+            reader, start, duration, rate, context);
 
     if (rate != 1.0f)
         FIXME("Ignoring rate %.8e.\n", rate);
@@ -784,7 +798,7 @@ static HRESULT WINAPI WMReaderAdvanced_DeliverTime(IWMReaderAdvanced6 *iface, QW
 {
     struct async_reader *reader = impl_from_IWMReaderAdvanced6(iface);
 
-    TRACE("reader %p, time %s.\n", reader, debugstr_time(time));
+    TRACE("reader %p, time %I64d.\n", reader, time);
 
     EnterCriticalSection(&reader->callback_cs);
 
@@ -1844,8 +1858,8 @@ static HRESULT WINAPI refclock_AdviseTime(IReferenceClock *iface, REFERENCE_TIME
 {
     struct async_reader *reader = impl_from_IReferenceClock(iface);
 
-    FIXME("reader %p, basetime %s, streamtime %s, event %#Ix, cookie %p, stub!\n",
-            reader, debugstr_time(basetime), debugstr_time(streamtime), event, cookie);
+    FIXME("reader %p, basetime %I64d, streamtime %I64d, event %#Ix, cookie %p, stub!\n",
+            reader, basetime, streamtime, event, cookie);
 
     return E_NOTIMPL;
 }
@@ -1855,8 +1869,8 @@ static HRESULT WINAPI refclock_AdvisePeriodic(IReferenceClock *iface, REFERENCE_
 {
     struct async_reader *reader = impl_from_IReferenceClock(iface);
 
-    FIXME("reader %p, starttime %s, period %s, semaphore %#Ix, cookie %p, stub!\n",
-            reader, debugstr_time(starttime), debugstr_time(period), semaphore, cookie);
+    FIXME("reader %p, starttime %I64d, period %I64d, semaphore %#Ix, cookie %p, stub!\n",
+            reader, starttime, period, semaphore, cookie);
 
     return E_NOTIMPL;
 }
@@ -1881,7 +1895,7 @@ static const IReferenceClockVtbl ReferenceClockVtbl =
     refclock_Unadvise
 };
 
-HRESULT WINAPI winegstreamer_create_wm_async_reader(IWMReader **reader)
+static HRESULT WINAPI async_reader_create(IWMReader **reader)
 {
     struct async_reader *object;
     HRESULT hr;
@@ -1926,4 +1940,18 @@ failed:
         IUnknown_Release(object->reader_inner);
     free(object);
     return hr;
+}
+
+HRESULT WINAPI WMCreateReader(IUnknown *reserved, DWORD rights, IWMReader **reader)
+{
+    TRACE("reserved %p, rights %#lx, reader %p.\n", reserved, rights, reader);
+
+    return async_reader_create(reader);
+}
+
+HRESULT WINAPI WMCreateReaderPriv(IWMReader **reader)
+{
+    TRACE("reader %p.\n", reader);
+
+    return async_reader_create(reader);
 }
