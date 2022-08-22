@@ -88,6 +88,12 @@ enum
     WM_SF_DATALOSS      = 0x4,
 };
 
+enum
+{
+    WM_SFEX_NOTASYNCPOINT = 0x2,
+    WM_SFEX_DATALOSS = 0x4,
+};
+
 typedef enum WMT_ATTR_DATATYPE
 {
     WMT_TYPE_DWORD      = 0,
