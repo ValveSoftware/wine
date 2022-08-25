@@ -337,11 +337,11 @@ NTSTATUS WINAPI NtQuerySemaphore( HANDLE handle, SEMAPHORE_INFORMATION_CLASS cla
 
     if (len != sizeof(SEMAPHORE_BASIC_INFORMATION)) return STATUS_INFO_LENGTH_MISMATCH;
 
-    if (!use_server_semaphores && do_fsync())
+    if (do_fsync())
         if ((ret = fsync_query_semaphore( handle, info, ret_len )) != STATUS_NOT_IMPLEMENTED)
             return ret;
 
-    if (!use_server_semaphores && do_esync())
+    if (do_esync())
         if ((ret = esync_query_semaphore( handle, info, ret_len )) != STATUS_NOT_IMPLEMENTED)
             return ret;
 
@@ -367,11 +367,11 @@ NTSTATUS WINAPI NtReleaseSemaphore( HANDLE handle, ULONG count, ULONG *previous 
 {
     NTSTATUS ret;
 
-    if (!use_server_semaphores && do_fsync())
+    if (do_fsync())
         if ((ret = fsync_release_semaphore( handle, count, previous )) != STATUS_NOT_IMPLEMENTED)
             return ret;
 
-    if (!use_server_semaphores && do_esync())
+    if (do_esync())
         if ((ret = esync_release_semaphore( handle, count, previous )) != STATUS_NOT_IMPLEMENTED)
             return ret;
 
