@@ -2256,6 +2256,7 @@ BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
 BOOL no_priv_elevation;
 BOOL localsystem_sid;
+BOOL use_server_semaphores;
 
 static void hacks_init(void)
 {
@@ -2279,6 +2280,14 @@ static void hacks_init(void)
     }
     if (fsync_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in fsync.\n");
+
+    env_str = getenv("WINE_USE_SERVER_SEMAPHORES");
+    if (env_str)
+        use_server_semaphores = !!atoi(env_str);
+    else if (main_argc > 1)
+        use_server_semaphores = !!strstr(main_argv[1], "\\GTA5.exe");
+    if (use_server_semaphores)
+        ERR("HACK: Using server semaphore objects.\n");
 
     sgi = getenv("SteamGameId");
     if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910")))

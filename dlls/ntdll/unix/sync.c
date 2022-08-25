@@ -264,10 +264,10 @@ NTSTATUS WINAPI NtCreateSemaphore( HANDLE *handle, ACCESS_MASK access, const OBJ
     if (max <= 0 || initial < 0 || initial > max) return STATUS_INVALID_PARAMETER;
     if ((ret = alloc_object_attributes( attr, &objattr, &len ))) return ret;
 
-    if (do_fsync())
+    if ((!use_server_semaphores || max == 0x7fffffff) && do_fsync())
         return fsync_create_semaphore( handle, access, attr, initial, max );
 
-    if (do_esync())
+    if ((!use_server_semaphores || max == 0x7fffffff) && do_esync())
         return esync_create_semaphore( handle, access, attr, initial, max );
 
     SERVER_START_REQ( create_semaphore )
@@ -295,10 +295,10 @@ NTSTATUS WINAPI NtOpenSemaphore( HANDLE *handle, ACCESS_MASK access, const OBJEC
 
     *handle = 0;
 
-    if (do_fsync())
+    if (!use_server_semaphores && do_fsync())
         return fsync_open_semaphore( handle, access, attr );
 
-    if (do_esync())
+    if (!use_server_semaphores && do_esync())
         return esync_open_semaphore( handle, access, attr );
 
     if ((ret = validate_open_object_attributes( attr ))) return ret;
@@ -337,11 +337,13 @@ NTSTATUS WINAPI NtQuerySemaphore( HANDLE handle, SEMAPHORE_INFORMATION_CLASS cla
 
     if (len != sizeof(SEMAPHORE_BASIC_INFORMATION)) return STATUS_INFO_LENGTH_MISMATCH;
 
-    if (do_fsync())
-        return fsync_query_semaphore( handle, info, ret_len );
+    if (!use_server_semaphores && do_fsync())
+        if ((ret = fsync_query_semaphore( handle, info, ret_len )) != STATUS_NOT_IMPLEMENTED)
+            return ret;
 
-    if (do_esync())
-        return esync_query_semaphore( handle, info, ret_len );
+    if (!use_server_semaphores && do_esync())
+        if ((ret = esync_query_semaphore( handle, info, ret_len )) != STATUS_NOT_IMPLEMENTED)
+            return ret;
 
     SERVER_START_REQ( query_semaphore )
     {
@@ -365,11 +367,13 @@ NTSTATUS WINAPI NtReleaseSemaphore( HANDLE handle, ULONG count, ULONG *previous 
 {
     NTSTATUS ret;
 
-    if (do_fsync())
-        return fsync_release_semaphore( handle, count, previous );
+    if (!use_server_semaphores && do_fsync())
+        if ((ret = fsync_release_semaphore( handle, count, previous )) != STATUS_NOT_IMPLEMENTED)
+            return ret;
 
-    if (do_esync())
-        return esync_release_semaphore( handle, count, previous );
+    if (!use_server_semaphores && do_esync())
+        if ((ret = esync_release_semaphore( handle, count, previous )) != STATUS_NOT_IMPLEMENTED)
+            return ret;
 
     SERVER_START_REQ( release_semaphore )
     {

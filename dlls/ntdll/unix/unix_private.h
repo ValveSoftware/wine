@@ -151,6 +151,7 @@ extern BOOL ac_odyssey DECLSPEC_HIDDEN;
 extern BOOL fsync_simulate_sched_quantum DECLSPEC_HIDDEN;
 extern BOOL no_priv_elevation DECLSPEC_HIDDEN;
 extern BOOL localsystem_sid DECLSPEC_HIDDEN;
+extern BOOL use_server_semaphores DECLSPEC_HIDDEN;
 
 extern void init_environment( int argc, char *argv[], char *envp[] ) DECLSPEC_HIDDEN;
 extern void init_startup_info(void) DECLSPEC_HIDDEN;
