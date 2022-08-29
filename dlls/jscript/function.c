@@ -605,18 +605,16 @@ static HRESULT Function_bind(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsig
         return JS_E_FUNCTION_EXPECTED;
 
     if(argc < 1) {
-        FIXME("no this argument\n");
-        return E_NOTIMPL;
-    }
-
-    if(is_object_instance(argv[0])) {
-        bound_this = get_object(argv[0]);
-    }else if(!is_null(argv[0])) {
-        FIXME("%s is not an object instance\n", debugstr_jsval(argv[0]));
-        return E_NOTIMPL;
+        argc = 1;
+    }else if(!is_undefined(argv[0]) && !is_null(argv[0])) {
+        hres = to_object(ctx, argv[0], &bound_this);
+        if(FAILED(hres))
+            return hres;
     }
 
     hres = create_bind_function(ctx, function, bound_this, argc - 1, argv + 1, &new_function);
+    if(bound_this)
+        IDispatch_Release(bound_this);
     if(FAILED(hres))
         return hres;
 
