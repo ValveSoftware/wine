@@ -6017,7 +6017,7 @@ NTSTATUS wine_vkCreateFence(void *args)
     if ((object->eventfd = eventfd(0, EFD_CLOEXEC)) == -1)
         ERR("Failed to create eventfd for fence.\n");
 
-    if ((vr = device->funcs.p_vkCreateFence(device->device, create_info, allocator, &object->fence)) == VK_SUCCESS)
+    if ((vr = device->funcs.p_vkCreateFence(device->device, create_info, NULL, &object->fence)) == VK_SUCCESS)
         *fence = wine_fence_to_handle(object);
     else
         free(object);
