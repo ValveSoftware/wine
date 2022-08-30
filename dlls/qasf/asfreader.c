@@ -900,7 +900,7 @@ static HRESULT WINAPI reader_callback_OnSample(IWMReaderCallback *iface, DWORD o
         IMediaSample_SetTime(buffer->sample, &start_time, &end_time);
         IMediaSample_SetDiscontinuity(buffer->sample, !!(flags & WM_SF_DISCONTINUITY));
         IMediaSample_SetSyncPoint(buffer->sample, !!(flags & WM_SF_CLEANPOINT));
-        IMediaSample_SetPreroll(buffer->sample, time <= 4 * duration);
+        IMediaSample_SetPreroll(buffer->sample, FALSE);
 
         hr = IMemInputPin_Receive(input, buffer->sample);
 
