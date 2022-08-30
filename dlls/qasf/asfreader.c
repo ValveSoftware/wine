@@ -200,9 +200,6 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
 
     TRACE("iface %p\n", iface);
 
-    while (filter->status == -1)
-        SleepConditionVariableCS(&filter->status_cv, &filter->filter.filter_cs, INFINITE);
-
     for (i = 0; i < filter->stream_count; ++i)
     {
         struct asf_stream *stream = filter->streams + i;
@@ -215,27 +212,7 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
             WARN("Failed to commit stream %u allocator, hr %#lx\n", i, hr);
             break;
         }
-
-        if (FAILED(hr = IPin_NewSegment(stream->source.pin.peer, 0, 0, 1)))
-        {
-            WARN("Failed to start stream %u new segment, hr %#lx\n", i, hr);
-            break;
-        }
     }
-
-    if (FAILED(hr))
-        return hr;
-
-    if (SUCCEEDED(hr = IWMReader_Start(filter->reader, 0, 0, 1, NULL)))
-    {
-        filter->status = -1;
-        while (filter->status != WMT_STARTED)
-            SleepConditionVariableCS(&filter->status_cv, &filter->filter.filter_cs, INFINITE);
-        hr = filter->result;
-    }
-
-    if (FAILED(hr))
-        WARN("Failed to start WMReader %p, hr %#lx\n", filter->reader, hr);
 
     return hr;
 }
@@ -247,20 +224,6 @@ static HRESULT asf_reader_cleanup_stream(struct strmbase_filter *iface)
     int i;
 
     TRACE("iface %p\n", iface);
-
-    while (filter->status == -1)
-        SleepConditionVariableCS(&filter->status_cv, &filter->filter.filter_cs, INFINITE);
-
-    if (SUCCEEDED(hr = IWMReader_Stop(filter->reader)))
-    {
-        filter->status = -1;
-        while (filter->status != WMT_STOPPED)
-            SleepConditionVariableCS(&filter->status_cv, &filter->filter.filter_cs, INFINITE);
-        hr = filter->result;
-    }
-
-    if (FAILED(hr))
-        WARN("Failed to stop WMReader %p, hr %#lx\n", filter->reader, hr);
 
     for (i = 0; i < filter->stream_count; ++i)
     {
@@ -536,36 +499,6 @@ static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STA
             BaseFilterImpl_IncrementPinVersion(&filter->filter);
 
             LeaveCriticalSection(&filter->filter.filter_cs);
-            break;
-
-        case WMT_END_OF_STREAMING:
-            EnterCriticalSection(&filter->filter.filter_cs);
-            for (i = 0; i < filter->stream_count; ++i)
-            {
-                struct asf_stream *stream = filter->streams + i;
-
-                if (!stream->source.pin.peer)
-                    continue;
-
-                IPin_EndOfStream(stream->source.pin.peer);
-            }
-            LeaveCriticalSection(&filter->filter.filter_cs);
-            break;
-
-        case WMT_STARTED:
-            EnterCriticalSection(&filter->filter.filter_cs);
-            filter->result = result;
-            filter->status = WMT_STARTED;
-            LeaveCriticalSection(&filter->filter.filter_cs);
-            WakeConditionVariable(&filter->status_cv);
-            break;
-
-        case WMT_STOPPED:
-            EnterCriticalSection(&filter->filter.filter_cs);
-            filter->result = result;
-            filter->status = WMT_STOPPED;
-            LeaveCriticalSection(&filter->filter.filter_cs);
-            WakeConditionVariable(&filter->status_cv);
             break;
 
         default:
