@@ -440,6 +440,7 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
     WORD stream_numbers[ARRAY_SIZE(filter->streams)];
     IWMReaderAdvanced2 *reader_advanced;
     HRESULT hr = S_OK;
+    BOOL value;
     int i;
 
     TRACE("iface %p\n", iface);
@@ -489,6 +490,14 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
         if (FAILED(hr = IPin_NewSegment(stream->source.pin.peer, 0, 0, 1)))
         {
             WARN("Failed to start stream %u new segment, hr %#lx\n", i, hr);
+            break;
+        }
+
+        value = IMemInputPin_ReceiveCanBlock(stream->source.pMemInputPin) == S_OK;
+        if (FAILED(hr = IWMReaderAdvanced2_SetOutputSetting(reader_advanced, i, L"DedicatedDeliveryThread",
+                WMT_TYPE_BOOL, (BYTE *)&value, sizeof(value))))
+        {
+            WARN("Failed to set DedicatedDeliveryThread for stream %u, hr %#lx\n", i, hr);
             break;
         }
 
