@@ -6039,6 +6039,9 @@ NTSTATUS wine_vkDestroyFence(void *args)
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
 
+    if (!handle)
+        return STATUS_SUCCESS;
+
     if (fence->eventfd != -1)
         close(fence->eventfd);
 
