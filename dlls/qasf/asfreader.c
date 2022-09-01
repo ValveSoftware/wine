@@ -438,13 +438,13 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
     struct asf_reader *filter = impl_from_strmbase_filter(iface);
     WMT_STREAM_SELECTION selections[ARRAY_SIZE(filter->streams)];
     WORD stream_numbers[ARRAY_SIZE(filter->streams)];
-    IWMReaderAdvanced *reader_advanced;
+    IWMReaderAdvanced2 *reader_advanced;
     HRESULT hr = S_OK;
     int i;
 
     TRACE("iface %p\n", iface);
 
-    if (FAILED(hr = IWMReader_QueryInterface(filter->reader, &IID_IWMReaderAdvanced, (void **)&reader_advanced)))
+    if (FAILED(hr = IWMReader_QueryInterface(filter->reader, &IID_IWMReaderAdvanced2, (void **)&reader_advanced)))
         return hr;
 
     for (i = 0; i < filter->stream_count; ++i)
@@ -464,7 +464,7 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
             break;
         }
 
-        if (FAILED(hr = IWMReaderAdvanced_SetAllocateForOutput(reader_advanced, i, TRUE)))
+        if (FAILED(hr = IWMReaderAdvanced2_SetAllocateForOutput(reader_advanced, i, TRUE)))
         {
             WARN("Failed to enable allocation for stream %u, hr %#lx\n", i, hr);
             break;
@@ -495,11 +495,11 @@ static HRESULT asf_reader_init_stream(struct strmbase_filter *iface)
         selections[i] = WMT_ON;
     }
 
-    if (SUCCEEDED(hr) && FAILED(hr = IWMReaderAdvanced_SetStreamsSelected(reader_advanced,
+    if (SUCCEEDED(hr) && FAILED(hr = IWMReaderAdvanced2_SetStreamsSelected(reader_advanced,
             filter->stream_count, stream_numbers, selections)))
         WARN("Failed to set reader %p stream selection, hr %#lx\n", filter->reader, hr);
 
-    IWMReaderAdvanced_Release(reader_advanced);
+    IWMReaderAdvanced2_Release(reader_advanced);
 
     if (FAILED(hr))
         return hr;
