@@ -604,7 +604,11 @@ static HRESULT WINAPI asf_reader_DecideBufferSize(struct strmbase_source *iface,
         buffer_size = format->nAvgBytesPerSec;
     }
 
-    req_props->cBuffers = max(req_props->cBuffers, 1);
+    if (IsEqualGUID(&stream->source.pin.mt.majortype, &MEDIATYPE_Audio))
+        req_props->cBuffers = max(req_props->cBuffers, 50);
+    else
+        req_props->cBuffers = max(req_props->cBuffers, 10);
+
     req_props->cbBuffer = max(req_props->cbBuffer, buffer_size);
     req_props->cbAlign = max(req_props->cbAlign, 1);
     return IMemAllocator_SetProperties(allocator, req_props, &ret_props);
