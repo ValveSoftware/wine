@@ -393,6 +393,8 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
     if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_NUM_CHANNELS, &item_type)) ||
         item_type != MF_ATTRIBUTE_UINT32)
         return MF_E_INVALIDMEDIATYPE;
+    if (flags & MFT_SET_TYPE_TEST_ONLY)
+        return S_OK;
 
     if (!decoder->input_type && FAILED(hr = MFCreateMediaType(&decoder->input_type)))
         return hr;
@@ -449,9 +451,6 @@ static HRESULT WINAPI transform_SetOutputType(IMFTransform *iface, DWORD id, IMF
         return hr;
     }
 
-    if (FAILED(IMFMediaType_SetUINT32(decoder->input_type, &MF_MT_AUDIO_BITS_PER_SAMPLE, sample_size)))
-        return MF_E_INVALIDMEDIATYPE;
-
     if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &item_type)) ||
         item_type != MF_ATTRIBUTE_UINT32)
         return MF_E_INVALIDMEDIATYPE;
@@ -466,6 +465,11 @@ static HRESULT WINAPI transform_SetOutputType(IMFTransform *iface, DWORD id, IMF
         return MF_E_INVALIDMEDIATYPE;
     if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &item_type)) ||
         item_type != MF_ATTRIBUTE_UINT32)
+        return MF_E_INVALIDMEDIATYPE;
+    if (flags & MFT_SET_TYPE_TEST_ONLY)
+        return S_OK;
+
+    if (FAILED(IMFMediaType_SetUINT32(decoder->input_type, &MF_MT_AUDIO_BITS_PER_SAMPLE, sample_size)))
         return MF_E_INVALIDMEDIATYPE;
 
     if (!decoder->output_type && FAILED(hr = MFCreateMediaType(&decoder->output_type)))
