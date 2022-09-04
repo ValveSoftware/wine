@@ -663,6 +663,10 @@ HRESULT video_processor_create(REFIID riid, void **ret)
     return S_OK;
 
 failed:
+    if (impl->output_attributes)
+        IMFAttributes_Release(impl->output_attributes);
+    if (impl->attributes)
+        IMFAttributes_Release(impl->attributes);
     free(impl);
     return hr;
 }
