@@ -299,3 +299,10 @@ void WINAPI RegisterWaitChainCOMCallback(PCOGETCALLSTATE call_state_cb,
 {
     FIXME("%p, %p\n", call_state_cb, activation_state_cb);
 }
+
+ULONG WINAPI PerfOpenQueryHandle(const WCHAR *machine, HANDLE *query)
+{
+    FIXME("machine %s, query %p stub.\n", debugstr_w(machine), query);
+
+    return ERROR_NOT_SUPPORTED;
+}
