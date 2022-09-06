@@ -1911,6 +1911,12 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_v2_fn(MonoAssemblyNam
                 "317940", /* Karmaflow */
                 "namespace ContentBrowser { class IContentBrowserBackendInterface {} class Package {} } "
             },
+            {
+                "UnrealEdCSharp",
+                "UnrealEdCSharp.dll",
+                "321360", /* Primal Carnage: Extinction */
+                "namespace ContentBrowser { class IContentBrowserBackendInterface {} class Package {} } "
+            },
         };
 
         for (i = 0; i < ARRAY_SIZE(assembly_hacks); ++i)
