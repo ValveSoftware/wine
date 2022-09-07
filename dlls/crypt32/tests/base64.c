@@ -23,7 +23,6 @@
 #include <windows.h>
 #include <wincrypt.h>
 
-#include "wine/heap.h"
 #include "wine/test.h"
 
 #define CERT_HEADER               "-----BEGIN CERTIFICATE-----\r\n"
@@ -93,7 +92,7 @@ static WCHAR *strdupAtoW(const char *str)
 
     if (!str) return ret;
     len = MultiByteToWideChar(CP_ACP, 0, str, -1, NULL, 0);
-    ret = heap_alloc(len * sizeof(WCHAR));
+    ret = malloc(len * sizeof(WCHAR));
     if (ret)
         MultiByteToWideChar(CP_ACP, 0, str, -1, ret, len);
     return ret;
@@ -128,7 +127,7 @@ static void encodeAndCompareBase64_A(const BYTE *toEncode, DWORD toEncodeLen,
     ok(ret, "CryptBinaryToStringA failed: %ld\n", GetLastError());
     ok(strLen == strLen2, "Unexpected required length %lu, expected %lu.\n", strLen2, strLen);
 
-    str = heap_alloc(strLen);
+    str = malloc(strLen);
 
     /* Partially filled output buffer. */
     strLen2 = strLen - 1;
@@ -157,7 +156,7 @@ static void encodeAndCompareBase64_A(const BYTE *toEncode, DWORD toEncodeLen,
     if (trailer)
         ok(!strncmp(trailer, ptr, strlen(trailer)), "Expected trailer %s, got %s\n", trailer, ptr);
 
-    heap_free(str);
+    free(str);
 }
 
 static void encode_compare_base64_W(const BYTE *toEncode, DWORD toEncodeLen, DWORD format,
@@ -196,7 +195,7 @@ static void encode_compare_base64_W(const BYTE *toEncode, DWORD toEncodeLen, DWO
     ok(ret, "CryptBinaryToStringW failed: %ld\n", GetLastError());
     ok(strLen == strLen2, "Unexpected required length.\n");
 
-    strW = heap_alloc(strLen * sizeof(WCHAR));
+    strW = malloc(strLen * sizeof(WCHAR));
 
     headerW = strdupAtoW(header);
     trailerW = strdupAtoW(trailer);
@@ -231,9 +230,9 @@ static void encode_compare_base64_W(const BYTE *toEncode, DWORD toEncodeLen, DWO
         ok(!memcmp(trailerW, ptr, lstrlenW(trailerW)), "Expected trailer %s, got %s.\n", wine_dbgstr_w(trailerW),
                 wine_dbgstr_w(ptr));
 
-    heap_free(strW);
-    heap_free(headerW);
-    heap_free(trailerW);
+    free(strW);
+    free(headerW);
+    free(trailerW);
 }
 
 static DWORD binary_to_hex_len(DWORD binary_len, DWORD flags)
@@ -300,12 +299,12 @@ static void test_CryptBinaryToString(void)
         ok(strLen == tests[i].toEncodeLen, "Unexpected required length %lu.\n", strLen);
 
         strLen2 = strLen;
-        str = heap_alloc(strLen);
+        str = malloc(strLen);
         ret = CryptBinaryToStringA(tests[i].toEncode, tests[i].toEncodeLen, CRYPT_STRING_BINARY, str, &strLen2);
         ok(ret, "CryptBinaryToStringA failed: %ld\n", GetLastError());
         ok(strLen == strLen2, "Expected length %lu, got %lu\n", strLen, strLen2);
         ok(!memcmp(str, tests[i].toEncode, tests[i].toEncodeLen), "Unexpected value\n");
-        heap_free(str);
+        free(str);
 
         strLen = 0;
         ret = CryptBinaryToStringW(tests[i].toEncode, tests[i].toEncodeLen, CRYPT_STRING_BINARY, NULL, &strLen);
@@ -313,12 +312,12 @@ static void test_CryptBinaryToString(void)
         ok(strLen == tests[i].toEncodeLen, "Unexpected required length %lu.\n", strLen);
 
         strLen2 = strLen;
-        strW = heap_alloc(strLen);
+        strW = malloc(strLen);
         ret = CryptBinaryToStringW(tests[i].toEncode, tests[i].toEncodeLen, CRYPT_STRING_BINARY, strW, &strLen2);
         ok(ret, "CryptBinaryToStringW failed: %ld\n", GetLastError());
         ok(strLen == strLen2, "Expected length %lu, got %lu\n", strLen, strLen2);
         ok(!memcmp(strW, tests[i].toEncode, tests[i].toEncodeLen), "Unexpected value\n");
-        heap_free(strW);
+        free(strW);
 
         encodeAndCompareBase64_A(tests[i].toEncode, tests[i].toEncodeLen, CRYPT_STRING_BASE64,
             tests[i].base64, NULL, NULL);
@@ -339,7 +338,7 @@ static void test_CryptBinaryToString(void)
         encode_compare_base64_W(tests[i].toEncode, tests[i].toEncodeLen, CRYPT_STRING_BASE64X509CRLHEADER, encodedW,
             X509_HEADER, X509_TRAILER);
 
-        heap_free(encodedW);
+        free(encodedW);
     }
 
     for (i = 0; i < ARRAY_SIZE(testsNoCR); i++)
@@ -353,13 +352,13 @@ static void test_CryptBinaryToString(void)
         ok(ret, "CryptBinaryToStringA failed: %ld\n", GetLastError());
 
         strLen2 = strLen;
-        str = heap_alloc(strLen);
+        str = malloc(strLen);
         ret = CryptBinaryToStringA(testsNoCR[i].toEncode, testsNoCR[i].toEncodeLen,
             CRYPT_STRING_BINARY | CRYPT_STRING_NOCR, str, &strLen2);
         ok(ret, "CryptBinaryToStringA failed: %ld\n", GetLastError());
         ok(strLen == strLen2, "Expected length %ld, got %ld\n", strLen, strLen2);
         ok(!memcmp(str, testsNoCR[i].toEncode, testsNoCR[i].toEncodeLen), "Unexpected value\n");
-        heap_free(str);
+        free(str);
 
         encodeAndCompareBase64_A(testsNoCR[i].toEncode, testsNoCR[i].toEncodeLen, CRYPT_STRING_BASE64 | CRYPT_STRING_NOCR,
             testsNoCR[i].base64, NULL, NULL);
@@ -384,7 +383,7 @@ static void test_CryptBinaryToString(void)
             CRYPT_STRING_BASE64X509CRLHEADER | CRYPT_STRING_NOCR, encodedW,
             X509_HEADER_NOCR, X509_TRAILER_NOCR);
 
-        heap_free(encodedW);
+        free(encodedW);
     }
 
     /* Systems that don't support HEXRAW format convert to BASE64 instead - 3 bytes in -> 4 chars + crlf + 1 null out. */
@@ -427,11 +426,11 @@ static void test_CryptBinaryToString(void)
         strLen2 += sizeof(input) * 2 + 1;
         ok(strLen == strLen2, "Expected length %ld, got %ld\n", strLen2, strLen);
 
-        hex = heap_alloc(strLen * sizeof(WCHAR));
+        hex = malloc(strLen * sizeof(WCHAR));
         hex_a = malloc(strLen);
 
         memset(hex, 0xcc, strLen * sizeof(WCHAR));
-        ptr = cmp = heap_alloc(strLen * sizeof(WCHAR));
+        ptr = cmp = malloc(strLen * sizeof(WCHAR));
         cmp_a = malloc(strLen);
         for (j = 0; j < ARRAY_SIZE(input); j++)
         {
@@ -552,10 +551,10 @@ static void test_CryptBinaryToString(void)
         strLen2 = binary_to_hex_len(sizes[k], CRYPT_STRING_HEX | flags[i]);
         ok(strLen == strLen2, "%lu: Expected length %ld, got %ld\n", i, strLen2, strLen);
 
-        hex = heap_alloc(strLen * sizeof(WCHAR) + 256);
+        hex = malloc(strLen * sizeof(WCHAR) + 256);
         memset(hex, 0xcc, strLen * sizeof(WCHAR));
 
-        ptr = cmp = heap_alloc(strLen * sizeof(WCHAR) + 256);
+        ptr = cmp = malloc(strLen * sizeof(WCHAR) + 256);
         for (j = 0; j < sizes[k]; j++)
         {
             *ptr++ = hexdig[(input[j] >> 4) & 0xf];
@@ -621,8 +620,8 @@ static void test_CryptBinaryToString(void)
         ok(strLen == strLen2, "%lu: Expected length %ld, got %ld\n", i, strLen, strLen2);
         ok(!memcmp(hex, cmp, strLen * sizeof(WCHAR)), "%lu: got %s\n", i, wine_dbgstr_wn(hex, strLen));
 
-        heap_free(hex);
-        heap_free(cmp);
+        free(hex);
+        free(cmp);
     }
 }
 
@@ -638,7 +637,7 @@ static void decodeAndCompareBase64_A(LPCSTR toDecode, LPCSTR header,
         len += strlen(header);
     if (trailer)
         len += strlen(trailer);
-    str = HeapAlloc(GetProcessHeap(), 0, len);
+    str = malloc(len);
     if (str)
     {
         LPBYTE buf;
@@ -655,7 +654,7 @@ static void decodeAndCompareBase64_A(LPCSTR toDecode, LPCSTR header,
         ret = CryptStringToBinaryA(str, 0, useFormat, NULL, &bufLen, NULL,
          NULL);
         ok(ret, "CryptStringToBinaryA failed: %ld\n", GetLastError());
-        buf = HeapAlloc(GetProcessHeap(), 0, bufLen);
+        buf = malloc(bufLen);
         if (buf)
         {
             DWORD skipped, usedFormat;
@@ -674,7 +673,7 @@ static void decodeAndCompareBase64_A(LPCSTR toDecode, LPCSTR header,
             ok(skipped == 0, "Expected skipped 0, got %ld\n", skipped);
             ok(usedFormat == expectedFormat, "Expected format %ld, got %ld\n",
              expectedFormat, usedFormat);
-            HeapFree(GetProcessHeap(), 0, buf);
+            free(buf);
         }
 
         /* Check again, but with garbage up front */
@@ -694,7 +693,7 @@ static void decodeAndCompareBase64_A(LPCSTR toDecode, LPCSTR header,
              "Expected !ret and last error ERROR_INVALID_DATA, got ret=%d, error=%ld\n", ret, GetLastError());
         if (ret)
         {
-            buf = HeapAlloc(GetProcessHeap(), 0, bufLen);
+            buf = malloc(bufLen);
             if (buf)
             {
                 DWORD skipped, usedFormat;
@@ -705,10 +704,10 @@ static void decodeAndCompareBase64_A(LPCSTR toDecode, LPCSTR header,
                 ok(skipped == strlen(garbage),
                  "Expected %d characters of \"%s\" skipped when trying format %08lx, got %ld (used format is %08lx)\n",
                  lstrlenA(garbage), str, useFormat, skipped, usedFormat);
-                HeapFree(GetProcessHeap(), 0, buf);
+                free(buf);
             }
         }
-        HeapFree(GetProcessHeap(), 0, str);
+        free(str);
     }
 }
 
