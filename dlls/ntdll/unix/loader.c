@@ -1922,6 +1922,7 @@ static ULONG_PTR get_image_address(void)
 
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
+BOOL alert_simulate_sched_quantum;
 
 static void hacks_init(void)
 {
@@ -1944,6 +1945,16 @@ static void hacks_init(void)
     }
     if (fsync_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in fsync.\n");
+
+    env_str = getenv("WINE_ALERT_SIMULATE_SCHED_QUANTUM");
+    if (env_str)
+        alert_simulate_sched_quantum = !!atoi(env_str);
+    else if (main_argc > 1)
+    {
+        alert_simulate_sched_quantum = !!strstr(main_argv[1], "GTA5.exe");
+    }
+    if (alert_simulate_sched_quantum)
+        ERR("HACK: Simulating sched quantum in NtWaitForAlertByThreadId.\n");
 
     switch (sgi ? atoi( sgi ) : -1)
     {

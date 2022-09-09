@@ -2706,6 +2706,7 @@ NTSTATUS WINAPI NtWaitForAlertByThreadId( const void *address, const LARGE_INTEG
 NTSTATUS WINAPI NtWaitForAlertByThreadId( const void *address, const LARGE_INTEGER *timeout )
 {
     union tid_alert_entry *entry = get_tid_alert_entry( NtCurrentTeb()->ClientId.UniqueThread );
+    BOOL waited = FALSE;
     NTSTATUS status;
 
     TRACE( "%p %s\n", address, debugstr_timeout( timeout ) );
@@ -2741,8 +2742,15 @@ NTSTATUS WINAPI NtWaitForAlertByThreadId( const void *address, const LARGE_INTEG
             else
                 ret = futex_wait( futex, 0, NULL );
 
+            if (!timeout || timeout->QuadPart)
+                waited = TRUE;
+
             if (ret == -1 && errno == ETIMEDOUT) return STATUS_TIMEOUT;
         }
+
+        if (alert_simulate_sched_quantum && waited)
+            usleep(0);
+
         return STATUS_ALERTED;
     }
 #endif
