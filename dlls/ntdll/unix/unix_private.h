@@ -212,6 +212,7 @@ extern BOOL simulate_writecopy;
 extern long long ram_reporting_bias;
 extern BOOL wine_allocs_2g_limit;
 extern char *release_reserved_memory_low_bound;
+extern BOOL alert_simulate_sched_quantum;
 
 extern void init_environment(void);
 extern void init_startup_info(void);
