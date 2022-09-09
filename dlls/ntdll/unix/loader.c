@@ -2239,6 +2239,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
 
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
+BOOL alert_simulate_sched_quantum;
 
 static void hacks_init(void)
 {
@@ -2263,6 +2264,16 @@ static void hacks_init(void)
     }
     if (fsync_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in fsync.\n");
+
+    env_str = getenv("WINE_ALERT_SIMULATE_SCHED_QUANTUM");
+    if (env_str)
+        alert_simulate_sched_quantum = !!atoi(env_str);
+    else if (main_argc > 1)
+    {
+        alert_simulate_sched_quantum = !!strstr(main_argv[1], "GTA5.exe");
+    }
+    if (alert_simulate_sched_quantum)
+        ERR("HACK: Simulating sched quantum in NtWaitForAlertByThreadId.\n");
 
     sgi = getenv("SteamGameId");
     if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910")))
