@@ -1940,6 +1940,7 @@ static void hacks_init(void)
     {
         fsync_simulate_sched_quantum = !!strstr(main_argv[1], "Ubisoft Game Launcher\\upc.exe");
         fsync_simulate_sched_quantum = fsync_simulate_sched_quantum || !!strstr(main_argv[1], "PlanetZoo.exe");
+        fsync_simulate_sched_quantum = fsync_simulate_sched_quantum || !!strstr(main_argv[1], "GTA5.exe");
     }
     if (fsync_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in fsync.\n");
