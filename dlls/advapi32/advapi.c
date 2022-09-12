@@ -31,6 +31,7 @@
 #include "winerror.h"
 #include "wincred.h"
 #include "wct.h"
+#include "perflib.h"
 
 #include "wine/debug.h"
 
@@ -298,4 +299,11 @@ void WINAPI RegisterWaitChainCOMCallback(PCOGETCALLSTATE call_state_cb,
                                          PCOGETACTIVATIONSTATE activation_state_cb)
 {
     FIXME("%p, %p\n", call_state_cb, activation_state_cb);
+}
+
+ULONG WINAPI PerfCloseQueryHandle( HANDLE query )
+{
+    FIXME( "query %p stub.\n", query );
+
+    return ERROR_SUCCESS;
 }
