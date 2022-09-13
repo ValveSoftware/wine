@@ -1909,10 +1909,6 @@ static WORD get_earliest_buffer(struct wm_reader *reader, struct wg_parser_buffe
     for (i = 0; i < reader->stream_count; ++i)
     {
         struct wm_stream *stream = &reader->streams[i];
-        QWORD offset = 0;
-
-        if (stream->format.major_type == WG_MAJOR_TYPE_VIDEO)
-            offset = 300000;
 
         if (stream->selection == WMT_OFF)
             continue;
@@ -1920,10 +1916,10 @@ static WORD get_earliest_buffer(struct wm_reader *reader, struct wg_parser_buffe
         if (!wg_parser_stream_get_buffer(stream->wg_stream, &buffer))
             continue;
 
-        if (buffer.has_pts && (buffer.pts + offset) < earliest_pts)
+        if (buffer.has_pts && buffer.pts < earliest_pts)
         {
             stream_number = i + 1;
-            earliest_pts = buffer.pts + offset;
+            earliest_pts = buffer.pts;
             *ret_buffer = buffer;
         }
     }
