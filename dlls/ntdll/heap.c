@@ -2337,7 +2337,8 @@ NTSTATUS WINAPI RtlSetHeapInformation( HANDLE heap, HEAP_INFORMATION_CLASS info_
             return STATUS_SUCCESS;
         }
 
-        heapPtr->extended_type = *(ULONG *)info;
+        if (!delay_heap_free)
+            heapPtr->extended_type = *(ULONG *)info;
         return STATUS_SUCCESS;
     }
 
