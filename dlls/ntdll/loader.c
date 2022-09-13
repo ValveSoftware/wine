@@ -4150,8 +4150,7 @@ void WINAPI LdrInitializeThunk( CONTEXT *context, ULONG_PTR unknown2, ULONG_PTR 
         wm->ldr.LoadCount = -1;
 
         build_ntdll_module();
-        if (!delay_heap_free)
-            RtlSetHeapInformation( GetProcessHeap(), HeapCompatibilityInformation, &hci, sizeof(hci) );
+        RtlSetHeapInformation( GetProcessHeap(), HeapCompatibilityInformation, &hci, sizeof(hci) );
 
         if (NtCurrentTeb()->WowTebOffset) init_wow64( context );
 
