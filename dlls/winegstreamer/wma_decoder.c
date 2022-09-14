@@ -535,7 +535,6 @@ static HRESULT WINAPI transform_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_
 static HRESULT WINAPI transform_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
 {
     struct wma_decoder *decoder = impl_from_IMFTransform(iface);
-    struct wg_sample *wg_sample;
     MFT_INPUT_STREAM_INFO info;
     DWORD total_length;
     HRESULT hr;
@@ -553,10 +552,7 @@ static HRESULT WINAPI transform_ProcessInput(IMFTransform *iface, DWORD id, IMFS
     if (total_length % info.cbSize)
         return S_OK;
 
-    if (FAILED(hr = wg_sample_create_mf(sample, &wg_sample)))
-        return hr;
-
-    return wg_transform_push_mf(decoder->wg_transform, wg_sample, decoder->wg_sample_queue);
+    return wg_transform_push_mf(decoder->wg_transform, sample, decoder->wg_sample_queue);
 }
 
 static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
