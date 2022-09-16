@@ -258,7 +258,7 @@ static BOOL WINAPI init_computer_sid( INIT_ONCE *init_once, void *parameter, voi
     index = 0;
     while (!(status = RegEnumKeyExA( HKEY_USERS, index, buffer, &len, NULL, NULL, NULL, NULL )))
     {
-        count = sscanf(buffer, "S-1-5-21-%u-%u-%u", &values[0], &values[1], &values[2]);
+        count = sscanf(buffer, "S-1-5-21-%lu-%lu-%lu", &values[0], &values[1], &values[2]);
         if (count == 3)
         {
             if (found)
