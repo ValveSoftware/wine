@@ -3271,7 +3271,7 @@ NTSTATUS virtual_alloc_thread_stack( INITIAL_TEB *stack, ULONG_PTR zero_bits, SI
         }
         /* setup kernel stack no access guard page */
         kernel_stack = (char *)view->base + view->size;
-        set_page_vprot( kernel_stack, kernel_stack_guard_size, VPROT_COMMITTED );
+        set_page_vprot( kernel_stack, kernel_stack_guard_size, VPROT_COMMITTED | VPROT_READ );
         mprotect_range( kernel_stack, kernel_stack_guard_size, 0, 0 );
     }
 
