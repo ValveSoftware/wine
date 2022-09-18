@@ -31,6 +31,7 @@
 #include "wine/test.h"
 
 static BOOL (WINAPI *pCompareObjectHandles)(HANDLE, HANDLE);
+static HANDLE (WINAPI *pOpenFileMappingFromApp)( ULONG, BOOL, LPCWSTR);
 
 static void test_CompareObjectHandles(void)
 {
@@ -89,16 +90,44 @@ static void test_CompareObjectHandles(void)
     CloseHandle( h1 );
 }
 
+static void test_OpenFileMappingFromApp(void)
+{
+    HANDLE file, mapping;
+
+    if (!pOpenFileMappingFromApp)
+    {
+        win_skip("OpenFileMappingFromApp is not available.\n");
+        return;
+    }
+
+    file = CreateFileMappingA(INVALID_HANDLE_VALUE, NULL, PAGE_EXECUTE_READ, 0, 4090, "foo");
+    ok(!!file, "Failed to create a mapping.\n");
+
+    mapping = pOpenFileMappingFromApp(FILE_MAP_READ, FALSE, L"foo");
+    ok(!!mapping, "Failed to open a mapping.\n");
+    CloseHandle(mapping);
+
+    mapping = pOpenFileMappingFromApp(FILE_MAP_EXECUTE, FALSE, L"foo");
+    ok(!!mapping, "Failed to open a mapping.\n");
+    CloseHandle(mapping);
+
+    CloseHandle(file);
+}
+
+static void init_funcs(void)
+{
+    HMODULE hmod = GetModuleHandleA("kernelbase.dll");
+
+#define X(f) { p##f = (void*)GetProcAddress(hmod, #f); }
+    X(CompareObjectHandles);
+    X(OpenFileMappingFromApp);
+#undef X
+}
+
 START_TEST(process)
 {
-    HMODULE hmod;
-
-    hmod = GetModuleHandleA("kernel32.dll");
-    pCompareObjectHandles = (void *)GetProcAddress(hmod, "CompareObjectHandles");
-    ok(!pCompareObjectHandles, "expected CompareObjectHandles only in kernelbase.dll\n");
-
-    hmod = GetModuleHandleA("kernelbase.dll");
-    pCompareObjectHandles = (void *)GetProcAddress(hmod, "CompareObjectHandles");
+    init_funcs();
 
     test_CompareObjectHandles();
+    test_OpenFileMappingFromApp();
 }
