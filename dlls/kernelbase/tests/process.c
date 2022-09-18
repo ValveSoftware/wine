@@ -35,6 +35,7 @@ static NTSTATUS (WINAPI *pNtQueryObject)(HANDLE,OBJECT_INFORMATION_CLASS,PVOID,U
 static BOOL (WINAPI *pCompareObjectHandles)(HANDLE, HANDLE);
 static HANDLE (WINAPI *pOpenFileMappingFromApp)( ULONG, BOOL, LPCWSTR);
 static HANDLE (WINAPI *pCreateFileMappingFromApp)(HANDLE, PSECURITY_ATTRIBUTES, ULONG, ULONG64, PCWSTR);
+static LPVOID (WINAPI *pMapViewOfFileFromApp)(HANDLE, ULONG, ULONG64, SIZE_T);
 
 static void test_CompareObjectHandles(void)
 {
@@ -151,6 +152,40 @@ static void test_CreateFileMappingFromApp(void)
     CloseHandle(file);
 }
 
+static void test_MapViewOfFileFromApp(void)
+{
+    static const char testfile[] = "testfile.xxx";
+    HANDLE file, mapping;
+    void *ptr;
+    BOOL ret;
+
+    if (!pMapViewOfFileFromApp)
+    {
+        win_skip("MapViewOfFileFromApp() is not supported.\n");
+        return;
+    }
+
+    SetLastError(0xdeadbeef);
+    file = CreateFileA( testfile, GENERIC_READ|GENERIC_WRITE, 0, NULL, CREATE_ALWAYS, 0, 0 );
+    ok( file != INVALID_HANDLE_VALUE, "Failed to create a file, error %u.\n", GetLastError() );
+    SetFilePointer( file, 12288, NULL, FILE_BEGIN );
+    SetEndOfFile( file );
+
+    SetLastError(0xdeadbeef);
+    mapping = CreateFileMappingA( file, NULL, PAGE_READWRITE, 0, 4096, NULL );
+    ok( mapping != 0, "Failed to create file mapping, error %u.\n", GetLastError() );
+
+    SetLastError(0xdeadbeef);
+    ptr = pMapViewOfFileFromApp( mapping, PAGE_EXECUTE_READWRITE, 0, 4096 );
+    ok( ptr != NULL, "Mapping failed, error %u.\n", GetLastError() );
+    UnmapViewOfFile( ptr );
+
+    CloseHandle( mapping );
+    CloseHandle( file );
+    ret = DeleteFileA( testfile );
+    ok(ret, "Failed to delete a test file.\n");
+}
+
 static void init_funcs(void)
 {
     HMODULE hmod = GetModuleHandleA("kernelbase.dll");
@@ -158,6 +193,7 @@ static void init_funcs(void)
 #define X(f) { p##f = (void*)GetProcAddress(hmod, #f); }
     X(CompareObjectHandles);
     X(CreateFileMappingFromApp);
+    X(MapViewOfFileFromApp);
     X(OpenFileMappingFromApp);
 
     hmod = GetModuleHandleA("ntdll.dll");
@@ -173,4 +209,5 @@ START_TEST(process)
     test_CompareObjectHandles();
     test_OpenFileMappingFromApp();
     test_CreateFileMappingFromApp();
+    test_MapViewOfFileFromApp();
 }
