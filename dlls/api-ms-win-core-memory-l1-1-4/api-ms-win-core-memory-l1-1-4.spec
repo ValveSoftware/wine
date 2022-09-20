@@ -1,4 +1,4 @@
-@ stub CreateFileMappingFromApp
+@ stdcall CreateFileMappingFromApp(long ptr long int64 wstr) kernelbase.CreateFileMappingFromApp
 @ stdcall CreateFileMappingW(long ptr long long long wstr) kernel32.CreateFileMappingW
 @ stub DiscardVirtualMemory
 @ stdcall FlushViewOfFile(ptr long) kernel32.FlushViewOfFile
@@ -7,9 +7,9 @@
 @ stdcall GetWriteWatch(long ptr long ptr ptr ptr) kernel32.GetWriteWatch
 @ stdcall MapViewOfFile(long long long long long) kernel32.MapViewOfFile
 @ stdcall MapViewOfFileEx(long long long long long ptr) kernel32.MapViewOfFileEx
-@ stub MapViewOfFileFromApp
+@ stdcall MapViewOfFileFromApp(long long int64 long) kernelbase.MapViewOfFileFromApp
 @ stub OfferVirtualMemory
-@ stub OpenFileMappingFromApp
+@ stdcall OpenFileMappingFromApp(long long wstr) kernelbase.OpenFileMappingFromApp
 @ stdcall OpenFileMappingW(long long wstr) kernel32.OpenFileMappingW
 @ stdcall ReadProcessMemory(long ptr ptr long ptr) kernel32.ReadProcessMemory
 @ stub ReclaimVirtualMemory
