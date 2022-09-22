@@ -2214,7 +2214,6 @@ static BOOL X11DRV_RawTouchEvent( XGenericEventCookie *xev )
     if (!(flags & POINTER_MESSAGE_FLAG_PRIMARY)) return TRUE;
 
     /* CW-Bug-Id: #20350
-     * CW-Bug-Id: #19994
      *
      * Some games use the "Always On Native Touchscreen" Steam Input option to
      * disable absolute mouse events from the Deck touchscreen. Until there is
@@ -2229,8 +2228,7 @@ static BOOL X11DRV_RawTouchEvent( XGenericEventCookie *xev )
     {
         static const char *sgi;
         if (!sgi && !(sgi = getenv( "SteamGameId" ))) return TRUE;
-        if (strcmp( sgi, "288160" /* The Room */ ) &&
-            strcmp( sgi, "1761390" /* Hatsune Miku */ )) return TRUE;
+        if (strcmp( sgi, "288160" /* The Room */ )) return TRUE;
     }
 
     input.type             = INPUT_MOUSE;
