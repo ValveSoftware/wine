@@ -105,12 +105,23 @@ static CRITICAL_SECTION_DEBUG critsect_debug =
 static CRITICAL_SECTION win_data_section = { &critsect_debug, -1, 0, 0, 0, 0 };
 
 
+static int handle_wm_name_badwindow_error( Display *dpy, XErrorEvent *event, void *arg )
+{
+    if (event->error_code == BadWindow)
+    {
+        WARN( "BadWindow error when reading WM name from window %lx, ignoring.\n", event->resourceid );
+        return 1;
+    }
+
+    return 0;
+}
+
 static int detect_wm(Display *dpy)
 {
     Display *display = dpy ? dpy : thread_init_display(); /* DefaultRootWindow is a macro... */
     Window root = DefaultRootWindow(display), *wm_check;
     Atom type;
-    int format;
+    int format, err;
     unsigned long count, remaining;
     char *wm_name;
     char const *sgi = getenv("SteamGameId");
@@ -123,18 +134,22 @@ static int detect_wm(Display *dpy)
                                  sizeof(*wm_check)/sizeof(CARD32), False, x11drv_atom(WINDOW),
                                  &type, &format, &count, &remaining, (unsigned char **)&wm_check ) == Success){
             if (type == x11drv_atom(WINDOW)){
-                if(XGetWindowProperty( display, *wm_check, x11drv_atom(_NET_WM_NAME), 0,
-                            256/sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
-                            &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success &&
-                        type == x11drv_atom(UTF8_STRING)){
-                    /* noop */
-                }else if(XGetWindowProperty( display, *wm_check, x11drv_atom(WM_NAME), 0,
-                            256/sizeof(CARD32), False, x11drv_atom(STRING),
-                            &type, &format, &count, &remaining, (unsigned char **)&wm_name) == Success &&
-                        type == x11drv_atom(STRING)){
-                    /* noop */
-                }else
-                    wm_name = NULL;
+                /* The window returned by _NET_SUPPORTING_WM_CHECK might be stale,
+                   so we may get errors when asking for its properties */
+                X11DRV_expect_error( display, handle_wm_name_badwindow_error, NULL );
+                err = XGetWindowProperty( display, *wm_check, x11drv_atom(_NET_WM_NAME), 0,
+                                           256/sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
+                                           &type, &format, &count, &remaining, (unsigned char **)&wm_name);
+
+                if (X11DRV_check_error(display) || err != Success || type != x11drv_atom(UTF8_STRING)){
+                    X11DRV_expect_error( display, handle_wm_name_badwindow_error, NULL );
+                    err = XGetWindowProperty( display, *wm_check, x11drv_atom(WM_NAME), 0,
+                                               256/sizeof(CARD32), False, x11drv_atom(STRING),
+                                               &type, &format, &count, &remaining, (unsigned char **)&wm_name);
+
+                    if (X11DRV_check_error(display) || err != Success || type != x11drv_atom(STRING))
+                        wm_name = NULL;
+                }
 
                 if(wm_name){
                     TRACE("Got WM name %s\n", wm_name);
