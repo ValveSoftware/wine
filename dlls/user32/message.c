@@ -2450,19 +2450,21 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
 
     if ((extra_info & 0xffffff00) != 0xff515700 && enable_mouse_in_pointer)
     {
+        WORD flags = POINTER_MESSAGE_FLAG_PRIMARY;
+        DWORD message = 0;
+
         switch (msg->message)
         {
         case WM_MOUSEMOVE:
+            message = WM_POINTERUPDATE;
+            flags |= POINTER_MESSAGE_FLAG_INRANGE;
+            break;
         case WM_LBUTTONDOWN:
-        case WM_LBUTTONUP:
         case WM_RBUTTONDOWN:
-        case WM_RBUTTONUP:
         case WM_MBUTTONDOWN:
-        case WM_MBUTTONUP:
         case WM_XBUTTONDOWN:
-        case WM_XBUTTONUP:
-        {
-            WORD flags = POINTER_MESSAGE_FLAG_INRANGE|POINTER_MESSAGE_FLAG_INCONTACT|POINTER_MESSAGE_FLAG_PRIMARY;
+            message = WM_POINTERDOWN;
+            flags |= POINTER_MESSAGE_FLAG_INRANGE|POINTER_MESSAGE_FLAG_INCONTACT;
             if (msg->message == WM_LBUTTONDOWN) flags |= POINTER_MESSAGE_FLAG_FIRSTBUTTON;
             if (msg->message == WM_RBUTTONDOWN) flags |= POINTER_MESSAGE_FLAG_SECONDBUTTON;
             if (msg->message == WM_MBUTTONDOWN) flags |= POINTER_MESSAGE_FLAG_THIRDBUTTON;
@@ -2471,16 +2473,24 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
             if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_MBUTTON) flags |= POINTER_MESSAGE_FLAG_THIRDBUTTON;
             if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_XBUTTON1) flags |= POINTER_MESSAGE_FLAG_FOURTHBUTTON;
             if (msg->message == WM_XBUTTONDOWN && LOWORD( msg->wParam ) == MK_XBUTTON2) flags |= POINTER_MESSAGE_FLAG_FIFTHBUTTON;
-            SendMessageW( msg->hwnd, WM_POINTERUPDATE, MAKELONG( 1, flags ), MAKELONG( msg->pt.x, msg->pt.y ) );
             break;
-        }
+        case WM_LBUTTONUP:
+        case WM_RBUTTONUP:
+        case WM_MBUTTONUP:
+        case WM_XBUTTONUP:
+            message = WM_POINTERUP;
+            break;
         case WM_MOUSEWHEEL:
-            SendMessageW( msg->hwnd, WM_POINTERWHEEL, MAKELONG( 1, HIWORD( msg->wParam ) ), MAKELONG( msg->pt.x, msg->pt.y ) );
+            message = WM_POINTERWHEEL;
+            flags = HIWORD( msg->wParam );
             break;
         case WM_MOUSEHWHEEL:
-            SendMessageW( msg->hwnd, WM_POINTERHWHEEL, MAKELONG( 1, HIWORD( msg->wParam ) ), MAKELONG( msg->pt.x, msg->pt.y ) );
+            message = WM_POINTERHWHEEL;
+            flags = HIWORD( msg->wParam );
             break;
         }
+
+        if (message) SendMessageW( msg->hwnd, message, MAKELONG( 1, flags ), MAKELONG( msg->pt.x, msg->pt.y ) );
     }
 
     /* FIXME: is this really the right place for this hook? */
