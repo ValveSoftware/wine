@@ -2213,24 +2213,6 @@ static BOOL X11DRV_RawTouchEvent( XGenericEventCookie *xev )
     __wine_send_input( 0, &input, &rawinput );
     if (!(flags & POINTER_MESSAGE_FLAG_PRIMARY)) return TRUE;
 
-    /* CW-Bug-Id: #20350
-     *
-     * Some games use the "Always On Native Touchscreen" Steam Input option to
-     * disable absolute mouse events from the Deck touchscreen. Until there is
-     * a dedicated option to disable it entirely, we should not send absolute
-     * mouse events from the touch events.
-     *
-     * Other games, such as "The Room", use the option to enable the touchscreen
-     * and support multi-touch and absolute mouse events. Then they also expect
-     * to receive standard mouse messages when the screen is touched, and use it
-     * to detect clicks on the menus.
-     */
-    {
-        static const char *sgi;
-        if (!sgi && !(sgi = getenv( "SteamGameId" ))) return TRUE;
-        if (strcmp( sgi, "288160" /* The Room */ )) return TRUE;
-    }
-
     input.type             = INPUT_MOUSE;
     input.u.mi.mouseData   = 0;
     input.u.mi.dwFlags     = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
