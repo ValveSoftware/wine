@@ -72,6 +72,15 @@ void msvcrt_init_math( void *module )
     sse2_supported = IsProcessorFeaturePresent( PF_XMMI64_INSTRUCTIONS_AVAILABLE );
 #if _MSVCR_VER <=71
     sse2_enabled = FALSE;
+    {
+        char sgi[64];
+
+        if (GetEnvironmentVariableA("SteamGameId", sgi, sizeof(sgi)) && !strcmp(sgi, "560430"))
+        {
+            sse2_supported = FALSE;
+            FIXME("HACK: disabling sse2 support in msvcrt.\n");
+        }
+    }
 #else
     sse2_enabled = sse2_supported;
 #endif
