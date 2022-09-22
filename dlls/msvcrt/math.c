@@ -75,7 +75,8 @@ void msvcrt_init_math( void *module )
     {
         char sgi[64];
 
-        if (GetEnvironmentVariableA("SteamGameId", sgi, sizeof(sgi)) && !strcmp(sgi, "560430"))
+        if (GetEnvironmentVariableA("SteamGameId", sgi, sizeof(sgi))
+                && (!strcmp(sgi, "560430") || !strcmp(sgi, "12330")))
         {
             sse2_supported = FALSE;
             FIXME("HACK: disabling sse2 support in msvcrt.\n");
