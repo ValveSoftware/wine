@@ -780,6 +780,27 @@ DWORD WINAPI GetFileVersionInfoSizeExW( DWORD flags, LPCWSTR filename, LPDWORD r
     if ((hModule = LoadLibraryExW( filename, 0, LOAD_LIBRARY_AS_IMAGE_RESOURCE )))
     {
         HRSRC hRsrc = NULL;
+
+        static const char builtin_signature[] = "Wine builtin DLL";
+        HMODULE mod = (HMODULE)((ULONG_PTR)hModule & ~(ULONG_PTR)3);
+        char *signature = (char *)((IMAGE_DOS_HEADER *)mod + 1);
+        WCHAR exe_name[MAX_PATH];
+        IMAGE_NT_HEADERS *nt;
+        DWORD exe_name_len;
+
+        if ((exe_name_len = GetModuleFileNameW( NULL, exe_name, ARRAY_SIZE(exe_name) ))
+            && exe_name_len >= 16
+            && (!memcmp( exe_name + exe_name_len - 16, L"vcredist_x64.exe", 16 * sizeof(*exe_name) )
+            || !memcmp( exe_name + exe_name_len - 16, L"vcredist_x86.exe", 16 * sizeof(*exe_name) ))
+            && (nt = RtlImageNtHeader( mod )) && (char *)nt - signature >= sizeof(builtin_signature)
+            && !memcmp( signature, builtin_signature, sizeof(builtin_signature) ))
+        {
+            ERR("HACK: not exposing version info.\n");
+            FreeLibrary( hModule );
+            SetLastError( ERROR_RESOURCE_NAME_NOT_FOUND );
+            return 0;
+        }
+
         if (!(flags & FILE_VER_GET_LOCALISED))
         {
             LANGID english = MAKELANGID( LANG_ENGLISH, SUBLANG_DEFAULT );
