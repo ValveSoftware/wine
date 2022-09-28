@@ -1511,7 +1511,7 @@ static HRESULT init_stream(struct wm_reader *reader)
             if (stream->format.u.video.height > 0)
                 stream->format.u.video.height = -stream->format.u.video.height;
         }
-        wg_parser_stream_enable(stream->wg_stream, &stream->format);
+        wg_parser_stream_enable(stream->wg_stream, &stream->format, STREAM_ENABLE_FLAG_FLIP_RGB);
     }
 
     /* We probably discarded events because streams weren't enabled yet.
@@ -1586,7 +1586,7 @@ static HRESULT reinit_stream(struct wm_reader *reader, bool read_compressed)
         stream->reader = reader;
         wg_parser_stream_get_preferred_format(stream->wg_stream, &format);
         if (stream->selection == WMT_ON)
-            wg_parser_stream_enable(stream->wg_stream, read_compressed ? &format : &stream->format);
+            wg_parser_stream_enable(stream->wg_stream, read_compressed ? &format : &stream->format, STREAM_ENABLE_FLAG_FLIP_RGB);
     }
 
     /* We probably discarded events because streams weren't enabled yet.
@@ -2325,7 +2325,7 @@ static HRESULT WINAPI reader_SetOutputProps(IWMSyncReader2 *iface, DWORD output,
     }
 
     stream->format = format;
-    wg_parser_stream_enable(stream->wg_stream, &format);
+    wg_parser_stream_enable(stream->wg_stream, &format, STREAM_ENABLE_FLAG_FLIP_RGB);
 
     /* Re-decode any buffers that might have been generated with the old format.
      *
@@ -2472,11 +2472,11 @@ static HRESULT WINAPI reader_SetStreamsSelected(IWMSyncReader2 *iface,
             {
                 struct wg_format format;
                 wg_parser_stream_get_preferred_format(stream->wg_stream, &format);
-                wg_parser_stream_enable(stream->wg_stream, &format);
+                wg_parser_stream_enable(stream->wg_stream, &format, STREAM_ENABLE_FLAG_FLIP_RGB);
             }
             else
             {
-                wg_parser_stream_enable(stream->wg_stream, &stream->format);
+                wg_parser_stream_enable(stream->wg_stream, &stream->format, STREAM_ENABLE_FLAG_FLIP_RGB);
             }
         }
     }

@@ -84,7 +84,8 @@ wg_parser_stream_t wg_parser_get_stream(wg_parser_t parser, uint32_t index);
 
 void wg_parser_stream_get_preferred_format(wg_parser_stream_t stream, struct wg_format *format);
 void wg_parser_stream_get_codec_format(wg_parser_stream_t stream, struct wg_format *format);
-void wg_parser_stream_enable(wg_parser_stream_t stream, const struct wg_format *format);
+void wg_parser_stream_enable(wg_parser_stream_t stream, const struct wg_format *format,
+        uint32_t flags);
 void wg_parser_stream_disable(wg_parser_stream_t stream);
 
 bool wg_parser_stream_get_buffer(wg_parser_t parser, wg_parser_stream_t stream,

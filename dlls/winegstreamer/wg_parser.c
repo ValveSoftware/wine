@@ -257,7 +257,7 @@ static NTSTATUS wg_parser_stream_enable(void *args)
 
     if (format->major_type == WG_MAJOR_TYPE_VIDEO)
     {
-        bool flip = (format->u.video.height < 0);
+        bool flip = (params->flags & STREAM_ENABLE_FLAG_FLIP_RGB) && (format->u.video.height < 0);
 
         gst_util_set_object_arg(G_OBJECT(stream->flip), "method", flip ? "vertical-flip" : "none");
     }
