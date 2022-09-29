@@ -60,7 +60,7 @@ struct dsound_render
     IDirectSoundBuffer *dsbuffer;
 
     DWORD buffer_size;
-    SIZE_T write_pos;
+    DWORD write_pos;
 
     LONG volume;
     LONG pan;
@@ -90,20 +90,11 @@ static HRESULT dsound_render_write_data(struct dsound_render *filter, const void
 {
     WAVEFORMATEX *wfx = (WAVEFORMATEX *)filter->sink.pin.mt.pbFormat;
     unsigned char silence = wfx->wBitsPerSample == 8 ? 128  : 0;
-    DWORD play_pos, write_pos, size1, size2;
+    DWORD play_pos, write_end, size1, size2;
     void *data1, *data2;
     HRESULT hr;
 
     TRACE("filter %p, data %p, size %#lx\n", filter, data, size);
-
-    if (FAILED(hr = IDirectSoundBuffer_GetCurrentPosition(filter->dsbuffer,
-            &play_pos, &write_pos)))
-    {
-        ERR("Failed to get current write position, hr %#lx\n", hr);
-        return hr;
-    }
-
-    TRACE("play_pos %#lx, write_pos %#lx\n", play_pos, write_pos);
 
     if (!size)
         size = filter->buffer_size / 2;
@@ -111,9 +102,17 @@ static HRESULT dsound_render_write_data(struct dsound_render *filter, const void
         size = min(size, filter->buffer_size / 2);
 
     if (filter->write_pos == -1)
-        filter->write_pos = write_pos;
-    else if (play_pos - filter->write_pos <= size)
-        return S_FALSE;
+        filter->write_pos = 0;
+    else
+    {
+        if (FAILED(hr = IDirectSoundBuffer_GetCurrentPosition(filter->dsbuffer,
+                &play_pos, NULL)))
+            return hr;
+
+        write_end = (filter->write_pos + size) % filter->buffer_size;
+        if (write_end - filter->write_pos >= play_pos - filter->write_pos)
+            return S_FALSE;
+    }
 
     if (FAILED(hr = IDirectSoundBuffer_Lock(filter->dsbuffer, filter->write_pos,
             size, &data1, &size1, &data2, &size2, 0)))
@@ -147,7 +146,7 @@ static HRESULT dsound_render_write_data(struct dsound_render *filter, const void
     filter->write_pos += size;
     filter->write_pos %= filter->buffer_size;
 
-    TRACE("Written size %#lx, write_pos %#Ix\n", size, filter->write_pos);
+    TRACE("Written size %#lx, write_pos %#lx\n", size, filter->write_pos);
 
     return S_OK;
 }
@@ -253,7 +252,7 @@ static HRESULT WINAPI dsound_render_sink_Receive(struct strmbase_sink *iface, IM
         if (SUCCEEDED(IMediaSample_GetTime(sample, &start, &stop)))
             strmbase_passthrough_update_time(&filter->passthrough, start);
 
-        if (SUCCEEDED(IReferenceClock_GetTime(filter->filter.clock, &current)))
+        if (filter->stream_start != -1 && SUCCEEDED(IReferenceClock_GetTime(filter->filter.clock, &current)))
             current -= filter->stream_start;
     }
 
@@ -572,6 +571,8 @@ static HRESULT dsound_render_stop_stream(struct strmbase_filter *iface)
 
     if (filter->sink.pin.peer)
         IDirectSoundBuffer_Stop(filter->dsbuffer);
+
+    filter->stream_start = -1;
 
     return S_OK;
 }
@@ -949,6 +950,7 @@ HRESULT dsound_render_create(IUnknown *outer, IUnknown **out)
     ISeekingPassThru_Init(&object->passthrough.ISeekingPassThru_iface, TRUE, &object->sink.pin.IPin_iface);
 
     strmbase_sink_init(&object->sink, &object->filter, L"Audio Input pin (rendered)", &sink_ops, NULL);
+    object->stream_start = -1;
 
     object->state_event = CreateEventW(NULL, TRUE, TRUE, NULL);
     object->flush_event = CreateEventW(NULL, TRUE, TRUE, NULL);
