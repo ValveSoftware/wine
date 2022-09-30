@@ -830,6 +830,39 @@ static DWORD WINTRUST_VerifySigner(CRYPT_PROVIDER_DATA *data, DWORD signerIdx)
     return err;
 }
 
+static DWORD get_secondary_signatures_count(CRYPT_PROVIDER_DATA *data, DWORD *ret_count)
+{
+    static const char *oid_nested_signature = "1.3.6.1.4.1.311.2.4.1";
+    CMSG_SIGNER_INFO *info;
+    unsigned int i;
+    DWORD size;
+
+    *ret_count = 0;
+
+    if (!data->hMsg)
+        return ERROR_SUCCESS;
+
+    if (!CryptMsgGetParam(data->hMsg, CMSG_SIGNER_INFO_PARAM, 0, NULL, &size))
+        return ERROR_SUCCESS;
+
+    if (!(info = data->psPfns->pfnAlloc(size)))
+        return ERROR_OUTOFMEMORY;
+
+    if (!CryptMsgGetParam(data->hMsg, CMSG_SIGNER_INFO_PARAM, 0, info, &size))
+    {
+        data->psPfns->pfnFree(info);
+        return GetLastError();
+    }
+
+    for (i = 0; i < info->UnauthAttrs.cAttr; ++i)
+    {
+        if (!strcmp(info->UnauthAttrs.rgAttr[i].pszObjId, oid_nested_signature))
+            ++*ret_count;
+    }
+    data->psPfns->pfnFree(info);
+    return ERROR_SUCCESS;
+}
+
 HRESULT WINAPI SoftpubLoadSignature(CRYPT_PROVIDER_DATA *data)
 {
     DWORD err;
@@ -847,9 +880,22 @@ HRESULT WINAPI SoftpubLoadSignature(CRYPT_PROVIDER_DATA *data)
         if (CryptMsgGetParam(data->hMsg, CMSG_SIGNER_COUNT_PARAM, 0,
          &signerCount, &size))
         {
+            WINTRUST_SIGNATURE_SETTINGS *settings;
             DWORD i;
 
             err = ERROR_SUCCESS;
+
+            if (WVT_ISINSTRUCT(WINTRUST_DATA, data->pWintrustData->cbStruct, pSignatureSettings)
+                    && (settings = data->pWintrustData->pSignatureSettings))
+            {
+                if (settings->dwFlags & WSS_VERIFY_SPECIFIC && settings->dwIndex)
+                    FIXME("WSS_VERIFY_SPECIFIC dwIndex %lu is not supported.\n", settings->dwIndex);
+
+                if (settings->dwFlags & WSS_GET_SECONDARY_SIG_COUNT)
+                    err = get_secondary_signatures_count(data, &settings->cSecondarySigs);
+                settings->dwVerifiedSigIndex = 0;
+            }
+
             for (i = 0; !err && i < signerCount; i++)
             {
                 if (!(err = WINTRUST_SaveSigner(data, i)))
