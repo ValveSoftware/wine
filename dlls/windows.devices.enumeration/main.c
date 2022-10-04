@@ -23,7 +23,7 @@
 
 #include "wine/debug.h"
 
-WINE_DEFAULT_DEBUG_CHANNEL(enumeration);
+WINE_DEFAULT_DEBUG_CHANNEL(mmdevapi);
 
 static const char *debugstr_hstring( HSTRING hstr )
 {
