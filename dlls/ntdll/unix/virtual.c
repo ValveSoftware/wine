@@ -79,6 +79,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(virtual);
 WINE_DECLARE_DEBUG_CHANNEL(module);
+WINE_DECLARE_DEBUG_CHANNEL(virtual_ranges);
 
 struct preload_info
 {
@@ -189,6 +190,7 @@ static struct list teb_list = LIST_INIT( teb_list );
 #define ROUND_SIZE(addr,size) (((SIZE_T)(size) + ((UINT_PTR)(addr) & page_mask) + page_mask) & ~page_mask)
 
 #define VIRTUAL_DEBUG_DUMP_VIEW(view) do { if (TRACE_ON(virtual)) dump_view(view); } while (0)
+#define VIRTUAL_DEBUG_DUMP_RANGES() do { if (TRACE_ON(virtual_ranges)) dump_free_ranges(); } while (0)
 
 #ifndef MAP_NORESERVE
 #define MAP_NORESERVE 0
@@ -721,6 +723,12 @@ static struct range_entry *free_ranges_lower_bound( void *addr )
     return begin;
 }
 
+static void dump_free_ranges(void)
+{
+    struct range_entry *r;
+    for (r = free_ranges; r != free_ranges_end; ++r)
+        TRACE_(virtual_ranges)("%p - %p.\n", r->base, r->end);
+}
 
 /***********************************************************************
  *           free_ranges_insert_view
@@ -740,14 +748,19 @@ static void free_ranges_insert_view( struct file_view *view )
 
     /* this happens because virtual_alloc_thread_stack shrinks a view, then creates another one on top,
      * or because AT_ROUND_TO_PAGE was used with NtMapViewOfSection to force 4kB aligned mapping. */
-    if ((range->end > view_base && range->base >= view_end) ||
-        (range->end == view_base && next->base >= view_end))
+
+    if (range->base > view_base)
+        view_base = range->base;
+    if (range->end < view_end)
+        view_end = range->end;
+    if (range->end == view_base && next->base >= view_end)
+        view_end = view_base;
+
+    TRACE( "%p-%p, aligned %p->%p.\n", view->base, (char *)view->base + view->size, view_base, view_end );
+
+    if (view_end <= view_base)
     {
-        /* on Win64, assert that it's correctly aligned so we're not going to be in trouble later */
-#ifdef _WIN64
-        assert( view->base == view_base );
-#endif
-        WARN( "range %p - %p is already mapped\n", view_base, view_end );
+        VIRTUAL_DEBUG_DUMP_RANGES();
         return;
     }
 
@@ -777,15 +790,18 @@ static void free_ranges_insert_view( struct file_view *view )
         else
             range->base = view_end;
 
-        if (range->base < range->end) return;
-
+        if (range->base < range->end)
+        {
+            VIRTUAL_DEBUG_DUMP_RANGES();
+            return;
+        }
         /* and possibly remove it if it's now empty */
         memmove( range, next, (free_ranges_end - next) * sizeof(struct range_entry) );
         free_ranges_end -= 1;
         assert( free_ranges_end - free_ranges > 0 );
     }
+    VIRTUAL_DEBUG_DUMP_RANGES();
 }
-
 
 /***********************************************************************
  *           free_ranges_remove_view
@@ -799,9 +815,6 @@ static void free_ranges_remove_view( struct file_view *view )
     struct range_entry *range = free_ranges_lower_bound( view_base );
     struct range_entry *next = range + 1;
 
-    /* It's possible to use AT_ROUND_TO_PAGE on 32bit with NtMapViewOfSection to force 4kB alignment,
-     * and this breaks our assumptions. Look at the views around to check if the range is still in use. */
-#ifndef _WIN64
     struct file_view *prev_view = WINE_RB_ENTRY_VALUE( wine_rb_prev( &view->entry ), struct file_view, entry );
     struct file_view *next_view = WINE_RB_ENTRY_VALUE( wine_rb_next( &view->entry ), struct file_view, entry );
     void *prev_view_base = prev_view ? ROUND_ADDR( prev_view->base, granularity_mask ) : NULL;
@@ -809,14 +822,18 @@ static void free_ranges_remove_view( struct file_view *view )
     void *next_view_base = next_view ? ROUND_ADDR( next_view->base, granularity_mask ) : NULL;
     void *next_view_end = next_view ? ROUND_ADDR( (char *)next_view->base + next_view->size + granularity_mask, granularity_mask ) : NULL;
 
-    if ((prev_view_base < view_end && prev_view_end > view_base) ||
-        (next_view_base < view_end && next_view_end > view_base))
+    if (prev_view_end && prev_view_end > view_base && prev_view_base < view_end)
+        view_base = prev_view_end;
+    if (next_view_base && next_view_base < view_end && next_view_end > view_base)
+        view_end = next_view_base;
+
+    TRACE( "%p-%p, aligned %p->%p.\n", view->base, (char *)view->base + view->size, view_base, view_end );
+
+    if (view_end <= view_base)
     {
-        WARN( "range %p - %p is still mapped\n", view_base, view_end );
+        VIRTUAL_DEBUG_DUMP_RANGES();
         return;
     }
-#endif
-
     /* free_ranges initial value is such that the view is either inside range or before another one. */
     assert( range != free_ranges_end );
     assert( range->end > view_base || next != free_ranges_end );
@@ -858,6 +875,7 @@ static void free_ranges_remove_view( struct file_view *view )
         range->base = view_base;
         range->end = view_end;
     }
+    VIRTUAL_DEBUG_DUMP_RANGES();
 }
 
 
@@ -1531,6 +1549,19 @@ static struct file_view *alloc_view(void)
 }
 
 
+static void free_view( struct file_view *view )
+{
+    *(struct file_view **)view = next_free_view;
+    next_free_view = view;
+}
+
+static void unregister_view( struct file_view *view )
+{
+    if (mmap_is_in_reserved_area( view->base, view->size ))
+        free_ranges_remove_view( view );
+    wine_rb_remove( &views_tree, &view->entry );
+}
+
 /***********************************************************************
  *           delete_view
  *
@@ -1540,13 +1571,16 @@ static void delete_view( struct file_view *view ) /* [in] View */
 {
     if (!(view->protect & VPROT_SYSTEM)) unmap_area( view->base, view->size );
     set_page_vprot( view->base, view->size, 0 );
-    if (mmap_is_in_reserved_area( view->base, view->size ))
-        free_ranges_remove_view( view );
-    wine_rb_remove( &views_tree, &view->entry );
-    *(struct file_view **)view = next_free_view;
-    next_free_view = view;
+    unregister_view( view );
+    free_view( view );
 }
 
+static void register_view( struct file_view *view )
+{
+    wine_rb_put( &views_tree, view->base, &view->entry );
+    if (mmap_is_in_reserved_area( view->base, view->size ))
+        free_ranges_insert_view( view );
+}
 
 /***********************************************************************
  *           create_view
@@ -1588,9 +1622,7 @@ static NTSTATUS create_view( struct file_view **view_ret, void *base, size_t siz
     view->protect = vprot;
     set_page_vprot( base, size, vprot );
 
-    wine_rb_put( &views_tree, view->base, &view->entry );
-    if (mmap_is_in_reserved_area( view->base, view->size ))
-        free_ranges_insert_view( view );
+    register_view( view );
 
     *view_ret = view;
 
@@ -4117,26 +4149,76 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
         if (addr == (void *)1 && !size && type == MEM_RELEASE) virtual_release_address_space();
         else status = STATUS_INVALID_PARAMETER;
     }
-    else if (!(view = find_view( base, size )) || !is_view_valloc( view ))
+    else if (!(view = find_view( base, 0 )) || !is_view_valloc( view ))
     {
-        status = STATUS_INVALID_PARAMETER;
+        status = view ? STATUS_INVALID_PARAMETER : STATUS_MEMORY_NOT_ALLOCATED;
     }
     else if (type == MEM_RELEASE)
     {
         /* Free the pages */
 
-        if (size) status = STATUS_INVALID_PARAMETER;
-        else if (base != view->base) status = STATUS_FREE_VM_NOT_AT_BASE;
+        if (size && (char *)view->base + view->size - base < size) status = STATUS_UNABLE_TO_FREE_VM;
+        else if (!size && base != view->base) status = STATUS_FREE_VM_NOT_AT_BASE;
         else
         {
+            if (!size) size = view->size;
+
+            if (size == view->size)
+            {
+                assert( base == view->base );
+                delete_view( view );
+            }
+            else
+            {
+                struct file_view *new_view = NULL;
+
+                if (view->base != base && base + size != (char *)view->base + view->size
+                    && !(new_view = alloc_view()))
+                {
+                    ERR( "out of memory for %p-%p\n", base, (char *)base + size );
+                    return STATUS_NO_MEMORY;
+                }
+                unregister_view( view );
+
+                if (new_view)
+                {
+                    new_view->base    = base + size;
+                    new_view->size    = (char *)view->base + view->size - (char *)new_view->base;
+                    new_view->protect = view->protect;
+
+                    view->size = base - (char *)view->base;
+                    register_view( view );
+                    register_view( new_view );
+
+                    VIRTUAL_DEBUG_DUMP_VIEW( view );
+                    VIRTUAL_DEBUG_DUMP_VIEW( new_view );
+                }
+                else
+                {
+                    if (view->base == base)
+                    {
+                        view->base = base + size;
+                        view->size -= size;
+                    }
+                    else
+                    {
+                        view->size = base - (char *)view->base;
+                    }
+                    register_view( view );
+                    VIRTUAL_DEBUG_DUMP_VIEW( view );
+                }
+
+                set_page_vprot( base, size, 0 );
+                unmap_area( base, size );
+            }
             *addr_ptr = base;
-            *size_ptr = view->size;
-            delete_view( view );
+            *size_ptr = size;
         }
     }
     else if (type == MEM_DECOMMIT)
     {
         if (!size && base != view->base) status = STATUS_FREE_VM_NOT_AT_BASE;
+        else if (base - (char *)view->base + size > view->size) status = STATUS_UNABLE_TO_FREE_VM;
         else status = decommit_pages( view, base - (char *)view->base, size );
         if (status == STATUS_SUCCESS)
         {
@@ -4151,6 +4233,7 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
     }
 
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
+    TRACE( "status %#x.\n", status );
     return status;
 }
 
