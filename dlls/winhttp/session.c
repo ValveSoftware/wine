@@ -84,7 +84,7 @@ static void session_destroy( struct object_header *hdr )
     free( session );
 }
 
-static BOOL validate_buffer( void *buffer, DWORD *buflen, DWORD required )
+BOOL validate_buffer( void *buffer, DWORD *buflen, DWORD required )
 {
     if (!buffer || *buflen < required)
     {

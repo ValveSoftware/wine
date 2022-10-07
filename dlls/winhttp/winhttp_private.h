@@ -252,6 +252,7 @@ struct socket
 {
     struct object_header hdr;
     struct request *request;
+    int keepalive_interval;
     enum socket_state state;
     struct queue send_q;
     struct queue recv_q;
@@ -358,6 +359,8 @@ struct object_header *grab_object( HINTERNET ) DECLSPEC_HIDDEN;
 void release_object( struct object_header * ) DECLSPEC_HIDDEN;
 HINTERNET alloc_handle( struct object_header * ) DECLSPEC_HIDDEN;
 BOOL free_handle( HINTERNET ) DECLSPEC_HIDDEN;
+
+BOOL validate_buffer( void *buffer, DWORD *buflen, DWORD required ) DECLSPEC_HIDDEN;
 
 void send_callback( struct object_header *, DWORD, LPVOID, DWORD ) DECLSPEC_HIDDEN;
 void close_connection( struct request * ) DECLSPEC_HIDDEN;
