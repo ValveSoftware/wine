@@ -3233,6 +3233,7 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
     socket->hdr.notify_mask = request->hdr.notify_mask;
     socket->hdr.context = context;
     socket->keepalive_interval = 30000;
+    socket->send_buffer_size = request->websocket_send_buffer_size;
     InitializeSRWLock( &socket->send_lock );
     init_queue( &socket->send_q );
     init_queue( &socket->recv_q );
@@ -3304,13 +3305,13 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
     }
 
     buffer_size = len + offset + 4;
-    assert( buffer_size - len < MAX_FRAME_BUFFER_SIZE );
-    if (buffer_size > socket->send_frame_buffer_size && socket->send_frame_buffer_size < MAX_FRAME_BUFFER_SIZE)
+    assert( buffer_size - len < socket->send_buffer_size );
+    if (buffer_size > socket->send_frame_buffer_size && socket->send_frame_buffer_size < socket->send_buffer_size)
     {
         DWORD new_size;
         void *new;
 
-        new_size = min( buffer_size, MAX_FRAME_BUFFER_SIZE );
+        new_size = min( buffer_size, socket->send_buffer_size );
         if (!(new = realloc( socket->send_frame_buffer, new_size )))
         {
             ERR( "out of memory, buffer_size %lu\n", buffer_size);
@@ -3340,7 +3341,7 @@ static DWORD send_frame( struct socket *socket, enum socket_opcode opcode, USHOR
     socket->client_buffer_offset = 0;
     while (socket->send_remaining_size)
     {
-        len = min( buflen, MAX_FRAME_BUFFER_SIZE - offset );
+        len = min( buflen, socket->send_buffer_size - offset );
         for (i = 0; i < len; ++i)
         {
             socket->send_frame_buffer[offset++] = buf[socket->client_buffer_offset++]
@@ -3384,7 +3385,7 @@ static DWORD complete_send_frame( struct socket *socket, WSAOVERLAPPED *ovr, con
 
     while (socket->send_remaining_size)
     {
-        len = min( socket->send_remaining_size, MAX_FRAME_BUFFER_SIZE );
+        len = min( socket->send_remaining_size, socket->send_buffer_size );
         for (i = 0; i < len; ++i)
         {
             socket->send_frame_buffer[i] = buf[socket->client_buffer_offset++]
