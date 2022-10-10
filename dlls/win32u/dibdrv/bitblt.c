@@ -1006,6 +1006,16 @@ DWORD CDECL dibdrv_PutImage( PHYSDEV dev, HRGN clip, BITMAPINFO *info,
     if (!bits) return ERROR_SUCCESS;
     if (stretch) return ERROR_TRANSFORM_NOT_SUPPORTED;
 
+    /* Fullscreen Hack:
+     *
+     * Use xrenderdrv_PutImage() if putting to a window because dibdrv_PutImage() isn't aware of any
+     * scaling used for the fullscreen hack. For CW bug 21171. */
+    if (user_callbacks && user_callbacks->pWindowFromDC( dev->hdc ))
+    {
+        dev = GET_NEXT_PHYSDEV( dev, pPutImage );
+        return dev->funcs->pPutImage( dev, clip, info, bits, src, dst, rop );
+    }
+
     /* For mask_rect, 1-bpp source without a color table uses the destination DC colors */
     if (info->bmiHeader.biBitCount == 1 && pdev->dib.bit_count != 1 && !info->bmiHeader.biClrUsed)
         get_mono_dc_colors( dc, pdev->dib.color_table_size, info, 2 );
