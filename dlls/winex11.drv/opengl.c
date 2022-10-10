@@ -4706,12 +4706,6 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
         if (gl->type == DC_GL_CHILD_WIN) escape.drawable = gl->window;
         /* fall through */
     default:
-        if (escape.drawable && pglXSwapBuffersMscOML)
-        {
-            pglFlush();
-            target_sbc = pglXSwapBuffersMscOML( gdi_display, gl->drawable, 0, 0, 0 );
-            break;
-        }
         if (gl->fs_hack){
             ctx->fs_hack = gl->fs_hack;
             if(!gl->fs_hack_context_set_up)
@@ -4722,6 +4716,14 @@ static BOOL WINAPI glxdrv_wglSwapBuffers( HDC hdc )
             ctx->fs_hack = FALSE;
             fs_hack_setup_context(ctx, gl);
         }
+
+        if (escape.drawable && pglXSwapBuffersMscOML)
+        {
+            pglFlush();
+            target_sbc = pglXSwapBuffersMscOML( gdi_display, gl->drawable, 0, 0, 0 );
+            break;
+        }
+
         pglXSwapBuffers(gdi_display, gl->drawable);
         break;
     }
