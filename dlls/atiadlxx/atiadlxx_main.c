@@ -172,16 +172,16 @@ typedef struct ADLDisplayMap
 } ADLDisplayMap, *LPADLDisplayMap;
 
 static const ADLVersionsInfo version = {
-    "21.20.01",
-    "21.20.01",
+    "22.20.19.16-221003a-384125E-AMD-Software-Adrenalin-Edition",
     "",
+    "http://support.amd.com/drivers/xml/driver_09_us.xml",
 };
 
 static const ADLVersionsInfoX2 version2 = {
-    "21.20.01",
-    "21.20.01",
-    "21.20.01",
+    "22.20.19.16-221003a-384125E-AMD-Software-Adrenalin-Edition",
     "",
+    "22.10.1",
+    "http://support.amd.com/drivers/xml/driver_09_us.xml",
 };
 
 int WINAPI ADL2_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg, ADL_CONTEXT_HANDLE *ptr)
