@@ -1,5 +1,6 @@
 EXTRADEFS = -DWINE_NO_LONG_TYPES
 MODULE    = vcruntime140.dll
+IMPORTLIB = vcruntime140
 
 C_SRCS = \
 	misc.c
