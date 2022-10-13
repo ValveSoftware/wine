@@ -1400,6 +1400,13 @@ HANDLE WINAPI RtlCreateHeap( ULONG flags, void *addr, SIZE_T total_size, SIZE_T 
         list_init( &process_heap->entry );
     }
 
+    if (!(flags & HEAP_CREATE_ENABLE_EXECUTE))
+    {
+        ULONG hci = 2;
+
+        RtlSetHeapInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci));
+    }
+
     return heap;
 }
 
@@ -2062,7 +2069,7 @@ NTSTATUS WINAPI RtlSetHeapInformation( HANDLE handle, HEAP_INFORMATION_CLASS inf
             FIXME( "HeapCompatibilityInformation %lu not implemented!\n", compat_info );
             return STATUS_UNSUCCESSFUL;
         }
-        if (InterlockedCompareExchange( &heap->compat_info, compat_info, HEAP_STD )) return STATUS_UNSUCCESSFUL;
+        InterlockedCompareExchange( &heap->compat_info, compat_info, HEAP_STD );
         return STATUS_SUCCESS;
     }
 
