@@ -90,7 +90,7 @@ static HRESULT dsound_render_write_data(struct dsound_render *filter, const void
 {
     WAVEFORMATEX *wfx = (WAVEFORMATEX *)filter->sink.pin.mt.pbFormat;
     unsigned char silence = wfx->wBitsPerSample == 8 ? 128  : 0;
-    DWORD play_pos, write_end, size1, size2;
+    DWORD write_end, size1, size2;
     void *data1, *data2;
     HRESULT hr;
 
@@ -105,9 +105,18 @@ static HRESULT dsound_render_write_data(struct dsound_render *filter, const void
         filter->write_pos = 0;
     else
     {
+        DWORD play_pos, write_pos;
+
         if (FAILED(hr = IDirectSoundBuffer_GetCurrentPosition(filter->dsbuffer,
-                &play_pos, NULL)))
+                &play_pos, &write_pos)))
             return hr;
+
+        if (filter->write_pos - play_pos <= write_pos - play_pos)
+        {
+            WARN("Buffer underrun detected, filter %p, dsound play pos %#lx, write pos %#lx, filter write pos %#lx!\n",
+                    filter, play_pos, write_pos, filter->write_pos);
+            filter->write_pos = write_pos;
+        }
 
         write_end = (filter->write_pos + size) % filter->buffer_size;
         if (write_end - filter->write_pos >= play_pos - filter->write_pos)
@@ -267,10 +276,10 @@ static HRESULT WINAPI dsound_render_sink_Receive(struct strmbase_sink *iface, IM
 
     size = IMediaSample_GetActualDataLength(sample);
 
-    if (filter->write_pos == -1 && start > current)
+    if (filter->write_pos == -1 && (start + 300000) > current)
     {
-        /* prepend some silence if the first sample doesn't start at 0 */
-        DWORD length = (start - current) * wfx->nAvgBytesPerSec / 10000000;
+        /* prepend at least 30ms of silence before the first sample */
+        DWORD length = (start + 300000 - current) * wfx->nAvgBytesPerSec / 10000000;
         length -= length % wfx->nBlockAlign;
 
         if (length != 0 && FAILED(hr = dsound_render_write_data(filter, NULL, length)))
