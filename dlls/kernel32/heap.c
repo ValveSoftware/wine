@@ -111,8 +111,11 @@ HANDLE WINAPI HeapCreate(
     }
     else
     {
+        ULONG hci = 2;
+
         ret = RtlCreateHeap( flags, NULL, maxSize, initialSize, NULL, NULL );
         if (!ret) SetLastError( ERROR_NOT_ENOUGH_MEMORY );
+        else      HeapSetInformation(ret, HeapCompatibilityInformation, &hci, sizeof(hci));
     }
     return ret;
 }
