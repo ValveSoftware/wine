@@ -276,10 +276,10 @@ static HRESULT WINAPI dsound_render_sink_Receive(struct strmbase_sink *iface, IM
 
     size = IMediaSample_GetActualDataLength(sample);
 
-    if (filter->write_pos == -1 && start > current)
+    if (filter->write_pos == -1 && (start + 300000) > current)
     {
-        /* prepend some silence if the first sample doesn't start at 0 */
-        DWORD length = (start - current) * wfx->nAvgBytesPerSec / 10000000;
+        /* prepend at least 30ms of silence before the first sample */
+        DWORD length = (start + 300000 - current) * wfx->nAvgBytesPerSec / 10000000;
         length -= length % wfx->nBlockAlign;
 
         if (length != 0 && FAILED(hr = dsound_render_write_data(filter, NULL, length)))
