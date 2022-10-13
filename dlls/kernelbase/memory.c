@@ -509,7 +509,10 @@ SIZE_T WINAPI DECLSPEC_HOTPATCH HeapCompact( HANDLE heap, DWORD flags )
 HANDLE WINAPI DECLSPEC_HOTPATCH HeapCreate( DWORD flags, SIZE_T init_size, SIZE_T max_size )
 {
     HANDLE ret = RtlCreateHeap( flags, NULL, max_size, init_size, NULL, NULL );
+    ULONG hci = 2;
+
     if (!ret) SetLastError( ERROR_NOT_ENOUGH_MEMORY );
+    else      HeapSetInformation( ret, HeapCompatibilityInformation, &hci, sizeof(hci) );
     return ret;
 }
 
