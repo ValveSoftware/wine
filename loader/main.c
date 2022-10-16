@@ -33,13 +33,99 @@
 #ifdef HAVE_SYS_SYSCTL_H
 # include <sys/sysctl.h>
 #endif
+#ifdef HAVE_LINK_H
+# include <link.h>
+#endif
+#ifdef HAVE_SYS_LINK_H
+# include <sys/link.h>
+#endif
 
 #include "main.h"
 
 extern char **environ;
 
-/* the preloader will set this variable */
+/* the preloader will set these variables */
 const struct wine_preload_info *wine_main_preload_info = NULL;
+void (*wine_dl_debug_state)(void) = NULL;
+struct r_debug *wine_r_debug = NULL;
+
+#ifdef __linux__
+
+static struct link_map so_link_map = {.l_name = (char *)""};
+static pthread_mutex_t link_map_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static void sync_wine_link_map(void)
+{
+    static struct r_debug *_r_debug;
+    struct link_map *next = &so_link_map, *prev = NULL, **rtld_map, **wine_map;
+
+    if (!_r_debug) _r_debug = dlsym( RTLD_NEXT, "_r_debug" );
+    rtld_map = &_r_debug->r_map;
+    wine_map = &next;
+
+    pthread_mutex_lock( &link_map_lock );
+
+    while (*rtld_map)
+    {
+        if (!*wine_map)
+        {
+            if (!(*wine_map = calloc( 1, sizeof(struct link_map) ))) break;
+            (*wine_map)->l_prev = prev;
+        }
+
+        prev = *wine_map;
+        (*wine_map)->l_addr = (*rtld_map)->l_addr;
+        (*wine_map)->l_name = strdup( (*rtld_map)->l_name );
+        (*wine_map)->l_ld = (*rtld_map)->l_ld;
+        rtld_map = &(*rtld_map)->l_next;
+        wine_map = &(*wine_map)->l_next;
+    }
+
+    /* remove the remaining wine entries */
+    next = *wine_map;
+    *wine_map = NULL;
+
+    while (next)
+    {
+        struct link_map *prev = next;
+        wine_map = &next->l_next;
+        next = *wine_map;
+        *wine_map = NULL;
+        free( prev->l_name );
+        free( prev );
+    }
+
+    pthread_mutex_unlock( &link_map_lock );
+
+    if (wine_r_debug) wine_r_debug->r_map = &so_link_map;
+    if (wine_dl_debug_state) wine_dl_debug_state();
+}
+
+void *dlopen( const char *file, int mode )
+{
+    static typeof(dlopen) *rtld_dlopen;
+    void *ret;
+
+    if (!rtld_dlopen) rtld_dlopen = dlsym( RTLD_NEXT, "dlopen" );
+    ret = rtld_dlopen( file, mode );
+
+    sync_wine_link_map();
+    return ret;
+}
+
+int dlclose( void *handle )
+{
+    static typeof(dlclose) *rtld_dlclose;
+    int ret;
+
+    if (!rtld_dlclose) rtld_dlclose = dlsym( RTLD_NEXT, "dlclose" );
+    ret = rtld_dlclose( handle );
+
+    sync_wine_link_map();
+    return ret;
+}
+
+#endif /* __linux__ */
 
 /* canonicalize path and return its directory name */
 static char *realpath_dirname( const char *name )

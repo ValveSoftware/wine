@@ -1359,6 +1359,9 @@ static void set_process_name( int argc, char *argv[] )
     for (i = 1; i < argc; i++) argv[i] -= off;
 }
 
+/* GDB hooks integration */
+struct r_debug _r_debug = {0};
+void _dl_debug_state(void) {}
 
 /*
  *  wld_start
@@ -1375,6 +1378,8 @@ void* wld_start( void **stack )
     struct wld_auxv new_av[8], delete_av[3], *av;
     struct wld_link_map main_binary_map, ld_so_map;
     struct wine_preload_info **wine_main_preload_info;
+    void (**wine_dl_debug_state)(void);
+    struct r_debug **wine_r_debug;
 
     pargc = *stack;
     argv = (char **)pargc + 1;
@@ -1446,6 +1451,16 @@ void* wld_start( void **stack )
     wine_main_preload_info = find_symbol( &main_binary_map, "wine_main_preload_info", STT_OBJECT );
     if (wine_main_preload_info) *wine_main_preload_info = preload_info;
     else wld_printf( "wine_main_preload_info not found\n" );
+
+    /* provide r_debug to inform GDB of loaded modules */
+    wine_r_debug = find_symbol( &main_binary_map, "wine_r_debug", STT_OBJECT );
+    if (wine_r_debug) *wine_r_debug = &_r_debug;
+    else wld_printf( "wine_r_debug not found\n" );
+
+    /* provide _dl_debug_state callback to trigger GDB hooks */
+    wine_dl_debug_state = find_symbol( &main_binary_map, "wine_dl_debug_state", STT_OBJECT );
+    if (wine_dl_debug_state) *wine_dl_debug_state = _dl_debug_state;
+    else wld_printf( "wine_dl_debug_state not found\n" );
 
 #define SET_NEW_AV(n,type,val) new_av[n].a_type = (type); new_av[n].a_un.a_val = (val);
     SET_NEW_AV( 0, AT_PHDR, (unsigned long)main_binary_map.l_phdr );
