@@ -162,7 +162,7 @@ static HRESULT dsound_render_write_data(struct dsound_render *filter, const void
 
 static HRESULT dsound_render_wait_play_end(struct dsound_render *filter)
 {
-    DWORD start_pos, play_pos, end_pos = filter->write_pos;
+    DWORD start_pos, play_pos, written, played = 0;
     HRESULT hr;
 
     if (FAILED(hr = IDirectSoundBuffer_GetCurrentPosition(filter->dsbuffer,
@@ -171,6 +171,8 @@ static HRESULT dsound_render_wait_play_end(struct dsound_render *filter)
         ERR("Failed to get buffer positions, hr %#lx\n", hr);
         return hr;
     }
+
+    written = filter->write_pos - start_pos + (filter->write_pos < start_pos ? filter->buffer_size : 0);
 
     if (FAILED(hr = dsound_render_write_data(filter, NULL, 0)))
         return hr;
@@ -186,13 +188,15 @@ static HRESULT dsound_render_wait_play_end(struct dsound_render *filter)
             return hr;
         }
 
-        if (play_pos - start_pos >= end_pos - start_pos)
+        played += play_pos - start_pos + (play_pos < start_pos ? filter->buffer_size : 0);
+        if (played >= written)
             break;
 
-        WARN("Waiting for EOS, start_pos %#lx, play_pos %#lx, end_pos %#lx\n",
-                start_pos, play_pos, end_pos);
+        WARN("Waiting for EOS, start_pos %#lx, play_pos %#lx, written %#lx, played %#lx\n",
+                start_pos, play_pos, written, played);
 
         WaitForMultipleObjects(2, handles, FALSE, INFINITE);
+        start_pos = play_pos;
     }
 
     return S_OK;
