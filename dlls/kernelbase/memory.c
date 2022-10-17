@@ -512,7 +512,8 @@ HANDLE WINAPI DECLSPEC_HOTPATCH HeapCreate( DWORD flags, SIZE_T init_size, SIZE_
     ULONG hci = 2;
 
     if (!ret) SetLastError( ERROR_NOT_ENOUGH_MEMORY );
-    else      HeapSetInformation( ret, HeapCompatibilityInformation, &hci, sizeof(hci) );
+    else if (!(flags & HEAP_CREATE_ENABLE_EXECUTE))
+        HeapSetInformation( ret, HeapCompatibilityInformation, &hci, sizeof(hci) );
     return ret;
 }
 
