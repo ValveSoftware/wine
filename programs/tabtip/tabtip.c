@@ -265,6 +265,10 @@ static DWORD WINAPI tabtip_exit_watcher(LPVOID lpParam)
     return 0;
 }
 
+static const char *osk_disable_appids[] = {
+    "1182900", /* A Plague Tale: Requiem */
+};
+
 static void tabtip_use_osk_check(void)
 {
     const char *var = getenv("SteamDeck");
@@ -273,6 +277,21 @@ static void tabtip_use_osk_check(void)
         use_steam_osk = TRUE;
     else
         use_steam_osk = FALSE;
+
+    if ((var = getenv("SteamAppId")))
+    {
+        int i;
+
+        for (i = 0; i < ARRAY_SIZE(osk_disable_appids); i++)
+        {
+            if (!strcmp(var, osk_disable_appids[i]))
+            {
+                WINE_TRACE("Disabling OSK auto-popup for appid %s\n", var);
+                use_steam_osk = FALSE;
+                break;
+            }
+        }
+    }
 
     WINE_TRACE("use_steam_osk=%d\n", use_steam_osk);
 }
