@@ -1614,6 +1614,8 @@ LONG WINAPI DisplayConfigGetDeviceInfo(DISPLAYCONFIG_DEVICE_INFO_HEADER *packet)
         if (packet->size < sizeof(*target_name))
             return ERROR_INVALID_PARAMETER;
 
+        memset(&target_name->flags, 0, sizeof(*target_name) - offsetof(DISPLAYCONFIG_TARGET_DEVICE_NAME, flags));
+        wcscpy(target_name->monitorFriendlyDeviceName, L"Display");
         return ERROR_NOT_SUPPORTED;
     }
     case DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE:
