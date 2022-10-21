@@ -42,6 +42,7 @@
 #include "d3dkmdt.h"
 #include "devguid.h"
 #include "setupapi.h"
+#include "ntddvdeo.h"
 #include "controls.h"
 #include "user_private.h"
 #include "wine/asm.h"
@@ -1608,15 +1609,90 @@ LONG WINAPI DisplayConfigGetDeviceInfo(DISPLAYCONFIG_DEVICE_INFO_HEADER *packet)
     case DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME:
     {
         DISPLAYCONFIG_TARGET_DEVICE_NAME *target_name = (DISPLAYCONFIG_TARGET_DEVICE_NAME *)packet;
+        BYTE iface_detail_buffer[sizeof(SP_DEVICE_INTERFACE_DETAIL_DATA_W) + 256 * sizeof(WCHAR)];
+        SP_DEVICE_INTERFACE_DATA iface = {sizeof(iface)};
+        SP_DEVICE_INTERFACE_DETAIL_DATA_W *iface_data;
+        UINT32 output_id;
+        HKEY key;
 
-        FIXME("DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME: stub\n");
+        TRACE("DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME.\n");
 
         if (packet->size < sizeof(*target_name))
             return ERROR_INVALID_PARAMETER;
 
         memset(&target_name->flags, 0, sizeof(*target_name) - offsetof(DISPLAYCONFIG_TARGET_DEVICE_NAME, flags));
         wcscpy(target_name->monitorFriendlyDeviceName, L"Display");
-        return ERROR_NOT_SUPPORTED;
+        mutex = get_display_device_init_mutex();
+
+        devinfo = SetupDiGetClassDevsW(&GUID_DEVINTERFACE_MONITOR, NULL, NULL, DIGCF_DEVICEINTERFACE | DIGCF_PRESENT);
+        if (devinfo == INVALID_HANDLE_VALUE)
+        {
+            release_display_device_init_mutex(mutex);
+            return ret;
+        }
+
+        iface_data = (SP_DEVICE_INTERFACE_DETAIL_DATA_W *)iface_detail_buffer;
+        iface_data->cbSize = sizeof(*iface_data);
+
+        memset(&target_name->flags, 0, sizeof(*target_name) - offsetof(DISPLAYCONFIG_TARGET_DEVICE_NAME, flags));
+        while (SetupDiEnumDeviceInterfaces(devinfo, NULL, &GUID_DEVINTERFACE_MONITOR, index++, &iface))
+        {
+            if (!SetupDiGetDeviceInterfaceDetailW(devinfo, &iface, iface_data,
+                                                  sizeof(iface_detail_buffer), NULL, &device_data))
+                continue;
+
+            if (!SetupDiGetDevicePropertyW(devinfo, &device_data, &DEVPROPKEY_MONITOR_GPU_LUID,
+                                           &type, (BYTE *)&gpu_luid, sizeof(gpu_luid), NULL, 0))
+                continue;
+
+            if ((target_name->header.adapterId.LowPart != gpu_luid.LowPart) ||
+                (target_name->header.adapterId.HighPart != gpu_luid.HighPart))
+                continue;
+
+            if (!SetupDiGetDevicePropertyW(devinfo, &device_data, &DEVPROPKEY_MONITOR_OUTPUT_ID,
+                                           &type, (BYTE *)&output_id, sizeof(output_id), NULL, 0))
+                continue;
+
+            if (target_name->header.id != output_id)
+                continue;
+
+            swprintf(target_name->monitorFriendlyDeviceName, sizeof(target_name->monitorFriendlyDeviceName),
+                     L"Display%u.\n", output_id);
+            wcscpy(target_name->monitorDevicePath, iface_data->DevicePath);
+            key = SetupDiOpenDevRegKey(devinfo, &device_data, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
+            if (key != INVALID_HANDLE_VALUE)
+            {
+                unsigned char edid[2048];
+                unsigned int i, j;
+                const char *s;
+                DWORD size;
+
+                size = sizeof(edid);
+                if (!RegQueryValueExW(key, L"edid", NULL, NULL, edid, &size) && size >= 128)
+                {
+                    for (i = 0; i < 4; ++i)
+                    {
+                        if (edid[54 + i * 18 + 3] != 0xfc) continue;
+                        /* "Display name" ASCII descriptor. */
+                        s = (const char *)&edid[54 + i * 18 + 5];
+                        for (j = 0; s[j] && j < 13; ++j)
+                            target_name->monitorFriendlyDeviceName[j] = s[j];
+                        while (j && isspace(s[j - 1])) --j;
+                        target_name->monitorFriendlyDeviceName[j] = 0;
+                        target_name->flags.u.s.friendlyNameFromEdid = 1;
+                    }
+                }
+                RegCloseKey(key);
+            }
+            ret = ERROR_SUCCESS;
+            break;
+        }
+
+        SetupDiDestroyDeviceInfoList(devinfo);
+        release_display_device_init_mutex(mutex);
+        if (ret)
+            WARN("DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_NAME error %d.\n", ret);
+        return ret;
     }
     case DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE:
     {
