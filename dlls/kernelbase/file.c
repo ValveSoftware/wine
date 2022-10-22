@@ -594,6 +594,14 @@ BOOL WINAPI DECLSPEC_HOTPATCH CopyFileW( const WCHAR *source, const WCHAR *dest,
     return CopyFileExW( source, dest, NULL, NULL, NULL, fail_if_exists ? COPY_FILE_FAIL_IF_EXISTS : 0 );
 }
 
+/***********************************************************************
+ *	CreateDirectoryTransactedA   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH CreateDirectoryTransactedA(LPCSTR template, LPCSTR path, LPSECURITY_ATTRIBUTES sa, HANDLE hTransaction)
+{
+    FIXME("(%s %s %p %p), semi-stub\n", debugstr_a(template), debugstr_a(path), sa, hTransaction);
+    return CreateDirectoryA(path, sa);
+}
 
 /***********************************************************************
  *	CreateDirectoryA   (kernelbase.@)
@@ -606,6 +614,14 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateDirectoryA( LPCSTR path, LPSECURITY_ATTRIBUT
     return CreateDirectoryW( pathW, sa );
 }
 
+/***********************************************************************
+ *	CreateDirectoryTransactedW   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH CreateDirectoryTransactedW(LPCWSTR template, LPCWSTR path, LPSECURITY_ATTRIBUTES sa, HANDLE hTransaction)
+{
+    FIXME("(%s %s %p %p), semi-stub\n", debugstr_w(template), debugstr_w(path), sa, hTransaction);
+    return CreateDirectoryW(path, sa);
+}
 
 /***********************************************************************
  *	CreateDirectoryW   (kernelbase.@)
@@ -693,6 +709,20 @@ HANDLE WINAPI DECLSPEC_HOTPATCH CreateFile2( LPCWSTR name, DWORD access, DWORD s
     return CreateFileW( name, access, sharing, sa, creation, flags | attributes, template );
 }
 
+/*************************************************************************
+ *	CreateFileTransactedA   (kernelbase.@)
+ */
+HANDLE WINAPI DECLSPEC_HOTPATCH CreateFileTransactedA( LPCSTR name, DWORD access, DWORD sharing,
+                                                       LPSECURITY_ATTRIBUTES sa, DWORD creation,
+                                                       DWORD attributes, HANDLE template,
+                                                       HANDLE transaction, PUSHORT pusMiniVersion,
+                                                       PVOID pExtendedParameter )
+{
+    FIXME( "(%s %lx %lx %p %lx %lx %p %p %p %p), semi-stub\n", debugstr_a(name), access, sharing, sa,
+           creation, attributes, template, transaction, pusMiniVersion, pExtendedParameter );
+    
+    return CreateFileA( name, access, sharing, sa, creation, attributes, template );
+}
 
 /*************************************************************************
  *	CreateFileA   (kernelbase.@)
@@ -729,6 +759,20 @@ static UINT get_nt_file_options( DWORD attributes )
     if (attributes & FILE_FLAG_WRITE_THROUGH)
         options |= FILE_WRITE_THROUGH;
     return options;
+}
+
+/*************************************************************************
+ *	CreateFileTransactedW   (kernelbase.@)
+ */
+HANDLE WINAPI DECLSPEC_HOTPATCH CreateFileTransactedW( LPCWSTR name, DWORD access, DWORD sharing,
+                                                       LPSECURITY_ATTRIBUTES sa, DWORD creation,
+                                                       DWORD attributes, HANDLE template, HANDLE transaction,
+                                                       PUSHORT pusMiniVersion, PVOID pExtendedParameter )
+{
+    FIXME( "(%s %lx %lx %p %lx %lx %p %p %p %p), semi-stub\n", debugstr_w(name), access, sharing, sa,
+           creation, attributes, template, transaction, pusMiniVersion, pExtendedParameter );
+
+    return CreateFileW( name, access, sharing, sa, creation, attributes, template );
 }
 
 /*************************************************************************
@@ -943,6 +987,14 @@ BOOLEAN WINAPI /* DECLSPEC_HOTPATCH */ CreateSymbolicLinkW( LPCWSTR link, LPCWST
     return TRUE;
 }
 
+/***********************************************************************
+ *	DeleteFileTransactedA   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH DeleteFileTransactedA(LPCSTR path, HANDLE hTransaction)
+{
+    FIXME("(%s %p): semi-stub\n", debugstr_a(path), hTransaction);
+    return DeleteFileA(path);
+}
 
 /***********************************************************************
  *	DeleteFileA   (kernelbase.@)
@@ -955,6 +1007,14 @@ BOOL WINAPI DECLSPEC_HOTPATCH DeleteFileA( LPCSTR path )
     return DeleteFileW( pathW );
 }
 
+/***********************************************************************
+ *	DeleteFileTransactedW   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH DeleteFileTransactedW(LPCWSTR path, HANDLE hTransaction)
+{
+    FIXME("(%s %p): semi-stub\n", debugstr_w(path), hTransaction);
+    return DeleteFileW(path);
+}
 
 /***********************************************************************
  *	DeleteFileW   (kernelbase.@)
@@ -1074,6 +1134,16 @@ BOOL WINAPI DECLSPEC_HOTPATCH FindNextChangeNotification( HANDLE handle )
     return set_ntstatus( status );
 }
 
+/******************************************************************************
+ *	FindFirstFileTransactedA   (kernelbase.@)
+ */
+HANDLE WINAPI DECLSPEC_HOTPATCH FindFirstFileTransactedA(LPCSTR filename, FINDEX_INFO_LEVELS level,
+                                                  LPVOID data, FINDEX_SEARCH_OPS search_op,
+                                                  LPVOID filter, DWORD flags, HANDLE hTransaction)
+{
+    FIXME( "(%s %d %p %d %p %lx %p): semi-stub\n", debugstr_a(filename), level, data, search_op, filter, flags, hTransaction );
+    return FindFirstFileExA(filename, level, data, search_op, filter, flags);
+}
 
 /******************************************************************************
  *	FindFirstFileExA   (kernelbase.@)
@@ -1104,6 +1174,16 @@ HANDLE WINAPI DECLSPEC_HOTPATCH FindFirstFileExA( const char *filename, FINDEX_I
     return handle;
 }
 
+/******************************************************************************
+ *	FindFirstFileTransactedW   (kernelbase.@)
+ */
+HANDLE WINAPI DECLSPEC_HOTPATCH FindFirstFileTransactedW(LPCWSTR filename, FINDEX_INFO_LEVELS level,
+                                                  LPVOID data, FINDEX_SEARCH_OPS search_op,
+                                                  LPVOID filter, DWORD flags, HANDLE hTransaction)
+{
+    FIXME( "(%s %d %p %d %p %lx %p): semi-stub\n", debugstr_w(filename), level, data, search_op, filter, flags, hTransaction );
+    return FindFirstFileExW(filename, level, data, search_op, filter, flags);
+}
 
 /******************************************************************************
  *	FindFirstFileExW   (kernelbase.@)
@@ -1563,6 +1643,14 @@ UINT WINAPI DECLSPEC_HOTPATCH GetCurrentDirectoryW( UINT buflen, LPWSTR buf )
     return RtlGetCurrentDirectory_U( buflen * sizeof(WCHAR), buf ) / sizeof(WCHAR);
 }
 
+/**************************************************************************
+ *	GetFileAttributesTransactedA   (kernelbase.@)
+ */
+DWORD WINAPI DECLSPEC_HOTPATCH GetFileAttributesTransactedA(LPCSTR name, GET_FILEEX_INFO_LEVELS level, void *ptr, HANDLE hTransaction)
+{
+    FIXME("(%s %p): semi-stub\n", debugstr_a(name), hTransaction);
+    return GetFileAttributesExA(name, level, ptr);
+}
 
 /**************************************************************************
  *	GetFileAttributesA   (kernelbase.@)
@@ -1575,6 +1663,14 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetFileAttributesA( LPCSTR name )
     return GetFileAttributesW( nameW );
 }
 
+/**************************************************************************
+ *	GetFileAttributesTransactedW   (kernelbase.@)
+ */
+DWORD WINAPI DECLSPEC_HOTPATCH GetFileAttributesTransactedW(LPCWSTR name, GET_FILEEX_INFO_LEVELS level, void *ptr, HANDLE hTransaction)
+{
+    FIXME("(%s %p): semi-stub\n", debugstr_w(name), hTransaction);
+    return GetFileAttributesExW(name, level, ptr);
+}
 
 /**************************************************************************
  *	GetFileAttributesW   (kernelbase.@)
@@ -3458,6 +3554,14 @@ BOOL WINAPI DECLSPEC_HOTPATCH ReadFileScatter( HANDLE file, FILE_SEGMENT_ELEMENT
                                             segments, count, &offset, NULL ));
 }
 
+/***********************************************************************
+ *	RemoveDirectoryTransactedA   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH RemoveDirectoryTransactedA( LPCSTR path, HANDLE hTransaction )
+{
+    FIXME("(%s %p), semi-stub\n", debugstr_a(path), hTransaction);
+    return RemoveDirectoryA(path);
+}
 
 /***********************************************************************
  *	RemoveDirectoryA   (kernelbase.@)
@@ -3470,6 +3574,14 @@ BOOL WINAPI DECLSPEC_HOTPATCH RemoveDirectoryA( LPCSTR path )
     return RemoveDirectoryW( pathW );
 }
 
+/***********************************************************************
+ *	RemoveDirectoryTransactedW   (kernelbase.@)
+ */
+BOOL WINAPI DECLSPEC_HOTPATCH RemoveDirectoryTransactedW( LPCWSTR path, HANDLE hTransaction )
+{
+    FIXME("(%s %p), semi-stub\n", debugstr_w(path), hTransaction);
+    return RemoveDirectoryW(path);
+}
 
 /***********************************************************************
  *	RemoveDirectoryW   (kernelbase.@)

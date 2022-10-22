@@ -177,7 +177,9 @@
 @ stdcall CreateBoundaryDescriptorW(wstr long)
 @ stdcall CreateConsoleScreenBuffer(long long ptr long ptr)
 @ stdcall CreateDirectoryA(str ptr)
+@ stdcall CreateDirectoryTransactedA(str str ptr ptr)
 @ stdcall CreateDirectoryExW(wstr wstr ptr)
+@ stdcall CreateDirectoryTransactedW(wstr wstr ptr ptr)
 @ stdcall CreateDirectoryW(wstr ptr)
 # @ stub CreateEnclave
 @ stdcall CreateEventA(ptr long long str)
@@ -188,10 +190,12 @@
 @ stdcall CreateFiberEx(long long long ptr ptr)
 @ stdcall CreateFile2(wstr long long long ptr)
 @ stdcall CreateFileA(str long long ptr long long long)
+@ stdcall CreateFileTransactedA(str long long ptr long long long ptr ptr ptr)
 @ stdcall CreateFileMappingFromApp(long ptr long int64 wstr)
 @ stdcall CreateFileMappingNumaW(long ptr long long long wstr long)
 @ stdcall CreateFileMappingW(long ptr long long long wstr)
 @ stdcall CreateFileW(wstr long long ptr long long long)
+@ stdcall CreateFileTransactedW(wstr long long ptr long long long ptr ptr ptr)
 @ stdcall CreateHardLinkA(str str ptr)
 @ stdcall CreateHardLinkW(wstr wstr ptr)
 @ stdcall CreateIoCompletionPort(long long long long)
@@ -253,7 +257,9 @@
 @ stdcall DeleteCriticalSection(ptr) ntdll.RtlDeleteCriticalSection
 @ stdcall DeleteFiber(ptr)
 @ stdcall DeleteFileA(str)
+@ stdcall DeleteFileTransactedA(str ptr)
 @ stdcall DeleteFileW(wstr)
+@ stdcall DeleteFileTransactedW(wstr ptr)
 @ stdcall DeleteProcThreadAttributeList(ptr)
 # @ stub DeleteStateAtomValue
 # @ stub DeleteStateContainer
@@ -358,7 +364,9 @@
 @ stdcall FindFirstChangeNotificationW(wstr long long)
 @ stdcall FindFirstFileA(str ptr)
 @ stdcall FindFirstFileExA(str long ptr long ptr long)
+@ stdcall FindFirstFileTransactedA(str long ptr long ptr long ptr)
 @ stdcall FindFirstFileExW(wstr long ptr long ptr long)
+@ stdcall FindFirstFileTransactedW(wstr long ptr long ptr long ptr)
 # @ stub FindFirstFileNameW
 @ stdcall FindFirstFileW(wstr ptr)
 @ stdcall FindFirstFreeAce(ptr ptr)
@@ -507,7 +515,9 @@
 @ stub GetFallbackDisplayName
 @ stdcall GetFileAttributesA(str)
 @ stdcall GetFileAttributesExA(str long ptr)
+@ stdcall GetFileAttributesTransactedA(str long ptr ptr)
 @ stdcall GetFileAttributesExW(wstr long ptr)
+@ stdcall GetFileAttributesTransactedW(wstr long ptr ptr)
 @ stdcall GetFileAttributesW(wstr)
 @ stdcall GetFileInformationByHandle(long ptr)
 @ stdcall GetFileInformationByHandleEx(long long ptr long)
@@ -1338,6 +1348,8 @@
 @ stdcall RemapPredefinedHandleInternal(long long)
 @ stdcall RemoveDirectoryA(str)
 @ stdcall RemoveDirectoryW(wstr)
+@ stdcall RemoveDirectoryTransactedA(str ptr)
+@ stdcall RemoveDirectoryTransactedW(wstr ptr)
 @ stdcall RemoveDllDirectory(ptr)
 # @ stub RemovePackageStatus
 # @ stub RemovePackageStatusForUser
