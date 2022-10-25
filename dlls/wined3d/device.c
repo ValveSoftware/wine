@@ -5913,7 +5913,10 @@ LRESULT device_process_message(struct wined3d_device *device, HWND window, BOOL 
     }
     else if (message == WM_DISPLAYCHANGE)
     {
+        BOOL inside_mode_change = wined3d_set_inside_mode_change(window, TRUE);
+
         device->device_parent->ops->mode_changed(device->device_parent);
+        wined3d_set_inside_mode_change(window, inside_mode_change);
     }
     else if (message == WM_ACTIVATEAPP)
     {
@@ -5940,7 +5943,7 @@ LRESULT device_process_message(struct wined3d_device *device, HWND window, BOOL 
                 DefWindowProcA(window, message, wparam, lparam);
         }
     }
-    else if (message == WM_SIZE)
+    else if (message == WM_SIZE && !wined3d_get_inside_mode_change(window))
     {
         if (!IsIconic(window))
             PostMessageW(window, WM_ACTIVATEAPP, 1, GetCurrentThreadId());

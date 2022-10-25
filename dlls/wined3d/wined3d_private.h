@@ -3676,6 +3676,9 @@ struct wined3d
 BOOL wined3d_filter_messages(HWND window, BOOL filter) DECLSPEC_HIDDEN;
 BOOL wined3d_get_activate_processed(HWND window) DECLSPEC_HIDDEN;
 void wined3d_set_activate_processed(HWND window, BOOL activate_processed) DECLSPEC_HIDDEN;
+BOOL wined3d_get_inside_mode_change(HWND window) DECLSPEC_HIDDEN;
+BOOL wined3d_set_inside_mode_change(HWND window, BOOL inside_mode_change) DECLSPEC_HIDDEN;
+
 
 HRESULT wined3d_init(struct wined3d *wined3d, DWORD flags) DECLSPEC_HIDDEN;
 void wined3d_unregister_window(HWND window) DECLSPEC_HIDDEN;
