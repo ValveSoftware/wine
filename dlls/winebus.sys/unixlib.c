@@ -112,6 +112,24 @@ BOOL is_thrustmaster_hotas(WORD vid, WORD pid)
     return vid == 0x044F && (pid == 0xB679 || pid == 0xB687 || pid == 0xB10A);
 }
 
+BOOL is_simucube_wheel(WORD vid, WORD pid)
+{
+    if (vid != 0x16D0) return FALSE;
+    if (pid == 0x0D61) return TRUE; /* Simucube 2 Sport */
+    if (pid == 0x0D60) return TRUE; /* Simucube 2 Pro */
+    if (pid == 0x0D5F) return TRUE; /* Simucube 2 Ultimate */
+    if (pid == 0x0D5A) return TRUE; /* Simucube 1 */
+    return FALSE;
+}
+
+BOOL is_fanatec_pedals(WORD vid, WORD pid)
+{
+    if (vid != 0x0EB7) return FALSE;
+    if (pid == 0x183B) return TRUE; /* Fanatec ClubSport Pedals v3 */
+    if (pid == 0x1839) return TRUE; /* Fanatec ClubSport Pedals v1/v2 */
+    return FALSE;
+}
+
 struct mouse_device
 {
     struct unix_device unix_device;
