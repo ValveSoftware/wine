@@ -37,6 +37,7 @@ struct wined3d_wndproc
     BOOL unicode;
     BOOL filter;
     BOOL activate_processed;
+    BOOL inside_mode_change;
     WNDPROC proc;
     struct wined3d_device *device;
     uint32_t flags;
@@ -569,6 +570,41 @@ void wined3d_set_activate_processed(HWND window, BOOL activate_processed)
     wined3d_wndproc_mutex_unlock();
 }
 
+BOOL wined3d_get_inside_mode_change(HWND window)
+{
+    struct wined3d_wndproc *entry;
+    BOOL ret;
+
+    wined3d_wndproc_mutex_lock();
+
+    if (!(entry = wined3d_find_wndproc(window, NULL)))
+    {
+        wined3d_wndproc_mutex_unlock();
+        return FALSE;
+    }
+    ret = entry->inside_mode_change;
+    wined3d_wndproc_mutex_unlock();
+    return ret;
+}
+
+BOOL wined3d_set_inside_mode_change(HWND window, BOOL inside_mode_change)
+{
+    struct wined3d_wndproc *entry;
+    BOOL ret;
+
+    wined3d_wndproc_mutex_lock();
+
+    if (!(entry = wined3d_find_wndproc(window, NULL)))
+    {
+        wined3d_wndproc_mutex_unlock();
+        return FALSE;
+    }
+    ret = entry->inside_mode_change;
+    entry->inside_mode_change = inside_mode_change;
+    wined3d_wndproc_mutex_unlock();
+    return ret;
+}
+
 static LRESULT CALLBACK wined3d_wndproc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
 {
     struct wined3d_wndproc *entry;
@@ -706,6 +742,7 @@ BOOL CDECL wined3d_register_window(struct wined3d *wined3d, HWND window,
     entry->wined3d = wined3d;
     entry->flags = flags;
     entry->activate_processed = FALSE;
+    entry->inside_mode_change = FALSE;
 
     wined3d_wndproc_mutex_unlock();
 
