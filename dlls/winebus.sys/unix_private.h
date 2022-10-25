@@ -273,5 +273,7 @@ BOOL is_dualshock4_gamepad(WORD vid, WORD pid) DECLSPEC_HIDDEN;
 BOOL is_dualsense_gamepad(WORD vid, WORD pid) DECLSPEC_HIDDEN;
 BOOL is_logitech_g920(WORD vid, WORD pid) DECLSPEC_HIDDEN;
 BOOL is_thrustmaster_hotas(WORD vid, WORD pid) DECLSPEC_HIDDEN;
+BOOL is_simucube_wheel(WORD vid, WORD pid) DECLSPEC_HIDDEN;
+BOOL is_fanatec_pedals(WORD vid, WORD pid) DECLSPEC_HIDDEN;
 
 #endif /* __WINEBUS_UNIX_PRIVATE_H */
