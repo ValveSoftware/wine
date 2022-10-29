@@ -1932,6 +1932,37 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetEnvironmentVariableW( LPCWSTR name, LPCWSTR val
         return FALSE;
     }
 
+    if (name && !lstrcmpW( name, L"QT_OPENGL" ) && value && !lstrcmpW( value, L"angle" ))
+    {
+        static const WCHAR *names[] =
+        {
+            L"\\EADesktop.exe",
+            L"\\Link2EA.exe",
+            L"\\EAConnect_microsoft.exe",
+            L"\\EALaunchHelper.exe",
+            L"\\EACrashReporter.exe",
+            L"EA Desktop\\ErrorReporter.exe",
+        };
+        unsigned int i, len;
+        WCHAR module[256];
+        DWORD size;
+
+        if ((size = GetModuleFileNameW( NULL, module, ARRAY_SIZE(module) )) && size < ARRAY_SIZE(module))
+        {
+            for (i = 0; i < ARRAY_SIZE(names); ++i)
+            {
+                len = lstrlenW(names[i]);
+                if (size > len && !memcmp( module + size - len, names[i], len * sizeof(*module) ))
+                {
+                    value = L"desktop";
+                    FIXME( "HACK: setting QT_OPENGL=desktop.\n" );
+                    break;
+                }
+            }
+        }
+    }
+
+
     RtlInitUnicodeString( &us_name, name );
     if (value)
     {
