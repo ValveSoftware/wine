@@ -1984,8 +1984,24 @@ static GLXContext get_common_context( GLXFBConfig fbconfig )
         if (e)
             share_all_contexts = !!atoi(e);
         else
+        {
             share_all_contexts = sgi && (!strcmp( sgi, "232050" ) || !strcmp( sgi, "333420" ));
+            if (!share_all_contexts)
+            {
+                static const WCHAR ea_desktop[] = u"EADesktop.exe";
+                UNICODE_STRING *name;
+                DWORD len, name_len;
 
+                name = &NtCurrentTeb()->Peb->ProcessParameters->ImagePathName;
+                len = name->Length / sizeof(WCHAR);
+                if (len && !name->Buffer[len]) --len;
+                name_len = sizeof(ea_desktop) / sizeof(*ea_desktop) - 1;
+
+                if (len >= name_len)
+                    share_all_contexts = !memcmp( name->Buffer + len - name_len, ea_desktop,
+                                                  name_len * sizeof(*ea_desktop) );
+            }
+        }
         if (share_all_contexts)
             FIXME( "HACK: sharing all the GL contexts.\n" );
     }
