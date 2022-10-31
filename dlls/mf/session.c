@@ -4163,6 +4163,13 @@ static HRESULT WINAPI session_rate_control_SetRate(IMFRateControl *iface, BOOL t
 
     TRACE("%p, %d, %f.\n", iface, thin, rate);
 
+    if (!rate)
+    {
+        /* The Anacrusis fails to play its video if we succeed here */
+        ERR("Scrubbing not implemented!\n");
+        return E_NOTIMPL;
+    }
+
     if (FAILED(hr = create_session_op(SESSION_CMD_SET_RATE, &op)))
         return hr;
 
