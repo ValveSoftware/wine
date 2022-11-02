@@ -1835,6 +1835,10 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetEnvironmentVariableW( LPCWSTR name, LPCWSTR val
         {
             L"\\EADesktop.exe",
             L"\\Link2EA.exe",
+            L"\\EAConnect_microsoft.exe",
+            L"\\EALaunchHelper.exe",
+            L"\\EACrashReporter.exe",
+            L"EA Desktop\\ErrorReporter.exe",
         };
         unsigned int i, len;
         WCHAR module[256];
