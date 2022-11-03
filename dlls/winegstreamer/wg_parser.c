@@ -546,6 +546,19 @@ static gboolean autoplug_continue_cb(GstElement * decodebin, GstPad *pad, GstCap
     return !caps_is_compressed(caps);
 }
 
+gboolean caps_detect_h264(GstCapsFeatures *features, GstStructure *structure, gpointer user_data)
+{
+    const char *cap_name = gst_structure_get_name(structure);
+
+    if (!strcmp(cap_name, "video/x-h264"))
+    {
+        touch_h264_used_tag();
+        return FALSE;
+    }
+
+    return TRUE;
+}
+
 static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
         GstCaps *caps, GstElementFactory *fact, gpointer user)
 {
@@ -554,6 +567,8 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
     const char *klass = gst_element_factory_get_klass(fact);
 
     GST_INFO("Using \"%s\".", name);
+
+    gst_caps_foreach(caps, caps_detect_h264, NULL);
 
     if (parser->error)
         return GST_AUTOPLUG_SELECT_SKIP;
