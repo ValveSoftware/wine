@@ -553,6 +553,9 @@ NTSTATUS wg_transform_create(void *args)
     GST_INFO("transform %p input caps %"GST_PTR_FORMAT, transform, transform->input_caps);
     input_mime = gst_structure_get_name(gst_caps_get_structure(transform->input_caps, 0));
 
+    if (!strcmp(input_mime, "video/x-h264"))
+        touch_h264_used_tag();
+
     if (!(transform->output_caps = caps_from_media_type(&params->output_type)))
         goto out;
     GST_INFO("transform %p output caps %"GST_PTR_FORMAT, transform, transform->output_caps);
