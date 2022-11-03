@@ -25,6 +25,11 @@
 
 #include <gst/gst.h>
 
+#include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+
 extern bool init_gstreamer(void) DECLSPEC_HIDDEN;
 extern GstElement *create_element(const char *name, const char *plugin_set) DECLSPEC_HIDDEN;
 extern bool append_element(GstBin *bin, GstElement *element, GstElement **first, GstElement **last) DECLSPEC_HIDDEN;
@@ -46,5 +51,35 @@ extern GstAllocator *wg_allocator_create(wg_allocator_request_sample_cb request_
 extern void wg_allocator_destroy(GstAllocator *allocator) DECLSPEC_HIDDEN;
 extern void wg_allocator_release_sample(GstAllocator *allocator, struct wg_sample *sample,
         bool discard_data) DECLSPEC_HIDDEN;
+
+static inline void touch_h264_used_tag(void)
+{
+    const char *e;
+
+    GST_LOG("h264 is used");
+
+    if ((e = getenv("STEAM_COMPAT_SHADER_PATH")))
+    {
+        char buffer[PATH_MAX];
+        int fd;
+
+        snprintf(buffer, sizeof(buffer), "%s/h264-used", e);
+
+        fd = open(buffer, O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH | S_IWOTH);
+        if (fd == -1)
+        {
+            GST_WARNING("Failed to open/create \"%s/h264-used\"", e);
+            return;
+        }
+
+        futimens(fd, NULL);
+
+        close(fd);
+    }
+    else
+    {
+        GST_WARNING("STEAM_COMPAT_SHADER_PATH not set, cannot create h264-used file");
+    }
+}
 
 #endif /* __WINE_WINEGSTREAMER_UNIX_PRIVATE_H */

@@ -361,6 +361,10 @@ NTSTATUS wg_transform_create(void *args)
     const gchar *media_type;
     GstEvent *event;
 
+    /* to detect h264_decoder_create() */
+    if (input_format.major_type == WG_MAJOR_TYPE_VIDEO_H264)
+        touch_h264_used_tag();
+
     if (!init_gstreamer())
         return STATUS_UNSUCCESSFUL;
 
