@@ -559,7 +559,12 @@ NTSTATUS wg_transform_create(void *args)
     output_mime = gst_structure_get_name(gst_caps_get_structure(transform->output_caps, 0));
 
     if (IsEqualGUID(&params->input_type.major, &MFMediaType_Video))
+    {
+        /* to detect h264_decoder_create() */
+        if (IsEqualGUID(&params->input_type.u.video->guidFormat, &MFVideoFormat_H264))
+            touch_h264_used_tag();
         transform->input_info = params->input_type.u.video->videoInfo;
+    }
     if (IsEqualGUID(&params->output_type.major, &MFMediaType_Video))
         transform->output_info = params->output_type.u.video->videoInfo;
 
