@@ -424,6 +424,7 @@ HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback
 HRESULT WINAPI UiaRemoveEvent(HUIAEVENT huiaevent);
 HRESULT WINAPI UiaEventAddWindow(HUIAEVENT huiaevent, HWND hwnd);
 HRESULT WINAPI UiaEventRemoveWindow(HUIAEVENT huiaevent, HWND hwnd);
+HRESULT WINAPI UiaProviderForNonClient(HWND hwnd, long objid, long child_id, IRawElementProviderSimple **elprov);
 
 #ifdef __cplusplus
 }

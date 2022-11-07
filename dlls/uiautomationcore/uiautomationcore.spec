@@ -82,7 +82,7 @@
 @ stdcall UiaNodeFromProvider(ptr ptr)
 @ stdcall UiaNodeRelease(ptr)
 @ stub UiaPatternRelease
-#@ stub UiaProviderForNonClient
+@ stdcall UiaProviderForNonClient(ptr long long ptr)
 @ stdcall UiaProviderFromIAccessible(ptr long long ptr)
 @ stub UiaRaiseAsyncContentLoadedEvent
 @ stdcall UiaRaiseAutomationEvent(ptr long)

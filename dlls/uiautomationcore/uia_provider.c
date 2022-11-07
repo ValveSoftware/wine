@@ -1166,6 +1166,165 @@ HRESULT WINAPI UiaProviderFromIAccessible(IAccessible *acc, long child_id, DWORD
 }
 
 /*
+ * UiaProviderForNonClient IRawElementProviderSimple interface.
+ */
+struct nc_provider {
+    IRawElementProviderSimple IRawElementProviderSimple_iface;
+    LONG refcount;
+
+    HWND hwnd;
+};
+
+static inline struct nc_provider *impl_from_nc_provider(IRawElementProviderSimple *iface)
+{
+    return CONTAINING_RECORD(iface, struct nc_provider, IRawElementProviderSimple_iface);
+}
+
+HRESULT WINAPI nc_provider_QueryInterface(IRawElementProviderSimple *iface, REFIID riid, void **ppv)
+{
+    *ppv = NULL;
+    if (IsEqualIID(riid, &IID_IRawElementProviderSimple) || IsEqualIID(riid, &IID_IUnknown))
+        *ppv = iface;
+    else
+        return E_NOINTERFACE;
+
+    IRawElementProviderSimple_AddRef(iface);
+    return S_OK;
+}
+
+ULONG WINAPI nc_provider_AddRef(IRawElementProviderSimple *iface)
+{
+    struct nc_provider *nc_prov = impl_from_nc_provider(iface);
+    ULONG refcount = InterlockedIncrement(&nc_prov->refcount);
+
+    TRACE("%p, refcount %ld\n", iface, refcount);
+
+    return refcount;
+}
+
+ULONG WINAPI nc_provider_Release(IRawElementProviderSimple *iface)
+{
+    struct nc_provider *nc_prov = impl_from_nc_provider(iface);
+    ULONG refcount = InterlockedDecrement(&nc_prov->refcount);
+
+    TRACE("%p, refcount %ld\n", iface, refcount);
+
+    if (!refcount)
+    {
+        heap_free(nc_prov);
+    }
+
+    return refcount;
+}
+
+HRESULT WINAPI nc_provider_get_ProviderOptions(IRawElementProviderSimple *iface,
+        enum ProviderOptions *ret_val)
+{
+    TRACE("%p, %p\n", iface, ret_val);
+    *ret_val = ProviderOptions_ClientSideProvider | ProviderOptions_NonClientAreaProvider |
+                    ProviderOptions_ProviderOwnsSetFocus;
+    return S_OK;
+}
+
+HRESULT WINAPI nc_provider_GetPatternProvider(IRawElementProviderSimple *iface,
+        PATTERNID pattern_id, IUnknown **ret_val)
+{
+    FIXME("%p, %d, %p: stub\n", iface, pattern_id, ret_val);
+    *ret_val = NULL;
+    return E_NOTIMPL;
+}
+
+HRESULT WINAPI nc_provider_GetPropertyValue(IRawElementProviderSimple *iface,
+        PROPERTYID prop_id, VARIANT *ret_val)
+{
+    TRACE("%p, %d, %p\n", iface, prop_id, ret_val);
+
+    VariantInit(ret_val);
+    switch (prop_id)
+    {
+    case UIA_ProviderDescriptionPropertyId:
+        V_VT(ret_val) = VT_BSTR;
+        V_BSTR(ret_val) = SysAllocString(L"Wine: Non-Client Proxy");
+        break;
+
+    case UIA_IsKeyboardFocusablePropertyId:
+        variant_init_bool(ret_val, TRUE);
+        break;
+
+    default:
+        break;
+    }
+
+    return S_OK;
+}
+
+HRESULT WINAPI nc_provider_get_HostRawElementProvider(IRawElementProviderSimple *iface,
+        IRawElementProviderSimple **ret_val)
+{
+    struct nc_provider *nc_prov = impl_from_nc_provider(iface);
+
+    TRACE("%p, %p\n", iface, ret_val);
+
+    return UiaHostProviderFromHwnd(nc_prov->hwnd, ret_val);
+}
+
+static const IRawElementProviderSimpleVtbl nc_provider_vtbl = {
+    nc_provider_QueryInterface,
+    nc_provider_AddRef,
+    nc_provider_Release,
+    nc_provider_get_ProviderOptions,
+    nc_provider_GetPatternProvider,
+    nc_provider_GetPropertyValue,
+    nc_provider_get_HostRawElementProvider,
+};
+
+HRESULT WINAPI UiaProviderForNonClient(HWND hwnd, long objid, long child_id,
+        IRawElementProviderSimple **elprov)
+{
+    TRACE("(%p, %ld, %ld, %p): stub\n", hwnd, objid, child_id, elprov);
+
+    if (!elprov)
+        return E_INVALIDARG;
+
+    *elprov = NULL;
+    if (!hwnd)
+        return E_INVALIDARG;
+
+    if (!IsWindow(hwnd))
+        return UIA_E_ELEMENTNOTAVAILABLE;
+
+    switch (objid)
+    {
+    case OBJID_WINDOW:
+    {
+        struct nc_provider *nc_prov = heap_alloc_zero(sizeof(*nc_prov));
+
+        if (!nc_prov)
+            return E_OUTOFMEMORY;
+
+        nc_prov->IRawElementProviderSimple_iface.lpVtbl = &nc_provider_vtbl;
+        nc_prov->refcount = 1;
+        nc_prov->hwnd = hwnd;
+        *elprov = &nc_prov->IRawElementProviderSimple_iface;
+        break;
+    }
+
+    case OBJID_VSCROLL:
+    case OBJID_HSCROLL:
+    case OBJID_TITLEBAR:
+    case OBJID_MENU:
+    case OBJID_SIZEGRIP:
+        FIXME("Nonclient proxy for objid %ld currently unimplemented\n", objid);
+        return E_NOTIMPL;
+
+    default:
+        return E_INVALIDARG;
+    }
+
+    return S_OK;
+}
+
+/*
  * UI Automation provider thread functions.
  */
 struct uia_provider_thread

@@ -29,6 +29,7 @@
 #include "wine/test.h"
 
 static HRESULT (WINAPI *pUiaProviderFromIAccessible)(IAccessible *, long, DWORD, IRawElementProviderSimple **);
+static HRESULT (WINAPI *pUiaProviderForNonClient)(HWND, long, long, IRawElementProviderSimple **);
 static HRESULT (WINAPI *pUiaDisconnectProvider)(IRawElementProviderSimple *);
 
 #define DEFINE_EXPECT(func) \
@@ -68,6 +69,7 @@ static HRESULT (WINAPI *pUiaDisconnectProvider)(IRawElementProviderSimple *);
 #define UIA_RUNTIME_ID_PREFIX 42
 
 DEFINE_EXPECT(winproc_GETOBJECT_CLIENT);
+DEFINE_EXPECT(winproc_GETOBJECT);
 DEFINE_EXPECT(prov_callback_base_hwnd);
 DEFINE_EXPECT(prov_callback_nonclient);
 DEFINE_EXPECT(prov_callback_proxy);
@@ -2218,11 +2220,18 @@ DEFINE_PROVIDER(child2_child_child);
 
 static IAccessible *acc_client;
 static IRawElementProviderSimple *prov_root;
+static LPARAM exp_objid;
 static LRESULT WINAPI test_wnd_proc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
     case WM_GETOBJECT:
+        if (exp_objid)
+        {
+            CHECK_EXPECT(winproc_GETOBJECT);
+            ok(exp_objid == lParam, "Unexpected objid %ld\n", lParam);
+        }
+
         if (lParam == (DWORD)OBJID_CLIENT)
         {
             CHECK_EXPECT(winproc_GETOBJECT_CLIENT);
@@ -9414,6 +9423,114 @@ static void test_UiaFind(void)
     CoUninitialize();
 }
 
+static const long nc_objids[] = { OBJID_VSCROLL, OBJID_HSCROLL, OBJID_TITLEBAR, OBJID_MENU, OBJID_SIZEGRIP };
+static void test_UiaProviderForNonClient(void)
+{
+    IRawElementProviderSimple *elprov, *elprov2;
+    enum ProviderOptions prov_opts;
+    WNDCLASSA cls;
+    HRESULT hr;
+    HWND hwnd;
+    VARIANT v;
+    int i;
+
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+    cls.style = 0;
+    cls.lpfnWndProc = test_wnd_proc;
+    cls.cbClsExtra = 0;
+    cls.cbWndExtra = 0;
+    cls.hInstance = GetModuleHandleA(NULL);
+    cls.hIcon = 0;
+    cls.hCursor = NULL;
+    cls.hbrBackground = NULL;
+    cls.lpszMenuName = NULL;
+    cls.lpszClassName = "UiaProviderForNonClient class";
+
+    RegisterClassA(&cls);
+
+    hr = pUiaProviderForNonClient(NULL, OBJID_WINDOW, CHILDID_SELF, &elprov);
+    ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
+    ok(!elprov, "elprov != NULL\n");
+
+    hr = pUiaProviderForNonClient((HWND)0xdeadbeef, OBJID_WINDOW, CHILDID_SELF, &elprov);
+    ok(hr == UIA_E_ELEMENTNOTAVAILABLE, "Unexpected hr %#lx.\n", hr);
+    ok(!elprov, "elprov != NULL\n");
+
+    hwnd = CreateWindowA("UiaProviderForNonClient class", "Test window", WS_OVERLAPPEDWINDOW,
+            0, 0, 100, 100, NULL, NULL, NULL, NULL);
+
+    /* OBJID_CLIENT isn't a valid object id. */
+    hr = pUiaProviderForNonClient(hwnd, OBJID_CLIENT, CHILDID_SELF, &elprov);
+    ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
+    ok(!elprov, "elprov != NULL\n");
+
+    /* NULL elprov. */
+    hr = pUiaProviderForNonClient(hwnd, OBJID_WINDOW, CHILDID_SELF, NULL);
+    ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
+
+    /* OBJID_WINDOW gets the nonclient provider for the entire HWND. */
+    hr = pUiaProviderForNonClient(hwnd, OBJID_WINDOW, CHILDID_SELF, &elprov);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!elprov, "elprov == NULL\n");
+
+    hr = IRawElementProviderSimple_get_ProviderOptions(elprov, &prov_opts);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(prov_opts == (ProviderOptions_ClientSideProvider | ProviderOptions_NonClientAreaProvider |
+                    ProviderOptions_ProviderOwnsSetFocus), "Unexpected provider options %#x\n", prov_opts);
+
+    VariantInit(&v);
+    hr = IRawElementProviderSimple_GetPropertyValue(elprov, UIA_ProviderDescriptionPropertyId, &v);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(V_VT(&v) == VT_BSTR, "V_VT(&v) = %d\n", V_VT(&v));
+    VariantClear(&v);
+
+    hr = IRawElementProviderSimple_GetPropertyValue(elprov, UIA_IsKeyboardFocusablePropertyId, &v);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(V_VT(&v) == VT_BOOL, "V_VT(&v) = %d\n", V_VT(&v));
+    ok(check_variant_bool(&v, TRUE), "V_BOOL(&v) = %#x\n", V_BOOL(&v));
+    VariantClear(&v);
+
+    hr = IRawElementProviderSimple_get_HostRawElementProvider(elprov, &elprov2);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!elprov2, "elprov == NULL, elprov %p\n", elprov2);
+    IRawElementProviderSimple_Release(elprov2);
+
+    IRawElementProviderSimple_Release(elprov);
+
+    /* Test each valid nonclient area OBJID. */
+    for (i = 0; i < ARRAY_SIZE(nc_objids); i++)
+    {
+        exp_objid = nc_objids[i];
+        SET_EXPECT(winproc_GETOBJECT);
+        hr = pUiaProviderForNonClient(hwnd, nc_objids[i], CHILDID_SELF, &elprov);
+        todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        todo_wine ok(!!elprov, "elprov == NULL\n");
+        todo_wine CHECK_CALLED(winproc_GETOBJECT);
+
+        if (!elprov)
+            continue;
+
+        hr = IRawElementProviderSimple_get_ProviderOptions(elprov, &prov_opts);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        ok(prov_opts == (ProviderOptions_ClientSideProvider | ProviderOptions_UseComThreading),
+                "Unexpected provider options %#x\n", prov_opts);
+
+        hr = IRawElementProviderSimple_GetPropertyValue(elprov, UIA_ProviderDescriptionPropertyId, &v);
+        ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+        ok(V_VT(&v) == VT_BSTR, "V_VT(&v) = %d\n", V_VT(&v));
+        VariantClear(&v);
+
+        IRawElementProviderSimple_Release(elprov);
+    }
+
+    exp_objid = 0;
+
+    DestroyWindow(hwnd);
+    UnregisterClassA("UiaProviderForNonClient class", NULL);
+    CoUninitialize();
+}
+
 /*
  * Once a process returns a UI Automation provider with
  * UiaReturnRawElementProvider it ends up in an implicit MTA until exit. This
@@ -9487,6 +9604,12 @@ START_TEST(uiautomation)
             test_UiaProviderFromIAccessible();
         else
             win_skip("UiaProviderFromIAccessible not exported by uiautomationcore.dll\n");
+
+        pUiaProviderForNonClient = (void *)GetProcAddress(uia_dll, "UiaProviderForNonClient");
+        if (pUiaProviderForNonClient)
+            test_UiaProviderForNonClient();
+        else
+            win_skip("UiaProviderForNonClient not exported by uiautomationcore.dll\n");
 
         FreeLibrary(uia_dll);
     }
