@@ -1922,6 +1922,7 @@ NTSTATUS WINAPI LdrGetProcedureAddress(HMODULE module, const ANSI_STRING *name,
     }
 
     RtlLeaveCriticalSection( &loader_section );
+
     return ret;
 }
 
