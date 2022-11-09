@@ -2503,7 +2503,9 @@ static SAFEARRAY WINAPI *default_uia_provider_callback(HWND hwnd, enum ProviderT
     }
 
     case ProviderType_NonClientArea:
-        FIXME("Default ProviderType_NonClientArea provider unimplemented.\n");
+        hr = UiaProviderForNonClient(hwnd, OBJID_WINDOW, CHILDID_SELF, &elprov);
+        if (FAILED(hr))
+            WARN("Failed to create NonClientArea provider with hr %#lx\n", hr);
         break;
 
     case ProviderType_BaseHwnd:
