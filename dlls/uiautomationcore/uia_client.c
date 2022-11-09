@@ -2507,7 +2507,9 @@ static SAFEARRAY WINAPI *default_uia_provider_callback(HWND hwnd, enum ProviderT
         break;
 
     case ProviderType_BaseHwnd:
-        FIXME("Default ProviderType_BaseHwnd provider unimplemented.\n");
+        hr = create_base_hwnd_provider(hwnd, &elprov);
+        if (FAILED(hr))
+            WARN("Failed to create BaseHwnd provider with hr %#lx\n", hr);
         break;
 
     default:

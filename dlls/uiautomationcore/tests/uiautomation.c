@@ -9698,16 +9698,15 @@ static void test_default_proxy_providers(void)
      */
     hr = UiaGetPropertyValue(node, UIA_ControlTypePropertyId, &v);
     ok(hr == S_OK, "Unexpected hr %#lx\n", hr);
-    todo_wine ok(V_VT(&v) == VT_I4, "Unexpected VT %d\n", V_VT(&v));
-    todo_wine ok(V_I4(&v) == UIA_WindowControlTypeId, "Unexpected I4 %#lx\n", V_I4(&v));
+    ok(V_VT(&v) == VT_I4, "Unexpected VT %d\n", V_VT(&v));
+    ok(V_I4(&v) == UIA_PaneControlTypeId, "Unexpected I4 %#lx\n", V_I4(&v));
     VariantClear(&v);
 
     /* Default BaseHwnd provider has its name property set to the window name. */
     hr = UiaGetPropertyValue(node, UIA_NamePropertyId, &v);
     ok(hr == S_OK, "Unexpected hr %#lx\n", hr);
-    todo_wine ok(V_VT(&v) == VT_BSTR, "Unexpected VT %d\n", V_VT(&v));
-    if (V_VT(&v) == VT_BSTR)
-        ok(!lstrcmpW(V_BSTR(&v), L"Test child window"), "Unexpected BSTR %s\n", wine_dbgstr_w(V_BSTR(&v)));
+    ok(V_VT(&v) == VT_BSTR, "Unexpected VT %d\n", V_VT(&v));
+    ok(!lstrcmpW(V_BSTR(&v), L"Test child window"), "Unexpected BSTR %s\n", wine_dbgstr_w(V_BSTR(&v)));
     VariantClear(&v);
 
     for (i = 0; i < ARRAY_SIZE(exp_node_desc); i++)
