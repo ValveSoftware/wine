@@ -1406,6 +1406,35 @@ static BOOL check_for_hwnd_window_pattern(HWND hwnd)
     return TRUE;
 }
 
+static BOOL hwnd_is_visible(HWND hwnd)
+{
+    RECT rect;
+
+    if (!IsWindowVisible(hwnd))
+        return FALSE;
+
+    if (!GetWindowRect(hwnd, &rect))
+        return FALSE;
+
+    if ((rect.right - rect.left) <= 0 || (rect.bottom - rect.top) <= 0)
+        return FALSE;
+
+    return TRUE;
+}
+
+static HWND get_real_hwnd_owner(HWND hwnd)
+{
+    HWND owner = GetWindow(hwnd, GW_OWNER);
+
+    if (!owner)
+        return NULL;
+
+    if (!hwnd_is_visible(owner))
+        return NULL;
+
+    return owner;
+}
+
 /*
  * Default ProviderType_BaseHwnd IRawElementProviderSimple interface.
  */
@@ -1577,9 +1606,59 @@ static ULONG WINAPI base_hwnd_fragment_Release(IRawElementProviderFragment *ifac
 static HRESULT WINAPI base_hwnd_fragment_Navigate(IRawElementProviderFragment *iface,
         enum NavigateDirection direction, IRawElementProviderFragment **ret_val)
 {
-    FIXME("%p, %d, %p: stub\n", iface, direction, ret_val);
+    struct base_hwnd_provider *base_hwnd_prov = impl_from_base_hwnd_fragment(iface);
+    IRawElementProviderSimple *elprov = NULL;
+    HRESULT hr;
+
+    TRACE("%p, %d, %p\n", iface, direction, ret_val);
+
     *ret_val = NULL;
-    return E_NOTIMPL;
+    switch (direction)
+    {
+    case NavigateDirection_Parent:
+    {
+        HWND parent = GetAncestor(base_hwnd_prov->hwnd, GA_PARENT);
+
+        if (parent == GetDesktopWindow())
+        {
+            HWND owner = get_real_hwnd_owner(parent);
+
+            if (owner)
+                parent = owner;
+        }
+
+        if (parent)
+        {
+            hr = create_base_hwnd_provider(parent, &elprov);
+            if (FAILED(hr))
+                WARN("Failed to create parent provider with hr %#lx\n", hr);
+        }
+        break;
+    }
+
+    case NavigateDirection_FirstChild:
+    case NavigateDirection_LastChild:
+    case NavigateDirection_NextSibling:
+    case NavigateDirection_PreviousSibling:
+        FIXME("Unimplemented NavigateDirection %d\n", direction);
+        break;
+
+    default:
+        FIXME("Invalid NavigateDirection %d\n", direction);
+        return E_INVALIDARG;
+    }
+
+    if (elprov)
+    {
+        IRawElementProviderFragment *elfrag;
+
+        hr = IRawElementProviderSimple_QueryInterface(elprov, &IID_IRawElementProviderFragment, (void **)&elfrag);
+        IRawElementProviderSimple_Release(elprov);
+        if (SUCCEEDED(hr))
+            *ret_val = elfrag;
+    }
+
+    return S_OK;
 }
 
 static HRESULT WINAPI base_hwnd_fragment_GetRuntimeId(IRawElementProviderFragment *iface,

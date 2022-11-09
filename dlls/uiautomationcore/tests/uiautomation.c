@@ -9722,18 +9722,16 @@ static void test_default_proxy_providers(void)
     SET_EXPECT(winproc_GETOBJECT_UiaRoot);
     hr = UiaNavigate(node, NavigateDirection_Parent, (struct UiaCondition *)&UiaTrueCondition, &cache_req, &out_req, &tree_struct);
     ok(hr == S_OK, "Unexpected hr %#lx\n", hr);
-    todo_wine ok(!!out_req, "out_req == NULL\n");
-    todo_wine ok(!!tree_struct, "tree_struct == NULL\n");
-    todo_wine ok(Provider2.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
-    todo_wine CHECK_CALLED(winproc_GETOBJECT_UiaRoot);
+    ok(!!out_req, "out_req == NULL\n");
+    ok(!!tree_struct, "tree_struct == NULL\n");
+    ok(Provider2.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
+    CHECK_CALLED(winproc_GETOBJECT_UiaRoot);
 
-    if (tree_struct)
-    {
-        exp_lbound[0] = exp_lbound[1] = 0;
-        exp_elems[0] = exp_elems[1] = 1;
-        test_cache_req_sa(out_req, exp_lbound, exp_elems, exp_node_desc);
-        ok(!wcscmp(tree_struct, L"P)"), "tree structure %s\n", debugstr_w(tree_struct));
-    }
+    exp_lbound[0] = exp_lbound[1] = 0;
+    exp_elems[0] = exp_elems[1] = 1;
+    test_cache_req_sa(out_req, exp_lbound, exp_elems, exp_node_desc);
+    ok(!wcscmp(tree_struct, L"P)"), "tree structure %s\n", debugstr_w(tree_struct));
+
     UiaNodeRelease(node);
 
     set_accessible_props(&Accessible, 0, 0, 0, NULL, 0, 0, 0, 0);
