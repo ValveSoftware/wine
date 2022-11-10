@@ -333,8 +333,7 @@ static char *get_buffer(const struct schan_transport *t, struct schan_buffers *s
     }
 
     buffer = &s->desc->pBuffers[s->current_buffer_idx];
-    TRACE("Using buffer %d: cbBuffer %d, BufferType %#x, pvBuffer %p\n",
-          s->current_buffer_idx, (unsigned)buffer->cbBuffer, (unsigned)buffer->BufferType, buffer->pvBuffer);
+    TRACE("Using buffer %d: cbBuffer %d, BufferType %#x, pvBuffer %p\n", s->current_buffer_idx, buffer->cbBuffer, buffer->BufferType, buffer->pvBuffer);
 
     max_count = buffer->cbBuffer - s->offset;
     if (s->limit != ~0UL && s->limit < max_count)
@@ -1047,7 +1046,7 @@ static gnutls_x509_privkey_t get_x509_key(const DATA_BLOB *key_blob)
     if (size < sizeof(BLOBHEADER)) return NULL;
 
     rsakey = (RSAPUBKEY *)(key_blob->pbData + sizeof(BLOBHEADER));
-    TRACE("RSA key bitlen %u pubexp %u\n", (unsigned)rsakey->bitlen, (unsigned)rsakey->pubexp);
+    TRACE("RSA key bitlen %u pubexp %u\n", rsakey->bitlen, rsakey->pubexp);
 
     size -= sizeof(BLOBHEADER) + FIELD_OFFSET(RSAPUBKEY, pubexp);
     set_component(&e, (BYTE *)&rsakey->pubexp, sizeof(rsakey->pubexp), &size);
@@ -1087,7 +1086,7 @@ static gnutls_x509_crt_t get_x509_crt(const CERT_CONTEXT *ctx)
     if (!ctx) return FALSE;
     if (ctx->dwCertEncodingType != X509_ASN_ENCODING)
     {
-        FIXME("encoding type %u not supported\n", (unsigned)ctx->dwCertEncodingType);
+        FIXME("encoding type %u not supported\n", ctx->dwCertEncodingType);
         return NULL;
     }
 
