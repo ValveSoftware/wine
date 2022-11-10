@@ -113,7 +113,32 @@ static inline TEB64 *NtCurrentTeb64(void) { return NULL; }
 static inline TEB64 *NtCurrentTeb64(void) { return (TEB64 *)NtCurrentTeb()->GdiBatchCount; }
 #endif
 
+#define HEAP_STD 0
+#define HEAP_LAL 1
+#define HEAP_LFH 2
+
+/* some undocumented flags (names are made up) */
+#define HEAP_PRIVATE          0x00001000
+#define HEAP_ADD_USER_INFO    0x00000100
+#define HEAP_USER_FLAGS_MASK  0x00000f00
+#define HEAP_PAGE_ALLOCS      0x01000000
+#define HEAP_VALIDATE         0x10000000
+#define HEAP_VALIDATE_ALL     0x20000000
+#define HEAP_VALIDATE_PARAMS  0x40000000
+#define HEAP_CHECKING_ENABLED 0x80000000
+
+NTSTATUS HEAP_lfh_allocate( HANDLE std_heap, ULONG flags, SIZE_T size, void **out );
+NTSTATUS HEAP_lfh_free( HANDLE std_heap, ULONG flags, void *ptr );
+NTSTATUS HEAP_lfh_reallocate( HANDLE std_heap, ULONG flags, void *ptr, SIZE_T size, void **out );
+NTSTATUS HEAP_lfh_get_allocated_size( HANDLE std_heap, ULONG flags, const void *ptr, SIZE_T *out );
+NTSTATUS HEAP_lfh_validate( HANDLE std_heap, ULONG flags, const void *ptr );
+NTSTATUS HEAP_lfh_get_user_info( HANDLE std_handle, ULONG flags, void *ptr, void **user_value, ULONG *user_flags );
+NTSTATUS HEAP_lfh_set_user_value( HANDLE std_handle, ULONG flags, void *ptr, void *user_value );
+NTSTATUS HEAP_lfh_set_user_flags( HANDLE std_handle, ULONG flags, void *ptr, ULONG clear, ULONG set );
+
 void HEAP_notify_thread_destroy( BOOLEAN last );
+void HEAP_lfh_notify_thread_destroy( BOOLEAN last );
+void HEAP_lfh_set_debug_flags( ULONG flags );
 
 #define HASH_STRING_ALGORITHM_DEFAULT  0
 #define HASH_STRING_ALGORITHM_X65599   1

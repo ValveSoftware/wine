@@ -225,16 +225,6 @@ C_ASSERT( offsetof(struct heap, subheap) <= REGION_ALIGN - 1 );
 #define HEAP_DEF_SIZE        (0x40000 * BLOCK_ALIGN)
 #define MAX_FREE_PENDING     1024    /* max number of free requests to delay */
 
-/* some undocumented flags (names are made up) */
-#define HEAP_PRIVATE          0x00001000
-#define HEAP_ADD_USER_INFO    0x00000100
-#define HEAP_USER_FLAGS_MASK  0x00000f00
-#define HEAP_PAGE_ALLOCS      0x01000000
-#define HEAP_VALIDATE         0x10000000
-#define HEAP_VALIDATE_ALL     0x20000000
-#define HEAP_VALIDATE_PARAMS  0x40000000
-#define HEAP_CHECKING_ENABLED 0x80000000
-
 static struct heap *process_heap;  /* main process heap */
 
 /* check if memory range a contains memory range b */
@@ -1303,6 +1293,8 @@ static void heap_set_debug_flags( HANDLE handle )
                                               MAX_FREE_PENDING * sizeof(*heap->pending_free) );
         heap->pending_pos = 0;
     }
+
+    HEAP_lfh_set_debug_flags( flags );
 }
 
 
@@ -1550,6 +1542,8 @@ void *WINAPI DECLSPEC_HOTPATCH RtlAllocateHeap( HANDLE handle, ULONG flags, SIZE
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
         status = STATUS_INVALID_HANDLE;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_allocate( heap, heap_flags, size, &ptr ))
+        status = STATUS_SUCCESS;
     else if ((block_size = heap_get_block_size( heap, heap_flags, size )) == ~0U)
         status = STATUS_NO_MEMORY;
     else if (block_size >= HEAP_MIN_LARGE_BLOCK_SIZE)
@@ -1585,6 +1579,8 @@ BOOLEAN WINAPI DECLSPEC_HOTPATCH RtlFreeHeap( HANDLE handle, ULONG flags, void *
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
         status = STATUS_INVALID_PARAMETER;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_free( heap, heap_flags, ptr ))
+        status = STATUS_SUCCESS;
     else if (!(block = unsafe_block_from_ptr( heap, heap_flags, ptr )))
         status = STATUS_INVALID_PARAMETER;
     else if (block_get_flags( block ) & BLOCK_FLAG_LARGE)
@@ -1693,6 +1689,8 @@ void *WINAPI RtlReAllocateHeap( HANDLE handle, ULONG flags, void *ptr, SIZE_T si
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
         status = STATUS_INVALID_HANDLE;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_reallocate( heap, heap_flags, ptr, size, &ret ))
+        status = STATUS_SUCCESS;
     else if ((block_size = heap_get_block_size( heap, heap_flags, size )) == ~0U)
         status = STATUS_NO_MEMORY;
     else if (!(block = unsafe_block_from_ptr( heap, heap_flags, ptr )))
@@ -1810,6 +1808,8 @@ SIZE_T WINAPI RtlSizeHeap( HANDLE handle, ULONG flags, const void *ptr )
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
         status = STATUS_INVALID_PARAMETER;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_get_allocated_size( heap, heap_flags, ptr, &size ))
+        status = STATUS_SUCCESS;
     else if (!(block = unsafe_block_from_ptr( heap, heap_flags, ptr )))
         status = STATUS_INVALID_PARAMETER;
     else
@@ -1836,6 +1836,8 @@ BOOLEAN WINAPI RtlValidateHeap( HANDLE handle, ULONG flags, const void *ptr )
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
         ret = FALSE;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_validate( heap, heap_flags, ptr ))
+        ret = TRUE;
     else
     {
         heap_lock( heap, heap_flags );
@@ -2055,8 +2057,11 @@ NTSTATUS WINAPI RtlSetHeapInformation( HANDLE handle, HEAP_INFORMATION_CLASS inf
         if (!(heap = unsafe_heap_from_handle( handle, 0, &heap_flags ))) return STATUS_INVALID_HANDLE;
 
         compat_info = *(ULONG *)info;
-        if (compat_info) FIXME( "HeapCompatibilityInformation %lu not implemented!\n", compat_info );
-        if (compat_info != HEAP_STD && compat_info != HEAP_LFH) return STATUS_UNSUCCESSFUL;
+        if (compat_info != HEAP_STD && compat_info != HEAP_LFH)
+        {
+            FIXME( "HeapCompatibilityInformation %lu not implemented!\n", compat_info );
+            return STATUS_UNSUCCESSFUL;
+        }
         if (InterlockedCompareExchange( &heap->compat_info, compat_info, HEAP_STD )) return STATUS_UNSUCCESSFUL;
         return STATUS_SUCCESS;
     }
@@ -2084,6 +2089,8 @@ BOOLEAN WINAPI RtlGetUserInfoHeap( HANDLE handle, ULONG flags, void *ptr, void *
     *user_flags = 0;
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
+        status = STATUS_SUCCESS;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_get_user_info( heap, heap_flags, ptr, user_value, user_flags ))
         status = STATUS_SUCCESS;
     else if (!(block = unsafe_block_from_ptr( heap, heap_flags, ptr )))
     {
@@ -2128,6 +2135,8 @@ BOOLEAN WINAPI RtlSetUserValueHeap( HANDLE handle, ULONG flags, void *ptr, void 
     TRACE( "handle %p, flags %#lx, ptr %p, user_value %p.\n", handle, flags, ptr, user_value );
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
+        ret = TRUE;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_set_user_value( heap, heap_flags, ptr, user_value ))
         ret = TRUE;
     else if (!(block = unsafe_block_from_ptr( heap, heap_flags, ptr )))
         ret = FALSE;
@@ -2174,6 +2183,8 @@ BOOLEAN WINAPI RtlSetUserFlagsHeap( HANDLE handle, ULONG flags, void *ptr, ULONG
 
     if (!(heap = unsafe_heap_from_handle( handle, flags, &heap_flags )))
         ret = TRUE;
+    else if (heap->compat_info == HEAP_LFH && !HEAP_lfh_set_user_flags( heap, heap_flags, ptr, clear, set ))
+        ret = TRUE;
     else if (!(block = unsafe_block_from_ptr( heap, heap_flags, ptr )))
         ret = FALSE;
     else if (!(block_get_flags( block ) & BLOCK_FLAG_USER_INFO))
@@ -2189,4 +2200,5 @@ BOOLEAN WINAPI RtlSetUserFlagsHeap( HANDLE handle, ULONG flags, void *ptr, ULONG
 
 void HEAP_notify_thread_destroy( BOOLEAN last )
 {
+    HEAP_lfh_notify_thread_destroy( last );
 }
