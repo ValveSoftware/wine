@@ -1435,6 +1435,50 @@ static HWND get_real_hwnd_owner(HWND hwnd)
     return owner;
 }
 
+static HWND get_visible_sibling_hwnd(HWND hwnd, int dir, BOOL include_self, HWND hwnd_owner)
+{
+    const int gw_arg = (dir == NavigateDirection_NextSibling) ? GW_HWNDNEXT : GW_HWNDPREV;
+
+    if (!hwnd)
+        return NULL;
+
+    if (!include_self)
+        hwnd = GetWindow(hwnd, gw_arg);
+
+    for (; hwnd; hwnd = GetWindow(hwnd, gw_arg))
+    {
+        HWND owner;
+
+        if (!hwnd_is_visible(hwnd))
+            continue;
+
+        owner = get_real_hwnd_owner(hwnd);
+        if (owner != hwnd_owner)
+            continue;
+
+        break;
+    }
+
+    return hwnd;
+}
+
+static HWND get_valid_child_hwnd(HWND parent, int dir)
+{
+    HWND scan;
+
+    if (!is_top_level_hwnd(parent))
+        return NULL;
+
+    scan = GetWindow(GetDesktopWindow(), GW_CHILD);
+    if (dir == NavigateDirection_LastChild)
+        scan = GetWindow(scan, GW_HWNDLAST);
+
+    if (dir == NavigateDirection_FirstChild)
+        return get_visible_sibling_hwnd(scan, NavigateDirection_NextSibling, TRUE, parent);
+    else
+        return get_visible_sibling_hwnd(scan, NavigateDirection_PreviousSibling, TRUE, parent);
+}
+
 /*
  * Default ProviderType_BaseHwnd IRawElementProviderSimple interface.
  */
@@ -1637,7 +1681,48 @@ static HRESULT WINAPI base_hwnd_fragment_Navigate(IRawElementProviderFragment *i
     }
 
     case NavigateDirection_FirstChild:
+    {
+        HWND child;
+
+        child = get_valid_child_hwnd(base_hwnd_prov->hwnd, direction);
+        if (!child)
+        {
+            child = GetWindow(base_hwnd_prov->hwnd, GW_CHILD);
+            child = get_visible_sibling_hwnd(child, NavigateDirection_NextSibling, TRUE, NULL);
+        }
+
+        if (child)
+        {
+            hr = create_base_hwnd_provider(child, &elprov);
+            if (FAILED(hr))
+                WARN("Failed to create child provider with hr %#lx\n", hr);
+        }
+        break;
+    }
+
     case NavigateDirection_LastChild:
+    {
+        HWND child;
+
+        child = GetWindow(base_hwnd_prov->hwnd, GW_CHILD);
+        if (child)
+        {
+            child = GetWindow(child, GW_HWNDLAST);
+            child = get_visible_sibling_hwnd(child, NavigateDirection_PreviousSibling, TRUE, NULL);
+        }
+
+        if (!child)
+            child = get_valid_child_hwnd(base_hwnd_prov->hwnd, direction);
+
+        if (child)
+        {
+            hr = create_base_hwnd_provider(child, &elprov);
+            if (FAILED(hr))
+                WARN("Failed to create child provider with hr %#lx\n", hr);
+        }
+        break;
+    }
+
     case NavigateDirection_NextSibling:
     case NavigateDirection_PreviousSibling:
         FIXME("Unimplemented NavigateDirection %d\n", direction);
