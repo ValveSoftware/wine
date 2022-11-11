@@ -39,6 +39,7 @@ static LPVOID (WINAPI *pMapViewOfFileFromApp)(HANDLE, ULONG, ULONG64, SIZE_T);
 static LPVOID (WINAPI *pMapViewOfFile3)(HANDLE, HANDLE, PVOID, ULONG64 offset, SIZE_T size,
         ULONG, ULONG, MEM_EXTENDED_PARAMETER *, ULONG);
 static LPVOID (WINAPI *pVirtualAlloc2)(HANDLE, void *, SIZE_T, DWORD, DWORD, MEM_EXTENDED_PARAMETER *, ULONG);
+static BOOL (WINAPI *pUnmapViewOfFile2)(HANDLE, void *, ULONG);
 
 static void test_CompareObjectHandles(void)
 {
@@ -151,6 +152,13 @@ static void test_VirtualAlloc2(void)
     ret = VirtualFree(addr, 0, MEM_RELEASE);
     ok(ret, "Unexpected return value %d, error %lu.\n", ret, GetLastError());
 
+    placeholder1 = pVirtualAlloc2(NULL, NULL, 2 * size, MEM_RESERVE, PAGE_NOACCESS, NULL, 0);
+    ok(!!placeholder1, "Failed to create a placeholder range.\n");
+    ret = VirtualFree(placeholder1, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+    ok(!ret && GetLastError() == ERROR_INVALID_ADDRESS, "Got ret %d, error %lu.\n", ret, GetLastError());
+    ret = VirtualFree(placeholder1, 0, MEM_RELEASE);
+    ok(ret, "Unexpected return value %d, error %lu.\n", ret, GetLastError());
+
     /* Placeholder splitting functionality */
     placeholder1 = pVirtualAlloc2(NULL, NULL, 2 * size, MEM_RESERVE_PLACEHOLDER | MEM_RESERVE, PAGE_NOACCESS, NULL, 0);
     ok(!!placeholder1, "Failed to create a placeholder range.\n");
@@ -184,11 +192,20 @@ static void test_VirtualAlloc2(void)
     section = CreateFileMappingW(INVALID_HANDLE_VALUE, NULL, PAGE_READWRITE, 0, size, NULL);
     ok(!!section, "Failed to create a section.\n");
 
-    view1 = pMapViewOfFile3(section, NULL, placeholder1, 0, size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0);
+    view1 = pMapViewOfFile3(section, NULL, NULL, 0, size, 0, PAGE_READWRITE, NULL, 0);
     ok(!!view1, "Failed to map a section.\n");
+    ret = VirtualFree( view1, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER );
+    ok(!ret && GetLastError() == ERROR_INVALID_PARAMETER, "Got ret %d, error %lu.\n", ret, GetLastError());
+    ret = pUnmapViewOfFile2(GetCurrentProcess(), view1, MEM_PRESERVE_PLACEHOLDER);
+    ok(!ret && GetLastError() == ERROR_INVALID_ADDRESS, "Got ret %d, error %lu.\n", ret, GetLastError());
+    ret = pUnmapViewOfFile2(GetCurrentProcess(), view1, 0);
+    ok(ret, "Got error %lu.\n", GetLastError());
+
+    view1 = pMapViewOfFile3(section, NULL, placeholder1, 0, size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0);
+    ok(view1 == placeholder1, "Address does not match.\n");
 
     view2 = pMapViewOfFile3(section, NULL, placeholder2, 0, size, MEM_REPLACE_PLACEHOLDER, PAGE_READWRITE, NULL, 0);
-    ok(!!view2, "Failed to map a section.\n");
+    ok(view2 == placeholder2, "Address does not match.\n");
 
     memset(&info, 0, sizeof(info));
     VirtualQuery(placeholder1, &info, sizeof(info));
@@ -205,11 +222,155 @@ static void test_VirtualAlloc2(void)
     ok(info.RegionSize == size, "Unexpected size.\n");
 
     CloseHandle(section);
-    UnmapViewOfFile(view1);
+    ret = pUnmapViewOfFile2(NULL, view1, MEM_PRESERVE_PLACEHOLDER);
+    ok(!ret && GetLastError() == ERROR_INVALID_HANDLE, "Got error %lu.\n", GetLastError());
+
+    ret = VirtualFree( placeholder1, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER );
+    ok(!ret && GetLastError() == ERROR_INVALID_PARAMETER, "Got ret %d, error %lu.\n", ret, GetLastError());
+
+    ret = pUnmapViewOfFile2(GetCurrentProcess(), view1, MEM_PRESERVE_PLACEHOLDER);
+    ok(ret, "Got error %lu.\n", GetLastError());
+    memset(&info, 0, sizeof(info));
+    VirtualQuery(placeholder1, &info, sizeof(info));
+    ok(info.AllocationProtect == PAGE_NOACCESS, "Unexpected protection %#lx.\n", info.AllocationProtect);
+    ok(info.State == MEM_RESERVE, "Unexpected state %#lx.\n", info.State);
+    ok(info.Type == MEM_PRIVATE, "Unexpected type %#lx.\n", info.Type);
+    ok(info.RegionSize == size, "Unexpected size.\n");
+
+    ret = pUnmapViewOfFile2(GetCurrentProcess(), view1, MEM_PRESERVE_PLACEHOLDER);
+    ok(!ret && GetLastError() == ERROR_INVALID_ADDRESS, "Got error %lu.\n", GetLastError());
+
+    ret = UnmapViewOfFile(view1);
+    ok(!ret && GetLastError() == ERROR_INVALID_ADDRESS, "Got error %lu.\n", GetLastError());
+
+    ret = VirtualFree( placeholder1, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER );
+    ok(!ret && GetLastError() == ERROR_INVALID_ADDRESS, "Got ret %d, error %lu.\n", ret, GetLastError());
+    ret = VirtualFreeEx(GetCurrentProcess(), placeholder1, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER );
+    ok(!ret && GetLastError() == ERROR_INVALID_ADDRESS, "Got ret %d, error %lu.\n", ret, GetLastError());
+    ret = VirtualFree(placeholder1, 0, MEM_RELEASE);
+    ok(ret, "Got error %lu.\n", GetLastError());
+
     UnmapViewOfFile(view2);
 
     VirtualFree(placeholder1, 0, MEM_RELEASE);
     VirtualFree(placeholder2, 0, MEM_RELEASE);
+
+    /* Split in three regions. */
+    p = pVirtualAlloc2(NULL, NULL, 2 * size, MEM_RESERVE_PLACEHOLDER | MEM_RESERVE, PAGE_NOACCESS, NULL, 0);
+    ok(!!p, "Failed to create a placeholder range.\n");
+
+    p1 = p + size / 2;
+    p2 = p1 + size / 4;
+    ret = VirtualFree(p1, size / 4, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+    ok(ret, "Failed to split a placeholder.\n");
+    check_region_size(p, size / 2);
+    check_region_size(p1, size / 4);
+    check_region_size(p2, 2 * size - size / 2 - size / 4);
+    ret = VirtualFree(p, 0, MEM_RELEASE);
+    ok(ret, "Failed to release a region.\n");
+    ret = VirtualFree(p1, 0, MEM_RELEASE);
+    ok(ret, "Failed to release a region.\n");
+    ret = VirtualFree(p2, 0, MEM_RELEASE);
+    ok(ret, "Failed to release a region.\n");
+
+    /* Split in two regions, specifying lower part. */
+    p = pVirtualAlloc2(NULL, NULL, 2 * size, MEM_RESERVE_PLACEHOLDER | MEM_RESERVE, PAGE_NOACCESS, NULL, 0);
+    ok(!!p, "Failed to create a placeholder range.\n");
+
+    p1 = p;
+    p2 = p + size / 2;
+    ret = VirtualFree(p1, 0, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+    ok(!ret && GetLastError() == ERROR_INVALID_PARAMETER, "Got ret %d, error %lu.\n", ret, GetLastError());
+    ret = VirtualFree(p1, size / 2, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+    ok(ret, "Failed to split a placeholder.\n");
+    check_region_size(p1, size / 2);
+    check_region_size(p2, 2 * size - size / 2);
+    ret = VirtualFree(p1, 0, MEM_RELEASE);
+    ok(ret, "Failed to release a region.\n");
+    ret = VirtualFree(p2, 0, MEM_RELEASE);
+    ok(ret, "Failed to release a region.\n");
+
+    /* Split in two regions, specifying second half. */
+    p = pVirtualAlloc2(NULL, NULL, 2 * size, MEM_RESERVE_PLACEHOLDER | MEM_RESERVE, PAGE_NOACCESS, NULL, 0);
+    ok(!!p, "Failed to create a placeholder range.\n");
+
+    p1 = p;
+    p2 = p + size;
+    ret = VirtualFree(p2, size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+    ok(ret, "Failed to split a placeholder.\n");
+    check_region_size(p1, size);
+    check_region_size(p2, size);
+    ret = VirtualFree(p1, 0, MEM_RELEASE);
+    ok(ret, "Failed to release a region.\n");
+    ret = VirtualFree(p2, 0, MEM_RELEASE);
+    ok(ret, "Failed to release a region.\n");
+}
+
+static void test_VirtualAllocFromApp(void)
+{
+    static const DWORD prot[] =
+    {
+        PAGE_EXECUTE,
+        PAGE_EXECUTE_READ,
+        PAGE_EXECUTE_READWRITE,
+        PAGE_EXECUTE_WRITECOPY,
+    };
+    unsigned int i;
+    BOOL ret;
+    void *p;
+
+    if (!pVirtualAllocFromApp)
+    {
+        win_skip("VirtualAllocFromApp is not available.\n");
+        return;
+    }
+
+    SetLastError(0xdeadbeef);
+    p = pVirtualAllocFromApp(NULL, 0x1000, MEM_RESERVE, PAGE_READWRITE);
+    ok(p && GetLastError() == 0xdeadbeef, "Got unexpected mem %p, GetLastError() %lu.\n", p, GetLastError());
+    ret = VirtualFree(p, 0, MEM_RELEASE);
+    ok(ret, "Got unexpected ret %#x, GetLastError() %lu.\n", ret, GetLastError());
+
+    for (i = 0; i < ARRAY_SIZE(prot); ++i)
+    {
+        SetLastError(0xdeadbeef);
+        p = pVirtualAllocFromApp(NULL, 0x1000, MEM_RESERVE, prot[i]);
+        ok(!p && GetLastError() == ERROR_INVALID_PARAMETER, "Got unexpected mem %p, GetLastError() %lu.\n",
+                p, GetLastError());
+    }
+}
+
+static void test_VirtualAlloc2FromApp(void)
+{
+    static const DWORD prot[] =
+    {
+        PAGE_EXECUTE,
+        PAGE_EXECUTE_READ,
+        PAGE_EXECUTE_READWRITE,
+        PAGE_EXECUTE_WRITECOPY,
+    };
+    unsigned int i;
+    void *addr;
+    BOOL ret;
+
+    if (!pVirtualAlloc2FromApp)
+    {
+        win_skip("VirtualAlloc2FromApp is not available.\n");
+        return;
+    }
+
+    addr = pVirtualAlloc2FromApp(NULL, NULL, 0x1000, MEM_COMMIT, PAGE_READWRITE, NULL, 0);
+    ok(!!addr, "Failed to allocate, error %lu.\n", GetLastError());
+    ret = VirtualFree(addr, 0, MEM_RELEASE);
+    ok(ret, "Unexpected return value %d, error %lu.\n", ret, GetLastError());
+
+    for (i = 0; i < ARRAY_SIZE(prot); ++i)
+    {
+        SetLastError(0xdeadbeef);
+        addr = pVirtualAlloc2FromApp(NULL, NULL, 0x1000, MEM_COMMIT, prot[i], NULL, 0);
+        ok(!addr && GetLastError() == ERROR_INVALID_PARAMETER, "Got unexpected mem %p, GetLastError() %lu.\n",
+                addr, GetLastError());
+    }
 }
 
 static void test_OpenFileMappingFromApp(void)
@@ -313,6 +474,7 @@ static void init_funcs(void)
     X(CreateFileMappingFromApp);
     X(MapViewOfFileFromApp);
     X(OpenFileMappingFromApp);
+    X(UnmapViewOfFile2);
 
     hmod = GetModuleHandleA("ntdll.dll");
 
