@@ -125,6 +125,7 @@ struct file_view
 #define VPROT_WRITEWATCH 0x40
 /* per-mapping protection flags */
 #define VPROT_SYSTEM     0x0200  /* system view (underlying mmap not under our control) */
+#define VPROT_PLACEHOLDER 0x0400
 
 /* Conversion from VPROT_* to Win32 flags */
 static const BYTE VIRTUAL_Win32Flags[16] =
@@ -1109,6 +1110,8 @@ static void dump_view( struct file_view *view )
     TRACE( "View: %p - %p", addr, addr + view->size - 1 );
     if (view->protect & VPROT_SYSTEM)
         TRACE( " (builtin image)\n" );
+    else if (view->protect & VPROT_PLACEHOLDER)
+        TRACE( " (placeholder)\n" );
     else if (view->protect & SEC_IMAGE)
         TRACE( " (image)\n" );
     else if (view->protect & SEC_FILE)
@@ -4181,7 +4184,7 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
     }
     else if (!(view = find_view( base, 0 ))) status = STATUS_MEMORY_NOT_ALLOCATED;
     else if (!is_view_valloc( view )) status = STATUS_INVALID_PARAMETER;
-    else if (type == MEM_RELEASE)
+    else if (type == MEM_RELEASE || (type == (MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER)))
     {
         /* Free the pages */
 
@@ -4191,14 +4194,15 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
         {
             if (!size) size = view->size;
 
-            if (size == view->size)
+            if (type == MEM_RELEASE && size == view->size)
             {
                 assert( base == view->base );
                 delete_view( view );
             }
             else
             {
-                struct file_view *new_view = NULL;
+                struct file_view *new_view = NULL, *preserve_view = NULL;
+                int preserve_whole;
 
                 if (view->base != base && base + size != (char *)view->base + view->size
                     && !(new_view = alloc_view()))
@@ -4206,7 +4210,8 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
                     ERR( "out of memory for %p-%p\n", base, (char *)base + size );
                     return STATUS_NO_MEMORY;
                 }
-                unregister_view( view );
+                preserve_whole = (size == view->size);
+                if (!preserve_whole) unregister_view( view );
 
                 if (new_view)
                 {
@@ -4221,7 +4226,7 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
                     VIRTUAL_DEBUG_DUMP_VIEW( view );
                     VIRTUAL_DEBUG_DUMP_VIEW( new_view );
                 }
-                else
+                else if (!preserve_whole)
                 {
                     if (view->base == base)
                     {
@@ -4236,8 +4241,35 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
                     VIRTUAL_DEBUG_DUMP_VIEW( view );
                 }
 
-                set_page_vprot( base, size, 0 );
-                unmap_area( base, size );
+                if (type & MEM_PRESERVE_PLACEHOLDER)
+                {
+                    if (preserve_whole)
+                    {
+                        view->protect = VPROT_PLACEHOLDER;
+                        preserve_view = view;
+                    }
+                    else
+                    {
+                        if (!(preserve_view = alloc_view()))
+                        {
+                            ERR( "out of memory for %p-%p\n", base, (char *)base + size );
+                            return STATUS_NO_MEMORY;
+                        }
+                        preserve_view->base = base;
+                        preserve_view->size = size;
+                        preserve_view->protect = VPROT_PLACEHOLDER;
+                        register_view( preserve_view );
+                    }
+                    set_page_vprot( base, size, 0 );
+                    if (anon_mmap_fixed(base, size, 0, 0) != base)
+                        ERR("anon_mmap_fixed failed, err %s.\n", strerror(errno));
+                    VIRTUAL_DEBUG_DUMP_VIEW( preserve_view );
+                }
+                else
+                {
+                    set_page_vprot( base, size, 0 );
+                    unmap_area( base, size );
+                }
             }
             *addr_ptr = base;
             *size_ptr = size;
