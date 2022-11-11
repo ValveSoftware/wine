@@ -2153,14 +2153,20 @@ static LRESULT CALLBACK msgbox_sysmodal_hook_proc(INT code, WPARAM wParam, LPARA
     if (code == HCBT_ACTIVATE)
     {
         HWND msgbox = (HWND)wParam;
+        char text[64];
         LONG exstyles = GetWindowLongA(msgbox, GWL_EXSTYLE);
 
         if (msgbox)
         {
-            todo_wine ok(exstyles & WS_EX_TOPMOST, "expected message box to have topmost exstyle set\n");
+            text[0] = 0;
+            GetWindowTextA(msgbox, text, sizeof(text));
+            if (strcmp(text, "parent") != 0)
+            {
+                todo_wine ok(exstyles & WS_EX_TOPMOST, "expected message box to have topmost exstyle set in %s\n", text);
 
-            SendDlgItemMessageA(msgbox, IDCANCEL, WM_LBUTTONDOWN, 0, 0);
-            SendDlgItemMessageA(msgbox, IDCANCEL, WM_LBUTTONUP, 0, 0);
+                SendDlgItemMessageA(msgbox, IDCANCEL, WM_LBUTTONDOWN, 0, 0);
+                SendDlgItemMessageA(msgbox, IDCANCEL, WM_LBUTTONUP, 0, 0);
+            }
         }
     }
 
@@ -2170,6 +2176,7 @@ static LRESULT CALLBACK msgbox_sysmodal_hook_proc(INT code, WPARAM wParam, LPARA
 static void test_MessageBox(void)
 {
     HHOOK hook;
+    HWND hwnd;
     int ret;
 
     hook = SetWindowsHookExA(WH_CBT, msgbox_hook_proc, NULL, GetCurrentThreadId());
@@ -2185,6 +2192,17 @@ static void test_MessageBox(void)
     MessageBoxA(NULL, NULL, "system modal", MB_OKCANCEL | MB_SYSTEMMODAL);
 
     UnhookWindowsHookEx(hook);
+
+    hwnd = CreateWindowExA(0, "IsDialogMessageWindowClass", "parent", 0,
+                           200, 200, 200, 200, NULL, NULL, NULL, NULL);
+    ok(hwnd != NULL, "failed to create window %ld\n", GetLastError());
+
+    hook = SetWindowsHookExA(WH_CBT, msgbox_sysmodal_hook_proc, NULL, GetCurrentThreadId());
+
+    MessageBoxA(hwnd, NULL, "system modal with parent", MB_OKCANCEL | MB_SYSTEMMODAL);
+
+    UnhookWindowsHookEx(hook);
+    DestroyWindow(hwnd);
 }
 
 static INT_PTR CALLBACK custom_test_dialog_proc(HWND hdlg, UINT msg, WPARAM wparam, LPARAM lparam)
