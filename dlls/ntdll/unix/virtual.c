@@ -5013,7 +5013,7 @@ NTSTATUS WINAPI NtMapViewOfSectionEx( HANDLE handle, HANDLE process, PVOID *addr
     return NtMapViewOfSection( handle, process, addr_ptr, 0, 0, offset_ptr, size_ptr, ViewShare, alloc_type, protect );
 }
 
-NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr )
+static NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr, ULONG flags )
 {
     struct file_view *view;
     unsigned int status = STATUS_NOT_MAPPED_VIEW;
@@ -5028,6 +5028,7 @@ NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr )
 
         call.unmap_view.type = APC_UNMAP_VIEW;
         call.unmap_view.addr = wine_server_client_ptr( addr );
+        call.unmap_view.flags = flags;
         status = server_queue_process_apc( process, &call, &result );
         if (status == STATUS_SUCCESS) status = result.unmap_view.status;
         return status;
@@ -5036,6 +5037,11 @@ NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr )
     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
     if ((view = find_view( addr, 0 )) && !is_view_valloc( view ))
     {
+        if (flags & MEM_PRESERVE_PLACEHOLDER && !(view->protect & VPROT_FROMPLACEHOLDER))
+        {
+            status = STATUS_CONFLICTING_ADDRESSES;
+            goto done;
+        }
         if (view->protect & VPROT_SYSTEM)
         {
             struct builtin_module *builtin;
@@ -5062,10 +5068,21 @@ NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr )
         if (!status)
         {
             if (view->protect & SEC_IMAGE) release_builtin_module( view->base );
-            delete_view( view );
+            if (flags & MEM_PRESERVE_PLACEHOLDER)
+            {
+                view->protect = VPROT_PLACEHOLDER;
+                set_page_vprot( view->base, view->size, 0 );
+                if (anon_mmap_fixed(view->base, view->size, 0, 0) != view->base)
+                    ERR("anon_mmap_fixed failed, err %s.\n", strerror(errno));
+            }
+            else
+            {
+                delete_view( view );
+            }
         }
         else FIXME( "failed to unmap %p %x\n", view->base, status );
     }
+done:
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
     return status;
 }
@@ -5076,7 +5093,7 @@ NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr )
  */
 NTSTATUS WINAPI NtUnmapViewOfSection( HANDLE process, PVOID addr )
 {
-    return unmap_view_of_section( process, addr );
+    return unmap_view_of_section( process, addr, 0 );
 }
 
 /***********************************************************************
@@ -5086,7 +5103,7 @@ NTSTATUS WINAPI NtUnmapViewOfSection( HANDLE process, PVOID addr )
 NTSTATUS WINAPI NtUnmapViewOfSectionEx( HANDLE process, PVOID addr, ULONG flags )
 {
     if (flags) FIXME("Ignoring flags %#x.\n", (int)flags);
-    return unmap_view_of_section( process, addr );
+    return unmap_view_of_section( process, addr, flags );
 }
 
 /******************************************************************************
