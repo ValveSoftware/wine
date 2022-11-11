@@ -602,6 +602,7 @@ typedef union
         enum apc_type    type;      /* APC_UNMAP_VIEW */
         int              __pad;
         client_ptr_t     addr;      /* view address */
+        unsigned int     flags;     /* unmap flags */
     } unmap_view;
     struct
     {
