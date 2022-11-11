@@ -1997,8 +1997,9 @@ static NTSTATUS map_fixed_area( void *base, size_t size, unsigned int vprot )
  * virtual_mutex must be held by caller.
  */
 static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
-                          int top_down, unsigned int vprot, ULONG_PTR limit, size_t align_mask )
+                          unsigned int alloc_type, unsigned int vprot, ULONG_PTR limit, size_t align_mask )
 {
+    int top_down = alloc_type & MEM_TOP_DOWN;
     void *ptr;
     NTSTATUS status;
 
@@ -2213,7 +2214,7 @@ static NTSTATUS allocate_dos_memory( struct file_view **view, unsigned int vprot
     if (mmap_is_in_reserved_area( low_64k, dosmem_size - 0x10000 ) != 1)
     {
         addr = anon_mmap_tryfixed( low_64k, dosmem_size - 0x10000, unix_prot, 0 );
-        if (addr == MAP_FAILED) return map_view( view, NULL, dosmem_size, FALSE, vprot, 0, 0 );
+        if (addr == MAP_FAILED) return map_view( view, NULL, dosmem_size, 0, vprot, 0, 0 );
     }
 
     /* now try to allocate the low 64K too */
@@ -3244,7 +3245,7 @@ NTSTATUS virtual_alloc_thread_stack( INITIAL_TEB *stack, ULONG_PTR zero_bits, SI
 
     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
 
-    if ((status = map_view( &view, NULL, size + extra_size, FALSE,
+    if ((status = map_view( &view, NULL, size + extra_size, 0,
                             VPROT_READ | VPROT_WRITE | VPROT_COMMITTED, get_zero_bits_mask( zero_bits ), 0 ))
                             != STATUS_SUCCESS)
         goto done;
