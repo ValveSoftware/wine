@@ -3922,10 +3922,15 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
 
     /* Compute the alloc type flags */
 
-    if (!(type & (MEM_COMMIT | MEM_RESERVE | MEM_RESET)) ||
-        (type & ~(MEM_COMMIT | MEM_RESERVE | MEM_TOP_DOWN | MEM_WRITE_WATCH | MEM_RESET)))
+    if (!(type & (MEM_COMMIT | MEM_RESERVE | MEM_RESET)))
     {
         WARN("called with wrong alloc type flags (%08x) !\n", (int)type);
+        return STATUS_INVALID_PARAMETER;
+    }
+
+    if (type & MEM_RESERVE_PLACEHOLDER && (protect != PAGE_NOACCESS))
+    {
+        WARN("Wrong protect %#x for placeholder.\n", (unsigned int)protect);
         return STATUS_INVALID_PARAMETER;
     }
 
@@ -3939,6 +3944,7 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
         {
             if (type & MEM_COMMIT) vprot |= VPROT_COMMITTED;
             if (type & MEM_WRITE_WATCH) vprot |= VPROT_WRITEWATCH;
+            if (type & MEM_RESERVE_PLACEHOLDER) vprot |= VPROT_PLACEHOLDER;
             if (protect & PAGE_NOCACHE) vprot |= SEC_NOCACHE;
 
             if (vprot & VPROT_WRITECOPY) status = STATUS_INVALID_PAGE_PROTECTION;
@@ -3958,6 +3964,7 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
     {
         if (!(view = find_view( base, size ))) status = STATUS_NOT_MAPPED_VIEW;
         else if (view->protect & SEC_FILE) status = STATUS_ALREADY_COMMITTED;
+        else if (view->protect & VPROT_PLACEHOLDER) status = STATUS_CONFLICTING_ADDRESSES;
         else if (!(status = set_protection( view, base, size, protect )) && (view->protect & SEC_RESERVE))
         {
             SERVER_START_REQ( add_mapping_committed_range )
@@ -3991,6 +3998,7 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
 NTSTATUS WINAPI NtAllocateVirtualMemory( HANDLE process, PVOID *ret, ULONG_PTR zero_bits,
                                          SIZE_T *size_ptr, ULONG type, ULONG protect )
 {
+    static const ULONG type_mask = MEM_COMMIT | MEM_RESERVE | MEM_TOP_DOWN | MEM_WRITE_WATCH | MEM_RESET;
     ULONG_PTR limit;
 
     TRACE("%p %p %08lx %x %08x\n", process, *ret, *size_ptr, (int)type, (int)protect );
@@ -4001,6 +4009,12 @@ NTSTATUS WINAPI NtAllocateVirtualMemory( HANDLE process, PVOID *ret, ULONG_PTR z
 #ifndef _WIN64
     if (!is_wow64 && zero_bits >= 32) return STATUS_INVALID_PARAMETER_3;
 #endif
+
+    if (type & ~type_mask)
+    {
+        WARN("Called with wrong alloc type flags %08x.\n", (int)type);
+        return STATUS_INVALID_PARAMETER;
+    }
 
     if (process != NtCurrentProcess())
     {
@@ -4044,6 +4058,8 @@ NTSTATUS WINAPI NtAllocateVirtualMemoryEx( HANDLE process, PVOID *ret, SIZE_T *s
                                            ULONG protect, MEM_EXTENDED_PARAMETER *parameters,
                                            ULONG count )
 {
+    static const ULONG type_mask = MEM_COMMIT | MEM_RESERVE | MEM_TOP_DOWN | MEM_WRITE_WATCH
+                                   | MEM_RESET | MEM_RESERVE_PLACEHOLDER;
     ULONG_PTR limit = 0;
     ULONG_PTR align = 0;
 
@@ -4051,6 +4067,12 @@ NTSTATUS WINAPI NtAllocateVirtualMemoryEx( HANDLE process, PVOID *ret, SIZE_T *s
           process, *ret, *size_ptr, (int)type, (int)protect, parameters, (int)count );
 
     if (count && !parameters) return STATUS_INVALID_PARAMETER;
+
+    if (type & ~type_mask)
+    {
+        WARN("Called with wrong alloc type flags %08x.\n", (int)type);
+        return STATUS_INVALID_PARAMETER;
+    }
 
     if (count)
     {
