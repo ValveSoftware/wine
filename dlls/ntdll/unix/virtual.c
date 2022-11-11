@@ -126,6 +126,7 @@ struct file_view
 /* per-mapping protection flags */
 #define VPROT_SYSTEM     0x0200  /* system view (underlying mmap not under our control) */
 #define VPROT_PLACEHOLDER 0x0400
+#define VPROT_FROMPLACEHOLDER 0x0800
 
 /* Conversion from VPROT_* to Win32 flags */
 static const BYTE VIRTUAL_Win32Flags[16] =
@@ -2002,6 +2003,31 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     int top_down = alloc_type & MEM_TOP_DOWN;
     void *ptr;
     NTSTATUS status;
+
+    if (alloc_type & MEM_REPLACE_PLACEHOLDER)
+    {
+        if ((*view_ret = find_view( base, 0 )))
+        {
+            TRACE( "found view %p, size %p, protect %#x.\n",
+                  (*view_ret)->base, (void *)(*view_ret)->size, (*view_ret)->protect );
+            if ((*view_ret)->base != base || (*view_ret)->size != size)
+                return STATUS_CONFLICTING_ADDRESSES;
+            if (!((*view_ret)->protect & VPROT_PLACEHOLDER))
+            {
+                TRACE("Wrong protect %#x for MEM_REPLACE_PLACEHOLDER.\n", (*view_ret)->protect);
+                return STATUS_INVALID_PARAMETER;
+            }
+            (*view_ret)->protect = vprot | VPROT_FROMPLACEHOLDER;
+
+            if (!set_vprot( *view_ret, base, size, vprot | VPROT_COMMITTED ))
+                ERR("set_protection failed.\n");
+            if (vprot & VPROT_WRITEWATCH)
+                reset_write_watches( base, size );
+            return STATUS_SUCCESS;
+        }
+        TRACE("MEM_REPLACE_PLACEHOLDER view not found.\n");
+        return STATUS_INVALID_PARAMETER;
+    }
 
     if (base)
     {
@@ -3898,7 +3924,7 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
 
     if (*ret)
     {
-        if (type & MEM_RESERVE) /* Round down to 64k boundary */
+        if (type & MEM_RESERVE && !(type & MEM_REPLACE_PLACEHOLDER)) /* Round down to 64k boundary */
             base = ROUND_ADDR( *ret, granularity_mask );
         else
             base = ROUND_ADDR( *ret, page_mask );
@@ -3922,7 +3948,8 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
 
     /* Compute the alloc type flags */
 
-    if (!(type & (MEM_COMMIT | MEM_RESERVE | MEM_RESET)))
+    if (!(type & (MEM_COMMIT | MEM_RESERVE | MEM_RESET))
+        || (type & MEM_REPLACE_PLACEHOLDER && !(type & MEM_RESERVE)))
     {
         WARN("called with wrong alloc type flags (%08x) !\n", (int)type);
         return STATUS_INVALID_PARAMETER;
@@ -3949,7 +3976,7 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
 
             if (vprot & VPROT_WRITECOPY) status = STATUS_INVALID_PAGE_PROTECTION;
             else if (is_dos_memory) status = allocate_dos_memory( &view, vprot );
-            else status = map_view( &view, base, size, type & MEM_TOP_DOWN, vprot, limit,
+            else status = map_view( &view, base, size, type & (MEM_TOP_DOWN | MEM_REPLACE_PLACEHOLDER), vprot, limit,
                                     align ? align - 1 : granularity_mask );
 
             if (status == STATUS_SUCCESS) base = view->base;
@@ -4059,7 +4086,7 @@ NTSTATUS WINAPI NtAllocateVirtualMemoryEx( HANDLE process, PVOID *ret, SIZE_T *s
                                            ULONG count )
 {
     static const ULONG type_mask = MEM_COMMIT | MEM_RESERVE | MEM_TOP_DOWN | MEM_WRITE_WATCH
-                                   | MEM_RESET | MEM_RESERVE_PLACEHOLDER;
+                                   | MEM_RESET | MEM_RESERVE_PLACEHOLDER | MEM_REPLACE_PLACEHOLDER;
     ULONG_PTR limit = 0;
     ULONG_PTR align = 0;
 
@@ -4213,6 +4240,12 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
 
         if (size && (char *)view->base + view->size - base < size) status = STATUS_UNABLE_TO_FREE_VM;
         else if (!size && base != view->base) status = STATUS_FREE_VM_NOT_AT_BASE;
+        else if (type == (MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER) && !size) status = STATUS_INVALID_PARAMETER_3;
+        else if (type == (MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER) && !((view->protect & VPROT_FROMPLACEHOLDER)
+                 || (view->protect & VPROT_PLACEHOLDER && size != view->size)))
+        {
+            status = STATUS_CONFLICTING_ADDRESSES;
+        }
         else
         {
             if (!size) size = view->size;
