@@ -4343,6 +4343,30 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
             *size_ptr = size;
         }
     }
+    else if (type & MEM_COALESCE_PLACEHOLDERS)
+    {
+        struct file_view *next_view = RB_ENTRY_VALUE( rb_next( &view->entry ), struct file_view, entry );
+
+        if (type != (MEM_RELEASE | MEM_COALESCE_PLACEHOLDERS)) status = STATUS_INVALID_PARAMETER_4;
+        else if (!size) status = STATUS_INVALID_PARAMETER_3;
+        else if (!next_view || (char *)view->base + view->size != next_view->base
+            || base != view->base || size != view->size + next_view->size
+            || !(view->protect & VPROT_PLACEHOLDER) || !(next_view->protect & VPROT_PLACEHOLDER))
+        {
+            status = STATUS_CONFLICTING_ADDRESSES;
+        }
+        else
+        {
+            unregister_view( view );
+            unregister_view( next_view );
+
+            view->size += next_view->size;
+            free_view( next_view );
+
+            register_view( view );
+            VIRTUAL_DEBUG_DUMP_VIEW( view );
+        }
+    }
     else
     {
         WARN("called with wrong free type flags (%08x) !\n", (int)type);
