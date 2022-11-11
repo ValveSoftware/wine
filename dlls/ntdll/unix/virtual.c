@@ -2681,7 +2681,8 @@ static NTSTATUS virtual_map_section( HANDLE handle, PVOID *addr_ptr, ULONG_PTR z
 
     server_enter_uninterrupted_section( &virtual_mutex, &sigset );
 
-    res = map_view( &view, base, size, alloc_type & MEM_TOP_DOWN, vprot, get_zero_bits_mask( zero_bits ), 0 );
+    res = map_view( &view, base, size, alloc_type & (MEM_TOP_DOWN | MEM_REPLACE_PLACEHOLDER),
+                    vprot, get_zero_bits_mask( zero_bits ), 0 );
     if (res) goto done;
 
     TRACE( "handle=%p size=%lx offset=%x%08x\n", handle, size, offset.u.HighPart, offset.u.LowPart );
