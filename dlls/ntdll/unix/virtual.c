@@ -5013,11 +5013,7 @@ NTSTATUS WINAPI NtMapViewOfSectionEx( HANDLE handle, HANDLE process, PVOID *addr
     return NtMapViewOfSection( handle, process, addr_ptr, 0, 0, offset_ptr, size_ptr, ViewShare, alloc_type, protect );
 }
 
-/***********************************************************************
- *             NtUnmapViewOfSection   (NTDLL.@)
- *             ZwUnmapViewOfSection   (NTDLL.@)
- */
-NTSTATUS WINAPI NtUnmapViewOfSection( HANDLE process, PVOID addr )
+NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr )
 {
     struct file_view *view;
     unsigned int status = STATUS_NOT_MAPPED_VIEW;
@@ -5075,13 +5071,22 @@ NTSTATUS WINAPI NtUnmapViewOfSection( HANDLE process, PVOID addr )
 }
 
 /***********************************************************************
+ *             NtUnmapViewOfSection   (NTDLL.@)
+ *             ZwUnmapViewOfSection   (NTDLL.@)
+ */
+NTSTATUS WINAPI NtUnmapViewOfSection( HANDLE process, PVOID addr )
+{
+    return unmap_view_of_section( process, addr );
+}
+
+/***********************************************************************
  *             NtUnmapViewOfSectionEx   (NTDLL.@)
  *             ZwUnmapViewOfSectionEx   (NTDLL.@)
  */
 NTSTATUS WINAPI NtUnmapViewOfSectionEx( HANDLE process, PVOID addr, ULONG flags )
 {
     if (flags) FIXME("Ignoring flags %#x.\n", (int)flags);
-    return NtUnmapViewOfSection( process, addr );
+    return unmap_view_of_section( process, addr );
 }
 
 /******************************************************************************
