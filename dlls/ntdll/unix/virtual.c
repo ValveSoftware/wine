@@ -5204,7 +5204,9 @@ static NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr, ULONG flags )
             if (flags & MEM_PRESERVE_PLACEHOLDER)
             {
                 view->protect = VPROT_PLACEHOLDER;
-                set_vprot( view, view->base, view->size, 0 );
+                set_page_vprot( view->base, view->size, 0 );
+                if (anon_mmap_fixed(view->base, view->size, 0, 0) != view->base)
+                    ERR("anon_mmap_fixed failed, err %s.\n", strerror(errno));
             }
             else
             {
