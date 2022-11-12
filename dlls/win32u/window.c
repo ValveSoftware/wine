@@ -4521,7 +4521,7 @@ BOOL WINAPI NtUserFlashWindowEx( FLASHWINFO *info )
         else wparam = (hwnd == NtUserGetForegroundWindow());
 
         release_win_ptr( win );
-        send_message( hwnd, WM_NCACTIVATE, wparam, 0 );
+        send_notify_message( hwnd, WM_NCACTIVATE, wparam, 0, 0 );
         user_driver->pFlashWindowEx( info );
         return wparam;
     }
