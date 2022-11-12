@@ -337,6 +337,41 @@ static void test_NtAllocateVirtualMemoryEx(void)
             PAGE_NOACCESS, NULL, 0);
     ok(status == STATUS_SUCCESS, "Unexpected status %08lx.\n", status);
 
+    size = 0x10000;
+    status = pNtAllocateVirtualMemoryEx(NtCurrentProcess(), &addr1, &size, MEM_RESERVE | MEM_COMMIT | MEM_REPLACE_PLACEHOLDER,
+            PAGE_READWRITE, NULL, 0);
+    ok(!status, "Unexpected status %08lx.\n", status);
+
+    memset(addr1, 0xcc, size);
+
+    status = NtFreeVirtualMemory(NtCurrentProcess(), (void **)&addr1, &size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+    ok(!status, "Unexpected status %08lx.\n", status);
+
+    size = 0x10000;
+    status = pNtAllocateVirtualMemoryEx(NtCurrentProcess(), &addr1, &size, MEM_RESERVE | MEM_COMMIT | MEM_REPLACE_PLACEHOLDER,
+            PAGE_READONLY, NULL, 0);
+    ok(!status, "Unexpected status %08lx.\n", status);
+
+    ok(!*(unsigned int *)addr1, "Got %#x.\n", *(unsigned int *)addr1);
+
+    status = NtQueryVirtualMemory( NtCurrentProcess(), addr1, MemoryBasicInformation, &mbi, sizeof(mbi), &size );
+    ok(!status, "Unexpected status %08lx.\n", status);
+    ok(mbi.AllocationProtect == PAGE_READONLY, "Unexpected protection %#lx.\n", mbi.AllocationProtect);
+    ok(mbi.State == MEM_COMMIT, "Unexpected state %#lx.\n", mbi.State);
+    ok(mbi.Type == MEM_PRIVATE, "Unexpected type %#lx.\n", mbi.Type);
+    ok(mbi.RegionSize == 0x10000, "Unexpected size.\n");
+
+    size = 0x10000;
+    status = NtFreeVirtualMemory(NtCurrentProcess(), (void **)&addr1, &size, MEM_RELEASE | MEM_PRESERVE_PLACEHOLDER);
+    ok(!status, "Unexpected status %08lx.\n", status);
+
+    status = NtQueryVirtualMemory( NtCurrentProcess(), addr1, MemoryBasicInformation, &mbi, sizeof(mbi), &size );
+    ok(!status, "Unexpected status %08lx.\n", status);
+    ok(mbi.AllocationProtect == PAGE_NOACCESS, "Unexpected protection %#lx.\n", mbi.AllocationProtect);
+    ok(mbi.State == MEM_RESERVE, "Unexpected state %#lx.\n", mbi.State);
+    ok(mbi.Type == MEM_PRIVATE, "Unexpected type %#lx.\n", mbi.Type);
+    ok(mbi.RegionSize == 0x10000, "Unexpected size.\n");
+
     status = pNtAllocateVirtualMemoryEx(NtCurrentProcess(), &addr1, &size, MEM_RESERVE | MEM_RESERVE_PLACEHOLDER,
             PAGE_NOACCESS, NULL, 0);
     ok(status == STATUS_CONFLICTING_ADDRESSES, "Unexpected status %08lx.\n", status);
