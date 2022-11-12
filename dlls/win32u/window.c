@@ -4585,7 +4585,7 @@ BOOL WINAPI NtUserFlashWindowEx( FLASHWINFO *info )
         release_win_ptr( win );
 
         if (!info->dwFlags || info->dwFlags & FLASHW_CAPTION)
-            send_message( hwnd, WM_NCACTIVATE, wparam, 0 );
+            send_notify_message( hwnd, WM_NCACTIVATE, wparam, 0, 0 );
 
         user_driver->pFlashWindowEx( info );
         return wparam;
