@@ -4393,9 +4393,11 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
                         preserve_view->base = base;
                         preserve_view->size = size;
                         preserve_view->protect = VPROT_PLACEHOLDER;
-                        set_vprot( preserve_view, base, size, 0 );
                         register_view( preserve_view );
                     }
+                    set_page_vprot( base, size, 0 );
+                    if (anon_mmap_fixed(base, size, 0, 0) != base)
+                        ERR("anon_mmap_fixed failed, err %s.\n", strerror(errno));
                     VIRTUAL_DEBUG_DUMP_VIEW( preserve_view );
                 }
                 else
