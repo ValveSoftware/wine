@@ -2110,10 +2110,10 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
             }
             (*view_ret)->protect = vprot | VPROT_FROMPLACEHOLDER;
 
-            if (vprot & VPROT_WRITEWATCH)
-                set_page_vprot( base, size, vprot );
             if (!set_vprot( *view_ret, base, size, vprot | VPROT_COMMITTED ))
                 ERR("set_protection failed.\n");
+            if (vprot & VPROT_WRITEWATCH)
+                reset_write_watches( base, size );
             return STATUS_SUCCESS;
         }
         TRACE("MEM_REPLACE_PLACEHOLDER view not found.\n");
