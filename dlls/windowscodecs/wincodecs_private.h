@@ -398,4 +398,9 @@ extern HRESULT CommonDecoder_CreateInstance(struct decoder *decoder,
 extern HRESULT CommonEncoder_CreateInstance(struct encoder *encoder,
     const struct encoder_info *encoder_info, REFIID iid, void** ppv);
 
+#ifdef _WIN64
+#undef setjmp
+#define setjmp(buf) _setjmpex(buf, NULL)
+#endif
+
 #endif /* WINCODECS_PRIVATE_H */
