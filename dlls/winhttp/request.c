@@ -3158,7 +3158,6 @@ static void socket_destroy( struct object_header *hdr )
     stop_queue( &socket->recv_q );
 
     netconn_close( socket->netconn );
-    release_object( &socket->request->hdr );
     free( socket->read_buffer );
     free( socket->send_frame_buffer );
     free( socket );
@@ -3247,9 +3246,6 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
         memcpy( socket->read_buffer, request->read_buf + request->read_pos, request->read_size );
         request->read_pos = request->read_size = 0;
     }
-
-    addref_object( &request->hdr );
-    socket->request = request;
 
     netconn_set_timeout( socket->netconn, FALSE, socket->keepalive_interval );
 
