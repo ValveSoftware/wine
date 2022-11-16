@@ -3103,6 +3103,13 @@ BOOL WINAPI WinHttpWriteData( HINTERNET hrequest, const void *buffer, DWORD to_w
         return FALSE;
     }
 
+    if (!request->netconn)
+    {
+        release_object( &request->hdr );
+        SetLastError( ERROR_WINHTTP_OPERATION_CANCELLED );
+        return FALSE;
+    }
+
     if (request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         struct write_data *w;
