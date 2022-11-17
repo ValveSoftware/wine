@@ -3364,14 +3364,6 @@ static void test_websocket(int port)
     socket = pWinHttpWebSocketCompleteUpgrade(request, 0);
     ok(socket != NULL, "got %lu\n", GetLastError());
 
-    ret = WinHttpReadData(request, buf, sizeof(buf) - 1, &size);
-    ok(ret, "WinHttpReadData failed: %lu\n", GetLastError());
-    ok(!size, "got size %ld.\n", size);
-    ret = WinHttpWriteData(request, buf, sizeof(buf) - 1, &size);
-    error = GetLastError();
-    ok(!ret, "success\n");
-    ok(error == ERROR_WINHTTP_OPERATION_CANCELLED, "got %lu\n", error);
-
     size = sizeof(header);
     ret = WinHttpQueryHeaders(socket, WINHTTP_QUERY_UPGRADE, NULL, &header, &size, NULL);
     error = GetLastError();
