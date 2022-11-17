@@ -3159,7 +3159,6 @@ static void socket_destroy( struct object_header *hdr )
 
     netconn_close( socket->netconn );
     release_object( &socket->request->hdr );
-    free( socket->read_buffer );
     free( socket->send_frame_buffer );
     free( socket );
 }
@@ -3239,14 +3238,6 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
     init_queue( &socket->recv_q );
     socket->netconn = request->netconn;
     request->netconn = NULL;
-
-    if (request->read_size)
-    {
-        socket->read_buffer = malloc( request->read_size );
-        socket->bytes_in_read_buffer = request->read_size;
-        memcpy( socket->read_buffer, request->read_buf + request->read_pos, request->read_size );
-        request->read_pos = request->read_size = 0;
-    }
 
     addref_object( &request->hdr );
     socket->request = request;
@@ -3650,12 +3641,11 @@ static DWORD receive_bytes( struct socket *socket, char *buf, DWORD len, DWORD *
     char *ptr = buf;
     int received;
 
-    if (socket->bytes_in_read_buffer)
+    if (socket->request->read_size)
     {
-        size = min( needed, socket->bytes_in_read_buffer );
-        memcpy( ptr, socket->read_buffer, size );
-        memmove( socket->read_buffer, socket->read_buffer + size, socket->bytes_in_read_buffer - size );
-        socket->bytes_in_read_buffer -= size;
+        size = min( needed, socket->request->read_size );
+        memcpy( ptr, socket->request->read_buf + socket->request->read_pos, size );
+        remove_data( socket->request, size );
         needed -= size;
         ptr += size;
     }
