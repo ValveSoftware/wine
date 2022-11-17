@@ -1383,7 +1383,7 @@ struct server_info
 };
 
 static int server_socket;
-static HANDLE server_socket_available, server_socket_done;
+static HANDLE server_socket_available, server_socket_closed, server_socket_done;
 
 static DWORD CALLBACK server_thread(LPVOID param)
 {
@@ -1418,7 +1418,7 @@ static DWORD CALLBACK server_thread(LPVOID param)
     do
     {
         if (c == -1) c = accept(s, NULL, NULL);
-
+        ResetEvent(server_socket_closed);
         memset(buffer, 0, sizeof buffer);
         for(i = 0; i < sizeof buffer - 1; i++)
         {
@@ -1445,6 +1445,7 @@ static DWORD CALLBACK server_thread(LPVOID param)
         }
         shutdown(c, 2);
         closesocket(c);
+        SetEvent(server_socket_closed);
         c = -1;
     } while (!last_request);
 
@@ -1731,6 +1732,7 @@ static void test_persistent_connection(int port)
 
     SetEvent( server_socket_done );
     CloseHandle( info.wait );
+    WaitForSingleObject( server_socket_closed, INFINITE );
 }
 
 struct test_recursion_context
@@ -1911,6 +1913,7 @@ START_TEST (notification)
     ok( thread != NULL, "failed to create thread %lu\n", GetLastError() );
 
     server_socket_available = CreateEventW( NULL, 0, 0, NULL );
+    server_socket_closed = CreateEventW( NULL, 0, 0, NULL );
     server_socket_done = CreateEventW( NULL, 0, 0, NULL );
 
     ret = WaitForSingleObject( si.event, 10000 );
@@ -1930,4 +1933,5 @@ START_TEST (notification)
     CloseHandle( thread );
     CloseHandle( server_socket_available );
     CloseHandle( server_socket_done );
+    CloseHandle( server_socket_closed );
 }
