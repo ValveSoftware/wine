@@ -3230,7 +3230,6 @@ HINTERNET WINAPI WinHttpWebSocketCompleteUpgrade( HINTERNET hrequest, DWORD_PTR 
     socket->hdr.callback = request->hdr.callback;
     socket->hdr.notify_mask = request->hdr.notify_mask;
     socket->hdr.context = context;
-    socket->hdr.flags = request->connect->hdr.flags & WINHTTP_FLAG_ASYNC;
     socket->keepalive_interval = 30000;
     socket->send_buffer_size = request->websocket_send_buffer_size;
     InitializeSRWLock( &socket->send_lock );
@@ -3555,7 +3554,7 @@ DWORD WINAPI WinHttpWebSocketSend( HINTERNET hsocket, WINHTTP_WEB_SOCKET_BUFFER_
         return ERROR_INVALID_OPERATION;
     }
 
-    if (socket->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         BOOL async_send, complete_async = FALSE;
         struct socket_send *s;
@@ -3730,7 +3729,7 @@ static void task_socket_send_pong( void *ctx, BOOL abort )
 
 static DWORD socket_send_pong( struct socket *socket )
 {
-    if (socket->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         BOOL async_send, complete_async = FALSE;
         struct socket_send *s;
@@ -3992,7 +3991,7 @@ DWORD WINAPI WinHttpWebSocketReceive( HINTERNET hsocket, void *buf, DWORD len, D
         return ERROR_INVALID_OPERATION;
     }
 
-    if (socket->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         struct socket_receive *r;
 
@@ -4061,7 +4060,7 @@ static DWORD send_socket_shutdown( struct socket *socket, USHORT status, const v
 
     if (socket->state < SOCKET_STATE_SHUTDOWN) socket->state = SOCKET_STATE_SHUTDOWN;
 
-    if (socket->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         BOOL async_send, complete_async = FALSE;
         struct socket_shutdown *s;
@@ -4219,7 +4218,7 @@ DWORD WINAPI WinHttpWebSocketClose( HINTERNET hsocket, USHORT status, void *reas
     prev_state = socket->state;
     socket->state = SOCKET_STATE_CLOSED;
 
-    if (socket->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         pending_receives = InterlockedIncrement( &socket->hdr.pending_receives );
         cancel_queue( &socket->recv_q );
@@ -4230,12 +4229,12 @@ DWORD WINAPI WinHttpWebSocketClose( HINTERNET hsocket, USHORT status, void *reas
 
     if (pending_receives == 1 && socket->close_frame_received)
     {
-        if (socket->hdr.flags & WINHTTP_FLAG_ASYNC)
+        if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
             socket_close_complete( socket, socket->close_frame_receive_err );
         goto done;
     }
 
-    if (socket->hdr.flags & WINHTTP_FLAG_ASYNC)
+    if (socket->request->connect->hdr.flags & WINHTTP_FLAG_ASYNC)
     {
         struct socket_shutdown *s;
 
