@@ -6816,11 +6816,12 @@ NTSTATUS WINAPI NtQueryVolumeInformationFile( HANDLE handle, IO_STATUS_BLOCK *io
                                               void *buffer, ULONG length,
                                               FS_INFORMATION_CLASS info_class )
 {
+    enum server_fd_type fd_type;
     int fd, needs_close;
     struct stat st;
     NTSTATUS status;
 
-    status = server_get_unix_fd( handle, 0, &fd, &needs_close, NULL, NULL );
+    status = server_get_unix_fd( handle, 0, &fd, &needs_close, &fd_type, NULL );
     if (status == STATUS_BAD_DEVICE_TYPE)
     {
         struct async_irp *async;
@@ -6924,7 +6925,15 @@ NTSTATUS WINAPI NtQueryVolumeInformationFile( HANDLE handle, IO_STATUS_BLOCK *io
         {
             FILE_FS_DEVICE_INFORMATION *info = buffer;
 
-            if ((status = get_device_info( fd, info )) == STATUS_SUCCESS)
+            if (fd_type == FD_TYPE_SOCKET || fd_type == FD_TYPE_PIPE)
+            {
+                info->Characteristics = 0;
+                info->DeviceType = FILE_DEVICE_NAMED_PIPE;
+                status = STATUS_SUCCESS;
+            }
+            else status = get_device_info( fd, info );
+
+            if (!status)
                 io->Information = sizeof(*info);
         }
         break;
