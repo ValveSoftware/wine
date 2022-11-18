@@ -6707,7 +6707,7 @@ NTSTATUS get_device_info( int fd, FILE_FS_DEVICE_INFORMATION *info )
     }
     else if (S_ISFIFO( st.st_mode ) || S_ISSOCK( st.st_mode ))
     {
-        info->DeviceType = FILE_DEVICE_NAMED_PIPE;
+        info->DeviceType = FILE_DEVICE_DISK;
     }
     else if (is_device_placeholder( fd ))
     {
