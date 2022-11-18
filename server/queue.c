@@ -3790,7 +3790,8 @@ DECL_HANDLER(get_rawinput_buffer)
         free_message( msg );
 
         size += next_size;
-        cur += sizeof(*data);
+        cur += sizeof(*data) + extra_size;
+
         count++;
     }
 
