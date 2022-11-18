@@ -2780,3 +2780,13 @@ BOOL WINAPI SymGetLineFromInlineContextW(HANDLE hProcess, DWORD64 addr, ULONG in
     if (!get_line_from_inline_context(hProcess, addr, inline_ctx, mod_addr, disp, &intl)) return FALSE;
     return internal_line_copy_toW64(&intl, line);
 }
+
+/******************************************************************
+ *		SymAddrIncludeInlineTrace (DBGHELP.@)
+ *
+ */
+DWORD WINAPI SymAddrIncludeInlineTrace(HANDLE hProcess, DWORD64 addr)
+{
+    FIXME("(%p, %I64x): stub\n", hProcess, addr);
+    return 0;
+}
