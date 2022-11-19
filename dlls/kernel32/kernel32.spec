@@ -272,8 +272,8 @@
 @ stdcall -import CreateDirectoryA(str ptr)
 @ stdcall CreateDirectoryExA(str str ptr)
 @ stdcall -import CreateDirectoryExW(wstr wstr ptr)
-# @ stub CreateDirectoryTransactedA
-# @ stub CreateDirectoryTransactedW
+@ stdcall CreateDirectoryTransactedA(str str ptr ptr)
+@ stdcall CreateDirectoryTransactedW(wstr wstr ptr ptr)
 @ stdcall -import CreateDirectoryW(wstr ptr)
 @ stdcall -import CreateEventA(ptr long long str)
 @ stdcall -import CreateEventExA(ptr str long long)
@@ -283,12 +283,14 @@
 @ stdcall -import CreateFiberEx(long long long ptr ptr)
 @ stdcall -import CreateFile2(wstr long long long ptr)
 @ stdcall -import CreateFileA(str long long ptr long long long)
+@ stdcall CreateFileTransactedA(str long long ptr long long long ptr ptr ptr)
 @ stdcall CreateFileMappingA(long ptr long long long str)
 # @ stub CreateFileMappingNumaA
 @ stdcall CreateFileMappingFromApp(long ptr long int64 wstr) kernelbase.CreateFileMappingFromApp
 @ stdcall -import CreateFileMappingNumaW(long ptr long long long wstr long)
 @ stdcall -import CreateFileMappingW(long ptr long long long wstr)
 @ stdcall -import CreateFileW(wstr long long ptr long long long)
+@ stdcall CreateFileTransactedW(wstr long long ptr long long long ptr ptr ptr)
 @ stdcall -import CreateHardLinkA(str str ptr)
 @ stdcall CreateHardLinkTransactedA(str str ptr ptr)
 @ stdcall CreateHardLinkTransactedW(wstr wstr ptr ptr)
@@ -365,8 +367,8 @@
 @ stdcall DeleteCriticalSection(ptr) NTDLL.RtlDeleteCriticalSection
 @ stdcall -import DeleteFiber(ptr)
 @ stdcall -import DeleteFileA(str)
-# @ stub DeleteFileTransactedA
-# @ stub DeleteFileTransactedW
+@ stdcall DeleteFileTransactedA(str ptr)
+@ stdcall DeleteFileTransactedW(wstr ptr)
 @ stdcall -import DeleteFileW(wstr)
 @ stdcall -import DeleteProcThreadAttributeList(ptr)
 # @ stub DisableThreadProfiling
@@ -487,8 +489,8 @@
 @ stdcall -import FindFirstFileExW(wstr long ptr long ptr long)
 # @ stub FindFirstFileNameTransactedW
 # @ stub FindFirstFileNameW
-# @ stub FindFirstFileTransactedA
-# @ stub FindFirstFileTransactedW
+@ stdcall FindFirstFileTransactedA(str long ptr long ptr long ptr)
+@ stdcall FindFirstFileTransactedW(wstr long ptr long ptr long ptr)
 @ stdcall -import FindFirstFileW(wstr ptr)
 # @ stub FindFirstStreamTransactedW
 @ stdcall -import FindFirstStreamW(wstr long ptr long)
@@ -676,8 +678,8 @@
 @ stdcall -import GetFileAttributesA(str)
 @ stdcall -import GetFileAttributesExA(str long ptr)
 @ stdcall -import GetFileAttributesExW(wstr long ptr)
-# @ stub GetFileAttributesTransactedA
-# @ stub GetFileAttributesTransactedW
+@ stdcall GetFileAttributesTransactedA(str long ptr ptr)
+@ stdcall GetFileAttributesTransactedW(wstr long ptr ptr)
 @ stdcall -import GetFileAttributesW(wstr)
 # @ stub GetFileBandwidthReservation
 @ stdcall -import GetFileInformationByHandle(long ptr)
@@ -1293,8 +1295,8 @@
 @ stdcall -import ReplaceFile(wstr wstr wstr long ptr ptr) ReplaceFileW
 @ stdcall ReplaceFileA(str str str long ptr ptr)
 @ stdcall -import ReplaceFileW(wstr wstr wstr long ptr ptr)
-# @ stub RemoveDirectoryTransactedA
-# @ stub RemoveDirectoryTransactedW
+@ stdcall RemoveDirectoryTransactedA(str ptr)
+@ stdcall RemoveDirectoryTransactedW(wstr ptr)
 @ stdcall -import RemoveDllDirectory(ptr)
 # @ stub RemoveSecureMemoryCacheCallback
 # @ stub ReplacePartitionUnit
