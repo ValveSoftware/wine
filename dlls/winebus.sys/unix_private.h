@@ -271,5 +271,6 @@ BOOL is_wine_blacklisted(WORD vid, WORD pid);
 BOOL is_xbox_gamepad(WORD vid, WORD pid);
 BOOL is_dualshock4_gamepad(WORD vid, WORD pid);
 BOOL is_dualsense_gamepad(WORD vid, WORD pid);
+BOOL is_logitech_g920(WORD vid, WORD pid);
 
 #endif /* __WINEBUS_UNIX_PRIVATE_H */

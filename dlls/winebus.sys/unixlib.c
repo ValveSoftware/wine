@@ -102,6 +102,11 @@ BOOL is_dualsense_gamepad(WORD vid, WORD pid)
     return FALSE;
 }
 
+BOOL is_logitech_g920(WORD vid, WORD pid)
+{
+    return vid == 0x046D && pid == 0xC262;
+}
+
 struct mouse_device
 {
     struct unix_device unix_device;
