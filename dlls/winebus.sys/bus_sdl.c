@@ -962,7 +962,7 @@ static void sdl_add_device(unsigned int index)
     SDL_Joystick* joystick;
     SDL_JoystickID id;
     SDL_GameController *controller = NULL;
-    const char *product, *sdl_serial;
+    const char *product, *sdl_serial, *str;
     char guid_str[33], buffer[ARRAY_SIZE(desc.product)];
     int axis_count, axis_offset;
 
@@ -1014,6 +1014,10 @@ static void sdl_add_device(unsigned int index)
         desc.vid = 0x045e;
         desc.pid = 0x028e;
     }
+
+    /* CW-Bug-Id: #20528 Check steam virtual controller indexes to keep them ordered */
+    if ((str = pSDL_JoystickName(joystick)) && sscanf(str, "Microsoft X-Box 360 pad %u", &desc.input) == 1) desc.input++;
+    else desc.input = -1;
 
     if (pSDL_JoystickGetSerial && (sdl_serial = pSDL_JoystickGetSerial(joystick)))
     {
