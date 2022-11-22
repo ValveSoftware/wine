@@ -66,6 +66,12 @@ struct unwind_builtin_dll_params
     CONTEXT                    *context;
 };
 
+struct steamclient_setup_trampolines_params
+{
+    HMODULE src_mod;
+    HMODULE tgt_mod;
+};
+
 enum ntdll_unix_funcs
 {
     unix_load_so_dll,
@@ -76,6 +82,7 @@ enum ntdll_unix_funcs
     unix_wine_server_handle_to_fd,
     unix_wine_spawnvp,
     unix_system_time_precise,
+    unix_steamclient_setup_trampolines,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;
