@@ -1696,6 +1696,7 @@
 @ extern -private __wine_syscall_dispatcher
 @ extern -private __wine_unix_call_dispatcher
 @ extern -arch=arm64 __wine_current_teb
+@ stdcall -syscall __wine_set_unix_env(ptr ptr)
 
 # Debugging
 @ stdcall -syscall -norelay __wine_dbg_write(ptr long)

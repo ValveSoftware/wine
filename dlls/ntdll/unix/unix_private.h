@@ -294,6 +294,7 @@ extern NTSTATUS call_user_apc_dispatcher( CONTEXT *context_ptr, ULONG_PTR arg1, 
                                           PNTAPCFUNC func, NTSTATUS status ) DECLSPEC_HIDDEN;
 extern NTSTATUS call_user_exception_dispatcher( EXCEPTION_RECORD *rec, CONTEXT *context ) DECLSPEC_HIDDEN;
 extern void call_raise_user_exception_dispatcher(void) DECLSPEC_HIDDEN;
+extern ULONG WINAPI __wine_set_unix_env( const char *var, const char *val ) DECLSPEC_HIDDEN;
 
 #define IMAGE_DLLCHARACTERISTICS_PREFER_NATIVE 0x0010 /* Wine extension */
 
