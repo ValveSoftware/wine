@@ -5437,6 +5437,13 @@ static void thread_detach(void)
     cleanup_imm_thread();
     NtClose( thread_info->server_queue );
 
+    if (thread_info->desktop_shared_map)
+    {
+        NtClose( thread_info->desktop_shared_map );
+        thread_info->desktop_shared_map = NULL;
+        thread_info->desktop_shared_memory = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 
