@@ -991,6 +991,7 @@ enum
     NtUserCallOneParam_ReplyMessage,
     NtUserCallOneParam_SetCaretBlinkTime,
     NtUserCallOneParam_SetProcessDefaultLayout,
+    NtUserCallOneParam_UnregisterTouchWindow,
     /* temporary exports */
     NtUserGetDeskPattern,
 };
@@ -1117,6 +1118,7 @@ enum
     NtUserCallTwoParam_GetMonitorInfo,
     NtUserCallTwoParam_GetSystemMetricsForDpi,
     NtUserCallTwoParam_MonitorFromRect,
+    NtUserCallTwoParam_RegisterTouchWindow,
     NtUserCallTwoParam_SetCaretPos,
     NtUserCallTwoParam_SetIconParam,
     NtUserCallTwoParam_UnhookWindowsHook,
