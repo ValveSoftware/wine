@@ -2206,6 +2206,22 @@ static BOOL X11DRV_RawTouchEvent( XGenericEventCookie *xev )
     rawinput.data.mouse.lLastY = pos.y;
 
     __wine_send_input( 0, &input, &rawinput );
+    if (!(flags & POINTER_MESSAGE_FLAG_PRIMARY)) return TRUE;
+
+    input.type             = INPUT_MOUSE;
+    input.u.mi.mouseData   = 0;
+    input.u.mi.dwFlags     = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+    if (event->evtype == XI_RawTouchBegin) input.u.mi.dwFlags |= MOUSEEVENTF_LEFTDOWN;
+    if (event->evtype == XI_RawTouchEnd) input.u.mi.dwFlags |= MOUSEEVENTF_LEFTUP;
+    input.u.mi.time        = x11drv_time_to_ticks( event->time );
+    input.u.mi.dx          = rawinput.data.mouse.lLastX;
+    input.u.mi.dy          = rawinput.data.mouse.lLastY;
+    input.u.mi.dwExtraInfo = 0xff515700;
+
+    rawinput.data.mouse.usFlags = input.u.mi.dwFlags;
+    rawinput.data.mouse.ulRawButtons = 0;
+
+    __wine_send_input( 0, &input, &rawinput );
     return TRUE;
 }
 
