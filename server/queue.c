@@ -1896,6 +1896,8 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         WM_MOUSEHWHEEL   /* 0x1000 = MOUSEEVENTF_HWHEEL */
     };
 
+    if ((input->mouse.info & 0xffffff00) == 0xff515700) source.origin = IMDT_TOUCH;
+
     desktop->cursor.last_change = get_tick_count();
     flags = input->mouse.flags;
     time  = input->mouse.time;
