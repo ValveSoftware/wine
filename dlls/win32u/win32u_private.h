@@ -104,6 +104,8 @@ extern void update_current_mouse_window( HWND hwnd, INT hittest, POINT pos );
 extern BOOL process_wine_clipcursor( HWND hwnd, UINT flags, BOOL reset );
 extern BOOL clip_fullscreen_window( HWND hwnd, BOOL reset );
 extern USHORT map_scan_to_kbd_vkey( USHORT scan, HKL layout );
+extern BOOL register_touch_window( HWND hwnd, UINT flags );
+extern BOOL unregister_touch_window( HWND hwnd );
 
 /* menu.c */
 extern UINT draw_nc_menu_bar( HDC hdc, RECT *rect, HWND hwnd );

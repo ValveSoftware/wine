@@ -7536,6 +7536,9 @@ ULONG_PTR WINAPI NtUserCallOneParam( ULONG_PTR arg, ULONG code )
     case NtUserCallOneParam_GetAsyncKeyboardState:
         return get_async_keyboard_state( (void *)arg );
 
+    case NtUserCallOneParam_UnregisterTouchWindow:
+        return unregister_touch_window( (HWND)arg );
+
     /* temporary exports */
     case NtUserGetDeskPattern:
         return get_entry( &entry_DESKPATTERN, 256, (WCHAR *)arg );
@@ -7567,6 +7570,9 @@ ULONG_PTR WINAPI NtUserCallTwoParam( ULONG_PTR arg1, ULONG_PTR arg2, ULONG code 
 
     case NtUserCallTwoParam_MonitorFromRect:
         return HandleToUlong( monitor_from_rect( (const RECT *)arg1, arg2, get_thread_dpi() ));
+
+    case NtUserCallTwoParam_RegisterTouchWindow:
+        return register_touch_window( (HWND)arg1, arg2 );
 
     case NtUserCallTwoParam_SetIconParam:
         return set_icon_param( UlongToHandle(arg1), UlongToHandle(arg2) );

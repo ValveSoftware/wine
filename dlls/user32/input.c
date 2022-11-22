@@ -733,9 +733,8 @@ LRESULT WINAPI DefRawInputProc( RAWINPUT **data, INT data_count, UINT header_siz
  */
 BOOL WINAPI CloseTouchInputHandle( HTOUCHINPUT handle )
 {
-    FIXME( "handle %p stub!\n", handle );
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    TRACE( "handle %p.\n", handle );
+    return TRUE;
 }
 
 /*****************************************************************************
@@ -743,9 +742,9 @@ BOOL WINAPI CloseTouchInputHandle( HTOUCHINPUT handle )
  */
 BOOL WINAPI GetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size )
 {
-    FIXME( "handle %p, count %u, ptr %p, size %u stub!\n", handle, count, ptr, size );
-    SetLastError( ERROR_CALL_NOT_IMPLEMENTED );
-    return FALSE;
+    TRACE( "handle %p, count %u, ptr %p, size %u.\n", handle, count, ptr, size );
+    *ptr = *(TOUCHINPUT *)handle;
+    return TRUE;
 }
 
 /*****************************************************************************
@@ -753,8 +752,8 @@ BOOL WINAPI GetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, 
  */
 BOOL WINAPI RegisterTouchWindow( HWND hwnd, ULONG flags )
 {
-    FIXME( "hwnd %p, flags %#lx stub!\n", hwnd, flags );
-    return TRUE;
+    TRACE( "hwnd %p, flags %#lx.\n", hwnd, flags );
+    return NtUserCallTwoParam( (ULONG_PTR)hwnd, flags, NtUserCallTwoParam_RegisterTouchWindow );
 }
 
 /*****************************************************************************
@@ -762,8 +761,8 @@ BOOL WINAPI RegisterTouchWindow( HWND hwnd, ULONG flags )
  */
 BOOL WINAPI UnregisterTouchWindow( HWND hwnd )
 {
-    FIXME( "hwnd %p stub!\n", hwnd );
-    return TRUE;
+    TRACE( "hwnd %p.\n", hwnd );
+    return NtUserCallOneParam( (ULONG_PTR)hwnd, NtUserCallOneParam_UnregisterTouchWindow );
 }
 
 /*****************************************************************************
