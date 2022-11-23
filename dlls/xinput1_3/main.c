@@ -337,7 +337,40 @@ static DWORD HID_set_state(struct xinput_controller *controller, XINPUT_VIBRATIO
     return ERROR_SUCCESS;
 }
 
-static void controller_destroy(struct xinput_controller *controller, BOOL already_removed);
+static void controller_disable(struct xinput_controller *controller)
+{
+    XINPUT_VIBRATION state = {0};
+
+    if (!controller->enabled) return;
+    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
+    controller->enabled = FALSE;
+
+    CancelIoEx(controller->device, &controller->hid.read_ovl);
+    WaitForSingleObject(controller->hid.read_ovl.hEvent, INFINITE);
+    SetEvent(update_event);
+}
+
+static void controller_destroy(struct xinput_controller *controller, BOOL already_removed)
+{
+    EnterCriticalSection(&controller->crit);
+
+    if (controller->device)
+    {
+        TRACE("removing device %s from index %Iu\n", debugstr_w(controller->device_path), controller - controllers);
+
+        if (!already_removed) controller_disable(controller);
+        CloseHandle(controller->device);
+        controller->device = NULL;
+
+        free(controller->hid.input_report_buf);
+        free(controller->hid.output_report_buf);
+        free(controller->hid.feature_report_buf);
+        HidD_FreePreparsedData(controller->hid.preparsed);
+        memset(&controller->hid, 0, sizeof(controller->hid));
+    }
+
+    LeaveCriticalSection(&controller->crit);
+}
 
 static void controller_enable(struct xinput_controller *controller)
 {
@@ -355,19 +388,6 @@ static void controller_enable(struct xinput_controller *controller)
     ret = ReadFile(controller->device, report_buf, report_len, NULL, &controller->hid.read_ovl);
     if (!ret && GetLastError() != ERROR_IO_PENDING) controller_destroy(controller, TRUE);
     else SetEvent(update_event);
-}
-
-static void controller_disable(struct xinput_controller *controller)
-{
-    XINPUT_VIBRATION state = {0};
-
-    if (!controller->enabled) return;
-    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
-    controller->enabled = FALSE;
-
-    CancelIoEx(controller->device, &controller->hid.read_ovl);
-    WaitForSingleObject(controller->hid.read_ovl.hEvent, INFINITE);
-    SetEvent(update_event);
 }
 
 static BOOL controller_init(struct xinput_controller *controller, PHIDP_PREPARSED_DATA preparsed,
@@ -523,26 +543,6 @@ static void update_controller_list(void)
     }
 
     SetupDiDestroyDeviceInfoList(set);
-}
-
-static void controller_destroy(struct xinput_controller *controller, BOOL already_removed)
-{
-    EnterCriticalSection(&controller->crit);
-
-    if (controller->device)
-    {
-        if (!already_removed) controller_disable(controller);
-        CloseHandle(controller->device);
-        controller->device = NULL;
-
-        free(controller->hid.input_report_buf);
-        free(controller->hid.output_report_buf);
-        free(controller->hid.feature_report_buf);
-        HidD_FreePreparsedData(controller->hid.preparsed);
-        memset(&controller->hid, 0, sizeof(controller->hid));
-    }
-
-    LeaveCriticalSection(&controller->crit);
 }
 
 static LONG sign_extend(ULONG value, const HIDP_VALUE_CAPS *caps)
