@@ -125,19 +125,6 @@ static HANDLE update_event;
 static HANDLE steam_overlay_event;
 static HANDLE steam_keyboard_event;
 
-static BOOL find_opened_device(const WCHAR *device_path, int *free_slot)
-{
-    int i;
-
-    *free_slot = XUSER_MAX_COUNT;
-    for (i = XUSER_MAX_COUNT; i > 0; i--)
-    {
-        if (!controllers[i - 1].device) *free_slot = i - 1;
-        else if (!wcsicmp(device_path, controllers[i - 1].device_path)) return TRUE;
-    }
-    return FALSE;
-}
-
 static void check_value_caps(struct xinput_controller *controller, USHORT usage, HIDP_VALUE_CAPS *caps)
 {
     switch (usage)
@@ -339,7 +326,40 @@ static DWORD HID_set_state(struct xinput_controller *controller, XINPUT_VIBRATIO
     return ERROR_SUCCESS;
 }
 
-static void controller_destroy(struct xinput_controller *controller, BOOL already_removed);
+static void controller_disable(struct xinput_controller *controller)
+{
+    XINPUT_VIBRATION state = {0};
+
+    if (!controller->enabled) return;
+    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
+    controller->enabled = FALSE;
+
+    CancelIoEx(controller->device, &controller->hid.read_ovl);
+    WaitForSingleObject(controller->hid.read_ovl.hEvent, INFINITE);
+    SetEvent(update_event);
+}
+
+static void controller_destroy(struct xinput_controller *controller, BOOL already_removed)
+{
+    EnterCriticalSection(&controller->crit);
+
+    if (controller->device)
+    {
+        TRACE("removing device %s from index %Iu\n", debugstr_w(controller->device_path), controller - controllers);
+
+        if (!already_removed) controller_disable(controller);
+        CloseHandle(controller->device);
+        controller->device = NULL;
+
+        free(controller->hid.input_report_buf);
+        free(controller->hid.output_report_buf);
+        free(controller->hid.feature_report_buf);
+        HidD_FreePreparsedData(controller->hid.preparsed);
+        memset(&controller->hid, 0, sizeof(controller->hid));
+    }
+
+    LeaveCriticalSection(&controller->crit);
+}
 
 static void controller_enable(struct xinput_controller *controller)
 {
@@ -357,19 +377,6 @@ static void controller_enable(struct xinput_controller *controller)
     ret = ReadFile(controller->device, report_buf, report_len, NULL, &controller->hid.read_ovl);
     if (!ret && GetLastError() != ERROR_IO_PENDING) controller_destroy(controller, TRUE);
     else SetEvent(update_event);
-}
-
-static void controller_disable(struct xinput_controller *controller)
-{
-    XINPUT_VIBRATION state = {0};
-
-    if (!controller->enabled) return;
-    if (controller->caps.Flags & XINPUT_CAPS_FFB_SUPPORTED) HID_set_state(controller, &state);
-    controller->enabled = FALSE;
-
-    CancelIoEx(controller->device, &controller->hid.read_ovl);
-    WaitForSingleObject(controller->hid.read_ovl.hEvent, INFINITE);
-    SetEvent(update_event);
 }
 
 static BOOL controller_init(struct xinput_controller *controller, PHIDP_PREPARSED_DATA preparsed,
@@ -455,21 +462,17 @@ static BOOL device_is_overridden(HANDLE device)
     return disable;
 }
 
-static BOOL try_add_device(const WCHAR *device_path)
+static void open_device_at_index(const WCHAR *device_path, int index)
 {
     SP_DEVICE_INTERFACE_DATA iface = {sizeof(iface)};
     PHIDP_PREPARSED_DATA preparsed;
     HIDP_CAPS caps;
     NTSTATUS status;
     HANDLE device;
-    int i;
-
-    if (find_opened_device(device_path, &i)) return TRUE; /* already opened */
-    if (i == XUSER_MAX_COUNT) return FALSE; /* no more slots */
 
     device = CreateFileW(device_path, GENERIC_READ | GENERIC_WRITE, FILE_SHARE_READ | FILE_SHARE_WRITE,
                          NULL, OPEN_EXISTING, FILE_FLAG_OVERLAPPED | FILE_FLAG_NO_BUFFERING, NULL);
-    if (device == INVALID_HANDLE_VALUE) return TRUE;
+    if (device == INVALID_HANDLE_VALUE) return;
 
     preparsed = NULL;
     if (!HidD_GetPreparsedData(device, &preparsed))
@@ -483,13 +486,39 @@ static BOOL try_add_device(const WCHAR *device_path)
         WARN("ignoring HID device, unsupported usage %04x:%04x\n", caps.UsagePage, caps.Usage);
     else if (device_is_overridden(device))
         WARN("ignoring HID device, overridden for dinput\n");
-    else if (!controller_init(&controllers[i], preparsed, &caps, device, device_path))
+    else if (!controller_init(&controllers[index], preparsed, &caps, device, device_path))
         WARN("ignoring HID device, failed to initialize\n");
     else
-        return TRUE;
+    {
+        TRACE("opened device %s at index %u\n", debugstr_w(device_path), index);
+        return;
+    }
 
     CloseHandle(device);
     HidD_FreePreparsedData(preparsed);
+}
+
+static BOOL find_opened_device(const WCHAR *device_path, int *free_slot)
+{
+    int i;
+
+    *free_slot = XUSER_MAX_COUNT;
+    for (i = XUSER_MAX_COUNT; i > 0; i--)
+    {
+        if (!controllers[i - 1].device) *free_slot = i - 1;
+        else if (!wcsicmp(device_path, controllers[i - 1].device_path)) return TRUE;
+    }
+    return FALSE;
+}
+
+static BOOL try_add_device(const WCHAR *device_path)
+{
+    SP_DEVICE_INTERFACE_DATA iface = {sizeof(iface)};
+    int i;
+
+    if (find_opened_device(device_path, &i)) return TRUE; /* already opened */
+    if (i == XUSER_MAX_COUNT) return FALSE; /* no more slots */
+    open_device_at_index(device_path, i);
     return TRUE;
 }
 
@@ -525,26 +554,6 @@ static void update_controller_list(void)
     }
 
     SetupDiDestroyDeviceInfoList(set);
-}
-
-static void controller_destroy(struct xinput_controller *controller, BOOL already_removed)
-{
-    EnterCriticalSection(&controller->crit);
-
-    if (controller->device)
-    {
-        if (!already_removed) controller_disable(controller);
-        CloseHandle(controller->device);
-        controller->device = NULL;
-
-        free(controller->hid.input_report_buf);
-        free(controller->hid.output_report_buf);
-        free(controller->hid.feature_report_buf);
-        HidD_FreePreparsedData(controller->hid.preparsed);
-        memset(&controller->hid, 0, sizeof(controller->hid));
-    }
-
-    LeaveCriticalSection(&controller->crit);
 }
 
 static LONG sign_extend(ULONG value, const HIDP_VALUE_CAPS *caps)
