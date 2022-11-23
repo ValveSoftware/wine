@@ -1903,14 +1903,40 @@ static BOOL parse_script_result( const char *result, WINHTTP_PROXY_INFO *info )
 
 static char *download_script( const WCHAR *url, DWORD *out_size )
 {
+    static SRWLOCK cache_lock = SRWLOCK_INIT;
+    static DWORD cached_script_size;
+    static DWORD cache_update_time;
+    static char *cached_script;
+    static WCHAR *cached_url;
+
     static const WCHAR *acceptW[] = {L"*/*", NULL};
     HINTERNET ses, con = NULL, req = NULL;
     WCHAR *hostname;
     URL_COMPONENTSW uc;
     DWORD status, size = sizeof(status), offset, to_read, bytes_read, flags = 0;
     char *tmp, *buffer = NULL;
+    BOOL cached = FALSE;
 
     *out_size = 0;
+
+    AcquireSRWLockExclusive( &cache_lock );
+    if (cached_url && !wcscmp( cached_url, url ) && GetTickCount() - cache_update_time < 60000)
+    {
+        cached = TRUE;
+        if (cached_script && (buffer = malloc( cached_script_size )))
+        {
+            memcpy( buffer, cached_script, cached_script_size );
+            *out_size = cached_script_size;
+        }
+    }
+    ReleaseSRWLockExclusive( &cache_lock );
+
+    if (cached)
+    {
+        TRACE( "Returning cached result.\n" );
+        if (!buffer) SetLastError( ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT );
+        return buffer;
+    }
 
     memset( &uc, 0, sizeof(uc) );
     uc.dwStructSize = sizeof(uc);
@@ -1957,6 +1983,21 @@ done:
     WinHttpCloseHandle( con );
     WinHttpCloseHandle( ses );
     free( hostname );
+
+    AcquireSRWLockExclusive( &cache_lock );
+    free( cached_url );
+    free( cached_script );
+    cached_url = wcsdup( url );
+    cached_script_size = 0;
+    cached_script = NULL;
+    if (buffer && (cached_script = malloc( *out_size )))
+    {
+        memcpy( cached_script, buffer, *out_size );
+        cached_script_size = *out_size;
+    }
+    cache_update_time = GetTickCount();
+    ReleaseSRWLockExclusive( &cache_lock );
+
     if (!buffer) SetLastError( ERROR_WINHTTP_UNABLE_TO_DOWNLOAD_SCRIPT );
     return buffer;
 }
