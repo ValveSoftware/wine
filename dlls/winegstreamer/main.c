@@ -271,6 +271,19 @@ uint64_t wg_parser_stream_get_duration(struct wg_parser_stream *stream)
     return params.duration;
 }
 
+bool wg_parser_stream_get_tag(struct wg_parser_stream *stream, enum wg_parser_tag tag, char *buffer, uint32_t size)
+{
+    struct wg_parser_stream_get_tag_params params =
+    {
+        .stream = stream,
+        .tag = tag,
+        .buffer = buffer,
+        .size = size,
+    };
+
+    return !__wine_unix_call(unix_handle, unix_wg_parser_stream_get_tag, &params);
+}
+
 void wg_parser_stream_seek(struct wg_parser_stream *stream, double rate,
         uint64_t start_pos, uint64_t stop_pos, DWORD start_flags, DWORD stop_flags)
 {
