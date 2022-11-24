@@ -64,7 +64,7 @@ from enum import Enum
 LOGGER = logging.Logger("vulkan")
 LOGGER.addHandler(logging.StreamHandler())
 
-VK_XML_VERSION = "1.3.230"
+VK_XML_VERSION = "1.3.235"
 WINE_VK_VERSION = (1, 3)
 
 # Filenames to create.
@@ -2798,8 +2798,12 @@ class VkGenerator(object):
                 continue
             if ext["name"] in UNEXPOSED_EXTENSIONS:
                 continue
+            if ext["name"] == "VK_EXT_descriptor_buffer":
+                f.write("#if !defined(USE_STRUCT_CONVERSION)\n")
 
             f.write("    \"{0}\",\n".format(ext["name"]))
+            if ext["name"] == "VK_EXT_descriptor_buffer":
+                f.write("#endif\n")
         f.write("};\n\n")
 
         # Create array of instance extensions.
