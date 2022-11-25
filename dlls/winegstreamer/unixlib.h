@@ -258,6 +258,7 @@ struct wg_parser_stream_get_duration_params
 enum wg_parser_tag
 {
     WG_PARSER_TAG_LANGUAGE,
+    WG_PARSER_TAG_NAME,
     WG_PARSER_TAG_MAX
 };
 
