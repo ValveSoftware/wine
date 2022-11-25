@@ -1487,6 +1487,7 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, const WCHAR *
         tags[] =
         {
             {WG_PARSER_TAG_LANGUAGE, &MF_SD_LANGUAGE},
+            {WG_PARSER_TAG_NAME, &MF_SD_STREAM_NAME},
         };
         unsigned int j;
         char str[128];
