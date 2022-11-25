@@ -449,7 +449,8 @@ done:
 static HRESULT init_audio_media_types(struct wg_format *format, IMFMediaType *types[9], DWORD *types_count)
 {
     /* Expose at least one PCM and one floating point type for the
-       consumer to pick from. */
+       consumer to pick from. Moreover, ensure that we expose S16LE first,
+       as games such as MGSV expect the native media type to be 16 bps. */
     static const enum wg_audio_format audio_types[] =
     {
         WG_AUDIO_FORMAT_S16LE,
@@ -457,15 +458,24 @@ static HRESULT init_audio_media_types(struct wg_format *format, IMFMediaType *ty
     };
     UINT count = *types_count, i;
 
+    BOOL has_native_format = FALSE;
+
     for (i = 0; i < ARRAY_SIZE(audio_types); i++)
     {
-        struct wg_format new_format = *format;
-        if (new_format.u.audio.format == audio_types[i])
-            continue;
+        struct wg_format new_format;
+
+        new_format = *format;
         new_format.u.audio.format = audio_types[i];
         if ((types[count] = mf_media_type_from_wg_format(&new_format)))
+        {
+            if (format->u.audio.format == audio_types[i])
+                has_native_format = TRUE;
             count++;
+        }
     }
+
+    if (!has_native_format && (types[count] = mf_media_type_from_wg_format(format)))
+        count++;
 
     *types_count = count;
     return S_OK;
