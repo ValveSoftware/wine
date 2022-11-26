@@ -151,6 +151,7 @@ ALLOWED_X_EXTENSIONS = [
 DIRECT_CALL_FUNCTIONS = [
     "vkCreateDevice",
     "vkEnumerateInstanceVersion",
+    "vkGetDescriptorEXT",
     "vkUpdateDescriptorSets",
     "vkUpdateDescriptorSetWithTemplate",
 # These functions involving shader compilation might require large stack
