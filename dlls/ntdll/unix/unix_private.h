@@ -309,6 +309,9 @@ extern ULONG WINAPI __wine_set_unix_env( const char *var, const char *val ) DECL
 
 #define IMAGE_DLLCHARACTERISTICS_PREFER_NATIVE 0x0010 /* Wine extension */
 
+extern void CDECL set_unix_env(const char *var, const char *val) DECLSPEC_HIDDEN;
+extern const char * CDECL wine_debuginfostr_pc(void *pc) DECLSPEC_HIDDEN;
+
 #define TICKSPERSEC 10000000
 #define SECS_1601_TO_1970  ((369 * 365 + 89) * (ULONGLONG)86400)
 
