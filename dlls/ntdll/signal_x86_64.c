@@ -262,10 +262,18 @@ static void dump_scope_table( ULONG64 base, const SCOPE_TABLE *table )
 }
 
 
+static BOOL need_backtrace( DWORD exc_code )
+{
+    if (!WINE_BACKTRACE_LOG_ON()) return FALSE;
+    return exc_code != EXCEPTION_WINE_NAME_THREAD && exc_code != DBG_PRINTEXCEPTION_WIDE_C
+           && exc_code != DBG_PRINTEXCEPTION_C && exc_code != EXCEPTION_WINE_CXX_EXCEPTION
+           && exc_code != 0x6ba;
+}
+
 /***********************************************************************
  *           virtual_unwind
  */
-static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT *dispatch, CONTEXT *context )
+static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT *dispatch, CONTEXT *context, BOOL dump_backtrace )
 {
     LDR_DATA_TABLE_ENTRY *module;
     NTSTATUS status = STATUS_SUCCESS;
@@ -278,6 +286,14 @@ static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT *dispatch, CONTEX
 
     if ((dispatch->FunctionEntry = lookup_function_info( context->Rip, &dispatch->ImageBase, &module )))
     {
+        if (dump_backtrace)
+        {
+            if (module)
+                WINE_BACKTRACE_LOG( "%p: %s + %p.\n", (void *)context->Rip, debugstr_w(module->BaseDllName.Buffer),
+                                    (void *)((char *)context->Rip - (char *)dispatch->ImageBase) );
+            else
+                WINE_BACKTRACE_LOG( "%p: unknown module.\n", (void *)context->Rip );
+        }
         dispatch->LanguageHandler = RtlVirtualUnwind( type, dispatch->ImageBase, context->Rip,
                                                       dispatch->FunctionEntry, context,
                                                       &dispatch->HandlerData, &dispatch->EstablisherFrame,
@@ -462,7 +478,7 @@ static NTSTATUS call_stack_handlers( EXCEPTION_RECORD *rec, CONTEXT *orig_contex
     dispatch.HistoryTable  = &table;
     for (;;)
     {
-        status = virtual_unwind( UNW_FLAG_EHANDLER, &dispatch, &context );
+        status = virtual_unwind( UNW_FLAG_EHANDLER, &dispatch, &context, need_backtrace( rec->ExceptionCode ));
         if (status != STATUS_SUCCESS && status != STATUS_NOT_FOUND) return status;
 
     unwind_done:
@@ -549,6 +565,9 @@ NTSTATUS WINAPI dispatch_exception( EXCEPTION_RECORD *rec, CONTEXT *context )
 {
     NTSTATUS status;
     DWORD c;
+
+    if (need_backtrace( rec->ExceptionCode ))
+        WINE_BACKTRACE_LOG( "--- Exception %#x.\n", (int)rec->ExceptionCode );
 
     TRACE_(seh)( "code=%lx flags=%lx addr=%p ip=%Ix\n",
                  rec->ExceptionCode, rec->ExceptionFlags, rec->ExceptionAddress, context->Rip );
@@ -1397,7 +1416,7 @@ void WINAPI RtlUnwindEx( PVOID end_frame, PVOID target_ip, EXCEPTION_RECORD *rec
 
     for (;;)
     {
-        status = virtual_unwind( UNW_FLAG_UHANDLER, &dispatch, &new_context );
+        status = virtual_unwind( UNW_FLAG_UHANDLER, &dispatch, &new_context, FALSE );
         if (status != STATUS_SUCCESS && status != STATUS_NOT_FOUND) raise_status( status, rec );
 
     unwind_done:
@@ -1643,7 +1662,7 @@ USHORT WINAPI RtlCaptureStackBackTrace( ULONG skip, ULONG count, PVOID *buffer, 
     if (hash) *hash = 0;
     for (i = 0; i < skip + count; i++)
     {
-        status = virtual_unwind( UNW_FLAG_NHANDLER, &dispatch, &context );
+        status = virtual_unwind( UNW_FLAG_NHANDLER, &dispatch, &context, FALSE );
         if (status != STATUS_SUCCESS) return i;
 
         if (!dispatch.EstablisherFrame) break;

@@ -215,6 +215,18 @@ NTSTATUS WINAPI dispatch_exception( EXCEPTION_RECORD *rec, CONTEXT *context )
     for (c = 0; c < rec->NumberParameters; c++)
         TRACE( " info[%ld]=%08Ix\n", c, rec->ExceptionInformation[c] );
 
+    if (WINE_BACKTRACE_LOG_ON())
+    {
+        struct debugstr_pc_args params;
+        char buffer[256];
+
+        params.pc = rec->ExceptionAddress;
+        params.buffer = buffer;
+        params.size = sizeof(buffer);
+        if (!WINE_UNIX_CALL( unix_debugstr_pc, &params ))
+            WINE_BACKTRACE_LOG( "--- Exception %#lx at %s.\n", rec->ExceptionCode, buffer );
+    }
+
     if (rec->ExceptionCode == EXCEPTION_WINE_STUB)
     {
         if (rec->ExceptionInformation[1] >> 16)

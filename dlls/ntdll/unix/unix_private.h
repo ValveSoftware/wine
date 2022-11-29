@@ -355,6 +355,8 @@ extern void call_raise_user_exception_dispatcher(void);
 
 #define IMAGE_DLLCHARACTERISTICS_PREFER_NATIVE 0x0010 /* Wine extension */
 
+extern const char * wine_debuginfostr_pc(void *pc);
+
 #define TICKSPERSEC 10000000
 #define SECS_1601_TO_1970  ((369 * 365 + 89) * (ULONGLONG)86400)
 

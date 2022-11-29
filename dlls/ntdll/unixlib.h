@@ -72,6 +72,13 @@ struct steamclient_setup_trampolines_params
     HMODULE tgt_mod;
 };
 
+struct debugstr_pc_args
+{
+    void *pc;
+    char *buffer;
+    unsigned int size;
+};
+
 enum ntdll_unix_funcs
 {
     unix_load_so_dll,
@@ -84,8 +91,15 @@ enum ntdll_unix_funcs
     unix_system_time_precise,
     unix_steamclient_setup_trampolines,
     unix_is_pc_in_native_so,
+    unix_debugstr_pc,
 };
 
 extern unixlib_handle_t __wine_unixlib_handle;
+
+#define WINE_BACKTRACE_LOG_ON() WARN_ON(seh)
+
+#define WINE_BACKTRACE_LOG(args...) do { \
+        WARN_(seh)("backtrace: " args); \
+    } while (0)
 
 #endif /* __NTDLL_UNIXLIB_H */
