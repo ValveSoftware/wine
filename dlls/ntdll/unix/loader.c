@@ -2221,6 +2221,35 @@ static void CDECL steamclient_setup_trampolines(HMODULE src_mod, HMODULE tgt_mod
     else steamclient_count++;
 }
 
+static BOOL CDECL debugstr_pc( void *pc, char *buffer, unsigned int size )
+{
+    unsigned int len;
+    char *s = buffer;
+    Dl_info info;
+
+    snprintf( s, size, "%p:", pc );
+    if (!dladdr( pc, &info )) return FALSE;
+
+    s += (len = strlen( s ));
+    size -= len;
+    snprintf( s, size, " %s + %#zx", info.dli_fname, (char *)pc - (char *)info.dli_fbase );
+    if (info.dli_sname)
+    {
+        s += (len = strlen( s ));
+        size -= len;
+        snprintf( s, size, " (%s + %#zx)", info.dli_sname, (char *)pc - (char *)info.dli_saddr );
+    }
+    return TRUE;
+}
+
+const char * CDECL wine_debuginfostr_pc( void *pc )
+{
+    char buffer[256];
+
+    debugstr_pc( pc, buffer, sizeof(buffer) );
+    return __wine_dbg_strdup( buffer );
+}
+
 static BOOL report_native_pc_as_ntdll;
 
 static BOOL CDECL is_pc_in_native_so(void *pc)
@@ -2252,6 +2281,7 @@ static struct unix_funcs unix_funcs =
     set_unix_env,
     write_crash_log,
     is_pc_in_native_so,
+    debugstr_pc,
 };
 
 BOOL ac_odyssey;

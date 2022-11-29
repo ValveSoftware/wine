@@ -46,6 +46,14 @@ struct unix_funcs
     void          (CDECL *set_unix_env)( const char *var, const char *val );
     void          (CDECL *write_crash_log)( const char *log_type, const char *log_msg );
     BOOL          (CDECL *is_pc_in_native_so)( void *pc );
+    BOOL          (CDECL *debugstr_pc)( void *pc, char *buffer, unsigned int size );
 };
+
+
+#define WINE_BACKTRACE_LOG_ON() WARN_ON(seh)
+
+#define WINE_BACKTRACE_LOG(args...) do { \
+        WARN_(seh)("backtrace: " args); \
+    } while (0)
 
 #endif /* __NTDLL_UNIXLIB_H */
