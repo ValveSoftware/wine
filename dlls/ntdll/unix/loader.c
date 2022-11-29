@@ -1310,6 +1310,42 @@ static NTSTATUS steamclient_setup_trampolines( void *args )
     return STATUS_SUCCESS;
 }
 
+static BOOL debugstr_pc_impl( void *pc, char *buffer, unsigned int size )
+{
+    unsigned int len;
+    char *s = buffer;
+    Dl_info info;
+
+    snprintf( s, size, "%p:", pc );
+    if (!dladdr( pc, &info )) return FALSE;
+
+    s += (len = strlen( s ));
+    size -= len;
+    snprintf( s, size, " %s + %#zx", info.dli_fname, (char *)pc - (char *)info.dli_fbase );
+    if (info.dli_sname)
+    {
+        s += (len = strlen( s ));
+        size -= len;
+        snprintf( s, size, " (%s + %#zx)", info.dli_sname, (char *)pc - (char *)info.dli_saddr );
+    }
+    return TRUE;
+}
+
+static NTSTATUS debugstr_pc( void *args )
+{
+    struct debugstr_pc_args *params = args;
+
+    return debugstr_pc_impl( params->pc, params->buffer, params->size ) ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+}
+
+const char * wine_debuginfostr_pc( void *pc )
+{
+    char buffer[256];
+
+    debugstr_pc_impl( pc, buffer, sizeof(buffer) );
+    return __wine_dbg_strdup( buffer );
+}
+
 static const unixlib_entry_t unix_call_funcs[] =
 {
     load_so_dll,
@@ -1323,6 +1359,7 @@ static const unixlib_entry_t unix_call_funcs[] =
     wine_get_unix_env,
     wine_set_unix_env,
     steamclient_setup_trampolines,
+    debugstr_pc,
 };
 
 
@@ -1376,6 +1413,18 @@ static NTSTATUS wow64_steamclient_setup_trampolines( void *args )
     return steamclient_setup_trampolines( &params );
 }
 
+static NTSTATUS wow64_debugstr_pc( void *args )
+{
+    struct
+    {
+        ULONG        pc;
+        ULONG        buffer;
+        unsigned int size;
+    } const *params32 = args;
+    return debugstr_pc_impl( ULongToPtr( params32->pc ), ULongToPtr( params32->buffer ), params32->size )
+               ? STATUS_SUCCESS : STATUS_UNSUCCESSFUL;
+}
+
 const unixlib_entry_t unix_call_wow64_funcs[] =
 {
     wow64_load_so_dll,
@@ -1389,6 +1438,7 @@ const unixlib_entry_t unix_call_wow64_funcs[] =
     wow64___wine_get_unix_env,
     wow64___wine_set_unix_env,
     wow64_steamclient_setup_trampolines,
+    wow64_debugstr_pc,
 };
 
 #endif  /* _WIN64 */

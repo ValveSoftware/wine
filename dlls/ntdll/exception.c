@@ -194,6 +194,20 @@ NTSTATUS WINAPI dispatch_exception( EXCEPTION_RECORD *rec, CONTEXT *context )
     NTSTATUS status;
     DWORD i;
 
+    if (need_backtrace(rec->ExceptionCode))
+    {
+        struct debugstr_pc_args params;
+        char buffer[256];
+
+        params.pc = rec->ExceptionAddress;
+        params.buffer = buffer;
+        params.size = sizeof(buffer);
+        if (!WINE_UNIX_CALL( unix_debugstr_pc, &params ))
+            WINE_BACKTRACE_LOG( "--- Exception %#lx at %s.\n", rec->ExceptionCode, buffer );
+        else
+            WINE_BACKTRACE_LOG( "--- Exception %#lx.\n", rec->ExceptionCode );
+    }
+
     switch (rec->ExceptionCode)
     {
     case EXCEPTION_WINE_STUB:

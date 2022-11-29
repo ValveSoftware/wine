@@ -122,6 +122,12 @@ static inline void ascii_to_unicode( WCHAR *dst, const char *src, size_t len )
 extern TEB_FLS_DATA *fls_alloc_data(void);
 extern void heap_thread_detach(void);
 
+#define need_backtrace(exc_code) \
+    WINE_BACKTRACE_LOG_ON() && exc_code != EXCEPTION_WINE_NAME_THREAD \
+    && exc_code != DBG_PRINTEXCEPTION_WIDE_C && exc_code != DBG_PRINTEXCEPTION_C \
+    && exc_code != EXCEPTION_WINE_CXX_EXCEPTION && exc_code != 0x6ba
+
+
 /* register context */
 
 #ifdef __i386__

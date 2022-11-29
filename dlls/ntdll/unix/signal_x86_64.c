@@ -637,6 +637,7 @@ static NTSTATUS dwarf_virtual_unwind( ULONG64 ip, ULONG64 *frame,CONTEXT *contex
     TRACE( "function %lx base %p cie %p len %x id %x version %x aug '%s' code_align %lu data_align %ld retaddr %s\n",
            ip, bases->func, cie, cie->length, cie->id, cie->version, cie->augmentation,
            info.code_align, info.data_align, dwarf_reg_names[info.retaddr_reg] );
+    WINE_BACKTRACE_LOG( "%s.\n", wine_debuginfostr_pc((void *)context->Rip) );
 
     end = NULL;
     for (augmentation = cie->augmentation; *augmentation; augmentation++)
@@ -2062,6 +2063,64 @@ static inline BOOL handle_interrupt( ucontext_t *sigcontext, EXCEPTION_RECORD *r
     return TRUE;
 }
 
+void dump_syscall_fault_return( struct syscall_frame *frame, DWORD exc_code, void *teb, void *syscall_dispatcher_return );
+
+__ASM_GLOBAL_FUNC( dump_syscall_fault_return,
+                   "movq %rdi,%rsp\n\t"
+                   "movq %rsi,%rax\n\t"
+                   "movq %rdx,%r13\n\t"
+                   "jmp %rcx")
+
+
+static void dump_syscall_fault( CONTEXT *context, DWORD exc_code )
+{
+    extern const void *__wine_unix_call_dispatcher_end_ptr;
+    struct syscall_frame *frame = get_syscall_frame();
+    struct unwind_builtin_dll_params params;
+
+    __TRY
+    {
+        DISPATCHER_CONTEXT dispatch;
+
+        context->ContextFlags &= ~0x40;
+
+        dispatch.EstablisherFrame = context->Rsp;
+        dispatch.TargetIp         = 0;
+        dispatch.ContextRecord    = context;
+        dispatch.HistoryTable     = NULL;
+
+        params.type = UNW_FLAG_UHANDLER;
+        params.dispatch = &dispatch;
+        params.context = context;
+
+        while (1)
+        {
+            if (context->Rip >= (ULONG_PTR)__wine_syscall_dispatcher
+                && context->Rip <= (ULONG_PTR)__wine_syscall_dispatcher_return)
+            {
+                WINE_BACKTRACE_LOG( "__wine_syscall_dispatcher.\n" );
+                break;
+            }
+            if (context->Rip >= (ULONG_PTR)__wine_unix_call_dispatcher
+                && context->Rip <= (ULONG_PTR)__wine_unix_call_dispatcher_end_ptr)
+            {
+                WINE_BACKTRACE_LOG( "__wine_unix_call_dispatcher.\n" );
+                break;
+            }
+
+            if (unwind_builtin_dll( &params ))
+                break;
+        }
+    }
+    __EXCEPT
+    {
+        WINE_BACKTRACE_LOG( "Fault during unwind.\n" );
+    }
+    __ENDTRY
+
+    WINE_BACKTRACE_LOG( "returning to user mode ip=%016lx ret=%08x\n", frame->rip, exc_code );
+    dump_syscall_fault_return( frame, exc_code, NtCurrentTeb(), __wine_syscall_dispatcher_return );
+}
 
 #pragma pack(push,1)
 union atl_thunk
@@ -2237,6 +2296,25 @@ static BOOL handle_syscall_fault( ucontext_t *sigcontext, EXCEPTION_RECORD *rec,
     }
     else
     {
+        const char *kernel_stack = ntdll_get_thread_data()->kernel_stack;
+        char *stack = (char *)RSP_sig(sigcontext);
+
+        WINE_BACKTRACE_LOG( "--- Exception %#x at %s.\n", rec->ExceptionCode,
+                            wine_debuginfostr_pc( rec->ExceptionAddress ));
+
+        if (!process_exiting && WINE_BACKTRACE_LOG_ON() && stack > kernel_stack + kernel_stack_guard_size + 4096)
+        {
+            stack = (char *)((ULONG_PTR)stack & ~(ULONG_PTR)15);
+            stack -= sizeof(*context);
+            RDI_sig(sigcontext) = (ULONG_PTR)stack;
+            RSI_sig(sigcontext) = rec->ExceptionCode;
+            memcpy( stack, context, sizeof(*context) );
+            stack -= 0x28;
+            RIP_sig(sigcontext) = (ULONG_PTR)dump_syscall_fault;
+            RSP_sig(sigcontext) = (ULONG_PTR)stack;
+            return TRUE;
+        }
+
         TRACE_(seh)( "returning to user mode ip=%016lx ret=%08x\n", frame->rip, rec->ExceptionCode );
         RAX_sig(sigcontext) = rec->ExceptionCode;
         R13_sig(sigcontext) = (ULONG_PTR)NtCurrentTeb();
@@ -3472,6 +3550,7 @@ __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
                    "movq 0x28(%rcx),%rdi\n\t"
                    "movq 0x20(%rcx),%rsi\n\t"
                    "pushq 0x70(%rcx)\n\t"          /* frame->rip */
+                   __ASM_LOCAL_LABEL("__wine_unix_call_dispatcher_end") ":\n\t"
                    "ret" )
 
 __ASM_GLOBAL_POINTER( __ASM_NAME("__wine_syscall_dispatcher_prolog_end_ptr"),
@@ -3482,5 +3561,7 @@ __ASM_GLOBAL_POINTER( __ASM_NAME("__wine_unix_call_dispatcher_prolog_end_ptr"),
                       __ASM_LOCAL_LABEL("__wine_unix_call_dispatcher_prolog_end") )
 __ASM_GLOBAL_POINTER( __ASM_NAME("__wine_unix_call_dispatcher_gs_load_ptr"),
                       __ASM_LOCAL_LABEL("__wine_unix_call_dispatcher_gs_load") )
+__ASM_GLOBAL_POINTER( __ASM_NAME("__wine_unix_call_dispatcher_end_ptr"),
+                      __ASM_LOCAL_LABEL("__wine_unix_call_dispatcher_end") )
 
 #endif  /* __x86_64__ */

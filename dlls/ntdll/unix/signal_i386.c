@@ -1892,6 +1892,9 @@ static BOOL handle_syscall_fault( ucontext_t *sigcontext, void *stack_ptr,
     }
     else
     {
+        WINE_BACKTRACE_LOG( "--- Exception %#x at %s.\n", rec->ExceptionCode,
+                            wine_debuginfostr_pc( rec->ExceptionAddress ));
+
         TRACE( "returning to user mode ip=%08x ret=%08x\n", frame->eip, rec->ExceptionCode );
         EAX_sig(sigcontext) = rec->ExceptionCode;
         EBP_sig(sigcontext) = (DWORD)&frame->ebp;

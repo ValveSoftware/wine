@@ -1009,9 +1009,10 @@ void WINAPI ProcessPendingCrossProcessEmulatorWork(void)
  *           virtual_unwind
  */
 static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT_ARM64EC *dispatch,
-                                ARM64EC_NT_CONTEXT *context )
+                                ARM64EC_NT_CONTEXT *context, BOOL dump_backtrace )
 {
     DISPATCHER_CONTEXT_NONVOLREG_ARM64 *nonvol_regs;
+    LDR_DATA_TABLE_ENTRY *module = NULL;
     DWORD64 pc = context->Pc;
     int i;
 
@@ -1035,6 +1036,15 @@ static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT_ARM64EC *dispatch
     for (i = 0; i < 8; i++) nonvol_regs->FpNvRegs[i] = context->V[i + 8].D[0];
 
     dispatch->FunctionEntry = RtlLookupFunctionEntry( pc, &dispatch->ImageBase, dispatch->HistoryTable );
+
+    if (dump_backtrace)
+    {
+        if (!LdrFindEntryForAddress( (void *)pc, &module ))
+            WINE_BACKTRACE_LOG( "%p: %s + %p.\n", (void *)pc, debugstr_w(module->BaseDllName.Buffer),
+                                (void *)((char *)pc - (char *)module->DllBase) );
+        else
+            WINE_BACKTRACE_LOG( "%p: unknown module.\n", (void *)pc );
+    }
 
     if (RtlVirtualUnwind2( type, dispatch->ImageBase, pc, dispatch->FunctionEntry, &context->AMD64_Context,
                            NULL, &dispatch->HandlerData, &dispatch->EstablisherFrame,
@@ -1160,7 +1170,7 @@ NTSTATUS call_seh_handlers( EXCEPTION_RECORD *rec, CONTEXT *orig_context )
 
     for (;;)
     {
-        status = virtual_unwind( UNW_FLAG_EHANDLER, &dispatch, &context );
+        status = virtual_unwind( UNW_FLAG_EHANDLER, &dispatch, &context, need_backtrace( rec->ExceptionCode ) );
         if (status != STATUS_SUCCESS) return status;
 
     unwind_done:
@@ -1655,7 +1665,7 @@ void WINAPI RtlUnwindEx( PVOID end_frame, PVOID target_ip, EXCEPTION_RECORD *rec
 
     for (;;)
     {
-        status = virtual_unwind( UNW_FLAG_UHANDLER, &dispatch, &new_context );
+        status = virtual_unwind( UNW_FLAG_UHANDLER, &dispatch, &new_context, FALSE );
         if (status != STATUS_SUCCESS) raise_status( status, rec );
 
     unwind_done:
