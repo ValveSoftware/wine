@@ -301,6 +301,7 @@ extern void call_raise_user_exception_dispatcher(void) DECLSPEC_HIDDEN;
 
 extern void CDECL set_unix_env(const char *var, const char *val) DECLSPEC_HIDDEN;
 extern void CDECL write_crash_log(const char *log_type, const char *log_msg) DECLSPEC_HIDDEN;
+extern const char * CDECL wine_debuginfostr_pc(void *pc) DECLSPEC_HIDDEN;
 
 #define TICKSPERSEC 10000000
 #define SECS_1601_TO_1970  ((369 * 365 + 89) * (ULONGLONG)86400)
