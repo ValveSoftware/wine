@@ -523,6 +523,14 @@ BOOL WINAPI GetPointerType(UINT32 id, POINTER_INPUT_TYPE *type)
     return TRUE;
 }
 
+BOOL WINAPI GetPointerInfo(UINT32 id, POINTER_INFO *info)
+{
+    FIXME("(%d %p): stub\n", id, info);
+
+    SetLastError(ERROR_INVALID_PARAMETER);
+    return FALSE;
+}
+
 const struct builtin_class_descr IME_builtin_class =
 {
     L"IME",             /* name */
