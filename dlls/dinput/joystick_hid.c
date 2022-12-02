@@ -175,6 +175,7 @@ struct pid_effect_state
 struct hid_joystick
 {
     struct dinput_device base;
+    BOOL wgi_device;
 
     HANDLE device;
     OVERLAPPED read_ovl;
@@ -575,7 +576,7 @@ static BOOL enum_objects( struct hid_joystick *impl, const DIPROPHEADER *filter,
             case MAKELONG(HID_USAGE_GENERIC_RX, HID_USAGE_PAGE_GENERIC):
             case MAKELONG(HID_USAGE_GENERIC_RY, HID_USAGE_PAGE_GENERIC):
             case MAKELONG(HID_USAGE_GENERIC_RZ, HID_USAGE_PAGE_GENERIC):
-                if (impl->attrs.VendorID == VID_LOGITECH && impl->attrs.ProductID == PID_LOGITECH_G920)
+                if (!impl->wgi_device && impl->attrs.VendorID == VID_LOGITECH && impl->attrs.ProductID == PID_LOGITECH_G920)
                 {
                     if (j == HID_USAGE_GENERIC_X)
                     {
@@ -2081,6 +2082,7 @@ HRESULT hid_joystick_create_device( struct dinput *dinput, const GUID *guid, IDi
                                        &attrs, &impl->caps, dinput->dwVersion );
     else
     {
+        impl->wgi_device = TRUE;
         wcscpy( impl->device_path, *(const WCHAR **)guid );
         hr = hid_joystick_device_try_open( impl->device_path, &impl->device, &impl->preparsed, &attrs,
                                            &impl->caps, &impl->base.instance, dinput->dwVersion );
