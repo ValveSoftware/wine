@@ -2979,6 +2979,7 @@ __ASM_GLOBAL_FUNC( signal_exit_thread,
  *           __wine_syscall_dispatcher
  */
 __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
+                   __ASM_CFI(".cfi_signal_frame\n\t")
 #ifdef __APPLE__
                    "movq %gs:0x30,%rcx\n\t"
                    "movq 0x328(%rcx),%rcx\n\t"
@@ -3203,6 +3204,7 @@ __ASM_GLOBAL_FUNC( __wine_syscall_dispatcher,
  *           __wine_unix_call_dispatcher
  */
 __ASM_GLOBAL_FUNC( __wine_unix_call_dispatcher,
+                   __ASM_CFI(".cfi_signal_frame\n\t")
                    "movq %rcx,%r10\n\t"
 #ifdef __APPLE__
                    "movq %gs:0x30,%rcx\n\t"
