@@ -16,6 +16,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "winerror.h"
 #define COBJMACROS
 
 #include <math.h>
@@ -145,6 +146,11 @@ struct media_engine
         IMFMediaSource *source;
         IMFPresentationDescriptor *pd;
     } presentation;
+    struct
+    {
+        IUnknown *audio;
+        BOOL audio_optional;
+    } effects;
     struct
     {
         LONGLONG pts;
@@ -999,6 +1005,27 @@ static HRESULT media_engine_create_source_node(IMFMediaSource *source, IMFPresen
     return S_OK;
 }
 
+static HRESULT media_engine_create_audio_effect(struct media_engine *engine, IMFTopologyNode **node)
+{
+    HRESULT hr;
+
+    *node = NULL;
+
+    if (!engine->effects.audio)
+        return S_OK;
+
+    if (FAILED(hr = MFCreateTopologyNode(MF_TOPOLOGY_TRANSFORM_NODE, node)))
+        return hr;
+
+    IMFTopologyNode_SetObject(*node, (IUnknown *)engine->effects.audio);
+    IMFTopologyNode_SetUINT32(*node, &MF_TOPONODE_NOSHUTDOWN_ON_REMOVE, FALSE);
+
+    IUnknown_Release(engine->effects.audio);
+    engine->effects.audio = NULL;
+
+    return hr;
+}
+
 static HRESULT media_engine_create_audio_renderer(struct media_engine *engine, IMFTopologyNode **node)
 {
     unsigned int category, role;
@@ -1169,7 +1196,7 @@ static HRESULT media_engine_create_topology(struct media_engine *engine, IMFMedi
 
     if (SUCCEEDED(hr = MFCreateTopology(&topology)))
     {
-        IMFTopologyNode *sar_node = NULL, *audio_src = NULL;
+        IMFTopologyNode *sar_node = NULL, *audio_src = NULL, *audio_effect = NULL;
         IMFTopologyNode *grabber_node = NULL, *video_src = NULL;
 
         if (engine->flags & MF_MEDIA_ENGINE_REAL_TIME_MODE)
@@ -1183,7 +1210,18 @@ static HRESULT media_engine_create_topology(struct media_engine *engine, IMFMedi
             if (FAILED(hr = media_engine_create_audio_renderer(engine, &sar_node)))
                 WARN("Failed to create audio renderer node, hr %#lx.\n", hr);
 
-            if (sar_node && audio_src)
+            if (FAILED(media_engine_create_audio_effect(engine, &audio_effect)))
+                WARN("Failed to create audio effect node, hr %#lx.\n", hr);
+
+            if (sar_node && audio_src && audio_effect)
+            {
+                IMFTopology_AddNode(topology, audio_src);
+                IMFTopology_AddNode(topology, sar_node);
+                IMFTopology_AddNode(topology, audio_effect);
+                IMFTopologyNode_ConnectOutput(audio_src, 0, audio_effect, 0);
+                IMFTopologyNode_ConnectOutput(audio_effect, 0, sar_node, 0);
+            }
+            else if (sar_node && audio_src)
             {
                 IMFTopology_AddNode(topology, audio_src);
                 IMFTopology_AddNode(topology, sar_node);
@@ -1192,6 +1230,8 @@ static HRESULT media_engine_create_topology(struct media_engine *engine, IMFMedi
 
             if (sar_node)
                 IMFTopologyNode_Release(sar_node);
+            if (audio_effect)
+                IMFTopologyNode_Release(audio_effect);
             if (audio_src)
                 IMFTopologyNode_Release(audio_src);
         }
@@ -2573,9 +2613,20 @@ static HRESULT WINAPI media_engine_InsertVideoEffect(IMFMediaEngineEx *iface, IU
 
 static HRESULT WINAPI media_engine_InsertAudioEffect(IMFMediaEngineEx *iface, IUnknown *effect, BOOL is_optional)
 {
+    struct media_engine *impl = impl_from_IMFMediaEngineEx(iface);
     FIXME("%p, %p, %d stub.\n", iface, effect, is_optional);
 
-    return E_NOTIMPL;
+    if (!effect)
+        return E_POINTER;
+
+    if (impl->effects.audio)
+        return MF_E_INVALIDREQUEST;
+
+    impl->effects.audio = effect;
+    IUnknown_AddRef(impl->effects.audio);
+    impl->effects.audio_optional = is_optional;
+
+    return S_OK;
 }
 
 static HRESULT WINAPI media_engine_RemoveAllEffects(IMFMediaEngineEx *iface)
