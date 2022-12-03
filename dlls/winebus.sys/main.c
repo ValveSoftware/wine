@@ -505,17 +505,48 @@ static DWORD check_bus_option(const WCHAR *option, DWORD default_value)
     return default_value;
 }
 
+static const WCHAR *wcscasestr(const WCHAR *search, const WCHAR *needle)
+{
+    UNICODE_STRING search_str, needle_str;
+
+    RtlInitUnicodeString(&search_str, search);
+    RtlInitUnicodeString(&needle_str, needle);
+
+    while (needle_str.Length <= search_str.Length)
+    {
+        UNICODE_STRING tmp;
+
+        tmp.Buffer = search_str.Buffer;
+        tmp.Length = tmp.MaximumLength = needle_str.Length;
+
+        if (!RtlCompareUnicodeString(&tmp, &needle_str, TRUE)) return search_str.Buffer;
+        search_str.Length -= sizeof(WCHAR);
+        search_str.Buffer += 1;
+    }
+
+    return NULL;
+}
+
 static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, UINT buttons)
 {
     char buffer[FIELD_OFFSET(KEY_VALUE_PARTIAL_INFORMATION, Data[1024])];
     KEY_VALUE_PARTIAL_INFORMATION *info = (KEY_VALUE_PARTIAL_INFORMATION *)buffer;
     struct device_options *device;
-    WCHAR vidpid[MAX_PATH], *tmp;
+    WCHAR vidpid[MAX_PATH], *tmp, value[1024];
     BOOL prefer_hidraw = FALSE;
     UNICODE_STRING str;
+    SIZE_T len;
     DWORD size;
 
     if (options.disable_hidraw) return FALSE;
+
+    if (!RtlQueryEnvironmentVariable(NULL, L"PROTON_DISABLE_HIDRAW", 21, value, ARRAY_SIZE(value) - 1, &len))
+    {
+        value[len] = 0;
+        if (!wcscmp(value, L"1")) return FALSE;
+        swprintf(vidpid, ARRAY_SIZE(vidpid), L"0x%04X/0x%04X", vid, pid);
+        if (wcscasestr(value, vidpid)) return FALSE;
+    }
 
     LIST_FOR_EACH_ENTRY(device, &options.devices, struct device_options, entry)
     {
@@ -523,6 +554,20 @@ static BOOL is_hidraw_enabled(WORD vid, WORD pid, const USAGE_AND_PAGE *usages, 
         if (device->pid != -1 && device->pid != pid) continue;
         if (device->hidraw == -1) continue;
         return !!device->hidraw;
+    }
+
+    if (usages->UsagePage == HID_USAGE_PAGE_DIGITIZER)
+    {
+        WARN("Ignoring unsupported %04X:%04X hidraw touchscreen\n", vid, pid);
+        return FALSE;
+    }
+
+    if (!RtlQueryEnvironmentVariable(NULL, L"PROTON_ENABLE_HIDRAW", 20, value, ARRAY_SIZE(value) - 1, &len))
+    {
+        value[len] = 0;
+        if (!wcscmp(value, L"1")) return TRUE;
+        swprintf(vidpid, ARRAY_SIZE(vidpid), L"0x%04X/0x%04X", vid, pid);
+        if (wcscasestr(value, vidpid)) return TRUE;
     }
 
     if (usages->UsagePage == HID_USAGE_PAGE_DIGITIZER)
