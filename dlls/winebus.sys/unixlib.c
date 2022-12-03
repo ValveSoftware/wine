@@ -62,29 +62,6 @@ BOOL is_sdl_blacklisted(WORD vid, WORD pid)
     return FALSE;
 }
 
-BOOL is_xbox_gamepad(WORD vid, WORD pid)
-{
-    if (vid != 0x045e) return FALSE;
-    if (pid == 0x0202) return TRUE; /* Xbox Controller */
-    if (pid == 0x0285) return TRUE; /* Xbox Controller S */
-    if (pid == 0x0289) return TRUE; /* Xbox Controller S */
-    if (pid == 0x028e) return TRUE; /* Xbox360 Controller */
-    if (pid == 0x028f) return TRUE; /* Xbox360 Wireless Controller */
-    if (pid == 0x02d1) return TRUE; /* Xbox One Controller */
-    if (pid == 0x02dd) return TRUE; /* Xbox One Controller (Covert Forces/Firmware 2015) */
-    if (pid == 0x02e0) return TRUE; /* Xbox One X Controller */
-    if (pid == 0x02e3) return TRUE; /* Xbox One Elite Controller */
-    if (pid == 0x02e6) return TRUE; /* Wireless XBox Controller Dongle */
-    if (pid == 0x02ea) return TRUE; /* Xbox One S Controller */
-    if (pid == 0x02fd) return TRUE; /* Xbox One S Controller (Firmware 2017) */
-    if (pid == 0x0b00) return TRUE; /* Xbox Elite 2 */
-    if (pid == 0x0b05) return TRUE; /* Xbox Elite 2 Wireless */
-    if (pid == 0x0b12) return TRUE; /* Xbox Series */
-    if (pid == 0x0b13) return TRUE; /* Xbox Series Wireless */
-    if (pid == 0x0719) return TRUE; /* Xbox 360 Wireless Adapter */
-    return FALSE;
-}
-
 BOOL is_dualshock4_gamepad(WORD vid, WORD pid)
 {
     if (vid != 0x054c) return FALSE;
@@ -107,12 +84,12 @@ BOOL is_logitech_g920(WORD vid, WORD pid)
     return vid == 0x046D && pid == 0xC262;
 }
 
-BOOL is_thrustmaster_hotas(WORD vid, WORD pid)
+static BOOL is_thrustmaster_hotas(WORD vid, WORD pid)
 {
     return vid == 0x044F && (pid == 0xB679 || pid == 0xB687 || pid == 0xB10A);
 }
 
-BOOL is_simucube_wheel(WORD vid, WORD pid)
+static BOOL is_simucube_wheel(WORD vid, WORD pid)
 {
     if (vid != 0x16D0) return FALSE;
     if (pid == 0x0D61) return TRUE; /* Simucube 2 Sport */
@@ -122,11 +99,27 @@ BOOL is_simucube_wheel(WORD vid, WORD pid)
     return FALSE;
 }
 
-BOOL is_fanatec_pedals(WORD vid, WORD pid)
+static BOOL is_fanatec_pedals(WORD vid, WORD pid)
 {
     if (vid != 0x0EB7) return FALSE;
     if (pid == 0x183B) return TRUE; /* Fanatec ClubSport Pedals v3 */
     if (pid == 0x1839) return TRUE; /* Fanatec ClubSport Pedals v1/v2 */
+    return FALSE;
+}
+
+BOOL is_hidraw_enabled(WORD vid, WORD pid)
+{
+    const char *enabled = getenv("PROTON_ENABLE_HIDRAW");
+    char needle[16];
+
+    if (is_dualshock4_gamepad(vid, pid)) return TRUE;
+    if (is_dualsense_gamepad(vid, pid)) return TRUE;
+    if (is_thrustmaster_hotas(vid, pid)) return TRUE;
+    if (is_simucube_wheel(vid, pid)) return TRUE;
+    if (is_fanatec_pedals(vid, pid)) return TRUE;
+
+    sprintf(needle, "0x%04x/0x%04x", vid, pid);
+    if (enabled) return strcasestr(enabled, needle) != NULL;
     return FALSE;
 }
 

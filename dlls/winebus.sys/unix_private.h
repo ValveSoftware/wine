@@ -268,12 +268,9 @@ extern void hid_device_set_effect_state(struct unix_device *iface, BYTE index, B
 
 BOOL is_sdl_blacklisted(WORD vid, WORD pid);
 BOOL is_wine_blacklisted(WORD vid, WORD pid);
-BOOL is_xbox_gamepad(WORD vid, WORD pid);
 BOOL is_dualshock4_gamepad(WORD vid, WORD pid);
 BOOL is_dualsense_gamepad(WORD vid, WORD pid);
 BOOL is_logitech_g920(WORD vid, WORD pid);
-BOOL is_thrustmaster_hotas(WORD vid, WORD pid);
-BOOL is_simucube_wheel(WORD vid, WORD pid);
-BOOL is_fanatec_pedals(WORD vid, WORD pid);
+BOOL is_hidraw_enabled(WORD vid, WORD pid);
 
 #endif /* __WINEBUS_UNIX_PRIVATE_H */
