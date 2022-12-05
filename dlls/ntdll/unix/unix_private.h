@@ -162,7 +162,7 @@ extern void *create_startup_info( const UNICODE_STRING *nt_image, const RTL_USER
                                   DWORD *info_size ) DECLSPEC_HIDDEN;
 extern char **build_envp( const WCHAR *envW ) DECLSPEC_HIDDEN;
 extern NTSTATUS exec_wineloader( char **argv, int socketfd, const pe_image_info_t *pe_info ) DECLSPEC_HIDDEN;
-extern NTSTATUS load_builtin( const pe_image_info_t *image_info, WCHAR *filename,
+extern NTSTATUS load_builtin( const pe_image_info_t *image_info, UNICODE_STRING *nt_name,
                               void **addr_ptr, SIZE_T *size_ptr, ULONG_PTR zero_bits ) DECLSPEC_HIDDEN;
 extern BOOL is_builtin_path( const UNICODE_STRING *path, WORD *machine ) DECLSPEC_HIDDEN;
 extern NTSTATUS load_main_exe( const WCHAR *name, const char *unix_name, const WCHAR *curdir, WCHAR **image,
