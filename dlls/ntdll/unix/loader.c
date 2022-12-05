@@ -1518,6 +1518,30 @@ static inline char *prepend_build_dir_path( char *ptr, const char *ext, const ch
 }
 
 
+static void notify_gdb_dll_loaded( void *module, const char *unix_path )
+{
+    static void (*wine_gdb_dll_loaded)( const void *module, const char *unix_path );
+    if (!wine_gdb_dll_loaded) wine_gdb_dll_loaded = dlsym( RTLD_DEFAULT, "wine_gdb_dll_loaded" );
+    if (wine_gdb_dll_loaded) wine_gdb_dll_loaded( module, unix_path );
+}
+
+void notify_gdb_native_dll_loaded( void *module, UNICODE_STRING *nt_name )
+{
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING redir;
+    char *unix_path;
+
+    InitializeObjectAttributes( &attr, nt_name, OBJ_CASE_INSENSITIVE, 0, 0 );
+    get_redirect( &attr, &redir );
+
+    if (!nt_to_unix_file_name( &attr, &unix_path, FILE_OPEN ))
+        notify_gdb_dll_loaded( module, unix_path );
+
+    free( redir.Buffer );
+    free( unix_path );
+}
+
+
 /***********************************************************************
  *	open_dll_file
  *
@@ -1568,6 +1592,7 @@ static NTSTATUS open_builtin_pe_file( const char *name, OBJECT_ATTRIBUTES *attr,
     {
         status = virtual_map_builtin_module( mapping, module, size, image_info, zero_bits, machine, prefer_native );
         NtClose( mapping );
+        if (!status) notify_gdb_dll_loaded( *module, name );
     }
     return status;
 }
@@ -1698,6 +1723,7 @@ static NTSTATUS find_builtin_dll( UNICODE_STRING *nt_name, void **module, SIZE_T
 
     if (found_image) status = STATUS_IMAGE_MACHINE_TYPE_MISMATCH;
     WARN( "cannot find builtin library for %s\n", debugstr_us(nt_name) );
+    if (!status) notify_gdb_native_dll_loaded( *module, nt_name );
 done:
     if (status >= 0 && ext)
     {
