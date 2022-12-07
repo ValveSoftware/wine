@@ -257,6 +257,7 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->msg_window = NULL;
             desktop->global_hooks = NULL;
             desktop->close_timeout = NULL;
+            desktop->close_timeout_val = 0;
             desktop->foreground_input = NULL;
             desktop->users = 0;
             desktop->cursor_win = 0;
@@ -368,7 +369,7 @@ static void remove_desktop_user( struct desktop *desktop )
 
     /* if we have one remaining user, it has to be the manager of the desktop window */
     if ((process = get_top_window_owner( desktop )) && desktop->users == process->running_threads && !desktop->close_timeout)
-        desktop->close_timeout = add_timeout_user( -TICKS_PER_SEC, close_desktop_timeout, desktop );
+        desktop->close_timeout = add_timeout_user( desktop->close_timeout_val, close_desktop_timeout, desktop );
 }
 
 /* set the thread default desktop handle */
@@ -707,6 +708,7 @@ DECL_HANDLER(set_user_object_info)
         reply->is_desktop = 1;
         reply->old_obj_flags = desktop->flags;
         if (req->flags & SET_USER_OBJECT_SET_FLAGS) desktop->flags = req->obj_flags;
+        if (req->flags & SET_USER_OBJECT_SET_CLOSE_TIMEOUT) desktop->close_timeout_val = req->close_timeout;
     }
     else if (obj->ops == &winstation_ops)
     {

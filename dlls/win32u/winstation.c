@@ -390,6 +390,8 @@ BOOL WINAPI NtUserGetObjectInformation( HANDLE handle, INT index, void *info,
     }
 }
 
+#define TICKSPERSEC  10000000
+
 /***********************************************************************
  *           NtUserSetObjectInformation   (win32u.@)
  */
@@ -397,8 +399,19 @@ BOOL WINAPI NtUserSetObjectInformation( HANDLE handle, INT index, void *info, DW
 {
     BOOL ret;
     const USEROBJECTFLAGS *obj_flags = info;
+    LONG64 close_timeout = 0;
 
-    if (index != UOI_FLAGS || !info || len < sizeof(*obj_flags))
+    if (index == 1000)
+    {
+        /* Wine specific: set desktop close timeout. */
+        if (!info || len < sizeof(DWORD))
+        {
+            RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+            return FALSE;
+        }
+        close_timeout = -(*(DWORD *)info * (ULONG64)TICKSPERSEC / 1000);
+    }
+    else if (index != UOI_FLAGS || !info || len < sizeof(*obj_flags))
     {
         RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
         return FALSE;
@@ -407,8 +420,16 @@ BOOL WINAPI NtUserSetObjectInformation( HANDLE handle, INT index, void *info, DW
     SERVER_START_REQ( set_user_object_info )
     {
         req->handle    = wine_server_obj_handle( handle );
-        req->flags     = SET_USER_OBJECT_SET_FLAGS;
-        req->obj_flags = obj_flags->dwFlags;
+        if (index == 1000)
+        {
+            req->flags = SET_USER_OBJECT_SET_CLOSE_TIMEOUT;
+            req->close_timeout = close_timeout;
+        }
+        else
+        {
+            req->flags     = SET_USER_OBJECT_SET_FLAGS;
+            req->obj_flags = obj_flags->dwFlags;
+        }
         ret = !wine_server_call_err( req );
     }
     SERVER_END_REQ;

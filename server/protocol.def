@@ -2897,6 +2897,7 @@ enum coords_relative
     obj_handle_t handle;          /* handle to the object */
     unsigned int flags;           /* information to set/get */
     unsigned int obj_flags;       /* new object flags */
+    timeout_t    close_timeout;   /* desktop close timeout */
 @REPLY
     int          is_desktop;      /* is object a desktop? */
     unsigned int old_obj_flags;   /* old object flags */
@@ -2904,6 +2905,7 @@ enum coords_relative
 @END
 #define SET_USER_OBJECT_SET_FLAGS       1
 #define SET_USER_OBJECT_GET_FULL_NAME   2
+#define SET_USER_OBJECT_SET_CLOSE_TIMEOUT 4
 
 
 /* Register a hotkey */
@@ -3671,6 +3673,7 @@ struct handle_info
 /* Make the current process a system process */
 @REQ(make_process_system)
     obj_handle_t handle;          /* handle to the process */
+    timeout_t    desktop_close_timeout; /* set timeout for desktop close */
 @REPLY
     obj_handle_t event;           /* event signaled when all user processes have exited */
 @END
