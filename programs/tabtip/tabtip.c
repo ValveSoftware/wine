@@ -55,6 +55,7 @@ typedef struct {
 
 static BOOL keyboard_up;
 static BOOL use_steam_osk;
+static unsigned int steam_app_id;
 
 static const char *ct_id_str[] = {
     "UIA_ButtonControlTypeId (50000)",
@@ -163,6 +164,7 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
     WINE_TRACE("This %p, sender %p\n", This, sender);
     if (sender)
     {
+        WCHAR link_buf[1024] = { 0 };
         RECT rect = { 0 };
         VARIANT var, var2;
         INT ct_id;
@@ -177,28 +179,39 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
         if (use_steam_osk && (ct_id == UIA_EditControlTypeId) && variant_to_bool(&var) &&
                 !variant_to_bool(&var2))
         {
-            WINE_TRACE("Keyboard up!\n");
-            keyboard_up = TRUE;
+            WCHAR *cur_buf_pos = link_buf;
+
+            if (steam_app_id)
+                cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard?AppID=%d", steam_app_id);
+            else
+                cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard");
+
             if (rect.left || rect.top || rect.right || rect.bottom)
             {
-                WCHAR link_buf[1024];
+                if (steam_app_id)
+                    wsprintfW(cur_buf_pos, L"&XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
+                            rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
+                else
+                    wsprintfW(cur_buf_pos, L"?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
+                            rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
+            }
 
-                wsprintfW(link_buf, L"steam://open/keyboard?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
-                        rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
-                ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
-            }
-            else
-                ShellExecuteW(NULL, NULL, L"steam://open/keyboard", NULL, NULL, SW_SHOWNOACTIVATE);
+            WINE_TRACE("Keyboard up!\n");
+            keyboard_up = TRUE;
         }
-        else
+        else if (keyboard_up)
         {
-            if (keyboard_up)
-            {
-                WINE_TRACE("Keyboard down!\n");
-                ShellExecuteW(NULL, NULL, L"steam://close/keyboard", NULL, NULL, SW_SHOWNOACTIVATE);
-                keyboard_up = FALSE;
-            }
+            if (steam_app_id)
+                wsprintfW(link_buf, L"steam://close/keyboard?AppID=%d", steam_app_id);
+            else
+                wsprintfW(link_buf, L"steam://close/keyboard");
+
+            WINE_TRACE("Keyboard down!\n");
+            keyboard_up = FALSE;
         }
+
+        if (lstrlenW(link_buf))
+            ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
 
         if (ct_id >= 50000)
             ct_id -= 50000;
@@ -291,6 +304,7 @@ static void tabtip_use_osk_check(void)
                 break;
             }
         }
+        steam_app_id = strtol(var, NULL, 10);
     }
 
     WINE_TRACE("use_steam_osk=%d\n", use_steam_osk);
