@@ -10047,7 +10047,7 @@ static const struct prov_method_sequence event_seq3[] = {
 };
 
 static const struct prov_method_sequence event_seq4[] = {
-    { &Provider, ADVISE_EVENTS_EVENT_REMOVED },
+    { &Provider, ADVISE_EVENTS_EVENT_REMOVED, METHOD_TODO },
     { 0 },
 };
 
@@ -10131,7 +10131,7 @@ static const struct prov_method_sequence event_seq11[] = {
 };
 
 static const struct prov_method_sequence event_seq12[] = {
-    { &Provider2, ADVISE_EVENTS_EVENT_REMOVED },
+    { &Provider2, ADVISE_EVENTS_EVENT_REMOVED, METHOD_TODO },
     { 0 },
 };
 
@@ -10174,11 +10174,10 @@ static DWORD WINAPI uia_add_event_test_thread(LPVOID param)
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
 
     hr = UiaRemoveEvent(data->event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
     ok(Provider2.ref == 1, "Unexpected refcnt %ld\n", Provider2.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq12, "event_seq12");
+    ok_method_sequence(event_seq12, "event_seq12");
 
     todo_wine ok(Provider2.last_call_tid == data->exp_thread_id ||
             broken(Provider2.last_call_tid == GetCurrentThreadId()), "Expected method call on separate thread\n");
@@ -10246,10 +10245,9 @@ static void test_UiaAddEvent(void)
         ok_method_sequence(event_seq3, "event_seq3");
 
     hr = UiaRemoveEvent(event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq4, "event_seq4");
+    ok_method_sequence(event_seq4, "event_seq4");
 
     /*
      * Register an event on the same node again, except this time we have a
@@ -10277,10 +10275,9 @@ static void test_UiaAddEvent(void)
         ok_method_sequence(event_seq5, "event_seq5");
 
     hr = UiaRemoveEvent(event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq4, "event_seq4");
+    ok_method_sequence(event_seq4, "event_seq4");
 
     /* Create an event with TreeScope_Children. */
     initialize_provider(&Provider_child, ProviderOptions_ServerSideProvider, NULL, TRUE);
@@ -10320,10 +10317,9 @@ static void test_UiaAddEvent(void)
         ok_method_sequence(event_seq9, "event_seq9");
 
     hr = UiaRemoveEvent(event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq4, "event_seq4");
+    ok_method_sequence(event_seq4, "event_seq4");
 
     /* Create an event with TreeScope_Descendants. */
     hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Element | TreeScope_Descendants, NULL, 0,
@@ -10344,10 +10340,9 @@ static void test_UiaAddEvent(void)
         ok_method_sequence(event_seq10, "event_seq10");
 
     hr = UiaRemoveEvent(event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq4, "event_seq4");
+    ok_method_sequence(event_seq4, "event_seq4");
 
     CoUninitialize();
 

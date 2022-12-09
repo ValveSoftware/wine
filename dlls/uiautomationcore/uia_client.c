@@ -190,6 +190,14 @@ static const IWineUiaEventVtbl uia_event_vtbl = {
     uia_event_Release,
 };
 
+static struct uia_event *unsafe_impl_from_IWineUiaEvent(IWineUiaEvent *iface)
+{
+    if (!iface || (iface->lpVtbl != &uia_event_vtbl))
+        return NULL;
+
+    return CONTAINING_RECORD(iface, struct uia_event, IWineUiaEvent_iface);
+}
+
 static struct uia_event *create_uia_event(int event_id, int scope, struct UiaCacheRequest *cache_req,
         UiaEventCallback *cback, SAFEARRAY *runtime_id)
 {
@@ -3292,8 +3300,15 @@ HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback
  */
 HRESULT WINAPI UiaRemoveEvent(HUIAEVENT huiaevent)
 {
-    FIXME("(%p): stub\n", huiaevent);
-    return E_NOTIMPL;
+    struct uia_event *event = unsafe_impl_from_IWineUiaEvent((IWineUiaEvent *)huiaevent);
+
+    TRACE("(%p)\n", event);
+
+    if (!event)
+        return E_INVALIDARG;
+
+    IWineUiaEvent_Release(&event->IWineUiaEvent_iface);
+    return S_OK;
 }
 
 /***********************************************************************
