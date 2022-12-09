@@ -10270,9 +10270,8 @@ static void test_UiaAddEvent(void)
     SET_EXPECT(uia_event_callback);
     hr = UiaRaiseAutomationEvent(&Provider.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine CHECK_CALLED(uia_event_callback);
-    if (SUCCEEDED(hr) && sequence_cnt)
-        ok_method_sequence(event_seq5, "event_seq5");
+    CHECK_CALLED(uia_event_callback);
+    ok_method_sequence(event_seq5, "event_seq5");
 
     hr = UiaRemoveEvent(event);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
@@ -10297,14 +10296,12 @@ static void test_UiaAddEvent(void)
      */
     hr = UiaRaiseAutomationEvent(&Provider.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    if (SUCCEEDED(hr) && sequence_cnt)
-        ok_method_sequence(event_seq7, "event_seq7");
+    ok_method_sequence(event_seq7, "event_seq7");
 
     /* Provider_child_child is not a direct child, handler won't be called. */
     hr = UiaRaiseAutomationEvent(&Provider_child_child.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    if (SUCCEEDED(hr) && sequence_cnt)
-        ok_method_sequence(event_seq8, "event_seq8");
+    ok_method_sequence(event_seq8, "event_seq8");
 
     /* Raised an event on Provider_child, handler will be called. */
     init_node_provider_desc(&EventData.exp_node_desc, GetCurrentProcessId(), NULL);
@@ -10312,9 +10309,8 @@ static void test_UiaAddEvent(void)
     SET_EXPECT(uia_event_callback);
     hr = UiaRaiseAutomationEvent(&Provider_child.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine CHECK_CALLED(uia_event_callback);
-    if (SUCCEEDED(hr) && sequence_cnt)
-        ok_method_sequence(event_seq9, "event_seq9");
+    CHECK_CALLED(uia_event_callback);
+    ok_method_sequence(event_seq9, "event_seq9");
 
     hr = UiaRemoveEvent(event);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
@@ -10335,9 +10331,8 @@ static void test_UiaAddEvent(void)
     SET_EXPECT(uia_event_callback);
     hr = UiaRaiseAutomationEvent(&Provider_child_child.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine CHECK_CALLED(uia_event_callback);
-    if (SUCCEEDED(hr) && sequence_cnt)
-        ok_method_sequence(event_seq10, "event_seq10");
+    CHECK_CALLED(uia_event_callback);
+    ok_method_sequence(event_seq10, "event_seq10");
 
     hr = UiaRemoveEvent(event);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);

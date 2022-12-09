@@ -3328,3 +3328,136 @@ HRESULT WINAPI UiaEventRemoveWindow(HUIAEVENT huiaevent, HWND hwnd)
     FIXME("(%p, %p): stub\n", huiaevent, hwnd);
     return E_NOTIMPL;
 }
+
+static HRESULT uia_process_event(HUIANODE node, struct UiaEventArgs *args, SAFEARRAY *rt_id,
+        struct uia_event *event)
+{
+    struct uia_node *node_data = unsafe_impl_from_IWineUiaNode((IWineUiaNode *)node);
+    SAFEARRAY *sa = rt_id;
+    int height = 0;
+    HUIANODE node2;
+    HRESULT hr;
+
+    IWineUiaEvent_AddRef(&event->IWineUiaEvent_iface);
+    IWineUiaNode_AddRef(&node_data->IWineUiaNode_iface);
+    while (1)
+    {
+        int cmp = -1;
+        if (sa)
+        {
+            cmp = uia_compare_safearrays(sa, event->runtime_id, UIAutomationType_IntArray);
+            if (sa != rt_id)
+                SafeArrayDestroy(sa);
+            sa = NULL;
+        }
+
+        if (!cmp && ((!height && (event->scope & TreeScope_Element)) ||
+                     (height && (event->scope & (TreeScope_Descendants | TreeScope_Children)))))
+        {
+            if (event->event_type == EVENT_TYPE_LOCAL)
+            {
+                SAFEARRAY *out_req;
+                BSTR tree_struct;
+
+                hr = UiaGetUpdatedCache(node, event->u.local.cache_req, NormalizeState_None, NULL, &out_req,
+                        &tree_struct);
+                if (SUCCEEDED(hr))
+                    event->u.local.cback(args, out_req, tree_struct);
+            }
+
+            break;
+        }
+
+        if ((!height && !(event->scope & (TreeScope_Descendants | TreeScope_Children))) ||
+                (height == 1 && !(event->scope & TreeScope_Descendants)))
+            break;
+
+        node2 = NULL;
+        hr = navigate_uia_node(node_data, NavigateDirection_Parent, &node2);
+        if (FAILED(hr) || !node2)
+            break;
+
+        height++;
+        IWineUiaNode_Release(&node_data->IWineUiaNode_iface);
+        node_data = unsafe_impl_from_IWineUiaNode((IWineUiaNode *)node2);
+
+        hr = UiaGetRuntimeId(node2, &sa);
+        if (FAILED(hr))
+            WARN("UiaGetRuntimeId failed with hr %#lx\n", hr);
+    }
+    IWineUiaNode_Release(&node_data->IWineUiaNode_iface);
+    IWineUiaEvent_Release(&event->IWineUiaEvent_iface);
+
+    return S_OK;
+}
+
+static HRESULT uia_raise_event(IRawElementProviderSimple *elprov, struct UiaEventArgs *args)
+{
+    struct uia_client_event_data_map_entry *event_data;
+    enum ProviderOptions prov_opts;
+    struct list *cursor, *cursor2;
+    HUIANODE node;
+    SAFEARRAY *sa;
+    HRESULT hr;
+
+    hr = IRawElementProviderSimple_get_ProviderOptions(elprov, &prov_opts);
+    if (FAILED(hr))
+        return hr;
+
+    hr = uia_get_event_data_for_event(&event_data, args->EventId, FALSE);
+    if (FAILED(hr) || !event_data)
+        return hr;
+
+    /* Events raised on client-side providers stay in process. */
+    if ((prov_opts & ProviderOptions_ClientSideProvider) && list_empty(&event_data->local_events_list))
+        return hr;
+
+    if (prov_opts & ProviderOptions_ServerSideProvider)
+        hr = create_uia_node_from_elprov(elprov, &node, FALSE);
+    else
+        hr = create_uia_node_from_elprov(elprov, &node, TRUE);
+    if (FAILED(hr))
+        return hr;
+
+    hr = UiaGetRuntimeId(node, &sa);
+    if (FAILED(hr))
+    {
+        UiaNodeRelease(node);
+        return hr;
+    }
+
+    LIST_FOR_EACH_SAFE(cursor, cursor2, &event_data->local_events_list)
+    {
+        struct uia_event *event = LIST_ENTRY(cursor, struct uia_event, event_list_entry);
+
+        hr = uia_process_event(node, args, sa, event);
+        if (FAILED(hr))
+            WARN("uia_process_event failed with hr %#lx\n", hr);
+    }
+
+    SafeArrayDestroy(sa);
+    UiaNodeRelease(node);
+
+    return hr;
+}
+
+/***********************************************************************
+ *          UiaRaiseAutomationEvent (uiautomationcore.@)
+ */
+HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *elprov, EVENTID id)
+{
+    const struct uia_event_info *event_info = uia_event_info_from_id(id);
+    struct UiaEventArgs args = { EventArgsType_Simple, id };
+    HRESULT hr;
+
+    TRACE("(%p, %d)\n", elprov, id);
+
+    if (!event_info || event_info->event_arg_type != EventArgsType_Simple)
+        return E_INVALIDARG;
+
+    hr = uia_raise_event(elprov, &args);
+    if (FAILED(hr))
+        return hr;
+
+    return S_OK;
+}
