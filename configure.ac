@@ -716,6 +716,7 @@ AC_CHECK_HEADERS(\
 	sys/cdio.h \
 	sys/epoll.h \
 	sys/event.h \
+	sys/eventfd.h \
 	sys/extattr.h \
 	sys/filio.h \
 	sys/ipc.h \
@@ -2152,6 +2153,7 @@ AC_CHECK_FUNCS(\
 	port_create \
 	posix_fadvise \
 	posix_fallocate \
+	ppoll \
 	prctl \
 	process_vm_readv \
 	process_vm_writev \
@@ -2170,6 +2172,12 @@ dnl Check for clock_gettime which may be in -lrt
 ac_save_LIBS=$LIBS
 AC_SEARCH_LIBS(clock_gettime, rt,
                [AC_DEFINE(HAVE_CLOCK_GETTIME, 1, [Define to 1 if you have the 'clock_gettime' function.])
+                test "$ac_res" = "none required" || AC_SUBST(RT_LIBS,"$ac_res")])
+LIBS=$ac_save_LIBS
+
+ac_save_LIBS=$LIBS
+AC_SEARCH_LIBS(shm_open, rt,
+               [AC_DEFINE(HAVE_SHM_OPEN, 1, [Define to 1 if you have the `shm_open' function.])
                 test "$ac_res" = "none required" || AC_SUBST(RT_LIBS,"$ac_res")])
 LIBS=$ac_save_LIBS
 
