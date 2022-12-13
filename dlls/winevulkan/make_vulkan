@@ -240,6 +240,9 @@ FUNCTION_OVERRIDES = {
     "vkGetSwapchainImagesKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
     "vkQueuePresentKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
 
+    "vkAcquireNextImageKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
+    "vkAcquireNextImage2KHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
+
     # VK_KHR_external_fence_capabilities
     "vkGetPhysicalDeviceExternalFencePropertiesKHR" : {"dispatch" : False, "driver" : False, "thunk" : ThunkType.NONE},
 

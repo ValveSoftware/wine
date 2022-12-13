@@ -75,6 +75,7 @@ typedef struct VkXlibSurfaceCreateInfoKHR
     Window window;
 } VkXlibSurfaceCreateInfoKHR;
 
+static VkResult (*pvkAcquireNextImageKHR)(VkDevice, VkSwapchainKHR, uint64_t, VkSemaphore, VkFence, uint32_t *);
 static VkResult (*pvkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *, VkInstance *);
 static VkResult (*pvkCreateSwapchainKHR)(VkDevice, const VkSwapchainCreateInfoKHR *, const VkAllocationCallbacks *, VkSwapchainKHR *);
 static VkResult (*pvkCreateXlibSurfaceKHR)(VkInstance, const VkXlibSurfaceCreateInfoKHR *, const VkAllocationCallbacks *, VkSurfaceKHR *);
@@ -118,6 +119,7 @@ static void wine_vk_init(void)
 
 #define LOAD_FUNCPTR(f) if (!(p##f = dlsym(vulkan_handle, #f))) goto fail
 #define LOAD_OPTIONAL_FUNCPTR(f) p##f = dlsym(vulkan_handle, #f)
+    LOAD_FUNCPTR(vkAcquireNextImageKHR);
     LOAD_FUNCPTR(vkCreateInstance);
     LOAD_FUNCPTR(vkCreateSwapchainKHR);
     LOAD_FUNCPTR(vkCreateXlibSurfaceKHR);
@@ -678,6 +680,21 @@ static VkResult X11DRV_vkGetSwapchainImagesKHR(VkDevice device,
     return pvkGetSwapchainImagesKHR(device, swapchain, count, images);
 }
 
+static VkResult X11DRV_vkAcquireNextImageKHR(VkDevice device,
+        VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore,
+        VkFence fence, uint32_t *image_index)
+{
+    return pvkAcquireNextImageKHR(device, swapchain, timeout, semaphore, fence, image_index);
+}
+
+static VkResult X11DRV_vkAcquireNextImage2KHR(VkDevice device,
+        const VkAcquireNextImageInfoKHR *acquire_info, uint32_t *image_index)
+{
+    static int once;
+    if (!once++) FIXME("Emulating vkGetPhysicalDeviceSurfaceCapabilities2KHR with vkGetPhysicalDeviceSurfaceCapabilitiesKHR, pNext is ignored.\n");
+    return X11DRV_vkAcquireNextImageKHR(device, acquire_info->swapchain, acquire_info->timeout, acquire_info->semaphore, acquire_info->fence, image_index);
+}
+
 static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *present_info)
 {
     static pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
@@ -724,6 +741,8 @@ static VkSurfaceKHR X11DRV_wine_get_native_surface(VkSurfaceKHR surface)
 
 static const struct vulkan_funcs vulkan_funcs =
 {
+    X11DRV_vkAcquireNextImage2KHR,
+    X11DRV_vkAcquireNextImageKHR,
     X11DRV_vkCreateInstance,
     X11DRV_vkCreateSwapchainKHR,
     X11DRV_vkCreateWin32SurfaceKHR,
