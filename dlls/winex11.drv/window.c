@@ -2040,6 +2040,15 @@ void X11DRV_SetWindowStyle( HWND hwnd, INT offset, STYLESTRUCT *style )
 {
     struct x11drv_win_data *data;
     DWORD changed = style->styleNew ^ style->styleOld;
+    HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
+
+    if (offset == GWL_STYLE && (changed & WS_CHILD))
+    {
+        if (NtUserGetWindowRelative( parent, GW_CHILD ) || NtUserGetAncestor( parent, GA_PARENT ) != NtUserGetDesktopWindow())
+            sync_vk_surface( parent, TRUE );
+        else
+            sync_vk_surface( parent, FALSE );
+    }
 
     if (hwnd == NtUserGetDesktopWindow()) return;
     if (!(data = get_win_data( hwnd ))) return;
@@ -2066,6 +2075,10 @@ void X11DRV_DestroyWindow( HWND hwnd )
 {
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     struct x11drv_win_data *data;
+    HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
+
+    if (!NtUserGetWindowRelative( parent, GW_CHILD ) && NtUserGetAncestor( parent, GA_PARENT ) == NtUserGetDesktopWindow())
+        sync_vk_surface( parent, FALSE );
 
     if (!(data = get_win_data( hwnd ))) return;
 
@@ -2283,6 +2296,7 @@ static struct x11drv_win_data *X11DRV_create_win_data( HWND hwnd, const RECT *wi
      * that will need clipping support.
      */
     sync_gl_drawable( parent, TRUE );
+    sync_vk_surface( parent, TRUE );
 
     display = thread_init_display();
     init_clip_window();  /* make sure the clip window is initialized in this thread */
@@ -2762,6 +2776,7 @@ done:
      * that will need clipping support.
      */
     sync_gl_drawable( parent, TRUE );
+    sync_vk_surface( parent, TRUE );
 
     fetch_icon_data( hwnd, 0, 0 );
 }
