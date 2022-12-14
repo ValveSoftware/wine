@@ -2382,6 +2382,11 @@ static void hacks_init(void)
         ERR("HACK: setting LIBGL_ALWAYS_SOFTWARE.\n");
         setenv("LIBGL_ALWAYS_SOFTWARE", "1", 0);
     }
+    if (sgi && !strcmp(sgi, "292030"))
+    {
+        ERR("HACK: setting LIBGL_ALWAYS_SOFTWARE.\n");
+        setenv("LIBGL_ALWAYS_SOFTWARE", "1", 0);
+    }
 }
 
 #ifdef _WIN64
