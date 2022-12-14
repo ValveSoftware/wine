@@ -1940,6 +1940,11 @@ static void hacks_init(void)
         ERR("HACK: setting WINE_ENABLE_GST_LIVE_LATENCY.\n");
         setenv("WINE_ENABLE_GST_LIVE_LATENCY", "1", 0);
     }
+    if (sgi && !strcmp(sgi, "292030"))
+    {
+        ERR("HACK: setting LIBGL_ALWAYS_SOFTWARE.\n");
+        setenv("LIBGL_ALWAYS_SOFTWARE", "1", 0);
+    }
 }
 
 /***********************************************************************
