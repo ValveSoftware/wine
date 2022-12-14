@@ -156,6 +156,7 @@ static VkResult wine_vk_instance_convert_create_info(const VkInstanceCreateInfo 
 {
     unsigned int i;
     const char **enabled_extensions = NULL;
+    VkBaseOutStructure *header;
 
     dst->sType = src->sType;
     dst->flags = src->flags;
@@ -165,6 +166,9 @@ static VkResult wine_vk_instance_convert_create_info(const VkInstanceCreateInfo 
     dst->ppEnabledLayerNames = NULL;
     dst->enabledExtensionCount = 0;
     dst->ppEnabledExtensionNames = NULL;
+
+    if ((header = (VkBaseOutStructure *)dst->pNext) && header->sType == VK_STRUCTURE_TYPE_CREATE_INFO_WINE_INSTANCE_CALLBACK)
+        dst->pNext = header->pNext;
 
     if (src->enabledExtensionCount > 0)
     {
@@ -256,12 +260,22 @@ void vulkan_thread_detach(void)
 static VkResult X11DRV_vkCreateInstance(const VkInstanceCreateInfo *create_info,
         const VkAllocationCallbacks *allocator, VkInstance *instance)
 {
+    PFN_native_vkCreateInstance native_create_instance = NULL;
+    void *native_create_instance_context = NULL;
+    VkCreateInfoWineInstanceCallback *callback;
     VkInstanceCreateInfo create_info_host;
     VkResult res;
     TRACE("create_info %p, allocator %p, instance %p\n", create_info, allocator, instance);
 
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
+
+    if ((callback = (VkCreateInfoWineInstanceCallback *)create_info->pNext)
+            && callback->sType == VK_STRUCTURE_TYPE_CREATE_INFO_WINE_INSTANCE_CALLBACK)
+    {
+        native_create_instance = callback->native_create_callback;
+        native_create_instance_context = callback->context;
+    }
 
     /* Perform a second pass on converting VkInstanceCreateInfo. Winevulkan
      * performed a first pass in which it handles everything except for WSI
@@ -274,7 +288,11 @@ static VkResult X11DRV_vkCreateInstance(const VkInstanceCreateInfo *create_info,
         return res;
     }
 
-    res = pvkCreateInstance(&create_info_host, NULL /* allocator */, instance);
+    if (native_create_instance)
+        res = native_create_instance(&create_info_host, NULL /* allocator */, instance,
+                pvkGetInstanceProcAddr, native_create_instance_context);
+    else
+        res = pvkCreateInstance(&create_info_host, NULL /* allocator */, instance);
 
     free((void *)create_info_host.ppEnabledExtensionNames);
     return res;

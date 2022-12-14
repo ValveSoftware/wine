@@ -452,9 +452,12 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
 {
     static const char *wine_xr_extension_name = "VK_WINE_openxr_device_extensions";
     unsigned int i, append_xr = 0;
+    VkBaseOutStructure *header;
     char **xr_extensions_list;
 
     *dst = *src;
+    if ((header = (VkBaseOutStructure *)dst->pNext) && header->sType == VK_STRUCTURE_TYPE_CREATE_INFO_WINE_DEVICE_CALLBACK)
+        dst->pNext = header->pNext;
 
     /* Should be filtered out by loader as ICDs don't support layers. */
     dst->enabledLayerCount = 0;
@@ -801,6 +804,9 @@ VkResult wine_vkCreateDevice(VkPhysicalDevice phys_dev_handle, const VkDeviceCre
                              void *client_ptr)
 {
     struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(phys_dev_handle);
+    PFN_native_vkCreateDevice native_create_device = NULL;
+    void *native_create_device_context = NULL;
+    VkCreateInfoWineDeviceCallback *callback;
     VkDevice device_handle = client_ptr;
     VkDeviceCreateInfo create_info_host;
     struct VkQueue_T *queue_handles;
@@ -829,11 +835,25 @@ VkResult wine_vkCreateDevice(VkPhysicalDevice phys_dev_handle, const VkDeviceCre
 
     object->phys_dev = phys_dev;
 
+    if ((callback = (VkCreateInfoWineDeviceCallback *)create_info->pNext)
+            && callback->sType == VK_STRUCTURE_TYPE_CREATE_INFO_WINE_DEVICE_CALLBACK)
+    {
+        native_create_device = callback->native_create_callback;
+        native_create_device_context = callback->context;
+    }
+
     init_conversion_context(&ctx);
     res = wine_vk_device_convert_create_info(phys_dev, &ctx, create_info, &create_info_host);
     if (res == VK_SUCCESS)
-        res = phys_dev->instance->funcs.p_vkCreateDevice(phys_dev->phys_dev,
-                &create_info_host, NULL /* allocator */, &object->device);
+    {
+        if (native_create_device)
+            res = native_create_device(phys_dev->phys_dev,
+                    &create_info_host, NULL /* allocator */, &object->device,
+                    vk_funcs->p_vkGetInstanceProcAddr, native_create_device_context);
+        else
+            res = phys_dev->instance->funcs.p_vkCreateDevice(phys_dev->phys_dev,
+                    &create_info_host, NULL /* allocator */, &object->device);
+    }
     free_conversion_context(&ctx);
     WINE_VK_ADD_DISPATCHABLE_MAPPING(phys_dev->instance, device_handle, object->device, object);
     if (res != VK_SUCCESS)
