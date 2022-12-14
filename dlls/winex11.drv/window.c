@@ -1270,7 +1270,15 @@ void update_net_wm_states( struct x11drv_win_data *data )
         new_state |= (1 << NET_WM_STATE_MAXIMIZED);
 
     ex_style = NtUserGetWindowLongW( data->hwnd, GWL_EXSTYLE );
-    if (ex_style & WS_EX_TOPMOST)
+    if ((ex_style & WS_EX_TOPMOST) &&
+        /* This workaround was initially targetting some mutter and KDE issues, but
+         * removing it causes failure to focus out from exclusive fullscreen windows.
+         *
+         * Many games do not have any specific logic to get out of exclusive fullscreen
+         * mode, and we have currently no way to tell exclusive fullscreen from a window
+         * with topmost + fullscreen styles, so we cannot properly implement it either.
+         */
+        !(new_state & (1 << NET_WM_STATE_FULLSCREEN)))
         new_state |= (1 << NET_WM_STATE_ABOVE);
     if (!data->add_taskbar)
     {
