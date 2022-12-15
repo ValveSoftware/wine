@@ -237,8 +237,8 @@ FUNCTION_OVERRIDES = {
     # VK_KHR_swapchain
     "vkCreateSwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE, "loader_thunk" : ThunkType.PRIVATE, "extra_param" : "client_ptr"},
     "vkDestroySwapchainKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE, "loader_thunk" : ThunkType.PRIVATE},
-    "vkGetSwapchainImagesKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
-    "vkQueuePresentKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
+    "vkGetSwapchainImagesKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
+    "vkQueuePresentKHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
 
     "vkAcquireNextImageKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
     "vkAcquireNextImage2KHR": {"dispatch" : True, "driver" : True, "thunk" : ThunkType.PUBLIC},
@@ -3099,6 +3099,12 @@ class VkGenerator(object):
         f.write("\n")
         f.write("    /* winevulkan specific functions */\n")
         f.write("    VkSurfaceKHR (*p_wine_get_native_surface)(VkSurfaceKHR);\n")
+        f.write("    /* Optional. Returns TRUE if FS hack is active, otherwise returns FALSE. If\n")
+        f.write("     * it returns TRUE, then real_sz will contain the actual display\n")
+        f.write("     * resolution; user_sz will contain the app's requested mode; and dst_blit\n")
+        f.write("     * will contain the area to blit the user image to in real coordinates.\n")
+        f.write("     * All parameters are optional. */\n")
+        f.write("    VkBool32 (*query_fs_hack)(VkSurfaceKHR surface, VkExtent2D *real_sz, VkExtent2D *user_sz, VkRect2D *dst_blit, VkFilter *filter);\n")
         f.write("};\n\n")
 
         f.write("extern const struct vulkan_funcs * __wine_get_vulkan_driver(UINT version);\n\n")
