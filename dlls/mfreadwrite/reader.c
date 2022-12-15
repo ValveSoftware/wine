@@ -2121,20 +2121,33 @@ static HRESULT source_reader_set_compatible_media_type(struct source_reader *rea
 }
 
 static HRESULT source_reader_create_sample_allocator_attributes(const struct source_reader *reader,
-        IMFAttributes **attributes)
+        struct media_stream *stream, IMFAttributes **attributes)
 {
-    UINT32 shared = 0, shared_without_mutex = 0;
+    UINT32 reader_shared = 0, reader_shared_without_mutex = 0;
+    UINT32 output_shared = 0, output_shared_without_mutex = 0;
     HRESULT hr;
 
     if (FAILED(hr = MFCreateAttributes(attributes, 1)))
         return hr;
 
-    IMFAttributes_GetUINT32(reader->attributes, &MF_SA_D3D11_SHARED, &shared);
-    IMFAttributes_GetUINT32(reader->attributes, &MF_SA_D3D11_SHARED_WITHOUT_MUTEX, &shared_without_mutex);
+    IMFAttributes_GetUINT32(reader->attributes, &MF_SA_D3D11_SHARED, &reader_shared);
+    IMFAttributes_GetUINT32(reader->attributes, &MF_SA_D3D11_SHARED_WITHOUT_MUTEX, &reader_shared_without_mutex);
 
-    if (shared_without_mutex)
+    if (stream->decoder.transform)
+    {
+        IMFAttributes *output_attributes;
+
+        if (SUCCEEDED(IMFTransform_GetOutputStreamAttributes(stream->decoder.transform, 0, &output_attributes)))
+        {
+            IMFAttributes_GetUINT32(output_attributes, &MF_SA_D3D11_SHARED, &output_shared);
+            IMFAttributes_GetUINT32(output_attributes, &MF_SA_D3D11_SHARED_WITHOUT_MUTEX, &output_shared_without_mutex);
+            IMFAttributes_Release(output_attributes);
+        }
+    }
+
+    if (reader_shared_without_mutex || output_shared_without_mutex)
         hr = IMFAttributes_SetUINT32(*attributes, &MF_SA_D3D11_SHARED_WITHOUT_MUTEX, TRUE);
-    else if (shared)
+    else if (reader_shared || output_shared)
         hr = IMFAttributes_SetUINT32(*attributes, &MF_SA_D3D11_SHARED, TRUE);
 
     return hr;
@@ -2170,7 +2183,7 @@ static HRESULT source_reader_setup_sample_allocator(struct source_reader *reader
         return hr;
     }
 
-    if (FAILED(hr = source_reader_create_sample_allocator_attributes(reader, &attributes)))
+    if (FAILED(hr = source_reader_create_sample_allocator_attributes(reader, stream, &attributes)))
         WARN("Failed to create allocator attributes, hr %#lx.\n", hr);
 
     if (FAILED(hr = IMFVideoSampleAllocatorEx_InitializeSampleAllocatorEx(stream->allocator, 2, 8,
