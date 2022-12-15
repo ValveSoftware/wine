@@ -2311,15 +2311,16 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
     if (ctx->fs_hack)
     {
-        MONITORINFO info = {.cbSize = sizeof(MONITORINFO)};
-        HMONITOR monitor;
         int width, height;
+        RECT rect = {0};
         GLuint profile;
+        HWND hwnd;
 
-        monitor = fs_hack_monitor_from_hwnd( NtUserWindowFromDC( ctx->hdc ) );
-        NtUserGetMonitorInfo( monitor, &info );
-        width = info.rcMonitor.right - info.rcMonitor.left;
-        height = info.rcMonitor.bottom - info.rcMonitor.top;
+        hwnd = NtUserWindowFromDC( ctx->hdc );
+        NtUserGetClientRect( hwnd, &rect );
+
+        width = rect.right - rect.left;
+        height = rect.bottom - rect.top;
 
         TRACE( "Render buffer width:%d height:%d\n", width, height );
 
@@ -2885,18 +2886,40 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     };
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
     SIZE scaled, src, real;
-    RECT user_rect, real_rect;
+    RECT user_rect = {0}, real_rect;
     POINT scaled_origin;
     HMONITOR monitor;
     struct fs_hack_gl_state state;
+    struct x11drv_win_data *data;
+    BOOL window_fs_hack = FALSE;
     const float *gamma_ramp;
     LONG gamma_serial;
     unsigned int i;
+    HWND hwnd;
 
-    monitor = fs_hack_monitor_from_hwnd( NtUserWindowFromDC( ctx->hdc ) );
-    scaled = fs_hack_get_scaled_screen_size( monitor );
-    user_rect = fs_hack_current_mode( monitor );
-    real_rect = fs_hack_real_mode( monitor );
+    hwnd = NtUserWindowFromDC( ctx->hdc );
+    monitor = fs_hack_monitor_from_hwnd( hwnd );
+
+    if ((data = get_win_data( hwnd )))
+    {
+        window_fs_hack = data->fs_hack;
+        release_win_data( data );
+    }
+
+    if (window_fs_hack)
+    {
+        user_rect = fs_hack_current_mode( monitor );
+        real_rect = fs_hack_real_mode( monitor );
+        scaled = fs_hack_get_scaled_screen_size( monitor );
+    }
+    else
+    {
+        NtUserGetClientRect( hwnd, &user_rect );
+        real_rect = user_rect;
+        scaled.cx = user_rect.right - user_rect.left;
+        scaled.cy = user_rect.bottom - user_rect.top;
+    }
+
     src.cx = user_rect.right - user_rect.left;
     src.cy = user_rect.bottom - user_rect.top;
     real.cx = real_rect.right - real_rect.left;
