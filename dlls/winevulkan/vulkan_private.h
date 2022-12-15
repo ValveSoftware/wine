@@ -72,6 +72,23 @@ static inline struct wine_device *wine_device_from_handle(VkDevice handle)
     return (struct wine_device *)(uintptr_t)handle->base.unix_handle;
 }
 
+struct wine_swapchain
+{
+    VkSwapchainKHR host_swapchain;
+
+    struct wine_vk_mapping mapping;
+};
+
+static inline struct wine_swapchain *wine_swapchain_from_handle(VkSwapchainKHR handle)
+{
+    return (struct wine_swapchain *)(uintptr_t)handle;
+}
+
+static inline VkSwapchainKHR wine_swapchain_to_handle(struct wine_swapchain *swapchain)
+{
+    return (VkSwapchainKHR)(uintptr_t)swapchain;
+}
+
 struct wine_debug_utils_messenger;
 
 struct wine_debug_report_callback

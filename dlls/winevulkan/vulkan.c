@@ -1544,6 +1544,39 @@ void wine_vkGetPhysicalDeviceExternalSemaphorePropertiesKHR(VkPhysicalDevice phy
     properties->externalSemaphoreFeatures = 0;
 }
 
+VkResult wine_vkCreateSwapchainKHR(VkDevice device_handle, const VkSwapchainCreateInfoKHR *info, const VkAllocationCallbacks *allocator,
+                                   VkSwapchainKHR *swapchain)
+{
+    struct wine_device *device = wine_device_from_handle(device_handle);
+    VkSwapchainCreateInfoKHR create_info_host = *info;
+    struct wine_swapchain *object;
+    VkResult res;
+
+    if (!(object = calloc(1, sizeof(*object))))
+    {
+        ERR("Failed to allocate memory for swapchain\n");
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
+    if (create_info_host.surface)
+        create_info_host.surface = wine_surface_from_handle(create_info_host.surface)->driver_surface;
+    if (create_info_host.oldSwapchain)
+        create_info_host.oldSwapchain = wine_swapchain_from_handle(create_info_host.oldSwapchain)->host_swapchain;
+
+    res = device->funcs.p_vkCreateSwapchainKHR(device->host_device, &create_info_host, NULL, &object->host_swapchain);
+
+    if (res != VK_SUCCESS)
+    {
+        free(object);
+        return res;
+    }
+
+    WINE_VK_ADD_NON_DISPATCHABLE_MAPPING(device->phys_dev->instance, object->host_swapchain, object->host_swapchain, object);
+    *swapchain = wine_swapchain_to_handle(object);
+
+    return res;
+}
+
 VkResult wine_vkCreateWin32SurfaceKHR(VkInstance handle, const VkWin32SurfaceCreateInfoKHR *createInfo,
                                       const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface)
 {
@@ -1991,6 +2024,25 @@ void wine_vkDestroyDebugReportCallbackEXT(VkInstance handle, VkDebugReportCallba
     WINE_VK_REMOVE_HANDLE_MAPPING(instance, object);
 
     free(object);
+}
+
+void wine_vkDestroySwapchainKHR(VkDevice device_handle, VkSwapchainKHR handle, const VkAllocationCallbacks *allocator)
+{
+    struct wine_device *device = wine_device_from_handle(device_handle);
+    struct wine_swapchain *swapchain;
+
+    if (!handle)
+        return;
+
+    swapchain = wine_swapchain_from_handle(handle);
+
+    if (allocator)
+        FIXME("Support for allocation callbacks not implemented yet\n");
+
+    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, swapchain);
+
+    device->funcs.p_vkDestroySwapchainKHR(device->host_device, swapchain->host_swapchain, NULL);
+    free(swapchain);
 }
 
 VkResult wine_vkCreateDeferredOperationKHR(VkDevice                     handle,
