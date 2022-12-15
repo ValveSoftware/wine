@@ -3252,6 +3252,26 @@ static void taskbar_delete_tab( HWND hwnd )
     release_win_data( data );
 }
 
+static void handle_window_desktop_resize( struct x11drv_win_data *data, UINT old_x, UINT old_y )
+{
+    /* update the full screen state */
+    update_net_wm_states( data );
+
+    if (data->whole_window)
+    {
+        /* sync window position with the new virtual screen rect */
+        POINT old_pos = {.x = data->whole_rect.left - old_x, .y = data->whole_rect.top - old_y};
+        POINT pos = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
+        XWindowChanges changes = {.x = pos.x, .y = pos.y};
+        UINT mask = 0;
+
+        if (old_pos.x != pos.x) mask |= CWX;
+        if (old_pos.y != pos.y) mask |= CWY;
+
+        if (mask) XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
+    }
+}
+
 /**********************************************************************
  *           X11DRV_WindowMessage   (X11DRV.@)
  */
@@ -3273,23 +3293,7 @@ LRESULT X11DRV_WindowMessage( HWND hwnd, UINT msg, WPARAM wp, LPARAM lp )
     case WM_X11DRV_DESKTOP_RESIZED:
         if ((data = get_win_data( hwnd )))
         {
-            /* update the full screen state */
-            update_net_wm_states( data );
-
-            if (data->whole_window)
-            {
-                /* sync window position with the new virtual screen rect */
-                POINT old_pos = {.x = data->whole_rect.left - wp, .y = data->whole_rect.top - lp};
-                POINT pos = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
-                XWindowChanges changes = {.x = pos.x, .y = pos.y};
-                UINT mask = 0;
-
-                if (old_pos.x != pos.x) mask |= CWX;
-                if (old_pos.y != pos.y) mask |= CWY;
-
-                if (mask) XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
-            }
-
+            handle_window_desktop_resize( data, wp, lp );
             release_win_data( data );
         }
         return 0;
