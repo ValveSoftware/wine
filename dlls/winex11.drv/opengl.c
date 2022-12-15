@@ -2430,6 +2430,8 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
         fs_hack_setup_gamma_shader( ctx, gl );
 
+        if (!ctx->has_been_current) opengl_funcs.gl.p_glViewport( 0, 0, width, height );
+
         if (!gl->fs_hack_context_set_up)
         {
             opengl_funcs.gl.p_glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
