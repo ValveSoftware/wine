@@ -1333,6 +1333,7 @@ enum
     NtUserCallHwndParam_SetWindowContextHelpId,
     NtUserCallHwndParam_SetWindowPixelFormat,
     NtUserCallHwndParam_ShowOwnedPopups,
+    NtUserCallHwndParam_EnumChildWindows,
     /* temporary exports */
     NtUserSetWindowStyle,
 };
@@ -1506,6 +1507,18 @@ static inline BOOL NtUserSetWindowPixelFormat( HWND hwnd, int format )
 static inline BOOL NtUserShowOwnedPopups( HWND hwnd, BOOL show )
 {
     return NtUserCallHwndParam( hwnd, show, NtUserCallHwndParam_ShowOwnedPopups );
+}
+
+struct enum_child_windows_params
+{
+    WNDENUMPROC proc;
+    LPARAM lparam;
+};
+
+static inline BOOL NtUserEnumChildWindows( HWND hwnd, WNDENUMPROC proc, LPARAM lparam )
+{
+    struct enum_child_windows_params params = {.proc = proc, .lparam = lparam};
+    return NtUserCallHwndParam( hwnd, (UINT_PTR)&params, NtUserCallHwndParam_EnumChildWindows );
 }
 
 #endif /* _NTUSER_ */
