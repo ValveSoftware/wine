@@ -84,6 +84,10 @@ struct fs_monitor
 static pthread_mutex_t fs_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct list fs_monitors = LIST_INIT( fs_monitors );
 
+static WORD gamma_ramp_i[GAMMA_RAMP_SIZE * 3];
+static float gamma_ramp[GAMMA_RAMP_SIZE * 4];
+static LONG gamma_serial;
+
 #define NEXT_DEVMODEW(mode) ((DEVMODEW *)((char *)((mode) + 1) + (mode)->dmDriverExtra))
 
 static const char *debugstr_devmode( const DEVMODEW *devmode )
@@ -957,4 +961,34 @@ void fs_hack_init(void)
     real_device_handler.free_gpus( gpus );
 
     initialized = TRUE;
+}
+
+const float *fs_hack_get_gamma_ramp( LONG *serial )
+{
+    if (gamma_serial == 0) return NULL;
+    if (serial) *serial = gamma_serial;
+    return gamma_ramp;
+}
+
+void fs_hack_set_gamma_ramp( const WORD *ramp )
+{
+    int i;
+    if (memcmp( gamma_ramp_i, ramp, sizeof(gamma_ramp_i) ) == 0)
+    {
+        /* identical */
+        return;
+    }
+    for (i = 0; i < GAMMA_RAMP_SIZE; ++i)
+    {
+        gamma_ramp[i * 4] = ramp[i] / 65535.f;
+        gamma_ramp[i * 4 + 1] = ramp[i + GAMMA_RAMP_SIZE] / 65535.f;
+        gamma_ramp[i * 4 + 2] = ramp[i + 2 * GAMMA_RAMP_SIZE] / 65535.f;
+    }
+    memcpy( gamma_ramp_i, ramp, sizeof(gamma_ramp_i) );
+    InterlockedIncrement( &gamma_serial );
+    TRACE( "new gamma serial: %u\n", (int)gamma_serial );
+    if (gamma_serial == 0)
+    {
+        InterlockedIncrement( &gamma_serial );
+    }
 }

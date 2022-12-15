@@ -702,6 +702,8 @@ extern double fs_hack_get_user_to_real_scale( HMONITOR );
 extern SIZE fs_hack_get_scaled_screen_size( HMONITOR monitor );
 extern RECT fs_hack_get_real_virtual_screen(void);
 extern void fs_hack_init(void);
+extern const float *fs_hack_get_gamma_ramp( LONG *serial );
+extern void fs_hack_set_gamma_ramp( const WORD *ramp );
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
