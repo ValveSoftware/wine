@@ -351,6 +351,7 @@ static BOOL grab_clipping_window( const RECT *clip )
     Window clip_window;
     HCURSOR cursor;
     POINT pos;
+    RECT real_clip;
 
     /* don't clip in the desktop process */
     if (NtUserGetWindowThread( NtUserGetDesktopWindow(), NULL ) == GetCurrentThreadId()) return TRUE;
@@ -379,9 +380,21 @@ static BOOL grab_clipping_window( const RECT *clip )
     TRACE( "clipping to %s win %lx\n", wine_dbgstr_rect(clip), clip_window );
 
     if (!data->clipping_cursor) XUnmapWindow( data->display, clip_window );
+
+    TRACE( "user clip rect %s\n", wine_dbgstr_rect( clip ) );
+
+    real_clip = *clip;
+    fs_hack_rect_user_to_real( &real_clip );
+
     pos = virtual_screen_to_root( clip->left, clip->top );
+
+    TRACE( "setting real clip to %s x (%d,%d)\n", wine_dbgstr_point( &pos ),
+           (int)real_clip.right - (int)real_clip.left,
+           (int)real_clip.bottom - (int)real_clip.top );
+
     XMoveResizeWindow( data->display, clip_window, pos.x, pos.y,
-                       max( 1, clip->right - clip->left ), max( 1, clip->bottom - clip->top ) );
+                       max( 1, real_clip.right - real_clip.left ),
+                       max( 1, real_clip.bottom - real_clip.top ) );
     XMapWindow( data->display, clip_window );
 
     /* if the rectangle is shrinking we may get a pointer warp */
@@ -485,11 +498,17 @@ static void map_event_coords( HWND hwnd, Window window, Window event_root, int x
         thread_data = x11drv_thread_data();
         if (!thread_data->clipping_cursor) return;
         if (thread_data->clip_window != window) return;
-        pt.x += clip_rect.left;
-        pt.y += clip_rect.top;
+        pt.x = clip_rect.left;
+        pt.y = clip_rect.top;
+        fs_hack_point_user_to_real( &pt );
+
+        pt.x += input->mi.dx;
+        pt.y += input->mi.dy;
+        fs_hack_point_real_to_user( &pt );
     }
     else if ((data = get_win_data( hwnd )))
     {
+        if (data->fs_hack) fs_hack_point_real_to_user( &pt );
         if (window == root_window) pt = root_to_virtual_screen( pt.x, pt.y );
         else if (event_root == root_window) pt = root_to_virtual_screen( x_root, y_root );
         else
@@ -1388,6 +1407,8 @@ BOOL X11DRV_SetCursorPos( INT x, INT y )
         return FALSE;
     }
 
+    TRACE( "real setting to %s\n", wine_dbgstr_point( &pos ) );
+
     XWarpPointer( data->display, root_window, root_window, 0, 0, 0, 0, pos.x, pos.y );
     data->warp_serial = NextRequest( data->display );
 
@@ -1396,7 +1417,7 @@ BOOL X11DRV_SetCursorPos( INT x, INT y )
 
     XNoOp( data->display );
     XFlush( data->display ); /* avoids bad mouse lag in games that do their own mouse warping */
-    TRACE( "warped to %d,%d serial %lu\n", x, y, data->warp_serial );
+    TRACE( "warped to (fake) %d,%d serial %lu\n", x, y, data->warp_serial );
     return TRUE;
 }
 
@@ -1719,6 +1740,23 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
     {
         TRACE( "accumulating motion\n" );
         return FALSE;
+    }
+
+    if (input->mi.dwFlags & MOUSEEVENTF_ABSOLUTE)
+        fs_hack_point_real_to_user( (POINT *)&input->mi.dx );
+    else
+    {
+        double user_to_real_scale;
+        HMONITOR monitor;
+        RECT rect;
+        POINT pt;
+
+        NtUserGetCursorPos( &pt );
+        SetRect( &rect, pt.x, pt.y, pt.x + 1, pt.y + 1 );
+        monitor = NtUserMonitorFromRect( &rect, MONITOR_DEFAULTTONULL );
+        user_to_real_scale = fs_hack_get_user_to_real_scale( monitor );
+        input->mi.dx = lround( (double)input->mi.dx / user_to_real_scale );
+        input->mi.dy = lround( (double)input->mi.dy / user_to_real_scale );
     }
 
     return TRUE;
