@@ -83,6 +83,16 @@ struct VkDevice_T
     struct VkQueue_T queues[1];
 };
 
+struct vk_swapchain
+{
+    UINT64 unix_handle;
+};
+
+static inline struct vk_swapchain *swapchain_from_handle(VkSwapchainKHR handle)
+{
+    return (struct vk_swapchain *)(uintptr_t)handle;
+}
+
 struct vk_command_pool
 {
     UINT64 unix_handle;

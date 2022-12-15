@@ -658,6 +658,46 @@ void WINAPI vkFreeCommandBuffers(VkDevice device, VkCommandPool cmd_pool, uint32
     }
 }
 
+VkResult WINAPI vkCreateSwapchainKHR(VkDevice device, const VkSwapchainCreateInfoKHR *pCreateInfo,
+                                     const VkAllocationCallbacks *pAllocator, VkSwapchainKHR *pSwapchain)
+{
+    struct vkCreateSwapchainKHR_params params;
+    struct vk_swapchain *swapchain;
+    NTSTATUS status;
+
+    if (!(swapchain = malloc(sizeof(*swapchain))))
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    swapchain->unix_handle = 0;
+
+    params.device = device;
+    params.pCreateInfo = pCreateInfo;
+    params.pAllocator = pAllocator;
+    params.pSwapchain = pSwapchain;
+    params.client_ptr = swapchain;
+    status = UNIX_CALL(vkCreateSwapchainKHR, &params);
+    assert(!status);
+    if (!swapchain->unix_handle)
+        free(swapchain);
+    return params.result;
+}
+
+void WINAPI vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR handle, const VkAllocationCallbacks *pAllocator)
+{
+    struct vk_swapchain *swapchain = swapchain_from_handle(handle);
+    struct vkDestroySwapchainKHR_params params;
+    NTSTATUS status;
+
+    if (!swapchain)
+        return;
+
+    params.device = device;
+    params.swapchain = handle;
+    params.pAllocator = pAllocator;
+    status = UNIX_CALL(vkDestroySwapchainKHR, &params);
+    assert(!status);
+    free(swapchain);
+}
+
 static BOOL WINAPI call_vulkan_debug_report_callback( struct wine_vk_debug_report_params *params, ULONG size )
 {
     return params->user_callback(params->flags, params->object_type, params->object_handle, params->location,
