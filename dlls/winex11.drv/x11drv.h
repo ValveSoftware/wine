@@ -454,6 +454,7 @@ extern BOOL private_color_map DECLSPEC_HIDDEN;
 extern int primary_monitor DECLSPEC_HIDDEN;
 extern int copy_default_colors DECLSPEC_HIDDEN;
 extern int alloc_system_colors DECLSPEC_HIDDEN;
+extern int limit_number_of_resolutions DECLSPEC_HIDDEN;
 extern int xrender_error_base DECLSPEC_HIDDEN;
 extern int xfixes_event_base DECLSPEC_HIDDEN;
 extern char *process_name DECLSPEC_HIDDEN;
@@ -638,6 +639,7 @@ struct x11drv_win_data
     BOOL        pending_fullscreen : 1; /* HACK: pending change to fullscreen state */
     BOOL        managed : 1;    /* is window managed? */
     BOOL        mapped : 1;     /* is window mapped? (in either normal or iconic state) */
+    BOOL        fs_hack : 1;    /* is window forced / faking fullscreen? */
     BOOL        iconic : 1;     /* is window in iconic state? */
     BOOL        embedded : 1;   /* is window an XEMBED client? */
     BOOL        shaped : 1;     /* is window using a custom region shape? */
@@ -696,6 +698,24 @@ extern void *file_list_to_drop_files( const void *data, size_t size, size_t *ret
 extern void *uri_list_to_drop_files( const void *data, size_t size, size_t *ret_size ) DECLSPEC_HIDDEN;
 extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
 extern BOOL wm_is_steamcompmgr(Display *) DECLSPEC_HIDDEN;
+
+extern BOOL fs_hack_enabled( HMONITOR monitor ) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_mapping_required( HMONITOR monitor ) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_is_integer(void) DECLSPEC_HIDDEN;
+extern HMONITOR fs_hack_monitor_from_hwnd( HWND hwnd ) DECLSPEC_HIDDEN;
+extern HMONITOR fs_hack_monitor_from_rect( const RECT *rect ) DECLSPEC_HIDDEN;
+extern BOOL fs_hack_matches_current_mode( HMONITOR monitor, INT width, INT height ) DECLSPEC_HIDDEN;
+extern RECT fs_hack_current_mode( HMONITOR monitor ) DECLSPEC_HIDDEN;
+extern RECT fs_hack_real_mode( HMONITOR monitor ) DECLSPEC_HIDDEN;
+extern void fs_hack_point_user_to_real( POINT *pos ) DECLSPEC_HIDDEN;
+extern void fs_hack_point_real_to_user( POINT *pos ) DECLSPEC_HIDDEN;
+extern void fs_hack_rect_user_to_real( RECT *rect ) DECLSPEC_HIDDEN;
+extern void fs_hack_rgndata_user_to_real( RGNDATA *data ) DECLSPEC_HIDDEN;
+extern double fs_hack_get_user_to_real_scale( HMONITOR ) DECLSPEC_HIDDEN;
+extern SIZE fs_hack_get_scaled_screen_size( HMONITOR monitor ) DECLSPEC_HIDDEN;
+extern RECT fs_hack_get_real_virtual_screen(void) DECLSPEC_HIDDEN;
+extern void fs_hack_init(void) DECLSPEC_HIDDEN;
+extern int mode_compare( const void *p1, const void *p2 ) DECLSPEC_HIDDEN;
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
@@ -790,6 +810,7 @@ struct x11drv_settings_handler
 };
 
 extern void X11DRV_Settings_SetHandler(const struct x11drv_settings_handler *handler) DECLSPEC_HIDDEN;
+extern struct x11drv_settings_handler X11DRV_Settings_GetHandler(void) DECLSPEC_HIDDEN;
 
 extern void X11DRV_init_desktop( Window win, unsigned int width, unsigned int height ) DECLSPEC_HIDDEN;
 extern void X11DRV_resize_desktop(void) DECLSPEC_HIDDEN;
@@ -848,6 +869,7 @@ struct x11drv_display_device_handler
 
 extern BOOL get_host_primary_gpu(struct gdi_gpu *gpu) DECLSPEC_HIDDEN;
 extern void X11DRV_DisplayDevices_SetHandler(const struct x11drv_display_device_handler *handler) DECLSPEC_HIDDEN;
+extern struct x11drv_display_device_handler X11DRV_DisplayDevices_GetHandler(void) DECLSPEC_HIDDEN;
 extern void X11DRV_DisplayDevices_Init(BOOL force) DECLSPEC_HIDDEN;
 extern void X11DRV_DisplayDevices_RegisterEventHandlers(void) DECLSPEC_HIDDEN;
 extern BOOL X11DRV_DisplayDevices_SupportEventHandlers(void) DECLSPEC_HIDDEN;
@@ -944,6 +966,30 @@ static inline BOOL intersect_rect( RECT *dst, const RECT *src1, const RECT *src2
     dst->right  = min( src1->right, src2->right );
     dst->bottom = min( src1->bottom, src2->bottom );
     return !IsRectEmpty( dst );
+}
+
+static inline void union_rect( RECT *dest, const RECT *src1, const RECT *src2 )
+{
+    if (IsRectEmpty( src1 ))
+    {
+        if (IsRectEmpty( src2 ))
+        {
+            reset_bounds( dest );
+            return;
+        }
+        else *dest = *src2;
+    }
+    else
+    {
+        if (IsRectEmpty( src2 )) *dest = *src1;
+        else
+        {
+            dest->left   = min( src1->left, src2->left );
+            dest->right  = max( src1->right, src2->right );
+            dest->top    = min( src1->top, src2->top );
+            dest->bottom = max( src1->bottom, src2->bottom );
+        }
+    }
 }
 
 /* registry helpers */

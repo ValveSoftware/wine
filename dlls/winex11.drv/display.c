@@ -63,6 +63,11 @@ void X11DRV_Settings_SetHandler(const struct x11drv_settings_handler *new_handle
     }
 }
 
+struct x11drv_settings_handler X11DRV_Settings_GetHandler(void)
+{
+    return settings_handler;
+}
+
 /***********************************************************************
  * Default handlers if resolution switching is not enabled
  *
@@ -380,7 +385,6 @@ static LONG apply_display_settings( DEVMODEW *displays, ULONG_PTR *ids, BOOL do_
  */
 LONG X11DRV_ChangeDisplaySettings( LPDEVMODEW displays, LPCWSTR primary_name, HWND hwnd, DWORD flags, LPVOID lpvoid )
 {
-    INT left_most = INT_MAX, top_most = INT_MAX;
     LONG count, ret = DISP_CHANGE_BADPARAM;
     ULONG_PTR *ids;
     DEVMODEW *mode;
@@ -388,18 +392,13 @@ LONG X11DRV_ChangeDisplaySettings( LPDEVMODEW displays, LPCWSTR primary_name, HW
     /* Convert virtual screen coordinates to root coordinates, and find display ids.
      * We cannot safely get the ids while changing modes, as the backend state may be invalidated.
      */
-    for (count = 0, mode = displays; mode->dmSize; mode = NEXT_DEVMODEW(mode), count++)
-    {
-        left_most = min( left_most, mode->dmPosition.x );
-        top_most = min( top_most, mode->dmPosition.y );
-    }
+    for (count = 0, mode = displays; mode->dmSize; mode = NEXT_DEVMODEW( mode )) count++;
 
     if (!(ids = calloc( count, sizeof(*ids) ))) return DISP_CHANGE_FAILED;
     for (count = 0, mode = displays; mode->dmSize; mode = NEXT_DEVMODEW(mode), count++)
     {
-        if (!settings_handler.get_id( mode->dmDeviceName, !wcsicmp( mode->dmDeviceName, primary_name ), ids + count )) goto done;
-        mode->dmPosition.x -= left_most;
-        mode->dmPosition.y -= top_most;
+        BOOL is_primary = !wcsicmp( mode->dmDeviceName, primary_name );
+        if (!settings_handler.get_id( mode->dmDeviceName, is_primary, ids + count )) goto done;
     }
 
     /* Detach displays first to free up CRTCs */
@@ -414,21 +413,33 @@ done:
 
 POINT virtual_screen_to_root(INT x, INT y)
 {
-    RECT virtual = NtUserGetVirtualScreenRect();
+    RECT virtual = fs_hack_get_real_virtual_screen();
     POINT pt;
 
-    pt.x = x - virtual.left;
-    pt.y = y - virtual.top;
+    TRACE( "from %d,%d\n", x, y );
+
+    pt.x = x;
+    pt.y = y;
+    fs_hack_point_user_to_real( &pt );
+    TRACE( "to real %s\n", wine_dbgstr_point( &pt ) );
+
+    pt.x -= virtual.left;
+    pt.y -= virtual.top;
+    TRACE( "to root %s\n", wine_dbgstr_point( &pt ) );
     return pt;
 }
 
 POINT root_to_virtual_screen(INT x, INT y)
 {
-    RECT virtual = NtUserGetVirtualScreenRect();
+    RECT virtual = fs_hack_get_real_virtual_screen();
     POINT pt;
 
+    TRACE( "from root %d,%d\n", x, y );
     pt.x = x + virtual.left;
     pt.y = y + virtual.top;
+    TRACE( "to real %s\n", wine_dbgstr_point( &pt ) );
+    fs_hack_point_real_to_user( &pt );
+    TRACE( "to user %s\n", wine_dbgstr_point( &pt ) );
     return pt;
 }
 
@@ -534,6 +545,11 @@ void X11DRV_DisplayDevices_SetHandler(const struct x11drv_display_device_handler
         host_handler = *new_handler;
         TRACE("Display device functions are now handled by: %s\n", host_handler.name);
     }
+}
+
+struct x11drv_display_device_handler X11DRV_DisplayDevices_GetHandler(void)
+{
+    return host_handler;
 }
 
 void X11DRV_DisplayDevices_RegisterEventHandlers(void)

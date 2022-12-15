@@ -13,6 +13,7 @@ C_SRCS = \
 	display.c \
 	dllmain.c \
 	event.c \
+	fs.c \
 	graphics.c \
 	ime.c \
 	init.c \
