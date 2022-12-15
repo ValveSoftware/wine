@@ -2281,6 +2281,49 @@ static void fs_hack_setup_gamma_shader( struct wgl_context *ctx, struct gl_drawa
     pglUseProgram( prev_program );
 }
 
+enum fshack_texture_type
+{
+    FSHACK_TEXTURE_COLOUR,
+    FSHACK_TEXTURE_DEPTH,
+    FSHACK_TEXTURE_LAST,
+};
+
+static void gen_texture( struct wgl_context *ctx, GLuint *tex, enum fshack_texture_type type )
+{
+    static const GLuint texture_names[FSHACK_TEXTURE_LAST] =
+    {
+        65535,
+        65536,
+    };
+    static int texture_name_hack = -1;
+    static int once;
+
+    if (ctx->is_core)
+    {
+        opengl_funcs.gl.p_glGenTextures( 1, tex );
+        return;
+    }
+
+    if (texture_name_hack == -1)
+    {
+        const char *sgi = getenv( "SteamGameId" );
+
+        texture_name_hack = sgi && !strcmp( sgi, "6020" );
+    }
+
+    if (!texture_name_hack || opengl_funcs.gl.p_glIsTexture( texture_names[type] ))
+    {
+        if (texture_name_hack) FIXME( "Texture %u already exists.\n", texture_names[type] );
+        opengl_funcs.gl.p_glGenTextures( 1, tex );
+        return;
+    }
+    /* Star Wars Jedi Knight: Jedi Academy uses texture names without allocating
+     * them with glGenTextures(). Trying to use a texture name which has low chances
+     * to overlap with what games may use. */
+    if (!once++) FIXME( "Using texture name hack.\n" );
+    *tex = texture_names[type];
+}
+
 static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *gl )
 {
     GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer;
@@ -2351,7 +2394,9 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
 
         fs_hack_get_attachments_config( gl, &attribs, &config );
 
-        if (!ctx->fs_hack_color_texture) opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_color_texture );
+        if (!ctx->fs_hack_color_texture)
+            gen_texture( ctx, &ctx->fs_hack_color_texture, FSHACK_TEXTURE_COLOUR );
+
         opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_color_texture );
         opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.color_internalformat, width,
                                         height, 0, config.color_format, config.color_type, NULL );
@@ -2413,7 +2458,8 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
             else
             {
                 if (!ctx->fs_hack_ds_texture)
-                    opengl_funcs.gl.p_glGenTextures( 1, &ctx->fs_hack_ds_texture );
+                    gen_texture( ctx, &ctx->fs_hack_ds_texture, FSHACK_TEXTURE_DEPTH );
+
                 opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, ctx->fs_hack_ds_texture );
                 opengl_funcs.gl.p_glTexImage2D( GL_TEXTURE_2D, 0, config.ds_internalformat, width,
                                                 height, 0, config.ds_format, config.ds_type, NULL );
