@@ -208,7 +208,6 @@ HRESULT IKsPrivatePropertySetImpl_Create(REFIID riid, void **ppv);
 HRESULT DSOUND_Create(REFIID riid, void **ppv);
 HRESULT DSOUND_Create8(REFIID riid, void **ppv);
 HRESULT IDirectSoundImpl_Create(IUnknown *outer_unk, REFIID riid, void **ppv, BOOL has_ds8);
-void DSOUND_ParseSpeakerConfig(DirectSoundDevice *device);
 
 /* primary.c */
 
