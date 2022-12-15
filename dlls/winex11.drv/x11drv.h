@@ -459,6 +459,8 @@ extern char *process_name;
 extern Display *clipboard_display;
 extern WNDPROC client_foreign_window_proc;
 
+extern int limit_number_of_resolutions;
+
 /* atoms */
 
 enum x11drv_atoms
@@ -626,6 +628,7 @@ struct x11drv_win_data
     XIC         xic;            /* X input context */
     UINT        managed : 1;    /* is window managed? */
     UINT        mapped : 1;     /* is window mapped? (in either normal or iconic state) */
+    UINT        fs_hack : 1;    /* is window forced / faking fullscreen? */
     UINT        iconic : 1;     /* is window in iconic state? */
     UINT        embedded : 1;   /* is window an XEMBED client? */
     UINT        shaped : 1;     /* is window using a custom region shape? */
@@ -682,6 +685,24 @@ extern BOOL update_clipboard( HWND hwnd );
 extern void init_win_context(void);
 extern void *file_list_to_drop_files( const void *data, size_t size, size_t *ret_size );
 extern void *uri_list_to_drop_files( const void *data, size_t size, size_t *ret_size );
+
+extern BOOL fs_hack_enabled( HMONITOR monitor );
+extern BOOL fs_hack_mapping_required( HMONITOR monitor );
+extern BOOL fs_hack_is_integer(void);
+extern HMONITOR fs_hack_monitor_from_hwnd( HWND hwnd );
+extern HMONITOR fs_hack_monitor_from_rect( const RECT *rect );
+extern BOOL fs_hack_matches_current_mode( HMONITOR monitor, INT width, INT height );
+extern RECT fs_hack_current_mode( HMONITOR monitor );
+extern RECT fs_hack_real_mode( HMONITOR monitor );
+extern void fs_hack_point_user_to_real( POINT *pos );
+extern void fs_hack_point_real_to_user( POINT *pos );
+extern void fs_hack_rect_user_to_real( RECT *rect );
+extern void fs_hack_rgndata_user_to_real( RGNDATA *data );
+extern double fs_hack_get_user_to_real_scale( HMONITOR );
+extern SIZE fs_hack_get_scaled_screen_size( HMONITOR monitor );
+extern RECT fs_hack_get_real_virtual_screen(void);
+extern void fs_hack_init(void);
+extern int mode_compare( const void *p1, const void *p2 );
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
@@ -770,6 +791,7 @@ struct x11drv_settings_handler
     LONG (*set_current_mode)(x11drv_settings_id id, const DEVMODEW *mode);
 };
 
+extern struct x11drv_settings_handler X11DRV_Settings_GetHandler(void);
 extern void X11DRV_Settings_SetHandler(const struct x11drv_settings_handler *handler);
 
 extern void X11DRV_init_desktop( Window win, unsigned int width, unsigned int height );
@@ -825,6 +847,7 @@ struct x11drv_display_device_handler
     void (*register_event_handlers)(void);
 };
 
+extern struct x11drv_display_device_handler X11DRV_DisplayDevices_GetHandler(void);
 extern void X11DRV_DisplayDevices_SetHandler(const struct x11drv_display_device_handler *handler);
 extern void X11DRV_DisplayDevices_Init(BOOL force);
 extern void X11DRV_DisplayDevices_RegisterEventHandlers(void);
@@ -917,6 +940,30 @@ static inline BOOL intersect_rect( RECT *dst, const RECT *src1, const RECT *src2
     dst->right  = min( src1->right, src2->right );
     dst->bottom = min( src1->bottom, src2->bottom );
     return !IsRectEmpty( dst );
+}
+
+static inline void union_rect( RECT *dest, const RECT *src1, const RECT *src2 )
+{
+    if (IsRectEmpty( src1 ))
+    {
+        if (IsRectEmpty( src2 ))
+        {
+            reset_bounds( dest );
+            return;
+        }
+        else *dest = *src2;
+    }
+    else
+    {
+        if (IsRectEmpty( src2 )) *dest = *src1;
+        else
+        {
+            dest->left   = min( src1->left, src2->left );
+            dest->right  = max( src1->right, src2->right );
+            dest->top    = min( src1->top, src2->top );
+            dest->bottom = max( src1->bottom, src2->bottom );
+        }
+    }
 }
 
 /* registry helpers */

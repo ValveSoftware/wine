@@ -13,6 +13,7 @@ SOURCES = \
 	display.c \
 	dllmain.c \
 	event.c \
+	fs.c \
 	graphics.c \
 	init.c \
 	keyboard.c \

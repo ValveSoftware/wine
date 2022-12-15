@@ -68,7 +68,7 @@ Atom systray_atom = 0;
 HWND systray_hwnd = 0;
 unsigned int screen_bpp;
 Window root_window;
-BOOL usexvidmode = TRUE;
+BOOL usexvidmode = FALSE;
 BOOL usexrandr = TRUE;
 BOOL usexcomposite = TRUE;
 BOOL use_take_focus = TRUE;
@@ -84,6 +84,7 @@ BOOL client_side_with_render = TRUE;
 BOOL shape_layered_windows = TRUE;
 int copy_default_colors = 128;
 int alloc_system_colors = 256;
+int limit_number_of_resolutions = 0;
 int xrender_error_base = 0;
 char *process_name = NULL;
 WNDPROC client_foreign_window_proc = NULL;
@@ -530,6 +531,9 @@ static void setup_options(void)
     if (!get_config_key( hkey, appkey, "AllocSystemColors", buffer, sizeof(buffer) ))
         alloc_system_colors = wcstol( buffer, NULL, 0 );
 
+    if (!get_config_key( hkey, appkey, "LimitNumberOfResolutions", buffer, sizeof(buffer) ))
+        limit_number_of_resolutions = wcstol( buffer, NULL, 0 );
+
     get_config_key( hkey, appkey, "InputStyle", input_style, sizeof(input_style) );
 
     NtClose( appkey );
@@ -708,6 +712,11 @@ static NTSTATUS x11drv_init( void *arg )
     XkbUseExtension( gdi_display, NULL, NULL );
     X11DRV_InitKeyboard( gdi_display );
     if (use_xim) use_xim = xim_init( input_style );
+
+    {
+        const char *e = getenv("WINE_DISABLE_FULLSCREEN_HACK");
+        if (!e || *e == '\0' || *e == '0') fs_hack_init();
+    }
 
     {
         const char *sgi = getenv("SteamGameId");
