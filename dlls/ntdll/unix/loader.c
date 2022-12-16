@@ -2277,10 +2277,16 @@ static void hacks_init(void)
         ERR( "HACK: ram_reporting_bias %lldMB.\n", ram_reporting_bias / (1024 * 1024) );
     }
 
-    if (inproc_device_fd >= 0 && main_argc > 1 && strstr(main_argv[1], "ACOdyssey.exe"))
+    if (inproc_device_fd >= 0)
     {
-        ERR("HACK: AC Odyssey sync tweak on.\n");
-        ac_odyssey = TRUE;
+        env_str = getenv("WINE_SIMULATE_ASYNC_READ");
+        if (env_str)
+            ac_odyssey = !!atoi(env_str);
+        else if (main_argc > 1 && (strstr(main_argv[1], "ACOdyssey.exe") || strstr(main_argv[1], "ImmortalsFenyxRising.exe")))
+            ac_odyssey = TRUE;
+
+        if (ac_odyssey)
+            ERR("HACK: AC Odyssey sync tweak on.\n");
     }
 
     env_str = getenv("WINE_ALERT_SIMULATE_SCHED_QUANTUM");
