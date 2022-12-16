@@ -1929,11 +1929,15 @@ static void hacks_init(void)
     const char *sgi = getenv( "SteamGameId" );
     const char *env_str;
 
-    if (main_argc > 1 && strstr(main_argv[1], "ACOdyssey.exe"))
-    {
-        ERR("HACK: AC Odyssey sync tweak on.\n");
+    env_str = getenv("WINE_SIMULATE_ASYNC_READ");
+    if (env_str)
+        ac_odyssey = !!atoi(env_str);
+    else if (main_argc > 1 && (strstr(main_argv[1], "ACOdyssey.exe") || strstr(main_argv[1], "ImmortalsFenyxRising.exe")))
         ac_odyssey = TRUE;
-    }
+
+    if (ac_odyssey)
+        ERR("HACK: AC Odyssey sync tweak on.\n");
+
     env_str = getenv("WINE_FSYNC_SIMULATE_SCHED_QUANTUM");
     if (env_str)
         fsync_simulate_sched_quantum = !!atoi(env_str);
