@@ -268,7 +268,7 @@ static void dump_scope_table( ULONG64 base, const SCOPE_TABLE *table )
 static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT *dispatch, CONTEXT *context )
 {
     LDR_DATA_TABLE_ENTRY *module;
-    NTSTATUS status;
+    NTSTATUS status = STATUS_SUCCESS;
 
     dispatch->ImageBase = 0;
     dispatch->ScopeIndex = 0;
@@ -299,7 +299,11 @@ static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT *dispatch, CONTEX
         }
         if (status != STATUS_UNSUCCESSFUL) return status;
     }
-    else WARN( "exception data not found in %s\n", debugstr_w(module->BaseDllName.Buffer) );
+    else
+    {
+        WARN( "exception data not found in %s\n", debugstr_w(module->BaseDllName.Buffer) );
+        status = STATUS_UNSUCCESSFUL;
+    }
 
     /* no exception information, treat as a leaf function */
 
@@ -307,7 +311,7 @@ static NTSTATUS virtual_unwind( ULONG type, DISPATCHER_CONTEXT *dispatch, CONTEX
     dispatch->LanguageHandler = NULL;
     context->Rip = *(ULONG64 *)context->Rsp;
     context->Rsp = context->Rsp + sizeof(ULONG64);
-    return STATUS_SUCCESS;
+    return status ? STATUS_NOT_FOUND : STATUS_SUCCESS;
 }
 
 
@@ -459,7 +463,7 @@ static NTSTATUS call_stack_handlers( EXCEPTION_RECORD *rec, CONTEXT *orig_contex
     for (;;)
     {
         status = virtual_unwind( UNW_FLAG_EHANDLER, &dispatch, &context );
-        if (status != STATUS_SUCCESS) return status;
+        if (status != STATUS_SUCCESS && status != STATUS_NOT_FOUND) return status;
 
     unwind_done:
         if (!dispatch.EstablisherFrame) break;
@@ -1394,7 +1398,7 @@ void WINAPI RtlUnwindEx( PVOID end_frame, PVOID target_ip, EXCEPTION_RECORD *rec
     for (;;)
     {
         status = virtual_unwind( UNW_FLAG_UHANDLER, &dispatch, &new_context );
-        if (status != STATUS_SUCCESS) raise_status( status, rec );
+        if (status != STATUS_SUCCESS && status != STATUS_NOT_FOUND) raise_status( status, rec );
 
     unwind_done:
         if (!dispatch.EstablisherFrame) break;
