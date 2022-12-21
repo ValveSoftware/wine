@@ -188,6 +188,7 @@ static void x11drv_set_input_display( Display *display )
 /* add a window to the windows we get input for */
 void x11drv_input_add_window( HWND hwnd, Window window )
 {
+    long mask = KeyPressMask | KeyReleaseMask | KeymapStateMask;
     Display *display = x11drv_input_display();
 
     TRACE( "display %p, window %p/%lx\n", display, hwnd, window );
@@ -195,6 +196,9 @@ void x11drv_input_add_window( HWND hwnd, Window window )
     EnterCriticalSection( &input_cs );
     XSaveContext( display, window, winContext, (char *)hwnd );
     LeaveCriticalSection( &input_cs );
+
+    XSelectInput( display, window, mask );
+    XFlush( display );
 }
 
 /* remove a window from the windows we get input for */
@@ -203,6 +207,9 @@ void x11drv_input_remove_window( Window window )
     Display *display = x11drv_input_display();
 
     TRACE( "display %p, window %lx\n", display, window );
+
+    XSelectInput( display, window, 0 );
+    XFlush( display );
 
     EnterCriticalSection( &input_cs );
     XDeleteContext( display, window, winContext );
