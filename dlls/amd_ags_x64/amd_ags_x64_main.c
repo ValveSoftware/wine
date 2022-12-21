@@ -240,29 +240,48 @@ static enum amd_ags_version determine_ags_version(void)
     UINT vallen, i;
     VS_FIXEDFILEINFO *info;
     UINT16 major, minor, patch;
+    WCHAR dllname[MAX_PATH], temp_path[MAX_PATH], temp_name[MAX_PATH];
 
-    infosize = GetFileVersionInfoSizeW(L"amd_ags_x64.dll", NULL);
+    *temp_name = 0;
+    if (!(infosize = GetModuleFileNameW(GetModuleHandleW(L"amd_ags_x64.dll"), dllname, ARRAY_SIZE(dllname)))
+            || infosize == ARRAY_SIZE(dllname))
+    {
+        ERR("GetModuleFileNameW failed.\n");
+        goto done;
+    }
+    if (!GetTempPathW(MAX_PATH, temp_path) || !GetTempFileNameW(temp_path, L"tmp", 0, temp_name))
+    {
+        ERR("Failed getting temp file name.\n");
+        goto done;
+    }
+    if (!CopyFileW(dllname, temp_name, FALSE))
+    {
+        ERR("Failed to copy file.\n");
+        goto done;
+    }
+
+    infosize = GetFileVersionInfoSizeW(temp_name, NULL);
     if (!infosize)
     {
-        WARN("Unable to determine desired version of amd_ags_x64.dll.\n");
+        ERR("Unable to determine desired version of amd_ags_x64.dll.\n");
         goto done;
     }
 
     if (!(infobuf = heap_alloc(infosize)))
     {
-        WARN("Failed to allocate memory.\n");
+        ERR("Failed to allocate memory.\n");
         goto done;
     }
 
-    if (!GetFileVersionInfoW(L"amd_ags_x64.dll", 0, infosize, infobuf))
+    if (!GetFileVersionInfoW(temp_name, 0, infosize, infobuf))
     {
-        WARN("Unable to determine desired version of amd_ags_x64.dll.\n");
+        ERR("Unable to determine desired version of amd_ags_x64.dll.\n");
         goto done;
     }
 
     if (!VerQueryValueW(infobuf, L"\\", &val, &vallen) || (vallen != sizeof(VS_FIXEDFILEINFO)))
     {
-        WARN("Unable to determine desired version of amd_ags_x64.dll.\n");
+        ERR("Unable to determine desired version of amd_ags_x64.dll.\n");
         goto done;
     }
 
@@ -284,6 +303,9 @@ static enum amd_ags_version determine_ags_version(void)
     }
 
 done:
+    if (*temp_name)
+        DeleteFileW(temp_name);
+
     heap_free(infobuf);
     TRACE("Using AGS v%d.%d.%d interface\n",
           amd_ags_info[ret].major, amd_ags_info[ret].minor, amd_ags_info[ret].patch);
