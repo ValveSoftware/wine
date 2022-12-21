@@ -597,6 +597,9 @@ extern void (*pXFreeEventData)( Display *display, XEvent /*XGenericEventCookie*/
 
 extern DWORD x11drv_time_to_ticks(Time time) DECLSPEC_HIDDEN;
 
+extern void x11drv_input_add_window( HWND hwnd, Window window ) DECLSPEC_HIDDEN;
+extern void x11drv_input_remove_window( Window window ) DECLSPEC_HIDDEN;
+
 /* X11 driver private messages, must be in the range 0x80001000..0x80001fff */
 enum x11drv_window_messages
 {

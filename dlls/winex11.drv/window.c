@@ -2032,6 +2032,7 @@ static void create_whole_window( struct x11drv_win_data *data )
     sync_window_opacity( data->display, data->whole_window, key, alpha, layered_flags );
 
     XFlush( data->display );  /* make sure the window exists before we start painting to it */
+    x11drv_input_add_window( data->hwnd, data->whole_window );
 
     sync_window_cursor( data->whole_window );
 
@@ -2074,6 +2075,7 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
             XSync( data->display, False );
         }
         XDeleteContext( data->display, data->whole_window, winContext );
+        x11drv_input_remove_window( data->whole_window );
         if (!already_destroyed) XDestroyWindow( data->display, data->whole_window );
     }
     if (data->whole_colormap) XFreeColormap( data->display, data->whole_colormap );
@@ -2123,6 +2125,7 @@ void set_window_visual( struct x11drv_win_data *data, const XVisualInfo *vis, BO
                      data->client_rect.left - data->whole_rect.left,
                      data->client_rect.top - data->whole_rect.top );
     data->client_window = client_window;
+    x11drv_input_remove_window( whole_window );
     XDestroyWindow( data->display, whole_window );
 }
 

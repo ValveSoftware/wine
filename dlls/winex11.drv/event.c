@@ -150,6 +150,65 @@ static const char * event_names[MAX_EVENT_HANDLERS] =
 
 int xinput2_opcode = 0;
 
+static CRITICAL_SECTION input_cs;
+static CRITICAL_SECTION_DEBUG input_cs_debug =
+{
+    0, 0, &input_cs,
+    { &input_cs_debug.ProcessLocksList, &input_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": input_cs") }
+};
+static CRITICAL_SECTION input_cs = { &input_cs_debug, -1, 0, 0, 0, 0 };
+static CONDITION_VARIABLE input_cond = {0};
+static Display *input_display;
+
+/* wait for the input thread to startup and return the input display */
+static Display *x11drv_input_display(void)
+{
+    if (!input_display)
+    {
+        EnterCriticalSection( &input_cs );
+        while (!input_display) SleepConditionVariableCS( &input_cond, &input_cs, INFINITE );
+        LeaveCriticalSection( &input_cs );
+    }
+
+    return input_display;
+}
+
+/* set the input display and notify waiters */
+static void x11drv_set_input_display( Display *display )
+{
+    if (input_display) return;
+
+    EnterCriticalSection( &input_cs );
+    input_display = display;
+    LeaveCriticalSection( &input_cs );
+    WakeAllConditionVariable( &input_cond );
+}
+
+/* add a window to the windows we get input for */
+void x11drv_input_add_window( HWND hwnd, Window window )
+{
+    Display *display = x11drv_input_display();
+
+    TRACE( "display %p, window %p/%lx\n", display, hwnd, window );
+
+    EnterCriticalSection( &input_cs );
+    XSaveContext( display, window, winContext, (char *)hwnd );
+    LeaveCriticalSection( &input_cs );
+}
+
+/* remove a window from the windows we get input for */
+void x11drv_input_remove_window( Window window )
+{
+    Display *display = x11drv_input_display();
+
+    TRACE( "display %p, window %lx\n", display, window );
+
+    EnterCriticalSection( &input_cs );
+    XDeleteContext( display, window, winContext );
+    LeaveCriticalSection( &input_cs );
+}
+
 /* return the name of an X event */
 static const char *dbgstr_event( int type )
 {
@@ -427,8 +486,10 @@ static inline BOOL call_event_handler( Display *display, XEvent *event )
 #ifdef GenericEvent
     if (event->type == GenericEvent) hwnd = 0; else
 #endif
+    EnterCriticalSection( &input_cs );
     if (XFindContext( display, event->xany.window, winContext, (char **)&hwnd ) != 0)
         hwnd = 0;  /* not for a registered window */
+    LeaveCriticalSection( &input_cs );
     if (!hwnd && event->xany.window == root_window) hwnd = GetDesktopWindow();
 
     TRACE( "%lu %s for hwnd/window %p/%lx\n",
@@ -1987,6 +2048,8 @@ static BOOL X11DRV_ClientMessage( HWND hwnd, XEvent *xev )
 NTSTATUS x11drv_input_thread( void *arg )
 {
     struct x11drv_thread_data *data = x11drv_init_thread_data();
+
+    x11drv_set_input_display( data->display );
 
     for (;;)
     {
