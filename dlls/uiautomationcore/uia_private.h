@@ -21,6 +21,7 @@
 #include "uiautomation.h"
 #include "uia_classes.h"
 #include "wine/list.h"
+#include "wine/heap.h"
 
 extern HMODULE huia_module DECLSPEC_HIDDEN;
 
@@ -89,6 +90,36 @@ struct uia_provider {
 static inline struct uia_provider *impl_from_IWineUiaProvider(IWineUiaProvider *iface)
 {
     return CONTAINING_RECORD(iface, struct uia_provider, IWineUiaProvider_iface);
+}
+
+static inline BOOL uia_array_reserve(void **elements, SIZE_T *capacity, SIZE_T count, SIZE_T size)
+{
+    SIZE_T max_capacity, new_capacity;
+    void *new_elements;
+
+    if (count <= *capacity)
+        return TRUE;
+
+    max_capacity = ~(SIZE_T)0 / size;
+    if (count > max_capacity)
+        return FALSE;
+
+    new_capacity = max(1, *capacity);
+    while (new_capacity < count && new_capacity <= max_capacity / 2)
+        new_capacity *= 2;
+    if (new_capacity < count)
+        new_capacity = count;
+
+    if (!*elements)
+        new_elements = heap_alloc_zero(new_capacity * size);
+    else
+        new_elements = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, *elements, new_capacity * size);
+    if (!new_elements)
+        return FALSE;
+
+    *elements = new_elements;
+    *capacity = new_capacity;
+    return TRUE;
 }
 
 /* uia_client.c */

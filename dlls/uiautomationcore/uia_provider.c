@@ -20,7 +20,6 @@
 #include "ocidl.h"
 
 #include "wine/debug.h"
-#include "wine/heap.h"
 #include "wine/rbtree.h"
 #include "initguid.h"
 #include "wine/iaccessible2.h"
@@ -1479,6 +1478,67 @@ static HWND get_valid_child_hwnd(HWND parent, int dir)
         return get_visible_sibling_hwnd(scan, NavigateDirection_PreviousSibling, TRUE, parent);
 }
 
+struct uia_fragment_array {
+    IRawElementProviderSimple **roots;
+    int root_count;
+    SIZE_T root_arr_size;
+};
+
+static const WCHAR *ignored_window_classes[] = {
+    L"OleMainThreadWndClass",
+    L"IME",
+};
+
+static HRESULT get_all_hwnd_fragment_roots(struct uia_fragment_array *arr, HWND hwnd, BOOL is_root)
+{
+    int loop_count;
+    HRESULT hr;
+    HWND child;
+
+    if (!is_root)
+    {
+        IRawElementProviderSimple *elprov;
+        WCHAR buf[256] = { 0 };
+
+        if (GetClassNameW(hwnd, buf, ARRAY_SIZE(buf)))
+        {
+            int i;
+
+            for (i = 0; i < ARRAY_SIZE(ignored_window_classes); i++)
+            {
+                if (!lstrcmpW(buf, ignored_window_classes[i]))
+                    return S_OK;
+            }
+        }
+
+        if (!uia_array_reserve((void **)&arr->roots, &arr->root_arr_size, arr->root_count + 1,
+                    sizeof(elprov)))
+            return E_OUTOFMEMORY;
+
+        hr = create_base_hwnd_provider(hwnd, &elprov);
+        if (SUCCEEDED(hr))
+        {
+            arr->roots[arr->root_count] = elprov;
+            arr->root_count++;
+            return S_OK;
+        }
+    }
+
+    loop_count = 0;
+    for (child = GetWindow(hwnd, GW_CHILD); child && (loop_count < 1024); child = GetWindow(child, GW_HWNDNEXT))
+    {
+        if (hwnd_is_visible(child))
+        {
+            hr = get_all_hwnd_fragment_roots(arr, child, FALSE);
+            if (FAILED(hr))
+                return hr;
+        }
+        loop_count++;
+    }
+
+    return S_OK;
+}
+
 /*
  * Default ProviderType_BaseHwnd IRawElementProviderSimple interface.
  */
@@ -1785,9 +1845,35 @@ static HRESULT WINAPI base_hwnd_fragment_get_BoundingRectangle(IRawElementProvid
 static HRESULT WINAPI base_hwnd_fragment_GetEmbeddedFragmentRoots(IRawElementProviderFragment *iface,
         SAFEARRAY **ret_val)
 {
-    FIXME("%p, %p: stub!\n", iface, ret_val);
-    *ret_val = NULL;
-    return E_NOTIMPL;
+    struct base_hwnd_provider *base_hwnd_prov = impl_from_base_hwnd_fragment(iface);
+    struct uia_fragment_array arr = { 0 };
+    HRESULT hr;
+
+    TRACE("%p, %p\n", iface, ret_val);
+
+    hr = get_all_hwnd_fragment_roots(&arr, base_hwnd_prov->hwnd, TRUE);
+    if (FAILED(hr))
+        return hr;
+
+    if (arr.root_count)
+    {
+        SAFEARRAY *sa;
+        LONG idx;
+
+        if (!(sa = SafeArrayCreateVector(VT_UNKNOWN, 0, arr.root_count)))
+            return E_FAIL;
+
+        for (idx = 0; idx < arr.root_count; idx++)
+        {
+            SafeArrayPutElement(sa, &idx, (IUnknown *)arr.roots[idx]);
+            IRawElementProviderSimple_Release(arr.roots[idx]);
+        }
+
+        heap_free(arr.roots);
+        *ret_val = sa;
+    }
+
+    return S_OK;
 }
 
 static HRESULT WINAPI base_hwnd_fragment_SetFocus(IRawElementProviderFragment *iface)
