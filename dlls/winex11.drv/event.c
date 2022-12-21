@@ -1983,3 +1983,17 @@ static BOOL X11DRV_ClientMessage( HWND hwnd, XEvent *xev )
     TRACE( "no handler found for %ld\n", event->message_type );
     return FALSE;
 }
+
+NTSTATUS x11drv_input_thread( void *arg )
+{
+    struct x11drv_thread_data *data = x11drv_init_thread_data();
+
+    for (;;)
+    {
+        XEvent event;
+        XPeekEvent( data->display, &event );
+        process_events( data->display, QS_ALLINPUT );
+    }
+
+    return 0;
+}

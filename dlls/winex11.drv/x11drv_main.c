@@ -837,12 +837,29 @@ struct x11drv_thread_data *x11drv_init_thread_data(void)
     return data;
 }
 
+extern NTSTATUS x11drv_input_thread( void *arg ) DECLSPEC_HIDDEN;
+
+static DWORD CALLBACK input_thread( void *arg )
+{
+    NTSTATUS status;
+
+    SetThreadDescription( GetCurrentThread(), L"wine_x11drv_input" );
+
+    for (;;)
+    {
+        status = x11drv_input_thread( NULL );
+        WARN( "input_thread returned %#x\n", status );
+    }
+
+    return 0;
+}
 
 /***********************************************************************
  *           X11DRV initialisation routine
  */
 BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
 {
+    static HANDLE thread;
     BOOL ret = TRUE;
 
     switch(reason)
@@ -853,8 +870,16 @@ BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
         ret = process_attach();
         steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
         steam_keyboard_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_KeyboardActivated");
+
+        thread = CreateThread( NULL, 0, input_thread, NULL, 0, NULL );
+        if (!thread) ERR( "Failed to create input monitor thread, error %u\n", GetLastError() );
+
         break;
     case DLL_PROCESS_DETACH:
+        TerminateThread( thread, -1 );
+        WaitForSingleObject( thread, INFINITE );
+        CloseHandle( thread );
+
         CloseHandle(steam_overlay_event);
         CloseHandle(steam_keyboard_event);
         break;
