@@ -1485,6 +1485,7 @@ static HWND get_valid_child_hwnd(HWND parent, int dir)
 struct base_hwnd_provider {
     IRawElementProviderSimple IRawElementProviderSimple_iface;
     IRawElementProviderFragment IRawElementProviderFragment_iface;
+    IRawElementProviderFragmentRoot IRawElementProviderFragmentRoot_iface;
     LONG refcount;
 
     HWND hwnd;
@@ -1504,6 +1505,8 @@ HRESULT WINAPI base_hwnd_provider_QueryInterface(IRawElementProviderSimple *ifac
         *ppv = iface;
     else if (IsEqualIID(riid, &IID_IRawElementProviderFragment))
         *ppv = &base_hwnd_prov->IRawElementProviderFragment_iface;
+    else if (IsEqualIID(riid, &IID_IRawElementProviderFragmentRoot))
+        *ppv = &base_hwnd_prov->IRawElementProviderFragmentRoot_iface;
     else
         return E_NOINTERFACE;
 
@@ -1796,9 +1799,20 @@ static HRESULT WINAPI base_hwnd_fragment_SetFocus(IRawElementProviderFragment *i
 static HRESULT WINAPI base_hwnd_fragment_get_FragmentRoot(IRawElementProviderFragment *iface,
         IRawElementProviderFragmentRoot **ret_val)
 {
-    FIXME("%p, %p: stub!\n", iface, ret_val);
+    IRawElementProviderSimple *elprov;
+    HRESULT hr;
+
+    TRACE("%p, %p\n", iface, ret_val);
+
     *ret_val = NULL;
-    return E_NOTIMPL;
+    hr = create_base_hwnd_provider(GetDesktopWindow(), &elprov);
+    if (FAILED(hr) || !elprov)
+        return hr;
+
+    hr = IRawElementProviderSimple_QueryInterface(elprov, &IID_IRawElementProviderFragmentRoot, (void **)ret_val);
+    IRawElementProviderSimple_Release(elprov);
+
+    return hr;
 }
 
 static const IRawElementProviderFragmentVtbl base_hwnd_fragment_vtbl = {
@@ -1811,6 +1825,56 @@ static const IRawElementProviderFragmentVtbl base_hwnd_fragment_vtbl = {
     base_hwnd_fragment_GetEmbeddedFragmentRoots,
     base_hwnd_fragment_SetFocus,
     base_hwnd_fragment_get_FragmentRoot,
+};
+
+/*
+ * IRawElementProviderFragmentRoot interface for default ProviderType_BaseHwnd
+ * providers.
+ */
+static inline struct base_hwnd_provider *impl_from_base_hwnd_fragment_root(IRawElementProviderFragmentRoot *iface)
+{
+    return CONTAINING_RECORD(iface, struct base_hwnd_provider, IRawElementProviderFragmentRoot_iface);
+}
+
+static HRESULT WINAPI base_hwnd_fragment_root_QueryInterface(IRawElementProviderFragmentRoot *iface, REFIID riid,
+        void **ppv)
+{
+    struct base_hwnd_provider *base_hwnd_prov = impl_from_base_hwnd_fragment_root(iface);
+    return IRawElementProviderSimple_QueryInterface(&base_hwnd_prov->IRawElementProviderSimple_iface, riid, ppv);
+}
+
+static ULONG WINAPI base_hwnd_fragment_root_AddRef(IRawElementProviderFragmentRoot *iface)
+{
+    struct base_hwnd_provider *base_hwnd_prov = impl_from_base_hwnd_fragment_root(iface);
+    return IRawElementProviderSimple_AddRef(&base_hwnd_prov->IRawElementProviderSimple_iface);
+}
+
+static ULONG WINAPI base_hwnd_fragment_root_Release(IRawElementProviderFragmentRoot *iface)
+{
+    struct base_hwnd_provider *base_hwnd_prov = impl_from_base_hwnd_fragment_root(iface);
+    return IRawElementProviderSimple_Release(&base_hwnd_prov->IRawElementProviderSimple_iface);
+}
+
+static HRESULT WINAPI base_hwnd_fragment_root_ElementProviderFromPoint(IRawElementProviderFragmentRoot *iface,
+        double x, double y, IRawElementProviderFragment **ret_val)
+{
+    FIXME("%p, %f, %f, %p: stub\n", iface, x, y, ret_val);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI base_hwnd_fragment_root_GetFocus(IRawElementProviderFragmentRoot *iface,
+        IRawElementProviderFragment **ret_val)
+{
+    FIXME("%p, %p: stub\n", iface, ret_val);
+    return E_NOTIMPL;
+}
+
+static const IRawElementProviderFragmentRootVtbl base_hwnd_fragment_root_vtbl = {
+    base_hwnd_fragment_root_QueryInterface,
+    base_hwnd_fragment_root_AddRef,
+    base_hwnd_fragment_root_Release,
+    base_hwnd_fragment_root_ElementProviderFromPoint,
+    base_hwnd_fragment_root_GetFocus,
 };
 
 HRESULT create_base_hwnd_provider(HWND hwnd, IRawElementProviderSimple **elprov)
@@ -1830,6 +1894,7 @@ HRESULT create_base_hwnd_provider(HWND hwnd, IRawElementProviderSimple **elprov)
 
     base_hwnd_prov->IRawElementProviderSimple_iface.lpVtbl = &base_hwnd_provider_vtbl;
     base_hwnd_prov->IRawElementProviderFragment_iface.lpVtbl = &base_hwnd_fragment_vtbl;
+    base_hwnd_prov->IRawElementProviderFragmentRoot_iface.lpVtbl = &base_hwnd_fragment_root_vtbl;
     base_hwnd_prov->refcount = 1;
     base_hwnd_prov->hwnd = hwnd;
     *elprov = &base_hwnd_prov->IRawElementProviderSimple_iface;
