@@ -2717,6 +2717,7 @@ static HRESULT WINAPI hid_joystick_effect_SetParameters( IDirectInputEffect *ifa
     }
     else
     {
+        flags &= ~DIEP_ENVELOPE;
         impl->flags &= ~DIEP_ENVELOPE;
         impl->modified &= ~DIEP_ENVELOPE;
         impl->params.lpEnvelope = NULL;
