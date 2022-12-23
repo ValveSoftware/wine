@@ -1240,7 +1240,8 @@ class VkHandle(object):
             return self.driver_handle(name)
         if unwrap == Unwrap.HOST:
             return self.host_handle(name)
-        assert unwrap != Unwrap.NONE
+        if unwrap == Unwrap.NONE:
+            return name
         return None
 
     def is_wrapped(self):
