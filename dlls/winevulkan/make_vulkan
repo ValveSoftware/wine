@@ -1504,7 +1504,10 @@ class VkMember(VkVariable):
                         self.value(input, conv), handle.driver_handle(self.value(input, conv)))
                 else:
                     input_name = "{0}{1}".format(input, self.name)
-                    return "{0}{1} = {2} ? {3} : VK_NULL_HANDLE;\n".format(output, self.name, input_name, handle.driver_handle(self.value(input, conv)))
+                    if unwrap:
+                        return "{0}{1} = {2} ? {3} : VK_NULL_HANDLE;\n".format(output, self.name, input_name, handle.driver_handle(self.value(input, conv)))
+                    else:
+                        return "{0}{1} = {2};\n".format(output, self.name, self.value(input, conv))
             elif self.is_generic_handle():
                 if direction == Direction.OUTPUT:
                     LOGGER.err("OUTPUT parameter {0}.{1} cannot be unwrapped".format(self.type, self.name))
