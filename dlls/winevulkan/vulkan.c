@@ -4616,7 +4616,7 @@ struct queue_submit_unit
 };
 
 /* Abstracts away the differences between VkSubmitInfo and VkSubmitInfo2. */
-static bool for_each_d3d12_semaphore(struct queue_submit_unit *unit, bool signal,
+static bool get_semaphore_by_index(struct queue_submit_unit *unit, bool signal,
                                      struct wine_semaphore **semaphore_out, uint64_t **value_out, uint32_t counter)
 {
     VkTimelineSemaphoreSubmitInfo *timeline_values;
@@ -4727,7 +4727,7 @@ static void *virtual_queue_worker(void *arg)
             goto free_submit_unit;
 
         /* Wait for all fences to have a pending signal */
-        for (i = 0; for_each_d3d12_semaphore(submit_unit, false, &sem, &timeline_value, i); i++)
+        for (i = 0; get_semaphore_by_index(submit_unit, false, &sem, &timeline_value, i); i++)
         {
             if ((wait = submit_unit->waits[i]))
             {
@@ -4742,7 +4742,7 @@ static void *virtual_queue_worker(void *arg)
             }
         }
 
-        for (i = 0; for_each_d3d12_semaphore(submit_unit, true, &sem, &timeline_value, i); i++)
+        for (i = 0; get_semaphore_by_index(submit_unit, true, &sem, &timeline_value, i); i++)
         {
             d3d12_semaphore_lock(sem);
 
@@ -4757,7 +4757,7 @@ static void *virtual_queue_worker(void *arg)
 
         pthread_mutex_lock(&queue->signaller_mutex);
 
-        for (i = 0; for_each_d3d12_semaphore(submit_unit, true, &sem, &timeline_value, i); i++)
+        for (i = 0; get_semaphore_by_index(submit_unit, true, &sem, &timeline_value, i); i++)
         {
             if (vr == VK_SUCCESS)
             {
