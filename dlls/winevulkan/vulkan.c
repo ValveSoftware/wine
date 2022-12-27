@@ -237,6 +237,7 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
     struct wine_phys_dev *object;
     uint32_t num_host_properties, num_properties = 0;
     VkExtensionProperties *host_properties = NULL;
+    VkPhysicalDeviceProperties physdev_properties;
     BOOL have_external_memory_host = FALSE;
     VkResult res;
     unsigned int i, j;
@@ -247,6 +248,9 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
     object->instance = instance;
     object->handle = handle;
     object->host_physical_device = phys_dev;
+
+    instance->funcs.p_vkGetPhysicalDeviceProperties(phys_dev, &physdev_properties);
+    object->api_version = physdev_properties.apiVersion;
 
     handle->base.unix_handle = (uintptr_t)object;
     WINE_VK_ADD_DISPATCHABLE_MAPPING(instance, handle, phys_dev, object);
@@ -504,6 +508,8 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
         else if (!strcmp(extension_name, "VK_KHR_timeline_semaphore"))
             append_timeline = 0;
     }
+    if (append_timeline)
+         append_timeline = phys_dev->api_version < VK_API_VERSION_1_2 || phys_dev->instance->api_version < VK_API_VERSION_1_2;
     if (append_timeline)
     {
         append_timeline = 0;
@@ -1057,6 +1063,8 @@ VkResult wine_vkCreateInstance(const VkInstanceCreateInfo *create_info,
         TRACE("Engine name %s, engine version %#x.\n", debugstr_a(app_info->pEngineName),
                 app_info->engineVersion);
         TRACE("API version %#x.\n", app_info->apiVersion);
+
+        object->api_version = app_info->apiVersion;
 
         if (app_info->pEngineName && !strcmp(app_info->pEngineName, "idTech"))
             object->quirks |= WINEVULKAN_QUIRK_GET_DEVICE_PROC_ADDR;
@@ -1708,6 +1716,25 @@ static void wine_vk_get_physical_device_external_semaphore_properties(struct win
             break;
         case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT:
         {
+            unsigned int i;
+
+            if (phys_dev->api_version < VK_API_VERSION_1_2 ||
+                phys_dev->instance->api_version < VK_API_VERSION_1_2)
+            {
+                for (i = 0; i < phys_dev->extension_count; i++)
+                {
+                    if (!strcmp(phys_dev->extensions[i].extensionName, "VK_KHR_timeline_semaphore"))
+                        break;
+                }
+                if (i == phys_dev->extension_count)
+                {
+                    properties->exportFromImportedHandleTypes = 0;
+                    properties->compatibleHandleTypes = 0;
+                    properties->externalSemaphoreFeatures = 0;
+                    return;
+                }
+            }
+
             if ((p_semaphore_type_info = wine_vk_find_struct(&semaphore_info_dup, SEMAPHORE_TYPE_CREATE_INFO)))
             {
                 p_semaphore_type_info->semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;

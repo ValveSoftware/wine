@@ -144,6 +144,7 @@ struct wine_instance
      */
     struct wine_phys_dev **phys_devs;
     uint32_t phys_dev_count;
+    uint32_t api_version;
 
     VkBool32 enable_wrapper_list;
     struct list wrappers;
@@ -174,6 +175,7 @@ struct wine_phys_dev
     VkPhysicalDeviceMemoryProperties memory_properties;
     VkExtensionProperties *extensions;
     uint32_t extension_count;
+    uint32_t api_version;
 
     uint32_t external_memory_align;
 
