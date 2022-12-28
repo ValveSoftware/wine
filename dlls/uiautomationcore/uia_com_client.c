@@ -127,15 +127,28 @@ static HRESULT WINAPI uia_element_BuildUpdatedCache(IUIAutomationElement9 *iface
 static HRESULT WINAPI uia_element_GetCurrentPropertyValue(IUIAutomationElement9 *iface, PROPERTYID prop_id,
         VARIANT *ret_val)
 {
-    FIXME("%p: stub\n", iface);
-    return E_NOTIMPL;
+    TRACE("%p, %d, %p\n", iface, prop_id, ret_val);
+
+    return IUIAutomationElement9_GetCurrentPropertyValueEx(iface, prop_id, FALSE, ret_val);
 }
 
 static HRESULT WINAPI uia_element_GetCurrentPropertyValueEx(IUIAutomationElement9 *iface, PROPERTYID prop_id,
         BOOL ignore_default, VARIANT *ret_val)
 {
-    FIXME("%p: stub\n", iface);
-    return E_NOTIMPL;
+    struct uia_element *element = impl_from_IUIAutomationElement9(iface);
+    HRESULT hr;
+    VARIANT v;
+
+    TRACE("%p, %d, %d, %p\n", iface, prop_id, ignore_default, ret_val);
+
+    if (!ignore_default)
+        FIXME("Default property values currently unimplemented\n");
+
+    VariantInit(&v);
+    hr = UiaGetPropertyValue(element->node, prop_id, &v);
+    *ret_val = v;
+
+    return hr;
 }
 
 static HRESULT WINAPI uia_element_GetCachedPropertyValue(IUIAutomationElement9 *iface, PROPERTYID prop_id,
