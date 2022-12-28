@@ -605,6 +605,24 @@ static void no_more_pads_cb(GstElement *element, gpointer user)
     pthread_cond_signal(&parser->init_cond);
 }
 
+static void deep_element_added_cb(GstBin *self, GstBin *sub_bin, GstElement *element, gpointer user)
+{
+    GstElementFactory *factory = NULL;
+    const char *name = NULL;
+
+    if (element)
+        factory = gst_element_get_factory(element);
+
+    if (factory)
+        name = gst_element_factory_get_longname(factory);
+
+    if (name && strstr(name, "Dav1d"))
+    {
+        GST_DEBUG("%s found, setting n-threads to 1.", name);
+        g_object_set(element, "n-threads", G_GINT64_CONSTANT(1), NULL);
+    }
+}
+
 static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
 {
     struct wg_parser_stream *stream = gst_pad_get_element_private(pad);
@@ -1867,6 +1885,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
     g_signal_connect(element, "autoplug-sort", G_CALLBACK(autoplug_sort_cb), parser);
     g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
+    g_signal_connect(element, "deep-element-added", G_CALLBACK(deep_element_added_cb), parser);
 
     pthread_mutex_lock(&parser->mutex);
     parser->no_more_pads = false;
