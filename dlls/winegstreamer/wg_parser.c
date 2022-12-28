@@ -660,11 +660,30 @@ static void no_more_pads_cb(GstElement *element, gpointer user)
     pthread_mutex_unlock(&parser->mutex);
     pthread_cond_signal(&parser->init_cond);
 }
+static void set_dav1d_n_threads(GstElement *element)
+{
+    GstElementFactory *factory = NULL;
+    const char *name = NULL;
+
+    if (element)
+        factory = gst_element_get_factory(element);
+
+    if (factory)
+        name = gst_element_factory_get_longname(factory);
+
+    if (name && strstr(name, "Dav1d"))
+    {
+        GST_DEBUG("%s found, setting n-threads to 1.", name);
+        g_object_set(element, "n-threads", G_GINT64_CONSTANT(1), NULL);
+    }
+}
 
 static void deep_element_added_cb(GstBin *self, GstBin *sub_bin, GstElement *element, gpointer user)
 {
     if (element)
         set_max_threads(element);
+
+    set_dav1d_n_threads(element);
 }
 
 static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
