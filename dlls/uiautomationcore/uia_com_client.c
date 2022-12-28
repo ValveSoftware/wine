@@ -224,8 +224,19 @@ static HRESULT WINAPI uia_element_get_CurrentLocalizedControlType(IUIAutomationE
 
 static HRESULT WINAPI uia_element_get_CurrentName(IUIAutomationElement9 *iface, BSTR *ret_val)
 {
-    FIXME("%p: stub\n", iface);
-    return E_NOTIMPL;
+    struct uia_element *element = impl_from_IUIAutomationElement9(iface);
+    HRESULT hr;
+    VARIANT v;
+
+    TRACE("%p, %p\n", element, ret_val);
+
+    *ret_val = NULL;
+    VariantInit(&v);
+    hr = UiaGetPropertyValue(element->node, UIA_NamePropertyId, &v);
+    if (SUCCEEDED(hr) && V_VT(&v) == VT_BSTR)
+        *ret_val = V_BSTR(&v);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI uia_element_get_CurrentAcceleratorKey(IUIAutomationElement9 *iface, BSTR *ret_val)
