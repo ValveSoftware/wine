@@ -510,6 +510,7 @@ struct msaa_provider {
 
     BOOL root_acc_check_ran;
     BOOL is_root_acc;
+    BOOL clientside_prov;
 
     IAccessible *parent;
     INT child_pos;
@@ -594,8 +595,16 @@ ULONG WINAPI msaa_provider_Release(IRawElementProviderSimple *iface)
 HRESULT WINAPI msaa_provider_get_ProviderOptions(IRawElementProviderSimple *iface,
         enum ProviderOptions *ret_val)
 {
+    struct msaa_provider *msaa_prov = impl_from_msaa_provider(iface);
+
     TRACE("%p, %p\n", iface, ret_val);
-    *ret_val = ProviderOptions_ServerSideProvider | ProviderOptions_UseComThreading;
+
+    *ret_val = ProviderOptions_UseComThreading;
+    if (msaa_prov->clientside_prov)
+        *ret_val |= ProviderOptions_ClientSideProvider;
+    else
+        *ret_val |= ProviderOptions_ServerSideProvider;
+
     return S_OK;
 }
 
@@ -769,7 +778,7 @@ static HRESULT WINAPI msaa_fragment_Navigate(IRawElementProviderFragment *iface,
         else
             acc = msaa_prov->acc;
 
-        hr = create_msaa_provider(acc, CHILDID_SELF, NULL, FALSE, &elprov);
+        hr = create_msaa_provider(acc, CHILDID_SELF, NULL, FALSE, msaa_prov->clientside_prov, &elprov);
         if (SUCCEEDED(hr))
         {
             struct msaa_provider *prov = impl_from_msaa_provider(elprov);
@@ -800,7 +809,7 @@ static HRESULT WINAPI msaa_fragment_Navigate(IRawElementProviderFragment *iface,
         if (FAILED(hr) || !acc)
             break;
 
-        hr = create_msaa_provider(acc, child_id, NULL, FALSE, &elprov);
+        hr = create_msaa_provider(acc, child_id, NULL, FALSE, msaa_prov->clientside_prov, &elprov);
         if (SUCCEEDED(hr))
         {
             struct msaa_provider *prov = impl_from_msaa_provider(elprov);
@@ -850,7 +859,7 @@ static HRESULT WINAPI msaa_fragment_Navigate(IRawElementProviderFragment *iface,
         if (FAILED(hr) || !acc)
             break;
 
-        hr = create_msaa_provider(acc, child_id, NULL, FALSE, &elprov);
+        hr = create_msaa_provider(acc, child_id, NULL, FALSE, msaa_prov->clientside_prov, &elprov);
         if (SUCCEEDED(hr))
         {
             struct msaa_provider *prov = impl_from_msaa_provider(elprov);
@@ -1096,7 +1105,7 @@ static const ILegacyIAccessibleProviderVtbl msaa_acc_provider_vtbl = {
     msaa_acc_provider_get_DefaultAction,
 };
 
-HRESULT create_msaa_provider(IAccessible *acc, long child_id, HWND hwnd, BOOL known_root_acc,
+HRESULT create_msaa_provider(IAccessible *acc, long child_id, HWND hwnd, BOOL known_root_acc, BOOL clientside_prov,
         IRawElementProviderSimple **elprov)
 {
     struct msaa_provider *msaa_prov = heap_alloc_zero(sizeof(*msaa_prov));
@@ -1112,6 +1121,7 @@ HRESULT create_msaa_provider(IAccessible *acc, long child_id, HWND hwnd, BOOL kn
     msaa_prov->acc = acc;
     IAccessible_AddRef(acc);
     msaa_prov->ia2 = msaa_acc_get_ia2(acc);
+    msaa_prov->clientside_prov = clientside_prov;
 
     if (!hwnd)
     {
@@ -1181,7 +1191,7 @@ HRESULT WINAPI UiaProviderFromIAccessible(IAccessible *acc, long child_id, DWORD
     if (!hwnd)
         return E_FAIL;
 
-    return create_msaa_provider(acc, child_id, hwnd, FALSE, elprov);
+    return create_msaa_provider(acc, child_id, hwnd, FALSE, FALSE, elprov);
 }
 
 /*
