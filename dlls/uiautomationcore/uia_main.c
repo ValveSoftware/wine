@@ -265,7 +265,7 @@ static const IRawElementProviderSimpleVtbl hwnd_host_provider_vtbl = {
 BOOL WINAPI UiaClientsAreListening(void)
 {
     FIXME("()\n");
-    return FALSE;
+    return TRUE;
 }
 
 /***********************************************************************
