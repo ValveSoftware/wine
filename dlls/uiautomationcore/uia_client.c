@@ -2102,22 +2102,25 @@ static HRESULT uia_node_from_lresult(LRESULT lr, HUIANODE *huianode)
  */
 static HRESULT uia_get_provider_from_hwnd(struct uia_node *node)
 {
-    struct uia_get_node_prov_args args;
+    struct uia_get_node_prov_args args = { 0 };
+    BOOL succeeded;
 
     if (!uia_start_client_thread())
         return E_FAIL;
 
     SetLastError(NOERROR);
-    args.lr = SendMessageW(node->hwnd, WM_GETOBJECT, 0, UiaRootObjectId);
-    if (GetLastError() == ERROR_INVALID_WINDOW_HANDLE)
+    succeeded = SendMessageTimeoutW(node->hwnd, WM_GETOBJECT, 0, UiaRootObjectId, 0, 1000, (PDWORD_PTR)&args.lr);
+    if (!succeeded || !args.lr)
     {
         uia_stop_client_thread();
-        return UIA_E_ELEMENTNOTAVAILABLE;
-    }
+        if (!succeeded)
+        {
+            if (GetLastError() == ERROR_TIMEOUT)
+                return UIA_E_TIMEOUT;
+            else
+                return UIA_E_ELEMENTNOTAVAILABLE;
+        }
 
-    if (!args.lr)
-    {
-        uia_stop_client_thread();
         return S_FALSE;
     }
 
