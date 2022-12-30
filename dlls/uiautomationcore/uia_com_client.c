@@ -182,6 +182,43 @@ static HRESULT uia_com_event_thread_handle_winevent(struct uia_queue_winevent *w
         break;
     }
 
+    case EVENT_OBJECT_FOCUS:
+    {
+        IRawElementProviderSimple *elprov = NULL;
+        HRESULT hr;
+
+        if (winevent->cid == CHILDID_SELF)
+        {
+            hr = create_base_hwnd_provider(winevent->hwnd, &elprov);
+            if (FAILED(hr))
+                WARN("Failed to create BaseHwnd provider with hr %#lx\n", hr);
+        }
+        else
+        {
+            IAccessible *acc = NULL;
+            VARIANT v;
+
+            hr = AccessibleObjectFromEvent(winevent->hwnd, winevent->objid, winevent->cid, &acc, &v);
+            if (FAILED(hr) || !acc)
+                break;
+
+            hr = create_msaa_provider(acc, V_I4(&v), winevent->hwnd, FALSE, TRUE, &elprov);
+            IAccessible_Release(acc);
+            if (FAILED(hr))
+                WARN("Failed to create MSAA proxy provider with hr %#lx\n", hr);
+        }
+
+        if (!elprov)
+            break;
+
+        hr = UiaRaiseAutomationEvent(elprov, UIA_AutomationFocusChangedEventId);
+        if (FAILED(hr))
+            WARN("Failed to raise event with hr %#lx\n", hr);
+
+        IRawElementProviderSimple_Release(elprov);
+        break;
+    }
+
     default:
         break;
     }
