@@ -1452,6 +1452,10 @@ static NTSTATUS key_import_pair( struct algorithm *alg, const WCHAR *type, BCRYP
             key_size = 32;
             magic = BCRYPT_ECDH_PRIVATE_P256_MAGIC;
             break;
+	case ALG_ID_ECDH_P384:
+            key_size = 48;
+            magic = BCRYPT_ECDH_PRIVATE_P384_MAGIC;
+            break;
         case ALG_ID_ECDSA_P256:
             key_size = 32;
             magic = BCRYPT_ECDSA_PRIVATE_P256_MAGIC;
@@ -1707,6 +1711,7 @@ NTSTATUS WINAPI BCryptGenerateKeyPair( BCRYPT_ALG_HANDLE algorithm, BCRYPT_KEY_H
     switch (alg->id)
     {
     case ALG_ID_ECDH_P256:
+    case ALG_ID_ECDH_P384:
     case ALG_ID_ECDSA_P256:
         size = sizeof(BCRYPT_ECCKEY_BLOB) + 2 * 256 / 8;
         break;
