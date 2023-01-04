@@ -6455,6 +6455,15 @@ dispex_static_data_t HTMLDocumentNode_dispex = {
     HTMLDocumentNode_init_dispex_info
 };
 
+dispex_static_data_t DocumentNode_dispex = {
+    L"Document",
+    &HTMLDocumentNode_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_Document,
+    DispHTMLDocument_tid,
+    HTMLDocumentNode_iface_tids,
+    HTMLDocumentNode_init_dispex_info
+};
+
 static HTMLDocumentNode *alloc_doc_node(HTMLDocumentObj *doc_obj, HTMLInnerWindow *window)
 {
     HTMLDocumentNode *doc;
