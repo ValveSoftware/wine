@@ -40,6 +40,7 @@ typedef struct {
 
     LONG ref;
 
+    HTMLInnerWindow *window;
     HTMLPluginsCollection *plugins;
     HTMLMimeTypesCollection *mime_types;
 } OmNavigator;
@@ -330,7 +331,7 @@ HRESULT create_dom_implementation(HTMLDocumentNode *doc_node, IHTMLDOMImplementa
     dom_implementation->browser = doc_node->browser;
 
     init_dispatch(&dom_implementation->dispex, (IUnknown*)&dom_implementation->IHTMLDOMImplementation_iface,
-                  &HTMLDOMImplementation_dispex, doc_node->document_mode);
+                  &HTMLDOMImplementation_dispex, get_inner_window(doc_node), doc_node->document_mode);
 
     nsres = nsIDOMDocument_GetImplementation(doc_node->dom_document, &dom_implementation->implementation);
     if(NS_FAILED(nsres)) {
@@ -564,7 +565,7 @@ static dispex_static_data_t HTMLScreen_dispex = {
     HTMLScreen_iface_tids
 };
 
-HRESULT create_html_screen(compat_mode_t compat_mode, IHTMLScreen **ret)
+HRESULT create_html_screen(HTMLInnerWindow *window, IHTMLScreen **ret)
 {
     HTMLScreen *screen;
 
@@ -575,7 +576,8 @@ HRESULT create_html_screen(compat_mode_t compat_mode, IHTMLScreen **ret)
     screen->IHTMLScreen_iface.lpVtbl = &HTMLSreenVtbl;
     screen->ref = 1;
 
-    init_dispatch(&screen->dispex, (IUnknown*)&screen->IHTMLScreen_iface, &HTMLScreen_dispex, compat_mode);
+    init_dispatch(&screen->dispex, (IUnknown*)&screen->IHTMLScreen_iface, &HTMLScreen_dispex,
+                  window, dispex_compat_mode(&window->event_target.dispex));
 
     *ret = &screen->IHTMLScreen_iface;
     return S_OK;
@@ -741,7 +743,7 @@ HRESULT create_history(HTMLInnerWindow *window, OmHistory **ret)
     history->ref = 1;
 
     init_dispatch(&history->dispex, (IUnknown*)&history->IOmHistory_iface, &OmHistory_dispex,
-                  dispex_compat_mode(&window->event_target.dispex));
+                  window, dispex_compat_mode(&window->event_target.dispex));
 
     history->window = window;
 
@@ -899,7 +901,7 @@ static HRESULT create_plugins_collection(OmNavigator *navigator, HTMLPluginsColl
     col->navigator = navigator;
 
     init_dispatch(&col->dispex, (IUnknown*)&col->IHTMLPluginsCollection_iface,
-                  &HTMLPluginsCollection_dispex, dispex_compat_mode(&navigator->dispex));
+                  &HTMLPluginsCollection_dispex, navigator->window, dispex_compat_mode(&navigator->dispex));
 
     *ret = col;
     return S_OK;
@@ -1044,7 +1046,7 @@ static HRESULT create_mime_types_collection(OmNavigator *navigator, HTMLMimeType
     col->navigator = navigator;
 
     init_dispatch(&col->dispex, (IUnknown*)&col->IHTMLMimeTypesCollection_iface,
-                  &HTMLMimeTypesCollection_dispex, dispex_compat_mode(&navigator->dispex));
+                  &HTMLMimeTypesCollection_dispex, navigator->window, dispex_compat_mode(&navigator->dispex));
 
     *ret = col;
     return S_OK;
@@ -1481,7 +1483,7 @@ static dispex_static_data_t OmNavigator_dispex = {
     OmNavigator_iface_tids
 };
 
-HRESULT create_navigator(compat_mode_t compat_mode, IOmNavigator **navigator)
+HRESULT create_navigator(HTMLInnerWindow *window, IOmNavigator **navigator)
 {
     OmNavigator *ret;
 
@@ -1491,11 +1493,19 @@ HRESULT create_navigator(compat_mode_t compat_mode, IOmNavigator **navigator)
 
     ret->IOmNavigator_iface.lpVtbl = &OmNavigatorVtbl;
     ret->ref = 1;
+    ret->window = window;
 
-    init_dispatch(&ret->dispex, (IUnknown*)&ret->IOmNavigator_iface, &OmNavigator_dispex, compat_mode);
+    init_dispatch(&ret->dispex, (IUnknown*)&ret->IOmNavigator_iface, &OmNavigator_dispex,
+                  window, dispex_compat_mode(&window->event_target.dispex));
 
     *navigator = &ret->IOmNavigator_iface;
     return S_OK;
+}
+
+void detach_navigator(IOmNavigator *iface)
+{
+    OmNavigator *navigator = impl_from_IOmNavigator(iface);
+    navigator->window = NULL;
 }
 
 static inline HTMLPerformanceTiming *impl_from_IHTMLPerformanceTiming(IHTMLPerformanceTiming *iface)
@@ -2238,7 +2248,7 @@ HRESULT create_performance(HTMLInnerWindow *window, IHTMLPerformance **ret)
     IHTMLPerformanceTiming_AddRef(&performance->timing->IHTMLPerformanceTiming_iface);
 
     init_dispatch(&performance->dispex, (IUnknown*)&performance->IHTMLPerformance_iface,
-                  &HTMLPerformance_dispex, compat_mode);
+                  &HTMLPerformance_dispex, window, compat_mode);
 
     navigation->IHTMLPerformanceNavigation_iface.lpVtbl = &HTMLPerformanceNavigationVtbl;
     navigation->ref = 1;
@@ -2246,10 +2256,10 @@ HRESULT create_performance(HTMLInnerWindow *window, IHTMLPerformance **ret)
     IHTMLPerformanceTiming_AddRef(&navigation->timing->IHTMLPerformanceTiming_iface);
 
     init_dispatch(&navigation->dispex, (IUnknown*)&navigation->IHTMLPerformanceNavigation_iface,
-                  &HTMLPerformanceNavigation_dispex, compat_mode);
+                  &HTMLPerformanceNavigation_dispex, window, compat_mode);
 
     init_dispatch(&performance->timing->dispex, (IUnknown*)&performance->timing->IHTMLPerformanceTiming_iface,
-                  &HTMLPerformanceTiming_dispex, compat_mode);
+                  &HTMLPerformanceTiming_dispex, window, compat_mode);
 
     *ret = &performance->IHTMLPerformance_iface;
     return S_OK;
@@ -2396,7 +2406,7 @@ static dispex_static_data_t HTMLNamespaceCollection_dispex = {
     HTMLNamespaceCollection_iface_tids
 };
 
-HRESULT create_namespace_collection(compat_mode_t compat_mode, IHTMLNamespaceCollection **ret)
+HRESULT create_namespace_collection(HTMLDocumentNode *doc_node, IHTMLNamespaceCollection **ret)
 {
     HTMLNamespaceCollection *namespaces;
 
@@ -2406,7 +2416,8 @@ HRESULT create_namespace_collection(compat_mode_t compat_mode, IHTMLNamespaceCol
     namespaces->IHTMLNamespaceCollection_iface.lpVtbl = &HTMLNamespaceCollectionVtbl;
     namespaces->ref = 1;
     init_dispatch(&namespaces->dispex, (IUnknown*)&namespaces->IHTMLNamespaceCollection_iface,
-                  &HTMLNamespaceCollection_dispex, compat_mode);
+                  &HTMLNamespaceCollection_dispex, get_inner_window(doc_node),
+                  dispex_compat_mode(&doc_node->node.event_target.dispex));
     *ret = &namespaces->IHTMLNamespaceCollection_iface;
     return S_OK;
 }
@@ -2652,7 +2663,7 @@ static dispex_static_data_t console_dispex = {
     console_iface_tids
 };
 
-void create_console(compat_mode_t compat_mode, IWineMSHTMLConsole **ret)
+void create_console(HTMLInnerWindow *window, IWineMSHTMLConsole **ret)
 {
     struct console *obj;
 
@@ -2665,7 +2676,8 @@ void create_console(compat_mode_t compat_mode, IWineMSHTMLConsole **ret)
 
     obj->IWineMSHTMLConsole_iface.lpVtbl = &WineMSHTMLConsoleVtbl;
     obj->ref = 1;
-    init_dispatch(&obj->dispex, (IUnknown*)&obj->IWineMSHTMLConsole_iface, &console_dispex, compat_mode);
+    init_dispatch(&obj->dispex, (IUnknown*)&obj->IWineMSHTMLConsole_iface, &console_dispex,
+                  window, dispex_compat_mode(&window->event_target.dispex));
 
     *ret = &obj->IWineMSHTMLConsole_iface;
 }
@@ -2859,7 +2871,7 @@ HRESULT create_media_query_list(HTMLWindow *window, BSTR media_query, IDispatch 
     media_query_list->IWineMSHTMLMediaQueryList_iface.lpVtbl = &media_query_list_vtbl;
     media_query_list->ref = 1;
     init_dispatch(&media_query_list->dispex, (IUnknown*)&media_query_list->IWineMSHTMLMediaQueryList_iface,
-                  &media_query_list_dispex, dispex_compat_mode(&window->inner_window->event_target.dispex));
+                  &media_query_list_dispex, window->inner_window, dispex_compat_mode(&window->inner_window->event_target.dispex));
 
     *ret = (IDispatch*)&media_query_list->IWineMSHTMLMediaQueryList_iface;
     return S_OK;

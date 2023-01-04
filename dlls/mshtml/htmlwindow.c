@@ -71,7 +71,7 @@ static inline BOOL is_outer_window(HTMLWindow *window)
 static void get_location(HTMLOuterWindow *This, HTMLLocation **ret)
 {
     if(!This->location.dispex.outer)
-        HTMLLocation_Init(&This->location);
+        HTMLLocation_Init(This);
 
     IHTMLLocation_AddRef(&This->location.IHTMLLocation_iface);
     *ret = &This->location;
@@ -311,8 +311,10 @@ static void release_inner_window(HTMLInnerWindow *This)
         IOmHistory_Release(&This->history->IOmHistory_iface);
     }
 
-    if(This->navigator)
+    if(This->navigator) {
+        detach_navigator(This->navigator);
         IOmNavigator_Release(This->navigator);
+    }
     if(This->session_storage) {
         detach_html_storage(This->session_storage);
         IHTMLStorage_Release(This->session_storage);
@@ -956,7 +958,7 @@ static HRESULT WINAPI HTMLWindow2_get_navigator(IHTMLWindow2 *iface, IOmNavigato
 
     if(!window->navigator) {
         HRESULT hres;
-        hres = create_navigator(dispex_compat_mode(&window->event_target.dispex), &window->navigator);
+        hres = create_navigator(window, &window->navigator);
         if(FAILED(hres))
             return hres;
     }
@@ -1345,7 +1347,7 @@ static HRESULT WINAPI HTMLWindow2_get_screen(IHTMLWindow2 *iface, IHTMLScreen **
     if(!window->screen) {
         HRESULT hres;
 
-        hres = create_html_screen(dispex_compat_mode(&window->event_target.dispex), &window->screen);
+        hres = create_html_screen(window, &window->screen);
         if(FAILED(hres))
             return hres;
     }
@@ -2623,7 +2625,8 @@ static HRESULT WINAPI HTMLWindow7_getComputedStyle(IHTMLWindow7 *iface, IHTMLDOM
         return S_OK;
     }
 
-    hres = create_computed_style(nsstyle, dispex_compat_mode(&This->inner_window->event_target.dispex), p);
+    hres = create_computed_style(nsstyle, This->inner_window,
+                                 dispex_compat_mode(&This->inner_window->event_target.dispex), p);
     nsIDOMCSSStyleDeclaration_Release(nsstyle);
     return hres;
 }
@@ -3396,7 +3399,7 @@ static HRESULT WINAPI window_private_get_console(IWineHTMLWindowPrivate *iface, 
     TRACE("iface %p, console %p.\n", iface, console);
 
     if (!This->console)
-        create_console(dispex_compat_mode(&This->inner_window->event_target.dispex), &This->console);
+        create_console(This->inner_window, &This->console);
 
     *console = (IDispatch *)This->console;
     if (This->console)
@@ -4310,7 +4313,7 @@ static HRESULT create_inner_window(HTMLOuterWindow *outer_window, IMoniker *mon,
     window->base.inner_window = window;
 
     EventTarget_Init(&window->event_target, (IUnknown*)&window->base.IHTMLWindow2_iface,
-                     &HTMLWindow_dispex, COMPAT_MODE_NONE);
+                     &HTMLWindow_dispex, NULL);
 
     window->task_magic = get_task_target_magic();
 

@@ -618,10 +618,10 @@ static dispex_static_data_t HTMLLocation_dispex = {
     HTMLLocation_iface_tids
 };
 
-void HTMLLocation_Init(HTMLLocation *location)
+void HTMLLocation_Init(HTMLOuterWindow *window)
 {
-    location->IHTMLLocation_iface.lpVtbl = &HTMLLocationVtbl;
+    window->location.IHTMLLocation_iface.lpVtbl = &HTMLLocationVtbl;
 
-    init_dispatch(&location->dispex, (IUnknown*)&location->IHTMLLocation_iface, &HTMLLocation_dispex,
-                  COMPAT_MODE_QUIRKS);
+    init_dispatch(&window->location.dispex, (IUnknown*)&window->location.IHTMLLocation_iface, &HTMLLocation_dispex,
+                  window->base.inner_window, COMPAT_MODE_QUIRKS);
 }

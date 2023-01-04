@@ -1357,7 +1357,7 @@ HRESULT HTMLCurrentStyle_Create(HTMLElement *elem, IHTMLCurrentStyle **p)
     ret->IHTMLCurrentStyle4_iface.lpVtbl = &HTMLCurrentStyle4Vtbl;
 
     init_css_style(&ret->css_style, nsstyle, HTMLCurrentStyle_QI, &HTMLCurrentStyle_dispex,
-                   dispex_compat_mode(&elem->node.event_target.dispex));
+                   get_inner_window(elem->node.doc), dispex_compat_mode(&elem->node.event_target.dispex));
     nsIDOMCSSStyleDeclaration_Release(nsstyle);
 
     IHTMLElement_AddRef(&elem->IHTMLElement_iface);

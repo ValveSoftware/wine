@@ -80,6 +80,7 @@ typedef struct DOMEvent {
     void *(*query_interface)(struct DOMEvent*,REFIID);
     void (*destroy)(struct DOMEvent*);
 
+    HTMLInnerWindow *window;
     nsIDOMEvent *nsevent;
 
     eventid_t event_id;
@@ -110,7 +111,7 @@ HRESULT fire_event(HTMLDOMNode*,const WCHAR*,VARIANT*,VARIANT_BOOL*) DECLSPEC_HI
 void update_doc_cp_events(HTMLDocumentNode*,cp_static_data_t*) DECLSPEC_HIDDEN;
 HRESULT doc_init_events(HTMLDocumentNode*) DECLSPEC_HIDDEN;
 void detach_events(HTMLDocumentNode *doc) DECLSPEC_HIDDEN;
-HRESULT create_event_obj(DOMEvent*,compat_mode_t,IHTMLEventObj**) DECLSPEC_HIDDEN;
+HRESULT create_event_obj(HTMLDocumentNode*,DOMEvent*,IHTMLEventObj**) DECLSPEC_HIDDEN;
 void bind_target_event(HTMLDocumentNode*,EventTarget*,const WCHAR*,IDispatch*) DECLSPEC_HIDDEN;
 HRESULT ensure_doc_nsevent_handler(HTMLDocumentNode*,nsIDOMNode*,eventid_t) DECLSPEC_HIDDEN;
 
@@ -118,7 +119,7 @@ void dispatch_event(EventTarget*,DOMEvent*) DECLSPEC_HIDDEN;
 
 HRESULT create_document_event(HTMLDocumentNode*,eventid_t,DOMEvent**) DECLSPEC_HIDDEN;
 HRESULT create_document_event_str(HTMLDocumentNode*,const WCHAR*,IDOMEvent**) DECLSPEC_HIDDEN;
-HRESULT create_event_from_nsevent(nsIDOMEvent*,compat_mode_t,DOMEvent**) DECLSPEC_HIDDEN;
+HRESULT create_event_from_nsevent(nsIDOMEvent*,HTMLInnerWindow*,compat_mode_t,DOMEvent**) DECLSPEC_HIDDEN;
 HRESULT create_message_event(HTMLDocumentNode*,IHTMLWindow2*,VARIANT*,DOMEvent**) DECLSPEC_HIDDEN;
 HRESULT create_storage_event(HTMLDocumentNode*,BSTR,BSTR,BSTR,const WCHAR*,BOOL,DOMEvent**) DECLSPEC_HIDDEN;
 

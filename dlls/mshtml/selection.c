@@ -355,7 +355,8 @@ HRESULT HTMLSelectionObject_Create(HTMLDocumentNode *doc, nsISelection *nsselect
     selection->nsselection = nsselection; /* We shouldn't call AddRef here */
 
     init_dispatch(&selection->dispex, (IUnknown*)&selection->IHTMLSelectionObject_iface,
-                  &HTMLSelectionObject_dispex, dispex_compat_mode(&doc->node.event_target.dispex));
+                  &HTMLSelectionObject_dispex, get_inner_window(doc),
+                  dispex_compat_mode(&doc->node.event_target.dispex));
 
     selection->doc = doc;
     list_add_head(&doc->selection_list, &selection->entry);
