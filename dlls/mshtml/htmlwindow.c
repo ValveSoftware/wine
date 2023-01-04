@@ -2225,6 +2225,77 @@ static HRESULT WINAPI HTMLWindow6_get_maxConnectionsPerServer(IHTMLWindow6 *ifac
     return E_NOTIMPL;
 }
 
+static HRESULT check_target_origin(HTMLInnerWindow *window, const WCHAR *target_origin)
+{
+    IUri *uri, *target;
+    DWORD port, port2;
+    BSTR bstr, bstr2;
+    HRESULT hres;
+
+    if(!target_origin)
+        return E_INVALIDARG;
+
+    if(!wcscmp(target_origin, L"*"))
+        return S_OK;
+
+    hres = create_uri(target_origin, Uri_CREATE_NOFRAG | Uri_CREATE_NO_DECODE_EXTRA_INFO, &target);
+    if(FAILED(hres))
+        return hres;
+
+    if(!(uri = window->base.outer_window->uri)) {
+        FIXME("window with no URI\n");
+        hres = S_FALSE;
+        goto done;
+    }
+
+    bstr = NULL;
+    hres = IUri_GetSchemeName(uri, &bstr);
+    if(hres != S_OK) {
+        SysFreeString(bstr);
+        goto done;
+    }
+    hres = IUri_GetSchemeName(target, &bstr2);
+    if(SUCCEEDED(hres)) {
+        if(hres == S_OK && wcsicmp(bstr, bstr2))
+            hres = S_FALSE;
+        SysFreeString(bstr2);
+    }
+    SysFreeString(bstr);
+    if(hres != S_OK)
+        goto done;
+
+    bstr = NULL;
+    hres = IUri_GetHost(uri, &bstr);
+    if(hres != S_OK) {
+        SysFreeString(bstr);
+        goto done;
+    }
+    hres = IUri_GetHost(target, &bstr2);
+    if(SUCCEEDED(hres)) {
+        if(hres == S_OK && wcsicmp(bstr, bstr2))
+            hres = S_FALSE;
+        SysFreeString(bstr2);
+    }
+    SysFreeString(bstr);
+    if(hres != S_OK)
+        goto done;
+
+    /* Legacy modes ignore port */
+    if(dispex_compat_mode(&window->event_target.dispex) < COMPAT_MODE_IE9)
+        goto done;
+
+    hres = IUri_GetPort(uri, &port);
+    if(hres != S_OK)
+        goto done;
+    hres = IUri_GetPort(target, &port2);
+    if(hres == S_OK && port != port2)
+        hres = S_FALSE;
+
+done:
+    IUri_Release(target);
+    return hres;
+}
+
 struct post_message_task {
     task_t header;
     HTMLInnerWindow *window;
@@ -2244,6 +2315,77 @@ static void post_message_destr(task_t *_task)
     IHTMLWindow2_Release(&task->window->base.IHTMLWindow2_iface);
 }
 
+static HRESULT post_message(HTMLInnerWindow *window, VARIANT msg, BSTR targetOrigin, VARIANT transfer,
+        IServiceProvider *caller, compat_mode_t compat_mode)
+{
+    DOMEvent *event;
+    HRESULT hres;
+
+    if(V_VT(&transfer) != VT_EMPTY && V_VT(&transfer) != VT_ERROR)
+        FIXME("transfer not implemented, ignoring\n");
+
+    hres = check_target_origin(window, targetOrigin);
+    if(hres != S_OK)
+        return SUCCEEDED(hres) ? S_OK : hres;
+
+    switch(V_VT(&msg)) {
+        case VT_EMPTY:
+        case VT_NULL:
+        case VT_VOID:
+        case VT_I1:
+        case VT_I2:
+        case VT_I4:
+        case VT_I8:
+        case VT_UI1:
+        case VT_UI2:
+        case VT_UI4:
+        case VT_UI8:
+        case VT_INT:
+        case VT_UINT:
+        case VT_R4:
+        case VT_R8:
+        case VT_BOOL:
+        case VT_BSTR:
+        case VT_CY:
+        case VT_DATE:
+        case VT_DECIMAL:
+        case VT_HRESULT:
+            break;
+        case VT_ERROR:
+            V_VT(&msg) = VT_EMPTY;
+            break;
+        default:
+            FIXME("Unsupported vt %d\n", V_VT(&msg));
+            return E_NOTIMPL;
+    }
+
+    if(!window->doc) {
+        FIXME("No document\n");
+        return E_FAIL;
+    }
+
+    hres = create_message_event(window->doc, &msg, &event);
+    if(FAILED(hres))
+        return hres;
+
+    if(compat_mode >= COMPAT_MODE_IE9) {
+        struct post_message_task *task;
+        if(!(task = malloc(sizeof(*task)))) {
+            IDOMEvent_Release(&event->IDOMEvent_iface);
+            return E_OUTOFMEMORY;
+        }
+
+        task->event = event;
+        task->window = window;
+        IHTMLWindow2_AddRef(&task->window->base.IHTMLWindow2_iface);
+        return push_task(&task->header, post_message_proc, post_message_destr, window->task_magic);
+    }
+
+    dispatch_event(&window->event_target, event);
+    IDOMEvent_Release(&event->IDOMEvent_iface);
+    return S_OK;
+}
+
 static HRESULT WINAPI HTMLWindow6_postMessage(IHTMLWindow6 *iface, BSTR msg, VARIANT targetOrigin)
 {
     HTMLWindow *This = impl_from_IHTMLWindow6(iface);
@@ -2257,7 +2399,8 @@ static HRESULT WINAPI HTMLWindow6_postMessage(IHTMLWindow6 *iface, BSTR msg, VAR
     V_VT(&var) = VT_BSTR;
     V_BSTR(&var) = msg;
     V_VT(&transfer) = VT_EMPTY;
-    return IWineHTMLWindowPrivate_postMessage(&This->IWineHTMLWindowPrivate_iface, var, V_BSTR(&targetOrigin), transfer);
+    return post_message(This->inner_window, var, V_BSTR(&targetOrigin), transfer, NULL,
+                        dispex_compat_mode(&This->inner_window->event_target.dispex));
 }
 
 static HRESULT WINAPI HTMLWindow6_toStaticHTML(IHTMLWindow6 *iface, BSTR bstrHTML, BSTR *pbstrStaticHTML)
@@ -3183,152 +3326,6 @@ static HRESULT WINAPI window_private_matchMedia(IWineHTMLWindowPrivate *iface, B
     return create_media_query_list(This, media_query, media_query_list);
 }
 
-static HRESULT check_target_origin(HTMLInnerWindow *window, const WCHAR *target_origin)
-{
-    IUri *uri, *target;
-    DWORD port, port2;
-    BSTR bstr, bstr2;
-    HRESULT hres;
-
-    if(!target_origin)
-        return E_INVALIDARG;
-
-    if(!wcscmp(target_origin, L"*"))
-        return S_OK;
-
-    hres = create_uri(target_origin, Uri_CREATE_NOFRAG | Uri_CREATE_NO_DECODE_EXTRA_INFO, &target);
-    if(FAILED(hres))
-        return hres;
-
-    if(!(uri = window->base.outer_window->uri)) {
-        FIXME("window with no URI\n");
-        hres = S_FALSE;
-        goto done;
-    }
-
-    bstr = NULL;
-    hres = IUri_GetSchemeName(uri, &bstr);
-    if(hres != S_OK) {
-        SysFreeString(bstr);
-        goto done;
-    }
-    hres = IUri_GetSchemeName(target, &bstr2);
-    if(SUCCEEDED(hres)) {
-        if(hres == S_OK && wcsicmp(bstr, bstr2))
-            hres = S_FALSE;
-        SysFreeString(bstr2);
-    }
-    SysFreeString(bstr);
-    if(hres != S_OK)
-        goto done;
-
-    bstr = NULL;
-    hres = IUri_GetHost(uri, &bstr);
-    if(hres != S_OK) {
-        SysFreeString(bstr);
-        goto done;
-    }
-    hres = IUri_GetHost(target, &bstr2);
-    if(SUCCEEDED(hres)) {
-        if(hres == S_OK && wcsicmp(bstr, bstr2))
-            hres = S_FALSE;
-        SysFreeString(bstr2);
-    }
-    SysFreeString(bstr);
-    if(hres != S_OK)
-        goto done;
-
-    /* Legacy modes ignore port */
-    if(dispex_compat_mode(&window->event_target.dispex) < COMPAT_MODE_IE9)
-        goto done;
-
-    hres = IUri_GetPort(uri, &port);
-    if(hres != S_OK)
-        goto done;
-    hres = IUri_GetPort(target, &port2);
-    if(hres == S_OK && port != port2)
-        hres = S_FALSE;
-
-done:
-    IUri_Release(target);
-    return hres;
-}
-
-static HRESULT WINAPI window_private_postMessage(IWineHTMLWindowPrivate *iface, VARIANT msg, BSTR targetOrigin, VARIANT transfer)
-{
-    HTMLWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface);
-    HTMLInnerWindow *window = This->inner_window;
-    DOMEvent *event;
-    HRESULT hres;
-
-    TRACE("iface %p, msg %s, targetOrigin %s, transfer %s\n", iface, debugstr_variant(&msg),
-          debugstr_w(targetOrigin), debugstr_variant(&transfer));
-
-    if(V_VT(&transfer) != VT_EMPTY && V_VT(&transfer) != VT_ERROR)
-        FIXME("transfer not implemented, ignoring\n");
-
-    hres = check_target_origin(window, targetOrigin);
-    if(hres != S_OK)
-        return SUCCEEDED(hres) ? S_OK : hres;
-
-    switch(V_VT(&msg)) {
-        case VT_EMPTY:
-        case VT_NULL:
-        case VT_VOID:
-        case VT_I1:
-        case VT_I2:
-        case VT_I4:
-        case VT_I8:
-        case VT_UI1:
-        case VT_UI2:
-        case VT_UI4:
-        case VT_UI8:
-        case VT_INT:
-        case VT_UINT:
-        case VT_R4:
-        case VT_R8:
-        case VT_BOOL:
-        case VT_BSTR:
-        case VT_CY:
-        case VT_DATE:
-        case VT_DECIMAL:
-        case VT_HRESULT:
-            break;
-        case VT_ERROR:
-            V_VT(&msg) = VT_EMPTY;
-            break;
-        default:
-            FIXME("Unsupported vt %d\n", V_VT(&msg));
-            return E_NOTIMPL;
-    }
-
-    if(!window->doc) {
-        FIXME("No document\n");
-        return E_FAIL;
-    }
-
-    hres = create_message_event(window->doc, &msg, &event);
-    if(FAILED(hres))
-        return hres;
-
-    if(dispex_compat_mode(&window->event_target.dispex) >= COMPAT_MODE_IE9) {
-        struct post_message_task *task;
-        if(!(task = malloc(sizeof(*task)))) {
-            IDOMEvent_Release(&event->IDOMEvent_iface);
-            return E_OUTOFMEMORY;
-        }
-
-        task->event = event;
-        task->window = window;
-        IHTMLWindow2_AddRef(&task->window->base.IHTMLWindow2_iface);
-        return push_task(&task->header, post_message_proc, post_message_destr, window->task_magic);
-    }
-
-    dispatch_event(&window->event_target, event);
-    IDOMEvent_Release(&event->IDOMEvent_iface);
-    return S_OK;
-}
-
 static HRESULT WINAPI window_private_get_console(IWineHTMLWindowPrivate *iface, IDispatch **console)
 {
     HTMLWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface);
@@ -3356,7 +3353,6 @@ static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_cancelAnimationFrame,
     window_private_get_console,
     window_private_matchMedia,
-    window_private_postMessage,
 };
 
 static inline HTMLWindow *impl_from_IWineHTMLWindowCompatPrivateVtbl(IWineHTMLWindowCompatPrivate *iface)
@@ -4057,6 +4053,57 @@ static HRESULT IHTMLWindow3_setTimeout_hook(DispatchEx *dispex, WORD flags, DISP
     return dispex_call_builtin(dispex, DISPID_IHTMLWINDOW3_SETTIMEOUT, &new_dp, res, ei, caller);
 }
 
+static HRESULT IHTMLWindow6_postMessage_hook(DispatchEx *dispex, WORD flags, DISPPARAMS *dp, VARIANT *res,
+        EXCEPINFO *ei, IServiceProvider *caller)
+{
+    HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
+    BSTR targetOrigin, converted_msg = NULL;
+    VARIANT msg, transfer, converted;
+    compat_mode_t compat_mode;
+    HRESULT hres;
+
+    if(!(flags & DISPATCH_METHOD) || dp->cArgs < 2 || dp->cNamedArgs)
+        return S_FALSE;
+    compat_mode = dispex_compat_mode(&This->event_target.dispex);
+
+    msg = dp->rgvarg[dp->cArgs - 1];
+    V_VT(&transfer) = VT_EMPTY;
+    if(compat_mode >= COMPAT_MODE_IE10 && dp->cArgs > 2)
+        transfer = dp->rgvarg[dp->cArgs - 3];
+
+    TRACE("(%p)->(msg %s, targetOrigin %s, transfer %s)\n", This, debugstr_variant(&msg),
+          debugstr_variant(&dp->rgvarg[dp->cArgs - 2]), debugstr_variant(&transfer));
+
+    if(compat_mode < COMPAT_MODE_IE10 && V_VT(&msg) != VT_BSTR) {
+        hres = change_type(&msg, &dp->rgvarg[dp->cArgs - 1], VT_BSTR, caller);
+        if(FAILED(hres))
+            return hres;
+        converted_msg = V_BSTR(&msg);
+    }
+
+    if(V_VT(&dp->rgvarg[dp->cArgs - 2]) == VT_BSTR) {
+        targetOrigin = V_BSTR(&dp->rgvarg[dp->cArgs - 2]);
+        V_BSTR(&converted) = NULL;
+    }else {
+        if(compat_mode < COMPAT_MODE_IE10) {
+            SysFreeString(converted_msg);
+            return E_INVALIDARG;
+        }
+        hres = change_type(&converted, &dp->rgvarg[dp->cArgs - 2], VT_BSTR, caller);
+        if(FAILED(hres)) {
+            SysFreeString(converted_msg);
+            return hres;
+        }
+        targetOrigin = V_BSTR(&converted);
+    }
+
+    hres = post_message(This, msg, targetOrigin, transfer, caller, compat_mode);
+
+    SysFreeString(V_BSTR(&converted));
+    SysFreeString(converted_msg);
+    return hres;
+}
+
 static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
 {
     static const dispex_hook_t window2_hooks[] = {
@@ -4082,6 +4129,10 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         {DISPID_IHTMLWINDOW4_CREATEPOPUP, NULL},
         {DISPID_UNKNOWN}
     };
+    static const dispex_hook_t window6_hooks[] = {
+        {DISPID_IHTMLWINDOW6_POSTMESSAGE, IHTMLWindow6_postMessage_hook},
+        {DISPID_UNKNOWN}
+    };
 
     if(compat_mode >= COMPAT_MODE_IE9)
         dispex_info_add_interface(info, IHTMLWindow7_tid, NULL);
@@ -4090,6 +4141,7 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
     if(compat_mode >= COMPAT_MODE_IE10)
         dispex_info_add_interface(info, IWineHTMLWindowPrivate_tid, NULL);
 
+    dispex_info_add_interface(info, IHTMLWindow6_tid, window6_hooks);
     dispex_info_add_interface(info, IHTMLWindow5_tid, NULL);
     dispex_info_add_interface(info, IHTMLWindow4_tid, compat_mode >= COMPAT_MODE_IE11 ? window4_ie11_hooks : NULL);
     dispex_info_add_interface(info, IHTMLWindow3_tid, compat_mode >= COMPAT_MODE_IE11 ? window3_ie11_hooks : window3_hooks);
@@ -4124,10 +4176,7 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
     HTMLWindow_set_current_event
 };
 
-static const tid_t HTMLWindow_iface_tids[] = {
-    IHTMLWindow6_tid,
-    0
-};
+static const tid_t HTMLWindow_iface_tids[] = { 0 };
 
 static dispex_static_data_t HTMLWindow_dispex = {
     L"Window",
