@@ -1844,10 +1844,17 @@ static HRESULT WINAPI HTMLXDomainRequest_get_onload(IHTMLXDomainRequest *iface, 
 static HRESULT WINAPI HTMLXDomainRequest_abort(IHTMLXDomainRequest *iface)
 {
     HTMLXDomainRequest *This = impl_from_IHTMLXDomainRequest(iface);
+    nsresult nsres;
 
-    FIXME("(%p)->()\n", This);
+    TRACE("(%p)->()\n", This);
 
-    return E_NOTIMPL;
+    nsres = nsIXMLHttpRequest_SlowAbort(This->nsxhr);
+    if(NS_FAILED(nsres)) {
+        ERR("nsIXMLHttpRequest_SlowAbort failed: %08lx\n", nsres);
+        return map_nsresult(nsres);
+    }
+
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLXDomainRequest_open(IHTMLXDomainRequest *iface, BSTR bstrMethod, BSTR bstrUrl)
