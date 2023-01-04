@@ -1114,7 +1114,6 @@ sync_test("builtin_prototypes", function() {
                     todo_wine_if(ctors[i][0] == "Image" || ctors[i][0] == "Option" || ctors[i][0] == "XMLHttpRequest").
                     ok(!(ctors[i][0] in window.Window.prototype), ctors[i][0] + " in Window.prototype");
                 r = "" + a;
-                todo_wine_if(ctors[i][0] == "Image" || ctors[i][0] == "Option" || ctors[i][0] == "XMLHttpRequest").
                 ok(r === "[object " + ctors[i][ctors[i].length < 3 ? 0 : 2] + "]", ctors[i][0] + " returned " + r);
                 r = "" + a.prototype;
                 ok(r === "[Interface prototype object]", ctors[i][0] + ".prototype returned " + r);

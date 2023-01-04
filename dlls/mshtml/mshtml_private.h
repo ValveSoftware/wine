@@ -502,6 +502,10 @@ COMMON_PROTOTYPE_LIST
     LEGACY_CTOR_ID_Image,
     LEGACY_CTOR_ID_Option,
 
+    LEGACY_CTOR_ID_Image_builtin,
+    LEGACY_CTOR_ID_Option_builtin,
+    LEGACY_CTOR_ID_HTMLXMLHttpRequest_builtin,
+
     LEGACY_CTOR_COUNT
 } legacy_ctor_id_t;
 
@@ -1670,6 +1674,9 @@ extern const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl DECLSP
 extern dispex_static_data_t HTMLImageElementFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLOptionElementFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLImageCtor_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLOptionCtor_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLXMLHttpRequestCtor_dispex DECLSPEC_HIDDEN;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex DECLSPEC_HIDDEN;
 LEGACY_PROTOTYPE_LIST

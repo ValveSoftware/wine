@@ -1023,12 +1023,6 @@ static HRESULT HTMLImageElementFactory_value(DispatchEx *dispex, LCID lcid,
     return S_OK;
 }
 
-static void HTMLImageElementFactory_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
-{
-    if(compat_mode < COMPAT_MODE_IE9)
-        dispex_info_add_interface(info, IHTMLImageElementFactory_tid, NULL);
-}
-
 static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
     HTMLImageElementFactory_value,
     legacy_ctor_get_dispid,
@@ -1037,11 +1031,47 @@ static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
     legacy_ctor_delete
 };
 
+static const tid_t HTMLImageElementFactory_iface_tids[] = {
+    IHTMLImageElementFactory_tid,
+    0
+};
+
 dispex_static_data_t HTMLImageElementFactory_dispex = {
-    L"Function",
+    L"HTMLImageElement",
     &HTMLImageElementFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLImageElementFactory_tid,
+    HTMLImageElementFactory_iface_tids
+};
+
+static HRESULT HTMLImageCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    if(flags == DISPATCH_CONSTRUCT)
+        return HTMLImageElementFactory_value(iface, lcid, flags, params, res, ei, caller);
+
+    return legacy_ctor_value(iface, lcid, flags, params, res, ei, caller);
+}
+
+static void HTMLImageCtor_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
+{
+    if(compat_mode < COMPAT_MODE_IE9)
+        dispex_info_add_interface(info, IHTMLImageElementFactory_tid, NULL);
+}
+
+static const dispex_static_data_vtbl_t HTMLImageCtor_dispex_vtbl = {
+    HTMLImageCtor_value,
+    legacy_ctor_get_dispid,
+    legacy_ctor_get_name,
+    legacy_ctor_invoke,
+    legacy_ctor_delete
+};
+
+dispex_static_data_t HTMLImageCtor_dispex = {
+    L"HTMLImageElement",
+    &HTMLImageCtor_dispex_vtbl,
+    PROTO_ID_NULL,
+    IHTMLImageElementFactory_tid,
     no_iface_tids,
-    HTMLImageElementFactory_init_dispex_info
+    HTMLImageCtor_init_dispex_info
 };

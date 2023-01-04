@@ -1552,8 +1552,33 @@ static const tid_t HTMLXMLHttpRequestFactory_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLXMLHttpRequestFactory_dispex = {
-    L"Function",
+    L"XMLHttpRequest",
     &HTMLXMLHttpRequestFactory_dispex_vtbl,
+    PROTO_ID_NULL,
+    IHTMLXMLHttpRequestFactory_tid,
+    HTMLXMLHttpRequestFactory_iface_tids
+};
+
+static HRESULT HTMLXMLHttpRequestCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    if(flags == DISPATCH_CONSTRUCT)
+        return HTMLXMLHttpRequestFactory_value(iface, lcid, flags, params, res, ei, caller);
+
+    return legacy_ctor_value(iface, lcid, flags, params, res, ei, caller);
+}
+
+static const dispex_static_data_vtbl_t HTMLXMLHttpRequestCtor_dispex_vtbl = {
+    HTMLXMLHttpRequestCtor_value,
+    legacy_ctor_get_dispid,
+    legacy_ctor_get_name,
+    legacy_ctor_invoke,
+    legacy_ctor_delete
+};
+
+dispex_static_data_t HTMLXMLHttpRequestCtor_dispex = {
+    L"XMLHttpRequest",
+    &HTMLXMLHttpRequestCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLXMLHttpRequestFactory_tid,
     HTMLXMLHttpRequestFactory_iface_tids

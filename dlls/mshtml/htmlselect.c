@@ -631,12 +631,6 @@ static HRESULT HTMLOptionElementFactory_value(DispatchEx *dispex, LCID lcid,
     return S_OK;
 }
 
-static void HTMLOptionElementFactory_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
-{
-    if(compat_mode < COMPAT_MODE_IE9)
-        dispex_info_add_interface(info, IHTMLOptionElementFactory_tid, NULL);
-}
-
 static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
     HTMLOptionElementFactory_value,
     legacy_ctor_get_dispid,
@@ -645,13 +639,49 @@ static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
     legacy_ctor_delete
 };
 
+static const tid_t HTMLOptionElementFactory_iface_tids[] = {
+    IHTMLOptionElementFactory_tid,
+    0
+};
+
 dispex_static_data_t HTMLOptionElementFactory_dispex = {
-    L"Function",
+    L"HTMLOptionElement",
     &HTMLOptionElementFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLOptionElementFactory_tid,
+    HTMLOptionElementFactory_iface_tids
+};
+
+static HRESULT HTMLOptionCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    if(flags == DISPATCH_CONSTRUCT)
+        return HTMLOptionElementFactory_value(iface, lcid, flags, params, res, ei, caller);
+
+    return legacy_ctor_value(iface, lcid, flags, params, res, ei, caller);
+}
+
+static void HTMLOptionCtor_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
+{
+    if(compat_mode < COMPAT_MODE_IE9)
+        dispex_info_add_interface(info, IHTMLOptionElementFactory_tid, NULL);
+}
+
+static const dispex_static_data_vtbl_t HTMLOptionCtor_dispex_vtbl = {
+    HTMLOptionCtor_value,
+    legacy_ctor_get_dispid,
+    legacy_ctor_get_name,
+    legacy_ctor_invoke,
+    legacy_ctor_delete
+};
+
+dispex_static_data_t HTMLOptionCtor_dispex = {
+    L"HTMLOptionElement",
+    &HTMLOptionCtor_dispex_vtbl,
+    PROTO_ID_NULL,
+    IHTMLOptionElementFactory_tid,
     no_iface_tids,
-    HTMLOptionElementFactory_init_dispex_info
+    HTMLOptionCtor_init_dispex_info
 };
 
 struct HTMLSelectElement {
