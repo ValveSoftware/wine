@@ -1191,12 +1191,15 @@ sync_test("builtin_prototypes", function() {
             [ "MessageEvent",                   "Event" ],
             [ "MimeTypeArray",                  "Object" ],
             [ "MouseEvent",                     "UIEvent" ],
+            [ "MSCSSProperties",                "CSSStyleDeclaration" ],
             [ "MSCSSRuleList",                  "Object" ],
+            [ "MSCurrentStyleCSSProperties",    "MSCSSProperties" ],
             [ "MSEventObj",                     "Object" ],
             [ "MSMimeTypesCollection",          "Object" ],
             [ "MSNamespaceInfoCollection",      "Object" ],
             [ "MSPluginsCollection",            "Object" ],
             [ "MSSelection",                    "Object" ],
+            [ "MSStyleCSSProperties",           "MSCSSProperties" ],
             [ "NamedNodeMap",                   "Object" ],
             [ "Navigator",                      "Object" ],
             [ "Node",                           "Object" ],
@@ -1227,6 +1230,11 @@ sync_test("builtin_prototypes", function() {
             ok(a === b, "getPrototypeOf(" + protos[i][0] + ".prototype) = " + a);
         }
 
+        var CSS_props = [ "accelerator","backgroundPositionX","backgroundPositionY","getAttribute","imeMode","layoutFlow","layoutGrid","layoutGridChar",
+                          "layoutGridLine","layoutGridMode","layoutGridType","lineBreak","msBlockProgression","msInterpolationMode","removeAttribute",
+                          "scrollbar3dLightColor","scrollbarArrowColor","scrollbarBaseColor","scrollbarDarkShadowColor","scrollbarFaceColor",
+                          "scrollbarHighlightColor","scrollbarShadowColor","scrollbarTrackColor","setAttribute","styleFloat","textAutospace",
+                          "textJustifyTrim","textKashida","textKashidaSpace","writingMode","zoom" ];
         var Elem_props = [ "clientHeight","clientLeft","clientTop","clientWidth","firstElementChild","getAttribute","getAttributeNode","getAttributeNodeNS",
                            "getAttributeNS","getBoundingClientRect","getClientRects","getElementsByTagName","getElementsByTagNameNS","hasAttribute",
                            "hasAttributeNS","lastElementChild","msMatchesSelector","nextElementSibling","previousElementSibling","querySelector",
@@ -1268,6 +1276,9 @@ sync_test("builtin_prototypes", function() {
             [ "KeyboardEvent", ["altKey","ctrlKey","getModifierState","initKeyboardEvent","key","metaKey"], ["detail","initUIEvent","view"] ],
             [ "MessageEvent", ["data","initMessageEvent","origin","source"], Event_props ],
             [ "MouseEvent", ["button","clientX","initMouseEvent","offsetY","pageX","shiftKey","x","y"], ["detail","initUIEvent","view"] ],
+            [ "MSCSSProperties", CSS_props, ["background","border","clip","fontWeight","listStyle","quotes","setProperty","zIndex"] ],
+            [ "MSCurrentStyleCSSProperties", ["blockDirection","clipBottom","clipLeft","clipRight","clipTop","hasLayout"], CSS_props ],
+            [ "MSStyleCSSProperties", ["pixelTop","pixelWidth","posHeight","posLeft","textDecorationBlink","textDecorationNone"], CSS_props ],
             [ "ProgressEvent", ["initProgressEvent","lengthComputable","loaded","total"], Event_props ],
             [ "StorageEvent", ["initStorageEvent","key","newValue","oldValue","storageArea"], Event_props ],
             [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ],
@@ -1545,10 +1556,21 @@ sync_test("style_props", function() {
     test_exposed("float", true);
     test_exposed("css-float", false);
     test_exposed("style-float", false);
+    test_exposed("styleFloat", true);
     test_exposed("setProperty", v >= 9);
     test_exposed("removeProperty", v >= 9);
     test_exposed("background-clip", v >= 9);
     test_exposed("transform", v >= 10);
+    test_exposed("zoom", true);
+
+    try {
+        style.styleFloat = "left";
+        ok(false, "expected exception setting styleFloat");
+    }catch(ex) {}
+    try {
+        style.zoom = "1.0";
+        ok(false, "expected exception setting zoom");
+    }catch(ex) {}
 
     if(window.getComputedStyle) {
         style = window.getComputedStyle(document.body);
