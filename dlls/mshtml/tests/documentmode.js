@@ -1178,6 +1178,7 @@ sync_test("builtin_prototypes", function() {
             [ "ProgressEvent",                  "Event" ],
             [ "Screen",                         "Object" ],
             [ "Storage",                        "Object" ],
+            [ "StorageEvent",                   "Event" ],
             [ "StyleSheetList",                 "Object" ],
             [ "Text",                           "CharacterData" ],
             [ "TextRange",                      "Object" ],
@@ -1210,6 +1211,7 @@ sync_test("builtin_prototypes", function() {
             [ "MessageEvent", ["data","initMessageEvent","origin","source"], Event_props ],
             [ "MouseEvent", ["button","clientX","initMouseEvent","offsetY","pageX","shiftKey","x","y"], ["detail","initUIEvent","view"] ],
             [ "ProgressEvent", ["initProgressEvent","lengthComputable","loaded","total"], Event_props ],
+            [ "StorageEvent", ["initStorageEvent","key","newValue","oldValue","storageArea"], Event_props ],
             [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ],
             [ "UIEvent", ["detail","initUIEvent","view"], Event_props ]
         ];
