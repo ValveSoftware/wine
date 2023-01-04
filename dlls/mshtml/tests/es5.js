@@ -3058,6 +3058,11 @@ sync_test("Crypto", function() {
     ok("subtle" in crypto, "subtle not in crypto");
     ok("getRandomValues" in crypto, "getRandomValues not in crypto");
     ok(!("randomUUID" in crypto), "randomUUID is in crypto");
+
+    var list = [ "decrypt", "deriveKey", "digest", "encrypt", "exportKey", "generateKey", "importKey", "sign", "unwrapKey", "verify", "wrapKey" ];
+    for(var i = 0; i < list.length; i++)
+        ok(list[i] in crypto.subtle, list[i] + " not in crypto.subtle");
+    ok(!("deriveBits" in crypto.subtle), "deriveBits is in crypto.subtle");
 });
 
 sync_test("DOMParser", function() {
