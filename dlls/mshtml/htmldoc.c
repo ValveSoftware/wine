@@ -369,6 +369,7 @@ static event_target_vtbl_t DocumentType_event_target_vtbl = {
     {
         NULL,
     },
+    NULL,
     DocumentType_get_gecko_target,
     NULL,
     NULL,
@@ -6130,6 +6131,7 @@ static const event_target_vtbl_t HTMLDocumentNode_event_target_vtbl = {
         HTMLDocumentNode_get_compat_mode,
         NULL
     },
+    NULL,
     HTMLDocumentNode_get_gecko_target,
     HTMLDocumentNode_bind_event,
     NULL,

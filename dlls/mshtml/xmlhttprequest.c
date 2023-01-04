@@ -1358,6 +1358,7 @@ static event_target_vtbl_t HTMLXMLHttpRequest_event_target_vtbl = {
     {
         NULL,
     },
+    NULL,
     HTMLXMLHttpRequest_get_gecko_target,
     HTMLXMLHttpRequest_bind_event
 };

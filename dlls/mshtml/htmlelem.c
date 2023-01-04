@@ -7240,6 +7240,7 @@ static event_target_vtbl_t HTMLElement_event_target_vtbl = {
         NULL,
         HTMLElement_populate_props
     },
+    NULL,
     HTMLElement_get_gecko_target,
     HTMLElement_bind_event,
     HTMLElement_event_target_dispatch_nsevent_hook,
