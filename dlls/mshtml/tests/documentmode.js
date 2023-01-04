@@ -1178,6 +1178,8 @@ sync_test("builtin_prototypes", function() {
             [ "HTMLScriptElement",              "HTMLElement" ],
             [ "HTMLSelectElement",              "HTMLElement" ],
             [ "HTMLStyleElement",               "HTMLElement" ],
+            [ "HTMLTableCellElement",           "HTMLElement" ],
+            [ "HTMLTableDataCellElement",       "HTMLTableCellElement" ],
             [ "HTMLTableElement",               "HTMLElement" ],
             [ "HTMLTableRowElement",            "HTMLElement" ],
             [ "HTMLTextAreaElement",            "HTMLElement" ],
@@ -1250,6 +1252,8 @@ sync_test("builtin_prototypes", function() {
                            "hasChildNodes","insertBefore","isDefaultNamespace","isEqualNode","isSameNode","isSupported","lastChild","localName",
                            "lookupNamespaceURI","lookupPrefix","namespaceURI","nextSibling","nodeName","nodeType","nodeValue","ownerDocument",
                            "parentNode","prefix","previousSibling","removeChild","removeEventListener","replaceChild","textContent" ];
+        var TableCell_props = [ "align","background","bgColor","borderColor","borderColorDark","borderColorLight","cellIndex","colSpan","height","noWrap",
+                                "rowSpan","vAlign","width" ];
 
         protos = [
             [ "CharacterData", ["data","length","appendData"], Node_props ],
@@ -1258,6 +1262,8 @@ sync_test("builtin_prototypes", function() {
             [ "DocumentType", ["entities","internalSubset","name","notations","publicId","systemId"], Node_props ],
             [ "Element", Elem_props, Node_props ],
             [ "HTMLElement", HtmlElem_props, Elem_props ],
+            [ "HTMLTableCellElement", TableCell_props, HtmlElem_props ],
+            [ "HTMLTableDataCellElement", [], TableCell_props ],
             [ "HTMLUnknownElement", ["recordset","namedRecordset"], HtmlElem_props ],
             [ "KeyboardEvent", ["altKey","ctrlKey","getModifierState","initKeyboardEvent","key","metaKey"], ["detail","initUIEvent","view"] ],
             [ "MessageEvent", ["data","initMessageEvent","origin","source"], Event_props ],
