@@ -3050,7 +3050,7 @@ sync_test("matchMedia", function() {
 });
 
 sync_test("Crypto", function() {
-    var crypto = window.msCrypto, r;
+    var crypto = window.msCrypto, arr, r;
     ok(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(window), "msCrypto"), "msCrypto not a property of window's prototype.");
     r = Object.getPrototypeOf(crypto);
     ok(r === window.Crypto.prototype, "getPrototypeOf(crypto) = " + r);
@@ -3063,6 +3063,81 @@ sync_test("Crypto", function() {
     for(var i = 0; i < list.length; i++)
         ok(list[i] in crypto.subtle, list[i] + " not in crypto.subtle");
     ok(!("deriveBits" in crypto.subtle), "deriveBits is in crypto.subtle");
+
+    list = [
+        [ "Int8Array",    65536 ],
+        [ "Uint8Array",   65536 ],
+        [ "Int16Array",   32768 ],
+        [ "Uint16Array",  32768 ],
+        [ "Int32Array",   16384 ],
+        [ "Uint32Array",  16384 ]
+    ];
+    for(var i = 0; i < list.length; i++) {
+        var arrType = list[i][0];
+        arr = eval(arrType + "(" + list[i][1] + ")");
+
+        ok(arr[0] === 0, arrType + "[0] = " + arr[0]);
+        ok(arr[1] === 0, arrType + "[1] = " + arr[1]);
+        r = crypto.getRandomValues(arr);
+        ok(r === arr, "getRandomValues returned " + r);
+
+        arr = eval(arrType + "(" + (list[i][1]+1) + ")");
+        try {
+            crypto.getRandomValues(arr);
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            todo_wine.
+            ok(ex.name === "QuotaExceededError", "getRandomValues(oversized " + arrType + ") threw " + ex.name);
+            todo_wine.
+            ok(n === 0, "getRandomValues(oversized " + arrType + ") threw code " + n);
+            todo_wine.
+            ok(ex.message === "QuotaExceededError", "getRandomValues(oversized " + arrType + ") threw message " + ex.message);
+        }
+    }
+
+    try {
+        crypto.getRandomValues(null);
+        ok(false, "getRandomValues(null) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === E_INVALIDARG, "getRandomValues(null) threw " + n);
+    }
+    try {
+        crypto.getRandomValues(external.nullDisp);
+        ok(false, "getRandomValues(nullDisp) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === E_INVALIDARG, "getRandomValues(nullDisp) threw " + n);
+    }
+    try {
+        crypto.getRandomValues([1,2,3]);
+        ok(false, "getRandomValues([1,2,3]) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === E_INVALIDARG, "getRandomValues([1,2,3]) threw " + n);
+    }
+    arr = Float32Array(2);
+    try {
+        crypto.getRandomValues(arr);
+        ok(false, "getRandomValues(Float32Array) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        todo_wine.
+        ok(ex.name === "TypeMismatchError", "getRandomValues(Float32Array) threw " + ex.name);
+        todo_wine.
+        ok(n === 0, "getRandomValues(Float32Array) threw code " + n);
+    }
+    arr = Float64Array(2);
+    try {
+        crypto.getRandomValues(arr);
+        ok(false, "getRandomValues(Float64Array) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        todo_wine.
+        ok(ex.name === "TypeMismatchError", "getRandomValues(Float64Array) threw " + ex.name);
+        todo_wine.
+        ok(n === 0, "getRandomValues(Float64Array) threw code " + n);
+    }
 });
 
 sync_test("DOMParser", function() {
