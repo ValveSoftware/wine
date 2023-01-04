@@ -447,15 +447,15 @@ HRESULT HTMLOptionElement_Create(HTMLDocumentNode *doc, nsIDOMElement *nselem, H
     return S_OK;
 }
 
-static inline HTMLOptionElementFactory *impl_from_IHTMLOptionElementFactory(IHTMLOptionElementFactory *iface)
+static inline struct legacy_ctor *impl_from_IHTMLOptionElementFactory(IHTMLOptionElementFactory *iface)
 {
-    return CONTAINING_RECORD(iface, HTMLOptionElementFactory, IHTMLOptionElementFactory_iface);
+    return CONTAINING_RECORD(iface, struct legacy_ctor, IHTMLOptionElementFactory_iface);
 }
 
 static HRESULT WINAPI HTMLOptionElementFactory_QueryInterface(IHTMLOptionElementFactory *iface,
                                                               REFIID riid, void **ppv)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
 
     TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
 
@@ -479,7 +479,7 @@ static HRESULT WINAPI HTMLOptionElementFactory_QueryInterface(IHTMLOptionElement
 
 static ULONG WINAPI HTMLOptionElementFactory_AddRef(IHTMLOptionElementFactory *iface)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
     LONG ref = InterlockedIncrement(&This->ref);
 
     TRACE("(%p) ref=%ld\n", This, ref);
@@ -489,7 +489,7 @@ static ULONG WINAPI HTMLOptionElementFactory_AddRef(IHTMLOptionElementFactory *i
 
 static ULONG WINAPI HTMLOptionElementFactory_Release(IHTMLOptionElementFactory *iface)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
     LONG ref = InterlockedDecrement(&This->ref);
 
     TRACE("(%p) ref=%ld\n", This, ref);
@@ -504,14 +504,14 @@ static ULONG WINAPI HTMLOptionElementFactory_Release(IHTMLOptionElementFactory *
 
 static HRESULT WINAPI HTMLOptionElementFactory_GetTypeInfoCount(IHTMLOptionElementFactory *iface, UINT *pctinfo)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
     return IDispatchEx_GetTypeInfoCount(&This->dispex.IDispatchEx_iface, pctinfo);
 }
 
 static HRESULT WINAPI HTMLOptionElementFactory_GetTypeInfo(IHTMLOptionElementFactory *iface, UINT iTInfo,
                                               LCID lcid, ITypeInfo **ppTInfo)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
     return IDispatchEx_GetTypeInfo(&This->dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
 }
 
@@ -519,7 +519,7 @@ static HRESULT WINAPI HTMLOptionElementFactory_GetIDsOfNames(IHTMLOptionElementF
                                                 LPOLESTR *rgszNames, UINT cNames,
                                                 LCID lcid, DISPID *rgDispId)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
     return IDispatchEx_GetIDsOfNames(&This->dispex.IDispatchEx_iface, riid, rgszNames, cNames, lcid, rgDispId);
 }
 
@@ -527,7 +527,7 @@ static HRESULT WINAPI HTMLOptionElementFactory_Invoke(IHTMLOptionElementFactory 
                             REFIID riid, LCID lcid, WORD wFlags, DISPPARAMS *pDispParams,
                             VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
     return IDispatchEx_Invoke(&This->dispex.IDispatchEx_iface, dispIdMember, riid, lcid, wFlags, pDispParams,
             pVarResult, pExcepInfo, puArgErr);
 }
@@ -536,7 +536,7 @@ static HRESULT WINAPI HTMLOptionElementFactory_create(IHTMLOptionElementFactory 
         VARIANT text, VARIANT value, VARIANT defaultselected, VARIANT selected,
         IHTMLOptionElement **optelem)
 {
-    HTMLOptionElementFactory *This = impl_from_IHTMLOptionElementFactory(iface);
+    struct legacy_ctor *This = impl_from_IHTMLOptionElementFactory(iface);
     nsIDOMElement *nselem;
     HTMLDOMNode *node;
     HRESULT hres;
@@ -582,7 +582,7 @@ static HRESULT WINAPI HTMLOptionElementFactory_create(IHTMLOptionElementFactory 
     return S_OK;
 }
 
-static const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl = {
+const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl = {
     HTMLOptionElementFactory_QueryInterface,
     HTMLOptionElementFactory_AddRef,
     HTMLOptionElementFactory_Release,
@@ -593,16 +593,16 @@ static const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl = {
     HTMLOptionElementFactory_create
 };
 
-static inline HTMLOptionElementFactory *HTMLOptionElementFactory_from_DispatchEx(DispatchEx *iface)
+static inline struct legacy_ctor *HTMLOptionElementFactory_from_DispatchEx(DispatchEx *iface)
 {
-    return CONTAINING_RECORD(iface, HTMLOptionElementFactory, dispex);
+    return CONTAINING_RECORD(iface, struct legacy_ctor, dispex);
 }
 
 static HRESULT HTMLOptionElementFactory_value(DispatchEx *dispex, LCID lcid,
         WORD flags, DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei,
         IServiceProvider *caller)
 {
-    HTMLOptionElementFactory *This = HTMLOptionElementFactory_from_DispatchEx(dispex);
+    struct legacy_ctor *This = HTMLOptionElementFactory_from_DispatchEx(dispex);
     unsigned int i, argc = params->cArgs - params->cNamedArgs;
     IHTMLOptionElement *opt;
     VARIANT empty, *arg[4];
@@ -642,32 +642,13 @@ static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
     NULL
 };
 
-static dispex_static_data_t HTMLOptionElementFactory_dispex = {
+dispex_static_data_t HTMLOptionElementFactory_dispex = {
     L"Function",
     &HTMLOptionElementFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLOptionElementFactory_tid,
     HTMLOptionElementFactory_iface_tids,
 };
-
-HRESULT HTMLOptionElementFactory_Create(HTMLInnerWindow *window, HTMLOptionElementFactory **ret_ptr)
-{
-    HTMLOptionElementFactory *ret;
-
-    ret = malloc(sizeof(*ret));
-    if(!ret)
-        return E_OUTOFMEMORY;
-
-    ret->IHTMLOptionElementFactory_iface.lpVtbl = &HTMLOptionElementFactoryVtbl;
-    ret->ref = 1;
-    ret->window = window;
-
-    init_dispatch(&ret->dispex, (IUnknown*)&ret->IHTMLOptionElementFactory_iface,
-                  &HTMLOptionElementFactory_dispex, window, dispex_compat_mode(&window->event_target.dispex));
-
-    *ret_ptr = ret;
-    return S_OK;
-}
 
 struct HTMLSelectElement {
     HTMLElement element;

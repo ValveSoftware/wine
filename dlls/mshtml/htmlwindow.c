@@ -152,6 +152,34 @@ static ULONG detach_inner_window(HTMLInnerWindow *window)
     return ref;
 }
 
+static HRESULT get_legacy_ctor(HTMLInnerWindow *window, legacy_ctor_id_t ctor_id, dispex_static_data_t *dispex,
+        const void *vtbl, IDispatch **ret)
+{
+    struct legacy_ctor *ctor = window->legacy_ctors[ctor_id];
+
+    if(!ctor) {
+        ctor = malloc(sizeof(*ctor));
+        if(!ctor)
+            return E_OUTOFMEMORY;
+
+        ctor->IUnknown_iface.lpVtbl = vtbl;
+        ctor->ref = 1;
+        ctor->window = window;
+        window->legacy_ctors[ctor_id] = ctor;
+
+        init_dispatch(&ctor->dispex, &ctor->IUnknown_iface, dispex, NULL, dispex_compat_mode(&window->event_target.dispex));
+    }
+
+    *ret = (IDispatch*)&ctor->dispex.IDispatchEx_iface;
+    IDispatch_AddRef(*ret);
+    return S_OK;
+}
+
+static inline struct legacy_ctor *legacy_ctor_from_IDispatch(IDispatch *iface)
+{
+    return CONTAINING_RECORD((IDispatchEx*)iface, struct legacy_ctor, dispex.IDispatchEx_iface);
+}
+
 static inline HTMLWindow *impl_from_IHTMLWindow2(IHTMLWindow2 *iface)
 {
     return CONTAINING_RECORD(iface, HTMLWindow, IHTMLWindow2_iface);
@@ -296,19 +324,11 @@ static void release_inner_window(HTMLInnerWindow *This)
         free(This->global_props[i].name);
     free(This->global_props);
 
-    if(This->image_factory) {
-        This->image_factory->window = NULL;
-        IHTMLImageElementFactory_Release(&This->image_factory->IHTMLImageElementFactory_iface);
-    }
-
-    if(This->option_factory) {
-        This->option_factory->window = NULL;
-        IHTMLOptionElementFactory_Release(&This->option_factory->IHTMLOptionElementFactory_iface);
-    }
-
-    if(This->xhr_factory) {
-        This->xhr_factory->window = NULL;
-        IHTMLXMLHttpRequestFactory_Release(&This->xhr_factory->IHTMLXMLHttpRequestFactory_iface);
+    for(i = 0; i < ARRAY_SIZE(This->legacy_ctors); i++) {
+        if(This->legacy_ctors[i]) {
+            This->legacy_ctors[i]->window = NULL;
+            IUnknown_Release(&This->legacy_ctors[i]->IUnknown_iface);
+        }
     }
 
     if(This->screen)
@@ -815,21 +835,16 @@ static HRESULT WINAPI HTMLWindow2_get_Image(IHTMLWindow2 *iface, IHTMLImageEleme
 {
     HTMLWindow *This = impl_from_IHTMLWindow2(iface);
     HTMLInnerWindow *window = This->inner_window;
+    IDispatch *disp;
+    HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    if(!window->image_factory) {
-        HRESULT hres;
-
-        hres = HTMLImageElementFactory_Create(window, &window->image_factory);
-        if(FAILED(hres))
-            return hres;
-    }
-
-    *p = &window->image_factory->IHTMLImageElementFactory_iface;
-    IHTMLImageElementFactory_AddRef(*p);
-
-    return S_OK;
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Image, &HTMLImageElementFactory_dispex,
+                           &HTMLImageElementFactoryVtbl, &disp);
+    if(SUCCEEDED(hres))
+        *p = &legacy_ctor_from_IDispatch(disp)->IHTMLImageElementFactory_iface;
+    return hres;
 }
 
 static HRESULT WINAPI HTMLWindow2_get_location(IHTMLWindow2 *iface, IHTMLLocation **p)
@@ -1369,21 +1384,16 @@ static HRESULT WINAPI HTMLWindow2_get_Option(IHTMLWindow2 *iface, IHTMLOptionEle
 {
     HTMLWindow *This = impl_from_IHTMLWindow2(iface);
     HTMLInnerWindow *window = This->inner_window;
+    IDispatch *disp;
+    HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    if(!window->option_factory) {
-        HRESULT hres;
-
-        hres = HTMLOptionElementFactory_Create(window, &window->option_factory);
-        if(FAILED(hres))
-            return hres;
-    }
-
-    *p = &window->option_factory->IHTMLOptionElementFactory_iface;
-    IHTMLOptionElementFactory_AddRef(*p);
-
-    return S_OK;
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Option, &HTMLOptionElementFactory_dispex,
+                           &HTMLOptionElementFactoryVtbl, &disp);
+    if(SUCCEEDED(hres))
+        *p = &legacy_ctor_from_IDispatch(disp)->IHTMLOptionElementFactory_iface;
+    return hres;
 }
 
 static HRESULT WINAPI HTMLWindow2_focus(IHTMLWindow2 *iface)
@@ -2062,6 +2072,8 @@ static HRESULT WINAPI HTMLWindow5_get_XMLHttpRequest(IHTMLWindow5 *iface, VARIAN
 {
     HTMLWindow *This = impl_from_IHTMLWindow5(iface);
     HTMLInnerWindow *window = This->inner_window;
+    IDispatch *disp;
+    HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
@@ -2070,20 +2082,13 @@ static HRESULT WINAPI HTMLWindow5_get_XMLHttpRequest(IHTMLWindow5 *iface, VARIAN
         return S_OK;
     }
 
-    if(!window->xhr_factory) {
-        HRESULT hres;
-
-        hres = HTMLXMLHttpRequestFactory_Create(window, &window->xhr_factory);
-        if(FAILED(hres)) {
-            return hres;
-        }
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_HTMLXMLHttpRequest, &HTMLXMLHttpRequestFactory_dispex,
+                           &HTMLXMLHttpRequestFactoryVtbl, &disp);
+    if(SUCCEEDED(hres)) {
+        V_VT(p) = VT_DISPATCH;
+        V_DISPATCH(p) = (IDispatch*)&legacy_ctor_from_IDispatch(disp)->IHTMLXMLHttpRequestFactory_iface;
     }
-
-    V_VT(p) = VT_DISPATCH;
-    V_DISPATCH(p) = (IDispatch*)&window->xhr_factory->IHTMLXMLHttpRequestFactory_iface;
-    IDispatch_AddRef(V_DISPATCH(p));
-
-    return S_OK;
+    return hres;
 }
 
 static const IHTMLWindow5Vtbl HTMLWindow5Vtbl = {
