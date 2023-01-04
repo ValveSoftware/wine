@@ -2293,6 +2293,7 @@ static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t
         DISPID_IHTMLWINDOW2_IMAGE,
         DISPID_IHTMLWINDOW2_OPTION,
         DISPID_IHTMLWINDOW5_XMLHTTPREQUEST,
+        DISPID_IHTMLWINDOW6_XDOMAINREQUEST,
         DISPID_UNKNOWN
     };
     prototype_id_t prot_id = info->desc - legacy_prototype_dispex;
@@ -2606,7 +2607,8 @@ static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_
         { PROTO_ID_DOMParser,           &DOMParserCtor_dispex,              &legacy_ctor_vtbl },
         { PROTO_ID_HTMLImgElement,      &HTMLImageCtor_dispex,              &HTMLImageElementFactoryVtbl },
         { PROTO_ID_HTMLOptionElement,   &HTMLOptionCtor_dispex,             &HTMLOptionElementFactoryVtbl },
-        { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl }
+        { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl },
+        { PROTO_ID_HTMLXDomainRequest,  &HTMLXDomainRequestFactory_dispex,  &HTMLXDomainRequestFactoryVtbl }
     };
     struct legacy_ctor *ctor;
     unsigned i;
@@ -3148,7 +3150,8 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDis
 {
     static const prototype_id_t special_ctors[] = {
         PROTO_ID_DOMParser,
-        PROTO_ID_HTMLXMLHttpRequest
+        PROTO_ID_HTMLXMLHttpRequest,
+        PROTO_ID_HTMLXDomainRequest
     };
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
     struct proxy_prototype *prot = proxy_prototype_from_IUnknown(This->outer);
@@ -3217,6 +3220,9 @@ static HRESULT WINAPI WineDispatchProxyPrivate_DefineConstructors(IWineDispatchP
     compat_mode = dispex_compat_mode(This);
 
     for(i = 0; i < ARRAY_SIZE(proxy_ctor_dispex); i++) {
+        if(PROTO_ID_HTMLXDomainRequest == i + LEGACY_PROTOTYPE_COUNT && compat_mode >= COMPAT_MODE_IE11)
+            continue;
+
         if(!(prot = get_default_prototype(i + LEGACY_PROTOTYPE_COUNT, compat_mode, prots_ref)))
             return E_OUTOFMEMORY;
 

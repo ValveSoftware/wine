@@ -236,6 +236,7 @@ typedef struct ScriptHost ScriptHost;
     XDIID(DispHTMLW3CComputedStyle) \
     XDIID(DispHTMLWindow2) \
     XDIID(DispHTMLXMLHttpRequest) \
+    XDIID(DispXDomainRequest) \
     XDIID(DispSVGCircleElement) \
     XDIID(DispSVGSVGElement) \
     XDIID(DispSVGTSpanElement) \
@@ -374,6 +375,8 @@ typedef struct ScriptHost ScriptHost;
     XIID(IHTMLXMLHttpRequest) \
     XIID(IHTMLXMLHttpRequest2) \
     XIID(IHTMLXMLHttpRequestFactory) \
+    XIID(IHTMLXDomainRequest) \
+    XIID(IHTMLXDomainRequestFactory) \
     XIID(IOmHistory) \
     XIID(IOmNavigator) \
     XIID(ISVGCircleElement) \
@@ -435,6 +438,7 @@ PRIVATE_TID_LIST
     X(HTMLStorage,                    "Storage",                      HTMLStorage_dispex,                     Object) \
     X(HTMLTextRange,                  "TextRange",                    HTMLTxtRange_dispex,                    Object) \
     X(HTMLXMLHttpRequest,             "XMLHttpRequest",               HTMLXMLHttpRequest_dispex,              Object) \
+    X(HTMLXDomainRequest,             "XDomainRequest",               HTMLXDomainRequest_dispex,              Object) \
     X(HTMLCurrentStyle,               "MSCurrentStyleCSSProperties",  HTMLCurrentStyle_dispex,                HTMLCSSProperties) \
     X(HTMLW3CComputedStyle,           "CSSStyleDeclaration",          HTMLW3CComputedStyle_dispex,            Object) \
     X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  StyleSheet) \
@@ -527,6 +531,7 @@ COMMON_PROTOTYPE_LIST
     LEGACY_CTOR_ID_Image_builtin,
     LEGACY_CTOR_ID_Option_builtin,
     LEGACY_CTOR_ID_HTMLXMLHttpRequest_builtin,
+    LEGACY_CTOR_ID_HTMLXDomainRequest_builtin,
 
     LEGACY_CTOR_COUNT
 } legacy_ctor_id_t;
@@ -680,6 +685,7 @@ struct legacy_ctor {
         IHTMLOptionElementFactory IHTMLOptionElementFactory_iface;
         IHTMLImageElementFactory IHTMLImageElementFactory_iface;
         IHTMLXMLHttpRequestFactory IHTMLXMLHttpRequestFactory_iface;
+        IHTMLXDomainRequestFactory IHTMLXDomainRequestFactory_iface;
     };
 
     LONG ref;
@@ -1718,12 +1724,15 @@ extern const IUnknownVtbl legacy_ctor_vtbl DECLSPEC_HIDDEN;
 extern const IHTMLImageElementFactoryVtbl HTMLImageElementFactoryVtbl DECLSPEC_HIDDEN;
 extern const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl DECLSPEC_HIDDEN;
 extern const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl DECLSPEC_HIDDEN;
+extern const IHTMLXDomainRequestFactoryVtbl HTMLXDomainRequestFactoryVtbl DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLImageElementFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLOptionElementFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLXDomainRequestFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLImageCtor_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLOptionCtor_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLXMLHttpRequestCtor_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t HTMLXDomainRequestCtor_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t DOMParserCtor_dispex DECLSPEC_HIDDEN;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex DECLSPEC_HIDDEN;

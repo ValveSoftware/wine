@@ -351,6 +351,7 @@ sync_test("builtin_toString", function() {
     if(v < 11) {
         test("eventObject", document.createEventObject(), "MSEventObj");
         test("selection", document.selection, "MSSelection");
+        test("XDomainRequest", new XDomainRequest(), "XDomainRequest", null, "Function");
     }
     if(v >= 9) {
         var xml = new DOMParser().parseFromString("<tag>foobar</tag>", "text/xml");
@@ -648,10 +649,12 @@ sync_test("builtin_prototypes", function() {
         [ "DOMParser",          [ "prototype", "arguments" ], [ "create", "length" ], 9 ],
         [ "Image",              [ "prototype", "arguments" ], [ "create", "length" ] ],
         [ "Option",             [ "prototype", "arguments" ], [ "create", "length" ] ],
+        [ "XDomainRequest",     [ "prototype", "arguments", "create" ], [ "length" ], 0, 10 ],
         [ "XMLHttpRequest",     [ "prototype", "arguments", "create" ], [ "length" ] ]
     ];
     for(var i = 0; i < special_ctors.length; i++) {
-        if(special_ctors[i].length > 3 && v < special_ctors[i][3])
+        if((special_ctors[i].length > 3 && v < special_ctors[i][3]) ||
+           (special_ctors[i].length > 4 && v > special_ctors[i][4]))
             continue;
         name = special_ctors[i][0];
         ok(Object.prototype.hasOwnProperty.call(window, name), name + " not a property of window.");
@@ -812,6 +815,26 @@ sync_test("builtin_prototypes", function() {
         ok(r === "test", "XMLHttpRequest.prototype.winetestprop after obj = " + r);
     }else
         ok(proto.constructor === window.XMLHttpRequest, "XMLHttpRequest.prototype.constructor = " + proto.constructor);
+
+    if(v < 11) {
+        set_obj("XDomainRequest", true);
+        test_prop("open");
+        test_prop("send");
+        test_prop("timeout");
+        test_legacy_ctor(["abort"], ["contentType", "responseText"], ["status", "onreadystatechange"], "onerror", function(){});
+        if(v < 9) {
+            r = obj.abort();
+            ok(r === "foobar", "(new XDomainRequest).abort() returned " + r);
+            r = obj.winetestprop;
+            ok(r === "test", "(new XDomainRequest).winetestprop = " + r);
+            obj.winetestprop = "prop";
+            r = obj.winetestprop;
+            ok(r === "prop", "(new XDomainRequest).winetestprop after set = " + r);
+            r = XDomainRequest.prototype.winetestprop;
+            ok(r === "test", "XDomainRequest.prototype.winetestprop after obj = " + r);
+        }else
+            ok(proto.constructor === window.XDomainRequest, "XDomainRequest.prototype.constructor = " + proto.constructor);
+    }
 
     set_obj("Image", true);
     test_prop("src");
@@ -1223,7 +1246,7 @@ sync_test("builtin_prototypes", function() {
             [ "XMLHttpRequest", 0 ]
         ];
         for(var i = 0; i < ctors.length; i++) {
-            if(!(ctors[i][0] in window) && (v >= 8 || ctors[i][0] === "XDomainRequest")) {
+            if(!(ctors[i][0] in window) && v >= 8) {
                 todo_wine.ok(false, ctors[i][0] + " not implemented");
                 continue;
             }
@@ -1234,8 +1257,6 @@ sync_test("builtin_prototypes", function() {
             }catch(ex) {
                 r = ex.number;
             }
-            if(r === 0x4001 - 0x80000000)  /* todo_wine XDomainRequest */
-                continue;
             if(v < 8 && (ctors[i].length < 2 || v < ctors[i][1]))
                 ok(r === 0xa1391 - 0x80000000, ctors[i][0] + " not undefined: " + r);
             else {
@@ -1362,6 +1383,7 @@ sync_test("builtin_prototypes", function() {
             [ "TextRange",                      "Object" ],
             [ "UIEvent",                        "Event" ],
             [ "Window",                         "Object" ],
+            [ "XDomainRequest",                 "Object" ],
             [ "XMLDocument",                    "Document" ],
             [ "XMLHttpRequest",                 "Object" ]
         ];
@@ -1650,6 +1672,7 @@ sync_test("window_props", function() {
     test_exposed("DOMParser", v >= 9);
     test_exposed("matchMedia", v >= 10);
     test_exposed("msCrypto", v >= 11);
+    test_exposed("XDomainRequest", v < 11);
 });
 
 sync_test("domimpl_props", function() {
