@@ -127,7 +127,9 @@ static const struct {
 typedef struct {
     nsIDOMEventListener nsIDOMEventListener_iface;
     LONG ref;
-    HTMLXMLHttpRequest *xhr;
+    EventTarget *event_target;
+    HTMLInnerWindow *window;
+    nsIXMLHttpRequest *nsxhr;
     DWORD events_mask;
 } XMLHttpReqEventListener;
 
@@ -160,7 +162,7 @@ static void detach_xhr_event_listener(XMLHttpReqEventListener *event_listener)
     nsAString str;
     nsresult nsres;
 
-    nsres = nsIXMLHttpRequest_QueryInterface(event_listener->xhr->nsxhr, &IID_nsIDOMEventTarget, (void**)&event_target);
+    nsres = nsIXMLHttpRequest_QueryInterface(event_listener->nsxhr, &IID_nsIDOMEventTarget, (void**)&event_target);
     assert(nsres == NS_OK);
 
     for(events_mask = event_listener->events_mask, i = 0; events_mask; events_mask >>= 1, i++) {
@@ -174,8 +176,7 @@ static void detach_xhr_event_listener(XMLHttpReqEventListener *event_listener)
 
     nsIDOMEventTarget_Release(event_target);
 
-    event_listener->xhr->event_listener = NULL;
-    event_listener->xhr = NULL;
+    event_listener->event_target = NULL;
     nsIDOMEventListener_Release(&event_listener->nsIDOMEventListener_iface);
 }
 
@@ -263,7 +264,7 @@ static nsrefcnt NSAPI XMLHttpReqEventListener_Release(nsIDOMEventListener *iface
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
-        assert(!This->xhr);
+        assert(!This->event_target);
         free(This);
     }
 
@@ -278,12 +279,12 @@ static nsresult NSAPI XMLHttpReqEventListener_HandleEvent(nsIDOMEventListener *i
 
     TRACE("(%p)\n", This);
 
-    if(!This->xhr)
+    if(!This->event_target)
         return NS_OK;
 
-    hres = create_event_from_nsevent(nsevent, This->xhr->window, dispex_compat_mode(&This->xhr->event_target.dispex), &event);
+    hres = create_event_from_nsevent(nsevent, This->window, dispex_compat_mode(&This->event_target->dispex), &event);
     if(SUCCEEDED(hres) ){
-        dispatch_event(&This->xhr->event_target, event);
+        dispatch_event(This->event_target, event);
         IDOMEvent_Release(&event->IDOMEvent_iface);
     }
     return NS_OK;
@@ -1360,7 +1361,9 @@ static void HTMLXMLHttpRequest_bind_event(DispatchEx *dispex, eventid_t eid)
 
         This->event_listener->nsIDOMEventListener_iface.lpVtbl = &XMLHttpReqEventListenerVtbl;
         This->event_listener->ref = 1;
-        This->event_listener->xhr = This;
+        This->event_listener->event_target = &This->event_target;
+        This->event_listener->window = This->window;
+        This->event_listener->nsxhr = This->nsxhr;
         This->event_listener->events_mask = 0;
     }
 
