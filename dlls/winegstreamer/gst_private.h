@@ -156,4 +156,6 @@ HRESULT h264_decoder_create(REFIID riid, void **ret);
 HRESULT video_processor_create(REFIID riid, void **ret);
 HRESULT gstreamer_scheme_handler_construct(REFIID riid, void **ret) DECLSPEC_HIDDEN;
 
+extern const GUID MFAudioFormat_RAW_AAC;
+
 #endif /* __GST_PRIVATE_INCLUDED__ */
