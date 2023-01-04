@@ -116,6 +116,7 @@ typedef enum {
     JSCLASS_VBARRAY,
     JSCLASS_JSON,
     JSCLASS_ARRAYBUFFER,
+    JSCLASS_DATAVIEW,
     JSCLASS_MAP,
     JSCLASS_SET,
 } jsclass_t;
@@ -417,10 +418,11 @@ struct _script_ctx_t {
             jsdisp_t *string_constr;
             jsdisp_t *vbarray_constr;
             jsdisp_t *arraybuf_constr;
+            jsdisp_t *dataview_constr;
             jsdisp_t *map_prototype;
             jsdisp_t *set_prototype;
         };
-        jsdisp_t *global_objects[23];
+        jsdisp_t *global_objects[24];
     };
 };
 C_ASSERT(RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, set_prototype) == RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, global_objects));
@@ -540,6 +542,10 @@ static inline DWORD make_grfdex(script_ctx_t *ctx, DWORD flags)
 #define JS_E_OBJECT_NONEXTENSIBLE    MAKE_JSERROR(IDS_OBJECT_NONEXTENSIBLE)
 #define JS_E_NONCONFIGURABLE_REDEFINED MAKE_JSERROR(IDS_NONCONFIGURABLE_REDEFINED)
 #define JS_E_NONWRITABLE_MODIFIED    MAKE_JSERROR(IDS_NONWRITABLE_MODIFIED)
+#define JS_E_NOT_DATAVIEW            MAKE_JSERROR(IDS_NOT_DATAVIEW)
+#define JS_E_DATAVIEW_NO_ARGUMENT    MAKE_JSERROR(IDS_DATAVIEW_NO_ARGUMENT)
+#define JS_E_DATAVIEW_INVALID_ACCESS MAKE_JSERROR(IDS_DATAVIEW_INVALID_ACCESS)
+#define JS_E_DATAVIEW_INVALID_OFFSET MAKE_JSERROR(IDS_DATAVIEW_INVALID_OFFSET)
 #define JS_E_WRONG_THIS              MAKE_JSERROR(IDS_WRONG_THIS)
 #define JS_E_PROP_DESC_MISMATCH      MAKE_JSERROR(IDS_PROP_DESC_MISMATCH)
 #define JS_E_INVALID_WRITABLE_PROP_DESC MAKE_JSERROR(IDS_INVALID_WRITABLE_PROP_DESC)
