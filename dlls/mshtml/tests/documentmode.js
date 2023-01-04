@@ -1149,6 +1149,7 @@ sync_test("builtin_prototypes", function() {
             [ "Comment",                        "CharacterData" ],
             [ "Console",                        "Object" ],
             [ "CSSStyleDeclaration",            "Object" ],
+            [ "CSSStyleSheet",                  "StyleSheet" ],
             [ "CustomEvent",                    "Event" ],
             [ "DocumentType",                   "Node" ],
             [ "DOMImplementation",              "Object" ],
@@ -1214,6 +1215,7 @@ sync_test("builtin_prototypes", function() {
             [ "Screen",                         "Object" ],
             [ "Storage",                        "Object" ],
             [ "StorageEvent",                   "Event" ],
+            [ "StyleSheet",                     "Object" ],
             [ "StyleSheetList",                 "Object" ],
             [ "Text",                           "CharacterData" ],
             [ "TextRange",                      "Object" ],
@@ -1266,6 +1268,7 @@ sync_test("builtin_prototypes", function() {
         protos = [
             [ "CharacterData", ["data","length","appendData"], Node_props ],
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
+            [ "CSSStyleSheet", ["addRule","cssRules","ownerRule","rules"], ["disabled","media","ownerNode","parentStyleSheet","title","type"] ],
             [ "CustomEvent", ["detail","initCustomEvent"], Event_props ],
             [ "DocumentType", ["entities","internalSubset","name","notations","publicId","systemId"], Node_props ],
             [ "Element", Elem_props, Node_props ],
