@@ -42,6 +42,9 @@ static HRESULT WINAPI HTMLDOMAttribute_QueryInterface(IHTMLDOMAttribute *iface,
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
 
+    if(This->node.nsnode)
+        return IHTMLDOMNode_QueryInterface(&This->node.IHTMLDOMNode_iface, riid, ppv);
+
     TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
 
     if(IsEqualGUID(&IID_IUnknown, riid)) {
@@ -50,7 +53,7 @@ static HRESULT WINAPI HTMLDOMAttribute_QueryInterface(IHTMLDOMAttribute *iface,
         *ppv = &This->IHTMLDOMAttribute_iface;
     }else if(IsEqualGUID(&IID_IHTMLDOMAttribute2, riid)) {
         *ppv = &This->IHTMLDOMAttribute2_iface;
-    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
+    }else if(dispex_query_interface(&This->node.event_target.dispex, riid, ppv)) {
         return *ppv ? S_OK : E_NOINTERFACE;
     }else {
         WARN("%s not supported\n", debugstr_mshtml_guid(riid));
@@ -65,7 +68,11 @@ static HRESULT WINAPI HTMLDOMAttribute_QueryInterface(IHTMLDOMAttribute *iface,
 static ULONG WINAPI HTMLDOMAttribute_AddRef(IHTMLDOMAttribute *iface)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
+    LONG ref;
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_AddRef(&This->node.IHTMLDOMNode_iface);
+    ref = InterlockedIncrement(&This->ref);
 
     TRACE("(%p) ref=%ld\n", This, ref);
 
@@ -75,13 +82,17 @@ static ULONG WINAPI HTMLDOMAttribute_AddRef(IHTMLDOMAttribute *iface)
 static ULONG WINAPI HTMLDOMAttribute_Release(IHTMLDOMAttribute *iface)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
-    LONG ref = InterlockedDecrement(&This->ref);
+    LONG ref;
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_Release(&This->node.IHTMLDOMNode_iface);
+    ref = InterlockedDecrement(&This->ref);
 
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
         assert(!This->elem);
-        release_dispex(&This->dispex);
+        release_dispex(&This->node.event_target.dispex);
         VariantClear(&This->value);
         free(This->name);
         free(This);
@@ -93,14 +104,14 @@ static ULONG WINAPI HTMLDOMAttribute_Release(IHTMLDOMAttribute *iface)
 static HRESULT WINAPI HTMLDOMAttribute_GetTypeInfoCount(IHTMLDOMAttribute *iface, UINT *pctinfo)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
-    return IDispatchEx_GetTypeInfoCount(&This->dispex.IDispatchEx_iface, pctinfo);
+    return IDispatchEx_GetTypeInfoCount(&This->node.event_target.dispex.IDispatchEx_iface, pctinfo);
 }
 
 static HRESULT WINAPI HTMLDOMAttribute_GetTypeInfo(IHTMLDOMAttribute *iface, UINT iTInfo,
                                               LCID lcid, ITypeInfo **ppTInfo)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
-    return IDispatchEx_GetTypeInfo(&This->dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
+    return IDispatchEx_GetTypeInfo(&This->node.event_target.dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
 }
 
 static HRESULT WINAPI HTMLDOMAttribute_GetIDsOfNames(IHTMLDOMAttribute *iface, REFIID riid,
@@ -108,7 +119,7 @@ static HRESULT WINAPI HTMLDOMAttribute_GetIDsOfNames(IHTMLDOMAttribute *iface, R
                                                 LCID lcid, DISPID *rgDispId)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
-    return IDispatchEx_GetIDsOfNames(&This->dispex.IDispatchEx_iface, riid, rgszNames, cNames,
+    return IDispatchEx_GetIDsOfNames(&This->node.event_target.dispex.IDispatchEx_iface, riid, rgszNames, cNames,
             lcid, rgDispId);
 }
 
@@ -117,13 +128,16 @@ static HRESULT WINAPI HTMLDOMAttribute_Invoke(IHTMLDOMAttribute *iface, DISPID d
                             VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
-    return IDispatchEx_Invoke(&This->dispex.IDispatchEx_iface, dispIdMember, riid, lcid,
+    return IDispatchEx_Invoke(&This->node.event_target.dispex.IDispatchEx_iface, dispIdMember, riid, lcid,
             wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 }
 
 static HRESULT WINAPI HTMLDOMAttribute_get_nodeName(IHTMLDOMAttribute *iface, BSTR *p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_nodeName(&This->node.IHTMLDOMNode_iface, p);
 
     TRACE("(%p)->(%p)\n", This, p);
 
@@ -148,6 +162,9 @@ static HRESULT WINAPI HTMLDOMAttribute_put_nodeValue(IHTMLDOMAttribute *iface, V
     EXCEPINFO ei;
     VARIANT ret;
 
+    if(This->node.nsnode)
+        return IHTMLDOMNode_put_nodeValue(&This->node.IHTMLDOMNode_iface, v);
+
     TRACE("(%p)->(%s)\n", This, debugstr_variant(&v));
 
     if(!This->elem)
@@ -162,6 +179,9 @@ static HRESULT WINAPI HTMLDOMAttribute_put_nodeValue(IHTMLDOMAttribute *iface, V
 static HRESULT WINAPI HTMLDOMAttribute_get_nodeValue(IHTMLDOMAttribute *iface, VARIANT *p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_nodeValue(&This->node.IHTMLDOMNode_iface, p);
 
     TRACE("(%p)->(%p)\n", This, p);
 
@@ -179,8 +199,15 @@ static HRESULT WINAPI HTMLDOMAttribute_get_specified(IHTMLDOMAttribute *iface, V
     BSTR name;
     nsresult nsres;
     HRESULT hres;
+    cpp_bool b;
 
     TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->node.nsnode) {
+        nsres = nsIDOMAttr_GetSpecified((nsIDOMAttr*)This->node.nsnode, &b);
+        *p = variant_bool(NS_SUCCEEDED(nsres) && b);
+        return S_OK;
+    }
 
     if(!This->elem || !This->elem->dom_element) {
         FIXME("NULL This->elem\n");
@@ -255,21 +282,21 @@ static ULONG WINAPI HTMLDOMAttribute2_Release(IHTMLDOMAttribute2 *iface)
 static HRESULT WINAPI HTMLDOMAttribute2_GetTypeInfoCount(IHTMLDOMAttribute2 *iface, UINT *pctinfo)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    return IDispatchEx_GetTypeInfoCount(&This->dispex.IDispatchEx_iface, pctinfo);
+    return IDispatchEx_GetTypeInfoCount(&This->node.event_target.dispex.IDispatchEx_iface, pctinfo);
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_GetTypeInfo(IHTMLDOMAttribute2 *iface, UINT iTInfo,
         LCID lcid, ITypeInfo **ppTInfo)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    return IDispatchEx_GetTypeInfo(&This->dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
+    return IDispatchEx_GetTypeInfo(&This->node.event_target.dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_GetIDsOfNames(IHTMLDOMAttribute2 *iface, REFIID riid,
         LPOLESTR *rgszNames, UINT cNames, LCID lcid, DISPID *rgDispId)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    return IDispatchEx_GetIDsOfNames(&This->dispex.IDispatchEx_iface, riid, rgszNames, cNames,
+    return IDispatchEx_GetIDsOfNames(&This->node.event_target.dispex.IDispatchEx_iface, riid, rgszNames, cNames,
             lcid, rgDispId);
 }
 
@@ -278,15 +305,23 @@ static HRESULT WINAPI HTMLDOMAttribute2_Invoke(IHTMLDOMAttribute2 *iface, DISPID
         VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
-    return IDispatchEx_Invoke(&This->dispex.IDispatchEx_iface, dispIdMember, riid, lcid,
+    return IDispatchEx_Invoke(&This->node.event_target.dispex.IDispatchEx_iface, dispIdMember, riid, lcid,
             wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_name(IHTMLDOMAttribute2 *iface, BSTR *p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+    nsAString nsstr;
+    nsresult nsres;
 
     TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->node.nsnode) {
+        nsAString_InitDepend(&nsstr, NULL);
+        nsres = nsIDOMAttr_GetName((nsIDOMAttr*)This->node.nsnode, &nsstr);
+        return return_nsstr(nsres, &nsstr, p);
+    }
 
     return IHTMLDOMAttribute_get_nodeName(&This->IHTMLDOMAttribute_iface, p);
 }
@@ -294,9 +329,18 @@ static HRESULT WINAPI HTMLDOMAttribute2_get_name(IHTMLDOMAttribute2 *iface, BSTR
 static HRESULT WINAPI HTMLDOMAttribute2_put_value(IHTMLDOMAttribute2 *iface, BSTR v)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+    nsAString nsstr;
+    nsresult nsres;
     VARIANT var;
 
     TRACE("(%p)->(%s)\n", This, debugstr_w(v));
+
+    if(This->node.nsnode) {
+        nsAString_InitDepend(&nsstr, v);
+        nsres = nsIDOMAttr_SetValue((nsIDOMAttr*)This->node.nsnode, &nsstr);
+        nsAString_Finish(&nsstr);
+        return NS_SUCCEEDED(nsres) ? S_OK : E_FAIL;
+    }
 
     V_VT(&var) = VT_BSTR;
     V_BSTR(&var) = v;
@@ -306,10 +350,18 @@ static HRESULT WINAPI HTMLDOMAttribute2_put_value(IHTMLDOMAttribute2 *iface, BST
 static HRESULT WINAPI HTMLDOMAttribute2_get_value(IHTMLDOMAttribute2 *iface, BSTR *p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+    nsAString nsstr;
+    nsresult nsres;
     VARIANT val;
     HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->node.nsnode) {
+        nsAString_InitDepend(&nsstr, NULL);
+        nsres = nsIDOMAttr_GetValue((nsIDOMAttr*)This->node.nsnode, &nsstr);
+        return return_nsstr(nsres, &nsstr, p);
+    }
 
     V_VT(&val) = VT_EMPTY;
     if(This->elem)
@@ -341,13 +393,21 @@ static HRESULT WINAPI HTMLDOMAttribute2_get_expando(IHTMLDOMAttribute2 *iface, V
 static HRESULT WINAPI HTMLDOMAttribute2_get_nodeType(IHTMLDOMAttribute2 *iface, LONG *p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_nodeType(&This->node.IHTMLDOMNode_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_parentNode(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_parentNode(&This->node.IHTMLDOMNode_iface, p);
 
     TRACE("(%p)->(%p)\n", This, p);
 
@@ -358,49 +418,84 @@ static HRESULT WINAPI HTMLDOMAttribute2_get_parentNode(IHTMLDOMAttribute2 *iface
 static HRESULT WINAPI HTMLDOMAttribute2_get_childNodes(IHTMLDOMAttribute2 *iface, IDispatch **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_childNodes(&This->node.IHTMLDOMNode_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_firstChild(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_firstChild(&This->node.IHTMLDOMNode_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_lastChild(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_lastChild(&This->node.IHTMLDOMNode_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_previousSibling(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_previousSibling(&This->node.IHTMLDOMNode_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_nextSibling(IHTMLDOMAttribute2 *iface, IHTMLDOMNode **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_nextSibling(&This->node.IHTMLDOMNode_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_attributes(IHTMLDOMAttribute2 *iface, IDispatch **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_get_attributes(&This->node.IHTMLDOMNode_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_get_ownerDocument(IHTMLDOMAttribute2 *iface, IDispatch **p)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode2_get_ownerDocument(&This->node.IHTMLDOMNode2_iface, p);
+
     FIXME("(%p)->(%p)\n", This, p);
+
     return E_NOTIMPL;
 }
 
@@ -408,7 +503,12 @@ static HRESULT WINAPI HTMLDOMAttribute2_insertBefore(IHTMLDOMAttribute2 *iface, 
         VARIANT refChild, IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_insertBefore(&This->node.IHTMLDOMNode_iface, newChild, refChild, node);
+
     FIXME("(%p)->(%p %s %p)\n", This, newChild, debugstr_variant(&refChild), node);
+
     return E_NOTIMPL;
 }
 
@@ -416,7 +516,12 @@ static HRESULT WINAPI HTMLDOMAttribute2_replaceChild(IHTMLDOMAttribute2 *iface, 
         IHTMLDOMNode *oldChild, IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_replaceChild(&This->node.IHTMLDOMNode_iface, newChild, oldChild, node);
+
     FIXME("(%p)->(%p %p %p)\n", This, newChild, oldChild, node);
+
     return E_NOTIMPL;
 }
 
@@ -424,7 +529,12 @@ static HRESULT WINAPI HTMLDOMAttribute2_removeChild(IHTMLDOMAttribute2 *iface, I
         IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_removeChild(&This->node.IHTMLDOMNode_iface, oldChild, node);
+
     FIXME("(%p)->(%p %p)\n", This, oldChild, node);
+
     return E_NOTIMPL;
 }
 
@@ -432,14 +542,24 @@ static HRESULT WINAPI HTMLDOMAttribute2_appendChild(IHTMLDOMAttribute2 *iface, I
         IHTMLDOMNode **node)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_appendChild(&This->node.IHTMLDOMNode_iface, newChild, node);
+
     FIXME("(%p)->(%p %p)\n", This, newChild, node);
+
     return E_NOTIMPL;
 }
 
 static HRESULT WINAPI HTMLDOMAttribute2_hasChildNodes(IHTMLDOMAttribute2 *iface, VARIANT_BOOL *fChildren)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+
+    if(This->node.nsnode)
+        return IHTMLDOMNode_hasChildNodes(&This->node.IHTMLDOMNode_iface, fChildren);
+
     FIXME("(%p)->(%p)\n", This, fChildren);
+
     return E_NOTIMPL;
 }
 
@@ -447,7 +567,20 @@ static HRESULT WINAPI HTMLDOMAttribute2_cloneNode(IHTMLDOMAttribute2 *iface, VAR
         IHTMLDOMAttribute **clonedNode)
 {
     HTMLDOMAttribute *This = impl_from_IHTMLDOMAttribute2(iface);
+    HRESULT hres;
+
+    if(This->node.nsnode) {
+        IHTMLDOMNode *cloned;
+        hres = IHTMLDOMNode_cloneNode(&This->node.IHTMLDOMNode_iface, fDeep, &cloned);
+        if(SUCCEEDED(hres)) {
+            hres = IHTMLDOMNode_QueryInterface(cloned, &IID_IHTMLDOMAttribute, (void**)clonedNode);
+            IHTMLDOMNode_Release(cloned);
+        }
+        return hres;
+    }
+
     FIXME("(%p)->(%x %p)\n", This, fDeep, clonedNode);
+
     return E_NOTIMPL;
 }
 
@@ -480,6 +613,73 @@ static const IHTMLDOMAttribute2Vtbl HTMLDOMAttribute2Vtbl = {
     HTMLDOMAttribute2_cloneNode
 };
 
+static inline HTMLDOMAttribute *impl_from_HTMLDOMNode(HTMLDOMNode *iface)
+{
+    return CONTAINING_RECORD(iface, HTMLDOMAttribute, node);
+}
+
+static HRESULT HTMLDOMAttribute_QI(HTMLDOMNode *iface, REFIID riid, void **ppv)
+{
+    HTMLDOMAttribute *This = impl_from_HTMLDOMNode(iface);
+
+    *ppv =  NULL;
+
+    if(IsEqualGUID(&IID_IUnknown, riid) || IsEqualGUID(&IID_IHTMLDOMAttribute, riid)) {
+        *ppv = &This->IHTMLDOMAttribute_iface;
+    }else if(IsEqualGUID(&IID_IHTMLDOMAttribute2, riid)) {
+        *ppv = &This->IHTMLDOMAttribute2_iface;
+    }else {
+        return HTMLDOMNode_QI(&This->node, riid, ppv);
+    }
+
+    IUnknown_AddRef((IUnknown*)*ppv);
+    return S_OK;
+}
+
+static HRESULT HTMLDOMAttribute_clone(HTMLDOMNode *iface, nsIDOMNode *nsnode, HTMLDOMNode **ret)
+{
+    HTMLDOMAttribute *This = impl_from_HTMLDOMNode(iface);
+    HTMLDOMAttribute *new_attr;
+    nsIDOMAttr *nsattr;
+    nsresult nsres;
+    HRESULT hres;
+
+    nsres = nsIDOMNode_QueryInterface(nsnode, &IID_nsIDOMAttr, (void**)&nsattr);
+    if(NS_FAILED(nsres)) {
+        ERR("no nsIDOMAttr iface\n");
+        return E_FAIL;
+    }
+
+    hres = HTMLDOMAttribute_Create(NULL, This->node.doc, This->elem, This->dispid, nsattr,
+                                   dispex_compat_mode(&This->node.event_target.dispex), &new_attr);
+    nsIDOMAttr_Release(nsattr);
+    if(FAILED(hres))
+        return hres;
+
+    *ret = &new_attr->node;
+    return S_OK;
+}
+
+static const cpc_entry_t HTMLDOMAttribute_cpc[] = {{NULL}};
+
+static const NodeImplVtbl HTMLDOMAttributeImplVtbl = {
+    NULL,
+    HTMLDOMAttribute_QI,
+    HTMLDOMNode_destructor,
+    HTMLDOMAttribute_cpc,
+    HTMLDOMAttribute_clone
+};
+
+static void HTMLDOMAttribute_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    HTMLDOMNode_init_dispex_info(info, mode);
+
+    if(mode >= COMPAT_MODE_IE9) {
+        dispex_info_add_interface(info, IHTMLDOMNode_tid, NULL);
+        dispex_info_add_interface(info, IHTMLDOMNode2_tid, NULL);
+    }
+}
+
 static const tid_t HTMLDOMAttribute_iface_tids[] = {
     IHTMLDOMAttribute_tid,
     IHTMLDOMAttribute2_tid,
@@ -490,7 +690,8 @@ dispex_static_data_t HTMLDOMAttribute_dispex = {
     NULL,
     PROTO_ID_HTMLDOMAttribute,
     DispHTMLDOMAttribute_tid,
-    HTMLDOMAttribute_iface_tids
+    HTMLDOMAttribute_iface_tids,
+    HTMLDOMAttribute_init_dispex_info
 };
 
 HTMLDOMAttribute *unsafe_impl_from_IHTMLDOMAttribute(IHTMLDOMAttribute *iface)
@@ -499,7 +700,7 @@ HTMLDOMAttribute *unsafe_impl_from_IHTMLDOMAttribute(IHTMLDOMAttribute *iface)
 }
 
 HRESULT HTMLDOMAttribute_Create(const WCHAR *name, HTMLDocumentNode *doc, HTMLElement *elem, DISPID dispid,
-        compat_mode_t compat_mode, HTMLDOMAttribute **attr)
+        nsIDOMAttr *nsattr, compat_mode_t compat_mode, HTMLDOMAttribute **attr)
 {
     HTMLAttributeCollection *col;
     HTMLDOMAttribute *ret;
@@ -515,20 +716,29 @@ HRESULT HTMLDOMAttribute_Create(const WCHAR *name, HTMLDocumentNode *doc, HTMLEl
     ret->dispid = dispid;
     ret->elem = elem;
 
-    init_dispatch(&ret->dispex, (IUnknown*)&ret->IHTMLDOMAttribute_iface,
-                  &HTMLDOMAttribute_dispex, get_inner_window(doc), compat_mode);
-
-    /* For attributes attached to an element, (elem,dispid) pair should be valid used for its operation. */
+    /* For attributes attached to an element, (elem,dispid) pair should
+       be valid used for its operation if we don't have a proper node. */
     if(elem) {
         hres = HTMLElement_get_attr_col(&elem->node, &col);
         if(FAILED(hres)) {
-            IHTMLDOMAttribute_Release(&ret->IHTMLDOMAttribute_iface);
+            free(ret);
             return hres;
         }
         IHTMLAttributeCollection_Release(&col->IHTMLAttributeCollection_iface);
 
         list_add_tail(&elem->attrs->attrs, &ret->entry);
     }
+
+    /* If we have a nsattr, use proper node */
+    if(nsattr) {
+        ret->node.vtbl = &HTMLDOMAttributeImplVtbl;
+        HTMLDOMNode_Init(doc, &ret->node, (nsIDOMNode*)nsattr, &HTMLDOMAttribute_dispex);
+        *attr = ret;
+        return S_OK;
+    }
+
+    init_dispatch(&ret->node.event_target.dispex, (IUnknown*)&ret->IHTMLDOMAttribute_iface,
+                  &HTMLDOMAttribute_dispex, get_inner_window(doc), compat_mode);
 
     /* For detached attributes we may still do most operations if we have its name available. */
     if(name) {
