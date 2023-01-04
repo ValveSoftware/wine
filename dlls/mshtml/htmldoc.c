@@ -39,6 +39,13 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
+static const WCHAR *const content_type_from_document_type[] = {
+    [DOCTYPE_HTML]  = L"text/html",
+    [DOCTYPE_XHTML] = L"application/xhtml+xml",
+    [DOCTYPE_XML]   = L"text/xml",
+    [DOCTYPE_SVG]   = L"image/svg+xml",
+};
+
 static dispex_static_data_t *const dispex_from_document_type[] = {
     [DOCTYPE_HTML]  = &HTMLDocumentNode_dispex,
     [DOCTYPE_XHTML] = &XMLDocumentNode_dispex,
@@ -1328,7 +1335,10 @@ static HRESULT WINAPI HTMLDocument_get_mimeType(IHTMLDocument2 *iface, BSTR *p)
 
     *p = NULL;
 
-    if(This->window && This->window->base.outer_window->readystate == READYSTATE_UNINITIALIZED)
+    if(!This->window)
+        return get_mime_type_display_name(content_type_from_document_type[This->doc_type], p);
+
+    if(This->window->base.outer_window->readystate == READYSTATE_UNINITIALIZED)
         return (*p = SysAllocString(L"")) ? S_OK : E_FAIL;
 
     nsAString_InitDepend(&nsstr, NULL);
