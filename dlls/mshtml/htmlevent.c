@@ -1884,11 +1884,19 @@ static HRESULT WINAPI HTMLEventObj5_get_data(IHTMLEventObj5 *iface, BSTR *p)
 static HRESULT WINAPI HTMLEventObj5_get_source(IHTMLEventObj5 *iface, IDispatch **p)
 {
     HTMLEventObj *This = impl_from_IHTMLEventObj5(iface);
+    IDOMMessageEvent *message_event;
+    HRESULT hres;
 
-    FIXME("(%p)->(%p)\n", This, p);
+    TRACE("(%p)->(%p)\n", This, p);
 
-    *p = NULL;
-    return S_OK;
+    if(!This->event || FAILED(IDOMEvent_QueryInterface(&This->event->IDOMEvent_iface, &IID_IDOMMessageEvent, (void**)&message_event))) {
+        *p = NULL;
+        return S_OK;
+    }
+
+    hres = IDOMMessageEvent_get_source(message_event, (IHTMLWindow2**)p);
+    IDOMMessageEvent_Release(message_event);
+    return hres;
 }
 
 static HRESULT WINAPI HTMLEventObj5_put_origin(IHTMLEventObj5 *iface, BSTR v)
@@ -3594,6 +3602,7 @@ static void DOMCustomEvent_destroy(DOMEvent *event)
 typedef struct {
     DOMEvent event;
     IDOMMessageEvent IDOMMessageEvent_iface;
+    IHTMLWindow2 *source;
     VARIANT data;
 } DOMMessageEvent;
 
@@ -3688,8 +3697,12 @@ static HRESULT WINAPI DOMMessageEvent_get_origin(IDOMMessageEvent *iface, BSTR *
 static HRESULT WINAPI DOMMessageEvent_get_source(IDOMMessageEvent *iface, IHTMLWindow2 **p)
 {
     DOMMessageEvent *This = impl_from_IDOMMessageEvent(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    if((*p = This->source))
+        IHTMLWindow2_AddRef(This->source);
+    return S_OK;
 }
 
 static HRESULT WINAPI DOMMessageEvent_initMessageEvent(IDOMMessageEvent *iface, BSTR type, VARIANT_BOOL can_bubble,
@@ -3732,6 +3745,8 @@ static void *DOMMessageEvent_query_interface(DOMEvent *event, REFIID riid)
 static void DOMMessageEvent_destroy(DOMEvent *event)
 {
     DOMMessageEvent *message_event = DOMMessageEvent_from_DOMEvent(event);
+    if(message_event->source)
+        IHTMLWindow2_Release(message_event->source);
     VariantClear(&message_event->data);
 }
 
@@ -4413,7 +4428,7 @@ HRESULT create_document_event(HTMLDocumentNode *doc, eventid_t event_id, DOMEven
     return S_OK;
 }
 
-HRESULT create_message_event(HTMLDocumentNode *doc, VARIANT *data, DOMEvent **ret)
+HRESULT create_message_event(HTMLDocumentNode *doc, IHTMLWindow2 *source, VARIANT *data, DOMEvent **ret)
 {
     DOMMessageEvent *message_event;
     DOMEvent *event;
@@ -4430,6 +4445,9 @@ HRESULT create_message_event(HTMLDocumentNode *doc, VARIANT *data, DOMEvent **re
         IDOMEvent_Release(&event->IDOMEvent_iface);
         return hres;
     }
+
+    message_event->source = source;
+    IHTMLWindow2_AddRef(message_event->source);
 
     *ret = event;
     return S_OK;

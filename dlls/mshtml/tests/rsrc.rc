@@ -88,6 +88,9 @@ doc_with_prop_ie9.html HTML "doc_with_prop_ie9.html"
 /* @makedep: iframe.html */
 iframe.html HTML "iframe.html"
 
+/* @makedep: send2parent.html */
+send2parent.html HTML "send2parent.html"
+
 /* For res: protocol test: */
 
 /* @makedep: jstest.html */
