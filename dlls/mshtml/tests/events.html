@@ -295,7 +295,6 @@ function test_event_obj_props(e) {
 
     props = [ "imeCompositionChange", "imeNotifyCommand", "imeNotifyData", "imeRequest", "imeRequestData", "issession", "keyboardLayout" ];
     for(i = 0; i < props.length; i++)
-        todo_wine.
         ok(!(props[i] in e), props[i] + " in event obj");
 }
 
