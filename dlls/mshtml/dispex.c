@@ -2160,6 +2160,45 @@ static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t
     memset(func, 0, (info->func_size - i) * sizeof(*func));
 }
 
+HRESULT legacy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+    case DISPATCH_CONSTRUCT:
+        return MSHTML_E_INVALID_ACTION;
+    case DISPATCH_PROPERTYGET: {
+        static const WCHAR prefix[8] = L"[object ";
+        static const WCHAR suffix[] = L"]";
+        WCHAR buf[ARRAY_SIZE(prefix) + 28 + ARRAY_SIZE(suffix)], *p = buf;
+        const WCHAR *name = dispex->info->desc->name;
+        unsigned len = wcslen(name);
+
+        memcpy(p, prefix, sizeof(prefix));
+        p += ARRAY_SIZE(prefix);
+        memcpy(p, name, len * sizeof(WCHAR));
+        p += len;
+        memcpy(p, suffix, sizeof(suffix));
+
+        if(!(V_BSTR(res) = SysAllocString(buf)))
+            return E_OUTOFMEMORY;
+        V_VT(res) = VT_BSTR;
+        break;
+    }
+    case DISPATCH_PROPERTYPUTREF|DISPATCH_PROPERTYPUT:
+    case DISPATCH_PROPERTYPUTREF:
+    case DISPATCH_PROPERTYPUT:
+        break;
+    default:
+        return E_INVALIDARG;
+    }
+    return S_OK;
+}
+
 HRESULT legacy_ctor_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
 {
     if((flags & fdexNameCaseInsensitive) ? !wcsicmp(name, L"prototype") : !wcscmp(name, L"prototype")) {

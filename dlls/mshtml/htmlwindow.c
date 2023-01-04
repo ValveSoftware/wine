@@ -176,10 +176,192 @@ static HRESULT get_legacy_ctor(HTMLInnerWindow *window, legacy_ctor_id_t ctor_id
     return S_OK;
 }
 
+static inline struct legacy_ctor *legacy_ctor_from_IUnknown(IUnknown *iface)
+{
+    return CONTAINING_RECORD(iface, struct legacy_ctor, IUnknown_iface);
+}
+
 static inline struct legacy_ctor *legacy_ctor_from_IDispatch(IDispatch *iface)
 {
     return CONTAINING_RECORD((IDispatchEx*)iface, struct legacy_ctor, dispex.IDispatchEx_iface);
 }
+
+static HRESULT WINAPI legacy_ctor_QueryInterface(IUnknown *iface, REFIID riid, void **ppv)
+{
+    struct legacy_ctor *This = legacy_ctor_from_IUnknown(iface);
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+
+    if(IsEqualGUID(&IID_IUnknown, riid)) {
+        *ppv = &This->IUnknown_iface;
+    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
+        return *ppv ? S_OK : E_NOINTERFACE;
+    }else {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown*)*ppv);
+    return S_OK;
+}
+
+static ULONG WINAPI legacy_ctor_AddRef(IUnknown *iface)
+{
+    struct legacy_ctor *This = legacy_ctor_from_IUnknown(iface);
+    LONG ref = InterlockedIncrement(&This->ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    return ref;
+}
+
+static ULONG WINAPI legacy_ctor_Release(IUnknown *iface)
+{
+    struct legacy_ctor *This = legacy_ctor_from_IUnknown(iface);
+    LONG ref = InterlockedDecrement(&This->ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    if(!ref) {
+        release_dispex(&This->dispex);
+        free(This);
+    }
+    return ref;
+}
+
+static const IUnknownVtbl legacy_ctor_vtbl = {
+    legacy_ctor_QueryInterface,
+    legacy_ctor_AddRef,
+    legacy_ctor_Release
+};
+
+static const dispex_static_data_vtbl_t legacy_ctor_dispex_vtbl = {
+    legacy_ctor_value,
+    legacy_ctor_get_dispid,
+    legacy_ctor_get_name,
+    legacy_ctor_invoke,
+    legacy_ctor_delete
+};
+
+static struct {
+    dispex_static_data_t dispex;
+    prototype_id_t prototype_id;
+} legacy_ctor_static_data[] = {
+#define X(name, proto_id)         \
+{                                 \
+    {                             \
+        L ## name,                \
+        &legacy_ctor_dispex_vtbl, \
+        PROTO_ID_NULL,            \
+        NULL_tid,                 \
+        no_iface_tids             \
+    },                            \
+    proto_id                      \
+},
+    X("Attr",                        PROTO_ID_HTMLDOMAttribute)
+ /* X("BehaviorUrnsCollection",      PROTO_ID_?) */
+ /* X("BookmarkCollection",          PROTO_ID_?) */
+ /* X("CompatibleInfo",              PROTO_ID_?) */
+ /* X("CompatibleInfoCollection",    PROTO_ID_?) */
+ /* X("ControlRangeCollection",      PROTO_ID_?) */
+    X("CSSCurrentStyleDeclaration",  PROTO_ID_HTMLCurrentStyle)
+    X("CSSRuleList",                 PROTO_ID_HTMLStyleSheetRulesCollection)
+ /* X("CSSRuleStyleDeclaration",     PROTO_ID_?) */
+    X("CSSStyleDeclaration",         PROTO_ID_HTMLW3CComputedStyle)
+    X("CSSStyleRule",                PROTO_ID_HTMLStyleSheetRule)
+    X("CSSStyleSheet",               PROTO_ID_HTMLStyleSheet)
+ /* X("DataTransfer",                PROTO_ID_?) */
+    X("DOMImplementation",           PROTO_ID_HTMLDOMImplementation)
+    X("Element",                     PROTO_ID_HTMLElement)
+    X("Event",                       PROTO_ID_HTMLEventObj)
+    X("History",                     PROTO_ID_History)
+ /* X("HTCElementBehaviorDefaults",  PROTO_ID_?) */
+    X("HTMLAnchorElement",           PROTO_ID_HTMLAnchorElement)
+    X("HTMLAreaElement",             PROTO_ID_HTMLAreaElement)
+ /* X("HTMLAreasCollection",         PROTO_ID_?) */
+ /* X("HTMLBaseElement",             PROTO_ID_?) */
+ /* X("HTMLBaseFontElement",         PROTO_ID_?) */
+ /* X("HTMLBGSoundElement",          PROTO_ID_?) */
+ /* X("HTMLBlockElement",            PROTO_ID_?) */
+    X("HTMLBodyElement",             PROTO_ID_HTMLBodyElement)
+ /* X("HTMLBRElement",               PROTO_ID_?) */
+    X("HTMLButtonElement",           PROTO_ID_HTMLButtonElement)
+    X("HTMLCollection",              PROTO_ID_HTMLElementCollection)
+    X("HTMLCommentElement",          PROTO_ID_HTMLCommentElement)
+ /* X("HTMLDDElement",               PROTO_ID_?) */
+ /* X("HTMLDivElement",              PROTO_ID_?) */
+ /* X("HTMLDListElement",            PROTO_ID_?) */
+    X("HTMLDocument",                PROTO_ID_HTMLDocument)
+ /* X("HTMLDTElement",               PROTO_ID_?) */
+    X("HTMLEmbedElement",            PROTO_ID_HTMLEmbedElement)
+ /* X("HTMLFieldSetElement",         PROTO_ID_?) */
+ /* X("HTMLFontElement",             PROTO_ID_?) */
+    X("HTMLFormElement",             PROTO_ID_HTMLFormElement)
+    X("HTMLFrameElement",            PROTO_ID_HTMLFrameElement)
+ /* X("HTMLFrameSetElement",         PROTO_ID_?) */
+    X("HTMLGenericElement",          PROTO_ID_HTMLGenericElement)
+    X("HTMLHeadElement",             PROTO_ID_HTMLHeadElement)
+ /* X("HTMLHeadingElement",          PROTO_ID_?) */
+ /* X("HTMLHRElement",               PROTO_ID_?) */
+    X("HTMLHtmlElement",             PROTO_ID_HTMLHtmlElement)
+ /* X("HTMLIFrameElement",           PROTO_ID_?) */
+    X("HTMLImageElement",            PROTO_ID_HTMLImgElement)
+    X("HTMLInputElement",            PROTO_ID_HTMLInputElement)
+ /* X("HTMLIsIndexElement",          PROTO_ID_?) */
+    X("HTMLLabelElement",            PROTO_ID_HTMLLabelElement)
+ /* X("HTMLLegendElement",           PROTO_ID_?) */
+ /* X("HTMLLIElement",               PROTO_ID_?) */
+    X("HTMLLinkElement",             PROTO_ID_HTMLLinkElement)
+ /* X("HTMLMapElement",              PROTO_ID_?) */
+ /* X("HTMLMarqueeElement",          PROTO_ID_?) */
+    X("HTMLMetaElement",             PROTO_ID_HTMLMetaElement)
+ /* X("HTMLModelessDialog",          PROTO_ID_?) */
+ /* X("HTMLNamespaceInfo",           PROTO_ID_?) */
+    X("HTMLNamespaceInfoCollection", PROTO_ID_HTMLNamespaceCollection)
+ /* X("HTMLNextIdElement",           PROTO_ID_?) */
+ /* X("HTMLNoShowElement",           PROTO_ID_?) */
+    X("HTMLObjectElement",           PROTO_ID_HTMLObjectElement)
+ /* X("HTMLOListElement",            PROTO_ID_?) */
+    X("HTMLOptionElement",           PROTO_ID_HTMLOptionElement)
+ /* X("HTMLParagraphElement",        PROTO_ID_?) */
+ /* X("HTMLParamElement",            PROTO_ID_?) */
+ /* X("HTMLPhraseElement",           PROTO_ID_?) */
+    X("HTMLPluginsCollection",       PROTO_ID_HTMLPluginsCollection)
+ /* X("HTMLPopup",                   PROTO_ID_?) */
+    X("HTMLScriptElement",           PROTO_ID_HTMLScriptElement)
+    X("HTMLSelectElement",           PROTO_ID_HTMLSelectElement)
+ /* X("HTMLSpanElement",             PROTO_ID_?) */
+ /* X("HTMLStyleElement",            PROTO_ID_?) */
+ /* X("HTMLTableCaptionElement",     PROTO_ID_?) */
+    X("HTMLTableCellElement",        PROTO_ID_HTMLTableCellElement)
+ /* X("HTMLTableColElement",         PROTO_ID_?) */
+    X("HTMLTableElement",            PROTO_ID_HTMLTableElement)
+    X("HTMLTableRowElement",         PROTO_ID_HTMLTableRowElement)
+ /* X("HTMLTableSectionElement",     PROTO_ID_?) */
+    X("HTMLTextAreaElement",         PROTO_ID_HTMLTextAreaElement)
+ /* X("HTMLTextElement",             PROTO_ID_?) */
+    X("HTMLTitleElement",            PROTO_ID_HTMLTitleElement)
+ /* X("HTMLUListElement",            PROTO_ID_?) */
+    X("HTMLUnknownElement",          PROTO_ID_HTMLUnknownElement)
+    X("Location",                    PROTO_ID_HTMLLocation)
+    X("NamedNodeMap",                PROTO_ID_HTMLAttributeCollection)
+    X("Navigator",                   PROTO_ID_Navigator)
+    X("NodeList",                    PROTO_ID_HTMLDOMChildrenCollection)
+    X("Screen",                      PROTO_ID_HTMLScreen)
+    X("Selection",                   PROTO_ID_HTMLSelectionObject)
+ /* X("StaticNodeList",              PROTO_ID_?) */
+    X("Storage",                     PROTO_ID_HTMLStorage)
+    X("StyleSheetList",              PROTO_ID_HTMLStyleSheetsCollection)
+ /* X("StyleSheetPage",              PROTO_ID_?) */
+ /* X("StyleSheetPageList",          PROTO_ID_?) */
+    X("Text",                        PROTO_ID_HTMLDOMTextNode)
+    X("TextRange",                   PROTO_ID_HTMLTextRange)
+ /* X("TextRangeCollection",         PROTO_ID_?) */
+    X("TextRectangle",               PROTO_ID_HTMLRect)
+    X("TextRectangleList",           PROTO_ID_HTMLRectCollection)
+    X("Window",                      PROTO_ID_HTMLWindow)
+#undef X
+};
 
 static inline HTMLWindow *impl_from_IHTMLWindow2(IHTMLWindow2 *iface)
 {
@@ -3616,6 +3798,9 @@ static HRESULT WINAPI WindowDispEx_Invoke(IDispatchEx *iface, DISPID dispIdMembe
 
 static global_prop_t *alloc_global_prop(HTMLInnerWindow *This, global_prop_type_t type, BSTR name)
 {
+    if(This->global_prop_cnt > MSHTML_CUSTOM_DISPID_CNT - ARRAY_SIZE(legacy_ctor_static_data))
+        return NULL;
+
     if(This->global_prop_cnt == This->global_prop_size) {
         global_prop_t *new_props;
         DWORD new_size;
@@ -3675,6 +3860,25 @@ HRESULT search_window_props(HTMLInnerWindow *This, BSTR bstrName, DWORD grfdex, 
     }
 
     return DISP_E_UNKNOWNNAME;
+}
+
+static DISPID lookup_legacy_ctor_prop(HTMLInnerWindow *window, BSTR name)
+{
+    DWORD i, a = 0, b = ARRAY_SIZE(legacy_ctor_static_data);
+    int c;
+
+    if(dispex_compat_mode(&window->event_target.dispex) != COMPAT_MODE_IE8)
+        return DISPID_UNKNOWN;
+
+    while(a < b) {
+        i = (a + b) / 2;
+        c = wcscmp(legacy_ctor_static_data[i].dispex.name, name);
+        if(!c)
+            return i + (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
+        if(c > 0) b = i;
+        else      a = i + 1;
+    }
+    return DISPID_UNKNOWN;
 }
 
 static HRESULT lookup_custom_prop(HTMLWindow *html_window, BSTR name, DISPID *pid)
@@ -3788,6 +3992,7 @@ static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, 
     HTMLInnerWindow *window = This->inner_window;
     IWineDispatchProxyCbPrivate *proxy = window->event_target.dispex.proxy;
     HRESULT hres;
+    DISPID id;
 
     if(proxy)
         return IDispatchEx_GetDispID((IDispatchEx*)proxy, bstrName, grfdex, pid);
@@ -3797,6 +4002,12 @@ static HRESULT WINAPI WindowDispEx_GetDispID(IDispatchEx *iface, BSTR bstrName, 
     hres = search_window_props(window, bstrName, grfdex, pid);
     if(hres != DISP_E_UNKNOWNNAME)
         return hres;
+
+    id = lookup_legacy_ctor_prop(window, bstrName);
+    if(id != DISPID_UNKNOWN) {
+        *pid = id;
+        return S_OK;
+    }
 
     hres = IDispatchEx_GetDispID(&window->base.inner_window->event_target.dispex.IDispatchEx_iface, bstrName, grfdex, pid);
     if(hres != DISP_E_UNKNOWNNAME)
@@ -3815,8 +4026,15 @@ static HRESULT WINAPI WindowDispEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID 
 static HRESULT WINAPI WindowDispEx_DeleteMemberByName(IDispatchEx *iface, BSTR bstrName, DWORD grfdex)
 {
     HTMLWindow *This = impl_from_IDispatchEx(iface);
+    IWineDispatchProxyCbPrivate *proxy = This->inner_window->event_target.dispex.proxy;
+
+    if(proxy)
+        return IDispatchEx_DeleteMemberByName((IDispatchEx*)proxy, bstrName, grfdex);
 
     TRACE("(%p)->(%s %lx)\n", This, debugstr_w(bstrName), grfdex);
+
+    if(lookup_legacy_ctor_prop(This->inner_window, bstrName) != DISPID_UNKNOWN)
+        return MSHTML_E_INVALID_ACTION;
 
     return IDispatchEx_DeleteMemberByName(&This->inner_window->event_target.dispex.IDispatchEx_iface, bstrName, grfdex);
 }
@@ -3824,8 +4042,18 @@ static HRESULT WINAPI WindowDispEx_DeleteMemberByName(IDispatchEx *iface, BSTR b
 static HRESULT WINAPI WindowDispEx_DeleteMemberByDispID(IDispatchEx *iface, DISPID id)
 {
     HTMLWindow *This = impl_from_IDispatchEx(iface);
+    IWineDispatchProxyCbPrivate *proxy = This->inner_window->event_target.dispex.proxy;
+    DWORD idx;
+
+    if(proxy && id >= 0)
+        return IDispatchEx_DeleteMemberByDispID((IDispatchEx*)proxy, id);
 
     TRACE("(%p)->(%lx)\n", This, id);
+
+    idx = id - (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
+    if(idx < ARRAY_SIZE(legacy_ctor_static_data) &&
+       dispex_compat_mode(&This->inner_window->event_target.dispex) == COMPAT_MODE_IE8)
+        return MSHTML_E_INVALID_ACTION;
 
     return IDispatchEx_DeleteMemberByDispID(&This->inner_window->event_target.dispex.IDispatchEx_iface, id);
 }
@@ -4232,11 +4460,19 @@ static HRESULT HTMLWindow_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
 {
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+    const WCHAR *str;
 
-    if(idx >= This->global_prop_cnt)
-        return DISP_E_MEMBERNOTFOUND;
+    if(idx >= This->global_prop_cnt) {
+        idx = id - (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
+        if(idx >= ARRAY_SIZE(legacy_ctor_static_data) ||
+           dispex_compat_mode(&This->event_target.dispex) != COMPAT_MODE_IE8)
+            return DISP_E_MEMBERNOTFOUND;
 
-    return (*name = SysAllocString(This->global_props[idx].name)) ? S_OK : E_OUTOFMEMORY;
+        str = legacy_ctor_static_data[idx].dispex.name;
+    }else {
+        str = This->global_props[idx].name;
+    }
+    return (*name = SysAllocString(str)) ? S_OK : E_OUTOFMEMORY;
 }
 
 static HRESULT HTMLWindow_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
@@ -4248,8 +4484,37 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID
     HRESULT hres;
 
     idx = id - MSHTML_DISPID_CUSTOM_MIN;
-    if(idx >= This->global_prop_cnt)
-        return DISP_E_MEMBERNOTFOUND;
+    if(idx >= This->global_prop_cnt) {
+        idx = id - (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
+        if(idx >= ARRAY_SIZE(legacy_ctor_static_data) ||
+           dispex_compat_mode(&This->event_target.dispex) != COMPAT_MODE_IE8)
+            return DISP_E_MEMBERNOTFOUND;
+
+        switch(flags) {
+        case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+            if(!res)
+                return E_INVALIDARG;
+            /* fall through */
+        case DISPATCH_METHOD:
+        case DISPATCH_CONSTRUCT:
+            return MSHTML_E_INVALID_ACTION;
+        case DISPATCH_PROPERTYGET:
+            /* For these generic constructors, LEGACY_CTOR_ID is the same as the PROTO_ID */
+            hres = get_legacy_ctor(This, legacy_ctor_static_data[idx].prototype_id, legacy_ctor_static_data[idx].prototype_id,
+                                   &legacy_ctor_static_data[idx].dispex, &legacy_ctor_vtbl, &V_DISPATCH(res));
+            if(FAILED(hres))
+                return hres;
+            V_VT(res) = VT_DISPATCH;
+            break;
+        case DISPATCH_PROPERTYPUTREF|DISPATCH_PROPERTYPUT:
+        case DISPATCH_PROPERTYPUTREF:
+        case DISPATCH_PROPERTYPUT:
+            break;
+        default:
+            return E_INVALIDARG;
+        }
+        return S_OK;
+    }
 
     prop = This->global_props+idx;
 
