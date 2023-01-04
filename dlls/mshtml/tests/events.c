@@ -3356,7 +3356,6 @@ static void test_doc_obj(IHTMLDocument2 *doc)
 
     hres = IHTMLWindow2_get_location(window, &location2);
     ok(hres == S_OK, "get_location failed: %08lx\n", hres);
-    todo_wine
     ok(location == location2, "location != location2\n");
     IHTMLLocation_Release(location2);
     IHTMLLocation_Release(location);

@@ -492,7 +492,7 @@ struct HTMLLocation {
 
     LONG ref;
 
-    HTMLInnerWindow *window;
+    HTMLOuterWindow *window;
 };
 
 typedef struct {
@@ -575,6 +575,7 @@ struct HTMLOuterWindow {
     unsigned readystate_pending;
 
     HTMLInnerWindow *pending_window;
+    HTMLLocation *location;
     IMoniker *mon;
     IUri *uri;
     IUri *uri_nofrag;
@@ -617,8 +618,6 @@ struct HTMLInnerWindow {
     DWORD global_prop_size;
 
     LONG task_magic;
-
-    HTMLLocation *location;
 
     IMoniker *mon;
     nsChannelBSC *bscallback;
@@ -993,7 +992,7 @@ void get_top_window(HTMLOuterWindow*,HTMLOuterWindow**) DECLSPEC_HIDDEN;
 HRESULT HTMLOptionElementFactory_Create(HTMLInnerWindow*,HTMLOptionElementFactory**) DECLSPEC_HIDDEN;
 HRESULT HTMLImageElementFactory_Create(HTMLInnerWindow*,HTMLImageElementFactory**) DECLSPEC_HIDDEN;
 HRESULT HTMLXMLHttpRequestFactory_Create(HTMLInnerWindow*,HTMLXMLHttpRequestFactory**) DECLSPEC_HIDDEN;
-HRESULT HTMLLocation_Create(HTMLInnerWindow*,HTMLLocation**) DECLSPEC_HIDDEN;
+HRESULT HTMLLocation_Create(HTMLOuterWindow*,HTMLLocation**) DECLSPEC_HIDDEN;
 HRESULT create_navigator(compat_mode_t,IOmNavigator**) DECLSPEC_HIDDEN;
 HRESULT create_html_screen(compat_mode_t,IHTMLScreen**) DECLSPEC_HIDDEN;
 HRESULT create_performance(HTMLInnerWindow*,IHTMLPerformance**) DECLSPEC_HIDDEN;
