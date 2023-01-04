@@ -3648,7 +3648,7 @@ static HRESULT WINAPI HTMLDocument7_get_defaultView(IHTMLDocument7 *iface, IHTML
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    if(This->window && This->window->base.outer_window) {
+    if(This->window) {
         *p = &This->window->base.outer_window->base.IHTMLWindow2_iface;
         IHTMLWindow2_AddRef(*p);
     }else {

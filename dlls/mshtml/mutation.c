@@ -400,7 +400,7 @@ static void set_document_mode(HTMLDocumentNode *doc, compat_mode_t document_mode
 
     TRACE("%p: %d\n", doc, document_mode);
 
-    max_compat_mode = doc->window && doc->window->base.outer_window
+    max_compat_mode = doc->window
         ? get_max_compat_mode(doc->window->base.outer_window->uri)
         : COMPAT_MODE_IE11;
     if(max_compat_mode < document_mode) {
@@ -859,7 +859,7 @@ static void NSAPI nsDocumentObserver_BindToDocument(nsIDocumentObserver *iface, 
                but it is not set by default on native, and the behavior is still different. This was tested
                by removing all iexplore.exe values from any FeatureControl subkeys, and renaming the test
                executable to iexplore.exe, which changed its default compat mode in such cases. */
-            if(This->window && This->window->base.outer_window && is_iexplore()) {
+            if(This->window && is_iexplore()) {
                 HTMLOuterWindow *window = This->window->base.outer_window;
                 DWORD zone;
                 HRESULT hres;

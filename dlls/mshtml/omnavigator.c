@@ -673,7 +673,7 @@ static HRESULT WINAPI OmHistory_get_length(IOmHistory *iface, short *p)
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    if(This->window && This->window->base.outer_window)
+    if(This->window)
         browser = This->window->base.outer_window->browser;
 
     *p = browser && browser->doc->travel_log
