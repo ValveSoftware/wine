@@ -685,6 +685,7 @@ extern BOOL update_clipboard( HWND hwnd ) DECLSPEC_HIDDEN;
 extern BOOL wm_is_mutter(Display *) DECLSPEC_HIDDEN;
 extern BOOL wm_is_steamcompmgr(Display *) DECLSPEC_HIDDEN;
 
+extern void set_wm_hints( struct x11drv_win_data *data ) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_enabled(HMONITOR monitor) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_mapping_required(HMONITOR monitor) DECLSPEC_HIDDEN;
 extern BOOL fs_hack_is_integer(void) DECLSPEC_HIDDEN;
