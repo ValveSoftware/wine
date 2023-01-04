@@ -558,7 +558,8 @@ static HRESULT WINAPI transform_GetOutputCurrentType(IMFTransform *iface, DWORD 
 static HRESULT WINAPI transform_GetInputStatus(IMFTransform *iface, DWORD id, DWORD *flags)
 {
     FIXME("iface %p, id %#lx, flags %p stub!\n", iface, id, flags);
-    return E_NOTIMPL;
+    *flags = MFT_INPUT_STATUS_ACCEPT_DATA;
+    return S_OK;
 }
 
 static HRESULT WINAPI transform_GetOutputStatus(IMFTransform *iface, DWORD *flags)
