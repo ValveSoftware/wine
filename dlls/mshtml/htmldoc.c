@@ -39,6 +39,13 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
+static dispex_static_data_t *const dispex_from_document_type[] = {
+    [DOCTYPE_HTML]  = &HTMLDocumentNode_dispex,
+    [DOCTYPE_XHTML] = &XMLDocumentNode_dispex,
+    [DOCTYPE_XML]   = &XMLDocumentNode_dispex,
+    [DOCTYPE_SVG]   = &XMLDocumentNode_dispex,
+};
+
 static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *doc_node, HTMLDocumentNode **ret);
 
 HRESULT get_doc_elem_by_id(HTMLDocumentNode *doc, const WCHAR *id, HTMLElement **ret)
@@ -6312,7 +6319,7 @@ static void HTMLDocumentNode_finalize_dispex(DispatchEx *dispex)
     if(COMPAT_MODE_IE9 <= compat_mode && compat_mode < COMPAT_MODE_IE11)
         dispex_data = &DocumentNode_dispex;
     else
-        dispex_data = &HTMLDocumentNode_dispex;
+        dispex_data = dispex_from_document_type[This->doc_type];
 
     finalize_delayed_init_dispex(dispex, get_inner_window(This), dispex_data);
 }
@@ -6474,6 +6481,15 @@ dispex_static_data_t HTMLDocumentNode_dispex = {
     HTMLDocumentNode_init_dispex_info
 };
 
+dispex_static_data_t XMLDocumentNode_dispex = {
+    L"XMLDocument",
+    &HTMLDocumentNode_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_XMLDocument,
+    DispHTMLDocument_tid,
+    HTMLDocumentNode_iface_tids,
+    HTMLDocumentNode_init_dispex_info
+};
+
 dispex_static_data_t DocumentNode_dispex = {
     L"Document",
     &HTMLDocumentNode_event_target_vtbl.dispex_vtbl,
@@ -6527,7 +6543,7 @@ static HTMLDocumentNode *alloc_doc_node(HTMLDocumentObj *doc_obj, HTMLInnerWindo
 }
 
 HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLInnerWindow *window,
-                             compat_mode_t parent_mode, HTMLDocumentNode **ret)
+                             document_type_t doc_type, compat_mode_t parent_mode, HTMLDocumentNode **ret)
 {
     HTMLDocumentObj *doc_obj = browser->doc;
     HTMLDocumentNode *doc;
@@ -6535,6 +6551,7 @@ HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLI
     doc = alloc_doc_node(doc_obj, window);
     if(!doc)
         return E_OUTOFMEMORY;
+    doc->doc_type = doc_type;
 
     if(!doc_obj->window || (window && is_main_content_window(window->base.outer_window)))
         doc->cp_container.forward_container = &doc_obj->cp_container;
@@ -6548,7 +6565,7 @@ HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLI
     }
 
     doc->node.vtbl = &HTMLDocumentNodeImplVtbl;
-    HTMLDOMNode_Init(doc, &doc->node, (nsIDOMNode*)doc->dom_document, &HTMLDocumentNode_dispex);
+    HTMLDOMNode_Init(doc, &doc->node, (nsIDOMNode*)doc->dom_document, dispex_from_document_type[doc_type]);
 
     if(parent_mode >= COMPAT_MODE_IE9) {
         TRACE("using parent mode %u\n", parent_mode);
@@ -6588,7 +6605,7 @@ static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *do
     IHTMLWindow2_AddRef(&doc_frag->window->base.IHTMLWindow2_iface);
 
     doc_frag->node.vtbl = &HTMLDocumentFragmentImplVtbl;
-    HTMLDOMNode_Init(doc_node, &doc_frag->node, nsnode, &HTMLDocumentNode_dispex);
+    HTMLDOMNode_Init(doc_node, &doc_frag->node, nsnode, dispex_from_document_type[doc_node->doc_type]);
     doc_frag->document_mode = lock_document_mode(doc_node);
 
     *ret = doc_frag;

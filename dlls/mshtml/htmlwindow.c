@@ -5046,7 +5046,7 @@ void set_window_uninitialized(HTMLOuterWindow *window, HTMLDocumentNode *doc_nod
     if(NS_FAILED(nsres))
         return;
 
-    hres = create_document_node(nsdoc, window->browser, window->pending_window, COMPAT_MODE_QUIRKS, &window->pending_window->doc);
+    hres = create_document_node(nsdoc, window->browser, window->pending_window, DOCTYPE_HTML, COMPAT_MODE_QUIRKS, &window->pending_window->doc);
     nsIDOMDocument_Release(nsdoc);
     if(FAILED(hres))
         return;
@@ -5081,7 +5081,7 @@ HRESULT update_window_doc(HTMLInnerWindow *window)
     if(outer_window->parent)
         parent_mode = outer_window->parent->base.inner_window->doc->document_mode;
 
-    hres = create_document_node(nsdoc, outer_window->browser, window, parent_mode, &window->doc);
+    hres = create_document_node(nsdoc, outer_window->browser, window, DOCTYPE_HTML, parent_mode, &window->doc);
     nsIDOMDocument_Release(nsdoc);
     if(FAILED(hres))
         return hres;
