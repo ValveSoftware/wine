@@ -1157,6 +1157,7 @@ sync_test("builtin_prototypes", function() {
             [ "History",                        "Object" ],
             [ "HTMLCollection",                 "Object" ],
             [ "MediaQueryList",                 "Object" ],
+            [ "MessageEvent",                   "Event" ],
             [ "MimeTypeArray",                  "Object" ],
             [ "MSCSSRuleList",                  "Object" ],
             [ "MSEventObj",                     "Object" ],
@@ -1202,6 +1203,7 @@ sync_test("builtin_prototypes", function() {
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
             [ "CustomEvent", ["detail","initCustomEvent"], Event_props ],
             [ "DocumentType", ["entities","internalSubset","name","notations","publicId","systemId"], Node_props ],
+            [ "MessageEvent", ["data","initMessageEvent","origin","source"], Event_props ],
             [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ],
             [ "UIEvent", ["detail","initUIEvent","view"], Event_props ]
         ];
