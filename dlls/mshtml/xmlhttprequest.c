@@ -1925,9 +1925,9 @@ static HRESULT WINAPI HTMLXDomainRequest_send(IHTMLXDomainRequest *iface, VARIAN
 {
     HTMLXDomainRequest *This = impl_from_IHTMLXDomainRequest(iface);
 
-    FIXME("(%p)->(%s)\n", This, debugstr_variant(&varBody));
+    TRACE("(%p)->(%s)\n", This, debugstr_variant(&varBody));
 
-    return E_NOTIMPL;
+    return nsxhr_send(This->nsxhr, varBody);
 }
 
 static const IHTMLXDomainRequestVtbl HTMLXDomainRequestVtbl = {
