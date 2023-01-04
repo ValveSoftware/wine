@@ -211,6 +211,7 @@ static inline dispex_data_t *proxy_prototype_object_info(struct proxy_prototype 
 static func_disp_t *create_func_disp(DispatchEx*,func_info_t*);
 static HRESULT get_dynamic_prop(DispatchEx*,const WCHAR*,DWORD,dynamic_prop_t**);
 static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+static inline BOOL is_legacy_prototype(IDispatch*);
 static inline struct proxy_prototype *to_proxy_prototype(DispatchEx*);
 
 static HRESULT load_typelib(void)
@@ -988,17 +989,19 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
 {
     IDispatchEx *dispex = NULL;
     DISPPARAMS params = { 0 };
+    HRESULT hres, errcode;
     IDispatch *this_obj;
     DISPID dispid;
     UINT argc = 0;
     VARIANT *arg;
-    HRESULT hres;
     VARIANT var;
 
     arg = dp->rgvarg + dp->cArgs - 1;
     if(dp->cArgs < 1 || V_VT(arg) != VT_DISPATCH || !V_DISPATCH(arg))
         return CTL_E_ILLEGALFUNCTIONCALL;
     this_obj = V_DISPATCH(arg);
+
+    errcode = is_legacy_prototype(this_obj) ? MSHTML_E_INVALID_PROPERTY : CTL_E_ILLEGALFUNCTIONCALL;
 
     if(dp->cArgs >= 2) {
         UINT i, err = 0;
@@ -1007,7 +1010,7 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
 
         arg--;
         if((V_VT(arg) & ~VT_BYREF) != VT_DISPATCH)
-            return CTL_E_ILLEGALFUNCTIONCALL;
+            return errcode;
         disp = (V_VT(arg) & VT_BYREF) ? *(IDispatch**)(V_BYREF(arg)) : V_DISPATCH(arg);
 
         /* get the array length */
@@ -1023,7 +1026,7 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
         }
         SysFreeString(name);
         if(FAILED(hres) || dispid == DISPID_UNKNOWN) {
-            hres = CTL_E_ILLEGALFUNCTIONCALL;
+            hres = errcode;
             goto fail;
         }
 
@@ -1042,7 +1045,7 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
         }
         VariantClear(res);
         if(FAILED(hres) || V_I4(&var) < 0) {
-            hres = CTL_E_ILLEGALFUNCTIONCALL;
+            hres = errcode;
             goto fail;
         }
         params.cArgs = V_I4(&var);
@@ -1072,7 +1075,7 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
                         V_VT(arg) = VT_EMPTY;
                         continue;
                     }
-                    hres = CTL_E_ILLEGALFUNCTIONCALL;
+                    hres = errcode;
                     break;
                 }
                 if(dispex)
@@ -1097,7 +1100,7 @@ cleanup:
 fail:
     if(dispex)
         IDispatchEx_Release(dispex);
-    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+    return (hres == E_UNEXPECTED) ? errcode : hres;
 }
 
 static HRESULT function_call(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
@@ -1112,7 +1115,8 @@ static HRESULT function_call(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIA
 
     hres = invoke_builtin_function(V_DISPATCH(arg), func->info, &params, res, ei, caller);
 
-    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+    return (hres != E_UNEXPECTED) ? hres :
+           (is_legacy_prototype(V_DISPATCH(arg)) ? MSHTML_E_INVALID_PROPERTY : CTL_E_ILLEGALFUNCTIONCALL);
 }
 
 static const struct {
@@ -3273,6 +3277,13 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     WineDispatchProxyPrivate_ToString,
     WineDispatchProxyPrivate_CanGC
 };
+
+static inline BOOL is_legacy_prototype(IDispatch *disp)
+{
+    if(!disp || disp->lpVtbl != (const IDispatchVtbl*)&WineDispatchProxyPrivateVtbl)
+        return FALSE;
+    return (impl_from_IDispatchEx((IDispatchEx*)disp)->outer->lpVtbl == &legacy_prototype_vtbl);
+}
 
 BOOL dispex_query_interface(DispatchEx *This, REFIID riid, void **ppv)
 {
