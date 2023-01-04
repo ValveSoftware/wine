@@ -923,7 +923,7 @@ static HRESULT HTMLFormElement_dispex_get_name(HTMLDOMNode *iface, DISPID id, BS
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLFormElement_invoke(HTMLDOMNode *iface,
+static HRESULT HTMLFormElement_invoke(HTMLDOMNode *iface, IDispatch *this_obj,
         DISPID id, LCID lcid, WORD flags, DISPPARAMS *params, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
