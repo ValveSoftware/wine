@@ -1023,10 +1023,11 @@ static HRESULT HTMLImageElementFactory_value(DispatchEx *dispex, LCID lcid,
     return S_OK;
 }
 
-static const tid_t HTMLImageElementFactory_iface_tids[] = {
-    IHTMLImageElementFactory_tid,
-    0
-};
+static void HTMLImageElementFactory_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
+{
+    if(compat_mode < COMPAT_MODE_IE9)
+        dispex_info_add_interface(info, IHTMLImageElementFactory_tid, NULL);
+}
 
 static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
     HTMLImageElementFactory_value,
@@ -1041,5 +1042,6 @@ dispex_static_data_t HTMLImageElementFactory_dispex = {
     &HTMLImageElementFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLImageElementFactory_tid,
-    HTMLImageElementFactory_iface_tids
+    no_iface_tids,
+    HTMLImageElementFactory_init_dispex_info
 };

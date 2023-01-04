@@ -631,10 +631,11 @@ static HRESULT HTMLOptionElementFactory_value(DispatchEx *dispex, LCID lcid,
     return S_OK;
 }
 
-static const tid_t HTMLOptionElementFactory_iface_tids[] = {
-    IHTMLOptionElementFactory_tid,
-    0
-};
+static void HTMLOptionElementFactory_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
+{
+    if(compat_mode < COMPAT_MODE_IE9)
+        dispex_info_add_interface(info, IHTMLOptionElementFactory_tid, NULL);
+}
 
 static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
     HTMLOptionElementFactory_value,
@@ -649,7 +650,8 @@ dispex_static_data_t HTMLOptionElementFactory_dispex = {
     &HTMLOptionElementFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLOptionElementFactory_tid,
-    HTMLOptionElementFactory_iface_tids,
+    no_iface_tids,
+    HTMLOptionElementFactory_init_dispex_info
 };
 
 struct HTMLSelectElement {

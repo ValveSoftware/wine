@@ -1017,18 +1017,29 @@ HRESULT create_proxy_constructor(IDispatch *disp, const WCHAR *name, jsdisp_t *p
 
     hres = jsdisp_define_data_property(&constructor->function.dispex, L"prototype", 0, jsval_obj(prototype));
     if(SUCCEEDED(hres)) {
+        BSTR bstr = SysAllocString(L"create");
         ProxyConstructorCreate *create;
+        DISPID dispid;
 
-        hres = create_function(ctx, &ProxyConstructorCreate_info, &ProxyConstructorCreateVtbl, sizeof(ProxyConstructorCreate),
-                               PROPF_METHOD, FALSE, NULL, (void**)&create);
-        if(SUCCEEDED(hres)) {
-            create->ctor = constructor;
-            jsdisp_addref(&constructor->function.dispex);
+        if(!bstr)
+            hres = E_OUTOFMEMORY;
+        else {
+            HRESULT prop_hres = IDispatch_GetIDsOfNames(disp, &IID_NULL, &bstr, 1, 0, &dispid);
+            SysFreeString(bstr);
 
-            hres = jsdisp_define_data_property(&create->function.dispex, L"prototype", 0, jsval_null());
-            if(SUCCEEDED(hres))
-                hres = jsdisp_define_data_property(&constructor->function.dispex, L"create", 0, jsval_obj(&create->function.dispex));
-            jsdisp_release(&create->function.dispex);
+            if(prop_hres == S_OK) {
+                hres = create_function(ctx, &ProxyConstructorCreate_info, &ProxyConstructorCreateVtbl, sizeof(ProxyConstructorCreate),
+                                       PROPF_METHOD, FALSE, NULL, (void**)&create);
+                if(SUCCEEDED(hres)) {
+                    create->ctor = constructor;
+                    jsdisp_addref(&constructor->function.dispex);
+
+                    hres = jsdisp_define_data_property(&create->function.dispex, L"prototype", 0, jsval_null());
+                    if(SUCCEEDED(hres))
+                        hres = jsdisp_define_data_property(&constructor->function.dispex, L"create", 0, jsval_obj(&create->function.dispex));
+                    jsdisp_release(&create->function.dispex);
+                }
+            }
         }
     }
     if(FAILED(hres)) {

@@ -547,7 +547,6 @@ sync_test("builtin_prototypes", function() {
                 ok(Object.prototype.hasOwnProperty.call(obj, special_ctors[i][1][j]), special_ctors[i][1][j] + " not a property of " + name + " constructor.");
 
             if(special_ctors[i][2]) for(var j = 0; j < special_ctors[i][2].length; j++)
-                todo_wine_if(special_ctors[i][2][j] === "create" && name !== "XMLHttpRequest").
                 ok(!Object.prototype.hasOwnProperty.call(obj, special_ctors[i][2][j]), special_ctors[i][2][j] + " is a property of " + name + " constructor.");
 
             ok(Object.getPrototypeOf(obj) === Function.prototype, "getPrototypeOf(" + name + " constructor) = " + Object.getPrototypeOf(obj));
