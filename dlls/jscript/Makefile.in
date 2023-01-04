@@ -4,6 +4,7 @@ IMPORTS   = oleaut32 ole32 user32 advapi32
 C_SRCS = \
 	activex.c \
 	array.c \
+	arraybuf.c \
 	bool.c \
 	compile.c \
 	date.c \
