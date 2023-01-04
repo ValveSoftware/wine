@@ -621,8 +621,10 @@ dispex_static_data_t HTMLLocation_dispex = {
 
 void HTMLLocation_Init(HTMLOuterWindow *window)
 {
+    compat_mode_t compat_mode = dispex_compat_mode(&window->base.inner_window->event_target.dispex);
+
     window->location.IHTMLLocation_iface.lpVtbl = &HTMLLocationVtbl;
 
     init_dispatch(&window->location.dispex, (IUnknown*)&window->location.IHTMLLocation_iface, &HTMLLocation_dispex,
-                  window->base.inner_window, COMPAT_MODE_QUIRKS);
+                  window->base.inner_window, min(compat_mode, COMPAT_MODE_IE8));
 }

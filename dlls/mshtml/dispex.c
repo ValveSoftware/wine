@@ -1931,7 +1931,7 @@ static BOOL ensure_real_info(DispatchEx *dispex)
     if(dispex->info != dispex->info->desc->delayed_init_info)
         return TRUE;
 
-    dispex->info = ensure_dispex_info(dispex->info->desc, dispex_compat_mode(dispex));
+    dispex->info->desc->vtbl->finalize_dispex(dispex);
     return dispex->info != NULL;
 }
 
@@ -3118,6 +3118,9 @@ void release_dispex(DispatchEx *This)
     if(This->proxy)
         This->proxy->lpVtbl->Unlinked(This->proxy, FALSE);
 
+    if(This->prototype)
+        IUnknown_Release(&This->prototype->IUnknown_iface);
+
     if(!This->dynamic_data)
         return;
 
@@ -3145,6 +3148,15 @@ void release_dispex(DispatchEx *This)
     free(This->dynamic_data);
 }
 
+void finalize_delayed_init_dispex(DispatchEx *This, HTMLInnerWindow *window, dispex_static_data_t *data)
+{
+    compat_mode_t compat_mode = window->doc->document_mode;
+
+    This->info = ensure_dispex_info(data, compat_mode);
+    if(!This->proxy && data->prototype_id < ARRAY_SIZE(window->legacy_prototypes))
+        This->prototype = get_legacy_prototype(window, data->prototype_id, compat_mode);
+}
+
 void init_dispatch(DispatchEx *dispex, IUnknown *outer, dispex_static_data_t *data, HTMLInnerWindow *window,
         compat_mode_t compat_mode)
 {
@@ -3153,6 +3165,7 @@ void init_dispatch(DispatchEx *dispex, IUnknown *outer, dispex_static_data_t *da
     dispex->IDispatchEx_iface.lpVtbl = (const IDispatchExVtbl*)&WineDispatchProxyPrivateVtbl;
     dispex->outer = outer;
     dispex->proxy = NULL;
+    dispex->prototype = NULL;
     dispex->dynamic_data = NULL;
 
     if(data->vtbl && data->vtbl->get_compat_mode) {
@@ -3190,6 +3203,8 @@ void init_dispatch(DispatchEx *dispex, IUnknown *outer, dispex_static_data_t *da
                     if(FAILED(hres))
                         ERR("InitProxy failed: %08lx\n", hres);
                 }
+            }else if(data->prototype_id < ARRAY_SIZE(window->legacy_prototypes)) {
+                dispex->prototype = get_legacy_prototype(window, data->prototype_id, compat_mode);
             }
         }
     }

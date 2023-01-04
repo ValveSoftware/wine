@@ -4346,6 +4346,14 @@ static compat_mode_t HTMLWindow_get_compat_mode(DispatchEx *dispex)
     return compat_mode;
 }
 
+static void HTMLWindow_finalize_dispex(DispatchEx *dispex)
+{
+    HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
+
+    HTMLWindow_get_compat_mode(dispex);
+    finalize_delayed_init_dispex(dispex, This, &HTMLWindow_dispex);
+}
+
 static IDispatch *HTMLWindow_get_dispatch_this(DispatchEx *dispex)
 {
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
@@ -4518,6 +4526,7 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
         NULL,
         NULL,
         HTMLWindow_get_compat_mode,
+        HTMLWindow_finalize_dispex,
         NULL
     },
     HTMLWindow_get_dispatch_this,

@@ -526,6 +526,7 @@ typedef struct dispex_dynamic_data_t dispex_dynamic_data_t;
 #define MSHTML_CUSTOM_DISPID_CNT (MSHTML_DISPID_CUSTOM_MAX-MSHTML_DISPID_CUSTOM_MIN)
 
 typedef struct DispatchEx DispatchEx;
+struct legacy_prototype;
 
 typedef struct {
     HRESULT (*value)(DispatchEx*,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
@@ -537,6 +538,7 @@ typedef struct {
     HRESULT (*override)(DispatchEx*,const WCHAR*,VARIANT*);
     HRESULT (*get_static_dispid)(compat_mode_t,BSTR,DWORD,DISPID*);
     compat_mode_t (*get_compat_mode)(DispatchEx*);
+    void (*finalize_dispex)(DispatchEx*);
     HRESULT (*populate_props)(DispatchEx*);
 } dispex_static_data_vtbl_t;
 
@@ -567,6 +569,7 @@ struct DispatchEx {
 
     IUnknown *outer;
     IWineDispatchProxyCbPrivate *proxy;
+    struct legacy_prototype *prototype;
 
     dispex_data_t *info;
     dispex_dynamic_data_t *dynamic_data;
@@ -601,6 +604,7 @@ extern void (__cdecl *note_cc_edge)(nsISupports*,const char*,nsCycleCollectionTr
 
 void init_proxies(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 void init_dispatch(DispatchEx*,IUnknown*,dispex_static_data_t*,HTMLInnerWindow*,compat_mode_t) DECLSPEC_HIDDEN;
+void finalize_delayed_init_dispex(DispatchEx*,HTMLInnerWindow*,dispex_static_data_t*) DECLSPEC_HIDDEN;
 void release_dispex(DispatchEx*) DECLSPEC_HIDDEN;
 BOOL dispex_query_interface(DispatchEx*,REFIID,void**) DECLSPEC_HIDDEN;
 HRESULT change_type(VARIANT*,VARIANT*,VARTYPE,IServiceProvider*) DECLSPEC_HIDDEN;
