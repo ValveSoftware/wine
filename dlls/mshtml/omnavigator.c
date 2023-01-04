@@ -2110,8 +2110,7 @@ static ULONG WINAPI HTMLPerformance_Release(IHTMLPerformance *iface)
 
     if(!ref) {
         IHTMLPerformanceTiming_Release(&This->timing->IHTMLPerformanceTiming_iface);
-        if(This->navigation)
-            IHTMLPerformanceNavigation_Release(This->navigation);
+        IHTMLPerformanceNavigation_Release(This->navigation);
         release_dispex(&This->dispex);
         free(This);
     }
@@ -2160,24 +2159,6 @@ static HRESULT WINAPI HTMLPerformance_get_navigation(IHTMLPerformance *iface,
     HTMLPerformance *This = impl_from_IHTMLPerformance(iface);
 
     TRACE("(%p)->(%p)\n", This, p);
-
-    if(!This->navigation) {
-        HTMLPerformanceNavigation *navigation;
-
-        navigation = calloc(1, sizeof(*navigation));
-        if(!navigation)
-            return E_OUTOFMEMORY;
-
-        navigation->IHTMLPerformanceNavigation_iface.lpVtbl = &HTMLPerformanceNavigationVtbl;
-        navigation->ref = 1;
-        navigation->timing = This->timing;
-        IHTMLPerformanceTiming_AddRef(&This->timing->IHTMLPerformanceTiming_iface);
-
-        init_dispatch(&navigation->dispex, (IUnknown*)&navigation->IHTMLPerformanceNavigation_iface,
-                      &HTMLPerformanceNavigation_dispex, dispex_compat_mode(&This->dispex));
-
-        This->navigation = &navigation->IHTMLPerformanceNavigation_iface;
-    }
 
     IHTMLPerformanceNavigation_AddRef(*p = This->navigation);
     return S_OK;
@@ -2237,20 +2218,35 @@ static dispex_static_data_t HTMLPerformance_dispex = {
 HRESULT create_performance(HTMLInnerWindow *window, IHTMLPerformance **ret)
 {
     compat_mode_t compat_mode = dispex_compat_mode(&window->event_target.dispex);
+    HTMLPerformanceNavigation *navigation;
     HTMLPerformance *performance;
 
     performance = calloc(1, sizeof(*performance));
     if(!performance)
         return E_OUTOFMEMORY;
 
+    navigation = calloc(1, sizeof(*navigation));
+    if(!navigation) {
+        free(performance);
+        return E_OUTOFMEMORY;
+    }
+
     performance->IHTMLPerformance_iface.lpVtbl = &HTMLPerformanceVtbl;
+    performance->navigation = &navigation->IHTMLPerformanceNavigation_iface;
+    performance->timing = window->performance_timing;
     performance->ref = 1;
+    IHTMLPerformanceTiming_AddRef(&performance->timing->IHTMLPerformanceTiming_iface);
 
     init_dispatch(&performance->dispex, (IUnknown*)&performance->IHTMLPerformance_iface,
                   &HTMLPerformance_dispex, compat_mode);
 
-    performance->timing = window->performance_timing;
-    IHTMLPerformanceTiming_AddRef(&performance->timing->IHTMLPerformanceTiming_iface);
+    navigation->IHTMLPerformanceNavigation_iface.lpVtbl = &HTMLPerformanceNavigationVtbl;
+    navigation->ref = 1;
+    navigation->timing = window->performance_timing;
+    IHTMLPerformanceTiming_AddRef(&navigation->timing->IHTMLPerformanceTiming_iface);
+
+    init_dispatch(&navigation->dispex, (IUnknown*)&navigation->IHTMLPerformanceNavigation_iface,
+                  &HTMLPerformanceNavigation_dispex, compat_mode);
 
     init_dispatch(&performance->timing->dispex, (IUnknown*)&performance->timing->IHTMLPerformanceTiming_iface,
                   &HTMLPerformanceTiming_dispex, compat_mode);
