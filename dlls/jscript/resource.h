@@ -78,6 +78,7 @@
 #define IDS_DATAVIEW_INVALID_ACCESS         0x13E1
 #define IDS_DATAVIEW_INVALID_OFFSET         0x13E2
 #define IDS_WRONG_THIS                      0x13FC
+#define IDS_ARRAYBUFFER_EXPECTED            0x15E4
 /* FIXME: This is not compatible with native, but we would
  * conflict with IDS_UNSUPPORTED_ACTION otherwise */
 #define IDS_PROP_DESC_MISMATCH              0x1F00

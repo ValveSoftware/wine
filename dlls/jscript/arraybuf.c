@@ -55,6 +55,8 @@ static inline ArrayBufferInstance *arraybuf_this(jsval_t vthis)
     return (jsdisp && is_class(jsdisp, JSCLASS_ARRAYBUFFER)) ? arraybuf_from_jsdisp(jsdisp) : NULL;
 }
 
+static HRESULT create_arraybuf(script_ctx_t*,DWORD,jsdisp_t**);
+
 static HRESULT ArrayBuffer_get_byteLength(script_ctx_t *ctx, jsdisp_t *jsthis, jsval_t *r)
 {
     TRACE("%p\n", jsthis);
@@ -66,9 +68,52 @@ static HRESULT ArrayBuffer_get_byteLength(script_ctx_t *ctx, jsdisp_t *jsthis, j
 static HRESULT ArrayBuffer_slice(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
         jsval_t *r)
 {
-    FIXME("not implemented\n");
+    ArrayBufferInstance *arraybuf;
+    DWORD begin = 0, end, size;
+    jsdisp_t *obj;
+    HRESULT hres;
+    double n;
 
-    return E_NOTIMPL;
+    TRACE("\n");
+
+    if(!(arraybuf = arraybuf_this(vthis)))
+        return JS_E_ARRAYBUFFER_EXPECTED;
+    end = arraybuf->size;
+    if(!r)
+        return S_OK;
+
+    if(argc) {
+        hres = to_integer(ctx, argv[0], &n);
+        if(FAILED(hres))
+            return hres;
+        if(n < 0.0)
+            n += arraybuf->size;
+        if(n >= 0.0 && n < arraybuf->size) {
+            begin = n;
+            if(argc > 1 && !is_undefined(argv[1])) {
+                hres = to_integer(ctx, argv[1], &n);
+                if(FAILED(hres))
+                    return hres;
+                if(n < 0.0)
+                    n += arraybuf->size;
+                if(n >= 0.0) {
+                    end = n < arraybuf->size ? n : arraybuf->size;
+                    end = end < begin ? begin : end;
+                }else
+                    end = begin;
+            }
+        }else
+            end = 0;
+    }
+
+    size = end - begin;
+    hres = create_arraybuf(ctx, size, &obj);
+    if(FAILED(hres))
+        return hres;
+    memcpy(arraybuf_from_jsdisp(obj)->buf, arraybuf->buf + begin, size);
+
+    *r = jsval_obj(obj);
+    return S_OK;
 }
 
 static const builtin_prop_t ArrayBuffer_props[] = {
