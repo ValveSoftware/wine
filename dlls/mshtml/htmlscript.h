@@ -16,6 +16,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "activscp.h"
+
 struct HTMLScriptElement {
     HTMLElement element;
 
@@ -48,3 +50,4 @@ HRESULT exec_script(HTMLInnerWindow*,const WCHAR*,const WCHAR*,VARIANT*) DECLSPE
 void update_browser_script_mode(GeckoBrowser*,IUri*) DECLSPEC_HIDDEN;
 BOOL find_global_prop(HTMLInnerWindow*,BSTR,DWORD,ScriptHost**,DISPID*) DECLSPEC_HIDDEN;
 IDispatch *get_script_disp(ScriptHost*) DECLSPEC_HIDDEN;
+IActiveScriptSite *get_first_script_site(HTMLInnerWindow*) DECLSPEC_HIDDEN;
