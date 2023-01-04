@@ -142,6 +142,7 @@ struct HTMLXMLHttpRequest {
     LONG ref;
     document_type_t doctype_override;
     response_type_t response_type;
+    IDispatch *response_obj;
     HTMLInnerWindow *window;
     nsIXMLHttpRequest *nsxhr;
     XMLHttpReqEventListener *event_listener;
@@ -349,6 +350,8 @@ static ULONG WINAPI HTMLXMLHttpRequest_Release(IHTMLXMLHttpRequest *iface)
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        if(This->response_obj)
+            IDispatch_Release(This->response_obj);
         if(This->event_listener)
             detach_xhr_event_listener(This->event_listener);
         IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
@@ -987,11 +990,21 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_Invoke(IWineXMLHttpRequestPriva
 static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpRequestPrivate *iface, VARIANT *p)
 {
     HTMLXMLHttpRequest *This = impl_from_IWineXMLHttpRequestPrivate(iface);
+    IWineDispatchProxyCbPrivate *proxy;
     HRESULT hres = S_OK;
+    UINT32 buf_size;
     nsresult nsres;
     UINT16 state;
+    void *buf;
 
     TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->response_obj) {
+        V_VT(p) = VT_DISPATCH;
+        V_DISPATCH(p) = This->response_obj;
+        IDispatch_AddRef(This->response_obj);
+        return S_OK;
+    }
 
     switch(This->response_type) {
     case response_type_empty:
@@ -1012,10 +1025,22 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpReques
             V_VT(p) = VT_EMPTY;
             break;
         }
-        if(This->response_type == response_type_arraybuf) {
-            FIXME("response_type_arraybuf\n");
+        if(!(proxy = This->event_target.dispex.proxy)) {
+            FIXME("No proxy\n");
             return E_NOTIMPL;
         }
+        nsres = nsIXMLHttpRequest_GetResponseBuffer(This->nsxhr, NULL, 0, &buf_size);
+        assert(nsres == NS_OK);
+
+        if(This->response_type == response_type_arraybuf) {
+            hres = proxy->lpVtbl->CreateArrayBuffer(proxy, buf_size, &This->response_obj, &buf);
+            if(SUCCEEDED(hres)) {
+                nsres = nsIXMLHttpRequest_GetResponseBuffer(This->nsxhr, buf, buf_size, &buf_size);
+                assert(nsres == NS_OK);
+            }
+            break;
+        }
+
         FIXME("response_type_blob\n");
         return E_NOTIMPL;
 
@@ -1027,6 +1052,11 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpReques
         assert(0);
     }
 
+    if(SUCCEEDED(hres) && This->response_obj) {
+        V_VT(p) = VT_DISPATCH;
+        V_DISPATCH(p) = This->response_obj;
+        IDispatch_AddRef(This->response_obj);
+    }
     return hres;
 }
 
