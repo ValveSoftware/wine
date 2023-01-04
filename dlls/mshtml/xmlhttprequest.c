@@ -179,6 +179,45 @@ static void detach_xhr_event_listener(XMLHttpReqEventListener *event_listener)
     nsIDOMEventListener_Release(&event_listener->nsIDOMEventListener_iface);
 }
 
+static HRESULT WINAPI nsxhr_send(nsIXMLHttpRequest *nsxhr, VARIANT body)
+{
+    nsIWritableVariant *nsbody = NULL;
+    nsresult nsres = NS_OK;
+
+    switch(V_VT(&body)) {
+    case VT_NULL:
+    case VT_EMPTY:
+    case VT_ERROR:
+        break;
+    case VT_BSTR: {
+        nsAString nsstr;
+
+        nsbody = create_nsvariant();
+        if(!nsbody)
+            return E_OUTOFMEMORY;
+
+        nsAString_InitDepend(&nsstr, V_BSTR(&body));
+        nsres = nsIWritableVariant_SetAsAString(nsbody, &nsstr);
+        nsAString_Finish(&nsstr);
+        break;
+    }
+    default:
+        FIXME("unsupported body type %s\n", debugstr_variant(&body));
+        return E_NOTIMPL;
+    }
+
+    if(NS_SUCCEEDED(nsres))
+        nsres = nsIXMLHttpRequest_Send(nsxhr, (nsIVariant*)nsbody);
+    if(nsbody)
+        nsIWritableVariant_Release(nsbody);
+    if(NS_FAILED(nsres)) {
+        ERR("nsIXMLHttpRequest_Send failed: %08lx\n", nsres);
+        return map_nsresult(nsres);
+    }
+
+    return S_OK;
+}
+
 
 static inline XMLHttpReqEventListener *impl_from_nsIDOMEventListener(nsIDOMEventListener *iface)
 {
@@ -654,43 +693,10 @@ static HRESULT WINAPI HTMLXMLHttpRequest_open(IHTMLXMLHttpRequest *iface, BSTR b
 static HRESULT WINAPI HTMLXMLHttpRequest_send(IHTMLXMLHttpRequest *iface, VARIANT varBody)
 {
     HTMLXMLHttpRequest *This = impl_from_IHTMLXMLHttpRequest(iface);
-    nsIWritableVariant *nsbody = NULL;
-    nsresult nsres = NS_OK;
 
     TRACE("(%p)->(%s)\n", This, debugstr_variant(&varBody));
 
-    switch(V_VT(&varBody)) {
-    case VT_NULL:
-    case VT_EMPTY:
-    case VT_ERROR:
-        break;
-    case VT_BSTR: {
-        nsAString nsstr;
-
-        nsbody = create_nsvariant();
-        if(!nsbody)
-            return E_OUTOFMEMORY;
-
-        nsAString_InitDepend(&nsstr, V_BSTR(&varBody));
-        nsres = nsIWritableVariant_SetAsAString(nsbody, &nsstr);
-        nsAString_Finish(&nsstr);
-        break;
-    }
-    default:
-        FIXME("unsupported body type %s\n", debugstr_variant(&varBody));
-        return E_NOTIMPL;
-    }
-
-    if(NS_SUCCEEDED(nsres))
-        nsres = nsIXMLHttpRequest_Send(This->nsxhr, (nsIVariant*)nsbody);
-    if(nsbody)
-        nsIWritableVariant_Release(nsbody);
-    if(NS_FAILED(nsres)) {
-        ERR("nsIXMLHttpRequest_Send failed: %08lx\n", nsres);
-        return E_FAIL;
-    }
-
-    return S_OK;
+    return nsxhr_send(This->nsxhr, varBody);
 }
 
 static HRESULT WINAPI HTMLXMLHttpRequest_getAllResponseHeaders(IHTMLXMLHttpRequest *iface, BSTR *p)
