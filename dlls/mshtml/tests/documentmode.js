@@ -1141,6 +1141,48 @@ sync_test("builtin_prototypes", function() {
                 }
             }
         }
+    }else {
+        var protos = [
+            [ "ClientRect",                     "Object" ],
+            [ "ClientRectList",                 "Object" ],
+            [ "Console",                        "Object" ],
+            [ "CSSStyleDeclaration",            "Object" ],
+            [ "DOMImplementation",              "Object" ],
+            [ "DOMTokenList",                   "Object" ],
+            [ "Event",                          "Object" ],
+            [ "History",                        "Object" ],
+            [ "HTMLCollection",                 "Object" ],
+            [ "MediaQueryList",                 "Object" ],
+            [ "MimeTypeArray",                  "Object" ],
+            [ "MSCSSRuleList",                  "Object" ],
+            [ "MSEventObj",                     "Object" ],
+            [ "MSMimeTypesCollection",          "Object" ],
+            [ "MSNamespaceInfoCollection",      "Object" ],
+            [ "MSPluginsCollection",            "Object" ],
+            [ "MSSelection",                    "Object" ],
+            [ "NamedNodeMap",                   "Object" ],
+            [ "Navigator",                      "Object" ],
+            [ "Node",                           "Object" ],
+            [ "NodeList",                       "Object" ],
+            [ "Performance",                    "Object" ],
+            [ "PerformanceNavigation",          "Object" ],
+            [ "PerformanceTiming",              "Object" ],
+            [ "PluginArray",                    "Object" ],
+            [ "Screen",                         "Object" ],
+            [ "Storage",                        "Object" ],
+            [ "StyleSheetList",                 "Object" ],
+            [ "TextRange",                      "Object" ],
+            [ "Window",                         "Object" ],
+            [ "XMLHttpRequest",                 "Object" ]
+        ];
+
+        for(var i = 0; i < protos.length; i++) {
+            if(!(protos[i][0] in window))
+                continue;
+            var a, b;
+            eval("a = Object.getPrototypeOf(" + protos[i][0] + ".prototype); b = " + protos[i][1] + ".prototype;");
+            ok(a === b, "getPrototypeOf(" + protos[i][0] + ".prototype) = " + a);
+        }
     }
 });
 
