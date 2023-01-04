@@ -153,6 +153,7 @@ typedef struct {
     LONG ref;
     HTMLInnerWindow *window;
     nsIXMLHttpRequest *nsxhr;
+    XMLHttpReqEventListener *event_listener;
 } HTMLXDomainRequest;
 
 static void detach_xhr_event_listener(XMLHttpReqEventListener *event_listener)
@@ -1690,6 +1691,8 @@ static ULONG WINAPI HTMLXDomainRequest_Release(IHTMLXDomainRequest *iface)
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        if(This->event_listener)
+            detach_xhr_event_listener(This->event_listener);
         IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
         release_event_target(&This->event_target);
         release_dispex(&This->event_target.dispex);
@@ -1979,8 +1982,46 @@ static nsISupports *HTMLXDomainRequest_get_gecko_target(DispatchEx *dispex)
 static void HTMLXDomainRequest_bind_event(DispatchEx *dispex, eventid_t eid)
 {
     HTMLXDomainRequest *This = XDomainRequest_from_DispatchEx(dispex);
+    nsIDOMEventTarget *nstarget;
+    nsAString type_str;
+    const WCHAR *name;
+    nsresult nsres;
+    unsigned i;
 
-    FIXME("(%p)\n", This);
+    TRACE("(%p)\n", This);
+
+    for(i = 0; i < ARRAY_SIZE(events); i++)
+        if(eid == events[i])
+            break;
+    if(i >= ARRAY_SIZE(events))
+        return;
+
+    if(!This->event_listener) {
+        This->event_listener = malloc(sizeof(*This->event_listener));
+        if(!This->event_listener)
+            return;
+
+        This->event_listener->nsIDOMEventListener_iface.lpVtbl = &XMLHttpReqEventListenerVtbl;
+        This->event_listener->ref = 1;
+        This->event_listener->event_target = &This->event_target;
+        This->event_listener->window = This->window;
+        This->event_listener->nsxhr = This->nsxhr;
+        This->event_listener->events_mask = 0;
+    }
+
+    nsres = nsIXMLHttpRequest_QueryInterface(This->nsxhr, &IID_nsIDOMEventTarget, (void**)&nstarget);
+    assert(nsres == NS_OK);
+
+    name = get_event_name(events[i]);
+    nsAString_InitDepend(&type_str, name);
+    nsres = nsIDOMEventTarget_AddEventListener(nstarget, &type_str, &This->event_listener->nsIDOMEventListener_iface, FALSE, TRUE, 2);
+    nsAString_Finish(&type_str);
+    if(NS_FAILED(nsres))
+        ERR("AddEventListener(%s) failed: %08lx\n", debugstr_w(name), nsres);
+
+    nsIDOMEventTarget_Release(nstarget);
+
+    This->event_listener->events_mask |= 1 << i;
 }
 
 static void HTMLXDomainRequest_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
