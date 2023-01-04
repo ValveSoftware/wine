@@ -116,6 +116,8 @@ static BOOL set_script_prop(ScriptHost *script_host, DWORD property, VARIANT *va
 
 static BOOL init_script_engine(ScriptHost *script_host)
 {
+    IWineDispatchProxyCbPrivate *proxy;
+    BOOL was_locked, ret = FALSE;
     compat_mode_t compat_mode;
     IObjectSafety *safety;
     SCRIPTSTATE state;
@@ -152,7 +154,11 @@ static BOOL init_script_engine(ScriptHost *script_host)
     if(FAILED(hres))
         return FALSE;
 
-    compat_mode = lock_document_mode(script_host->window->doc);
+    /* Don't lock it properly yet, but mark it as such, to avoid recursively creating another script engine when initializing proxies */
+    was_locked = script_host->window->doc->document_mode_locked;
+    script_host->window->doc->document_mode_locked = TRUE;
+
+    compat_mode = script_host->window->doc->document_mode;
     script_mode = compat_mode < COMPAT_MODE_IE8 ? SCRIPTLANGUAGEVERSION_5_7 : SCRIPTLANGUAGEVERSION_5_8;
     if(IsEqualGUID(&script_host->guid, &CLSID_JScript)) {
         if(compat_mode >= COMPAT_MODE_IE11)
@@ -177,14 +183,26 @@ static BOOL init_script_engine(ScriptHost *script_host)
     hres = IActiveScriptParse_InitNew(script_host->parse);
     if(FAILED(hres)) {
         WARN("InitNew failed: %08lx\n", hres);
-        return FALSE;
+        goto done;
     }
 
     hres = IActiveScript_SetScriptSite(script_host->script, &script_host->IActiveScriptSite_iface);
     if(FAILED(hres)) {
         WARN("SetScriptSite failed: %08lx\n", hres);
         IActiveScript_Close(script_host->script);
-        return FALSE;
+        goto done;
+    }
+
+    if(script_mode & SCRIPTLANGUAGEVERSION_HTML) {
+        proxy = script_host->window->event_target.dispex.proxy;
+        if(proxy) {
+            hres = proxy->lpVtbl->HostUpdated(proxy, script_host->script);
+            if(FAILED(hres)) {
+                ERR("Proxy->HostUpdated failed: %08lx\n", hres);
+                IActiveScript_Close(script_host->script);
+                goto done;
+            }
+        }
     }
 
     hres = IActiveScript_GetScriptState(script_host->script, &state);
@@ -196,7 +214,7 @@ static BOOL init_script_engine(ScriptHost *script_host)
     hres = IActiveScript_SetScriptState(script_host->script, SCRIPTSTATE_STARTED);
     if(FAILED(hres)) {
         WARN("Starting script failed: %08lx\n", hres);
-        return FALSE;
+        goto done;
     }
 
     hres = IActiveScript_AddNamedItem(script_host->script, L"window",
@@ -217,6 +235,13 @@ static BOOL init_script_engine(ScriptHost *script_host)
        WARN("AddNamedItem failed: %08lx\n", hres);
     }
 
+    proxy = script_host->window->event_target.dispex.proxy;
+    if(proxy) {
+        hres = proxy->lpVtbl->InitProxy(proxy, (IDispatch*)&script_host->window->doc->node.event_target.dispex.IDispatchEx_iface);
+        if(FAILED(hres))
+            ERR("InitProxy for document failed: %08lx\n", hres);
+    }
+
     hres = IActiveScript_QueryInterface(script_host->script, &IID_IActiveScriptParseProcedure2,
                                         (void**)&script_host->parse_proc);
     if(FAILED(hres)) {
@@ -224,7 +249,11 @@ static BOOL init_script_engine(ScriptHost *script_host)
         WARN("Could not get IActiveScriptParseProcedure iface: %08lx\n", hres);
     }
 
-    return TRUE;
+    ret = TRUE;
+
+done:
+    script_host->window->doc->document_mode_locked = was_locked;
+    return ret;
 }
 
 static void release_script_engine(ScriptHost *This)
@@ -818,6 +847,9 @@ static ScriptHost *create_script_host(HTMLInnerWindow *window, const GUID *guid)
         release_script_engine(ret);
 
     list_add_tail(&window->script_hosts, &ret->entry);
+
+    /* It's safe to lock it now since we're done */
+    lock_document_mode(window->doc);
     return ret;
 }
 
@@ -1443,6 +1475,15 @@ void doc_insert_script(HTMLInnerWindow *window, HTMLScriptElement *script_elem, 
 
     if(is_complete)
         set_script_elem_readystate(script_elem, READYSTATE_COMPLETE);
+}
+
+void init_proxies(HTMLInnerWindow *window)
+{
+    if(!window->doc->browser || window->doc->browser->script_mode != SCRIPTMODE_ACTIVESCRIPT)
+        return;
+
+    /* init jscript engine, which should create the global window and document proxies */
+    get_script_host(window, &CLSID_JScript);
 }
 
 IDispatch *script_parse_event(HTMLInnerWindow *window, LPCWSTR text)

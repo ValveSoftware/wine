@@ -377,6 +377,27 @@ static nsresult run_insert_script(HTMLDocumentNode *doc, nsISupports *script_ifa
     return NS_OK;
 }
 
+static void setup_doc_proxy(HTMLDocumentNode *doc)
+{
+    HTMLOuterWindow *outer_window = doc->outer_window ? doc->outer_window : doc->doc_obj->window;
+    HTMLInnerWindow *window = outer_window->base.inner_window;
+
+    /* If stray document while inner window not attached yet, let update_window_doc handle it. */
+    if(doc->window && doc->window != window)
+        return;
+
+    init_proxies(window);
+
+    if(!doc->node.event_target.dispex.proxy) {
+        IWineDispatchProxyCbPrivate *proxy = window->event_target.dispex.proxy;
+        if(proxy) {
+            HRESULT hres = proxy->lpVtbl->InitProxy(proxy, (IDispatch*)&doc->node.event_target.dispex.IDispatchEx_iface);
+            if(FAILED(hres))
+                ERR("InitProxy failed: %08lx\n", hres);
+        }
+    }
+}
+
 /*
  * We may change document mode only in early stage of document lifetime.
  * Later attempts will not have an effect.
@@ -385,7 +406,14 @@ compat_mode_t lock_document_mode(HTMLDocumentNode *doc)
 {
     TRACE("%p: %d\n", doc, doc->document_mode);
 
-    doc->document_mode_locked = TRUE;
+    if(!doc->document_mode_locked) {
+        doc->document_mode_locked = TRUE;
+
+        /* Setup the proxy immediately since mode is decided. Proxies delegate the
+           methods so we can't rely on the delay init of the dispex to set them up. */
+        if(doc->document_mode >= COMPAT_MODE_IE9)
+            setup_doc_proxy(doc);
+    }
     return doc->document_mode;
 }
 

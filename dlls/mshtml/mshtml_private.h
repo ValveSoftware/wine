@@ -419,6 +419,7 @@ typedef struct {
     HRESULT (*invoke)(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
     HRESULT (*delete)(DispatchEx*,DISPID);
     HRESULT (*next_dispid)(DispatchEx*,DISPID,DISPID*);
+    HRESULT (*override)(DispatchEx*,const WCHAR*,VARIANT*);
     compat_mode_t (*get_compat_mode)(DispatchEx*);
     HRESULT (*populate_props)(DispatchEx*);
 } dispex_static_data_vtbl_t;
@@ -446,6 +447,7 @@ struct DispatchEx {
     IDispatchEx IDispatchEx_iface;
 
     IUnknown *outer;
+    IWineDispatchProxyCbPrivate *proxy;
 
     dispex_data_t *info;
     dispex_dynamic_data_t *dynamic_data;
@@ -478,10 +480,12 @@ extern void (__cdecl *ccp_init)(ExternalCycleCollectionParticipant*,const CCObjC
 extern void (__cdecl *describe_cc_node)(nsCycleCollectingAutoRefCnt*,const char*,nsCycleCollectionTraversalCallback*) DECLSPEC_HIDDEN;
 extern void (__cdecl *note_cc_edge)(nsISupports*,const char*,nsCycleCollectionTraversalCallback*) DECLSPEC_HIDDEN;
 
+void init_proxies(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 void init_dispatch(DispatchEx*,IUnknown*,dispex_static_data_t*,HTMLInnerWindow*,compat_mode_t) DECLSPEC_HIDDEN;
 void release_dispex(DispatchEx*) DECLSPEC_HIDDEN;
 BOOL dispex_query_interface(DispatchEx*,REFIID,void**) DECLSPEC_HIDDEN;
 HRESULT change_type(VARIANT*,VARIANT*,VARTYPE,IServiceProvider*) DECLSPEC_HIDDEN;
+HRESULT dispex_get_builtin_id(DispatchEx*,BSTR,DWORD,DISPID*) DECLSPEC_HIDDEN;
 HRESULT dispex_get_dprop_ref(DispatchEx*,const WCHAR*,BOOL,VARIANT**) DECLSPEC_HIDDEN;
 HRESULT get_dispids(tid_t,DWORD*,DISPID**) DECLSPEC_HIDDEN;
 HRESULT remove_attribute(DispatchEx*,DISPID,VARIANT_BOOL*) DECLSPEC_HIDDEN;
