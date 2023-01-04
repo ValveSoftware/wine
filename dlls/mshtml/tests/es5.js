@@ -3049,6 +3049,17 @@ sync_test("matchMedia", function() {
     ok(mql.matches === true, "(max-width: 1000px) does not match");
 });
 
+sync_test("Crypto", function() {
+    var crypto = window.msCrypto, r;
+    ok(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(window), "msCrypto"), "msCrypto not a property of window's prototype.");
+    r = Object.getPrototypeOf(crypto);
+    ok(r === window.Crypto.prototype, "getPrototypeOf(crypto) = " + r);
+
+    ok("subtle" in crypto, "subtle not in crypto");
+    ok("getRandomValues" in crypto, "getRandomValues not in crypto");
+    ok(!("randomUUID" in crypto), "randomUUID is in crypto");
+});
+
 sync_test("DOMParser", function() {
     var p, r = DOMParser.length, mimeType;
     ok(r === 0, "length = " + r);

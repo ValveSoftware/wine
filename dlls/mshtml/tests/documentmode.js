@@ -373,6 +373,9 @@ sync_test("builtin_toString", function() {
         test("console", window.console, "Console");
         test("mediaQueryList", window.matchMedia("(hover:hover)"), "MediaQueryList");
     }
+    if(v >= 11) {
+        test("crypto", window.msCrypto, "Crypto");
+    }
     if(v >= 9) {
         document.body.innerHTML = "<!--...-->";
         test("comment", document.body.firstChild, "Comment");
@@ -917,6 +920,9 @@ sync_test("builtin_prototypes", function() {
         set_obj("TextRange");
         set_obj("Window");
     }
+    if(v >= 11) {
+        set_obj("Crypto");
+    }
 
     if(v >= 8 && v < 11) {
         set_obj(v < 9 ? "Event" : "MSEventObj", document.createEventObject());
@@ -1274,6 +1280,7 @@ sync_test("builtin_prototypes", function() {
             [ "ClientRectList",                 "Object" ],
             [ "Comment",                        "CharacterData" ],
             [ "Console",                        "Object" ],
+            [ "Crypto",                         "Object" ],
             [ "CSSRule",                        "Object" ],
             [ "CSSStyleDeclaration",            "Object" ],
             [ "CSSStyleRule",                   "CSSRule" ],
@@ -1639,6 +1646,7 @@ sync_test("window_props", function() {
     test_exposed("console", v >= 10);
     test_exposed("DOMParser", v >= 9);
     test_exposed("matchMedia", v >= 10);
+    test_exposed("msCrypto", v >= 11);
 });
 
 sync_test("domimpl_props", function() {

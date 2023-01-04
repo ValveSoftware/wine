@@ -3169,3 +3169,156 @@ HRESULT create_media_query_list(HTMLWindow *window, BSTR media_query, IDispatch 
     *ret = (IDispatch*)&media_query_list->IWineMSHTMLMediaQueryList_iface;
     return S_OK;
 }
+
+struct crypto {
+    DispatchEx dispex;
+    IWineMSHTMLCrypto IWineMSHTMLCrypto_iface;
+    LONG ref;
+};
+
+static inline struct crypto *impl_from_IWineMSHTMLCrypto(IWineMSHTMLCrypto *iface)
+{
+    return CONTAINING_RECORD(iface, struct crypto, IWineMSHTMLCrypto_iface);
+}
+
+static HRESULT WINAPI crypto_QueryInterface(IWineMSHTMLCrypto *iface, REFIID riid, void **ppv)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+
+    TRACE("(%p)->(%s %p)\n", crypto, debugstr_mshtml_guid(riid), ppv);
+
+    if(IsEqualGUID(&IID_IUnknown, riid)) {
+        *ppv = &crypto->IWineMSHTMLCrypto_iface;
+    }else if(IsEqualGUID(&IID_IWineMSHTMLCrypto, riid)) {
+        *ppv = &crypto->IWineMSHTMLCrypto_iface;
+    }else if(dispex_query_interface(&crypto->dispex, riid, ppv)) {
+        return *ppv ? S_OK : E_NOINTERFACE;
+    }else {
+        WARN("(%p)->(%s %p)\n", crypto, debugstr_mshtml_guid(riid), ppv);
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown*)*ppv);
+    return S_OK;
+}
+
+static ULONG WINAPI crypto_AddRef(IWineMSHTMLCrypto *iface)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+    LONG ref = InterlockedIncrement(&crypto->ref);
+
+    TRACE("(%p) ref=%ld\n", crypto, ref);
+
+    return ref;
+}
+
+static ULONG WINAPI crypto_Release(IWineMSHTMLCrypto *iface)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+    LONG ref = InterlockedDecrement(&crypto->ref);
+
+    TRACE("(%p) ref=%ld\n", crypto, ref);
+
+    if(!ref) {
+        release_dispex(&crypto->dispex);
+        free(crypto);
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI crypto_GetTypeInfoCount(IWineMSHTMLCrypto *iface, UINT *pctinfo)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+
+    TRACE("(%p)->(%p)\n", crypto, pctinfo);
+
+    return IDispatchEx_GetTypeInfoCount(&crypto->dispex.IDispatchEx_iface, pctinfo);
+}
+
+static HRESULT WINAPI crypto_GetTypeInfo(IWineMSHTMLCrypto *iface, UINT iTInfo,
+        LCID lcid, ITypeInfo **ppTInfo)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+
+    return IDispatchEx_GetTypeInfo(&crypto->dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
+}
+
+static HRESULT WINAPI crypto_GetIDsOfNames(IWineMSHTMLCrypto *iface, REFIID riid,
+        LPOLESTR *rgszNames, UINT cNames, LCID lcid, DISPID *rgDispId)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+
+    return IDispatchEx_GetIDsOfNames(&crypto->dispex.IDispatchEx_iface, riid, rgszNames, cNames,
+            lcid, rgDispId);
+}
+
+static HRESULT WINAPI crypto_Invoke(IWineMSHTMLCrypto *iface, DISPID dispIdMember,
+        REFIID riid, LCID lcid, WORD wFlags, DISPPARAMS *pDispParams,
+        VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+
+    return IDispatchEx_Invoke(&crypto->dispex.IDispatchEx_iface, dispIdMember, riid, lcid, wFlags,
+            pDispParams, pVarResult, pExcepInfo, puArgErr);
+}
+
+static HRESULT WINAPI crypto_get_subtle(IWineMSHTMLCrypto *iface, IDispatch **subtle)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+
+    FIXME("(%p)->(%p)\n", crypto, subtle);
+
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI crypto_getRandomValues(IWineMSHTMLCrypto *iface, VARIANT *typedArray, IDispatch **ret)
+{
+    struct crypto *crypto = impl_from_IWineMSHTMLCrypto(iface);
+
+    FIXME("(%p)->(%p %p)\n", crypto, typedArray, ret);
+
+    return E_NOTIMPL;
+}
+
+static const IWineMSHTMLCryptoVtbl WineMSHTMLCryptoVtbl = {
+    crypto_QueryInterface,
+    crypto_AddRef,
+    crypto_Release,
+    crypto_GetTypeInfoCount,
+    crypto_GetTypeInfo,
+    crypto_GetIDsOfNames,
+    crypto_Invoke,
+    crypto_get_subtle,
+    crypto_getRandomValues
+};
+
+static const tid_t crypto_iface_tids[] = {
+    IWineMSHTMLCrypto_tid,
+    0
+};
+dispex_static_data_t crypto_dispex = {
+    L"Crypto",
+    NULL,
+    PROTO_ID_Crypto,
+    IWineMSHTMLCrypto_tid,
+    crypto_iface_tids
+};
+
+void create_crypto(HTMLInnerWindow *window, IWineMSHTMLCrypto **ret)
+{
+    struct crypto *obj;
+
+    if(!(obj = calloc(1, sizeof(*obj)))) {
+        ERR("No memory.\n");
+        return;
+    }
+
+    obj->IWineMSHTMLCrypto_iface.lpVtbl = &WineMSHTMLCryptoVtbl;
+    obj->ref = 1;
+    init_dispatch(&obj->dispex, (IUnknown*)&obj->IWineMSHTMLCrypto_iface, &crypto_dispex,
+                  window, dispex_compat_mode(&window->event_target.dispex));
+
+    *ret = &obj->IWineMSHTMLCrypto_iface;
+}

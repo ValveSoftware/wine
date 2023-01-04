@@ -388,6 +388,7 @@ typedef struct ScriptHost ScriptHost;
     XIID(IWinePageTransitionEvent) \
     XIID(IWineXMLHttpRequestPrivate) \
     XIID(IWineMSHTMLConsole) \
+    XIID(IWineMSHTMLCrypto) \
     XIID(IWineMSHTMLMediaQueryList)
 
 typedef enum {
@@ -463,6 +464,7 @@ PRIVATE_TID_LIST
 
 #define PROXY_PROTOTYPE_LIST \
     X(Console,                        "Console",                      console_dispex,                         Object) \
+    X(Crypto,                         "Crypto",                       crypto_dispex,                          Object) \
     X(DOMParser,                      "DOMParser",                    DOMParser_dispex,                       Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
@@ -819,6 +821,7 @@ struct HTMLInnerWindow {
     IOmNavigator *navigator;
     IHTMLStorage *session_storage;
     IHTMLStorage *local_storage;
+    IWineMSHTMLCrypto *crypto;
 
     BOOL performance_initialized;
     VARIANT performance;
@@ -1700,6 +1703,7 @@ IInternetSecurityManager *get_security_manager(void) DECLSPEC_HIDDEN;
 
 extern HINSTANCE hInst DECLSPEC_HIDDEN;
 void create_console(HTMLInnerWindow *window, IWineMSHTMLConsole **ret) DECLSPEC_HIDDEN;
+void create_crypto(HTMLInnerWindow *window, IWineMSHTMLCrypto **ret) DECLSPEC_HIDDEN;
 HRESULT create_media_query_list(HTMLWindow *window, BSTR media_query, IDispatch **ret) DECLSPEC_HIDDEN;
 
 extern const IUnknownVtbl legacy_ctor_vtbl DECLSPEC_HIDDEN;
