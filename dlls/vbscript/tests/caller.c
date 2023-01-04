@@ -74,6 +74,7 @@ extern const CLSID CLSID_VBScript;
     expect_ ## func = called_ ## func = FALSE
 
 DEFINE_EXPECT(sp_caller_QI_NULL);
+DEFINE_EXPECT(site_QI_NULL);
 DEFINE_EXPECT(testGetCaller);
 DEFINE_EXPECT(testGetCaller_no_args);
 DEFINE_EXPECT(testGetCaller_two_args);
@@ -290,6 +291,8 @@ static HRESULT WINAPI Test_InvokeEx(IDispatchEx *iface, DISPID id, LCID lcid, WO
             if(test_get_caller_sp)
                 CHECK_CALLED(sp_caller_QI_NULL);
         }else if(pdp->cArgs == 1) {
+            IUnknown *unk;
+
             CHECK_EXPECT(testGetCaller);
             ok(pdp->cArgs == 1, "cArgs = %d\n", pdp->cArgs);
             ok(V_VT(pdp->rgvarg) == VT_I2, "V_VT(rgvarg) = %d\n", V_VT(pdp->rgvarg));
@@ -298,6 +301,12 @@ static HRESULT WINAPI Test_InvokeEx(IDispatchEx *iface, DISPID id, LCID lcid, WO
             hres = IServiceProvider_QueryService(pspCaller, &SID_GetCaller, &IID_IServiceProvider, (void**)&caller);
             ok(hres == E_NOINTERFACE, "QueryService(SID_GetCaller) returned: %08lx\n", hres);
             ok(caller == NULL, "caller != NULL\n");
+
+            SET_EXPECT(site_QI_NULL);
+            hres = IServiceProvider_QueryService(pspCaller, &IID_IActiveScriptSite, &IID_NULL, (void**)&unk);
+            ok(hres == E_NOINTERFACE, "QueryService(IActiveScriptSite->NULL) returned: %08lx\n", hres);
+            ok(!unk, "unk != NULL\n");
+            CHECK_CALLED(site_QI_NULL);
         }else {
             CHECK_EXPECT(testGetCaller_two_args);
             ok(pdp->cArgs == 2, "cArgs = %d\n", pdp->cArgs);
@@ -347,6 +356,8 @@ static HRESULT WINAPI ActiveScriptSite_QueryInterface(IActiveScriptSite *iface, 
     }else if(IsEqualGUID(&IID_IActiveScriptSite, riid)) {
         *ppv = iface;
     }else {
+        if(IsEqualGUID(&IID_NULL, riid))
+            CHECK_EXPECT(site_QI_NULL);
         *ppv = NULL;
         return E_NOINTERFACE;
     }
