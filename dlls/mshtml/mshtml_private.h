@@ -207,6 +207,11 @@ typedef struct EventTarget EventTarget;
     XIID(IHTMLElementCollection) \
     XIID(IHTMLEmbedElement) \
     XIID(IHTMLEventObj) \
+    XIID(IHTMLEventObj2) \
+    XIID(IHTMLEventObj3) \
+    XIID(IHTMLEventObj4) \
+    XIID(IHTMLEventObj5) \
+    XIID(IHTMLEventObj6) \
     XIID(IHTMLFiltersCollection) \
     XIID(IHTMLFormElement) \
     XIID(IHTMLFrameBase) \

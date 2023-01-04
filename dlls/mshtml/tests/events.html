@@ -283,7 +283,24 @@ function test_attach_in_attach() {
     document.body.removeChild(div);
 }
 
+function test_event_obj_props(e) {
+    var i, props = [
+        "actionURL", "altKey", "altLeft", "behaviorCookie", "behaviorPart", "bookmarks", "boundElements", "button", "buttonID",
+        "cancelBubble", "clientX", "clientY", "contentOverflow", "ctrlKey", "ctrlLeft", "data", "dataFld", "dataTransfer",
+        "fromElement", "keyCode", "nextPage", "offsetX", "offsetY", "origin", "propertyName", "qualifier", "reason", "recordset",
+        "repeat", "returnValue", "screenX", "screenY", "shiftKey", "shiftLeft", "source", "srcElement", "srcFilter", "srcUrn",
+        "toElement", "type", "url", "wheelDelta", "x", "y", "getAttribute", "setAttribute", "removeAttribute" ];
+    for(i = 0; i < props.length; i++)
+        ok(props[i] in e, props[i] + " not in event obj");
+
+    props = [ "imeCompositionChange", "imeNotifyCommand", "imeNotifyData", "imeRequest", "imeRequestData", "issession", "keyboardLayout" ];
+    for(i = 0; i < props.length; i++)
+        todo_wine.
+        ok(!(props[i] in e), props[i] + " in event obj");
+}
+
 window.onload = function() {
+    test_event_obj_props(window.event);
     try {
         ok(inlscr_complete_called, "onreadystatechange not fired");
         ok(extern_res_script_rs === "eval,complete1," || extern_res_script_rs == "loaded0,eval,complete1,",
