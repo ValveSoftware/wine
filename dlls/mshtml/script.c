@@ -201,9 +201,17 @@ static BOOL init_script_engine(ScriptHost *script_host)
     hres = IActiveScript_AddNamedItem(script_host->script, L"window",
             SCRIPTITEM_ISVISIBLE|SCRIPTITEM_ISSOURCE|SCRIPTITEM_GLOBALMEMBERS);
     if(SUCCEEDED(hres)) {
+        const struct list *list = &script_host->window->script_hosts, *head = list_head(list);
         V_VT(&var) = VT_BOOL;
-        V_BOOL(&var) = VARIANT_TRUE;
+        V_BOOL(&var) = head ? VARIANT_FALSE : VARIANT_TRUE;
         set_script_prop(script_host, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
+
+        /* if this was second engine added, also set it to first engine, since it used to be TRUE */
+        if(head && !list_next(list, head)) {
+            ScriptHost *first_host = LIST_ENTRY(head, ScriptHost, entry);
+            if(first_host->script)
+                set_script_prop(first_host, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
+        }
     }else {
        WARN("AddNamedItem failed: %08lx\n", hres);
     }
@@ -708,7 +716,6 @@ static ScriptHost *create_script_host(HTMLInnerWindow *window, const GUID *guid)
     ret->script_state = SCRIPTSTATE_UNINITIALIZED;
 
     ret->guid = *guid;
-    list_add_tail(&window->script_hosts, &ret->entry);
 
     hres = CoCreateInstance(&ret->guid, NULL, CLSCTX_INPROC_SERVER|CLSCTX_INPROC_HANDLER,
             &IID_IActiveScript, (void**)&ret->script);
@@ -717,6 +724,7 @@ static ScriptHost *create_script_host(HTMLInnerWindow *window, const GUID *guid)
     else if(!init_script_engine(ret))
         release_script_engine(ret);
 
+    list_add_tail(&window->script_hosts, &ret->entry);
     return ret;
 }
 
