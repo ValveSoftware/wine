@@ -1537,7 +1537,11 @@ static HRESULT HTMLXMLHttpRequestFactory_value(DispatchEx *iface, LCID lcid, WOR
 }
 
 static const dispex_static_data_vtbl_t HTMLXMLHttpRequestFactory_dispex_vtbl = {
-    HTMLXMLHttpRequestFactory_value
+    HTMLXMLHttpRequestFactory_value,
+    legacy_ctor_get_dispid,
+    legacy_ctor_get_name,
+    legacy_ctor_invoke,
+    legacy_ctor_delete
 };
 
 static const tid_t HTMLXMLHttpRequestFactory_iface_tids[] = {

@@ -159,6 +159,25 @@ PROXY_PROTOTYPE_LIST
 #undef X
 };
 
+static const WCHAR legacy_prototype_nameW[] = L"[Interface prototype object]";
+static void legacy_prototype_init_dispex_info(dispex_data_t*,compat_mode_t);
+static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl;
+
+static dispex_static_data_t legacy_prototype_dispex[] = {
+#define X(id, name, dispex, proto_id) \
+{                                     \
+    legacy_prototype_nameW,           \
+    &legacy_prototype_dispex_vtbl,    \
+    PROTO_ID_NULL,                    \
+    NULL_tid,                         \
+    no_iface_tids,                    \
+    legacy_prototype_init_dispex_info \
+},
+LEGACY_PROTOTYPE_LIST
+COMMON_PROTOTYPE_LIST
+#undef X
+};
+
 static inline dispex_data_t *proxy_prototype_object_info(struct proxy_prototype *prot)
 {
     dispex_static_data_t *desc = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex)->desc;
@@ -467,6 +486,32 @@ static void add_func_info(dispex_data_t *data, tid_t tid, const FUNCDESC *desc, 
 
         assert(info->prop_vt == VT_EMPTY || vt == info->prop_vt);
         info->prop_vt = vt;
+    }
+}
+
+static void copy_func_info(func_info_t *dst, func_info_t *src)
+{
+    unsigned i, argc = src->argc;
+
+    *dst = *src;
+    dst->name = SysAllocString(src->name);
+
+    if(src->arg_types) {
+        DWORD size = (argc + (src->prop_vt == VT_VOID ? 0 : 1)) * sizeof(*dst->arg_types);
+        dst->arg_types = malloc(size);
+        if(dst->arg_types)
+            memcpy(dst->arg_types, src->arg_types, size);
+    }
+
+    if(src->arg_info) {
+        dst->arg_info = malloc(argc * sizeof(*dst->arg_info));
+        if(dst->arg_info) {
+            for(i = 0; i < argc; i++) {
+                dst->arg_info[i].iid = src->arg_info[i].iid;
+                V_VT(&dst->arg_info[i].default_value) = VT_EMPTY;
+                VariantCopy(&dst->arg_info[i].default_value, &src->arg_info[i].default_value);
+            }
+        }
     }
 }
 
@@ -1610,6 +1655,8 @@ static HRESULT func_invoke(DispatchEx *This, IDispatch *this_obj, func_info_t *f
         }
 
         hres = invoke_builtin_function(this_obj, func, dp, res, ei, caller);
+        if(hres == E_UNEXPECTED && dispex_compat_mode(This) < COMPAT_MODE_IE9)
+            hres = MSHTML_E_INVALID_PROPERTY;
         break;
     case DISPATCH_PROPERTYGET: {
         func_obj_entry_t *entry;
@@ -1686,8 +1733,13 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, IDispatch *this_obj, DISPID
         return func_invoke(This, this_obj, func, flags, dp, res, ei, caller);
 
     hres = IDispatch_QueryInterface(this_obj, tid_ids[func->tid], (void**)&iface);
-    if(FAILED(hres) || !iface)
-        return E_UNEXPECTED;
+    if(FAILED(hres) || !iface) {
+        if(dispex_compat_mode(This) >= COMPAT_MODE_IE9)
+            return E_UNEXPECTED;
+        if(res)
+            V_VT(res) = VT_EMPTY;
+        return S_OK;
+    }
 
     if(func->hook && (dispex = get_dispex_for_hook(iface))) {
         hres = func->hook(dispex, flags, dp, res, ei, caller);
@@ -1881,6 +1933,194 @@ static BOOL ensure_real_info(DispatchEx *dispex)
 
     dispex->info = ensure_dispex_info(dispex->info->desc, dispex_compat_mode(dispex));
     return dispex->info != NULL;
+}
+
+static inline struct legacy_prototype *legacy_prototype_from_IUnknown(IUnknown *iface)
+{
+    return CONTAINING_RECORD(iface, struct legacy_prototype, IUnknown_iface);
+}
+
+static HRESULT WINAPI legacy_prototype_QueryInterface(IUnknown *iface, REFIID riid, void **ppv)
+{
+    struct legacy_prototype *This = legacy_prototype_from_IUnknown(iface);
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+
+    if(IsEqualGUID(&IID_IUnknown, riid)) {
+        *ppv = &This->IUnknown_iface;
+    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
+        return *ppv ? S_OK : E_NOINTERFACE;
+    }else {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown*)*ppv);
+    return S_OK;
+}
+
+static ULONG WINAPI legacy_prototype_AddRef(IUnknown *iface)
+{
+    struct legacy_prototype *This = legacy_prototype_from_IUnknown(iface);
+    LONG ref = InterlockedIncrement(&This->ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    return ref;
+}
+
+static ULONG WINAPI legacy_prototype_Release(IUnknown *iface)
+{
+    struct legacy_prototype *This = legacy_prototype_from_IUnknown(iface);
+    LONG ref = InterlockedDecrement(&This->ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    if(!ref) {
+        release_dispex(&This->dispex);
+        free(This);
+    }
+    return ref;
+}
+
+static const IUnknownVtbl legacy_prototype_vtbl = {
+    legacy_prototype_QueryInterface,
+    legacy_prototype_AddRef,
+    legacy_prototype_Release
+};
+
+struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow *window, prototype_id_t prot_id,
+        compat_mode_t compat_mode)
+{
+    struct legacy_prototype *prot = window->legacy_prototypes[prot_id];
+
+    if(!prot) {
+        if(!(prot = malloc(sizeof(*prot))))
+            return NULL;
+
+        prot->IUnknown_iface.lpVtbl = &legacy_prototype_vtbl;
+        prot->ref = 1;
+        window->legacy_prototypes[prot_id] = prot;
+
+        init_dispatch(&prot->dispex, &prot->IUnknown_iface, &legacy_prototype_dispex[prot_id], NULL, compat_mode);
+    }
+
+    IUnknown_AddRef(&prot->IUnknown_iface);
+    return prot;
+}
+
+static HRESULT legacy_prototype_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+    case DISPATCH_CONSTRUCT:
+        return MSHTML_E_INVALID_ACTION;
+    case DISPATCH_PROPERTYGET:
+        if(!(V_BSTR(res) = SysAllocString(legacy_prototype_nameW)))
+            return E_OUTOFMEMORY;
+        V_VT(res) = VT_BSTR;
+        break;
+    case DISPATCH_PROPERTYPUTREF|DISPATCH_PROPERTYPUT:
+    case DISPATCH_PROPERTYPUTREF:
+    case DISPATCH_PROPERTYPUT:
+        break;
+    default:
+        return E_INVALIDARG;
+    }
+    return S_OK;
+}
+
+static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl = {
+    legacy_prototype_value,
+};
+
+static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
+{
+    prototype_id_t prot_id = info->desc - legacy_prototype_dispex;
+    dispex_data_t *data = ensure_dispex_info(prototype_static_data[prot_id].desc, compat_mode);
+    func_info_t *func;
+    unsigned i;
+
+    if(!data)
+        return;
+
+    /* Copy the info from the object instance data */
+    func = realloc(info->funcs, data->func_size * sizeof(*func));
+    if(!func)
+        return;
+    info->funcs = func;
+    info->func_cnt = data->func_cnt;
+    info->func_disp_cnt = data->func_disp_cnt;
+    info->func_size = data->func_size;
+
+    for(i = 0; i < data->func_cnt; i++) {
+        copy_func_info(func, &data->funcs[i]);
+        func++;
+    }
+    memset(func, 0, (info->func_size - i) * sizeof(*func));
+}
+
+HRESULT legacy_ctor_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
+{
+    if((flags & fdexNameCaseInsensitive) ? !wcsicmp(name, L"prototype") : !wcscmp(name, L"prototype")) {
+        *dispid = MSHTML_DISPID_CUSTOM_MIN;
+        return S_OK;
+    }
+    return DISP_E_UNKNOWNNAME;
+}
+
+HRESULT legacy_ctor_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
+{
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(idx > 0)
+        return DISP_E_MEMBERNOTFOUND;
+    return (*name = SysAllocString(L"prototype")) ? S_OK : E_OUTOFMEMORY;
+}
+
+HRESULT legacy_ctor_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    struct legacy_ctor *This = CONTAINING_RECORD(dispex, struct legacy_ctor, dispex);
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+    struct legacy_prototype *prot;
+
+    if(idx > 0)
+        return DISP_E_MEMBERNOTFOUND;
+
+    if(!This->window)
+        return E_UNEXPECTED;
+
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+        return MSHTML_E_INVALID_PROPERTY;
+    case DISPATCH_PROPERTYGET:
+        if(!(prot = get_legacy_prototype(This->window, This->prot_id, dispex_compat_mode(dispex))))
+            return E_OUTOFMEMORY;
+        V_VT(res) = VT_DISPATCH;
+        V_DISPATCH(res) = (IDispatch*)&prot->dispex.IDispatchEx_iface;
+        break;
+    default:
+        return MSHTML_E_INVALID_PROPERTY;
+    }
+
+    return S_OK;
+}
+
+HRESULT legacy_ctor_delete(DispatchEx *dispex, DISPID id)
+{
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+    return dispex_compat_mode(dispex) < COMPAT_MODE_IE8 ? E_NOTIMPL :
+           idx > 0 ? S_OK : MSHTML_E_INVALID_PROPERTY;
 }
 
 static inline struct proxy_prototype *proxy_prototype_from_IUnknown(IUnknown *iface)

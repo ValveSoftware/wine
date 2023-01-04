@@ -641,7 +641,14 @@ struct legacy_ctor {
 
     LONG ref;
 
+    prototype_id_t prot_id;
     HTMLInnerWindow *window;
+};
+
+struct legacy_prototype {
+    IUnknown IUnknown_iface;
+    DispatchEx dispex;
+    LONG ref;
 };
 
 typedef enum {
@@ -796,6 +803,7 @@ struct HTMLInnerWindow {
     struct list bindings;
 
     struct legacy_ctor *legacy_ctors[LEGACY_CTOR_COUNT];
+    struct legacy_prototype *legacy_prototypes[COMMON_PROTOTYPE_COUNT];
 };
 
 typedef enum {
@@ -1164,6 +1172,11 @@ void set_window_uninitialized(HTMLOuterWindow*,HTMLDocumentNode*) DECLSPEC_HIDDE
 HRESULT update_window_doc(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 HTMLOuterWindow *mozwindow_to_window(const mozIDOMWindowProxy*) DECLSPEC_HIDDEN;
 void get_top_window(HTMLOuterWindow*,HTMLOuterWindow**) DECLSPEC_HIDDEN;
+struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow*,prototype_id_t,compat_mode_t) DECLSPEC_HIDDEN;
+HRESULT legacy_ctor_get_dispid(DispatchEx*,BSTR,DWORD,DISPID*) DECLSPEC_HIDDEN;
+HRESULT legacy_ctor_get_name(DispatchEx*,DISPID,BSTR*) DECLSPEC_HIDDEN;
+HRESULT legacy_ctor_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*) DECLSPEC_HIDDEN;
+HRESULT legacy_ctor_delete(DispatchEx*,DISPID) DECLSPEC_HIDDEN;
 void HTMLLocation_Init(HTMLOuterWindow*) DECLSPEC_HIDDEN;
 HRESULT create_navigator(HTMLInnerWindow*,IOmNavigator**) DECLSPEC_HIDDEN;
 void detach_navigator(IOmNavigator*) DECLSPEC_HIDDEN;
