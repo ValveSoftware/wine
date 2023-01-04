@@ -1983,34 +1983,6 @@ compat_mode_t dispex_compat_mode(DispatchEx *dispex)
         : dispex->info->desc->vtbl->get_compat_mode(dispex);
 }
 
-HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
-{
-    static const WCHAR prefix[8] = L"[object ";
-    static const WCHAR suffix[] = L"]";
-    WCHAR buf[ARRAY_SIZE(prefix) + 36 + ARRAY_SIZE(suffix)], *p = buf;
-    compat_mode_t compat_mode = dispex_compat_mode(dispex);
-    const WCHAR *name = dispex->info->desc->name;
-    unsigned len;
-
-    if(!ret)
-        return E_INVALIDARG;
-
-    memcpy(p, prefix, sizeof(prefix));
-    p += ARRAY_SIZE(prefix);
-    if(compat_mode < COMPAT_MODE_IE9)
-        p--;
-    else {
-        len = wcslen(name);
-        assert(len <= 36);
-        memcpy(p, name, len * sizeof(WCHAR));
-        p += len;
-    }
-    memcpy(p, suffix, sizeof(suffix));
-
-    *ret = SysAllocString(buf);
-    return *ret ? S_OK : E_OUTOFMEMORY;
-}
-
 static dispex_data_t *ensure_dispex_info(dispex_static_data_t *desc, compat_mode_t compat_mode)
 {
     if(!desc->info_cache[compat_mode]) {
@@ -2029,6 +2001,37 @@ static BOOL ensure_real_info(DispatchEx *dispex)
 
     dispex->info->desc->vtbl->finalize_dispex(dispex);
     return dispex->info != NULL;
+}
+
+HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
+{
+    static const WCHAR prefix[8] = L"[object ";
+    static const WCHAR suffix[] = L"]";
+    WCHAR buf[ARRAY_SIZE(prefix) + 36 + ARRAY_SIZE(suffix)], *p = buf;
+    compat_mode_t compat_mode = dispex_compat_mode(dispex);
+    const WCHAR *name;
+    unsigned len;
+
+    if(!ret)
+        return E_INVALIDARG;
+
+    memcpy(p, prefix, sizeof(prefix));
+    p += ARRAY_SIZE(prefix);
+    if(compat_mode < COMPAT_MODE_IE9)
+        p--;
+    else {
+        if(!ensure_real_info(dispex))
+            return E_OUTOFMEMORY;
+        name = dispex->info->desc->name;
+        len = wcslen(name);
+        assert(len <= 36);
+        memcpy(p, name, len * sizeof(WCHAR));
+        p += len;
+    }
+    memcpy(p, suffix, sizeof(suffix));
+
+    *ret = SysAllocString(buf);
+    return *ret ? S_OK : E_OUTOFMEMORY;
 }
 
 static inline struct legacy_prototype *legacy_prototype_from_IUnknown(IUnknown *iface)
