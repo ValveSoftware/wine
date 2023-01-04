@@ -17,6 +17,7 @@
  */
 
 
+#include <math.h>
 #include <limits.h>
 #include <assert.h>
 
@@ -744,11 +745,28 @@ static const builtin_info_t DataViewConstr_info = {
     NULL
 };
 
+static HRESULT clamped_u8(script_ctx_t *ctx, jsval_t v, UINT8 *ret)
+{
+    HRESULT hres;
+    double n;
+
+    hres = to_number(ctx, v, &n);
+    if(FAILED(hres))
+        return hres;
+
+    if(!isfinite(n))
+        *ret = (n == INFINITY ? 255 : 0);
+    else
+        *ret = (n >= 255.0 ? 255 : n <= 0 ? 0 : lround(n));
+    return S_OK;
+}
+
 #define TYPEDARRAY_LIST \
 X(Int8Array,            JSCLASS_INT8ARRAY,          INT8,   to_int32,   INT)    \
 X(Int16Array,           JSCLASS_INT16ARRAY,         INT16,  to_int32,   INT)    \
 X(Int32Array,           JSCLASS_INT32ARRAY,         INT32,  to_int32,   INT)    \
 X(Uint8Array,           JSCLASS_UINT8ARRAY,         UINT8,  to_int32,   INT)    \
+X(Uint8ClampedArray,    JSCLASS_UINT8CLAMPEDARRAY,  UINT8,  clamped_u8, UINT8)  \
 X(Uint16Array,          JSCLASS_UINT16ARRAY,        UINT16, to_int32,   INT)    \
 X(Uint32Array,          JSCLASS_UINT32ARRAY,        UINT32, to_int32,   INT)    \
 X(Float32Array,         JSCLASS_FLOAT32ARRAY,       float,  to_number,  double) \

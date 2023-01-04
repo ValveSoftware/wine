@@ -56,6 +56,7 @@ static HRESULT Object_toString(script_ctx_t *ctx, jsval_t vthis, WORD flags, uns
         L"[object Int16Array]",
         L"[object Int32Array]",
         L"[object Uint8Array]",
+        L"[object Uint8ClampedArray]",
         L"[object Uint16Array]",
         L"[object Uint32Array]",
         L"[object Float32Array]",
