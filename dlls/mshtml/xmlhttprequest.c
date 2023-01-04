@@ -149,6 +149,7 @@ typedef struct {
     EventTarget event_target;
     IHTMLXDomainRequest IHTMLXDomainRequest_iface;
     LONG ref;
+    HTMLInnerWindow *window;
     nsIXMLHttpRequest *nsxhr;
 } HTMLXDomainRequest;
 
@@ -1680,6 +1681,7 @@ static ULONG WINAPI HTMLXDomainRequest_Release(IHTMLXDomainRequest *iface)
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
         release_event_target(&This->event_target);
         release_dispex(&This->event_target.dispex);
         nsIXMLHttpRequest_Release(This->nsxhr);
@@ -1845,10 +1847,72 @@ static HRESULT WINAPI HTMLXDomainRequest_abort(IHTMLXDomainRequest *iface)
 static HRESULT WINAPI HTMLXDomainRequest_open(IHTMLXDomainRequest *iface, BSTR bstrMethod, BSTR bstrUrl)
 {
     HTMLXDomainRequest *This = impl_from_IHTMLXDomainRequest(iface);
+    nsAString nsstr, password;
+    nsACString str1, str2;
+    nsresult nsres;
+    HRESULT hres;
+    WCHAR *p;
 
-    FIXME("(%p)->(%s %s)\n", This, debugstr_w(bstrMethod), debugstr_w(bstrUrl));
+    TRACE("(%p)->(%s %s)\n", This, debugstr_w(bstrMethod), debugstr_w(bstrUrl));
 
-    return E_NOTIMPL;
+    if((p = wcschr(bstrUrl, ':')) && p[1] == '/' && p[2] == '/') {
+        size_t len = p - bstrUrl;
+        BSTR bstr;
+
+        /* Native only allows http and https, and the scheme must match */
+        if(len < 4 || len > 5 || wcsnicmp(bstrUrl, L"https", len) || !This->window->base.outer_window->uri)
+            return E_ACCESSDENIED;
+
+        hres = IUri_GetSchemeName(This->window->base.outer_window->uri, &bstr);
+        if(FAILED(hres))
+            return hres;
+        if(SysStringLen(bstr) != len || wcsnicmp(bstr, bstrUrl, len))
+            hres = E_ACCESSDENIED;
+        SysFreeString(bstr);
+        if(FAILED(hres))
+            return hres;
+    }
+
+    hres = bstr_to_nsacstr(bstrMethod, &str1);
+    if(FAILED(hres))
+        return hres;
+
+    hres = bstr_to_nsacstr(bstrUrl, &str2);
+    if(FAILED(hres)) {
+        nsACString_Finish(&str1);
+        return hres;
+    }
+
+    nsAString_Init(&nsstr, NULL);
+    nsAString_Init(&password, NULL);
+    nsres = nsIXMLHttpRequest_Open(This->nsxhr, &str1, &str2, TRUE, &nsstr, &password, 0);
+    nsAString_Finish(&nsstr);
+    nsAString_Finish(&password);
+    nsACString_Finish(&str1);
+    nsACString_Finish(&str2);
+    if(NS_FAILED(nsres)) {
+        ERR("nsIXMLHttpRequest_Open failed: %08lx\n", nsres);
+        return map_nsresult(nsres);
+    }
+
+    /* Prevent Gecko from parsing responseXML for no reason */
+    nsAString_InitDepend(&nsstr, L"text/plain");
+    nsIXMLHttpRequest_SlowOverrideMimeType(This->nsxhr, &nsstr);
+    nsAString_Finish(&nsstr);
+
+    /* XDomainRequest only accepts text/plain */
+    nsACString_InitDepend(&str1, "Accept");
+    nsACString_InitDepend(&str2, "text/plain");
+    nsres = nsIXMLHttpRequest_SetRequestHeader(This->nsxhr, &str1, &str2);
+    nsACString_Finish(&str1);
+    nsACString_Finish(&str2);
+    if(NS_FAILED(nsres)) {
+        ERR("nsIXMLHttpRequest_SetRequestHeader failed: %08lx\n", nsres);
+        return map_nsresult(nsres);
+    }
+
+    /* IE always adds Origin header, even from same origin, but Gecko doesn't allow us to alter it. */
+    return S_OK;
 }
 
 static HRESULT WINAPI HTMLXDomainRequest_send(IHTMLXDomainRequest *iface, VARIANT varBody)
@@ -2030,6 +2094,8 @@ static HRESULT WINAPI HTMLXDomainRequestFactory_create(IHTMLXDomainRequestFactor
         return E_OUTOFMEMORY;
     }
     ret->nsxhr = nsxhr;
+    ret->window = This->window;
+    IHTMLWindow2_AddRef(&This->window->base.IHTMLWindow2_iface);
 
     ret->IHTMLXDomainRequest_iface.lpVtbl = &HTMLXDomainRequestVtbl;
     ret->ref = 1;
