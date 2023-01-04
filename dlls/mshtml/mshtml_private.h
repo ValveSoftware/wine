@@ -420,6 +420,7 @@ typedef struct {
     HRESULT (*delete)(DispatchEx*,DISPID);
     HRESULT (*next_dispid)(DispatchEx*,DISPID,DISPID*);
     HRESULT (*override)(DispatchEx*,const WCHAR*,VARIANT*);
+    HRESULT (*get_static_dispid)(compat_mode_t,BSTR,DWORD,DISPID*);
     compat_mode_t (*get_compat_mode)(DispatchEx*);
     HRESULT (*populate_props)(DispatchEx*);
 } dispex_static_data_vtbl_t;

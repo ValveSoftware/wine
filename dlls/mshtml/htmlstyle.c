@@ -702,7 +702,7 @@ static const style_tbl_entry_t style_tbl[] = {
 
 C_ASSERT(ARRAY_SIZE(style_tbl) == STYLEID_MAX_VALUE);
 
-static const style_tbl_entry_t *lookup_style_tbl(CSSStyle *style, const WCHAR *name)
+static const style_tbl_entry_t *lookup_style_tbl_compat_mode(compat_mode_t compat_mode, const WCHAR *name)
 {
     int c, i, min = 0, max = ARRAY_SIZE(style_tbl)-1;
 
@@ -711,7 +711,7 @@ static const style_tbl_entry_t *lookup_style_tbl(CSSStyle *style, const WCHAR *n
 
         c = wcscmp(style_tbl[i].name, name);
         if(!c) {
-            if((style_tbl[i].flags & ATTR_COMPAT_IE10) && dispex_compat_mode(&style->dispex) < COMPAT_MODE_IE10)
+            if((style_tbl[i].flags & ATTR_COMPAT_IE10) && compat_mode < COMPAT_MODE_IE10)
                 return NULL;
             return style_tbl+i;
         }
@@ -723,6 +723,11 @@ static const style_tbl_entry_t *lookup_style_tbl(CSSStyle *style, const WCHAR *n
     }
 
     return NULL;
+}
+
+static const style_tbl_entry_t *lookup_style_tbl(CSSStyle *style, const WCHAR *name)
+{
+    return lookup_style_tbl_compat_mode(dispex_compat_mode(&style->dispex), name);
 }
 
 static void fix_px_value(nsAString *nsstr)
@@ -9976,14 +9981,13 @@ static inline CSSStyle *impl_from_DispatchEx(DispatchEx *dispex)
     return CONTAINING_RECORD(dispex, CSSStyle, dispex);
 }
 
-static HRESULT CSSStyle_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
+static HRESULT CSSStyle_get_static_dispid(compat_mode_t compat_mode, BSTR name, DWORD flags, DISPID *dispid)
 {
-    CSSStyle *This = impl_from_DispatchEx(dispex);
     const style_tbl_entry_t *style_entry;
 
-    style_entry = lookup_style_tbl(This, name);
+    style_entry = lookup_style_tbl_compat_mode(compat_mode, name);
     if(style_entry) {
-        DISPID id = dispex_compat_mode(dispex) >= COMPAT_MODE_IE9
+        DISPID id = compat_mode >= COMPAT_MODE_IE9
             ? style_entry->dispid : style_entry->compat_dispid;
         if(id == DISPID_UNKNOWN)
             return DISP_E_UNKNOWNNAME;
@@ -10005,9 +10009,13 @@ void CSSStyle_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
 
 const dispex_static_data_vtbl_t CSSStyle_dispex_vtbl = {
     NULL,
-    CSSStyle_get_dispid,
     NULL,
-    NULL
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    CSSStyle_get_static_dispid
 };
 
 static const tid_t HTMLStyle_iface_tids[] = {

@@ -6314,6 +6314,7 @@ static const event_target_vtbl_t HTMLDocumentNode_event_target_vtbl = {
         NULL,
         HTMLDocumentNode_next_dispid,
         NULL,
+        NULL,
         HTMLDocumentNode_get_compat_mode,
         NULL
     },

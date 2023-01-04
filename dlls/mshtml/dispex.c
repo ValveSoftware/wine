@@ -1266,12 +1266,20 @@ HRESULT dispex_get_builtin_id(DispatchEx *This, BSTR name, DWORD grfdex, DISPID 
             min = n+1;
     }
 
-    if(This->info->desc->vtbl && This->info->desc->vtbl->get_dispid) {
+    if(This->info->desc->vtbl) {
         HRESULT hres;
 
-        hres = This->info->desc->vtbl->get_dispid(This, name, grfdex, ret);
-        if(hres != DISP_E_UNKNOWNNAME)
-            return hres;
+        if(This->info->desc->vtbl->get_static_dispid) {
+            hres = This->info->desc->vtbl->get_static_dispid(dispex_compat_mode(This), name, grfdex, ret);
+            if(hres != DISP_E_UNKNOWNNAME)
+                return hres;
+        }
+
+        if(This->info->desc->vtbl->get_dispid) {
+            hres = This->info->desc->vtbl->get_dispid(This, name, grfdex, ret);
+            if(hres != DISP_E_UNKNOWNNAME)
+                return hres;
+        }
     }
 
     return DISP_E_UNKNOWNNAME;

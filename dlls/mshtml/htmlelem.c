@@ -7244,6 +7244,7 @@ static event_target_vtbl_t HTMLElement_event_target_vtbl = {
         NULL,
         NULL,
         NULL,
+        NULL,
         HTMLElement_populate_props
     },
     NULL,
