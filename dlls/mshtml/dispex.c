@@ -145,6 +145,7 @@ PRIVATE_TID_LIST
 };
 
 const tid_t no_iface_tids[1] = { 0 };
+static void proxy_prototype_init_dispex_info(dispex_data_t*,compat_mode_t);
 
 static struct prototype_static_data {
     dispex_static_data_t dispex;
@@ -157,7 +158,8 @@ static struct prototype_static_data {
         NULL,                         \
         PROTO_ID_ ## proto_id,        \
         NULL_tid,                     \
-        no_iface_tids                 \
+        no_iface_tids,                \
+        proxy_prototype_init_dispex_info \
     },                                \
     &dispex                           \
 },
@@ -1408,13 +1410,8 @@ static HRESULT get_builtin_func(dispex_data_t *data, DISPID id, func_info_t **re
 
 static HRESULT get_builtin_func_prot(DispatchEx *This, DISPID id, func_info_t **ret)
 {
-    if(This->proxy) {
-        struct proxy_prototype *prot = to_proxy_prototype(This);
-        if(prot)
-            return get_builtin_func(proxy_prototype_object_info(prot), id, ret);
-        if(id != DISPID_VALUE && This->info->desc->prototype_id >= 0)
-            return DISP_E_MEMBERNOTFOUND;
-    }
+    if(This->proxy && !to_proxy_prototype(This) && id != DISPID_VALUE && This->info->desc->prototype_id >= 0)
+        return DISP_E_MEMBERNOTFOUND;
     return get_builtin_func(This->info, id, ret);
 }
 
@@ -2406,9 +2403,65 @@ static inline struct proxy_prototype *to_proxy_prototype(DispatchEx *dispex)
     return (dispex->outer->lpVtbl == &proxy_prototype_vtbl) ? proxy_prototype_from_IUnknown(dispex->outer) : NULL;
 }
 
+static void proxy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
+{
+    dispex_static_data_t *desc = CONTAINING_RECORD(info->desc, struct prototype_static_data, dispex)->desc;
+    dispex_data_t *data = ensure_dispex_info(desc, compat_mode);
+    prototype_id_t prot_id;
+    func_info_t *func;
+    unsigned i;
+
+    if(!data)
+        return;
+
+    /* Copy the info from the object instance data, but
+       exclude builtins found up the prototype chain. */
+    func = realloc(info->funcs, data->func_size * sizeof(*func));
+    if(!func)
+        return;
+    info->funcs = func;
+    info->func_disp_cnt = 0;
+
+    for(i = 0; i < data->func_cnt; i++) {
+        BOOL found = FALSE;
+
+        for(prot_id = info->desc->prototype_id; prot_id >= 0; prot_id = prototype_static_data[prot_id].dispex.prototype_id) {
+            dispex_data_t *chain_data = ensure_dispex_info(prototype_static_data[prot_id].desc, compat_mode);
+            DWORD a = 0, b = chain_data->func_cnt;
+
+            while(a < b) {
+                DWORD idx = (a + b) / 2;
+                int c = wcsicmp(chain_data->name_table[idx]->name, data->funcs[i].name);
+                if(!c) {
+                    found = TRUE;
+                    break;
+                }
+                if(c > 0) b = idx;
+                else      a = idx + 1;
+            }
+            if(found)
+                break;
+        }
+        if(found)
+            continue;
+
+        copy_func_info(func, &data->funcs[i]);
+        if(func->func_disp_idx >= 0)
+            info->func_disp_cnt++;
+        func++;
+    }
+
+    info->func_cnt = func - info->funcs;
+    info->func_size = max(info->func_cnt, 16);
+    func = realloc(info->funcs, info->func_size * sizeof(*func));
+    if(func)
+        info->funcs = func;
+    memset(info->funcs + info->func_cnt, 0, (info->func_size - info->func_cnt) * sizeof(*func));
+}
+
 static HRESULT get_prototype_builtin_id(struct proxy_prototype *prot, BSTR name, DWORD flags, DISPID *id)
 {
-    dispex_data_t *data = proxy_prototype_object_info(prot);
+    dispex_data_t *data = prot->dispex.info;
     func_info_t **funcs = data->name_table;
     DWORD i, a = 0, b = data->func_cnt;
     int c;
@@ -2426,6 +2479,7 @@ static HRESULT get_prototype_builtin_id(struct proxy_prototype *prot, BSTR name,
         else      a = i + 1;
     }
 
+    data = proxy_prototype_object_info(prot);
     if(data->desc->vtbl && data->desc->vtbl->get_static_dispid)
         return data->desc->vtbl->get_static_dispid(dispex_compat_mode(&prot->dispex), name, flags, id);
     return DISP_E_UNKNOWNNAME;
@@ -2436,9 +2490,6 @@ static IDispatch *get_default_prototype(prototype_id_t prot_id, compat_mode_t co
     unsigned num_prots = ARRAY_SIZE(prototype_static_data) - LEGACY_PROTOTYPE_COUNT;
     struct proxy_prototype *prot;
     IDispatch **entry;
-
-    if(!ensure_dispex_info(prototype_static_data[prot_id].desc, compat_mode))
-        return NULL;
 
     if(!*prots_ref) {
         if(!(*prots_ref = calloc(1, FIELD_OFFSET(struct proxy_prototypes, disp[num_prots]))))
@@ -3260,7 +3311,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropEnum(IWineDispatchProxyPrivat
         return E_OUTOFMEMORY;
 
     if(prot) {
-        dispex_data_t *info = proxy_prototype_object_info(prot);
+        dispex_data_t *info = prot->dispex.info;
         func = info->funcs;
         func_end = func + info->func_cnt;
     }else if(This->info->desc->prototype_id < 0) {
