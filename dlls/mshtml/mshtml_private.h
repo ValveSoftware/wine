@@ -49,6 +49,12 @@ DEFINE_GUID(IID_IWineDispatchProxyPrivate, 0xd359f2fe,0x5531,0x741b,0xa4,0x1a,0x
 typedef struct _IWineDispatchProxyPrivate IWineDispatchProxyPrivate;
 typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
 
+struct proxy_prototypes
+{
+    unsigned int num;
+    IDispatch *prototype[];
+};
+
 struct proxy_func_invoker
 {
     HRESULT (STDMETHODCALLTYPE *invoke)(IDispatch*,void*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
@@ -66,7 +72,8 @@ struct proxy_prop_info
 typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
-    BOOL    (STDMETHODCALLTYPE *HasProxy)(IWineDispatchProxyPrivate *This);
+    IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
+    BOOL    (STDMETHODCALLTYPE *IsPrototype)(IWineDispatchProxyPrivate *This);
     HRESULT (STDMETHODCALLTYPE *PropFixOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);
     HRESULT (STDMETHODCALLTYPE *PropOverride)(IWineDispatchProxyPrivate *This, const WCHAR *name, VARIANT *value);
     HRESULT (STDMETHODCALLTYPE *PropDefineOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);
@@ -382,6 +389,102 @@ PRIVATE_TID_LIST
     LAST_tid
 } tid_t;
 
+#define LEGACY_PROTOTYPE_LIST \
+    X(HTMLLocation,                   "Location",                     HTMLLocation_dispex,                    NULL) \
+    X(HTMLUnknownElement,             "HTMLUnknownElement",           HTMLUnknownElement_dispex,              NULL)
+
+#define COMMON_PROTOTYPE_LIST \
+    X(History,                        "History",                      OmHistory_dispex,                       Object) \
+    X(Navigator,                      "Navigator",                    OmNavigator_dispex,                     Object) \
+    X(HTMLDOMAttribute,               "Attr",                         HTMLDOMAttribute_dispex,                Object) \
+    X(HTMLDOMChildrenCollection,      "NodeList",                     HTMLDOMChildrenCollection_dispex,       Object) \
+    X(HTMLDOMImplementation,          "DOMImplementation",            HTMLDOMImplementation_dispex,           Object) \
+    X(HTMLDOMTextNode,                "Text",                         HTMLDOMTextNode_dispex,                 Object) \
+    X(HTMLDocument,                   "HTMLDocument",                 HTMLDocumentNode_dispex,                Object) \
+    X(HTMLWindow,                     "Window",                       HTMLWindow_dispex,                      Object) \
+    X(HTMLAttributeCollection,        "NamedNodeMap",                 HTMLAttributeCollection_dispex,         Object) \
+    X(HTMLElementCollection,          "HTMLCollection",               HTMLElementCollection_dispex,           Object) \
+    X(HTMLNamespaceCollection,        "MSNamespaceInfoCollection",    HTMLNamespaceCollection_dispex,         Object) \
+    X(HTMLPluginsCollection,          "PluginArray",                  HTMLPluginsCollection_dispex,           Object) \
+    X(HTMLRectCollection,             "ClientRectList",               HTMLRectCollection_dispex,              Object) \
+    X(HTMLStyleSheetsCollection,      "StyleSheetList",               HTMLStyleSheetsCollection_dispex,       Object) \
+    X(HTMLStyleSheetRulesCollection,  "MSCSSRuleList",                HTMLStyleSheetRulesCollection_dispex,   Object) \
+    X(HTMLEventObj,                   "MSEventObj",                   HTMLEventObj_dispex,                    Object) \
+    X(HTMLRect,                       "ClientRect",                   HTMLRect_dispex,                        Object) \
+    X(HTMLScreen,                     "Screen",                       HTMLScreen_dispex,                      Object) \
+    X(HTMLSelectionObject,            "MSSelection",                  HTMLSelectionObject_dispex,             Object) \
+    X(HTMLStorage,                    "Storage",                      HTMLStorage_dispex,                     Object) \
+    X(HTMLTextRange,                  "TextRange",                    HTMLTxtRange_dispex,                    Object) \
+    X(HTMLXMLHttpRequest,             "XMLHttpRequest",               HTMLXMLHttpRequest_dispex,              Object) \
+    X(HTMLCurrentStyle,               "MSCurrentStyleCSSProperties",  HTMLCurrentStyle_dispex,                Object) \
+    X(HTMLW3CComputedStyle,           "CSSStyleDeclaration",          HTMLW3CComputedStyle_dispex,            Object) \
+    X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  Object) \
+    X(HTMLStyleSheetRule,             "CSSStyleRule",                 HTMLStyleSheetRule_dispex,              Object) \
+    X(HTMLElement,                    "HTMLElement",                  HTMLElement_dispex,                     Object) \
+    X(HTMLGenericElement,             "HTMLUnknownElement",           HTMLGenericElement_dispex,              Object) \
+    X(HTMLAnchorElement,              "HTMLAnchorElement",            HTMLAnchorElement_dispex,               Object) \
+    X(HTMLAreaElement,                "HTMLAreaElement",              HTMLAreaElement_dispex,                 Object) \
+    X(HTMLBodyElement,                "HTMLBodyElement",              HTMLBodyElement_dispex,                 Object) \
+    X(HTMLButtonElement,              "HTMLButtonElement",            HTMLButtonElement_dispex,               Object) \
+    X(HTMLCommentElement,             "Comment",                      HTMLCommentElement_dispex,              Object) \
+    X(HTMLEmbedElement,               "HTMLEmbedElement",             HTMLEmbedElement_dispex,                Object) \
+    X(HTMLFormElement,                "HTMLFormElement",              HTMLFormElement_dispex,                 Object) \
+    X(HTMLFrameElement,               "HTMLFrameElement",             HTMLFrameElement_dispex,                Object) \
+    X(HTMLHeadElement,                "HTMLHeadElement",              HTMLHeadElement_dispex,                 Object) \
+    X(HTMLHtmlElement,                "HTMLHtmlElement",              HTMLHtmlElement_dispex,                 Object) \
+    X(HTMLIFrameElement,              "HTMLIFrameElement",            HTMLIFrame_dispex,                      Object) \
+    X(HTMLImgElement,                 "HTMLImageElement",             HTMLImgElement_dispex,                  Object) \
+    X(HTMLInputElement,               "HTMLInputElement",             HTMLInputElement_dispex,                Object) \
+    X(HTMLLabelElement,               "HTMLLabelElement",             HTMLLabelElement_dispex,                Object) \
+    X(HTMLLinkElement,                "HTMLLinkElement",              HTMLLinkElement_dispex,                 Object) \
+    X(HTMLMetaElement,                "HTMLMetaElement",              HTMLMetaElement_dispex,                 Object) \
+    X(HTMLObjectElement,              "HTMLObjectElement",            HTMLObjectElement_dispex,               Object) \
+    X(HTMLOptionElement,              "HTMLOptionElement",            HTMLOptionElement_dispex,               Object) \
+    X(HTMLScriptElement,              "HTMLScriptElement",            HTMLScriptElement_dispex,               Object) \
+    X(HTMLSelectElement,              "HTMLSelectElement",            HTMLSelectElement_dispex,               Object) \
+    X(HTMLStyleElement,               "HTMLStyleElement",             HTMLStyleElement_dispex,                Object) \
+    X(HTMLTableElement,               "HTMLTableElement",             HTMLTable_dispex,                       Object) \
+    X(HTMLTableCellElement,           "HTMLTableDataCellElement",     HTMLTableCell_dispex,                   Object) \
+    X(HTMLTableRowElement,            "HTMLTableRowElement",          HTMLTableRow_dispex,                    Object) \
+    X(HTMLTextAreaElement,            "HTMLTextAreaElement",          HTMLTextAreaElement_dispex,             Object) \
+    X(HTMLTitleElement,               "HTMLTitleElement",             HTMLTitleElement_dispex,                Object)
+
+#define PROXY_PROTOTYPE_LIST \
+    X(Console,                        "Console",                      console_dispex,                         Object) \
+    X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
+    X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  Object) \
+    X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                Object) \
+    X(DOMMessageEvent,                "MessageEvent",                 DOMMessageEvent_dispex,                 Object) \
+    X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   Object) \
+    X(DOMPageTransitionEvent,         "PageTransitionEvent",          DOMPageTransitionEvent_dispex,          Object) \
+    X(DOMProgressEvent,               "ProgressEvent",                DOMProgressEvent_dispex,                Object) \
+    X(DOMStorageEvent,                "StorageEvent",                 DOMStorageEvent_dispex,                 Object) \
+    X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      Object) \
+    X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    Object) \
+    X(MediaQueryList,                 "MediaQueryList",               media_query_list_dispex,                Object) \
+    X(DOMTokenList,                   "DOMTokenList",                 DOMTokenList_dispex,                    Object) \
+    X(HTMLDOMNode,                    "Node",                         HTMLDOMNode_dispex,                     Object) \
+    X(HTMLDOMRange,                   "Range",                        HTMLDOMRange_dispex,                    Object) \
+    X(HTMLMimeTypesCollection,        "MimeTypeArray",                HTMLMimeTypesCollection_dispex,         Object) \
+    X(HTMLPerformance,                "Performance",                  HTMLPerformance_dispex,                 Object) \
+    X(HTMLPerformanceNavigation,      "PerformanceNavigation",        HTMLPerformanceNavigation_dispex,       Object) \
+    X(HTMLPerformanceTiming,          "PerformanceTiming",            HTMLPerformanceTiming_dispex,           Object) \
+    X(HTMLStyle,                      "MSStyleCSSProperties",         HTMLStyle_dispex,                       Object)
+
+typedef enum {
+    PROTO_ID_NULL = -2,
+    PROTO_ID_Object = -1,  /* jscript Object.prototype */
+#define X(id, name, dispex, proto_id) PROTO_ID_ ## id,
+LEGACY_PROTOTYPE_LIST
+    LEGACY_PROTOTYPE_COUNT,
+    PROTO_ID_LAST_LEGACY = LEGACY_PROTOTYPE_COUNT - 1,
+COMMON_PROTOTYPE_LIST
+    COMMON_PROTOTYPE_COUNT,
+    PROTO_ID_LAST_COMMON = COMMON_PROTOTYPE_COUNT - 1,
+PROXY_PROTOTYPE_LIST
+#undef X
+} prototype_id_t;
+
 typedef enum {
     COMPAT_MODE_INVALID = -1,
     COMPAT_MODE_QUIRKS,
@@ -428,12 +531,15 @@ typedef struct {
 typedef struct {
     const WCHAR *name;
     const dispex_static_data_vtbl_t *vtbl;
+    const prototype_id_t prototype_id;
     const tid_t disp_tid;
     const tid_t* const iface_tids;
     void (*init_info)(dispex_data_t*,compat_mode_t);
     dispex_data_t *info_cache[COMPAT_MODE_CNT];
     dispex_data_t *delayed_init_info;
 } dispex_static_data_t;
+
+extern const tid_t no_iface_tids[1];
 
 typedef HRESULT (*dispex_hook_invoke_t)(DispatchEx*,WORD,DISPPARAMS*,VARIANT*,
                                         EXCEPINFO*,IServiceProvider*);
@@ -1536,3 +1642,9 @@ IInternetSecurityManager *get_security_manager(void) DECLSPEC_HIDDEN;
 extern HINSTANCE hInst DECLSPEC_HIDDEN;
 void create_console(HTMLInnerWindow *window, IWineMSHTMLConsole **ret) DECLSPEC_HIDDEN;
 HRESULT create_media_query_list(HTMLWindow *window, BSTR media_query, IDispatch **ret) DECLSPEC_HIDDEN;
+
+#define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex DECLSPEC_HIDDEN;
+LEGACY_PROTOTYPE_LIST
+COMMON_PROTOTYPE_LIST
+PROXY_PROTOTYPE_LIST
+#undef X

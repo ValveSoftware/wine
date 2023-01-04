@@ -745,9 +745,10 @@ static const tid_t HTMLRect_iface_tids[] = {
     IHTMLRect_tid,
     0
 };
-static dispex_static_data_t HTMLRect_dispex = {
+dispex_static_data_t HTMLRect_dispex = {
     L"ClientRect",
     NULL,
+    PROTO_ID_HTMLRect,
     IHTMLRect_tid,
     HTMLRect_iface_tids
 };
@@ -1174,9 +1175,10 @@ static const tid_t HTMLRectCollection_iface_tids[] = {
     IHTMLRectCollection_tid,
     0
 };
-static dispex_static_data_t HTMLRectCollection_dispex = {
+dispex_static_data_t HTMLRectCollection_dispex = {
     L"ClientRectList",
     &HTMLRectCollection_dispex_vtbl,
+    PROTO_ID_HTMLRectCollection,
     IHTMLRectCollection_tid,
     HTMLRectCollection_iface_tids
 };
@@ -7530,9 +7532,10 @@ static const tid_t token_list_iface_tids[] = {
     IWineDOMTokenList_tid,
     0
 };
-static dispex_static_data_t token_list_dispex = {
+dispex_static_data_t DOMTokenList_dispex = {
     L"DOMTokenList",
     &token_list_dispex_vtbl,
+    PROTO_ID_DOMTokenList,
     IWineDOMTokenList_tid,
     token_list_iface_tids
 };
@@ -7550,7 +7553,7 @@ static HRESULT create_token_list(compat_mode_t compat_mode, HTMLElement *element
 
     obj->IWineDOMTokenList_iface.lpVtbl = &WineDOMTokenListVtbl;
     obj->ref = 1;
-    init_dispatch(&obj->dispex, (IUnknown*)&obj->IWineDOMTokenList_iface, &token_list_dispex,
+    init_dispatch(&obj->dispex, (IUnknown*)&obj->IWineDOMTokenList_iface, &DOMTokenList_dispex,
                   get_inner_window(element->node.doc), compat_mode);
     IHTMLElement_AddRef(&element->IHTMLElement_iface);
     obj->element = &element->IHTMLElement_iface;
@@ -7642,17 +7645,19 @@ static const IWineHTMLElementPrivateVtbl WineHTMLElementPrivateVtbl = {
     htmlelement_private_get_classList,
 };
 
-static dispex_static_data_t HTMLElement_dispex = {
+dispex_static_data_t HTMLElement_dispex = {
     L"HTMLElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLElement,
     DispHTMLUnknownElement_tid,
     HTMLElement_iface_tids,
     HTMLElement_init_dispex_info
 };
 
-static dispex_static_data_t HTMLUnknownElement_dispex = {
+dispex_static_data_t HTMLUnknownElement_dispex = {
     L"HTMLUnknownElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLUnknownElement,
     DispHTMLUnknownElement_tid,
     HTMLElement_iface_tids,
     HTMLElement_init_dispex_info
@@ -7679,7 +7684,10 @@ void HTMLElement_Init(HTMLElement *This, HTMLDocumentNode *doc, nsIDOMElement *n
         nsIDOMHTMLElement *html_element;
         nsresult nsres;
 
-        HTMLDOMNode_Init(doc, &This->node, (nsIDOMNode*)nselem, dispex_data ? dispex_data : &HTMLUnknownElement_dispex);
+        if(!dispex_data)
+            dispex_data = (doc->document_mode >= COMPAT_MODE_IE9) ? &HTMLGenericElement_dispex : &HTMLUnknownElement_dispex;
+
+        HTMLDOMNode_Init(doc, &This->node, (nsIDOMNode*)nselem, dispex_data);
 
         /* No AddRef, share reference with HTMLDOMNode */
         assert((nsIDOMNode*)nselem == This->node.nsnode);
@@ -7728,7 +7736,7 @@ HRESULT HTMLElement_Create(HTMLDocumentNode *doc, nsIDOMNode *nsnode, BOOL use_g
         if(NS_SUCCEEDED(nsres)) {
             hres = create_svg_element(doc, svg_element, tag_name, &elem);
             nsIDOMSVGElement_Release(svg_element);
-        }else if(use_generic) {
+        }else if(use_generic || doc->document_mode >= COMPAT_MODE_IE9) {
             hres = HTMLGenericElement_Create(doc, nselem, &elem);
         }else {
             elem = calloc(1, sizeof(HTMLElement));
@@ -7954,6 +7962,7 @@ static const tid_t HTMLFiltersCollection_iface_tids[] = {
 static dispex_static_data_t HTMLFiltersCollection_dispex = {
     L"FiltersCollection",
     &HTMLFiltersCollection_dispex_vtbl,
+    PROTO_ID_NULL,
     IHTMLFiltersCollection_tid,
     HTMLFiltersCollection_iface_tids
 };
@@ -8713,9 +8722,10 @@ static const tid_t HTMLAttributeCollection_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLAttributeCollection_dispex = {
+dispex_static_data_t HTMLAttributeCollection_dispex = {
     L"NamedNodeMap",
     &HTMLAttributeCollection_dispex_vtbl,
+    PROTO_ID_HTMLAttributeCollection,
     DispHTMLAttributeCollection_tid,
     HTMLAttributeCollection_iface_tids
 };

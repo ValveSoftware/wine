@@ -636,9 +636,10 @@ static const tid_t HTMLElementCollection_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLElementCollection_dispex = {
+dispex_static_data_t HTMLElementCollection_dispex = {
     L"HTMLCollection",
     &HTMLElementColection_dispex_vtbl,
+    PROTO_ID_HTMLElementCollection,
     DispHTMLElementCollection_tid,
     HTMLElementCollection_iface_tids
 };

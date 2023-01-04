@@ -2317,17 +2317,6 @@ static HRESULT delete_prop(jsdisp_t *prop_obj, dispex_prop_t *prop, BOOL *ret)
             prop->type = PROP_DELETED;
         return hres;
     }
-    /* FIXME: Get rid of this once the builtin proxy props are moved to the prototype */
-    if(prop_obj->proxy) {
-        if(prop->type == PROP_JSVAL && is_object_instance(prop->u.val) &&
-           is_proxy_func(to_jsdisp(get_object(prop->u.val)))) {
-            return S_OK;
-        }
-        if(prop->type == PROP_ACCESSOR &&
-           (is_proxy_func(prop->u.accessor.getter) || is_proxy_func(prop->u.accessor.setter))) {
-            return S_OK;
-        }
-    }
     if(prop->type == PROP_JSVAL)
         jsval_release(prop->u.val);
     if(prop->type == PROP_ACCESSOR) {
@@ -2430,6 +2419,28 @@ static HRESULT WINAPI DispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnknown
     return E_NOTIMPL;
 }
 
+static HRESULT get_proxy_default_prototype(script_ctx_t *ctx, IWineDispatchProxyPrivate *proxy, jsdisp_t **prot)
+{
+    IDispatch *disp = proxy->lpVtbl->GetDefaultPrototype(proxy, &ctx->proxy_prototypes);
+    HRESULT hres;
+
+    if(!disp)
+        return E_OUTOFMEMORY;
+
+    if(disp == WINE_DISP_PROXY_NULL_PROTOTYPE)
+        *prot = NULL;
+    else if(disp == WINE_DISP_PROXY_OBJECT_PROTOTYPE)
+        *prot = jsdisp_addref(ctx->object_prototype);
+    else {
+        jsval_t tmp = jsval_disp(disp);
+        hres = convert_to_proxy(ctx, &tmp);
+        if(FAILED(hres))
+            return hres;
+        *prot = as_jsdisp(get_object(tmp));
+    }
+    return S_OK;
+}
+
 static inline jsdisp_t *impl_from_IWineDispatchProxyCbPrivate(IWineDispatchProxyCbPrivate *iface)
 {
     return impl_from_IDispatchEx((IDispatchEx*)iface);
@@ -2476,6 +2487,7 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
     jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
     script_ctx_t *ctx = get_script_ctx(script);
     dispex_prop_t *prop, *end;
+    jsdisp_t *prot;
     HRESULT hres;
     BOOL b;
 
@@ -2490,6 +2502,10 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
             return S_OK;
         }
 
+        hres = get_proxy_default_prototype(ctx, This->proxy, &prot);
+        if(FAILED(hres))
+            return hres;
+
         if(This->ref) {
             list_remove(&This->entry);
             list_add_tail(&ctx->objects, &This->entry);
@@ -2498,7 +2514,9 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
         script_addref(ctx);
         This->ctx = ctx;
 
-        hres = jsdisp_change_prototype(This, ctx->object_prototype);
+        hres = jsdisp_change_prototype(This, prot);
+        if(prot)
+            jsdisp_release(prot);
         if(FAILED(hres))
             return hres;
     }
@@ -2642,7 +2660,7 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
 {
     IWineDispatchProxyCbPrivate **proxy_ref;
     IWineDispatchProxyPrivate *proxy;
-    jsdisp_t *jsdisp;
+    jsdisp_t *jsdisp, *prot;
     IDispatch *obj;
     HRESULT hres;
 
@@ -2654,10 +2672,6 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
 
     if(FAILED(IDispatch_QueryInterface(obj, &IID_IWineDispatchProxyPrivate, (void**)&proxy)) || !proxy)
         return S_OK;
-    if(!proxy->lpVtbl->HasProxy(proxy)) {
-        IDispatchEx_Release((IDispatchEx*)proxy);
-        return S_OK;
-    }
     IDispatch_Release(obj);
 
     proxy_ref = proxy->lpVtbl->GetProxyFieldRef(proxy);
@@ -2678,20 +2692,42 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
 
     if(!ctx->global) {
         FIXME("Script is uninitialized?\n");
-        IDispatchEx_Release((IDispatchEx*)proxy);
-        return E_UNEXPECTED;
+        hres = E_UNEXPECTED;
+        goto fail;
     }
 
-    hres = create_dispex(ctx, &proxy_dispex_info, ctx->object_prototype, &jsdisp);
-    if(FAILED(hres)) {
-        IDispatchEx_Release((IDispatchEx*)proxy);
-        return hres;
-    }
+    hres = get_proxy_default_prototype(ctx, proxy, &prot);
+    if(FAILED(hres))
+        goto fail;
+    if(!prot)
+        return hres;  /* not a JS object */
+
+    hres = create_dispex(ctx, &proxy_dispex_info, prot, &jsdisp);
+    jsdisp_release(prot);
+    if(FAILED(hres))
+        goto fail;
+
     *proxy_ref = (IWineDispatchProxyCbPrivate*)&jsdisp->IDispatchEx_iface;
     jsdisp->proxy = proxy;
+    if(proxy->lpVtbl->IsPrototype(proxy)) {
+        /* FIXME: use proper constructor */
+        jsval_t ctor = jsval_null();
+
+        hres = jsdisp_define_data_property(jsdisp, L"constructor", PROPF_WRITABLE | PROPF_CONFIGURABLE, ctor);
+    }
+    if(FAILED(hres)) {
+        *proxy_ref = NULL;
+        jsdisp->proxy = NULL;
+        jsdisp_release(jsdisp);
+        goto fail;
+    }
 
     *val = jsval_obj(jsdisp);
     return S_OK;
+
+fail:
+    IDispatchEx_Release((IDispatchEx*)proxy);
+    return hres;
 }
 
 void jsdisp_free(jsdisp_t *obj)

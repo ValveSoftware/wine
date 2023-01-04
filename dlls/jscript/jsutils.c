@@ -398,6 +398,24 @@ HRESULT jsval_to_variant(jsval_t val, VARIANT *retv)
     return E_FAIL;
 }
 
+static HRESULT proxy_tostring(jsdisp_t *jsdisp, jsval_t *ret)
+{
+    jsstr_t *str;
+    HRESULT hres;
+    BSTR bstr;
+
+    /* Proxy prototype with custom toString fails when called on itself */
+    hres = jsdisp->proxy->lpVtbl->ToString(jsdisp->proxy, &bstr);
+    if(FAILED(hres))
+        return hres;
+    str = jsstr_alloc(bstr);
+    SysFreeString(bstr);
+    if(!str)
+        return E_OUTOFMEMORY;
+    *ret = jsval_string(str);
+    return S_OK;
+}
+
 /* ECMA-262 3rd Edition    9.1 */
 HRESULT to_primitive(script_ctx_t *ctx, jsval_t val, jsval_t *ret, hint_t hint)
 {
@@ -420,8 +438,11 @@ HRESULT to_primitive(script_ctx_t *ctx, jsval_t val, jsval_t *ret, hint_t hint)
         if(SUCCEEDED(hres)) {
             hres = jsdisp_call(jsdisp, id, DISPATCH_METHOD, 0, NULL, &prim);
             if(FAILED(hres)) {
-                WARN("call error - forwarding exception\n");
+                if(hres == E_UNEXPECTED && jsdisp->proxy)
+                    hres = proxy_tostring(jsdisp, ret);
                 jsdisp_release(jsdisp);
+                if(FAILED(hres))
+                    WARN("call error - forwarding exception\n");
                 return hres;
             }else if(!is_object_instance(prim)) {
                 jsdisp_release(jsdisp);
@@ -439,8 +460,11 @@ HRESULT to_primitive(script_ctx_t *ctx, jsval_t val, jsval_t *ret, hint_t hint)
         if(SUCCEEDED(hres)) {
             hres = jsdisp_call(jsdisp, id, DISPATCH_METHOD, 0, NULL, &prim);
             if(FAILED(hres)) {
-                WARN("call error - forwarding exception\n");
+                if(hres == E_UNEXPECTED && jsdisp->proxy)
+                    hres = proxy_tostring(jsdisp, ret);
                 jsdisp_release(jsdisp);
+                if(FAILED(hres))
+                    WARN("call error - forwarding exception\n");
                 return hres;
             }else if(!is_object_instance(prim)) {
                 jsdisp_release(jsdisp);

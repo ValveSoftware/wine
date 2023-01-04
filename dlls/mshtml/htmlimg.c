@@ -780,9 +780,10 @@ static void HTMLImgElement_init_dispex_info(dispex_data_t *info, compat_mode_t m
     dispex_info_add_interface(info, IHTMLImgElement_tid, mode >= COMPAT_MODE_IE11 ? img_ie11_hooks : NULL);
 }
 
-static dispex_static_data_t HTMLImgElement_dispex = {
+dispex_static_data_t HTMLImgElement_dispex = {
     L"HTMLImageElement",
     NULL,
+    PROTO_ID_HTMLImgElement,
     DispHTMLImg_tid,
     HTMLImgElement_iface_tids,
     HTMLImgElement_init_dispex_info
@@ -1031,6 +1032,7 @@ static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
 static dispex_static_data_t HTMLImageElementFactory_dispex = {
     L"Function",
     &HTMLImageElementFactory_dispex_vtbl,
+    PROTO_ID_NULL,
     IHTMLImageElementFactory_tid,
     HTMLImageElementFactory_iface_tids
 };
