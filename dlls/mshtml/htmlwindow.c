@@ -3909,6 +3909,11 @@ static BOOL WINAPI WindowWineDispProxyPrivate_IsPrototype(IWineDispatchProxyPriv
     return FALSE;
 }
 
+static BOOL WINAPI WindowWineDispProxyPrivate_IsConstructor(IWineDispatchProxyPrivate *iface)
+{
+    return FALSE;
+}
+
 static HRESULT WINAPI WindowWineDispProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -4064,6 +4069,7 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     WindowWineDispProxyPrivate_GetDefaultConstructor,
     WindowWineDispProxyPrivate_DefineConstructors,
     WindowWineDispProxyPrivate_IsPrototype,
+    WindowWineDispProxyPrivate_IsConstructor,
     WindowWineDispProxyPrivate_PropFixOverride,
     WindowWineDispProxyPrivate_PropOverride,
     WindowWineDispProxyPrivate_PropDefineOverride,
