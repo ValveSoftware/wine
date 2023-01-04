@@ -2865,7 +2865,7 @@ static HRESULT WINAPI HTMLPrivateWindow_GetAddressBarUrl(IHTMLPrivateWindow *ifa
     if(!url)
         return E_INVALIDARG;
 
-    *url = SysAllocString(This->outer_window->url);
+    *url = SysAllocString(This->outer_window->url ? This->outer_window->url : L"about:blank");
     return S_OK;
 }
 
@@ -4153,6 +4153,49 @@ HRESULT create_pending_window(HTMLOuterWindow *outer_window, nsChannelBSC *chann
 
     outer_window->pending_window = pending_window;
     return S_OK;
+}
+
+void set_window_uninitialized(HTMLOuterWindow *window, HTMLDocumentNode *doc_node)
+{
+    nsIDOMDOMImplementation *implementation;
+    nsIDOMDocument *nsdoc;
+    nsAString nsstr;
+    nsresult nsres;
+    HRESULT hres;
+
+    window->readystate = READYSTATE_UNINITIALIZED;
+    set_current_uri(window, NULL);
+    if(window->mon) {
+        IMoniker_Release(window->mon);
+        window->mon = NULL;
+    }
+
+    hres = create_pending_window(window, NULL);
+    if(FAILED(hres))
+        return;
+
+    nsres = nsIDOMDocument_GetImplementation(doc_node->dom_document, &implementation);
+    if(NS_FAILED(nsres))
+        return;
+
+    nsAString_InitDepend(&nsstr, L"");
+    nsres = nsIDOMDOMImplementation_CreateHTMLDocument(implementation, &nsstr, &nsdoc);
+    nsIDOMDOMImplementation_Release(implementation);
+    nsAString_Finish(&nsstr);
+    if(NS_FAILED(nsres))
+        return;
+
+    hres = create_document_node(nsdoc, window->browser, window->pending_window, COMPAT_MODE_QUIRKS, &window->pending_window->doc);
+    nsIDOMDocument_Release(nsdoc);
+    if(FAILED(hres))
+        return;
+    window->pending_window->doc->doc_obj = NULL;
+    window->pending_window->doc->cp_container.forward_container = NULL;
+
+    if(window->base.inner_window)
+        detach_inner_window(window->base.inner_window);
+    window->base.inner_window = window->pending_window;
+    window->pending_window = NULL;
 }
 
 HRESULT update_window_doc(HTMLInnerWindow *window)

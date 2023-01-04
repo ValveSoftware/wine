@@ -5754,6 +5754,97 @@ static void test_empty_document(void)
     IHTMLDocument2_Release(doc);
 }
 
+static void test_document_close(void)
+{
+    IHTMLPrivateWindow *priv_window;
+    IHTMLDocument2 *doc, *doc_node;
+    IHTMLDocument3 *doc3;
+    IHTMLWindow2 *window;
+    IHTMLElement *elem;
+    HRESULT hres;
+    BSTR bstr;
+
+    doc = create_document_with_origin(input_doc_str);
+    if(!doc)
+        return;
+
+    hres = IHTMLDocument2_get_parentWindow(doc, &window);
+    ok(hres == S_OK, "get_parentWindow failed: %08lx\n", hres);
+
+    hres = IHTMLWindow2_get_document(window, &doc_node);
+    ok(hres == S_OK, "get_document failed: %08lx\n", hres);
+
+    hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLPrivateWindow, (void**)&priv_window);
+    ok(hres == S_OK, "Could not get IHTMLPrivateWindow) interface: %08lx\n", hres);
+    hres = IHTMLPrivateWindow_GetAddressBarUrl(priv_window, &bstr);
+    ok(hres == S_OK, "GetAddressBarUrl failed: %08lx\n", hres);
+    ok(!wcscmp(bstr, L"http://winetest.example.org/"), "unexpected address bar: %s\n", wine_dbgstr_w(bstr));
+    IHTMLPrivateWindow_Release(priv_window);
+    SysFreeString(bstr);
+
+    elem = get_elem_id(doc_node, L"inputid");
+    IHTMLElement_Release(elem);
+
+    set_client_site(doc, FALSE);
+    IHTMLDocument2_Release(doc);
+
+    hres = IHTMLWindow2_get_document(window, &doc);
+    ok(hres == S_OK, "get_document failed: %08lx\n", hres);
+    ok(doc != doc_node, "doc == doc_node\n");
+
+    hres = IHTMLDocument2_get_readyState(doc_node, &bstr);
+    ok(hres == S_OK, "get_readyState failed: %08lx\n", hres);
+    ok(!wcscmp(bstr, L"uninitialized"), "readyState = %s\n", wine_dbgstr_w(bstr));
+    SysFreeString(bstr);
+
+    hres = IHTMLDocument2_get_readyState(doc, &bstr);
+    ok(hres == S_OK, "get_readyState failed: %08lx\n", hres);
+    ok(!wcscmp(bstr, L"uninitialized"), "readyState = %s\n", wine_dbgstr_w(bstr));
+    SysFreeString(bstr);
+
+    hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLPrivateWindow, (void**)&priv_window);
+    ok(hres == S_OK, "Could not get IHTMLPrivateWindow) interface: %08lx\n", hres);
+    hres = IHTMLPrivateWindow_GetAddressBarUrl(priv_window, &bstr);
+    ok(hres == S_OK, "GetAddressBarUrl failed: %08lx\n", hres);
+    ok(!wcscmp(bstr, L"about:blank"), "unexpected address bar: %s\n", wine_dbgstr_w(bstr));
+    IHTMLPrivateWindow_Release(priv_window);
+    SysFreeString(bstr);
+
+    bstr = SysAllocString(L"inputid");
+    doc3 = get_doc3_iface((IUnknown*)doc);
+    hres = IHTMLDocument3_getElementById(doc3, bstr, &elem);
+    ok(hres == S_OK, "getElementById returned: %08lx\n", hres);
+    ok(elem == NULL, "elem != NULL\n");
+    IHTMLDocument3_Release(doc3);
+    SysFreeString(bstr);
+
+    IHTMLDocument2_Release(doc_node);
+    IHTMLDocument2_Release(doc);
+    IHTMLWindow2_Release(window);
+
+    doc = create_document();
+    if(!doc)
+        return;
+    set_client_site(doc, TRUE);
+
+    hres = IHTMLDocument2_get_parentWindow(doc, &window);
+    ok(hres == S_OK, "get_parentWindow failed: %08lx\n", hres);
+
+    hres = IHTMLWindow2_get_document(window, &doc_node);
+    ok(hres == S_OK, "get_document failed: %08lx\n", hres);
+
+    set_client_site(doc, FALSE);
+    IHTMLDocument2_Release(doc);
+
+    hres = IHTMLWindow2_get_document(window, &doc);
+    ok(hres == S_OK, "get_document failed: %08lx\n", hres);
+    ok(doc != doc_node, "doc == doc_node\n");
+
+    IHTMLDocument2_Release(doc_node);
+    IHTMLDocument2_Release(doc);
+    IHTMLWindow2_Release(window);
+}
+
 static void test_storage_events(const char *doc_str)
 {
     static struct  {
@@ -6030,6 +6121,7 @@ START_TEST(events)
         }
 
         test_empty_document();
+        test_document_close();
         test_storage_events(empty_doc_str);
         if(is_ie9plus)
             test_storage_events(empty_doc_ie9_str);

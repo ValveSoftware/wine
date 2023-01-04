@@ -3440,8 +3440,19 @@ static ULONG WINAPI HTMLDocumentObj_Release(IUnknown *iface)
 
     if(!ref) {
         if(This->doc_node) {
-            This->doc_node->doc_obj = NULL;
-            IHTMLDOMNode_Release(&This->doc_node->node.IHTMLDOMNode_iface);
+            HTMLDocumentNode *doc_node = This->doc_node;
+
+            /* The nscontainer holds a ref as well as us, so only do it if anyone else is holding it */
+            if(This->window->base.ref > 2) {
+                /* Protect against re-entry */
+                This->ref = 1;
+                set_window_uninitialized(This->window, doc_node);
+                assert(This->ref == 1);
+                This->ref = 0;
+            }
+
+            doc_node->doc_obj = NULL;
+            IHTMLDOMNode_Release(&doc_node->node.IHTMLDOMNode_iface);
         }
         if(This->window)
             IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
