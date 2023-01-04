@@ -6295,12 +6295,11 @@ HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLI
         doc->html_document = NULL;
     }
 
+    doc->node.vtbl = &HTMLDocumentNodeImplVtbl;
     HTMLDOMNode_Init(doc, &doc->node, (nsIDOMNode*)doc->dom_document, &HTMLDocumentNode_dispex);
 
     init_document_mutation(doc);
     doc_init_events(doc);
-
-    doc->node.vtbl = &HTMLDocumentNodeImplVtbl;
 
     list_add_head(&browser->document_nodes, &doc->browser_entry);
     doc->browser = browser;
@@ -6330,8 +6329,8 @@ static HRESULT create_document_fragment(nsIDOMNode *nsnode, HTMLDocumentNode *do
 
     IHTMLWindow2_AddRef(&doc_frag->window->base.IHTMLWindow2_iface);
 
-    HTMLDOMNode_Init(doc_node, &doc_frag->node, nsnode, &HTMLDocumentNode_dispex);
     doc_frag->node.vtbl = &HTMLDocumentFragmentImplVtbl;
+    HTMLDOMNode_Init(doc_node, &doc_frag->node, nsnode, &HTMLDocumentNode_dispex);
     doc_frag->document_mode = lock_document_mode(doc_node);
 
     *ret = doc_frag;

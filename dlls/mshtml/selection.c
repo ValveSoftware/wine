@@ -349,13 +349,13 @@ HRESULT HTMLSelectionObject_Create(HTMLDocumentNode *doc, nsISelection *nsselect
     if(!selection)
         return E_OUTOFMEMORY;
 
-    init_dispatch(&selection->dispex, (IUnknown*)&selection->IHTMLSelectionObject_iface,
-                  &HTMLSelectionObject_dispex, dispex_compat_mode(&doc->node.event_target.dispex));
-
     selection->IHTMLSelectionObject_iface.lpVtbl = &HTMLSelectionObjectVtbl;
     selection->IHTMLSelectionObject2_iface.lpVtbl = &HTMLSelectionObject2Vtbl;
     selection->ref = 1;
     selection->nsselection = nsselection; /* We shouldn't call AddRef here */
+
+    init_dispatch(&selection->dispex, (IUnknown*)&selection->IHTMLSelectionObject_iface,
+                  &HTMLSelectionObject_dispex, dispex_compat_mode(&doc->node.event_target.dispex));
 
     selection->doc = doc;
     list_add_head(&doc->selection_list, &selection->entry);
