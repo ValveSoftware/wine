@@ -127,6 +127,7 @@ PRIVATE_TID_LIST
 };
 
 static inline DispatchEx *get_dispex_for_hook(IUnknown*);
+static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 
 static HRESULT load_typelib(void)
 {
@@ -835,6 +836,145 @@ static const IUnknownVtbl FunctionUnkVtbl = {
     Function_Release
 };
 
+static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    IDispatchEx *dispex = NULL;
+    DISPPARAMS params = { 0 };
+    IDispatch *this_obj;
+    DISPID dispid;
+    UINT argc = 0;
+    VARIANT *arg;
+    HRESULT hres;
+    VARIANT var;
+
+    arg = dp->rgvarg + dp->cArgs - 1;
+    if(dp->cArgs < 1 || V_VT(arg) != VT_DISPATCH || !V_DISPATCH(arg))
+        return CTL_E_ILLEGALFUNCTIONCALL;
+    this_obj = V_DISPATCH(arg);
+
+    if(dp->cArgs >= 2) {
+        UINT i, err = 0;
+        IDispatch *disp;
+        BSTR name;
+
+        arg--;
+        if((V_VT(arg) & ~VT_BYREF) != VT_DISPATCH)
+            return CTL_E_ILLEGALFUNCTIONCALL;
+        disp = (V_VT(arg) & VT_BYREF) ? *(IDispatch**)(V_BYREF(arg)) : V_DISPATCH(arg);
+
+        /* get the array length */
+        if(!(name = SysAllocString(L"length")))
+            return E_OUTOFMEMORY;
+
+        hres = IDispatch_QueryInterface(disp, &IID_IDispatchEx, (void**)&dispex);
+        if(SUCCEEDED(hres) && dispex)
+            hres = IDispatchEx_GetDispID(dispex, name, fdexNameCaseSensitive, &dispid);
+        else {
+            hres = IDispatch_GetIDsOfNames(disp, &IID_NULL, &name, 1, 0, &dispid);
+            dispex = NULL;
+        }
+        SysFreeString(name);
+        if(FAILED(hres) || dispid == DISPID_UNKNOWN) {
+            hres = CTL_E_ILLEGALFUNCTIONCALL;
+            goto fail;
+        }
+
+        if(dispex)
+            hres = IDispatchEx_InvokeEx(dispex, dispid, lcid, DISPATCH_PROPERTYGET, &params, res, ei, caller);
+        else
+            hres = IDispatch_Invoke(disp, dispid, &IID_NULL, lcid, DISPATCH_PROPERTYGET, &params, res, ei, &err);
+        if(FAILED(hres))
+            goto fail;
+
+        if(V_VT(res) == VT_I4)
+            V_I4(&var) = V_I4(res);
+        else {
+            V_VT(&var) = VT_EMPTY;
+            hres = change_type(&var, res, VT_I4, caller);
+        }
+        VariantClear(res);
+        if(FAILED(hres) || V_I4(&var) < 0) {
+            hres = CTL_E_ILLEGALFUNCTIONCALL;
+            goto fail;
+        }
+        params.cArgs = V_I4(&var);
+
+        /* alloc new params */
+        if(params.cArgs) {
+            if(!(params.rgvarg = malloc(params.cArgs * sizeof(VARIANTARG)))) {
+                hres = E_OUTOFMEMORY;
+                goto fail;
+            }
+            for(i = 0; i < params.cArgs; i++) {
+                WCHAR buf[12];
+
+                arg = params.rgvarg + params.cArgs - i - 1;
+                swprintf(buf, ARRAY_SIZE(buf), L"%u", i);
+                if(!(name = SysAllocString(buf))) {
+                    hres = E_OUTOFMEMORY;
+                    break;
+                }
+                if(dispex)
+                    hres = IDispatchEx_GetDispID(dispex, name, fdexNameCaseSensitive, &dispid);
+                else
+                    hres = IDispatch_GetIDsOfNames(disp, &IID_NULL, &name, 1, 0, &dispid);
+                SysFreeString(name);
+                if(FAILED(hres)) {
+                    if(hres == DISP_E_UNKNOWNNAME) {
+                        V_VT(arg) = VT_EMPTY;
+                        continue;
+                    }
+                    hres = CTL_E_ILLEGALFUNCTIONCALL;
+                    break;
+                }
+                if(dispex)
+                    hres = IDispatchEx_InvokeEx(dispex, dispid, lcid, DISPATCH_PROPERTYGET, NULL, arg, ei, caller);
+                else
+                    hres = IDispatch_Invoke(disp, dispid, &IID_NULL, lcid, DISPATCH_PROPERTYGET, NULL, arg, ei, &err);
+                if(FAILED(hres))
+                    break;
+            }
+            argc = i;
+            if(argc < params.cArgs)
+                goto cleanup;
+        }
+    }
+
+    hres = invoke_builtin_function(this_obj, func->info, &params, res, ei, caller);
+
+cleanup:
+    while(argc--)
+        VariantClear(&params.rgvarg[params.cArgs - argc - 1]);
+    free(params.rgvarg);
+fail:
+    if(dispex)
+        IDispatchEx_Release(dispex);
+    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+}
+
+static HRESULT function_call(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    DISPPARAMS params = { dp->rgvarg, NULL, dp->cArgs - 1, 0 };
+    VARIANT *arg;
+    HRESULT hres;
+
+    arg = dp->rgvarg + dp->cArgs - 1;
+    if(dp->cArgs < 1 || V_VT(arg) != VT_DISPATCH || !V_DISPATCH(arg))
+        return CTL_E_ILLEGALFUNCTIONCALL;
+
+    hres = invoke_builtin_function(V_DISPATCH(arg), func->info, &params, res, ei, caller);
+
+    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+}
+
+static const struct {
+    const WCHAR *name;
+    HRESULT (*invoke)(func_disp_t*,DISPPARAMS*,LCID,VARIANT*,EXCEPINFO*,IServiceProvider*);
+} function_props[] = {
+    { L"apply", function_apply },
+    { L"call",  function_call }
+};
+
 static inline func_disp_t *impl_from_DispatchEx(DispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, func_disp_t, dispex);
@@ -854,7 +994,7 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
     case DISPATCH_METHOD:
         if(!This->obj)
             return E_UNEXPECTED;
-        hres = dispex_call_builtin(This->obj, This->info->id, params, res, ei, caller);
+        hres = invoke_builtin_function((IDispatch*)&This->obj->IDispatchEx_iface, This->info, params, res, ei, caller);
         break;
     case DISPATCH_PROPERTYGET: {
         unsigned name_len;
@@ -895,10 +1035,57 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
     return hres;
 }
 
+static HRESULT function_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
+{
+    DWORD i;
+
+    for(i = 0; i < ARRAY_SIZE(function_props); i++) {
+        if((flags & fdexNameCaseInsensitive) ? wcsicmp(name, function_props[i].name) : wcscmp(name, function_props[i].name))
+            continue;
+        *dispid = MSHTML_DISPID_CUSTOM_MIN + i;
+        return S_OK;
+    }
+    return DISP_E_UNKNOWNNAME;
+}
+
+static HRESULT function_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
+{
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(idx >= ARRAY_SIZE(function_props))
+        return DISP_E_MEMBERNOTFOUND;
+
+    return (*name = SysAllocString(function_props[idx].name)) ? S_OK : E_OUTOFMEMORY;
+}
+
+static HRESULT function_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    func_disp_t *This = impl_from_DispatchEx(dispex);
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(idx >= ARRAY_SIZE(function_props))
+        return DISP_E_MEMBERNOTFOUND;
+
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+        return function_props[idx].invoke(This, params, lcid, res, ei, caller);
+    default:
+        return MSHTML_E_INVALID_PROPERTY;
+    }
+
+    return S_OK;
+}
+
 static const dispex_static_data_vtbl_t function_dispex_vtbl = {
     function_value,
-    NULL,
-    NULL,
+    function_get_dispid,
+    function_get_name,
+    function_invoke,
     NULL
 };
 
@@ -1293,7 +1480,7 @@ static HRESULT invoke_builtin_function(IDispatch *this_obj, func_info_t *func, D
     return V_ERROR(&vhres);
 }
 
-static HRESULT function_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
+static HRESULT func_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
     HRESULT hres;
@@ -1391,7 +1578,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD 
         return hres;
 
     if(func->func_disp_idx >= 0)
-        return function_invoke(This, func, flags, dp, res, ei, caller);
+        return func_invoke(This, func, flags, dp, res, ei, caller);
 
     hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
     if(FAILED(hres) || !iface)
