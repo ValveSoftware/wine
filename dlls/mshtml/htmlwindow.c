@@ -104,10 +104,11 @@ static inline HRESULT get_window_event(HTMLWindow *window, eventid_t eid, VARIAN
     return get_event_handler(&window->inner_window->event_target, eid, var);
 }
 
-static void detach_inner_window(HTMLInnerWindow *window)
+static ULONG detach_inner_window(HTMLInnerWindow *window)
 {
     HTMLOuterWindow *outer_window = window->base.outer_window;
     HTMLDocumentNode *doc = window->doc;
+    ULONG ref = 0;
 
     while(!list_empty(&window->children)) {
         HTMLOuterWindow *child = LIST_ENTRY(list_tail(&window->children), HTMLOuterWindow, sibling_entry);
@@ -130,12 +131,18 @@ static void detach_inner_window(HTMLInnerWindow *window)
     abort_window_bindings(window);
     remove_target_tasks(window->task_magic);
     release_script_hosts(window);
-    window->base.outer_window = NULL;
 
-    if(outer_window && outer_window->base.inner_window == window) {
+    if(outer_window) {
+        assert(outer_window->base.inner_window == window);
+
+        /* Detached inner windows hold a ref to the outer window */
+        IHTMLWindow2_AddRef(&outer_window->base.IHTMLWindow2_iface);
+
         outer_window->base.inner_window = NULL;
-        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
+        ref = IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
     }
+
+    return ref;
 }
 
 static inline HTMLWindow *impl_from_IHTMLWindow2(IHTMLWindow2 *iface)
@@ -228,8 +235,6 @@ static void release_outer_window(HTMLOuterWindow *This)
     remove_target_tasks(This->task_magic);
     set_current_mon(This, NULL, 0);
     set_current_uri(This, NULL);
-    if(This->base.inner_window)
-        detach_inner_window(This->base.inner_window);
 
     if(This->location.dispex.outer)
         release_dispex(&This->location.dispex);
@@ -248,9 +253,17 @@ static void release_outer_window(HTMLOuterWindow *This)
 
 static void release_inner_window(HTMLInnerWindow *This)
 {
+    HTMLOuterWindow *outer_window = This->base.outer_window;
     unsigned i;
 
     TRACE("%p\n", This);
+
+    /* If we're releasing inner window, it means we're already detached
+       from the outer window, and detached inner windows hold a ref to it */
+    if(outer_window) {
+        This->base.outer_window = NULL;
+        IHTMLWindow2_Release(&outer_window->base.IHTMLWindow2_iface);
+    }
 
     detach_inner_window(This);
 
@@ -317,6 +330,12 @@ static ULONG WINAPI HTMLWindow2_Release(IHTMLWindow2 *iface)
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        if(is_outer_window(This) && This->inner_window) {
+            /* Detached inner windows hold a ref to the outer window,
+               so return the ref to us if it's still alive after */
+            return detach_inner_window(This->inner_window) ? 1 : 0;
+        }
+
         if (This->console)
             IWineMSHTMLConsole_Release(This->console);
 
