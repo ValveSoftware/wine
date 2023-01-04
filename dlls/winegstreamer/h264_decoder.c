@@ -267,7 +267,8 @@ static HRESULT WINAPI transform_GetStreamLimits(IMFTransform *iface, DWORD *inpu
 static HRESULT WINAPI transform_GetStreamCount(IMFTransform *iface, DWORD *inputs, DWORD *outputs)
 {
     FIXME("iface %p, inputs %p, outputs %p stub!\n", iface, inputs, outputs);
-    return E_NOTIMPL;
+    *inputs = *outputs = 1;
+    return S_OK;
 }
 
 static HRESULT WINAPI transform_GetStreamIDs(IMFTransform *iface, DWORD input_size,

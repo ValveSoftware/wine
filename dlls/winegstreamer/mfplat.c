@@ -770,7 +770,7 @@ static void mf_media_type_to_wg_format_aac(IMFMediaType *type, const GUID *subty
     if (FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AAC_AUDIO_PROFILE_LEVEL_INDICATION, &profile_level_indication)))
     {
         FIXME("AAC provile level indication is not set.\n");
-        profile_level_indication = aac_info->profile_level_indication;
+        profile_level_indication = format->u.aac.is_raw ? 0 : aac_info->profile_level_indication;
     }
 
     format->major_type = WG_MAJOR_TYPE_AAC;

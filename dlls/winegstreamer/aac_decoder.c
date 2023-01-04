@@ -33,6 +33,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 static const GUID *const aac_decoder_input_types[] =
 {
     &MFAudioFormat_AAC,
+    &MFAudioFormat_RAW_AAC,
 };
 static const GUID *const aac_decoder_output_types[] =
 {
@@ -153,24 +154,14 @@ static HRESULT WINAPI transform_GetStreamIDs(IMFTransform *iface, DWORD input_si
 
 static HRESULT WINAPI transform_GetInputStreamInfo(IMFTransform *iface, DWORD id, MFT_INPUT_STREAM_INFO *info)
 {
-    struct aac_decoder *decoder = impl_from_IMFTransform(iface);
-    UINT32 block_alignment;
-    HRESULT hr;
-
     TRACE("iface %p, id %#lx, info %p.\n", iface, id, info);
 
-    if (!decoder->input_type || !decoder->output_type)
-        return MF_E_TRANSFORM_TYPE_NOT_SET;
+    if (id)
+        return MF_E_INVALIDSTREAMNUMBER;
 
-    if (FAILED(hr = IMFMediaType_GetUINT32(decoder->input_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &block_alignment)))
-        return hr;
-
-    info->hnsMaxLatency = 0;
-    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES|MFT_INPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER
-            |MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE|MFT_INPUT_STREAM_HOLDS_BUFFERS;
-    info->cbSize = 0;
-    info->cbMaxLookahead = 0;
-    info->cbAlignment = 0;
+    memset(info, 0, sizeof(*info));
+    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER
+            | MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE | MFT_INPUT_STREAM_HOLDS_BUFFERS;
 
     return S_OK;
 }
@@ -186,14 +177,12 @@ static HRESULT WINAPI transform_GetOutputStreamInfo(IMFTransform *iface, DWORD i
     if (!decoder->input_type || !decoder->output_type)
         return MF_E_TRANSFORM_TYPE_NOT_SET;
 
-    if (FAILED(hr = IMFMediaType_GetUINT32(decoder->output_type, &MF_MT_AUDIO_NUM_CHANNELS, &channel_count)))
-        return hr;
-    if (FAILED(hr = IMFMediaType_GetUINT32(decoder->output_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &block_alignment)))
-        return hr;
+    if (id)
+        return MF_E_INVALIDSTREAMNUMBER;
 
-    info->dwFlags = 0;
-    info->cbSize = 0x1800 * block_alignment * channel_count;
-    info->cbAlignment = 0;
+    memset(info, 0, sizeof(*info));
+    info->dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES;
+    info->cbSize = 0xc000;
 
     return S_OK;
 }
@@ -337,22 +326,7 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
     if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_USER_DATA, &item_type)) ||
         item_type != MF_ATTRIBUTE_BLOB)
         return MF_E_INVALIDMEDIATYPE;
-    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &item_type)) ||
-        item_type != MF_ATTRIBUTE_UINT32)
-        return MF_E_INVALIDMEDIATYPE;
     if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_SAMPLES_PER_SECOND, &item_type)) ||
-        item_type != MF_ATTRIBUTE_UINT32)
-        return MF_E_INVALIDMEDIATYPE;
-    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_NUM_CHANNELS, &item_type)) ||
-        item_type != MF_ATTRIBUTE_UINT32)
-        return MF_E_INVALIDMEDIATYPE;
-    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_BITS_PER_SAMPLE, &item_type)) ||
-        item_type != MF_ATTRIBUTE_UINT32)
-        return MF_E_INVALIDMEDIATYPE;
-    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &item_type)) ||
-        item_type != MF_ATTRIBUTE_UINT32)
-        return MF_E_INVALIDMEDIATYPE;
-    if (FAILED(IMFMediaType_GetItemType(type, &MF_MT_AUDIO_PREFER_WAVEFORMATEX, &item_type)) ||
         item_type != MF_ATTRIBUTE_UINT32)
         return MF_E_INVALIDMEDIATYPE;
 
