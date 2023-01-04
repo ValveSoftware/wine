@@ -91,8 +91,12 @@ typedef struct {
     DispatchEx dispex;
     IUnknown IUnknown_iface;
     LONG ref;
-    DispatchEx *obj;
+    union {
+        DispatchEx *obj;
+        DWORD idx;          /* index into function_props, used when info == NULL */
+    };
     func_info_t *info;
+    IDispatch *funcs[2];    /* apply, call */
 } func_disp_t;
 
 typedef struct {
@@ -126,6 +130,7 @@ PRIVATE_TID_LIST
 #undef XDIID
 };
 
+static func_disp_t *create_func_disp(DispatchEx*,func_info_t*);
 static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 
 static HRESULT load_typelib(void)
@@ -817,11 +822,15 @@ static ULONG WINAPI Function_Release(IUnknown *iface)
 {
     func_disp_t *This = impl_from_IUnknown(iface);
     LONG ref = InterlockedDecrement(&This->ref);
+    unsigned i;
 
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
-        assert(!This->obj);
+        assert(!This->info || !This->obj);
+        for(i = 0; i < ARRAY_SIZE(This->funcs); i++)
+            if(This->funcs[i])
+                IDispatch_Release(This->funcs[i]);
         release_dispex(&This->dispex);
         free(This);
     }
@@ -991,6 +1000,8 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
             return E_INVALIDARG;
         /* fall through */
     case DISPATCH_METHOD:
+        if(!This->info)
+            return MSHTML_E_INVALID_PROPERTY;
         if(!This->obj)
             return E_UNEXPECTED;
         hres = invoke_builtin_function((IDispatch*)&This->obj->IDispatchEx_iface, This->info, params, res, ei, caller);
@@ -1009,7 +1020,7 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
         if(!caller)
             return E_ACCESSDENIED;
 
-        name_len = SysStringLen(This->info->name);
+        name_len = This->info ? SysStringLen(This->info->name) : wcslen(function_props[This->idx].name);
         ptr = str = SysAllocStringLen(NULL, name_len + ARRAY_SIZE(func_prefixW) + ARRAY_SIZE(func_suffixW));
         if(!str)
             return E_OUTOFMEMORY;
@@ -1017,7 +1028,7 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
         memcpy(ptr, func_prefixW, sizeof(func_prefixW));
         ptr += ARRAY_SIZE(func_prefixW);
 
-        memcpy(ptr, This->info->name, name_len*sizeof(WCHAR));
+        memcpy(ptr, This->info ? This->info->name : function_props[This->idx].name, name_len*sizeof(WCHAR));
         ptr += name_len;
 
         memcpy(ptr, func_suffixW, sizeof(func_suffixW));
@@ -1036,7 +1047,12 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
 
 static HRESULT function_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
 {
+    func_disp_t *This = impl_from_DispatchEx(dispex);
     DWORD i;
+
+    /* can't chain apply/call */
+    if(!This->info)
+        return DISP_E_UNKNOWNNAME;
 
     for(i = 0; i < ARRAY_SIZE(function_props); i++) {
         if((flags & fdexNameCaseInsensitive) ? wcsicmp(name, function_props[i].name) : wcscmp(name, function_props[i].name))
@@ -1049,9 +1065,10 @@ static HRESULT function_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, D
 
 static HRESULT function_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
 {
+    func_disp_t *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
 
-    if(idx >= ARRAY_SIZE(function_props))
+    if(idx >= ARRAY_SIZE(function_props) || !This->info)
         return DISP_E_MEMBERNOTFOUND;
 
     return (*name = SysAllocString(function_props[idx].name)) ? S_OK : E_OUTOFMEMORY;
@@ -1063,7 +1080,7 @@ static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID i
     func_disp_t *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
 
-    if(idx >= ARRAY_SIZE(function_props))
+    if(idx >= ARRAY_SIZE(function_props) || !This->info)
         return DISP_E_MEMBERNOTFOUND;
 
     switch(flags) {
@@ -1073,6 +1090,18 @@ static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID i
         /* fall through */
     case DISPATCH_METHOD:
         return function_props[idx].invoke(This, params, lcid, res, ei, caller);
+    case DISPATCH_PROPERTYGET:
+        if(!This->funcs[idx]) {
+            func_disp_t *disp = create_func_disp(dispex, NULL);
+            if(!disp)
+                return E_OUTOFMEMORY;
+            disp->idx = idx;
+            This->funcs[idx] = (IDispatch*)&disp->dispex.IDispatchEx_iface;
+        }
+        V_VT(res) = VT_DISPATCH;
+        V_DISPATCH(res) = This->funcs[idx];
+        IDispatch_AddRef(This->funcs[idx]);
+        break;
     default:
         return MSHTML_E_INVALID_PROPERTY;
     }
