@@ -183,6 +183,7 @@ typedef struct ScriptHost ScriptHost;
     XDIID(DispDOMStorageEvent) \
     XDIID(DispDOMUIEvent) \
     XDIID(DispDOMDocumentType) \
+    XDIID(DispDOMParser) \
     XDIID(DispHTMLAnchorElement) \
     XDIID(DispHTMLAreaElement) \
     XDIID(DispHTMLAttributeCollection) \
@@ -247,6 +248,7 @@ typedef struct ScriptHost ScriptHost;
     XIID(IDOMStorageEvent) \
     XIID(IDOMUIEvent) \
     XIID(IDOMDocumentType) \
+    XIID(IDOMParser) \
     XIID(IDocumentEvent) \
     XIID(IDocumentRange) \
     XIID(IDocumentSelector) \
@@ -460,6 +462,7 @@ PRIVATE_TID_LIST
 
 #define PROXY_PROTOTYPE_LIST \
     X(Console,                        "Console",                      console_dispex,                         Object) \
+    X(DOMParser,                      "DOMParser",                    DOMParser_dispex,                       Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
     X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                DOMUIEvent) \
@@ -1686,6 +1689,7 @@ extern HINSTANCE hInst DECLSPEC_HIDDEN;
 void create_console(HTMLInnerWindow *window, IWineMSHTMLConsole **ret) DECLSPEC_HIDDEN;
 HRESULT create_media_query_list(HTMLWindow *window, BSTR media_query, IDispatch **ret) DECLSPEC_HIDDEN;
 
+extern const IUnknownVtbl legacy_ctor_vtbl DECLSPEC_HIDDEN;
 extern const IHTMLImageElementFactoryVtbl HTMLImageElementFactoryVtbl DECLSPEC_HIDDEN;
 extern const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl DECLSPEC_HIDDEN;
 extern const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl DECLSPEC_HIDDEN;
@@ -1695,6 +1699,7 @@ extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLImageCtor_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLOptionCtor_dispex DECLSPEC_HIDDEN;
 extern dispex_static_data_t HTMLXMLHttpRequestCtor_dispex DECLSPEC_HIDDEN;
+extern dispex_static_data_t DOMParserCtor_dispex DECLSPEC_HIDDEN;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex DECLSPEC_HIDDEN;
 LEGACY_PROTOTYPE_LIST

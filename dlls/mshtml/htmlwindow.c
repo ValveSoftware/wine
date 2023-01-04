@@ -223,13 +223,16 @@ static ULONG WINAPI legacy_ctor_Release(IUnknown *iface)
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        /* Proxy constructor disps hold ref to window, others are always detached first */
+        if(This->window)
+            IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
         release_dispex(&This->dispex);
         free(This);
     }
     return ref;
 }
 
-static const IUnknownVtbl legacy_ctor_vtbl = {
+const IUnknownVtbl legacy_ctor_vtbl = {
     legacy_ctor_QueryInterface,
     legacy_ctor_AddRef,
     legacy_ctor_Release

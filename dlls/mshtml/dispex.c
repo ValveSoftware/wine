@@ -2603,6 +2603,7 @@ static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_
         dispex_static_data_t *dispex;
         const void *vtbl;
     } ctors[] = {
+        { PROTO_ID_DOMParser,           &DOMParserCtor_dispex,              &legacy_ctor_vtbl },
         { PROTO_ID_HTMLImgElement,      &HTMLImageCtor_dispex,              &HTMLImageElementFactoryVtbl },
         { PROTO_ID_HTMLOptionElement,   &HTMLOptionCtor_dispex,             &HTMLOptionElementFactoryVtbl },
         { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl }
@@ -3145,11 +3146,16 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultPrototype(IWineDispa
 static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface,
         IWineDispatchProxyPrivate *window, struct proxy_prototypes *prots)
 {
+    static const prototype_id_t special_ctors[] = {
+        PROTO_ID_DOMParser,
+        PROTO_ID_HTMLXMLHttpRequest
+    };
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
     struct proxy_prototype *prot = proxy_prototype_from_IUnknown(This->outer);
     struct proxy_ctor *ctor;
     prototype_id_t prot_id;
     IDispatch **entry;
+    unsigned i;
 
     prot_id = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex) - prototype_static_data;
 
@@ -3159,9 +3165,12 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDis
         return *entry;
     }
 
-    /* XMLHttpRequest is a special case */
-    if(prot_id == PROTO_ID_HTMLXMLHttpRequest) {
-        IDispatch *disp = get_proxy_constructor_disp(CONTAINING_RECORD((IDispatchEx*)window, HTMLWindow, IDispatchEx_iface)->inner_window, prot_id);
+    for(i = 0; i < ARRAY_SIZE(special_ctors); i++) {
+        IDispatch *disp;
+        if(prot_id != special_ctors[i])
+            continue;
+
+        disp = get_proxy_constructor_disp(CONTAINING_RECORD((IDispatchEx*)window, HTMLWindow, IDispatchEx_iface)->inner_window, prot_id);
         if(disp) {
             *entry = This->proxy->lpVtbl->CreateConstructor(This->proxy, disp, proxy_ctor_dispex[prot_id - LEGACY_PROTOTYPE_COUNT].name);
             IDispatch_Release(disp);
@@ -3170,6 +3179,7 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDis
                 return *entry;
             }
         }
+        break;
     }
 
     if(!(ctor = malloc(sizeof(*ctor))))

@@ -355,6 +355,7 @@ sync_test("builtin_toString", function() {
     if(v >= 9) {
         test("computedStyle", window.getComputedStyle(e), "CSSStyleDeclaration");
         test("doctype", document.doctype, "DocumentType");
+        test("domParser", new DOMParser(), "DOMParser", null, "Function");
 
         test("Event", document.createEvent("Event"), "Event");
         test("CustomEvent", document.createEvent("CustomEvent"), "CustomEvent");
@@ -635,11 +636,14 @@ sync_test("builtin_prototypes", function() {
     var v = document.documentMode, r, obj, name, proto;
 
     var special_ctors = [
+        [ "DOMParser",          [ "prototype", "arguments" ], [ "create", "length" ], 9 ],
         [ "Image",              [ "prototype", "arguments" ], [ "create", "length" ] ],
         [ "Option",             [ "prototype", "arguments" ], [ "create", "length" ] ],
         [ "XMLHttpRequest",     [ "prototype", "arguments", "create" ], [ "length" ] ]
     ];
     for(var i = 0; i < special_ctors.length; i++) {
+        if(special_ctors[i].length > 3 && v < special_ctors[i][3])
+            continue;
         name = special_ctors[i][0];
         ok(Object.prototype.hasOwnProperty.call(window, name), name + " not a property of window.");
         eval("obj = window." + name + ";");
@@ -863,6 +867,12 @@ sync_test("builtin_prototypes", function() {
         ok(r === "string", "(new Option).winetestprop after change in prototype = " + r);
     }else
         ok(proto.constructor === window.HTMLOptionElement, "Option.prototype.constructor = " + proto.constructor);
+
+    if(v >= 9) {
+        set_obj("DOMParser", true);
+        test_prop("parseFromString");
+        ok(proto.constructor === window.DOMParser, "DOMParser.prototype.constructor = " + proto.constructor);
+    }
 
     // other constructors don't support construction
     set_obj("ClientRect");
@@ -1267,6 +1277,7 @@ sync_test("builtin_prototypes", function() {
             [ "Document",                       "Node" ],
             [ "DocumentType",                   "Node" ],
             [ "DOMImplementation",              "Object" ],
+            [ "DOMParser",                      "Object" ],
             [ "DOMTokenList",                   "Object" ],
             [ "Element",                        "Node" ],
             [ "Event",                          "Object" ],
@@ -1620,6 +1631,7 @@ sync_test("window_props", function() {
     test_exposed("Set", v >= 11);
     test_exposed("performance", true);
     test_exposed("console", v >= 10);
+    test_exposed("DOMParser", v >= 9);
     test_exposed("matchMedia", v >= 10);
 });
 
