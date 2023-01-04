@@ -1361,6 +1361,7 @@ sync_test("attr_props", function() {
     elem.setAttribute("id", "test");
     elem.setAttribute("test", "wine");
     elem.setAttribute("z-index", "foobar");
+    elem.setAttribute("removeAttribute", "funcattr");
 
     function test_exposed(prop, expect) {
         if(expect)
@@ -1415,6 +1416,9 @@ sync_test("attr_props", function() {
     test_attr(true, true);
 
     attr = elem.getAttributeNode("z-index");
+    test_attr(true, true);
+
+    attr = elem.getAttributeNode("removeAttribute");
     test_attr(true, true);
 
     attr = elem.getAttributeNode("tabIndex");
