@@ -111,6 +111,9 @@ struct wg_format
         } wma;
         struct
         {
+            bool is_raw;
+            uint32_t rate;
+            uint32_t channels;
             uint32_t payload_type;
             uint32_t profile_level_indication;
             uint32_t codec_data_len;

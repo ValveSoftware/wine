@@ -479,6 +479,11 @@ static GstCaps *wg_format_to_caps_aac(const struct wg_format *format)
     if (stream_format)
         gst_caps_set_simple(caps, "stream-format", G_TYPE_STRING, stream_format, NULL);
 
+    if (format->u.aac.channels)
+        gst_caps_set_simple(caps, "channels", G_TYPE_INT, format->u.aac.channels, NULL);
+    if (format->u.aac.rate)
+        gst_caps_set_simple(caps, "rate", G_TYPE_INT, format->u.aac.rate, NULL);
+
     switch (format->u.aac.profile_level_indication)
     {
         case 0x29: profile = "lc"; level = "2";  break;

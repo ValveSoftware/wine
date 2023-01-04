@@ -738,7 +738,7 @@ static void mf_media_type_to_wg_format_wma(IMFMediaType *type, const GUID *subty
     format->u.wma.is_xma = is_xma;
 }
 
-static void mf_media_type_to_wg_format_aac(IMFMediaType *type, struct wg_format *format)
+static void mf_media_type_to_wg_format_aac(IMFMediaType *type, const GUID *subtype, struct wg_format *format)
 {
     UINT32 codec_data_len, payload_type, profile_level_indication;
     BYTE codec_data[64];
@@ -754,6 +754,8 @@ static void mf_media_type_to_wg_format_aac(IMFMediaType *type, struct wg_format 
         WORD reserved1;
         DWORD reserved2;
     } *aac_info = (void *)codec_data;
+
+    format->u.aac.is_raw = IsEqualGUID(subtype, &MFAudioFormat_RAW_AAC);
 
     if (FAILED(IMFMediaType_GetBlob(type, &MF_MT_USER_DATA, codec_data, sizeof(codec_data), &codec_data_len)))
     {
@@ -775,6 +777,14 @@ static void mf_media_type_to_wg_format_aac(IMFMediaType *type, struct wg_format 
     format->u.aac.payload_type = payload_type;
     format->u.aac.profile_level_indication = profile_level_indication;
     format->u.aac.codec_data_len = 0;
+
+    if (!format->u.aac.is_raw
+            || FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_NUM_CHANNELS, &format->u.aac.channels)))
+        format->u.aac.channels = 0;
+
+    if (!format->u.aac.is_raw
+            || FAILED(IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_SAMPLES_PER_SECOND, &format->u.aac.rate)))
+        format->u.aac.rate = 0;
 
     if (codec_data_len > sizeof(*aac_info))
     {
@@ -882,7 +892,7 @@ void mf_media_type_to_wg_format(IMFMediaType *type, struct wg_format *format)
                 IsEqualGUID(&subtype, &MFAudioFormat_XMAudio2))
             mf_media_type_to_wg_format_wma(type, &subtype, format);
         else if (IsEqualGUID(&subtype, &MFAudioFormat_AAC) || IsEqualGUID(&subtype, &MFAudioFormat_RAW_AAC))
-            mf_media_type_to_wg_format_aac(type, format);
+            mf_media_type_to_wg_format_aac(type, &subtype, format);
         else
             mf_media_type_to_wg_format_audio(type, &subtype, format);
     }
