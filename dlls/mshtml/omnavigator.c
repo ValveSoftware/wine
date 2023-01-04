@@ -31,6 +31,31 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
+static document_type_t document_type_from_content_type(const WCHAR *content_type)
+{
+    static const struct {
+        const WCHAR *content_type;
+        document_type_t doc_type;
+    } table[] = {
+        { L"application/xhtml+xml", DOCTYPE_XHTML },
+        { L"application/xml",       DOCTYPE_XML },
+        { L"image/svg+xml",         DOCTYPE_SVG },
+        { L"text/html",             DOCTYPE_HTML },
+        { L"text/xml",              DOCTYPE_XML },
+    };
+    unsigned int i, a = 0, b = ARRAY_SIZE(table);
+    int c;
+
+    while(a < b) {
+        i = (a + b) / 2;
+        c = wcsicmp(table[i].content_type, content_type);
+        if(!c) return table[i].doc_type;
+        if(c > 0) b = i;
+        else      a = i + 1;
+    }
+    return DOCTYPE_INVALID;
+}
+
 typedef struct HTMLPluginsCollection HTMLPluginsCollection;
 typedef struct HTMLMimeTypesCollection HTMLMimeTypesCollection;
 
@@ -355,6 +380,8 @@ struct dom_parser {
     IDOMParser IDOMParser_iface;
     DispatchEx dispex;
     LONG ref;
+
+    HTMLDocumentNode *doc;
 };
 
 static inline struct dom_parser *impl_from_IDOMParser(IDOMParser *iface)
@@ -399,6 +426,7 @@ static ULONG WINAPI DOMParser_Release(IDOMParser *iface)
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        IHTMLDOMNode_Release(&This->doc->node.IHTMLDOMNode_iface);
         release_dispex(&This->dispex);
         free(This);
     }
@@ -443,9 +471,50 @@ static HRESULT WINAPI DOMParser_Invoke(IDOMParser *iface, DISPID dispIdMember,
 static HRESULT WINAPI DOMParser_parseFromString(IDOMParser *iface, BSTR string, BSTR mimeType, IHTMLDocument2 **ppNode)
 {
     struct dom_parser *This = impl_from_IDOMParser(iface);
+    document_type_t doc_type;
+    HRESULT hres;
 
-    FIXME("(%p)->(%s %s %p)\n", This, debugstr_w(string), debugstr_w(mimeType), ppNode);
+    TRACE("(%p)->(%s %s %p)\n", This, debugstr_w(string), debugstr_w(mimeType), ppNode);
 
+    if(!string || !mimeType || (doc_type = document_type_from_content_type(mimeType)) == DOCTYPE_INVALID)
+        return E_INVALIDARG;
+
+    if(doc_type == DOCTYPE_HTML) {
+        IHTMLDOMImplementation *impl_iface;
+        HTMLDOMImplementation *impl;
+        IHTMLDocument7 *html_doc;
+        IHTMLElement *html_elem;
+        HTMLDocumentNode *doc;
+
+        hres = IHTMLDocument5_get_implementation(&This->doc->IHTMLDocument5_iface, &impl_iface);
+        if(FAILED(hres))
+            return hres;
+
+        impl = impl_from_IHTMLDOMImplementation(impl_iface);
+        hres = HTMLDOMImplementation2_createHTMLDocument(&impl->IHTMLDOMImplementation2_iface, NULL, &html_doc);
+        HTMLDOMImplementation_Release(impl_iface);
+        if(FAILED(hres))
+            return hres;
+        doc = CONTAINING_RECORD(html_doc, HTMLDocumentNode, IHTMLDocument7_iface);
+
+        hres = IHTMLDocument3_get_documentElement(&doc->IHTMLDocument3_iface, &html_elem);
+        if(FAILED(hres)) {
+            IHTMLDocument7_Release(html_doc);
+            return hres;
+        }
+
+        hres = IHTMLElement_put_innerHTML(html_elem, string);
+        IHTMLElement_Release(html_elem);
+        if(FAILED(hres)) {
+            IHTMLDocument7_Release(html_doc);
+            return hres;
+        }
+
+        *ppNode = &doc->IHTMLDocument2_iface;
+        return hres;
+    }
+
+    FIXME("Not implemented for XML Document\n");
     return E_NOTIMPL;
 }
 
@@ -498,6 +567,9 @@ static HRESULT DOMParserCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DIS
 
     ret->IDOMParser_iface.lpVtbl = &DOMParserVtbl;
     ret->ref = 1;
+    ret->doc = This->window->doc;
+    IHTMLDOMNode_AddRef(&ret->doc->node.IHTMLDOMNode_iface);
+
     init_dispatch(&ret->dispex, (IUnknown*)&ret->IDOMParser_iface, &DOMParser_dispex,
                   This->window, dispex_compat_mode(&This->dispex));
 
