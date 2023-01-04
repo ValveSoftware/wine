@@ -1149,6 +1149,7 @@ sync_test("builtin_prototypes", function() {
             [ "Comment",                        "CharacterData" ],
             [ "Console",                        "Object" ],
             [ "CSSStyleDeclaration",            "Object" ],
+            [ "DocumentType",                   "Node" ],
             [ "DOMImplementation",              "Object" ],
             [ "DOMTokenList",                   "Object" ],
             [ "Event",                          "Object" ],
@@ -1195,6 +1196,7 @@ sync_test("builtin_prototypes", function() {
         protos = [
             [ "CharacterData", ["data","length","appendData"], Node_props ],
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
+            [ "DocumentType", ["entities","internalSubset","name","notations","publicId","systemId"], Node_props ],
             [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ]
         ];
 
