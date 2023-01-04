@@ -25,6 +25,7 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "ole2.h"
+#include "mshtmdid.h"
 #include "mscoree.h"
 
 #include "wine/debug.h"
@@ -85,6 +86,12 @@ typedef struct {
 } dynamic_prop_t;
 
 struct proxy_prototype {
+    IUnknown IUnknown_iface;
+    DispatchEx dispex;
+    LONG ref;
+};
+
+struct proxy_ctor {
     IUnknown IUnknown_iface;
     DispatchEx dispex;
     LONG ref;
@@ -176,6 +183,22 @@ static dispex_static_data_t legacy_prototype_dispex[] = {
 },
 LEGACY_PROTOTYPE_LIST
 COMMON_PROTOTYPE_LIST
+#undef X
+};
+
+static const dispex_static_data_vtbl_t proxy_ctor_dispex_vtbl;
+
+static dispex_static_data_t proxy_ctor_dispex[] = {
+#define X(id, name, dispex, proto_id) \
+{                                     \
+    L ## name,                        \
+    &proxy_ctor_dispex_vtbl,          \
+    PROTO_ID_Object,                  \
+    NULL_tid,                         \
+    no_iface_tids                     \
+},
+COMMON_PROTOTYPE_LIST
+PROXY_PROTOTYPE_LIST
 #undef X
 };
 
@@ -2289,12 +2312,12 @@ static IDispatch *get_default_prototype(prototype_id_t prot_id, compat_mode_t co
         return NULL;
 
     if(!*prots_ref) {
-        if(!(*prots_ref = calloc(1, FIELD_OFFSET(struct proxy_prototypes, prototype[num_prots]))))
+        if(!(*prots_ref = calloc(1, FIELD_OFFSET(struct proxy_prototypes, disp[num_prots]))))
             return NULL;
         (*prots_ref)->num = num_prots;
     }
 
-    entry = &(*prots_ref)->prototype[prot_id - LEGACY_PROTOTYPE_COUNT];
+    entry = &(*prots_ref)->disp[prot_id - LEGACY_PROTOTYPE_COUNT].prototype;
     if(*entry) {
         IDispatch_AddRef(*entry);
         return *entry;
@@ -2311,6 +2334,124 @@ static IDispatch *get_default_prototype(prototype_id_t prot_id, compat_mode_t co
     *entry = (IDispatch*)&prot->dispex.IDispatchEx_iface;
     return *entry;
 }
+
+static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_id_t prot_id)
+{
+    static const struct {
+        prototype_id_t prot_id;
+        dispex_static_data_t *dispex;
+        const void *vtbl;
+    } ctors[] = {
+        { PROTO_ID_HTMLImgElement,      &HTMLImageElementFactory_dispex,    &HTMLImageElementFactoryVtbl },
+        { PROTO_ID_HTMLOptionElement,   &HTMLOptionElementFactory_dispex,   &HTMLOptionElementFactoryVtbl },
+        { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl }
+    };
+    struct legacy_ctor *ctor;
+    unsigned i;
+
+    for(i = 0; i < ARRAY_SIZE(ctors); i++)
+        if(ctors[i].prot_id == prot_id)
+            break;
+    assert(i < ARRAY_SIZE(ctors));
+
+    if(!(ctor = malloc(sizeof(*ctor))))
+        return NULL;
+
+    ctor->IUnknown_iface.lpVtbl = ctors[i].vtbl;
+    ctor->ref = 1;
+    ctor->prot_id = prot_id;
+    ctor->window = window;
+
+    /* Proxy constructor disps hold ref to window */
+    IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
+
+    init_dispatch(&ctor->dispex, &ctor->IUnknown_iface, ctors[i].dispex, NULL, dispex_compat_mode(&window->event_target.dispex));
+
+    return (IDispatch*)&ctor->dispex.IDispatchEx_iface;
+}
+
+static inline struct proxy_ctor *proxy_ctor_from_IUnknown(IUnknown *iface)
+{
+    return CONTAINING_RECORD(iface, struct proxy_ctor, IUnknown_iface);
+}
+
+static HRESULT WINAPI proxy_ctor_QueryInterface(IUnknown *iface, REFIID riid, void **ppv)
+{
+    struct proxy_ctor *This = proxy_ctor_from_IUnknown(iface);
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+
+    if(IsEqualGUID(&IID_IUnknown, riid)) {
+        *ppv = &This->IUnknown_iface;
+    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
+        return *ppv ? S_OK : E_NOINTERFACE;
+    }else {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }
+
+    IUnknown_AddRef((IUnknown*)*ppv);
+    return S_OK;
+}
+
+static ULONG WINAPI proxy_ctor_AddRef(IUnknown *iface)
+{
+    struct proxy_ctor *This = proxy_ctor_from_IUnknown(iface);
+    LONG ref = InterlockedIncrement(&This->ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    return ref;
+}
+
+static ULONG WINAPI proxy_ctor_Release(IUnknown *iface)
+{
+    struct proxy_ctor *This = proxy_ctor_from_IUnknown(iface);
+    LONG ref = InterlockedDecrement(&This->ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    if(!ref) {
+        release_dispex(&This->dispex);
+        free(This);
+    }
+    return ref;
+}
+
+static const IUnknownVtbl proxy_ctor_vtbl = {
+    proxy_ctor_QueryInterface,
+    proxy_ctor_AddRef,
+    proxy_ctor_Release
+};
+
+static HRESULT proxy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+    case DISPATCH_CONSTRUCT:
+        return MSHTML_E_INVALID_ACTION;
+    case DISPATCH_PROPERTYGET:
+        V_VT(res) = VT_BSTR;
+        return dispex_to_string(dispex, &V_BSTR(res));
+    case DISPATCH_PROPERTYPUTREF|DISPATCH_PROPERTYPUT:
+    case DISPATCH_PROPERTYPUTREF:
+    case DISPATCH_PROPERTYPUT:
+        break;
+    default:
+        return E_INVALIDARG;
+    }
+    return S_OK;
+}
+
+static const dispex_static_data_vtbl_t proxy_ctor_dispex_vtbl = {
+    proxy_ctor_value,
+    NULL
+};
 
 static HRESULT proxy_get_dispid(DispatchEx *dispex, const WCHAR *name, BOOL case_insens, DISPID *id)
 {
@@ -2740,6 +2881,97 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultPrototype(IWineDispa
     return get_default_prototype(prot_id, dispex_compat_mode(This), prots_ref);
 }
 
+static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface,
+        IWineDispatchProxyPrivate *window, struct proxy_prototypes *prots)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    struct proxy_prototype *prot = proxy_prototype_from_IUnknown(This->outer);
+    struct proxy_ctor *ctor;
+    prototype_id_t prot_id;
+    IDispatch **entry;
+
+    prot_id = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex) - prototype_static_data;
+
+    entry = &prots->disp[prot_id - LEGACY_PROTOTYPE_COUNT].ctor;
+    if(*entry) {
+        IDispatch_AddRef(*entry);
+        return *entry;
+    }
+
+    /* XMLHttpRequest is a special case */
+    if(prot_id == PROTO_ID_HTMLXMLHttpRequest) {
+        IDispatch *disp = get_proxy_constructor_disp(CONTAINING_RECORD((IDispatchEx*)window, HTMLWindow, IDispatchEx_iface)->inner_window, prot_id);
+        if(disp) {
+            *entry = This->proxy->lpVtbl->CreateConstructor(This->proxy, disp, proxy_ctor_dispex[prot_id - LEGACY_PROTOTYPE_COUNT].name);
+            IDispatch_Release(disp);
+            if(*entry) {
+                IDispatch_AddRef(*entry);
+                return *entry;
+            }
+        }
+    }
+
+    if(!(ctor = malloc(sizeof(*ctor))))
+        return NULL;
+
+    ctor->IUnknown_iface.lpVtbl = &proxy_ctor_vtbl;
+    ctor->ref = 2;  /* the script's ctx also holds one ref */
+
+    init_dispatch(&ctor->dispex, &ctor->IUnknown_iface, &proxy_ctor_dispex[prot_id - LEGACY_PROTOTYPE_COUNT],
+                  NULL, dispex_compat_mode(This));
+
+    *entry = (IDispatch*)&ctor->dispex.IDispatchEx_iface;
+    return *entry;
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_DefineConstructors(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
+{
+    static const struct {
+        const WCHAR *name;
+        prototype_id_t proto_id;
+    } extra_ctors[] = {
+        { L"Image",     PROTO_ID_HTMLImgElement },
+        { L"Option",    PROTO_ID_HTMLOptionElement },
+    };
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    compat_mode_t compat_mode;
+    IDispatch *prot, *ctor;
+    unsigned int i;
+    HRESULT hres;
+
+    if(!ensure_real_info(This))
+        return E_OUTOFMEMORY;
+    if(This->info->desc != &HTMLWindow_dispex)
+        return S_FALSE;
+    compat_mode = dispex_compat_mode(This);
+
+    for(i = 0; i < ARRAY_SIZE(proxy_ctor_dispex); i++) {
+        if(!(prot = get_default_prototype(i + LEGACY_PROTOTYPE_COUNT, compat_mode, prots_ref)))
+            return E_OUTOFMEMORY;
+
+        hres = This->proxy->lpVtbl->DefineConstructor(This->proxy, proxy_ctor_dispex[i].name, prot, NULL);
+        if(FAILED(hres))
+            return hres;
+    }
+
+    for(i = 0; i < ARRAY_SIZE(extra_ctors); i++) {
+        if(!(ctor = get_proxy_constructor_disp(CONTAINING_RECORD(This, HTMLInnerWindow, event_target.dispex),
+                                               extra_ctors[i].proto_id)))
+            return E_OUTOFMEMORY;
+
+        if(!(prot = get_default_prototype(extra_ctors[i].proto_id, compat_mode, prots_ref)))
+            hres = E_OUTOFMEMORY;
+        else
+            hres = This->proxy->lpVtbl->DefineConstructor(This->proxy, extra_ctors[i].name, prot, ctor);
+
+        IDispatch_Release(ctor);
+        if(FAILED(hres))
+            return hres;
+    }
+
+    return S_OK;
+}
+
 static BOOL WINAPI WineDispatchProxyPrivate_IsPrototype(IWineDispatchProxyPrivate *iface)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -2982,6 +3214,8 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     /* IWineDispatchProxyPrivate extension */
     WineDispatchProxyPrivate_GetProxyFieldRef,
     WineDispatchProxyPrivate_GetDefaultPrototype,
+    WineDispatchProxyPrivate_GetDefaultConstructor,
+    WineDispatchProxyPrivate_DefineConstructors,
     WineDispatchProxyPrivate_IsPrototype,
     WineDispatchProxyPrivate_PropFixOverride,
     WineDispatchProxyPrivate_PropOverride,

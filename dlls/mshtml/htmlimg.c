@@ -857,6 +857,9 @@ static ULONG WINAPI HTMLImageElementFactory_Release(IHTMLImageElementFactory *if
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        /* Proxy constructor disps hold ref to window, others are always detached first */
+        if(This->window)
+            IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
         release_dispex(&This->dispex);
         free(This);
     }

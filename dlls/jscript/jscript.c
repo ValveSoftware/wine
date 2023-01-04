@@ -505,9 +505,12 @@ static void decrease_state(JScript *This, SCRIPTSTATE state)
             }
 
             if(This->ctx->proxy_prototypes) {
-                for(i = 0; i < This->ctx->proxy_prototypes->num; i++)
-                    if(This->ctx->proxy_prototypes->prototype[i])
-                        IDispatch_Release(This->ctx->proxy_prototypes->prototype[i]);
+                for(i = 0; i < This->ctx->proxy_prototypes->num; i++) {
+                    if(This->ctx->proxy_prototypes->disp[i].prototype)
+                        IDispatch_Release(This->ctx->proxy_prototypes->disp[i].prototype);
+                    if(This->ctx->proxy_prototypes->disp[i].ctor)
+                        IDispatch_Release(This->ctx->proxy_prototypes->disp[i].ctor);
+                }
 
                 free(This->ctx->proxy_prototypes);
                 This->ctx->proxy_prototypes = NULL;
@@ -935,11 +938,6 @@ static HRESULT WINAPI JScript_AddNamedItem(IActiveScript *iface,
         disp = get_object(val);
 
         if((jsdisp = to_jsdisp(disp)) && jsdisp->proxy) {
-            hres = set_js_globals(jsdisp);
-            if(FAILED(hres)) {
-                jsdisp_release(jsdisp);
-                return hres;
-            }
             jsdisp_release(This->ctx->global);
             This->ctx->global = jsdisp_addref(jsdisp);
         }
