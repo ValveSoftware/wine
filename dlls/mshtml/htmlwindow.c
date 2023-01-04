@@ -2794,7 +2794,7 @@ static HRESULT WINAPI HTMLPrivateWindow_SuperNavigate(IHTMLPrivateWindow *iface,
           debugstr_variant(post_data_var), debugstr_variant(headers_var), flags);
 
     if(!window || !window->browser)
-        return E_UNEXPECTED;
+        return E_FAIL;
 
     if(window->browser->doc->hostui) {
         hres = IDocHostUIHandler_TranslateUrl(window->browser->doc->hostui, 0, url, &translated_url);
