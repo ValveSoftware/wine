@@ -48,6 +48,8 @@ function test_xhr() {
         }else {
             ok("anchors" in x, "anchors not in returned XML document");
             ok(!x.hasOwnProperty("createElement"), "createElement is a prop of returned XML document");
+            r = x.anchors;
+            ok(r.length === 0, "anchors.length of returned XML document = " + r.length);
         }
 
         if(complete_cnt++ && !("onloadend" in xhr))
