@@ -369,7 +369,7 @@ static HRESULT WINAPI ActiveScriptSite_GetItemInfo(IActiveScriptSite *iface, LPC
         return E_FAIL;
 
     /* FIXME: Return proxy object */
-    *ppiunkItem = (IUnknown*)&This->window->base.IHTMLWindow2_iface;
+    *ppiunkItem = (IUnknown*)&This->window->base.outer_window->base.IHTMLWindow2_iface;
     IUnknown_AddRef(*ppiunkItem);
 
     return S_OK;
