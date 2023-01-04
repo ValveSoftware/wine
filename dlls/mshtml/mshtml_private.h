@@ -665,6 +665,8 @@ struct legacy_prototype {
     IUnknown IUnknown_iface;
     DispatchEx dispex;
     LONG ref;
+
+    HTMLInnerWindow *window;
 };
 
 typedef enum {

@@ -529,9 +529,12 @@ static void release_inner_window(HTMLInnerWindow *This)
         }
     }
 
-    for(i = 0; i < ARRAY_SIZE(This->legacy_prototypes); i++)
-        if(This->legacy_prototypes[i])
+    for(i = 0; i < ARRAY_SIZE(This->legacy_prototypes); i++) {
+        if(This->legacy_prototypes[i]) {
+            This->legacy_prototypes[i]->window = NULL;
             IUnknown_Release(&This->legacy_prototypes[i]->IUnknown_iface);
+        }
+    }
 
     if(This->screen)
         IHTMLScreen_Release(This->screen);
