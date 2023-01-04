@@ -1143,6 +1143,7 @@ sync_test("builtin_prototypes", function() {
         }
     }else {
         var protos = [
+            [ "Attr",                           "Node" ],
             [ "CharacterData",                  "Node" ],
             [ "ClientRect",                     "Object" ],
             [ "ClientRectList",                 "Object" ],
@@ -1270,6 +1271,7 @@ sync_test("builtin_prototypes", function() {
                                 "rowSpan","vAlign","width" ];
 
         protos = [
+            [ "Attr", ["expando","name","specified","value"], Node_props ],
             [ "CharacterData", ["data","length","appendData"], Node_props ],
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
             [ "CSSStyleRule", ["readOnly","selectorText","style"], ["cssText","parentRule","parentStyleSheet","type" ] ],
