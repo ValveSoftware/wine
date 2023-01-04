@@ -39,6 +39,7 @@ HRESULT script_elem_from_nsscript(nsIDOMHTMLScriptElement*,HTMLScriptElement**) 
 void bind_event_scripts(HTMLDocumentNode*) DECLSPEC_HIDDEN;
 HRESULT load_script(HTMLScriptElement*,const WCHAR*,BOOL) DECLSPEC_HIDDEN;
 
+void move_script_hosts(HTMLInnerWindow*,HTMLInnerWindow*) DECLSPEC_HIDDEN;
 void release_script_hosts(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 void connect_scripts(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 void doc_insert_script(HTMLInnerWindow*,HTMLScriptElement*,BOOL) DECLSPEC_HIDDEN;

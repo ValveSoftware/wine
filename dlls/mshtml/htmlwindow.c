@@ -4351,8 +4351,11 @@ HRESULT update_window_doc(HTMLInnerWindow *window)
         return S_OK;
     }
 
-    if(outer_window->base.inner_window)
+    if(outer_window->base.inner_window) {
+        if(!outer_window->base.inner_window->performance_timing->navigation_start_time)
+            move_script_hosts(outer_window->base.inner_window, window);
         detach_inner_window(outer_window->base.inner_window);
+    }
     outer_window->base.inner_window = window;
     outer_window->pending_window = NULL;
 
