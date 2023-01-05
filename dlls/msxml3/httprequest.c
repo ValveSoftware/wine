@@ -101,6 +101,21 @@ typedef struct
 
     /* IObjectSafety */
     DWORD safeopt;
+
+    /* Properties */
+    DWORD no_prompt;
+    DWORD no_auth;
+    DWORD timeout;
+    BOOL no_headeres;
+    BOOL redirect;
+    BOOL cache;
+    BOOL extended;
+    BOOL query_utf8;
+    BOOL ignore_errors;
+    BOOL threshold;
+    DWORD enterrprised_id;
+    DWORD max_connections;
+
 } httprequest;
 
 typedef struct
@@ -2226,8 +2241,52 @@ static HRESULT WINAPI xml_http_request_2_SetCustomResponseStream(IXMLHTTPRequest
 static HRESULT WINAPI xml_http_request_2_SetProperty(IXMLHTTPRequest3 *iface, XHR_PROPERTY property, ULONGLONG value)
 {
     struct xml_http_request_2 *This = impl_from_IXMLHTTPRequest3(iface);
-    FIXME("(%p)->(%#x %s) stub!\n", This, property, wine_dbgstr_longlong( value ));
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%#x %s) stub!\n", This, property, wine_dbgstr_longlong( value ));
+
+    switch (property)
+    {
+        case XHR_PROP_NO_CRED_PROMPT:
+            This->req.no_prompt = value;
+            break;
+        case XHR_PROP_NO_AUTH:
+            This->req.no_auth = value;
+            break;
+        case XHR_PROP_TIMEOUT:
+            This->req.timeout = value;
+            break;
+        case XHR_PROP_NO_DEFAULT_HEADERS:
+            This->req.no_headeres = value != 0;
+            break;
+        case XHR_PROP_REPORT_REDIRECT_STATUS:
+            This->req.redirect = value != 0;
+            break;
+        case XHR_PROP_NO_CACHE:
+            This->req.cache = value != 0;
+            break;
+        case XHR_PROP_EXTENDED_ERROR:
+            This->req.extended = value != 0;
+            break;
+        case XHR_PROP_QUERY_STRING_UTF8:
+            This->req.query_utf8 = value != 0;
+            break;
+        case XHR_PROP_IGNORE_CERT_ERRORS:
+            This->req.ignore_errors = value != 0;
+            break;
+        case XHR_PROP_ONDATA_THRESHOLD:
+            This->req.threshold = value;
+            break;
+        case XHR_PROP_SET_ENTERPRISEID:
+            This->req.enterrprised_id = value;
+            break;
+        case XHR_PROP_MAX_CONNECTIONS:
+            This->req.max_connections = value;
+            break;
+        default:
+            WARN("Invalid property %#x\n", property);
+            return E_INVALIDARG;
+    }
+    return S_OK;
 }
 
 static HRESULT WINAPI xml_http_request_2_SetRequestHeader(IXMLHTTPRequest3 *iface,
@@ -2547,6 +2606,20 @@ static void init_httprequest(httprequest *req)
 
     req->site = NULL;
     req->safeopt = 0;
+
+    /* Properties */
+    req->no_prompt = XHR_CRED_PROMPT_ALL;
+    req->no_auth = XHR_AUTH_ALL;
+    req->timeout = 0xFFFFFFFF;
+    req->no_headeres = FALSE;
+    req->redirect = FALSE;
+    req->cache = FALSE;
+    req->extended = FALSE;
+    req->query_utf8 = FALSE;;
+    req->ignore_errors = FALSE;;
+    req->threshold = 0x100;
+    req->enterrprised_id = 0;
+    req->max_connections = 10;
 }
 
 HRESULT XMLHTTPRequest_create(void **obj)
