@@ -280,6 +280,7 @@ static DWORD WINAPI tabtip_exit_watcher(LPVOID lpParam)
 
 static const char *osk_disable_appids[] = {
     "1182900", /* A Plague Tale: Requiem */
+    "752590", /* A Plague Tale: Innocence */
 };
 
 static void tabtip_use_osk_check(void)
