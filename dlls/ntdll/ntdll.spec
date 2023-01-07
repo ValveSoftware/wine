@@ -1724,6 +1724,7 @@
 @ cdecl -norelay __wine_dbg_header(long long str)
 @ cdecl -norelay __wine_dbg_output(str)
 @ cdecl -norelay __wine_dbg_strdup(str)
+@ stdcall -syscall -norelay __wine_dbg_ftrace(ptr long long)
 
 # Version
 @ cdecl wine_get_version()

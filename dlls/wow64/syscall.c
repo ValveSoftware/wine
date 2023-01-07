@@ -594,6 +594,19 @@ NTSTATUS WINAPI wow64_NtSetContextThread( UINT *args )
 
 
 /**********************************************************************
+ *           wow64___wine_dbg_ftrace
+ */
+NTSTATUS WINAPI wow64___wine_dbg_ftrace( UINT *args )
+{
+    const char *str = get_ptr( &args );
+    ULONG len = get_ulong( &args );
+    ULONG ctx = get_ulong( &args );
+
+    return __wine_dbg_ftrace( (char *)str, len, ctx );
+}
+
+
+/**********************************************************************
  *           wow64_NtSetDebugFilterState
  */
 NTSTATUS WINAPI wow64_NtSetDebugFilterState( UINT *args )

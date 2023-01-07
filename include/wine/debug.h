@@ -114,6 +114,7 @@ extern DECLSPEC_EXPORT const char * __cdecl __wine_dbg_strdup( const char *str )
 extern DECLSPEC_EXPORT int __cdecl __wine_dbg_output( const char *str );
 extern DECLSPEC_EXPORT int __cdecl __wine_dbg_header( enum __wine_debug_class cls, struct __wine_debug_channel *channel,
                                                       const char *function );
+extern unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int str_size, unsigned int ctx );
 
 /*
  * Exported definitions and macros
@@ -128,6 +129,18 @@ extern DECLSPEC_EXPORT int __cdecl __wine_dbg_header( enum __wine_debug_class cl
 #else
 # define __wine_dbg_cdecl
 #endif
+
+static inline unsigned int __wine_dbg_cdecl __wine_dbg_ftrace_printf( unsigned int ctx, const char *format, ...)
+{
+    char buffer[256];
+
+    va_list args;
+
+    va_start( args, format );
+    vsnprintf( buffer, sizeof(buffer), format, args );
+    va_end( args );
+    return __wine_dbg_ftrace(buffer, sizeof(buffer), ctx);
+}
 
 static const char * __wine_dbg_cdecl wine_dbg_vsprintf( const char *format, va_list args ) __WINE_PRINTF_ATTR(1,0);
 static inline const char * __wine_dbg_cdecl wine_dbg_vsprintf( const char *format, va_list args )
@@ -547,6 +560,16 @@ static inline const char *debugstr_variant( const VARIANT *v ) { return wine_dbg
 #define ERR_ON(ch)                 WINE_ERR_ON(ch)
 
 #define MESSAGE                    WINE_MESSAGE
+
+#define FTRACE(...)                do { if (TRACE_ON(ftrace)) __wine_dbg_ftrace_printf( -1, __VA_ARGS__ ); } while (0)
+
+#define FTRACE_BLOCK_START(...) do { \
+                                    unsigned int ctx = TRACE_ON(ftrace) ? __wine_dbg_ftrace_printf( 0, __VA_ARGS__ ) : 0; \
+                                    do {
+
+#define FTRACE_BLOCK_END()          } while (0); \
+                                    if (TRACE_ON(ftrace)) __wine_dbg_ftrace_printf( ctx, "" ); \
+                                } while (0);
 
 #endif /* __WINESRC__ */
 
