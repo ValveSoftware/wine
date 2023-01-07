@@ -202,6 +202,17 @@ int __cdecl __wine_dbg_output( const char *str )
 
 
 /***********************************************************************
+ *		__wine_dbg_ftrace
+ */
+unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int len, unsigned int ctx )
+{
+    struct wine_dbg_ftrace_params params = { str, len, ctx };
+
+    return WINE_UNIX_CALL( unix_wine_dbg_ftrace, &params );
+}
+
+
+/***********************************************************************
  *           set_native_thread_name
  */
 void set_native_thread_name( DWORD tid, const char *name )

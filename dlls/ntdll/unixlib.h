@@ -79,6 +79,14 @@ struct wine_set_unix_env_params
     const char *val;
 };
 
+struct wine_dbg_ftrace_params
+{
+    char *str;
+    unsigned int len;
+    unsigned int ctx;
+};
+
+
 struct steamclient_setup_trampolines_params
 {
     HMODULE src_mod;
@@ -104,6 +112,7 @@ enum ntdll_unix_funcs
     unix_system_time_precise,
     unix___wine_get_unix_env,
     unix___wine_set_unix_env,
+    unix_wine_dbg_ftrace,
     unix_steamclient_setup_trampolines,
     unix_debugstr_pc,
 };
