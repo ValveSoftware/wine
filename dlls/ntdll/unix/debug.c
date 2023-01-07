@@ -33,6 +33,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -259,6 +260,59 @@ const char * __cdecl __wine_dbg_strdup( const char *str )
 int WINAPI __wine_dbg_write( const char *str, unsigned int len )
 {
     return write( 2, str, len );
+}
+
+unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int str_size, unsigned int ctx )
+{
+    static unsigned int curr_ctx;
+    static int ftrace_fd = -1;
+    unsigned int str_len;
+    char ctx_str[64];
+    int ctx_len;
+
+    if (ftrace_fd == -1)
+    {
+        int expected = -1;
+        const char *fn;
+        int fd;
+
+        if (!(fn = getenv( "WINE_FTRACE_FILE" )))
+        {
+            MESSAGE( "wine: WINE_FTRACE_FILE is not set.\n" );
+            ftrace_fd = -2;
+            return 0;
+        }
+        if ((fd = open( fn, O_WRONLY )) == -1)
+        {
+            MESSAGE( "wine: error opening ftrace file: %s.\n", strerror(errno) );
+            ftrace_fd = -2;
+            return 0;
+        }
+        if (!__atomic_compare_exchange_n( &ftrace_fd, &expected, fd, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST ))
+            close( fd );
+        else
+            MESSAGE( "wine: ftrace initialized.\n" );
+    }
+    if (ftrace_fd == -2) return ~0u;
+
+    if (ctx == ~0u) ctx_len = 0;
+    else if (ctx) ctx_len = sprintf( ctx_str, " (end_ctx=%u)", ctx );
+    else
+    {
+        ctx = __atomic_add_fetch( &curr_ctx, 1, __ATOMIC_SEQ_CST );
+        ctx_len = sprintf( ctx_str, " (begin_ctx=%u)", ctx );
+    }
+
+    str_len = strlen(str);
+    if (ctx_len > 0)
+    {
+        if (str_size < ctx_len) return ~0u;
+        if (str_len + ctx_len > str_size) str_len = str_size - ctx_len;
+        memcpy( &str[str_len], ctx_str, ctx_len );
+        str_len += ctx_len;
+    }
+    write( ftrace_fd, str, str_len );
+    return ctx;
 }
 
 /***********************************************************************

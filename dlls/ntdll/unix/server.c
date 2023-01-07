@@ -87,6 +87,8 @@
 #include "ddk/wdm.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(server);
+WINE_DECLARE_DEBUG_CHANNEL(client);
+WINE_DECLARE_DEBUG_CHANNEL(ftrace);
 
 #ifndef MSG_CMSG_CLOEXEC
 #define MSG_CMSG_CLOEXEC 0
@@ -269,8 +271,13 @@ unsigned int server_call_unlocked( void *req_ptr )
     struct __server_request_info * const req = req_ptr;
     unsigned int ret;
 
-    if ((ret = send_request( req ))) return ret;
-    return wait_reply( req );
+    FTRACE_BLOCK_START("req %s", req->name)
+    TRACE_(client)("%s start\n", req->name); \
+    if (!(ret = send_request( req )))
+        ret = wait_reply( req );
+    TRACE_(client)("%s end\n", req->name);
+    FTRACE_BLOCK_END()
+    return ret;
 }
 
 
@@ -672,7 +679,9 @@ unsigned int server_select( const select_op_t *select_op, data_size_t size, UINT
         pthread_sigmask( SIG_SETMASK, &old_set, NULL );
         if (signaled) break;
 
+        FTRACE_BLOCK_START("select_reply")
         ret = wait_select_reply( &cookie );
+        FTRACE_BLOCK_END()
     }
     while (ret == STATUS_USER_APC || ret == STATUS_KERNEL_APC);
 

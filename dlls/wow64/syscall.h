@@ -254,6 +254,7 @@
     SYSCALL_ENTRY( NtWriteFileGather ) \
     SYSCALL_ENTRY( NtWriteVirtualMemory ) \
     SYSCALL_ENTRY( NtYieldExecution ) \
+    SYSCALL_ENTRY( __wine_dbg_ftrace ) \
     SYSCALL_ENTRY( __wine_dbg_write ) \
     SYSCALL_ENTRY( __wine_unix_spawnvp ) \
     SYSCALL_ENTRY( wine_nt_to_unix_file_name ) \
