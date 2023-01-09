@@ -29,6 +29,7 @@ enum uia_prop_type {
     PROP_TYPE_UNKNOWN,
     PROP_TYPE_ELEM_PROP,
     PROP_TYPE_SPECIAL,
+    PROP_TYPE_PATTERN_PROP,
 };
 
 /*
@@ -144,6 +145,12 @@ static inline struct uia_event_args *impl_from_UiaEventArgs(struct UiaEventArgs 
     return CONTAINING_RECORD(args, struct uia_event_args, u.simple_args);
 }
 
+static inline void variant_init_bool(VARIANT *v, BOOL val)
+{
+    V_VT(v) = VT_BOOL;
+    V_BOOL(v) = val ? VARIANT_TRUE : VARIANT_FALSE;
+}
+
 /* uia_client.c */
 int uia_compare_safearrays(SAFEARRAY *sa1, SAFEARRAY *sa2, int prop_type) DECLSPEC_HIDDEN;
 int get_node_provider_type_at_idx(struct uia_node *node, int idx) DECLSPEC_HIDDEN;
@@ -159,6 +166,7 @@ HRESULT create_uia_iface(IUnknown **iface, BOOL is_cui8) DECLSPEC_HIDDEN;
 /* uia_ids.c */
 const struct uia_prop_info *uia_prop_info_from_id(PROPERTYID prop_id) DECLSPEC_HIDDEN;
 const struct uia_event_info *uia_event_info_from_id(EVENTID event_id) DECLSPEC_HIDDEN;
+const struct uia_pattern_info *uia_pattern_info_from_id(PATTERNID pattern_id) DECLSPEC_HIDDEN;
 
 /* uia_provider.c */
 void uia_stop_provider_thread(void) DECLSPEC_HIDDEN;
