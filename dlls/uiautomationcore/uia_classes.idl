@@ -86,6 +86,7 @@ library UIA_wine_private
         HRESULT has_parent([out, retval]BOOL *out_val);
         HRESULT navigate([in]int nav_dir, [out, retval]VARIANT *ret_val);
         HRESULT attach_event([in]LONG_PTR huiaevent);
+        HRESULT get_focus([out, retval]VARIANT *ret_val);
     }
 
     [

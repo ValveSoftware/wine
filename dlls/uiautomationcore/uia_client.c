@@ -1372,6 +1372,22 @@ static HRESULT attach_event_to_node_provider(IWineUiaNode *node, int idx, HUIAEV
     return hr;
 }
 
+static HRESULT get_focus_from_node_provider(IWineUiaNode *node, int idx, VARIANT *ret_val)
+{
+    IWineUiaProvider *prov;
+    HRESULT hr;
+
+    VariantInit(ret_val);
+    hr = IWineUiaNode_get_provider(node, idx, &prov);
+    if (FAILED(hr))
+        return hr;
+
+    hr = IWineUiaProvider_get_focus(prov, ret_val);
+    IWineUiaProvider_Release(prov);
+
+    return hr;
+}
+
 /*
  * IWineUiaNode interface.
  */
@@ -1678,6 +1694,41 @@ static HRESULT prepare_uia_node(struct uia_node *node)
                     &node->git_cookie[i]);
             if (FAILED(hr))
                 return hr;
+        }
+    }
+
+    return S_OK;
+}
+
+static HRESULT get_focused_uia_node(HUIANODE in_node, BOOL ignore_creator, HUIANODE *out_node)
+{
+    struct uia_node *node = unsafe_impl_from_IWineUiaNode((IWineUiaNode *)in_node);
+    HRESULT hr;
+    VARIANT v;
+    int i;
+
+    *out_node = NULL;
+    if (!node)
+        return E_INVALIDARG;
+
+    VariantInit(&v);
+    for (i = 0; i < node->prov_count; i++)
+    {
+        if (ignore_creator && (i == node->creator_prov_idx))
+            continue;
+
+        hr = get_focus_from_node_provider(&node->IWineUiaNode_iface, i, &v);
+        if (FAILED(hr))
+            return hr;
+
+        if (V_VT(&v) == VT_EMPTY)
+            continue;
+
+        hr = UiaHUiaNodeFromVariant(&v, out_node);
+        if (FAILED(hr))
+        {
+            out_node = NULL;
+            return hr;
         }
     }
 
@@ -2734,6 +2785,53 @@ static HRESULT WINAPI uia_provider_attach_event(IWineUiaProvider *iface, LONG_PT
     return S_OK;
 }
 
+static HRESULT WINAPI uia_provider_get_focus(IWineUiaProvider *iface, VARIANT *out_val)
+{
+    struct uia_provider *prov = impl_from_IWineUiaProvider(iface);
+    IRawElementProviderFragmentRoot *elroot;
+    IRawElementProviderFragment *elfrag;
+    IUnknown *unk, *unk2;
+    HRESULT hr;
+
+    TRACE("%p, %p\n", iface, out_val);
+
+    VariantInit(out_val);
+    hr = IRawElementProviderSimple_QueryInterface(prov->elprov, &IID_IRawElementProviderFragmentRoot, (void **)&elroot);
+    if (FAILED(hr) || !elroot)
+        return S_OK;
+
+    hr = IRawElementProviderFragmentRoot_GetFocus(elroot, &elfrag);
+    IRawElementProviderFragmentRoot_Release(elroot);
+    if (FAILED(hr) || !elfrag)
+        return hr;
+
+    IRawElementProviderSimple_QueryInterface(prov->elprov, &IID_IUnknown, (void **)&unk);
+    IRawElementProviderFragment_QueryInterface(elfrag, &IID_IUnknown, (void **)&unk2);
+
+    /*
+     * We only want to return a node if the focused provider is different than
+     * the current provider.
+     */
+    if (unk != unk2)
+    {
+        IRawElementProviderSimple *elprov;
+
+        hr = IRawElementProviderFragment_QueryInterface(elfrag, &IID_IRawElementProviderSimple, (void **)&elprov);
+        IRawElementProviderFragment_Release(elfrag);
+        if (SUCCEEDED(hr) && elprov)
+        {
+            hr = get_variant_for_elprov_node(elprov, prov->return_nested_node, out_val);
+            if (FAILED(hr))
+                VariantClear(out_val);
+        }
+    }
+
+    IUnknown_Release(unk);
+    IUnknown_Release(unk2);
+
+    return hr;
+}
+
 static const IWineUiaProviderVtbl uia_provider_vtbl = {
     uia_provider_QueryInterface,
     uia_provider_AddRef,
@@ -2743,6 +2841,7 @@ static const IWineUiaProviderVtbl uia_provider_vtbl = {
     uia_provider_has_parent,
     uia_provider_navigate,
     uia_provider_attach_event,
+    uia_provider_get_focus,
 };
 
 static HRESULT create_wine_uia_provider(struct uia_node *node, IRawElementProviderSimple *elprov,
@@ -3187,6 +3286,30 @@ static HRESULT WINAPI uia_nested_node_provider_attach_event(IWineUiaProvider *if
     return S_OK;
 }
 
+static HRESULT WINAPI uia_nested_node_provider_get_focus(IWineUiaProvider *iface, VARIANT *out_val)
+{
+    struct uia_nested_node_provider *prov = impl_from_nested_node_IWineUiaProvider(iface);
+    HUIANODE node;
+    HRESULT hr;
+    VARIANT v;
+
+    TRACE("%p, %p\n", iface, out_val);
+
+    VariantInit(out_val);
+    hr = get_focus_from_node_provider(prov->nested_node, 0, &v);
+    if (FAILED(hr) || V_VT(&v) == VT_EMPTY)
+        return hr;
+
+    hr = uia_node_from_lresult((LRESULT)V_I4(&v), &node);
+    if (FAILED(hr))
+        return hr;
+
+    get_variant_for_node(node, out_val);
+    VariantClear(&v);
+
+    return S_OK;
+}
+
 static const IWineUiaProviderVtbl uia_nested_node_provider_vtbl = {
     uia_nested_node_provider_QueryInterface,
     uia_nested_node_provider_AddRef,
@@ -3196,6 +3319,7 @@ static const IWineUiaProviderVtbl uia_nested_node_provider_vtbl = {
     uia_nested_node_provider_has_parent,
     uia_nested_node_provider_navigate,
     uia_nested_node_provider_attach_event,
+    uia_nested_node_provider_get_focus,
 };
 
 static BOOL is_nested_node_provider(IWineUiaProvider *iface)
@@ -3442,6 +3566,55 @@ HRESULT WINAPI UiaNodeFromHandle(HWND hwnd, HUIANODE *huianode)
     }
 
     *huianode = (void *)&node->IWineUiaNode_iface;
+
+    return S_OK;
+}
+
+/***********************************************************************
+ *          UiaNodeFromFocus (uiautomationcore.@)
+ */
+HRESULT WINAPI UiaNodeFromFocus(struct UiaCacheRequest *cache_req, SAFEARRAY **out_req, BSTR *tree_struct)
+{
+    HUIANODE node, node2;
+    HRESULT hr;
+
+    TRACE("(%p, %p, %p)\n", cache_req, out_req, tree_struct);
+
+    if (!cache_req || !out_req || !tree_struct)
+        return E_INVALIDARG;
+
+    *out_req = NULL;
+    *tree_struct = NULL;
+
+    hr = UiaNodeFromHandle(GetDesktopWindow(), &node);
+    if (FAILED(hr))
+        return hr;
+
+    hr = get_focused_uia_node(node, FALSE, &node2);
+    if (FAILED(hr))
+    {
+        UiaNodeRelease(node);
+        return hr;
+    }
+
+    while (node2)
+    {
+        UiaNodeRelease(node);
+
+        node = node2;
+        node2 = NULL;
+        hr = get_focused_uia_node(node, TRUE, &node2);
+        if (FAILED(hr))
+        {
+            UiaNodeRelease(node);
+            return hr;
+        }
+    }
+
+    hr = UiaGetUpdatedCache(node, cache_req, NormalizeState_None, NULL, out_req, tree_struct);
+    if (FAILED(hr))
+        WARN("UiaGetUpdatedCache failed with hr %#lx\n", hr);
+    UiaNodeRelease(node);
 
     return S_OK;
 }

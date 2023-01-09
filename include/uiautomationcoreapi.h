@@ -511,6 +511,7 @@ HRESULT WINAPI UiaRemoveEvent(HUIAEVENT huiaevent);
 HRESULT WINAPI UiaEventAddWindow(HUIAEVENT huiaevent, HWND hwnd);
 HRESULT WINAPI UiaEventRemoveWindow(HUIAEVENT huiaevent, HWND hwnd);
 HRESULT WINAPI UiaProviderForNonClient(HWND hwnd, long objid, long child_id, IRawElementProviderSimple **elprov);
+HRESULT WINAPI UiaNodeFromFocus(struct UiaCacheRequest *cache_req, SAFEARRAY **out_req, BSTR *tree_struct);
 
 #ifdef __cplusplus
 }
