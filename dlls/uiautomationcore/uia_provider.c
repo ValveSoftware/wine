@@ -1955,8 +1955,29 @@ static HRESULT WINAPI base_hwnd_fragment_root_ElementProviderFromPoint(IRawEleme
 static HRESULT WINAPI base_hwnd_fragment_root_GetFocus(IRawElementProviderFragmentRoot *iface,
         IRawElementProviderFragment **ret_val)
 {
-    FIXME("%p, %p: stub\n", iface, ret_val);
-    return E_NOTIMPL;
+    GUITHREADINFO info = { sizeof(info) };
+    IRawElementProviderSimple *elprov;
+    HRESULT hr;
+
+    TRACE("%p, %p\n", iface, ret_val);
+
+    *ret_val = NULL;
+    if (!GetGUIThreadInfo(0, &info))
+    {
+        WARN("GetGUIThreadInfo failed\n");
+        return E_FAIL;
+    }
+
+    hr = create_base_hwnd_provider(info.hwndFocus, &elprov);
+    if (FAILED(hr) || !elprov)
+    {
+        WARN("create_base_hwnd_provider failed with hr %#lx\n", hr);
+        return hr;
+    }
+
+    hr = IRawElementProviderSimple_QueryInterface(elprov, &IID_IRawElementProviderFragment, (void **)ret_val);
+    IRawElementProviderSimple_Release(elprov);
+    return hr;
 }
 
 static const IRawElementProviderFragmentRootVtbl base_hwnd_fragment_root_vtbl = {
