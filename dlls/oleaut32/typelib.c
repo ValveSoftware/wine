@@ -3342,11 +3342,22 @@ static HRESULT TLB_ReadTypeLib(LPCWSTR pszFileName, LPWSTR pszPath, UINT cchPath
     {
         if (!wcsicmp(entry->path, pszPath) && entry->index == index)
         {
-            TRACE("cache hit\n");
-            *ppTypeLib = &entry->ITypeLib2_iface;
-            ITypeLib2_AddRef(*ppTypeLib);
-            LeaveCriticalSection(&cache_section);
-            return S_OK;
+            /*
+             * Avoid a race condition where a cached entry has been released,
+             * but not yet removed from the cache.
+             */
+            if (ITypeLib2_AddRef(&entry->ITypeLib2_iface) > 1)
+            {
+                TRACE("cache hit\n");
+                *ppTypeLib = &entry->ITypeLib2_iface;
+                LeaveCriticalSection(&cache_section);
+                return S_OK;
+            }
+            else
+            {
+                entry->ref = 0;
+                break;
+            }
         }
     }
     LeaveCriticalSection(&cache_section);
