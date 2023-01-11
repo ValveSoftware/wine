@@ -2321,8 +2321,7 @@ static HRESULT WINAPI xml_http_request_2_GetResponseHeader(IXMLHTTPRequest3 *ifa
 
     TRACE("(%p)->(%s %p)\n", This, debugstr_w(header), value);
 
-    if (FAILED(hr = httprequest_getResponseHeader(&This->req, (BSTR)header, value)))
-        return hr;
+    hr = httprequest_getResponseHeader(&This->req, (BSTR)header, value);
 
 #define E_FILE_NOT_FOUND                                   _HRESULT_TYPEDEF_(0x80070002)
 
