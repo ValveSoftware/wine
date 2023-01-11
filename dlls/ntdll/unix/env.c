@@ -59,6 +59,7 @@
 #include "error.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(environ);
+WINE_DECLARE_DEBUG_CHANNEL(nls);
 
 PEB *peb = NULL;
 WOW_PEB *wow_peb = NULL;
@@ -275,13 +276,14 @@ static const struct { const char *name; UINT cp; } charset_names[] =
 
 static void init_unix_codepage(void)
 {
+    const char *name, *ctype;
     char charset_name[16];
-    const char *name;
     size_t i, j;
     int min = 0, max = ARRAY_SIZE(charset_names) - 1;
 
-    setlocale( LC_CTYPE, "" );
-    if (!(name = nl_langinfo( CODESET ))) return;
+    if (!(ctype = setlocale( LC_CTYPE, "" ))) name = "UTF-8";
+    else if (!(name = nl_langinfo( CODESET ))) return;
+    TRACE_(nls)( "Unix LC_CTYPE %s, using %s codeset\n", debugstr_a(ctype), debugstr_a(name) );
 
     /* remove punctuation characters from charset name */
     for (i = j = 0; name[i] && j < sizeof(charset_name)-1; i++)
@@ -797,13 +799,22 @@ static const NLS_LOCALE_DATA *get_win_locale( const NLS_LOCALE_HEADER *header, c
 static void init_locale(void)
 {
     struct locale_nls_header *header;
+    const char *all, *ctype, *messages;
     const NLS_LOCALE_HEADER *locale_table;
     const NLS_LOCALE_DATA *locale;
     char *p;
 
-    setlocale( LC_ALL, "" );
-    if (!unix_to_win_locale( setlocale( LC_CTYPE, NULL ), system_locale )) system_locale[0] = 0;
-    if (!unix_to_win_locale( setlocale( LC_MESSAGES, NULL ), user_locale )) user_locale[0] = 0;
+    if (!(all = setlocale( LC_ALL, "" )) && (all = getenv( "LC_ALL" )))
+        FIXME_(nls)( "Failed to set LC_ALL to %s, is the locale supported?\n", debugstr_a(all) );
+    if (!(ctype = setlocale( LC_CTYPE, "" )) && (ctype = getenv( "LC_CTYPE" )))
+        FIXME_(nls)( "Failed to set LC_CTYPE to %s, is the locale supported?\n", debugstr_a(ctype) );
+    if (!(messages = setlocale( LC_MESSAGES, "" )) && (messages = getenv( "LC_MESSAGES" )))
+        FIXME_(nls)( "Failed to set LC_MESSAGES to %s, is the locale supported?\n", debugstr_a(messages) );
+
+    if (!unix_to_win_locale( ctype, system_locale )) system_locale[0] = 0;
+    TRACE_(nls)( "Unix LC_CTYPE is %s, setting system locale to %s\n", debugstr_a(ctype), debugstr_a(user_locale) );
+    if (!unix_to_win_locale( messages, user_locale )) user_locale[0] = 0;
+    TRACE_(nls)( "Unix LC_MESSAGES is %s, user system locale to %s\n", debugstr_a(messages), debugstr_a(user_locale) );
 
 #ifdef __APPLE__
     if (!system_locale[0])
