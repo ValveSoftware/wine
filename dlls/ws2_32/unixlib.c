@@ -167,6 +167,56 @@ static const int ip_protocol_map[][2] =
 
 #undef MAP
 
+static pthread_once_t hash_init_once = PTHREAD_ONCE_INIT;
+static BYTE byte_hash[256];
+
+static void init_hash(void)
+{
+    unsigned int i, index, buf_len, offset;
+    NTSTATUS status;
+    BYTE *buf, tmp;
+
+    for (i = 0; i < sizeof(byte_hash); ++i)
+        byte_hash[i] = i;
+
+    buf_len = sizeof(SYSTEM_INTERRUPT_INFORMATION) * NtCurrentTeb()->Peb->NumberOfProcessors;
+    if (!(buf = malloc( buf_len )))
+    {
+        ERR( "Failed to get random bytes.\n" );
+        return;
+    }
+
+    offset = sizeof(byte_hash) - 1;
+    do
+    {
+        if ((status = NtQuerySystemInformation( SystemInterruptInformation, buf,
+                                                buf_len, NULL )))
+        {
+            ERR( "Failed to get random bytes.\n" );
+            free(buf);
+            return;
+        }
+        buf_len = min( buf_len, offset - 1 );
+        for (i = 0; i < buf_len; ++i)
+        {
+            index = buf[i] % (offset + 1);
+            tmp = byte_hash[index];
+            byte_hash[index] = byte_hash[offset];
+            byte_hash[offset] = tmp;
+            --offset;
+        }
+    } while (offset != 1);
+    free( buf );
+}
+
+static void hash_random( BYTE *d, const BYTE *s, unsigned int len )
+{
+    unsigned int i;
+
+    for (i = 0; i < len; ++i)
+        d[i] = byte_hash[s[i]];
+}
+
 static int addrinfo_flags_from_unix( int flags )
 {
     int ws_flags = 0;
@@ -889,6 +939,28 @@ static NTSTATUS unix_gethostbyaddr( void *args )
 #endif
 }
 
+static int compare_addrs_hashed(const void *a1, const void *a2, void *length)
+{
+    unsigned int addr_len = (uintptr_t)length;
+    char a1_hashed[16], a2_hashed[16];
+
+    assert( addr_len <= sizeof(a1_hashed) );
+    hash_random( (BYTE *)a1_hashed, *(void **)a1, addr_len );
+    hash_random( (BYTE *)a2_hashed, *(void **)a2, addr_len );
+    return memcmp( a1_hashed, a2_hashed, addr_len );
+}
+
+static void sort_addrs_hashed( struct hostent *host )
+{
+    unsigned int count;
+
+    pthread_once(&hash_init_once, init_hash);
+
+    for (count = 0; host->h_addr_list[count]; ++count)
+        ;
+    qsort_r( host->h_addr_list, count, sizeof(*host->h_addr_list), compare_addrs_hashed,
+            (void *)(uintptr_t)host->h_length );
+}
 
 #ifdef HAVE_LINUX_GETHOSTBYNAME_R_6
 static NTSTATUS unix_gethostbyname( void *args )
@@ -917,6 +989,7 @@ static NTSTATUS unix_gethostbyname( void *args )
     if (!unix_host)
         return (locerr < 0 ? errno_from_unix( errno ) : host_errno_from_unix( locerr ));
 
+    sort_addrs_hashed( unix_host );
     ret = hostent_from_unix( unix_host, params->host, params->size );
 
     free( unix_buffer );
@@ -938,6 +1011,7 @@ static NTSTATUS unix_gethostbyname( void *args )
         return ret;
     }
 
+    sort_addrs_hashed( unix_host );
     ret = hostent_from_unix( unix_host, params->host, params->size );
 
     pthread_mutex_unlock( &host_mutex );
