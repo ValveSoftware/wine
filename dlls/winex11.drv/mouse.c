@@ -151,6 +151,31 @@ MAKE_FUNCPTR(XGetDeviceButtonMapping);
 #undef MAKE_FUNCPTR
 #endif
 
+static HWND get_clip_hwnd(void)
+{
+    static const WCHAR messageW[] = {'M','e','s','s','a','g','e',0};
+    struct x11drv_thread_data *data = x11drv_thread_data();
+    HWND ret;
+
+    if (data->cached_clip_hwnd)
+    {
+        ret = data->cached_clip_hwnd;
+        data->cached_clip_hwnd = NULL;
+        return ret;
+    }
+    return CreateWindowW( messageW, NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, 0,
+                          GetModuleHandleW(0), NULL );
+}
+
+static void release_clip_hwnd( HWND hwnd )
+{
+    struct x11drv_thread_data *data = x11drv_thread_data();
+
+    if (data->cached_clip_hwnd)
+        DestroyWindow(data->cached_clip_hwnd);
+    data->cached_clip_hwnd = hwnd;
+}
+
 /***********************************************************************
  *		X11DRV_Xcursor_Init
  *
@@ -439,7 +464,6 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
 static BOOL grab_clipping_window( const RECT *clip )
 {
 #if HAVE_X11_EXTENSIONS_XINPUT2_H
-    static const WCHAR messageW[] = {'M','e','s','s','a','g','e',0};
     struct x11drv_thread_data *data = x11drv_thread_data();
     Window clip_window;
     HWND msg_hwnd = 0;
@@ -452,8 +476,7 @@ static BOOL grab_clipping_window( const RECT *clip )
     if (!data) return FALSE;
     if (!(clip_window = init_clip_window())) return TRUE;
 
-    if (!(msg_hwnd = CreateWindowW( messageW, NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, 0,
-                                    GetModuleHandleW(0), NULL )))
+    if (!(msg_hwnd = get_clip_hwnd()))
         return TRUE;
 
     /* enable XInput2 unless we are already clipping */
@@ -492,7 +515,7 @@ static BOOL grab_clipping_window( const RECT *clip )
     if (!clipping_cursor)
     {
         X11DRV_XInput2_Enable( data->display, None, 0 );
-        DestroyWindow( msg_hwnd );
+        release_clip_hwnd( msg_hwnd );
         return FALSE;
     }
     clip_rect = *clip;
@@ -565,7 +588,7 @@ LRESULT clip_cursor_notify( HWND hwnd, HWND prev_clip_hwnd, HWND new_clip_hwnd )
         data->clip_hwnd = 0;
         data->clip_reset = GetTickCount();
         X11DRV_XInput2_Enable( data->display, None, 0 );
-        DestroyWindow( hwnd );
+        release_clip_hwnd( hwnd );
     }
     else if (prev_clip_hwnd)
     {
@@ -573,7 +596,7 @@ LRESULT clip_cursor_notify( HWND hwnd, HWND prev_clip_hwnd, HWND new_clip_hwnd )
          * dangling clip window.
          */
         TRACE( "destroying old clip hwnd %p\n", prev_clip_hwnd );
-        DestroyWindow( prev_clip_hwnd );
+        release_clip_hwnd( prev_clip_hwnd );
     }
     return 0;
 }
