@@ -155,6 +155,34 @@ MAKE_FUNCPTR(XGetDeviceButtonMapping);
 #undef MAKE_FUNCPTR
 #endif
 
+static HWND get_clip_hwnd(void)
+{
+    static const WCHAR messageW[] = {'M','e','s','s','a','g','e',0};
+    struct x11drv_thread_data *data = x11drv_thread_data();
+    UNICODE_STRING class_name;
+    HWND ret;
+
+    if (data->cached_clip_hwnd)
+    {
+        ret = data->cached_clip_hwnd;
+        data->cached_clip_hwnd = NULL;
+        return ret;
+    }
+    RtlInitUnicodeString( &class_name, messageW );
+    return NtUserCreateWindowEx( 0, &class_name, &class_name, NULL, 0, 0, 0, 0, 0,
+                                 HWND_MESSAGE, 0, NtCurrentTeb()->Peb->ImageBaseAddress,
+                                 NULL, 0, NULL, 0, FALSE );
+}
+
+static void release_clip_hwnd( HWND hwnd )
+{
+    struct x11drv_thread_data *data = x11drv_thread_data();
+
+    if (data->cached_clip_hwnd)
+        NtUserDestroyWindow( data->cached_clip_hwnd );
+    data->cached_clip_hwnd = hwnd;
+}
+
 /***********************************************************************
  *		X11DRV_Xcursor_Init
  *
@@ -439,9 +467,7 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
 static BOOL grab_clipping_window( const RECT *clip )
 {
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
-    static const WCHAR messageW[] = {'M','e','s','s','a','g','e',0};
     struct x11drv_thread_data *data = x11drv_thread_data();
-    UNICODE_STRING class_name;
     Window clip_window;
     HWND msg_hwnd = 0;
     POINT pos;
@@ -453,10 +479,7 @@ static BOOL grab_clipping_window( const RECT *clip )
     if (!data) return FALSE;
     if (!(clip_window = init_clip_window())) return TRUE;
 
-    RtlInitUnicodeString( &class_name, messageW );
-    if (!(msg_hwnd = NtUserCreateWindowEx( 0, &class_name, &class_name, NULL, 0, 0, 0, 0, 0,
-                                           HWND_MESSAGE, 0, NtCurrentTeb()->Peb->ImageBaseAddress,
-                                           NULL, 0, NULL, 0, FALSE )))
+    if (!(msg_hwnd = data->clip_hwnd) && !(msg_hwnd = get_clip_hwnd()))
         return TRUE;
 
     if (keyboard_grabbed)
@@ -508,17 +531,13 @@ static BOOL grab_clipping_window( const RECT *clip )
     if (!clipping_cursor)
     {
         X11DRV_XInput2_Enable( data->display, None, 0 );
-        NtUserDestroyWindow( msg_hwnd );
+        release_clip_hwnd( msg_hwnd );
+        data->clip_hwnd = 0;
         return FALSE;
     }
     clip_rect = *clip;
     if (!data->clip_hwnd) sync_window_cursor( clip_window );
     InterlockedExchangePointer( (void **)&cursor_window, msg_hwnd );
-    if (data->clip_hwnd)
-    {
-        TRACE( "destroying old clip hwnd %p\n", data->clip_hwnd );
-        NtUserDestroyWindow( data->clip_hwnd );
-    }
     data->clip_hwnd = msg_hwnd;
     return TRUE;
 #else
@@ -551,7 +570,7 @@ static BOOL ungrab_clipping_window(void)
     if (data->clip_hwnd)
     {
         X11DRV_XInput2_Enable( data->display, None, 0 );
-        NtUserDestroyWindow( data->clip_hwnd );
+        release_clip_hwnd( data->clip_hwnd );
         data->clip_hwnd = 0;
     }
 
