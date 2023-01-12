@@ -658,6 +658,53 @@ static volatile void *map_shared_memory_section( const WCHAR *name, SIZE_T size,
     return ptr;
 }
 
+volatile struct global_shared_memory *get_global_shared_memory( void )
+{
+    static const WCHAR global_mappingW[] =
+    {
+        '\\','?','?','\\','_','_','w','i','n','e','_','w','i','n','3','2','u','_','m','a','p','p','i','n','g',0
+    };
+    static struct global_shared_memory *global_shared;
+    struct global_shared_memory *ret;
+    UNICODE_STRING section_str;
+    OBJECT_ATTRIBUTES attr;
+    LARGE_INTEGER size_l;
+    unsigned int status;
+    HANDLE handle;
+    SIZE_T size;
+
+    __WINE_ATOMIC_LOAD_RELAXED( &global_shared, &ret );
+    if (ret) return ret;
+
+    RtlInitUnicodeString( &section_str, global_mappingW );
+    InitializeObjectAttributes( &attr, &section_str, OBJ_CASE_INSENSITIVE | OBJ_OPENIF | OBJ_PERMANENT, NULL, NULL );
+    size_l.QuadPart = sizeof(struct global_shared_memory);
+    status = NtCreateSection( &handle, SECTION_ALL_ACCESS, &attr, &size_l, PAGE_READWRITE, SEC_COMMIT, NULL );
+    if (status && status != STATUS_OBJECT_NAME_EXISTS)
+    {
+        static int once;
+        if (!once++)
+            ERR( "Failed to get global shared memory, status %#x.\n", status );
+    }
+    size = sizeof(struct global_shared_memory);
+    status = NtMapViewOfSection( handle, GetCurrentProcess(), (void **)&ret, 0, 0, NULL,
+                                 &size, ViewUnmap, 0, PAGE_READWRITE );
+    NtClose( handle );
+    if (status)
+    {
+        ERR( "failed to map view of section, status %#x\n", status );
+        return NULL;
+    }
+    if (InterlockedCompareExchangePointer( (void **)&global_shared, ret, NULL ))
+    {
+        if (NtUnmapViewOfSection( GetCurrentProcess(), ret ))
+            ERR( "NtUnmapViewOfSection failed.\n" );
+        ret = global_shared;
+    }
+
+    return ret;
+}
+
 const desktop_shm_t *get_desktop_shared_memory(void)
 {
     static const WCHAR dir_desktop_maps[] =

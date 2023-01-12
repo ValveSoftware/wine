@@ -270,6 +270,12 @@ void *next_process_user_handle_ptr( HANDLE *handle, unsigned int type );
 UINT win_set_flags( HWND hwnd, UINT set_mask, UINT clear_mask );
 
 /* winstation.c */
+struct global_shared_memory
+{
+    ULONG display_settings_serial;
+};
+
+extern volatile struct global_shared_memory *get_global_shared_memory( void );
 extern const desktop_shm_t *get_desktop_shared_memory(void);
 extern const queue_shm_t *get_queue_shared_memory(void);
 extern const input_shm_t *get_input_shared_memory(void);
