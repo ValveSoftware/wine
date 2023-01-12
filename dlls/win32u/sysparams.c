@@ -856,6 +856,7 @@ static void reg_empty_key( HKEY root, const char *key_name )
 
 static void prepare_devices(void)
 {
+    volatile struct global_shared_memory *global_shared = get_global_shared_memory();
     char buffer[4096];
     KEY_NODE_INFORMATION *key = (void *)buffer;
     KEY_VALUE_PARTIAL_INFORMATION *value = (void *)buffer;
@@ -864,6 +865,8 @@ static void prepare_devices(void)
     unsigned i = 0;
     DWORD size;
     HKEY hkey, subkey, device_key, prop_key;
+
+    if (global_shared) InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
 
     if (!enum_key) enum_key = reg_create_key( NULL, enum_keyW, sizeof(enum_keyW), 0, NULL );
     if (!control_key) control_key = reg_create_key( NULL, control_keyW, sizeof(control_keyW), 0, NULL );
@@ -1559,11 +1562,24 @@ static BOOL update_display_cache_from_registry(void)
 
 static BOOL update_display_cache( BOOL force )
 {
-    HWINSTA winstation = NtUserGetProcessWindowStation();
+    static ULONG last_update_serial;
+
+    volatile struct global_shared_memory *global_shared = get_global_shared_memory();
+    ULONG current_serial, global_serial;
+    HWINSTA winstation;
     struct device_manager_ctx ctx = {0};
     USEROBJECTFLAGS flags;
 
+    __WINE_ATOMIC_LOAD_RELAXED( &last_update_serial, &current_serial );
+    if (global_shared)
+    {
+        __WINE_ATOMIC_LOAD_RELAXED( &global_shared->display_settings_serial, &global_serial );
+        if (!force && current_serial && current_serial == global_serial) return TRUE;
+    }
+    else global_serial = 0;
+
     /* services do not have any adapters, only a virtual monitor */
+    winstation = NtUserGetProcessWindowStation();
     if (NtUserGetObjectInformation( winstation, UOI_FLAGS, &flags, sizeof(flags), NULL )
         && !(flags.dwFlags & WSF_VISIBLE))
     {
@@ -1571,6 +1587,7 @@ static BOOL update_display_cache( BOOL force )
         clear_display_devices();
         list_add_tail( &monitors, &virtual_monitor.entry );
         pthread_mutex_unlock( &display_lock );
+        InterlockedCompareExchange( (LONG *)&last_update_serial, global_serial, current_serial );
         return TRUE;
     }
 
@@ -1642,6 +1659,7 @@ static BOOL update_display_cache( BOOL force )
         return update_display_cache( TRUE );
     }
 
+    InterlockedCompareExchange( (LONG *)&last_update_serial, global_serial, current_serial );
     return TRUE;
 }
 
@@ -1956,6 +1974,7 @@ RECT get_primary_monitor_rect( UINT dpi )
 LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_info,
                                                UINT32 *num_mode_info )
 {
+    volatile struct global_shared_memory *global_shared;
     struct monitor *monitor;
     UINT32 count = 0;
 
@@ -1979,6 +1998,10 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
     /* FIXME: semi-stub */
     if (flags != QDC_ONLY_ACTIVE_PATHS)
         FIXME( "only returning active paths\n" );
+
+    /* NtUserGetDisplayConfigBufferSizes() is called by display drivers to trigger display settings update. */
+    if ((global_shared = get_global_shared_memory()))
+        InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
 
     if (lock_display_devices())
     {
@@ -2481,6 +2504,7 @@ static BOOL all_detached_settings( const DEVMODEW *displays )
 static LONG apply_display_settings( const WCHAR *devname, const DEVMODEW *devmode,
                                     HWND hwnd, DWORD flags, void *lparam )
 {
+    volatile struct global_shared_memory *global_shared = get_global_shared_memory();
     WCHAR primary_name[CCHDEVICENAME];
     struct display_device *primary;
     DEVMODEW *mode, *displays;
@@ -2524,6 +2548,7 @@ static LONG apply_display_settings( const WCHAR *devname, const DEVMODEW *devmod
     free( displays );
     if (ret) return ret;
 
+    if (global_shared) InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
     if (!update_display_cache( TRUE ))
         WARN( "Failed to update display cache after mode change.\n" );
 

@@ -252,6 +252,12 @@ void release_user_handle_ptr( void *ptr ) DECLSPEC_HIDDEN;
 UINT win_set_flags( HWND hwnd, UINT set_mask, UINT clear_mask ) DECLSPEC_HIDDEN;
 
 /* winstation.c */
+struct global_shared_memory
+{
+    ULONG display_settings_serial;
+};
+
+extern volatile struct global_shared_memory *get_global_shared_memory( void ) DECLSPEC_HIDDEN;
 extern volatile struct desktop_shared_memory *get_desktop_shared_memory( void ) DECLSPEC_HIDDEN;
 extern volatile struct queue_shared_memory *get_queue_shared_memory( void ) DECLSPEC_HIDDEN;
 extern volatile struct input_shared_memory *get_input_shared_memory( void ) DECLSPEC_HIDDEN;
