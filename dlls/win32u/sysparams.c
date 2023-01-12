@@ -34,6 +34,56 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(system);
 
+struct global_shared_memory
+{
+    ULONG display_settings_serial;
+};
+
+static volatile struct global_shared_memory *get_global_shared_memory( void )
+{
+    static const WCHAR global_mappingW[] =
+    {
+        '\\','?','?','\\','_','_','w','i','n','e','_','w','i','n','3','2','u','_','m','a','p','p','i','n','g',0
+    };
+    static struct global_shared_memory *global_shared;
+    struct global_shared_memory *ret;
+    UNICODE_STRING section_str;
+    OBJECT_ATTRIBUTES attr;
+    LARGE_INTEGER size_l;
+    unsigned int status;
+    HANDLE handle;
+    SIZE_T size;
+
+    ret = __atomic_load_n( &global_shared, __ATOMIC_RELAXED );
+    if (ret) return ret;
+
+    init_unicode_string( &section_str, global_mappingW );
+    InitializeObjectAttributes( &attr, &section_str, OBJ_CASE_INSENSITIVE | OBJ_OPENIF, NULL, NULL );
+    size_l.QuadPart = sizeof(struct global_shared_memory);
+    status = NtCreateSection( &handle, SECTION_ALL_ACCESS, &attr, &size_l, PAGE_READWRITE, SEC_COMMIT, NULL );
+    if (status && status != STATUS_OBJECT_NAME_EXISTS)
+    {
+        static int once;
+        if (!once++)
+            ERR( "Failed to get global shared memory, status %#x.\n", status );
+    }
+    size = sizeof(struct global_shared_memory);
+    status = NtMapViewOfSection( handle, GetCurrentProcess(), (void **)&ret, 0, 0, NULL,
+                                 &size, ViewUnmap, 0, PAGE_READWRITE );
+    NtClose( handle );
+    if (status)
+    {
+        ERR( "failed to map view of section, status %#x\n", status );
+        return NULL;
+    }
+    if (InterlockedCompareExchangePointer( (void **)&global_shared, ret, NULL ))
+    {
+        if (NtUnmapViewOfSection( GetCurrentProcess(), ret ))
+            ERR( "NtUnmapViewOfSection failed.\n" );
+    }
+
+    return ret;
+}
 
 static HKEY video_key, enum_key, control_key, config_key, volatile_base_key;
 
@@ -588,6 +638,7 @@ static void reg_empty_key( HKEY root, const char *key_name )
 
 static void prepare_devices(void)
 {
+    volatile struct global_shared_memory *global_shared = get_global_shared_memory();
     char buffer[4096];
     KEY_NODE_INFORMATION *key = (void *)buffer;
     KEY_VALUE_PARTIAL_INFORMATION *value = (void *)buffer;
@@ -596,6 +647,8 @@ static void prepare_devices(void)
     unsigned i = 0;
     DWORD size;
     HKEY hkey, subkey, device_key, prop_key;
+
+    if (global_shared) InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
 
     if (!enum_key) enum_key = reg_create_key( NULL, enum_keyW, sizeof(enum_keyW), 0, NULL );
     if (!control_key) control_key = reg_create_key( NULL, control_keyW, sizeof(control_keyW), 0, NULL );
@@ -1290,6 +1343,17 @@ static BOOL update_display_cache_from_registry(void)
 static BOOL update_display_cache(void)
 {
     struct device_manager_ctx ctx = { 0 };
+    static ULONG last_update_serial;
+    volatile struct global_shared_memory *global_shared = get_global_shared_memory();
+    ULONG current_serial, global_serial;
+
+    current_serial = __atomic_load_n( &last_update_serial, __ATOMIC_RELAXED );
+    if (global_shared)
+    {
+        global_serial = __atomic_load_n( &global_shared->display_settings_serial, __ATOMIC_RELAXED );
+        if (current_serial && current_serial == global_serial) return TRUE;
+    }
+    else global_serial = 0;
 
     user_driver->pUpdateDisplayDevices( &device_manager, FALSE, &ctx );
     release_display_manager_ctx( &ctx );
@@ -1297,10 +1361,15 @@ static BOOL update_display_cache(void)
     {
         clear_display_devices();
         list_add_tail( &monitors, &virtual_monitor.entry );
+        InterlockedCompareExchange( (LONG *)&last_update_serial, global_serial, current_serial );
         return TRUE;
     }
 
-    if (update_display_cache_from_registry()) return TRUE;
+    if (update_display_cache_from_registry())
+    {
+        InterlockedCompareExchange( (LONG *)&last_update_serial, global_serial, current_serial );
+        return TRUE;
+    }
     if (ctx.gpu_count)
     {
         ERR( "driver reported devices, but we failed to read them\n" );
@@ -1315,6 +1384,7 @@ static BOOL update_display_cache(void)
         ERR( "failed to read display config\n" );
         return FALSE;
     }
+    InterlockedCompareExchange( (LONG *)&last_update_serial, global_serial, current_serial );
     return TRUE;
 }
 
@@ -1498,6 +1568,7 @@ static RECT get_primary_monitor_rect(void)
 LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_info,
                                                UINT32 *num_mode_info )
 {
+    volatile struct global_shared_memory *global_shared;
     struct monitor *monitor;
     UINT32 count = 0;
 
@@ -1521,6 +1592,10 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
     /* FIXME: semi-stub */
     if (flags != QDC_ONLY_ACTIVE_PATHS)
         FIXME( "only returning active paths\n" );
+
+    /* NtUserGetDisplayConfigBufferSizes() is called by display drivers to trigger display settings update. */
+    if ((global_shared = get_global_shared_memory()))
+        InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
 
     if (lock_display_devices())
     {
