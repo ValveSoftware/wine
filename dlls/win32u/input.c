@@ -2735,7 +2735,19 @@ BOOL WINAPI NtUserClipCursor( const RECT *rect )
  */
 BOOL WINAPI NtUserGetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size )
 {
+    struct user_thread_info *thread_info = get_user_thread_info();
+    struct touchinput_thread_data *thread_data;
+    UINT index = (ULONG_PTR)handle;
+
     TRACE( "handle %p, count %u, ptr %p, size %u.\n", handle, count, ptr, size );
-    *ptr = *(TOUCHINPUT *)handle;
+
+    if (!thread_info || !(thread_data = thread_info->touchinput) || size != sizeof(TOUCHINPUT) ||
+        index >= ARRAY_SIZE(thread_data->history))
+    {
+        RtlSetLastWin32Error( ERROR_INVALID_PARAMETER );
+        return FALSE;
+    }
+
+    memcpy( ptr, thread_data->history + index, min( count, ARRAY_SIZE(thread_data->current) ) * size );
     return TRUE;
 }
