@@ -907,6 +907,7 @@ struct desktop_shared_memory
     struct shared_cursor cursor;           /* global cursor information */
     unsigned char        keystate[256];    /* asynchronous key state */
     thread_id_t          foreground_tid;   /* tid of the foreground thread */
+    __int64              update_serial;
 };
 typedef volatile struct desktop_shared_memory desktop_shm_t;
 
@@ -938,6 +939,7 @@ struct input_shared_memory
     int                  cursor_count;     /* cursor show count */
     unsigned char        keystate[256];    /* key state */
     int                  keystate_lock;    /* keystate is locked */
+    __int64              sync_serial;
 };
 typedef volatile struct input_shared_memory input_shm_t;
 

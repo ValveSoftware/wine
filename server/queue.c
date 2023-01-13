@@ -374,8 +374,9 @@ static void sync_input_keystate( struct thread_input *input )
             if (input->desktop_keystate[i] == input->desktop->shared->keystate[i]) continue;
             shared->keystate[i] = input->desktop_keystate[i] = input->desktop->shared->keystate[i];
         }
+        shared->sync_serial = input->desktop->shared->update_serial;
     }
-    SHARED_WRITE_END
+    SHARED_WRITE_END;
 }
 
 /* locks thread input keystate to prevent synchronization */
@@ -1713,6 +1714,7 @@ static void update_desktop_key_state( struct desktop *desktop, unsigned int msg,
 {
     SHARED_WRITE_BEGIN( desktop, desktop_shm_t )
     {
+        ++shared->update_serial;
         update_key_state( shared->keystate, msg, wparam, 1 );
     }
     SHARED_WRITE_END
@@ -3535,6 +3537,7 @@ DECL_HANDLER(get_key_state)
             reply->state = desktop->shared->keystate[req->key & 0xff];
             SHARED_WRITE_BEGIN( desktop, desktop_shm_t )
             {
+                ++shared->update_serial;
                 shared->keystate[req->key & 0xff] &= ~0x40;
             }
             SHARED_WRITE_END
@@ -3575,6 +3578,7 @@ DECL_HANDLER(set_key_state)
     {
         SHARED_WRITE_BEGIN( desktop, desktop_shm_t )
         {
+            ++shared->update_serial;
             memcpy( (void *)shared->keystate, get_req_data(), size );
         }
         SHARED_WRITE_END

@@ -227,7 +227,10 @@ static int init_desktop_mapping( struct desktop *desktop, const struct unicode_s
     if (!(dir = create_desktop_map_directory( desktop->winstation ))) return 0;
     if ((desktop->shared_mapping = create_shared_mapping( dir, name, sizeof(struct desktop_shared_memory),
                                                           0, NULL, (void **)&desktop->shared )))
+    {
         memset( (void *)desktop->shared, 0, sizeof(*desktop->shared) );
+        ((desktop_shm_t *)desktop->shared)->update_serial = 1;
+    }
     release_object( dir );
 
     return !!desktop->shared;
