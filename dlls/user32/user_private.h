@@ -120,6 +120,13 @@ struct rawinput_thread_data
     RAWINPUT buffer[1]; /* rawinput message data buffer */
 };
 
+struct touchinput_thread_data
+{
+    BYTE       index;            /* history index */
+    TOUCHINPUT current[8];       /* current touch state */
+    TOUCHINPUT history[128][8];  /* touches history buffer */
+};
+
 extern BOOL (WINAPI *imm_register_window)(HWND) DECLSPEC_HIDDEN;
 extern void (WINAPI *imm_unregister_window)(HWND) DECLSPEC_HIDDEN;
 #define WM_IME_INTERNAL 0x287

@@ -231,6 +231,15 @@ static void DEFWND_Print( HWND hwnd, HDC hdc, ULONG uFlags)
     SendMessageW(hwnd, WM_PRINTCLIENT, (WPARAM)hdc, uFlags);
 }
 
+static struct touchinput_thread_data *touch_input_thread_data(void)
+{
+    struct user_thread_info *thread_info = get_user_thread_info();
+    struct touchinput_thread_data *data = thread_info->touchinput;
+
+    if (!data) data = thread_info->touchinput = HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY,
+                                                           sizeof(struct touchinput_thread_data) );
+    return data;
+}
 
 
 /***********************************************************************
@@ -756,25 +765,53 @@ static LRESULT DEFWND_DefWinProc( HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPa
     case WM_POINTERUP:
     case WM_POINTERUPDATE:
     {
-        TOUCHINPUT touchinput;
+        struct touchinput_thread_data *thread_data;
+        TOUCHINPUT *touches, *end, *touch;
+        UINT i;
 
         if (!IsTouchWindow( hwnd, NULL )) return 0;
-        touchinput.x = LOWORD( lParam ) * 100;
-        touchinput.y = HIWORD( lParam ) * 100;
-        touchinput.hSource = WINE_MOUSE_HANDLE;
-        touchinput.dwID = GET_POINTERID_WPARAM( wParam );
-        touchinput.dwFlags = TOUCHEVENTF_NOCOALESCE | TOUCHEVENTF_PALM;
-        if (msg == WM_POINTERDOWN) touchinput.dwFlags |= TOUCHEVENTF_DOWN;
-        if (msg == WM_POINTERUP) touchinput.dwFlags |= TOUCHEVENTF_UP;
-        if (msg == WM_POINTERUPDATE) touchinput.dwFlags |= TOUCHEVENTF_MOVE;
-        if (IS_POINTER_PRIMARY_WPARAM( wParam )) touchinput.dwFlags |= TOUCHEVENTF_PRIMARY;
-        touchinput.dwMask = 0;
-        touchinput.dwTime = GetTickCount();
-        touchinput.dwExtraInfo = 0;
-        touchinput.cxContact = 0;
-        touchinput.cyContact = 0;
+        if (!(thread_data = touch_input_thread_data())) return 0;
 
-        SendMessageW( hwnd, WM_TOUCH, MAKELONG( 1, 0 ), (LPARAM)&touchinput );
+        for (touches = thread_data->current, end = touches + ARRAY_SIZE(thread_data->current), touch = touches; touch < end; touch++)
+            if (!touch->dwID || touch->dwID == GET_POINTERID_WPARAM( wParam )) break;
+
+        if (touch == end || (msg != WM_POINTERDOWN && !touch->dwID))
+        {
+            if (msg != WM_POINTERDOWN) FIXME("Touch point not found!\n");
+            else FIXME("Unsupported number of touch points!\n");
+            break;
+        }
+
+        while (end > touch && !(end - 1)->dwID) end--;
+
+        if (msg == WM_POINTERUP)
+        {
+            while (++touch < end) *(touch - 1) = *touch;
+            memset( touch - 1, 0, sizeof(*touch) );
+            end--;
+        }
+        else
+        {
+            touch->x = LOWORD( lParam ) * 100;
+            touch->y = HIWORD( lParam ) * 100;
+            touch->hSource = WINE_MOUSE_HANDLE;
+            touch->dwID = GET_POINTERID_WPARAM( wParam );
+            touch->dwFlags = TOUCHEVENTF_NOCOALESCE | TOUCHEVENTF_PALM;
+            if (msg == WM_POINTERDOWN) touch->dwFlags |= TOUCHEVENTF_DOWN;
+            if (msg == WM_POINTERUP) touch->dwFlags |= TOUCHEVENTF_UP;
+            if (msg == WM_POINTERUPDATE) touch->dwFlags |= TOUCHEVENTF_MOVE;
+            if (IS_POINTER_PRIMARY_WPARAM( wParam )) touch->dwFlags |= TOUCHEVENTF_PRIMARY;
+            touch->dwMask = 0;
+            touch->dwTime = GetTickCount();
+            touch->dwExtraInfo = 0;
+            touch->cxContact = 0;
+            touch->cyContact = 0;
+        }
+
+        i = thread_data->index++ % ARRAY_SIZE(thread_data->history);
+        memcpy( thread_data->history + i, thread_data->current, sizeof(thread_data->current) );
+
+        SendMessageW( hwnd, WM_TOUCH, MAKELONG(end - touches, 0), (LPARAM)i );
         break;
     }
 

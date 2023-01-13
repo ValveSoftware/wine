@@ -100,6 +100,7 @@ struct user_thread_info
     HWND                          top_window;             /* Desktop window */
     HWND                          msg_window;             /* HWND_MESSAGE parent window */
     struct rawinput_thread_data  *rawinput;               /* RawInput thread local data / buffer */
+    struct touchinput_thread_data *touchinput;            /* touch input thread local buffer */
     struct desktop_shared_memory *desktop_shared_memory;  /* Ptr to server's desktop shared memory */
     struct queue_shared_memory   *queue_shared_memory;     /* Ptr to server's thread queue shared memory */
     struct input_shared_memory   *input_shared_memory;    /* Ptr to server's thread input shared memory */
