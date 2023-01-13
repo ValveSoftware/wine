@@ -2824,6 +2824,7 @@ HRESULT create_dispex(script_ctx_t *ctx, const builtin_info_t *builtin_info, jsd
     jsdisp_t *ret;
     HRESULT hres;
 
+    *dispex = NULL;
     ret = calloc(1, sizeof(jsdisp_t));
     if(!ret)
         return E_OUTOFMEMORY;
