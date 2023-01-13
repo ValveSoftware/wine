@@ -401,6 +401,7 @@ HKL WINAPI NtUserGetKeyboardLayout( DWORD thread_id )
 SHORT WINAPI NtUserGetKeyState( INT vkey )
 {
     volatile struct input_shared_memory *shared = get_input_shared_memory();
+    volatile struct desktop_shared_memory *desktop_shared;
     SHORT retval = 0;
     BOOL skip = TRUE;
 
@@ -408,8 +409,19 @@ SHORT WINAPI NtUserGetKeyState( INT vkey )
     else SHARED_READ_BEGIN( &shared->seq )
     {
         if (!shared->created) skip = FALSE; /* server needs to create the queue */
-        else if (!shared->keystate_lock) skip = FALSE; /* server needs to call sync_input_keystate */
-        else retval = (signed char)(shared->keystate[vkey & 0xff] & 0x81);
+        else if (!shared->keystate_lock)
+        {
+            desktop_shared = get_desktop_shared_memory();
+            if (!desktop_shared) skip = FALSE;
+            else SHARED_READ_BEGIN( &desktop_shared->seq )
+            {
+                if (shared->sync_serial != desktop_shared->update_serial)
+                    skip = FALSE; /* server needs to call sync_input_keystate */
+            }
+            SHARED_READ_END( &desktop_shared->seq );
+        }
+        if (skip)
+            retval = (signed char)(shared->keystate[vkey & 0xff] & 0x81);
     }
     SHARED_READ_END( &shared->seq );
 
