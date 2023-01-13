@@ -731,9 +731,22 @@ UINT WINAPI DECLSPEC_HOTPATCH GetRawInputBuffer(RAWINPUT *data, UINT *data_size,
     {
         data->header.dwSize = remaining;
         if (!rawinput_from_hardware_message(data, msg_data)) break;
-        if (overhead) memmove((char *)&data->data + overhead, &data->data,
-                              data->header.dwSize - sizeof(RAWINPUTHEADER));
-        data->header.dwSize += overhead;
+        if (overhead)
+        {
+            /* Under WoW64, GetRawInputBuffer always gives 64-bit RAWINPUT structs. */
+            RAWINPUT64 *ri64 = (RAWINPUT64 *)data;
+            memmove( (char *)&data->data + overhead, &data->data,
+                     data->header.dwSize - sizeof(RAWINPUTHEADER) );
+            ri64->header.dwSize += overhead;
+
+            /* Need to copy wParam before hDevice so it's not overwritten. */
+            ri64->header.wParam = data->header.wParam;
+#ifdef _WIN64
+            ri64->header.hDevice = data->header.hDevice;
+#else
+            ri64->header.hDevice = HandleToULong(data->header.hDevice);
+#endif
+        }
         remaining -= data->header.dwSize;
         data = NEXTRAWINPUTBLOCK(data);
         msg_data = (struct hardware_msg_data *)((char *)msg_data + msg_data->size);
