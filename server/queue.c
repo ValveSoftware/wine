@@ -409,6 +409,7 @@ static void sync_input_keystate( struct thread_input *input )
         if (input->desktop_keystate[i] == input->desktop->shared->keystate[i]) continue;
         input->shared->keystate[i] = input->desktop_keystate[i] = input->desktop->shared->keystate[i];
     }
+    input->shared->sync_serial = input->desktop->shared->update_serial;
     SHARED_WRITE_END( &input->shared->seq );
 }
 
@@ -1623,6 +1624,7 @@ static void update_input_key_state( struct thread_input *input, unsigned int msg
 static void update_desktop_key_state( struct desktop *desktop, unsigned int msg, lparam_t wparam )
 {
     SHARED_WRITE_BEGIN( &desktop->shared->seq );
+    ++desktop->shared->update_serial;
     update_key_state( desktop->shared->keystate, msg, wparam, 1 );
     SHARED_WRITE_END( &desktop->shared->seq );
 }
@@ -3464,6 +3466,7 @@ DECL_HANDLER(get_key_state)
         {
             reply->state = desktop->shared->keystate[req->key & 0xff];
             SHARED_WRITE_BEGIN( &desktop->shared->seq );
+            ++desktop->shared->update_serial;
             desktop->shared->keystate[req->key & 0xff] &= ~0x40;
             SHARED_WRITE_END( &desktop->shared->seq );
         }
@@ -3499,6 +3502,7 @@ DECL_HANDLER(set_key_state)
     if (req->async && (desktop = get_thread_desktop( current, 0 )))
     {
         SHARED_WRITE_BEGIN( &desktop->shared->seq );
+        ++desktop->shared->update_serial;
         memcpy( (void *)desktop->shared->keystate, get_req_data(), size );
         SHARED_WRITE_END( &desktop->shared->seq );
         release_object( desktop );
