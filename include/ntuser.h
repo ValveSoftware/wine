@@ -100,13 +100,9 @@ struct user_thread_info
     HWND                          top_window;             /* Desktop window */
     HWND                          msg_window;             /* HWND_MESSAGE parent window */
     struct rawinput_thread_data  *rawinput;               /* RawInput thread local data / buffer */
-    HANDLE                        desktop_shared_map;     /* HANDLE to server's desktop shared memory */
     struct desktop_shared_memory *desktop_shared_memory;  /* Ptr to server's desktop shared memory */
-    HANDLE                        queue_shared_map;       /* HANDLE to server's thread queue shared memory */
     struct queue_shared_memory   *queue_shared_memory;     /* Ptr to server's thread queue shared memory */
-    HANDLE                        input_shared_map;       /* HANDLE to server's thread input shared memory */
     struct input_shared_memory   *input_shared_memory;    /* Ptr to server's thread input shared memory */
-    HANDLE                        foreground_shared_map;    /* HANDLE to server's thread input shared memory */
     struct input_shared_memory   *foreground_shared_memory; /* Ptr to server's thread input shared memory */
 };
 

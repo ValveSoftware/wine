@@ -266,31 +266,27 @@ static void thread_detach(void)
     HeapFree( GetProcessHeap(), 0, thread_info->wmchar_data );
     HeapFree( GetProcessHeap(), 0, thread_info->rawinput );
 
-    if (thread_info->desktop_shared_map)
+    if (thread_info->desktop_shared_memory)
     {
-        CloseHandle( thread_info->desktop_shared_map );
-        thread_info->desktop_shared_map = NULL;
+        NtUnmapViewOfSection( GetCurrentProcess(), thread_info->desktop_shared_memory );
         thread_info->desktop_shared_memory = NULL;
     }
 
-    if (thread_info->queue_shared_map)
+    if (thread_info->queue_shared_memory)
     {
-        CloseHandle( thread_info->queue_shared_map );
-        thread_info->queue_shared_map = NULL;
+        NtUnmapViewOfSection( GetCurrentProcess(), thread_info->queue_shared_memory );
         thread_info->queue_shared_memory = NULL;
     }
 
-    if (thread_info->input_shared_map)
+    if (thread_info->input_shared_memory)
     {
-        CloseHandle( thread_info->input_shared_map );
-        thread_info->input_shared_map = NULL;
+        NtUnmapViewOfSection( GetCurrentProcess(), thread_info->input_shared_memory );
         thread_info->input_shared_memory = NULL;
     }
 
     if (thread_info->foreground_shared_memory)
     {
-        CloseHandle( thread_info->foreground_shared_map );
-        thread_info->foreground_shared_map = NULL;
+        NtUnmapViewOfSection( GetCurrentProcess(), thread_info->foreground_shared_memory );
         thread_info->foreground_shared_memory = NULL;
     }
 
