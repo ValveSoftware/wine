@@ -58,7 +58,7 @@ static volatile struct global_shared_memory *get_global_shared_memory( void )
     if (ret) return ret;
 
     init_unicode_string( &section_str, global_mappingW );
-    InitializeObjectAttributes( &attr, &section_str, OBJ_CASE_INSENSITIVE | OBJ_OPENIF, NULL, NULL );
+    InitializeObjectAttributes( &attr, &section_str, OBJ_CASE_INSENSITIVE | OBJ_OPENIF | OBJ_PERMANENT, NULL, NULL );
     size_l.QuadPart = sizeof(struct global_shared_memory);
     status = NtCreateSection( &handle, SECTION_ALL_ACCESS, &attr, &size_l, PAGE_READWRITE, SEC_COMMIT, NULL );
     if (status && status != STATUS_OBJECT_NAME_EXISTS)
