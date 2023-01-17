@@ -80,6 +80,7 @@ static volatile struct global_shared_memory *get_global_shared_memory( void )
     {
         if (NtUnmapViewOfSection( GetCurrentProcess(), ret ))
             ERR( "NtUnmapViewOfSection failed.\n" );
+        ret = global_shared;
     }
 
     return ret;
