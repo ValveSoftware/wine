@@ -1163,6 +1163,54 @@ static void init_functions(void)
     is_win8_plus = pMFPutWaitingWorkItem != NULL;
 }
 
+#define check_format_representation(a) check_format_representation_(__LINE__, a)
+static void check_format_representation_(unsigned int line, IMFMediaType *mediatype)
+{
+    AM_MEDIA_TYPE *amt;
+    GUID guid, subtype;
+    UINT32 value, size;
+    MFVIDEOFORMAT *mvf;
+    HRESULT hr;
+
+    amt = (void *)0xdeadbeef;
+    hr = IMFMediaType_GetRepresentation(mediatype, FORMAT_MFVideoFormat, (void **)&amt);
+
+    if (IMFMediaType_GetMajorType(mediatype, &guid) || !IsEqualGUID(&guid, &MFMediaType_Video)
+            || IMFMediaType_GetGUID(mediatype, &MF_MT_SUBTYPE, &subtype))
+    {
+        ok_(__FILE__, line)(hr == MF_E_ATTRIBUTENOTFOUND, "hr %#lx.\n", hr);
+        ok_(__FILE__, line)(!amt, "got %p.\n", amt);
+        return;
+    }
+
+    ok_(__FILE__, line)(hr == S_OK, "hr %#lx.\n", hr);
+    ok_(__FILE__, line)(IsEqualIID(&amt->majortype, &MEDIATYPE_Video), "major_type %s.\n", debugstr_guid(&amt->majortype));
+    ok_(__FILE__, line)(IsEqualIID(&amt->subtype, &subtype), "subtype %s.\n", debugstr_guid(&amt->subtype));
+    if (IMFMediaType_GetUINT32(mediatype, &MF_MT_FIXED_SIZE_SAMPLES, &value))
+        value = 0;
+    ok_(__FILE__, line)(amt->bFixedSizeSamples == value, "bFixedSizeSamples %d.\n", amt->bFixedSizeSamples);
+
+    if ((hr = IMFMediaType_GetUINT32(mediatype, &MF_MT_ALL_SAMPLES_INDEPENDENT, &value)))
+        value = FALSE;
+    ok_(__FILE__, line)(amt->bTemporalCompression == !value, "bTemporalCompression %d.\n", amt->bTemporalCompression);
+
+    if (IMFMediaType_GetUINT32(mediatype, &MF_MT_SAMPLE_SIZE, &value))
+        value = 0;
+    ok_(__FILE__, line)(amt->lSampleSize == value, "lSampleSize %lu.\n", amt->lSampleSize);
+
+    ok_(__FILE__, line)(IsEqualIID(&amt->formattype, &FORMAT_MFVideoFormat), "formattype %s.\n", debugstr_guid(&amt->formattype));
+    ok_(__FILE__, line)(!amt->pUnk, "pUnk %p.\n", amt->pUnk);
+    ok_(__FILE__, line)(amt->cbFormat == sizeof(MFVIDEOFORMAT), "cbFormat %lu.\n", amt->cbFormat);
+
+    hr = MFCreateMFVideoFormatFromMFMediaType(mediatype, &mvf, &size);
+    ok_(__FILE__, line)(hr == S_OK, "hr %#lx.\n", hr);
+    ok_(__FILE__, line)(!memcmp(mvf, amt->pbFormat, sizeof(*mvf)), "video format does not match.\n");
+    CoTaskMemFree(mvf);
+
+    hr = IMFMediaType_FreeRepresentation(mediatype, FORMAT_MFVideoFormat, amt);
+    ok_(__FILE__, line)(hr == S_OK, "hr %#lx.\n", hr);
+}
+
 static void test_media_type(void)
 {
     IMFMediaType *mediatype, *mediatype2;
@@ -1183,6 +1231,8 @@ if(0)
 
     hr = MFCreateMediaType(&mediatype);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    check_format_representation(mediatype);
 
     hr = IMFMediaType_GetMajorType(mediatype, &guid);
     ok(hr == MF_E_ATTRIBUTENOTFOUND, "Unexpected hr %#lx.\n", hr);
@@ -1225,6 +1275,8 @@ if(0)
     hr = IMFMediaType_SetGUID(mediatype, &MF_MT_MAJOR_TYPE, &MFMediaType_Video);
     ok(hr == S_OK, "Failed to set GUID value, hr %#lx.\n", hr);
 
+    check_format_representation(mediatype);
+
     hr = IMFMediaType_GetMajorType(mediatype, &guid);
     ok(hr == S_OK, "Failed to get major type, hr %#lx.\n", hr);
     ok(IsEqualGUID(&guid, &MFMediaType_Video), "Unexpected major type.\n");
@@ -1237,6 +1289,8 @@ if(0)
     hr = IMFMediaType_IsEqual(mediatype, mediatype2, &flags);
     ok(hr == E_INVALIDARG, "Unexpected hr %#lx.\n", hr);
     ok(flags == 0, "Unexpected flags %#lx.\n", flags);
+
+    check_format_representation(mediatype);
 
     /* Different major types. */
     hr = IMFMediaType_SetGUID(mediatype2, &MF_MT_MAJOR_TYPE, &MFMediaType_Audio);
@@ -1251,6 +1305,7 @@ if(0)
     /* Same major types, different subtypes. */
     hr = IMFMediaType_SetGUID(mediatype2, &MF_MT_MAJOR_TYPE, &MFMediaType_Video);
     ok(hr == S_OK, "Failed to set major type, hr %#lx.\n", hr);
+
 
     flags = 0;
     hr = IMFMediaType_IsEqual(mediatype, mediatype2, &flags);
@@ -1271,8 +1326,12 @@ if(0)
     hr = IMFMediaType_DeleteItem(mediatype, &MF_MT_USER_DATA);
     ok(hr == S_OK, "Failed to delete item, hr %#lx.\n", hr);
 
+    check_format_representation(mediatype);
+
     hr = IMFMediaType_SetGUID(mediatype, &MF_MT_SUBTYPE, &MFVideoFormat_RGB32);
     ok(hr == S_OK, "Failed to set subtype, hr %#lx.\n", hr);
+
+    check_format_representation(mediatype);
 
     flags = 0;
     hr = IMFMediaType_IsEqual(mediatype, mediatype2, &flags);
@@ -1322,6 +1381,8 @@ if(0)
     {
         hr = pMFCreateVideoMediaTypeFromSubtype(&MFVideoFormat_RGB555, &video_type);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+        check_format_representation((IMFMediaType *)video_type);
 
         check_interface(video_type, &IID_IMFMediaType, TRUE);
         check_interface(video_type, &IID_IMFVideoMediaType, TRUE);
@@ -1376,6 +1437,8 @@ if(0)
     IUnknown_Release(unk2);
 
     IUnknown_Release(unk);
+
+    check_format_representation(mediatype);
 
     IMFMediaType_Release(mediatype);
 }
