@@ -70,6 +70,71 @@ struct presentation_desc
 
 static HRESULT presentation_descriptor_init(struct presentation_desc *object, DWORD count);
 
+static HRESULT WINAPI mediatype_get_representation(struct media_type *media_type, const GUID *guid,
+        void **representation)
+{
+    if (IsEqualIID(guid, &FORMAT_MFVideoFormat))
+    {
+        IMFMediaType *iface = &media_type->IMFMediaType_iface;
+        AM_MEDIA_TYPE *amt;
+        UINT32 value;
+        HRESULT hr;
+
+        *representation = NULL;
+        if (!(amt = CoTaskMemAlloc(sizeof(*amt))))
+            return E_OUTOFMEMORY;
+
+        memset(amt, 0, sizeof(*amt));
+
+        if (IMFMediaType_GetMajorType(iface, &amt->majortype) || !IsEqualGUID(&amt->majortype, &MFMediaType_Video)
+                || IMFMediaType_GetGUID(iface, &MF_MT_SUBTYPE, &amt->subtype))
+        {
+            CoTaskMemFree(amt);
+            return MF_E_ATTRIBUTENOTFOUND;
+        }
+
+        if (FAILED(hr = MFCreateMFVideoFormatFromMFMediaType(iface, (MFVIDEOFORMAT **)&amt->pbFormat,
+                (UINT32 *)&amt->cbFormat )))
+        {
+            WARN("Failed to create format description, hr %#lx.\n", hr);
+            CoTaskMemFree(amt);
+            return hr;
+        }
+        memcpy(&amt->formattype, guid, sizeof(*guid));
+        if (IMFMediaType_GetUINT32(iface, &MF_MT_FIXED_SIZE_SAMPLES, (UINT32 *)&value))
+            value = 0;
+        amt->bFixedSizeSamples = !!value;
+
+        if ((hr = IMFMediaType_GetUINT32(iface, &MF_MT_ALL_SAMPLES_INDEPENDENT, &value)))
+            value = 0;
+        amt->bTemporalCompression = !value;
+
+        if (IMFMediaType_GetUINT32(iface, &MF_MT_SAMPLE_SIZE, (UINT32 *)&amt->lSampleSize))
+            amt->lSampleSize = 0;
+
+        *representation = amt;
+        return S_OK;
+    }
+
+    FIXME("Not implemented for %s.\n", debugstr_guid(guid));
+    return E_NOTIMPL;
+}
+
+static HRESULT mediatype_free_representation(const GUID *guid, void *representation)
+{
+    if (IsEqualIID(guid, &FORMAT_MFVideoFormat))
+    {
+        AM_MEDIA_TYPE *amt = representation;
+
+        CoTaskMemFree(amt->pbFormat);
+        CoTaskMemFree(amt);
+        return S_OK;
+    }
+
+    FIXME("Not implemented for %s.\n", debugstr_guid(guid));
+    return E_NOTIMPL;
+}
+
 static struct media_type *impl_from_IMFMediaType(IMFMediaType *iface)
 {
     return CONTAINING_RECORD(iface, struct media_type, IMFMediaType_iface);
@@ -581,16 +646,16 @@ static HRESULT WINAPI mediatype_IsEqual(IMFMediaType *iface, IMFMediaType *type,
 
 static HRESULT WINAPI mediatype_GetRepresentation(IMFMediaType *iface, GUID guid, void **representation)
 {
-    FIXME("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
+    TRACE("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
 
-    return E_NOTIMPL;
+    return mediatype_get_representation(impl_from_IMFMediaType(iface), &guid, representation);
 }
 
 static HRESULT WINAPI mediatype_FreeRepresentation(IMFMediaType *iface, GUID guid, void *representation)
 {
-    FIXME("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
+    TRACE("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
 
-    return E_NOTIMPL;
+    return mediatype_free_representation(&guid, representation);
 }
 
 static const IMFMediaTypeVtbl mediatypevtbl =
@@ -956,16 +1021,16 @@ static HRESULT WINAPI video_mediatype_IsEqual(IMFVideoMediaType *iface, IMFMedia
 
 static HRESULT WINAPI video_mediatype_GetRepresentation(IMFVideoMediaType *iface, GUID guid, void **representation)
 {
-    FIXME("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
+    TRACE("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
 
-    return E_NOTIMPL;
+    return mediatype_get_representation(impl_from_IMFVideoMediaType(iface), &guid, representation);;
 }
 
 static HRESULT WINAPI video_mediatype_FreeRepresentation(IMFVideoMediaType *iface, GUID guid, void *representation)
 {
-    FIXME("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
+    TRACE("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
 
-    return E_NOTIMPL;
+    return mediatype_free_representation(&guid, representation);
 }
 
 static const MFVIDEOFORMAT * WINAPI video_mediatype_GetVideoFormat(IMFVideoMediaType *iface)
@@ -1356,16 +1421,16 @@ static HRESULT WINAPI audio_mediatype_IsEqual(IMFAudioMediaType *iface, IMFMedia
 
 static HRESULT WINAPI audio_mediatype_GetRepresentation(IMFAudioMediaType *iface, GUID guid, void **representation)
 {
-    FIXME("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
+    TRACE("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
 
-    return E_NOTIMPL;
+    return mediatype_get_representation(impl_from_IMFAudioMediaType(iface), &guid, representation);;
 }
 
 static HRESULT WINAPI audio_mediatype_FreeRepresentation(IMFAudioMediaType *iface, GUID guid, void *representation)
 {
-    FIXME("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
+    TRACE("%p, %s, %p.\n", iface, debugstr_guid(&guid), representation);
 
-    return E_NOTIMPL;
+    return mediatype_free_representation(&guid, representation);
 }
 
 static const WAVEFORMATEX * WINAPI audio_mediatype_GetAudioFormat(IMFAudioMediaType *iface)
