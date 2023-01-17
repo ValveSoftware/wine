@@ -19030,6 +19030,10 @@ static HRESULT WINAPI test_enum_devices_caps_callback(GUID *guid, char *device_d
         todo_wine
         ok((hel->dwDevCaps & D3DDEVCAPS_DRAWPRIMITIVES2EX) == 0,
            "RGB Device hel device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n");
+        ok((hal->dwDevCaps & D3DDEVCAPS_HWRASTERIZATION) == 0,
+           "RGB Device hal device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n");
+        ok((hel->dwDevCaps & D3DDEVCAPS_HWRASTERIZATION) == 0,
+           "RGB Device hel device caps has D3DDEVCAPS_DRAWPRIMITIVES2EX set\n");
     }
     else if(IsEqualGUID(&IID_IDirect3DHALDevice, guid))
     {
