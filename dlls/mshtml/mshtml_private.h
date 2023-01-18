@@ -336,6 +336,7 @@ typedef struct ScriptHost ScriptHost;
     XIID(IHTMLPerformanceTiming) \
     XIID(IHTMLPluginsCollection) \
     XIID(IHTMLRect) \
+    XIID(IHTMLRect2) \
     XIID(IHTMLRectCollection) \
     XIID(IHTMLScreen) \
     XIID(IHTMLScriptElement) \
