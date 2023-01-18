@@ -10179,7 +10179,7 @@ static DWORD WINAPI uia_add_event_test_thread(LPVOID param)
     ok(Provider2.ref == 1, "Unexpected refcnt %ld\n", Provider2.ref);
     ok_method_sequence(event_seq12, "event_seq12");
 
-    todo_wine ok(Provider2.last_call_tid == data->exp_thread_id ||
+    ok(Provider2.last_call_tid == data->exp_thread_id ||
             broken(Provider2.last_call_tid == GetCurrentThreadId()), "Expected method call on separate thread\n");
 
     CoUninitialize();

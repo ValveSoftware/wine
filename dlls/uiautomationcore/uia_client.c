@@ -320,6 +320,7 @@ struct uia_advise_events {
     LONG ref;
 
     IRawElementProviderAdviseEvents *advise_events;
+    DWORD git_cookie;
 };
 
 static inline struct uia_advise_events *impl_from_IWineUiaAdviseEvents(IWineUiaAdviseEvents *iface)
@@ -356,6 +357,12 @@ static ULONG WINAPI uia_advise_events_Release(IWineUiaAdviseEvents *iface)
     TRACE("%p, refcount %ld\n", adv_events, ref);
     if (!ref)
     {
+        if (adv_events->git_cookie)
+        {
+            if (FAILED(unregister_interface_in_git(adv_events->git_cookie)))
+                WARN("Failed to revoke advise events interface from GIT\n");
+        }
+
         IRawElementProviderAdviseEvents_Release(adv_events->advise_events);
         heap_free(adv_events);
     }
@@ -367,16 +374,32 @@ static HRESULT WINAPI uia_advise_events_advise_events(IWineUiaAdviseEvents *ifac
         long event_id, SAFEARRAY *prop_ids)
 {
     struct uia_advise_events *adv_events = impl_from_IWineUiaAdviseEvents(iface);
+    IRawElementProviderAdviseEvents *advise_events;
     HRESULT hr;
 
     TRACE("%p, %d, %p\n", adv_events, advise_removed, prop_ids);
 
-    if (advise_removed)
-        hr = IRawElementProviderAdviseEvents_AdviseEventRemoved(adv_events->advise_events, event_id, prop_ids);
+    if (adv_events->git_cookie)
+    {
+        hr = get_interface_in_git(&IID_IRawElementProviderAdviseEvents, adv_events->git_cookie,
+                (IUnknown **)&advise_events);
+        if (FAILED(hr))
+            return hr;
+    }
     else
-        hr = IRawElementProviderAdviseEvents_AdviseEventAdded(adv_events->advise_events, event_id, prop_ids);
+    {
+        advise_events = adv_events->advise_events;
+        IRawElementProviderAdviseEvents_AddRef(advise_events);
+    }
+
+    if (advise_removed)
+        hr = IRawElementProviderAdviseEvents_AdviseEventRemoved(advise_events, event_id, prop_ids);
+    else
+        hr = IRawElementProviderAdviseEvents_AdviseEventAdded(advise_events, event_id, prop_ids);
     if (FAILED(hr))
         WARN("AdviseEvents failed with hr %#lx\n", hr);
+
+    IRawElementProviderAdviseEvents_Release(advise_events);
 
     return S_OK;
 }
@@ -392,11 +415,38 @@ static HRESULT create_wine_uia_advise_events(IRawElementProviderAdviseEvents *ad
         IWineUiaAdviseEvents **out_events)
 {
     struct uia_advise_events *adv_events;
+    IRawElementProviderSimple *elprov;
+    enum ProviderOptions prov_opts;
+    HRESULT hr;
 
     *out_events = NULL;
 
+    hr = IRawElementProviderAdviseEvents_QueryInterface(advise_events, &IID_IRawElementProviderSimple,
+            (void **)&elprov);
+    if (FAILED(hr) || !elprov)
+    {
+        ERR("Failed to get IRawElementProviderSimple from advise events\n");
+        return E_FAIL;
+    }
+
+    hr = IRawElementProviderSimple_get_ProviderOptions(elprov, &prov_opts);
+    IRawElementProviderSimple_Release(elprov);
+    if (FAILED(hr))
+        prov_opts = 0;
+
     if (!(adv_events = heap_alloc_zero(sizeof(*adv_events))))
         return E_OUTOFMEMORY;
+
+    if (prov_opts & ProviderOptions_UseComThreading)
+    {
+        hr = register_interface_in_git((IUnknown *)advise_events, &IID_IRawElementProviderAdviseEvents,
+                &adv_events->git_cookie);
+        if (FAILED(hr))
+        {
+            heap_free(adv_events);
+            return hr;
+        }
+    }
 
     adv_events->IWineUiaAdviseEvents_iface.lpVtbl = &uia_advise_events_vtbl;
     adv_events->ref = 1;
