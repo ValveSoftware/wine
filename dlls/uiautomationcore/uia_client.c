@@ -25,6 +25,79 @@ WINE_DEFAULT_DEBUG_CHANNEL(uiautomation);
 
 static const struct UiaCondition UiaFalseCondition = { ConditionType_False };
 
+static HRESULT get_global_interface_table(IGlobalInterfaceTable **git)
+{
+    HRESULT hr;
+
+    hr = CoCreateInstance(&CLSID_StdGlobalInterfaceTable, NULL,
+            CLSCTX_INPROC_SERVER, &IID_IGlobalInterfaceTable, (void **)git);
+    if (FAILED(hr))
+        WARN("Failed to get GlobalInterfaceTable, hr %#lx\n", hr);
+
+    return hr;
+}
+
+static HRESULT register_interface_in_git(IUnknown *iface, REFIID riid, DWORD *ret_cookie)
+{
+    IGlobalInterfaceTable *git;
+    DWORD git_cookie;
+    HRESULT hr;
+
+    *ret_cookie = 0;
+    hr = get_global_interface_table(&git);
+    if (FAILED(hr))
+        return hr;
+
+    hr = IGlobalInterfaceTable_RegisterInterfaceInGlobal(git, iface, riid, &git_cookie);
+    if (FAILED(hr))
+    {
+        WARN("Failed to register interface in GlobalInterfaceTable, hr %#lx\n", hr);
+        return hr;
+    }
+
+    *ret_cookie = git_cookie;
+
+    return S_OK;
+}
+
+static HRESULT unregister_interface_in_git(DWORD git_cookie)
+{
+    IGlobalInterfaceTable *git;
+    HRESULT hr;
+
+    hr = get_global_interface_table(&git);
+    if (FAILED(hr))
+        return hr;
+
+    hr = IGlobalInterfaceTable_RevokeInterfaceFromGlobal(git, git_cookie);
+    if (FAILED(hr))
+        WARN("Failed to revoke interface from GlobalInterfaceTable, hr %#lx\n", hr);
+
+    return hr;
+}
+
+static HRESULT get_interface_in_git(REFIID riid, DWORD git_cookie, IUnknown **ret_iface)
+{
+    IGlobalInterfaceTable *git;
+    IUnknown *iface;
+    HRESULT hr;
+
+    hr = get_global_interface_table(&git);
+    if (FAILED(hr))
+        return hr;
+
+    hr = IGlobalInterfaceTable_GetInterfaceFromGlobal(git, git_cookie, riid, (void **)&iface);
+    if (FAILED(hr))
+    {
+        ERR("Failed to get interface from Global Interface Table, hr %#lx\n", hr);
+        return hr;
+    }
+
+    *ret_iface = iface;
+
+    return S_OK;
+}
+
 #define EVENT_TYPE_LOCAL 0
 struct uia_event
 {
@@ -566,18 +639,6 @@ exit:
     }
 }
 
-static HRESULT get_global_interface_table(IGlobalInterfaceTable **git)
-{
-    HRESULT hr;
-
-    hr = CoCreateInstance(&CLSID_StdGlobalInterfaceTable, NULL,
-            CLSCTX_INPROC_SERVER, &IID_IGlobalInterfaceTable, (void **)git);
-    if (FAILED(hr))
-        WARN("Failed to get GlobalInterfaceTable, hr %#lx\n", hr);
-
-    return hr;
-}
-
 static HWND get_hwnd_from_provider(IRawElementProviderSimple *elprov)
 {
     IRawElementProviderSimple *host_prov;
@@ -792,16 +853,8 @@ static ULONG WINAPI uia_node_Release(IWineUiaNode *iface)
         {
             if (node->git_cookie[i])
             {
-                IGlobalInterfaceTable *git;
-                HRESULT hr;
-
-                hr = get_global_interface_table(&git);
-                if (SUCCEEDED(hr))
-                {
-                    hr = IGlobalInterfaceTable_RevokeInterfaceFromGlobal(git, node->git_cookie[i]);
-                    if (FAILED(hr))
-                        WARN("Failed to get revoke provider interface from Global Interface Table, hr %#lx\n", hr);
-                }
+                if (FAILED(unregister_interface_in_git(node->git_cookie[i])))
+                    WARN("Failed to get revoke provider interface from GIT\n");
             }
 
             if (node->prov[i])
@@ -836,21 +889,13 @@ static HRESULT WINAPI uia_node_get_provider(IWineUiaNode *iface, int idx, IWineU
     prov_type = get_node_provider_type_at_idx(node, idx);
     if (node->git_cookie[prov_type])
     {
-        IGlobalInterfaceTable *git;
         IWineUiaProvider *prov;
         HRESULT hr;
 
-        hr = get_global_interface_table(&git);
+        hr = get_interface_in_git(&IID_IWineUiaProvider, node->git_cookie[prov_type], (IUnknown **)&prov);
         if (FAILED(hr))
             return hr;
 
-        hr = IGlobalInterfaceTable_GetInterfaceFromGlobal(git, node->git_cookie[prov_type],
-                &IID_IWineUiaProvider, (void **)&prov);
-        if (FAILED(hr))
-        {
-            ERR("Failed to get provider interface from GlobalInterfaceTable, hr %#lx\n", hr);
-            return hr;
-        }
         *out_prov = prov;
     }
     else
@@ -906,16 +951,8 @@ static HRESULT WINAPI uia_node_disconnect(IWineUiaNode *iface)
     prov_type = get_node_provider_type_at_idx(node, 0);
     if (node->git_cookie[prov_type])
     {
-        IGlobalInterfaceTable *git;
-        HRESULT hr;
-
-        hr = get_global_interface_table(&git);
-        if (SUCCEEDED(hr))
-        {
-            hr = IGlobalInterfaceTable_RevokeInterfaceFromGlobal(git, node->git_cookie[prov_type]);
-            if (FAILED(hr))
-                WARN("Failed to get revoke provider interface from Global Interface Table, hr %#lx\n", hr);
-        }
+        if (FAILED(unregister_interface_in_git(node->git_cookie[prov_type])))
+            WARN("Failed to get revoke provider interface from GIT\n");
         node->git_cookie[prov_type] = 0;
     }
 
@@ -1003,7 +1040,6 @@ static HRESULT prepare_uia_node(struct uia_node *node)
     for (i = 0; i < PROV_TYPE_COUNT; i++)
     {
         enum ProviderOptions prov_opts;
-        IGlobalInterfaceTable *git;
         struct uia_provider *prov;
         HRESULT hr;
 
@@ -1024,12 +1060,8 @@ static HRESULT prepare_uia_node(struct uia_node *node)
         */
         if (prov_opts & ProviderOptions_UseComThreading)
         {
-            hr = get_global_interface_table(&git);
-            if (FAILED(hr))
-                return hr;
-
-            hr = IGlobalInterfaceTable_RegisterInterfaceInGlobal(git, (IUnknown *)&prov->IWineUiaProvider_iface,
-                    &IID_IWineUiaProvider, &node->git_cookie[i]);
+            hr = register_interface_in_git((IUnknown *)&prov->IWineUiaProvider_iface, &IID_IWineUiaProvider,
+                    &node->git_cookie[i]);
             if (FAILED(hr))
                 return hr;
         }
