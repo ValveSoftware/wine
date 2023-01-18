@@ -377,6 +377,18 @@ bool wg_transform_set_output_format(struct wg_transform *transform, struct wg_fo
     return !__wine_unix_call(unix_handle, unix_wg_transform_set_output_format, &params);
 }
 
+HRESULT wg_transform_drain(struct wg_transform *transform)
+{
+    struct wg_transform_drain_params params =
+    {
+        .transform = transform,
+    };
+
+    TRACE("transform %p.\n", transform);
+
+    return __wine_unix_call(unix_handle, unix_wg_transform_drain, &params);
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     if (reason == DLL_PROCESS_ATTACH)
