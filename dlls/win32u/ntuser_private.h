@@ -273,7 +273,7 @@ static inline UINT win_get_flags( HWND hwnd )
 }
 
 WND *get_win_ptr( HWND hwnd ) DECLSPEC_HIDDEN;
-BOOL is_child( HWND parent, HWND child );
+BOOL is_child( HWND parent, HWND child ) DECLSPEC_HIDDEN;
 BOOL is_window( HWND hwnd ) DECLSPEC_HIDDEN;
 
 #if defined(__i386__) || defined(__x86_64__)
