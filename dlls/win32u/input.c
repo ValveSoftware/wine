@@ -2051,7 +2051,7 @@ BOOL set_foreground_window( HWND hwnd, BOOL mouse )
     return ret;
 }
 
-struct
+static struct
 {
     HBITMAP bitmap;
     unsigned int timeout;
