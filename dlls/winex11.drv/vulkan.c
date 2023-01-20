@@ -725,7 +725,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     list_add_tail(&surface_list, &x11_surface->entry);
     LeaveCriticalSection(&context_section);
 
-    *surface = (uintptr_t)x11_surface;
+    *surface = (uintptr_t)wine_vk_surface_grab(x11_surface);
 
     if (x11_surface->gdi_blit_source && !x11_surface->other_process)
     {
