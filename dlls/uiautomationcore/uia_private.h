@@ -137,6 +137,7 @@ const struct uia_event_info *uia_event_info_from_id(EVENTID event_id) DECLSPEC_H
 
 /* uia_provider.c */
 void uia_stop_provider_thread(void) DECLSPEC_HIDDEN;
+BOOL uia_start_provider_thread(void) DECLSPEC_HIDDEN;
 void uia_provider_thread_remove_node(HUIANODE node) DECLSPEC_HIDDEN;
 LRESULT uia_lresult_from_node(HUIANODE huianode) DECLSPEC_HIDDEN;
 HRESULT create_msaa_provider(IAccessible *acc, long child_id, HWND hwnd, BOOL known_root_acc, BOOL clientside_prov,

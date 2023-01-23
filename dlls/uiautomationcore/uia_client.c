@@ -99,6 +99,7 @@ static HRESULT get_interface_in_git(REFIID riid, DWORD git_cookie, IUnknown **re
 }
 
 #define EVENT_TYPE_LOCAL 0
+#define EVENT_TYPE_REMOTE 1
 struct uia_event
 {
     IWineUiaEvent IWineUiaEvent_iface;
@@ -121,7 +122,18 @@ struct uia_event
         struct {
             struct UiaCacheRequest *cache_req;
             UiaEventCallback *cback;
+            DWORD git_cookie;
+
+            /* Array of remote events attached to this local HUIAEVENT. */
+            IWineUiaEvent **remote_events;
+            int remote_events_count;
+            SIZE_T remote_events_arr_size;
         } local;
+        struct {
+            struct rb_entry remote_event_entry;
+            IWineUiaEvent *event_iface;
+            LONG proc_id;
+        } remote;
     } u;
 };
 
@@ -132,7 +144,29 @@ static struct uia_client_events
 {
     struct rb_tree event_map;
     LONG event_count;
+
+    /*
+     * We need an rb_tree entry to use as a way to lookup a remote event by
+     * process_id and event_cookie to avoid creating duplicate events.
+     */
+    struct rb_tree remote_event_map;
 } client_events;
+
+struct uia_event_identifier {
+    LONG event_cookie;
+    LONG proc_id;
+};
+
+static int uia_remote_event_identifier_compare(const void *key, const struct rb_entry *entry)
+{
+    struct uia_event *event = RB_ENTRY_VALUE(entry, struct uia_event, u.remote.remote_event_entry);
+    struct uia_event_identifier *event_id = (struct uia_event_identifier *)key;
+
+    if (event_id->proc_id != event->u.remote.proc_id)
+        return (event_id->proc_id > event->u.remote.proc_id) - (event_id->proc_id < event->u.remote.proc_id);
+    else
+        return (event_id->event_cookie > event->event_cookie) - (event_id->event_cookie < event->event_cookie);
+}
 
 struct uia_client_event_data_map_entry
 {
@@ -140,6 +174,7 @@ struct uia_client_event_data_map_entry
 
     int event_id;
     struct list local_events_list;
+    struct list remote_events_list;
 };
 
 static int uia_event_map_id_compare(const void *key, const struct rb_entry *entry)
@@ -180,9 +215,13 @@ static HRESULT uia_get_event_data_for_event(struct uia_client_event_data_map_ent
 
         data->event_id = event_id;
         list_init(&data->local_events_list);
+        list_init(&data->remote_events_list);
 
         if (InterlockedIncrement(&client_events.event_count) == 1)
+        {
             rb_init(&client_events.event_map, uia_event_map_id_compare);
+            rb_init(&client_events.remote_event_map, uia_remote_event_identifier_compare);
+        }
         rb_put(&client_events.event_map, &event_id, &data->entry);
 
         *event_data = data;
@@ -200,10 +239,32 @@ static HRESULT uia_client_add_event(struct uia_event *event)
     if (FAILED(hr))
         return hr;
 
-    list_add_head(&event_data->local_events_list, &event->event_list_entry);
+    if (event->event_type == EVENT_TYPE_LOCAL)
+        list_add_head(&event_data->local_events_list, &event->event_list_entry);
+    else
+    {
+        struct uia_event_identifier event_identifier = { event->event_cookie, event->u.remote.proc_id };
+
+        list_add_head(&event_data->remote_events_list, &event->event_list_entry);
+        rb_put(&client_events.remote_event_map, &event_identifier, &event->u.remote.remote_event_entry);
+    }
     event->event_data = event_data;
 
     return S_OK;
+}
+
+static struct uia_event *uia_client_find_remote_event(LONG event_cookie, LONG proc_id)
+{
+    struct uia_event_identifier event_identifier = { event_cookie, proc_id };
+    struct rb_entry *rb_entry;
+
+    if (!client_events.event_count)
+        return NULL;
+
+    if ((rb_entry = rb_get(&client_events.remote_event_map, &event_identifier)))
+        return RB_ENTRY_VALUE(rb_entry, struct uia_event, u.remote.remote_event_entry);
+
+    return NULL;
 }
 
 /*
@@ -246,7 +307,14 @@ static ULONG WINAPI uia_event_Release(IWineUiaEvent *iface)
         if (event->event_data)
         {
             list_remove(&event->event_list_entry);
-            if (list_empty(&event->event_data->local_events_list))
+
+            if (event->event_type == EVENT_TYPE_REMOTE)
+            {
+                rb_remove(&client_events.remote_event_map, &event->u.remote.remote_event_entry);
+                IWineUiaEvent_detach(iface);
+            }
+
+            if (list_empty(&event->event_data->local_events_list) && list_empty(&event->event_data->remote_events_list))
             {
                 rb_remove(&client_events.event_map, &event->event_data->entry);
                 heap_free(event->event_data);
@@ -284,6 +352,54 @@ static HRESULT WINAPI uia_event_detach(IWineUiaEvent *iface)
         event->adv_events_ifaces = NULL;
     }
 
+    if ((event->event_type == EVENT_TYPE_LOCAL) && event->u.local.remote_events && event->u.local.remote_events_count)
+    {
+        for (i = 0; i < event->u.local.remote_events_count; i++)
+        {
+            hr = IWineUiaEvent_detach(event->u.local.remote_events[i]);
+            if (FAILED(hr))
+                WARN("remote event detach failed with hr %#lx\n", hr);
+            IWineUiaEvent_Release(event->u.local.remote_events[i]);
+        }
+
+        heap_free(event->u.local.remote_events);
+        event->u.local.remote_events = NULL;
+        event->u.local.remote_events_count = 0;
+    }
+
+    if ((event->event_type == EVENT_TYPE_REMOTE) && event->u.remote.event_iface)
+    {
+        IWineUiaEvent_Release(event->u.remote.event_iface);
+        event->u.remote.event_iface = NULL;
+        uia_stop_provider_thread();
+    }
+
+    return S_OK;
+}
+
+static HRESULT WINAPI uia_event_get_event_data(IWineUiaEvent *iface, GUID *event_guid, VARIANT *runtime_id,
+                long *scope)
+{
+    struct uia_event *event = impl_from_IWineUiaEvent(iface);
+    const struct uia_event_info *event_info;
+    HRESULT hr;
+
+    TRACE("%p, %p, %p, %p\n", iface, event_guid, runtime_id, scope);
+
+    event_info = uia_event_info_from_id(event->event_id);
+    memcpy(event_guid, event_info->guid, sizeof(*event_guid));
+    *scope = event->scope;
+
+    VariantInit(runtime_id);
+    if (event->runtime_id)
+    {
+        hr = SafeArrayCopy(event->runtime_id, &V_ARRAY(runtime_id));
+        if (SUCCEEDED(hr))
+            V_VT(runtime_id) = VT_I4 | VT_ARRAY;
+        else
+            WARN("SafeArrayCopy failed with hr %#lx\n", hr);
+    }
+
     return S_OK;
 }
 
@@ -292,6 +408,7 @@ static const IWineUiaEventVtbl uia_event_vtbl = {
     uia_event_AddRef,
     uia_event_Release,
     uia_event_detach,
+    uia_event_get_event_data,
 };
 
 static struct uia_event *unsafe_impl_from_IWineUiaEvent(IWineUiaEvent *iface)
@@ -321,6 +438,43 @@ static struct uia_event *create_uia_event(int event_id, int scope, struct UiaCac
     event->event_type = EVENT_TYPE_LOCAL;
     event->u.local.cache_req = cache_req;
     event->u.local.cback = cback;
+
+    return event;
+}
+
+static struct uia_event *create_remote_uia_event(IWineUiaEvent *event_iface, LONG event_cookie, LONG proc_id)
+{
+    struct uia_event *event = heap_alloc_zero(sizeof(*event));
+    GUID event_guid = { 0 };
+    VARIANT rt_id;
+    long scope;
+    HRESULT hr;
+
+    if (!event)
+        return NULL;
+
+    VariantInit(&rt_id);
+    IWineUiaEvent_AddRef(event_iface);
+    hr = IWineUiaEvent_get_event_data(event_iface, &event_guid, &rt_id, &scope);
+    if (FAILED(hr))
+    {
+        WARN("get_event_data failed with hr %#lx\n", hr);
+        IWineUiaEvent_Release(event_iface);
+        heap_free(event);
+        return NULL;
+    }
+
+    event->IWineUiaEvent_iface.lpVtbl = &uia_event_vtbl;
+    event->ref = 1;
+    event->event_cookie = event_cookie;
+    if (V_VT(&rt_id) == (VT_ARRAY | VT_I4))
+        event->runtime_id = V_ARRAY(&rt_id);
+    event->event_id = UiaLookupId(AutomationIdentifierType_Event, &event_guid);
+    event->scope = scope;
+
+    event->event_type = EVENT_TYPE_REMOTE;
+    event->u.remote.event_iface = event_iface;
+    event->u.remote.proc_id = proc_id;
 
     return event;
 }
@@ -1039,6 +1193,44 @@ static HRESULT WINAPI uia_node_get_hwnd(IWineUiaNode *iface, ULONG *out_hwnd)
     return S_OK;
 }
 
+static HRESULT attach_event_to_uia_node(struct uia_event *event, HUIANODE node, BOOL advise_events);
+static HRESULT WINAPI uia_node_add_event(IWineUiaNode *iface, IWineUiaEvent *event_iface, long proc_id,
+        long event_cookie, IWineUiaEvent **ret_event)
+{
+    struct uia_node *node = impl_from_IWineUiaNode(iface);
+    struct uia_event *remote_event;
+    HRESULT hr;
+
+    TRACE("%p, %p, %#lx, %ld, %p\n", node, event_iface, proc_id, event_cookie, ret_event);
+
+    *ret_event = NULL;
+
+    remote_event = uia_client_find_remote_event(event_cookie, proc_id);
+    if (!remote_event)
+    {
+        remote_event = create_remote_uia_event(event_iface, event_cookie, proc_id);
+        if (!remote_event)
+        {
+            WARN("Failed to create remote event\n");
+            return E_FAIL;
+        }
+
+        hr = uia_client_add_event(remote_event);
+        if (FAILED(hr))
+        {
+            WARN("Failed to add remote event, hr %#lx\n", hr);
+            return hr;
+        }
+
+        uia_start_provider_thread();
+        *ret_event = &remote_event->IWineUiaEvent_iface;
+    }
+
+    attach_event_to_uia_node(remote_event, (HUIANODE)iface, TRUE);
+
+    return S_OK;
+}
+
 static const IWineUiaNodeVtbl uia_node_vtbl = {
     uia_node_QueryInterface,
     uia_node_AddRef,
@@ -1047,6 +1239,7 @@ static const IWineUiaNodeVtbl uia_node_vtbl = {
     uia_node_get_prop_val,
     uia_node_disconnect,
     uia_node_get_hwnd,
+    uia_node_add_event,
 };
 
 static struct uia_node *unsafe_impl_from_IWineUiaNode(IWineUiaNode *iface)
@@ -2471,8 +2664,41 @@ static HRESULT WINAPI uia_nested_node_provider_navigate(IWineUiaProvider *iface,
 
 static HRESULT WINAPI uia_nested_node_provider_attach_event(IWineUiaProvider *iface, LONG_PTR huiaevent)
 {
-    FIXME("%p, %#Ix: stub\n", iface, huiaevent);
-    return E_NOTIMPL;
+    struct uia_nested_node_provider *prov = impl_from_nested_node_IWineUiaProvider(iface);
+    struct uia_event *event = unsafe_impl_from_IWineUiaEvent((IWineUiaEvent *)huiaevent);
+    IWineUiaEvent *remote_event;
+    HRESULT hr;
+
+    TRACE("%p, %#Ix\n", iface, huiaevent);
+
+    hr = IWineUiaNode_add_event(prov->nested_node, &event->IWineUiaEvent_iface, GetCurrentProcessId(),
+            event->event_cookie, &remote_event);
+    if (FAILED(hr))
+        WARN("add_event failed with hr %#lx\n", hr);
+
+    if (remote_event)
+    {
+        if (!uia_array_reserve((void **)&event->u.local.remote_events, &event->u.local.remote_events_arr_size,
+                    event->u.local.remote_events_count + 1, sizeof(*event->u.local.remote_events)))
+            return E_OUTOFMEMORY;
+
+        if (!event->u.local.remote_events_count)
+        {
+            uia_start_client_thread();
+            hr = register_interface_in_git((IUnknown *)&event->IWineUiaEvent_iface, &IID_IWineUiaEvent,
+                    &event->u.local.git_cookie);
+            if (FAILED(hr))
+            {
+                WARN("Failed to register event interface in git, hr %#lx\n", hr);
+                heap_free(event->u.local.remote_events);
+                return hr;
+            }
+        }
+        event->u.local.remote_events[event->u.local.remote_events_count] = remote_event;
+        event->u.local.remote_events_count++;
+    }
+
+    return S_OK;
 }
 
 static const IWineUiaProviderVtbl uia_nested_node_provider_vtbl = {
@@ -3673,7 +3899,25 @@ HRESULT WINAPI UiaRemoveEvent(HUIAEVENT huiaevent)
     if (!event)
         return E_INVALIDARG;
 
-    IWineUiaEvent_detach(&event->IWineUiaEvent_iface);
+    if (event->u.local.git_cookie)
+    {
+        IWineUiaEvent *event_iface;
+        HRESULT hr;
+
+        hr = get_interface_in_git(&IID_IWineUiaEvent, event->u.local.git_cookie, (IUnknown **)&event_iface);
+        if (SUCCEEDED(hr))
+        {
+            IWineUiaEvent_detach(event_iface);
+            IWineUiaEvent_Release(event_iface);
+        }
+
+        unregister_interface_in_git(event->u.local.git_cookie);
+        event->u.local.git_cookie = 0;
+        uia_stop_client_thread();
+    }
+    else
+        IWineUiaEvent_detach(&event->IWineUiaEvent_iface);
+
     IWineUiaEvent_Release(&event->IWineUiaEvent_iface);
     return S_OK;
 }

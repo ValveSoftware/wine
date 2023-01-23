@@ -57,6 +57,8 @@ library UIA_wine_private
     interface IWineUiaEvent : IUnknown
     {
         HRESULT detach();
+        HRESULT get_event_data([out, retval]GUID *event_guid, [out, retval]VARIANT *runtime_id,
+                [out, retval]long *scope);
     }
 
     [
@@ -96,5 +98,7 @@ library UIA_wine_private
         HRESULT get_prop_val([in]const GUID *prop_guid, [out, retval]VARIANT *ret_val);
         HRESULT disconnect();
         HRESULT get_hwnd([out, retval]ULONG *out_hwnd);
+        HRESULT add_event([in]IWineUiaEvent *event_iface, [in]long proc_id, [in]long event_cookie,
+                [out, retval]IWineUiaEvent **ret_event);
     }
 }

@@ -2235,7 +2235,7 @@ static DWORD WINAPI uia_provider_thread_proc(void *arg)
     FreeLibraryAndExitThread(huia_module, 0);
 }
 
-static BOOL uia_start_provider_thread(void)
+BOOL uia_start_provider_thread(void)
 {
     BOOL started = TRUE;
 
