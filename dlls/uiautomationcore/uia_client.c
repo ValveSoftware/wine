@@ -243,9 +243,6 @@ static ULONG WINAPI uia_event_Release(IWineUiaEvent *iface)
     TRACE("%p, refcount %ld\n", event, ref);
     if (!ref)
     {
-        HRESULT hr;
-        int i;
-
         if (event->event_data)
         {
             list_remove(&event->event_list_entry);
@@ -257,6 +254,23 @@ static ULONG WINAPI uia_event_Release(IWineUiaEvent *iface)
             }
         }
 
+        SafeArrayDestroy(event->runtime_id);
+        heap_free(event);
+    }
+
+    return ref;
+}
+
+static HRESULT WINAPI uia_event_detach(IWineUiaEvent *iface)
+{
+    struct uia_event *event = impl_from_IWineUiaEvent(iface);
+    HRESULT hr;
+    int i;
+
+    TRACE("%p\n", event);
+
+    if (event->adv_events_ifaces && event->adv_events_ifaces_count)
+    {
         for (i = 0; i < event->adv_events_ifaces_count; i++)
         {
             hr = IWineUiaAdviseEvents_advise_events(event->adv_events_ifaces[i], TRUE, event->event_id, NULL);
@@ -265,20 +279,19 @@ static ULONG WINAPI uia_event_Release(IWineUiaEvent *iface)
             IWineUiaAdviseEvents_Release(event->adv_events_ifaces[i]);
         }
 
-        if (event->adv_events_ifaces)
-            heap_free(event->adv_events_ifaces);
-
-        SafeArrayDestroy(event->runtime_id);
-        heap_free(event);
+        heap_free(event->adv_events_ifaces);
+        event->adv_events_ifaces_count = 0;
+        event->adv_events_ifaces = NULL;
     }
 
-    return ref;
+    return S_OK;
 }
 
 static const IWineUiaEventVtbl uia_event_vtbl = {
     uia_event_QueryInterface,
     uia_event_AddRef,
     uia_event_Release,
+    uia_event_detach,
 };
 
 static struct uia_event *unsafe_impl_from_IWineUiaEvent(IWineUiaEvent *iface)
@@ -3660,6 +3673,7 @@ HRESULT WINAPI UiaRemoveEvent(HUIAEVENT huiaevent)
     if (!event)
         return E_INVALIDARG;
 
+    IWineUiaEvent_detach(&event->IWineUiaEvent_iface);
     IWineUiaEvent_Release(&event->IWineUiaEvent_iface);
     return S_OK;
 }
