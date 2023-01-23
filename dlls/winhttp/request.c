@@ -1874,9 +1874,8 @@ static void finished_reading( struct request *request )
 
     if (request->netconn->socket == -1) close = TRUE;
     else if (request->hdr.disable_flags & WINHTTP_DISABLE_KEEP_ALIVE) close = TRUE;
-    else if (!query_headers( request, WINHTTP_QUERY_CONNECTION | WINHTTP_QUERY_FLAG_REQUEST_HEADERS,
-             NULL, connection, &size, NULL ) || !query_headers( request, WINHTTP_QUERY_PROXY_CONNECTION
-             | WINHTTP_QUERY_FLAG_REQUEST_HEADERS, NULL, connection, &size, NULL ))
+    else if (!query_headers( request, WINHTTP_QUERY_CONNECTION, NULL, connection, &size, NULL ) ||
+             !query_headers( request, WINHTTP_QUERY_PROXY_CONNECTION, NULL, connection, &size, NULL ))
     {
         if (!wcsicmp( connection, L"close" )) close = TRUE;
     }
