@@ -387,7 +387,18 @@ DECL_HANDLER(remove_completion)
 
     entry = list_head( &wait->queue );
     if (!entry)
-        set_error( STATUS_PENDING );
+    {
+        if (wait->completion)
+        {
+            if (do_fsync() || do_esync())
+            {
+                /* completion_wait_satisfied is not called, so lock completion here. */
+                current->locked_completion = grab_object( wait );
+            }
+            set_error( STATUS_PENDING );
+        }
+        else set_error( STATUS_ABANDONED_WAIT_0 );
+    }
     else
     {
         list_remove( entry );
