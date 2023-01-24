@@ -59,6 +59,7 @@ library UIA_wine_private
         HRESULT detach();
         HRESULT get_event_data([out, retval]GUID *event_guid, [out, retval]VARIANT *runtime_id,
                 [out, retval]long *scope);
+        HRESULT raise_event([in]VARIANT node, [in]BOOL needs_clientside);
     }
 
     [
