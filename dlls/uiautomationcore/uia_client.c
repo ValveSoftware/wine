@@ -267,6 +267,77 @@ static struct uia_event *uia_client_find_remote_event(LONG event_cookie, LONG pr
     return NULL;
 }
 
+struct uia_event_args
+{
+    LONG ref;
+
+    union {
+        struct UiaEventArgs                    simple_args;
+        struct UiaPropertyChangedEventArgs     prop_change_args;
+        struct UiaStructureChangedEventArgs    struct_change_args;
+        struct UiaAsyncContentLoadedEventArgs  async_loaded_args;
+        struct UiaWindowClosedEventArgs        window_closed_args;
+        struct UiaTextEditTextChangedEventArgs text_edit_change_args;
+        struct UiaChangesEventArgs             changes_args;
+    } u;
+};
+
+static struct uia_event_args *create_uia_event_args(const struct uia_event_info *event_info)
+{
+    struct uia_event_args *args = heap_alloc_zero(sizeof(*args));
+
+    if (!args)
+        return NULL;
+
+    args->u.simple_args.Type = event_info->event_arg_type;
+    args->u.simple_args.EventId = event_info->event_id;
+    args->ref = 1;
+
+    return args;
+}
+
+static void uia_event_args_release(struct uia_event_args *args)
+{
+    if (!InterlockedDecrement(&args->ref))
+    {
+        switch (args->u.simple_args.Type)
+        {
+        case EventArgsType_Simple:
+            break;
+
+        case EventArgsType_PropertyChanged:
+            VariantClear(&args->u.prop_change_args.OldValue);
+            VariantClear(&args->u.prop_change_args.NewValue);
+            break;
+
+        case EventArgsType_StructureChanged:
+            heap_free(args->u.struct_change_args.pRuntimeId);
+            break;
+
+        case EventArgsType_AsyncContentLoaded:
+            break;
+
+        case EventArgsType_WindowClosed:
+            heap_free(args->u.window_closed_args.pRuntimeId);
+            break;
+
+        case EventArgsType_TextEditTextChanged:
+            SafeArrayDestroy(args->u.text_edit_change_args.pTextChange);
+            break;
+
+        /* FIXME: Need to clear out each individual UiaChangeInfo struct. */
+        case EventArgsType_Changes:
+            heap_free(args->u.changes_args.pUiaChanges);
+            break;
+
+        default:
+            break;
+        }
+
+        heap_free(args);
+    }
+}
+
 /*
  * IWineUiaEvent interface.
  */
@@ -3940,7 +4011,7 @@ HRESULT WINAPI UiaEventRemoveWindow(HUIAEVENT huiaevent, HWND hwnd)
     return E_NOTIMPL;
 }
 
-static HRESULT uia_process_event(HUIANODE node, struct UiaEventArgs *args, SAFEARRAY *rt_id,
+static HRESULT uia_process_event(HUIANODE node, struct uia_event_args *args, SAFEARRAY *rt_id,
         struct uia_event *event)
 {
     struct uia_node *node_data = unsafe_impl_from_IWineUiaNode((IWineUiaNode *)node);
@@ -3973,7 +4044,7 @@ static HRESULT uia_process_event(HUIANODE node, struct UiaEventArgs *args, SAFEA
                 hr = UiaGetUpdatedCache(node, event->u.local.cache_req, NormalizeState_None, NULL, &out_req,
                         &tree_struct);
                 if (SUCCEEDED(hr))
-                    event->u.local.cback(args, out_req, tree_struct);
+                    event->u.local.cback(&args->u.simple_args, out_req, tree_struct);
             }
 
             break;
@@ -4002,7 +4073,7 @@ static HRESULT uia_process_event(HUIANODE node, struct UiaEventArgs *args, SAFEA
     return S_OK;
 }
 
-static HRESULT uia_raise_event(IRawElementProviderSimple *elprov, struct UiaEventArgs *args)
+static HRESULT uia_raise_event(IRawElementProviderSimple *elprov, struct uia_event_args *args)
 {
     struct uia_client_event_data_map_entry *event_data;
     enum ProviderOptions prov_opts;
@@ -4015,7 +4086,7 @@ static HRESULT uia_raise_event(IRawElementProviderSimple *elprov, struct UiaEven
     if (FAILED(hr))
         return hr;
 
-    hr = uia_get_event_data_for_event(&event_data, args->EventId, FALSE);
+    hr = uia_get_event_data_for_event(&event_data, args->u.simple_args.EventId, FALSE);
     if (FAILED(hr) || !event_data)
         return hr;
 
@@ -4058,17 +4129,24 @@ static HRESULT uia_raise_event(IRawElementProviderSimple *elprov, struct UiaEven
 HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *elprov, EVENTID id)
 {
     const struct uia_event_info *event_info = uia_event_info_from_id(id);
-    struct UiaEventArgs args = { EventArgsType_Simple, id };
+    struct uia_event_args *args;
     HRESULT hr;
 
     TRACE("(%p, %d)\n", elprov, id);
 
+
     if (!event_info || event_info->event_arg_type != EventArgsType_Simple)
         return E_INVALIDARG;
 
-    hr = uia_raise_event(elprov, &args);
+    args = create_uia_event_args(event_info);
+    if (!args)
+        return E_OUTOFMEMORY;
+
+    hr = uia_raise_event(elprov, args);
     if (FAILED(hr))
         return hr;
+
+    uia_event_args_release(args);
 
     return S_OK;
 }
