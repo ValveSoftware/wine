@@ -318,6 +318,22 @@ library UIA
 
     [
         object,
+        uuid(a407b27b-0f6d-4427-9292-473c7bf93258),
+        pointer_default(unique),
+        oleautomation
+    ]
+    interface IRawElementProviderAdviseEvents : IUnknown
+    {
+        HRESULT AdviseEventAdded(
+                [in] EVENTID eventId,
+                [in] SAFEARRAY(PROPERTYID) propertyIDs);
+        HRESULT AdviseEventRemoved(
+                [in] EVENTID eventId,
+                [in] SAFEARRAY(PROPERTYID) propertyIDs);
+    }
+
+    [
+        object,
         uuid(e44c3566-915d-4070-99c6-047bff5a08f5),
         pointer_default(unique),
         oleautomation
