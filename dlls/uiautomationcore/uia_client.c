@@ -1511,12 +1511,13 @@ static HRESULT traverse_uia_node_tree(HUIANODE huianode, struct UiaCondition *vi
     return hr;
 }
 
-static HRESULT attach_event_to_uia_node(struct uia_event *event, HUIANODE node)
+static HRESULT attach_event_to_uia_node(struct uia_event *event, HUIANODE node, BOOL advise_events)
 {
     struct uia_node *node_data = unsafe_impl_from_IWineUiaNode((IWineUiaNode *)node);
     HRESULT hr = S_OK;
-    int i;
+    int i, prev_count;
 
+    prev_count = event->adv_events_ifaces_count;
     for (i = 0; i < node_data->prov_count; i++)
     {
         hr = attach_event_to_node_provider(&node_data->IWineUiaNode_iface, i, (HUIAEVENT)event);
@@ -1524,11 +1525,14 @@ static HRESULT attach_event_to_uia_node(struct uia_event *event, HUIANODE node)
             WARN("attach_event_to_node_provider failed with hr %#lx\n", hr);
     }
 
-    for (i = 0; i < event->adv_events_ifaces_count; i++)
+    if (prev_count != event->adv_events_ifaces_count && advise_events)
     {
-        hr = IWineUiaAdviseEvents_advise_events(event->adv_events_ifaces[i], FALSE, event->event_id, NULL);
-        if (FAILED(hr))
-            WARN("advise_events failed with hr %#lx\n", hr);
+        for (i = prev_count; i < event->adv_events_ifaces_count; i++)
+        {
+            hr = IWineUiaAdviseEvents_advise_events(event->adv_events_ifaces[i], FALSE, event->event_id, NULL);
+            if (FAILED(hr))
+                WARN("advise_events failed with hr %#lx\n", hr);
+        }
     }
 
     return hr;
@@ -1946,6 +1950,8 @@ static HRESULT WINAPI uia_provider_attach_event(IWineUiaProvider *iface, LONG_PT
     IRawElementProviderFragmentRoot *elroot;
     IWineUiaAdviseEvents *adv_event = NULL;
     IRawElementProviderFragment *elfrag;
+    SAFEARRAY *embedded_roots = NULL;
+    LONG i, idx, lbound, elems;
     HRESULT hr;
 
     TRACE("%p, %#Ix\n", iface, huiaevent);
@@ -1961,9 +1967,21 @@ static HRESULT WINAPI uia_provider_attach_event(IWineUiaProvider *iface, LONG_PT
         return S_OK;
 
     hr = IRawElementProviderFragment_get_FragmentRoot(elfrag, &elroot);
-    IRawElementProviderFragment_Release(elfrag);
     if (FAILED(hr) || !elroot)
         return S_OK;
+
+    /*
+     * For now, we only support embedded fragment roots on providers that
+     * don't represent a nested node.
+     */
+    if (event->scope & (TreeScope_Descendants | TreeScope_Children) && !prov->return_nested_node)
+    {
+        hr = IRawElementProviderFragment_GetEmbeddedFragmentRoots(elfrag, &embedded_roots);
+        if (FAILED(hr))
+            WARN("GetEmbeddedFragmentRoots failed with hr %#lx\n", hr);
+    }
+
+    IRawElementProviderFragment_Release(elfrag);
 
     if (elroot)
     {
@@ -1993,6 +2011,38 @@ static HRESULT WINAPI uia_provider_attach_event(IWineUiaProvider *iface, LONG_PT
         event->adv_events_ifaces[event->adv_events_ifaces_count] = adv_event;
         event->adv_events_ifaces_count++;
     }
+
+    if (embedded_roots && SUCCEEDED(get_safearray_bounds(embedded_roots, &lbound, &elems)))
+    {
+        HUIANODE node;
+
+        for (i = 0; i < elems; i++)
+        {
+            IRawElementProviderSimple *elprov;
+            IUnknown *unk;
+
+            idx = lbound + i;
+            hr = SafeArrayGetElement(embedded_roots, &idx, &unk);
+            if (FAILED(hr))
+                break;
+
+            hr = IUnknown_QueryInterface(unk, &IID_IRawElementProviderSimple, (void **)&elprov);
+            IUnknown_Release(unk);
+            if (FAILED(hr))
+                break;
+
+            hr = create_uia_node_from_elprov(elprov, &node, !prov->return_nested_node);
+            IRawElementProviderSimple_Release(elprov);
+            if (SUCCEEDED(hr) && node)
+            {
+                hr = attach_event_to_uia_node(event, node, FALSE);
+                if (FAILED(hr))
+                    WARN("attach_event_to_uia_node failed with hr %#lx\n", hr);
+                UiaNodeRelease(node);
+            }
+        }
+    }
+    SafeArrayDestroy(embedded_roots);
 
     return S_OK;
 }
@@ -3582,7 +3632,7 @@ HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback
         return E_OUTOFMEMORY;
     }
 
-    hr = attach_event_to_uia_node(event, huianode);
+    hr = attach_event_to_uia_node(event, huianode, TRUE);
     if (FAILED(hr))
         WARN("attach_event_to_uia_node failed with hr %#lx\n", hr);
 

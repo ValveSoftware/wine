@@ -1137,6 +1137,8 @@ static struct Provider
     struct Provider_prop_override *prop_override;
     int prop_override_count;
     struct UiaRect bounds_rect;
+    IRawElementProviderFragmentRoot **embedded_frag_roots;
+    int embedded_frag_roots_count;
 } Provider, Provider2, Provider_child, Provider_child2;
 static struct Provider Provider_hwnd, Provider_nc, Provider_proxy, Provider_proxy2, Provider_override;
 static void initialize_provider(struct Provider *prov, int prov_opts, HWND hwnd, BOOL initialize_nav_links);
@@ -1933,6 +1935,23 @@ static HRESULT WINAPI ProviderFragment_GetEmbeddedFragmentRoots(IRawElementProvi
     This->last_call_tid = GetCurrentThreadId();
 
     *ret_val = NULL;
+    if (This->embedded_frag_roots && This->embedded_frag_roots_count)
+    {
+        SAFEARRAY *sa;
+        LONG idx;
+
+        if (!(sa = SafeArrayCreateVector(VT_UNKNOWN, 0, This->embedded_frag_roots_count)))
+            return E_FAIL;
+
+        for (idx = 0; idx < This->embedded_frag_roots_count; idx++)
+            SafeArrayPutElement(sa, &idx, (IUnknown *)This->embedded_frag_roots[idx]);
+
+        if (This == &Provider_child)
+            This->embedded_frag_roots_count = 0;
+
+        *ret_val = sa;
+    }
+
     return S_OK;
 }
 
@@ -8712,6 +8731,8 @@ static void initialize_provider(struct Provider *prov, int prov_opts, HWND hwnd,
     prov->prop_override = NULL;
     prov->prop_override_count = 0;
     memset(&prov->bounds_rect, 0, sizeof(prov->bounds_rect));
+    prov->embedded_frag_roots = NULL;
+    prov->embedded_frag_roots_count = 0;
     if (initialize_nav_links)
     {
         prov->frag_root = NULL;
@@ -10064,7 +10085,7 @@ static const struct prov_method_sequence event_seq6[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
     { &Provider, FRAG_GET_FRAGMENT_ROOT },
-    { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS, METHOD_TODO },
+    { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
     { &Provider, ADVISE_EVENTS_EVENT_ADDED },
@@ -10123,7 +10144,7 @@ static const struct prov_method_sequence event_seq11[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
     { &Provider, FRAG_GET_FRAGMENT_ROOT },
-    { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS, METHOD_TODO },
+    { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider2, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
     { &Provider2, ADVISE_EVENTS_EVENT_ADDED },
@@ -10132,6 +10153,36 @@ static const struct prov_method_sequence event_seq11[] = {
 
 static const struct prov_method_sequence event_seq12[] = {
     { &Provider2, ADVISE_EVENTS_EVENT_REMOVED },
+    { 0 },
+};
+
+static const struct prov_method_sequence event_seq13[] = {
+    { &Provider, FRAG_GET_RUNTIME_ID },
+    { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
+    { &Provider, FRAG_GET_FRAGMENT_ROOT },
+    { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS },
+    { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
+    { &Provider, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
+    NODE_CREATE_SEQ3(&Provider_child),
+    { &Provider_child, FRAG_GET_FRAGMENT_ROOT },
+    { &Provider_child, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS },
+    { &Provider_child, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
+    { &Provider_child, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
+    NODE_CREATE_SEQ3(&Provider_child2),
+    { &Provider_child2, FRAG_GET_FRAGMENT_ROOT },
+    { &Provider_child2, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS },
+    { &Provider_child2, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
+    { &Provider_child2, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
+    { &Provider, ADVISE_EVENTS_EVENT_ADDED },
+    { &Provider_child, ADVISE_EVENTS_EVENT_ADDED },
+    { &Provider_child2, ADVISE_EVENTS_EVENT_ADDED },
+    { 0 },
+};
+
+static const struct prov_method_sequence event_seq14[] = {
+    { &Provider, ADVISE_EVENTS_EVENT_REMOVED },
+    { &Provider_child, ADVISE_EVENTS_EVENT_REMOVED },
+    { &Provider_child2, ADVISE_EVENTS_EVENT_REMOVED },
     { 0 },
 };
 
@@ -10188,6 +10239,8 @@ static DWORD WINAPI uia_add_event_test_thread(LPVOID param)
 
 static void test_UiaAddEvent(void)
 {
+    IRawElementProviderFragmentRoot *embedded_roots[2] = { &Provider_child.IRawElementProviderFragmentRoot_iface,
+                                                           &Provider_child2.IRawElementProviderFragmentRoot_iface };
     struct event_test_thread_data thread_data = { 0 };
     HUIAEVENT event;
     HUIANODE node;
@@ -10374,6 +10427,29 @@ static void test_UiaAddEvent(void)
         }
     }
     CloseHandle(thread);
+
+    /* Test retrieving AdviseEvents on embedded fragment roots. */
+    Provider.frag_root = &Provider.IRawElementProviderFragmentRoot_iface;
+    Provider.embedded_frag_roots = embedded_roots;
+    Provider.embedded_frag_roots_count = ARRAY_SIZE(embedded_roots);
+    Provider_child.frag_root = &Provider_child.IRawElementProviderFragmentRoot_iface;
+    Provider_child2.frag_root = &Provider_child2.IRawElementProviderFragmentRoot_iface;
+
+    hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Element | TreeScope_Descendants, NULL, 0,
+            (struct UiaCacheRequest *)&DefaultCacheReq, &event);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!event, "event == NULL\n");
+    ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
+    ok(Provider_child.ref == 2, "Unexpected refcnt %ld\n", Provider_child.ref);
+    ok(Provider_child2.ref == 2, "Unexpected refcnt %ld\n", Provider_child2.ref);
+    ok_method_sequence(event_seq13, "event_seq13");
+
+    hr = UiaRemoveEvent(event);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
+    ok(Provider_child.ref == 1, "Unexpected refcnt %ld\n", Provider_child.ref);
+    ok(Provider_child2.ref == 1, "Unexpected refcnt %ld\n", Provider_child2.ref);
+    ok_method_sequence(event_seq14, "event_seq14");
 
     UiaNodeRelease(node);
     ok(Provider.ref == 1, "Unexpected refcnt %ld\n", Provider.ref);
