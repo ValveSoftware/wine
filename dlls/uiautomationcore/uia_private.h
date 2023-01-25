@@ -133,6 +133,7 @@ HRESULT create_uia_iface(IUnknown **iface, BOOL is_cui8) DECLSPEC_HIDDEN;
 
 /* uia_ids.c */
 const struct uia_prop_info *uia_prop_info_from_id(PROPERTYID prop_id) DECLSPEC_HIDDEN;
+const struct uia_event_info *uia_event_info_from_id(EVENTID event_id) DECLSPEC_HIDDEN;
 
 /* uia_provider.c */
 void uia_stop_provider_thread(void) DECLSPEC_HIDDEN;

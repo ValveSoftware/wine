@@ -19,10 +19,199 @@
 #include "uia_private.h"
 
 #include "wine/debug.h"
+#include "wine/rbtree.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(uiautomation);
 
 static const struct UiaCondition UiaFalseCondition = { ConditionType_False };
+
+#define EVENT_TYPE_LOCAL 0
+struct uia_event
+{
+    IWineUiaEvent IWineUiaEvent_iface;
+    LONG ref;
+
+    SAFEARRAY *runtime_id;
+    LONG event_cookie;
+    int event_id;
+    int scope;
+
+    struct list event_list_entry;
+    struct uia_client_event_data_map_entry *event_data;
+    int event_type;
+    union
+    {
+        struct {
+            struct UiaCacheRequest *cache_req;
+            UiaEventCallback *cback;
+        } local;
+    } u;
+};
+
+/*
+ * UI Automation client event list.
+ */
+static struct uia_client_events
+{
+    struct rb_tree event_map;
+    LONG event_count;
+} client_events;
+
+struct uia_client_event_data_map_entry
+{
+    struct rb_entry entry;
+
+    int event_id;
+    struct list local_events_list;
+};
+
+static int uia_event_map_id_compare(const void *key, const struct rb_entry *entry)
+{
+    struct uia_client_event_data_map_entry *event_entry = RB_ENTRY_VALUE(entry, struct uia_client_event_data_map_entry, entry);
+    int *event_id = (int *)key;
+
+    return (event_entry->event_id > (*event_id)) - (event_entry->event_id < (*event_id));
+}
+
+static HRESULT uia_get_event_data_for_event(struct uia_client_event_data_map_entry **event_data,
+        int event_id, BOOL create_new)
+{
+    *event_data = NULL;
+
+    if (!client_events.event_count && !create_new)
+        return S_OK;
+
+    /* First, attempt to find an existing event_data structure. */
+    if (client_events.event_count)
+    {
+        struct rb_entry *rb_entry;
+
+        rb_entry = rb_get(&client_events.event_map, &event_id);
+        if (rb_entry)
+        {
+            *event_data = RB_ENTRY_VALUE(rb_entry, struct uia_client_event_data_map_entry, entry);
+            return S_OK;
+        }
+    }
+
+    if (create_new)
+    {
+        struct uia_client_event_data_map_entry *data = heap_alloc_zero(sizeof(*data));
+
+        if (!data)
+            return E_OUTOFMEMORY;
+
+        data->event_id = event_id;
+        list_init(&data->local_events_list);
+
+        if (InterlockedIncrement(&client_events.event_count) == 1)
+            rb_init(&client_events.event_map, uia_event_map_id_compare);
+        rb_put(&client_events.event_map, &event_id, &data->entry);
+
+        *event_data = data;
+    }
+
+    return S_OK;
+}
+
+static HRESULT uia_client_add_event(struct uia_event *event)
+{
+    struct uia_client_event_data_map_entry *event_data;
+    HRESULT hr;
+
+    hr = uia_get_event_data_for_event(&event_data, event->event_id, TRUE);
+    if (FAILED(hr))
+        return hr;
+
+    list_add_head(&event_data->local_events_list, &event->event_list_entry);
+    event->event_data = event_data;
+
+    return S_OK;
+}
+
+/*
+ * IWineUiaEvent interface.
+ */
+static inline struct uia_event *impl_from_IWineUiaEvent(IWineUiaEvent *iface)
+{
+    return CONTAINING_RECORD(iface, struct uia_event, IWineUiaEvent_iface);
+}
+
+static HRESULT WINAPI uia_event_QueryInterface(IWineUiaEvent *iface, REFIID riid, void **ppv)
+{
+    *ppv = NULL;
+    if (IsEqualIID(riid, &IID_IWineUiaEvent) || IsEqualIID(riid, &IID_IUnknown))
+        *ppv = iface;
+    else
+        return E_NOINTERFACE;
+
+    IWineUiaEvent_AddRef(iface);
+    return S_OK;
+}
+
+static ULONG WINAPI uia_event_AddRef(IWineUiaEvent *iface)
+{
+    struct uia_event *event = impl_from_IWineUiaEvent(iface);
+    ULONG ref = InterlockedIncrement(&event->ref);
+
+    TRACE("%p, refcount %ld\n", event, ref);
+    return ref;
+}
+
+static ULONG WINAPI uia_event_Release(IWineUiaEvent *iface)
+{
+    struct uia_event *event = impl_from_IWineUiaEvent(iface);
+    ULONG ref = InterlockedDecrement(&event->ref);
+
+    TRACE("%p, refcount %ld\n", event, ref);
+    if (!ref)
+    {
+        if (event->event_data)
+        {
+            list_remove(&event->event_list_entry);
+            if (list_empty(&event->event_data->local_events_list))
+            {
+                rb_remove(&client_events.event_map, &event->event_data->entry);
+                heap_free(event->event_data);
+                InterlockedDecrement(&client_events.event_count);
+            }
+        }
+
+        SafeArrayDestroy(event->runtime_id);
+        heap_free(event);
+    }
+
+    return ref;
+}
+
+static const IWineUiaEventVtbl uia_event_vtbl = {
+    uia_event_QueryInterface,
+    uia_event_AddRef,
+    uia_event_Release,
+};
+
+static struct uia_event *create_uia_event(int event_id, int scope, struct UiaCacheRequest *cache_req,
+        UiaEventCallback *cback, SAFEARRAY *runtime_id)
+{
+    struct uia_event *event = heap_alloc_zero(sizeof(*event));
+    static LONG next_event_cookie;
+
+    if (!event)
+        return NULL;
+
+    event->IWineUiaEvent_iface.lpVtbl = &uia_event_vtbl;
+    event->ref = 1;
+    event->event_cookie = InterlockedIncrement(&next_event_cookie);
+    event->runtime_id = runtime_id;
+    event->event_id = event_id;
+    event->scope = scope;
+
+    event->event_type = EVENT_TYPE_LOCAL;
+    event->u.local.cache_req = cache_req;
+    event->u.local.cback = cback;
+
+    return event;
+}
 
 struct uia_node_array {
     HUIANODE *nodes;
@@ -3063,9 +3252,39 @@ exit:
 HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback *callback, enum TreeScope scope,
         PROPERTYID *prop_ids, int prop_ids_count, struct UiaCacheRequest *cache_req, HUIAEVENT *huiaevent)
 {
-    FIXME("(%p, %d, %p, %#x, %p, %d, %p, %p)\n", huianode, event_id, callback, scope, prop_ids, prop_ids_count,
+    const struct uia_event_info *event_info = uia_event_info_from_id(event_id);
+    struct uia_event *event;
+    SAFEARRAY *sa;
+    HRESULT hr;
+
+    TRACE("(%p, %d, %p, %#x, %p, %d, %p, %p)\n", huianode, event_id, callback, scope, prop_ids, prop_ids_count,
             cache_req, huiaevent);
-    return E_NOTIMPL;
+
+    if (!callback || !cache_req || !huiaevent || !event_info)
+        return E_INVALIDARG;
+
+    *huiaevent = NULL;
+
+    hr = UiaGetRuntimeId(huianode, &sa);
+    if (FAILED(hr))
+        return hr;
+
+    if (!(event = create_uia_event(event_id, scope, cache_req, callback, sa)))
+    {
+        SafeArrayDestroy(sa);
+        return E_OUTOFMEMORY;
+    }
+
+    hr = uia_client_add_event(event);
+    if (FAILED(hr))
+    {
+        IWineUiaEvent_Release(&event->IWineUiaEvent_iface);
+        return hr;
+    }
+
+    *huiaevent = (HUIAEVENT)event;
+
+    return S_OK;
 }
 
 /***********************************************************************

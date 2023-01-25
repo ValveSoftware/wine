@@ -10031,10 +10031,10 @@ static const struct prov_method_sequence event_seq1[] = {
 static const struct prov_method_sequence event_seq2[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, FRAG_GET_FRAGMENT_ROOT },
+    { &Provider, FRAG_GET_FRAGMENT_ROOT, METHOD_TODO },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, ADVISE_EVENTS_EVENT_ADDED },
+    { &Provider, ADVISE_EVENTS_EVENT_ADDED, METHOD_TODO },
     { 0 },
 };
 
@@ -10063,11 +10063,11 @@ static const struct prov_method_sequence event_seq5[] = {
 static const struct prov_method_sequence event_seq6[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, FRAG_GET_FRAGMENT_ROOT },
+    { &Provider, FRAG_GET_FRAGMENT_ROOT, METHOD_TODO },
     { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS, METHOD_TODO },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, ADVISE_EVENTS_EVENT_ADDED },
+    { &Provider, ADVISE_EVENTS_EVENT_ADDED, METHOD_TODO },
     { 0 },
 };
 
@@ -10122,11 +10122,11 @@ static const struct prov_method_sequence event_seq10[] = {
 static const struct prov_method_sequence event_seq11[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, FRAG_GET_FRAGMENT_ROOT },
+    { &Provider, FRAG_GET_FRAGMENT_ROOT, METHOD_TODO },
     { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS, METHOD_TODO },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider2, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider2, ADVISE_EVENTS_EVENT_ADDED },
+    { &Provider2, ADVISE_EVENTS_EVENT_ADDED, METHOD_TODO },
     { 0 },
 };
 
@@ -10230,11 +10230,10 @@ static void test_UiaAddEvent(void)
     Provider.frag_root = &Provider.IRawElementProviderFragmentRoot_iface;
     hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Element, NULL, 0,
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine ok(!!event, "event == NULL\n");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!event, "event == NULL\n");
     todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq2, "event_seq2");
+    ok_method_sequence(event_seq2, "event_seq2");
 
     /*
      * Even though we raise an event on the same provider as the one our node
@@ -10260,11 +10259,10 @@ static void test_UiaAddEvent(void)
     Provider.runtime_id[0] = Provider.runtime_id[1] = 0xdeadbeef;
     hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Element, NULL, 0,
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine ok(!!event, "event == NULL\n");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!event, "event == NULL\n");
     todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq2, "event_seq2");
+    ok_method_sequence(event_seq2, "event_seq2");
 
     /* Event handler is called since we can match our providers by runtime ID. */
     EventData.exp_elems[0] = EventData.exp_elems[1] = 1;
@@ -10291,11 +10289,10 @@ static void test_UiaAddEvent(void)
     provider_add_child(&Provider_child, &Provider_child_child);
     hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Children, NULL, 0,
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine ok(!!event, "event == NULL\n");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!event, "event == NULL\n");
     todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq6, "event_seq6");
+    ok_method_sequence(event_seq6, "event_seq6");
 
     /*
      * Only TreeScope_Children and not TreeScope_Element, handler won't be
@@ -10331,11 +10328,10 @@ static void test_UiaAddEvent(void)
     /* Create an event with TreeScope_Descendants. */
     hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Element | TreeScope_Descendants, NULL, 0,
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine ok(!!event, "event == NULL\n");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!event, "event == NULL\n");
     todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq6, "event_seq6");
+    ok_method_sequence(event_seq6, "event_seq6");
 
     /* Raised an event on Provider_child_child. */
     init_node_provider_desc(&EventData.exp_node_desc, GetCurrentProcessId(), NULL);
@@ -10368,12 +10364,11 @@ static void test_UiaAddEvent(void)
     Provider.frag_root = &Provider2.IRawElementProviderFragmentRoot_iface;
     hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Element | TreeScope_Descendants, NULL, 0,
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
-    todo_wine ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine ok(!!event, "event == NULL\n");
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!event, "event == NULL\n");
     ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
     todo_wine ok(Provider2.ref > 1, "Unexpected refcnt %ld\n", Provider2.ref);
-    if (SUCCEEDED(hr))
-        ok_method_sequence(event_seq11, "event_seq11");
+    ok_method_sequence(event_seq11, "event_seq11");
 
     thread_data.exp_thread_id = GetCurrentThreadId();
     thread_data.event = event;
