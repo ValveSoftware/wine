@@ -1642,12 +1642,26 @@ static HRESULT prepare_uia_node(struct uia_node *node)
         enum ProviderOptions prov_opts;
         struct uia_provider *prov;
         HRESULT hr;
+        VARIANT v;
 
         /* Only regular providers need to be queried for UseComThreading. */
         if (!node->prov[i] || is_nested_node_provider(node->prov[i]))
             continue;
 
         prov = impl_from_IWineUiaProvider(node->prov[i]);
+
+        /*
+         * wine-mono currently doesn't support marshaling for return array
+         * method arguments, so we'll need to avoid this.
+         */
+        hr = IRawElementProviderSimple_GetPropertyValue(prov->elprov, UIA_FrameworkIdPropertyId, &v);
+        if (SUCCEEDED(hr) && V_VT(&v) == VT_BSTR)
+        {
+            if (!wcscmp(V_BSTR(&v), L"WPF"))
+                prov->is_wpf_prov = TRUE;
+            VariantClear(&v);
+        }
+
         hr = IRawElementProviderSimple_get_ProviderOptions(prov->elprov, &prov_opts);
         if (FAILED(hr))
             continue;
@@ -2353,14 +2367,38 @@ static HRESULT uia_provider_get_special_prop_val(struct uia_provider *prov,
         LONG lbound;
         int val;
 
-        hr = IRawElementProviderSimple_QueryInterface(prov->elprov, &IID_IRawElementProviderFragment, (void **)&elfrag);
-        if (FAILED(hr) || !elfrag)
-            break;
+        /*
+         * HACK: UIA_RuntimeIdPropertyId requires calling
+         * IRawElementProviderFragment::GetRuntimeId, which returns an array as a
+         * method argument. This is currently unsupported in wine-mono, so
+         * instead we'll get the runtime ID from
+         * IRawElementProviderSimple::GetPropertyValue.
+         */
+        if (prov->is_wpf_prov)
+        {
+            VARIANT v;
 
-        hr = IRawElementProviderFragment_GetRuntimeId(elfrag, &sa);
-        IRawElementProviderFragment_Release(elfrag);
-        if (FAILED(hr) || !sa)
-            break;
+            VariantInit(&v);
+            hr = IRawElementProviderSimple_GetPropertyValue(prov->elprov, prop_info->prop_id, &v);
+            if (FAILED(hr) || (V_VT(&v) != (VT_I4 | VT_ARRAY)))
+            {
+                VariantClear(&v);
+                break;
+            }
+
+            sa = V_ARRAY(&v);
+        }
+        else
+        {
+            hr = IRawElementProviderSimple_QueryInterface(prov->elprov, &IID_IRawElementProviderFragment, (void **)&elfrag);
+            if (FAILED(hr) || !elfrag)
+                break;
+
+            hr = IRawElementProviderFragment_GetRuntimeId(elfrag, &sa);
+            IRawElementProviderFragment_Release(elfrag);
+            if (FAILED(hr) || !sa)
+                break;
+        }
 
         hr = SafeArrayGetLBound(sa, 1, &lbound);
         if (FAILED(hr))

@@ -85,6 +85,7 @@ struct uia_provider {
     BOOL return_nested_node;
     BOOL parent_check_ran;
     BOOL has_parent;
+    BOOL is_wpf_prov;
 };
 
 static inline struct uia_provider *impl_from_IWineUiaProvider(IWineUiaProvider *iface)
