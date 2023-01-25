@@ -10199,6 +10199,7 @@ static struct EventData {
     LONG exp_elems[2];
     struct node_provider_desc exp_node_desc;
     const WCHAR *exp_tree_struct;
+    HANDLE event_handle;
 } EventData;
 
 static void WINAPI uia_event_callback(struct UiaEventArgs *args, SAFEARRAY *req_data, BSTR tree_struct)
@@ -10210,11 +10211,79 @@ static void WINAPI uia_event_callback(struct UiaEventArgs *args, SAFEARRAY *req_
 
     SafeArrayDestroy(req_data);
     SysFreeString(tree_struct);
+    if (EventData.event_handle)
+        SetEvent(EventData.event_handle);
+}
+
+enum {
+    WM_UIA_TEST_RAISE_SERVERSIDE_EVENT = WM_USER,
+    WM_UIA_TEST_RAISE_CLIENTSIDE_EVENT,
+    WM_UIA_TEST_RAISE_SERVERSIDE_CHILD_EVENT,
+};
+
+static void test_UiaAddEvent_client_proc(void)
+{
+    HUIAEVENT event;
+    HUIANODE node;
+    HRESULT hr;
+    HWND hwnd;
+    VARIANT v;
+    DWORD pid;
+
+    hwnd = FindWindowA("UiaAddEvent class", "Test window");
+
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    hr = UiaNodeFromHandle(hwnd, &node);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    hr = UiaGetPropertyValue(node, UIA_LabeledByPropertyId, &v);
+    ok(hr == S_OK, "Unexpected hr %#lx\n", hr);
+    ok(UiaNodeRelease(node), "UiaNodeRelease returned FALSE\n");
+
+    node = NULL;
+    hr = UiaHUiaNodeFromVariant(&v, &node);
+    ok(hr == S_OK, "Unexpected hr %#lx\n", hr);
+    ok(!!node, "node == NULL\n");
+
+    GetWindowThreadProcessId(hwnd, &pid);
+    EventData.exp_elems[0] = EventData.exp_elems[1] = 1;
+    EventData.exp_tree_struct = L"P)";
+    init_node_provider_desc(&EventData.exp_node_desc, pid, NULL);
+    add_provider_desc(&EventData.exp_node_desc, L"Main", L"Provider_child", TRUE);
+    EventData.event_handle = CreateEventW(NULL, FALSE, FALSE, NULL);
+
+    hr = UiaAddEvent(node, UIA_AutomationFocusChangedEventId, uia_event_callback, TreeScope_Element | TreeScope_Descendants, NULL, 0,
+            (struct UiaCacheRequest *)&DefaultCacheReq, &event);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+    ok(!!event, "event == NULL\n");
+    ok(UiaNodeRelease(node), "UiaNodeRelease returned FALSE\n");
+
+    SET_EXPECT(uia_event_callback);
+    PostMessageW(hwnd, WM_UIA_TEST_RAISE_SERVERSIDE_EVENT, 0, 0);
+    todo_wine ok(!WaitForSingleObject(EventData.event_handle, 500), "Wait for event_handle failed.\n");
+    todo_wine CHECK_CALLED(uia_event_callback);
+
+    EventData.exp_elems[0] = EventData.exp_elems[1] = 1;
+    EventData.exp_tree_struct = L"P)";
+    init_node_provider_desc(&EventData.exp_node_desc, pid, NULL);
+    add_provider_desc(&EventData.exp_node_desc, L"Main", L"Provider_child_child", TRUE);
+    SET_EXPECT(uia_event_callback);
+    PostMessageW(hwnd, WM_UIA_TEST_RAISE_SERVERSIDE_CHILD_EVENT, 0, 0);
+    todo_wine ok(!WaitForSingleObject(EventData.event_handle, 500), "Wait for event_handle failed.\n");
+    todo_wine CHECK_CALLED(uia_event_callback);
+
+    PostMessageW(hwnd, WM_UIA_TEST_RAISE_CLIENTSIDE_EVENT, 0, 0);
+    hr = UiaRemoveEvent(event);
+    ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+
+    CloseHandle(EventData.event_handle);
+    CoUninitialize();
 }
 
 struct event_test_thread_data {
     HUIAEVENT event;
     DWORD exp_thread_id;
+    HWND hwnd;
 };
 
 static DWORD WINAPI uia_add_event_test_thread(LPVOID param)
@@ -10237,18 +10306,32 @@ static DWORD WINAPI uia_add_event_test_thread(LPVOID param)
     return 0;
 }
 
-static void test_UiaAddEvent(void)
+static void test_UiaAddEvent(const char *name)
 {
     IRawElementProviderFragmentRoot *embedded_roots[2] = { &Provider_child.IRawElementProviderFragmentRoot_iface,
                                                            &Provider_child2.IRawElementProviderFragmentRoot_iface };
     struct event_test_thread_data thread_data = { 0 };
+    PROCESS_INFORMATION proc;
+    char cmdline[MAX_PATH];
+    WNDCLASSA cls = { 0 };
+    STARTUPINFOA startup;
     HUIAEVENT event;
+    DWORD exit_code;
     HUIANODE node;
     HANDLE thread;
     HRESULT hr;
+    HWND hwnd;
     VARIANT v;
 
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
+
+    cls.lpfnWndProc = test_wnd_proc;
+    cls.hInstance = GetModuleHandleA(NULL);
+    cls.lpszClassName = "UiaAddEvent class";
+    RegisterClassA(&cls);
+
+    hwnd = CreateWindowA("UiaAddEvent class", "Test window", WS_OVERLAPPEDWINDOW,
+            0, 0, 100, 100, NULL, NULL, NULL, NULL);
 
     /*
      * Raise event without any registered event handlers.
@@ -10415,6 +10498,7 @@ static void test_UiaAddEvent(void)
 
     thread_data.exp_thread_id = GetCurrentThreadId();
     thread_data.event = event;
+    thread_data.hwnd = hwnd;
     thread = CreateThread(NULL, 0, uia_add_event_test_thread, (void *)&thread_data, 0, NULL);
     while (MsgWaitForMultipleObjects(1, &thread, FALSE, INFINITE, QS_ALLINPUT) != WAIT_OBJECT_0)
     {
@@ -10453,6 +10537,78 @@ static void test_UiaAddEvent(void)
 
     UiaNodeRelease(node);
     ok(Provider.ref == 1, "Unexpected refcnt %ld\n", Provider.ref);
+    CoUninitialize();
+
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    initialize_provider(&Provider, ProviderOptions_ServerSideProvider, hwnd, TRUE);
+    Provider.ignore_hwnd_prop = TRUE;
+    Provider.frag_root = &Provider.IRawElementProviderFragmentRoot_iface;
+
+    initialize_provider(&Provider_child, ProviderOptions_ServerSideProvider, NULL, TRUE);
+    Provider_child.runtime_id[0] = 0xdeadbeef;
+    Provider_child.runtime_id[1] = 0x01;
+
+    initialize_provider(&Provider_child_child, ProviderOptions_ServerSideProvider, NULL, TRUE);
+    provider_add_child(&Provider_child, &Provider_child_child);
+    Provider_child_child.runtime_id[0] = 0xdeadbeef;
+    Provider_child_child.runtime_id[1] = 0x02;
+
+    prov_root = &Provider.IRawElementProviderSimple_iface;
+    sprintf(cmdline, "\"%s\" uiautomation UiaAddEvent_client_proc", name);
+    memset(&startup, 0, sizeof(startup));
+    startup.cb = sizeof(startup);
+    SET_EXPECT(winproc_GETOBJECT_UiaRoot);
+    /* Only sent on Win7. */
+    SET_EXPECT(winproc_GETOBJECT_CLIENT);
+    CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &startup, &proc);
+    while (MsgWaitForMultipleObjects(1, &proc.hProcess, FALSE, INFINITE, QS_ALLINPUT) != WAIT_OBJECT_0)
+    {
+        MSG msg;
+        while (PeekMessageW(&msg, 0, 0, 0, PM_REMOVE))
+        {
+            switch (msg.message)
+            {
+            case WM_UIA_TEST_RAISE_SERVERSIDE_EVENT:
+                initialize_provider(&Provider_child, ProviderOptions_ServerSideProvider, NULL, TRUE);
+                Provider_child.runtime_id[0] = 0xdeadbeef;
+                Provider_child.runtime_id[1] = 0x01;
+                hr = UiaRaiseAutomationEvent(&Provider_child.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
+                ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                break;
+
+            case WM_UIA_TEST_RAISE_CLIENTSIDE_EVENT:
+                initialize_provider(&Provider_child, ProviderOptions_ClientSideProvider, NULL, TRUE);
+                Provider_child.runtime_id[0] = 0xdeadbeef;
+                Provider_child.runtime_id[1] = 0x01;
+                hr = UiaRaiseAutomationEvent(&Provider_child.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
+                ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                break;
+
+            case WM_UIA_TEST_RAISE_SERVERSIDE_CHILD_EVENT:
+                hr = UiaRaiseAutomationEvent(&Provider_child_child.IRawElementProviderSimple_iface, UIA_AutomationFocusChangedEventId);
+                ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
+                break;
+
+            default:
+                break;
+            }
+
+            TranslateMessage(&msg);
+            DispatchMessageW(&msg);
+        }
+    }
+
+    GetExitCodeProcess(proc.hProcess, &exit_code);
+    if (exit_code > 255)
+        ok(0, "unhandled exception %08x in child process %04x\n", (UINT)exit_code, (UINT)GetProcessId(proc.hProcess));
+    else if (exit_code)
+        ok(0, "%u failures in child process\n", (UINT)exit_code);
+
+    flush_method_sequence();
+    CloseHandle(proc.hProcess);
+
+    DestroyWindow(hwnd);
+    UnregisterClassA("UiaAddEvent class", NULL);
 
     CoUninitialize();
 }
@@ -10506,6 +10662,8 @@ START_TEST(uiautomation)
             test_UiaNodeFromHandle_client_proc();
         else if (!strcmp(argv[2], "UiaRegisterProviderCallback"))
             test_UiaRegisterProviderCallback();
+        else if (!strcmp(argv[2], "UiaAddEvent_client_proc"))
+            test_UiaAddEvent_client_proc();
 
         FreeLibrary(uia_dll);
         return;
@@ -10525,7 +10683,7 @@ START_TEST(uiautomation)
     test_UiaFind();
     test_default_proxy_providers();
     test_CUIAutomation();
-    test_UiaAddEvent();
+    test_UiaAddEvent(argv[0]);
     if (uia_dll)
     {
         pUiaProviderFromIAccessible = (void *)GetProcAddress(uia_dll, "UiaProviderFromIAccessible");
