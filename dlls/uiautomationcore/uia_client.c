@@ -4411,6 +4411,48 @@ HRESULT WINAPI UiaEventRemoveWindow(HUIAEVENT huiaevent, HWND hwnd)
     return E_NOTIMPL;
 }
 
+static void uia_event_invoke_callback(HUIANODE node, struct uia_event_args *args, struct uia_event *event)
+{
+    HRESULT hr;
+
+    if (event->event_type == EVENT_TYPE_LOCAL)
+    {
+        SAFEARRAY *out_req;
+        BSTR tree_struct;
+
+        hr = UiaGetUpdatedCache(node, event->u.local.cache_req, NormalizeState_None, NULL, &out_req,
+                &tree_struct);
+        if (SUCCEEDED(hr))
+            event->u.local.cback(&args->u.simple_args, out_req, tree_struct);
+    }
+    else
+    {
+        struct uia_queue_event *queue_event;
+        VARIANT v;
+
+        get_variant_for_node(node, &v);
+        hr = create_uia_queue_event(event, v, FALSE, args, &queue_event);
+        if (SUCCEEDED(hr))
+        {
+            EnterCriticalSection(&event_thread_cs);
+            if (event_thread.event_queue)
+            {
+                InterlockedIncrement(&args->ref);
+                IWineUiaNode_AddRef((IWineUiaNode *)node);
+                list_add_tail(event_thread.event_queue, &queue_event->event_queue_entry);
+                PostMessageW(event_thread.hwnd, WM_UIA_EVENT_THREAD_RAISE_EVENT, 0, 0);
+            }
+            else
+            {
+                IWineUiaEvent_Release(&event->IWineUiaEvent_iface);
+                heap_free(queue_event);
+            }
+            LeaveCriticalSection(&event_thread_cs);
+        }
+    }
+}
+
+static SAFEARRAY *uia_desktop_node_rt_id;
 static HRESULT uia_process_event(HUIANODE node, struct uia_event_args *args, SAFEARRAY *rt_id,
         struct uia_event *event)
 {
@@ -4421,6 +4463,16 @@ static HRESULT uia_process_event(HUIANODE node, struct uia_event_args *args, SAF
     HRESULT hr;
 
     IWineUiaEvent_AddRef(&event->IWineUiaEvent_iface);
+
+    /* For events registered on the desktop node, always match. */
+    if (uia_desktop_node_rt_id && (event->scope & (TreeScope_Descendants | TreeScope_Children)) &&
+            !uia_compare_safearrays(event->runtime_id, uia_desktop_node_rt_id, UIAutomationType_IntArray))
+    {
+        uia_event_invoke_callback(node, args, event);
+        IWineUiaEvent_Release(&event->IWineUiaEvent_iface);
+        return S_OK;
+    }
+
     IWineUiaNode_AddRef(&node_data->IWineUiaNode_iface);
     while (1)
     {
@@ -4436,38 +4488,7 @@ static HRESULT uia_process_event(HUIANODE node, struct uia_event_args *args, SAF
         if (!cmp && ((!height && (event->scope & TreeScope_Element)) ||
                      (height && (event->scope & (TreeScope_Descendants | TreeScope_Children)))))
         {
-            if (event->event_type == EVENT_TYPE_LOCAL)
-            {
-                SAFEARRAY *out_req;
-                BSTR tree_struct;
-
-                hr = UiaGetUpdatedCache(node, event->u.local.cache_req, NormalizeState_None, NULL, &out_req,
-                        &tree_struct);
-                if (SUCCEEDED(hr))
-                    event->u.local.cback(&args->u.simple_args, out_req, tree_struct);
-            }
-            else
-            {
-                struct uia_queue_event *queue_event;
-                VARIANT v;
-
-                get_variant_for_node(node, &v);
-                hr = create_uia_queue_event(event, v, FALSE, args, &queue_event);
-                if (SUCCEEDED(hr))
-                {
-                    IWineUiaNode_AddRef((IWineUiaNode *)node);
-                    InterlockedIncrement(&args->ref);
-
-                    EnterCriticalSection(&event_thread_cs);
-                    if (event_thread.event_queue)
-                    {
-                        list_add_tail(event_thread.event_queue, &queue_event->event_queue_entry);
-                        PostMessageW(event_thread.hwnd, WM_UIA_EVENT_THREAD_RAISE_EVENT, 0, 0);
-                    }
-                    LeaveCriticalSection(&event_thread_cs);
-                }
-            }
-
+            uia_event_invoke_callback(node, args, event);
             break;
         }
 
@@ -4502,6 +4523,20 @@ static HRESULT uia_raise_event(IRawElementProviderSimple *elprov, struct uia_eve
     HUIANODE node;
     SAFEARRAY *sa;
     HRESULT hr;
+
+    /* Create the desktop node runtime ID safearray, if it hasn't been already. */
+    if (!uia_desktop_node_rt_id)
+    {
+        SAFEARRAY *sa2;
+
+        if ((sa2 = SafeArrayCreateVector(VT_I4, 0, 2)))
+        {
+            if (SUCCEEDED(write_runtime_id_base(sa2, GetDesktopWindow())))
+                uia_desktop_node_rt_id = sa2;
+            else
+                SafeArrayDestroy(sa2);
+        }
+    }
 
     hr = IRawElementProviderSimple_get_ProviderOptions(elprov, &prov_opts);
     if (FAILED(hr))
