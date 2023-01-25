@@ -10031,10 +10031,10 @@ static const struct prov_method_sequence event_seq1[] = {
 static const struct prov_method_sequence event_seq2[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, FRAG_GET_FRAGMENT_ROOT, METHOD_TODO },
+    { &Provider, FRAG_GET_FRAGMENT_ROOT },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, ADVISE_EVENTS_EVENT_ADDED, METHOD_TODO },
+    { &Provider, ADVISE_EVENTS_EVENT_ADDED },
     { 0 },
 };
 
@@ -10047,7 +10047,7 @@ static const struct prov_method_sequence event_seq3[] = {
 };
 
 static const struct prov_method_sequence event_seq4[] = {
-    { &Provider, ADVISE_EVENTS_EVENT_REMOVED, METHOD_TODO },
+    { &Provider, ADVISE_EVENTS_EVENT_REMOVED },
     { 0 },
 };
 
@@ -10063,11 +10063,11 @@ static const struct prov_method_sequence event_seq5[] = {
 static const struct prov_method_sequence event_seq6[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, FRAG_GET_FRAGMENT_ROOT, METHOD_TODO },
+    { &Provider, FRAG_GET_FRAGMENT_ROOT },
     { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS, METHOD_TODO },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, ADVISE_EVENTS_EVENT_ADDED, METHOD_TODO },
+    { &Provider, ADVISE_EVENTS_EVENT_ADDED },
     { 0 },
 };
 
@@ -10122,16 +10122,16 @@ static const struct prov_method_sequence event_seq10[] = {
 static const struct prov_method_sequence event_seq11[] = {
     { &Provider, FRAG_GET_RUNTIME_ID },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider, FRAG_GET_FRAGMENT_ROOT, METHOD_TODO },
+    { &Provider, FRAG_GET_FRAGMENT_ROOT },
     { &Provider, FRAG_GET_EMBEDDED_FRAGMENT_ROOTS, METHOD_TODO },
     { &Provider, FRAG_GET_RUNTIME_ID, METHOD_OPTIONAL }, /* Only done on Win8+. */
     { &Provider2, PROV_GET_PROVIDER_OPTIONS, METHOD_OPTIONAL }, /* Only done on Win10v1809+. */
-    { &Provider2, ADVISE_EVENTS_EVENT_ADDED, METHOD_TODO },
+    { &Provider2, ADVISE_EVENTS_EVENT_ADDED },
     { 0 },
 };
 
 static const struct prov_method_sequence event_seq12[] = {
-    { &Provider2, ADVISE_EVENTS_EVENT_REMOVED, METHOD_TODO },
+    { &Provider2, ADVISE_EVENTS_EVENT_REMOVED },
     { 0 },
 };
 
@@ -10231,7 +10231,7 @@ static void test_UiaAddEvent(void)
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(!!event, "event == NULL\n");
-    todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
+    ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
     ok_method_sequence(event_seq2, "event_seq2");
 
     /*
@@ -10259,7 +10259,7 @@ static void test_UiaAddEvent(void)
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(!!event, "event == NULL\n");
-    todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
+    ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
     ok_method_sequence(event_seq2, "event_seq2");
 
     /* Event handler is called since we can match our providers by runtime ID. */
@@ -10287,7 +10287,7 @@ static void test_UiaAddEvent(void)
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(!!event, "event == NULL\n");
-    todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
+    ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
     ok_method_sequence(event_seq6, "event_seq6");
 
     /*
@@ -10322,7 +10322,7 @@ static void test_UiaAddEvent(void)
             (struct UiaCacheRequest *)&DefaultCacheReq, &event);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(!!event, "event == NULL\n");
-    todo_wine ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
+    ok(Provider.ref == 3, "Unexpected refcnt %ld\n", Provider.ref);
     ok_method_sequence(event_seq6, "event_seq6");
 
     /* Raised an event on Provider_child_child. */
@@ -10357,7 +10357,7 @@ static void test_UiaAddEvent(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(!!event, "event == NULL\n");
     ok(Provider.ref == 2, "Unexpected refcnt %ld\n", Provider.ref);
-    todo_wine ok(Provider2.ref > 1, "Unexpected refcnt %ld\n", Provider2.ref);
+    ok(Provider2.ref > 1, "Unexpected refcnt %ld\n", Provider2.ref);
     ok_method_sequence(event_seq11, "event_seq11");
 
     thread_data.exp_thread_id = GetCurrentThreadId();

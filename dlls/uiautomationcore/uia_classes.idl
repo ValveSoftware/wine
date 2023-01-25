@@ -60,6 +60,16 @@ library UIA_wine_private
 
     [
         object,
+        uuid(9a754e12-e570-49ab-b223-6f6871007d28),
+        pointer_default(unique),
+    ]
+    interface IWineUiaAdviseEvents : IUnknown
+    {
+        HRESULT advise_events([in]BOOL advise_removed, [in]long event_id, [in]SAFEARRAY *prop_ids);
+    }
+
+    [
+        object,
         uuid(57865755-6c05-4522-98df-4ca658b768ef),
         pointer_default(unique),
         oleautomation,
@@ -70,6 +80,7 @@ library UIA_wine_private
         HRESULT get_prov_opts([out, retval]int *out_opts);
         HRESULT has_parent([out, retval]BOOL *out_val);
         HRESULT navigate([in]int nav_dir, [out, retval]VARIANT *ret_val);
+        HRESULT attach_event([in]LONG_PTR huiaevent);
     }
 
     [
