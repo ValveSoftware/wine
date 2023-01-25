@@ -4347,8 +4347,25 @@ HRESULT WINAPI UiaRemoveEvent(HUIAEVENT huiaevent)
  */
 HRESULT WINAPI UiaEventAddWindow(HUIAEVENT huiaevent, HWND hwnd)
 {
-    FIXME("(%p, %p): stub\n", huiaevent, hwnd);
-    return E_NOTIMPL;
+    struct uia_event *event = unsafe_impl_from_IWineUiaEvent((IWineUiaEvent *)huiaevent);
+    HUIANODE node;
+    HRESULT hr;
+
+    TRACE("(%p, %p)\n", event, hwnd);
+
+    if (!event)
+        return E_INVALIDARG;
+
+    hr = UiaNodeFromHandle(hwnd, &node);
+    if (FAILED(hr))
+        return hr;
+
+    hr = attach_event_to_uia_node(event, node, TRUE);
+    UiaNodeRelease(node);
+    if (FAILED(hr))
+        WARN("Failed to attach event to node, hr %#lx\n", hr);
+
+    return hr;
 }
 
 /***********************************************************************
