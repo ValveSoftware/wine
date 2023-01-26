@@ -92,12 +92,12 @@ struct ScriptHost {
 
 static ScriptHost *get_elem_script_host(HTMLInnerWindow*,HTMLScriptElement*);
 
-static BOOL set_script_prop(ScriptHost *script_host, DWORD property, VARIANT *val)
+static BOOL set_script_prop(IActiveScript *script, DWORD property, VARIANT *val)
 {
     IActiveScriptProperty *script_prop;
     HRESULT hres;
 
-    hres = IActiveScript_QueryInterface(script_host->script, &IID_IActiveScriptProperty,
+    hres = IActiveScript_QueryInterface(script, &IID_IActiveScriptProperty,
             (void**)&script_prop);
     if(FAILED(hres)) {
         WARN("Could not get IActiveScriptProperty iface: %08lx\n", hres);
@@ -114,7 +114,7 @@ static BOOL set_script_prop(ScriptHost *script_host, DWORD property, VARIANT *va
     return TRUE;
 }
 
-static BOOL init_script_engine(ScriptHost *script_host)
+static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
 {
     IWineDispatchProxyCbPrivate *proxy;
     BOOL was_locked, ret = FALSE;
@@ -125,13 +125,13 @@ static BOOL init_script_engine(ScriptHost *script_host)
     VARIANT var;
     HRESULT hres;
 
-    hres = IActiveScript_QueryInterface(script_host->script, &IID_IActiveScriptParse, (void**)&script_host->parse);
+    hres = IActiveScript_QueryInterface(script, &IID_IActiveScriptParse, (void**)&script_host->parse);
     if(FAILED(hres)) {
         WARN("Could not get IActiveScriptParse: %08lx\n", hres);
         return FALSE;
     }
 
-    hres = IActiveScript_QueryInterface(script_host->script, &IID_IObjectSafety, (void**)&safety);
+    hres = IActiveScript_QueryInterface(script, &IID_IObjectSafety, (void**)&safety);
     if(FAILED(hres)) {
         FIXME("Could not get IObjectSafety: %08lx\n", hres);
         return FALSE;
@@ -169,16 +169,16 @@ static BOOL init_script_engine(ScriptHost *script_host)
     }
     V_VT(&var) = VT_I4;
     V_I4(&var) = script_mode;
-    if(!set_script_prop(script_host, SCRIPTPROP_INVOKEVERSIONING, &var) && (script_mode & SCRIPTLANGUAGEVERSION_HTML)) {
+    if(!set_script_prop(script, SCRIPTPROP_INVOKEVERSIONING, &var) && (script_mode & SCRIPTLANGUAGEVERSION_HTML)) {
         /* If this failed, we're most likely using native jscript. */
         WARN("Failed to set script mode to HTML version.\n");
         V_I4(&var) = compat_mode < COMPAT_MODE_IE8 ? SCRIPTLANGUAGEVERSION_5_7 : SCRIPTLANGUAGEVERSION_5_8;
-        set_script_prop(script_host, SCRIPTPROP_INVOKEVERSIONING, &var);
+        set_script_prop(script, SCRIPTPROP_INVOKEVERSIONING, &var);
     }
 
     V_VT(&var) = VT_BOOL;
     V_BOOL(&var) = VARIANT_TRUE;
-    set_script_prop(script_host, SCRIPTPROP_HACK_TRIDENTEVENTSINK, &var);
+    set_script_prop(script, SCRIPTPROP_HACK_TRIDENTEVENTSINK, &var);
 
     hres = IActiveScriptParse_InitNew(script_host->parse);
     if(FAILED(hres)) {
@@ -186,50 +186,50 @@ static BOOL init_script_engine(ScriptHost *script_host)
         goto done;
     }
 
-    hres = IActiveScript_SetScriptSite(script_host->script, &script_host->IActiveScriptSite_iface);
+    hres = IActiveScript_SetScriptSite(script, &script_host->IActiveScriptSite_iface);
     if(FAILED(hres)) {
         WARN("SetScriptSite failed: %08lx\n", hres);
-        IActiveScript_Close(script_host->script);
+        IActiveScript_Close(script);
         goto done;
     }
 
     if(script_mode & SCRIPTLANGUAGEVERSION_HTML) {
         proxy = script_host->window->event_target.dispex.proxy;
         if(proxy) {
-            hres = proxy->lpVtbl->HostUpdated(proxy, script_host->script);
+            hres = proxy->lpVtbl->HostUpdated(proxy, script);
             if(FAILED(hres)) {
                 ERR("Proxy->HostUpdated failed: %08lx\n", hres);
-                IActiveScript_Close(script_host->script);
+                IActiveScript_Close(script);
                 goto done;
             }
         }
     }
 
-    hres = IActiveScript_GetScriptState(script_host->script, &state);
+    hres = IActiveScript_GetScriptState(script, &state);
     if(FAILED(hres))
         WARN("GetScriptState failed: %08lx\n", hres);
     else if(state != SCRIPTSTATE_INITIALIZED)
         FIXME("state = %x\n", state);
 
-    hres = IActiveScript_SetScriptState(script_host->script, SCRIPTSTATE_STARTED);
+    hres = IActiveScript_SetScriptState(script, SCRIPTSTATE_STARTED);
     if(FAILED(hres)) {
         WARN("Starting script failed: %08lx\n", hres);
         goto done;
     }
 
-    hres = IActiveScript_AddNamedItem(script_host->script, L"window",
+    hres = IActiveScript_AddNamedItem(script, L"window",
             SCRIPTITEM_ISVISIBLE|SCRIPTITEM_ISSOURCE|SCRIPTITEM_GLOBALMEMBERS);
     if(SUCCEEDED(hres)) {
         const struct list *list = &script_host->window->script_hosts, *head = list_head(list);
         V_VT(&var) = VT_BOOL;
         V_BOOL(&var) = head ? VARIANT_FALSE : VARIANT_TRUE;
-        set_script_prop(script_host, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
+        set_script_prop(script, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
 
         /* if this was second engine added, also set it to first engine, since it used to be TRUE */
         if(head && !list_next(list, head)) {
             ScriptHost *first_host = LIST_ENTRY(head, ScriptHost, entry);
             if(first_host->script)
-                set_script_prop(first_host, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
+                set_script_prop(first_host->script, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
         }
     }else {
        WARN("AddNamedItem failed: %08lx\n", hres);
@@ -242,7 +242,7 @@ static BOOL init_script_engine(ScriptHost *script_host)
             ERR("InitProxy for document failed: %08lx\n", hres);
     }
 
-    hres = IActiveScript_QueryInterface(script_host->script, &IID_IActiveScriptParseProcedure2,
+    hres = IActiveScript_QueryInterface(script, &IID_IActiveScriptParseProcedure2,
                                         (void**)&script_host->parse_proc);
     if(FAILED(hres)) {
         /* FIXME: QI for IActiveScriptParseProcedure */
@@ -819,6 +819,7 @@ static const IOleCommandTargetVtbl OleCommandTargetVtbl = {
 
 static ScriptHost *create_script_host(HTMLInnerWindow *window, const GUID *guid)
 {
+    IActiveScript *script;
     ScriptHost *ret;
     HRESULT hres;
 
@@ -840,11 +841,15 @@ static ScriptHost *create_script_host(HTMLInnerWindow *window, const GUID *guid)
     ret->guid = *guid;
 
     hres = CoCreateInstance(&ret->guid, NULL, CLSCTX_INPROC_SERVER|CLSCTX_INPROC_HANDLER,
-            &IID_IActiveScript, (void**)&ret->script);
+            &IID_IActiveScript, (void**)&script);
     if(FAILED(hres))
         WARN("Could not load script engine: %08lx\n", hres);
-    else if(!init_script_engine(ret))
-        release_script_engine(ret);
+    else {
+        BOOL succeeded = init_script_engine(ret, script);
+        ret->script = script;
+        if(!succeeded)
+            release_script_engine(ret);
+    }
 
     list_add_tail(&window->script_hosts, &ret->entry);
 
