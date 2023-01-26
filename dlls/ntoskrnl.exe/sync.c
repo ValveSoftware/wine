@@ -457,6 +457,24 @@ void FASTCALL KeAcquireGuardedMutex(PKGUARDED_MUTEX mutex)
     KeAcquireGuardedMutexUnsafe(mutex);
 }
 
+/***********************************************************************
+ *           KeReleaseGuardedMutexUnsafe   (NTOSKRNL.EXE.@)
+ */
+DEFINE_FASTCALL1_WRAPPER(KeReleaseGuardedMutexUnsafe)
+void FASTCALL KeReleaseGuardedMutexUnsafe(PKGUARDED_MUTEX mutex)
+{
+    ExReleaseFastMutexUnsafe((PFAST_MUTEX)mutex);
+}
+
+/***********************************************************************
+ *           KeReleaseGuardedMutex   (NTOSKRNL.EXE.@)
+ */
+DEFINE_FASTCALL1_WRAPPER(KeReleaseGuardedMutex)
+void FASTCALL KeReleaseGuardedMutex(PKGUARDED_MUTEX mutex)
+{
+    KeReleaseGuardedMutexUnsafe(mutex);
+    /* FIXME: Leave Guarded Region */
+}
 
 static void CALLBACK ke_timer_complete_proc(PTP_CALLBACK_INSTANCE instance, void *timer_, PTP_TIMER tp_timer)
 {
