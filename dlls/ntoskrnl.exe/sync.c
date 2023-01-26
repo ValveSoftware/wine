@@ -438,6 +438,26 @@ void WINAPI KeInitializeGuardedMutex(PKGUARDED_MUTEX mutex)
     KeInitializeEvent(&mutex->Event, SynchronizationEvent, FALSE);
 }
 
+/***********************************************************************
+ *           KeAcquireGuardedMutexUnsafe   (NTOSKRNL.EXE.@)
+ */
+DEFINE_FASTCALL1_WRAPPER(KeAcquireGuardedMutexUnsafe)
+void FASTCALL KeAcquireGuardedMutexUnsafe(PKGUARDED_MUTEX mutex)
+{
+    ExAcquireFastMutexUnsafe((PFAST_MUTEX)mutex);
+}
+
+/***********************************************************************
+ *           KeAcquireGuardedMutex   (NTOSKRNL.EXE.@)
+ */
+DEFINE_FASTCALL1_WRAPPER(KeAcquireGuardedMutex)
+void FASTCALL KeAcquireGuardedMutex(PKGUARDED_MUTEX mutex)
+{
+    /* FIXME: Enter Guarded Region */
+    KeAcquireGuardedMutexUnsafe(mutex);
+}
+
+
 static void CALLBACK ke_timer_complete_proc(PTP_CALLBACK_INSTANCE instance, void *timer_, PTP_TIMER tp_timer)
 {
     KTIMER *timer = timer_;
