@@ -2674,6 +2674,12 @@ static NTSTATUS virtual_map_image( HANDLE mapping, ACCESS_MASK access, void **ad
     base = wine_server_get_ptr( image_info->base );
     if ((ULONG_PTR)base != image_info->base) base = NULL;
 
+#ifdef _WIN64
+    if (high_dll_addresses && base && (ULONG_PTR)base > 0x100000000 && image_info->image_charact & IMAGE_FILE_DLL
+        && !(image_info->image_charact & IMAGE_FILE_RELOCS_STRIPPED))
+        base = (char *)base + 0x800000000;
+#endif
+
     if ((char *)base >= (char *)address_space_start)  /* make sure the DOS area remains free */
         status = map_view( &view, base, size, alloc_type & MEM_TOP_DOWN, vprot, get_zero_bits_mask( zero_bits ), 0 );
 

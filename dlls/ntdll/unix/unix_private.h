@@ -155,6 +155,7 @@ extern BOOL fsync_simulate_sched_quantum DECLSPEC_HIDDEN;
 extern BOOL alert_simulate_sched_quantum DECLSPEC_HIDDEN;
 extern BOOL no_priv_elevation DECLSPEC_HIDDEN;
 extern BOOL localsystem_sid DECLSPEC_HIDDEN;
+extern BOOL high_dll_addresses DECLSPEC_HIDDEN;
 
 extern void init_environment( int argc, char *argv[], char *envp[] ) DECLSPEC_HIDDEN;
 extern void init_startup_info(void) DECLSPEC_HIDDEN;
