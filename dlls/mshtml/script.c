@@ -117,7 +117,6 @@ static BOOL set_script_prop(IActiveScript *script, DWORD property, VARIANT *val)
 static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
 {
     IWineDispatchProxyCbPrivate *proxy;
-    BOOL was_locked, ret = FALSE;
     compat_mode_t compat_mode;
     IObjectSafety *safety;
     SCRIPTSTATE state;
@@ -154,11 +153,7 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
     if(FAILED(hres))
         return FALSE;
 
-    /* Don't lock it properly yet, but mark it as such, to avoid recursively creating another script engine when initializing proxies */
-    was_locked = script_host->window->doc->document_mode_locked;
-    script_host->window->doc->document_mode_locked = TRUE;
-
-    compat_mode = script_host->window->doc->document_mode;
+    compat_mode = lock_document_mode(script_host->window->doc);
     script_mode = compat_mode < COMPAT_MODE_IE8 ? SCRIPTLANGUAGEVERSION_5_7 : SCRIPTLANGUAGEVERSION_5_8;
     if(IsEqualGUID(&script_host->guid, &CLSID_JScript)) {
         if(compat_mode >= COMPAT_MODE_IE11)
@@ -183,14 +178,14 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
     hres = IActiveScriptParse_InitNew(script_host->parse);
     if(FAILED(hres)) {
         WARN("InitNew failed: %08lx\n", hres);
-        goto done;
+        return FALSE;
     }
 
     hres = IActiveScript_SetScriptSite(script, &script_host->IActiveScriptSite_iface);
     if(FAILED(hres)) {
         WARN("SetScriptSite failed: %08lx\n", hres);
         IActiveScript_Close(script);
-        goto done;
+        return FALSE;
     }
 
     if(script_mode & SCRIPTLANGUAGEVERSION_HTML) {
@@ -200,7 +195,7 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
             if(FAILED(hres)) {
                 ERR("Proxy->HostUpdated failed: %08lx\n", hres);
                 IActiveScript_Close(script);
-                goto done;
+                return FALSE;
             }
         }
     }
@@ -214,21 +209,37 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
     hres = IActiveScript_SetScriptState(script, SCRIPTSTATE_STARTED);
     if(FAILED(hres)) {
         WARN("Starting script failed: %08lx\n", hres);
-        goto done;
+        return FALSE;
     }
 
     hres = IActiveScript_AddNamedItem(script, L"window",
             SCRIPTITEM_ISVISIBLE|SCRIPTITEM_ISSOURCE|SCRIPTITEM_GLOBALMEMBERS);
     if(SUCCEEDED(hres)) {
-        const struct list *list = &script_host->window->script_hosts, *head = list_head(list);
+        ScriptHost *first_host;
+
         V_VT(&var) = VT_BOOL;
-        V_BOOL(&var) = head ? VARIANT_FALSE : VARIANT_TRUE;
+        V_BOOL(&var) = VARIANT_TRUE;
+
+        LIST_FOR_EACH_ENTRY(first_host, &script_host->window->script_hosts, ScriptHost, entry) {
+            if(first_host->script) {
+                V_BOOL(&var) = VARIANT_FALSE;
+                break;
+            }
+        }
         set_script_prop(script, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
 
-        /* if this was second engine added, also set it to first engine, since it used to be TRUE */
-        if(head && !list_next(list, head)) {
-            ScriptHost *first_host = LIST_ENTRY(head, ScriptHost, entry);
-            if(first_host->script)
+        /* if this was second engine initialized, also set it to first engine, since it used to be TRUE */
+        if(!V_BOOL(&var)) {
+            struct list *iter = &first_host->entry;
+            BOOL is_second_init = TRUE;
+
+            while((iter = list_next(&script_host->window->script_hosts, iter))) {
+                if(LIST_ENTRY(iter, ScriptHost, entry)->script) {
+                    is_second_init = FALSE;
+                    break;
+                }
+            }
+            if(is_second_init)
                 set_script_prop(first_host->script, SCRIPTPROP_ABBREVIATE_GLOBALNAME_RESOLUTION, &var);
         }
     }else {
@@ -249,11 +260,7 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
         WARN("Could not get IActiveScriptParseProcedure iface: %08lx\n", hres);
     }
 
-    ret = TRUE;
-
-done:
-    script_host->window->doc->document_mode_locked = was_locked;
-    return ret;
+    return TRUE;
 }
 
 static void release_script_engine(ScriptHost *This)
@@ -839,6 +846,7 @@ static ScriptHost *create_script_host(HTMLInnerWindow *window, const GUID *guid)
     ret->script_state = SCRIPTSTATE_UNINITIALIZED;
 
     ret->guid = *guid;
+    list_add_tail(&window->script_hosts, &ret->entry);
 
     hres = CoCreateInstance(&ret->guid, NULL, CLSCTX_INPROC_SERVER|CLSCTX_INPROC_HANDLER,
             &IID_IActiveScript, (void**)&script);
@@ -851,10 +859,6 @@ static ScriptHost *create_script_host(HTMLInnerWindow *window, const GUID *guid)
             release_script_engine(ret);
     }
 
-    list_add_tail(&window->script_hosts, &ret->entry);
-
-    /* It's safe to lock it now since we're done */
-    lock_document_mode(window->doc);
     return ret;
 }
 
