@@ -472,9 +472,9 @@ void X11DRV_resize_desktop(void)
                         SWP_NOZORDER | SWP_NOACTIVATE | SWP_DEFERERASE );
     ungrab_clipping_window();
 
-    if (old_virtual_rect.left != virtual_rect.left || old_virtual_rect.top != virtual_rect.top)
-        send_message_timeout( HWND_BROADCAST, WM_X11DRV_DESKTOP_RESIZED, old_virtual_rect.left,
-                              old_virtual_rect.top, SMTO_ABORTIFHUNG, 2000, FALSE );
+    /* HACK: always send the desktop resize notification, to eventually update fshack on windows */
+    send_message_timeout( HWND_BROADCAST, WM_X11DRV_DESKTOP_RESIZED, old_virtual_rect.left,
+                          old_virtual_rect.top, SMTO_ABORTIFHUNG, 2000, FALSE );
 
     /* forward clip_fullscreen_window request to the foreground window */
     send_notify_message( NtUserGetForegroundWindow(), WM_X11DRV_CLIP_CURSOR_REQUEST, TRUE, TRUE );
