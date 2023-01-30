@@ -1566,6 +1566,7 @@ typedef enum _PROCESSINFOCLASS {
     ProcessThreadStackAllocation = 41,
     ProcessWorkingSetWatchEx = 42,
     ProcessImageFileNameWin32 = 43,
+    ProcessHandleTable = 58,
     MaxProcessInfoClass,
 #ifdef __WINESRC__
     ProcessWineMakeProcessSystem = 1000,
