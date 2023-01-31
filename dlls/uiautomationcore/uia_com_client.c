@@ -65,6 +65,7 @@ struct uia_com_event_thread
     HWND hwnd;
     LONG ref;
 
+    struct list *winevent_queue;
     struct list events_list;
     struct list event_type_list[UIA_COM_EVENT_TYPE_COUNT];
 };
@@ -79,6 +80,7 @@ static CRITICAL_SECTION_DEBUG com_event_thread_cs_debug =
 };
 static CRITICAL_SECTION com_event_thread_cs = { &com_event_thread_cs_debug, -1, 0, 0, 0, 0 };
 
+#define WM_UIA_COM_EVENT_THREAD_PROCESS_WINEVENT (WM_USER + 1)
 #define WM_UIA_COM_EVENT_THREAD_STOP (WM_USER + 2)
 static LRESULT CALLBACK uia_com_event_thread_msg_proc(HWND hwnd, UINT msg, WPARAM wparam,
         LPARAM lparam)
@@ -92,20 +94,56 @@ static LRESULT CALLBACK uia_com_event_thread_msg_proc(HWND hwnd, UINT msg, WPARA
     return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
+struct uia_queue_winevent
+{
+    DWORD event_id;
+    HWND hwnd;
+    LONG objid;
+    LONG cid;
+    DWORD thread;
+    DWORD event_time;
+
+    struct list winevent_queue_entry;
+};
+
+void CALLBACK uia_com_client_winevent_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG objid, LONG cid,
+        DWORD thread, DWORD event_time)
+{
+    struct uia_queue_winevent *queue_winevent = heap_alloc_zero(sizeof(*queue_winevent));
+
+    TRACE("%p, %ld, %p, %ld, %ld, %ld, %ld\n", hook, event, hwnd, objid, cid, thread, event_time);
+
+    if (!queue_winevent)
+    {
+        ERR("Failed to allocate queue_winevent\n");
+        return;
+    }
+
+    queue_winevent->event_id = event;
+    queue_winevent->hwnd = hwnd;
+    queue_winevent->objid = objid;
+    queue_winevent->cid = cid;
+    queue_winevent->thread = thread;
+    queue_winevent->event_time = event_time;
+    EnterCriticalSection(&com_event_thread_cs);
+    if (com_event_thread.winevent_queue)
+        list_add_tail(com_event_thread.winevent_queue, &queue_winevent->winevent_queue_entry);
+    else
+        heap_free(queue_winevent);
+    LeaveCriticalSection(&com_event_thread_cs);
+
+    PostMessageW(com_event_thread.hwnd, WM_UIA_COM_EVENT_THREAD_PROCESS_WINEVENT, 0, 0);
+}
+
 static const WCHAR *ignored_window_classes[] = {
     L"OleMainThreadWndClass",
     L"IME",
     L"Message",
 };
 
-void CALLBACK window_create_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG objid, LONG cid, DWORD thread,
-        DWORD event_time)
+static BOOL is_ignored_hwnd(HWND hwnd)
 {
-    struct list *cursor, *cursor2;
     WCHAR buf[256] = { 0 };
-
-    if (objid != OBJID_WINDOW)
-        return;
 
     if (GetClassNameW(hwnd, buf, ARRAY_SIZE(buf)))
     {
@@ -114,27 +152,88 @@ void CALLBACK window_create_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LON
         for (i = 0; i < ARRAY_SIZE(ignored_window_classes); i++)
         {
             if (!lstrcmpW(buf, ignored_window_classes[i]))
-                return;
+                return TRUE;
         }
     }
 
-    LIST_FOR_EACH_SAFE(cursor, cursor2, &com_event_thread.events_list)
+    return FALSE;
+}
+
+static HRESULT uia_com_event_thread_handle_winevent(struct uia_queue_winevent *winevent)
+{
+    switch (winevent->event_id)
     {
-        struct uia_com_event *event = LIST_ENTRY(cursor, struct uia_com_event, main_event_list_entry);
+    case EVENT_OBJECT_CREATE:
+    {
+        struct list *cursor, *cursor2;
+
+        if (winevent->objid != OBJID_WINDOW)
+            break;
+
+        LIST_FOR_EACH_SAFE(cursor, cursor2, &com_event_thread.events_list)
+        {
+            struct uia_com_event *event = LIST_ENTRY(cursor, struct uia_com_event, main_event_list_entry);
+            HRESULT hr;
+
+            hr = UiaEventAddWindow(event->uia_event, winevent->hwnd);
+            if (FAILED(hr))
+                WARN("UiaEventAddWindow failed with hr %#lx\n", hr);
+        }
+        break;
+    }
+
+    default:
+        break;
+    }
+
+    return S_OK;
+}
+
+static HRESULT uia_com_event_thread_process_winevent_queue(struct list *winevent_queue)
+{
+    struct uia_queue_winevent prev_winevent = { 0 };
+    struct list *cursor, *cursor2;
+
+    if (list_empty(winevent_queue))
+        return S_OK;
+
+    LIST_FOR_EACH_SAFE(cursor, cursor2, winevent_queue)
+    {
+        struct uia_queue_winevent *winevent = LIST_ENTRY(cursor, struct uia_queue_winevent, winevent_queue_entry);
         HRESULT hr;
 
-        hr = UiaEventAddWindow(event->uia_event, hwnd);
+        list_remove(cursor);
+        TRACE("Processing: event_id %ld, hwnd %p, objid %ld, cid %ld, thread %ld, event_time %ld\n", winevent->event_id,
+                winevent->hwnd,winevent->objid, winevent->cid, winevent->thread, winevent->event_time);
+
+        if (is_ignored_hwnd(winevent->hwnd) || ((prev_winevent.event_id == winevent->event_id) &&
+                    (prev_winevent.hwnd == winevent->hwnd) && (prev_winevent.objid == winevent->objid) &&
+                    (prev_winevent.cid == winevent->cid) && (prev_winevent.thread == winevent->thread) &&
+                    (prev_winevent.event_time == winevent->event_time)))
+        {
+            heap_free(winevent);
+            continue;
+        }
+
+        hr = uia_com_event_thread_handle_winevent(winevent);
         if (FAILED(hr))
-            WARN("UiaEventAddWindow failed with hr %#lx\n", hr);
+            WARN("Failed to handle winevent, hr %#lx\n", hr);
+        prev_winevent = *winevent;
+        heap_free(winevent);
     }
+
+    return S_OK;
 }
 
 static DWORD WINAPI uia_com_event_thread_proc(void *arg)
 {
     HANDLE initialized_event = arg;
+    struct list winevent_queue;
+    HWINEVENTHOOK hook;
     HWND hwnd;
     MSG msg;
 
+    list_init(&winevent_queue);
     CoInitializeEx(NULL, COINIT_MULTITHREADED);
     hwnd = CreateWindowW(L"Message", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
     if (!hwnd)
@@ -146,15 +245,26 @@ static DWORD WINAPI uia_com_event_thread_proc(void *arg)
 
     SetWindowLongPtrW(hwnd, GWLP_WNDPROC, (LONG_PTR)uia_com_event_thread_msg_proc);
     com_event_thread.hwnd = hwnd;
-    SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE, 0, window_create_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
+    com_event_thread.winevent_queue = &winevent_queue;
+    hook = SetWinEventHook(EVENT_MIN, EVENT_MAX, 0, uia_com_client_winevent_proc, 0, 0,
+            WINEVENT_OUTOFCONTEXT);
 
     /* Initialization complete, thread can now process window messages. */
     SetEvent(initialized_event);
     TRACE("Event thread started.\n");
     while (GetMessageW(&msg, NULL, 0, 0))
     {
-        if (msg.message == WM_UIA_COM_EVENT_THREAD_STOP)
-            break;
+        if (msg.message == WM_UIA_COM_EVENT_THREAD_STOP || msg.message == WM_UIA_COM_EVENT_THREAD_PROCESS_WINEVENT)
+        {
+            HRESULT hr;
+
+            hr = uia_com_event_thread_process_winevent_queue(&winevent_queue);
+            if (FAILED(hr))
+                WARN("Process winevent queue failed with hr %#lx\n", hr);
+
+            if (msg.message == WM_UIA_COM_EVENT_THREAD_STOP)
+                break;
+        }
 
         TranslateMessage(&msg);
         DispatchMessageW(&msg);
@@ -162,6 +272,7 @@ static DWORD WINAPI uia_com_event_thread_proc(void *arg)
 
     TRACE("Shutting down UI Automation COM event thread.\n");
 
+    UnhookWinEvent(hook);
     DestroyWindow(hwnd);
     CoUninitialize();
     FreeLibraryAndExitThread(huia_module, 0);
