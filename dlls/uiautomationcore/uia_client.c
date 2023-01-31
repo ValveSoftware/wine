@@ -123,6 +123,7 @@ struct uia_event
     {
         struct {
             struct UiaCacheRequest *cache_req;
+            void *event_handler_data;
             UiaEventCallback *cback;
             DWORD git_cookie;
 
@@ -269,21 +270,6 @@ static struct uia_event *uia_client_find_remote_event(LONG event_cookie, LONG pr
     return NULL;
 }
 
-struct uia_event_args
-{
-    LONG ref;
-
-    union {
-        struct UiaEventArgs                    simple_args;
-        struct UiaPropertyChangedEventArgs     prop_change_args;
-        struct UiaStructureChangedEventArgs    struct_change_args;
-        struct UiaAsyncContentLoadedEventArgs  async_loaded_args;
-        struct UiaWindowClosedEventArgs        window_closed_args;
-        struct UiaTextEditTextChangedEventArgs text_edit_change_args;
-        struct UiaChangesEventArgs             changes_args;
-    } u;
-};
-
 static struct uia_event_args *create_uia_event_args(const struct uia_event_info *event_info)
 {
     struct uia_event_args *args = heap_alloc_zero(sizeof(*args));
@@ -425,6 +411,7 @@ static HRESULT uia_event_thread_process_queue(struct list *event_queue)
         list_remove(cursor);
         if (event->event->event_type == EVENT_TYPE_LOCAL)
         {
+            event->args->event_handler_data = event->event->u.local.event_handler_data;
             hr = uia_node_from_lresult((LRESULT)V_I4(&event->node), &node);
             if (SUCCEEDED(hr) && node)
             {
@@ -772,7 +759,7 @@ static struct uia_event *unsafe_impl_from_IWineUiaEvent(IWineUiaEvent *iface)
 }
 
 static struct uia_event *create_uia_event(int event_id, int scope, struct UiaCacheRequest *cache_req,
-        UiaEventCallback *cback, SAFEARRAY *runtime_id)
+        UiaEventCallback *cback, SAFEARRAY *runtime_id, void *event_handler_data)
 {
     struct uia_event *event = heap_alloc_zero(sizeof(*event));
     static LONG next_event_cookie;
@@ -789,6 +776,7 @@ static struct uia_event *create_uia_event(int event_id, int scope, struct UiaCac
 
     event->event_type = EVENT_TYPE_LOCAL;
     event->u.local.cache_req = cache_req;
+    event->u.local.event_handler_data = event_handler_data;
     event->u.local.cback = cback;
 
     return event;
@@ -4262,22 +4250,13 @@ exit:
     return hr;
 }
 
-/***********************************************************************
- *          UiaAddEvent (uiautomationcore.@)
- */
-HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback *callback, enum TreeScope scope,
-        PROPERTYID *prop_ids, int prop_ids_count, struct UiaCacheRequest *cache_req, HUIAEVENT *huiaevent)
+HRESULT uia_add_event(HUIANODE huianode, EVENTID event_id, UiaEventCallback *callback, enum TreeScope scope,
+        PROPERTYID *prop_ids, int prop_ids_count, struct UiaCacheRequest *cache_req, void *event_handler_data,
+        HUIAEVENT *huiaevent)
 {
-    const struct uia_event_info *event_info = uia_event_info_from_id(event_id);
     struct uia_event *event;
     SAFEARRAY *sa;
     HRESULT hr;
-
-    TRACE("(%p, %d, %p, %#x, %p, %d, %p, %p)\n", huianode, event_id, callback, scope, prop_ids, prop_ids_count,
-            cache_req, huiaevent);
-
-    if (!callback || !cache_req || !huiaevent || !event_info)
-        return E_INVALIDARG;
 
     *huiaevent = NULL;
 
@@ -4285,7 +4264,7 @@ HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback
     if (FAILED(hr))
         return hr;
 
-    if (!(event = create_uia_event(event_id, scope, cache_req, callback, sa)))
+    if (!(event = create_uia_event(event_id, scope, cache_req, callback, sa, event_handler_data)))
     {
         SafeArrayDestroy(sa);
         return E_OUTOFMEMORY;
@@ -4305,6 +4284,23 @@ HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback
     *huiaevent = (HUIAEVENT)event;
 
     return S_OK;
+}
+
+/***********************************************************************
+ *          UiaAddEvent (uiautomationcore.@)
+ */
+HRESULT WINAPI UiaAddEvent(HUIANODE huianode, EVENTID event_id, UiaEventCallback *callback, enum TreeScope scope,
+        PROPERTYID *prop_ids, int prop_ids_count, struct UiaCacheRequest *cache_req, HUIAEVENT *huiaevent)
+{
+    const struct uia_event_info *event_info = uia_event_info_from_id(event_id);
+
+    TRACE("(%p, %d, %p, %#x, %p, %d, %p, %p)\n", huianode, event_id, callback, scope, prop_ids, prop_ids_count,
+            cache_req, huiaevent);
+
+    if (!callback || !cache_req || !huiaevent || !event_info)
+        return E_INVALIDARG;
+
+    return uia_add_event(huianode, event_id, callback, scope, prop_ids, prop_ids_count, cache_req, NULL, huiaevent);
 }
 
 /***********************************************************************
@@ -4508,6 +4504,7 @@ static HRESULT uia_raise_event(IRawElementProviderSimple *elprov, struct uia_eve
     {
         struct uia_event *event = LIST_ENTRY(cursor, struct uia_event, event_list_entry);
 
+        args->event_handler_data = event->u.local.event_handler_data;
         hr = uia_process_event(node, args, sa, event);
         if (FAILED(hr))
             WARN("uia_process_event failed with hr %#lx\n", hr);

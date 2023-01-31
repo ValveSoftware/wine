@@ -122,11 +122,35 @@ static inline BOOL uia_array_reserve(void **elements, SIZE_T *capacity, SIZE_T c
     return TRUE;
 }
 
+struct uia_event_args
+{
+    LONG ref;
+
+    union {
+        struct UiaEventArgs                    simple_args;
+        struct UiaPropertyChangedEventArgs     prop_change_args;
+        struct UiaStructureChangedEventArgs    struct_change_args;
+        struct UiaAsyncContentLoadedEventArgs  async_loaded_args;
+        struct UiaWindowClosedEventArgs        window_closed_args;
+        struct UiaTextEditTextChangedEventArgs text_edit_change_args;
+        struct UiaChangesEventArgs             changes_args;
+    } u;
+    void *event_handler_data;
+};
+
+static inline struct uia_event_args *impl_from_UiaEventArgs(struct UiaEventArgs *args)
+{
+    return CONTAINING_RECORD(args, struct uia_event_args, u.simple_args);
+}
+
 /* uia_client.c */
 int uia_compare_safearrays(SAFEARRAY *sa1, SAFEARRAY *sa2, int prop_type) DECLSPEC_HIDDEN;
 int get_node_provider_type_at_idx(struct uia_node *node, int idx) DECLSPEC_HIDDEN;
 HRESULT create_uia_node_from_elprov(IRawElementProviderSimple *elprov, HUIANODE *out_node,
         BOOL get_hwnd_providers) DECLSPEC_HIDDEN;
+HRESULT uia_add_event(HUIANODE huianode, EVENTID event_id, UiaEventCallback *callback, enum TreeScope scope,
+        PROPERTYID *prop_ids, int prop_ids_count, struct UiaCacheRequest *cache_req, void *event_handler_data,
+        HUIAEVENT *huiaevent) DECLSPEC_HIDDEN;
 
 /* uia_com_client.c */
 HRESULT create_uia_iface(IUnknown **iface, BOOL is_cui8) DECLSPEC_HIDDEN;

@@ -23,9 +23,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(uiautomation);
 
-/*
- * IUIAutomationElement interface.
- */
 struct uia_element {
     IUIAutomationElement9 IUIAutomationElement9_iface;
     LONG ref;
@@ -38,6 +35,371 @@ static inline struct uia_element *impl_from_IUIAutomationElement9(IUIAutomationE
     return CONTAINING_RECORD(iface, struct uia_element, IUIAutomationElement9_iface);
 }
 
+enum uia_com_event_types {
+    UIA_COM_FOCUS_EVENT_TYPE,
+    UIA_COM_EVENT_TYPE_COUNT,
+};
+
+struct uia_com_event {
+    struct list main_event_list_entry;
+    struct list event_type_list_entry;
+
+    const struct uia_event_info *event_info;
+    struct UiaCacheRequest cache_req;
+    IUIAutomationElement *elem;
+    HUIAEVENT uia_event;
+
+    int event_type;
+    union {
+        IUnknown *handler;
+        IUIAutomationFocusChangedEventHandler *focus_handler;
+    } u;
+};
+
+/*
+ * UI Automation COM client event thread functions.
+ */
+struct uia_com_event_thread
+{
+    HANDLE hthread;
+    HWND hwnd;
+    LONG ref;
+
+    struct list events_list;
+    struct list event_type_list[UIA_COM_EVENT_TYPE_COUNT];
+};
+
+static struct uia_com_event_thread com_event_thread;
+static CRITICAL_SECTION com_event_thread_cs;
+static CRITICAL_SECTION_DEBUG com_event_thread_cs_debug =
+{
+    0, 0, &com_event_thread_cs,
+    { &com_event_thread_cs_debug.ProcessLocksList, &com_event_thread_cs_debug.ProcessLocksList },
+      0, 0, { (DWORD_PTR)(__FILE__ ": com_event_thread_cs") }
+};
+static CRITICAL_SECTION com_event_thread_cs = { &com_event_thread_cs_debug, -1, 0, 0, 0, 0 };
+
+#define WM_UIA_COM_EVENT_THREAD_STOP (WM_USER + 2)
+static LRESULT CALLBACK uia_com_event_thread_msg_proc(HWND hwnd, UINT msg, WPARAM wparam,
+        LPARAM lparam)
+{
+    switch (msg)
+    {
+    default:
+        break;
+    }
+
+    return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
+
+static const WCHAR *ignored_window_classes[] = {
+    L"OleMainThreadWndClass",
+    L"IME",
+    L"Message",
+};
+
+void CALLBACK window_create_proc(HWINEVENTHOOK hook, DWORD event, HWND hwnd, LONG objid, LONG cid, DWORD thread,
+        DWORD event_time)
+{
+    struct list *cursor, *cursor2;
+    WCHAR buf[256] = { 0 };
+
+    if (objid != OBJID_WINDOW)
+        return;
+
+    if (GetClassNameW(hwnd, buf, ARRAY_SIZE(buf)))
+    {
+        int i;
+
+        for (i = 0; i < ARRAY_SIZE(ignored_window_classes); i++)
+        {
+            if (!lstrcmpW(buf, ignored_window_classes[i]))
+                return;
+        }
+    }
+
+    LIST_FOR_EACH_SAFE(cursor, cursor2, &com_event_thread.events_list)
+    {
+        struct uia_com_event *event = LIST_ENTRY(cursor, struct uia_com_event, main_event_list_entry);
+        HRESULT hr;
+
+        hr = UiaEventAddWindow(event->uia_event, hwnd);
+        if (FAILED(hr))
+            WARN("UiaEventAddWindow failed with hr %#lx\n", hr);
+    }
+}
+
+static DWORD WINAPI uia_com_event_thread_proc(void *arg)
+{
+    HANDLE initialized_event = arg;
+    HWND hwnd;
+    MSG msg;
+
+    CoInitializeEx(NULL, COINIT_MULTITHREADED);
+    hwnd = CreateWindowW(L"Message", NULL, 0, 0, 0, 0, 0, HWND_MESSAGE, NULL, NULL, NULL);
+    if (!hwnd)
+    {
+        WARN("CreateWindow failed: %ld\n", GetLastError());
+        CoUninitialize();
+        FreeLibraryAndExitThread(huia_module, 1);
+    }
+
+    SetWindowLongPtrW(hwnd, GWLP_WNDPROC, (LONG_PTR)uia_com_event_thread_msg_proc);
+    com_event_thread.hwnd = hwnd;
+    SetWinEventHook(EVENT_OBJECT_CREATE, EVENT_OBJECT_CREATE, 0, window_create_proc, 0, 0, WINEVENT_OUTOFCONTEXT);
+
+    /* Initialization complete, thread can now process window messages. */
+    SetEvent(initialized_event);
+    TRACE("Event thread started.\n");
+    while (GetMessageW(&msg, NULL, 0, 0))
+    {
+        if (msg.message == WM_UIA_COM_EVENT_THREAD_STOP)
+            break;
+
+        TranslateMessage(&msg);
+        DispatchMessageW(&msg);
+    }
+
+    TRACE("Shutting down UI Automation COM event thread.\n");
+
+    DestroyWindow(hwnd);
+    CoUninitialize();
+    FreeLibraryAndExitThread(huia_module, 0);
+}
+
+static BOOL uia_start_com_event_thread(void)
+{
+    BOOL started = TRUE;
+
+    EnterCriticalSection(&com_event_thread_cs);
+    if (++com_event_thread.ref == 1)
+    {
+        HANDLE ready_event = NULL;
+        HANDLE events[2];
+        HMODULE hmodule;
+        DWORD wait_obj;
+        int i;
+
+        /* Increment DLL reference count. */
+        GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS,
+                (const WCHAR *)uia_start_com_event_thread, &hmodule);
+
+        list_init(&com_event_thread.events_list);
+        for (i = 0; i < UIA_COM_EVENT_TYPE_COUNT; i++)
+            list_init(&com_event_thread.event_type_list[i]);
+
+        events[0] = ready_event = CreateEventW(NULL, FALSE, FALSE, NULL);
+        if (!(com_event_thread.hthread = CreateThread(NULL, 0, uia_com_event_thread_proc,
+                ready_event, 0, NULL)))
+        {
+            FreeLibrary(hmodule);
+            started = FALSE;
+            goto exit;
+        }
+
+        events[1] = com_event_thread.hthread;
+        wait_obj = WaitForMultipleObjects(2, events, FALSE, INFINITE);
+        if (wait_obj != WAIT_OBJECT_0)
+        {
+            CloseHandle(com_event_thread.hthread);
+            started = FALSE;
+        }
+
+exit:
+        if (ready_event)
+            CloseHandle(ready_event);
+        if (!started)
+            memset(&com_event_thread, 0, sizeof(com_event_thread));
+    }
+
+    LeaveCriticalSection(&com_event_thread_cs);
+    return started;
+}
+
+static void uia_stop_com_event_thread(void)
+{
+    EnterCriticalSection(&com_event_thread_cs);
+    if (!--com_event_thread.ref)
+    {
+        PostMessageW(com_event_thread.hwnd, WM_UIA_COM_EVENT_THREAD_STOP, 0, 0);
+        CloseHandle(com_event_thread.hthread);
+        memset(&com_event_thread, 0, sizeof(com_event_thread));
+    }
+    LeaveCriticalSection(&com_event_thread_cs);
+}
+
+static HRESULT create_uia_element(IUIAutomationElement **iface, HUIANODE node);
+static void WINAPI uia_com_event_callback(struct UiaEventArgs *args, SAFEARRAY *req_data, BSTR tree_struct)
+{
+    struct uia_event_args *event_args = impl_from_UiaEventArgs(args);
+    struct uia_com_event *com_event;
+    IUIAutomationElement *elem;
+    LONG idx[2] = { 0 };
+    HUIANODE node;
+    HRESULT hr;
+    VARIANT v;
+
+    TRACE("%p, %p, %p\n", args, req_data, tree_struct);
+
+    hr = SafeArrayGetElement(req_data, idx, &v);
+    if (FAILED(hr))
+        WARN("%d: hr %#lx\n", __LINE__, hr);
+
+    hr = UiaHUiaNodeFromVariant(&v, &node);
+    if (FAILED(hr))
+        WARN("%d: hr %#lx\n", __LINE__, hr);
+    VariantClear(&v);
+
+    hr = create_uia_element(&elem, node);
+    if (FAILED(hr))
+        WARN("%d: hr %#lx\n", __LINE__, hr);
+
+    com_event = (struct uia_com_event *)event_args->event_handler_data;
+    switch (args->Type)
+    {
+    case EventArgsType_Simple:
+        if (args->EventId == UIA_AutomationFocusChangedEventId)
+            hr = IUIAutomationFocusChangedEventHandler_HandleFocusChangedEvent(com_event->u.focus_handler, elem);
+        break;
+
+    case EventArgsType_PropertyChanged:
+    case EventArgsType_StructureChanged:
+    case EventArgsType_AsyncContentLoaded:
+    case EventArgsType_WindowClosed:
+    case EventArgsType_TextEditTextChanged:
+    case EventArgsType_Changes:
+    default:
+        break;
+    }
+
+    if (FAILED(hr))
+        WARN("Event handler failed with hr %#lx\n", hr);
+
+    IUIAutomationElement_Release(elem);
+    SafeArrayDestroy(req_data);
+    SysFreeString(tree_struct);
+}
+
+static const struct UiaCondition UiaTrueCondition  = { ConditionType_True };
+static const struct UiaCacheRequest DefaultCacheReq = {
+    (struct UiaCondition *)&UiaTrueCondition,
+    TreeScope_Element,
+    NULL, 0,
+    NULL, 0,
+    AutomationElementMode_Full,
+};
+
+static HRESULT add_uia_com_event(const struct uia_event_info *event_info, int com_event_type,
+        IUIAutomationElement *elem, IUnknown *handler, int scope, int *prop_ids, int prop_ids_count,
+        struct UiaCacheRequest *cache_req)
+{
+    struct uia_com_event *com_event = heap_alloc_zero(sizeof(*com_event));
+    struct uia_element *element;
+    HUIAEVENT event;
+    HRESULT hr;
+
+    element = impl_from_IUIAutomationElement9((IUIAutomationElement9 *)elem);
+    hr = uia_add_event(element->node, event_info->event_id, (UiaEventCallback *)uia_com_event_callback, scope,
+            prop_ids, prop_ids_count, cache_req, (void *)com_event, &event);
+    if (FAILED(hr))
+    {
+        heap_free(com_event);
+        return hr;
+    }
+
+    if (!uia_start_com_event_thread())
+    {
+        ERR("Failed to start COM event thread!\n");
+        heap_free(com_event);
+        return E_FAIL;
+    }
+
+    switch (com_event_type)
+    {
+    case UIA_COM_FOCUS_EVENT_TYPE:
+        hr = IUnknown_QueryInterface(handler, &IID_IUIAutomationFocusChangedEventHandler,
+                (void **)&com_event->u.focus_handler);
+        break;
+
+    default:
+        break;
+    }
+
+    if (FAILED(hr))
+    {
+        ERR("Failed to get event handler interface, hr %#lx\n", hr);
+        uia_stop_com_event_thread();
+        heap_free(com_event);
+        return hr;
+    }
+
+    com_event->cache_req = *cache_req;
+    com_event->uia_event = event;
+    com_event->event_info = event_info;
+    list_add_tail(&com_event_thread.events_list, &com_event->main_event_list_entry);
+    list_add_tail(&com_event_thread.event_type_list[com_event_type], &com_event->event_type_list_entry);
+
+    return S_OK;
+}
+
+static void remove_uia_com_event(struct uia_com_event *event)
+{
+    HRESULT hr;
+
+    list_remove(&event->main_event_list_entry);
+    list_remove(&event->event_type_list_entry);
+    hr = UiaRemoveEvent(event->uia_event);
+    if (FAILED(hr))
+        WARN("UiaRemoveEvent failed with hr %#lx\n", hr);
+
+    if (event->elem)
+        IUIAutomationElement_Release(event->elem);
+    IUnknown_Release(event->u.handler);
+    heap_free(event);
+
+    uia_stop_com_event_thread();
+}
+
+static HRESULT find_uia_com_event(const struct uia_event_info *event_info, int com_event_type,
+        IUIAutomationElement *elem, IUnknown *handler, struct uia_com_event **out_event)
+{
+    struct list *cursor, *cursor2;
+    IUnknown *unk, *unk2;
+    HRESULT hr;
+
+    *out_event = NULL;
+    hr = IUnknown_QueryInterface(handler, &IID_IUnknown, (void **)&unk);
+    if (FAILED(hr) || !unk)
+        return hr;
+
+    LIST_FOR_EACH_SAFE(cursor, cursor2, &com_event_thread.event_type_list[com_event_type])
+    {
+        struct uia_com_event *event = LIST_ENTRY(cursor, struct uia_com_event, event_type_list_entry);
+        HRESULT hr;
+
+        if (event->event_info != event_info)
+            continue;
+
+        hr = IUnknown_QueryInterface(event->u.handler, &IID_IUnknown, (void **)&unk2);
+        if (FAILED(hr) || !unk2)
+            continue;
+
+        if ((unk == unk2) && (!elem || (elem == event->elem)))
+            *out_event = event;
+
+        IUnknown_Release(unk2);
+        if (*out_event)
+            break;
+    }
+
+    IUnknown_Release(unk);
+
+    return S_OK;
+}
+
+/*
+ * IUIAutomationElement interface.
+ */
 static HRESULT WINAPI uia_element_QueryInterface(IUIAutomationElement9 *iface, REFIID riid, void **ppv)
 {
     if (IsEqualIID(riid, &IID_IUnknown) || IsEqualIID(riid, &IID_IUIAutomationElement) ||
@@ -1309,15 +1671,40 @@ static HRESULT WINAPI uia_iface_RemoveStructureChangedEventHandler(IUIAutomation
 static HRESULT WINAPI uia_iface_AddFocusChangedEventHandler(IUIAutomation6 *iface,
         IUIAutomationCacheRequest *cache_req, IUIAutomationFocusChangedEventHandler *handler)
 {
-    FIXME("%p, %p, %p: stub\n", iface, cache_req, handler);
-    return E_NOTIMPL;
+    const struct uia_event_info *event_info = uia_event_info_from_id(UIA_AutomationFocusChangedEventId);
+    IUIAutomationElement *element;
+    HRESULT hr;
+
+    TRACE("%p, %p, %p\n", iface, cache_req, handler);
+
+    if (cache_req)
+        FIXME("Cache req parameter currently ignored\n");
+
+    hr = IUIAutomation6_ElementFromHandle(iface, GetDesktopWindow(), &element);
+    if (FAILED(hr) || !element)
+    {
+        WARN("Failed to get desktop element, hr %#lx\n", hr);
+        return hr;
+    }
+
+    return add_uia_com_event(event_info, UIA_COM_FOCUS_EVENT_TYPE, element, (IUnknown *)handler, TreeScope_SubTree, NULL,
+            0, (struct UiaCacheRequest *)&DefaultCacheReq);
 }
 
 static HRESULT WINAPI uia_iface_RemoveFocusChangedEventHandler(IUIAutomation6 *iface,
         IUIAutomationFocusChangedEventHandler *handler)
 {
-    FIXME("%p, %p: stub\n", iface, handler);
-    return E_NOTIMPL;
+    const struct uia_event_info *event_info = uia_event_info_from_id(UIA_AutomationFocusChangedEventId);
+    struct uia_com_event *event;
+    HRESULT hr;
+
+    TRACE("%p, %p\n", iface, handler);
+
+    hr = find_uia_com_event(event_info, UIA_COM_FOCUS_EVENT_TYPE, NULL, (IUnknown *)handler, &event);
+    if (SUCCEEDED(hr) && event)
+        remove_uia_com_event(event);
+
+    return S_OK;
 }
 
 static HRESULT WINAPI uia_iface_RemoveAllEventHandlers(IUIAutomation6 *iface)
