@@ -591,7 +591,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     }
     options[] =
     {
-        {L"UplayWebCore.exe", L" --use-gl=swiftshader"},
+        {L"UplayWebCore.exe", L" --use-angle=gl"},
         {L"Paradox Launcher.exe", L" --use-gl=swiftshader --in-process-gpu"},
         {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
         {L"EOSOverlayRenderer-Win64-Shipping.exe", L" --use-gl=swiftshader --in-process-gpu"},
