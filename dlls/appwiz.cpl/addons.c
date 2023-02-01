@@ -58,10 +58,10 @@ WINE_DEFAULT_DEBUG_CHANNEL(appwizcpl);
 #define GECKO_SHA "???"
 #endif
 
-#define MONO_VERSION "7.4.0"
+#define MONO_VERSION "7.4.1"
 #if defined(__i386__) || defined(__x86_64__)
 #define MONO_ARCH "x86"
-#define MONO_SHA "6413ff328ebbf7ec7689c648feb3546d8102ded865079d1fbf0331b14b3ab0ec"
+#define MONO_SHA "4721de007ecd0019cc18e144a882c290da3314d7e1bc77f57c404675e644b9fe"
 #else
 #define MONO_ARCH ""
 #define MONO_SHA "???"
@@ -97,7 +97,7 @@ static const addon_info_t addons_info[] = {
         L"wine-mono-" MONO_VERSION "-" MONO_ARCH ".msi",
         L"mono",
         MONO_SHA,
-        "http://source.winehq.org/winemono.php",
+        "https://github.com/madewokherd/wine-mono/releases/download/wine-mono-" MONO_VERSION "/wine-mono-" MONO_VERSION "-" MONO_ARCH ".msi",
         "Dotnet", "MonoUrl", "MonoCabDir",
         MAKEINTRESOURCEW(ID_DWL_MONO_DIALOG)
     }
