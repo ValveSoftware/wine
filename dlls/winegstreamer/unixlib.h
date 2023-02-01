@@ -317,6 +317,12 @@ struct wg_transform_set_output_format_params
     const struct wg_format *format;
 };
 
+struct wg_transform_get_status_params
+{
+    struct wg_transform *transform;
+    UINT32 accepts_input;
+};
+
 struct wg_transform_drain_params
 {
     struct wg_transform *transform;
@@ -355,6 +361,7 @@ enum unix_funcs
 
     unix_wg_transform_push_data,
     unix_wg_transform_read_data,
+    unix_wg_transform_get_status,
     unix_wg_transform_drain,
 };
 
