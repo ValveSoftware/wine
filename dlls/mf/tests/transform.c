@@ -2370,6 +2370,7 @@ static void test_aac_decoder(void)
     IMFMediaType *media_type;
     IMFTransform *transform;
     const BYTE *aacenc_data;
+    DWORD flags;
     HRESULT hr;
 
     hr = CoInitialize(NULL);
@@ -2449,10 +2450,23 @@ static void test_aac_decoder(void)
     ok(aacenc_data_len == 24861, "got length %lu\n", aacenc_data_len);
 
     input_sample = create_sample(aacenc_data + sizeof(DWORD), *(DWORD *)aacenc_data);
+
+    flags = 0;
+    hr = IMFTransform_GetInputStatus(transform, 0, &flags);
+    ok(hr == S_OK, "Got %#lx\n", hr);
+    ok(flags == MFT_INPUT_STATUS_ACCEPT_DATA, "Got flags %#lx.\n", flags);
     hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
     ok(hr == S_OK, "ProcessInput returned %#lx\n", hr);
+    flags = 0xdeadbeef;
+    hr = IMFTransform_GetInputStatus(transform, 0, &flags);
+    ok(hr == S_OK, "Got %#lx\n", hr);
+    ok(!flags, "Got flags %#lx.\n", flags);
     hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
     ok(hr == MF_E_NOTACCEPTING, "ProcessInput returned %#lx\n", hr);
+    flags = 0xdeadbeef;
+    hr = IMFTransform_GetInputStatus(transform, 0, &flags);
+    ok(hr == S_OK, "Got %#lx\n", hr);
+    ok(!flags, "Got flags %#lx.\n", flags);
 
     /* As output_info.dwFlags doesn't have MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES
      * IMFTransform_ProcessOutput needs a sample or returns MF_E_TRANSFORM_NEED_MORE_INPUT */
@@ -2460,11 +2474,19 @@ static void test_aac_decoder(void)
     hr = check_mft_process_output(transform, NULL, &output_status);
     ok(hr == E_INVALIDARG, "ProcessOutput returned %#lx\n", hr);
     ok(output_status == 0, "got output[0].dwStatus %#lx\n", output_status);
+    flags = 0xdeadbeef;
+    hr = IMFTransform_GetInputStatus(transform, 0, &flags);
+    ok(hr == S_OK, "Got %#lx\n", hr);
+    ok(!flags, "Got flags %#lx.\n", flags);
     hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
     ok(hr == MF_E_NOTACCEPTING, "ProcessInput returned %#lx\n", hr);
 
     hr = IMFTransform_ProcessMessage(transform, MFT_MESSAGE_COMMAND_DRAIN, 0);
     ok(hr == S_OK, "ProcessMessage returned %#lx\n", hr);
+    flags = 0xdeadbeef;
+    hr = IMFTransform_GetInputStatus(transform, 0, &flags);
+    ok(hr == S_OK, "Got %#lx\n", hr);
+    ok(!flags, "Got flags %#lx.\n", flags);
     if (0)
     {
         /* This is fine on Windows but currently MFT_MESSAGE_COMMAND_DRAIN removes input sample from the queue
@@ -2489,6 +2511,12 @@ static void test_aac_decoder(void)
         winetest_pop_context();
     }
     ok(hr == MF_E_TRANSFORM_NEED_MORE_INPUT, "ProcessOutput returned %#lx\n", hr);
+
+    flags = 0;
+    hr = IMFTransform_GetInputStatus(transform, 0, &flags);
+    ok(hr == S_OK, "Got %#lx\n", hr);
+    ok(flags == MFT_INPUT_STATUS_ACCEPT_DATA, "Got flags %#lx.\n", flags);
+
     ok(output_status == MFT_OUTPUT_DATA_BUFFER_NO_SAMPLE, "got output[0].dwStatus %#lx\n", output_status);
     ret = IMFSample_Release(output_sample);
     ok(ret == 0, "Release returned %lu\n", ret);
