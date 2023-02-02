@@ -135,6 +135,9 @@ static ULONG detach_inner_window(HTMLInnerWindow *window)
     if(doc)
         detach_document_node(doc);
 
+    if(outer_window && outer_window->location.dispex.outer)
+        dispex_unlink(&outer_window->location.dispex);
+
     abort_window_bindings(window);
     remove_target_tasks(window->task_magic);
     release_script_hosts(window);
