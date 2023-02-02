@@ -1675,13 +1675,15 @@ static void test_known_dlls_load(void)
     h = LoadLibraryA( dll );
     ret = pSetDefaultDllDirectories( LOAD_LIBRARY_SEARCH_DEFAULT_DIRS );
     ok( ret, "SetDefaultDllDirectories failed err %lu\n", GetLastError() );
-    todo_wine ok( !!h, "Got NULL.\n" );
+    ok( !!h, "Got NULL.\n" );
+    check_dll_path( h, system_path );
     hapiset = GetModuleHandleA( apiset_dll );
     ok( hapiset == h, "Got %p, %p.\n", hapiset, h );
     FreeLibrary( h );
 
     h = LoadLibraryExA( dll, 0, LOAD_LIBRARY_SEARCH_APPLICATION_DIR );
-    todo_wine ok( !!h, "Got NULL.\n" );
+    ok( !!h, "Got NULL.\n" );
+    check_dll_path( h, system_path );
     hapiset = GetModuleHandleA( apiset_dll );
     ok( hapiset == h, "Got %p, %p.\n", hapiset, h );
     FreeLibrary( h );
@@ -1691,8 +1693,9 @@ static void test_known_dlls_load(void)
 
     h = LoadLibraryExA( dll, 0, LOAD_LIBRARY_SEARCH_APPLICATION_DIR );
     ok( !!h, "Got NULL.\n" );
+    check_dll_path( h, system_path );
     hapiset = GetModuleHandleA( apiset_dll );
-    todo_wine ok( hapiset == h, "Got %p, %p.\n", hapiset, h );
+    ok( hapiset == h, "Got %p, %p.\n", hapiset, h );
     FreeLibrary( h );
 
     /* Local version can still be loaded if dll name contains path. */
