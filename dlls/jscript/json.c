@@ -350,8 +350,8 @@ static jsval_t transform_json_object(struct transform_json_object_ctx *proc_ctx,
     }
 
     args[0] = jsval_string(name);
-    proc_ctx->hres = disp_call_value(proc_ctx->ctx, proc_ctx->reviver, jsval_obj(holder), DISPATCH_METHOD,
-                                     ARRAY_SIZE(args), args, &res, &proc_ctx->ctx->jscaller->IServiceProvider_iface);
+    proc_ctx->hres = disp_call_value(proc_ctx->ctx, proc_ctx->reviver, jsval_obj(holder),
+                                     DISPATCH_METHOD, ARRAY_SIZE(args), args, &res);
     return FAILED(proc_ctx->hres) ? jsval_undefined() : res;
 }
 

@@ -541,7 +541,7 @@ static HRESULT Function_apply(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsi
             hres = function->vtbl->call(ctx, function, this_val, flags, cnt, args, r, &ctx->jscaller->IServiceProvider_iface);
         }else {
             jsval_t res;
-            hres = disp_call_value(ctx, get_object(vthis), this_val, DISPATCH_METHOD, cnt, args, &res, &ctx->jscaller->IServiceProvider_iface);
+            hres = disp_call_value(ctx, get_object(vthis), this_val, DISPATCH_METHOD, cnt, args, &res);
             if(SUCCEEDED(hres)) {
                 if(r)
                     *r = res;
@@ -1014,7 +1014,8 @@ static HRESULT ProxyConstructor_call(script_ctx_t *ctx, FunctionInstance *func, 
 {
     ProxyConstructor *constructor = (ProxyConstructor*)func;
 
-    return disp_call_value(ctx, constructor->disp, jsval_undefined(), flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK, argc, argv, r, caller);
+    return disp_call_value_with_caller(ctx, constructor->disp, jsval_undefined(), flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK,
+                                       argc, argv, r, caller);
 }
 
 static HRESULT ProxyConstructor_toString(FunctionInstance *func, jsstr_t **ret)
@@ -1064,7 +1065,8 @@ static HRESULT ProxyConstructorCreate_call(script_ctx_t *ctx, FunctionInstance *
     if(!(flags & DISPATCH_METHOD))
         return E_UNEXPECTED;
 
-    return disp_call_value(ctx, create->ctor->disp, jsval_undefined(), flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK, argc, argv, r, caller);
+    return disp_call_value_with_caller(ctx, create->ctor->disp, jsval_undefined(), flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK,
+                                       argc, argv, r, caller);
 }
 
 static HRESULT ProxyConstructorCreate_toString(FunctionInstance *func, jsstr_t **ret)
