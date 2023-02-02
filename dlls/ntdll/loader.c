@@ -3004,6 +3004,23 @@ done:
 }
 
 
+/******************************************************************************
+ *	prepend_system_dir
+ */
+static NTSTATUS prepend_system_dir( const WCHAR *name, ULONG name_length, WCHAR **fullname )
+{
+    ULONG len;
+
+    len = wcslen( system_dir ) + name_length;
+    if (!(*fullname = RtlAllocateHeap( GetProcessHeap(), 0, (len + 1) * sizeof(WCHAR) )))
+        return STATUS_NO_MEMORY;
+    wcscpy( *fullname, system_dir );
+    memcpy( *fullname + wcslen( system_dir ), name, name_length * sizeof(WCHAR) );
+    (*fullname)[len] = 0;
+
+    return STATUS_SUCCESS;
+}
+
 
 /******************************************************************************
  *	find_apiset_dll
@@ -3013,18 +3030,11 @@ static NTSTATUS find_apiset_dll( const WCHAR *name, WCHAR **fullname )
     const API_SET_NAMESPACE *map = NtCurrentTeb()->Peb->ApiSetMap;
     const API_SET_NAMESPACE_ENTRY *entry;
     UNICODE_STRING str;
-    ULONG len;
 
     if (get_apiset_entry( map, name, wcslen(name), &entry )) return STATUS_APISET_NOT_PRESENT;
     if (get_apiset_target( map, entry, NULL, &str )) return STATUS_DLL_NOT_FOUND;
 
-    len = wcslen( system_dir ) + str.Length / sizeof(WCHAR);
-    if (!(*fullname = RtlAllocateHeap( GetProcessHeap(), 0, (len + 1) * sizeof(WCHAR) )))
-        return STATUS_NO_MEMORY;
-    wcscpy( *fullname, system_dir );
-    memcpy( *fullname + wcslen( system_dir ), str.Buffer, str.Length );
-    (*fullname)[len] = 0;
-    return STATUS_SUCCESS;
+    return prepend_system_dir( str.Buffer, str.Length / sizeof(WCHAR), fullname );
 }
 
 
