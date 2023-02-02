@@ -1067,8 +1067,7 @@ static HRESULT Array_every(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigne
         args[0] = value;
         args[1] = jsval_number(i);
         args[2] = jsval_obj(jsthis);
-        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res,
-                               &ctx->jscaller->IServiceProvider_iface);
+        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res);
         jsval_release(value);
         if(FAILED(hres))
             goto done;
@@ -1135,8 +1134,7 @@ static HRESULT Array_filter(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsign
         args[0] = value;
         args[1] = jsval_number(i);
         args[2] = jsval_obj(jsthis);
-        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res,
-                               &ctx->jscaller->IServiceProvider_iface);
+        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res);
         if(SUCCEEDED(hres)) {
             hres = to_boolean(res, &boolval);
             jsval_release(res);
@@ -1198,8 +1196,7 @@ static HRESULT Array_forEach(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsig
         args[0] = value;
         args[1] = jsval_number(i);
         args[2] = jsval_obj(jsthis);
-        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res,
-                               &ctx->jscaller->IServiceProvider_iface);
+        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res);
         jsval_release(value);
         if(FAILED(hres))
             goto done;
@@ -1374,8 +1371,7 @@ static HRESULT Array_map(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned 
 
         callback_args[1] = jsval_number(k);
         callback_args[2] = jsval_obj(jsthis);
-        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, 3, callback_args, &mapped_value,
-                               &ctx->jscaller->IServiceProvider_iface);
+        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, 3, callback_args, &mapped_value);
         jsval_release(callback_args[0]);
         if(FAILED(hres))
             break;
@@ -1442,8 +1438,7 @@ static HRESULT Array_reduce(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsign
         callback_args[0] = acc;
         callback_args[2] = jsval_number(k);
         callback_args[3] = jsval_obj(jsthis);
-        hres = disp_call_value(ctx, callback, jsval_undefined(), DISPATCH_METHOD, ARRAY_SIZE(callback_args),
-                               callback_args, &new_acc, &ctx->jscaller->IServiceProvider_iface);
+        hres = disp_call_value(ctx, callback, jsval_undefined(), DISPATCH_METHOD, ARRAY_SIZE(callback_args), callback_args, &new_acc);
         jsval_release(callback_args[1]);
         if(FAILED(hres))
             break;
@@ -1504,8 +1499,7 @@ static HRESULT Array_some(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned
         args[0] = value;
         args[1] = jsval_number(i);
         args[2] = jsval_obj(jsthis);
-        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res,
-                               &ctx->jscaller->IServiceProvider_iface);
+        hres = disp_call_value(ctx, callback, context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &res);
         jsval_release(value);
         if(FAILED(hres))
             goto done;

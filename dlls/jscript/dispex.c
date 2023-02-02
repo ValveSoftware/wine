@@ -845,9 +845,9 @@ static HRESULT invoke_prop_func(jsdisp_t *This, IDispatch *jsthis, dispex_prop_t
 
         TRACE("call %s %p\n", debugstr_w(prop->name), get_object(prop->u.val));
 
-        return disp_call_value(This->ctx, get_object(prop->u.val),
-                               jsval_disp(jsthis ? jsthis : (IDispatch*)&This->IDispatchEx_iface),
-                               flags, argc, argv, r, caller);
+        return disp_call_value_with_caller(This->ctx, get_object(prop->u.val),
+                jsval_disp(jsthis ? jsthis : (IDispatch*)&This->IDispatchEx_iface),
+                flags, argc, argv, r, caller);
     }
     case PROP_ACCESSOR:
     case PROP_IDX: {
@@ -858,9 +858,9 @@ static HRESULT invoke_prop_func(jsdisp_t *This, IDispatch *jsthis, dispex_prop_t
             return hres;
 
         if(is_object_instance(val)) {
-            hres = disp_call_value(This->ctx, get_object(val),
-                                   jsval_disp(jsthis ? jsthis : (IDispatch*)&This->IDispatchEx_iface),
-                                   flags, argc, argv, r, caller);
+            hres = disp_call_value_with_caller(This->ctx, get_object(val),
+                    jsval_disp(jsthis ? jsthis : (IDispatch*)&This->IDispatchEx_iface),
+                    flags, argc, argv, r, caller);
         }else {
             FIXME("invoke %s\n", debugstr_jsval(val));
             hres = E_NOTIMPL;
@@ -3277,8 +3277,8 @@ HRESULT disp_call_name(script_ctx_t *ctx, IDispatch *disp, const WCHAR *name, WO
     return disp_call(ctx, disp, id, flags, argc, argv, ret);
 }
 
-HRESULT disp_call_value(script_ctx_t *ctx, IDispatch *disp, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
-        jsval_t *r, IServiceProvider *caller)
+HRESULT disp_call_value_with_caller(script_ctx_t *ctx, IDispatch *disp, jsval_t vthis, WORD flags, unsigned argc,
+        jsval_t *argv, jsval_t *r, IServiceProvider *caller)
 {
     VARIANT buf[6], retv, *args = buf;
     IDispatch *jsthis;
