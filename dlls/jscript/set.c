@@ -208,8 +208,7 @@ static HRESULT iterate_map(MapInstance *map, script_ctx_t *ctx, unsigned argc, j
         args[1] = entry->key;
         args[2] = jsval_obj(&map->dispex);
         grab_map_entry(entry);
-        hres = disp_call_value(ctx, get_object(argv[0]), context_this, DISPATCH_METHOD, ARRAY_SIZE(args),
-                               args, &v, &ctx->jscaller->IServiceProvider_iface);
+        hres = disp_call_value(ctx, get_object(argv[0]), context_this, DISPATCH_METHOD, ARRAY_SIZE(args), args, &v);
         iter = list_next(&map->entries, iter);
         release_map_entry(entry);
         if(FAILED(hres))
