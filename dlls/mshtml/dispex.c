@@ -3741,6 +3741,9 @@ void dispex_traverse(DispatchEx *This, nsCycleCollectionTraversalCallback *cb)
 {
     dynamic_prop_t *prop;
 
+    if(This->prototype)
+        note_cc_edge((nsISupports*)&This->prototype->IUnknown_iface, "dispex_prototype", cb);
+
     if(!This->dynamic_data)
         return;
 
@@ -3765,6 +3768,12 @@ void dispex_traverse(DispatchEx *This, nsCycleCollectionTraversalCallback *cb)
 void dispex_unlink(DispatchEx *This)
 {
     dynamic_prop_t *prop;
+
+    if(This->prototype) {
+        struct legacy_prototype *prototype = This->prototype;
+        This->prototype = NULL;
+        IUnknown_Release(&prototype->IUnknown_iface);
+    }
 
     if(!This->dynamic_data)
         return;
