@@ -50,10 +50,6 @@ static const WCHAR keyboard_layouts_keyW[] =
     '\\','K','e','y','b','o','a','r','d',' ','L','a','y','o','u','t','s'
 };
 
-
-BOOL enable_mouse_in_pointer = FALSE;
-
-
 /**********************************************************************
  *	     NtUserAttachThreadInput    (win32u.@)
  */
@@ -2198,17 +2194,6 @@ BOOL unregister_touch_window( HWND hwnd )
     DWORD win_flags = win_set_flags( hwnd, 0, WIN_IS_TOUCH );
     TRACE( "hwnd %p.\n", hwnd );
     return (win_flags & WIN_IS_TOUCH) != 0;
-}
-
-
-/**********************************************************************
- *       NtUserEnableMouseInPointer    (win32u.@)
- */
-BOOL WINAPI NtUserEnableMouseInPointer( BOOL enable )
-{
-    FIXME( "enable %u semi-stub!\n", enable );
-    enable_mouse_in_pointer = TRUE;
-    return TRUE;
 }
 
 
