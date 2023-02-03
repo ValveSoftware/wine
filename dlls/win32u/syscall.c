@@ -145,7 +145,6 @@ static void * const syscalls[] =
     NtUserDrawIconEx,
     NtUserEmptyClipboard,
     NtUserEnableMenuItem,
-    NtUserEnableMouseInPointer,
     NtUserEnableScrollBar,
     NtUserEndDeferWindowPosEx,
     NtUserEndMenu,
