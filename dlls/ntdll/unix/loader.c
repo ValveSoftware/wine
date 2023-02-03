@@ -2367,6 +2367,7 @@ static void hacks_init(void)
 #ifdef _WIN64
     env_str = getenv("WINE_HIGH_DLL_ADDRESSES");
     if (env_str)  high_dll_addresses = atoi(env_str);
+    else if (sgi) high_dll_addresses = !strcmp(sgi, "1938010");
     if (high_dll_addresses)
         ERR("HACK: moving dlls to high addresses.\n");
 #endif
