@@ -273,7 +273,6 @@ extern DWORD get_input_state(void) DECLSPEC_HIDDEN;
 extern HWND get_progman_window(void) DECLSPEC_HIDDEN;
 extern HWND get_shell_window(void) DECLSPEC_HIDDEN;
 extern HWND get_taskman_window(void) DECLSPEC_HIDDEN;
-extern BOOL register_touch_window( HWND hwnd, UINT flags ) DECLSPEC_HIDDEN;
 extern BOOL WINAPI release_capture(void) DECLSPEC_HIDDEN;
 extern BOOL set_capture_window( HWND hwnd, UINT gui_flags, HWND *prev_ret ) DECLSPEC_HIDDEN;
 extern BOOL set_caret_blink_time( unsigned int time ) DECLSPEC_HIDDEN;
@@ -282,7 +281,6 @@ extern BOOL set_foreground_window( HWND hwnd, BOOL mouse ) DECLSPEC_HIDDEN;
 extern HWND set_progman_window( HWND hwnd ) DECLSPEC_HIDDEN;
 extern HWND set_taskman_window( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void toggle_caret( HWND hwnd ) DECLSPEC_HIDDEN;
-extern BOOL unregister_touch_window( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void update_mouse_tracking_info( HWND hwnd ) DECLSPEC_HIDDEN;
 
 /* menu.c */

@@ -2175,25 +2175,8 @@ void toggle_caret( HWND hwnd )
  */
 BOOL WINAPI NtUserIsTouchWindow( HWND hwnd, ULONG *flags )
 {
-    DWORD win_flags = win_set_flags( hwnd, 0, 0 );
-    TRACE( "hwnd %p, flags %p.\n", hwnd, flags );
-    return (win_flags & WIN_IS_TOUCH) != 0;
-}
-
-
-BOOL register_touch_window( HWND hwnd, UINT flags )
-{
-    DWORD win_flags = win_set_flags( hwnd, WIN_IS_TOUCH, 0 );
-    TRACE( "hwnd %p, flags %#x.\n", hwnd, flags );
-    return (win_flags & WIN_IS_TOUCH) == 0;
-}
-
-
-BOOL unregister_touch_window( HWND hwnd )
-{
-    DWORD win_flags = win_set_flags( hwnd, 0, WIN_IS_TOUCH );
-    TRACE( "hwnd %p.\n", hwnd );
-    return (win_flags & WIN_IS_TOUCH) != 0;
+    FIXME( "hwnd %p, flags %p stub!\n", hwnd, flags );
+    return FALSE;
 }
 
 
