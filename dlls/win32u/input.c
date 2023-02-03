@@ -2169,17 +2169,6 @@ void toggle_caret( HWND hwnd )
     if (ret && !hidden) display_caret( hwnd, &r );
 }
 
-
-/**********************************************************************
- *       NtUserIsTouchWindow    (win32u.@)
- */
-BOOL WINAPI NtUserIsTouchWindow( HWND hwnd, ULONG *flags )
-{
-    FIXME( "hwnd %p, flags %p stub!\n", hwnd, flags );
-    return FALSE;
-}
-
-
 HWND get_shell_window(void)
 {
     HWND hwnd = 0;

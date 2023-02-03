@@ -1056,7 +1056,7 @@
 @ stub NtUserIsNonClientDpiScalingEnabled
 @ stub NtUserIsResizeLayoutSynchronizationEnabled
 @ stub NtUserIsTopLevelWindow
-@ stdcall -syscall NtUserIsTouchWindow(long ptr)
+@ stub NtUserIsTouchWindow
 @ stub NtUserIsWindowBroadcastingDpiToChildren
 @ stub NtUserIsWindowGDIScaledDpiMessageEnabled
 @ stdcall -syscall NtUserKillTimer(long long)
