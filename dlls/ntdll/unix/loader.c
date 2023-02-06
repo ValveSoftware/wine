@@ -1518,7 +1518,13 @@ static void notify_gdb_dll_loaded( void *module, const char *unix_path )
 {
     static void (*wine_gdb_dll_loaded)( const void *module, const char *unix_path );
     if (!wine_gdb_dll_loaded) wine_gdb_dll_loaded = dlsym( RTLD_DEFAULT, "wine_gdb_dll_loaded" );
-    if (wine_gdb_dll_loaded) wine_gdb_dll_loaded( module, unix_path );
+    if (wine_gdb_dll_loaded)
+    {
+        char *real = realpath( unix_path, NULL ), *path = real;
+        if (!strncmp( path, "/run/host", 9 )) path = path + 9;
+        wine_gdb_dll_loaded( module, path );
+        free( real );
+    }
 }
 
 void notify_gdb_native_dll_loaded( void *module, UNICODE_STRING *nt_name )
