@@ -530,6 +530,15 @@ static BOOL process_events( Display *display, ULONG_PTR arg )
     prev_event.type = 0;
     while (XCheckIfEvent( display, &event, filter_event, (char *)arg ))
     {
+        switch (event.type)
+        {
+        case KeyPress:
+        case KeyRelease:
+        case KeymapNotify:
+            if (display != x11drv_input_display()) continue;
+            break;
+        }
+
         count++;
         if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
         if (steam_keyboard_opened && filter_event( display, &event, (char *)keyboard_filter )) continue;
