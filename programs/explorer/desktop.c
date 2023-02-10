@@ -1071,7 +1071,7 @@ void manage_desktop( WCHAR *arg )
     GUID guid;
     MSG msg;
     HWND hwnd;
-    HANDLE taptip;
+    HANDLE tabtip = NULL;
     HMODULE graphics_driver;
     unsigned int width, height;
     WCHAR *cmdline = NULL, *driver = NULL;
@@ -1184,12 +1184,12 @@ void manage_desktop( WCHAR *arg )
     desktopshellbrowserwindow_init();
     shellwindows_init();
 
-    /* FIXME: hack, run tabtip.exe on startup. */
-    taptip = start_tabtip_process();
-
     /* run the desktop message loop */
     if (hwnd)
     {
+        /* FIXME: hack, run tabtip.exe on startup. */
+        tabtip = start_tabtip_process();
+
         WINE_TRACE( "desktop message loop starting on hwnd %p\n", hwnd );
         while (GetMessageW( &msg, 0, 0, 0 )) DispatchMessageW( &msg );
         WINE_TRACE( "desktop message loop exiting for hwnd %p\n", hwnd );
@@ -1197,9 +1197,12 @@ void manage_desktop( WCHAR *arg )
 
     if (pShellDDEInit) pShellDDEInit( FALSE );
 
-    TerminateProcess( taptip, 0 );
-    WaitForSingleObject( taptip, INFINITE );
-    CloseHandle( taptip );
+    if (tabtip)
+    {
+        TerminateProcess( tabtip, 0 );
+        WaitForSingleObject( tabtip, INFINITE );
+        CloseHandle( tabtip );
+    }
 
     ExitProcess( 0 );
 }
