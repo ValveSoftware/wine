@@ -22,6 +22,10 @@
 
 #include <stdarg.h>
 
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
+#include "winerror.h"
+#include "winternl.h"
 #define COBJMACROS
 #include "corerror.h"
 #include "windef.h"
