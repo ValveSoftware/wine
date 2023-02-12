@@ -20,9 +20,35 @@
 #include "initguid.h"
 #include "private.h"
 
+#include "unixlib.h"
+
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(speech);
+
+BOOL WINAPI DllMain( HINSTANCE instance, DWORD reason, void *reserved )
+{
+    NTSTATUS status;
+
+    switch (reason)
+    {
+    case DLL_PROCESS_ATTACH:
+        DisableThreadLibraryCalls(instance);
+
+        if ((status = __wine_init_unix_call()))
+            ERR("loading the unixlib failed with status %#lx.\n", status);
+
+        if ((status = WINE_UNIX_CALL(unix_process_attach, NULL)))
+            WARN("initializing the unixlib failed with status %#lx.\n", status);
+
+        break;
+    case DLL_PROCESS_DETACH:
+        WINE_UNIX_CALL(unix_process_detach, NULL);
+        break;
+    }
+
+    return TRUE;
+}
 
 HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID riid, void **out)
 {
