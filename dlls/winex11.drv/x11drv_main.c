@@ -232,7 +232,8 @@ static const char * const atom_names[NB_XATOMS - FIRST_XATOM] =
     "text/rtf",
     "text/richtext",
     "text/uri-list",
-    "GAMESCOPE_FOCUSED_APP"
+    "GAMESCOPE_FOCUSED_APP",
+    "GAMESCOPE_DISPLAY_EDID_PATH",
 };
 
 /***********************************************************************

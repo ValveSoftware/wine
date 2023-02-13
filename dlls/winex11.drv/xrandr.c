@@ -454,6 +454,7 @@ static unsigned int get_edid( RROutput output, unsigned char **prop,
     int result, actual_format;
     XRRModeInfo *mode;
     Atom actual_type;
+    char *edid_path;
 
     *prop = NULL;
     result = pXRRGetOutputProperty( gdi_display, output, x11drv_atom(EDID), 0, 128, FALSE, FALSE,
@@ -469,6 +470,31 @@ static unsigned int get_edid( RROutput output, unsigned char **prop,
         memcpy( *prop, edid, len );
         return len;
     }
+
+    edid_path = NULL;
+    if ((result = XGetWindowProperty( gdi_display, DefaultRootWindow(gdi_display), x11drv_atom(GAMESCOPE_DISPLAY_EDID_PATH), 0,
+                                      PATH_MAX, False, x11drv_atom(UTF8_STRING), &actual_type, &actual_format,
+                                      &len, &bytes_after, (unsigned char **)&edid_path )) == Success
+        && actual_type == x11drv_atom(UTF8_STRING))
+    {
+        char buffer[4096];
+        FILE *f;
+
+        f = fopen( edid_path, "rb" );
+        if (f)
+        {
+            len = fread( buffer, 1, sizeof(buffer), f );
+            fclose( f );
+            if (len)
+            {
+                XFree( edid_path );
+                if (!(*prop = malloc( len ))) return 0;
+                memcpy( *prop, buffer, len );
+                return len;
+            }
+        }
+    }
+    if (edid_path) XFree( edid_path );
 
     WARN( "Could not retrieve EDID property for output %#lx.\n", output );
     if (!output_info->npreferred)
