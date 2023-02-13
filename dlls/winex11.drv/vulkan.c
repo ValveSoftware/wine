@@ -69,6 +69,7 @@ struct wine_vk_surface
     VkPresentModeKHR present_mode;
     BOOL gdi_blit_source; /* HACK: gdi blits from the window should work with Vulkan rendered contents. */
     BOOL other_process;
+    BOOL invalidated;
     Colormap client_colormap;
     HDC draw_dc;
     unsigned int width, height;
@@ -354,6 +355,18 @@ void sync_vk_surface( HWND hwnd, BOOL known_child )
     pthread_mutex_unlock( &vulkan_mutex );
 }
 
+void invalidate_vk_surfaces(HWND hwnd)
+{
+    struct wine_vk_surface *surface;
+    pthread_mutex_lock(&vulkan_mutex);
+    LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd) continue;
+        surface->invalidated = TRUE;
+    }
+    pthread_mutex_unlock(&vulkan_mutex);
+}
+
 BOOL wine_vk_direct_window_draw( HWND hwnd )
 {
     struct wine_vk_surface *surface;
@@ -453,6 +466,7 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
     else if (x11_surface->offscreen && create_info->presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
         create_info_host.presentMode = VK_PRESENT_MODE_FIFO_KHR;
     x11_surface->present_mode = create_info->presentMode;
+    x11_surface->invalidated = FALSE;
 
     if ((result = pvkCreateSwapchainKHR( device, &create_info_host, NULL /* allocator */,
                                          swapchain )) == VK_SUCCESS)
@@ -1004,6 +1018,9 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
 
     if (fence != orig_fence) pvkDestroyFence( device, fence, NULL );
 
+    if (result == VK_SUCCESS && surface && surface->invalidated)
+        result = VK_SUBOPTIMAL_KHR;
+
     return result;
 }
 
@@ -1060,6 +1077,25 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
         }
     }
 
+    if (res == VK_SUCCESS)
+    {
+        struct wine_vk_surface *surface;
+        BOOL invalidated = FALSE;
+        unsigned int i;
+
+        pthread_mutex_lock(&vulkan_mutex);
+        for (i = 0; i < present_info->swapchainCount; ++i)
+        {
+            if (!XFindContext(gdi_display, (XID)present_info->pSwapchains[i], swapchain_context, (char **)&surface)
+                && surface->invalidated)
+            {
+                invalidated = TRUE;
+                break;
+            }
+        }
+        pthread_mutex_unlock(&vulkan_mutex);
+        if (invalidated) res = VK_SUBOPTIMAL_KHR;
+    }
     return res;
 }
 
@@ -1238,6 +1274,10 @@ void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *cha
 }
 
 void sync_vk_surface( HWND hwnd, BOOL known_child )
+{
+}
+
+void invalidate_vk_surfaces(HWND hwnd)
 {
 }
 

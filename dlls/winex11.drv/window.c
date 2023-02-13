@@ -2866,6 +2866,7 @@ static void window_update_fshack( struct x11drv_win_data *data, const RECT *wind
         XMoveResizeWindow( gdi_display, data->client_window, top_left.x, top_left.y, client_rect_host.right, client_rect_host.bottom );
 
         sync_gl_drawable( data->hwnd, !data->whole_window );
+        invalidate_vk_surfaces( data->hwnd );
     }
 
     NtUserEnumChildWindows( data->hwnd, update_child_window_fshack, enable );

@@ -664,6 +664,7 @@ extern void destroy_gl_drawable( HWND hwnd );
 extern void destroy_vk_surface( HWND hwnd );
 extern void sync_vk_surface( HWND hwnd, BOOL known_child );
 extern void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes );
+extern void invalidate_vk_surfaces( HWND hwnd );
 extern void vulkan_thread_detach(void);
 extern BOOL wine_vk_direct_window_draw( HWND hwnd );
 
