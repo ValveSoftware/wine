@@ -204,6 +204,7 @@ const char * const X11DRV_atom_names[NB_XATOMS - FIRST_XATOM] =
     "text/richtext",
     "text/uri-list",
     "GAMESCOPE_XALIA_OVERLAY",
+    "GAMESCOPE_DISPLAY_EDID_PATH",
 };
 
 /***********************************************************************
