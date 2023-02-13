@@ -60,6 +60,7 @@ AC_ARG_WITH(udev,      AS_HELP_STRING([--without-udev],[do not use udev (plug an
 AC_ARG_WITH(unwind,    AS_HELP_STRING([--without-unwind],[do not use the libunwind library (exception handling)]))
 AC_ARG_WITH(usb,       AS_HELP_STRING([--without-usb],[do not use the libusb library]))
 AC_ARG_WITH(v4l2,      AS_HELP_STRING([--without-v4l2],[do not use v4l2 (video capture)]))
+AC_ARG_WITH(vosk,      AS_HELP_STRING([--without-vosk],[do not use Vosk]))
 AC_ARG_WITH(vulkan,    AS_HELP_STRING([--without-vulkan],[do not use Vulkan]))
 AC_ARG_WITH(xcomposite,AS_HELP_STRING([--without-xcomposite],[do not use the Xcomposite extension]),
             [if test "x$withval" = "xno"; then ac_cv_header_X11_extensions_Xcomposite_h=no; fi])
@@ -488,7 +489,8 @@ AC_CHECK_HEADERS(\
 	syscall.h \
 	utime.h \
 	valgrind/memcheck.h \
-	valgrind/valgrind.h
+	valgrind/valgrind.h \
+	vosk_api.h
 )
 WINE_HEADER_MAJOR()
 AC_HEADER_STAT()
@@ -1811,6 +1813,14 @@ if test "x$enable_winealsa_drv$enable_winecoreaudio_drv$enable_winepulse_drv$ena
 then
     WINE_WARNING([No sound system was found. Windows applications will be silent.])
 fi
+
+dnl **** Check for Vosk ****
+if test x$with_vosk != xno
+then
+    WINE_CHECK_SONAME(vosk,vosk_recognizer_new)
+fi
+WINE_NOTICE_WITH(vosk,[test x$ac_cv_lib_soname_vosk = x],
+                 [libvosk ${notice_platform}development files not found, speech recognition won't be supported.])
 
 dnl *** Check for Vulkan ***
 if test "x$with_vulkan" != "xno"
