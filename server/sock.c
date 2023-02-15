@@ -39,6 +39,9 @@
 #ifdef HAVE_NETINET_IN_H
 # include <netinet/in.h>
 #endif
+#ifdef HAVE_NETINET_TCP_H
+# include <netinet/tcp.h>
+#endif
 #include <poll.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -227,6 +230,11 @@ struct sock
     unsigned int        nonblocking : 1; /* is the socket nonblocking? */
     unsigned int        bound : 1;   /* is the socket bound? */
 };
+
+static int is_tcp_socket( struct sock *sock )
+{
+    return sock->type == WS_SOCK_STREAM && (sock->family == WS_AF_INET || sock->family == WS_AF_INET6);
+}
 
 static void sock_dump( struct object *obj, int verbose );
 static struct fd *sock_get_fd( struct object *obj );
@@ -1690,6 +1698,12 @@ static int init_socket( struct sock *sock, int family, int type, int protocol, u
     sock->proto  = protocol;
     sock->type   = type;
     sock->family = family;
+
+    if (is_tcp_socket( sock ))
+    {
+        value = 4;
+        setsockopt( sockfd, IPPROTO_TCP, TCP_SYNCNT, &value, sizeof(value) );
+    }
 
     if (sock->fd)
     {
