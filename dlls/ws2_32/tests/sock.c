@@ -7367,7 +7367,6 @@ static void test_connect(void)
 
     closesocket(connector);
     closesocket(acceptor);
-    closesocket(listener);
 
     tcp_socketpair(&connector, &acceptor);
 
@@ -7427,6 +7426,34 @@ static void test_connect(void)
 
     WSACloseEvent(overlapped.hEvent);
     closesocket(connector);
+
+    /* Test connect after previous connect attempt failure. */
+    connector = socket(AF_INET, SOCK_STREAM, 0);
+    ok(connector != INVALID_SOCKET, "failed to create socket, error %u\n", WSAGetLastError());
+
+    conaddress.sin_addr.s_addr = inet_addr("127.0.0.1");
+    conaddress.sin_port = htons(59243);
+    iret = connect(connector, (struct sockaddr *)&conaddress, sizeof(conaddress));
+    if (iret != -1)
+    {
+        skip("Connection succeeded, skipping failed connection test.\n");
+    }
+    else
+    {
+        ok(WSAGetLastError() == WSAECONNREFUSED, "got error %u\n", WSAGetLastError());
+        set_blocking( connector, FALSE );
+        iret = getsockname(listener, (struct sockaddr*)&address, &addrlen);
+        ok(!iret, "failed to get address, error %u\n", WSAGetLastError());
+
+        iret = connect(connector, (struct sockaddr *)&address, sizeof(address));
+        ok(iret == -1 && WSAGetLastError() == WSAEWOULDBLOCK, "unexpected iret %d, error %d.\n",
+                iret, WSAGetLastError());
+        acceptor = accept(listener, NULL, NULL);
+        ok(acceptor != INVALID_SOCKET, "could not accept socket error %d\n", WSAGetLastError());
+        closesocket(acceptor);
+    }
+    closesocket(connector);
+    closesocket(listener);
 }
 
 static void test_AcceptEx(void)
