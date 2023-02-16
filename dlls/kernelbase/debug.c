@@ -635,6 +635,8 @@ static BOOL start_debugger_atomic( EXCEPTION_POINTERS *epointers )
 {
     static HANDLE once;
 
+    if (!ERR_ON(seh)) return FALSE;
+
     if (once == 0)
     {
 	OBJECT_ATTRIBUTES attr;
