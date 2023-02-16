@@ -922,5 +922,6 @@ static inline BOOL is_window_rect_mapped( const RECT *rect )
 
 extern BOOL layered_window_client_hack;
 extern BOOL vulkan_gdi_blit_source_hack;
+extern BOOL input_thread_hack;
 
 #endif  /* __WINE_X11DRV_H */

@@ -93,6 +93,7 @@ HANDLE steam_overlay_event;
 HANDLE steam_keyboard_event;
 BOOL layered_window_client_hack = FALSE;
 BOOL vulkan_gdi_blit_source_hack = FALSE;
+BOOL input_thread_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -740,6 +741,13 @@ static BOOL process_attach(void)
         vulkan_gdi_blit_source_hack =
             (sgi && (
                 !strcmp(sgi, "803600") /* Disgaea 5 Complete     */
+            )) ||
+            (e && *e != '\0' && *e != '0');
+
+        e = getenv("WINE_INPUT_THREAD_HACK");
+        input_thread_hack =
+            (sgi && (
+                !strcmp(sgi, "1938010")
             )) ||
             (e && *e != '\0' && *e != '0');
     }

@@ -164,7 +164,7 @@ static Display *input_display;
 /* wait for the input thread to startup and return the input display */
 static Display *x11drv_input_display(void)
 {
-    if (!input_display)
+    if (input_thread_hack && !input_display)
     {
         EnterCriticalSection( &input_cs );
         while (!input_display) SleepConditionVariableCS( &input_cond, &input_cs, INFINITE );
@@ -191,6 +191,8 @@ void x11drv_input_add_window( HWND hwnd, Window window )
     long mask = KeyPressMask | KeyReleaseMask | KeymapStateMask;
     Display *display = x11drv_input_display();
 
+    if (input_thread_hack) return;
+
     TRACE( "display %p, window %p/%lx\n", display, hwnd, window );
 
     EnterCriticalSection( &input_cs );
@@ -205,6 +207,8 @@ void x11drv_input_add_window( HWND hwnd, Window window )
 void x11drv_input_remove_window( Window window )
 {
     Display *display = x11drv_input_display();
+
+    if (input_thread_hack) return;
 
     TRACE( "display %p, window %lx\n", display, window );
 
@@ -535,7 +539,7 @@ static BOOL process_events( Display *display, ULONG_PTR arg )
         case KeyPress:
         case KeyRelease:
         case KeymapNotify:
-            if (display != x11drv_input_display()) continue;
+            if (input_thread_hack && display != x11drv_input_display()) continue;
             break;
         }
 
