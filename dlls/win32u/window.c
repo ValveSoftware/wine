@@ -4693,6 +4693,7 @@ static void send_destroy_message( HWND hwnd )
     if (hwnd == NtUserGetClipboardOwner()) release_clipboard_owner( hwnd );
 
     send_message( hwnd, WM_DESTROY, 0, 0);
+    NtUserNotifyWinEvent( EVENT_OBJECT_DESTROY, hwnd, OBJID_WINDOW, 0 );
 
     /*
      * This WM_DESTROY message can trigger re-entrant calls to DestroyWindow
