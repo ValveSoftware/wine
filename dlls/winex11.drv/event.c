@@ -191,7 +191,7 @@ void x11drv_input_add_window( HWND hwnd, Window window )
     long mask = KeyPressMask | KeyReleaseMask | KeymapStateMask;
     Display *display = x11drv_input_display();
 
-    if (input_thread_hack) return;
+    if (!input_thread_hack) return;
 
     TRACE( "display %p, window %p/%lx\n", display, hwnd, window );
 
@@ -208,7 +208,7 @@ void x11drv_input_remove_window( Window window )
 {
     Display *display = x11drv_input_display();
 
-    if (input_thread_hack) return;
+    if (!input_thread_hack) return;
 
     TRACE( "display %p, window %lx\n", display, window );
 
