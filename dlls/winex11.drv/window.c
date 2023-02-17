@@ -1854,13 +1854,13 @@ void update_client_window( HWND hwnd )
 /**********************************************************************
  *		detach_client_window
  */
-void detach_client_window( HWND hwnd )
+void detach_client_window( HWND hwnd, Window window )
 {
     struct x11drv_win_data *data;
 
     if (!(data = get_win_data( hwnd ))) return;
 
-    if (!data->client_window)
+    if (!data->client_window || (window && data->client_window != window))
     {
         release_win_data( data );
         return;
@@ -1871,6 +1871,7 @@ void detach_client_window( HWND hwnd )
     TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
     data->client_window = 0;
     XFlush( data->display );
+    XSync( gdi_display, False );
     release_win_data( data );
 }
 
