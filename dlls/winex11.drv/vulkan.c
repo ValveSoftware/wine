@@ -524,7 +524,10 @@ static void X11DRV_vkDestroySwapchainKHR(VkDevice device, VkSwapchainKHR swapcha
     pvkDestroySwapchainKHR(device, swapchain, NULL /* allocator */);
 
     if (!XFindContext( gdi_display, (XID)swapchain, swapchain_context, (char **)&surface ))
+    {
         wine_vk_surface_release( surface );
+        XDeleteContext( gdi_display, (XID)swapchain, swapchain_context );
+    }
 }
 
 static VkResult X11DRV_vkEnumerateInstanceExtensionProperties(const char *layer_name,
