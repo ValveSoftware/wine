@@ -2228,7 +2228,10 @@ void X11DRV_DestroyWindow( HWND hwnd )
     HWND parent = NtUserGetAncestor( hwnd, GA_PARENT );
 
     if (!NtUserGetWindowRelative( parent, GW_CHILD ) && NtUserGetAncestor( parent, GA_PARENT ) == NtUserGetDesktopWindow())
+    {
+        sync_gl_drawable( parent, FALSE );
         sync_vk_surface( parent, FALSE );
+    }
 
     if (!(data = get_win_data( hwnd ))) return;
 
