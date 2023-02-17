@@ -109,6 +109,7 @@ static unsigned long err_serial;             /* serial number of first request *
 static int (*old_error_handler)( Display *, XErrorEvent * );
 static BOOL use_xim = TRUE;
 static WCHAR input_style[20];
+static int xcomp_opcode;
 
 static pthread_mutex_t d3dkmt_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t error_mutex = PTHREAD_MUTEX_INITIALIZER;
@@ -268,6 +269,11 @@ static inline BOOL ignore_error( Display *display, XErrorEvent *event )
         {
             if (event->error_code == xrender_error_base + BadPicture) return TRUE;
         }
+#endif
+#ifdef SONAME_LIBXCOMPOSITE
+        if (xcomp_opcode && event->request_code == xcomp_opcode
+            && (event->minor_code == X_CompositeRedirectWindow || event->minor_code == X_CompositeUnredirectWindow))
+            return TRUE;
 #endif
     }
     return FALSE;
@@ -611,7 +617,11 @@ static void X11DRV_XComposite_Init(void)
         usexcomposite = FALSE;
         return;
     }
-    TRACE("XComposite is up and running error_base = %d\n", xcomp_error_base);
+    if (!XQueryExtension(gdi_display, "Composite", &xcomp_opcode, &xcomp_event_base, &xcomp_error_base))
+        ERR("XQueryExtension failed.\n");
+
+    TRACE("XComposite is up and running opcode = %d, error_base = %d, event_base %d\n",
+          xcomp_opcode, xcomp_error_base, xcomp_event_base);
     return;
 
 sym_not_found:
