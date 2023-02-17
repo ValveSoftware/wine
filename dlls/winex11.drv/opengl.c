@@ -1505,7 +1505,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
 
     if (gl->layered_type)
     {
-        detach_client_window( hwnd );
+        detach_client_window( hwnd, 0 );
         gl->type = DC_GL_PIXMAP_WIN;
         gl->pixmap = XCreatePixmap( gdi_display, root_window, width, height, visual->depth );
         if (gl->pixmap)
