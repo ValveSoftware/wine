@@ -223,14 +223,21 @@ static VkResult wine_vk_instance_convert_create_info(const VkInstanceCreateInfo 
 
 static struct wine_vk_surface *wine_vk_surface_grab(struct wine_vk_surface *surface)
 {
-    InterlockedIncrement(&surface->ref);
+    int refcount = InterlockedIncrement(&surface->ref);
+    TRACE("surface %p, refcount %d.\n", surface, refcount);
     return surface;
 }
 
 static void wine_vk_surface_release(struct wine_vk_surface *surface)
 {
-    if (InterlockedDecrement(&surface->ref))
+    int refcount = InterlockedDecrement(&surface->ref);
+
+    TRACE("surface %p, refcount %d.\n", surface, refcount);
+
+    if (refcount)
         return;
+
+    TRACE("Destroying vk surface %p.\n", surface);
 
     if (surface->entry.next)
     {
@@ -242,7 +249,19 @@ static void wine_vk_surface_release(struct wine_vk_surface *surface)
     if (surface->draw_dc)
         NtGdiDeleteObjectApp(surface->draw_dc);
     if (surface->window)
+    {
+        struct x11drv_win_data *data;
+        if (surface->hwnd && (data = get_win_data( surface->hwnd )))
+        {
+            if (data->client_window == surface->window)
+            {
+                XDeleteContext( data->display, data->client_window, winContext );
+                data->client_window = 0;
+            }
+            release_win_data( data );
+        }
         XDestroyWindow(gdi_display, surface->window);
+    }
     if (surface->client_colormap)
         XFreeColormap( gdi_display, surface->client_colormap );
 
@@ -252,12 +271,11 @@ static void wine_vk_surface_release(struct wine_vk_surface *surface)
 void wine_vk_surface_destroy(struct wine_vk_surface *surface)
 {
     TRACE("Detaching surface %p, hwnd %p.\n", surface, surface->hwnd);
-    XReparentWindow(gdi_display, surface->window, get_dummy_parent(), 0, 0);
-    XSync(gdi_display, False);
+    if (surface->window)
+        detach_client_window( surface->hwnd, surface->window );
 
     surface->hwnd_thread_id = 0;
     surface->hwnd = 0;
-    wine_vk_surface_release(surface);
 }
 
 void destroy_vk_surface(HWND hwnd)
@@ -668,7 +686,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     list_add_tail(&surface_list, &x11_surface->entry);
     pthread_mutex_unlock(&vulkan_mutex);
 
-    *surface = (uintptr_t)wine_vk_surface_grab(x11_surface);
+    *surface = (uintptr_t)x11_surface;
 
     if (x11_surface->gdi_blit_source && !x11_surface->other_process)
     {
