@@ -52,6 +52,7 @@
 #include "wingdi.h"
 #include "winuser.h"
 
+#include "xcomposite.h"
 #include "wine/debug.h"
 #include "wine/server.h"
 
@@ -1825,28 +1826,49 @@ Window get_dummy_parent(void)
     return dummy_parent;
 }
 
+void reparent_client_window( struct x11drv_win_data *data, BOOL attach, BOOL offscreen )
+{
+    if (!data->client_window) return;
+
+    TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
+
+    if (attach)
+    {
+        XReparentWindow( gdi_display, data->client_window, data->whole_window,
+                         data->client_rect.left - data->whole_rect.left,
+                         data->client_rect.top - data->whole_rect.top );
+#ifdef SONAME_LIBXCOMPOSITE
+        if (!offscreen && usexcomposite)
+            pXCompositeUnredirectWindow( gdi_display, data->client_window, CompositeRedirectManual );
+#endif
+    }
+    else
+    {
+#ifdef SONAME_LIBXCOMPOSITE
+        if (offscreen && usexcomposite)
+            pXCompositeRedirectWindow( gdi_display, data->client_window, CompositeRedirectManual );
+#endif
+        XReparentWindow( gdi_display, data->client_window, get_dummy_parent(), 0, 0 );
+    }
+}
 
 /**********************************************************************
  *		update_client_window
  */
-void update_client_window( HWND hwnd )
+void update_client_window( HWND hwnd, Window new_active, BOOL offscreen )
 {
     struct x11drv_win_data *data;
-    Window old_active;
 
     if ((data = get_win_data( hwnd )))
     {
-        old_active = data->client_window;
-        data->client_window = wine_vk_active_surface( hwnd );
-        if (data->client_window && data->whole_window && old_active != data->client_window)
+        if (data->whole_window && data->client_window != new_active)
         {
-            TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
-            XReparentWindow( data->display, data->client_window, data->whole_window,
-                     data->client_rect.left - data->whole_rect.left,
-                     data->client_rect.top - data->whole_rect.top );
+            reparent_client_window( data, FALSE, TRUE );
+            data->client_window = new_active;
+            reparent_client_window( data, TRUE, offscreen );
+            /* make sure any request that could use old client window has been flushed */
+            XSync( gdi_display, False );
         }
-        /* make sure any request that could use old client window has been flushed */
-        XFlush( data->display );
         release_win_data( data );
     }
 }
@@ -1868,8 +1890,7 @@ void detach_client_window( HWND hwnd, Window window )
     }
 
     XDeleteContext( data->display, data->client_window, winContext );
-    XReparentWindow( gdi_display, data->client_window, get_dummy_parent(), 0, 0 );
-    TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
+    reparent_client_window( data, 0, TRUE );
     data->client_window = 0;
     XFlush( data->display );
     XSync( gdi_display, False );
@@ -1916,11 +1937,7 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual )
         data->window_rect = data->whole_rect = data->client_rect;
     }
 
-    if (data->client_window)
-    {
-        XReparentWindow( gdi_display, data->client_window, dummy_parent, 0, 0 );
-        TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
-    }
+    if (data->client_window) reparent_client_window( data, FALSE, TRUE );
 
     if (data->client_colormap) XFreeColormap( gdi_display, data->client_colormap );
     data->client_colormap = XCreateColormap( gdi_display, dummy_parent, visual->visual,
@@ -2102,8 +2119,9 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
         if (data->client_window && !already_destroyed)
         {
             XSelectInput( data->display, data->client_window, 0 );
-            XReparentWindow( data->display, data->client_window, get_dummy_parent(), 0, 0 );
+            reparent_client_window( data, FALSE, TRUE );
             XSync( data->display, False );
+            XSync( gdi_display, False );
         }
         XDeleteContext( data->display, data->whole_window, winContext );
         if (!already_destroyed) XDestroyWindow( data->display, data->whole_window );
