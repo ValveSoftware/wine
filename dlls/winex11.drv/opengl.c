@@ -1662,6 +1662,7 @@ void sync_gl_drawable( HWND hwnd, BOOL known_child )
 
     new_layered_type = get_gl_layered_type( hwnd );
     if (old->type == DC_GL_PIXMAP_WIN || (known_child && old->type == DC_GL_WINDOW)
+        || (!known_child && old->type != DC_GL_WINDOW)
         || old->layered_type != new_layered_type)
     {
         if ((new = create_gl_drawable( hwnd, old->format, known_child, old->mutable_pf )))

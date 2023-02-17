@@ -2196,7 +2196,10 @@ void CDECL X11DRV_DestroyWindow( HWND hwnd )
     HWND parent = GetAncestor( hwnd, GA_PARENT );
 
     if (!GetWindow( parent, GW_CHILD ) && GetAncestor( parent, GA_PARENT ) == GetDesktopWindow())
+    {
+        sync_gl_drawable( parent, FALSE );
         sync_vk_surface( parent, FALSE );
+    }
 
     if (!(data = get_win_data( hwnd ))) return;
 
