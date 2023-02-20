@@ -31,6 +31,7 @@
 #include "windef.h"
 #include "winbase.h"
 #include "winstring.h"
+#include "winuser.h"
 #include "objbase.h"
 
 #include "activation.h"
@@ -46,6 +47,8 @@
 #include "windows.media.speechrecognition.h"
 
 #include "wine/list.h"
+
+#define SPERR_WINRT_INTERNAL_ERROR 0x800455a0
 
 /*
  *
