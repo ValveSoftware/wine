@@ -372,7 +372,6 @@ BOOL CDECL X11DRV_create_desktop( UINT width, UINT height )
             1);
     }
     XFlush( display );
-    x11drv_input_add_window( 0, win );
     return TRUE;
 }
 

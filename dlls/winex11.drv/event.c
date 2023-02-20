@@ -1138,6 +1138,8 @@ static BOOL X11DRV_MapNotify( HWND hwnd, XEvent *event )
 {
     struct x11drv_win_data *data;
 
+    x11drv_input_add_window( hwnd, event->xany.window );
+
     if (event->xany.window == x11drv_thread_data()->clip_window) return TRUE;
 
     if (!(data = get_win_data( hwnd ))) return FALSE;
@@ -1158,6 +1160,7 @@ static BOOL X11DRV_MapNotify( HWND hwnd, XEvent *event )
  */
 static BOOL X11DRV_UnmapNotify( HWND hwnd, XEvent *event )
 {
+    x11drv_input_remove_window( event->xany.window );
     return TRUE;
 }
 
