@@ -25,6 +25,9 @@
 
 #include "wine/debug.h"
 
+#include "unixlib.h"
+#include "wine/unixlib.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(speech);
 
 /*
@@ -170,6 +173,8 @@ struct session
     IAudioClient *audio_client;
     IAudioCaptureClient *capture_client;
     WAVEFORMATEX capture_wfx;
+
+    speech_recognizer_handle unix_handle;
 
     HANDLE worker_thread, worker_control_event, audio_buf_event;
     BOOLEAN worker_running, worker_paused;
@@ -318,7 +323,9 @@ static ULONG WINAPI session_AddRef( ISpeechContinuousRecognitionSession *iface )
 static ULONG WINAPI session_Release( ISpeechContinuousRecognitionSession *iface )
 {
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
+    struct speech_release_recognizer_params release_params;
     ULONG ref = InterlockedDecrement(&impl->ref);
+
     TRACE("iface %p, ref %lu.\n", iface, ref);
 
     if (!ref)
@@ -343,6 +350,9 @@ static ULONG WINAPI session_Release( ISpeechContinuousRecognitionSession *iface 
 
         impl->cs.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&impl->cs);
+
+        release_params.handle = impl->unix_handle;
+        WINE_UNIX_CALL(unix_speech_release_recognizer, &release_params);
 
         IVector_ISpeechRecognitionConstraint_Release(impl->constraints);
         free(impl);
@@ -1079,6 +1089,35 @@ cleanup:
     return hr;
 }
 
+static HRESULT recognizer_factory_create_unix_instance( struct session *session )
+{
+    struct speech_create_recognizer_params create_params = { 0 };
+    WCHAR locale[LOCALE_NAME_MAX_LENGTH];
+    NTSTATUS status;
+    INT len;
+
+    if (!(len = GetUserDefaultLocaleName(locale, LOCALE_NAME_MAX_LENGTH)))
+        return E_FAIL;
+
+    if (CharLowerBuffW(locale, len) != len)
+        return E_FAIL;
+
+    if (!WideCharToMultiByte(CP_ACP, 0, locale, len, create_params.locale, ARRAY_SIZE(create_params.locale), NULL, NULL))
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    create_params.sample_rate = (FLOAT)session->capture_wfx.nSamplesPerSec;
+
+    if ((status = WINE_UNIX_CALL(unix_speech_create_recognizer, &create_params)))
+    {
+        ERR("Unable to create Vosk instance for locale %s, status %#lx. Speech recognition won't work.\n", debugstr_a(create_params.locale), status);
+        return SPERR_WINRT_INTERNAL_ERROR;
+    }
+
+    session->unix_handle = create_params.handle;
+
+    return S_OK;
+}
+
 static HRESULT WINAPI recognizer_factory_Create( ISpeechRecognizerFactory *iface, ILanguage *language, ISpeechRecognizer **speechrecognizer )
 {
     struct recognizer *impl;
@@ -1123,6 +1162,9 @@ static HRESULT WINAPI recognizer_factory_Create( ISpeechRecognizerFactory *iface
         goto error;
 
     if (FAILED(hr = recognizer_factory_create_audio_capture(session)))
+        goto error;
+
+    if (FAILED(hr = recognizer_factory_create_unix_instance(session)))
         goto error;
 
     InitializeCriticalSection(&session->cs);
