@@ -30,10 +30,26 @@
 
 #include "wine/unixlib.h"
 
+typedef UINT64 speech_recognizer_handle;
+
+struct speech_create_recognizer_params
+{
+    speech_recognizer_handle handle;
+    CHAR locale[LOCALE_NAME_MAX_LENGTH];
+    FLOAT sample_rate;
+};
+
+struct speech_release_recognizer_params
+{
+    speech_recognizer_handle handle;
+};
+
 enum unix_funcs
 {
     unix_process_attach,
     unix_process_detach,
+    unix_speech_create_recognizer,
+    unix_speech_release_recognizer,
 };
 
 #endif
