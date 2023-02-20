@@ -879,14 +879,20 @@ BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
         steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
         steam_keyboard_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_KeyboardActivated");
 
-        thread = CreateThread( NULL, 0, input_thread, NULL, 0, NULL );
-        if (!thread) ERR( "Failed to create input monitor thread, error %u\n", GetLastError() );
+        if (input_thread_hack)
+        {
+            thread = CreateThread( NULL, 0, input_thread, NULL, 0, NULL );
+            if (!thread) ERR( "Failed to create input monitor thread, error %u\n", GetLastError() );
+        }
 
         break;
     case DLL_PROCESS_DETACH:
-        TerminateThread( thread, -1 );
-        WaitForSingleObject( thread, INFINITE );
-        CloseHandle( thread );
+        if (input_thread_hack)
+        {
+            TerminateThread( thread, -1 );
+            WaitForSingleObject( thread, INFINITE );
+            CloseHandle( thread );
+        }
 
         CloseHandle(steam_overlay_event);
         CloseHandle(steam_keyboard_event);
