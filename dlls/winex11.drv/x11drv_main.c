@@ -853,6 +853,11 @@ static DWORD CALLBACK input_thread( void *arg )
 
     SetThreadDescription( GetCurrentThread(), L"wine_x11drv_input" );
 
+    TRACE("\n");
+
+    /* wait for explorer startup sequence to complete */
+    SendMessageW( GetDesktopWindow(), WM_NULL, 0, 0 );
+
     for (;;)
     {
         status = x11drv_input_thread( NULL );
