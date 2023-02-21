@@ -1870,9 +1870,6 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
         attach_client_window( data, client_window );
         XMapWindow( gdi_display, data->client_window );
 
-        /* Save to gdi_display as well for fullscreen hack, needed in X11DRV_query_fs_hack() */
-        XSaveContext( gdi_display, data->client_window, winContext, (char *)data->hwnd );
-
         TRACE( "%p xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
     }
 

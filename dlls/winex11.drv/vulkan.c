@@ -1118,9 +1118,12 @@ static VkBool32 X11DRV_query_fs_hack( VkSurfaceKHR surface, VkExtent2D *real_sz,
     if (wm_is_steamcompmgr( gdi_display )) return VK_FALSE;
     if (x11_surface->other_process) return VK_FALSE;
 
-    if (XFindContext( gdi_display, x11_surface->window, winContext, (char **)&hwnd ) != 0)
+    if (x11_surface->other_process)
+        return VK_FALSE;
+
+    if (!(hwnd = x11_surface->hwnd))
     {
-        ERR( "Failed to find hwnd context\n" );
+        TRACE("No window.\n");
         return VK_FALSE;
     }
 
