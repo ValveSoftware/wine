@@ -1309,11 +1309,9 @@ static void release_gl_drawable( struct gl_drawable *gl )
         TRACE( "destroying %lx drawable %lx\n", gl->window, gl->drawable );
         if (data)
         {
+            XDeleteContext( data->display, data->client_window, winContext );
             if (data->client_window == gl->window)
-            {
-                XDeleteContext( data->display, data->client_window, winContext );
                 data->client_window = 0;
-            }
             release_win_data( data );
         }
         pglXDestroyWindow( gdi_display, gl->drawable );

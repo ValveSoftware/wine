@@ -1918,7 +1918,6 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual )
 
     if (data->client_window)
     {
-        XDeleteContext( data->display, data->client_window, winContext );
         XReparentWindow( gdi_display, data->client_window, dummy_parent, 0, 0 );
         TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
     }
