@@ -1957,8 +1957,6 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual )
     if (data->client_window)
     {
         XSaveContext( data->display, data->client_window, winContext, (char *)data->hwnd );
-        /* Save to gdi_display as well for fullscreen hack, needed in X11DRV_query_fs_hack() */
-        XSaveContext( gdi_display, data->client_window, winContext, (char *)data->hwnd );
         XMapWindow( gdi_display, data->client_window );
         XSync( gdi_display, False );
         if (data->whole_window) XSelectInput( data->display, data->client_window, ExposureMask );
