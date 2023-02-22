@@ -1618,8 +1618,6 @@ static void test_GlobalAlloc(void)
     }
 
     /* invalid pointers are caught */
-if (0)
-{
     SetLastError( 0xdeadbeef );
     tmp_mem = pGlobalFree( invalid_ptr );
     ok( tmp_mem == invalid_ptr, "GlobalFree succeeded\n" );
@@ -1660,7 +1658,6 @@ if (0)
         ok( ret, "RtlGetUserInfoHeap failed, error %lu\n", GetLastError() );
         ok( GetLastError() == ERROR_INVALID_HANDLE, "got error %lu\n", GetLastError() );
     }
-}
 
     /* GMEM_FIXED block doesn't allow resize, though it succeeds with GMEM_MODIFY */
     mem = GlobalAlloc( GMEM_FIXED, small_size );
@@ -2366,8 +2363,6 @@ static void test_LocalAlloc(void)
     }
 
     /* invalid pointers are caught */
-if (0)
-{
     SetLastError( 0xdeadbeef );
     tmp_mem = pLocalFree( invalid_ptr );
     ok( tmp_mem == invalid_ptr, "LocalFree succeeded\n" );
@@ -2401,7 +2396,6 @@ if (0)
     ok( !tmp_mem, "LocalHandle succeeded\n" );
     todo_wine
     ok( GetLastError() == ERROR_NOACCESS, "got error %lu\n", GetLastError() );
-}
 
     /* LMEM_FIXED block doesn't allow resize, though it succeeds with LMEM_MODIFY */
     mem = LocalAlloc( LMEM_FIXED, small_size );
