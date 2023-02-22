@@ -1402,13 +1402,6 @@ HANDLE WINAPI RtlCreateHeap( ULONG flags, void *addr, SIZE_T total_size, SIZE_T 
         list_init( &process_heap->entry );
     }
 
-    if (!(flags & HEAP_CREATE_ENABLE_EXECUTE))
-    {
-        ULONG hci = 2;
-
-        RtlSetHeapInformation(heap, HeapCompatibilityInformation, &hci, sizeof(hci));
-    }
-
     return heap;
 }
 
