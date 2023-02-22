@@ -36,7 +36,7 @@
 
 #include "macdrv_dll.h"
 #include "imm.h"
-#include "ddk/imm.h"
+#include "immdev.h"
 #include "wine/server.h"
 #include "wine/debug.h"
 
