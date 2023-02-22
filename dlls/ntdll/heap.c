@@ -2188,7 +2188,3 @@ BOOLEAN WINAPI RtlSetUserFlagsHeap( HANDLE handle, ULONG flags, void *ptr, ULONG
 
     return ret;
 }
-
-void HEAP_notify_thread_destroy( BOOLEAN last )
-{
-}
