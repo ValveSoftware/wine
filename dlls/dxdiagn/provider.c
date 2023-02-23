@@ -612,7 +612,7 @@ static HRESULT build_systeminfo_tree(IDxDiagContainerImpl_Container *node)
     WCHAR buffer[MAX_PATH], computer_name[MAX_COMPUTERNAME_LENGTH + 1], print_buf[200], localized_pagefile_fmt[200];
     DWORD_PTR args[2];
 
-    hr = add_ui4_property(node, L"dwDirectXVersionMajor", 9);
+    hr = add_ui4_property(node, L"dwDirectXVersionMajor", 12);
     if (FAILED(hr))
         return hr;
 
@@ -620,15 +620,15 @@ static HRESULT build_systeminfo_tree(IDxDiagContainerImpl_Container *node)
     if (FAILED(hr))
         return hr;
 
-    hr = add_bstr_property(node, L"szDirectXVersionLetter", L"c");
+    hr = add_bstr_property(node, L"szDirectXVersionLetter", L" ");
     if (FAILED(hr))
         return hr;
 
-    hr = add_bstr_property(node, L"szDirectXVersionEnglish", L"4.09.0000.0904");
+    hr = add_bstr_property(node, L"szDirectXVersionEnglish", L"");
     if (FAILED(hr))
         return hr;
 
-    hr = add_bstr_property(node, L"szDirectXVersionLongEnglish", L"= \"DirectX 9.0c (4.09.0000.0904)");
+    hr = add_bstr_property(node, L"szDirectXVersionLongEnglish", L"DirectX 12");
     if (FAILED(hr))
         return hr;
 
