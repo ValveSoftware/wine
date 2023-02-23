@@ -2787,3 +2787,5 @@ HKCU,Software\Wine\AppDefaults\SpellForce.exe\X11 Driver,"LimitNumberOfResolutio
 ;;Other app-specific overrides
 HKCU,Software\Wine\AppDefaults\Pentiment.exe\DllOverrides,"SpeechSynthesisWrapper",,"disabled"
 HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynthWrapper",0x2,"disabled"
+HKCU,Software\Wine\AppDefaults\rayne1.exe\DllOverrides,"d3d8",,"native"
+HKCU,Software\Wine\AppDefaults\rayne2.exe\DllOverrides,"d3d8",,"native"
