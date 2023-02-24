@@ -32,4 +32,5 @@ import "windows.foundation.idl";
 
 #define DO_NO_IMPORTS
 #include "windows.globalization.idl"
+#include "windows.system.profile.idl"
 #include "windows.system.userprofile.idl"

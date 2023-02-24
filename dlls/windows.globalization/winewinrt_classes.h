@@ -32,11 +32,14 @@
 #include "windows.foundation.h"
 
 #define WIDL_using_Windows_Globalization
+#define WIDL_using_Windows_System_Profile
 #define WIDL_using_Windows_System_UserProfile
 #include "windows.globalization.h"
+#include "windows.system.profile.h"
 #include "windows.system.userprofile.h"
 
 extern IInspectable *globalization_geographic_region_factory;
+extern IInspectable *system_profile_analytics_info_factory;
 
 #include "wine/debug.h"
 #include "wine/list.h"
