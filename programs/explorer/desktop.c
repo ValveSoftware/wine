@@ -1041,6 +1041,46 @@ static HANDLE start_tabtip_process(void)
     return pi.hProcess;
 }
 
+static void start_xalia_process(void)
+{
+    PROCESS_INFORMATION pi;
+    STARTUPINFOW si = { sizeof(si) };
+    WCHAR use_envvar[2];
+    LPWSTR path;
+    LPCWSTR path_suffix = L"/../xalia/xalia.exe";
+    DWORD ret, buffersize;
+
+    /* check if xalia is enabled */
+    ret = GetEnvironmentVariableW(L"PROTON_USE_XALIA", use_envvar, ARRAY_SIZE(use_envvar));
+    if (!ret || (ret <= ARRAY_SIZE(use_envvar) && lstrcmpW(use_envvar, L"0") == 0))
+        return;
+
+    /* locate xalia.exe */
+    ret = GetEnvironmentVariableW(L"WINEDATADIR", NULL, 0);
+    if (ret == 0)
+        return;
+
+    buffersize = ret + lstrlenW(path_suffix);
+    path = HeapAlloc(GetProcessHeap(), 0, buffersize * sizeof(*path));
+
+    GetEnvironmentVariableW(L"WINEDATADIR", path, ret);
+    if (!memcmp(path, L"\\??\\", 8))  path[1] = '\\';  /* change \??\ into \\?\ */
+    lstrcatW(path, path_suffix);
+
+    /* setup environment */
+    SetEnvironmentVariableW(L"XALIA_WINE_SYSTEM_PROCESS", L"1");
+
+    if (!CreateProcessW(path, NULL,
+                        NULL, NULL, TRUE, DETACHED_PROCESS, NULL, NULL, &si, &pi))
+    {
+        WINE_ERR("Couldn't start xalia.exe: error %lu\n", GetLastError());
+        return;
+    }
+    CloseHandle(pi.hThread);
+    CloseHandle(pi.hProcess);
+    return;
+}
+
 /* main desktop management function */
 void manage_desktop( WCHAR *arg )
 {
@@ -1168,6 +1208,8 @@ void manage_desktop( WCHAR *arg )
     {
         /* FIXME: hack, run tabtip.exe on startup. */
         tabtip = start_tabtip_process();
+
+        start_xalia_process();
 
         TRACE( "desktop message loop starting on hwnd %p\n", hwnd );
         while (GetMessageW( &msg, 0, 0, 0 )) DispatchMessageW( &msg );
