@@ -108,6 +108,13 @@ struct mouse_tracking_info
     POINT last_mouse_message_pos;
 };
 
+struct touchinput_thread_data
+{
+    BYTE       index;            /* history index */
+    TOUCHINPUT current[8];       /* current touch state */
+    TOUCHINPUT history[128][8];  /* touches history buffer */
+};
+
 /* this is the structure stored in TEB->Win32ClientInfo */
 /* no attempt is made to keep the layout compatible with the Windows one */
 struct user_thread_info
@@ -124,6 +131,7 @@ struct user_thread_info
     HKL                           kbd_layout;             /* Current keyboard layout */
     UINT                          kbd_layout_id;          /* Current keyboard layout ID */
     struct hardware_msg_data     *rawinput;               /* Current rawinput message data */
+    struct touchinput_thread_data *touchinput;            /* touch input thread local buffer */
     UINT                          spy_indent;             /* Current spy indent */
     BOOL                          clipping_cursor;        /* thread is currently clipping */
     DWORD                         clipping_reset;         /* time when clipping was last reset */

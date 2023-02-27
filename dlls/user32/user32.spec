@@ -686,7 +686,7 @@
 @ stdcall GetTitleBarInfo(long ptr) NtUserGetTitleBarInfo
 # @ stub GetTopLevelWindow
 @ stdcall GetTopWindow(long)
-@ stdcall GetTouchInputInfo(long long ptr long)
+@ stdcall GetTouchInputInfo(long long ptr long) NtUserGetTouchInputInfo
 # @ stub GetUnpredictedMessagePos
 @ stdcall GetUpdateRect(long ptr long) NtUserGetUpdateRect
 @ stdcall GetUpdateRgn(long long long) NtUserGetUpdateRgn

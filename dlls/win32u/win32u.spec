@@ -1104,7 +1104,7 @@
 @ stdcall -syscall NtUserGetThreadState(long)
 @ stdcall -syscall NtUserGetTitleBarInfo(long ptr)
 @ stub -syscall NtUserGetTopLevelWindow
-@ stub -syscall NtUserGetTouchInputInfo
+@ stdcall -syscall NtUserGetTouchInputInfo(ptr long ptr long)
 @ stub -syscall NtUserGetTouchValidationStatus
 @ stub -syscall NtUserGetUniformSpaceMapping
 @ stub -syscall NtUserGetUnpredictedMessagePos

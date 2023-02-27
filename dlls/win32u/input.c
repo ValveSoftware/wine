@@ -2868,3 +2868,13 @@ INT WINAPI NtUserScheduleDispatchNotification( HWND hwnd )
 
     return 0;
 }
+
+/*****************************************************************************
+ * NtUserGetTouchInputInfo (WIN32U.@)
+ */
+BOOL WINAPI NtUserGetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size )
+{
+    TRACE( "handle %p, count %u, ptr %p, size %u.\n", handle, count, ptr, size );
+    *ptr = *(TOUCHINPUT *)handle;
+    return TRUE;
+}
