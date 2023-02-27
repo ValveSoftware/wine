@@ -17,36 +17,10 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
-#include <stdarg.h>
-
-#define COBJMACROS
-#include "windef.h"
-#include "winbase.h"
-#include "winstring.h"
-#include "wine/debug.h"
-#include "objbase.h"
-
 #include "initguid.h"
-#include "activation.h"
-
-#define WIDL_using_Windows_Foundation
-#define WIDL_using_Windows_Foundation_Collections
-#include "windows.foundation.h"
-#define WIDL_using_Windows_Globalization
-#include "windows.globalization.h"
-#define WIDL_using_Windows_System_UserProfile
-#include "windows.system.userprofile.h"
+#include "winewinrt_classes.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(locale);
-
-static const char *debugstr_hstring(HSTRING hstr)
-{
-    const WCHAR *str;
-    UINT32 len;
-    if (hstr && !((ULONG_PTR)hstr >> 16)) return "(invalid)";
-    str = WindowsGetStringRawBuffer(hstr, &len);
-    return wine_dbgstr_wn(str, len);
-}
 
 struct hstring_vector
 {
@@ -751,6 +725,11 @@ HRESULT WINAPI DllGetActivationFactory(HSTRING classid, IActivationFactory **fac
     else if (!wcscmp(name, RuntimeClass_Windows_Globalization_Language))
     {
         *factory = &language_factory.IActivationFactory_iface;
+        IUnknown_AddRef(*factory);
+    }
+    else if (!wcscmp(name, RuntimeClass_Windows_Globalization_GeographicRegion))
+    {
+        *factory = (IActivationFactory *)globalization_geographic_region_factory;
         IUnknown_AddRef(*factory);
     }
 

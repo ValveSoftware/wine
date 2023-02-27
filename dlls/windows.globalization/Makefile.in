@@ -2,6 +2,7 @@ MODULE = windows.globalization.dll
 IMPORTS = combase uuid
 
 C_SRCS = \
+	geographic_region.c \
 	main.c
 
 IDL_SRCS = classes.idl
