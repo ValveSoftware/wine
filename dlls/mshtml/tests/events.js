@@ -828,7 +828,7 @@ async_test("message event", function() {
 
     window.addEventListener("message", function(e) {
         if(listener_called) {
-            ok(e.data === "foobar", "e.data (diff origin) = " + e.data);
+            ok(e.data === "echo", "e.data (diff origin) = " + e.data);
             ok(e.source === iframe.contentWindow, "e.source (diff origin) not iframe.contentWindow");
             ok(e.origin === "http://winetest.different.org:1234", "e.origin (diff origin) = " + e.origin);
             next_test();
@@ -842,7 +842,8 @@ async_test("message event", function() {
         ok(e.source === window, "e.source = " + e.source);
         ok(e.origin === "http://winetest.example.org", "e.origin = " + e.origin);
 
-        iframe.src = "http://winetest.different.org:1234/send2parent.html";
+        iframe.onload = function() { iframe.contentWindow.postMessage("echo", "hTtP://WinEtesT.difFerent.ORG:1234"); }
+        iframe.src = "http://winetest.different.org:1234/xhr_iframe.html";
         document.body.appendChild(iframe);
     });
 
