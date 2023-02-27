@@ -138,6 +138,7 @@ struct HTMLXMLHttpRequest {
     IProvideClassInfo2 IProvideClassInfo2_iface;
     IHTMLXDomainRequest IHTMLXDomainRequest_iface;  /* only for XDomainRequests */
     LONG ref;
+    LONG ready_state;
     document_type_t doctype_override;
     response_type_t response_type;
     IDispatch *response_obj;
@@ -229,6 +230,7 @@ static nsrefcnt NSAPI XMLHttpReqEventListener_Release(nsIDOMEventListener *iface
 static nsresult NSAPI XMLHttpReqEventListener_HandleEvent(nsIDOMEventListener *iface, nsIDOMEvent *nsevent)
 {
     XMLHttpReqEventListener *This = impl_from_nsIDOMEventListener(iface);
+    UINT16 ready_state;
     DOMEvent *event;
     HRESULT hres;
 
@@ -236,6 +238,9 @@ static nsresult NSAPI XMLHttpReqEventListener_HandleEvent(nsIDOMEventListener *i
 
     if(!This->xhr)
         return NS_OK;
+
+    if(NS_SUCCEEDED(nsIXMLHttpRequest_GetReadyState(This->xhr->nsxhr, &ready_state)))
+        This->xhr->ready_state = ready_state;
 
     hres = create_event_from_nsevent(nsevent, This->xhr->window, dispex_compat_mode(&This->xhr->event_target.dispex), &event);
     if(SUCCEEDED(hres) ){
@@ -357,19 +362,12 @@ static HRESULT WINAPI HTMLXMLHttpRequest_Invoke(IHTMLXMLHttpRequest *iface, DISP
 static HRESULT WINAPI HTMLXMLHttpRequest_get_readyState(IHTMLXMLHttpRequest *iface, LONG *p)
 {
     HTMLXMLHttpRequest *This = impl_from_IHTMLXMLHttpRequest(iface);
-    UINT16 val;
-    nsresult nsres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
     if(!p)
         return E_POINTER;
-    nsres = nsIXMLHttpRequest_GetReadyState(This->nsxhr, &val);
-    if(NS_FAILED(nsres)) {
-        ERR("nsIXMLHttpRequest_GetReadyState failed: %08lx\n", nsres);
-        return E_FAIL;
-    }
-    *p = val;
+    *p = This->ready_state;
     return S_OK;
 }
 
@@ -391,6 +389,11 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_responseText(IHTMLXMLHttpRequest *i
     if(!p)
         return E_POINTER;
 
+    if(This->ready_state < READYSTATE_INTERACTIVE) {
+        *p = NULL;
+        return S_OK;
+    }
+
     nsAString_Init(&nsstr, NULL);
     nsres = nsIXMLHttpRequest_GetResponseText(This->nsxhr, &nsstr);
     return return_nsstr(nsres, &nsstr, p);
@@ -406,6 +409,11 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_responseXML(IHTMLXMLHttpRequest *if
     IObjectSafety *safety;
 
     TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->ready_state < READYSTATE_COMPLETE) {
+        *p = NULL;
+        return S_OK;
+    }
 
     if(dispex_compat_mode(&This->event_target.dispex) >= COMPAT_MODE_IE10) {
         nsACString header, nscstr;
@@ -491,6 +499,11 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_status(IHTMLXMLHttpRequest *iface, 
     if(!p)
         return E_POINTER;
 
+    if(This->ready_state < READYSTATE_LOADED) {
+        *p = 0;
+        return E_FAIL;
+    }
+
     nsres = nsIXMLHttpRequest_GetStatus(This->nsxhr, &val);
     if(NS_FAILED(nsres)) {
         ERR("nsIXMLHttpRequest_GetStatus failed: %08lx\n", nsres);
@@ -508,19 +521,13 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_statusText(IHTMLXMLHttpRequest *ifa
     HTMLXMLHttpRequest *This = impl_from_IHTMLXMLHttpRequest(iface);
     nsACString nscstr;
     nsresult nsres;
-    HRESULT hres;
-    LONG state;
 
     TRACE("(%p)->(%p)\n", This, p);
 
     if(!p)
         return E_POINTER;
 
-    hres = IHTMLXMLHttpRequest_get_readyState(iface, &state);
-    if(FAILED(hres))
-        return hres;
-
-    if(state < 2) {
+    if(This->ready_state < READYSTATE_LOADED) {
         *p = NULL;
         return E_FAIL;
     }
@@ -551,6 +558,7 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_onreadystatechange(IHTMLXMLHttpRequ
 static HRESULT WINAPI HTMLXMLHttpRequest_abort(IHTMLXMLHttpRequest *iface)
 {
     HTMLXMLHttpRequest *This = impl_from_IHTMLXMLHttpRequest(iface);
+    UINT16 ready_state;
     nsresult nsres;
 
     TRACE("(%p)->()\n", This);
@@ -561,6 +569,10 @@ static HRESULT WINAPI HTMLXMLHttpRequest_abort(IHTMLXMLHttpRequest *iface)
         return E_FAIL;
     }
 
+    /* Gecko changed to READYSTATE_UNINITIALIZED if it did abort */
+    nsres = nsIXMLHttpRequest_GetReadyState(This->nsxhr, &ready_state);
+    if(NS_SUCCEEDED(nsres))
+        This->ready_state = ready_state;
     return S_OK;
 }
 
@@ -704,19 +716,13 @@ static HRESULT WINAPI HTMLXMLHttpRequest_getAllResponseHeaders(IHTMLXMLHttpReque
     HTMLXMLHttpRequest *This = impl_from_IHTMLXMLHttpRequest(iface);
     nsACString nscstr;
     nsresult nsres;
-    HRESULT hres;
-    LONG state;
 
     TRACE("(%p)->(%p)\n", This, p);
 
     if(!p)
         return E_POINTER;
 
-    hres = IHTMLXMLHttpRequest_get_readyState(iface, &state);
-    if(FAILED(hres))
-        return hres;
-
-    if(state < 2) {
+    if(This->ready_state < READYSTATE_LOADED) {
         *p = NULL;
         return E_FAIL;
     }
@@ -732,8 +738,6 @@ static HRESULT WINAPI HTMLXMLHttpRequest_getResponseHeader(IHTMLXMLHttpRequest *
     nsACString header, ret;
     char *cstr;
     nsresult nsres;
-    HRESULT hres;
-    LONG state;
     TRACE("(%p)->(%s %p)\n", This, debugstr_w(bstrHeader), p);
 
     if(!p)
@@ -741,11 +745,7 @@ static HRESULT WINAPI HTMLXMLHttpRequest_getResponseHeader(IHTMLXMLHttpRequest *
     if(!bstrHeader)
         return E_INVALIDARG;
 
-    hres = IHTMLXMLHttpRequest_get_readyState(iface, &state);
-    if(FAILED(hres))
-        return hres;
-
-    if(state < 2) {
+    if(This->ready_state < READYSTATE_LOADED) {
         *p = NULL;
         return E_FAIL;
     }
@@ -989,7 +989,6 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpReques
     HRESULT hres = S_OK;
     UINT32 buf_size;
     nsresult nsres;
-    UINT16 state;
     void *buf;
 
     TRACE("(%p)->(%p)\n", This, p);
@@ -1015,8 +1014,7 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpReques
 
     case response_type_arraybuf:
     case response_type_blob:
-        nsres = nsIXMLHttpRequest_GetReadyState(This->nsxhr, &state);
-        if(NS_FAILED(nsres) || state < 4) {
+        if(This->ready_state < READYSTATE_COMPLETE) {
             V_VT(p) = VT_EMPTY;
             break;
         }
@@ -1060,17 +1058,11 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_put_responseType(IWineXMLHttpRe
     HTMLXMLHttpRequest *This = impl_from_IWineXMLHttpRequestPrivate(iface);
     nsAString nsstr;
     nsresult nsres;
-    HRESULT hres;
     unsigned i;
-    LONG state;
 
     TRACE("(%p)->(%s)\n", This, debugstr_w(v));
 
-    hres = IHTMLXMLHttpRequest_get_readyState(&This->IHTMLXMLHttpRequest_iface, &state);
-    if(FAILED(hres))
-        return hres;
-
-    if(state < 1 || state > 2) {
+    if(This->ready_state < READYSTATE_LOADING || This->ready_state > READYSTATE_INTERACTIVE) {
         /* FIXME: Return InvalidStateError */
         return E_FAIL;
     }
@@ -1767,15 +1759,13 @@ static HRESULT WINAPI HTMLXDomainRequest_get_contentType(IHTMLXDomainRequest *if
     nsAString nsstr;
     nsresult nsres;
     HRESULT hres;
-    UINT16 state;
 
     TRACE("(%p)->(%p)\n", This, p);
 
     if(!p)
         return E_POINTER;
 
-    nsres = nsIXMLHttpRequest_GetReadyState(This->nsxhr, &state);
-    if(NS_FAILED(nsres) || state < 2) {
+    if(This->ready_state < READYSTATE_LOADED) {
         *p = NULL;
         return S_OK;
     }
