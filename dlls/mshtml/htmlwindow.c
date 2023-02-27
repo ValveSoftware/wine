@@ -2684,6 +2684,8 @@ static HRESULT post_message(HTMLInnerWindow *window, VARIANT msg, BSTR targetOri
             return E_OUTOFMEMORY;
         }
 
+        /* Because message events can be sent to different windows, they get blocked by any context */
+        task->header.thread_blocked = TRUE;
         task->event = event;
         return push_event_task(&task->header, window, post_message_proc, post_message_destr, window->task_magic);
     }
