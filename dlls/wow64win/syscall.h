@@ -195,6 +195,7 @@
     SYSCALL_ENTRY( NtUserGetSystemMenu ) \
     SYSCALL_ENTRY( NtUserGetThreadDesktop ) \
     SYSCALL_ENTRY( NtUserGetTitleBarInfo ) \
+    SYSCALL_ENTRY( NtUserGetTouchInputInfo ) \
     SYSCALL_ENTRY( NtUserGetUpdateRect ) \
     SYSCALL_ENTRY( NtUserGetUpdateRgn ) \
     SYSCALL_ENTRY( NtUserGetUpdatedClipboardFormats ) \
