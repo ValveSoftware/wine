@@ -59,6 +59,9 @@ MAKE_FUNCPTR(vosk_model_new);
 MAKE_FUNCPTR(vosk_model_free);
 MAKE_FUNCPTR(vosk_recognizer_new);
 MAKE_FUNCPTR(vosk_recognizer_free);
+MAKE_FUNCPTR(vosk_recognizer_accept_waveform);
+MAKE_FUNCPTR(vosk_recognizer_final_result);
+MAKE_FUNCPTR(vosk_recognizer_reset);
 #undef MAKE_FUNCPTR
 
 static NTSTATUS process_attach( void *args )
@@ -80,6 +83,9 @@ static NTSTATUS process_attach( void *args )
     LOAD_FUNCPTR(vosk_model_free)
     LOAD_FUNCPTR(vosk_recognizer_new)
     LOAD_FUNCPTR(vosk_recognizer_free)
+    LOAD_FUNCPTR(vosk_recognizer_accept_waveform)
+    LOAD_FUNCPTR(vosk_recognizer_final_result)
+    LOAD_FUNCPTR(vosk_recognizer_reset)
 #undef LOAD_FUNCPTR
 
     return STATUS_SUCCESS;
@@ -258,6 +264,73 @@ static NTSTATUS speech_release_recognizer( void *args )
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS speech_recognize_audio( void *args )
+{
+    struct speech_recognize_audio_params *params = args;
+    VoskRecognizer *recognizer = vosk_recognizer_from_handle(params->handle);
+
+    if (!vosk_handle)
+        return STATUS_NOT_SUPPORTED;
+
+    if (!recognizer)
+        return STATUS_UNSUCCESSFUL;
+
+    params->status = p_vosk_recognizer_accept_waveform(recognizer, (const char *)params->samples, params->samples_size);
+
+    return STATUS_SUCCESS;
+}
+
+static NTSTATUS speech_get_recognition_result( void* args )
+{
+    struct speech_get_recognition_result_params *params = args;
+    VoskRecognizer *recognizer = vosk_recognizer_from_handle(params->handle);
+    static const char *result_json_start = "{\n  \"text\" : \"";
+    const size_t json_start_len = strlen(result_json_start);
+    static size_t last_result_len = 0;
+    static char *last_result = NULL;
+    const char *tmp = NULL;
+
+    TRACE("args %p.\n", args);
+
+    if (!vosk_handle)
+        return STATUS_NOT_SUPPORTED;
+
+    if (!recognizer)
+        return STATUS_UNSUCCESSFUL;
+
+    if (!last_result)
+    {
+        if ((tmp = p_vosk_recognizer_final_result(recognizer)))
+        {
+            last_result = strdup(tmp);
+            tmp = last_result;
+
+            /* Operations to remove the JSON wrapper "{\n  \"text\" : \"some recognized text\"\n}" -> "some recognized text\0" */
+            memmove(last_result, last_result + json_start_len, strlen(last_result) - json_start_len + 1);
+            last_result = strrchr(last_result, '\"');
+            last_result[0] = '\0';
+
+            last_result = (char *)tmp;
+            last_result_len = strlen(last_result);
+            TRACE("last_result %s.\n", debugstr_a(last_result));
+        }
+        else return STATUS_NOT_FOUND;
+    }
+    else if (params->result_buf_size >= last_result_len + 1)
+    {
+        memcpy(params->result_buf, last_result, last_result_len + 1);
+        p_vosk_recognizer_reset(recognizer);
+
+        free (last_result);
+        last_result = NULL;
+
+        return STATUS_SUCCESS;
+    }
+
+    params->result_buf_size = last_result_len + 1;
+    return STATUS_BUFFER_TOO_SMALL;
+}
+
 #else /* SONAME_LIBVOSK */
 
 #define MAKE_UNSUPPORTED_FUNC( f ) \
@@ -271,6 +344,8 @@ MAKE_UNSUPPORTED_FUNC(process_attach)
 MAKE_UNSUPPORTED_FUNC(process_detach)
 MAKE_UNSUPPORTED_FUNC(speech_create_recognizer)
 MAKE_UNSUPPORTED_FUNC(speech_release_recognizer)
+MAKE_UNSUPPORTED_FUNC(speech_recognize_audio)
+MAKE_UNSUPPORTED_FUNC(speech_get_recognition_result)
 #undef MAKE_UNSUPPORTED_FUNC
 
 #endif /* SONAME_LIBVOSK */
@@ -281,6 +356,8 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     process_detach,
     speech_create_recognizer,
     speech_release_recognizer,
+    speech_recognize_audio,
+    speech_get_recognition_result,
 };
 
 const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
@@ -289,4 +366,6 @@ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
     process_detach,
     speech_create_recognizer,
     speech_release_recognizer,
+    speech_recognize_audio,
+    speech_get_recognition_result,
 };
