@@ -196,10 +196,13 @@ static DWORD CALLBACK session_worker_thread_cb( void *args )
 {
     ISpeechContinuousRecognitionSession *iface = args;
     struct session *impl = impl_from_ISpeechContinuousRecognitionSession(iface);
+    struct speech_get_recognition_result_params recognition_result_params;
+    struct speech_recognize_audio_params recognize_audio_params;
     BOOLEAN running = TRUE, paused = FALSE;
     UINT32 frame_count, tmp_buf_size;
     BYTE *audio_buf, *tmp_buf = NULL;
     DWORD flags, status;
+    NTSTATUS nt_status;
     HANDLE events[2];
     HRESULT hr;
 
@@ -269,7 +272,37 @@ static DWORD CALLBACK session_worker_thread_cb( void *args )
                 IAudioCaptureClient_ReleaseBuffer(impl->capture_client, frames_available);
             }
 
-            /* TODO: Send mic data to recognizer and handle results. */
+            recognize_audio_params.handle = impl->unix_handle;
+            recognize_audio_params.samples = tmp_buf;
+            recognize_audio_params.samples_size = tmp_buf_offset;
+            recognize_audio_params.status = RECOGNITION_STATUS_EXCEPTION;
+
+            if (NT_ERROR(nt_status = WINE_UNIX_CALL(unix_speech_recognize_audio, &recognize_audio_params)))
+                WARN("unix_speech_recognize_audio failed with status %#lx.\n", nt_status);
+
+            if (recognize_audio_params.status != RECOGNITION_STATUS_RESULT_AVAILABLE)
+                continue;
+
+            recognition_result_params.handle = impl->unix_handle;
+            recognition_result_params.result_buf = NULL;
+            recognition_result_params.result_buf_size = 512;
+
+            do
+            {
+                recognition_result_params.result_buf = realloc(recognition_result_params.result_buf, recognition_result_params.result_buf_size);
+            }
+            while (WINE_UNIX_CALL(unix_speech_get_recognition_result, &recognition_result_params) == STATUS_BUFFER_TOO_SMALL &&
+                   recognition_result_params.result_buf);
+
+            if (!recognition_result_params.result_buf)
+            {
+                WARN("memory allocation failed.\n");
+                break;
+            }
+
+            /* TODO: Compare recognized text to available options. */
+
+            free(recognition_result_params.result_buf);
         }
         else
         {
