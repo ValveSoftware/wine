@@ -1196,6 +1196,9 @@ static BOOL wined3d_context_gl_set_pixel_format(struct wined3d_context_gl *conte
     current = gl_info->gl_ops.wgl.p_wglGetPixelFormat(dc);
     if (current == format) goto success;
 
+    if (current && !private)
+        return FALSE;
+
     /* By default WGL doesn't allow pixel format adjustments but we need it
      * here. For this reason there's a Wine specific wglSetPixelFormat()
      * which allows us to set the pixel format multiple times. Use it when we
