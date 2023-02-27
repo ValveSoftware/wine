@@ -2594,3 +2594,13 @@ HWND set_taskman_window( HWND hwnd )
     SERVER_END_REQ;
     return hwnd;
 }
+
+/*****************************************************************************
+ * NtUserGetTouchInputInfo (WIN32U.@)
+ */
+BOOL WINAPI NtUserGetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size )
+{
+    TRACE( "handle %p, count %u, ptr %p, size %u.\n", handle, count, ptr, size );
+    *ptr = *(TOUCHINPUT *)handle;
+    return TRUE;
+}

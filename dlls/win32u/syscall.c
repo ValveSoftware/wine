@@ -209,6 +209,7 @@ static void * const syscalls[] =
     NtUserGetSystemMenu,
     NtUserGetThreadDesktop,
     NtUserGetTitleBarInfo,
+    NtUserGetTouchInputInfo,
     NtUserGetUpdateRect,
     NtUserGetUpdateRgn,
     NtUserGetUpdatedClipboardFormats,

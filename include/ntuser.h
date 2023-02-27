@@ -778,6 +778,7 @@ ULONG   WINAPI NtUserGetSystemDpiForProcess( HANDLE process );
 HMENU   WINAPI NtUserGetSystemMenu( HWND hwnd, BOOL revert );
 HDESK   WINAPI NtUserGetThreadDesktop( DWORD thread );
 BOOL    WINAPI NtUserGetTitleBarInfo( HWND hwnd, TITLEBARINFO *info );
+BOOL    WINAPI NtUserGetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size );
 INT     WINAPI NtUserGetUpdateRgn( HWND hwnd, HRGN hrgn, BOOL erase );
 BOOL    WINAPI NtUserGetUpdatedClipboardFormats( UINT *formats, UINT size, UINT *out_size );
 BOOL    WINAPI NtUserGetUpdateRect( HWND hwnd, RECT *rect, BOOL erase );
