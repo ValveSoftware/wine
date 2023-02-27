@@ -128,7 +128,6 @@ typedef struct {
     nsIDOMEventListener nsIDOMEventListener_iface;
     LONG ref;
     HTMLXMLHttpRequest *xhr;
-    DWORD events_mask;
 } XMLHttpReqEventListener;
 
 struct HTMLXMLHttpRequest {
@@ -155,16 +154,14 @@ static inline BOOL is_XDomainRequest(HTMLXMLHttpRequest *xhr)
 static void detach_xhr_event_listener(XMLHttpReqEventListener *event_listener)
 {
     nsIDOMEventTarget *event_target;
-    DWORD events_mask, i;
-    nsAString str;
     nsresult nsres;
+    nsAString str;
+    unsigned i;
 
     nsres = nsIXMLHttpRequest_QueryInterface(event_listener->xhr->nsxhr, &IID_nsIDOMEventTarget, (void**)&event_target);
     assert(nsres == NS_OK);
 
-    for(events_mask = event_listener->events_mask, i = 0; events_mask; events_mask >>= 1, i++) {
-        if(!(events_mask & 1))
-            continue;
+    for(i = 0; i < ARRAY_SIZE(events) ; i++) {
         nsAString_InitDepend(&str, get_event_name(events[i]));
         nsres = nsIDOMEventTarget_RemoveEventListener(event_target, &str, &event_listener->nsIDOMEventListener_iface, FALSE);
         nsAString_Finish(&str);
@@ -173,7 +170,6 @@ static void detach_xhr_event_listener(XMLHttpReqEventListener *event_listener)
 
     nsIDOMEventTarget_Release(event_target);
 
-    event_listener->xhr->event_listener = NULL;
     event_listener->xhr = NULL;
     nsIDOMEventListener_Release(&event_listener->nsIDOMEventListener_iface);
 }
@@ -313,10 +309,9 @@ static ULONG WINAPI HTMLXMLHttpRequest_Release(IHTMLXMLHttpRequest *iface)
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
+        detach_xhr_event_listener(This->event_listener);
         if(This->response_obj)
             IDispatch_Release(This->response_obj);
-        if(This->event_listener)
-            detach_xhr_event_listener(This->event_listener);
         IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
         release_event_target(&This->event_target);
         release_dispex(&This->event_target.dispex);
@@ -1370,45 +1365,8 @@ static nsISupports *HTMLXMLHttpRequest_get_gecko_target(DispatchEx *dispex)
 
 static void HTMLXMLHttpRequest_bind_event(DispatchEx *dispex, eventid_t eid)
 {
-    HTMLXMLHttpRequest *This = impl_from_DispatchEx(dispex);
-    nsIDOMEventTarget *nstarget;
-    nsAString type_str;
-    const WCHAR *name;
-    nsresult nsres;
-    unsigned i;
-
-    TRACE("(%p)\n", This);
-
-    for(i = 0; i < ARRAY_SIZE(events); i++)
-        if(eid == events[i])
-            break;
-    if(i >= ARRAY_SIZE(events))
-        return;
-
-    if(!This->event_listener) {
-        This->event_listener = malloc(sizeof(*This->event_listener));
-        if(!This->event_listener)
-            return;
-
-        This->event_listener->nsIDOMEventListener_iface.lpVtbl = &XMLHttpReqEventListenerVtbl;
-        This->event_listener->ref = 1;
-        This->event_listener->xhr = This;
-        This->event_listener->events_mask = 0;
-    }
-
-    nsres = nsIXMLHttpRequest_QueryInterface(This->nsxhr, &IID_nsIDOMEventTarget, (void**)&nstarget);
-    assert(nsres == NS_OK);
-
-    name = get_event_name(events[i]);
-    nsAString_InitDepend(&type_str, name);
-    nsres = nsIDOMEventTarget_AddEventListener(nstarget, &type_str, &This->event_listener->nsIDOMEventListener_iface, FALSE, TRUE, 2);
-    nsAString_Finish(&type_str);
-    if(NS_FAILED(nsres))
-        ERR("AddEventListener(%s) failed: %08lx\n", debugstr_w(name), nsres);
-
-    nsIDOMEventTarget_Release(nstarget);
-
-    This->event_listener->events_mask |= 1 << i;
+    /* Do nothing. To be able to track state and queue events manually, when blocked
+     * by sync XHRs in their send() event loop, we always register the handlers. */
 }
 
 static void HTMLXMLHttpRequest_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
@@ -1556,8 +1514,12 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_Invoke(IHTMLXMLHttpRequestFactor
 
 static HRESULT create_xhr(HTMLInnerWindow *window, dispex_static_data_t *dispex, HTMLXMLHttpRequest **p)
 {
+    XMLHttpReqEventListener *event_listener;
+    nsIDOMEventTarget *nstarget;
     nsIXMLHttpRequest *nsxhr;
     HTMLXMLHttpRequest *ret;
+    nsresult nsres;
+    unsigned i;
 
     nsxhr = create_nsxhr(window->base.outer_window->nswindow);
     if(!nsxhr)
@@ -1565,6 +1527,13 @@ static HRESULT create_xhr(HTMLInnerWindow *window, dispex_static_data_t *dispex,
 
     ret = calloc(1, sizeof(*ret));
     if(!ret) {
+        nsIXMLHttpRequest_Release(nsxhr);
+        return E_OUTOFMEMORY;
+    }
+
+    event_listener = malloc(sizeof(*event_listener));
+    if(!event_listener) {
+        free(ret);
         nsIXMLHttpRequest_Release(nsxhr);
         return E_OUTOFMEMORY;
     }
@@ -1580,6 +1549,30 @@ static HRESULT create_xhr(HTMLInnerWindow *window, dispex_static_data_t *dispex,
     ret->IProvideClassInfo2_iface.lpVtbl = &ProvideClassInfo2Vtbl;
     ret->ref = 1;
     EventTarget_Init(&ret->event_target, (IUnknown*)&ret->IHTMLXMLHttpRequest_iface, dispex, window);
+
+    /* Always register the handlers because we need them to track state */
+    event_listener->nsIDOMEventListener_iface.lpVtbl = &XMLHttpReqEventListenerVtbl;
+    event_listener->ref = 1;
+    event_listener->xhr = ret;
+    ret->event_listener = event_listener;
+
+    nsres = nsIXMLHttpRequest_QueryInterface(nsxhr, &IID_nsIDOMEventTarget, (void**)&nstarget);
+    assert(nsres == NS_OK);
+
+    for(i = 0; i < ARRAY_SIZE(events); i++) {
+        const WCHAR *name = get_event_name(events[i]);
+        nsAString type_str;
+
+        nsAString_InitDepend(&type_str, name);
+        nsres = nsIDOMEventTarget_AddEventListener(nstarget, &type_str, &event_listener->nsIDOMEventListener_iface, FALSE, TRUE, 2);
+        nsAString_Finish(&type_str);
+        if(NS_FAILED(nsres)) {
+            WARN("AddEventListener(%s) failed: %08lx\n", debugstr_w(name), nsres);
+            IHTMLXMLHttpRequest_Release(&ret->IHTMLXMLHttpRequest_iface);
+            return map_nsresult(nsres);
+        }
+    }
+    nsIDOMEventTarget_Release(nstarget);
 
     *p = ret;
     return S_OK;
