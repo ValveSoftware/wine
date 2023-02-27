@@ -398,7 +398,7 @@
 @ stdcall GetThreadDpiHostingBehavior()
 @ stdcall GetTitleBarInfo(long ptr) NtUserGetTitleBarInfo
 @ stdcall GetTopWindow(long)
-@ stdcall GetTouchInputInfo(long long ptr long)
+@ stdcall GetTouchInputInfo(long long ptr long) NtUserGetTouchInputInfo
 @ stdcall GetUpdateRect(long ptr long) NtUserGetUpdateRect
 @ stdcall GetUpdateRgn(long long long) NtUserGetUpdateRgn
 @ stdcall GetUpdatedClipboardFormats(ptr long ptr) NtUserGetUpdatedClipboardFormats

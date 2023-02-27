@@ -3058,6 +3058,16 @@ NTSTATUS WINAPI wow64_NtUserGetTitleBarInfo( UINT *args )
     return NtUserGetTitleBarInfo( hwnd, info );
 }
 
+NTSTATUS WINAPI wow64_NtUserGetTouchInputInfo( UINT *args )
+{
+    HTOUCHINPUT handle = get_handle( &args );
+    UINT count = get_ulong( &args );
+    TOUCHINPUT *ptr = get_ptr( &args );
+    int size = get_ulong( &args );
+
+    return NtUserGetTouchInputInfo( handle, count, ptr, size );
+}
+
 NTSTATUS WINAPI wow64_NtUserGetUpdateRect( UINT *args )
 {
     HWND hwnd = get_handle( &args );

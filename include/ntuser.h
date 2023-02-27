@@ -671,6 +671,7 @@ W32KAPI ULONG   WINAPI NtUserGetSystemDpiForProcess( HANDLE process );
 W32KAPI HMENU   WINAPI NtUserGetSystemMenu( HWND hwnd, BOOL revert );
 W32KAPI HDESK   WINAPI NtUserGetThreadDesktop( DWORD thread );
 W32KAPI BOOL    WINAPI NtUserGetTitleBarInfo( HWND hwnd, TITLEBARINFO *info );
+W32KAPI BOOL    WINAPI NtUserGetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size );
 W32KAPI INT     WINAPI NtUserGetUpdateRgn( HWND hwnd, HRGN hrgn, BOOL erase );
 W32KAPI BOOL    WINAPI NtUserGetUpdatedClipboardFormats( UINT *formats, UINT size, UINT *out_size );
 W32KAPI BOOL    WINAPI NtUserGetUpdateRect( HWND hwnd, RECT *rect, BOOL erase );

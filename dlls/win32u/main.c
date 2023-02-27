@@ -1559,6 +1559,11 @@ BOOL SYSCALL_API NtUserGetTitleBarInfo( HWND hwnd, TITLEBARINFO *info )
     __ASM_SYSCALL_FUNC( __id_NtUserGetTitleBarInfo );
 }
 
+BOOL SYSCALL_API NtUserGetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size )
+{
+    __ASM_SYSCALL_FUNC( __id_NtUserGetTouchInputInfo );
+}
+
 BOOL SYSCALL_API NtUserGetUpdateRect( HWND hwnd, RECT *rect, BOOL erase )
 {
     __ASM_SYSCALL_FUNC( __id_NtUserGetUpdateRect );

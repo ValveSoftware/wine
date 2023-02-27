@@ -702,16 +702,6 @@ BOOL WINAPI CloseTouchInputHandle( HTOUCHINPUT handle )
 }
 
 /*****************************************************************************
- * GetTouchInputInfo (USER32.@)
- */
-BOOL WINAPI GetTouchInputInfo( HTOUCHINPUT handle, UINT count, TOUCHINPUT *ptr, int size )
-{
-    TRACE( "handle %p, count %u, ptr %p, size %u.\n", handle, count, ptr, size );
-    *ptr = *(TOUCHINPUT *)handle;
-    return TRUE;
-}
-
-/*****************************************************************************
  * RegisterTouchWindow (USER32.@)
  */
 BOOL WINAPI RegisterTouchWindow( HWND hwnd, ULONG flags )
