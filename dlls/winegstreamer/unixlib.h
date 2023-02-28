@@ -312,6 +312,7 @@ struct wg_transform_set_output_format_params
 struct wg_transform_drain_params
 {
     struct wg_transform *transform;
+    BOOL flush;
 };
 
 enum unix_funcs

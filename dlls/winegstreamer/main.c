@@ -377,11 +377,12 @@ bool wg_transform_set_output_format(struct wg_transform *transform, struct wg_fo
     return !__wine_unix_call(unix_handle, unix_wg_transform_set_output_format, &params);
 }
 
-HRESULT wg_transform_drain(struct wg_transform *transform)
+HRESULT wg_transform_drain(struct wg_transform *transform, BOOL flush)
 {
     struct wg_transform_drain_params params =
     {
         .transform = transform,
+        .flush = flush,
     };
 
     TRACE("transform %p.\n", transform);
