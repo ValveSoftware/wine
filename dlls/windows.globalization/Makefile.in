@@ -3,6 +3,7 @@ IMPORTS = combase uuid
 
 C_SRCS = \
 	analytics_info.c \
+	advertising_manager.c \
 	geographic_region.c \
 	main.c
 

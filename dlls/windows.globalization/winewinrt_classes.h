@@ -40,6 +40,7 @@
 
 extern IInspectable *globalization_geographic_region_factory;
 extern IInspectable *system_profile_analytics_info_factory;
+extern IInspectable *system_user_profile_advertising_manager_factory;
 
 #include "wine/debug.h"
 #include "wine/list.h"

@@ -737,6 +737,11 @@ HRESULT WINAPI DllGetActivationFactory(HSTRING classid, IActivationFactory **fac
         *factory = (IActivationFactory *)system_profile_analytics_info_factory;
         IUnknown_AddRef(*factory);
     }
+    else if (!wcscmp(name, RuntimeClass_Windows_System_UserProfile_AdvertisingManager))
+    {
+        *factory = (IActivationFactory *)system_user_profile_advertising_manager_factory;
+        IUnknown_AddRef(*factory);
+    }
 
     if (*factory) return S_OK;
     return CLASS_E_CLASSNOTAVAILABLE;
