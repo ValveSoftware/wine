@@ -206,9 +206,7 @@ static HRESULT WINAPI eas_client_devinfo_get_OperatingSystem(IEasClientDeviceInf
 {
     FIXME("iface %p, value %p stub.\n", iface, value);
 
-    WindowsCreateString(NULL, 0, value);
-
-    return E_NOTIMPL;
+    return WindowsCreateString(NULL, 0, value);
 }
 
 static HRESULT WINAPI eas_client_devinfo_get_FriendlyName(IEasClientDeviceInformation *iface,
@@ -216,9 +214,7 @@ static HRESULT WINAPI eas_client_devinfo_get_FriendlyName(IEasClientDeviceInform
 {
     FIXME("iface %p, value %p stub.\n", iface, value);
 
-    WindowsCreateString(NULL, 0, value);
-
-    return E_NOTIMPL;
+    return WindowsCreateString(NULL, 0, value);
 }
 
 static HRESULT WINAPI eas_client_devinfo_get_SystemManufacturer(IEasClientDeviceInformation *iface,
@@ -226,9 +222,7 @@ static HRESULT WINAPI eas_client_devinfo_get_SystemManufacturer(IEasClientDevice
 {
     FIXME("iface %p, value %p stub.\n", iface, value);
 
-    WindowsCreateString(NULL, 0, value);
-
-    return E_NOTIMPL;
+    return WindowsCreateString(NULL, 0, value);
 }
 
 static HRESULT WINAPI eas_client_devinfo_get_SystemProductName(IEasClientDeviceInformation *iface,
@@ -236,9 +230,7 @@ static HRESULT WINAPI eas_client_devinfo_get_SystemProductName(IEasClientDeviceI
 {
     FIXME("iface %p, value %p stub.\n", iface, value);
 
-    WindowsCreateString(NULL, 0, value);
-
-    return E_NOTIMPL;
+    return WindowsCreateString(NULL, 0, value);
 }
 
 static HRESULT WINAPI eas_client_devinfo_get_SystemSku(IEasClientDeviceInformation *iface,
@@ -246,9 +238,7 @@ static HRESULT WINAPI eas_client_devinfo_get_SystemSku(IEasClientDeviceInformati
 {
     FIXME("iface %p, value %p stub.\n", iface, value);
 
-    WindowsCreateString(NULL, 0, value);
-
-    return E_NOTIMPL;
+    return WindowsCreateString(NULL, 0, value);
 }
 
 static IEasClientDeviceInformationVtbl eas_client_devinfo_vtbl = {
