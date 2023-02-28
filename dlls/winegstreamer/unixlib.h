@@ -326,6 +326,7 @@ struct wg_transform_get_status_params
 struct wg_transform_drain_params
 {
     struct wg_transform *transform;
+    BOOL flush;
 };
 
 enum unix_funcs
