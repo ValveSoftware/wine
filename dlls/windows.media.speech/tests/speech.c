@@ -202,7 +202,23 @@ HRESULT WINAPI recognition_result_handler_Invoke( IHandler_RecognitionResult *if
                                                   ISpeechContinuousRecognitionSession *sender,
                                                   ISpeechContinuousRecognitionResultGeneratedEventArgs *args )
 {
-    trace("iface %p, sender %p, args %p.\n", iface, sender, args);
+    ISpeechRecognitionResult *result;
+    HSTRING hstring;
+    HRESULT hr;
+
+    if (!args) return S_OK;
+
+    hr = ISpeechContinuousRecognitionResultGeneratedEventArgs_get_Result(args, &result);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    hr = ISpeechRecognitionResult_get_Text(result, &hstring);
+    ok(hr == S_OK, "Got unexpected hr %#lx.\n", hr);
+
+    trace("iface %p, sender %p, args %p, text %s.\n", iface, sender, args, debugstr_w(WindowsGetStringRawBuffer(hstring, NULL)));
+
+    WindowsDeleteString(hstring);
+    ISpeechRecognitionResult_Release(result);
+
     return S_OK;
 }
 
@@ -1702,7 +1718,7 @@ static void test_Recognition(void)
     static const WCHAR *list_constraint_name = L"Windows.Media.SpeechRecognition.SpeechRecognitionListConstraint";
     static const WCHAR *recognizer_name = L"Windows.Media.SpeechRecognition.SpeechRecognizer";
     static const WCHAR *speech_constraint_tag = L"test_message";
-    static const WCHAR *speech_constraints[] = { L"This is a test.", L"Number 5!", L"What time is it?" };
+    static const WCHAR *speech_constraints[] = { L"This is a test", L"Number 5", L"What time is it" };
     ISpeechRecognitionListConstraintFactory *listconstraint_factory = NULL;
     IAsyncOperation_SpeechRecognitionCompilationResult *operation = NULL;
     IVector_ISpeechRecognitionConstraint *constraints = NULL;
@@ -1865,6 +1881,8 @@ static void test_Recognition(void)
     ok(hr == S_OK, "ISpeechRecognizer2_get_State failed, hr %#lx.\n", hr);
     ok(recog_state == SpeechRecognizerState_Capturing || broken(recog_state == SpeechRecognizerState_Idle), "recog_state was %u.\n", recog_state);
 
+
+    Sleep(10000);
     /*
      * TODO: Use a loopback device together with prerecorded audio files to test the recognizer's functionality.
      */
