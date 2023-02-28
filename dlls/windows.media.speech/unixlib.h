@@ -37,6 +37,8 @@ struct speech_create_recognizer_params
     speech_recognizer_handle handle;
     CHAR locale[LOCALE_NAME_MAX_LENGTH];
     FLOAT sample_rate;
+    const char **grammar;
+    unsigned int grammar_size;
 };
 
 struct speech_release_recognizer_params

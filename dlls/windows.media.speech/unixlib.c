@@ -55,6 +55,7 @@ static void *vosk_handle;
 MAKE_FUNCPTR(vosk_model_new);
 MAKE_FUNCPTR(vosk_model_free);
 MAKE_FUNCPTR(vosk_recognizer_new);
+MAKE_FUNCPTR(vosk_recognizer_new_grm);
 MAKE_FUNCPTR(vosk_recognizer_free);
 MAKE_FUNCPTR(vosk_recognizer_accept_waveform);
 MAKE_FUNCPTR(vosk_recognizer_final_result);
@@ -77,6 +78,8 @@ static NTSTATUS process_attach( void *args )
         goto error; \
     }
     LOAD_FUNCPTR(vosk_model_new)
+    LOAD_FUNCPTR(vosk_recognizer_new)
+    LOAD_FUNCPTR(vosk_recognizer_new_grm)
     LOAD_FUNCPTR(vosk_model_free)
     LOAD_FUNCPTR(vosk_recognizer_new)
     LOAD_FUNCPTR(vosk_recognizer_free)
@@ -222,12 +225,58 @@ static NTSTATUS find_model_by_locale( const char *locale, VoskModel **model )
     return status;
 }
 
+static NTSTATUS grammar_to_json_array(const char **grammar, UINT32 grammar_size, const char **array)
+{
+    size_t buf_size = strlen("[]") + 1, len;
+    char *buf;
+    UINT32 i;
+
+    for (i = 0; i < grammar_size; ++i)
+    {
+        buf_size += strlen(grammar[i]) + 4; /* (4) - two double quotes, a comma and a space */
+    }
+
+    if (!(buf = malloc(buf_size)))
+        return STATUS_NO_MEMORY;
+
+    *array = buf;
+
+    *buf = '[';
+    buf++;
+
+    for (i = 0; i < grammar_size; ++i)
+    {
+        *buf = '\"';
+        buf++;
+        len = strlen(grammar[i]);
+        memcpy(buf, grammar[i], len);
+        buf += len;
+        *buf = '\"';
+        buf++;
+        if (i < (grammar_size - 1))
+        {
+            *buf = ',';
+            buf++;
+            *buf = ' ';
+            buf++;
+        }
+    }
+
+    *buf = ']';
+    buf++;
+    *buf = '\0';
+
+    TRACE("created json array %s.\n", debugstr_a(*array));
+    return STATUS_SUCCESS;
+}
+
 static NTSTATUS speech_create_recognizer( void *args )
 {
     struct speech_create_recognizer_params *params = args;
     VoskRecognizer *recognizer = NULL;
     VoskModel *model = NULL;
     NTSTATUS status = STATUS_SUCCESS;
+    const char *grammar_json;
 
     TRACE("args %p.\n", args);
 
@@ -237,8 +286,16 @@ static NTSTATUS speech_create_recognizer( void *args )
     if ((status = find_model_by_locale(params->locale, &model)))
         return status;
 
-    if (!(recognizer = p_vosk_recognizer_new(model, params->sample_rate)))
-        status = STATUS_UNSUCCESSFUL;
+    if (params->grammar && grammar_to_json_array(params->grammar, params->grammar_size, &grammar_json) == STATUS_SUCCESS)
+    {
+        if (!(recognizer = p_vosk_recognizer_new_grm(model, params->sample_rate, grammar_json)))
+                status = STATUS_UNSUCCESSFUL;
+    }
+    else
+    {
+        if (!(recognizer = p_vosk_recognizer_new(model, params->sample_rate)))
+                status = STATUS_UNSUCCESSFUL;
+    }
 
     /* VoskModel is reference-counted.  A VoskRecognizer keeps a reference to its model. */
     p_vosk_model_free(model);
