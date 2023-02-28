@@ -1489,7 +1489,7 @@ static HRESULT WINAPI recognizer_get_UIOptions( ISpeechRecognizer *iface, ISpeec
     return E_NOTIMPL;
 }
 
-static HRESULT recognizer_create_unix_instance( struct session *session )
+static HRESULT recognizer_create_unix_instance( struct session *session, const char **grammar, UINT32 grammar_size )
 {
     struct speech_create_recognizer_params create_params = { 0 };
     WCHAR locale[LOCALE_NAME_MAX_LENGTH];
@@ -1506,6 +1506,8 @@ static HRESULT recognizer_create_unix_instance( struct session *session )
         return HRESULT_FROM_WIN32(GetLastError());
 
     create_params.sample_rate = (FLOAT)session->capture_wfx.nSamplesPerSec;
+    create_params.grammar = grammar;
+    create_params.grammar_size = grammar_size;
 
     if ((status = WINE_UNIX_CALL(unix_speech_create_recognizer, &create_params)))
     {
@@ -1522,11 +1524,109 @@ static HRESULT recognizer_compile_constraints_async( IInspectable *invoker, IIns
 {
     struct recognizer *impl = impl_from_ISpeechRecognizer((ISpeechRecognizer *)invoker);
     struct session *session = impl_from_ISpeechContinuousRecognitionSession(impl->session);
+    struct speech_release_recognizer_params release_params;
+    ISpeechRecognitionListConstraint *list_constraint;
+    IIterable_IInspectable *constraints_iterable;
+    IIterator_IInspectable *constraints_iterator;
+    ISpeechRecognitionConstraint *constraint;
+    IIterable_HSTRING *commands_iterable;
+    IIterator_HSTRING *commands_iterator;
+    BOOLEAN has_constraint, has_command;
+    IVector_HSTRING *commands;
+    const WCHAR *command_str;
+    UINT32 grammar_size = 0, i = 0;
+    char **grammar = NULL;
+    HSTRING command;
+    UINT32 size = 0;
     HRESULT hr;
 
-    if (FAILED(hr = recognizer_create_unix_instance(session)))
+    if (FAILED(hr = IVector_ISpeechRecognitionConstraint_QueryInterface(session->constraints, &IID_IIterable_ISpeechRecognitionConstraint, (void **)&constraints_iterable)))
+        return hr;
+
+    if (FAILED(hr = IIterable_IInspectable_First(constraints_iterable, &constraints_iterator)))
     {
-        WARN("Failed to created recognizer instance.\n");
+        IIterable_IInspectable_Release(constraints_iterable);
+        return hr;
+    }
+
+    for (hr = IIterator_IInspectable_get_HasCurrent(constraints_iterator, &has_constraint); SUCCEEDED(hr) && has_constraint; hr = IIterator_IInspectable_MoveNext(constraints_iterator, &has_constraint))
+    {
+        list_constraint = NULL;
+        commands_iterable = NULL;
+        commands_iterator = NULL;
+        commands = NULL;
+
+        if (FAILED(IIterator_IInspectable_get_Current(constraints_iterator, (IInspectable **)&constraint)))
+            goto skip;
+
+        if (FAILED(ISpeechRecognitionConstraint_QueryInterface(constraint, &IID_ISpeechRecognitionListConstraint, (void**)&list_constraint)))
+            goto skip;
+
+        if (FAILED(ISpeechRecognitionListConstraint_get_Commands(list_constraint, &commands)))
+            goto skip;
+
+        if (FAILED(IVector_HSTRING_QueryInterface(commands, &IID_IIterable_HSTRING, (void **)&commands_iterable)))
+            goto skip;
+
+        if (FAILED(IIterable_HSTRING_First(commands_iterable, &commands_iterator)))
+            goto skip;
+
+        if (FAILED(IVector_HSTRING_get_Size(commands, &size)))
+            goto skip;
+
+        grammar_size += size;
+        grammar = realloc(grammar, grammar_size * sizeof(char *));
+
+        for (hr = IIterator_HSTRING_get_HasCurrent(commands_iterator, &has_command); SUCCEEDED(hr) && has_command; hr = IIterator_HSTRING_MoveNext(commands_iterator, &has_command))
+        {
+            if (FAILED(IIterator_HSTRING_get_Current(commands_iterator, &command)))
+                continue;
+
+            command_str = WindowsGetStringRawBuffer(command, NULL);
+
+            if (command_str)
+            {
+                WCHAR *wstr = wcsdup(command_str);
+                size_t len = WideCharToMultiByte(CP_UTF8, 0, wstr, -1, grammar[i], 0, NULL, NULL);
+                grammar[i] = malloc(len * sizeof(char));
+
+                CharLowerW(wstr);
+                WideCharToMultiByte(CP_UTF8, 0, wstr, -1, grammar[i], len, NULL, NULL);
+                free(wstr);
+                i++;
+            }
+
+            WindowsDeleteString(command);
+        }
+
+skip:
+        if (commands_iterator) IIterator_HSTRING_Release(commands_iterator);
+        if (commands_iterable) IIterable_HSTRING_Release(commands_iterable);
+        if (commands) IVector_HSTRING_Release(commands);
+
+        if (list_constraint) ISpeechRecognitionListConstraint_Release(list_constraint);
+        if (constraint) ISpeechRecognitionConstraint_Release(constraint);
+    }
+
+    IIterator_IInspectable_Release(constraints_iterator);
+    IIterable_IInspectable_Release(constraints_iterable);
+
+    if (session->unix_handle)
+    {
+        release_params.handle = session->unix_handle;
+        WINE_UNIX_CALL(unix_speech_release_recognizer, &release_params);
+        session->unix_handle = 0;
+    }
+
+    hr = recognizer_create_unix_instance(session, (const char **)grammar, grammar_size);
+
+    for(i = 0; i < grammar_size; ++i)
+        free(grammar[i]);
+    free(grammar);
+
+    if (FAILED(hr))
+    {
+        WARN("Failed to created recognizer instance with grammar.\n");
         return compilation_result_create(SpeechRecognitionResultStatus_GrammarCompilationFailure, (ISpeechRecognitionCompilationResult **) result);
     }
     else return compilation_result_create(SpeechRecognitionResultStatus_Success, (ISpeechRecognitionCompilationResult **) result);
