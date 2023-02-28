@@ -2511,7 +2511,7 @@ HWND create_foreign_window( Display *display, Window xwin )
     unsigned int nchildren;
     XWindowAttributes attr;
     UINT style = WS_CLIPCHILDREN;
-    UNICODE_STRING class_name;
+    UNICODE_STRING class_name = RTL_CONSTANT_STRING( classW );
 
     if (!class_registered)
     {
@@ -2522,7 +2522,6 @@ HWND create_foreign_window( Display *display, Window xwin )
         class.cbSize        = sizeof(class);
         class.lpfnWndProc   = client_foreign_window_proc;
         class.lpszClassName = classW;
-        RtlInitUnicodeString( &class_name, classW );
         if (!NtUserRegisterClassExWOW( &class, &class_name, &version, NULL, 0, 0, NULL ) &&
             RtlGetLastWin32Error() != ERROR_CLASS_ALREADY_EXISTS)
         {
