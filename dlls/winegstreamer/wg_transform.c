@@ -718,19 +718,19 @@ NTSTATUS wg_transform_push_data(void *args)
     return STATUS_SUCCESS;
 }
 
-static bool copy_video_buffer(GstBuffer *buffer, GstCaps *caps, gsize plane_align,
+static NTSTATUS copy_video_buffer(GstBuffer *buffer, GstCaps *caps, gsize plane_align,
         struct wg_sample *sample, gsize *total_size)
 {
+    NTSTATUS status = STATUS_UNSUCCESSFUL;
     GstVideoFrame src_frame, dst_frame;
     GstVideoInfo src_info, dst_info;
     GstVideoAlignment align;
     GstBuffer *dst_buffer;
-    bool ret = false;
 
     if (!gst_video_info_from_caps(&src_info, caps))
     {
         GST_ERROR("Failed to get video info from caps.");
-        return false;
+        return STATUS_UNSUCCESSFUL;
     }
 
     dst_info = src_info;
@@ -739,14 +739,14 @@ static bool copy_video_buffer(GstBuffer *buffer, GstCaps *caps, gsize plane_alig
     if (sample->max_size < dst_info.size)
     {
         GST_ERROR("Output buffer is too small.");
-        return false;
+        return STATUS_BUFFER_TOO_SMALL;
     }
 
     if (!(dst_buffer = gst_buffer_new_wrapped_full(0, sample->data, sample->max_size,
             0, sample->max_size, 0, NULL)))
     {
         GST_ERROR("Failed to wrap wg_sample into GstBuffer");
-        return false;
+        return STATUS_UNSUCCESSFUL;
     }
     gst_buffer_set_size(dst_buffer, dst_info.size);
     *total_size = sample->size = dst_info.size;
@@ -759,7 +759,9 @@ static bool copy_video_buffer(GstBuffer *buffer, GstCaps *caps, gsize plane_alig
             GST_ERROR("Failed to map destination frame.");
         else
         {
-            if (!(ret = gst_video_frame_copy(&dst_frame, &src_frame)))
+            if (gst_video_frame_copy(&dst_frame, &src_frame))
+                status = STATUS_SUCCESS;
+            else
                 GST_ERROR("Failed to copy video frame.");
             gst_video_frame_unmap(&dst_frame);
         }
@@ -767,16 +769,16 @@ static bool copy_video_buffer(GstBuffer *buffer, GstCaps *caps, gsize plane_alig
     }
 
     gst_buffer_unref(dst_buffer);
-    return ret;
+    return status;
 }
 
-static bool copy_buffer(GstBuffer *buffer, GstCaps *caps, struct wg_sample *sample,
+static NTSTATUS copy_buffer(GstBuffer *buffer, GstCaps *caps, struct wg_sample *sample,
         gsize *total_size)
 {
     GstMapInfo info;
 
     if (!gst_buffer_map(buffer, &info, GST_MAP_READ))
-        return false;
+        return STATUS_UNSUCCESSFUL;
 
     if (sample->max_size >= info.size)
         sample->size = info.size;
@@ -793,15 +795,16 @@ static bool copy_buffer(GstBuffer *buffer, GstCaps *caps, struct wg_sample *samp
         gst_buffer_resize(buffer, sample->size, -1);
 
     *total_size = info.size;
-    return true;
+    return STATUS_SUCCESS;
 }
 
 static NTSTATUS read_transform_output_data(GstBuffer *buffer, GstCaps *caps, gsize plane_align,
         struct wg_sample *sample)
 {
-    bool ret, needs_copy;
     gsize total_size;
+    bool needs_copy;
     GstMapInfo info;
+    NTSTATUS status;
 
     if (!gst_buffer_map(buffer, &info, GST_MAP_READ))
     {
@@ -812,18 +815,24 @@ static NTSTATUS read_transform_output_data(GstBuffer *buffer, GstCaps *caps, gsi
     needs_copy = info.data != sample->data;
     gst_buffer_unmap(buffer, &info);
 
-    if ((ret = !needs_copy))
+    if (!needs_copy)
+    {
         total_size = sample->size = info.size;
-    else if (is_caps_video(caps))
-        ret = copy_video_buffer(buffer, caps, plane_align, sample, &total_size);
+        status = STATUS_SUCCESS;
+    }
     else
-        ret = copy_buffer(buffer, caps, sample, &total_size);
+    {
+        if (is_caps_video(caps))
+            status = copy_video_buffer(buffer, caps, plane_align, sample, &total_size);
+        else
+            status = copy_buffer(buffer, caps, sample, &total_size);
+    }
 
-    if (!ret)
+    if (status)
     {
         GST_ERROR("Failed to copy buffer %p", buffer);
         sample->size = 0;
-        return STATUS_UNSUCCESSFUL;
+        return status;
     }
 
     if (GST_BUFFER_PTS_IS_VALID(buffer))
@@ -960,6 +969,11 @@ NTSTATUS wg_transform_read_data(void *args)
     if ((status = read_transform_output_data(output_buffer, output_caps,
                 transform->output_plane_align, sample)))
     {
+        if (status == STATUS_BUFFER_TOO_SMALL)
+        {
+            status = 0;
+            params->result = E_FAIL;
+        }
         wg_allocator_release_sample(transform->allocator, sample, false);
         return status;
     }
