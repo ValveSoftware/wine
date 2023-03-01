@@ -63,6 +63,7 @@ struct wg_transform
     bool output_caps_changed;
     GstCaps *output_caps;
     bool broken_timestamps;
+    bool setting_output_format;
 };
 
 static bool is_caps_video(GstCaps *caps)
@@ -188,6 +189,9 @@ static gboolean transform_sink_query_cb(GstPad *pad, GstObject *parent, GstQuery
             GstCaps *caps, *filter, *temp;
             gchar *str;
 
+            if (!transform->setting_output_format)
+                return gst_pad_query_default(pad, parent, query);
+
             gst_query_parse_caps(query, &filter);
             caps = gst_caps_ref(transform->output_caps);
 
@@ -227,6 +231,7 @@ static gboolean transform_sink_event_cb(GstPad *pad, GstObject *parent, GstEvent
         {
             GstCaps *caps;
 
+            transform->setting_output_format = false;
             gst_event_parse_caps(event, &caps);
 
             transform->output_caps_changed = transform->output_caps_changed
@@ -601,6 +606,8 @@ NTSTATUS wg_transform_set_output_format(void *args)
 
     gst_caps_unref(transform->output_caps);
     transform->output_caps = caps;
+
+    transform->setting_output_format = true;
 
     if (!gst_pad_push_event(transform->my_sink, gst_event_new_reconfigure()))
     {
