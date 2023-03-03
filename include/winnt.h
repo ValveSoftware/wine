@@ -6362,6 +6362,13 @@ typedef enum _PROCESS_MITIGATION_POLICY
     MaxProcessMitigationPolicy
 } PROCESS_MITIGATION_POLICY, *PPROCESS_MITIGATION_POLICY;
 
+typedef enum _FIRMWARE_TYPE
+{
+    FirmwareTypeUnknown,
+    FirmwareTypeBios,
+    FirmwareTypeUefi,
+    FirmwareTypeMax
+} FIRMWARE_TYPE, *PFIRMWARE_TYPE;
 
 /* Intrinsic functions */
 

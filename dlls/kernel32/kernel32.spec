@@ -695,6 +695,7 @@
 @ stdcall -import GetFinalPathNameByHandleW(long ptr long long)
 @ stdcall GetFirmwareEnvironmentVariableA(str str ptr long)
 @ stdcall GetFirmwareEnvironmentVariableW(wstr wstr ptr long)
+@ stdcall GetFirmwareType(ptr)
 @ stdcall -import GetFullPathNameA(str long ptr ptr)
 # @ stub GetFullPathNameTransactedA
 # @ stub GetFullPathNameTransactedW
