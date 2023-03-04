@@ -1701,6 +1701,7 @@ NTSTATUS WINAPI BCryptGenerateKeyPair( BCRYPT_ALG_HANDLE algorithm, BCRYPT_KEY_H
     case ALG_ID_ECDSA_P256:
         size = sizeof(BCRYPT_ECCKEY_BLOB) + 2 * 256 / 8;
         break;
+    case ALG_ID_ECDH_P384:
     case ALG_ID_ECDSA_P384:
         size = sizeof(BCRYPT_ECCKEY_BLOB) + 2 * 384 / 8;
         break;
