@@ -734,17 +734,55 @@ static HRESULT WINAPI recognizer_get_UIOptions( ISpeechRecognizer *iface, ISpeec
     return E_NOTIMPL;
 }
 
+static HRESULT recognizer_create_unix_instance( struct session *session )
+{
+    struct speech_create_recognizer_params create_params = { 0 };
+    WCHAR locale[LOCALE_NAME_MAX_LENGTH];
+    NTSTATUS status;
+    INT len;
+
+    if (!(len = GetUserDefaultLocaleName(locale, LOCALE_NAME_MAX_LENGTH)))
+        return E_FAIL;
+
+    if (CharLowerBuffW(locale, len) != len)
+        return E_FAIL;
+
+    if (!WideCharToMultiByte(CP_ACP, 0, locale, len, create_params.locale, ARRAY_SIZE(create_params.locale), NULL, NULL))
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    create_params.sample_rate = (FLOAT)session->capture_wfx.nSamplesPerSec;
+
+    if ((status = WINE_UNIX_CALL(unix_speech_create_recognizer, &create_params)))
+    {
+        ERR("Unable to create Vosk instance for locale %s, status %#lx. Speech recognition won't work.\n", debugstr_a(create_params.locale), status);
+        return SPERR_WINRT_INTERNAL_ERROR;
+    }
+
+    session->unix_handle = create_params.handle;
+
+    return S_OK;
+}
+
 static HRESULT recognizer_compile_constraints_async( IInspectable *invoker, IInspectable **result )
 {
-    return compilation_result_create(SpeechRecognitionResultStatus_Success, (ISpeechRecognitionCompilationResult **) result);
+    struct recognizer *impl = impl_from_ISpeechRecognizer((ISpeechRecognizer *)invoker);
+    struct session *session = impl_from_ISpeechContinuousRecognitionSession(impl->session);
+    HRESULT hr;
+
+    if (FAILED(hr = recognizer_create_unix_instance(session)))
+    {
+        WARN("Failed to created recognizer instance.\n");
+        return compilation_result_create(SpeechRecognitionResultStatus_GrammarCompilationFailure, (ISpeechRecognitionCompilationResult **) result);
+    }
+    else return compilation_result_create(SpeechRecognitionResultStatus_Success, (ISpeechRecognitionCompilationResult **) result);
 }
 
 static HRESULT WINAPI recognizer_CompileConstraintsAsync( ISpeechRecognizer *iface,
                                                           IAsyncOperation_SpeechRecognitionCompilationResult **operation )
 {
     IAsyncOperation_IInspectable **value = (IAsyncOperation_IInspectable **)operation;
-    FIXME("iface %p, operation %p semi-stub!\n", iface, operation);
-    return async_operation_inspectable_create(&IID_IAsyncOperation_SpeechRecognitionCompilationResult, NULL, recognizer_compile_constraints_async, value);
+    TRACE("iface %p, operation %p semi-stub!\n", iface, operation);
+    return async_operation_inspectable_create(&IID_IAsyncOperation_SpeechRecognitionCompilationResult, (IInspectable *)iface, recognizer_compile_constraints_async, value);
 }
 
 static HRESULT WINAPI recognizer_RecognizeAsync( ISpeechRecognizer *iface,
@@ -1089,35 +1127,6 @@ cleanup:
     return hr;
 }
 
-static HRESULT recognizer_factory_create_unix_instance( struct session *session )
-{
-    struct speech_create_recognizer_params create_params = { 0 };
-    WCHAR locale[LOCALE_NAME_MAX_LENGTH];
-    NTSTATUS status;
-    INT len;
-
-    if (!(len = GetUserDefaultLocaleName(locale, LOCALE_NAME_MAX_LENGTH)))
-        return E_FAIL;
-
-    if (CharLowerBuffW(locale, len) != len)
-        return E_FAIL;
-
-    if (!WideCharToMultiByte(CP_ACP, 0, locale, len, create_params.locale, ARRAY_SIZE(create_params.locale), NULL, NULL))
-        return HRESULT_FROM_WIN32(GetLastError());
-
-    create_params.sample_rate = (FLOAT)session->capture_wfx.nSamplesPerSec;
-
-    if ((status = WINE_UNIX_CALL(unix_speech_create_recognizer, &create_params)))
-    {
-        ERR("Unable to create Vosk instance for locale %s, status %#lx. Speech recognition won't work.\n", debugstr_a(create_params.locale), status);
-        return SPERR_WINRT_INTERNAL_ERROR;
-    }
-
-    session->unix_handle = create_params.handle;
-
-    return S_OK;
-}
-
 static HRESULT WINAPI recognizer_factory_Create( ISpeechRecognizerFactory *iface, ILanguage *language, ISpeechRecognizer **speechrecognizer )
 {
     struct recognizer *impl;
@@ -1162,9 +1171,6 @@ static HRESULT WINAPI recognizer_factory_Create( ISpeechRecognizerFactory *iface
         goto error;
 
     if (FAILED(hr = recognizer_factory_create_audio_capture(session)))
-        goto error;
-
-    if (FAILED(hr = recognizer_factory_create_unix_instance(session)))
         goto error;
 
     InitializeCriticalSection(&session->cs);
