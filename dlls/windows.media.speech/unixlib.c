@@ -327,7 +327,6 @@ static NTSTATUS grammar_to_json_array(const char **grammar, UINT32 grammar_size,
     buf++;
     *buf = '\0';
 
-    TRACE("created json array %s.\n", debugstr_a(*array));
     return STATUS_SUCCESS;
 }
 
@@ -405,8 +404,6 @@ static NTSTATUS speech_get_recognition_result( void* args )
     static char *last_result = NULL;
     const char *tmp = NULL;
 
-    TRACE("args %p.\n", args);
-
     if (!vosk_handle)
         return STATUS_NOT_SUPPORTED;
 
@@ -427,7 +424,6 @@ static NTSTATUS speech_get_recognition_result( void* args )
 
             last_result = (char *)tmp;
             last_result_len = strlen(last_result);
-            TRACE("last_result %s.\n", debugstr_a(last_result));
         }
         else return STATUS_NOT_FOUND;
     }
