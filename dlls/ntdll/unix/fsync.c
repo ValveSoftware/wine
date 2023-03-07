@@ -975,15 +975,18 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                     case FSYNC_SEMAPHORE:
                     {
                         struct semaphore *semaphore = obj->shm;
-                        int current;
+                        int current, new;
 
-                        if ((current = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST ))
-                                && __sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) == current)
+                        new = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST );
+                        while ((current = new))
                         {
-                            TRACE("Woken up by handle %p [%d].\n", handles[i], i);
-                            if (waited) simulate_sched_quantum();
-                            put_objects( objs, count );
-                            return i;
+                            if ((new = __sync_val_compare_and_swap( &semaphore->count, current, current - 1 )) == current)
+                            {
+                                TRACE("Woken up by handle %p [%d].\n", handles[i], i);
+                                if (waited) simulate_sched_quantum();
+                                put_objects( objs, count );
+                                return i;
+                            }
                         }
                         futex_vector_set( &futexes[i], &semaphore->count, 0 );
                         break;
@@ -1229,10 +1232,15 @@ tryagain:
                 case FSYNC_SEMAPHORE:
                 {
                     struct semaphore *semaphore = obj->shm;
-                    int current;
+                    int current, new;
 
-                    if (!(current = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST ))
-                            || __sync_val_compare_and_swap( &semaphore->count, current, current - 1 ) != current)
+                    new = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST );
+                    while ((current = new))
+                    {
+                        if ((new = __sync_val_compare_and_swap( &semaphore->count, current, current - 1 )) == current)
+                            break;
+                    }
+                    if (!current)
                         goto tooslow;
                     break;
                 }
