@@ -119,13 +119,55 @@ static inline VoskRecognizer *vosk_recognizer_from_handle( speech_recognizer_han
     return (VoskRecognizer *)(UINT_PTR)handle;
 }
 
+static const char* map_lang_to_phasmophobia_dir(const char* lang, size_t len)
+{
+    if (!strncmp(lang, "ar", len))
+        return "Arabic";
+    if (!strncmp(lang, "ca", len))
+        return "Catalan";
+    if (!strncmp(lang, "zn", len))
+        return "Chinese";
+    if (!strncmp(lang, "cs", len))
+        return "Czech";
+    if (!strncmp(lang, "nl", len))
+        return "Dutch";
+    if (!strncmp(lang, "en", len))
+        return "English";
+    if (!strncmp(lang, "fr", len))
+        return "French";
+    if (!strncmp(lang, "de", len))
+        return "German";
+    if (!strncmp(lang, "de", len))
+        return "German";
+    if (!strncmp(lang, "el", len))
+        return "Greek";
+    if (!strncmp(lang, "it", len))
+        return "Italian";
+    if (!strncmp(lang, "ja", len))
+        return "Japanese";
+    if (!strncmp(lang, "pt", len))
+        return "Portuguese";
+    if (!strncmp(lang, "ru", len))
+        return "Russian";
+    if (!strncmp(lang, "es", len))
+        return "Spanish";
+    if (!strncmp(lang, "sw", len))
+        return "Swedish";
+    if (!strncmp(lang, "tr", len))
+        return "Turkish";
+    if (!strncmp(lang, "uk", len))
+        return "Ukrainian";
+
+    return "";
+}
+
 static NTSTATUS find_model_by_locale_and_path( const char *path, const char *locale, VoskModel **model )
 {
     static const char *vosk_model_identifier_small = "vosk-model-small-";
     static const char *vosk_model_identifier = "vosk-model-";
     size_t ident_small_len = strlen(vosk_model_identifier_small);
     size_t ident_len = strlen(vosk_model_identifier);
-    char *ent_name, *model_path, *best_match, *delim;
+    char *ent_name, *model_path, *best_match, *delim, *appid = getenv("SteamAppId"), *str = NULL;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
     struct dirent *dirent;
     size_t path_len, len;
@@ -152,7 +194,7 @@ static NTSTATUS find_model_by_locale_and_path( const char *path, const char *loc
             ent_name += ident_small_len;
         else if (!strncmp(ent_name, vosk_model_identifier, ident_len))
             ent_name += ident_len;
-        else
+        else if (strcmp(appid, "739630") != 0)
             continue;
 
         /*
@@ -168,6 +210,12 @@ static NTSTATUS find_model_by_locale_and_path( const char *path, const char *loc
 
         if (!best_match && !strncmp(ent_name, locale, delim - locale))
             best_match = strdup(dirent->d_name);
+
+        if (!best_match && !strcmp(appid, "739630"))
+        {
+            if ((str = (char *)map_lang_to_phasmophobia_dir(locale, delim - locale)))
+                best_match = strdup(str);
+        }
     }
 
     closedir(dir);
@@ -198,7 +246,7 @@ done:
 static NTSTATUS find_model_by_locale( const char *locale, VoskModel **model )
 {
     const char *suffix = NULL;
-    char *env, *path = NULL;
+    char *env, *path = NULL, *appid = getenv("SteamAppId");
     NTSTATUS status;
 
     TRACE("locale %s, model %p.\n", debugstr_a(locale), model);
@@ -224,6 +272,19 @@ static NTSTATUS find_model_by_locale( const char *locale, VoskModel **model )
     sprintf(path, "%s%s", env, suffix);
     status = find_model_by_locale_and_path(path, locale, model);
     free(path);
+
+    /* Hack to load Vosk models from Phasmophobia, so they don't need to be downloaded separately.*/
+    if (status && appid && !strcmp(appid, "739630") && (env = getenv("PWD")))
+    {
+        suffix = "/Phasmophobia_Data/StreamingAssets/LanguageModels";
+
+        if (!(path = malloc(strlen(env) + strlen(suffix) + 1)))
+            return STATUS_NO_MEMORY;
+
+        sprintf(path, "%s%s", env, suffix);
+        status = find_model_by_locale_and_path(path, locale, model);
+        free(path);
+    }
 
     return status;
 }
