@@ -202,7 +202,8 @@ const char * const X11DRV_atom_names[NB_XATOMS - FIRST_XATOM] =
     "text/plain",
     "text/rtf",
     "text/richtext",
-    "text/uri-list"
+    "text/uri-list",
+    "GAMESCOPE_XALIA_OVERLAY",
 };
 
 /***********************************************************************

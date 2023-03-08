@@ -2528,6 +2528,29 @@ Window create_client_window( HWND hwnd, RECT client_rect, const XVisualInfo *vis
 }
 
 
+void set_gamescope_overlay_prop( Display *display, Window window, HWND hwnd )
+{
+    static const WCHAR class_name[] = {'X','a','l','i','a','O','v','e','r','l','a','y','B','o','x',0};
+    WCHAR class_name_buf[16];
+    UNICODE_STRING class_name_str;
+    INT ret;
+
+    class_name_str.Buffer = class_name_buf;
+    class_name_str.MaximumLength = sizeof(class_name_buf);
+
+    ret = NtUserGetClassName( hwnd, FALSE, &class_name_str );
+
+    if (ret && !wcscmp( class_name_buf, class_name )) {
+        DWORD one = 1;
+
+        TRACE( "setting GAMESCOPE_XALIA_OVERLAY on window %lx, hwnd %p\n", window, hwnd );
+
+        XChangeProperty( display, window, x11drv_atom(GAMESCOPE_XALIA_OVERLAY), XA_CARDINAL, 32,
+                         PropModeReplace, (unsigned char *)&one, sizeof(one) / 4 );
+    }
+}
+
+
 /**********************************************************************
  *		create_whole_window
  *
@@ -2581,6 +2604,8 @@ static void create_whole_window( struct x11drv_win_data *data )
 
     XSaveContext( data->display, data->whole_window, winContext, (char *)data->hwnd );
     NtUserSetProp( data->hwnd, whole_window_prop, (HANDLE)data->whole_window );
+
+    set_gamescope_overlay_prop( data->display, data->whole_window, data->hwnd );
 
     /* set the window text */
     if (!NtUserInternalGetWindowText( data->hwnd, text, ARRAY_SIZE( text ))) text[0] = 0;
