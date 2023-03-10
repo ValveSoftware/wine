@@ -31,6 +31,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(win);
 WINE_DECLARE_DEBUG_CHANNEL(keyboard);
+WINE_DECLARE_DEBUG_CHANNEL(rawinput);
 
 /***********************************************************************
  *           get_locale_kbd_layout
@@ -502,6 +503,7 @@ BOOL WINAPI UnloadKeyboardLayout( HKL layout )
 
 static DWORD CALLBACK devnotify_window_callbackW(HANDLE handle, DWORD flags, DEV_BROADCAST_HDR *header)
 {
+    TRACE_(rawinput)("handle %p, flags %#lx, header %p\n", handle, flags, header);
     SendMessageTimeoutW(handle, WM_DEVICECHANGE, flags, (LPARAM)header, SMTO_ABORTIFHUNG, 2000, NULL);
     return 0;
 }
@@ -585,7 +587,7 @@ HDEVNOTIFY WINAPI RegisterDeviceNotificationW( HANDLE handle, void *filter, DWOR
     struct device_notification_details details;
     DEV_BROADCAST_HDR *header = filter;
 
-    TRACE("handle %p, filter %p, flags %#lx\n", handle, filter, flags);
+    TRACE_(rawinput)("handle %p, filter %p, flags %#lx\n", handle, filter, flags);
 
     if (flags & ~(DEVICE_NOTIFY_SERVICE_HANDLE | DEVICE_NOTIFY_ALL_INTERFACE_CLASSES))
     {
