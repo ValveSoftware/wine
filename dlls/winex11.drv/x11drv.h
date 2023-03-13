@@ -1019,5 +1019,6 @@ static inline UINT asciiz_to_unicode( WCHAR *dst, const char *src )
 
 extern BOOL layered_window_client_hack;
 extern BOOL vulkan_gdi_blit_source_hack;
+extern BOOL vulkan_disable_child_window_rendering_hack;
 
 #endif  /* __WINE_X11DRV_H */

@@ -99,6 +99,7 @@ HANDLE steam_overlay_event;
 HANDLE steam_keyboard_event;
 BOOL layered_window_client_hack = FALSE;
 BOOL vulkan_gdi_blit_source_hack = FALSE;
+BOOL vulkan_disable_child_window_rendering_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -843,6 +844,13 @@ static NTSTATUS x11drv_init( void *arg )
         vulkan_gdi_blit_source_hack =
             (sgi && (
                 !strcmp(sgi, "803600") /* Disgaea 5 Complete     */
+            )) ||
+            (e && *e != '\0' && *e != '0');
+
+        e = getenv("WINE_DISABLE_VK_CHILD_WINDOW_RENDERING_HACK");
+        vulkan_disable_child_window_rendering_hack =
+            (sgi && (
+                !strcmp(sgi, "429660")  /* Bug 21949 : Tales of Berseria video tearing */
             )) ||
             (e && *e != '\0' && *e != '0');
     }

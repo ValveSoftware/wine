@@ -289,6 +289,12 @@ static BOOL wine_vk_surface_set_offscreen(struct wine_vk_surface *surface, BOOL 
 #ifdef SONAME_LIBXCOMPOSITE
     if (usexcomposite)
     {
+        if (vulkan_disable_child_window_rendering_hack)
+        {
+            FIXME("Vulkan child window rendering is supported, but it's disabled.\n");
+            return TRUE;
+        }
+
         if (!surface->offscreen && offscreen)
         {
             FIXME("Redirecting vulkan surface offscreen, expect degraded performance.\n");
@@ -325,6 +331,17 @@ void sync_vk_surface(HWND hwnd, BOOL known_child)
 {
     struct wine_vk_surface *surface;
     UINT surface_with_swapchain_count = 0;
+
+    if (vulkan_disable_child_window_rendering_hack)
+    {
+        static BOOL once = FALSE;
+
+        if (!once++)
+            FIXME("Vulkan child window rendering is disabled.\n");
+        else
+            WARN("Vulkan child window rendering is disabled.\n");
+        return;
+    }
 
     pthread_mutex_lock(&vulkan_mutex);
     LIST_FOR_EACH_ENTRY(surface, &surface_list, struct wine_vk_surface, entry)
