@@ -937,4 +937,6 @@ static inline UINT asciiz_to_unicode( WCHAR *dst, const char *src )
     return (p - dst) * sizeof(WCHAR);
 }
 
+extern BOOL vulkan_disable_child_window_rendering_hack;
+
 #endif  /* __WINE_X11DRV_H */

@@ -87,6 +87,7 @@ int alloc_system_colors = 256;
 int xrender_error_base = 0;
 char *process_name = NULL;
 WNDPROC client_foreign_window_proc = NULL;
+BOOL vulkan_disable_child_window_rendering_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -706,6 +707,18 @@ static NTSTATUS x11drv_init( void *arg )
     XkbUseExtension( gdi_display, NULL, NULL );
     X11DRV_InitKeyboard( gdi_display );
     if (use_xim) use_xim = xim_init( input_style );
+
+    {
+        const char *sgi = getenv("SteamGameId");
+        const char *e = getenv("WINE_LAYERED_WINDOW_CLIENT_HACK");
+
+        e = getenv("WINE_DISABLE_VK_CHILD_WINDOW_RENDERING_HACK");
+        vulkan_disable_child_window_rendering_hack =
+            (sgi && (
+                !strcmp(sgi, "429660")  /* Bug 21949 : Tales of Berseria video tearing */
+            )) ||
+            (e && *e != '\0' && *e != '0');
+    }
 
     init_user_driver();
     X11DRV_DisplayDevices_Init(FALSE);
