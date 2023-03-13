@@ -488,15 +488,15 @@ static HRESULT wg_format_from_stream_descriptor(IMFStreamDescriptor *descriptor,
     return hr;
 }
 
-static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor, wg_parser_stream_t stream,
-    const GUID *attr, enum wg_parser_tag tag)
+static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor,
+    wg_source_t source, UINT index, const GUID *attr, enum wg_parser_tag tag)
 {
     WCHAR *strW;
     HRESULT hr;
     DWORD len;
     char *str;
 
-    if (!(str = wg_parser_stream_get_tag(stream, tag))
+    if (!(str = wg_source_get_stream_tag(source, index, tag))
             || !(len = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0)))
         hr = S_OK;
     else if (!(strW = malloc(len * sizeof(*strW))))
@@ -1809,18 +1809,17 @@ static void media_source_init_stream_map(struct media_source *source, UINT strea
 
 static void media_source_init_descriptors(struct media_source *source)
 {
-    HRESULT hr = S_OK;
+    HRESULT hr;
     UINT i;
 
     for (i = 0; i < source->stream_count; i++)
     {
-        struct media_stream *stream = source->streams[i];
-        IMFStreamDescriptor *descriptor = stream->descriptor;
+        IMFStreamDescriptor *descriptor = source->descriptors[i];
 
-        if (FAILED(hr = stream_descriptor_set_tag(descriptor, stream->wg_stream,
+        if (FAILED(hr = stream_descriptor_set_tag(descriptor, source->wg_source, source->stream_map[i],
                 &MF_SD_LANGUAGE, WG_PARSER_TAG_LANGUAGE)))
             WARN("Failed to set stream descriptor language, hr %#lx\n", hr);
-        if (FAILED(hr = stream_descriptor_set_tag(descriptor, stream->wg_stream,
+        if (FAILED(hr = stream_descriptor_set_tag(descriptor, source->wg_source, source->stream_map[i],
                 &MF_SD_STREAM_NAME, WG_PARSER_TAG_NAME)))
             WARN("Failed to set stream descriptor name, hr %#lx\n", hr);
     }
