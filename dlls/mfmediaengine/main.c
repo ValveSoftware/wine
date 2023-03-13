@@ -2588,7 +2588,7 @@ static HRESULT WINAPI media_engine_SetBalance(IMFMediaEngineEx *iface, double ba
 {
     FIXME("%p, %f stub.\n", iface, balance);
 
-    return E_NOTIMPL;
+    return S_OK;
 }
 
 static BOOL WINAPI media_engine_IsPlaybackRateSupported(IMFMediaEngineEx *iface, double rate)
