@@ -712,6 +712,8 @@ static HRESULT WINAPI topology_CloneFrom(IMFTopology *iface, IMFTopology *src)
         for (j = 0; j < outputs->count; ++j)
         {
             DWORD input_index = outputs->streams[j].connection_stream;
+            if (!outputs->streams[j].connection)
+                continue;
             TOPOID id = outputs->streams[j].connection->id;
 
             /* Skip node lookup in destination topology, assuming same node order. */
