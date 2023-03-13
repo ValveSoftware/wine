@@ -525,14 +525,32 @@ NTSTATUS wg_source_get_stream_format(void *args)
     struct wg_source_get_stream_format_params *params = args;
     struct wg_source *source = params->source;
     guint index = params->index;
-    GstCaps *caps;
+    GstCaps *caps, *copy;
 
     GST_TRACE("source %p, index %u", source, index);
 
     if (!(caps = source_get_stream_caps(source, index)))
         return STATUS_UNSUCCESSFUL;
-    wg_format_from_caps(&params->format, caps);
 
+    if (!(copy = gst_caps_copy(caps)))
+        goto done;
+    switch (stream_type_from_caps(caps))
+    {
+    case GST_STREAM_TYPE_VIDEO:
+        gst_structure_set_name(gst_caps_get_structure(copy, 0), "video/x-raw");
+        gst_caps_set_simple(copy, "format", G_TYPE_STRING, "NV12", NULL);
+        break;
+    case GST_STREAM_TYPE_AUDIO:
+        gst_structure_set_name(gst_caps_get_structure(copy, 0), "audio/x-raw");
+        gst_caps_set_simple(copy, "format", G_TYPE_STRING, "S16LE", NULL);
+        gst_caps_set_simple(copy, "layout", G_TYPE_STRING, "interleaved", NULL);
+        break;
+    default: break;
+    }
+    wg_format_from_caps(&params->format, copy);
+    gst_caps_unref(copy);
+
+done:
     gst_caps_unref(caps);
     return STATUS_SUCCESS;
 }
