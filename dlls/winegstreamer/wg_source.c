@@ -64,6 +64,14 @@ static struct wg_source *get_source(wg_source_t source)
     return (struct wg_source *)(ULONG_PTR)source;
 }
 
+static const char *media_type_from_caps(GstCaps *caps)
+{
+    GstStructure *structure;
+    if (!caps || !(structure = gst_caps_get_structure(caps, 0)))
+        return "";
+    return gst_structure_get_name(structure);
+}
+
 static GstCaps *detect_caps_from_data(const char *url, const void *data, guint size)
 {
     const char *extension = url ? strrchr(url, '.') : NULL;
@@ -134,6 +142,17 @@ static GstCaps *source_get_stream_caps(struct wg_source *source, guint index)
     caps = gst_stream_get_caps(stream);
     gst_object_unref(stream);
     return caps;
+}
+
+static GstTagList *source_get_stream_tags(struct wg_source *source, guint index)
+{
+    GstStream *stream;
+    GstTagList *tags;
+    if (!(stream = source_get_stream(source, index)))
+        return NULL;
+    tags = gst_stream_get_tags(stream);
+    gst_object_unref(stream);
+    return tags;
 }
 
 static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
@@ -646,3 +665,127 @@ NTSTATUS wg_source_get_stream_format(void *args)
     return STATUS_SUCCESS;
 }
 
+static gchar *stream_lang_from_tags(GstTagList *tags, bool is_quicktime)
+{
+    gchar *value;
+
+    if (!gst_tag_list_get_string(tags, GST_TAG_LANGUAGE_CODE, &value) || !value)
+        return NULL;
+
+    if (is_quicktime)
+    {
+        /* For QuickTime media, we convert the language tags to ISO 639-1. */
+        const gchar *lang_code_iso_639_1 = gst_tag_get_language_code_iso_639_1(value);
+        gchar *tmp = lang_code_iso_639_1 ? g_strdup(lang_code_iso_639_1) : NULL;
+        g_free(value);
+        value = tmp;
+    }
+
+    return value;
+}
+
+static gchar *stream_name_from_tags(GstTagList *tags)
+{
+    /* Extract stream name from Quick Time demuxer private tag where it puts unrecognized chunks. */
+    guint i, tag_count = gst_tag_list_get_tag_size(tags, "private-qt-tag");
+    gchar *value = NULL;
+
+    for (i = 0; !value && i < tag_count; ++i)
+    {
+        const gchar *name;
+        const GValue *val;
+        GstSample *sample;
+        GstBuffer *buf;
+        gsize size;
+
+        if (!(val = gst_tag_list_get_value_index(tags, "private-qt-tag", i)))
+            continue;
+        if (!GST_VALUE_HOLDS_SAMPLE(val) || !(sample = gst_value_get_sample(val)))
+            continue;
+        name = gst_structure_get_name(gst_sample_get_info(sample));
+        if (!name || strcmp(name, "application/x-gst-qt-name-tag"))
+            continue;
+        if (!(buf = gst_sample_get_buffer(sample)))
+            continue;
+        if ((size = gst_buffer_get_size(buf)) < 8)
+            continue;
+        size -= 8;
+        if (!(value = g_malloc(size + 1)))
+            return NULL;
+        if (gst_buffer_extract(buf, 8, value, size) != size)
+        {
+            g_free(value);
+            value = NULL;
+            continue;
+        }
+        value[size] = 0;
+    }
+
+    return value;
+}
+
+NTSTATUS wg_source_get_stream_tag(void *args)
+{
+    struct wg_source_get_stream_tag_params *params = args;
+    struct wg_source *source = get_source(params->source);
+    enum wg_parser_tag tag = params->tag;
+    guint index = params->index;
+    GstTagList *tags;
+    NTSTATUS status;
+    uint32_t len;
+    gchar *value;
+
+    GST_TRACE("source %p, index %u, tag %u", source, index, tag);
+
+    if (params->tag >= WG_PARSER_TAG_COUNT)
+        return STATUS_INVALID_PARAMETER;
+    if (!(tags = source_get_stream_tags(source, index)))
+        return STATUS_UNSUCCESSFUL;
+
+    switch (tag)
+    {
+    case WG_PARSER_TAG_LANGUAGE:
+    {
+        bool is_quicktime = false;
+        GstCaps *caps;
+
+        if ((caps = gst_pad_get_current_caps(source->src_pad)))
+        {
+            is_quicktime = !strcmp(media_type_from_caps(caps), "video/quicktime");
+            gst_caps_unref(caps);
+        }
+
+        value = stream_lang_from_tags(tags, is_quicktime);
+        break;
+    }
+    case WG_PARSER_TAG_NAME:
+        value = stream_name_from_tags(tags);
+        break;
+    default:
+        GST_FIXME("Unsupported stream tag %u", tag);
+        value = NULL;
+        break;
+    }
+
+    if (!value)
+        goto error;
+
+    if ((len = strlen(value) + 1) > params->size)
+    {
+        params->size = len;
+        status = STATUS_BUFFER_TOO_SMALL;
+    }
+    else
+    {
+        memcpy(params->buffer, value, len);
+        status = STATUS_SUCCESS;
+    }
+
+    gst_tag_list_unref(tags);
+    g_free(value);
+    return status;
+
+error:
+    gst_tag_list_unref(tags);
+    return STATUS_NOT_FOUND;
+}
