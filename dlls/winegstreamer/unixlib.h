@@ -383,6 +383,15 @@ struct wg_source_get_stream_format_params
     struct wg_format format;
 };
 
+struct wg_source_get_stream_tag_params
+{
+    wg_source_t source;
+    UINT32 index;
+    wg_parser_tag tag;
+    UINT32 size;
+    char *buffer;
+};
+
 struct wg_transform_attrs
 {
     UINT32 output_plane_align;
@@ -500,6 +509,7 @@ enum unix_funcs
     unix_wg_source_get_position,
     unix_wg_source_push_data,
     unix_wg_source_get_stream_format,
+    unix_wg_source_get_stream_tag,
 
     unix_wg_transform_create,
     unix_wg_transform_destroy,

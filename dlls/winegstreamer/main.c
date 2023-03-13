@@ -478,6 +478,35 @@ bool wg_source_get_stream_format(wg_source_t source, UINT32 index,
     return true;
 }
 
+char *wg_source_get_stream_tag(wg_source_t source, UINT32 index, wg_parser_tag tag)
+{
+    struct wg_source_get_stream_tag_params params =
+    {
+        .source = source,
+        .index = index,
+        .tag = tag,
+    };
+    char *buffer;
+
+    TRACE("source %#I64x, index %u, tag %#I64x\n", source, index, tag);
+
+    if (WINE_UNIX_CALL(unix_wg_source_get_stream_tag, &params) != STATUS_BUFFER_TOO_SMALL)
+        return NULL;
+    if (!(buffer = malloc(params.size)))
+    {
+        ERR("No memory.\n");
+        return NULL;
+    }
+    params.buffer = buffer;
+    if (WINE_UNIX_CALL(unix_wg_source_get_stream_tag, &params))
+    {
+        ERR("wg_source_get_stream_tag failed unexpectedly.\n");
+        free(buffer);
+        return NULL;
+    }
+    return buffer;
+}
+
 wg_transform_t wg_transform_create(const struct wg_format *input_format,
         const struct wg_format *output_format, const struct wg_transform_attrs *attrs)
 {
