@@ -374,8 +374,9 @@ again:
     {
         /* This check does not strictly guarantee that we avoid the potential race but is supposed to greatly
          * reduce the probability of that. */
+        FIXME( "Cache changed while getting object, handle %p, shm_idx %d, refcount %d.\n",
+               handle, cache.shm_idx, ((int *)obj->shm)[2] );
         put_object( obj );
-        FIXME( "Cache changed while getting object.\n" );
         goto again;
     }
     return TRUE;
@@ -390,6 +391,7 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
     NTSTATUS ret = STATUS_SUCCESS;
     unsigned int shm_idx = 0;
     enum fsync_type type;
+    sigset_t sigset;
 
     if (get_cached_object( handle, obj )) return STATUS_SUCCESS;
 
@@ -399,7 +401,17 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
         return STATUS_NOT_IMPLEMENTED;
     }
 
-    /* We need to try grabbing it from the server. */
+
+    /* We need to try grabbing it from the server. Uninterrupted section
+     * is needed to avoid race with NtClose() which first calls fsync_close()
+     * and then closes handle on server. Without the section we might cache
+     * already closed handle back. */
+    server_enter_uninterrupted_section( &fd_cache_mutex, &sigset );
+    if (get_cached_object( handle, obj ))
+    {
+        server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
+        return STATUS_SUCCESS;
+    }
     SERVER_START_REQ( get_fsync_idx )
     {
         req->handle = wine_server_obj_handle( handle );
@@ -410,6 +422,8 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
         }
     }
     SERVER_END_REQ;
+    if (!ret) add_to_list( handle, type, shm_idx );
+    server_leave_uninterrupted_section( &fd_cache_mutex, &sigset );
 
     if (ret)
     {
@@ -421,7 +435,6 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
 
     obj->type = type;
     obj->shm = get_shm( shm_idx );
-    add_to_list( handle, type, shm_idx );
     /* get_fsync_idx server request increments shared mem refcount, so not grabbing object here. */
     return ret;
 }
