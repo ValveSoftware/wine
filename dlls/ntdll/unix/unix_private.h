@@ -185,6 +185,7 @@ extern BOOL alert_simulate_sched_quantum;
 extern BOOL fsync_yield_to_waiters;
 extern BOOL no_priv_elevation;
 extern BOOL localsystem_sid;
+extern BOOL simulate_writecopy;
 
 extern void init_environment(void);
 extern void init_startup_info(void);
