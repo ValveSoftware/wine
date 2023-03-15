@@ -2305,6 +2305,7 @@ BOOL alert_simulate_sched_quantum;
 BOOL no_priv_elevation;
 BOOL localsystem_sid;
 BOOL high_dll_addresses;
+BOOL simulate_writecopy;
 
 static void hacks_init(void)
 {
@@ -2359,6 +2360,10 @@ static void hacks_init(void)
     if (high_dll_addresses)
         ERR("HACK: moving dlls to high addresses.\n");
 #endif
+
+    env_str = getenv("WINE_SIMULATE_WRITECOPY");
+    if (env_str) simulate_writecopy = atoi(env_str);
+    else if (sgi) simulate_writecopy = !strcmp(sgi, "1608730");
 
     if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
     {
