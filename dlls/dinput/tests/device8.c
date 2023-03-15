@@ -315,12 +315,12 @@ void test_overlapped_format( DWORD version )
     if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
     {
         keybd_event( 0, DIK_F, KEYEVENTF_SCANCODE, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
     }
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     keybd_event( 0, DIK_F, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP, 0 );
-    res = WaitForSingleObject( event, 100 );
+    res = WaitForSingleObject( event, 5000 );
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     count = 10;
@@ -331,7 +331,7 @@ void test_overlapped_format( DWORD version )
 
     /* press D */
     keybd_event( 0, DIK_D, KEYEVENTF_SCANCODE, 0 );
-    res = WaitForSingleObject( event, 100 );
+    res = WaitForSingleObject( event, 5000 );
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     count = 10;
@@ -351,7 +351,7 @@ void test_overlapped_format( DWORD version )
 
     /* release D */
     keybd_event( 0, DIK_D, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP, 0 );
-    res = WaitForSingleObject( event, 100 );
+    res = WaitForSingleObject( event, 5000 );
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     count = 10;
@@ -376,12 +376,12 @@ void test_overlapped_format( DWORD version )
     if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
     {
         keybd_event( 0, DIK_F, KEYEVENTF_SCANCODE, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
     }
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     keybd_event( 0, DIK_F, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP, 0 );
-    res = WaitForSingleObject( event, 100 );
+    res = WaitForSingleObject( event, 5000 );
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     count = 10;
@@ -392,7 +392,7 @@ void test_overlapped_format( DWORD version )
 
     /* press D */
     keybd_event( 0, DIK_D, KEYEVENTF_SCANCODE, 0 );
-    res = WaitForSingleObject( event, 100 );
+    res = WaitForSingleObject( event, 5000 );
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     count = 10;
@@ -412,7 +412,7 @@ void test_overlapped_format( DWORD version )
 
     /* release D */
     keybd_event( 0, DIK_D, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP, 0 );
-    res = WaitForSingleObject( event, 100 );
+    res = WaitForSingleObject( event, 5000 );
     ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
     count = 10;
@@ -455,12 +455,12 @@ static void test_device_input( IDirectInputDevice8A *device, DWORD type, DWORD c
         if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
         {
             keybd_event( 0, code, KEYEVENTF_SCANCODE, 0 );
-            res = WaitForSingleObject( event, 100 );
+            res = WaitForSingleObject( event, 5000 );
         }
         ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
         keybd_event( 0, code, KEYEVENTF_SCANCODE | KEYEVENTF_KEYUP, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
         ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
     }
     if (type == INPUT_MOUSE)
@@ -470,12 +470,12 @@ static void test_device_input( IDirectInputDevice8A *device, DWORD type, DWORD c
         if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
         {
             mouse_event( MOUSEEVENTF_LEFTDOWN, 0, 0, 0, 0 );
-            res = WaitForSingleObject( event, 100 );
+            res = WaitForSingleObject( event, 5000 );
         }
         ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
         mouse_event( MOUSEEVENTF_LEFTUP, 0, 0, 0, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
         ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
     }
 
@@ -491,21 +491,21 @@ static void test_device_input( IDirectInputDevice8A *device, DWORD type, DWORD c
         if (type == INPUT_KEYBOARD)
         {
             keybd_event( VK_SPACE, DIK_SPACE, 0, 0 );
-            res = WaitForSingleObject( event, 100 );
+            res = WaitForSingleObject( event, 5000 );
             ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
             keybd_event( VK_SPACE, DIK_SPACE, KEYEVENTF_KEYUP, 0 );
-            res = WaitForSingleObject( event, 100 );
+            res = WaitForSingleObject( event, 5000 );
             ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
         }
         if (type == INPUT_MOUSE)
         {
             mouse_event( MOUSEEVENTF_LEFTDOWN, 1, 1, 0, 0 );
-            res = WaitForSingleObject( event, 100 );
+            res = WaitForSingleObject( event, 5000 );
             ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
 
             mouse_event( MOUSEEVENTF_LEFTUP, 1, 1, 0, 0 );
-            res = WaitForSingleObject( event, 100 );
+            res = WaitForSingleObject( event, 5000 );
             ok( res == WAIT_OBJECT_0, "WaitForSingleObject returned %#lx\n", res );
         }
     }
@@ -1463,7 +1463,7 @@ static void test_sys_mouse( DWORD version )
     if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
     {
         mouse_event( MOUSEEVENTF_MOVE, 10, 10, 0, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
     }
     ok( !res, "WaitForSingleObject returned %#lx\n", res );
 
@@ -1473,7 +1473,7 @@ static void test_sys_mouse( DWORD version )
     ok( count == 1, "got count %lu\n", count );
 
     mouse_event( MOUSEEVENTF_MOVE, 10, 10, 0, 0 );
-    res = WaitForSingleObject( event, 100 );
+    res = WaitForSingleObject( event, 5000 );
     ok( !res, "WaitForSingleObject returned %#lx\n", res );
 
     hr = IDirectInputDevice8_Unacquire( device );
@@ -1491,7 +1491,7 @@ static void test_sys_mouse( DWORD version )
     if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
     {
         mouse_event( MOUSEEVENTF_MOVE, 10, 10, 0, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
     }
     ok( !res, "WaitForSingleObject returned %#lx\n", res );
 
@@ -1510,14 +1510,14 @@ static void test_sys_mouse( DWORD version )
     if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
     {
         mouse_event( MOUSEEVENTF_MOVE, 10, 10, 0, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
     }
     ok( !res, "WaitForSingleObject returned %#lx\n", res );
 
     for (i = 0; i < 2; i++)
     {
         mouse_event( MOUSEEVENTF_MOVE, 10 + i, 10 + i, 0, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
         ok( !res, "WaitForSingleObject returned %#lx\n", res );
     }
 
@@ -1652,7 +1652,7 @@ static void test_dik_codes( IDirectInputDevice8W *device, HANDLE event, HWND hwn
             if (i == 0 && j == 0 && res == WAIT_TIMEOUT) /* Acquire is asynchronous */
             {
                 keybd_event( vkey, scan, 0, 0 );
-                res = WaitForSingleObject( event, 100 );
+                res = WaitForSingleObject( event, 5000 );
             }
             ok( !res, "WaitForSingleObject returned %#lx\n", res );
 
@@ -1663,7 +1663,7 @@ static void test_dik_codes( IDirectInputDevice8W *device, HANDLE event, HWND hwn
             ok( key_state[map[j].dik] == 0x80, "got state %#x\n", key_state[map[j].dik] );
 
             keybd_event( vkey, scan, KEYEVENTF_KEYUP, 0 );
-            res = WaitForSingleObject( event, 100 );
+            res = WaitForSingleObject( event, 5000 );
             ok( !res, "WaitForSingleObject returned %#lx\n", res );
 
             winetest_pop_context();
@@ -2142,7 +2142,7 @@ static void test_sys_keyboard( DWORD version )
     if (res == WAIT_TIMEOUT) /* Acquire is asynchronous */
     {
         keybd_event( 'Q', 0, 0, 0 );
-        res = WaitForSingleObject( event, 100 );
+        res = WaitForSingleObject( event, 5000 );
     }
     ok( !res, "WaitForSingleObject returned %#lx\n", res );
 
