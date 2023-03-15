@@ -2227,10 +2227,12 @@ static ULONG_PTR get_image_address(void)
 }
 
 BOOL localsystem_sid;
+BOOL simulate_writecopy;
 
 static void hacks_init(void)
 {
     const char *sgi = getenv( "SteamGameId" );
+    const char *env_str;
 
     switch (sgi ? atoi( sgi ) : -1)
     {
@@ -2242,6 +2244,10 @@ static void hacks_init(void)
         setenv( "WINESTEAMNOEXEC", "1", 0 );
         break;
     }
+
+    env_str = getenv("WINE_SIMULATE_WRITECOPY");
+    if (env_str) simulate_writecopy = atoi(env_str);
+    else if (sgi) simulate_writecopy = !strcmp(sgi, "1608730");
 
     if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
     {

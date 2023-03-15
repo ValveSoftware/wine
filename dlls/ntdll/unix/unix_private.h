@@ -206,6 +206,7 @@ extern pthread_mutex_t fd_cache_mutex;
 extern struct _KUSER_SHARED_DATA *user_shared_data;
 
 extern BOOL localsystem_sid;
+extern BOOL simulate_writecopy;
 
 extern void init_environment(void);
 extern void init_startup_info(void);
