@@ -2791,6 +2791,7 @@ static NTSTATUS open_known_dll( const WCHAR *libname, UNICODE_STRING *nt_name, W
     OBJECT_ATTRIBUTES attr;
 
     if (!known_dlls_ntdir) return STATUS_DLL_NOT_FOUND;
+    if (libname && !_wcsicmp( libname, L"ucrtbase.dll" )) return STATUS_DLL_NOT_FOUND;
     RtlInitUnicodeString( &str, libname );
     InitializeObjectAttributes( &attr, &str, OBJ_CASE_INSENSITIVE, known_dlls_ntdir, NULL );
     if ((status = NtOpenSection( mapping, MAXIMUM_ALLOWED, &attr ))) return status;
@@ -3330,7 +3331,14 @@ static NTSTATUS find_dll_file( const WCHAR *load_path, const WCHAR *libname, UNI
 
         if (status == STATUS_SUCCESS)
         {
+            static const WCHAR ucrtbase[] = L"ucrtbase.dll";
+            unsigned int len;
+
             TRACE ("found %s for %s\n", debugstr_w(fullname), debugstr_w(libname) );
+            len = wcslen( fullname );
+            if (len > ARRAY_SIZE(ucrtbase) - 1 && !_wcsicmp( fullname + len - (ARRAY_SIZE(ucrtbase) - 1), ucrtbase )
+                && (*pwm = find_basename_module( ucrtbase )))
+                return STATUS_SUCCESS;
             libname = fullname;
         }
         else
@@ -3603,7 +3611,6 @@ NTSTATUS WINAPI LdrGetDllHandleEx( ULONG flags, LPCWSTR load_path, ULONG *dll_ch
 
     status = find_dll_file( load_path, dllname ? dllname : name->Buffer,
                             &nt_name, &wm, &mapping, &image_info, &id, &redirected, TRUE );
-
     if (wm) *base = wm->ldr.DllBase;
     else
     {
