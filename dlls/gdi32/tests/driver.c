@@ -33,6 +33,7 @@
 #include "setupapi.h"
 #include "ntddvdeo.h"
 #include "devpkey.h"
+#include "cfgmgr32.h"
 
 #include "wine/test.h"
 
@@ -932,6 +933,12 @@ static void test_gpu_device_properties(void)
             ok(ret, "Got unexpected ret %d, GetLastError() %lu, %s.\n", ret, GetLastError(), debugstr_w(device_id));
             ok(type == DEVPROP_TYPE_UINT32, "Got type %ld.\n", type);
         }
+
+        ret = SetupDiGetDevicePropertyW(set, &device_data, &DEVPKEY_Device_RemovalPolicy, &type,
+                (BYTE *)&value, sizeof(value), NULL, 0);
+        ok(ret, "Got unexpected ret %d, GetLastError() %lu, %s.\n", ret, GetLastError(), debugstr_w(device_id));
+        ok(value == CM_REMOVAL_POLICY_EXPECT_NO_REMOVAL || value == CM_REMOVAL_POLICY_EXPECT_ORDERLY_REMOVAL
+                || value == CM_REMOVAL_POLICY_EXPECT_SURPRISE_REMOVAL, "Got value %d.\n", value);
         ++i;
     }
     SetupDiDestroyDeviceInfoList( set );
