@@ -896,6 +896,7 @@ static void test_gpu_device_properties(void)
     WCHAR device_id[256];
     DEVPROPTYPE type;
     unsigned int i;
+    UINT32 value;
     HDEVINFO set;
     BOOL ret;
 
@@ -920,6 +921,17 @@ static void test_gpu_device_properties(void)
         ok(ret, "Got unexpected ret %d, GetLastError() %lu.\n", ret, GetLastError());
         ok(type == DEVPROP_TYPE_STRING, "Got type %ld.\n", type);
 
+        ret = SetupDiGetDevicePropertyW(set, &device_data, &DEVPKEY_Device_BusNumber, &type,
+                (BYTE *)&value, sizeof(value), NULL, 0);
+        if (!wcsicmp(device_id, L"root\\basicdisplay"))
+        {
+            ok(!ret, "Found Bus Id.\n");
+        }
+        else
+        {
+            ok(ret, "Got unexpected ret %d, GetLastError() %lu, %s.\n", ret, GetLastError(), debugstr_w(device_id));
+            ok(type == DEVPROP_TYPE_UINT32, "Got type %ld.\n", type);
+        }
         ++i;
     }
     SetupDiDestroyDeviceInfoList( set );
