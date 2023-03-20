@@ -1153,6 +1153,7 @@ static BOOL check_device_state_button( struct hid_joystick *impl, struct hid_val
     IDirectInputDevice8W *iface = &impl->base.IDirectInputDevice8W_iface;
     struct parse_device_state_params *params = data;
     BYTE old_value, value;
+    int index;
 
     if (instance->wReportId != impl->base.device_state_report_id) return DIENUM_CONTINUE;
 
@@ -1162,8 +1163,8 @@ static BOOL check_device_state_button( struct hid_joystick *impl, struct hid_val
     if (params->reset_state) value = 0;
 
     impl->base.device_state[instance->dwOfs] = value;
-    if (old_value != value)
-        queue_event( iface, instance->dwType, value, params->time, params->seq );
+    if (old_value != value && (index = dinput_device_object_index_from_id( iface, instance->dwType )) >= 0)
+        queue_event( iface, index, value, params->time, params->seq );
 
     return DIENUM_CONTINUE;
 }
@@ -1233,6 +1234,7 @@ static BOOL read_device_state_value( struct hid_joystick *impl, struct hid_value
     char *report_buf = impl->input_report_buf;
     LONG old_value, value;
     NTSTATUS status;
+    int index;
 
     if (instance->wReportId != impl->base.device_state_report_id) return DIENUM_CONTINUE;
 
@@ -1255,8 +1257,8 @@ static BOOL read_device_state_value( struct hid_joystick *impl, struct hid_value
 
     old_value = *(LONG *)(params->old_state + instance->dwOfs);
     *(LONG *)(impl->base.device_state + instance->dwOfs) = value;
-    if (old_value != value)
-        queue_event( iface, instance->dwType, value, params->time, params->seq );
+    if (old_value != value && (index = dinput_device_object_index_from_id( iface, instance->dwType )) >= 0)
+        queue_event( iface, index, value, params->time, params->seq );
 
     return DIENUM_CONTINUE;
 }
