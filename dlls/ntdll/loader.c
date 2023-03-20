@@ -3017,7 +3017,17 @@ done:
  */
 static NTSTATUS prepend_system_dir( const WCHAR *name, ULONG name_length, WCHAR **fullname )
 {
+    static const WCHAR ucrtbase[] = L"ucrtbase.dll";
     ULONG len;
+
+    if (name_length == sizeof(ucrtbase) / sizeof(*ucrtbase) - 1 && !_wcsnicmp( name, ucrtbase, name_length ))
+    {
+        if (!(*fullname = RtlAllocateHeap( GetProcessHeap(), 0, (name_length + 1) * sizeof(WCHAR) )))
+            return STATUS_NO_MEMORY;
+        memcpy( *fullname, name, name_length * sizeof(WCHAR) );
+        (*fullname)[name_length] = 0;
+        return STATUS_SUCCESS;
+    }
 
     len = wcslen( system_dir ) + name_length;
     if (!(*fullname = RtlAllocateHeap( GetProcessHeap(), 0, (len + 1) * sizeof(WCHAR) )))
