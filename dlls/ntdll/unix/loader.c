@@ -2402,6 +2402,9 @@ static void hacks_init(void)
         ERR("HACK: setting LIBGL_ALWAYS_SOFTWARE.\n");
         setenv("LIBGL_ALWAYS_SOFTWARE", "1", 0);
     }
+
+    if (main_argc > 1 && strstr(main_argv[1], "\\Diablo IV.exe"))
+        setenv("WINE_HIDE_VANGOGH_GPU", "1", 0);
 }
 
 /***********************************************************************
