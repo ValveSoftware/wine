@@ -996,6 +996,7 @@ static void add_gpu( const struct gdi_gpu *gpu, void *param )
 
         set_reg_value( subkey, NULL, 0xffff0000 | DEVPROP_TYPE_UINT32,
                        &removal_policy, sizeof(removal_policy) );
+        NtClose( subkey );
     }
 
     desc = gpu->name;
