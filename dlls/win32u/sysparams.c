@@ -982,8 +982,11 @@ static void add_gpu( const struct gdi_gpu *gpu, void *param )
     {
         if ((subkey = reg_create_key( hkey, devpkey_device_bus_number,
                                       sizeof(devpkey_device_bus_number), 0, NULL )))
+        {
             set_reg_value( subkey, NULL, 0xffff0000 | DEVPROP_TYPE_UINT32,
                            &gpu_index, sizeof(gpu_index) );
+            NtClose( subkey );
+        }
     }
 
     if ((subkey = reg_create_key( hkey, devpkey_device_removal_policy,
