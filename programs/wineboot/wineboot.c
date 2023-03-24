@@ -79,6 +79,7 @@
 #include <shellapi.h>
 #include <setupapi.h>
 #include <newdev.h>
+#include <wincrypt.h>
 #include "resource.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(wineboot);
@@ -1589,6 +1590,15 @@ static void update_win_version(void)
     }
 }
 
+static void update_root_certs(void)
+{
+    HCERTSTORE store;
+
+    store = CertOpenStore( CERT_STORE_PROV_SYSTEM_REGISTRY_W, 0, 0, CERT_STORE_OPEN_EXISTING_FLAG
+                           | CERT_STORE_READONLY_FLAG | CERT_SYSTEM_STORE_LOCAL_MACHINE, L"Root");
+    CertCloseStore( store, 0 );
+}
+
 /* execute rundll32 on the wine.inf file if necessary */
 static void update_wineprefix( BOOL force )
 {
@@ -1646,6 +1656,7 @@ static void update_wineprefix( BOOL force )
         install_root_pnp_devices();
         update_user_profile();
         update_win_version();
+        update_root_certs();
 
         WINE_MESSAGE( "wine: configuration in %s has been updated.\n", debugstr_w(prettyprint_configdir()) );
     }
