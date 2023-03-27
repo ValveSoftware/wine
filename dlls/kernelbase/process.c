@@ -615,6 +615,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
         {L"\\EOSOverlayRenderer-Win64-Shipping.exe", L" --use-gl=swiftshader --in-process-gpu"},
         {L"\\EpicOnlineServicesUIHelper", L" --use-gl=desktop"},
+        {L"OlympiaRising.exe", L" --use-gl=swiftshader"},
     };
     unsigned int i;
 
