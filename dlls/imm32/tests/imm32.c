@@ -4015,7 +4015,6 @@ static void test_ImmActivateLayout(void)
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = MSG_IME_UI, .message = {.msg = WM_IME_SELECT, .wparam = 1, .lparam = (LPARAM)expect_ime},
-            .todo = TRUE,
         },
         {
             .hkl = expect_ime, .himc = default_himc,
@@ -4054,7 +4053,6 @@ static void test_ImmActivateLayout(void)
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = MSG_IME_UI, .message = {.msg = WM_IME_SELECT, .wparam = 0, .lparam = (LPARAM)expect_ime},
-            .todo = TRUE,
         },
         {
             .hkl = default_hkl, .himc = default_himc,
@@ -4216,7 +4214,6 @@ static void test_ImmCreateInputContext(void)
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = MSG_IME_UI, .message = {.msg = WM_IME_SELECT, .wparam = 1, .lparam = (LPARAM)expect_ime},
-            .todo = TRUE,
         },
         {
             .hkl = expect_ime, .himc = default_himc,
@@ -4262,7 +4259,6 @@ static void test_ImmCreateInputContext(void)
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = MSG_IME_UI, .message = {.msg = WM_IME_SELECT, .wparam = 0, .lparam = (LPARAM)expect_ime},
-            .todo = TRUE,
         },
         {
             .hkl = default_hkl, .himc = default_himc,
