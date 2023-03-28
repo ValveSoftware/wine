@@ -3790,7 +3790,6 @@ static void test_ImmActivateLayout(void)
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = IME_SELECT, .select = 1,
-            .todo = TRUE,
         },
         {0},
     };
@@ -3804,6 +3803,15 @@ static void test_ImmActivateLayout(void)
         {
             .hkl = default_hkl, .himc = default_himc,
             .func = IME_SELECT, .select = 0,
+            .todo = TRUE,
+        },
+        {0},
+    };
+    const struct ime_call activate_with_window_seq[] =
+    {
+        {
+            .hkl = expect_ime, .himc = default_himc,
+            .func = IME_SELECT, .select = 1,
             .todo = TRUE,
         },
         {0},
@@ -3835,7 +3843,6 @@ static void test_ImmActivateLayout(void)
     SET_EXPECT( ImeInquire );
     ok_ret( 1, ImmActivateLayout( hkl ) );
     ok_seq( activate_seq );
-    todo_wine
     CHECK_CALLED( ImeInquire );
 
     ok_eq( hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
@@ -3843,8 +3850,10 @@ static void test_ImmActivateLayout(void)
     ok_ret( 1, ImmActivateLayout( hkl ) );
     ok_seq( empty_sequence );
 
+    todo_ImeDestroy = TRUE; /* Wine doesn't leak the IME */
     ok_ret( 1, ImmActivateLayout( old_hkl ) );
     ok_seq( deactivate_seq );
+    todo_ImeDestroy = FALSE;
 
     ok_eq( old_hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
 
@@ -3857,7 +3866,6 @@ static void test_ImmActivateLayout(void)
     SET_EXPECT( ImeDestroy );
     ret = ImmFreeLayout( hkl );
     ok( ret, "ImmFreeLayout returned %u\n", ret );
-    todo_wine
     CHECK_CALLED( ImeDestroy );
     ok_seq( empty_sequence );
 
@@ -3875,7 +3883,7 @@ static void test_ImmActivateLayout(void)
     ok_eq( old_hkl, ActivateKeyboardLayout( hkl, 0 ), HKL, "%p" );
     todo_wine
     CHECK_CALLED( ImeInquire );
-    ok_seq( activate_seq );
+    ok_seq( activate_with_window_seq );
 
     ok_eq( hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
 
@@ -3911,12 +3919,12 @@ static void test_ImmCreateInputContext(void)
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = IME_SELECT, .select = 1,
-            .todo = TRUE, .flaky_himc = TRUE,
+            .flaky_himc = TRUE,
         },
         {
             .hkl = expect_ime, .himc = 0/*himc[0]*/,
             .func = IME_SELECT, .select = 1,
-            .todo = TRUE, .flaky_himc = TRUE,
+            .flaky_himc = TRUE,
         },
         {0},
     };
