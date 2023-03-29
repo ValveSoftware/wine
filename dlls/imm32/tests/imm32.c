@@ -2973,7 +2973,7 @@ static HKL ime_install(void)
     return hkl;
 }
 
-static void ime_cleanup( HKL hkl )
+static void ime_cleanup( HKL hkl, BOOL free )
 {
     HMODULE module = GetModuleHandleW( L"winetest_ime.dll" );
     WCHAR buffer[MAX_PATH], value[MAX_PATH];
@@ -2983,6 +2983,8 @@ static void ime_cleanup( HKL hkl )
     ret = UnloadKeyboardLayout( hkl );
     todo_wine
     ok( ret, "UnloadKeyboardLayout failed, error %lu\n", GetLastError() );
+
+    if (free) ok_ret( 1, ImmFreeLayout( hkl ) );
 
     swprintf( buffer, ARRAY_SIZE(buffer), L"System\\CurrentControlSet\\Control\\Keyboard Layouts\\%08x", hkl );
     ret = RegDeleteKeyW( HKEY_LOCAL_MACHINE, buffer );
@@ -3086,7 +3088,7 @@ static void test_ImmInstallIME(void)
     ret = ImmFreeLayout( hkl );
     ok( ret, "ImmFreeLayout returned %#x\n", ret );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
     ime_info.fdwProperty = 0;
 
@@ -3112,7 +3114,7 @@ static void test_ImmInstallIME(void)
     ret = ImmFreeLayout( hkl );
     ok( ret, "ImmFreeLayout returned %#x\n", ret );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( IME_DLL_PROCESS_ATTACH, FALSE );
@@ -3151,7 +3153,7 @@ static void test_ImmIsIME(void)
     todo_ImeInquire = FALSE;
     todo_ImeDestroy = FALSE;
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( IME_DLL_PROCESS_ATTACH, FALSE );
@@ -3246,7 +3248,7 @@ static void test_ImmGetProperty(void)
     todo_ImeDestroy = FALSE;
     called_ImeDestroy = FALSE;
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( ImeInquire, FALSE );
@@ -3319,7 +3321,7 @@ static void test_ImmGetDescription(void)
     ok( ret == 12, "ImmGetDescriptionA returned %lu\n", ret );
     ok( !strcmp( bufferA, "WineTest IME" ), "got bufferA %s\n", debugstr_a(bufferA) );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( IME_DLL_PROCESS_ATTACH, FALSE );
@@ -3398,7 +3400,7 @@ static void test_ImmGetIMEFileName(void)
     ok( ret == 12, "ImmGetIMEFileNameA returned %lu\n", ret );
     ok( !strcmp( bufferA, expectA ), "got bufferA %s\n", debugstr_a(bufferA) );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( IME_DLL_PROCESS_ATTACH, FALSE );
@@ -3506,7 +3508,7 @@ static void test_ImmEscape( BOOL unicode )
         winetest_pop_context();
     }
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( ImeEscape, FALSE );
@@ -3574,7 +3576,7 @@ static void test_ImmEnumRegisterWord( BOOL unicode )
     ok_ret( 0xdeadbeef, ImmEnumRegisterWordA( hkl, enum_register_wordA, "Reading", 0xdeadbeef, "String", NULL ) );
     CHECK_CALLED( ImeEnumRegisterWord );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( ImeEnumRegisterWord, FALSE );
@@ -3636,7 +3638,7 @@ static void test_ImmRegisterWord( BOOL unicode )
     ok_ret( 0, ImmRegisterWordA( hkl, NULL, 0, "String" ) );
     CHECK_CALLED( ImeRegisterWord );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( ImeRegisterWord, FALSE );
@@ -3713,7 +3715,7 @@ skip_null:
     }
     CHECK_CALLED( ImeGetRegisterWordStyle );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( ImeGetRegisterWordStyle, FALSE );
@@ -3775,7 +3777,7 @@ static void test_ImmUnregisterWord( BOOL unicode )
     ok_ret( 0, ImmUnregisterWordA( hkl, NULL, 0, "String" ) );
     CHECK_CALLED( ImeUnregisterWord );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
 
 cleanup:
     SET_ENABLE( ImeUnregisterWord, FALSE );
@@ -3844,6 +3846,7 @@ static void test_ImmActivateLayout(void)
     ok_ret( 1, ImmActivateLayout( hkl ) );
     ok_seq( activate_seq );
     CHECK_CALLED( ImeInquire );
+    ok_ret( 1, ImmLoadIME( hkl ) );
 
     ok_eq( hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
 
@@ -3857,7 +3860,7 @@ static void test_ImmActivateLayout(void)
 
     ok_eq( old_hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
 
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, FALSE );
     ok_seq( empty_sequence );
 
 
@@ -3884,6 +3887,9 @@ static void test_ImmActivateLayout(void)
     todo_wine
     CHECK_CALLED( ImeInquire );
     ok_seq( activate_with_window_seq );
+    todo_ImeInquire = TRUE;
+    ok_ret( 1, ImmLoadIME( hkl ) );
+    todo_ImeInquire = FALSE;
 
     ok_eq( hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
 
@@ -3892,15 +3898,8 @@ static void test_ImmActivateLayout(void)
 
     ok_eq( old_hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
 
-    ime_cleanup( hkl );
-    ok_seq( empty_sequence );
-
-    /* ImmActivateLayout leaks the IME, we need to free it manually */
-
     SET_EXPECT( ImeDestroy );
-    ret = ImmFreeLayout( hkl );
-    ok( ret, "ImmFreeLayout returned %u\n", ret );
-    todo_wine
+    ime_cleanup( hkl, TRUE );
     CHECK_CALLED( ImeDestroy );
     ok_seq( empty_sequence );
 
@@ -4007,6 +4006,7 @@ static void test_ImmCreateInputContext(void)
 
     if (!(hkl = ime_install())) goto cleanup;
 
+    ok_ret( 1, ImmLoadIME( hkl ) );
 
     /* Activating the layout calls ImeSelect 1 on existing HIMC */
 
@@ -4055,8 +4055,7 @@ static void test_ImmCreateInputContext(void)
 
     ok_eq( old_hkl, GetKeyboardLayout( 0 ), HKL, "%p" );
 
-    ok_ret( 1, ImmFreeLayout( hkl ) );
-    ime_cleanup( hkl );
+    ime_cleanup( hkl, TRUE );
     ok_seq( empty_sequence );
 
 cleanup:
