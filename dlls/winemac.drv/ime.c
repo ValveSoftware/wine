@@ -498,7 +498,7 @@ static void UpdateDataInDefaultIMEWindow(HIMC hIMC, HWND hwnd, BOOL showable)
     LPCOMPOSITIONSTRING compstr;
     LPINPUTCONTEXT lpIMC;
 
-    lpIMC = LockRealIMC(hIMC);
+    lpIMC = ImmLockIMC(hIMC);
     if (lpIMC == NULL)
         return;
 
@@ -517,7 +517,7 @@ static void UpdateDataInDefaultIMEWindow(HIMC hIMC, HWND hwnd, BOOL showable)
     if (compstr != NULL)
         ImmUnlockIMCC(lpIMC->hCompStr);
 
-    UnlockRealIMC(hIMC);
+    ImmUnlockIMC(hIMC);
 }
 
 BOOL WINAPI ImeDestroy(UINT uForce)
@@ -945,7 +945,7 @@ static void PaintDefaultIMEWnd(HIMC hIMC, HWND hwnd)
     INT offX = 0, offY = 0;
     LPINPUTCONTEXT lpIMC;
 
-    lpIMC = LockRealIMC(hIMC);
+    lpIMC = ImmLockIMC(hIMC);
     if (lpIMC == NULL)
         return;
 
@@ -1060,7 +1060,7 @@ static void PaintDefaultIMEWnd(HIMC hIMC, HWND hwnd)
     ImmUnlockIMCC(lpIMC->hCompStr);
 
     EndPaint(hwnd, &ps);
-    UnlockRealIMC(hIMC);
+    ImmUnlockIMC(hIMC);
 }
 
 static void DefaultIMEComposition(HIMC hIMC, HWND hwnd, LPARAM lParam)
@@ -1074,14 +1074,14 @@ static void DefaultIMEStartComposition(HIMC hIMC, HWND hwnd)
 {
     LPINPUTCONTEXT lpIMC;
 
-    lpIMC = LockRealIMC(hIMC);
+    lpIMC = ImmLockIMC(hIMC);
     if (lpIMC == NULL)
         return;
 
     TRACE("IME message WM_IME_STARTCOMPOSITION\n");
     lpIMC->hWnd = GetFocus();
     ShowWindow(hwnd, SW_SHOWNOACTIVATE);
-    UnlockRealIMC(hIMC);
+    ImmUnlockIMC(hIMC);
 }
 
 static LRESULT ImeHandleNotify(HIMC hIMC, HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
@@ -1150,8 +1150,6 @@ static LRESULT WINAPI IME_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
      */
 
     hIMC = (HIMC)GetWindowLongPtrW(hwnd, IMMGWL_IMC);
-    if (!hIMC)
-        hIMC = RealIMC(FROM_MACDRV);
 
     /* if we have no hIMC there are many messages we cannot process */
     if (hIMC == NULL)
@@ -1180,14 +1178,14 @@ static LRESULT WINAPI IME_WindowProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM 
 
             SetWindowTextA(hwnd, "Wine Ime Active");
 
-            lpIMC = LockRealIMC(hIMC);
+            lpIMC = ImmLockIMC(hIMC);
             if (lpIMC)
             {
                 myPrivate = ImmLockIMCC(lpIMC->hPrivate);
                 myPrivate->hwndDefault = hwnd;
                 ImmUnlockIMCC(lpIMC->hPrivate);
             }
-            UnlockRealIMC(hIMC);
+            ImmUnlockIMC(hIMC);
 
             return TRUE;
         }
