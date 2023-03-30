@@ -216,7 +216,11 @@ static void WINAPI service_main(DWORD argc, char **argv)
 {
     SERVICE_STATUS status;
     char buf[64];
-    BOOL res;
+    BOOL res, value;
+
+    res = IsProcessInJob(GetCurrentProcess(), NULL, &value);
+    service_ok(res, "Got error %d.\n", res);
+    service_ok(value, "Process is not in job.\n");
 
     service_ok(argc == 3, "argc = %u, expected 3\n", argc);
     service_ok(!strcmp(argv[0], service_name), "argv[0] = '%s', expected '%s'\n", argv[0], service_name);
