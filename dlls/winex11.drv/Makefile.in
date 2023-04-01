@@ -15,7 +15,6 @@ C_SRCS = \
 	event.c \
 	fs.c \
 	graphics.c \
-	ime.c \
 	init.c \
 	keyboard.c \
 	mouse.c \
