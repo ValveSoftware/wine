@@ -1376,7 +1376,9 @@ void update_net_wm_states( struct x11drv_win_data *data )
         }
     }
     data->net_wm_state = new_state;
-    update_net_wm_fullscreen_monitors( data );
+
+    if (!(style & WS_MINIMIZE))
+        update_net_wm_fullscreen_monitors( data );
 
     XChangeProperty( data->display, data->whole_window, x11drv_atom(_NET_WM_BYPASS_COMPOSITOR), XA_CARDINAL,
                      32, PropModeReplace, (unsigned char *)&net_wm_bypass_compositor, 1 );
