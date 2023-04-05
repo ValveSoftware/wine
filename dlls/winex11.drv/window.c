@@ -1132,7 +1132,10 @@ static void update_net_wm_fullscreen_monitors( struct x11drv_win_data *data )
         return;
 
     if (!xinerama_get_fullscreen_monitors( &data->whole_rect, monitors ))
+    {
+        ERR( "Failed to find xinerama monitors at %s\n", wine_dbgstr_rect(&data->whole_rect) );
         return;
+    }
 
     /* If _NET_WM_FULLSCREEN_MONITORS is not set and the fullscreen monitors are spanning only one
      * monitor then do not set _NET_WM_FULLSCREEN_MONITORS.

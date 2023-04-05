@@ -126,7 +126,7 @@ static inline int query_screens(void)
 /* Get xinerama monitor indices required for _NET_WM_FULLSCREEN_MONITORS */
 BOOL xinerama_get_fullscreen_monitors( const RECT *rect, long *indices )
 {
-    RECT window_rect, intersected_rect, monitor_rect;
+    RECT window_rect, intersected_rect, monitor_rect, virtual;
     BOOL ret = FALSE;
     POINT offset;
     INT i;
@@ -140,11 +140,9 @@ BOOL xinerama_get_fullscreen_monitors( const RECT *rect, long *indices )
     }
 
     /* Convert window rectangle to root coordinates */
-    offset = virtual_screen_to_root( rect->left, rect->top );
-    window_rect.left = offset.x;
-    window_rect.top = offset.y;
-    window_rect.right = window_rect.left + rect->right - rect->left;
-    window_rect.bottom = window_rect.top + rect->bottom - rect->top;
+    window_rect = *rect;
+    virtual = fs_hack_get_real_virtual_screen();
+    OffsetRect( &window_rect, -virtual.left, -virtual.top );
 
     /* Compare to xinerama monitor rectangles in root coordinates */
     offset.x = INT_MAX;
