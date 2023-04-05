@@ -2662,6 +2662,7 @@ done:
                          received->himc, received->message.msg, received->message.wparam, received->message.lparam );
         return ret;
     case MSG_TEST_WIN:
+        todo_wine_if( expected->todo )
         ok_(file, line)( !ret, "got hkl %p, himc %p, MSG_TEST_WIN msg %#x, wparam %#Ix, lparam %#Ix\n", received->hkl,
                          received->himc, received->message.msg, received->message.wparam, received->message.lparam );
         return ret;
@@ -2695,6 +2696,7 @@ done:
                          expected->himc, expected->message.msg, expected->message.wparam, expected->message.lparam );
         break;
     case MSG_TEST_WIN:
+        todo_wine_if( expected->todo )
         ok_(file, line)( !ret, "hkl %p, himc %p, MSG_TEST_WIN msg %#x, wparam %#Ix, lparam %#Ix\n", expected->hkl,
                          expected->himc, expected->message.msg, expected->message.wparam, expected->message.lparam );
         break;
@@ -2714,7 +2716,8 @@ static void ok_seq_( const char *file, int line, const struct ime_call *expected
         winetest_push_context( "%u%s%s", i++, !expected->func ? " (spurious)" : "",
                                !received->func ? " (missing)" : "" );
         ret = ok_call_( file, line, expected, received );
-        if (ret && expected->todo && !strcmp( winetest_platform, "wine" ))
+        if (ret && expected->todo && expected->func &&
+            !strcmp( winetest_platform, "wine" ))
             expected++;
         else if (ret && broken(expected->broken))
             expected++;
@@ -4016,11 +4019,19 @@ static void test_ImmSetConversionStatus(void)
         },
         {
             .hkl = expect_ime, .himc = default_himc,
+            .func = MSG_TEST_WIN, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETCONVERSIONMODE},
+        },
+        {
+            .hkl = expect_ime, .himc = default_himc,
             .func = MSG_IME_UI, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETCONVERSIONMODE},
         },
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = IME_NOTIFY, .notify = {.action = NI_CONTEXTUPDATED, .index = 0, .value = IMC_SETSENTENCEMODE},
+        },
+        {
+            .hkl = expect_ime, .himc = default_himc,
+            .func = MSG_TEST_WIN, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETSENTENCEMODE},
         },
         {
             .hkl = expect_ime, .himc = default_himc,
@@ -4034,10 +4045,7 @@ static void test_ImmSetConversionStatus(void)
             .hkl = expect_ime, .himc = default_himc,
             .func = IME_NOTIFY, .notify = {.action = NI_CONTEXTUPDATED, .index = 0xdeadbeef, .value = IMC_SETCONVERSIONMODE},
         },
-        {
-            .hkl = expect_ime, .himc = default_himc,
-            .func = MSG_IME_UI, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETCONVERSIONMODE},
-        },
+        {.todo = TRUE}, /* spurious calls */
         {0},
     };
     const struct ime_call set_conversion_status_2_seq[] =
@@ -4048,11 +4056,19 @@ static void test_ImmSetConversionStatus(void)
         },
         {
             .hkl = expect_ime, .himc = default_himc,
+            .func = MSG_TEST_WIN, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETCONVERSIONMODE},
+        },
+        {
+            .hkl = expect_ime, .himc = default_himc,
             .func = MSG_IME_UI, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETCONVERSIONMODE},
         },
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = IME_NOTIFY, .notify = {.action = NI_CONTEXTUPDATED, .index = 0xfeedcafe, .value = IMC_SETSENTENCEMODE},
+        },
+        {
+            .hkl = expect_ime, .himc = default_himc,
+            .func = MSG_TEST_WIN, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETSENTENCEMODE},
         },
         {
             .hkl = expect_ime, .himc = default_himc,
@@ -4072,7 +4088,7 @@ static void test_ImmSetConversionStatus(void)
     ok_eq( old_conversion, ctx->fdwConversion, UINT, "%#x" );
     ok_eq( old_sentence, ctx->fdwSentence, UINT, "%#x" );
 
-    hwnd = CreateWindowW( L"static", NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+    hwnd = CreateWindowW( test_class.lpszClassName, NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                           100, 100, 100, 100, NULL, NULL, NULL, NULL );
     ok( !!hwnd, "CreateWindowW failed, error %lu\n", GetLastError() );
     process_messages();
@@ -4126,6 +4142,7 @@ static void test_ImmSetConversionStatus(void)
     ok_eq( 0xdeadbeef, ctx->fdwConversion, UINT, "%#x" );
     ok_eq( 0xfeedcafe, ctx->fdwSentence, UINT, "%#x" );
 
+    ctx->hWnd = 0;
     ok_seq( empty_sequence );
     ok_ret( 1, ImmSetConversionStatus( default_himc, 0, 0xfeedcafe ) );
     ok_seq( set_conversion_status_1_seq );
@@ -4136,6 +4153,7 @@ static void test_ImmSetConversionStatus(void)
     ok_eq( 0, ctx->fdwConversion, UINT, "%#x" );
     ok_eq( 0xfeedcafe, ctx->fdwSentence, UINT, "%#x" );
 
+    ctx->hWnd = hwnd;
     ok_seq( empty_sequence );
     ok_ret( 1, ImmSetConversionStatus( default_himc, ~0, ~0 ) );
     ok_seq( set_conversion_status_2_seq );
@@ -4194,6 +4212,10 @@ static void test_ImmSetOpenStatus(void)
         },
         {
             .hkl = expect_ime, .himc = default_himc,
+            .func = MSG_TEST_WIN, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETOPENSTATUS},
+        },
+        {
+            .hkl = expect_ime, .himc = default_himc,
             .func = MSG_IME_UI, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETOPENSTATUS},
         },
         {0},
@@ -4203,6 +4225,20 @@ static void test_ImmSetOpenStatus(void)
         {
             .hkl = expect_ime, .himc = default_himc,
             .func = IME_NOTIFY, .notify = {.action = NI_CONTEXTUPDATED, .index = 0, .value = IMC_SETOPENSTATUS},
+            .todo = TRUE,
+        },
+        {0},
+    };
+    const struct ime_call set_open_status_2_seq[] =
+    {
+        {
+            .hkl = expect_ime, .himc = default_himc,
+            .func = IME_NOTIFY, .notify = {.action = NI_CONTEXTUPDATED, .index = 0, .value = IMC_SETOPENSTATUS},
+            .todo = TRUE,
+        },
+        {
+            .hkl = expect_ime, .himc = default_himc,
+            .func = MSG_TEST_WIN, .message = {.msg = WM_IME_NOTIFY, .wparam = IMN_SETOPENSTATUS},
             .todo = TRUE,
         },
         {
@@ -4223,7 +4259,7 @@ static void test_ImmSetOpenStatus(void)
     ok_ne( NULL, ctx, INPUTCONTEXT *, "%p" );
     ok_eq( old_status, ctx->fOpen, UINT, "%#x" );
 
-    hwnd = CreateWindowW( L"static", NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
+    hwnd = CreateWindowW( test_class.lpszClassName, NULL, WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                           100, 100, 100, 100, NULL, NULL, NULL, NULL );
     ok( !!hwnd, "CreateWindowW failed, error %lu\n", GetLastError() );
     process_messages();
@@ -4268,9 +4304,18 @@ static void test_ImmSetOpenStatus(void)
     ok_eq( 0xdeadbeef, status, UINT, "%#x" );
     ok_eq( 0xdeadbeef, ctx->fOpen, UINT, "%#x" );
 
+    ctx->hWnd = 0;
+    ok_ret( 1, ImmSetOpenStatus( default_himc, 0xfeedcafe ) );
+    ok_seq( set_open_status_1_seq );
+
+    status = ImmGetOpenStatus( default_himc );
+    todo_wine ok_eq( 0xfeedcafe, status, UINT, "%#x" );
+    todo_wine ok_eq( 0xfeedcafe, ctx->fOpen, UINT, "%#x" );
+
+    ctx->hWnd = hwnd;
     ok_seq( empty_sequence );
     ok_ret( 1, ImmSetOpenStatus( default_himc, ~0 ) );
-    ok_seq( set_open_status_1_seq );
+    ok_seq( set_open_status_2_seq );
 
     status = ImmGetOpenStatus( default_himc );
     todo_wine ok_eq( ~0, status, UINT, "%#x" );
