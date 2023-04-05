@@ -913,9 +913,13 @@ void fs_hack_init(void)
 {
     struct x11drv_display_device_handler device_handler;
     struct x11drv_settings_handler settings_handler;
+    RECT rect;
 
     real_device_handler = X11DRV_DisplayDevices_GetHandler();
     real_settings_handler = X11DRV_Settings_GetHandler();
+
+    rect = get_host_primary_monitor_rect();
+    xinerama_init( rect.right - rect.left, rect.bottom - rect.top );
 
     settings_handler.name = "Fullscreen Hack";
     settings_handler.priority = 500;
@@ -934,7 +938,7 @@ void fs_hack_init(void)
     device_handler.free_gpus = real_device_handler.free_gpus;
     device_handler.free_adapters = real_device_handler.free_adapters;
     device_handler.free_monitors = real_device_handler.free_monitors;
-    device_handler.register_event_handlers = NULL;
+    device_handler.register_event_handlers = real_device_handler.register_event_handlers;
     X11DRV_DisplayDevices_SetHandler( &device_handler );
 
     initialized = TRUE;
