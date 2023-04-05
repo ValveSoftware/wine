@@ -617,6 +617,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"\\EpicOnlineServicesUIHelper", L" --use-gl=desktop"},
         {L"OlympiaRising.exe", L" --use-gl=swiftshader"},
         {L"nw.exe.exe", L" --use-angle=d3d9"},
+        {L"DC Universe Online\\LaunchPad.exe", L" --use-gl=swiftshader"},
     };
     unsigned int i;
 
