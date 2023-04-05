@@ -608,6 +608,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"nw.exe.exe", L" --use-angle=d3d9"},
         {L"PaladinLias\\Game.exe", L" --use-gl=desktop"},
         {L"DC Universe Online\\LaunchPad.exe", L" --use-gl=swiftshader"},
+        {L"Planetside 2\\LaunchPad.exe", L" --use-gl=swiftshader"},
     };
     unsigned int i;
 
