@@ -978,7 +978,7 @@ static HRESULT ddraw_set_cooperative_level(struct ddraw *ddraw, HWND window,
            topmost bit unless the DDSCL_NOWINDOWCHANGES flag is set in
            this call that sets it to normal, not in the old coop level. */
         if (!(cooplevel & DDSCL_NOWINDOWCHANGES))
-            SetWindowPos(window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+            SetWindowPos(ddraw->dest_window, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
 
         if (restore_mode_on_normal && FAILED(ddraw7_RestoreDisplayMode(&ddraw->IDirectDraw7_iface)))
             ERR("RestoreDisplayMode failed\n");
