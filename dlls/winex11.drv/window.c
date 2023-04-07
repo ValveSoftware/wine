@@ -2803,10 +2803,10 @@ static inline BOOL get_surface_rect( const RECT *visible_rect, RECT *surface_rec
     return TRUE;
 }
 
-static BOOL CALLBACK update_child_window_fshack( HWND hwnd, LPARAM enable );
+static BOOL CALLBACK update_child_window_fshack( HWND hwnd, LPARAM lparam );
 
 static void window_update_fshack( struct x11drv_win_data *data, const RECT *window_rect_virt,
-                                  const RECT *client_rect_virt, BOOL enable )
+                                  const RECT *client_rect_virt, HMONITOR hmonitor, BOOL enable )
 {
     BOOL set_hints = window_rect_virt == NULL; /* don't change hints yet in X11DRV_WindowPosChanging */
     RECT window_rect_host, client_rect_host;
@@ -2826,8 +2826,7 @@ static void window_update_fshack( struct x11drv_win_data *data, const RECT *wind
     }
     else
     {
-        HMONITOR monitor = fs_hack_monitor_from_hwnd( data->hwnd );
-        window_rect_host = fs_hack_real_mode( monitor );
+        window_rect_host = fs_hack_real_mode( hmonitor );
 
         if (data->whole_window)  /* HACK: top-level window, pretend client rect covers it fully */
             client_rect_host = window_rect_host;
@@ -2872,14 +2871,14 @@ static void window_update_fshack( struct x11drv_win_data *data, const RECT *wind
         invalidate_vk_surfaces( data->hwnd );
     }
 
-    NtUserEnumChildWindows( data->hwnd, update_child_window_fshack, enable );
+    NtUserEnumChildWindows( data->hwnd, update_child_window_fshack, MAKELONG(hmonitor, enable) );
 }
 
-static BOOL CALLBACK update_child_window_fshack( HWND hwnd, LPARAM enable )
+static BOOL CALLBACK update_child_window_fshack( HWND hwnd, LPARAM lparam )
 {
     struct x11drv_win_data *data;
     if (!(data = get_win_data( hwnd ))) return TRUE;
-    if (data->client_window) window_update_fshack( data, NULL, NULL, enable );
+    if (data->client_window) window_update_fshack( data, NULL, NULL, UlongToPtr(LOWORD(lparam)), HIWORD(lparam) );
     release_win_data( data );
     return TRUE;
 }
@@ -2903,9 +2902,9 @@ BOOL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flags,
     monitor = fs_hack_monitor_from_rect( window_rect );
     if (fs_hack_enabled( monitor ) && fs_hack_matches_current_mode( monitor, window_rect->right - window_rect->left,
                                                                     window_rect->bottom - window_rect->top ))
-        window_update_fshack( data, window_rect, client_rect, TRUE );
+        window_update_fshack( data, window_rect, client_rect, monitor, TRUE );
     else
-        window_update_fshack( data, window_rect, client_rect, FALSE );
+        window_update_fshack( data, window_rect, client_rect, monitor, FALSE );
 
     /* check if we need to switch the window to managed */
     if (!data->managed && data->whole_window && is_window_managed( hwnd, swp_flags, window_rect ))
@@ -3441,7 +3440,7 @@ static void handle_window_desktop_resize( struct x11drv_win_data *data, UINT old
         fs_hack_matches_current_mode( monitor, data->whole_rect.right - data->whole_rect.left,
                                       data->whole_rect.bottom - data->whole_rect.top ))
     {
-        window_update_fshack( data, NULL, NULL, TRUE );
+        window_update_fshack( data, NULL, NULL, monitor, TRUE );
         return;
     }
 
@@ -3466,7 +3465,7 @@ static void handle_window_desktop_resize( struct x11drv_win_data *data, UINT old
     if (!fs_hack_mapping_required( monitor ) ||
         !fs_hack_matches_current_mode( monitor, data->whole_rect.right - data->whole_rect.left,
                                        data->whole_rect.bottom - data->whole_rect.top ))
-        window_update_fshack( data, NULL, NULL, FALSE );
+        window_update_fshack( data, NULL, NULL, monitor, FALSE );
 }
 
 /**********************************************************************
