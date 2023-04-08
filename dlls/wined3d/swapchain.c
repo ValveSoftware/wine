@@ -2191,7 +2191,6 @@ static void set_window_state(struct wined3d_window_state *s)
     static const UINT timeout = 1500;
     DWORD window_tid = GetWindowThreadProcessId(s->window, NULL);
     DWORD tid = GetCurrentThreadId();
-    HANDLE thread;
 
     TRACE("Window %p belongs to thread %#lx.\n", s->window, window_tid);
     /* If the window belongs to a different thread, modifying the style and/or
@@ -2209,18 +2208,8 @@ static void set_window_state(struct wined3d_window_state *s)
             else
                 KillTimer(s->window, WINED3D_WINDOW_TOPMOST_TIMER_ID);
         }
-
-        set_window_state_thread(s);
     }
-    else if ((thread = CreateThread(NULL, 0, set_window_state_thread, s, 0, NULL)))
-    {
-        SetThreadDescription(thread, L"wined3d_set_window_state");
-        CloseHandle(thread);
-    }
-    else
-    {
-        ERR("Failed to create thread.\n");
-    }
+    set_window_state_thread(s);
 }
 
 HRESULT wined3d_swapchain_state_setup_fullscreen(struct wined3d_swapchain_state *state,
