@@ -633,6 +633,17 @@ AGSReturnCode WINAPI agsDeInitialize(AGSContext *context)
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsSetDisplayMode(AGSContext *context, int device_index, int display_index, const AGSDisplaySettings *settings)
+{
+    FIXME("context %p device_index %d display_index %d settings %p stub!\n", context, device_index,
+          display_index, settings);
+
+    if (!context)
+        return AGS_INVALID_ARGS;
+
+    return AGS_SUCCESS;
+}
+
 AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count)
 {
     TRACE("context %p gpu_count %p stub!\n", context, gpu_count);

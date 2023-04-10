@@ -42,4 +42,4 @@
 @ stdcall agsGetVersionNumber()
 @ stdcall agsInit(ptr ptr ptr)
 @ stdcall agsInitialize(long ptr ptr ptr)
-@ stub agsSetDisplayMode
+@ stdcall agsSetDisplayMode(ptr long long ptr)
