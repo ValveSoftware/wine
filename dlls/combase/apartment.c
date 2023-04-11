@@ -719,7 +719,7 @@ static BOOL get_object_dll_path(const struct class_reg_data *regdata, WCHAR *dst
         WCHAR src[MAX_PATH];
         DWORD dwLength = dstlen * sizeof(WCHAR);
 
-        if ((ret = RegQueryValueExW(regdata->u.hkey, NULL, NULL, &keytype, (BYTE*)src, &dwLength)) == ERROR_SUCCESS)
+        if ((ret = RegQueryValueExW(regdata->u.hkey, L"", NULL, &keytype, (BYTE*)src, &dwLength)) == ERROR_SUCCESS)
         {
             if (keytype == REG_EXPAND_SZ)
             {
