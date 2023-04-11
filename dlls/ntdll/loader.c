@@ -2258,6 +2258,18 @@ done:
     return status;
 }
 
+static int use_lsteamclient(void)
+{
+    WCHAR env[32];
+    static int use = -1;
+
+    if (use != -1) return use;
+
+    use = !get_env( L"PROTON_DISABLE_LSTEAMCLIENT", env, sizeof(env) ) || *env == '0';
+    if (!use)
+        ERR("lsteamclient disabled.\n");
+    return use;
+}
 
 /*************************************************************************
  *		build_module
@@ -2306,7 +2318,7 @@ static NTSTATUS build_module( LPCWSTR load_path, const UNICODE_STRING *nt_name, 
     basename_len = wcslen(basename);
     if (basename_len >= 4 && !wcscmp(basename + basename_len - 4, L".dll")) basename_len -= 4;
 
-    if ((!RtlCompareUnicodeStrings(basename, basename_len, L"steamclient", 11, TRUE) ||
+    if (use_lsteamclient() && (!RtlCompareUnicodeStrings(basename, basename_len, L"steamclient", 11, TRUE) ||
          !RtlCompareUnicodeStrings(basename, basename_len, L"steamclient64", 13, TRUE) ||
          !RtlCompareUnicodeStrings(basename, basename_len, L"gameoverlayrenderer", 19, TRUE) ||
          !RtlCompareUnicodeStrings(basename, basename_len, L"gameoverlayrenderer64", 21, TRUE)) &&
