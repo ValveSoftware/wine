@@ -1124,13 +1124,13 @@ static HKEY ShellExecute_GetClassKey( const SHELLEXECUTEINFOW *sei )
         if (r != ERROR_SUCCESS )
             return hkey;
 
-        r = RegQueryValueExW( hkey, NULL, 0, &type, NULL, &sz );
+        r = RegQueryValueExW( hkey, L"", 0, &type, NULL, &sz );
         if ( r == ERROR_SUCCESS && type == REG_SZ )
         {
             sz += sizeof (WCHAR);
             cls = malloc( sz );
             cls[0] = 0;
-            RegQueryValueExW( hkey, NULL, 0, &type, (LPBYTE) cls, &sz );
+            RegQueryValueExW( hkey, L"", 0, &type, (LPBYTE) cls, &sz );
         }
 
         RegCloseKey( hkey );
