@@ -212,6 +212,21 @@ static inline BOOL contains_path( LPCWSTR name )
     return ((*name && (name[1] == ':')) || wcschr(name, '/') || wcschr(name, '\\'));
 }
 
+static BOOL get_env( const WCHAR *var, WCHAR *val, unsigned int len )
+{
+    UNICODE_STRING name, value;
+
+    name.Length = wcslen( var ) * sizeof(WCHAR);
+    name.MaximumLength = name.Length + sizeof(WCHAR);
+    name.Buffer = (WCHAR *)var;
+
+    value.Length = 0;
+    value.MaximumLength = len;
+    value.Buffer = val;
+
+    return !RtlQueryEnvironmentVariable_U( NULL, &name, &value );
+}
+
 #define RTL_UNLOAD_EVENT_TRACE_NUMBER 64
 
 typedef struct _RTL_UNLOAD_EVENT_TRACE
@@ -3103,21 +3118,6 @@ static WCHAR *strstriW( const WCHAR *str, const WCHAR *sub )
         str++;
     }
     return NULL;
-}
-
-static BOOL get_env( const WCHAR *var, WCHAR *val, unsigned int len )
-{
-    UNICODE_STRING name, value;
-
-    name.Length = wcslen( var ) * sizeof(WCHAR);
-    name.MaximumLength = name.Length + sizeof(WCHAR);
-    name.Buffer = (WCHAR *)var;
-
-    value.Length = 0;
-    value.MaximumLength = len;
-    value.Buffer = val;
-
-    return !RtlQueryEnvironmentVariable_U( NULL, &name, &value );
 }
 
 /***********************************************************************
