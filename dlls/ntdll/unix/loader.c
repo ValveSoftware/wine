@@ -2086,8 +2086,10 @@ static void hacks_init(void)
 
     env_str = getenv("WINE_SIMULATE_WRITECOPY");
     if (env_str) simulate_writecopy = atoi(env_str);
-    else if (sgi) simulate_writecopy = !strcmp(sgi, "1608730") || !strcmp(sgi, "1680700")
-        || !strcmp(sgi, "2095300");
+    else if (sgi) simulate_writecopy = !strcmp(sgi, "1608730") /* Dawn of Corruption */
+                                       || !strcmp(sgi, "1680700") /* Purgo box */
+                                       || !strcmp(sgi, "2095300") /* Breakout 13 */
+                                       || !strcmp(sgi, "2176450"); /* Mr. Hopp's Playhouse 3 */
 
     if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
     {
