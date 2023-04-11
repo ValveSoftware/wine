@@ -3249,7 +3249,7 @@ static DWORD get_device_reg_property( HKEY base_key, const DEVPROPKEY *prop_key,
     if (!(ret = RegOpenKeyExW( base_key, prop_path, 0, KEY_QUERY_VALUE, &property )))
     {
         size = buf_size;
-        ret = RegQueryValueExW( property, NULL, NULL, &val_type, buf, &size );
+        ret = RegQueryValueExW( property, L"", NULL, &val_type, buf, &size );
         RegCloseKey( property );
     }
 
