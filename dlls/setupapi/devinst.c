@@ -4451,7 +4451,7 @@ static LSTATUS get_device_property(struct device *device, const DEVPROPKEY *prop
     if (!ls)
     {
         value_size = prop_buff_size;
-        ls = RegQueryValueExW(hkey, NULL, NULL, &value_type, prop_buff, &value_size);
+        ls = RegQueryValueExW(hkey, L"", NULL, &value_type, prop_buff, &value_size);
         RegCloseKey(hkey);
     }
 
