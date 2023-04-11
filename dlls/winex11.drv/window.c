@@ -1578,17 +1578,21 @@ static HWND sync_window_position( struct x11drv_win_data *data,
         if (changes.width <= 0 || changes.height <= 0) changes.width = changes.height = 1;
         if (changes.width > 65535) changes.width = 65535;
         if (changes.height > 65535) changes.height = 65535;
-        mask |= CWWidth | CWHeight;
     }
 
     /* only the size is allowed to change for the desktop window */
     if (data->whole_window != root_window)
     {
         POINT pt = virtual_screen_to_root( data->whole_rect.left, data->whole_rect.top );
+        POINT old_pt = virtual_screen_to_root( old_whole_rect->left, old_whole_rect->top );
         changes.x = pt.x;
         changes.y = pt.y;
-        mask |= CWX | CWY;
+        if (changes.x != old_pt.x) mask |= CWX;
+        if (changes.y != old_pt.y) mask |= CWY;
     }
+
+    if (changes.width  != old_whole_rect->right - old_whole_rect->left) mask |= CWWidth;
+    if (changes.height != old_whole_rect->bottom - old_whole_rect->top) mask |= CWHeight;
 
     if (!(swp_flags & SWP_NOZORDER) || (swp_flags & SWP_SHOWWINDOW))
     {
@@ -1606,23 +1610,26 @@ static HWND sync_window_position( struct x11drv_win_data *data,
         /* and Above with a sibling doesn't work so well either, so we ignore it */
     }
 
-    set_size_hints( data, style );
-    set_mwm_hints( data, style, ex_style );
-    /* KWin doesn't allow moving a window with _NET_WM_STATE_FULLSCREEN set. So we need to remove
-     * _NET_WM_STATE_FULLSCREEN before moving the window and restore it later */
-    if (wm_is_kde( data->display ) && is_window_rect_full_screen( &data->whole_rect ))
+    if (mask)
     {
-        original_rect = data->whole_rect;
-        SetRectEmpty( &data->whole_rect );
-    }
-    update_net_wm_states( data );
-    data->configure_serial = NextRequest( data->display );
-    XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
-
-    if (!IsRectEmpty( &original_rect ))
-    {
-        data->whole_rect = original_rect;
+        set_size_hints( data, style );
+        set_mwm_hints( data, style, ex_style );
+        /* KWin doesn't allow moving a window with _NET_WM_STATE_FULLSCREEN set. So we need to remove
+         * _NET_WM_STATE_FULLSCREEN before moving the window and restore it later */
+        if (wm_is_kde( data->display ) && is_window_rect_full_screen( &data->whole_rect ))
+        {
+            original_rect = data->whole_rect;
+            SetRectEmpty( &data->whole_rect );
+        }
         update_net_wm_states( data );
+        data->configure_serial = NextRequest( data->display );
+        XReconfigureWMWindow( data->display, data->whole_window, data->vis.screen, mask, &changes );
+
+        if (!IsRectEmpty( &original_rect ))
+        {
+            data->whole_rect = original_rect;
+            update_net_wm_states( data );
+        }
     }
 #ifdef HAVE_LIBXSHAPE
     if (IsRectEmpty( old_window_rect ) != IsRectEmpty( &data->window_rect ))
