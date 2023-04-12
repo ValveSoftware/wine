@@ -4905,7 +4905,6 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
     NULL,
     NULL,
     NULL,
-    NULL,
     HTMLWindow_set_current_event
 };
 

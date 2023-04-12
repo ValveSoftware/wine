@@ -173,7 +173,6 @@ static const NodeImplVtbl HTMLTitleElementImplVtbl = {
     HTMLTitleElement_destructor,
     HTMLElement_cpc,
     HTMLElement_clone,
-    HTMLElement_dispatch_nsevent_hook,
     HTMLElement_handle_event,
     HTMLElement_get_attr_col
 };
@@ -347,7 +346,6 @@ static const NodeImplVtbl HTMLHtmlElementImplVtbl = {
     HTMLHtmlElement_destructor,
     HTMLElement_cpc,
     HTMLElement_clone,
-    HTMLElement_dispatch_nsevent_hook,
     HTMLElement_handle_event,
     HTMLElement_get_attr_col,
     NULL,
@@ -598,7 +596,6 @@ static const NodeImplVtbl HTMLMetaElementImplVtbl = {
     HTMLMetaElement_destructor,
     HTMLElement_cpc,
     HTMLElement_clone,
-    HTMLElement_dispatch_nsevent_hook,
     HTMLElement_handle_event,
     HTMLElement_get_attr_col
 };
@@ -765,7 +762,6 @@ static const NodeImplVtbl HTMLHeadElementImplVtbl = {
     HTMLHeadElement_destructor,
     HTMLElement_cpc,
     HTMLElement_clone,
-    HTMLElement_dispatch_nsevent_hook,
     HTMLElement_handle_event,
     HTMLElement_get_attr_col
 };
