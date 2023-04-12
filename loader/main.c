@@ -51,7 +51,7 @@ struct r_debug *wine_r_debug = NULL;
 
 #ifdef __linux__
 
-static struct link_map so_link_map = {.l_name = (char *)""};
+static struct link_map so_link_map = {0};
 static pthread_mutex_t link_map_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void sync_wine_link_map(void)
@@ -74,6 +74,7 @@ static void sync_wine_link_map(void)
         }
 
         prev = *wine_map;
+        free( (*wine_map)->l_name );
         (*wine_map)->l_addr = (*rtld_map)->l_addr;
         (*wine_map)->l_name = strdup( (*rtld_map)->l_name );
         (*wine_map)->l_ld = (*rtld_map)->l_ld;
