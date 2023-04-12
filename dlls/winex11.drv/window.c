@@ -446,11 +446,10 @@ static int get_window_attributes( struct x11drv_win_data *data, XSetWindowAttrib
     attr->bit_gravity       = NorthWestGravity;
     attr->backing_store     = NotUseful;
     attr->border_pixel      = 0;
-    attr->event_mask        = (ExposureMask | PointerMotionMask |
-                               ButtonPressMask | ButtonReleaseMask | EnterWindowMask |
-                               KeyPressMask | KeyReleaseMask | FocusChangeMask |
-                               KeymapStateMask | StructureNotifyMask);
+    attr->event_mask        = (ExposureMask | FocusChangeMask | StructureNotifyMask |
+                               PointerMotionMask | ButtonPressMask | ButtonReleaseMask | EnterWindowMask);
     if (data->managed) attr->event_mask |= PropertyChangeMask;
+    if (!input_thread_hack) attr->event_mask |= KeyPressMask | KeyReleaseMask | KeymapStateMask;
 
     return (CWOverrideRedirect | CWSaveUnder | CWColormap | CWBorderPixel |
             CWEventMask | CWBitGravity | CWBackingStore);
