@@ -97,6 +97,7 @@ HANDLE steam_keyboard_event;
 BOOL layered_window_client_hack = FALSE;
 BOOL vulkan_gdi_blit_source_hack = FALSE;
 BOOL vulkan_disable_child_window_rendering_hack = FALSE;
+BOOL input_thread_hack = FALSE;
 
 static x11drv_error_callback err_callback;   /* current callback for error */
 static Display *err_callback_display;        /* display callback is set for */
@@ -859,11 +860,19 @@ static NTSTATUS x11drv_init( void *arg )
                 !strcmp(sgi, "1009290")   /* Bug 21949 : SWORD ART ONLINE Alicization Lycoris video tearing */
             )) ||
             (e && *e != '\0' && *e != '0');
+
+        e = getenv("WINE_INPUT_THREAD_HACK");
+        input_thread_hack =
+            (sgi && (
+                !strcmp(sgi, "1938010")
+            )) ||
+            (e && *e != '\0' && *e != '0');
     }
 
     init_user_driver();
     X11DRV_DisplayDevices_Init(FALSE);
     *params->show_systray = show_systray;
+    params->input_thread_hack = input_thread_hack;
     return STATUS_SUCCESS;
 }
 
@@ -1486,6 +1495,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     x11drv_tablet_get_packet,
     x11drv_tablet_info,
     x11drv_tablet_load_info,
+    x11drv_input_thread,
 };
 
 
@@ -1574,6 +1584,7 @@ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
     x11drv_wow64_tablet_get_packet,
     x11drv_wow64_tablet_info,
     x11drv_tablet_load_info,
+    x11drv_input_thread,
 };
 
 C_ASSERT( ARRAYSIZE(__wine_unix_call_wow64_funcs) == unix_funcs_count );
