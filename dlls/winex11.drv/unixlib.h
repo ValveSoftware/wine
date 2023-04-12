@@ -33,6 +33,7 @@ enum x11drv_funcs
     unix_tablet_load_info,
     unix_xim_preedit_state,
     unix_xim_reset,
+    unix_input_thread,
     unix_funcs_count,
 };
 
@@ -50,6 +51,7 @@ struct init_params
 {
     WNDPROC foreign_window_proc;
     BOOL *show_systray;
+    BOOL input_thread_hack;
 };
 
 struct systray_dock_params
