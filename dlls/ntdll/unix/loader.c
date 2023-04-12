@@ -1529,7 +1529,7 @@ void notify_gdb_native_dll_loaded( void *module, UNICODE_STRING *nt_name )
 {
     OBJECT_ATTRIBUTES attr;
     UNICODE_STRING redir;
-    char *unix_path;
+    char *unix_path = NULL;
 
     InitializeObjectAttributes( &attr, nt_name, OBJ_CASE_INSENSITIVE, 0, 0 );
     get_redirect( &attr, &redir );
