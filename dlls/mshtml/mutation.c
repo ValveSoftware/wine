@@ -388,6 +388,26 @@ static nsresult run_insert_script(HTMLDocumentNode *doc, nsISupports *script_ifa
     return NS_OK;
 }
 
+DWORD get_compat_mode_version(compat_mode_t compat_mode)
+{
+    switch(compat_mode) {
+    case COMPAT_MODE_QUIRKS:
+    case COMPAT_MODE_IE5:
+    case COMPAT_MODE_IE7:
+        return 7;
+    case COMPAT_MODE_IE8:
+        return 8;
+    case COMPAT_MODE_IE9:
+        return 9;
+    case COMPAT_MODE_IE10:
+        return 10;
+    case COMPAT_MODE_IE11:
+        return 11;
+    DEFAULT_UNREACHABLE;
+    }
+    return 0;
+}
+
 static void setup_doc_proxy(HTMLDocumentNode *doc)
 {
     HTMLOuterWindow *outer_window = doc->outer_window ? doc->outer_window : doc->doc_obj->window;
@@ -430,6 +450,9 @@ compat_mode_t lock_document_mode(HTMLDocumentNode *doc)
 
     if(!doc->document_mode_locked) {
         doc->document_mode_locked = TRUE;
+
+        if(doc->html_document)
+            nsIDOMHTMLDocument_SetIECompatMode(doc->html_document, get_compat_mode_version(doc->document_mode));
 
         /* Setup the proxy immediately since mode is decided. Proxies delegate the
            methods so we can't rely on the delay init of the dispex to set them up. */
