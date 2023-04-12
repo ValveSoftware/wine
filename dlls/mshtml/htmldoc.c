@@ -392,7 +392,6 @@ static event_target_vtbl_t DocumentType_event_target_vtbl = {
     NULL,
     DocumentType_get_gecko_target,
     NULL,
-    NULL,
     DocumentType_get_parent_event_target,
     NULL,
     NULL,
@@ -6155,7 +6154,6 @@ static const NodeImplVtbl HTMLDocumentNodeImplVtbl = {
     NULL,
     NULL,
     NULL,
-    NULL,
     HTMLDocumentNode_unlink
 };
 
@@ -6392,7 +6390,6 @@ static const event_target_vtbl_t HTMLDocumentNode_event_target_vtbl = {
     NULL,
     HTMLDocumentNode_get_gecko_target,
     HTMLDocumentNode_bind_event,
-    NULL,
     HTMLDocumentNode_get_parent_event_target,
     NULL,
     HTMLDocumentNode_get_cp_container,
@@ -6405,7 +6402,6 @@ static const NodeImplVtbl HTMLDocumentFragmentImplVtbl = {
     HTMLDocumentNode_destructor,
     HTMLDocumentNode_cpc,
     HTMLDocumentFragment_clone,
-    NULL,
     NULL,
     NULL,
     NULL,
