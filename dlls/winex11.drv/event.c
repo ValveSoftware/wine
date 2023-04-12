@@ -147,6 +147,69 @@ static const char * event_names[MAX_EVENT_HANDLERS] =
 
 int xinput2_opcode = 0;
 
+static pthread_mutex_t input_cs = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t input_cond = PTHREAD_COND_INITIALIZER;
+static Display *input_display;
+
+/* wait for the input thread to startup and return the input display */
+static Display *x11drv_input_display(void)
+{
+    if (input_thread_hack && !input_display)
+    {
+        pthread_mutex_lock( &input_cs );
+        while (!input_display) pthread_cond_wait( &input_cond, &input_cs );
+        pthread_mutex_unlock( &input_cs );
+    }
+
+    return input_display;
+}
+
+/* set the input display and notify waiters */
+static void x11drv_set_input_display( Display *display )
+{
+    if (input_display) return;
+
+    pthread_mutex_lock( &input_cs );
+    input_display = display;
+    pthread_mutex_unlock( &input_cs );
+    pthread_cond_broadcast( &input_cond );
+}
+
+/* add a window to the windows we get input for */
+void x11drv_input_add_window( HWND hwnd, Window window )
+{
+    long mask = KeyPressMask | KeyReleaseMask | KeymapStateMask;
+    Display *display = x11drv_input_display();
+
+    if (!input_thread_hack) return;
+
+    TRACE( "display %p, window %p/%lx\n", display, hwnd, window );
+
+    pthread_mutex_lock( &input_cs );
+    XSaveContext( display, window, winContext, (char *)hwnd );
+    pthread_mutex_unlock( &input_cs );
+
+    XSelectInput( display, window, mask );
+    XFlush( display );
+}
+
+/* remove a window from the windows we get input for */
+void x11drv_input_remove_window( Window window )
+{
+    Display *display = x11drv_input_display();
+
+    if (!input_thread_hack) return;
+
+    TRACE( "display %p, window %lx\n", display, window );
+
+    XSelectInput( display, window, 0 );
+    XFlush( display );
+
+    pthread_mutex_lock( &input_cs );
+    XDeleteContext( display, window, winContext );
+    pthread_mutex_unlock( &input_cs );
+}
+
 /* return the name of an X event */
 static const char *dbgstr_event( int type )
 {
@@ -421,11 +484,13 @@ static inline BOOL call_event_handler( Display *display, XEvent *event )
         return FALSE;  /* no handler, ignore it */
     }
 
+    pthread_mutex_lock( &input_cs );
 #ifdef GenericEvent
     if (event->type == GenericEvent) hwnd = 0; else
 #endif
     if (XFindContext( display, event->xany.window, winContext, (char **)&hwnd ) != 0)
         hwnd = 0;  /* not for a registered window */
+    pthread_mutex_unlock( &input_cs );
     if (!hwnd && event->xany.window == root_window) hwnd = NtUserGetDesktopWindow();
 
     TRACE( "%lu %s for hwnd/window %p/%lx\n",
@@ -460,6 +525,15 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
     prev_event.type = 0;
     while (XCheckIfEvent( display, &event, filter, (char *)arg ))
     {
+        switch (event.type)
+        {
+        case KeyPress:
+        case KeyRelease:
+        case KeymapNotify:
+            if (input_thread_hack && display != x11drv_input_display()) continue;
+            break;
+        }
+
         count++;
         if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
         if (steam_keyboard_opened && filter_event( display, &event, (char *)keyboard_filter )) continue;
@@ -1067,6 +1141,8 @@ static BOOL X11DRV_MapNotify( HWND hwnd, XEvent *event )
 {
     struct x11drv_win_data *data;
 
+    x11drv_input_add_window( hwnd, event->xany.window );
+
     if (event->xany.window == x11drv_thread_data()->clip_window) return TRUE;
 
     if (!(data = get_win_data( hwnd ))) return FALSE;
@@ -1087,6 +1163,7 @@ static BOOL X11DRV_MapNotify( HWND hwnd, XEvent *event )
  */
 static BOOL X11DRV_UnmapNotify( HWND hwnd, XEvent *event )
 {
+    x11drv_input_remove_window( event->xany.window );
     return TRUE;
 }
 
@@ -2109,4 +2186,20 @@ static BOOL X11DRV_ClientMessage( HWND hwnd, XEvent *xev )
     }
     TRACE( "no handler found for %ld\n", event->message_type );
     return FALSE;
+}
+
+NTSTATUS x11drv_input_thread( void *arg )
+{
+    struct x11drv_thread_data *data = x11drv_init_thread_data();
+
+    x11drv_set_input_display( data->display );
+
+    for (;;)
+    {
+        XEvent event;
+        XPeekEvent( data->display, &event );
+        process_events( data->display, filter_event, QS_ALLINPUT );
+    }
+
+    return 0;
 }
