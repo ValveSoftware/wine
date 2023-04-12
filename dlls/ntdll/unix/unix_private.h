@@ -169,7 +169,6 @@ extern BOOL is_builtin_path( const UNICODE_STRING *path, WORD *machine ) DECLSPE
 extern NTSTATUS load_main_exe( const WCHAR *name, const char *unix_name, const WCHAR *curdir, WCHAR **image,
                                void **module ) DECLSPEC_HIDDEN;
 extern NTSTATUS load_start_exe( WCHAR **image, void **module ) DECLSPEC_HIDDEN;
-extern void notify_gdb_native_dll_loaded( void *module, UNICODE_STRING *nt_name ) DECLSPEC_HIDDEN;
 extern void start_server( BOOL debug ) DECLSPEC_HIDDEN;
 
 extern unsigned int server_call_unlocked( void *req_ptr ) DECLSPEC_HIDDEN;
