@@ -1,5 +1,5 @@
 MODULE    = belauncher.exe
-IMPORTS   =
+IMPORTS   = shlwapi
 
 EXTRADLLFLAGS = -mwindows -municode
 
