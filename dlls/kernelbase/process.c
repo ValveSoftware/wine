@@ -555,49 +555,23 @@ static BOOL product_name_matches(const WCHAR *app_name, const char *match)
     return TRUE;
 }
 
-static int battleye_launcher_redirect_hack(const WCHAR *app_name, WCHAR *new_name, DWORD new_name_len, WCHAR **cmd_line)
+static int battleye_launcher_redirect_hack( const WCHAR *app_name, WCHAR *new_name, DWORD new_name_len )
 {
     static const WCHAR belauncherW[] = L"c:\\windows\\system32\\belauncher.exe";
-    WCHAR *new_cmd_line;
-    WCHAR *p;
 
     /* We detect the BattlEye launcher executable through the product name property, as the executable name varies */
-    if (!product_name_matches(app_name, "BattlEye Launcher"))
+    if (!product_name_matches( app_name, "BattlEye Launcher" ))
         return 0;
 
-    TRACE("Detected launch of a BattlEye Launcher, redirecting to Proton version.\n");
+    TRACE( "Detected launch of a BattlEye Launcher, redirecting to Proton version.\n" );
 
-    if (new_name_len < wcslen(belauncherW) + 1)
+    if (new_name_len < wcslen( belauncherW ) + 1)
     {
-        WARN("Game executable path doesn't fit in buffer.\n");
+        ERR( "Game executable path doesn't fit in buffer.\n" );
         return 0;
     }
 
-    wcscpy(new_name, belauncherW);
-
-    /* find and replace executable name in command line, and add BE argument */
-    p = *cmd_line;
-    if (p[0] == '\"')
-        p++;
-
-    if (!wcsncmp(p, app_name, wcslen(app_name)))
-    {
-        new_cmd_line = HeapAlloc( GetProcessHeap(), 0, ( wcslen(*cmd_line) + wcslen(belauncherW) + 1 - wcslen(app_name) ) * sizeof(WCHAR) );
-
-        wcscpy(new_cmd_line, *cmd_line);
-        p = new_cmd_line;
-        if (p[0] == '\"')
-            p++;
-
-        memmove( p + wcslen(belauncherW), p + wcslen(app_name), (wcslen(p) - wcslen(belauncherW)) * sizeof(WCHAR) );
-        memcpy( p, belauncherW, wcslen(belauncherW) * sizeof(WCHAR) );
-
-        TRACE("old command line %s.\n", debugstr_w(*cmd_line));
-        TRACE("new command line %s.\n", debugstr_w(new_cmd_line));
-
-        *cmd_line = new_cmd_line;
-    }
-
+    wcscpy( new_name, belauncherW );
     return 1;
 }
 
@@ -706,13 +680,8 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateProcessInternalW( HANDLE token, const WCHAR 
         app_name = name;
     }
 
-    p = tidy_cmdline;
-    if (battleye_launcher_redirect_hack( app_name, name, ARRAY_SIZE(name), &tidy_cmdline ))
-    {
+    if (battleye_launcher_redirect_hack( app_name, name, ARRAY_SIZE(name) ))
         app_name = name;
-        if (p != tidy_cmdline && p != cmd_line)
-            HeapFree( GetProcessHeap(), 0, p );
-    }
 
     /* Warn if unsupported features are used */
 
