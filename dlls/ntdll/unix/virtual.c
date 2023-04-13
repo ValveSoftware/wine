@@ -80,7 +80,6 @@
 WINE_DEFAULT_DEBUG_CHANNEL(virtual);
 WINE_DECLARE_DEBUG_CHANNEL(module);
 WINE_DECLARE_DEBUG_CHANNEL(virtual_ranges);
-WINE_DECLARE_DEBUG_CHANNEL(gdb);
 
 struct preload_info
 {
@@ -5311,12 +5310,9 @@ static NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr, ULONG flags )
         SERVER_END_REQ;
         if (!status)
         {
-            if (TRACE_ON(gdb))
-            {
-                static void (*wine_gdb_dll_unload)( const void *module );
-                if (!wine_gdb_dll_unload) wine_gdb_dll_unload = dlsym( RTLD_DEFAULT, "wine_gdb_dll_unload" );
-                if (wine_gdb_dll_unload) wine_gdb_dll_unload( view->base );
-            }
+            static void (*wine_gdb_dll_unload)( const void *module );
+            if (!wine_gdb_dll_unload) wine_gdb_dll_unload = dlsym( RTLD_DEFAULT, "wine_gdb_dll_unload" );
+            if (wine_gdb_dll_unload) wine_gdb_dll_unload( view->base );
 
             if (view->protect & SEC_IMAGE) release_builtin_module( view->base );
             if (flags & MEM_PRESERVE_PLACEHOLDER)

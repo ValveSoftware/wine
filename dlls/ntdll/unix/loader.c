@@ -95,7 +95,6 @@
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(module);
-WINE_DECLARE_DEBUG_CHANNEL(gdb);
 
 #ifdef __i386__
 static const char so_dir[] = "/i386-unix";
@@ -1532,8 +1531,6 @@ void notify_gdb_native_dll_loaded( void *module, UNICODE_STRING *nt_name )
     UNICODE_STRING redir;
     char *unix_path = NULL;
 
-    if (!TRACE_ON(gdb)) return;
-
     InitializeObjectAttributes( &attr, nt_name, OBJ_CASE_INSENSITIVE, 0, 0 );
     get_redirect( &attr, &redir );
 
@@ -1595,7 +1592,7 @@ static NTSTATUS open_builtin_pe_file( const char *name, OBJECT_ATTRIBUTES *attr,
     {
         status = virtual_map_builtin_module( mapping, module, size, image_info, zero_bits, machine, prefer_native );
         NtClose( mapping );
-        if (!status && TRACE_ON(gdb)) notify_gdb_dll_loaded( *module, name );
+        if (!status) notify_gdb_dll_loaded( *module, name );
     }
     return status;
 }
