@@ -1469,7 +1469,7 @@ static HRESULT init_stream(struct wm_reader *reader, QWORD file_size)
         goto out_destroy_parser;
     }
 
-    if (FAILED(hr = wg_parser_connect(reader->wg_parser, file_size, NULL)))
+    if (FAILED(hr = wg_parser_connect(reader->wg_parser, file_size)))
     {
         ERR("Failed to connect parser, hr %#lx.\n", hr);
         goto out_shutdown_thread;
