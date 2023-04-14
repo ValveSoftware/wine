@@ -12,31 +12,3 @@ HKCR
         }
     }
 }
-
-HKLM
-{
-    NoRemove 'Software'
-    {
-        NoRemove 'Microsoft'
-        {
-            NoRemove 'Windows Media Foundation'
-            {
-                NoRemove 'SchemeHandlers'
-                {
-                    'http:'
-                    {
-                        val '{587eeb6a-7336-4ebd-a4f2-91c948de622c}' = s 'GStreamer Scheme Handler'
-                    }
-                    'https:'
-                    {
-                        val '{587eeb6a-7336-4ebd-a4f2-91c948de622c}' = s 'GStreamer Scheme Handler'
-                    }
-                    'rtsp:'
-                    {
-                        val '{587eeb6a-7336-4ebd-a4f2-91c948de622c}' = s 'GStreamer Scheme Handler'
-                    }
-                }
-            }
-        }
-    }
-}
