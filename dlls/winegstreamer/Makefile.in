@@ -16,7 +16,6 @@ C_SRCS = \
 	quartz_parser.c \
 	quartz_transform.c \
 	resampler.c \
-	scheme_handler.c \
 	unixlib.c \
 	video_decoder.c \
 	video_processor.c \
