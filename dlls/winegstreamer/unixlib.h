@@ -188,7 +188,6 @@ struct wg_parser_create_params
 {
     struct wg_parser *parser;
     enum wg_parser_type type;
-    bool use_opengl;
     bool err_on;
     bool warn_on;
 };
