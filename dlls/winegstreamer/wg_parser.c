@@ -913,7 +913,6 @@ static void free_stream(struct wg_parser_stream *stream)
 
 static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
 {
-    GstElement *first = NULL, *last = NULL;
     struct wg_parser *parser = user;
     struct wg_parser_stream *stream;
     const char *name;
@@ -960,46 +959,62 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
     }
     else if (!strcmp(name, "video/x-raw"))
     {
+        GstElement *deinterlace, *vconv, *flip, *vconv2;
+
         /* DirectShow can express interlaced video, but downstream filters can't
          * necessarily consume it. In particular, the video renderer can't. */
-        if (!(element = create_element("deinterlace", "good"))
-                || !append_element(GST_BIN(parser->container), element, &first, &last))
+        if (!(deinterlace = create_element("deinterlace", "good")))
             goto out;
 
         /* decodebin considers many YUV formats to be "raw", but some quartz
          * filters can't handle those. Also, videoflip can't handle all "raw"
          * formats either. Add a videoconvert to swap color spaces. */
-        if (!(element = create_element("videoconvert", "base"))
-                || !append_element(GST_BIN(parser->container), element, &first, &last))
+        if (!(vconv = create_element("videoconvert", "base")))
             goto out;
 
         /* GStreamer outputs RGB video top-down, but DirectShow expects bottom-up. */
-        if (!(element = create_element("videoflip", "base"))
-                || !append_element(GST_BIN(parser->container), element, &first, &last))
+        if (!(flip = create_element("videoflip", "good")))
             goto out;
-        stream->flip = element;
 
         /* videoflip does not support 15 and 16-bit RGB so add a second videoconvert
          * to do the final conversion. */
-        if (!(element = create_element("videoconvert", "base"))
-                || !append_element(GST_BIN(parser->container), element, &first, &last))
+        if (!(vconv2 = create_element("videoconvert", "base")))
             goto out;
 
-        stream->post_sink = gst_element_get_static_pad(first, "sink");
-        stream->post_src = gst_element_get_static_pad(last, "src");
+        /* The bin takes ownership of these elements. */
+        gst_bin_add(GST_BIN(parser->container), deinterlace);
+        gst_element_sync_state_with_parent(deinterlace);
+        gst_bin_add(GST_BIN(parser->container), vconv);
+        gst_element_sync_state_with_parent(vconv);
+        gst_bin_add(GST_BIN(parser->container), flip);
+        gst_element_sync_state_with_parent(flip);
+        gst_bin_add(GST_BIN(parser->container), vconv2);
+        gst_element_sync_state_with_parent(vconv2);
+
+        gst_element_link(deinterlace, vconv);
+        gst_element_link(vconv, flip);
+        gst_element_link(flip, vconv2);
+
+        stream->post_sink = gst_element_get_static_pad(deinterlace, "sink");
+        stream->post_src = gst_element_get_static_pad(vconv2, "src");
+        stream->flip = flip;
     }
     else if (!strcmp(name, "audio/x-raw"))
     {
+        GstElement *convert;
+
         /* Currently our dsound can't handle 64-bit formats or all
          * surround-sound configurations. Native dsound can't always handle
          * 64-bit formats either. Add an audioconvert to allow changing bit
          * depth and channel count. */
-        if (!(element = create_element("audioconvert", "base"))
-                || !append_element(GST_BIN(parser->container), element, &first, &last))
+        if (!(convert = create_element("audioconvert", "base")))
             goto out;
 
-        stream->post_sink = gst_element_get_static_pad(first, "sink");
-        stream->post_src = gst_element_get_static_pad(last, "src");
+        gst_bin_add(GST_BIN(parser->container), convert);
+        gst_element_sync_state_with_parent(convert);
+
+        stream->post_sink = gst_element_get_static_pad(convert, "sink");
+        stream->post_src = gst_element_get_static_pad(convert, "src");
     }
 
     if (stream->post_sink)
