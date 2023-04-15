@@ -110,8 +110,8 @@ static const IUnknownVtbl async_create_object_vtbl =
 
 struct handler
 {
-    IMFByteStreamHandler IMFByteStreamHandler_iface;
     IMFAsyncCallback IMFAsyncCallback_iface;
+    IMFByteStreamHandler IMFByteStreamHandler_iface;
     LONG refcount;
     struct list results;
     CRITICAL_SECTION cs;
@@ -145,13 +145,34 @@ static HRESULT WINAPI async_callback_QueryInterface(IMFAsyncCallback *iface, REF
 static ULONG WINAPI async_callback_AddRef(IMFAsyncCallback *iface)
 {
     struct handler *handler = impl_from_IMFAsyncCallback(iface);
-    return IMFByteStreamHandler_AddRef(&handler->IMFByteStreamHandler_iface);
+    ULONG refcount = InterlockedIncrement(&handler->refcount);
+    TRACE("%p, refcount %lu.\n", handler, refcount);
+    return refcount;
 }
 
 static ULONG WINAPI async_callback_Release(IMFAsyncCallback *iface)
 {
     struct handler *handler = impl_from_IMFAsyncCallback(iface);
-    return IMFByteStreamHandler_Release(&handler->IMFByteStreamHandler_iface);
+    ULONG refcount = InterlockedDecrement(&handler->refcount);
+    struct result_entry *entry, *next;
+
+    TRACE("%p, refcount %lu.\n", iface, refcount);
+
+    if (!refcount)
+    {
+        LIST_FOR_EACH_ENTRY_SAFE(entry, next, &handler->results, struct result_entry, entry)
+        {
+            list_remove(&entry->entry);
+            IMFAsyncResult_Release(entry->result);
+            if (entry->object)
+                IUnknown_Release(entry->object);
+            free(entry);
+        }
+        DeleteCriticalSection(&handler->cs);
+        free(handler);
+    }
+
+    return refcount;
 }
 
 static HRESULT WINAPI async_callback_GetParameters(IMFAsyncCallback *iface, DWORD *flags, DWORD *queue)
@@ -259,34 +280,13 @@ static HRESULT WINAPI stream_handler_QueryInterface(IMFByteStreamHandler *iface,
 static ULONG WINAPI stream_handler_AddRef(IMFByteStreamHandler *iface)
 {
     struct handler *handler = impl_from_IMFByteStreamHandler(iface);
-    ULONG refcount = InterlockedIncrement(&handler->refcount);
-    TRACE("%p, refcount %lu.\n", handler, refcount);
-    return refcount;
+    return IMFAsyncCallback_AddRef(&handler->IMFAsyncCallback_iface);
 }
 
 static ULONG WINAPI stream_handler_Release(IMFByteStreamHandler *iface)
 {
     struct handler *handler = impl_from_IMFByteStreamHandler(iface);
-    ULONG refcount = InterlockedDecrement(&handler->refcount);
-    struct result_entry *entry, *next;
-
-    TRACE("%p, refcount %lu.\n", iface, refcount);
-
-    if (!refcount)
-    {
-        LIST_FOR_EACH_ENTRY_SAFE(entry, next, &handler->results, struct result_entry, entry)
-        {
-            list_remove(&entry->entry);
-            IMFAsyncResult_Release(entry->result);
-            if (entry->object)
-                IUnknown_Release(entry->object);
-            free(entry);
-        }
-        DeleteCriticalSection(&handler->cs);
-        free(handler);
-    }
-
-    return refcount;
+    return IMFAsyncCallback_Release(&handler->IMFAsyncCallback_iface);
 }
 
 static HRESULT WINAPI stream_handler_BeginCreateObject(IMFByteStreamHandler *iface,
@@ -452,15 +452,14 @@ HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj)
     if (!(handler = calloc(1, sizeof(*handler))))
         return E_OUTOFMEMORY;
 
+    handler->IMFAsyncCallback_iface.lpVtbl = &async_callback_vtbl;
+    handler->IMFByteStreamHandler_iface.lpVtbl = &stream_handler_vtbl;
+    handler->refcount = 1;
     list_init(&handler->results);
     InitializeCriticalSection(&handler->cs);
 
-    handler->IMFByteStreamHandler_iface.lpVtbl = &stream_handler_vtbl;
-    handler->IMFAsyncCallback_iface.lpVtbl = &async_callback_vtbl;
-    handler->refcount = 1;
-
     hr = IMFByteStreamHandler_QueryInterface(&handler->IMFByteStreamHandler_iface, riid, obj);
-    IMFByteStreamHandler_Release(&handler->IMFByteStreamHandler_iface);
+    IMFAsyncCallback_Release(&handler->IMFAsyncCallback_iface);
 
     return hr;
 }
