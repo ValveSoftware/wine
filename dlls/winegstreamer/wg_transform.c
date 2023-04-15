@@ -39,9 +39,6 @@
 
 #include "unix_private.h"
 
-GST_DEBUG_CATEGORY_EXTERN(wine);
-#define GST_CAT_DEFAULT wine
-
 #define GST_SAMPLE_FLAG_WG_CAPS_CHANGED (GST_MINI_OBJECT_FLAG_LAST << 0)
 
 struct wg_transform
@@ -373,9 +370,6 @@ NTSTATUS wg_transform_create(void *args)
     /* to detect h264_decoder_create() */
     if (input_format.major_type == WG_MAJOR_TYPE_VIDEO_H264)
         touch_h264_used_tag();
-
-    if (!init_gstreamer())
-        return STATUS_UNSUCCESSFUL;
 
     if (!(transform = calloc(1, sizeof(*transform))))
         return STATUS_NO_MEMORY;
