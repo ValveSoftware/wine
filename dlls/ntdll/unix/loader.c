@@ -1924,6 +1924,7 @@ static void hacks_init(void)
 
     switch (sgi ? atoi( sgi ) : -1)
     {
+    case 25700: /* Madballs in Babo: Invasion */
     case 50130: /* Mafia II */
     case 202990: /* CoD Black Ops II Multiplayer */
     case 212910: /* CoD Black Ops II Zombies */
