@@ -2321,7 +2321,7 @@ static void hacks_init(void)
         ERR("HACK: Simulating sched quantum in NtWaitForAlertByThreadId.\n");
 
     sgi = getenv("SteamGameId");
-    if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910")))
+    if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910") || !strcmp(sgi, "25700")))
         setenv("WINESTEAMNOEXEC", "1", 0);
 
     env_str = getenv("WINE_NO_PRIV_ELEVATION");
