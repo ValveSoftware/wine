@@ -963,30 +963,6 @@ static HRESULT media_stream_init_desc(struct media_stream *stream, UINT id)
                 goto done;
         }
     }
-    else if (format.major_type == WG_MAJOR_TYPE_AUDIO)
-    {
-        /* Expose at least one PCM and one floating point type for the
-           consumer to pick from. */
-        static const enum wg_audio_format audio_types[] =
-        {
-            WG_AUDIO_FORMAT_S16LE,
-            WG_AUDIO_FORMAT_F32LE,
-        };
-
-        if ((stream_types[0] = mf_media_type_from_wg_format(&format)))
-            type_count = 1;
-
-        for (i = 0; i < ARRAY_SIZE(audio_types); i++)
-        {
-            struct wg_format new_format;
-            if (format.u.audio.format == audio_types[i])
-                continue;
-            new_format = format;
-            new_format.u.audio.format = audio_types[i];
-            if ((stream_types[type_count] = mf_media_type_from_wg_format(&new_format)))
-                type_count++;
-        }
-    }
     else
     {
         if ((stream_types[0] = mf_media_type_from_wg_format(&format)))
