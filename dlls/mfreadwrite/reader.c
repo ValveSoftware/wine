@@ -212,7 +212,7 @@ static ULONG source_reader_release(struct source_reader *reader)
     if (!refcount)
     {
         if (reader->device_manager)
-            IMFDXGIDeviceManager_Release(reader->device_manager);
+            IUnknown_Release(reader->device_manager);
         if (reader->async_callback)
             IMFSourceReaderCallback_Release(reader->async_callback);
         if (reader->descriptor)
