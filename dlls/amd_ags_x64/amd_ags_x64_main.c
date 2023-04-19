@@ -117,6 +117,7 @@ struct AGSContext
     struct AGSDeviceInfo *devices;
     VkPhysicalDeviceProperties *properties;
     VkPhysicalDeviceMemoryProperties *memory_properties;
+    ID3D11DeviceContext *d3d11_context;
 };
 
 static HMODULE hd3d11, hd3d12;
@@ -451,11 +452,9 @@ static AGSReturnCode init_ags_context(AGSContext *context)
     unsigned int i, j;
     BYTE *device;
 
+    memset(context, 0, sizeof(*context));
+
     context->version = determine_ags_version();
-    context->device_count = 0;
-    context->devices = NULL;
-    context->properties = NULL;
-    context->memory_properties = NULL;
 
     ret = vk_get_physical_device_properties(&context->device_count, &context->properties, &context->memory_properties);
     if (ret != AGS_SUCCESS || !context->device_count)
@@ -616,19 +615,24 @@ AGSReturnCode WINAPI agsDeInitialize(AGSContext *context)
 
     TRACE("context %p.\n", context);
 
-    if (context)
+    if (!context)
+        return AGS_SUCCESS;
+
+    if (context->d3d11_context)
     {
-        heap_free(context->memory_properties);
-        heap_free(context->properties);
-        device = (BYTE *)context->devices;
-        for (i = 0; i < context->device_count; ++i)
-        {
-            heap_free(*GET_DEVICE_FIELD_ADDR(device, displays, void *, context->version));
-            device += amd_ags_info[context->version].device_size;
-        }
-        heap_free(context->devices);
-        heap_free(context);
+        ID3D11DeviceContext_Release(context->d3d11_context);
+        context->d3d11_context = NULL;
     }
+    heap_free(context->memory_properties);
+    heap_free(context->properties);
+    device = (BYTE *)context->devices;
+    for (i = 0; i < context->device_count; ++i)
+    {
+        heap_free(*GET_DEVICE_FIELD_ADDR(device, displays, void *, context->version));
+        device += amd_ags_info[context->version].device_size;
+    }
+    heap_free(context->devices);
+    heap_free(context);
 
     return AGS_SUCCESS;
 }
@@ -722,6 +726,15 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_CreateDevice( AGSContext* context,
         r->featureLevel = feature_level;
     }
 
+    if (context->version < AMD_AGS_VERSION_5_3_0)
+    {
+        /* Later versions pass context to functions explicitly, no need to keep it. */
+        if (context->d3d11_context)
+            ID3D11DeviceContext_Release(context->d3d11_context);
+        ID3D11DeviceContext_AddRef(device_context);
+        context->d3d11_context = device_context;
+    }
+
     return AGS_SUCCESS;
 }
 
@@ -783,11 +796,25 @@ int WINAPI agsGetVersionNumber(void)
     return AGS_MAKE_VERSION(amd_ags_info[version].major, amd_ags_info[version].minor, amd_ags_info[version].patch);
 }
 
-AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext* context, ID3D11Device* device, unsigned int uavSlot, unsigned int* extensionsSupported )
+AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext *context, ID3D11Device *device, unsigned int uavSlot, unsigned int *extensionsSupported )
 {
     FIXME("context %p, device %p, uavSlot %u, extensionsSupported %p stub.\n", context, device, uavSlot, extensionsSupported);
 
     *extensionsSupported = 0;
+    if (device)
+    {
+        if (context->version < AMD_AGS_VERSION_5_3_0)
+        {
+            /* Later versions pass context to functions explicitly, no need to keep it. */
+            if (context->d3d11_context)
+            {
+                ID3D11DeviceContext_Release(context->d3d11_context);
+                context->d3d11_context = NULL;
+            }
+            ID3D11Device_GetImmediateContext(device, &context->d3d11_context);
+        }
+    }
+
     return AGS_SUCCESS;
 }
 
@@ -896,6 +923,12 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_DestroyDevice_520(AGSContext *conte
 
     if (!device)
         return AGS_SUCCESS;
+
+    if (context->d3d11_context)
+    {
+        ID3D11DeviceContext_Release(context->d3d11_context);
+        context->d3d11_context = NULL;
+    }
 
     ref = ID3D11Device_Release(device);
     if (device_ref)
