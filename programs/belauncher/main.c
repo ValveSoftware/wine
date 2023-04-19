@@ -127,7 +127,13 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     wcscpy(launch_cmd + path_len + game_exe_len + 1, cmdline);
     launch_cmd[path_len + game_exe_len + 1 + wcslen(cmdline)] = ' ';
 
-    MultiByteToWideChar(CP_ACP, 0, be_arg, -1, launch_cmd + path_len + game_exe_len + 1 + wcslen(cmdline) + 1, arg_len + 1);
+
+    if (!MultiByteToWideChar(CP_ACP, 0, be_arg, -1, launch_cmd + path_len + game_exe_len + 1 + wcslen(cmdline) + 1, arg_len + 1))
+        launch_cmd[path_len + game_exe_len + 1 + wcslen(cmdline)] = 0;
+
+    WINE_TRACE("game_exe %s, cmdline %s.\n", wine_dbgstr_a(game_exe), wine_dbgstr_w(cmdline));
+    WINE_TRACE("path %s, be_arg %s.\n", wine_dbgstr_w(path), wine_dbgstr_a(be_arg));
+    WINE_TRACE("launch_cmd %s.\n", wine_dbgstr_w(launch_cmd));
 
     if (!CreateProcessW(NULL, launch_cmd, NULL, NULL, FALSE, CREATE_NEW_CONSOLE, NULL, NULL, &si, &pi))
     {
