@@ -2,6 +2,7 @@
 #include <windows.h>
 #include <io.h>
 #include <shlwapi.h>
+#include <shellapi.h>
 
 #include "wine/debug.h"
 
@@ -9,8 +10,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(belauncher);
 
 int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cmdshow)
 {
-    char *configs, *config, *arch_32_exe = NULL, *arch_64_exe = NULL, *game_exe, *be_arg = NULL;
-    WCHAR path[MAX_PATH], *p, config_path[MAX_PATH];
+    char *configs, *config, *arch_32_exe = NULL, *arch_64_exe = NULL, *game_exe = NULL, *be_arg = NULL;
+    WCHAR path[MAX_PATH], *p, config_path[MAX_PATH], game_exeW[MAX_PATH], **argvW;
     LARGE_INTEGER launcher_cfg_size;
     unsigned char battleye_status;
     int game_exe_len, arg_len, path_len;
@@ -18,6 +19,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     HANDLE launcher_cfg;
     LPWSTR launch_cmd;
     STARTUPINFOW si = {0};
+    int i, argc;
     DWORD size;
     BOOL wow64;
 
@@ -81,22 +83,47 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     }
     while ((config = strchr(config, '\n')) && *(config++));
 
-    if (arch_64_exe && (sizeof(void *) == 8 || (IsWow64Process(GetCurrentProcess(), &wow64) && wow64)))
-        game_exe = arch_64_exe;
-    else if (arch_32_exe)
-        game_exe = arch_32_exe;
-    else
+    *game_exeW = 0;
+    game_exe_len = 0;
+
+    if ((argvW = CommandLineToArgvW(cmdline, &argc)))
     {
-        HeapFree( GetProcessHeap(), 0, configs );
-        WINE_ERR("Failed to find game executable name from BattlEye config.\n");
-        goto start_failed;
+        for (i = 0; i < argc; ++i)
+        {
+            if (!wcscmp(argvW[i], L"-exe") && i < argc - 1)
+            {
+                wcscpy(game_exeW, argvW[i + 1]);
+                game_exe_len = wcslen(game_exeW);
+                break;
+            }
+        }
     }
 
-    if (strchr(game_exe, '\r'))
-        *(strchr(game_exe, '\r')) = 0;
-    if (strchr(game_exe, '\n'))
-        *(strchr(game_exe, '\n')) = 0;
-    game_exe_len = MultiByteToWideChar(CP_ACP, 0, game_exe, -1, NULL, 0) - 1;
+    if (!*game_exeW)
+    {
+        if (arch_64_exe && (sizeof(void *) == 8 || (IsWow64Process(GetCurrentProcess(), &wow64) && wow64)))
+            game_exe = arch_64_exe;
+        else if (arch_32_exe)
+            game_exe = arch_32_exe;
+        else
+        {
+            HeapFree( GetProcessHeap(), 0, configs );
+            WINE_ERR("Failed to find game executable name from BattlEye config.\n");
+            goto start_failed;
+        }
+
+        if (strchr(game_exe, '\r'))
+            *(strchr(game_exe, '\r')) = 0;
+        if (strchr(game_exe, '\n'))
+            *(strchr(game_exe, '\n')) = 0;
+        game_exe_len = MultiByteToWideChar(CP_ACP, 0, game_exe, -1, game_exeW, ARRAY_SIZE(game_exeW));
+        if (!game_exe_len)
+        {
+            WINE_ERR("Failed to convert game_exe %s.\n", wine_dbgstr_a(game_exe));
+            goto start_failed;
+        }
+        --game_exe_len;
+    }
 
     if (!be_arg) arg_len = 0;
     else
@@ -112,7 +139,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
     battleye_status = 0x9; /* Launching Game */
     _write(1, &battleye_status, 1);
 
-    if (PathIsRelativeA(game_exe))
+    if (PathIsRelativeW(game_exeW))
         path_len = wcslen(path);
     else
         path_len = 0;
@@ -121,17 +148,16 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE hPrevInst, LPWSTR cmdline, int cm
 
     memcpy(launch_cmd, path, path_len * sizeof(*path));
 
-    MultiByteToWideChar(CP_ACP, 0, game_exe, -1, launch_cmd + path_len, game_exe_len + 1);
+    memcpy(launch_cmd + path_len, game_exeW, game_exe_len * sizeof(*launch_cmd));
     launch_cmd[path_len + game_exe_len] = ' ';
 
     wcscpy(launch_cmd + path_len + game_exe_len + 1, cmdline);
     launch_cmd[path_len + game_exe_len + 1 + wcslen(cmdline)] = ' ';
 
-
     if (!MultiByteToWideChar(CP_ACP, 0, be_arg, -1, launch_cmd + path_len + game_exe_len + 1 + wcslen(cmdline) + 1, arg_len + 1))
         launch_cmd[path_len + game_exe_len + 1 + wcslen(cmdline)] = 0;
 
-    WINE_TRACE("game_exe %s, cmdline %s.\n", wine_dbgstr_a(game_exe), wine_dbgstr_w(cmdline));
+    WINE_TRACE("game_exe %s, cmdline %s.\n", wine_dbgstr_w(game_exeW), wine_dbgstr_w(cmdline));
     WINE_TRACE("path %s, be_arg %s.\n", wine_dbgstr_w(path), wine_dbgstr_a(be_arg));
     WINE_TRACE("launch_cmd %s.\n", wine_dbgstr_w(launch_cmd));
 
