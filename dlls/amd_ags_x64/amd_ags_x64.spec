@@ -1,7 +1,7 @@
 @ stdcall agsDeInit(ptr)
 @ stdcall agsDeInitialize(ptr)
 @ stdcall agsCheckDriverVersion(ptr long)
-@ stub agsDriverExtensionsDX11_BeginUAVOverlap
+@ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_BeginUAVOverlap() DX11_BeginUAVOverlap_impl
 @ stub agsDriverExtensionsDX11_CreateBuffer
 @ stdcall agsDriverExtensionsDX11_CreateDevice(ptr ptr ptr ptr)
 @ stub agsDriverExtensionsDX11_CreateFromDevice

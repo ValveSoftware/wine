@@ -833,6 +833,32 @@ __ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds_530") )
 
+AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap_520(AGSContext *context)
+{
+    static int once;
+
+    if (!once++)
+        FIXME("context %p stub.\n", context);
+    return AGS_EXTENSION_NOT_SUPPORTED;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap(AGSContext *context, ID3D11DeviceContext *dx_context)
+{
+    static int once;
+
+    if (!once++)
+        FIXME("context %p, dx_context %p stub.\n", context, dx_context);
+
+    return AGS_EXTENSION_NOT_SUPPORTED;
+}
+
+__ASM_GLOBAL_FUNC( DX11_BeginUAVOverlap_impl,
+                   "mov (%rcx),%eax\n\t" /* version */
+                   "cmp $3,%eax\n\t"
+                   "jge 1f\n\t"
+                   "jmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap_520") "\n\t"
+                   "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap") )
+
 AGSReturnCode WINAPI agsDriverExtensionsDX11_DestroyDevice_520(AGSContext *context, ID3D11Device* device,
         unsigned int *device_ref, ID3D11DeviceContext *device_context,
         unsigned int *context_ref)
