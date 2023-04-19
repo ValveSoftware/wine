@@ -11,7 +11,7 @@
 @ stub agsDriverExtensionsDX11_DeInit
 @ stub agsDriverExtensionsDX11_Destroy
 @ stdcall -norelay -arch=x86_64,arm64ec agsDriverExtensionsDX11_DestroyDevice()
-@ stub agsDriverExtensionsDX11_EndUAVOverlap
+@ stdcall -norelay -arch=x86_64,arm64ec agsDriverExtensionsDX11_EndUAVOverlap() DX11_EndUAVOverlap_impl
 @ stub agsDriverExtensionsDX11_GetMaxClipRects
 @ stub agsDriverExtensionsDX11_IASetPrimitiveTopology
 @ stdcall agsDriverExtensionsDX11_Init(ptr ptr long ptr)
