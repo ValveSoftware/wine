@@ -328,6 +328,8 @@ BOOL delay_heap_free = FALSE;
 
 static struct heap *process_heap;  /* main process heap */
 
+static NTSTATUS heap_free_block_lfh( struct heap *heap, ULONG flags, struct block *block );
+
 /* check if memory range a contains memory range b */
 static inline BOOL contains( const void *a, SIZE_T a_size, const void *b, SIZE_T b_size )
 {
@@ -1642,7 +1644,10 @@ HANDLE WINAPI RtlDestroyHeap( HANDLE handle )
     {
         heap->pending_free = NULL;
         for (tmp = pending; *tmp && tmp != pending + MAX_FREE_PENDING; ++tmp)
+        {
+            if (!heap_free_block_lfh( heap, heap->flags, *tmp )) continue;
             heap_free_block( heap, heap->flags, *tmp );
+        }
         RtlFreeHeap( handle, 0, pending );
     }
 
