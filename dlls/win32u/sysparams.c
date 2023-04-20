@@ -5882,13 +5882,49 @@ NTSTATUS WINAPI NtUserDisplayConfigGetDeviceInfo( DISPLAYCONFIG_DEVICE_INFO_HEAD
     case DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE:
     {
         DISPLAYCONFIG_TARGET_PREFERRED_MODE *preferred_mode = (DISPLAYCONFIG_TARGET_PREFERRED_MODE *)packet;
+        unsigned int i, display_frequency = 0;
+        struct monitor *monitor;
 
-        FIXME( "DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE stub.\n" );
+        FIXME( "DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE semi-stub.\n" );
 
         if (packet->size < sizeof(*preferred_mode))
             return STATUS_INVALID_PARAMETER;
 
-        return STATUS_NOT_SUPPORTED;
+        if (!lock_display_devices()) return STATUS_UNSUCCESSFUL;
+
+        memset( &preferred_mode->width, 0, sizeof(*preferred_mode) - offsetof(DISPLAYCONFIG_TARGET_PREFERRED_MODE, width) );
+
+        LIST_FOR_EACH_ENTRY(monitor, &monitors, struct monitor, entry)
+        {
+            if (preferred_mode->header.id != monitor->output_id) continue;
+            if (memcmp( &preferred_mode->header.adapterId, &monitor->adapter->gpu_luid,
+                        sizeof(monitor->adapter->gpu_luid) ))
+                continue;
+
+            preferred_mode->width = monitor->rc_monitor.right - monitor->rc_monitor.left;
+            preferred_mode->height = monitor->rc_monitor.bottom - monitor->rc_monitor.top;
+
+            for (i = 0; i < monitor->adapter->mode_count; ++i)
+            {
+                DEVMODEW *mode = &monitor->adapter->modes[i];
+
+                if (mode->dmPelsWidth == preferred_mode->width && mode->dmPelsHeight == preferred_mode->height
+                    && mode->dmDisplayFrequency > display_frequency)
+                    display_frequency = mode->dmDisplayFrequency;
+            }
+            if (!display_frequency) display_frequency = 60;
+            preferred_mode->targetMode.targetVideoSignalInfo.vSyncFreq.Numerator = display_frequency;
+            preferred_mode->targetMode.targetVideoSignalInfo.vSyncFreq.Denominator = 1;
+            preferred_mode->targetMode.targetVideoSignalInfo.activeSize.cx = preferred_mode->width;
+            preferred_mode->targetMode.targetVideoSignalInfo.activeSize.cy = preferred_mode->height;
+            preferred_mode->targetMode.targetVideoSignalInfo.totalSize = preferred_mode->targetMode.targetVideoSignalInfo.activeSize;
+
+            ret = STATUS_SUCCESS;
+            break;
+        }
+
+        unlock_display_devices();
+        return ret;
     }
     case DISPLAYCONFIG_DEVICE_INFO_GET_ADAPTER_NAME:
     {

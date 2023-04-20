@@ -1722,7 +1722,6 @@ static void test_QueryDisplayConfig_result(UINT32 flags,
         ok(!ret, "Expected 0, got %ld\n", ret);
         check_device_path(target_name.monitorDevicePath, &target_name.header.adapterId, target_name.header.id);
 
-        todo_wine {
         preferred_mode.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_TARGET_PREFERRED_MODE;
         preferred_mode.header.size = sizeof(preferred_mode);
         preferred_mode.header.adapterId = pi[i].targetInfo.adapterId;
@@ -1732,7 +1731,6 @@ static void test_QueryDisplayConfig_result(UINT32 flags,
         ok(!ret, "Expected 0, got %ld\n", ret);
         ok(preferred_mode.width > 0 && preferred_mode.height > 0, "Expected non-zero height/width, got %ux%u\n",
                 preferred_mode.width, preferred_mode.height);
-        }
 
         todo_wine {
         adapter_name.header.type = DISPLAYCONFIG_DEVICE_INFO_GET_ADAPTER_NAME;
