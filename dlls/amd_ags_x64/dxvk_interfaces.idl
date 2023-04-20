@@ -1,0 +1,116 @@
+/*
+ * Copyright 2023      Paul Gofman for CodeWeavers
+ *
+ * This library is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU Lesser General Public
+ * License as published by the Free Software Foundation; either
+ * version 2.1 of the License, or (at your option) any later version.
+ *
+ * This library is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with this library; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
+ */
+
+import "d3d11.idl";
+
+typedef enum D3D11_VK_EXTENSION
+{
+    D3D11_VK_EXT_MULTI_DRAW_INDIRECT,
+    D3D11_VK_EXT_MULTI_DRAW_INDIRECT_COUNT,
+    D3D11_VK_EXT_DEPTH_BOUNDS,
+    D3D11_VK_EXT_BARRIER_CONTROL,
+    D3D11_VK_NVX_BINARY_IMPORT,
+    D3D11_VK_NVX_IMAGE_VIEW_HANDLE,
+} D3D11_VK_EXTENSION;
+
+typedef enum D3D11_VK_BARRIER_CONTROL
+{
+    D3D11_VK_BARRIER_CONTROL_IGNORE_WRITE_AFTER_WRITE = 0x1,
+    D3D11_VK_BARRIER_CONTROL_IGNORE_GRAPHICS_UAV = 0x2,
+} D3D11_VK_BARRIER_CONTROL;
+
+[
+    object,
+    uuid(bb8a4fb9-3935-4762-b44b-35189a26414a),
+    local,
+    pointer_default(unique)
+]
+interface ID3D11VkExtShader : IUnknown
+{
+    HRESULT GetSpirvCode([in, out] SIZE_T *code_size, [out] void *code);
+}
+
+[
+    object,
+    uuid(8a6e3c42-f74c-45b7-8265-a231b677ca17),
+    local,
+    pointer_default(unique)
+]
+interface ID3D11VkExtDevice : IUnknown
+{
+    BOOL GetExtensionSupport([in] D3D11_VK_EXTENSION extension);
+}
+
+[
+    object,
+    uuid(cfcf64ef-9586-46d0-bca4-97cf2ca61b06),
+    local,
+    pointer_default(unique)
+]
+interface ID3D11VkExtDevice1 : ID3D11VkExtDevice
+{
+    BOOL GetResourceHandleGPUVirtualAddressAndSizeNVX([in] void *object, [out] UINT64 *gpu_va_start,
+            [out] UINT64 *gpu_va_size);
+    BOOL CreateUnorderedAccessViewAndGetDriverHandleNVX([in] ID3D11Resource *resource,
+            [in] const D3D11_UNORDERED_ACCESS_VIEW_DESC *desc, [out] ID3D11UnorderedAccessView **uav,
+            UINT32 *driver_handle);
+    BOOL CreateShaderResourceViewAndGetDriverHandleNVX([in] ID3D11Resource *resource,
+            [in] const D3D11_SHADER_RESOURCE_VIEW_DESC* desc, [out] ID3D11ShaderResourceView **srv,
+            UINT32 *dirver_handle);
+    BOOL CreateSamplerStateAndGetDriverHandleNVX([in] const D3D11_SAMPLER_DESC *sample_desc,
+            [out] ID3D11SamplerState **sample_state, UINT32 *driver_handle);
+    BOOL CreateCubinComputeShaderWithNameNVX([in] const void *cubin, [in] UINT32 size, [in] UINT32 block_x,
+            [in] UINT32 block_y, [in] UINT32 block_z, [in] const char *shader_name, [out] IUnknown **shader);
+    BOOL GetCudaTextureObjectNVX([in] UINT32 srv_driver_hadnle, [in] UINT32 sample_driver_handle,
+            [out] UINT32 *cuda_texture_handle);
+}
+
+[
+    object,
+    uuid(fd0bca13-5cb6-4c3a-987e-4750de2ca791),
+    local,
+    pointer_default(unique)
+]
+interface ID3D11VkExtContext : IUnknown
+{
+    void MultiDrawIndirect([in] UINT draw_count, [in] ID3D11Buffer *buffer_for_args, [in] UINT byte_offset_for_args,
+            [in] UINT byte_stride_for_args);
+    void MultiDrawIndexedIndirect([in] UINT draw_count, [in] ID3D11Buffer *buffer_for_args,
+            [in] UINT byte_offset_for_args, [in] UINT byte_stride_for_args);
+    void MultiDrawIndirectCount([in] UINT max_draw_count, [in] ID3D11Buffer *buffer_for_count,
+            [in] UINT byte_offset_for_count, [in] ID3D11Buffer *buffer_for_args,
+            [in] UINT byte_offset_for_args, [in] UINT byte_stride_for_args);
+    void MultiDrawIndexedIndirectCount([in] UINT max_draw_count, [in] ID3D11Buffer *buffer_for_count,
+            [in] UINT byte_offset_for_count, [in] ID3D11Buffer *buffer_for_args,
+            [in] UINT byte_offset_for_args, [in] UINT byte_stride_for_args);
+    void SetDepthBoundsTest([in] BOOL enable, [in] FLOAT min_depth_bounds, [in] FLOAT max_depth_bounds);
+    void SetBarrierControl([in] UINT control_flags);
+}
+
+[
+    object,
+    uuid(874b09b2-ae0b-41d8-8476-5f3b7a0e879d),
+    local,
+    pointer_default(unique)
+]
+interface ID3D11VkExtContext1 : ID3D11VkExtContext
+{
+    BOOL LaunchCubinShaderNVX([in] IUnknown *shader,[in] UINT32 grid_x, [in] UINT32 grid_y, [in] UINT32 grid_z,
+            [in] const void *params, [in] UINT32 param_size, [in] void * const *read_resources,
+            [in] UINT32 read_resource_count, [in] void* const *write_resources, [in] UINT32 write_resources_count);
+}
