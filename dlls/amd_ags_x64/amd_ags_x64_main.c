@@ -14,6 +14,10 @@
 #include "d3d11.h"
 #include "d3d12.h"
 
+#include "initguid.h"
+
+#include "dxvk_interfaces.h"
+
 #include "amd_ags.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(amd_ags);
@@ -118,6 +122,7 @@ struct AGSContext
     VkPhysicalDeviceProperties *properties;
     VkPhysicalDeviceMemoryProperties *memory_properties;
     ID3D11DeviceContext *d3d11_context;
+    AGSDX11ExtensionsSupported_600 extensions;
 };
 
 static HMODULE hd3d11, hd3d12;
@@ -659,6 +664,23 @@ AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count
     return AGS_SUCCESS;
 }
 
+static void get_dx11_extensions_supported(ID3D11Device *device, AGSDX11ExtensionsSupported_600 *extensions)
+{
+    ID3D11VkExtDevice *ext_device;
+
+    if (FAILED(ID3D11Device_QueryInterface(device, &IID_ID3D11VkExtDevice, (void **)&ext_device)))
+    {
+        TRACE("No ID3D11VkExtDevice.\n");
+        return;
+    }
+
+    extensions->depthBoundsTest = !!ID3D11VkExtDevice_GetExtensionSupport(ext_device, D3D11_VK_EXT_DEPTH_BOUNDS);
+
+    ID3D11VkExtDevice_Release(ext_device);
+
+    TRACE("extensions %#x.\n", *(unsigned int *)extensions);
+}
+
 AGSReturnCode WINAPI agsDriverExtensionsDX11_CreateDevice( AGSContext* context,
         const AGSDX11DeviceCreationParams* creation_params, const AGSDX11ExtensionParams* extension_params,
         AGSDX11ReturnedParams* returned_params )
@@ -701,6 +723,9 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_CreateDevice( AGSContext* context,
         ERR("Device creation failed, hr %#x.\n", hr);
         return AGS_DX_FAILURE;
     }
+
+    get_dx11_extensions_supported(device, &context->extensions);
+
     if (context->version < AMD_AGS_VERSION_5_2_0)
     {
         AGSDX11ReturnedParams_511 *r = &returned_params->agsDX11ReturnedParams511;
@@ -708,6 +733,7 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_CreateDevice( AGSContext* context,
         r->pImmediateContext = device_context;
         r->pSwapChain = swapchain;
         r->FeatureLevel = feature_level;
+        r->extensionsSupported = *(unsigned int *)&context->extensions;
     }
     else if (context->version < AMD_AGS_VERSION_6_0_0)
     {
@@ -716,6 +742,7 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_CreateDevice( AGSContext* context,
         r->pImmediateContext = device_context;
         r->pSwapChain = swapchain;
         r->FeatureLevel = feature_level;
+        r->extensionsSupported = *(unsigned int *)&context->extensions;
     }
     else
     {
@@ -724,6 +751,7 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_CreateDevice( AGSContext* context,
         r->pImmediateContext = device_context;
         r->pSwapChain = swapchain;
         r->featureLevel = feature_level;
+        r->extensionsSupported = context->extensions;
     }
 
     if (context->version < AMD_AGS_VERSION_5_3_0)
@@ -813,6 +841,8 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext *context, ID3D11De
             }
             ID3D11Device_GetImmediateContext(device, &context->d3d11_context);
         }
+        get_dx11_extensions_supported(device, &context->extensions);
+        *extensionsSupported = *(unsigned int *)&context->extensions;
     }
 
     return AGS_SUCCESS;
@@ -833,24 +863,52 @@ BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 }
 
 #ifdef __x86_64__
-AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds(AGSContext* context, bool enabled,
-        float minDepth, float maxDepth )
-{
-    static int once;
 
-    if (!once++)
-        FIXME("context %p, enabled %#x, minDepth %f, maxDepth %f stub.\n", context, enabled, minDepth, maxDepth);
-    return AGS_EXTENSION_NOT_SUPPORTED;
+static AGSReturnCode set_depth_bounds(AGSContext* context, ID3D11DeviceContext *dx_context, bool enabled,
+        float min_depth, float max_depth)
+{
+    ID3D11VkExtContext *ext_context;
+
+    if (!context->extensions.depthBoundsTest)
+        return AGS_EXTENSION_NOT_SUPPORTED;
+
+    if (FAILED(ID3D11DeviceContext_QueryInterface(dx_context, &IID_ID3D11VkExtContext, (void **)&ext_context)))
+    {
+        TRACE("No ID3D11VkExtContext.\n");
+        return AGS_EXTENSION_NOT_SUPPORTED;
+    }
+    ID3D11VkExtContext_SetDepthBoundsTest(ext_context, enabled, min_depth, max_depth);
+    ID3D11VkExtContext_Release(ext_context);
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds(AGSContext* context, bool enabled,
+        float min_depth, float max_depth )
+{
+    TRACE("context %p, enabled %d, min_depth %f, max_depth %f.\n", context, enabled, min_depth, max_depth);
+
+    if (!context || !context->d3d11_context)
+    {
+        WARN("Invalid arguments.\n");
+        return AGS_INVALID_ARGS;
+    }
+
+    return set_depth_bounds(context, context->d3d11_context, enabled, min_depth, max_depth);
 }
 
 AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds_530(AGSContext* context,
-        ID3D11DeviceContext* dxContext, bool enabled, float minDepth, float maxDepth )
+        ID3D11DeviceContext* dx_context, bool enabled, float min_depth, float max_depth )
 {
-    static int once;
+    TRACE("context %p, dx_context %p, enabled %d, min_depth %f, max_depth %f.\n", context, dx_context, enabled,
+            min_depth, max_depth);
 
-    if (!once++)
-        FIXME("context %p, enabled %#x, minDepth %f, maxDepth %f stub.\n", context, enabled, minDepth, maxDepth);
-    return AGS_EXTENSION_NOT_SUPPORTED;
+    if (!context || !dx_context)
+    {
+        WARN("Invalid arguments.\n");
+        return AGS_INVALID_ARGS;
+    }
+
+    return set_depth_bounds(context, dx_context, enabled, min_depth, max_depth);
 }
 
 __ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
