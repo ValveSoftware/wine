@@ -95,7 +95,6 @@
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(module);
-WINE_DECLARE_DEBUG_CHANNEL(gdb);
 
 #ifdef __i386__
 static const char so_dir[] = "/i386-unix";
@@ -1519,34 +1518,6 @@ static inline char *prepend_build_dir_path( char *ptr, const char *ext, const ch
 }
 
 
-static void notify_gdb_dll_loaded( void *module, const char *unix_path )
-{
-    static void (*wine_gdb_dll_loaded)( const void *module, const char *unix_path );
-    if (!wine_gdb_dll_loaded) wine_gdb_dll_loaded = dlsym( RTLD_DEFAULT, "wine_gdb_dll_loaded" );
-    if (wine_gdb_dll_loaded) wine_gdb_dll_loaded( module, unix_path );
-}
-
-void notify_gdb_native_dll_loaded( void *module, UNICODE_STRING *nt_name )
-{
-    OBJECT_ATTRIBUTES attr;
-    UNICODE_STRING redir;
-    char *unix_path;
-
-    if (!TRACE_ON(gdb)) return;
-
-    InitializeObjectAttributes( &attr, nt_name, OBJ_CASE_INSENSITIVE, 0, 0 );
-    get_redirect( &attr, &redir );
-
-    if (!nt_to_unix_file_name( &attr, &unix_path, FILE_OPEN ))
-    {
-        notify_gdb_dll_loaded( module, unix_path );
-        free( unix_path );
-    }
-
-    free( redir.Buffer );
-}
-
-
 /***********************************************************************
  *	open_dll_file
  *
@@ -1597,7 +1568,6 @@ static NTSTATUS open_builtin_pe_file( const char *name, OBJECT_ATTRIBUTES *attr,
     {
         status = virtual_map_builtin_module( mapping, module, size, image_info, zero_bits, machine, prefer_native );
         NtClose( mapping );
-        if (!status && TRACE_ON(gdb)) notify_gdb_dll_loaded( *module, name );
     }
     return status;
 }
@@ -1728,7 +1698,6 @@ static NTSTATUS find_builtin_dll( UNICODE_STRING *nt_name, void **module, SIZE_T
 
     if (found_image) status = STATUS_IMAGE_MACHINE_TYPE_MISMATCH;
     WARN( "cannot find builtin library for %s\n", debugstr_us(nt_name) );
-    if (!status) notify_gdb_native_dll_loaded( *module, nt_name );
 done:
     if (status >= 0 && ext)
     {
@@ -1746,15 +1715,17 @@ done:
  * Load the builtin dll if specified by load order configuration.
  * Return STATUS_IMAGE_ALREADY_LOADED if we should keep the native one that we have found.
  */
-NTSTATUS load_builtin( const pe_image_info_t *image_info, UNICODE_STRING *nt_name,
+NTSTATUS load_builtin( const pe_image_info_t *image_info, WCHAR *filename,
                        void **module, SIZE_T *size, ULONG_PTR zero_bits )
 {
     WORD machine = image_info->machine;  /* request same machine as the native one */
     NTSTATUS status;
+    UNICODE_STRING nt_name;
     SECTION_IMAGE_INFORMATION info;
     enum loadorder loadorder;
 
-    loadorder = get_load_order( nt_name );
+    init_unicode_string( &nt_name, filename );
+    loadorder = get_load_order( &nt_name );
 
     if (loadorder == LO_DISABLED) return STATUS_DLL_NOT_FOUND;
 
@@ -1765,7 +1736,7 @@ NTSTATUS load_builtin( const pe_image_info_t *image_info, UNICODE_STRING *nt_nam
     }
     else if (image_info->image_flags & IMAGE_FLAGS_WineFakeDll)
     {
-        TRACE( "%s is a fake Wine dll\n", debugstr_us(nt_name) );
+        TRACE( "%s is a fake Wine dll\n", debugstr_w(filename) );
         if (loadorder == LO_NATIVE) return STATUS_DLL_NOT_FOUND;
         loadorder = LO_BUILTIN;  /* builtin with no fallback since mapping a fake dll is not useful */
     }
@@ -1776,9 +1747,9 @@ NTSTATUS load_builtin( const pe_image_info_t *image_info, UNICODE_STRING *nt_nam
     case LO_NATIVE_BUILTIN:
         return STATUS_IMAGE_ALREADY_LOADED;
     case LO_BUILTIN:
-        return find_builtin_dll( nt_name, module, size, &info, zero_bits, machine, FALSE );
+        return find_builtin_dll( &nt_name, module, size, &info, zero_bits, machine, FALSE );
     default:
-        status = find_builtin_dll( nt_name, module, size, &info, zero_bits, machine, (loadorder == LO_DEFAULT) );
+        status = find_builtin_dll( &nt_name, module, size, &info, zero_bits, machine, (loadorder == LO_DEFAULT) );
         if (status == STATUS_DLL_NOT_FOUND || status == STATUS_IMAGE_MACHINE_TYPE_MISMATCH)
             return STATUS_IMAGE_ALREADY_LOADED;
         return status;
