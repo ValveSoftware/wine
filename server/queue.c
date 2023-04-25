@@ -68,6 +68,8 @@ struct message_result
     void                  *data;          /* message reply data */
     unsigned int           data_size;     /* size of message reply data */
     struct timeout_user   *timeout;       /* result timeout */
+    thread_id_t            hook_thread_id;/* Hook owner thread id. */
+    client_ptr_t           hook_proc;     /* Hook proc address. */
 };
 
 struct message
@@ -986,6 +988,13 @@ static void result_timeout( void *private )
     {
         struct message *msg = result->msg;
 
+        if (result->sender && result->hook_thread_id && result->hook_proc)
+        {
+            if (debug_level > 1)
+                fprintf( stderr, "disabling hung hook: tid %04x, proc %#lx\n",
+                         result->hook_thread_id, (unsigned long)result->hook_proc );
+            disable_hung_hook( result->sender->input->desktop, msg->msg, result->hook_thread_id, result->hook_proc );
+        }
         result->msg = NULL;
         msg->result = NULL;
         remove_queue_message( result->receiver, msg, SEND_MESSAGE );
@@ -997,7 +1006,8 @@ static void result_timeout( void *private )
 /* allocate and fill a message result structure */
 static struct message_result *alloc_message_result( struct msg_queue *send_queue,
                                                     struct msg_queue *recv_queue,
-                                                    struct message *msg, timeout_t timeout )
+                                                    struct message *msg, timeout_t timeout,
+                                                    thread_id_t hook_thread_id, client_ptr_t hook_proc)
 {
     struct message_result *result = mem_alloc( sizeof(*result) );
     if (result)
@@ -1012,6 +1022,8 @@ static struct message_result *alloc_message_result( struct msg_queue *send_queue
         result->hardware_msg = NULL;
         result->desktop      = NULL;
         result->callback_msg = NULL;
+        result->hook_thread_id = hook_thread_id;
+        result->hook_proc = hook_proc;
 
         if (msg->type == MSG_CALLBACK)
         {
@@ -2001,8 +2013,10 @@ static int send_hook_ll_message( struct desktop *desktop, struct message *hardwa
     struct message *msg;
     timeout_t timeout = 2000 * -10000;  /* FIXME: load from registry */
     int id = (input->type == INPUT_MOUSE) ? WH_MOUSE_LL : WH_KEYBOARD_LL;
+    thread_id_t hook_thread_id;
+    client_ptr_t hook_proc;
 
-    if (!(hook_thread = get_first_global_hook( id ))) return 0;
+    if (!(hook_thread = get_first_global_hook( id, &hook_thread_id, &hook_proc ))) return 0;
     if (!(queue = hook_thread->queue)) return 0;
     if (is_queue_hung( queue )) return 0;
 
@@ -2027,7 +2041,7 @@ static int send_hook_ll_message( struct desktop *desktop, struct message *hardwa
     else msg->lparam = input->mouse.data << 16;
 
     if (!(msg->data = memdup( hardware_msg->data, hardware_msg->data_size )) ||
-        !(msg->result = alloc_message_result( sender, queue, msg, timeout )))
+        !(msg->result = alloc_message_result( sender, queue, msg, timeout, hook_thread_id, hook_proc )))
     {
         free_message( msg );
         return 0;
@@ -3031,7 +3045,7 @@ DECL_HANDLER(send_message)
         case MSG_ASCII:
         case MSG_UNICODE:
         case MSG_CALLBACK:
-            if (!(msg->result = alloc_message_result( send_queue, recv_queue, msg, req->timeout )))
+            if (!(msg->result = alloc_message_result( send_queue, recv_queue, msg, req->timeout, 0, 0 )))
             {
                 free_message( msg );
                 break;
