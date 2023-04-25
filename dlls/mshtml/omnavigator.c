@@ -549,8 +549,7 @@ static HRESULT WINAPI DOMParser_parseFromString(IDOMParser *iface, BSTR string, 
     }
 
     hres = create_document_node(nsdoc, This->doc->browser, NULL, doc_type, This->doc->document_mode, &xml_doc);
-    /* FIXME HACK: in FFXIV launcher, cycle collector crashes due to some bad refcount somewhere (gecko bug?) */
-    /* nsIDOMDocument_Release(nsdoc); */
+    nsIDOMDocument_Release(nsdoc);
     if(FAILED(hres))
         return hres;
 
