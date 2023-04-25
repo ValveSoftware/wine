@@ -622,7 +622,7 @@ static HRESULT build_systeminfo_tree(IDxDiagContainerImpl_Container *node)
     if (FAILED(hr))
         return hr;
 
-    hr = add_bstr_property(node, L"szDirectXVersionLetter", L"");
+    hr = add_bstr_property(node, L"szDirectXVersionLetter", L" ");
     if (FAILED(hr))
         return hr;
 
