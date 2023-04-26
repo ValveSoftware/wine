@@ -25,6 +25,7 @@ C_SRCS = \
 	wg_format.c \
 	wg_parser.c \
 	wg_sample.c \
+	wg_source.c \
 	wg_transform.c \
 	wm_reader.c \
 	wma_decoder.c \
