@@ -109,6 +109,7 @@ HRESULT wg_transform_drain(struct wg_transform *transform, BOOL flush);
 
 struct wg_source *wg_source_create(const WCHAR *url, uint64_t file_size, const void *data, uint32_t size);
 void wg_source_destroy(struct wg_source *source);
+bool wg_source_get_status(struct wg_source *source, uint32_t *stream_count);
 HRESULT wg_source_push_data(struct wg_source *source, const void *data, uint32_t size);
 
 unsigned int wg_format_get_max_size(const struct wg_format *format);

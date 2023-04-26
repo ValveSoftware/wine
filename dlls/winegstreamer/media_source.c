@@ -1426,7 +1426,7 @@ static void media_source_init_descriptors(struct media_source *source)
 
 HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *data, UINT64 size, IMFMediaSource **out)
 {
-    unsigned int stream_count = UINT_MAX;
+    UINT32 stream_count;
     struct media_source *object;
     struct wg_source *wg_source;
     struct wg_parser *parser;
@@ -1455,6 +1455,8 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
 
     if (FAILED(hr = wg_source_push_data(wg_source, data, size)))
         WARN("Failed to push initial data, hr %#lx\n", hr);
+    if (wg_source_get_status(wg_source, &stream_count))
+        TRACE("Found %u streams\n", stream_count);
 
     if (!(object = calloc(1, sizeof(*object))))
     {
@@ -1546,7 +1548,7 @@ fail:
     free(object->descriptors);
     free(object->streams);
 
-    if (stream_count != UINT_MAX)
+    if (object->state == SOURCE_OPENING)
         wg_parser_disconnect(object->wg_parser);
     if (object->read_thread)
     {
