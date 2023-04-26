@@ -60,6 +60,14 @@ static gboolean src_query_duration(struct wg_source *source, GstQuery *query)
     return true;
 }
 
+static gboolean src_query_scheduling(struct wg_source *source, GstQuery *query)
+{
+    GST_TRACE("source %p", source);
+    gst_query_set_scheduling(query, GST_SCHEDULING_FLAG_SEEKABLE, 1, -1, 0);
+    gst_query_add_scheduling_mode(query, GST_PAD_MODE_PUSH);
+    return true;
+}
+
 static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
 {
     struct wg_source *source = gst_pad_get_element_private(pad);
@@ -68,6 +76,8 @@ static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
     {
     case GST_QUERY_DURATION:
         return src_query_duration(source, query);
+    case GST_QUERY_SCHEDULING:
+        return src_query_scheduling(source, query);
     default:
         return gst_pad_query_default(pad, parent, query);
     }
