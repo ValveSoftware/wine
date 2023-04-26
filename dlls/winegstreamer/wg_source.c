@@ -41,6 +41,7 @@
 
 struct wg_source
 {
+    GstPad *src_pad;
     GstElement *container;
 };
 
@@ -75,6 +76,21 @@ static GstCaps *detect_caps_from_data(const char *url, const void *data, guint s
     return caps;
 }
 
+static GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps)
+{
+    GstCaps *pad_caps = caps ? gst_caps_ref(caps) : gst_caps_new_any();
+    const char *name = direction == GST_PAD_SRC ? "src" : "sink";
+    GstPadTemplate *template;
+    GstPad *pad;
+
+    if (!pad_caps || !(template = gst_pad_template_new(name, direction, GST_PAD_ALWAYS, pad_caps)))
+        return NULL;
+    pad = gst_pad_new_from_template(template, "src");
+    g_object_unref(template);
+    gst_caps_unref(pad_caps);
+    return pad;
+}
+
 NTSTATUS wg_source_create(void *args)
 {
     struct wg_source_create_params *params = args;
@@ -91,6 +107,9 @@ NTSTATUS wg_source_create(void *args)
 
     if (!(source->container = gst_bin_new("wg_source")))
         goto error;
+    if (!(source->src_pad = create_pad_with_caps(GST_PAD_SRC, src_caps)))
+        goto error;
+    gst_pad_set_element_private(source->src_pad, source);
 
     gst_element_set_state(source->container, GST_STATE_PAUSED);
     if (!gst_element_get_state(source->container, NULL, NULL, -1))
@@ -108,6 +127,8 @@ error:
         gst_element_set_state(source->container, GST_STATE_NULL);
         gst_object_unref(source->container);
     }
+    if (source->src_pad)
+        gst_object_unref(source->src_pad);
     free(source);
 
     gst_caps_unref(src_caps);
@@ -124,6 +145,7 @@ NTSTATUS wg_source_destroy(void *args)
 
     gst_element_set_state(source->container, GST_STATE_NULL);
     gst_object_unref(source->container);
+    gst_object_unref(source->src_pad);
     free(source);
 
     return STATUS_SUCCESS;
