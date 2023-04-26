@@ -1466,8 +1466,6 @@ static void query_tags(struct wg_parser_stream *stream)
 
 static NTSTATUS wg_parser_connect(void *args)
 {
-    GstStaticPadTemplate src_template = GST_STATIC_PAD_TEMPLATE("quartz_src",
-            GST_PAD_SRC, GST_PAD_ALWAYS, GST_STATIC_CAPS_ANY);
     const struct wg_parser_connect_params *params = args;
     struct wg_parser *parser = params->parser;
     const WCHAR *uri = params->uri;
@@ -1498,7 +1496,7 @@ static NTSTATUS wg_parser_connect(void *args)
     if (parser->context)
         gst_element_set_context(parser->container, parser->context);
 
-    parser->my_src = gst_pad_new_from_static_template(&src_template, "quartz-src");
+    parser->my_src = create_pad_with_caps(GST_PAD_SRC, NULL);
     gst_pad_set_getrange_function(parser->my_src, src_getrange_cb);
     gst_pad_set_query_function(parser->my_src, src_query_cb);
     gst_pad_set_activatemode_function(parser->my_src, src_activate_mode_cb);

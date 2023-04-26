@@ -284,7 +284,6 @@ NTSTATUS wg_transform_create(void *args)
     GstElement *first = NULL, *last = NULL, *element;
     GstCaps *raw_caps = NULL, *src_caps = NULL;
     NTSTATUS status = STATUS_UNSUCCESSFUL;
-    GstPadTemplate *template = NULL;
     struct wg_transform *transform;
     const gchar *media_type;
     GstEvent *event;
@@ -310,20 +309,12 @@ NTSTATUS wg_transform_create(void *args)
 
     if (!(src_caps = wg_format_to_caps(&input_format)))
         goto out;
-    if (!(template = gst_pad_template_new("src", GST_PAD_SRC, GST_PAD_ALWAYS, src_caps)))
-        goto out;
-    transform->my_src = gst_pad_new_from_template(template, "src");
-    g_object_unref(template);
-    if (!transform->my_src)
+    if (!(transform->my_src = create_pad_with_caps(GST_PAD_SRC, src_caps)))
         goto out;
 
     if (!(transform->output_caps = wg_format_to_caps(&output_format)))
         goto out;
-    if (!(template = gst_pad_template_new("sink", GST_PAD_SINK, GST_PAD_ALWAYS, transform->output_caps)))
-        goto out;
-    transform->my_sink = gst_pad_new_from_template(template, "sink");
-    g_object_unref(template);
-    if (!transform->my_sink)
+    if (!(transform->my_sink = create_pad_with_caps(GST_PAD_SINK, transform->output_caps)))
         goto out;
 
     gst_pad_set_element_private(transform->my_sink, transform);
