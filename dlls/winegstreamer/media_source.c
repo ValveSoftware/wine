@@ -90,6 +90,7 @@ struct media_source
 
     CRITICAL_SECTION cs;
 
+    struct wg_source *wg_source;
     struct wg_parser *wg_parser;
     UINT64 duration;
 
@@ -1167,6 +1168,7 @@ static ULONG WINAPI media_source_Release(IMFMediaSource *iface)
         IMFMediaSource_Shutdown(iface);
         IMFMediaEventQueue_Release(source->event_queue);
         IMFByteStream_Release(source->byte_stream);
+        wg_source_destroy(source->wg_source);
         wg_parser_destroy(source->wg_parser);
         source->cs.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&source->cs);
@@ -1426,6 +1428,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
 {
     unsigned int stream_count = UINT_MAX;
     struct media_source *object;
+    struct wg_source *wg_source;
     struct wg_parser *parser;
     DWORD bytestream_caps;
     uint64_t file_size;
@@ -1447,8 +1450,14 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
         return hr;
     }
 
+    if (!(wg_source = wg_source_create(url, data, size)))
+        return MF_E_UNSUPPORTED_FORMAT;
+
     if (!(object = calloc(1, sizeof(*object))))
+    {
+        wg_source_destroy(wg_source);
         return E_OUTOFMEMORY;
+    }
 
     object->IMFMediaSource_iface.lpVtbl = &IMFMediaSource_vtbl;
     object->IMFGetService_iface.lpVtbl = &media_source_get_service_vtbl;
@@ -1456,8 +1465,9 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     object->IMFRateControl_iface.lpVtbl = &media_source_rate_control_vtbl;
     object->async_commands_callback.lpVtbl = &source_async_commands_callback_vtbl;
     object->ref = 1;
-    object->byte_stream = bytestream;
     IMFByteStream_AddRef(bytestream);
+    object->byte_stream = bytestream;
+    object->wg_source = wg_source;
     object->rate = 1.0f;
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": cs");
@@ -1521,7 +1531,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     *out = &object->IMFMediaSource_iface;
     return S_OK;
 
-    fail:
+fail:
     WARN("Failed to construct MFMediaSource, hr %#lx.\n", hr);
 
     while (object->streams && object->stream_count--)
@@ -1548,6 +1558,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     if (object->event_queue)
         IMFMediaEventQueue_Release(object->event_queue);
     IMFByteStream_Release(object->byte_stream);
+    wg_source_destroy(wg_source);
     free(object);
     return hr;
 }
