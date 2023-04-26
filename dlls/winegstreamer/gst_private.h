@@ -107,6 +107,9 @@ bool wg_transform_set_output_format(struct wg_transform *transform, struct wg_fo
 bool wg_transform_get_status(struct wg_transform *transform, bool *accepts_input);
 HRESULT wg_transform_drain(struct wg_transform *transform, BOOL flush);
 
+struct wg_source *wg_source_create(const WCHAR *url, const void *data, uint32_t size);
+void wg_source_destroy(struct wg_source *source);
+
 unsigned int wg_format_get_max_size(const struct wg_format *format);
 
 HRESULT avi_splitter_create(IUnknown *outer, IUnknown **out);
