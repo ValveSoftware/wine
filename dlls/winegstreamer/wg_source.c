@@ -426,6 +426,7 @@ NTSTATUS wg_source_get_status(void *args)
     }
 
     params->stream_count = stream_count;
+    params->duration = source->max_duration / 100;
     params->read_offset = source->segment.start;
     return STATUS_SUCCESS;
 }
