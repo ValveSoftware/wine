@@ -107,7 +107,8 @@ bool wg_transform_set_output_format(struct wg_transform *transform, struct wg_fo
 bool wg_transform_get_status(struct wg_transform *transform, bool *accepts_input);
 HRESULT wg_transform_drain(struct wg_transform *transform, BOOL flush);
 
-struct wg_source *wg_source_create(const WCHAR *url, uint64_t file_size, const void *data, uint32_t size);
+struct wg_source *wg_source_create(const WCHAR *url, uint64_t file_size,
+        const void *data, uint32_t size, WCHAR mime_type[256]);
 void wg_source_destroy(struct wg_source *source);
 bool wg_source_get_status(struct wg_source *source, uint32_t *stream_count,
         uint64_t *duration, uint64_t *read_offset);
