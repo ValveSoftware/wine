@@ -44,6 +44,7 @@ extern bool append_element(GstElement *container, GstElement *element, GstElemen
 extern bool link_src_to_element(GstPad *src_pad, GstElement *element) DECLSPEC_HIDDEN;
 extern bool link_element_to_sink(GstElement *element, GstPad *sink_pad) DECLSPEC_HIDDEN;
 extern GstCaps *detect_caps_from_data(const char *url, const void *data, guint size) DECLSPEC_HIDDEN;
+extern GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps) DECLSPEC_HIDDEN;
 
 /* wg_format.c */
 
