@@ -223,6 +223,19 @@ GstCaps *detect_caps_from_data(const char *url, const void *data, guint size)
     return caps;
 }
 
+GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps)
+{
+    const char *name = direction == GST_PAD_SRC ? "src" : "sink";
+    GstPadTemplate *template;
+    GstPad *pad;
+
+    if (!(template = gst_pad_template_new(name, direction, GST_PAD_ALWAYS, caps)))
+        return NULL;
+    pad = gst_pad_new_from_template(template, "src");
+    g_object_unref(template);
+    return pad;
+}
+
 NTSTATUS wg_init_gstreamer(void *arg)
 {
     static GstGLContext *gl_context;
