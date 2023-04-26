@@ -345,6 +345,12 @@ struct wg_source_create_params
     struct wg_source *source;
 };
 
+struct wg_source_get_status_params
+{
+    struct wg_source *source;
+    UINT32 stream_count;
+};
+
 struct wg_source_push_data_params
 {
     struct wg_source *source;
@@ -392,6 +398,7 @@ enum unix_funcs
 
     unix_wg_source_create,
     unix_wg_source_destroy,
+    unix_wg_source_get_status,
     unix_wg_source_push_data,
 };
 
