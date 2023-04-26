@@ -223,6 +223,21 @@ GstCaps *detect_caps_from_data(const char *url, const void *data, guint size)
     return caps;
 }
 
+GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps)
+{
+    GstCaps *pad_caps = caps ? gst_caps_ref(caps) : gst_caps_new_any();
+    const char *name = direction == GST_PAD_SRC ? "src" : "sink";
+    GstPadTemplate *template;
+    GstPad *pad;
+
+    if (!pad_caps || !(template = gst_pad_template_new(name, direction, GST_PAD_ALWAYS, pad_caps)))
+        return NULL;
+    pad = gst_pad_new_from_template(template, "src");
+    g_object_unref(template);
+    gst_caps_unref(pad_caps);
+    return pad;
+}
+
 NTSTATUS wg_init_gstreamer(void *arg)
 {
     static GstGLContext *gl_context;
