@@ -336,6 +336,14 @@ struct wg_transform_drain_params
     BOOL flush;
 };
 
+struct wg_source_create_params
+{
+    const char *url;
+    const void *data;
+    UINT32 size;
+    struct wg_source *source;
+};
+
 enum unix_funcs
 {
     unix_wg_init_gstreamer,
@@ -373,6 +381,9 @@ enum unix_funcs
     unix_wg_transform_read_data,
     unix_wg_transform_get_status,
     unix_wg_transform_drain,
+
+    unix_wg_source_create,
+    unix_wg_source_destroy,
 };
 
 #endif /* __WINE_WINEGSTREAMER_UNIXLIB_H */
