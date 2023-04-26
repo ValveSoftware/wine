@@ -1924,5 +1924,6 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
 
     X(wg_source_create),
     X(wg_source_destroy),
+    X(wg_source_get_status),
     X(wg_source_push_data),
 };
