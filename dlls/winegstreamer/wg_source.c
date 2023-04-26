@@ -303,6 +303,7 @@ NTSTATUS wg_source_create(void *args)
     GstElement *first = NULL, *last = NULL, *element;
     GstCaps *src_caps, *any_caps;
     struct wg_source *source;
+    const gchar *media_type;
     GstEvent *event;
     GstPad *peer;
     guint i;
@@ -316,6 +317,14 @@ NTSTATUS wg_source_create(void *args)
     }
     gst_segment_init(&source->segment, GST_FORMAT_BYTES);
     source->segment.stop = params->file_size;
+
+    media_type = gst_structure_get_name(gst_caps_get_structure(src_caps, 0));
+    if (!strcmp(media_type, "video/quicktime"))
+        strcpy(params->mime_type, "video/mp4");
+    else if (!strcmp(media_type, "video/x-msvideo"))
+        strcpy(params->mime_type, "video/avi");
+    else
+        lstrcpynA(params->mime_type, media_type, ARRAY_SIZE(params->mime_type));
 
     if (!(source->container = gst_bin_new("wg_source")))
         goto error;
