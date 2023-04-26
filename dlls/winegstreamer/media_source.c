@@ -92,6 +92,7 @@ struct media_source
 
     struct wg_source *wg_source;
     struct wg_parser *wg_parser;
+    WCHAR mime_type[256];
     UINT64 file_size;
     UINT64 duration;
 
@@ -1249,6 +1250,8 @@ static HRESULT WINAPI media_source_CreatePresentationDescriptor(IMFMediaSource *
         hr = MF_E_SHUTDOWN;
     else if (SUCCEEDED(hr = MFCreatePresentationDescriptor(source->stream_count, source->descriptors, descriptor)))
     {
+        if (FAILED(hr = IMFPresentationDescriptor_SetString(*descriptor, &MF_PD_MIME_TYPE, source->mime_type)))
+            WARN("Failed to set presentation descriptor MF_PD_MIME_TYPE, hr %#lx\n", hr);
         if (FAILED(hr = IMFPresentationDescriptor_SetUINT64(*descriptor, &MF_PD_TOTAL_FILE_SIZE, source->file_size)))
             WARN("Failed to set presentation descriptor MF_PD_TOTAL_FILE_SIZE, hr %#lx\n", hr);
         if (FAILED(hr = IMFPresentationDescriptor_SetUINT64(*descriptor, &MF_PD_DURATION, source->duration)))
@@ -1435,6 +1438,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     struct wg_source *wg_source;
     struct wg_parser *parser;
     DWORD bytestream_caps, read_size = size;
+    WCHAR mime_type[256];
     unsigned int i;
     HRESULT hr;
 
@@ -1453,7 +1457,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
         return hr;
     }
 
-    if (!(wg_source = wg_source_create(url, file_size, data, size)))
+    if (!(wg_source = wg_source_create(url, file_size, data, size, mime_type)))
         return MF_E_UNSUPPORTED_FORMAT;
 
     while (SUCCEEDED(hr) && SUCCEEDED(hr = wg_source_push_data(wg_source, data, read_size))
@@ -1487,6 +1491,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     IMFByteStream_AddRef(bytestream);
     object->byte_stream = bytestream;
     object->wg_source = wg_source;
+    wcscpy(object->mime_type, mime_type);
     object->file_size = file_size;
     object->duration = duration;
     object->rate = 1.0f;

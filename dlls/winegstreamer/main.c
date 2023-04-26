@@ -429,7 +429,7 @@ HRESULT wg_transform_drain(struct wg_transform *transform, BOOL flush)
 }
 
 struct wg_source *wg_source_create(const WCHAR *url, uint64_t file_size,
-        const void *data, uint32_t size)
+        const void *data, uint32_t size, WCHAR mime_type[256])
 {
     struct wg_source_create_params params =
     {
@@ -439,14 +439,17 @@ struct wg_source *wg_source_create(const WCHAR *url, uint64_t file_size,
     UINT len = url ? WideCharToMultiByte(CP_ACP, 0, url, -1, NULL, 0, NULL, NULL) : 0;
     char *tmp = url ? malloc(len) : NULL;
 
-    TRACE("url %s, file_size %#I64x, data %p, size %#x\n", debugstr_w(url),
-            file_size, data, size);
+    TRACE("url %s, file_size %#I64x, data %p, size %#x, mime_type %p\n", debugstr_w(url),
+            file_size, data, size, mime_type);
 
     if ((params.url = tmp))
         WideCharToMultiByte(CP_ACP, 0, url, -1, tmp, len, NULL, NULL);
 
     if (!WINE_UNIX_CALL(unix_wg_source_create, &params))
+    {
+        MultiByteToWideChar(CP_ACP, 0, params.mime_type, -1, mime_type, 256);
         TRACE("Returning source %p.\n", params.source);
+    }
 
     free(tmp);
     return params.source;
