@@ -1429,7 +1429,7 @@ static void media_source_init_descriptors(struct media_source *source)
 
 HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *data, UINT64 size, IMFMediaSource **out)
 {
-    UINT64 next_offset, file_size;
+    UINT64 duration, next_offset, file_size;
     UINT32 stream_count;
     struct media_source *object;
     struct wg_source *wg_source;
@@ -1457,7 +1457,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
         return MF_E_UNSUPPORTED_FORMAT;
 
     while (SUCCEEDED(hr) && SUCCEEDED(hr = wg_source_push_data(wg_source, data, read_size))
-            && wg_source_get_status(wg_source, &stream_count, &next_offset)
+            && wg_source_get_status(wg_source, &stream_count, &duration, &next_offset)
             && !stream_count && (read_size = min(file_size - min(file_size, next_offset), size)))
     {
         if (FAILED(hr = IMFByteStream_SetCurrentPosition(bytestream, next_offset)))
@@ -1488,6 +1488,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     object->byte_stream = bytestream;
     object->wg_source = wg_source;
     object->file_size = file_size;
+    object->duration = duration;
     object->rate = 1.0f;
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": cs");
@@ -1538,7 +1539,6 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
             goto fail;
         }
 
-        object->duration = max(object->duration, wg_parser_stream_get_duration(wg_stream));
         IMFStreamDescriptor_AddRef(descriptor);
         object->descriptors[i] = descriptor;
         object->streams[i] = stream;
