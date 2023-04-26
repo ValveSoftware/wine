@@ -30,6 +30,10 @@
 
 #define GLIB_VERSION_MIN_REQUIRED GLIB_VERSION_2_30
 #include <gst/gst.h>
+#include <gst/video/video.h>
+#include <gst/audio/audio.h>
+#include <gst/base/base.h>
+#include <gst/tag/tag.h>
 #include <gst/gl/gl.h>
 
 #include "ntstatus.h"
@@ -191,6 +195,32 @@ bool link_element_to_sink(GstElement *element, GstPad *sink_pad)
     }
     gst_object_unref(src_pad);
     return !ret;
+}
+
+GstCaps *detect_caps_from_data(const char *url, const void *data, guint size)
+{
+    const char *extension = url ? strrchr(url, '.') : NULL;
+    GstTypeFindProbability probability;
+    GstCaps *caps;
+    gchar *str;
+
+    if (!(caps = gst_type_find_helper_for_data_with_extension(NULL, data, size,
+            extension ? extension + 1 : NULL, &probability)))
+    {
+        GST_ERROR("Failed to detect caps for url %s, data %p, size %u", url, data, size);
+        return NULL;
+    }
+
+    str = gst_caps_to_string(caps);
+    if (probability > GST_TYPE_FIND_POSSIBLE)
+        GST_INFO("Detected caps %s with probability %u for url %s, data %p, size %u",
+                str, probability, url, data, size);
+    else
+        GST_FIXME("Detected caps %s with probability %u for url %s, data %p, size %u",
+                str, probability, url, data, size);
+    g_free(str);
+
+    return caps;
 }
 
 NTSTATUS wg_init_gstreamer(void *arg)
