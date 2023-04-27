@@ -3826,7 +3826,7 @@ static HRESULT bytestream_create_io_request(struct bytestream *stream, enum asyn
             &stream->write_callback, NULL, &request)))
         goto failed;
 
-    RtwqPutWorkItem(MFASYNC_CALLBACK_QUEUE_STANDARD, 0, request);
+    RtwqPutWorkItem(MFASYNC_CALLBACK_QUEUE_IO, 0, request);
     IRtwqAsyncResult_Release(request);
 
 failed:
