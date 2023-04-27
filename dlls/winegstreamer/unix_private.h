@@ -66,6 +66,7 @@ extern NTSTATUS wg_transform_drain(void *args) DECLSPEC_HIDDEN;
 
 extern NTSTATUS wg_source_create(void *args) DECLSPEC_HIDDEN;
 extern NTSTATUS wg_source_destroy(void *args) DECLSPEC_HIDDEN;
+extern NTSTATUS wg_source_push_data(void *args) DECLSPEC_HIDDEN;
 
 /* wg_allocator.c */
 
