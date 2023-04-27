@@ -43,7 +43,25 @@ struct wg_source
 {
     GstPad *src_pad;
     GstElement *container;
+    GstSegment segment;
+    bool valid_segment;
 };
+
+static GstEvent *create_stream_start_event(const char *stream_id)
+{
+    GstStream *stream;
+    GstEvent *event;
+
+    if (!(stream = gst_stream_new(stream_id, NULL, GST_STREAM_TYPE_UNKNOWN, 0)))
+        return NULL;
+    if ((event = gst_event_new_stream_start(stream_id)))
+    {
+        gst_event_set_stream(event, stream);
+        gst_object_unref(stream);
+    }
+
+    return event;
+}
 
 NTSTATUS wg_source_create(void *args)
 {
@@ -51,6 +69,7 @@ NTSTATUS wg_source_create(void *args)
     GstElement *first = NULL, *last = NULL, *element;
     GstCaps *src_caps, *any_caps;
     struct wg_source *source;
+    GstEvent *event;
 
     if (!(src_caps = detect_caps_from_data(params->url, params->data, params->size)))
         return STATUS_UNSUCCESSFUL;
@@ -59,6 +78,7 @@ NTSTATUS wg_source_create(void *args)
         gst_caps_unref(src_caps);
         return STATUS_UNSUCCESSFUL;
     }
+    gst_segment_init(&source->segment, GST_FORMAT_BYTES);
 
     if (!(source->container = gst_bin_new("wg_source")))
         goto error;
@@ -85,6 +105,9 @@ NTSTATUS wg_source_create(void *args)
     if (!gst_element_get_state(source->container, NULL, NULL, -1))
         goto error;
 
+    if (!(event = create_stream_start_event("wg_source"))
+            || !gst_pad_push_event(source->src_pad, event))
+        goto error;
     gst_caps_unref(src_caps);
 
     params->source = source;
@@ -117,6 +140,25 @@ NTSTATUS wg_source_destroy(void *args)
     gst_object_unref(source->container);
     gst_object_unref(source->src_pad);
     free(source);
+
+    return STATUS_SUCCESS;
+}
+
+NTSTATUS wg_source_push_data(void *args)
+{
+    struct wg_source_push_data_params *params = args;
+    struct wg_source *source = params->source;
+    GstEvent *event;
+
+    GST_TRACE("source %p, data %p, size %#x", source, params->data, params->size);
+
+    if (!source->valid_segment)
+    {
+        if (!(event = gst_event_new_segment(&source->segment))
+                || !gst_pad_push_event(source->src_pad, event))
+            GST_ERROR("Failed to push new segment event");
+        source->valid_segment = true;
+    }
 
     return STATUS_SUCCESS;
 }
