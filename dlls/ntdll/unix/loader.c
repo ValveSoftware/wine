@@ -2278,6 +2278,7 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
 BOOL alert_simulate_sched_quantum;
+BOOL fsync_yield_to_waiters;
 BOOL no_priv_elevation;
 BOOL localsystem_sid;
 BOOL high_dll_addresses;
@@ -2339,6 +2340,13 @@ static void hacks_init(void)
     if (high_dll_addresses)
         ERR("HACK: moving dlls to high addresses.\n");
 #endif
+
+    env_str = getenv("WINE_FSYNC_YIELD_TO_WAITERS");
+    if (env_str)
+        fsync_yield_to_waiters = !!atoi(env_str);
+    if (fsync_yield_to_waiters)
+        ERR("HACK: fsync: yield to waiters.\n");
+
 
     env_str = getenv("WINE_SIMULATE_WRITECOPY");
     if (env_str) simulate_writecopy = atoi(env_str);
