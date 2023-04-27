@@ -1453,6 +1453,9 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     if (!(wg_source = wg_source_create(url, data, size)))
         return MF_E_UNSUPPORTED_FORMAT;
 
+    if (FAILED(hr = wg_source_push_data(wg_source, data, size)))
+        WARN("Failed to push initial data, hr %#lx\n", hr);
+
     if (!(object = calloc(1, sizeof(*object))))
     {
         wg_source_destroy(wg_source);
