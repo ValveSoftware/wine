@@ -152,6 +152,7 @@ extern struct ldt_copy __wine_ldt_copy DECLSPEC_HIDDEN;
 extern BOOL ac_odyssey DECLSPEC_HIDDEN;
 extern BOOL fsync_simulate_sched_quantum DECLSPEC_HIDDEN;
 extern BOOL alert_simulate_sched_quantum DECLSPEC_HIDDEN;
+extern BOOL fsync_yield_to_waiters;
 extern BOOL no_priv_elevation DECLSPEC_HIDDEN;
 extern BOOL localsystem_sid DECLSPEC_HIDDEN;
 extern BOOL high_dll_addresses DECLSPEC_HIDDEN;
