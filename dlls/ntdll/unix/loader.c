@@ -1923,6 +1923,7 @@ static ULONG_PTR get_image_address(void)
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
 BOOL alert_simulate_sched_quantum;
+BOOL fsync_yield_to_waiters;
 
 static void hacks_init(void)
 {
@@ -1959,6 +1960,12 @@ static void hacks_init(void)
     }
     if (alert_simulate_sched_quantum)
         ERR("HACK: Simulating sched quantum in NtWaitForAlertByThreadId.\n");
+
+    env_str = getenv("WINE_FSYNC_YIELD_TO_WAITERS");
+    if (env_str)
+        fsync_yield_to_waiters = !!atoi(env_str);
+    if (fsync_yield_to_waiters)
+        ERR("HACK: fsync: yield to waiters.\n");
 
     switch (sgi ? atoi( sgi ) : -1)
     {

@@ -426,7 +426,7 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
     return ret;
 }
 
-static NTSTATUS get_object_for_wait( HANDLE handle, struct fsync *obj )
+static NTSTATUS get_object_for_wait( HANDLE handle, struct fsync *obj, int *prev_pid )
 {
     NTSTATUS ret;
     int *shm;
@@ -436,7 +436,10 @@ static NTSTATUS get_object_for_wait( HANDLE handle, struct fsync *obj )
     shm = obj->shm;
     /* Give wineserver a chance to cleanup shm index if the process
      * is killed while we are waiting on the object. */
-    __atomic_store_n( &shm[3], current_pid, __ATOMIC_SEQ_CST );
+    if (fsync_yield_to_waiters)
+        *prev_pid = __atomic_exchange_n( &shm[3], current_pid, __ATOMIC_SEQ_CST );
+    else
+        __atomic_store_n( &shm[3], current_pid, __ATOMIC_SEQ_CST );
     return STATUS_SUCCESS;
 }
 
@@ -823,6 +826,24 @@ NTSTATUS fsync_query_mutex( HANDLE handle, void *info, ULONG *ret_len )
     return STATUS_SUCCESS;
 }
 
+static inline void try_yield_to_waiters( int prev_pid )
+{
+    if (!fsync_yield_to_waiters) return;
+
+    /* On Windows singaling an object will wake the threads waiting on the object. With fsync
+     * it may happen that signaling thread (or other thread) grabs the object before the already waiting
+     * thread gets a chance. Try to workaround that for the affected apps. Non-zero 'prev_pid' indicates
+     * that the object is grabbed in __fsync_wait_objects() by some other thread. It is the same for
+     * a non-current pid, but we may currently have a stale PID on an object from a terminated process
+     * and it is probably safer to skip this workaround. This won't work great if the object is used in 'wait all'
+     * and the waiter is blocked on the other object.
+     * This check is also not entirely reliable as if multiple waiters from the same process enter
+     * __fsync_wait_objects() the first one leaving will clear 'last_pid' in the object. */
+
+    if (prev_pid == current_pid)
+        usleep(0);
+}
+
 static NTSTATUS do_single_wait( int *addr, int val, const struct timespec64 *end, clockid_t clock_id,
                                 BOOLEAN alertable )
 {
@@ -877,6 +898,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
     struct futex_waitv futexes[MAXIMUM_WAIT_OBJECTS + 1];
     struct fsync objs[MAXIMUM_WAIT_OBJECTS];
     BOOL msgwait = FALSE, waited = FALSE;
+    int prev_pids[MAXIMUM_WAIT_OBJECTS];
     int has_fsync = 0, has_server = 0;
     clockid_t clock_id = 0;
     struct timespec64 end;
@@ -907,7 +929,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 
     for (i = 0; i < count; i++)
     {
-        ret = get_object_for_wait( handles[i], &objs[i] );
+        ret = get_object_for_wait( handles[i], &objs[i], &prev_pids[i] );
         if (ret == STATUS_SUCCESS)
         {
             assert( objs[i].type );
@@ -986,6 +1008,9 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         int current, new;
 
                         new = __atomic_load_n( &semaphore->count, __ATOMIC_SEQ_CST );
+                        if (!waited && new)
+                            try_yield_to_waiters(prev_pids[i]);
+
                         while ((current = new))
                         {
                             if ((new = __sync_val_compare_and_swap( &semaphore->count, current, current - 1 )) == current)
@@ -1013,6 +1038,9 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             return i;
                         }
 
+                        if (!waited && !mutex->tid)
+                            try_yield_to_waiters(prev_pids[i]);
+
                         if (!(tid = __sync_val_compare_and_swap( &mutex->tid, 0, CURRENT_TID )))
                         {
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
@@ -1036,6 +1064,9 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                     case FSYNC_AUTO_SERVER:
                     {
                         struct event *event = obj->shm;
+
+                        if (!waited && event->signaled)
+                            try_yield_to_waiters(prev_pids[i]);
 
                         if (__sync_val_compare_and_swap( &event->signaled, 1, 0 ))
                         {
