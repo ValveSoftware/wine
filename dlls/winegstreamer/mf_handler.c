@@ -75,7 +75,12 @@ struct async_create_object
     WCHAR *url;
     DWORD flags;
     IMFAsyncResult *result;
+
+    UINT64 size;
+    BYTE buffer[];
 };
+
+C_ASSERT(sizeof(struct async_create_object) == offsetof(struct async_create_object, buffer[0]));
 
 static struct async_create_object *impl_from_IUnknown(IUnknown *iface)
 {
@@ -134,14 +139,14 @@ static const IUnknownVtbl async_create_object_vtbl =
 };
 
 static HRESULT async_create_object_create(DWORD flags, IMFByteStream *stream, const WCHAR *url,
-        IMFAsyncResult *result, IUnknown **out)
+        IMFAsyncResult *result, UINT size, IUnknown **out, BYTE **buffer)
 {
     WCHAR *tmp_url = url ? wcsdup(url) : NULL;
     struct async_create_object *impl;
 
     if (!stream && !tmp_url)
         return E_INVALIDARG;
-    if (!(impl = calloc(1, sizeof(*impl))))
+    if (!(impl = calloc(1, offsetof(struct async_create_object, buffer[size]))))
     {
         free(tmp_url);
         return E_OUTOFMEMORY;
@@ -155,6 +160,7 @@ static HRESULT async_create_object_create(DWORD flags, IMFByteStream *stream, co
     impl->url = tmp_url;
     IMFAsyncResult_AddRef((impl->result = result));
 
+    *buffer = impl->buffer;
     *out = &impl->IUnknown_iface;
     return S_OK;
 }
@@ -213,12 +219,16 @@ struct handler
 static HRESULT handler_begin_create_object(struct handler *handler, DWORD flags,
         IMFByteStream *stream, const WCHAR *url, IMFAsyncResult *result)
 {
+    UINT size = 0x2000;
     IUnknown *async;
     HRESULT hr;
+    BYTE *buffer;
 
-    if (SUCCEEDED(hr = async_create_object_create(flags, stream, url, result, &async)))
+    if (SUCCEEDED(hr = async_create_object_create(flags, stream, url, result, size, &async, &buffer)))
     {
-        if (FAILED(hr = MFPutWorkItem(MFASYNC_CALLBACK_QUEUE_IO, &handler->IMFAsyncCallback_iface, async)))
+        if (stream && FAILED(hr = IMFByteStream_BeginRead(stream, buffer, size, &handler->IMFAsyncCallback_iface, async)))
+            WARN("Failed to begin reading from stream, hr %#lx\n", hr);
+        if (!stream && FAILED(hr = MFPutWorkItem(MFASYNC_CALLBACK_QUEUE_IO, &handler->IMFAsyncCallback_iface, async)))
             WARN("Failed to queue async work item, hr %#lx\n", hr);
         IUnknown_Release(async);
     }
@@ -338,13 +348,17 @@ static ULONG WINAPI async_callback_Release(IMFAsyncCallback *iface)
 
 static HRESULT WINAPI async_callback_GetParameters(IMFAsyncCallback *iface, DWORD *flags, DWORD *queue)
 {
-    return E_NOTIMPL;
+    *flags = 0;
+    *queue = MFASYNC_CALLBACK_QUEUE_IO;
+    return S_OK;
 }
 
 static HRESULT WINAPI async_callback_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
 {
     struct handler *handler = impl_from_IMFAsyncCallback(iface);
     struct async_create_object *async;
+    ULONG size = 0;
+    HRESULT hr;
 
     TRACE("iface %p, result %p\n", iface, result);
 
@@ -353,6 +367,10 @@ static HRESULT WINAPI async_callback_Invoke(IMFAsyncCallback *iface, IMFAsyncRes
         WARN("Expected context set for callee result.\n");
         return E_FAIL;
     }
+
+    if (async->stream && FAILED(hr = IMFByteStream_EndRead(async->stream, result, &size)))
+        WARN("Failed to complete stream read, hr %#lx\n", hr);
+    async->size = size;
 
     return async_create_object_complete(async, &handler->results, &handler->cs);
 }
