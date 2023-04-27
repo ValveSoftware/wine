@@ -238,6 +238,21 @@ GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps)
     return pad;
 }
 
+GstBuffer *create_buffer_from_bytes(const void *data, guint size)
+{
+    GstBuffer *buffer;
+
+    if (!(buffer = gst_buffer_new_and_alloc(size)))
+        GST_ERROR("Failed to allocate buffer for %#x bytes\n", size);
+    else
+    {
+        gst_buffer_fill(buffer, 0, data, size);
+        gst_buffer_set_size(buffer, size);
+    }
+
+    return buffer;
+}
+
 NTSTATUS wg_init_gstreamer(void *arg)
 {
     static GstGLContext *gl_context;
