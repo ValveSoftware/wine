@@ -456,6 +456,18 @@ void wg_source_destroy(struct wg_source *source)
     WINE_UNIX_CALL(unix_wg_source_destroy, source);
 }
 
+HRESULT wg_source_push_data(struct wg_source *source, const void *data, uint32_t size)
+{
+    struct wg_source_push_data_params params =
+    {
+        .source = source,
+        .data = data,
+        .size = size,
+    };
+    TRACE("source %p, data %p, size %#x\n", source, data, size);
+    return HRESULT_FROM_NT(WINE_UNIX_CALL(unix_wg_source_push_data, &params));
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     if (reason == DLL_PROCESS_ATTACH)
