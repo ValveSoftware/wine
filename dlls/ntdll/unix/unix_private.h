@@ -214,6 +214,7 @@ extern BOOL wine_allocs_2g_limit;
 extern char *release_reserved_memory_low_bound;
 extern BOOL alert_simulate_sched_quantum;
 extern BOOL fsync_simulate_sched_quantum;
+extern BOOL fsync_yield_to_waiters;
 
 extern void init_environment(void);
 extern void init_startup_info(void);
