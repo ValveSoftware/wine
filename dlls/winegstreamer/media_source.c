@@ -95,6 +95,8 @@ struct media_source
     IMFMediaEventQueue *event_queue;
     IMFByteStream *byte_stream;
 
+    CRITICAL_SECTION cs;
+
     struct wg_parser *wg_parser;
 
     struct media_stream **streams;
@@ -1134,7 +1136,9 @@ static HRESULT WINAPI media_source_rate_control_SetRate(IMFRateControl *iface, B
     if (FAILED(hr = IMFRateSupport_IsRateSupported(&source->IMFRateSupport_iface, thin, rate, NULL)))
         return hr;
 
+    EnterCriticalSection(&source->cs);
     source->rate = rate;
+    LeaveCriticalSection(&source->cs);
 
     return IMFMediaEventQueue_QueueEventParamVar(source->event_queue, MESourceRateChanged, &GUID_NULL, S_OK, NULL);
 }
@@ -1148,7 +1152,9 @@ static HRESULT WINAPI media_source_rate_control_GetRate(IMFRateControl *iface, B
     if (thin)
         *thin = FALSE;
 
+    EnterCriticalSection(&source->cs);
     *rate = source->rate;
+    LeaveCriticalSection(&source->cs);
 
     return S_OK;
 }
@@ -1213,6 +1219,8 @@ static ULONG WINAPI media_source_Release(IMFMediaSource *iface)
         IMFMediaEventQueue_Release(source->event_queue);
         IMFByteStream_Release(source->byte_stream);
         wg_parser_destroy(source->wg_parser);
+        source->cs.DebugInfo->Spare[0] = 0;
+        DeleteCriticalSection(&source->cs);
         free(source);
     }
 
@@ -1259,27 +1267,39 @@ static HRESULT WINAPI media_source_QueueEvent(IMFMediaSource *iface, MediaEventT
 static HRESULT WINAPI media_source_GetCharacteristics(IMFMediaSource *iface, DWORD *characteristics)
 {
     struct media_source *source = impl_from_IMFMediaSource(iface);
+    HRESULT hr = S_OK;
 
     TRACE("%p, %p.\n", iface, characteristics);
 
+    EnterCriticalSection(&source->cs);
+
     if (source->state == SOURCE_SHUTDOWN)
-        return MF_E_SHUTDOWN;
+        hr = MF_E_SHUTDOWN;
+    else
+        *characteristics = MFMEDIASOURCE_CAN_SEEK | MFMEDIASOURCE_CAN_PAUSE;
 
-    *characteristics = MFMEDIASOURCE_CAN_SEEK | MFMEDIASOURCE_CAN_PAUSE;
+    LeaveCriticalSection(&source->cs);
 
-    return S_OK;
+    return hr;
 }
 
 static HRESULT WINAPI media_source_CreatePresentationDescriptor(IMFMediaSource *iface, IMFPresentationDescriptor **descriptor)
 {
     struct media_source *source = impl_from_IMFMediaSource(iface);
+    HRESULT hr;
 
     TRACE("%p, %p.\n", iface, descriptor);
 
-    if (source->state == SOURCE_SHUTDOWN)
-        return MF_E_SHUTDOWN;
+    EnterCriticalSection(&source->cs);
 
-    return IMFPresentationDescriptor_Clone(source->pres_desc, descriptor);
+    if (source->state == SOURCE_SHUTDOWN)
+        hr = MF_E_SHUTDOWN;
+    else
+        hr = IMFPresentationDescriptor_Clone(source->pres_desc, descriptor);
+
+    LeaveCriticalSection(&source->cs);
+
+    return hr;
 }
 
 static HRESULT WINAPI media_source_Start(IMFMediaSource *iface, IMFPresentationDescriptor *descriptor,
@@ -1291,13 +1311,13 @@ static HRESULT WINAPI media_source_Start(IMFMediaSource *iface, IMFPresentationD
 
     TRACE("%p, %p, %p, %p.\n", iface, descriptor, time_format, position);
 
+    EnterCriticalSection(&source->cs);
+
     if (source->state == SOURCE_SHUTDOWN)
-        return MF_E_SHUTDOWN;
-
-    if (!(IsEqualIID(time_format, &GUID_NULL)))
-        return MF_E_UNSUPPORTED_TIME_FORMAT;
-
-    if (SUCCEEDED(hr = source_create_async_op(SOURCE_ASYNC_START, &command)))
+        hr = MF_E_SHUTDOWN;
+    else if (!(IsEqualIID(time_format, &GUID_NULL)))
+        hr = MF_E_UNSUPPORTED_TIME_FORMAT;
+    else if (SUCCEEDED(hr = source_create_async_op(SOURCE_ASYNC_START, &command)))
     {
         command->u.start.descriptor = descriptor;
         command->u.start.format = *time_format;
@@ -1305,6 +1325,8 @@ static HRESULT WINAPI media_source_Start(IMFMediaSource *iface, IMFPresentationD
 
         hr = MFPutWorkItem(source->async_commands_queue, &source->async_commands_callback, &command->IUnknown_iface);
     }
+
+    LeaveCriticalSection(&source->cs);
 
     return hr;
 }
@@ -1317,11 +1339,14 @@ static HRESULT WINAPI media_source_Stop(IMFMediaSource *iface)
 
     TRACE("%p.\n", iface);
 
-    if (source->state == SOURCE_SHUTDOWN)
-        return MF_E_SHUTDOWN;
+    EnterCriticalSection(&source->cs);
 
-    if (SUCCEEDED(hr = source_create_async_op(SOURCE_ASYNC_STOP, &command)))
+    if (source->state == SOURCE_SHUTDOWN)
+        hr = MF_E_SHUTDOWN;
+    else if (SUCCEEDED(hr = source_create_async_op(SOURCE_ASYNC_STOP, &command)))
         hr = MFPutWorkItem(source->async_commands_queue, &source->async_commands_callback, &command->IUnknown_iface);
+
+    LeaveCriticalSection(&source->cs);
 
     return hr;
 }
@@ -1334,15 +1359,17 @@ static HRESULT WINAPI media_source_Pause(IMFMediaSource *iface)
 
     TRACE("%p.\n", iface);
 
+    EnterCriticalSection(&source->cs);
+
     if (source->state == SOURCE_SHUTDOWN)
-        return MF_E_SHUTDOWN;
-
-    if (source->state != SOURCE_RUNNING)
-        return MF_E_INVALID_STATE_TRANSITION;
-
-    if (SUCCEEDED(hr = source_create_async_op(SOURCE_ASYNC_PAUSE, &command)))
+        hr = MF_E_SHUTDOWN;
+    else if (source->state != SOURCE_RUNNING)
+        hr = MF_E_INVALID_STATE_TRANSITION;
+    else if (SUCCEEDED(hr = source_create_async_op(SOURCE_ASYNC_PAUSE, &command)))
         hr = MFPutWorkItem(source->async_commands_queue,
                 &source->async_commands_callback, &command->IUnknown_iface);
+
+    LeaveCriticalSection(&source->cs);
 
     return S_OK;
 }
@@ -1353,8 +1380,13 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
 
     TRACE("%p.\n", iface);
 
+    EnterCriticalSection(&source->cs);
+
     if (source->state == SOURCE_SHUTDOWN)
+    {
+        LeaveCriticalSection(&source->cs);
         return MF_E_SHUTDOWN;
+    }
 
     source->state = SOURCE_SHUTDOWN;
 
@@ -1377,6 +1409,8 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
     free(source->streams);
 
     MFUnlockWorkQueue(source->async_commands_queue);
+
+    LeaveCriticalSection(&source->cs);
 
     return S_OK;
 }
@@ -1438,6 +1472,8 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, const WCHAR *
     object->byte_stream = bytestream;
     IMFByteStream_AddRef(bytestream);
     object->rate = 1.0f;
+    InitializeCriticalSection(&object->cs);
+    object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": cs");
 
     if (FAILED(hr = MFCreateEventQueue(&object->event_queue)))
         goto fail;
