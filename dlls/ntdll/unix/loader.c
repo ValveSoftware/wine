@@ -1715,15 +1715,17 @@ done:
  * Load the builtin dll if specified by load order configuration.
  * Return STATUS_IMAGE_ALREADY_LOADED if we should keep the native one that we have found.
  */
-NTSTATUS load_builtin( const pe_image_info_t *image_info, UNICODE_STRING *nt_name,
+NTSTATUS load_builtin( const pe_image_info_t *image_info, WCHAR *filename,
                        void **module, SIZE_T *size, ULONG_PTR zero_bits )
 {
     WORD machine = image_info->machine;  /* request same machine as the native one */
     NTSTATUS status;
+    UNICODE_STRING nt_name;
     SECTION_IMAGE_INFORMATION info;
     enum loadorder loadorder;
 
-    loadorder = get_load_order( nt_name );
+    init_unicode_string( &nt_name, filename );
+    loadorder = get_load_order( &nt_name );
 
     if (loadorder == LO_DISABLED) return STATUS_DLL_NOT_FOUND;
 
@@ -1734,7 +1736,7 @@ NTSTATUS load_builtin( const pe_image_info_t *image_info, UNICODE_STRING *nt_nam
     }
     else if (image_info->image_flags & IMAGE_FLAGS_WineFakeDll)
     {
-        TRACE( "%s is a fake Wine dll\n", debugstr_us(nt_name) );
+        TRACE( "%s is a fake Wine dll\n", debugstr_w(filename) );
         if (loadorder == LO_NATIVE) return STATUS_DLL_NOT_FOUND;
         loadorder = LO_BUILTIN;  /* builtin with no fallback since mapping a fake dll is not useful */
     }
@@ -1745,9 +1747,9 @@ NTSTATUS load_builtin( const pe_image_info_t *image_info, UNICODE_STRING *nt_nam
     case LO_NATIVE_BUILTIN:
         return STATUS_IMAGE_ALREADY_LOADED;
     case LO_BUILTIN:
-        return find_builtin_dll( nt_name, module, size, &info, zero_bits, machine, FALSE );
+        return find_builtin_dll( &nt_name, module, size, &info, zero_bits, machine, FALSE );
     default:
-        status = find_builtin_dll( nt_name, module, size, &info, zero_bits, machine, (loadorder == LO_DEFAULT) );
+        status = find_builtin_dll( &nt_name, module, size, &info, zero_bits, machine, (loadorder == LO_DEFAULT) );
         if (status == STATUS_DLL_NOT_FOUND || status == STATUS_IMAGE_MACHINE_TYPE_MISMATCH)
             return STATUS_IMAGE_ALREADY_LOADED;
         return status;
