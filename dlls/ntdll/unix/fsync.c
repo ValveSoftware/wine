@@ -871,6 +871,9 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
 {
     static const LARGE_INTEGER zero = {0};
 
+    int current_tid = 0;
+#define CURRENT_TID (current_tid ? current_tid : (current_tid = GetCurrentThreadId()))
+
     struct futex_waitv futexes[MAXIMUM_WAIT_OBJECTS + 1];
     struct fsync objs[MAXIMUM_WAIT_OBJECTS];
     BOOL msgwait = FALSE, waited = FALSE;
@@ -1001,7 +1004,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                         struct mutex *mutex = obj->shm;
                         int tid;
 
-                        if (mutex->tid == GetCurrentThreadId())
+                        if (mutex->tid == CURRENT_TID)
                         {
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             mutex->count++;
@@ -1010,7 +1013,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             return i;
                         }
 
-                        if (!(tid = __sync_val_compare_and_swap( &mutex->tid, 0, GetCurrentThreadId() )))
+                        if (!(tid = __sync_val_compare_and_swap( &mutex->tid, 0, CURRENT_TID )))
                         {
                             TRACE("Woken up by handle %p [%d].\n", handles[i], i);
                             mutex->count = 1;
@@ -1018,7 +1021,7 @@ static NTSTATUS __fsync_wait_objects( DWORD count, const HANDLE *handles,
                             put_objects( objs, count );
                             return i;
                         }
-                        else if (tid == ~0 && (tid = __sync_val_compare_and_swap( &mutex->tid, ~0, GetCurrentThreadId() )) == ~0)
+                        else if (tid == ~0 && (tid = __sync_val_compare_and_swap( &mutex->tid, ~0, CURRENT_TID )) == ~0)
                         {
                             TRACE("Woken up by abandoned mutex %p [%d].\n", handles[i], i);
                             mutex->count = 1;
@@ -1157,7 +1160,7 @@ tryagain:
                 {
                     struct mutex *mutex = obj->shm;
 
-                    if (mutex->tid == GetCurrentThreadId())
+                    if (mutex->tid == CURRENT_TID)
                         continue;
 
                     while ((current = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST )))
@@ -1201,7 +1204,7 @@ tryagain:
                     struct mutex *mutex = obj->shm;
                     int tid = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST );
 
-                    if (tid && tid != ~0 && tid != GetCurrentThreadId())
+                    if (tid && tid != ~0 && tid != CURRENT_TID)
                         goto tryagain;
                 }
                 else if (obj->type)
@@ -1224,11 +1227,11 @@ tryagain:
                 {
                     struct mutex *mutex = obj->shm;
                     int tid = __atomic_load_n( &mutex->tid, __ATOMIC_SEQ_CST );
-                    if (tid == GetCurrentThreadId())
+                    if (tid == CURRENT_TID)
                         break;
                     if (tid && tid != ~0)
                         goto tooslow;
-                    if (__sync_val_compare_and_swap( &mutex->tid, tid, GetCurrentThreadId() ) != tid)
+                    if (__sync_val_compare_and_swap( &mutex->tid, tid, CURRENT_TID ) != tid)
                         goto tooslow;
                     if (tid == ~0)
                         abandoned = TRUE;
@@ -1338,6 +1341,7 @@ userapc:
      * right thing to do seems to be to return STATUS_USER_APC anyway. */
     if (ret == STATUS_TIMEOUT) ret = STATUS_USER_APC;
     return ret;
+#undef CURRENT_TID
 }
 
 /* Like esync, we need to let the server know when we are doing a message wait,
