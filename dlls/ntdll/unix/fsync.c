@@ -60,6 +60,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(fsync);
 #include "pshpack4.h"
 #include "poppack.h"
 
+static int current_pid;
+
 /* futex_waitv interface */
 
 #ifndef __NR_futex_waitv
@@ -349,7 +351,7 @@ static void put_object_from_wait( struct fsync *obj )
 {
     int *shm = obj->shm;
 
-    __sync_val_compare_and_swap( &shm[3], GetCurrentProcessId(), 0 );
+    __sync_val_compare_and_swap( &shm[3], current_pid, 0 );
     put_object( obj );
 }
 
@@ -448,7 +450,7 @@ static NTSTATUS get_object_for_wait( HANDLE handle, struct fsync *obj )
     shm = obj->shm;
     /* Give wineserver a chance to cleanup shm index if the process
      * is killed while we are waiting on the object. */
-    __atomic_store_n( &shm[3], GetCurrentProcessId(), __ATOMIC_SEQ_CST );
+    __atomic_store_n( &shm[3], current_pid, __ATOMIC_SEQ_CST );
     return STATUS_SUCCESS;
 }
 
@@ -578,6 +580,9 @@ void fsync_init(void)
             ERR("Failed to initialize shared memory: %s\n", strerror( errno ));
         exit(1);
     }
+
+    current_pid = GetCurrentProcessId();
+    assert(current_pid);
 }
 
 NTSTATUS fsync_create_semaphore( HANDLE *handle, ACCESS_MASK access,
