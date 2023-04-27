@@ -48,8 +48,9 @@ struct wg_source
 NTSTATUS wg_source_create(void *args)
 {
     struct wg_source_create_params *params = args;
+    GstElement *first = NULL, *last = NULL, *element;
+    GstCaps *src_caps, *any_caps;
     struct wg_source *source;
-    GstCaps *src_caps;
 
     if (!(src_caps = detect_caps_from_data(params->url, params->data, params->size)))
         return STATUS_UNSUCCESSFUL;
@@ -64,6 +65,21 @@ NTSTATUS wg_source_create(void *args)
     if (!(source->src_pad = create_pad_with_caps(GST_PAD_SRC, src_caps)))
         goto error;
     gst_pad_set_element_private(source->src_pad, source);
+
+    if (!(any_caps = gst_caps_new_any()))
+        goto error;
+    if (!(element = find_element(GST_ELEMENT_FACTORY_TYPE_DECODABLE, src_caps, any_caps))
+            || !append_element(source->container, element, &first, &last))
+    {
+        gst_caps_unref(any_caps);
+        goto error;
+    }
+    gst_caps_unref(any_caps);
+
+    if (!link_src_to_element(source->src_pad, first))
+        goto error;
+    if (!gst_pad_set_active(source->src_pad, true))
+        goto error;
 
     gst_element_set_state(source->container, GST_STATE_PAUSED);
     if (!gst_element_get_state(source->container, NULL, NULL, -1))
