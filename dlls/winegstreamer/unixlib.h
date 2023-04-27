@@ -344,6 +344,13 @@ struct wg_source_create_params
     struct wg_source *source;
 };
 
+struct wg_source_push_data_params
+{
+    struct wg_source *source;
+    const void *data;
+    UINT32 size;
+};
+
 enum unix_funcs
 {
     unix_wg_init_gstreamer,
@@ -384,6 +391,7 @@ enum unix_funcs
 
     unix_wg_source_create,
     unix_wg_source_destroy,
+    unix_wg_source_push_data,
 };
 
 #endif /* __WINE_WINEGSTREAMER_UNIXLIB_H */
