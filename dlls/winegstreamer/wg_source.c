@@ -47,6 +47,32 @@ struct wg_source
     bool valid_segment;
 };
 
+static gboolean src_query_duration(struct wg_source *source, GstQuery *query)
+{
+    GstFormat format;
+
+    gst_query_parse_duration(query, &format, NULL);
+    GST_TRACE("source %p, format %s", source, gst_format_get_name(format));
+    if (format != GST_FORMAT_BYTES)
+        return false;
+
+    gst_query_set_duration(query, format, source->segment.stop);
+    return true;
+}
+
+static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
+{
+    struct wg_source *source = gst_pad_get_element_private(pad);
+
+    switch (GST_QUERY_TYPE(query))
+    {
+    case GST_QUERY_DURATION:
+        return src_query_duration(source, query);
+    default:
+        return gst_pad_query_default(pad, parent, query);
+    }
+}
+
 static GstEvent *create_stream_start_event(const char *stream_id)
 {
     GstStream *stream;
@@ -79,12 +105,14 @@ NTSTATUS wg_source_create(void *args)
         return STATUS_UNSUCCESSFUL;
     }
     gst_segment_init(&source->segment, GST_FORMAT_BYTES);
+    source->segment.stop = params->file_size;
 
     if (!(source->container = gst_bin_new("wg_source")))
         goto error;
     if (!(source->src_pad = create_pad_with_caps(GST_PAD_SRC, src_caps)))
         goto error;
     gst_pad_set_element_private(source->src_pad, source);
+    gst_pad_set_query_function(source->src_pad, src_query_cb);
 
     if (!(any_caps = gst_caps_new_any()))
         goto error;
