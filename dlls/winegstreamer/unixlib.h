@@ -339,6 +339,7 @@ struct wg_transform_drain_params
 struct wg_source_create_params
 {
     const char *url;
+    UINT64 file_size;
     const void *data;
     UINT32 size;
     struct wg_source *source;
