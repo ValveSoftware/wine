@@ -198,6 +198,8 @@ extern const WCHAR system_dir[];
 extern unsigned int supported_machines_count;
 extern USHORT supported_machines[8];
 extern BOOL process_exiting;
+extern BOOL terminate_process_running;
+extern LONG terminate_process_exit_code;
 extern HANDLE keyed_event;
 extern int inproc_device_fd;
 extern timeout_t server_start_time;
