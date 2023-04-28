@@ -1511,12 +1511,36 @@ static void media_source_init_stream_map(struct media_source *source, UINT strea
 
 static void media_source_init_descriptors(struct media_source *source)
 {
+    UINT i, last_audio = -1, last_video = -1;
     HRESULT hr;
-    UINT i;
 
     for (i = 0; i < source->stream_count; i++)
     {
         IMFStreamDescriptor *descriptor = source->descriptors[i];
+        struct wg_format format = {0};
+        UINT exclude = -1;
+
+        if (FAILED(hr = wg_format_from_stream_descriptor(descriptor, &format)))
+            WARN("Failed to get format from stream descriptor, hr %#lx\n", hr);
+
+        if (format.major_type == WG_MAJOR_TYPE_AUDIO)
+        {
+            exclude = last_audio;
+            last_audio = i;
+        }
+        else if (format.major_type == WG_MAJOR_TYPE_VIDEO)
+        {
+            exclude = last_video;
+            last_video = i;
+        }
+
+        if (exclude != -1)
+        {
+            if (FAILED(IMFStreamDescriptor_SetUINT32(source->descriptors[exclude], &MF_SD_MUTUALLY_EXCLUSIVE, 1)))
+                WARN("Failed to set stream %u MF_SD_MUTUALLY_EXCLUSIVE\n", exclude);
+            else if (FAILED(IMFStreamDescriptor_SetUINT32(descriptor, &MF_SD_MUTUALLY_EXCLUSIVE, 1)))
+                WARN("Failed to set stream %u MF_SD_MUTUALLY_EXCLUSIVE\n", i);
+        }
 
         if (FAILED(hr = stream_descriptor_set_tag(descriptor, source->wg_source, source->stream_map[i],
                 &MF_SD_LANGUAGE, WG_PARSER_TAG_LANGUAGE)))
