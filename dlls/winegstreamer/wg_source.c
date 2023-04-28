@@ -254,6 +254,38 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
     return GST_FLOW_EOS;
 }
 
+static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, GstEvent *event)
+{
+    guint group, flags;
+    GstStream *stream;
+    const gchar *id;
+
+    gst_event_parse_stream_start(event, &id);
+    gst_event_parse_stream(event, &stream);
+    gst_event_parse_stream_flags(event, &flags);
+    if (!gst_event_parse_group_id(event, &group))
+        group = -1;
+
+    GST_TRACE("source %p, pad %p, stream %p, id %s, flags %#x, group %d",
+            source, pad, stream, id, flags, group);
+
+    gst_event_unref(event);
+    return true;
+}
+
+static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+    struct wg_source *source = gst_pad_get_element_private(pad);
+
+    switch (GST_EVENT_TYPE(event))
+    {
+    case GST_EVENT_STREAM_START:
+        return sink_event_stream_start(source, pad, event);
+    default:
+        return gst_pad_event_default(pad, parent, event);
+    }
+}
+
 static GstEvent *create_stream_start_event(const char *stream_id)
 {
     GstStream *stream;
@@ -273,7 +305,10 @@ static GstEvent *create_stream_start_event(const char *stream_id)
 static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
 {
     struct wg_source *source = user;
+    char stream_id[256];
+    GstFlowReturn ret;
     GstPad *sink_pad;
+    GstEvent *event;
     guint index;
 
     GST_TRACE("source %p, element %p, pad %p.", source, element, pad);
@@ -286,6 +321,18 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
     sink_pad = source->streams[index].pad;
     if (gst_pad_link(pad, sink_pad) < 0 || !gst_pad_set_active(sink_pad, true))
         GST_ERROR("Failed to link new pad to sink pad %p", sink_pad);
+
+    snprintf(stream_id, ARRAY_SIZE(stream_id), "wg_source/%03u", index);
+    if (!(event = create_stream_start_event(stream_id)))
+        GST_ERROR("Failed to create stream event for sink pad %p", sink_pad);
+    else
+    {
+        if ((ret = gst_pad_store_sticky_event(pad, event)) < 0)
+            GST_ERROR("Failed to create pad %p stream, ret %d", sink_pad, ret);
+        if ((ret = gst_pad_store_sticky_event(sink_pad, event)) < 0)
+            GST_ERROR("Failed to create pad %p stream, ret %d", sink_pad, ret);
+        gst_event_unref(event);
+    }
 }
 
 NTSTATUS wg_source_create(void *args)
@@ -325,6 +372,7 @@ NTSTATUS wg_source_create(void *args)
             goto error;
         gst_pad_set_element_private(source->streams[i].pad, source);
         gst_pad_set_chain_function(source->streams[i].pad, sink_chain_cb);
+        gst_pad_set_event_function(source->streams[i].pad, sink_event_cb);
     }
 
     if (!(any_caps = gst_caps_new_any()))
