@@ -19,7 +19,6 @@ SOURCES = \
 	appcompatapi.h \
 	appmgmt.h \
 	appmodel.h \
-	appnotify.h \
 	asferr.h \
 	asptlb.idl \
 	asyncinfo.idl \

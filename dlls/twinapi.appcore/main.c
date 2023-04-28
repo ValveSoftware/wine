@@ -27,7 +27,6 @@
 #include "objbase.h"
 
 #include "activation.h"
-#include "appnotify.h"
 
 #define WIDL_using_Windows_Foundation
 #define WIDL_using_Windows_Foundation_Collections
@@ -283,21 +282,4 @@ HRESULT WINAPI DllGetActivationFactory(HSTRING classid, IActivationFactory **fac
     *factory = &twinapi_appcore.IActivationFactory_iface;
     IUnknown_AddRef(*factory);
     return S_OK;
-}
-
-ULONG WINAPI RegisterAppStateChangeNotification(PAPPSTATE_CHANGE_ROUTINE routine,
-                                                PVOID                    context,
-                                                PAPPSTATE_REGISTRATION*  registration)
-{
-    FIXME("routine %p, context %p, registration %p: stub.\n", routine, context, registration);
-
-    if (!registration) return E_INVALIDARG;
-    /* Just pretend success */
-    *registration = (void*)(DWORD_PTR)0x0baddad0;
-    return S_OK;
-}
-
-void WINAPI UnregisterAppStateChangeNotification(PAPPSTATE_REGISTRATION registration)
-{
-    FIXME("registration %p: stub.\n", registration);
 }

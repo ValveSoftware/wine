@@ -132,10 +132,10 @@
 @ stub PsmUnregisterAppStateChangeNotification
 @ stub PsmWaitForAppResume
 @ stub RegisterAppConstrainedChangeNotification
-@ stdcall RegisterAppStateChangeNotification(ptr ptr ptr)
+@ stub RegisterAppStateChangeNotification
 @ stub TryGetTitleBarIslandId
 @ stub TryGetTitleBarIslandSelectedHost
 @ stub UnregisterAppConstrainedChangeNotification
-@ stdcall UnregisterAppStateChangeNotification(ptr)
+@ stub UnregisterAppStateChangeNotification
 500 stub @
 505 stub @
