@@ -427,7 +427,6 @@ static HRESULT uia_event_thread_process_queue(struct list *event_queue)
         }
         else
         {
-            HUIANODE node2;
             LRESULT lr;
             VARIANT v;
 
@@ -435,12 +434,7 @@ static HRESULT uia_event_thread_process_queue(struct list *event_queue)
             if (FAILED(hr))
                 goto next_event;
 
-            hr = clone_uia_node(node, &node2);
-            UiaNodeRelease(node);
-            if (FAILED(hr))
-                goto next_event;
-
-            if ((lr = uia_lresult_from_node(node2)))
+            if ((lr = uia_lresult_from_node(node)))
             {
                 V_VT(&v) = VT_I4;
                 V_I4(&v) = lr;
@@ -449,7 +443,7 @@ static HRESULT uia_event_thread_process_queue(struct list *event_queue)
                     WARN("IWineUiaEvent_raise_event failed with hr %#lx\n", hr);
             }
             else
-                UiaNodeRelease(node2);
+                UiaNodeRelease(node);
         }
 
 next_event:
@@ -4641,9 +4635,14 @@ static void uia_event_invoke_callback(HUIANODE node, struct uia_event_args *args
     else
     {
         struct uia_queue_event *queue_event;
+        HUIANODE node2;
         VARIANT v;
 
-        get_variant_for_node(node, &v);
+        hr = clone_uia_node(node, &node2);
+        if (FAILED(hr))
+            return;
+
+        get_variant_for_node(node2, &v);
         hr = create_uia_queue_event(event, v, FALSE, args, &queue_event);
         if (SUCCEEDED(hr))
         {
@@ -4651,7 +4650,7 @@ static void uia_event_invoke_callback(HUIANODE node, struct uia_event_args *args
             if (event_thread.event_queue)
             {
                 InterlockedIncrement(&args->ref);
-                IWineUiaNode_AddRef((IWineUiaNode *)node);
+                IWineUiaNode_AddRef((IWineUiaNode *)node2);
                 list_add_tail(event_thread.event_queue, &queue_event->event_queue_entry);
                 PostMessageW(event_thread.hwnd, WM_UIA_EVENT_THREAD_RAISE_EVENT, 0, 0);
             }
@@ -4662,6 +4661,7 @@ static void uia_event_invoke_callback(HUIANODE node, struct uia_event_args *args
             }
             LeaveCriticalSection(&event_thread_cs);
         }
+        UiaNodeRelease(node2);
     }
 }
 
