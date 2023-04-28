@@ -173,6 +173,28 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
     return GST_FLOW_EOS;
 }
 
+static gboolean sink_event_caps(struct wg_source *source, GstPad *pad, GstEvent *event)
+{
+    GstStream *stream;
+    GstCaps *caps;
+    gchar *str;
+
+    gst_event_parse_caps(event, &caps);
+    str = gst_caps_to_string(caps);
+    GST_TRACE("source %p, pad %p, caps %s", source, pad, str);
+    g_free(str);
+
+    if ((stream = gst_pad_get_stream(pad)))
+    {
+        gst_stream_set_caps(stream, gst_caps_copy(caps));
+        gst_stream_set_stream_type(stream, stream_type_from_caps(caps));
+        gst_object_unref(stream);
+    }
+
+    gst_event_unref(event);
+    return !!stream;
+}
+
 static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, GstEvent *event)
 {
     guint group, flags;
@@ -201,6 +223,8 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
 
     switch (GST_EVENT_TYPE(event))
     {
+    case GST_EVENT_CAPS:
+        return sink_event_caps(source, pad, event);
     case GST_EVENT_STREAM_START:
         return sink_event_stream_start(source, pad, event);
     default:
