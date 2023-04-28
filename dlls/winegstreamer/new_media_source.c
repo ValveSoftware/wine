@@ -475,6 +475,19 @@ static HRESULT stream_descriptor_get_media_type(IMFStreamDescriptor *descriptor,
     return hr;
 }
 
+static HRESULT stream_descriptor_get_major_type(IMFStreamDescriptor *descriptor, GUID *major)
+{
+    IMFMediaTypeHandler *handler;
+    HRESULT hr;
+
+    if (FAILED(hr = IMFStreamDescriptor_GetMediaTypeHandler(descriptor, &handler)))
+        return hr;
+    hr = IMFMediaTypeHandler_GetMajorType(handler, major);
+    IMFMediaTypeHandler_Release(handler);
+
+    return hr;
+}
+
 static HRESULT wg_format_from_stream_descriptor(IMFStreamDescriptor *descriptor, struct wg_format *format)
 {
     IMFMediaType *media_type;
@@ -1809,12 +1822,36 @@ static void media_source_init_stream_map(struct media_source *source, UINT strea
 
 static void media_source_init_descriptors(struct media_source *source)
 {
+    UINT i, last_audio = -1, last_video = -1;
     HRESULT hr;
-    UINT i;
 
     for (i = 0; i < source->stream_count; i++)
     {
         IMFStreamDescriptor *descriptor = source->descriptors[i];
+        GUID major = GUID_NULL;
+        UINT exclude = -1;
+
+        if (FAILED(hr = stream_descriptor_get_major_type(descriptor, &major)))
+            WARN("Failed to get major type from stream descriptor, hr %#lx\n", hr);
+
+        if (IsEqualGUID(&major, &MFMediaType_Audio))
+        {
+            exclude = last_audio;
+            last_audio = i;
+        }
+        else if (IsEqualGUID(&major, &MFMediaType_Video))
+        {
+            exclude = last_video;
+            last_video = i;
+        }
+
+        if (exclude != -1)
+        {
+            if (FAILED(IMFStreamDescriptor_SetUINT32(source->descriptors[exclude], &MF_SD_MUTUALLY_EXCLUSIVE, 1)))
+                WARN("Failed to set stream %u MF_SD_MUTUALLY_EXCLUSIVE\n", exclude);
+            else if (FAILED(IMFStreamDescriptor_SetUINT32(descriptor, &MF_SD_MUTUALLY_EXCLUSIVE, 1)))
+                WARN("Failed to set stream %u MF_SD_MUTUALLY_EXCLUSIVE\n", i);
+        }
 
         if (FAILED(hr = stream_descriptor_set_tag(descriptor, source->wg_source, source->stream_map[i],
                 &MF_SD_LANGUAGE, WG_PARSER_TAG_LANGUAGE)))
