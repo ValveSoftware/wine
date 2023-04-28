@@ -269,6 +269,37 @@ static HRESULT wg_format_from_stream_descriptor(IMFStreamDescriptor *descriptor,
     return hr;
 }
 
+static HRESULT stream_descriptor_create(UINT32 id, struct wg_format *format, IMFStreamDescriptor **out)
+{
+    IMFStreamDescriptor *descriptor;
+    IMFMediaTypeHandler *handler;
+    IMFMediaType *type;
+    HRESULT hr;
+
+    /* native exposes NV12 video format before I420 */
+    if (format->major_type == WG_MAJOR_TYPE_VIDEO
+            && format->u.video.format == WG_VIDEO_FORMAT_I420)
+        format->u.video.format = WG_VIDEO_FORMAT_NV12;
+
+    if (!(type = mf_media_type_from_wg_format(format)))
+        return MF_E_INVALIDMEDIATYPE;
+    if (FAILED(hr = MFCreateStreamDescriptor(id, 1, &type, &descriptor)))
+        goto done;
+
+    if (FAILED(hr = IMFStreamDescriptor_GetMediaTypeHandler(descriptor, &handler)))
+        IMFStreamDescriptor_Release(descriptor);
+    else
+    {
+        hr = IMFMediaTypeHandler_SetCurrentMediaType(handler, type);
+        IMFMediaTypeHandler_Release(handler);
+    }
+
+done:
+    IMFMediaType_Release(type);
+    *out = SUCCEEDED(hr) ? descriptor : NULL;
+    return hr;
+}
+
 static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor, struct wg_parser_stream *stream,
     const GUID *attr, enum wg_parser_tag tag)
 {
@@ -876,7 +907,7 @@ static const IMFMediaStreamVtbl media_stream_vtbl =
 };
 
 static HRESULT media_stream_create(IMFMediaSource *source, struct wg_parser_stream *wg_stream,
-        struct media_stream **out)
+        IMFStreamDescriptor *descriptor, struct media_stream **out)
 {
     struct media_stream *object;
     HRESULT hr;
@@ -897,6 +928,8 @@ static HRESULT media_stream_create(IMFMediaSource *source, struct wg_parser_stre
 
     IMFMediaSource_AddRef(source);
     object->media_source = source;
+    IMFStreamDescriptor_AddRef(descriptor);
+    object->descriptor = descriptor;
 
     object->active = TRUE;
     object->eos = FALSE;
@@ -906,56 +939,6 @@ static HRESULT media_stream_create(IMFMediaSource *source, struct wg_parser_stre
 
     *out = object;
     return S_OK;
-}
-
-static HRESULT media_stream_init_desc(struct media_stream *stream, UINT id)
-{
-    IMFMediaTypeHandler *type_handler = NULL;
-    IMFMediaType *stream_types[6];
-    struct wg_format format;
-    DWORD type_count = 0;
-    HRESULT hr = S_OK;
-    unsigned int i;
-
-    wg_parser_stream_get_preferred_format(stream->wg_stream, &format);
-
-    /* native exposes NV12 video format before I420 */
-    if (format.major_type == WG_MAJOR_TYPE_VIDEO
-            && format.u.video.format == WG_VIDEO_FORMAT_I420)
-        format.u.video.format = WG_VIDEO_FORMAT_NV12;
-
-    if ((stream_types[0] = mf_media_type_from_wg_format(&format)))
-        type_count = 1;
-
-    assert(type_count <= ARRAY_SIZE(stream_types));
-
-    if (!type_count)
-    {
-        ERR("Failed to establish an IMFMediaType from any of the possible stream caps!\n");
-        return E_FAIL;
-    }
-
-    if (FAILED(hr = MFCreateStreamDescriptor(id, type_count, stream_types, &stream->descriptor)))
-        goto done;
-
-    if (FAILED(hr = IMFStreamDescriptor_GetMediaTypeHandler(stream->descriptor, &type_handler)))
-    {
-        IMFStreamDescriptor_Release(stream->descriptor);
-        goto done;
-    }
-
-    if (FAILED(hr = IMFMediaTypeHandler_SetCurrentMediaType(type_handler, stream_types[0])))
-    {
-        IMFStreamDescriptor_Release(stream->descriptor);
-        goto done;
-    }
-
-done:
-    if (type_handler)
-        IMFMediaTypeHandler_Release(type_handler);
-    for (i = 0; i < type_count; i++)
-        IMFMediaType_Release(stream_types[i]);
-    return hr;
 }
 
 static HRESULT WINAPI media_source_get_service_QueryInterface(IMFGetService *iface, REFIID riid, void **obj)
@@ -1512,22 +1495,22 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     for (i = 0; i < stream_count; ++i)
     {
         struct wg_parser_stream *wg_stream = wg_parser_get_stream(parser, i);
+        IMFStreamDescriptor *descriptor;
         struct media_stream *stream;
+        struct wg_format format;
 
-        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, wg_stream, &stream)))
+        wg_parser_stream_get_preferred_format(wg_stream, &format);
+        if (FAILED(hr = stream_descriptor_create(i, &format, &descriptor)))
             goto fail;
-        if (FAILED(hr = media_stream_init_desc(stream, i)))
+        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, wg_stream, descriptor, &stream)))
         {
-            ERR("Failed to finish initialization of media stream %p, hr %#lx.\n", stream, hr);
-            IMFMediaSource_Release(stream->media_source);
-            IMFMediaEventQueue_Release(stream->event_queue);
-            free(stream);
+            IMFStreamDescriptor_Release(descriptor);
             goto fail;
         }
 
         object->duration = max(object->duration, wg_parser_stream_get_duration(wg_stream));
-        IMFStreamDescriptor_AddRef(stream->descriptor);
-        object->descriptors[i] = stream->descriptor;
+        IMFStreamDescriptor_AddRef(descriptor);
+        object->descriptors[i] = descriptor;
         object->streams[i] = stream;
         object->stream_count++;
     }
