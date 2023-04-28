@@ -236,8 +236,6 @@ struct wg_parser_stream_get_preferred_format_params
     struct wg_format *format;
 };
 
-#define STREAM_ENABLE_FLAG_FLIP_RGB 0x1
-
 struct wg_parser_stream_enable_params
 {
     struct wg_parser_stream *stream;
