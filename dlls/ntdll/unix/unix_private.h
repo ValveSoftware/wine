@@ -137,6 +137,8 @@ extern const WCHAR system_dir[] DECLSPEC_HIDDEN;
 extern unsigned int supported_machines_count DECLSPEC_HIDDEN;
 extern USHORT supported_machines[8] DECLSPEC_HIDDEN;
 extern BOOL process_exiting DECLSPEC_HIDDEN;
+extern BOOL terminate_process_running;
+extern LONG terminate_process_exit_code;
 extern HANDLE keyed_event DECLSPEC_HIDDEN;
 extern timeout_t server_start_time DECLSPEC_HIDDEN;
 extern sigset_t server_block_set DECLSPEC_HIDDEN;
