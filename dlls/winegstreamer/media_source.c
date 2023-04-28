@@ -919,55 +919,13 @@ static HRESULT media_stream_init_desc(struct media_stream *stream, UINT id)
 
     wg_parser_stream_get_preferred_format(stream->wg_stream, &format);
 
-    if (format.major_type == WG_MAJOR_TYPE_VIDEO)
-    {
-        /* These are the most common native output types of decoders:
-            https://docs.microsoft.com/en-us/windows/win32/medfound/mft-decoder-expose-output-types-in-native-order */
-        static const GUID *const video_types[] =
-        {
-            &MFVideoFormat_NV12,
-            &MFVideoFormat_YV12,
-            &MFVideoFormat_YUY2,
-            &MFVideoFormat_IYUV,
-            &MFVideoFormat_I420,
-        };
+    /* native exposes NV12 video format before I420 */
+    if (format.major_type == WG_MAJOR_TYPE_VIDEO
+            && format.u.video.format == WG_VIDEO_FORMAT_I420)
+        format.u.video.format = WG_VIDEO_FORMAT_NV12;
 
-        IMFMediaType *base_type = mf_media_type_from_wg_format(&format);
-        GUID base_subtype;
-
-        if (!base_type)
-        {
-            hr = MF_E_INVALIDMEDIATYPE;
-            goto done;
-        }
-
-        IMFMediaType_GetGUID(base_type, &MF_MT_SUBTYPE, &base_subtype);
-
-        stream_types[0] = base_type;
+    if ((stream_types[0] = mf_media_type_from_wg_format(&format)))
         type_count = 1;
-
-        for (i = 0; i < ARRAY_SIZE(video_types); i++)
-        {
-            IMFMediaType *new_type;
-
-            if (IsEqualGUID(&base_subtype, video_types[i]))
-                continue;
-
-            if (FAILED(hr = MFCreateMediaType(&new_type)))
-                goto done;
-            stream_types[type_count++] = new_type;
-
-            if (FAILED(hr = IMFMediaType_CopyAllItems(base_type, (IMFAttributes *) new_type)))
-                goto done;
-            if (FAILED(hr = IMFMediaType_SetGUID(new_type, &MF_MT_SUBTYPE, video_types[i])))
-                goto done;
-        }
-    }
-    else
-    {
-        if ((stream_types[0] = mf_media_type_from_wg_format(&format)))
-            type_count = 1;
-    }
 
     assert(type_count <= ARRAY_SIZE(stream_types));
 
