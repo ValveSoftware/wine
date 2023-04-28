@@ -983,6 +983,8 @@ done:
     return status;
 }
 
+BOOL terminate_process_running;
+LONG terminate_process_exit_code;
 
 /******************************************************************************
  *              NtTerminateProcess  (NTDLL.@)
@@ -992,6 +994,14 @@ NTSTATUS WINAPI NtTerminateProcess( HANDLE handle, LONG exit_code )
     unsigned int ret;
     BOOL self;
 
+    TRACE("handle %p, exit_code %d, process_exiting %d.\n", handle, (int)exit_code, process_exiting);
+
+    if (handle == GetCurrentProcess())
+    {
+        terminate_process_running = TRUE;
+        terminate_process_exit_code = exit_code;
+    }
+
     SERVER_START_REQ( terminate_process )
     {
         req->handle    = wine_server_obj_handle( handle );
@@ -1000,6 +1010,8 @@ NTSTATUS WINAPI NtTerminateProcess( HANDLE handle, LONG exit_code )
         self = reply->self;
     }
     SERVER_END_REQ;
+
+    TRACE("handle %p, self %d, process_exiting %d.\n", handle, self, process_exiting);
     if (self)
     {
         if (!handle) process_exiting = TRUE;

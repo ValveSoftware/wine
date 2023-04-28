@@ -2170,6 +2170,12 @@ static BOOL handle_syscall_fault( ucontext_t *sigcontext, EXCEPTION_RECORD *rec,
     TRACE_(seh)( " r12=%016lx r13=%016lx r14=%016lx r15=%016lx\n",
                  context->R12, context->R13, context->R14, context->R15 );
 
+    if (terminate_process_running)
+    {
+        FIXME_(seh)( "Process is terminating, aborting.\n" );
+        abort_process( terminate_process_exit_code );
+    }
+
     if (rec->ExceptionCode == STATUS_ACCESS_VIOLATION
             && is_inside_syscall_stack_guard( (char *)rec->ExceptionInformation[1] ))
         ERR_(seh)( "Syscall stack overrun.\n ");
