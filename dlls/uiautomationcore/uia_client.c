@@ -4814,7 +4814,7 @@ HRESULT WINAPI UiaRaiseAutomationEvent(IRawElementProviderSimple *elprov, EVENTI
     TRACE("(%p, %d)\n", elprov, id);
 
 
-    if (!event_info || event_info->event_arg_type != EventArgsType_Simple)
+    if (!elprov || !event_info || event_info->event_arg_type != EventArgsType_Simple)
         return E_INVALIDARG;
 
     args = create_uia_event_args(event_info);
