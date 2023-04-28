@@ -348,6 +348,13 @@ NTSTATUS wg_source_push_data(void *args)
         source->valid_segment = true;
     }
 
+    if (!params->size)
+    {
+        if (source->segment.start != source->segment.stop)
+            goto eos;
+        return STATUS_SUCCESS;
+    }
+
     if (!(buffer = create_buffer_from_bytes(params->data, params->size)))
     {
         GST_WARNING("Failed to allocate buffer for data");
@@ -361,6 +368,15 @@ NTSTATUS wg_source_push_data(void *args)
         source->segment.start -= params->size;
         return STATUS_UNSUCCESSFUL;
     }
+
+    if (source->segment.start != source->segment.stop)
+        return STATUS_SUCCESS;
+
+eos:
+    if (!(event = gst_event_new_eos())
+            || !gst_pad_push_event(source->src_pad, event))
+        GST_WARNING("Failed to push EOS event");
+    source->segment.start = source->segment.stop;
 
     return STATUS_SUCCESS;
 }
