@@ -272,5 +272,12 @@ NTSTATUS wg_source_push_data(void *args)
         return STATUS_UNSUCCESSFUL;
     }
 
+    if (source->segment.start != source->segment.stop)
+        return STATUS_SUCCESS;
+
+    if (!(event = gst_event_new_eos())
+        || !gst_pad_push_event(source->src_pad, event))
+        GST_WARNING("Failed to push EOS event");
+
     return STATUS_SUCCESS;
 }
