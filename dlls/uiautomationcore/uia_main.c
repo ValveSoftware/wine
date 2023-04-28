@@ -259,61 +259,12 @@ static const IRawElementProviderSimpleVtbl hwnd_host_provider_vtbl = {
     hwnd_host_provider_get_HostRawElementProvider,
 };
 
-static BOOL is_ea_launcher_check(void)
-{
-    static const WCHAR *names[] =
-    {
-        L"\\EADesktop.exe",
-        L"\\Link2EA.exe",
-        L"\\EAConnect_microsoft.exe",
-        L"\\EALaunchHelper.exe",
-        L"\\EACrashReporter.exe",
-        L"EA Desktop\\ErrorReporter.exe",
-    };
-    unsigned int i, len;
-    WCHAR module[256];
-    DWORD size;
-
-    if ((size = GetModuleFileNameW( NULL, module, ARRAY_SIZE(module) )) && size < ARRAY_SIZE(module))
-    {
-        for (i = 0; i < ARRAY_SIZE(names); ++i)
-        {
-            len = lstrlenW(names[i]);
-            if (size > len && !memcmp( module + size - len, names[i], len * sizeof(*module) ))
-            {
-                FIXME("HACK: Returning FALSE from UiaClientsAreListening for EA launcher.\n");
-                return TRUE;
-            }
-        }
-    }
-
-    return FALSE;
-}
-
 /***********************************************************************
  *          UiaClientsAreListening (uiautomationcore.@)
  */
 BOOL WINAPI UiaClientsAreListening(void)
 {
-    static BOOL ea_launcher_check_ran;
-    static BOOL is_ea_launcher;
-
     FIXME("()\n");
-
-    /*
-     * HACK: Tell EA Launcher no clients are listening so it doesn't attempt
-     * to raise an event. Temporarily disabling until the cause of the access
-     * violation is found.
-     */
-    if (!ea_launcher_check_ran)
-    {
-        is_ea_launcher = is_ea_launcher_check();
-        ea_launcher_check_ran = TRUE;
-    }
-
-    if (is_ea_launcher)
-        return FALSE;
-
     return TRUE;
 }
 
