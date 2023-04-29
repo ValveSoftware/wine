@@ -366,7 +366,7 @@ static HRESULT media_stream_get_wg_parser_stream(struct media_stream *stream, st
 
     if (FAILED(hr = IMFStreamDescriptor_GetStreamIdentifier(stream->descriptor, &id)))
         return hr;
-    if (!(id = source->stream_map[id]) || !(*wg_stream = wg_parser_get_stream(source->wg_parser, id - 1)))
+    if (!(id = source->stream_map[id - 1]) || !(*wg_stream = wg_parser_get_stream(source->wg_parser, id - 1)))
         return MF_E_INVALIDSTREAMNUMBER;
     return S_OK;
 }
@@ -483,7 +483,7 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
         else if (!selected || FAILED(hr = IMFStreamDescriptor_GetStreamIdentifier(stream_descriptor, &id)))
             IMFStreamDescriptor_Release(stream_descriptor);
         else
-            descriptors[id] = stream_descriptor;
+            descriptors[id - 1] = stream_descriptor;
     }
 
     source->state = SOURCE_RUNNING;
@@ -1683,7 +1683,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
         struct wg_format format;
 
         wg_source_get_stream_format(wg_source, object->stream_map[i], &format);
-        if (FAILED(hr = stream_descriptor_create(i, &format, &descriptor)))
+        if (FAILED(hr = stream_descriptor_create(i + 1, &format, &descriptor)))
             goto fail;
         if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, descriptor, &stream)))
         {
