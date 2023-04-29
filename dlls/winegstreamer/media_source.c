@@ -92,6 +92,7 @@ struct media_source
 
     struct wg_source *wg_source;
     struct wg_parser *wg_parser;
+    UINT64 file_size;
     UINT64 duration;
 
     IMFStreamDescriptor **descriptors;
@@ -1248,6 +1249,8 @@ static HRESULT WINAPI media_source_CreatePresentationDescriptor(IMFMediaSource *
         hr = MF_E_SHUTDOWN;
     else if (SUCCEEDED(hr = MFCreatePresentationDescriptor(source->stream_count, source->descriptors, descriptor)))
     {
+        if (FAILED(hr = IMFPresentationDescriptor_SetUINT64(*descriptor, &MF_PD_TOTAL_FILE_SIZE, source->file_size)))
+            WARN("Failed to set presentation descriptor MF_PD_TOTAL_FILE_SIZE, hr %#lx\n", hr);
         if (FAILED(hr = IMFPresentationDescriptor_SetUINT64(*descriptor, &MF_PD_DURATION, source->duration)))
             WARN("Failed to set presentation descriptor MF_PD_DURATION, hr %#lx\n", hr);
 
@@ -1473,6 +1476,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     IMFByteStream_AddRef(bytestream);
     object->byte_stream = bytestream;
     object->wg_source = wg_source;
+    object->file_size = file_size;
     object->rate = 1.0f;
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": cs");
