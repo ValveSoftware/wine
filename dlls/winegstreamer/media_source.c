@@ -1429,12 +1429,12 @@ static void media_source_init_descriptors(struct media_source *source)
 
 HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *data, UINT64 size, IMFMediaSource **out)
 {
+    UINT64 next_offset, file_size;
     UINT32 stream_count;
     struct media_source *object;
     struct wg_source *wg_source;
     struct wg_parser *parser;
-    DWORD bytestream_caps;
-    uint64_t file_size;
+    DWORD bytestream_caps, read_size = size;
     unsigned int i;
     HRESULT hr;
 
@@ -1456,10 +1456,21 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     if (!(wg_source = wg_source_create(url, file_size, data, size)))
         return MF_E_UNSUPPORTED_FORMAT;
 
-    if (FAILED(hr = wg_source_push_data(wg_source, data, size)))
-        WARN("Failed to push initial data, hr %#lx\n", hr);
-    if (wg_source_get_status(wg_source, &stream_count))
-        TRACE("Found %u streams\n", stream_count);
+    while (SUCCEEDED(hr) && SUCCEEDED(hr = wg_source_push_data(wg_source, data, read_size))
+            && wg_source_get_status(wg_source, &stream_count, &next_offset)
+            && !stream_count && (read_size = min(file_size - min(file_size, next_offset), size)))
+    {
+        if (FAILED(hr = IMFByteStream_SetCurrentPosition(bytestream, next_offset)))
+            WARN("Failed to seek stream to %#I64x, hr %#lx\n", next_offset, hr);
+        else if (FAILED(hr = IMFByteStream_Read(bytestream, data, read_size, &read_size)))
+            WARN("Failed to read %#lx bytes from stream, hr %#lx\n", read_size, hr);
+    }
+
+    if (!stream_count)
+    {
+        wg_source_destroy(wg_source);
+        return MF_E_UNSUPPORTED_FORMAT;
+    }
 
     if (!(object = calloc(1, sizeof(*object))))
     {
