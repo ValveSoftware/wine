@@ -349,6 +349,7 @@ struct wg_source_get_status_params
 {
     struct wg_source *source;
     UINT32 stream_count;
+    UINT64 read_offset;
 };
 
 struct wg_source_push_data_params
