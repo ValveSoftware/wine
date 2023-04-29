@@ -459,7 +459,8 @@ void wg_source_destroy(struct wg_source *source)
     WINE_UNIX_CALL(unix_wg_source_destroy, source);
 }
 
-bool wg_source_get_status(struct wg_source *source, uint32_t *stream_count)
+bool wg_source_get_status(struct wg_source *source, uint32_t *stream_count,
+        uint64_t *read_offset)
 {
     struct wg_source_get_status_params params =
     {
@@ -467,14 +468,17 @@ bool wg_source_get_status(struct wg_source *source, uint32_t *stream_count)
     };
     NTSTATUS status;
 
-    TRACE("source %p, stream_count %p\n", source, stream_count);
+    TRACE("source %p, stream_count %p, read_offset %p\n",
+            source, stream_count, read_offset);
 
     if ((status = WINE_UNIX_CALL(unix_wg_source_get_status, &params))
             && status != STATUS_PENDING)
         return false;
 
     *stream_count = params.stream_count;
-    TRACE("source %p, stream_count %u\n", source, *stream_count);
+    *read_offset = params.read_offset;
+    TRACE("source %p, stream_count %u, read_offset %#I64x\n",
+            source, *stream_count, *read_offset);
     return true;
 }
 
