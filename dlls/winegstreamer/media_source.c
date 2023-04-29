@@ -992,9 +992,6 @@ static HRESULT media_stream_create(IMFMediaSource *source, IMFStreamDescriptor *
     IMFStreamDescriptor_AddRef(descriptor);
     object->descriptor = descriptor;
 
-    object->active = TRUE;
-    object->eos = FALSE;
-
     TRACE("Created stream object %p.\n", object);
 
     *out = object;
@@ -1511,7 +1508,7 @@ static void media_source_init_stream_map(struct media_source *source, UINT strea
 
 static void media_source_init_descriptors(struct media_source *source)
 {
-    UINT i, last_audio = -1, last_video = -1;
+    UINT i, last_audio = -1, last_video = -1, first_audio = -1, first_video = -1;
     HRESULT hr;
 
     for (i = 0; i < source->stream_count; i++)
@@ -1525,11 +1522,15 @@ static void media_source_init_descriptors(struct media_source *source)
 
         if (format.major_type == WG_MAJOR_TYPE_AUDIO)
         {
+            if (first_audio == -1)
+                first_audio = i;
             exclude = last_audio;
             last_audio = i;
         }
         else if (format.major_type == WG_MAJOR_TYPE_VIDEO)
         {
+            if (first_video == -1)
+                first_video = i;
             exclude = last_video;
             last_video = i;
         }
@@ -1556,6 +1557,21 @@ static void media_source_init_descriptors(struct media_source *source)
     {
         if (FAILED(hr = map_stream_to_wg_parser_stream(source, i)))
             WARN("Failed to map stream descriptor %u, hr %#lx\n", i, hr);
+    }
+
+    if (!wcscmp(source->mime_type, L"video/mp4"))
+    {
+        if (last_audio != -1)
+            source->streams[last_audio]->active = TRUE;
+        if (last_video != -1)
+            source->streams[last_video]->active = TRUE;
+    }
+    else
+    {
+        if (first_audio != -1)
+            source->streams[first_audio]->active = TRUE;
+        if (first_video != -1)
+            source->streams[first_video]->active = TRUE;
     }
 }
 
