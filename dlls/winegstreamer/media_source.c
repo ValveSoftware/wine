@@ -269,30 +269,6 @@ static HRESULT wg_format_from_stream_descriptor(IMFStreamDescriptor *descriptor,
     return hr;
 }
 
-static IMFStreamDescriptor *stream_descriptor_from_id(IMFPresentationDescriptor *pres_desc, DWORD id, BOOL *selected)
-{
-    ULONG sd_count;
-    IMFStreamDescriptor *ret;
-    unsigned int i;
-
-    if (FAILED(IMFPresentationDescriptor_GetStreamDescriptorCount(pres_desc, &sd_count)))
-        return NULL;
-
-    for (i = 0; i < sd_count; i++)
-    {
-        DWORD stream_id;
-
-        if (FAILED(IMFPresentationDescriptor_GetStreamDescriptorByIndex(pres_desc, i, selected, &ret)))
-            return NULL;
-
-        if (SUCCEEDED(IMFStreamDescriptor_GetStreamIdentifier(ret, &stream_id)) && stream_id == id)
-            return ret;
-
-        IMFStreamDescriptor_Release(ret);
-    }
-    return NULL;
-}
-
 static BOOL enqueue_token(struct media_stream *stream, IUnknown *token)
 {
     if (stream->token_queue_count == stream->token_queue_cap)
@@ -368,7 +344,8 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
         GUID *format, PROPVARIANT *position)
 {
     BOOL starting = source->state == SOURCE_STOPPED, seek_message = !starting && position->vt != VT_EMPTY;
-    unsigned int i;
+    IMFStreamDescriptor **descriptors;
+    DWORD i, count;
     HRESULT hr;
 
     TRACE("source %p, descriptor %p, format %s, position %s\n", source, descriptor,
@@ -384,28 +361,46 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
         position->hVal.QuadPart = 0;
     }
 
+    if (!(descriptors = calloc(source->stream_count, sizeof(*descriptors))))
+        return E_OUTOFMEMORY;
+
+    if (FAILED(hr = IMFPresentationDescriptor_GetStreamDescriptorCount(descriptor, &count)))
+        WARN("Failed to get presentation descriptor stream count, hr %#lx\n", hr);
+
+    for (i = 0; i < count; i++)
+    {
+        IMFStreamDescriptor *stream_descriptor;
+        BOOL selected;
+        DWORD id;
+
+        if (FAILED(hr = IMFPresentationDescriptor_GetStreamDescriptorByIndex(descriptor, i, &selected, &stream_descriptor)))
+            WARN("Failed to get presentation stream descriptor, hr %#lx\n", hr);
+        else if (!selected || FAILED(hr = IMFStreamDescriptor_GetStreamIdentifier(stream_descriptor, &id)))
+            IMFStreamDescriptor_Release(stream_descriptor);
+        else
+            descriptors[id] = stream_descriptor;
+    }
+
+    source->state = SOURCE_RUNNING;
     for (i = 0; i < source->stream_count; i++)
     {
-        struct media_stream *stream;
-        BOOL was_active, selected;
-        IMFStreamDescriptor *sd;
-        DWORD stream_id;
-
-        stream = source->streams[i];
-        was_active = !starting && stream->active;
-
-        IMFStreamDescriptor_GetStreamIdentifier(stream->descriptor, &stream_id);
-        sd = stream_descriptor_from_id(descriptor, stream_id, &selected);
-        IMFStreamDescriptor_Release(sd);
+        struct media_stream *stream = source->streams[i];
+        BOOL was_active = !starting && stream->active;
 
         if (position->vt != VT_EMPTY)
             stream->eos = FALSE;
 
-        if (!(stream->active = selected))
+        if (!(stream->active = !!descriptors[i]))
             wg_parser_stream_disable(stream->wg_stream);
-        else if (FAILED(hr = media_stream_start(stream, was_active, seek_message, position)))
-            WARN("Failed to start media stream, hr %#lx\n", hr);
+        else
+        {
+            if (FAILED(hr = media_stream_start(stream, was_active, seek_message, position)))
+                WARN("Failed to start media stream, hr %#lx\n", hr);
+            IMFStreamDescriptor_Release(descriptors[i]);
+        }
     }
+
+    free(descriptors);
 
     source->state = SOURCE_RUNNING;
 
@@ -854,14 +849,13 @@ static const IMFMediaStreamVtbl media_stream_vtbl =
     media_stream_RequestSample
 };
 
-static HRESULT media_stream_create(IMFMediaSource *source, DWORD id,
+static HRESULT media_stream_create(IMFMediaSource *source, struct wg_parser_stream *wg_stream,
         struct media_stream **out)
 {
-    struct wg_parser *wg_parser = impl_from_IMFMediaSource(source)->wg_parser;
     struct media_stream *object;
     HRESULT hr;
 
-    TRACE("source %p, id %lu.\n", source, id);
+    TRACE("source %p, wg_stream %p.\n", source, wg_stream);
 
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
@@ -877,11 +871,10 @@ static HRESULT media_stream_create(IMFMediaSource *source, DWORD id,
 
     IMFMediaSource_AddRef(source);
     object->media_source = source;
-    object->stream_id = id;
 
     object->active = TRUE;
     object->eos = FALSE;
-    object->wg_stream = wg_parser_get_stream(wg_parser, id);
+    object->wg_stream = wg_stream;
 
     TRACE("Created stream object %p.\n", object);
 
@@ -889,7 +882,7 @@ static HRESULT media_stream_create(IMFMediaSource *source, DWORD id,
     return S_OK;
 }
 
-static HRESULT media_stream_init_desc(struct media_stream *stream)
+static HRESULT media_stream_init_desc(struct media_stream *stream, UINT id)
 {
     IMFMediaTypeHandler *type_handler = NULL;
     IMFMediaType *stream_types[6];
@@ -982,7 +975,7 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
         return E_FAIL;
     }
 
-    if (FAILED(hr = MFCreateStreamDescriptor(stream->stream_id, type_count, stream_types, &stream->descriptor)))
+    if (FAILED(hr = MFCreateStreamDescriptor(id, type_count, stream_types, &stream->descriptor)))
         goto done;
 
     if (FAILED(hr = IMFStreamDescriptor_GetMediaTypeHandler(stream->descriptor, &type_handler)))
@@ -1539,11 +1532,12 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
 
     for (i = 0; i < stream_count; ++i)
     {
+        struct wg_parser_stream *wg_stream = wg_parser_get_stream(parser, i);
         struct media_stream *stream;
 
-        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, i, &stream)))
+        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, wg_stream, &stream)))
             goto fail;
-        if (FAILED(hr = media_stream_init_desc(stream)))
+        if (FAILED(hr = media_stream_init_desc(stream, i)))
         {
             ERR("Failed to finish initialization of media stream %p, hr %#lx.\n", stream, hr);
             IMFMediaSource_Release(stream->media_source);
@@ -1552,7 +1546,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
             goto fail;
         }
 
-        object->duration = max(object->duration, wg_parser_stream_get_duration(stream->wg_stream));
+        object->duration = max(object->duration, wg_parser_stream_get_duration(wg_stream));
         IMFStreamDescriptor_AddRef(stream->descriptor);
         object->descriptors[i] = stream->descriptor;
         object->streams[i] = stream;
