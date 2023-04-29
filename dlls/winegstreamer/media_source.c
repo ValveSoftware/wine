@@ -99,6 +99,7 @@ struct media_source
     IMFStreamDescriptor **descriptors;
     struct media_stream **streams;
     ULONG stream_count;
+    UINT *stream_map;
 
     enum
     {
@@ -1384,6 +1385,7 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
         IMFMediaEventQueue_Shutdown(stream->event_queue);
         IMFMediaStream_Release(&stream->IMFMediaStream_iface);
     }
+    free(source->stream_map);
     free(source->descriptors);
     free(source->streams);
 
@@ -1410,6 +1412,46 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
     media_source_Pause,
     media_source_Shutdown,
 };
+
+static void media_source_init_stream_map(struct media_source *source, UINT stream_count)
+{
+    struct wg_format format;
+    int i, n = 0;
+
+    if (wcscmp(source->mime_type, L"video/mp4"))
+    {
+        for (i = stream_count - 1; i >= 0; i--)
+        {
+            TRACE("mapping stream %u to wg_source stream %u\n", i, i);
+            source->stream_map[i] = i;
+        }
+        return;
+    }
+
+    for (i = stream_count - 1; i >= 0; i--)
+    {
+        wg_source_get_stream_format(source->wg_source, i, &format);
+        if (format.major_type == WG_MAJOR_TYPE_UNKNOWN) continue;
+        if (format.major_type >= WG_MAJOR_TYPE_VIDEO) continue;
+        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+        source->stream_map[n++] = i;
+    }
+    for (i = stream_count - 1; i >= 0; i--)
+    {
+        wg_source_get_stream_format(source->wg_source, i, &format);
+        if (format.major_type == WG_MAJOR_TYPE_UNKNOWN) continue;
+        if (format.major_type < WG_MAJOR_TYPE_VIDEO) continue;
+        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+        source->stream_map[n++] = i;
+    }
+    for (i = stream_count - 1; i >= 0; i--)
+    {
+        wg_source_get_stream_format(source->wg_source, i, &format);
+        if (format.major_type != WG_MAJOR_TYPE_UNKNOWN) continue;
+        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+        source->stream_map[n++] = i;
+    }
+}
 
 static void media_source_init_descriptors(struct media_source *source)
 {
@@ -1518,16 +1560,19 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     if (FAILED(hr = wg_parser_connect(parser, file_size, NULL)))
         goto fail;
 
-    stream_count = wg_parser_get_stream_count(parser);
-
     if (!(object->descriptors = calloc(stream_count, sizeof(*object->descriptors)))
+            || !(object->stream_map = calloc(stream_count, sizeof(*object->stream_map)))
             || !(object->streams = calloc(stream_count, sizeof(*object->streams))))
     {
+        free(object->stream_map);
         free(object->descriptors);
         hr = E_OUTOFMEMORY;
         goto fail;
     }
 
+    media_source_init_stream_map(object, stream_count);
+
+    stream_count = wg_parser_get_stream_count(parser);
     for (i = 0; i < stream_count; ++i)
     {
         struct wg_parser_stream *wg_stream = wg_parser_get_stream(parser, i);
@@ -1565,6 +1610,7 @@ fail:
         IMFStreamDescriptor_Release(object->descriptors[object->stream_count]);
         IMFMediaStream_Release(&stream->IMFMediaStream_iface);
     }
+    free(object->stream_map);
     free(object->descriptors);
     free(object->streams);
 
