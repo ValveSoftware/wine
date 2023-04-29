@@ -39,12 +39,17 @@
 
 #include "unix_private.h"
 
+#define WG_SOURCE_MAX_STREAMS 32
+
 struct wg_source
 {
     GstPad *src_pad;
     GstElement *container;
     GstSegment segment;
     bool valid_segment;
+
+    GstPad *stream_pads[WG_SOURCE_MAX_STREAMS];
+    guint stream_count;
 };
 
 static gboolean src_query_duration(struct wg_source *source, GstQuery *query)
@@ -83,6 +88,14 @@ static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
     }
 }
 
+static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *buffer)
+{
+    struct wg_soutce *source = gst_pad_get_element_private(pad);
+    GST_TRACE("source %p, pad %p, buffer %p.", source, pad, buffer);
+    gst_buffer_unref(buffer);
+    return GST_FLOW_EOS;
+}
+
 static GstEvent *create_stream_start_event(const char *stream_id)
 {
     GstStream *stream;
@@ -99,6 +112,24 @@ static GstEvent *create_stream_start_event(const char *stream_id)
     return event;
 }
 
+static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
+{
+    struct wg_source *source = user;
+    GstPad *sink_pad;
+    guint index;
+
+    GST_TRACE("source %p, element %p, pad %p.", source, element, pad);
+    if ((index = source->stream_count++) >= ARRAY_SIZE(source->stream_pads))
+    {
+        GST_FIXME("Not enough sink pads, need %u", source->stream_count);
+        return;
+    }
+
+    sink_pad = source->stream_pads[index];
+    if (gst_pad_link(pad, sink_pad) < 0 || !gst_pad_set_active(sink_pad, true))
+        GST_ERROR("Failed to link new pad to sink pad %p", sink_pad);
+}
+
 NTSTATUS wg_source_create(void *args)
 {
     struct wg_source_create_params *params = args;
@@ -106,6 +137,8 @@ NTSTATUS wg_source_create(void *args)
     GstCaps *src_caps, *any_caps;
     struct wg_source *source;
     GstEvent *event;
+    GstPad *peer;
+    guint i;
 
     if (!(src_caps = detect_caps_from_data(params->url, params->data, params->size)))
         return STATUS_UNSUCCESSFUL;
@@ -124,6 +157,14 @@ NTSTATUS wg_source_create(void *args)
     gst_pad_set_element_private(source->src_pad, source);
     gst_pad_set_query_function(source->src_pad, src_query_cb);
 
+    for (i = 0; i < ARRAY_SIZE(source->stream_pads); i++)
+    {
+        if (!(source->stream_pads[i] = create_pad_with_caps(GST_PAD_SINK, NULL)))
+            goto error;
+        gst_pad_set_element_private(source->stream_pads[i], source);
+        gst_pad_set_chain_function(source->stream_pads[i], sink_chain_cb);
+    }
+
     if (!(any_caps = gst_caps_new_any()))
         goto error;
     if (!(element = find_element(GST_ELEMENT_FACTORY_TYPE_DECODABLE, src_caps, any_caps))
@@ -132,12 +173,24 @@ NTSTATUS wg_source_create(void *args)
         gst_caps_unref(any_caps);
         goto error;
     }
+    g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), source);
     gst_caps_unref(any_caps);
 
     if (!link_src_to_element(source->src_pad, first))
         goto error;
     if (!gst_pad_set_active(source->src_pad, true))
         goto error;
+
+    /* try to link the first output pad, some demuxers only have static pads */
+    if ((peer = gst_element_get_static_pad(last, "src")))
+    {
+        GstPad *sink_pad = source->stream_pads[0];
+        if (gst_pad_link(peer, sink_pad) < 0 || !gst_pad_set_active(sink_pad, true))
+            GST_ERROR("Failed to link static source pad %p", peer);
+        else
+            source->stream_count++;
+        gst_object_unref(peer);
+    }
 
     gst_element_set_state(source->container, GST_STATE_PAUSED);
     if (!gst_element_get_state(source->container, NULL, NULL, -1))
@@ -158,6 +211,8 @@ error:
         gst_element_set_state(source->container, GST_STATE_NULL);
         gst_object_unref(source->container);
     }
+    for (i = 0; i < ARRAY_SIZE(source->stream_pads) && source->stream_pads[i]; i++)
+        gst_object_unref(source->stream_pads[i]);
     if (source->src_pad)
         gst_object_unref(source->src_pad);
     free(source);
@@ -171,11 +226,14 @@ error:
 NTSTATUS wg_source_destroy(void *args)
 {
     struct wg_source *source = args;
+    guint i;
 
     GST_TRACE("source %p", source);
 
     gst_element_set_state(source->container, GST_STATE_NULL);
     gst_object_unref(source->container);
+    for (i = 0; i < ARRAY_SIZE(source->stream_pads); i++)
+        gst_object_unref(source->stream_pads[i]);
     gst_object_unref(source->src_pad);
     free(source);
 
