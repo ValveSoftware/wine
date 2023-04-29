@@ -498,6 +498,25 @@ HRESULT wg_source_push_data(struct wg_source *source, const void *data, uint32_t
     return HRESULT_FROM_NT(WINE_UNIX_CALL(unix_wg_source_push_data, &params));
 }
 
+bool wg_source_get_stream_format(struct wg_source *source, UINT32 index,
+        struct wg_format *format)
+{
+    struct wg_source_get_stream_format_params params =
+    {
+        .source = source,
+        .index = index,
+    };
+
+    TRACE("source %p, index %u, format %p\n", source,
+            index, format);
+
+    if (WINE_UNIX_CALL(unix_wg_source_get_stream_format, &params))
+        return false;
+
+    *format = params.format;
+    return true;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     if (reason == DLL_PROCESS_ATTACH)

@@ -113,6 +113,8 @@ void wg_source_destroy(struct wg_source *source);
 bool wg_source_get_status(struct wg_source *source, uint32_t *stream_count,
         uint64_t *duration, uint64_t *read_offset);
 HRESULT wg_source_push_data(struct wg_source *source, const void *data, uint32_t size);
+bool wg_source_get_stream_format(struct wg_source *source, UINT32 index,
+        struct wg_format *format);
 
 unsigned int wg_format_get_max_size(const struct wg_format *format);
 
