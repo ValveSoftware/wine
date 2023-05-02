@@ -2138,6 +2138,9 @@ static void start_main_thread(void)
     virtual_map_user_shared_data();
     init_cpu_info();
     init_files();
+
+    set_thread_teb( teb );
+
     init_startup_info();
     *(ULONG_PTR *)&peb->CloudFileFlags = get_image_address();
     set_load_order_app_name( main_wargv[0] );

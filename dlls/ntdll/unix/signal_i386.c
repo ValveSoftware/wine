@@ -2393,6 +2393,12 @@ void signal_init_threading(void)
 #endif
 }
 
+void set_thread_teb( TEB *teb )
+{
+    struct x86_thread_data *thread_data = (struct x86_thread_data *)&teb->GdiTebBatch;
+
+    ldt_set_fs( thread_data->fs, teb );
+}
 
 /**********************************************************************
  *		signal_alloc_thread
