@@ -254,6 +254,7 @@ extern BOOL get_thread_times( int unix_pid, int unix_tid, LARGE_INTEGER *kernel_
                               LARGE_INTEGER *user_time ) DECLSPEC_HIDDEN;
 extern void signal_init_threading(void) DECLSPEC_HIDDEN;
 extern NTSTATUS signal_alloc_thread( TEB *teb ) DECLSPEC_HIDDEN;
+extern void set_thread_teb( TEB *teb ) DECLSPEC_HIDDEN;
 extern void signal_free_thread( TEB *teb ) DECLSPEC_HIDDEN;
 extern void signal_init_process(void) DECLSPEC_HIDDEN;
 extern void DECLSPEC_NORETURN signal_start_thread( PRTL_THREAD_START_ROUTINE entry, void *arg,
