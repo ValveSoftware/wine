@@ -2412,6 +2412,9 @@ static void start_main_thread(void)
     virtual_map_user_shared_data();
     init_cpu_info();
     init_files();
+
+    set_thread_teb( teb );
+
     load_libwine();
     init_startup_info();
     if (p___wine_main_argc) *p___wine_main_argc = main_argc;
