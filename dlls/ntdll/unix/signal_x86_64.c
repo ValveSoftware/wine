@@ -2830,6 +2830,10 @@ void signal_init_process(void)
     exit(1);
 }
 
+void set_thread_teb( TEB *teb )
+{
+    arch_prctl( ARCH_SET_GS, teb );
+}
 
 /***********************************************************************
  *           call_init_thunk
