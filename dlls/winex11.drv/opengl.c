@@ -220,6 +220,7 @@ struct wgl_context
     POINT setup_for;
     GLuint current_draw_fbo, current_read_fbo;
     BOOL drawing_to_front;
+    BOOL fs_hack_needs_resolve;
     struct list entry;
 };
 
@@ -477,11 +478,13 @@ static void (*pglUseProgram)( GLuint program );
 static void (*pglViewportIndexedf)( GLuint index, GLfloat x, GLfloat y, GLfloat w, GLfloat h );
 static void (*pglViewportIndexedfv)( GLuint index, const GLfloat *v );
 static void (*pglGetFramebufferAttachmentParameteriv)( GLenum target, GLenum attachment, GLenum pname, GLint *params );
+static void (*pglCopyTexSubImage2D)( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer );
 static void wglDrawBuffer( GLenum buffer );
 static void wglReadBuffer( GLenum src );
 static void wglFramebufferTexture2D( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level );
+static void wglCopyTexSubImage2D( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
 
 /* check if the extension is present in the list */
 static BOOL has_extension( const char *list, const char *ext )
@@ -663,6 +666,7 @@ static void init_opengl(void)
     REDIRECT( glFlush );
     REDIRECT( glGetString );
     REDIRECT( glReadBuffer );
+    REDIRECT( glCopyTexSubImage2D );
 #undef REDIRECT
 
     pglXGetProcAddressARB = dlsym(opengl_handle, "glXGetProcAddressARB");
@@ -2533,6 +2537,7 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         gl->has_vertex_program = !ctx->is_core &&
                                  has_extension( glExtensions, "GL_ARB_vertex_program" );
         ctx->fs_hack_integer = fs_hack_is_integer();
+        ctx->fs_hack_needs_resolve = gl->fs_hack_needs_resolve;
         gl->fs_hack_context_set_up = TRUE;
     }
     else
@@ -2685,6 +2690,49 @@ static void wglReadBuffer( GLenum buffer )
         buffer = GL_COLOR_ATTACHMENT0;
     }
     pglReadBuffer( buffer );
+}
+
+static BOOL resolve_fs_hack_fbo( GLuint *old_read_fbo )
+{
+    struct wgl_context *ctx = NtCurrentTeb()->glContext;
+    GLuint old_draw_fbo;
+    unsigned int cx, cy;
+    RECT user_rect;
+    HWND hwnd;
+
+    if (!ctx || !ctx->fs_hack || !ctx->fs_hack_needs_resolve) return FALSE;
+    if (!ctx->fs_hack_needs_resolve) return FALSE;
+    if (ctx->current_read_fbo != ctx->fs_hack_fbo) return FALSE;
+    if (!(hwnd = NtUserWindowFromDC( ctx->hdc ))) return FALSE;
+
+    NtUserGetClientRect( hwnd, &user_rect );
+    cx = user_rect.right - user_rect.left;
+    cy = user_rect.bottom - user_rect.top;
+
+    TRACE( "resolving fbo, %ux%u.\n", cx, cy );
+
+    opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)old_read_fbo );
+    opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&old_draw_fbo );
+
+    pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
+    pglBlitFramebuffer( 0, 0, cx, cy, 0, 0, cx, cy, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+    pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
+    pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, old_draw_fbo );
+
+    return TRUE;
+}
+
+static void wglCopyTexSubImage2D( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height )
+{
+    GLuint old_read_fbo;
+    BOOL restore;
+
+    TRACE( "target %#x, level %d, offset %dx%d, origin %dx%d, size %dx%d.\n",
+            target, level, xoffset, yoffset, x, y, width, height );
+
+    restore = resolve_fs_hack_fbo( &old_read_fbo );
+    pglCopyTexSubImage2D( target, level, xoffset, yoffset, x, y, width, height );
+    if (restore) pglBindFramebuffer( GL_READ_FRAMEBUFFER, old_read_fbo );
 }
 
 struct fs_hack_gl_state
