@@ -3983,7 +3983,6 @@ static void test_pen(void)
     play_metafile(clone_metafile, graphics, pen_bitmap_records, "pen playback", dst_points, &frame, UnitPixel);
 
     color = GetPixel(hdc, 10, 10);
-    todo_wine
     expect(RGB(0xff, 0, 0), color);
 
     color = GetPixel(hdc, 40, 90);
