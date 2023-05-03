@@ -36,8 +36,6 @@ struct media_stream
     IMFMediaEventQueue *event_queue;
     IMFStreamDescriptor *descriptor;
 
-    struct wg_parser_stream *wg_stream;
-
     IUnknown **token_queue;
     LONG token_queue_count;
     LONG token_queue_cap;
@@ -304,15 +302,15 @@ done:
     return hr;
 }
 
-static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor, struct wg_parser_stream *stream,
-    const GUID *attr, enum wg_parser_tag tag)
+static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor,
+    struct wg_source *source, UINT index, const GUID *attr, enum wg_parser_tag tag)
 {
     WCHAR *strW;
     HRESULT hr;
     DWORD len;
     char *str;
 
-    if (!(str = wg_parser_stream_get_tag(stream, tag))
+    if (!(str = wg_source_get_stream_tag(source, index, tag))
             || !(len = MultiByteToWideChar(CP_UTF8, 0, str, -1, NULL, 0)))
         hr = S_OK;
     else if (!(strW = malloc(len * sizeof(*strW))))
@@ -328,6 +326,49 @@ static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor, struct
 
     free(str);
     return hr;
+}
+
+static HRESULT map_stream_to_wg_parser_stream(struct media_source *source, UINT stream)
+{
+    struct wg_parser_stream *wg_stream;
+    struct wg_format stream_format;
+    HRESULT hr;
+    UINT i;
+
+    if (!(wg_stream = wg_parser_get_stream(source->wg_parser, stream)))
+        return E_FAIL;
+    wg_parser_stream_get_preferred_format(wg_stream, &stream_format);
+
+    for (i = 0; i < source->stream_count; i++)
+    {
+        struct wg_format format;
+
+        if (FAILED(hr = wg_format_from_stream_descriptor(source->descriptors[i], &format)))
+            return hr;
+        if (stream_format.major_type != format.major_type)
+            continue;
+        if (source->stream_map[i])
+            continue;
+
+        TRACE("Mapped stream %u with descriptor %u\n", stream, i);
+        source->stream_map[i] = stream + 1;
+        return S_OK;
+    }
+
+    return E_FAIL;
+}
+
+static HRESULT media_stream_get_wg_parser_stream(struct media_stream *stream, struct wg_parser_stream **wg_stream)
+{
+    struct media_source *source = impl_from_IMFMediaSource(stream->media_source);
+    HRESULT hr;
+    DWORD id;
+
+    if (FAILED(hr = IMFStreamDescriptor_GetStreamIdentifier(stream->descriptor, &id)))
+        return hr;
+    if (!(id = source->stream_map[id]) || !(*wg_stream = wg_parser_get_stream(source->wg_parser, id - 1)))
+        return MF_E_INVALIDSTREAMNUMBER;
+    return S_OK;
 }
 
 static BOOL enqueue_token(struct media_stream *stream, IUnknown *token)
@@ -385,14 +426,17 @@ static void flush_token_queue(struct media_stream *stream, BOOL send)
 static HRESULT media_stream_start(struct media_stream *stream, BOOL active, BOOL seeking, const PROPVARIANT *position)
 {
     struct media_source *source = impl_from_IMFMediaSource(stream->media_source);
+    struct wg_parser_stream *wg_stream;
     struct wg_format format;
     HRESULT hr;
 
     TRACE("source %p, stream %p\n", source, stream);
 
+    if (FAILED(hr = media_stream_get_wg_parser_stream(stream, &wg_stream)))
+        return hr;
     if (FAILED(hr = wg_format_from_stream_descriptor(stream->descriptor, &format)))
         WARN("Failed to get wg_format from stream descriptor, hr %#lx\n", hr);
-    wg_parser_stream_enable(stream->wg_stream, &format, 0);
+    wg_parser_stream_enable(wg_stream, &format, 0);
 
     if (FAILED(hr = IMFMediaEventQueue_QueueEventParamUnk(source->event_queue, active ? MEUpdatedStream : MENewStream,
             &GUID_NULL, S_OK, (IUnknown *)&stream->IMFMediaStream_iface)))
@@ -447,12 +491,17 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
     {
         struct media_stream *stream = source->streams[i];
         BOOL was_active = !starting && stream->active;
+        struct wg_parser_stream *wg_stream;
 
         if (position->vt != VT_EMPTY)
             stream->eos = FALSE;
 
         if (!(stream->active = !!descriptors[i]))
-            wg_parser_stream_disable(stream->wg_stream);
+        {
+            if (FAILED(hr = media_stream_get_wg_parser_stream(stream, &wg_stream)))
+                return hr;
+            wg_parser_stream_disable(wg_stream);
+        }
         else
         {
             if (FAILED(hr = media_stream_start(stream, was_active, seek_message, position)))
@@ -466,8 +515,11 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
     source->state = SOURCE_RUNNING;
 
     if (position->vt == VT_I8)
-        wg_parser_stream_seek(source->streams[0]->wg_stream, 1.0, position->hVal.QuadPart, 0,
+    {
+        struct wg_parser_stream *wg_stream = wg_parser_get_stream(source->wg_parser, 0);
+        wg_parser_stream_seek(wg_stream, 1.0, position->hVal.QuadPart, 0,
                 AM_SEEKING_AbsolutePositioning, AM_SEEKING_NoPositioning);
+    }
 
     for (i = 0; i < source->stream_count; i++)
         flush_token_queue(source->streams[i], position->vt == VT_EMPTY);
@@ -524,7 +576,8 @@ static HRESULT media_source_stop(struct media_source *source)
     return IMFMediaEventQueue_QueueEventParamVar(source->event_queue, MESourceStopped, &GUID_NULL, S_OK, NULL);
 }
 
-static HRESULT media_stream_send_sample(struct media_stream *stream, const struct wg_parser_buffer *wg_buffer, IUnknown *token)
+static HRESULT media_stream_send_sample(struct media_stream *stream, struct wg_parser_stream *wg_stream,
+        const struct wg_parser_buffer *wg_buffer, IUnknown *token)
 {
     IMFSample *sample = NULL;
     IMFMediaBuffer *buffer;
@@ -538,13 +591,13 @@ static HRESULT media_stream_send_sample(struct media_stream *stream, const struc
     if (FAILED(hr = IMFMediaBuffer_Lock(buffer, &data, NULL, NULL)))
         goto out;
 
-    if (!wg_parser_stream_copy_buffer(stream->wg_stream, data, 0, wg_buffer->size))
+    if (!wg_parser_stream_copy_buffer(wg_stream, data, 0, wg_buffer->size))
     {
-        wg_parser_stream_release_buffer(stream->wg_stream);
+        wg_parser_stream_release_buffer(wg_stream);
         IMFMediaBuffer_Unlock(buffer);
         goto out;
     }
-    wg_parser_stream_release_buffer(stream->wg_stream);
+    wg_parser_stream_release_buffer(wg_stream);
 
     if (FAILED(hr = IMFMediaBuffer_Unlock(buffer)))
         goto out;
@@ -597,12 +650,16 @@ static HRESULT media_stream_send_eos(struct media_source *source, struct media_s
 static HRESULT wait_on_sample(struct media_stream *stream, IUnknown *token)
 {
     struct media_source *source = impl_from_IMFMediaSource(stream->media_source);
+    struct wg_parser_stream *wg_stream;
     struct wg_parser_buffer buffer;
+    HRESULT hr;
 
     TRACE("%p, %p\n", stream, token);
 
-    if (wg_parser_stream_get_buffer(source->wg_parser, stream->wg_stream, &buffer))
-        return media_stream_send_sample(stream, &buffer, token);
+    if (FAILED(hr = media_stream_get_wg_parser_stream(stream, &wg_stream)))
+        return hr;
+    if (wg_parser_stream_get_buffer(source->wg_parser, wg_stream, &buffer))
+        return media_stream_send_sample(stream, wg_stream, &buffer, token);
 
     return media_stream_send_eos(source, stream);
 }
@@ -910,13 +967,13 @@ static const IMFMediaStreamVtbl media_stream_vtbl =
     media_stream_RequestSample
 };
 
-static HRESULT media_stream_create(IMFMediaSource *source, struct wg_parser_stream *wg_stream,
-        IMFStreamDescriptor *descriptor, struct media_stream **out)
+static HRESULT media_stream_create(IMFMediaSource *source, IMFStreamDescriptor *descriptor,
+        struct media_stream **out)
 {
     struct media_stream *object;
     HRESULT hr;
 
-    TRACE("source %p, wg_stream %p.\n", source, wg_stream);
+    TRACE("source %p, descriptor %p.\n", source, descriptor);
 
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
@@ -937,7 +994,6 @@ static HRESULT media_stream_create(IMFMediaSource *source, struct wg_parser_stre
 
     object->active = TRUE;
     object->eos = FALSE;
-    object->wg_stream = wg_stream;
 
     TRACE("Created stream object %p.\n", object);
 
@@ -1455,20 +1511,27 @@ static void media_source_init_stream_map(struct media_source *source, UINT strea
 
 static void media_source_init_descriptors(struct media_source *source)
 {
-    HRESULT hr = S_OK;
+    HRESULT hr;
     UINT i;
 
     for (i = 0; i < source->stream_count; i++)
     {
-        struct media_stream *stream = source->streams[i];
-        IMFStreamDescriptor *descriptor = stream->descriptor;
+        IMFStreamDescriptor *descriptor = source->descriptors[i];
 
-        if (FAILED(hr = stream_descriptor_set_tag(descriptor, stream->wg_stream,
+        if (FAILED(hr = stream_descriptor_set_tag(descriptor, source->wg_source, source->stream_map[i],
                 &MF_SD_LANGUAGE, WG_PARSER_TAG_LANGUAGE)))
             WARN("Failed to set stream descriptor language, hr %#lx\n", hr);
-        if (FAILED(hr = stream_descriptor_set_tag(descriptor, stream->wg_stream,
+        if (FAILED(hr = stream_descriptor_set_tag(descriptor, source->wg_source, source->stream_map[i],
                 &MF_SD_STREAM_NAME, WG_PARSER_TAG_NAME)))
             WARN("Failed to set stream descriptor name, hr %#lx\n", hr);
+    }
+
+    /* reset the stream map to map wg_stream numbers instead */
+    memset(source->stream_map, 0, source->stream_count * sizeof(*source->stream_map));
+    for (i = 0; i < source->stream_count; i++)
+    {
+        if (FAILED(hr = map_stream_to_wg_parser_stream(source, i)))
+            WARN("Failed to map stream descriptor %u, hr %#lx\n", i, hr);
     }
 }
 
@@ -1575,15 +1638,14 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     stream_count = wg_parser_get_stream_count(parser);
     for (i = 0; i < stream_count; ++i)
     {
-        struct wg_parser_stream *wg_stream = wg_parser_get_stream(parser, i);
         IMFStreamDescriptor *descriptor;
         struct media_stream *stream;
         struct wg_format format;
 
-        wg_parser_stream_get_preferred_format(wg_stream, &format);
+        wg_source_get_stream_format(wg_source, object->stream_map[i], &format);
         if (FAILED(hr = stream_descriptor_create(i, &format, &descriptor)))
             goto fail;
-        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, wg_stream, descriptor, &stream)))
+        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, descriptor, &stream)))
         {
             IMFStreamDescriptor_Release(descriptor);
             goto fail;
