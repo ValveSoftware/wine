@@ -2347,6 +2347,111 @@ static GpStatus metafile_deserialize_brush(const BYTE *record_data, UINT data_si
     return status;
 }
 
+static GpStatus metafile_deserialize_custom_line_cap(const BYTE *record_data, UINT data_size, GpCustomLineCap **cap)
+{
+    EmfPlusCustomStartCapData *custom_cap_data = (EmfPlusCustomStartCapData *)record_data;
+    EmfPlusCustomLineCap *line_cap;
+    GpStatus status;
+    UINT offset;
+
+    *cap = NULL;
+
+    if (data_size < FIELD_OFFSET(EmfPlusCustomStartCapData, data) + custom_cap_data->CustomStartCapSize)
+        return InvalidParameter;
+
+    offset = FIELD_OFFSET(EmfPlusCustomStartCapData, data);
+    line_cap = (EmfPlusCustomLineCap *)(record_data + offset);
+
+    offset += FIELD_OFFSET(EmfPlusCustomLineCap, CustomLineCapData);
+    if (line_cap->Type == CustomLineCapTypeAdjustableArrow)
+    {
+        EmfPlusCustomLineCapArrowData *arrow_data;
+        GpAdjustableArrowCap *arrow_cap;
+
+        arrow_data = (EmfPlusCustomLineCapArrowData *)(record_data + offset);
+
+        if ((status = GdipCreateAdjustableArrowCap(arrow_data->Height, arrow_data->Width,
+                                                   arrow_data->FillState, &arrow_cap)))
+            return status;
+
+        if ((status = GdipSetAdjustableArrowCapMiddleInset(arrow_cap, arrow_data->MiddleInset)))
+            goto arrow_cap_failed;
+        if ((status = GdipSetCustomLineCapStrokeCaps((GpCustomLineCap *)arrow_cap, arrow_data->LineStartCap, arrow_data->LineEndCap)))
+            goto arrow_cap_failed;
+        if ((status = GdipSetCustomLineCapStrokeJoin((GpCustomLineCap *)arrow_cap, arrow_data->LineJoin)))
+            goto arrow_cap_failed;
+        if ((status = GdipSetCustomLineCapWidthScale((GpCustomLineCap *)arrow_cap, arrow_data->WidthScale)))
+            goto arrow_cap_failed;
+
+        *cap = (GpCustomLineCap *)arrow_cap;
+        return Ok;
+
+    arrow_cap_failed:
+        GdipDeleteCustomLineCap((GpCustomLineCap *)arrow_cap);
+        return status;
+    }
+    else
+    {
+        EmfPlusCustomLineCapData *line_cap_data;
+        GpCustomLineCap *line_cap;
+        EmfPlusPath *path;
+
+        line_cap_data = (EmfPlusCustomLineCapData *)(record_data + offset);
+        offset += FIELD_OFFSET(EmfPlusCustomLineCapData, OptionalData);
+        if (line_cap_data->CustomLineCapDataFlags == CustomLineCapDataFillPath)
+        {
+            EmfPlusCustomLineCapDataFillPath *fill_path = (EmfPlusCustomLineCapDataFillPath *)(record_data + offset);
+            offset += FIELD_OFFSET(EmfPlusCustomLineCapDataFillPath, FillPath);
+            if (data_size < offset + fill_path->FillPathLength)
+                return InvalidParameter;
+
+            path = (EmfPlusPath *)(record_data + offset);
+        }
+        else
+        {
+            EmfPlusCustomLineCapDataLinePath *line_path = (EmfPlusCustomLineCapDataLinePath *)(record_data + offset);
+            offset += FIELD_OFFSET(EmfPlusCustomLineCapDataLinePath, LinePath);
+            if (data_size < offset + line_path->LinePathLength)
+                return InvalidParameter;
+
+            path = (EmfPlusPath *)(record_data + offset);
+        }
+
+        line_cap = heap_alloc_zero(sizeof(GpCustomLineCap));
+        if (!line_cap)
+            return OutOfMemory;
+
+        line_cap->pathdata.Points = heap_alloc_zero(path->PathPointCount * sizeof(PointF));
+        if (!line_cap->pathdata.Points)
+        {
+            heap_free(line_cap);
+            return OutOfMemory;
+        }
+        line_cap->pathdata.Types = heap_alloc_zero(path->PathPointCount * sizeof(BYTE));
+        if (!line_cap->pathdata.Types)
+        {
+            heap_free(line_cap->pathdata.Points);
+            heap_free(line_cap);
+            return OutOfMemory;
+        }
+
+        memcpy(line_cap->pathdata.Points, (BYTE *)path + FIELD_OFFSET(EmfPlusPath, data), path->PathPointCount * sizeof(PointF));
+        memcpy(line_cap->pathdata.Types, (BYTE *)path + FIELD_OFFSET(EmfPlusPath, data) + path->PathPointCount * sizeof(PointF),
+               path->PathPointCount * sizeof(BYTE));
+        line_cap->pathdata.Count = path->PathPointCount;
+        line_cap->type = CustomLineCapTypeDefault;
+        line_cap->fill = line_cap_data->CustomLineCapDataFlags == CustomLineCapDataFillPath;
+        line_cap->basecap =  line_cap_data->BaseCap;
+        line_cap->inset = line_cap_data->BaseInset;
+        line_cap->strokeStartCap = line_cap_data->StrokeStartCap;
+        line_cap->strokeEndCap = line_cap_data->StrokeEndCap;
+        line_cap->join = line_cap_data->StrokeJoin;
+        line_cap->scale = line_cap_data->WidthScale;
+        *cap = line_cap;
+        return Ok;
+    }
+}
+
 static GpStatus metafile_get_pen_brush_data_offset(EmfPlusPen *data, UINT data_size, DWORD *ret)
 {
     EmfPlusPenData *pendata = (EmfPlusPenData *)data->data;
@@ -2453,6 +2558,7 @@ static GpStatus METAFILE_PlaybackObject(GpMetafile *metafile, UINT flags, UINT d
     {
         EmfPlusPen *data = (EmfPlusPen *)record_data;
         EmfPlusPenData *pendata = (EmfPlusPenData *)data->data;
+        GpCustomLineCap *custom_line_cap;
         GpBrush *brush;
         DWORD offset;
         GpPen *pen;
@@ -2549,7 +2655,12 @@ static GpStatus METAFILE_PlaybackObject(GpMetafile *metafile, UINT flags, UINT d
         if (pendata->PenDataFlags & PenDataCustomStartCap)
         {
             EmfPlusCustomStartCapData *startcap = (EmfPlusCustomStartCapData *)((BYTE *)pendata + offset);
-            FIXME("PenDataCustomStartCap is not supported.\n");
+            if ((status = metafile_deserialize_custom_line_cap((BYTE *)startcap, data_size, &custom_line_cap)) != Ok)
+                goto penfailed;
+            status = GdipSetPenCustomStartCap(pen, custom_line_cap);
+            GdipDeleteCustomLineCap(custom_line_cap);
+            if (status != Ok)
+                goto penfailed;
             offset += FIELD_OFFSET(EmfPlusCustomStartCapData, data) + startcap->CustomStartCapSize;
         }
 
