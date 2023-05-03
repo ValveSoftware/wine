@@ -150,7 +150,8 @@ HRESULT wg_transform_read_quartz(struct wg_transform *transform, struct wg_sampl
 
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj);
 HRESULT winegstreamer_scheme_handler_create(REFIID riid, void **obj);
-HRESULT media_source_create(IMFByteStream *stream, const WCHAR *url, IMFMediaSource **out);
+HRESULT media_source_create(IMFByteStream *stream, const WCHAR *url, BYTE *data, UINT64 size, IMFMediaSource **out);
+HRESULT media_source_create_old(IMFByteStream *stream, const WCHAR *url, IMFMediaSource **out);
 HRESULT media_source_create_from_url(const WCHAR *url, IMFMediaSource **out);
 
 HRESULT aac_decoder_create(REFIID riid, void **ret);
