@@ -41,19 +41,45 @@ struct result_entry
     IUnknown *object;
 };
 
+static HRESULT result_entry_create(IMFAsyncResult *result, MF_OBJECT_TYPE type,
+        IUnknown *object, struct result_entry **out)
+{
+    struct result_entry *entry;
+
+    if (!(entry = malloc(sizeof(*entry))))
+        return E_OUTOFMEMORY;
+
+    IMFAsyncResult_AddRef((entry->result = result));
+    entry->type = type;
+    if ((entry->object = object))
+        IUnknown_AddRef(entry->object);
+
+    *out = entry;
+    return S_OK;
+}
+
+static void result_entry_destroy(struct result_entry *entry)
+{
+    IMFAsyncResult_Release(entry->result);
+    if (entry->object)
+        IUnknown_Release(entry->object);
+    free(entry);
+}
+
 struct async_create_object
 {
     IUnknown IUnknown_iface;
     LONG refcount;
 
-    IPropertyStore *props;
     IMFByteStream *stream;
     WCHAR *url;
     DWORD flags;
+    IMFAsyncResult *result;
 };
 
 static struct async_create_object *impl_from_IUnknown(IUnknown *iface)
 {
+    if (!iface) return NULL;
     return CONTAINING_RECORD(iface, struct async_create_object, IUnknown_iface);
 }
 
@@ -90,8 +116,7 @@ static ULONG WINAPI async_create_object_Release(IUnknown *iface)
 
     if (!refcount)
     {
-        if (async->props)
-            IPropertyStore_Release(async->props);
+        IMFAsyncResult_Release(async->result);
         if (async->stream)
             IMFByteStream_Release(async->stream);
         free(async->url);
@@ -108,6 +133,68 @@ static const IUnknownVtbl async_create_object_vtbl =
     async_create_object_Release,
 };
 
+static HRESULT async_create_object_create(DWORD flags, IMFByteStream *stream, const WCHAR *url,
+        IMFAsyncResult *result, IUnknown **out)
+{
+    WCHAR *tmp_url = url ? wcsdup(url) : NULL;
+    struct async_create_object *impl;
+
+    if (!stream && !tmp_url)
+        return E_INVALIDARG;
+    if (!(impl = calloc(1, sizeof(*impl))))
+    {
+        free(tmp_url);
+        return E_OUTOFMEMORY;
+    }
+
+    impl->IUnknown_iface.lpVtbl = &async_create_object_vtbl;
+    impl->refcount = 1;
+    impl->flags = flags;
+    if ((impl->stream = stream))
+        IMFByteStream_AddRef(impl->stream);
+    impl->url = tmp_url;
+    IMFAsyncResult_AddRef((impl->result = result));
+
+    *out = &impl->IUnknown_iface;
+    return S_OK;
+}
+
+static HRESULT async_create_object_complete(struct async_create_object *async,
+        struct list *results, CRITICAL_SECTION *results_cs)
+{
+    IUnknown *object;
+    HRESULT hr;
+
+    if (async->flags & MF_RESOLUTION_MEDIASOURCE)
+        hr = media_source_create(async->stream, NULL, (IMFMediaSource **)&object);
+    else
+    {
+        FIXME("Unhandled flags %#lx.\n", async->flags);
+        hr = E_NOTIMPL;
+    }
+
+    if (FAILED(hr))
+        WARN("Failed to create object, hr %#lx.\n", hr);
+    else
+    {
+        struct result_entry *entry;
+
+        if (FAILED(hr = result_entry_create(async->result, MF_OBJECT_MEDIASOURCE, object, &entry)))
+            WARN("Failed to add handler result, hr %#lx\n", hr);
+        else
+        {
+            EnterCriticalSection(results_cs);
+            list_add_tail(results, &entry->entry);
+            LeaveCriticalSection(results_cs);
+        }
+
+        IUnknown_Release(object);
+    }
+
+    IMFAsyncResult_SetStatus(async->result, hr);
+    return MFInvokeCallback(async->result);
+}
+
 struct handler
 {
     IMFAsyncCallback IMFAsyncCallback_iface;
@@ -116,6 +203,75 @@ struct handler
     struct list results;
     CRITICAL_SECTION cs;
 };
+
+static HRESULT handler_begin_create_object(struct handler *handler, DWORD flags,
+        IMFByteStream *stream, const WCHAR *url, IMFAsyncResult *result)
+{
+    IUnknown *async;
+    HRESULT hr;
+
+    if (SUCCEEDED(hr = async_create_object_create(flags, stream, url, result, &async)))
+    {
+        if (FAILED(hr = MFPutWorkItem(MFASYNC_CALLBACK_QUEUE_IO, &handler->IMFAsyncCallback_iface, async)))
+            WARN("Failed to queue async work item, hr %#lx\n", hr);
+        IUnknown_Release(async);
+    }
+
+    return hr;
+}
+
+static struct result_entry *handler_find_result_entry(struct handler *handler, IMFAsyncResult *result)
+{
+    struct result_entry *entry;
+
+    EnterCriticalSection(&handler->cs);
+    LIST_FOR_EACH_ENTRY(entry, &handler->results, struct result_entry, entry)
+    {
+        if (result == entry->result)
+        {
+            list_remove(&entry->entry);
+            LeaveCriticalSection(&handler->cs);
+            return entry;
+        }
+    }
+    LeaveCriticalSection(&handler->cs);
+
+    return NULL;
+}
+
+static HRESULT handler_end_create_object(struct handler *handler,
+        IMFAsyncResult *result, MF_OBJECT_TYPE *type, IUnknown **object)
+{
+    struct result_entry *entry;
+    HRESULT hr;
+
+    if (!(entry = handler_find_result_entry(handler, result)))
+    {
+        *type = MF_OBJECT_INVALID;
+        *object = NULL;
+        return MF_E_UNEXPECTED;
+    }
+
+    hr = IMFAsyncResult_GetStatus(entry->result);
+    *type = entry->type;
+    *object = entry->object;
+    entry->object = NULL;
+
+    result_entry_destroy(entry);
+    return hr;
+}
+
+static HRESULT handler_cancel_object_creation(struct handler *handler, IUnknown *cookie)
+{
+    IMFAsyncResult *result = (IMFAsyncResult *)cookie;
+    struct result_entry *entry;
+
+    if (!(entry = handler_find_result_entry(handler, result)))
+        return MF_E_UNEXPECTED;
+
+    result_entry_destroy(entry);
+    return S_OK;
+}
 
 static struct handler *impl_from_IMFAsyncCallback(IMFAsyncCallback *iface)
 {
@@ -161,13 +317,7 @@ static ULONG WINAPI async_callback_Release(IMFAsyncCallback *iface)
     if (!refcount)
     {
         LIST_FOR_EACH_ENTRY_SAFE(entry, next, &handler->results, struct result_entry, entry)
-        {
-            list_remove(&entry->entry);
-            IMFAsyncResult_Release(entry->result);
-            if (entry->object)
-                IUnknown_Release(entry->object);
-            free(entry);
-        }
+            result_entry_destroy(entry);
         DeleteCriticalSection(&handler->cs);
         free(handler);
     }
@@ -180,75 +330,20 @@ static HRESULT WINAPI async_callback_GetParameters(IMFAsyncCallback *iface, DWOR
     return E_NOTIMPL;
 }
 
-static HRESULT stream_handler_create_object(struct handler *handler, WCHAR *url,
-        IMFByteStream *stream, DWORD flags, IPropertyStore *props, IUnknown **object, MF_OBJECT_TYPE *type)
-{
-    TRACE("%p, %s, %p, %#lx, %p, %p, %p.\n", handler, debugstr_w(url), stream, flags, props, object, type);
-
-    if (flags & MF_RESOLUTION_MEDIASOURCE)
-    {
-        HRESULT hr;
-
-        if (FAILED(hr = media_source_create(stream, NULL, (IMFMediaSource **)object)))
-            return hr;
-
-        *type = MF_OBJECT_MEDIASOURCE;
-        return S_OK;
-    }
-    else
-    {
-        FIXME("Unhandled flags %#lx.\n", flags);
-        return E_NOTIMPL;
-    }
-}
-
 static HRESULT WINAPI async_callback_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
 {
     struct handler *handler = impl_from_IMFAsyncCallback(iface);
-    MF_OBJECT_TYPE type = MF_OBJECT_INVALID;
-    IUnknown *object = NULL, *context_object;
     struct async_create_object *async;
-    struct result_entry *entry;
-    IMFAsyncResult *caller;
-    HRESULT hr;
 
-    caller = (IMFAsyncResult *)IMFAsyncResult_GetStateNoAddRef(result);
+    TRACE("iface %p, result %p\n", iface, result);
 
-    if (FAILED(hr = IMFAsyncResult_GetObject(result, &context_object)))
+    if (!(async = impl_from_IUnknown(IMFAsyncResult_GetStateNoAddRef(result))))
     {
         WARN("Expected context set for callee result.\n");
-        return hr;
+        return E_FAIL;
     }
 
-    async = impl_from_IUnknown(context_object);
-
-    hr = stream_handler_create_object(handler, async->url, async->stream, async->flags,
-            async->props, &object, &type);
-
-    if ((entry = malloc(sizeof(*entry))))
-    {
-        entry->result = caller;
-        IMFAsyncResult_AddRef(entry->result);
-        entry->type = type;
-        entry->object = object;
-
-        EnterCriticalSection(&handler->cs);
-        list_add_tail(&handler->results, &entry->entry);
-        LeaveCriticalSection(&handler->cs);
-    }
-    else
-    {
-        if (object)
-            IUnknown_Release(object);
-        hr = E_OUTOFMEMORY;
-    }
-
-    IUnknown_Release(&async->IUnknown_iface);
-
-    IMFAsyncResult_SetStatus(caller, hr);
-    MFInvokeCallback(caller);
-
-    return S_OK;
+    return async_create_object_complete(async, &handler->results, &handler->cs);
 }
 
 static const IMFAsyncCallbackVtbl async_callback_vtbl =
@@ -294,8 +389,7 @@ static HRESULT WINAPI stream_handler_BeginCreateObject(IMFByteStreamHandler *ifa
         IUnknown **cookie, IMFAsyncCallback *callback, IUnknown *state)
 {
     struct handler *handler = impl_from_IMFByteStreamHandler(iface);
-    struct async_create_object *async;
-    IMFAsyncResult *caller, *item;
+    IMFAsyncResult *result;
     HRESULT hr;
 
     TRACE("%p, %s, %#lx, %p, %p, %p, %p.\n", iface, debugstr_w(url), flags, props, cookie, callback, state);
@@ -303,50 +397,16 @@ static HRESULT WINAPI stream_handler_BeginCreateObject(IMFByteStreamHandler *ifa
     if (cookie)
         *cookie = NULL;
 
-    if (FAILED(hr = MFCreateAsyncResult(NULL, callback, state, &caller)))
+    if (FAILED(hr = MFCreateAsyncResult((IUnknown *)iface, callback, state, &result)))
         return hr;
 
-    if (!(async = calloc(1, sizeof(*async))))
+    if (SUCCEEDED(hr = handler_begin_create_object(handler, flags, stream, url, result)) && cookie)
     {
-        IMFAsyncResult_Release(caller);
-        return E_OUTOFMEMORY;
+        *cookie = (IUnknown *)result;
+        IUnknown_AddRef(*cookie);
     }
 
-    async->IUnknown_iface.lpVtbl = &async_create_object_vtbl;
-    async->refcount = 1;
-    async->props = props;
-    if (async->props)
-        IPropertyStore_AddRef(async->props);
-    async->flags = flags;
-    async->stream = stream;
-    if (async->stream)
-        IMFByteStream_AddRef(async->stream);
-    if (url)
-        async->url = wcsdup(url);
-    if (!async->stream)
-    {
-        IMFAsyncResult_Release(caller);
-        IUnknown_Release(&async->IUnknown_iface);
-        return E_OUTOFMEMORY;
-    }
-
-    hr = MFCreateAsyncResult(&async->IUnknown_iface, &handler->IMFAsyncCallback_iface,
-            (IUnknown *)caller, &item);
-    IUnknown_Release(&async->IUnknown_iface);
-    if (SUCCEEDED(hr))
-    {
-        if (SUCCEEDED(hr = MFPutWorkItemEx(MFASYNC_CALLBACK_QUEUE_IO, item)))
-        {
-            if (cookie)
-            {
-                *cookie = (IUnknown *)caller;
-                IUnknown_AddRef(*cookie);
-            }
-        }
-
-        IMFAsyncResult_Release(item);
-    }
-    IMFAsyncResult_Release(caller);
+    IMFAsyncResult_Release(result);
 
     return hr;
 }
@@ -355,73 +415,15 @@ static HRESULT WINAPI stream_handler_EndCreateObject(IMFByteStreamHandler *iface
         IMFAsyncResult *result, MF_OBJECT_TYPE *type, IUnknown **object)
 {
     struct handler *handler = impl_from_IMFByteStreamHandler(iface);
-    struct result_entry *found = NULL, *entry;
-    HRESULT hr;
-
     TRACE("%p, %p, %p, %p.\n", iface, result, type, object);
-
-    EnterCriticalSection(&handler->cs);
-
-    LIST_FOR_EACH_ENTRY(entry, &handler->results, struct result_entry, entry)
-    {
-        if (result == entry->result)
-        {
-            list_remove(&entry->entry);
-            found = entry;
-            break;
-        }
-    }
-
-    LeaveCriticalSection(&handler->cs);
-
-    if (found)
-    {
-        *type = found->type;
-        *object = found->object;
-        hr = IMFAsyncResult_GetStatus(found->result);
-        IMFAsyncResult_Release(found->result);
-        free(found);
-    }
-    else
-    {
-        *type = MF_OBJECT_INVALID;
-        *object = NULL;
-        hr = MF_E_UNEXPECTED;
-    }
-
-    return hr;
+    return handler_end_create_object(handler, result, type, object);
 }
 
 static HRESULT WINAPI stream_handler_CancelObjectCreation(IMFByteStreamHandler *iface, IUnknown *cookie)
 {
     struct handler *handler = impl_from_IMFByteStreamHandler(iface);
-    struct result_entry *found = NULL, *entry;
-
     TRACE("%p, %p.\n", iface, cookie);
-
-    EnterCriticalSection(&handler->cs);
-
-    LIST_FOR_EACH_ENTRY(entry, &handler->results, struct result_entry, entry)
-    {
-        if (cookie == (IUnknown *)entry->result)
-        {
-            list_remove(&entry->entry);
-            found = entry;
-            break;
-        }
-    }
-
-    LeaveCriticalSection(&handler->cs);
-
-    if (found)
-    {
-        IMFAsyncResult_Release(found->result);
-        if (found->object)
-            IUnknown_Release(found->object);
-        free(found);
-    }
-
-    return found ? S_OK : MF_E_UNEXPECTED;
+    return handler_cancel_object_creation(handler, cookie);
 }
 
 static HRESULT WINAPI stream_handler_GetMaxNumberOfBytesRequiredForResolution(
