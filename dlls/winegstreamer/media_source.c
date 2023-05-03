@@ -1430,7 +1430,6 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
 
 HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *data, UINT64 size, IMFMediaSource **out)
 {
-    BOOL video_selected = FALSE, audio_selected = FALSE;
     IMFStreamDescriptor **descriptors = NULL;
     unsigned int stream_count = UINT_MAX;
     struct media_source *object;
@@ -1559,28 +1558,9 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     if (FAILED(hr = MFCreatePresentationDescriptor(object->stream_count, descriptors, &object->pres_desc)))
         goto fail;
 
-    /* Select one of each major type. */
     for (i = 0; i < object->stream_count; i++)
     {
-        IMFMediaTypeHandler *handler;
-        GUID major_type;
-        BOOL select_stream = FALSE;
-
-        IMFStreamDescriptor_GetMediaTypeHandler(descriptors[i], &handler);
-        IMFMediaTypeHandler_GetMajorType(handler, &major_type);
-        if (IsEqualGUID(&major_type, &MFMediaType_Video) && !video_selected)
-        {
-            select_stream = TRUE;
-            video_selected = TRUE;
-        }
-        if (IsEqualGUID(&major_type, &MFMediaType_Audio) && !audio_selected)
-        {
-            select_stream = TRUE;
-            audio_selected = TRUE;
-        }
-        if (select_stream)
-            IMFPresentationDescriptor_SelectStream(object->pres_desc, i);
-        IMFMediaTypeHandler_Release(handler);
+        IMFPresentationDescriptor_SelectStream(object->pres_desc, i);
         IMFStreamDescriptor_Release(descriptors[i]);
     }
     free(descriptors);
