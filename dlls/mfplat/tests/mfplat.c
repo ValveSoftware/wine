@@ -6094,6 +6094,7 @@ static void test_MFCreate2DMediaBuffer(void)
 
             case MAKEFOURCC('I','M','C','2'):
             case MAKEFOURCC('I','M','C','4'):
+            case MAKEFOURCC('N','V','1','1'):
                 ok(stride * 3 / 2 * ptr->height <= length2, "Insufficient buffer space: expected at least %lu bytes, got only %lu\n",
                         stride * 3 / 2 * ptr->height, length2);
                 for (j = 0; j < ptr->height; j++)
@@ -6144,6 +6145,7 @@ static void test_MFCreate2DMediaBuffer(void)
 
             case MAKEFOURCC('I','M','C','2'):
             case MAKEFOURCC('I','M','C','4'):
+            case MAKEFOURCC('N','V','1','1'):
                 for (j = 0; j < ptr->height; j++)
                     for (k = 0; k < stride / 2; k++)
                         ok(data[j * (pitch / 2) + k] == (((j + ptr->height) % 16) << 4) + (k % 16),
