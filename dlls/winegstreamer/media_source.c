@@ -445,6 +445,8 @@ static HRESULT media_stream_start(struct media_stream *stream, BOOL active, BOOL
             &GUID_NULL, S_OK, position);
 }
 
+static DWORD CALLBACK read_thread(void *arg);
+
 static HRESULT media_source_start(struct media_source *source, IMFPresentationDescriptor *descriptor,
         GUID *format, PROPVARIANT *position)
 {
@@ -458,6 +460,30 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
 
     if (source->state == SOURCE_SHUTDOWN)
         return MF_E_SHUTDOWN;
+
+    if (!source->wg_parser)
+    {
+        /* In Media Foundation, sources may read from any media source stream
+         * without fear of blocking due to buffering limits on another. Trailmakers,
+         * a Unity3D Engine game, only reads one sample from the audio stream (and
+         * never deselects it). Remove buffering limits from decodebin in order to
+         * account for this. Note that this does leak memory, but the same memory
+         * leak occurs with native. */
+        if (!(source->wg_parser = wg_parser_create(WG_PARSER_DECODEBIN, true)))
+            return E_OUTOFMEMORY;
+        if (!(source->read_thread = CreateThread(NULL, 0, read_thread, source, 0, NULL)))
+            return E_OUTOFMEMORY;
+        if (FAILED(hr = wg_parser_connect(source->wg_parser, source->file_size, NULL)))
+            return hr;
+
+        /* reset the stream map to map wg_stream numbers instead */
+        memset(source->stream_map, 0, source->stream_count * sizeof(*source->stream_map));
+        for (i = 0; i < source->stream_count; i++)
+        {
+            if (FAILED(hr = map_stream_to_wg_parser_stream(source, i)))
+                WARN("Failed to map stream %lu, hr %#lx\n", i, hr);
+        }
+    }
 
     /* seek to beginning on stop->play */
     if (source->state == SOURCE_STOPPED && position->vt == VT_EMPTY)
@@ -1225,7 +1251,8 @@ static ULONG WINAPI media_source_Release(IMFMediaSource *iface)
         IMFMediaEventQueue_Release(source->event_queue);
         IMFByteStream_Release(source->byte_stream);
         wg_source_destroy(source->wg_source);
-        wg_parser_destroy(source->wg_parser);
+        if (source->wg_parser)
+            wg_parser_destroy(source->wg_parser);
         source->cs.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&source->cs);
         free(source);
@@ -1422,7 +1449,8 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
 
     source->state = SOURCE_SHUTDOWN;
 
-    wg_parser_disconnect(source->wg_parser);
+    if (source->wg_parser)
+        wg_parser_disconnect(source->wg_parser);
 
     source->read_thread_shutdown = true;
     WaitForSingleObject(source->read_thread, INFINITE);
@@ -1551,14 +1579,6 @@ static void media_source_init_descriptors(struct media_source *source)
             WARN("Failed to set stream descriptor name, hr %#lx\n", hr);
     }
 
-    /* reset the stream map to map wg_stream numbers instead */
-    memset(source->stream_map, 0, source->stream_count * sizeof(*source->stream_map));
-    for (i = 0; i < source->stream_count; i++)
-    {
-        if (FAILED(hr = map_stream_to_wg_parser_stream(source, i)))
-            WARN("Failed to map stream descriptor %u, hr %#lx\n", i, hr);
-    }
-
     if (!wcscmp(source->mime_type, L"video/mp4"))
     {
         if (last_audio != -1)
@@ -1581,7 +1601,6 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     UINT32 stream_count;
     struct media_source *object;
     struct wg_source *wg_source;
-    struct wg_parser *parser;
     DWORD bytestream_caps, read_size = size;
     WCHAR mime_type[256];
     unsigned int i;
@@ -1649,20 +1668,6 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     if (FAILED(hr = MFAllocateWorkQueue(&object->async_commands_queue)))
         goto fail;
 
-    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, false)))
-    {
-        hr = E_OUTOFMEMORY;
-        goto fail;
-    }
-    object->wg_parser = parser;
-
-    object->read_thread = CreateThread(NULL, 0, read_thread, object, 0, NULL);
-
-    object->state = SOURCE_OPENING;
-
-    if (FAILED(hr = wg_parser_connect(parser, file_size, NULL)))
-        goto fail;
-
     if (!(object->descriptors = calloc(stream_count, sizeof(*object->descriptors)))
             || !(object->stream_map = calloc(stream_count, sizeof(*object->stream_map)))
             || !(object->streams = calloc(stream_count, sizeof(*object->streams))))
@@ -1675,7 +1680,6 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
 
     media_source_init_stream_map(object, stream_count);
 
-    stream_count = wg_parser_get_stream_count(parser);
     for (i = 0; i < stream_count; ++i)
     {
         IMFStreamDescriptor *descriptor;
@@ -1716,16 +1720,6 @@ fail:
     free(object->descriptors);
     free(object->streams);
 
-    if (object->state == SOURCE_OPENING)
-        wg_parser_disconnect(object->wg_parser);
-    if (object->read_thread)
-    {
-        object->read_thread_shutdown = true;
-        WaitForSingleObject(object->read_thread, INFINITE);
-        CloseHandle(object->read_thread);
-    }
-    if (object->wg_parser)
-        wg_parser_destroy(object->wg_parser);
     if (object->async_commands_queue)
         MFUnlockWorkQueue(object->async_commands_queue);
     if (object->event_queue)
