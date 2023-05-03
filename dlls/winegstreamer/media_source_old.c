@@ -1441,7 +1441,7 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
     media_source_Shutdown,
 };
 
-HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *data, UINT64 size, IMFMediaSource **out)
+HRESULT media_source_create_old(IMFByteStream *bytestream, const WCHAR *uri, IMFMediaSource **out)
 {
     BOOL video_selected = FALSE, audio_selected = FALSE;
     IMFStreamDescriptor **descriptors = NULL;
@@ -1490,7 +1490,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
     if (FAILED(hr = MFAllocateWorkQueue(&object->async_commands_queue)))
         goto fail;
 
-    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, false)))
+    if (!(parser = wg_parser_create(uri ? WG_PARSER_URIDECODEBIN : WG_PARSER_DECODEBIN, false)))
     {
         hr = E_OUTOFMEMORY;
         goto fail;
@@ -1501,7 +1501,7 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
 
     object->state = SOURCE_OPENING;
 
-    if (FAILED(hr = wg_parser_connect(parser, file_size, NULL)))
+    if (FAILED(hr = wg_parser_connect(parser, file_size, uri)))
         goto fail;
 
     stream_count = wg_parser_get_stream_count(parser);
@@ -1644,5 +1644,25 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *url, BYTE *d
         IMFMediaEventQueue_Release(object->event_queue);
     IMFByteStream_Release(object->byte_stream);
     free(object);
+    return hr;
+}
+
+HRESULT media_source_create_from_url(const WCHAR *url, IMFMediaSource **out)
+{
+    IMFByteStream *bytestream;
+    IStream *stream;
+    HRESULT hr;
+
+    if (FAILED(hr = CreateStreamOnHGlobal(0, TRUE, &stream)))
+        return hr;
+
+    hr = MFCreateMFByteStreamOnStream(stream, &bytestream);
+    IStream_Release(stream);
+    if (FAILED(hr))
+        return hr;
+
+    hr = media_source_create_old(bytestream, url, out);
+    IMFByteStream_Release(bytestream);
+
     return hr;
 }
