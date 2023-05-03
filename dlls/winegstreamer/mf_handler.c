@@ -173,10 +173,16 @@ static HRESULT async_create_object_complete(struct async_create_object *async,
 
     if (async->flags & MF_RESOLUTION_MEDIASOURCE)
     {
+        const char *env = getenv("WINE_NEW_MEDIA_SOURCE");
         if (!async->stream)
             hr = media_source_create_from_url(async->url, (IMFMediaSource **)&object);
-        else
-            hr = media_source_create(async->stream, NULL, (IMFMediaSource **)&object);
+        else if (!env || !atoi(env))
+            hr = media_source_create_old(async->stream, NULL, (IMFMediaSource **)&object);
+        else if (FAILED(hr = media_source_create(async->stream, async->url, async->buffer, async->size, (IMFMediaSource **)&object)))
+        {
+            FIXME("Failed to create new media source, falling back to old implementation, hr %#lx\n", hr);
+            hr = media_source_create_old(async->stream, NULL, (IMFMediaSource **)&object);
+        }
     }
     else
     {
