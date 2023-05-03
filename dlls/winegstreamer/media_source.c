@@ -875,7 +875,7 @@ static HRESULT media_stream_create(IMFMediaSource *source, DWORD id,
 static HRESULT media_stream_init_desc(struct media_stream *stream)
 {
     IMFMediaTypeHandler *type_handler = NULL;
-    IMFMediaType *stream_types[8];
+    IMFMediaType *stream_types[7];
     struct wg_format format;
     DWORD type_count = 0;
     HRESULT hr = S_OK;
@@ -895,7 +895,6 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
             &MFVideoFormat_IYUV,
             &MFVideoFormat_I420,
             &MFVideoFormat_ARGB32,
-            &MFVideoFormat_RGB32,
         };
 
         IMFMediaType *base_type = mf_media_type_from_wg_format(&format);
