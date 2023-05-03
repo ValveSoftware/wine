@@ -1646,3 +1646,23 @@ HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *uri, IMFMedi
     free(object);
     return hr;
 }
+
+HRESULT media_source_create_from_url(const WCHAR *url, IMFMediaSource **out)
+{
+    IMFByteStream *bytestream;
+    IStream *stream;
+    HRESULT hr;
+
+    if (FAILED(hr = CreateStreamOnHGlobal(0, TRUE, &stream)))
+        return hr;
+
+    hr = MFCreateMFByteStreamOnStream(stream, &bytestream);
+    IStream_Release(stream);
+    if (FAILED(hr))
+        return hr;
+
+    hr = media_source_create(bytestream, url, out);
+    IMFByteStream_Release(bytestream);
+
+    return hr;
+}
