@@ -1647,28 +1647,6 @@ static HRESULT media_source_constructor(IMFByteStream *bytestream, const WCHAR *
     return hr;
 }
 
-HRESULT winegstreamer_create_media_source_from_uri(const WCHAR *uri, IUnknown **out_object)
-{
-    struct media_source *object;
-    IMFByteStream *bytestream;
-    IStream *stream;
-    HRESULT hr;
-
-    if (FAILED(hr = CreateStreamOnHGlobal(0, TRUE, &stream)))
-        return hr;
-
-    hr = MFCreateMFByteStreamOnStream(stream, &bytestream);
-    IStream_Release(stream);
-    if (FAILED(hr))
-        return hr;
-
-    if (SUCCEEDED(hr = media_source_constructor(bytestream, uri, &object)))
-        *out_object = (IUnknown*)&object->IMFMediaSource_iface;
-
-    IMFByteStream_Release(bytestream);
-    return hr;
-}
-
 struct winegstreamer_stream_handler_result
 {
     struct list entry;
