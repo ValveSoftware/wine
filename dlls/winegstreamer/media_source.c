@@ -1441,7 +1441,7 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
     media_source_Shutdown,
 };
 
-HRESULT media_source_create_from_stream(IMFByteStream *bytestream, IMFMediaSource **out)
+HRESULT media_source_create(IMFByteStream *bytestream, const WCHAR *uri, IMFMediaSource **out)
 {
     BOOL video_selected = FALSE, audio_selected = FALSE;
     IMFStreamDescriptor **descriptors = NULL;
