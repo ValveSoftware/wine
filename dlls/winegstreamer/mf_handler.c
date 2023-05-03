@@ -168,7 +168,7 @@ static HRESULT stream_handler_create_object(struct handler *handler, WCHAR *url,
     {
         HRESULT hr;
 
-        if (FAILED(hr = media_source_create_from_stream(stream, (IMFMediaSource **)object)))
+        if (FAILED(hr = media_source_create(stream, NULL, (IMFMediaSource **)object)))
             return hr;
 
         *type = MF_OBJECT_MEDIASOURCE;
