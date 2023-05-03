@@ -475,6 +475,30 @@ static BOOL disable_opwr(void)
     return disable;
 }
 
+static void cleanup_leaked_surfaces(HWND hwnd)
+{
+    struct wine_vk_surface *surface, *next;
+    static int cleanup = -1;
+
+    if (cleanup == -1)
+    {
+        const char *e = getenv("SteamGameId");
+        cleanup = e && !strcmp(e, "379720");
+        if (cleanup)
+            ERR("HACK.\n");
+    }
+
+    if (!cleanup)
+        return;
+
+    LIST_FOR_EACH_ENTRY_SAFE(surface, next, &surface_list, struct wine_vk_surface, entry)
+    {
+        if (surface->hwnd != hwnd)
+            continue;
+        wine_vk_surface_release(surface);
+    }
+}
+
 static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
         const VkWin32SurfaceCreateInfoKHR *create_info,
         const VkAllocationCallbacks *allocator, VkSurfaceKHR *surface)
@@ -610,6 +634,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     }
 
     pthread_mutex_lock(&vulkan_mutex);
+    cleanup_leaked_surfaces(x11_surface->hwnd);
     list_add_tail(&surface_list, &x11_surface->entry);
     pthread_mutex_unlock(&vulkan_mutex);
 
