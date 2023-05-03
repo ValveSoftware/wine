@@ -517,6 +517,33 @@ bool wg_source_get_stream_format(struct wg_source *source, UINT32 index,
     return true;
 }
 
+char *wg_source_get_stream_tag(struct wg_source *source, UINT32 index, enum wg_parser_tag tag)
+{
+    struct wg_source_get_stream_tag_params params =
+    {
+        .source = source,
+        .index = index,
+        .tag = tag,
+    };
+    char *buffer;
+
+    if (WINE_UNIX_CALL(unix_wg_source_get_stream_tag, &params) != STATUS_BUFFER_TOO_SMALL)
+        return NULL;
+    if (!(buffer = malloc(params.size)))
+    {
+        ERR("No memory.\n");
+        return NULL;
+    }
+    params.buffer = buffer;
+    if (WINE_UNIX_CALL(unix_wg_source_get_stream_tag, &params))
+    {
+        ERR("wg_source_get_stream_tag failed unexpectedly.\n");
+        free(buffer);
+        return NULL;
+    }
+    return buffer;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     if (reason == DLL_PROCESS_ATTACH)

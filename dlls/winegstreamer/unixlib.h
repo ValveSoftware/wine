@@ -368,6 +368,15 @@ struct wg_source_get_stream_format_params
     struct wg_format format;
 };
 
+struct wg_source_get_stream_tag_params
+{
+    struct wg_source *source;
+    UINT32 index;
+    enum wg_parser_tag tag;
+    UINT32 size;
+    char *buffer;
+};
+
 enum unix_funcs
 {
     unix_wg_init_gstreamer,
@@ -411,6 +420,7 @@ enum unix_funcs
     unix_wg_source_get_status,
     unix_wg_source_push_data,
     unix_wg_source_get_stream_format,
+    unix_wg_source_get_stream_tag,
 };
 
 #endif /* __WINE_WINEGSTREAMER_UNIXLIB_H */
