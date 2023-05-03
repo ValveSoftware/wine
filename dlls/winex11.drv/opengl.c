@@ -475,11 +475,13 @@ static void (*pglUseProgram)( GLuint program );
 static void (*pglViewportIndexedf)( GLuint index, GLfloat x, GLfloat y, GLfloat w, GLfloat h );
 static void (*pglViewportIndexedfv)( GLuint index, const GLfloat *v );
 static void (*pglGetFramebufferAttachmentParameteriv)( GLenum target, GLenum attachment, GLenum pname, GLint *params );
+static void (*pglCopyTexSubImage2D)( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer );
 static void wglDrawBuffer( GLenum buffer );
 static void wglReadBuffer( GLenum src );
 static void wglFramebufferTexture2D( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level );
+static void wglCopyTexSubImage2D( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
 
 /* check if the extension is present in the list */
 static BOOL has_extension( const char *list, const char *ext )
@@ -661,6 +663,7 @@ static void init_opengl(void)
     REDIRECT( glFlush );
     REDIRECT( glGetString );
     REDIRECT( glReadBuffer );
+    REDIRECT( glCopyTexSubImage2D );
 #undef REDIRECT
 
     pglXGetProcAddressARB = dlsym(opengl_handle, "glXGetProcAddressARB");
@@ -2710,6 +2713,56 @@ static void wglReadBuffer( GLenum buffer )
         buffer = GL_COLOR_ATTACHMENT0;
     }
     pglReadBuffer( buffer );
+}
+
+static void wglCopyTexSubImage2D( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height )
+{
+    struct wgl_context *ctx = NtCurrentTeb()->glContext;
+    HWND hwnd = NtUserWindowFromDC( ctx->hdc );
+    struct gl_drawable *gl = get_gl_drawable( hwnd, 0 );
+
+    if (!gl->fs_hack_needs_resolve)
+    {
+        pglCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+        return;
+    }
+
+    /**
+     * GL_INVALID_OPERATION is generated if: the effective value of GL_SAMPLE_BUFFERS for the read framebuffer is one.
+     * This API works by spec with a system multisampled renderbuffer BUT returns error with user-defined multisampled renderbuffers
+     * MESA project introduced a workaround for Penumbra game: https://gitlab.freedesktop.org/mesa/mesa/-/commit/8ced03437d62b38dc2d8c1bd43c005aedcaf7f72
+     * But it might break other games, so it need to be resolved in Proton layer
+     * Note: Pure WINE does not have this issue, it's only Proton wine fail
+    */
+    HMONITOR monitor = fs_hack_monitor_from_hwnd( hwnd );
+    RECT user_rect = {0};
+    SIZE src = {0};
+    GLuint renderbuffer, read_fbo, draw_fbo;
+    opengl_funcs.gl.p_glGetIntegerv( GL_RENDERBUFFER_BINDING, (GLint *)&renderbuffer );
+
+    if (fs_hack_enabled( monitor ))
+    {
+        user_rect = fs_hack_current_mode( monitor );
+    }
+    else
+    {
+        NtUserGetClientRect( hwnd, &user_rect );
+    }
+
+    opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&read_fbo );
+    opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&draw_fbo );
+
+    src.cx = user_rect.right - user_rect.left;
+    src.cy = user_rect.bottom - user_rect.top;
+
+    pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
+    pglBlitFramebuffer( 0, 0, src.cx, src.cy, 0, 0, src.cx, src.cy, GL_COLOR_BUFFER_BIT, GL_NEAREST );
+    pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
+    pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, draw_fbo );
+
+    pglCopyTexSubImage2D(target, level, xoffset, yoffset, x, y, width, height);
+
+    pglBindFramebuffer( GL_READ_FRAMEBUFFER, read_fbo );
 }
 
 struct fs_hack_gl_state
