@@ -1394,6 +1394,27 @@ static void add_registry_environment( WCHAR **env, SIZE_T *pos, SIZE_T *size )
     }
 }
 
+static void get_std_handle( int fd, unsigned int access, unsigned int attributes, HANDLE *handle )
+{
+    IO_STATUS_BLOCK io;
+    FILE_POSITION_INFORMATION pos_info;
+    FILE_NAME_INFORMATION name_info;
+    NTSTATUS status;
+
+    wine_server_fd_to_handle( fd, access, attributes, handle );
+    if (!*handle) return;
+
+    /* Python checks if a file is seekable and if so expects the file name to be gettable from handle. */
+    if (NtQueryInformationFile( *handle, &io, &pos_info, sizeof(pos_info), FilePositionInformation ))
+        return;
+
+    TRACE("handle for fd %d is seekable.\n", fd);
+    if (!(status = NtQueryInformationFile( *handle, &io, &name_info, sizeof(name_info), FileNameInformation ))
+          || status == STATUS_BUFFER_OVERFLOW) return;
+    TRACE("closing handle for fd %d.\n", fd);
+    NtClose( *handle );
+    *handle = NULL;
+}
 
 /*************************************************************************
  *		get_initial_console
@@ -1404,9 +1425,9 @@ static void get_initial_console( RTL_USER_PROCESS_PARAMETERS *params )
 {
     int output_fd = -1;
 
-    wine_server_fd_to_handle( 0, GENERIC_READ|SYNCHRONIZE,  OBJ_INHERIT, &params->hStdInput );
-    wine_server_fd_to_handle( 1, GENERIC_WRITE|SYNCHRONIZE, OBJ_INHERIT, &params->hStdOutput );
-    wine_server_fd_to_handle( 2, GENERIC_WRITE|SYNCHRONIZE, OBJ_INHERIT, &params->hStdError );
+    get_std_handle( 0, GENERIC_READ|SYNCHRONIZE,  OBJ_INHERIT, &params->hStdInput );
+    get_std_handle( 1, GENERIC_WRITE|SYNCHRONIZE, OBJ_INHERIT, &params->hStdOutput );
+    get_std_handle( 2, GENERIC_WRITE|SYNCHRONIZE, OBJ_INHERIT, &params->hStdError );
 
     if (main_image_info.SubSystemType != IMAGE_SUBSYSTEM_WINDOWS_CUI)
         return;
