@@ -253,6 +253,56 @@ GstBuffer *create_buffer_from_bytes(const void *data, guint size)
     return buffer;
 }
 
+gchar *stream_lang_from_tags(GstTagList *tags, GstCaps *caps)
+{
+    gchar *value;
+
+    if (!gst_tag_list_get_string(tags, GST_TAG_LANGUAGE_CODE, &value) || !value)
+        return NULL;
+
+    return value;
+}
+
+gchar *stream_name_from_tags(GstTagList *tags)
+{
+    /* Extract stream name from Quick Time demuxer private tag where it puts unrecognized chunks. */
+    guint i, tag_count = gst_tag_list_get_tag_size(tags, "private-qt-tag");
+    gchar *value = NULL;
+
+    for (i = 0; !value && i < tag_count; ++i)
+    {
+        const gchar *name;
+        const GValue *val;
+        GstSample *sample;
+        GstBuffer *buf;
+        gsize size;
+
+        if (!(val = gst_tag_list_get_value_index(tags, "private-qt-tag", i)))
+            continue;
+        if (!GST_VALUE_HOLDS_SAMPLE(val) || !(sample = gst_value_get_sample(val)))
+            continue;
+        name = gst_structure_get_name(gst_sample_get_info(sample));
+        if (!name || strcmp(name, "application/x-gst-qt-name-tag"))
+            continue;
+        if (!(buf = gst_sample_get_buffer(sample)))
+            continue;
+        if ((size = gst_buffer_get_size(buf)) < 8)
+            continue;
+        size -= 8;
+        if (!(value = g_malloc(size + 1)))
+            return NULL;
+        if (gst_buffer_extract(buf, 8, value, size) != size)
+        {
+            g_free(value);
+            value = NULL;
+            continue;
+        }
+        value[size] = 0;
+    }
+
+    return value;
+}
+
 NTSTATUS wg_init_gstreamer(void *arg)
 {
     static GstGLContext *gl_context;

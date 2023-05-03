@@ -46,12 +46,17 @@ extern bool link_element_to_sink(GstElement *element, GstPad *sink_pad) DECLSPEC
 extern GstCaps *detect_caps_from_data(const char *url, const void *data, guint size) DECLSPEC_HIDDEN;
 extern GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps) DECLSPEC_HIDDEN;
 extern GstBuffer *create_buffer_from_bytes(const void *data, guint size) DECLSPEC_HIDDEN;
+extern gchar *stream_lang_from_tags(GstTagList *tags, GstCaps *caps) DECLSPEC_HIDDEN;
+extern gchar *stream_name_from_tags(GstTagList *tags) DECLSPEC_HIDDEN;
 
 /* wg_format.c */
 
 extern void wg_format_from_caps(struct wg_format *format, const GstCaps *caps) DECLSPEC_HIDDEN;
 extern bool wg_format_compare(const struct wg_format *a, const struct wg_format *b) DECLSPEC_HIDDEN;
 extern GstCaps *wg_format_to_caps(const struct wg_format *format) DECLSPEC_HIDDEN;
+
+extern gchar *wg_stream_lang_from_tags(GstTagList *tags, GstCaps *caps) DECLSPEC_HIDDEN;
+extern gchar *wg_stream_name_from_tags(GstTagList *tags) DECLSPEC_HIDDEN;
 
 /* wg_transform.c */
 
@@ -70,6 +75,7 @@ extern NTSTATUS wg_source_destroy(void *args) DECLSPEC_HIDDEN;
 extern NTSTATUS wg_source_get_status(void *args) DECLSPEC_HIDDEN;
 extern NTSTATUS wg_source_push_data(void *args) DECLSPEC_HIDDEN;
 extern NTSTATUS wg_source_get_stream_format(void *args) DECLSPEC_HIDDEN;
+extern NTSTATUS wg_source_get_stream_tag(void *args) DECLSPEC_HIDDEN;
 
 /* wg_allocator.c */
 

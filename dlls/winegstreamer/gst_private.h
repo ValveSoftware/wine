@@ -115,6 +115,8 @@ bool wg_source_get_status(struct wg_source *source, uint32_t *stream_count,
 HRESULT wg_source_push_data(struct wg_source *source, const void *data, uint32_t size);
 bool wg_source_get_stream_format(struct wg_source *source, UINT32 index,
         struct wg_format *format);
+char *wg_source_get_stream_tag(struct wg_source *source, UINT32 index,
+        enum wg_parser_tag tag);
 
 unsigned int wg_format_get_max_size(const struct wg_format *format);
 
