@@ -149,6 +149,7 @@ HRESULT wg_transform_read_mf(struct wg_transform *transform, IMFSample *sample,
 HRESULT wg_transform_read_quartz(struct wg_transform *transform, struct wg_sample *sample);
 
 HRESULT winegstreamer_stream_handler_create(REFIID riid, void **obj);
+HRESULT media_source_create_from_stream(IMFByteStream *stream, IMFMediaSource **out);
 
 HRESULT aac_decoder_create(REFIID riid, void **ret);
 HRESULT h264_decoder_create(REFIID riid, void **ret);
