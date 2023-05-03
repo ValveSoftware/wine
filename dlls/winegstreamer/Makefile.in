@@ -12,6 +12,7 @@ C_SRCS = \
 	h264_decoder.c \
 	main.c \
 	media_source.c \
+	mf_handler.c \
 	mfplat.c \
 	quartz_parser.c \
 	quartz_transform.c \
