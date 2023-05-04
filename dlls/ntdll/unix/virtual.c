@@ -3426,6 +3426,7 @@ void virtual_get_system_info( SYSTEM_BASIC_INFORMATION *info, BOOL wow64 )
     if (!sysinfo(&sinfo))
     {
         ULONG64 total = (ULONG64)sinfo.totalram * sinfo.mem_unit;
+        total -= min(total, ram_reporting_bias);
         info->MmHighestPhysicalPage = max(1, total / page_size);
     }
 #elif defined(__APPLE__)

@@ -2116,7 +2116,15 @@ static void get_performance_info( SYSTEM_PERFORMANCE_INFORMATION *info )
                     mem_available = value * 1024;
             }
             fclose(fp);
+            totalram -= min( totalram, ram_reporting_bias );
             if (mem_available) freeram = mem_available;
+            if ((long long)freeram >= ram_reporting_bias) freeram -= ram_reporting_bias;
+            else
+            {
+                long long bias = ram_reporting_bias - freeram;
+                freeswap -= min( bias, freeswap );
+                freeram = 0;
+            }
         }
     }
 #elif defined(__FreeBSD__) || defined(__FreeBSD_kernel__) || defined(__NetBSD__) || \
