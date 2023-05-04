@@ -2229,11 +2229,17 @@ static ULONG_PTR get_image_address(void)
 BOOL localsystem_sid;
 BOOL simulate_writecopy;
 SIZE_T kernel_stack_size = 0x100000;
+long long ram_reporting_bias;
 
 static void hacks_init(void)
 {
     const char *sgi = getenv( "SteamGameId" );
     const char *env_str;
+    if ((env_str = getenv("WINE_RAM_REPORTING_BIAS")))
+    {
+        ram_reporting_bias = atoll(env_str) * 1024 * 1024;
+        ERR( "HACK: ram_reporting_bias %lldMB.\n", ram_reporting_bias / (1024 * 1024) );
+    }
 
     switch (sgi ? atoi( sgi ) : -1)
     {
