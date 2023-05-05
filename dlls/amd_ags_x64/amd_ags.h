@@ -417,6 +417,7 @@ typedef enum AsicFamily
     AsicFamily_Vega,                                            ///< AMD Vega architecture, including Raven Ridge (ie AMD Ryzen CPU + AMD Vega GPU).
     AsicFamily_RDNA,                                            ///< AMD RDNA architecture
     AsicFamily_RDNA2,                                           ///< AMD RDNA2 architecture
+    AsicFamily_RDNA3,                                           ///< AMD RDNA3 architecture
 
     AsicFamily_Count                                            ///< Number of enumerated ASIC families
 } AsicFamily;
@@ -1422,11 +1423,11 @@ AMD_AGS_API AGSReturnCode agsDriverExtensionsDX11_WriteBreadcrumb( AGSContext* c
 /// @{
 
 /// Additional topologies supported via extensions
-typedef enum AGSPrimitiveTopology
+typedef enum AGSPrimitiveTopologyDX11
 {
     AGS_PRIMITIVE_TOPOLOGY_QUADLIST                         = 7,    ///< Quad list
     AGS_PRIMITIVE_TOPOLOGY_SCREENRECTLIST                   = 9     ///< Screen rect list
-} AGSPrimitiveTopology;
+} AGSPrimitiveTopologyDX11;
 
 ///
 /// Function used to set the primitive topology. If you are using any of the extended topology types, then this function should
