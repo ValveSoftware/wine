@@ -123,7 +123,6 @@ struct AGSContext
     VkPhysicalDeviceMemoryProperties *memory_properties;
     ID3D11DeviceContext *d3d11_context;
     AGSDX11ExtensionsSupported_600 extensions;
-    unsigned int barrier_control;
 };
 
 static HMODULE hd3d11, hd3d12;
@@ -677,6 +676,7 @@ static void get_dx11_extensions_supported(ID3D11Device *device, AGSDX11Extension
 
     extensions->depthBoundsTest = !!ID3D11VkExtDevice_GetExtensionSupport(ext_device, D3D11_VK_EXT_DEPTH_BOUNDS);
     extensions->uavOverlap = !!ID3D11VkExtDevice_GetExtensionSupport(ext_device, D3D11_VK_EXT_BARRIER_CONTROL);
+    extensions->UAVOverlapDeferredContexts = extensions->uavOverlap;
 
     ID3D11VkExtDevice_Release(ext_device);
 
@@ -920,8 +920,7 @@ __ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds_530") )
 
-static AGSReturnCode update_barrier_control(AGSContext* context, ID3D11DeviceContext *dx_context,
-        D3D11_VK_BARRIER_CONTROL control, BOOL set)
+static AGSReturnCode update_uav_overlap(AGSContext* context, ID3D11DeviceContext *dx_context, BOOL set)
 {
     ID3D11VkExtContext *ext_context;
 
@@ -934,12 +933,7 @@ static AGSReturnCode update_barrier_control(AGSContext* context, ID3D11DeviceCon
         return AGS_EXTENSION_NOT_SUPPORTED;
     }
 
-    if (set)
-        context->barrier_control |= control;
-    else
-        context->barrier_control &= ~control;
-
-    ID3D11VkExtContext_SetBarrierControl(ext_context, context->barrier_control);
+    ID3D11VkExtContext_SetBarrierControl(ext_context, set ? D3D11_VK_BARRIER_CONTROL_IGNORE_WRITE_AFTER_WRITE : 0);
     ID3D11VkExtContext_Release(ext_context);
     return AGS_SUCCESS;
 }
@@ -954,7 +948,7 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap_520(AGSContext *con
         return AGS_INVALID_ARGS;
     }
 
-    return update_barrier_control(context, context->d3d11_context, D3D11_VK_BARRIER_CONTROL_IGNORE_WRITE_AFTER_WRITE, TRUE);
+    return update_uav_overlap(context, context->d3d11_context, TRUE);
 }
 
 AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap(AGSContext *context, ID3D11DeviceContext *dx_context)
@@ -967,7 +961,7 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap(AGSContext *context
         return AGS_INVALID_ARGS;
     }
 
-    return update_barrier_control(context, dx_context, D3D11_VK_BARRIER_CONTROL_IGNORE_WRITE_AFTER_WRITE, TRUE);
+    return update_uav_overlap(context, dx_context, TRUE);
 }
 
 __ASM_GLOBAL_FUNC( DX11_BeginUAVOverlap_impl,
@@ -987,7 +981,7 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_EndUAVOverlap_520(AGSContext *conte
         return AGS_INVALID_ARGS;
     }
 
-    return update_barrier_control(context, context->d3d11_context, D3D11_VK_BARRIER_CONTROL_IGNORE_WRITE_AFTER_WRITE, FALSE);
+    return update_uav_overlap(context, context->d3d11_context, FALSE);
 }
 
 AGSReturnCode WINAPI agsDriverExtensionsDX11_EndUAVOverlap(AGSContext *context, ID3D11DeviceContext *dx_context)
@@ -1000,7 +994,7 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_EndUAVOverlap(AGSContext *context, 
         return AGS_INVALID_ARGS;
     }
 
-    return update_barrier_control(context, dx_context, D3D11_VK_BARRIER_CONTROL_IGNORE_WRITE_AFTER_WRITE, FALSE);
+    return update_uav_overlap(context, dx_context, FALSE);
 }
 
 __ASM_GLOBAL_FUNC( DX11_EndUAVOverlap_impl,
