@@ -221,10 +221,18 @@ static AGSReturnCode vk_get_physical_device_properties(unsigned int *out_count,
     }
 
     for (i = 0; i < count; ++i)
+    {
         vkGetPhysicalDeviceProperties(vk_physical_devices[i], &properties[i]);
-
-    for (i = 0; i < count; ++i)
+        if (properties[i].deviceType != VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU
+                && properties[i].deviceType != VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
+        {
+            TRACE("Skipping device type %d.\n", properties[i].deviceType);
+            --i;
+            --count;
+            continue;
+        }
         vkGetPhysicalDeviceMemoryProperties(vk_physical_devices[i], &memory_properties[i]);
+    }
 
     *out_count = count;
     *out = properties;
