@@ -71,6 +71,10 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
         -1, -1, offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name), \
         offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
+#define DEF_FIELD_540_600(name) {DEVICE_FIELD_##name, {-1, -1, \
+        -1, -1, offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
+        -1, -1, -1}}
 #define DEF_FIELD_600_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), -1, \
@@ -85,6 +89,7 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
 #define DEVICE_FIELD_localMemoryInBytes 6
 #define DEVICE_FIELD_numDisplays 7
 #define DEVICE_FIELD_displays 8
+#define DEVICE_FIELD_isAPU 9
 
 static const struct
 {
@@ -102,6 +107,7 @@ device_struct_fields[] =
     DEF_FIELD(localMemoryInBytes),
     DEF_FIELD(numDisplays),
     DEF_FIELD(displays),
+    DEF_FIELD_540_600(isAPU),
 };
 
 #undef DEF_FIELD
@@ -482,6 +488,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
     {
         const VkPhysicalDeviceProperties *vk_properties = &context->properties[i];
         const VkPhysicalDeviceMemoryProperties *vk_memory_properties = &context->memory_properties[i];
+        struct AGSDeviceInfo_600 *device_600 = (struct AGSDeviceInfo_600 *)device;
         VkDeviceSize local_memory_size = 0;
 
         for (j = 0; j < vk_memory_properties->memoryHeapCount; j++)
@@ -492,7 +499,9 @@ static AGSReturnCode init_ags_context(AGSContext *context)
                 break;
             }
         }
-        TRACE("device %s, %04x:%04x, reporting local memory size 0x%s bytes\n", debugstr_a(vk_properties->deviceName),
+
+        TRACE("device %s, type %d, %04x:%04x, reporting local memory size 0x%s bytes\n",
+                debugstr_a(vk_properties->deviceName), vk_properties->deviceType,
                 vk_properties->vendorID, vk_properties->deviceID, wine_dbgstr_longlong(local_memory_size));
 
         SET_DEVICE_FIELD(device, adapterString, const char *, context->version, vk_properties->deviceName);
@@ -502,6 +511,13 @@ static AGSReturnCode init_ags_context(AGSContext *context)
         {
             SET_DEVICE_FIELD(device, architectureVersion, ArchitectureVersion, context->version, ArchitectureVersion_GCN);
             SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version, AsicFamily_GCN4);
+            if (vk_properties->deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+            {
+                if (context->version >= AMD_AGS_VERSION_6_0_0)
+                    device_600->isAPU = 1;
+                else
+                    SET_DEVICE_FIELD(device, isAPU, int, context->version, 1);
+            }
         }
         SET_DEVICE_FIELD(device, localMemoryInBytes, ULONG64, context->version, local_memory_size);
         if (!i)
@@ -509,7 +525,6 @@ static AGSReturnCode init_ags_context(AGSContext *context)
             if (context->version >= AMD_AGS_VERSION_6_0_0)
             {
                 // This is a bitfield now... Nice...
-                struct AGSDeviceInfo_600 *device_600 = (struct AGSDeviceInfo_600 *)device;
                 device_600->isPrimaryDevice = 1;
             }
             else
