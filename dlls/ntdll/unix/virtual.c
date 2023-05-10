@@ -80,6 +80,7 @@
 WINE_DEFAULT_DEBUG_CHANNEL(virtual);
 WINE_DECLARE_DEBUG_CHANNEL(module);
 WINE_DECLARE_DEBUG_CHANNEL(virtual_ranges);
+WINE_DECLARE_DEBUG_CHANNEL(virtstat);
 
 struct preload_info
 {
@@ -1171,6 +1172,53 @@ static void VIRTUAL_Dump(void)
 }
 #endif
 
+
+static void dump_memory_statistics(void)
+{
+    struct file_view *view;
+    SIZE_T anon_reserved = 0, anon_committed = 0, mapped = 0, mapped_committed = 0, marked_native = 0;
+    SIZE_T size, c_size;
+    char *base;
+    BYTE vprot;
+
+    if (!TRACE_ON(virtstat)) return;
+
+    WINE_RB_FOR_EACH_ENTRY( view, &views_tree, struct file_view, entry )
+    {
+        if (view->protect & VPROT_NATIVE)
+        {
+            marked_native += view->size;
+            continue;
+        }
+        base = view->base;
+        c_size = 0;
+        while (base != (char *)view->base + view->size)
+        {
+            size = get_vprot_range_size( base, (char *)view->base + view->size - base, VPROT_COMMITTED, &vprot );
+            if (vprot & VPROT_COMMITTED) c_size += size;
+            base += size;
+        }
+        if (is_view_valloc( view ))
+        {
+            anon_reserved += view->size;
+            anon_committed += c_size;
+        }
+        else
+        {
+            mapped += view->size;
+            mapped_committed += c_size;
+        }
+    }
+
+    anon_reserved /= 1024 * 1024;
+    anon_committed /= 1024 * 1024;
+    mapped /= 1024 * 1024;
+    mapped_committed /= 1024 * 1024;
+    marked_native /= 1024 * 1024;
+    TRACE_(virtstat)( "Total: res %lu, comm %lu; Anon: res %lu, comm %lu, marked Unix %lu.\n",
+                      anon_reserved + mapped, anon_committed + mapped_committed, anon_reserved, anon_committed,
+                      marked_native );
+}
 
 /***********************************************************************
  *           find_view
@@ -4154,7 +4202,11 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
         }
     }
 
-    if (!status) VIRTUAL_DEBUG_DUMP_VIEW( view );
+    if (!status)
+    {
+        VIRTUAL_DEBUG_DUMP_VIEW( view );
+        dump_memory_statistics();
+    }
 
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
 
@@ -4520,6 +4572,8 @@ NTSTATUS WINAPI NtFreeVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T *si
         WARN("called with wrong free type flags (%08x) !\n", (int)type);
         status = STATUS_INVALID_PARAMETER;
     }
+
+    dump_memory_statistics();
 
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
     return status;
