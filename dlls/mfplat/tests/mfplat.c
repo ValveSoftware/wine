@@ -8950,9 +8950,9 @@ static void test_MFInitMediaTypeFromAMMediaType(void)
     IMFMediaType_Release(media_type);
 }
 
-#define check_reset_data(a, b, c, d, e, f) check_reset_data_(__LINE__, a, b, c, d, e, f)
+#define check_reset_data(a, b, c, d, e) check_reset_data_(__LINE__, a, b, c, d, e)
 static void check_reset_data_(unsigned int line, IMF2DBuffer2 *buffer2d, const BYTE *data, BOOL bottom_up,
-        DWORD width, DWORD height, BOOL todo)
+        DWORD width, DWORD height)
 {
     BYTE *scanline0, *buffer_start;
     DWORD length, max_length;
@@ -8978,7 +8978,7 @@ static void check_reset_data_(unsigned int line, IMF2DBuffer2 *buffer2d, const B
         ok(buffer_start == scanline0, "buffer start mismatch.\n");
     }
     for (i = 0; i < height; ++i)
-        todo_wine_if(bottom_up && todo) ok_(__FILE__,line)(!memcmp(buffer_start + abs(pitch) * i, data + width * i * 4, width * 4),
+        ok_(__FILE__,line)(!memcmp(buffer_start + abs(pitch) * i, data + width * i * 4, width * 4),
                 "2D Data mismatch, scaline %d.\n", i);
     hr = IMF2DBuffer2_Unlock2D(buffer2d);
     ok(hr == S_OK, "got hr %#lx.\n", hr);
@@ -8987,7 +8987,7 @@ static void check_reset_data_(unsigned int line, IMF2DBuffer2 *buffer2d, const B
     ok(hr == S_OK, "got hr %#lx.\n", hr);
     ok_(__FILE__,line)(max_length == width * height * 4, "got max_length %lu.\n", max_length);
     ok_(__FILE__,line)(length == width * height * 4, "got length %lu.\n", length);
-    todo_wine_if(bottom_up && todo) ok_(__FILE__,line)(!memcmp(lock, data, length), "contiguous data mismatch.\n");
+    ok_(__FILE__,line)(!memcmp(lock, data, length), "contiguous data mismatch.\n");
     memset(lock, 0xcc, length);
     hr =  IMFMediaBuffer_Unlock(buffer);
     ok(hr == S_OK, "got hr %#lx.\n", hr);
@@ -9044,7 +9044,7 @@ static void test_2dbuffer_copy_(IMFMediaBuffer *buffer, BOOL bottom_up, DWORD wi
 
     memset(data, 0xcc, sizeof(data));
     data[0] = ((BYTE *)test_data)[0];
-    check_reset_data(buffer2d, data, bottom_up, width, height, FALSE);
+    check_reset_data(buffer2d, data, bottom_up, width, height);
 
     hr = IMF2DBuffer2_ContiguousCopyFrom(buffer2d, (BYTE *)test_data, sizeof(test_data));
     ok(hr == S_OK, "got hr %#lx.\n", hr);
@@ -9052,7 +9052,7 @@ static void test_2dbuffer_copy_(IMFMediaBuffer *buffer, BOOL bottom_up, DWORD wi
     ok(hr == S_OK, "got hr %#lx.\n", hr);
     ok(!memcmp(data, test_data, sizeof(data)), "data mismatch.\n");
 
-    check_reset_data(buffer2d, (const BYTE *)test_data, bottom_up, width, height, TRUE);
+    check_reset_data(buffer2d, (const BYTE *)test_data, bottom_up, width, height);
 
     hr = IMFMediaBuffer_SetCurrentLength(src_buffer, sizeof(test_data) + 1);
     ok(hr == S_OK, "got hr %#lx.\n", hr);
@@ -9064,7 +9064,7 @@ static void test_2dbuffer_copy_(IMFMediaBuffer *buffer, BOOL bottom_up, DWORD wi
     hr = IMFSample_CopyToBuffer(sample, buffer);
     ok(hr == S_OK, "got hr %#lx.\n", hr);
 
-    check_reset_data(buffer2d, (const BYTE *)test_data, bottom_up, width, height, FALSE);
+    check_reset_data(buffer2d, (const BYTE *)test_data, bottom_up, width, height);
 
     IMF2DBuffer2_Release(buffer2d);
     ref = IMFSample_Release(sample);
