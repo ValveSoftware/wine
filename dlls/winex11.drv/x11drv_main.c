@@ -715,7 +715,8 @@ static NTSTATUS x11drv_init( void *arg )
         e = getenv("WINE_DISABLE_VK_CHILD_WINDOW_RENDERING_HACK");
         vulkan_disable_child_window_rendering_hack =
             (sgi && (
-                !strcmp(sgi, "429660")  /* Bug 21949 : Tales of Berseria video tearing */
+                !strcmp(sgi, "429660") || /* Bug 21949 : Tales of Berseria video tearing */
+                !strcmp(sgi, "1009290")   /* Bug 21949 : SWORD ART ONLINE Alicization Lycoris video tearing */
             )) ||
             (e && *e != '\0' && *e != '0');
     }
