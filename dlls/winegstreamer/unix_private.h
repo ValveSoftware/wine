@@ -93,6 +93,10 @@ extern NTSTATUS wg_muxer_push_sample(void *args);
 extern NTSTATUS wg_muxer_read_data(void *args);
 extern NTSTATUS wg_muxer_finalize(void *args);
 
+/* wg_task_pool.c */
+
+extern GstTaskPool *wg_task_pool_new(void);
+
 /* wg_allocator.c */
 
 static inline BYTE *wg_sample_data(struct wg_sample *sample)
