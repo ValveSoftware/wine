@@ -101,7 +101,7 @@ struct wg_parser_stream
     struct wg_parser *parser;
     uint32_t number;
 
-    GstPad *their_src, *my_sink;
+    GstPad *my_sink;
     GstElement *flip;
     GstSegment segment;
     struct wg_format preferred_format, current_format;
@@ -865,8 +865,6 @@ static void free_stream(struct wg_parser_stream *stream)
 {
     unsigned int i;
 
-    if (stream->their_src)
-        gst_object_unref(stream->their_src);
     gst_object_unref(stream->my_sink);
 
     if (stream->buffer)
@@ -1033,7 +1031,6 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
     }
 
     gst_pad_set_active(stream->my_sink, 1);
-    gst_object_ref(stream->their_src = pad);
 out:
     gst_caps_unref(caps);
 }
@@ -1041,22 +1038,9 @@ out:
 static void pad_removed_cb(GstElement *element, GstPad *pad, gpointer user)
 {
     struct wg_parser *parser = user;
-    unsigned int i;
     char *name;
 
     GST_LOG("parser %p, element %p, pad %p.", parser, element, pad);
-
-    for (i = 0; i < parser->stream_count; ++i)
-    {
-        struct wg_parser_stream *stream = parser->streams[i];
-
-        if (stream->their_src == pad)
-        {
-            gst_object_unref(stream->their_src);
-            stream->their_src = NULL;
-            return;
-        }
-    }
 
     name = gst_pad_get_name(pad);
     GST_WARNING("No pin matching pad \"%s\" found.", name);
@@ -1391,6 +1375,7 @@ static gboolean src_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
 
 static void query_tags(struct wg_parser_stream *stream)
 {
+    GstPad *peer = gst_pad_get_peer(stream->my_sink);
     const gchar *struct_name;
     GstTagList *tag_list;
     GstEvent *tag_event;
@@ -1400,8 +1385,10 @@ static void query_tags(struct wg_parser_stream *stream)
     GstBuffer *buf;
     gsize size;
 
-    if (!(tag_event = gst_pad_get_sticky_event(stream->their_src, GST_EVENT_TAG, 0)))
+    if (!(tag_event = gst_pad_get_sticky_event(peer, GST_EVENT_TAG, 0))) {
+        gst_object_unref(peer);
         return;
+    }
 
     gst_event_parse_tag(tag_event, &tag_list);
     gst_tag_list_get_string(tag_list, "language-code", &stream->tags[WG_PARSER_TAG_LANGUAGE]);
@@ -1433,6 +1420,7 @@ static void query_tags(struct wg_parser_stream *stream)
         stream->tags[WG_PARSER_TAG_NAME][size] = 0;
     }
     gst_event_unref(tag_event);
+    gst_object_unref(peer);
 }
 
 static NTSTATUS wg_parser_connect(void *args)
@@ -1548,7 +1536,7 @@ static NTSTATUS wg_parser_connect(void *args)
                 pthread_mutex_unlock(&parser->mutex);
                 goto out;
             }
-            if (gst_pad_query_duration(stream->their_src, GST_FORMAT_TIME, &duration))
+            if (gst_pad_peer_query_duration(stream->my_sink, GST_FORMAT_TIME, &duration))
             {
                 stream->duration = duration / 100;
                 break;
@@ -1745,7 +1733,6 @@ static BOOL mpeg_audio_parser_init_gst(struct wg_parser *parser)
 {
     struct wg_parser_stream *stream;
     GstElement *element;
-    int ret;
 
     if (!(element = create_element("mpegaudioparse", "good")))
         return FALSE;
@@ -1758,12 +1745,8 @@ static BOOL mpeg_audio_parser_init_gst(struct wg_parser *parser)
     if (!(stream = create_stream(parser, NULL)))
         return FALSE;
 
-    gst_object_ref(stream->their_src = gst_element_get_static_pad(element, "src"));
-    if ((ret = gst_pad_link(stream->their_src, stream->my_sink)) < 0)
-    {
-        GST_ERROR("Failed to link source pads, error %d.", ret);
+    if (!link_element_to_sink(element, stream->my_sink))
         return FALSE;
-    }
     gst_pad_set_active(stream->my_sink, 1);
 
     parser->no_more_pads = true;
@@ -1775,7 +1758,6 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
 {
     struct wg_parser_stream *stream;
     GstElement *element;
-    int ret;
 
     if (!(element = create_element("wavparse", "good")))
         return FALSE;
@@ -1788,13 +1770,8 @@ static BOOL wave_parser_init_gst(struct wg_parser *parser)
     if (!(stream = create_stream(parser, NULL)))
         return FALSE;
 
-    stream->their_src = gst_element_get_static_pad(element, "src");
-    gst_object_ref(stream->their_src);
-    if ((ret = gst_pad_link(stream->their_src, stream->my_sink)) < 0)
-    {
-        GST_ERROR("Failed to link source pads, error %d.", ret);
+    if (!link_element_to_sink(element, stream->my_sink))
         return FALSE;
-    }
     gst_pad_set_active(stream->my_sink, 1);
 
     parser->no_more_pads = true;
