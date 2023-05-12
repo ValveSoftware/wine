@@ -898,8 +898,14 @@ static struct wg_parser_stream *create_stream(struct wg_parser *parser)
 
 static void free_stream(struct wg_parser_stream *stream)
 {
+    GstPad *peer;
     unsigned int i;
 
+    if ((peer = gst_pad_get_peer(stream->my_sink)))
+    {
+        gst_pad_unlink(peer, stream->my_sink);
+        gst_object_unref(peer);
+    }
     gst_object_unref(stream->my_sink);
 
     if (stream->buffer)
