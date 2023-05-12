@@ -64,6 +64,7 @@ struct wg_parser
 
     GstElement *container, *decodebin;
     GstBus *bus;
+    GstTaskPool *task_pool;
     GstPad *my_src;
 
     guint64 file_size, start_offset, next_offset, stop_offset;
@@ -1332,6 +1333,24 @@ static GstBusSyncReply bus_handler_cb(GstBus *bus, GstMessage *msg, gpointer use
         }
         break;
 
+    case GST_MESSAGE_STREAM_STATUS:
+    {
+        GstStreamStatusType type;
+        GstElement *element;
+        const GValue *val;
+        GstTask *task;
+
+        gst_message_parse_stream_status(msg, &type, &element);
+        val = gst_message_get_stream_status_object(msg);
+        GST_DEBUG("parser %p, message %s, type %u, value %p (%s).", parser, GST_MESSAGE_TYPE_NAME(msg), type, val, G_VALUE_TYPE_NAME(val));
+
+        if (G_VALUE_TYPE(val) == GST_TYPE_TASK && (task = g_value_get_object(val))
+                && type == GST_STREAM_STATUS_TYPE_CREATE)
+            gst_task_set_pool(task, parser->task_pool);
+
+        break;
+    }
+
     default:
         break;
     }
@@ -1692,6 +1711,7 @@ static NTSTATUS wg_parser_disconnect(void *args)
     gst_object_unref(parser->container);
     parser->container = NULL;
 
+    gst_task_pool_cleanup(parser->task_pool);
     return S_OK;
 }
 
@@ -1834,6 +1854,7 @@ static NTSTATUS wg_parser_create(void *args)
 
     struct wg_parser_create_params *params = args;
     struct wg_parser *parser;
+    GError *error;
 
     if (!(parser = calloc(1, sizeof(*parser))))
         return E_OUTOFMEMORY;
@@ -1847,6 +1868,12 @@ static NTSTATUS wg_parser_create(void *args)
             parser->use_opengl = FALSE;
         }
     }
+    if (!(parser->task_pool = wg_task_pool_new()))
+    {
+        free(parser);
+        return E_OUTOFMEMORY;
+    }
+    gst_task_pool_prepare(parser->task_pool, &error);
 
     pthread_mutex_init(&parser->mutex, NULL);
     pthread_cond_init(&parser->init_cond, NULL);
@@ -1869,6 +1896,7 @@ static NTSTATUS wg_parser_destroy(void *args)
         gst_bus_set_sync_handler(parser->bus, NULL, NULL, NULL);
         gst_object_unref(parser->bus);
     }
+    gst_object_unref(parser->task_pool);
 
     if (parser->context)
         gst_context_unref(parser->context);
