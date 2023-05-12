@@ -77,6 +77,10 @@ extern NTSTATUS wg_source_push_data(void *args) DECLSPEC_HIDDEN;
 extern NTSTATUS wg_source_get_stream_format(void *args) DECLSPEC_HIDDEN;
 extern NTSTATUS wg_source_get_stream_tag(void *args) DECLSPEC_HIDDEN;
 
+/* wg_task_pool.c */
+
+extern GstTaskPool *wg_task_pool_new(void) DECLSPEC_HIDDEN;
+
 /* wg_allocator.c */
 
 /* wg_allocator_release_sample can be used to release any sample that was requested. */
