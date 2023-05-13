@@ -426,6 +426,7 @@ void test_overlapped_format( DWORD version )
 
 
     IUnknown_Release( keyboard );
+    IDirectInput_Release( dinput );
 
     DestroyWindow( hwnd );
     CloseHandle( event );
