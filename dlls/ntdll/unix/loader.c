@@ -2283,6 +2283,7 @@ BOOL no_priv_elevation;
 BOOL localsystem_sid;
 BOOL high_dll_addresses;
 BOOL simulate_writecopy;
+SIZE_T kernel_stack_size = 0x100000;
 
 static void hacks_init(void)
 {
@@ -2362,6 +2363,13 @@ static void hacks_init(void)
         localsystem_sid = TRUE;
         return;
     }
+
+    if ((env_str = getenv( "WINE_KERNEL_STACK_SIZE" )))
+        kernel_stack_size = atoll( env_str ) * 1024;
+    else if (sgi && !strcmp( sgi, "702700" ))
+        kernel_stack_size = 200 * 1024;
+    if (kernel_stack_size != 0x100000)
+        ERR( "HACK: setting kernel_stack_size to %luKB.\n", (long)(kernel_stack_size / 1024) );
 
     if (main_argc > 1 && (strstr(main_argv[1], "\\EADesktop.exe") || strstr(main_argv[1], "\\Link2EA.exe")
         || strstr(main_argv[1], "EA Desktop\\ErrorReporter.exe") || strstr(main_argv[1], "\\EAConnect_microsoft.exe")
