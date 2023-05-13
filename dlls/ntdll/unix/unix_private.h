@@ -126,7 +126,7 @@ static const SIZE_T page_size = 0x1000;
 static const SIZE_T teb_size = 0x3800;  /* TEB64 + TEB32 + debug info */
 static const SIZE_T signal_stack_mask = 0xffff;
 static const SIZE_T signal_stack_size = 0x10000 - 0x3800;
-static const SIZE_T kernel_stack_size = 0x100000;
+extern SIZE_T kernel_stack_size;
 static const SIZE_T kernel_stack_guard_size = 0x1000;
 static const SIZE_T min_kernel_stack  = 0x3000;
 static const LONG teb_offset = 0x2000;
