@@ -182,6 +182,9 @@ static void *user_space_limit    = (void *)0x7fff0000;
 static void *working_set_limit   = (void *)0x7fff0000;
 #endif
 
+static const ptrdiff_t max_try_map_step = 0x40000000;
+static BOOL increase_try_map_step = TRUE;
+
 struct _KUSER_SHARED_DATA *user_shared_data = (void *)0x7ffe0000;
 
 /* TEB allocation blocks */
@@ -1302,7 +1305,8 @@ static void* try_map_free_area( struct alloc_area *area, void *base, void *end, 
             step == 0)
             break;
         start = (char *)start + step;
-        step *= 2;
+        if (increase_try_map_step && llabs(step) < max_try_map_step)
+            step *= 2;
     }
 
     return NULL;
@@ -2168,11 +2172,13 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     }
     else if (!(ptr = alloc_free_area( (void *)limit, size, top_down, get_unix_prot( vprot ), align_mask )))
     {
-        WARN("Allocation failed, clearing native views.\n");
+        WARN( "Allocation failed, clearing native views.\n" );
 
         clear_native_views();
-        if (!(ptr = alloc_free_area( (void *)limit, size, top_down, get_unix_prot( vprot ), align_mask )))
-            return STATUS_NO_MEMORY;
+        if (!is_win64) increase_try_map_step = FALSE;
+        ptr = alloc_free_area( (void *)limit, size, top_down, get_unix_prot( vprot ), align_mask );
+        if (!is_win64) increase_try_map_step = TRUE;
+        if (!ptr) return STATUS_NO_MEMORY;
     }
     status = create_view( view_ret, ptr, size, vprot );
     if (status != STATUS_SUCCESS) unmap_area( ptr, size );
