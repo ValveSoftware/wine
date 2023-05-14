@@ -3986,7 +3986,6 @@ static void test_pen(void)
     expect(RGB(0xff, 0, 0), color);
 
     color = GetPixel(hdc, 40, 90);
-    todo_wine
     flaky /* Win10 + */
     expect(RGB(0xff, 0, 0), color);
 
