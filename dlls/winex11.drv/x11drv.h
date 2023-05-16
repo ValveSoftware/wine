@@ -597,9 +597,6 @@ extern void (*pXFreeEventData)( Display *display, XEvent /*XGenericEventCookie*/
 
 extern DWORD x11drv_time_to_ticks(Time time) DECLSPEC_HIDDEN;
 
-extern void x11drv_input_add_window( HWND hwnd, Window window ) DECLSPEC_HIDDEN;
-extern void x11drv_input_remove_window( Window window ) DECLSPEC_HIDDEN;
-
 /* X11 driver private messages, must be in the range 0x80001000..0x80001fff */
 enum x11drv_window_messages
 {
@@ -911,7 +908,6 @@ extern NTSTATUS x11drv_tablet_load_info( void *arg ) DECLSPEC_HIDDEN;
 extern NTSTATUS x11drv_tablet_info( void *arg ) DECLSPEC_HIDDEN;
 extern NTSTATUS x11drv_xim_preedit_state( void *arg ) DECLSPEC_HIDDEN;
 extern NTSTATUS x11drv_xim_reset( void *arg ) DECLSPEC_HIDDEN;
-extern NTSTATUS x11drv_input_thread( void *arg ) DECLSPEC_HIDDEN;
 
 extern NTSTATUS x11drv_client_func( enum x11drv_client_funcs func, const void *params,
                                     ULONG size ) DECLSPEC_HIDDEN;
@@ -1022,6 +1018,5 @@ static inline UINT asciiz_to_unicode( WCHAR *dst, const char *src )
 extern BOOL layered_window_client_hack;
 extern BOOL vulkan_gdi_blit_source_hack;
 extern BOOL vulkan_disable_child_window_rendering_hack;
-extern BOOL input_thread_hack;
 
 #endif  /* __WINE_X11DRV_H */
