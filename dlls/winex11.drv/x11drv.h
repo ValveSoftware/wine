@@ -459,7 +459,7 @@ extern int xrender_error_base DECLSPEC_HIDDEN;
 extern int xfixes_event_base DECLSPEC_HIDDEN;
 extern char *process_name DECLSPEC_HIDDEN;
 extern Display *clipboard_display DECLSPEC_HIDDEN;
-extern WNDPROC client_foreign_window_proc;
+extern WNDPROC client_foreign_window_proc DECLSPEC_HIDDEN;
 extern HANDLE steam_overlay_event DECLSPEC_HIDDEN;
 extern HANDLE steam_keyboard_event DECLSPEC_HIDDEN;
 
