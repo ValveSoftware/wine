@@ -469,7 +469,7 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
          * never deselects it). Remove buffering limits from decodebin in order to
          * account for this. Note that this does leak memory, but the same memory
          * leak occurs with native. */
-        if (!(source->wg_parser = wg_parser_create(WG_PARSER_DECODEBIN, true)))
+        if (!(source->wg_parser = wg_parser_create(WG_PARSER_DECODEBIN, false)))
             return E_OUTOFMEMORY;
         if (!(source->read_thread = CreateThread(NULL, 0, read_thread, source, 0, NULL)))
             return E_OUTOFMEMORY;
