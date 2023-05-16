@@ -828,7 +828,7 @@ static NTSTATUS x11drv_init( void *arg )
     XkbUseExtension( gdi_display, NULL, NULL );
     X11DRV_InitKeyboard( gdi_display );
     X11DRV_InitMouse( gdi_display );
-    if (use_xim) use_xim = X11DRV_InitXIM( input_style );
+    if (use_xim) use_xim = xim_init( input_style );
 
     {
         const char *e = getenv("WINE_DISABLE_FULLSCREEN_HACK");
@@ -943,7 +943,7 @@ struct x11drv_thread_data *x11drv_init_thread_data(void)
     set_queue_display_fd( data->display );
     NtUserGetThreadInfo()->driver_data = (UINT_PTR)data;
 
-    if (use_xim) X11DRV_SetupXIM();
+    if (use_xim) xim_thread_attach( data );
 
     X11DRV_XInput2_Init();
     if (NtUserGetWindowThread( NtUserGetDesktopWindow(), NULL ) == GetCurrentThreadId())
