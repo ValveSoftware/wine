@@ -2281,7 +2281,7 @@ static DWORD wait_message( DWORD count, const HANDLE *handles, DWORD timeout, DW
                                                      mask, flags );
     if (HIWORD(ret))  /* is it an error code? */
     {
-        if (count) RtlSetLastWin32Error( RtlNtStatusToDosError(ret) );
+        RtlSetLastWin32Error( RtlNtStatusToDosError(ret) );
         ret = WAIT_FAILED;
     }
     if (ret == WAIT_TIMEOUT && !count && !timeout) NtYieldExecution();
