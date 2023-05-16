@@ -374,9 +374,7 @@ NTSTATUS wg_source_create(void *args)
 
     for (i = 0; i < ARRAY_SIZE(source->stream_pads); i++)
     {
-        GstStaticPadTemplate sink_template = GST_STATIC_PAD_TEMPLATE("sink",
-                GST_PAD_SINK, GST_PAD_ALWAYS, GST_STATIC_CAPS_ANY);
-        if (!(source->stream_pads[i] = gst_pad_new_from_static_template(&sink_template, "src")))
+        if (!(source->stream_pads[i] = create_pad_with_caps(GST_PAD_SINK, NULL)))
             goto error;
         gst_pad_set_element_private(source->stream_pads[i], source);
         gst_pad_set_chain_function(source->stream_pads[i], sink_chain_cb);
