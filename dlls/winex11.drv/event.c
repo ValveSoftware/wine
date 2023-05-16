@@ -509,7 +509,7 @@ static inline BOOL call_event_handler( Display *display, XEvent *event )
 /***********************************************************************
  *           process_events
  */
-static BOOL process_events( Display *display, ULONG_PTR arg )
+static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,XPointer), ULONG_PTR arg )
 {
     XEvent event, prev_event;
     int count = 0;
@@ -525,7 +525,7 @@ static BOOL process_events( Display *display, ULONG_PTR arg )
         steam_keyboard_opened = TRUE;
 
     prev_event.type = 0;
-    while (XCheckIfEvent( display, &event, filter_event, (char *)arg ))
+    while (XCheckIfEvent( display, &event, filter, (char *)arg ))
     {
         switch (event.type)
         {
@@ -614,12 +614,12 @@ NTSTATUS X11DRV_MsgWaitForMultipleObjectsEx( DWORD count, const HANDLE *handles,
 
     if (data->current_event) mask = 0;  /* don't process nested events */
 
-    if (process_events( data->display, mask )) ret = count - 1;
+    if (process_events( data->display, filter_event, mask )) ret = count - 1;
     else if (count || !timeout || timeout->QuadPart)
     {
         ret = NtWaitForMultipleObjects( count, handles, !(flags & MWMO_WAITALL),
                                         !!(flags & MWMO_ALERTABLE), timeout );
-        if (ret == count - 1) process_events( data->display, mask );
+        if (ret == count - 1) process_events( data->display, filter_event, mask );
     }
     else ret = WAIT_TIMEOUT;
 
