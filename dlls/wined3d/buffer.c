@@ -1369,7 +1369,7 @@ static HRESULT wined3d_buffer_init(struct wined3d_buffer *buffer, struct wined3d
         access |= WINED3D_RESOURCE_ACCESS_MAP_W;
 
     if (FAILED(hr = resource_init(resource, device, WINED3D_RTYPE_BUFFER, format,
-            WINED3D_MULTISAMPLE_NONE, 0, desc->usage, desc->bind_flags, access,
+            WINED3D_MULTISAMPLE_NONE, 0, desc->usage & ~WINED3DUSAGE_PRIVATE, desc->bind_flags, access,
             desc->byte_width, 1, 1, desc->byte_width, parent, parent_ops, &buffer_resource_ops)))
     {
         WARN("Failed to initialize resource, hr %#lx.\n", hr);
@@ -1382,8 +1382,8 @@ static HRESULT wined3d_buffer_init(struct wined3d_buffer *buffer, struct wined3d
     TRACE("buffer %p, size %#x, usage %#x, memory @ %p.\n",
             buffer, buffer->resource.size, buffer->resource.usage, buffer->resource.heap_memory);
 
-    if (device->create_parms.flags & WINED3DCREATE_SOFTWARE_VERTEXPROCESSING
-            || (desc->usage & WINED3DUSAGE_MANAGED))
+    if (!(desc->usage & WINED3DUSAGE_PRIVATE) && (device->create_parms.flags & WINED3DCREATE_SOFTWARE_VERTEXPROCESSING
+            || (desc->usage & WINED3DUSAGE_MANAGED)))
     {
         /* SWvp and managed buffers always return the same pointer in buffer
          * maps and retain data in DISCARD maps. Keep a system memory copy of
@@ -1760,7 +1760,7 @@ static HRESULT wined3d_streaming_buffer_prepare(struct wined3d_device *device,
     TRACE("Growing buffer to %u bytes.\n", size);
 
     desc.byte_width = size;
-    desc.usage = WINED3DUSAGE_DYNAMIC;
+    desc.usage = WINED3DUSAGE_DYNAMIC | WINED3DUSAGE_PRIVATE;
     desc.bind_flags = buffer->bind_flags;
     desc.access = WINED3D_RESOURCE_ACCESS_GPU | WINED3D_RESOURCE_ACCESS_MAP_W;
     desc.misc_flags = 0;
