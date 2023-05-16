@@ -1407,6 +1407,13 @@ static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
             }
             return FALSE;
 
+        case GST_QUERY_LATENCY:
+        {
+            const char *live = getenv("WINE_ENABLE_GST_LIVE_LATENCY");
+            gst_query_set_latency(query, live && !strcmp(live, "1"), 0, 0);
+            return TRUE;
+        }
+
         default:
             GST_WARNING("Unhandled query type %s.", GST_QUERY_TYPE_NAME(query));
             return FALSE;
