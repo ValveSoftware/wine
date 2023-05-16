@@ -28,19 +28,17 @@
 
 #define NONAMELESSSTRUCT
 #define NONAMELESSUNION
-
-#include "wine/debug.h"
-
-WINE_DEFAULT_DEBUG_CHANNEL(xrandr);
-
-#ifdef SONAME_LIBXRANDR
-
 #include <assert.h>
 #include <X11/Xlib.h>
 #include <X11/extensions/Xrandr.h>
 #include <dlfcn.h>
 #include <stdlib.h>
 #include "x11drv.h"
+#include "wine/debug.h"
+
+WINE_DEFAULT_DEBUG_CHANNEL(xrandr);
+
+#ifdef SONAME_LIBXRANDR
 
 #define VK_NO_PROTOTYPES
 #define WINE_VK_HOST
