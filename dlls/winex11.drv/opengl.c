@@ -2103,7 +2103,7 @@ static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_ha
     if (attribs->red_size != 8 || attribs->green_size != 8 || attribs->blue_size != 8)
         FIXME( "Unsupported RGBA color sizes {%u, %u, %u, %u}.\n", attribs->red_size,
                attribs->green_size, attribs->blue_size, attribs->alpha_size );
-    config->color_internalformat = attribs->alpha_size ? GL_SRGB8_ALPHA8 : GL_SRGB8;
+    config->color_internalformat = attribs->alpha_size ? GL_RGBA8 : GL_RGB8;
     config->color_format = GL_BGRA;
     config->color_type = GL_UNSIGNED_INT_8_8_8_8_REV;
     if (attribs->depth_size || attribs->stencil_size)
@@ -2763,7 +2763,7 @@ static void fs_hack_handle_shaders( int mode, struct gl_drawable *gl, struct wgl
         fs_hack_handle_enable_switch( mode, GL_FRAGMENT_PROGRAM_ARB, &state->arb_frag, FALSE );
     if (gl->has_vertex_program)
         fs_hack_handle_enable_switch( mode, GL_VERTEX_PROGRAM_ARB, &state->arb_vert, FALSE );
-    fs_hack_handle_enable_switch( mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, TRUE );
+    fs_hack_handle_enable_switch( mode, GL_FRAMEBUFFER_SRGB, &state->fb_srgb, FALSE );
 
     if (gl->has_ati_frag_shader)
         fs_hack_handle_enable_switch( mode, GL_FRAGMENT_SHADER_ATI, &state->ati_frag, FALSE );
