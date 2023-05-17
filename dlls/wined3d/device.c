@@ -3071,6 +3071,7 @@ static void init_transformed_lights(struct lights_settings *ls,
 {
     const struct wined3d_light_info *lights[WINED3D_MAX_SOFTWARE_ACTIVE_LIGHTS];
     const struct wined3d_light_info *light_info;
+    struct wined3d_light_info *light_iter;
     struct light_transformed *light;
     struct wined3d_vec4 vec4;
     unsigned int light_count;
@@ -3102,12 +3103,13 @@ static void init_transformed_lights(struct lights_settings *ls,
     ls->normalise = !!state->render_states[WINED3D_RS_NORMALIZENORMALS];
     ls->localviewer = !!state->render_states[WINED3D_RS_LOCALVIEWER];
 
-    RB_FOR_EACH_ENTRY(light_info, &state->light_state.lights_tree, struct wined3d_light_info, entry)
+    index = 0;
+    RB_FOR_EACH_ENTRY(light_iter, &state->light_state.lights_tree, struct wined3d_light_info, entry)
     {
-        if (!light_info->enabled)
+        if (!light_iter->enabled)
             continue;
 
-        switch (light_info->OriginalParms.type)
+        switch (light_iter->OriginalParms.type)
         {
             case WINED3D_LIGHT_DIRECTIONAL:
                 ++ls->directional_light_count;
@@ -3126,10 +3128,10 @@ static void init_transformed_lights(struct lights_settings *ls,
                 break;
 
             default:
-                FIXME("Unhandled light type %#x.\n", light_info->OriginalParms.type);
+                FIXME("Unhandled light type %#x.\n", light_iter->OriginalParms.type);
                 continue;
         }
-        lights[index++] = light_info;
+        lights[index++] = light_iter;
         if (index == WINED3D_MAX_SOFTWARE_ACTIVE_LIGHTS)
             break;
     }
