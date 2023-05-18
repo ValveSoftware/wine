@@ -1723,6 +1723,59 @@ LPSTR WINAPI DECLSPEC_HOTPATCH GetEnvironmentStringsA(void)
     return ret;
 }
 
+static void hack_shrink_environment( WCHAR *env, SIZE_T len )
+{
+    static int enabled = -1;
+    static const char *skip[] =
+    {
+        "SteamGenericControllers=",
+        "STEAM_RUNTIME_LIBRARY_PATH=",
+        "SDL_GAMECONTROLLER_IGNORE_DEVICES=",
+        "SDL_GAMECONTROLLERCONFIG=",
+        "LD_LIBRARY_PATH=",
+        "ORIG_LD_LIBRARY_PATH=",
+        "LS_COLORS=",
+        "BASH_FUNC_",
+        "XDG_DATA_DIRS=",
+    };
+    SIZE_T l;
+    unsigned int i, j;
+
+    if (enabled == -1)
+    {
+        WCHAR str[40];
+
+        *str = 0;
+        if (GetEnvironmentVariableW( L"WINE_SHRINK_ENV", str, sizeof(str)) )
+            enabled = *str != '0';
+        else if (GetEnvironmentVariableW( L"SteamGameId", str, sizeof(str)) )
+            enabled = !wcscmp( str, L"431590" );
+        else
+            enabled = 0;
+
+        if (enabled)
+            ERR( "HACK: shrinking environment size.\n" );
+    }
+
+    if (!enabled) return;
+
+    while (*env)
+    {
+        for (i = 0; i < ARRAY_SIZE(skip); ++i)
+        {
+            j = 0;
+            while (skip[i][j] && skip[i][j] == env[j])
+                ++j;
+            if (!skip[i][j]) break;
+        }
+        l = lstrlenW( env );
+        len -= (l + 1) * sizeof(WCHAR);
+        if (i == ARRAY_SIZE(skip))
+            env += l + 1;
+        else
+            memmove( env, env + l + 1, len );
+    }
+}
 
 /***********************************************************************
  *           GetEnvironmentStringsW   (kernelbase.@)
@@ -1735,7 +1788,10 @@ LPWSTR WINAPI DECLSPEC_HOTPATCH GetEnvironmentStringsW(void)
     RtlAcquirePebLock();
     len = get_env_length( NtCurrentTeb()->Peb->ProcessParameters->Environment ) * sizeof(WCHAR);
     if ((ret = HeapAlloc( GetProcessHeap(), 0, len )))
+    {
         memcpy( ret, NtCurrentTeb()->Peb->ProcessParameters->Environment, len );
+        hack_shrink_environment( ret, len );
+    }
     RtlReleasePebLock();
     return ret;
 }
