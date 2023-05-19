@@ -816,7 +816,6 @@ static const char * const focus_modes[] =
 static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
 {
     XFocusChangeEvent *event = &xev->xfocus;
-    XIC xic;
 
     if (!hwnd) return FALSE;
 
@@ -853,7 +852,8 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
     if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
 
-    if ((xic = X11DRV_get_ic( hwnd ))) XSetICFocus( xic );
+    xim_set_focus( hwnd, TRUE );
+
     if (use_take_focus)
     {
         if (hwnd == NtUserGetForegroundWindow()) clip_fullscreen_window( hwnd, FALSE );
@@ -882,7 +882,6 @@ static void focus_out( Display *display , HWND hwnd )
     HWND hwnd_tmp;
     Window focus_win;
     int revert;
-    XIC xic;
     struct x11drv_win_data *data;
 
     if (xim_in_compose_mode()) return;
@@ -908,7 +907,7 @@ static void focus_out( Display *display , HWND hwnd )
     }
 
     x11drv_thread_data()->last_focus = hwnd;
-    if ((xic = X11DRV_get_ic( hwnd ))) XUnsetICFocus( xic );
+    xim_set_focus( hwnd, FALSE );
 
     if (is_virtual_desktop())
     {
