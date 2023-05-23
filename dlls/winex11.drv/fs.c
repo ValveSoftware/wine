@@ -42,29 +42,35 @@ static struct x11drv_settings_handler real_settings_handler;
 static BOOL initialized;
 
 /* A table of resolutions some games expect but host system may not report */
-static SIZE fs_monitor_sizes[] =
+static const struct
 {
-    {640, 480},   /*  4:3 */
-    {800, 600},   /*  4:3 */
-    {1024, 768},  /*  4:3 */
-    {1600, 1200}, /*  4:3 */
-    {960, 540},   /* 16:9 */
-    {1280, 720},  /* 16:9 */
-    {1600, 900},  /* 16:9 */
-    {1920, 1080}, /* 16:9 */
-    {2560, 1440}, /* 16:9 */
-    {2880, 1620}, /* 16:9 */
-    {3200, 1800}, /* 16:9 */
-    {1440, 900},  /*  8:5 */
-    {1680, 1050}, /*  8:5 */
-    {1920, 1200}, /*  8:5 */
-    {2560, 1600}, /*  8:5 */
-    {1440, 960},  /*  3:2 */
-    {1920, 1280}, /*  3:2 */
-    {2560, 1080}, /* 21:9 ultra-wide */
-    {1920, 800},  /* 12:5 */
-    {3840, 1600}, /* 12:5 */
-    {1280, 1024}, /*  5:4 */
+    SIZE size;
+    BOOL additional;
+}
+fs_monitor_sizes[] =
+{
+    {{640, 480}},   /*  4:3 */
+    {{800, 600}},   /*  4:3 */
+    {{1024, 768}},  /*  4:3 */
+    {{1600, 1200}}, /*  4:3 */
+    {{960, 540}},   /* 16:9 */
+    {{1280, 720}},  /* 16:9 */
+    {{1600, 900}},  /* 16:9 */
+    {{1920, 1080}}, /* 16:9 */
+    {{2560, 1440}}, /* 16:9 */
+    {{2880, 1620}}, /* 16:9 */
+    {{3200, 1800}}, /* 16:9 */
+    {{1440, 900}},  /*  8:5 */
+    {{1680, 1050}}, /*  8:5 */
+    {{1920, 1200}}, /*  8:5 */
+    {{2560, 1600}}, /*  8:5 */
+    {{1440, 960}},  /*  3:2 */
+    {{1920, 1280}}, /*  3:2 */
+    {{2560, 1080}}, /* 21:9 ultra-wide */
+    {{1920, 800}},  /* 12:5 */
+    {{3840, 1600}}, /* 12:5 */
+    {{1280, 1024}}, /*  5:4 */
+    {{1280, 768}, TRUE },
 };
 
 /* A fake monitor for the fullscreen hack */
@@ -277,6 +283,8 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
 {
     UINT i, j, max_count, real_mode_count, resolutions = 0;
     DEVMODEW *real_modes, *real_mode, mode_host = {0};
+    BOOL additional_modes = FALSE;
+    const char *env;
 
     *mode_count = 0;
     *modes = NULL;
@@ -295,21 +303,28 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     /* Add the current mode early, in case we have to limit */
     modes_append( *modes, mode_count, &resolutions, &mode_host );
 
+    if ((env = getenv( "WINE_ADDITIONAL_DISPLAY_MODES" )))
+        additional_modes = (env[0] != '0');
+    else if ((env = getenv( "SteamAppId" )))
+        additional_modes = !strcmp( env, "979400" );
+
     /* Linux reports far fewer resolutions than Windows. Add modes that some games may expect. */
     for (i = 0; i < ARRAY_SIZE(fs_monitor_sizes); ++i)
     {
         DEVMODEW mode = mode_host;
 
+        if (!additional_modes && fs_monitor_sizes[i].additional) continue;
+
         if (mode_host.dmDisplayOrientation == DMDO_DEFAULT ||
             mode_host.dmDisplayOrientation == DMDO_180)
         {
-            mode.dmPelsWidth = fs_monitor_sizes[i].cx;
-            mode.dmPelsHeight = fs_monitor_sizes[i].cy;
+            mode.dmPelsWidth = fs_monitor_sizes[i].size.cx;
+            mode.dmPelsHeight = fs_monitor_sizes[i].size.cy;
         }
         else
         {
-            mode.dmPelsWidth = fs_monitor_sizes[i].cy;
-            mode.dmPelsHeight = fs_monitor_sizes[i].cx;
+            mode.dmPelsWidth = fs_monitor_sizes[i].size.cy;
+            mode.dmPelsHeight = fs_monitor_sizes[i].size.cx;
         }
 
         /* Don't report modes that are larger than the current mode */
