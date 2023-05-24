@@ -88,7 +88,7 @@ struct video_processor
 static HRESULT try_create_wg_transform(struct video_processor *impl)
 {
     struct wg_format input_format, output_format;
-    struct wg_transform_attrs attrs = {0};
+    struct wg_transform_attrs attrs = {.input_queue_length = 15};
 
     if (impl->wg_transform)
         wg_transform_destroy(impl->wg_transform);
