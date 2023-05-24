@@ -170,13 +170,19 @@ static NTSTATUS if_get_physical( const char *name, UINT *type, IF_PHYSICAL_ADDRE
             break;
         }
 
+    TRACE( "iface %s, sa_family %u.\n", ifr.ifr_name, ifr.ifr_hwaddr.sa_family );
+    if (*type == MIB_IF_TYPE_OTHER && !ioctl( fd, SIOCGIFFLAGS, &ifr ))
+    {
+        TRACE( "flags %#x.\n", ifr.ifr_flags );
+        if (ifr.ifr_flags & IFF_POINTOPOINT) *type = MIB_IF_TYPE_PPP;
+    }
+
 err:
     close( fd );
     return ret;
 }
 
 #elif defined (HAVE_SYS_SYSCTL_H) && defined (HAVE_NET_IF_DL_H)
-
 static NTSTATUS if_get_physical( const char *name, UINT *type, IF_PHYSICAL_ADDRESS *phys_addr )
 {
     struct if_msghdr *ifm;
