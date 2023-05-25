@@ -410,6 +410,7 @@ enum unix_funcs
     unix_wg_transform_read_data,
     unix_wg_transform_get_status,
     unix_wg_transform_drain,
+    unix_wg_transform_flush,
 
     unix_wg_source_create,
     unix_wg_source_destroy,
