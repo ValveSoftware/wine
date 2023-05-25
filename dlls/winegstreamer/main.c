@@ -415,6 +415,21 @@ bool wg_transform_set_output_format(struct wg_transform *transform, struct wg_fo
     return !WINE_UNIX_CALL(unix_wg_transform_set_output_format, &params);
 }
 
+HRESULT wg_transform_drain(struct wg_transform *transform)
+{
+    NTSTATUS status;
+
+    TRACE("transform %p.\n", transform);
+
+    if ((status = WINE_UNIX_CALL(unix_wg_transform_drain, transform)))
+    {
+        WARN("wg_transform_drain returned status %#lx\n", status);
+        return HRESULT_FROM_NT(status);
+    }
+
+    return S_OK;
+}
+
 struct wg_source *wg_source_create(const WCHAR *url, uint64_t file_size,
         const void *data, uint32_t size, WCHAR mime_type[256])
 {
