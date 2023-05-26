@@ -157,6 +157,7 @@ struct _IWineDispatchProxyCbPrivate {
 #define MSHTML_E_INVALID_ACTION   0x800a01bd
 #define MSHTML_E_NODOC            0x800a025c
 #define MSHTML_E_SYNTAX           0x800a03ea
+#define MSHTML_E_NOT_FUNC         0x800a138a
 
 typedef struct HTMLWindow HTMLWindow;
 typedef struct HTMLInnerWindow HTMLInnerWindow;
