@@ -280,6 +280,7 @@ extern void toggle_caret( HWND hwnd ) DECLSPEC_HIDDEN;
 extern BOOL unregister_touch_window( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void update_mouse_tracking_info( HWND hwnd ) DECLSPEC_HIDDEN;
 extern BOOL get_clip_cursor( RECT *rect ) DECLSPEC_HIDDEN;
+extern BOOL process_wine_clipcursor( BOOL empty ) DECLSPEC_HIDDEN;
 
 /* menu.c */
 extern HMENU create_menu( BOOL is_popup ) DECLSPEC_HIDDEN;
