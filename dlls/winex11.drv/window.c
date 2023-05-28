@@ -170,6 +170,8 @@ static int detect_wm(Display *dpy)
                         cached = WINE_WM_X11_STEAMCOMPMGR;
                     else if(strcmp(wm_name, "KWin") == 0)
                         cached = WINE_WM_X11_KDE;
+                    else if(strcmp(wm_name, "Xfwm4") == 0 || strcmp(wm_name, "xfwm4") == 0)
+                        cached = WINE_WM_X11_XFCE4;
                     else
                         cached = WINE_WM_UNKNOWN;
 
@@ -204,6 +206,11 @@ BOOL wm_is_mutter(Display *display)
 BOOL wm_is_kde(Display *display)
 {
     return detect_wm(display) == WINE_WM_X11_KDE;
+}
+
+BOOL wm_is_xfce4(Display *display)
+{
+    return detect_wm(display) == WINE_WM_X11_XFCE4;
 }
 
 BOOL wm_is_steamcompmgr(Display *display)
@@ -1280,9 +1287,12 @@ void update_net_wm_states( struct x11drv_win_data *data )
          * Many games do not have any specific logic to get out of exclusive fullscreen
          * mode, and we have currently no way to tell exclusive fullscreen from a window
          * with topmost + fullscreen styles, so we cannot properly implement it either.
+         *
+         * XFCE doesn't make fullscreen (without above) windows appear above their panels.
          */
-        !(new_state & (1 << NET_WM_STATE_FULLSCREEN)))
+        (wm_is_xfce4(data->display) || !(new_state & (1 << NET_WM_STATE_FULLSCREEN))))
         new_state |= (1 << NET_WM_STATE_ABOVE);
+
     if (!data->add_taskbar)
     {
         if (data->skip_taskbar || (ex_style & WS_EX_NOACTIVATE)
