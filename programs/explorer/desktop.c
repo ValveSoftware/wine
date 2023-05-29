@@ -1114,6 +1114,10 @@ void manage_desktop( WCHAR *arg )
     if (name)
         enable_shell = get_default_enable_shell( name );
 
+    UuidCreate( &guid );
+    TRACE( "display guid %s\n", debugstr_guid(&guid) );
+    graphics_driver = load_graphics_driver( driver, &guid );
+
     if (name && width && height)
     {
         if (!(desktop = CreateDesktopW( name, NULL, NULL, 0, DESKTOP_ALL_ACCESS, NULL )))
@@ -1123,10 +1127,6 @@ void manage_desktop( WCHAR *arg )
         }
         SetThreadDesktop( desktop );
     }
-
-    UuidCreate( &guid );
-    TRACE( "display guid %s\n", debugstr_guid(&guid) );
-    graphics_driver = load_graphics_driver( driver, &guid );
 
     /* create the desktop window */
     hwnd = CreateWindowExW( 0, DESKTOP_CLASS_ATOM, NULL,
