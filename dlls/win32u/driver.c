@@ -753,7 +753,7 @@ static BOOL nulldrv_SetCursorPos( INT x, INT y )
     return TRUE;
 }
 
-static BOOL nulldrv_ClipCursor( LPCRECT clip )
+static BOOL nulldrv_ClipCursor( const RECT *clip, BOOL reset )
 {
     return TRUE;
 }
@@ -1134,9 +1134,9 @@ static BOOL loaderdrv_SetCursorPos( INT x, INT y )
     return load_driver()->pSetCursorPos( x, y );
 }
 
-static BOOL loaderdrv_ClipCursor( const RECT *clip )
+static BOOL loaderdrv_ClipCursor( const RECT *clip, BOOL reset )
 {
-    return load_driver()->pClipCursor( clip );
+    return load_driver()->pClipCursor( clip, reset );
 }
 
 static LRESULT nulldrv_ClipboardWindowProc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam )
