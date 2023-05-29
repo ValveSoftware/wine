@@ -1641,6 +1641,22 @@ sync_test("isFrozen", function() {
     }
 });
 
+sync_test("RegExp", function() {
+    var r;
+
+    r = /()/.exec("")[1];
+    ok(r === "", "/()/ captured: " + r);
+    r = /()?/.exec("")[1];
+    ok(r === undefined, "/()?/ captured: " + r);
+    r = /()??/.exec("")[1];
+    ok(r === undefined, "/()??/ captured: " + r);
+    r = /()*/.exec("")[1];
+    ok(r === undefined, "/()*/ captured: " + r);
+    r = /()??()/.exec("");
+    ok(r[1] === undefined, "/()??()/ [1] captured: " + r);
+    ok(r[2] === "", "/()??()/ [2] captured: " + r);
+});
+
 sync_test("ArrayBuffers & Views", function() {
     var i, r, buf, buf2, view, view2, arr, arr2;
 
