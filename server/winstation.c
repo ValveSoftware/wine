@@ -260,7 +260,6 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->close_timeout_val = 0;
             desktop->foreground_input = NULL;
             desktop->users = 0;
-            desktop->cursor_clip_msg = 0;
             desktop->cursor_win = 0;
             desktop->last_press_alt = 0;
             list_add_tail( &winstation->desktops, &desktop->entry );
