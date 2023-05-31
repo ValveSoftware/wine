@@ -2470,17 +2470,8 @@ static void test_aac_decoder_subtype(const struct attribute_desc *input_type_des
 
     hr = IMFTransform_ProcessMessage(transform, MFT_MESSAGE_COMMAND_DRAIN, 0);
     ok(hr == S_OK, "ProcessMessage returned %#lx\n", hr);
-    flags = 0xdeadbeef;
-    hr = IMFTransform_GetInputStatus(transform, 0, &flags);
-    ok(hr == S_OK, "Got %#lx\n", hr);
-    ok(!flags, "Got flags %#lx.\n", flags);
-    if (0)
-    {
-        /* This is fine on Windows but currently MFT_MESSAGE_COMMAND_DRAIN removes input sample from the queue
-         * and makes next _ProcessInput succeed on Wine breaking the tests below. */
-        hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
-        ok(hr == MF_E_NOTACCEPTING, "ProcessInput returned %#lx\n", hr);
-    }
+    hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
+    ok(hr == MF_E_NOTACCEPTING, "ProcessInput returned %#lx\n", hr);
 
     hr = MFCreateCollection(&output_samples);
     ok(hr == S_OK, "MFCreateCollection returned %#lx\n", hr);
