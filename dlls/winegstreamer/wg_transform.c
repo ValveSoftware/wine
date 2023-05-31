@@ -85,11 +85,6 @@ static GstFlowReturn transform_sink_chain_cb(GstPad *pad, GstObject *parent, Gst
 
     GST_LOG("transform %p, buffer %p.", transform, buffer);
 
-    if (GST_BUFFER_PTS_IS_VALID(buffer))
-        transform->segment.start = GST_BUFFER_PTS(buffer);
-    else if (GST_BUFFER_DURATION_IS_VALID(buffer))
-        transform->segment.start += GST_BUFFER_DURATION(buffer);
-
     if (!(sample = gst_sample_new(buffer, transform->output_caps, NULL, NULL)))
     {
         GST_ERROR("Failed to allocate transform %p output sample.", transform);
@@ -559,50 +554,6 @@ NTSTATUS wg_transform_set_output_format(void *args)
     transform->output_sample = NULL;
 
     return STATUS_SUCCESS;
-}
-
-NTSTATUS wg_transform_drain(void *args)
-{
-    struct wg_transform_drain_params *params = args;
-    struct wg_transform *transform = params->transform;
-    GstBuffer *input_buffer;
-    GstFlowReturn ret;
-    GstEvent *event;
-
-
-    while ((input_buffer = gst_atomic_queue_pop(transform->input_queue)))
-    {
-        if ((ret = gst_pad_push(transform->my_src, input_buffer)))
-        {
-            GST_ERROR("Failed to push transform input, error %d", ret);
-            return S_OK;
-        }
-    }
-
-    if (!gst_pad_peer_query(transform->my_src, transform->drain_query))
-    {
-        GST_ERROR("Drain query failed, transform %p.", transform);
-        return MF_E_STREAM_ERROR;
-    }
-    if (!(event = gst_event_new_segment_done(GST_FORMAT_TIME, transform->segment.start))
-            || !gst_pad_push_event(transform->my_src, event))
-    {
-        GST_ERROR("Sending segment done event failed, transform %p.", transform);
-        return MF_E_STREAM_ERROR;
-    }
-    if (!gst_pad_peer_query(transform->my_src, transform->drain_query))
-    {
-        GST_ERROR("Drain query failed, transform %p.", transform);
-        return MF_E_STREAM_ERROR;
-    }
-    if (!(event = gst_event_new_segment(&transform->segment))
-            || !gst_pad_push_event(transform->my_src, event))
-    {
-        GST_ERROR("Sending new segment event failed, transform %p.", transform);
-        return MF_E_STREAM_ERROR;
-    }
-
-    return S_OK;
 }
 
 static void wg_sample_free_notify(void *arg)

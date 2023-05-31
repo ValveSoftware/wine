@@ -3700,6 +3700,7 @@ static void test_h264_decoder(void)
         ok(hr == S_OK, "ProcessMessage returned %#lx\n", hr);
     }
     ok(i == 2, "got %lu iterations\n", i);
+    todo_wine
     ok(h264_encoded_data_len == 1180, "got h264_encoded_data_len %lu\n", h264_encoded_data_len);
     ok(hr == MF_E_TRANSFORM_STREAM_CHANGE, "ProcessOutput returned %#lx\n", hr);
     ok(output_status == MFT_OUTPUT_DATA_BUFFER_FORMAT_CHANGE, "got output[0].dwStatus %#lx\n", output_status);
