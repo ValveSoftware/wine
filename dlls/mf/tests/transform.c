@@ -6567,9 +6567,6 @@ static void test_h264_reuse(void)
     ok(hr == S_OK, "got %#lx\n", hr);
     IMFSample_Release(output_sample);
 
-    hr = IMFTransform_ProcessMessage(transform, MFT_MESSAGE_COMMAND_FLUSH, 0);
-    ok(hr == S_OK, "got %#lx\n", hr);
-
     IMFSample_Release(input_sample);
 
     load_resource(L"stream2.bin", &data1, &data1_len);
@@ -6600,6 +6597,22 @@ static void test_h264_reuse(void)
         i++;
     }
     trace("i %d.\n", i);
+    ok(hr == S_OK, "got %#lx\n", hr);
+    while (hr == S_OK)
+    {
+        IMFSample_Release(output_sample);
+        output_sample = create_sample(NULL, width * height * 3 / 2);
+        hr = check_mft_process_output(transform, output_sample, &output_status);
+    }
+    while (hr == MF_E_TRANSFORM_NEED_MORE_INPUT)
+    {
+        hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
+        ok(hr == S_OK, "got %#lx\n", hr);
+        IMFSample_Release(input_sample);
+        input_sample = next_h264_sample(&data1, &data1_len);
+
+        hr = check_mft_process_output(transform, output_sample, &output_status);
+    }
 
     ok(hr == MF_E_TRANSFORM_STREAM_CHANGE, "got %#lx\n", hr);
 

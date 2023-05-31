@@ -573,16 +573,13 @@ NTSTATUS wg_transform_drain(void *args)
     struct wg_transform_drain_params *params = args;
     struct wg_transform *transform = params->transform;
     GstBuffer *input_buffer;
-    GstSample *sample;
     GstFlowReturn ret;
     GstEvent *event;
 
 
     while ((input_buffer = gst_atomic_queue_pop(transform->input_queue)))
     {
-        if (params->flush)
-            gst_buffer_unref(input_buffer);
-        else if ((ret = gst_pad_push(transform->my_src, input_buffer)))
+        if ((ret = gst_pad_push(transform->my_src, input_buffer)))
         {
             GST_ERROR("Failed to push transform input, error %d", ret);
             return S_OK;
@@ -610,15 +607,6 @@ NTSTATUS wg_transform_drain(void *args)
     {
         GST_ERROR("Sending new segment event failed, transform %p.", transform);
         return MF_E_STREAM_ERROR;
-    }
-
-    if (params->flush)
-    {
-        if (transform->output_sample)
-            gst_sample_unref(transform->output_sample);
-        while ((sample = gst_atomic_queue_pop(transform->output_queue)))
-            gst_sample_unref(sample);
-        transform->output_sample = NULL;
     }
 
     return S_OK;
