@@ -140,6 +140,7 @@ struct user_thread_info
     struct rawinput_thread_data  *rawinput;               /* RawInput thread local data / buffer */
     struct touchinput_thread_data *touchinput;            /* touch input thread local buffer */
     UINT                          spy_indent;             /* Current spy indent */
+    BOOL                          clipping_cursor;        /* thread is currently clipping */
     DWORD                         clipping_reset;         /* time when clipping was last reset */
     struct desktop_shared_memory *desktop_shared_memory;  /* Ptr to server's desktop shared memory */
     struct queue_shared_memory   *queue_shared_memory;    /* Ptr to server's thread queue shared memory */

@@ -404,6 +404,7 @@ static const KBDTABLES kbdus_tables =
     .fLocaleFlags = MAKELONG(0, KBD_VERSION),
 };
 
+static LONG clipping_cursor; /* clipping thread counter */
 
 BOOL grab_pointer = TRUE;
 
@@ -2546,6 +2547,9 @@ BOOL process_wine_clipcursor( BOOL empty, BOOL reset )
 
     TRACE( "empty %u, reset %u\n", empty, reset );
 
+    if (thread_info->clipping_cursor) InterlockedDecrement( &clipping_cursor );
+    thread_info->clipping_cursor = FALSE;
+
     if (reset)
     {
         thread_info->clipping_reset = NtGetTickCount();
@@ -2556,7 +2560,10 @@ BOOL process_wine_clipcursor( BOOL empty, BOOL reset )
     if (empty) return user_driver->pClipCursor( NULL, reset );
 
     get_clip_cursor( &rect );
-    return user_driver->pClipCursor( &rect, FALSE );
+    if (!user_driver->pClipCursor( &rect, FALSE )) return FALSE;
+    InterlockedIncrement( &clipping_cursor );
+    thread_info->clipping_cursor = TRUE;
+    return TRUE;
 }
 
 /***********************************************************************
