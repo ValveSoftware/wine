@@ -2592,7 +2592,7 @@ BOOL WINAPI NtUserClipCursor( const RECT *rect )
         }
     }
     SERVER_END_REQ;
-    if (ret) user_driver->pClipCursor( &new_rect, FALSE );
+
     return ret;
 }
 
