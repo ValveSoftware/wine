@@ -335,7 +335,6 @@ struct wg_transform_get_status_params
 struct wg_transform_drain_params
 {
     struct wg_transform *transform;
-    BOOL flush;
 };
 
 struct wg_source_create_params

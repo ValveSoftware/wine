@@ -105,7 +105,7 @@ struct wg_transform *wg_transform_create(const struct wg_format *input_format,
 void wg_transform_destroy(struct wg_transform *transform);
 bool wg_transform_set_output_format(struct wg_transform *transform, struct wg_format *format);
 bool wg_transform_get_status(struct wg_transform *transform, bool *accepts_input);
-HRESULT wg_transform_drain(struct wg_transform *transform, BOOL flush);
+HRESULT wg_transform_drain(struct wg_transform *transform);
 
 struct wg_source *wg_source_create(const WCHAR *url, uint64_t file_size,
         const void *data, uint32_t size, WCHAR mime_type[256]);
