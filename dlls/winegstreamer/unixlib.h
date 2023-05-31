@@ -332,11 +332,6 @@ struct wg_transform_get_status_params
     UINT32 accepts_input;
 };
 
-struct wg_transform_drain_params
-{
-    struct wg_transform *transform;
-};
-
 struct wg_source_create_params
 {
     const char *url;
@@ -414,7 +409,6 @@ enum unix_funcs
     unix_wg_transform_push_data,
     unix_wg_transform_read_data,
     unix_wg_transform_get_status,
-    unix_wg_transform_drain,
 
     unix_wg_source_create,
     unix_wg_source_destroy,

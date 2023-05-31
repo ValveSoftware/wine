@@ -1923,7 +1923,6 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     X(wg_transform_push_data),
     X(wg_transform_read_data),
     X(wg_transform_get_status),
-    X(wg_transform_drain),
 
     X(wg_source_create),
     X(wg_source_destroy),
