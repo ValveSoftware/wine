@@ -559,7 +559,7 @@ static void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect
     SHARED_WRITE_BEGIN( &desktop->shared->seq );
     desktop->shared->cursor.clip = new_rect;
 
-    if (send_clip_msg) post_desktop_message( desktop, WM_WINE_CLIPCURSOR, rect != NULL, 0 );
+    if (send_clip_msg) post_desktop_message( desktop, WM_WINE_CLIPCURSOR, rect == NULL, 0 );
 
     /* warp the mouse to be inside the clip rect */
     x = max( min( desktop->shared->cursor.x, desktop->shared->cursor.clip.right - 1 ), desktop->shared->cursor.clip.left );
