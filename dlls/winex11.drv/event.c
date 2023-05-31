@@ -893,7 +893,7 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     xim_set_focus( hwnd, TRUE );
     if (use_take_focus)
     {
-        if (hwnd == NtUserGetForegroundWindow()) clip_fullscreen_window( hwnd, FALSE );
+        clip_fullscreen_window( hwnd, FALSE );
         return TRUE;
     }
 
