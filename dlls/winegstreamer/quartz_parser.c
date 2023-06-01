@@ -1489,9 +1489,6 @@ static HRESULT parser_create(enum wg_parser_type type, struct parser **parser)
 {
     struct parser *object;
 
-    if (!init_gstreamer())
-        return E_FAIL;
-
     if (!(object = calloc(1, sizeof(*object))))
         return E_OUTOFMEMORY;
 
