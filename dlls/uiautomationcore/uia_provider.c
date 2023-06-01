@@ -2312,19 +2312,6 @@ void uia_stop_provider_thread(void)
     LeaveCriticalSection(&provider_thread_cs);
 }
 
-struct uia_lresult_from_node_data {
-    LRESULT lr;
-    BOOL returned;
-};
-
-static void CALLBACK uia_lresult_from_node_callback(HWND hwnd, UINT msg, ULONG_PTR data, LRESULT lresult)
-{
-    struct uia_lresult_from_node_data *cb_data = (struct uia_lresult_from_node_data *)data;
-
-    cb_data->lr = lresult;
-    cb_data->returned = TRUE;
-}
-
 /*
  * Pass our IWineUiaNode interface to the provider thread for marshaling. UI
  * Automation has to work regardless of whether or not COM is initialized on
@@ -2332,34 +2319,13 @@ static void CALLBACK uia_lresult_from_node_callback(HWND hwnd, UINT msg, ULONG_P
  */
 LRESULT uia_lresult_from_node(HUIANODE huianode)
 {
-    struct uia_lresult_from_node_data cb_data = { 0 };
-
     if (!uia_start_provider_thread())
     {
         UiaNodeRelease(huianode);
         return 0;
     }
 
-    if (!SendMessageCallbackW(provider_thread.hwnd, WM_GET_OBJECT_UIA_NODE, 0, (LPARAM)huianode,
-                uia_lresult_from_node_callback, (ULONG_PTR)&cb_data))
-    {
-        WARN("SendMessageCallback failed, error %ld\n", GetLastError());
-        UiaNodeRelease(huianode);
-        return 0;
-    }
-
-    while (!cb_data.returned)
-    {
-        MSG msg;
-
-        if (PeekMessageW(&msg, 0, 0, 0, PM_REMOVE))
-        {
-            TranslateMessage(&msg);
-            DispatchMessageW(&msg);
-        }
-    }
-
-    return cb_data.lr;
+    return SendMessageW(provider_thread.hwnd, WM_GET_OBJECT_UIA_NODE, 0, (LPARAM)huianode);
 }
 
 /***********************************************************************
