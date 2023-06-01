@@ -335,6 +335,8 @@ struct wg_transform_drain_params
 
 enum unix_funcs
 {
+    unix_wg_init_gstreamer,
+
     unix_wg_parser_create,
     unix_wg_parser_destroy,
 
