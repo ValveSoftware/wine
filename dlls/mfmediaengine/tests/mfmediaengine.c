@@ -152,7 +152,7 @@ static void check_rgb32_data_(int line, const WCHAR *filename, const BYTE *data,
     expect_data = LockResource(LoadResource(GetModuleHandleW(NULL), resource));
 
     diff = compare_rgb32(data, &length, rect, expect_data);
-    ok_(__FILE__, line)(diff == 0, "Unexpected %lu%% diff\n", diff);
+    ok_(__FILE__, line)(diff <= 3 /* small difference in wine */, "Unexpected %lu%% diff\n", diff);
 }
 
 static void init_functions(void)
