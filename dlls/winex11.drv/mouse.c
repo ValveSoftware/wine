@@ -629,10 +629,9 @@ BOOL clip_fullscreen_window( HWND hwnd, BOOL reset )
     release_win_data( data );
     if (!fullscreen) return FALSE;
     if (!(thread_data = x11drv_thread_data())) return FALSE;
-    if (!reset) {
-        if (NtGetTickCount() - thread_data->clip_reset < 1000) return FALSE;
-        if (!reset && clipping_cursor && thread_data->clip_hwnd) return FALSE;  /* already clipping */
-    }
+    if (NtGetTickCount() - thread_data->clip_reset < 1000) return FALSE;
+    if (!reset && clipping_cursor && thread_data->clip_hwnd) return FALSE;  /* already clipping */
+
     monitor = NtUserMonitorFromWindow( hwnd, MONITOR_DEFAULTTONEAREST );
     if (!monitor) return FALSE;
     monitor_info.cbSize = sizeof(monitor_info);
