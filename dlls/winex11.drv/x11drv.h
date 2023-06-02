@@ -402,7 +402,6 @@ struct x11drv_thread_data
     int      xi2_active_touches;
     int      xi2_primary_touchid;
 #endif /* HAVE_X11_EXTENSIONS_XINPUT2_H */
-    HWND    cached_clip_hwnd;
 };
 
 extern struct x11drv_thread_data *x11drv_init_thread_data(void) DECLSPEC_HIDDEN;
