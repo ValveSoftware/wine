@@ -382,7 +382,12 @@ static HRESULT WINAPI media_object_GetInputType(IMediaObject *iface, DWORD index
     if (!format.u.video.width)
         format.u.video.width = 1920;
     if (!format.u.video.height)
-        format.u.video.height = 1080;
+    {
+        if (wg_video_format_is_rgb(format.u.video.format))
+            format.u.video.height = -1080;
+        else
+            format.u.video.height = 1080;
+    }
     if (!format.u.video.fps_d)
         format.u.video.fps_d = 1;
     if (!format.u.video.fps_n)
@@ -410,12 +415,16 @@ static HRESULT WINAPI media_object_GetOutputType(IMediaObject *iface, DWORD inde
     if (!format.u.video.width)
         format.u.video.width = 1920;
     if (!format.u.video.height)
-        format.u.video.height = 1080;
+    {
+        if (wg_video_format_is_rgb(format.u.video.format))
+            format.u.video.height = -1080;
+        else
+            format.u.video.height = 1080;
+    }
     if (!format.u.video.fps_d)
         format.u.video.fps_d = 1;
     if (!format.u.video.fps_n)
         format.u.video.fps_n = 1;
-
     if (!amt_from_wg_format((AM_MEDIA_TYPE *)type, &format, false))
         return VFW_E_NO_TYPES;
 
