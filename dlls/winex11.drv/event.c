@@ -386,25 +386,6 @@ static enum event_merge_action merge_raw_motion_events( XIRawEvent *prev, XIRawE
 }
 #endif
 
-static int try_grab_pointer( Display *display )
-{
-    if (!grab_pointer)
-        return 1;
-
-    /* if we are already clipping the cursor in the current thread, we should not
-     * call XGrabPointer here or it would change the confine-to window. */
-    if (clipping_cursor && x11drv_thread_data()->clip_hwnd)
-        return 1;
-
-    if (XGrabPointer( display, root_window, False, 0, GrabModeAsync, GrabModeAsync,
-                      None, None, CurrentTime ) != GrabSuccess)
-        return 0;
-
-    XUngrabPointer( display, CurrentTime );
-    XFlush( display );
-    return 1;
-}
-
 /***********************************************************************
  *           merge_events
  *
@@ -704,16 +685,8 @@ static void set_focus( XEvent *xev, HWND hwnd, Time time )
     Window win;
     GUITHREADINFO threadinfo;
 
-    if (!try_grab_pointer( xev->xany.display ))
-    {
-        XSendEvent( xev->xany.display, xev->xany.window, False, 0, xev );
-        return;
-    }
-    else
-    {
-        TRACE( "setting foreground window to %p\n", hwnd );
-        NtUserSetForegroundWindow( hwnd );
-    }
+    TRACE( "setting foreground window to %p\n", hwnd );
+    NtUserSetForegroundWindow( hwnd );
 
     threadinfo.cbSize = sizeof(threadinfo);
     NtUserGetGUIThreadInfo( 0, &threadinfo );
@@ -917,14 +890,6 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         break;
     }
 
-    if (!try_grab_pointer( event->display ))
-    {
-        /* ask the desktop window to release its grab before trying to get ours */
-        send_message( NtUserGetDesktopWindow(), WM_X11DRV_RELEASE_CURSOR, 0, 0 );
-        XSendEvent( event->display, event->window, False, 0, xev );
-        return FALSE;
-    }
-
     /* ignore wm specific NotifyUngrab / NotifyGrab events w.r.t focus */
     if (event->mode == NotifyGrab || event->mode == NotifyUngrab) return FALSE;
 
@@ -943,10 +908,8 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         if (!hwnd) hwnd = get_active_window();
         if (!hwnd) hwnd = x11drv_thread_data()->last_focus;
         if (hwnd && can_activate_window(hwnd)) set_focus( xev, hwnd, CurrentTime );
-        return TRUE;
     }
-
-    NtUserSetForegroundWindow( hwnd );
+    else NtUserSetForegroundWindow( hwnd );
     return TRUE;
 }
 
