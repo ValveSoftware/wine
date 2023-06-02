@@ -538,8 +538,25 @@ static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsig
     *time = get_tick_count();
 }
 
+static void queue_clip_cursor_msg( struct desktop *desktop, lparam_t wparam, lparam_t lparam )
+{
+    static const struct hw_msg_source source = { IMDT_UNAVAILABLE, IMO_SYSTEM };
+    struct thread_input *input;
+    struct message *msg;
+
+    if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
+
+    msg->msg = WM_WINE_CLIPCURSOR;
+    msg->wparam = wparam;
+    msg->lparam = lparam;
+    msg->x = desktop->shared->cursor.x;
+    msg->y = desktop->shared->cursor.y;
+    if ((input = desktop->foreground_input)) msg->win = input->shared->active;
+    queue_hardware_message( desktop, msg, 1 );
+}
+
 /* set the cursor clip rectangle */
-void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int send_clip_msg )
+void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int reset )
 {
     rectangle_t top_rect, new_rect;
     int x, y;
@@ -559,13 +576,17 @@ void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int s
     SHARED_WRITE_BEGIN( &desktop->shared->seq );
     desktop->shared->cursor.clip = new_rect;
 
-    if (send_clip_msg) post_desktop_message( desktop, WM_WINE_CLIPCURSOR, rect == NULL, 0 );
-
     /* warp the mouse to be inside the clip rect */
     x = max( min( desktop->shared->cursor.x, desktop->shared->cursor.clip.right - 1 ), desktop->shared->cursor.clip.left );
     y = max( min( desktop->shared->cursor.y, desktop->shared->cursor.clip.bottom - 1 ), desktop->shared->cursor.clip.top );
     if (x != desktop->shared->cursor.x || y != desktop->shared->cursor.y) set_cursor_pos( desktop, x, y );
     SHARED_WRITE_END( &desktop->shared->seq );
+
+    /* request clip cursor rectangle reset to the desktop thread */
+    if (reset) post_desktop_message( desktop, WM_WINE_CLIPCURSOR, TRUE, FALSE );
+
+    /* notify foreground thread, of reset, or to apply new cursor clipping rect */
+    queue_clip_cursor_msg( desktop, rect == NULL, reset );
 }
 
 /* change the foreground input and reset the cursor clip rect */
@@ -672,6 +693,7 @@ static inline int get_hardware_msg_bit( struct message *msg )
     if (msg->msg >= WM_KEYFIRST && msg->msg <= WM_KEYLAST) return QS_KEY;
     if (msg->msg == WM_POINTERDOWN || msg->msg == WM_POINTERUP ||
         msg->msg == WM_POINTERUPDATE) return QS_POINTER;
+    if (msg->msg == WM_WINE_CLIPCURSOR) return QS_RAWINPUT;
     return QS_MOUSEBUTTON;
 }
 
@@ -754,11 +776,37 @@ static int merge_mousemove( struct thread_input *input, const struct message *ms
     return 1;
 }
 
+/* try to merge a WM_WINE_CLIPCURSOR message with the last in the list; return 1 if successful */
+static int merge_wine_clipcursor( struct thread_input *input, const struct message *msg )
+{
+    struct message *prev;
+
+    LIST_FOR_EACH_ENTRY_REV( prev, &input->msg_list, struct message, entry )
+        if (prev->msg == WM_WINE_CLIPCURSOR) break;
+    if (&prev->entry == &input->msg_list) return 0;
+
+    if (prev->result) return 0;
+    if (prev->win != msg->win) return 0;
+    if (prev->type != msg->type) return 0;
+
+    /* now we can merge it */
+    prev->wparam  = msg->wparam;
+    prev->lparam  = msg->lparam;
+    prev->x       = msg->x;
+    prev->y       = msg->y;
+    prev->time    = msg->time;
+    list_remove( &prev->entry );
+    list_add_tail( &input->msg_list, &prev->entry );
+
+    return 1;
+}
+
 /* try to merge a message with the messages in the list; return 1 if successful */
 static int merge_message( struct thread_input *input, const struct message *msg )
 {
     if (msg->msg == WM_POINTERUPDATE) return merge_pointer_update_message( input, msg );
     if (msg->msg == WM_MOUSEMOVE) return merge_mousemove( input, msg );
+    if (msg->msg == WM_WINE_CLIPCURSOR) return merge_wine_clipcursor( input, msg );
     return 0;
 }
 
