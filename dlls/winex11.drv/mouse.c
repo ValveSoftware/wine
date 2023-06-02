@@ -1667,13 +1667,6 @@ BOOL X11DRV_ClipCursor( LPCRECT clip )
         HWND foreground = NtUserGetForegroundWindow();
         DWORD tid, pid;
 
-        if (foreground == NtUserGetDesktopWindow())
-        {
-            WARN( "desktop is foreground, ignoring ClipCursor\n" );
-            ungrab_clipping_window();
-            return TRUE;
-        }
-
         /* forward request to the foreground window if it's in a different thread */
         tid = NtUserGetWindowThread( foreground, &pid );
         if (tid && tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
