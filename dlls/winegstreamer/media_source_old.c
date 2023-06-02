@@ -887,18 +887,18 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
 
     if (format.major_type == WG_MAJOR_TYPE_VIDEO)
     {
-        /* Try to prefer YUV formats over RGB ones. Most decoders output in the
-         * YUV color space, and it's generally much less expensive for
-         * videoconvert to do YUV -> YUV transformations. */
-        static const enum wg_video_format video_formats[] =
+        /* These are the most common native output types of decoders:
+            https://docs.microsoft.com/en-us/windows/win32/medfound/mft-decoder-expose-output-types-in-native-order */
+        static const GUID *const video_types[] =
         {
-            WG_VIDEO_FORMAT_NV12,
-            WG_VIDEO_FORMAT_YV12,
-            WG_VIDEO_FORMAT_YUY2,
-            WG_VIDEO_FORMAT_I420,
-            WG_VIDEO_FORMAT_BGRA,
-            WG_VIDEO_FORMAT_BGRx,
-            WG_VIDEO_FORMAT_RGBA,
+            &MFVideoFormat_NV12,
+            &MFVideoFormat_YV12,
+            &MFVideoFormat_YUY2,
+            &MFVideoFormat_IYUV,
+            &MFVideoFormat_I420,
+            &MFVideoFormat_ARGB32,
+            &MFVideoFormat_RGB32,
+            &MFVideoFormat_ABGR32,
         };
 
         IMFMediaType *base_type = mf_media_type_from_wg_format(&format);
@@ -917,32 +917,21 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
         stream_types[0] = base_type;
         type_count = 1;
 
-        for (i = 0; i < ARRAY_SIZE(video_formats); ++i)
+        for (i = 0; i < ARRAY_SIZE(video_types); i++)
         {
-            struct wg_format new_format = format;
             IMFMediaType *new_type;
 
-            new_format.u.video.format = video_formats[i];
+            if (IsEqualGUID(&base_subtype, video_types[i]))
+                continue;
 
-            if (!(new_type = mf_media_type_from_wg_format(&new_format)))
-            {
-                hr = E_OUTOFMEMORY;
+            if (FAILED(hr = MFCreateMediaType(&new_type)))
                 goto done;
-            }
             stream_types[type_count++] = new_type;
 
-            if (video_formats[i] == WG_VIDEO_FORMAT_I420)
-            {
-                IMFMediaType *iyuv_type;
-
-                if (FAILED(hr = MFCreateMediaType(&iyuv_type)))
-                    goto done;
-                if (FAILED(hr = IMFMediaType_CopyAllItems(new_type, (IMFAttributes *)iyuv_type)))
-                    goto done;
-                if (FAILED(hr = IMFMediaType_SetGUID(iyuv_type, &MF_MT_SUBTYPE, &MFVideoFormat_IYUV)))
-                    goto done;
-                stream_types[type_count++] = iyuv_type;
-            }
+            if (FAILED(hr = IMFMediaType_CopyAllItems(base_type, (IMFAttributes *) new_type)))
+                goto done;
+            if (FAILED(hr = IMFMediaType_SetGUID(new_type, &MF_MT_SUBTYPE, video_types[i])))
+                goto done;
         }
     }
     else if (format.major_type == WG_MAJOR_TYPE_AUDIO)
