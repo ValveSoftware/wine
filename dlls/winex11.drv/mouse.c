@@ -521,11 +521,7 @@ void ungrab_clipping_window(void)
 
     TRACE( "no longer clipping\n" );
     XUnmapWindow( display, clip_window );
-    if (clipping_cursor)
-    {
-        XUngrabPointer( display, CurrentTime );
-        XFlush( display );
-    }
+    if (clipping_cursor) XUngrabPointer( display, CurrentTime );
     clipping_cursor = FALSE;
     send_notify_message( NtUserGetDesktopWindow(), WM_X11DRV_CLIP_CURSOR_NOTIFY, 0, 0 );
 }
