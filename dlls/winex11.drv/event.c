@@ -898,17 +898,6 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (event->detail == NotifyPointer) return FALSE;
     if (hwnd == NtUserGetDesktopWindow()) return FALSE;
 
-    /* Focus was just restored but it can be right after super was
-     * pressed and gnome-shell needs a bit of time to respond and
-     * toggle the activity view. If we grab the cursor right away
-     * it will cancel it and super key will do nothing.
-     */
-    if (event->mode == NotifyUngrab && wm_is_mutter(event->display))
-    {
-        LARGE_INTEGER timeout = {.QuadPart = 100 * -10000};
-        NtDelayExecution( FALSE, &timeout );
-    }
-
     if (!try_grab_pointer( event->display ))
     {
         /* ask the desktop window to release its grab before trying to get ours */
