@@ -538,7 +538,7 @@ static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsig
 }
 
 /* set the cursor clip rectangle */
-void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int send_clip_msg )
+static void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int send_clip_msg )
 {
     rectangle_t top_rect, new_rect;
     int x, y;
