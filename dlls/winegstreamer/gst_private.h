@@ -165,6 +165,10 @@ HRESULT media_source_create(IMFByteStream *stream, const WCHAR *url, BYTE *data,
 HRESULT media_source_create_old(IMFByteStream *stream, const WCHAR *url, IMFMediaSource **out);
 HRESULT media_source_create_from_url(const WCHAR *url, IMFMediaSource **out);
 
+unsigned int wg_format_get_stride(const struct wg_format *format);
+
+bool wg_video_format_is_rgb(enum wg_video_format format);
+
 HRESULT aac_decoder_create(REFIID riid, void **ret);
 HRESULT h264_decoder_create(REFIID riid, void **ret);
 HRESULT video_processor_create(REFIID riid, void **ret);
