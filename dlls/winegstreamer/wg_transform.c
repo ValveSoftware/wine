@@ -52,6 +52,9 @@ struct wg_transform
     guint input_max_length;
     GstAtomicQueue *input_queue;
 
+    bool input_is_flipped;
+    GstElement *video_flip;
+
     guint output_plane_align;
     struct wg_sample *output_wg_sample;
     GstAtomicQueue *output_queue;
@@ -276,6 +279,11 @@ static struct wg_sample *transform_request_sample(gsize size, void *context)
     return InterlockedExchangePointer((void **)&transform->output_wg_sample, NULL);
 }
 
+static bool wg_format_video_is_flipped(const struct wg_format *format)
+{
+    return format->major_type == WG_MAJOR_TYPE_VIDEO && (format->u.video.height < 0);
+}
+
 NTSTATUS wg_transform_create(void *args)
 {
     struct wg_transform_create_params *params = args;
@@ -392,6 +400,12 @@ NTSTATUS wg_transform_create(void *args)
             break;
 
         case WG_MAJOR_TYPE_VIDEO:
+            if (!(transform->video_flip = create_element("videoflip", "base"))
+                    || !append_element(transform->container, transform->video_flip, &first, &last))
+                goto out;
+            transform->input_is_flipped = wg_format_video_is_flipped(&input_format);
+            if (transform->input_is_flipped != wg_format_video_is_flipped(&output_format))
+                gst_util_set_object_arg(G_OBJECT(transform->video_flip), "method", "vertical-flip");
             if (!(element = create_element("videoconvert", "base"))
                     || !append_element(transform->container, element, &first, &last))
                 goto out;
@@ -519,6 +533,15 @@ NTSTATUS wg_transform_set_output_format(void *args)
 
     transform->setting_output_format = true;
 
+    if (transform->video_flip)
+    {
+        const char *value;
+        if (transform->input_is_flipped != wg_format_video_is_flipped(format))
+            value = "vertical-flip";
+        else
+            value = "none";
+        gst_util_set_object_arg(G_OBJECT(transform->video_flip), "method", value);
+    }
     if (!gst_pad_push_event(transform->my_sink, gst_event_new_reconfigure()))
     {
         GST_ERROR("Failed to reconfigure transform %p.", transform);
