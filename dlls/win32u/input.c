@@ -124,6 +124,8 @@ static const WCHAR left_windowsW[] = {'L','e','f','t',' ','W','i','n','d','o','w
 static const WCHAR right_windowsW[] = {'R','i','g','h','t',' ','W','i','n','d','o','w','s',0};
 static const WCHAR applicationW[] = {'A','p','p','l','i','c','a','t','i','o','n',0};
 
+static BOOL grab_pointer = TRUE;
+
 static const VK_TO_BIT vk_to_bit[] =
 {
     {.Vk = VK_SHIFT, .ModBits = KBDSHIFT},
@@ -404,6 +406,83 @@ static const KBDTABLES kbdus_tables =
     .fLocaleFlags = MAKELONG(0, KBD_VERSION),
 };
 
+
+/***********************************************************************
+ *      get_config_key
+ *
+ * Get a config key from either the app-specific or the default config
+ */
+static DWORD get_config_key( HKEY defkey, HKEY appkey, const char *name,
+                             WCHAR *buffer, DWORD size )
+{
+    WCHAR nameW[128];
+    char buf[2048];
+    KEY_VALUE_PARTIAL_INFORMATION *info = (void *)buf;
+
+    asciiz_to_unicode( nameW, name );
+
+    if (appkey && query_reg_value( appkey, nameW, info, sizeof(buf) ))
+    {
+        size = min( info->DataLength, size - sizeof(WCHAR) );
+        memcpy( buffer, info->Data, size );
+        buffer[size / sizeof(WCHAR)] = 0;
+        return 0;
+    }
+
+    if (defkey && query_reg_value( defkey, nameW, info, sizeof(buf) ))
+    {
+        size = min( info->DataLength, size - sizeof(WCHAR) );
+        memcpy( buffer, info->Data, size );
+        buffer[size / sizeof(WCHAR)] = 0;
+        return 0;
+    }
+
+    return ERROR_FILE_NOT_FOUND;
+}
+
+void input_init(void)
+{
+    static const WCHAR x11driverW[] = {'\\','X','1','1',' ','D','r','i','v','e','r',0};
+    WCHAR buffer[MAX_PATH+16], *p, *appname;
+    HKEY hkey, appkey = 0;
+    DWORD len;
+
+    /* @@ Wine registry key: HKCU\Software\Wine\X11 Driver */
+    hkey = reg_open_hkcu_key( "Software\\Wine\\X11 Driver" );
+
+    /* open the app-specific key */
+
+    appname = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
+    if ((p = wcsrchr( appname, '/' ))) appname = p + 1;
+    if ((p = wcsrchr( appname, '\\' ))) appname = p + 1;
+    len = lstrlenW( appname );
+
+    if (len && len < MAX_PATH)
+    {
+        HKEY tmpkey;
+        int i;
+
+        for (i = 0; appname[i]; i++) buffer[i] = RtlDowncaseUnicodeChar( appname[i] );
+        buffer[i] = 0;
+        appname = buffer;
+        memcpy( appname + i, x11driverW, sizeof(x11driverW) );
+
+        /* @@ Wine registry key: HKCU\Software\Wine\AppDefaults\app.exe\X11 Driver */
+        if ((tmpkey = reg_open_hkcu_key( "Software\\Wine\\AppDefaults" )))
+        {
+            appkey = reg_open_key( tmpkey, appname, lstrlenW( appname ) * sizeof(WCHAR) );
+            NtClose( tmpkey );
+        }
+    }
+
+#define IS_OPTION_TRUE(ch) \
+    ((ch) == 'y' || (ch) == 'Y' || (ch) == 't' || (ch) == 'T' || (ch) == '1')
+
+    if (!get_config_key( hkey, appkey, "GrabPointer", buffer, sizeof(buffer) ))
+        grab_pointer = IS_OPTION_TRUE( buffer[0] );
+
+#undef IS_OPTION_TRUE
+}
 
 static void kbd_tables_init_vsc2vk( const KBDTABLES *tables, BYTE vsc2vk[0x300] )
 {
@@ -2543,7 +2622,10 @@ BOOL process_wine_clipcursor( BOOL empty, BOOL reset )
 
     TRACE( "empty %u, reset %u\n", empty, reset );
 
-    if (empty || reset) return user_driver->pClipCursor( NULL, reset );
+    if (reset) return user_driver->pClipCursor( NULL, TRUE );
+    if (!grab_pointer) return TRUE;
+
+    if (empty) return user_driver->pClipCursor( NULL, reset );
 
     get_clip_cursor( &rect );
     return user_driver->pClipCursor( &rect, FALSE );

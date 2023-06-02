@@ -1346,8 +1346,10 @@ void __wine_set_user_driver( const struct user_driver_funcs *funcs, UINT version
     {
         /* another thread beat us to it */
         free( driver );
-        driver = prev;
+        return;
     }
+
+    input_init();
 }
 
 /******************************************************************************
