@@ -437,6 +437,7 @@ extern Colormap default_colormap DECLSPEC_HIDDEN;
 extern XPixmapFormatValues **pixmap_formats DECLSPEC_HIDDEN;
 extern Window root_window DECLSPEC_HIDDEN;
 extern BOOL clipping_cursor DECLSPEC_HIDDEN;
+extern BOOL keyboard_grabbed DECLSPEC_HIDDEN;
 extern unsigned int screen_bpp DECLSPEC_HIDDEN;
 extern BOOL usexrandr DECLSPEC_HIDDEN;
 extern BOOL usexvidmode DECLSPEC_HIDDEN;

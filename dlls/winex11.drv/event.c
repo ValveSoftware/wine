@@ -145,6 +145,9 @@ static const char * event_names[MAX_EVENT_HANDLERS] =
     "SelectionNotify", "ColormapNotify", "ClientMessage", "MappingNotify", "GenericEvent"
 };
 
+/* is someone else grabbing the keyboard, for example the WM, when manipulating the window */
+BOOL keyboard_grabbed = FALSE;
+
 int xinput2_opcode = 0;
 
 static pthread_mutex_t input_cs = PTHREAD_MUTEX_INITIALIZER;
@@ -898,6 +901,23 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
     if (event->detail == NotifyPointer) return FALSE;
     if (hwnd == NtUserGetDesktopWindow()) return FALSE;
 
+    switch (event->mode)
+    {
+    case NotifyGrab:
+        /* these are received when moving undecorated managed windows on mutter */
+        keyboard_grabbed = TRUE;
+        break;
+    case NotifyWhileGrabbed:
+        keyboard_grabbed = TRUE;
+        break;
+    case NotifyNormal:
+        keyboard_grabbed = FALSE;
+        break;
+    case NotifyUngrab:
+        keyboard_grabbed = FALSE;
+        break;
+    }
+
     if (!try_grab_pointer( event->display ))
     {
         /* ask the desktop window to release its grab before trying to get ours */
@@ -1034,6 +1054,23 @@ static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
         return TRUE;
     }
     if (!hwnd) return FALSE;
+
+    switch (event->mode)
+    {
+    case NotifyUngrab:
+        /* these are received when moving undecorated managed windows on mutter */
+        keyboard_grabbed = FALSE;
+        break;
+    case NotifyNormal:
+        keyboard_grabbed = FALSE;
+        break;
+    case NotifyWhileGrabbed:
+        keyboard_grabbed = TRUE;
+        break;
+    case NotifyGrab:
+        keyboard_grabbed = TRUE;
+        break;
+    }
 
     if (hwnd == NtUserGetForegroundWindow()) ungrab_clipping_window();
 
