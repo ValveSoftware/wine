@@ -921,8 +921,6 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
             goto done;
         }
 
-        IMFMediaType_SetUINT32(base_type, &MF_MT_VIDEO_NOMINAL_RANGE, MFNominalRange_Normal);
-
         IMFMediaType_GetGUID(base_type, &MF_MT_SUBTYPE, &base_subtype);
 
         stream_types[0] = base_type;
@@ -954,6 +952,12 @@ static HRESULT media_stream_init_desc(struct media_stream *stream)
                     goto done;
                 stream_types[type_count++] = iyuv_type;
             }
+        }
+
+        for (i = 0; i < type_count; i++)
+        {
+            IMFMediaType_SetUINT32(stream_types[i], &MF_MT_VIDEO_NOMINAL_RANGE,
+                    MFNominalRange_Normal);
         }
     }
     else if (format.major_type == WG_MAJOR_TYPE_AUDIO)
