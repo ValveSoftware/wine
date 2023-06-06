@@ -441,6 +441,12 @@ static HRESULT init_video_media_types(struct wg_format *format, IMFMediaType *ty
         }
     }
 
+    for (i = 0; i < count; i++)
+    {
+        IMFMediaType_SetUINT32(types[i], &MF_MT_VIDEO_NOMINAL_RANGE,
+                MFNominalRange_Normal);
+    }
+
 done:
     *types_count = count;
     return hr;
