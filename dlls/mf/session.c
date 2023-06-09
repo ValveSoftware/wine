@@ -2609,7 +2609,8 @@ static HRESULT WINAPI session_commands_callback_Invoke(IMFAsyncCallback *iface, 
         case SESSION_CMD_STOP:
             if (session->presentation.flags & SESSION_FLAG_END_OF_PRESENTATION)
                 session_set_topo_status(session, S_OK, MF_TOPOSTATUS_ENDED);
-            session_clear_end_of_presentation(session);
+            if (session->presentation.topo_status != MF_TOPOSTATUS_INVALID)
+                session_clear_end_of_presentation(session);
             session_stop(session);
             break;
         case SESSION_CMD_CLOSE:
