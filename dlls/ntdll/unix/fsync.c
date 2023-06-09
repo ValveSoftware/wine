@@ -714,6 +714,12 @@ NTSTATUS fsync_reset_event( HANDLE handle, LONG *prev )
     if ((ret = get_object( handle, &obj ))) return ret;
     event = obj.shm;
 
+    if (obj.type != FSYNC_MANUAL_EVENT && obj.type != FSYNC_AUTO_EVENT)
+    {
+        put_object( &obj );
+        return STATUS_OBJECT_TYPE_MISMATCH;
+    }
+
     current = __atomic_exchange_n( &event->signaled, 0, __ATOMIC_SEQ_CST );
 
     if (prev) *prev = current;
