@@ -283,7 +283,7 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
 {
     UINT i, j, max_count, real_mode_count, resolutions = 0;
     DEVMODEW *real_modes, *real_mode, mode_host = {0};
-    BOOL additional_modes = FALSE;
+    BOOL additional_modes = FALSE, landscape;
     const char *env;
 
     *mode_count = 0;
@@ -300,6 +300,11 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
         return;
     }
 
+    /* Check the ratio of dmPelsWidth to dmPelsHeight to determine whether the host is currently in
+     * portrait or landscape orientation. DMDO_DEFAULT is the natural orientation of the device,
+     * which isn't necessarily a landscape mode */
+    landscape = mode_host.dmPelsWidth >= mode_host.dmPelsHeight;
+
     /* Add the current mode early, in case we have to limit */
     modes_append( *modes, mode_count, &resolutions, &mode_host );
 
@@ -315,8 +320,7 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
 
         if (!additional_modes && fs_monitor_sizes[i].additional) continue;
 
-        if (mode_host.dmDisplayOrientation == DMDO_DEFAULT ||
-            mode_host.dmDisplayOrientation == DMDO_180)
+        if (landscape)
         {
             mode.dmPelsWidth = fs_monitor_sizes[i].size.cx;
             mode.dmPelsHeight = fs_monitor_sizes[i].size.cy;
