@@ -740,6 +740,12 @@ NTSTATUS fsync_pulse_event( HANDLE handle, LONG *prev )
     if ((ret = get_object( handle, &obj ))) return ret;
     event = obj.shm;
 
+    if (obj.type != FSYNC_MANUAL_EVENT && obj.type != FSYNC_AUTO_EVENT)
+    {
+        put_object( &obj );
+        return STATUS_OBJECT_TYPE_MISMATCH;
+    }
+
     /* This isn't really correct; an application could miss the write.
      * Unfortunately we can't really do much better. Fortunately this is rarely
      * used (and publicly deprecated). */
