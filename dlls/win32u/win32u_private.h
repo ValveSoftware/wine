@@ -263,6 +263,7 @@ extern BOOL register_imm_window( HWND hwnd ) DECLSPEC_HIDDEN;
 extern void unregister_imm_window( HWND hwnd ) DECLSPEC_HIDDEN;
 
 /* input.c */
+extern BOOL grab_pointer DECLSPEC_HIDDEN;
 extern BOOL destroy_caret(void) DECLSPEC_HIDDEN;
 extern BOOL enable_mouse_in_pointer DECLSPEC_HIDDEN;
 extern HWND get_active_window(void) DECLSPEC_HIDDEN;

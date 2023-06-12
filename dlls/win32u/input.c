@@ -405,6 +405,8 @@ static const KBDTABLES kbdus_tables =
 };
 
 
+BOOL grab_pointer = TRUE;
+
 static void kbd_tables_init_vsc2vk( const KBDTABLES *tables, BYTE vsc2vk[0x300] )
 {
     const VSC_VK *entry;
@@ -2543,7 +2545,10 @@ BOOL process_wine_clipcursor( BOOL empty, BOOL reset )
 
     TRACE( "empty %u, reset %u\n", empty, reset );
 
-    if (empty || reset) return user_driver->pClipCursor( NULL, reset );
+    if (reset) return user_driver->pClipCursor( NULL, TRUE );
+
+    if (!grab_pointer) return TRUE;
+    if (empty) return user_driver->pClipCursor( NULL, reset );
 
     get_clip_cursor( &rect );
     return user_driver->pClipCursor( &rect, FALSE );
