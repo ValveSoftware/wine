@@ -67,7 +67,8 @@ struct desktop
     struct list          touches;          /* list of active touches */
     struct thread_input *foreground_input; /* thread input of foreground thread */
     unsigned int         users;            /* processes and threads using this desktop */
-    user_handle_t                          cursor_win;       /* window that contains the cursor */
+    user_handle_t        cursor_win;       /* window that contains the cursor */
+    user_handle_t        cursor_handle;    /* last set cursor handle */
     struct object                         *shared_mapping;   /* desktop shared memory mapping */
     volatile struct desktop_shared_memory *shared;           /* desktop shared memory ptr */
     unsigned int                           last_press_alt:1; /* last key press was Alt (used to determine msg on Alt release) */
