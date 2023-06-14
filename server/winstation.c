@@ -30,6 +30,7 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "winternl.h"
+#include "ntuser.h"
 
 #include "object.h"
 #include "handle.h"
@@ -271,7 +272,11 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
                 return NULL;
             }
         }
-        else clear_error();
+        else
+        {
+            desktop->flags |= (flags & DF_WINE_CREATE_DESKTOP);
+            clear_error();
+        }
     }
     return desktop;
 }
