@@ -858,6 +858,18 @@ static const char * const focus_modes[] =
     "NotifyWhileGrabbed"
 };
 
+BOOL is_current_process_focused(void)
+{
+    Display *display = x11drv_thread_data()->display;
+    Window focus;
+    int revert;
+    HWND hwnd;
+
+    XGetInputFocus( display, &focus, &revert );
+    if (focus && !XFindContext( display, focus, winContext, (char **)&hwnd )) return TRUE;
+    return FALSE;
+}
+
 /**********************************************************************
  *              X11DRV_FocusIn
  */
@@ -911,9 +923,6 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
  */
 static void focus_out( Display *display , HWND hwnd )
  {
-    HWND hwnd_tmp;
-    Window focus_win;
-    int revert;
     struct x11drv_win_data *data;
 
     if (xim_in_compose_mode()) return;
@@ -953,14 +962,7 @@ static void focus_out( Display *display , HWND hwnd )
     /* don't reset the foreground window, if the window which is
        getting the focus is a Wine window */
 
-    XGetInputFocus( display, &focus_win, &revert );
-    if (focus_win)
-    {
-        if (XFindContext( display, focus_win, winContext, (char **)&hwnd_tmp ) != 0)
-            focus_win = 0;
-    }
-
-    if (!focus_win)
+    if (!is_current_process_focused())
     {
         /* Abey : 6-Oct-99. Check again if the focus out window is the
            Foreground window, because in most cases the messages sent
