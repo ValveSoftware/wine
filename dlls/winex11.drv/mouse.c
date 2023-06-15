@@ -427,8 +427,10 @@ static BOOL grab_clipping_window( const RECT *clip )
     POINT pos;
     RECT real_clip;
 
-    if (NtUserGetWindowThread( NtUserGetDesktopWindow(), NULL ) == GetCurrentThreadId())
-        return TRUE;  /* don't clip in the desktop process */
+    /* don't clip in the desktop process */
+    if (NtUserGetWindowThread( NtUserGetDesktopWindow(), NULL ) == GetCurrentThreadId()) return TRUE;
+    /* don't clip the cursor if the X input focus is on another process window */
+    if (!is_current_process_focused()) return TRUE;
 
     if (!data) return FALSE;
     if (!(clip_window = init_clip_window())) return TRUE;
