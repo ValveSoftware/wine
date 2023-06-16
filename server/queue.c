@@ -454,7 +454,7 @@ static struct thread_input *get_desktop_cursor_thread_input( struct desktop *des
     struct thread_input *input = NULL;
     struct thread *thread;
 
-    if ((thread = get_window_thread( desktop->cursor.win )))
+    if ((thread = get_window_thread( desktop->cursor_win )))
     {
         if (thread->queue) input = thread->queue->input;
         release_object( thread );
@@ -465,9 +465,9 @@ static struct thread_input *get_desktop_cursor_thread_input( struct desktop *des
 
 static int update_desktop_cursor_window( struct desktop *desktop, user_handle_t win )
 {
-    int updated = win != desktop->cursor.win;
+    int updated = win != desktop->cursor_win;
     struct thread_input *input;
-    desktop->cursor.win = win;
+    desktop->cursor_win = win;
 
     if (updated && (input = get_desktop_cursor_thread_input( desktop )))
     {
@@ -508,7 +508,7 @@ static void update_desktop_cursor_handle( struct desktop *desktop, struct thread
 {
     if (input == get_desktop_cursor_thread_input( desktop ))
     {
-        user_handle_t handle = input->cursor_count < 0 ? 0 : input->cursor, win = desktop->cursor.win;
+        user_handle_t handle = input->cursor_count < 0 ? 0 : input->cursor, win = desktop->cursor_win;
         /* when clipping send the message to the foreground window as well, as some driver have an artificial overlay window */
         if (is_cursor_clipped( desktop )) queue_cursor_message( desktop, 0, WM_WINE_SETCURSOR, win, handle );
         queue_cursor_message( desktop, win, WM_WINE_SETCURSOR, win, handle );
@@ -1961,7 +1961,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
     if ((input->mouse.info & 0xffffff00) == 0xff515700) source.origin = IMDT_TOUCH;
 
     /* update last desktop cursor change time */
-    update_desktop_cursor_pos( desktop, desktop->cursor.win, desktop->shared->cursor.x, desktop->shared->cursor.y );
+    update_desktop_cursor_pos( desktop, desktop->cursor_win, desktop->shared->cursor.x, desktop->shared->cursor.y );
 
     flags = input->mouse.flags;
     time  = input->mouse.time;
