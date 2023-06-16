@@ -952,9 +952,20 @@ HKL WINAPI NtUserGetKeyboardLayout( DWORD thread_id )
  */
 SHORT WINAPI NtUserGetKeyState( INT vkey )
 {
+    const input_shm_t *shared = get_input_shared_memory();
     SHORT retval = 0;
+    BOOL skip = TRUE;
 
-    SERVER_START_REQ( get_key_state )
+    if (!shared) skip = FALSE;
+    else SHARED_READ_BEGIN( shared, input_shm_t )
+    {
+        if (!shared->created) skip = FALSE; /* server needs to create the queue */
+        else if (!shared->keystate_lock) skip = FALSE; /* server needs to call sync_input_keystate */
+        else retval = (signed char)(shared->keystate[vkey & 0xff] & 0x81);
+    }
+    SHARED_READ_END
+
+    if (!skip) SERVER_START_REQ( get_key_state )
     {
         req->key = vkey;
         if (!wine_server_call( req )) retval = (signed char)(reply->state & 0x81);
