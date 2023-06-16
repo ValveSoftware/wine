@@ -893,9 +893,16 @@ typedef struct
     lparam_t info;
 } cursor_pos_t;
 
+struct shared_cursor
+{
+    int                  x;                /* cursor position */
+    int                  y;
+    unsigned int         last_change;      /* time of last position change */
+};
+
 struct desktop_shared_memory
 {
-    int placeholder;
+    struct shared_cursor cursor;           /* global cursor information */
 };
 typedef volatile struct desktop_shared_memory desktop_shm_t;
 
