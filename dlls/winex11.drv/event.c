@@ -1224,6 +1224,18 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
                 rect.bottom = rect.top + (data->whole_rect.bottom - data->whole_rect.top);
             }
         }
+        else if (steamgameid && !strcmp( steamgameid, "863550" ))
+        {
+            /* When going fullscreen WMs may set intermediate window sizes (e. g., excluding taskbar) before finally
+             * settle with the correct fullscreen window size. Hitman 2 is quick to react on window size change
+             * and trigger window resize again which randomly triggers the process to repeat. */
+            if (data->net_wm_state & (1 << NET_WM_STATE_FULLSCREEN) && NtUserIsWindowRectFullScreen( &data->whole_rect )
+                && !NtUserIsWindowRectFullScreen( &rect ))
+            {
+                TRACE( "Window is fullscreen, ignoring.\n" );
+                goto done;
+            }
+        }
     }
 
     x     = rect.left;
