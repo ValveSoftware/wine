@@ -44,6 +44,10 @@
 #include "request.h"
 #include "security.h"
 
+#ifndef F_SEAL_FUTURE_WRITE
+#define F_SEAL_FUTURE_WRITE 0x0010  /* prevent future writes while mapped */
+#endif
+
 /* list of memory ranges, used to store committed info */
 struct ranges
 {
@@ -285,6 +289,7 @@ int grow_file( int unix_fd, file_pos_t new_size )
     return 0;
 }
 
+#ifndef HAVE_MEMFD_CREATE
 /* simplified version of mkstemps() */
 static int make_temp_file( char name[16] )
 {
@@ -318,10 +323,23 @@ static int check_current_dir_for_exec(void)
     unlink( tmpfn );
     return (ret != MAP_FAILED);
 }
+#endif
 
 /* create a temp file for anonymous mappings */
 static int create_temp_file( file_pos_t size )
 {
+#ifdef HAVE_MEMFD_CREATE
+    int fd = memfd_create( "wine-mapping", MFD_ALLOW_SEALING );
+    if (fd != -1)
+    {
+        if (!grow_file( fd, size ))
+        {
+            close( fd );
+            fd = -1;
+        }
+    }
+    else file_set_error();
+#else
     static int temp_dir_fd = -1;
     char tmpfn[16];
     int fd;
@@ -354,6 +372,7 @@ static int create_temp_file( file_pos_t size )
     else file_set_error();
 
     if (temp_dir_fd != server_dir_fd) fchdir( server_dir_fd );
+#endif
     return fd;
 }
 
@@ -1248,6 +1267,11 @@ struct object *create_shared_mapping( struct object *root, const struct unicode_
             release_object( &mapping->obj );
             return NULL;
         }
+
+#if defined(HAVE_MEMFD_CREATE) && defined(F_ADD_SEALS)
+        /* protect the mapping against any future writable mapping, resize or re-sealing */
+        fcntl( fd, F_ADD_SEALS, F_SEAL_FUTURE_WRITE | F_SEAL_SHRINK | F_SEAL_GROW | F_SEAL_SEAL );
+#endif
     }
 
     *ptr = mapping->shared_ptr;
