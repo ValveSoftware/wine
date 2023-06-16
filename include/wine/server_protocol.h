@@ -5300,6 +5300,7 @@ struct set_cursor_reply
 #define SET_CURSOR_POS    0x04
 #define SET_CURSOR_CLIP   0x08
 #define SET_CURSOR_NOCLIP 0x10
+#define SET_CURSOR_FSCLIP 0x20
 
 
 struct get_cursor_history_request
