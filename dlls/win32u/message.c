@@ -2836,6 +2836,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
                 thread_info->wake_mask = changed_mask & (QS_SENDMESSAGE | QS_SMRESULT);
                 thread_info->changed_mask = changed_mask;
                 if (buffer != buffer_init) free( buffer );
+                NtYieldExecution();
                 return 0;
             }
             if (res != STATUS_BUFFER_OVERFLOW)
