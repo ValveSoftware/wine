@@ -265,6 +265,11 @@ BOOL WINAPI NtUserSetThreadDesktop( HDESK handle )
         thread_info->client_info.msg_window = 0;
         if (key_state_info) key_state_info->time = 0;
         if (was_virtual_desktop != is_virtual_desktop()) update_display_cache( TRUE );
+        if (thread_info->desktop_shm)
+        {
+            NtUnmapViewOfSection( GetCurrentProcess(), (void *)thread_info->desktop_shm );
+            thread_info->desktop_shm = NULL;
+        }
     }
     return ret;
 }
@@ -605,6 +610,66 @@ static const WCHAR *get_default_desktop( void *buf, size_t buf_size )
     }
 
     return defaultW;
+}
+
+static volatile void *map_shared_memory_section( const WCHAR *name, SIZE_T size, HANDLE root )
+{
+    OBJECT_ATTRIBUTES attr;
+    UNICODE_STRING section_str;
+    HANDLE handle;
+    UINT status;
+    void *ptr;
+
+    RtlInitUnicodeString( &section_str, name );
+    InitializeObjectAttributes( &attr, &section_str, 0, root, NULL );
+    if (!(status = NtOpenSection( &handle, SECTION_ALL_ACCESS, &attr )))
+    {
+        ptr = NULL;
+        status = NtMapViewOfSection( handle, GetCurrentProcess(), &ptr, 0, 0, NULL,
+                                     &size, ViewUnmap, 0, PAGE_READONLY );
+        NtClose( handle );
+    }
+
+    if (status)
+    {
+        WARN( "Failed to map view of section %s, status %#x\n", debugstr_w(name), status );
+        return NULL;
+    }
+
+    return ptr;
+}
+
+const desktop_shm_t *get_desktop_shared_memory(void)
+{
+    static const WCHAR dir_desktop_maps[] =
+    {
+        '_','_','w','i','n','e','_','d','e','s','k','t','o','p','_','m','a','p','p','i','n','g','s','\\',0
+    };
+    struct user_thread_info *thread_info = get_user_thread_info();
+    HANDLE root, handles[2];
+    WCHAR buf[MAX_PATH], *ptr;
+    DWORD i, needed;
+
+    if (thread_info->desktop_shm) return thread_info->desktop_shm;
+
+    handles[0] = NtUserGetProcessWindowStation();
+    handles[1] = NtUserGetThreadDesktop( GetCurrentThreadId() );
+
+    memcpy( buf, dir_desktop_maps, wcslen(dir_desktop_maps) * sizeof(WCHAR) );
+    ptr = buf + wcslen(dir_desktop_maps);
+
+    for (i = 0; i < 2; i++)
+    {
+        NtUserGetObjectInformation( handles[i], UOI_NAME, (void *)ptr, sizeof(buf) - (ptr - buf) * sizeof(WCHAR), &needed );
+        ptr += needed / sizeof(WCHAR);
+        if (i == 0) *(ptr - 1) = '\\';
+    }
+
+    root = get_winstations_dir_handle();
+    thread_info->desktop_shm = map_shared_memory_section( buf, sizeof(*thread_info->desktop_shm), root );
+    NtClose( root );
+
+    return thread_info->desktop_shm;
 }
 
 /***********************************************************************
