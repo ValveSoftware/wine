@@ -489,10 +489,42 @@ static struct message *alloc_hardware_message( lparam_t info, struct hw_msg_sour
     return msg;
 }
 
+static int is_cursor_clipped( struct desktop *desktop )
+{
+    rectangle_t top_rect, clip_rect = desktop->shared->cursor.clip;
+    get_top_window_rectangle( desktop, &top_rect );
+    return !is_rect_equal( &clip_rect, &top_rect );
+}
+
+static void queue_cursor_message( struct desktop *desktop, user_handle_t win, unsigned int message,
+                                  lparam_t wparam, lparam_t lparam )
+{
+    static const struct hw_msg_source source = { IMDT_UNAVAILABLE, IMO_SYSTEM };
+    struct thread_input *input;
+    struct message *msg;
+
+    if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
+
+    msg->msg = message;
+    msg->wparam = wparam;
+    msg->lparam = lparam;
+    msg->x = desktop->shared->cursor.x;
+    msg->y = desktop->shared->cursor.y;
+    if (!(msg->win = win) && (input = desktop->foreground_input)) msg->win = input->shared->active;
+    queue_hardware_message( desktop, msg, 1 );
+}
+
 static int update_desktop_cursor_window( struct desktop *desktop, user_handle_t win )
 {
     int updated = win != desktop->cursor_win;
+    user_handle_t handle = desktop->cursor_handle;
     desktop->cursor_win = win;
+    if (updated)
+    {
+        /* when clipping send the message to the foreground window as well, as some driver have an artificial overlay window */
+        if (is_cursor_clipped( desktop )) queue_cursor_message( desktop, 0, WM_WINE_SETCURSOR, win, handle );
+        queue_cursor_message( desktop, win, WM_WINE_SETCURSOR, win, handle );
+    }
     return updated;
 }
 
@@ -522,7 +554,15 @@ static int update_desktop_cursor_pos( struct desktop *desktop, user_handle_t win
 
 static void update_desktop_cursor_handle( struct desktop *desktop, user_handle_t handle )
 {
+    int updated = desktop->cursor_handle != handle;
+    user_handle_t win = desktop->cursor_win;
     desktop->cursor_handle = handle;
+    if (updated)
+    {
+        /* when clipping send the message to the foreground window as well, as some driver have an artificial overlay window */
+        if (is_cursor_clipped( desktop )) queue_cursor_message( desktop, 0, WM_WINE_SETCURSOR, win, handle );
+        queue_cursor_message( desktop, win, WM_WINE_SETCURSOR, win, handle );
+    }
 }
 
 /* set the cursor position and queue the corresponding mouse message */
@@ -556,23 +596,6 @@ static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsig
     *time = get_tick_count();
 }
 
-static void queue_clip_cursor_msg( struct desktop *desktop, lparam_t wparam, lparam_t lparam )
-{
-    static const struct hw_msg_source source = { IMDT_UNAVAILABLE, IMO_SYSTEM };
-    struct thread_input *input;
-    struct message *msg;
-
-    if (!(msg = alloc_hardware_message( 0, source, get_tick_count(), 0 ))) return;
-
-    msg->msg = WM_WINE_CLIPCURSOR;
-    msg->wparam = wparam;
-    msg->lparam = lparam;
-    msg->x = desktop->shared->cursor.x;
-    msg->y = desktop->shared->cursor.y;
-    if ((input = desktop->foreground_input)) msg->win = input->shared->active;
-    queue_hardware_message( desktop, msg, 1 );
-}
-
 /* set the cursor clip rectangle */
 void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int reset )
 {
@@ -604,7 +627,7 @@ void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, int r
     if (reset) post_desktop_message( desktop, WM_WINE_CLIPCURSOR, TRUE, FALSE );
 
     /* notify foreground thread, of reset, or to apply new cursor clipping rect */
-    queue_clip_cursor_msg( desktop, rect == NULL, reset );
+    queue_cursor_message( desktop, 0, WM_WINE_CLIPCURSOR, rect == NULL, reset );
 }
 
 /* change the foreground input and reset the cursor clip rect */
@@ -712,6 +735,7 @@ static inline int get_hardware_msg_bit( unsigned int message )
     if (message == WM_POINTERDOWN || message == WM_POINTERUP ||
         message == WM_POINTERUPDATE) return QS_POINTER;
     if (message == WM_WINE_CLIPCURSOR) return QS_RAWINPUT;
+    if (message == WM_WINE_SETCURSOR) return QS_RAWINPUT;
     return QS_MOUSEBUTTON;
 }
 
@@ -794,13 +818,13 @@ static int merge_mousemove( struct thread_input *input, const struct message *ms
     return 1;
 }
 
-/* try to merge a WM_WINE_CLIPCURSOR message with the last in the list; return 1 if successful */
-static int merge_wine_clipcursor( struct thread_input *input, const struct message *msg )
+/* try to merge a unique message with the last in the list; return 1 if successful */
+static int merge_unique_message( struct thread_input *input, unsigned int message, const struct message *msg )
 {
     struct message *prev;
 
     LIST_FOR_EACH_ENTRY_REV( prev, &input->msg_list, struct message, entry )
-        if (prev->msg == WM_WINE_CLIPCURSOR) break;
+        if (prev->msg == message) break;
     if (&prev->entry == &input->msg_list) return 0;
 
     if (prev->result) return 0;
@@ -824,7 +848,8 @@ static int merge_message( struct thread_input *input, const struct message *msg 
 {
     if (msg->msg == WM_POINTERUPDATE) return merge_pointer_update_message( input, msg );
     if (msg->msg == WM_MOUSEMOVE) return merge_mousemove( input, msg );
-    if (msg->msg == WM_WINE_CLIPCURSOR) return merge_wine_clipcursor( input, msg );
+    if (msg->msg == WM_WINE_CLIPCURSOR) return merge_unique_message( input, WM_WINE_CLIPCURSOR, msg );
+    if (msg->msg == WM_WINE_SETCURSOR) return merge_unique_message( input, WM_WINE_SETCURSOR, msg );
     return 0;
 }
 
