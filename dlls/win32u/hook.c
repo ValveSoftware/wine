@@ -60,12 +60,31 @@ static const char *debugstr_hook_id( unsigned int id )
     return hook_names[id - WH_MINHOOK];
 }
 
-BOOL is_hooked( INT id )
+/***********************************************************************
+ *      get_active_hooks
+ *
+ */
+static UINT get_active_hooks(void)
 {
     struct user_thread_info *thread_info = get_user_thread_info();
 
-    if (!thread_info->active_hooks) return TRUE;
-    return (thread_info->active_hooks & (1 << (id - WH_MINHOOK))) != 0;
+    if (!thread_info->active_hooks)
+    {
+        SERVER_START_REQ( get_active_hooks )
+        {
+            if (!wine_server_call( req )) thread_info->active_hooks = reply->active_hooks;
+        }
+        SERVER_END_REQ;
+    }
+
+    return thread_info->active_hooks;
+}
+
+BOOL is_hooked( INT id )
+{
+    UINT active_hooks = get_active_hooks();
+    if (!active_hooks) return TRUE;
+    return (active_hooks & (1 << (id - WH_MINHOOK))) != 0;
 }
 
 /***********************************************************************
@@ -432,7 +451,7 @@ LRESULT call_message_hooks( INT id, INT code, WPARAM wparam, LPARAM lparam, size
 
     if (!is_hooked( id ))
     {
-        TRACE( "skipping hook %s mask %x\n", hook_names[id-WH_MINHOOK], thread_info->active_hooks );
+        TRACE( "skipping hook %s mask %x\n", hook_names[id-WH_MINHOOK], get_active_hooks() );
         return 0;
     }
 
@@ -571,7 +590,7 @@ void WINAPI NtUserNotifyWinEvent( DWORD event, HWND hwnd, LONG object_id, LONG c
 
     if (!is_hooked( WH_WINEVENT ))
     {
-        TRACE( "skipping hook mask %x\n", thread_info->active_hooks );
+        TRACE( "skipping hook mask %x\n", get_active_hooks() );
         return;
     }
 
