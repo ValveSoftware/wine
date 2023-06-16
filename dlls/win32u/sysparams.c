@@ -1224,6 +1224,8 @@ static void add_gpu( const struct gdi_gpu *gpu, void *param )
     static const WCHAR ramdacW[] =
         {'I','n','t','e','r','g','r','a','t','e','d',' ','R','A','M','D','A','C',0};
     static const WCHAR driver_dateW[] = {'D','r','i','v','e','r','D','a','t','e',0};
+    static const WCHAR driver_versionW[] =
+        {'D','r','i','v','e','r','V','e','r','s','i','o','n',0};
 
     TRACE( "%s %04X %04X %08X %02X\n", debugstr_w(gpu->name),
            gpu->vendor_id, gpu->device_id, gpu->subsys_id, gpu->revision_id );
@@ -1360,6 +1362,10 @@ static void add_gpu( const struct gdi_gpu *gpu, void *param )
     set_reg_value( hkey, driver_dateW, REG_SZ, bufferW, format_date( bufferW, ft.QuadPart ));
 
     set_reg_value( hkey, driver_date_dataW, REG_BINARY, &ft, sizeof(ft) );
+
+    /* 21 - Windows 10 WDDM 2.1; 0 - unused field; remaining is a build number and driver version */
+    sprintf( buffer, "21.0.%u", gpu->driver_version );
+    set_reg_value( hkey, driver_versionW, REG_SZ, bufferW, asciiz_to_unicode( bufferW, buffer ));
 
     size = (lstrlenW( desc ) + 1) * sizeof(WCHAR);
     set_reg_value( hkey, driver_descW, REG_SZ, desc, size );

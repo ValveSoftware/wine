@@ -820,6 +820,7 @@ static void add_remaining_gpus_via_vulkan( struct gdi_gpu **gpus, int *count )
             memcpy( &new_gpu->vulkan_uuid, id.deviceUUID, sizeof(id.deviceUUID) );
             new_gpu->vendor_id = properties2.properties.vendorID;
             new_gpu->device_id = properties2.properties.deviceID;
+            new_gpu->driver_version = properties2.properties.driverVersion;
             ntdll_umbstowcs( properties2.properties.deviceName, -1, new_gpu->name, ARRAY_SIZE(new_gpu->name) );
 
             TRACE("Added a new GPU via Vulkan: %04x:%04x %s\n", new_gpu->vendor_id, new_gpu->device_id, debugstr_w(new_gpu->name));
@@ -941,6 +942,7 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
             {
                 gpu->vendor_id = properties2.properties.vendorID;
                 gpu->device_id = properties2.properties.deviceID;
+                gpu->driver_version = properties2.properties.driverVersion;
             }
             RtlUTF8ToUnicodeN( gpu->name, sizeof(gpu->name), &len, properties2.properties.deviceName,
                                strlen( properties2.properties.deviceName ) + 1 );

@@ -243,6 +243,7 @@ struct gdi_gpu
     UINT device_id;
     UINT subsys_id;
     UINT revision_id;
+    UINT driver_version;  /* DriverVersion from Vulkan device */
     GUID vulkan_uuid;     /* Vulkan device UUID */
 };
 
