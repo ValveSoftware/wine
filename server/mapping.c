@@ -29,6 +29,7 @@
 #include <sys/stat.h>
 #include <sys/mman.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -161,6 +162,7 @@ struct mapping
     pe_image_info_t image;           /* image info (for PE image mapping) */
     struct ranges  *committed;       /* list of committed ranges in this mapping */
     struct shared_map *shared;       /* temp file for shared PE mapping */
+    void           *shared_ptr;      /* mmaped pointer for shared mappings */
 };
 
 static void mapping_dump( struct object *obj, int verbose );
@@ -949,6 +951,7 @@ static struct mapping *create_mapping( struct object *root, const struct unicode
     mapping->fd          = NULL;
     mapping->shared      = NULL;
     mapping->committed   = NULL;
+    mapping->shared_ptr  = MAP_FAILED;
 
     if (!(mapping->flags = get_mapping_flags( handle, flags ))) goto error;
 
@@ -1149,6 +1152,7 @@ static void mapping_destroy( struct object *obj )
     if (mapping->fd) release_object( mapping->fd );
     if (mapping->committed) release_object( mapping->committed );
     if (mapping->shared) release_object( mapping->shared );
+    if (mapping->shared_ptr != MAP_FAILED) munmap( mapping->shared_ptr, mapping->size );
 }
 
 static enum server_fd_type mapping_get_fd_type( struct fd *fd )
@@ -1223,6 +1227,31 @@ void free_map_addr( client_ptr_t base, mem_size_t size )
 int get_page_size(void)
 {
     return page_mask + 1;
+}
+
+struct object *create_shared_mapping( struct object *root, const struct unicode_str *name, mem_size_t size,
+                                      unsigned int attr, const struct security_descriptor *sd, void **ptr )
+{
+    static unsigned int access = FILE_READ_DATA | FILE_WRITE_DATA;
+    struct mapping *mapping;
+
+    if (!(mapping = create_mapping( root, name, attr, size, SEC_COMMIT, 0, access, sd ))) return NULL;
+
+    if (mapping->shared_ptr == MAP_FAILED)
+    {
+        int fd = get_unix_fd( mapping->fd );
+
+        mapping->shared_ptr = mmap( NULL, mapping->size, PROT_WRITE, MAP_SHARED, fd, 0 );
+        if (mapping->shared_ptr == MAP_FAILED)
+        {
+            fprintf( stderr, "wine: Failed to map shared memory: %u %m\n", errno );
+            release_object( &mapping->obj );
+            return NULL;
+        }
+    }
+
+    *ptr = mapping->shared_ptr;
+    return &mapping->obj;
 }
 
 struct object *create_user_data_mapping( struct object *root, const struct unicode_str *name,

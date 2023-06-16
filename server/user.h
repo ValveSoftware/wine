@@ -77,6 +77,8 @@ struct desktop
     unsigned int         users;            /* processes and threads using this desktop */
     struct global_cursor cursor;           /* global cursor information */
     unsigned char        keystate[256];    /* asynchronous key state */
+    struct object       *shared_mapping;   /* desktop shared memory mapping */
+    const desktop_shm_t *shared;           /* desktop shared memory */
 };
 
 /* user handles functions */

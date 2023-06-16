@@ -217,6 +217,22 @@ struct desktop *get_desktop_obj( struct process *process, obj_handle_t handle, u
     return (struct desktop *)get_handle_obj( process, handle, access, &desktop_ops );
 }
 
+static int init_desktop_mapping( struct desktop *desktop, const struct unicode_str *name )
+{
+    struct object *dir;
+
+    desktop->shared = NULL;
+    desktop->shared_mapping = NULL;
+
+    if (!(dir = create_desktop_map_directory( desktop->winstation ))) return 0;
+    if ((desktop->shared_mapping = create_shared_mapping( dir, name, sizeof(struct desktop_shared_memory),
+                                                          0, NULL, (void **)&desktop->shared )))
+        memset( (void *)desktop->shared, 0, sizeof(*desktop->shared) );
+    release_object( dir );
+
+    return !!desktop->shared;
+}
+
 /* create a desktop object */
 static struct desktop *create_desktop( const struct unicode_str *name, unsigned int attr,
                                        unsigned int flags, struct winstation *winstation )
@@ -241,6 +257,11 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             list_add_tail( &winstation->desktops, &desktop->entry );
             list_init( &desktop->hotkeys );
             list_init( &desktop->touches );
+            if (!init_desktop_mapping( desktop, name ))
+            {
+                release_object( desktop );
+                return NULL;
+            }
         }
         else
         {
@@ -299,6 +320,8 @@ static void desktop_destroy( struct object *obj )
     if (desktop->global_hooks) release_object( desktop->global_hooks );
     if (desktop->close_timeout) remove_timeout_user( desktop->close_timeout );
     list_remove( &desktop->entry );
+    if (desktop->shared_mapping) release_object( desktop->shared_mapping );
+    desktop->shared_mapping = NULL;
     release_object( desktop->winstation );
 }
 
@@ -314,6 +337,7 @@ static void close_desktop_timeout( void *private )
 
     desktop->close_timeout = NULL;
     unlink_named_object( &desktop->obj );  /* make sure no other process can open it */
+    unlink_named_object( desktop->shared_mapping );
     post_desktop_message( desktop, WM_CLOSE, 0, 0 );  /* and signal the owner to quit */
 }
 

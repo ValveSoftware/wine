@@ -893,6 +893,12 @@ typedef struct
     lparam_t info;
 } cursor_pos_t;
 
+struct desktop_shared_memory
+{
+    int placeholder;
+};
+typedef volatile struct desktop_shared_memory desktop_shm_t;
+
 /****************************************************************/
 /* Request declarations */
 
