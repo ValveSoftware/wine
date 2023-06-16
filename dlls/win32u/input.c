@@ -552,14 +552,17 @@ BOOL enable_mouse_in_pointer = FALSE;
  */
 HWND WINAPI NtUserGetForegroundWindow(void)
 {
+    const input_shm_t *shared = get_foreground_shared_memory();
     HWND ret = 0;
 
-    SERVER_START_REQ( get_thread_input )
+    if (!shared) return 0;
+
+    SHARED_READ_BEGIN( shared, input_shm_t )
     {
-        req->tid = 0;
-        if (!wine_server_call_err( req )) ret = wine_server_ptr_handle( reply->foreground );
+        ret = wine_server_ptr_handle( shared->active );
     }
-    SERVER_END_REQ;
+    SHARED_READ_END
+
     return ret;
 }
 
@@ -781,20 +784,19 @@ BOOL get_cursor_pos( POINT *pt )
  */
 BOOL WINAPI NtUserGetCursorInfo( CURSORINFO *info )
 {
+    const input_shm_t *shared = get_foreground_shared_memory();
     BOOL ret;
 
     if (!info) return FALSE;
 
-    SERVER_START_REQ( get_thread_input )
+    if (!shared) ret = FALSE;
+    else SHARED_READ_BEGIN( shared, input_shm_t )
     {
-        req->tid = 0;
-        if ((ret = !wine_server_call( req )))
-        {
-            info->hCursor = wine_server_ptr_handle( reply->cursor );
-            info->flags = reply->show_count >= 0 ? CURSOR_SHOWING : 0;
-        }
+        info->hCursor = wine_server_ptr_handle( shared->cursor );
+        info->flags = (shared->cursor_count >= 0) ? CURSOR_SHOWING : 0;
+        ret = TRUE;
     }
-    SERVER_END_REQ;
+    SHARED_READ_END
     get_cursor_pos( &info->ptScreenPos );
     return ret;
 }
