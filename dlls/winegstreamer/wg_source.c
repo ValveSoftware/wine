@@ -53,6 +53,7 @@ struct wg_source
     GstElement *container;
     GstSegment segment;
     bool valid_segment;
+    guint64 max_duration;
 
     guint stream_count;
     struct source_stream streams[WG_SOURCE_MAX_STREAMS];
@@ -258,6 +259,7 @@ static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, G
 {
     guint group, flags;
     GstStream *stream;
+    gint64 duration;
     const gchar *id;
 
     gst_event_parse_stream_start(event, &id);
@@ -266,8 +268,11 @@ static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, G
     if (!gst_event_parse_group_id(event, &group))
         group = -1;
 
-    GST_TRACE("source %p, pad %p, stream %p, id %s, flags %#x, group %d",
-            source, pad, stream, id, flags, group);
+    if (gst_pad_peer_query_duration(pad, GST_FORMAT_TIME, &duration) && GST_CLOCK_TIME_IS_VALID(duration))
+        source->max_duration = max(source->max_duration, duration);
+
+    GST_TRACE("source %p, pad %p, stream %p, id %s, flags %#x, group %d, duration %" GST_TIME_FORMAT,
+            source, pad, stream, id, flags, group, GST_TIME_ARGS(duration));
 
     gst_event_unref(event);
     return true;
