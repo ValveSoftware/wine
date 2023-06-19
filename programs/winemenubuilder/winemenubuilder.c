@@ -1319,100 +1319,6 @@ static BOOL write_desktop_entry(const WCHAR *link, const WCHAR *location, const 
     return TRUE;
 }
 
-static BOOL write_directory_entry(const WCHAR *directory, const WCHAR *location)
-{
-    FILE *file;
-
-    WINE_TRACE("(%s,%s)\n", wine_dbgstr_w(directory), wine_dbgstr_w(location));
-
-    file = _wfopen( location, L"wb" );
-    if (file == NULL)
-        return FALSE;
-
-    fprintf(file, "[Desktop Entry]\n");
-    fprintf(file, "Type=Directory\n");
-    if (wcscmp(directory, L"wine") == 0)
-    {
-        fprintf(file, "Name=Wine\n");
-        fprintf(file, "Icon=wine\n");
-    }
-    else
-    {
-        fprintf(file, "Name=%s\n", wchars_to_utf8_chars(directory));
-        fprintf(file, "Icon=folder\n");
-    }
-
-    fclose(file);
-    return TRUE;
-}
-
-static BOOL write_menu_file(const WCHAR *windows_link, const WCHAR *link)
-{
-    WCHAR tempfilename[MAX_PATH];
-    FILE *tempfile = NULL;
-    WCHAR *filename, *lastEntry, *menuPath;
-    int i;
-    int count = 0;
-    BOOL ret = FALSE;
-
-    WINE_TRACE("(%s)\n", wine_dbgstr_w(link));
-
-    GetTempFileNameW( xdg_menu_dir, L"mnu", 0, tempfilename );
-    if (!(tempfile = _wfopen( tempfilename, L"wb" ))) return FALSE;
-
-    fprintf(tempfile, "<!DOCTYPE Menu PUBLIC \"-//freedesktop//DTD Menu 1.0//EN\"\n");
-    fprintf(tempfile, "\"http://www.freedesktop.org/standards/menu-spec/menu-1.0.dtd\">\n");
-    fprintf(tempfile, "<Menu>\n");
-    fprintf(tempfile, "  <Name>Applications</Name>\n");
-
-    filename = heap_wprintf(L"wine\\%s.desktop", link);
-    lastEntry = filename;
-    for (i = 0; filename[i]; i++)
-    {
-        if (filename[i] == '\\')
-        {
-            WCHAR *dir_file_name;
-            const char *prefix = count ? "" : "wine-";
-
-            filename[i] = 0;
-            fprintf(tempfile, "  <Menu>\n");
-            fprintf(tempfile, "    <Name>%s%s</Name>\n",
-                    prefix, wchars_to_xml_text(filename));
-            fprintf(tempfile, "    <Directory>%s%s.directory</Directory>\n",
-                    prefix, wchars_to_xml_text(filename));
-            dir_file_name = heap_wprintf(L"%s\\desktop-directories\\%s%s.directory",
-                                         xdg_data_dir, count ? L"" : L"wine-", filename);
-            if (GetFileAttributesW( dir_file_name ) == INVALID_FILE_ATTRIBUTES)
-                write_directory_entry(lastEntry, dir_file_name);
-            free(dir_file_name);
-            filename[i] = '-';
-            lastEntry = &filename[i+1];
-            ++count;
-        }
-    }
-    filename[i] = 0;
-
-    fprintf(tempfile, "    <Include>\n");
-    fprintf(tempfile, "      <Filename>%s</Filename>\n", wchars_to_xml_text(filename));
-    fprintf(tempfile, "    </Include>\n");
-    for (i = 0; i < count; i++)
-         fprintf(tempfile, "  </Menu>\n");
-    fprintf(tempfile, "</Menu>\n");
-
-    menuPath = heap_wprintf(L"%s\\%s", xdg_menu_dir, filename);
-    lstrcpyW(menuPath + lstrlenW(menuPath) - lstrlenW(L".desktop"), L".menu");
-
-    fclose(tempfile);
-    ret = MoveFileExW( tempfilename, menuPath, MOVEFILE_REPLACE_EXISTING );
-    if (ret)
-        register_menus_entry(menuPath, windows_link);
-    else
-        DeleteFileW( tempfilename );
-    free(filename);
-    free(menuPath);
-    return ret;
-}
-
 static BOOL write_menu_entry(const WCHAR *windows_link, const WCHAR *link, const WCHAR *path, const WCHAR *args,
                              const WCHAR *descr, const WCHAR *workdir, const WCHAR *icon, const WCHAR *wmclass)
 {
@@ -1440,12 +1346,6 @@ static BOOL write_menu_entry(const WCHAR *windows_link, const WCHAR *link, const
         WINE_WARN("couldn't make desktop entry %s\n", wine_dbgstr_w(desktopPath));
         ret = FALSE;
         goto end;
-    }
-
-    if (!write_menu_file(windows_link, link))
-    {
-        WINE_WARN("couldn't make menu file %s\n", wine_dbgstr_w(filename));
-        ret = FALSE;
     }
 
 end:
