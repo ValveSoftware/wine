@@ -6216,6 +6216,18 @@ static void thread_detach(void)
         thread_info->queue_shm = NULL;
     }
 
+    if (thread_info->input_shm)
+    {
+        NtUnmapViewOfSection( GetCurrentProcess(), (void *)thread_info->input_shm );
+        thread_info->input_shm = NULL;
+    }
+
+    if (thread_info->foreground_shm)
+    {
+        NtUnmapViewOfSection( GetCurrentProcess(), (void *)thread_info->foreground_shm );
+        thread_info->foreground_shm = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 

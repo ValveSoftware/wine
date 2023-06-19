@@ -685,6 +685,54 @@ const queue_shm_t *get_queue_shared_memory(void)
     return thread_info->queue_shm;
 }
 
+static const input_shm_t *get_thread_input_shared_memory( UINT tid, const input_shm_t *input_shm )
+{
+    WCHAR bufferW[MAX_PATH];
+    char buffer[MAX_PATH];
+
+    if (input_shm && input_shm->tid == tid) return input_shm;
+    if (input_shm) NtUnmapViewOfSection( GetCurrentProcess(), (void *)input_shm );
+
+    snprintf( buffer, ARRAY_SIZE(buffer), "\\KernelObjects\\__wine_thread_mappings\\%08x-input", tid );
+    asciiz_to_unicode( bufferW, buffer );
+    return map_shared_memory_section( bufferW, sizeof(*input_shm), NULL );
+}
+
+const input_shm_t *get_input_shared_memory(void)
+{
+    const queue_shm_t *queue = get_queue_shared_memory();
+    struct user_thread_info *thread_info = get_user_thread_info();
+    UINT tid;
+
+    if (!queue) return NULL;
+    SHARED_READ_BEGIN( queue, queue_shm_t )
+    {
+        tid = queue->input_tid;
+    }
+    SHARED_READ_END
+
+    thread_info->input_shm = get_thread_input_shared_memory( tid, thread_info->input_shm );
+    return thread_info->input_shm;
+}
+
+const input_shm_t *get_foreground_shared_memory(void)
+{
+    const desktop_shm_t *desktop = get_desktop_shared_memory();
+    struct user_thread_info *thread_info = get_user_thread_info();
+    UINT tid;
+
+    if (!desktop) return NULL;
+    SHARED_READ_BEGIN( desktop, desktop_shm_t )
+    {
+        tid = desktop->foreground_tid;
+    }
+    SHARED_READ_END
+
+    if (!tid) return NULL;
+    thread_info->foreground_shm = get_thread_input_shared_memory( tid, thread_info->foreground_shm );
+    return thread_info->foreground_shm;
+}
+
 /***********************************************************************
  *           winstation_init
  *
