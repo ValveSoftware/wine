@@ -7,6 +7,7 @@ SOURCES = \
 	avimux.c \
 	capturegraph.c \
 	filewriter.c \
+	inftee.c \
 	qcap.c \
 	smartteefilter.c \
 	videocapture.c

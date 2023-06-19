@@ -569,10 +569,11 @@ static HRESULT WINAPI source_Disconnect(IPin *iface)
 {
     HRESULT hr;
     struct strmbase_source *This = impl_source_from_IPin(iface);
+    struct strmbase_filter *filter = This->pin.filter;
 
     TRACE("pin %p %s:%s.\n", This, debugstr_w(This->pin.filter->name), debugstr_w(This->pin.name));
 
-    EnterCriticalSection(&This->pin.filter->filter_cs);
+    EnterCriticalSection(&filter->filter_cs);
     {
         if (This->pin.filter->state != State_Stopped)
         {
@@ -580,9 +581,6 @@ static HRESULT WINAPI source_Disconnect(IPin *iface)
             WARN("Filter is not stopped; returning VFW_E_NOT_STOPPED.\n");
             return VFW_E_NOT_STOPPED;
         }
-
-        if (This->pFuncsTable->source_disconnect)
-            This->pFuncsTable->source_disconnect(This);
 
         if (This->pMemInputPin)
         {
@@ -606,8 +604,11 @@ static HRESULT WINAPI source_Disconnect(IPin *iface)
         }
         else
             hr = S_FALSE;
+
+        if (This->pFuncsTable->source_disconnect)
+            This->pFuncsTable->source_disconnect(This);
     }
-    LeaveCriticalSection(&This->pin.filter->filter_cs);
+    LeaveCriticalSection(&filter->filter_cs);
 
     return hr;
 }

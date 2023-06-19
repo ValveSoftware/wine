@@ -36,6 +36,7 @@ HRESULT avi_compressor_create(IUnknown *outer, IUnknown **out);
 HRESULT avi_mux_create(IUnknown *outer, IUnknown **out);
 HRESULT capture_graph_create(IUnknown *outer, IUnknown **out);
 HRESULT file_writer_create(IUnknown *outer, IUnknown **out);
+HRESULT inf_tee_create(IUnknown *outer, IUnknown **out);
 HRESULT smart_tee_create(IUnknown *outer, IUnknown **out);
 HRESULT vfw_capture_create(IUnknown *outer, IUnknown **out);
 

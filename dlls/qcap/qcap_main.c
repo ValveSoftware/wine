@@ -103,6 +103,7 @@ static struct class_factory audio_record_cf = {{&class_factory_vtbl}, audio_reco
 static struct class_factory avi_compressor_cf = {{&class_factory_vtbl}, avi_compressor_create};
 static struct class_factory avi_mux_cf = {{&class_factory_vtbl}, avi_mux_create};
 static struct class_factory capture_graph_cf = {{&class_factory_vtbl}, capture_graph_create};
+static struct class_factory inf_tee_cf = {{&class_factory_vtbl}, inf_tee_create};
 static struct class_factory file_writer_cf = {{&class_factory_vtbl}, file_writer_create};
 static struct class_factory smart_tee_cf = {{&class_factory_vtbl}, smart_tee_create};
 static struct class_factory vfw_capture_cf = {{&class_factory_vtbl}, vfw_capture_create};
@@ -125,6 +126,8 @@ HRESULT WINAPI DllGetClassObject(REFCLSID clsid, REFIID iid, void **out)
         factory = &capture_graph_cf;
     else if (IsEqualGUID(clsid, &CLSID_FileWriter))
         factory = &file_writer_cf;
+    else if (IsEqualGUID(clsid, &CLSID_InfTee))
+        factory = &inf_tee_cf;
     else if (IsEqualGUID(clsid, &CLSID_SmartTee))
         factory = &smart_tee_cf;
     else if (IsEqualGUID(clsid, &CLSID_VfwCapture))
@@ -188,6 +191,31 @@ static const REGFILTER2 reg_smart_tee =
     .u.s2.rgPins2 = reg_smart_tee_pins,
 };
 
+static const REGPINTYPES reg_null_mt = {&GUID_NULL, &GUID_NULL};
+
+static const REGFILTERPINS2 reg_inf_tee_pins[2] =
+{
+    {
+        .cInstances = 1,
+        .nMediaTypes = 1,
+        .lpMediaType = &reg_null_mt,
+    },
+    {
+        .dwFlags = REG_PINFLAG_B_OUTPUT,
+        .cInstances = 1,
+        .nMediaTypes = 1,
+        .lpMediaType = &reg_null_mt,
+    },
+};
+
+static const REGFILTER2 reg_inf_tee =
+{
+    .dwVersion = 2,
+    .dwMerit = MERIT_DO_NOT_USE,
+    .u.s2.cPins2 = 2,
+    .u.s2.rgPins2 = reg_inf_tee_pins,
+};
+
 static const REGPINTYPES reg_file_writer_sink_mt = {&GUID_NULL, &GUID_NULL};
 
 static const REGFILTERPINS2 reg_file_writer_pins[1] =
@@ -226,6 +254,8 @@ HRESULT WINAPI DllRegisterServer(void)
             NULL, NULL, NULL, &reg_avi_mux);
     IFilterMapper2_RegisterFilter(mapper, &CLSID_FileWriter, L"File writer",
             NULL, NULL, NULL, &reg_file_writer);
+    IFilterMapper2_RegisterFilter(mapper, &CLSID_InfTee, L"Infinite Pin Tee Filter",
+            NULL, NULL, NULL, &reg_inf_tee);
     IFilterMapper2_RegisterFilter(mapper, &CLSID_SmartTee, L"Smart Tee",
             NULL, NULL, NULL, &reg_smart_tee);
 

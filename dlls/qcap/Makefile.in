@@ -9,6 +9,7 @@ SOURCES = \
 	avimux.c \
 	capturegraph.c \
 	filewriter.c \
+	inftee.c \
 	qcap_classes.idl \
 	qcap_main.c \
 	smartteefilter.c \
