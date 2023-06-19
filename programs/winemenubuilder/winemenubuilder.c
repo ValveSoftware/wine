@@ -1264,7 +1264,7 @@ static BOOL write_desktop_entry(const WCHAR *link, const WCHAR *location, const 
     char *workdir_unix;
     int needs_chmod = FALSE;
     const WCHAR *name;
-    const WCHAR *prefix = _wgetenv( L"WINECONFIGDIR" );
+    WCHAR *shortcuts_dir;
 
     WINE_TRACE("(%s,%s,%s,%s,%s,%s,%s,%s,%s)\n", wine_dbgstr_w(link), wine_dbgstr_w(location),
                wine_dbgstr_w(linkname), wine_dbgstr_w(path), wine_dbgstr_w(args),
@@ -1272,11 +1272,12 @@ static BOOL write_desktop_entry(const WCHAR *link, const WCHAR *location, const 
                wine_dbgstr_w(wmclass));
 
     name = PathFindFileNameW( linkname );
-    if (!location)
-    {
-        location = heap_wprintf(L"%s\\%s.desktop", xdg_desktop_dir, name);
-        needs_chmod = TRUE;
-    }
+
+    shortcuts_dir = heap_wprintf(L"%s", L"c:\\proton_shortcuts");
+    create_directories(shortcuts_dir);
+    location = heap_wprintf(L"%s\\%s.desktop", shortcuts_dir, name);
+    heap_free(shortcuts_dir);
+    needs_chmod = TRUE;
 
     file = _wfopen( location, L"wb" );
     if (file == NULL)
