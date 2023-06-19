@@ -1249,7 +1249,6 @@ static BOOL write_desktop_entry(const WCHAR *link, const WCHAR *location, const 
     char *workdir_unix;
     int needs_chmod = FALSE;
     const WCHAR *name;
-    const WCHAR *prefix = _wgetenv( L"WINECONFIGDIR" );
     WCHAR *shortcuts_dir;
 
     WINE_TRACE("(%s,%s,%s,%s,%s,%s,%s,%s,%s)\n", wine_dbgstr_w(link), wine_dbgstr_w(location),
@@ -1272,13 +1271,8 @@ static BOOL write_desktop_entry(const WCHAR *link, const WCHAR *location, const 
     fprintf(file, "[Desktop Entry]\n");
     fprintf(file, "Name=%s\n", wchars_to_utf8_chars(name));
     fprintf(file, "Exec=" );
-    if (prefix)
-    {
-        char *path = wine_get_unix_file_name( prefix );
-        fprintf(file, "env \"WINEPREFIX=%s\" ", path);
-        heap_free( path );
-    }
-    fprintf(file, "wine \"%s\"", escape(path));
+
+    fprintf(file, "\"%s\"", escape(path));
     if (args) fprintf(file, " \"%s\"", escape(args) );
     fputc( '\n', file );
     fprintf(file, "Type=Application\n");
