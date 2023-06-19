@@ -2864,20 +2864,7 @@ static BOOL init_xdg(void)
 
 static BOOL associations_enabled(void)
 {
-    BOOL ret = TRUE;
-    HKEY hkey;
-    BYTE buf[32];
-    DWORD len;
-
-    if ((hkey = open_associations_reg_key()))
-    {
-        len = sizeof(buf);
-        if (!RegQueryValueExA(hkey, "Enable", NULL, NULL, buf, &len))
-            ret = IS_OPTION_TRUE(buf[0]);
-        RegCloseKey( hkey );
-    }
-
-    return ret;
+    return FALSE;
 }
 
 /***********************************************************************
