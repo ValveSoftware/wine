@@ -1082,7 +1082,8 @@ static HRESULT platform_write_icon(IStream *icoStream, ICONDIRENTRY *iconDirEntr
     LARGE_INTEGER zero;
 
     *nativeIdentifier = compute_native_identifier(exeIndex, icoPathW, destFilename);
-    iconsDir = heap_wprintf(L"%s\\icons\\hicolor", xdg_data_dir);
+    iconsDir = heap_wprintf(L"%s", L"c:\\proton_shortcuts\\icons");
+    create_directories(iconsDir);
 
     for (i = 0; i < numEntries; i++)
     {
