@@ -124,7 +124,7 @@ static struct key *root_key;
 static const timeout_t ticks_1601_to_1970 = (timeout_t)86400 * (369 * 365 + 89) * TICKS_PER_SEC;
 static const timeout_t save_period = 30 * -TICKS_PER_SEC;  /* delay between periodic saves */
 static struct timeout_user *save_timeout_user;  /* saving timer */
-static enum prefix_type { PREFIX_UNKNOWN, PREFIX_32BIT, PREFIX_64BIT } prefix_type;
+static enum prefix_type prefix_type;
 
 static const WCHAR wow6432node[] = {'W','o','w','6','4','3','2','N','o','d','e'};
 static const WCHAR symlink_value[] = {'S','y','m','b','o','l','i','c','L','i','n','k','V','a','l','u','e'};
@@ -2021,29 +2021,104 @@ static void save_all_subkeys( struct key *key, FILE *f )
     save_subkeys( key, key, f );
 }
 
-/* save a registry branch to a file handle */
-static void save_registry( struct key *key, obj_handle_t handle )
+static data_size_t serialize_value( const struct key_value *value, char *buf )
 {
-    struct file *file;
-    int fd;
+    data_size_t size;
 
-    if (!(file = get_file_obj( current->process, handle, FILE_WRITE_DATA ))) return;
-    fd = dup( get_file_unix_fd( file ) );
-    release_object( file );
-    if (fd != -1)
+    size = sizeof(data_size_t) + value->namelen + sizeof(unsigned int) + sizeof(data_size_t) + value->len;
+    if (!buf) return size;
+
+    *(data_size_t *)buf = value->namelen;
+    buf += sizeof(data_size_t);
+    memcpy( buf, value->name, value->namelen );
+    buf += value->namelen;
+
+    *(unsigned int *)buf = value->type;
+    buf += sizeof(unsigned int);
+
+    *(data_size_t *)buf = value->len;
+    buf += sizeof(data_size_t);
+    memcpy( buf, value->data, value->len );
+
+    return size;
+}
+
+/* save a registry key with subkeys to a buffer */
+static data_size_t serialize_key( const struct key *key, char *buf )
+{
+    data_size_t size;
+    int subkey_count, i;
+
+    if (key->flags & KEY_VOLATILE) return 0;
+
+    size = sizeof(data_size_t) + key->obj.name->len + sizeof(data_size_t) + key->classlen + sizeof(int) + sizeof(int)
+           + sizeof(unsigned int) + sizeof(timeout_t);
+    for (i = 0; i <= key->last_value; i++)
+        size += serialize_value( &key->values[i], buf ? buf + size : NULL );
+    subkey_count = 0;
+    for (i = 0; i <= key->last_subkey; i++)
     {
-        FILE *f = fdopen( fd, "w" );
-        if (f)
-        {
-            save_all_subkeys( key, f );
-            if (fclose( f )) file_set_error();
-        }
-        else
-        {
-            file_set_error();
-            close( fd );
-        }
+        if (key->subkeys[i]->flags & KEY_VOLATILE) continue;
+        size += serialize_key( key->subkeys[i], buf ? buf + size : NULL );
+        ++subkey_count;
     }
+    if (!buf) return size;
+
+    *(data_size_t *)buf = key->obj.name->len;
+    buf += sizeof(data_size_t);
+    memcpy( buf, key->obj.name->name, key->obj.name->len );
+    buf += key->obj.name->len;
+
+    *(data_size_t *)buf = key->classlen;
+    buf += sizeof(data_size_t);
+    memcpy( buf, key->class, key->classlen );
+    buf += key->classlen;
+
+    *(int *)buf = key->last_value + 1;
+    buf += sizeof(int);
+
+    *(int *)buf = subkey_count;
+    buf += sizeof(int);
+
+    *(unsigned int *)buf = key->flags & KEY_SYMLINK;
+    buf += sizeof(unsigned int);
+
+    *(timeout_t *)buf = key->modif;
+
+    return size;
+}
+
+/* save registry branch to buffer */
+static data_size_t save_registry( const struct key *key, char *buf )
+{
+    int *parent_count = NULL;
+    const struct key *parent;
+    data_size_t size;
+
+    size = sizeof(int) + sizeof(int);
+    if (buf)
+    {
+        *(int *)buf = prefix_type;
+        buf += sizeof(int);
+        parent_count = (int *)buf;
+        buf += sizeof(int);
+        *parent_count = 0;
+    }
+
+    parent = key;
+    do
+    {
+        size += sizeof(data_size_t) + parent->obj.name->len;
+        if (!buf) continue;
+        ++*parent_count;
+        *(data_size_t *)buf = parent->obj.name->len;
+        buf += sizeof(data_size_t);
+        memcpy( buf, parent->obj.name->name, parent->obj.name->len );
+        buf += parent->obj.name->len;
+    } while ((parent = get_parent( parent )));
+
+    size += serialize_key( key, buf );
+    return size;
 }
 
 /* save a registry branch to a file */
@@ -2370,6 +2445,7 @@ DECL_HANDLER(unload_registry)
 DECL_HANDLER(save_registry)
 {
     struct key *key;
+    char *data;
 
     if (!thread_single_check_privilege( current, SeBackupPrivilege ))
     {
@@ -2379,7 +2455,13 @@ DECL_HANDLER(save_registry)
 
     if ((key = get_hkey_obj( req->hkey, 0 )))
     {
-        save_registry( key, req->file );
+        reply->total = save_registry( key, NULL );
+        if (reply->total <= get_reply_max_size())
+        {
+            if ((data = set_reply_data_size( reply->total )))
+                save_registry( key, data );
+        }
+        else set_error( STATUS_BUFFER_TOO_SMALL );
         release_object( key );
     }
 }
