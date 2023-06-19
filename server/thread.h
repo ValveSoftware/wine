@@ -92,6 +92,8 @@ struct thread
     WCHAR                 *desc;          /* thread description string */
     struct object         *queue_shared_mapping; /* thread queue shared memory mapping */
     queue_shm_t           *queue_shared;  /* thread queue shared memory ptr */
+    struct object         *input_shared_mapping; /* thread input shared memory mapping */
+    input_shm_t           *input_shared;  /* thread input shared memory ptr */
 };
 
 extern struct thread *current;

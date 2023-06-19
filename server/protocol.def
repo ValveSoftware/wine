@@ -917,8 +917,17 @@ struct queue_shared_memory
     unsigned int         changed_bits;
     unsigned int         wake_mask;
     unsigned int         changed_mask;
+    thread_id_t          input_tid;
 };
 typedef volatile struct queue_shared_memory queue_shm_t;
+
+struct input_shared_memory
+{
+    unsigned int         seq;              /* sequence number - server updating if (seq & 1) != 0 */
+    int                  created;
+    thread_id_t          tid;
+};
+typedef volatile struct input_shared_memory input_shm_t;
 
 /****************************************************************/
 /* Request declarations */
