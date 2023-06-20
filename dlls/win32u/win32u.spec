@@ -1112,7 +1112,7 @@
 @ stub NtUserPromotePointer
 @ stub NtUserQueryActivationObject
 @ stub NtUserQueryBSDRWindow
-@ stdcall -syscall NtUserQueryDisplayConfig(long ptr ptr ptr ptr ptr)
+@ stub NtUserQueryDisplayConfig
 @ stub NtUserQueryInformationThread
 @ stdcall -syscall NtUserQueryInputContext(long long)
 @ stub NtUserQuerySendMessage
