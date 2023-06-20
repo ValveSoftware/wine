@@ -90,6 +90,7 @@ struct key
     unsigned int      flags;       /* flags */
     timeout_t         modif;       /* last modification time */
     struct list       notify_list; /* list of notifications */
+    abstime_t         timestamp_counter; /* timestamp counter at last change */
 };
 
 /* key flags */
@@ -117,6 +118,8 @@ struct key_value
 
 #define MAX_NAME_LEN  256    /* max. length of a key name */
 #define MAX_VALUE_LEN 16383  /* max. length of a value name */
+
+static abstime_t change_timestamp_counter;
 
 /* the root of the registry tree */
 static struct key *root_key;
@@ -710,6 +713,7 @@ static struct key *create_key_object( struct object *parent, const struct unicod
             key->last_value  = -1;
             key->values      = NULL;
             key->modif       = modif;
+            key->timestamp_counter = 0;
             list_init( &key->notify_list );
 
             if (options & REG_OPTION_CREATE_LINK) key->flags |= KEY_SYMLINK;
@@ -730,23 +734,25 @@ static struct key *create_key_object( struct object *parent, const struct unicod
 /* mark a key and all its parents as dirty (modified) */
 static void make_dirty( struct key *key )
 {
+    ++change_timestamp_counter;
     while (key)
     {
         if (key->flags & (KEY_DIRTY|KEY_VOLATILE)) return;  /* nothing to do */
         key->flags |= KEY_DIRTY;
+        key->timestamp_counter = change_timestamp_counter;
         key = get_parent( key );
     }
 }
 
 /* mark a key and all its subkeys as clean (not modified) */
-static void make_clean( struct key *key )
+static void make_clean( struct key *key, abstime_t timestamp_counter )
 {
     int i;
 
     if (key->flags & KEY_VOLATILE) return;
     if (!(key->flags & KEY_DIRTY)) return;
-    key->flags &= ~KEY_DIRTY;
-    for (i = 0; i <= key->last_subkey; i++) make_clean( key->subkeys[i] );
+    if (key->timestamp_counter <= timestamp_counter) key->flags &= ~KEY_DIRTY;
+    for (i = 0; i <= key->last_subkey; i++) make_clean( key->subkeys[i], timestamp_counter );
 }
 
 /* go through all the notifications and send them if necessary */
@@ -2003,6 +2009,7 @@ void init_registry(void)
 /* save a registry branch to a file */
 static void save_all_subkeys( struct key *key, FILE *f )
 {
+    /* Registry format in ntdll/registry.c:save_all_subkeys() should match. */
     fprintf( f, "WINE REGISTRY Version 2\n" );
     fprintf( f, ";; All keys relative to " );
     dump_path( key, NULL, f );
@@ -2191,7 +2198,7 @@ static int save_branch( struct key *key, const char *path )
 
 done:
     free( tmp );
-    if (ret) make_clean( key );
+    if (ret) make_clean( key, key->timestamp_counter );
     return ret;
 }
 
@@ -2239,6 +2246,36 @@ static int is_wow64_thread( struct thread *thread )
     return (is_machine_64bit( native_machine ) && !is_machine_64bit( thread->process->machine ));
 }
 
+/* find all the branches inside the specified key or the branch containing the key */
+static void find_branches_for_key( struct key *key, int *branches, int *branch_count )
+{
+    struct key *k;
+    int i;
+
+    *branch_count = 0;
+    for (i = 0; i < save_branch_count; i++)
+    {
+        k = save_branch_info[i].key;
+        while ((k = get_parent(k)))
+        {
+            if (k != key) continue;
+            branches[(*branch_count)++] = i;
+            break;
+        }
+    }
+
+    if (*branch_count) return;
+
+    do
+    {
+        for (i = 0; i < save_branch_count; i++)
+        {
+            if(key != save_branch_info[i].key) continue;
+            branches[(*branch_count)++] = i;
+            return;
+        }
+    } while ((key = get_parent( key )));
+}
 
 /* create a registry key */
 DECL_HANDLER(create_key)
@@ -2303,15 +2340,56 @@ DECL_HANDLER(delete_key)
     }
 }
 
-/* flush a registry key */
+/* return registry branches snaphot data for flushing key */
 DECL_HANDLER(flush_key)
 {
     struct key *key = get_hkey_obj( req->hkey, 0 );
-    if (key)
+    int branches[3], branch_count = 0, i, path_len;
+    char *data;
+
+    if (!key) return;
+
+    reply->total = 0;
+    reply->branch_count = 0;
+    if ((key->flags & KEY_DIRTY) && !(key->flags & KEY_VOLATILE))
+        find_branches_for_key( key, branches, &branch_count );
+    release_object( key );
+
+    reply->timestamp_counter = change_timestamp_counter;
+    for (i = 0; i < branch_count; ++i)
     {
-        /* we don't need to do anything here with the current implementation */
-        release_object( key );
+        if (!(save_branch_info[branches[i]].key->flags & KEY_DIRTY)) continue;
+        ++reply->branch_count;
+        path_len = strlen( save_branch_info[branches[i]].path ) + 1;
+        reply->total += sizeof(int) + sizeof(int) + path_len + save_registry( save_branch_info[branches[i]].key, NULL );
     }
+    if (reply->total > get_reply_max_size())
+    {
+        set_error( STATUS_BUFFER_TOO_SMALL );
+        return;
+    }
+
+    if (!(data = set_reply_data_size( reply->total ))) return;
+
+    for (i = 0; i < branch_count; ++i)
+    {
+        if (!(save_branch_info[branches[i]].key->flags & KEY_DIRTY)) continue;
+        *(int *)data = branches[i];
+        data += sizeof(int);
+        path_len = strlen( save_branch_info[branches[i]].path ) + 1;
+        *(int *)data = path_len;
+        data += sizeof(int);
+        memcpy( data, save_branch_info[branches[i]].path, path_len );
+        data += path_len;
+        data += save_registry( save_branch_info[branches[i]].key, data );
+    }
+}
+
+/* clear dirty state after successful registry branch flush */
+DECL_HANDLER(flush_key_done)
+{
+    if (req->branch < save_branch_count) make_clean( save_branch_info[req->branch].key, req->timestamp_counter );
+    else set_error( STATUS_INVALID_PARAMETER );
 }
 
 /* enumerate registry subkeys */

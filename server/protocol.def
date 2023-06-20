@@ -1908,6 +1908,18 @@ struct process_info
 /* Flush a registry key */
 @REQ(flush_key)
     obj_handle_t hkey;         /* handle to the key */
+@REPLY
+    abstime_t   timestamp_counter; /* branch last change timestamp counter */
+    data_size_t total;             /* total length needed for data */
+    int         branch_count;      /* number of registry branches to flush */
+    VARARG(data,bytes);            /* registry data */
+@END
+
+
+/* Clear KEY_DIRTY after key flush */
+@REQ(flush_key_done)
+    abstime_t    timestamp_counter; /* timestamp counter returned from flush_key */
+    int          branch;            /* saved registry branch id */
 @END
 
 
