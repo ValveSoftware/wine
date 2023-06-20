@@ -125,15 +125,12 @@ static abstime_t change_timestamp_counter;
 static struct key *root_key;
 
 static const timeout_t ticks_1601_to_1970 = (timeout_t)86400 * (369 * 365 + 89) * TICKS_PER_SEC;
-static const timeout_t save_period = 30 * -TICKS_PER_SEC;  /* delay between periodic saves */
-static struct timeout_user *save_timeout_user;  /* saving timer */
 static enum prefix_type prefix_type;
 
 static const WCHAR wow6432node[] = {'W','o','w','6','4','3','2','N','o','d','e'};
 static const WCHAR symlink_value[] = {'S','y','m','b','o','l','i','c','L','i','n','k','V','a','l','u','e'};
 static const struct unicode_str symlink_str = { symlink_value, sizeof(symlink_value) };
 
-static void set_periodic_save_timer(void);
 static struct key_value *find_value( const struct key *key, const struct unicode_str *name, int *index );
 
 /* information about where to save a registry branch */
@@ -1984,9 +1981,6 @@ void init_registry(void)
     release_object( hklm );
     release_object( hkcu );
 
-    /* start the periodic save timer */
-    set_periodic_save_timer();
-
     /* create windows directories */
 
     if (!mkdir( "drive_c/windows", 0777 ))
@@ -2200,26 +2194,6 @@ done:
     free( tmp );
     if (ret) make_clean( key, key->timestamp_counter );
     return ret;
-}
-
-/* periodic saving of the registry */
-static void periodic_save( void *arg )
-{
-    int i;
-
-    if (fchdir( config_dir_fd ) == -1) return;
-    save_timeout_user = NULL;
-    for (i = 0; i < save_branch_count; i++)
-        save_branch( save_branch_info[i].key, save_branch_info[i].path );
-    if (fchdir( server_dir_fd ) == -1) fatal_error( "chdir to server dir: %s\n", strerror( errno ));
-    set_periodic_save_timer();
-}
-
-/* start the periodic save timer */
-static void set_periodic_save_timer(void)
-{
-    if (save_timeout_user) remove_timeout_user( save_timeout_user );
-    save_timeout_user = add_timeout_user( save_period, periodic_save, NULL );
 }
 
 /* save the modified registry branches to disk */
