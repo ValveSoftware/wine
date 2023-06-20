@@ -29,6 +29,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <sys/stat.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -282,8 +284,9 @@ static char *save_subkeys( char *data, struct saved_key *parent, struct saved_ke
 }
 
 /* save a registry branch to a file */
-static void save_all_subkeys( char *data, FILE *f )
+static char *save_all_subkeys( char *data, FILE *f )
 {
+    /* Output registry format should match server/registry.c:save_all_subkeys(). */
     enum prefix_type prefix_type;
     int parent_count;
 
@@ -309,7 +312,7 @@ static void save_all_subkeys( char *data, FILE *f )
     default:
         break;
     }
-    save_subkeys( data, NULL, NULL, f );
+    return save_subkeys( data, NULL, NULL, f );
 }
 
 
@@ -916,22 +919,162 @@ NTSTATUS WINAPI NtNotifyChangeKey( HANDLE key, HANDLE event, PIO_APC_ROUTINE apc
                                        io, filter, subtree, buffer, length, async );
 }
 
+/* acquire mutex for registry flush operation */
+static HANDLE get_key_flush_mutex(void)
+{
+    WCHAR bufferW[256];
+    UNICODE_STRING name = {.Buffer = bufferW};
+    OBJECT_ATTRIBUTES attr;
+    char buffer[256];
+    HANDLE mutex;
+
+    snprintf( buffer, ARRAY_SIZE(buffer), "\\Sessions\\%u\\BaseNamedObjects\\__wine_regkey_flush",
+              (int)NtCurrentTeb()->Peb->SessionId );
+    name.Length = name.MaximumLength = (strlen(buffer) + 1) * sizeof(WCHAR);
+    ascii_to_unicode( bufferW, buffer, name.Length / sizeof(WCHAR) );
+
+    InitializeObjectAttributes( &attr, &name, OBJ_OPENIF, NULL, NULL );
+    if (NtCreateMutant( &mutex, MUTEX_ALL_ACCESS, &attr, FALSE ) < 0) return NULL;
+    NtWaitForSingleObject( mutex, FALSE, NULL );
+    return mutex;
+}
+
+/* release registry flush mutex */
+static void release_key_flush_mutex( HANDLE mutex )
+{
+    NtReleaseMutant( mutex, NULL );
+    NtClose( mutex );
+}
+
+/* save registry branch to Wine regsitry storage file */
+static NTSTATUS save_registry_branch( char **data )
+{
+    static const char temp_fn[] = "savereg.tmp";
+    char *file_name, *path = NULL, *tmp = NULL;
+    int file_name_len, path_len, fd;
+    struct stat st;
+    NTSTATUS ret;
+    FILE *f;
+
+    file_name_len = *(int *)*data;
+    *data += sizeof(int);
+    file_name = *data;
+    *data += file_name_len;
+
+    path_len = strlen( config_dir ) + 1 + file_name_len + 1;
+    if (!(path = malloc( path_len ))) return STATUS_NO_MEMORY;
+    sprintf( path, "%s/%s", config_dir, file_name );
+
+    if ((fd = open( path, O_WRONLY )) != -1)
+    {
+        /* if file is not a regular file or has multiple links or is accessed
+         * via symbolic links, write directly into it; otherwise use a temp file */
+        if (!lstat( path, &st ) && (!S_ISREG(st.st_mode) || st.st_nlink > 1))
+        {
+            ftruncate( fd, 0 );
+            goto save;
+        }
+        close( fd );
+    }
+
+    /* create a temp file in the same directory */
+    if (!(tmp = malloc( strlen( config_dir ) + 1 + strlen( temp_fn ) + 1 )))
+    {
+        ret = STATUS_NO_MEMORY;
+        goto done;
+    }
+    sprintf( tmp, "%s/%s", config_dir, temp_fn );
+
+    if ((fd = open( tmp, O_CREAT | O_EXCL | O_WRONLY, 0666 )) == -1)
+    {
+        ret = errno_to_status( errno );
+        goto done;
+    }
+
+save:
+    if (!(f = fdopen( fd, "w" )))
+    {
+        ret = errno_to_status( errno );
+        if (tmp) unlink( tmp );
+        close( fd );
+        goto done;
+    }
+
+    *data = save_all_subkeys( *data, f );
+
+    ret = fclose( f ) ? errno_to_status( errno ) : STATUS_SUCCESS;
+    if (tmp)
+    {
+        if (!ret && rename( tmp, path )) ret = errno_to_status( errno );
+        if (ret) unlink( tmp );
+    }
+
+done:
+    free( tmp );
+    free( path );
+    return ret;
+}
 
 /******************************************************************************
  *              NtFlushKey  (NTDLL.@)
  */
 NTSTATUS WINAPI NtFlushKey( HANDLE key )
 {
+    abstime_t timestamp_counter;
+    data_size_t size = 0;
     unsigned int ret;
+    char *data = NULL, *curr_data;
+    HANDLE mutex;
+    int i, branch_count, branch;
 
     TRACE( "key=%p\n", key );
 
-    SERVER_START_REQ( flush_key )
+    mutex = get_key_flush_mutex();
+
+    while (1)
     {
-	req->hkey = wine_server_obj_handle( key );
-	ret = wine_server_call( req );
+        SERVER_START_REQ( flush_key )
+        {
+            req->hkey = wine_server_obj_handle( key );
+            if (size) wine_server_set_reply( req, data, size );
+            ret = wine_server_call( req );
+            size = reply->total;
+            branch_count = reply->branch_count;
+            timestamp_counter = reply->timestamp_counter;
+        }
+        SERVER_END_REQ;
+
+        if (ret != STATUS_BUFFER_TOO_SMALL) break;
+        free( data );
+        if (!(data = malloc( size )))
+        {
+            ERR( "No memory.\n" );
+            ret = STATUS_NO_MEMORY;
+            goto done;
+        }
     }
-    SERVER_END_REQ;
+    if (ret) goto done;
+
+    curr_data = data;
+    for (i = 0; i < branch_count; ++i)
+    {
+        branch = *(int *)curr_data;
+        curr_data += sizeof(int);
+        if ((ret = save_registry_branch( &curr_data ))) goto done;
+
+        SERVER_START_REQ( flush_key_done )
+        {
+            req->branch = branch;
+            req->timestamp_counter = timestamp_counter;
+            ret = wine_server_call( req );
+        }
+        SERVER_END_REQ;
+        if (ret) break;
+    }
+
+done:
+    release_key_flush_mutex( mutex );
+    free( data );
     return ret;
 }
 
