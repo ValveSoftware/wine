@@ -246,7 +246,6 @@ static void * const syscalls[] =
     NtUserPostMessage,
     NtUserPostThreadMessage,
     NtUserPrintWindow,
-    NtUserQueryDisplayConfig,
     NtUserQueryInputContext,
     NtUserRealChildWindowFromPoint,
     NtUserRedrawWindow,
