@@ -453,6 +453,15 @@ error:
  */
 BOOL WINAPI AllocConsole(void)
 {
+    RTL_USER_PROCESS_PARAMETERS *params = RtlGetCurrentPeb()->ProcessParameters;
+
+    /* allow gui applications to create a genuine console over a unix one */
+    if (RtlImageNtHeader( GetModuleHandleW( NULL ) )->OptionalHeader.Subsystem == IMAGE_SUBSYSTEM_WINDOWS_GUI &&
+        (params->ConsoleHandle == CONSOLE_HANDLE_SHELL_NO_WINDOW ||
+         console_ioctl( params->ConsoleHandle, IOCTL_CONDRV_IS_UNIX, NULL, 0, NULL, 0, NULL )))
+    {
+        FreeConsole();
+    }
     return alloc_console( FALSE );
 }
 
