@@ -130,7 +130,6 @@ MonoThread* (CDECL *mono_thread_attach)(MonoDomain *domain);
 void (CDECL *mono_thread_manage)(void);
 void (CDECL *mono_trace_set_print_handler)(MonoPrintCallback callback);
 void (CDECL *mono_trace_set_printerr_handler)(MonoPrintCallback callback);
-static MonoAssembly* (CDECL *wine_mono_assembly_load_from_gac)(MonoAssemblyName *aname, MonoImageOpenStatus *status, int refonly);
 static void (CDECL *wine_mono_install_assembly_preload_hook)(WineMonoAssemblyPreLoadFunc func, void *user_data);
 static void (CDECL *wine_mono_install_assembly_preload_hook_v2)(WineMonoAssemblyPreLoadFunc func, void *user_data);
 
@@ -254,7 +253,6 @@ static HRESULT load_mono(LPCWSTR mono_path)
         LOAD_OPT_MONO_FUNCTION(mono_set_crash_chaining, set_crash_chaining_dummy);
         LOAD_OPT_MONO_FUNCTION(mono_trace_set_print_handler, set_print_handler_dummy);
         LOAD_OPT_MONO_FUNCTION(mono_trace_set_printerr_handler, set_print_handler_dummy);
-        LOAD_OPT_MONO_FUNCTION(wine_mono_assembly_load_from_gac, NULL);
         LOAD_OPT_MONO_FUNCTION(wine_mono_install_assembly_preload_hook, NULL);
         LOAD_OPT_MONO_FUNCTION(wine_mono_install_assembly_preload_hook_v2, NULL);
 
@@ -1377,19 +1375,16 @@ HRESULT CLRMetaHostPolicy_CreateInstance(REFIID riid, void **ppobj)
  * Assembly search override settings:
  *
  * WINE_MONO_OVERRIDES=*,Gac=n
- *  Never search the Windows GAC for libraries.
- *
- * WINE_MONO_OVERRIDES=*,MonoGac=n
- *  Never search the Mono GAC for libraries.
+ *  Never search the GAC for libraries.
  *
  * WINE_MONO_OVERRIDES=*,PrivatePath=n
  *  Never search the AppDomain search path for libraries.
  *
  * WINE_MONO_OVERRIDES=Microsoft.Xna.Framework,Gac=n
- *  Never search the Windows GAC for Microsoft.Xna.Framework
+ *  Never search the GAC for Microsoft.Xna.Framework
  *
  * WINE_MONO_OVERRIDES=Microsoft.Xna.Framework.*,Gac=n;Microsoft.Xna.Framework.GamerServices,Gac=y
- *  Never search the Windows GAC for Microsoft.Xna.Framework, or any library starting
+ *  Never search the GAC for Microsoft.Xna.Framework, or any library starting
  *  with Microsoft.Xna.Framework, except for Microsoft.Xna.Framework.GamerServices
  */
 
@@ -1397,8 +1392,7 @@ HRESULT CLRMetaHostPolicy_CreateInstance(REFIID riid, void **ppobj)
 #define ASSEMBLY_SEARCH_GAC 1
 #define ASSEMBLY_SEARCH_UNDEFINED 2
 #define ASSEMBLY_SEARCH_PRIVATEPATH 4
-#define ASSEMBLY_SEARCH_MONOGAC 8
-#define ASSEMBLY_SEARCH_DEFAULT (ASSEMBLY_SEARCH_GAC|ASSEMBLY_SEARCH_PRIVATEPATH|ASSEMBLY_SEARCH_MONOGAC)
+#define ASSEMBLY_SEARCH_DEFAULT (ASSEMBLY_SEARCH_GAC|ASSEMBLY_SEARCH_PRIVATEPATH)
 
 typedef struct override_entry {
     char *name;
@@ -1445,14 +1439,6 @@ static void parse_override_entry(override_entry *entry, const char *string, int 
                         entry->flags |= ASSEMBLY_SEARCH_GAC;
                     else if (IS_OPTION_FALSE(*value))
                         entry->flags &= ~ASSEMBLY_SEARCH_GAC;
-                }
-                break;
-            case 7:
-                if (!_strnicmp(string, "monogac", 7)) {
-                    if (IS_OPTION_TRUE(*value))
-                        entry->flags |= ASSEMBLY_SEARCH_MONOGAC;
-                    else if (IS_OPTION_FALSE(*value))
-                        entry->flags &= ~ASSEMBLY_SEARCH_MONOGAC;
                 }
                 break;
             case 11:
@@ -1582,7 +1568,7 @@ static DWORD get_basename_search_flags(const char *basename, MonoAssemblyName *a
     if (strcmp(basename, "Microsoft.Xna.Framework.*") == 0 &&
         mono_assembly_name_get_version(aname, NULL, NULL, NULL) == 4)
         /* Use FNA as a replacement for XNA4. */
-        return ASSEMBLY_SEARCH_MONOGAC;
+        return 0;
 
     return ASSEMBLY_SEARCH_UNDEFINED;
 }
@@ -1971,26 +1957,6 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_v2_fn(MonoAssemblyNam
     }
     else
         TRACE("skipping Windows GAC search due to override setting\n");
-
-    if (wine_mono_assembly_load_from_gac)
-    {
-        if (search_flags & ASSEMBLY_SEARCH_MONOGAC)
-        {
-            result = wine_mono_assembly_load_from_gac (aname, &stat, FALSE);
-
-            if (result)
-            {
-                TRACE("found in Mono GAC\n");
-                *flags |= WINE_PRELOAD_SET_GAC;
-                goto done;
-            }
-        }
-        else
-        {
-            *flags |= WINE_PRELOAD_SKIP_GAC;
-            TRACE("skipping Mono GAC search due to override setting\n");
-        }
-    }
 
     if ((search_flags & ASSEMBLY_SEARCH_PRIVATEPATH) == 0)
     {
