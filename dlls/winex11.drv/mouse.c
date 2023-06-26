@@ -514,7 +514,10 @@ void ungrab_clipping_window(void)
     }
     clipping_cursor = FALSE;
     data->clipping_cursor = FALSE;
-    X11DRV_XInput2_Enable( data->display, None, 0 );
+
+    /* desktop window needs to listen to XInput2 events all the time for rawinput to work */
+    if (NtUserGetWindowThread( NtUserGetDesktopWindow(), NULL ) != GetCurrentThreadId())
+        X11DRV_XInput2_Enable( data->display, None, 0 );
 }
 
 /***********************************************************************
