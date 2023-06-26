@@ -1211,8 +1211,19 @@ static void store_key_permissions(HCRYPTKEY hCryptKey, HKEY hKey, DWORD dwKeySpe
  */
 static BOOL create_container_key(KEYCONTAINER *pKeyContainer, REGSAM sam, HKEY *phKey)
 {
+    static DWORD key_options = ~0ul;
     CHAR szRSABase[sizeof(RSAENH_REGKEY) + MAX_PATH];
     HKEY hRootKey;
+
+    if (key_options == ~0ul)
+    {
+        const char *sgi;
+
+        if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "1364780"))
+            key_options = REG_OPTION_VOLATILE;
+        else
+            key_options = REG_OPTION_NON_VOLATILE;
+    }
 
     sprintf(szRSABase, RSAENH_REGKEY, pKeyContainer->szName);
 
@@ -1224,7 +1235,7 @@ static BOOL create_container_key(KEYCONTAINER *pKeyContainer, REGSAM sam, HKEY *
     /* @@ Wine registry key: HKLM\Software\Wine\Crypto\RSA */
     /* @@ Wine registry key: HKCU\Software\Wine\Crypto\RSA */
     return RegCreateKeyExA(hRootKey, szRSABase, 0, NULL,
-                           REG_OPTION_NON_VOLATILE, sam, NULL, phKey, NULL)
+                           key_options, sam, NULL, phKey, NULL)
                            == ERROR_SUCCESS;
 }
 
