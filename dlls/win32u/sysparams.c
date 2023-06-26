@@ -2081,7 +2081,7 @@ RECT get_virtual_screen_rect( UINT dpi )
     return rect;
 }
 
-static BOOL is_window_rect_full_screen( const RECT *rect )
+BOOL is_window_rect_full_screen( const RECT *rect )
 {
     struct monitor *monitor;
     BOOL ret = FALSE;
