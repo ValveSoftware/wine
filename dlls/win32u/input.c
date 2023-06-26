@@ -2642,13 +2642,15 @@ BOOL process_wine_clipcursor( HWND hwnd, UINT flags, BOOL reset )
  */
 BOOL WINAPI NtUserClipCursor( const RECT *rect )
 {
+    static int keep_inside_window = -1;
+    HWND foreground = NtUserGetForegroundWindow();
     UINT dpi;
     BOOL ret;
-    RECT new_rect;
+    RECT new_rect, full_rect;
 
     TRACE( "Clipping to %s\n", wine_dbgstr_rect(rect) );
 
-    if (NtUserGetForegroundWindow() == NtUserGetDesktopWindow())
+    if (foreground == NtUserGetDesktopWindow())
     {
         WARN( "desktop is foreground, ignoring ClipCursor\n" );
         rect = NULL;
@@ -2662,6 +2664,22 @@ BOOL WINAPI NtUserClipCursor( const RECT *rect )
             HMONITOR monitor = monitor_from_rect( rect, MONITOR_DEFAULTTOPRIMARY, dpi );
             new_rect = map_dpi_rect( *rect, dpi, get_monitor_dpi( monitor ));
             rect = &new_rect;
+        }
+
+        if (keep_inside_window == -1)
+        {
+            const char *sgi = getenv( "SteamGameId" );
+            keep_inside_window = sgi && !strcmp( sgi, "730830" ); /* Escape from Monkey Island */
+        }
+
+        /* keep the mouse clipped inside of a fullscreen foreground window */
+        if (keep_inside_window && NtUserGetWindowRect( foreground, &full_rect ) && is_window_rect_full_screen( &full_rect ))
+        {
+            full_rect.left = max( full_rect.left, min( full_rect.right - 1, rect->left ) );
+            full_rect.right = max( full_rect.left, min( full_rect.right - 1, rect->right ) );
+            full_rect.top = max( full_rect.top, min( full_rect.bottom - 1, rect->top ) );
+            full_rect.bottom = max( full_rect.top, min( full_rect.bottom - 1, rect->bottom ) );
+            rect = &full_rect;
         }
     }
 
