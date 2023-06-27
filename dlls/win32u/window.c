@@ -4528,11 +4528,11 @@ BOOL WINAPI NtUserFlashWindowEx( FLASHWINFO *info )
 
         win = get_win_ptr( info->hwnd );
         if (!win || win == WND_OTHER_PROCESS || win == WND_DESKTOP) return FALSE;
-        if (info->dwFlags && !(win->flags & WIN_NCACTIVATED))
+        if (info->dwFlags & FLASHW_CAPTION && !(win->flags & WIN_NCACTIVATED))
         {
             win->flags |= WIN_NCACTIVATED;
         }
-        else
+        else if (!info->dwFlags)
         {
             win->flags &= ~WIN_NCACTIVATED;
         }
@@ -4553,7 +4553,10 @@ BOOL WINAPI NtUserFlashWindowEx( FLASHWINFO *info )
         else wparam = (hwnd == NtUserGetForegroundWindow());
 
         release_win_ptr( win );
-        send_notify_message( hwnd, WM_NCACTIVATE, wparam, 0, 0 );
+
+        if (!info->dwFlags || info->dwFlags & FLASHW_CAPTION)
+            send_notify_message( hwnd, WM_NCACTIVATE, wparam, 0, 0 );
+
         user_driver->pFlashWindowEx( info );
         return wparam;
     }
