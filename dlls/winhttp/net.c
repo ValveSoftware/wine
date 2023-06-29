@@ -307,7 +307,7 @@ void netconn_release( struct netconn *conn )
 }
 
 static DWORD netconn_negotiate( struct netconn *conn, WCHAR *hostname, CredHandle *cred_handle,
-                                CtxtHandle *ctx )
+                                CtxtHandle *prev_ctx, SecBufferDesc *prev_buf, CtxtHandle *ctx )
 {
     SecBuffer out_buf = {0, SECBUFFER_TOKEN, NULL}, in_bufs[2] = {{0, SECBUFFER_TOKEN}, {0, SECBUFFER_EMPTY}};
     SecBufferDesc out_desc = {SECBUFFER_VERSION, 1, &out_buf}, in_desc = {SECBUFFER_VERSION, 2, in_bufs};
@@ -322,8 +322,9 @@ static DWORD netconn_negotiate( struct netconn *conn, WCHAR *hostname, CredHandl
 
     if (!(read_buf = malloc( read_buf_size ))) return ERROR_OUTOFMEMORY;
 
-    status = InitializeSecurityContextW(cred_handle, NULL, hostname, isc_req_flags, 0, 0, NULL, 0,
+    status = InitializeSecurityContextW(cred_handle, prev_ctx, hostname, isc_req_flags, 0, 0, prev_buf, 0,
             ctx, &out_desc, &attrs, NULL);
+    if (!ctx) ctx = prev_ctx;
 
     assert(status != SEC_E_OK);
 
@@ -400,7 +401,7 @@ DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD secur
     SECURITY_STATUS status;
     DWORD res = ERROR_SUCCESS;
 
-    status = netconn_negotiate(conn, hostname, cred_handle, &ctx);
+    status = netconn_negotiate(conn, hostname, cred_handle, NULL, NULL, &ctx);
     if(status != SEC_E_OK || res != ERROR_SUCCESS)
         goto failed;
 
@@ -561,8 +562,23 @@ static DWORD read_ssl_chunk( struct netconn *conn, void *buf, SIZE_T buf_size, S
             break;
 
         case SEC_I_RENEGOTIATE:
+        {
+            SecBuffer out_buf = {0, SECBUFFER_TOKEN, NULL};
+            SecBufferDesc out_desc = {SECBUFFER_VERSION, 1, &out_buf};
+
             TRACE("renegotiate\n");
-            return ERROR_WINHTTP_CLIENT_AUTH_CERT_NEEDED;
+
+            for(i = 0; i < ARRAY_SIZE(bufs); i++) {
+                if(bufs[i].BufferType == SECBUFFER_EXTRA) {
+                    out_buf.cbBuffer = bufs[i].cbBuffer;
+                    out_buf.pvBuffer = bufs[i].pvBuffer;
+                }
+            }
+
+            res = netconn_negotiate(conn, conn->host->hostname, NULL, &conn->ssl_ctx, &out_desc, NULL);
+            if (res != SEC_E_OK) return res;
+            continue;
+        }
 
         case SEC_I_CONTEXT_EXPIRED:
             TRACE("context expired\n");
