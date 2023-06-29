@@ -563,7 +563,7 @@ static DWORD read_ssl_chunk( struct netconn *conn, void *buf, SIZE_T buf_size, S
             SecBuffer out_buf = {0, SECBUFFER_TOKEN, NULL};
             SecBufferDesc out_desc = {SECBUFFER_VERSION, 1, &out_buf};
 
-            ERR("renegotiate\n");
+            TRACE("renegotiate\n");
 
             for(i = 0; i < ARRAY_SIZE(bufs); i++) {
                 if(bufs[i].BufferType == SECBUFFER_EXTRA) {
@@ -574,7 +574,6 @@ static DWORD read_ssl_chunk( struct netconn *conn, void *buf, SIZE_T buf_size, S
 
             res = netconn_negotiate(conn, conn->host->hostname, NULL, &conn->ssl_ctx, &out_desc, NULL);
             if (res != SEC_E_OK) return res;
-            ERR("res %#lx SEC_E_OK %#lx\n", res, SEC_E_OK);
             continue;
         }
 
