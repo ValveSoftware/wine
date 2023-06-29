@@ -306,28 +306,24 @@ void netconn_release( struct netconn *conn )
     free(conn);
 }
 
-DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD security_flags, CredHandle *cred_handle,
-                              BOOL check_revocation )
+static DWORD netconn_negotiate( struct netconn *conn, WCHAR *hostname, CredHandle *cred_handle,
+                                CtxtHandle *ctx )
 {
     SecBuffer out_buf = {0, SECBUFFER_TOKEN, NULL}, in_bufs[2] = {{0, SECBUFFER_TOKEN}, {0, SECBUFFER_EMPTY}};
     SecBufferDesc out_desc = {SECBUFFER_VERSION, 1, &out_buf}, in_desc = {SECBUFFER_VERSION, 2, in_bufs};
     BYTE *read_buf;
     SIZE_T read_buf_size = 2048;
     ULONG attrs = 0;
-    CtxtHandle ctx;
     SSIZE_T size;
-    const CERT_CONTEXT *cert;
     SECURITY_STATUS status;
-    DWORD res = ERROR_SUCCESS;
 
     const DWORD isc_req_flags = ISC_REQ_ALLOCATE_MEMORY|ISC_REQ_USE_SESSION_KEY|ISC_REQ_CONFIDENTIALITY
         |ISC_REQ_SEQUENCE_DETECT|ISC_REQ_REPLAY_DETECT|ISC_REQ_MANUAL_CRED_VALIDATION;
 
     if (!(read_buf = malloc( read_buf_size ))) return ERROR_OUTOFMEMORY;
 
-    memset( &ctx, 0, sizeof(ctx) );
     status = InitializeSecurityContextW(cred_handle, NULL, hostname, isc_req_flags, 0, 0, NULL, 0,
-            &ctx, &out_desc, &attrs, NULL);
+            ctx, &out_desc, &attrs, NULL);
 
     assert(status != SEC_E_OK);
 
@@ -340,7 +336,7 @@ DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD secur
             size = sock_send(conn->socket, out_buf.pvBuffer, out_buf.cbBuffer, NULL);
             if(size != out_buf.cbBuffer) {
                 ERR("send failed\n");
-                res = ERROR_WINHTTP_SECURE_CHANNEL_ERROR;
+                status = ERROR_WINHTTP_SECURE_CHANNEL_ERROR;
                 break;
             }
 
@@ -384,7 +380,7 @@ DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD secur
 
         in_bufs[0].cbBuffer += size;
         in_bufs[0].pvBuffer = read_buf;
-        status = InitializeSecurityContextW(cred_handle, &ctx, hostname,  isc_req_flags, 0, 0, &in_desc,
+        status = InitializeSecurityContextW(cred_handle, ctx, hostname, isc_req_flags, 0, 0, &in_desc,
                 0, NULL, &out_desc, &attrs, NULL);
         TRACE( "InitializeSecurityContext ret %#lx\n", status );
         if(status == SEC_E_OK && in_bufs[1].BufferType == SECBUFFER_EXTRA)
@@ -393,6 +389,18 @@ DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD secur
 
     free(read_buf);
 
+    return status;
+}
+
+DWORD netconn_secure_connect( struct netconn *conn, WCHAR *hostname, DWORD security_flags, CredHandle *cred_handle,
+                              BOOL check_revocation )
+{
+    CtxtHandle ctx = {0};
+    const CERT_CONTEXT *cert;
+    SECURITY_STATUS status;
+    DWORD res = ERROR_SUCCESS;
+
+    status = netconn_negotiate(conn, hostname, cred_handle, &ctx);
     if(status != SEC_E_OK || res != ERROR_SUCCESS)
         goto failed;
 
