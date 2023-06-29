@@ -758,10 +758,10 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
         {
             if (FAILED(hr = IMFStreamDescriptor_GetStreamIdentifier(stream_descriptor, &id)))
                 WARN("Failed to get stream descriptor id, hr %#lx\n", hr);
-            else if (id >= source->stream_count)
+            else if (id > source->stream_count)
                 WARN("Invalid stream descriptor id %lu, hr %#lx\n", id, hr);
             else if (selected)
-                IMFStreamDescriptor_AddRef((descriptors[id] = stream_descriptor));
+                IMFStreamDescriptor_AddRef((descriptors[id - 1] = stream_descriptor));
 
             IMFStreamDescriptor_Release(stream_descriptor);
         }
@@ -1953,7 +1953,7 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
             continue;
         wg_parser_stream_get_preferred_format(parser_stream, &format);
 
-        if (FAILED(hr = stream_descriptor_create(i, &format, &descriptor)))
+        if (FAILED(hr = stream_descriptor_create(i + 1, &format, &descriptor)))
             goto fail;
         if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, descriptor, parser_stream, &stream)))
         {
