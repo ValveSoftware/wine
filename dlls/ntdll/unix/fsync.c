@@ -401,6 +401,7 @@ static NTSTATUS get_object( HANDLE handle, struct fsync *obj )
         return STATUS_NOT_IMPLEMENTED;
     }
 
+    if (!handle) return STATUS_INVALID_HANDLE;
 
     /* We need to try grabbing it from the server. Uninterrupted section
      * is needed to avoid race with NtClose() which first calls fsync_close()
