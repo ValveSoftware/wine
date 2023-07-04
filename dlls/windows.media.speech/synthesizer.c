@@ -33,6 +33,7 @@ struct voice_information
     HSTRING language;
     HSTRING description;
     VoiceGender gender;
+    BOOL is_static;
 };
 
 static inline struct voice_information *impl_from_IVoiceInformation( IVoiceInformation *iface )
@@ -81,7 +82,9 @@ static ULONG WINAPI voice_information_Release( IVoiceInformation *iface )
     struct voice_information *impl = impl_from_IVoiceInformation(iface);
     ULONG ref = InterlockedDecrement(&impl->ref);
     TRACE("iface %p, ref %lu.\n", iface, ref);
-    /* all voices are (for now) statically allocated in all_voices vector. so don't free them */
+    /* only deallocate non static instances */
+    if (!ref && !impl->is_static)
+        voice_information_delete(impl);
     return ref;
 }
 
@@ -192,8 +195,8 @@ HRESULT voice_information_allocate(const WCHAR *display_name, const WCHAR *id, c
     if (SUCCEEDED(hr))
     {
         voice_info->gender = gender;
+        voice_info->is_static = TRUE;
         voice_info->IVoiceInformation_iface.lpVtbl = &voice_information_vtbl;
-
         *pvoice = &voice_info->IVoiceInformation_iface;
     }
     else
@@ -201,6 +204,35 @@ HRESULT voice_information_allocate(const WCHAR *display_name, const WCHAR *id, c
         voice_information_delete(voice_info);
     }
     free(description);
+    return hr;
+}
+
+HRESULT voice_information_clone(IVoiceInformation *voice, IVoiceInformation **out)
+{
+    struct voice_information *voice_info;
+    HRESULT hr;
+
+    voice_info = calloc(1, sizeof(*voice_info));
+    if (!voice_info) return E_OUTOFMEMORY;
+
+    hr = IVoiceInformation_get_DisplayName(voice, &voice_info->display_name);
+    if (SUCCEEDED(hr))
+        hr = IVoiceInformation_get_Id(voice, &voice_info->id);
+    if (SUCCEEDED(hr))
+        hr = IVoiceInformation_get_Language(voice, &voice_info->language);
+    if (SUCCEEDED(hr))
+        hr = IVoiceInformation_get_Description(voice, &voice_info->description);
+    if (SUCCEEDED(hr))
+        hr = IVoiceInformation_get_Gender(voice, &voice_info->gender);
+    if (SUCCEEDED(hr))
+    {
+        voice_info->IVoiceInformation_iface.lpVtbl = &voice_information_vtbl;
+        voice_info->ref = 1;
+        *out = &voice_info->IVoiceInformation_iface;
+    }
+    else
+        voice_information_delete(voice_info);
+
     return hr;
 }
 
@@ -1192,8 +1224,18 @@ static HRESULT WINAPI installed_voices_static_get_AllVoices( IInstalledVoicesSta
 
 static HRESULT WINAPI installed_voices_static_get_DefaultVoice( IInstalledVoicesStatic *iface, IVoiceInformation **value )
 {
-    FIXME("iface %p, value %p stub!\n", iface, value);
-    return E_NOTIMPL;
+    struct IVoiceInformation *static_voice;
+    HRESULT hr;
+
+    TRACE("iface %p, value %p\n", iface, value);
+
+    EnterCriticalSection(&allvoices_cs);
+    hr = IVectorView_VoiceInformation_GetAt(&all_voices.IVectorView_VoiceInformation_iface, 0, &static_voice);
+    if (SUCCEEDED(hr))
+        hr = voice_information_clone(static_voice, value);
+    LeaveCriticalSection(&allvoices_cs);
+
+    return hr;
 }
 
 static const struct IInstalledVoicesStaticVtbl installed_voices_static_vtbl =
