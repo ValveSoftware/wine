@@ -23,6 +23,187 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(speech);
 
+struct voice_information
+{
+    IVoiceInformation IVoiceInformation_iface;
+    LONG ref;
+
+    HSTRING id;
+    HSTRING display_name;
+    HSTRING language;
+    HSTRING description;
+    VoiceGender gender;
+};
+
+static inline struct voice_information *impl_from_IVoiceInformation( IVoiceInformation *iface )
+{
+    return CONTAINING_RECORD(iface, struct voice_information, IVoiceInformation_iface);
+}
+
+static void voice_information_delete( struct voice_information *voice_info )
+{
+    WindowsDeleteString(voice_info->id);
+    WindowsDeleteString(voice_info->display_name);
+    WindowsDeleteString(voice_info->language);
+    WindowsDeleteString(voice_info->description);
+    free(voice_info);
+}
+
+static HRESULT WINAPI voice_information_QueryInterface( IVoiceInformation *iface, REFIID iid, void **ppvObject)
+{
+    struct voice_information *impl = impl_from_IVoiceInformation( iface );
+
+    TRACE("iface %p, riid %s, ppv %p\n", iface, wine_dbgstr_guid(iid), ppvObject);
+
+    if (IsEqualGUID(iid, &IID_IUnknown) ||
+        IsEqualGUID(iid, &IID_IInspectable) ||
+        IsEqualGUID(iid, &IID_IVoiceInformation))
+    {
+        IInspectable_AddRef((*ppvObject = &impl->IVoiceInformation_iface));
+        return S_OK;
+    }
+
+    WARN("%s not implemented, returning E_NOINTERFACE.\n", debugstr_guid(iid));
+    *ppvObject = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI voice_information_AddRef( IVoiceInformation *iface )
+{
+    struct voice_information *impl = impl_from_IVoiceInformation(iface);
+    ULONG ref = InterlockedIncrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+    return ref;
+}
+
+static ULONG WINAPI voice_information_Release( IVoiceInformation *iface )
+{
+    struct voice_information *impl = impl_from_IVoiceInformation(iface);
+    ULONG ref = InterlockedDecrement(&impl->ref);
+    TRACE("iface %p, ref %lu.\n", iface, ref);
+    /* all voices are (for now) statically allocated in all_voices vector. so don't free them */
+    return ref;
+}
+
+static HRESULT WINAPI voice_information_GetIids( IVoiceInformation *iface, ULONG *iid_count, IID **iids )
+{
+    FIXME("iface %p, iid_count %p, iids %p stub!\n", iface, iid_count, iids);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI voice_information_GetRuntimeClassName( IVoiceInformation *iface, HSTRING *class_name )
+{
+    FIXME("iface %p, class_name %p stub!\n", iface, class_name);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI voice_information_GetTrustLevel( IVoiceInformation *iface, TrustLevel *trust_level )
+{
+    FIXME("iface %p, trust_level %p stub!\n", iface, trust_level);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI voice_information_get_DisplayName( IVoiceInformation *iface, HSTRING *value )
+{
+    struct voice_information *impl = impl_from_IVoiceInformation(iface);
+
+    TRACE("iface %p, value %p!n", iface, value);
+    return WindowsDuplicateString(impl->display_name, value);
+}
+
+static HRESULT WINAPI voice_information_get_Id( IVoiceInformation *iface, HSTRING *value )
+{
+    struct voice_information *impl = impl_from_IVoiceInformation(iface);
+
+    TRACE("iface %p, value %p\n", iface, value);
+    return WindowsDuplicateString(impl->id, value);
+}
+
+static HRESULT WINAPI voice_information_get_Language( IVoiceInformation *iface, HSTRING *value )
+{
+    struct voice_information *impl = impl_from_IVoiceInformation(iface);
+
+    TRACE("iface %p, value %p\n", iface, value);
+    return WindowsDuplicateString(impl->language, value);
+}
+
+static HRESULT WINAPI voice_information_get_Description( IVoiceInformation *iface, HSTRING *value )
+{
+    struct voice_information *impl = impl_from_IVoiceInformation(iface);
+
+    TRACE("iface %p, value %p\n", iface, value);
+    return WindowsDuplicateString(impl->description, value);
+}
+
+static HRESULT WINAPI voice_information_get_Gender( IVoiceInformation *iface, VoiceGender *value )
+{
+    struct voice_information *impl = impl_from_IVoiceInformation(iface);
+
+    TRACE("iface %p, value %p\n", iface, value);
+    *value = impl->gender;
+    return S_OK;
+}
+
+static const struct IVoiceInformationVtbl voice_information_vtbl =
+{
+    /*** IUnknown methods ***/
+    voice_information_QueryInterface,
+    voice_information_AddRef,
+    voice_information_Release,
+
+    /*** IInspectable methods ***/
+    voice_information_GetIids,
+    voice_information_GetRuntimeClassName,
+    voice_information_GetTrustLevel,
+
+    /*** IVoiceInformation methods ***/
+    voice_information_get_DisplayName,
+    voice_information_get_Id,
+    voice_information_get_Language,
+    voice_information_get_Description,
+    voice_information_get_Gender,
+};
+
+HRESULT voice_information_allocate(const WCHAR *display_name, const WCHAR *id, const WCHAR *locale,
+                                   VoiceGender gender, IVoiceInformation **pvoice)
+{
+    struct voice_information *voice_info;
+    WCHAR *description;
+    HRESULT hr;
+    size_t len, langlen;
+
+    voice_info = calloc(1, sizeof(*voice_info));
+    if (!voice_info) return E_OUTOFMEMORY;
+
+    len = wcslen(display_name) + 3;
+    langlen = GetLocaleInfoEx(locale, LOCALE_SLOCALIZEDDISPLAYNAME, NULL, 0);
+    description = malloc((len + langlen)  * sizeof(WCHAR));
+    wcscpy(description, display_name);
+    wcscat(description, L" - ");
+    GetLocaleInfoEx(locale, LOCALE_SLOCALIZEDDISPLAYNAME, description + len, langlen);
+
+    hr = WindowsCreateString(display_name, wcslen(display_name), &voice_info->display_name);
+    if (SUCCEEDED(hr))
+        hr = WindowsCreateString(id, wcslen(id), &voice_info->id);
+    if (SUCCEEDED(hr))
+        hr = WindowsCreateString(locale, wcslen(locale), &voice_info->language);
+    if (SUCCEEDED(hr))
+        hr = WindowsCreateString(description, len + langlen - 1, &voice_info->description);
+    if (SUCCEEDED(hr))
+    {
+        voice_info->gender = gender;
+        voice_info->IVoiceInformation_iface.lpVtbl = &voice_information_vtbl;
+
+        *pvoice = &voice_info->IVoiceInformation_iface;
+    }
+    else
+    {
+        voice_information_delete(voice_info);
+    }
+    free(description);
+    return hr;
+}
+
 /*
  *
  * IVectorView_VoiceInformation
