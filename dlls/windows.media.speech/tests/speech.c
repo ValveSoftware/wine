@@ -942,7 +942,7 @@ static void test_SpeechSynthesizer(void)
     size = 0xdeadbeef;
     hr = IVectorView_VoiceInformation_get_Size(voices, &size);
     ok(hr == S_OK, "IVectorView_VoiceInformation_get_Size voices failed, hr %#lx\n", hr);
-    todo_wine ok(size != 0 && size != 0xdeadbeef, "IVectorView_VoiceInformation_get_Size returned %u\n", size);
+    ok(size != 0 && size != 0xdeadbeef, "IVectorView_VoiceInformation_get_Size returned %u\n", size);
 
     voice = (IVoiceInformation *)0xdeadbeef;
     hr = IVectorView_VoiceInformation_GetAt(voices, size, &voice);
