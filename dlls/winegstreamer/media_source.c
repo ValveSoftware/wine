@@ -1392,6 +1392,7 @@ static ULONG WINAPI media_source_Release(IMFMediaSource *iface)
     if (!ref)
     {
         IMFMediaSource_Shutdown(iface);
+        MFUnlockWorkQueue(source->async_commands_queue);
         IMFMediaEventQueue_Release(source->event_queue);
         IMFByteStream_Release(source->byte_stream);
         wg_parser_destroy(source->wg_parser);
