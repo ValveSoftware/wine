@@ -1251,6 +1251,7 @@ static ULONG WINAPI media_source_Release(IMFMediaSource *iface)
     if (!ref)
     {
         IMFMediaSource_Shutdown(iface);
+        MFUnlockWorkQueue(source->async_commands_queue);
         IMFPresentationDescriptor_Release(source->pres_desc);
         IMFMediaEventQueue_Release(source->event_queue);
         IMFByteStream_Release(source->byte_stream);
@@ -1451,8 +1452,6 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
         IMFMediaStream_Release(&stream->IMFMediaStream_iface);
     }
     free(source->streams);
-
-    MFUnlockWorkQueue(source->async_commands_queue);
 
     LeaveCriticalSection(&source->cs);
 
