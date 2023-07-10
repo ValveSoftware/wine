@@ -371,6 +371,7 @@ SOURCES = \
 	inspectable.idl \
 	interactioncontext.h \
 	intshcut.h \
+	ioringapi.h \
 	ip2string.h \
 	ipexport.h \
 	iphlpapi.h \
@@ -570,6 +571,7 @@ SOURCES = \
 	ntdef.h \
 	ntdsapi.h \
 	ntgdi.h \
+	ntioring_x.h \
 	ntlsa.h \
 	ntquery.h \
 	ntsecapi.h \
