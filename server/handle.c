@@ -503,6 +503,21 @@ unsigned int get_handle_access( struct process *process, obj_handle_t handle )
     return entry->access & ~RESERVED_ALL;
 }
 
+/* return number of open handles to the object in the process */
+unsigned int get_obj_handle_count( struct process *process, const struct object *obj )
+{
+    struct handle_table *table = process->handles;
+    struct handle_entry *ptr;
+    unsigned int count = 0;
+    int i;
+
+    if (!table) return 0;
+
+    for (i = 0, ptr = table->entries; i <= table->last; i++, ptr++)
+        if (ptr->ptr == obj) ++count;
+    return count;
+}
+
 /* find the first inherited handle of the given type */
 /* this is needed for window stations and desktops (don't ask...) */
 obj_handle_t find_inherited_handle( struct process *process, const struct object_ops *ops )
