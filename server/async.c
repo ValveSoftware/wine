@@ -646,7 +646,9 @@ restart:
     LIST_FOR_EACH_ENTRY( async, &thread->process->asyncs, struct async, process_entry )
     {
         if (async->thread != thread || async->terminated || async->canceled) continue;
-        if (async->completion && async->data.apc_context && !async->event) continue;
+        if (async->completion && async->data.apc_context && !async->event
+            && get_obj_handle_count( thread->process, get_fd_user( async->fd )))
+            continue;
 
         async->canceled = 1;
         fd_cancel_async( async->fd, async );
