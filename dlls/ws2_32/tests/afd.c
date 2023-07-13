@@ -2499,9 +2499,9 @@ static void test_async_thread_termination(void)
     struct afd_poll_params *in_params = (struct afd_poll_params *)in_buffer;
     struct afd_poll_params *out_params = (struct afd_poll_params *)out_buffer;
     LARGE_INTEGER zero = {{0}};
+    HANDLE event, port, port2;
     ULONG_PTR key, value;
     IO_STATUS_BLOCK io;
-    HANDLE event, port;
     ULONG params_size;
     SOCKET listener;
     unsigned int i;
@@ -2509,15 +2509,8 @@ static void test_async_thread_termination(void)
 
     event = CreateEventW(NULL, FALSE, FALSE, NULL);
 
-    listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    ret = bind(listener, (const struct sockaddr *)&bind_addr, sizeof(bind_addr));
-    ok(!ret, "got error %u\n", WSAGetLastError());
-    ret = listen(listener, 1);
-    ok(!ret, "got error %u\n", WSAGetLastError());
-
     in_params->count = 1;
     in_params->exclusive = FALSE;
-    in_params->sockets[0].socket = listener;
     in_params->sockets[0].flags = ~0;
     in_params->sockets[0].status = 0xdeadbeef;
     params_size = offsetof(struct afd_poll_params, sockets[1]);
@@ -2527,6 +2520,14 @@ static void test_async_thread_termination(void)
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
         winetest_push_context("test %u", i);
+
+        listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        ret = bind(listener, (const struct sockaddr *)&bind_addr, sizeof(bind_addr));
+        ok(!ret, "got error %u\n", WSAGetLastError());
+        ret = listen(listener, 1);
+        ok(!ret, "got error %u\n", WSAGetLastError());
+        in_params->sockets[0].socket = listener;
+
         memset(&io, 0xcc, sizeof(io));
         ResetEvent(event);
         ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, (HANDLE)listener, tests[i].event ? event : NULL,
@@ -2539,17 +2540,29 @@ static void test_async_thread_termination(void)
             ret = WaitForSingleObject(event, 1000);
             ok(!ret, "got %#x\n", ret);
         }
+        closesocket(listener);
         winetest_pop_context();
     }
 
     SleepEx(0, TRUE);
     ok(!test_async_thread_termination_apc_count, "got APC.\n");
 
-    port = CreateIoCompletionPort((HANDLE)listener, NULL, 0, 0);
+    port = CreateIoCompletionPort(INVALID_HANDLE_VALUE, NULL, 0, 0);
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
         winetest_push_context("test %u", i);
+
+        listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+        ret = bind(listener, (const struct sockaddr *)&bind_addr, sizeof(bind_addr));
+        ok(!ret, "got error %u\n", WSAGetLastError());
+        ret = listen(listener, 1);
+        ok(!ret, "got error %u\n", WSAGetLastError());
+        in_params->sockets[0].socket = listener;
+
+        port2 = CreateIoCompletionPort((HANDLE)listener, port, 0, 0);
+        ok(port2 == port, "got %p, %p.\n", port, port2);
+
         memset(&io, 0xcc, sizeof(io));
         ResetEvent(event);
         ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, (HANDLE)listener, tests[i].event ? event : NULL,
@@ -2597,12 +2610,12 @@ static void test_async_thread_termination(void)
         ok(!key, "got key %#Ix\n", key);
         ok(value == 0xdeadbeef, "got value %#Ix\n", value);
         ok(io.Status == STATUS_CANCELLED, "got %#lx\n", io.Status);
+        closesocket(listener);
         winetest_pop_context();
     }
 
     CloseHandle(port);
     CloseHandle(event);
-    closesocket(listener);
 }
 
 static DWORD WINAPI sync_read_file_thread(void *arg)
