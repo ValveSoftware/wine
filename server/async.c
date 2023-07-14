@@ -634,6 +634,20 @@ restart:
     }
 }
 
+void cancel_terminated_threads_asyncs( struct process *process, struct object *obj )
+{
+    struct async *async;
+
+restart:
+    LIST_FOR_EACH_ENTRY( async, &process->asyncs, struct async, process_entry )
+    {
+        if (async->terminated || async->canceled || async->thread->state != TERMINATED) continue;
+        async->canceled = 1;
+        fd_cancel_async( async->fd, async );
+        goto restart;
+    }
+}
+
 /* wake up async operations on the queue */
 void async_wake_up( struct async_queue *queue, unsigned int status )
 {

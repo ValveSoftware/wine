@@ -1658,6 +1658,8 @@ static int sock_close_handle( struct object *obj, struct process *process, obj_h
             if (signaled) complete_async_poll( poll_req, STATUS_SUCCESS );
         }
     }
+    if (sock->obj.handle_count == 1 || get_obj_handle_count( process, obj ) == 1)
+        cancel_terminated_threads_asyncs( process, obj );
 
     return 1;
 }
