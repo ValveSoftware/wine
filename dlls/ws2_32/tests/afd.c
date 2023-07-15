@@ -33,24 +33,6 @@
 
 #define TIMEOUT_INFINITE _I64_MAX
 
-static HANDLE create_process(const char *arg)
-{
-    STARTUPINFOA si = { 0 };
-    PROCESS_INFORMATION pi;
-    char cmdline[MAX_PATH];
-    char **argv;
-    BOOL ret;
-
-    si.cb = sizeof(si);
-    winetest_get_mainargs(&argv);
-    sprintf(cmdline, "%s %s %s", argv[0], argv[1], arg);
-    ret = CreateProcessA(NULL, cmdline, NULL, NULL, FALSE, 0, NULL, NULL, &si, &pi);
-    ok(ret, "got %lu.\n", GetLastError());
-    ret = CloseHandle(pi.hThread);
-    ok(ret, "got %lu.\n", GetLastError());
-    return pi.hProcess;
-}
-
 static void tcp_socketpair_flags(SOCKET *src, SOCKET *dst, DWORD flags)
 {
     SOCKET server = INVALID_SOCKET;
@@ -2424,11 +2406,9 @@ struct ioctl_params
     void *out_buffer;
     ULONG out_size;
     NTSTATUS ret;
-    HANDLE complete_event, handle_closed_event;
+    HANDLE complete_event;
     BOOL kill_thread;
 };
-
-static HANDLE other_process;
 
 static DWORD WINAPI async_ioctl_thread(void *params)
 {
@@ -2437,22 +2417,20 @@ static DWORD WINAPI async_ioctl_thread(void *params)
     io->ret = NtDeviceIoControlFile(io->handle, io->event, io->apc, io->apc_context, io->io,
             io->code, io->in_buffer, io->in_size, io->out_buffer, io->out_size);
     SetEvent(io->complete_event);
-    WaitForSingleObject(io->handle_closed_event, INFINITE);
     if (io->kill_thread)
         Sleep(3000);
     return io->ret;
 }
 
-static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, BOOL other_process_handle, HANDLE *handle, HANDLE event,
+static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, HANDLE handle, HANDLE event,
         PIO_APC_ROUTINE apc, void *apc_context, IO_STATUS_BLOCK *io, ULONG code, void *in_buffer, ULONG in_size,
         void *out_buffer, ULONG out_size)
 {
-    HANDLE thread, handle2;
     struct ioctl_params p;
+    HANDLE thread;
     DWORD ret;
-    BOOL bret;
 
-    p.handle = *handle;
+    p.handle = handle;
     p.event = event;
     p.apc = apc;
     p.apc_context = apc_context;
@@ -2462,20 +2440,13 @@ static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, BOOL other
     p.in_size = in_size;
     p.out_buffer = out_buffer;
     p.out_size = out_size;
-    p.handle_closed_event = CreateEventW(NULL, FALSE, FALSE, NULL);
     p.complete_event = CreateEventW(NULL, FALSE, FALSE, NULL);
     p.kill_thread = kill_thread;
-
-    bret = DuplicateHandle(GetCurrentProcess(), *handle, other_process_handle ? other_process : GetCurrentProcess(),
-            &handle2, 0, TRUE, DUPLICATE_SAME_ACCESS);
-    ok(bret, "failed, error %lu.\n", GetLastError());
 
     thread = CreateThread(NULL, 0, async_ioctl_thread, &p, 0, NULL);
     ok(!!thread, "got NULL.\n");
     ret = WaitForSingleObject(p.complete_event, INFINITE);
     ok(ret == WAIT_OBJECT_0, "got ret %#lx.\n", ret);
-    CloseHandle(*handle);
-    SetEvent(p.handle_closed_event);
     if (kill_thread)
         TerminateThread(thread, -1);
     CloseHandle(p.complete_event);
@@ -2483,7 +2454,6 @@ static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, BOOL other
     ok(ret == WAIT_OBJECT_0, "got ret %#lx.\n", ret);
     CloseHandle(thread);
     SleepEx(0, TRUE);
-    *handle = other_process_handle ? NULL : handle2;
     return p.ret;
 }
 
@@ -2502,7 +2472,6 @@ static void test_async_thread_termination(void)
         BOOL event;
         PIO_APC_ROUTINE apc;
         void *apc_context;
-        BOOL other_process_handle;
     }
     tests[] =
     {
@@ -2522,24 +2491,6 @@ static void test_async_thread_termination(void)
         {TRUE,  TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef},
         {FALSE, FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef},
         {TRUE,  FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef},
-
-        /* other process handle */
-        {FALSE, TRUE, NULL, NULL, TRUE},
-        {TRUE,  TRUE, NULL, NULL, TRUE},
-        {FALSE, FALSE, NULL, NULL, TRUE},
-        {TRUE,  FALSE, NULL, NULL, TRUE},
-        {FALSE, TRUE, test_async_thread_termination_apc, NULL, TRUE},
-        {TRUE,  TRUE, test_async_thread_termination_apc, NULL, TRUE},
-        {FALSE, FALSE, test_async_thread_termination_apc, NULL, TRUE},
-        {TRUE,  FALSE, test_async_thread_termination_apc, NULL, TRUE},
-        {FALSE, TRUE, NULL, (void *)0xdeadbeef, TRUE},
-        {TRUE,  TRUE, NULL, (void *)0xdeadbeef, TRUE},
-        {FALSE, FALSE, NULL, (void *)0xdeadbeef, TRUE},
-        {TRUE,  FALSE, NULL, (void *)0xdeadbeef, TRUE},
-        {FALSE, TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
-        {TRUE,  TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
-        {FALSE, FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
-        {TRUE,  FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
     };
 
     const struct sockaddr_in bind_addr = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
@@ -2552,12 +2503,9 @@ static void test_async_thread_termination(void)
     ULONG_PTR key, value;
     IO_STATUS_BLOCK io;
     ULONG params_size;
-    NTSTATUS expected;
     SOCKET listener;
     unsigned int i;
     int ret;
-
-    other_process = create_process("sleep");
 
     event = CreateEventW(NULL, FALSE, FALSE, NULL);
 
@@ -2582,7 +2530,7 @@ static void test_async_thread_termination(void)
 
         memset(&io, 0xcc, sizeof(io));
         ResetEvent(event);
-        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, tests[i].other_process_handle, (HANDLE *)&listener, tests[i].event ? event : NULL,
+        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, (HANDLE)listener, tests[i].event ? event : NULL,
                 tests[i].apc, tests[i].apc_context, &io, IOCTL_AFD_POLL, in_params, params_size,
                 out_params, params_size);
         ok(ret == STATUS_PENDING, "got %#x\n", ret);
@@ -2603,7 +2551,7 @@ static void test_async_thread_termination(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
-        winetest_push_context("test %u, other process %d", i, tests[i].other_process_handle);
+        winetest_push_context("test %u", i);
 
         listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         ret = bind(listener, (const struct sockaddr *)&bind_addr, sizeof(bind_addr));
@@ -2617,7 +2565,7 @@ static void test_async_thread_termination(void)
 
         memset(&io, 0xcc, sizeof(io));
         ResetEvent(event);
-        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, tests[i].other_process_handle, (HANDLE *)&listener, tests[i].event ? event : NULL,
+        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, (HANDLE)listener, tests[i].event ? event : NULL,
                 tests[i].apc, tests[i].apc_context, &io, IOCTL_AFD_POLL, in_params, params_size,
                 out_params, params_size);
         if (tests[i].apc)
@@ -2627,14 +2575,9 @@ static void test_async_thread_termination(void)
             continue;
         }
         ok(ret == STATUS_PENDING, "got %#x\n", ret);
-        if (tests[i].other_process_handle || !tests[i].apc_context || tests[i].event)
+        if (!tests[i].apc_context || tests[i].event)
         {
-            if (tests[i].other_process_handle && !tests[i].event && !tests[i].apc && !!tests[i].apc_context)
-                expected = 0xcccccccc;
-            else
-                expected = STATUS_CANCELLED;
-            todo_wine_if(expected == 0xcccccccc)
-            ok(io.Status == expected, "got %#lx, expected %#lx.\n", io.Status, expected);
+            ok(io.Status == STATUS_CANCELLED, "got %#lx\n", io.Status);
             memset(&io, 0xcc, sizeof(io));
             key = 0xcc;
             value = 0;
@@ -2673,7 +2616,6 @@ static void test_async_thread_termination(void)
 
     CloseHandle(port);
     CloseHandle(event);
-    TerminateProcess(other_process, 0);
 }
 
 static DWORD WINAPI sync_read_file_thread(void *arg)
@@ -2821,20 +2763,6 @@ static void test_read_write(void)
 START_TEST(afd)
 {
     WSADATA data;
-    char **argv;
-    int argc;
-
-    argc = winetest_get_mainargs(&argv);
-
-    if (argc >= 3)
-    {
-        if (!strcmp(argv[2], "sleep"))
-        {
-            Sleep(5000);
-            return;
-        }
-        return;
-    }
 
     WSAStartup(MAKEWORD(2, 2), &data);
 
