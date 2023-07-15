@@ -2443,16 +2443,9 @@ static DWORD WINAPI async_ioctl_thread(void *params)
     return io->ret;
 }
 
-enum test_close_handle_type
-{
-    TEST_CLOSE_SAME_PROCESS,
-    TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT,
-    TEST_CLOSE_OTHER_AFTER_THREAD_EXIT,
-};
-
-static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, enum test_close_handle_type other_process_handle,
-        HANDLE *handle, HANDLE event, PIO_APC_ROUTINE apc, void *apc_context, IO_STATUS_BLOCK *io, ULONG code,
-        void *in_buffer, ULONG in_size, void *out_buffer, ULONG out_size)
+static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, BOOL other_process_handle, HANDLE *handle, HANDLE event,
+        PIO_APC_ROUTINE apc, void *apc_context, IO_STATUS_BLOCK *io, ULONG code, void *in_buffer, ULONG in_size,
+        void *out_buffer, ULONG out_size)
 {
     HANDLE thread, handle2;
     struct ioctl_params p;
@@ -2481,8 +2474,7 @@ static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, enum test_
     ok(!!thread, "got NULL.\n");
     ret = WaitForSingleObject(p.complete_event, INFINITE);
     ok(ret == WAIT_OBJECT_0, "got ret %#lx.\n", ret);
-    if (other_process_handle != TEST_CLOSE_OTHER_AFTER_THREAD_EXIT)
-        CloseHandle(*handle);
+    CloseHandle(*handle);
     SetEvent(p.handle_closed_event);
     if (kill_thread)
         TerminateThread(thread, -1);
@@ -2490,8 +2482,6 @@ static NTSTATUS WINAPI thread_NtDeviceIoControlFile(BOOL kill_thread, enum test_
     ret = WaitForSingleObject(thread, INFINITE);
     ok(ret == WAIT_OBJECT_0, "got ret %#lx.\n", ret);
     CloseHandle(thread);
-    if (other_process_handle == TEST_CLOSE_OTHER_AFTER_THREAD_EXIT)
-        CloseHandle(*handle);
     SleepEx(0, TRUE);
     *handle = other_process_handle ? NULL : handle2;
     return p.ret;
@@ -2512,7 +2502,7 @@ static void test_async_thread_termination(void)
         BOOL event;
         PIO_APC_ROUTINE apc;
         void *apc_context;
-        enum test_close_handle_type close_type;
+        BOOL other_process_handle;
     }
     tests[] =
     {
@@ -2533,41 +2523,23 @@ static void test_async_thread_termination(void)
         {FALSE, FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef},
         {TRUE,  FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef},
 
-        /* closing handle before thread exit */
-        {FALSE, TRUE, NULL, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  TRUE, NULL, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, FALSE, NULL, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  FALSE, NULL, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, TRUE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  TRUE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, FALSE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  FALSE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, TRUE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  TRUE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, FALSE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  FALSE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-
-        /* closing handle after thread exit */
-        {FALSE, TRUE, NULL, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {TRUE,  TRUE, NULL, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {FALSE, FALSE, NULL, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {TRUE,  FALSE, NULL, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {FALSE, TRUE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {TRUE,  TRUE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {FALSE, FALSE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {TRUE,  FALSE, test_async_thread_termination_apc, NULL, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {FALSE, TRUE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  TRUE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, FALSE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {TRUE,  FALSE, NULL, (void *)0xdeadbeef, TEST_CLOSE_OTHER_BEFORE_THREAD_EXIT},
-        {FALSE, TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {TRUE,  TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {FALSE, FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
-        {TRUE,  FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TEST_CLOSE_OTHER_AFTER_THREAD_EXIT},
+        /* other process handle */
+        {FALSE, TRUE, NULL, NULL, TRUE},
+        {TRUE,  TRUE, NULL, NULL, TRUE},
+        {FALSE, FALSE, NULL, NULL, TRUE},
+        {TRUE,  FALSE, NULL, NULL, TRUE},
+        {FALSE, TRUE, test_async_thread_termination_apc, NULL, TRUE},
+        {TRUE,  TRUE, test_async_thread_termination_apc, NULL, TRUE},
+        {FALSE, FALSE, test_async_thread_termination_apc, NULL, TRUE},
+        {TRUE,  FALSE, test_async_thread_termination_apc, NULL, TRUE},
+        {FALSE, TRUE, NULL, (void *)0xdeadbeef, TRUE},
+        {TRUE,  TRUE, NULL, (void *)0xdeadbeef, TRUE},
+        {FALSE, FALSE, NULL, (void *)0xdeadbeef, TRUE},
+        {TRUE,  FALSE, NULL, (void *)0xdeadbeef, TRUE},
+        {FALSE, TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
+        {TRUE,  TRUE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
+        {FALSE, FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
+        {TRUE,  FALSE, test_async_thread_termination_apc, (void *)0xdeadbeef, TRUE},
     };
 
     const struct sockaddr_in bind_addr = {.sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
@@ -2610,7 +2582,7 @@ static void test_async_thread_termination(void)
 
         memset(&io, 0xcc, sizeof(io));
         ResetEvent(event);
-        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, tests[i].close_type, (HANDLE *)&listener, tests[i].event ? event : NULL,
+        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, tests[i].other_process_handle, (HANDLE *)&listener, tests[i].event ? event : NULL,
                 tests[i].apc, tests[i].apc_context, &io, IOCTL_AFD_POLL, in_params, params_size,
                 out_params, params_size);
         ok(ret == STATUS_PENDING, "got %#x\n", ret);
@@ -2631,7 +2603,7 @@ static void test_async_thread_termination(void)
 
     for (i = 0; i < ARRAY_SIZE(tests); ++i)
     {
-        winetest_push_context("test %u, other process %d", i, tests[i].close_type);
+        winetest_push_context("test %u, other process %d", i, tests[i].other_process_handle);
 
         listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
         ret = bind(listener, (const struct sockaddr *)&bind_addr, sizeof(bind_addr));
@@ -2645,7 +2617,7 @@ static void test_async_thread_termination(void)
 
         memset(&io, 0xcc, sizeof(io));
         ResetEvent(event);
-        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, tests[i].close_type, (HANDLE *)&listener, tests[i].event ? event : NULL,
+        ret = thread_NtDeviceIoControlFile(tests[i].kill_thread, tests[i].other_process_handle, (HANDLE *)&listener, tests[i].event ? event : NULL,
                 tests[i].apc, tests[i].apc_context, &io, IOCTL_AFD_POLL, in_params, params_size,
                 out_params, params_size);
         if (tests[i].apc)
@@ -2655,9 +2627,9 @@ static void test_async_thread_termination(void)
             continue;
         }
         ok(ret == STATUS_PENDING, "got %#x\n", ret);
-        if (tests[i].close_type || !tests[i].apc_context || tests[i].event)
+        if (tests[i].other_process_handle || !tests[i].apc_context || tests[i].event)
         {
-            if (tests[i].close_type && !tests[i].event && !tests[i].apc && !!tests[i].apc_context)
+            if (tests[i].other_process_handle && !tests[i].event && !tests[i].apc && !!tests[i].apc_context)
                 expected = 0xcccccccc;
             else
                 expected = STATUS_CANCELLED;
