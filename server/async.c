@@ -616,6 +616,22 @@ void cancel_process_asyncs( struct process *process )
     cancel_async( process, NULL, NULL, 0 );
 }
 
+void cancel_asyncs_on_handles_closed( struct process *process, struct object *obj )
+{
+    struct async *async;
+
+restart:
+    LIST_FOR_EACH_ENTRY( async, &process->asyncs, struct async, process_entry )
+    {
+        if (async->terminated || async->canceled || get_fd_user( async->fd ) != obj) continue;
+        if (!async->completion || !async->data.apc_context || async->event) continue;
+
+        async->canceled = 1;
+        fd_cancel_async( async->fd, async );
+        goto restart;
+    }
+}
+
 void cancel_terminating_thread_asyncs( struct thread *thread )
 {
     struct async *async;

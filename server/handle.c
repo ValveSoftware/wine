@@ -37,6 +37,7 @@
 #include "process.h"
 #include "thread.h"
 #include "security.h"
+#include "file.h"
 #include "request.h"
 
 struct handle_entry
@@ -419,6 +420,21 @@ struct handle_table *copy_handle_table( struct process *process, struct process 
     return table;
 }
 
+/* return number of open handles to the object in the process */
+static unsigned int get_obj_handle_count( struct process *process, const struct object *obj )
+{
+    struct handle_table *table = process->handles;
+    struct handle_entry *ptr;
+    unsigned int count = 0;
+    int i;
+
+    if (!table) return 0;
+
+    for (i = 0, ptr = table->entries; i <= table->last; i++, ptr++)
+        if (ptr->ptr == obj) ++count;
+    return count;
+}
+
 /* close a handle and decrement the refcount of the associated object */
 unsigned int close_handle( struct process *process, obj_handle_t handle )
 {
@@ -430,6 +446,8 @@ unsigned int close_handle( struct process *process, obj_handle_t handle )
     if (entry->access & RESERVED_CLOSE_PROTECT) return STATUS_HANDLE_NOT_CLOSABLE;
     obj = entry->ptr;
     if (!obj->ops->close_handle( obj, process, handle )) return STATUS_HANDLE_NOT_CLOSABLE;
+    if (obj->handle_count == 1 || get_obj_handle_count( process, obj ) == 1)
+        cancel_asyncs_on_handles_closed( process, obj );
     entry->ptr = NULL;
     table = handle_is_global(handle) ? global_table : process->handles;
     if (entry < table->entries + table->free) table->free = entry - table->entries;
