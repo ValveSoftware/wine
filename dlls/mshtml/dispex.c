@@ -2302,7 +2302,7 @@ static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t
     func_info_t *func;
     unsigned i, j;
 
-    if(!data)
+    if(!data || !data->func_cnt)
         return;
 
     if(prototype_static_data[prot_id].desc == &HTMLWindow_dispex)
@@ -2493,7 +2493,7 @@ static void proxy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t 
     func_info_t *func;
     unsigned i;
 
-    if(!data)
+    if(!data || !data->func_cnt)
         return;
 
     /* Copy the info from the object instance data, but
