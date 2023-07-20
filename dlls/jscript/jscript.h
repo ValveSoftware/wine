@@ -208,6 +208,7 @@ typedef enum {
     JSCLASS_FLOAT64ARRAY,
     JSCLASS_MAP,
     JSCLASS_SET,
+    JSCLASS_WEAKMAP,
 
     FIRST_TYPEDARRAY_JSCLASS = JSCLASS_INT8ARRAY,
     LAST_TYPEDARRAY_JSCLASS  = JSCLASS_FLOAT64ARRAY,
@@ -527,12 +528,13 @@ struct _script_ctx_t {
             jsdisp_t *typedarr_constr[NUM_TYPEDARRAY_TYPES];
             jsdisp_t *map_prototype;
             jsdisp_t *set_prototype;
+            jsdisp_t *weakmap_prototype;
         };
-        jsdisp_t *global_objects[25 + NUM_TYPEDARRAY_TYPES];
+        jsdisp_t *global_objects[26 + NUM_TYPEDARRAY_TYPES];
     };
     struct proxy_prototypes *proxy_prototypes;
 };
-C_ASSERT(RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, set_prototype) == RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, global_objects));
+C_ASSERT(RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, weakmap_prototype) == RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, global_objects));
 
 void script_release(script_ctx_t*) DECLSPEC_HIDDEN;
 

@@ -2599,7 +2599,8 @@ sync_test("builtin override", function() {
         "Uint32Array",
         "unescape",
         "URIError",
-        "VBArray"
+        "VBArray",
+        "WeakMap"
     ];
 
     var override = {
