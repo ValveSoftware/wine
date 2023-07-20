@@ -64,6 +64,7 @@ HRESULT Object_toString(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned a
         L"[object Float32Array]",
         L"[object Float64Array]",
         L"[object Object]",
+        L"[object Object]",
         L"[object Object]"
     };
 
