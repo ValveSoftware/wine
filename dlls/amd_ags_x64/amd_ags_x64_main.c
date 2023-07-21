@@ -22,6 +22,9 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(amd_ags);
 
+static const char driver_version[] = "23.10.01.45-230626a-393367C-AMD-Software-Adrenalin-Edition";
+static const char radeon_version[] = "23.7.1";
+
 enum amd_ags_version
 {
     AMD_AGS_VERSION_5_1_1,
@@ -586,8 +589,8 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     gpu_info->agsVersionMajor = amd_ags_info[object->version].major;
     gpu_info->agsVersionMinor = amd_ags_info[object->version].minor;
     gpu_info->agsVersionPatch = amd_ags_info[object->version].patch;
-    gpu_info->driverVersion = "21.30.25.05-211005a-372402E-RadeonSoftware";
-    gpu_info->radeonSoftwareVersion  = "21.10.2";
+    gpu_info->driverVersion = driver_version;
+    gpu_info->radeonSoftwareVersion  = radeon_version;
     gpu_info->numDevices = object->device_count;
     gpu_info->devices = object->devices;
 
@@ -621,8 +624,8 @@ AGSReturnCode WINAPI agsInitialize(int ags_version, const AGSConfiguration *conf
     }
 
     memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->driverVersion = "21.30.25.05-211005a-372402E-RadeonSoftware";
-    gpu_info->radeonSoftwareVersion  = "21.10.2";
+    gpu_info->driverVersion = driver_version;
+    gpu_info->radeonSoftwareVersion  = radeon_version;
     gpu_info->numDevices = object->device_count;
     gpu_info->devices = object->devices;
 
