@@ -3270,8 +3270,49 @@ static void test_heap_checks( DWORD flags )
     ret = HeapFree( GetProcessHeap(), 0, p );
     ok( ret, "HeapFree failed\n" );
 
+    if (flags & HEAP_FREE_CHECKING_ENABLED)
+    {
+        void *p_prev;
+        SIZE_T count;
+
+        p = pHeapAlloc( GetProcessHeap(), 0, 39 );
+        ok( !!p, "HeapAlloc failed\n" );
+        for (i = 0; i < 39 / sizeof(int); ++i)
+            ok( ((unsigned int *)p)[i] == 0xbaadf00d, "got %#x, i %Iu.\n", ((unsigned int *)p)[i], i );
+        memset( p, 0xcc, 39 );
+
+        p_prev = p;
+        count = 5;
+        p = pHeapReAlloc( GetProcessHeap(), 0, p, 39 + count * 4 );
+        ok( !!p, "got NULL.\n" );
+
+        winetest_push_context( "in place %d", p == p_prev);
+        if (p == p_prev)
+        {
+            if (flags & HEAP_TAIL_CHECKING_ENABLED)
+                ok( p[39] == 0xab, "got %#x.\n", p[39] );
+            for (i = 0; i < count - 1; ++i)
+                ok( ((unsigned int *)p)[10 + i] == 0xbaadf00d, "got %#x, i %Iu.\n", ((unsigned int *)p)[10 + i], i );
+        }
+        else
+        {
+            ok( p[39] == 0xba, "got %#x.\n", p[39] );
+            for (i = 0; i < count - 1; ++i)
+                ok( ((unsigned int *)p)[10 + i] == 0xbaadf00d, "got %#x, i %Iu.\n", ((unsigned int *)p)[10 + i], i );
+        }
+        winetest_pop_context();
+
+        ret = pHeapFree( GetProcessHeap(), 0, p );
+        ok( ret, "failed.\n" );
+    }
+
     p = HeapAlloc( GetProcessHeap(), 0, 37 );
     ok( p != NULL, "HeapAlloc failed\n" );
+    if (flags & HEAP_FREE_CHECKING_ENABLED)
+    {
+        for (i = 0; i < 37 / sizeof(int); ++i)
+            ok( ((unsigned int *)p)[i] == 0xbaadf00d, "got %#x, i %Iu.\n", ((unsigned int *)p)[i], i );
+    }
     memset( p, 0xcc, 37 );
 
     ret = pHeapFree( GetProcessHeap(), 0, p );
