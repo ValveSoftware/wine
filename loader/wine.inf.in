@@ -430,6 +430,8 @@ HKLM,%CurrentVersionNT%\Ports,,16
 HKLM,%CurrentVersionNT%\Print,,16
 HKLM,%CurrentVersionNT%\ProfileList,,16
 HKLM,%CurrentVersionNT%\Winlogon,"Shell",,"explorer.exe"
+;; App specific heap debug flags
+HKLM,%CurrentVersionNT%\Image File Execution Options\ChaosCode.exe,GlobalFlag,0x00040002,0x00000020
 
 [CurrentVersionWow64.ntamd64]
 HKLM,%CurrentVersion%,"ProgramFilesDir (x86)",,"%16426%"
