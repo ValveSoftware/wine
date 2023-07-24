@@ -2127,6 +2127,7 @@ static HRESULT WINAPI stream_handler_callback_Invoke(IMFAsyncCallback *iface, IM
     IUnknown *object, *state = IMFAsyncResult_GetStateNoAddRef(result);
     struct object_context *context;
     struct result_entry *entry;
+    UINT64 read_offset;
     DWORD size = 0;
     HRESULT hr;
 
@@ -2135,13 +2136,30 @@ static HRESULT WINAPI stream_handler_callback_Invoke(IMFAsyncCallback *iface, IM
 
     if (FAILED(hr = IMFByteStream_EndRead(context->stream, result, &size)))
         WARN("Failed to complete stream read, hr %#lx\n", hr);
-    else if (FAILED(hr = wg_source_create(context->url, context->file_size,
+    else if (!context->wg_source && FAILED(hr = wg_source_create(context->url, context->file_size,
             context->buffer, size, &context->wg_source)))
         WARN("Failed to create wg_source, hr %#lx\n", hr);
     else if (FAILED(hr = wg_source_push_data(context->wg_source, context->buffer, size)))
         WARN("Failed to push wg_source data, hr %#lx\n", hr);
     else if (FAILED(hr = wg_source_get_stream_count(context->wg_source, &context->stream_count)))
         WARN("Failed to get wg_source status, hr %#lx\n", hr);
+    else if (!context->stream_count)
+    {
+        QWORD position, offset;
+        if (FAILED(hr = wg_source_get_position(context->wg_source, &read_offset)))
+            WARN("Failed to get wg_source position, hr %#lx\n", hr);
+        else if (FAILED(hr = IMFByteStream_GetCurrentPosition(context->stream, &position)))
+            WARN("Failed to get current byte stream position, hr %#lx\n", hr);
+        else if (position != (offset = min(read_offset, context->file_size))
+                && FAILED(hr = IMFByteStream_SetCurrentPosition(context->stream, offset)))
+            WARN("Failed to set current byte stream position, hr %#lx\n", hr);
+        else
+        {
+            UINT32 read_size = min(SOURCE_BUFFER_SIZE, context->file_size - offset);
+            return IMFByteStream_BeginRead(context->stream, context->buffer, read_size,
+                    &handler->IMFAsyncCallback_iface, state);
+        }
+    }
     else if (FAILED(hr = media_source_create(context, (IMFMediaSource **)&object)))
         WARN("Failed to create media source, hr %#lx\n", hr);
 

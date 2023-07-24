@@ -356,6 +356,12 @@ struct wg_source_get_stream_count_params
     UINT32 stream_count;
 };
 
+struct wg_source_get_position_params
+{
+    wg_source_t source;
+    UINT64 read_offset;
+};
+
 struct wg_source_push_data_params
 {
     wg_source_t source;
@@ -476,6 +482,7 @@ enum unix_funcs
     unix_wg_source_create,
     unix_wg_source_destroy,
     unix_wg_source_get_stream_count,
+    unix_wg_source_get_position,
     unix_wg_source_push_data,
 
     unix_wg_transform_create,

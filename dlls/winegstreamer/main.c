@@ -399,6 +399,28 @@ HRESULT wg_source_get_stream_count(wg_source_t source, uint32_t *stream_count)
     return S_OK;
 }
 
+HRESULT wg_source_get_position(wg_source_t source, uint64_t *read_offset)
+{
+    struct wg_source_get_position_params params =
+    {
+        .source = source,
+    };
+    NTSTATUS status;
+
+    TRACE("source %#I64x, read_offset %p\n", source, read_offset);
+
+    if ((status = WINE_UNIX_CALL(unix_wg_source_get_position, &params))
+            && status != STATUS_PENDING)
+    {
+        WARN("wg_source_get_position returned status %#lx\n", status);
+        return HRESULT_FROM_NT(status);
+    }
+
+    *read_offset = params.read_offset;
+    TRACE("source %#I64x, read_offset %#I64x\n", source, *read_offset);
+    return S_OK;
+}
+
 HRESULT wg_source_push_data(wg_source_t source, const void *data, uint32_t size)
 {
     struct wg_source_push_data_params params =
