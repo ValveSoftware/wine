@@ -119,6 +119,67 @@ static GstBuffer *create_buffer_from_bytes(const void *data, guint size)
     return buffer;
 }
 
+static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
+{
+    guint32 seqnum = gst_event_get_seqnum(event);
+    GstSeekType cur_type, stop_type;
+    GstSeekFlags flags;
+    GstFormat format;
+    gint64 cur, stop;
+    gdouble rate;
+
+    gst_event_parse_seek(event, &rate, &format, &flags, &cur_type, &cur, &stop_type, &stop);
+    gst_event_unref(event);
+    if (format != GST_FORMAT_BYTES)
+        return false;
+
+    GST_TRACE("source %p, rate %f, format %s, flags %#x, cur_type %u, cur %#" G_GINT64_MODIFIER "x, "
+            "stop_type %u, stop %#" G_GINT64_MODIFIER "x.", source, rate, gst_format_get_name(format),
+            flags, cur_type, cur, stop_type, stop);
+
+    if (flags & GST_SEEK_FLAG_FLUSH)
+    {
+        if (!(event = gst_event_new_flush_start()))
+            GST_ERROR("Failed to allocate flush_start event");
+        else
+        {
+            gst_event_set_seqnum(event, seqnum);
+            if (!gst_pad_push_event(source->src_pad, event))
+                GST_ERROR("Failed to push flush_start event");
+        }
+    }
+
+    source->segment.start = cur;
+
+    if (flags & GST_SEEK_FLAG_FLUSH)
+    {
+        if (!(event = gst_event_new_flush_stop(true)))
+            GST_ERROR("Failed to allocate flush_stop event");
+        else
+        {
+            gst_event_set_seqnum(event, seqnum);
+            if (!gst_pad_push_event(source->src_pad, event))
+                GST_ERROR("Failed to push flush_stop event");
+        }
+        source->valid_segment = false;
+    }
+
+    return true;
+}
+
+static gboolean src_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+    struct wg_source *source = gst_pad_get_element_private(pad);
+
+    switch (GST_EVENT_TYPE(event))
+    {
+    case GST_EVENT_SEEK:
+        return src_event_seek(source, event);
+    default:
+        return gst_pad_event_default(pad, parent, event);
+    }
+}
+
 static gboolean src_query_duration(struct wg_source *source, GstQuery *query)
 {
     GstFormat format;
@@ -137,6 +198,19 @@ static gboolean src_query_scheduling(struct wg_source *source, GstQuery *query)
     GST_TRACE("source %p", source);
     gst_query_set_scheduling(query, GST_SCHEDULING_FLAG_SEEKABLE, 1, -1, 0);
     gst_query_add_scheduling_mode(query, GST_PAD_MODE_PUSH);
+    return true;
+}
+
+static gboolean src_query_seeking(struct wg_source *source, GstQuery *query)
+{
+    GstFormat format;
+
+    gst_query_parse_seeking(query, &format, NULL, NULL, NULL);
+    GST_TRACE("source %p, format %s", source, gst_format_get_name(format));
+    if (format != GST_FORMAT_BYTES)
+        return false;
+
+    gst_query_set_seeking(query, GST_FORMAT_BYTES, 1, 0, source->segment.stop);
     return true;
 }
 
@@ -161,6 +235,8 @@ static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
         return src_query_duration(source, query);
     case GST_QUERY_SCHEDULING:
         return src_query_scheduling(source, query);
+    case GST_QUERY_SEEKING:
+        return src_query_seeking(source, query);
     case GST_QUERY_URI:
         if (!source->url)
             return false;
@@ -241,6 +317,7 @@ NTSTATUS wg_source_create(void *args)
         goto error;
     gst_pad_set_element_private(source->src_pad, source);
     gst_pad_set_query_function(source->src_pad, src_query_cb);
+    gst_pad_set_event_function(source->src_pad, src_event_cb);
 
     for (i = 0; i < ARRAY_SIZE(source->streams); i++)
     {
