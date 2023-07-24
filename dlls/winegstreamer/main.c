@@ -341,7 +341,8 @@ void wg_parser_stream_seek(wg_parser_stream_t stream, double rate,
 }
 
 HRESULT wg_source_create(const WCHAR *url, uint64_t file_size,
-        const void *data, uint32_t size, wg_source_t *out)
+        const void *data, uint32_t size, WCHAR mime_type[256],
+        wg_source_t *out)
 {
     struct wg_source_create_params params =
     {
@@ -352,8 +353,8 @@ HRESULT wg_source_create(const WCHAR *url, uint64_t file_size,
     char *tmp = url ? malloc(len) : NULL;
     NTSTATUS status;
 
-    TRACE("url %s, file_size %#I64x, data %p, size %#x\n", debugstr_w(url),
-            file_size, data, size);
+    TRACE("url %s, file_size %#I64x, data %p, size %#x, mime_type %p\n", debugstr_w(url),
+            file_size, data, size, mime_type);
 
     if ((params.url = tmp))
         WideCharToMultiByte(CP_ACP, 0, url, -1, tmp, len, NULL, NULL);
@@ -363,6 +364,7 @@ HRESULT wg_source_create(const WCHAR *url, uint64_t file_size,
     else
     {
         TRACE("Returning source %#I64x.\n", params.source);
+        MultiByteToWideChar(CP_ACP, 0, params.mime_type, -1, mime_type, 256);
         *out = params.source;
     }
 
