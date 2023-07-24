@@ -354,6 +354,7 @@ struct wg_source_create_params
     UINT64 file_size;
     const void *data;
     UINT32 size;
+    char mime_type[256];
     wg_source_t source;
 };
 

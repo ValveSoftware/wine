@@ -104,7 +104,8 @@ void wg_parser_stream_seek(wg_parser_stream_t stream, double rate,
         uint64_t start_pos, uint64_t stop_pos, DWORD start_flags, DWORD stop_flags);
 
 HRESULT wg_source_create(const WCHAR *url, uint64_t file_size,
-        const void *data, uint32_t size, wg_source_t *out);
+        const void *data, uint32_t size, WCHAR mime_type[256],
+        wg_source_t *out);
 void wg_source_destroy(wg_source_t source);
 HRESULT wg_source_get_stream_count(wg_source_t source, uint32_t *stream_count);
 HRESULT wg_source_get_duration(wg_source_t source, uint64_t *duration);
