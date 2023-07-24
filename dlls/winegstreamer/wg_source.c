@@ -155,6 +155,16 @@ static GstTagList *source_get_stream_tags(struct wg_source *source, guint index)
     return tags;
 }
 
+static bool source_set_stream_flags(struct wg_source *source, guint index, GstStreamFlags flags)
+{
+    GstStream *stream;
+    if (!(stream = source_get_stream(source, index)))
+        return false;
+    gst_stream_set_stream_flags(stream, flags);
+    gst_object_unref(stream);
+    return true;
+}
+
 static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
 {
     guint32 seqnum = gst_event_get_seqnum(event);
@@ -384,6 +394,7 @@ static GstEvent *create_stream_start_event(const char *stream_id)
 
     if (!(stream = gst_stream_new(stream_id, NULL, GST_STREAM_TYPE_UNKNOWN, 0)))
         return NULL;
+    gst_stream_set_stream_flags(stream, GST_STREAM_FLAG_SELECT);
     if ((event = gst_event_new_stream_start(stream_id)))
     {
         gst_event_set_stream(event, stream);
@@ -788,4 +799,21 @@ NTSTATUS wg_source_get_stream_tag(void *args)
 error:
     gst_tag_list_unref(tags);
     return STATUS_NOT_FOUND;
+}
+
+NTSTATUS wg_source_set_stream_flags(void *args)
+{
+    struct wg_source_set_stream_flags_params *params = args;
+    struct wg_source *source = get_source(params->source);
+    BOOL select = params->select;
+    guint index = params->index;
+    GstStreamFlags flags;
+
+    GST_TRACE("source %p, index %u, select %u", source, index, select);
+
+    flags = select ? GST_STREAM_FLAG_SELECT : GST_STREAM_FLAG_UNSELECT;
+    if (!source_set_stream_flags(source, index, flags))
+        return STATUS_UNSUCCESSFUL;
+
+    return STATUS_SUCCESS;
 }
