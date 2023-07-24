@@ -783,6 +783,8 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
                 WARN("Failed to start media stream, hr %#lx\n", hr);
             IMFStreamDescriptor_Release(descriptors[i]);
         }
+
+        wg_source_set_stream_flags(source->wg_source, source->stream_map[i], stream->active);
     }
 
     free(descriptors);
