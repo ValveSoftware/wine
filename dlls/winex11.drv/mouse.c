@@ -55,6 +55,7 @@ MAKE_FUNCPTR(XcursorLibraryLoadCursor);
 #define OEMRESOURCE
 
 #include "x11drv.h"
+#include "xfixes.h"
 #include "winreg.h"
 #include "wine/server.h"
 #include "wine/debug.h"
@@ -1470,9 +1471,10 @@ BOOL X11DRV_SetCursorPos( INT x, INT y )
 
     TRACE( "real setting to %s\n", wine_dbgstr_point( &pos ) );
 
+    pXFixesHideCursor( data->display, root_window );
     XWarpPointer( data->display, root_window, root_window, 0, 0, 0, 0, pos.x, pos.y );
     data->warp_serial = NextRequest( data->display );
-    XNoOp( data->display );
+    pXFixesShowCursor( data->display, root_window );
     XFlush( data->display ); /* avoids bad mouse lag in games that do their own mouse warping */
     TRACE( "warped to (fake) %d,%d serial %lu\n", x, y, data->warp_serial );
     return TRUE;
