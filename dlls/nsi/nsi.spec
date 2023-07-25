@@ -16,7 +16,7 @@
 @ stdcall NsiGetParameterEx(ptr)
 @ stub NsiRegisterChangeNotification
 @ stub NsiRegisterChangeNotificationEx
-@ stub NsiRequestChangeNotification
+@ stdcall NsiRequestChangeNotification(long ptr long ptr ptr)
 @ stub NsiRequestChangeNotificationEx
 @ stub NsiSetAllParameters
 @ stub NsiSetAllParametersEx

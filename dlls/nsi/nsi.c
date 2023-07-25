@@ -307,3 +307,11 @@ err:
     CloseHandle( device );
     return err;
 }
+
+DWORD WINAPI NsiRequestChangeNotification( DWORD unk, const NPI_MODULEID *module, DWORD table, OVERLAPPED *ovr,
+                                           HANDLE *handle )
+{
+    FIXME( "%lu %p %lu %p %p stub.\n", unk, module, table, ovr, handle );
+
+    return ERROR_NOT_SUPPORTED;
+}
