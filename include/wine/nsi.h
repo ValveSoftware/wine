@@ -508,5 +508,7 @@ DWORD WINAPI NsiGetAllParametersEx( struct nsi_get_all_parameters_ex *params );
 DWORD WINAPI NsiGetParameter( DWORD unk, const NPI_MODULEID *module, DWORD table, const void *key, DWORD key_size,
                               DWORD param_type, void *data, DWORD data_size, DWORD data_offset );
 DWORD WINAPI NsiGetParameterEx( struct nsi_get_parameter_ex *params );
+DWORD WINAPI NsiRequestChangeNotification( DWORD unk, const NPI_MODULEID *module, DWORD table, OVERLAPPED *ovr,
+                                           HANDLE *handle );
 
 #endif /* __WINE_NSI_H */
