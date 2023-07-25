@@ -200,7 +200,6 @@ err:
 }
 
 #elif defined (HAVE_SYS_SYSCTL_H) && defined (HAVE_NET_IF_DL_H)
-
 static NTSTATUS if_get_physical( const char *name, UINT *type, IF_PHYSICAL_ADDRESS *phys_addr )
 {
     struct if_msghdr *ifm;
