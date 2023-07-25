@@ -510,5 +510,6 @@ DWORD WINAPI NsiGetParameter( DWORD unk, const NPI_MODULEID *module, DWORD table
 DWORD WINAPI NsiGetParameterEx( struct nsi_get_parameter_ex *params );
 DWORD WINAPI NsiRequestChangeNotification( DWORD unk, const NPI_MODULEID *module, DWORD table, OVERLAPPED *ovr,
                                            HANDLE *handle );
+DWORD WINAPI NsiCancelChangeNotification( OVERLAPPED *ovr );
 
 #endif /* __WINE_NSI_H */

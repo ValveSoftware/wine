@@ -315,3 +315,10 @@ DWORD WINAPI NsiRequestChangeNotification( DWORD unk, const NPI_MODULEID *module
 
     return ERROR_NOT_SUPPORTED;
 }
+
+DWORD WINAPI NsiCancelChangeNotification( OVERLAPPED *ovr )
+{
+    FIXME( "%p stub.\n", ovr );
+
+    return ERROR_NOT_SUPPORTED;
+}
