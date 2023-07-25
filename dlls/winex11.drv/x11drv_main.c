@@ -629,11 +629,13 @@ sym_not_found:
 #ifdef SONAME_LIBXFIXES
 
 #define MAKE_FUNCPTR(f) typeof(f) * p##f;
+MAKE_FUNCPTR(XFixesHideCursor)
 MAKE_FUNCPTR(XFixesQueryExtension)
 MAKE_FUNCPTR(XFixesQueryVersion)
 MAKE_FUNCPTR(XFixesCreateRegion)
 MAKE_FUNCPTR(XFixesCreateRegionFromGC)
 MAKE_FUNCPTR(XFixesSelectSelectionInput)
+MAKE_FUNCPTR(XFixesShowCursor)
 #undef MAKE_FUNCPTR
 
 static void x11drv_load_xfixes(void)
@@ -654,11 +656,13 @@ static void x11drv_load_xfixes(void)
         dlclose(xfixes);                                      \
         return;                                               \
     }
+    LOAD_FUNCPTR(XFixesHideCursor)
     LOAD_FUNCPTR(XFixesQueryExtension)
     LOAD_FUNCPTR(XFixesQueryVersion)
     LOAD_FUNCPTR(XFixesCreateRegion)
     LOAD_FUNCPTR(XFixesCreateRegionFromGC)
     LOAD_FUNCPTR(XFixesSelectSelectionInput)
+    LOAD_FUNCPTR(XFixesShowCursor)
 #undef LOAD_FUNCPTR
 
     if (!pXFixesQueryExtension(gdi_display, &event, &error))
