@@ -1038,16 +1038,16 @@ void test_change_notifications(void)
 
     handle = (HANDLE)0xdeadbeef;
     ret = NsiRequestChangeNotification( 0, &NPI_MS_NDIS_MODULEID, NSI_NDIS_IFINFO_TABLE, &ovr, &handle );
-    todo_wine ok( ret == ERROR_IO_PENDING, "got %lu.\n", ret );
+    ok( ret == ERROR_IO_PENDING, "got %lu.\n", ret );
 
     handle2 = (HANDLE)0xdeadbeef;
     memset( &ovr2, 0, sizeof(ovr2) );
     ret = NsiRequestChangeNotification( 0, &NPI_MS_NDIS_MODULEID, NSI_NDIS_IFINFO_TABLE, &ovr2, &handle2 );
-    todo_wine ok( ret == ERROR_IO_PENDING, "got %lu.\n", ret );
+    ok( ret == ERROR_IO_PENDING, "got %lu.\n", ret );
 
     ok( handle2 == handle, "got %p, %p.\n", handle, handle2 );
     bret = GetOverlappedResult( handle, &ovr, &bytes, FALSE );
-    todo_wine ok( !bret && GetLastError() == ERROR_IO_INCOMPLETE, "got bret %d, err %lu.\n", bret, GetLastError() );
+    ok( !bret && GetLastError() == ERROR_IO_INCOMPLETE, "got bret %d, err %lu.\n", bret, GetLastError() );
 
     ret = NsiCancelChangeNotification( NULL );
     todo_wine ok( ret == ERROR_NOT_FOUND, "got %lu.\n", ret );
@@ -1057,12 +1057,13 @@ void test_change_notifications(void)
 
     bytes = 0xdeadbeef;
     bret = GetOverlappedResult( handle, &ovr, &bytes, FALSE );
+
     todo_wine ok( !bret && GetLastError() == ERROR_OPERATION_ABORTED, "got bret %d, err %lu.\n", bret, GetLastError() );
     todo_wine ok( ovr.Internal == (ULONG)STATUS_CANCELLED, "got %Ix.\n", ovr.Internal );
-    ok( !bytes, "got %lu.\n", bytes );
+    todo_wine ok( !bytes, "got %lu.\n", bytes );
 
     bret = GetOverlappedResult( handle2, &ovr2, &bytes, FALSE );
-    todo_wine ok( !bret && GetLastError() == ERROR_IO_INCOMPLETE, "got bret %d, err %lu.\n", bret, GetLastError() );
+    ok( !bret && GetLastError() == ERROR_IO_INCOMPLETE, "got bret %d, err %lu.\n", bret, GetLastError() );
     ret = NsiCancelChangeNotification( &ovr2 );
     todo_wine ok( !ret, "got %lu.\n", ret );
     bret = GetOverlappedResult( handle, &ovr, &bytes, FALSE );
@@ -1072,7 +1073,7 @@ void test_change_notifications(void)
     todo_wine ok( ret == ERROR_INVALID_PARAMETER, "got %lu.\n", ret );
 
     ret = NsiRequestChangeNotification( 0, &NPI_MS_IPV4_MODULEID, NSI_IP_FORWARD_TABLE, &ovr, &handle );
-    todo_wine ok( ret == ERROR_IO_PENDING, "got %lu.\n", ret );
+    ok( ret == ERROR_IO_PENDING, "got %lu.\n", ret );
     ret = NsiCancelChangeNotification( &ovr );
     todo_wine ok( !ret, "got %lu.\n", ret );
     bret = GetOverlappedResult( handle, &ovr, &bytes, FALSE );
