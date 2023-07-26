@@ -365,7 +365,13 @@ DWORD WINAPI NsiRequestChangeNotification( DWORD unk, const NPI_MODULEID *module
 
 DWORD WINAPI NsiCancelChangeNotification( OVERLAPPED *ovr )
 {
-    FIXME( "%p stub.\n", ovr );
+    DWORD err = ERROR_SUCCESS;
 
-    return ERROR_NOT_SUPPORTED;
+    TRACE( "%p.\n", ovr );
+
+    if (!ovr) return ERROR_NOT_FOUND;
+    if (!CancelIoEx(  get_nsi_device( TRUE ), ovr ))
+        err = GetLastError();
+
+    return err;
 }
