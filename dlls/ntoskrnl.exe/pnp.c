@@ -1126,9 +1126,7 @@ static DWORD CALLBACK device_enum_thread_proc(void *arg)
         while (!invalidated_devices_count)
             SleepConditionVariableCS( &invalidated_devices_cv, &invalidated_devices_cs, INFINITE );
 
-        invalidated_devices_count--;
-        device = invalidated_devices[0];
-        memmove( invalidated_devices, invalidated_devices + 1, invalidated_devices_count * sizeof(*invalidated_devices) );
+        device = invalidated_devices[--invalidated_devices_count];
 
         /* Don't hold the CS while enumerating the device. Tests show that
          * calling IoInvalidateDeviceRelations() from another thread shouldn't
