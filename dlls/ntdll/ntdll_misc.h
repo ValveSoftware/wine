@@ -82,6 +82,7 @@ extern void WINAPI KiUserApcDispatcher(CONTEXT*,ULONG_PTR,ULONG_PTR,ULONG_PTR,PN
 extern void WINAPI KiUserCallbackDispatcher(ULONG,void*,ULONG);
 extern void WINAPI KiUserCallbackDispatcherReturn(void);
 extern void (WINAPI *pWow64PrepareForException)( EXCEPTION_RECORD *rec, CONTEXT *context );
+extern NTSTATUS (WINAPI *pWow64SuspendLocalThread)( HANDLE thread, ULONG *count );
 
 /* debug helpers */
 extern LPCSTR debugstr_us( const UNICODE_STRING *str );
