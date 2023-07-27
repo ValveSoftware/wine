@@ -22,7 +22,7 @@
 @ stub Wow64ShallowThunkAllocSecurityQualityOfService32TO64_FNC
 @ stub Wow64ShallowThunkSIZE_T32TO64
 @ stub Wow64ShallowThunkSIZE_T64TO32
-@ stub Wow64SuspendLocalThread
+@ stdcall Wow64SuspendLocalThread(long ptr)
 @ stdcall -norelay Wow64SystemServiceEx(long ptr)
 @ stub Wow64ValidateUserCallTarget
 @ stub Wow64ValidateUserCallTargetFilter
