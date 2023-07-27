@@ -684,6 +684,23 @@ BOOLEAN WINAPI RtlIsProcessorFeaturePresent( UINT feature )
     return !!(cpu_features_bitmap[feature / 64] & (1ull << (feature % 64)));
 }
 
+/***********************************************************************
+ *              RtlWow64SuspendThread (NTDLL.@)
+ */
+NTSTATUS WINAPI RtlWow64SuspendThread( HANDLE thread, ULONG *count )
+{
+    THREAD_BASIC_INFORMATION tbi;
+
+    NTSTATUS ret = NtQueryInformationThread( thread, ThreadBasicInformation, &tbi, sizeof(tbi), NULL);
+    if (ret) return ret;
+
+    if (tbi.ClientId.UniqueProcess != NtCurrentTeb()->ClientId.UniqueProcess) {
+        FIXME( "Non-local process thread suspend\n" );
+        return STATUS_SUCCESS;
+    }
+
+    return pWow64SuspendLocalThread( thread, count );
+}
 
 /*************************************************************************
  *		RtlWalkFrameChain (NTDLL.@)
