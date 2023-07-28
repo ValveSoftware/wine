@@ -91,6 +91,12 @@ coclass GStreamerByteStreamHandler2 {}
 
 [
     threading(both),
+    uuid(480b1517-c8e9-4eae-b006-e6300718d85d)
+]
+coclass GStreamerAudioDecoder {}
+
+[
+    threading(both),
     uuid(2eeb4adf-4578-4d10-bca7-bb955f56320a)
 ]
 coclass CWMADecMediaObject {};
