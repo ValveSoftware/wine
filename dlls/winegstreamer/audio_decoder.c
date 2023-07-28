@@ -612,6 +612,9 @@ HRESULT aac_decoder_create(REFIID riid, void **ret)
 
     if (!(decoder = calloc(1, sizeof(*decoder))))
         return E_OUTOFMEMORY;
+    decoder->IMFTransform_iface.lpVtbl = &transform_vtbl;
+    decoder->refcount = 1;
+
     decoder->input_types = (WAVEFORMATEXTENSIBLE *)aac_decoder_input_types;
     decoder->input_type_count = ARRAY_SIZE(aac_decoder_input_types);
 
@@ -621,8 +624,43 @@ HRESULT aac_decoder_create(REFIID riid, void **ret)
         return hr;
     }
 
+    *ret = &decoder->IMFTransform_iface;
+    TRACE("Created decoder %p\n", *ret);
+    return S_OK;
+}
+
+static WAVEFORMATEXTENSIBLE audio_decoder_input_types[] =
+{
+#define MAKE_WAVEFORMATEXTENSIBLE(format) \
+    {.Format = {.wFormatTag = WAVE_FORMAT_EXTENSIBLE, .nChannels = 6, .nSamplesPerSec = 48000, .nAvgBytesPerSec = 1152000, \
+                .nBlockAlign = 24, .wBitsPerSample = 32, .cbSize = sizeof(WAVEFORMATEXTENSIBLE) - sizeof(WAVEFORMATEX)}, \
+     .SubFormat = {format,0x0000,0x0010,{0x80,0x00,0x00,0xaa,0x00,0x38,0x9b,0x71}}}
+
+    MAKE_WAVEFORMATEXTENSIBLE(MAKEFOURCC('G','S','T','a')),
+
+#undef MAKE_WAVEFORMATEXTENSIBLE
+};
+
+HRESULT audio_decoder_create(REFIID riid, void **ret)
+{
+    struct audio_decoder *decoder;
+    HRESULT hr;
+
+    TRACE("riid %s, ret %p.\n", debugstr_guid(riid), ret);
+
+    if (!(decoder = calloc(1, sizeof(*decoder))))
+        return E_OUTOFMEMORY;
     decoder->IMFTransform_iface.lpVtbl = &transform_vtbl;
     decoder->refcount = 1;
+
+    decoder->input_types = audio_decoder_input_types;
+    decoder->input_type_count = ARRAY_SIZE(audio_decoder_input_types);
+
+    if (FAILED(hr = wg_sample_queue_create(&decoder->wg_sample_queue)))
+    {
+        free(decoder);
+        return hr;
+    }
 
     *ret = &decoder->IMFTransform_iface;
     TRACE("Created decoder %p\n", *ret);
