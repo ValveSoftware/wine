@@ -24,6 +24,7 @@
 #define VK_NO_PROTOTYPES
 
 #include <pthread.h>
+#include <stdbool.h>
 
 #include "vulkan_loader.h"
 #include "vulkan_thunks.h"
@@ -53,6 +54,25 @@ static inline struct wine_cmd_buffer *wine_cmd_buffer_from_handle(VkCommandBuffe
     return (struct wine_cmd_buffer *)(uintptr_t)handle->base.unix_handle;
 }
 
+struct wine_semaphore;
+
+struct local_timeline_semaphore
+{
+    VkSemaphore sem;
+    uint64_t value;
+};
+
+struct pending_d3d12_fence_op
+{
+    /* Vulkan native local semaphore. */
+    struct local_timeline_semaphore local_sem;
+
+    /* Operation values. */
+    struct wine_vk_mapping mapping;
+    struct list entry;
+    uint64_t virtual_value;
+};
+
 struct wine_device
 {
     struct vulkan_device_funcs funcs;
@@ -67,6 +87,16 @@ struct wine_device
     VkQueueFamilyProperties *queue_props;
 
     struct wine_vk_mapping mapping;
+
+    pthread_t signaller_thread;
+    pthread_mutex_t signaller_mutex;
+    bool stop;
+    struct list free_fence_ops_list;
+    struct list sem_poll_list;
+    struct local_timeline_semaphore sem_poll_update;
+    pthread_cond_t sem_poll_updated_cond;
+    uint64_t sem_poll_update_value; /* set to sem_poll_update.value by signaller thread once update is processed. */
+    unsigned int allocated_fence_ops_count;
 };
 
 static inline struct wine_device *wine_device_from_handle(VkDevice handle)
@@ -329,7 +359,6 @@ static inline void free_conversion_context(struct conversion_context *pool)
 struct wine_semaphore
 {
     VkSemaphore semaphore;
-    VkSemaphore fence_timeline_semaphore;
 
     VkExternalSemaphoreHandleTypeFlagBits export_types;
 
@@ -337,12 +366,18 @@ struct wine_semaphore
 
     /* mutable members */
     VkExternalSemaphoreHandleTypeFlagBits handle_type;
+    struct list poll_entry;
+    struct list pending_waits;
+    struct list pending_signals;
     HANDLE handle;
     struct
     {
+        /* Shared mem access mutex. The non-shared parts access is guarded with device global signaller_mutex. */
         pthread_mutex_t mutex;
-        uint64_t virtual_value;
+        uint64_t virtual_value, physical_value;
     } *d3d12_fence_shm;
+    /* The Vulkan shared semaphore is only waited or signaled in signaller_worker(). */
+    VkSemaphore fence_timeline_semaphore;
 };
 
 static inline struct wine_semaphore *wine_semaphore_from_handle(VkSemaphore handle)
