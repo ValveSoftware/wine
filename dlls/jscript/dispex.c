@@ -658,7 +658,7 @@ cleanup:
     return hres;
 }
 
-static HRESULT prop_get(jsdisp_t *This, dispex_prop_t *prop, jsval_t *r, IServiceProvider *caller)
+static HRESULT prop_get(jsdisp_t *This, IDispatch *jsthis, dispex_prop_t *prop, jsval_t *r, IServiceProvider *caller)
 {
     jsdisp_t *prop_obj = This;
     HRESULT hres;
@@ -689,7 +689,7 @@ static HRESULT prop_get(jsdisp_t *This, dispex_prop_t *prop, jsval_t *r, IServic
         break;
     case PROP_ACCESSOR:
         if(prop->u.accessor.getter) {
-            hres = jsdisp_call_value(prop->u.accessor.getter, jsval_obj(This), DISPATCH_METHOD, 0, NULL, r, caller);
+            hres = jsdisp_call_value(prop->u.accessor.getter, jsval_disp(jsthis), DISPATCH_METHOD, 0, NULL, r, caller);
         }else {
             *r = jsval_undefined();
             hres = S_OK;
@@ -698,10 +698,14 @@ static HRESULT prop_get(jsdisp_t *This, dispex_prop_t *prop, jsval_t *r, IServic
     case PROP_PROXY: {
         DISPPARAMS dp = { 0 };
         EXCEPINFO ei = { 0 };
+        jsdisp_t *jsdisp;
+
+        if((jsdisp = to_jsdisp(jsthis)) && jsdisp->proxy)
+            jsthis = (IDispatch*)jsdisp->proxy;
 
         V_VT(&var) = VT_EMPTY;
-        hres = prop_obj->proxy->lpVtbl->PropInvoke(prop_obj->proxy, This->proxy ? (IDispatch*)This->proxy : to_disp(This),
-                                                   prop->u.proxy_id, This->ctx->lcid, DISPATCH_PROPERTYGET, &dp, &var, &ei, caller);
+        hres = prop_obj->proxy->lpVtbl->PropInvoke(prop_obj->proxy, jsthis, prop->u.proxy_id, This->ctx->lcid,
+                                                   DISPATCH_PROPERTYGET, &dp, &var, &ei, caller);
         if(hres == DISP_E_EXCEPTION)
             disp_fill_exception(This->ctx, &ei);
         else if(SUCCEEDED(hres)) {
@@ -852,7 +856,7 @@ static HRESULT invoke_prop_func(jsdisp_t *This, IDispatch *jsthis, dispex_prop_t
     case PROP_IDX: {
         jsval_t val;
 
-        hres = prop_get(This, prop, &val, caller);
+        hres = prop_get(This, jsthis ? jsthis : (IDispatch *)&This->IDispatchEx_iface, prop, &val, caller);
         if(FAILED(hres))
             return hres;
 
@@ -2259,7 +2263,7 @@ static HRESULT WINAPI DispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID lc
         jsval_t r;
 
         if(prop)
-            hres = prop_get(This, prop, &r, pspCaller);
+            hres = prop_get(This, to_disp(This), prop, &r, pspCaller);
         else {
             hres = to_primitive(This->ctx, jsval_obj(This), &r, NO_HINT);
             if(hres == JS_E_TO_PRIMITIVE)
@@ -3032,7 +3036,7 @@ HRESULT init_dispex_from_constr(jsdisp_t *dispex, script_ctx_t *ctx, const built
     if(SUCCEEDED(hres) && prop && prop->type!=PROP_DELETED) {
         jsval_t val;
 
-        hres = prop_get(constr, prop, &val, &ctx->jscaller->IServiceProvider_iface);
+        hres = prop_get(constr, to_disp(constr), prop, &val, &ctx->jscaller->IServiceProvider_iface);
         if(FAILED(hres)) {
             ERR("Could not get prototype\n");
             return hres;
@@ -3509,7 +3513,7 @@ HRESULT jsdisp_propget_name(jsdisp_t *obj, const WCHAR *name, jsval_t *val)
         return S_OK;
     }
 
-    hres = prop_get(obj, prop, val, &obj->ctx->jscaller->IServiceProvider_iface);
+    hres = prop_get(obj, to_disp(obj), prop, val, &obj->ctx->jscaller->IServiceProvider_iface);
     if(hres == DISP_E_MEMBERNOTFOUND) {
         *val = jsval_undefined();
         return S_OK;
@@ -3537,7 +3541,7 @@ HRESULT jsdisp_get_idx(jsdisp_t *obj, DWORD idx, jsval_t *r)
         return DISP_E_UNKNOWNNAME;
     }
 
-    hres = prop_get(obj, prop, r, &obj->ctx->jscaller->IServiceProvider_iface);
+    hres = prop_get(obj, to_disp(obj), prop, r, &obj->ctx->jscaller->IServiceProvider_iface);
     if(hres == DISP_E_MEMBERNOTFOUND) {
         *r = jsval_undefined();
         return DISP_E_UNKNOWNNAME;
@@ -3553,7 +3557,7 @@ HRESULT jsdisp_propget(jsdisp_t *jsdisp, DISPID id, jsval_t *val)
     if(!prop)
         return DISP_E_MEMBERNOTFOUND;
 
-    return prop_get(jsdisp, prop, val, &jsdisp->ctx->jscaller->IServiceProvider_iface);
+    return prop_get(jsdisp, to_disp(jsdisp), prop, val, &jsdisp->ctx->jscaller->IServiceProvider_iface);
 }
 
 HRESULT disp_propget(script_ctx_t *ctx, IDispatch *disp, DISPID id, jsval_t *val)
@@ -3779,7 +3783,7 @@ HRESULT jsdisp_get_own_property(jsdisp_t *obj, const WCHAR *name, BOOL flags_onl
         desc->mask |= PROPF_WRITABLE;
         desc->explicit_value = TRUE;
         if(!flags_only) {
-            hres = prop_get(obj, prop, &desc->value, &obj->ctx->jscaller->IServiceProvider_iface);
+            hres = prop_get(obj, to_disp(obj), prop, &desc->value, &obj->ctx->jscaller->IServiceProvider_iface);
             if(FAILED(hres))
                 return (hres == DISP_E_MEMBERNOTFOUND) ? DISP_E_UNKNOWNNAME : hres;
         }
