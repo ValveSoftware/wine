@@ -2391,7 +2391,10 @@ static void hacks_init(void)
         setenv("LIBGL_ALWAYS_SOFTWARE", "1", 0);
     }
 
-    if (sgi && (!strcmp(sgi, "1364780") || !strcmp(sgi, "1952120") || !strcmp(sgi, "2154900")))
+    if (sgi && (0
+        || !strcmp(sgi, "1364780") || !strcmp(sgi, "1952120") || !strcmp(sgi, "2154900") /* Street Fighter 6 */
+        || !strcmp(sgi, "1740720") /* Have a Nice Death  */
+    ))
     {
         ERR("HACK: setting WINE_ENABLE_GST_LIVE_LATENCY.\n");
         setenv("WINE_ENABLE_GST_LIVE_LATENCY", "1", 0);
