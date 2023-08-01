@@ -1716,13 +1716,7 @@ static void HTMLInputElement_traverse(HTMLDOMNode *iface, nsCycleCollectionTrave
 static void HTMLInputElement_unlink(HTMLDOMNode *iface)
 {
     HTMLInputElement *This = impl_from_HTMLDOMNode(iface);
-
-    if(This->nsinput) {
-        nsIDOMHTMLInputElement *nsinput = This->nsinput;
-
-        This->nsinput = NULL;
-        nsIDOMHTMLInputElement_Release(nsinput);
-    }
+    unlink_ref(&This->nsinput);
 }
 
 static const NodeImplVtbl HTMLInputElementImplVtbl = {
@@ -2554,13 +2548,7 @@ static void HTMLButtonElement_traverse(HTMLDOMNode *iface, nsCycleCollectionTrav
 static void HTMLButtonElement_unlink(HTMLDOMNode *iface)
 {
     HTMLButtonElement *This = button_from_HTMLDOMNode(iface);
-
-    if(This->nsbutton) {
-        nsIDOMHTMLButtonElement *nsbutton = This->nsbutton;
-
-        This->nsbutton = NULL;
-        nsIDOMHTMLButtonElement_Release(nsbutton);
-    }
+    unlink_ref(&This->nsbutton);
 }
 
 static const NodeImplVtbl HTMLButtonElementImplVtbl = {
