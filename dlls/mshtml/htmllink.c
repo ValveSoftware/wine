@@ -448,7 +448,7 @@ static const tid_t HTMLLinkElement_iface_tids[] = {
 };
 dispex_static_data_t HTMLLinkElement_dispex = {
     L"HTMLLinkElement",
-    NULL,
+    &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLLinkElement,
     DispHTMLLinkElement_tid,
     HTMLLinkElement_iface_tids,

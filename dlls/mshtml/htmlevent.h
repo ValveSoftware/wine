@@ -141,6 +141,7 @@ typedef struct {
     IHTMLEventObj *(*set_current_event)(DispatchEx*,IHTMLEventObj*);
 } event_target_vtbl_t;
 
+extern const event_target_vtbl_t HTMLElement_event_target_vtbl DECLSPEC_HIDDEN;
 IHTMLEventObj *default_set_current_event(HTMLInnerWindow*,IHTMLEventObj*) DECLSPEC_HIDDEN;
 
 static inline EventTarget *get_node_event_prop_target(HTMLDOMNode *node, eventid_t eid)
