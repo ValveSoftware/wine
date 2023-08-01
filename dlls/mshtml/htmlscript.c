@@ -481,7 +481,7 @@ static const tid_t HTMLScriptElement_iface_tids[] = {
 
 dispex_static_data_t HTMLScriptElement_dispex = {
     L"HTMLScriptElement",
-    NULL,
+    &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLScriptElement,
     DispHTMLScriptElement_tid,
     HTMLScriptElement_iface_tids,

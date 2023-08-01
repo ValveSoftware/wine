@@ -28,6 +28,7 @@
 #include "wine/debug.h"
 
 #include "mshtml_private.h"
+#include "htmlevent.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
@@ -522,7 +523,7 @@ static const tid_t HTMLTableCell_iface_tids[] = {
 
 dispex_static_data_t HTMLTableCell_dispex = {
     L"HTMLTableDataCellElement",
-    NULL,
+    &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLTableCellElement,
     DispHTMLTableCell_tid,
     HTMLTableCell_iface_tids,
@@ -984,7 +985,7 @@ static const tid_t HTMLTableRow_iface_tids[] = {
 
 dispex_static_data_t HTMLTableRow_dispex = {
     L"HTMLTableRowElement",
-    NULL,
+    &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLTableRowElement,
     DispHTMLTableRow_tid,
     HTMLTableRow_iface_tids,
@@ -2019,7 +2020,7 @@ static const tid_t HTMLTable_iface_tids[] = {
 
 dispex_static_data_t HTMLTable_dispex = {
     L"HTMLTableElement",
-    NULL,
+    &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLTableElement,
     DispHTMLTable_tid,
     HTMLTable_iface_tids,

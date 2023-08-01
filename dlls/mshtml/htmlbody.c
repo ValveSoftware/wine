@@ -1010,7 +1010,7 @@ static const tid_t HTMLBodyElement_iface_tids[] = {
 
 dispex_static_data_t HTMLBodyElement_dispex = {
     L"HTMLBodyElement",
-    NULL,
+    &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLBodyElement,
     DispHTMLBody_tid,
     HTMLBodyElement_iface_tids,
