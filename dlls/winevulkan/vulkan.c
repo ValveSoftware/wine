@@ -36,7 +36,6 @@
 #include "winnt.h"
 #include "winioctl.h"
 #include "wine/server.h"
-#include "wine/list.h"
 
 #include "vulkan_private.h"
 #include "wine/vulkan_driver.h"
@@ -243,7 +242,6 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
     struct wine_phys_dev *object;
     uint32_t num_host_properties, num_properties = 0;
     VkExtensionProperties *host_properties = NULL;
-    VkPhysicalDeviceProperties physdev_properties;
     BOOL have_external_memory_host = FALSE;
     VkResult res;
     unsigned int i, j;
@@ -254,9 +252,6 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
     object->instance = instance;
     object->handle = handle;
     object->phys_dev = phys_dev;
-
-    instance->funcs.p_vkGetPhysicalDeviceProperties(phys_dev, &physdev_properties);
-    object->api_version = physdev_properties.apiVersion;
 
     handle->base.unix_handle = (uintptr_t)object;
     WINE_VK_ADD_DISPATCHABLE_MAPPING(instance, handle, phys_dev, object);
@@ -401,14 +396,6 @@ static void wine_vk_device_get_queues(struct wine_device *device,
         queue->family_index = family_index;
         queue->queue_index = i;
         queue->flags = flags;
-
-        pthread_mutex_init(&queue->submissions_mutex, NULL);
-        pthread_cond_init(&queue->submissions_cond, NULL);
-        list_init(&queue->submissions);
-
-        pthread_mutex_init(&queue->signaller_mutex, NULL);
-        pthread_cond_init(&queue->signaller_cond, NULL);
-        list_init(&queue->signal_ops);
 
         /* The Vulkan spec says:
          *
@@ -579,11 +566,6 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
     return VK_SUCCESS;
 }
 
-static bool is_virtual_queue(struct wine_queue *queue)
-{
-    return __atomic_load_n(&queue->virtual_queue, __ATOMIC_ACQUIRE);
-}
-
 /* Helper function used for freeing a device structure. This function supports full
  * and partial object cleanups and can thus be used for vkCreateDevice failures.
  */
@@ -600,28 +582,6 @@ static void wine_vk_device_free(struct wine_device *device)
         for (i = 0; i < device->queue_count; i++)
         {
             queue = &device->queues[i];
-
-            if (is_virtual_queue(queue))
-            {
-                pthread_mutex_lock(&queue->submissions_mutex);
-                pthread_mutex_lock(&queue->signaller_mutex);
-                queue->stop = 1;
-                pthread_mutex_unlock(&queue->submissions_mutex);
-                pthread_mutex_unlock(&queue->signaller_mutex);
-
-                pthread_cond_signal(&queue->submissions_cond);
-                pthread_cond_signal(&queue->signaller_cond);
-
-                pthread_join(queue->virtual_queue_thread, NULL);
-                pthread_join(queue->signal_thread, NULL);
-            }
-
-            pthread_mutex_destroy(&queue->submissions_mutex);
-            pthread_mutex_destroy(&queue->signaller_mutex);
-
-            pthread_cond_destroy(&queue->submissions_cond);
-            pthread_cond_destroy(&queue->signaller_cond);
-
             if (queue && queue->queue)
                 WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, queue);
         }
@@ -1096,8 +1056,6 @@ VkResult wine_vkCreateInstance(const VkInstanceCreateInfo *create_info,
         TRACE("Engine name %s, engine version %#x.\n", debugstr_a(app_info->pEngineName),
                 app_info->engineVersion);
         TRACE("API version %#x.\n", app_info->apiVersion);
-
-        object->api_version = app_info->apiVersion;
 
         if (app_info->pEngineName && !strcmp(app_info->pEngineName, "idTech"))
             object->quirks |= WINEVULKAN_QUIRK_GET_DEVICE_PROC_ADDR;
@@ -3741,7 +3699,7 @@ static void d3d12_semaphore_unlock(struct wine_semaphore *semaphore)
 
 /* returns -1 when there is no queued update that would satisfy the wait */
 static uint64_t d3d12_semaphore_try_get_wait_value_locked(struct wine_semaphore *semaphore, uint64_t virtual_value,
-        struct wine_queue *waiting_queue)
+        struct VkQueue_T *waiting_queue)
 {
     struct pending_update *update;
     uint64_t ret = -1;
@@ -3749,19 +3707,6 @@ static uint64_t d3d12_semaphore_try_get_wait_value_locked(struct wine_semaphore 
 
     if (semaphore->d3d12_fence_shm->virtual_value >= virtual_value)
         return 0;
-
-    for (i = 0; i < semaphore->d3d12_fence_shm->pending_updates_count; i++)
-    {
-        update = &semaphore->d3d12_fence_shm->pending_updates[i];
-
-        if (update->virtual_value < virtual_value)
-            continue;
-
-        if (update->signalling_pid == getpid() && waiting_queue && update->signalling_queue == waiting_queue)
-            return 0;
-
-        ret = min(ret, update->physical_value);
-    }
 
     return ret;
 }
@@ -3817,34 +3762,6 @@ static void d3d12_semaphore_satisfy_waits_locked(struct wine_semaphore *semaphor
             pthread_cond_signal(&wait->cond);
         }
     }
-}
-
-static uint64_t d3d12_semaphore_add_pending_signal_locked(struct wine_semaphore *semaphore, uint64_t virtual_value,
-        struct wine_queue *signalling_queue)
-{
-    struct pending_update *update;
-
-    if (semaphore->d3d12_fence_shm->pending_updates_count == ARRAY_SIZE(semaphore->d3d12_fence_shm->pending_updates))
-    {
-        /* Called from Unix thread, can't use Wine traces. */
-        fprintf(stderr, "winevulkan/d3d12_semaphore_add_pending_signal_locked: maximum concurrent signals exceeded.\n");
-        return 0;
-    }
-
-    update = &semaphore->d3d12_fence_shm->pending_updates[
-        semaphore->d3d12_fence_shm->pending_updates_count++];
-
-    update->virtual_value = virtual_value;
-    update->physical_value = ++semaphore->d3d12_fence_shm->counter;
-    update->signalling_pid = getpid();
-    update->signalling_queue = signalling_queue;
-
-    return update->physical_value;
-}
-
-static struct pending_update d3d12_semaphore_peek_added_signal_locked(struct wine_semaphore *semaphore)
-{
-    return semaphore->d3d12_fence_shm->pending_updates[semaphore->d3d12_fence_shm->pending_updates_count - 1];
 }
 
 static bool d3d12_semaphore_pop_pending_signal_locked(struct wine_semaphore *semaphore, uint64_t phys_val, struct pending_update *ret)
@@ -4288,41 +4205,27 @@ static NTSTATUS wine_vk_signal_semaphore(VkDevice device, const VkSemaphoreSigna
 
     if (semaphore->handle_type == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
     {
+        VkSemaphoreSignalInfo step_signal_info;
+
         d3d12_semaphore_lock(semaphore);
 
-        /* vkWaitSemaphore w/ WAIT_ANY wakes on every physical value increment to check if the wait is satisfied, so
-           if there are no scheduled signals, step the physical value */
-        if ((vr = vk_get_semaphore_counter_value(device, signal_info->semaphore, &phys_val, khr)) != VK_SUCCESS)
+        assert(semaphore->d3d12_fence_shm->counter == phys_val);
+        phys_val++;
+
+        semaphore->d3d12_fence_shm->counter = semaphore->d3d12_fence_shm->physical_value = phys_val;
+
+        step_signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
+        step_signal_info.pNext = NULL;
+        step_signal_info.semaphore = signal_info->semaphore;
+        step_signal_info.value = phys_val;
+
+        vr = vk_signal_semaphore(device, &step_signal_info, khr);
+        if (vr != VK_SUCCESS)
         {
             d3d12_semaphore_unlock(semaphore);
             return vr;
         }
 
-        d3d12_semaphore_update_phys_val_locked(semaphore, phys_val);
-
-        if (!semaphore->d3d12_fence_shm->pending_updates_count)
-        {
-            VkSemaphoreSignalInfo step_signal_info;
-
-            assert(semaphore->d3d12_fence_shm->counter == phys_val);
-            phys_val++;
-
-            semaphore->d3d12_fence_shm->counter = semaphore->d3d12_fence_shm->physical_value = phys_val;
-
-            step_signal_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
-            step_signal_info.pNext = NULL;
-            step_signal_info.semaphore = signal_info->semaphore;
-            step_signal_info.value = phys_val;
-
-            vr = vk_signal_semaphore(device, &step_signal_info, khr);
-            if (vr != VK_SUCCESS)
-            {
-                d3d12_semaphore_unlock(semaphore);
-                return vr;
-            }
-        }
-
-        /* If a queue is already waiting on the pending physical value of a previous submit, this won't wake it up. */
         d3d12_semaphore_satisfy_waits_locked(semaphore, signal_info->value, 0);
         semaphore->d3d12_fence_shm->virtual_value = signal_info->value;
 
@@ -4552,445 +4455,12 @@ VkResult vk_queue_submit_unwrap(struct wine_queue *queue, uint32_t submit_count,
     return ret;
 }
 
-struct signal_op
-{
-    enum
-    {
-        SIGNAL_TYPE_SEMAPHORE,
-    } signal_type;
-
-    union
-    {
-        struct
-        {
-            struct wine_semaphore *obj;
-            uint64_t phys_val;
-
-            bool khr;
-        } semaphore;
-    };
-
-    struct list entry;
-};
-
-static void *queue_signaller_worker(void *arg)
-{
-    struct wine_queue *queue = arg;
-    VkSemaphoreWaitInfo wait_info;
-    struct signal_op *signal_op;
-    VkSemaphore sem_handle;
-    bool device_lost;
-    VkResult vr;
-
-    for (;;)
-    {
-        pthread_mutex_lock(&queue->signaller_mutex);
-
-        while (!queue->stop && list_empty(&queue->signal_ops))
-            pthread_cond_wait(&queue->signaller_cond, &queue->signaller_mutex);
-
-        if (queue->stop)
-        {
-            assert( list_empty(&queue->signal_ops) );
-            pthread_mutex_unlock(&queue->signaller_mutex);
-            return NULL;
-        }
-
-        signal_op = LIST_ENTRY(list_head(&queue->signal_ops), struct signal_op, entry);
-        list_remove(&signal_op->entry);
-
-        device_lost = queue->device_lost;
-
-        pthread_mutex_unlock(&queue->signaller_mutex);
-
-        if (signal_op->signal_type == SIGNAL_TYPE_SEMAPHORE)
-        {
-            wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
-            wait_info.pNext = NULL;
-            wait_info.flags = 0;
-            wait_info.semaphoreCount = 1;
-            sem_handle = wine_semaphore_to_handle(signal_op->semaphore.obj);
-            wait_info.pSemaphores = &sem_handle;
-            wait_info.pValues = &signal_op->semaphore.phys_val;
-            if (!device_lost && (vr = vk_wait_semaphores(queue->device, &wait_info, -1, signal_op->semaphore.khr)) < 0)
-            {
-                /* likely GPU hang */
-                fprintf(stderr, "winevulkan/queue_signaller_worker: Semaphore wait failed, vr %d.\n", vr);
-                continue;
-            }
-
-            d3d12_semaphore_lock(signal_op->semaphore.obj);
-            d3d12_semaphore_update_phys_val_locked(signal_op->semaphore.obj, signal_op->semaphore.phys_val);
-            d3d12_semaphore_unlock(signal_op->semaphore.obj);
-        }
-
-        free(signal_op);
-    }
-
-    return NULL;
-}
-
-struct struct_chain_def
-{
-    VkStructureType sType;
-    unsigned int size;
-};
-
-void copy_VkSubmitInfo(struct conversion_context *ctx, const VkSubmitInfo *in, VkSubmitInfo *out);
-static VkSubmitInfo *copy_VkSubmitInfo_array(struct conversion_context *ctx, const VkSubmitInfo *in, uint32_t submit_count)
-{
-    VkSubmitInfo *out = conversion_context_alloc(ctx, sizeof(*out) * submit_count);
-    unsigned int i;
-
-    for (i = 0; i < submit_count; i++)
-        copy_VkSubmitInfo(ctx, &in[i], &out[i]);
-    return out;
-}
-
-void copy_VkSubmitInfo2(struct conversion_context *ctx, const VkSubmitInfo2 *in, VkSubmitInfo2 *out);
-static VkSubmitInfo2 *copy_VkSubmitInfo2_array(struct conversion_context *ctx, const VkSubmitInfo2 *in, uint32_t submit_count)
-{
-    VkSubmitInfo2 *out = conversion_context_alloc(ctx, sizeof(*out) * submit_count);
-    unsigned int i;
-
-    for (i = 0; i < submit_count; i++)
-        copy_VkSubmitInfo2(ctx, &in[i], &out[i]);
-    return out;
-}
-
-struct queue_submit_unit
-{
-    uint32_t submit_count;
-    VkSubmitInfo *submits;
-    VkSubmitInfo2 *submits2;
-    VkFence fence;
-    bool khr;
-
-    struct pending_wait **waits;
-
-    struct list entry;
-    struct conversion_context ctx;
-};
-
-/* Abstracts away the differences between VkSubmitInfo and VkSubmitInfo2. */
-static bool for_each_d3d12_semaphore(struct queue_submit_unit *unit, bool signal,
-                                     struct wine_semaphore **semaphore_out, uint64_t **value_out, uint32_t counter)
-{
-    VkTimelineSemaphoreSubmitInfo *timeline_values;
-    struct wine_semaphore *semaphore;
-    unsigned int i, j, k;
-    uint32_t sem_count;
-
-    for (i = 0, k = 0; i < unit->submit_count; i++)
-    {
-        if (unit->submits)
-        {
-            timeline_values = wine_vk_find_struct(&unit->submits[i], TIMELINE_SEMAPHORE_SUBMIT_INFO);
-
-            if (signal)
-                sem_count = unit->submits[i].signalSemaphoreCount;
-            else
-                sem_count = unit->submits[i].waitSemaphoreCount;
-
-            for (j = 0; j < sem_count; j++)
-            {
-                if (signal)
-                    semaphore = wine_semaphore_from_handle(unit->submits[i].pSignalSemaphores[j]);
-                else
-                    semaphore = wine_semaphore_from_handle(unit->submits[i].pWaitSemaphores[j]);
-
-                if (semaphore->handle_type != VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                    continue;
-
-                if (k++ == counter)
-                {
-                    *semaphore_out = semaphore;
-                    if (signal)
-                        *value_out = (uint64_t *) &timeline_values->pSignalSemaphoreValues[j];
-                    else
-                        *value_out = (uint64_t *) &timeline_values->pWaitSemaphoreValues[j];
-                    return true;
-                }
-            }
-        }
-        else
-        {
-            if (signal)
-                sem_count = unit->submits2[i].signalSemaphoreInfoCount;
-            else
-                sem_count = unit->submits2[i].waitSemaphoreInfoCount;
-
-            for (j = 0; j < sem_count; j++)
-            {
-                if (signal)
-                    semaphore = wine_semaphore_from_handle(unit->submits2[i].pSignalSemaphoreInfos[j].semaphore);
-                else
-                    semaphore = wine_semaphore_from_handle(unit->submits2[i].pWaitSemaphoreInfos[j].semaphore);
-
-                if (semaphore->handle_type != VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                    continue;
-
-                if (k++ == counter)
-                {
-                    *semaphore_out = semaphore;
-                    if (signal)
-                        *value_out = (uint64_t *) &unit->submits2[i].pSignalSemaphoreInfos[j].value;
-                    else
-                        *value_out = (uint64_t *) &unit->submits2[i].pWaitSemaphoreInfos[j].value;
-                    return true;
-                }
-            }
-        }
-    }
-
-    return false;
-}
-
-VkResult vk_queue_submit_2_unwrap(struct wine_queue *queue, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence, bool khr);
-
-static void *virtual_queue_worker(void *arg)
-{
-    struct wine_queue *queue = (struct wine_queue *)arg;
-    struct queue_submit_unit *submit_unit;
-    struct signal_op *signal_op;
-    struct wine_semaphore *sem;
-    struct pending_wait *wait;
-    bool device_lost = false;
-    uint64_t *timeline_value;
-    unsigned int i;
-    VkResult vr;
-
-    for (;;)
-    {
-        pthread_mutex_lock(&queue->submissions_mutex);
-
-        while (!queue->stop && list_empty(&queue->submissions))
-            pthread_cond_wait(&queue->submissions_cond, &queue->submissions_mutex);
-
-        if (queue->stop)
-        {
-            assert( list_empty(&queue->submissions) );
-            pthread_mutex_unlock(&queue->submissions_mutex);
-            return NULL;
-        }
-
-        submit_unit = LIST_ENTRY(list_head(&queue->submissions), struct queue_submit_unit, entry);
-        list_remove(&submit_unit->entry);
-
-        pthread_mutex_unlock(&queue->submissions_mutex);
-
-        if (device_lost)
-            goto free_submit_unit;
-
-        /* Wait for all fences to have a pending signal */
-        for (i = 0; for_each_d3d12_semaphore(submit_unit, false, &sem, &timeline_value, i); i++)
-        {
-            if ((wait = submit_unit->waits[i++]))
-            {
-                assert(wait);
-                d3d12_semaphore_lock(sem);
-
-                while (!wait->satisfied)
-                    pthread_cond_wait(&wait->cond, &sem->d3d12_fence_shm->mutex);
-
-                *timeline_value = d3d12_semaphore_pop_wait_locked(sem, wait);
-
-                d3d12_semaphore_unlock(sem);
-            }
-        }
-
-        for (i = 0; for_each_d3d12_semaphore(submit_unit, true, &sem, &timeline_value, i); i++)
-        {
-            d3d12_semaphore_lock(sem);
-
-            *timeline_value = d3d12_semaphore_add_pending_signal_locked(sem, *timeline_value, queue);
-        }
-
-        if (submit_unit->submits)
-            vr = vk_queue_submit_unwrap(queue, submit_unit->submit_count, submit_unit->submits, VK_NULL_HANDLE);
-        else
-            vr = vk_queue_submit_2_unwrap(queue, submit_unit->submit_count, submit_unit->submits2,
-                    VK_NULL_HANDLE, submit_unit->khr);
-
-        pthread_mutex_lock(&queue->signaller_mutex);
-
-        for (i = 0; for_each_d3d12_semaphore(submit_unit, true, &sem, &timeline_value, i); i++)
-        {
-            if (vr == VK_SUCCESS)
-            {
-                struct pending_update added_signal = d3d12_semaphore_peek_added_signal_locked(sem);
-                d3d12_semaphore_satisfy_waits_locked(sem, added_signal.virtual_value, added_signal.physical_value);
-
-                signal_op = malloc(sizeof(*signal_op));
-                signal_op->signal_type = SIGNAL_TYPE_SEMAPHORE;
-                signal_op->semaphore.obj = sem;
-                signal_op->semaphore.phys_val = added_signal.physical_value;
-                signal_op->semaphore.khr = submit_unit->khr;
-
-                list_add_tail(&queue->signal_ops, &signal_op->entry);
-            }
-            else
-            {
-                d3d12_semaphore_pop_pending_signal_locked(sem, *timeline_value, NULL);
-            }
-
-            d3d12_semaphore_unlock(sem);
-        }
-
-        pthread_cond_signal(&queue->signaller_cond);
-        pthread_mutex_unlock(&queue->signaller_mutex);
-
-        if (vr != VK_SUCCESS)
-        {
-            fprintf(stderr, "winevulkan/virtual_queue_worker: queue submission failed with %d, treating as DEVICE_LOST.\n", vr);
-            pthread_mutex_lock(&queue->submissions_mutex);
-            queue->device_lost = device_lost = true;
-            pthread_mutex_unlock(&queue->submissions_mutex);
-        }
-
-free_submit_unit:
-        free_conversion_context(&submit_unit->ctx);
-        free(submit_unit->waits);
-        free(submit_unit);
-
-        pthread_mutex_lock(&queue->submissions_mutex);
-        if (list_empty(&queue->submissions))
-        {
-            queue->processing = false;
-        }
-        pthread_cond_signal(&queue->submissions_cond);
-        pthread_mutex_unlock(&queue->submissions_mutex);
-    }
-
-    return NULL;
-}
-
-static void init_virtual_queue(struct wine_queue *queue)
-{
-    if (is_virtual_queue(queue))
-        return;
-
-    pthread_mutex_lock(&queue->submissions_mutex);
-
-    if (queue->virtual_queue)
-    {
-        pthread_mutex_unlock(&queue->submissions_mutex);
-        return;
-    }
-
-    __atomic_store_n(&queue->virtual_queue, 1, __ATOMIC_RELEASE);
-
-    pthread_create(&queue->virtual_queue_thread, NULL, virtual_queue_worker, queue);
-    pthread_create(&queue->signal_thread, NULL, queue_signaller_worker, queue);
-
-    queue->virtual_queue = true;
-
-    pthread_mutex_unlock(&queue->submissions_mutex);
-}
-
-static NTSTATUS virtual_queue_submit(struct wine_queue *queue, uint32_t submit_count, const VkSubmitInfo *submits,
-        VkFence fence, void *submits_win_ptr)
-{
-    VkTimelineSemaphoreSubmitInfo *timeline_submit_info, *host_timeline_values;
-    const VkSubmitInfo *submits_win = submits_win_ptr;
-    VkD3D12FenceSubmitInfoKHR *d3d12_submit_info;
-    struct queue_submit_unit *submit_unit;
-    struct wine_semaphore *sem;
-    unsigned int i, j, k;
-    uint64_t wait_value;
-    bool device_lost;
-
-    if (fence != VK_NULL_HANDLE)
-    {
-        FIXME("Signalling fences in queue submissions involving D3D12-Fence compatible timeline semaphores not supported.\n");
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
-    }
-
-    init_virtual_queue(queue);
-
-    pthread_mutex_lock(&queue->submissions_mutex);
-    device_lost = queue->device_lost;
-    pthread_mutex_unlock(&queue->submissions_mutex);
-    if (device_lost)
-        return VK_ERROR_DEVICE_LOST;
-
-    submit_unit = malloc(sizeof(*submit_unit));
-    init_conversion_context(&submit_unit->ctx);
-    submit_unit->submit_count = submit_count;
-    submit_unit->submits = copy_VkSubmitInfo_array(&submit_unit->ctx, submits, submit_count);
-    submit_unit->submits2 = NULL;
-    submit_unit->waits = NULL;
-    submit_unit->khr = queue->device->phys_dev->api_version < VK_API_VERSION_1_2 ||
-                       queue->device->phys_dev->instance->api_version < VK_API_VERSION_1_2;
-
-    /* As D3D12 fences are rewindable, we add the wait synchronously as not to miss a temporarily signalled value
-     between vkQueueSubmit and processing the submit unit*/
-    for (i = 0, k = 0; i < submit_count; i++)
-    {
-        timeline_submit_info = wine_vk_find_struct(&submits[i], TIMELINE_SEMAPHORE_SUBMIT_INFO);
-        d3d12_submit_info = wine_vk_find_struct(&submits_win[i], D3D12_FENCE_SUBMIT_INFO_KHR);
-
-        host_timeline_values = wine_vk_find_struct(&submit_unit->submits[i], TIMELINE_SEMAPHORE_SUBMIT_INFO);
-
-        if (d3d12_submit_info && !host_timeline_values)
-        {
-            host_timeline_values = conversion_context_alloc(&submit_unit->ctx, sizeof(*host_timeline_values));
-            host_timeline_values->sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
-            host_timeline_values->pNext = submit_unit->submits[i].pNext;
-            host_timeline_values->waitSemaphoreValueCount = d3d12_submit_info->waitSemaphoreValuesCount;
-            MEMDUP(&submit_unit->ctx, host_timeline_values->pWaitSemaphoreValues, d3d12_submit_info->pWaitSemaphoreValues,
-                    d3d12_submit_info->waitSemaphoreValuesCount);
-            host_timeline_values->signalSemaphoreValueCount = d3d12_submit_info->signalSemaphoreValuesCount;
-            MEMDUP(&submit_unit->ctx, host_timeline_values->pSignalSemaphoreValues, d3d12_submit_info->pSignalSemaphoreValues,
-                    d3d12_submit_info->signalSemaphoreValuesCount);
-            submit_unit->submits[i].pNext = host_timeline_values;
-        }
-
-        for (j = 0; j < submits[i].waitSemaphoreCount; j++)
-        {
-            sem = wine_semaphore_from_handle(submits[i].pWaitSemaphores[j]);
-
-            if (sem->handle_type != VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                continue;
-
-            if (timeline_submit_info)
-                wait_value = timeline_submit_info->pWaitSemaphoreValues[j];
-            else
-                wait_value = d3d12_submit_info->pWaitSemaphoreValues[j];
-
-            submit_unit->waits = realloc(submit_unit->waits, (k + 1) * sizeof(*submit_unit->waits));
-            submit_unit->waits[k] = NULL;
-
-            d3d12_semaphore_lock(sem);
-
-            if ((((uint64_t*)host_timeline_values->pWaitSemaphoreValues)[j] =
-                                d3d12_semaphore_try_get_wait_value_locked(sem, wait_value, queue)) == -1)
-                submit_unit->waits[k] = d3d12_semaphore_push_wait_locked(sem, wait_value);
-
-            d3d12_semaphore_unlock(sem);
-            k++;
-        }
-    }
-
-    pthread_mutex_lock(&queue->submissions_mutex);
-    queue->processing = true;
-    list_add_tail(&queue->submissions, &submit_unit->entry);
-    pthread_cond_signal(&queue->submissions_cond);
-    pthread_mutex_unlock(&queue->submissions_mutex);
-
-    return VK_SUCCESS;
-}
-
-VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo *submits, VkFence fence,
-        void *submits_win)
+VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo *submits, VkFence fence)
 {
     struct wine_queue *queue = wine_queue_from_handle(queue_handle);
     unsigned int i, k;
 
     TRACE("(%p %u %p 0x%s)\n", queue_handle, submit_count, submits, wine_dbgstr_longlong(fence));
-
-    if (is_virtual_queue(queue))
-        return virtual_queue_submit(queue, submit_count, submits, fence, submits_win);
 
     for (i = 0; i < submit_count; i++)
     {
@@ -4998,14 +4468,20 @@ VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const V
         {
             if (wine_semaphore_from_handle(submits[i].pWaitSemaphores[k])->handle_type ==
                     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                return virtual_queue_submit(queue, submit_count, submits, fence, submits_win);
+            {
+                FIXME("Queue submissions with waits on D3D12-Fence compatible timeline semaphores not supported.\n");
+                return VK_ERROR_OUT_OF_HOST_MEMORY;
+            }
         }
 
         for (k = 0; k < submits[i].signalSemaphoreCount; k++)
         {
             if (wine_semaphore_from_handle(submits[i].pSignalSemaphores[k])->handle_type ==
                     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                return virtual_queue_submit(queue, submit_count, submits, fence, submits_win);
+            {
+                FIXME("Queue submissions with signalling D3D12-Fence compatible timeline semaphores not supported.\n");
+                return VK_ERROR_OUT_OF_HOST_MEMORY;
+            }
         }
     }
     return vk_queue_submit_unwrap(queue, submit_count, submits, fence);
@@ -5021,77 +4497,6 @@ static void duplicate_array_for_unwrapping(struct conversion_context *ctx, void 
     out = conversion_context_alloc(ctx, size);
     memcpy(out, *ptr, size);
     *ptr = out;
-}
-
-static NTSTATUS virtual_queue_submit2(struct wine_queue *queue, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence, bool khr)
-{
-    VkSemaphoreSubmitInfo *sem_submit_info;
-    struct queue_submit_unit *submit_unit;
-    VkSubmitInfo2 *queue_submit;
-    struct wine_semaphore *sem;
-    unsigned int i, j, k;
-    uint64_t wait_value;
-    bool device_lost;
-
-    init_virtual_queue(queue);
-
-    pthread_mutex_lock(&queue->submissions_mutex);
-    device_lost = queue->device_lost;
-    pthread_mutex_unlock(&queue->submissions_mutex);
-    if (device_lost)
-        return VK_ERROR_DEVICE_LOST;
-
-    submit_unit = malloc(sizeof(*submit_unit));
-    init_conversion_context(&submit_unit->ctx);
-    submit_unit->submit_count = submit_count;
-    submit_unit->submits = NULL;
-    submit_unit->submits2 = copy_VkSubmitInfo2_array(&submit_unit->ctx, submits, submit_count);
-    submit_unit->fence = fence;
-    submit_unit->waits = NULL;
-    submit_unit->khr = khr;
-
-    /* As D3D12 fences are rewindable, we add the wait synchronously as not to miss a temporarily signalled value
-     between vkQueueSubmit and processing the submit unit */
-    for (i = 0, k = 0; i < submit_count; i++)
-    {
-        queue_submit = &submit_unit->submits2[i];
-
-        for (j = 0; j < queue_submit->waitSemaphoreInfoCount; j++)
-        {
-            sem_submit_info = (VkSemaphoreSubmitInfo *) &queue_submit->pWaitSemaphoreInfos[j];
-            sem = wine_semaphore_from_handle(sem_submit_info->semaphore);
-
-            if (sem->handle_type != VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                continue;
-
-            wait_value = sem_submit_info->value;
-
-            submit_unit->waits = realloc(submit_unit->waits, (k + 1) * sizeof(*submit_unit->waits));
-            submit_unit->waits[k] = NULL;
-
-            d3d12_semaphore_lock(sem);
-
-            if ((sem_submit_info->value =
-                                d3d12_semaphore_try_get_wait_value_locked(sem, wait_value, queue)) == -1)
-                submit_unit->waits[k] = d3d12_semaphore_push_wait_locked(sem, wait_value);
-
-            d3d12_semaphore_unlock(sem);
-            k++;
-        }
-    }
-
-    pthread_mutex_lock(&queue->submissions_mutex);
-    queue->processing = true;
-    if (fence)
-    {
-        wine_fence_from_handle(fence)->queue = queue;
-        wine_fence_from_handle(fence)->wait_assist = true;
-    }
-    list_add_tail(&queue->submissions, &submit_unit->entry);
-    pthread_cond_signal(&queue->submissions_cond);
-    pthread_mutex_unlock(&queue->submissions_mutex);
-
-    return VK_SUCCESS;
 }
 
 VkResult vk_queue_submit_2_unwrap(struct wine_queue *queue, uint32_t submit_count, const VkSubmitInfo2 *submits_orig,
@@ -5144,23 +4549,26 @@ static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, c
 
     TRACE("(%p, %u, %p, %s)\n", queue_handle, submit_count, submits, wine_dbgstr_longlong(fence));
 
-    if (is_virtual_queue(queue))
-        return virtual_queue_submit2(queue, submit_count, submits, fence, khr);
-
     for (i = 0; i < submit_count; i++)
     {
         for (k = 0; k < submits[i].waitSemaphoreInfoCount; k++)
         {
             if (wine_semaphore_from_handle(submits[i].pWaitSemaphoreInfos[k].semaphore)->handle_type ==
                     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                return virtual_queue_submit2(queue, submit_count, submits, fence, khr);
+            {
+                FIXME("Queue submissions with waits on D3D12-Fence compatible timeline semaphores not supported.\n");
+                return VK_ERROR_OUT_OF_HOST_MEMORY;
+            }
         }
 
         for (k = 0; k < submits[i].signalSemaphoreInfoCount; k++)
         {
             if (wine_semaphore_from_handle(submits[i].pSignalSemaphoreInfos[k].semaphore)->handle_type ==
                     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                return virtual_queue_submit2(queue, submit_count, submits, fence, khr);
+            {
+                FIXME("Queue submissions signalling D3D12-Fence compatible timeline semaphores not supported.\n");
+                return VK_ERROR_OUT_OF_HOST_MEMORY;
+            }
         }
     }
 
@@ -5179,7 +4587,6 @@ VkResult wine_vkQueueSubmit2KHR(VkQueue queue, uint32_t submit_count, const VkSu
 
 VkResult wine_vkQueuePresentKHR(VkQueue queue_handle, const VkPresentInfoKHR *present_info)
 {
-    struct wine_queue *queue = wine_queue_from_handle(queue_handle);
     VkPresentInfoKHR host_present_info = *present_info;
     struct wine_semaphore *semaphore;
     struct conversion_context ctx;
@@ -5199,14 +4606,6 @@ VkResult wine_vkQueuePresentKHR(VkQueue queue_handle, const VkPresentInfoKHR *pr
         }
     }
 
-    if (is_virtual_queue(queue))
-    {
-        pthread_mutex_lock(&queue->submissions_mutex);
-        while (queue->processing)
-            pthread_cond_wait(&queue->submissions_cond, &queue->submissions_mutex);
-        pthread_mutex_unlock(&queue->submissions_mutex);
-    }
-
     init_conversion_context(&ctx);
     host_present_info.pWaitSemaphores = unwrap_semaphore_array(present_info->pWaitSemaphores, present_info->waitSemaphoreCount, &ctx);
     ret = fshack_vk_queue_present(queue_handle, &host_present_info);
@@ -5224,15 +4623,6 @@ VkResult wine_vkQueueBindSparse(VkQueue queue_handle, uint32_t bind_info_count, 
     VkResult ret;
 
     TRACE("(%p, %u, %p, 0x%s)\n", queue, bind_info_count, bind_info, wine_dbgstr_longlong(fence));
-
-    if (is_virtual_queue(queue))
-    {
-        FIXME("Can't process sparse bind calls on virtual queue, flushing.\n");
-        pthread_mutex_lock(&queue->submissions_mutex);
-        while (queue->processing)
-            pthread_cond_wait(&queue->submissions_cond, &queue->submissions_mutex);
-        pthread_mutex_unlock(&queue->submissions_mutex);
-    }
 
     for (i = 0; i < bind_info_count; i++)
     {
@@ -5301,21 +4691,4 @@ VkResult wine_vkQueueBindSparse(VkQueue queue_handle, uint32_t bind_info_count, 
     ret = queue->device->funcs.p_vkQueueBindSparse(queue->queue, bind_info_count, bind_info, fence);
     free_conversion_context(&ctx);
     return ret;
-}
-
-VkResult wine_vkQueueWaitIdle(VkQueue queue_handle)
-{
-    struct wine_queue *queue = wine_queue_from_handle(queue_handle);
-
-    TRACE("(%p)\n", queue);
-
-    if (is_virtual_queue(queue))
-    {
-        pthread_mutex_lock(&queue->submissions_mutex);
-        while (queue->processing)
-            pthread_cond_wait(&queue->submissions_cond, &queue->submissions_mutex);
-        pthread_mutex_unlock(&queue->submissions_mutex);
-    }
-
-    return queue->device->funcs.p_vkQueueWaitIdle(queue->queue);
 }
