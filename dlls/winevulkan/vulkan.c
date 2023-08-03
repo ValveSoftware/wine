@@ -4827,8 +4827,9 @@ static void *virtual_queue_worker(void *arg)
         /* Wait for all fences to have a pending signal */
         for (i = 0; for_each_d3d12_semaphore(submit_unit, false, &sem, &timeline_value, i); i++)
         {
-            if ((wait = submit_unit->waits[i]))
+            if ((wait = submit_unit->waits[i++]))
             {
+                assert(wait);
                 d3d12_semaphore_lock(sem);
 
                 while (!wait->satisfied)
