@@ -523,8 +523,6 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
             append_timeline = 0;
     }
     if (append_timeline)
-         append_timeline = phys_dev->api_version < VK_API_VERSION_1_2 || phys_dev->instance->api_version < VK_API_VERSION_1_2;
-    if (append_timeline)
     {
         append_timeline = 0;
         for (i = 0; i < phys_dev->extension_count; ++i)
@@ -1750,25 +1748,6 @@ static void wine_vk_get_physical_device_external_semaphore_properties(struct win
             break;
         case VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT:
         {
-            unsigned int i;
-
-            if (phys_dev->api_version < VK_API_VERSION_1_2 ||
-                phys_dev->instance->api_version < VK_API_VERSION_1_2)
-            {
-                for (i = 0; i < phys_dev->extension_count; i++)
-                {
-                    if (!strcmp(phys_dev->extensions[i].extensionName, "VK_KHR_timeline_semaphore"))
-                        break;
-                }
-                if (i == phys_dev->extension_count)
-                {
-                    properties->exportFromImportedHandleTypes = 0;
-                    properties->compatibleHandleTypes = 0;
-                    properties->externalSemaphoreFeatures = 0;
-                    return;
-                }
-            }
-
             if ((p_semaphore_type_info = wine_vk_find_struct(&semaphore_info_dup, SEMAPHORE_TYPE_CREATE_INFO)))
             {
                 p_semaphore_type_info->semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
