@@ -30,6 +30,9 @@
 
 #include <pthread.h>
 
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
 #include "windef.h"
@@ -894,6 +897,55 @@ static BOOL get_integer( TEB *teb, GLenum pname, GLint *data )
     return get_default_fbo_integer( ctx, draw, read, pname, data );
 }
 
+static const GLubyte *override_vendor( GLenum name, const GLubyte *orig )
+{
+    static int override_vendor = -1;
+
+    if (override_vendor == -1)
+    {
+        int fd;
+        char buffer[4096], *env;
+        int sz;
+
+        override_vendor = 0;
+        if ((env = getenv("WINE_GL_HIDE_NVIDIA")))
+        {
+            override_vendor = env[0] != '0';
+        }
+        else
+        {
+            fd = open("/proc/self/cmdline", O_RDONLY);
+            if (fd != -1)
+            {
+                if ((sz = read(fd, buffer, sizeof(buffer) - 1)) > 0)
+                {
+                    buffer[sz] = 0;
+                    if (strstr(buffer, "\\Paradox Launcher.exe"))
+                    {
+                        FIXME("HACK: overriding GL vendor and renderer.\n");
+                        override_vendor = 1;
+                    }
+                }
+                close(fd);
+            }
+        }
+    }
+
+    if (!override_vendor) return orig;
+
+    if (name == GL_RENDERER)
+    {
+        if (orig && strstr((const char *)orig, "NVIDIA")) return (const GLubyte *)"AMD Radeon Graphics";
+        return orig;
+    }
+    if (name == GL_VENDOR)
+    {
+        if (orig && strstr((const char *)orig, "NVIDIA")) return (const GLubyte *)"AMD";
+        return orig;
+    }
+    return orig;
+}
+
 const GLubyte *wrap_glGetString( TEB *teb, GLenum name )
 {
     const struct opengl_funcs *funcs = teb->glTable;
@@ -904,13 +956,15 @@ const GLubyte *wrap_glGetString( TEB *teb, GLenum name )
         if (name == GL_VENDOR && funcs->p_wglQueryCurrentRendererStringWINE)
         {
             const char *vendor = funcs->p_wglQueryCurrentRendererStringWINE( WGL_RENDERER_VENDOR_ID_WINE );
-            return vendor ? (const GLubyte *)vendor : ret;
+            return override_vendor( name, vendor ? (const GLubyte *)vendor : ret );
         }
+        if (name == GL_VENDOR) return override_vendor( name, ret );
         if (name == GL_RENDERER && funcs->p_wglQueryCurrentRendererStringWINE)
         {
             const char *renderer = funcs->p_wglQueryCurrentRendererStringWINE( WGL_RENDERER_DEVICE_ID_WINE );
-            return renderer ? (const GLubyte *)renderer : ret;
+            return override_vendor( name, renderer ? (const GLubyte *)renderer : ret );
         }
+        if (name == GL_RENDERER) return override_vendor( name, ret );
         if (name == GL_EXTENSIONS)
         {
             struct context *ctx = get_current_context( teb, NULL, NULL );
