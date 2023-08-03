@@ -100,8 +100,6 @@ struct thread_input
 {
     struct object          obj;           /* object header */
     struct desktop        *desktop;       /* desktop that this thread input belongs to */
-    user_handle_t          caret;         /* caret window */
-    rectangle_t            caret_rect;    /* caret rectangle */
     int                    caret_hide;    /* caret hide count */
     int                    caret_state;   /* caret on/off state */
     user_handle_t          cursor;        /* current cursor */
@@ -254,17 +252,17 @@ static unsigned int cursor_history_latest;
 static void queue_hardware_message( struct desktop *desktop, struct message *msg, int always_queue );
 static void free_message( struct message *msg );
 
-/* set the caret window in a given thread input */
-static void set_caret_window( struct thread_input *input, user_handle_t win )
+/* set the caret window in a given thread input, requires write lock on the thread input shared member */
+static void set_caret_window( struct thread_input *input, input_shm_t *shared, user_handle_t win )
 {
-    if (!win || win != input->caret)
+    if (!win || win != shared->caret)
     {
-        input->caret_rect.left   = 0;
-        input->caret_rect.top    = 0;
-        input->caret_rect.right  = 0;
-        input->caret_rect.bottom = 0;
+        shared->caret_rect.left   = 0;
+        shared->caret_rect.top    = 0;
+        shared->caret_rect.right  = 0;
+        shared->caret_rect.bottom = 0;
     }
-    input->caret             = win;
+    shared->caret     = win;
     input->caret_hide        = 1;
     input->caret_state       = 0;
 }
@@ -281,7 +279,6 @@ static struct thread_input *create_thread_input( struct thread *thread )
         input->cursor       = 0;
         input->cursor_count = 0;
         list_init( &input->msg_list );
-        set_caret_window( input, 0 );
         memset( input->keystate, 0, sizeof(input->keystate) );
         input->keystate_lock = 0;
 
@@ -301,6 +298,7 @@ static struct thread_input *create_thread_input( struct thread *thread )
             shared->created = TRUE;
             shared->menu_owner = 0;
             shared->move_size = 0;
+            set_caret_window( input, shared, 0 );
         }
         SHARED_WRITE_END
     }
@@ -1355,10 +1353,10 @@ static inline void thread_input_cleanup_window( struct msg_queue *queue, user_ha
         if (window == shared->active) shared->active = 0;
         if (window == shared->menu_owner) shared->menu_owner = 0;
         if (window == shared->move_size) shared->move_size = 0;
+        if (window == shared->caret) set_caret_window( input, shared, 0 );
     }
     SHARED_WRITE_END
 
-    if (window == input->caret) set_caret_window( input, 0 );
 }
 
 /* check if the specified window can be set in the input data of a given queue */
@@ -3478,10 +3476,10 @@ DECL_HANDLER(get_thread_input)
         reply->active     = input->shared->active;
         reply->menu_owner = input->shared->menu_owner;
         reply->move_size  = input->shared->move_size;
-        reply->caret      = input->caret;
+        reply->caret      = input->shared->caret;
         reply->cursor     = input->cursor;
         reply->show_count = input->cursor_count;
-        reply->rect       = input->caret_rect;
+        reply->rect       = input->shared->caret_rect;
     }
 
     /* foreground window is active window of foreground thread */
@@ -3669,15 +3667,20 @@ DECL_HANDLER(set_caret_window)
     if (queue && check_queue_input_window( queue, req->handle ))
     {
         struct thread_input *input = queue->input;
+        user_handle_t caret = get_user_full_handle(req->handle);
 
-        reply->previous  = input->caret;
-        reply->old_rect  = input->caret_rect;
+        reply->previous  = input->shared->caret;
+        reply->old_rect  = input->shared->caret_rect;
         reply->old_hide  = input->caret_hide;
         reply->old_state = input->caret_state;
 
-        set_caret_window( input, get_user_full_handle(req->handle) );
-        input->caret_rect.right  = input->caret_rect.left + req->width;
-        input->caret_rect.bottom = input->caret_rect.top + req->height;
+        SHARED_WRITE_BEGIN( input, input_shm_t )
+        {
+            set_caret_window( input, shared, caret );
+            shared->caret_rect.right  = shared->caret_rect.left + req->width;
+            shared->caret_rect.bottom = shared->caret_rect.top + req->height;
+        }
+        SHARED_WRITE_END
     }
 }
 
@@ -3690,22 +3693,26 @@ DECL_HANDLER(set_caret_info)
 
     if (!queue) return;
     input = queue->input;
-    reply->full_handle = input->caret;
-    reply->old_rect    = input->caret_rect;
+    reply->full_handle = input->shared->caret;
+    reply->old_rect    = input->shared->caret_rect;
     reply->old_hide    = input->caret_hide;
     reply->old_state   = input->caret_state;
 
-    if (req->handle && get_user_full_handle(req->handle) != input->caret)
+    if (req->handle && get_user_full_handle(req->handle) != input->shared->caret)
     {
         set_error( STATUS_ACCESS_DENIED );
         return;
     }
     if (req->flags & SET_CARET_POS)
     {
-        input->caret_rect.right  += req->x - input->caret_rect.left;
-        input->caret_rect.bottom += req->y - input->caret_rect.top;
-        input->caret_rect.left = req->x;
-        input->caret_rect.top  = req->y;
+        SHARED_WRITE_BEGIN( input, input_shm_t )
+        {
+            shared->caret_rect.right  += req->x - shared->caret_rect.left;
+            shared->caret_rect.bottom += req->y - shared->caret_rect.top;
+            shared->caret_rect.left = req->x;
+            shared->caret_rect.top  = req->y;
+        }
+        SHARED_WRITE_END
     }
     if (req->flags & SET_CARET_HIDE)
     {
