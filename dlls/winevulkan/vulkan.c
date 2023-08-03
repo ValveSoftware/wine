@@ -5426,7 +5426,7 @@ void wine_vkDestroyFence(VkDevice device_handle, VkFence fence_handle, const VkA
     if (fence->eventfd != -1)
         close(fence->eventfd);
 
-    device->funcs.p_vkDestroyFence(device->device, fence->fence, NULL);
+    device->funcs.p_vkDestroyFence(device->device, fence->fence, allocator);
     free(fence);
 }
 
