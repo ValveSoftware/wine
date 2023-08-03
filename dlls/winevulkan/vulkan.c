@@ -3639,15 +3639,6 @@ VkQueue WINAPI __wine_get_native_VkQueue(VkQueue handle)
 {
     struct wine_queue *queue = wine_queue_from_handle(handle);
 
-    if (is_virtual_queue(queue))
-    {
-        FIXME("VR is using native handle of virtualized queue, this is untested.\n");
-        pthread_mutex_lock(&queue->submissions_mutex);
-        while (queue->processing)
-            pthread_cond_wait(&queue->submissions_cond, &queue->submissions_mutex);
-        pthread_mutex_unlock(&queue->submissions_mutex);
-    }
-
     return queue->queue;
 }
 
