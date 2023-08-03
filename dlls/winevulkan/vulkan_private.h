@@ -142,7 +142,6 @@ struct wine_instance
      */
     struct wine_phys_dev **phys_devs;
     uint32_t phys_dev_count;
-    uint32_t api_version;
 
     VkBool32 enable_wrapper_list;
     struct list wrappers;
@@ -173,7 +172,6 @@ struct wine_phys_dev
     VkPhysicalDeviceMemoryProperties memory_properties;
     VkExtensionProperties *extensions;
     uint32_t extension_count;
-    uint32_t api_version;
 
     uint32_t external_memory_align;
 
@@ -195,22 +193,6 @@ struct wine_queue
     uint32_t family_index;
     uint32_t queue_index;
     VkDeviceQueueCreateFlags flags;
-
-    bool virtual_queue;
-    bool processing;
-    bool device_lost;
-
-    pthread_t virtual_queue_thread;
-    pthread_mutex_t submissions_mutex;
-    pthread_cond_t submissions_cond;
-    struct list submissions;
-
-    pthread_t signal_thread;
-    pthread_mutex_t signaller_mutex;
-    pthread_cond_t signaller_cond;
-    struct list signal_ops;
-
-    bool stop;
 
     struct wine_vk_mapping mapping;
 };
