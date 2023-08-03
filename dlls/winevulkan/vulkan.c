@@ -29,7 +29,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <assert.h>
-#include <limits.h>
 #include <poll.h>
 #include <sys/eventfd.h>
 
@@ -4394,7 +4393,6 @@ static VkResult wine_vk_wait_semaphores(VkDevice device_handle, const VkSemaphor
     unsigned int i, remaining_waits;
     VkSemaphore* semaphores_dup;
     uint64_t *values_dup;
-    int64_t tv_sec_wide;
     uint64_t phys_val;
     int wait_stat;
     VkResult res;
@@ -4405,18 +4403,13 @@ static VkResult wine_vk_wait_semaphores(VkDevice device_handle, const VkSemaphor
     {
         clock_gettime(CLOCK_REALTIME, &start_time);
 
-        abs_timeout.tv_sec = tv_sec_wide = start_time.tv_sec + (timeout / NANOSECONDS_IN_A_SECOND);
+        abs_timeout.tv_sec = start_time.tv_sec + (timeout / NANOSECONDS_IN_A_SECOND);
         abs_timeout.tv_nsec = start_time.tv_nsec + (timeout % NANOSECONDS_IN_A_SECOND);
         if (abs_timeout.tv_nsec >= NANOSECONDS_IN_A_SECOND)
         {
             abs_timeout.tv_sec++;
-            tv_sec_wide++;
             abs_timeout.tv_nsec-=NANOSECONDS_IN_A_SECOND;
         }
-
-        /* tv_sec is still! 32-bit on x86 */
-        if (tv_sec_wide > abs_timeout.tv_sec)
-            abs_timeout.tv_sec = INT_MAX;
     }
 
     wait_info_dup.pSemaphores = semaphores_dup = calloc(wait_info->semaphoreCount, sizeof(VkSemaphore));
