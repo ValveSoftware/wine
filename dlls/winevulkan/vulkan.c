@@ -29,8 +29,6 @@
 #include <errno.h>
 #include <stdio.h>
 #include <assert.h>
-#include <poll.h>
-#include <sys/eventfd.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -4526,9 +4524,8 @@ VkResult wine_vkWaitSemaphoresKHR(VkDevice device, const VkSemaphoreWaitInfo *wa
     return wine_vk_wait_semaphores(device, wait_info, timeout, true);
 }
 
-VkResult vk_queue_submit_unwrap(struct wine_queue *queue, uint32_t submit_count, const VkSubmitInfo *submits_orig, VkFence fence_handle)
+VkResult vk_queue_submit_unwrap(struct wine_queue *queue, uint32_t submit_count, const VkSubmitInfo *submits_orig, VkFence fence)
 {
-    struct wine_fence *fence = fence_handle ? wine_fence_from_handle(fence_handle) : NULL;
     struct conversion_context ctx;
     VkSubmitInfo *submits;
     unsigned int i, j;
@@ -4550,12 +4547,7 @@ VkResult vk_queue_submit_unwrap(struct wine_queue *queue, uint32_t submit_count,
             submits[i].pCommandBuffers = out;
         }
     }
-
-
-    if (fence)
-        fence->queue = queue;
-
-    ret = queue->device->funcs.p_vkQueueSubmit(queue->queue, submit_count, submits, fence ? fence->fence : VK_NULL_HANDLE);
+    ret = queue->device->funcs.p_vkQueueSubmit(queue->queue, submit_count, submits, fence);
     free_conversion_context(&ctx);
     return ret;
 }
@@ -4565,7 +4557,6 @@ struct signal_op
     enum
     {
         SIGNAL_TYPE_SEMAPHORE,
-        SIGNAL_TYPE_FENCE,
     } signal_type;
 
     union
@@ -4577,8 +4568,6 @@ struct signal_op
 
             bool khr;
         } semaphore;
-
-        struct wine_fence *fence;
     };
 
     struct list entry;
@@ -4591,7 +4580,6 @@ static void *queue_signaller_worker(void *arg)
     struct signal_op *signal_op;
     VkSemaphore sem_handle;
     bool device_lost;
-    uint64_t buf;
     VkResult vr;
 
     for (;;)
@@ -4634,19 +4622,6 @@ static void *queue_signaller_worker(void *arg)
             d3d12_semaphore_lock(signal_op->semaphore.obj);
             d3d12_semaphore_update_phys_val_locked(signal_op->semaphore.obj, signal_op->semaphore.phys_val);
             d3d12_semaphore_unlock(signal_op->semaphore.obj);
-        }
-        else
-        {
-            if (!device_lost && (vr = queue->device->funcs.p_vkWaitForFences
-                    (queue->device->device, 1, &signal_op->fence->fence, VK_TRUE, -1)) < 0)
-            {
-                /* likely GPU hang */
-                fprintf(stderr, "winevulkan/queue_signaller_worker: Fence wait failed, vr %d.\n", vr);
-                continue;
-            }
-
-            buf = 1;
-            assert( write(signal_op->fence->eventfd, &buf, sizeof(buf)) != -1 );
         }
 
         free(signal_op);
@@ -4780,7 +4755,6 @@ static void *virtual_queue_worker(void *arg)
     struct signal_op *signal_op;
     struct wine_semaphore *sem;
     struct pending_wait *wait;
-    struct wine_fence *fence;
     bool device_lost = false;
     uint64_t *timeline_value;
     unsigned int i;
@@ -4833,10 +4807,10 @@ static void *virtual_queue_worker(void *arg)
         }
 
         if (submit_unit->submits)
-            vr = vk_queue_submit_unwrap(queue, submit_unit->submit_count, submit_unit->submits, submit_unit->fence);
+            vr = vk_queue_submit_unwrap(queue, submit_unit->submit_count, submit_unit->submits, VK_NULL_HANDLE);
         else
             vr = vk_queue_submit_2_unwrap(queue, submit_unit->submit_count, submit_unit->submits2,
-                    submit_unit->fence, submit_unit->khr);
+                    VK_NULL_HANDLE, submit_unit->khr);
 
         pthread_mutex_lock(&queue->signaller_mutex);
 
@@ -4863,15 +4837,6 @@ static void *virtual_queue_worker(void *arg)
             d3d12_semaphore_unlock(sem);
         }
 
-        if (vr == VK_SUCCESS && (fence = wine_fence_from_handle(submit_unit->fence)))
-        {
-            signal_op = malloc(sizeof(*signal_op));
-            signal_op->signal_type = SIGNAL_TYPE_FENCE;
-            signal_op->fence = fence;
-
-            list_add_tail(&queue->signal_ops, &signal_op->entry);
-        }
-
         pthread_cond_signal(&queue->signaller_cond);
         pthread_mutex_unlock(&queue->signaller_mutex);
 
@@ -4881,12 +4846,6 @@ static void *virtual_queue_worker(void *arg)
             pthread_mutex_lock(&queue->submissions_mutex);
             queue->device_lost = device_lost = true;
             pthread_mutex_unlock(&queue->submissions_mutex);
-
-            if ((fence = wine_fence_from_handle(submit_unit->fence)))
-            {
-                uint64_t buf = 1;
-                assert( write(fence->eventfd, &buf, sizeof(buf)) != -1 );
-            }
         }
 
 free_submit_unit:
@@ -4941,6 +4900,12 @@ static NTSTATUS virtual_queue_submit(struct wine_queue *queue, uint32_t submit_c
     uint64_t wait_value;
     bool device_lost;
 
+    if (fence != VK_NULL_HANDLE)
+    {
+        FIXME("Signalling fences in queue submissions involving D3D12-Fence compatible timeline semaphores not supported.\n");
+        return VK_ERROR_OUT_OF_HOST_MEMORY;
+    }
+
     init_virtual_queue(queue);
 
     pthread_mutex_lock(&queue->submissions_mutex);
@@ -4954,7 +4919,6 @@ static NTSTATUS virtual_queue_submit(struct wine_queue *queue, uint32_t submit_c
     submit_unit->submit_count = submit_count;
     submit_unit->submits = copy_VkSubmitInfo_array(&submit_unit->ctx, submits, submit_count);
     submit_unit->submits2 = NULL;
-    submit_unit->fence = fence;
     submit_unit->waits = NULL;
     submit_unit->khr = queue->device->phys_dev->api_version < VK_API_VERSION_1_2 ||
                        queue->device->phys_dev->instance->api_version < VK_API_VERSION_1_2;
@@ -5010,11 +4974,6 @@ static NTSTATUS virtual_queue_submit(struct wine_queue *queue, uint32_t submit_c
 
     pthread_mutex_lock(&queue->submissions_mutex);
     queue->processing = true;
-    if (fence)
-    {
-        wine_fence_from_handle(fence)->queue = queue;
-        wine_fence_from_handle(fence)->wait_assist = true;
-    }
     list_add_tail(&queue->submissions, &submit_unit->entry);
     pthread_cond_signal(&queue->submissions_cond);
     pthread_mutex_unlock(&queue->submissions_mutex);
@@ -5136,9 +5095,8 @@ static NTSTATUS virtual_queue_submit2(struct wine_queue *queue, uint32_t submit_
 }
 
 VkResult vk_queue_submit_2_unwrap(struct wine_queue *queue, uint32_t submit_count, const VkSubmitInfo2 *submits_orig,
-        VkFence fence_handle, bool khr)
+        VkFence fence, bool khr)
 {
-    struct wine_fence *fence = fence_handle ? wine_fence_from_handle(fence_handle) : NULL;
     struct conversion_context ctx;
     VkSubmitInfo2 *submits;
     unsigned int i, j;
@@ -5171,27 +5129,23 @@ VkResult vk_queue_submit_2_unwrap(struct wine_queue *queue, uint32_t submit_coun
                         = wine_cmd_buffer_from_handle(submits[i].pCommandBufferInfos[j].commandBuffer)->command_buffer;
         }
     }
-    if (fence)
-        fence->queue = queue;
-
     if (khr)
-        ret = queue->device->funcs.p_vkQueueSubmit2KHR(queue->queue, submit_count, submits, fence ? fence->fence : VK_NULL_HANDLE);
+        ret = queue->device->funcs.p_vkQueueSubmit2KHR(queue->queue, submit_count, submits, fence);
     else
-        ret = queue->device->funcs.p_vkQueueSubmit2(queue->queue, submit_count, submits, fence ? fence->fence : VK_NULL_HANDLE);
-
+        ret = queue->device->funcs.p_vkQueueSubmit2(queue->queue, submit_count, submits, fence);
     free_conversion_context(&ctx);
     return ret;
 }
 
-static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence_handle, bool khr)
+static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence, bool khr)
 {
     struct wine_queue *queue = wine_queue_from_handle(queue_handle);
     unsigned int i, k;
 
-    TRACE("(%p, %u, %p, %s)\n", queue_handle, submit_count, submits, wine_dbgstr_longlong(fence_handle));
+    TRACE("(%p, %u, %p, %s)\n", queue_handle, submit_count, submits, wine_dbgstr_longlong(fence));
 
     if (is_virtual_queue(queue))
-        return virtual_queue_submit2(queue, submit_count, submits, fence_handle, khr);
+        return virtual_queue_submit2(queue, submit_count, submits, fence, khr);
 
     for (i = 0; i < submit_count; i++)
     {
@@ -5199,18 +5153,18 @@ static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, c
         {
             if (wine_semaphore_from_handle(submits[i].pWaitSemaphoreInfos[k].semaphore)->handle_type ==
                     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                return virtual_queue_submit2(queue, submit_count, submits, fence_handle, khr);
+                return virtual_queue_submit2(queue, submit_count, submits, fence, khr);
         }
 
         for (k = 0; k < submits[i].signalSemaphoreInfoCount; k++)
         {
             if (wine_semaphore_from_handle(submits[i].pSignalSemaphoreInfos[k].semaphore)->handle_type ==
                     VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-                return virtual_queue_submit2(queue, submit_count, submits, fence_handle, khr);
+                return virtual_queue_submit2(queue, submit_count, submits, fence, khr);
         }
     }
 
-    return vk_queue_submit_2_unwrap(queue, submit_count, submits, fence_handle, khr);
+    return vk_queue_submit_2_unwrap(queue, submit_count, submits, fence, khr);
 }
 
 VkResult wine_vkQueueSubmit2(VkQueue queue, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence)
@@ -5347,207 +5301,6 @@ VkResult wine_vkQueueBindSparse(VkQueue queue_handle, uint32_t bind_info_count, 
     ret = queue->device->funcs.p_vkQueueBindSparse(queue->queue, bind_info_count, bind_info, fence);
     free_conversion_context(&ctx);
     return ret;
-}
-
-VkResult wine_vkCreateFence(VkDevice device_handle, const VkFenceCreateInfo *create_info, const VkAllocationCallbacks *allocator, VkFence *fence)
-{
-    struct wine_device *device = wine_device_from_handle(device_handle);
-    struct wine_fence *object;
-    VkResult vr;
-
-    TRACE("(%p, %p, %p, %p)\n", device, create_info, allocator, fence);
-
-    if (allocator)
-        FIXME("Support for allocation callbacks not implemented yet\n");
-
-    if (!(object = calloc(1, sizeof(*object))))
-        return VK_ERROR_OUT_OF_HOST_MEMORY;
-
-    if ((object->eventfd = eventfd(0, EFD_CLOEXEC)) == -1)
-        ERR("Failed to create eventfd for fence.\n");
-
-    if ((vr = device->funcs.p_vkCreateFence(device->device, create_info, NULL, &object->fence)) == VK_SUCCESS)
-        *fence = wine_fence_to_handle(object);
-    else
-        free(object);
-
-    return vr;
-}
-
-void wine_vkDestroyFence(VkDevice device_handle, VkFence fence_handle, const VkAllocationCallbacks *allocator)
-{
-    struct wine_device *device = wine_device_from_handle(device_handle);
-    struct wine_fence *fence = wine_fence_from_handle(fence_handle);
-
-    TRACE("(%p, %p, %p)\n", device, fence, allocator);
-
-    if (allocator)
-        FIXME("Support for allocation callbacks not implemented yet\n");
-
-    if (!fence_handle)
-        return;
-
-    if (fence->eventfd != -1)
-        close(fence->eventfd);
-
-    device->funcs.p_vkDestroyFence(device->device, fence->fence, allocator);
-    free(fence);
-}
-
-static VkFence *unwrap_fence_array(const VkFence *in, uint32_t count, struct conversion_context *ctx)
-{
-    VkFence *out;
-    unsigned int i;
-
-    if (!in || !count) return NULL;
-
-    out = conversion_context_alloc(ctx, count * sizeof(*out));
-    for (i = 0; i < count; ++i)
-        out[i] = in[i] ? wine_fence_from_handle(in[i])->fence : VK_NULL_HANDLE;
-
-    return out;
-}
-
-VkResult wine_vkResetFences(VkDevice device_handle, uint32_t fence_count, const VkFence *fences)
-{
-    struct wine_device *device = wine_device_from_handle(device_handle);
-    struct conversion_context ctx;
-    struct wine_fence *fence;
-    VkFence *fences_unwrap;
-    unsigned int i;
-    uint64_t buf;
-    VkResult vr;
-
-    TRACE("(%p, %u, %p)\n", device, fence_count, fences);
-
-    init_conversion_context(&ctx);
-    fences_unwrap = unwrap_fence_array(fences, fence_count, &ctx);
-    vr = device->funcs.p_vkResetFences(device->device, fence_count, fences_unwrap);
-    free_conversion_context(&ctx);
-    if (vr)
-        return vr;
-
-    for (i = 0; i < fence_count; i++)
-    {
-        fence = wine_fence_from_handle(fences[i]);
-
-        fence->queue = NULL;
-        fence->swapchain = NULL;
-        if (fence->wait_assist)
-        {
-            fence->wait_assist = false;
-            if (read(fence->eventfd, &buf, sizeof(buf)) == -1)
-                ERR("Failed to reset event fd.\n");
-        }
-    }
-
-    return VK_SUCCESS;
-}
-
-VkResult wine_vkWaitForFences(VkDevice device_handle, uint32_t fence_count, const VkFence *fences,
-        VkBool32 wait_all, uint64_t timeout)
-{
-    struct wine_device *device = wine_device_from_handle(device_handle);
-    struct signal_op *signal_op;
-    bool assisted_wait = false;
-    struct wine_fence *fence;
-    struct pollfd *wait_fds;
-    struct pollfd wait_fd;
-    unsigned int i;
-    VkResult vr;
-    int ret;
-
-    TRACE("(%p, %u, %p, %u, 0x%s)\n", device, fence_count, fences, wait_all, wine_dbgstr_longlong(timeout));
-
-    for (i = 0; i < fence_count; i++)
-    {
-        fence = wine_fence_from_handle(fences[i]);
-        if (!fence->wait_assist)
-            continue;
-
-        if (!wait_all && fence_count > 1)
-        {
-            assisted_wait = true;
-            break;
-        }
-
-        wait_fd.fd = fence->eventfd;
-        wait_fd.events = POLLIN;
-        ret = poll(&wait_fd, 1, timeout / 1000000);
-        if (ret == -1)
-        {
-            ERR("Failed to poll wait assisted fence.\n");
-            return VK_ERROR_OUT_OF_HOST_MEMORY;
-        }
-        if (!ret)
-            return VK_TIMEOUT;
-
-        if (wait_fd.revents & (POLLERR | POLLHUP | POLLNVAL))
-            ERR("Polling on fd %d returned %#x.", fence->eventfd, wait_fd.revents);
-        return VK_SUCCESS;
-    }
-
-    if (assisted_wait)
-    {
-        /* Turn all non assisted waits into assisted waits, then poll on all */
-        wait_fds = malloc( sizeof(wait_fds[0]) * fence_count );
-
-        for (i = 0; i < fence_count; i++)
-        {
-            if (!fence->wait_assist)
-            {
-                assert(fence->queue || fence->swapchain);
-
-                if (fence->queue)
-                {
-                    fence->wait_assist = true;
-
-                    /* If virtual-queue requiring work was submitted after the work signalling this mutex,
-                     * we will end up unnecessarily waiting on that work first,
-                     * but this will only happen once per queue */
-                    init_virtual_queue(fence->queue);
-
-                    signal_op = malloc(sizeof(*signal_op));
-                    signal_op->signal_type = SIGNAL_TYPE_FENCE;
-                    signal_op->fence = fence;
-
-                    pthread_mutex_lock(&fence->queue->signaller_mutex);
-                    list_add_tail(&fence->queue->signal_ops, &signal_op->entry);
-                    pthread_cond_signal(&fence->queue->signaller_cond);
-                    pthread_mutex_unlock(&fence->queue->signaller_mutex);
-                }
-                else
-                {
-                    FIXME("Wait assist for swapchain signaled fences not supported.\n");
-                    free(wait_fds);
-                    return VK_ERROR_OUT_OF_HOST_MEMORY;
-                }
-            }
-
-            wait_fds[i].fd = fence->eventfd;
-            wait_fds[i].events = POLLIN;
-        }
-
-        if (poll(wait_fds, fence_count, timeout / 1000000) == -1)
-        {
-            ERR("Failed to poll wait assisted fences.\n");
-            vr = VK_ERROR_OUT_OF_HOST_MEMORY;
-        }
-
-        free(wait_fds);
-    }
-    else
-    {
-        struct conversion_context ctx;
-        VkFence *fences_unwrap;
-
-        init_conversion_context(&ctx);
-        fences_unwrap = unwrap_fence_array(fences, fence_count, &ctx);
-        vr = device->funcs.p_vkWaitForFences(device->device, fence_count, fences_unwrap, wait_all, timeout);
-        free_conversion_context(&ctx);
-    }
-
-    return vr;
 }
 
 VkResult wine_vkQueueWaitIdle(VkQueue queue_handle)
