@@ -37,6 +37,8 @@
 #ifdef HAVE_SYS_UN_H
 #include <sys/un.h>
 #endif
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "x11drv.h"
 #include "xcomposite.h"
@@ -3433,6 +3435,52 @@ static void wglFlush(void)
 
 static const GLubyte *wglGetString(GLenum name)
 {
+    static int override_vendor = -1;
+    if (override_vendor == -1)
+    {
+        int fd;
+        char buffer[4096], *env;
+        int sz;
+
+        override_vendor = 0;
+        if ((env = getenv("WINE_GL_HIDE_NVIDIA")))
+        {
+            override_vendor = env[0] != '0';
+        }
+        else
+        {
+            fd = open("/proc/self/cmdline", O_RDONLY);
+            if (fd != -1)
+            {
+                if ((sz = read(fd, buffer, sizeof(buffer) - 1)) > 0)
+                {
+                    buffer[sz] = 0;
+                    if (strstr(buffer, "\\Paradox Launcher.exe"))
+                    {
+                        FIXME("HACK: overriding GL vendor and renderer.\n");
+                        override_vendor = 1;
+                    }
+                }
+                close(fd);
+            }
+        }
+    }
+    if (override_vendor)
+    {
+        const GLubyte *s;
+        if (name == GL_RENDERER)
+        {
+            s = pglGetString(name);
+            if (s && strstr((const char *)s, "NVIDIA")) return (const GLubyte *)"AMD Radeon Graphics";
+            return s;
+        }
+        else if (name == GL_VENDOR)
+        {
+            s = pglGetString(name);
+            if (s && strstr((const char *)s, "NVIDIA")) return (const GLubyte *)"AMD";
+            return s;
+        }
+    }
     if (name == GL_EXTENSIONS && glExtensions) return (const GLubyte *)glExtensions;
     return pglGetString(name);
 }
