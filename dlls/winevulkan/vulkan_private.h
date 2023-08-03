@@ -393,26 +393,6 @@ static inline VkSemaphore wine_semaphore_host_handle(struct wine_semaphore *sema
     return semaphore->semaphore;
 }
 
-struct wine_fence
-{
-    VkFence fence;
-
-    struct wine_queue *queue;
-    struct wine_swapchain *swapchain;
-    bool wait_assist;
-    int eventfd;
-};
-
-static inline struct wine_fence *wine_fence_from_handle(VkFence handle)
-{
-    return (struct wine_fence *)(uintptr_t)handle;
-}
-
-static inline VkFence wine_fence_to_handle(struct wine_fence *fence)
-{
-    return (VkFence)(uintptr_t)fence;
-}
-
 static inline void *conversion_context_alloc(struct conversion_context *pool, size_t size)
 {
     if (pool->used + size <= sizeof(pool->buffer))
