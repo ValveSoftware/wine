@@ -104,7 +104,6 @@ struct thread_input
     int                    caret_state;   /* caret on/off state */
     struct list            msg_list;      /* list of hardware messages */
     unsigned char          desktop_keystate[256]; /* desktop keystate when keystate was synced */
-    int                    keystate_lock; /* keystate is locked */
     struct object         *shared_mapping; /* thread input shared memory mapping */
     const input_shm_t     *shared;        /* thread input shared memory ptr */
 };
@@ -274,7 +273,6 @@ static struct thread_input *create_thread_input( struct thread *thread )
         input->shared_mapping = grab_object( thread->input_shared_mapping );
         input->shared = thread->input_shared;
         list_init( &input->msg_list );
-        input->keystate_lock = 0;
 
         if (!(input->desktop = get_thread_desktop( thread, 0 /* FIXME: access rights */ )))
         {
@@ -294,6 +292,7 @@ static struct thread_input *create_thread_input( struct thread *thread )
             shared->cursor = 0;
             shared->cursor_count = 0;
             set_caret_window( input, shared, 0 );
+            shared->keystate_lock = 0;
             memset( (void *)shared->keystate, 0, sizeof(shared->keystate) );
             shared->created = TRUE;
         }
@@ -366,7 +365,7 @@ static struct msg_queue *create_msg_queue( struct thread *thread, struct thread_
 static void sync_input_keystate( struct thread_input *input )
 {
     int i;
-    if (!input->desktop || input->keystate_lock) return;
+    if (!input->desktop || input->shared->keystate_lock) return;
 
     SHARED_WRITE_BEGIN( input, input_shm_t )
     {
@@ -382,14 +381,23 @@ static void sync_input_keystate( struct thread_input *input )
 /* locks thread input keystate to prevent synchronization */
 static void lock_input_keystate( struct thread_input *input )
 {
-    input->keystate_lock++;
+    SHARED_WRITE_BEGIN( input, input_shm_t )
+    {
+        shared->keystate_lock++;
+    }
+    SHARED_WRITE_END
 }
 
 /* unlock the thread input keystate and synchronize it again */
 static void unlock_input_keystate( struct thread_input *input )
 {
-    input->keystate_lock--;
-    if (!input->keystate_lock) sync_input_keystate( input );
+    SHARED_WRITE_BEGIN( input, input_shm_t )
+    {
+        shared->keystate_lock--;
+    }
+    SHARED_WRITE_END
+
+    if (!input->shared->keystate_lock) sync_input_keystate( input );
 }
 
 /* change the thread input data of a given thread */
