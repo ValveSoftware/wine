@@ -4226,7 +4226,7 @@ VkResult vk_queue_submit_unwrap(struct wine_queue *queue, uint32_t submit_count,
     return ret;
 }
 
-VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo *submits, VkFence fence)
+VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo *submits, VkFence fence, void *submits_win_ptr)
 {
     struct wine_queue *queue = wine_queue_from_handle(queue_handle);
     unsigned int i, k;

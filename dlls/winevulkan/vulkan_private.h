@@ -448,5 +448,7 @@ static inline void init_unicode_string( UNICODE_STRING *str, const WCHAR *data )
 
 #define MEMDUP(ctx, dst, src, count) dst = conversion_context_alloc((ctx), sizeof(*(dst)) * (count)); \
     memcpy((void *)(dst), (src), sizeof(*(dst)) * (count));
+#define MEMDUP_VOID(ctx, dst, src, size) dst = conversion_context_alloc((ctx), size); \
+    memcpy((void *)(dst), (src), size);
 
 #endif /* __WINE_VULKAN_PRIVATE_H */
