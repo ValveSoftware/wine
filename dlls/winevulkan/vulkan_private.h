@@ -24,7 +24,6 @@
 #define VK_NO_PROTOTYPES
 
 #include <pthread.h>
-#include <stdbool.h>
 
 #include "vulkan_loader.h"
 #include "vulkan_thunks.h"
@@ -337,24 +336,7 @@ struct wine_semaphore
     struct
     {
         pthread_mutex_t mutex;
-        uint64_t virtual_value, physical_value, counter;
-
-        struct pending_wait
-        {
-            bool present, satisfied;
-            uint64_t virtual_value;
-            uint64_t physical_value;
-            pthread_cond_t cond;
-        } pending_waits[100];
-
-        struct pending_update
-        {
-            uint64_t virtual_value;
-            uint64_t physical_value;
-            pid_t signalling_pid;
-            struct wine_queue *signalling_queue;
-        } pending_updates[100];
-        uint32_t pending_updates_count;
+        uint64_t virtual_value;
     } *d3d12_fence_shm;
 };
 
