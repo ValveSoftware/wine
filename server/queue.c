@@ -102,8 +102,6 @@ struct thread_input
     struct desktop        *desktop;       /* desktop that this thread input belongs to */
     int                    caret_hide;    /* caret hide count */
     int                    caret_state;   /* caret on/off state */
-    user_handle_t          cursor;        /* current cursor */
-    int                    cursor_count;  /* cursor show count */
     struct list            msg_list;      /* list of hardware messages */
     unsigned char          keystate[256]; /* state of each key */
     unsigned char          desktop_keystate[256]; /* desktop keystate when keystate was synced */
@@ -276,8 +274,6 @@ static struct thread_input *create_thread_input( struct thread *thread )
     {
         input->shared_mapping = grab_object( thread->input_shared_mapping );
         input->shared = thread->input_shared;
-        input->cursor       = 0;
-        input->cursor_count = 0;
         list_init( &input->msg_list );
         memset( input->keystate, 0, sizeof(input->keystate) );
         input->keystate_lock = 0;
@@ -298,6 +294,8 @@ static struct thread_input *create_thread_input( struct thread *thread )
             shared->created = TRUE;
             shared->menu_owner = 0;
             shared->move_size = 0;
+            shared->cursor = 0;
+            shared->cursor_count = 0;
             set_caret_window( input, shared, 0 );
         }
         SHARED_WRITE_END
@@ -402,13 +400,23 @@ static int assign_thread_input( struct thread *thread, struct thread_input *new_
     }
     if (queue->input)
     {
-        queue->input->cursor_count -= queue->cursor_count;
+        SHARED_WRITE_BEGIN( queue->input, input_shm_t )
+        {
+            shared->cursor_count -= queue->cursor_count;
+        }
+        SHARED_WRITE_END
+
         if (queue->keystate_lock) unlock_input_keystate( queue->input );
         release_object( queue->input );
     }
     queue->input = (struct thread_input *)grab_object( new_input );
     if (queue->keystate_lock) lock_input_keystate( queue->input );
-    new_input->cursor_count += queue->cursor_count;
+
+    SHARED_WRITE_BEGIN( new_input, input_shm_t )
+    {
+        shared->cursor_count += queue->cursor_count;
+    }
+    SHARED_WRITE_END
 
     SHARED_WRITE_BEGIN( queue, queue_shm_t )
     {
@@ -492,7 +500,7 @@ static int update_desktop_cursor_window( struct desktop *desktop, user_handle_t 
 
     if (updated && (input = get_desktop_cursor_thread_input( desktop )))
     {
-        user_handle_t handle = input->cursor_count < 0 ? 0 : input->cursor;
+        user_handle_t handle = input->shared->cursor_count < 0 ? 0 : input->shared->cursor;
         /* when clipping send the message to the foreground window as well, as some driver have an artificial overlay window */
         if (is_cursor_clipped( desktop )) queue_cursor_message( desktop, 0, WM_WINE_SETCURSOR, win, handle );
         queue_cursor_message( desktop, win, WM_WINE_SETCURSOR, win, handle );
@@ -529,7 +537,7 @@ static void update_desktop_cursor_handle( struct desktop *desktop, struct thread
 {
     if (input == get_desktop_cursor_thread_input( desktop ))
     {
-        user_handle_t handle = input->cursor_count < 0 ? 0 : input->cursor, win = desktop->cursor_win;
+        user_handle_t handle = input->shared->cursor_count < 0 ? 0 : input->shared->cursor, win = desktop->cursor_win;
         /* when clipping send the message to the foreground window as well, as some driver have an artificial overlay window */
         if (is_cursor_clipped( desktop )) queue_cursor_message( desktop, 0, WM_WINE_SETCURSOR, win, handle );
         queue_cursor_message( desktop, win, WM_WINE_SETCURSOR, win, handle );
@@ -1286,7 +1294,12 @@ static void cleanup_msg_queue( struct msg_queue *queue )
         free( timer );
     }
     if (queue->timeout) remove_timeout_user( queue->timeout );
-    queue->input->cursor_count -= queue->cursor_count;
+    SHARED_WRITE_BEGIN( queue->input, input_shm_t )
+    {
+        shared->cursor_count -= queue->cursor_count;
+    }
+    SHARED_WRITE_END
+
     if (queue->keystate_lock) unlock_input_keystate( queue->input );
     release_object( queue->input );
     if (queue->hooks) release_object( queue->hooks );
@@ -3477,8 +3490,8 @@ DECL_HANDLER(get_thread_input)
         reply->menu_owner = input->shared->menu_owner;
         reply->move_size  = input->shared->move_size;
         reply->caret      = input->shared->caret;
-        reply->cursor     = input->cursor;
-        reply->show_count = input->cursor_count;
+        reply->cursor     = input->shared->cursor;
+        reply->show_count = input->shared->cursor_count;
         reply->rect       = input->shared->caret_rect;
     }
 
@@ -3751,25 +3764,32 @@ DECL_HANDLER(set_cursor)
     input = queue->input;
     desktop = input->desktop;
 
-    reply->prev_handle = input->cursor;
-    reply->prev_count  = input->cursor_count;
+    reply->prev_handle = input->shared->cursor;
+    reply->prev_count  = input->shared->cursor_count;
     reply->prev_x      = desktop->shared->cursor.x;
     reply->prev_y      = desktop->shared->cursor.y;
 
-    if (req->flags & SET_CURSOR_HANDLE)
+    if ((req->flags & SET_CURSOR_HANDLE) && req->handle &&
+        !get_user_object( req->handle, USER_CLIENT ))
     {
-        if (req->handle && !get_user_object( req->handle, USER_CLIENT ))
+        set_win32_error( ERROR_INVALID_CURSOR_HANDLE );
+        return;
+    }
+
+    SHARED_WRITE_BEGIN( input, input_shm_t )
+    {
+        if (req->flags & SET_CURSOR_HANDLE)
         {
-            set_win32_error( ERROR_INVALID_CURSOR_HANDLE );
-            return;
+            shared->cursor = req->handle;
         }
-        input->cursor = req->handle;
+        if (req->flags & SET_CURSOR_COUNT)
+        {
+            queue->cursor_count += req->show_count;
+            shared->cursor_count += req->show_count;
+        }
     }
-    if (req->flags & SET_CURSOR_COUNT)
-    {
-        queue->cursor_count += req->show_count;
-        input->cursor_count += req->show_count;
-    }
+    SHARED_WRITE_END
+
     if (req->flags & SET_CURSOR_POS) set_cursor_pos( desktop, req->x, req->y );
     if (req->flags & SET_CURSOR_CLIP) set_clip_rectangle( desktop, &req->clip, req->flags, 0 );
     if (req->flags & SET_CURSOR_NOCLIP) set_clip_rectangle( desktop, NULL, SET_CURSOR_NOCLIP, 0 );
