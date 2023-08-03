@@ -220,9 +220,8 @@ FUNCTION_OVERRIDES = {
     "vkSignalSemaphore" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkWaitSemaphores" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueBindSparse" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
-    "vkQueueSubmit" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE, "extra_param" : "pSubmits"},
+    "vkQueueSubmit" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueSubmit2" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
-    "vkQueueWaitIdle" : {"dispatch": True, "driver": False, "thunk" : ThunkType.NONE},
 
     # VK_KHR_surface
     "vkDestroySurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
@@ -312,15 +311,10 @@ STRUCT_CHAIN_CONVERSIONS = {
     "VkPhysicalDeviceImageFormatInfo2": [],
     "VkPhysicalDeviceExternalSemaphoreInfo": [],
     "VkSemaphoreCreateInfo": ["VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_WIN32_HANDLE_INFO_KHR"],
-    "VkSubmitInfo": ["VK_STRUCTURE_TYPE_D3D12_FENCE_SUBMIT_INFO_KHR"],
+    "VkSubmitInfo": [],
     "VkSubmitInfo2": [],
     "VkBindSparseInfo" : [],
 }
-
-STRUCT_COPY = {
-    "VkSubmitInfo",
-    "VkSubmitInfo2",
-};
 
 # Some struct members are conditionally ignored and callers are free to leave them uninitialized.
 # We can't deduce that from XML, so we allow expressing it here.
@@ -1409,9 +1403,6 @@ class VkVariable(object):
                 if struct.needs_conversion(conv, unwrap, Direction.OUTPUT, is_const):
                     conversions.append(StructConversionFunction(struct, Direction.OUTPUT, conv, unwrap, is_const))
 
-            if struct.name in STRUCT_COPY:
-                conversions.append(StructConversionFunction(struct, Direction.INPUT, False, unwrap, is_const, True))
-
         if self.is_static_array() or self.is_dynamic_array():
             for conv in [False, True]:
                 if self.needs_conversion(conv, unwrap, Direction.INPUT, parent_const):
@@ -1541,7 +1532,7 @@ class VkMember(VkVariable):
                         values=values, object_type=object_type, bit_width=bit_width, returnedonly=returnedonly,
                         parent=parent, selection=selection, selector=selector)
 
-    def copy(self, input, output, direction, conv, unwrap, copy):
+    def copy(self, input, output, direction, conv, unwrap):
         """ Helper method for use by conversion logic to generate a C-code statement to copy this member.
             - `conv` indicates whether the statement is in a struct alignment conversion path. """
 
@@ -1599,8 +1590,6 @@ class VkMember(VkVariable):
         elif self.is_static_array():
             bytes_count = "{0} * sizeof({1})".format(self.array_len, self.type)
             return "memcpy({0}{1}, {2}{1}, {3});\n".format(output, self.name, input, bytes_count)
-        elif self.is_dynamic_array() and copy:
-            return "MEMDUP(ctx, {0}{1}, {2}{1}, {3});\n".format(output, self.name, input, self.get_dyn_array_len(input, conv))
         elif direction == Direction.INPUT:
             return "{0}{1} = {2};\n".format(output, self.name, self.value(input, conv))
         elif conv and direction == Direction.OUTPUT and self.is_pointer():
@@ -2323,25 +2312,21 @@ class VkStruct(Sequence):
 
 
 class StructConversionFunction(object):
-    def __init__(self, struct, direction, conv, unwrap, const, copy=False):
+    def __init__(self, struct, direction, conv, unwrap, const):
         self.direction = direction
         self.operand = struct
         self.type = struct.name
         self.conv = conv
         self.unwrap = unwrap or not self.operand.needs_unwrapping()
         self.const = const
-        self.copy = copy
 
-        if copy:
-            name = "copy_{0}".format(self.type)
-        else:
-            name = "convert_{0}_".format(self.type)
-            win_type = "win32" if self.conv else "win64"
-            host_part = "host" if self.unwrap else "unwrapped_host"
-            if self.direction == Direction.INPUT:
-                name += "{0}_to_{1}".format(win_type, host_part)
-            else: # Direction.OUTPUT
-                name += "{0}_to_{1}".format(host_part, win_type)
+        name = "convert_{0}_".format(self.type)
+        win_type = "win32" if self.conv else "win64"
+        host_part = "host" if self.unwrap else "unwrapped_host"
+        if self.direction == Direction.INPUT:
+            name += "{0}_to_{1}".format(win_type, host_part)
+        else: # Direction.OUTPUT
+            name += "{0}_to_{1}".format(host_part, win_type)
         self.name = name
 
     def __eq__(self, other):
@@ -2373,7 +2358,7 @@ class StructConversionFunction(object):
 
         body = ""
 
-        if not self.conv and not self.copy:
+        if not self.conv:
             body += "#ifdef _WIN64\n"
 
         needs_alloc = self.direction != Direction.OUTPUT and self.operand.needs_alloc(self.conv, self.unwrap)
@@ -2383,11 +2368,8 @@ class StructConversionFunction(object):
         if self.direction == Direction.OUTPUT and self.const:
             win_type = "const " + win_type
 
-        if self.copy:
-            body += "void {0}(".format(self.name)
-        else:
-            body += "static inline void {0}(".format(self.name)
         if self.conv:
+            body += "static inline void {0}(".format(self.name)
 
             if self.direction == Direction.OUTPUT:
                 params = ["const {0} *in".format(self.type), "{0} *out".format(win_type)]
@@ -2404,6 +2386,8 @@ class StructConversionFunction(object):
             body += ")\n"
 
         else:
+            body += "static inline void {0}(".format(self.name)
+
             params = ["const {0} *in".format(self.type), "{0} *out".format(self.type)]
 
             # Generate parameter list
@@ -2443,7 +2427,7 @@ class StructConversionFunction(object):
                 body += " || ".join("selector == {}".format(s) for s in m.selection)
                 body += ")\n    "
 
-            body += "    " + m.copy("in->", "out->", self.direction, self.conv, self.unwrap, self.copy)
+            body += "    " + m.copy("in->", "out->", self.direction, self.conv, self.unwrap)
 
         if needs_extensions:
             if self.conv and self.direction == Direction.INPUT:
@@ -2503,7 +2487,7 @@ class StructConversionFunction(object):
                         copy_body += ident + "out_ext->pNext = NULL;\n"
                         continue
 
-                    copy_body += ident + m.copy("in_ext->", "out_ext->", self.direction, self.conv, True, self.copy)
+                    copy_body += ident + m.copy("in_ext->", "out_ext->", self.direction, self.conv, True)
 
                 # Generate the definition of "in_ext" if we need it
                 if "in_ext->" in copy_body:
@@ -2538,7 +2522,7 @@ class StructConversionFunction(object):
             body += "        FIXME(\"Unexpected pNext\\n\");\n"
 
         body += "}\n"
-        if not self.conv and not self.copy:
+        if not self.conv:
             body += "#endif /* _WIN64 */\n"
         body += "\n"
 
