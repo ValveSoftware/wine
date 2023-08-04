@@ -902,6 +902,7 @@ struct shared_cursor
 
 struct desktop_shared_memory
 {
+    unsigned int         seq;              /* sequence number - server updating if (seq & 1) != 0 */
     struct shared_cursor cursor;           /* global cursor information */
 };
 typedef volatile struct desktop_shared_memory desktop_shm_t;

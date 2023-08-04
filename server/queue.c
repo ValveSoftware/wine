@@ -232,14 +232,24 @@ static unsigned int last_input_time;
 static cursor_pos_t cursor_history[64];
 static unsigned int cursor_history_latest;
 
-#define SHARED_WRITE_BEGIN( object, type )                        \
-    do {                                                          \
-        const type *__shared = (object)->shared;                  \
-        type *shared = (type *)__shared;                          \
+#if defined(__i386__) || defined(__x86_64__)
+#define __SHARED_INCREMENT_SEQ( x ) ++(x)
+#else
+#define __SHARED_INCREMENT_SEQ( x ) __atomic_add_fetch( &(x), 1, __ATOMIC_RELEASE )
+#endif
+
+#define SHARED_WRITE_BEGIN( object, type )                           \
+    do {                                                             \
+        const type *__shared = (object)->shared;                     \
+        type *shared = (type *)__shared;                             \
+        unsigned int __seq = __SHARED_INCREMENT_SEQ( shared->seq );  \
+        assert( (__seq & 1) != 0 );                                  \
         do
 
-#define SHARED_WRITE_END                                          \
-        while(0);                                                 \
+#define SHARED_WRITE_END                                             \
+        while(0);                                                    \
+        __seq = __SHARED_INCREMENT_SEQ( shared->seq ) - __seq;       \
+        assert( __seq == 1 );                                        \
     } while(0);
 
 static void queue_hardware_message( struct desktop *desktop, struct message *msg, int always_queue );
