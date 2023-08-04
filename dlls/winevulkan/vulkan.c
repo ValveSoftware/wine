@@ -937,6 +937,9 @@ VkResult wine_vkCreateDevice(VkPhysicalDevice phys_dev_handle, const VkDeviceCre
     if (!(object = calloc(1, sizeof(*object))))
         return VK_ERROR_OUT_OF_HOST_MEMORY;
 
+    pthread_mutex_init(&object->signaller_mutex, NULL);
+    list_init(&object->sem_poll_list);
+    list_init(&object->free_fence_ops_list);
     object->phys_dev = phys_dev;
 
     if ((callback = (VkCreateInfoWineDeviceCallback *)create_info->pNext)
@@ -1029,9 +1032,6 @@ VkResult wine_vkCreateDevice(VkPhysicalDevice phys_dev_handle, const VkDeviceCre
 
     device_handle->quirks = phys_dev->instance->quirks;
     device_handle->base.unix_handle = (uintptr_t)object;
-    pthread_mutex_init(&object->signaller_mutex, NULL);
-    list_init(&object->sem_poll_list);
-    list_init(&object->free_fence_ops_list);
     *ret_device = device_handle;
     TRACE("Created device %p (native device %p).\n", object, object->device);
     return VK_SUCCESS;
