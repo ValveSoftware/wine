@@ -279,7 +279,7 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
     uint32_t num_host_properties, num_properties = 0;
     VkExtensionProperties *host_properties = NULL;
     VkPhysicalDeviceProperties physdev_properties;
-    BOOL have_external_memory_host = FALSE;
+    BOOL have_external_memory_host = FALSE, have_external_memory_fd = FALSE, have_external_semaphore_fd = FALSE;
     VkResult res;
     unsigned int i, j;
 
@@ -333,6 +333,7 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
             snprintf(host_properties[i].extensionName, sizeof(host_properties[i].extensionName),
                     VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
             host_properties[i].specVersion = VK_KHR_EXTERNAL_MEMORY_WIN32_SPEC_VERSION;
+            have_external_memory_fd = TRUE;
         }
         if (!strcmp(host_properties[i].extensionName, "VK_KHR_external_semaphore_fd"))
         {
@@ -341,6 +342,7 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
             snprintf(host_properties[i].extensionName, sizeof(host_properties[i].extensionName),
                     VK_KHR_EXTERNAL_SEMAPHORE_WIN32_EXTENSION_NAME);
             host_properties[i].specVersion = VK_KHR_EXTERNAL_SEMAPHORE_WIN32_SPEC_VERSION;
+            have_external_semaphore_fd = TRUE;
         }
 
         if (wine_vk_device_extension_supported(host_properties[i].extensionName))
@@ -356,7 +358,8 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
             have_external_memory_host = TRUE;
     }
 
-    TRACE("Host supported extensions %u, Wine supported extensions %u\n", num_host_properties, num_properties);
+    if (have_external_memory_fd && have_external_semaphore_fd)
+        ++num_properties; /* VK_KHR_win32_keyed_mutex */
 
     if (!(object->extensions = calloc(num_properties, sizeof(*object->extensions))))
     {
@@ -372,7 +375,15 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
             j++;
         }
     }
+    if (have_external_memory_fd && have_external_semaphore_fd)
+    {
+        strcpy(object->extensions[j].extensionName, VK_KHR_WIN32_KEYED_MUTEX_EXTENSION_NAME);
+        object->extensions[j].specVersion = VK_KHR_WIN32_KEYED_MUTEX_SPEC_VERSION;
+        TRACE("Enabling extension '%s' for physical device %p\n", object->extensions[j].extensionName, object);
+        ++j;
+    }
     object->extension_count = num_properties;
+    TRACE("Host supported extensions %u, Wine supported extensions %u\n", num_host_properties, num_properties);
 
     if (use_external_memory() && have_external_memory_host)
     {
@@ -524,7 +535,7 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
         struct conversion_context *ctx, const VkDeviceCreateInfo *src, VkDeviceCreateInfo *dst)
 {
     static const char *wine_xr_extension_name = "VK_WINE_openxr_device_extensions";
-    unsigned int i, append_xr = 0, replace_win32 = 0, append_timeline = 1;
+    unsigned int i, append_xr = 0, have_ext_mem32 = 0, have_ext_sem32 = 0, have_keyed_mutex = 0, append_timeline = 1;
     VkBaseOutStructure *header;
     char **xr_extensions_list;
 
@@ -544,8 +555,12 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
 
         if (!strcmp(extension_name, wine_xr_extension_name))
             append_xr = 1;
-        else if (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32") || !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_semaphore_win32"))
-            replace_win32 = 1;
+        else if (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
+            have_ext_mem32 = 1;
+        else if (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_semaphore_win32"))
+            have_ext_sem32 = 1;
+        else if (!strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_win32_keyed_mutex"))
+            have_keyed_mutex = 1;
         else if (!strcmp(extension_name, "VK_KHR_timeline_semaphore"))
             append_timeline = 0;
     }
@@ -567,7 +582,7 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
     if (append_xr)
         xr_extensions_list = parse_xr_extensions(&append_xr);
 
-    if (phys_dev->external_memory_align || append_xr || replace_win32 || append_timeline)
+    if (phys_dev->external_memory_align || append_xr || have_ext_mem32 || have_ext_sem32 || have_keyed_mutex || append_timeline)
     {
         const char **new_extensions;
         unsigned int o = 0, count;
@@ -579,18 +594,29 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
             count += append_xr - 1;
         if (append_timeline)
             ++count;
+        if (have_keyed_mutex)
+            count += !have_ext_mem32 + !have_ext_sem32;
 
         new_extensions = conversion_context_alloc(ctx, count * sizeof(*dst->ppEnabledExtensionNames));
         for (i = 0; i < dst->enabledExtensionCount; ++i)
         {
             if (append_xr && !strcmp(src->ppEnabledExtensionNames[i], wine_xr_extension_name))
                 continue;
-            if (replace_win32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
+            if (have_ext_mem32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_memory_win32"))
                 new_extensions[o++] = "VK_KHR_external_memory_fd";
-            else if (replace_win32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_semaphore_win32"))
+            else if (have_ext_sem32 && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_external_semaphore_win32"))
                 new_extensions[o++] = "VK_KHR_external_semaphore_fd";
+            else if (have_keyed_mutex && !strcmp(src->ppEnabledExtensionNames[i], "VK_KHR_win32_keyed_mutex"))
+                continue;
             else
                 new_extensions[o++] = src->ppEnabledExtensionNames[i];
+        }
+        if (have_keyed_mutex)
+        {
+            if (!have_ext_mem32)
+                new_extensions[o++] = "VK_KHR_external_memory_fd";
+            if (!have_ext_sem32)
+                new_extensions[o++] = "VK_KHR_external_semaphore_fd";
         }
         if (phys_dev->external_memory_align)
         {
@@ -604,7 +630,7 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
         }
         if (append_timeline)
             new_extensions[o++] = "VK_KHR_timeline_semaphore";
-        dst->enabledExtensionCount = count;
+        dst->enabledExtensionCount = o;
         dst->ppEnabledExtensionNames = new_extensions;
     }
 
