@@ -2779,7 +2779,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
 
         thread_info->client_info.msg_source = prev_source;
 
-        if (!shared) skip = FALSE;
+        if (!shared || NtGetTickCount() - thread_info->last_getmsg_time >= 3000) skip = FALSE;
         else SHARED_READ_BEGIN( shared, queue_shm_t )
         {
             /* not created yet */
@@ -2809,6 +2809,7 @@ static int peek_message( MSG *msg, HWND hwnd, UINT first, UINT last, UINT flags,
             req->wake_mask = changed_mask & (QS_SENDMESSAGE | QS_SMRESULT);
             req->changed_mask = changed_mask;
             wine_server_set_reply( req, buffer, buffer_size );
+            thread_info->last_getmsg_time = NtGetTickCount();
             if (!(res = wine_server_call( req )))
             {
                 size = wine_server_reply_size( reply );
