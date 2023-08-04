@@ -3614,12 +3614,23 @@ void wine_vkDestroyDeferredOperationKHR(VkDevice                     handle,
     free(object);
 }
 
+static void substitute_function_name(const char **name)
+{
+    if (!strcmp(*name, "vkGetMemoryWin32HandleKHR") || !strcmp(*name, "vkGetMemoryWin32HandlePropertiesKHR"))
+        *name = "vkGetMemoryFdKHR";
+    else if (!strcmp(*name, "vkGetSemaphoreWin32HandleKHR"))
+        *name = "vkGetSemaphoreFdKHR";
+    else if (!strcmp(*name, "vkImportSemaphoreWin32HandleKHR"))
+        *name = "vkImportSemaphoreFdKHR";
+}
+
 #ifdef _WIN64
 
 NTSTATUS vk_is_available_instance_function(void *arg)
 {
     struct is_available_instance_function_params *params = arg;
     struct wine_instance *instance = wine_instance_from_handle(params->instance);
+    substitute_function_name(&params->name);
     return !!vk_funcs->p_vkGetInstanceProcAddr(instance->host_instance, params->name);
 }
 
@@ -3627,12 +3638,7 @@ NTSTATUS vk_is_available_device_function(void *arg)
 {
     struct is_available_device_function_params *params = arg;
     struct wine_device *device = wine_device_from_handle(params->device);
-    if (!strcmp(params->name, "vkGetMemoryWin32HandleKHR") || !strcmp(params->name, "vkGetMemoryWin32HandlePropertiesKHR"))
-        params->name = "vkGetMemoryFdKHR";
-    else if (!strcmp(params->name, "vkGetSemaphoreWin32HandleKHR"))
-        params->name = "vkGetSemaphoreFdKHR";
-    else if (!strcmp(params->name, "vkImportSemaphoreWin32HandleKHR"))
-        params->name = "vkImportSemaphoreFdKHR";
+    substitute_function_name(&params->name);
     return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, params->name);
 }
 
@@ -3646,7 +3652,9 @@ NTSTATUS vk_is_available_instance_function32(void *arg)
         UINT32 name;
     } *params = arg;
     struct wine_instance *instance = wine_instance_from_handle(UlongToPtr(params->instance));
-    return !!vk_funcs->p_vkGetInstanceProcAddr(instance->host_instance, UlongToPtr(params->name));
+    const char *name = UlongToPtr(params->name);
+    substitute_function_name(&name);
+    return !!vk_funcs->p_vkGetInstanceProcAddr(instance->host_instance, name);
 }
 
 NTSTATUS vk_is_available_device_function32(void *arg)
@@ -3657,14 +3665,9 @@ NTSTATUS vk_is_available_device_function32(void *arg)
         UINT32 name;
     } *params = arg;
     struct wine_device *device = wine_device_from_handle(UlongToPtr(params->device));
-    char *name = UlongToPtr(params->name);
-    if (!strcmp(name, "vkGetMemoryWin32HandleKHR") || !strcmp(name, "vkGetMemoryWin32HandlePropertiesKHR"))
-        return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, "vkGetMemoryFdKHR");
-    if (!strcmp(name, "vkGetSemaphoreWin32HandleKHR"))
-        return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, "vkGetSemaphoreFdKHR");
-    if (!strcmp(name, "vkImportSemaphoreWin32HandleKHR"))
-        return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, "vkImportSemaphoreFdKHR");
-    return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, UlongToPtr(params->name));
+    const char *name = UlongToPtr(params->name);
+    substitute_function_name(&name);
+    return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, name);
 }
 
 DECLSPEC_EXPORT VkDevice __wine_get_native_VkDevice(VkDevice handle)
