@@ -168,13 +168,12 @@ static NTSTATUS shared_resource_open(struct shared_resource **res, void *buff, S
         /* name lookup */
         for (i = 0; i < resource_pool_size; i++)
         {
-            if (!wcscmp(resource_pool[i].name, &input->name[0]))
+            if (resource_pool[i].name && !wcscmp(resource_pool[i].name, input->name))
             {
                 *res = &resource_pool[i];
                 break;
             }
         }
-
         if (i == resource_pool_size)
             return STATUS_OBJECT_NAME_NOT_FOUND;
     }
