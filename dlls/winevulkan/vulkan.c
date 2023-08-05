@@ -2569,11 +2569,12 @@ void wine_vkDestroySurfaceKHR(VkInstance handle, VkSurfaceKHR surface,
 
 struct shared_resource_create
 {
+    UINT64 resource_size;
     obj_handle_t unix_handle;
     WCHAR name[1];
 };
 
-static HANDLE create_gpu_resource(int fd, LPCWSTR name)
+static HANDLE create_gpu_resource(int fd, LPCWSTR name, UINT64 resource_size)
 {
     static const WCHAR shared_gpu_resourceW[] = {'\\','?','?','\\','S','h','a','r','e','d','G','p','u','R','e','s','o','u','r','c','e',0};
     HANDLE unix_resource = INVALID_HANDLE_VALUE;
@@ -2609,6 +2610,7 @@ static HANDLE create_gpu_resource(int fd, LPCWSTR name)
     in_size = sizeof(*inbuff) + (name ? lstrlenW(name) * sizeof(WCHAR) : 0);
     inbuff = calloc(1, in_size);
     inbuff->unix_handle = wine_server_obj_handle(unix_resource);
+    inbuff->resource_size = resource_size;
     if (name)
         lstrcpyW(&inbuff->name[0], name);
 
@@ -2634,6 +2636,11 @@ struct shared_resource_open
 {
     obj_handle_t kmt_handle;
     WCHAR name[1];
+};
+
+struct shared_resource_info
+{
+    UINT64 resource_size;
 };
 
 static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
@@ -2681,6 +2688,21 @@ static HANDLE open_shared_resource(HANDLE kmt_handle, LPCWSTR name)
     }
 
     return shared_resource;
+}
+
+#define IOCTL_SHARED_GPU_RESOURCE_GET_INFO CTL_CODE(FILE_DEVICE_VIDEO, 7, METHOD_BUFFERED, FILE_READ_ACCESS)
+
+static BOOL shared_resource_get_info(HANDLE handle, struct shared_resource_info *info)
+{
+    IO_STATUS_BLOCK iosb;
+    unsigned int status;
+
+    status = NtDeviceIoControlFile(handle, NULL, NULL, NULL, &iosb, IOCTL_SHARED_GPU_RESOURCE_GET_INFO,
+            NULL, 0, info, sizeof(*info));
+    if (status)
+        ERR("Failed to get shared resource info, status %#x.\n", status);
+
+    return !status;
 }
 
 #define IOCTL_SHARED_GPU_RESOURCE_GET_UNIX_RESOURCE           CTL_CODE(FILE_DEVICE_VIDEO, 3, METHOD_BUFFERED, FILE_READ_ACCESS)
@@ -2761,10 +2783,14 @@ VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *allo
     /* Vulkan consumes imported FDs, but not imported HANDLEs */
     if (handle_import_info)
     {
+        struct shared_resource_info res_info;
+
         fd_import_info.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
         fd_import_info.pNext = info.pNext;
         fd_import_info.handleType = VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT;
         info.pNext = &fd_import_info;
+
+        TRACE("import handle type %#x.\n", handle_import_info->handleType);
 
         switch (handle_import_info->handleType)
         {
@@ -2800,6 +2826,26 @@ VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *allo
                     handle_import_info->name ? debugstr_w(handle_import_info->name) : "");
             result = VK_ERROR_INVALID_EXTERNAL_HANDLE;
             goto done;
+        }
+
+        /* From VkMemoryAllocateInfo spec: "if the parameters define an import operation and the external handle type is
+         * VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_BIT, VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D11_TEXTURE_KMT_BIT,
+         * or VK_EXTERNAL_MEMORY_HANDLE_TYPE_D3D12_RESOURCE_BIT, allocationSize is ignored.". Although test suggests
+         * that it is also true for opaque Win32 handles. */
+        if (shared_resource_get_info(memory->handle, &res_info))
+        {
+            if (res_info.resource_size)
+            {
+                TRACE("Shared resource size %llu.\n", (long long)res_info.resource_size);
+                if (info.allocationSize && info.allocationSize != res_info.resource_size)
+                    FIXME("Shared resource allocationSize %llu, resource_size %llu.\n",
+                            (long long)info.allocationSize, (long long)res_info.resource_size);
+                info.allocationSize = res_info.resource_size;
+            }
+            else
+            {
+                ERR("Zero shared resource size.\n");
+            }
         }
     }
     else if (device->phys_dev->external_memory_align && (mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) &&
@@ -2881,7 +2927,7 @@ VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *allo
 
         if (device->funcs.p_vkGetMemoryFdKHR(device->host_device, &get_fd_info, &fd) == VK_SUCCESS)
         {
-            memory->handle = create_gpu_resource(fd, handle_export_info ? handle_export_info->name : NULL);
+            memory->handle = create_gpu_resource(fd, handle_export_info ? handle_export_info->name : NULL, alloc_info->allocationSize);
             memory->access = handle_export_info ? handle_export_info->dwAccess : GENERIC_ALL;
             if (handle_export_info && handle_export_info->pAttributes)
                 memory->inherit = handle_export_info->pAttributes->bInheritHandle;
@@ -4269,7 +4315,7 @@ VkResult wine_vkCreateSemaphore(VkDevice device_handle, const VkSemaphoreCreateI
 
         if ((res = device->funcs.p_vkGetSemaphoreFdKHR(device->host_device, &fd_info, &fd)) == VK_SUCCESS)
         {
-            object->handle = create_gpu_resource(fd, export_handle_info ? export_handle_info->name : NULL);
+            object->handle = create_gpu_resource(fd, export_handle_info ? export_handle_info->name : NULL, 0);
             close(fd);
         }
 
@@ -4308,7 +4354,7 @@ VkResult wine_vkCreateSemaphore(VkDevice device_handle, const VkSemaphoreCreateI
 
         if ((res = device->funcs.p_vkGetSemaphoreFdKHR(device->host_device, &fd_info, &fd)) == VK_SUCCESS)
         {
-            object->handle = create_gpu_resource(fd, export_handle_info ? export_handle_info->name : NULL);
+            object->handle = create_gpu_resource(fd, export_handle_info ? export_handle_info->name : NULL, 0);
             close(fd);
         }
 
