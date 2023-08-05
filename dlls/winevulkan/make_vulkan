@@ -220,7 +220,7 @@ FUNCTION_OVERRIDES = {
     "vkWaitSemaphores" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueBindSparse" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "vkQueueSubmit" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE, "extra_param" : "pSubmits"},
-    "vkQueueSubmit2" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkQueueSubmit2" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE, "extra_param" : "pSubmits"},
 
     # VK_KHR_surface
     "vkDestroySurfaceKHR" : {"dispatch" : True, "driver" : True, "thunk" : ThunkType.NONE},
@@ -295,7 +295,7 @@ FUNCTION_OVERRIDES = {
     "vkWaitSemaphoresKHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
 
     # VK_KHR_synchronization2
-    "vkQueueSubmit2KHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "vkQueueSubmit2KHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE, "extra_param" : "pSubmits"},
 }
 
 STRUCT_CHAIN_CONVERSIONS = {
