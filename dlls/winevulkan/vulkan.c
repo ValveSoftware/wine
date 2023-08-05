@@ -2923,6 +2923,111 @@ error:
     destroy_keyed_mutex(device, memory);
 }
 
+static VkResult acquire_keyed_mutex(struct wine_device *device, struct wine_device_memory *memory, uint64_t key,
+        uint32_t timeout_ms)
+{
+    ULONG end_wait, curr_tick, remaining_wait;
+    VkSemaphoreWaitInfo wait_info = { 0 };
+    uint64_t timeline;
+    VkResult vr;
+
+    if (!memory->keyed_mutex_shm)
+        return VK_ERROR_UNKNOWN;
+
+    wait_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_WAIT_INFO;
+    wait_info.semaphoreCount = 1;
+    wait_info.pSemaphores = &memory->keyed_mutex_sem;
+    wait_info.pValues = &timeline;
+
+    end_wait = NtGetTickCount() + timeout_ms;
+
+    while (1)
+    {
+        pthread_mutex_lock(&memory->keyed_mutex_shm->mutex);
+
+        if (memory->keyed_mutex_shm->acquired_to_instance)
+        {
+            if ((vr = get_semaphore_value(device, memory->keyed_mutex_sem, &timeline)) != VK_SUCCESS)
+            {
+                pthread_mutex_unlock(&memory->keyed_mutex_shm->mutex);
+                return VK_ERROR_UNKNOWN;
+            }
+            assert(timeline == memory->keyed_mutex_shm->timeline_value
+                    || timeline == memory->keyed_mutex_shm->timeline_value + 1);
+            if (timeline == memory->keyed_mutex_shm->timeline_value + 1)
+            {
+                /* released from queue. */
+                assert(memory->keyed_mutex_shm->timeline_queued_release == timeline);
+                memory->keyed_mutex_shm->timeline_queued_release = 0;
+                ++memory->keyed_mutex_shm->timeline_value;
+                memory->keyed_mutex_shm->acquired_to_instance = 0;
+            }
+        }
+
+        if (memory->keyed_mutex_shm->acquired_to_instance == memory->keyed_mutex_instance_id
+                && !memory->keyed_mutex_shm->timeline_queued_release)
+        {
+            /* Already acquired to this device. */
+            pthread_mutex_unlock(&memory->keyed_mutex_shm->mutex);
+            return VK_ERROR_UNKNOWN;
+        }
+        if (!memory->keyed_mutex_shm->acquired_to_instance && memory->keyed_mutex_shm->key == key)
+        {
+            /* Can acquire. */
+            memory->keyed_mutex_shm->acquired_to_instance = memory->keyed_mutex_instance_id;
+            pthread_mutex_unlock(&memory->keyed_mutex_shm->mutex);
+            return VK_SUCCESS;
+        }
+        curr_tick = NtGetTickCount();
+        if (!timeout_ms || curr_tick >= end_wait)
+        {
+            pthread_mutex_unlock(&memory->keyed_mutex_shm->mutex);
+            return VK_TIMEOUT;
+        }
+        remaining_wait = timeout_ms == INFINITE ? INFINITE : end_wait - curr_tick;
+        timeline = memory->keyed_mutex_shm->timeline_value + 1;
+        pthread_mutex_unlock(&memory->keyed_mutex_shm->mutex);
+
+        vr = wait_semaphores(device, &wait_info, remaining_wait * 1000000ull);
+        if (vr != VK_SUCCESS && vr != VK_TIMEOUT)
+        {
+            ERR("vkWaitSemaphores failed, vr %d.\n", vr);
+            return VK_ERROR_UNKNOWN;
+        }
+    }
+}
+
+static VkResult release_keyed_mutex(struct wine_device *device, struct wine_device_memory *memory, uint64_t key,
+        uint64_t *timeline_value)
+{
+    if (!memory->keyed_mutex_shm)
+        return VK_ERROR_UNKNOWN;
+
+    pthread_mutex_lock(&memory->keyed_mutex_shm->mutex);
+    if (memory->keyed_mutex_shm->acquired_to_instance != memory->keyed_mutex_instance_id
+            || memory->keyed_mutex_shm->timeline_queued_release)
+    {
+        pthread_mutex_unlock(&memory->keyed_mutex_shm->mutex);
+        return VK_ERROR_UNKNOWN;
+    }
+    memory->keyed_mutex_shm->key = key;
+    if (timeline_value)
+    {
+        /* Return timeline value to signal from queue. */
+        *timeline_value = memory->keyed_mutex_shm->timeline_value + 1;
+        memory->keyed_mutex_shm->timeline_queued_release = *timeline_value;
+    }
+    else
+    {
+        /* Release immediately. */
+        memory->keyed_mutex_shm->acquired_to_instance = 0;
+        signal_timeline_sem(device, memory->keyed_mutex_sem, &memory->keyed_mutex_shm->timeline_value);
+    }
+    pthread_mutex_unlock(&memory->keyed_mutex_shm->mutex);
+
+    return VK_SUCCESS;
+}
+
 VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *alloc_info,
                                const VkAllocationCallbacks *allocator, VkDeviceMemory *ret,
                                void *win_pAllocateInfo)
@@ -4977,17 +5082,127 @@ struct struct_chain_def
     unsigned int size;
 };
 
+static VkResult process_keyed_mutexes(struct conversion_context *ctx, struct wine_device *device,
+        uint32_t submit_count, const void *submits_win, size_t submit_size, uint32_t **signal_counts,
+        VkSemaphoreSubmitInfo ***signal_infos)
+{
+    VkWin32KeyedMutexAcquireReleaseInfoKHR *keyed_mutex_info;
+    struct wine_device_memory *memory;
+    VkResult ret = VK_ERROR_UNKNOWN;
+    uint32_t i, j, signal_count = 0;
+    void *ptr;
+
+    for (i = 0; i < submit_count; ++i)
+    {
+        ptr = (char *)submits_win + i * submit_size;
+        if (!(keyed_mutex_info = wine_vk_find_struct(ptr, WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR)))
+            continue;
+        for (j = 0; j < keyed_mutex_info->acquireCount; ++j)
+        {
+            memory = wine_device_memory_from_handle(keyed_mutex_info->pAcquireSyncs[j]);
+            if ((ret = acquire_keyed_mutex(device, memory, keyed_mutex_info->pAcquireKeys[j],
+                    keyed_mutex_info->pAcquireTimeouts[j])) == VK_SUCCESS)
+                continue;
+            while (j)
+            {
+                --j;
+                memory = wine_device_memory_from_handle(keyed_mutex_info->pAcquireSyncs[j]);
+                release_keyed_mutex(device, memory, keyed_mutex_info->pAcquireKeys[j], NULL);
+            }
+            goto error;
+        }
+        /* Pre-check release error conditions. */
+        for (j = 0; j < keyed_mutex_info->releaseCount; ++j)
+        {
+            memory = wine_device_memory_from_handle(keyed_mutex_info->pReleaseSyncs[j]);
+            if (!memory->keyed_mutex_shm)
+                goto error;
+            if (memory->keyed_mutex_shm->acquired_to_instance != memory->keyed_mutex_instance_id)
+                goto error;
+        }
+        signal_count += keyed_mutex_info->releaseCount;
+    }
+
+    if (!signal_count)
+    {
+        *signal_counts = NULL;
+        return VK_SUCCESS;
+    }
+    *signal_counts = conversion_context_alloc(ctx, sizeof(**signal_counts) * submit_count);
+    *signal_infos = conversion_context_alloc(ctx, sizeof(**signal_infos) * submit_count);
+    for (i = 0; i < submit_count; ++i)
+    {
+        ptr = (char *)submits_win + i * submit_size;
+        if (!(keyed_mutex_info = wine_vk_find_struct(ptr, WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR)))
+        {
+            (*signal_counts)[i] = 0;
+            continue;
+        }
+        (*signal_counts)[i] = keyed_mutex_info->releaseCount;
+        (*signal_infos)[i] = conversion_context_alloc(ctx, sizeof(***signal_infos) * keyed_mutex_info->releaseCount);
+        for (j = 0; j < keyed_mutex_info->releaseCount; ++j)
+        {
+            memory = wine_device_memory_from_handle(keyed_mutex_info->pReleaseSyncs[j]);
+            (*signal_infos)[i][j].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
+            (*signal_infos)[i][j].pNext = NULL;
+            (*signal_infos)[i][j].semaphore = memory->keyed_mutex_sem;
+            (*signal_infos)[i][j].stageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+            (*signal_infos)[i][j].deviceIndex = 0;
+            ret = release_keyed_mutex(device, memory, keyed_mutex_info->pReleaseKeys[j], &(*signal_infos)[i][j].value);
+            if (ret != VK_SUCCESS)
+            {
+                /* This should only be possible if a racing submit queued release before us, currently not handled. */
+                ERR("release_keyed_mutex failed, ret %d.\n", ret);
+                (*signal_infos)[i][j].value = 0;
+            }
+        }
+    }
+
+    return VK_SUCCESS;
+
+error:
+    while (i)
+    {
+        --i;
+        ptr = (char *)submits_win + i * submit_size;
+        if (!(keyed_mutex_info = wine_vk_find_struct(ptr, WIN32_KEYED_MUTEX_ACQUIRE_RELEASE_INFO_KHR)))
+            continue;
+        for (j = 0; j < keyed_mutex_info->acquireCount; ++j)
+        {
+            memory = wine_device_memory_from_handle(keyed_mutex_info->pAcquireSyncs[j]);
+            release_keyed_mutex(device, memory, keyed_mutex_info->pAcquireKeys[j], NULL);
+        }
+    }
+    return ret;
+}
+
+static void duplicate_array_for_unwrapping_copy_size(struct conversion_context *ctx, void **ptr, unsigned int size,
+        unsigned int copy_size)
+{
+    void *out;
+
+    if (!size)
+        return;
+
+    out = conversion_context_alloc(ctx, size);
+    if (*ptr)
+        memcpy(out, *ptr, copy_size);
+    *ptr = out;
+}
+
 VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo *submits_orig, VkFence fence,
         void *submits_win_ptr)
 {
     struct wine_queue *queue = wine_queue_from_handle(queue_handle);
     struct wine_device *device = queue->device;
-    VkTimelineSemaphoreSubmitInfo *timeline_submit_info;
+    VkTimelineSemaphoreSubmitInfo *timeline_submit_info, ts_info_copy;
     const VkSubmitInfo *submits_win = submits_win_ptr;
     VkD3D12FenceSubmitInfoKHR *d3d12_submit_info;
     const uint64_t **values;
     struct conversion_context ctx;
     VkSubmitInfo *submits;
+    VkSemaphoreSubmitInfo **km_infos;
+    uint32_t *km_counts;
     unsigned int i, j;
     VkResult ret;
 
@@ -4995,6 +5210,9 @@ VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const V
 
     init_conversion_context(&ctx);
     MEMDUP(&ctx, submits, submits_orig, submit_count);
+    if ((ret = process_keyed_mutexes(&ctx, device, submit_count, submits_win_ptr, sizeof(*submits), &km_counts, &km_infos)))
+        return ret;
+
     for (i = 0; i < submit_count; ++i)
     {
         timeline_submit_info = wine_vk_find_struct(&submits[i], TIMELINE_SEMAPHORE_SUBMIT_INFO);
@@ -5024,6 +5242,36 @@ VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const V
         else
             values = NULL;
         unwrap_semaphore_array(&submits[i].pSignalSemaphores, values, submits[i].signalSemaphoreCount, &ctx, TRUE, device);
+        if (km_counts && km_counts[i])
+        {
+            if (timeline_submit_info)
+            {
+                ts_info_copy = *timeline_submit_info;
+                timeline_submit_info = &ts_info_copy;
+                duplicate_array_for_unwrapping_copy_size(&ctx, (void **)&timeline_submit_info->pSignalSemaphoreValues,
+                        (timeline_submit_info->signalSemaphoreValueCount + km_counts[i]) * sizeof(*timeline_submit_info->pSignalSemaphoreValues),
+                        timeline_submit_info->signalSemaphoreValueCount * sizeof(*timeline_submit_info->pSignalSemaphoreValues));
+            }
+            else
+            {
+                timeline_submit_info = &ts_info_copy;
+                timeline_submit_info->sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+                timeline_submit_info->pNext = submits[i].pNext;
+                timeline_submit_info->waitSemaphoreValueCount = 0;
+                timeline_submit_info->signalSemaphoreValueCount = 0;
+                timeline_submit_info->pSignalSemaphoreValues = conversion_context_alloc(&ctx, km_counts[i] * sizeof(*timeline_submit_info->pSignalSemaphoreValues));
+                submits[i].pNext = timeline_submit_info;
+            }
+            duplicate_array_for_unwrapping_copy_size(&ctx, (void **)&submits[i].pSignalSemaphores,
+                    (submits[i].signalSemaphoreCount + km_counts[i]) * sizeof(*submits[i].pSignalSemaphores),
+                    submits[i].signalSemaphoreCount * sizeof(*submits[i].pSignalSemaphores));
+            for (j = 0; j < km_counts[i]; ++j)
+            {
+                ((uint64_t *)timeline_submit_info->pSignalSemaphoreValues)[j + timeline_submit_info->signalSemaphoreValueCount++]
+                        = km_infos[i][j].value;
+                ((VkSemaphore *)submits[i].pSignalSemaphores)[j + submits[i].signalSemaphoreCount++] = km_infos[i][j].semaphore;
+            }
+        }
 
         if (submits[i].pCommandBuffers && submits[i].commandBufferCount)
         {
@@ -5042,20 +5290,17 @@ VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const V
 
 static void duplicate_array_for_unwrapping(struct conversion_context *ctx, void **ptr, unsigned int size)
 {
-    void *out;
-
-    if (!*ptr || !size)
-        return;
-
-    out = conversion_context_alloc(ctx, size);
-    memcpy(out, *ptr, size);
-    *ptr = out;
+    duplicate_array_for_unwrapping_copy_size(ctx, ptr, size, size);
 }
 
-static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo2 *submits_orig, VkFence fence, bool khr)
+static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, const VkSubmitInfo2 *submits_orig,
+        VkFence fence, bool khr, void *submits_win_ptr)
 {
     struct wine_queue *queue = wine_queue_from_handle(queue_handle);
+    struct wine_device *device = queue->device;
     struct conversion_context ctx;
+    VkSemaphoreSubmitInfo **km_infos;
+    uint32_t *km_counts, count;
     VkSubmitInfo2 *submits;
     unsigned int i, j;
     VkResult ret;
@@ -5064,6 +5309,8 @@ static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, c
 
     init_conversion_context(&ctx);
     MEMDUP(&ctx, submits, submits_orig, submit_count);
+    if ((ret = process_keyed_mutexes(&ctx, device, submit_count, submits_win_ptr, sizeof(*submits), &km_counts, &km_infos)))
+        return ret;
     for (i = 0; i < submit_count; ++i)
     {
         duplicate_array_for_unwrapping(&ctx, (void **)&submits[i].pWaitSemaphoreInfos,
@@ -5072,11 +5319,16 @@ static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, c
             unwrap_semaphore(queue->device, &((VkSemaphoreSubmitInfo *)submits[i].pWaitSemaphoreInfos)[j].semaphore,
                     &((VkSemaphoreSubmitInfo *)submits[i].pWaitSemaphoreInfos)[j].value, FALSE);
 
-        duplicate_array_for_unwrapping(&ctx, (void **)&submits[i].pSignalSemaphoreInfos,
+        count = submits[i].signalSemaphoreInfoCount + (km_counts ? km_counts[i] : 0);
+        duplicate_array_for_unwrapping_copy_size(&ctx, (void **)&submits[i].pSignalSemaphoreInfos,
+                count * sizeof(*submits[i].pSignalSemaphoreInfos),
                 submits[i].signalSemaphoreInfoCount * sizeof(*submits[i].pSignalSemaphoreInfos));
         for (j = 0; j < submits[i].signalSemaphoreInfoCount; ++j)
             unwrap_semaphore(queue->device, &((VkSemaphoreSubmitInfo *)submits[i].pSignalSemaphoreInfos)[j].semaphore,
                     &((VkSemaphoreSubmitInfo *)submits[i].pSignalSemaphoreInfos)[j].value, TRUE);
+        for (; j < count; ++j)
+            ((VkSemaphoreSubmitInfo *)submits[i].pSignalSemaphoreInfos)[j] = km_infos[i][j - submits[i].signalSemaphoreInfoCount];
+        submits[i].signalSemaphoreInfoCount = count;
 
         if (submits[i].pCommandBufferInfos && submits[i].commandBufferInfoCount)
         {
@@ -5096,14 +5348,16 @@ static VkResult vk_queue_submit_2(VkQueue queue_handle, uint32_t submit_count, c
     return ret;
 }
 
-VkResult wine_vkQueueSubmit2(VkQueue queue, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence)
+VkResult wine_vkQueueSubmit2(VkQueue queue, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence,
+        void *submits_win)
 {
-    return vk_queue_submit_2(queue, submit_count, submits, fence, false);
+    return vk_queue_submit_2(queue, submit_count, submits, fence, false, submits_win);
 }
 
-VkResult wine_vkQueueSubmit2KHR(VkQueue queue, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence)
+VkResult wine_vkQueueSubmit2KHR(VkQueue queue, uint32_t submit_count, const VkSubmitInfo2 *submits, VkFence fence,
+        void *submits_win)
 {
-    return vk_queue_submit_2(queue, submit_count, submits, fence, true);
+    return vk_queue_submit_2(queue, submit_count, submits, fence, true, submits_win);
 }
 
 VkResult wine_vkQueuePresentKHR(VkQueue queue_handle, const VkPresentInfoKHR *present_info)

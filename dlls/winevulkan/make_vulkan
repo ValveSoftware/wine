@@ -182,7 +182,7 @@ FUNCTION_OVERRIDES = {
     "vkWaitSemaphores" : {"dispatch" : True},
     "vkQueueBindSparse" : {"dispatch" : True},
     "vkQueueSubmit" : {"dispatch" : True, "extra_param" : "pSubmits"},
-    "vkQueueSubmit2" : {"dispatch" : True},
+    "vkQueueSubmit2" : {"dispatch" : True, "extra_param" : "pSubmits"},
     "vkDestroySemaphore" : {"dispatch" : True},
 
     # VK_KHR_external_fence_capabilities
@@ -209,7 +209,7 @@ FUNCTION_OVERRIDES = {
     "vkWaitSemaphoresKHR" : {"dispatch" : True},
 
     # VK_KHR_synchronization2
-    "vkQueueSubmit2KHR" : {"dispatch" : True},
+    "vkQueueSubmit2KHR" : {"dispatch" : True, "extra_param" : "pSubmits"},
 }
 
 # functions for which a user driver entry must be generated
