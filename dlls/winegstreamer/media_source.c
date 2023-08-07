@@ -44,12 +44,11 @@ struct media_stream
     LONG token_queue_count;
     LONG token_queue_cap;
 
+    CRITICAL_SECTION cs;
+
     DWORD stream_id;
     BOOL active;
     BOOL eos;
-
-    DWORD busy;
-    CONDITION_VARIABLE cond;
 };
 
 enum source_async_op
@@ -539,12 +538,17 @@ static void wait_on_sample(struct media_stream *stream, IUnknown *token)
 
     TRACE("%p, %p\n", stream, token);
 
-    stream->busy = TRUE;
+    EnterCriticalSection(&stream->cs);
+
+    if (!stream->wg_stream)
+    {
+        LeaveCriticalSection(&stream->cs);
+        return;
+    }
+
     LeaveCriticalSection(&source->cs);
     ret = wg_parser_stream_get_buffer(source->wg_parser, stream->wg_stream, &buffer);
     EnterCriticalSection(&source->cs);
-    stream->busy = FALSE;
-    WakeConditionVariable(&stream->cond);
 
     if (source->state == SOURCE_SHUTDOWN)
         WARN("media source has been shutdown, returning\n");
@@ -556,6 +560,8 @@ static void wait_on_sample(struct media_stream *stream, IUnknown *token)
         IMFMediaEventQueue_QueueEventParamVar(stream->event_queue, MEEndOfStream, &GUID_NULL, S_OK, &empty_var);
         dispatch_end_of_presentation(source);
     }
+
+    LeaveCriticalSection(&stream->cs);
 }
 
 static HRESULT WINAPI source_async_commands_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
@@ -715,6 +721,8 @@ static ULONG WINAPI media_stream_Release(IMFMediaStream *iface)
         IMFStreamDescriptor_Release(stream->descriptor);
         IMFMediaEventQueue_Release(stream->event_queue);
         flush_token_queue(stream, FALSE);
+        stream->cs.DebugInfo->Spare[0] = 0;
+        DeleteCriticalSection(&stream->cs);
         free(stream);
     }
 
@@ -878,6 +886,9 @@ static HRESULT media_stream_create(IMFMediaSource *source, DWORD id,
     object->active = FALSE;
     object->eos = FALSE;
     object->wg_stream = wg_parser_get_stream(wg_parser, id);
+
+    InitializeCriticalSection(&object->cs);
+    object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": cs");
 
     TRACE("Created stream object %p.\n", object);
 
@@ -1416,8 +1427,10 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
     {
         struct media_stream *stream = source->streams[i];
         wg_parser_stream_disable(stream->wg_stream);
-        while (stream->busy)
-            SleepConditionVariableCS(&stream->cond, &source->cs, INFINITE);
+
+        EnterCriticalSection(&stream->cs);
+        stream->wg_stream = NULL;
+        LeaveCriticalSection(&stream->cs);
     }
 
     wg_parser_disconnect(source->wg_parser);
