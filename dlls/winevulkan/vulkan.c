@@ -135,8 +135,8 @@ static void signal_timeline_sem(struct wine_device *device, VkSemaphore sem, uin
 
     info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_SIGNAL_INFO;
     info.semaphore = sem;
-    ++*value;
-    info.value = *value;
+    info.value = *value + 1;
+    __atomic_store_n(value, info.value, __ATOMIC_RELEASE);
     if (device->phys_dev->api_version < VK_API_VERSION_1_2 || device->phys_dev->instance->api_version < VK_API_VERSION_1_2)
         res = device->funcs.p_vkSignalSemaphoreKHR(device->host_device, &info);
     else
@@ -3863,14 +3863,13 @@ static int semaphore_process(struct wine_device *device, struct wine_semaphore *
     int virtual_value_updated = 0;
     uint64_t value, virtual_value;
     VkResult res;
+    uint32_t i;
 
     /* Check local pending signal ops completion, update shared semaphore. */
     d3d12_semaphore_lock( sem );
+    virtual_value = sem->d3d12_fence_shm->virtual_value;
     LIST_FOR_EACH_ENTRY_SAFE(op, op2, &sem->pending_signals, struct pending_d3d12_fence_op, entry)
     {
-        if (op->virtual_value <= sem->d3d12_fence_shm->virtual_value)
-            goto signal_op_complete;
-
         res = get_semaphore_value(device, op->local_sem.sem, &value);
         if (res != VK_SUCCESS)
         {
@@ -3887,28 +3886,64 @@ static int semaphore_process(struct wine_device *device, struct wine_semaphore *
             continue;
         }
 
+        virtual_value = max( sem->d3d12_fence_shm->virtual_value, op->virtual_value );
         sem->d3d12_fence_shm->virtual_value = op->virtual_value;
         virtual_value_updated = 1;
 signal_op_complete:
-        ++op->local_sem.value;
+        op->local_sem.value = value;
         release_fence_op(device, op);
     }
 
+    if (sem->d3d12_fence_shm->virtual_value < virtual_value)
+    {
+        uint32_t idx = sem->d3d12_fence_shm->reset_backlog_count;
+
+        if (debug_level >= 3)
+            fprintf(stderr, "warn:winevulkan:semaphore_process resetting semaphore %p virtual value.\n", sem);
+        if (idx == ARRAY_SIZE(sem->d3d12_fence_shm->reset_backlog))
+        {
+            sem->d3d12_fence_shm->last_dropped_reset_physical = sem->d3d12_fence_shm->reset_backlog[0].physical_at_reset;
+            --idx;
+            memmove(&sem->d3d12_fence_shm->reset_backlog[0], &sem->d3d12_fence_shm->reset_backlog[1],
+                    sizeof(*sem->d3d12_fence_shm->reset_backlog) * sem->d3d12_fence_shm->reset_backlog_count);
+        }
+        else
+        {
+            ++sem->d3d12_fence_shm->reset_backlog_count;
+        }
+        sem->d3d12_fence_shm->last_reset_physical = sem->d3d12_fence_shm->physical_value + 1;
+        sem->d3d12_fence_shm->reset_backlog[idx].physical_at_reset = sem->d3d12_fence_shm->last_reset_physical;
+        sem->d3d12_fence_shm->reset_backlog[idx].virtual_before_reset = virtual_value;
+    }
     if (virtual_value_updated)
         signal_timeline_sem(device, sem->fence_timeline_semaphore, &sem->d3d12_fence_shm->physical_value);
     global_sem_wait_value = sem->d3d12_fence_shm->physical_value + 1;
-    virtual_value = sem->d3d12_fence_shm->virtual_value;
-    d3d12_semaphore_unlock(sem);
 
     /* Complete satisfied local waits. */
     LIST_FOR_EACH_ENTRY_SAFE(op, op2, &sem->pending_waits, struct pending_d3d12_fence_op, entry)
     {
         if (op->virtual_value > virtual_value)
-            continue;
+        {
+            if (op->shared_physical_value > sem->d3d12_fence_shm->last_reset_physical)
+                continue;
+            for (i = 0; i < sem->d3d12_fence_shm->reset_backlog_count; ++i)
+            {
+                if (sem->d3d12_fence_shm->reset_backlog[i].physical_at_reset >= op->shared_physical_value
+                        && sem->d3d12_fence_shm->reset_backlog[i].virtual_before_reset >= op->virtual_value)
+                    break;
+            }
+            if (i == sem->d3d12_fence_shm->reset_backlog_count)
+            {
+                if (sem->d3d12_fence_shm->last_dropped_reset_physical < op->shared_physical_value)
+                    continue;
+                fprintf(stderr, "err:winevulkan:semaphore_process wait needs reset backlog beyond cut off.\n");
+            }
+        }
 
         signal_timeline_sem(device, op->local_sem.sem, &op->local_sem.value);
         release_fence_op(device, op);
     }
+    d3d12_semaphore_unlock(sem);
 
     /* Only poll shared semaphore if there are waits pending. */
     if (list_empty(&sem->pending_waits))
@@ -4087,6 +4122,7 @@ static void add_sem_wait_op(struct wine_device *device, struct wine_semaphore *s
     if ((op = get_free_fence_op(device)))
     {
         op->virtual_value = virtual_value;
+        op->shared_physical_value = __atomic_load_n(&semaphore->d3d12_fence_shm->physical_value, __ATOMIC_ACQUIRE) + 1;
         *phys_semaphore = op->local_sem.sem;
         *phys_wait_value = op->local_sem.value + 1;
         list_add_tail(&semaphore->pending_waits, &op->entry);

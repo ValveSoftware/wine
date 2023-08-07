@@ -71,6 +71,7 @@ struct pending_d3d12_fence_op
     struct wine_vk_mapping mapping;
     struct list entry;
     uint64_t virtual_value;
+    uint64_t shared_physical_value;
 };
 
 struct wine_device
@@ -375,6 +376,15 @@ struct wine_semaphore
         /* Shared mem access mutex. The non-shared parts access is guarded with device global signaller_mutex. */
         pthread_mutex_t mutex;
         uint64_t virtual_value, physical_value;
+        uint64_t last_reset_physical;
+        uint64_t last_dropped_reset_physical;
+        struct
+        {
+            uint64_t physical_at_reset;
+            uint64_t virtual_before_reset;
+        }
+        reset_backlog[16];
+        uint32_t reset_backlog_count;
     } *d3d12_fence_shm;
     /* The Vulkan shared semaphore is only waited or signaled in signaller_worker(). */
     VkSemaphore fence_timeline_semaphore;
