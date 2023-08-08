@@ -139,9 +139,26 @@ static void signal_timeline_sem(struct wine_device *device, VkSemaphore sem, uin
     info.semaphore = sem;
     ++*value;
     info.value = *value;
-    res = device->funcs.p_vkSignalSemaphore(device->device, &info);
+    if (device->phys_dev->api_version < VK_API_VERSION_1_2 || device->phys_dev->instance->api_version < VK_API_VERSION_1_2)
+        res = device->funcs.p_vkSignalSemaphoreKHR(device->device, &info);
+    else
+        res = device->funcs.p_vkSignalSemaphore(device->device, &info);
     if (res != VK_SUCCESS)
         fprintf(stderr, "err:winevulkan:signal_timeline_sem vkSignalSemaphore failed, res=%d.\n", res);
+}
+
+static VkResult wait_semaphores(struct wine_device *device, const VkSemaphoreWaitInfo *wait_info, uint64_t timeout)
+{
+    if (device->phys_dev->api_version < VK_API_VERSION_1_2 || device->phys_dev->instance->api_version < VK_API_VERSION_1_2)
+        return device->funcs.p_vkWaitSemaphoresKHR(device->device, wait_info, timeout);
+    return device->funcs.p_vkWaitSemaphores(device->device, wait_info, timeout);
+}
+
+static VkResult get_semaphore_value(struct wine_device *device, VkSemaphore sem, uint64_t *value)
+{
+    if (device->phys_dev->api_version < VK_API_VERSION_1_2 || device->phys_dev->instance->api_version < VK_API_VERSION_1_2)
+        return device->funcs.p_vkGetSemaphoreCounterValueKHR(device->device, sem, value);
+    return device->funcs.p_vkGetSemaphoreCounterValue(device->device, sem, value);
 }
 
 static VkBool32 debug_utils_callback_conversion(VkDebugUtilsMessageSeverityFlagBitsEXT severity,
@@ -3846,7 +3863,7 @@ static int semaphore_process(struct wine_device *device, struct wine_semaphore *
         if (op->virtual_value <= sem->d3d12_fence_shm->virtual_value)
             goto signal_op_complete;
 
-        res = device->funcs.p_vkGetSemaphoreCounterValue(device->device, op->local_sem.sem, &value);
+        res = get_semaphore_value(device, op->local_sem.sem, &value);
         if (res != VK_SUCCESS)
         {
             fprintf(stderr, "err:winevulkan:semaphore_process vkGetSemaphoreCounterValue failed, res=%d.\n", res);
@@ -3946,7 +3963,7 @@ void *signaller_worker(void *arg)
         device->sem_poll_update_value = device->sem_poll_update.value;
         pthread_cond_signal(&device->sem_poll_updated_cond);
         pthread_mutex_unlock(&device->signaller_mutex);
-        while ((res = device->funcs.p_vkWaitSemaphores(device->device, &wait_info, 3000000000ull)) == VK_TIMEOUT)
+        while ((res = wait_semaphores(device, &wait_info, 3000000000ull)) == VK_TIMEOUT)
         {
             if (wait_info.semaphoreCount > 1)
                 fprintf(stderr, "err:winevulkan:signaller_worker wait timed out with non-empty poll list.\n");
@@ -4079,9 +4096,10 @@ static void add_sem_wait_op(struct wine_device *device, struct wine_semaphore *s
 }
 
 static void add_sem_signal_op(struct wine_device *device, struct wine_semaphore *semaphore, uint64_t virtual_value,
-        VkSemaphore *phys_semaphore, uint64_t *phys_signal_value)
+        VkSemaphore *phys_semaphore, uint64_t *phys_signal_value, BOOL signal_immediate)
 {
     struct pending_d3d12_fence_op *op;
+    uint64_t value;
 
     pthread_mutex_lock(&device->signaller_mutex);
     if ((op = get_free_fence_op(device)))
@@ -4091,9 +4109,20 @@ static void add_sem_signal_op(struct wine_device *device, struct wine_semaphore 
         *phys_signal_value = op->local_sem.value + 1;
         list_add_tail(&semaphore->pending_signals, &op->entry);
         WINE_VK_ADD_NON_DISPATCHABLE_MAPPING(device->phys_dev->instance, semaphore, op->local_sem.sem, op);
-        signal_timeline_sem(device, device->sem_poll_update.sem, &device->sem_poll_update.value);
-        TRACE("added signal op, semaphore %p, %s, temp sem %s, %s.\n", semaphore, wine_dbgstr_longlong(virtual_value),
-                wine_dbgstr_longlong(op->local_sem.sem), wine_dbgstr_longlong(op->local_sem.value));
+        if (signal_immediate)
+        {
+            value = op->local_sem.value;
+            signal_timeline_sem(device, op->local_sem.sem, &value);
+            update_sem_poll_wait_processed(device);
+            TRACE("signal op %p, semaphore %p, %s, temp sem %s, %s.\n", op, semaphore, wine_dbgstr_longlong(virtual_value),
+                    wine_dbgstr_longlong(op->local_sem.sem), wine_dbgstr_longlong(op->local_sem.value));
+        }
+        else
+        {
+            signal_timeline_sem(device, device->sem_poll_update.sem, &device->sem_poll_update.value);
+            TRACE("added signal op, semaphore %p, %s, temp sem %s, %s.\n", semaphore, wine_dbgstr_longlong(virtual_value),
+                    wine_dbgstr_longlong(op->local_sem.sem), wine_dbgstr_longlong(op->local_sem.value));
+        }
     }
     else
     {
@@ -4495,7 +4524,10 @@ static NTSTATUS wine_vk_signal_semaphore(VkDevice device_handle, const VkSemapho
     TRACE("(%p, %p)\n", device, signal_info);
 
     if (semaphore->handle_type == VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_D3D12_FENCE_BIT)
-        add_sem_signal_op(device, semaphore, signal_info->value, &dup_signal_info.semaphore, &dup_signal_info.value);
+    {
+        add_sem_signal_op(device, semaphore, signal_info->value, &dup_signal_info.semaphore, &dup_signal_info.value, TRUE);
+        return VK_SUCCESS;
+    }
     else
         dup_signal_info.semaphore = wine_semaphore_host_handle(semaphore);
 
@@ -4528,7 +4560,7 @@ static void unwrap_semaphore(struct wine_device *device, VkSemaphore *sem_handle
         return;
     }
     if (signal)
-        add_sem_signal_op(device, sem, *value, sem_handle, value);
+        add_sem_signal_op(device, sem, *value, sem_handle, value, FALSE);
     else
         add_sem_wait_op(device, sem, *value, sem_handle, value);
 }
@@ -4574,7 +4606,7 @@ static VkResult unwrap_semaphore_array(const VkSemaphore **sems, const uint64_t 
             memcpy((void *)*values_out, values, count * sizeof(*values));
         }
         if (signal)
-            add_sem_signal_op(device, sem, values[i], &out[i], (uint64_t *)&(*values_out)[i]);
+            add_sem_signal_op(device, sem, values[i], &out[i], (uint64_t *)&(*values_out)[i], FALSE);
         else
             add_sem_wait_op(device, sem, values[i], &out[i], (uint64_t *)&(*values_out)[i]);
     }
