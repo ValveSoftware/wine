@@ -150,8 +150,6 @@ struct media_engine
     {
         IUnknown *audio;
         BOOL audio_optional;
-        IUnknown *video;
-        BOOL video_optional;
     } effects;
     struct
     {
@@ -1047,27 +1045,6 @@ static HRESULT media_engine_create_audio_effect(struct media_engine *engine, IMF
     return hr;
 }
 
-static HRESULT media_engine_create_video_effect(struct media_engine *engine, IMFTopologyNode **node)
-{
-    HRESULT hr;
-
-    *node = NULL;
-
-    if (!engine->effects.video)
-        return S_OK;
-
-    if (FAILED(hr = MFCreateTopologyNode(MF_TOPOLOGY_TRANSFORM_NODE, node)))
-        return hr;
-
-    IMFTopologyNode_SetObject(*node, (IUnknown *)engine->effects.video);
-    IMFTopologyNode_SetUINT32(*node, &MF_TOPONODE_NOSHUTDOWN_ON_REMOVE, FALSE);
-
-    IUnknown_Release(engine->effects.video);
-    engine->effects.video = NULL;
-
-    return hr;
-}
-
 static HRESULT media_engine_create_audio_renderer(struct media_engine *engine, IMFTopologyNode **node)
 {
     unsigned int category, role;
@@ -1239,7 +1216,7 @@ static HRESULT media_engine_create_topology(struct media_engine *engine, IMFMedi
     if (SUCCEEDED(hr = MFCreateTopology(&topology)))
     {
         IMFTopologyNode *sar_node = NULL, *audio_src = NULL, *audio_effect = NULL;
-        IMFTopologyNode *grabber_node = NULL, *video_src = NULL, *video_effect = NULL;
+        IMFTopologyNode *grabber_node = NULL, *video_src = NULL;
 
         if (engine->flags & MF_MEDIA_ENGINE_REAL_TIME_MODE)
             IMFTopology_SetUINT32(topology, &MF_LOW_LATENCY, TRUE);
@@ -1286,18 +1263,7 @@ static HRESULT media_engine_create_topology(struct media_engine *engine, IMFMedi
             if (FAILED(hr = media_engine_create_video_renderer(engine, &grabber_node)))
                 WARN("Failed to create video grabber node, hr %#lx.\n", hr);
 
-            if (FAILED(media_engine_create_video_effect(engine, &video_effect)))
-                WARN("Failed to create video effect node, hr %#lx.\n", hr);
-
-            if (grabber_node && video_src && video_effect)
-            {
-                IMFTopology_AddNode(topology, video_src);
-                IMFTopology_AddNode(topology, grabber_node);
-                IMFTopology_AddNode(topology, video_effect);
-                IMFTopologyNode_ConnectOutput(video_src, 0, video_effect, 0);
-                IMFTopologyNode_ConnectOutput(video_effect, 0, grabber_node, 0);
-            }
-            else if (grabber_node && video_src)
+            if (grabber_node && video_src)
             {
                 IMFTopology_AddNode(topology, video_src);
                 IMFTopology_AddNode(topology, grabber_node);
@@ -2660,20 +2626,9 @@ static HRESULT WINAPI media_engine_IsProtected(IMFMediaEngineEx *iface, BOOL *pr
 
 static HRESULT WINAPI media_engine_InsertVideoEffect(IMFMediaEngineEx *iface, IUnknown *effect, BOOL is_optional)
 {
-    struct media_engine *impl = impl_from_IMFMediaEngineEx(iface);
     FIXME("%p, %p, %d stub.\n", iface, effect, is_optional);
 
-    if (!effect)
-        return E_POINTER;
-
-    if (impl->effects.video)
-        return MF_E_INVALIDREQUEST;
-
-    impl->effects.video = effect;
-    IUnknown_AddRef(impl->effects.video);
-    impl->effects.video_optional = is_optional;
-
-    return S_OK;
+    return E_NOTIMPL;
 }
 
 static HRESULT WINAPI media_engine_InsertAudioEffect(IMFMediaEngineEx *iface, IUnknown *effect, BOOL is_optional)
