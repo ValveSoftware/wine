@@ -434,7 +434,7 @@ static LRESULT WINAPI ime_ui_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LP
     case WM_IME_CONTROL:
         FIXME( "hwnd %p, himc %p, msg %s, wparam %s, lparam %#Ix stub!\n", hwnd, himc,
                debugstr_wm_ime(msg), debugstr_imc(wparam), lparam );
-        return 1;
+        return 0;
     }
 
     return DefWindowProcW( hwnd, msg, wparam, lparam );
