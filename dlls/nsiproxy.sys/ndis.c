@@ -105,6 +105,8 @@ struct if_entry
 static struct list if_list = LIST_INIT( if_list );
 static pthread_mutex_t if_list_lock = PTHREAD_MUTEX_INITIALIZER;
 
+static BOOL have_ethernet_iface;
+
 static struct if_entry *find_entry_from_index( UINT index )
 {
     struct if_entry *entry;
@@ -275,7 +277,22 @@ static WCHAR *strdupAtoW( const char *str )
     return ret;
 }
 
-static struct if_entry *add_entry( UINT index, char *name )
+static int fake_ethernet_adapter(void)
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *s;
+        if ((s = getenv( "WINE_FAKE_ETH_PRESENCE" )))
+            cached = atoi( s );
+        else
+            cached = (s = getenv( "SteamGameId" )) && !strcmp( s, "1293830" );
+    }
+    return cached;
+}
+
+static struct if_entry *add_entry( UINT index, const char *name )
 {
     struct if_entry *entry;
     int name_len = strlen( name );
@@ -304,6 +321,10 @@ static struct if_entry *add_entry( UINT index, char *name )
     memcpy( entry->if_guid.Data4 + 2, "NetDev", 6 );
 
     list_add_tail( &if_list, &entry->entry );
+
+    if (entry->if_luid.Info.IfType == MIB_IF_TYPE_ETHERNET)
+        have_ethernet_iface = TRUE;
+
     return entry;
 }
 
@@ -311,6 +332,7 @@ static unsigned int update_if_table( void )
 {
     struct if_nameindex *indices = if_nameindex(), *entry;
     unsigned int append_count = 0;
+    struct if_entry *if_entry;
 
     for (entry = indices; entry->if_index; entry++)
     {
@@ -319,6 +341,14 @@ static unsigned int update_if_table( void )
     }
 
     if_freenameindex( indices );
+
+    if (!have_ethernet_iface && fake_ethernet_adapter() && (if_entry = add_entry( 0xdeadbeef, "eth0faked" )))
+    {
+        if_entry->if_type = if_entry->if_luid.Info.IfType = MIB_IF_TYPE_ETHERNET;
+        have_ethernet_iface = TRUE;
+        ++append_count;
+    }
+
     return append_count;
 }
 
