@@ -3040,7 +3040,7 @@ static void window_update_fshack( struct x11drv_win_data *data, const RECT *wind
 
         client_rect_host.right = min( max( client_rect_host.right, 1 ), 65535 );
         client_rect_host.bottom = min( max( client_rect_host.bottom, 1 ), 65535 );
-        XMoveResizeWindow( gdi_display, data->client_window, top_left.x, top_left.y, client_rect_host.right, client_rect_host.bottom );
+        XMoveResizeWindow( data->display, data->client_window, top_left.x, top_left.y, client_rect_host.right, client_rect_host.bottom );
 
         sync_gl_drawable( data->hwnd, !data->whole_window );
         invalidate_vk_surfaces( data->hwnd );
