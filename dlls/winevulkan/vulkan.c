@@ -3990,6 +3990,8 @@ static void substitute_function_name(const char **name)
         *name = "vkGetSemaphoreFdKHR";
     else if (!strcmp(*name, "vkImportSemaphoreWin32HandleKHR"))
         *name = "vkImportSemaphoreFdKHR";
+    else if (!strcmp(*name, "wine_vkAcquireKeyedMutex") || !strcmp(*name, "wine_vkReleaseKeyedMutex"))
+        *name = "vkImportSemaphoreFdKHR";
 }
 
 #ifdef _WIN64
@@ -5468,4 +5470,14 @@ VkResult wine_vkQueueBindSparse(VkQueue queue_handle, uint32_t bind_info_count, 
     ret = queue->device->funcs.p_vkQueueBindSparse(queue->host_queue, bind_info_count, bind_info, fence);
     free_conversion_context(&ctx);
     return ret;
+}
+
+VkResult wine_wine_vkAcquireKeyedMutex(VkDevice device, VkDeviceMemory memory, uint64_t key, uint32_t timeout_ms)
+{
+    return acquire_keyed_mutex(wine_device_from_handle(device), wine_device_memory_from_handle(memory), key, timeout_ms);
+}
+
+VkResult wine_wine_vkReleaseKeyedMutex(VkDevice device, VkDeviceMemory memory, uint64_t key)
+{
+    return release_keyed_mutex(wine_device_from_handle(device), wine_device_memory_from_handle(memory), key, NULL);
 }
