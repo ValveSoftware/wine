@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<registry>
+    <commands>
+        <command successcodes="VK_SUCCESS,VK_TIMEOUT" errorcodes="VK_ERROR_UNKNOWN">
+            <proto><type>VkResult</type> <name>wine_vkAcquireKeyedMutex</name></proto>
+            <param><type>VkDevice</type> <name>device</name></param>
+            <param><type>VkDeviceMemory</type> <name>memory</name></param>
+            <param><type>uint64_t</type> <name>key</name></param>
+            <param><type>uint32_t</type> <name>timeout_ms</name></param>
+        </command>
+        <command successcodes="VK_SUCCESS" errorcodes="VK_ERROR_UNKNOWN">
+            <proto><type>VkResult</type> <name>wine_vkReleaseKeyedMutex</name></proto>
+            <param><type>VkDevice</type> <name>device</name></param>
+            <param><type>VkDeviceMemory</type> <name>memory</name></param>
+            <param><type>uint64_t</type> <name>key</name></param>
+        </command>
+    </commands>
+    <feature api="vulkan,vulkansc" name="WINE_CUSTOM" comment="Wine custom functions.">
+        <require>
+            <command name="wine_vkAcquireKeyedMutex"/>
+            <command name="wine_vkReleaseKeyedMutex"/>
+        </require>
+    </feature>
+</registry>

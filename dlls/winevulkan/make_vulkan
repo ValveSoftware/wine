@@ -296,6 +296,10 @@ FUNCTION_OVERRIDES = {
 
     # VK_KHR_synchronization2
     "vkQueueSubmit2KHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE, "extra_param" : "pSubmits"},
+
+    # Custom functions
+    "wine_vkAcquireKeyedMutex" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
+    "wine_vkReleaseKeyedMutex" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
 }
 
 STRUCT_CHAIN_CONVERSIONS = {
@@ -3353,12 +3357,16 @@ class VkRegistry(object):
         # function call we want we set a member 'required' to True.
         tree = ET.parse(reg_filename)
         root = tree.getroot()
+
+        tree_custom = ET.parse("vk_custom.xml")
+        root_custom = tree_custom.getroot()
+
         self._parse_enums(root)
         self._parse_types(root)
-        self._parse_commands(root)
+        self._parse_commands(root, root_custom)
 
         # Pull in any required types and functions.
-        self._parse_features(root)
+        self._parse_features(root, root_custom)
         self._parse_extensions(root)
 
         for enum in self.enums.values():
@@ -3451,10 +3459,10 @@ class VkRegistry(object):
             if not handle.object_type:
                 LOGGER.warning("No object type found for {}".format(handle.name))
 
-    def _parse_commands(self, root):
+    def _parse_commands(self, root, root_custom):
         """ Parse command section containing the Vulkan function calls. """
         funcs = {}
-        commands = root.findall("./commands/")
+        commands = root.findall("./commands/") + root_custom.findall("./commands/")
 
         # As of Vulkan 1.1, various extensions got promoted to Core.
         # The old commands (e.g. KHR) are available for backwards compatibility
@@ -3470,6 +3478,7 @@ class VkRegistry(object):
                 continue
 
             func = VkFunction.from_xml(command, self.types)
+
             if func:
                 funcs[func.name] = func
 
@@ -3721,10 +3730,10 @@ class VkRegistry(object):
         # Sort in alphabetical order.
         self.extensions = sorted(extensions, key=lambda ext: ext["name"])
 
-    def _parse_features(self, root):
+    def _parse_features(self, root, root_custom):
         """ Parse the feature section, which describes Core commands and types needed. """
 
-        for feature in root.findall("./feature"):
+        for feature in (root.findall("./feature") + root_custom.findall("./feature")):
             if not api_is_vulkan(feature):
                 continue
             feature_name = feature.attrib["name"]
