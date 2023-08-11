@@ -532,7 +532,8 @@ static char **parse_xr_extensions(unsigned int *len)
 }
 
 static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_dev,
-        struct conversion_context *ctx, const VkDeviceCreateInfo *src, VkDeviceCreateInfo *dst)
+        struct conversion_context *ctx, const VkDeviceCreateInfo *src, VkDeviceCreateInfo *dst,
+        struct wine_device *device)
 {
     static const char *wine_xr_extension_name = "VK_WINE_openxr_device_extensions";
     unsigned int i, append_xr = 0, have_ext_mem32 = 0, have_ext_sem32 = 0, have_keyed_mutex = 0, append_timeline = 1;
@@ -617,6 +618,7 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
                 new_extensions[o++] = "VK_KHR_external_memory_fd";
             if (!have_ext_sem32)
                 new_extensions[o++] = "VK_KHR_external_semaphore_fd";
+            device->keyed_mutexes_enabled = TRUE;
         }
         if (phys_dev->external_memory_align)
         {
@@ -997,7 +999,7 @@ VkResult wine_vkCreateDevice(VkPhysicalDevice phys_dev_handle, const VkDeviceCre
     }
 
     init_conversion_context(&ctx);
-    res = wine_vk_device_convert_create_info(phys_dev, &ctx, create_info, &create_info_host);
+    res = wine_vk_device_convert_create_info(phys_dev, &ctx, create_info, &create_info_host, object);
     if (res == VK_SUCCESS)
     {
         VkPhysicalDeviceFeatures features = {0};
@@ -2737,6 +2739,190 @@ static HANDLE get_shared_resource_kmt_handle(HANDLE shared_resource)
     return wine_server_ptr_handle(kmt_handle);
 }
 
+static bool set_shared_resource_object(HANDLE shared_resource, unsigned int index, HANDLE handle);
+static HANDLE get_shared_resource_object(HANDLE shared_resource, unsigned int index);
+
+static void destroy_keyed_mutex(struct wine_device *device, struct wine_device_memory *memory)
+{
+    if (memory->keyed_mutex_shm)
+    {
+        NtUnmapViewOfSection(GetCurrentProcess(), memory->keyed_mutex_shm);
+        memory->keyed_mutex_shm = NULL;
+    }
+    if (memory->keyed_mutex_sem)
+    {
+        device->funcs.p_vkDestroySemaphore(device->host_device, memory->keyed_mutex_sem, NULL);
+        memory->keyed_mutex_sem = VK_NULL_HANDLE;
+    }
+}
+
+static void create_keyed_mutex(struct wine_device *device, struct wine_device_memory *memory)
+{
+    VkExportSemaphoreCreateInfo timeline_export_info;
+    VkSemaphoreTypeCreateInfo type_info;
+    VkSemaphoreCreateInfo create_info;
+    VkSemaphoreGetFdInfoKHR fd_info;
+    pthread_mutexattr_t mutex_attr;
+    OBJECT_ATTRIBUTES attr;
+    HANDLE section_handle;
+    LARGE_INTEGER li;
+    HANDLE handle;
+    SIZE_T size;
+    VkResult vr;
+    int fd;
+
+    InitializeObjectAttributes(&attr, NULL, 0, NULL, NULL);
+    size = li.QuadPart = sizeof(*memory->keyed_mutex_shm);
+    if (NtCreateSection(&section_handle, STANDARD_RIGHTS_REQUIRED | SECTION_QUERY | SECTION_MAP_READ | SECTION_MAP_WRITE, &attr, &li, PAGE_READWRITE, SEC_COMMIT, NULL))
+    {
+        ERR("NtCreateSection failed.\n");
+        return;
+    }
+
+    if (!set_shared_resource_object(memory->handle, 0, section_handle))
+    {
+        NtClose(section_handle);
+        ERR("set_shared_resource_object failed.\n");
+        return;
+    }
+
+    if (NtMapViewOfSection(section_handle, GetCurrentProcess(), (void**) &memory->keyed_mutex_shm, 0, 0, NULL, &size, ViewShare, 0, PAGE_READWRITE))
+    {
+        NtClose(section_handle);
+        ERR("NtMapViewOfSection failed.\n");
+        return;
+    }
+
+    NtClose(section_handle);
+
+    timeline_export_info.sType = VK_STRUCTURE_TYPE_EXPORT_SEMAPHORE_CREATE_INFO;
+    timeline_export_info.pNext = NULL;
+    timeline_export_info.handleTypes = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    type_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    type_info.pNext = &timeline_export_info;
+    type_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    type_info.initialValue = 0;
+
+    create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    create_info.pNext = &type_info;
+    create_info.flags = 0;
+
+    if ((vr = device->funcs.p_vkCreateSemaphore(device->host_device, &create_info, NULL, &memory->keyed_mutex_sem)) != VK_SUCCESS)
+    {
+        ERR("Failed to create semaphore, vr %d.\n", vr);
+        goto error;
+    }
+    fd_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_GET_FD_INFO_KHR;
+    fd_info.pNext = NULL;
+    fd_info.semaphore = memory->keyed_mutex_sem;
+    fd_info.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    if ((vr = device->funcs.p_vkGetSemaphoreFdKHR(device->host_device, &fd_info, &fd)) != VK_SUCCESS)
+    {
+        ERR("Failed to export semaphore fd, vr %d.\n", vr);
+        goto error;
+    }
+    if (wine_server_fd_to_handle(fd, GENERIC_ALL, 0, &handle) != STATUS_SUCCESS)
+    {
+        ERR("wine_server_fd_to_handle failed.\n");
+        close(fd);
+        goto error;
+    }
+    close(fd);
+    if (!set_shared_resource_object(memory->handle, 1, handle))
+    {
+        ERR("set_shared_resource_object failed.\n");
+        NtClose(handle);
+        goto error;
+    }
+    NtClose(handle);
+
+    pthread_mutexattr_init(&mutex_attr);
+    pthread_mutexattr_setpshared(&mutex_attr, PTHREAD_PROCESS_SHARED);
+    if (pthread_mutex_init(&memory->keyed_mutex_shm->mutex, &mutex_attr))
+    memory->keyed_mutex_shm->instance_id_counter = 1;
+    memory->keyed_mutex_instance_id = ++memory->keyed_mutex_shm->instance_id_counter;
+    TRACE("memory %p, created keyed mutex.\n", memory);
+    return;
+
+error:
+    destroy_keyed_mutex(device, memory);
+}
+
+static void import_keyed_mutex(struct wine_device *device, struct wine_device_memory *memory)
+{
+    VkSemaphoreTypeCreateInfo type_info;
+    VkImportSemaphoreFdInfoKHR fd_info;
+    VkSemaphoreCreateInfo create_info;
+    HANDLE section_handle, sem_handle;
+    SIZE_T size;
+
+    VkResult vr;
+
+    if (!(section_handle = get_shared_resource_object(memory->handle, 0)))
+    {
+        TRACE("No section handle.\n");
+        return;
+    }
+    if (!(sem_handle = get_shared_resource_object(memory->handle, 1)))
+    {
+        ERR("No smeaphore handle.\n");
+        NtClose(section_handle);
+        return;
+    }
+
+    size = sizeof(*memory->keyed_mutex_shm);
+    if (NtMapViewOfSection(section_handle, GetCurrentProcess(), (void**) &memory->keyed_mutex_shm, 0, 0, NULL, &size, ViewShare, 0, PAGE_READWRITE))
+    {
+        ERR("NtMapViewOfSection failed.\n");
+        goto error;
+    }
+
+    type_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_TYPE_CREATE_INFO;
+    type_info.pNext = NULL;
+    type_info.semaphoreType = VK_SEMAPHORE_TYPE_TIMELINE;
+    type_info.initialValue = 0;
+
+    create_info.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    create_info.pNext = &type_info;
+    create_info.flags = 0;
+
+    if ((vr = device->funcs.p_vkCreateSemaphore(device->host_device, &create_info, NULL, &memory->keyed_mutex_sem)) != VK_SUCCESS)
+    {
+        ERR("Failed to create semaphore, vr %d.\n", vr);
+        goto error;
+    }
+
+    fd_info.sType = VK_STRUCTURE_TYPE_IMPORT_SEMAPHORE_FD_INFO_KHR;
+    fd_info.pNext = NULL;
+    fd_info.semaphore = memory->keyed_mutex_sem;
+    fd_info.flags = 0;
+    fd_info.handleType = VK_EXTERNAL_SEMAPHORE_HANDLE_TYPE_OPAQUE_FD_BIT;
+
+    if (wine_server_handle_to_fd(sem_handle, FILE_READ_DATA, &fd_info.fd, NULL))
+    {
+        ERR("wine_server_handle_to_fd failed.\n");
+        goto error;
+    }
+
+    vr = device->funcs.p_vkImportSemaphoreFdKHR(device->host_device, &fd_info);
+    close(fd_info.fd);
+    if (vr != VK_SUCCESS)
+    {
+        ERR("vkImportSemaphoreFdKHR failed, vr %d.\n", vr);
+        goto error;
+    }
+
+    memory->keyed_mutex_instance_id = InterlockedIncrement64((LONGLONG *)&memory->keyed_mutex_shm->instance_id_counter);
+    TRACE("memory %p, imported keyed mutex.\n", memory);
+    return;
+error:
+    NtClose(section_handle);
+    NtClose(sem_handle);
+    destroy_keyed_mutex(device, memory);
+}
+
 VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *alloc_info,
                                const VkAllocationCallbacks *allocator, VkDeviceMemory *ret,
                                void *win_pAllocateInfo)
@@ -2847,6 +3033,8 @@ VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *allo
                 ERR("Zero shared resource size.\n");
             }
         }
+        if (device->keyed_mutexes_enabled)
+            import_keyed_mutex(device, memory);
     }
     else if (device->phys_dev->external_memory_align && (mem_flags & VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT) &&
         !find_next_struct(alloc_info->pNext, VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT))
@@ -2934,6 +3122,8 @@ VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *allo
             else
                 memory->inherit = FALSE;
             close(fd);
+            if (device->keyed_mutexes_enabled)
+                create_keyed_mutex(device, memory);
         }
 
         if (memory->handle == INVALID_HANDLE_VALUE)
@@ -2968,6 +3158,7 @@ void wine_vkFreeMemory(VkDevice handle, VkDeviceMemory memory_handle, const VkAl
         return;
     memory = wine_device_memory_from_handle(memory_handle);
 
+    destroy_keyed_mutex(device, memory);
     device->funcs.p_vkFreeMemory(device->host_device, memory->host_memory, NULL);
 
     if (memory->mapping)
