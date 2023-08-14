@@ -22,8 +22,8 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(amd_ags);
 
-static const char driver_version[] = "23.10.01.45-230626a-393367C-AMD-Software-Adrenalin-Edition";
-static const char radeon_version[] = "23.7.1";
+static const char driver_version[] = "23.10.23.02-230720a-394204C-AMD-Software-Adrenalin-Edition";
+static const char radeon_version[] = "23.8.1";
 
 enum amd_ags_version
 {
