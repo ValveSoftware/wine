@@ -332,7 +332,7 @@ static const tid_t HTMLDOMImplementation_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLDOMImplementation_dispex = {
-    L"DOMImplementation",
+    "DOMImplementation",
     NULL,
     PROTO_ID_HTMLDOMImplementation,
     DispHTMLDOMImplementation_tid,
@@ -574,7 +574,7 @@ static const tid_t DOMParser_iface_tids[] = {
 };
 
 dispex_static_data_t DOMParser_dispex = {
-    L"DOMParser",
+    "DOMParser",
     NULL,
     PROTO_ID_DOMParser,
     DispDOMParser_tid,
@@ -626,7 +626,7 @@ static const dispex_static_data_vtbl_t DOMParserCtor_dispex_vtbl = {
 };
 
 dispex_static_data_t DOMParserCtor_dispex = {
-    L"DOMParser",
+    "DOMParser",
     &DOMParserCtor_dispex_vtbl,
     PROTO_ID_NULL,
     NULL_tid,
@@ -842,7 +842,7 @@ static const tid_t HTMLScreen_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLScreen_dispex = {
-    L"Screen",
+    "Screen",
     NULL,
     PROTO_ID_HTMLScreen,
     DispHTMLScreen_tid,
@@ -1008,7 +1008,7 @@ static const tid_t OmHistory_iface_tids[] = {
     0
 };
 dispex_static_data_t OmHistory_dispex = {
-    L"History",
+    "History",
     NULL,
     PROTO_ID_History,
     DispHTMLHistory_tid,
@@ -1167,7 +1167,7 @@ static const tid_t HTMLPluginsCollection_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLPluginsCollection_dispex = {
-    L"PluginArray",
+    "PluginArray",
     NULL,
     PROTO_ID_HTMLPluginsCollection,
     DispCPlugins_tid,
@@ -1313,7 +1313,7 @@ static const tid_t HTMLMimeTypesCollection_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLMimeTypesCollection_dispex = {
-    L"MimeTypeArray",
+    "MimeTypeArray",
     NULL,
     PROTO_ID_HTMLMimeTypesCollection,
     IHTMLMimeTypesCollection_tid,
@@ -1742,7 +1742,7 @@ static const tid_t OmNavigator_iface_tids[] = {
     0
 };
 dispex_static_data_t OmNavigator_dispex = {
-    L"Navigator",
+    "Navigator",
     NULL,
     PROTO_ID_Navigator,
     DispHTMLNavigator_tid,
@@ -2158,7 +2158,7 @@ static void HTMLPerformanceTiming_init_dispex_info(dispex_data_t *info, compat_m
 }
 
 dispex_static_data_t HTMLPerformanceTiming_dispex = {
-    L"PerformanceTiming",
+    "PerformanceTiming",
     NULL,
     PROTO_ID_HTMLPerformanceTiming,
     IHTMLPerformanceTiming_tid,
@@ -2340,7 +2340,7 @@ static void HTMLPerformanceNavigation_init_dispex_info(dispex_data_t *info, comp
 }
 
 dispex_static_data_t HTMLPerformanceNavigation_dispex = {
-    L"PerformanceNavigation",
+    "PerformanceNavigation",
     NULL,
     PROTO_ID_HTMLPerformanceNavigation,
     IHTMLPerformanceNavigation_tid,
@@ -2510,7 +2510,7 @@ static void HTMLPerformance_init_dispex_info(dispex_data_t *info, compat_mode_t 
 }
 
 dispex_static_data_t HTMLPerformance_dispex = {
-    L"Performance",
+    "Performance",
     NULL,
     PROTO_ID_HTMLPerformance,
     IHTMLPerformance_tid,
@@ -2693,7 +2693,7 @@ static const tid_t HTMLNamespaceCollection_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLNamespaceCollection_dispex = {
-    L"MSNamespaceInfoCollection",
+    "MSNamespaceInfoCollection",
     NULL,
     PROTO_ID_HTMLNamespaceCollection,
     DispHTMLNamespaceCollection_tid,
@@ -2951,7 +2951,7 @@ static const tid_t console_iface_tids[] = {
     0
 };
 dispex_static_data_t console_dispex = {
-    L"Console",
+    "Console",
     NULL,
     PROTO_ID_Console,
     IWineMSHTMLConsole_tid,
@@ -3276,7 +3276,7 @@ static const tid_t media_query_list_iface_tids[] = {
     0
 };
 dispex_static_data_t media_query_list_dispex = {
-    L"MediaQueryList",
+    "MediaQueryList",
     NULL,
     PROTO_ID_MediaQueryList,
     IWineMSHTMLMediaQueryList_tid,
@@ -3563,7 +3563,7 @@ static const tid_t crypto_subtle_iface_tids[] = {
     0
 };
 dispex_static_data_t crypto_subtle_dispex = {
-    L"SubtleCrypto",
+    "SubtleCrypto",
     NULL,
     PROTO_ID_SubtleCrypto,
     IWineMSHTMLSubtleCrypto_tid,
@@ -3718,7 +3718,7 @@ static const tid_t crypto_iface_tids[] = {
     0
 };
 dispex_static_data_t crypto_dispex = {
-    L"Crypto",
+    "Crypto",
     NULL,
     PROTO_ID_Crypto,
     IWineMSHTMLCrypto_tid,

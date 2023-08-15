@@ -10031,7 +10031,7 @@ static const tid_t HTMLStyle_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLStyle_dispex = {
-    L"MSStyleCSSProperties",
+    "MSStyleCSSProperties",
     &CSSStyle_dispex_vtbl,
     PROTO_ID_HTMLStyle,
     DispHTMLStyle_tid,
@@ -10190,7 +10190,7 @@ const dispex_static_data_vtbl_t HTMLCSSProperties_dispex_vtbl = {
 };
 
 dispex_static_data_t HTMLCSSProperties_dispex = {
-    L"MSCSSProperties",
+    "MSCSSProperties",
     &HTMLCSSProperties_dispex_vtbl,
     PROTO_ID_HTMLCSSProperties,
     NULL_tid,
@@ -10278,7 +10278,7 @@ const dispex_static_data_vtbl_t HTMLW3CComputedStyle_dispex_vtbl = {
 };
 
 dispex_static_data_t HTMLW3CComputedStyle_dispex = {
-    L"CSSStyleDeclaration",
+    "CSSStyleDeclaration",
     &HTMLW3CComputedStyle_dispex_vtbl,
     PROTO_ID_HTMLW3CComputedStyle,
     DispHTMLW3CComputedStyle_tid,

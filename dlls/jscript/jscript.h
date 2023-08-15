@@ -105,8 +105,8 @@ typedef struct {
     HRESULT (STDMETHODCALLTYPE *InitProxy)(IWineDispatchProxyCbPrivate *This, IDispatch *obj);
     void    (STDMETHODCALLTYPE *Unlinked)(IWineDispatchProxyCbPrivate *This, BOOL persist);
     HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
-    IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, IDispatch *disp, const WCHAR *name);
-    HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const WCHAR *name, IDispatch *prot, IDispatch *ctor);
+    IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, IDispatch *disp, const char *name);
+    HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const char *name, IDispatch *prot, IDispatch *ctor);
     HRESULT (STDMETHODCALLTYPE *CreateObject)(IWineDispatchProxyCbPrivate *This, IDispatchEx **obj);
     HRESULT (STDMETHODCALLTYPE *CreateArrayBuffer)(IWineDispatchProxyCbPrivate *This, DWORD size, IDispatch **arraybuf, void **data);
     HRESULT (STDMETHODCALLTYPE *GetRandomValues)(IDispatch *typedarr);
@@ -378,7 +378,7 @@ HRESULT create_builtin_function(script_ctx_t*,builtin_invoke_t,const WCHAR*,cons
 HRESULT create_builtin_constructor(script_ctx_t*,builtin_invoke_t,const WCHAR*,const builtin_info_t*,DWORD,
         jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
 HRESULT create_proxy_functions(jsdisp_t*,const struct proxy_prop_info*,jsdisp_t**) DECLSPEC_HIDDEN;
-HRESULT create_proxy_constructor(IDispatch*,const WCHAR*,jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
+HRESULT create_proxy_constructor(IDispatch*,const char*,jsdisp_t*,jsdisp_t**) DECLSPEC_HIDDEN;
 HRESULT Function_invoke(jsdisp_t*,jsval_t,WORD,unsigned,jsval_t*,jsval_t*,IServiceProvider*) DECLSPEC_HIDDEN;
 
 HRESULT Function_value(script_ctx_t*,jsval_t,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;

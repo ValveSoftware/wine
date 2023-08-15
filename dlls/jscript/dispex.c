@@ -2667,7 +2667,7 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
 }
 
 static IDispatch* WINAPI WineDispatchProxyCbPrivate_CreateConstructor(IWineDispatchProxyCbPrivate *iface,
-        IDispatch *disp, const WCHAR *name)
+        IDispatch *disp, const char *name)
 {
     jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
     jsdisp_t *ctor;
@@ -2678,15 +2678,19 @@ static IDispatch* WINAPI WineDispatchProxyCbPrivate_CreateConstructor(IWineDispa
 }
 
 static HRESULT WINAPI WineDispatchProxyCbPrivate_DefineConstructor(IWineDispatchProxyCbPrivate *iface,
-        const WCHAR *name, IDispatch *prot_disp, IDispatch *ctor_disp)
+        const char *name, IDispatch *prot_disp, IDispatch *ctor_disp)
 {
     jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
     jsval_t val = jsval_disp(prot_disp);
-    unsigned hash = string_hash(name);
     jsdisp_t *prot, *ctor;
+    unsigned i = 0, hash;
     dispex_prop_t *prop;
+    WCHAR nameW[64];
     HRESULT hres;
     BOOL b;
+
+    do nameW[i] = name[i]; while(name[i++]);
+    assert(i <= ARRAY_SIZE(nameW));
 
     hres = convert_to_proxy(This->ctx, &val);
     if(FAILED(hres))
@@ -2706,18 +2710,19 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_DefineConstructor(IWineDispatch
         return hres;
 
     /* Remove the builtin proxy prop from the prototype (first time only), since it's part of the object itself */
-    if(!find_prop_name_raw(This->prototype, hash, name, FALSE) && !alloc_prop(This->prototype, name, PROP_DELETED, 0)) {
+    hash = string_hash(nameW);
+    if(!find_prop_name_raw(This->prototype, hash, nameW, FALSE) && !alloc_prop(This->prototype, nameW, PROP_DELETED, 0)) {
         hres = E_OUTOFMEMORY;
         goto end;
     }
 
     /* Define the constructor forcefully, so make sure to not look into the underlying proxy dispids,
        otherwise it might pick up elements by this id. And if any found, force it to be configurable. */
-    prop = find_prop_name_raw(This, hash, name, FALSE);
+    prop = find_prop_name_raw(This, hash, nameW, FALSE);
     if(prop) {
         prop->flags |= PROPF_CONFIGURABLE;
         delete_prop(This, prop, &b);
-    }else if(!(prop = alloc_prop(This, name, PROP_DELETED, 0))) {
+    }else if(!(prop = alloc_prop(This, nameW, PROP_DELETED, 0))) {
         hres = E_OUTOFMEMORY;
         goto end;
     }

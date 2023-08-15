@@ -2064,7 +2064,7 @@ static const tid_t HTMLEventObj_iface_tids[] = {
 };
 
 dispex_static_data_t HTMLEventObj_dispex = {
-    L"MSEventObj",
+    "MSEventObj",
     NULL,
     PROTO_ID_HTMLEventObj,
     DispCEventObj_tid,
@@ -4152,7 +4152,7 @@ static const tid_t DOMEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMEvent_dispex = {
-    L"Event",
+    "Event",
     NULL,
     PROTO_ID_DOMEvent,
     DispDOMEvent_tid,
@@ -4166,7 +4166,7 @@ static const tid_t DOMUIEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMUIEvent_dispex = {
-    L"UIEvent",
+    "UIEvent",
     NULL,
     PROTO_ID_DOMUIEvent,
     DispDOMUIEvent_tid,
@@ -4181,7 +4181,7 @@ static const tid_t DOMMouseEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMMouseEvent_dispex = {
-    L"MouseEvent",
+    "MouseEvent",
     NULL,
     PROTO_ID_DOMMouseEvent,
     DispDOMMouseEvent_tid,
@@ -4196,7 +4196,7 @@ static const tid_t DOMKeyboardEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMKeyboardEvent_dispex = {
-    L"KeyboardEvent",
+    "KeyboardEvent",
     NULL,
     PROTO_ID_DOMKeyboardEvent,
     DispDOMKeyboardEvent_tid,
@@ -4210,7 +4210,7 @@ static void DOMPageTransitionEvent_init_dispex_info(dispex_data_t *info, compat_
 }
 
 dispex_static_data_t DOMPageTransitionEvent_dispex = {
-    L"PageTransitionEvent",
+    "PageTransitionEvent",
     NULL,
     PROTO_ID_DOMPageTransitionEvent,
     DispDOMEvent_tid,
@@ -4225,7 +4225,7 @@ static const tid_t DOMCustomEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMCustomEvent_dispex = {
-    L"CustomEvent",
+    "CustomEvent",
     NULL,
     PROTO_ID_DOMCustomEvent,
     DispDOMCustomEvent_tid,
@@ -4238,7 +4238,7 @@ static const tid_t DOMMessageEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMMessageEvent_dispex = {
-    L"MessageEvent",
+    "MessageEvent",
     NULL,
     PROTO_ID_DOMMessageEvent,
     DispDOMMessageEvent_tid,
@@ -4253,7 +4253,7 @@ static const tid_t DOMProgressEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMProgressEvent_dispex = {
-    L"ProgressEvent",
+    "ProgressEvent",
     NULL,
     PROTO_ID_DOMProgressEvent,
     DispDOMProgressEvent_tid,
@@ -4267,7 +4267,7 @@ static const tid_t DOMStorageEvent_iface_tids[] = {
 };
 
 dispex_static_data_t DOMStorageEvent_dispex = {
-    L"StorageEvent",
+    "StorageEvent",
     NULL,
     PROTO_ID_DOMStorageEvent,
     DispDOMStorageEvent_tid,
