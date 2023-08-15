@@ -180,7 +180,7 @@ static const ADLVersionsInfo version = {
 static const ADLVersionsInfoX2 version2 = {
     "23.10.23.02-230720a-394204C-AMD-Software-Adrenalin-Edition",
     "",
-    "23.7.2",
+    "23.8.1",
     "http://support.amd.com/drivers/xml/driver_09_us.xml",
 };
 
