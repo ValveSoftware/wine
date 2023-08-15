@@ -977,11 +977,11 @@ static HRESULT HTMLImageElementFactory_value(DispatchEx *dispex, LCID lcid,
 }
 
 static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
-    HTMLImageElementFactory_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLImageElementFactory_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 static const tid_t HTMLImageElementFactory_iface_tids[] = {
@@ -1013,11 +1013,11 @@ static void HTMLImageCtor_init_dispex_info(dispex_data_t *info, compat_mode_t co
 }
 
 static const dispex_static_data_vtbl_t HTMLImageCtor_dispex_vtbl = {
-    HTMLImageCtor_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLImageCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 dispex_static_data_t HTMLImageCtor_dispex = {

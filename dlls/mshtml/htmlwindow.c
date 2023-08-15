@@ -237,11 +237,11 @@ const IUnknownVtbl legacy_ctor_vtbl = {
 };
 
 static const dispex_static_data_vtbl_t legacy_ctor_dispex_vtbl = {
-    legacy_ctor_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = legacy_ctor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 static const struct {
@@ -5028,25 +5028,16 @@ static IHTMLEventObj *HTMLWindow_set_current_event(DispatchEx *dispex, IHTMLEven
 
 static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
     {
-        NULL,
-        NULL,
-        HTMLWindow_get_name,
-        HTMLWindow_invoke,
-        NULL,
-        HTMLWindow_next_dispid,
-        NULL,
-        NULL,
-        HTMLWindow_get_compat_mode,
-        HTMLWindow_finalize_dispex,
-        NULL
+        .get_name            = HTMLWindow_get_name,
+        .invoke              = HTMLWindow_invoke,
+        .next_dispid         = HTMLWindow_next_dispid,
+        .get_compat_mode     = HTMLWindow_get_compat_mode,
+        .finalize_dispex     = HTMLWindow_finalize_dispex
     },
-    HTMLWindow_get_dispatch_this,
-    HTMLWindow_get_gecko_target,
-    HTMLWindow_bind_event,
-    NULL,
-    NULL,
-    NULL,
-    HTMLWindow_set_current_event
+    .get_dispatch_this       = HTMLWindow_get_dispatch_this,
+    .get_gecko_target        = HTMLWindow_get_gecko_target,
+    .bind_event              = HTMLWindow_bind_event,
+    .set_current_event       = HTMLWindow_set_current_event
 };
 
 dispex_static_data_t HTMLWindow_dispex = {

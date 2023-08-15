@@ -598,10 +598,9 @@ static HRESULT HTMLStyleSheetRulesCollection_invoke(DispatchEx *dispex, IDispatc
 }
 
 static const dispex_static_data_vtbl_t HTMLStyleSheetRulesCollection_dispex_vtbl = {
-    NULL,
-    HTMLStyleSheetRulesCollection_get_dispid,
-    HTMLStyleSheetRulesCollection_get_name,
-    HTMLStyleSheetRulesCollection_invoke
+    .get_dispid       = HTMLStyleSheetRulesCollection_get_dispid,
+    .get_name         = HTMLStyleSheetRulesCollection_get_name,
+    .invoke           = HTMLStyleSheetRulesCollection_invoke
 };
 static const tid_t HTMLStyleSheetRulesCollection_iface_tids[] = {
     IHTMLStyleSheetRulesCollection_tid,
@@ -1029,10 +1028,9 @@ static HRESULT HTMLStyleSheetsCollection_invoke(DispatchEx *dispex, IDispatch *t
 }
 
 static const dispex_static_data_vtbl_t HTMLStyleSheetsCollection_dispex_vtbl = {
-    NULL,
-    HTMLStyleSheetsCollection_get_dispid,
-    HTMLStyleSheetsCollection_get_name,
-    HTMLStyleSheetsCollection_invoke
+    .get_dispid       = HTMLStyleSheetsCollection_get_dispid,
+    .get_name         = HTMLStyleSheetsCollection_get_name,
+    .invoke           = HTMLStyleSheetsCollection_invoke
 };
 static const tid_t HTMLStyleSheetsCollection_iface_tids[] = {
     IHTMLStyleSheetsCollection_tid,
