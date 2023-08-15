@@ -32,7 +32,7 @@ WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
 #define ALIGN_SIZE(size, alignment) (((size) + (alignment)) & ~((alignment)))
 
-typedef HRESULT (*p_copy_image_func)(BYTE *dest, LONG dest_stride, const BYTE *src, LONG src_stride, DWORD width, DWORD lines, DWORD dest_size);
+typedef void (*p_copy_image_func)(BYTE *dest, LONG dest_stride, const BYTE *src, LONG src_stride, DWORD width, DWORD lines);
 
 struct buffer
 {
@@ -75,39 +75,32 @@ struct buffer
     CRITICAL_SECTION cs;
 };
 
-static HRESULT copy_image(const struct buffer *buffer, BYTE *dest, LONG dest_stride, const BYTE *src,
-        LONG src_stride, DWORD width, DWORD lines, DWORD dest_size)
+static void copy_image(const struct buffer *buffer, BYTE *dest, LONG dest_stride, const BYTE *src,
+        LONG src_stride, DWORD width, DWORD lines)
 {
-    HRESULT hr = S_OK;
+    MFCopyImage(dest, dest_stride, src, src_stride, width, lines);
 
-    hr = MFCopyImage(dest, dest_stride, src, src_stride, width, lines);
-
-    if (SUCCEEDED(hr) && buffer->_2d.copy_image)
+    if (buffer->_2d.copy_image)
     {
         dest += dest_stride * lines;
         src += src_stride * lines;
-        hr = buffer->_2d.copy_image(dest, dest_stride, src, src_stride, width, lines, dest_size);
+        buffer->_2d.copy_image(dest, dest_stride, src, src_stride, width, lines);
     }
-
-    return hr;
 }
 
-static HRESULT copy_image_nv12(BYTE *dest, LONG dest_stride, const BYTE *src,
-        LONG src_stride, DWORD width, DWORD lines, DWORD dest_size)
+static void copy_image_nv12(BYTE *dest, LONG dest_stride, const BYTE *src, LONG src_stride, DWORD width, DWORD lines)
 {
-    return MFCopyImage(dest, dest_stride, src, src_stride, width, lines / 2);
+    MFCopyImage(dest, dest_stride, src, src_stride, width, lines / 2);
 }
 
-static HRESULT copy_image_imc1(BYTE *dest, LONG dest_stride, const BYTE *src,
-        LONG src_stride, DWORD width, DWORD lines, DWORD dest_size)
+static void copy_image_imc1(BYTE *dest, LONG dest_stride, const BYTE *src, LONG src_stride, DWORD width, DWORD lines)
 {
-    return MFCopyImage(dest, dest_stride, src, src_stride, width / 2, lines);
+    MFCopyImage(dest, dest_stride, src, src_stride, width / 2, lines);
 }
 
-static HRESULT copy_image_imc2(BYTE *dest, LONG dest_stride, const BYTE *src,
-        LONG src_stride, DWORD width, DWORD lines, DWORD dest_size)
+static void copy_image_imc2(BYTE *dest, LONG dest_stride, const BYTE *src, LONG src_stride, DWORD width, DWORD lines)
 {
-    return MFCopyImage(dest, dest_stride / 2, src, src_stride / 2, width / 2, lines);
+    MFCopyImage(dest, dest_stride / 2, src, src_stride / 2, width / 2, lines);
 }
 
 static inline struct buffer *impl_from_IMFMediaBuffer(IMFMediaBuffer *iface)
@@ -319,8 +312,8 @@ static HRESULT WINAPI memory_1d_2d_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
             hr = E_OUTOFMEMORY;
 
         if (SUCCEEDED(hr))
-            hr = copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, buffer->data, buffer->_2d.pitch,
-                    buffer->_2d.width, buffer->_2d.height, buffer->_2d.plane_size);
+            copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, buffer->data, buffer->_2d.pitch,
+                    buffer->_2d.width, buffer->_2d.height);
     }
 
     if (SUCCEEDED(hr))
@@ -341,7 +334,6 @@ static HRESULT WINAPI memory_1d_2d_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
 static HRESULT WINAPI memory_1d_2d_buffer_Unlock(IMFMediaBuffer *iface)
 {
     struct buffer *buffer = impl_from_IMFMediaBuffer(iface);
-    HRESULT hr = S_OK;
 
     TRACE("%p.\n", iface);
 
@@ -349,8 +341,8 @@ static HRESULT WINAPI memory_1d_2d_buffer_Unlock(IMFMediaBuffer *iface)
 
     if (buffer->_2d.linear_buffer && !--buffer->_2d.locks)
     {
-        hr = copy_image(buffer, buffer->data, buffer->_2d.pitch, buffer->_2d.linear_buffer, buffer->_2d.width,
-                buffer->_2d.width, buffer->_2d.height, buffer->max_length);
+        copy_image(buffer, buffer->data, buffer->_2d.pitch, buffer->_2d.linear_buffer, buffer->_2d.width,
+                buffer->_2d.width, buffer->_2d.height);
 
         free(buffer->_2d.linear_buffer);
         buffer->_2d.linear_buffer = NULL;
@@ -358,7 +350,7 @@ static HRESULT WINAPI memory_1d_2d_buffer_Unlock(IMFMediaBuffer *iface)
 
     LeaveCriticalSection(&buffer->cs);
 
-    return hr;
+    return S_OK;
 }
 
 static const IMFMediaBufferVtbl memory_1d_2d_buffer_vtbl =
@@ -399,8 +391,8 @@ static HRESULT WINAPI d3d9_surface_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
             hr = IDirect3DSurface9_LockRect(buffer->d3d9_surface.surface, &rect, NULL, 0);
             if (SUCCEEDED(hr))
             {
-                hr = copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, rect.pBits, rect.Pitch,
-                        buffer->_2d.width, buffer->_2d.height, buffer->_2d.plane_size);
+                copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, rect.pBits, rect.Pitch,
+                        buffer->_2d.width, buffer->_2d.height);
                 IDirect3DSurface9_UnlockRect(buffer->d3d9_surface.surface);
             }
         }
@@ -438,8 +430,8 @@ static HRESULT WINAPI d3d9_surface_buffer_Unlock(IMFMediaBuffer *iface)
 
         if (SUCCEEDED(hr = IDirect3DSurface9_LockRect(buffer->d3d9_surface.surface, &rect, NULL, 0)))
         {
-            hr = copy_image(buffer, rect.pBits, rect.Pitch, buffer->_2d.linear_buffer, buffer->_2d.width,
-                    buffer->_2d.width, buffer->_2d.height, buffer->max_length);
+            copy_image(buffer, rect.pBits, rect.Pitch, buffer->_2d.linear_buffer, buffer->_2d.width,
+                    buffer->_2d.width, buffer->_2d.height);
             IDirect3DSurface9_UnlockRect(buffer->d3d9_surface.surface);
         }
 
@@ -978,8 +970,8 @@ static HRESULT WINAPI dxgi_surface_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
             hr = dxgi_surface_buffer_map(buffer);
             if (SUCCEEDED(hr))
             {
-                hr = copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, buffer->dxgi_surface.map_desc.pData,
-                        buffer->dxgi_surface.map_desc.RowPitch, buffer->_2d.width, buffer->_2d.height, buffer->_2d.plane_size);
+                copy_image(buffer, buffer->_2d.linear_buffer, buffer->_2d.width, buffer->dxgi_surface.map_desc.pData,
+                        buffer->dxgi_surface.map_desc.RowPitch, buffer->_2d.width, buffer->_2d.height);
             }
         }
     }
@@ -1012,8 +1004,8 @@ static HRESULT WINAPI dxgi_surface_buffer_Unlock(IMFMediaBuffer *iface)
         hr = HRESULT_FROM_WIN32(ERROR_WAS_UNLOCKED);
     else if (!--buffer->_2d.locks)
     {
-        hr = copy_image(buffer, buffer->dxgi_surface.map_desc.pData, buffer->dxgi_surface.map_desc.RowPitch,
-                buffer->_2d.linear_buffer, buffer->_2d.width, buffer->_2d.width, buffer->_2d.height, buffer->max_length);
+        copy_image(buffer, buffer->dxgi_surface.map_desc.pData, buffer->dxgi_surface.map_desc.RowPitch,
+                buffer->_2d.linear_buffer, buffer->_2d.width, buffer->_2d.width, buffer->_2d.height);
         dxgi_surface_buffer_unmap(buffer);
 
         free(buffer->_2d.linear_buffer);
