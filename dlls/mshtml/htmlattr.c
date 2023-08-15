@@ -663,11 +663,10 @@ static HRESULT HTMLDOMAttribute_clone(HTMLDOMNode *iface, nsIDOMNode *nsnode, HT
 static const cpc_entry_t HTMLDOMAttribute_cpc[] = {{NULL}};
 
 static const NodeImplVtbl HTMLDOMAttributeImplVtbl = {
-    NULL,
-    HTMLDOMAttribute_QI,
-    HTMLDOMNode_destructor,
-    HTMLDOMAttribute_cpc,
-    HTMLDOMAttribute_clone
+    .qi                    = HTMLDOMAttribute_QI,
+    .destructor            = HTMLDOMNode_destructor,
+    .cpc_entries           = HTMLDOMAttribute_cpc,
+    .clone                 = HTMLDOMAttribute_clone
 };
 
 static void HTMLDOMAttribute_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
