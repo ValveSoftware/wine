@@ -1658,9 +1658,8 @@ static const event_target_vtbl_t HTMLXMLHttpRequest_event_target_vtbl = {
     {
         NULL,
     },
-    NULL,
-    HTMLXMLHttpRequest_get_gecko_target,
-    HTMLXMLHttpRequest_bind_event
+    .get_gecko_target        = HTMLXMLHttpRequest_get_gecko_target,
+    .bind_event              = HTMLXMLHttpRequest_bind_event
 };
 
 static const tid_t HTMLXMLHttpRequest_iface_tids[] = {
@@ -1886,11 +1885,11 @@ static HRESULT HTMLXMLHttpRequestFactory_value(DispatchEx *iface, LCID lcid, WOR
 }
 
 static const dispex_static_data_vtbl_t HTMLXMLHttpRequestFactory_dispex_vtbl = {
-    HTMLXMLHttpRequestFactory_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLXMLHttpRequestFactory_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 static const tid_t HTMLXMLHttpRequestFactory_iface_tids[] = {
@@ -1915,11 +1914,11 @@ static HRESULT HTMLXMLHttpRequestCtor_value(DispatchEx *iface, LCID lcid, WORD f
 }
 
 static const dispex_static_data_vtbl_t HTMLXMLHttpRequestCtor_dispex_vtbl = {
-    HTMLXMLHttpRequestCtor_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLXMLHttpRequestCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 dispex_static_data_t HTMLXMLHttpRequestCtor_dispex = {
@@ -2377,11 +2376,11 @@ static HRESULT HTMLXDomainRequestFactory_value(DispatchEx *iface, LCID lcid, WOR
 }
 
 static const dispex_static_data_vtbl_t HTMLXDomainRequestFactory_dispex_vtbl = {
-    HTMLXDomainRequestFactory_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLXDomainRequestFactory_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 static const tid_t HTMLXDomainRequestFactory_iface_tids[] = {
@@ -2406,11 +2405,11 @@ static HRESULT HTMLXDomainRequestCtor_value(DispatchEx *iface, LCID lcid, WORD f
 }
 
 static const dispex_static_data_vtbl_t HTMLXDomainRequestCtor_dispex_vtbl = {
-    HTMLXDomainRequestCtor_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLXDomainRequestCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 dispex_static_data_t HTMLXDomainRequestCtor_dispex = {
