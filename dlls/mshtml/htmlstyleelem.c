@@ -453,7 +453,7 @@ static const tid_t HTMLStyleElement_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLStyleElement_dispex = {
-    L"HTMLStyleElement",
+    "HTMLStyleElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLStyleElement,
     DispHTMLStyleElement_tid,

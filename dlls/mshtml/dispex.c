@@ -154,7 +154,7 @@ static struct prototype_static_data {
 #define X(id, name, dispex, proto_id) \
 {                                     \
     {                                 \
-        L ## name L"Prototype",       \
+        name "Prototype",             \
         NULL,                         \
         PROTO_ID_ ## proto_id,        \
         NULL_tid,                     \
@@ -169,14 +169,14 @@ PROXY_PROTOTYPE_LIST
 #undef X
 };
 
-static const WCHAR legacy_prototype_nameW[] = L"[Interface prototype object]";
+static const char legacy_prototype_name[] = "[Interface prototype object]";
 static void legacy_prototype_init_dispex_info(dispex_data_t*,compat_mode_t);
 static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl;
 
 static dispex_static_data_t legacy_prototype_dispex[] = {
 #define X(id, name, dispex, proto_id) \
 {                                     \
-    legacy_prototype_nameW,           \
+    legacy_prototype_name,            \
     &legacy_prototype_dispex_vtbl,    \
     PROTO_ID_NULL,                    \
     NULL_tid,                         \
@@ -193,7 +193,7 @@ static const dispex_static_data_vtbl_t proxy_ctor_dispex_vtbl;
 static dispex_static_data_t proxy_ctor_dispex[] = {
 #define X(id, name, dispex, proto_id) \
 {                                     \
-    L ## name,                        \
+    name,                             \
     &proxy_ctor_dispex_vtbl,          \
     PROTO_ID_Object,                  \
     NULL_tid,                         \
@@ -1285,7 +1285,7 @@ static const dispex_static_data_vtbl_t function_dispex_vtbl = {
 };
 
 static dispex_static_data_t function_dispex = {
-    L"Function",
+    "Function",
     &function_dispex_vtbl,
     PROTO_ID_NULL,
     NULL_tid,
@@ -2089,8 +2089,7 @@ HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
     static const WCHAR suffix[] = L"]";
     WCHAR buf[ARRAY_SIZE(prefix) + 36 + ARRAY_SIZE(suffix)], *p = buf;
     compat_mode_t compat_mode = dispex_compat_mode(dispex);
-    const WCHAR *name;
-    unsigned len;
+    const char *name;
 
     if(!ret)
         return E_INVALIDARG;
@@ -2103,10 +2102,9 @@ HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
         if(!ensure_real_info(dispex))
             return E_OUTOFMEMORY;
         name = dispex->info->desc->name;
-        len = wcslen(name);
-        assert(len <= 36);
-        memcpy(p, name, len * sizeof(WCHAR));
-        p += len;
+        while(*name)
+            *p++ = *name++;
+        assert(p + ARRAY_SIZE(suffix) - buf <= ARRAY_SIZE(buf));
     }
     memcpy(p, suffix, sizeof(suffix));
 
@@ -2206,7 +2204,7 @@ static HRESULT legacy_prototype_value(DispatchEx *dispex, LCID lcid, WORD flags,
     case DISPATCH_CONSTRUCT:
         return MSHTML_E_INVALID_ACTION;
     case DISPATCH_PROPERTYGET:
-        if(!(V_BSTR(res) = SysAllocString(legacy_prototype_nameW)))
+        if(!(V_BSTR(res) = SysAllocString(L"[Interface prototype object]")))
             return E_OUTOFMEMORY;
         V_VT(res) = VT_BSTR;
         break;
@@ -2346,13 +2344,12 @@ HRESULT legacy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS 
         static const WCHAR prefix[8] = L"[object ";
         static const WCHAR suffix[] = L"]";
         WCHAR buf[ARRAY_SIZE(prefix) + 28 + ARRAY_SIZE(suffix)], *p = buf;
-        const WCHAR *name = dispex->info->desc->name;
-        unsigned len = wcslen(name);
+        const char *name = dispex->info->desc->name;
 
         memcpy(p, prefix, sizeof(prefix));
         p += ARRAY_SIZE(prefix);
-        memcpy(p, name, len * sizeof(WCHAR));
-        p += len;
+        while(*name)
+            *p++ = *name++;
         memcpy(p, suffix, sizeof(suffix));
 
         if(!(V_BSTR(res) = SysAllocString(buf)))
@@ -3203,11 +3200,11 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDis
 static HRESULT WINAPI WineDispatchProxyPrivate_DefineConstructors(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
 {
     static const struct {
-        const WCHAR *name;
+        const char *name;
         prototype_id_t proto_id;
     } extra_ctors[] = {
-        { L"Image",     PROTO_ID_HTMLImgElement },
-        { L"Option",    PROTO_ID_HTMLOptionElement },
+        { "Image",      PROTO_ID_HTMLImgElement },
+        { "Option",     PROTO_ID_HTMLOptionElement },
     };
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
     compat_mode_t compat_mode;

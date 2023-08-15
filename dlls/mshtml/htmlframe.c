@@ -1036,7 +1036,7 @@ static const tid_t HTMLFrameElement_iface_tids[] = {
 };
 
 dispex_static_data_t HTMLFrameElement_dispex = {
-    L"HTMLFrameElement",
+    "HTMLFrameElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLFrameElement,
     DispHTMLFrameElement_tid,
@@ -1626,7 +1626,7 @@ static const tid_t HTMLIFrame_iface_tids[] = {
 };
 
 dispex_static_data_t HTMLIFrame_dispex = {
-    L"HTMLIFrameElement",
+    "HTMLIFrameElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLIFrameElement,
     DispHTMLIFrame_tid,

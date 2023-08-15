@@ -324,7 +324,7 @@ static const tid_t HTMLStyleSheetRule_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLStyleSheetRule_dispex = {
-    L"CSSStyleRule",
+    "CSSStyleRule",
     NULL,
     PROTO_ID_HTMLStyleSheetRule,
     DispHTMLStyleSheetRule_tid,
@@ -368,7 +368,7 @@ static void CSSRule_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
 }
 
 dispex_static_data_t CSSRule_dispex = {
-    L"CSSRule",
+    "CSSRule",
     NULL,
     PROTO_ID_CSSRule,
     NULL_tid,
@@ -608,7 +608,7 @@ static const tid_t HTMLStyleSheetRulesCollection_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLStyleSheetRulesCollection_dispex = {
-    L"MSCSSRuleList",
+    "MSCSSRuleList",
     &HTMLStyleSheetRulesCollection_dispex_vtbl,
     PROTO_ID_HTMLStyleSheetRulesCollection,
     DispHTMLStyleSheetRulesCollection_tid,
@@ -1039,7 +1039,7 @@ static const tid_t HTMLStyleSheetsCollection_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLStyleSheetsCollection_dispex = {
-    L"StyleSheetList",
+    "StyleSheetList",
     &HTMLStyleSheetsCollection_dispex_vtbl,
     PROTO_ID_HTMLStyleSheetsCollection,
     DispHTMLStyleSheetsCollection_tid,
@@ -1645,7 +1645,7 @@ static const tid_t HTMLStyleSheet_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLStyleSheet_dispex = {
-    L"CSSStyleSheet",
+    "CSSStyleSheet",
     NULL,
     PROTO_ID_HTMLStyleSheet,
     DispHTMLStyleSheet_tid,
@@ -1712,7 +1712,7 @@ static void StyleSheet_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
 }
 
 dispex_static_data_t StyleSheet_dispex = {
-    L"StyleSheet",
+    "StyleSheet",
     NULL,
     PROTO_ID_StyleSheet,
     NULL_tid,

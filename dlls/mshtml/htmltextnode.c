@@ -54,7 +54,7 @@ static void DOMCharacterData_init_dispex_info(dispex_data_t *info, compat_mode_t
 }
 
 dispex_static_data_t DOMCharacterData_dispex = {
-    L"CharacterData",
+    "CharacterData",
     NULL,
     PROTO_ID_DOMCharacterData,
     NULL_tid,
@@ -388,7 +388,7 @@ static const tid_t HTMLDOMTextNode_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLDOMTextNode_dispex = {
-    L"Text",
+    "Text",
     NULL,
     PROTO_ID_HTMLDOMTextNode,
     DispHTMLDOMTextNode_tid,

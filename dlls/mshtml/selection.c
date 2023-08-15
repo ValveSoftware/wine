@@ -335,7 +335,7 @@ static const tid_t HTMLSelectionObject_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLSelectionObject_dispex = {
-    L"MSSelection",
+    "MSSelection",
     NULL,
     PROTO_ID_HTMLSelectionObject,
     IHTMLSelectionObject_tid, /* FIXME: We have a test for that, but it doesn't expose IHTMLSelectionObject2 iface. */

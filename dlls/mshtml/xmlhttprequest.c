@@ -1668,7 +1668,7 @@ static const tid_t HTMLXMLHttpRequest_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLXMLHttpRequest_dispex = {
-    L"XMLHttpRequest",
+    "XMLHttpRequest",
     &HTMLXMLHttpRequest_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLXMLHttpRequest,
     DispHTMLXMLHttpRequest_tid,
@@ -1898,7 +1898,7 @@ static const tid_t HTMLXMLHttpRequestFactory_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLXMLHttpRequestFactory_dispex = {
-    L"XMLHttpRequest",
+    "XMLHttpRequest",
     &HTMLXMLHttpRequestFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLXMLHttpRequestFactory_tid,
@@ -1923,7 +1923,7 @@ static const dispex_static_data_vtbl_t HTMLXMLHttpRequestCtor_dispex_vtbl = {
 };
 
 dispex_static_data_t HTMLXMLHttpRequestCtor_dispex = {
-    L"XMLHttpRequest",
+    "XMLHttpRequest",
     &HTMLXMLHttpRequestCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLXMLHttpRequestFactory_tid,
@@ -2232,7 +2232,7 @@ static void HTMLXDomainRequest_init_dispex_info(dispex_data_t *info, compat_mode
 }
 
 dispex_static_data_t HTMLXDomainRequest_dispex = {
-    L"XDomainRequest",
+    "XDomainRequest",
     &HTMLXMLHttpRequest_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLXDomainRequest,
     DispXDomainRequest_tid,
@@ -2389,7 +2389,7 @@ static const tid_t HTMLXDomainRequestFactory_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLXDomainRequestFactory_dispex = {
-    L"XDomainRequest",
+    "XDomainRequest",
     &HTMLXDomainRequestFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLXDomainRequestFactory_tid,
@@ -2414,7 +2414,7 @@ static const dispex_static_data_vtbl_t HTMLXDomainRequestCtor_dispex_vtbl = {
 };
 
 dispex_static_data_t HTMLXDomainRequestCtor_dispex = {
-    L"XDomainRequest",
+    "XDomainRequest",
     &HTMLXDomainRequestCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLXDomainRequestFactory_tid,

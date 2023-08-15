@@ -97,8 +97,8 @@ typedef struct {
     HRESULT (STDMETHODCALLTYPE *InitProxy)(IWineDispatchProxyCbPrivate *This, IDispatch *obj);
     void    (STDMETHODCALLTYPE *Unlinked)(IWineDispatchProxyCbPrivate *This, BOOL persist);
     HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
-    IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, IDispatch *disp, const WCHAR *name);
-    HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const WCHAR *name, IDispatch *prot, IDispatch *ctor);
+    IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, IDispatch *disp, const char *name);
+    HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const char *name, IDispatch *prot, IDispatch *ctor);
     HRESULT (STDMETHODCALLTYPE *CreateObject)(IWineDispatchProxyCbPrivate *This, IDispatchEx **obj);
     HRESULT (STDMETHODCALLTYPE *CreateArrayBuffer)(IWineDispatchProxyCbPrivate *This, DWORD size, IDispatch **arraybuf, void **data);
     HRESULT (STDMETHODCALLTYPE *GetRandomValues)(IDispatch *typedarr);
@@ -585,7 +585,7 @@ typedef struct {
 } dispex_static_data_vtbl_t;
 
 typedef struct {
-    const WCHAR *name;
+    const char *name;
     const dispex_static_data_vtbl_t *vtbl;
     const prototype_id_t prototype_id;
     const tid_t disp_tid;
