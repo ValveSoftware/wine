@@ -56,7 +56,6 @@ struct buffer
         unsigned int height;
         int pitch;
         unsigned int locks;
-        MF2DBuffer_LockFlags lock_flags;
         p_copy_image_func copy_image;
     } _2d;
     struct
@@ -999,14 +998,9 @@ static HRESULT dxgi_surface_buffer_map(struct buffer *buffer)
 
     ID3D11Texture2D_GetDevice(buffer->dxgi_surface.texture, &device);
     ID3D11Device_GetImmediateContext(device, &immediate_context);
+    ID3D11DeviceContext_CopySubresourceRegion(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.rb_texture,
+            0, 0, 0, 0, (ID3D11Resource *)buffer->dxgi_surface.texture, buffer->dxgi_surface.sub_resource_idx, NULL);
 
-    if (buffer->_2d.lock_flags == MF2DBuffer_LockFlags_Read || buffer->_2d.lock_flags == MF2DBuffer_LockFlags_ReadWrite)
-    {
-        ID3D11DeviceContext_CopySubresourceRegion(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.rb_texture,
-                0, 0, 0, 0, (ID3D11Resource *)buffer->dxgi_surface.texture, buffer->dxgi_surface.sub_resource_idx, NULL);
-    }
-
-    // TODO: fix _Map flags
     memset(&buffer->dxgi_surface.map_desc, 0, sizeof(buffer->dxgi_surface.map_desc));
     if (FAILED(hr = ID3D11DeviceContext_Map(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.rb_texture,
             0, D3D11_MAP_READ_WRITE, 0, &buffer->dxgi_surface.map_desc)))
@@ -1030,11 +1024,8 @@ static void dxgi_surface_buffer_unmap(struct buffer *buffer)
     ID3D11DeviceContext_Unmap(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.rb_texture, 0);
     memset(&buffer->dxgi_surface.map_desc, 0, sizeof(buffer->dxgi_surface.map_desc));
 
-    if (buffer->_2d.lock_flags == MF2DBuffer_LockFlags_Write || buffer->_2d.lock_flags == MF2DBuffer_LockFlags_ReadWrite)
-    {
-        ID3D11DeviceContext_CopySubresourceRegion(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.texture,
-                buffer->dxgi_surface.sub_resource_idx, 0, 0, 0, (ID3D11Resource *)buffer->dxgi_surface.rb_texture, 0, NULL);
-    }
+    ID3D11DeviceContext_CopySubresourceRegion(immediate_context, (ID3D11Resource *)buffer->dxgi_surface.texture,
+            buffer->dxgi_surface.sub_resource_idx, 0, 0, 0, (ID3D11Resource *)buffer->dxgi_surface.rb_texture, 0, NULL);
 
     ID3D11DeviceContext_Release(immediate_context);
     ID3D11Device_Release(device);
@@ -1062,7 +1053,6 @@ static HRESULT WINAPI dxgi_surface_buffer_Lock(IMFMediaBuffer *iface, BYTE **dat
 
         if (SUCCEEDED(hr))
         {
-            buffer->_2d.lock_flags = MF2DBuffer_LockFlags_ReadWrite;
             hr = dxgi_surface_buffer_map(buffer);
             if (SUCCEEDED(hr))
             {
@@ -1132,14 +1122,7 @@ static HRESULT dxgi_surface_buffer_lock(struct buffer *buffer, MF2DBuffer_LockFl
     if (buffer->_2d.linear_buffer)
         hr = MF_E_UNEXPECTED;
     else if (!buffer->_2d.locks++)
-    {
-        buffer->_2d.lock_flags = flags;
         hr = dxgi_surface_buffer_map(buffer);
-    }
-    else if (buffer->_2d.lock_flags != flags)
-    {
-        WARN("relocking DXGI surface buffer %p with different flags!\n", buffer);
-    }
 
     if (SUCCEEDED(hr))
     {
