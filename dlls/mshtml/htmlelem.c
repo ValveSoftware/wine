@@ -898,7 +898,7 @@ static const tid_t HTMLRect_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLRect_dispex = {
-    L"ClientRect",
+    "ClientRect",
     NULL,
     PROTO_ID_HTMLRect,
     IHTMLRect_tid,
@@ -1330,7 +1330,7 @@ static const tid_t HTMLRectCollection_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLRectCollection_dispex = {
-    L"ClientRectList",
+    "ClientRectList",
     &HTMLRectCollection_dispex_vtbl,
     PROTO_ID_HTMLRectCollection,
     IHTMLRectCollection_tid,
@@ -7655,7 +7655,7 @@ static void DOMElement_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
 }
 
 dispex_static_data_t DOMElement_dispex = {
-    L"Element",
+    "Element",
     NULL,
     PROTO_ID_DOMElement,
     NULL_tid,
@@ -8124,7 +8124,7 @@ static const tid_t token_list_iface_tids[] = {
     0
 };
 dispex_static_data_t DOMTokenList_dispex = {
-    L"DOMTokenList",
+    "DOMTokenList",
     &token_list_dispex_vtbl,
     PROTO_ID_DOMTokenList,
     IWineDOMTokenList_tid,
@@ -8237,7 +8237,7 @@ static const IWineHTMLElementPrivateVtbl WineHTMLElementPrivateVtbl = {
 };
 
 dispex_static_data_t HTMLElement_dispex = {
-    L"HTMLElement",
+    "HTMLElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLElement,
     DispHTMLUnknownElement_tid,
@@ -8246,7 +8246,7 @@ dispex_static_data_t HTMLElement_dispex = {
 };
 
 dispex_static_data_t HTMLUnknownElement_dispex = {
-    L"HTMLUnknownElement",
+    "HTMLUnknownElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLUnknownElement,
     DispHTMLUnknownElement_tid,
@@ -8566,7 +8566,7 @@ static const tid_t HTMLFiltersCollection_iface_tids[] = {
     0
 };
 static dispex_static_data_t HTMLFiltersCollection_dispex = {
-    L"FiltersCollection",
+    "FiltersCollection",
     &HTMLFiltersCollection_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLFiltersCollection_tid,
@@ -9366,7 +9366,7 @@ static const tid_t HTMLAttributeCollection_iface_tids[] = {
 };
 
 dispex_static_data_t HTMLAttributeCollection_dispex = {
-    L"NamedNodeMap",
+    "NamedNodeMap",
     &HTMLAttributeCollection_dispex_vtbl,
     PROTO_ID_HTMLAttributeCollection,
     DispHTMLAttributeCollection_tid,

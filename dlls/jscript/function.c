@@ -65,7 +65,7 @@ typedef struct {
 typedef struct {
     FunctionInstance function;
     IDispatch *disp;
-    const WCHAR *name;
+    const char *name;
 } ProxyConstructor;
 
 typedef struct {
@@ -1035,7 +1035,13 @@ static HRESULT ProxyConstructor_call(script_ctx_t *ctx, FunctionInstance *func, 
 static HRESULT ProxyConstructor_toString(FunctionInstance *func, jsstr_t **ret)
 {
     ProxyConstructor *constructor = (ProxyConstructor*)func;
-    return native_code_toString(constructor->name, ret);
+    WCHAR nameW[64];
+    unsigned i = 0;
+
+    do nameW[i] = constructor->name[i]; while(constructor->name[i++]);
+    assert(i <= ARRAY_SIZE(nameW));
+
+    return native_code_toString(nameW, ret);
 }
 
 static function_code_t *ProxyConstructor_get_code(FunctionInstance *func)
@@ -1127,7 +1133,7 @@ static const builtin_info_t ProxyConstructorCreate_info = {
     Function_gc_traverse
 };
 
-HRESULT create_proxy_constructor(IDispatch *disp, const WCHAR *name, jsdisp_t *prototype, jsdisp_t **ret)
+HRESULT create_proxy_constructor(IDispatch *disp, const char *name, jsdisp_t *prototype, jsdisp_t **ret)
 {
     script_ctx_t *ctx = prototype->ctx;
     ProxyConstructor *constructor;

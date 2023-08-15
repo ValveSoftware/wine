@@ -169,7 +169,7 @@ static const tid_t HTMLGenericElement_iface_tids[] = {
 };
 
 dispex_static_data_t HTMLGenericElement_dispex = {
-    L"HTMLUnknownElement",
+    "HTMLUnknownElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLGenericElement,
     DispHTMLGenericElement_tid,

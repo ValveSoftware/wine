@@ -1131,7 +1131,7 @@ static const tid_t HTMLFormElement_iface_tids[] = {
 };
 
 dispex_static_data_t HTMLFormElement_dispex = {
-    L"HTMLFormElement",
+    "HTMLFormElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLFormElement,
     DispHTMLFormElement_tid,

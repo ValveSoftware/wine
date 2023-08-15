@@ -1723,7 +1723,7 @@ static const tid_t HTMLTxtRange_iface_tids[] = {
     0
 };
 dispex_static_data_t HTMLTxtRange_dispex = {
-    L"TextRange",
+    "TextRange",
     NULL,
     PROTO_ID_HTMLTextRange,
     IHTMLTxtRange_tid,
@@ -2070,7 +2070,7 @@ static const tid_t HTMLDOMRange_iface_tids[] = {
 };
 
 dispex_static_data_t HTMLDOMRange_dispex = {
-    L"Range",
+    "Range",
     NULL,
     PROTO_ID_HTMLDOMRange,
     DispHTMLDOMRange_tid,

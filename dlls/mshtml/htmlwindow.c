@@ -250,16 +250,16 @@ static const dispex_static_data_vtbl_t legacy_ctor_dispex_vtbl = {
 };
 
 static const struct {
-    const WCHAR *name;
+    const char *name;
     prototype_id_t prototype_id;
     prototype_id_t ctor_id;
     dispex_static_data_t *dispex;
     const void *vtbl;
 } special_ctor_static_data[] = {
-    { L"Image",             PROTO_ID_HTMLImgElement,        LEGACY_CTOR_ID_Image,               &HTMLImageCtor_dispex,          &HTMLImageElementFactoryVtbl },
-    { L"Option",            PROTO_ID_HTMLOptionElement,     LEGACY_CTOR_ID_Option,              &HTMLOptionCtor_dispex,         &HTMLOptionElementFactoryVtbl },
-    { L"XDomainRequest",    PROTO_ID_HTMLXDomainRequest,    LEGACY_CTOR_ID_HTMLXDomainRequest,  &HTMLXDomainRequestCtor_dispex, &HTMLXDomainRequestFactoryVtbl },
-    { L"XMLHttpRequest",    PROTO_ID_HTMLXMLHttpRequest,    LEGACY_CTOR_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestCtor_dispex, &HTMLXMLHttpRequestFactoryVtbl }
+    { "Image",              PROTO_ID_HTMLImgElement,        LEGACY_CTOR_ID_Image,               &HTMLImageCtor_dispex,          &HTMLImageElementFactoryVtbl },
+    { "Option",             PROTO_ID_HTMLOptionElement,     LEGACY_CTOR_ID_Option,              &HTMLOptionCtor_dispex,         &HTMLOptionElementFactoryVtbl },
+    { "XDomainRequest",     PROTO_ID_HTMLXDomainRequest,    LEGACY_CTOR_ID_HTMLXDomainRequest,  &HTMLXDomainRequestCtor_dispex, &HTMLXDomainRequestFactoryVtbl },
+    { "XMLHttpRequest",     PROTO_ID_HTMLXMLHttpRequest,    LEGACY_CTOR_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestCtor_dispex, &HTMLXMLHttpRequestFactoryVtbl }
 };
 
 static struct {
@@ -269,7 +269,7 @@ static struct {
 #define X(name, proto_id)         \
 {                                 \
     {                             \
-        L ## name,                \
+        name,                     \
         &legacy_ctor_dispex_vtbl, \
         PROTO_ID_NULL,            \
         NULL_tid,                 \
@@ -3918,6 +3918,16 @@ HRESULT search_window_props(HTMLInnerWindow *This, BSTR bstrName, DWORD grfdex, 
     return DISP_E_UNKNOWNNAME;
 }
 
+static inline int legacy_ctor_name_cmp(const char *ctor_name, WCHAR *name)
+{
+    const unsigned char *p = (const unsigned char*)ctor_name;
+    while(*name && (*p == *name)) {
+        name++;
+        p++;
+    }
+    return (*p > *name) ? 1 : (*p < *name) ? -1 : 0;
+}
+
 static DISPID lookup_legacy_ctor_prop(HTMLInnerWindow *window, BSTR name)
 {
     DWORD i, a = 0, b = ARRAY_SIZE(special_ctor_static_data);
@@ -3925,7 +3935,7 @@ static DISPID lookup_legacy_ctor_prop(HTMLInnerWindow *window, BSTR name)
 
     while(a < b) {
         i = (a + b) / 2;
-        c = wcscmp(special_ctor_static_data[i].name, name);
+        c = legacy_ctor_name_cmp(special_ctor_static_data[i].name, name);
         if(!c)
             return i + (MSHTML_DISPID_CUSTOM_MAX - legacy_ctor_props_num + 1);
         if(c > 0) b = i;
@@ -3938,7 +3948,7 @@ static DISPID lookup_legacy_ctor_prop(HTMLInnerWindow *window, BSTR name)
     a = 0, b = ARRAY_SIZE(legacy_ctor_static_data);
     while(a < b) {
         i = (a + b) / 2;
-        c = wcscmp(legacy_ctor_static_data[i].dispex.name, name);
+        c = legacy_ctor_name_cmp(legacy_ctor_static_data[i].dispex.name, name);
         if(!c)
             return i + (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
         if(c > 0) b = i;
@@ -4529,6 +4539,8 @@ static HRESULT HTMLWindow_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
     const WCHAR *str;
+    WCHAR nameW[38];
+    unsigned i = 0;
 
     if(idx >= This->global_prop_cnt) {
         idx = id - (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
@@ -4536,7 +4548,9 @@ static HRESULT HTMLWindow_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
            dispex_compat_mode(&This->event_target.dispex) != COMPAT_MODE_IE8)
             return DISP_E_MEMBERNOTFOUND;
 
-        str = legacy_ctor_static_data[idx].dispex.name;
+        do nameW[i] = legacy_ctor_static_data[idx].dispex.name[i]; while(legacy_ctor_static_data[idx].dispex.name[i++]);
+        assert(i <= ARRAY_SIZE(nameW));
+        str = nameW;
     }else {
         str = This->global_props[idx].name;
     }
@@ -4909,7 +4923,7 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
 };
 
 dispex_static_data_t HTMLWindow_dispex = {
-    L"Window",
+    "Window",
     &HTMLWindow_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLWindow,
     DispHTMLWindow2_tid,
