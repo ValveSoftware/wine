@@ -618,11 +618,11 @@ static HRESULT DOMParserCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DIS
 }
 
 static const dispex_static_data_vtbl_t DOMParserCtor_dispex_vtbl = {
-    DOMParserCtor_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = DOMParserCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 dispex_static_data_t DOMParserCtor_dispex = {

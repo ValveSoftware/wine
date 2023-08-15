@@ -433,11 +433,9 @@ static HRESULT HTMLDOMChildrenCollection_invoke(DispatchEx *dispex, IDispatch *t
 }
 
 static const dispex_static_data_vtbl_t HTMLDOMChildrenCollection_dispex_vtbl = {
-    NULL,
-    HTMLDOMChildrenCollection_get_dispid,
-    HTMLDOMChildrenCollection_get_name,
-    HTMLDOMChildrenCollection_invoke,
-    NULL
+    .get_dispid       = HTMLDOMChildrenCollection_get_dispid,
+    .get_name         = HTMLDOMChildrenCollection_get_name,
+    .invoke           = HTMLDOMChildrenCollection_invoke,
 };
 
 static const tid_t HTMLDOMChildrenCollection_iface_tids[] = {

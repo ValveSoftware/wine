@@ -1341,14 +1341,12 @@ static HRESULT HTMLStorage_override(DispatchEx *dispex, const WCHAR *name, VARIA
 }
 
 static const dispex_static_data_vtbl_t HTMLStorage_dispex_vtbl = {
-    NULL,
-    HTMLStorage_get_dispid,
-    HTMLStorage_get_name,
-    HTMLStorage_invoke,
-    HTMLStorage_delete,
-    HTMLStorage_next_dispid,
-    HTMLStorage_override,
-    NULL
+    .get_dispid       = HTMLStorage_get_dispid,
+    .get_name         = HTMLStorage_get_name,
+    .invoke           = HTMLStorage_invoke,
+    .delete           = HTMLStorage_delete,
+    .next_dispid      = HTMLStorage_next_dispid,
+    .override         = HTMLStorage_override,
 };
 
 static const tid_t HTMLStorage_iface_tids[] = {

@@ -1277,11 +1277,10 @@ static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID i
 }
 
 static const dispex_static_data_vtbl_t function_dispex_vtbl = {
-    function_value,
-    function_get_dispid,
-    function_get_name,
-    function_invoke,
-    NULL
+    .value            = function_value,
+    .get_dispid       = function_get_dispid,
+    .get_name         = function_get_name,
+    .invoke           = function_invoke
 };
 
 static dispex_static_data_t function_dispex = {
@@ -2280,10 +2279,10 @@ static HRESULT legacy_prototype_invoke(DispatchEx *dispex, IDispatch *this_obj, 
 }
 
 static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl = {
-    legacy_prototype_value,
-    legacy_prototype_get_dispid,
-    legacy_prototype_get_name,
-    legacy_prototype_invoke
+    .value            = legacy_prototype_value,
+    .get_dispid       = legacy_prototype_get_dispid,
+    .get_name         = legacy_prototype_get_name,
+    .invoke           = legacy_prototype_invoke
 };
 
 static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
@@ -2712,8 +2711,7 @@ static HRESULT proxy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPP
 }
 
 static const dispex_static_data_vtbl_t proxy_ctor_dispex_vtbl = {
-    proxy_ctor_value,
-    NULL
+    .value            = proxy_ctor_value
 };
 
 static HRESULT proxy_get_dispid(DispatchEx *dispex, const WCHAR *name, BOOL case_insens, DISPID *id)

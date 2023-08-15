@@ -10011,14 +10011,7 @@ void CSSStyle_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
 }
 
 const dispex_static_data_vtbl_t CSSStyle_dispex_vtbl = {
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    CSSStyle_get_static_dispid
+    .get_static_dispid = CSSStyle_get_static_dispid
 };
 
 static const tid_t HTMLStyle_iface_tids[] = {
@@ -10179,14 +10172,7 @@ static void HTMLCSSProperties_init_dispex_info(dispex_data_t *info, compat_mode_
 }
 
 const dispex_static_data_vtbl_t HTMLCSSProperties_dispex_vtbl = {
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    HTMLCSSProperties_get_static_dispid
+    .get_static_dispid = HTMLCSSProperties_get_static_dispid
 };
 
 dispex_static_data_t HTMLCSSProperties_dispex = {
@@ -10267,14 +10253,7 @@ void HTMLW3CComputedStyle_init_dispex_info(dispex_data_t *info, compat_mode_t mo
 }
 
 const dispex_static_data_vtbl_t HTMLW3CComputedStyle_dispex_vtbl = {
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    NULL,
-    HTMLW3CComputedStyle_get_static_dispid
+    .get_static_dispid = HTMLW3CComputedStyle_get_static_dispid
 };
 
 dispex_static_data_t HTMLW3CComputedStyle_dispex = {

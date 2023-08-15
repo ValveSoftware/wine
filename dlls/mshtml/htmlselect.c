@@ -626,11 +626,11 @@ static HRESULT HTMLOptionElementFactory_value(DispatchEx *dispex, LCID lcid,
 }
 
 static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
-    HTMLOptionElementFactory_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLOptionElementFactory_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 static const tid_t HTMLOptionElementFactory_iface_tids[] = {
@@ -662,11 +662,11 @@ static void HTMLOptionCtor_init_dispex_info(dispex_data_t *info, compat_mode_t c
 }
 
 static const dispex_static_data_vtbl_t HTMLOptionCtor_dispex_vtbl = {
-    HTMLOptionCtor_value,
-    legacy_ctor_get_dispid,
-    legacy_ctor_get_name,
-    legacy_ctor_invoke,
-    legacy_ctor_delete
+    .value            = HTMLOptionCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 dispex_static_data_t HTMLOptionCtor_dispex = {
