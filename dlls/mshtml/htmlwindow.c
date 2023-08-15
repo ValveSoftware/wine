@@ -63,11 +63,6 @@ HTMLOuterWindow *mozwindow_to_window(const mozIDOMWindowProxy *mozwindow)
     return entry ? WINE_RB_ENTRY_VALUE(entry, HTMLOuterWindow, entry) : NULL;
 }
 
-static inline BOOL is_outer_window(HTMLWindow *window)
-{
-    return &window->outer_window->base == window;
-}
-
 static void get_location(HTMLOuterWindow *This, HTMLLocation **ret)
 {
     if(!This->location.dispex.outer)
@@ -389,12 +384,18 @@ static inline HTMLWindow *impl_from_IHTMLWindow2(IHTMLWindow2 *iface)
     return CONTAINING_RECORD(iface, HTMLWindow, IHTMLWindow2_iface);
 }
 
-static HRESULT WINAPI HTMLWindow2_QueryInterface(IHTMLWindow2 *iface, REFIID riid, void **ppv)
+static inline HTMLInnerWindow *HTMLInnerWindow_from_IHTMLWindow2(IHTMLWindow2 *iface)
 {
-    HTMLWindow *This = impl_from_IHTMLWindow2(iface);
+    return CONTAINING_RECORD(iface, HTMLInnerWindow, base.IHTMLWindow2_iface);
+}
 
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+static inline HTMLOuterWindow *HTMLOuterWindow_from_IHTMLWindow2(IHTMLWindow2 *iface)
+{
+    return CONTAINING_RECORD(iface, HTMLOuterWindow, base.IHTMLWindow2_iface);
+}
 
+static HRESULT base_query_interface(HTMLWindow *This, REFIID riid, void **ppv)
+{
     if(IsEqualGUID(&IID_IUnknown, riid)) {
         *ppv = &This->IHTMLWindow2_iface;
     }else if(IsEqualGUID(&IID_IDispatch, riid)) {
@@ -439,9 +440,6 @@ static HRESULT WINAPI HTMLWindow2_QueryInterface(IHTMLWindow2 *iface, REFIID rii
         *ppv = NULL;
         FIXME("(%p)->(IID_IMarshal %p)\n", This, ppv);
         return E_NOINTERFACE;
-    }else if(dispex_query_interface(&This->inner_window->event_target.dispex, riid, ppv)) {
-        assert(!*ppv);
-        return E_NOINTERFACE;
     }else if(IsEqualGUID(&IID_IEventTarget, riid)) {
         if(!This->inner_window->doc || This->inner_window->doc->document_mode < COMPAT_MODE_IE9) {
             *ppv = NULL;
@@ -449,19 +447,33 @@ static HRESULT WINAPI HTMLWindow2_QueryInterface(IHTMLWindow2 *iface, REFIID rii
         }
         *ppv = &This->IEventTarget_iface;
     }else {
-        WARN("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-        *ppv = NULL;
-        return E_NOINTERFACE;
+        return S_FALSE;
     }
 
     IUnknown_AddRef((IUnknown*)*ppv);
     return S_OK;
 }
 
+static HRESULT WINAPI HTMLWindow2_QueryInterface(IHTMLWindow2 *iface, REFIID riid, void **ppv)
+{
+    HTMLInnerWindow *This = HTMLInnerWindow_from_IHTMLWindow2(iface);
+    HRESULT hres;
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+
+    hres = base_query_interface(&This->base, riid, ppv);
+    if(hres != S_FALSE)
+        return hres;
+
+    WARN("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
 static ULONG WINAPI HTMLWindow2_AddRef(IHTMLWindow2 *iface)
 {
-    HTMLWindow *This = impl_from_IHTMLWindow2(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
+    HTMLInnerWindow *This = HTMLInnerWindow_from_IHTMLWindow2(iface);
+    LONG ref = InterlockedIncrement(&This->base.ref);
 
     TRACE("(%p) ref=%ld\n", This, ref);
 
@@ -577,22 +589,58 @@ static void release_inner_window(HTMLInnerWindow *This)
 
 static ULONG WINAPI HTMLWindow2_Release(IHTMLWindow2 *iface)
 {
+    HTMLInnerWindow *This = HTMLInnerWindow_from_IHTMLWindow2(iface);
+    LONG ref = InterlockedDecrement(&This->base.ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    if(!ref)
+        release_inner_window(This);
+
+    return ref;
+}
+
+static HRESULT WINAPI outer_window_QueryInterface(IHTMLWindow2 *iface, REFIID riid, void **ppv)
+{
+    HTMLOuterWindow *This = HTMLOuterWindow_from_IHTMLWindow2(iface);
+    HRESULT hres;
+
+    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+
+    hres = base_query_interface(&This->base, riid, ppv);
+    if(hres != S_FALSE)
+        return hres;
+
+    WARN("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+    *ppv = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI outer_window_AddRef(IHTMLWindow2 *iface)
+{
+    HTMLOuterWindow *This = HTMLOuterWindow_from_IHTMLWindow2(iface);
+    LONG ref = InterlockedIncrement(&This->base.ref);
+
+    TRACE("(%p) ref=%ld\n", This, ref);
+
+    return ref;
+}
+
+static ULONG WINAPI outer_window_Release(IHTMLWindow2 *iface)
+{
     HTMLWindow *This = impl_from_IHTMLWindow2(iface);
     LONG ref = InterlockedDecrement(&This->ref);
 
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if(!ref) {
-        if(is_outer_window(This) && This->inner_window) {
+        if(This->inner_window) {
             /* Detached inner windows hold a ref to the outer window,
                so return the ref to us if it's still alive after */
             return detach_inner_window(This->inner_window) ? 1 : 0;
         }
 
-        if(is_outer_window(This))
-            release_outer_window(This->outer_window);
-        else
-            release_inner_window(This->inner_window);
+        release_outer_window(This->outer_window);
     }
 
     return ref;
@@ -1795,6 +1843,86 @@ static const IHTMLWindow2Vtbl HTMLWindow2Vtbl = {
     HTMLWindow2_QueryInterface,
     HTMLWindow2_AddRef,
     HTMLWindow2_Release,
+    HTMLWindow2_GetTypeInfoCount,
+    HTMLWindow2_GetTypeInfo,
+    HTMLWindow2_GetIDsOfNames,
+    HTMLWindow2_Invoke,
+    HTMLWindow2_item,
+    HTMLWindow2_get_length,
+    HTMLWindow2_get_frames,
+    HTMLWindow2_put_defaultStatus,
+    HTMLWindow2_get_defaultStatus,
+    HTMLWindow2_put_status,
+    HTMLWindow2_get_status,
+    HTMLWindow2_setTimeout,
+    HTMLWindow2_clearTimeout,
+    HTMLWindow2_alert,
+    HTMLWindow2_confirm,
+    HTMLWindow2_prompt,
+    HTMLWindow2_get_Image,
+    HTMLWindow2_get_location,
+    HTMLWindow2_get_history,
+    HTMLWindow2_close,
+    HTMLWindow2_put_opener,
+    HTMLWindow2_get_opener,
+    HTMLWindow2_get_navigator,
+    HTMLWindow2_put_name,
+    HTMLWindow2_get_name,
+    HTMLWindow2_get_parent,
+    HTMLWindow2_open,
+    HTMLWindow2_get_self,
+    HTMLWindow2_get_top,
+    HTMLWindow2_get_window,
+    HTMLWindow2_navigate,
+    HTMLWindow2_put_onfocus,
+    HTMLWindow2_get_onfocus,
+    HTMLWindow2_put_onblur,
+    HTMLWindow2_get_onblur,
+    HTMLWindow2_put_onload,
+    HTMLWindow2_get_onload,
+    HTMLWindow2_put_onbeforeunload,
+    HTMLWindow2_get_onbeforeunload,
+    HTMLWindow2_put_onunload,
+    HTMLWindow2_get_onunload,
+    HTMLWindow2_put_onhelp,
+    HTMLWindow2_get_onhelp,
+    HTMLWindow2_put_onerror,
+    HTMLWindow2_get_onerror,
+    HTMLWindow2_put_onresize,
+    HTMLWindow2_get_onresize,
+    HTMLWindow2_put_onscroll,
+    HTMLWindow2_get_onscroll,
+    HTMLWindow2_get_document,
+    HTMLWindow2_get_event,
+    HTMLWindow2_get__newEnum,
+    HTMLWindow2_showModalDialog,
+    HTMLWindow2_showHelp,
+    HTMLWindow2_get_screen,
+    HTMLWindow2_get_Option,
+    HTMLWindow2_focus,
+    HTMLWindow2_get_closed,
+    HTMLWindow2_blur,
+    HTMLWindow2_scroll,
+    HTMLWindow2_get_clientInformation,
+    HTMLWindow2_setInterval,
+    HTMLWindow2_clearInterval,
+    HTMLWindow2_put_offscreenBuffering,
+    HTMLWindow2_get_offscreenBuffering,
+    HTMLWindow2_execScript,
+    HTMLWindow2_toString,
+    HTMLWindow2_scrollBy,
+    HTMLWindow2_scrollTo,
+    HTMLWindow2_moveTo,
+    HTMLWindow2_moveBy,
+    HTMLWindow2_resizeTo,
+    HTMLWindow2_resizeBy,
+    HTMLWindow2_get_external
+};
+
+static const IHTMLWindow2Vtbl outer_window_HTMLWindow2Vtbl = {
+    outer_window_QueryInterface,
+    outer_window_AddRef,
+    outer_window_Release,
     HTMLWindow2_GetTypeInfoCount,
     HTMLWindow2_GetTypeInfo,
     HTMLWindow2_GetIDsOfNames,
@@ -4938,7 +5066,6 @@ static void *alloc_window(size_t size)
     if(!window)
         return NULL;
 
-    window->IHTMLWindow2_iface.lpVtbl = &HTMLWindow2Vtbl;
     window->IHTMLWindow3_iface.lpVtbl = &HTMLWindow3Vtbl;
     window->IHTMLWindow4_iface.lpVtbl = &HTMLWindow4Vtbl;
     window->IHTMLWindow5_iface.lpVtbl = &HTMLWindow5Vtbl;
@@ -4966,6 +5093,7 @@ static HRESULT create_inner_window(HTMLOuterWindow *outer_window, IMoniker *mon,
     window = alloc_window(sizeof(HTMLInnerWindow));
     if(!window)
         return E_OUTOFMEMORY;
+    window->base.IHTMLWindow2_iface.lpVtbl = &HTMLWindow2Vtbl;
 
     hres = create_performance_timing(&window->performance_timing);
     if(FAILED(hres)) {
@@ -5005,6 +5133,7 @@ HRESULT create_outer_window(GeckoBrowser *browser, mozIDOMWindowProxy *mozwindow
     window = alloc_window(sizeof(HTMLOuterWindow));
     if(!window)
         return E_OUTOFMEMORY;
+    window->base.IHTMLWindow2_iface.lpVtbl = &outer_window_HTMLWindow2Vtbl;
 
     window->base.outer_window = window;
     window->base.inner_window = NULL;
