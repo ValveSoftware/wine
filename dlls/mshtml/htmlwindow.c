@@ -514,6 +514,7 @@ static void release_inner_window(HTMLInnerWindow *This)
         IHTMLWindow2_Release(&outer_window->base.IHTMLWindow2_iface);
     }
 
+    unlink_ref(&This->console);
     detach_inner_window(This);
 
     if(This->doc) {
@@ -587,9 +588,6 @@ static ULONG WINAPI HTMLWindow2_Release(IHTMLWindow2 *iface)
                so return the ref to us if it's still alive after */
             return detach_inner_window(This->inner_window) ? 1 : 0;
         }
-
-        if (This->console)
-            IWineMSHTMLConsole_Release(This->console);
 
         if(is_outer_window(This))
             release_outer_window(This->outer_window);
@@ -3635,15 +3633,16 @@ static HRESULT WINAPI window_private_matchMedia(IWineHTMLWindowPrivate *iface, B
 static HRESULT WINAPI window_private_get_console(IWineHTMLWindowPrivate *iface, IDispatch **console)
 {
     HTMLWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface);
+    HTMLInnerWindow *window = This->inner_window;
 
     TRACE("iface %p, console %p.\n", iface, console);
 
-    if (!This->console)
-        create_console(This->inner_window, &This->console);
+    if (!window->console)
+        create_console(window, &window->console);
 
-    *console = (IDispatch *)This->console;
-    if (This->console)
-        IWineMSHTMLConsole_AddRef(This->console);
+    *console = (IDispatch *)window->console;
+    if (window->console)
+        IWineMSHTMLConsole_AddRef(window->console);
     return S_OK;
 }
 
