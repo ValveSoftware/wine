@@ -190,6 +190,13 @@ int WINAPI ADL2_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg, ADL_CO
     return ADL_OK;
 }
 
+int WINAPI ADL2_Main_Control_Destroy(ADL_CONTEXT_HANDLE handle)
+{
+    FIXME("handle %p stub!\n")
+
+    return ADL_OK;
+}
+
 int WINAPI ADL_Main_Control_Create(ADL_MAIN_MALLOC_CALLBACK cb, int arg)
 {
     FIXME("cb %p, arg %d stub!\n", cb, arg);
