@@ -113,6 +113,12 @@ static HRESULT try_create_wg_transform(struct h264_decoder *decoder)
     if (SUCCEEDED(IMFAttributes_GetUINT32(decoder->attributes, &MF_LOW_LATENCY, &low_latency)))
         attrs.low_latency = !!low_latency;
 
+    {
+        const char *sgi;
+        if ((sgi = getenv("SteamGameId")) && ((!strcmp(sgi, "2009100")) || (!strcmp(sgi, "2555360"))))
+            attrs.low_latency = FALSE;
+    }
+
     if (!(decoder->wg_transform = wg_transform_create(&input_format, &output_format, &attrs)))
         return E_FAIL;
 
