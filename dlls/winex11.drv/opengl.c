@@ -1476,6 +1476,11 @@ static enum dc_gl_layered_type get_gl_layered_type( HWND hwnd )
     return ret;
 }
 
+static BOOL drawable_needs_clipping( HWND hwnd, BOOL known_child )
+{
+    if (known_child) return TRUE;
+    return NtUserGetWindowRelative( hwnd, GW_CHILD ) || NtUserGetAncestor( hwnd, GA_PARENT ) != NtUserGetDesktopWindow();
+}
 
 /***********************************************************************
  *              create_gl_drawable
@@ -1520,8 +1525,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
         }
         TRACE( "%p created pixmap drawable %lx for layered window, type %u.\n", hwnd, gl->drawable, gl->layered_type );
     }
-    else if (!known_child && !NtUserGetWindowRelative( hwnd, GW_CHILD ) &&
-             NtUserGetAncestor( hwnd, GA_PARENT ) == NtUserGetDesktopWindow())  /* childless top-level window */
+    else if (!drawable_needs_clipping( hwnd, known_child ))  /* childless top-level window */
     {
         struct x11drv_win_data *data;
 
@@ -1666,6 +1670,9 @@ void sync_gl_drawable( HWND hwnd, BOOL known_child )
     if (!(old = get_gl_drawable( hwnd, 0 ))) return;
 
     new_layered_type = get_gl_layered_type( hwnd );
+
+    known_child = drawable_needs_clipping( hwnd, known_child );
+
     if (old->type == DC_GL_PIXMAP_WIN || (known_child && old->type == DC_GL_WINDOW)
         || (!known_child && old->type != DC_GL_WINDOW)
         || old->layered_type != new_layered_type)
