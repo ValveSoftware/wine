@@ -221,6 +221,7 @@ struct wgl_context
     GLuint fs_hack_gamma_pgm, ramp_ubo;
     POINT setup_for;
     GLuint current_draw_fbo, current_read_fbo;
+    BOOL drawing_to_front;
     struct list entry;
 };
 
@@ -2710,6 +2711,9 @@ static void wglDrawBuffer( GLenum buffer )
 {
     struct wgl_context *ctx = NtCurrentTeb()->glContext;
 
+    TRACE( "buffer %#x.\n", buffer );
+
+    ctx->drawing_to_front = (buffer == GL_FRONT);
     if (ctx->fs_hack && ctx->current_draw_fbo == ctx->fs_hack_fbo)
     {
         TRACE( "Overriding %#x with GL_COLOR_ATTACHMENT0\n", buffer );
@@ -3324,7 +3328,7 @@ static void wglFinish(void)
         {
             ctx->fs_hack = gl->fs_hack;
             if (!gl->fs_hack_context_set_up) fs_hack_setup_context( ctx, gl );
-            if (!gl->fs_hack_did_swapbuf) fs_hack_blit_framebuffer( gl, GL_FRONT );
+            if (!gl->fs_hack_did_swapbuf || ctx->drawing_to_front) fs_hack_blit_framebuffer( gl, GL_FRONT );
         }
         else if (gl->fs_hack_context_set_up)
         {
@@ -3365,7 +3369,7 @@ static void wglFlush(void)
         {
             ctx->fs_hack = gl->fs_hack;
             if (!gl->fs_hack_context_set_up) fs_hack_setup_context( ctx, gl );
-            if (!gl->fs_hack_did_swapbuf) fs_hack_blit_framebuffer( gl, GL_FRONT );
+            if (!gl->fs_hack_did_swapbuf || ctx->drawing_to_front) fs_hack_blit_framebuffer( gl, GL_FRONT );
         }
         else if (gl->fs_hack_context_set_up)
         {
