@@ -101,26 +101,6 @@ static GstFlowReturn transform_sink_chain_cb(GstPad *pad, GstObject *parent, Gst
     return GST_FLOW_OK;
 }
 
-static gboolean transform_src_query_latency(struct wg_transform *transform, GstQuery *query)
-{
-    GST_LOG("transform %p, query %p", transform, query);
-    gst_query_set_latency(query, transform->attrs.low_latency, 0, 0);
-    return true;
-}
-
-static gboolean transform_src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
-{
-    struct wg_transform *transform = gst_pad_get_element_private(pad);
-
-    switch (query->type)
-    {
-    case GST_QUERY_LATENCY:
-        return transform_src_query_latency(transform, query);
-    default:
-        return gst_pad_query_default(pad, parent, query);
-    }
-}
-
 static gboolean transform_sink_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
 {
     struct wg_transform *transform = gst_pad_get_element_private(pad);
@@ -332,7 +312,6 @@ NTSTATUS wg_transform_create(void *args)
         goto out;
 
     gst_pad_set_element_private(transform->my_src, transform);
-    gst_pad_set_query_function(transform->my_src, transform_src_query_cb);
 
     if (!(transform->output_caps = wg_format_to_caps(&output_format)))
         goto out;
@@ -367,6 +346,16 @@ NTSTATUS wg_transform_create(void *args)
                 gst_caps_unref(raw_caps);
                 goto out;
             }
+
+            /* When MF_LOW_LATENCY is requested, allow only one additional decoding thread. Native
+             * usually does hardware decoding, which isn't stricly synchronous, and low-latency
+             * probably means one frame latency instead. With only one thread, or using live latency
+             * reply, we force the decoder to work completely synchronously, which is blocking and
+             * too slow compared to some applications expectations.
+             */
+            if (transform->attrs.low_latency)
+                gst_util_set_object_arg(G_OBJECT(element), "max-threads", "2");
+
             break;
 
         case WG_MAJOR_TYPE_AUDIO:
