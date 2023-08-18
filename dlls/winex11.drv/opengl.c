@@ -1542,6 +1542,8 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
 #ifdef SONAME_LIBXCOMPOSITE
     else if(usexcomposite)
     {
+        struct x11drv_win_data *data;
+
         gl->type = DC_GL_CHILD_WIN;
         gl->window = create_client_window( hwnd, visual );
         if (gl->window)
@@ -1549,6 +1551,10 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
             pXCompositeRedirectWindow( gdi_display, gl->window, CompositeRedirectManual );
         }
+        data = get_win_data( hwnd );
+        gl->fs_hack = data->fs_hack || fs_hack_get_gamma_ramp( NULL );
+        if (gl->fs_hack) TRACE( "Window %p has the fullscreen hack enabled\n", hwnd );
+        release_win_data( data );
         TRACE( "%p created child %lx drawable %lx\n", hwnd, gl->window, gl->drawable );
     }
 #endif
@@ -3033,11 +3039,20 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     src.cy = user_rect.bottom - user_rect.top;
     real.cx = real_rect.right - real_rect.left;
     real.cy = real_rect.bottom - real_rect.top;
-    scaled_origin.x = user_rect.left;
-    scaled_origin.y = user_rect.top;
-    fs_hack_point_user_to_real( &scaled_origin );
-    scaled_origin.x -= real_rect.left;
-    scaled_origin.y -= real_rect.top;
+    if (gl->type != DC_GL_CHILD_WIN)
+    {
+        scaled_origin.x = user_rect.left;
+        scaled_origin.y = user_rect.top;
+        fs_hack_point_user_to_real( &scaled_origin );
+        scaled_origin.x -= real_rect.left;
+        scaled_origin.y -= real_rect.top;
+    }
+    else
+    {
+        /* ExtEscape performs the fshack offset. */
+        scaled_origin.x = 0;
+        scaled_origin.y = 0;
+    }
 
     gamma_ramp = fs_hack_get_gamma_ramp( &gamma_serial );
 
@@ -4798,12 +4813,6 @@ static BOOL glxdrv_wglSwapBuffers( HDC hdc )
         if (gl->type == DC_GL_CHILD_WIN) escape.drawable = gl->window;
         /* fall through */
     default:
-        if (escape.drawable && pglXSwapBuffersMscOML)
-        {
-            pglFlush();
-            target_sbc = pglXSwapBuffersMscOML( gdi_display, gl->drawable, 0, 0, 0 );
-            break;
-        }
         if (gl->fs_hack)
         {
             ctx->fs_hack = gl->fs_hack;
@@ -4815,6 +4824,12 @@ static BOOL glxdrv_wglSwapBuffers( HDC hdc )
         {
             ctx->fs_hack = FALSE;
             fs_hack_setup_context( ctx, gl );
+        }
+        if (escape.drawable && pglXSwapBuffersMscOML)
+        {
+            pglFlush();
+            target_sbc = pglXSwapBuffersMscOML( gdi_display, gl->drawable, 0, 0, 0 );
+            break;
         }
         pglXSwapBuffers(gdi_display, gl->drawable);
         break;
