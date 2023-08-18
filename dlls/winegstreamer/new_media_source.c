@@ -36,6 +36,8 @@ struct object_context
     IMFByteStream *stream;
     UINT64 file_size;
     WCHAR *url;
+
+    wg_source_t wg_source;
 };
 
 static struct object_context *impl_from_IUnknown(IUnknown *iface)
@@ -78,6 +80,8 @@ static ULONG WINAPI object_context_Release(IUnknown *iface)
 
     if (!refcount)
     {
+        if (context->wg_source)
+            wg_source_destroy(context->wg_source);
         IMFAsyncResult_Release(context->result);
         IMFByteStream_Release(context->stream);
         free(context->url);
@@ -269,6 +273,7 @@ struct media_source
 
     CRITICAL_SECTION cs;
 
+    wg_source_t wg_source;
     UINT64 file_size;
     wg_parser_t wg_parser;
     UINT64 duration;
@@ -1446,6 +1451,7 @@ static ULONG WINAPI media_source_Release(IMFMediaSource *iface)
         IMFMediaSource_Shutdown(iface);
         IMFMediaEventQueue_Release(source->event_queue);
         IMFByteStream_Release(source->byte_stream);
+        wg_source_destroy(source->wg_source);
         wg_parser_destroy(source->wg_parser);
         source->cs.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&source->cs);
@@ -1724,6 +1730,9 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": cs");
 
+    object->wg_source = context->wg_source;
+    context->wg_source = 0;
+
     if (FAILED(hr = MFCreateEventQueue(&object->event_queue)))
         goto fail;
 
@@ -1803,6 +1812,8 @@ fail:
         WaitForSingleObject(object->read_thread, INFINITE);
         CloseHandle(object->read_thread);
     }
+    if (object->wg_source)
+        wg_source_destroy(object->wg_source);
     if (object->wg_parser)
         wg_parser_destroy(object->wg_parser);
     if (object->async_commands_queue)
@@ -2086,7 +2097,9 @@ static HRESULT WINAPI stream_handler_callback_Invoke(IMFAsyncCallback *iface, IM
     if (!state || !(context = impl_from_IUnknown(state)))
         return E_INVALIDARG;
 
-    if (FAILED(hr = media_source_create(context, (IMFMediaSource **)&object)))
+    if (FAILED(hr = wg_source_create(&context->wg_source)))
+        WARN("Failed to create wg_source, hr %#lx\n", hr);
+    else if (FAILED(hr = media_source_create(context, (IMFMediaSource **)&object)))
         WARN("Failed to create media source, hr %#lx\n", hr);
 
     if (FAILED(hr))
