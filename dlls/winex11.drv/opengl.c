@@ -2999,6 +2999,8 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     POINT scaled_origin;
     HMONITOR monitor;
     struct fs_hack_gl_state state;
+    struct x11drv_win_data *data;
+    BOOL window_fs_hack = FALSE;
     const float *gamma_ramp;
     LONG gamma_serial;
     unsigned int i;
@@ -3007,7 +3009,13 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
     hwnd = NtUserWindowFromDC( ctx->hdc );
     monitor = fs_hack_monitor_from_hwnd( hwnd );
 
-    if (fs_hack_enabled( monitor ))
+    if ((data = get_win_data( hwnd )))
+    {
+        window_fs_hack = data->fs_hack;
+        release_win_data( data );
+    }
+
+    if (window_fs_hack)
     {
         user_rect = fs_hack_current_mode( monitor );
         real_rect = fs_hack_real_mode( monitor );
