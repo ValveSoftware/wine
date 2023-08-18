@@ -2356,6 +2356,28 @@ static NTSTATUS wow64_wg_parser_stream_get_tag(void *args)
     return wg_parser_stream_get_tag(&params);
 }
 
+NTSTATUS wow64_wg_source_create(void *args)
+{
+    struct
+    {
+        PTR32 url;
+        PTR32 data;
+        UINT32 size;
+        wg_source_t source;
+    } *params32 = args;
+    struct wg_source_create_params params =
+    {
+        .url = ULongToPtr(params32->url),
+        .data = ULongToPtr(params32->data),
+        .size = params32->size,
+    };
+    NTSTATUS ret;
+
+    ret = wg_source_create(&params);
+    params32->source = params.source;
+    return ret;
+}
+
 NTSTATUS wow64_wg_transform_create(void *args)
 {
     struct
@@ -2542,7 +2564,7 @@ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
     X64(wg_parser_stream_get_tag),
     X(wg_parser_stream_seek),
 
-    X(wg_source_create),
+    X64(wg_source_create),
     X(wg_source_destroy),
 
     X64(wg_transform_create),
