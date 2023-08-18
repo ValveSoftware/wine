@@ -340,12 +340,20 @@ void wg_parser_stream_seek(wg_parser_stream_t stream, double rate,
     WINE_UNIX_CALL(unix_wg_parser_stream_seek, &params);
 }
 
-HRESULT wg_source_create(wg_source_t *out)
+HRESULT wg_source_create(const WCHAR *url, const void *data, uint32_t size, wg_source_t *out)
 {
-    struct wg_source_create_params params = {0};
+    struct wg_source_create_params params =
+    {
+        .data = data, .size = size,
+    };
+    UINT len = url ? WideCharToMultiByte(CP_ACP, 0, url, -1, NULL, 0, NULL, NULL) : 0;
+    char *tmp = url ? malloc(len) : NULL;
     NTSTATUS status;
 
-    TRACE("out %p\n", out);
+    TRACE("url %s, data %p, size %#x\n", debugstr_w(url), data, size);
+
+    if ((params.url = tmp))
+        WideCharToMultiByte(CP_ACP, 0, url, -1, tmp, len, NULL, NULL);
 
     if ((status = WINE_UNIX_CALL(unix_wg_source_create, &params)))
         WARN("wg_source_create returned status %#lx\n", status);
@@ -355,6 +363,7 @@ HRESULT wg_source_create(wg_source_t *out)
         *out = params.source;
     }
 
+    free(tmp);
     return HRESULT_FROM_NT(status);
 }
 
