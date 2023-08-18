@@ -103,7 +103,7 @@ char *wg_parser_stream_get_tag(wg_parser_stream_t stream, enum wg_parser_tag tag
 void wg_parser_stream_seek(wg_parser_stream_t stream, double rate,
         uint64_t start_pos, uint64_t stop_pos, DWORD start_flags, DWORD stop_flags);
 
-HRESULT wg_source_create(wg_source_t *out);
+HRESULT wg_source_create(const WCHAR *url, const void *data, uint32_t size, wg_source_t *out);
 void wg_source_destroy(wg_source_t source);
 
 wg_transform_t wg_transform_create(const struct wg_format *input_format,
