@@ -2206,6 +2206,9 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     X(wg_parser_stream_get_tag),
     X(wg_parser_stream_seek),
 
+    X(wg_source_create),
+    X(wg_source_destroy),
+
     X(wg_transform_create),
     X(wg_transform_destroy),
     X(wg_transform_set_output_format),
@@ -2538,6 +2541,9 @@ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
     X(wg_parser_stream_get_duration),
     X64(wg_parser_stream_get_tag),
     X(wg_parser_stream_seek),
+
+    X(wg_source_create),
+    X(wg_source_destroy),
 
     X64(wg_transform_create),
     X(wg_transform_destroy),
