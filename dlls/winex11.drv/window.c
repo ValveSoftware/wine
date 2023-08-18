@@ -3256,7 +3256,7 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
 
     set_hwnd_style_props( data->display, data->whole_window, data->hwnd );
 
-    if (data->fs_hack) sync_gl_drawable( hwnd, FALSE );
+    if (data->fs_hack) needs_resize = TRUE;
 
     /* check if we are currently processing an event relevant to this window */
     event_type = 0;
