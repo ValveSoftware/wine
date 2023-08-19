@@ -1048,7 +1048,7 @@ done:
     return ret; /* Return current position */
 }
 
-static BOOL get_scroll_bar_info( HWND hwnd, LONG id, SCROLLBARINFO *info )
+BOOL get_scroll_bar_info( HWND hwnd, LONG id, SCROLLBARINFO *info )
 {
     struct scroll_info *scroll;
     int bar, dummy;
@@ -1066,6 +1066,9 @@ static BOOL get_scroll_bar_info( HWND hwnd, LONG id, SCROLLBARINFO *info )
 
     /* handle invalid data structure */
     if (info->cbSize != sizeof(*info)) return FALSE;
+
+    if (bar != SB_CTL && !is_current_thread_window( hwnd ))
+        return send_message( hwnd, WM_WINE_GETSCROLLBARINFO, (WPARAM)id, (LPARAM)info );
 
     get_scroll_bar_rect( hwnd, bar, &info->rcScrollBar, &dummy,
                          &info->dxyLineButton, &info->xyThumbTop );
