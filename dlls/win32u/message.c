@@ -733,6 +733,7 @@ static BOOL unpack_message( HWND hwnd, UINT message, WPARAM *wparam, LPARAM *lpa
         minsize = sizeof(SCROLLINFO);
         break;
     case SBM_GETSCROLLINFO:
+    case WM_WINE_GETSCROLLINFO:
         if (!get_buffer_space( buffer, sizeof(SCROLLINFO), buffer_size )) return FALSE;
         break;
     case SBM_GETSCROLLBARINFO:
@@ -1132,6 +1133,7 @@ static size_t pack_message( HWND hwnd, UINT message, WPARAM wparam, LPARAM lpara
         push_data( data, (SCROLLINFO *)lparam, sizeof(SCROLLINFO) );
         return 0;
     case SBM_GETSCROLLINFO:
+    case WM_WINE_GETSCROLLINFO:
         push_data( data, (SCROLLINFO *)lparam, sizeof(SCROLLINFO) );
         return sizeof(SCROLLINFO);
     case SBM_GETSCROLLBARINFO:
@@ -1370,6 +1372,7 @@ static void pack_reply( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
         break;
     }
     case SBM_GETSCROLLINFO:
+    case WM_WINE_GETSCROLLINFO:
         push_data( data, (SCROLLINFO *)lparam, sizeof(SCROLLINFO) );
         break;
     case SBM_GETSCROLLBARINFO:
@@ -1514,6 +1517,7 @@ static void unpack_reply( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
         }
         break;
     case SBM_GETSCROLLINFO:
+    case WM_WINE_GETSCROLLINFO:
         memcpy( (SCROLLINFO *)lparam, buffer, min( sizeof(SCROLLINFO), size ));
         break;
     case SBM_GETSCROLLBARINFO:
@@ -1719,6 +1723,7 @@ size_t user_message_size( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
         break;
     case SBM_SETSCROLLINFO:
     case SBM_GETSCROLLINFO:
+    case WM_WINE_GETSCROLLINFO:
         size = sizeof(SCROLLINFO);
         break;
     case SBM_GETSCROLLBARINFO:
@@ -1962,6 +1967,7 @@ static void copy_user_result( void *buffer, size_t size, LRESULT result, UINT me
         break;
     case SBM_SETSCROLLINFO:
     case SBM_GETSCROLLINFO:
+    case WM_WINE_GETSCROLLINFO:
         copy_size = sizeof(SCROLLINFO);
         break;
     case SBM_GETSCROLLBARINFO:
@@ -2139,6 +2145,8 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
         return 0;
     case WM_WINE_GETSCROLLBARINFO:
         return get_scroll_bar_info( hwnd, (LONG)wparam, (SCROLLBARINFO *)lparam );
+    case WM_WINE_GETSCROLLINFO:
+        return get_scroll_info( hwnd, (int)wparam, (SCROLLINFO *)lparam );
     default:
         if (msg >= WM_WINE_FIRST_DRIVER_MSG && msg <= WM_WINE_LAST_DRIVER_MSG)
             return user_driver->pWindowMessage( hwnd, msg, wparam, lparam );
