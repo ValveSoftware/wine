@@ -144,6 +144,7 @@ extern BOOL process_rawinput_message( MSG *msg, UINT hw_id, const struct hardwar
 
 /* scroll.c */
 extern void draw_nc_scrollbar( HWND hwnd, HDC hdc, BOOL draw_horizontal, BOOL draw_vertical );
+extern BOOL get_scroll_bar_info( HWND hwnd, LONG id, SCROLLBARINFO *info );
 extern BOOL get_scroll_info( HWND hwnd, INT bar, SCROLLINFO *info );
 extern void handle_scroll_event( HWND hwnd, INT bar, UINT msg, POINT pt );
 extern LRESULT scroll_bar_window_proc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam,

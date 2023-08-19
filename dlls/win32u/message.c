@@ -776,6 +776,7 @@ static BOOL unpack_message( HWND hwnd, UINT message, WPARAM *wparam, LPARAM *lpa
         if (!get_buffer_space( buffer, sizeof(SCROLLINFO), buffer_size )) return FALSE;
         break;
     case SBM_GETSCROLLBARINFO:
+    case WM_WINE_GETSCROLLBARINFO:
         if (!get_buffer_space( buffer, sizeof(SCROLLBARINFO), buffer_size )) return FALSE;
         break;
     case EM_GETSEL:
@@ -1174,6 +1175,7 @@ static size_t pack_message( HWND hwnd, UINT message, WPARAM wparam, LPARAM lpara
         push_data( data, (SCROLLINFO *)lparam, sizeof(SCROLLINFO) );
         return sizeof(SCROLLINFO);
     case SBM_GETSCROLLBARINFO:
+    case WM_WINE_GETSCROLLBARINFO:
     {
         const SCROLLBARINFO *info = (const SCROLLBARINFO *)lparam;
         size_t size = min( info->cbSize, sizeof(SCROLLBARINFO) );
@@ -1410,6 +1412,10 @@ static void pack_reply( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
     case SBM_GETSCROLLINFO:
         push_data( data, (SCROLLINFO *)lparam, sizeof(SCROLLINFO) );
         break;
+    case SBM_GETSCROLLBARINFO:
+    case WM_WINE_GETSCROLLBARINFO:
+        push_data( data, (SCROLLBARINFO *)lparam, sizeof(SCROLLBARINFO) );
+        break;
     case EM_GETRECT:
     case LB_GETITEMRECT:
     case CB_GETDROPPEDCONTROLRECT:
@@ -1551,6 +1557,7 @@ static void unpack_reply( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
         memcpy( (SCROLLINFO *)lparam, buffer, min( sizeof(SCROLLINFO), size ));
         break;
     case SBM_GETSCROLLBARINFO:
+    case WM_WINE_GETSCROLLBARINFO:
         memcpy( (SCROLLBARINFO *)lparam, buffer, min( sizeof(SCROLLBARINFO), size ));
         break;
     case EM_GETRECT:
@@ -1759,6 +1766,7 @@ size_t user_message_size( HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam,
         size = sizeof(SCROLLINFO);
         break;
     case SBM_GETSCROLLBARINFO:
+    case WM_WINE_GETSCROLLBARINFO:
         size = sizeof(SCROLLBARINFO);
         break;
     case EM_GETSEL:
@@ -2044,6 +2052,7 @@ static void copy_user_result( void *buffer, size_t size, LRESULT result, UINT me
         copy_size = sizeof(SCROLLINFO);
         break;
     case SBM_GETSCROLLBARINFO:
+    case WM_WINE_GETSCROLLBARINFO:
         copy_size = sizeof(SCROLLBARINFO);
         break;
     case EM_GETSEL:
@@ -2265,6 +2274,8 @@ static LRESULT handle_internal_message( HWND hwnd, UINT msg, WPARAM wparam, LPAR
         info.dwHoverTime = lparam;
         return NtUserTrackMouseEvent( &info );
     }
+    case WM_WINE_GETSCROLLBARINFO:
+        return get_scroll_bar_info( hwnd, (LONG)wparam, (SCROLLBARINFO *)lparam );
     default:
         if (msg >= WM_WINE_FIRST_DRIVER_MSG && msg <= WM_WINE_LAST_DRIVER_MSG)
             return user_driver->pWindowMessage( hwnd, msg, wparam, lparam );
