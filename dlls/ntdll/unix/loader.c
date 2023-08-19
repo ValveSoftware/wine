@@ -2127,6 +2127,13 @@ static void hacks_init(void)
         ERR("HACK: setting LIBGL_ALWAYS_SOFTWARE.\n");
         setenv("LIBGL_ALWAYS_SOFTWARE", "1", 0);
     }
+
+    if (sgi && !strcmp(sgi, "2379390"))
+    {
+        ERR("HACK: setting vk_x11_override_min_image_count, vk_x11_strict_image_count.\n");
+        setenv("vk_x11_override_min_image_count", "2", 0);
+        setenv("vk_x11_strict_image_count", "true", 0);
+    }
 }
 
 /***********************************************************************
