@@ -892,7 +892,13 @@ BOOL get_scroll_info( HWND hwnd, int bar, SCROLLINFO *info )
     struct scroll_info *scroll;
 
     /* handle invalid data structure */
-    if (!validate_scroll_info( info ) || !(scroll = get_scroll_info_ptr( hwnd, bar, FALSE )))
+    if (!validate_scroll_info( info ))
+        return FALSE;
+
+    if (bar != SB_CTL && !is_current_thread_window( hwnd ))
+        return send_message( hwnd, WM_WINE_GETSCROLLINFO, (WPARAM)bar, (LPARAM)info );
+
+    if (!(scroll = get_scroll_info_ptr( hwnd, bar, FALSE )))
         return FALSE;
 
     /* fill in the desired scroll info structure */
