@@ -894,6 +894,12 @@ HRESULT h264_decoder_create(REFIID riid, void **ret)
     if (FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &AVDecVideoAcceleration_H264, TRUE)))
         goto failed;
 
+    {
+        const char *sgi;
+        if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "2009100")))
+            IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, FALSE);
+    }
+
     if (FAILED(hr = MFCreateAttributes(&decoder->output_attributes, 0)))
         goto failed;
     if (FAILED(hr = wg_sample_queue_create(&decoder->wg_sample_queue)))
