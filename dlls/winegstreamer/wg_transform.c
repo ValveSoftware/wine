@@ -404,6 +404,19 @@ NTSTATUS wg_transform_create(void *args)
             break;
 
         case WG_MAJOR_TYPE_VIDEO:
+        {
+            const char *sgi;
+            if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "2009100")))
+            {
+                if (!(element = create_element("videoconvert", "base"))
+                        || !append_element(transform->container, element, &first, &last))
+                    goto out;
+                gst_util_set_object_arg(G_OBJECT(element), "n-threads", "0");
+                /* HACK: skip slow?? videoflip for some games */
+                break;
+            }
+        }
+
             if (!(element = create_element("videoconvert", "base"))
                     || !append_element(transform->container, element, &first, &last))
                 goto out;
