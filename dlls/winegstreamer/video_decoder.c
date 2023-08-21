@@ -826,7 +826,7 @@ static HRESULT video_decoder_create_with_types(const GUID *const *input_types, U
 
     {
         const char *sgi;
-        if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "2009100")))
+        if ((sgi = getenv("SteamGameId")) && ((!strcmp(sgi, "2009100")) || (!strcmp(sgi, "2555360"))))
             IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, FALSE);
     }
 
