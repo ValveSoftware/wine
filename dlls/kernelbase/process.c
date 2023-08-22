@@ -2002,6 +2002,16 @@ BOOL WINAPI DECLSPEC_HOTPATCH SetEnvironmentVariableW( LPCWSTR name, LPCWSTR val
                 len = lstrlenW(names[i]);
                 if (size > len && !memcmp( module + size - len, names[i], len * sizeof(*module) ))
                 {
+                    HMODULE h = GetModuleHandleW(L"Qt5Core.dll");
+                    void (WINAPI *QCoreApplication_setAttribute)(int attr, BOOL set);
+
+                    QCoreApplication_setAttribute = (void *)GetProcAddress(h, "?setAttribute@QCoreApplication@@SAXW4ApplicationAttribute@Qt@@_N@Z");
+                    if (QCoreApplication_setAttribute)
+                    {
+                        QCoreApplication_setAttribute(16 /* AA_UseOpenGLES */, 0);
+                        QCoreApplication_setAttribute(15 /* AA_UseDesktopOpenGL */, 1);
+                    }
+                    else ERR("QCoreApplication_setAttribute not found, h %p.\n", h);
                     value = L"desktop";
                     FIXME( "HACK: setting QT_OPENGL=desktop.\n" );
                     break;
