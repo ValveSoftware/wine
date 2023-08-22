@@ -1181,8 +1181,6 @@ void update_user_time( Time time )
  * windows spanning multiple monitors */
 static void update_net_wm_fullscreen_monitors( struct x11drv_win_data *data )
 {
-    RECT window_rect = data->whole_rect, monitor_rect;
-    HMONITOR hmonitor;
     long monitors[4];
     XEvent xev;
 
@@ -1195,25 +1193,9 @@ static void update_net_wm_fullscreen_monitors( struct x11drv_win_data *data )
     if (!X11DRV_DisplayDevices_SupportEventHandlers())
         return;
 
-    if (!(hmonitor = fs_hack_monitor_from_hwnd( data->hwnd )))
+    if (!xinerama_get_fullscreen_monitors( &data->whole_rect, monitors ))
     {
-        ERR( "Failed to find monitor for %p at %s\n", data->hwnd, wine_dbgstr_rect(&data->whole_rect) );
-        return;
-    }
-
-    monitor_rect = fs_hack_current_mode( hmonitor );
-    intersect_rect( &window_rect, &monitor_rect, &window_rect );
-    if (!EqualRect( &window_rect, &data->whole_rect ))
-    {
-        ERR( "hwnd %p at %s is outside of monitor %p at %s, ignoring\n", data->hwnd,
-             wine_dbgstr_rect(&data->whole_rect), hmonitor, wine_dbgstr_rect(&monitor_rect) );
-        return;
-    }
-
-    monitor_rect = fs_hack_real_mode( hmonitor );
-    if (!xinerama_get_fullscreen_monitors( &monitor_rect, monitors ))
-    {
-        ERR( "Failed to find xinerama monitors for %p at %s\n", hmonitor, wine_dbgstr_rect(&monitor_rect) );
+        ERR( "Failed to find xinerama monitors at %s\n", wine_dbgstr_rect(&data->whole_rect) );
         return;
     }
 
