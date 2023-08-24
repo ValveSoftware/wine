@@ -31,9 +31,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(dmsynth);
 
-typedef struct IDirectMusicSynth8Impl IDirectMusicSynth8Impl;
-
-struct IDirectMusicSynth8Impl
+struct synth
 {
     IDirectMusicSynth8 IDirectMusicSynth8_iface;
     IKsControl IKsControl_iface;
@@ -47,15 +45,15 @@ struct IDirectMusicSynth8Impl
     IDirectMusicSynthSink *sink;
 };
 
-static inline IDirectMusicSynth8Impl *impl_from_IDirectMusicSynth8(IDirectMusicSynth8 *iface)
+static inline struct synth *impl_from_IDirectMusicSynth8(IDirectMusicSynth8 *iface)
 {
-    return CONTAINING_RECORD(iface, IDirectMusicSynth8Impl, IDirectMusicSynth8_iface);
+    return CONTAINING_RECORD(iface, struct synth, IDirectMusicSynth8_iface);
 }
 
 static HRESULT WINAPI synth_QueryInterface(IDirectMusicSynth8 *iface, REFIID riid,
         void **ret_iface)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     TRACE("(%p)->(%s, %p)\n", iface, debugstr_dmguid(riid), ret_iface);
 
@@ -83,7 +81,7 @@ static HRESULT WINAPI synth_QueryInterface(IDirectMusicSynth8 *iface, REFIID rii
 
 static ULONG WINAPI synth_AddRef(IDirectMusicSynth8 *iface)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
     ULONG ref = InterlockedIncrement(&This->ref);
 
     TRACE("(%p): new ref = %lu\n", This, ref);
@@ -93,7 +91,7 @@ static ULONG WINAPI synth_AddRef(IDirectMusicSynth8 *iface)
 
 static ULONG WINAPI synth_Release(IDirectMusicSynth8 *iface)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
     ULONG ref = InterlockedDecrement(&This->ref);
 
     TRACE("(%p): new ref = %lu\n", This, ref);
@@ -109,7 +107,7 @@ static ULONG WINAPI synth_Release(IDirectMusicSynth8 *iface)
 
 static HRESULT WINAPI synth_Open(IDirectMusicSynth8 *iface, DMUS_PORTPARAMS *params)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
     BOOL modified = FALSE;
     const DMUS_PORTPARAMS def = {
         .dwValidParams = DMUS_PORTPARAMS_VOICES|DMUS_PORTPARAMS_CHANNELGROUPS|
@@ -195,7 +193,7 @@ static HRESULT WINAPI synth_Open(IDirectMusicSynth8 *iface, DMUS_PORTPARAMS *par
 
 static HRESULT WINAPI synth_Close(IDirectMusicSynth8 *iface)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     TRACE("(%p)\n", This);
 
@@ -210,7 +208,7 @@ static HRESULT WINAPI synth_Close(IDirectMusicSynth8 *iface)
 static HRESULT WINAPI synth_SetNumChannelGroups(IDirectMusicSynth8 *iface,
         DWORD groups)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, %ld): stub\n", This, groups);
 
@@ -220,7 +218,7 @@ static HRESULT WINAPI synth_SetNumChannelGroups(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_Download(IDirectMusicSynth8 *iface, HANDLE *hDownload,
         void *data, BOOL *free)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
     LPBYTE buffer = data;
     DMUS_DOWNLOADINFO *info = (DMUS_DOWNLOADINFO*)buffer;
     ULONG *offsets = ((DMUS_OFFSETTABLE*)(buffer + sizeof(DMUS_DOWNLOADINFO)))->ulOffsetTable;
@@ -355,7 +353,7 @@ static HRESULT WINAPI synth_Download(IDirectMusicSynth8 *iface, HANDLE *hDownloa
 static HRESULT WINAPI synth_Unload(IDirectMusicSynth8 *iface, HANDLE hDownload,
         HRESULT (CALLBACK *lpFreeHandle)(HANDLE,HANDLE), HANDLE hUserData)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p)->(%p, %p, %p): stub\n", This, hDownload, lpFreeHandle, hUserData);
 
@@ -365,7 +363,7 @@ static HRESULT WINAPI synth_Unload(IDirectMusicSynth8 *iface, HANDLE hDownload,
 static HRESULT WINAPI synth_PlayBuffer(IDirectMusicSynth8 *iface,
         REFERENCE_TIME rt, BYTE *buffer, DWORD size)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, 0x%s, %p, %lu): stub\n", This, wine_dbgstr_longlong(rt), buffer, size);
 
@@ -375,7 +373,7 @@ static HRESULT WINAPI synth_PlayBuffer(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_GetRunningStats(IDirectMusicSynth8 *iface,
         DMUS_SYNTHSTATS *stats)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p)->(%p): stub\n", This, stats);
 
@@ -385,7 +383,7 @@ static HRESULT WINAPI synth_GetRunningStats(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_GetPortCaps(IDirectMusicSynth8 *iface,
         DMUS_PORTCAPS *caps)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     TRACE("(%p)->(%p)\n", This, caps);
 
@@ -400,7 +398,7 @@ static HRESULT WINAPI synth_GetPortCaps(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_SetMasterClock(IDirectMusicSynth8 *iface,
         IReferenceClock *clock)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     TRACE("(%p)->(%p)\n", This, clock);
 
@@ -413,7 +411,7 @@ static HRESULT WINAPI synth_SetMasterClock(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_GetLatencyClock(IDirectMusicSynth8 *iface,
         IReferenceClock **clock)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     TRACE("(%p)->(%p)\n", iface, clock);
 
@@ -431,7 +429,7 @@ static HRESULT WINAPI synth_GetLatencyClock(IDirectMusicSynth8 *iface,
 
 static HRESULT WINAPI synth_Activate(IDirectMusicSynth8 *iface, BOOL enable)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
     HRESULT hr;
 
     TRACE("(%p)->(%d)\n", This, enable);
@@ -461,7 +459,7 @@ static HRESULT WINAPI synth_Activate(IDirectMusicSynth8 *iface, BOOL enable)
 static HRESULT WINAPI synth_SetSynthSink(IDirectMusicSynth8 *iface,
         IDirectMusicSynthSink *sink)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
     HRESULT hr;
 
     TRACE("(%p)->(%p)\n", iface, sink);
@@ -489,7 +487,7 @@ static HRESULT WINAPI synth_SetSynthSink(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_Render(IDirectMusicSynth8 *iface, short *buffer,
         DWORD length, LONGLONG position)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, %p, %ld, 0x%s): stub\n", This, buffer, length, wine_dbgstr_longlong(position));
 
@@ -499,7 +497,7 @@ static HRESULT WINAPI synth_Render(IDirectMusicSynth8 *iface, short *buffer,
 static HRESULT WINAPI synth_SetChannelPriority(IDirectMusicSynth8 *iface,
         DWORD channel_group, DWORD channel, DWORD priority)
 {
-    /* IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface); */
+    /* struct synth *This = impl_from_IDirectMusicSynth8(iface); */
 
     /* Silenced because of too many messages - 1000 groups * 16 channels ;=) */
     /* FIXME("(%p)->(%ld, %ld, %ld): stub\n", This, channel_group, channel, priority); */
@@ -510,7 +508,7 @@ static HRESULT WINAPI synth_SetChannelPriority(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_GetChannelPriority(IDirectMusicSynth8 *iface,
         DWORD channel_group, DWORD channel, DWORD *priority)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, %ld, %ld, %p): stub\n", This, channel_group, channel, priority);
 
@@ -520,7 +518,7 @@ static HRESULT WINAPI synth_GetChannelPriority(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_GetFormat(IDirectMusicSynth8 *iface,
         WAVEFORMATEX *format, DWORD *size)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
     WAVEFORMATEX fmt;
 
     TRACE("(%p, %p, %p)\n", This, format, size);
@@ -560,7 +558,7 @@ static HRESULT WINAPI synth_PlayVoice(IDirectMusicSynth8 *iface,
         LONG prPitch, LONG vrVolume, SAMPLE_TIME stVoiceStart, SAMPLE_TIME stLoopStart,
         SAMPLE_TIME stLoopEnd)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, 0x%s, %ld, %ld, %ld, %ld, %li, %li, 0x%s, 0x%s, 0x%s): stub\n",
           This, wine_dbgstr_longlong(ref_time), voice_id, channel_group, channel, dwDLId, prPitch, vrVolume,
@@ -572,7 +570,7 @@ static HRESULT WINAPI synth_PlayVoice(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_StopVoice(IDirectMusicSynth8 *iface,
         REFERENCE_TIME ref_time, DWORD voice_id)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, 0x%s, %ld): stub\n", This, wine_dbgstr_longlong(ref_time), voice_id);
 
@@ -582,7 +580,7 @@ static HRESULT WINAPI synth_StopVoice(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_GetVoiceState(IDirectMusicSynth8 *iface,
         DWORD dwVoice[], DWORD cbVoice, DMUS_VOICE_STATE dwVoiceState[])
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, %p, %ld, %p): stub\n", This, dwVoice, cbVoice, dwVoiceState);
 
@@ -592,7 +590,7 @@ static HRESULT WINAPI synth_GetVoiceState(IDirectMusicSynth8 *iface,
 static HRESULT WINAPI synth_Refresh(IDirectMusicSynth8 *iface, DWORD download_id,
         DWORD flags)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, %ld, %ld): stub\n", This, download_id, flags);
 
@@ -602,7 +600,7 @@ static HRESULT WINAPI synth_Refresh(IDirectMusicSynth8 *iface, DWORD download_id
 static HRESULT WINAPI synth_AssignChannelToBuses(IDirectMusicSynth8 *iface,
         DWORD channel_group, DWORD channel, DWORD *pdwBuses, DWORD cBuses)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IDirectMusicSynth8(iface);
+    struct synth *This = impl_from_IDirectMusicSynth8(iface);
 
     FIXME("(%p, %ld, %ld, %p, %ld): stub\n", This, channel_group, channel, pdwBuses, cBuses);
 
@@ -638,28 +636,28 @@ static const IDirectMusicSynth8Vtbl synth_vtbl =
 	synth_AssignChannelToBuses,
 };
 
-static inline IDirectMusicSynth8Impl *impl_from_IKsControl(IKsControl *iface)
+static inline struct synth *impl_from_IKsControl(IKsControl *iface)
 {
-    return CONTAINING_RECORD(iface, IDirectMusicSynth8Impl, IKsControl_iface);
+    return CONTAINING_RECORD(iface, struct synth, IKsControl_iface);
 }
 
 static HRESULT WINAPI synth_control_QueryInterface(IKsControl* iface, REFIID riid, LPVOID *ppobj)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IKsControl(iface);
+    struct synth *This = impl_from_IKsControl(iface);
 
     return synth_QueryInterface(&This->IDirectMusicSynth8_iface, riid, ppobj);
 }
 
 static ULONG WINAPI synth_control_AddRef(IKsControl* iface)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IKsControl(iface);
+    struct synth *This = impl_from_IKsControl(iface);
 
     return synth_AddRef(&This->IDirectMusicSynth8_iface);
 }
 
 static ULONG WINAPI synth_control_Release(IKsControl* iface)
 {
-    IDirectMusicSynth8Impl *This = impl_from_IKsControl(iface);
+    struct synth *This = impl_from_IKsControl(iface);
 
     return synth_Release(&This->IDirectMusicSynth8_iface);
 }
@@ -744,7 +742,7 @@ static const IKsControlVtbl synth_control_vtbl =
 
 HRESULT DMUSIC_CreateDirectMusicSynthImpl(REFIID riid, void **ppobj)
 {
-    IDirectMusicSynth8Impl *obj;
+    struct synth *obj;
     HRESULT hr;
 
     TRACE("(%s, %p)\n", debugstr_guid(riid), ppobj);
