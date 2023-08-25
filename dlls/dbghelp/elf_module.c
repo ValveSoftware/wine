@@ -1464,6 +1464,59 @@ static BOOL elf_search_and_load_file(struct process* pcs, const WCHAR* filename,
 typedef BOOL (*enum_elf_modules_cb)(const WCHAR*, ULONG_PTR load_addr,
                                     ULONG_PTR dyn_addr, BOOL is_system, void* user);
 
+static BOOL elf_linkmap_validate_entry(const struct process* pcs, DWORD64 base, DWORD64 name_addr, WCHAR* buffer, SIZE_T buflen)
+{
+    static DWORD page_size;
+    MEMORY_BASIC_INFORMATION mem_info;
+    char bufstr[MAX_PATH];
+
+    if (!page_size)
+    {
+        SYSTEM_INFO sys_info;
+        GetSystemInfo(&sys_info);
+        page_size = sys_info.dwPageSize;
+    }
+    if (base & (page_size - 1))
+    {
+        WARN("Unaligned base addr=%I64x page_size=%lx\n", base, page_size);
+        return FALSE;
+    }
+    if (VirtualQueryEx(pcs->handle, (void*)(ULONG_PTR)base, &mem_info, sizeof(mem_info)))
+    {
+        if (mem_info.BaseAddress != (void*)(ULONG_PTR)base)
+        {
+            WARN("Invalid base addr %I64x (beg map at %p)\n", base, mem_info.BaseAddress);
+            return FALSE;
+        }
+    }
+    else
+    {
+        /* Some ELF modules are loaded in 32bit mode above 2G limit,
+         * and virtual query will fail on these addresses when process is not large address aware.
+         * Don't consider this as an error for a 32bit debuggee.
+         */
+        if (pcs->is_64bit)
+        {
+            WARN("Invalid base addr %I64x\n", base);
+            return FALSE;
+        }
+    }
+
+    memset(bufstr, ' ', sizeof(bufstr));
+    if (!read_process_memory(pcs, name_addr, bufstr, sizeof(bufstr)))
+    {
+        WARN("Invalid name_address %I64x\n", name_addr);
+        return FALSE;
+    }
+    if (!memchr(bufstr, '\0', sizeof(bufstr)))
+    {
+        WARN("Unterminated string %s\n", wine_dbgstr_an(bufstr, sizeof(bufstr)));
+        return FALSE;
+    }
+    MultiByteToWideChar(CP_UNIXCP, 0, bufstr, -1, buffer, buflen);
+    return TRUE;
+}
+
 /******************************************************************
  *		elf_enum_modules_internal
  *
@@ -1473,8 +1526,7 @@ static BOOL elf_enum_modules_internal(const struct process* pcs,
                                       const WCHAR* main_name,
                                       enum_elf_modules_cb cb, void* user)
 {
-    WCHAR bufstrW[MAX_PATH];
-    char bufstr[256];
+    WCHAR bufstr[MAX_PATH];
     ULONG_PTR lm_addr;
 
     if (pcs->is_host_64bit)
@@ -1508,15 +1560,16 @@ static BOOL elf_enum_modules_internal(const struct process* pcs,
             if (!read_process_memory(pcs, lm_addr, &lm, sizeof(lm)))
                 return FALSE;
 
-            if (lm.l_prev && /* skip first entry, normally debuggee itself */
-                lm.l_name && read_process_memory(pcs, lm.l_name, bufstr, sizeof(bufstr)))
+            /* skip first entry(normally debuggee itself) and entries without names */
+            if (!lm.l_prev || !lm.l_name) continue;
+            if (!elf_linkmap_validate_entry(pcs, lm.l_addr, lm.l_name, bufstr, ARRAY_SIZE(bufstr)))
             {
-                bufstr[sizeof(bufstr) - 1] = '\0';
-                MultiByteToWideChar(CP_UNIXCP, 0, bufstr, -1, bufstrW, ARRAY_SIZE(bufstrW));
-                if (main_name && !bufstrW[0]) lstrcpyW(bufstrW, main_name);
-                if (!cb(bufstrW, (ULONG_PTR)lm.l_addr, (ULONG_PTR)lm.l_ld, FALSE, user))
-                    break;
+                FIXME("Incorrect link_map entry, bailing out\n");
+                return FALSE;
             }
+            if (main_name && !bufstr[0]) lstrcpyW(bufstr, main_name);
+            if (!cb(bufstr, (ULONG_PTR)lm.l_addr, (ULONG_PTR)lm.l_ld, FALSE, user))
+                break;
         }
     }
     else
@@ -1550,15 +1603,16 @@ static BOOL elf_enum_modules_internal(const struct process* pcs,
             if (!read_process_memory(pcs, lm_addr, &lm, sizeof(lm)))
                 return FALSE;
 
-            if (lm.l_prev && /* skip first entry, normally debuggee itself */
-                lm.l_name && read_process_memory(pcs, lm.l_name, bufstr, sizeof(bufstr)))
+            /* skip first entry(normally debuggee itself) and entries without names */
+            if (!lm.l_prev || !lm.l_name) continue;
+            if (!elf_linkmap_validate_entry(pcs, lm.l_addr, lm.l_name, bufstr, ARRAY_SIZE(bufstr)))
             {
-                bufstr[sizeof(bufstr) - 1] = '\0';
-                MultiByteToWideChar(CP_UNIXCP, 0, bufstr, -1, bufstrW, ARRAY_SIZE(bufstrW));
-                if (main_name && !bufstrW[0]) lstrcpyW(bufstrW, main_name);
-                if (!cb(bufstrW, (ULONG_PTR)lm.l_addr, (ULONG_PTR)lm.l_ld, FALSE, user))
-                    break;
+                FIXME("Incorrect link_map entry, bailing out\n");
+                return FALSE;
             }
+            if (main_name && !bufstr[0]) lstrcpyW(bufstr, main_name);
+            if (!cb(bufstr, (ULONG_PTR)lm.l_addr, (ULONG_PTR)lm.l_ld, FALSE, user))
+                break;
         }
     }
 
