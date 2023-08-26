@@ -689,22 +689,54 @@ typedef struct AGSGPUInfo_600
 } AGSGPUInfo_600;
 
 /// The display mode
-typedef enum AGSDisplaySettings_Mode
+typedef enum AGSDisplaySettings_Mode_506
 {
-    Mode_SDR,                                           ///< SDR mode
-    Mode_HDR10_PQ,                                      ///< HDR10 PQ encoding, requiring a 1010102 UNORM swapchain and PQ encoding in the output shader.
-    Mode_HDR10_scRGB,                                   ///< HDR10 scRGB, requiring an FP16 swapchain. Values of 1.0 == 80 nits, 125.0 == 10000 nits.
-    Mode_FreesyncHDR_scRGB,                             ///< Freesync HDR scRGB, requiring an FP16 swapchain. A value of 1.0 == 80 nits.
-    Mode_FreesyncHDR_Gamma22,                           ///< Freesync HDR Gamma 2.2, requiring a 1010102 UNORM swapchain.  The output needs to be encoded to gamma 2.2.
-    Mode_DolbyVision,                                   ///< Dolby Vision, requiring an 8888 UNORM swapchain
+    Mode_506_SDR,                                       ///< SDR mode
+    Mode_506_scRGB,                                     ///< scRGB, requiring an FP16 swapchain. Values of 1.0 == 80 nits, 125.0 == 10000 nits. Uses REC709 primaries.
+    Mode_506_PQ,                                        ///< PQ encoding, requiring a 1010102 UNORM swapchain and PQ encoding in the output shader. Uses BT2020 primaries.
+    Mode_506_DolbyVision                                ///< Dolby Vision, requiring an 8888 UNORM swapchain
+} AGSDisplaySettings_Mode_506;
 
-    Mode_Count                                          ///< Number of enumerated display modes
-} AGSDisplaySettings_Mode;
+typedef enum AGSDisplaySettings_Mode_600
+{
+    Mode_600_SDR,                                           ///< SDR mode
+    Mode_600_HDR10_PQ,                                      ///< HDR10 PQ encoding, requiring a 1010102 UNORM swapchain and PQ encoding in the output shader.
+    Mode_600_HDR10_scRGB,                                   ///< HDR10 scRGB, requiring an FP16 swapchain. Values of 1.0 == 80 nits, 125.0 == 10000 nits.
+    Mode_600_FreesyncHDR_scRGB,                             ///< Freesync HDR scRGB, requiring an FP16 swapchain. A value of 1.0 == 80 nits.
+    Mode_600_FreesyncHDR_Gamma22,                           ///< Freesync HDR Gamma 2.2, requiring a 1010102 UNORM swapchain.  The output needs to be encoded to gamma 2.2.
+    Mode_600_DolbyVision,                                   ///< Dolby Vision, requiring an 8888 UNORM swapchain
+
+    Mode_600_Count                                          ///< Number of enumerated display modes
+} AGSDisplaySettings_Mode_600;
+
+/// The struct to specify the display settings to the driver.
+typedef struct AGSDisplaySettings_506
+{
+    AGSDisplaySettings_Mode_506 mode;                           ///< The display mode to set the display into
+
+    double                  chromaticityRedX;               ///< Red display primary X coord
+    double                  chromaticityRedY;               ///< Red display primary Y coord
+
+    double                  chromaticityGreenX;             ///< Green display primary X coord
+    double                  chromaticityGreenY;             ///< Green display primary Y coord
+
+    double                  chromaticityBlueX;              ///< Blue display primary X coord
+    double                  chromaticityBlueY;              ///< Blue display primary Y coord
+
+    double                  chromaticityWhitePointX;        ///< White point X coord
+    double                  chromaticityWhitePointY;        ///< White point Y coord
+
+    double                  minLuminance;                   ///< The minimum scene luminance in nits
+    double                  maxLuminance;                   ///< The maximum scene luminance in nits
+
+    double                  maxContentLightLevel;           ///< The maximum content light level in nits (MaxCLL)
+    double                  maxFrameAverageLightLevel;      ///< The maximum frame average light level in nits (MaxFALL)
+} AGSDisplaySettings_506;
 
 /// The struct to specify the display settings to the driver.
 typedef struct AGSDisplaySettings_511
 {
-    AGSDisplaySettings_Mode mode;                           ///< The display mode to set the display into
+    AGSDisplaySettings_Mode_600 mode;                           ///< The display mode to set the display into
 
     double                  chromaticityRedX;               ///< Red display primary X coord
     double                  chromaticityRedY;               ///< Red display primary Y coord
@@ -731,7 +763,7 @@ typedef struct AGSDisplaySettings_511
 /// The struct to specify the display settings to the driver.
 typedef struct AGSDisplaySettings_600
 {
-    AGSDisplaySettings_Mode mode;                           ///< The display mode to set the display into
+    AGSDisplaySettings_Mode_600 mode;                           ///< The display mode to set the display into
 
     double                  chromaticityRedX;               ///< Red display primary X coord
     double                  chromaticityRedY;               ///< Red display primary Y coord
@@ -757,6 +789,7 @@ typedef struct AGSDisplaySettings_600
 
 typedef union AGSDisplaySettings
 {
+    AGSDisplaySettings_506 agsDisplaySettings506;
     AGSDisplaySettings_511 agsDisplaySettings511;
     AGSDisplaySettings_600 agsDisplaySettings600;
 } AGSDisplaySettings;
