@@ -777,15 +777,108 @@ AGSReturnCode WINAPI agsDeInitialize(AGSContext *context)
     return AGS_SUCCESS;
 }
 
+static DXGI_COLOR_SPACE_TYPE convert_ags_colorspace_506(AGSDisplaySettings_Mode_506 mode)
+{
+    switch (mode)
+    {
+        default:
+            ERR("Unknown color space in AGS: %d.\n", mode);
+        /* fallthrough */
+        case Mode_506_SDR:
+            TRACE("Setting Mode_506_SDR.\n");
+            return DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+        case Mode_506_PQ:
+            TRACE("Setting Mode_506_PQ.\n");
+            return DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+        case Mode_506_scRGB:
+            TRACE("Setting Mode_506_scRGB.\n");
+            return DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
+    }
+}
+
+static DXGI_COLOR_SPACE_TYPE convert_ags_colorspace_600(AGSDisplaySettings_Mode_600 mode)
+{
+    switch (mode)
+    {
+        default:
+            ERR("Unknown color space in AGS: %d\n", mode);
+        /* fallthrough */
+        case Mode_600_SDR:
+            TRACE("Setting Mode_600_SDR.\n");
+            return DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
+        case Mode_600_HDR10_PQ:
+            TRACE("Setting Mode_600_HDR10_PQ.\n");
+            return DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020;
+        case Mode_600_HDR10_scRGB:
+            TRACE("Setting Mode_600_HDR10_scRGB.\n");
+            return DXGI_COLOR_SPACE_RGB_FULL_G10_NONE_P709;
+    }
+}
+
+static DXGI_HDR_METADATA_HDR10 convert_ags_metadata(const AGSDisplaySettings_600 *settings)
+{
+    DXGI_HDR_METADATA_HDR10 metadata;
+    metadata.RedPrimary[0] = settings->chromaticityRedX * 50000;
+    metadata.RedPrimary[1] = settings->chromaticityRedY * 50000;
+    metadata.GreenPrimary[0] = settings->chromaticityGreenX * 50000;
+    metadata.GreenPrimary[1] = settings->chromaticityGreenY * 50000;
+    metadata.BluePrimary[0] = settings->chromaticityBlueX * 50000;
+    metadata.BluePrimary[1] = settings->chromaticityBlueY * 50000;
+    metadata.WhitePoint[0] = settings->chromaticityWhitePointX * 50000;
+    metadata.WhitePoint[1] = settings->chromaticityWhitePointY * 50000;
+    metadata.MaxMasteringLuminance = settings->maxLuminance;
+    metadata.MinMasteringLuminance = settings->minLuminance / 0.0001f;
+    metadata.MaxContentLightLevel = settings->maxContentLightLevel;
+    metadata.MaxFrameAverageLightLevel = settings->maxFrameAverageLightLevel;
+    return metadata;
+}
+
 AGSReturnCode WINAPI agsSetDisplayMode(AGSContext *context, int device_index, int display_index, const AGSDisplaySettings *settings)
 {
-    FIXME("context %p device_index %d display_index %d settings %p stub!\n", context, device_index,
+    const AGSDisplaySettings_506 *settings506 = &settings->agsDisplaySettings506;
+    const AGSDisplaySettings_600 *settings600 = &settings->agsDisplaySettings600;
+    IDXGIVkInteropFactory1 *dxgi_interop = NULL;
+    DXGI_COLOR_SPACE_TYPE colorspace;
+    DXGI_HDR_METADATA_HDR10 metadata;
+    AGSReturnCode ret = AGS_SUCCESS;
+    IDXGIFactory1 *dxgi_factory;
+    HMODULE hdxgi;
+
+    TRACE("context %p device_index %d display_index %d settings %p\n", context, device_index,
           display_index, settings);
 
     if (!context)
         return AGS_INVALID_ARGS;
 
-    return AGS_SUCCESS;
+    create_dxgi_factory(&hdxgi, &dxgi_factory);
+    if (!dxgi_factory)
+        goto done;
+
+    if (FAILED(IDXGIFactory1_QueryInterface(dxgi_factory, &IID_IDXGIVkInteropFactory1, (void**)&dxgi_interop)))
+    {
+        WARN("Failed to get IDXGIVkInteropFactory1.\n");
+        goto done;
+    }
+
+    colorspace = context->version < AMD_AGS_VERSION_5_1_1
+        ? convert_ags_colorspace_506(settings506->mode)
+        : convert_ags_colorspace_600(settings600->mode);
+    /* Settings 506, 511 and 600 are identical aside from enum order + use
+     * of bitfield flags we do not use. */
+    metadata = convert_ags_metadata(settings600);
+
+    TRACE("chromacity: (%.6lf, %.6lf) (%.6lf, %.6lf) (%.6lf, %.6lf).\n", settings600->chromaticityRedX,
+            settings600->chromaticityRedY, settings600->chromaticityGreenX, settings600->chromaticityGreenY,
+            settings600->chromaticityBlueX, settings600->chromaticityBlueY);
+
+    if (FAILED(IDXGIVkInteropFactory1_SetGlobalHDRState(dxgi_interop, colorspace, &metadata)))
+        ret = AGS_DX_FAILURE;
+
+done:
+    if (dxgi_interop)
+        IDXGIVkInteropFactory1_Release(dxgi_interop);
+    release_dxgi_factory(hdxgi, dxgi_factory);
+    return ret;
 }
 
 AGSReturnCode WINAPI agsGetCrossfireGPUCount(AGSContext *context, int *gpu_count)
