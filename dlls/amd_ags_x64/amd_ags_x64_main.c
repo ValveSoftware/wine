@@ -11,10 +11,11 @@
 #include "wine/asm.h"
 
 #define COBJMACROS
+#include "initguid.h"
+
 #include "d3d11.h"
 #include "d3d12.h"
-
-#include "initguid.h"
+#include "dxgi1_6.h"
 
 #include "dxvk_interfaces.h"
 
@@ -134,14 +135,16 @@ struct AGSContext
     struct AGSDeviceInfo *devices;
     VkPhysicalDeviceProperties *properties;
     VkPhysicalDeviceMemoryProperties *memory_properties;
+    IDXGIFactory1 *dxgi_factory;
     ID3D11DeviceContext *d3d11_context;
     AGSDX11ExtensionsSupported_600 extensions;
 };
 
-static HMODULE hd3d11, hd3d12;
+static HMODULE hd3d11, hd3d12, hdxgi;
 static typeof(D3D12CreateDevice) *pD3D12CreateDevice;
 static typeof(D3D11CreateDevice) *pD3D11CreateDevice;
 static typeof(D3D11CreateDeviceAndSwapChain) *pD3D11CreateDeviceAndSwapChain;
+static typeof(CreateDXGIFactory1) *pCreateDXGIFactory1;
 
 static BOOL load_d3d12_functions(void)
 {
@@ -165,6 +168,18 @@ static BOOL load_d3d11_functions(void)
 
     pD3D11CreateDevice = (void *)GetProcAddress(hd3d11, "D3D11CreateDevice");
     pD3D11CreateDeviceAndSwapChain = (void *)GetProcAddress(hd3d11, "D3D11CreateDeviceAndSwapChain");
+    return TRUE;
+}
+
+static BOOL load_dxgi_functions(void)
+{
+    if (hdxgi)
+        return TRUE;
+
+    if (!(hdxgi = LoadLibraryA("dxgi.dll")))
+        return FALSE;
+
+    pCreateDXGIFactory1 = (void *)GetProcAddress(hdxgi, "CreateDXGIFactory1");
     return TRUE;
 }
 
@@ -480,6 +495,18 @@ static AGSReturnCode init_ags_context(AGSContext *context)
 
     memset(context, 0, sizeof(*context));
 
+    if (!load_dxgi_functions())
+    {
+        ERR("Could not load dxgi.dll.\n");
+        return AGS_MISSING_D3D_DLL;
+    }
+
+    if (FAILED(pCreateDXGIFactory1(&IID_IDXGIFactory1, (void**)&context->dxgi_factory)))
+    {
+        ERR("Failed to create DXGIFactory1.\n");
+        return AGS_DX_FAILURE;
+    }
+
     context->version = determine_ags_version();
 
     ret = vk_get_physical_device_properties(&context->device_count, &context->properties, &context->memory_properties);
@@ -653,6 +680,11 @@ AGSReturnCode WINAPI agsDeInitialize(AGSContext *context)
     if (!context)
         return AGS_SUCCESS;
 
+    if (context->dxgi_factory)
+    {
+        IDXGIFactory1_Release(context->dxgi_factory);
+        context->dxgi_factory = NULL;
+    }
     if (context->d3d11_context)
     {
         ID3D11DeviceContext_Release(context->d3d11_context);
