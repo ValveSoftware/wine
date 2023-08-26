@@ -17,6 +17,11 @@
  */
 
 import "d3d11.idl";
+import "dxgi1_6.idl";
+
+typedef struct VkInstance_T *VkInstance;
+typedef void (__stdcall *PFN_vkVoidFunction)(void);
+typedef PFN_vkVoidFunction (__stdcall *PFN_vkGetInstanceProcAddr)(VkInstance instance, const char* pName);
 
 typedef enum D3D11_VK_EXTENSION
 {
@@ -113,4 +118,34 @@ interface ID3D11VkExtContext1 : ID3D11VkExtContext
     BOOL LaunchCubinShaderNVX([in] IUnknown *shader,[in] UINT32 grid_x, [in] UINT32 grid_y, [in] UINT32 grid_z,
             [in] const void *params, [in] UINT32 param_size, [in] void * const *read_resources,
             [in] UINT32 read_resource_count, [in] void* const *write_resources, [in] UINT32 write_resources_count);
+}
+
+[
+    object,
+    uuid(4c5e1b0d-b0c8-4131-bfd8-9b2476f7f408),
+    local,
+    pointer_default(unique)
+]
+interface IDXGIVkInteropFactory : IUnknown
+{
+    void GetVulkanInstance(
+          [out] VkInstance *pInstance,
+          [out] PFN_vkGetInstanceProcAddr *ppfnVkGetInstanceProcAddr);
+}
+
+[
+    object,
+    uuid(2a289dbd-2d0a-4a51-89f7-f2adce465cd6),
+    local,
+    pointer_default(unique)
+]
+interface IDXGIVkInteropFactory1 : IDXGIVkInteropFactory
+{
+  HRESULT GetGlobalHDRState(
+          [out] DXGI_COLOR_SPACE_TYPE   *pOutColorSpace,
+          [out] DXGI_HDR_METADATA_HDR10 *ppOutMetadata) = 0;
+
+  HRESULT SetGlobalHDRState(
+          [in] DXGI_COLOR_SPACE_TYPE    ColorSpace,
+    [in] const DXGI_HDR_METADATA_HDR10 *pMetadata) = 0;
 }
