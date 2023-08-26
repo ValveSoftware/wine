@@ -354,117 +354,148 @@ done:
     return ret;
 }
 
-struct monitor_enum_context_600
+static void init_device_displays_600(IDXGIFactory1 *factory, const char *adapter_name, AGSDisplayInfo_600 **ret_displays, int *ret_display_count)
 {
-    const char *adapter_name;
-    AGSDisplayInfo_600 **ret_displays;
-    int *ret_display_count;
-};
-
-static BOOL WINAPI monitor_enum_proc_600(HMONITOR hmonitor, HDC hdc, RECT *rect, LPARAM context)
-{
-    struct monitor_enum_context_600 *c = (struct monitor_enum_context_600 *)context;
-    MONITORINFOEXA monitor_info;
-    AGSDisplayInfo_600 *new_alloc;
-    DISPLAY_DEVICEA device;
-    AGSDisplayInfo_600 *info;
-    unsigned int i, mode;
-    DEVMODEA dev_mode;
-
-
-    monitor_info.cbSize = sizeof(monitor_info);
-    GetMonitorInfoA(hmonitor, (MONITORINFO *)&monitor_info);
-    TRACE("monitor_info.szDevice %s.\n", debugstr_a(monitor_info.szDevice));
-
-    device.cb = sizeof(device);
-    i = 0;
-    while (EnumDisplayDevicesA(NULL, i, &device, 0))
-    {
-        TRACE("device.DeviceName %s, device.DeviceString %s.\n", debugstr_a(device.DeviceName), debugstr_a(device.DeviceString));
-        ++i;
-        if (strcmp(device.DeviceString, c->adapter_name) || strcmp(device.DeviceName, monitor_info.szDevice))
-            continue;
-
-        if (*c->ret_display_count)
-        {
-            if (!(new_alloc = heap_realloc(*c->ret_displays, sizeof(*new_alloc) * (*c->ret_display_count + 1))))
-            {
-                ERR("No memory.");
-                return FALSE;
-            }
-            *c->ret_displays = new_alloc;
-        }
-        else if (!(*c->ret_displays = heap_alloc(sizeof(**c->ret_displays))))
-        {
-            ERR("No memory.");
-            return FALSE;
-        }
-        info = &(*c->ret_displays)[*c->ret_display_count];
-        memset(info, 0, sizeof(*info));
-        strcpy(info->displayDeviceName, device.DeviceName);
-        if (EnumDisplayDevicesA(info->displayDeviceName, 0, &device, 0))
-        {
-            strcpy(info->name, device.DeviceString);
-        }
-        else
-        {
-            ERR("Could not get monitor name for device %s.\n", debugstr_a(info->displayDeviceName));
-            strcpy(info->name, "Unknown");
-        }
-        if (monitor_info.dwFlags & MONITORINFOF_PRIMARY)
-            info->isPrimaryDisplay = 1;
-
-        mode = 0;
-        memset(&dev_mode, 0, sizeof(dev_mode));
-        dev_mode.dmSize = sizeof(dev_mode);
-        while (EnumDisplaySettingsExA(monitor_info.szDevice, mode, &dev_mode, EDS_RAWMODE))
-        {
-            ++mode;
-            if (dev_mode.dmPelsWidth > info->maxResolutionX)
-                info->maxResolutionX = dev_mode.dmPelsWidth;
-            if (dev_mode.dmPelsHeight > info->maxResolutionY)
-                info->maxResolutionY = dev_mode.dmPelsHeight;
-            if (dev_mode.dmDisplayFrequency > info->maxRefreshRate)
-                info->maxRefreshRate = dev_mode.dmDisplayFrequency;
-            memset(&dev_mode, 0, sizeof(dev_mode));
-            dev_mode.dmSize = sizeof(dev_mode);
-        }
-
-        info->currentResolution.offsetX = monitor_info.rcMonitor.left;
-        info->currentResolution.offsetY = monitor_info.rcMonitor.top;
-        info->currentResolution.width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
-        info->currentResolution.height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
-        info->visibleResolution = info->currentResolution;
-
-        memset(&dev_mode, 0, sizeof(dev_mode));
-        dev_mode.dmSize = sizeof(dev_mode);
-
-        if (EnumDisplaySettingsExA(monitor_info.szDevice, ENUM_CURRENT_SETTINGS, &dev_mode, EDS_RAWMODE))
-            info->currentRefreshRate = dev_mode.dmDisplayFrequency;
-        else
-            ERR("Could not get current display settings.\n");
-        ++*c->ret_display_count;
-
-        TRACE("Added display %s for %s.\n", debugstr_a(monitor_info.szDevice), debugstr_a(c->adapter_name));
-    }
-
-    return TRUE;
-}
-
-static void init_device_displays_600(const char *adapter_name, AGSDisplayInfo_600 **ret_displays, int *ret_display_count)
-{
-    struct monitor_enum_context_600 context;
+    IDXGIAdapter1 *adapter = NULL;
+    WCHAR wide_adapter_name[128];
+    UINT adapter_index = 0;
 
     TRACE("adapter_name %s.\n", debugstr_a(adapter_name));
 
-    context.adapter_name = adapter_name;
-    context.ret_displays = ret_displays;
-    context.ret_display_count = ret_display_count;
+    *ret_displays = NULL;
+    *ret_display_count = 0;
 
-    EnumDisplayMonitors(NULL, NULL, monitor_enum_proc_600, (LPARAM)&context);
+    MultiByteToWideChar(CP_ACP, 0, adapter_name, -1, wide_adapter_name, ARRAY_SIZE(wide_adapter_name));
+
+    while (SUCCEEDED(IDXGIFactory1_EnumAdapters1(factory, adapter_index++, &adapter)))
+    {
+        DXGI_ADAPTER_DESC1 adapter_desc;
+        IDXGIOutput *output;
+        UINT output_index;
+
+        IDXGIAdapter1_GetDesc1(adapter, &adapter_desc);
+
+        if (wcscmp(wide_adapter_name, adapter_desc.Description))
+        {
+            IDXGIAdapter1_Release(adapter);
+            continue;
+        }
+
+        output_index = 0;
+        while (SUCCEEDED(IDXGIAdapter1_EnumOutputs(adapter, output_index, &output)))
+        {
+            IDXGIOutput_Release(output);
+            output_index++;
+        }
+
+        *ret_display_count = output_index;
+        *ret_displays = heap_alloc(*ret_display_count * sizeof(AGSDisplayInfo_600));
+
+        output_index = 0;
+        while (SUCCEEDED(IDXGIAdapter1_EnumOutputs(adapter, output_index++, &output)))
+        {
+            DXGI_OUTPUT_DESC1 output_desc;
+            MONITORINFOEXA monitor_info;
+            AGSDisplayInfo_600 *info;
+            DISPLAY_DEVICEA device;
+            IDXGIOutput6 *output6;
+            DEVMODEA dev_mode;
+            unsigned int mode;
+
+            info = &(*ret_displays)[output_index - 1];
+            memset(info, 0, sizeof(*info));
+
+            if (FAILED(IDXGIOutput_QueryInterface(output, &IID_IDXGIOutput6, (void**)&output6)))
+            {
+                ERR("Failed to query IDXGIOutput6\n");
+                IDXGIOutput_Release(output);
+                break;
+            }
+
+            IDXGIOutput6_GetDesc1(output6, &output_desc);
+
+            monitor_info.cbSize = sizeof(monitor_info);
+            GetMonitorInfoA(output_desc.Monitor, (MONITORINFO *)&monitor_info);
+            TRACE("monitor_info.szDevice %s.\n", debugstr_a(monitor_info.szDevice));
+
+            if (EnumDisplayDevicesA(monitor_info.szDevice, 0, &device, 0))
+            {
+                strcpy(info->name, device.DeviceString);
+            }
+            else
+            {
+                ERR("Could not get monitor name for device %s.\n", debugstr_a(info->displayDeviceName));
+                strcpy(info->name, "Unknown");
+            }
+            strcpy(info->displayDeviceName, monitor_info.szDevice);
+            if (monitor_info.dwFlags & MONITORINFOF_PRIMARY)
+                info->isPrimaryDisplay = 1;
+            if (output_desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020)
+            {
+                TRACE("Reporting monitor %s as HDR10 supported.\n", debugstr_a(monitor_info.szDevice));
+                info->HDR10 = 1;
+            }
+
+            mode = 0;
+            memset(&dev_mode, 0, sizeof(dev_mode));
+            dev_mode.dmSize = sizeof(dev_mode);
+            while (EnumDisplaySettingsExA(monitor_info.szDevice, mode, &dev_mode, EDS_RAWMODE))
+            {
+                ++mode;
+                if (dev_mode.dmPelsWidth > info->maxResolutionX)
+                    info->maxResolutionX = dev_mode.dmPelsWidth;
+                if (dev_mode.dmPelsHeight > info->maxResolutionY)
+                    info->maxResolutionY = dev_mode.dmPelsHeight;
+                if (dev_mode.dmDisplayFrequency > info->maxRefreshRate)
+                    info->maxRefreshRate = dev_mode.dmDisplayFrequency;
+                memset(&dev_mode, 0, sizeof(dev_mode));
+                dev_mode.dmSize = sizeof(dev_mode);
+            }
+
+            info->currentResolution.offsetX = monitor_info.rcMonitor.left;
+            info->currentResolution.offsetY = monitor_info.rcMonitor.top;
+            info->currentResolution.width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
+            info->currentResolution.height = monitor_info.rcMonitor.bottom - monitor_info.rcMonitor.top;
+            info->visibleResolution = info->currentResolution;
+
+            memset(&dev_mode, 0, sizeof(dev_mode));
+            dev_mode.dmSize = sizeof(dev_mode);
+
+            if (EnumDisplaySettingsExA(monitor_info.szDevice, ENUM_CURRENT_SETTINGS, &dev_mode, EDS_RAWMODE))
+                info->currentRefreshRate = dev_mode.dmDisplayFrequency;
+
+            info->eyefinityGridCoordX = -1;
+            info->eyefinityGridCoordY = -1;
+
+            info->chromaticityRedX = output_desc.RedPrimary[0];
+            info->chromaticityRedY = output_desc.RedPrimary[1];
+            info->chromaticityGreenX = output_desc.GreenPrimary[0];
+            info->chromaticityGreenY = output_desc.GreenPrimary[1];
+            info->chromaticityBlueX = output_desc.BluePrimary[0];
+            info->chromaticityBlueY = output_desc.BluePrimary[1];
+            info->chromaticityWhitePointX = output_desc.WhitePoint[0];
+            info->chromaticityWhitePointY = output_desc.WhitePoint[1];
+
+            info->screenDiffuseReflectance = 0;
+            info->screenSpecularReflectance = 0;
+
+            info->minLuminance = output_desc.MinLuminance;
+            info->maxLuminance = output_desc.MaxLuminance;
+            info->avgLuminance = output_desc.MaxFullFrameLuminance;
+
+            info->logicalDisplayIndex = output_index - 1;
+            info->adlAdapterIndex = adapter_index - 1;
+
+            IDXGIOutput6_Release(output6);
+            IDXGIOutput_Release(output);
+        }
+
+        IDXGIAdapter1_Release(adapter);
+        break;
+    }
 }
 
-static void init_device_displays_511(const char *adapter_name, AGSDisplayInfo_511 **ret_displays, int *ret_display_count)
+static void init_device_displays_511(IDXGIFactory1 *factory, const char *adapter_name, AGSDisplayInfo_511 **ret_displays, int *ret_display_count)
 {
     AGSDisplayInfo_600 *displays = NULL;
     int display_count = 0;
@@ -472,7 +503,7 @@ static void init_device_displays_511(const char *adapter_name, AGSDisplayInfo_51
     *ret_displays = NULL;
     *ret_display_count = 0;
 
-    init_device_displays_600(adapter_name, &displays, &display_count);
+    init_device_displays_600(factory, adapter_name, &displays, &display_count);
 
     if ((*ret_displays = heap_alloc(sizeof(**ret_displays) * display_count)))
     {
@@ -575,13 +606,13 @@ static AGSReturnCode init_ags_context(AGSContext *context)
 
         if (context->version >= AMD_AGS_VERSION_6_0_0)
         {
-            init_device_displays_600(vk_properties->deviceName,
+            init_device_displays_600(context->dxgi_factory, vk_properties->deviceName,
                     GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo_600 *, context->version),
                     GET_DEVICE_FIELD_ADDR(device, numDisplays, int, context->version));
         }
         else
         {
-            init_device_displays_511(vk_properties->deviceName,
+            init_device_displays_511(context->dxgi_factory, vk_properties->deviceName,
                     GET_DEVICE_FIELD_ADDR(device, displays, AGSDisplayInfo_511 *, context->version),
                     GET_DEVICE_FIELD_ADDR(device, numDisplays, int, context->version));
         }
