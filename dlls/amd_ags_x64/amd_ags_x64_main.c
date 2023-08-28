@@ -11,10 +11,11 @@
 #include "wine/asm.h"
 
 #define COBJMACROS
+#include "initguid.h"
 #include "d3d11.h"
 #include "d3d12.h"
 
-#include "initguid.h"
+#include "dxgi1_6.h"
 
 #include "dxvk_interfaces.h"
 
@@ -344,7 +345,102 @@ struct monitor_enum_context_600
     const char *adapter_name;
     AGSDisplayInfo_600 **ret_displays;
     int *ret_display_count;
+    IDXGIFactory1 *dxgi_factory;
 };
+
+static void create_dxgi_factory(HMODULE *hdxgi, IDXGIFactory1 **factory)
+{
+    typeof(CreateDXGIFactory1) *pCreateDXGIFactory1;
+
+    *factory = NULL;
+
+    if (!(*hdxgi = LoadLibraryW(L"dxgi.dll")))
+    {
+        ERR("Could not load dxgi.dll.\n");
+        return;
+    }
+
+    if (!(pCreateDXGIFactory1 = (void *)GetProcAddress(*hdxgi, "CreateDXGIFactory1")))
+    {
+        ERR("Could not find CreateDXGIFactory1.\n");
+        return;
+    }
+
+    if (FAILED(pCreateDXGIFactory1(&IID_IDXGIFactory1, (void**)factory)))
+        return;
+}
+
+static void release_dxgi_factory(HMODULE hdxgi, IDXGIFactory1 *factory)
+{
+    if (factory)
+        IDXGIFactory1_Release(factory);
+    if (hdxgi)
+        FreeLibrary(hdxgi);
+}
+
+static void fill_chroma_info(AGSDisplayInfo_600 *info, struct monitor_enum_context_600 *c, HMONITOR monitor)
+{
+    DXGI_OUTPUT_DESC1 output_desc;
+    IDXGIAdapter1 *adapter;
+    IDXGIOutput6 *output6;
+    IDXGIOutput *output;
+    BOOL found = FALSE;
+    unsigned int i, j;
+    HRESULT hr;
+
+    i = 0;
+    while (!found && (SUCCEEDED(IDXGIFactory1_EnumAdapters1(c->dxgi_factory, i++, &adapter))))
+    {
+        j = 0;
+        while (SUCCEEDED(IDXGIAdapter1_EnumOutputs(adapter, j++, &output)))
+        {
+            hr = IDXGIOutput_QueryInterface(output, &IID_IDXGIOutput6, (void**)&output6);
+            IDXGIOutput_Release(output);
+            if (FAILED(hr))
+            {
+                WARN("Failed to query IDXGIOutput6.\n");
+                continue;
+            }
+            hr = IDXGIOutput6_GetDesc1(output6, &output_desc);
+            IDXGIOutput6_Release(output6);
+
+            if (FAILED(hr) || output_desc.Monitor != monitor)
+                continue;
+            found = TRUE;
+
+            TRACE("output_desc.ColorSpace %#x.\n", output_desc.ColorSpace);
+            if (output_desc.ColorSpace == DXGI_COLOR_SPACE_RGB_FULL_G2084_NONE_P2020)
+            {
+                TRACE("Reporting monitor %s as HDR10 supported.\n", debugstr_a(info->displayDeviceName));
+                info->HDR10 = 1;
+            }
+
+            info->chromaticityRedX = output_desc.RedPrimary[0];
+            info->chromaticityRedY = output_desc.RedPrimary[1];
+            info->chromaticityGreenX = output_desc.GreenPrimary[0];
+            info->chromaticityGreenY = output_desc.GreenPrimary[1];
+            info->chromaticityBlueX = output_desc.BluePrimary[0];
+            info->chromaticityBlueY = output_desc.BluePrimary[1];
+            info->chromaticityWhitePointX = output_desc.WhitePoint[0];
+            info->chromaticityWhitePointY = output_desc.WhitePoint[1];
+
+            TRACE("chromacity: (%.6lf, %.6lf) (%.6lf, %.6lf) (%.6lf, %.6lf).\n", info->chromaticityRedX,
+                    info->chromaticityRedY, info->chromaticityGreenX, info->chromaticityGreenY, info->chromaticityBlueX,
+                    info->chromaticityBlueY);
+
+            info->screenDiffuseReflectance = 0;
+            info->screenSpecularReflectance = 0;
+
+            info->minLuminance = output_desc.MinLuminance;
+            info->maxLuminance = output_desc.MaxLuminance;
+            info->avgLuminance = output_desc.MaxFullFrameLuminance;
+        }
+        IDXGIAdapter1_Release(adapter);
+    }
+
+    if (!found)
+        WARN("dxgi output not found.\n");
+}
 
 static BOOL WINAPI monitor_enum_proc_600(HMONITOR hmonitor, HDC hdc, RECT *rect, LPARAM context)
 {
@@ -415,6 +511,9 @@ static BOOL WINAPI monitor_enum_proc_600(HMONITOR hmonitor, HDC hdc, RECT *rect,
             dev_mode.dmSize = sizeof(dev_mode);
         }
 
+        info->eyefinityGridCoordX = -1;
+        info->eyefinityGridCoordY = -1;
+
         info->currentResolution.offsetX = monitor_info.rcMonitor.left;
         info->currentResolution.offsetY = monitor_info.rcMonitor.top;
         info->currentResolution.width = monitor_info.rcMonitor.right - monitor_info.rcMonitor.left;
@@ -428,6 +527,9 @@ static BOOL WINAPI monitor_enum_proc_600(HMONITOR hmonitor, HDC hdc, RECT *rect,
             info->currentRefreshRate = dev_mode.dmDisplayFrequency;
         else
             ERR("Could not get current display settings.\n");
+
+        fill_chroma_info(info, c, hmonitor);
+
         ++*c->ret_display_count;
 
         TRACE("Added display %s for %s.\n", debugstr_a(monitor_info.szDevice), debugstr_a(c->adapter_name));
@@ -439,14 +541,17 @@ static BOOL WINAPI monitor_enum_proc_600(HMONITOR hmonitor, HDC hdc, RECT *rect,
 static void init_device_displays_600(const char *adapter_name, AGSDisplayInfo_600 **ret_displays, int *ret_display_count)
 {
     struct monitor_enum_context_600 context;
+    HMODULE hdxgi;
 
     TRACE("adapter_name %s.\n", debugstr_a(adapter_name));
 
     context.adapter_name = adapter_name;
     context.ret_displays = ret_displays;
     context.ret_display_count = ret_display_count;
+    create_dxgi_factory(&hdxgi, &context.dxgi_factory);
 
     EnumDisplayMonitors(NULL, NULL, monitor_enum_proc_600, (LPARAM)&context);
+    release_dxgi_factory(hdxgi, context.dxgi_factory);
 }
 
 static void init_device_displays_511(const char *adapter_name, AGSDisplayInfo_511 **ret_displays, int *ret_display_count)
