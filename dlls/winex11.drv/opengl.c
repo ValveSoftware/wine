@@ -480,6 +480,7 @@ static void (*pglViewportIndexedfv)( GLuint index, const GLfloat *v );
 static void (*pglGetFramebufferAttachmentParameteriv)( GLenum target, GLenum attachment, GLenum pname, GLint *params );
 static void (*pglCopyTexImage2D)( GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border );
 static void (*pglCopyTexSubImage2D)( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
+static void (*pglReadPixels)( GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void * data);
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer );
 static void wglDrawBuffer( GLenum buffer );
@@ -487,6 +488,7 @@ static void wglReadBuffer( GLenum src );
 static void wglFramebufferTexture2D( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level );
 static void wglCopyTexImage2D( GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border );
 static void wglCopyTexSubImage2D( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
+static void wglReadPixels( GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void * data);
 
 /* check if the extension is present in the list */
 static BOOL has_extension( const char *list, const char *ext )
@@ -670,6 +672,7 @@ static void init_opengl(void)
     REDIRECT( glReadBuffer );
     REDIRECT( glCopyTexSubImage2D );
     REDIRECT( glCopyTexImage2D );
+    REDIRECT( glReadPixels );
 #undef REDIRECT
 
     pglXGetProcAddressARB = dlsym(opengl_handle, "glXGetProcAddressARB");
@@ -2748,6 +2751,18 @@ static void wglCopyTexImage2D( GLenum target, GLint level, GLenum internalformat
 
     restore = resolve_fs_hack_fbo( &old_read_fbo );
     pglCopyTexImage2D( target, level, internalformat, x, y, width, height, border );
+    if (restore) pglBindFramebuffer( GL_READ_FRAMEBUFFER, old_read_fbo );
+}
+
+static void wglReadPixels( GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, void * data)
+{
+    GLuint old_read_fbo;
+    BOOL restore;
+
+    TRACE( "origin %dx%d, size %dx%d, format %#x, type %#x, data %p.\n", x, y, width, height, format, type, data );
+
+    restore = resolve_fs_hack_fbo( &old_read_fbo );
+    pglReadPixels( x, y, width, height, format, type, data );
     if (restore) pglBindFramebuffer( GL_READ_FRAMEBUFFER, old_read_fbo );
 }
 
