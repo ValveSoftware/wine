@@ -478,12 +478,14 @@ static void (*pglUseProgram)( GLuint program );
 static void (*pglViewportIndexedf)( GLuint index, GLfloat x, GLfloat y, GLfloat w, GLfloat h );
 static void (*pglViewportIndexedfv)( GLuint index, const GLfloat *v );
 static void (*pglGetFramebufferAttachmentParameteriv)( GLenum target, GLenum attachment, GLenum pname, GLint *params );
+static void (*pglCopyTexImage2D)( GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border );
 static void (*pglCopyTexSubImage2D)( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
 static void wglBindFramebuffer( GLenum target, GLuint framebuffer );
 static void wglBindFramebufferEXT( GLenum target, GLuint framebuffer );
 static void wglDrawBuffer( GLenum buffer );
 static void wglReadBuffer( GLenum src );
 static void wglFramebufferTexture2D( GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level );
+static void wglCopyTexImage2D( GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border );
 static void wglCopyTexSubImage2D( GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint x, GLint y, GLsizei width, GLsizei height );
 
 /* check if the extension is present in the list */
@@ -667,6 +669,7 @@ static void init_opengl(void)
     REDIRECT( glGetString );
     REDIRECT( glReadBuffer );
     REDIRECT( glCopyTexSubImage2D );
+    REDIRECT( glCopyTexImage2D );
 #undef REDIRECT
 
     pglXGetProcAddressARB = dlsym(opengl_handle, "glXGetProcAddressARB");
@@ -2732,6 +2735,19 @@ static void wglCopyTexSubImage2D( GLenum target, GLint level, GLint xoffset, GLi
 
     restore = resolve_fs_hack_fbo( &old_read_fbo );
     pglCopyTexSubImage2D( target, level, xoffset, yoffset, x, y, width, height );
+    if (restore) pglBindFramebuffer( GL_READ_FRAMEBUFFER, old_read_fbo );
+}
+
+static void wglCopyTexImage2D( GLenum target, GLint level, GLenum internalformat, GLint x, GLint y, GLsizei width, GLsizei height, GLint border )
+{
+    GLuint old_read_fbo;
+    BOOL restore;
+
+    TRACE( "target %#x, level %d, internalformat %#x, origin %dx%d, size %dx%d, border %d.\n",
+            target, level, internalformat, x, y, width, height, border );
+
+    restore = resolve_fs_hack_fbo( &old_read_fbo );
+    pglCopyTexImage2D( target, level, internalformat, x, y, width, height, border );
     if (restore) pglBindFramebuffer( GL_READ_FRAMEBUFFER, old_read_fbo );
 }
 
