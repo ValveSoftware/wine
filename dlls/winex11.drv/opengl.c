@@ -3498,17 +3498,17 @@ static const GLubyte *wglGetString(GLenum name)
     }
     if (override_vendor)
     {
-        const char *s;
+        const GLubyte *s;
         if (name == GL_RENDERER)
         {
             s = pglGetString(name);
-            if (s && strstr(s, "NVIDIA")) return (const GLubyte *)"AMD Radeon Graphics";
+            if (s && strstr((const char *)s, "NVIDIA")) return (const GLubyte *)"AMD Radeon Graphics";
             return s;
         }
         else if (name == GL_VENDOR)
         {
             s = pglGetString(name);
-            if (s && strstr(s, "NVIDIA")) return (const GLubyte *)"AMD";
+            if (s && strstr((const char *)s, "NVIDIA")) return (const GLubyte *)"AMD";
             return s;
         }
     }
