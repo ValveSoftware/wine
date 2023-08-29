@@ -94,7 +94,7 @@ static ULONG WINAPI synth_sink_Release(IDirectMusicSynthSink *iface)
             IReferenceClock_Release(This->latency_clock);
         if (This->master_clock)
             IReferenceClock_Release(This->master_clock);
-        HeapFree(GetProcessHeap(), 0, This);
+        free(This);
     }
 
     return ref;
@@ -317,10 +317,7 @@ HRESULT DMUSIC_CreateDirectMusicSynthSinkImpl(REFIID riid, void **ret_iface)
 
     *ret_iface = NULL;
 
-    obj = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(struct synth_sink));
-    if (!obj)
-        return E_OUTOFMEMORY;
-
+    if (!(obj = calloc(1, sizeof(*obj)))) return E_OUTOFMEMORY;
     obj->IDirectMusicSynthSink_iface.lpVtbl = &synth_sink_vtbl;
     obj->IKsControl_iface.lpVtbl = &synth_sink_control;
     obj->ref = 1;
@@ -328,7 +325,7 @@ HRESULT DMUSIC_CreateDirectMusicSynthSinkImpl(REFIID riid, void **ret_iface)
     hr = CoCreateInstance(&CLSID_SystemClock, NULL, CLSCTX_INPROC_SERVER, &IID_IReferenceClock, (LPVOID*)&obj->latency_clock);
     if (FAILED(hr))
     {
-        HeapFree(GetProcessHeap(), 0, obj);
+        free(obj);
         return hr;
     }
 
