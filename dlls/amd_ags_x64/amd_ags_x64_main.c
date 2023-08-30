@@ -1141,9 +1141,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds_530(AGSContext* cont
     return set_depth_bounds(context, dx_context, enabled, min_depth, max_depth);
 }
 
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
 __ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $3,%eax\n\t"
+                   "cmp $4,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds_530") )
@@ -1192,9 +1193,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap(AGSContext *context
     return update_uav_overlap(context, dx_context, TRUE);
 }
 
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
 __ASM_GLOBAL_FUNC( DX11_BeginUAVOverlap_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $3,%eax\n\t"
+                   "cmp $4,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap_520") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap") )
@@ -1225,9 +1227,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_EndUAVOverlap(AGSContext *context, 
     return update_uav_overlap(context, dx_context, FALSE);
 }
 
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
 __ASM_GLOBAL_FUNC( DX11_EndUAVOverlap_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $3,%eax\n\t"
+                   "cmp $4,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_EndUAVOverlap_520") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_EndUAVOverlap") )
@@ -1270,9 +1273,11 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_DestroyDevice_511(AGSContext *conte
 
     return agsDriverExtensionsDX11_DestroyDevice_520(context, device, references, NULL, NULL);
 }
+
+C_ASSERT(AMD_AGS_VERSION_5_2_0 == 2);
 __ASM_GLOBAL_FUNC( agsDriverExtensionsDX11_DestroyDevice,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $1,%eax\n\t"
+                   "cmp $2,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp "     __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_511") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_520") )
