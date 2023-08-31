@@ -74,13 +74,15 @@ typedef struct port_info {
     ULONG device;
 } port_info;
 
-typedef struct instrument_region {
+struct region
+{
+    struct list entry;
     RGNHEADER header;
     WAVELINK wave_link;
     WSMPL wave_sample;
     WLOOP wave_loop;
     BOOL loop_present;
-} instrument_region;
+};
 
 /*****************************************************************************
  * ClassFactory
@@ -183,9 +185,9 @@ struct instrument
     WCHAR wszName[DMUS_MAX_NAME];
     /* instrument data */
     BOOL loaded;
-    instrument_region *regions;
 
     struct list articulations;
+    struct list regions;
 };
 
 static inline struct instrument *impl_from_IDirectMusicInstrument(IDirectMusicInstrument *iface)
