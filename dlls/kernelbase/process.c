@@ -603,6 +603,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"DC Universe Online\\LaunchPad.exe", L" --use-gl=swiftshader"},
         {L"PlanetSide 2\\LaunchPad.exe", L" --use-gl=swiftshader"},
         {L"PaladinLias\\Game.exe", L" --use-gl=desktop"},
+        {L"EverQuest 2\\LaunchPad.exe", L" --use-gl=swiftshader"},
     };
     unsigned int i;
 
