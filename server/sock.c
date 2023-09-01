@@ -239,6 +239,7 @@ struct sock
     struct poll_req    *main_poll;   /* main poll */
     union win_sockaddr  addr;        /* socket name */
     int                 addr_len;    /* socket name length */
+    unsigned int        default_rcvbuf;  /* initial advisory recv buffer size */
     unsigned int        rcvbuf;      /* advisory recv buffer size */
     unsigned int        sndbuf;      /* advisory send buffer size */
     unsigned int        rcvtimeo;    /* receive timeout in ms */
@@ -1729,6 +1730,7 @@ static struct sock *create_socket(void)
     sock->reset = 0;
     sock->reuseaddr = 0;
     sock->exclusiveaddruse = 0;
+    sock->default_rcvbuf = 0;
     sock->rcvbuf = 0;
     sock->sndbuf = 0;
     sock->rcvtimeo = 0;
@@ -1912,7 +1914,7 @@ static int init_socket( struct sock *sock, int family, int type, int protocol )
 
     len = sizeof(value);
     if (!getsockopt( sockfd, SOL_SOCKET, SO_RCVBUF, &value, &len ))
-        sock->rcvbuf = value;
+        sock->rcvbuf = sock->default_rcvbuf = value;
 
     len = sizeof(value);
     if (!getsockopt( sockfd, SOL_SOCKET, SO_SNDBUF, &value, &len ))
@@ -2007,6 +2009,7 @@ static struct sock *accept_socket( struct sock *sock )
         acceptsock->reuseaddr           = sock->reuseaddr;
         acceptsock->exclusiveaddruse    = sock->exclusiveaddruse;
         acceptsock->sndbuf              = sock->sndbuf;
+        acceptsock->default_rcvbuf      = sock->default_rcvbuf;
         acceptsock->rcvbuf              = sock->rcvbuf;
         acceptsock->sndtimeo            = sock->sndtimeo;
         acceptsock->rcvtimeo            = sock->rcvtimeo;
@@ -3086,7 +3089,7 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
 
     case IOCTL_AFD_WINE_SET_SO_RCVBUF:
     {
-        DWORD rcvbuf;
+        DWORD rcvbuf, set_rcvbuf;
 
         if (get_req_data_size() < sizeof(rcvbuf))
         {
@@ -3094,8 +3097,9 @@ static void sock_ioctl( struct fd *fd, ioctl_code_t code, struct async *async )
             return;
         }
         rcvbuf = *(DWORD *)get_req_data();
+        set_rcvbuf = max( rcvbuf, sock->default_rcvbuf );
 
-        if (!setsockopt( unix_fd, SOL_SOCKET, SO_RCVBUF, (char *)&rcvbuf, sizeof(rcvbuf) ))
+        if (!setsockopt( unix_fd, SOL_SOCKET, SO_RCVBUF, (char *)&set_rcvbuf, sizeof(set_rcvbuf) ))
             sock->rcvbuf = rcvbuf;
         else
             set_error( sock_get_ntstatus( errno ) );
