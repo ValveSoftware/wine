@@ -120,6 +120,18 @@ static BOOL is_vkb_controller(WORD vid, WORD pid, INT buttons)
     return FALSE;
 }
 
+static BOOL is_virpil_controller(WORD vid, WORD pid, INT buttons)
+{
+    if (vid != 0x3344) return FALSE;
+
+    /* comes with 31 buttons in the default configuration, or 128 max */
+    if ((buttons == 31) || (buttons == 128)) return TRUE;
+
+    /* if customized, arbitrary amount of buttons may be shown, decide by PID */
+    if (pid == 0x412f) return TRUE; /* Virpil Constellation ALPHA-R */
+    return FALSE;
+}
+
 BOOL is_hidraw_enabled(WORD vid, WORD pid, INT axes, INT buttons)
 {
     const char *enabled = getenv("PROTON_ENABLE_HIDRAW");
@@ -131,6 +143,7 @@ BOOL is_hidraw_enabled(WORD vid, WORD pid, INT axes, INT buttons)
     if (is_simucube_wheel(vid, pid)) return TRUE;
     if (is_fanatec_pedals(vid, pid)) return TRUE;
     if (is_vkb_controller(vid, pid, buttons)) return TRUE;
+    if (is_virpil_controller(vid, pid, buttons)) return TRUE;
 
     sprintf(needle, "0x%04x/0x%04x", vid, pid);
     if (enabled) return strcasestr(enabled, needle) != NULL;
