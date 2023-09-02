@@ -1622,6 +1622,7 @@ static void udev_add_device(struct udev_device *dev, int fd)
     const char *subsystem;
     const char *devnode;
     int bus = 0;
+    int axes = -1, buttons = -1;
 
     if (!(devnode = udev_device_get_devnode(dev)))
     {
@@ -1644,6 +1645,9 @@ static void udev_add_device(struct udev_device *dev, int fd)
         close(fd);
         return;
     }
+
+    axes = count_abs_axis(fd);
+    buttons = count_buttons(fd, NULL);
 #endif
 
     get_device_subsystem_info(dev, "hid", &desc, &bus);
@@ -1697,7 +1701,7 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
-    if (!is_hidraw_enabled(desc.vid, desc.pid))
+    if (!is_hidraw_enabled(desc.vid, desc.pid, axes, buttons))
     {
         TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
         close(fd);
@@ -1712,12 +1716,7 @@ static void udev_add_device(struct udev_device *dev, int fd)
     }
 #ifdef HAS_PROPER_INPUT_HEADER
     else
-    {
-        int axes=0, buttons=0;
-        axes = count_abs_axis(fd);
-        buttons = count_buttons(fd, NULL);
         desc.is_gamepad = (axes == 6 && buttons >= 14);
-    }
 #endif
 
     TRACE("dev %p, node %s, desc %s.\n", dev, debugstr_a(devnode), debugstr_device_desc(&desc));
