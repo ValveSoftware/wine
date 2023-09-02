@@ -107,7 +107,7 @@ static BOOL is_fanatec_pedals(WORD vid, WORD pid)
     return FALSE;
 }
 
-BOOL is_hidraw_enabled(WORD vid, WORD pid)
+BOOL is_hidraw_enabled(WORD vid, WORD pid, INT axes, INT buttons)
 {
     const char *enabled = getenv("PROTON_ENABLE_HIDRAW");
     char needle[16];
