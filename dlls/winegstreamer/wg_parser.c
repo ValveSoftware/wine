@@ -517,6 +517,11 @@ static GstAutoplugSelectResult autoplug_select_cb(GstElement *bin, GstPad *pad,
     }
     if (!strcmp(name, "QuickTime demuxer"))
         parser->using_qtdemux = true;
+    if (!strcmp(name, "Proton video converter") && !parser->use_mediaconv)
+    {
+        GST_INFO("Skipping \"Proton video converter\".");
+        return GST_AUTOPLUG_SELECT_SKIP;
+    }
     return GST_AUTOPLUG_SELECT_TRY;
 }
 
