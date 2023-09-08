@@ -5211,6 +5211,8 @@ VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const V
     {
         timeline_submit_info = wine_vk_find_struct(&submits[i], TIMELINE_SEMAPHORE_SUBMIT_INFO);
         d3d12_submit_info = wine_vk_find_struct(&submits_win[i], D3D12_FENCE_SUBMIT_INFO_KHR);
+        if (d3d12_submit_info && timeline_submit_info)
+            WARN("Both TIMELINE_SEMAPHORE_SUBMIT_INFO and D3D12_FENCE_SUBMIT_INFO_KHR specified.\n");
         if (d3d12_submit_info && !timeline_submit_info)
         {
             timeline_submit_info = conversion_context_alloc(&ctx, sizeof(*timeline_submit_info));
@@ -5220,10 +5222,8 @@ VkResult wine_vkQueueSubmit(VkQueue queue_handle, uint32_t submit_count, const V
             MEMDUP(&ctx, timeline_submit_info->pWaitSemaphoreValues, d3d12_submit_info->pWaitSemaphoreValues, d3d12_submit_info->waitSemaphoreValuesCount);
             timeline_submit_info->signalSemaphoreValueCount = d3d12_submit_info->signalSemaphoreValuesCount;
             MEMDUP(&ctx, timeline_submit_info->pSignalSemaphoreValues, d3d12_submit_info->pSignalSemaphoreValues, d3d12_submit_info->signalSemaphoreValuesCount);
-            submits[i].pNext = &timeline_submit_info;
+            submits[i].pNext = timeline_submit_info;
         }
-        if (d3d12_submit_info && timeline_submit_info)
-            WARN("Both TIMELINE_SEMAPHORE_SUBMIT_INFO and D3D12_FENCE_SUBMIT_INFO_KHR specified.\n");
 
         if (timeline_submit_info)
             values = &timeline_submit_info->pWaitSemaphoreValues;
