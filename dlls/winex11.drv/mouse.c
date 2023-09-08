@@ -1667,7 +1667,7 @@ BOOL X11DRV_MotionNotify( HWND hwnd, XEvent *xev )
     input.mi.time        = x11drv_time_to_ticks( event->time );
     input.mi.dwExtraInfo = 0;
 
-    if (!hwnd && is_old_motion_event( event->serial ))
+    if (is_old_motion_event( event->serial ))
     {
         TRACE( "pos %d,%d old serial %lu, ignoring\n", event->x, event->y, event->serial );
         return FALSE;
@@ -1929,7 +1929,7 @@ static BOOL X11DRV_XIDeviceEvent( XIDeviceEvent *event )
     TRACE( "evtype %u hwnd %p/%lx pos %f,%f detail %u flags %#x serial %lu\n",
            event->evtype, hwnd, event->event, event->event_x, event->event_y, event->detail, event->flags, event->serial );
 
-    if (!hwnd && is_old_motion_event( event->serial ))
+    if (is_old_motion_event( event->serial ))
     {
         TRACE( "pos %f,%f old serial %lu, ignoring\n", event->event_x, event->event_y, event->serial );
         return FALSE;
