@@ -347,7 +347,6 @@ extern void __wine_set_user_driver( const struct user_driver_funcs *funcs, UINT 
 #define WINE_WM_X11_MUTTER       1
 #define WINE_WM_X11_STEAMCOMPMGR 2
 #define WINE_WM_X11_KDE          3
-#define WINE_WM_X11_XFCE4        4
 
 static inline LONG_PTR __wine_get_window_manager(void)
 {
