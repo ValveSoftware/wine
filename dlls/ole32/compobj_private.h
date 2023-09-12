@@ -63,6 +63,7 @@ struct oletls
     struct list       spies;         /* Spies installed with CoRegisterInitializeSpy */
     DWORD             spies_lock;
     DWORD             cancelcount;
+    struct apartment *implicit_mta;  /* mta referenced by roapi from sta thread */
 };
 
 /* Global Interface Table Functions */
