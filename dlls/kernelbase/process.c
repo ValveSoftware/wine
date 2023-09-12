@@ -604,6 +604,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"PlanetSide 2\\LaunchPad.exe", L" --use-gl=swiftshader"},
         {L"PaladinLias\\Game.exe", L" --use-gl=desktop"},
         {L"EverQuest 2\\LaunchPad.exe", L" --use-gl=swiftshader"},
+        {L"Everquest F2P\\LaunchPad.exe", L" --use-gl=swiftshader"},
     };
     unsigned int i;
 
