@@ -1159,6 +1159,11 @@ void leave_apartment(struct tlsdata *data)
         if (data->ole_inits)
             WARN( "Uninitializing apartment while Ole is still initialized\n" );
         apartment_release(data->apt);
+        if (data->implicit_mta)
+        {
+            apartment_release(data->implicit_mta);
+            data->implicit_mta = NULL;
+        }
         data->apt = NULL;
         data->flags &= ~(OLETLS_DISABLE_OLE1DDE | OLETLS_APARTMENTTHREADED | OLETLS_MULTITHREADED);
     }
@@ -1289,4 +1294,31 @@ void apartment_global_cleanup(void)
         UnregisterClassW((const WCHAR *)MAKEINTATOM(apt_win_class), hProxyDll);
     apartment_release_dlls();
     DeleteCriticalSection(&apt_cs);
+}
+
+HRESULT reference_implicit_mta_from_sta(void)
+{
+    struct tlsdata *data;
+    HRESULT hr;
+    struct apartment *apt, *apt_mt;
+
+    if (FAILED(hr = com_get_tlsdata(&data)))
+        return hr;
+    if ((apt = data->apt) && (data->implicit_mta || apt->multi_threaded))
+        return S_OK;
+
+    EnterCriticalSection(&apt_cs);
+    if (apt && !mta)
+        apt_mt = mta = apartment_construct(COINIT_MULTITHREADED);
+    else if ((apt_mt = mta))
+        apartment_addref(mta);
+    LeaveCriticalSection(&apt_cs);
+
+    if (!apt_mt)
+    {
+        ERR("Apartment not initialized.\n");
+        return CO_E_NOTINITIALIZED;
+    }
+    data->implicit_mta = apt_mt;
+    return S_OK;
 }

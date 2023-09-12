@@ -410,6 +410,9 @@ static void com_cleanup_tlsdata(void)
 
     if (tlsdata->apt)
         apartment_release(tlsdata->apt);
+    if (tlsdata->implicit_mta)
+        apartment_release(tlsdata->implicit_mta);
+
     if (tlsdata->errorinfo)
         IErrorInfo_Release(tlsdata->errorinfo);
     if (tlsdata->state)

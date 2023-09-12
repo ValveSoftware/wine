@@ -74,6 +74,7 @@ enum tlsdata_flags
 struct tlsdata
 {
     struct apartment *apt;
+    struct apartment *implicit_mta;  /* mta referenced by roapi from sta thread */
     IErrorInfo       *errorinfo;
     DWORD             thread_seqid;  /* returned with CoGetCurrentProcess */
     DWORD             flags;         /* tlsdata_flags (+0Ch on x86) */
@@ -161,6 +162,7 @@ void apartment_release(struct apartment *apt) DECLSPEC_HIDDEN;
 struct apartment * apartment_get_current_or_mta(void) DECLSPEC_HIDDEN;
 HRESULT apartment_increment_mta_usage(CO_MTA_USAGE_COOKIE *cookie) DECLSPEC_HIDDEN;
 void apartment_decrement_mta_usage(CO_MTA_USAGE_COOKIE cookie) DECLSPEC_HIDDEN;
+HRESULT reference_implicit_mta_from_sta(void) DECLSPEC_HIDDEN;
 struct apartment * apartment_get_mta(void) DECLSPEC_HIDDEN;
 HRESULT apartment_get_inproc_class_object(struct apartment *apt, const struct class_reg_data *regdata,
         REFCLSID rclsid, REFIID riid, DWORD class_context, void **ppv) DECLSPEC_HIDDEN;
