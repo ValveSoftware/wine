@@ -74,7 +74,6 @@ enum tlsdata_flags
 struct tlsdata
 {
     struct apartment *apt;
-    struct apartment *implicit_mta;  /* mta referenced by roapi from sta thread */
     IErrorInfo       *errorinfo;
     DWORD             thread_seqid;  /* returned with CoGetCurrentProcess */
     DWORD             flags;         /* tlsdata_flags (+0Ch on x86) */
@@ -93,6 +92,7 @@ struct tlsdata
     struct list       spies;         /* Spies installed with CoRegisterInitializeSpy */
     DWORD             spies_lock;
     DWORD             cancelcount;
+    struct apartment *implicit_mta;  /* mta referenced by roapi from sta thread */
 };
 
 extern HRESULT WINAPI InternalTlsAllocData(struct tlsdata **data);
