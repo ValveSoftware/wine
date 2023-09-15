@@ -3455,7 +3455,7 @@ static const GLubyte *wglGetString(GLenum name)
                 if ((sz = read(fd, buffer, sizeof(buffer) - 1)) > 0)
                 {
                     buffer[sz] = 0;
-                    if (strstr(buffer, "\\Paradox Launcher.exe"))
+                    if (strstr(buffer, "\\Paradox Launcher.exe") || strstr(buffer, "Red Tie Runner.exe"))
                     {
                         FIXME("HACK: overriding GL vendor and renderer.\n");
                         override_vendor = 1;
