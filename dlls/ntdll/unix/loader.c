@@ -2357,6 +2357,7 @@ static void hacks_init(void)
                                        || !strcmp(sgi, "1680700") /* Purgo box */
                                        || !strcmp(sgi, "2095300") /* Breakout 13 */
                                        || !strcmp(sgi, "2053940") /* Idol Hands 2 */
+                                       || !strcmp(sgi, "391150") /* Red Tie Runner */
                                        || !strcmp(sgi, "2176450"); /* Mr. Hopp's Playhouse 3 */
 
     if (main_argc > 1 && strstr(main_argv[1], "MicrosoftEdgeUpdate.exe"))
