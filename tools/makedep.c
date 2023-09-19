@@ -4414,7 +4414,7 @@ static int parse_option( const char *opt )
 int main( int argc, char *argv[] )
 {
     const char *makeflags = getenv( "MAKEFLAGS" );
-    const char *target;
+    const char *target, *tmp;
     unsigned int i, j, arch;
 
     if (makeflags) parse_makeflags( makeflags );
@@ -4530,7 +4530,12 @@ int main( int argc, char *argv[] )
     subdirs = get_expanded_make_var_array( top_makefile, "SUBDIRS" );
     submakes = xmalloc( subdirs.count * sizeof(*submakes) );
 
-    for (i = 0; i < subdirs.count; i++) submakes[i] = parse_makefile( subdirs.str[i] );
+    for (i = 0; i < subdirs.count; i++)
+    {
+        submakes[i] = parse_makefile( subdirs.str[i] );
+        if (*(tmp = subdirs.str[i]) == '/') tmp = strmake( "dlls%s", strrchr( tmp, '/' ) );
+        submakes[i]->obj_dir = subdirs.str[i] = tmp;
+    }
 
     load_sources( top_makefile );
     load_sources( include_makefile );
