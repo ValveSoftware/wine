@@ -3559,12 +3559,14 @@ static const struct
 static void output_fake_module( struct makefile *make, const char *spec_file )
 {
     unsigned int arch = 0;  /* fake modules are always native */
-    const char *name = strmake( "%s/%s", arch_pe_dirs[arch], make->module );
+    const char *name, *module;
 
     if (make->disabled[arch]) return;
+    if (!(module = get_expanded_make_variable( make, strmake( "%s_%s", archs.str[arch], "MODULE" ) ))) module = make->module;
 
+    name = strmake( "%s%s", arch_pe_dirs[arch], module );
     strarray_add( &make->all_targets[arch], name );
-    install_data_file( make, make->module, name, strmake( "$(libdir)/wine/%s", arch_pe_dirs[arch] ), NULL );
+    install_data_file( make, module, name, strmake( "$(libdir)/wine/%s", arch_pe_dirs[arch] ), NULL );
 
     output( "%s:", obj_dir_path( make, name ));
     if (spec_file) output_filename( spec_file );
@@ -3591,27 +3593,28 @@ static void output_module( struct makefile *make, unsigned int arch )
     struct strarray all_libs = empty_strarray;
     struct strarray dep_libs = empty_strarray;
     struct strarray imports = make->imports;
-    const char *module_name;
+    const char *module_name, *module;
     char *spec_file = NULL;
     unsigned int link_arch;
 
+    if (!(module = get_expanded_arch_var( make, "MODULE", arch ))) module = make->module;
     if (!make->is_exe)
     {
-        if (make->data_only || strendswith( make->module, ".drv" ) ||
+        if (make->data_only || strendswith( module, ".drv" ) ||
             strarray_exists( make->extradllflags, "-Wl,--subsystem,native" ))
         {
             /* spec file is optional */
-            struct incl_file *spec = find_src_file( make, replace_extension( make->module, ".dll", ".spec" ));
+            struct incl_file *spec = find_src_file( make, replace_extension( module, ".dll", ".spec" ));
             if (spec) spec_file = spec->filename;
         }
-        else spec_file = src_dir_path( make, replace_extension( make->module, ".dll", ".spec" ));
+        else spec_file = src_dir_path( make, replace_extension( module, ".dll", ".spec" ));
     }
 
     if (!make->data_only)
     {
         if (!get_link_arch( make, arch, &link_arch )) return;
 
-        module_name = arch_module_name( make->module, arch );
+        module_name = arch_module_name( module, arch );
         default_imports = get_default_imports( make, imports,
                                                strarray_exists( make->extradllflags, "-nodefaultlibs" ));
 
@@ -3628,7 +3631,7 @@ static void output_module( struct makefile *make, unsigned int arch )
                 if (import) strarray_add( &all_libs, strmake( "%s%s", delay_load_flags[arch], import->module ));
             }
         }
-        if (!make->disabled[link_arch]) install_program( make, make->module, arch,
+        if (!make->disabled[link_arch]) install_program( make, module, arch,
                                                          module_name, arch_install_dirs[arch] );
     }
     else
@@ -3637,8 +3640,8 @@ static void output_module( struct makefile *make, unsigned int arch )
         if (make->disabled[arch]) return;
         link_arch = arch;
 
-        module_name = strmake( "%s/%s", arch_pe_dirs[arch], make->module );
-        install_data_file( make, make->module, module_name,
+        module_name = strmake( "%s/%s", arch_pe_dirs[arch], module );
+        install_data_file( make, module, module_name,
                            strmake( "$(libdir)/wine/%s", arch_pe_dirs[arch] ), NULL );
     }
 
@@ -4585,6 +4588,12 @@ static void load_sources( struct makefile *make )
             if (make->importlib) strarray_add( &make->install[INSTALL_DEV], make->importlib );
             if (make->staticlib) strarray_add( &make->install[INSTALL_DEV], make->staticlib );
             else strarray_add( &make->install[INSTALL_LIB], make->module );
+            for (arch = 1; arch < archs.count; arch++)
+            {
+                char *module;
+                if (!(module = get_expanded_arch_var( make, "MODULE", arch ))) continue;
+                strarray_add( &make->install[INSTALL_LIB], module );
+            }
         }
     }
 
