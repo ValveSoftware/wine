@@ -203,6 +203,7 @@ struct makefile
     const char     *staticlib;
     const char     *importlib;
     const char     *unixlib;
+    const char     *unixlib_x64;
     int             use_msvcrt;
     int             data_only;
     int             is_win16;
@@ -3469,13 +3470,15 @@ static void output_unix_lib( struct makefile *make )
     struct strarray unix_deps = empty_strarray;
     struct strarray unix_libs = add_unix_libraries( make, &unix_deps );
     unsigned int arch = 0;  /* unix libs are always native */
+    const char *unixlib = make->unixlib;
 
     if (make->disabled[arch]) return;
+    if (make->unixlib_x64 && !strcmp( archs.str[arch], "x86_64" )) unixlib = make->unixlib_x64;
 
-    strarray_add( &make->all_targets[arch], make->unixlib );
-    add_install_rule( make, make->module, arch, make->unixlib,
-                      strmake( "p%s%s", arch_install_dirs[arch], make->unixlib ));
-    output( "%s:", obj_dir_path( make, make->unixlib ));
+    strarray_add( &make->all_targets[arch], unixlib );
+    add_install_rule( make, make->module, arch, unixlib,
+                      strmake( "p%s%s", arch_install_dirs[arch], unixlib ));
+    output( "%s:", obj_dir_path( make, unixlib ));
     output_filenames_obj_dir( make, make->unixobj_files );
     output_filenames( unix_deps );
     output( "\n" );
@@ -4227,7 +4230,11 @@ static void load_sources( struct makefile *make )
     make->staticlib     = get_expanded_make_variable( make, "STATICLIB" );
     make->importlib     = get_expanded_make_variable( make, "IMPORTLIB" );
     make->extlib        = get_expanded_make_variable( make, "EXTLIB" );
-    if (unix_lib_supported) make->unixlib = get_expanded_make_variable( make, "UNIXLIB" );
+    if (unix_lib_supported)
+    {
+        make->unixlib = get_expanded_make_variable( make, "UNIXLIB" );
+        make->unixlib_x64 = get_expanded_make_variable( make, "UNIXLIB_x64" );
+    }
 
     make->programs      = get_expanded_make_var_array( make, "PROGRAMS" );
     make->scripts       = get_expanded_make_var_array( make, "SCRIPTS" );
