@@ -588,10 +588,16 @@ static void no_more_pads_cb(GstElement *element, gpointer user)
 
 static void deep_element_added_cb(GstBin *self, GstBin *sub_bin, GstElement *element, gpointer user)
 {
-    GstElementFactory *factory = gst_element_get_factory(element);
-    const char *name = gst_element_factory_get_longname(factory);
+    GstElementFactory *factory = NULL;
+    const char *name = NULL;
 
-    if (strstr(name, "Dav1d"))
+    if (element)
+        factory = gst_element_get_factory(element);
+
+    if (factory)
+        name = gst_element_factory_get_longname(factory);
+
+    if (name && strstr(name, "Dav1d"))
     {
 #if defined(__x86_64__)
         GST_DEBUG("%s found, setting n-threads to 4.", name);
