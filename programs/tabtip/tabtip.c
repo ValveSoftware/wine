@@ -34,8 +34,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(tabtip);
 
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
 typedef struct {
     IUIAutomationFocusChangedEventHandler IUIAutomationFocusChangedEventHandler_iface;
     LONG ref;
@@ -44,6 +42,12 @@ typedef struct {
 static BOOL keyboard_up;
 static BOOL use_steam_osk;
 static unsigned int steam_app_id;
+
+static const WCHAR tabtip_window_class_name[]  = L"IPTip_Main_Window";
+static LRESULT CALLBACK tabtip_win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
+{
+    return DefWindowProcW(hwnd, msg, wparam, lparam);
+}
 
 static const char *ct_id_str[] = {
     "UIA_ButtonControlTypeId (50000)",
@@ -279,8 +283,6 @@ static void tabtip_use_osk_check(void)
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
-    // Register the window class.
-    const wchar_t CLASS_NAME[]  = L"IPTip_Main_Window";
     HANDLE wine_exit_event, started_event;
     IUIAutomation *uia_iface;
     WNDCLASSW wc = { };
@@ -317,19 +319,19 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         goto exit;
     }
 
-    wc.lpfnWndProc   = WindowProc;
+    wc.lpfnWndProc   = tabtip_win_proc;
     wc.hInstance     = hInstance;
-    wc.lpszClassName = CLASS_NAME;
-
+    wc.lpszClassName = tabtip_window_class_name;
     RegisterClassW(&wc);
 
-    hwnd = CreateWindowExW(0, CLASS_NAME,
+    hwnd = CreateWindowExW(0, tabtip_window_class_name,
             L"Input", WS_OVERLAPPEDWINDOW, 4, 4, 0, 0, NULL,
             NULL, hInstance, NULL);
 
     if (!hwnd)
     {
         ERR("Failed to create hwnd!\n");
+        UnregisterClassW(tabtip_window_class_name, hInstance);
         ret = -1;
         goto exit;
     }
@@ -368,29 +370,4 @@ exit:
     if (started_event) CloseHandle(started_event);
 
     return ret;
-}
-
-LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
-{
-    switch (uMsg)
-    {
-    case WM_DESTROY:
-        PostQuitMessage(0);
-        return 0;
-
-    case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            HDC hdc = BeginPaint(hwnd, &ps);
-
-            FillRect(hdc, &ps.rcPaint, (HBRUSH) (COLOR_WINDOW+1));
-
-            EndPaint(hwnd, &ps);
-        }
-        return 0;
-    default:
-        break;
-    }
-
-    return DefWindowProcW(hwnd, uMsg, wParam, lParam);
 }
