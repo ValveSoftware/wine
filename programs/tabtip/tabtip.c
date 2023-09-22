@@ -199,22 +199,53 @@ static const IUIAutomationFocusChangedEventHandlerVtbl FocusChangedHandlerVtbl =
 
 static IUIAutomationFocusChangedEventHandler FocusChangedHandler = { &FocusChangedHandlerVtbl };
 
+static const int uia_cache_props[] = { UIA_BoundingRectanglePropertyId, UIA_ControlTypePropertyId, UIA_NamePropertyId,
+                                       UIA_HasKeyboardFocusPropertyId, UIA_ValueIsReadOnlyPropertyId, };
 static HRESULT add_uia_event_handler(IUIAutomation **uia_iface)
 {
+    IUIAutomationCacheRequest *cache_req = NULL;
+    IUIAutomationCondition *true_cond = NULL;
     HRESULT hr;
+    int i;
 
-    hr = CoCreateInstance(&CLSID_CUIAutomation, NULL, CLSCTX_INPROC_SERVER,
-            &IID_IUIAutomation, (void **)uia_iface);
+    hr = CoCreateInstance(&CLSID_CUIAutomation8, NULL, CLSCTX_INPROC_SERVER, &IID_IUIAutomation, (void **)uia_iface);
     if (FAILED(hr))
     {
         ERR("Failed to create IUIAutomation interface, hr %#x\n", hr);
         return hr;
     }
 
-    hr = IUIAutomation_AddFocusChangedEventHandler(*uia_iface, NULL,
-            &FocusChangedHandler);
+    hr = IUIAutomation_CreateCacheRequest(*uia_iface, &cache_req);
+    if (FAILED(hr))
+        goto exit;
+
+    hr = IUIAutomation_CreateTrueCondition(*uia_iface, &true_cond);
+    if (FAILED(hr))
+        goto exit;
+
+    hr = IUIAutomationCacheRequest_put_TreeFilter(cache_req, true_cond);
+    if (FAILED(hr))
+        goto exit;
+
+    for (i = 0; i < ARRAY_SIZE(uia_cache_props); i++)
+    {
+        hr = IUIAutomationCacheRequest_AddProperty(cache_req, uia_cache_props[i]);
+        if (FAILED(hr))
+        {
+            ERR("Failed to add prop_id %d to cache req, hr %#x\n", uia_cache_props[i], hr);
+            goto exit;
+        }
+    }
+
+    hr = IUIAutomation_AddFocusChangedEventHandler(*uia_iface, cache_req, &FocusChangedHandler);
     if (FAILED(hr))
         ERR("Failed to add focus changed event handler, hr %#x\n", hr);
+
+exit:
+    if (cache_req)
+        IUIAutomationCacheRequest_Release(cache_req);
+    if (true_cond)
+        IUIAutomationCondition_Release(true_cond);
 
     return hr;
 }
@@ -255,7 +286,7 @@ static void tabtip_use_osk_check(void)
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
     HANDLE wine_exit_event, started_event;
-    IUIAutomation *uia_iface;
+    IUIAutomation *uia_iface = NULL;
     WNDCLASSW wc = { };
     int ret = 0;
     HWND hwnd;
@@ -330,12 +361,14 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
             break;
     }
 
-    IUIAutomation_RemoveAllEventHandlers(uia_iface);
-    IUIAutomation_Release(uia_iface);
+exit:
+    if (uia_iface)
+    {
+        IUIAutomation_RemoveAllEventHandlers(uia_iface);
+        IUIAutomation_Release(uia_iface);
+    }
 
     CoUninitialize();
-
-exit:
     if (wine_exit_event) CloseHandle(wine_exit_event);
     if (started_event) CloseHandle(started_event);
 
