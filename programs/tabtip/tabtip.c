@@ -34,11 +34,6 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(tabtip);
 
-typedef struct {
-    IUIAutomationFocusChangedEventHandler IUIAutomationFocusChangedEventHandler_iface;
-    LONG ref;
-} event_data;
-
 static BOOL keyboard_up;
 static BOOL use_steam_osk;
 static unsigned int steam_app_id;
@@ -96,47 +91,27 @@ static const char *ct_id_str[] = {
 /*
  * IUIAutomationFocusChangedEventHandler vtbl.
  */
-static inline event_data *impl_from_uia_focus_event(IUIAutomationFocusChangedEventHandler *iface)
-{
-    return CONTAINING_RECORD(iface, event_data, IUIAutomationFocusChangedEventHandler_iface);
-}
-
-HRESULT WINAPI uia_focus_event_QueryInterface(IUIAutomationFocusChangedEventHandler *iface,
+static HRESULT WINAPI FocusChangedHandler_QueryInterface(IUIAutomationFocusChangedEventHandler *iface,
         REFIID riid, void **ppv)
 {
-    event_data *This = impl_from_uia_focus_event(iface);
-
-    WINE_TRACE("This %p, %s\n", This, debugstr_guid( riid ));
-    if (IsEqualIID(riid, &IID_IUIAutomationFocusChangedEventHandler) ||
-            IsEqualIID(riid, &IID_IUnknown)) {
+    *ppv = NULL;
+    if (IsEqualIID(riid, &IID_IUIAutomationFocusChangedEventHandler) || IsEqualIID(riid, &IID_IUnknown))
         *ppv = iface;
-    } else {
-        *ppv = NULL;
+    else
         return E_NOINTERFACE;
-    }
 
     IUIAutomationFocusChangedEventHandler_AddRef(iface);
     return S_OK;
 }
 
-ULONG WINAPI uia_focus_event_AddRef(IUIAutomationFocusChangedEventHandler* iface)
+static ULONG WINAPI FocusChangedHandler_AddRef(IUIAutomationFocusChangedEventHandler* iface)
 {
-    event_data *This = impl_from_uia_focus_event(iface);
-    ULONG ref = InterlockedIncrement(&This->ref);
-
-    WINE_TRACE("This %p, ref %d\n", This, ref);
-
-    return ref;
+    return 2;
 }
 
-ULONG WINAPI uia_focus_event_Release(IUIAutomationFocusChangedEventHandler* iface)
+static ULONG WINAPI FocusChangedHandler_Release(IUIAutomationFocusChangedEventHandler* iface)
 {
-    event_data *This = impl_from_uia_focus_event(iface);
-    ULONG ref = InterlockedDecrement(&This->ref);
-
-    WINE_TRACE("This %p, ref %d\n", This, ref);
-
-    return ref;
+    return 1;
 }
 
 static BOOL variant_to_bool(VARIANT *v)
@@ -147,13 +122,10 @@ static BOOL variant_to_bool(VARIANT *v)
     return FALSE;
 }
 
-/*** IUIAutomationFocusChangedEventHandler methods ***/
-HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChangedEventHandler *iface,
+static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationFocusChangedEventHandler *iface,
         IUIAutomationElement *sender)
 {
-    event_data *This = impl_from_uia_focus_event(iface);
-
-    WINE_TRACE("This %p, sender %p\n", This, sender);
+    WINE_TRACE("sender %p\n", sender);
     if (sender)
     {
         WCHAR link_buf[1024] = { 0 };
@@ -218,14 +190,16 @@ HRESULT WINAPI uia_focus_event_HandleFocusChangedEvent(IUIAutomationFocusChanged
     return S_OK;
 }
 
-IUIAutomationFocusChangedEventHandlerVtbl uia_focus_event_vtbl = {
-    uia_focus_event_QueryInterface,
-    uia_focus_event_AddRef,
-    uia_focus_event_Release,
-    uia_focus_event_HandleFocusChangedEvent,
+static const IUIAutomationFocusChangedEventHandlerVtbl FocusChangedHandlerVtbl = {
+    FocusChangedHandler_QueryInterface,
+    FocusChangedHandler_AddRef,
+    FocusChangedHandler_Release,
+    FocusChangedHandler_HandleFocusChangedEvent,
 };
 
-static HRESULT create_uia_event_handler(IUIAutomation **uia_iface, event_data *data)
+static IUIAutomationFocusChangedEventHandler FocusChangedHandler = { &FocusChangedHandlerVtbl };
+
+static HRESULT add_uia_event_handler(IUIAutomation **uia_iface)
 {
     HRESULT hr;
 
@@ -237,11 +211,8 @@ static HRESULT create_uia_event_handler(IUIAutomation **uia_iface, event_data *d
         return hr;
     }
 
-    data->IUIAutomationFocusChangedEventHandler_iface.lpVtbl = &uia_focus_event_vtbl;
-    data->ref = 1;
-
     hr = IUIAutomation_AddFocusChangedEventHandler(*uia_iface, NULL,
-            &data->IUIAutomationFocusChangedEventHandler_iface);
+            &FocusChangedHandler);
     if (FAILED(hr))
         ERR("Failed to add focus changed event handler, hr %#x\n", hr);
 
@@ -286,7 +257,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
     HANDLE wine_exit_event, started_event;
     IUIAutomation *uia_iface;
     WNDCLASSW wc = { };
-    event_data data = { };
     int ret = 0;
     HWND hwnd;
 
@@ -313,7 +283,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
     SetEvent(started_event);
 
-    if (FAILED(create_uia_event_handler(&uia_iface, &data)))
+    if (FAILED(add_uia_event_handler(&uia_iface)))
     {
         ret = -1;
         goto exit;
