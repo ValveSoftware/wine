@@ -113,6 +113,48 @@ static LRESULT CALLBACK tabtip_win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPAR
     return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
 
+#define MAX_LINK_BUF 4096
+struct osk_link_data {
+    WCHAR link_buf[MAX_LINK_BUF];
+    WCHAR *link_buf_pos;
+    int args_count;
+};
+
+static void osk_link_init(struct osk_link_data *data, const WCHAR *link)
+{
+    data->link_buf_pos = data->link_buf;
+    data->link_buf_pos += wsprintfW(data->link_buf, L"%s", link);
+    data->args_count = 0;
+}
+
+#define MAX_ARG_BUF 512
+static const WCHAR max_int_arg_str[] = L"=-0000000000";
+static const WCHAR separator_arg_start_str[] = L"?";
+static const WCHAR separator_arg_cont_str[] = L"&";
+static const int max_separator_str_len = max(ARRAY_SIZE(separator_arg_start_str), ARRAY_SIZE(separator_arg_cont_str));
+static void osk_link_add_int_arg(struct osk_link_data *data, const WCHAR *arg, int arg_val)
+{
+    const WCHAR *separator_str = !data->args_count ? separator_arg_start_str : separator_arg_cont_str;
+    WCHAR arg_buf[MAX_ARG_BUF] = { 0 };
+    int arg_buf_len;
+
+    if ((lstrlenW(arg) + ARRAY_SIZE(max_int_arg_str)) >= MAX_ARG_BUF)
+    {
+        ERR("Arg would overflow buffer, suggest upping argument buffer size.\n");
+        return;
+    }
+
+    arg_buf_len = wsprintfW(arg_buf, L"%s=%d", arg, arg_val);
+    if ((arg_buf_len + (MAX_LINK_BUF - (data->link_buf_pos - data->link_buf)) + max_separator_str_len) >= MAX_LINK_BUF)
+    {
+        ERR("Adding another arg would overflow buffer, suggest upping link buffer size.\n");
+        return;
+    }
+
+    data->link_buf_pos += wsprintfW(data->link_buf_pos, L"%s%s", separator_str, arg_buf);
+    data->args_count++;
+}
+
 /*
  * IUIAutomationFocusChangedEventHandler vtbl.
  */
@@ -143,7 +185,7 @@ static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationF
         IUIAutomationElement *sender)
 {
     BOOL is_readonly, has_kbd_focus;
-    WCHAR link_buf[1024] = { 0 };
+    struct osk_link_data link_data = { 0 };
     RECT rect = { 0 };
     BSTR name = NULL;
     int control_type;
@@ -176,21 +218,15 @@ static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationF
 
     if (use_steam_osk && (control_type == UIA_EditControlTypeId) && has_kbd_focus && !is_readonly)
     {
-        WCHAR *cur_buf_pos = link_buf;
-
-        if (steam_app_id)
-            cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard?AppID=%d", steam_app_id);
-        else
-            cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard");
-
+        osk_link_init(&link_data, L"steam://open/keyboard");
+        if (steam_app_id) osk_link_add_int_arg(&link_data, L"AppID", steam_app_id);
         if (rect.left || rect.top || rect.right || rect.bottom)
         {
-            if (steam_app_id)
-                wsprintfW(cur_buf_pos, L"&XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
-                        rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
-            else
-                wsprintfW(cur_buf_pos, L"?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
-                        rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
+            osk_link_add_int_arg(&link_data, L"XPosition", rect.left);
+            osk_link_add_int_arg(&link_data, L"YPosition", rect.top);
+            osk_link_add_int_arg(&link_data, L"Width", (rect.right - rect.left));
+            osk_link_add_int_arg(&link_data, L"Height", (rect.bottom - rect.top));
+            osk_link_add_int_arg(&link_data, L"Mode", 0);
         }
 
         WINE_TRACE("Keyboard up!\n");
@@ -198,17 +234,15 @@ static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationF
     }
     else if (keyboard_up)
     {
-        if (steam_app_id)
-            wsprintfW(link_buf, L"steam://close/keyboard?AppID=%d", steam_app_id);
-        else
-            wsprintfW(link_buf, L"steam://close/keyboard");
+        osk_link_init(&link_data, L"steam://close/keyboard");
+        if (steam_app_id) osk_link_add_int_arg(&link_data, L"AppID", steam_app_id);
 
         WINE_TRACE("Keyboard down!\n");
         keyboard_up = FALSE;
     }
 
-    if (lstrlenW(link_buf))
-        ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
+    if (use_steam_osk && link_data.link_buf_pos && (link_data.link_buf_pos != link_data.link_buf))
+        ShellExecuteW(NULL, NULL, link_data.link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
 
     WINE_TRACE("name %s, control_type %d (%s), rect %s, has_kbd_focus %d, is_readonly %d\n", wine_dbgstr_w(name),
             control_type, get_str_for_id(control_type, uia_control_type_id_strs), wine_dbgstr_rect(&rect),
