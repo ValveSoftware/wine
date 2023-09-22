@@ -38,55 +38,80 @@ static BOOL keyboard_up;
 static BOOL use_steam_osk;
 static unsigned int steam_app_id;
 
+struct str_id_pair {
+    int id;
+    const char *str;
+};
+
+static const struct str_id_pair uia_control_type_id_strs[] = {
+    { UIA_ButtonControlTypeId,       "UIA_ButtonControlTypeId", },
+    { UIA_CalendarControlTypeId,     "UIA_CalendarControlTypeId", },
+    { UIA_CheckBoxControlTypeId,     "UIA_CheckBoxControlTypeId", },
+    { UIA_ComboBoxControlTypeId,     "UIA_ComboBoxControlTypeId", },
+    { UIA_EditControlTypeId,         "UIA_EditControlTypeId", },
+    { UIA_HyperlinkControlTypeId,    "UIA_HyperlinkControlTypeId", },
+    { UIA_ImageControlTypeId,        "UIA_ImageControlTypeId", },
+    { UIA_ListItemControlTypeId,     "UIA_ListItemControlTypeId", },
+    { UIA_ListControlTypeId,         "UIA_ListControlTypeId", },
+    { UIA_MenuControlTypeId,         "UIA_MenuControlTypeId", },
+    { UIA_MenuBarControlTypeId,      "UIA_MenuBarControlTypeId", },
+    { UIA_MenuItemControlTypeId,     "UIA_MenuItemControlTypeId", },
+    { UIA_ProgressBarControlTypeId,  "UIA_ProgressBarControlTypeId", },
+    { UIA_RadioButtonControlTypeId,  "UIA_RadioButtonControlTypeId", },
+    { UIA_ScrollBarControlTypeId,    "UIA_ScrollBarControlTypeId", },
+    { UIA_SliderControlTypeId,       "UIA_SliderControlTypeId", },
+    { UIA_SpinnerControlTypeId,      "UIA_SpinnerControlTypeId", },
+    { UIA_StatusBarControlTypeId,    "UIA_StatusBarControlTypeId", },
+    { UIA_TabControlTypeId,          "UIA_TabControlTypeId", },
+    { UIA_TabItemControlTypeId,      "UIA_TabItemControlTypeId", },
+    { UIA_TextControlTypeId,         "UIA_TextControlTypeId", },
+    { UIA_ToolBarControlTypeId,      "UIA_ToolBarControlTypeId", },
+    { UIA_ToolTipControlTypeId,      "UIA_ToolTipControlTypeId", },
+    { UIA_TreeControlTypeId,         "UIA_TreeControlTypeId", },
+    { UIA_TreeItemControlTypeId,     "UIA_TreeItemControlTypeId", },
+    { UIA_CustomControlTypeId,       "UIA_CustomControlTypeId", },
+    { UIA_GroupControlTypeId,        "UIA_GroupControlTypeId", },
+    { UIA_ThumbControlTypeId,        "UIA_ThumbControlTypeId", },
+    { UIA_DataGridControlTypeId,     "UIA_DataGridControlTypeId", },
+    { UIA_DataItemControlTypeId,     "UIA_DataItemControlTypeId", },
+    { UIA_DocumentControlTypeId,     "UIA_DocumentControlTypeId", },
+    { UIA_SplitButtonControlTypeId,  "UIA_SplitButtonControlTypeId", },
+    { UIA_WindowControlTypeId,       "UIA_WindowControlTypeId", },
+    { UIA_PaneControlTypeId,         "UIA_PaneControlTypeId", },
+    { UIA_HeaderControlTypeId,       "UIA_HeaderControlTypeId", },
+    { UIA_HeaderItemControlTypeId,   "UIA_HeaderItemControlTypeId", },
+    { UIA_TableControlTypeId,        "UIA_TableControlTypeId", },
+    { UIA_TitleBarControlTypeId,     "UIA_TitleBarControlTypeId", },
+    { UIA_SeparatorControlTypeId,    "UIA_SeparatorControlTypeId", },
+    { UIA_SemanticZoomControlTypeId, "UIA_SemanticZoomControlTypeId", },
+    { UIA_AppBarControlTypeId,       "UIA_AppBarControlTypeId", },
+};
+
+static int __cdecl str_id_pair_compare(const void *a, const void *b)
+{
+    const int *id = a;
+    const struct str_id_pair *pair = b;
+
+    return ((*id) > pair->id) - ((*id) < pair->id);
+}
+
+#define get_str_for_id(id, id_pair) \
+    get_str_from_id_pair( (id), (id_pair), (ARRAY_SIZE(id_pair)) )
+static const char *get_str_from_id_pair(int id, const struct str_id_pair *id_pair, int id_pair_size)
+{
+    const struct str_id_pair *pair;
+
+    if ((pair = bsearch(&id, id_pair, id_pair_size, sizeof(*pair), str_id_pair_compare)))
+        return pair->str;
+
+    return "";
+}
+
 static const WCHAR tabtip_window_class_name[]  = L"IPTip_Main_Window";
 static LRESULT CALLBACK tabtip_win_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 {
     return DefWindowProcW(hwnd, msg, wparam, lparam);
 }
-
-static const char *ct_id_str[] = {
-    "UIA_ButtonControlTypeId (50000)",
-    "UIA_CalendarControlTypeId (50001)",
-    "UIA_CheckBoxControlTypeId (50002)",
-    "UIA_ComboBoxControlTypeId (50003)",
-    "UIA_EditControlTypeId (50004)",
-    "UIA_HyperlinkControlTypeId (50005)",
-    "UIA_ImageControlTypeId (50006)",
-    "UIA_ListItemControlTypeId (50007)",
-    "UIA_ListControlTypeId (50008)",
-    "UIA_MenuControlTypeId (50009)",
-    "UIA_MenuBarControlTypeId (50010)",
-    "UIA_MenuItemControlTypeId (50011)",
-    "UIA_ProgressBarControlTypeId (50012)",
-    "UIA_RadioButtonControlTypeId (50013)",
-    "UIA_ScrollBarControlTypeId (50014)",
-    "UIA_SliderControlTypeId (50015)",
-    "UIA_SpinnerControlTypeId (50016)",
-    "UIA_StatusBarControlTypeId (50017)",
-    "UIA_TabControlTypeId (50018)",
-    "UIA_TabItemControlTypeId (50019)",
-    "UIA_TextControlTypeId (50020)",
-    "UIA_ToolBarControlTypeId (50021)",
-    "UIA_ToolTipControlTypeId (50022)",
-    "UIA_TreeControlTypeId (50023)",
-    "UIA_TreeItemControlTypeId (50024)",
-    "UIA_CustomControlTypeId (50025)",
-    "UIA_GroupControlTypeId (50026)",
-    "UIA_ThumbControlTypeId (50027)",
-    "UIA_DataGridControlTypeId (50028)",
-    "UIA_DataItemControlTypeId (50029)",
-    "UIA_DocumentControlTypeId (50030)",
-    "UIA_SplitButtonControlTypeId (50031)",
-    "UIA_WindowControlTypeId (50032)",
-    "UIA_PaneControlTypeId (50033)",
-    "UIA_HeaderControlTypeId (50034)",
-    "UIA_HeaderItemControlTypeId (50035)",
-    "UIA_TableControlTypeId (50036)",
-    "UIA_TitleBarControlTypeId (50037)",
-    "UIA_SeparatorControlTypeId (50038)",
-    "UIA_SemanticZoomControlTypeId (50039)",
-    "UIA_AppBarControlTypeId (50040)",
-};
 
 /*
  * IUIAutomationFocusChangedEventHandler vtbl.
@@ -114,78 +139,81 @@ static ULONG WINAPI FocusChangedHandler_Release(IUIAutomationFocusChangedEventHa
     return 1;
 }
 
-static BOOL variant_to_bool(VARIANT *v)
-{
-    if (V_VT(v) == VT_BOOL && (V_BOOL(v) == VARIANT_TRUE))
-        return TRUE;
-
-    return FALSE;
-}
-
 static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationFocusChangedEventHandler *iface,
         IUIAutomationElement *sender)
 {
+    BOOL is_readonly, has_kbd_focus;
+    WCHAR link_buf[1024] = { 0 };
+    RECT rect = { 0 };
+    BSTR name = NULL;
+    int control_type;
+    HRESULT hr;
+    VARIANT v;
+
     WINE_TRACE("sender %p\n", sender);
-    if (sender)
+
+    /* Should never happen, handle it anyways just in case. */
+    if (!sender)
+        return S_OK;
+
+    hr = IUIAutomationElement_get_CachedBoundingRectangle(sender, &rect);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached bounding rect, hr %#x\n", hr);
+
+    hr = IUIAutomationElement_get_CachedControlType(sender, &control_type);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached control type, hr %#x\n", hr);
+
+    hr = IUIAutomationElement_get_CachedName(sender, &name);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached name, hr %#x\n", hr);
+
+    hr = IUIAutomationElement_get_CachedHasKeyboardFocus(sender, &has_kbd_focus);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached has keyboard focus property, hr %#x\n", hr);
+
+    VariantInit(&v);
+    hr = IUIAutomationElement_GetCachedPropertyValueEx(sender, UIA_ValueIsReadOnlyPropertyId, TRUE, &v);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached property value for UIA_ValueIsReadOnlyPropertyId, hr %#x\n", hr);
+    is_readonly = ((V_VT(&v) == VT_BOOL) && (V_BOOL(&v) == VARIANT_TRUE));
+    VariantClear(&v);
+
+    if (use_steam_osk && (control_type == UIA_EditControlTypeId) && has_kbd_focus && !is_readonly)
     {
-        WCHAR link_buf[1024] = { 0 };
-        RECT rect = { 0 };
-        VARIANT var, var2;
-        INT ct_id;
-        BSTR name;
+        WCHAR *cur_buf_pos = link_buf;
 
-        IUIAutomationElement_get_CurrentControlType(sender, &ct_id);
-        IUIAutomationElement_get_CurrentName(sender, &name);
-        IUIAutomationElement_get_CurrentBoundingRectangle(sender, &rect);
-        IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_IsKeyboardFocusablePropertyId, &var);
-        IUIAutomationElement_GetCurrentPropertyValue(sender, UIA_ValueIsReadOnlyPropertyId, &var2);
-
-        if (use_steam_osk && (ct_id == UIA_EditControlTypeId) && variant_to_bool(&var) &&
-                !variant_to_bool(&var2))
-        {
-            WCHAR *cur_buf_pos = link_buf;
-
-            if (steam_app_id)
-                cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard?AppID=%d", steam_app_id);
-            else
-                cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard");
-
-            if (rect.left || rect.top || rect.right || rect.bottom)
-            {
-                if (steam_app_id)
-                    wsprintfW(cur_buf_pos, L"&XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
-                            rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
-                else
-                    wsprintfW(cur_buf_pos, L"?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
-                            rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
-            }
-
-            WINE_TRACE("Keyboard up!\n");
-            keyboard_up = TRUE;
-        }
-        else if (keyboard_up)
-        {
-            if (steam_app_id)
-                wsprintfW(link_buf, L"steam://close/keyboard?AppID=%d", steam_app_id);
-            else
-                wsprintfW(link_buf, L"steam://close/keyboard");
-
-            WINE_TRACE("Keyboard down!\n");
-            keyboard_up = FALSE;
-        }
-
-        if (lstrlenW(link_buf))
-            ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
-
-        if (ct_id >= 50000)
-            ct_id -= 50000;
+        if (steam_app_id)
+            cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard?AppID=%d", steam_app_id);
         else
-            ct_id = 0;
+            cur_buf_pos += wsprintfW(cur_buf_pos, L"steam://open/keyboard");
 
-        WINE_TRACE("element name: %s, ct_id %s, rect { %d, %d } - { %d, %d }\n", wine_dbgstr_w(name), ct_id_str[ct_id],
-                rect.left, rect.top, rect.right, rect.bottom);
-        SysFreeString(name);
+        if (rect.left || rect.top || rect.right || rect.bottom)
+        {
+            if (steam_app_id)
+                wsprintfW(cur_buf_pos, L"&XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
+                        rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
+            else
+                wsprintfW(cur_buf_pos, L"?XPosition=%d&YPosition=%d&Width=%d&Height=%d&Mode=0",
+                        rect.left, rect.top, (rect.right - rect.left), (rect.bottom - rect.top));
+        }
+
+        WINE_TRACE("Keyboard up!\n");
+        keyboard_up = TRUE;
     }
+    else if (keyboard_up)
+    {
+        if (steam_app_id)
+            wsprintfW(link_buf, L"steam://close/keyboard?AppID=%d", steam_app_id);
+        else
+            wsprintfW(link_buf, L"steam://close/keyboard");
+
+        WINE_TRACE("Keyboard down!\n");
+        keyboard_up = FALSE;
+    }
+
+    if (lstrlenW(link_buf))
+        ShellExecuteW(NULL, NULL, link_buf, NULL, NULL, SW_SHOWNOACTIVATE);
+
+    WINE_TRACE("name %s, control_type %d (%s), rect %s, has_kbd_focus %d, is_readonly %d\n", wine_dbgstr_w(name),
+            control_type, get_str_for_id(control_type, uia_control_type_id_strs), wine_dbgstr_rect(&rect),
+            has_kbd_focus, is_readonly);
+    SysFreeString(name);
 
     return S_OK;
 }
