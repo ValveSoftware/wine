@@ -34,19 +34,7 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(tabtip);
 
-extern HANDLE CDECL __wine_make_process_system(void);
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
-
-enum {
-    EVENT_PGM_EXIT,
-    EVENT_WINE_EXIT,
-    THREAD_EVENT_COUNT,
-};
-
-struct thread_data {
-    HANDLE events[THREAD_EVENT_COUNT];
-    HWND main_hwnd;
-};
 
 typedef struct {
     IUIAutomationFocusChangedEventHandler IUIAutomationFocusChangedEventHandler_iface;
@@ -256,28 +244,6 @@ static HRESULT create_uia_event_handler(IUIAutomation **uia_iface, event_data *d
     return hr;
 }
 
-static DWORD WINAPI tabtip_exit_watcher(LPVOID lpParam)
-{
-    struct thread_data *data = (struct thread_data *)lpParam;
-    DWORD event;
-
-    event = WaitForMultipleObjects(THREAD_EVENT_COUNT, data->events, FALSE, INFINITE);
-    switch (event)
-    {
-    case EVENT_PGM_EXIT:
-        break;
-
-    case EVENT_WINE_EXIT:
-        PostMessageW(data->main_hwnd, WM_DESTROY, 0, 0);
-        break;
-
-    default:
-        break;
-    }
-
-    return 0;
-}
-
 static const char *osk_disable_appids[] = {
     "1182900", /* A Plague Tale: Requiem */
     "752590", /* A Plague Tale: Innocence */
@@ -313,27 +279,23 @@ static void tabtip_use_osk_check(void)
 
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
 {
-    HANDLE wine_exit_event, pgm_exit_event, started_event;
     // Register the window class.
     const wchar_t CLASS_NAME[]  = L"IPTip_Main_Window";
-    struct thread_data t_data = { };
+    HANDLE wine_exit_event, started_event;
     IUIAutomation *uia_iface;
     WNDCLASSW wc = { };
     event_data data = { };
-    MSG msg = { };
     int ret = 0;
     HWND hwnd;
 
-    wine_exit_event = pgm_exit_event = started_event = NULL;
     keyboard_up = FALSE;
     tabtip_use_osk_check();
 
+    wine_exit_event = started_event = NULL;
     NtSetInformationProcess( GetCurrentProcess(), ProcessWineMakeProcessSystem,
                              &wine_exit_event, sizeof(HANDLE *) );
-    pgm_exit_event = CreateEventW(NULL, 0, 0, NULL);
     started_event = CreateEventW(NULL, TRUE, FALSE, L"TABTIP_STARTED_EVENT");
-
-    if (!pgm_exit_event || !wine_exit_event || !started_event)
+    if (!wine_exit_event || !started_event)
     {
         ERR("Failed to create event handles!\n");
         ret = -1;
@@ -372,33 +334,38 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         goto exit;
     }
 
-    t_data.events[EVENT_WINE_EXIT] = wine_exit_event;
-    t_data.events[EVENT_PGM_EXIT]  = pgm_exit_event;
-    t_data.main_hwnd = hwnd;
-    CreateThread(NULL, 0, tabtip_exit_watcher, &t_data, 0, NULL);
-
-    while (GetMessageW(&msg, NULL, 0, 0))
+    while (MsgWaitForMultipleObjects(1, &wine_exit_event, FALSE, INFINITE, QS_ALLINPUT) != WAIT_OBJECT_0)
     {
-        TranslateMessage(&msg);
-        DispatchMessageW(&msg);
+        BOOL quit = FALSE;
+        MSG msg;
+
+        while (PeekMessageW(&msg, 0, 0, 0, PM_REMOVE))
+        {
+            switch (msg.message)
+            {
+            case WM_QUIT: /* Unlikely to ever happen, but handle anyways. */
+                quit = TRUE;
+                break;
+
+            default:
+                TranslateMessage(&msg);
+                DispatchMessageW(&msg);
+                break;
+            }
+        }
+
+        if (quit)
+            break;
     }
 
-    SetEvent(pgm_exit_event);
     IUIAutomation_RemoveAllEventHandlers(uia_iface);
     IUIAutomation_Release(uia_iface);
 
     CoUninitialize();
 
 exit:
-
-    if (wine_exit_event)
-        CloseHandle(wine_exit_event);
-
-    if (pgm_exit_event)
-        CloseHandle(pgm_exit_event);
-
-    if (started_event)
-        CloseHandle(started_event);
+    if (wine_exit_event) CloseHandle(wine_exit_event);
+    if (started_event) CloseHandle(started_event);
 
     return ret;
 }
