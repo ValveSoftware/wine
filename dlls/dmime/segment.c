@@ -37,7 +37,6 @@ typedef struct IDirectMusicSegment8Impl {
     PCMWAVEFORMAT wave_format;
     void *wave_data;
     int data_size;
-    IDirectSoundBuffer *buffer;
 } IDirectMusicSegment8Impl;
 
 IDirectMusicSegment8Impl *create_segment(void);
@@ -91,8 +90,6 @@ static ULONG WINAPI IDirectMusicSegment8Impl_Release(IDirectMusicSegment8 *iface
     TRACE("(%p) ref=%ld\n", This, ref);
 
     if (!ref) {
-        if (This->buffer)
-            IDirectSoundBuffer_Release(This->buffer);
         if (This->wave_data)
             free(This->wave_data);
 
@@ -562,87 +559,9 @@ static HRESULT WINAPI IDirectMusicSegment8Impl_Compose(IDirectMusicSegment8 *ifa
 static HRESULT WINAPI IDirectMusicSegment8Impl_Download(IDirectMusicSegment8 *iface,
         IUnknown *pAudioPath)
 {
-    IDirectMusicSegment8Impl *This = impl_from_IDirectMusicSegment8(iface);
-    IDirectMusicPerformance8 *perf;
-    IDirectMusicAudioPath *audio;
-    IDirectSound *dsound;
-    HRESULT hr;
-    DSBUFFERDESC dsbd = {.dwSize = sizeof(dsbd)};
-    void *data;
-    DWORD size;
-    DWORD buffer = 0;
-
-    TRACE("(%p, %p)\n", This, pAudioPath);
-
-    if (!pAudioPath)
-        return E_INVALIDARG;
-
-    if (This->buffer)
-    {
-        TRACE("Using Cached buffer\n");
-        return S_OK;
-    }
-
-    /* pAudioPath can either be IDirectMusicAudioPath or IDirectMusicPerformance */
-    hr = IUnknown_QueryInterface(pAudioPath, &IID_IDirectMusicPerformance8, (void**)&perf);
-    if (FAILED(hr))
-    {
-        TRACE("Checking for IDirectMusicAudioPath interface\n");
-        hr = IUnknown_QueryInterface(pAudioPath, &IID_IDirectMusicAudioPath, (void**)&audio);
-        if (FAILED(hr))
-        {
-            WARN("Cannot query for IDirectMusicAudioPath\n");
-            return E_INVALIDARG;
-        }
-
-        IDirectMusicAudioPath_GetObjectInPath(audio, DMUS_PCHANNEL_ALL, DMUS_PATH_PERFORMANCE, buffer, &GUID_NULL,
-                0, &IID_IDirectMusicPerformance, (void**)&perf);
-        IDirectMusicAudioPath_Release(audio);
-    }
-
-    if (!perf)
-    {
-        ERR("Failed to get IDirectMusicPerformance interface\n");
-        return E_INVALIDARG;
-    }
-
-    dsound = get_dsound_interface(perf);
-    if (!dsound)
-    {
-        ERR("Failed get_dsound_interface\n");
-        return E_INVALIDARG;
-    }
-
-    if (This->data_size == 0)
-    {
-        FIXME("No wave data skipping\n");
-        return S_OK;
-    }
-
-    dsbd.dwBufferBytes = This->data_size;
-    dsbd.lpwfxFormat = (WAVEFORMATEX*)&This->wave_format;
-
-    hr = IDirectSound_CreateSoundBuffer(dsound, &dsbd, &This->buffer, NULL);
-    if (FAILED(hr))
-    {
-        ERR("IDirectSound_CreateSoundBuffer failed 0x%08lx\n", hr);
-        return E_INVALIDARG;
-    }
-
-    TRACE("CreateSoundBuffer successful\n");
-
-    hr = IDirectSoundBuffer_Lock(This->buffer, 0, This->data_size, &data, &size, NULL, 0, 0);
-    TRACE("IDirectSoundBuffer_Lock hr 0x%08lx\n", hr);
-
-    memcpy(data, This->wave_data, This->data_size);
-
-    hr = IDirectSoundBuffer_Unlock(This->buffer, data, This->data_size, NULL, 0);
-    TRACE("IDirectSoundBuffer_Unlock hr 0x%08lx\n", hr);
-
-    /*hr = IDirectSoundBuffer_Play(This->buffer, 0, 0, 0);
-    TRACE("IDirectSoundBuffer_Play hr 0x%08lx\n", hr);*/
-
-    return S_OK;
+        IDirectMusicSegment8Impl *This = impl_from_IDirectMusicSegment8(iface);
+	FIXME("(%p, %p): stub\n", This, pAudioPath);
+	return S_OK;
 }
 
 static HRESULT WINAPI IDirectMusicSegment8Impl_Unload(IDirectMusicSegment8 *iface,
