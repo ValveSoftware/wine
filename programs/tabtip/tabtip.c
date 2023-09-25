@@ -199,20 +199,20 @@ static HRESULT WINAPI FocusChangedHandler_HandleFocusChangedEvent(IUIAutomationF
         return S_OK;
 
     hr = IUIAutomationElement_get_CachedBoundingRectangle(sender, &rect);
-    if (FAILED(hr)) WINE_ERR("Failed to get cached bounding rect, hr %#x\n", hr);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached bounding rect, hr %#lx\n", hr);
 
     hr = IUIAutomationElement_get_CachedControlType(sender, &control_type);
-    if (FAILED(hr)) WINE_ERR("Failed to get cached control type, hr %#x\n", hr);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached control type, hr %#lx\n", hr);
 
     hr = IUIAutomationElement_get_CachedName(sender, &name);
-    if (FAILED(hr)) WINE_ERR("Failed to get cached name, hr %#x\n", hr);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached name, hr %#lx\n", hr);
 
     hr = IUIAutomationElement_get_CachedHasKeyboardFocus(sender, &has_kbd_focus);
-    if (FAILED(hr)) WINE_ERR("Failed to get cached has keyboard focus property, hr %#x\n", hr);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached has keyboard focus property, hr %#lx\n", hr);
 
     VariantInit(&v);
     hr = IUIAutomationElement_GetCachedPropertyValueEx(sender, UIA_ValueIsReadOnlyPropertyId, TRUE, &v);
-    if (FAILED(hr)) WINE_ERR("Failed to get cached property value for UIA_ValueIsReadOnlyPropertyId, hr %#x\n", hr);
+    if (FAILED(hr)) WINE_ERR("Failed to get cached property value for UIA_ValueIsReadOnlyPropertyId, hr %#lx\n", hr);
     is_readonly = ((V_VT(&v) == VT_BOOL) && (V_BOOL(&v) == VARIANT_TRUE));
     VariantClear(&v);
 
@@ -273,7 +273,7 @@ static HRESULT add_uia_event_handler(IUIAutomation **uia_iface)
     hr = CoCreateInstance(&CLSID_CUIAutomation8, NULL, CLSCTX_INPROC_SERVER, &IID_IUIAutomation, (void **)uia_iface);
     if (FAILED(hr))
     {
-        ERR("Failed to create IUIAutomation interface, hr %#x\n", hr);
+        ERR("Failed to create IUIAutomation interface, hr %#lx\n", hr);
         return hr;
     }
 
@@ -294,14 +294,14 @@ static HRESULT add_uia_event_handler(IUIAutomation **uia_iface)
         hr = IUIAutomationCacheRequest_AddProperty(cache_req, uia_cache_props[i]);
         if (FAILED(hr))
         {
-            ERR("Failed to add prop_id %d to cache req, hr %#x\n", uia_cache_props[i], hr);
+            ERR("Failed to add prop_id %d to cache req, hr %#lx\n", uia_cache_props[i], hr);
             goto exit;
         }
     }
 
     hr = IUIAutomation_AddFocusChangedEventHandler(*uia_iface, cache_req, &FocusChangedHandler);
     if (FAILED(hr))
-        ERR("Failed to add focus changed event handler, hr %#x\n", hr);
+        ERR("Failed to add focus changed event handler, hr %#lx\n", hr);
 
 exit:
     if (cache_req)
