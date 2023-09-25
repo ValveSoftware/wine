@@ -1043,26 +1043,13 @@ static HRESULT WINAPI IDirectMusicPerformance8Impl_PlaySegmentEx(IDirectMusicPer
         __int64 i64StartTime, IDirectMusicSegmentState **ppSegmentState, IUnknown *pFrom,
         IUnknown *pAudioPath)
 {
-    IDirectMusicPerformance8Impl *This = impl_from_IDirectMusicPerformance8(iface);
-    IDirectMusicSegment8 *segment;
-    IDirectSoundBuffer *buffer;
-    HRESULT hr;
+        IDirectMusicPerformance8Impl *This = impl_from_IDirectMusicPerformance8(iface);
 
-    FIXME("(%p, %p, %p, %p, %ld, 0x%s, %p, %p, %p): semi-stub\n", This, pSource, pwzSegmentName,
-        pTransition, dwFlags, wine_dbgstr_longlong(i64StartTime), ppSegmentState, pFrom, pAudioPath);
-
-    hr = IUnknown_QueryInterface(pSource, &IID_IDirectMusicSegment8, (void**)&segment);
-    if (FAILED(hr))
-        return hr;
-
-    buffer = get_segment_buffer(segment);
-
-    if (segment)
-        hr = IDirectSoundBuffer_Play(buffer, 0, 0, 0);
-
-    if (ppSegmentState)
-      return create_dmsegmentstate(&IID_IDirectMusicSegmentState,(void**)ppSegmentState);
-    return S_OK;
+	FIXME("(%p, %p, %p, %p, %ld, 0x%s, %p, %p, %p): stub\n", This, pSource, pwzSegmentName,
+	    pTransition, dwFlags, wine_dbgstr_longlong(i64StartTime), ppSegmentState, pFrom, pAudioPath);
+	if (ppSegmentState)
+          return create_dmsegmentstate(&IID_IDirectMusicSegmentState,(void**)ppSegmentState);
+	return S_OK;
 }
 
 static HRESULT WINAPI IDirectMusicPerformance8Impl_StopEx(IDirectMusicPerformance8 *iface,

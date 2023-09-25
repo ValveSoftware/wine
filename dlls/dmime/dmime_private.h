@@ -72,7 +72,6 @@ extern void set_audiopath_dsound_buffer(IDirectMusicAudioPath*,IDirectSoundBuffe
 extern void set_audiopath_primary_dsound_buffer(IDirectMusicAudioPath*,IDirectSoundBuffer*) DECLSPEC_HIDDEN;
 
 extern IDirectSound *get_dsound_interface(IDirectMusicPerformance8*) DECLSPEC_HIDDEN;
-extern IDirectSoundBuffer *get_segment_buffer(IDirectMusicSegment8 *iface) DECLSPEC_HIDDEN;
 
 /*****************************************************************************
  * Auxiliary definitions
