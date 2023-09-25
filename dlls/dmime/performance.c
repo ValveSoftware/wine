@@ -252,13 +252,6 @@ static inline IDirectMusicPerformance8Impl *impl_from_IDirectMusicPerformance8(I
     return CONTAINING_RECORD(iface, IDirectMusicPerformance8Impl, IDirectMusicPerformance8_iface);
 }
 
-IDirectSound *get_dsound_interface(IDirectMusicPerformance8* iface)
-{
-    IDirectMusicPerformance8Impl *This = impl_from_IDirectMusicPerformance8(iface);
-    return This->dsound;
-}
-
-
 /* IDirectMusicPerformance8 IUnknown part: */
 static HRESULT WINAPI IDirectMusicPerformance8Impl_QueryInterface(IDirectMusicPerformance8 *iface,
         REFIID riid, void **ppv)
