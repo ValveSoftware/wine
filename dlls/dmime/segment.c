@@ -47,12 +47,6 @@ static inline IDirectMusicSegment8Impl *impl_from_IDirectMusicSegment8(IDirectMu
   return CONTAINING_RECORD(iface, IDirectMusicSegment8Impl, IDirectMusicSegment8_iface);
 }
 
-IDirectSoundBuffer *get_segment_buffer(IDirectMusicSegment8 *iface)
-{
-    IDirectMusicSegment8Impl *This = impl_from_IDirectMusicSegment8(iface);
-    return This->buffer;
-}
-
 static HRESULT WINAPI IDirectMusicSegment8Impl_QueryInterface(IDirectMusicSegment8 *iface,
         REFIID riid, void **ret_iface)
 {
