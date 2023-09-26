@@ -1452,9 +1452,9 @@ static struct file *open_include_file( const struct makefile *make, struct incl_
     if ((file = open_local_file( make, pFile->name, &pFile->filename ))) return file;
 
     /* check for global importlib (module dependency) */
-    if (pFile->type == INCL_IMPORTLIB && find_importlib_module( pFile->name ))
+    if (pFile->type == INCL_IMPORTLIB)
     {
-        pFile->filename = pFile->name;
+        if (find_importlib_module( pFile->name )) pFile->filename = pFile->name;
         return NULL;
     }
 
@@ -4493,6 +4493,8 @@ int main( int argc, char *argv[] )
     submakes = xmalloc( subdirs.count * sizeof(*submakes) );
 
     for (i = 0; i < subdirs.count; i++) submakes[i] = parse_makefile( subdirs.str[i] );
+
+    if (!include_makefile) include_makefile = parse_makefile( root_src_dir_path( "include" ) );
 
     load_sources( top_makefile );
     load_sources( include_makefile );
