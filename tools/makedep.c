@@ -143,6 +143,7 @@ static struct strarray subdirs;
 static struct strarray delay_import_libs;
 static struct strarray top_install[NB_INSTALL_RULES];
 static const char *root_src_dir;
+static const char *root_obj_dir;
 static const char *tools_dir;
 static const char *tools_ext;
 static const char *exe_ext;
@@ -642,6 +643,16 @@ static char *src_dir_path( const struct makefile *make, const char *path )
 static char *root_src_dir_path( const char *path )
 {
     return concat_paths( root_src_dir, path );
+}
+
+
+/*******************************************************************
+ *         root_obj_dir_path
+ */
+static char *root_obj_dir_path( const char *path )
+{
+    if (!root_obj_dir) return (char *)path;
+    return concat_paths( root_obj_dir, path );
 }
 
 
@@ -2421,7 +2432,7 @@ static void output_winegcc_command( struct makefile *make, unsigned int arch, in
     const char *tool = tools_path( make, "winegcc" );
     if (is_cxx) strcpy( strrchr( tool, 'w' ), "wineg++" );
     output( "\t%s%s -o $@", cmd_prefix( "CCLD" ), tool );
-    output_filename( "--wine-objdir ." );
+    output_filename( strmake( "--wine-objdir %s", root_obj_dir_path( "." ) ) );
     if (tools_dir)
     {
         output_filename( "--winebuild" );
@@ -4332,7 +4343,7 @@ static void load_sources( struct makefile *make )
         strarray_add( &make->include_args, strmake( "-I%s", make->src_dir ));
     if (make->parent_dir)
         strarray_add( &make->include_args, strmake( "-I%s", src_dir_path( make, make->parent_dir )));
-    strarray_add( &make->include_args, "-Iinclude" );
+    strarray_add( &make->include_args, strmake( "-I%s", root_obj_dir_path( "include" ) ) );
     if (root_src_dir) strarray_add( &make->include_args, strmake( "-I%s", root_src_dir_path( "include" )));
 
     list_init( &make->sources );
@@ -4470,6 +4481,7 @@ int main( int argc, char *argv[] )
         top_install[i] = get_expanded_make_var_array( top_makefile, strmake( "TOP_%s", install_variables[i] ));
 
     root_src_dir       = get_expanded_make_variable( top_makefile, "srcdir" );
+    root_obj_dir       = get_expanded_make_variable( top_makefile, "objdir" );
     tools_dir          = get_expanded_make_variable( top_makefile, "toolsdir" );
     tools_ext          = get_expanded_make_variable( top_makefile, "toolsext" );
     exe_ext            = get_expanded_make_variable( top_makefile, "EXEEXT" );
