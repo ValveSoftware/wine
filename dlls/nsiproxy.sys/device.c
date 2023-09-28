@@ -19,6 +19,8 @@
  */
 
 #include <stdarg.h>
+#include <stddef.h>
+#include <stdlib.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
