@@ -3460,7 +3460,8 @@ static void output_unix_lib( struct makefile *make )
     output_filenames_obj_dir( make, make->unixobj_files );
     output_filenames( unix_deps );
     output( "\n" );
-    output( "\t%s$(CC) -o $@", cmd_prefix( "CCLD" ));
+    if (make->has_cxx) output( "\t%s$(CXX) -o $@", cmd_prefix( "CCLD" ));
+    else output( "\t%s$(CC) -o $@", cmd_prefix( "CCLD" ));
     output_filenames( get_expanded_make_var_array( make, "UNIXLDFLAGS" ));
     output_filenames_obj_dir( make, make->unixobj_files );
     output_filenames( unix_libs );
