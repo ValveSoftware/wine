@@ -265,7 +265,7 @@ static enum amd_ags_version get_version_number(int ags_version)
     return AMD_AGS_VERSION_5_4_1;
 }
 
-static enum amd_ags_version determine_ags_version(void)
+static enum amd_ags_version determine_ags_version(int ags_version)
 {
     /* AMD AGS is not binary compatible between versions (even minor versions), and the game
      * does not request a specific version when calling agsInit().
@@ -283,6 +283,11 @@ static enum amd_ags_version determine_ags_version(void)
     VS_FIXEDFILEINFO *info;
     UINT16 major, minor, patch;
     WCHAR dllname[MAX_PATH], temp_path[MAX_PATH], temp_name[MAX_PATH];
+
+    TRACE("ags_version %#x.\n", ags_version);
+
+    if (ags_version)
+        return get_version_number(ags_version);
 
     *temp_name = 0;
     if (!(infosize = GetModuleFileNameW(GetModuleHandleW(L"amd_ags_x64.dll"), dllname, ARRAY_SIZE(dllname)))
@@ -581,7 +586,7 @@ static void init_device_displays_511(const char *adapter_name, AGSDisplayInfo_51
 }
 
 
-static AGSReturnCode init_ags_context(AGSContext *context)
+static AGSReturnCode init_ags_context(AGSContext *context, int ags_version)
 {
     AGSReturnCode ret;
     unsigned int i, j;
@@ -589,7 +594,7 @@ static AGSReturnCode init_ags_context(AGSContext *context)
 
     memset(context, 0, sizeof(*context));
 
-    context->version = determine_ags_version();
+    context->version = determine_ags_version(ags_version);
 
     ret = vk_get_physical_device_properties(&context->device_count, &context->properties, &context->memory_properties);
     if (ret != AGS_SUCCESS || !context->device_count)
@@ -690,7 +695,7 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     if (!(object = heap_alloc(sizeof(*object))))
         return AGS_OUT_OF_MEMORY;
 
-    if ((ret = init_ags_context(object)) != AGS_SUCCESS)
+    if ((ret = init_ags_context(object, 0)) != AGS_SUCCESS)
     {
         heap_free(object);
         return ret;
@@ -728,7 +733,7 @@ AGSReturnCode WINAPI agsInitialize(int ags_version, const AGSConfiguration *conf
     if (!(object = heap_alloc(sizeof(*object))))
         return AGS_OUT_OF_MEMORY;
 
-    if ((ret = init_ags_context(object)) != AGS_SUCCESS)
+    if ((ret = init_ags_context(object, ags_version)) != AGS_SUCCESS)
     {
         heap_free(object);
         return ret;
@@ -1051,7 +1056,7 @@ AGSDriverVersionResult WINAPI agsCheckDriverVersion(const char* version_reported
 
 int WINAPI agsGetVersionNumber(void)
 {
-    enum amd_ags_version version = determine_ags_version();
+    enum amd_ags_version version = determine_ags_version(0);
 
     TRACE("version %d.\n", version);
 
