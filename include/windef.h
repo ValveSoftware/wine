@@ -54,7 +54,7 @@ extern "C" {
 # endif
 #endif
 
-#if !defined(_MSC_VER) && !defined(__MINGW32__)
+#ifndef _MSC_VER
 # undef __stdcall
 # ifdef __i386__
 #  ifdef __GNUC__
@@ -72,13 +72,16 @@ extern "C" {
 #  else
 #   define __stdcall __attribute__((ms_abi))
 #  endif
-# elif defined(__arm__) && defined (__GNUC__) && !defined(__SOFTFP__) && !defined(__CYGWIN__)
+# elif defined(__arm__) && defined (__GNUC__) && !defined(__SOFTFP__) && !defined(__MINGW32__) && !defined(__CYGWIN__)
 #   define __stdcall __attribute__((pcs("aapcs-vfp")))
 # elif defined(__aarch64__) && defined (__GNUC__) && __has_attribute(ms_abi)
 #  define __stdcall __attribute__((ms_abi))
 # else  /* __i386__ */
 #  define __stdcall
 # endif  /* __i386__ */
+#endif /* __stdcall */
+
+#ifndef _MSC_VER
 # undef __cdecl
 # if defined(__i386__) && defined(__GNUC__)
 #  if (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 2)) || defined(__APPLE__)
@@ -89,13 +92,15 @@ extern "C" {
 # else
 #  define __cdecl __stdcall
 # endif
-# ifndef __fastcall
-#  define __fastcall __stdcall
-# endif
-# ifndef __thiscall
-#  define __thiscall __stdcall
-# endif
-#endif  /* _MSC_VER || __MINGW32__ */
+#endif
+
+#if !defined(_MSC_VER) && !defined(__fastcall)
+# define __fastcall __stdcall
+#endif
+
+#if (!defined(_MSC_VER) || !defined(__clang__)) && !defined(__thiscall)
+# define __thiscall __stdcall
+#endif
 
 #ifndef __ms_va_list
 # if (defined(__x86_64__) || (defined(__aarch64__) && __has_attribute(ms_abi))) && defined (__GNUC__)
