@@ -5022,7 +5022,7 @@ static HRESULT dispatch_event_object(EventTarget *event_target, DOMEvent *event,
             vtbl = dispex_get_vtbl(&target_chain[i]->dispex);
             if(!vtbl || !vtbl->handle_event_default)
                 continue;
-            hres = vtbl->handle_event_default(&event_target->dispex, event->event_id,
+            hres = vtbl->handle_event_default(&target_chain[i]->dispex, event->event_id,
                     event->nsevent, &prevent_default);
             if(FAILED(hres) || event->stop_propagation)
                 break;
