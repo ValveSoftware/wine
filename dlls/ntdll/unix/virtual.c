@@ -1609,7 +1609,10 @@ static NTSTATUS create_view( struct file_view **view_ret, void *base, size_t siz
     }
 
     if (vprot & VPROT_WRITEWATCH && use_kernel_writewatch)
+    {
+        madvise( view->base, view->size, MADV_NOHUGEPAGE );
         reset_write_watches( view->base, view->size );
+    }
 
     return STATUS_SUCCESS;
 }
@@ -2201,7 +2204,10 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
             if (!set_vprot( *view_ret, base, size, vprot | VPROT_COMMITTED ))
                 ERR("set_protection failed.\n");
             if (vprot & VPROT_WRITEWATCH)
+            {
+                madvise( base, size, MADV_NOHUGEPAGE );
                 reset_write_watches( base, size );
+            }
             return STATUS_SUCCESS;
         }
         TRACE("MEM_REPLACE_PLACEHOLDER view not found.\n");
