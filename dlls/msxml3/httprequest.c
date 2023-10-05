@@ -2412,6 +2412,7 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
         IRtwqAsyncResult *result)
 {
     struct xml_http_request_2 *This = xml_http_request_2_from_IRtwqAsyncCallback(iface);
+    SAFEARRAY *sa = NULL;
     VARIANT body_v;
     HRESULT hr;
     ULONG read;
@@ -2422,14 +2423,25 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
 
     if (This->request_body)
     {
-        V_VT(&body_v) = VT_BSTR;
-        V_BSTR(&body_v) = CoTaskMemAlloc(This->request_body_size);
+        SAFEARRAYBOUND bound;
+        void *ptr;
 
-        if (FAILED(hr = ISequentialStream_Read(This->request_body, V_BSTR(&body_v), This->request_body_size, &read)) ||
-            read < This->request_body_size)
+        bound.lLbound = 0;
+        bound.cElements = This->request_body_size;
+        if (!(sa = SafeArrayCreate(VT_UI1, 1, &bound)))
         {
-            ERR("Failed to allocate request body memory, hr %#lx\n", hr);
-            CoTaskMemFree(V_BSTR(&body_v));
+            ERR("No memory.\n");
+            hr = E_OUTOFMEMORY;
+            goto done;
+        }
+        V_ARRAY(&body_v) = sa;
+        V_VT(&body_v) = VT_ARRAY | VT_UI1;
+        SafeArrayAccessData(sa, &ptr);
+        hr = ISequentialStream_Read(This->request_body, ptr, This->request_body_size, &read);
+        SafeArrayUnaccessData(sa);
+        if (FAILED(hr) || read < This->request_body_size)
+        {
+            ERR("Failed to read from stream, hr %#lx\n", hr);
             goto done;
         }
 
@@ -2440,6 +2452,8 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
     hr = httprequest_send(&This->req, body_v);
 
 done:
+    if (sa)
+        SafeArrayDestroy(sa);
     return IRtwqAsyncResult_SetStatus(result, hr);
 }
 
