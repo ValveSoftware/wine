@@ -2412,6 +2412,7 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
         IRtwqAsyncResult *result)
 {
     struct xml_http_request_2 *This = xml_http_request_2_from_IRtwqAsyncCallback(iface);
+    IStream *stream = NULL;
     SAFEARRAY *sa = NULL;
     VARIANT body_v;
     HRESULT hr;
@@ -2424,10 +2425,27 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
     if (This->request_body)
     {
         SAFEARRAYBOUND bound;
+        ULONGLONG body_size;
+        STATSTG stream_stat;
+        LARGE_INTEGER li;
         void *ptr;
 
+        if (SUCCEEDED(ISequentialStream_QueryInterface(This->request_body, &IID_IStream, (void **)&stream))
+                && SUCCEEDED(IStream_Stat(stream, &stream_stat, 0)))
+        {
+            body_size = stream_stat.cbSize.QuadPart;
+            li.QuadPart = 0;
+            IStream_Seek(stream, li, STREAM_SEEK_SET, NULL);
+        }
+        else
+        {
+            body_size = This->request_body_size;
+        }
+
+        TRACE("body_size %I64u.\n", body_size);
+
         bound.lLbound = 0;
-        bound.cElements = This->request_body_size;
+        bound.cElements = body_size;
         if (!(sa = SafeArrayCreate(VT_UI1, 1, &bound)))
         {
             ERR("No memory.\n");
@@ -2437,9 +2455,13 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
         V_ARRAY(&body_v) = sa;
         V_VT(&body_v) = VT_ARRAY | VT_UI1;
         SafeArrayAccessData(sa, &ptr);
-        hr = ISequentialStream_Read(This->request_body, ptr, This->request_body_size, &read);
+
+        if (stream)
+            hr = IStream_Read(stream, ptr, body_size, &read);
+        else
+            hr = ISequentialStream_Read(This->request_body, ptr, body_size, &read);
         SafeArrayUnaccessData(sa);
-        if (FAILED(hr) || read < This->request_body_size)
+        if (FAILED(hr) || read < body_size)
         {
             ERR("Failed to read from stream, hr %#lx\n", hr);
             goto done;
@@ -2454,6 +2476,8 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
 done:
     if (sa)
         SafeArrayDestroy(sa);
+    if (stream)
+        IStream_Release(stream);
     return IRtwqAsyncResult_SetStatus(result, hr);
 }
 
