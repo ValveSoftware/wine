@@ -2463,8 +2463,12 @@ static HRESULT WINAPI xml_http_request_2_IRtwqAsyncCallback_Invoke(IRtwqAsyncCal
         SafeArrayUnaccessData(sa);
         if (FAILED(hr) || read < body_size)
         {
-            ERR("Failed to read from stream, hr %#lx\n", hr);
-            goto done;
+            /* Windows doesn't send the body in this case but still sends request with Content-Length
+             * set to requested body size. */
+            ERR("Failed to read from stream, hr %#lx, read %lu\n", hr, read);
+            SafeArrayDestroy(sa);
+            sa = NULL;
+            V_VT(&body_v) = VT_NULL;
         }
 
         ISequentialStream_Release(This->request_body);
