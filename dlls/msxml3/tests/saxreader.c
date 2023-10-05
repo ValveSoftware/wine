@@ -29,7 +29,6 @@
 #include "windows.h"
 #include "ole2.h"
 #include "msxml2.h"
-#include "msxml6.h"
 #include "msxml2did.h"
 #include "ocidl.h"
 #include "dispex.h"
