@@ -1905,6 +1905,12 @@ static MonoAssembly* CDECL wine_mono_assembly_preload_hook_v2_fn(MonoAssemblyNam
                 "321360", /* Primal Carnage: Extinction */
                 "namespace ContentBrowser { class IContentBrowserBackendInterface {} class Package {} } "
             },
+            {
+                "DockPanel",
+                "DockPanel.dll",
+                "46450", /* Grotesque Tactics: Evil Heroes  */
+                "namespace WeifenLuo.WinFormsUI { class DockPanel {} }"
+            },
         };
 
         for (i = 0; i < ARRAY_SIZE(assembly_hacks); ++i)
