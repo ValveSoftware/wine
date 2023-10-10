@@ -1703,7 +1703,6 @@ static BOOL update_display_cache_from_registry(void)
     struct monitor *monitor, *monitor2;
     HANDLE mutex = NULL;
     NTSTATUS status;
-    BOOL ret;
 
     /* If user driver did initialize the registry, then exit */
     if (!video_key && !(video_key = reg_open_key( NULL, devicemap_video_keyW,
@@ -1761,11 +1760,15 @@ static BOOL update_display_cache_from_registry(void)
         }
     }
 
-    if ((ret = !list_empty( &adapters ) && !list_empty( &monitors )))
-        last_query_display_time = key.LastWriteTime.QuadPart;
+    if (list_empty( &adapters ))
+    {
+        WARN( "No adapters found.\n" );
+        assert( list_empty( &monitors ));
+    }
+    else if (!list_empty( &monitors )) last_query_display_time = key.LastWriteTime.QuadPart;
     pthread_mutex_unlock( &display_lock );
     release_display_device_init_mutex( mutex );
-    return ret;
+    return TRUE;
 }
 
 static BOOL is_same_devmode( const DEVMODEW *a, const DEVMODEW *b )
@@ -2934,6 +2937,8 @@ static DEVMODEW *get_display_settings( const WCHAR *devname, const DEVMODEW *dev
     DEVMODEW *mode, *displays;
     struct adapter *adapter;
     BOOL ret;
+
+    if (list_empty( &adapters )) return NULL;
 
     /* allocate an extra mode for easier iteration */
     if (!(displays = calloc( list_count( &adapters ) + 1, sizeof(DEVMODEW) ))) return NULL;
