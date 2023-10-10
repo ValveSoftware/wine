@@ -262,6 +262,7 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->foreground_input = NULL;
             desktop->users = 0;
             desktop->cursor_win = 0;
+            desktop->cursor_handle = 0;
             desktop->last_press_alt = 0;
             list_add_tail( &winstation->desktops, &desktop->entry );
             list_init( &desktop->hotkeys );
