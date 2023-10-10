@@ -514,13 +514,22 @@ static void queue_cursor_message( struct desktop *desktop, user_handle_t win, un
     queue_hardware_message( desktop, msg, 1 );
 }
 
-static int update_desktop_cursor_window( struct desktop *desktop, user_handle_t win )
+static int update_desktop_cursor_window( struct desktop *desktop, user_handle_t win, int x, int y )
 {
     int updated = win != desktop->cursor_win;
     user_handle_t handle = desktop->cursor_handle;
     desktop->cursor_win = win;
     if (updated)
     {
+        struct thread *thread;
+
+        if ((thread = window_thread_from_point( win, x, y )))
+        {
+            struct thread_input *input = thread->queue->input;
+            if (input) handle = input->shared->cursor_count < 0 ? 0 : input->shared->cursor;
+            release_object( thread );
+        }
+
         /* when clipping send the message to the foreground window as well, as some driver have an artificial overlay window */
         if (is_cursor_clipped( desktop )) queue_cursor_message( desktop, 0, WM_WINE_SETCURSOR, win, handle );
         queue_cursor_message( desktop, win, WM_WINE_SETCURSOR, win, handle );
@@ -547,7 +556,7 @@ static int update_desktop_cursor_pos( struct desktop *desktop, user_handle_t win
     if (!win && (input = desktop->foreground_input)) win = input->shared->capture;
     if (!win || !is_window_visible( win ) || is_window_transparent( win ))
         win = shallow_window_from_point( desktop, x, y );
-    if (update_desktop_cursor_window( desktop, win )) updated = 1;
+    if (update_desktop_cursor_window( desktop, win, x, y )) updated = 1;
 
     return updated;
 }
