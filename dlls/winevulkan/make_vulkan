@@ -297,6 +297,9 @@ FUNCTION_OVERRIDES = {
     # VK_KHR_synchronization2
     "vkQueueSubmit2KHR" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE, "extra_param" : "pSubmits"},
 
+    # VK_NV_low_latency2
+    "vkSetLatencySleepModeNV" : {"dispatch": True, "driver": False, "thunk" : ThunkType.NONE},
+
     # Custom functions
     "wine_vkAcquireKeyedMutex" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
     "wine_vkReleaseKeyedMutex" : {"dispatch": True, "driver": False, "thunk" : ThunkType.PRIVATE},
