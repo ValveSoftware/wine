@@ -1347,13 +1347,6 @@ static HRESULT stream_queue_sample(struct audio_renderer *renderer, IMFSample *s
 
     sample_frames = sample_len / renderer->frame_size;
 
-    if (!(object = calloc(1, sizeof(*object))))
-        return E_OUTOFMEMORY;
-
-    object->type = OBJECT_TYPE_SAMPLE;
-    object->u.sample.sample = sample;
-    IMFSample_AddRef(object->u.sample.sample);
-
     if (FAILED(hr = IMFSample_GetSampleTime(sample, &time)))
     {
         WARN("Failed to get sample time, hr %#lx.\n", hr);
@@ -1372,6 +1365,12 @@ static HRESULT stream_queue_sample(struct audio_renderer *renderer, IMFSample *s
         FIXME("Dropping sample %p, time %I64u, clocktime %I64u, systime %I64u.\n", sample, time, clocktime, systime);
     else
     {
+        if (!(object = calloc(1, sizeof(*object))))
+            return E_OUTOFMEMORY;
+
+        object->type = OBJECT_TYPE_SAMPLE;
+        object->u.sample.sample = sample;
+        IMFSample_AddRef(object->u.sample.sample);
         list_add_tail(&renderer->queue, &object->entry);
         renderer->queued_frames += sample_frames;
     }
