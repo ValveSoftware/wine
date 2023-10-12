@@ -762,7 +762,7 @@ static void session_shutdown_current_topology(struct media_session *session)
                         WARN("Failed to shut down activation object for the sink, hr %#lx.\n", hr);
                     IMFActivate_Release(activate);
                 }
-                else if (SUCCEEDED(topology_node_get_object(node, &IID_IMFStreamSink, (void **)&stream_sink)))
+                if (SUCCEEDED(topology_node_get_object(node, &IID_IMFStreamSink, (void **)&stream_sink)))
                 {
                     if (SUCCEEDED(IMFStreamSink_GetMediaSink(stream_sink, &sink)))
                     {
