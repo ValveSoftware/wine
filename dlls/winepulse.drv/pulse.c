@@ -806,8 +806,8 @@ static NTSTATUS pulse_test_connect(void *args)
     list_init(&g_phys_speakers);
     list_init(&g_phys_sources);
 
-    pulse_add_device(&g_phys_speakers, NULL, 0, Speakers, 0, "", "PulseAudio");
-    pulse_add_device(&g_phys_sources, NULL, 0, Microphone, 0, "", "PulseAudio");
+    pulse_add_device(&g_phys_speakers, NULL, 0, Speakers, 0, "", "Pulse Audio");
+    pulse_add_device(&g_phys_sources, NULL, 0, Microphone, 0, "", "Pulse Audio");
 
     o = pa_context_get_sink_info_list(pulse_ctx, &pulse_phys_speakers_cb, NULL);
     if (o) {
