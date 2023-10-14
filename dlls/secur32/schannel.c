@@ -68,6 +68,7 @@ struct schan_context
 };
 
 static struct schan_handle *schan_handle_table;
+static struct schan_handle *schan_free_handles;
 static SIZE_T schan_handle_table_size;
 static SIZE_T schan_handle_count;
 static SRWLOCK handle_table_lock = SRWLOCK_INIT;
@@ -81,17 +82,23 @@ static DWORD config_default_disabled_protocols;
 static ULONG_PTR schan_alloc_handle(void *object, enum schan_handle_type type)
 {
     struct schan_handle *handle;
-    ULONG_PTR index = SCHAN_INVALID_HANDLE, i;
+    ULONG_PTR index = SCHAN_INVALID_HANDLE;
 
     AcquireSRWLockExclusive(&handle_table_lock);
-    for (i = 0; i < schan_handle_table_size; ++i)
+    if (schan_free_handles)
     {
-        handle = &schan_handle_table[i];
+        /* Use a free handle */
+        handle = schan_free_handles;
         if (handle->type != SCHAN_HANDLE_FREE)
-            continue;
+        {
+            ERR("Handle %p is in the free list, but has type %#x.\n", handle, handle->type);
+            goto done;
+        }
+        index = schan_free_handles - schan_handle_table;
+        schan_free_handles = handle->object;
         handle->object = object;
         handle->type = type;
-        index = i;
+
         goto done;
     }
     if (!(schan_handle_count < schan_handle_table_size))
@@ -139,8 +146,9 @@ static void *schan_free_handle(ULONG_PTR handle_idx, enum schan_handle_type type
     }
 
     object = handle->object;
-    handle->object = NULL;
+    handle->object = schan_free_handles;
     handle->type = SCHAN_HANDLE_FREE;
+    schan_free_handles = handle;
 
 done:
     ReleaseSRWLockExclusive(&handle_table_lock);
