@@ -26,6 +26,10 @@
 
 #include "wine/debug.h"
 
+#include "initguid.h"
+
+#include "codecapi.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
@@ -886,6 +890,8 @@ HRESULT h264_decoder_create(REFIID riid, void **ret)
     if (FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &MF_LOW_LATENCY, 0)))
         goto failed;
     if (FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, TRUE)))
+        goto failed;
+    if (FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &AVDecVideoAcceleration_H264, TRUE)))
         goto failed;
 
     {
