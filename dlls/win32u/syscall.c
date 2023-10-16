@@ -54,6 +54,7 @@ static void * const syscalls[] =
     NtGdiCreateSolidBrush,
     NtGdiDdDDICreateDevice,
     NtGdiDdDDIOpenAdapterFromHdc,
+    NtGdiDdDDIQueryAdapterInfo,
     NtGdiDdDDIQueryStatistics,
     NtGdiDdDDISetQueuedLimit,
     NtGdiDeleteClientObj,
