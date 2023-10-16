@@ -1339,6 +1339,7 @@ static BOOL gen_from_connection(const CONNECTION *conn, UINT *gen)
 
 static BOOL set_gen_from_connection(fluid_voice_t *fluid_voice, const CONNECTION *conn)
 {
+    double value;
     UINT gen;
 
     if (conn->usControl != CONN_SRC_NONE) return FALSE;
@@ -1391,7 +1392,16 @@ static BOOL set_gen_from_connection(fluid_voice_t *fluid_voice, const CONNECTION
         return FALSE;
     }
 
-    fluid_voice_gen_set(fluid_voice, gen, conn->lScale);
+    /* SF2 / FluidSynth use 0.1% as "Sustain Level" unit, DLS2 uses percent, meaning is also reversed */
+    if (gen == GEN_MODENVSUSTAIN || gen == GEN_VOLENVSUSTAIN) value = 1000 - conn->lScale * 10 / 65536.;
+    /* FIXME: SF2 and FluidSynth use 1200 * log2(f / 8.176) for absolute freqs,
+     * whereas DLS2 uses (1200 * log2(f / 440.) + 6900) * 65536. The values
+     * are very close but not strictly identical and we may need a conversion.
+     */
+    else if (conn->lScale == 0x80000000) value = -32768;
+    else value = conn->lScale / 65536.;
+    fluid_voice_gen_set(fluid_voice, gen, value);
+
     return TRUE;
 }
 
@@ -1434,6 +1444,7 @@ static BOOL add_mod_from_connection(fluid_voice_t *fluid_voice, const CONNECTION
 {
     fluid_mod_t *mod;
     UINT gen = -1;
+    double value;
 
     switch (MAKELONG(conn->usSource, conn->usDestination))
     {
@@ -1463,7 +1474,17 @@ static BOOL add_mod_from_connection(fluid_voice_t *fluid_voice, const CONNECTION
     fluid_mod_set_source1(mod, src1, flags1);
     fluid_mod_set_source2(mod, src2, flags2);
     fluid_mod_set_dest(mod, gen);
-    fluid_mod_set_amount(mod, conn->lScale);
+
+    /* SF2 / FluidSynth use 0.1% as "Sustain Level" unit, DLS2 uses percent, meaning is also reversed */
+    if (gen == GEN_MODENVSUSTAIN || gen == GEN_VOLENVSUSTAIN) value = 1000 - conn->lScale * 10 / 65536.;
+    /* FIXME: SF2 and FluidSynth use 1200 * log2(f / 8.176) for absolute freqs,
+     * whereas DLS2 uses (1200 * log2(f / 440.) + 6900) * 65536. The values
+     * are very close but not strictly identical and we may need a conversion.
+     */
+    else if (conn->lScale == 0x80000000) value = -32768;
+    else value = conn->lScale / 65536.;
+    fluid_mod_set_amount(mod, value);
+
     fluid_voice_add_mod(fluid_voice, mod, FLUID_VOICE_OVERWRITE);
 
     return TRUE;
