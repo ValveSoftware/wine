@@ -174,7 +174,8 @@ static HRESULT async_create_object_complete(struct async_create_object *async,
     if (async->flags & MF_RESOLUTION_MEDIASOURCE)
     {
         const char *sgi, *env = getenv("WINE_NEW_MEDIA_SOURCE");
-        if (!env && (sgi = getenv("SteamGameId")) && (!strcmp(sgi, "692850"))) env = "1";
+        if (!env && (sgi = getenv("SteamGameId")) &&
+            (!strcmp(sgi, "692850") || !strcmp(sgi, "559100"))) env = "1";
 
         if (!async->stream)
             hr = media_source_create_from_url(async->url, (IMFMediaSource **)&object);
