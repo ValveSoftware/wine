@@ -1639,6 +1639,12 @@ static BOOL process_mouse_message( MSG *msg, UINT hw_id, ULONG_PTR extra_info, H
     msg->pt = point_phys_to_win_dpi( msg->hwnd, msg->pt );
     SetThreadDpiAwarenessContext( get_window_dpi_awareness_context( msg->hwnd ));
 
+    if ((extra_info & 0xffffff00) == 0xff515700 && NtUserIsTouchWindow( msg->hwnd, NULL ))
+    {
+        accept_hardware_message( hw_id );
+        return FALSE;
+    }
+
     if ((extra_info & 0xffffff00) != 0xff515700 && enable_mouse_in_pointer)
     {
         WORD flags = POINTER_MESSAGE_FLAG_PRIMARY;
