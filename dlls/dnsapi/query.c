@@ -21,11 +21,15 @@
 #include <stdarg.h>
 #include "windef.h"
 #include "winbase.h"
+#include "winternl.h"
 #include "winerror.h"
 #include "winnls.h"
 #include "windns.h"
 #include "nb30.h"
 #include "ws2def.h"
+#include "in6addr.h"
+#include "inaddr.h"
+#include "ip2string.h"
 
 #include "wine/debug.h"
 #include "dnsapi.h"
@@ -169,12 +173,47 @@ DNS_STATUS WINAPI DnsQuery_UTF8( const char *name, WORD type, DWORD options, voi
     unsigned char answer[4096];
     DWORD len = sizeof(answer);
     struct query_params query_params = { name, type, options, answer, &len };
+    DNS_RECORDA *r;
+    const char *end;
 
     TRACE( "(%s, %s, %#lx, %p, %p, %p)\n", debugstr_a(name), debugstr_type( type ),
            options, servers, result, reserved );
 
     if (!name || !result)
         return ERROR_INVALID_PARAMETER;
+
+    if (type == DNS_TYPE_A)
+    {
+        struct in_addr addr;
+
+        if (!RtlIpv4StringToAddressA(name, TRUE, &end, &addr) && !*end && (r = calloc(1, sizeof(*r))))
+        {
+            ret = ERROR_SUCCESS;
+            r->Data.A.IpAddress = addr.s_addr;
+            r->wDataLength = sizeof(r->Data.A);
+        }
+    }
+    else if (type == DNS_TYPE_AAAA)
+    {
+        struct in6_addr addr;
+
+        if (!RtlIpv6StringToAddressA(name, &end, &addr) && !*end && (r = calloc(1, sizeof(*r))))
+        {
+            ret = ERROR_SUCCESS;
+            memcpy(&r->Data.AAAA.Ip6Address, &addr, sizeof(r->Data.AAAA.Ip6Address));
+            r->wDataLength = sizeof(r->Data.AAAA);
+        }
+    }
+    if (!ret)
+    {
+        r->wType = type;
+        r->dwTtl = 604800;
+        r->pName = strdup(name);
+        r->Flags.S.Reserved = 0x20;
+        r->Flags.S.CharSet = DnsCharSetUtf8;
+        *result = r;
+        return ret;
+    }
 
     if ((ret = RESOLV_CALL( set_serverlist, servers ))) return ret;
 
