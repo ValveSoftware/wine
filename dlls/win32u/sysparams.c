@@ -1399,7 +1399,7 @@ static void add_gpu( const struct gdi_gpu *gpu, void *param )
             break;
         /* AMD */
         case 0x1002:
-            sprintf( buffer, "31.0.14051.5006" );
+            sprintf( buffer, "31.0.21902.5" );
             break;
         /* Nvidia */
         case 0x10de:
