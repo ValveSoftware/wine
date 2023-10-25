@@ -139,7 +139,20 @@ static HRESULT WINAPI wave_track_InitPlay(IDirectMusicTrack8 *iface,
 static HRESULT WINAPI wave_track_EndPlay(IDirectMusicTrack8 *iface, void *pStateData)
 {
     struct wave_track *This = impl_from_IDirectMusicTrack8(iface);
+    struct wave_part *part;
+    struct wave_item *item;
+
     FIXME("(%p, %p): stub\n", This, pStateData);
+
+    LIST_FOR_EACH_ENTRY(part, &This->parts, struct wave_part, entry)
+    {
+        LIST_FOR_EACH_ENTRY(item, &part->items, struct wave_item, entry)
+        {
+            if (!item->buffer) continue;
+            IDirectSoundBuffer_Stop(item->buffer);
+        }
+    }
+
     return S_OK;
 }
 
