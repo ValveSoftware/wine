@@ -1135,6 +1135,7 @@ static HRESULT perf_dmport_create(struct performance *perf, DMUS_PORTPARAMS *par
     }
 
     performance_update_latency_time(perf, port, NULL);
+    IDirectMusicPort_Release(port);
     return S_OK;
 }
 
@@ -1198,6 +1199,8 @@ static HRESULT WINAPI performance_AssignPChannelBlock(IDirectMusicPerformance8 *
         channel->midi_group = midi_group;
         channel->midi_channel = i;
         channel->port = port;
+        if (channel->port) IDirectMusicPort_Release(channel->port);
+        if ((channel->port = port)) IDirectMusicPort_AddRef(channel->port);
     }
 
     return S_OK;
@@ -1218,6 +1221,7 @@ static HRESULT WINAPI performance_AssignPChannel(IDirectMusicPerformance8 *iface
     channel->midi_group = midi_group;
     channel->midi_channel = midi_channel;
     channel->port = port;
+    IDirectMusicPort_AddRef(port);
 
     return S_OK;
 }
