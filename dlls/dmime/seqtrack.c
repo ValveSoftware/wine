@@ -407,6 +407,7 @@ static HRESULT WINAPI track_IPersistStream_Load(IPersistStream *iface, IStream *
         }
     }
 
+    stream_skip_chunk(stream, &chunk);
     if (FAILED(hr)) return hr;
 
     if (TRACE_ON(dmime))
@@ -449,7 +450,6 @@ static HRESULT WINAPI track_IPersistStream_Load(IPersistStream *iface, IStream *
         }
     }
 
-    stream_skip_chunk(stream, &chunk);
     return S_OK;
 }
 
