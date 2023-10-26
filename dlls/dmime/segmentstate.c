@@ -61,6 +61,7 @@ struct segment_state
     BOOL auto_download;
     DWORD repeats, actual_repeats;
     DWORD track_flags;
+    DWORD segment_flags;
 
     struct list tracks;
 };
@@ -118,7 +119,7 @@ static ULONG WINAPI segment_state_Release(IDirectMusicSegmentState8 *iface)
 
     if (!ref)
     {
-        segment_state_end_play((IDirectMusicSegmentState *)iface, NULL);
+        if (!(This->segment_flags & DMUS_SEGF_SECONDARY)) segment_state_end_play((IDirectMusicSegmentState *)iface, NULL);
         if (This->segment) IDirectMusicSegment_Release(This->segment);
         if (This->parent_graph) IDirectMusicGraph_Release(This->parent_graph);
         free(This);
@@ -309,7 +310,7 @@ HRESULT create_dmsegmentstate(REFIID riid, void **ret_iface)
     return hr;
 }
 
-HRESULT segment_state_create(IDirectMusicSegment *segment, MUSIC_TIME start_time,
+HRESULT segment_state_create(IDirectMusicSegment *segment, MUSIC_TIME start_time, DWORD segment_flags,
         IDirectMusicPerformance8 *performance, IDirectMusicSegmentState **ret_iface)
 {
     IDirectMusicSegmentState *iface;
@@ -324,6 +325,7 @@ HRESULT segment_state_create(IDirectMusicSegment *segment, MUSIC_TIME start_time
     if (FAILED(hr = create_dmsegmentstate(&IID_IDirectMusicSegmentState, (void **)&iface))) return hr;
     This = impl_from_IDirectMusicSegmentState8((IDirectMusicSegmentState8 *)iface);
 
+    This->segment_flags = segment_flags;
     This->segment = segment;
     IDirectMusicSegment_AddRef(This->segment);
 
@@ -436,6 +438,7 @@ static HRESULT segment_state_play_chunk(struct segment_state *This, IDirectMusic
         {
             MUSIC_TIME end_time = This->start_time + This->played;
 
+            if (This->segment_flags & DMUS_SEGF_SECONDARY) return S_OK;
             if (FAILED(hr = performance_send_segment_end(performance, end_time, iface, FALSE)))
             {
                 ERR("Failed to send segment end, hr %#lx\n", hr);
