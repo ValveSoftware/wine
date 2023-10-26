@@ -1550,6 +1550,13 @@ static HRESULT WINAPI performance_PlaySegmentEx(IDirectMusicPerformance8 *iface,
     if (FAILED(hr = IUnknown_QueryInterface(source, &IID_IDirectMusicSegment, (void **)&segment)))
         return hr;
 
+    if (primary && SUCCEEDED(hr = IDirectMusicPerformance8_GetSegmentState(iface, &state, start_time)))
+    {
+        if (FAILED(hr = IDirectMusicPerformance_Stop(&This->IDirectMusicPerformance8_iface, NULL, state, start_time, 0)))
+            ERR("Failed to stop current previous segment, hr %#lx\n", hr);
+        IDirectMusicSegmentState_Release(state);
+    }
+
     EnterCriticalSection(&This->safe);
 
     if (primary) performance_set_primary_segment(This, segment);
