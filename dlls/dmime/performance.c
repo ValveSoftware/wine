@@ -1586,7 +1586,7 @@ static HRESULT WINAPI performance_PlaySegmentEx(IDirectMusicPerformance8 *iface,
     if (control) performance_set_control_segment(This, segment);
 
     if ((!(music_time = start_time) && FAILED(hr = IDirectMusicPerformance8_GetTime(iface, NULL, &music_time)))
-            || FAILED(hr = segment_state_create(segment, music_time, iface, &state)))
+            || FAILED(hr = segment_state_create(segment, music_time, segment_flags, iface, &state)))
     {
         if (primary) performance_set_primary_segment(This, NULL);
         if (control) performance_set_control_segment(This, NULL);
