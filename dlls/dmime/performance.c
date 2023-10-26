@@ -257,30 +257,18 @@ static struct channel *performance_get_channel(struct performance *This, DWORD c
     return WINE_RB_ENTRY_VALUE(entry, struct channel_block, entry)->channels + channel_num % 16;
 }
 
-static struct channel_block *channel_block_set(struct wine_rb_tree *tree, DWORD block_num,
-        IDirectMusicPort *port, DWORD midi_group, BOOL only_set_new)
+static struct channel_block *performance_get_channel_block(struct performance *This, DWORD block_num)
 {
     struct channel_block *block;
     struct wine_rb_entry *entry;
-    unsigned int i;
 
-    entry = wine_rb_get(tree, &block_num);
-    if (entry) {
+    if ((entry = wine_rb_get(&This->channel_blocks, &block_num)))
         block = WINE_RB_ENTRY_VALUE(entry, struct channel_block, entry);
-        if (only_set_new)
-            return block;
-    } else {
-        if (!(block = malloc(sizeof(*block)))) return NULL;
+    else if ((block = malloc(sizeof(*block))))
+    {
         block->block_num = block_num;
+        wine_rb_put(&This->channel_blocks, &block->block_num, &block->entry);
     }
-
-    for (i = 0; i < 16; ++i) {
-        block->channels[i].port = port;
-        block->channels[i].midi_group = midi_group;
-        block->channels[i].midi_channel = i;
-    }
-    if (!entry)
-        wine_rb_put(tree, &block->block_num, &block->entry);
 
     return block;
 }
@@ -1121,6 +1109,7 @@ static void performance_update_latency_time(struct performance *This, IDirectMus
 
 static HRESULT perf_dmport_create(struct performance *perf, DMUS_PORTPARAMS *params)
 {
+    IDirectMusicPerformance8 *iface = &perf->IDirectMusicPerformance8_iface;
     IDirectMusicPort *port;
     GUID guid;
     unsigned int i;
@@ -1140,7 +1129,10 @@ static HRESULT perf_dmport_create(struct performance *perf, DMUS_PORTPARAMS *par
     }
 
     for (i = 0; i < params->dwChannelGroups; i++)
-        channel_block_set(&perf->channel_blocks, i, port, i + 1, FALSE);
+    {
+        if (FAILED(hr = IDirectMusicPerformance8_AssignPChannelBlock(iface, i, port, i + 1)))
+            ERR("Failed to set performance channel block info, hr %#lx\n", hr);
+    }
 
     performance_update_latency_time(perf, port, NULL);
     return S_OK;
@@ -1190,6 +1182,8 @@ static HRESULT WINAPI performance_AssignPChannelBlock(IDirectMusicPerformance8 *
         DWORD block_num, IDirectMusicPort *port, DWORD midi_group)
 {
     struct performance *This = impl_from_IDirectMusicPerformance8(iface);
+    struct channel_block *block;
+    UINT i;
 
     FIXME("(%p, %ld, %p, %ld): semi-stub\n", This, block_num, port, midi_group);
 
@@ -1197,7 +1191,14 @@ static HRESULT WINAPI performance_AssignPChannelBlock(IDirectMusicPerformance8 *
     if (block_num > MAXDWORD / 16) return E_INVALIDARG;
     if (This->audio_paths_enabled) return DMUS_E_AUDIOPATHS_IN_USE;
 
-    channel_block_set(&This->channel_blocks, block_num, port, midi_group, FALSE);
+    if (!(block = performance_get_channel_block(This, block_num))) return E_OUTOFMEMORY;
+    for (i = 0; i < ARRAY_SIZE(block->channels); ++i)
+    {
+        struct channel *channel = block->channels + i;
+        channel->midi_group = midi_group;
+        channel->midi_channel = i;
+        channel->port = port;
+    }
 
     return S_OK;
 }
