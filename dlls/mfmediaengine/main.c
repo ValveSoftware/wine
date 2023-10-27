@@ -2201,6 +2201,7 @@ static HRESULT WINAPI media_engine_GetVideoAspectRatio(IMFMediaEngineEx *iface, 
 static HRESULT WINAPI media_engine_Shutdown(IMFMediaEngineEx *iface)
 {
     struct media_engine *engine = impl_from_IMFMediaEngineEx(iface);
+    IMFMediaSession *session;
     HRESULT hr = S_OK;
 
     TRACE("%p.\n", iface);
@@ -2212,10 +2213,13 @@ static HRESULT WINAPI media_engine_Shutdown(IMFMediaEngineEx *iface)
     {
         media_engine_set_flag(engine, FLAGS_ENGINE_SHUT_DOWN, TRUE);
         media_engine_clear_presentation(engine);
-        IMFMediaSession_Shutdown(engine->session);
+        IMFMediaSession_AddRef(engine->session);
+        session = engine->session;
     }
     LeaveCriticalSection(&engine->cs);
 
+    IMFMediaSession_Shutdown(session);
+    IMFMediaSession_Release(session);
     return hr;
 }
 
