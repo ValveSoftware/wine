@@ -394,9 +394,14 @@ UINT X11DRV_UpdateDisplayDevices( const struct gdi_device_manager *device_manage
     struct x11drv_gpu *gpus;
     INT gpu, adapter, monitor;
     struct x11drv_mode *modes;
+    const char *env;
+    BOOL hdr_enabled;
     UINT mode_count;
 
     TRACE( "via %s\n", debugstr_a(host_handler.name) );
+
+    hdr_enabled = (env = getenv("DXVK_HDR")) && *env == '1';
+    TRACE( "hdr_enabled %d.\n", hdr_enabled );
 
     /* Initialize GPUs */
     if (!host_handler.get_gpus( &gpus, &gpu_count, TRUE )) return STATUS_UNSUCCESSFUL;
@@ -427,7 +432,10 @@ UINT X11DRV_UpdateDisplayDevices( const struct gdi_device_manager *device_manage
 
             /* Initialize monitors */
             for (monitor = 0; monitor < monitor_count; monitor++)
+            {
+                monitors[monitor].hdr_enabled = hdr_enabled;
                 device_manager->add_monitor( &monitors[monitor], param );
+            }
 
             host_handler.free_monitors( monitors, monitor_count );
 
