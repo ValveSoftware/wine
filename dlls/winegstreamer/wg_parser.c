@@ -295,6 +295,7 @@ static NTSTATUS wg_parser_stream_disable(void *args)
         stream->desired_caps = NULL;
     }
     pthread_mutex_unlock(&parser->mutex);
+    pthread_cond_signal(&stream->event_cond);
     pthread_cond_signal(&stream->event_empty_cond);
     return S_OK;
 }
