@@ -257,6 +257,8 @@ static void modes_append( DEVMODEW *modes, UINT *mode_count, UINT *resolutions, 
         if (modes[i].dmBitsPerPel != mode->dmBitsPerPel) continue;
         if (modes[i].dmDisplayFrequency != mode->dmDisplayFrequency) continue;
         if (modes[i].dmDisplayOrientation != mode->dmDisplayOrientation) continue;
+        if ((mode->dmFields & DM_DISPLAYFIXEDOUTPUT) != (modes[i].dmFields & DM_DISPLAYFIXEDOUTPUT)) continue;
+        if (mode->dmFields & DM_DISPLAYFIXEDOUTPUT && modes[i].dmDisplayFixedOutput != mode->dmDisplayFixedOutput) continue;
         return; /* The exact mode is already added, nothing to do */
     }
 
@@ -268,7 +270,7 @@ static void modes_append( DEVMODEW *modes, UINT *mode_count, UINT *resolutions, 
     }
 
     mode->dmFields = DM_DISPLAYORIENTATION | DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT |
-                     DM_DISPLAYFLAGS | DM_DISPLAYFREQUENCY;
+                     DM_DISPLAYFLAGS | DM_DISPLAYFREQUENCY | (mode->dmFields & DM_DISPLAYFIXEDOUTPUT);
     mode->dmSize = sizeof(DEVMODEW);
     mode->dmDriverExtra = 0;
     mode->dmDisplayFlags = 0;
@@ -283,7 +285,7 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
 {
     UINT i, j, max_count, real_mode_count, resolutions = 0;
     DEVMODEW *real_modes, *real_mode, mode_host = {0};
-    BOOL additional_modes = FALSE, landscape;
+    BOOL additional_modes = FALSE, center_modes = FALSE, landscape;
     const char *env;
 
     *mode_count = 0;
@@ -293,7 +295,14 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     /* Fullscreen hack doesn't support changing display orientations */
     if (!real_settings_handler.get_modes( monitor->settings_id, 0, &real_modes, &real_mode_count )) return;
 
+    if ((env = getenv( "WINE_CENTER_DISPLAY_MODES" )))
+        center_modes = (env[0] != '0');
+    else if ((env = getenv( "SteamAppId" )))
+        center_modes = !strcmp( env, "359870" );
+
     max_count = ARRAY_SIZE(fs_monitor_sizes) * DEPTH_COUNT + real_mode_count;
+    if (center_modes) max_count += ARRAY_SIZE(fs_monitor_sizes) + real_mode_count;
+
     if (!(*modes = calloc( max_count, sizeof(DEVMODEW) )))
     {
         real_settings_handler.free_modes( real_modes );
@@ -341,6 +350,13 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
             mode.dmDisplayFrequency = 60;
             modes_append( *modes, mode_count, &resolutions, &mode );
         }
+
+        if (center_modes && mode.dmPelsWidth != mode_host.dmPelsWidth && mode.dmPelsHeight != mode_host.dmPelsHeight)
+        {
+            mode.dmFields |= DM_DISPLAYFIXEDOUTPUT;
+            mode.dmDisplayFixedOutput = DMDFO_CENTER;
+            modes_append( *modes, mode_count, &resolutions, &mode );
+        }
     }
 
     for (i = 0, real_mode = real_modes; i < real_mode_count; ++i)
@@ -349,7 +365,16 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
 
         /* Don't report modes that are larger than the current mode */
         if (mode.dmPelsWidth <= mode_host.dmPelsWidth && mode.dmPelsHeight <= mode_host.dmPelsHeight)
+        {
             modes_append( *modes, mode_count, &resolutions, &mode );
+
+            if (center_modes && mode.dmPelsWidth != mode_host.dmPelsWidth && mode.dmPelsHeight != mode_host.dmPelsHeight)
+            {
+                mode.dmFields |= DM_DISPLAYFIXEDOUTPUT;
+                mode.dmDisplayFixedOutput = DMDFO_CENTER;
+                modes_append( *modes, mode_count, &resolutions, &mode );
+            }
+        }
 
         real_mode = NEXT_DEVMODEW(real_mode);
     }
