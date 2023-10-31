@@ -313,6 +313,11 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     else if ((env = getenv( "SteamAppId" )))
         additional_modes = !strcmp( env, "979400" );
 
+    if ((env = getenv( "WINE_CENTER_DISPLAY_MODES" )))
+        center_modes = (env[0] != '0');
+    else if ((env = getenv( "SteamAppId" )))
+        center_modes = !strcmp( env, "359870" );
+
     /* Linux reports far fewer resolutions than Windows. Add modes that some games may expect. */
     for (i = 0; i < ARRAY_SIZE(fs_monitor_sizes); ++i)
     {
