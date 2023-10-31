@@ -233,9 +233,8 @@ static WINE_PLAYSOUND*  PlaySound_Alloc(const void* pszSound, HMODULE hmod,
         else
         {
             UNICODE_STRING usBuffer;
-            if (!RtlCreateUnicodeStringFromAsciiz(&usBuffer, pszSound)) goto oom_error;
-            wps->pszSound = wcsdup(usBuffer.Buffer);
-            HeapFree(GetProcessHeap(), 0, usBuffer.Buffer);
+            RtlCreateUnicodeStringFromAsciiz(&usBuffer, pszSound);
+            wps->pszSound = usBuffer.Buffer;
             if (!wps->pszSound) goto oom_error;
             wps->bAlloc = TRUE;
         }
