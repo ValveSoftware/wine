@@ -300,6 +300,11 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     else if ((env = getenv( "SteamAppId" )))
         center_modes = !strcmp( env, "359870" );
 
+    if ((env = getenv( "WINE_CENTER_DISPLAY_MODES" )))
+        center_modes = (env[0] != '0');
+    else if ((env = getenv( "SteamAppId" )))
+        center_modes = !strcmp( env, "359870" );
+
     max_count = ARRAY_SIZE(fs_monitor_sizes) * DEPTH_COUNT + real_mode_count;
     if (center_modes) max_count += ARRAY_SIZE(fs_monitor_sizes) + real_mode_count;
 
