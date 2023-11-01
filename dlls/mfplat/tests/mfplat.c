@@ -3200,6 +3200,7 @@ static void test_scheduled_items(void)
     IMFAsyncResult *result;
     MFWORKITEM_KEY key, key2;
     HRESULT hr;
+    ULONG refcount;
 
     callback = create_test_callback(NULL);
 
@@ -3212,6 +3213,9 @@ static void test_scheduled_items(void)
     hr = MFCancelWorkItem(key);
     ok(hr == S_OK, "Failed to cancel item, hr %#lx.\n", hr);
 
+    refcount = IMFAsyncCallback_Release(&callback->IMFAsyncCallback_iface);
+    ok(refcount == 0, "Unexpected refcount %lu.\n", refcount);
+
     hr = MFCancelWorkItem(key);
     ok(hr == MF_E_NOT_FOUND || broken(hr == S_OK) /* < win10 */, "Unexpected hr %#lx.\n", hr);
 
@@ -3220,6 +3224,8 @@ static void test_scheduled_items(void)
         win_skip("Waiting items are not supported.\n");
         return;
     }
+
+    callback = create_test_callback(NULL);
 
     hr = MFCreateAsyncResult(NULL, &callback->IMFAsyncCallback_iface, NULL, &result);
     ok(hr == S_OK, "Failed to create result, hr %#lx.\n", hr);
