@@ -732,14 +732,16 @@ static HRESULT invoke_async_callback(IRtwqAsyncResult *result)
 
 static void queue_release_pending_item(struct work_item *item)
 {
-    EnterCriticalSection(&item->queue->cs);
+    struct queue *queue = item->queue;
+    EnterCriticalSection(&queue->cs);
     if (item->key)
     {
         list_remove(&item->entry);
         item->key = 0;
         IUnknown_Release(&item->IUnknown_iface);
     }
-    LeaveCriticalSection(&item->queue->cs);
+    LeaveCriticalSection(&queue->cs);
+
 }
 
 static void CALLBACK waiting_item_callback(TP_CALLBACK_INSTANCE *instance, void *context, TP_WAIT *wait,
