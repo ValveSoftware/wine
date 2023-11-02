@@ -286,7 +286,14 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     /* Fullscreen hack doesn't support changing display orientations */
     if (!real_settings_handler.get_modes( monitor->adapter_id, 0, &real_modes, &real_mode_count )) return;
 
+    if ((env = getenv( "WINE_CENTER_DISPLAY_MODES" )))
+        center_modes = (env[0] != '0');
+    else if ((env = getenv( "SteamAppId" )))
+        center_modes = !strcmp( env, "359870" );
+
     max_count = ARRAY_SIZE(fs_monitor_sizes) * DEPTH_COUNT + real_mode_count;
+    if (center_modes) max_count += ARRAY_SIZE(fs_monitor_sizes) + real_mode_count;
+
     if (!(*modes = calloc( max_count, sizeof(DEVMODEW) )))
     {
         real_settings_handler.free_modes( real_modes );
@@ -305,11 +312,6 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
         additional_modes = (env[0] != '0');
     else if ((env = getenv( "SteamAppId" )))
         additional_modes = !strcmp( env, "979400" );
-
-    if ((env = getenv( "WINE_CENTER_DISPLAY_MODES" )))
-        center_modes = (env[0] != '0');
-    else if ((env = getenv( "SteamAppId" )))
-        center_modes = !strcmp( env, "359870" );
 
     /* Linux reports far fewer resolutions than Windows. Add modes that some games may expect. */
     for (i = 0; i < ARRAY_SIZE(fs_monitor_sizes); ++i)
