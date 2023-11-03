@@ -1158,6 +1158,8 @@ static HRESULT Array_filter(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsign
 
     if(r)
         *r = jsval_obj(arr);
+    else
+        jsdisp_release(arr);
 done:
     jsdisp_release(jsthis);
     return hres;
