@@ -3414,7 +3414,7 @@ UINT X11DRV_ShowWindow( HWND hwnd, INT cmd, RECT *rect, UINT swp )
                   &root, &x, &y, &width, &height, &border, &depth );
     XTranslateCoordinates( thread_data->display, data->whole_window, root, 0, 0, &x, &y, &top );
     pos = root_to_virtual_screen( x, y );
-    monitor = fs_hack_monitor_from_hwnd( hwnd );
+    monitor = fs_hack_monitor_from_rect( rect );
     if (data->fs_hack ||
         (fs_hack_enabled( monitor ) &&
          fs_hack_matches_current_mode( monitor, rect->right - rect->left, rect->bottom - rect->top )))
