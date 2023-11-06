@@ -323,6 +323,13 @@ struct event
     BYTE midi[3];
 };
 
+struct voice
+{
+    struct list entry;
+    fluid_voice_t *fluid_voice;
+    struct wave *wave;
+};
+
 struct synth
 {
     IDirectMusicSynth8 IDirectMusicSynth8_iface;
@@ -339,6 +346,7 @@ struct synth
     struct list instruments;
     struct list waves;
     struct list events;
+    struct list voices;
 
     fluid_settings_t *fluid_settings;
     fluid_sfont_t *fluid_sfont;
@@ -587,6 +595,8 @@ static HRESULT WINAPI synth_Open(IDirectMusicSynth8 *iface, DMUS_PORTPARAMS *par
 static HRESULT WINAPI synth_Close(IDirectMusicSynth8 *iface)
 {
     struct synth *This = impl_from_IDirectMusicSynth8(iface);
+    struct voice *voice;
+    void *next;
 
     TRACE("(%p)\n", This);
 
@@ -600,6 +610,14 @@ static HRESULT WINAPI synth_Close(IDirectMusicSynth8 *iface)
     fluid_synth_remove_sfont(This->fluid_synth, This->fluid_sfont);
     delete_fluid_synth(This->fluid_synth);
     This->fluid_synth = NULL;
+
+    LIST_FOR_EACH_ENTRY_SAFE(voice, next, &This->voices, struct voice, entry)
+    {
+        list_remove(&voice->entry);
+        wave_release(voice->wave);
+        free(voice);
+    }
+
     This->open = FALSE;
     LeaveCriticalSection(&This->cs);
 
@@ -1745,6 +1763,7 @@ static int synth_preset_noteon(fluid_preset_t *fluid_preset, fluid_synth_t *flui
     {
         struct articulation *articulation;
         struct wave *wave = region->wave;
+        struct voice *voice;
 
         if (key < region->key_range.usLow || key > region->key_range.usHigh) continue;
         if (vel < region->vel_range.usLow || vel > region->vel_range.usHigh) continue;
@@ -1765,6 +1784,29 @@ static int synth_preset_noteon(fluid_preset_t *fluid_preset, fluid_synth_t *flui
             delete_fluid_sample(fluid_sample);
             return FLUID_FAILED;
         }
+
+        LIST_FOR_EACH_ENTRY(voice, &synth->voices, struct voice, entry)
+        {
+            if (voice->fluid_voice == fluid_voice)
+            {
+                wave_release(voice->wave);
+                break;
+            }
+        }
+
+        if (&voice->entry == &synth->voices)
+        {
+            if (!(voice = calloc(1, sizeof(struct voice))))
+            {
+                delete_fluid_sample(fluid_sample);
+                return FLUID_FAILED;
+            }
+            voice->fluid_voice = fluid_voice;
+            list_add_tail(&synth->voices, &voice->entry);
+        }
+
+        voice->wave = wave;
+        wave_addref(voice->wave);
 
         set_default_voice_connections(fluid_voice);
         if (region->wave_sample.cSampleLoops)
@@ -1888,6 +1930,7 @@ HRESULT synth_create(IUnknown **ret_iface)
     list_init(&obj->instruments);
     list_init(&obj->waves);
     list_init(&obj->events);
+    list_init(&obj->voices);
 
     if (!(obj->fluid_settings = new_fluid_settings())) goto failed;
     if (!(obj->fluid_sfont = new_fluid_sfont(synth_sfont_get_name, synth_sfont_get_preset,
