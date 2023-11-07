@@ -1550,10 +1550,12 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
             pXCompositeRedirectWindow( gdi_display, gl->window, CompositeRedirectManual );
         }
-        data = get_win_data( hwnd );
-        gl->fs_hack = data->fs_hack || fs_hack_get_gamma_ramp( NULL );
-        if (gl->fs_hack) TRACE( "Window %p has the fullscreen hack enabled\n", hwnd );
-        release_win_data( data );
+        if ((data = get_win_data( hwnd )))
+        {
+            gl->fs_hack = data->fs_hack || fs_hack_get_gamma_ramp( NULL );
+            if (gl->fs_hack) TRACE( "Window %p has the fullscreen hack enabled\n", hwnd );
+            release_win_data( data );
+        }
         if (gl->layered_type) detach_client_window( hwnd, 0 );
         TRACE( "%p created child %lx drawable %lx\n", hwnd, gl->window, gl->drawable );
     }
