@@ -2854,6 +2854,7 @@ HKCU,Software\Wine\AppDefaults\u4.exe\DllOverrides,"amd_ags_x64",0x2,"builtin"
 HKCU,Software\Wine\AppDefaults\tll.exe\DllOverrides,"amd_ags_x64",0x2,"builtin"
 HKCU,Software\Wine\AppDefaults\SOPFFO.exe\DllOverrides,"amd_ags_x64",0x2,"builtin"
 HKCU,Software\Wine\AppDefaults\RiftApart.exe\DllOverrides,"amd_ags_x64",0x2,"builtin"
+HKCU,Software\Wine\AppDefaults\ACMirage.exe\DllOverrides,"amd_ags_x64",0x2,"builtin"
 ;;App-specific overrides for atiadlxx.dll.
 HKCU,Software\Wine\AppDefaults\s2_sp64_ship.exe\DllOverrides,"atiadlxx",,"builtin"
 HKCU,Software\Wine\AppDefaults\s2_mp64_ship.exe\DllOverrides,"atiadlxx",,"builtin"
