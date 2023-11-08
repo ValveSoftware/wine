@@ -1256,14 +1256,7 @@ INT WINAPI DECLSPEC_HOTPATCH LoadStringW(HINSTANCE instance, UINT resource_id, L
         memcpy(buffer, p + 1, i * sizeof (WCHAR));
         buffer[i] = 0;
     }
-    else
-    {
-        if (buflen > 1)
-        {
-            buffer[0] = 0;
-            return 0;
-        }
-    }
+    else goto error;
 
     TRACE("returning %s\n", debugstr_w(buffer));
     return i;
