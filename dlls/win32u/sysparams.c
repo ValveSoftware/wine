@@ -2037,7 +2037,7 @@ static BOOL desktop_update_display_devices( BOOL force, struct device_manager_ct
     return TRUE;
 }
 
-BOOL update_display_cache( BOOL force )
+BOOL update_display_cache( BOOL force, BOOL increment_serial )
 {
     static const WCHAR wine_service_station_name[] =
         {'_','_','w','i','n','e','s','e','r','v','i','c','e','_','w','i','n','s','t','a','t','i','o','n',0};
@@ -2084,6 +2084,9 @@ BOOL update_display_cache( BOOL force )
     release_display_manager_ctx( &ctx );
     if (!ret) WARN( "Failed to update display devices\n" );
 
+    if (increment_serial && global_shared)
+        global_serial = InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
+
     if (!update_display_cache_from_registry())
     {
         if (force)
@@ -2098,7 +2101,7 @@ BOOL update_display_cache( BOOL force )
             return FALSE;
         }
 
-        return update_display_cache( TRUE );
+        return update_display_cache( TRUE, FALSE );
     }
 
     InterlockedCompareExchange( (LONG *)&last_update_serial, global_serial, current_serial );
@@ -2107,7 +2110,7 @@ BOOL update_display_cache( BOOL force )
 
 static BOOL lock_display_devices(void)
 {
-    if (!update_display_cache( FALSE )) return FALSE;
+    if (!update_display_cache( FALSE, FALSE )) return FALSE;
     pthread_mutex_lock( &display_lock );
     return TRUE;
 }
@@ -3180,7 +3183,6 @@ static BOOL all_detached_settings( const DEVMODEW *displays )
 static LONG apply_display_settings( const WCHAR *devname, const DEVMODEW *devmode,
                                     HWND hwnd, DWORD flags, void *lparam )
 {
-    volatile struct global_shared_memory *global_shared = get_global_shared_memory();
     WCHAR primary_name[CCHDEVICENAME];
     struct display_device *primary;
     DEVMODEW *mode, *displays;
@@ -3228,8 +3230,7 @@ static LONG apply_display_settings( const WCHAR *devname, const DEVMODEW *devmod
     free( displays );
     if (ret) return ret;
 
-    if (global_shared) InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
-    if (!update_display_cache( TRUE ))
+    if (!update_display_cache( TRUE, TRUE ))
         WARN( "Failed to update display cache after mode change.\n" );
 
     if ((adapter = find_adapter( NULL )))

@@ -184,7 +184,7 @@ HDESK WINAPI NtUserCreateDesktopEx( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *dev
     }
 
     /* force update display cache to use virtual desktop display settings */
-    if (flags & DF_WINE_CREATE_DESKTOP) update_display_cache( TRUE );
+    if (flags & DF_WINE_CREATE_DESKTOP) update_display_cache( TRUE, TRUE );
     return ret;
 }
 
@@ -262,7 +262,7 @@ BOOL WINAPI NtUserSetThreadDesktop( HDESK handle )
         struct user_thread_info *thread_info = get_user_thread_info();
         thread_info->client_info.top_window = 0;
         thread_info->client_info.msg_window = 0;
-        if (was_virtual_desktop != is_virtual_desktop()) update_display_cache( TRUE );
+        if (was_virtual_desktop != is_virtual_desktop()) update_display_cache( TRUE, TRUE );
         if (thread_info->desktop_shm)
         {
             NtUnmapViewOfSection( GetCurrentProcess(), (void *)thread_info->desktop_shm );

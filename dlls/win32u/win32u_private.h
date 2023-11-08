@@ -191,7 +191,7 @@ extern RECT rect_thread_to_win_dpi( HWND hwnd, RECT rect );
 extern HMONITOR monitor_from_point( POINT pt, UINT flags, UINT dpi );
 extern HMONITOR monitor_from_rect( const RECT *rect, UINT flags, UINT dpi );
 extern HMONITOR monitor_from_window( HWND hwnd, UINT flags, UINT dpi );
-extern BOOL update_display_cache( BOOL force );
+extern BOOL update_display_cache( BOOL force, BOOL increment_serial );
 extern void user_lock(void);
 extern void user_unlock(void);
 extern void user_check_not_lock(void);
