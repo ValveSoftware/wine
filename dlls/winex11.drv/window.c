@@ -1451,7 +1451,7 @@ static void map_window( HWND hwnd, DWORD new_style )
             sync_window_style( data );
             XMapWindow( data->display, data->whole_window );
             /* Mutter always unminimizes windows when handling map requests. Restore iconic state */
-            if (new_style & WS_MINIMIZE)
+            if (new_style & WS_MINIMIZE && !wm_is_steamcompmgr( data->display ))
                 XIconifyWindow( data->display, data->whole_window, data->vis.screen );
             XFlush( data->display );
             if (data->surface && data->vis.visualid != default_visual.visualid)
@@ -3325,7 +3325,16 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
             TRACE( "changing win %p iconic state to %u\n", data->hwnd, data->iconic );
             if (data->iconic)
             {
-                XIconifyWindow( data->display, data->whole_window, data->vis.screen );
+                if (!wm_is_steamcompmgr( data->display ))
+                {
+                    /* XIconifyWindow is essentially a no-op on Gamescope but has an undesirable side effect.
+                     * Gamescope handles wm state change to iconic and immediately changes it back to normal.
+                     * Upon that change back we would receive WM_STATE change notification and kick the window
+                     * out of minimized state even if the window is not focused by Gamescope. Upon focusing the
+                     * window Gamescope will change WM_STATE regardless and we will get the window out of
+                     * minimized state correctly. */
+                    XIconifyWindow( data->display, data->whole_window, data->vis.screen );
+                }
             }
             else if (is_window_rect_mapped( rectWindow ))
             {
