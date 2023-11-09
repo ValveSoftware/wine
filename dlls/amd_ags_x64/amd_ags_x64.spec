@@ -8,7 +8,7 @@
 @ stub agsDriverExtensionsDX11_CreateTexture1D
 @ stub agsDriverExtensionsDX11_CreateTexture2D
 @ stub agsDriverExtensionsDX11_CreateTexture3D
-@ stub agsDriverExtensionsDX11_DeInit
+@ stdcall agsDriverExtensionsDX11_DeInit(ptr)
 @ stub agsDriverExtensionsDX11_Destroy
 @ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_DestroyDevice()
 @ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_EndUAVOverlap() DX11_EndUAVOverlap_impl
