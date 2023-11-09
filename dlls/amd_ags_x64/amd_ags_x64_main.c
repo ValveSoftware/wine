@@ -1078,6 +1078,19 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext *context, ID3D11De
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsDriverExtensionsDX11_DeInit( AGSContext* context )
+{
+    TRACE("context %p.\n", context);
+
+    if (context->d3d11_context)
+    {
+        ID3D11DeviceContext_Release(context->d3d11_context);
+        context->d3d11_context = NULL;
+    }
+
+    return AGS_SUCCESS;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p.\n", instance, reason, reserved);
