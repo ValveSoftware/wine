@@ -323,6 +323,8 @@ static enum amd_ags_version determine_ags_version(int ags_version)
      */
     enum amd_ags_version ret = AMD_AGS_VERSION_5_4_1;
     WCHAR dllname[MAX_PATH], temp_path[MAX_PATH], temp_name[MAX_PATH];
+    int (WINAPI *pagsGetVersionNumber)(void);
+    HMODULE hnative = NULL;
     DWORD size;
 
     TRACE("ags_version %#x.\n", ags_version);
@@ -348,9 +350,26 @@ static enum amd_ags_version determine_ags_version(int ags_version)
         goto done;
     }
 
-    get_ags_version_from_resource(temp_name, &ret);
+    if (get_ags_version_from_resource(temp_name, &ret))
+        goto done;
+
+    if (!(hnative = LoadLibraryW(temp_name)))
+    {
+        ERR("LoadLibraryW failed for %s.\n", debugstr_w(temp_name));
+        goto done;
+    }
+
+    if ((pagsGetVersionNumber = (void *)GetProcAddress(hnative, "agsGetVersionNumber")))
+    {
+        ags_version = pagsGetVersionNumber();
+        ret = get_version_number(ags_version);
+        TRACE("Got version %#x (%d) from agsGetVersionNumber.\n", ags_version, ret);
+    }
 
 done:
+    if (hnative)
+        FreeLibrary(hnative);
+
     if (*temp_name)
         DeleteFileW(temp_name);
 
