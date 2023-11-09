@@ -251,6 +251,20 @@ done:
     return ret;
 }
 
+static enum amd_ags_version get_version_number(int ags_version)
+{
+    unsigned int i;
+
+    for (i = 0; i < ARRAY_SIZE(amd_ags_info); i++)
+        if (AGS_MAKE_VERSION(amd_ags_info[i].major, amd_ags_info[i].minor, amd_ags_info[i].patch) == ags_version)
+        {
+            TRACE("Found AGS v%d.%d.%d.\n", amd_ags_info[i].major, amd_ags_info[i].minor, amd_ags_info[i].patch);
+            return i;
+        }
+    ERR("Unknown ags_version %#x, using 5.4.1.\n", ags_version);
+    return AMD_AGS_VERSION_5_4_1;
+}
+
 static enum amd_ags_version determine_ags_version(void)
 {
     /* AMD AGS is not binary compatible between versions (even minor versions), and the game
@@ -265,7 +279,7 @@ static enum amd_ags_version determine_ags_version(void)
     DWORD infosize;
     void *infobuf = NULL;
     void *val;
-    UINT vallen, i;
+    UINT vallen;
     VS_FIXEDFILEINFO *info;
     UINT16 major, minor, patch;
     WCHAR dllname[MAX_PATH], temp_path[MAX_PATH], temp_name[MAX_PATH];
@@ -318,17 +332,7 @@ static enum amd_ags_version determine_ags_version(void)
     minor = info->dwFileVersionMS;
     patch = info->dwFileVersionLS >> 16;
     TRACE("Found amd_ags_x64.dll v%d.%d.%d\n", major, minor, patch);
-
-    for (i = 0; i < ARRAY_SIZE(amd_ags_info); i++)
-    {
-        if ((major == amd_ags_info[i].major) &&
-            (minor == amd_ags_info[i].minor) &&
-            (patch == amd_ags_info[i].patch))
-        {
-            ret = i;
-            break;
-        }
-    }
+    ret = get_version_number(AGS_MAKE_VERSION(major, minor, patch));
 
 done:
     if (*temp_name)
