@@ -265,6 +265,52 @@ static enum amd_ags_version get_version_number(int ags_version)
     return AMD_AGS_VERSION_5_4_1;
 }
 
+static BOOL get_ags_version_from_resource(const WCHAR *filename, enum amd_ags_version *ret)
+{
+    DWORD infosize;
+    void *infobuf;
+    void *val;
+    UINT vallen;
+    VS_FIXEDFILEINFO *info;
+    UINT16 major, minor, patch;
+
+    infosize = GetFileVersionInfoSizeW(filename, NULL);
+    if (!infosize)
+    {
+        ERR("File version info not found, err %u.\n", GetLastError());
+        return FALSE;
+    }
+
+    if (!(infobuf = heap_alloc(infosize)))
+    {
+        ERR("Failed to allocate memory.\n");
+        return FALSE;
+    }
+
+    if (!GetFileVersionInfoW(filename, 0, infosize, infobuf))
+    {
+        ERR("GetFileVersionInfoW failed, err %u.\n", GetLastError());
+        heap_free(infobuf);
+        return FALSE;
+    }
+
+    if (!VerQueryValueW(infobuf, L"\\", &val, &vallen) || (vallen != sizeof(VS_FIXEDFILEINFO)))
+    {
+        ERR("Version value not found, err %u.\n", GetLastError());
+        heap_free(infobuf);
+        return FALSE;
+    }
+
+    info = val;
+    major = info->dwFileVersionMS >> 16;
+    minor = info->dwFileVersionMS;
+    patch = info->dwFileVersionLS >> 16;
+    TRACE("Found amd_ags_x64.dll v%d.%d.%d\n", major, minor, patch);
+    *ret = get_version_number(AGS_MAKE_VERSION(major, minor, patch));
+    heap_free(infobuf);
+    return TRUE;
+}
+
 static enum amd_ags_version determine_ags_version(int ags_version)
 {
     /* AMD AGS is not binary compatible between versions (even minor versions), and the game
@@ -276,13 +322,8 @@ static enum amd_ags_version determine_ags_version(int ags_version)
      * In case of an error, assume it's that version.
      */
     enum amd_ags_version ret = AMD_AGS_VERSION_5_4_1;
-    DWORD infosize;
-    void *infobuf = NULL;
-    void *val;
-    UINT vallen;
-    VS_FIXEDFILEINFO *info;
-    UINT16 major, minor, patch;
     WCHAR dllname[MAX_PATH], temp_path[MAX_PATH], temp_name[MAX_PATH];
+    DWORD size;
 
     TRACE("ags_version %#x.\n", ags_version);
 
@@ -290,8 +331,8 @@ static enum amd_ags_version determine_ags_version(int ags_version)
         return get_version_number(ags_version);
 
     *temp_name = 0;
-    if (!(infosize = GetModuleFileNameW(GetModuleHandleW(L"amd_ags_x64.dll"), dllname, ARRAY_SIZE(dllname)))
-            || infosize == ARRAY_SIZE(dllname))
+    if (!(size = GetModuleFileNameW(GetModuleHandleW(L"amd_ags_x64.dll"), dllname, ARRAY_SIZE(dllname)))
+            || size == ARRAY_SIZE(dllname))
     {
         ERR("GetModuleFileNameW failed.\n");
         goto done;
@@ -307,43 +348,12 @@ static enum amd_ags_version determine_ags_version(int ags_version)
         goto done;
     }
 
-    infosize = GetFileVersionInfoSizeW(temp_name, NULL);
-    if (!infosize)
-    {
-        ERR("Unable to determine desired version of amd_ags_x64.dll.\n");
-        goto done;
-    }
-
-    if (!(infobuf = heap_alloc(infosize)))
-    {
-        ERR("Failed to allocate memory.\n");
-        goto done;
-    }
-
-    if (!GetFileVersionInfoW(temp_name, 0, infosize, infobuf))
-    {
-        ERR("Unable to determine desired version of amd_ags_x64.dll.\n");
-        goto done;
-    }
-
-    if (!VerQueryValueW(infobuf, L"\\", &val, &vallen) || (vallen != sizeof(VS_FIXEDFILEINFO)))
-    {
-        ERR("Unable to determine desired version of amd_ags_x64.dll.\n");
-        goto done;
-    }
-
-    info = val;
-    major = info->dwFileVersionMS >> 16;
-    minor = info->dwFileVersionMS;
-    patch = info->dwFileVersionLS >> 16;
-    TRACE("Found amd_ags_x64.dll v%d.%d.%d\n", major, minor, patch);
-    ret = get_version_number(AGS_MAKE_VERSION(major, minor, patch));
+    get_ags_version_from_resource(temp_name, &ret);
 
 done:
     if (*temp_name)
         DeleteFileW(temp_name);
 
-    heap_free(infobuf);
     TRACE("Using AGS v%d.%d.%d interface\n",
           amd_ags_info[ret].major, amd_ags_info[ret].minor, amd_ags_info[ret].patch);
     return ret;
