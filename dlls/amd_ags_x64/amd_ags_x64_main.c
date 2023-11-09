@@ -311,15 +311,29 @@ static BOOL get_ags_version_from_resource(const WCHAR *filename, enum amd_ags_ve
     return TRUE;
 }
 
+static enum amd_ags_version guess_version_from_exports(HMODULE hnative)
+{
+    /* Known DLL versions without version info:
+     *  - An update to AGS 5.4.1 included an amd_ags_x64.dll with no file version info;
+     *  - CoD: Modern Warfare Remastered (2017) ships dll without version info which is version 5.0.1
+     *    (not tagged in AGSSDK history), compatible with 5.0.5.
+     */
+    if (GetProcAddress(hnative, "agsDriverExtensionsDX11_Init"))
+    {
+        /* agsDriverExtensionsDX11_Init was deprecated in 5.3.0 */
+        TRACE("agsDriverExtensionsDX11_Init found.\n");
+        return AMD_AGS_VERSION_5_0_5;
+    }
+    TRACE("Returning 5.4.1.\n");
+    return AMD_AGS_VERSION_5_4_1;
+}
+
 static enum amd_ags_version determine_ags_version(int ags_version)
 {
     /* AMD AGS is not binary compatible between versions (even minor versions), and the game
      * does not request a specific version when calling agsInit().
      * Checking the version of amd_ags_x64.dll shipped with the game is the only way to
      * determine what version the game was built against.
-     *
-     * An update to AGS 5.4.1 included an amd_ags_x64.dll with no file version info.
-     * In case of an error, assume it's that version.
      */
     enum amd_ags_version ret = AMD_AGS_VERSION_5_4_1;
     WCHAR dllname[MAX_PATH], temp_path[MAX_PATH], temp_name[MAX_PATH];
@@ -364,7 +378,10 @@ static enum amd_ags_version determine_ags_version(int ags_version)
         ags_version = pagsGetVersionNumber();
         ret = get_version_number(ags_version);
         TRACE("Got version %#x (%d) from agsGetVersionNumber.\n", ags_version, ret);
+        goto done;
     }
+
+    ret = guess_version_from_exports(hnative);
 
 done:
     if (hnative)
