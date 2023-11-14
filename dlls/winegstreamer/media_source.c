@@ -1427,6 +1427,7 @@ static HRESULT WINAPI media_source_GetCharacteristics(IMFMediaSource *iface, DWO
 static HRESULT WINAPI media_source_CreatePresentationDescriptor(IMFMediaSource *iface, IMFPresentationDescriptor **descriptor)
 {
     struct media_source *source = impl_from_IMFMediaSource(iface);
+    BOOL video_selected = FALSE, audio_selected = FALSE;
     HRESULT hr;
     UINT i;
 
@@ -1443,8 +1444,22 @@ static HRESULT WINAPI media_source_CreatePresentationDescriptor(IMFMediaSource *
 
         for (i = 0; i < source->stream_count; ++i)
         {
-            if (FAILED(hr = IMFPresentationDescriptor_SelectStream(*descriptor, i)))
-                WARN("Failed to select stream %u, hr %#lx\n", i, hr);
+            struct wg_format format;
+
+            wg_format_from_stream_descriptor(source->descriptors[i], &format);
+
+            if (format.major_type >= WG_MAJOR_TYPE_VIDEO)
+            {
+                if (!video_selected && FAILED(hr = IMFPresentationDescriptor_SelectStream(*descriptor, i)))
+                    WARN("Failed to select stream %u, hr %#lx\n", i, hr);
+                video_selected = TRUE;
+            }
+            else if (format.major_type >= WG_MAJOR_TYPE_AUDIO)
+            {
+                if (!audio_selected && FAILED(hr = IMFPresentationDescriptor_SelectStream(*descriptor, i)))
+                    WARN("Failed to select stream %u, hr %#lx\n", i, hr);
+                audio_selected = TRUE;
+            }
         }
 
         hr = S_OK;
