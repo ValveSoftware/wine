@@ -1684,7 +1684,7 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
 
         object->duration = max(object->duration, wg_parser_stream_get_duration(wg_stream));
         IMFStreamDescriptor_AddRef(descriptor);
-        object->descriptors[i] = descriptor;
+        object->descriptors[stream_count - 1 - i] = descriptor;
         object->streams[i] = stream;
         object->stream_count++;
     }
@@ -1699,11 +1699,15 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
 fail:
     WARN("Failed to construct MFMediaSource, hr %#lx.\n", hr);
 
-    while (object->streams && object->stream_count--)
+    for (i = 0; i < stream_count; i++)
     {
-        struct media_stream *stream = object->streams[object->stream_count];
-        IMFStreamDescriptor_Release(object->descriptors[object->stream_count]);
-        IMFMediaStream_Release(&stream->IMFMediaStream_iface);
+        if (object->streams && object->streams[i])
+            IMFMediaStream_Release(&object->streams[i]->IMFMediaStream_iface);
+    }
+    for (i = 0; i < stream_count; i++)
+    {
+        if (object->descriptors && object->descriptors[i])
+            IMFStreamDescriptor_Release(object->descriptors[i]);
     }
     free(object->descriptors);
     free(object->streams);
