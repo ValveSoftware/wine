@@ -396,43 +396,31 @@ void wg_format_from_caps(struct wg_format *format, const GstCaps *caps)
 {
     const GstStructure *structure = gst_caps_get_structure(caps, 0);
     const char *name = gst_structure_get_name(structure);
+    GstAudioInfo audio_info;
+    GstVideoInfo video_info;
     gboolean parsed;
 
     memset(format, 0, sizeof(*format));
 
-    if (!strcmp(name, "audio/x-raw"))
+    if (g_str_has_prefix(name, "audio/") && gst_audio_info_from_caps(&audio_info, caps))
     {
-        GstAudioInfo info;
-
-        if (gst_audio_info_from_caps(&info, caps))
-            wg_format_from_audio_info(format, &info);
+        if (GST_AUDIO_INFO_FORMAT(&audio_info) != GST_AUDIO_FORMAT_ENCODED)
+            wg_format_from_audio_info(format, &audio_info);
+        else if (!strcmp(name, "audio/mpeg") && gst_structure_get_boolean(structure, "parsed", &parsed) && parsed)
+            wg_format_from_caps_audio_mpeg1(format, caps);
+        else if (!strcmp(name, "audio/x-wma"))
+            wg_format_from_caps_audio_wma(format, caps);
     }
-    else if (!strcmp(name, "video/x-raw"))
+    else if (g_str_has_prefix(name, "video/") && gst_video_info_from_caps(&video_info, caps))
     {
-        GstVideoInfo info;
-
-        if (gst_video_info_from_caps(&info, caps))
-            wg_format_from_video_info(format, &info);
-    }
-    else if (!strcmp(name, "audio/mpeg") && gst_structure_get_boolean(structure, "parsed", &parsed) && parsed)
-    {
-        wg_format_from_caps_audio_mpeg1(format, caps);
-    }
-    else if (!strcmp(name, "audio/x-wma"))
-    {
-        wg_format_from_caps_audio_wma(format, caps);
-    }
-    else if (!strcmp(name, "video/x-cinepak"))
-    {
-        wg_format_from_caps_video_cinepak(format, caps);
-    }
-    else if (!strcmp(name, "video/x-wmv"))
-    {
-        wg_format_from_caps_video_wmv(format, caps);
-    }
-    else if (!strcmp(name, "video/mpeg") && gst_structure_get_boolean(structure, "parsed", &parsed) && parsed)
-    {
-        wg_format_from_caps_video_mpeg1(format, caps);
+        if (GST_VIDEO_INFO_FORMAT(&video_info) != GST_VIDEO_FORMAT_ENCODED)
+            wg_format_from_video_info(format, &video_info);
+        else if (!strcmp(name, "video/x-cinepak"))
+            wg_format_from_caps_video_cinepak(format, caps);
+        else if (!strcmp(name, "video/x-wmv"))
+            wg_format_from_caps_video_wmv(format, caps);
+        else if (!strcmp(name, "video/mpeg") && gst_structure_get_boolean(structure, "parsed", &parsed) && parsed)
+            wg_format_from_caps_video_mpeg1(format, caps);
     }
     else
     {
