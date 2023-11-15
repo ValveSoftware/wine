@@ -47,6 +47,8 @@
 
 GST_DEBUG_CATEGORY(wine);
 
+extern bool media_converter_init(void);
+
 static UINT thread_count;
 
 GstStreamType stream_type_from_caps(GstCaps *caps)
@@ -303,6 +305,12 @@ NTSTATUS wg_init_gstreamer(void *arg)
 
     if (!gst_element_register_winegstreamerstepper(NULL))
         GST_ERROR("Failed to register the stepper element");
+
+    if (!media_converter_init())
+    {
+        GST_ERROR("Failed to init media converter.");
+        return STATUS_UNSUCCESSFUL;
+    }
 
     return STATUS_SUCCESS;
 }
