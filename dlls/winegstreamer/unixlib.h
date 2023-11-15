@@ -37,12 +37,14 @@ enum wg_major_type
     WG_MAJOR_TYPE_AUDIO_MPEG1,
     WG_MAJOR_TYPE_AUDIO_MPEG4,
     WG_MAJOR_TYPE_AUDIO_WMA,
+    WG_MAJOR_TYPE_AUDIO_ENCODED,
     WG_MAJOR_TYPE_VIDEO,
     WG_MAJOR_TYPE_VIDEO_CINEPAK,
     WG_MAJOR_TYPE_VIDEO_H264,
     WG_MAJOR_TYPE_VIDEO_WMV,
     WG_MAJOR_TYPE_VIDEO_INDEO,
     WG_MAJOR_TYPE_VIDEO_MPEG1,
+    WG_MAJOR_TYPE_VIDEO_ENCODED,
 };
 
 typedef UINT32 wg_audio_format;
@@ -128,6 +130,12 @@ struct wg_format
             unsigned char codec_data[64];
             UINT8 is_xma;
         } audio_wma;
+        struct
+        {
+            uint32_t channels;
+            uint32_t rate;
+            char caps[512];
+        } audio_encoded;
 
         struct
         {
@@ -173,6 +181,12 @@ struct wg_format
             int32_t width, height;
             uint32_t fps_n, fps_d;
         } video_mpeg1;
+        struct
+        {
+            int32_t width, height;
+            uint32_t fps_n, fps_d;
+            char caps[512];
+        } video_encoded;
     } u;
 };
 

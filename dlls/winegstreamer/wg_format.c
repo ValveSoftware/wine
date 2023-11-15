@@ -267,6 +267,25 @@ static void wg_format_from_caps_audio_wma(struct wg_format *format, const GstCap
     gst_buffer_unmap(codec_data, &map);
 }
 
+static void wg_format_from_caps_audio_encoded(struct wg_format *format, const GstCaps *caps,
+        const GstAudioInfo *info)
+{
+    gchar *str;
+    gint len;
+
+    format->major_type = WG_MAJOR_TYPE_AUDIO_ENCODED;
+    format->u.audio_encoded.rate = info->rate;
+    format->u.audio_encoded.channels = info->channels;
+
+    str = gst_caps_to_string(caps);
+    len = strlen(str) + 1;
+    if (len >= ARRAY_SIZE(format->u.audio_encoded.caps))
+        GST_FIXME("wg_format.audio_encoded.caps buffer is too small, need %u bytes", len);
+    else
+        memcpy(format->u.audio_encoded.caps, str, len);
+    g_free(str);
+}
+
 static void wg_format_from_caps_video_cinepak(struct wg_format *format, const GstCaps *caps)
 {
     const GstStructure *structure = gst_caps_get_structure(caps, 0);
@@ -392,6 +411,27 @@ static void wg_format_from_caps_video_mpeg1(struct wg_format *format, const GstC
     format->u.video_mpeg1.fps_d = fps_d;
 }
 
+static void wg_format_from_caps_video_encoded(struct wg_format *format, const GstCaps *caps,
+        const GstVideoInfo *info)
+{
+    gchar *str;
+    gint len;
+
+    format->major_type = WG_MAJOR_TYPE_VIDEO_ENCODED;
+    format->u.video_encoded.width = info->width;
+    format->u.video_encoded.height = info->height;
+    format->u.video_encoded.fps_n = info->fps_n;
+    format->u.video_encoded.fps_d = info->fps_d;
+
+    str = gst_caps_to_string(caps);
+    len = strlen(str) + 1;
+    if (len >= ARRAY_SIZE(format->u.video_encoded.caps))
+        GST_FIXME("wg_format.video_encoded.caps buffer is too small, need %u bytes", len);
+    else
+        memcpy(format->u.video_encoded.caps, str, len);
+    g_free(str);
+}
+
 void wg_format_from_caps(struct wg_format *format, const GstCaps *caps)
 {
     const GstStructure *structure = gst_caps_get_structure(caps, 0);
@@ -410,6 +450,11 @@ void wg_format_from_caps(struct wg_format *format, const GstCaps *caps)
             wg_format_from_caps_audio_mpeg1(format, caps);
         else if (!strcmp(name, "audio/x-wma"))
             wg_format_from_caps_audio_wma(format, caps);
+        else
+        {
+            GST_FIXME("Using fallback for encoded audio caps %" GST_PTR_FORMAT ".", caps);
+            wg_format_from_caps_audio_encoded(format, caps, &audio_info);
+        }
     }
     else if (g_str_has_prefix(name, "video/") && gst_video_info_from_caps(&video_info, caps))
     {
@@ -421,6 +466,11 @@ void wg_format_from_caps(struct wg_format *format, const GstCaps *caps)
             wg_format_from_caps_video_wmv(format, caps);
         else if (!strcmp(name, "video/mpeg") && gst_structure_get_boolean(structure, "parsed", &parsed) && parsed)
             wg_format_from_caps_video_mpeg1(format, caps);
+        else
+        {
+            GST_FIXME("Using fallback for encoded video caps %" GST_PTR_FORMAT ".", caps);
+            wg_format_from_caps_video_encoded(format, caps, &video_info);
+        }
     }
     else
     {
@@ -871,6 +921,8 @@ GstCaps *wg_format_to_caps(const struct wg_format *format)
             return wg_format_to_caps_audio_mpeg4(format);
         case WG_MAJOR_TYPE_AUDIO_WMA:
             return wg_format_to_caps_audio_wma(format);
+        case WG_MAJOR_TYPE_AUDIO_ENCODED:
+            return gst_caps_from_string(format->u.audio_encoded.caps);
         case WG_MAJOR_TYPE_VIDEO:
             return wg_format_to_caps_video(format);
         case WG_MAJOR_TYPE_VIDEO_CINEPAK:
@@ -883,6 +935,8 @@ GstCaps *wg_format_to_caps(const struct wg_format *format)
             return wg_format_to_caps_video_indeo(format);
         case WG_MAJOR_TYPE_VIDEO_MPEG1:
             return wg_format_to_caps_video_mpeg1(format);
+        case WG_MAJOR_TYPE_VIDEO_ENCODED:
+            return gst_caps_from_string(format->u.video_encoded.caps);
     }
     assert(0);
     return NULL;
@@ -898,9 +952,11 @@ bool wg_format_compare(const struct wg_format *a, const struct wg_format *b)
         case WG_MAJOR_TYPE_AUDIO_MPEG1:
         case WG_MAJOR_TYPE_AUDIO_MPEG4:
         case WG_MAJOR_TYPE_AUDIO_WMA:
+        case WG_MAJOR_TYPE_AUDIO_ENCODED:
         case WG_MAJOR_TYPE_VIDEO_H264:
         case WG_MAJOR_TYPE_VIDEO_INDEO:
         case WG_MAJOR_TYPE_VIDEO_MPEG1:
+        case WG_MAJOR_TYPE_VIDEO_ENCODED:
             GST_FIXME("Format %u not implemented!", a->major_type);
             /* fallthrough */
         case WG_MAJOR_TYPE_UNKNOWN:
