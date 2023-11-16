@@ -327,7 +327,7 @@ struct font_backend_funcs
     UINT  (*get_default_glyph)( struct gdi_font *gdi_font );
     UINT  (*get_glyph_outline)( struct gdi_font *font, UINT glyph, UINT format,
                                 GLYPHMETRICS *gm, ABC *abc, UINT buflen, void *buf,
-                                const MAT2 *mat, BOOL tategaki );
+                                const MAT2 *mat, BOOL tategaki, UINT aa_flags );
     UINT  (*get_unicode_ranges)( struct gdi_font *font, GLYPHSET *gs );
     BOOL  (*get_char_width_info)( struct gdi_font *font, struct char_width_info *info );
     BOOL  (*set_outline_text_metrics)( struct gdi_font *font );
