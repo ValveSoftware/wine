@@ -254,6 +254,8 @@ HRESULT IDirectSoundCaptureImpl_Create(IUnknown *outer_unk, REFIID riid, void **
 extern CRITICAL_SECTION DSOUND_renderers_lock DECLSPEC_HIDDEN;
 extern struct list DSOUND_renderers DECLSPEC_HIDDEN;
 
+extern GUID DSOUND_renderer_guids[MAXWAVEDRIVERS] DECLSPEC_HIDDEN;
+extern GUID DSOUND_capture_guids[MAXWAVEDRIVERS] DECLSPEC_HIDDEN;
 
 extern const WCHAR wine_vxd_drv[] DECLSPEC_HIDDEN;
 
@@ -263,7 +265,8 @@ HRESULT get_mmdevice(EDataFlow flow, const GUID *tgt, IMMDevice **device) DECLSP
 
 BOOL DSOUND_check_supported(IAudioClient *client, DWORD rate,
         DWORD depth, WORD channels) DECLSPEC_HIDDEN;
-HRESULT enumerate_mmdevices(EDataFlow flow, LPDSENUMCALLBACKW cb, void *user) DECLSPEC_HIDDEN;
+HRESULT enumerate_mmdevices(EDataFlow flow, GUID *guids,
+        LPDSENUMCALLBACKW cb, void *user) DECLSPEC_HIDDEN;
 
 static inline WCHAR *strdupW( const WCHAR *str )
 {
