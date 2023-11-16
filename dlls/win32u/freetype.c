@@ -3459,7 +3459,7 @@ static FT_Int get_load_flags( UINT format, BOOL vertical_metrics, BOOL force_no_
  */
 static UINT freetype_get_glyph_outline( struct gdi_font *font, UINT glyph, UINT format,
                                         GLYPHMETRICS *lpgm, ABC *abc, UINT buflen, void *buf,
-                                        const MAT2 *lpmat, BOOL tategaki )
+                                        const MAT2 *lpmat, BOOL tategaki, UINT aa_flags )
 {
     struct gdi_font *base_font = font->base_font ? font->base_font : font;
     FT_Face ft_face = get_ft_face( font );
@@ -3469,6 +3469,7 @@ static UINT freetype_get_glyph_outline( struct gdi_font *font, UINT glyph, UINT 
     FT_Int load_flags;
     FT_Matrix transform_matrices[3], *matrices = NULL;
     BOOL vertical_metrics;
+    UINT effective_format = format;
 
     TRACE("%p, %04x, %08x, %p, %08x, %p, %p\n", font, glyph, format, lpgm, buflen, buf, lpmat);
 
@@ -3478,14 +3479,22 @@ static UINT freetype_get_glyph_outline( struct gdi_font *font, UINT glyph, UINT 
 
     matrices = get_transform_matrices( font, tategaki, lpmat, transform_matrices );
 
+    if (aa_flags && (format & ~GGO_GLYPH_INDEX) == GGO_METRICS)
+        effective_format = aa_flags | (format & GGO_GLYPH_INDEX);
     vertical_metrics = (tategaki && FT_HAS_VERTICAL(ft_face));
     /* there is a freetype bug where vertical metrics are only
        properly scaled and correct in 2.4.0 or greater */
     if (vertical_metrics && FT_SimpleVersion < FT_VERSION_VALUE(2, 4, 0))
         vertical_metrics = FALSE;
-    load_flags = get_load_flags(format, vertical_metrics, !!matrices);
+    load_flags = get_load_flags(effective_format, vertical_metrics, !!matrices);
 
     err = pFT_Load_Glyph(ft_face, glyph, load_flags);
+    if (err && format != effective_format)
+    {
+        WARN("Failed to load glyph %#x, retrying with GGO_METRICS. Error %#x.\n", glyph, err);
+        load_flags = get_load_flags(effective_format, vertical_metrics, !!matrices);
+        err = pFT_Load_Glyph(ft_face, glyph, load_flags);
+    }
     if (err && !(load_flags & FT_LOAD_NO_HINTING))
     {
         WARN("Failed to load glyph %#x, retrying without hinting. Error %#x.\n", glyph, err);
