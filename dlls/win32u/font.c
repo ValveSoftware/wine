@@ -4689,6 +4689,7 @@ static HFONT font_SelectFont( PHYSDEV dev, HFONT hfont, UINT *aa_flags )
                     *aa_flags = font_smoothing;
             }
             *aa_flags = font_funcs->get_aa_flags( font, *aa_flags, antialias_fakes );
+            font->aa_flags = *aa_flags;
         }
         TRACE( "%p %s %d aa %x\n", hfont, debugstr_w(lf.lfFaceName), (int)lf.lfHeight, *aa_flags );
         pthread_mutex_unlock( &font_lock );
