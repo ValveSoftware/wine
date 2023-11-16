@@ -3776,7 +3776,7 @@ static UINT get_glyph_index_linked( struct gdi_font **font, UINT glyph )
 
 static DWORD get_glyph_outline( struct gdi_font *font, UINT glyph, UINT format,
                                 GLYPHMETRICS *gm_ret, ABC *abc_ret, DWORD buflen, void *buf,
-                                const MAT2 *mat )
+                                const MAT2 *mat, UINT aa_flags )
 {
     GLYPHMETRICS gm;
     ABC abc;
@@ -3810,7 +3810,7 @@ static DWORD get_glyph_outline( struct gdi_font *font, UINT glyph, UINT format,
     if (format == GGO_METRICS && !mat && get_gdi_font_glyph_metrics( font, index, &gm, &abc ))
         goto done;
 
-    ret = font_funcs->get_glyph_outline( font, index, format, &gm, &abc, buflen, buf, mat, tategaki );
+    ret = font_funcs->get_glyph_outline( font, index, format, &gm, &abc, buflen, buf, mat, tategaki, aa_flags );
     if (ret == GDI_ERROR) return ret;
 
     if (format == GGO_METRICS && !mat)
@@ -3859,7 +3859,7 @@ static BOOL font_GetCharABCWidths( PHYSDEV dev, UINT first, UINT count, WCHAR *c
     for (i = 0; i < count; i++)
     {
         c = chars ? chars[i] : first + i;
-        get_glyph_outline( physdev->font, c, GGO_METRICS, NULL, &buffer[i], 0, NULL, NULL );
+        get_glyph_outline( physdev->font, c, GGO_METRICS, NULL, &buffer[i], 0, NULL, NULL, physdev->aa_flags );
     }
     pthread_mutex_unlock( &font_lock );
     return TRUE;
@@ -3885,7 +3885,7 @@ static BOOL font_GetCharABCWidthsI( PHYSDEV dev, UINT first, UINT count, WORD *g
     pthread_mutex_lock( &font_lock );
     for (c = 0; c < count; c++, buffer++)
         get_glyph_outline( physdev->font, gi ? gi[c] : first + c, GGO_METRICS | GGO_GLYPH_INDEX,
-                           NULL, buffer, 0, NULL, NULL );
+                           NULL, buffer, 0, NULL, NULL, physdev->aa_flags );
     pthread_mutex_unlock( &font_lock );
     return TRUE;
 }
@@ -3912,7 +3912,7 @@ static BOOL font_GetCharWidth( PHYSDEV dev, UINT first, UINT count, const WCHAR 
     for (i = 0; i < count; i++)
     {
         c = chars ? chars[i] : i + first;
-        if (get_glyph_outline( physdev->font, c, GGO_METRICS, NULL, &abc, 0, NULL, NULL ) == GDI_ERROR)
+        if (get_glyph_outline( physdev->font, c, GGO_METRICS, NULL, &abc, 0, NULL, NULL, physdev->aa_flags ) == GDI_ERROR)
             buffer[i] = 0;
         else
             buffer[i] = abc.abcA + abc.abcB + abc.abcC;
@@ -4091,7 +4091,7 @@ static DWORD font_GetGlyphOutline( PHYSDEV dev, UINT glyph, UINT format,
         return dev->funcs->pGetGlyphOutline( dev, glyph, format, gm, buflen, buf, mat );
     }
     pthread_mutex_lock( &font_lock );
-    ret = get_glyph_outline( physdev->font, glyph, format, gm, NULL, buflen, buf, mat );
+    ret = get_glyph_outline( physdev->font, glyph, format, gm, NULL, buflen, buf, mat, physdev->aa_flags );
     pthread_mutex_unlock( &font_lock );
     return ret;
 }
@@ -4271,7 +4271,7 @@ static BOOL font_GetTextExtentExPoint( PHYSDEV dev, const WCHAR *str, INT count,
     pthread_mutex_lock( &font_lock );
     for (i = pos = 0; i < count; i++)
     {
-        get_glyph_outline( physdev->font, str[i], GGO_METRICS, NULL, &abc, 0, NULL, NULL );
+        get_glyph_outline( physdev->font, str[i], GGO_METRICS, NULL, &abc, 0, NULL, NULL, physdev->aa_flags );
         pos += abc.abcA + abc.abcB + abc.abcC;
         dxs[i] = pos;
     }
@@ -4301,7 +4301,7 @@ static BOOL font_GetTextExtentExPointI( PHYSDEV dev, const WORD *indices, INT co
     for (i = pos = 0; i < count; i++)
     {
         get_glyph_outline( physdev->font, indices[i], GGO_METRICS | GGO_GLYPH_INDEX,
-                           NULL, &abc, 0, NULL, NULL );
+                           NULL, &abc, 0, NULL, NULL, physdev->aa_flags );
         pos += abc.abcA + abc.abcB + abc.abcC;
         dxs[i] = pos;
     }
