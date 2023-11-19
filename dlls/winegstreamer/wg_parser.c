@@ -147,7 +147,9 @@ static bool format_is_compressed(struct wg_format *format)
 {
     return format->major_type != WG_MAJOR_TYPE_UNKNOWN
             && format->major_type != WG_MAJOR_TYPE_VIDEO
-            && format->major_type != WG_MAJOR_TYPE_AUDIO;
+            && format->major_type != WG_MAJOR_TYPE_AUDIO
+            && format->major_type != WG_MAJOR_TYPE_VIDEO_ENCODED
+            && format->major_type != WG_MAJOR_TYPE_AUDIO_ENCODED;
 }
 
 static NTSTATUS wg_parser_get_stream_count(void *args)
