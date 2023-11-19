@@ -65,6 +65,7 @@ extern NTSTATUS wg_source_get_stream_count(void *args);
 extern NTSTATUS wg_source_get_duration(void *args);
 extern NTSTATUS wg_source_get_position(void *args);
 extern NTSTATUS wg_source_push_data(void *args);
+extern NTSTATUS wg_source_get_stream_format(void *args);
 
 /* wg_transform.c */
 

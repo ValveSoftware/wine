@@ -628,3 +628,21 @@ eos:
 
     return STATUS_SUCCESS;
 }
+
+NTSTATUS wg_source_get_stream_format(void *args)
+{
+    struct wg_source_get_stream_format_params *params = args;
+    struct wg_source *source = get_source(params->source);
+    guint index = params->index;
+    GstCaps *caps;
+
+    GST_TRACE("source %p, index %u", source, index);
+
+    if (!(caps = source_get_stream_caps(source, index)))
+        return STATUS_UNSUCCESSFUL;
+    wg_format_from_caps(&params->format, caps);
+
+    gst_caps_unref(caps);
+    return STATUS_SUCCESS;
+}
+
