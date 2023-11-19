@@ -1721,6 +1721,50 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
     media_source_Shutdown,
 };
 
+static HRESULT map_stream_to_wg_parser_stream(struct media_source *source, UINT stream_count,
+        wg_parser_stream_t *parser_streams, wg_parser_stream_t parser_stream)
+{
+    struct wg_format parser_format, source_format;
+    HRESULT hr;
+    UINT i;
+
+    wg_parser_stream_get_preferred_format(parser_stream, &parser_format);
+
+    for (i = 0; i < stream_count; i++)
+    {
+        if (parser_streams[i])
+            continue;
+        if (FAILED(hr = wg_source_get_stream_format(source->wg_source, i, &source_format)))
+            return hr;
+        if ((parser_format.major_type >= WG_MAJOR_TYPE_VIDEO) != (source_format.major_type >= WG_MAJOR_TYPE_VIDEO)
+                || (parser_format.major_type >= WG_MAJOR_TYPE_AUDIO) != (source_format.major_type >= WG_MAJOR_TYPE_AUDIO))
+            continue;
+
+        TRACE("Mapped stream %#I64x with descriptor %u\n", parser_stream, i);
+        parser_streams[i] = parser_stream;
+        return S_OK;
+    }
+
+    return E_FAIL;
+}
+
+static void media_source_init_parser_streams(struct media_source *source, UINT stream_count,
+        wg_parser_stream_t *parser_streams)
+{
+    wg_parser_stream_t parser_stream;
+    UINT i, parser_stream_count;
+    HRESULT hr;
+
+    parser_stream_count = wg_parser_get_stream_count(source->wg_parser);
+    for (i = 0; i < parser_stream_count; i++)
+    {
+        if (!(parser_stream = wg_parser_get_stream(source->wg_parser, i)))
+            continue;
+        if (FAILED(hr = map_stream_to_wg_parser_stream(source, stream_count, parser_streams, parser_stream)))
+            WARN("Failed to map parser stream %u, hr %#lx\n", i, hr);
+    }
+}
+
 static void media_source_init_descriptors(struct media_source *source)
 {
     HRESULT hr = S_OK;
@@ -1742,7 +1786,8 @@ static void media_source_init_descriptors(struct media_source *source)
 
 static HRESULT media_source_create(struct object_context *context, IMFMediaSource **out)
 {
-    UINT32 stream_count;
+    UINT32 stream_count = context->stream_count;
+    wg_parser_stream_t *parser_streams = NULL;
     struct media_source *object;
     wg_parser_t parser;
     unsigned int i;
@@ -1789,26 +1834,30 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
     if (FAILED(hr = wg_parser_connect(parser, object->file_size, NULL)))
         goto fail;
 
-    stream_count = wg_parser_get_stream_count(parser);
-
     if (!(object->descriptors = calloc(stream_count, sizeof(*object->descriptors)))
+            || !(parser_streams = calloc(stream_count, sizeof(*parser_streams)))
             || !(object->streams = calloc(stream_count, sizeof(*object->streams))))
     {
         hr = E_OUTOFMEMORY;
         goto fail;
     }
 
+    media_source_init_parser_streams(object, stream_count, parser_streams);
+
     for (i = 0; i < stream_count; ++i)
     {
-        wg_parser_stream_t wg_stream = wg_parser_get_stream(object->wg_parser, i);
+        wg_parser_stream_t parser_stream;
         IMFStreamDescriptor *descriptor;
         struct media_stream *stream;
         struct wg_format format;
 
-        wg_parser_stream_get_preferred_format(wg_stream, &format);
+        if (!(parser_stream = parser_streams[i]))
+            continue;
+        wg_parser_stream_get_preferred_format(parser_stream, &format);
+
         if (FAILED(hr = stream_descriptor_create(i, &format, &descriptor)))
             goto fail;
-        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, descriptor, wg_stream, &stream)))
+        if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, descriptor, parser_stream, &stream)))
         {
             IMFStreamDescriptor_Release(descriptor);
             goto fail;
@@ -1819,6 +1868,8 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
         object->streams[i] = stream;
         object->stream_count++;
     }
+
+    free(parser_streams);
 
     media_source_init_descriptors(object);
     object->state = SOURCE_STOPPED;
@@ -1836,6 +1887,7 @@ fail:
         IMFStreamDescriptor_Release(object->descriptors[object->stream_count]);
         IMFMediaStream_Release(&stream->IMFMediaStream_iface);
     }
+    free(parser_streams);
     free(object->descriptors);
     free(object->streams);
 
