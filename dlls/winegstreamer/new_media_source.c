@@ -311,6 +311,7 @@ struct media_source
     IMFStreamDescriptor **descriptors;
     struct media_stream **streams;
     ULONG stream_count;
+    UINT *stream_map;
 
     enum
     {
@@ -1694,6 +1695,7 @@ static HRESULT WINAPI media_source_Shutdown(IMFMediaSource *iface)
         IMFMediaEventQueue_Shutdown(stream->event_queue);
         IMFMediaStream_Release(&stream->IMFMediaStream_iface);
     }
+    free(source->stream_map);
     free(source->descriptors);
     free(source->streams);
 
@@ -1734,7 +1736,7 @@ static HRESULT map_stream_to_wg_parser_stream(struct media_source *source, UINT 
     {
         if (parser_streams[i])
             continue;
-        if (FAILED(hr = wg_source_get_stream_format(source->wg_source, i, &source_format)))
+        if (FAILED(hr = wg_source_get_stream_format(source->wg_source, source->stream_map[i], &source_format)))
             return hr;
         if ((parser_format.major_type >= WG_MAJOR_TYPE_VIDEO) != (source_format.major_type >= WG_MAJOR_TYPE_VIDEO)
                 || (parser_format.major_type >= WG_MAJOR_TYPE_AUDIO) != (source_format.major_type >= WG_MAJOR_TYPE_AUDIO))
@@ -1762,6 +1764,46 @@ static void media_source_init_parser_streams(struct media_source *source, UINT s
             continue;
         if (FAILED(hr = map_stream_to_wg_parser_stream(source, stream_count, parser_streams, parser_stream)))
             WARN("Failed to map parser stream %u, hr %#lx\n", i, hr);
+    }
+}
+
+static void media_source_init_stream_map(struct media_source *source, UINT stream_count)
+{
+    struct wg_format format;
+    int i, n = 0;
+
+    if (wcscmp(source->mime_type, L"video/mp4"))
+    {
+        for (i = stream_count - 1; i >= 0; i--)
+        {
+            TRACE("mapping stream %u to wg_source stream %u\n", i, i);
+            source->stream_map[i] = i;
+        }
+        return;
+    }
+
+    for (i = stream_count - 1; i >= 0; i--)
+    {
+        wg_source_get_stream_format(source->wg_source, i, &format);
+        if (format.major_type == WG_MAJOR_TYPE_UNKNOWN) continue;
+        if (format.major_type >= WG_MAJOR_TYPE_VIDEO) continue;
+        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+        source->stream_map[n++] = i;
+    }
+    for (i = stream_count - 1; i >= 0; i--)
+    {
+        wg_source_get_stream_format(source->wg_source, i, &format);
+        if (format.major_type == WG_MAJOR_TYPE_UNKNOWN) continue;
+        if (format.major_type < WG_MAJOR_TYPE_VIDEO) continue;
+        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+        source->stream_map[n++] = i;
+    }
+    for (i = stream_count - 1; i >= 0; i--)
+    {
+        wg_source_get_stream_format(source->wg_source, i, &format);
+        if (format.major_type != WG_MAJOR_TYPE_UNKNOWN) continue;
+        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+        source->stream_map[n++] = i;
     }
 }
 
@@ -1836,12 +1878,14 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
 
     if (!(object->descriptors = calloc(stream_count, sizeof(*object->descriptors)))
             || !(parser_streams = calloc(stream_count, sizeof(*parser_streams)))
+            || !(object->stream_map = calloc(stream_count, sizeof(*object->stream_map)))
             || !(object->streams = calloc(stream_count, sizeof(*object->streams))))
     {
         hr = E_OUTOFMEMORY;
         goto fail;
     }
 
+    media_source_init_stream_map(object, stream_count);
     media_source_init_parser_streams(object, stream_count, parser_streams);
 
     for (i = 0; i < stream_count; ++i)
@@ -1888,6 +1932,7 @@ fail:
         IMFMediaStream_Release(&stream->IMFMediaStream_iface);
     }
     free(parser_streams);
+    free(object->stream_map);
     free(object->descriptors);
     free(object->streams);
 
