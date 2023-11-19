@@ -459,6 +459,25 @@ HRESULT wg_source_push_data(wg_source_t source, const void *data, uint32_t size)
     return HRESULT_FROM_NT(WINE_UNIX_CALL(unix_wg_source_push_data, &params));
 }
 
+bool wg_source_get_stream_format(wg_source_t source, UINT32 index,
+        struct wg_format *format)
+{
+    struct wg_source_get_stream_format_params params =
+    {
+        .source = source,
+        .index = index,
+    };
+
+    TRACE("source %#I64x, index %u, format %p\n", source,
+            index, format);
+
+    if (WINE_UNIX_CALL(unix_wg_source_get_stream_format, &params))
+        return false;
+
+    *format = params.format;
+    return true;
+}
+
 wg_transform_t wg_transform_create(const struct wg_format *input_format,
         const struct wg_format *output_format, const struct wg_transform_attrs *attrs)
 {
