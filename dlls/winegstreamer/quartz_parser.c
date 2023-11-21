@@ -1583,10 +1583,18 @@ static BOOL decodebin_parser_filter_init_gst(struct parser *filter)
     unsigned int i, stream_count;
     WCHAR source_name[20];
 
+    const char *sgi = getenv("SteamGameId");
+    const WCHAR *format;
+
+    /* King of Fighters XIII requests the WMV decoder filter pins by name
+     * to connect them to a Sample Grabber filter.
+     */
+    format = (sgi && !strcmp(sgi, "222940")) ? L"out%u" : L"Stream %02u";
+
     stream_count = wg_parser_get_stream_count(parser);
     for (i = 0; i < stream_count; ++i)
     {
-        swprintf(source_name, ARRAY_SIZE(source_name), L"Stream %02u", i);
+        swprintf(source_name, ARRAY_SIZE(source_name), format, i);
         if (!create_pin(filter, wg_parser_get_stream(parser, i), source_name))
             return FALSE;
     }
