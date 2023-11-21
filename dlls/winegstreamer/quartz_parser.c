@@ -41,6 +41,7 @@ static const GUID MEDIASUBTYPE_VC1S = {mmioFOURCC('V','C','1','S'), 0x0000, 0x00
 static const GUID MEDIASUBTYPE_MP3  = {WAVE_FORMAT_MPEGLAYER3, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 static const GUID MEDIASUBTYPE_WMV_Unknown = {0x7ce12ca9, 0xbfbf, 0x43d9, {0x9d, 0x00, 0x82, 0xb8, 0xed, 0x54, 0x31, 0x6b}};
 DEFINE_GUID(MEDIASUBTYPE_ABGR32,D3DFMT_A8B8G8R8,0x524f,0x11ce,0x9f,0x53,0x00,0x20,0xaf,0x0b,0xa7,0x70);
+static const GUID MEDIASUBTYPE_XMAUDIO2 = {0x0166, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 
 struct parser
 {
@@ -301,6 +302,11 @@ static bool amt_from_wg_format_audio_wma(AM_MEDIA_TYPE *mt, const struct wg_form
             subtype = &MEDIASUBTYPE_WMAUDIO2;
             codec_data_len = WMAUDIO2_WFX_EXTRA_BYTES;
             fmt_tag = WAVE_FORMAT_WMAUDIO2;
+            if (format->u.audio.is_xma)
+            {
+                subtype = &MEDIASUBTYPE_XMAUDIO2;
+                fmt_tag = 0x0166;
+            }
             break;
         case 3:
             subtype = &MEDIASUBTYPE_WMAUDIO3;
@@ -870,7 +876,8 @@ static bool amt_to_wg_format_audio_mpeg1_layer3(const AM_MEDIA_TYPE *mt, struct 
     return true;
 }
 
-static bool amt_to_wg_format_audio_wma(const AM_MEDIA_TYPE *mt, struct wg_format *format)
+static bool amt_to_wg_format_audio_wma(const AM_MEDIA_TYPE *mt, struct wg_format *format,
+        bool is_xma)
 {
     const WAVEFORMATEX *audio_format = (const WAVEFORMATEX *)mt->pbFormat;
 
@@ -896,6 +903,7 @@ static bool amt_to_wg_format_audio_wma(const AM_MEDIA_TYPE *mt, struct wg_format
     else
         assert(false);
     format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+    format->u.audio.is_xma = is_xma;
     format->u.audio.bitrate = audio_format->nAvgBytesPerSec * 8;
     format->u.audio.rate = audio_format->nSamplesPerSec;
     format->u.audio.depth = audio_format->wBitsPerSample;
@@ -1075,7 +1083,9 @@ bool amt_to_wg_format(const AM_MEDIA_TYPE *mt, struct wg_format *format)
                 || IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_WMAUDIO2)
                 || IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_WMAUDIO3)
                 || IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_WMAUDIO_LOSSLESS))
-            return amt_to_wg_format_audio_wma(mt, format);
+            return amt_to_wg_format_audio_wma(mt, format, false);
+        if (IsEqualGUID(&mt->subtype, &MEDIASUBTYPE_XMAUDIO2))
+            return amt_to_wg_format_audio_wma(mt, format, true);
         return amt_to_wg_format_audio(mt, format);
     }
 
