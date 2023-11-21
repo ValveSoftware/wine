@@ -224,6 +224,7 @@ struct wg_parser_create_params
     wg_parser_t parser;
     wg_parser_type type;
     UINT8 output_compressed;
+    UINT8 use_opengl;
     UINT8 err_on;
     UINT8 warn_on;
 };

@@ -28,10 +28,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 
+#define GLIB_VERSION_MIN_REQUIRED GLIB_VERSION_2_30
 #include <gst/gst.h>
-#include <gst/video/video.h>
-#include <gst/audio/audio.h>
-#include <gst/tag/tag.h>
+#include <gst/gl/gl.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -46,6 +45,8 @@
  * any use of Wine debug logging in this entire file. */
 
 GST_DEBUG_CATEGORY(wine);
+
+GstGLDisplay *gl_display;
 
 GstStreamType stream_type_from_caps(GstCaps *caps)
 {
@@ -246,6 +247,8 @@ bool push_event(GstPad *pad, GstEvent *event)
 
 NTSTATUS wg_init_gstreamer(void *arg)
 {
+    static GstGLContext *gl_context;
+
     char arg0[] = "wine";
     char arg1[] = "--gst-disable-registry-fork";
     char *args[] = {arg0, arg1, NULL};
@@ -281,5 +284,28 @@ NTSTATUS wg_init_gstreamer(void *arg)
 
     GST_INFO("GStreamer library version %s; wine built with %d.%d.%d.",
             gst_version_string(), GST_VERSION_MAJOR, GST_VERSION_MINOR, GST_VERSION_MICRO);
+
+    if (!(gl_display = gst_gl_display_new()))
+        GST_ERROR("Failed to create OpenGL display");
+    else
+    {
+        GError *error = NULL;
+        gboolean ret;
+
+        GST_OBJECT_LOCK(gl_display);
+        ret = gst_gl_display_create_context(gl_display, NULL, &gl_context, &error);
+        GST_OBJECT_UNLOCK(gl_display);
+        g_clear_error(&error);
+
+        if (ret)
+            gst_gl_display_add_context(gl_display, gl_context);
+        else
+        {
+            GST_ERROR("Failed to create OpenGL context");
+            gst_object_unref(gl_display);
+            gl_display = NULL;
+        }
+    }
+
     return STATUS_SUCCESS;
 }

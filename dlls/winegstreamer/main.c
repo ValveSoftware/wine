@@ -66,17 +66,18 @@ bool array_reserve(void **elements, size_t *capacity, size_t count, size_t size)
     return TRUE;
 }
 
-wg_parser_t wg_parser_create(enum wg_parser_type type, bool output_compressed)
+wg_parser_t wg_parser_create(enum wg_parser_type type, bool output_compressed, bool use_opengl)
 {
     struct wg_parser_create_params params =
     {
         .type = type,
         .output_compressed = output_compressed,
+        .use_opengl = use_opengl,
         .err_on = ERR_ON(quartz),
         .warn_on = WARN_ON(quartz),
     };
 
-    TRACE("type %#x.\n", type);
+    TRACE("type %#x, use_opengl %u.\n", type, use_opengl);
 
     if (WINE_UNIX_CALL(unix_wg_parser_create, &params))
         return 0;
