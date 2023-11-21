@@ -119,7 +119,7 @@ static HRESULT try_create_wg_transform(struct h264_decoder *decoder)
 
     {
         const char *sgi;
-        if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "2009100")))
+        if ((sgi = getenv("SteamGameId")) && ((!strcmp(sgi, "2009100")) || (!strcmp(sgi, "2555360"))))
             attrs.low_latency = FALSE;
     }
 
