@@ -28,7 +28,6 @@
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
-WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
 extern const GUID MEDIASUBTYPE_VC1S;
 
@@ -486,7 +485,6 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
 {
     struct wmv_decoder *decoder = impl_from_IMediaObject(iface);
     struct wg_format wg_format;
-    unsigned int i;
 
     TRACE("iface %p, index %lu, type %p, flags %#lx.\n", iface, index, type, flags);
 
@@ -511,17 +509,18 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
     if (!IsEqualGUID(&type->majortype, &MEDIATYPE_Video))
         return DMO_E_TYPE_NOT_ACCEPTED;
 
-    for (i = 0; i < ARRAY_SIZE(wmv_decoder_input_types); ++i)
-        if (IsEqualGUID(&type->subtype, wmv_decoder_input_types[i]))
-            break;
-    if (i == ARRAY_SIZE(wmv_decoder_input_types))
-        return DMO_E_TYPE_NOT_ACCEPTED;
-
     if (!amt_to_wg_format((const AM_MEDIA_TYPE *)type, &wg_format))
         return DMO_E_TYPE_NOT_ACCEPTED;
-    assert(wg_format.major_type == WG_MAJOR_TYPE_VIDEO_WMV);
-    wg_format.u.video_wmv.fps_n = 0;
-    wg_format.u.video_wmv.fps_d = 0;
+    if (wg_format.major_type == WG_MAJOR_TYPE_VIDEO_WMV)
+    {
+        wg_format.u.video_wmv.fps_n = 0;
+        wg_format.u.video_wmv.fps_d = 0;
+    }
+    else if (wg_format.major_type == WG_MAJOR_TYPE_VIDEO)
+    {
+        wg_format.u.video.fps_n = 0;
+        wg_format.u.video.fps_d = 0;
+    }
 
     if (flags & DMO_SET_TYPEF_TEST_ONLY)
         return S_OK;
@@ -880,34 +879,10 @@ static const IPropertyStoreVtbl property_store_vtbl =
 
 HRESULT wmv_decoder_create(IUnknown *outer, IUnknown **out)
 {
-    static const struct wg_format input_format =
-    {
-        .major_type = WG_MAJOR_TYPE_VIDEO_WMV,
-        .u.video_wmv.format = WG_WMV_VIDEO_FORMAT_WMV3,
-    };
-    static const struct wg_format output_format =
-    {
-        .major_type = WG_MAJOR_TYPE_VIDEO,
-        .u.video =
-        {
-            .format = WG_VIDEO_FORMAT_NV12,
-            .width = 1920,
-            .height = 1080,
-        },
-    };
-    struct wg_transform_attrs attrs = {0};
-    wg_transform_t transform;
     struct wmv_decoder *decoder;
     HRESULT hr;
 
     TRACE("outer %p, out %p.\n", outer, out);
-
-    if (!(transform = wg_transform_create(&input_format, &output_format, &attrs)))
-    {
-        ERR_(winediag)("GStreamer doesn't support WMV decoding, please install appropriate plugins.\n");
-        return E_FAIL;
-    }
-    wg_transform_destroy(transform);
 
     if (!(decoder = calloc(1, sizeof(*decoder))))
         return E_OUTOFMEMORY;
