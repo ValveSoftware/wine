@@ -126,6 +126,7 @@ struct wg_format
             uint32_t block_align;
             uint32_t codec_data_len;
             unsigned char codec_data[64];
+            UINT8 is_xma;
         } audio_wma;
 
         struct
