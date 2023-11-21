@@ -1214,7 +1214,6 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
 {
     struct video_decoder *decoder = impl_from_IMediaObject(iface);
     IMFMediaType *media_type;
-    unsigned int i;
 
     TRACE("iface %p, index %lu, type %p, flags %#lx.\n", iface, index, type, flags);
 
@@ -1238,12 +1237,6 @@ static HRESULT WINAPI media_object_SetInputType(IMediaObject *iface, DWORD index
     }
 
     if (!IsEqualGUID(&type->majortype, &MEDIATYPE_Video))
-        return DMO_E_TYPE_NOT_ACCEPTED;
-
-    for (i = 0; i < decoder->input_type_count; ++i)
-        if (IsEqualGUID(&type->subtype, get_dmo_subtype(decoder->input_types[i])))
-            break;
-    if (i == decoder->input_type_count)
         return DMO_E_TYPE_NOT_ACCEPTED;
 
     if (FAILED(MFCreateMediaTypeFromRepresentation(AM_MEDIA_TYPE_REPRESENTATION,
@@ -1816,28 +1809,10 @@ static const GUID *const wmv_decoder_output_types[] =
 
 HRESULT wmv_decoder_create(IUnknown *outer, IUnknown **out)
 {
-    const MFVIDEOFORMAT output_format =
-    {
-        .dwSize = sizeof(MFVIDEOFORMAT),
-        .videoInfo = {.dwWidth = 1920, .dwHeight = 1080},
-        .guidFormat = MFVideoFormat_I420,
-    };
-    const MFVIDEOFORMAT input_format =
-    {
-        .dwSize = sizeof(MFVIDEOFORMAT),
-        .videoInfo = {.dwWidth = 1920, .dwHeight = 1080},
-        .guidFormat = MFVideoFormat_WMV3,
-    };
     struct video_decoder *decoder;
     HRESULT hr;
 
     TRACE("outer %p, out %p.\n", outer, out);
-
-    if (FAILED(hr = check_video_transform_support(&input_format, &output_format)))
-    {
-        ERR_(winediag)("GStreamer doesn't support WMV decoding, please install appropriate plugins\n");
-        return hr;
-    }
 
     if (FAILED(hr = video_decoder_create_with_types(wmv_decoder_input_types, ARRAY_SIZE(wmv_decoder_input_types),
             wmv_decoder_output_types, ARRAY_SIZE(wmv_decoder_output_types), outer, &decoder)))
