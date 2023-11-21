@@ -1477,7 +1477,10 @@ static HRESULT init_stream(struct wm_reader *reader)
     HRESULT hr;
     WORD i;
 
-    if (!(wg_parser = wg_parser_create(FALSE)))
+    /* 32-bit GStreamer ORC cannot efficiently convert I420 to RGBA, use OpenGL converter
+     * in that case but keep the usual codepath otherwise.
+     */
+    if (!(wg_parser = wg_parser_create(FALSE, sizeof(void *) == 4)))
         return E_OUTOFMEMORY;
 
     reader->wg_parser = wg_parser;
@@ -1616,7 +1619,7 @@ static HRESULT reinit_stream(struct wm_reader *reader, bool read_compressed)
     wg_parser_destroy(reader->wg_parser);
     reader->wg_parser = 0;
 
-    if (!(wg_parser = wg_parser_create(read_compressed)))
+    if (!(wg_parser = wg_parser_create(read_compressed, sizeof(void *) == 4 && !read_compressed)))
         return E_OUTOFMEMORY;
 
     reader->wg_parser = wg_parser;
