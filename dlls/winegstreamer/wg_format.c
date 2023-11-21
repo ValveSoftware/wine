@@ -643,10 +643,20 @@ static GstCaps *wg_format_to_caps_audio_wma(const struct wg_format *format)
     GstBuffer *buffer;
     GstCaps *caps;
 
-    if (!(caps = gst_caps_new_empty_simple("audio/x-wma")))
-        return NULL;
-    if (format->u.audio.version)
-        gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, format->u.audio.version, NULL);
+    if (format->u.audio.is_xma)
+    {
+        if (!(caps = gst_caps_new_empty_simple("audio/x-xma")))
+            return NULL;
+        if (format->u.audio.version)
+            gst_caps_set_simple(caps, "xmaversion", G_TYPE_INT, format->u.audio.version, NULL);
+    }
+    else
+    {
+        if (!(caps = gst_caps_new_empty_simple("audio/x-wma")))
+            return NULL;
+        if (format->u.audio.version)
+            gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, format->u.audio.version, NULL);
+    }
 
     if (format->u.audio.bitrate)
         gst_caps_set_simple(caps, "bitrate", G_TYPE_INT, format->u.audio.bitrate, NULL);
