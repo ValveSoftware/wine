@@ -253,6 +253,23 @@ NTSTATUS wg_init_gstreamer(void *arg)
     char **argv = args;
     GError *err;
 
+    const char *e;
+
+    if ((e = getenv("WINE_GST_REGISTRY_DIR")))
+    {
+        char gst_reg[PATH_MAX];
+#if defined(__x86_64__)
+        const char *arch = "/registry.x86_64.bin";
+#elif defined(__i386__)
+        const char *arch = "/registry.i386.bin";
+#else
+#error Bad arch
+#endif
+        strcpy(gst_reg, e);
+        strcat(gst_reg, arch);
+        setenv("GST_REGISTRY_1_0", gst_reg, 1);
+    }
+
     if (!gst_init_check(&argc, &argv, &err))
     {
         fprintf(stderr, "winegstreamer: failed to initialize GStreamer: %s\n", err->message);
