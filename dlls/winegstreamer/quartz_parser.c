@@ -29,6 +29,8 @@
 #include "dvdmedia.h"
 #include "mmreg.h"
 #include "ks.h"
+#include "mfapi.h"
+#include "d3d9types.h"
 #include "wmcodecdsp.h"
 #include "initguid.h"
 #include "ksmedia.h"
@@ -39,6 +41,7 @@ static const GUID MEDIASUBTYPE_CVID = {mmioFOURCC('c','v','i','d'), 0x0000, 0x00
 static const GUID MEDIASUBTYPE_VC1S = {mmioFOURCC('V','C','1','S'), 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 static const GUID MEDIASUBTYPE_MP3  = {WAVE_FORMAT_MPEGLAYER3, 0x0000, 0x0010, {0x80, 0x00, 0x00, 0xaa, 0x00, 0x38, 0x9b, 0x71}};
 static const GUID MEDIASUBTYPE_WMV_Unknown = {0x7ce12ca9, 0xbfbf, 0x43d9, {0x9d, 0x00, 0x82, 0xb8, 0xed, 0x54, 0x31, 0x6b}};
+extern const GUID MFVideoFormat_ABGR32;
 
 struct parser
 {
@@ -348,6 +351,7 @@ static unsigned int wg_format_get_max_size_video_raw(enum wg_video_format format
     {
         case WG_VIDEO_FORMAT_BGRA:
         case WG_VIDEO_FORMAT_BGRx:
+        case WG_VIDEO_FORMAT_RGBA:
         case WG_VIDEO_FORMAT_AYUV:
             return width * height * 4;
 
@@ -479,6 +483,7 @@ static const GUID *wg_video_format_get_mediasubtype(enum wg_video_format format)
         case WG_VIDEO_FORMAT_BGRA: return &MEDIASUBTYPE_ARGB32;
         case WG_VIDEO_FORMAT_BGRx: return &MEDIASUBTYPE_RGB32;
         case WG_VIDEO_FORMAT_BGR: return &MEDIASUBTYPE_RGB24;
+        case WG_VIDEO_FORMAT_RGBA: return &MFVideoFormat_ABGR32;
         case WG_VIDEO_FORMAT_RGB15: return &MEDIASUBTYPE_RGB555;
         case WG_VIDEO_FORMAT_RGB16: return &MEDIASUBTYPE_RGB565;
         case WG_VIDEO_FORMAT_AYUV: return &MEDIASUBTYPE_AYUV;
@@ -502,6 +507,7 @@ static DWORD wg_video_format_get_compression(enum wg_video_format format)
         case WG_VIDEO_FORMAT_BGRA: return BI_RGB;
         case WG_VIDEO_FORMAT_BGRx: return BI_RGB;
         case WG_VIDEO_FORMAT_BGR: return BI_RGB;
+        case WG_VIDEO_FORMAT_RGBA: return BI_RGB;
         case WG_VIDEO_FORMAT_RGB15: return BI_RGB;
         case WG_VIDEO_FORMAT_RGB16: return BI_BITFIELDS;
         case WG_VIDEO_FORMAT_AYUV: return mmioFOURCC('A','Y','U','V');
@@ -525,6 +531,7 @@ static WORD wg_video_format_get_depth(enum wg_video_format format)
         case WG_VIDEO_FORMAT_BGRA: return 32;
         case WG_VIDEO_FORMAT_BGRx: return 32;
         case WG_VIDEO_FORMAT_BGR: return 24;
+        case WG_VIDEO_FORMAT_RGBA: return 32;
         case WG_VIDEO_FORMAT_RGB15: return 16;
         case WG_VIDEO_FORMAT_RGB16: return 16;
         case WG_VIDEO_FORMAT_AYUV: return 32;
@@ -923,6 +930,7 @@ static bool amt_to_wg_format_video(const AM_MEDIA_TYPE *mt, struct wg_format *fo
         {&MEDIASUBTYPE_ARGB32,  WG_VIDEO_FORMAT_BGRA},
         {&MEDIASUBTYPE_RGB32,   WG_VIDEO_FORMAT_BGRx},
         {&MEDIASUBTYPE_RGB24,   WG_VIDEO_FORMAT_BGR},
+        {&MFVideoFormat_ABGR32, WG_VIDEO_FORMAT_RGBA},
         {&MEDIASUBTYPE_RGB555,  WG_VIDEO_FORMAT_RGB15},
         {&MEDIASUBTYPE_RGB565,  WG_VIDEO_FORMAT_RGB16},
         {&MEDIASUBTYPE_AYUV,    WG_VIDEO_FORMAT_AYUV},

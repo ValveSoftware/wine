@@ -646,6 +646,7 @@ bool wg_video_format_is_rgb(enum wg_video_format format)
         case WG_VIDEO_FORMAT_BGRA:
         case WG_VIDEO_FORMAT_BGRx:
         case WG_VIDEO_FORMAT_BGR:
+        case WG_VIDEO_FORMAT_RGBA:
         case WG_VIDEO_FORMAT_RGB15:
         case WG_VIDEO_FORMAT_RGB16:
             return true;
