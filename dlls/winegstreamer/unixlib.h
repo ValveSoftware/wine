@@ -351,6 +351,7 @@ struct wg_parser_stream_seek_params
 struct wg_source_create_params
 {
     const char *url;
+    UINT64 file_size;
     const void *data;
     UINT32 size;
     wg_source_t source;
