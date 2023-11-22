@@ -356,6 +356,13 @@ struct wg_source_create_params
     wg_source_t source;
 };
 
+struct wg_source_push_data_params
+{
+    wg_source_t source;
+    const void *data;
+    UINT32 size;
+};
+
 struct wg_transform_attrs
 {
     UINT32 output_plane_align;
@@ -468,6 +475,7 @@ enum unix_funcs
 
     unix_wg_source_create,
     unix_wg_source_destroy,
+    unix_wg_source_push_data,
 
     unix_wg_transform_create,
     unix_wg_transform_destroy,
