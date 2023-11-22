@@ -119,6 +119,93 @@ static HRESULT object_context_create(DWORD flags, IMFByteStream *stream, const W
     return S_OK;
 }
 
+struct media_source_fallback_callback
+{
+    IMFAsyncCallback IMFAsyncCallback_iface;
+    IMFAsyncResult *result;
+    HANDLE event;
+};
+
+static HRESULT WINAPI media_source_fallback_callback_QueryInterface(IMFAsyncCallback *iface, REFIID riid, void **obj)
+{
+    if (IsEqualIID(riid, &IID_IMFAsyncCallback) ||
+            IsEqualIID(riid, &IID_IUnknown))
+    {
+        *obj = iface;
+        IMFAsyncCallback_AddRef(iface);
+        return S_OK;
+    }
+
+    WARN("Unsupported %s.\n", debugstr_guid(riid));
+    *obj = NULL;
+    return E_NOINTERFACE;
+}
+
+static ULONG WINAPI media_source_fallback_callback_AddRef(IMFAsyncCallback *iface)
+{
+    return 2;
+}
+
+static ULONG WINAPI media_source_fallback_callback_Release(IMFAsyncCallback *iface)
+{
+    return 1;
+}
+
+static HRESULT WINAPI media_source_fallback_callback_GetParameters(IMFAsyncCallback *iface, DWORD *flags, DWORD *queue)
+{
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI media_source_fallback_callback_Invoke(IMFAsyncCallback *iface, IMFAsyncResult *result)
+{
+    struct media_source_fallback_callback *impl = CONTAINING_RECORD(iface, struct media_source_fallback_callback, IMFAsyncCallback_iface);
+
+    IMFAsyncResult_AddRef((impl->result = result));
+    SetEvent(impl->event);
+
+    return S_OK;
+}
+
+static const IMFAsyncCallbackVtbl media_source_fallback_callback_vtbl =
+{
+    media_source_fallback_callback_QueryInterface,
+    media_source_fallback_callback_AddRef,
+    media_source_fallback_callback_Release,
+    media_source_fallback_callback_GetParameters,
+    media_source_fallback_callback_Invoke,
+};
+
+static HRESULT create_media_source_fallback(struct object_context *context, IUnknown **object)
+{
+    static const GUID CLSID_GStreamerByteStreamHandler = {0x317df618, 0x5e5a, 0x468a, {0x9f, 0x15, 0xd8, 0x27, 0xa9, 0xa0, 0x81, 0x62}};
+    struct media_source_fallback_callback callback = {{&media_source_fallback_callback_vtbl}};
+    IMFByteStreamHandler *handler;
+    MF_OBJECT_TYPE type;
+    HRESULT hr;
+
+    if (!(callback.event = CreateEventW(NULL, FALSE, FALSE, NULL)))
+        return HRESULT_FROM_WIN32(GetLastError());
+
+    if (FAILED(hr = CoCreateInstance(&CLSID_GStreamerByteStreamHandler, NULL, CLSCTX_INPROC_SERVER,
+            &IID_IMFByteStreamHandler, (void **)&handler)))
+    {
+        CloseHandle(callback.event);
+        return hr;
+    }
+
+    if (SUCCEEDED(hr = IMFByteStreamHandler_BeginCreateObject(handler, context->stream, NULL, MF_RESOLUTION_MEDIASOURCE,
+            NULL, NULL, &callback.IMFAsyncCallback_iface, NULL)))
+    {
+        WaitForSingleObject(callback.event, INFINITE);
+        hr = IMFByteStreamHandler_EndCreateObject(handler, callback.result, &type, object);
+        IMFAsyncResult_Release(callback.result);
+    }
+
+    IMFByteStreamHandler_Release(handler);
+    CloseHandle(callback.event);
+    return hr;
+}
+
 struct media_stream
 {
     IMFMediaStream IMFMediaStream_iface;
@@ -1724,6 +1811,7 @@ fail:
         IMFMediaEventQueue_Release(object->event_queue);
     IMFByteStream_Release(object->byte_stream);
     free(object);
+
     return hr;
 }
 
@@ -2000,7 +2088,14 @@ static HRESULT WINAPI stream_handler_callback_Invoke(IMFAsyncCallback *iface, IM
 
     if (FAILED(hr = media_source_create(context, (IMFMediaSource **)&object)))
         WARN("Failed to create media source, hr %#lx\n", hr);
-    else
+
+    if (FAILED(hr))
+    {
+        FIXME("Falling back to old media source, hr %#lx\n", hr);
+        hr = create_media_source_fallback(context, (IUnknown **)&object);
+    }
+
+    if (SUCCEEDED(hr))
     {
         if (FAILED(hr = result_entry_create(context->result, MF_OBJECT_MEDIASOURCE, object, &entry)))
             WARN("Failed to create handler result, hr %#lx\n", hr);
