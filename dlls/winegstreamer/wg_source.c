@@ -41,6 +41,7 @@
 
 struct wg_source
 {
+    gchar *url;
     GstPad *src_pad;
     GstElement *container;
     GstSegment segment;
@@ -93,6 +94,32 @@ static GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps)
     return pad;
 }
 
+static gboolean src_query_uri(struct wg_source *source, GstQuery *query)
+{
+    gchar *uri;
+
+    gst_query_parse_uri(query, &uri);
+    GST_TRACE("source %p, uri %s", source, uri);
+    gst_query_set_uri(query, source->url);
+
+    return true;
+}
+
+static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
+{
+    struct wg_source *source = gst_pad_get_element_private(pad);
+
+    switch (GST_QUERY_TYPE(query))
+    {
+    case GST_QUERY_URI:
+        if (!source->url)
+            return false;
+        return src_query_uri(source, query);
+    default:
+        return gst_pad_query_default(pad, parent, query);
+    }
+}
+
 static GstEvent *create_stream_start_event(const char *stream_id)
 {
     GstStream *stream;
@@ -124,6 +151,7 @@ NTSTATUS wg_source_create(void *args)
         gst_caps_unref(src_caps);
         return STATUS_UNSUCCESSFUL;
     }
+    source->url = params->url ? strdup(params->url) : NULL;
     gst_segment_init(&source->segment, GST_FORMAT_BYTES);
 
     if (!(source->container = gst_bin_new("wg_source")))
@@ -131,6 +159,7 @@ NTSTATUS wg_source_create(void *args)
     if (!(source->src_pad = create_pad_with_caps(GST_PAD_SRC, src_caps)))
         goto error;
     gst_pad_set_element_private(source->src_pad, source);
+    gst_pad_set_query_function(source->src_pad, src_query_cb);
 
     if (!(any_caps = gst_caps_new_any()))
         goto error;
@@ -168,6 +197,7 @@ error:
     }
     if (source->src_pad)
         gst_object_unref(source->src_pad);
+    free(source->url);
     free(source);
 
     gst_caps_unref(src_caps);
@@ -185,6 +215,7 @@ NTSTATUS wg_source_destroy(void *args)
     gst_element_set_state(source->container, GST_STATE_NULL);
     gst_object_unref(source->container);
     gst_object_unref(source->src_pad);
+    free(source->url);
     free(source);
 
     return STATUS_SUCCESS;
