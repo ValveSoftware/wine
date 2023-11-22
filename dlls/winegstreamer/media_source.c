@@ -391,7 +391,7 @@ static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor, wg_par
     return hr;
 }
 
-static HRESULT init_video_media_types(struct wg_format *format, IMFMediaType *types[6], DWORD *types_count)
+static HRESULT init_video_media_types(struct wg_format *format, IMFMediaType *types[9], DWORD *types_count)
 {
     /* Try to prefer YUV formats over RGB ones. Most decoders output in the
      * YUV color space, and it's generally much less expensive for
@@ -402,6 +402,9 @@ static HRESULT init_video_media_types(struct wg_format *format, IMFMediaType *ty
         WG_VIDEO_FORMAT_YV12,
         WG_VIDEO_FORMAT_YUY2,
         WG_VIDEO_FORMAT_I420,
+        WG_VIDEO_FORMAT_BGRA,
+        WG_VIDEO_FORMAT_BGRx,
+        WG_VIDEO_FORMAT_RGBA,
     };
     UINT count = *types_count, i;
     GUID base_subtype;
@@ -443,7 +446,7 @@ done:
     return hr;
 }
 
-static HRESULT init_audio_media_types(struct wg_format *format, IMFMediaType *types[6], DWORD *types_count)
+static HRESULT init_audio_media_types(struct wg_format *format, IMFMediaType *types[9], DWORD *types_count)
 {
     /* Expose at least one PCM and one floating point type for the
        consumer to pick from. */
@@ -472,7 +475,7 @@ static HRESULT stream_descriptor_create(UINT32 id, struct wg_format *format, IMF
 {
     IMFStreamDescriptor *descriptor;
     IMFMediaTypeHandler *handler;
-    IMFMediaType *types[6];
+    IMFMediaType *types[9];
     DWORD count = 0;
     HRESULT hr;
 
