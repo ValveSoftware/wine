@@ -340,17 +340,20 @@ void wg_parser_stream_seek(wg_parser_stream_t stream, double rate,
     WINE_UNIX_CALL(unix_wg_parser_stream_seek, &params);
 }
 
-HRESULT wg_source_create(const WCHAR *url, const void *data, uint32_t size, wg_source_t *out)
+HRESULT wg_source_create(const WCHAR *url, uint64_t file_size,
+        const void *data, uint32_t size, wg_source_t *out)
 {
     struct wg_source_create_params params =
     {
+        .file_size = file_size,
         .data = data, .size = size,
     };
     UINT len = url ? WideCharToMultiByte(CP_ACP, 0, url, -1, NULL, 0, NULL, NULL) : 0;
     char *tmp = url ? malloc(len) : NULL;
     NTSTATUS status;
 
-    TRACE("url %s, data %p, size %#x\n", debugstr_w(url), data, size);
+    TRACE("url %s, file_size %#I64x, data %p, size %#x\n", debugstr_w(url),
+            file_size, data, size);
 
     if ((params.url = tmp))
         WideCharToMultiByte(CP_ACP, 0, url, -1, tmp, len, NULL, NULL);
