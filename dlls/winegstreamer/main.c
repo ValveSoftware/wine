@@ -376,6 +376,20 @@ void wg_source_destroy(wg_source_t source)
     WINE_UNIX_CALL(unix_wg_source_destroy, &source);
 }
 
+HRESULT wg_source_push_data(wg_source_t source, const void *data, uint32_t size)
+{
+    struct wg_source_push_data_params params =
+    {
+        .source = source,
+        .data = data,
+        .size = size,
+    };
+
+    TRACE("source %#I64x, data %p, size %#x\n", source, data, size);
+
+    return HRESULT_FROM_NT(WINE_UNIX_CALL(unix_wg_source_push_data, &params));
+}
+
 wg_transform_t wg_transform_create(const struct wg_format *input_format,
         const struct wg_format *output_format, const struct wg_transform_attrs *attrs)
 {
