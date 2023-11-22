@@ -104,6 +104,21 @@ static GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps)
     return pad;
 }
 
+static GstBuffer *create_buffer_from_bytes(const void *data, guint size)
+{
+    GstBuffer *buffer;
+
+    if (!(buffer = gst_buffer_new_and_alloc(size)))
+        GST_ERROR("Failed to allocate buffer for %#x bytes\n", size);
+    else
+    {
+        gst_buffer_fill(buffer, 0, data, size);
+        gst_buffer_set_size(buffer, size);
+    }
+
+    return buffer;
+}
+
 static gboolean src_query_duration(struct wg_source *source, GstQuery *query)
 {
     GstFormat format;
@@ -319,6 +334,8 @@ NTSTATUS wg_source_push_data(void *args)
 {
     struct wg_source_push_data_params *params = args;
     struct wg_source *source = get_source(params->source);
+    GstFlowReturn ret = GST_FLOW_OK;
+    GstBuffer *buffer;
     GstEvent *event;
 
     GST_TRACE("source %p, data %p, size %#x", source, params->data, params->size);
@@ -329,6 +346,20 @@ NTSTATUS wg_source_push_data(void *args)
                 || !gst_pad_push_event(source->src_pad, event))
             GST_ERROR("Failed to push new segment event");
         source->valid_segment = true;
+    }
+
+    if (!(buffer = create_buffer_from_bytes(params->data, params->size)))
+    {
+        GST_WARNING("Failed to allocate buffer for data");
+        return STATUS_UNSUCCESSFUL;
+    }
+
+    source->segment.start += params->size;
+    if ((ret = gst_pad_push(source->src_pad, buffer)) && ret != GST_FLOW_EOS)
+    {
+        GST_WARNING("Failed to push data buffer, ret %d", ret);
+        source->segment.start -= params->size;
+        return STATUS_UNSUCCESSFUL;
     }
 
     return STATUS_SUCCESS;
