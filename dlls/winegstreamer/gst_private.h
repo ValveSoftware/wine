@@ -166,6 +166,7 @@ HRESULT wg_transform_read_quartz(wg_transform_t transform, struct wg_sample *sam
 HRESULT wg_transform_read_dmo(wg_transform_t transform, DMO_OUTPUT_DATA_BUFFER *buffer);
 
 HRESULT gstreamer_byte_stream_handler_create(REFIID riid, void **obj);
+HRESULT gstreamer_byte_stream_handler_2_create(REFIID riid, void **obj);
 
 unsigned int wg_format_get_stride(const struct wg_format *format);
 
