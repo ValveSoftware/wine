@@ -265,6 +265,7 @@ NTSTATUS wg_init_gstreamer(void *arg)
     char *args[] = {arg0, arg1, NULL};
     int argc = ARRAY_SIZE(args) - 1;
     char **argv = args;
+    const char *e;
     GError *err;
     DWORD_PTR process_mask;
 
@@ -282,6 +283,23 @@ NTSTATUS wg_init_gstreamer(void *arg)
      * and handle them, or eventually propagate the exceptions to the user.
      */
     gst_segtrap_set_enabled(false);
+
+    if ((e = getenv("WINE_GST_REGISTRY_DIR")))
+    {
+        char gst_reg[PATH_MAX];
+#if defined(__x86_64__)
+        const char *arch = "/registry.x86_64.bin";
+#elif defined(__i386__)
+        const char *arch = "/registry.i386.bin";
+#elif defined(__aarch64__)
+        const char *arch = "/registry.aarch64.bin";
+#else
+#error Bad arch
+#endif
+        strcpy(gst_reg, e);
+        strcat(gst_reg, arch);
+        setenv("GST_REGISTRY_1_0", gst_reg, 1);
+    }
 
     if (!gst_init_check(&argc, &argv, &err))
     {
