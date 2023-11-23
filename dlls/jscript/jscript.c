@@ -521,13 +521,19 @@ static void decrease_state(JScript *This, SCRIPTSTATE state)
                 This->ctx->secmgr = NULL;
             }
 
+            script_globals_release(This->ctx);
+
+            /* Force the CC, because it might hold refs to a pure jscript cycle, and so our GC can't
+             * tear down this cycle because it still thinks there's an "external ref" to it. Forcing
+             * the CC ensures it runs first, unlinking its ref, so the GC can do its job. The CC knows
+             * about the pure jscript cycle, but it won't clean it by itself, since it thinks it would
+             * get teared down later by the purple buffer scan, but we aren't part of it, so it won't. */
+            gc_run(This->ctx, TRUE);
+
             if(This->ctx->site) {
                 IActiveScriptSite_Release(This->ctx->site);
                 This->ctx->site = NULL;
             }
-
-            script_globals_release(This->ctx);
-            gc_run(This->ctx);
 
             /* FALLTHROUGH */
         case SCRIPTSTATE_UNINITIALIZED:
@@ -938,6 +944,9 @@ static HRESULT WINAPI JScript_AddNamedItem(IActiveScript *iface,
             WARN("object does not implement IDispatch\n");
             return hres;
         }
+
+        if(This->ctx->html_mode)
+            init_cc_api(disp);
 
         val = jsval_disp(disp);
         hres = convert_to_proxy(This->ctx, &val);
