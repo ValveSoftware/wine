@@ -2890,58 +2890,63 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
         return S_OK;
     IDispatch_Release(obj);
 
-    proxy_ref = proxy->lpVtbl->GetProxyFieldRef(proxy);
-    if(*proxy_ref) {
-        /* Re-acquire the proxy if it's an old dangling proxy */
-        jsdisp = impl_from_IWineDispatchProxyCbPrivate(*proxy_ref);
-        assert(jsdisp->proxy == proxy);
-
-        if(!jsdisp->ref++)
-            list_add_tail(&jsdisp->ctx->objects, &jsdisp->entry);
-        else
-            IDispatchEx_Release((IDispatchEx*)proxy);  /* already held by jsdisp */
-
-        TRACE("re-acquired %p\n", jsdisp);
-        *val = jsval_obj(jsdisp);
-        return S_OK;
-    }
-
-    if(!ctx->global) {
-        FIXME("Script is uninitialized?\n");
-        hres = E_UNEXPECTED;
-        goto fail;
-    }
-
-    hres = get_proxy_default_prototype(ctx, proxy, &prot);
-    if(FAILED(hres))
-        goto fail;
-    if(!prot)
-        return hres;  /* not a JS object */
-
-    hres = create_dispex(ctx, &proxy_dispex_info, prot, &jsdisp);
-    jsdisp_release(prot);
-    if(FAILED(hres))
-        goto fail;
-
-    *proxy_ref = (IWineDispatchProxyCbPrivate*)&jsdisp->IDispatchEx_iface;
-    jsdisp->proxy = proxy;
-    if(proxy->lpVtbl->IsPrototype(proxy)) {
-        jsdisp_t *ctor;
-        hres = get_proxy_default_constructor(ctx, jsdisp, &ctor);
-        if(SUCCEEDED(hres)) {
-            hres = jsdisp_define_data_property(jsdisp, L"constructor", PROPF_WRITABLE | PROPF_CONFIGURABLE, jsval_obj(ctor));
-            jsdisp_release(ctor);
+    if(!*(proxy_ref = proxy->lpVtbl->GetProxyFieldRef(proxy))) {
+        if(!ctx->global) {
+            FIXME("Script is uninitialized?\n");
+            hres = E_UNEXPECTED;
+            goto fail;
         }
-    }else {
-        hres = maybe_init_global_proxy(jsdisp);
-    }
-    if(FAILED(hres)) {
-        *proxy_ref = NULL;
-        jsdisp->proxy = NULL;
-        jsdisp_release(jsdisp);
-        goto fail;
+
+        hres = get_proxy_default_prototype(ctx, proxy, &prot);
+        if(FAILED(hres))
+            goto fail;
+        if(!prot)
+            return hres;  /* not a JS object */
+
+        /* It's possible for get_proxy_default_prototype to have initialized the proxy ref,
+           e.g. locking the document mode while obtaining the dispex info, so re-check it. */
+        if(!*proxy_ref) {
+            hres = create_dispex(ctx, &proxy_dispex_info, prot, &jsdisp);
+            jsdisp_release(prot);
+            if(FAILED(hres))
+                goto fail;
+
+            *proxy_ref = (IWineDispatchProxyCbPrivate*)&jsdisp->IDispatchEx_iface;
+            jsdisp->proxy = proxy;
+            if(proxy->lpVtbl->IsPrototype(proxy)) {
+                jsdisp_t *ctor;
+                hres = get_proxy_default_constructor(ctx, jsdisp, &ctor);
+                if(SUCCEEDED(hres)) {
+                    hres = jsdisp_define_data_property(jsdisp, L"constructor", PROPF_WRITABLE | PROPF_CONFIGURABLE, jsval_obj(ctor));
+                    jsdisp_release(ctor);
+                }
+            }else {
+                hres = maybe_init_global_proxy(jsdisp);
+            }
+            if(FAILED(hres)) {
+                *proxy_ref = NULL;
+                jsdisp->proxy = NULL;
+                jsdisp_release(jsdisp);
+                goto fail;
+            }
+
+            *val = jsval_obj(jsdisp);
+            return S_OK;
+        }
+
+        jsdisp_release(prot);
     }
 
+    /* Re-acquire the proxy if it's an old dangling proxy */
+    jsdisp = impl_from_IWineDispatchProxyCbPrivate(*proxy_ref);
+    assert(jsdisp->proxy == proxy);
+
+    if(!jsdisp->ref++)
+        list_add_tail(&jsdisp->ctx->objects, &jsdisp->entry);
+    else
+        IDispatchEx_Release((IDispatchEx*)proxy);  /* already held by jsdisp */
+
+    TRACE("re-acquired %p\n", jsdisp);
     *val = jsval_obj(jsdisp);
     return S_OK;
 

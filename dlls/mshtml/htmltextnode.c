@@ -55,7 +55,7 @@ static void DOMCharacterData_init_dispex_info(dispex_data_t *info, compat_mode_t
 
 dispex_static_data_t DOMCharacterData_dispex = {
     "CharacterData",
-    NULL,
+    &no_dispex_vtbl,
     PROTO_ID_DOMCharacterData,
     NULL_tid,
     no_iface_tids,
@@ -346,23 +346,6 @@ static inline HTMLDOMTextNode *impl_from_HTMLDOMNode(HTMLDOMNode *iface)
     return CONTAINING_RECORD(iface, HTMLDOMTextNode, node);
 }
 
-static HRESULT HTMLDOMTextNode_QI(HTMLDOMNode *iface, REFIID riid, void **ppv)
-{
-    HTMLDOMTextNode *This = impl_from_HTMLDOMNode(iface);
-
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-
-    if(IsEqualGUID(&IID_IHTMLDOMTextNode, riid))
-        *ppv = &This->IHTMLDOMTextNode_iface;
-    else if(IsEqualGUID(&IID_IHTMLDOMTextNode2, riid))
-        *ppv = &This->IHTMLDOMTextNode2_iface;
-    else
-        return HTMLDOMNode_QI(&This->node, riid, ppv);
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
-}
-
 static HRESULT HTMLDOMTextNode_clone(HTMLDOMNode *iface, nsIDOMNode *nsnode, HTMLDOMNode **ret)
 {
     HTMLDOMTextNode *This = impl_from_HTMLDOMNode(iface);
@@ -370,13 +353,35 @@ static HRESULT HTMLDOMTextNode_clone(HTMLDOMNode *iface, nsIDOMNode *nsnode, HTM
     return HTMLDOMTextNode_Create(This->node.doc, nsnode, ret);
 }
 
+static inline HTMLDOMTextNode *impl_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, HTMLDOMTextNode, node.event_target.dispex);
+}
+
+static void *HTMLDOMTextNode_query_interface(DispatchEx *dispex, REFIID riid)
+{
+    HTMLDOMTextNode *This = impl_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IHTMLDOMTextNode, riid))
+        return &This->IHTMLDOMTextNode_iface;
+    if(IsEqualGUID(&IID_IHTMLDOMTextNode2, riid))
+        return &This->IHTMLDOMTextNode2_iface;
+
+    return HTMLDOMNode_query_interface(&This->node.event_target.dispex, riid);
+}
+
 static const cpc_entry_t HTMLDOMTextNode_cpc[] = {{NULL}};
 
 static const NodeImplVtbl HTMLDOMTextNodeImplVtbl = {
-    .qi                    = HTMLDOMTextNode_QI,
-    .destructor            = HTMLDOMNode_destructor,
     .cpc_entries           = HTMLDOMTextNode_cpc,
     .clone                 = HTMLDOMTextNode_clone
+};
+
+static const dispex_static_data_vtbl_t HTMLDOMTextNode_dispex_vtbl = {
+    .query_interface = HTMLDOMTextNode_query_interface,
+    .destructor      = HTMLDOMNode_destructor,
+    .traverse        = HTMLDOMNode_traverse,
+    .unlink          = HTMLDOMNode_unlink
 };
 
 static const tid_t HTMLDOMTextNode_iface_tids[] = {
@@ -388,7 +393,7 @@ static const tid_t HTMLDOMTextNode_iface_tids[] = {
 };
 dispex_static_data_t HTMLDOMTextNode_dispex = {
     "Text",
-    NULL,
+    &HTMLDOMTextNode_dispex_vtbl,
     PROTO_ID_HTMLDOMTextNode,
     DispHTMLDOMTextNode_tid,
     HTMLDOMTextNode_iface_tids,

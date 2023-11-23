@@ -1637,43 +1637,6 @@ static inline HTMLInputElement *impl_from_HTMLDOMNode(HTMLDOMNode *iface)
     return CONTAINING_RECORD(iface, HTMLInputElement, element.node);
 }
 
-static HRESULT HTMLInputElement_QI(HTMLDOMNode *iface, REFIID riid, void **ppv)
-{
-    HTMLInputElement *This = impl_from_HTMLDOMNode(iface);
-
-    *ppv = NULL;
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        TRACE("(%p)->(IID_IUnknown %p)\n", This, ppv);
-        *ppv = &This->IHTMLInputElement_iface;
-    }else if(IsEqualGUID(&IID_IDispatch, riid)) {
-        TRACE("(%p)->(IID_IDispatch %p)\n", This, ppv);
-        *ppv = &This->IHTMLInputElement_iface;
-    }else if(IsEqualGUID(&IID_IHTMLInputElement, riid)) {
-        TRACE("(%p)->(IID_IHTMLInputElement %p)\n", This, ppv);
-        *ppv = &This->IHTMLInputElement_iface;
-    }else if(IsEqualGUID(&IID_IHTMLInputTextElement, riid)) {
-        TRACE("(%p)->(IID_IHTMLInputTextElement %p)\n", This, ppv);
-        *ppv = &This->IHTMLInputTextElement_iface;
-    }else if(IsEqualGUID(&IID_IHTMLInputTextElement2, riid)) {
-        TRACE("(%p)->(IID_IHTMLInputTextElement2 %p)\n", This, ppv);
-        *ppv = &This->IHTMLInputTextElement2_iface;
-    }else if(IsEqualGUID(&IID_IWineHTMLInputPrivate, riid)) {
-        TRACE("(%p)->(IID_IWineHTMLInputPrivate %p)\n", This, ppv);
-        *ppv = &This->IWineHTMLInputPrivate_iface;
-    }else if(IsEqualGUID(&IID_IWineHTMLParentFormPrivate, riid)) {
-        TRACE("(%p)->(IID_IWineHTMLParentFormPrivate %p)\n", This, ppv);
-        *ppv = &This->IWineHTMLParentFormPrivate_iface;
-    }
-
-    if(*ppv) {
-        IUnknown_AddRef((IUnknown*)*ppv);
-        return S_OK;
-    }
-
-    return HTMLElement_QI(&This->element.node, riid, ppv);
-}
-
 static HRESULT HTMLInputElementImpl_put_disabled(HTMLDOMNode *iface, VARIANT_BOOL v)
 {
     HTMLInputElement *This = impl_from_HTMLDOMNode(iface);
@@ -1705,33 +1668,72 @@ static BOOL HTMLInputElement_is_text_edit(HTMLDOMNode *iface)
     return ret;
 }
 
-static void HTMLInputElement_traverse(HTMLDOMNode *iface, nsCycleCollectionTraversalCallback *cb)
+static inline HTMLInputElement *input_from_DispatchEx(DispatchEx *iface)
 {
-    HTMLInputElement *This = impl_from_HTMLDOMNode(iface);
-
-    if(This->nsinput)
-        note_cc_edge((nsISupports*)This->nsinput, "This->nsinput", cb);
+    return CONTAINING_RECORD(iface, HTMLInputElement, element.node.event_target.dispex);
 }
 
-static void HTMLInputElement_unlink(HTMLDOMNode *iface)
+static void *HTMLInputElement_query_interface(DispatchEx *dispex, REFIID riid)
 {
-    HTMLInputElement *This = impl_from_HTMLDOMNode(iface);
+    HTMLInputElement *This = input_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IHTMLInputElement, riid))
+        return &This->IHTMLInputElement_iface;
+    if(IsEqualGUID(&IID_IHTMLInputTextElement, riid))
+        return &This->IHTMLInputTextElement_iface;
+    if(IsEqualGUID(&IID_IHTMLInputTextElement2, riid))
+        return &This->IHTMLInputTextElement2_iface;
+    if(IsEqualGUID(&IID_IWineHTMLInputPrivate, riid))
+        return &This->IWineHTMLInputPrivate_iface;
+    if(IsEqualGUID(&IID_IWineHTMLParentFormPrivate, riid))
+        return &This->IWineHTMLParentFormPrivate_iface;
+
+    return HTMLElement_query_interface(&This->element.node.event_target.dispex, riid);
+}
+
+static void HTMLInputElement_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    HTMLInputElement *This = input_from_DispatchEx(dispex);
+    HTMLElement_traverse(dispex, cb);
+
+    if(This->nsinput)
+        note_cc_edge((nsISupports*)This->nsinput, "nsinput", cb);
+}
+
+static void HTMLInputElement_unlink(DispatchEx *dispex)
+{
+    HTMLInputElement *This = input_from_DispatchEx(dispex);
+    HTMLElement_unlink(dispex);
     unlink_ref(&This->nsinput);
 }
 
 static const NodeImplVtbl HTMLInputElementImplVtbl = {
     .clsid                 = &CLSID_HTMLInputElement,
-    .qi                    = HTMLInputElement_QI,
-    .destructor            = HTMLElement_destructor,
     .cpc_entries           = HTMLElement_cpc,
     .clone                 = HTMLElement_clone,
-    .handle_event          = HTMLElement_handle_event,
     .get_attr_col          = HTMLElement_get_attr_col,
     .put_disabled          = HTMLInputElementImpl_put_disabled,
     .get_disabled          = HTMLInputElementImpl_get_disabled,
-    .traverse              = HTMLInputElement_traverse,
-    .unlink                = HTMLInputElement_unlink,
     .is_text_edit          = HTMLInputElement_is_text_edit
+};
+
+static const event_target_vtbl_t HTMLInputElement_event_target_vtbl = {
+    {
+        HTMLELEMENT_DISPEX_VTBL_ENTRIES,
+        .query_interface= HTMLInputElement_query_interface,
+        .destructor     = HTMLElement_destructor,
+        .traverse       = HTMLInputElement_traverse,
+        .unlink         = HTMLInputElement_unlink
+    },
+    HTMLELEMENT_EVENT_TARGET_VTBL_ENTRIES,
+    .handle_event       = HTMLElement_handle_event
+};
+
+static const tid_t HTMLInputElement_iface_tids[] = {
+    HTMLELEMENT_TIDS,
+    IHTMLInputElement_tid,
+    IHTMLInputTextElement2_tid,
+    0
 };
 
 static void HTMLInputElement_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
@@ -1744,15 +1746,9 @@ static void HTMLInputElement_init_dispex_info(dispex_data_t *info, compat_mode_t
     }
 }
 
-static const tid_t HTMLInputElement_iface_tids[] = {
-    HTMLELEMENT_TIDS,
-    IHTMLInputElement_tid,
-    IHTMLInputTextElement2_tid,
-    0
-};
 dispex_static_data_t HTMLInputElement_dispex = {
     "HTMLInputElement",
-    &HTMLElement_event_target_vtbl.dispex_vtbl,
+    &HTMLInputElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLInputElement,
     DispHTMLInputElement_tid,
     HTMLInputElement_iface_tids,
@@ -1909,39 +1905,38 @@ static const IHTMLLabelElementVtbl HTMLLabelElementVtbl = {
     HTMLLabelElement_get_accessKey
 };
 
-static inline HTMLLabelElement *label_from_HTMLDOMNode(HTMLDOMNode *iface)
+static inline HTMLLabelElement *label_from_DispatchEx(DispatchEx *iface)
 {
-    return CONTAINING_RECORD(iface, HTMLLabelElement, element.node);
+    return CONTAINING_RECORD(iface, HTMLLabelElement, element.node.event_target.dispex);
 }
 
-static HRESULT HTMLLabelElement_QI(HTMLDOMNode *iface, REFIID riid, void **ppv)
+static void *HTMLLabelElement_query_interface(DispatchEx *dispex, REFIID riid)
 {
-    HTMLLabelElement *This = label_from_HTMLDOMNode(iface);
+    HTMLLabelElement *This = label_from_DispatchEx(dispex);
 
-    *ppv = NULL;
+    if(IsEqualGUID(&IID_IHTMLLabelElement, riid))
+        return &This->IHTMLLabelElement_iface;
 
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        TRACE("(%p)->(IID_IUnknown %p)\n", This, ppv);
-        *ppv = &This->IHTMLLabelElement_iface;
-    }else if(IsEqualGUID(&IID_IHTMLLabelElement, riid)) {
-        TRACE("(%p)->(IID_IHTMLLabelElement %p)\n", This, ppv);
-        *ppv = &This->IHTMLLabelElement_iface;
-    }else {
-        return HTMLElement_QI(&This->element.node, riid, ppv);
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
+    return HTMLElement_query_interface(&This->element.node.event_target.dispex, riid);
 }
 
 static const NodeImplVtbl HTMLLabelElementImplVtbl = {
     .clsid                 = &CLSID_HTMLLabelElement,
-    .qi                    = HTMLLabelElement_QI,
-    .destructor            = HTMLElement_destructor,
     .cpc_entries           = HTMLElement_cpc,
     .clone                 = HTMLElement_clone,
-    .handle_event          = HTMLElement_handle_event,
     .get_attr_col          = HTMLElement_get_attr_col,
+};
+
+static const event_target_vtbl_t HTMLLabelElement_event_target_vtbl = {
+    {
+        HTMLELEMENT_DISPEX_VTBL_ENTRIES,
+        .query_interface= HTMLLabelElement_query_interface,
+        .destructor     = HTMLElement_destructor,
+        .traverse       = HTMLElement_traverse,
+        .unlink         = HTMLElement_unlink
+    },
+    HTMLELEMENT_EVENT_TARGET_VTBL_ENTRIES,
+    .handle_event       = HTMLElement_handle_event
 };
 
 static const tid_t HTMLLabelElement_iface_tids[] = {
@@ -1952,7 +1947,7 @@ static const tid_t HTMLLabelElement_iface_tids[] = {
 
 dispex_static_data_t HTMLLabelElement_dispex = {
     "HTMLLabelElement",
-    &HTMLElement_event_target_vtbl.dispex_vtbl,
+    &HTMLLabelElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLLabelElement,
     DispHTMLLabelElement_tid,
     HTMLLabelElement_iface_tids,
@@ -2487,32 +2482,6 @@ static inline HTMLButtonElement *button_from_HTMLDOMNode(HTMLDOMNode *iface)
     return CONTAINING_RECORD(iface, HTMLButtonElement, element.node);
 }
 
-static HRESULT HTMLButtonElement_QI(HTMLDOMNode *iface, REFIID riid, void **ppv)
-{
-    HTMLButtonElement *This = button_from_HTMLDOMNode(iface);
-
-    *ppv = NULL;
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        TRACE("(%p)->(IID_IUnknown %p)\n", This, ppv);
-        *ppv = &This->IHTMLButtonElement_iface;
-    }else if(IsEqualGUID(&IID_IHTMLButtonElement, riid)) {
-        TRACE("(%p)->(IID_IHTMLButtonElement %p)\n", This, ppv);
-        *ppv = &This->IHTMLButtonElement_iface;
-    }else if(IsEqualGUID(&IID_IWineHTMLInputPrivate, riid)) {
-        TRACE("(%p)->(IID_IWineHTMLInputPrivate %p)\n", This, ppv);
-        *ppv = &This->IWineHTMLInputPrivate_iface;
-    }else if(IsEqualGUID(&IID_IWineHTMLParentFormPrivate, riid)) {
-        TRACE("(%p)->(IID_IWineHTMLParentFormPrivate %p)\n", This, ppv);
-        *ppv = &This->IWineHTMLParentFormPrivate_iface;
-    }else {
-        return HTMLElement_QI(&This->element.node, riid, ppv);
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
-}
-
 static HRESULT HTMLButtonElementImpl_put_disabled(HTMLDOMNode *iface, VARIANT_BOOL v)
 {
     HTMLButtonElement *This = button_from_HTMLDOMNode(iface);
@@ -2530,33 +2499,67 @@ static BOOL HTMLButtonElement_is_text_edit(HTMLDOMNode *iface)
     return TRUE;
 }
 
-static void HTMLButtonElement_traverse(HTMLDOMNode *iface, nsCycleCollectionTraversalCallback *cb)
+static inline HTMLButtonElement *button_from_DispatchEx(DispatchEx *iface)
 {
-    HTMLButtonElement *This = button_from_HTMLDOMNode(iface);
-
-    if(This->nsbutton)
-        note_cc_edge((nsISupports*)This->nsbutton, "This->nsbutton", cb);
+    return CONTAINING_RECORD(iface, HTMLButtonElement, element.node.event_target.dispex);
 }
 
-static void HTMLButtonElement_unlink(HTMLDOMNode *iface)
+static void *HTMLButtonElement_query_interface(DispatchEx *dispex, REFIID riid)
 {
-    HTMLButtonElement *This = button_from_HTMLDOMNode(iface);
+    HTMLButtonElement *This = button_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IHTMLButtonElement, riid))
+        return &This->IHTMLButtonElement_iface;
+    if(IsEqualGUID(&IID_IWineHTMLInputPrivate, riid))
+        return &This->IWineHTMLInputPrivate_iface;
+    if(IsEqualGUID(&IID_IWineHTMLParentFormPrivate, riid))
+        return &This->IWineHTMLParentFormPrivate_iface;
+
+    return HTMLElement_query_interface(&This->element.node.event_target.dispex, riid);
+}
+
+static void HTMLButtonElement_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    HTMLButtonElement *This = button_from_DispatchEx(dispex);
+    HTMLElement_traverse(dispex, cb);
+
+    if(This->nsbutton)
+        note_cc_edge((nsISupports*)This->nsbutton, "nsbutton", cb);
+}
+
+static void HTMLButtonElement_unlink(DispatchEx *dispex)
+{
+    HTMLButtonElement *This = button_from_DispatchEx(dispex);
+    HTMLElement_unlink(dispex);
     unlink_ref(&This->nsbutton);
 }
 
 static const NodeImplVtbl HTMLButtonElementImplVtbl = {
     .clsid                 = &CLSID_HTMLButtonElement,
-    .qi                    = HTMLButtonElement_QI,
-    .destructor            = HTMLElement_destructor,
     .cpc_entries           = HTMLElement_cpc,
     .clone                 = HTMLElement_clone,
-    .handle_event          = HTMLElement_handle_event,
     .get_attr_col          = HTMLElement_get_attr_col,
     .put_disabled          = HTMLButtonElementImpl_put_disabled,
     .get_disabled          = HTMLButtonElementImpl_get_disabled,
-    .traverse              = HTMLButtonElement_traverse,
-    .unlink                = HTMLButtonElement_unlink,
     .is_text_edit          = HTMLButtonElement_is_text_edit
+};
+
+static const event_target_vtbl_t HTMLButtonElement_event_target_vtbl = {
+    {
+        HTMLELEMENT_DISPEX_VTBL_ENTRIES,
+        .query_interface= HTMLButtonElement_query_interface,
+        .destructor     = HTMLElement_destructor,
+        .traverse       = HTMLButtonElement_traverse,
+        .unlink         = HTMLButtonElement_unlink
+    },
+    HTMLELEMENT_EVENT_TARGET_VTBL_ENTRIES,
+    .handle_event       = HTMLElement_handle_event
+};
+
+static const tid_t HTMLButtonElement_iface_tids[] = {
+    HTMLELEMENT_TIDS,
+    IHTMLButtonElement_tid,
+    0
 };
 
 static void HTMLButtonElement_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
@@ -2569,15 +2572,9 @@ static void HTMLButtonElement_init_dispex_info(dispex_data_t *info, compat_mode_
     }
 }
 
-static const tid_t HTMLButtonElement_iface_tids[] = {
-    HTMLELEMENT_TIDS,
-    IHTMLButtonElement_tid,
-    0
-};
-
 dispex_static_data_t HTMLButtonElement_dispex = {
     "HTMLButtonElement",
-    &HTMLElement_event_target_vtbl.dispex_vtbl,
+    &HTMLButtonElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLButtonElement,
     DispHTMLButtonElement_tid,
     HTMLButtonElement_iface_tids,

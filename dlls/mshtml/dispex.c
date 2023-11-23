@@ -36,6 +36,8 @@ WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
 #define MAX_ARGS 16
 
+static ExternalCycleCollectionParticipant dispex_ccp;
+
 static CRITICAL_SECTION cs_dispex_static_data;
 static CRITICAL_SECTION_DEBUG cs_dispex_static_data_dbg =
 {
@@ -86,15 +88,11 @@ typedef struct {
 } dynamic_prop_t;
 
 struct proxy_prototype {
-    IUnknown IUnknown_iface;
     DispatchEx dispex;
-    LONG ref;
 };
 
 struct proxy_ctor {
-    IUnknown IUnknown_iface;
     DispatchEx dispex;
-    LONG ref;
 };
 
 #define DYNPROP_DELETED    0x01
@@ -103,15 +101,14 @@ struct proxy_ctor {
 
 typedef struct {
     DispatchEx dispex;
-    IUnknown IUnknown_iface;
-    LONG ref;
-    union {
-        DispatchEx *obj;
-        DWORD idx;          /* index into function_props, used when info == NULL */
-    };
+    DispatchEx *obj;
     func_info_t *info;
-    IDispatch *funcs[2];    /* apply, call */
 } func_disp_t;
+
+typedef struct {
+    DispatchEx dispex;
+    DWORD idx;          /* index into function_props */
+} func_prop_disp_t;
 
 typedef struct {
     func_disp_t *func_obj;
@@ -144,8 +141,10 @@ PRIVATE_TID_LIST
 #undef XDIID
 };
 
-const tid_t no_iface_tids[1] = { 0 };
+static const dispex_static_data_vtbl_t proxy_prototype_dispex_vtbl;
 static void proxy_prototype_init_dispex_info(dispex_data_t*,compat_mode_t);
+const dispex_static_data_vtbl_t no_dispex_vtbl = { 0 };
+const tid_t no_iface_tids[1] = { 0 };
 
 static struct prototype_static_data {
     dispex_static_data_t dispex;
@@ -155,7 +154,7 @@ static struct prototype_static_data {
 {                                     \
     {                                 \
         name "Prototype",             \
-        NULL,                         \
+        &proxy_prototype_dispex_vtbl, \
         PROTO_ID_ ## proto_id,        \
         NULL_tid,                     \
         no_iface_tids,                \
@@ -169,7 +168,7 @@ PROXY_PROTOTYPE_LIST
 #undef X
 };
 
-static const char legacy_prototype_name[] = "[Interface prototype object]";
+static const char legacy_prototype_name[] = "legacy prototype";
 static void legacy_prototype_init_dispex_info(dispex_data_t*,compat_mode_t);
 static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl;
 
@@ -204,13 +203,27 @@ PROXY_PROTOTYPE_LIST
 #undef X
 };
 
+static unsigned char proxy_ctor_mode_unavailable[PROTO_ID_TOTAL_COUNT - LEGACY_PROTOTYPE_COUNT] = {
+    [PROTO_ID_Console                          - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+    [PROTO_ID_Crypto                           - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_DOMPageTransitionEvent           - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_DOMProgressEvent                 - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+    [PROTO_ID_DOMTokenList                     - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+    [PROTO_ID_HTMLDocument                     - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_HTMLMimeTypesCollection          - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_HTMLNamespaceCollection          - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE10) | (1<<COMPAT_MODE_IE11),
+    [PROTO_ID_HTMLPluginsCollection            - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_HTMLSelectionObject              - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE11),
+    [PROTO_ID_HTMLXDomainRequest               - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE11),
+    [PROTO_ID_MediaQueryList                   - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+};
+
 static inline dispex_data_t *proxy_prototype_object_info(struct proxy_prototype *prot)
 {
     dispex_static_data_t *desc = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex)->desc;
     return desc->info_cache[prot->dispex.info->compat_mode];
 }
 
-static func_disp_t *create_func_disp(DispatchEx*,func_info_t*);
 static HRESULT get_dynamic_prop(DispatchEx*,const WCHAR*,DWORD,dynamic_prop_t**);
 static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 static inline BOOL is_legacy_prototype(IDispatch*);
@@ -795,7 +808,7 @@ static inline dispex_dynamic_data_t *get_dynamic_data(DispatchEx *This)
     if(!This->dynamic_data)
         return NULL;
 
-    if(This->info->desc->vtbl && This->info->desc->vtbl->populate_props)
+    if(This->info->desc->vtbl->populate_props)
         This->info->desc->vtbl->populate_props(This);
 
     return This->dynamic_data;
@@ -946,65 +959,38 @@ static HRESULT typeinfo_invoke(IUnknown *iface, func_info_t *func, WORD flags, D
     return ITypeInfo_Invoke(ti, iface, func->id, flags, &params, res, ei, &argerr);
 }
 
-static inline func_disp_t *impl_from_IUnknown(IUnknown *iface)
+static HRESULT format_func_disp_string(const WCHAR *name, IServiceProvider *caller, VARIANT *res)
 {
-    return CONTAINING_RECORD(iface, func_disp_t, IUnknown_iface);
-}
+    unsigned name_len;
+    WCHAR *ptr;
+    BSTR str;
 
-static HRESULT WINAPI Function_QueryInterface(IUnknown *iface, REFIID riid, void **ppv)
-{
-    func_disp_t *This = impl_from_IUnknown(iface);
+    static const WCHAR func_prefixW[] =
+        {'\n','f','u','n','c','t','i','o','n',' '};
+    static const WCHAR func_suffixW[] =
+        {'(',')',' ','{','\n',' ',' ',' ',' ','[','n','a','t','i','v','e',' ','c','o','d','e',']','\n','}','\n'};
 
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
+    /* FIXME: This probably should be more generic. Also we should try to get IID_IActiveScriptSite and SID_GetCaller. */
+    if(!caller)
+        return E_ACCESSDENIED;
 
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        *ppv = &This->IUnknown_iface;
-    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
-        return *ppv ? S_OK : E_NOINTERFACE;
-    }else {
-        *ppv = NULL;
-        return E_NOINTERFACE;
-    }
+    name_len = wcslen(name);
+    ptr = str = SysAllocStringLen(NULL, name_len + ARRAY_SIZE(func_prefixW) + ARRAY_SIZE(func_suffixW));
+    if(!str)
+        return E_OUTOFMEMORY;
 
-    IUnknown_AddRef((IUnknown*)*ppv);
+    memcpy(ptr, func_prefixW, sizeof(func_prefixW));
+    ptr += ARRAY_SIZE(func_prefixW);
+
+    memcpy(ptr, name, name_len * sizeof(WCHAR));
+    ptr += name_len;
+
+    memcpy(ptr, func_suffixW, sizeof(func_suffixW));
+
+    V_VT(res) = VT_BSTR;
+    V_BSTR(res) = str;
     return S_OK;
 }
-
-static ULONG WINAPI Function_AddRef(IUnknown *iface)
-{
-    func_disp_t *This = impl_from_IUnknown(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    return ref;
-}
-
-static ULONG WINAPI Function_Release(IUnknown *iface)
-{
-    func_disp_t *This = impl_from_IUnknown(iface);
-    LONG ref = InterlockedDecrement(&This->ref);
-    unsigned i;
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    if(!ref) {
-        assert(!This->info || !This->obj);
-        for(i = 0; i < ARRAY_SIZE(This->funcs); i++)
-            if(This->funcs[i])
-                IDispatch_Release(This->funcs[i]);
-        release_dispex(&This->dispex);
-        free(This);
-    }
-
-    return ref;
-}
-
-static const IUnknownVtbl FunctionUnkVtbl = {
-    Function_QueryInterface,
-    Function_AddRef,
-    Function_Release
-};
 
 static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
@@ -1148,9 +1134,66 @@ static const struct {
     { L"call",  function_call }
 };
 
+static inline func_prop_disp_t *func_prop_disp_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, func_prop_disp_t, dispex);
+}
+
+static void function_prop_destructor(DispatchEx *dispex)
+{
+    func_prop_disp_t *This = func_prop_disp_from_DispatchEx(dispex);
+    free(This);
+}
+
+static HRESULT function_prop_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    func_prop_disp_t *This = func_prop_disp_from_DispatchEx(dispex);
+    HRESULT hres;
+
+    switch(flags) {
+    case DISPATCH_CONSTRUCT:
+        return MSHTML_E_INVALID_PROPERTY;
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+        return MSHTML_E_INVALID_PROPERTY;
+    case DISPATCH_PROPERTYGET:
+        hres = format_func_disp_string(function_props[This->idx].name, caller, res);
+        break;
+    default:
+        FIXME("Unimplemented flags %x\n", flags);
+        hres = E_NOTIMPL;
+    }
+
+    return hres;
+}
+
+static const dispex_static_data_vtbl_t function_prop_dispex_vtbl = {
+    .destructor       = function_prop_destructor,
+    .value            = function_prop_value
+};
+
+static dispex_static_data_t function_prop_dispex = {
+    "Function",
+    &function_prop_dispex_vtbl,
+    PROTO_ID_NULL,
+    NULL_tid,
+    no_iface_tids
+};
+
 static inline func_disp_t *impl_from_DispatchEx(DispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, func_disp_t, dispex);
+}
+
+static void function_destructor(DispatchEx *dispex)
+{
+    func_disp_t *This = impl_from_DispatchEx(dispex);
+    assert(!This->obj);
+    free(This);
 }
 
 static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
@@ -1167,43 +1210,13 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
             return E_INVALIDARG;
         /* fall through */
     case DISPATCH_METHOD:
-        if(!This->info)
-            return MSHTML_E_INVALID_PROPERTY;
         if(!This->obj)
             return E_UNEXPECTED;
         hres = invoke_builtin_function((IDispatch*)&This->obj->IDispatchEx_iface, This->info, params, res, ei, caller);
         break;
-    case DISPATCH_PROPERTYGET: {
-        unsigned name_len;
-        WCHAR *ptr;
-        BSTR str;
-
-        static const WCHAR func_prefixW[] =
-            {'\n','f','u','n','c','t','i','o','n',' '};
-        static const WCHAR func_suffixW[] =
-            {'(',')',' ','{','\n',' ',' ',' ',' ','[','n','a','t','i','v','e',' ','c','o','d','e',']','\n','}','\n'};
-
-        /* FIXME: This probably should be more generic. Also we should try to get IID_IActiveScriptSite and SID_GetCaller. */
-        if(!caller)
-            return E_ACCESSDENIED;
-
-        name_len = This->info ? SysStringLen(This->info->name) : wcslen(function_props[This->idx].name);
-        ptr = str = SysAllocStringLen(NULL, name_len + ARRAY_SIZE(func_prefixW) + ARRAY_SIZE(func_suffixW));
-        if(!str)
-            return E_OUTOFMEMORY;
-
-        memcpy(ptr, func_prefixW, sizeof(func_prefixW));
-        ptr += ARRAY_SIZE(func_prefixW);
-
-        memcpy(ptr, This->info ? This->info->name : function_props[This->idx].name, name_len*sizeof(WCHAR));
-        ptr += name_len;
-
-        memcpy(ptr, func_suffixW, sizeof(func_suffixW));
-
-        V_VT(res) = VT_BSTR;
-        V_BSTR(res) = str;
-        return S_OK;
-    }
+    case DISPATCH_PROPERTYGET:
+        hres = format_func_disp_string(This->info->name, caller, res);
+        break;
     default:
         FIXME("Unimplemented flags %x\n", flags);
         hres = E_NOTIMPL;
@@ -1214,12 +1227,7 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
 
 static HRESULT function_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
 {
-    func_disp_t *This = impl_from_DispatchEx(dispex);
     DWORD i;
-
-    /* can't chain apply/call */
-    if(!This->info)
-        return DISP_E_UNKNOWNNAME;
 
     for(i = 0; i < ARRAY_SIZE(function_props); i++) {
         if((flags & fdexNameCaseInsensitive) ? wcsicmp(name, function_props[i].name) : wcscmp(name, function_props[i].name))
@@ -1232,10 +1240,9 @@ static HRESULT function_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, D
 
 static HRESULT function_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
 {
-    func_disp_t *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
 
-    if(idx >= ARRAY_SIZE(function_props) || !This->info)
+    if(idx >= ARRAY_SIZE(function_props))
         return DISP_E_MEMBERNOTFOUND;
 
     return (*name = SysAllocString(function_props[idx].name)) ? S_OK : E_OUTOFMEMORY;
@@ -1247,7 +1254,7 @@ static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID i
     func_disp_t *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
 
-    if(idx >= ARRAY_SIZE(function_props) || !This->info)
+    if(idx >= ARRAY_SIZE(function_props))
         return DISP_E_MEMBERNOTFOUND;
 
     switch(flags) {
@@ -1257,18 +1264,18 @@ static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID i
         /* fall through */
     case DISPATCH_METHOD:
         return function_props[idx].invoke(This, params, lcid, res, ei, caller);
-    case DISPATCH_PROPERTYGET:
-        if(!This->funcs[idx]) {
-            func_disp_t *disp = create_func_disp(dispex, NULL);
-            if(!disp)
-                return E_OUTOFMEMORY;
-            disp->idx = idx;
-            This->funcs[idx] = (IDispatch*)&disp->dispex.IDispatchEx_iface;
-        }
+    case DISPATCH_PROPERTYGET: {
+        func_prop_disp_t *disp = calloc(1, sizeof(func_prop_disp_t));
+
+        if(!disp)
+            return E_OUTOFMEMORY;
+        disp->idx = idx;
+        init_dispatch(&disp->dispex, &function_prop_dispex, NULL, dispex_compat_mode(&This->dispex));
+
         V_VT(res) = VT_DISPATCH;
-        V_DISPATCH(res) = This->funcs[idx];
-        IDispatch_AddRef(This->funcs[idx]);
+        V_DISPATCH(res) = (IDispatch*)&disp->dispex.IDispatchEx_iface;
         break;
+    }
     default:
         return MSHTML_E_INVALID_PROPERTY;
     }
@@ -1277,6 +1284,7 @@ static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID i
 }
 
 static const dispex_static_data_vtbl_t function_dispex_vtbl = {
+    .destructor       = function_destructor,
     .value            = function_value,
     .get_dispid       = function_get_dispid,
     .get_name         = function_get_name,
@@ -1299,11 +1307,9 @@ static func_disp_t *create_func_disp(DispatchEx *obj, func_info_t *info)
     if(!ret)
         return NULL;
 
-    ret->IUnknown_iface.lpVtbl = &FunctionUnkVtbl;
-    ret->ref = 1;
     ret->obj = obj;
     ret->info = info;
-    init_dispatch(&ret->dispex, &ret->IUnknown_iface,  &function_dispex, NULL, dispex_compat_mode(obj));
+    init_dispatch(&ret->dispex, &function_dispex, NULL, dispex_compat_mode(obj));
 
     return ret;
 }
@@ -1458,21 +1464,14 @@ HRESULT dispex_get_builtin_id(DispatchEx *This, BSTR name, DWORD grfdex, DISPID 
             min = n+1;
     }
 
-    if(This->info->desc->vtbl) {
-        HRESULT hres;
-
-        if(This->info->desc->vtbl->get_static_dispid) {
-            hres = This->info->desc->vtbl->get_static_dispid(dispex_compat_mode(This), name, grfdex, ret);
-            if(hres != DISP_E_UNKNOWNNAME)
-                return hres;
-        }
-
-        if(This->info->desc->vtbl->get_dispid) {
-            hres = This->info->desc->vtbl->get_dispid(This, name, grfdex, ret);
-            if(hres != DISP_E_UNKNOWNNAME)
-                return hres;
-        }
+    if(This->info->desc->vtbl->get_static_dispid) {
+        HRESULT hres = This->info->desc->vtbl->get_static_dispid(dispex_compat_mode(This), name, grfdex, ret);
+        if(hres != DISP_E_UNKNOWNNAME)
+            return hres;
     }
+
+    if(This->info->desc->vtbl->get_dispid)
+        return This->info->desc->vtbl->get_dispid(This, name, grfdex, ret);
 
     return DISP_E_UNKNOWNNAME;
 }
@@ -1829,7 +1828,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, IDispatch *this_obj, DISPID
     IUnknown *iface;
     HRESULT hres;
 
-    if(id == DISPID_VALUE && This->info->desc->vtbl && This->info->desc->vtbl->value) {
+    if(id == DISPID_VALUE && This->info->desc->vtbl->value) {
         hres = This->info->desc->vtbl->value(This, lcid, flags, dp, res, ei, caller);
         if(hres != S_FALSE)
             return hres;
@@ -2111,60 +2110,6 @@ HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
     return *ret ? S_OK : E_OUTOFMEMORY;
 }
 
-static inline struct legacy_prototype *legacy_prototype_from_IUnknown(IUnknown *iface)
-{
-    return CONTAINING_RECORD(iface, struct legacy_prototype, IUnknown_iface);
-}
-
-static HRESULT WINAPI legacy_prototype_QueryInterface(IUnknown *iface, REFIID riid, void **ppv)
-{
-    struct legacy_prototype *This = legacy_prototype_from_IUnknown(iface);
-
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        *ppv = &This->IUnknown_iface;
-    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
-        return *ppv ? S_OK : E_NOINTERFACE;
-    }else {
-        *ppv = NULL;
-        return E_NOINTERFACE;
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
-}
-
-static ULONG WINAPI legacy_prototype_AddRef(IUnknown *iface)
-{
-    struct legacy_prototype *This = legacy_prototype_from_IUnknown(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    return ref;
-}
-
-static ULONG WINAPI legacy_prototype_Release(IUnknown *iface)
-{
-    struct legacy_prototype *This = legacy_prototype_from_IUnknown(iface);
-    LONG ref = InterlockedDecrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    if(!ref) {
-        release_dispex(&This->dispex);
-        free(This);
-    }
-    return ref;
-}
-
-static const IUnknownVtbl legacy_prototype_vtbl = {
-    legacy_prototype_QueryInterface,
-    legacy_prototype_AddRef,
-    legacy_prototype_Release
-};
-
 struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow *window, prototype_id_t prot_id,
         compat_mode_t compat_mode)
 {
@@ -2174,21 +2119,45 @@ struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow *window, prototype
         if(!(prot = malloc(sizeof(*prot))))
             return NULL;
 
-        prot->IUnknown_iface.lpVtbl = &legacy_prototype_vtbl;
-        prot->ref = 1;
         prot->window = window;
         window->legacy_prototypes[prot_id] = prot;
+        IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
 
-        init_dispatch(&prot->dispex, &prot->IUnknown_iface, &legacy_prototype_dispex[prot_id], NULL, compat_mode);
+        init_dispatch(&prot->dispex, &legacy_prototype_dispex[prot_id], NULL, compat_mode);
     }
 
-    IUnknown_AddRef(&prot->IUnknown_iface);
+    IDispatchEx_AddRef(&prot->dispex.IDispatchEx_iface);
     return prot;
 }
 
 static inline struct legacy_prototype *legacy_prototype_from_DispatchEx(DispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, struct legacy_prototype, dispex);
+}
+
+static void legacy_prototype_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    struct legacy_prototype *This = legacy_prototype_from_DispatchEx(dispex);
+
+    if(This->window)
+        note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
+}
+
+static void legacy_prototype_unlink(DispatchEx *dispex)
+{
+    struct legacy_prototype *This = legacy_prototype_from_DispatchEx(dispex);
+
+    if(This->window) {
+        HTMLInnerWindow *window = This->window;
+        This->window = NULL;
+        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
+    }
+}
+
+static void legacy_prototype_destructor(DispatchEx *dispex)
+{
+    struct legacy_prototype *This = legacy_prototype_from_DispatchEx(dispex);
+    free(This);
 }
 
 static HRESULT legacy_prototype_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
@@ -2250,9 +2219,6 @@ static HRESULT legacy_prototype_invoke(DispatchEx *dispex, IDispatch *this_obj, 
     if(idx > 0 || dispex_compat_mode(dispex) != COMPAT_MODE_IE8)
         return DISP_E_MEMBERNOTFOUND;
 
-    if(!window)
-        return E_UNEXPECTED;
-
     switch(flags) {
     case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
         if(!res)
@@ -2279,6 +2245,9 @@ static HRESULT legacy_prototype_invoke(DispatchEx *dispex, IDispatch *this_obj, 
 }
 
 static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl = {
+    .destructor       = legacy_prototype_destructor,
+    .traverse         = legacy_prototype_traverse,
+    .unlink           = legacy_prototype_unlink,
     .value            = legacy_prototype_value,
     .get_dispid       = legacy_prototype_get_dispid,
     .get_name         = legacy_prototype_get_name,
@@ -2326,6 +2295,36 @@ static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t
     }
     info->func_cnt = func - info->funcs;
     memset(func, 0, (info->func_size - info->func_cnt) * sizeof(*func));
+}
+
+static inline struct legacy_ctor *legacy_ctor_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, struct legacy_ctor, dispex);
+}
+
+void legacy_ctor_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    struct legacy_ctor *This = legacy_ctor_from_DispatchEx(dispex);
+
+    if(This->window)
+        note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
+}
+
+void legacy_ctor_unlink(DispatchEx *dispex)
+{
+    struct legacy_ctor *This = legacy_ctor_from_DispatchEx(dispex);
+
+    if(This->window) {
+        HTMLInnerWindow *window = This->window;
+        This->window = NULL;
+        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
+    }
+}
+
+void legacy_ctor_destructor(DispatchEx *dispex)
+{
+    struct legacy_ctor *This = legacy_ctor_from_DispatchEx(dispex);
+    free(This);
 }
 
 HRESULT legacy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
@@ -2394,9 +2393,6 @@ HRESULT legacy_ctor_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, L
     if(idx > 0)
         return DISP_E_MEMBERNOTFOUND;
 
-    if(!This->window)
-        return E_UNEXPECTED;
-
     switch(flags) {
     case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
         if(!res)
@@ -2424,64 +2420,27 @@ HRESULT legacy_ctor_delete(DispatchEx *dispex, DISPID id)
            idx > 0 ? S_OK : MSHTML_E_INVALID_PROPERTY;
 }
 
-static inline struct proxy_prototype *proxy_prototype_from_IUnknown(IUnknown *iface)
+static inline struct proxy_prototype *proxy_prototype_from_DispatchEx(DispatchEx *iface)
 {
-    return CONTAINING_RECORD(iface, struct proxy_prototype, IUnknown_iface);
+    return CONTAINING_RECORD(iface, struct proxy_prototype, dispex);
 }
-
-static HRESULT WINAPI proxy_prototype_QueryInterface(IUnknown *iface, REFIID riid, void **ppv)
-{
-    struct proxy_prototype *This = proxy_prototype_from_IUnknown(iface);
-
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        *ppv = &This->IUnknown_iface;
-    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
-        return *ppv ? S_OK : E_NOINTERFACE;
-    }else {
-        *ppv = NULL;
-        return E_NOINTERFACE;
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
-}
-
-static ULONG WINAPI proxy_prototype_AddRef(IUnknown *iface)
-{
-    struct proxy_prototype *This = proxy_prototype_from_IUnknown(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    return ref;
-}
-
-static ULONG WINAPI proxy_prototype_Release(IUnknown *iface)
-{
-    struct proxy_prototype *This = proxy_prototype_from_IUnknown(iface);
-    LONG ref = InterlockedDecrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    if(!ref) {
-        release_dispex(&This->dispex);
-        free(This);
-    }
-    return ref;
-}
-
-static const IUnknownVtbl proxy_prototype_vtbl = {
-    proxy_prototype_QueryInterface,
-    proxy_prototype_AddRef,
-    proxy_prototype_Release
-};
 
 static inline struct proxy_prototype *to_proxy_prototype(DispatchEx *dispex)
 {
-    return (dispex->outer->lpVtbl == &proxy_prototype_vtbl) ? proxy_prototype_from_IUnknown(dispex->outer) : NULL;
+    if(dispex->info->desc >= &prototype_static_data[0].dispex && dispex->info->desc < &prototype_static_data[ARRAY_SIZE(prototype_static_data)].dispex)
+        return proxy_prototype_from_DispatchEx(dispex);
+    return NULL;
 }
+
+static void proxy_prototype_destructor(DispatchEx *dispex)
+{
+    struct proxy_prototype *This = proxy_prototype_from_DispatchEx(dispex);
+    free(This);
+}
+
+static const dispex_static_data_vtbl_t proxy_prototype_dispex_vtbl = {
+    .destructor       = proxy_prototype_destructor
+};
 
 static void proxy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
 {
@@ -2560,7 +2519,7 @@ static HRESULT get_prototype_builtin_id(struct proxy_prototype *prot, BSTR name,
     }
 
     data = proxy_prototype_object_info(prot);
-    if(data->desc->vtbl && data->desc->vtbl->get_static_dispid)
+    if(data->desc->vtbl->get_static_dispid)
         return data->desc->vtbl->get_static_dispid(dispex_compat_mode(&prot->dispex), name, flags, id);
     return DISP_E_UNKNOWNNAME;
 }
@@ -2586,11 +2545,10 @@ static IDispatch *get_default_prototype(prototype_id_t prot_id, compat_mode_t co
     if(!(prot = malloc(sizeof(*prot))))
         return NULL;
 
-    prot->IUnknown_iface.lpVtbl = &proxy_prototype_vtbl;
-    prot->ref = 2;  /* the script's ctx also holds one ref */
+    init_dispatch(&prot->dispex, &prototype_static_data[prot_id].dispex, NULL, compat_mode);
 
-    init_dispatch(&prot->dispex, &prot->IUnknown_iface, &prototype_static_data[prot_id].dispex, NULL, compat_mode);
-
+    /* The script's ctx also holds one ref */
+    IDispatchEx_AddRef(&prot->dispex.IDispatchEx_iface);
     *entry = (IDispatch*)&prot->dispex.IDispatchEx_iface;
     return *entry;
 }
@@ -2602,7 +2560,7 @@ static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_
         dispex_static_data_t *dispex;
         const void *vtbl;
     } ctors[] = {
-        { PROTO_ID_DOMParser,           &DOMParserCtor_dispex,              &legacy_ctor_vtbl },
+        { PROTO_ID_DOMParser,           &DOMParserCtor_dispex },
         { PROTO_ID_HTMLImgElement,      &HTMLImageCtor_dispex,              &HTMLImageElementFactoryVtbl },
         { PROTO_ID_HTMLOptionElement,   &HTMLOptionCtor_dispex,             &HTMLOptionElementFactoryVtbl },
         { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl },
@@ -2620,71 +2578,25 @@ static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_
         return NULL;
 
     ctor->IUnknown_iface.lpVtbl = ctors[i].vtbl;
-    ctor->ref = 1;
     ctor->prot_id = prot_id;
     ctor->window = window;
-
-    /* Proxy constructor disps hold ref to window */
     IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
 
-    init_dispatch(&ctor->dispex, &ctor->IUnknown_iface, ctors[i].dispex, NULL, dispex_compat_mode(&window->event_target.dispex));
+    init_dispatch(&ctor->dispex, ctors[i].dispex, NULL, dispex_compat_mode(&window->event_target.dispex));
 
     return (IDispatch*)&ctor->dispex.IDispatchEx_iface;
 }
 
-static inline struct proxy_ctor *proxy_ctor_from_IUnknown(IUnknown *iface)
+static inline struct proxy_ctor *proxy_ctor_from_DispatchEx(DispatchEx *iface)
 {
-    return CONTAINING_RECORD(iface, struct proxy_ctor, IUnknown_iface);
+    return CONTAINING_RECORD(iface, struct proxy_ctor, dispex);
 }
 
-static HRESULT WINAPI proxy_ctor_QueryInterface(IUnknown *iface, REFIID riid, void **ppv)
+static void proxy_ctor_destructor(DispatchEx *dispex)
 {
-    struct proxy_ctor *This = proxy_ctor_from_IUnknown(iface);
-
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        *ppv = &This->IUnknown_iface;
-    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
-        return *ppv ? S_OK : E_NOINTERFACE;
-    }else {
-        *ppv = NULL;
-        return E_NOINTERFACE;
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
+    struct proxy_ctor *This = proxy_ctor_from_DispatchEx(dispex);
+    free(This);
 }
-
-static ULONG WINAPI proxy_ctor_AddRef(IUnknown *iface)
-{
-    struct proxy_ctor *This = proxy_ctor_from_IUnknown(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    return ref;
-}
-
-static ULONG WINAPI proxy_ctor_Release(IUnknown *iface)
-{
-    struct proxy_ctor *This = proxy_ctor_from_IUnknown(iface);
-    LONG ref = InterlockedDecrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    if(!ref) {
-        release_dispex(&This->dispex);
-        free(This);
-    }
-    return ref;
-}
-
-static const IUnknownVtbl proxy_ctor_vtbl = {
-    proxy_ctor_QueryInterface,
-    proxy_ctor_AddRef,
-    proxy_ctor_Release
-};
 
 static HRESULT proxy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
         VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
@@ -2711,6 +2623,7 @@ static HRESULT proxy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPP
 }
 
 static const dispex_static_data_vtbl_t proxy_ctor_dispex_vtbl = {
+    .destructor       = proxy_ctor_destructor,
     .value            = proxy_ctor_value
 };
 
@@ -2740,7 +2653,7 @@ static HRESULT proxy_get_dispid(DispatchEx *dispex, const WCHAR *name, BOOL case
             }
         }
 
-        if(dispex->info->desc->vtbl && dispex->info->desc->vtbl->get_dispid) {
+        if(dispex->info->desc->vtbl->get_dispid) {
             hres = dispex->info->desc->vtbl->get_dispid(dispex, bstr, grfdex, id);
             if(hres != DISP_E_UNKNOWNNAME) {
                 SysFreeString(bstr);
@@ -2825,28 +2738,75 @@ static HRESULT WINAPI DispatchEx_QueryInterface(IDispatchEx *iface, REFIID riid,
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
 
-    return IUnknown_QueryInterface(This->outer, riid, ppv);
+    TRACE("%s (%p)->(%s %p)\n", This->info->desc->name, This, debugstr_mshtml_guid(riid), ppv);
+
+    if(This->info->desc->vtbl->query_interface) {
+        *ppv = This->info->desc->vtbl->query_interface(This, riid);
+        if(*ppv)
+            goto ret;
+    }
+
+    if(IsEqualGUID(&IID_IUnknown, riid) || IsEqualGUID(&IID_IDispatch, riid) || IsEqualGUID(&IID_IDispatchEx, riid))
+        *ppv = &This->IDispatchEx_iface;
+    else if(IsEqualGUID(&IID_IWineDispatchProxyPrivate, riid))
+        *ppv = &This->IDispatchEx_iface;
+    else if(IsEqualGUID(&IID_nsXPCOMCycleCollectionParticipant, riid)) {
+        *ppv = &dispex_ccp;
+        return S_OK;
+    }else if(IsEqualGUID(&IID_nsCycleCollectionISupports, riid)) {
+        *ppv = &This->IDispatchEx_iface;
+        return S_OK;
+    }else if(IsEqualGUID(&IID_IDispatchJS, riid) ||
+             IsEqualGUID(&IID_UndocumentedScriptIface, riid) ||
+             IsEqualGUID(&IID_IMarshal, riid) ||
+             IsEqualGUID(&IID_IManagedObject, riid)) {
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }else {
+        *ppv = NULL;
+        WARN("%s (%p)->(%s %p)\n", This->info->desc->name, This, debugstr_mshtml_guid(riid), ppv);
+        return E_NOINTERFACE;
+    }
+
+ret:
+    IDispatchEx_AddRef(&This->IDispatchEx_iface);
+    return S_OK;
 }
 
 static ULONG WINAPI DispatchEx_AddRef(IDispatchEx *iface)
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
+    LONG ref = ccref_incr(&This->ccref, (nsISupports*)&This->IDispatchEx_iface);
 
-    return IUnknown_AddRef(This->outer);
+    TRACE("%s (%p) ref=%ld\n", This->info->desc->name, This, ref);
+
+    return ref;
 }
 
 static ULONG WINAPI DispatchEx_Release(IDispatchEx *iface)
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
+    LONG ref = ccref_decr(&This->ccref, (nsISupports*)&This->IDispatchEx_iface, &dispex_ccp);
 
-    return IUnknown_Release(This->outer);
+    TRACE("%s (%p) ref=%ld\n", This->info->desc->name, This, ref);
+
+    /* Gecko ccref may not free the object immediately when ref count reaches 0, so we need
+     * an extra care for objects that need an immediate clean up. See Gecko's
+     * NS_IMPL_CYCLE_COLLECTING_NATIVE_RELEASE_WITH_LAST_RELEASE for details. */
+    if(!ref && This->info->desc->vtbl->last_release) {
+        ccref_incr(&This->ccref, (nsISupports*)&This->IDispatchEx_iface);
+        This->info->desc->vtbl->last_release(This);
+        ccref_decr(&This->ccref, (nsISupports*)&This->IDispatchEx_iface, &dispex_ccp);
+    }
+
+    return ref;
 }
 
 static HRESULT WINAPI DispatchEx_GetTypeInfoCount(IDispatchEx *iface, UINT *pctinfo)
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
 
-    TRACE("(%p)->(%p)\n", This, pctinfo);
+    TRACE("%s (%p)->(%p)\n", This->info->desc->name, This, pctinfo);
 
     *pctinfo = 1;
     return S_OK;
@@ -2858,7 +2818,7 @@ static HRESULT WINAPI DispatchEx_GetTypeInfo(IDispatchEx *iface, UINT iTInfo,
     DispatchEx *This = impl_from_IDispatchEx(iface);
     HRESULT hres;
 
-    TRACE("(%p)->(%u %lu %p)\n", This, iTInfo, lcid, ppTInfo);
+    TRACE("%s (%p)->(%u %lu %p)\n", This->info->desc->name, This, iTInfo, lcid, ppTInfo);
 
     hres = get_typeinfo(This->info->desc->disp_tid, ppTInfo);
     if(FAILED(hres))
@@ -2879,8 +2839,8 @@ static HRESULT WINAPI DispatchEx_GetIDsOfNames(IDispatchEx *iface, REFIID riid,
         return IDispatchEx_GetIDsOfNames((IDispatchEx*)This->proxy, riid, rgszNames,
                                          cNames, lcid, rgDispId);
 
-    TRACE("(%p)->(%s %p %u %lu %p)\n", This, debugstr_guid(riid), rgszNames, cNames,
-          lcid, rgDispId);
+    TRACE("%s (%p)->(%s %p %u %lu %p)\n", This->info->desc->name, This, debugstr_guid(riid), rgszNames,
+          cNames, lcid, rgDispId);
 
     /* Native ignores all cNames > 1, and doesn't even fill them */
     if(cNames)
@@ -2899,8 +2859,8 @@ static HRESULT WINAPI DispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMember,
         return IDispatchEx_Invoke((IDispatchEx*)This->proxy, dispIdMember, riid, lcid, wFlags,
                                   pDispParams, pVarResult, pExcepInfo, puArgErr);
 
-    TRACE("(%p)->(%ld %s %ld %d %p %p %p %p)\n", This, dispIdMember, debugstr_guid(riid),
-          lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+    TRACE("%s (%p)->(%ld %s %ld %d %p %p %p %p)\n", This->info->desc->name, This, dispIdMember,
+          debugstr_guid(riid), lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 
     return dispex_invoke(This, (IDispatch*)iface, dispIdMember, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, NULL);
 }
@@ -2914,7 +2874,7 @@ static HRESULT WINAPI DispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DW
     if(This->proxy)
         return IDispatchEx_GetDispID((IDispatchEx*)This->proxy, bstrName, grfdex, pid);
 
-    TRACE("(%p)->(%s %lx %p)\n", This, debugstr_w(bstrName), grfdex, pid);
+    TRACE("%s (%p)->(%s %lx %p)\n", This->info->desc->name, This, debugstr_w(bstrName), grfdex, pid);
 
     if(grfdex & ~(fdexNameCaseSensitive|fdexNameCaseInsensitive|fdexNameEnsure|fdexNameImplicit|FDEX_VERSION_MASK))
         FIXME("Unsupported grfdex %lx\n", grfdex);
@@ -2942,7 +2902,7 @@ static HRESULT WINAPI DispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID lc
     if(This->proxy && id >= 0)
         return IDispatchEx_InvokeEx((IDispatchEx*)This->proxy, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 
-    TRACE("(%p)->(%lx %lx %x %p %p %p %p)\n", This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    TRACE("%s (%p)->(%lx %lx %x %p %p %p %p)\n", This->info->desc->name, This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 
     return dispex_invoke(This, (IDispatch*)iface, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
@@ -2956,7 +2916,7 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR nam
     if(This->proxy)
         return IDispatchEx_DeleteMemberByName((IDispatchEx*)This->proxy, name, grfdex);
 
-    TRACE("(%p)->(%s %lx)\n", This, debugstr_w(name), grfdex);
+    TRACE("%s (%p)->(%s %lx)\n", This->info->desc->name, This, debugstr_w(name), grfdex);
 
     hres = IDispatchEx_GetDispID(&This->IDispatchEx_iface, name, grfdex & ~fdexNameEnsure, &id);
     if(FAILED(hres)) {
@@ -2974,7 +2934,7 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByDispID(IDispatchEx *iface, DISPID
     if(This->proxy && id >= 0)
         return IDispatchEx_DeleteMemberByDispID((IDispatchEx*)This->proxy, id);
 
-    TRACE("(%p)->(%lx)\n", This, id);
+    TRACE("%s (%p)->(%lx)\n", This->info->desc->name, This, id);
 
     return dispex_delete_prop(This, id);
 }
@@ -2986,7 +2946,7 @@ static HRESULT WINAPI DispatchEx_GetMemberProperties(IDispatchEx *iface, DISPID 
     if(This->proxy && id >= 0)
         return IDispatchEx_GetMemberProperties((IDispatchEx*)This->proxy, id, grfdexFetch, pgrfdex);
 
-    FIXME("(%p)->(%lx %lx %p)\n", This, id, grfdexFetch, pgrfdex);
+    FIXME("%s (%p)->(%lx %lx %p)\n", This->info->desc->name, This, id, grfdexFetch, pgrfdex);
     return E_NOTIMPL;
 }
 
@@ -2999,13 +2959,13 @@ static HRESULT WINAPI DispatchEx_GetMemberName(IDispatchEx *iface, DISPID id, BS
     if(This->proxy && id >= 0)
         return IDispatchEx_GetMemberName((IDispatchEx*)This->proxy, id, pbstrName);
 
-    TRACE("(%p)->(%lx %p)\n", This, id, pbstrName);
+    TRACE("%s (%p)->(%lx %p)\n", This->info->desc->name, This, id, pbstrName);
 
     if(!ensure_real_info(This))
         return E_OUTOFMEMORY;
 
     if(is_custom_dispid(id)) {
-        if(This->info->desc->vtbl && This->info->desc->vtbl->get_name)
+        if(This->info->desc->vtbl->get_name)
             return This->info->desc->vtbl->get_name(This, id, pbstrName);
         return DISP_E_MEMBERNOTFOUND;
     }
@@ -3058,7 +3018,7 @@ static HRESULT WINAPI DispatchEx_GetNextDispID(IDispatchEx *iface, DWORD grfdex,
     if(This->proxy)
         return IDispatchEx_GetNextDispID((IDispatchEx*)This->proxy, grfdex, id, pid);
 
-    TRACE("(%p)->(%lx %lx %p)\n", This, grfdex, id, pid);
+    TRACE("%s (%p)->(%lx %lx %p)\n", This->info->desc->name, This, grfdex, id, pid);
 
     if(!ensure_real_info(This))
         return E_OUTOFMEMORY;
@@ -3093,7 +3053,7 @@ static HRESULT WINAPI DispatchEx_GetNextDispID(IDispatchEx *iface, DWORD grfdex,
         id = DISPID_STARTENUM;
     }
 
-    if(This->info->desc->vtbl && This->info->desc->vtbl->next_dispid) {
+    if(This->info->desc->vtbl->next_dispid) {
         hres = This->info->desc->vtbl->next_dispid(This, id, pid);
         if(hres != S_FALSE)
             return hres;
@@ -3109,7 +3069,7 @@ static HRESULT WINAPI DispatchEx_GetNextDispID(IDispatchEx *iface, DWORD grfdex,
 static HRESULT WINAPI DispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnknown **ppunk)
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
-    FIXME("(%p)->(%p)\n", This, ppunk);
+    FIXME("%s (%p)->(%p)\n", This->info->desc->name, This, ppunk);
     return E_NOTIMPL;
 }
 
@@ -3151,13 +3111,12 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDis
         PROTO_ID_HTMLXDomainRequest
     };
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
-    struct proxy_prototype *prot = proxy_prototype_from_IUnknown(This->outer);
     struct proxy_ctor *ctor;
     prototype_id_t prot_id;
     IDispatch **entry;
     unsigned i;
 
-    prot_id = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex) - prototype_static_data;
+    prot_id = CONTAINING_RECORD(This->info->desc, struct prototype_static_data, dispex) - prototype_static_data;
 
     entry = &prots->disp[prot_id - LEGACY_PROTOTYPE_COUNT].ctor;
     if(*entry) {
@@ -3185,12 +3144,10 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDis
     if(!(ctor = malloc(sizeof(*ctor))))
         return NULL;
 
-    ctor->IUnknown_iface.lpVtbl = &proxy_ctor_vtbl;
-    ctor->ref = 2;  /* the script's ctx also holds one ref */
+    init_dispatch(&ctor->dispex, &proxy_ctor_dispex[prot_id - LEGACY_PROTOTYPE_COUNT], NULL, dispex_compat_mode(This));
 
-    init_dispatch(&ctor->dispex, &ctor->IUnknown_iface, &proxy_ctor_dispex[prot_id - LEGACY_PROTOTYPE_COUNT],
-                  NULL, dispex_compat_mode(This));
-
+    /* The script's ctx also holds one ref */
+    IDispatchEx_AddRef(&ctor->dispex.IDispatchEx_iface);
     *entry = (IDispatch*)&ctor->dispex.IDispatchEx_iface;
     return *entry;
 }
@@ -3217,7 +3174,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_DefineConstructors(IWineDispatchP
     compat_mode = dispex_compat_mode(This);
 
     for(i = 0; i < ARRAY_SIZE(proxy_ctor_dispex); i++) {
-        if(PROTO_ID_HTMLXDomainRequest == i + LEGACY_PROTOTYPE_COUNT && compat_mode >= COMPAT_MODE_IE11)
+        if(proxy_ctor_mode_unavailable[i] & (1 << compat_mode))
             continue;
 
         if(!(prot = get_default_prototype(i + LEGACY_PROTOTYPE_COUNT, compat_mode, prots_ref)))
@@ -3255,7 +3212,7 @@ static BOOL WINAPI WineDispatchProxyPrivate_IsPrototype(IWineDispatchProxyPrivat
 static BOOL WINAPI WineDispatchProxyPrivate_IsConstructor(IWineDispatchProxyPrivate *iface)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
-    return This->outer->lpVtbl == &proxy_ctor_vtbl;
+    return This->info->desc >= &proxy_ctor_dispex[0] && This->info->desc < &proxy_ctor_dispex[ARRAY_SIZE(proxy_ctor_dispex)];
 }
 
 static HRESULT WINAPI WineDispatchProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
@@ -3263,7 +3220,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropFixOverride(IWineDispatchProx
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
     HRESULT hres;
 
-    if(!This->info->desc->vtbl || !This->info->desc->vtbl->override)
+    if(!This->info->desc->vtbl->override)
         return S_FALSE;
 
     /* We only care about custom props, as those are the only ones which can mismatch.
@@ -3290,7 +3247,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropOverride(IWineDispatchProxyPr
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
 
-    if(!This->info->desc->vtbl || !This->info->desc->vtbl->override)
+    if(!This->info->desc->vtbl->override)
         return S_FALSE;
     return This->info->desc->vtbl->override(This, name, value);
 }
@@ -3300,7 +3257,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropDefineOverride(IWineDispatchP
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
     HRESULT hres;
 
-    if(!This->info->desc->vtbl || !This->info->desc->vtbl->override)
+    if(!This->info->desc->vtbl->override)
         return S_FALSE;
 
     hres = This->info->desc->vtbl->get_dispid(This, (WCHAR*)info->name, fdexNameEnsure | fdexNameCaseSensitive, &info->dispid);
@@ -3334,12 +3291,10 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropGetInfo(IWineDispatchProxyPri
     if(is_custom_dispid(info->dispid)) {
         info->name = name;  /* FIXME */
         info->flags = PROPF_WRITABLE;
-        if(This->info->desc->vtbl) {
-            if(This->info->desc->vtbl->delete)
-                info->flags |= PROPF_CONFIGURABLE;
-            if(This->info->desc->vtbl->next_dispid)
-                info->flags |= PROPF_ENUMERABLE;
-        }
+        if(This->info->desc->vtbl->delete)
+            info->flags |= PROPF_CONFIGURABLE;
+        if(This->info->desc->vtbl->next_dispid)
+            info->flags |= PROPF_ENUMERABLE;
         return S_OK;
     }
 
@@ -3361,6 +3316,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropGetInfo(IWineDispatchProxyPri
         }
         info->flags = PROPF_METHOD | func->argc | PROPF_WRITABLE | PROPF_CONFIGURABLE;
         info->func[0].invoke = proxy_func_invoke;
+        info->func[1].invoke = NULL;
         return S_OK;
     }
 
@@ -3421,7 +3377,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropEnum(IWineDispatchProxyPrivat
         }
     }
 
-    if(This->info->desc->vtbl && This->info->desc->vtbl->next_dispid) {
+    if(This->info->desc->vtbl->next_dispid) {
         const dispex_static_data_vtbl_t *vtbl = This->info->desc->vtbl;
         DISPID id = DISPID_STARTENUM;
         BSTR name;
@@ -3465,11 +3421,10 @@ static HRESULT WINAPI WineDispatchProxyPrivate_ToString(IWineDispatchProxyPrivat
 static BOOL WINAPI WineDispatchProxyPrivate_CanGC(IWineDispatchProxyPrivate *iface)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
-    IUnknown *outer = This->outer;
 
     /* Allow garbage collection only if the proxy is the only one holding a ref to us */
-    IUnknown_AddRef(outer);
-    return IUnknown_Release(outer) == 1;
+    IDispatchEx_AddRef(&This->IDispatchEx_iface);
+    return IDispatchEx_Release(&This->IDispatchEx_iface) == 1;
 }
 
 static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
@@ -3511,33 +3466,13 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
 
 static inline BOOL is_legacy_prototype(IDispatch *disp)
 {
+    DispatchEx *dispex;
+
     if(!disp || disp->lpVtbl != (const IDispatchVtbl*)&WineDispatchProxyPrivateVtbl)
         return FALSE;
-    return (impl_from_IDispatchEx((IDispatchEx*)disp)->outer->lpVtbl == &legacy_prototype_vtbl);
-}
+    dispex = impl_from_IDispatchEx((IDispatchEx*)disp);
 
-BOOL dispex_query_interface(DispatchEx *This, REFIID riid, void **ppv)
-{
-    if(IsEqualGUID(&IID_IDispatch, riid))
-        *ppv = &This->IDispatchEx_iface;
-    else if(IsEqualGUID(&IID_IDispatchEx, riid))
-        *ppv = &This->IDispatchEx_iface;
-    else if(IsEqualGUID(&IID_IWineDispatchProxyPrivate, riid))
-        *ppv = &This->IDispatchEx_iface;
-    else if(IsEqualGUID(&IID_IDispatchJS, riid))
-        *ppv = NULL;
-    else if(IsEqualGUID(&IID_UndocumentedScriptIface, riid))
-        *ppv = NULL;
-    else if(IsEqualGUID(&IID_IMarshal, riid))
-        *ppv = NULL;
-    else if(IsEqualGUID(&IID_IManagedObject, riid))
-        *ppv = NULL;
-    else
-        return FALSE;
-
-    if(*ppv)
-        IUnknown_AddRef((IUnknown*)*ppv);
-    return TRUE;
+    return dispex->info->desc >= &legacy_prototype_dispex[0] && dispex->info->desc < &legacy_prototype_dispex[ARRAY_SIZE(legacy_prototype_dispex)];
 }
 
 HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp,
@@ -3553,7 +3488,7 @@ HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID l
 
     switch(get_dispid_type(id)) {
     case DISPEXPROP_CUSTOM:
-        if(!dispex->info->desc->vtbl || !dispex->info->desc->vtbl->invoke)
+        if(!dispex->info->desc->vtbl->invoke)
             return DISP_E_MEMBERNOTFOUND;
         return dispex->info->desc->vtbl->invoke(dispex, this_obj, id, lcid, wFlags, pdp, res, pei, caller);
 
@@ -3615,7 +3550,7 @@ HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID l
     case DISPEXPROP_BUILTIN:
         if(wFlags == DISPATCH_CONSTRUCT) {
             if(id == DISPID_VALUE) {
-                if(dispex->info->desc->vtbl && dispex->info->desc->vtbl->value) {
+                if(dispex->info->desc->vtbl->value) {
                     return dispex->info->desc->vtbl->value(dispex, lcid, wFlags, pdp, res, pei, caller);
                 }
                 FIXME("DISPATCH_CONSTRUCT flag but missing value function\n");
@@ -3636,7 +3571,7 @@ HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
 {
     HRESULT hres;
 
-    if(is_custom_dispid(id) && dispex->info->desc->vtbl && dispex->info->desc->vtbl->delete)
+    if(is_custom_dispid(id) && dispex->info->desc->vtbl->delete)
         return dispex->info->desc->vtbl->delete(dispex, id);
 
     if(dispex_compat_mode(dispex) < COMPAT_MODE_IE8) {
@@ -3734,20 +3669,24 @@ HRESULT dispex_builtin_props_to_json(DispatchEx *dispex, VARIANT *ret)
     return hres;
 }
 
-void dispex_traverse(DispatchEx *This, nsCycleCollectionTraversalCallback *cb)
+static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTraversalCallback *cb)
 {
+    DispatchEx *This = impl_from_IDispatchEx(p);
     dynamic_prop_t *prop;
 
+    describe_cc_node(&This->ccref, This->info->desc->name, cb);
+
     if(This->prototype)
-        note_cc_edge((nsISupports*)&This->prototype->IUnknown_iface, "dispex_prototype", cb);
+        note_cc_edge((nsISupports*)&This->prototype->dispex.IDispatchEx_iface, "prototype", cb);
+
+    if(This->info->desc->vtbl->traverse)
+        This->info->desc->vtbl->traverse(This, cb);
 
     if(!This->dynamic_data)
-        return;
+        return NS_OK;
 
-    for(prop = This->dynamic_data->props; prop < This->dynamic_data->props + This->dynamic_data->prop_cnt; prop++) {
-        if(V_VT(&prop->var) == VT_DISPATCH)
-            note_cc_edge((nsISupports*)V_DISPATCH(&prop->var), "dispex_data", cb);
-    }
+    for(prop = This->dynamic_data->props; prop < This->dynamic_data->props + This->dynamic_data->prop_cnt; prop++)
+        traverse_variant(&prop->var, "dispex_data", cb);
 
     if(This->dynamic_data->func_disps) {
         func_obj_entry_t *iter = This->dynamic_data->func_disps, *end = iter + This->info->func_disp_cnt;
@@ -3756,28 +3695,35 @@ void dispex_traverse(DispatchEx *This, nsCycleCollectionTraversalCallback *cb)
             if(!iter->func_obj)
                 continue;
             note_cc_edge((nsISupports*)&iter->func_obj->dispex.IDispatchEx_iface, "func_obj", cb);
-            if(V_VT(&iter->val) == VT_DISPATCH)
-                note_cc_edge((nsISupports*)V_DISPATCH(&iter->val), "func_val", cb);
+            traverse_variant(&iter->val, "func_val", cb);
         }
     }
+
+    return NS_OK;
 }
 
-void dispex_unlink(DispatchEx *This)
+void dispex_props_unlink(DispatchEx *This)
 {
     dynamic_prop_t *prop;
 
     if(This->prototype) {
         struct legacy_prototype *prototype = This->prototype;
         This->prototype = NULL;
-        IUnknown_Release(&prototype->IUnknown_iface);
+        IDispatchEx_Release(&prototype->dispex.IDispatchEx_iface);
+    }
+
+    if(This->proxy) {
+        IWineDispatchProxyCbPrivate *proxy = This->proxy;
+        This->proxy = NULL;
+        proxy->lpVtbl->Unlinked(proxy, FALSE);
     }
 
     if(!This->dynamic_data)
         return;
 
     for(prop = This->dynamic_data->props; prop < This->dynamic_data->props + This->dynamic_data->prop_cnt; prop++) {
-        VariantClear(&prop->var);
         prop->flags |= DYNPROP_DELETED;
+        unlink_variant(&prop->var);
     }
 
     if(This->dynamic_data->func_disps) {
@@ -3796,23 +3742,33 @@ void dispex_unlink(DispatchEx *This)
     }
 }
 
-const void *dispex_get_vtbl(DispatchEx *dispex)
+static nsresult NSAPI dispex_unlink(void *p)
 {
-    return dispex->info->desc->vtbl;
+    DispatchEx *This = impl_from_IDispatchEx(p);
+
+    if(This->info->desc->vtbl->unlink)
+        This->info->desc->vtbl->unlink(This);
+
+    dispex_props_unlink(This);
+    return NS_OK;
 }
 
-void release_dispex(DispatchEx *This)
+static void NSAPI dispex_delete_cycle_collectable(void *p)
 {
+    DispatchEx *This = impl_from_IDispatchEx(p);
     dynamic_prop_t *prop;
+
+    if(This->info->desc->vtbl->unlink)
+        This->info->desc->vtbl->unlink(This);
+
+    if(This->prototype)
+        IDispatchEx_Release(&This->prototype->dispex.IDispatchEx_iface);
 
     if(This->proxy)
         This->proxy->lpVtbl->Unlinked(This->proxy, FALSE);
 
-    if(This->prototype)
-        IUnknown_Release(&This->prototype->IUnknown_iface);
-
     if(!This->dynamic_data)
-        return;
+        goto destructor;
 
     for(prop = This->dynamic_data->props; prop < This->dynamic_data->props + This->dynamic_data->prop_cnt; prop++) {
         VariantClear(&prop->var);
@@ -3836,6 +3792,24 @@ void release_dispex(DispatchEx *This)
     }
 
     free(This->dynamic_data);
+
+destructor:
+    This->info->desc->vtbl->destructor(This);
+}
+
+void init_dispex_cc(void)
+{
+    static const CCObjCallback dispex_ccp_callback = {
+        dispex_traverse,
+        dispex_unlink,
+        dispex_delete_cycle_collectable
+    };
+    ccp_init(&dispex_ccp, &dispex_ccp_callback);
+}
+
+const void *dispex_get_vtbl(DispatchEx *dispex)
+{
+    return dispex->info->desc->vtbl;
 }
 
 void finalize_delayed_init_dispex(DispatchEx *This, HTMLInnerWindow *window, dispex_static_data_t *data)
@@ -3847,18 +3821,17 @@ void finalize_delayed_init_dispex(DispatchEx *This, HTMLInnerWindow *window, dis
         This->prototype = get_legacy_prototype(window, data->prototype_id, compat_mode);
 }
 
-void init_dispatch(DispatchEx *dispex, IUnknown *outer, dispex_static_data_t *data, HTMLInnerWindow *window,
-        compat_mode_t compat_mode)
+void init_dispatch(DispatchEx *dispex, dispex_static_data_t *data, HTMLInnerWindow *window, compat_mode_t compat_mode)
 {
     assert(compat_mode < COMPAT_MODE_CNT);
 
     dispex->IDispatchEx_iface.lpVtbl = (const IDispatchExVtbl*)&WineDispatchProxyPrivateVtbl;
-    dispex->outer = outer;
     dispex->proxy = NULL;
     dispex->prototype = NULL;
     dispex->dynamic_data = NULL;
+    ccref_init(&dispex->ccref, 1);
 
-    if(data->vtbl && data->vtbl->get_compat_mode) {
+    if(data->vtbl->get_compat_mode) {
         /* delayed init */
         if(!data->delayed_init_info) {
             EnterCriticalSection(&cs_dispex_static_data);

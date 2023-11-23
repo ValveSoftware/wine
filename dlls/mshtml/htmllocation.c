@@ -36,19 +36,14 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(mshtml);
 
-static inline HTMLOuterWindow *get_window(HTMLLocation *This)
-{
-    return CONTAINING_RECORD(This, HTMLOuterWindow, location);
-}
-
 static IUri *get_uri(HTMLLocation *This)
 {
-    return get_window(This)->uri;
+    return This->window->uri;
 }
 
 static HRESULT get_url_components(HTMLLocation *This, URL_COMPONENTSW *url)
 {
-    const WCHAR *doc_url = get_window(This)->url ? get_window(This)->url : L"about:blank";
+    const WCHAR *doc_url = This->window->url ? This->window->url : L"about:blank";
 
     if(!InternetCrackUrlW(doc_url, 0, 0, url)) {
         FIXME("InternetCrackUrlW failed: 0x%08lx\n", GetLastError());
@@ -67,39 +62,19 @@ static inline HTMLLocation *impl_from_IHTMLLocation(IHTMLLocation *iface)
 static HRESULT WINAPI HTMLLocation_QueryInterface(IHTMLLocation *iface, REFIID riid, void **ppv)
 {
     HTMLLocation *This = impl_from_IHTMLLocation(iface);
-
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        *ppv = &This->IHTMLLocation_iface;
-    }else if(IsEqualGUID(&IID_IHTMLLocation, riid)) {
-        *ppv = &This->IHTMLLocation_iface;
-    }else if(IsEqualGUID(&IID_IMarshal, riid)) {
-        *ppv = NULL;
-        FIXME("(%p)->(IID_IMarshal %p)\n", This, ppv);
-        return E_NOINTERFACE;
-    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
-        return *ppv ? S_OK : E_NOINTERFACE;
-    }else {
-        *ppv = NULL;
-        WARN("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-        return E_NOINTERFACE;
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
+    return IDispatchEx_QueryInterface(&This->dispex.IDispatchEx_iface, riid, ppv);
 }
 
 static ULONG WINAPI HTMLLocation_AddRef(IHTMLLocation *iface)
 {
     HTMLLocation *This = impl_from_IHTMLLocation(iface);
-    return IHTMLWindow2_AddRef(&get_window(This)->base.IHTMLWindow2_iface);
+    return IDispatchEx_AddRef(&This->dispex.IDispatchEx_iface);
 }
 
 static ULONG WINAPI HTMLLocation_Release(IHTMLLocation *iface)
 {
     HTMLLocation *This = impl_from_IHTMLLocation(iface);
-    return IHTMLWindow2_Release(&get_window(This)->base.IHTMLWindow2_iface);
+    return IDispatchEx_Release(&This->dispex.IDispatchEx_iface);
 }
 
 static HRESULT WINAPI HTMLLocation_GetTypeInfoCount(IHTMLLocation *iface, UINT *pctinfo)
@@ -139,7 +114,7 @@ static HRESULT WINAPI HTMLLocation_put_href(IHTMLLocation *iface, BSTR v)
 
     TRACE("(%p)->(%s)\n", This, debugstr_w(v));
 
-    return navigate_url(get_window(This), v, get_uri(This), BINDING_NAVIGATED);
+    return navigate_url(This->window, v, get_uri(This), BINDING_NAVIGATED);
 }
 
 static HRESULT WINAPI HTMLLocation_get_href(IHTMLLocation *iface, BSTR *p)
@@ -500,7 +475,7 @@ static HRESULT WINAPI HTMLLocation_put_hash(IHTMLLocation *iface, BSTR v)
         memcpy(hash + 1, v, size - sizeof(WCHAR));
     }
 
-    hres = navigate_url(get_window(This), hash, get_uri(This), BINDING_NAVIGATED);
+    hres = navigate_url(This->window, hash, get_uri(This), BINDING_NAVIGATED);
 
     if(hash != v)
         free(hash);
@@ -544,12 +519,12 @@ static HRESULT WINAPI HTMLLocation_reload(IHTMLLocation *iface, VARIANT_BOOL fla
     TRACE("(%p)->(%x)\n", This, flag);
 
     /* reload is supposed to fail if called from a script with different origin, but IE doesn't care */
-    if(!is_main_content_window(get_window(This))) {
+    if(!is_main_content_window(This->window)) {
         FIXME("Unsupported on iframe\n");
         return E_NOTIMPL;
     }
 
-    return reload_page(get_window(This));
+    return reload_page(This->window);
 }
 
 static HRESULT WINAPI HTMLLocation_replace(IHTMLLocation *iface, BSTR bstr)
@@ -558,7 +533,7 @@ static HRESULT WINAPI HTMLLocation_replace(IHTMLLocation *iface, BSTR bstr)
 
     TRACE("(%p)->(%s)\n", This, debugstr_w(bstr));
 
-    return navigate_url(get_window(This), bstr, get_uri(This), BINDING_NAVIGATED | BINDING_REPLACE);
+    return navigate_url(This->window, bstr, get_uri(This), BINDING_NAVIGATED | BINDING_REPLACE);
 }
 
 static HRESULT WINAPI HTMLLocation_assign(IHTMLLocation *iface, BSTR bstr)
@@ -607,24 +582,81 @@ static const IHTMLLocationVtbl HTMLLocationVtbl = {
     HTMLLocation_toString
 };
 
+static inline HTMLLocation *impl_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, HTMLLocation, dispex);
+}
+
+static void *HTMLLocation_query_interface(DispatchEx *dispex, REFIID riid)
+{
+    HTMLLocation *This = impl_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IHTMLLocation, riid))
+        return &This->IHTMLLocation_iface;
+    if(IsEqualGUID(&IID_IMarshal, riid)) {
+        FIXME("(%p)->(IID_IMarshal)\n", This);
+        return NULL;
+    }
+
+    return NULL;
+}
+
+static void HTMLLocation_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    HTMLLocation *This = impl_from_DispatchEx(dispex);
+    if(This->window)
+        note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
+}
+
+static void HTMLLocation_unlink(DispatchEx *dispex)
+{
+    HTMLLocation *This = impl_from_DispatchEx(dispex);
+    if(This->window) {
+        HTMLOuterWindow *window = This->window;
+        This->window = NULL;
+        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
+    }
+}
+
+static void HTMLLocation_destructor(DispatchEx *dispex)
+{
+    HTMLLocation *This = impl_from_DispatchEx(dispex);
+    free(This);
+}
+
+static const dispex_static_data_vtbl_t HTMLLocation_dispex_vtbl = {
+    .query_interface  = HTMLLocation_query_interface,
+    .destructor       = HTMLLocation_destructor,
+    .traverse         = HTMLLocation_traverse,
+    .unlink           = HTMLLocation_unlink
+};
+
 static const tid_t HTMLLocation_iface_tids[] = {
     IHTMLLocation_tid,
     0
 };
 dispex_static_data_t HTMLLocation_dispex = {
     "Location",
-    NULL,
+    &HTMLLocation_dispex_vtbl,
     PROTO_ID_HTMLLocation,
     DispHTMLLocation_tid,
     HTMLLocation_iface_tids
 };
 
-void HTMLLocation_Init(HTMLOuterWindow *window)
+HRESULT create_location(HTMLOuterWindow *window, HTMLLocation **ret)
 {
     compat_mode_t compat_mode = dispex_compat_mode(&window->base.inner_window->event_target.dispex);
+    HTMLLocation *location;
 
-    window->location.IHTMLLocation_iface.lpVtbl = &HTMLLocationVtbl;
+    if(!(location = calloc(1, sizeof(*location))))
+        return E_OUTOFMEMORY;
 
-    init_dispatch(&window->location.dispex, (IUnknown*)&window->location.IHTMLLocation_iface, &HTMLLocation_dispex,
-                  window->base.inner_window, min(compat_mode, COMPAT_MODE_IE8));
+    location->IHTMLLocation_iface.lpVtbl = &HTMLLocationVtbl;
+    location->window = window;
+    IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
+
+    init_dispatch(&location->dispex, &HTMLLocation_dispex, window->base.inner_window, min(compat_mode, COMPAT_MODE_IE8));
+
+    *ret = location;
+    return S_OK;
 }

@@ -313,7 +313,7 @@ static nsresult run_end_load(HTMLDocumentNode *This, nsISupports *arg1, nsISuppo
     bind_event_scripts(This);
 
     if(This->window == window) {
-        window->performance_timing->dom_interactive_time = get_time_stamp();
+        window->dom_interactive_time = get_time_stamp();
         set_ready_state(This->outer_window, READYSTATE_INTERACTIVE);
     }
     IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
@@ -433,10 +433,10 @@ static void update_location_dispex(HTMLDocumentNode *doc)
 {
     HTMLOuterWindow *outer_window = doc->window->base.outer_window;
 
-    if(outer_window->location.dispex.outer) {
-        if(outer_window->location.dispex.prototype)
-            IUnknown_Release(&outer_window->location.dispex.prototype->IUnknown_iface);
-        outer_window->location.dispex.prototype = get_legacy_prototype(doc->window, PROTO_ID_HTMLLocation, min(doc->document_mode, COMPAT_MODE_IE8));
+    if(outer_window->location) {
+        if(outer_window->location->dispex.prototype)
+            IDispatchEx_Release(&outer_window->location->dispex.prototype->dispex.IDispatchEx_iface);
+        outer_window->location->dispex.prototype = get_legacy_prototype(doc->window, PROTO_ID_HTMLLocation, min(doc->document_mode, COMPAT_MODE_IE8));
     }
 }
 
@@ -463,6 +463,7 @@ compat_mode_t lock_document_mode(HTMLDocumentNode *doc)
         if(doc->window)
             update_location_dispex(doc);
     }
+
     return doc->document_mode;
 }
 

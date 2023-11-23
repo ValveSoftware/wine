@@ -597,7 +597,8 @@ static BOOL init_xpcom(const PRUnichar *gre_path)
         ERR("NS_GetComponentRegistrar failed: %08lx\n", nsres);
     }
 
-    init_node_cc();
+    init_dispex_cc();
+    init_window_cc();
 
     return TRUE;
 }
