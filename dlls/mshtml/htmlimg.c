@@ -658,23 +658,6 @@ static inline HTMLImg *impl_from_HTMLDOMNode(HTMLDOMNode *iface)
     return CONTAINING_RECORD(iface, HTMLImg, element.node);
 }
 
-static HRESULT HTMLImgElement_QI(HTMLDOMNode *iface, REFIID riid, void **ppv)
-{
-    HTMLImg *This = impl_from_HTMLDOMNode(iface);
-
-    *ppv = NULL;
-
-    if(IsEqualGUID(&IID_IHTMLImgElement, riid)) {
-        TRACE("(%p)->(IID_IHTMLImgElement %p)\n", This, ppv);
-        *ppv = &This->IHTMLImgElement_iface;
-    }else {
-        return HTMLElement_QI(&This->element.node, riid, ppv);
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
-}
-
 static HRESULT HTMLImgElement_get_readystate(HTMLDOMNode *iface, BSTR *p)
 {
     HTMLImg *This = impl_from_HTMLDOMNode(iface);
@@ -682,31 +665,55 @@ static HRESULT HTMLImgElement_get_readystate(HTMLDOMNode *iface, BSTR *p)
     return IHTMLImgElement_get_readyState(&This->IHTMLImgElement_iface, p);
 }
 
-static void HTMLImgElement_traverse(HTMLDOMNode *iface, nsCycleCollectionTraversalCallback *cb)
+static inline HTMLImg *HTMLImg_from_DispatchEx(DispatchEx *iface)
 {
-    HTMLImg *This = impl_from_HTMLDOMNode(iface);
-
-    if(This->nsimg)
-        note_cc_edge((nsISupports*)This->nsimg, "This->nsimg", cb);
+    return CONTAINING_RECORD(iface, HTMLImg, element.node.event_target.dispex);
 }
 
-static void HTMLImgElement_unlink(HTMLDOMNode *iface)
+static void *HTMLImgElement_query_interface(DispatchEx *dispex, REFIID riid)
 {
-    HTMLImg *This = impl_from_HTMLDOMNode(iface);
+    HTMLImg *This = HTMLImg_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IHTMLImgElement, riid))
+        return &This->IHTMLImgElement_iface;
+
+    return HTMLElement_query_interface(&This->element.node.event_target.dispex, riid);
+}
+
+static void HTMLImgElement_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    HTMLImg *This = HTMLImg_from_DispatchEx(dispex);
+    HTMLElement_traverse(dispex, cb);
+
+    if(This->nsimg)
+        note_cc_edge((nsISupports*)This->nsimg, "nsimg", cb);
+}
+
+static void HTMLImgElement_unlink(DispatchEx *dispex)
+{
+    HTMLImg *This = HTMLImg_from_DispatchEx(dispex);
+    HTMLElement_unlink(dispex);
     unlink_ref(&This->nsimg);
 }
 
 static const NodeImplVtbl HTMLImgElementImplVtbl = {
     .clsid                 = &CLSID_HTMLImg,
-    .qi                    = HTMLImgElement_QI,
-    .destructor            = HTMLElement_destructor,
     .cpc_entries           = HTMLElement_cpc,
     .clone                 = HTMLElement_clone,
-    .handle_event          = HTMLElement_handle_event,
     .get_attr_col          = HTMLElement_get_attr_col,
     .get_readystate        = HTMLImgElement_get_readystate,
-    .traverse              = HTMLImgElement_traverse,
-    .unlink                = HTMLImgElement_unlink
+};
+
+static const event_target_vtbl_t HTMLImgElement_event_target_vtbl = {
+    {
+        HTMLELEMENT_DISPEX_VTBL_ENTRIES,
+        .query_interface= HTMLImgElement_query_interface,
+        .destructor     = HTMLElement_destructor,
+        .traverse       = HTMLImgElement_traverse,
+        .unlink         = HTMLImgElement_unlink
+    },
+    HTMLELEMENT_EVENT_TARGET_VTBL_ENTRIES,
+    .handle_event       = HTMLElement_handle_event
 };
 
 static const tid_t HTMLImgElement_iface_tids[] = {
@@ -728,7 +735,7 @@ static void HTMLImgElement_init_dispex_info(dispex_data_t *info, compat_mode_t m
 
 dispex_static_data_t HTMLImgElement_dispex = {
     "HTMLImageElement",
-    &HTMLElement_event_target_vtbl.dispex_vtbl,
+    &HTMLImgElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLImgElement,
     DispHTMLImg_tid,
     HTMLImgElement_iface_tids,
@@ -765,51 +772,19 @@ static HRESULT WINAPI HTMLImageElementFactory_QueryInterface(IHTMLImageElementFa
         REFIID riid, void **ppv)
 {
     struct legacy_ctor *This = impl_from_IHTMLImageElementFactory(iface);
-
-    TRACE("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        *ppv = &This->IHTMLImageElementFactory_iface;
-    }else if(IsEqualGUID(&IID_IHTMLImageElementFactory, riid)) {
-        *ppv = &This->IHTMLImageElementFactory_iface;
-    }else if(dispex_query_interface(&This->dispex, riid, ppv)) {
-        return *ppv ? S_OK : E_NOINTERFACE;
-    }else {
-        *ppv = NULL;
-        WARN("(%p)->(%s %p)\n", This, debugstr_mshtml_guid(riid), ppv);
-        return E_NOINTERFACE;
-    }
-
-    IUnknown_AddRef((IUnknown*)*ppv);
-    return S_OK;
+    return IDispatchEx_QueryInterface(&This->dispex.IDispatchEx_iface, riid, ppv);
 }
 
 static ULONG WINAPI HTMLImageElementFactory_AddRef(IHTMLImageElementFactory *iface)
 {
     struct legacy_ctor *This = impl_from_IHTMLImageElementFactory(iface);
-    LONG ref = InterlockedIncrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    return ref;
+    return IDispatchEx_AddRef(&This->dispex.IDispatchEx_iface);
 }
 
 static ULONG WINAPI HTMLImageElementFactory_Release(IHTMLImageElementFactory *iface)
 {
     struct legacy_ctor *This = impl_from_IHTMLImageElementFactory(iface);
-    LONG ref = InterlockedDecrement(&This->ref);
-
-    TRACE("(%p) ref=%ld\n", This, ref);
-
-    if(!ref) {
-        /* Proxy constructor disps hold ref to window, others are always detached first */
-        if(This->window)
-            IHTMLWindow2_Release(&This->window->base.IHTMLWindow2_iface);
-        release_dispex(&This->dispex);
-        free(This);
-    }
-
-    return ref;
+    return IDispatchEx_Release(&This->dispex.IDispatchEx_iface);
 }
 
 static HRESULT WINAPI HTMLImageElementFactory_GetTypeInfoCount(IHTMLImageElementFactory *iface,
@@ -872,7 +847,7 @@ static HRESULT WINAPI HTMLImageElementFactory_create(IHTMLImageElementFactory *i
         VARIANT width, VARIANT height, IHTMLImgElement **img_elem)
 {
     struct legacy_ctor *This = impl_from_IHTMLImageElementFactory(iface);
-    HTMLDocumentNode *doc;
+    HTMLDocumentNode *doc = This->window->doc;
     IHTMLImgElement *img;
     HTMLElement *elem;
     nsIDOMElement *nselem;
@@ -881,13 +856,6 @@ static HRESULT WINAPI HTMLImageElementFactory_create(IHTMLImageElementFactory *i
 
     TRACE("(%p)->(%s %s %p)\n", This, debugstr_variant(&width),
             debugstr_variant(&height), img_elem);
-
-    if(!This->window || !This->window->doc) {
-        WARN("NULL doc\n");
-        return E_UNEXPECTED;
-    }
-
-    doc = This->window->doc;
 
     *img_elem = NULL;
 
@@ -937,6 +905,16 @@ static inline struct legacy_ctor *impl_from_DispatchEx(DispatchEx *iface)
     return CONTAINING_RECORD(iface, struct legacy_ctor, dispex);
 }
 
+static void *HTMLImageElementFactory_query_interface(DispatchEx *dispex, REFIID riid)
+{
+    struct legacy_ctor *This = impl_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IHTMLImageElementFactory, riid))
+        return &This->IHTMLImageElementFactory_iface;
+
+    return NULL;
+}
+
 static HRESULT HTMLImageElementFactory_value(DispatchEx *dispex, LCID lcid,
         WORD flags, DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei,
         IServiceProvider *caller)
@@ -969,6 +947,10 @@ static HRESULT HTMLImageElementFactory_value(DispatchEx *dispex, LCID lcid,
 }
 
 static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
+    .query_interface  = HTMLImageElementFactory_query_interface,
+    .destructor       = legacy_ctor_destructor,
+    .traverse         = legacy_ctor_traverse,
+    .unlink           = legacy_ctor_unlink,
     .value            = HTMLImageElementFactory_value,
     .get_dispid       = legacy_ctor_get_dispid,
     .get_name         = legacy_ctor_get_name,
@@ -998,13 +980,11 @@ static HRESULT HTMLImageCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DIS
     return legacy_ctor_value(iface, lcid, flags, params, res, ei, caller);
 }
 
-static void HTMLImageCtor_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
-{
-    if(compat_mode < COMPAT_MODE_IE9)
-        dispex_info_add_interface(info, IHTMLImageElementFactory_tid, NULL);
-}
-
 static const dispex_static_data_vtbl_t HTMLImageCtor_dispex_vtbl = {
+    .query_interface  = HTMLImageElementFactory_query_interface,
+    .destructor       = legacy_ctor_destructor,
+    .traverse         = legacy_ctor_traverse,
+    .unlink           = legacy_ctor_unlink,
     .value            = HTMLImageCtor_value,
     .get_dispid       = legacy_ctor_get_dispid,
     .get_name         = legacy_ctor_get_name,
@@ -1017,6 +997,5 @@ dispex_static_data_t HTMLImageCtor_dispex = {
     &HTMLImageCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLImageElementFactory_tid,
-    no_iface_tids,
-    HTMLImageCtor_init_dispex_info
+    HTMLImageElementFactory_iface_tids
 };

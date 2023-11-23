@@ -164,10 +164,10 @@ interface IWineHTMLWindowPrivate : IDispatch
     HRESULT requestAnimationFrame([in] VARIANT *expr, [retval, out] VARIANT *timer_id);
     [id(51)]
     HRESULT cancelAnimationFrame([in] VARIANT timer_id);
-    [id(52)]
-    HRESULT matchMedia([in] BSTR media_query, [retval, out] IDispatch **media_query_list);
-    [propget, id(53)]
+    [propget, id(52)]
     HRESULT console([retval, out] IDispatch **console);
+    [id(53)]
+    HRESULT matchMedia([in] BSTR media_query, [retval, out] IDispatch **media_query_list);
     [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO)]
     HRESULT msCrypto([retval, out] IDispatch **crypto);
 }
