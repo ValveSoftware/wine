@@ -23,4 +23,13 @@
 enum amd_ags_funcs
 {
     unix_init,
+    unix_get_device_info,
+};
+
+struct get_device_info_params
+{
+    uint32_t device_id;
+    uint32_t _pad;
+    /* Output parameters. */
+    uint32_t asic_family;
 };
