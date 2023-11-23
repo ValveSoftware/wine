@@ -2174,6 +2174,24 @@ static const nsISupportsWeakReferenceVtbl nsSupportsWeakReferenceVtbl = {
     nsSupportsWeakReference_GetWeakReference
 };
 
+void cycle_collect(nsIDOMWindowUtils *window_utils, BOOL force)
+{
+    thread_data_t *thread_data = get_thread_data(TRUE);
+
+    if(thread_data) {
+        DWORD current_tick = GetTickCount();
+
+        /* Since this is thread-wide, don't perform it too often, unless forced */
+        if(force || current_tick - thread_data->cc_last_tick > 60000) {
+            thread_data->cc_last_tick = current_tick;
+            thread_data->full_cc_in_progress++;
+            nsIDOMWindowUtils_CycleCollect(window_utils, NULL, 0);
+            thread_data->full_cc_in_progress--;
+            thread_data->cc_last_tick = GetTickCount();
+        }
+    }
+}
+
 static HRESULT init_browser(GeckoBrowser *browser)
 {
     mozIDOMWindowProxy *mozwindow;
@@ -2397,7 +2415,7 @@ void detach_gecko_browser(GeckoBrowser *This)
 
     /* Force cycle collection */
     if(window_utils) {
-        nsIDOMWindowUtils_CycleCollect(window_utils, NULL, 0);
+        cycle_collect(window_utils, TRUE);
         nsIDOMWindowUtils_Release(window_utils);
     }
 }

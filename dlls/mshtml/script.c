@@ -1954,3 +1954,16 @@ void release_script_hosts(HTMLInnerWindow *window)
         IActiveScriptSite_Release(&iter->IActiveScriptSite_iface);
     }
 }
+
+void __cdecl cc_api_collect(IActiveScriptSite *site, BOOL force)
+{
+    ScriptHost *This = impl_from_IActiveScriptSite(site);
+    nsIDOMWindowUtils *window_utils = NULL;
+
+    get_nsinterface((nsISupports*)This->window->base.outer_window->browser->content_window->nswindow, &IID_nsIDOMWindowUtils, (void**)&window_utils);
+
+    if(window_utils) {
+        cycle_collect(window_utils, force);
+        nsIDOMWindowUtils_Release(window_utils);
+    }
+}

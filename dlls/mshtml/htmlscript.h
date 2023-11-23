@@ -51,3 +51,4 @@ void update_browser_script_mode(GeckoBrowser*,IUri*) DECLSPEC_HIDDEN;
 BOOL find_global_prop(HTMLInnerWindow*,BSTR,DWORD,ScriptHost**,DISPID*) DECLSPEC_HIDDEN;
 IDispatch *get_script_disp(ScriptHost*) DECLSPEC_HIDDEN;
 IActiveScriptSite *get_first_script_site(HTMLInnerWindow*) DECLSPEC_HIDDEN;
+void __cdecl cc_api_collect(IActiveScriptSite*,BOOL) DECLSPEC_HIDDEN;

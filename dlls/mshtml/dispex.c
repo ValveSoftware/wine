@@ -3418,15 +3418,6 @@ static HRESULT WINAPI WineDispatchProxyPrivate_ToString(IWineDispatchProxyPrivat
     return dispex_to_string(This, string);
 }
 
-static BOOL WINAPI WineDispatchProxyPrivate_CanGC(IWineDispatchProxyPrivate *iface)
-{
-    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
-
-    /* Allow garbage collection only if the proxy is the only one holding a ref to us */
-    IDispatchEx_AddRef(&This->IDispatchEx_iface);
-    return IDispatchEx_Release(&This->IDispatchEx_iface) == 1;
-}
-
 static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     {
     DispatchEx_QueryInterface,
@@ -3460,8 +3451,7 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     WineDispatchProxyPrivate_PropInvoke,
     WineDispatchProxyPrivate_PropDelete,
     WineDispatchProxyPrivate_PropEnum,
-    WineDispatchProxyPrivate_ToString,
-    WineDispatchProxyPrivate_CanGC
+    WineDispatchProxyPrivate_ToString
 };
 
 static inline BOOL is_legacy_prototype(IDispatch *disp)
@@ -3678,6 +3668,9 @@ static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTrave
 
     if(This->prototype)
         note_cc_edge((nsISupports*)&This->prototype->dispex.IDispatchEx_iface, "prototype", cb);
+
+    if(This->proxy)
+        note_cc_edge((nsISupports*)This->proxy, "proxy", cb);
 
     if(This->info->desc->vtbl->traverse)
         This->info->desc->vtbl->traverse(This, cb);

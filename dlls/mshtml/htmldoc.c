@@ -5398,15 +5398,6 @@ static HRESULT WINAPI DocWineDispProxyPrivate_ToString(IWineDispatchProxyPrivate
     return dispex_to_string(&This->node.event_target.dispex, string);
 }
 
-static BOOL WINAPI DocWineDispProxyPrivate_CanGC(IWineDispatchProxyPrivate *iface)
-{
-    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
-
-    /* Allow garbage collection only if the proxy is the only one holding a ref to us */
-    IHTMLDOMNode_AddRef(&This->node.IHTMLDOMNode_iface);
-    return IHTMLDOMNode_Release(&This->node.IHTMLDOMNode_iface) == 1;
-}
-
 static const IWineDispatchProxyPrivateVtbl DocDispatchExVtbl = {
     {
     DocDispatchEx_QueryInterface,
@@ -5440,8 +5431,7 @@ static const IWineDispatchProxyPrivateVtbl DocDispatchExVtbl = {
     DocWineDispProxyPrivate_PropInvoke,
     DocWineDispProxyPrivate_PropDelete,
     DocWineDispProxyPrivate_PropEnum,
-    DocWineDispProxyPrivate_ToString,
-    DocWineDispProxyPrivate_CanGC
+    DocWineDispProxyPrivate_ToString
 };
 
 static inline HTMLDocumentNode *impl_from_IProvideMultipleClassInfo(IProvideMultipleClassInfo *iface)

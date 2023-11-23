@@ -387,6 +387,20 @@ static HRESULT Map_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op, js
     return S_OK;
 }
 
+static void Map_cc_traverse(jsdisp_t *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    note_edge_t note_edge = cc_api.note_edge;
+    MapInstance *map = (MapInstance*)dispex;
+    struct jsval_map_entry *entry;
+
+    LIST_FOR_EACH_ENTRY(entry, &map->entries, struct jsval_map_entry, list_entry) {
+        if(is_object_instance(entry->key))
+            note_edge((nsISupports*)get_object(entry->key), "key", cb);
+        if(is_object_instance(entry->value))
+            note_edge((nsISupports*)get_object(entry->value), "value", cb);
+    }
+}
+
 static const builtin_prop_t Map_prototype_props[] = {
     {L"clear",      Map_clear,     PROPF_METHOD},
     {L"delete" ,    Map_delete,    PROPF_METHOD|1},
@@ -419,7 +433,8 @@ static const builtin_info_t Map_info = {
     NULL,
     NULL,
     NULL,
-    Map_gc_traverse
+    Map_gc_traverse,
+    Map_cc_traverse
 };
 
 static HRESULT Map_constructor(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
@@ -578,7 +593,8 @@ static const builtin_info_t Set_info = {
     NULL,
     NULL,
     NULL,
-    Map_gc_traverse
+    Map_gc_traverse,
+    Map_cc_traverse
 };
 
 static HRESULT Set_constructor(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
@@ -853,6 +869,19 @@ static HRESULT WeakMap_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op
     return S_OK;
 }
 
+static void WeakMap_cc_traverse(jsdisp_t *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    WeakMapInstance *weakmap = (WeakMapInstance*)dispex;
+    note_edge_t note_edge = cc_api.note_edge;
+    struct weakmap_entry *entry;
+
+    /* FIXME: WeakMaps need special handling (see above), but we can't do that with this API.
+       This will possibly leak objects that need the CC until the WeakMap has no more refs to it. */
+    RB_FOR_EACH_ENTRY(entry, &weakmap->map, struct weakmap_entry, entry)
+        if(is_object_instance(entry->value))
+            note_edge((nsISupports*)get_object(entry->value), "value", cb);
+}
+
 static const builtin_prop_t WeakMap_prototype_props[] = {
     {L"clear",      WeakMap_clear,     PROPF_METHOD},
     {L"delete",     WeakMap_delete,    PROPF_METHOD|1},
@@ -880,7 +909,8 @@ static const builtin_info_t WeakMap_info = {
     NULL,
     NULL,
     NULL,
-    WeakMap_gc_traverse
+    WeakMap_gc_traverse,
+    WeakMap_cc_traverse
 };
 
 static HRESULT WeakMap_constructor(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
