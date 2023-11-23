@@ -27,9 +27,13 @@
 #include <stdarg.h>
 #include <stdlib.h>
 #include <dlfcn.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 
 #include <xf86drm.h>
 #include <amdgpu_drm.h>
+#include <amdgpu.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -42,9 +46,61 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(amd_ags);
 
+#define MAX_DEVICE_COUNT 64
+
+static unsigned int device_count;
+static struct drm_amdgpu_info_device *amd_info;
+
 static NTSTATUS init( void *args )
 {
-    TRACE(".\n");
+    drmDevicePtr devices[MAX_DEVICE_COUNT];
+    amdgpu_device_handle h;
+    uint32_t major, minor;
+    int i, count, fd, ret;
+
+    device_count = 0;
+
+    if ((count = drmGetDevices(devices, MAX_DEVICE_COUNT)) <= 0)
+    {
+        ERR("drmGetDevices failed, err %d.\n", count);
+        return STATUS_UNSUCCESSFUL;
+    }
+    TRACE("Got %d devices.\n", count);
+    for (i = 0; i < count; ++i)
+    {
+        if (!devices[i] || !devices[i]->nodes[DRM_NODE_RENDER])
+        {
+            TRACE("No render node, skipping.\n");
+            continue;
+        }
+        if ((fd = open(devices[i]->nodes[DRM_NODE_RENDER], O_RDONLY | O_CLOEXEC)) < 0)
+        {
+            ERR("Failed to open device %s, errno %d.\n", devices[i]->nodes[DRM_NODE_RENDER], errno);
+            continue;
+        }
+        if ((ret = amdgpu_device_initialize(fd, &major, &minor, &h)))
+        {
+            WARN("Failed to initialize amdgpu device bustype %d, %04x:%04x, err %d.\n", devices[i]->bustype,
+                    devices[i]->deviceinfo.pci->vendor_id, devices[i]->deviceinfo.pci->device_id, ret);
+            close(fd);
+            continue;
+        }
+        amd_info = realloc(amd_info, (device_count + 1) * sizeof(*amd_info));
+        if (!(ret = amdgpu_query_info(h, AMDGPU_INFO_DEV_INFO, sizeof(*amd_info), &amd_info[device_count])))
+        {
+            TRACE("Got amdgpu info for device id %04x, family %#x, external_rev %#x, chip_rev %#x.\n",
+                    amd_info[device_count].device_id, amd_info[device_count].family, amd_info[device_count].external_rev,
+                    amd_info[device_count].chip_rev);
+            ++device_count;
+        }
+        else
+        {
+            ERR("amdgpu_query_info failed, ret %d.\n", ret);
+        }
+        amdgpu_device_deinitialize(h);
+        close(fd);
+    }
+    drmFreeDevices(devices, count);
     return STATUS_SUCCESS;
 }
 
