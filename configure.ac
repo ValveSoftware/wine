@@ -1439,6 +1439,15 @@ then
             [WINE_CHECK_SONAME(gmp,__gmpz_init,,[GMP_CFLAGS=""],[$GMP_LIBS],[[libgmp-*]])])])
 fi
 
+dnl **** Check for libdrm ****
+WINE_PACKAGE_FLAGS(DRM,[libdrm],,,,
+    [AC_CHECK_HEADERS([xf86drm.h],
+        [WINE_CHECK_SONAME(drm,drmOpen,,,[$DRM_LIBS])])])
+
+WINE_PACKAGE_FLAGS(DRMAMDGPU,[libdrm_amdgpu],,,,
+    [AC_CHECK_HEADERS([amdgpu_drm.h],
+        [WINE_CHECK_SONAME(drm_amdgpu,amdgpu_query_info,,,[$DRMAMDGPU_LIBS])])])
+
 dnl **** Check for SANE ****
 if test "x$with_sane" != "xno"
 then
