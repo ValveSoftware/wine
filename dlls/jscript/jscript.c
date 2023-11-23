@@ -467,7 +467,6 @@ static void exec_queued_code(JScript *This)
 static void decrease_state(JScript *This, SCRIPTSTATE state)
 {
     named_item_t *item, *item_next;
-    unsigned int i;
 
     if(This->ctx) {
         switch(This->ctx->state) {
@@ -502,18 +501,6 @@ static void decrease_state(JScript *This, SCRIPTSTATE state)
                     list_remove(&item->entry);
                     release_named_item(item);
                 }
-            }
-
-            if(This->ctx->proxy_prototypes) {
-                for(i = 0; i < This->ctx->proxy_prototypes->num; i++) {
-                    if(This->ctx->proxy_prototypes->disp[i].prototype)
-                        IDispatch_Release(This->ctx->proxy_prototypes->disp[i].prototype);
-                    if(This->ctx->proxy_prototypes->disp[i].ctor)
-                        IDispatch_Release(This->ctx->proxy_prototypes->disp[i].ctor);
-                }
-
-                free(This->ctx->proxy_prototypes);
-                This->ctx->proxy_prototypes = NULL;
             }
 
             if(This->ctx->secmgr) {

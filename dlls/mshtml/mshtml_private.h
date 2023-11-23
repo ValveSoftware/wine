@@ -67,15 +67,6 @@ typedef struct {
 
 DEFINE_GUID(IID_nsXPCOMCycleCollectionParticipant, 0x9674489b,0x1f6f,0x4550,0xa7,0x30, 0xcc,0xae,0xdd,0x10,0x4c,0xf9);
 
-struct proxy_prototypes
-{
-    unsigned int num;
-    struct {
-        IDispatch *prototype;
-        IDispatch *ctor;
-    } disp[];
-};
-
 struct proxy_func_invoker
 {
     HRESULT (STDMETHODCALLTYPE *invoke)(IDispatch*,void*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
@@ -104,10 +95,8 @@ struct proxy_cc_api
 typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
-    IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
-    IDispatch* (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window, struct proxy_prototypes *prots);
-    HRESULT (STDMETHODCALLTYPE *DefineConstructors)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
-    BOOL    (STDMETHODCALLTYPE *IsPrototype)(IWineDispatchProxyPrivate *This);
+    IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window);
+    HRESULT (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window, IDispatch **ret);
     BOOL    (STDMETHODCALLTYPE *IsConstructor)(IWineDispatchProxyPrivate *This);
     HRESULT (STDMETHODCALLTYPE *PropFixOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);
     HRESULT (STDMETHODCALLTYPE *PropOverride)(IWineDispatchProxyPrivate *This, const WCHAR *name, VARIANT *value);
@@ -676,6 +665,7 @@ HRESULT dispex_get_dynid(DispatchEx*,const WCHAR*,BOOL,DISPID*) DECLSPEC_HIDDEN;
 HRESULT dispex_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*) DECLSPEC_HIDDEN;
 HRESULT dispex_delete_prop(DispatchEx*,DISPID) DECLSPEC_HIDDEN;
 HRESULT dispex_builtin_props_to_json(DispatchEx*,VARIANT*) DECLSPEC_HIDDEN;
+HRESULT define_global_constructors(HTMLInnerWindow*) DECLSPEC_HIDDEN;
 void release_typelib(void) DECLSPEC_HIDDEN;
 HRESULT get_class_typeinfo(const CLSID*,ITypeInfo**) DECLSPEC_HIDDEN;
 const void *dispex_get_vtbl(DispatchEx*) DECLSPEC_HIDDEN;
@@ -713,6 +703,11 @@ struct legacy_ctor {
 struct legacy_prototype {
     DispatchEx dispex;
     HTMLInnerWindow *window;
+};
+
+struct proxy_globals {
+    IDispatch *prototype[PROTO_ID_TOTAL_COUNT - LEGACY_PROTOTYPE_COUNT];
+    IDispatch *ctor[PROTO_ID_TOTAL_COUNT - LEGACY_PROTOTYPE_COUNT];
 };
 
 typedef enum {
@@ -828,6 +823,7 @@ struct HTMLInnerWindow {
     unsigned parser_callback_cnt;
     struct list script_queue;
 
+    struct proxy_globals *proxy_globals;
     global_prop_t *global_props;
     DWORD global_prop_cnt;
     DWORD global_prop_size;
@@ -861,6 +857,8 @@ struct HTMLInnerWindow {
     struct legacy_ctor *legacy_ctors[LEGACY_CTOR_COUNT];
     struct legacy_prototype *legacy_prototypes[COMMON_PROTOTYPE_COUNT];
 };
+
+HTMLWindow *unsafe_HTMLWindow_from_IWineDispatchProxyPrivate(IWineDispatchProxyPrivate*);
 
 typedef enum {
     UNKNOWN_USERMODE,
