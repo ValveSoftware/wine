@@ -76,15 +76,6 @@ typedef struct {
 
 DEFINE_GUID(IID_nsXPCOMCycleCollectionParticipant, 0x9674489b,0x1f6f,0x4550,0xa7,0x30, 0xcc,0xae,0xdd,0x10,0x4c,0xf9);
 
-struct proxy_prototypes
-{
-    unsigned int num;
-    struct {
-        IDispatch *prototype;
-        IDispatch *ctor;
-    } disp[];
-};
-
 struct proxy_func_invoker
 {
     HRESULT (STDMETHODCALLTYPE *invoke)(IDispatch*,void*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
@@ -113,10 +104,8 @@ struct proxy_cc_api
 typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
-    IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
-    IDispatch* (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window, struct proxy_prototypes *prots);
-    HRESULT (STDMETHODCALLTYPE *DefineConstructors)(IWineDispatchProxyPrivate *This, struct proxy_prototypes **prots_ref);
-    BOOL    (STDMETHODCALLTYPE *IsPrototype)(IWineDispatchProxyPrivate *This);
+    IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window);
+    HRESULT (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window, IDispatch **ret);
     BOOL    (STDMETHODCALLTYPE *IsConstructor)(IWineDispatchProxyPrivate *This);
     HRESULT (STDMETHODCALLTYPE *PropFixOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);
     HRESULT (STDMETHODCALLTYPE *PropOverride)(IWineDispatchProxyPrivate *This, const WCHAR *name, VARIANT *value);
@@ -573,7 +562,6 @@ struct _script_ctx_t {
         };
         jsdisp_t *global_objects[26 + NUM_TYPEDARRAY_TYPES];
     };
-    struct proxy_prototypes *proxy_prototypes;
 };
 C_ASSERT(RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, weakmap_prototype) == RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, global_objects));
 

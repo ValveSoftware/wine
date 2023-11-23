@@ -5241,31 +5241,18 @@ static IWineDispatchProxyCbPrivate** WINAPI DocWineDispProxyPrivate_GetProxyFiel
     return &This->node.event_target.dispex.proxy;
 }
 
-static IDispatch* WINAPI DocWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
+static IDispatch* WINAPI DocWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window)
 {
     HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
     IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->node.event_target.dispex.IDispatchEx_iface;
 
-    return itf->lpVtbl->GetDefaultPrototype(itf, prots_ref);
+    return itf->lpVtbl->GetDefaultPrototype(itf, window);
 }
 
-static IDispatch* WINAPI DocWineDispProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface,
-        IWineDispatchProxyPrivate *window, struct proxy_prototypes *prots)
+static HRESULT WINAPI DocWineDispProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window, IDispatch **ret)
 {
-    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
-    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->node.event_target.dispex.IDispatchEx_iface;
-
-    return itf->lpVtbl->GetDefaultConstructor(itf, window, prots);
-}
-
-static HRESULT WINAPI DocWineDispProxyPrivate_DefineConstructors(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
-{
-    return S_FALSE;
-}
-
-static BOOL WINAPI DocWineDispProxyPrivate_IsPrototype(IWineDispatchProxyPrivate *iface)
-{
-    return FALSE;
+    *ret = NULL;
+    return S_OK;
 }
 
 static BOOL WINAPI DocWineDispProxyPrivate_IsConstructor(IWineDispatchProxyPrivate *iface)
@@ -5421,8 +5408,6 @@ static const IWineDispatchProxyPrivateVtbl DocDispatchExVtbl = {
     DocWineDispProxyPrivate_GetProxyFieldRef,
     DocWineDispProxyPrivate_GetDefaultPrototype,
     DocWineDispProxyPrivate_GetDefaultConstructor,
-    DocWineDispProxyPrivate_DefineConstructors,
-    DocWineDispProxyPrivate_IsPrototype,
     DocWineDispProxyPrivate_IsConstructor,
     DocWineDispProxyPrivate_PropFixOverride,
     DocWineDispProxyPrivate_PropOverride,
