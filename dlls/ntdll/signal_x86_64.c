@@ -905,6 +905,7 @@ PVOID WINAPI RtlVirtualUnwind( ULONG type, ULONG64 base, ULONG64 pc,
                                PVOID *data, ULONG64 *frame_ret,
                                KNONVOLATILE_CONTEXT_POINTERS *ctx_ptr )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlVirtualUnwind");
     union handler_data *handler_data;
     ULONG64 frame, off;
     struct UNWIND_INFO *info;
@@ -1317,6 +1318,7 @@ void CDECL RtlRestoreContext( CONTEXT *context, EXCEPTION_RECORD *rec )
 void WINAPI RtlUnwindEx( PVOID end_frame, PVOID target_ip, EXCEPTION_RECORD *rec,
                          PVOID retval, CONTEXT *context, UNWIND_HISTORY_TABLE *table )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlUnwindEx");
     EXCEPTION_REGISTRATION_RECORD *teb_frame = NtCurrentTeb()->Tib.ExceptionList;
     EXCEPTION_RECORD record;
     DISPATCHER_CONTEXT dispatch;

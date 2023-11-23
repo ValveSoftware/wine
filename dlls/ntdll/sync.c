@@ -206,6 +206,7 @@ static inline NTSTATUS wait_semaphore( RTL_CRITICAL_SECTION *crit, int timeout )
  */
 NTSTATUS WINAPI RtlInitializeCriticalSection( RTL_CRITICAL_SECTION *crit )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlInitializeCriticalSection");
     return RtlInitializeCriticalSectionEx( crit, 0, 0 );
 }
 
@@ -215,6 +216,7 @@ NTSTATUS WINAPI RtlInitializeCriticalSection( RTL_CRITICAL_SECTION *crit )
  */
 NTSTATUS WINAPI RtlInitializeCriticalSectionAndSpinCount( RTL_CRITICAL_SECTION *crit, ULONG spincount )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlInitializeCriticalSectionAndSpinCount");
     return RtlInitializeCriticalSectionEx( crit, spincount, 0 );
 }
 
@@ -277,6 +279,7 @@ ULONG WINAPI RtlSetCriticalSectionSpinCount( RTL_CRITICAL_SECTION *crit, ULONG s
  */
 NTSTATUS WINAPI RtlDeleteCriticalSection( RTL_CRITICAL_SECTION *crit )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlDeleteCriticalSection");
     crit->LockCount      = -1;
     crit->RecursionCount = 0;
     crit->OwningThread   = 0;
@@ -384,6 +387,7 @@ NTSTATUS WINAPI RtlpUnWaitCriticalSection( RTL_CRITICAL_SECTION *crit )
  */
 NTSTATUS WINAPI RtlEnterCriticalSection( RTL_CRITICAL_SECTION *crit )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlEnterCriticalSection");
     if (crit->SpinCount)
     {
         ULONG count;
@@ -423,6 +427,7 @@ done:
  */
 BOOL WINAPI RtlTryEnterCriticalSection( RTL_CRITICAL_SECTION *crit )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlTryEnterCriticalSection");
     BOOL ret = FALSE;
     if (InterlockedCompareExchange( &crit->LockCount, 0, -1 ) == -1)
     {
@@ -464,6 +469,7 @@ BOOL WINAPI RtlIsCriticalSectionLockedByThread( RTL_CRITICAL_SECTION *crit )
  */
 NTSTATUS WINAPI RtlLeaveCriticalSection( RTL_CRITICAL_SECTION *crit )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlLeaveCriticalSection");
     if (--crit->RecursionCount)
     {
         if (crit->RecursionCount > 0) InterlockedDecrement( &crit->LockCount );
@@ -585,6 +591,7 @@ void WINAPI RtlAcquireSRWLockExclusive( RTL_SRWLOCK *lock )
  */
 void WINAPI RtlAcquireSRWLockShared( RTL_SRWLOCK *lock )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlAcquireSRWLockShared");
     union { RTL_SRWLOCK *rtl; struct srw_lock *s; LONG *l; } u = { lock };
 
     for (;;)
@@ -620,6 +627,7 @@ void WINAPI RtlAcquireSRWLockShared( RTL_SRWLOCK *lock )
  */
 void WINAPI RtlReleaseSRWLockExclusive( RTL_SRWLOCK *lock )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlReleaseSRWLockExclusive");
     union { RTL_SRWLOCK *rtl; struct srw_lock *s; LONG *l; } u = { lock };
     union { struct srw_lock s; LONG l; } old, new;
 
@@ -644,6 +652,7 @@ void WINAPI RtlReleaseSRWLockExclusive( RTL_SRWLOCK *lock )
  */
 void WINAPI RtlReleaseSRWLockShared( RTL_SRWLOCK *lock )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlReleaseSRWLockShared");
     union { RTL_SRWLOCK *rtl; struct srw_lock *s; LONG *l; } u = { lock };
     union { struct srw_lock s; LONG l; } old, new;
 

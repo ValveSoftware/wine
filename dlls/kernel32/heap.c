@@ -148,6 +148,7 @@ static inline void *unsafe_ptr_from_HLOCAL( HLOCAL handle )
  */
 void *WINAPI GlobalLock( HGLOBAL handle )
 {
+    printf("[LOL_DEBUG] FUNCTION GlobalLock");
     return LocalLock( handle );
 }
 
@@ -170,6 +171,7 @@ void *WINAPI GlobalLock( HGLOBAL handle )
  */
 BOOL WINAPI GlobalUnlock( HGLOBAL handle )
 {
+    printf("[LOL_DEBUG] FUNCTION GlobalUnlock");
     if (unsafe_ptr_from_HLOCAL( handle )) return TRUE;
     return LocalUnlock( handle );
 }

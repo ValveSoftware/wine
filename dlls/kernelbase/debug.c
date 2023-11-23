@@ -54,6 +54,7 @@ void *dummy = RtlUnwind;  /* force importing RtlUnwind from ntdll */
  */
 BOOL WINAPI DECLSPEC_HOTPATCH CheckRemoteDebuggerPresent( HANDLE process, BOOL *present )
 {
+    printf("[LOL_DEBUG] FUNCTION CheckRemoteDebuggerPresent");
     DWORD_PTR port;
 
     if (!process || !present)
@@ -163,6 +164,7 @@ void WINAPI DECLSPEC_HOTPATCH FatalAppExitW( UINT action, LPCWSTR str )
  */
 BOOL WINAPI IsDebuggerPresent(void)
 {
+    printf("[LOL_DEBUG] FUNCTION IsDebuggerPresent");
     return NtCurrentTeb()->Peb->BeingDebugged;
 }
 
@@ -358,6 +360,7 @@ C_ASSERT( offsetof(EXCEPTION_RECORD, ExceptionInformation) == 0x20 );
 #else
 void WINAPI DECLSPEC_HOTPATCH RaiseException( DWORD code, DWORD flags, DWORD count, const ULONG_PTR *args )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlAcquireSRWLockShared");
     EXCEPTION_RECORD record;
 
     record.ExceptionCode    = code;
@@ -703,6 +706,7 @@ static BOOL check_resource_write( void *addr )
  */
 LONG WINAPI UnhandledExceptionFilter( EXCEPTION_POINTERS *epointers )
 {
+    printf("[LOL_DEBUG] FUNCTION UnhandledExceptionFilter");
     const EXCEPTION_RECORD *rec = epointers->ExceptionRecord;
 
     if (rec->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && rec->NumberParameters >= 2)

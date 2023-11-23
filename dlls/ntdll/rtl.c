@@ -1573,6 +1573,7 @@ static DWORD_PTR get_pointer_obfuscator( void )
  */
 PVOID WINAPI RtlEncodePointer( PVOID ptr )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlEncodePointer");
     DWORD_PTR ptrval = (DWORD_PTR) ptr;
     return (PVOID)(ptrval ^ get_pointer_obfuscator());
 }
@@ -1588,6 +1589,7 @@ PVOID WINAPI RtlDecodePointer( PVOID ptr )
  */
 VOID WINAPI RtlInitializeSListHead(PSLIST_HEADER list)
 {
+    printf("[LOL_DEBUG] FUNCTION RtlInitializeSListHead");
 #ifdef _WIN64
     list->s.Alignment = list->s.Region = 0;
     list->Header16.HeaderType = 1;  /* we use the 16-byte header */
@@ -1601,6 +1603,7 @@ VOID WINAPI RtlInitializeSListHead(PSLIST_HEADER list)
  */
 WORD WINAPI RtlQueryDepthSList(PSLIST_HEADER list)
 {
+    printf("[LOL_DEBUG] FUNCTION RtlQueryDepthSList");
 #ifdef _WIN64
     return list->Header16.Depth;
 #else
@@ -1625,6 +1628,7 @@ PSLIST_ENTRY WINAPI RtlFirstEntrySList(const SLIST_HEADER* list)
  */
 PSLIST_ENTRY WINAPI RtlInterlockedFlushSList(PSLIST_HEADER list)
 {
+    printf("[LOL_DEBUG] FUNCTION RtlInterlockedFlushSList");
     SLIST_HEADER old, new;
 
 #ifdef _WIN64
@@ -1655,6 +1659,7 @@ PSLIST_ENTRY WINAPI RtlInterlockedFlushSList(PSLIST_HEADER list)
  */
 PSLIST_ENTRY WINAPI RtlInterlockedPushEntrySList(PSLIST_HEADER list, PSLIST_ENTRY entry)
 {
+    printf("[LOL_DEBUG] FUNCTION RtlInterlockedPushEntrySList");
     SLIST_HEADER old, new;
 
 #ifdef _WIN64
@@ -1686,6 +1691,7 @@ PSLIST_ENTRY WINAPI RtlInterlockedPushEntrySList(PSLIST_HEADER list, PSLIST_ENTR
  */
 PSLIST_ENTRY WINAPI RtlInterlockedPopEntrySList(PSLIST_HEADER list)
 {
+    printf("[LOL_DEBUG] FUNCTION RtlAcquireSRWLockShared");
     SLIST_HEADER old, new;
     PSLIST_ENTRY entry;
 

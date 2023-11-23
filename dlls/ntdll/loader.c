@@ -4489,6 +4489,7 @@ PVOID WINAPI RtlImageRvaToVa( const IMAGE_NT_HEADERS *nt, HMODULE module,
  */
 PVOID WINAPI RtlPcToFileHeader( PVOID pc, PVOID *address )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlPcToFileHeader");
     LDR_DATA_TABLE_ENTRY *module;
     PVOID ret = NULL;
 

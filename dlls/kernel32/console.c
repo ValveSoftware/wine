@@ -112,6 +112,7 @@ BOOL WINAPI CloseConsoleHandle(HANDLE handle)
  */
 HANDLE WINAPI GetConsoleInputWaitHandle(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetStdHandle");
     return GetStdHandle( STD_INPUT_HANDLE );
 }
 

@@ -5517,6 +5517,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH FormatMessageW( DWORD flags, const void *source, 
  */
 UINT WINAPI GetACP(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetACP");
     return ansi_cpinfo.CodePage;
 }
 
@@ -5526,6 +5527,7 @@ UINT WINAPI GetACP(void)
  */
 BOOL WINAPI DECLSPEC_HOTPATCH GetCPInfo( UINT codepage, CPINFO *cpinfo )
 {
+    printf("[LOL_DEBUG] FUNCTION GetCPInfo");
     const CPTABLEINFO *table;
 
     if (!cpinfo || !(table = get_codepage_table( codepage )))
@@ -5918,6 +5920,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetNLSVersionEx( NLS_FUNCTION func, const WCHAR *l
  */
 UINT WINAPI GetOEMCP(void)
 {
+    printf("[LOL_DEBUG] FUNCTION RtlAcquireSRWLockShared");
     return oem_cpinfo.CodePage;
 }
 
@@ -5967,6 +5970,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetStringTypeA( LCID locale, DWORD type, const cha
  */
 BOOL WINAPI DECLSPEC_HOTPATCH GetStringTypeW( DWORD type, const WCHAR *src, INT count, WORD *chartype )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlAcquireSRWLockShared");
     if (!src)
     {
         SetLastError( ERROR_INVALID_PARAMETER );
@@ -6444,6 +6448,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH IsNormalizedString( NORM_FORM form, const WCHAR *s
  */
 BOOL WINAPI DECLSPEC_HOTPATCH IsValidCodePage( UINT codepage )
 {
+    printf("[LOL_DEBUG] FUNCTION IsValidCodePage");
     switch (codepage)
     {
     case CP_ACP:
@@ -6725,6 +6730,7 @@ done:
 INT WINAPI DECLSPEC_HOTPATCH LCMapStringW( LCID lcid, DWORD flags, const WCHAR *src, int srclen,
                                            WCHAR *dst, int dstlen )
 {
+    printf("[LOL_DEBUG] FUNCTION LCMapStringW");
     const WCHAR *locale = LOCALE_NAME_USER_DEFAULT;
     const NLS_LOCALE_LCID_INDEX *entry;
 
@@ -6778,6 +6784,7 @@ LCID WINAPI DECLSPEC_HOTPATCH LocaleNameToLCID( const WCHAR *name, DWORD flags )
 INT WINAPI DECLSPEC_HOTPATCH MultiByteToWideChar( UINT codepage, DWORD flags, const char *src, INT srclen,
                                                   WCHAR *dst, INT dstlen )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlAcquireSRWLockShared");
     const CPTABLEINFO *info;
     int ret;
 
@@ -7136,6 +7143,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH VerLanguageNameW( DWORD lang, LPWSTR buffer, DWOR
 INT WINAPI DECLSPEC_HOTPATCH WideCharToMultiByte( UINT codepage, DWORD flags, LPCWSTR src, INT srclen,
                                                   LPSTR dst, INT dstlen, LPCSTR defchar, BOOL *used )
 {
+    printf("[LOL_DEBUG] FUNCTION WideCharToMultiByte");
     const CPTABLEINFO *info;
     int ret;
 

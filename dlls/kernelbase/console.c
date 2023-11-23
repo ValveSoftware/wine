@@ -792,6 +792,7 @@ DWORD WINAPI GetConsoleCommandHistoryLengthW( LPCWSTR exename )
  */
 UINT WINAPI DECLSPEC_HOTPATCH GetConsoleCP(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetConsoleCP");
     struct condrv_input_info info;
 
     if (!console_ioctl( RtlGetCurrentPeb()->ProcessParameters->ConsoleHandle,
@@ -891,6 +892,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetConsoleInputExeNameW( DWORD len, LPWSTR buffer 
  */
 BOOL WINAPI DECLSPEC_HOTPATCH GetConsoleMode( HANDLE handle, DWORD *mode )
 {
+    printf("[LOL_DEBUG] FUNCTION GetConsoleMode");
     return console_ioctl( handle, IOCTL_CONDRV_GET_MODE, NULL, 0, mode, sizeof(*mode), NULL );
 }
 
@@ -2148,6 +2150,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH WriteConsoleA( HANDLE handle, const void *buffer, 
 BOOL WINAPI DECLSPEC_HOTPATCH WriteConsoleW( HANDLE handle, const void *buffer, DWORD length,
                                              DWORD *written, void *reserved )
 {
+    printf("[LOL_DEBUG] FUNCTION WriteConsoleW");
     BOOL ret;
 
     TRACE( "(%p,%s,%ld,%p,%p)\n", handle, debugstr_wn(buffer, length), length, written, reserved );

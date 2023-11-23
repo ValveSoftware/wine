@@ -383,6 +383,7 @@ LONGLONG WINAPI RtlGetSystemTimePrecise( void )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceCounter( LARGE_INTEGER *counter )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlQueryPerformanceCounter");
     NtQueryPerformanceCounter( counter, NULL );
     return TRUE;
 }
@@ -392,6 +393,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceCounter( LARGE_INTEGER *counter
  */
 BOOL WINAPI DECLSPEC_HOTPATCH RtlQueryPerformanceFrequency( LARGE_INTEGER *frequency )
 {
+    printf("[LOL_DEBUG] FUNCTION RtlQueryPerformanceFrequency");
     frequency->QuadPart = TICKSPERSEC;
     return TRUE;
 }

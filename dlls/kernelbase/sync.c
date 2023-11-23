@@ -182,6 +182,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetSystemTimes( FILETIME *idle, FILETIME *kernel, 
  */
 ULONG WINAPI DECLSPEC_HOTPATCH GetTickCount(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetTickCount");
     /* note: we ignore TickCountMultiplier */
     return user_shared_data->u.TickCount.LowPart;
 }
@@ -243,6 +244,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH RegisterWaitForSingleObjectEx( HANDLE handle, WA
 DWORD WINAPI DECLSPEC_HOTPATCH SignalObjectAndWait( HANDLE signal, HANDLE wait,
                                                     DWORD timeout, BOOL alertable )
 {
+    printf("[LOL_DEBUG] FUNCTION GlobalLock");
     NTSTATUS status;
     LARGE_INTEGER time;
 
@@ -288,6 +290,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH SleepEx( DWORD timeout, BOOL alertable )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH UnregisterWaitEx( HANDLE handle, HANDLE event )
 {
+    printf("[LOL_DEBUG] FUNCTION UnregisterWaitEx");
     return set_ntstatus( RtlDeregisterWaitEx( handle, event ));
 }
 
@@ -297,6 +300,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH UnregisterWaitEx( HANDLE handle, HANDLE event )
  */
 DWORD WINAPI DECLSPEC_HOTPATCH WaitForSingleObject( HANDLE handle, DWORD timeout )
 {
+    printf("[LOL_DEBUG] FUNCTION WaitForSingleObject");
     return WaitForMultipleObjectsEx( 1, &handle, FALSE, timeout, FALSE );
 }
 
@@ -306,6 +310,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH WaitForSingleObject( HANDLE handle, DWORD timeout
  */
 DWORD WINAPI DECLSPEC_HOTPATCH WaitForSingleObjectEx( HANDLE handle, DWORD timeout, BOOL alertable )
 {
+    printf("[LOL_DEBUG] FUNCTION WaitForSingleObjectEx");
     return WaitForMultipleObjectsEx( 1, &handle, FALSE, timeout, alertable );
 }
 
@@ -458,6 +463,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH CreateEventA( SECURITY_ATTRIBUTES *sa, BOOL manu
 HANDLE WINAPI DECLSPEC_HOTPATCH CreateEventW( SECURITY_ATTRIBUTES *sa, BOOL manual_reset,
                                               BOOL initial_state, LPCWSTR name )
 {
+    printf("[LOL_DEBUG] FUNCTION CreateEventW");
     DWORD flags = 0;
 
     if (manual_reset) flags |= CREATE_EVENT_MANUAL_RESET;
@@ -570,6 +576,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH PulseEvent( HANDLE handle )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH SetEvent( HANDLE handle )
 {
+    printf("[LOL_DEBUG] FUNCTION SetEvent");
     return set_ntstatus( NtSetEvent( handle, NULL ));
 }
 
@@ -737,6 +744,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH OpenSemaphoreW( DWORD access, BOOL inherit, LPCW
  */
 BOOL WINAPI DECLSPEC_HOTPATCH ReleaseSemaphore( HANDLE handle, LONG count, LONG *previous )
 {
+    printf("[LOL_DEBUG] FUNCTION ReleaseSemaphore");
     return set_ntstatus( NtReleaseSemaphore( handle, count, (PULONG)previous ));
 }
 
@@ -843,6 +851,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CancelWaitableTimer( HANDLE handle )
  */
 HANDLE WINAPI DECLSPEC_HOTPATCH CreateTimerQueue(void)
 {
+    printf("[LOL_DEBUG] FUNCTION CreateTimerQueue");
     HANDLE q;
 
     if (!set_ntstatus( RtlCreateTimerQueue( &q ))) return NULL;
@@ -857,6 +866,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateTimerQueueTimer( PHANDLE timer, HANDLE queue
                                                      WAITORTIMERCALLBACK callback, PVOID arg,
                                                      DWORD when, DWORD period, ULONG flags )
 {
+    printf("[LOL_DEBUG] FUNCTION CreateTimerQueueTimer");
     return set_ntstatus( RtlCreateTimer( queue, timer, callback, arg, when, period, flags ));
 }
 
@@ -867,6 +877,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CreateTimerQueueTimer( PHANDLE timer, HANDLE queue
 BOOL WINAPI DECLSPEC_HOTPATCH ChangeTimerQueueTimer( HANDLE queue, HANDLE timer,
                                                      ULONG when, ULONG period )
 {
+    printf("[LOL_DEBUG] FUNCTION ChangeTimerQueueTimer");
     return set_ntstatus( RtlUpdateTimer( queue, timer, when, period ));
 }
 
@@ -885,6 +896,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH DeleteTimerQueueEx( HANDLE queue, HANDLE event )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH DeleteTimerQueueTimer( HANDLE queue, HANDLE timer, HANDLE event )
 {
+    printf("[LOL_DEBUG] FUNCTION DeleteTimerQueueTimer");
     return set_ntstatus( RtlDeleteTimer( queue, timer, event ));
 }
 

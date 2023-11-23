@@ -117,6 +117,7 @@ void WINAPI DECLSPEC_HOTPATCH GetNativeSystemInfo( SYSTEM_INFO *si )
  */
 void WINAPI DECLSPEC_HOTPATCH GetSystemInfo( SYSTEM_INFO *si )
 {
+    printf("[LOL_DEBUG] FUNCTION GetSystemInfo");
     SYSTEM_BASIC_INFORMATION basic_info;
     SYSTEM_CPU_INFORMATION cpu_info;
 
@@ -353,6 +354,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH UnmapViewOfFileEx( void *addr, ULONG flags )
  */
 LPVOID WINAPI DECLSPEC_HOTPATCH VirtualAlloc( void *addr, SIZE_T size, DWORD type, DWORD protect )
 {
+    printf("[LOL_DEBUG] FUNCTION VirtualAlloc");
     return VirtualAllocEx( GetCurrentProcess(), addr, size, type, protect );
 }
 
@@ -363,6 +365,7 @@ LPVOID WINAPI DECLSPEC_HOTPATCH VirtualAlloc( void *addr, SIZE_T size, DWORD typ
 LPVOID WINAPI DECLSPEC_HOTPATCH VirtualAllocEx( HANDLE process, void *addr, SIZE_T size,
                                                 DWORD type, DWORD protect )
 {
+    printf("[LOL_DEBUG] FUNCTION VirtualAllocEx");
     LPVOID ret = addr;
 
     if (!set_ntstatus( NtAllocateVirtualMemory( process, &ret, 0, &size, type, protect ))) return NULL;
@@ -453,6 +456,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH PrefetchVirtualMemory( HANDLE process, ULONG_PTR c
  */
 BOOL WINAPI DECLSPEC_HOTPATCH VirtualFree( void *addr, SIZE_T size, DWORD type )
 {
+    printf("[LOL_DEBUG] FUNCTION VirtualFree");
     return VirtualFreeEx( GetCurrentProcess(), addr, size, type );
 }
 
@@ -462,6 +466,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH VirtualFree( void *addr, SIZE_T size, DWORD type )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH VirtualFreeEx( HANDLE process, void *addr, SIZE_T size, DWORD type )
 {
+    printf("[LOL_DEBUG] FUNCTION VirtualFreeEx");
     if (type == MEM_RELEASE && size)
     {
         WARN( "Trying to release memory with specified size.\n" );
@@ -486,6 +491,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH  VirtualLock( void *addr, SIZE_T size )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH VirtualProtect( void *addr, SIZE_T size, DWORD new_prot, DWORD *old_prot )
 {
+    printf("[LOL_DEBUG] FUNCTION VirtualProtect");
     return VirtualProtectEx( GetCurrentProcess(), addr, size, new_prot, old_prot );
 }
 
@@ -827,6 +833,7 @@ void *WINAPI KernelBaseGetGlobalData(void)
  */
 HGLOBAL WINAPI DECLSPEC_HOTPATCH GlobalAlloc( UINT flags, SIZE_T size )
 {
+    printf("[LOL_DEBUG] FUNCTION GlobalAlloc");
     struct mem_entry *mem;
     HGLOBAL handle;
 
@@ -1310,6 +1317,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH CreateFileMappingNumaW( HANDLE file, LPSECURITY_
 BOOL WINAPI DECLSPEC_HOTPATCH GetLogicalProcessorInformation( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *buffer,
                                                               DWORD *len )
 {
+    printf("[LOL_DEBUG] FUNCTION GetLogicalProcessorInformation");
     NTSTATUS status;
 
     if (!len)
@@ -1386,6 +1394,7 @@ BOOL WINAPI SetProcessDefaultCpuSets(HANDLE process, const ULONG *cpu_set_ids, U
  */
 BOOL WINAPI DECLSPEC_HOTPATCH GetNumaHighestNodeNumber( ULONG *node )
 {
+    printf("[LOL_DEBUG] FUNCTION GetNumaHighestNodeNumber");
     FIXME( "semi-stub: %p\n", node );
     *node = 0;
     return TRUE;

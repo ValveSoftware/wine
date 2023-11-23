@@ -747,6 +747,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH CreateFileW( LPCWSTR filename, DWORD access, DWO
                                              LPSECURITY_ATTRIBUTES sa, DWORD creation,
                                              DWORD attributes, HANDLE template )
 {
+    printf("[LOL_DEBUG] FUNCTION CreateFileW");
     NTSTATUS status;
     OBJECT_ATTRIBUTES attr;
     UNICODE_STRING nameW;
@@ -1121,6 +1122,7 @@ HANDLE WINAPI DECLSPEC_HOTPATCH FindFirstFileExW( LPCWSTR filename, FINDEX_INFO_
                                                   LPVOID data, FINDEX_SEARCH_OPS search_op,
                                                   LPVOID filter, DWORD flags )
 {
+    printf("[LOL_DEBUG] FUNCTION FindFirstFileExW");
     WCHAR *mask;
     BOOL has_wildcard = FALSE;
     FIND_FIRST_INFO *info = NULL;
@@ -1554,6 +1556,7 @@ BOOL WINAPI FindNextStreamW( HANDLE handle, void *data )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH FindClose( HANDLE handle )
 {
+    printf("[LOL_DEBUG] FUNCTION FindClose");
     FIND_FIRST_INFO *info = handle;
 
     if (!handle || handle == INVALID_HANDLE_VALUE)
@@ -2384,6 +2387,7 @@ UINT WINAPI DECLSPEC_HOTPATCH GetTempFileNameA( LPCSTR path, LPCSTR prefix, UINT
  */
 UINT WINAPI DECLSPEC_HOTPATCH GetTempFileNameW( LPCWSTR path, LPCWSTR prefix, UINT unique, LPWSTR buffer )
 {
+    printf("[LOL_DEBUG] FUNCTION GetTempFileNameW");
     int i;
     LPWSTR p;
     DWORD attr;
@@ -2467,6 +2471,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH GetTempPathA( DWORD count, LPSTR path )
  */
 DWORD WINAPI DECLSPEC_HOTPATCH GetTempPathW( DWORD count, LPWSTR path )
 {
+    printf("[LOL_DEBUG] FUNCTION GetTempPathW");
     WCHAR tmp_path[MAX_PATH];
     UINT ret;
 
@@ -3023,6 +3028,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH CancelSynchronousIo( HANDLE thread )
  */
 BOOL WINAPI DECLSPEC_HOTPATCH FlushFileBuffers( HANDLE file )
 {
+    printf("[LOL_DEBUG] FUNCTION FlushFileBuffers");
     IO_STATUS_BLOCK iosb;
 
     return set_ntstatus( NtFlushBuffersFile( file, &iosb ));
@@ -3218,6 +3224,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetFileTime( HANDLE file, FILETIME *creation,
  */
 DWORD WINAPI DECLSPEC_HOTPATCH GetFileType( HANDLE file )
 {
+    printf("[LOL_DEBUG] FUNCTION GetFileType");
     FILE_FS_DEVICE_INFORMATION info;
     IO_STATUS_BLOCK io;
 
@@ -3765,6 +3772,7 @@ DWORD WINAPI DECLSPEC_HOTPATCH SetFilePointer( HANDLE file, LONG distance, LONG 
 BOOL WINAPI DECLSPEC_HOTPATCH SetFilePointerEx( HANDLE file, LARGE_INTEGER distance,
                                                 LARGE_INTEGER *newpos, DWORD method )
 {
+    printf("[LOL_DEBUG] FUNCTION SetFilePointerEx");
     LONGLONG pos;
     IO_STATUS_BLOCK io;
     FILE_POSITION_INFORMATION info;
@@ -4088,6 +4096,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetSystemTimeAdjustment( DWORD *adjust, DWORD *inc
  */
 void WINAPI DECLSPEC_HOTPATCH GetSystemTimeAsFileTime( FILETIME *time )
 {
+    printf("[LOL_DEBUG] FUNCTION GetSystemTimeAsFileTime");
     NtQuerySystemTime( (LARGE_INTEGER *)time );
 }
 
@@ -4242,6 +4251,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH DeviceIoControl( HANDLE handle, DWORD code, void *
                                                void *out_buff, DWORD out_count, DWORD *returned,
                                                OVERLAPPED *overlapped )
 {
+    printf("[LOL_DEBUG] FUNCTION DeviceIoControl");
     IO_STATUS_BLOCK iosb, *piosb = &iosb;
     void *cvalue = NULL;
     HANDLE event = 0;

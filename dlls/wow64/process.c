@@ -506,6 +506,7 @@ NTSTATUS WINAPI wow64_NtContinue( UINT *args )
  */
 NTSTATUS WINAPI wow64_NtCreateThread( UINT *args )
 {
+    printf("[LOL_DEBUG] FUNCTION wow64_NtCreateThread");
     ULONG *handle_ptr = get_ptr( &args );
     ACCESS_MASK access = get_ulong( &args );
     OBJECT_ATTRIBUTES32 *attr32 = get_ptr( &args );

@@ -2982,31 +2982,37 @@ extern WCHAR * CDECL wine_get_dos_file_name( const char * ) __WINE_DEALLOC(HeapF
 
 static FORCEINLINE HANDLE WINAPI GetCurrentProcess(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetCurrentProcess");
     return (HANDLE)~(ULONG_PTR)0;
 }
 
 static FORCEINLINE DWORD WINAPI GetCurrentProcessId(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetCurrentProcessId");
     return HandleToULong( ((HANDLE *)NtCurrentTeb())[8] );
 }
 
 static FORCEINLINE HANDLE WINAPI GetCurrentThread(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetCurrentThread");
     return (HANDLE)~(ULONG_PTR)1;
 }
 
 static FORCEINLINE DWORD WINAPI GetCurrentThreadId(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetCurrentThreadId");
     return HandleToULong( ((HANDLE *)NtCurrentTeb())[9] );
 }
 
 static FORCEINLINE DWORD WINAPI GetLastError(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetLastError");
     return *(DWORD *)((void **)NtCurrentTeb() + 13);
 }
 
 static FORCEINLINE HANDLE WINAPI GetProcessHeap(void)
 {
+    printf("[LOL_DEBUG] FUNCTION GetProcessHeap");
     return ((HANDLE **)NtCurrentTeb())[12][6];
 }
 

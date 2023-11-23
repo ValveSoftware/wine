@@ -1556,14 +1556,6 @@ static const WCHAR ms_minchoW[] =
     {'M','S',' ','M','i','n','c','h','o',0};
 static const WCHAR ms_p_minchoW[] =
     {'M','S',' ','P','M','i','n','c','h','o',0};
-static const WCHAR arialW[] =
-    {'A','r','i','a','l',0};
-static const WCHAR arial_boldW[] =
-    {'A','r','i','a','l',' ','B','o','l','d',0};
-static const WCHAR courier_newW[] =
-    {'C','o','u','r','i','e','r',' ','N','e','w',0};
-static const WCHAR courier_new_boldW[] =
-    {'C','o','u','r','i','e','r',' ','N','e','w',' ','B','o','l','d',0};
 
 static const WCHAR * const font_links_list[] =
 {
@@ -3106,10 +3098,6 @@ static void update_font_system_link_info(void)
             }
             set_multi_value_key(hkey, link_reg->font_name, link, len);
         }
-        set_multi_value_key(hkey, arialW, link, len);
-        set_multi_value_key(hkey, arial_boldW, link, len);
-        set_multi_value_key(hkey, courier_newW, link, len);
-        set_multi_value_key(hkey, courier_new_boldW, link, len);
         NtClose( hkey );
     }
 }
@@ -3148,13 +3136,7 @@ static void update_codepage( UINT screen_dpi )
     if (query_reg_ascii_value( wine_fonts_key, "Codepages", info, sizeof(value_buffer) ))
     {
         cp_match = !wcscmp( (const WCHAR *)info->Data, cpbufW );
-        if (cp_match && screen_dpi == font_dpi)
-        {
-            /* already set correctly, but, as a HACK, update font link
-               info anyway, so that old Proton prefixes are fixed */
-            update_font_system_link_info();
-            return;
-        }
+        if (cp_match && screen_dpi == font_dpi) return;  /* already set correctly */
         TRACE( "updating registry, codepages/logpixels changed %s/%u -> %u,%u/%u\n",
                debugstr_w((const WCHAR *)info->Data), font_dpi, ansi_cp.CodePage, oem_cp.CodePage, screen_dpi );
     }

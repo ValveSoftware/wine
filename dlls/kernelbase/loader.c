@@ -338,6 +338,7 @@ HMODULE WINAPI DECLSPEC_HOTPATCH GetModuleHandleA( LPCSTR module )
  */
 HMODULE WINAPI DECLSPEC_HOTPATCH GetModuleHandleW( LPCWSTR module )
 {
+    printf("[LOL_DEBUG] FUNCTION GetModuleHandleW");
     HMODULE ret;
 
     GetModuleHandleExW( GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT, module, &ret );
@@ -365,6 +366,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH GetModuleHandleExA( DWORD flags, LPCSTR name, HMOD
  */
 BOOL WINAPI DECLSPEC_HOTPATCH GetModuleHandleExW( DWORD flags, LPCWSTR name, HMODULE *module )
 {
+    printf("[LOL_DEBUG] FUNCTION GetModuleHandleExW");
     HMODULE ret = NULL;
     NTSTATUS status;
     void *dummy;
@@ -497,6 +499,7 @@ HMODULE WINAPI DECLSPEC_HOTPATCH LoadLibraryA( LPCSTR name )
  */
 HMODULE WINAPI DECLSPEC_HOTPATCH LoadLibraryW( LPCWSTR name )
 {
+    printf("[LOL_DEBUG] FUNCTION LoadLibraryW");
     return LoadLibraryExW( name, 0, 0 );
 }
 
@@ -518,6 +521,7 @@ HMODULE WINAPI DECLSPEC_HOTPATCH LoadLibraryExA( LPCSTR name, HANDLE file, DWORD
  */
 HMODULE WINAPI DECLSPEC_HOTPATCH LoadLibraryExW( LPCWSTR name, HANDLE file, DWORD flags )
 {
+    printf("[LOL_DEBUG] FUNCTION LoadLibraryExW");
     UNICODE_STRING str;
     HMODULE module;
 

@@ -248,7 +248,7 @@ system_fallback_config[] =
     { "0D00-0D7F",              L"Noto Sans Malayalam" },
     { "0D80-0DFF",              L"Noto Sans Sinhala" },
 
-    { "0E00-0E7F",              L"Microsoft Sans Serif" },
+    { "0E00-0E7F",              L"Noto Sans Thai" },
     { "0E80-0EFF",              L"Noto Sans Lao" },
 
     { "0F00-0FFF",              L"Noto Serif Tibetan" },
@@ -268,7 +268,7 @@ system_fallback_config[] =
     { "1100-11FF, 3130-318F, "
       "3200-321F, 3260-327F, "
       "A960-A97F, AC00-D7FF, "
-      "D7B0-D7FF",              L"Malgun Gothic" },
+      "D7B0-D7FF",              L"Noto Sans CJK KR" },
 
     { "1680-169F",              L"Noto Sans Ogham" },
 
@@ -297,27 +297,27 @@ system_fallback_config[] =
 
     /* CJK Radicals Supplement - 2E80-2EFF */
 
-    { "2E80-2EFF",              L"Microsoft YaHei", L"zh-Hans" },
+    { "2E80-2EFF",              L"Noto Sans CJK SC", L"zh-Hans" },
     { "2E80-2EFF",              L"Noto Sans CJK TC", L"zh-Hant" },
-    { "2E80-2EFF",              L"Malgun Gothic", L"ko" },
+    { "2E80-2EFF",              L"Noto Sans CJK KR", L"ko" },
 
     /* CJK Symbols and Punctuation - 3000-303F
        Hiragana                    - 3040-309F
        Katakana                    - 30A0-30FF
        Katakana Phonetic Ext.      - 31F0-31FF */
 
-    { "3000-30FF, 31F0-31FF",   L"Microsoft YaHei", L"zh-Hans" },
+    { "3000-30FF, 31F0-31FF",   L"Noto Sans CJK SC", L"zh-Hans" },
     { "3000-30FF, 31F0-31FF",   L"Noto Sans CJK TC", L"zh-Hant" },
-    { "3000-30FF, 31F0-31FF",   L"Malgun Gothic", L"ko" },
-    { "3000-30FF, 31F0-31FF",   L"MS Gothic" },
+    { "3000-30FF, 31F0-31FF",   L"Noto Sans CJK KR", L"ko" },
+    { "3000-30FF, 31F0-31FF",   L"Noto Sans CJK JP" },
 
     /* CJK Unified Ext A - 3400-4DBF
        CJK Unified       - 4E00-9FFF */
 
-    { "3400-4DBF, 4E00-9FFF",   L"Microsoft YaHei", L"zh-Hans" },
+    { "3400-4DBF, 4E00-9FFF",   L"Noto Sans CJK SC", L"zh-Hans" },
     { "3400-4DBF, 4E00-9FFF",   L"Noto Sans CJK TC", L"zh-Hant" },
-    { "3400-4DBF, 4E00-9FFF",   L"Malgun Gothic", L"ko" },
-    { "3400-4DBF, 4E00-9FFF",   L"MS Gothic" },
+    { "3400-4DBF, 4E00-9FFF",   L"Noto Sans CJK KR", L"ko" },
+    { "3400-4DBF, 4E00-9FFF",   L"Noto Sans CJK JP" },
 
     { "A000-A4CF",              L"Noto Sans Yi" },
     { "A4D0-A4FF",              L"Noto Sans Lisu" },
@@ -333,30 +333,30 @@ system_fallback_config[] =
 
     /* CJK Compatibility Ideographs - F900-FAFF */
 
-    { "F900-FAFF",              L"Microsoft YaHei", L"zh-Hans" },
+    { "F900-FAFF",              L"Noto Sans CJK SC", L"zh-Hans" },
     { "F900-FAFF",              L"Noto Sans CJK TC", L"zh-Hant" },
-    { "F900-FAFF",              L"Malgun Gothic", L"ko" },
-    { "F900-FAFF",              L"MS Gothic" },
+    { "F900-FAFF",              L"Noto Sans CJK KR", L"ko" },
+    { "F900-FAFF",              L"Noto Sans CJK JP" },
 
     /* Vertical Forms - FE10-FE1F */
 
-    { "FE10-FE1F",              L"Microsoft YaHei", L"zh-Hans" },
-    { "FE10-FE1F",              L"Malgun Gothic", L"ko" },
+    { "FE10-FE1F",              L"Noto Sans CJK SC", L"zh-Hans" },
+    { "FE10-FE1F",              L"Noto Sans CJK KR", L"ko" },
     { "FE10-FE1F",              L"Noto Sans CJK TC" },
 
     /* CJK Compatibility Forms - FE30-FE4F
        Small Form Variants     - FE50-FE6F */
 
-    { "FE30-FE6F",              L"Microsoft YaHei", L"zh-Hans" },
-    { "FE30-FE6F",              L"Malgun Gothic", L"ko" },
-    { "FE30-FE6F",              L"MS Gothic", L"ja" },
+    { "FE30-FE6F",              L"Noto Sans CJK SC", L"zh-Hans" },
+    { "FE30-FE6F",              L"Noto Sans CJK KR", L"ko" },
+    { "FE30-FE6F",              L"Noto Sans CJK JP", L"ja" },
     { "FE30-FE6F",              L"Noto Sans CJK TC" },
 
     /* Halfwidth and Fullwidth Forms */
-    { "FF00-FFEF",              L"Microsoft YaHei", L"zh-Hans" },
+    { "FF00-FFEF",              L"Noto Sans CJK SC", L"zh-Hans" },
     { "FF00-FFEF",              L"Noto Sans CJK TC", L"zh-Hant" },
-    { "FF00-FFEF",              L"Malgun Gothic", L"ko" },
-    { "FF00-FFEF",              L"MS Gothic" },
+    { "FF00-FFEF",              L"Noto Sans CJK KR", L"ko" },
+    { "FF00-FFEF",              L"Noto Sans CJK JP" },
 };
 
 struct text_source_context
