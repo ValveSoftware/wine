@@ -104,7 +104,113 @@ static NTSTATUS init( void *args )
     return STATUS_SUCCESS;
 }
 
+typedef enum AsicFamily
+{
+    AsicFamily_Unknown,                                         ///< Unknown architecture, potentially from another IHV. Check \ref AGSDeviceInfo::vendorId
+    AsicFamily_PreGCN,                                          ///< Pre GCN architecture.
+    AsicFamily_GCN1,                                            ///< AMD GCN 1 architecture: Oland, Cape Verde, Pitcairn & Tahiti.
+    AsicFamily_GCN2,                                            ///< AMD GCN 2 architecture: Hawaii & Bonaire.  This also includes APUs Kaveri and Carrizo.
+    AsicFamily_GCN3,                                            ///< AMD GCN 3 architecture: Tonga & Fiji.
+    AsicFamily_GCN4,                                            ///< AMD GCN 4 architecture: Polaris.
+    AsicFamily_Vega,                                            ///< AMD Vega architecture, including Raven Ridge (ie AMD Ryzen CPU + AMD Vega GPU).
+    AsicFamily_RDNA,                                            ///< AMD RDNA architecture
+    AsicFamily_RDNA2,                                           ///< AMD RDNA2 architecture
+    AsicFamily_RDNA3,                                           ///< AMD RDNA3 architecture
+} AsicFamily;
+
+/* Constants from Mesa source. */
+#define FAMILY_UNKNOWN 0x00
+#define FAMILY_TN      0x69 /* # 105 / Trinity APUs */
+#define FAMILY_SI      0x6E /* # 110 / Southern Islands: Tahiti, Pitcairn, CapeVerde, Oland, Hainan */
+#define FAMILY_CI      0x78 /* # 120 / Sea Islands: Bonaire, Hawaii */
+#define FAMILY_KV      0x7D /* # 125 / Kaveri APUs: Spectre, Spooky, Kalindi, Godavari */
+#define FAMILY_VI      0x82 /* # 130 / Volcanic Islands: Iceland, Tonga, Fiji */
+#define FAMILY_POLARIS 0x82 /* # 130 / Polaris: 10, 11, 12 */
+#define FAMILY_CZ      0x87 /* # 135 / Carrizo APUs: Carrizo, Stoney */
+#define FAMILY_AI      0x8D /* # 141 / Vega: 10, 20 */
+#define FAMILY_RV      0x8E /* # 142 / Raven */
+#define FAMILY_NV      0x8F /* # 143 / Navi: 10 */
+#define FAMILY_VGH     0x90 /* # 144 / Van Gogh */
+#define FAMILY_NV3     0x91 /* # 145 / Navi: 3x */
+#define FAMILY_RMB     0x92 /* # 146 / Rembrandt */
+#define FAMILY_RPL     0x95 /* # 149 / Raphael */
+#define FAMILY_GFX1103 0x94
+#define FAMILY_GFX1150 0x96
+#define FAMILY_MDN     0x97 /* # 151 / Mendocino */
+
+static void fill_device_info(struct drm_amdgpu_info_device *info, struct get_device_info_params *out)
+{
+    uint32_t erev = info->external_rev;
+
+    out->asic_family = AsicFamily_Unknown;
+    switch (info->family)
+    {
+        case FAMILY_AI:
+        case FAMILY_RV:
+            out->asic_family = AsicFamily_Vega;
+            break;
+
+        /* Treat pre-Polaris cards as Polaris. */
+        case FAMILY_CZ:
+        case FAMILY_SI:
+        case FAMILY_CI:
+        case FAMILY_KV:
+        case FAMILY_POLARIS:
+            out->asic_family = AsicFamily_GCN4;
+            break;
+
+        case FAMILY_NV:
+            if (erev >= 0x01 && erev < 0x28)
+                out->asic_family = AsicFamily_RDNA;
+            else if (erev >= 0x28 && erev < 0x50)
+                out->asic_family = AsicFamily_RDNA2;
+            break;
+
+        case FAMILY_RMB:
+        case FAMILY_RPL:
+        case FAMILY_MDN:
+        case FAMILY_VGH:
+            out->asic_family = AsicFamily_RDNA2;
+            break;
+
+        case FAMILY_NV3:
+        case FAMILY_GFX1103:
+        case FAMILY_GFX1150:
+            out->asic_family = AsicFamily_RDNA3;
+            break;
+    }
+    TRACE("family %u, erev %#x -> asicFamily %d.\n", info->family, erev, out->asic_family);
+    if (out->asic_family == AsicFamily_Unknown && info->family != FAMILY_UNKNOWN)
+    {
+        if (info->family > FAMILY_GFX1150)
+            out->asic_family = AsicFamily_RDNA3;
+        else
+            out->asic_family = AsicFamily_GCN4;
+
+        FIXME("Unrecognized family %u, erev %#x -> defaulting to %d.\n", info->family, erev,
+                out->asic_family);
+    }
+}
+
+static NTSTATUS get_device_info( void *args )
+{
+    struct get_device_info_params *params = args;
+    unsigned int i;
+
+    for (i = 0; i < device_count; ++i)
+    {
+        if (amd_info[i].device_id != params->device_id)
+            continue;
+        TRACE("device %04x found.\n", params->device_id);
+        fill_device_info(&amd_info[i], params);
+        return STATUS_SUCCESS;
+    }
+    TRACE("Device %04x not found.\n", params->device_id);
+    return STATUS_NOT_FOUND;
+}
+
 const unixlib_entry_t __wine_unix_call_funcs[] =
 {
     init,
+    get_device_info,
 };

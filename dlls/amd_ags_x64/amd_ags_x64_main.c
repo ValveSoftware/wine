@@ -73,21 +73,22 @@ static const struct
     int patch;
     unsigned int device_size;
     unsigned int dx11_returned_params_size;
+    int max_asicFamily;
 }
 amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
-    {5, 0, 5, sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511)},
-    {5, 1, 1, sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511)},
-    {5, 2, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520)},
-    {5, 2, 1, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520)},
-    {5, 3, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520)},
-    {5, 4, 0, sizeof(AGSDeviceInfo_540), sizeof(AGSDX11ReturnedParams_520)},
-    {5, 4, 1, sizeof(AGSDeviceInfo_541), sizeof(AGSDX11ReturnedParams_520)},
-    {5, 4, 2, sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520)},
-    {6, 0, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600)},
-    {6, 0, 1, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600)},
-    {6, 1, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600)},
-    {6, 2, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600)},
+    {5, 0, 5, sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {5, 1, 1, sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {5, 2, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {5, 2, 1, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {5, 3, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {5, 4, 0, sizeof(AGSDeviceInfo_540), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {5, 4, 1, sizeof(AGSDeviceInfo_541), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {5, 4, 2, sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {6, 0, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
+    {6, 0, 1, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
+    {6, 1, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
+    {6, 2, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
 };
 
 #define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
@@ -706,10 +707,21 @@ static AGSReturnCode init_ags_context(AGSContext *context, int ags_version)
         SET_DEVICE_FIELD(device, deviceId, int, context->version, vk_properties->deviceID);
         if (vk_properties->vendorID == 0x1002)
         {
-            if (!init_unix_lib())
-                ERR("Failed to load unix lib.\n");
+            struct get_device_info_params params =
+            {
+                .device_id = vk_properties->deviceID,
+            };
+
             SET_DEVICE_FIELD(device, architectureVersion, ArchitectureVersion, context->version, ArchitectureVersion_GCN);
-            SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version, AsicFamily_GCN4);
+            if (init_unix_lib() && !AMD_AGS_CALL(get_device_info, &params))
+            {
+                SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version,
+                        min(params.asic_family, amd_ags_info[context->version].max_asicFamily));
+            }
+            else
+            {
+                SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version, AsicFamily_GCN4);
+            }
             if (vk_properties->deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
             {
                 if (context->version >= AMD_AGS_VERSION_6_0_0)
