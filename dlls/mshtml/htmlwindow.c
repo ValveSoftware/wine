@@ -4129,34 +4129,27 @@ static IWineDispatchProxyCbPrivate** WINAPI WindowWineDispProxyPrivate_GetProxyF
     return &This->inner_window->event_target.dispex.proxy;
 }
 
-static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
+static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window)
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
     IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
 
-    return itf->lpVtbl->GetDefaultPrototype(itf, prots_ref);
+    return itf->lpVtbl->GetDefaultPrototype(itf, iface);
 }
 
-static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface,
-        IWineDispatchProxyPrivate *window, struct proxy_prototypes *prots)
+static HRESULT WINAPI WindowWineDispProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window, IDispatch **ret)
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
-    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
+    HRESULT hres;
 
-    return itf->lpVtbl->GetDefaultConstructor(itf, window, prots);
-}
+    /* We aren't a prototype, so we don't have a constructor, but we're the global window, on which constructors are defined. */
+    hres = define_global_constructors(This->inner_window);
+    if(FAILED(hres))
+        return hres;
 
-static HRESULT WINAPI WindowWineDispProxyPrivate_DefineConstructors(IWineDispatchProxyPrivate *iface, struct proxy_prototypes **prots_ref)
-{
-    HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
-    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
-
-    return itf->lpVtbl->DefineConstructors(itf, prots_ref);
-}
-
-static BOOL WINAPI WindowWineDispProxyPrivate_IsPrototype(IWineDispatchProxyPrivate *iface)
-{
-    return FALSE;
+    /* Return S_FALSE to signal the caller that we are the object on which globals are defined. */
+    *ret = NULL;
+    return S_FALSE;
 }
 
 static BOOL WINAPI WindowWineDispProxyPrivate_IsConstructor(IWineDispatchProxyPrivate *iface)
@@ -4332,8 +4325,6 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     WindowWineDispProxyPrivate_GetProxyFieldRef,
     WindowWineDispProxyPrivate_GetDefaultPrototype,
     WindowWineDispProxyPrivate_GetDefaultConstructor,
-    WindowWineDispProxyPrivate_DefineConstructors,
-    WindowWineDispProxyPrivate_IsPrototype,
     WindowWineDispProxyPrivate_IsConstructor,
     WindowWineDispProxyPrivate_PropFixOverride,
     WindowWineDispProxyPrivate_PropOverride,
@@ -4345,6 +4336,11 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     WindowWineDispProxyPrivate_ToString,
     WindowWineDispProxyPrivate_InitCC
 };
+
+HTMLWindow *unsafe_HTMLWindow_from_IWineDispatchProxyPrivate(IWineDispatchProxyPrivate *iface)
+{
+    return iface && iface->lpVtbl == &WindowDispExVtbl ? impl_from_IWineDispatchProxyPrivate(iface) : NULL;
+}
 
 static inline HTMLOuterWindow *impl_from_IEventTarget(IEventTarget *iface)
 {
@@ -4521,6 +4517,15 @@ static void HTMLWindow_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCa
     for(i = 0; i < ARRAY_SIZE(This->legacy_prototypes); i++)
         if(This->legacy_prototypes[i])
             note_cc_edge((nsISupports*)&This->legacy_prototypes[i]->dispex.IDispatchEx_iface, "legacy_prototype", cb);
+    if(This->proxy_globals) {
+        struct proxy_globals *globals = This->proxy_globals;
+        for(i = 0; i < ARRAY_SIZE(globals->prototype); i++)
+            if(globals->prototype[i])
+                note_cc_edge((nsISupports*)globals->prototype[i], "proxy_prototype", cb);
+        for(i = 0; i < ARRAY_SIZE(globals->ctor); i++)
+            if(globals->ctor[i])
+                note_cc_edge((nsISupports*)globals->ctor[i], "proxy_ctor", cb);
+    }
     if(This->screen)
         note_cc_edge((nsISupports*)This->screen, "screen", cb);
     if(This->history)
@@ -4573,6 +4578,18 @@ static void HTMLWindow_unlink(DispatchEx *dispex)
             This->legacy_prototypes[i] = NULL;
             IDispatchEx_Release(&prot->dispex.IDispatchEx_iface);
         }
+    }
+    if(This->proxy_globals) {
+        struct proxy_globals *globals = This->proxy_globals;
+        This->proxy_globals = NULL;
+
+        for(i = 0; i < ARRAY_SIZE(globals->prototype); i++)
+            if(globals->prototype[i])
+                IDispatch_Release(globals->prototype[i]);
+        for(i = 0; i < ARRAY_SIZE(globals->ctor); i++)
+            if(globals->ctor[i])
+                IDispatch_Release(globals->ctor[i]);
+        free(globals);
     }
     unlink_ref(&This->screen);
     if(This->history) {
