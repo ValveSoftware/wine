@@ -57,6 +57,25 @@ DEFINE_GUID(IID_IWineDispatchProxyPrivate, 0xd359f2fe,0x5531,0x741b,0xa4,0x1a,0x
 typedef struct _IWineDispatchProxyPrivate IWineDispatchProxyPrivate;
 typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
 
+typedef IUnknown nsISupports;
+DEFINE_GUID(IID_nsCycleCollectionISupports, 0xc61eac14,0x5f7a,0x4481,0x96,0x5e,0x7e,0xaa,0x6e,0xff,0xa8,0x5f);
+
+typedef struct {
+    void *vtbl;
+    int ref_flags;
+    void *callbacks;
+} ExternalCycleCollectionParticipant;
+
+typedef struct nsCycleCollectionTraversalCallback nsCycleCollectionTraversalCallback;
+
+typedef struct {
+    HRESULT (WINAPI *traverse)(void*,void*,nsCycleCollectionTraversalCallback*);
+    HRESULT (WINAPI *unlink)(void*);
+    void (WINAPI *delete_cycle_collectable)(void*);
+} CCObjCallback;
+
+DEFINE_GUID(IID_nsXPCOMCycleCollectionParticipant, 0x9674489b,0x1f6f,0x4550,0xa7,0x30, 0xcc,0xae,0xdd,0x10,0x4c,0xf9);
+
 struct proxy_prototypes
 {
     unsigned int num;
@@ -80,6 +99,17 @@ struct proxy_prop_info
     unsigned flags;
 };
 
+typedef void (__cdecl *note_edge_t)(nsISupports*,const char*,nsCycleCollectionTraversalCallback*);
+
+struct proxy_cc_api
+{
+    ExternalCycleCollectionParticipant participant;
+    BOOL (__cdecl *is_full_cc)(void);
+    void (__cdecl *collect)(IActiveScriptSite *script_site, BOOL force);
+    void (__cdecl *describe_node)(ULONG ref, const char *obj_name, nsCycleCollectionTraversalCallback *cb);
+    note_edge_t note_edge;
+};
+
 typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
@@ -97,7 +127,7 @@ typedef struct {
     HRESULT (STDMETHODCALLTYPE *PropDelete)(IWineDispatchProxyPrivate *This, DISPID id);
     HRESULT (STDMETHODCALLTYPE *PropEnum)(IWineDispatchProxyPrivate *This);
     HRESULT (STDMETHODCALLTYPE *ToString)(IWineDispatchProxyPrivate *This, BSTR *string);
-    BOOL    (STDMETHODCALLTYPE *CanGC)(IWineDispatchProxyPrivate *This);
+    void    (STDMETHODCALLTYPE *InitCC)(struct proxy_cc_api *cc_api, const CCObjCallback *callback);
 } IWineDispatchProxyPrivateVtbl;
 
 typedef struct {
@@ -151,6 +181,7 @@ heap_pool_t *heap_pool_mark(heap_pool_t*) DECLSPEC_HIDDEN;
 
 typedef struct jsdisp_t jsdisp_t;
 
+extern struct proxy_cc_api cc_api;
 extern HINSTANCE jscript_hinstance DECLSPEC_HIDDEN;
 HRESULT get_dispatch_typeinfo(ITypeInfo**) DECLSPEC_HIDDEN;
 
@@ -248,7 +279,7 @@ enum gc_traverse_op {
 HRESULT create_named_item_script_obj(script_ctx_t*,named_item_t*) DECLSPEC_HIDDEN;
 named_item_t *lookup_named_item(script_ctx_t*,const WCHAR*,unsigned) DECLSPEC_HIDDEN;
 void release_named_item(named_item_t*) DECLSPEC_HIDDEN;
-HRESULT gc_run(script_ctx_t*) DECLSPEC_HIDDEN;
+HRESULT gc_run(script_ctx_t*,BOOL) DECLSPEC_HIDDEN;
 HRESULT gc_process_linked_obj(struct gc_ctx*,enum gc_traverse_op,jsdisp_t*,jsdisp_t*,void**) DECLSPEC_HIDDEN;
 HRESULT gc_process_linked_val(struct gc_ctx*,enum gc_traverse_op,jsdisp_t*,jsval_t*) DECLSPEC_HIDDEN;
 
@@ -271,6 +302,7 @@ typedef struct {
     HRESULT (*idx_get)(jsdisp_t*,unsigned,jsval_t*);
     HRESULT (*idx_put)(jsdisp_t*,unsigned,jsval_t);
     HRESULT (*gc_traverse)(struct gc_ctx*,enum gc_traverse_op,jsdisp_t*);
+    void (*cc_traverse)(jsdisp_t*,nsCycleCollectionTraversalCallback*);
 } builtin_info_t;
 
 struct jsdisp_t {
@@ -342,6 +374,7 @@ HRESULT create_dispex(script_ctx_t*,const builtin_info_t*,jsdisp_t*,jsdisp_t**) 
 HRESULT init_dispex(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
 HRESULT init_dispex_from_constr(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*) DECLSPEC_HIDDEN;
 HRESULT convert_to_proxy(script_ctx_t*,jsval_t*) DECLSPEC_HIDDEN;
+void init_cc_api(IDispatch*) DECLSPEC_HIDDEN;
 
 void disp_fill_exception(script_ctx_t*,EXCEPINFO*) DECLSPEC_HIDDEN;
 HRESULT disp_call(script_ctx_t*,IDispatch*,DISPID,WORD,unsigned,jsval_t*,jsval_t*) DECLSPEC_HIDDEN;
