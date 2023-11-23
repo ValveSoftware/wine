@@ -890,48 +890,6 @@ static inline HTMLBodyElement *impl_from_HTMLDOMNode(HTMLDOMNode *iface)
     return CONTAINING_RECORD(iface, HTMLBodyElement, element.node);
 }
 
-static HRESULT HTMLBodyElement_QI(HTMLDOMNode *iface, REFIID riid, void **ppv)
-{
-    HTMLBodyElement *This = impl_from_HTMLDOMNode(iface);
-
-    *ppv = NULL;
-
-    if(IsEqualGUID(&IID_IUnknown, riid)) {
-        TRACE("(%p)->(IID_IUnknown %p)\n", This, ppv);
-        *ppv = &This->IHTMLBodyElement_iface;
-    }else if(IsEqualGUID(&IID_IDispatch, riid)) {
-        TRACE("(%p)->(IID_IDispatch %p)\n", This, ppv);
-        *ppv = &This->IHTMLBodyElement_iface;
-    }else if(IsEqualGUID(&IID_IHTMLBodyElement, riid)) {
-        TRACE("(%p)->(IID_IHTMLBodyElement %p)\n", This, ppv);
-        *ppv = &This->IHTMLBodyElement_iface;
-    }else if(IsEqualGUID(&IID_IHTMLTextContainer, riid)) {
-        TRACE("(%p)->(IID_IHTMLTextContainer %p)\n", This, ppv);
-        *ppv = &This->IHTMLTextContainer_iface;
-    }
-
-    if(*ppv) {
-        IUnknown_AddRef((IUnknown*)*ppv);
-        return S_OK;
-    }
-
-    return HTMLElement_QI(&This->element.node, riid, ppv);
-}
-
-static void HTMLBodyElement_traverse(HTMLDOMNode *iface, nsCycleCollectionTraversalCallback *cb)
-{
-    HTMLBodyElement *This = impl_from_HTMLDOMNode(iface);
-
-    if(This->nsbody)
-        note_cc_edge((nsISupports*)This->nsbody, "This->nsbody", cb);
-}
-
-static void HTMLBodyElement_unlink(HTMLDOMNode *iface)
-{
-    HTMLBodyElement *This = impl_from_HTMLDOMNode(iface);
-    unlink_ref(&This->nsbody);
-}
-
 static EventTarget *HTMLBodyElement_get_event_prop_target(HTMLDOMNode *iface, int event_id)
 {
     HTMLBodyElement *This = impl_from_HTMLDOMNode(iface);
@@ -965,6 +923,39 @@ static BOOL HTMLBodyElement_is_settable(HTMLDOMNode *iface, DISPID dispid)
     }
 }
 
+static inline HTMLBodyElement *impl_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, HTMLBodyElement, element.node.event_target.dispex);
+}
+
+static void *HTMLBodyElement_query_interface(DispatchEx *dispex, REFIID riid)
+{
+    HTMLBodyElement *This = impl_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IHTMLBodyElement, riid))
+        return &This->IHTMLBodyElement_iface;
+    if(IsEqualGUID(&IID_IHTMLTextContainer, riid))
+        return &This->IHTMLTextContainer_iface;
+
+    return HTMLElement_query_interface(&This->element.node.event_target.dispex, riid);
+}
+
+static void HTMLBodyElement_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    HTMLBodyElement *This = impl_from_DispatchEx(dispex);
+    HTMLElement_traverse(dispex, cb);
+
+    if(This->nsbody)
+        note_cc_edge((nsISupports*)This->nsbody, "nsbody", cb);
+}
+
+static void HTMLBodyElement_unlink(DispatchEx *dispex)
+{
+    HTMLBodyElement *This = impl_from_DispatchEx(dispex);
+    HTMLElement_unlink(dispex);
+    unlink_ref(&This->nsbody);
+}
+
 static const cpc_entry_t HTMLBodyElement_cpc[] = {
     {&DIID_HTMLTextContainerEvents},
     {&IID_IPropertyNotifySink},
@@ -974,17 +965,24 @@ static const cpc_entry_t HTMLBodyElement_cpc[] = {
 
 static const NodeImplVtbl HTMLBodyElementImplVtbl = {
     .clsid                 = &CLSID_HTMLBody,
-    .qi                    = HTMLBodyElement_QI,
-    .destructor            = HTMLElement_destructor,
     .cpc_entries           = HTMLBodyElement_cpc,
     .clone                 = HTMLElement_clone,
-    .handle_event          = HTMLElement_handle_event,
     .get_attr_col          = HTMLElement_get_attr_col,
     .get_event_prop_target = HTMLBodyElement_get_event_prop_target,
-    .traverse              = HTMLBodyElement_traverse,
-    .unlink                = HTMLBodyElement_unlink,
     .is_text_edit          = HTMLBodyElement_is_text_edit,
     .is_settable           = HTMLBodyElement_is_settable
+};
+
+static const event_target_vtbl_t HTMLBodyElement_event_target_vtbl = {
+    {
+        HTMLELEMENT_DISPEX_VTBL_ENTRIES,
+        .query_interface= HTMLBodyElement_query_interface,
+        .destructor     = HTMLElement_destructor,
+        .traverse       = HTMLBodyElement_traverse,
+        .unlink         = HTMLBodyElement_unlink
+    },
+    HTMLELEMENT_EVENT_TARGET_VTBL_ENTRIES,
+    .handle_event       = HTMLElement_handle_event
 };
 
 static const tid_t HTMLBodyElement_iface_tids[] = {
@@ -997,7 +995,7 @@ static const tid_t HTMLBodyElement_iface_tids[] = {
 
 dispex_static_data_t HTMLBodyElement_dispex = {
     "HTMLBodyElement",
-    &HTMLElement_event_target_vtbl.dispex_vtbl,
+    &HTMLBodyElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLBodyElement,
     DispHTMLBody_tid,
     HTMLBodyElement_iface_tids,
