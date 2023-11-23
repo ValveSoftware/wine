@@ -749,6 +749,10 @@ static void mf_media_type_to_wg_format_audio(IMFMediaType *type, const GUID *sub
             channel_mask = KSAUDIO_SPEAKER_MONO;
         else if (channels == 2)
             channel_mask = KSAUDIO_SPEAKER_STEREO;
+        else if (channels == 6)
+            channel_mask = KSAUDIO_SPEAKER_5POINT1;
+        else if (channels == 8)
+            channel_mask = KSAUDIO_SPEAKER_7POINT1;
         else
         {
             FIXME("Channel mask is not set.\n");
