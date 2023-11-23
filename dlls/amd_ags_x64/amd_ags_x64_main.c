@@ -2,8 +2,11 @@
 #include <stdbool.h>
 #include <assert.h>
 
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
 #include "windef.h"
 #include "winbase.h"
+#include "winternl.h"
 #include "wine/debug.h"
 #include "wine/heap.h"
 
@@ -21,7 +24,26 @@
 
 #include "amd_ags.h"
 
+#include "unixlib.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(amd_ags);
+
+#define AMD_AGS_CALL(func, args) WINE_UNIX_CALL( unix_ ## func, args )
+
+static INIT_ONCE unix_init_once = INIT_ONCE_STATIC_INIT;
+static BOOL unix_lib_initialized;
+
+static BOOL WINAPI init_unix_lib_once( INIT_ONCE *once, void *param, void **context )
+{
+    unix_lib_initialized = !__wine_init_unix_call() && !AMD_AGS_CALL( init, NULL );
+    return TRUE;
+}
+
+static BOOL init_unix_lib(void)
+{
+    InitOnceExecuteOnce( &unix_init_once, init_unix_lib_once, NULL, NULL );
+    return unix_lib_initialized;
+}
 
 static const char driver_version[] = "23.19.02-230831a-396538C-AMD-Software-Adrenalin-Edition";
 static const char radeon_version[] = "23.10.2";
@@ -684,6 +706,8 @@ static AGSReturnCode init_ags_context(AGSContext *context, int ags_version)
         SET_DEVICE_FIELD(device, deviceId, int, context->version, vk_properties->deviceID);
         if (vk_properties->vendorID == 0x1002)
         {
+            if (!init_unix_lib())
+                ERR("Failed to load unix lib.\n");
             SET_DEVICE_FIELD(device, architectureVersion, ArchitectureVersion, context->version, ArchitectureVersion_GCN);
             SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version, AsicFamily_GCN4);
             if (vk_properties->deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
