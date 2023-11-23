@@ -1487,6 +1487,15 @@ fi
 WINE_WARNING_WITH(gnutls,[test "x$ac_cv_lib_soname_gnutls" = "x"],
                  [libgnutls ${notice_platform}development files not found, no schannel support.])
 
+dnl **** Check for libdrm ****
+WINE_PACKAGE_FLAGS(DRM,[libdrm],,,,
+    [AC_CHECK_HEADERS([xf86drm.h],
+        [WINE_CHECK_SONAME(drm,drmOpen,,,[$DRM_LIBS])])])
+
+WINE_PACKAGE_FLAGS(DRMAMDGPU,[libdrm_amdgpu],,,,
+    [AC_CHECK_HEADERS([amdgpu_drm.h],
+        [WINE_CHECK_SONAME(drm_amdgpu,amdgpu_query_info,,,[$DRMAMDGPU_LIBS])])])
+
 dnl **** Check for SANE ****
 if test "x$with_sane" != "xno"
 then
