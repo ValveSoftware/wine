@@ -86,6 +86,9 @@ static NTSTATUS init( void *args )
             continue;
         }
         amd_info = realloc(amd_info, (device_count + 1) * sizeof(*amd_info));
+        /* amdgpu_query_info() doesn't fail on short buffer (filling in the available buffer size). So older or
+         * newer DRM version should be fine but zero init the structure to avoid random values. */
+        memset(&amd_info[device_count], 0, sizeof(*amd_info));
         if (!(ret = amdgpu_query_info(h, AMDGPU_INFO_DEV_INFO, sizeof(*amd_info), &amd_info[device_count])))
         {
             TRACE("Got amdgpu info for device id %04x, family %#x, external_rev %#x, chip_rev %#x.\n",
