@@ -200,16 +200,18 @@ static VkResult wine_vk_instance_convert_create_info(const VkInstanceCreateInfo 
     return VK_SUCCESS;
 }
 
-static struct wine_vk_surface *wine_vk_surface_grab(struct wine_vk_surface *surface)
+static struct wine_vk_surface *wine_vk_surface_grab( struct wine_vk_surface *surface )
 {
-    InterlockedIncrement(&surface->ref);
+    int refcount = InterlockedIncrement( &surface->ref );
+    TRACE( "surface %p, refcount %d.\n", surface, refcount );
     return surface;
 }
 
-static void wine_vk_surface_release(struct wine_vk_surface *surface)
+static void wine_vk_surface_release( struct wine_vk_surface *surface )
 {
-    if (InterlockedDecrement(&surface->ref))
-        return;
+    int refcount = InterlockedDecrement( &surface->ref );
+    TRACE( "surface %p, refcount %d.\n", surface, refcount );
+    if (refcount) return;
 
     if (surface->entry.next)
     {
