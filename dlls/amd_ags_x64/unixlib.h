@@ -32,4 +32,11 @@ struct get_device_info_params
     uint32_t _pad;
     /* Output parameters. */
     uint32_t asic_family;
+    uint32_t num_cu;
+    uint32_t num_wgp;
+    uint32_t num_rops;
+    uint32_t core_clock;
+    uint32_t memory_clock;
+    uint32_t memory_bandwidth;
+    float teraflops;
 };
