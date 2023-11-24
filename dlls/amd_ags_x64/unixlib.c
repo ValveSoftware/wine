@@ -107,6 +107,42 @@ static NTSTATUS init( void *args )
     return STATUS_SUCCESS;
 }
 
+#ifndef AMDGPU_VRAM_TYPE_DDR5
+#   define AMDGPU_VRAM_TYPE_DDR5  10
+#endif
+#ifndef AMDGPU_VRAM_TYPE_LPDDR4
+#   define AMDGPU_VRAM_TYPE_LPDDR4 11
+#endif
+#ifndef AMDGPU_VRAM_TYPE_LPDDR5
+#   define AMDGPU_VRAM_TYPE_LPDDR5 12
+#endif
+
+/* From Mesa source. */
+static uint32_t memory_ops_per_clock(uint32_t vram_type)
+{
+   /* Based on MemoryOpsPerClockTable from PAL. */
+   switch (vram_type) {
+   case AMDGPU_VRAM_TYPE_GDDR1:
+   case AMDGPU_VRAM_TYPE_GDDR3: /* last in low-end Evergreen */
+   case AMDGPU_VRAM_TYPE_GDDR4: /* last in R7xx, not used much */
+   case AMDGPU_VRAM_TYPE_UNKNOWN:
+   default:
+      return 0;
+   case AMDGPU_VRAM_TYPE_DDR2:
+   case AMDGPU_VRAM_TYPE_DDR3:
+   case AMDGPU_VRAM_TYPE_DDR4:
+   case AMDGPU_VRAM_TYPE_LPDDR4:
+   case AMDGPU_VRAM_TYPE_HBM: /* same for HBM2 and HBM3 */
+      return 2;
+   case AMDGPU_VRAM_TYPE_DDR5:
+   case AMDGPU_VRAM_TYPE_LPDDR5:
+   case AMDGPU_VRAM_TYPE_GDDR5: /* last in Polaris and low-end Navi14 */
+      return 4;
+   case AMDGPU_VRAM_TYPE_GDDR6:
+      return 16;
+   }
+}
+
 typedef enum AsicFamily
 {
     AsicFamily_Unknown,                                         ///< Unknown architecture, potentially from another IHV. Check \ref AGSDeviceInfo::vendorId
@@ -140,6 +176,8 @@ typedef enum AsicFamily
 #define FAMILY_GFX1103 0x94
 #define FAMILY_GFX1150 0x96
 #define FAMILY_MDN     0x97 /* # 151 / Mendocino */
+
+#define ROUND_DIV(value, div) (((value) + (div) / 2) / (div))
 
 static void fill_device_info(struct drm_amdgpu_info_device *info, struct get_device_info_params *out)
 {
@@ -193,6 +231,19 @@ static void fill_device_info(struct drm_amdgpu_info_device *info, struct get_dev
         FIXME("Unrecognized family %u, erev %#x -> defaulting to %d.\n", info->family, erev,
                 out->asic_family);
     }
+
+    out->num_cu = info->cu_active_number;
+    out->num_wgp = out->asic_family >= AsicFamily_RDNA ? out->num_cu / 2 : 0;
+    out->num_rops = info->num_rb_pipes * 4;
+    TRACE("num_cu %d, num_wgp %d, num_rops %d.\n", out->num_cu, out->num_wgp, out->num_rops);
+    out->core_clock = ROUND_DIV(info->max_engine_clock, 1000);
+    out->memory_clock = ROUND_DIV(info->max_memory_clock, 1000);
+    out->memory_bandwidth = ROUND_DIV(info->max_memory_clock * memory_ops_per_clock(info->vram_type)
+            * info->vram_bit_width / 8, 1000);
+    TRACE("core_clock %uMHz, memory_clock %uMHz, memory_bandwidth %u.\n",
+            out->core_clock, out->memory_clock, out->memory_bandwidth);
+    out->teraflops = 1e-9f * info->max_engine_clock * info->cu_active_number * 64 * 2;
+    TRACE("teraflops %.2f.\n", out->teraflops);
 }
 
 static NTSTATUS get_device_info( void *args )
