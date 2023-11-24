@@ -182,6 +182,7 @@ typedef enum AsicFamily
 static void fill_device_info(struct drm_amdgpu_info_device *info, struct get_device_info_params *out)
 {
     uint32_t erev = info->external_rev;
+    uint64_t max_engine_clock_khz, max_memory_clock_khz;
 
     out->asic_family = AsicFamily_Unknown;
     switch (info->family)
@@ -236,13 +237,19 @@ static void fill_device_info(struct drm_amdgpu_info_device *info, struct get_dev
     out->num_wgp = out->asic_family >= AsicFamily_RDNA ? out->num_cu / 2 : 0;
     out->num_rops = info->num_rb_pipes * 4;
     TRACE("num_cu %d, num_wgp %d, num_rops %d.\n", out->num_cu, out->num_wgp, out->num_rops);
-    out->core_clock = ROUND_DIV(info->max_engine_clock, 1000);
-    out->memory_clock = ROUND_DIV(info->max_memory_clock, 1000);
-    out->memory_bandwidth = ROUND_DIV(info->max_memory_clock * memory_ops_per_clock(info->vram_type)
+    /* These numbers are zero on Vangogh, workaround that (similar to how it is currently done
+     * in Mesa src/amd/common/ac_rgp.c. */
+    if (!(max_engine_clock_khz = info->max_engine_clock))
+        max_engine_clock_khz = 1300000;
+    if (!(max_memory_clock_khz = info->max_memory_clock))
+        max_memory_clock_khz = 687000;
+    out->core_clock = ROUND_DIV(max_engine_clock_khz, 1000);
+    out->memory_clock = ROUND_DIV(max_memory_clock_khz, 1000);
+    out->memory_bandwidth = ROUND_DIV(max_memory_clock_khz * memory_ops_per_clock(info->vram_type)
             * info->vram_bit_width / 8, 1000);
     TRACE("core_clock %uMHz, memory_clock %uMHz, memory_bandwidth %u.\n",
             out->core_clock, out->memory_clock, out->memory_bandwidth);
-    out->teraflops = 1e-9f * info->max_engine_clock * info->cu_active_number * 64 * 2;
+    out->teraflops = 1e-9f * max_engine_clock_khz * info->cu_active_number * 64 * 2;
     TRACE("teraflops %.2f.\n", out->teraflops);
 }
 
