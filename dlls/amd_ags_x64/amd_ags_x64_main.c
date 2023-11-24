@@ -98,6 +98,10 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
 #define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), -1, \
         -1, -1, -1, -1, -1, -1}}
+#define DEF_FIELD_520_UP(name) {DEVICE_FIELD_##name, {-1, -1, offsetof(AGSDeviceInfo_520, name), \
+        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name), \
+        offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
 #define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, -1, \
         -1, -1, offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name), \
@@ -122,6 +126,14 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
 #define DEVICE_FIELD_displays 8
 #define DEVICE_FIELD_isAPU 9
 
+#define DEVICE_FIELD_numCUs 10
+#define DEVICE_FIELD_coreClock 11
+#define DEVICE_FIELD_memoryClock 12
+#define DEVICE_FIELD_teraFlops 13
+#define DEVICE_FIELD_numWGPs 14
+#define DEVICE_FIELD_numROPs 15
+#define DEVICE_FIELD_memoryBandwidth 16
+
 static const struct
 {
     unsigned int field_index;
@@ -139,6 +151,13 @@ device_struct_fields[] =
     DEF_FIELD(numDisplays),
     DEF_FIELD(displays),
     DEF_FIELD_540_600(isAPU),
+    DEF_FIELD(numCUs),
+    DEF_FIELD(coreClock),
+    DEF_FIELD(memoryClock),
+    DEF_FIELD(teraFlops),
+    DEF_FIELD_540_UP(numWGPs),
+    DEF_FIELD_520_UP(numROPs),
+    DEF_FIELD_520_UP(memoryBandwidth),
 };
 
 #undef DEF_FIELD
@@ -717,6 +736,13 @@ static AGSReturnCode init_ags_context(AGSContext *context, int ags_version)
             {
                 SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version,
                         min(params.asic_family, amd_ags_info[context->version].max_asicFamily));
+                SET_DEVICE_FIELD(device, numCUs, int, context->version, params.num_cu);
+                SET_DEVICE_FIELD(device, numWGPs, int, context->version, params.num_wgp);
+                SET_DEVICE_FIELD(device, numROPs, int, context->version, params.num_rops);
+                SET_DEVICE_FIELD(device, coreClock, int, context->version, params.core_clock);
+                SET_DEVICE_FIELD(device, memoryClock, int, context->version, params.memory_clock);
+                SET_DEVICE_FIELD(device, memoryBandwidth, int, context->version, params.memory_bandwidth);
+                SET_DEVICE_FIELD(device, teraFlops, float, context->version, params.teraflops);
             }
             else
             {
