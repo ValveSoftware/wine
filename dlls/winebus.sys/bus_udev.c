@@ -1701,28 +1701,27 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
-    if (!is_hidraw_enabled(desc.vid, desc.pid, axes, buttons))
-    {
-        TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
-        close(fd);
-        return;
-    }
-    if (is_sdl_blacklisted(desc.vid, desc.pid))
-    {
-        /* this device is blacklisted */
-        TRACE("hidraw %s: ignoring %s, in SDL blacklist\n", debugstr_a(devnode), debugstr_device_desc(&desc));
-        close(fd);
-        return;
-    }
 #ifdef HAS_PROPER_INPUT_HEADER
-    else
-        desc.is_gamepad = (axes == 6 && buttons >= 14);
+    desc.is_gamepad = (axes == 6 && buttons >= 14);
 #endif
 
     TRACE("dev %p, node %s, desc %s.\n", dev, debugstr_a(devnode), debugstr_device_desc(&desc));
 
     if (strcmp(subsystem, "hidraw") == 0)
     {
+        if (!is_hidraw_enabled(desc.vid, desc.pid, axes, buttons))
+        {
+            TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+            close(fd);
+            return;
+        }
+        if (is_sdl_blacklisted(desc.vid, desc.pid))
+        {
+            /* this device is blacklisted */
+            TRACE("hidraw %s: ignoring %s, in SDL blacklist\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+            close(fd);
+            return;
+        }
         if (!(impl = raw_device_create(&hidraw_device_vtbl, sizeof(struct hidraw_device)))) return;
         list_add_tail(&device_list, &impl->unix_device.entry);
         impl->read_report = hidraw_device_read_report;
