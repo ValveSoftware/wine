@@ -38,7 +38,8 @@
 
 extern char **environ;
 
-/* the preloader will set this variable */
+/* the preloader will set these variables */
+__attribute((visibility("default"))) struct r_debug *wine_r_debug = NULL;
 const __attribute((visibility("default"))) struct wine_preload_info *wine_main_preload_info = NULL;
 
 /* canonicalize path and return its directory name */
