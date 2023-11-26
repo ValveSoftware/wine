@@ -432,7 +432,6 @@ static BOOL fs_get_current_mode( ULONG_PTR adapter_id, DEVMODEW *mode )
 
 static LONG fs_set_current_mode( ULONG_PTR adapter_id, const DEVMODEW *user_mode )
 {
-    WCHAR device_name[CCHDEVICENAME];
     struct fs_monitor *fs_monitor;
     DEVMODEW real_mode;
     double scale;
@@ -462,7 +461,7 @@ static LONG fs_set_current_mode( ULONG_PTR adapter_id, const DEVMODEW *user_mode
 
     fs_monitor->user_mode = *user_mode;
     fs_monitor->real_mode = real_mode;
-    lstrcpyW( fs_monitor->user_mode.dmDeviceName, device_name );
+    lstrcpyW( fs_monitor->user_mode.dmDeviceName, L"fshack" );
 
     if (is_detached_mode( user_mode ))
     {
