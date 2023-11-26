@@ -51,6 +51,12 @@
 #ifdef HAVE_SYS_USER_H
 # include <sys/user.h>
 #endif
+#ifdef HAVE_LINK_H
+# include <link.h>
+#endif
+#ifdef HAVE_SYS_LINK_H
+# include <sys/link.h>
+#endif
 #ifdef HAVE_LIBPROCSTAT_H
 # include <libprocstat.h>
 #endif
@@ -85,6 +91,120 @@ WINE_DEFAULT_DEBUG_CHANNEL(virtual);
 WINE_DECLARE_DEBUG_CHANNEL(module);
 WINE_DECLARE_DEBUG_CHANNEL(virtual_ranges);
 WINE_DECLARE_DEBUG_CHANNEL(virtstat);
+
+/* Gdb integration, in loader/main.c */
+static struct r_debug *wine_r_debug;
+
+#if defined(HAVE_LINK_H) || defined(HAVE_SYS_LINK_H)
+
+struct link_map_entry
+{
+    struct link_map map;
+    const void *module;
+};
+static struct link_map link_map = {.l_name = (char *)""};
+
+static void r_debug_set_state( int state )
+{
+    wine_r_debug->r_map = &link_map;
+    wine_r_debug->r_state = state;
+    ((void (*)(void))wine_r_debug->r_brk)();
+}
+
+static char *get_path_from_fd( int fd, int sz )
+{
+#ifdef linux
+    char *ret = malloc( 32 + sz );
+
+    if (ret) sprintf( ret, "/proc/self/fd/%u", fd );
+    return ret;
+#elif defined(F_GETPATH)
+    char *ret = malloc( PATH_MAX + sz );
+
+    if (!ret) return NULL;
+    if (!fcntl( fd, F_GETPATH, ret )) return ret;
+    free( ret );
+    return NULL;
+#else
+    return NULL;
+#endif
+}
+
+static char *r_debug_path_from_fd( int fd )
+{
+    char *real, *path;
+    if (!(path = get_path_from_fd( fd, 0 ))) return NULL;
+    if (!(real = realpath( path, NULL ))) return path;
+    free( path );
+    return real;
+}
+
+static void r_debug_add_module( void *module, int fd, INT_PTR offset )
+{
+    struct link_map *ptr = link_map.l_next, *next;
+    struct link_map_entry *entry;
+
+    if (!wine_r_debug) return;
+
+    while (ptr)
+    {
+        entry = LIST_ENTRY(ptr, struct link_map_entry, map);
+        if (entry->module == module) break;
+        ptr = ptr->l_next;
+    }
+
+    r_debug_set_state( RT_ADD );
+
+    if (ptr) entry->map.l_addr = offset;
+    else if ((entry = calloc( 1, sizeof(*entry) )))
+    {
+        entry->module = module;
+        entry->map.l_addr = offset;
+        entry->map.l_name = r_debug_path_from_fd( fd );
+
+        entry->map.l_next = link_map.l_next;
+        if ((next = entry->map.l_next)) next->l_prev = &entry->map;
+        entry->map.l_prev = &link_map;
+        link_map.l_next = &entry->map;
+    }
+
+    r_debug_set_state( RT_CONSISTENT );
+}
+
+static void r_debug_remove_module( void *module )
+{
+    struct link_map *ptr = link_map.l_next, *next;
+    struct link_map_entry *entry;
+
+    if (!wine_r_debug) return;
+
+    while (ptr)
+    {
+        entry = LIST_ENTRY(ptr, struct link_map_entry, map);
+        if (entry->module == module) break;
+        ptr = ptr->l_next;
+    }
+    if (!ptr) return;
+
+    r_debug_set_state( RT_DELETE );
+
+    entry->map.l_prev->l_next = entry->map.l_next;
+    if ((next = entry->map.l_next)) next->l_prev = entry->map.l_prev;
+
+    r_debug_set_state( RT_CONSISTENT );
+
+    free( entry->map.l_name );
+    free( entry );
+}
+
+#else /* defined(HAVE_LINK_H) || defined(HAVE_SYS_LINK_H) */
+
+#define RT_CONSISTENT 0
+static void r_debug_set_state( int state ) {}
+static void r_debug_add_module( void *module, int fd, INT_PTR offset ) {}
+static void r_debug_remove_module( void *module ) {}
+
+#endif /* defined(HAVE_LINK_H) || defined(HAVE_SYS_LINK_H) */
 
 struct preload_info
 {
@@ -3272,6 +3392,7 @@ static NTSTATUS map_image_into_view( struct file_view *view, const WCHAR *filena
 #ifdef VALGRIND_LOAD_PDB_DEBUGINFO
     VALGRIND_LOAD_PDB_DEBUGINFO(fd, ptr, total_size, ptr - (char *)wine_server_get_ptr( image_info->base ));
 #endif
+    r_debug_add_module( ptr, fd, ptr - (char *)wine_server_get_ptr( image_info->base ) );
     return STATUS_SUCCESS;
 }
 
@@ -3625,11 +3746,14 @@ static void *alloc_virtual_heap( SIZE_T size )
 void virtual_init(void)
 {
     const struct preload_info **preload_info = dlsym( RTLD_DEFAULT, "wine_main_preload_info" );
+    struct r_debug **r_debug = dlsym( RTLD_DEFAULT, "wine_r_debug" );
     const char *preload = getenv( "WINEPRELOADRESERVE" );
     size_t size;
     int i;
     pthread_mutexattr_t attr;
     const char *env_var;
+
+    if (r_debug && (wine_r_debug = *r_debug)) r_debug_set_state( RT_CONSISTENT );
 
     pthread_mutexattr_init( &attr );
     pthread_mutexattr_settype( &attr, PTHREAD_MUTEX_RECURSIVE );
@@ -6174,7 +6298,11 @@ static NTSTATUS unmap_view_of_section( HANDLE process, PVOID addr, ULONG flags )
     SERVER_END_REQ;
     if (!status)
     {
-        if (view->protect & SEC_IMAGE) release_builtin_module( view->base );
+        if (view->protect & SEC_IMAGE)
+        {
+            r_debug_remove_module( view->base );
+            release_builtin_module( view->base );
+        }
         if (flags & MEM_PRESERVE_PLACEHOLDER) free_pages_preserve_placeholder( view, view->base, view->size );
         else delete_view( view );
     }
