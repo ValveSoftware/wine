@@ -79,12 +79,16 @@
 #ifdef HAVE_ELF_H
 # include <elf.h>
 #endif
+
+/* define _r_debug so we can re-define it as r_debug_extended */
+#define _r_debug no_r_debug;
 #ifdef HAVE_LINK_H
 # include <link.h>
 #endif
 #ifdef HAVE_SYS_LINK_H
 # include <sys/link.h>
 #endif
+#undef _r_debug
 
 #include "wine/asm.h"
 #include "main.h"
@@ -1387,6 +1391,39 @@ static void set_process_name( int argc, char *argv[] )
     for (i = 1; i < argc; i++) argv[i] -= off;
 }
 
+struct wld_r_debug_extended
+{
+    struct r_debug base;
+    struct wld_r_debug_extended *r_next;
+};
+
+/* GDB integration, _r_debug_state is *required* for GDB to hook the preloader */
+__attribute((visibility("default"))) void _r_debug_state(void) {}
+__attribute((visibility("default"))) struct wld_r_debug_extended _r_debug = {{0}};
+
+/* sets the preloader r_debug address into DT_DEBUG */
+static void init_r_debug( struct wld_auxv *av )
+{
+    ElfW(Phdr) *phdr, *ph;
+    ElfW(Dyn) *dyn = NULL;
+    char *l_addr;
+    int phnum;
+
+    _r_debug.base.r_version = 2;
+    _r_debug.base.r_brk = (ElfW(Addr))_r_debug_state;
+
+    if (!(phnum = get_auxiliary( av, AT_PHNUM, 0 ))) return;
+    if (!(phdr = (void *)get_auxiliary( av, AT_PHDR, 0 ))) return;
+    l_addr = (char *)phdr - sizeof(ElfW(Ehdr));
+    _r_debug.base.r_ldbase = (ElfW(Addr))l_addr;
+
+    for (ph = phdr; ph < &phdr[phnum]; ++ph) if (ph->p_type == PT_DYNAMIC) break;
+    if (ph >= &phdr[phnum]) return;
+
+    dyn = (void *)(ph->p_vaddr + l_addr);
+    while (dyn->d_tag != DT_DEBUG && dyn->d_tag != DT_NULL) dyn++;
+    if (dyn->d_tag == DT_DEBUG) dyn->d_un.d_ptr = (uintptr_t)&_r_debug;
+}
 
 /*
  *  wld_start
@@ -1403,6 +1440,7 @@ void* wld_start( void **stack )
     struct wld_auxv new_av[8], delete_av[3], *av;
     struct wld_link_map main_binary_map, ld_so_map;
     struct wine_preload_info **wine_main_preload_info;
+    struct r_debug *ld_so_r_debug, **wine_r_debug;
 
     pargc = *stack;
     argv = (char **)pargc + 1;
@@ -1431,6 +1469,8 @@ void* wld_start( void **stack )
     for( i = 0; i < *pargc; i++ ) wld_printf("argv[%lx] = %s\n", i, argv[i]);
     dump_auxiliary( av );
 #endif
+
+    init_r_debug( av );
 
     /* reserve memory that Wine needs */
     if (reserve) preload_reserve( reserve );
@@ -1469,6 +1509,17 @@ void* wld_start( void **stack )
     /* load the ELF interpreter */
     interp = (char *)main_binary_map.l_addr + main_binary_map.l_interp;
     map_so_lib( interp, &ld_so_map );
+
+    /* expose ld.so _r_debug as a separate namespace in r_next */
+    ld_so_r_debug = find_symbol( &ld_so_map, "_r_debug", STT_OBJECT );
+    if (ld_so_r_debug) _r_debug.r_next = (struct wld_r_debug_extended *)ld_so_r_debug;
+    else wld_printf( "_r_debug not found in ld.so\n" );
+
+    _r_debug_state(); /* notify GDB that _r_debug is ready */
+
+    wine_r_debug = find_symbol( &main_binary_map, "wine_r_debug", STT_OBJECT );
+    if (wine_r_debug) *wine_r_debug = &_r_debug.base;
+    else wld_printf( "wine_r_debug not found\n" );
 
     /* store pointer to the preload info into the appropriate main binary variable */
     wine_main_preload_info = find_symbol( &main_binary_map, "wine_main_preload_info", STT_OBJECT );
