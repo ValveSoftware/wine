@@ -657,6 +657,7 @@ extern void sync_gl_drawable( HWND hwnd, BOOL known_child );
 extern void set_gl_drawable_parent( HWND hwnd, HWND parent );
 extern void destroy_gl_drawable( HWND hwnd );
 extern void destroy_vk_surface( HWND hwnd );
+extern void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes );
 extern void vulkan_thread_detach(void);
 
 extern void wait_for_withdrawn_state( HWND hwnd, BOOL set );

@@ -253,6 +253,20 @@ void destroy_vk_surface( HWND hwnd )
     pthread_mutex_unlock( &vulkan_mutex );
 }
 
+void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes )
+{
+    struct wine_vk_surface *surface;
+
+    pthread_mutex_lock( &vulkan_mutex );
+    LIST_FOR_EACH_ENTRY( surface, &surface_list, struct wine_vk_surface, entry )
+    {
+        if (surface->hwnd != hwnd) continue;
+        if (!surface->window || surface->window == active) continue;
+        XConfigureWindow( gdi_display, surface->window, mask, changes );
+    }
+    pthread_mutex_unlock( &vulkan_mutex );
+}
+
 void vulkan_thread_detach(void)
 {
     struct wine_vk_surface *surface, *next;
@@ -793,6 +807,10 @@ const struct vulkan_funcs *get_vulkan_driver(UINT version)
 }
 
 void destroy_vk_surface( HWND hwnd )
+{
+}
+
+void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes )
 {
 }
 
