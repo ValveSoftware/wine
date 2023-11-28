@@ -65,6 +65,7 @@ struct wine_vk_surface
     HWND hwnd;
     DWORD hwnd_thread_id;
     BOOL offscreen; /* drawable is offscreen */
+    VkPresentModeKHR present_mode;
 };
 
 typedef struct VkXlibSurfaceCreateInfoKHR
@@ -97,6 +98,9 @@ static VkResult (*pvkGetPhysicalDeviceSurfaceSupportKHR)(VkPhysicalDevice, uint3
 static VkBool32 (*pvkGetPhysicalDeviceXlibPresentationSupportKHR)(VkPhysicalDevice, uint32_t, Display *, VisualID);
 static VkResult (*pvkGetSwapchainImagesKHR)(VkDevice, VkSwapchainKHR, uint32_t *, VkImage *);
 static VkResult (*pvkQueuePresentKHR)(VkQueue, const VkPresentInfoKHR *);
+static VkResult (*pvkWaitForFences)(VkDevice device, uint32_t fenceCount, const VkFence *pFences, VkBool32 waitAll, uint64_t timeout);
+static VkResult (*pvkCreateFence)(VkDevice device, const VkFenceCreateInfo *pCreateInfo, const VkAllocationCallbacks *pAllocator, VkFence *pFence);
+static void (*pvkDestroyFence)(VkDevice device, VkFence fence, const VkAllocationCallbacks *pAllocator);
 
 static void *X11DRV_get_vk_device_proc_addr(const char *name);
 static void *X11DRV_get_vk_instance_proc_addr(VkInstance instance, const char *name);
@@ -141,6 +145,9 @@ static void wine_vk_init(void)
     LOAD_FUNCPTR(vkQueuePresentKHR);
     LOAD_OPTIONAL_FUNCPTR(vkGetDeviceGroupSurfacePresentModesKHR);
     LOAD_OPTIONAL_FUNCPTR(vkGetPhysicalDevicePresentRectanglesKHR);
+    LOAD_FUNCPTR(vkWaitForFences);
+    LOAD_FUNCPTR(vkCreateFence);
+    LOAD_FUNCPTR(vkDestroyFence);
 #undef LOAD_FUNCPTR
 #undef LOAD_OPTIONAL_FUNCPTR
 
@@ -382,6 +389,11 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
 
     create_info_host = *create_info;
     create_info_host.surface = x11_surface->host_surface;
+
+    /* force fifo when running offscreen so the acquire fence is more likely to be vsynced */
+    if (x11_surface->offscreen && create_info->presentMode == VK_PRESENT_MODE_MAILBOX_KHR)
+        create_info_host.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    x11_surface->present_mode = create_info->presentMode;
 
     if ((result = pvkCreateSwapchainKHR( device, &create_info_host, NULL /* allocator */,
                                          swapchain )) == VK_SUCCESS)
@@ -740,11 +752,23 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
                                               VkSemaphore semaphore, VkFence fence, uint32_t *image_index )
 {
     struct wine_vk_surface *surface;
+    VkFence orig_fence;
     VkResult result;
+    BOOL wait_fence;
     HDC hdc = 0;
 
     if (XFindContext( gdi_display, (XID)swapchain, swapchain_context, (char **)&surface ))
         return VK_ERROR_SURFACE_LOST_KHR;
+
+    wait_fence = surface->offscreen && (surface->present_mode == VK_PRESENT_MODE_MAILBOX_KHR ||
+                                        surface->present_mode == VK_PRESENT_MODE_FIFO_KHR);
+
+    orig_fence = fence;
+    if (wait_fence && !fence)
+    {
+        VkFenceCreateInfo create_info = {.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        pvkCreateFence( device, &create_info, NULL, &fence );
+    }
 
     result = pvkAcquireNextImageKHR( device, swapchain, timeout, semaphore, fence, image_index );
 
@@ -760,9 +784,12 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
             .flush = TRUE,
         };
 
+        if (wait_fence) pvkWaitForFences( device, 1, &fence, 0, timeout );
         NtGdiExtEscape( hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL );
         NtUserReleaseDC( surface->hwnd, hdc );
     }
+
+    if (fence != orig_fence) pvkDestroyFence( device, fence, NULL );
 
     return result;
 }
