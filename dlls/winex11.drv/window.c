@@ -1689,6 +1689,25 @@ Window get_dummy_parent(void)
 
 
 /**********************************************************************
+ *		detach_client_window
+ */
+static void detach_client_window( struct x11drv_win_data *data, Window client_window )
+{
+    if (data->client_window != client_window || !client_window) return;
+    data->client_window = 0;
+
+    if (!data->whole_window) return;
+
+    XSelectInput( data->display, client_window, 0 );
+    XFlush( data->display ); /* make sure XSelectInput is disabled for client_window after this point */
+    XDeleteContext( data->display, client_window, winContext );
+
+    XReparentWindow( gdi_display, client_window, get_dummy_parent(), 0, 0 );
+    TRACE( "%p/%lx detached client window %lx\n", data->hwnd, data->whole_window, client_window );
+}
+
+
+/**********************************************************************
  *		create_dummy_client_window
  */
 Window create_dummy_client_window(void)
@@ -1727,12 +1746,7 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
         data->window_rect = data->whole_rect = data->client_rect;
     }
 
-    if (data->client_window)
-    {
-        XDeleteContext( data->display, data->client_window, winContext );
-        XReparentWindow( gdi_display, data->client_window, dummy_parent, 0, 0 );
-        TRACE( "%p reparent xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
-    }
+    detach_client_window( data, data->client_window );
 
     attr.colormap = colormap;
     attr.bit_gravity = NorthWestGravity;
@@ -1865,12 +1879,7 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
     }
     else
     {
-        if (data->client_window && !already_destroyed)
-        {
-            XSelectInput( data->display, data->client_window, 0 );
-            XFlush( data->display ); /* make sure XSelectInput doesn't use client_window after this point */
-            XReparentWindow( gdi_display, data->client_window, get_dummy_parent(), 0, 0 );
-        }
+        if (!already_destroyed) detach_client_window( data, data->client_window );
         XDeleteContext( data->display, data->whole_window, winContext );
         if (!already_destroyed)
         {
