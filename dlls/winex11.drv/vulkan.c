@@ -214,6 +214,22 @@ static void wine_vk_surface_release( struct wine_vk_surface *surface )
     free(surface);
 }
 
+static void wine_vk_surface_detach( struct wine_vk_surface *surface )
+{
+    struct x11drv_win_data *data;
+
+    TRACE( "Detaching surface %p, hwnd %p.\n", surface, surface->hwnd );
+
+    if ((data = get_win_data( surface->hwnd )))
+    {
+        detach_client_window( data, surface->window, TRUE );
+        release_win_data( data );
+    }
+
+    surface->hwnd_thread_id = 0;
+    surface->hwnd = NULL;
+}
+
 void destroy_vk_surface( HWND hwnd )
 {
     struct wine_vk_surface *surface, *next;
@@ -222,8 +238,7 @@ void destroy_vk_surface( HWND hwnd )
     LIST_FOR_EACH_ENTRY_SAFE( surface, next, &surface_list, struct wine_vk_surface, entry )
     {
         if (surface->hwnd != hwnd) continue;
-        surface->hwnd_thread_id = 0;
-        surface->hwnd = NULL;
+        wine_vk_surface_detach( surface );
     }
     pthread_mutex_unlock( &vulkan_mutex );
 }
@@ -236,12 +251,8 @@ void vulkan_thread_detach(void)
     pthread_mutex_lock(&vulkan_mutex);
     LIST_FOR_EACH_ENTRY_SAFE(surface, next, &surface_list, struct wine_vk_surface, entry)
     {
-        if (surface->hwnd_thread_id != thread_id)
-            continue;
-
-        TRACE("Detaching surface %p, hwnd %p.\n", surface, surface->hwnd);
-        XReparentWindow(gdi_display, surface->window, get_dummy_parent(), 0, 0);
-        XSync(gdi_display, False);
+        if (surface->hwnd_thread_id != thread_id) continue;
+        wine_vk_surface_detach( surface );
     }
     pthread_mutex_unlock(&vulkan_mutex);
 }

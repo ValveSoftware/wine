@@ -1691,7 +1691,7 @@ Window get_dummy_parent(void)
 /**********************************************************************
  *		detach_client_window
  */
-static void detach_client_window( struct x11drv_win_data *data, Window client_window, BOOL reparent )
+void detach_client_window( struct x11drv_win_data *data, Window client_window, BOOL reparent )
 {
     if (data->client_window != client_window || !client_window) return;
     data->client_window = 0;

@@ -668,6 +668,7 @@ extern void make_window_embedded( struct x11drv_win_data *data );
 extern Window create_dummy_client_window(void);
 extern Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colormap );
 extern void destroy_client_window( HWND hwnd, Window client_window );
+extern void detach_client_window( struct x11drv_win_data *data, Window client_window, BOOL reparent );
 extern void set_window_visual( struct x11drv_win_data *data, const XVisualInfo *vis, BOOL use_alpha );
 extern void change_systray_owner( Display *display, Window systray_window );
 extern HWND create_foreign_window( Display *display, Window window );
