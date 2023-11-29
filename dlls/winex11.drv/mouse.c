@@ -1481,31 +1481,6 @@ BOOL X11DRV_SetCursorPos( INT x, INT y )
 }
 
 /***********************************************************************
- *		GetCursorPos (X11DRV.@)
- */
-BOOL X11DRV_GetCursorPos(LPPOINT pos)
-{
-    Display *display = thread_init_display();
-    LARGE_INTEGER timeout = {0};
-    Window root, child;
-    int rootX, rootY, winX, winY;
-    unsigned int xstate;
-    BOOL ret;
-
-    if (NtWaitForSingleObject(steam_overlay_event, FALSE, &timeout) == WAIT_OBJECT_0) return TRUE;
-    if (NtWaitForSingleObject(steam_keyboard_event, FALSE, &timeout) == WAIT_OBJECT_0) return TRUE;
-
-    ret = XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &winX, &winY, &xstate );
-    if (ret)
-    {
-        POINT old = *pos;
-        *pos = root_to_virtual_screen( winX, winY );
-        TRACE( "pointer at %s server pos %s\n", wine_dbgstr_point(pos), wine_dbgstr_point(&old) );
-    }
-    return ret;
-}
-
-/***********************************************************************
  *		ClipCursor (X11DRV.@)
  */
 BOOL X11DRV_ClipCursor( const RECT *clip, BOOL reset )
