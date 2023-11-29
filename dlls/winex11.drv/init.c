@@ -404,7 +404,6 @@ static const struct user_driver_funcs x11drv_funcs =
     .pNotifyIMEStatus = X11DRV_NotifyIMEStatus,
     .pDestroyCursorIcon = X11DRV_DestroyCursorIcon,
     .pSetCursor = X11DRV_SetCursor,
-    .pGetCursorPos = X11DRV_GetCursorPos,
     .pSetCursorPos = X11DRV_SetCursorPos,
     .pClipCursor = X11DRV_ClipCursor,
     .pChangeDisplaySettings = X11DRV_ChangeDisplaySettings,
