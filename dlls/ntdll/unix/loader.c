@@ -594,6 +594,8 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info 
     if (pe_info->wine_fakedll) res_start = res_end = 0;
     if (pe_info->image_flags & IMAGE_FLAGS_ComPlusNativeReady) machine = native_machine;
 
+    unsetenv( "WINE_LD_PRELOAD" );
+
     /* HACK: Unset LD_PRELOAD before executing explorer.exe to disable buggy gameoverlayrenderer.so */
     if (ld_preload && argv[2] && !strcmp( argv[2], "C:\\windows\\system32\\explorer.exe" ) &&
         argv[3] && !strcmp( argv[3], "/desktop" ))
@@ -623,7 +625,10 @@ NTSTATUS exec_wineloader( char **argv, int socketfd, const struct pe_image_info 
         while (*next);
 
         putenv( env );
+        ld_preload = NULL;
     }
+
+    if (ld_preload) setenv( "WINE_LD_PRELOAD", ld_preload, 1 );
 
     signal( SIGPIPE, SIG_DFL );
 

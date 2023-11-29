@@ -962,6 +962,30 @@ void *get_builtin_so_handle( void *module )
     return ret;
 }
 
+static void load_steam_overlay(const char *unix_lib_path)
+{
+    const char *preload, *p;
+    char path[PATH_MAX];
+    unsigned int len;
+    void *handle;
+
+    if (!strstr(unix_lib_path, "winex11.so")) return;
+    if (getenv("LD_PRELOAD") || !(preload = getenv("WINE_LD_PRELOAD"))) return;
+
+    p = preload;
+    while (*(preload = p))
+    {
+        p = strchrnul( preload, ':' );
+        len = p - preload;
+        if (*p) ++p;
+        if (len + 1 > sizeof(path)) continue;
+        memcpy( path, preload, len );
+        path[len] = 0;
+        if (!strstr( path, "gameoverlayrenderer.so" )) continue;
+        handle = dlopen( path, RTLD_NOW | RTLD_GLOBAL );
+        FIXME( "HACK: tried to load %s, handle %p.\n", debugstr_a(path), handle );
+    }
+}
 
 /***********************************************************************
  *           get_builtin_unix_funcs
@@ -979,6 +1003,7 @@ static NTSTATUS get_builtin_unix_funcs( void *module, BOOL wow, const void **fun
         if (builtin->module != module) continue;
         if (builtin->unix_path && !builtin->unix_handle)
         {
+            load_steam_overlay(builtin->unix_path);
             builtin->unix_handle = dlopen( builtin->unix_path, RTLD_NOW );
             if (!builtin->unix_handle)
                 WARN_(module)( "failed to load %s: %s\n", debugstr_a(builtin->unix_path), dlerror() );
@@ -1010,7 +1035,11 @@ NTSTATUS load_builtin_unixlib( void *module, const char *name )
         if (builtin->module != module) continue;
         if (!builtin->unix_path) builtin->unix_path = strdup( name );
         else status = STATUS_IMAGE_ALREADY_LOADED;
-        if (!builtin->unix_handle) builtin->unix_handle = dlopen( builtin->unix_path, RTLD_NOW );
+        if (!builtin->unix_handle)
+        {
+            load_steam_overlay(builtin->unix_path);
+            builtin->unix_handle = dlopen( builtin->unix_path, RTLD_NOW );
+        }
         break;
     }
     server_leave_uninterrupted_section( &virtual_mutex, &sigset );
