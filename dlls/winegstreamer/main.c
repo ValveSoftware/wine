@@ -401,6 +401,28 @@ HRESULT wg_source_get_stream_count(wg_source_t source, uint32_t *stream_count)
     return S_OK;
 }
 
+HRESULT wg_source_get_duration(wg_source_t source, uint64_t *duration)
+{
+    struct wg_source_get_duration_params params =
+    {
+        .source = source,
+    };
+    NTSTATUS status;
+
+    TRACE("source %#I64x, duration %p\n", source, duration);
+
+    if ((status = WINE_UNIX_CALL(unix_wg_source_get_duration, &params))
+            && status != STATUS_PENDING)
+    {
+        WARN("wg_source_get_duration returned status %#lx\n", status);
+        return HRESULT_FROM_NT(status);
+    }
+
+    *duration = params.duration;
+    TRACE("source %#I64x, duration %s\n", source, debugstr_time(*duration));
+    return S_OK;
+}
+
 HRESULT wg_source_get_position(wg_source_t source, uint64_t *read_offset)
 {
     struct wg_source_get_position_params params =
