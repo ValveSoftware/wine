@@ -62,6 +62,7 @@ extern GstCaps *wg_format_to_caps(const struct wg_format *format);
 extern NTSTATUS wg_source_create(void *args);
 extern NTSTATUS wg_source_destroy(void *args);
 extern NTSTATUS wg_source_get_stream_count(void *args);
+extern NTSTATUS wg_source_get_duration(void *args);
 extern NTSTATUS wg_source_get_position(void *args);
 extern NTSTATUS wg_source_push_data(void *args);
 

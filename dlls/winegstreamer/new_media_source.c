@@ -1765,8 +1765,9 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
 
     if (FAILED(hr = MFCreateEventQueue(&object->event_queue)))
         goto fail;
-
     if (FAILED(hr = MFAllocateWorkQueue(&object->async_commands_queue)))
+        goto fail;
+    if (FAILED(hr = wg_source_get_duration(object->wg_source, &object->duration)))
         goto fail;
 
     if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, FALSE, FALSE)))
@@ -1808,7 +1809,6 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
             goto fail;
         }
 
-        object->duration = max(object->duration, wg_parser_stream_get_duration(wg_stream));
         IMFStreamDescriptor_AddRef(descriptor);
         object->descriptors[i] = descriptor;
         object->streams[i] = stream;
