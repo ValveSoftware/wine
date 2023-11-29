@@ -1494,27 +1494,6 @@ BOOL X11DRV_SetCursorPos( INT x, INT y )
 }
 
 /***********************************************************************
- *		GetCursorPos (X11DRV.@)
- */
-BOOL X11DRV_GetCursorPos(LPPOINT pos)
-{
-    Display *display = thread_init_display();
-    Window root, child;
-    int rootX, rootY, winX, winY;
-    unsigned int xstate;
-    BOOL ret;
-
-    ret = XQueryPointer( display, root_window, &root, &child, &rootX, &rootY, &winX, &winY, &xstate );
-    if (ret)
-    {
-        POINT old = *pos;
-        *pos = root_to_virtual_screen( winX, winY );
-        TRACE( "pointer at %s server pos %s\n", wine_dbgstr_point(pos), wine_dbgstr_point(&old) );
-    }
-    return ret;
-}
-
-/***********************************************************************
  *		ClipCursor (X11DRV.@)
  */
 BOOL X11DRV_ClipCursor( const RECT *clip, BOOL reset )
