@@ -520,6 +520,17 @@ NTSTATUS wg_source_get_stream_count(void *args)
     return STATUS_SUCCESS;
 }
 
+NTSTATUS wg_source_get_duration(void *args)
+{
+    struct wg_source_get_duration_params *params = args;
+    struct wg_source *source = get_source(params->source);
+
+    GST_TRACE("source %p", source);
+
+    params->duration = source->max_duration / 100;
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS wg_source_get_position(void *args)
 {
     struct wg_source_get_position_params *params = args;
