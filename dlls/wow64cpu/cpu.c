@@ -373,6 +373,14 @@ NTSTATUS WINAPI BTCpuResetToConsistentState( EXCEPTION_POINTERS *ptrs )
 {
     CONTEXT *context = ptrs->ContextRecord;
     I386_CONTEXT wow_context;
+    struct machine_frame
+    {
+        ULONG64 rip;
+        ULONG64 cs;
+        ULONG64 eflags;
+        ULONG64 rsp;
+        ULONG64 ss;
+    } *machine_frame;
 
     copy_context_64to32( &wow_context, CONTEXT_I386_ALL, context );
     wow_context.EFlags &= ~(0x100|0x40000);
@@ -382,6 +390,10 @@ NTSTATUS WINAPI BTCpuResetToConsistentState( EXCEPTION_POINTERS *ptrs )
     context->Rip = (ULONG64)syscall_32to64;
     context->SegCs = cs64_sel;
     context->Rsp = context->R14;
+    /* fixup machine frame */
+    machine_frame = (struct machine_frame *)(((ULONG_PTR)(ptrs->ExceptionRecord + 1) + 15) & ~15);
+    machine_frame->rip = context->Rip;
+    machine_frame->rsp = context->Rsp;
     return STATUS_SUCCESS;
 }
 
