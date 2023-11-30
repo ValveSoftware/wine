@@ -35,6 +35,7 @@
 
 #include "wine/debug.h"
 #include "x11drv.h"
+#include "xcomposite.h"
 
 #define VK_NO_PROTOTYPES
 #define WINE_VK_HOST
@@ -63,6 +64,7 @@ struct wine_vk_surface
     VkSurfaceKHR host_surface;
     HWND hwnd;
     DWORD hwnd_thread_id;
+    BOOL offscreen; /* drawable is offscreen */
 };
 
 typedef struct VkXlibSurfaceCreateInfoKHR
@@ -74,6 +76,7 @@ typedef struct VkXlibSurfaceCreateInfoKHR
     Window window;
 } VkXlibSurfaceCreateInfoKHR;
 
+static VkResult (*pvkAcquireNextImageKHR)(VkDevice, VkSwapchainKHR, uint64_t, VkSemaphore, VkFence, uint32_t *);
 static VkResult (*pvkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *, VkInstance *);
 static VkResult (*pvkCreateSwapchainKHR)(VkDevice, const VkSwapchainCreateInfoKHR *, const VkAllocationCallbacks *, VkSwapchainKHR *);
 static VkResult (*pvkCreateXlibSurfaceKHR)(VkInstance, const VkXlibSurfaceCreateInfoKHR *, const VkAllocationCallbacks *, VkSurfaceKHR *);
@@ -117,6 +120,7 @@ static void wine_vk_init(void)
 
 #define LOAD_FUNCPTR(f) if (!(p##f = dlsym(vulkan_handle, #f))) goto fail
 #define LOAD_OPTIONAL_FUNCPTR(f) p##f = dlsym(vulkan_handle, #f)
+    LOAD_FUNCPTR(vkAcquireNextImageKHR);
     LOAD_FUNCPTR(vkCreateInstance);
     LOAD_FUNCPTR(vkCreateSwapchainKHR);
     LOAD_FUNCPTR(vkCreateXlibSurfaceKHR);
@@ -253,6 +257,31 @@ void destroy_vk_surface( HWND hwnd )
     pthread_mutex_unlock( &vulkan_mutex );
 }
 
+static BOOL wine_vk_surface_set_offscreen( struct wine_vk_surface *surface, BOOL offscreen )
+{
+#ifdef SONAME_LIBXCOMPOSITE
+    if (usexcomposite)
+    {
+        if (!surface->offscreen && offscreen)
+        {
+            FIXME( "Redirecting vulkan surface %lx offscreen, expect degraded performance.\n", surface->window );
+            pXCompositeRedirectWindow( gdi_display, surface->window, CompositeRedirectManual );
+        }
+        else if (surface->offscreen && !offscreen)
+        {
+            FIXME( "Putting vulkan surface %lx back onscreen, expect standard performance.\n", surface->window );
+            pXCompositeUnredirectWindow( gdi_display, surface->window, CompositeRedirectManual );
+        }
+        surface->offscreen = offscreen;
+        return TRUE;
+    }
+#endif
+
+    if (offscreen) FIXME( "Application requires child window rendering, which is not implemented yet!\n" );
+    surface->offscreen = offscreen;
+    return !offscreen;
+}
+
 void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes )
 {
     struct wine_vk_surface *surface;
@@ -263,6 +292,19 @@ void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *cha
         if (surface->hwnd != hwnd) continue;
         if (!surface->window || surface->window == active) continue;
         XConfigureWindow( gdi_display, surface->window, mask, changes );
+    }
+    pthread_mutex_unlock( &vulkan_mutex );
+}
+
+void sync_vk_surface( HWND hwnd, BOOL known_child )
+{
+    struct wine_vk_surface *surface;
+
+    pthread_mutex_lock( &vulkan_mutex );
+    LIST_FOR_EACH_ENTRY( surface, &surface_list, struct wine_vk_surface, entry )
+    {
+        if (surface->hwnd != hwnd) continue;
+        wine_vk_surface_set_offscreen( surface, known_child );
     }
     pthread_mutex_unlock( &vulkan_mutex );
 }
@@ -364,13 +406,6 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
 
-    /* TODO: support child window rendering. */
-    if (create_info->hwnd && NtUserGetAncestor(create_info->hwnd, GA_PARENT) != NtUserGetDesktopWindow())
-    {
-        FIXME("Application requires child window rendering, which is not implemented yet!\n");
-        return VK_ERROR_INCOMPATIBLE_DRIVER;
-    }
-
     x11_surface = calloc(1, sizeof(*x11_surface));
     if (!x11_surface)
         return VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -394,6 +429,18 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
         /* VK_KHR_win32_surface only allows out of host and device memory as errors. */
         res = VK_ERROR_OUT_OF_HOST_MEMORY;
         goto err;
+    }
+
+    if (NtUserGetAncestor( create_info->hwnd, GA_PARENT ) != NtUserGetDesktopWindow() ||
+        NtUserGetWindowRelative( create_info->hwnd, GW_CHILD ))
+    {
+        TRACE( "hwnd %p creating offscreen child window surface\n", x11_surface->hwnd );
+
+        if (!wine_vk_surface_set_offscreen( x11_surface, TRUE ))
+        {
+            res = VK_ERROR_INCOMPATIBLE_DRIVER;
+            goto err;
+        }
     }
 
     create_info_host.sType = VK_STRUCTURE_TYPE_XLIB_SURFACE_CREATE_INFO_KHR;
@@ -689,6 +736,46 @@ static VkResult X11DRV_vkGetSwapchainImagesKHR(VkDevice device,
     return pvkGetSwapchainImagesKHR(device, swapchain, count, images);
 }
 
+static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout,
+                                              VkSemaphore semaphore, VkFence fence, uint32_t *image_index )
+{
+    struct wine_vk_surface *surface;
+    VkResult result;
+    HDC hdc = 0;
+
+    if (XFindContext( gdi_display, (XID)swapchain, swapchain_context, (char **)&surface ))
+        return VK_ERROR_SURFACE_LOST_KHR;
+
+    result = pvkAcquireNextImageKHR( device, swapchain, timeout, semaphore, fence, image_index );
+
+    if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && surface->offscreen)
+        hdc = NtUserGetDCEx( surface->hwnd, 0, DCX_USESTYLE | DCX_CACHE );
+
+    if (hdc)
+    {
+        struct x11drv_escape_present_drawable escape =
+        {
+            .code = X11DRV_PRESENT_DRAWABLE,
+            .drawable = surface->window,
+            .flush = TRUE,
+        };
+
+        NtGdiExtEscape( hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (char *)&escape, 0, NULL );
+        NtUserReleaseDC( surface->hwnd, hdc );
+    }
+
+    return result;
+}
+
+static VkResult X11DRV_vkAcquireNextImage2KHR( VkDevice device, const VkAcquireNextImageInfoKHR *acquire_info,
+                                               uint32_t *image_index )
+{
+    static int once;
+    if (!once++) FIXME( "Emulating vkAcquireNextImage2KHR, ignoring pNext.\n" );
+    return X11DRV_vkAcquireNextImageKHR( device, acquire_info->swapchain, acquire_info->timeout,
+                                         acquire_info->semaphore, acquire_info->fence, image_index );
+}
+
 static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *present_info)
 {
     VkResult res;
@@ -747,6 +834,8 @@ static VkSurfaceKHR X11DRV_wine_get_host_surface( VkSurfaceKHR surface )
 
 static const struct vulkan_funcs vulkan_funcs =
 {
+    X11DRV_vkAcquireNextImage2KHR,
+    X11DRV_vkAcquireNextImageKHR,
     X11DRV_vkCreateInstance,
     X11DRV_vkCreateSwapchainKHR,
     X11DRV_vkCreateWin32SurfaceKHR,
@@ -811,6 +900,10 @@ void destroy_vk_surface( HWND hwnd )
 }
 
 void resize_vk_surfaces( HWND hwnd, Window active, int mask, XWindowChanges *changes )
+{
+}
+
+void sync_vk_surface( HWND hwnd, BOOL known_child )
 {
 }
 
