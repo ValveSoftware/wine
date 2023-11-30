@@ -1771,10 +1771,10 @@ Window create_dummy_client_window(void)
  */
 Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colormap )
 {
-    Window dummy_parent = get_dummy_parent();
     struct x11drv_win_data *data = get_win_data( hwnd );
+    Window parent_window, client_window;
     XSetWindowAttributes attr;
-    Window ret;
+    unsigned int attr_mask;
     int x, y, cx, cy;
 
     if (!data)
@@ -1787,38 +1787,35 @@ Window create_client_window( HWND hwnd, const XVisualInfo *visual, Colormap colo
         data->window_rect = data->whole_rect = data->client_rect;
     }
 
-    detach_client_window( data, data->client_window, TRUE );
-
     attr.colormap = colormap;
     attr.bit_gravity = NorthWestGravity;
     attr.win_gravity = NorthWestGravity;
     attr.backing_store = NotUseful;
     attr.border_pixel = 0;
+    attr_mask = CWColormap | CWBitGravity | CWWinGravity | CWBackingStore | CWBorderPixel;
 
     x = data->client_rect.left - data->whole_rect.left;
     y = data->client_rect.top - data->whole_rect.top;
     cx = min( max( 1, data->client_rect.right - data->client_rect.left ), 65535 );
     cy = min( max( 1, data->client_rect.bottom - data->client_rect.top ), 65535 );
 
-    ret = data->client_window = XCreateWindow( gdi_display,
-                                               data->whole_window ? data->whole_window : dummy_parent,
-                                               x, y, cx, cy, 0, default_visual.depth, InputOutput,
-                                               visual->visual, CWBitGravity | CWWinGravity |
-                                               CWBackingStore | CWColormap | CWBorderPixel, &attr );
-    if (data->client_window)
+    /* NOTE: Creating the client windows as child of dummy parent has bad interactions with
+     * Steam Overlay and will cause whole_window to minimize when the overlay opens... */
+    parent_window = data->whole_window ? data->whole_window : get_dummy_parent();
+    if ((client_window = XCreateWindow( gdi_display, parent_window, x, y, cx, cy, 0, default_visual.depth,
+                                        InputOutput, visual->visual, attr_mask, &attr )))
     {
-        XSaveContext( data->display, data->client_window, winContext, (char *)data->hwnd );
+        XFlush( gdi_display ); /* make sure client_window is created for XSelectInput */
+        XSync( data->display, False ); /* make sure client_window is known from data->display */
+
+        attach_client_window( data, client_window );
         XMapWindow( gdi_display, data->client_window );
-        if (data->whole_window)
-        {
-            XFlush( gdi_display ); /* make sure client_window is created for XSelectInput */
-            XSync( data->display, False ); /* make sure client_window is known from data->display */
-            XSelectInput( data->display, data->client_window, ExposureMask );
-        }
+
         TRACE( "%p xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
     }
+
     release_win_data( data );
-    return ret;
+    return client_window;
 }
 
 
