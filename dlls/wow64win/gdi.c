@@ -25,6 +25,7 @@
 #include "windef.h"
 #include "winbase.h"
 #include "ntgdi.h"
+#include "ddk/d3dkmthk.h"
 #include "wow64win_private.h"
 
 typedef struct
@@ -276,6 +277,27 @@ NTSTATUS WINAPI wow64_NtGdiDdDDIOpenAdapterFromHdc( UINT *args )
         desc32->VidPnSourceId = desc.VidPnSourceId;
     }
     return status;
+}
+
+NTSTATUS WINAPI wow64_NtGdiDdDDIQueryAdapterInfo( UINT *args )
+{
+    struct _D3DKMT_QUERYADAPTERINFO
+    {
+        D3DKMT_HANDLE           hAdapter;
+        KMTQUERYADAPTERINFOTYPE Type;
+        ULONG                   pPrivateDriverData;
+        UINT                    PrivateDriverDataSize;
+    } *desc32 = get_ptr( &args );
+    D3DKMT_QUERYADAPTERINFO desc;
+
+    if (!desc32) return STATUS_INVALID_PARAMETER;
+
+    desc.hAdapter = desc32->hAdapter;
+    desc.Type = desc32->Type;
+    desc.pPrivateDriverData = UlongToPtr( desc32->pPrivateDriverData );
+    desc.PrivateDriverDataSize = desc32->PrivateDriverDataSize;
+
+    return NtGdiDdDDIQueryAdapterInfo( &desc );
 }
 
 NTSTATUS WINAPI wow64_NtGdiDdDDIQueryStatistics( UINT *args )

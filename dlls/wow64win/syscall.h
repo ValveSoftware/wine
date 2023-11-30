@@ -40,6 +40,7 @@
     SYSCALL_ENTRY( NtGdiCreateSolidBrush ) \
     SYSCALL_ENTRY( NtGdiDdDDICreateDevice ) \
     SYSCALL_ENTRY( NtGdiDdDDIOpenAdapterFromHdc ) \
+    SYSCALL_ENTRY( NtGdiDdDDIQueryAdapterInfo ) \
     SYSCALL_ENTRY( NtGdiDdDDIQueryStatistics ) \
     SYSCALL_ENTRY( NtGdiDdDDISetQueuedLimit ) \
     SYSCALL_ENTRY( NtGdiDeleteClientObj ) \
