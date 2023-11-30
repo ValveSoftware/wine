@@ -1881,7 +1881,7 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
 {
     TRACE( "win %p xwin %lx/%lx\n", data->hwnd, data->whole_window, data->client_window );
 
-    if (data->client_window) XDeleteContext( data->display, data->client_window, winContext );
+    detach_client_window( data, data->client_window, !already_destroyed );
 
     if (!data->whole_window)
     {
@@ -1899,7 +1899,6 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
     }
     else
     {
-        if (!already_destroyed) detach_client_window( data, data->client_window, TRUE );
         XDeleteContext( data->display, data->whole_window, winContext );
         if (!already_destroyed)
         {
@@ -1908,7 +1907,7 @@ static void destroy_whole_window( struct x11drv_win_data *data, BOOL already_des
         }
     }
     if (data->whole_colormap) XFreeColormap( data->display, data->whole_colormap );
-    data->whole_window = data->client_window = 0;
+    data->whole_window = 0;
     data->whole_colormap = 0;
     data->wm_state = WithdrawnState;
     data->net_wm_state = 0;
