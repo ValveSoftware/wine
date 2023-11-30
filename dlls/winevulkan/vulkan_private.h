@@ -99,6 +99,7 @@ struct wine_device
     uint64_t sem_poll_update_value; /* set to sem_poll_update.value by signaller thread once update is processed. */
     unsigned int allocated_fence_ops_count;
     BOOL keyed_mutexes_enabled;
+    BOOL low_latency_enabled;
 };
 
 static inline struct wine_device *wine_device_from_handle(VkDevice handle)

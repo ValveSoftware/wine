@@ -896,6 +896,24 @@ static void wine_vk_instance_free(struct wine_instance *instance)
     free(instance);
 }
 
+VkResult wine_vkSetLatencySleepModeNV(VkDevice device, VkSwapchainKHR swapchain, const VkLatencySleepModeInfoNV *pSleepModeInfo)
+{
+    VkLatencySleepModeInfoNV sleep_mode_info_host;
+
+    struct wine_device* wine_device = wine_device_from_handle(device);
+    struct wine_swapchain* wine_swapchain = wine_swapchain_from_handle(swapchain);
+
+    wine_device->low_latency_enabled = pSleepModeInfo->lowLatencyMode;
+
+    sleep_mode_info_host.sType = VK_STRUCTURE_TYPE_LATENCY_SLEEP_MODE_INFO_NV;
+    sleep_mode_info_host.pNext = NULL;
+    sleep_mode_info_host.lowLatencyMode = pSleepModeInfo->lowLatencyMode;
+    sleep_mode_info_host.lowLatencyBoost = pSleepModeInfo->lowLatencyBoost;
+    sleep_mode_info_host.minimumIntervalUs = pSleepModeInfo->minimumIntervalUs;
+
+    return wine_device->funcs.p_vkSetLatencySleepModeNV(wine_device->device, wine_swapchain->swapchain, &sleep_mode_info_host);
+}
+
 VkResult wine_vkAllocateCommandBuffers(VkDevice handle, const VkCommandBufferAllocateInfo *allocate_info,
                                        VkCommandBuffer *buffers )
 {
@@ -3921,6 +3939,8 @@ VkResult fshack_vk_queue_present(VkQueue queue_handle, const VkPresentInfoKHR *p
     if (n_hacks > 0)
     {
         VkPipelineStageFlags waitStage, *waitStages, *waitStages_arr = NULL;
+        VkLatencySubmissionPresentIdNV latencySubmitInfo;
+        VkPresentIdKHR *present_id;
 
         if (pPresentInfo->waitSemaphoreCount > 1)
         {
@@ -3943,6 +3963,15 @@ VkResult fshack_vk_queue_present(VkQueue queue_handle, const VkPresentInfoKHR *p
         submitInfo.pCommandBuffers = blit_cmds;
         submitInfo.signalSemaphoreCount = 1;
         submitInfo.pSignalSemaphores = &blit_sema;
+
+        if ((queue->device->low_latency_enabled) &&
+            (present_id = wine_vk_find_struct(&our_presentInfo, PRESENT_ID_KHR)))
+        {
+            latencySubmitInfo.sType = VK_STRUCTURE_TYPE_LATENCY_SUBMISSION_PRESENT_ID_NV;
+            latencySubmitInfo.pNext = NULL;
+            latencySubmitInfo.presentID = *present_id->pPresentIds;
+            submitInfo.pNext = &latencySubmitInfo;
+        }
 
         res = queue->device->funcs.p_vkQueueSubmit(queue->queue, 1, &submitInfo, VK_NULL_HANDLE);
         if (res != VK_SUCCESS)
