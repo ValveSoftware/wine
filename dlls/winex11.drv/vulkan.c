@@ -346,7 +346,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
     x11_surface->hwnd = create_info->hwnd;
     if (x11_surface->hwnd)
     {
-        x11_surface->window = create_client_window(create_info->hwnd, &default_visual);
+        x11_surface->window = create_client_window(create_info->hwnd, &default_visual, default_colormap);
         x11_surface->hwnd_thread_id = NtUserGetWindowThread(x11_surface->hwnd, NULL);
     }
     else
