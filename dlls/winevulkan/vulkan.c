@@ -408,11 +408,6 @@ static VkResult wine_vk_device_convert_create_info(struct wine_phys_dev *phys_de
     {
         const char *extension_name = dst->ppEnabledExtensionNames[i];
         TRACE("Extension %u: %s.\n", i, debugstr_a(extension_name));
-        if (!wine_vk_device_extension_supported(extension_name))
-        {
-            WARN("Extension %s is not supported.\n", debugstr_a(extension_name));
-            return VK_ERROR_EXTENSION_NOT_PRESENT;
-        }
     }
 
     if (phys_dev->external_memory_align)
