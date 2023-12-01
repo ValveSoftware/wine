@@ -1362,28 +1362,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
 
     gl->layered_type = get_gl_layered_type( hwnd );
 
-    if (gl->layered_type)
-    {
-        struct x11drv_win_data *data;
-
-        if ((data = get_win_data( hwnd )))
-        {
-            detach_client_window( data, data->client_window, TRUE );
-            release_win_data( data );
-        }
-
-        gl->type = DC_GL_PIXMAP_WIN;
-        gl->pixmap = XCreatePixmap( gdi_display, root_window, width, height, visual->depth );
-        if (gl->pixmap)
-        {
-            gl->drawable = pglXCreatePixmap( gdi_display, gl->format->fbconfig, gl->pixmap, NULL );
-            if (!gl->drawable) XFreePixmap( gdi_display, gl->pixmap );
-            gl->pixmap_size.cx = width;
-            gl->pixmap_size.cy = height;
-        }
-        TRACE( "%p created pixmap drawable %lx for layered window, type %u.\n", hwnd, gl->drawable, gl->layered_type );
-    }
-    else if (!drawable_needs_clipping( hwnd, known_child ))  /* childless top-level window */
+    if (!gl->layered_type && !drawable_needs_clipping( hwnd, known_child ))  /* childless top-level window */
     {
         gl->type = DC_GL_WINDOW;
         gl->colormap = XCreateColormap( gdi_display, get_dummy_parent(), visual->visual,
@@ -1397,6 +1376,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
 #ifdef SONAME_LIBXCOMPOSITE
     else if(usexcomposite)
     {
+        struct x11drv_win_data *data;
         gl->type = DC_GL_CHILD_WIN;
         gl->colormap = XCreateColormap( gdi_display, get_dummy_parent(), visual->visual,
                                         (visual->class == PseudoColor || visual->class == GrayScale ||
@@ -1406,6 +1386,11 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
         {
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
             pXCompositeRedirectWindow( gdi_display, gl->window, CompositeRedirectManual );
+        }
+        if (gl->layered_type && (data = get_win_data( hwnd )))
+        {
+            detach_client_window( data, data->client_window, TRUE );
+            release_win_data( data );
         }
         TRACE( "%p created child %lx drawable %lx\n", hwnd, gl->window, gl->drawable );
     }
@@ -1533,7 +1518,7 @@ void sync_gl_drawable( HWND hwnd, BOOL known_child )
 
     known_child = drawable_needs_clipping( hwnd, known_child );
 
-    if (old->type == DC_GL_PIXMAP_WIN || (known_child && old->type == DC_GL_WINDOW)
+    if (old->layered_type || (known_child && old->type == DC_GL_WINDOW)
         || (!known_child && old->type != DC_GL_WINDOW)
         || old->layered_type != new_layered_type)
     {
@@ -2039,6 +2024,11 @@ static BOOL glxdrv_wglShareLists(struct wgl_context *org, struct wgl_context *de
     return TRUE;
 }
 
+static int XGetImage_handler( Display *dpy, XErrorEvent *event, void *arg )
+{
+    return event->request_code == X_GetImage && event->error_code == BadMatch;
+}
+
 static void update_window_surface(struct gl_drawable *gl, HWND hwnd)
 {
     char buffer[FIELD_OFFSET( BITMAPINFO, bmiColors[256] )];
@@ -2052,7 +2042,7 @@ static void update_window_surface(struct gl_drawable *gl, HWND hwnd)
 
     TRACE( "gl %p, hwnd %p, gl->layered_type %u.\n", gl, hwnd, gl->layered_type );
 
-    if (gl->layered_type != DC_GL_LAYERED_ATTRIBUTES || !gl->pixmap) return;
+    if (gl->layered_type != DC_GL_LAYERED_ATTRIBUTES || !gl->window) return;
 
     if (!(data = get_win_data( hwnd ))) return;
 
@@ -2073,11 +2063,18 @@ static void update_window_surface(struct gl_drawable *gl, HWND hwnd)
     rect.right = min( rect.right, abs( bmi->bmiHeader.biWidth ));
     rect.bottom = min( rect.bottom, abs( bmi->bmiHeader.biHeight ));
 
-    width = min( rect.right - rect.left, gl->pixmap_size.cx );
-    height = min( rect.bottom - rect.top, gl->pixmap_size.cy );
+    width = rect.right - rect.left;
+    height = rect.bottom - rect.top;
 
-    image = XGetImage( gdi_display, gl->pixmap, 0, 0, width, height,
+    TRACE( "client_rect %s, whole_rect %s bmi %dx%d, rect %s.\n",
+            wine_dbgstr_rect(&data->client_rect), wine_dbgstr_rect(&data->whole_rect),
+            (int)bmi->bmiHeader.biWidth, (int)bmi->bmiHeader.biHeight,
+            wine_dbgstr_rect(&rect) );
+
+    X11DRV_expect_error( gdi_display, XGetImage_handler, NULL );
+    image = XGetImage( gdi_display, gl->window, 0, 0, width, height,
                        AllPlanes, ZPixmap );
+    if (X11DRV_check_error()) ERR( "XGetImage error.\n" );
     if (!image)
     {
         TRACE( "NULL image.\n" );
@@ -2099,7 +2096,6 @@ static void update_window_surface(struct gl_drawable *gl, HWND hwnd)
     for (y = 0; y < height; ++y)
         memcpy( dst_bits + (y + rect.top) * pitch + rect.left * stride,
                 src_bits + y * image->bytes_per_line, width * stride );
-
     add_bounds_rect( surface->funcs->get_bounds( surface ), &rect );
 
 done:
@@ -2124,7 +2120,7 @@ static void wglFinish(void)
         switch (gl->type)
         {
         case DC_GL_PIXMAP_WIN: if (!gl->layered_type) escape.drawable = gl->pixmap; break;
-        case DC_GL_CHILD_WIN:  escape.drawable = gl->window; break;
+        case DC_GL_CHILD_WIN:  if (!gl->layered_type) escape.drawable = gl->window; break;
         default: break;
         }
         sync_context(ctx);
@@ -2153,7 +2149,7 @@ static void wglFlush(void)
         switch (gl->type)
         {
         case DC_GL_PIXMAP_WIN: if (!gl->layered_type) escape.drawable = gl->pixmap; break;
-        case DC_GL_CHILD_WIN:  escape.drawable = gl->window; break;
+        case DC_GL_CHILD_WIN:  if (!gl->layered_type) escape.drawable = gl->window; break;
         default: break;
         }
         sync_context(ctx);
@@ -3533,10 +3529,10 @@ static BOOL glxdrv_wglSwapBuffers( HDC hdc )
     case DC_GL_WINDOW:
     case DC_GL_CHILD_WIN:
         if (ctx) sync_context( ctx );
-        if (gl->type == DC_GL_CHILD_WIN) escape.drawable = gl->window;
+        if (gl->type == DC_GL_CHILD_WIN && !gl->layered_type) escape.drawable = gl->window;
         /* fall through */
     default:
-        if (escape.drawable && pglXSwapBuffersMscOML)
+        if ((escape.drawable || gl->layered_type) && pglXSwapBuffersMscOML)
         {
             pglFlush();
             target_sbc = pglXSwapBuffersMscOML( gdi_display, gl->drawable, 0, 0, 0 );
@@ -3546,7 +3542,7 @@ static BOOL glxdrv_wglSwapBuffers( HDC hdc )
         break;
     }
 
-    if (escape.drawable && pglXWaitForSbcOML)
+    if ((escape.drawable || gl->layered_type) && pglXWaitForSbcOML)
         pglXWaitForSbcOML( gdi_display, gl->drawable, target_sbc, &ust, &msc, &sbc );
 
     update_window_surface( gl, hwnd );
