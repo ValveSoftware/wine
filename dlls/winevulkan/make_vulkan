@@ -2490,7 +2490,18 @@ class StructConversionFunction(object):
 
             body += "        default:\n"
             if self.direction == Direction.INPUT:
-                body += ident + "FIXME(\"Unhandled sType %u.\\n\", in_header->sType);\n"
+                body += ident + "if ((in_header->sType >> 16) == 0x7ead)\n"
+                body += ident + "{\n"
+                body += ident + "    VkBaseOutStructure *out_ext = conversion_context_alloc(ctx, 32);\n";
+                body += ident + "    memcpy(out_ext, in_header, 32);\n";
+                body += ident + "    out_ext->pNext = NULL;\n";
+                body += ident + "    out_header->pNext = (void *)out_ext;\n";
+                body += ident + "    out_header = (void *)out_ext;\n";
+                body += ident + "}\n"
+                body += ident + "else\n"
+                body += ident + "{\n"
+                body += ident + "    FIXME(\"Unhandled sType %u.\\n\", in_header->sType);\n"
+                body += ident + "}\n"
             body += "            break;\n"
             body += "        }\n"
             body += "    }\n"
@@ -3201,6 +3212,28 @@ class VkGenerator(object):
         f.write("\n")
         f.write("    name -= 2;\n\n")
         f.write("    return get_vulkan_driver_device_proc_addr(vulkan_funcs, name);\n}\n\n")
+
+        f.write("typedef VkResult (WINAPI *PFN_native_vkCreateInstance)(const VkInstanceCreateInfo *, const VkAllocationCallbacks *, VkInstance *,\n")
+        f.write("                                                       void * (*)(VkInstance, const char *), void *);\n");
+        f.write("typedef VkResult (WINAPI *PFN_native_vkCreateDevice)(VkPhysicalDevice, const VkDeviceCreateInfo *, const VkAllocationCallbacks *, VkDevice *,\n");
+        f.write("                                                     void * (*)(VkInstance, const char *), void *);\n\n");
+        f.write("typedef struct VkCreateInfoWineDeviceCallback {\n");
+        f.write("    VkStructureType             sType;\n");
+        f.write("    const void*                 pNext;\n");
+        f.write("    PFN_native_vkCreateDevice   native_create_callback;\n");
+        f.write("    void*                       context;\n");
+        f.write("} VkCreateInfoWineDeviceCallback;\n");
+
+        f.write("#define VK_STRUCTURE_TYPE_CREATE_INFO_WINE_DEVICE_CALLBACK 2125312001\n");
+
+        f.write("typedef struct VkCreateInfoWineInstanceCallback {\n");
+        f.write("    VkStructureType             sType;\n");
+        f.write("    const void*                 pNext;\n");
+        f.write("    PFN_native_vkCreateInstance native_create_callback;\n");
+        f.write("    void*                       context;\n");
+        f.write("} VkCreateInfoWineInstanceCallback;\n");
+
+        f.write("#define VK_STRUCTURE_TYPE_CREATE_INFO_WINE_INSTANCE_CALLBACK 2125312002\n");
 
         f.write("#endif /* __WINE_VULKAN_DRIVER_H */\n")
 
