@@ -3341,7 +3341,14 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
                 /* whole_window could be both iconic and mapped. Since XMapWindow() doesn't do
                  * anything if the window is already mapped, we need to unmap it first */
                 if (data->mapped)
+                {
+                    if (wm_is_steamcompmgr( data->display ))
+                    {
+                        /* Gamescope will generate FocusOut event upon processing UnmapNotify. Ignore it. */
+                        data->fake_unmap_serial = NextRequest( data->display );
+                    }
                     XUnmapWindow( data->display, data->whole_window );
+                }
                 XMapWindow( data->display, data->whole_window );
             }
             update_net_wm_states( data );
