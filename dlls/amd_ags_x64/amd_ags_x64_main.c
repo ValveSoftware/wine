@@ -68,27 +68,25 @@ enum amd_ags_version
 
 static const struct
 {
-    int major;
-    int minor;
-    int patch;
+    unsigned int ags_public_version;
     unsigned int device_size;
     unsigned int dx11_returned_params_size;
     int max_asicFamily;
 }
 amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
-    {5, 0, 5, sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
-    {5, 1, 1, sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
-    {5, 2, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
-    {5, 2, 1, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
-    {5, 3, 0, sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
-    {5, 4, 0, sizeof(AGSDeviceInfo_540), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
-    {5, 4, 1, sizeof(AGSDeviceInfo_541), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
-    {5, 4, 2, sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
-    {6, 0, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
-    {6, 0, 1, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
-    {6, 1, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
-    {6, 2, 0, sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
+    {AGS_MAKE_VERSION(5, 0, 5), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {AGS_MAKE_VERSION(5, 1, 1), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {AGS_MAKE_VERSION(5, 2, 0), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {AGS_MAKE_VERSION(5, 2, 1), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {AGS_MAKE_VERSION(5, 3, 0), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {AGS_MAKE_VERSION(5, 4, 0), sizeof(AGSDeviceInfo_540), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {AGS_MAKE_VERSION(5, 4, 1), sizeof(AGSDeviceInfo_541), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {AGS_MAKE_VERSION(5, 4, 2), sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {AGS_MAKE_VERSION(6, 0, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
+    {AGS_MAKE_VERSION(6, 0, 1), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
+    {AGS_MAKE_VERSION(6, 1, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
+    {AGS_MAKE_VERSION(6, 2, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
 };
 
 #define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
@@ -187,6 +185,15 @@ static HMODULE hd3d11, hd3d12;
 static typeof(D3D12CreateDevice) *pD3D12CreateDevice;
 static typeof(D3D11CreateDevice) *pD3D11CreateDevice;
 static typeof(D3D11CreateDeviceAndSwapChain) *pD3D11CreateDeviceAndSwapChain;
+
+#define AGS_VER_MAJOR(ver) ((ver) >> 22)
+#define AGS_VER_MINOR(ver) (((ver) >> 12) & ((1 << 10) - 1))
+#define AGS_VER_PATCH(ver) ((ver) & ((1 << 12) - 1))
+
+static const char *debugstr_agsversion(unsigned int ags_version)
+{
+    return wine_dbg_sprintf("%d.%d.%d", AGS_VER_MAJOR(ags_version), AGS_VER_MINOR(ags_version), AGS_VER_PATCH(ags_version));
+}
 
 static BOOL load_d3d12_functions(void)
 {
@@ -300,12 +307,12 @@ static enum amd_ags_version get_version_number(int ags_version)
     unsigned int i;
 
     for (i = 0; i < ARRAY_SIZE(amd_ags_info); i++)
-        if (AGS_MAKE_VERSION(amd_ags_info[i].major, amd_ags_info[i].minor, amd_ags_info[i].patch) == ags_version)
+        if (amd_ags_info[i].ags_public_version == ags_version)
         {
-            TRACE("Found AGS v%d.%d.%d.\n", amd_ags_info[i].major, amd_ags_info[i].minor, amd_ags_info[i].patch);
+            TRACE("Found AGS v%s.\n", debugstr_agsversion(ags_version));
             return i;
         }
-    ERR("Unknown ags_version %#x, using 5.4.1.\n", ags_version);
+    ERR("Unknown ags_version %s, using 5.4.1.\n", debugstr_agsversion(ags_version));
     return AMD_AGS_VERSION_5_4_1;
 }
 
@@ -421,7 +428,7 @@ static enum amd_ags_version determine_ags_version(int ags_version)
     {
         ags_version = pagsGetVersionNumber();
         ret = get_version_number(ags_version);
-        TRACE("Got version %#x (%d) from agsGetVersionNumber.\n", ags_version, ret);
+        TRACE("Got version %s (%d) from agsGetVersionNumber.\n", debugstr_agsversion(ags_version), ret);
         goto done;
     }
 
@@ -434,8 +441,7 @@ done:
     if (*temp_name)
         DeleteFileW(temp_name);
 
-    TRACE("Using AGS v%d.%d.%d interface\n",
-          amd_ags_info[ret].major, amd_ags_info[ret].minor, amd_ags_info[ret].patch);
+    TRACE("Using AGS v%s interface\n", debugstr_agsversion(amd_ags_info[ret].ags_public_version));
     return ret;
 }
 
@@ -812,9 +818,9 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     }
 
     memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->agsVersionMajor = amd_ags_info[object->version].major;
-    gpu_info->agsVersionMinor = amd_ags_info[object->version].minor;
-    gpu_info->agsVersionPatch = amd_ags_info[object->version].patch;
+    gpu_info->agsVersionMajor = AGS_VER_MAJOR(amd_ags_info[object->version].ags_public_version);
+    gpu_info->agsVersionMinor = AGS_VER_MINOR(amd_ags_info[object->version].ags_public_version);;
+    gpu_info->agsVersionPatch = AGS_VER_PATCH(amd_ags_info[object->version].ags_public_version);;
     gpu_info->driverVersion = driver_version;
     gpu_info->radeonSoftwareVersion  = radeon_version;
     gpu_info->numDevices = object->device_count;
@@ -1170,7 +1176,7 @@ int WINAPI agsGetVersionNumber(void)
 
     TRACE("version %d.\n", version);
 
-    return AGS_MAKE_VERSION(amd_ags_info[version].major, amd_ags_info[version].minor, amd_ags_info[version].patch);
+    return amd_ags_info[version].ags_public_version;
 }
 
 AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext *context, ID3D11Device *device, unsigned int uavSlot, unsigned int *extensionsSupported )
