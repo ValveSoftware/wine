@@ -73,7 +73,7 @@ static const struct
 }
 amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
-    {AGS_MAKE_VERSION(5, 0, 5), AGS_MAKE_VERSION(5, 0, 5), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {AGS_MAKE_VERSION(5, 0, 0), AGS_MAKE_VERSION(5, 0, 6), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 1, 1), AGS_MAKE_VERSION(5, 1, 1), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 2, 0), AGS_MAKE_VERSION(5, 2, 1), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
     {AGS_MAKE_VERSION(5, 3, 0), AGS_MAKE_VERSION(5, 3, 0), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
