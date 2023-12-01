@@ -95,7 +95,8 @@ AddReg=\
     Tapi,\
     ThemeManager,\
     VersionInfo,\
-    LicenseInformation
+    LicenseInformation,\
+    ProtonOverrides
 
 [DefaultInstall.ntamd64]
 RegisterDlls=RegisterDllsSection
@@ -120,7 +121,8 @@ AddReg=\
     Tapi,\
     ThemeManager,\
     VersionInfo,\
-    LicenseInformation
+    LicenseInformation,\
+    ProtonOverrides
 
 [DefaultInstall.ntarm64]
 RegisterDlls=RegisterDllsSection
@@ -160,7 +162,8 @@ AddReg=\
     Misc,\
     Tapi,\
     VersionInfo,\
-    LicenseInformation
+    LicenseInformation,\
+    ProtonOverrides
 
 [Wow64Install.ntarm]
 RegisterDlls=RegisterDllsSection
@@ -2702,3 +2705,6 @@ EtcFiles  = 12,etc
 InfFiles  = 17
 NlsFiles  = 11
 SortFiles = 10,globalization\sorting
+
+[ProtonOverrides]
+HKLM,Software\Khronos\OpenXR\1,"ActiveRuntime",,"C:\openxr\wineopenxr64.json"
