@@ -1008,8 +1008,20 @@ static void focus_out( Display *display , HWND hwnd )
 static BOOL X11DRV_FocusOut( HWND hwnd, XEvent *xev )
 {
     XFocusChangeEvent *event = &xev->xfocus;
+    struct x11drv_win_data *data;
 
     TRACE( "win %p xwin %lx detail=%s mode=%s\n", hwnd, event->window, focus_details[event->detail], focus_modes[event->mode] );
+
+    if ((data = get_win_data( hwnd )))
+    {
+        if (data->fake_unmap_serial == event->serial)
+        {
+            release_win_data( data );
+            TRACE( "Ignoring event from intermediate unmap.\n" );
+            return FALSE;
+        }
+        release_win_data( data );
+    }
 
     if (event->detail == NotifyPointer)
     {
