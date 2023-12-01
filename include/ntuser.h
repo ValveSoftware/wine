@@ -1403,4 +1403,24 @@ static inline BOOL NtUserShowOwnedPopups( HWND hwnd, BOOL show )
 /* Wine extensions */
 W32KAPI BOOL WINAPI __wine_send_input( HWND hwnd, const INPUT *input, const RAWINPUT *rawinput );
 
+/* HACK: We use some WM specific hacks in user32 and we need the user
+ * driver to export that information. */
+
+#define WINE_WM_UNKNOWN          0
+#define WINE_WM_X11_MUTTER       1
+#define WINE_WM_X11_STEAMCOMPMGR 2
+#define WINE_WM_X11_KDE          3
+
+static inline LONG_PTR __wine_get_window_manager(void)
+{
+    static const WCHAR __wine_window_managerW[] = {'_','_','w','i','n','e','_','w','i','n','d','o','w','_','m','a','n','a','g','e','r',0};
+    return (LONG_PTR)NtUserGetProp(NtUserGetDesktopWindow(), __wine_window_managerW);
+}
+
+static inline void __wine_set_window_manager(LONG_PTR window_manager)
+{
+    static const WCHAR __wine_window_managerW[] = {'_','_','w','i','n','e','_','w','i','n','d','o','w','_','m','a','n','a','g','e','r',0};
+    NtUserSetProp(NtUserGetDesktopWindow(), __wine_window_managerW, (HANDLE)window_manager);
+}
+
 #endif /* _NTUSER_ */

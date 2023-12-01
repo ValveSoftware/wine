@@ -113,6 +113,97 @@ static const WCHAR clip_window_prop[] =
 static pthread_mutex_t win_data_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 
+static int handle_wm_name_badwindow_error( Display *dpy, XErrorEvent *event, void *arg )
+{
+    if (event->error_code == BadWindow)
+    {
+        WARN( "BadWindow error when reading WM name from window %lx, ignoring.\n", event->resourceid );
+        return 1;
+    }
+
+    return 0;
+}
+
+static int detect_wm(Display *dpy)
+{
+    Display *display = dpy ? dpy : thread_init_display(); /* DefaultRootWindow is a macro... */
+    Window root = DefaultRootWindow(display), *wm_check;
+    Atom type;
+    int format, err;
+    unsigned long count, remaining;
+    char *wm_name;
+
+    static int cached = -1;
+
+    if(cached < 0){
+
+        if (XGetWindowProperty( display, root, x11drv_atom(_NET_SUPPORTING_WM_CHECK), 0,
+                                 sizeof(*wm_check)/sizeof(CARD32), False, x11drv_atom(WINDOW),
+                                 &type, &format, &count, &remaining, (unsigned char **)&wm_check ) == Success){
+            if (type == x11drv_atom(WINDOW)){
+                /* The window returned by _NET_SUPPORTING_WM_CHECK might be stale,
+                   so we may get errors when asking for its properties */
+                X11DRV_expect_error( display, handle_wm_name_badwindow_error, NULL );
+                err = XGetWindowProperty( display, *wm_check, x11drv_atom(_NET_WM_NAME), 0,
+                                           256/sizeof(CARD32), False, x11drv_atom(UTF8_STRING),
+                                           &type, &format, &count, &remaining, (unsigned char **)&wm_name);
+
+                if (X11DRV_check_error() || err != Success || type != x11drv_atom(UTF8_STRING)){
+                    X11DRV_expect_error( display, handle_wm_name_badwindow_error, NULL );
+                    err = XGetWindowProperty( display, *wm_check, x11drv_atom(WM_NAME), 0,
+                                               256/sizeof(CARD32), False, x11drv_atom(STRING),
+                                               &type, &format, &count, &remaining, (unsigned char **)&wm_name);
+
+                    if (X11DRV_check_error() || err != Success || type != x11drv_atom(STRING))
+                        wm_name = NULL;
+                }
+
+                if(wm_name){
+                    TRACE("Got WM name %s\n", wm_name);
+
+                    if((strcmp(wm_name, "GNOME Shell") == 0) ||
+                            (strcmp(wm_name, "Mutter") == 0))
+                        cached = WINE_WM_X11_MUTTER;
+                    else if(strcmp(wm_name, "steamcompmgr") == 0)
+                        cached = WINE_WM_X11_STEAMCOMPMGR;
+                    else if(strcmp(wm_name, "KWin") == 0)
+                        cached = WINE_WM_X11_KDE;
+                    else
+                        cached = WINE_WM_UNKNOWN;
+
+                    XFree(wm_name);
+                }else{
+                    TRACE("WM did not set _NET_WM_NAME or WM_NAME\n");
+                    cached = WINE_WM_UNKNOWN;
+                }
+            }else
+                cached = WINE_WM_UNKNOWN;
+
+            XFree(wm_check);
+        }else
+            cached = WINE_WM_UNKNOWN;
+
+        __wine_set_window_manager(cached);
+    }
+
+    return cached;
+}
+
+BOOL wm_is_mutter(Display *display)
+{
+    return detect_wm(display) == WINE_WM_X11_MUTTER;
+}
+
+BOOL wm_is_kde(Display *display)
+{
+    return detect_wm(display) == WINE_WM_X11_KDE;
+}
+
+BOOL wm_is_steamcompmgr(Display *display)
+{
+    return detect_wm(display) == WINE_WM_X11_STEAMCOMPMGR;
+}
+
 /***********************************************************************
  * http://standards.freedesktop.org/startup-notification-spec
  */
@@ -1953,6 +2044,8 @@ static BOOL create_desktop_win_data( Window win, HWND hwnd )
 void X11DRV_SetDesktopWindow( HWND hwnd )
 {
     unsigned int width, height;
+
+    detect_wm( gdi_display );
 
     /* retrieve the real size of the desktop */
     SERVER_START_REQ( get_window_rectangles )
