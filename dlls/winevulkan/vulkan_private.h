@@ -64,6 +64,8 @@ struct wine_device
     struct wine_queue *queues;
     uint32_t queue_count;
 
+    VkQueueFamilyProperties *queue_props;
+
     struct wine_vk_mapping mapping;
 };
 
@@ -72,9 +74,38 @@ static inline struct wine_device *wine_device_from_handle(VkDevice handle)
     return (struct wine_device *)(uintptr_t)handle->base.unix_handle;
 }
 
+struct fs_hack_image
+{
+    uint32_t cmd_queue_idx;
+    VkCommandBuffer cmd;
+    VkImage swapchain_image;
+    VkImage blit_image;
+    VkImage user_image;
+    VkSemaphore blit_finished;
+    VkImageView user_view, blit_view;
+    VkDescriptorSet descriptor_set;
+};
+
 struct wine_swapchain
 {
     VkSwapchainKHR host_swapchain;
+
+    /* fs hack data below */
+    BOOL fs_hack_enabled;
+    VkExtent2D user_extent;
+    VkExtent2D real_extent;
+    VkImageUsageFlags surface_usage;
+    VkRect2D blit_dst;
+    VkCommandPool *cmd_pools; /* VkCommandPool[device->queue_count] */
+    VkDeviceMemory user_image_memory, blit_image_memory;
+    uint32_t n_images;
+    struct fs_hack_image *fs_hack_images; /* struct fs_hack_image[n_images] */
+    VkFilter fs_hack_filter;
+    VkSampler sampler;
+    VkDescriptorPool descriptor_pool;
+    VkDescriptorSetLayout descriptor_set_layout;
+    VkPipelineLayout pipeline_layout;
+    VkPipeline pipeline;
 
     struct wine_vk_mapping mapping;
 };
