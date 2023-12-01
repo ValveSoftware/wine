@@ -53,65 +53,60 @@ enum amd_ags_version
     AMD_AGS_VERSION_5_0_5,
     AMD_AGS_VERSION_5_1_1,
     AMD_AGS_VERSION_5_2_0,
-    AMD_AGS_VERSION_5_2_1,
     AMD_AGS_VERSION_5_3_0,
     AMD_AGS_VERSION_5_4_0,
     AMD_AGS_VERSION_5_4_1,
     AMD_AGS_VERSION_5_4_2,
     AMD_AGS_VERSION_6_0_0,
-    AMD_AGS_VERSION_6_0_1,
     AMD_AGS_VERSION_6_1_0,
-    AMD_AGS_VERSION_6_2_0,
 
     AMD_AGS_VERSION_COUNT
 };
 
 static const struct
 {
-    unsigned int ags_public_version;
+    unsigned int ags_min_public_version;
+    unsigned int ags_max_public_version;
     unsigned int device_size;
     unsigned int dx11_returned_params_size;
     int max_asicFamily;
 }
 amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
-    {AGS_MAKE_VERSION(5, 0, 5), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
-    {AGS_MAKE_VERSION(5, 1, 1), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
-    {AGS_MAKE_VERSION(5, 2, 0), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
-    {AGS_MAKE_VERSION(5, 2, 1), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
-    {AGS_MAKE_VERSION(5, 3, 0), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
-    {AGS_MAKE_VERSION(5, 4, 0), sizeof(AGSDeviceInfo_540), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
-    {AGS_MAKE_VERSION(5, 4, 1), sizeof(AGSDeviceInfo_541), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
-    {AGS_MAKE_VERSION(5, 4, 2), sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
-    {AGS_MAKE_VERSION(6, 0, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
-    {AGS_MAKE_VERSION(6, 0, 1), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
-    {AGS_MAKE_VERSION(6, 1, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
-    {AGS_MAKE_VERSION(6, 2, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
+    {AGS_MAKE_VERSION(5, 0, 5), AGS_MAKE_VERSION(5, 0, 5), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {AGS_MAKE_VERSION(5, 1, 1), AGS_MAKE_VERSION(5, 1, 1), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
+    {AGS_MAKE_VERSION(5, 2, 0), AGS_MAKE_VERSION(5, 2, 1), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {AGS_MAKE_VERSION(5, 3, 0), AGS_MAKE_VERSION(5, 3, 0), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
+    {AGS_MAKE_VERSION(5, 4, 0), AGS_MAKE_VERSION(5, 4, 0), sizeof(AGSDeviceInfo_540), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {AGS_MAKE_VERSION(5, 4, 1), AGS_MAKE_VERSION(5, 4, 1), sizeof(AGSDeviceInfo_541), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {AGS_MAKE_VERSION(5, 4, 2), AGS_MAKE_VERSION(5, 4, 2), sizeof(AGSDeviceInfo_542), sizeof(AGSDX11ReturnedParams_520), AsicFamily_RDNA},
+    {AGS_MAKE_VERSION(6, 0, 0), AGS_MAKE_VERSION(6, 0, 1), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA2},
+    {AGS_MAKE_VERSION(6, 1, 0), AGS_MAKE_VERSION(6, 2, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
 };
 
 #define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
-        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name), \
-        offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
-#define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
-        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), -1, \
-        -1, -1, -1, -1, -1, -1}}
-#define DEF_FIELD_520_UP(name) {DEVICE_FIELD_##name, {-1, -1, offsetof(AGSDeviceInfo_520, name), \
-        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name), \
-        offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
-#define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, -1, \
-        -1, -1, offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), offsetof(AGSDeviceInfo_600, name), \
-        offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
-#define DEF_FIELD_540_600(name) {DEVICE_FIELD_##name, {-1, -1, -1, \
-        -1, -1, offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
+        offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
+#define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
+        offsetof(AGSDeviceInfo_520, name), -1, \
         -1, -1, -1, -1}}
+#define DEF_FIELD_520_UP(name) {DEVICE_FIELD_##name, {-1, -1, offsetof(AGSDeviceInfo_520, name), \
+        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
+        offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
+#define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, -1, \
+        -1, offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
+        offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
+#define DEF_FIELD_540_600(name) {DEVICE_FIELD_##name, {-1, -1, -1, \
+        -1, offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
+        -1, -1}}
 #define DEF_FIELD_600_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
-        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
-        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), -1, \
-        -1, -1, -1}}
+        offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
+        offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
+        -1, -1}}
 
 #define DEVICE_FIELD_adapterString 0
 #define DEVICE_FIELD_architectureVersion 1
@@ -179,6 +174,7 @@ struct AGSContext
     VkPhysicalDeviceMemoryProperties *memory_properties;
     ID3D11DeviceContext *d3d11_context;
     AGSDX11ExtensionsSupported_600 extensions;
+    unsigned int public_version;
 };
 
 static HMODULE hd3d11, hd3d12;
@@ -307,16 +303,16 @@ static enum amd_ags_version get_version_number(int ags_version)
     unsigned int i;
 
     for (i = 0; i < ARRAY_SIZE(amd_ags_info); i++)
-        if (amd_ags_info[i].ags_public_version == ags_version)
+        if (ags_version >= amd_ags_info[i].ags_min_public_version && ags_version <= amd_ags_info[i].ags_max_public_version)
         {
-            TRACE("Found AGS v%s.\n", debugstr_agsversion(ags_version));
+            TRACE("Found AGS v%s (internal %d).\n", debugstr_agsversion(ags_version), i);
             return i;
         }
     ERR("Unknown ags_version %s, using 5.4.1.\n", debugstr_agsversion(ags_version));
     return AMD_AGS_VERSION_5_4_1;
 }
 
-static BOOL get_ags_version_from_resource(const WCHAR *filename, enum amd_ags_version *ret)
+static BOOL get_ags_version_from_resource(const WCHAR *filename, enum amd_ags_version *ret, int *public_version)
 {
     DWORD infosize;
     void *infobuf;
@@ -356,8 +352,9 @@ static BOOL get_ags_version_from_resource(const WCHAR *filename, enum amd_ags_ve
     major = info->dwFileVersionMS >> 16;
     minor = info->dwFileVersionMS;
     patch = info->dwFileVersionLS >> 16;
+    *public_version = AGS_MAKE_VERSION(major, minor, patch);
     TRACE("Found amd_ags_x64.dll v%d.%d.%d\n", major, minor, patch);
-    *ret = get_version_number(AGS_MAKE_VERSION(major, minor, patch));
+    *ret = get_version_number(*public_version);
     heap_free(infobuf);
     return TRUE;
 }
@@ -379,7 +376,7 @@ static enum amd_ags_version guess_version_from_exports(HMODULE hnative)
     return AMD_AGS_VERSION_5_4_1;
 }
 
-static enum amd_ags_version determine_ags_version(int ags_version)
+static enum amd_ags_version determine_ags_version(int *ags_version)
 {
     /* AMD AGS is not binary compatible between versions (even minor versions), and the game
      * does not request a specific version when calling agsInit().
@@ -392,10 +389,10 @@ static enum amd_ags_version determine_ags_version(int ags_version)
     HMODULE hnative = NULL;
     DWORD size;
 
-    TRACE("ags_version %#x.\n", ags_version);
+    TRACE("*ags_version %#x.\n", *ags_version);
 
-    if (ags_version)
-        return get_version_number(ags_version);
+    if (*ags_version)
+        return get_version_number(*ags_version);
 
     *temp_name = 0;
     if (!(size = GetModuleFileNameW(GetModuleHandleW(L"amd_ags_x64.dll"), dllname, ARRAY_SIZE(dllname)))
@@ -415,7 +412,7 @@ static enum amd_ags_version determine_ags_version(int ags_version)
         goto done;
     }
 
-    if (get_ags_version_from_resource(temp_name, &ret))
+    if (get_ags_version_from_resource(temp_name, &ret, ags_version))
         goto done;
 
     if (!(hnative = LoadLibraryW(temp_name)))
@@ -426,22 +423,25 @@ static enum amd_ags_version determine_ags_version(int ags_version)
 
     if ((pagsGetVersionNumber = (void *)GetProcAddress(hnative, "agsGetVersionNumber")))
     {
-        ags_version = pagsGetVersionNumber();
-        ret = get_version_number(ags_version);
-        TRACE("Got version %s (%d) from agsGetVersionNumber.\n", debugstr_agsversion(ags_version), ret);
+        *ags_version = pagsGetVersionNumber();
+        ret = get_version_number(*ags_version);
+        TRACE("Got version %s (%d) from agsGetVersionNumber.\n", debugstr_agsversion(*ags_version), ret);
         goto done;
     }
 
     ret = guess_version_from_exports(hnative);
 
 done:
+    if (!*ags_version)
+        *ags_version = amd_ags_info[ret].ags_max_public_version;
+
     if (hnative)
         FreeLibrary(hnative);
 
     if (*temp_name)
         DeleteFileW(temp_name);
 
-    TRACE("Using AGS v%s interface\n", debugstr_agsversion(amd_ags_info[ret].ags_public_version));
+    TRACE("Using AGS v%s (internal %d) interface\n", debugstr_agsversion(*ags_version), ret);
     return ret;
 }
 
@@ -690,7 +690,8 @@ static AGSReturnCode init_ags_context(AGSContext *context, int ags_version)
 
     memset(context, 0, sizeof(*context));
 
-    context->version = determine_ags_version(ags_version);
+    context->version = determine_ags_version(&ags_version);
+    context->public_version = ags_version;
 
     ret = vk_get_physical_device_properties(&context->device_count, &context->properties, &context->memory_properties);
     if (ret != AGS_SUCCESS || !context->device_count)
@@ -818,9 +819,9 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     }
 
     memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->agsVersionMajor = AGS_VER_MAJOR(amd_ags_info[object->version].ags_public_version);
-    gpu_info->agsVersionMinor = AGS_VER_MINOR(amd_ags_info[object->version].ags_public_version);;
-    gpu_info->agsVersionPatch = AGS_VER_PATCH(amd_ags_info[object->version].ags_public_version);;
+    gpu_info->agsVersionMajor = AGS_VER_MAJOR(object->public_version);
+    gpu_info->agsVersionMinor = AGS_VER_MINOR(object->public_version);
+    gpu_info->agsVersionPatch = AGS_VER_PATCH(object->public_version);
     gpu_info->driverVersion = driver_version;
     gpu_info->radeonSoftwareVersion  = radeon_version;
     gpu_info->numDevices = object->device_count;
@@ -1172,11 +1173,12 @@ AGSDriverVersionResult WINAPI agsCheckDriverVersion(const char* version_reported
 
 int WINAPI agsGetVersionNumber(void)
 {
-    enum amd_ags_version version = determine_ags_version(0);
+    int public_version = 0;
+    enum amd_ags_version version = determine_ags_version(&public_version);
 
-    TRACE("version %d.\n", version);
+    TRACE("version %s (internal %d).\n", debugstr_agsversion(public_version), version);
 
-    return amd_ags_info[version].ags_public_version;
+    return public_version;
 }
 
 AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext *context, ID3D11Device *device, unsigned int uavSlot, unsigned int *extensionsSupported )
@@ -1279,10 +1281,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds_530(AGSContext* cont
     return set_depth_bounds(context, dx_context, enabled, min_depth, max_depth);
 }
 
-C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 3);
 __ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $4,%eax\n\t"
+                   "cmp $3,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds_530") )
@@ -1331,10 +1333,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap(AGSContext *context
     return update_uav_overlap(context, dx_context, TRUE);
 }
 
-C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 3);
 __ASM_GLOBAL_FUNC( DX11_BeginUAVOverlap_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $4,%eax\n\t"
+                   "cmp $3,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap_520") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap") )
@@ -1365,10 +1367,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_EndUAVOverlap(AGSContext *context, 
     return update_uav_overlap(context, dx_context, FALSE);
 }
 
-C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 3);
 __ASM_GLOBAL_FUNC( DX11_EndUAVOverlap_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $4,%eax\n\t"
+                   "cmp $3,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_EndUAVOverlap_520") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_EndUAVOverlap") )
