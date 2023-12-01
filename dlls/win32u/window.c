@@ -652,6 +652,38 @@ HWND *list_window_children( HDESK desktop, HWND hwnd, UNICODE_STRING *class, DWO
     return NULL;
 }
 
+static BOOL enum_window_children( HWND *list, WNDENUMPROC func, LPARAM lParam )
+{
+    HWND *child_list;
+    BOOL ret = FALSE;
+
+    for ( ; *list; list++)
+    {
+        if (!is_window( *list )) continue;
+        child_list = list_window_children( 0, *list, NULL, 0 );
+        ret = func( *list, lParam );
+        if (child_list)
+        {
+            if (ret) ret = enum_window_children( child_list, func, lParam );
+            free( child_list );
+        }
+        if (!ret) return FALSE;
+    }
+
+    return TRUE;
+}
+
+static BOOL enum_child_windows( HWND parent, WNDENUMPROC func, LPARAM lParam )
+{
+    HWND *list;
+    BOOL ret;
+
+    if (!(list = list_window_children( 0, parent, NULL, 0 ))) return FALSE;
+    ret = enum_window_children( list, func, lParam );
+    free( list );
+    return ret;
+}
+
 /*****************************************************************
  *           NtUserGetAncestor (win32u.@)
  */
@@ -5589,6 +5621,12 @@ ULONG_PTR WINAPI NtUserCallHwndParam( HWND hwnd, DWORD_PTR param, DWORD code )
 
     case NtUserCallHwndParam_ShowOwnedPopups:
         return show_owned_popups( hwnd, param );
+
+    case NtUserCallHwndParam_EnumChildWindows:
+        {
+            struct enum_child_windows_params *params = (void *)param;
+            return enum_child_windows( hwnd, params->proc, params->lparam );
+        }
 
     /* temporary exports */
     case NtUserSetWindowStyle:

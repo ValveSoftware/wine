@@ -702,7 +702,6 @@ extern double fs_hack_get_user_to_real_scale( HMONITOR );
 extern SIZE fs_hack_get_scaled_screen_size( HMONITOR monitor );
 extern RECT fs_hack_get_real_virtual_screen(void);
 extern void fs_hack_init(void);
-extern int mode_compare( const void *p1, const void *p2 );
 
 static inline void mirror_rect( const RECT *window_rect, RECT *rect )
 {
