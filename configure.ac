@@ -817,6 +817,7 @@ enable_winemac_drv=${enable_winemac_drv:-no}
 
 dnl Check for cross compiler(s)
 AC_SUBST(PE_ARCHS,"")
+AC_SUBST(MSHTML_CFLAGS,"")
 cross_archs=
 AS_VAR_SET_IF([enable_archs],
     [test "x$with_system_dllpath" = "x" || AC_MSG_ERROR("The --with-system-dllpath option is not compatible with --enable-archs")
@@ -999,6 +1000,8 @@ This is an error since --enable-archs=$wine_arch was requested.])])
     WINE_TRY_PE_CFLAGS([-Wlogical-op])
     WINE_TRY_PE_CFLAGS([-Wabsolute-value])
     WINE_TRY_PE_CFLAGS([-Wenum-conversion])
+    WINE_TRY_PE_CFLAGS([-Wno-misleading-indentation],
+                       [AS_VAR_APPEND([MSHTML_CFLAGS],[" -Wno-misleading-indentation"])])
 
     case $wine_arch in
       i386) WINE_TRY_PE_CFLAGS([-fno-omit-frame-pointer])
