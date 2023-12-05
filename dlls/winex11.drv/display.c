@@ -530,6 +530,26 @@ static const char *debugstr_devmodew( const DEVMODEW *devmode )
                              position );
 }
 
+static void fixup_device_id(UINT *vendor_id, UINT *device_id)
+{
+    const char *sgi;
+
+    if (*vendor_id == 0x10de /* NVIDIA */ && (sgi = getenv("WINE_HIDE_NVIDIA_GPU")) && *sgi != '0')
+    {
+        *vendor_id = 0x1002; /* AMD */
+        *device_id = 0x73df; /* RX 6700XT */
+    }
+    else if (*vendor_id == 0x1002 /* AMD */ && (sgi = getenv("WINE_HIDE_AMD_GPU")) && *sgi != '0')
+    {
+        *vendor_id = 0x10de; /* NVIDIA */
+        *device_id = 0x2487; /* RTX 3060 */
+    }
+    else if (*vendor_id == 0x1002 && *device_id == 0x163f && (sgi = getenv("WINE_HIDE_VANGOGH_GPU")) && *sgi != '0')
+    {
+        *device_id = 0x687f; /* Radeon RX Vega 56/64 */
+    }
+}
+
 BOOL X11DRV_UpdateDisplayDevices( const struct gdi_device_manager *device_manager, BOOL force, void *param )
 {
     struct gdi_adapter *adapters;
@@ -551,6 +571,8 @@ BOOL X11DRV_UpdateDisplayDevices( const struct gdi_device_manager *device_manage
 
     for (gpu = 0; gpu < gpu_count; gpu++)
     {
+        fixup_device_id( &gpus[gpu].vendor_id, &gpus[gpu].device_id );
+
         device_manager->add_gpu( &gpus[gpu], param );
 
         /* Initialize adapters */

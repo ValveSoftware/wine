@@ -416,6 +416,41 @@ static void fill_luid_property(VkPhysicalDeviceProperties2 *properties2)
             device_node_mask);
 }
 
+static void fixup_device_id(UINT *vendor_id, UINT *device_id)
+{
+    const char *sgi;
+
+    if (*vendor_id == 0x10de /* NVIDIA */ && (sgi = getenv("WINE_HIDE_NVIDIA_GPU")) && *sgi != '0')
+    {
+        *vendor_id = 0x1002; /* AMD */
+        *device_id = 0x73df; /* RX 6700XT */
+    }
+    else if (*vendor_id == 0x1002 /* AMD */ && (sgi = getenv("WINE_HIDE_AMD_GPU")) && *sgi != '0')
+    {
+        *vendor_id = 0x10de; /* NVIDIA */
+        *device_id = 0x2487; /* RTX 3060 */
+    }
+    else if (*vendor_id == 0x1002 && *device_id == 0x163f && (sgi = getenv("WINE_HIDE_VANGOGH_GPU")) && *sgi != '0')
+    {
+        *device_id = 0x687f; /* Radeon RX Vega 56/64 */
+    }
+}
+
+void WINAPI vkGetPhysicalDeviceProperties(VkPhysicalDevice physical_device,
+        VkPhysicalDeviceProperties *properties)
+{
+    struct vkGetPhysicalDeviceProperties_params params;
+    NTSTATUS status;
+
+    TRACE("%p, %p\n", physical_device, properties);
+
+    params.physicalDevice = physical_device;
+    params.pProperties = properties;
+    status = UNIX_CALL(vkGetPhysicalDeviceProperties, &params);
+    assert(!status);
+    fixup_device_id(&properties->vendorID, &properties->deviceID);
+}
+
 void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
         VkPhysicalDeviceProperties2 *properties2)
 {
@@ -429,6 +464,7 @@ void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
     status = UNIX_CALL(vkGetPhysicalDeviceProperties2, &params);
     assert(!status);
     fill_luid_property(properties2);
+    fixup_device_id(&properties2->properties.vendorID, &properties2->properties.deviceID);
 }
 
 void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
@@ -444,6 +480,7 @@ void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
     status = UNIX_CALL(vkGetPhysicalDeviceProperties2KHR, &params);
     assert(!status);
     fill_luid_property(properties2);
+    fixup_device_id(&properties2->properties.vendorID, &properties2->properties.deviceID);
 }
 
 VkResult WINAPI vkCreateDevice(VkPhysicalDevice phys_dev, const VkDeviceCreateInfo *create_info,
