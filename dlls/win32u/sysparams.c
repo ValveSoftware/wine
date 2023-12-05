@@ -6210,6 +6210,12 @@ static void thread_detach(void)
         thread_info->desktop_shm = NULL;
     }
 
+    if (thread_info->queue_shm)
+    {
+        NtUnmapViewOfSection( GetCurrentProcess(), (void *)thread_info->queue_shm );
+        thread_info->queue_shm = NULL;
+    }
+
     exiting_thread_id = 0;
 }
 

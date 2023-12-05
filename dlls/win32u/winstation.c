@@ -670,6 +670,21 @@ const desktop_shm_t *get_desktop_shared_memory(void)
     return thread_info->desktop_shm;
 }
 
+const queue_shm_t *get_queue_shared_memory(void)
+{
+    struct user_thread_info *thread_info = get_user_thread_info();
+    UINT tid = GetCurrentThreadId();
+    WCHAR bufferW[MAX_PATH];
+    char buffer[MAX_PATH];
+
+    if (thread_info->queue_shm) return thread_info->queue_shm;
+
+    snprintf( buffer, ARRAY_SIZE(buffer), "\\KernelObjects\\__wine_thread_mappings\\%08x-queue", tid );
+    asciiz_to_unicode( bufferW, buffer );
+    thread_info->queue_shm = map_shared_memory_section( bufferW, sizeof(*thread_info->queue_shm), NULL );
+    return thread_info->queue_shm;
+}
+
 /***********************************************************************
  *           winstation_init
  *

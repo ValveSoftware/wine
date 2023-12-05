@@ -147,6 +147,7 @@ struct user_thread_info
     BOOL                          clipping_cursor;        /* thread is currently clipping */
     DWORD                         clipping_reset;         /* time when clipping was last reset */
     const desktop_shm_t          *desktop_shm;            /* Ptr to server's desktop shared memory */
+    const queue_shm_t            *queue_shm;              /* Ptr to server's thread queue shared memory */
 };
 
 C_ASSERT( sizeof(struct user_thread_info) <= sizeof(((TEB *)0)->Win32ClientInfo) );
@@ -266,6 +267,7 @@ UINT win_set_flags( HWND hwnd, UINT set_mask, UINT clear_mask );
 
 /* winstation.c */
 extern const desktop_shm_t *get_desktop_shared_memory(void);
+extern const queue_shm_t *get_queue_shared_memory(void);
 
 static inline UINT win_get_flags( HWND hwnd )
 {

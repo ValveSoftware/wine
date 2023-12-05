@@ -909,6 +909,17 @@ struct desktop_shared_memory
 };
 typedef volatile struct desktop_shared_memory desktop_shm_t;
 
+struct queue_shared_memory
+{
+    unsigned int         seq;              /* sequence number - server updating if (seq & 1) != 0 */
+    int                  created;          /* queue has been created */
+    unsigned int         wake_bits;
+    unsigned int         changed_bits;
+    unsigned int         wake_mask;
+    unsigned int         changed_mask;
+};
+typedef volatile struct queue_shared_memory queue_shm_t;
+
 /****************************************************************/
 /* Request declarations */
 
