@@ -1738,6 +1738,38 @@ static struct gpu_info *find_gpu_info_from_pci_id( const struct list *infos, con
     return NULL;
 }
 
+void fixup_device_id( const struct pci_id **pci_id )
+{
+    static struct pci_id fake_id;
+    const char *sgi;
+
+    if ((*pci_id)->vendor == 0x10de /* NVIDIA */ && (sgi = getenv("WINE_HIDE_NVIDIA_GPU")) && *sgi != '0')
+    {
+        fake_id.vendor = 0x1002; /* AMD */
+        fake_id.device = 0x73df; /* RX 6700XT */
+        *pci_id = &fake_id;
+    }
+    else if ((*pci_id)->vendor == 0x1002 /* AMD */ && (sgi = getenv("WINE_HIDE_AMD_GPU")) && *sgi != '0')
+    {
+        fake_id.vendor = 0x10de; /* NVIDIA */
+        fake_id.device = 0x2487; /* RTX 3060 */
+        *pci_id = &fake_id;
+    }
+    else if ((*pci_id)->vendor == 0x1002 && ((*pci_id)->device == 0x163f || (*pci_id)->device == 0x1435)
+             && (sgi = getenv("WINE_HIDE_VANGOGH_GPU")) && *sgi != '0')
+    {
+        fake_id.vendor = (*pci_id)->vendor;
+        fake_id.device = 0x687f; /* Radeon RX Vega 56/64 */
+        *pci_id = &fake_id;
+    }
+    else if ((*pci_id)->vendor == 0x8086 /* Intel */ && (sgi = getenv("WINE_HIDE_INTEL_GPU")) && *sgi != '0')
+    {
+        fake_id.vendor = 0x1002; /* AMD */
+        fake_id.device = 0x73df; /* RX 6700XT */
+        *pci_id = &fake_id;
+    }
+}
+
 static struct gpu_info *find_gpu_info( const struct list *infos, const GUID *uuid, const struct pci_id *pci_id )
 {
     struct gpu_info *info;
@@ -1804,6 +1836,7 @@ static void add_gpu( const char *name, const struct pci_id *pci_id, const GUID *
 
     if (!pci_id->vendor && !pci_id->device && vulkan_gpu) pci_id = &vulkan_gpu->pci_id;
     if (!pci_id->vendor && !pci_id->device && opengl_gpu) pci_id = &opengl_gpu->pci_id;
+    fixup_device_id( &pci_id );
 
     name = gpu_device_name( pci_id->vendor, pci_id->device, name );
     if (!strcmp( name, "Wine Adapter" ) && vulkan_gpu) name = vulkan_gpu->name;

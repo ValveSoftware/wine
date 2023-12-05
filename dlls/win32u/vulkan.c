@@ -1862,6 +1862,18 @@ static void *find_vk_struct( void *s, VkStructureType t )
     return NULL;
 }
 
+static void fixup_device_id_vulkan( UINT *vendor_id, UINT *device_id )
+{
+    struct pci_id id_real;
+    const struct pci_id *id = &id_real;
+
+    id_real.vendor = *vendor_id;
+    id_real.device = *device_id;
+    fixup_device_id( &id );
+    *vendor_id = id->vendor;
+    *device_id = id->device;
+}
+
 static void get_physical_device_properties2( struct vulkan_physical_device *physical_device, VkPhysicalDeviceProperties2 *properties2,
                                              PFN_vkGetPhysicalDeviceProperties2 p_vkGetPhysicalDeviceProperties2 )
 {
@@ -1907,6 +1919,8 @@ static void get_physical_device_properties2( struct vulkan_physical_device *phys
         vk11->deviceLUIDValid = device_luid_valid;
         vk11->deviceNodeMask = node_mask;
     }
+
+    fixup_device_id_vulkan( &properties2->properties.vendorID, &properties2->properties.deviceID );
 
     TRACE( "deviceName:%s deviceLUIDValid:%d LUID:%08x:%08x.\n",
            properties2->properties.deviceName, device_luid_valid, luid.HighPart, luid.LowPart );
