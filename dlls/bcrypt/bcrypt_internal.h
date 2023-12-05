@@ -244,6 +244,8 @@ struct key_asymmetric_decrypt_params
     UCHAR       *output;
     ULONG        output_len;
     ULONG       *ret_len;
+    void        *padding;
+    ULONG        flags;
 };
 
 struct key_asymmetric_encrypt_params

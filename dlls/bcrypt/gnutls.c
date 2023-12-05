@@ -257,9 +257,11 @@ MAKE_FUNCPTR(mpz_sub_ui);
 static BOOL gcrypt_available;
 static void *libgcrypt_handle;
 
+MAKE_FUNCPTR(gcry_control);
 MAKE_FUNCPTR(gcry_check_version);
 MAKE_FUNCPTR(gcry_sexp_build);
 MAKE_FUNCPTR(gcry_pk_encrypt);
+MAKE_FUNCPTR(gcry_pk_decrypt);
 MAKE_FUNCPTR(gcry_mpi_new);
 MAKE_FUNCPTR(gcry_mpi_print);
 MAKE_FUNCPTR(gcry_sexp_release);
@@ -537,9 +539,11 @@ static NTSTATUS gnutls_process_attach( void *args )
     {
         gcrypt_available = TRUE;
 
+        LOAD_FUNCPTR(gcry_control);
         LOAD_FUNCPTR(gcry_check_version);
         LOAD_FUNCPTR(gcry_sexp_build);
         LOAD_FUNCPTR(gcry_pk_encrypt);
+        LOAD_FUNCPTR(gcry_pk_decrypt);
         LOAD_FUNCPTR(gcry_mpi_new);
         LOAD_FUNCPTR(gcry_mpi_print);
         LOAD_FUNCPTR(gcry_sexp_release);
@@ -549,6 +553,12 @@ static NTSTATUS gnutls_process_attach( void *args )
         LOAD_FUNCPTR(gcry_sexp_find_token);
         LOAD_FUNCPTR(gcry_sexp_nth_mpi);
         LOAD_FUNCPTR(gcry_sexp_nth_data);
+
+        if (0)
+        {
+            pgcry_control(GCRYCTL_SET_VERBOSITY, 9);
+            pgcry_control(GCRYCTL_SET_DEBUG_FLAGS, ~0u);
+        }
     }
     else
         WARN("failed to load gcrypt, no support for ECC secret agreement\n");
@@ -2733,12 +2743,17 @@ static NTSTATUS key_asymmetric_duplicate( void *args )
     return STATUS_SUCCESS;
 }
 
+static NTSTATUS key_asymmetric_decrypt_gcrypt( void *args );
+
 static NTSTATUS key_asymmetric_decrypt( void *args )
 {
     const struct key_asymmetric_decrypt_params *params = args;
     gnutls_datum_t e, d = { 0 };
     NTSTATUS status = STATUS_SUCCESS;
     int ret;
+
+    if (params->flags == BCRYPT_PAD_NONE || params->flags == BCRYPT_PAD_OAEP)
+        return key_asymmetric_decrypt_gcrypt( args );
 
     e.data = params->input;
     e.size = params->input_len;
@@ -2911,8 +2926,139 @@ done:
 
     return STATUS_SUCCESS;
 }
+
+static NTSTATUS key_asymmetric_decrypt_gcrypt( void *args )
+{
+    const struct key_asymmetric_encrypt_params *params = args;
+    gnutls_datum_t m, e, d, p, q, u, e1, e2;
+    struct key *key = params->key;
+    UCHAR *input = params->input;
+    ULONG input_len = params->input_len;
+    UCHAR *output = params->output;
+    ULONG *ret_len = params->ret_len;
+    void *padding = params->padding;
+    ULONG flags = params->flags;
+    BCRYPT_OAEP_PADDING_INFO *oaep_info = padding;
+    NTSTATUS status;
+    gcry_sexp_t sexp_privkey = NULL;
+    gcry_sexp_t sexp_result = NULL;
+    gcry_sexp_t sexp_input = NULL;
+    gnutls_datum_t result;
+    size_t result_len;
+    gcry_error_t err;
+    int ret;
+
+    if (!gcrypt_available)
+    {
+        ERR( "Asymmetric decryption not available.\n" );
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    if (key->alg_id != ALG_ID_RSA)
+    {
+        FIXME( "Unsupported algorithm id: %u\n", key->alg_id );
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    if ((ret = pgnutls_privkey_export_rsa_raw( key_data(key)->a.privkey, &m, &e, &d, &p, &q, &u, &e1, &e2 )))
+    {
+        pgnutls_perror( ret );
+        return STATUS_INTERNAL_ERROR;
+    }
+    err = pgcry_sexp_build(&sexp_privkey, NULL,
+                        "(private-key(rsa (e %b)(n %b)(d %b)))",
+                        e.size, e.data,
+                        m.size, m.data,
+                        d.size, d.data);
+    free( m.data ); free( e.data ); free( d.data ); free( p.data ); free( q.data ); free( u.data );
+    free( e1.data ); free( e2.data );
+
+    if (err)
+    {
+        ERR( "Failed to build gcrypt private key\n" );
+        status = STATUS_INVALID_PARAMETER;
+        goto done;
+    }
+
+    if (flags == BCRYPT_PAD_PKCS1) err = pgcry_sexp_build( &sexp_input, NULL, "(enc-val (flags pkcs1)(rsa (a %b)))", input_len, input );
+    else if (flags == BCRYPT_PAD_OAEP)
+    {
+        if (oaep_info->pbLabel)
+            err = pgcry_sexp_build( &sexp_input, NULL,
+                                    "(enc-val (flags oaep)(hash-algo %s)(label %b)(rsa (a %b)))",
+                                    gcrypt_hash_algorithm_name(oaep_info->pszAlgId),
+                                    oaep_info->cbLabel,
+                                    oaep_info->pbLabel,
+                                    input_len,
+                                    input );
+        else
+            err = pgcry_sexp_build( &sexp_input, NULL,
+                                    "(enc-val (flags oaep)(hash-algo %s)(rsa (a %b)))",
+                                    gcrypt_hash_algorithm_name(oaep_info->pszAlgId),
+                                    input_len,
+                                    input );
+    }
+    else if (flags == BCRYPT_PAD_NONE) err = pgcry_sexp_build( &sexp_input, NULL, "(enc-val (flags raw)(rsa (a %b)))", input_len, input );
+    else
+    {
+        status = STATUS_INVALID_PARAMETER;
+        goto done;
+    }
+
+    if (err)
+    {
+        ERR( "Failed to build gcrypt padded input data\n" );
+        status = STATUS_INVALID_PARAMETER;
+        goto done;
+    }
+
+    if ((err = pgcry_pk_decrypt( &sexp_result, sexp_input, sexp_privkey )))
+    {
+        ERR( "Failed to decrypt data\n" );
+        status = STATUS_INVALID_PARAMETER;
+        goto done;
+    }
+
+    result.data = (void *)pgcry_sexp_nth_data(sexp_result, 1, &result_len);
+    result.size = result_len;
+    if (flags == BCRYPT_PAD_NONE) result_len = EXPORT_SIZE(result, key->u.a.bitlen / 8, 1);
+    *ret_len = result_len;
+
+    if (params->output_len >= result_len)
+    {
+        status = STATUS_SUCCESS;
+        if (flags == BCRYPT_PAD_NONE)
+            export_gnutls_datum(output, params->output_len, &result, 1);
+        else
+            memcpy(output, result.data, result_len);
+    }
+    else if (params->output_len == 0) status = STATUS_SUCCESS;
+    else status = STATUS_BUFFER_TOO_SMALL;
+
+done:
+    pgcry_sexp_release(sexp_input);
+    pgcry_sexp_release(sexp_privkey);
+    pgcry_sexp_release(sexp_result);
+
+    if (status) return status;
+
+    if (err)
+    {
+        ERR( "Error %s/%s\n", pgcry_strsource (err), pgcry_strerror (err) );
+        return STATUS_INTERNAL_ERROR;
+    }
+
+    return STATUS_SUCCESS;
+}
+
 #else
 static NTSTATUS key_asymmetric_encrypt_gcrypt( void *args )
+{
+    ERR("Asymmetric key encryption not supported without gcrypt.\n");
+    return STATUS_NOT_IMPLEMENTED;
+}
+
+static NTSTATUS key_asymmetric_decrypt_gcrypt( void *args )
 {
     ERR("Asymmetric key encryption not supported without gcrypt.\n");
     return STATUS_NOT_IMPLEMENTED;

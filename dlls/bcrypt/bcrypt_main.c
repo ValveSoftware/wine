@@ -2309,11 +2309,6 @@ NTSTATUS WINAPI BCryptDecrypt( BCRYPT_KEY_HANDLE handle, UCHAR *input, ULONG inp
     }
     else
     {
-        if (flags & BCRYPT_PAD_NONE || flags & BCRYPT_PAD_OAEP)
-        {
-            FIXME( "flags %#lx not implemented\n", flags );
-            return STATUS_NOT_IMPLEMENTED;
-        }
         if (!is_asymmetric_encryption_key( key )) return STATUS_NOT_SUPPORTED;
 
         params.key = key;
@@ -2322,6 +2317,8 @@ NTSTATUS WINAPI BCryptDecrypt( BCRYPT_KEY_HANDLE handle, UCHAR *input, ULONG inp
         params.output = output;
         params.output_len = output_len;
         params.ret_len = ret_len;
+        params.padding    = padding;
+        params.flags      = flags;
         ret = UNIX_CALL(key_asymmetric_decrypt, &params);
     }
 
