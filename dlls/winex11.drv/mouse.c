@@ -1735,12 +1735,12 @@ static BOOL X11DRV_XIDeviceChangedEvent( XIDeviceChangedEvent *event )
     return TRUE;
 }
 
-static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
+static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input, RAWINPUT *rawinput )
 {
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     XIValuatorClassInfo *x = &thread_data->x_valuator, *y = &thread_data->y_valuator;
-    double x_value = 0, y_value = 0, x_scale, y_scale;
-    const double *values = event->valuators.values;
+    const double *values = event->valuators.values, *raw_values = event->raw_values;
+    double x_raw = 0, y_raw = 0, x_value = 0, y_value = 0, x_scale, y_scale;
     RECT virtual_rect;
     int i;
 
@@ -1768,16 +1768,19 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
         if (!XIMaskIsSet( event->valuators.mask, i )) continue;
         if (i == x->number)
         {
+            x_raw = *raw_values;
             x_value = *values;
             if (x->mode == XIModeRelative) x->value += x_value * x_scale;
             else x->value = (x_value - x->min) * x_scale;
         }
         if (i == y->number)
         {
+            y_raw = *raw_values;
             y_value = *values;
             if (y->mode == XIModeRelative) y->value += y_value * y_scale;
             else y->value = (y_value - y->min) * y_scale;
         }
+        raw_values++;
         values++;
     }
 
@@ -1789,12 +1792,6 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
 
     x->value -= input->mi.dx;
     y->value -= input->mi.dy;
-
-    if (!(input->mi.dwFlags & MOUSEEVENTF_ABSOLUTE) && !input->mi.dx && !input->mi.dy)
-    {
-        TRACE( "accumulating motion\n" );
-        return FALSE;
-    }
 
     if (input->mi.dwFlags & MOUSEEVENTF_ABSOLUTE)
         fs_hack_point_real_to_user( (POINT *)&input->mi.dx );
@@ -1812,6 +1809,11 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
         input->mi.dx = lround( (double)input->mi.dx / user_to_real_scale );
         input->mi.dy = lround( (double)input->mi.dy / user_to_real_scale );
     }
+
+    if (x->mode != XIModeAbsolute) rawinput->data.mouse.lLastX = x_raw;
+    else rawinput->data.mouse.lLastX = input->mi.dx;
+    if (y->mode != XIModeAbsolute) rawinput->data.mouse.lLastY = y_raw;
+    else rawinput->data.mouse.lLastY = input->mi.dy;
 
     return TRUE;
 }
@@ -1840,7 +1842,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.mi.dwExtraInfo = 0;
     input.mi.dx          = 0;
     input.mi.dy          = 0;
-    if (!map_raw_event_coords( event, &input )) return FALSE;
+    if (!map_raw_event_coords( event, &input, &rawinput )) return FALSE;
 
     if (!thread_data->xi2_rawinput_only)
         __wine_send_input( 0, &input, NULL );
@@ -1854,8 +1856,6 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
         rawinput.data.mouse.ulRawButtons = 0;
         rawinput.data.mouse.usButtonData = 0;
         rawinput.data.mouse.usButtonFlags = 0;
-        rawinput.data.mouse.lLastX = input.mi.dx;
-        rawinput.data.mouse.lLastY = input.mi.dy;
         rawinput.data.mouse.ulExtraInformation = 0;
 
         input.type = INPUT_HARDWARE;
