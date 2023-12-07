@@ -445,6 +445,39 @@ HRESULT mfplat_DllRegisterServer(void)
             resampler_types,
         },
         {
+            CLSID_CFrameRateConvertDmo,
+            MFT_CATEGORY_VIDEO_EFFECT,
+            L"Frame Rate Converter",
+            MFT_ENUM_FLAG_SYNCMFT,
+            /* FIXME: check the actual media types */
+            ARRAY_SIZE(color_convert_input_types),
+            color_convert_input_types,
+            ARRAY_SIZE(color_convert_output_types),
+            color_convert_output_types,
+        },
+        {
+            CLSID_CResizerDMO,
+            MFT_CATEGORY_VIDEO_EFFECT,
+            L"Resizer MFT",
+            MFT_ENUM_FLAG_SYNCMFT,
+            /* FIXME: check the actual media types */
+            ARRAY_SIZE(color_convert_input_types),
+            color_convert_input_types,
+            ARRAY_SIZE(color_convert_output_types),
+            color_convert_output_types,
+        },
+        {
+            CLSID_CColorControlDmo,
+            MFT_CATEGORY_VIDEO_EFFECT,
+            L"Color Control",
+            MFT_ENUM_FLAG_SYNCMFT,
+            /* FIXME: check the actual media types */
+            ARRAY_SIZE(color_convert_input_types),
+            color_convert_input_types,
+            ARRAY_SIZE(color_convert_output_types),
+            color_convert_output_types,
+        },
+        {
             CLSID_CColorConvertDMO,
             MFT_CATEGORY_VIDEO_EFFECT,
             L"Color Converter MFT",
