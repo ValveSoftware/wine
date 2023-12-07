@@ -507,6 +507,19 @@ HRESULT mfplat_DllRegisterServer(void)
             ARRAY_SIZE(video_decoder_output_types),
             video_decoder_output_types,
         },
+        {
+            /* HACK: Register the video processor as a decoder too as
+             * the media source currently always decodes.
+             */
+            CLSID_VideoProcessorMFT,
+            MFT_CATEGORY_VIDEO_DECODER,
+            L"Null Decoder",
+            MFT_ENUM_FLAG_SYNCMFT,
+            ARRAY_SIZE(video_processor_input_types),
+            video_processor_input_types,
+            ARRAY_SIZE(video_processor_output_types),
+            video_processor_output_types,
+        },
     };
 
     unsigned int i;
