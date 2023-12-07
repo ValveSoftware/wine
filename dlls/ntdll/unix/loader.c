@@ -2345,7 +2345,7 @@ static void hacks_init(void)
     env_str = getenv("WINE_FSYNC_YIELD_TO_WAITERS");
     if (env_str)
         fsync_yield_to_waiters = !!atoi(env_str);
-    else if (sgi) fsync_yield_to_waiters = !strcmp(sgi, "292120") || !strcmp(sgi, "345350");
+    else if (sgi) fsync_yield_to_waiters = !strcmp(sgi, "292120") || !strcmp(sgi, "345350") || !strcmp(sgi, "292140");
     if (fsync_yield_to_waiters)
         ERR("HACK: fsync: yield to waiters.\n");
 
