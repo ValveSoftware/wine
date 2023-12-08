@@ -608,6 +608,23 @@ NTSTATUS wg_source_get_position(void *args)
     return STATUS_SUCCESS;
 }
 
+NTSTATUS wg_source_set_position(void *args)
+{
+    struct wg_source_set_position_params *params = args;
+    struct wg_source *source = get_source(params->source);
+    guint64 time = params->time * 100;
+    GstEvent *event;
+
+    GST_TRACE("source %p", source);
+
+    if (!(event = gst_event_new_seek(1.0, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH,
+            GST_SEEK_TYPE_SET, time, GST_SEEK_TYPE_NONE, -1))
+            || !gst_pad_push_event(source->streams[0].pad, event))
+        GST_WARNING("Failed to seek source %p to %" G_GINT64_MODIFIER "x", source, time);
+
+    return S_OK;
+}
+
 NTSTATUS wg_source_push_data(void *args)
 {
     struct wg_source_push_data_params *params = args;

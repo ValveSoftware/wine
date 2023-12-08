@@ -790,6 +790,8 @@ static HRESULT media_source_start(struct media_source *source, IMFPresentationDe
     free(descriptors);
 
     source->state = SOURCE_RUNNING;
+    if (position->vt == VT_I8)
+        wg_source_set_position(source->wg_source, position->hVal.QuadPart);
 
     if (position->vt == VT_I8)
         wg_parser_stream_seek(source->streams[0]->wg_stream, 1.0, position->hVal.QuadPart, 0,
