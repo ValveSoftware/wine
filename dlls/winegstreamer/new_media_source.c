@@ -307,6 +307,7 @@ struct media_source
     UINT64 file_size;
     wg_parser_t wg_parser;
     UINT64 duration;
+    BYTE *read_buffer;
 
     IMFStreamDescriptor **descriptors;
     struct media_stream **streams;
@@ -926,8 +927,33 @@ static HRESULT wait_on_sample(struct media_stream *stream, IUnknown *token)
 {
     struct media_source *source = impl_from_IMFMediaSource(stream->media_source);
     struct wg_parser_buffer buffer;
+    DWORD id, read_size;
+    UINT64 read_offset;
+    IMFSample *sample;
+    HRESULT hr;
 
     TRACE("%p, %p\n", stream, token);
+
+    if (FAILED(hr = IMFStreamDescriptor_GetStreamIdentifier(stream->descriptor, &id)))
+        return hr;
+    id = source->stream_map[id - 1];
+
+    while (SUCCEEDED(hr) && (hr = wg_source_read_data(source->wg_source, id, &sample)) == E_PENDING)
+    {
+        if (FAILED(hr = wg_source_get_position(source->wg_source, &read_offset)))
+            break;
+        if (FAILED(hr = IMFByteStream_SetCurrentPosition(source->byte_stream, read_offset)))
+            WARN("Failed to seek stream to %#I64x, hr %#lx\n", read_offset, hr);
+        else if (FAILED(hr = IMFByteStream_Read(source->byte_stream, source->read_buffer, SOURCE_BUFFER_SIZE, &read_size)))
+            WARN("Failed to read %#lx bytes from stream, hr %#lx\n", read_size, hr);
+        else if (FAILED(hr = wg_source_push_data(source->wg_source, source->read_buffer, read_size)))
+            WARN("Failed to push %#lx bytes to source, hr %#lx\n", read_size, hr);
+    }
+
+    if (FAILED(hr))
+        WARN("Failed to read stream %lu data, hr %#lx\n", id, hr);
+    else
+        IMFSample_Release(sample);
 
     if (wg_parser_stream_get_buffer(source->wg_parser, stream->wg_stream, &buffer))
         return media_stream_send_sample(stream, &buffer, token);
@@ -1497,6 +1523,7 @@ static ULONG WINAPI media_source_Release(IMFMediaSource *iface)
         IMFMediaEventQueue_Release(source->event_queue);
         IMFByteStream_Release(source->byte_stream);
         wg_source_destroy(source->wg_source);
+        free(source->read_buffer);
         wg_parser_destroy(source->wg_parser);
         source->cs.DebugInfo->Spare[0] = 0;
         DeleteCriticalSection(&source->cs);
@@ -1910,6 +1937,8 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
     InitializeCriticalSection(&object->cs);
     object->cs.DebugInfo->Spare[0] = (DWORD_PTR)(__FILE__ ": cs");
 
+    object->read_buffer = context->buffer;
+    context->buffer = NULL;
     object->wg_source = context->wg_source;
     context->wg_source = 0;
 
@@ -2011,6 +2040,7 @@ fail:
     if (object->event_queue)
         IMFMediaEventQueue_Release(object->event_queue);
     IMFByteStream_Release(object->byte_stream);
+    free(object->read_buffer);
     free(object);
 
     return hr;
