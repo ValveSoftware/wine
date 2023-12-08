@@ -447,6 +447,15 @@ HRESULT wg_source_get_position(wg_source_t source, uint64_t *read_offset)
     return S_OK;
 }
 
+HRESULT wg_source_set_position(wg_source_t source, uint64_t time)
+{
+    struct wg_source_set_position_params params = {.source = source, .time = time};
+
+    TRACE("source %#I64x, time %s\n", source, debugstr_time(time));
+
+    return HRESULT_FROM_NT(WINE_UNIX_CALL(unix_wg_source_set_position, &params));
+}
+
 HRESULT wg_source_push_data(wg_source_t source, const void *data, uint32_t size)
 {
     struct wg_source_push_data_params params =
