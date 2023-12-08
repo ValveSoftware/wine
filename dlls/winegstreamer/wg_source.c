@@ -44,6 +44,9 @@
 struct source_stream
 {
     GstPad *pad;
+    GstAtomicQueue *queue;
+    GstBuffer *buffer;
+    gboolean eos;
 };
 
 struct wg_source
@@ -165,9 +168,34 @@ static bool source_set_stream_flags(struct wg_source *source, guint index, GstSt
     return true;
 }
 
+static GstStreamFlags source_get_stream_flags(struct wg_source *source, guint index)
+{
+    GstStreamFlags flags;
+    GstStream *stream;
+    if (!(stream = source_get_stream(source, index)))
+        return 0;
+    flags = gst_stream_get_stream_flags(stream);
+    gst_object_unref(stream);
+    return flags;
+}
+
+static NTSTATUS source_get_stream_buffer(struct wg_source *source, guint index, GstBuffer **buffer)
+{
+    GstBuffer **stream_buffer;
+    if (index >= source->stream_count)
+        return STATUS_INVALID_PARAMETER;
+
+    stream_buffer = &source->streams[index].buffer;
+    if (!*stream_buffer && !(*stream_buffer = gst_atomic_queue_pop(source->streams[index].queue)))
+        return source->streams[index].eos ? STATUS_END_OF_FILE : STATUS_PENDING;
+
+    *buffer = gst_buffer_ref(*stream_buffer);
+    return STATUS_SUCCESS;
+}
+
 static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
 {
-    guint32 seqnum = gst_event_get_seqnum(event);
+    guint32 i, seqnum = gst_event_get_seqnum(event);
     GstSeekType cur_type, stop_type;
     GstSeekFlags flags;
     GstFormat format;
@@ -196,6 +224,9 @@ static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
     }
 
     source->segment.start = cur;
+
+    for (i = 0; i < ARRAY_SIZE(source->streams); i++)
+        source->streams[i].eos = false;
 
     if (flags & GST_SEEK_FLAG_FLUSH)
     {
@@ -294,10 +325,21 @@ static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
 
 static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *buffer)
 {
-    struct wg_soutce *source = gst_pad_get_element_private(pad);
+    struct wg_source *source = gst_pad_get_element_private(pad);
+    guint index;
+
     GST_TRACE("source %p, pad %p, buffer %p.", source, pad, buffer);
-    gst_buffer_unref(buffer);
-    return GST_FLOW_EOS;
+
+    for (index = 0; index < source->stream_count; index++)
+        if (source->streams[index].pad == pad)
+            break;
+
+    if (source_get_stream_flags(source, index) & GST_STREAM_FLAG_SELECT)
+        gst_atomic_queue_push(source->streams[index].queue, buffer);
+    else
+        gst_buffer_unref(buffer);
+
+    return GST_FLOW_OK;
 }
 
 static gboolean sink_event_caps(struct wg_source *source, GstPad *pad, GstEvent *event)
@@ -370,6 +412,23 @@ static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, G
     return true;
 }
 
+static gboolean sink_event_eos(struct wg_source *source, GstPad *pad, GstEvent *event)
+{
+    guint index;
+
+    GST_TRACE("source %p, pad %p, event %p", source, pad, event);
+
+    for (index = 0; index < source->stream_count; index++)
+        if (source->streams[index].pad == pad)
+            break;
+
+    if (index < source->stream_count)
+        source->streams[index].eos = true;
+
+    gst_event_unref(event);
+    return true;
+}
+
 static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
 {
     struct wg_source *source = gst_pad_get_element_private(pad);
@@ -382,6 +441,8 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
         return sink_event_tag(source, pad, event);
     case GST_EVENT_STREAM_START:
         return sink_event_stream_start(source, pad, event);
+    case GST_EVENT_EOS:
+        return sink_event_eos(source, pad, event);
     default:
         return gst_pad_event_default(pad, parent, event);
     }
@@ -481,6 +542,8 @@ NTSTATUS wg_source_create(void *args)
     {
         if (!(source->streams[i].pad = create_pad_with_caps(GST_PAD_SINK, NULL)))
             goto error;
+        if (!(source->streams[i].queue = gst_atomic_queue_new(1)))
+            goto error;
         gst_pad_set_element_private(source->streams[i].pad, source);
         gst_pad_set_chain_function(source->streams[i].pad, sink_chain_cb);
         gst_pad_set_event_function(source->streams[i].pad, sink_event_cb);
@@ -534,6 +597,10 @@ error:
     }
     for (i = 0; i < ARRAY_SIZE(source->streams); i++)
     {
+        if (source->streams[i].buffer)
+            gst_buffer_unref(source->streams[i].buffer);
+        if (source->streams[i].queue)
+            gst_atomic_queue_unref(source->streams[i].queue);
         if (source->streams[i].pad)
             gst_object_unref(source->streams[i].pad);
     }
@@ -558,7 +625,12 @@ NTSTATUS wg_source_destroy(void *args)
     gst_element_set_state(source->container, GST_STATE_NULL);
     gst_object_unref(source->container);
     for (i = 0; i < ARRAY_SIZE(source->streams); i++)
+    {
+        if (source->streams[i].buffer)
+            gst_buffer_unref(source->streams[i].buffer);
+        gst_atomic_queue_unref(source->streams[i].queue);
         gst_object_unref(source->streams[i].pad);
+    }
     gst_object_unref(source->src_pad);
     free(source->url);
     free(source);
@@ -614,6 +686,7 @@ NTSTATUS wg_source_set_position(void *args)
     struct wg_source *source = get_source(params->source);
     guint64 time = params->time * 100;
     GstEvent *event;
+    guint i;
 
     GST_TRACE("source %p", source);
 
@@ -621,6 +694,18 @@ NTSTATUS wg_source_set_position(void *args)
             GST_SEEK_TYPE_SET, time, GST_SEEK_TYPE_NONE, -1))
             || !gst_pad_push_event(source->streams[0].pad, event))
         GST_WARNING("Failed to seek source %p to %" G_GINT64_MODIFIER "x", source, time);
+
+    for (i = 0; i < source->stream_count; i++)
+    {
+        GstBuffer *buffer;
+
+        while (!source_get_stream_buffer(source, i, &buffer))
+        {
+            gst_buffer_unref(source->streams[i].buffer);
+            source->streams[i].buffer = NULL;
+            gst_buffer_unref(buffer);
+        }
+    }
 
     return S_OK;
 }
@@ -674,6 +759,65 @@ eos:
     source->segment.start = source->segment.stop;
 
     return STATUS_SUCCESS;
+}
+
+NTSTATUS wg_source_read_data(void *args)
+{
+    struct wg_source_read_data_params *params = args;
+    struct wg_source *source = get_source(params->source);
+    struct wg_sample *sample = params->sample;
+    NTSTATUS status = STATUS_SUCCESS;
+    guint index = params->index;
+    GstMapInfo info = {0};
+    GstBuffer *buffer;
+
+    GST_TRACE("source %p, index %#x, sample %p", source, index, sample);
+
+    if ((status = source_get_stream_buffer(source, index, &buffer)))
+        return status;
+
+    if (!gst_buffer_map(buffer, &info, GST_MAP_READ))
+        status = STATUS_UNSUCCESSFUL;
+    else
+    {
+        if (info.size > sample->max_size)
+            status = STATUS_BUFFER_TOO_SMALL;
+        else
+        {
+            memcpy(wg_sample_data(sample), info.data, info.size);
+            sample->size = info.size;
+
+            if (GST_BUFFER_PTS_IS_VALID(buffer))
+            {
+                sample->flags |= WG_SAMPLE_FLAG_HAS_PTS;
+                sample->pts = GST_BUFFER_PTS(buffer) / 100;
+            }
+            else if (GST_BUFFER_DTS_IS_VALID(buffer))
+            {
+                sample->flags |= WG_SAMPLE_FLAG_HAS_PTS;
+                sample->pts = GST_BUFFER_DTS(buffer) / 100;
+            }
+            if (GST_BUFFER_DURATION_IS_VALID(buffer))
+            {
+                GstClockTime duration = GST_BUFFER_DURATION(buffer) / 100;
+                sample->flags |= WG_SAMPLE_FLAG_HAS_DURATION;
+                sample->duration = duration;
+            }
+            if (!GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DELTA_UNIT))
+                sample->flags |= WG_SAMPLE_FLAG_SYNC_POINT;
+            if (GST_BUFFER_FLAG_IS_SET(buffer, GST_BUFFER_FLAG_DISCONT))
+                sample->flags |= WG_SAMPLE_FLAG_DISCONTINUITY;
+
+            gst_buffer_unref(source->streams[index].buffer);
+            source->streams[index].buffer = NULL;
+        }
+
+        sample->max_size = info.size;
+        gst_buffer_unmap(buffer, &info);
+    }
+
+    gst_buffer_unref(buffer);
+    return status;
 }
 
 NTSTATUS wg_source_get_stream_format(void *args)
@@ -831,6 +975,18 @@ NTSTATUS wg_source_set_stream_flags(void *args)
     flags = select ? GST_STREAM_FLAG_SELECT : GST_STREAM_FLAG_UNSELECT;
     if (!source_set_stream_flags(source, index, flags))
         return STATUS_UNSUCCESSFUL;
+
+    if (!select)
+    {
+        GstBuffer *buffer;
+
+        while (!source_get_stream_buffer(source, index, &buffer))
+        {
+            gst_buffer_unref(source->streams[index].buffer);
+            source->streams[index].buffer = NULL;
+            gst_buffer_unref(buffer);
+        }
+    }
 
     return STATUS_SUCCESS;
 }
