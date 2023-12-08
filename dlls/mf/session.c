@@ -1677,7 +1677,7 @@ static HRESULT session_append_node(struct media_session *session, IMFTopologyNod
                         &IID_IMFVideoSampleAllocator, (void **)&topo_node->u.sink.allocator)))
                     {
                         if (FAILED(hr = IMFVideoSampleAllocator_InitializeSampleAllocator(topo_node->u.sink.allocator,
-                                2, media_type)))
+                                4, media_type)))
                         {
                             WARN("Failed to initialize sample allocator for the stream, hr %#lx.\n", hr);
                         }
