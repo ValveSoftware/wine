@@ -17,6 +17,8 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include "ntstatus.h"
+#define WIN32_NO_STATUS
 #include "gst_private.h"
 
 #include "ks.h"
@@ -26,6 +28,7 @@
 #include "d3d9types.h"
 #include "mfapi.h"
 #include "mmreg.h"
+#include "mferror.h"
 
 #include "wine/debug.h"
 #include "wine/list.h"
