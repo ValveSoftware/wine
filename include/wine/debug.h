@@ -556,9 +556,6 @@ static inline const char *debugstr_variant( const VARIANT *v ) { return wine_dbg
                                     if (TRACE_ON(ftrace)) __wine_dbg_ftrace_printf( ctx, "" ); \
                                 } while (0);
 
-#define __WINE_DBG_LOG(...) \
-    wine_dbg_log( __dbcl, __dbch, __func__, __builtin_return_address(0), __VA_ARGS__); } } while(0)
-
 #endif /* __WINESRC__ */
 
 #ifdef __cplusplus
