@@ -5075,7 +5075,8 @@ static void test_attributes_serialization(void)
 static void test_wrapped_media_type(void)
 {
     IMFMediaType *mediatype, *mediatype2;
-    UINT32 count, type;
+    MF_ATTRIBUTE_TYPE type;
+    UINT32 count;
     HRESULT hr;
     GUID guid;
 
