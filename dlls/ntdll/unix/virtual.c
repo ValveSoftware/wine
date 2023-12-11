@@ -2183,8 +2183,9 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     int top_down = alloc_type & MEM_TOP_DOWN;
     void *ptr;
     NTSTATUS status;
+    const void *effective_user_space_limit = wine_allocs_2g_limit ? (void *)0x7fff0000 : user_space_limit;
 
-    limit = limit ? min( limit + 1, (UINT_PTR)user_space_limit) : (UINT_PTR)user_space_limit;
+    limit = limit ? min( limit + 1, (UINT_PTR)effective_user_space_limit) : (UINT_PTR)effective_user_space_limit;
 
     if (alloc_type & MEM_REPLACE_PLACEHOLDER)
     {

@@ -159,6 +159,7 @@ extern BOOL no_priv_elevation DECLSPEC_HIDDEN;
 extern BOOL localsystem_sid DECLSPEC_HIDDEN;
 extern BOOL high_dll_addresses DECLSPEC_HIDDEN;
 extern BOOL simulate_writecopy DECLSPEC_HIDDEN;
+extern BOOL wine_allocs_2g_limit DECLSPEC_HIDDEN;
 extern long long ram_reporting_bias;
 
 extern void init_environment( int argc, char *argv[], char *envp[] ) DECLSPEC_HIDDEN;
