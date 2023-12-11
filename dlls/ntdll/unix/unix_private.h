@@ -210,6 +210,7 @@ extern struct _KUSER_SHARED_DATA *user_shared_data;
 extern BOOL localsystem_sid;
 extern BOOL simulate_writecopy;
 extern long long ram_reporting_bias;
+extern BOOL wine_allocs_2g_limit;
 
 extern void init_environment(void);
 extern void init_startup_info(void);

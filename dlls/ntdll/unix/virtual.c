@@ -2448,6 +2448,8 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     void *ptr;
     int unix_prot = get_unix_prot( vprot );
     NTSTATUS status;
+    const void *effective_user_space_limit = !is_win64 && wine_allocs_2g_limit ?
+        (void *)0x7fff0000 : min( user_space_limit, host_addr_space_limit);
 
     if (!align_mask) align_mask = granularity_mask;
     assert( align_mask >= host_page_mask );
@@ -2493,7 +2495,7 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     else
     {
         void *start = address_space_start;
-        void *end = min( user_space_limit, host_addr_space_limit );
+        void *end = min( effective_user_space_limit, host_addr_space_limit );
         size_t host_size = ROUND_SIZE( 0, size, host_page_mask );
 
         if (limit_low && (void *)limit_low > start) start = (void *)limit_low;
