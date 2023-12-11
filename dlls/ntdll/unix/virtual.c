@@ -2095,6 +2095,7 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     int top_down = alloc_type & MEM_TOP_DOWN;
     void *ptr;
     NTSTATUS status;
+    const void *effective_user_space_limit = !is_win64 && wine_allocs_2g_limit ? (void *)0x7fff0000 : user_space_limit;
 
     if (alloc_type & MEM_REPLACE_PLACEHOLDER)
     {
@@ -2131,7 +2132,7 @@ static NTSTATUS map_view( struct file_view **view_ret, void *base, size_t size,
     }
     else
     {
-        limit_high = limit_high ? min( limit_high + 1, (UINT_PTR)user_space_limit) : (UINT_PTR)user_space_limit;
+        limit_high = limit_high ? min( limit_high + 1, (UINT_PTR)effective_user_space_limit) : (UINT_PTR)effective_user_space_limit;
         if (limit_low < (ULONG_PTR)address_space_start) limit_low = (ULONG_PTR)address_space_start;
         if (!align_mask) align_mask = granularity_mask;
 
