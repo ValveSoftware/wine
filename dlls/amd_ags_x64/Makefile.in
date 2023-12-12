@@ -6,7 +6,7 @@ UNIX_LIBS = $(DRM_LIBS) $(DRMAMDGPU_LIBS)
 IMPORTS   = version vulkan-1 user32
 IMPORTLIB = amd_ags_x64
 
-EXTRADLLFLAGS = -mno-cygwin -Wb,--prefer-native
+EXTRADLLFLAGS = -mno-cygwin
 
 SOURCES = \
 	amd_ags_x64_main.c \
