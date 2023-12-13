@@ -109,6 +109,7 @@ static const WCHAR *overflow_values[] = {
 #define ATTR_REMOVE_COMMA   0x0010
 #define ATTR_NO_NULL        0x0020
 #define ATTR_COMPAT_IE10    0x0040
+#define ATTR_IN_CSSPROPERTIES 0x0080
 
 typedef struct {
     const WCHAR *name;
@@ -167,13 +168,13 @@ static const style_tbl_entry_t style_tbl[] = {
         L"background-position-x",
         DISPID_IHTMLCSSSTYLEDECLARATION_BACKGROUNDPOSITIONX,
         DISPID_A_BACKGROUNDPOSX,
-        ATTR_FIX_PX
+        ATTR_FIX_PX | ATTR_IN_CSSPROPERTIES
     },
     {
         L"background-position-y",
         DISPID_IHTMLCSSSTYLEDECLARATION_BACKGROUNDPOSITIONY,
         DISPID_A_BACKGROUNDPOSY,
-        ATTR_FIX_PX
+        ATTR_FIX_PX | ATTR_IN_CSSPROPERTIES
     },
     {
         L"background-repeat",
@@ -9964,13 +9965,16 @@ HRESULT CSSStyle_get_static_dispid(compat_mode_t compat_mode, BSTR name, DWORD f
 {
     const style_tbl_entry_t *style_entry;
 
+    /* Found in prototypes */
+    if(compat_mode >= COMPAT_MODE_IE9)
+        return DISP_E_UNKNOWNNAME;
+
     style_entry = lookup_style_tbl_compat_mode(compat_mode, name);
     if(style_entry) {
-        DISPID id = compat_mode >= COMPAT_MODE_IE9 ? style_entry->dispid : style_entry->compat_dispid;
-        if(id == DISPID_UNKNOWN)
+        if(style_entry->compat_dispid == DISPID_UNKNOWN)
             return DISP_E_UNKNOWNNAME;
 
-        *dispid = id;
+        *dispid = style_entry->compat_dispid;
         return S_OK;
     }
 
@@ -10034,7 +10038,8 @@ static const dispex_static_data_vtbl_t HTMLStyle_dispex_vtbl = {
     CSSSTYLE_DISPEX_VTBL_ENTRIES,
     .query_interface   = HTMLStyle_query_interface,
     .traverse          = HTMLStyle_traverse,
-    .unlink            = HTMLStyle_unlink
+    .unlink            = HTMLStyle_unlink,
+    .get_static_dispid = CSSStyle_get_static_dispid
 };
 
 static const tid_t HTMLStyle_iface_tids[] = {
@@ -10138,11 +10143,147 @@ HRESULT HTMLStyle_Create(HTMLElement *elem, HTMLStyle **ret)
     return S_OK;
 }
 
+/* dummy dispex used only for MSCSSPropertiesPrototype in prototype chain */
+static HRESULT HTMLCSSProperties_get_static_dispid(compat_mode_t compat_mode, BSTR name, DWORD flags, DISPID *dispid)
+{
+    const style_tbl_entry_t *style_entry;
+
+    style_entry = lookup_style_tbl_compat_mode(compat_mode, name);
+    if(style_entry) {
+        if(style_entry->dispid == DISPID_UNKNOWN || !(style_entry->flags & ATTR_IN_CSSPROPERTIES))
+            return DISP_E_UNKNOWNNAME;
+
+        *dispid = style_entry->dispid;
+        return S_OK;
+    }
+
+    return DISP_E_UNKNOWNNAME;
+}
+
+static void HTMLCSSProperties_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t style_hooks[] = {
+        {DISPID_IHTMLSTYLE_TEXTDECORATIONNONE},
+        {DISPID_IHTMLSTYLE_TEXTDECORATIONUNDERLINE},
+        {DISPID_IHTMLSTYLE_TEXTDECORATIONOVERLINE},
+        {DISPID_IHTMLSTYLE_TEXTDECORATIONLINETHROUGH},
+        {DISPID_IHTMLSTYLE_TEXTDECORATIONBLINK},
+        {DISPID_IHTMLSTYLE_PIXELTOP},
+        {DISPID_IHTMLSTYLE_PIXELLEFT},
+        {DISPID_IHTMLSTYLE_PIXELWIDTH},
+        {DISPID_IHTMLSTYLE_PIXELHEIGHT},
+        {DISPID_IHTMLSTYLE_POSTOP},
+        {DISPID_IHTMLSTYLE_POSLEFT},
+        {DISPID_IHTMLSTYLE_POSWIDTH},
+        {DISPID_IHTMLSTYLE_POSHEIGHT},
+        {DISPID_IHTMLSTYLE_TOSTRING},
+        {DISPID_UNKNOWN}
+    };
+    static const dispex_hook_t style2_hooks[] = {
+        {DISPID_IHTMLSTYLE2_SETEXPRESSION},
+        {DISPID_IHTMLSTYLE2_GETEXPRESSION},
+        {DISPID_IHTMLSTYLE2_REMOVEEXPRESSION},
+        {DISPID_IHTMLSTYLE2_PIXELBOTTOM},
+        {DISPID_IHTMLSTYLE2_PIXELRIGHT},
+        {DISPID_IHTMLSTYLE2_POSBOTTOM},
+        {DISPID_IHTMLSTYLE2_POSRIGHT},
+        {DISPID_UNKNOWN}
+    };
+
+    dispex_info_add_interface(info, IHTMLStyle6_tid, NULL);
+    dispex_info_add_interface(info, IHTMLStyle5_tid, NULL);
+    dispex_info_add_interface(info, IHTMLStyle3_tid, NULL);
+    dispex_info_add_interface(info, IHTMLStyle2_tid, style2_hooks);
+    dispex_info_add_interface(info, IHTMLStyle_tid, style_hooks);
+}
+
+static const dispex_static_data_vtbl_t HTMLCSSProperties_dispex_vtbl = {
+    .get_static_dispid = HTMLCSSProperties_get_static_dispid
+};
+
+dispex_static_data_t HTMLCSSProperties_dispex = {
+    "MSCSSProperties",
+    &HTMLCSSProperties_dispex_vtbl,
+    PROTO_ID_HTMLCSSProperties,
+    NULL_tid,
+    no_iface_tids,
+    HTMLCSSProperties_init_dispex_info
+};
+
+static HRESULT HTMLW3CComputedStyle_get_static_dispid(compat_mode_t compat_mode, BSTR name, DWORD flags, DISPID *dispid)
+{
+    const style_tbl_entry_t *style_entry;
+    DISPID id;
+
+    style_entry = lookup_style_tbl_compat_mode(compat_mode, name);
+    if(style_entry) {
+        if(compat_mode < COMPAT_MODE_IE9)
+            id = style_entry->compat_dispid;
+        else {
+            if(style_entry->flags & ATTR_IN_CSSPROPERTIES)
+                return DISP_E_UNKNOWNNAME;
+            id = style_entry->dispid;
+        }
+        if(id == DISPID_UNKNOWN)
+            return DISP_E_UNKNOWNNAME;
+
+        *dispid = id;
+        return S_OK;
+    }
+
+    return DISP_E_UNKNOWNNAME;
+}
+
+void HTMLW3CComputedStyle_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    /* don't expose props shared with children prototypes */
+    static const dispex_hook_t styledecl_hooks[] = {
+        {DISPID_IHTMLCSSSTYLEDECLARATION_BACKGROUNDPOSITIONX},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_BACKGROUNDPOSITIONY},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_STYLEFLOAT},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_IMEMODE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_LAYOUTGRIDCHAR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_LAYOUTGRIDLINE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_LAYOUTGRIDMODE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_LAYOUTGRIDTYPE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_LAYOUTGRID},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_TEXTAUTOSPACE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_LINEBREAK},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_TEXTJUSTIFYTRIM},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_TEXTKASHIDA},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_ACCELERATOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_LAYOUTFLOW},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_ZOOM},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBARBASECOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBARFACECOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBAR3DLIGHTCOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBARSHADOWCOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBARHIGHLIGHTCOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBARDARKSHADOWCOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBARARROWCOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_SCROLLBARTRACKCOLOR},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_WRITINGMODE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_TEXTKASHIDASPACE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_MSINTERPOLATIONMODE},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_MSBLOCKPROGRESSION},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_CLIPTOP},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_CLIPRIGHT},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_CLIPBOTTOM},
+        {DISPID_IHTMLCSSSTYLEDECLARATION_CLIPLEFT},
+        {DISPID_UNKNOWN}
+    };
+    if(mode >= COMPAT_MODE_IE9)
+        dispex_info_add_interface(info, IHTMLCSSStyleDeclaration_tid, styledecl_hooks);
+    if(mode >= COMPAT_MODE_IE10)
+        dispex_info_add_interface(info, IHTMLCSSStyleDeclaration2_tid, NULL);
+}
+
 static const dispex_static_data_vtbl_t HTMLW3CComputedStyle_dispex_vtbl = {
     CSSSTYLE_DISPEX_VTBL_ENTRIES,
     .query_interface   = CSSStyle_query_interface,
     .traverse          = CSSStyle_traverse,
-    .unlink            = CSSStyle_unlink
+    .unlink            = CSSStyle_unlink,
+    .get_static_dispid = HTMLW3CComputedStyle_get_static_dispid
 };
 
 dispex_static_data_t HTMLW3CComputedStyle_dispex = {
@@ -10151,7 +10292,7 @@ dispex_static_data_t HTMLW3CComputedStyle_dispex = {
     PROTO_ID_HTMLW3CComputedStyle,
     DispHTMLW3CComputedStyle_tid,
     no_iface_tids,
-    CSSStyle_init_dispex_info
+    HTMLW3CComputedStyle_init_dispex_info
 };
 
 HRESULT create_computed_style(nsIDOMCSSStyleDeclaration *nsstyle, HTMLInnerWindow *window,

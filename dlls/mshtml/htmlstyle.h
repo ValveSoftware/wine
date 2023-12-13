@@ -165,5 +165,4 @@ HRESULT get_elem_style(HTMLElement*,styleid_t,BSTR*);
 HRESULT set_elem_style(HTMLElement*,styleid_t,const WCHAR*);
 
 #define CSSSTYLE_DISPEX_VTBL_ENTRIES                \
-    .destructor        = CSSStyle_destructor,       \
-    .get_static_dispid = CSSStyle_get_static_dispid
+    .destructor        = CSSStyle_destructor

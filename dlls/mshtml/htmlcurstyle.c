@@ -4157,7 +4157,8 @@ static const dispex_static_data_vtbl_t HTMLCurrentStyle_dispex_vtbl = {
     CSSSTYLE_DISPEX_VTBL_ENTRIES,
     .query_interface   = HTMLCurrentStyle_query_interface,
     .traverse          = HTMLCurrentStyle_traverse,
-    .unlink            = HTMLCurrentStyle_unlink
+    .unlink            = HTMLCurrentStyle_unlink,
+    .get_static_dispid = CSSStyle_get_static_dispid
 };
 
 static const tid_t HTMLCurrentStyle_iface_tids[] = {
