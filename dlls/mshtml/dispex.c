@@ -124,6 +124,8 @@ PRIVATE_TID_LIST
 #undef XDIID
 };
 
+static inline DispatchEx *get_dispex_for_hook(IUnknown*);
+
 static HRESULT load_typelib(void)
 {
     WCHAR module_path[MAX_PATH + 3];
@@ -755,12 +757,11 @@ static HRESULT dispex_value(DispatchEx *This, LCID lcid, WORD flags, DISPPARAMS 
     return S_OK;
 }
 
-static HRESULT typeinfo_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
+static HRESULT typeinfo_invoke(IUnknown *iface, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
         EXCEPINFO *ei)
 {
     DISPPARAMS params = {dp->rgvarg, NULL, dp->cArgs, 0};
     ITypeInfo *ti;
-    IUnknown *unk;
     UINT argerr=0;
     HRESULT hres;
 
@@ -775,16 +776,7 @@ static HRESULT typeinfo_invoke(DispatchEx *This, func_info_t *func, WORD flags, 
         return hres;
     }
 
-    hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&unk);
-    if(FAILED(hres)) {
-        ERR("Could not get iface %s: %08lx\n", debugstr_mshtml_guid(tid_ids[func->tid]), hres);
-        return E_FAIL;
-    }
-
-    hres = ITypeInfo_Invoke(ti, unk, func->id, flags, &params, res, ei, &argerr);
-
-    IUnknown_Release(unk);
-    return hres;
+    return ITypeInfo_Invoke(ti, iface, func->id, flags, &params, res, ei, &argerr);
 }
 
 static inline func_disp_t *impl_from_DispatchEx(DispatchEx *iface)
@@ -1053,9 +1045,8 @@ HRESULT change_type(VARIANT *dst, VARIANT *src, VARTYPE vt, IServiceProvider *ca
     return VariantChangeType(dst, src, 0, vt);
 }
 
-static HRESULT builtin_propget(DispatchEx *This, func_info_t *func, DISPPARAMS *dp, VARIANT *res)
+static HRESULT builtin_propget(IUnknown *iface, func_info_t *func, DISPPARAMS *dp, VARIANT *res)
 {
-    IUnknown *iface;
     HRESULT hres;
 
     if(dp && dp->cArgs) {
@@ -1065,24 +1056,20 @@ static HRESULT builtin_propget(DispatchEx *This, func_info_t *func, DISPPARAMS *
 
     assert(func->get_vtbl_off);
 
-    hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
-    if(SUCCEEDED(hres)) {
-        switch(func->prop_vt) {
+    switch(func->prop_vt) {
 #define CASE_VT(vt,type,access) \
-        case vt: { \
-            type val; \
-            hres = ((HRESULT (WINAPI*)(IUnknown*,type*))((void**)iface->lpVtbl)[func->get_vtbl_off])(iface,&val); \
-            if(SUCCEEDED(hres)) \
-                access(res) = val; \
-            } \
-            break
-        BUILTIN_TYPES_SWITCH;
+    case vt: { \
+        type val; \
+        hres = ((HRESULT (WINAPI*)(IUnknown*,type*))((void**)iface->lpVtbl)[func->get_vtbl_off])(iface,&val); \
+        if(SUCCEEDED(hres)) \
+            access(res) = val; \
+        } \
+        break
+    BUILTIN_TYPES_SWITCH;
 #undef CASE_VT
-        default:
-            FIXME("Unhandled vt %d\n", func->prop_vt);
-            hres = E_NOTIMPL;
-        }
-        IUnknown_Release(iface);
+    default:
+        FIXME("Unhandled vt %d\n", func->prop_vt);
+        hres = E_NOTIMPL;
     }
 
     if(FAILED(hres))
@@ -1093,10 +1080,9 @@ static HRESULT builtin_propget(DispatchEx *This, func_info_t *func, DISPPARAMS *
     return S_OK;
 }
 
-static HRESULT builtin_propput(DispatchEx *This, func_info_t *func, DISPPARAMS *dp, IServiceProvider *caller)
+static HRESULT builtin_propput(DispatchEx *This, IUnknown *iface, func_info_t *func, DISPPARAMS *dp, IServiceProvider *caller)
 {
     VARIANT *v, tmpv;
-    IUnknown *iface;
     HRESULT hres;
 
     if(dp->cArgs != 1 || (dp->cNamedArgs == 1 && *dp->rgdispidNamedArgs != DISPID_PROPERTYPUT)
@@ -1122,21 +1108,16 @@ static HRESULT builtin_propput(DispatchEx *This, func_info_t *func, DISPPARAMS *
         v = &tmpv;
     }
 
-    hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
-    if(SUCCEEDED(hres)) {
-        switch(func->prop_vt) {
+    switch(func->prop_vt) {
 #define CASE_VT(vt,type,access) \
-        case vt: \
-            hres = ((HRESULT (WINAPI*)(IUnknown*,type))((void**)iface->lpVtbl)[func->put_vtbl_off])(iface,access(v)); \
-            break
-        BUILTIN_TYPES_SWITCH;
+    case vt: \
+        hres = ((HRESULT (WINAPI*)(IUnknown*,type))((void**)iface->lpVtbl)[func->put_vtbl_off])(iface,access(v)); \
+        break
+    BUILTIN_TYPES_SWITCH;
 #undef CASE_VT
-        default:
-            FIXME("Unimplemented vt %d\n", func->prop_vt);
-            hres = E_NOTIMPL;
-        }
-
-        IUnknown_Release(iface);
+    default:
+        FIXME("Unimplemented vt %d\n", func->prop_vt);
+        hres = E_NOTIMPL;
     }
 
     if(v == &tmpv)
@@ -1144,31 +1125,39 @@ static HRESULT builtin_propput(DispatchEx *This, func_info_t *func, DISPPARAMS *
     return hres;
 }
 
-static HRESULT invoke_builtin_function(DispatchEx *This, func_info_t *func, DISPPARAMS *dp,
+static HRESULT invoke_builtin_function(IDispatch *this_obj, func_info_t *func, DISPPARAMS *dp,
                                        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     VARIANT arg_buf[MAX_ARGS], *arg_ptrs[MAX_ARGS], *arg, retv, ret_ref, vhres;
     unsigned i, nconv = 0;
+    DispatchEx *dispex;
     IUnknown *iface;
     HRESULT hres;
 
-    if(func->hook) {
-        hres = func->hook(This, DISPATCH_METHOD, dp, res, ei, caller);
-        if(hres != S_FALSE)
+    hres = IDispatch_QueryInterface(this_obj, tid_ids[func->tid], (void**)&iface);
+    if(FAILED(hres) || !iface)
+        return E_UNEXPECTED;
+
+    if(func->hook && (dispex = get_dispex_for_hook(iface))) {
+        hres = func->hook(dispex, DISPATCH_METHOD, dp, res, ei, caller);
+        IDispatchEx_Release(&dispex->IDispatchEx_iface);
+        if(hres != S_FALSE) {
+            IUnknown_Release(iface);
             return hres;
+        }
     }
 
-    if(!func->call_vtbl_off)
-        return typeinfo_invoke(This, func, DISPATCH_METHOD, dp, res, ei);
+    if(!func->call_vtbl_off) {
+        hres = typeinfo_invoke(iface, func, DISPATCH_METHOD, dp, res, ei);
+        IUnknown_Release(iface);
+        return hres;
+    }
 
     if(dp->cArgs + func->default_value_cnt < func->argc) {
         FIXME("Invalid argument count (expected %u, got %u)\n", func->argc, dp->cArgs);
+        IUnknown_Release(iface);
         return E_INVALIDARG;
     }
-
-    hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
-    if(FAILED(hres))
-        return hres;
 
     for(i=0; i < func->argc; i++) {
         BOOL own_value = FALSE;
@@ -1282,7 +1271,7 @@ static HRESULT function_invoke(DispatchEx *This, func_info_t *func, WORD flags, 
             }
         }
 
-        hres = invoke_builtin_function(This, func, dp, res, ei, caller);
+        hres = invoke_builtin_function((IDispatch*)&This->IDispatchEx_iface, func, dp, res, ei, caller);
         break;
     case DISPATCH_PROPERTYGET: {
         func_obj_entry_t *entry;
@@ -1339,6 +1328,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD 
         VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     func_info_t *func;
+    IUnknown *iface;
     HRESULT hres;
 
     hres = get_builtin_func(This->info, id, &func);
@@ -1350,36 +1340,43 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD 
     if(func->func_disp_idx >= 0)
         return function_invoke(This, func, flags, dp, res, ei, caller);
 
+    hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
+    if(FAILED(hres) || !iface)
+        return E_UNEXPECTED;
+
     if(func->hook) {
         hres = func->hook(This, flags, dp, res, ei, caller);
-        if(hres != S_FALSE)
+        if(hres != S_FALSE) {
+            IUnknown_Release(iface);
             return hres;
+        }
     }
 
     switch(flags) {
     case DISPATCH_PROPERTYPUT:
         if(res)
             V_VT(res) = VT_EMPTY;
-        hres = builtin_propput(This, func, dp, caller);
+        hres = builtin_propput(This, iface, func, dp, caller);
         break;
     case DISPATCH_PROPERTYGET:
-        hres = builtin_propget(This, func, dp, res);
+        hres = builtin_propget(iface, func, dp, res);
         break;
     default:
         if(!func->get_vtbl_off) {
-            hres = typeinfo_invoke(This, func, flags, dp, res, ei);
+            hres = typeinfo_invoke(iface, func, flags, dp, res, ei);
         }else {
             VARIANT v;
 
-            hres = builtin_propget(This, func, NULL, &v);
+            hres = builtin_propget(iface, func, NULL, &v);
             if(FAILED(hres))
-                return hres;
+                break;
 
             if(flags != (DISPATCH_PROPERTYGET|DISPATCH_METHOD) || dp->cArgs) {
                 if(V_VT(&v) != VT_DISPATCH) {
                     FIXME("Not a function %s flags %08x\n", debugstr_variant(&v), flags);
                     VariantClear(&v);
-                    return E_FAIL;
+                    hres = E_FAIL;
+                    break;
                 }
 
                 hres = invoke_disp_value(This, V_DISPATCH(&v), lcid, flags, dp, res, ei, caller);
@@ -1392,6 +1389,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD 
         }
     }
 
+    IUnknown_Release(iface);
     return hres;
 }
 
@@ -1405,7 +1403,7 @@ HRESULT dispex_call_builtin(DispatchEx *dispex, DISPID id, DISPPARAMS *dp,
     if(FAILED(hres))
         return hres;
 
-    return invoke_builtin_function(dispex, func, dp, res, ei, caller);
+    return invoke_builtin_function((IDispatch*)&dispex->IDispatchEx_iface, func, dp, res, ei, caller);
 }
 
 HRESULT remove_attribute(DispatchEx *This, DISPID id, VARIANT_BOOL *success)
@@ -1429,6 +1427,7 @@ HRESULT remove_attribute(DispatchEx *This, DISPID id, VARIANT_BOOL *success)
         VARIANT var;
         DISPPARAMS dp = {&var,NULL,1,0};
         func_info_t *func;
+        IUnknown *iface;
         HRESULT hres;
 
         hres = get_builtin_func(This->info, id, &func);
@@ -1461,8 +1460,10 @@ HRESULT remove_attribute(DispatchEx *This, DISPID id, VARIANT_BOOL *success)
         }
         *success = VARIANT_TRUE;
 
+        IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
+
         V_VT(&var) = VT_EMPTY;
-        hres = builtin_propput(This, func, &dp, NULL);
+        hres = builtin_propput(This, iface, func, &dp, NULL);
         if(FAILED(hres)) {
             VARIANT *ref;
             hres = dispex_get_dprop_ref(This, func->name, FALSE, &ref);
@@ -1471,6 +1472,7 @@ HRESULT remove_attribute(DispatchEx *This, DISPID id, VARIANT_BOOL *success)
             else
                 VariantClear(ref);
         }
+        IUnknown_Release(iface);
         return S_OK;
     }
     default:
@@ -1960,6 +1962,27 @@ static IDispatchExVtbl DispatchExVtbl = {
     DispatchEx_GetNextDispID,
     DispatchEx_GetNameSpaceParent
 };
+
+extern const IDispatchExVtbl WindowDispExVtbl;
+extern const IDispatchExVtbl DocDispatchExVtbl;
+static inline DispatchEx *get_dispex_for_hook(IUnknown *iface)
+{
+    IDispatchEx *dispex;
+
+    if(FAILED(IUnknown_QueryInterface(iface, &IID_IDispatchEx, (void**)&dispex)) || !dispex)
+        return NULL;
+
+    /* FIXME: Handle these generically (needs private interface) */
+    if(dispex->lpVtbl == &DispatchExVtbl)
+        return impl_from_IDispatchEx(dispex);
+    if(dispex->lpVtbl == &WindowDispExVtbl)
+        return &CONTAINING_RECORD(dispex, HTMLWindow, IDispatchEx_iface)->inner_window->event_target.dispex;
+    if(dispex->lpVtbl == &DocDispatchExVtbl)
+        return &CONTAINING_RECORD(dispex, HTMLDocumentNode, IDispatchEx_iface)->node.event_target.dispex;
+
+    IDispatchEx_Release(dispex);
+    return NULL;
+}
 
 static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTraversalCallback *cb)
 {

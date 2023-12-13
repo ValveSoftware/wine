@@ -5184,7 +5184,7 @@ static HRESULT WINAPI DocDispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnkn
     return IDispatchEx_GetNameSpaceParent(&This->node.event_target.dispex.IDispatchEx_iface, ppunk);
 }
 
-static const IDispatchExVtbl DocDispatchExVtbl = {
+const IDispatchExVtbl DocDispatchExVtbl = {
     DocDispatchEx_QueryInterface,
     DocDispatchEx_AddRef,
     DocDispatchEx_Release,

@@ -3817,7 +3817,7 @@ static HRESULT WINAPI WindowDispEx_GetNameSpaceParent(IDispatchEx *iface, IUnkno
     return S_OK;
 }
 
-static const IDispatchExVtbl WindowDispExVtbl = {
+const IDispatchExVtbl WindowDispExVtbl = {
     WindowDispEx_QueryInterface,
     WindowDispEx_AddRef,
     WindowDispEx_Release,
