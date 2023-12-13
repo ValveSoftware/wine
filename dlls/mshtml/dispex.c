@@ -1739,6 +1739,26 @@ HRESULT dispex_call_builtin(DispatchEx *dispex, DISPID id, DISPPARAMS *dp,
     return invoke_builtin_function((IDispatch*)&dispex->IDispatchEx_iface, func, dp, res, ei, caller);
 }
 
+static VARIANT_BOOL reset_builtin_func(DispatchEx *dispex, func_info_t *func)
+{
+    func_obj_entry_t *entry;
+
+    if(!dispex->dynamic_data || !dispex->dynamic_data->func_disps ||
+       !dispex->dynamic_data->func_disps[func->func_disp_idx].func_obj)
+        return VARIANT_FALSE;
+
+    entry = dispex->dynamic_data->func_disps + func->func_disp_idx;
+    if(V_VT(&entry->val) == VT_DISPATCH &&
+       V_DISPATCH(&entry->val) == (IDispatch*)&entry->func_obj->dispex.IDispatchEx_iface)
+        return VARIANT_FALSE;
+
+    VariantClear(&entry->val);
+    V_VT(&entry->val) = VT_DISPATCH;
+    V_DISPATCH(&entry->val) = (IDispatch*)&entry->func_obj->dispex.IDispatchEx_iface;
+    IDispatch_AddRef(V_DISPATCH(&entry->val));
+    return VARIANT_TRUE;
+}
+
 HRESULT remove_attribute(DispatchEx *This, DISPID id, VARIANT_BOOL *success)
 {
     switch(get_dispid_type(id)) {
@@ -1769,26 +1789,7 @@ HRESULT remove_attribute(DispatchEx *This, DISPID id, VARIANT_BOOL *success)
 
         /* For builtin functions, we set their value to the original function. */
         if(func->func_disp_idx >= 0) {
-            func_obj_entry_t *entry;
-
-            if(!This->dynamic_data || !This->dynamic_data->func_disps
-                || !This->dynamic_data->func_disps[func->func_disp_idx].func_obj) {
-                *success = VARIANT_FALSE;
-                return S_OK;
-            }
-
-            entry = This->dynamic_data->func_disps + func->func_disp_idx;
-            if(V_VT(&entry->val) == VT_DISPATCH
-                    && V_DISPATCH(&entry->val) == (IDispatch*)&entry->func_obj->dispex.IDispatchEx_iface) {
-                *success = VARIANT_FALSE;
-                return S_OK;
-            }
-
-            VariantClear(&entry->val);
-            V_VT(&entry->val) = VT_DISPATCH;
-            V_DISPATCH(&entry->val) = (IDispatch*)&entry->func_obj->dispex.IDispatchEx_iface;
-            IDispatch_AddRef(V_DISPATCH(&entry->val));
-            *success = VARIANT_TRUE;
+            *success = reset_builtin_func(This, func);
             return S_OK;
         }
         *success = VARIANT_TRUE;
@@ -2739,6 +2740,8 @@ HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID l
 
 HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
 {
+    HRESULT hres;
+
     if(is_custom_dispid(id) && dispex->info->desc->vtbl->delete)
         return dispex->info->desc->vtbl->delete(dispex, id);
 
@@ -2747,7 +2750,8 @@ HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
         return E_NOTIMPL;
     }
 
-    if(is_dynamic_dispid(id)) {
+    switch(get_dispid_type(id)) {
+    case DISPEXPROP_DYNAMIC: {
         DWORD idx = id - DISPID_DYNPROP_0;
         dynamic_prop_t *prop;
 
@@ -2758,6 +2762,23 @@ HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
         VariantClear(&prop->var);
         prop->flags |= DYNPROP_DELETED;
         return S_OK;
+    }
+    case DISPEXPROP_BUILTIN: {
+        func_info_t *func;
+
+        if(!ensure_real_info(dispex))
+            return E_OUTOFMEMORY;
+
+        hres = get_builtin_func_prot(dispex, id, &func);
+        if(FAILED(hres))
+            return hres;
+
+        if(func->func_disp_idx >= 0)
+            reset_builtin_func(dispex, func);
+        return S_OK;
+    }
+    default:
+        break;
     }
 
     return S_OK;

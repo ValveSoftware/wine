@@ -1271,7 +1271,7 @@ sync_test("navigator", function() {
 
 sync_test("delete_prop", function() {
     var v = document.documentMode;
-    var obj = document.createElement("div"), r, obj2;
+    var obj = document.createElement("div"), r, obj2, func, prop;
 
     obj.prop1 = true;
     r = false;
@@ -1286,6 +1286,40 @@ sync_test("delete_prop", function() {
     }
     ok(!r, "got an unexpected exception");
     ok(!("prop1" in obj), "prop1 is still in obj");
+
+    /* builtin properties don't throw any exception, but are not really deleted */
+    r = (delete obj.tagName);
+    ok(r, "delete returned " + r);
+    ok("tagName" in obj, "tagName deleted from obj");
+    ok(obj.tagName === "DIV", "tagName = " + obj.tagName);
+
+    prop = obj.id;
+    r = (delete obj.id);
+    ok(r, "delete returned " + r);
+    ok("id" in obj, "id deleted from obj");
+    ok(obj.id === prop, "id = " + obj.id);
+
+    obj.id = "1234";
+    ok(obj.id === "1234", "id after set to 1234 = " + obj.id);
+    r = (delete obj.id);
+    ok(r, "delete returned " + r);
+    ok("id" in obj, "id deleted from obj");
+    ok(obj.id === "1234", "id = " + obj.id);
+
+    /* builtin functions get reset to their original values */
+    func = function() { }
+    prop = obj.setAttribute;
+    r = (delete obj.setAttribute);
+    ok(r, "delete returned " + r);
+    ok("setAttribute" in obj, "setAttribute deleted from obj");
+    ok(obj.setAttribute === prop, "setAttribute = " + obj.setAttribute);
+
+    obj.setAttribute = func;
+    ok(obj.setAttribute === func, "setAttribute after set to func = " + obj.setAttribute);
+    r = (delete obj.setAttribute);
+    ok(r, "delete returned " + r);
+    ok("setAttribute" in obj, "setAttribute deleted from obj");
+    ok(obj.setAttribute === prop, "setAttribute = " + obj.setAttribute);
 
     /* again, this time prop1 does not exist */
     r = false;
@@ -1306,12 +1340,6 @@ sync_test("delete_prop", function() {
     ok(r, "delete returned " + r);
     ok("className" in obj, "className deleted from obj");
     ok(obj.className === "", "className = " + obj.className);
-
-    /* builtin propertiles don't throw any exception, but are not really deleted */
-    r = (delete obj.tagName);
-    ok(r, "delete returned " + r);
-    ok("tagName" in obj, "tagName deleted from obj");
-    ok(obj.tagName === "DIV", "tagName = " + obj.tagName);
 
     obj = document.querySelectorAll("*");
     ok("0" in obj, "0 is not in obj");
