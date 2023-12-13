@@ -2064,6 +2064,7 @@ static const dispex_static_data_vtbl_t HTMLEventObj_dispex_vtbl = {
 };
 
 static const tid_t HTMLEventObj_iface_tids[] = {
+    IHTMLEventObj5_tid,
     IHTMLEventObj_tid,
     0
 };
