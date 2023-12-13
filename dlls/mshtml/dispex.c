@@ -1852,8 +1852,7 @@ static HRESULT WINAPI DispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMember,
     TRACE("%s (%p)->(%ld %s %ld %d %p %p %p %p)\n", This->info->desc->name, This, dispIdMember,
           debugstr_guid(riid), lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 
-    return IDispatchEx_InvokeEx(&This->IDispatchEx_iface, dispIdMember, lcid, wFlags, pDispParams,
-            pVarResult, pExcepInfo, NULL);
+    return dispex_invoke(This, dispIdMember, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, NULL);
 }
 
 static HRESULT WINAPI DispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
@@ -1886,86 +1885,10 @@ static HRESULT WINAPI DispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID lc
         VARIANT *pvarRes, EXCEPINFO *pei, IServiceProvider *pspCaller)
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
-    HRESULT hres;
 
     TRACE("%s (%p)->(%lx %lx %x %p %p %p %p)\n", This->info->desc->name, This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 
-    if(!ensure_real_info(This))
-        return E_OUTOFMEMORY;
-
-    if(wFlags == (DISPATCH_PROPERTYPUT|DISPATCH_PROPERTYPUTREF))
-        wFlags = DISPATCH_PROPERTYPUT;
-
-    switch(get_dispid_type(id)) {
-    case DISPEXPROP_CUSTOM:
-        if(!This->info->desc->vtbl->invoke)
-            return DISP_E_MEMBERNOTFOUND;
-        return This->info->desc->vtbl->invoke(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
-
-    case DISPEXPROP_DYNAMIC: {
-        DWORD idx = id - DISPID_DYNPROP_0;
-        dynamic_prop_t *prop;
-
-        if(!get_dynamic_data(This) || This->dynamic_data->prop_cnt <= idx)
-            return DISP_E_MEMBERNOTFOUND;
-
-        prop = This->dynamic_data->props+idx;
-
-        switch(wFlags) {
-        case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
-            if(!pvarRes)
-                return E_INVALIDARG;
-            /* fall through */
-        case DISPATCH_METHOD:
-            if(V_VT(&prop->var) != VT_DISPATCH) {
-                FIXME("invoke %s\n", debugstr_variant(&prop->var));
-                return E_NOTIMPL;
-            }
-
-            return invoke_disp_value(This, V_DISPATCH(&prop->var), lcid, wFlags, pdp, pvarRes, pei, pspCaller);
-        case DISPATCH_PROPERTYGET:
-            if(prop->flags & DYNPROP_DELETED)
-                return DISP_E_MEMBERNOTFOUND;
-            V_VT(pvarRes) = VT_EMPTY;
-            return variant_copy(pvarRes, &prop->var);
-        case DISPATCH_PROPERTYPUT:
-            if(pdp->cArgs != 1 || (pdp->cNamedArgs == 1 && *pdp->rgdispidNamedArgs != DISPID_PROPERTYPUT)
-               || pdp->cNamedArgs > 1) {
-                FIXME("invalid args\n");
-                return E_INVALIDARG;
-            }
-
-            TRACE("put %s\n", debugstr_variant(pdp->rgvarg));
-            VariantClear(&prop->var);
-            hres = variant_copy(&prop->var, pdp->rgvarg);
-            if(FAILED(hres))
-                return hres;
-
-            prop->flags &= ~DYNPROP_DELETED;
-            return S_OK;
-        default:
-            FIXME("unhandled wFlags %x\n", wFlags);
-            return E_NOTIMPL;
-        }
-    }
-    case DISPEXPROP_BUILTIN:
-        if(wFlags == DISPATCH_CONSTRUCT) {
-            if(id == DISPID_VALUE) {
-                if(This->info->desc->vtbl->value) {
-                    return This->info->desc->vtbl->value(This, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
-                }
-                FIXME("DISPATCH_CONSTRUCT flag but missing value function\n");
-                return E_FAIL;
-            }
-            FIXME("DISPATCH_CONSTRUCT flag without DISPID_VALUE\n");
-            return E_FAIL;
-        }
-
-        return invoke_builtin_prop(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
-    default:
-        assert(0);
-        return E_FAIL;
-    }
+    return dispex_invoke(This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI DispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR name, DWORD grfdex)
@@ -1984,7 +1907,7 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR nam
                compat_mode < COMPAT_MODE_IE9 ? hres : S_OK;
     }
 
-    return IDispatchEx_DeleteMemberByDispID(&This->IDispatchEx_iface, id);
+    return dispex_delete_prop(This, id);
 }
 
 static HRESULT WINAPI DispatchEx_DeleteMemberByDispID(IDispatchEx *iface, DISPID id)
@@ -1993,28 +1916,7 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByDispID(IDispatchEx *iface, DISPID
 
     TRACE("%s (%p)->(%lx)\n", This->info->desc->name, This, id);
 
-    if(is_custom_dispid(id) && This->info->desc->vtbl->delete)
-        return This->info->desc->vtbl->delete(This, id);
-
-    if(dispex_compat_mode(This) < COMPAT_MODE_IE8) {
-        /* Not implemented by IE */
-        return E_NOTIMPL;
-    }
-
-    if(is_dynamic_dispid(id)) {
-        DWORD idx = id - DISPID_DYNPROP_0;
-        dynamic_prop_t *prop;
-
-        if(!get_dynamic_data(This) || idx >= This->dynamic_data->prop_cnt)
-            return S_OK;
-
-        prop = This->dynamic_data->props + idx;
-        VariantClear(&prop->var);
-        prop->flags |= DYNPROP_DELETED;
-        return S_OK;
-    }
-
-    return S_OK;
+    return dispex_delete_prop(This, id);
 }
 
 static HRESULT WINAPI DispatchEx_GetMemberProperties(IDispatchEx *iface, DISPID id, DWORD grfdexFetch, DWORD *pgrfdex)
@@ -2177,6 +2079,115 @@ static inline DispatchEx *get_dispex_for_hook(IUnknown *iface)
 
     IDispatchEx_Release(dispex);
     return NULL;
+}
+
+HRESULT dispex_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp, VARIANT *res,
+        EXCEPINFO *pei, IServiceProvider *caller)
+{
+    HRESULT hres;
+
+    if(!ensure_real_info(dispex))
+        return E_OUTOFMEMORY;
+
+    if(wFlags == (DISPATCH_PROPERTYPUT|DISPATCH_PROPERTYPUTREF))
+        wFlags = DISPATCH_PROPERTYPUT;
+
+    switch(get_dispid_type(id)) {
+    case DISPEXPROP_CUSTOM:
+        if(!dispex->info->desc->vtbl->invoke)
+            return DISP_E_MEMBERNOTFOUND;
+        return dispex->info->desc->vtbl->invoke(dispex, id, lcid, wFlags, pdp, res, pei, caller);
+
+    case DISPEXPROP_DYNAMIC: {
+        DWORD idx = id - DISPID_DYNPROP_0;
+        dynamic_prop_t *prop;
+
+        if(!get_dynamic_data(dispex) || dispex->dynamic_data->prop_cnt <= idx)
+            return DISP_E_MEMBERNOTFOUND;
+
+        prop = dispex->dynamic_data->props+idx;
+
+        switch(wFlags) {
+        case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+            if(!res)
+                return E_INVALIDARG;
+            /* fall through */
+        case DISPATCH_METHOD:
+            if(V_VT(&prop->var) != VT_DISPATCH) {
+                FIXME("invoke %s\n", debugstr_variant(&prop->var));
+                return E_NOTIMPL;
+            }
+
+            return invoke_disp_value(dispex, V_DISPATCH(&prop->var), lcid, wFlags, pdp, res, pei, caller);
+        case DISPATCH_PROPERTYGET:
+            if(prop->flags & DYNPROP_DELETED)
+                return DISP_E_MEMBERNOTFOUND;
+            V_VT(res) = VT_EMPTY;
+            return variant_copy(res, &prop->var);
+        case DISPATCH_PROPERTYPUT:
+            if(pdp->cArgs != 1 || (pdp->cNamedArgs == 1 && *pdp->rgdispidNamedArgs != DISPID_PROPERTYPUT)
+               || pdp->cNamedArgs > 1) {
+                FIXME("invalid args\n");
+                return E_INVALIDARG;
+            }
+
+            TRACE("put %s\n", debugstr_variant(pdp->rgvarg));
+            VariantClear(&prop->var);
+            hres = variant_copy(&prop->var, pdp->rgvarg);
+            if(FAILED(hres))
+                return hres;
+
+            prop->flags &= ~DYNPROP_DELETED;
+            return S_OK;
+        default:
+            FIXME("unhandled wFlags %x\n", wFlags);
+            return E_NOTIMPL;
+        }
+    }
+    case DISPEXPROP_BUILTIN:
+        if(wFlags == DISPATCH_CONSTRUCT) {
+            if(id == DISPID_VALUE) {
+                if(dispex->info->desc->vtbl->value) {
+                    return dispex->info->desc->vtbl->value(dispex, lcid, wFlags, pdp, res, pei, caller);
+                }
+                FIXME("DISPATCH_CONSTRUCT flag but missing value function\n");
+                return E_FAIL;
+            }
+            FIXME("DISPATCH_CONSTRUCT flag without DISPID_VALUE\n");
+            return E_FAIL;
+        }
+
+        return invoke_builtin_prop(dispex, id, lcid, wFlags, pdp, res, pei, caller);
+    default:
+        assert(0);
+        return E_FAIL;
+    }
+}
+
+HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
+{
+    if(is_custom_dispid(id) && dispex->info->desc->vtbl->delete)
+        return dispex->info->desc->vtbl->delete(dispex, id);
+
+    if(dispex_compat_mode(dispex) < COMPAT_MODE_IE8) {
+        /* Not implemented by IE */
+        return E_NOTIMPL;
+    }
+
+    if(is_dynamic_dispid(id)) {
+        DWORD idx = id - DISPID_DYNPROP_0;
+        dynamic_prop_t *prop;
+
+        if(!get_dynamic_data(dispex) || idx >= dispex->dynamic_data->prop_cnt)
+            return S_OK;
+
+        prop = dispex->dynamic_data->props + idx;
+        VariantClear(&prop->var);
+        prop->flags |= DYNPROP_DELETED;
+        return S_OK;
+    }
+
+    return S_OK;
 }
 
 static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTraversalCallback *cb)

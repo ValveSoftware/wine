@@ -4184,7 +4184,7 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
 
             prop->type = GLOBAL_DISPEXVAR;
             prop->id = dispex_id;
-            return IDispatchEx_InvokeEx(&This->event_target.dispex.IDispatchEx_iface, dispex_id, 0, flags, params, res, ei, caller);
+            return dispex_invoke(&This->event_target.dispex, dispex_id, 0, flags, params, res, ei, caller);
         }
         default:
             FIXME("Not supported flags: %x\n", flags);
@@ -4212,7 +4212,7 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
             return E_NOTIMPL;
         }
     case GLOBAL_DISPEXVAR:
-        return IDispatchEx_InvokeEx(&This->event_target.dispex.IDispatchEx_iface, prop->id, 0, flags, params, res, ei, caller);
+        return dispex_invoke(&This->event_target.dispex, prop->id, 0, flags, params, res, ei, caller);
     default:
         ERR("invalid type %d\n", prop->type);
         hres = DISP_E_MEMBERNOTFOUND;
@@ -4275,7 +4275,7 @@ static HRESULT IHTMLWindow2_location_hook(DispatchEx *dispex, WORD flags, DISPPA
     if(FAILED(hres))
         return hres;
 
-    hres = IDispatchEx_InvokeEx(&location->dispex.IDispatchEx_iface, DISPID_VALUE, 0, flags, dp, res, ei, caller);
+    hres = dispex_invoke(&location->dispex, DISPID_VALUE, 0, flags, dp, res, ei, caller);
     IHTMLLocation_Release(&location->IHTMLLocation_iface);
     return hres;
 }

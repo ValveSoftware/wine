@@ -2676,8 +2676,8 @@ static HRESULT WINAPI HTMLElement_toString(IHTMLElement *iface, BSTR *String)
     if(!String)
         return E_INVALIDARG;
 
-    hres = IDispatchEx_InvokeEx(&This->node.event_target.dispex.IDispatchEx_iface, DISPID_VALUE,
-                                LOCALE_SYSTEM_DEFAULT, DISPATCH_PROPERTYGET, NULL, &var, NULL, NULL);
+    hres = dispex_invoke(&This->node.event_target.dispex, DISPID_VALUE, LOCALE_SYSTEM_DEFAULT,
+                         DISPATCH_PROPERTYGET, NULL, &var, NULL, NULL);
     if(SUCCEEDED(hres)) {
         assert(V_VT(&var) == VT_BSTR);
         *String = V_BSTR(&var);

@@ -6094,8 +6094,8 @@ static HRESULT HTMLDocumentNode_location_hook(DispatchEx *dispex, WORD flags, DI
     if(!This->window->base.outer_window)
         return E_FAIL;
 
-    return IDispatchEx_InvokeEx(&This->window->base.outer_window->base.IDispatchEx_iface, DISPID_IHTMLWINDOW2_LOCATION,
-                                0, flags, dp, res, ei, caller);
+    return dispex_invoke(&This->window->base.outer_window->base.inner_window->event_target.dispex,
+                         DISPID_IHTMLWINDOW2_LOCATION, 0, flags, dp, res, ei, caller);
 }
 
 static const event_target_vtbl_t HTMLDocumentNode_event_target_vtbl = {

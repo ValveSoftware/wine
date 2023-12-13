@@ -997,8 +997,8 @@ static HRESULT HTMLFrameElement_invoke(DispatchEx *dispex, DISPID id, LCID lcid,
         return E_FAIL;
     }
 
-    return IDispatchEx_InvokeEx(&This->framebase.content_window->base.IDispatchEx_iface, id, lcid,
-            flags, params, res, ei, caller);
+    return dispex_invoke(&This->framebase.content_window->base.inner_window->event_target.dispex,
+                         id, lcid, flags, params, res, ei, caller);
 }
 
 static const NodeImplVtbl HTMLFrameElementImplVtbl = {
@@ -1587,8 +1587,8 @@ static HRESULT HTMLIFrame_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
         return E_FAIL;
     }
 
-    return IDispatchEx_InvokeEx(&This->framebase.content_window->base.IDispatchEx_iface, id, lcid,
-            flags, params, res, ei, caller);
+    return dispex_invoke(&This->framebase.content_window->base.inner_window->event_target.dispex,
+                         id, lcid, flags, params, res, ei, caller);
 }
 
 static const NodeImplVtbl HTMLIFrameImplVtbl = {

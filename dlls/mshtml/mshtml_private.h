@@ -441,6 +441,8 @@ HRESULT dispex_get_dprop_ref(DispatchEx*,const WCHAR*,BOOL,VARIANT**);
 HRESULT get_dispids(tid_t,DWORD*,DISPID**);
 HRESULT remove_attribute(DispatchEx*,DISPID,VARIANT_BOOL*);
 HRESULT dispex_get_dynid(DispatchEx*,const WCHAR*,BOOL,DISPID*);
+HRESULT dispex_invoke(DispatchEx*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+HRESULT dispex_delete_prop(DispatchEx*,DISPID);
 void release_typelib(void);
 HRESULT get_class_typeinfo(const CLSID*,ITypeInfo**);
 const void *dispex_get_vtbl(DispatchEx*);
