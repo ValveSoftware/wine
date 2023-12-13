@@ -421,7 +421,7 @@ PRIVATE_TID_LIST
 #define COMMON_PROTOTYPE_LIST \
     X(History,                        "History",                      OmHistory_dispex,                       Object) \
     X(Navigator,                      "Navigator",                    OmNavigator_dispex,                     Object) \
-    X(HTMLDOMAttribute,               "Attr",                         HTMLDOMAttribute_dispex,                Object) \
+    X(HTMLDOMAttribute,               "Attr",                         HTMLDOMAttribute_dispex,                HTMLDOMNode) \
     X(HTMLDOMChildrenCollection,      "NodeList",                     HTMLDOMChildrenCollection_dispex,       Object) \
     X(HTMLDOMImplementation,          "DOMImplementation",            HTMLDOMImplementation_dispex,           Object) \
     X(HTMLDOMTextNode,                "Text",                         HTMLDOMTextNode_dispex,                 DOMCharacterData) \
