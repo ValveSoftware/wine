@@ -1070,6 +1070,10 @@ HRESULT gc_run(script_ctx_t *ctx)
     if(thread_data->gc_is_unlinking)
         return S_OK;
 
+    thread_data->gc_is_unlinking = TRUE;
+    cc_api.collect();
+    thread_data->gc_is_unlinking = FALSE;
+
     if(!(head = malloc(sizeof(*head))))
         return E_OUTOFMEMORY;
     head->next = NULL;
@@ -1996,6 +2000,21 @@ static HRESULT WINAPI DispatchEx_QueryInterface(IDispatchEx *iface, REFIID riid,
     }else if(IsEqualGUID(&IID_IDispatchEx, riid)) {
         TRACE("(%p)->(IID_IDispatchEx %p)\n", This, ppv);
         *ppv = &This->IDispatchEx_iface;
+    }else if(IsEqualGUID(&IID_nsXPCOMCycleCollectionParticipant, riid)) {
+        /* Only expose these during a full CC, as we can't have their refs change between incremental CC phases */
+        if(This->ctx->html_mode && cc_api.is_full_cc()) {
+            *ppv = &cc_api.participant;
+            return S_OK;
+        }
+        *ppv = NULL;
+        return E_NOINTERFACE;
+    }else if(IsEqualGUID(&IID_nsCycleCollectionISupports, riid)) {
+        if(This->ctx->html_mode && cc_api.is_full_cc()) {
+            *ppv = &This->IDispatchEx_iface;
+            return S_OK;
+        }
+        *ppv = NULL;
+        return E_NOINTERFACE;
     }else {
         WARN("(%p)->(%s %p)\n", This, debugstr_guid(riid), ppv);
         *ppv = NULL;
@@ -2824,6 +2843,91 @@ jsdisp_t *iface_to_jsdisp(IDispatch *iface)
     return iface->lpVtbl == (const IDispatchVtbl*)&WineDispatchProxyCbPrivateVtbl
         ? jsdisp_addref( impl_from_IDispatchEx((IDispatchEx*)iface))
         : NULL;
+}
+
+static HRESULT WINAPI jsdisp_cc_traverse(void *ccp, void *p, nsCycleCollectionTraversalCallback *cb)
+{
+    jsdisp_t *This = impl_from_IDispatchEx(p);
+    note_edge_t note_edge = cc_api.note_edge;
+    dispex_prop_t *prop = This->props, *end;
+
+    /* If we have a proxy, we don't actually let it hold ref to us (to prevent cyclic refs on every one of them),
+       but we remain alive even with 0 refcount until it notifies us of being unlinked. However, for the CC to
+       work properly, we need to fake our reported refcount to it by letting it assume it does hold a ref to us. */
+    cc_api.describe_node(This->ref + (This->proxy != NULL), "jsdisp", cb);
+
+    for(end = prop + This->prop_cnt; prop < end; prop++) {
+        switch(prop->type) {
+        case PROP_JSVAL:
+            if(is_object_instance(prop->u.val))
+                note_edge((nsISupports*)get_object(prop->u.val), "prop", cb);
+            break;
+        case PROP_ACCESSOR:
+            if(prop->u.accessor.getter)
+                note_edge((nsISupports*)&prop->u.accessor.getter->IDispatchEx_iface, "prop", cb);
+            if(prop->u.accessor.setter)
+                note_edge((nsISupports*)&prop->u.accessor.setter->IDispatchEx_iface, "prop", cb);
+            break;
+        default:
+            break;
+        }
+    }
+
+    if(This->prototype)
+        note_edge((nsISupports*)&This->prototype->IDispatchEx_iface, "prototype", cb);
+
+    if(This->builtin_info->cc_traverse)
+        This->builtin_info->cc_traverse(This, cb);
+
+    /* We hold a ref when we're not kept alive only by the proxy */
+    if(This->proxy && This->ref)
+        note_edge((nsISupports*)This->proxy, "proxy", cb);
+
+    return S_OK;
+}
+
+static HRESULT WINAPI jsdisp_cc_unlink(void *p)
+{
+    jsdisp_t *This = impl_from_IDispatchEx(p);
+
+    if(This->proxy) {
+        IWineDispatchProxyPrivate *proxy = This->proxy;
+
+        This->proxy = NULL;
+        *proxy->lpVtbl->GetProxyFieldRef(proxy) = NULL;
+
+        if(!This->ref) {
+            jsdisp_free(This);
+            return S_OK;
+        }
+        IDispatchEx_Release((IDispatchEx*)proxy);
+    }
+
+    unlink_jsdisp(This);
+    return S_OK;
+}
+
+static BOOL __cdecl cc_api_stub_is_full_cc(void) { return FALSE; }
+static void __cdecl cc_api_stub_collect(void) { }
+
+struct proxy_cc_api cc_api = {
+    .is_full_cc    = cc_api_stub_is_full_cc,
+    .collect       = cc_api_stub_collect,
+};
+
+void init_cc_api(IDispatch *disp)
+{
+    static const CCObjCallback jsdisp_ccp_callback = {
+        jsdisp_cc_traverse,
+        jsdisp_cc_unlink,
+        NULL  /* delete_cycle_collectable shouldn't ever be called, since we're never part of the purple buffer */
+    };
+    IWineDispatchProxyPrivate *proxy;
+
+    if(SUCCEEDED(IDispatch_QueryInterface(disp, &IID_IWineDispatchProxyPrivate, (void**)&proxy)) && proxy) {
+        proxy->lpVtbl->InitCC(&cc_api, &jsdisp_ccp_callback);
+        IDispatchEx_Release((IDispatchEx*)proxy);
+    }
 }
 
 HRESULT jsdisp_get_id(jsdisp_t *jsdisp, const WCHAR *name, DWORD flags, DISPID *id)

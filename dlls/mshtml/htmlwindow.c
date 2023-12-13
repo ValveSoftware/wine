@@ -4042,6 +4042,44 @@ static HRESULT WINAPI WindowWineDispProxyPrivate_ToString(IWineDispatchProxyPriv
     return dispex_to_string(&This->inner_window->event_target.dispex, string);
 }
 
+static BOOL __cdecl is_full_cc(void)
+{
+    thread_data_t *thread_data = get_thread_data(FALSE);
+    return thread_data ? thread_data->full_cc_in_progress : FALSE;
+}
+
+static void __cdecl collect(void)
+{
+    nsIDOMWindowUtils *window_utils = NULL;
+    HTMLOuterWindow *window;
+
+    if(!window_map.root || !(window = WINE_RB_ENTRY_VALUE(window_map.root, HTMLOuterWindow, entry))->browser)
+        return;
+    get_nsinterface((nsISupports*)window->browser->content_window->nswindow, &IID_nsIDOMWindowUtils, (void**)&window_utils);
+
+    if(window_utils) {
+        cycle_collect(window_utils);
+        nsIDOMWindowUtils_Release(window_utils);
+    }
+}
+
+static void __cdecl describe_node(ULONG ref, const char *obj_name, nsCycleCollectionTraversalCallback *cb)
+{
+    nsCycleCollectingAutoRefCnt ccref;
+
+    ccref_init(&ccref, ref);
+    describe_cc_node(&ccref, obj_name, cb);
+}
+
+static void WINAPI WindowWineDispProxyPrivate_InitCC(struct proxy_cc_api *cc_api, const CCObjCallback *callback)
+{
+    ccp_init(&cc_api->participant, callback);
+    cc_api->is_full_cc = is_full_cc;
+    cc_api->collect = collect;
+    cc_api->describe_node = describe_node;
+    cc_api->note_edge = note_cc_edge;
+}
+
 static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     {
     WindowDispEx_QueryInterface,
@@ -4071,7 +4109,8 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     WindowWineDispProxyPrivate_PropInvoke,
     WindowWineDispProxyPrivate_PropDelete,
     WindowWineDispProxyPrivate_PropEnum,
-    WindowWineDispProxyPrivate_ToString
+    WindowWineDispProxyPrivate_ToString,
+    WindowWineDispProxyPrivate_InitCC
 };
 
 static inline HTMLOuterWindow *impl_from_IEventTarget(IEventTarget *iface)

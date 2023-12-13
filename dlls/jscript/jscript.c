@@ -925,6 +925,9 @@ static HRESULT WINAPI JScript_AddNamedItem(IActiveScript *iface,
             return hres;
         }
 
+        if(This->ctx->html_mode)
+            init_cc_api(disp);
+
         val = jsval_disp(disp);
         hres = convert_to_proxy(This->ctx, &val);
         if(FAILED(hres))

@@ -44,10 +44,28 @@
 
 #include <assert.h>
 
+#define NSAPI WINAPI
+
 /* NOTE: Keep in sync with jscript.h in jscript.dll */
 DEFINE_GUID(IID_IWineDispatchProxyPrivate, 0xd359f2fe,0x5531,0x741b,0xa4,0x1a,0x5c,0xf9,0x2e,0xdc,0x97,0x1b);
 typedef struct _IWineDispatchProxyPrivate IWineDispatchProxyPrivate;
 typedef struct _IWineDispatchProxyCbPrivate IWineDispatchProxyCbPrivate;
+
+typedef struct {
+    void *vtbl;
+    int ref_flags;
+    void *callbacks;
+} ExternalCycleCollectionParticipant;
+
+typedef struct nsCycleCollectionTraversalCallback nsCycleCollectionTraversalCallback;
+
+typedef struct {
+    nsresult (NSAPI *traverse)(void*,void*,nsCycleCollectionTraversalCallback*);
+    nsresult (NSAPI *unlink)(void*);
+    void (NSAPI *delete_cycle_collectable)(void*);
+} CCObjCallback;
+
+DEFINE_GUID(IID_nsXPCOMCycleCollectionParticipant, 0x9674489b,0x1f6f,0x4550,0xa7,0x30, 0xcc,0xae,0xdd,0x10,0x4c,0xf9);
 
 struct proxy_func_invoker
 {
@@ -63,6 +81,17 @@ struct proxy_prop_info
     unsigned flags;
 };
 
+typedef void (__cdecl *note_edge_t)(nsISupports*,const char*,nsCycleCollectionTraversalCallback*);
+
+struct proxy_cc_api
+{
+    ExternalCycleCollectionParticipant participant;
+    BOOL (__cdecl *is_full_cc)(void);
+    void (__cdecl *collect)(void);
+    void (__cdecl *describe_node)(ULONG ref, const char *obj_name, nsCycleCollectionTraversalCallback *cb);
+    note_edge_t note_edge;
+};
+
 typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
@@ -76,6 +105,7 @@ typedef struct {
     HRESULT (STDMETHODCALLTYPE *PropDelete)(IWineDispatchProxyPrivate *This, DISPID id);
     HRESULT (STDMETHODCALLTYPE *PropEnum)(IWineDispatchProxyPrivate *This);
     HRESULT (STDMETHODCALLTYPE *ToString)(IWineDispatchProxyPrivate *This, BSTR *string);
+    void    (STDMETHODCALLTYPE *InitCC)(struct proxy_cc_api *cc_api, const CCObjCallback *callback);
 } IWineDispatchProxyPrivateVtbl;
 
 typedef struct {
@@ -131,8 +161,6 @@ struct _IWineDispatchProxyCbPrivate {
 
 #define NS_FAILED(res) ((res) & 0x80000000)
 #define NS_SUCCEEDED(res) (!NS_FAILED(res))
-
-#define NSAPI WINAPI
 
 #define MSHTML_E_INVALID_PROPERTY 0x800a01b6
 #define MSHTML_E_INVALID_ACTION   0x800a01bd
@@ -487,20 +515,6 @@ struct DispatchEx {
     dispex_data_t *info;
     dispex_dynamic_data_t *dynamic_data;
 };
-
-typedef struct {
-    void *vtbl;
-    int ref_flags;
-    void *callbacks;
-} ExternalCycleCollectionParticipant;
-
-typedef struct {
-    nsresult (NSAPI *traverse)(void*,void*,nsCycleCollectionTraversalCallback*);
-    nsresult (NSAPI *unlink)(void*);
-    void (NSAPI *delete_cycle_collectable)(void*);
-} CCObjCallback;
-
-DEFINE_GUID(IID_nsXPCOMCycleCollectionParticipant, 0x9674489b,0x1f6f,0x4550,0xa7,0x30, 0xcc,0xae,0xdd,0x10,0x4c,0xf9);
 
 extern nsrefcnt (__cdecl *ccref_incr)(nsCycleCollectingAutoRefCnt*,nsISupports*);
 extern nsrefcnt (__cdecl *ccref_decr)(nsCycleCollectingAutoRefCnt*,nsISupports*,ExternalCycleCollectionParticipant*);
@@ -1091,6 +1105,7 @@ void ConnectionPointContainer_Destroy(ConnectionPointContainer*);
 
 HRESULT create_gecko_browser(HTMLDocumentObj*,GeckoBrowser**);
 void detach_gecko_browser(GeckoBrowser*);
+void cycle_collect(nsIDOMWindowUtils*);
 
 DWORD get_compat_mode_version(compat_mode_t compat_mode);
 compat_mode_t lock_document_mode(HTMLDocumentNode*);
@@ -1381,6 +1396,7 @@ typedef struct {
     struct list *pending_xhr_events_tail;
     struct wine_rb_tree session_storage_map;
     void *blocking_xhr;
+    unsigned full_cc_in_progress;
 } thread_data_t;
 
 thread_data_t *get_thread_data(BOOL);
