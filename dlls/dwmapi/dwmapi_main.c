@@ -226,6 +226,15 @@ HRESULT WINAPI DwmGetWindowAttribute(HWND hwnd, DWORD attribute, PVOID pv_attrib
         SetThreadDpiAwarenessContext(context);
         break;
     }
+    case DWMWA_CLOAKED:
+        if (size < sizeof(DWORD))
+            return E_INVALIDARG;
+
+        FIXME("DWMWA_CLOAKED: always returning 0.\n");
+        *(DWORD*)(pv_attribute) = 0;
+        hr = S_OK;
+        break;
+
     default:
         FIXME("attribute %ld not implemented.\n", attribute);
         hr = E_NOTIMPL;
