@@ -940,6 +940,7 @@ sync_test("builtin_prototypes", function() {
 
     if(v >= 9) {
         var protos = [
+            [ "CharacterData",                  "Node" ],
             [ "ClientRect",                     "Object" ],
             [ "ClientRectList",                 "Object" ],
             [ "Console",                        "Object" ],
@@ -970,6 +971,7 @@ sync_test("builtin_prototypes", function() {
             [ "Screen",                         "Object" ],
             [ "Storage",                        "Object" ],
             [ "StyleSheetList",                 "Object" ],
+            [ "Text",                           "CharacterData" ],
             [ "TextRange",                      "Object" ],
             [ "Window",                         "Object" ],
             [ "XMLHttpRequest",                 "Object" ]
@@ -981,6 +983,28 @@ sync_test("builtin_prototypes", function() {
             var a, b;
             eval("a = Object.getPrototypeOf(" + protos[i][0] + ".prototype); b = " + protos[i][1] + ".prototype;");
             ok(a === b, "getPrototypeOf(" + protos[i][0] + ".prototype) = " + a);
+        }
+
+        var Node_props = [ "addEventListener","appendChild","attributes","childNodes","cloneNode","compareDocumentPosition","dispatchEvent","firstChild",
+                           "hasChildNodes","insertBefore","isDefaultNamespace","isEqualNode","isSameNode","isSupported","lastChild","localName",
+                           "lookupNamespaceURI","lookupPrefix","namespaceURI","nextSibling","nodeName","nodeType","nodeValue","ownerDocument",
+                           "parentNode","prefix","previousSibling","removeChild","removeEventListener","replaceChild","textContent" ];
+
+        protos = [
+            [ "CharacterData", ["data","length"], Node_props ],
+            [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ]
+        ];
+
+        for(var i = 0; i < protos.length; i++) {
+            if(!(protos[i][0] in window))
+                continue;
+            eval("r = " + protos[i][0] + ".prototype");
+            for(var j = 0; j < protos[i][1].length; j++)
+                ok(Object.prototype.hasOwnProperty.call(r, protos[i][1][j]), protos[i][1][j] + " not a property of " + protos[i][0] + ".prototype");
+            for(var j = 0; j < protos[i][2].length; j++) {
+                ok(!Object.prototype.hasOwnProperty.call(r, protos[i][2][j]), protos[i][2][j] + " is a property of " + protos[i][0] + ".prototype");
+                ok(protos[i][2][j] in r, protos[i][2][j] + " not in " + protos[i][0] + ".prototype");
+            }
         }
     }
 });
@@ -1198,6 +1222,7 @@ sync_test("builtin_constructors", function() {
     }else {
         var ctors = [
             [ "Attr" ],
+            [ "CharacterData" ],
             [ "ClientRect" ],
             [ "ClientRectList" ],
             [ "Comment" ],

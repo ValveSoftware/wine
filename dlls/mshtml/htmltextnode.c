@@ -25,6 +25,7 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "ole2.h"
+#include "mshtmdid.h"
 
 #include "mshtml_private.h"
 
@@ -38,6 +39,27 @@ struct HTMLDOMTextNode {
     IHTMLDOMTextNode2 IHTMLDOMTextNode2_iface;
 
     nsIDOMText *nstext;
+};
+
+/* dummy dispex used only for CharacterDataPrototype in prototype chain */
+static void DOMCharacterData_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t textnode_hooks[] = {
+        {DISPID_IHTMLDOMTEXTNODE_TOSTRING},
+        {DISPID_IHTMLDOMTEXTNODE_SPLITTEXT},
+        {DISPID_UNKNOWN}
+    };
+    dispex_info_add_interface(info, IHTMLDOMTextNode_tid, textnode_hooks);
+    dispex_info_add_interface(info, IHTMLDOMTextNode2_tid, NULL);
+}
+
+dispex_static_data_t DOMCharacterData_dispex = {
+    "CharacterData",
+    &no_dispex_vtbl,
+    PROTO_ID_DOMCharacterData,
+    NULL_tid,
+    no_iface_tids,
+    DOMCharacterData_init_dispex_info
 };
 
 static inline HTMLDOMTextNode *impl_from_IHTMLDOMTextNode(IHTMLDOMTextNode *iface)

@@ -141,6 +141,7 @@ PRIVATE_TID_LIST
 
 static const dispex_static_data_vtbl_t proxy_prototype_dispex_vtbl;
 static void proxy_prototype_init_dispex_info(dispex_data_t*,compat_mode_t);
+const dispex_static_data_vtbl_t no_dispex_vtbl = { 0 };
 const tid_t no_iface_tids[1] = { 0 };
 
 static struct prototype_static_data {
