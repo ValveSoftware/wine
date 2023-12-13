@@ -408,6 +408,109 @@ static HRESULT array_to_args(script_ctx_t *ctx, jsdisp_t *arg_array, unsigned *a
     return S_OK;
 }
 
+static HRESULT disp_to_args(script_ctx_t *ctx, IDispatch *disp, unsigned *argc, jsval_t **ret)
+{
+    IDispatchEx *dispex;
+    DWORD length, i;
+    jsval_t *argv;
+    DISPID dispid;
+    EXCEPINFO ei;
+    UINT err = 0;
+    HRESULT hres;
+    VARIANT var;
+    BSTR name;
+
+    if(!(name = SysAllocString(L"length")))
+        return E_OUTOFMEMORY;
+    hres = IDispatch_QueryInterface(disp, &IID_IDispatchEx, (void**)&dispex);
+    if(SUCCEEDED(hres) && dispex)
+        hres = IDispatchEx_GetDispID(dispex, name, fdexNameCaseSensitive, &dispid);
+    else {
+        hres = IDispatch_GetIDsOfNames(disp, &IID_NULL, &name, 1, 0, &dispid);
+        dispex = NULL;
+    }
+    SysFreeString(name);
+    if(SUCCEEDED(hres) && dispid == DISPID_UNKNOWN)
+        hres = DISP_E_UNKNOWNNAME;
+    if(FAILED(hres)) {
+        if(hres == DISP_E_UNKNOWNNAME)
+            hres = JS_E_JSCRIPT_EXPECTED;
+        goto fail;
+    }
+
+    if(dispex)
+        hres = IDispatchEx_InvokeEx(dispex, dispid, ctx->lcid, DISPATCH_PROPERTYGET, NULL,
+                                    &var, &ei, &ctx->jscaller->IServiceProvider_iface);
+    else
+        hres = IDispatch_Invoke(disp, dispid, &IID_NULL, ctx->lcid, DISPATCH_PROPERTYGET, NULL, &var, &ei, &err);
+    if(FAILED(hres)) {
+        if(hres == DISP_E_EXCEPTION)
+            disp_fill_exception(ctx, &ei);
+        if(hres == DISP_E_MEMBERNOTFOUND)
+            hres = JS_E_JSCRIPT_EXPECTED;
+        goto fail;
+    }
+
+    if(FAILED(VariantChangeType(&var, &var, 0, VT_UI4))) {
+        VariantClear(&var);
+        hres = JS_E_JSCRIPT_EXPECTED;
+        goto fail;
+    }
+    length = V_UI4(&var);
+
+    argv = malloc(length * sizeof(*argv));
+    if(!argv) {
+        hres = E_OUTOFMEMORY;
+        goto fail;
+    }
+
+    for(i = 0; i < length; i++) {
+        WCHAR buf[12];
+
+        swprintf(buf, ARRAY_SIZE(buf), L"%u", i);
+        if(!(name = SysAllocString(buf)))
+            hres = E_OUTOFMEMORY;
+        else {
+            if(dispex)
+                hres = IDispatchEx_GetDispID(dispex, name, fdexNameCaseSensitive, &dispid);
+            else
+                hres = IDispatch_GetIDsOfNames(disp, &IID_NULL, &name, 1, 0, &dispid);
+            SysFreeString(name);
+        }
+        if(SUCCEEDED(hres)) {
+            if(dispex)
+                hres = IDispatchEx_InvokeEx(dispex, dispid, ctx->lcid, DISPATCH_PROPERTYGET, NULL,
+                                            &var, &ei, &ctx->jscaller->IServiceProvider_iface);
+            else
+                hres = IDispatch_Invoke(disp, dispid, &IID_NULL, ctx->lcid, DISPATCH_PROPERTYGET, NULL, &var, &ei, &err);
+            if(SUCCEEDED(hres)) {
+                hres = variant_to_jsval(ctx, &var, &argv[i]);
+                VariantClear(&var);
+            }else if(hres == DISP_E_EXCEPTION) {
+                disp_fill_exception(ctx, &ei);
+            }
+        }
+        if(FAILED(hres)) {
+            if(hres == DISP_E_UNKNOWNNAME || hres == DISP_E_MEMBERNOTFOUND) {
+                argv[i] = jsval_undefined();
+                continue;
+            }
+            while(i--)
+                jsval_release(argv[i]);
+            free(argv);
+            goto fail;
+        }
+    }
+
+    *argc = length;
+    *ret = argv;
+    hres = S_OK;
+fail:
+    if(dispex)
+        IDispatchEx_Release(dispex);
+    return hres;
+}
+
 static HRESULT Function_apply(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv, jsval_t *r)
 {
     jsval_t this_val = jsval_undefined();
@@ -439,22 +542,31 @@ static HRESULT Function_apply(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsi
 
     if(argc >= 2) {
         jsdisp_t *arg_array = NULL;
+        IDispatch *obj = NULL;
 
         if(is_object_instance(argv[1])) {
-            arg_array = iface_to_jsdisp(get_object(argv[1]));
-            if(arg_array &&
-               (!is_class(arg_array, JSCLASS_ARRAY) && !is_class(arg_array, JSCLASS_ARGUMENTS) )) {
-                jsdisp_release(arg_array);
-                arg_array = NULL;
+            obj = get_object(argv[1]);
+            arg_array = iface_to_jsdisp(obj);
+
+            if(ctx->version < SCRIPTLANGUAGEVERSION_ES5) {
+                if(!arg_array) {
+                    if(!ctx->html_mode)
+                        obj = NULL;
+                }else if(!is_class(arg_array, JSCLASS_ARRAY) && !is_class(arg_array, JSCLASS_ARGUMENTS)) {
+                    jsdisp_release(arg_array);
+                    arg_array = NULL;
+                    obj = NULL;
+                }
             }
         }
 
         if(arg_array) {
             hres = array_to_args(ctx, arg_array, &cnt, &args);
             jsdisp_release(arg_array);
+        }else if(obj) {
+            hres = disp_to_args(ctx, obj, &cnt, &args);
         }else {
-            FIXME("throw TypeError\n");
-            hres = E_FAIL;
+            hres = JS_E_JSCRIPT_EXPECTED;
         }
     }
 
