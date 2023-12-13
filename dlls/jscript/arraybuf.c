@@ -975,8 +975,39 @@ static HRESULT TypedArrayConstr_value(script_ctx_t *ctx, jsval_t vthis, WORD fla
                 if(!obj)
                     return JS_E_TYPEDARRAY_BAD_CTOR_ARG;
 
-                FIXME("Construction from object not implemented\n");
-                return E_NOTIMPL;
+                if(obj->builtin_info->class == JSCLASS_ARRAYBUFFER) {
+                    ArrayBufferInstance *arraybuf = arraybuf_from_jsdisp(obj);
+
+                    if(argc > 1) {
+                        hres = to_integer(ctx, argv[1], &n);
+                        if(FAILED(hres))
+                            return hres;
+                        if(n < 0.0 || n > arraybuf->size)
+                            return JS_E_TYPEDARRAY_INVALID_OFFSLEN;
+                        offset = n;
+                        if(offset % elem_size)
+                            return JS_E_TYPEDARRAY_INVALID_OFFSLEN;
+                    }
+                    if(argc > 2 && !is_undefined(argv[2])) {
+                        hres = to_integer(ctx, argv[2], &n);
+                        if(FAILED(hres))
+                            return hres;
+                        if(n < 0.0 || n > UINT_MAX)
+                            return JS_E_TYPEDARRAY_INVALID_OFFSLEN;
+                        length = n;
+                        if(offset + length * elem_size > arraybuf->size)
+                            return JS_E_TYPEDARRAY_INVALID_OFFSLEN;
+                    }else {
+                        length = arraybuf->size - offset;
+                        if(length % elem_size)
+                            return JS_E_TYPEDARRAY_INVALID_OFFSLEN;
+                        length /= elem_size;
+                    }
+                    buffer = jsdisp_addref(&arraybuf->dispex);
+                }else {
+                    FIXME("Construction from object not implemented\n");
+                    return E_NOTIMPL;
+                }
             }else if(is_number(argv[0])) {
                 hres = to_integer(ctx, argv[0], &n);
                 if(FAILED(hres))
