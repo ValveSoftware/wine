@@ -1136,8 +1136,18 @@ sync_test("builtin_constructors", function() {
                 if(v < 8 || ctors[i][0] === "HTMLModelessDialog") {
                     ok(!("constructor" in a.prototype), "constructor in " + ctors[i][0] + ".prototype");
                 }else {
-                    todo_wine.
                     ok("constructor" in a.prototype, "constructor not in " + ctors[i][0] + ".prototype");
+                    b = a.prototype.constructor;
+                    r = ctors[i][(ctors[i].length > 2) ? 2 : 0];
+                    var ctor = (r.length > 7 && r.slice(-7) === "Element") ? window.Element : null;
+                    ok(b === ctor, ctors[i][0] + ".prototype.constructor = " + b);
+                    a.prototype.constructor = "foobar";
+                    b = a.prototype.constructor;
+                    ok(b === ctor, ctors[i][0] + ".prototype.constructor after set = " + b);
+                    r = (delete a.prototype.constructor);
+                    ok(r === true, "delete " + ctors[i][0] + ".prototype.constructor returned " + r);
+                    b = a.prototype.constructor;
+                    ok(b === ctor, ctors[i][0] + ".prototype.constructor after delete = " + b);
                 }
             }
         }

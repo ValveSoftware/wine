@@ -2044,7 +2044,9 @@ struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow *window, prototype
         if(!(prot = malloc(sizeof(*prot))))
             return NULL;
 
+        prot->window = window;
         window->legacy_prototypes[prot_id] = prot;
+        IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
 
         init_dispatch(&prot->dispex, &legacy_prototype_dispex[prot_id], NULL, compat_mode);
     }
@@ -2056,6 +2058,25 @@ struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow *window, prototype
 static inline struct legacy_prototype *legacy_prototype_from_DispatchEx(DispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, struct legacy_prototype, dispex);
+}
+
+static void legacy_prototype_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    struct legacy_prototype *This = legacy_prototype_from_DispatchEx(dispex);
+
+    if(This->window)
+        note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
+}
+
+static void legacy_prototype_unlink(DispatchEx *dispex)
+{
+    struct legacy_prototype *This = legacy_prototype_from_DispatchEx(dispex);
+
+    if(This->window) {
+        HTMLInnerWindow *window = This->window;
+        This->window = NULL;
+        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
+    }
 }
 
 static void legacy_prototype_destructor(DispatchEx *dispex)
@@ -2090,9 +2111,72 @@ static HRESULT legacy_prototype_value(DispatchEx *dispex, LCID lcid, WORD flags,
     return S_OK;
 }
 
+static HRESULT legacy_prototype_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
+{
+    if(dispex_compat_mode(dispex) == COMPAT_MODE_IE8) {
+        if((flags & fdexNameCaseInsensitive) ? !wcsicmp(name, L"constructor") : !wcscmp(name, L"constructor")) {
+            *dispid = MSHTML_DISPID_CUSTOM_MIN;
+            return S_OK;
+        }
+    }
+    return DISP_E_UNKNOWNNAME;
+}
+
+static HRESULT legacy_prototype_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
+{
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(idx > 0 || dispex_compat_mode(dispex) != COMPAT_MODE_IE8)
+        return DISP_E_MEMBERNOTFOUND;
+    return (*name = SysAllocString(L"constructor")) ? S_OK : E_OUTOFMEMORY;
+}
+
+static HRESULT legacy_prototype_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    static WCHAR ElementW[] = L"Element";
+    struct legacy_prototype *This = legacy_prototype_from_DispatchEx(dispex);
+    prototype_id_t prot_id = This->dispex.info->desc - legacy_prototype_dispex;
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+    HTMLInnerWindow *window = This->window;
+    DISPPARAMS dp = { 0 };
+
+    if(idx > 0 || dispex_compat_mode(dispex) != COMPAT_MODE_IE8)
+        return DISP_E_MEMBERNOTFOUND;
+
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+        return MSHTML_E_INVALID_PROPERTY;
+    case DISPATCH_PROPERTYGET:
+        if(prot_id < PROTO_ID_HTMLGenericElement && prot_id != PROTO_ID_HTMLUnknownElement)
+            break;
+        if(FAILED(IDispatchEx_GetDispID(&window->base.IDispatchEx_iface, ElementW, fdexNameCaseSensitive, &id)))
+            break;
+        return IDispatchEx_InvokeEx(&window->base.IDispatchEx_iface, id, lcid, DISPATCH_PROPERTYGET, &dp, res, ei, caller);
+    case DISPATCH_PROPERTYPUTREF|DISPATCH_PROPERTYPUT:
+    case DISPATCH_PROPERTYPUTREF:
+    case DISPATCH_PROPERTYPUT:
+        return S_OK;
+    default:
+        return MSHTML_E_INVALID_PROPERTY;
+    }
+
+    V_VT(res) = VT_NULL;
+    return S_OK;
+}
+
 static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl = {
     .destructor       = legacy_prototype_destructor,
-    .value            = legacy_prototype_value
+    .traverse         = legacy_prototype_traverse,
+    .unlink           = legacy_prototype_unlink,
+    .value            = legacy_prototype_value,
+    .get_dispid       = legacy_prototype_get_dispid,
+    .get_name         = legacy_prototype_get_name,
+    .invoke           = legacy_prototype_invoke
 };
 
 static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)

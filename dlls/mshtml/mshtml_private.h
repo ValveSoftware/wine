@@ -697,6 +697,7 @@ struct global_ctor {
 
 struct legacy_prototype {
     DispatchEx dispex;
+    HTMLInnerWindow *window;
 };
 
 struct proxy_globals {
