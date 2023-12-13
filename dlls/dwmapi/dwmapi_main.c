@@ -193,15 +193,24 @@ HRESULT WINAPI DwmGetWindowAttribute(HWND hwnd, DWORD attribute, PVOID pv_attrib
         return E_HANDLE;
     if (!IsWindow(hwnd))
         return E_HANDLE;
+    if (!pv_attribute)
+        return E_INVALIDARG;
 
     switch (attribute) {
+    case DWMWA_NCRENDERING_ENABLED:
+        if (size < sizeof(BOOL))
+            return E_INVALIDARG;
+
+        WARN("DWMWA_NCRENDERING_ENABLED: always returning FALSE.\n");
+        *(BOOL*)(pv_attribute) = FALSE;
+        hr = S_OK;
+        break;
+
     case DWMWA_EXTENDED_FRAME_BOUNDS:
     {
         RECT *rect = (RECT *)pv_attribute;
         DPI_AWARENESS_CONTEXT context;
 
-        if (!rect)
-            return E_INVALIDARG;
         if (size < sizeof(*rect))
             return E_NOT_SUFFICIENT_BUFFER;
         if (GetWindowLongW(hwnd, GWL_STYLE) & WS_CHILD)
