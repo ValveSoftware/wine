@@ -232,7 +232,7 @@ sync_test("builtin_toString", function() {
     ];
     var v = document.documentMode, e;
 
-    function test(msg, obj, name, tostr) {
+    function test(msg, obj, name, tostr, ctor_name) {
         var s;
         if(obj.toString) {
             s = obj.toString();
@@ -242,6 +242,32 @@ sync_test("builtin_toString", function() {
         s = Object.prototype.toString.call(obj);
         todo_wine_if(name !== "HTMLElement" && s === "[object HTMLElement]").
         ok(s === (v < 9 ? "[object Object]" : "[object " + name + "]"), msg + " Object.toString returned " + s);
+
+        if(v >= 9) {
+            eval("var c = window." + name + ";");
+            todo_wine_if(name !== "HTMLElement" && s === "[object HTMLElement]").
+            ok(c !== undefined, name + " is undefined");
+            if(!ctor_name) ctor_name = name;
+            if(c === undefined) return;  /* todo_wine */
+
+            s = Object.getPrototypeOf(obj);
+            if(name === "Object") {
+                ok(s === null, msg + "'s proto is not null: " + s);
+
+                s = Object.prototype.toString.call(c);
+                ok(s === "[object Function]", msg + " Object.toString on constructor returned " + s);
+            }else {
+                ok(s === c.prototype, msg + "'s proto is not its constructor's prototype");
+
+                s = Object.prototype.toString.call(c);
+                todo_wine_if(name !== "HTMLElement" && s === "[object HTMLElement]").
+                ok(s === "[object " + ctor_name + "]", msg + " Object.toString on constructor returned " + s);
+
+                s = Object.prototype.toString.call(c.prototype);
+                todo_wine_if(name !== "HTMLElement" && s === "[object HTMLElementPrototype]").
+                ok(s === "[object " + name + "Prototype]", msg + " Object.toString on constructor.prototype returned " + s);
+            }
+        }
     }
 
     for(var i = 0; i < tags.length; i++)
@@ -318,7 +344,7 @@ sync_test("builtin_toString", function() {
     test("textNode", document.createTextNode("testNode"), "Text", v < 9 ? "testNode" : null);
     test("textRange", txtRange, "TextRange");
     test("window", window, "Window", "[object Window]");
-    test("xmlHttpRequest", new XMLHttpRequest(), "XMLHttpRequest");
+    test("xmlHttpRequest", new XMLHttpRequest(), "XMLHttpRequest", null, "Function");
     if(v < 10) {
         test("namespaces", document.namespaces, "MSNamespaceInfoCollection");
     }
@@ -343,7 +369,7 @@ sync_test("builtin_toString", function() {
     }
     if(v >= 11) {
         test("crypto", window.msCrypto, "Crypto");
-        test("MutationObserver", new window.MutationObserver(function() {}), "MutationObserver");
+        test("MutationObserver", new window.MutationObserver(function() {}), "MutationObserver", null, "Function");
     }
     if(v >= 9) {
         document.body.innerHTML = "<!--...-->";
@@ -494,6 +520,564 @@ sync_test("builtin_obj", function() {
         f.call = function() { };
         ok(f.apply === 0, "changed f.apply = ", f.apply);
         ok(f.call instanceof Function, "changed f.call not instance of Function");
+    }
+});
+
+sync_test("builtin_prototypes", function() {
+    var v = document.documentMode, r, obj, name, proto;
+
+    function set_obj(n, o) {
+        name = n;
+        proto = null;
+        if(o) {
+            proto = window[n]["prototype"];
+            if(typeof o !== "boolean") {
+                obj = o;
+                return;
+            }
+        }
+        try {
+            obj = new window[n]();
+            ok(o, "expected exception when creating " + name + ".");
+        }catch(ex) {
+            obj = null;
+            ok(!o, "did not expect exception when creating " + name + ".");
+            ok(ex.number == 0xa01bd - 0x80000000, "unexpected exception number when creating " + name + ": " + ex.number);
+        }
+    }
+    function test_prop(prop, own) {
+        if(own === undefined ? v < 9 : own)
+            ok(Object.prototype.hasOwnProperty.call(obj, prop), prop + " not a property of " + name + ".");
+        else
+            ok(!Object.prototype.hasOwnProperty.call(obj, prop), prop + " is a property of " + name + ".");
+        ok(Object.prototype.hasOwnProperty.call(proto, prop), prop + " not a property of " + name + ".prototype.");
+    }
+    function test_legacy_ctor(methods, props, non_props, set_prop, set_prop_val) {
+        if(v >= 9)
+            return;
+        ok(""+proto === "[Interface prototype object]", name + ".prototype = " + proto);
+        if(v < 8)
+            ok(proto.constructor === undefined, name + ".prototype.constructor = " + proto.constructor);
+        for(var i = 0; i < methods.length; i++) {
+            ok(methods[i] in proto, methods[i] + " not in " + name + ".prototype");
+            var r = 0;
+            try {
+                eval("proto." + methods[i] + "();");
+            }catch(ex) {
+                r = ex.number;
+            }
+            ok(r === 0xa01b6 - 0x80000000, name + ".prototype." + methods[i] + "() exception code = " + r);
+            eval("r = \"\"+proto." + methods[i] + ";");
+            ok(r === "\nfunction " + methods[i] + "() {\n    [native code]\n}\n", name + ".prototype." + methods[i] + " = " + r);
+            try {
+                eval("r = (delete proto." + methods[i] + ");");
+                ok(v >= 8, "expected exception deleting " + name + ".prototype." + methods[i]);
+                ok(r === true, "delete " + name + ".prototype." + methods[i] + " returned " + r);
+            }catch(ex) {
+                ok(v < 8, "did not expect exception deleting " + name + ".prototype." + methods[i]);
+            }
+            eval("r = \"\"+proto." + methods[i] + ";");
+            ok(r === "\nfunction " + methods[i] + "() {\n    [native code]\n}\n", name + ".prototype." + methods[i] + " after delete = " + r);
+            ok(methods[i] in proto, methods[i] + " not in " + name + ".prototype after delete");
+
+            var func = function() { return "foobar"; }
+            eval("proto." + methods[i] + " = func;");
+            eval("r = proto." + methods[i] + ";");
+            ok(r === func, name + ".prototype." + methods[i] + " after set = " + r);
+            try {
+                eval("r = (delete proto." + methods[i] + ");");
+                ok(v >= 8, "expected exception deleting " + name + ".prototype." + methods[i] + " after set");
+                ok(r === true, "delete " + name + ".prototype." + methods[i] + " after set returned " + r);
+                eval("r = \"\"+proto." + methods[i] + ";");
+                ok(r === "\nfunction " + methods[i] + "() {\n    [native code]\n}\n", name + ".prototype." + methods[i] + " after second delete = " + r);
+            }catch(ex) {
+                ok(v < 8, "did not expect exception deleting " + name + ".prototype." + methods[i] + " after set");
+                eval("r = proto." + methods[i] + ";");
+                ok(r === func, name + ".prototype." + methods[i] + " after second delete = " + r);
+            }
+            eval("proto." + methods[i] + " = func;");
+            eval("r = proto." + methods[i] + ";");
+            ok(r === func, name + ".prototype." + methods[i] + " after second set = " + r);
+        }
+        for(var i = 0; i < props.length; i++) {
+            ok(props[i] in proto, props[i] + " not in " + name + ".prototype");
+            eval("var r = proto." + props[i] + ";");
+            ok(r === undefined, name + ".prototype." + props[i] + " = " + r);
+            try {
+                eval("r = (delete proto." + props[i] + ");");
+                ok(v >= 8, "expected exception deleting " + name + ".prototype." + props[i]);
+                ok(r === true, "delete " + name + ".prototype." + props[i] + " returned " + r);
+            }catch(ex) {
+                ok(v < 8, "did not expect exception deleting " + name + ".prototype." + props[i]);
+            }
+            eval("r = proto." + props[i] + ";");
+            ok(r === undefined, name + ".prototype." + props[i] + " after delete = " + r);
+            ok(props[i] in proto, props[i] + " not in " + name + ".prototype after delete");
+        }
+        for(var i = 0; i < non_props.length; i++)
+            ok(!(non_props[i] in proto), non_props[i] + " in " + name + ".prototype");
+
+        eval("r = proto." + set_prop + ";");
+        ok(r === undefined, name + ".prototype." + set_prop + " = " + r);
+        eval("proto." + set_prop + " = set_prop_val; r = proto." + set_prop + ";");
+        ok(r === undefined, name + ".prototype." + set_prop + " after set = " + r);
+
+        r = proto.winetestprop;
+        ok(r === undefined, name + ".prototype.winetestprop = " + r);
+        proto.winetestprop = "test";
+        r = proto.winetestprop;
+        ok(r === "test", name + ".prototype.winetestprop after set = " + r);
+    }
+
+    set_obj("XMLHttpRequest", true);
+    test_prop("open");
+    test_prop("status");
+    test_prop("onreadystatechange");
+    test_legacy_ctor(["abort", "send"], ["readyState", "status"], ["selected", "src", "getAttribute"], "onreadystatechange", function(){});
+    if(v < 9) {
+        r = obj.abort();
+        ok(r === "foobar", "(new XMLHttpRequest).abort() returned " + r);
+        r = obj.winetestprop;
+        ok(r === "test", "(new XMLHttpRequest).winetestprop = " + r);
+        obj.winetestprop = "prop";
+        r = obj.winetestprop;
+        ok(r === "prop", "(new XMLHttpRequest).winetestprop after set = " + r);
+        r = XMLHttpRequest.prototype.winetestprop;
+        ok(r === "test", "XMLHttpRequest.prototype.winetestprop after obj = " + r);
+    }else
+        ok(proto.constructor === window.XMLHttpRequest, "XMLHttpRequest.prototype.constructor = " + proto.constructor);
+
+    set_obj("Image", true);
+    test_prop("src");
+    test_prop("border");
+    test_legacy_ctor(["getAttribute", "toString"], ["isMap", "alt"], ["selected", "send"], "src", "about:blank");
+    if(v < 9) {
+        r = obj.toString();
+        ok(r === "foobar", "(new Image).toString() returned " + r);
+        r = obj.winetestprop;
+        ok(r === "test", "(new Image).winetestprop = " + r);
+        obj.winetestprop = "prop";
+        r = obj.winetestprop;
+        ok(r === "prop", "(new Image).winetestprop after set = " + r);
+        r = window.Image.prototype.winetestprop;
+        ok(r === "test", "Image.prototype.winetestprop after obj = " + r);
+        try {
+            r = (delete obj.winetestprop);
+            ok(v >= 8, "expected exception deleting (new Image).winetestprop");
+            ok(r === true, "delete (new Image).winetestprop returned " + r);
+        }catch(ex) {
+            ok(v < 8, "did not expect exception deleting (new Image).winetestprop");
+        }
+        r = obj.winetestprop;
+        ok(r === (v < 8 ? "prop" : "test"), "(new Image).winetestprop after delete = " + r);
+        obj = new window.Image();
+        r = obj.winetestprop;
+        ok(r === "test", "(new Image).winetestprop second time = " + r);
+        window.Image.prototype.winetestprop = "string";
+        r = obj.winetestprop;
+        ok(r === "string", "(new Image).winetestprop after change in prototype = " + r);
+    }else
+        ok(proto.constructor === window.HTMLImageElement, "Image.prototype.constructor = " + proto.constructor);
+
+    set_obj("Option", true);
+    test_prop("text");
+    test_prop("selected");
+    test_legacy_ctor(["setAttribute", "contains"], ["index", "value"], ["src", "send"], "text", "foo");
+    if(v < 9) {
+        r = obj.setAttribute("a", "b");
+        ok(r === "foobar", "(new Option).setAttribute() returned " + r);
+        r = obj.winetestprop;
+        ok(r === "test", "(new Option).winetestprop = " + r);
+        obj.winetestprop = "prop";
+        r = obj.winetestprop;
+        ok(r === "prop", "(new Option).winetestprop after set = " + r);
+        r = window.Option.prototype.winetestprop;
+        ok(r === "test", "Option.prototype.winetestprop after obj = " + r);
+        try {
+            r = (delete obj.winetestprop);
+            ok(v >= 8, "expected exception deleting (new Option).winetestprop");
+            ok(r === true, "delete (new Option).winetestprop returned " + r);
+        }catch(ex) {
+            ok(v < 8, "did not expect exception deleting (new Option).winetestprop");
+        }
+        r = obj.winetestprop;
+        ok(r === (v < 8 ? "prop" : "test"), "(new Option).winetestprop after delete = " + r);
+        obj = new window.Option();
+        r = obj.winetestprop;
+        ok(r === "test", "(new Option).winetestprop second time = " + r);
+        window.Option.prototype.winetestprop = "string";
+        r = obj.winetestprop;
+        ok(r === "string", "(new Option).winetestprop after change in prototype = " + r);
+    }else
+        ok(proto.constructor === window.HTMLOptionElement, "Option.prototype.constructor = " + proto.constructor);
+
+    // other constructors don't support construction
+    set_obj("ClientRect");
+    set_obj("ClientRectList");
+    set_obj("Console");
+    set_obj("CustomEvent");
+    set_obj("DOMTokenList");
+    set_obj("KeyboardEvent");
+    set_obj("MessageEvent");
+    set_obj("MouseEvent");
+    set_obj("MSCSSRuleList");
+    set_obj("MSCurrentStyleCSSProperties");
+    set_obj("MSEventObj");
+    set_obj("MSNamespaceInfoCollection");
+    set_obj("MSSelection");
+    set_obj("MSStyleCSSProperties");
+    set_obj("Performance");
+    set_obj("PerformanceNavigation");
+    set_obj("PerformanceTiming");
+    set_obj("UIEvent");
+    if(v >= 9) {
+        set_obj("Attr");
+        set_obj("CSSStyleDeclaration");
+        set_obj("CSSStyleRule");
+        set_obj("CSSStyleSheet");
+        set_obj("DOMImplementation");
+        set_obj("Event");
+        set_obj("History");
+        set_obj("HTMLCollection");
+        set_obj("NamedNodeMap");
+        set_obj("Navigator");
+        set_obj("NodeList");
+        set_obj("Screen");
+        set_obj("Storage");
+        set_obj("StyleSheetList");
+        set_obj("Text");
+        set_obj("TextRange");
+        set_obj("Window");
+    }
+    if(v >= 11) {
+        set_obj("Crypto");
+    }
+
+    // todo_wine
+    if(v === 8 && window.Event === undefined)
+        return;
+
+    if(v >= 8 && v < 11) {
+        set_obj(v < 9 ? "Event" : "MSEventObj", document.createEventObject());
+        test_prop("x");
+        test_prop("y");
+        test_prop("srcElement");
+        test_prop("returnValue");
+
+        if(Object.create) {
+            obj = Object.create(proto);
+            test_prop("reason");
+            test_prop("srcFilter");
+            r = Object.prototype.toString.call(obj);
+            ok(r === "[object Object]", "Object.toString on obj created from MSEventObj.prototype returned " + r);
+        }
+
+        var ctor = function() {};
+        ctor.prototype = proto;
+        ctor.prototype.testWineProp = function() { return 42; };
+        obj = new ctor();
+        test_prop("shiftKey", false);
+        test_prop("testWineProp", false);
+        r = Object.prototype.toString.call(obj);
+        ok(r === "[object Object]", "Object.toString on custom obj returned " + r);
+
+        r = (delete proto.shiftKey);
+        ok(r === true, "delete shiftKey returned " + r);
+        if(v < 9)
+            ok(Object.prototype.hasOwnProperty.call(proto, "shiftKey"), "shiftKey not a property anymore of Event.prototype.");
+        else {
+            ok(!Object.prototype.hasOwnProperty.call(proto, "shiftKey"), "shiftKey still a property of MSEventObj.prototype.");
+            proto.shiftKey = ctor;
+            ok(proto.shiftKey === ctor, "shiftKey = " + proto.shiftKey);
+        }
+
+        r = (delete proto.testWineProp);
+        ok(r === true, "delete testWineProp returned " + r);
+        ok(!Object.prototype.hasOwnProperty.call(proto, "testWineProp"), "testWineProp still a property of " + name + ".prototype.");
+    }
+
+    if(v >= 9) {
+        set_obj("Event", document.createEvent("Event"));
+        test_prop("initEvent");
+        test_prop("currentTarget");
+
+        obj = Object.create(proto);
+        test_prop("eventPhase");
+        test_prop("preventDefault");
+        r = Object.prototype.toString.call(obj);
+        ok(r === "[object Object]", "Object.toString on obj created from Event.prototype returned " + r);
+
+        var ctor = function() {};
+        ctor.prototype = proto;
+        ctor.prototype.testWineProp = function() { return 42; };
+        obj = new ctor();
+        test_prop("timeStamp");
+        test_prop("testWineProp");
+        r = Object.prototype.toString.call(obj);
+        ok(r === "[object Object]", "Object.toString on custom obj returned " + r);
+
+        r = (delete proto.timeStamp);
+        ok(r === true, "delete timeStamp returned " + r);
+        ok(!Object.prototype.hasOwnProperty.call(proto, "timeStamp"), "timeStamp still a property of Event.prototype.");
+
+        r = (delete proto.testWineProp);
+        ok(r === true, "delete testWineProp returned " + r);
+        ok(!Object.prototype.hasOwnProperty.call(proto, "testWineProp"), "testWineProp still a property of Event.prototype.");
+
+        proto.timeStamp = ctor;
+        ok(proto.timeStamp === ctor, "timeStamp = " + proto.timeStamp);
+
+        set_obj("HTMLImageElement", document.createElement("img"));
+        document.body.setAttribute.call(obj, "width", "100");
+        obj = Object.create(proto);
+        r = 0;
+        try {
+            document.body.setAttribute.call(obj, "width", "100");
+        }catch(ex) {
+            r = ex.number;
+        }
+        ok(r === 0xffff - 0x80000000, "document.body.setAttribute.call(obj ...) exception code = " + r);
+    }
+
+    if(v >= 8) {
+        obj = window.HTMLMetaElement;
+        ok(!("charset" in obj), "charset in HTMLMetaElement constructor.");
+        ok(!("setAttribute" in obj), "setAttribute in HTMLMetaElement constructor.");
+        ok(!Object.prototype.hasOwnProperty.call(obj, "charset"), "charset is a property of HTMLMetaElement constructor.");
+        if(Object.getPrototypeOf)
+            ok(Object.getPrototypeOf(obj) === Object.prototype, "getPrototypeOf(HTMLMetaElement constructor) = " + Object.getPrototypeOf(obj));
+        r = 0;
+        try {
+            document.body.setAttribute.call(obj, "charset", "UTF-8");
+        }catch(ex) {
+            r = ex.number;
+        }
+        ok(r === (v < 9 ? 0xa0005 : 0xffff) - 0x80000000, "setAttribute on HTMLMetaElement constructor error code = " + r);
+
+        proto = window.HTMLMetaElement.prototype;
+        try {
+            window.HTMLMetaElement.prototype = Object.prototype;
+            ok(v >= 9, "expected exception setting HTMLMetaElement.prototype");
+        }catch(ex) {
+            ok(v < 9, "did not expect exception setting HTMLMetaElement.prototype");
+            ok(ex.number === 0xa01b6 - 0x80000000, "exception code setting HTMLMetaElement.prototype = " + ex.number);
+        }
+        ok(window.HTMLMetaElement.prototype === proto, "HTMLMetaElement.prototype = " + window.HTMLMetaElement.prototype);
+        ok(proto !== Object.prototype, "old prototype is Object.prototype");
+
+        obj = document.createElement("meta");
+        ok("tagName" in obj, "tagName not in HTMLMetaElement");
+        if(Object.getPrototypeOf)
+            ok(Object.getPrototypeOf(obj) === proto, "getPrototypeOf(meta element) = " + Object.getPrototypeOf(obj));
+
+        try {
+            r = (delete window.HTMLMetaElement.prototype);
+            ok(r === false, "delete HTMLMetaElement.prototype returned " + r);
+            ok(v >= 9, "expected exception deleting HTMLMetaElement.prototype");
+        }catch(ex) {
+            ok(v < 9, "did not expect exception deleting HTMLMetaElement.prototype");
+            ok(ex.number === 0xa01b6 - 0x80000000, "exception code deleting HTMLMetaElement.prototype = " + ex.number);
+        }
+        ok(Object.prototype.hasOwnProperty.call(window.HTMLMetaElement, "prototype"), "prototype not a property anymore of HTMLMetaElement.");
+
+        try {
+            r = (delete window.HTMLMetaElement);
+            ok(r === true, "delete HTMLMetaElement returned " + r);
+            ok(v >= 9, "expected exception deleting HTMLMetaElement");
+            ok(!Object.prototype.hasOwnProperty.call(window, "HTMLMetaElement"), "HTMLMetaElement still a property of window.");
+        }catch(ex) {
+            ok(v < 9, "did not expect exception deleting HTMLMetaElement");
+            ok(ex.number === 0xa01bd - 0x80000000, "exception code deleting HTMLMetaElement = " + ex.number);
+            ok(Object.prototype.hasOwnProperty.call(window, "HTMLMetaElement"), "HTMLMetaElement not a property anymore of window.");
+        }
+
+        obj = document.createElement("meta");
+        ok("tagName" in obj, "tagName not in HTMLMetaElement");
+        if(Object.getPrototypeOf) {
+            ok(Object.getPrototypeOf(obj) === proto, "getPrototypeOf(meta element) = " + Object.getPrototypeOf(obj));
+            ok(window.HTMLMetaElement === undefined, "HTMLMetaElement = " + window.HTMLMetaElement);
+        }
+
+        ok("setAttribute" in proto, "setAttribute not in proto.");
+        r = 0;
+        try {
+            obj.setAttribute.call(proto, "charset", "UTF-8");
+        }catch(ex) {
+            r = ex.number;
+        }
+        todo_wine_if(v < 9).
+        ok(r === (v < 9 ? 0xa01b6 : 0xffff) - 0x80000000, "setAttribute on proto error code = " + r);
+        r = 0;
+        try {
+            proto.setAttribute("charset", "UTF-8");
+        }catch(ex) {
+            r = ex.number;
+        }
+        ok(r === (v < 9 ? 0xa01b6 : 0xffff) - 0x80000000, "proto.setAttribute error code = " + r);
+
+        ok(Object.prototype.hasOwnProperty.call(proto, "charset"), "charset not a property of proto.");
+        if(v < 9) {
+            proto.charset = "UTF-8";
+            ok(proto.charset === undefined, "proto.charset = " + proto.charset);
+        }else {
+            r = Object.getOwnPropertyDescriptor(proto, "charset");
+            ok(r.get.toString() === "\nfunction charset() {\n    [native code]\n}\n", "charset.get = " + r.get.toString());
+            ok(r.set.toString() === "\nfunction charset() {\n    [native code]\n}\n", "charset.set = " + r.set.toString());
+            ok(Object.getPrototypeOf(r.get) === Function.prototype, "unexpected charset.get prototype");
+            ok(Object.getPrototypeOf(r.set) === Function.prototype, "unexpected charset.set prototype");
+
+            r = 0;
+            try {
+                proto.charset;
+            }catch(ex) {
+                r = ex.number;
+            }
+            ok(r === 0xffff - 0x80000000, "proto.charset error code = " + r);
+            r = 0;
+            try {
+                proto.charset = "UTF-8";
+            }catch(ex) {
+                r = ex.number;
+            }
+            ok(r === 0xffff - 0x80000000, "set proto.charset error code = " + r);
+        }
+    }
+});
+
+sync_test("builtin_constructors", function() {
+    var v = document.documentMode;
+
+    var special_ctors = [
+        [ "Image",              [ "prototype", "arguments" ], [ "create", "length" ] ],
+        [ "MutationObserver",   [ "prototype", "arguments" ], [ "create", "length" ], 11 ],
+        [ "Option",             [ "prototype", "arguments" ], [ "create", "length" ] ],
+        [ "XMLHttpRequest",     [ "prototype", "arguments", "create" ], [ "length" ] ]
+    ];
+    for(var i = 0; i < special_ctors.length; i++) {
+        if(special_ctors[i].length > 3 && v < special_ctors[i][3])
+            continue;
+        var name = special_ctors[i][0];
+        ok(Object.prototype.hasOwnProperty.call(window, name), name + " not a property of window.");
+        var obj = window[name];
+        if(v < 9) {
+            ok(!Object.prototype.hasOwnProperty.call(obj, "arguments"), "arguments is a property of " + name + " constructor.");
+            ok(Object.prototype.hasOwnProperty.call(obj, "create"), "create not a property of " + name + " constructor.");
+            ok(!Object.prototype.hasOwnProperty.call(obj, "length"), "length is a property of " + name + " constructor.");
+            ok(Object.prototype.hasOwnProperty.call(obj, "prototype"), "prototype not a property of " + name + " constructor.");
+            ok(!("length" in obj), "length in " + name + " constructor.");
+            if(window.Window)
+                todo_wine.
+                ok(!Object.prototype.hasOwnProperty.call(window.Window.prototype, name), name + " is a property of window's prototype.");
+        }else {
+            for(var j = 0; j < special_ctors[i][1].length; j++)
+                ok(Object.prototype.hasOwnProperty.call(obj, special_ctors[i][1][j]), special_ctors[i][1][j] + " not a property of " + name + " constructor.");
+
+            for(var j = 0; j < special_ctors[i][2].length; j++)
+                ok(!Object.prototype.hasOwnProperty.call(obj, special_ctors[i][2][j]), special_ctors[i][2][j] + " is a property of " + name + " constructor.");
+
+            ok(Object.getPrototypeOf(obj) === Function.prototype, "getPrototypeOf(" + name + " constructor) = " + Object.getPrototypeOf(obj));
+            ok(!Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(window), name), name + " is a property of window's prototype.");
+
+            if(obj.create) {
+                var proto = obj.prototype, func = obj.create, s = Object.prototype.toString.call(func);
+                ok(s === "[object Function]", "obj.create toString = " + s);
+                ok(Object.getPrototypeOf(func) === Function.prototype, "getPrototypeOf(" + name + ".create) = " + Object.getPrototypeOf(func));
+                ok(Object.prototype.hasOwnProperty.call(func, "arguments"), "arguments not a property of " + name + ".create");
+                ok(!Object.prototype.hasOwnProperty.call(func, "length"), "length is a property of " + name + ".create");
+                ok(Object.prototype.hasOwnProperty.call(func, "prototype"), "prototype not a property of " + name + ".create");
+
+                obj = func();
+                ok(Object.getPrototypeOf(obj) === proto, "getPrototypeOf(obj.create()) = " + Object.getPrototypeOf(obj));
+                obj = func.call(Object);
+                ok(Object.getPrototypeOf(obj) === proto, "getPrototypeOf(obj.create() on Object) = " + Object.getPrototypeOf(obj));
+            }
+        }
+    }
+
+    if(v >= 9) {
+        var ctors = [
+            [ "Attr" ],
+            [ "ClientRect" ],
+            [ "ClientRectList" ],
+            [ "Comment" ],
+            [ "Console", 10 ],
+            [ "Crypto", 11 ],
+            [ "CSSStyleDeclaration" ],
+            [ "CSSStyleRule" ],
+            [ "CSSStyleSheet" ],
+            [ "CustomEvent" ],
+            [ "DocumentType" ],
+            [ "DOMImplementation" ],
+            [ "DOMTokenList", 10 ],
+            [ "Event" ],
+            [ "History" ],
+            [ "HTMLAnchorElement" ],
+            [ "HTMLAreaElement" ],
+            [ "HTMLBodyElement" ],
+            [ "HTMLButtonElement" ],
+            [ "HTMLCollection" ],
+            [ "HTMLDocument", 11 ],
+            [ "HTMLElement" ],
+            [ "HTMLEmbedElement" ],
+            [ "HTMLFormElement" ],
+            [ "HTMLFrameElement" ],
+            [ "HTMLHeadElement" ],
+            [ "HTMLHtmlElement" ],
+            [ "HTMLIFrameElement" ],
+            [ "HTMLImageElement" ],
+            [ "HTMLInputElement" ],
+            [ "HTMLLabelElement" ],
+            [ "HTMLLinkElement" ],
+            [ "HTMLObjectElement" ],
+            [ "HTMLOptionElement" ],
+            [ "HTMLScriptElement" ],
+            [ "HTMLSelectElement" ],
+            [ "HTMLStyleElement" ],
+            [ "HTMLTableDataCellElement" ],
+            [ "HTMLTableElement" ],
+            [ "HTMLTableRowElement" ],
+            [ "HTMLTextAreaElement" ],
+            [ "HTMLTitleElement" ],
+            [ "HTMLUnknownElement" ],
+            [ "KeyboardEvent" ],
+            [ "MediaQueryList", 10 ],
+            [ "MessageEvent" ],
+            [ "MimeTypeArray", 11 ],
+            [ "MouseEvent" ],
+            [ "MSCSSRuleList" ],
+            [ "MSCurrentStyleCSSProperties" ],
+            [ "MSEventObj" ],
+            [ "MSNamespaceInfoCollection", 0, 9 ],
+            [ "MSSelection", 0, 10 ],
+            [ "MSStyleCSSProperties" ],
+            [ "MutationObserver", 11 ],
+            [ "NamedNodeMap" ],
+            [ "Navigator" ],
+            [ "Node" ],
+            [ "NodeList" ],
+            [ "PageTransitionEvent", 11 ],
+            [ "Performance" ],
+            [ "PerformanceNavigation" ],
+            [ "PerformanceTiming" ],
+            [ "PluginArray", 11 ],
+            [ "ProgressEvent", 10 ],
+            [ "Range" ],
+            [ "Screen" ],
+            [ "Storage" ],
+            [ "StorageEvent" ],
+            [ "StyleSheetList" ],
+            [ "Text" ],
+            [ "TextRange" ],
+            [ "UIEvent" ],
+            [ "Window" ],
+            [ "XMLHttpRequest" ]
+        ];
+        for(var i = 0; i < ctors.length; i++) {
+            if((ctors[i].length > 1 && v < ctors[i][1]) || (ctors[i].length > 2 && v > ctors[i][2]))
+                ok(!(ctors[i][0] in window), ctors[i][0] + " in window.");
+            else
+                ok(Object.prototype.hasOwnProperty.call(window, ctors[i][0]), ctors[i][0] + " not a property of window.");
+        }
     }
 });
 
@@ -2840,6 +3424,13 @@ sync_test("__proto__", function() {
         ok(e.number === 0xa13b6 - 0x80000000 && e.name === "TypeError",
             "changing __proto__ on non-extensible object threw exception " + e.number + " (" + e.name + ")");
     }
+
+    obj = document.createElement("img");
+    obj.__proto__ = ctor.prototype;
+    document.body.setAttribute.call(obj, "height", "101");
+    r = document.body.getAttribute.call(obj, "height");
+    ok(r === "101", "getAttribute(height) = " + r);
+    ok(!("getAttribute" in obj), "getAttribute exposed in obj");
 });
 
 sync_test("__defineGetter__", function() {
@@ -3026,10 +3617,12 @@ sync_test("__defineSetter__", function() {
 });
 
 sync_test("Crypto", function() {
-    var crypto = window.msCrypto;
+    var crypto = window.msCrypto, r;
     if(!crypto) return;
 
     ok(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(window), "msCrypto"), "msCrypto not a property of window's prototype.");
+    r = Object.getPrototypeOf(crypto);
+    ok(r === window.Crypto.prototype, "getPrototypeOf(crypto) = " + r);
 
     ok("subtle" in crypto, "subtle not in crypto");
     ok("getRandomValues" in crypto, "getRandomValues not in crypto");
