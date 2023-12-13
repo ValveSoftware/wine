@@ -974,6 +974,7 @@ sync_test("builtin_prototypes", function() {
             [ "PerformanceNavigation",          "Object" ],
             [ "PerformanceTiming",              "Object" ],
             [ "PluginArray",                    "Object" ],
+            [ "ProgressEvent",                  "Event" ],
             [ "Screen",                         "Object" ],
             [ "Storage",                        "Object" ],
             [ "StyleSheetList",                 "Object" ],
@@ -1007,6 +1008,7 @@ sync_test("builtin_prototypes", function() {
             [ "KeyboardEvent", ["altKey","ctrlKey","getModifierState","initKeyboardEvent","key","metaKey"], ["detail","initUIEvent","view"] ],
             [ "MessageEvent", ["data","initMessageEvent","origin","source"], Event_props ],
             [ "MouseEvent", ["button","clientX","initMouseEvent","offsetY","pageX","shiftKey","x","y"], ["detail","initUIEvent","view"] ],
+            [ "ProgressEvent", ["initProgressEvent","lengthComputable","loaded","total"], Event_props ],
             [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ],
             [ "UIEvent", ["detail","initUIEvent","view"], Event_props ]
         ];
