@@ -125,6 +125,7 @@ PRIVATE_TID_LIST
 };
 
 static inline DispatchEx *get_dispex_for_hook(IUnknown*);
+static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 
 static HRESULT load_typelib(void)
 {
@@ -779,6 +780,28 @@ static HRESULT typeinfo_invoke(IUnknown *iface, func_info_t *func, WORD flags, D
     return ITypeInfo_Invoke(ti, iface, func->id, flags, &params, res, ei, &argerr);
 }
 
+static HRESULT function_call(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    DISPPARAMS params = { dp->rgvarg, NULL, dp->cArgs - 1, 0 };
+    VARIANT *arg;
+    HRESULT hres;
+
+    arg = dp->rgvarg + dp->cArgs - 1;
+    if(dp->cArgs < 1 || V_VT(arg) != VT_DISPATCH || !V_DISPATCH(arg))
+        return CTL_E_ILLEGALFUNCTIONCALL;
+
+    hres = invoke_builtin_function(V_DISPATCH(arg), func->info, &params, res, ei, caller);
+
+    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+}
+
+static const struct {
+    const WCHAR *name;
+    HRESULT (*invoke)(func_disp_t*,DISPPARAMS*,LCID,VARIANT*,EXCEPINFO*,IServiceProvider*);
+} function_props[] = {
+    { L"call",  function_call }
+};
+
 static inline func_disp_t *impl_from_DispatchEx(DispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, func_disp_t, dispex);
@@ -805,7 +828,7 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
     case DISPATCH_METHOD:
         if(!This->obj)
             return E_UNEXPECTED;
-        hres = dispex_call_builtin(This->obj, This->info->id, params, res, ei, caller);
+        hres = invoke_builtin_function((IDispatch*)&This->obj->IDispatchEx_iface, This->info, params, res, ei, caller);
         break;
     case DISPATCH_PROPERTYGET: {
         unsigned name_len;
@@ -846,9 +869,58 @@ static HRESULT function_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPAR
     return hres;
 }
 
+static HRESULT function_get_dispid(DispatchEx *dispex, BSTR name, DWORD flags, DISPID *dispid)
+{
+    DWORD i;
+
+    for(i = 0; i < ARRAY_SIZE(function_props); i++) {
+        if((flags & fdexNameCaseInsensitive) ? wcsicmp(name, function_props[i].name) : wcscmp(name, function_props[i].name))
+            continue;
+        *dispid = MSHTML_DISPID_CUSTOM_MIN + i;
+        return S_OK;
+    }
+    return DISP_E_UNKNOWNNAME;
+}
+
+static HRESULT function_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
+{
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(idx >= ARRAY_SIZE(function_props))
+        return DISP_E_MEMBERNOTFOUND;
+
+    return (*name = SysAllocString(function_props[idx].name)) ? S_OK : E_OUTOFMEMORY;
+}
+
+static HRESULT function_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    func_disp_t *This = impl_from_DispatchEx(dispex);
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(idx >= ARRAY_SIZE(function_props))
+        return DISP_E_MEMBERNOTFOUND;
+
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+        return function_props[idx].invoke(This, params, lcid, res, ei, caller);
+    default:
+        return MSHTML_E_INVALID_PROPERTY;
+    }
+
+    return S_OK;
+}
+
 static const dispex_static_data_vtbl_t function_dispex_vtbl = {
     .destructor       = function_destructor,
     .value            = function_value,
+    .get_dispid       = function_get_dispid,
+    .get_name         = function_get_name,
+    .invoke           = function_invoke
 };
 
 static const tid_t function_iface_tids[] = {0};
@@ -1240,7 +1312,7 @@ static HRESULT invoke_builtin_function(IDispatch *this_obj, func_info_t *func, D
     return V_ERROR(&vhres);
 }
 
-static HRESULT function_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
+static HRESULT func_invoke(DispatchEx *This, func_info_t *func, WORD flags, DISPPARAMS *dp, VARIANT *res,
         EXCEPINFO *ei, IServiceProvider *caller)
 {
     HRESULT hres;
@@ -1338,7 +1410,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, DISPID id, LCID lcid, WORD 
         return hres;
 
     if(func->func_disp_idx >= 0)
-        return function_invoke(This, func, flags, dp, res, ei, caller);
+        return func_invoke(This, func, flags, dp, res, ei, caller);
 
     hres = IDispatchEx_QueryInterface(&This->IDispatchEx_iface, tid_ids[func->tid], (void**)&iface);
     if(FAILED(hres) || !iface)
