@@ -18,6 +18,7 @@
 
 
 #include <limits.h>
+#include <assert.h>
 
 #include "jscript.h"
 
@@ -801,6 +802,40 @@ static HRESULT TypedArray_get_length(script_ctx_t *ctx, jsdisp_t *jsthis, jsval_
     return S_OK;
 }
 
+static HRESULT fill_typedarr_data_from_object(script_ctx_t *ctx, BYTE *data, jsdisp_t *obj, DWORD length, jsclass_t jsclass)
+{
+    HRESULT hres = S_OK;
+    jsval_t val;
+    UINT32 i;
+
+    switch(jsclass) {
+#define X(NAME, JSCLASS, TYPE, CONVERT, NUM_TYPE)   \
+    case JSCLASS:                                   \
+        for(i = 0; i < length; i++) {               \
+            NUM_TYPE n;                             \
+                                                    \
+            hres = jsdisp_get_idx(obj, i, &val);    \
+            if(FAILED(hres)) {                      \
+                if(hres != DISP_E_UNKNOWNNAME)      \
+                    break;                          \
+                val = jsval_undefined();            \
+            }                                       \
+                                                    \
+            hres = CONVERT(ctx, val, &n);           \
+            jsval_release(val);                     \
+            if(FAILED(hres))                        \
+                break;                              \
+            *(TYPE*)&data[i * sizeof(TYPE)] = n;    \
+        }                                           \
+        break;
+        TYPEDARRAY_LIST
+    DEFAULT_UNREACHABLE;
+#undef X
+    }
+
+    return hres;
+}
+
 static HRESULT TypedArray_set(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
         jsval_t *r, jsclass_t jsclass)
 {
@@ -1016,8 +1051,36 @@ static HRESULT TypedArrayConstr_value(script_ctx_t *ctx, jsval_t vthis, WORD fla
                     }
                     buffer = jsdisp_addref(&arraybuf->dispex);
                 }else {
-                    FIXME("Construction from object not implemented\n");
-                    return E_NOTIMPL;
+                    jsval_t val;
+                    UINT32 len;
+                    DWORD size;
+
+                    hres = jsdisp_propget_name(obj, L"length", &val);
+                    if(FAILED(hres))
+                        return hres;
+                    if(is_undefined(val))
+                        return JS_E_TYPEDARRAY_BAD_CTOR_ARG;
+
+                    hres = to_uint32(ctx, val, &len);
+                    jsval_release(val);
+                    if(FAILED(hres))
+                        return hres;
+
+                    length = len;
+                    size = length * elem_size;
+                    if(size < length || size > (UINT_MAX - FIELD_OFFSET(ArrayBufferInstance, buf[0])))
+                        return E_OUTOFMEMORY;
+
+                    hres = create_arraybuf(ctx, size, &buffer);
+                    if(FAILED(hres))
+                        return hres;
+
+                    hres = fill_typedarr_data_from_object(ctx, arraybuf_from_jsdisp(buffer)->buf,
+                                                          obj, length, jsclass);
+                    if(FAILED(hres)) {
+                        jsdisp_release(buffer);
+                        return hres;
+                    }
                 }
             }else if(is_number(argv[0])) {
                 hres = to_integer(ctx, argv[0], &n);

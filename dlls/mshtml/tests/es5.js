@@ -2123,6 +2123,13 @@ sync_test("ArrayBuffers & Views", function() {
             var n = ex.number >>> 0;
             ok(n === JS_E_TYPEDARRAY_BAD_CTOR_ARG, "new " + arrType + "(null) threw " + n);
         }
+        try {
+            eval("new " + arrType + "({})");
+            ok(false, "new " + arrType + "({}) did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_TYPEDARRAY_BAD_CTOR_ARG, "new " + arrType + "({}) threw " + n);
+        }
         if(typeSz > 1) {
             /* test misalignment */
             var a = typeSz >>> 1;
@@ -2240,6 +2247,23 @@ sync_test("ArrayBuffers & Views", function() {
         delete arr[-1];
         delete arr.foo;
 
+        arr2 = { length: 4 };
+        arr2[0] = 1.5;
+        arr2[1] = '3';
+        arr2[3] = 12;
+        var name = arrType + "(array-like object)";
+        arr = eval(arrType + "(arr2)");
+        ok(arr.byteLength === 4 * typeSz, name + ".byteLength = " + arr.byteLength);
+        ok(arr.byteOffset === 0, name + ".byteOffset = " + arr.byteOffset);
+        ok(arr.length === 4, name + ".length = " + arr.length);
+        if(isNaN(arr[2])) {
+            ok(arr[0] === 1.5, name + "[0] = " + arr[0]);
+            ok(arr[1] === 3,   name + "[1] = " + arr[1]);
+            ok(arr[3] === 12,  name + "[3] = " + arr[3]);
+        }else
+            for(var j = 0; j < 4; j++)
+                ok(arr[j] === [1, 3, 0, 12][j], name + "[" + j + "] = " + arr[j]);
+
         name = arrType + "(buf, " + typeSz + ", 2)";
         arr = eval(name);
         ok(arr.byteLength === 2 * typeSz, name + ".byteLength = " + arr.byteLength);
@@ -2254,7 +2278,28 @@ sync_test("ArrayBuffers & Views", function() {
         ok(r === 12, "DataView(buf).get" + types[i][0] + " after arr[0] set = " + r);
         Object.freeze(arr);
         ok(Object.isFrozen(arr) === true, name + " not frozen");
+
+        arr2 = eval(arrType + "(arr)");
+        ok(arr2.byteLength === arr.byteLength, name + " copy.byteLength = " + arr2.byteLength);
+        ok(arr2.byteOffset === 0, name + " copy.byteOffset = " + arr2.byteOffset);
+        ok(arr2.length === arr.length, name + " copy.length = " + arr2.length);
+        ok(arr2.buffer !== arr.buffer, name + " copy.buffer = " + arr2.buffer);
     }
+
+    arr = new Float32Array(3);
+    arr[0] = 1.125;
+    arr[1] = 2.25;
+    arr[2] = 3.375;
+    arr2 = new Uint16Array(arr);
+    ok(arr[0] === 1.125, "arr[0] = " + arr[0]);
+    ok(arr[1] === 2.25, "arr[1] = " + arr[1]);
+    ok(arr[2] === 3.375, "arr[2] = " + arr[2]);
+    ok(arr2[0] === 1, "arr2[0] = " + arr2[0]);
+    ok(arr2[1] === 2, "arr2[1] = " + arr2[1]);
+    ok(arr2[2] === 3, "arr2[2] = " + arr2[2]);
+    arr2[0] = 100;
+    ok(arr[0] === 1.125, "arr[0] after arr2[0] changed = " + arr[0]);
+    ok(arr2[0] === 100, "arr2[0] after change = " + arr2[0]);
 
     arr = new Int16Array(2);
     arr[0] = 65535;
