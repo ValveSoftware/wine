@@ -445,33 +445,33 @@ PRIVATE_TID_LIST
     X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  Object) \
     X(HTMLStyleSheetRule,             "CSSStyleRule",                 HTMLStyleSheetRule_dispex,              Object) \
     X(HTMLElement,                    "HTMLElement",                  HTMLElement_dispex,                     DOMElement) \
-    X(HTMLGenericElement,             "HTMLUnknownElement",           HTMLGenericElement_dispex,              Object) \
-    X(HTMLAnchorElement,              "HTMLAnchorElement",            HTMLAnchorElement_dispex,               Object) \
-    X(HTMLAreaElement,                "HTMLAreaElement",              HTMLAreaElement_dispex,                 Object) \
-    X(HTMLBodyElement,                "HTMLBodyElement",              HTMLBodyElement_dispex,                 Object) \
-    X(HTMLButtonElement,              "HTMLButtonElement",            HTMLButtonElement_dispex,               Object) \
+    X(HTMLGenericElement,             "HTMLUnknownElement",           HTMLGenericElement_dispex,              HTMLElement) \
+    X(HTMLAnchorElement,              "HTMLAnchorElement",            HTMLAnchorElement_dispex,               HTMLElement) \
+    X(HTMLAreaElement,                "HTMLAreaElement",              HTMLAreaElement_dispex,                 HTMLElement) \
+    X(HTMLBodyElement,                "HTMLBodyElement",              HTMLBodyElement_dispex,                 HTMLElement) \
+    X(HTMLButtonElement,              "HTMLButtonElement",            HTMLButtonElement_dispex,               HTMLElement) \
     X(HTMLCommentElement,             "Comment",                      HTMLCommentElement_dispex,              DOMCharacterData) \
-    X(HTMLEmbedElement,               "HTMLEmbedElement",             HTMLEmbedElement_dispex,                Object) \
-    X(HTMLFormElement,                "HTMLFormElement",              HTMLFormElement_dispex,                 Object) \
-    X(HTMLFrameElement,               "HTMLFrameElement",             HTMLFrameElement_dispex,                Object) \
-    X(HTMLHeadElement,                "HTMLHeadElement",              HTMLHeadElement_dispex,                 Object) \
-    X(HTMLHtmlElement,                "HTMLHtmlElement",              HTMLHtmlElement_dispex,                 Object) \
-    X(HTMLIFrameElement,              "HTMLIFrameElement",            HTMLIFrame_dispex,                      Object) \
-    X(HTMLImgElement,                 "HTMLImageElement",             HTMLImgElement_dispex,                  Object) \
-    X(HTMLInputElement,               "HTMLInputElement",             HTMLInputElement_dispex,                Object) \
-    X(HTMLLabelElement,               "HTMLLabelElement",             HTMLLabelElement_dispex,                Object) \
-    X(HTMLLinkElement,                "HTMLLinkElement",              HTMLLinkElement_dispex,                 Object) \
-    X(HTMLMetaElement,                "HTMLMetaElement",              HTMLMetaElement_dispex,                 Object) \
-    X(HTMLObjectElement,              "HTMLObjectElement",            HTMLObjectElement_dispex,               Object) \
-    X(HTMLOptionElement,              "HTMLOptionElement",            HTMLOptionElement_dispex,               Object) \
-    X(HTMLScriptElement,              "HTMLScriptElement",            HTMLScriptElement_dispex,               Object) \
-    X(HTMLSelectElement,              "HTMLSelectElement",            HTMLSelectElement_dispex,               Object) \
-    X(HTMLStyleElement,               "HTMLStyleElement",             HTMLStyleElement_dispex,                Object) \
-    X(HTMLTableElement,               "HTMLTableElement",             HTMLTable_dispex,                       Object) \
-    X(HTMLTableCellElement,           "HTMLTableDataCellElement",     HTMLTableCell_dispex,                   Object) \
-    X(HTMLTableRowElement,            "HTMLTableRowElement",          HTMLTableRow_dispex,                    Object) \
-    X(HTMLTextAreaElement,            "HTMLTextAreaElement",          HTMLTextAreaElement_dispex,             Object) \
-    X(HTMLTitleElement,               "HTMLTitleElement",             HTMLTitleElement_dispex,                Object)
+    X(HTMLEmbedElement,               "HTMLEmbedElement",             HTMLEmbedElement_dispex,                HTMLElement) \
+    X(HTMLFormElement,                "HTMLFormElement",              HTMLFormElement_dispex,                 HTMLElement) \
+    X(HTMLFrameElement,               "HTMLFrameElement",             HTMLFrameElement_dispex,                HTMLElement) \
+    X(HTMLHeadElement,                "HTMLHeadElement",              HTMLHeadElement_dispex,                 HTMLElement) \
+    X(HTMLHtmlElement,                "HTMLHtmlElement",              HTMLHtmlElement_dispex,                 HTMLElement) \
+    X(HTMLIFrameElement,              "HTMLIFrameElement",            HTMLIFrame_dispex,                      HTMLElement) \
+    X(HTMLImgElement,                 "HTMLImageElement",             HTMLImgElement_dispex,                  HTMLElement) \
+    X(HTMLInputElement,               "HTMLInputElement",             HTMLInputElement_dispex,                HTMLElement) \
+    X(HTMLLabelElement,               "HTMLLabelElement",             HTMLLabelElement_dispex,                HTMLElement) \
+    X(HTMLLinkElement,                "HTMLLinkElement",              HTMLLinkElement_dispex,                 HTMLElement) \
+    X(HTMLMetaElement,                "HTMLMetaElement",              HTMLMetaElement_dispex,                 HTMLElement) \
+    X(HTMLObjectElement,              "HTMLObjectElement",            HTMLObjectElement_dispex,               HTMLElement) \
+    X(HTMLOptionElement,              "HTMLOptionElement",            HTMLOptionElement_dispex,               HTMLElement) \
+    X(HTMLScriptElement,              "HTMLScriptElement",            HTMLScriptElement_dispex,               HTMLElement) \
+    X(HTMLSelectElement,              "HTMLSelectElement",            HTMLSelectElement_dispex,               HTMLElement) \
+    X(HTMLStyleElement,               "HTMLStyleElement",             HTMLStyleElement_dispex,                HTMLElement) \
+    X(HTMLTableElement,               "HTMLTableElement",             HTMLTable_dispex,                       HTMLElement) \
+    X(HTMLTableCellElement,           "HTMLTableDataCellElement",     HTMLTableCell_dispex,                   HTMLElement) \
+    X(HTMLTableRowElement,            "HTMLTableRowElement",          HTMLTableRow_dispex,                    HTMLElement) \
+    X(HTMLTextAreaElement,            "HTMLTextAreaElement",          HTMLTextAreaElement_dispex,             HTMLElement) \
+    X(HTMLTitleElement,               "HTMLTitleElement",             HTMLTitleElement_dispex,                HTMLElement)
 
 #define PROXY_PROTOTYPE_LIST \
     X(Console,                        "Console",                      console_dispex,                         Object) \
