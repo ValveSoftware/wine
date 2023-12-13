@@ -2821,6 +2821,7 @@ static IWineDispatchProxyCbPrivateVtbl WineDispatchProxyCbPrivateVtbl = {
     WineDispatchProxyCbPrivate_CreateConstructor,
     WineDispatchProxyCbPrivate_DefineConstructor,
     WineDispatchProxyCbPrivate_CreateObject,
+    WineDispatchProxyCbPrivate_CreateArrayBuffer,
     WineDispatchProxyCbPrivate_GetRandomValues,
     WineDispatchProxyCbPrivate_PropEnum
 };

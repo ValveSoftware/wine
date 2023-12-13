@@ -144,6 +144,7 @@ struct HTMLXMLHttpRequest {
     BOOLEAN synchronous;
     DWORD magic;
     DWORD pending_events_magic;
+    IDispatch *response_obj;
     HTMLInnerWindow *window;
     nsIXMLHttpRequest *nsxhr;
     XMLHttpReqEventListener *event_listener;
@@ -1194,9 +1195,20 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_Invoke(IWineXMLHttpRequestPriva
 static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpRequestPrivate *iface, VARIANT *p)
 {
     HTMLXMLHttpRequest *This = impl_from_IWineXMLHttpRequestPrivate(iface);
+    IWineDispatchProxyCbPrivate *proxy;
     HRESULT hres = S_OK;
+    UINT32 buf_size;
+    nsresult nsres;
+    void *buf;
 
     TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->response_obj) {
+        V_VT(p) = VT_DISPATCH;
+        V_DISPATCH(p) = This->response_obj;
+        IDispatch_AddRef(This->response_obj);
+        return S_OK;
+    }
 
     switch(This->response_type) {
     case response_type_empty:
@@ -1216,10 +1228,22 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpReques
             V_VT(p) = VT_EMPTY;
             break;
         }
-        if(This->response_type == response_type_arraybuf) {
-            FIXME("response_type_arraybuf\n");
+        if(!(proxy = This->event_target.dispex.proxy)) {
+            FIXME("No proxy\n");
             return E_NOTIMPL;
         }
+        nsres = nsIXMLHttpRequest_GetResponseBuffer(This->nsxhr, NULL, 0, &buf_size);
+        assert(nsres == NS_OK);
+
+        if(This->response_type == response_type_arraybuf) {
+            hres = proxy->lpVtbl->CreateArrayBuffer(proxy, buf_size, &This->response_obj, &buf);
+            if(SUCCEEDED(hres)) {
+                nsres = nsIXMLHttpRequest_GetResponseBuffer(This->nsxhr, buf, buf_size, &buf_size);
+                assert(nsres == NS_OK);
+            }
+            break;
+        }
+
         FIXME("response_type_blob\n");
         return E_NOTIMPL;
 
@@ -1231,6 +1255,11 @@ static HRESULT WINAPI HTMLXMLHttpRequest_private_get_response(IWineXMLHttpReques
         assert(0);
     }
 
+    if(SUCCEEDED(hres) && This->response_obj) {
+        V_VT(p) = VT_DISPATCH;
+        V_DISPATCH(p) = This->response_obj;
+        IDispatch_AddRef(This->response_obj);
+    }
     return hres;
 }
 
@@ -1555,6 +1584,8 @@ static void HTMLXMLHttpRequest_traverse(DispatchEx *dispex, nsCycleCollectionTra
         note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
     if(This->pending_progress_event)
         note_cc_edge((nsISupports*)&This->pending_progress_event->IDOMEvent_iface, "pending_progress_event", cb);
+    if(This->response_obj)
+        note_cc_edge((nsISupports*)This->response_obj, "response_obj", cb);
     if(This->nsxhr)
         note_cc_edge((nsISupports*)This->nsxhr, "nsxhr", cb);
     traverse_event_target(&This->event_target, cb);
@@ -1578,6 +1609,7 @@ static void HTMLXMLHttpRequest_unlink(DispatchEx *dispex)
         This->pending_progress_event = NULL;
         IDOMEvent_Release(&pending_progress_event->IDOMEvent_iface);
     }
+    unlink_ref(&This->response_obj);
     unlink_ref(&This->nsxhr);
     release_event_target(&This->event_target);
 }

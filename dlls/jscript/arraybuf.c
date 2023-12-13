@@ -1295,6 +1295,26 @@ static const builtin_info_t TypedArrayConstr_info = {
     NULL
 };
 
+static inline jsdisp_t *impl_from_IWineDispatchProxyCbPrivate(IWineDispatchProxyCbPrivate *iface)
+{
+    return CONTAINING_RECORD((IDispatchEx*)iface, jsdisp_t, IDispatchEx_iface);
+}
+
+HRESULT WINAPI WineDispatchProxyCbPrivate_CreateArrayBuffer(IWineDispatchProxyCbPrivate *iface, DWORD size, IDispatch **arraybuf, void **data)
+{
+    jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
+    jsdisp_t *obj;
+    HRESULT hres;
+
+    hres = create_arraybuf(This->ctx, size, &obj);
+    if(FAILED(hres))
+        return hres;
+
+    *arraybuf = (IDispatch*)&obj->IDispatchEx_iface;
+    *data = arraybuf_from_jsdisp(obj)->buf;
+    return S_OK;
+}
+
 HRESULT WINAPI WineDispatchProxyCbPrivate_GetRandomValues(IDispatch *disp)
 {
     jsdisp_t *obj = to_jsdisp(disp);

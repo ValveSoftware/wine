@@ -127,6 +127,7 @@ typedef struct {
     IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, IDispatch *disp, const char *name);
     HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const char *name, IDispatch *prot, IDispatch *ctor);
     HRESULT (STDMETHODCALLTYPE *CreateObject)(IWineDispatchProxyCbPrivate *This, IDispatchEx **obj);
+    HRESULT (STDMETHODCALLTYPE *CreateArrayBuffer)(IWineDispatchProxyCbPrivate *This, DWORD size, IDispatch **arraybuf, void **data);
     HRESULT (STDMETHODCALLTYPE *GetRandomValues)(IDispatch *typedarr);
     HRESULT (STDMETHODCALLTYPE *PropEnum)(IWineDispatchProxyCbPrivate *This, const WCHAR *name);
 } IWineDispatchProxyCbPrivateVtbl;
@@ -748,4 +749,5 @@ static inline void unlock_module(void)
     InterlockedDecrement(&module_ref);
 }
 
+HRESULT WINAPI WineDispatchProxyCbPrivate_CreateArrayBuffer(IWineDispatchProxyCbPrivate*,DWORD,IDispatch**,void**);
 HRESULT WINAPI WineDispatchProxyCbPrivate_GetRandomValues(IDispatch*);
