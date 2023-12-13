@@ -937,6 +937,52 @@ sync_test("builtin_prototypes", function() {
             ok(r === 0xffff - 0x80000000, "set proto.charset error code = " + r);
         }
     }
+
+    if(v >= 9) {
+        var protos = [
+            [ "ClientRect",                     "Object" ],
+            [ "ClientRectList",                 "Object" ],
+            [ "Console",                        "Object" ],
+            [ "Crypto",                         "Object" ],
+            [ "CSSStyleDeclaration",            "Object" ],
+            [ "DOMImplementation",              "Object" ],
+            [ "DOMTokenList",                   "Object" ],
+            [ "Event",                          "Object" ],
+            [ "History",                        "Object" ],
+            [ "HTMLCollection",                 "Object" ],
+            [ "MediaQueryList",                 "Object" ],
+            [ "MimeTypeArray",                  "Object" ],
+            [ "MSCSSRuleList",                  "Object" ],
+            [ "MSEventObj",                     "Object" ],
+            [ "MSMimeTypesCollection",          "Object" ],
+            [ "MSNamespaceInfoCollection",      "Object" ],
+            [ "MSPluginsCollection",            "Object" ],
+            [ "MSSelection",                    "Object" ],
+            [ "MutationObserver",               "Object" ],
+            [ "NamedNodeMap",                   "Object" ],
+            [ "Navigator",                      "Object" ],
+            [ "Node",                           "Object" ],
+            [ "NodeList",                       "Object" ],
+            [ "Performance",                    "Object" ],
+            [ "PerformanceNavigation",          "Object" ],
+            [ "PerformanceTiming",              "Object" ],
+            [ "PluginArray",                    "Object" ],
+            [ "Screen",                         "Object" ],
+            [ "Storage",                        "Object" ],
+            [ "StyleSheetList",                 "Object" ],
+            [ "TextRange",                      "Object" ],
+            [ "Window",                         "Object" ],
+            [ "XMLHttpRequest",                 "Object" ]
+        ];
+
+        for(var i = 0; i < protos.length; i++) {
+            if(!(protos[i][0] in window))
+                continue;
+            var a, b;
+            eval("a = Object.getPrototypeOf(" + protos[i][0] + ".prototype); b = " + protos[i][1] + ".prototype;");
+            ok(a === b, "getPrototypeOf(" + protos[i][0] + ".prototype) = " + a);
+        }
+    }
 });
 
 sync_test("builtin_constructors", function() {
