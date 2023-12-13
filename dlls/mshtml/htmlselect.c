@@ -581,11 +581,6 @@ static HRESULT HTMLOptionElementFactory_value(DispatchEx *dispex, LCID lcid,
     return S_OK;
 }
 
-static const tid_t HTMLOptionElementFactory_iface_tids[] = {
-    IHTMLOptionElementFactory_tid,
-    0
-};
-
 static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
     .query_interface  = HTMLOptionElementFactory_query_interface,
     .destructor       = global_ctor_destructor,
@@ -598,9 +593,43 @@ static const dispex_static_data_vtbl_t HTMLOptionElementFactory_dispex_vtbl = {
     .delete           = legacy_ctor_delete
 };
 
+static const tid_t HTMLOptionElementFactory_iface_tids[] = {
+    IHTMLOptionElementFactory_tid,
+    0
+};
+
 dispex_static_data_t HTMLOptionElementFactory_dispex = {
-    "Function",
+    "HTMLOptionElement",
     &HTMLOptionElementFactory_dispex_vtbl,
+    PROTO_ID_NULL,
+    IHTMLOptionElementFactory_tid,
+    HTMLOptionElementFactory_iface_tids,
+};
+
+static HRESULT HTMLOptionCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    if(flags == DISPATCH_CONSTRUCT)
+        return HTMLOptionElementFactory_value(iface, lcid, flags, params, res, ei, caller);
+
+    return global_ctor_value(iface, lcid, flags, params, res, ei, caller);
+}
+
+static const dispex_static_data_vtbl_t HTMLOptionCtor_dispex_vtbl = {
+    .query_interface  = HTMLOptionElementFactory_query_interface,
+    .destructor       = global_ctor_destructor,
+    .traverse         = global_ctor_traverse,
+    .unlink           = global_ctor_unlink,
+    .value            = HTMLOptionCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
+};
+
+dispex_static_data_t HTMLOptionCtor_dispex = {
+    "HTMLOptionElement",
+    &HTMLOptionCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLOptionElementFactory_tid,
     HTMLOptionElementFactory_iface_tids,

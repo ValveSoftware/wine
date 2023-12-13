@@ -946,11 +946,6 @@ static HRESULT HTMLImageElementFactory_value(DispatchEx *dispex, LCID lcid,
     return S_OK;
 }
 
-static const tid_t HTMLImageElementFactory_iface_tids[] = {
-    IHTMLImageElementFactory_tid,
-    0
-};
-
 static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
     .query_interface  = HTMLImageElementFactory_query_interface,
     .destructor       = global_ctor_destructor,
@@ -963,9 +958,43 @@ static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
     .delete           = legacy_ctor_delete
 };
 
+static const tid_t HTMLImageElementFactory_iface_tids[] = {
+    IHTMLImageElementFactory_tid,
+    0
+};
+
 dispex_static_data_t HTMLImageElementFactory_dispex = {
-    "Function",
+    "HTMLImageElement",
     &HTMLImageElementFactory_dispex_vtbl,
+    PROTO_ID_NULL,
+    IHTMLImageElementFactory_tid,
+    HTMLImageElementFactory_iface_tids
+};
+
+static HRESULT HTMLImageCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    if(flags == DISPATCH_CONSTRUCT)
+        return HTMLImageElementFactory_value(iface, lcid, flags, params, res, ei, caller);
+
+    return global_ctor_value(iface, lcid, flags, params, res, ei, caller);
+}
+
+static const dispex_static_data_vtbl_t HTMLImageCtor_dispex_vtbl = {
+    .query_interface  = HTMLImageElementFactory_query_interface,
+    .destructor       = global_ctor_destructor,
+    .traverse         = global_ctor_traverse,
+    .unlink           = global_ctor_unlink,
+    .value            = HTMLImageCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
+};
+
+dispex_static_data_t HTMLImageCtor_dispex = {
+    "HTMLImageElement",
+    &HTMLImageCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLImageElementFactory_tid,
     HTMLImageElementFactory_iface_tids

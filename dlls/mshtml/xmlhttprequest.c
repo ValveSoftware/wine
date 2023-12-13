@@ -1806,9 +1806,39 @@ static const tid_t HTMLXMLHttpRequestFactory_iface_tids[] = {
     IHTMLXMLHttpRequestFactory_tid,
     0
 };
+
 dispex_static_data_t HTMLXMLHttpRequestFactory_dispex = {
-    "Function",
+    "XMLHttpRequest",
     &HTMLXMLHttpRequestFactory_dispex_vtbl,
+    PROTO_ID_NULL,
+    IHTMLXMLHttpRequestFactory_tid,
+    HTMLXMLHttpRequestFactory_iface_tids
+};
+
+static HRESULT HTMLXMLHttpRequestCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    if(flags == DISPATCH_CONSTRUCT)
+        return HTMLXMLHttpRequestFactory_value(iface, lcid, flags, params, res, ei, caller);
+
+    return global_ctor_value(iface, lcid, flags, params, res, ei, caller);
+}
+
+static const dispex_static_data_vtbl_t HTMLXMLHttpRequestCtor_dispex_vtbl = {
+    .query_interface  = HTMLXMLHttpRequestFactory_query_interface,
+    .destructor       = global_ctor_destructor,
+    .traverse         = global_ctor_traverse,
+    .unlink           = global_ctor_unlink,
+    .value            = HTMLXMLHttpRequestCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
+};
+
+dispex_static_data_t HTMLXMLHttpRequestCtor_dispex = {
+    "XMLHttpRequest",
+    &HTMLXMLHttpRequestCtor_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLXMLHttpRequestFactory_tid,
     HTMLXMLHttpRequestFactory_iface_tids

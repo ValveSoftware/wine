@@ -189,6 +189,19 @@ static const dispex_static_data_vtbl_t legacy_ctor_dispex_vtbl = {
     .delete           = legacy_ctor_delete
 };
 
+static const struct {
+    const char *name;
+    prototype_id_t prototype_id;
+    legacy_ctor_id_t ctor_id;
+    dispex_static_data_t *dispex;
+    const void *vtbl;
+} special_ctor_static_data[] = {
+    { "Image",              PROTO_ID_HTMLImgElement,        LEGACY_CTOR_ID_Image,               &HTMLImageCtor_dispex,          &HTMLImageElementFactoryVtbl },
+    { "Option",             PROTO_ID_HTMLOptionElement,     LEGACY_CTOR_ID_Option,              &HTMLOptionCtor_dispex,         &HTMLOptionElementFactoryVtbl },
+ /* { "XDomainRequest",     PROTO_ID_?,                     LEGACY_CTOR_ID_?,                   ?,                              ? } */
+    { "XMLHttpRequest",     PROTO_ID_HTMLXMLHttpRequest,    LEGACY_CTOR_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestCtor_dispex, &HTMLXMLHttpRequestFactoryVtbl }
+};
+
 static struct {
     dispex_static_data_t dispex;
     prototype_id_t prototype_id;
@@ -308,6 +321,8 @@ static struct {
     X("Window",                      PROTO_ID_HTMLWindow)
 #undef X
 };
+
+enum { legacy_ctor_props_num = ARRAY_SIZE(special_ctor_static_data) + ARRAY_SIZE(legacy_ctor_static_data) };
 
 static inline HTMLWindow *impl_from_IHTMLWindow2(IHTMLWindow2 *iface)
 {
@@ -901,7 +916,7 @@ static HRESULT WINAPI HTMLWindow2_get_Image(IHTMLWindow2 *iface, IHTMLImageEleme
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Image, PROTO_ID_HTMLImgElement,
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Image_builtin, PROTO_ID_HTMLImgElement,
                            &HTMLImageElementFactory_dispex, &HTMLImageElementFactoryVtbl, &disp);
     if(SUCCEEDED(hres))
         *p = &global_ctor_from_IDispatch(disp)->IHTMLImageElementFactory_iface;
@@ -1454,7 +1469,7 @@ static HRESULT WINAPI HTMLWindow2_get_Option(IHTMLWindow2 *iface, IHTMLOptionEle
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Option, PROTO_ID_HTMLOptionElement,
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Option_builtin, PROTO_ID_HTMLOptionElement,
                            &HTMLOptionElementFactory_dispex, &HTMLOptionElementFactoryVtbl, &disp);
     if(SUCCEEDED(hres))
         *p = &global_ctor_from_IDispatch(disp)->IHTMLOptionElementFactory_iface;
@@ -2227,7 +2242,7 @@ static HRESULT WINAPI HTMLWindow5_get_XMLHttpRequest(IHTMLWindow5 *iface, VARIAN
         return S_OK;
     }
 
-    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_HTMLXMLHttpRequest, PROTO_ID_HTMLXMLHttpRequest,
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_HTMLXMLHttpRequest_builtin, PROTO_ID_HTMLXMLHttpRequest,
                            &HTMLXMLHttpRequestFactory_dispex, &HTMLXMLHttpRequestFactoryVtbl, &disp);
     if(SUCCEEDED(hres)) {
         V_VT(p) = VT_DISPATCH;
@@ -3788,7 +3803,7 @@ static HRESULT WINAPI WindowDispEx_Invoke(IDispatchEx *iface, DISPID dispIdMembe
 
 static global_prop_t *alloc_global_prop(HTMLInnerWindow *This, global_prop_type_t type, BSTR name)
 {
-    if(This->global_prop_cnt > MSHTML_CUSTOM_DISPID_CNT - ARRAY_SIZE(legacy_ctor_static_data))
+    if(This->global_prop_cnt > MSHTML_CUSTOM_DISPID_CNT - legacy_ctor_props_num)
         return NULL;
 
     if(This->global_prop_cnt == This->global_prop_size) {
@@ -3864,12 +3879,22 @@ static inline int legacy_ctor_name_cmp(const char *ctor_name, WCHAR *name)
 
 static DISPID lookup_legacy_ctor_prop(HTMLInnerWindow *window, BSTR name)
 {
-    DWORD i, a = 0, b = ARRAY_SIZE(legacy_ctor_static_data);
+    DWORD i, a = 0, b = ARRAY_SIZE(special_ctor_static_data);
     int c;
+
+    while(a < b) {
+        i = (a + b) / 2;
+        c = legacy_ctor_name_cmp(special_ctor_static_data[i].name, name);
+        if(!c)
+            return i + (MSHTML_DISPID_CUSTOM_MAX - legacy_ctor_props_num + 1);
+        if(c > 0) b = i;
+        else      a = i + 1;
+    }
 
     if(dispex_compat_mode(&window->event_target.dispex) != COMPAT_MODE_IE8)
         return DISPID_UNKNOWN;
 
+    a = 0, b = ARRAY_SIZE(legacy_ctor_static_data);
     while(a < b) {
         i = (a + b) / 2;
         c = legacy_ctor_name_cmp(legacy_ctor_static_data[i].dispex.name, name);
@@ -4044,10 +4069,12 @@ static HRESULT WINAPI WindowDispEx_DeleteMemberByDispID(IDispatchEx *iface, DISP
 
     TRACE("(%p)->(%lx)\n", This, id);
 
-    idx = id - (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
-    if(idx < ARRAY_SIZE(legacy_ctor_static_data) &&
-       dispex_compat_mode(&This->inner_window->event_target.dispex) == COMPAT_MODE_IE8)
-        return MSHTML_E_INVALID_ACTION;
+    idx = id - (MSHTML_DISPID_CUSTOM_MAX - legacy_ctor_props_num + 1);
+    if(idx < legacy_ctor_props_num) {
+        if(idx < ARRAY_SIZE(special_ctor_static_data) ||
+           dispex_compat_mode(&This->inner_window->event_target.dispex) == COMPAT_MODE_IE8)
+            return MSHTML_E_INVALID_ACTION;
+    }
 
     return IDispatchEx_DeleteMemberByDispID(&This->inner_window->event_target.dispex.IDispatchEx_iface, id);
 }
@@ -4654,9 +4681,9 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID
 
     idx = id - MSHTML_DISPID_CUSTOM_MIN;
     if(idx >= This->global_prop_cnt) {
-        idx = id - (MSHTML_DISPID_CUSTOM_MAX - ARRAY_SIZE(legacy_ctor_static_data) + 1);
-        if(idx >= ARRAY_SIZE(legacy_ctor_static_data) ||
-           dispex_compat_mode(&This->event_target.dispex) != COMPAT_MODE_IE8)
+        idx = id - (MSHTML_DISPID_CUSTOM_MAX - legacy_ctor_props_num + 1);
+        if(idx >= legacy_ctor_props_num || (idx >= ARRAY_SIZE(special_ctor_static_data) &&
+           dispex_compat_mode(&This->event_target.dispex) != COMPAT_MODE_IE8))
             return DISP_E_MEMBERNOTFOUND;
 
         switch(flags) {
@@ -4668,9 +4695,15 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID
         case DISPATCH_CONSTRUCT:
             return MSHTML_E_INVALID_ACTION;
         case DISPATCH_PROPERTYGET:
-            /* For these generic constructors, LEGACY_CTOR_ID is the same as the PROTO_ID */
-            hres = get_legacy_ctor(This, (legacy_ctor_id_t)legacy_ctor_static_data[idx].prototype_id, legacy_ctor_static_data[idx].prototype_id,
-                                   &legacy_ctor_static_data[idx].dispex, NULL, &V_DISPATCH(res));
+            if(idx < ARRAY_SIZE(special_ctor_static_data))
+                hres = get_legacy_ctor(This, special_ctor_static_data[idx].ctor_id, special_ctor_static_data[idx].prototype_id,
+                                       special_ctor_static_data[idx].dispex, special_ctor_static_data[idx].vtbl, &V_DISPATCH(res));
+            else {
+                /* For these generic constructors, LEGACY_CTOR_ID is the same as the PROTO_ID */
+                idx -= ARRAY_SIZE(special_ctor_static_data);
+                hres = get_legacy_ctor(This, (legacy_ctor_id_t)legacy_ctor_static_data[idx].prototype_id, legacy_ctor_static_data[idx].prototype_id,
+                                       &legacy_ctor_static_data[idx].dispex, NULL, &V_DISPATCH(res));
+            }
             if(FAILED(hres))
                 return hres;
             V_VT(res) = VT_DISPATCH;

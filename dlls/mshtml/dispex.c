@@ -2326,8 +2326,8 @@ static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_
         const void *vtbl;
     } ctors[] = {
         { PROTO_ID_MutationObserver,    &mutation_observer_ctor_dispex },
-        { PROTO_ID_HTMLImgElement,      &HTMLImageElementFactory_dispex,    &HTMLImageElementFactoryVtbl },
-        { PROTO_ID_HTMLOptionElement,   &HTMLOptionElementFactory_dispex,   &HTMLOptionElementFactoryVtbl },
+        { PROTO_ID_HTMLImgElement,      &HTMLImageCtor_dispex,              &HTMLImageElementFactoryVtbl },
+        { PROTO_ID_HTMLOptionElement,   &HTMLOptionCtor_dispex,             &HTMLOptionElementFactoryVtbl },
         { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl }
     };
     struct global_ctor *ctor;
