@@ -480,6 +480,9 @@ typedef struct {
     /* Used when the object wants to override getter or deletion for custom props (e.g. if they can be changed asynchronously at any point) */
     HRESULT (*override)(DispatchEx*,const WCHAR*,VARIANT*);
 
+    /* Used when the object wants to return DISPIDs for names that aren't part of the instance (i.e. builtin props alias, not custom props) */
+    HRESULT (*get_static_dispid)(compat_mode_t,BSTR,DWORD,DISPID*);
+
     /* Used by objects that want to delay their compat mode initialization until actually needed */
     compat_mode_t (*get_compat_mode)(DispatchEx*);
 

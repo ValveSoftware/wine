@@ -155,7 +155,7 @@ void *CSSStyle_query_interface(DispatchEx*,REFIID);
 void CSSStyle_traverse(DispatchEx*,nsCycleCollectionTraversalCallback*);
 void CSSStyle_unlink(DispatchEx*);
 void CSSStyle_destructor(DispatchEx*);
-HRESULT CSSStyle_get_dispid(DispatchEx*,BSTR,DWORD,DISPID*);
+HRESULT CSSStyle_get_static_dispid(compat_mode_t,BSTR,DWORD,DISPID*);
 void CSSStyle_init_dispex_info(dispex_data_t *info, compat_mode_t mode);
 
 HRESULT get_style_property(CSSStyle*,styleid_t,BSTR*);
@@ -164,6 +164,6 @@ HRESULT get_style_property_var(CSSStyle*,styleid_t,VARIANT*);
 HRESULT get_elem_style(HTMLElement*,styleid_t,BSTR*);
 HRESULT set_elem_style(HTMLElement*,styleid_t,const WCHAR*);
 
-#define CSSSTYLE_DISPEX_VTBL_ENTRIES           \
-    .destructor        = CSSStyle_destructor,  \
-    .get_dispid        = CSSStyle_get_dispid
+#define CSSSTYLE_DISPEX_VTBL_ENTRIES                \
+    .destructor        = CSSStyle_destructor,       \
+    .get_static_dispid = CSSStyle_get_static_dispid
