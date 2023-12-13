@@ -212,6 +212,7 @@ static unsigned char proxy_ctor_mode_unavailable[PROTO_ID_TOTAL_COUNT - LEGACY_P
     [PROTO_ID_HTMLNamespaceCollection          - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE10) | (1<<COMPAT_MODE_IE11),
     [PROTO_ID_HTMLPluginsCollection            - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
     [PROTO_ID_HTMLSelectionObject              - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE11),
+    [PROTO_ID_HTMLXDomainRequest               - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE11),
     [PROTO_ID_MediaQueryList                   - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
     [PROTO_ID_MutationObserver                 - LEGACY_PROTOTYPE_COUNT] = ~0,  /* FIXME HACK: Not exposed as FFXIV Launcher breaks with MutationObserver stub */
 };
@@ -2265,6 +2266,7 @@ static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t
         DISPID_IHTMLWINDOW2_IMAGE,
         DISPID_IHTMLWINDOW2_OPTION,
         DISPID_IHTMLWINDOW5_XMLHTTPREQUEST,
+        DISPID_IHTMLWINDOW6_XDOMAINREQUEST,
         DISPID_UNKNOWN
     };
     prototype_id_t prot_id = info->desc - legacy_prototype_dispex;
@@ -2562,7 +2564,8 @@ static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_
         { PROTO_ID_MutationObserver,    &mutation_observer_ctor_dispex },
         { PROTO_ID_HTMLImgElement,      &HTMLImageCtor_dispex,              &HTMLImageElementFactoryVtbl },
         { PROTO_ID_HTMLOptionElement,   &HTMLOptionCtor_dispex,             &HTMLOptionElementFactoryVtbl },
-        { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl }
+        { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl },
+        { PROTO_ID_HTMLXDomainRequest,  &HTMLXDomainRequestFactory_dispex,  &HTMLXDomainRequestFactoryVtbl }
     };
     struct global_ctor *ctor;
     unsigned i;
@@ -3156,7 +3159,8 @@ static HRESULT WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDispat
     static const prototype_id_t special_ctors[] = {
         PROTO_ID_DOMParser,
         PROTO_ID_MutationObserver,
-        PROTO_ID_HTMLXMLHttpRequest
+        PROTO_ID_HTMLXMLHttpRequest,
+        PROTO_ID_HTMLXDomainRequest
     };
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
     struct proxy_prototype *prot = to_proxy_prototype(This);

@@ -198,7 +198,7 @@ static const struct {
 } special_ctor_static_data[] = {
     { "Image",              PROTO_ID_HTMLImgElement,        LEGACY_CTOR_ID_Image,               &HTMLImageCtor_dispex,          &HTMLImageElementFactoryVtbl },
     { "Option",             PROTO_ID_HTMLOptionElement,     LEGACY_CTOR_ID_Option,              &HTMLOptionCtor_dispex,         &HTMLOptionElementFactoryVtbl },
- /* { "XDomainRequest",     PROTO_ID_?,                     LEGACY_CTOR_ID_?,                   ?,                              ? } */
+    { "XDomainRequest",     PROTO_ID_HTMLXDomainRequest,    LEGACY_CTOR_ID_HTMLXDomainRequest,  &HTMLXDomainRequestCtor_dispex, &HTMLXDomainRequestFactoryVtbl },
     { "XMLHttpRequest",     PROTO_ID_HTMLXMLHttpRequest,    LEGACY_CTOR_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestCtor_dispex, &HTMLXMLHttpRequestFactoryVtbl }
 };
 
@@ -2334,8 +2334,24 @@ static HRESULT WINAPI HTMLWindow6_put_XDomainRequest(IHTMLWindow6 *iface, VARIAN
 static HRESULT WINAPI HTMLWindow6_get_XDomainRequest(IHTMLWindow6 *iface, VARIANT *p)
 {
     HTMLWindow *This = impl_from_IHTMLWindow6(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+    HTMLInnerWindow *window = This->inner_window;
+    IDispatch *disp;
+    HRESULT hres;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->outer_window->readystate == READYSTATE_UNINITIALIZED) {
+        V_VT(p) = VT_EMPTY;
+        return S_OK;
+    }
+
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_HTMLXDomainRequest_builtin, PROTO_ID_HTMLXDomainRequest,
+                           &HTMLXDomainRequestFactory_dispex, &HTMLXDomainRequestFactoryVtbl, &disp);
+    if(SUCCEEDED(hres)) {
+        V_VT(p) = VT_DISPATCH;
+        V_DISPATCH(p) = (IDispatch*)&global_ctor_from_IDispatch(disp)->IHTMLXDomainRequestFactory_iface;
+    }
+    return hres;
 }
 
 static HRESULT WINAPI HTMLWindow6_get_sessionStorage(IHTMLWindow6 *iface, IHTMLStorage **p)
@@ -4983,10 +4999,12 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         {DISPID_IHTMLWINDOW4_CREATEPOPUP, NULL},
         {DISPID_UNKNOWN}
     };
-    static const dispex_hook_t window6_hooks[] = {
+    static const dispex_hook_t window6_ie11_hooks[] = {
+        {DISPID_IHTMLWINDOW6_XDOMAINREQUEST},  /* hidden in IE11 */
         {DISPID_IHTMLWINDOW6_POSTMESSAGE, IHTMLWindow6_postMessage_hook},
         {DISPID_UNKNOWN}
     };
+    const dispex_hook_t *const window6_hooks = window6_ie11_hooks + 1;
 
     /* Hide props not available in IE10 */
     static const dispex_hook_t private_ie10_hooks[] = {
@@ -5002,7 +5020,7 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
         dispex_info_add_interface(info, IWineHTMLWindowPrivate_tid,
                                   compat_mode >= COMPAT_MODE_IE11 ? NULL : private_ie10_hooks);
 
-    dispex_info_add_interface(info, IHTMLWindow6_tid, window6_hooks);
+    dispex_info_add_interface(info, IHTMLWindow6_tid, compat_mode >= COMPAT_MODE_IE11 ? window6_ie11_hooks : window6_hooks);
     dispex_info_add_interface(info, IHTMLWindow5_tid, NULL);
     dispex_info_add_interface(info, IHTMLWindow4_tid, compat_mode >= COMPAT_MODE_IE11 ? window4_ie11_hooks : NULL);
     dispex_info_add_interface(info, IHTMLWindow3_tid, compat_mode >= COMPAT_MODE_IE11 ? window3_ie11_hooks : window3_hooks);

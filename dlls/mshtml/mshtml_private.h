@@ -253,6 +253,7 @@ typedef struct ScriptHost ScriptHost;
     XDIID(DispHTMLW3CComputedStyle) \
     XDIID(DispHTMLWindow2) \
     XDIID(DispHTMLXMLHttpRequest) \
+    XDIID(DispXDomainRequest) \
     XDIID(DispSVGCircleElement) \
     XDIID(DispSVGSVGElement) \
     XDIID(DispSVGTSpanElement) \
@@ -388,6 +389,8 @@ typedef struct ScriptHost ScriptHost;
     XIID(IHTMLXMLHttpRequest) \
     XIID(IHTMLXMLHttpRequest2) \
     XIID(IHTMLXMLHttpRequestFactory) \
+    XIID(IHTMLXDomainRequest) \
+    XIID(IHTMLXDomainRequestFactory) \
     XIID(IOmHistory) \
     XIID(IOmNavigator) \
     XIID(ISVGCircleElement) \
@@ -450,6 +453,7 @@ PRIVATE_TID_LIST
     X(HTMLStorage,                    "Storage",                      HTMLStorage_dispex,                     Object) \
     X(HTMLTextRange,                  "TextRange",                    HTMLTxtRange_dispex,                    Object) \
     X(HTMLXMLHttpRequest,             "XMLHttpRequest",               HTMLXMLHttpRequest_dispex,              Object) \
+    X(HTMLXDomainRequest,             "XDomainRequest",               HTMLXDomainRequest_dispex,              Object) \
     X(HTMLCurrentStyle,               "MSCurrentStyleCSSProperties",  HTMLCurrentStyle_dispex,                HTMLCSSProperties) \
     X(HTMLW3CComputedStyle,           "CSSStyleDeclaration",          HTMLW3CComputedStyle_dispex,            Object) \
     X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  StyleSheet) \
@@ -544,6 +548,7 @@ COMMON_PROTOTYPE_LIST
     LEGACY_CTOR_ID_Image_builtin,
     LEGACY_CTOR_ID_Option_builtin,
     LEGACY_CTOR_ID_HTMLXMLHttpRequest_builtin,
+    LEGACY_CTOR_ID_HTMLXDomainRequest_builtin,
 
     LEGACY_CTOR_COUNT
 } legacy_ctor_id_t;
@@ -715,6 +720,7 @@ struct global_ctor {
         IHTMLOptionElementFactory IHTMLOptionElementFactory_iface;
         IHTMLImageElementFactory IHTMLImageElementFactory_iface;
         IHTMLXMLHttpRequestFactory IHTMLXMLHttpRequestFactory_iface;
+        IHTMLXDomainRequestFactory IHTMLXDomainRequestFactory_iface;
     };
 
     prototype_id_t prot_id;
@@ -1777,12 +1783,15 @@ HRESULT create_mutation_observer_ctor(HTMLInnerWindow *window, IDispatch **ret);
 extern const IHTMLImageElementFactoryVtbl HTMLImageElementFactoryVtbl;
 extern const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl;
 extern const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl;
+extern const IHTMLXDomainRequestFactoryVtbl HTMLXDomainRequestFactoryVtbl;
 extern dispex_static_data_t HTMLImageElementFactory_dispex;
 extern dispex_static_data_t HTMLOptionElementFactory_dispex;
 extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex;
+extern dispex_static_data_t HTMLXDomainRequestFactory_dispex;
 extern dispex_static_data_t HTMLImageCtor_dispex;
 extern dispex_static_data_t HTMLOptionCtor_dispex;
 extern dispex_static_data_t HTMLXMLHttpRequestCtor_dispex;
+extern dispex_static_data_t HTMLXDomainRequestCtor_dispex;
 extern dispex_static_data_t DOMParserCtor_dispex;
 extern dispex_static_data_t mutation_observer_ctor_dispex;
 

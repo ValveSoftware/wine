@@ -7326,6 +7326,41 @@ static void test_xmlhttprequest(IHTMLWindow5 *window)
     VariantClear(&var);
 }
 
+static void test_xdomainrequest(IHTMLWindow6 *window)
+{
+    IHTMLXDomainRequestFactory *factory;
+    IHTMLXDomainRequest *xdr;
+    HRESULT hres;
+    VARIANT var;
+
+    hres = IHTMLWindow6_get_XDomainRequest(window, &var);
+    ok(hres == S_OK, "get_XDomainRequest failed: %08lx\n", hres);
+    ok(V_VT(&var) == VT_DISPATCH || broken(V_VT(&var) == VT_EMPTY), "expect VT_DISPATCH, got %s\n", debugstr_variant(&var));
+
+    if(V_VT(&var) == VT_EMPTY) {
+        win_skip("Native XDomainRequest support is missing or disabled.\n");
+        return;
+    }
+
+    factory = NULL;
+    hres = IDispatch_QueryInterface(V_DISPATCH(&var), &IID_IHTMLXDomainRequestFactory, (void**)&factory);
+    ok(hres == S_OK, "QueryInterface(&IID_IHTMLXDomainRequestFactory) failed: %08lx\n", hres);
+    ok(factory != NULL, "factory == NULL\n");
+
+    test_factory(window, factory, L"XDomainRequest", L"[object XDomainRequest]");
+
+    xdr = NULL;
+    hres = IHTMLXDomainRequestFactory_create(factory, &xdr);
+    ok(hres == S_OK, "create failed: %08lx\n", hres);
+    ok(xdr != NULL, "xdr == NULL\n");
+    if(is_ie9plus)
+        test_disp((IUnknown*)xdr, &DIID_DispXDomainRequest, NULL, L"[object]");
+
+    IHTMLXDomainRequest_Release(xdr);
+    IHTMLXDomainRequestFactory_Release(factory);
+    VariantClear(&var);
+}
+
 static void test_read_only_style(IHTMLCSSStyleDeclaration *style)
 {
     BSTR none = SysAllocString(L"none"), display = SysAllocString(L"display"), str;
@@ -7351,6 +7386,7 @@ static void test_window(IHTMLDocument2 *doc)
 {
     IHTMLWindow2 *window, *window2, *self, *parent;
     IHTMLWindow5 *window5;
+    IHTMLWindow6 *window6;
     IHTMLWindow7 *window7;
     IHTMLDOMConstructorCollection *ctor_col;
     IHTMLDocument2 *doc2 = NULL;
@@ -7454,6 +7490,15 @@ static void test_window(IHTMLDocument2 *doc)
         IHTMLWindow5_Release(window5);
     }else {
         win_skip("IHTMLWindow5 not supported!\n");
+    }
+
+    hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLWindow6, (void**)&window6);
+    if(SUCCEEDED(hres)) {
+        ok(window6 != NULL, "window6 == NULL\n");
+        test_xdomainrequest(window6);
+        IHTMLWindow6_Release(window6);
+    }else {
+        win_skip("IHTMLWindow6 not supported!\n");
     }
 
     hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLDOMConstructorCollection, (void**)&ctor_col);
@@ -7684,6 +7729,29 @@ static void test_xhr(IHTMLDocument2 *doc)
     IDispatchEx_Release(dispex);
 }
 
+static void test_xdr(IHTMLDocument2 *doc)
+{
+    IHTMLWindow2 *window;
+    IDispatchEx *dispex;
+    DISPID id;
+    BSTR str;
+    HRESULT hres;
+
+    hres = IHTMLDocument2_get_parentWindow(doc, &window);
+    ok(hres == S_OK, "get_parentWindow failed: %08lx\n", hres);
+
+    hres = IHTMLWindow2_QueryInterface(window, &IID_IDispatchEx, (void**)&dispex);
+    ok(hres == S_OK, "Could not get IDispatchEx iface: %08lx\n", hres);
+
+    str = SysAllocString(L"XDomainRequest");
+    hres = IDispatchEx_GetDispID(dispex, str, 0, &id);
+    ok(hres == S_OK, "GetDispID failed: %08lx\n", hres);
+    SysFreeString(str);
+
+    IHTMLWindow2_Release(window);
+    IDispatchEx_Release(dispex);
+}
+
 static void test_defaults(IHTMLDocument2 *doc)
 {
     IHTMLStyleSheetsCollection *stylesheetcol;
@@ -7757,6 +7825,7 @@ static void test_defaults(IHTMLDocument2 *doc)
     }
 
     test_xhr(doc);
+    test_xdr(doc);
 
     hres = IHTMLElement_QueryInterface(elem, &IID_IHTMLBodyElement, (void**)&body);
     ok(hres == S_OK, "Could not get IHTMBodyElement: %08lx\n", hres);
@@ -12004,6 +12073,7 @@ static void test_document_mode_lock(void)
     IEventTarget *event_target;
     IPersistStreamInit *init;
     IHTMLWindow7 *window7;
+    IHTMLWindow6 *window6;
     IHTMLWindow5 *window5;
     IHTMLWindow2 *window;
     IDispatchEx *dispex;
@@ -12056,6 +12126,14 @@ static void test_document_mode_lock(void)
     ok(hres == S_OK, "get_XMLHttpRequest failed: %08lx\n", hres);
     ok(V_VT(&var) == VT_EMPTY, "V_VT(XMLHttpRequest) = %d\n", V_VT(&var));
     IHTMLWindow5_Release(window5);
+
+    V_VT(&var) = VT_NULL;
+    hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLWindow6, (void**)&window6);
+    ok(hres == S_OK, "Could not get IHTMLWindow6: %08lx\n", hres);
+    hres = IHTMLWindow6_get_XDomainRequest(window6, &var);
+    ok(hres == S_OK, "get_XDomainRequest failed: %08lx\n", hres);
+    ok(V_VT(&var) == VT_EMPTY, "V_VT(XDomainRequest) = %d\n", V_VT(&var));
+    IHTMLWindow6_Release(window6);
 
     hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLWindow7, (void**)&window7);
     ok(hres == S_OK, "Could not get IHTMLWindow7: %08lx\n", hres);
