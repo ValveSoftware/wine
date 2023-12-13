@@ -561,10 +561,8 @@ static HRESULT HTMLOptionElementFactory_value(DispatchEx *dispex, LCID lcid,
     VARIANT empty, *arg[4];
     HRESULT hres;
 
-    if(flags != DISPATCH_CONSTRUCT) {
-        FIXME("flags %x not supported\n", flags);
-        return E_NOTIMPL;
-    }
+    if(flags != DISPATCH_CONSTRUCT)
+        return S_FALSE;
 
     V_VT(res) = VT_NULL;
     V_VT(&empty) = VT_EMPTY;

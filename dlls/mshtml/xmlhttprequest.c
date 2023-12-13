@@ -1778,10 +1778,8 @@ static HRESULT HTMLXMLHttpRequestFactory_value(DispatchEx *iface, LCID lcid, WOR
 
     TRACE("\n");
 
-    if(flags != DISPATCH_CONSTRUCT) {
-        FIXME("flags %x not supported\n", flags);
-        return E_NOTIMPL;
-    }
+    if(flags != DISPATCH_CONSTRUCT)
+        return S_FALSE;
 
     hres = IHTMLXMLHttpRequestFactory_create(&This->IHTMLXMLHttpRequestFactory_iface, &xhr);
     if(FAILED(hres))

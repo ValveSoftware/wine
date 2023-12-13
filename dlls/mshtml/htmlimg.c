@@ -925,6 +925,9 @@ static HRESULT HTMLImageElementFactory_value(DispatchEx *dispex, LCID lcid,
     HRESULT hres;
     int argc = params->cArgs - params->cNamedArgs;
 
+    if(flags != DISPATCH_CONSTRUCT)
+        return S_FALSE;
+
     V_VT(res) = VT_NULL;
 
     V_VT(&empty) = VT_EMPTY;
