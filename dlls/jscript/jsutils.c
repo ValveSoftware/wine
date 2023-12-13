@@ -286,7 +286,7 @@ HRESULT variant_to_jsval(script_ctx_t *ctx, VARIANT *var, jsval_t *r)
         }
         IDispatch_AddRef(V_DISPATCH(var));
         *r = jsval_disp(V_DISPATCH(var));
-        return S_OK;
+        return convert_to_proxy(ctx, r);
     }
     case VT_I1:
         *r = jsval_number(V_I1(var));
@@ -330,7 +330,7 @@ HRESULT variant_to_jsval(script_ctx_t *ctx, VARIANT *var, jsval_t *r)
             hres = IUnknown_QueryInterface(V_UNKNOWN(var), &IID_IDispatch, (void**)&disp);
             if(SUCCEEDED(hres)) {
                 *r = jsval_disp(disp);
-                return S_OK;
+                return convert_to_proxy(ctx, r);
             }
         }else {
             *r = ctx->html_mode ? jsval_null() : jsval_null_disp();
@@ -344,6 +344,9 @@ HRESULT variant_to_jsval(script_ctx_t *ctx, VARIANT *var, jsval_t *r)
 
 HRESULT jsval_to_variant(jsval_t val, VARIANT *retv)
 {
+    jsdisp_t *jsdisp;
+    IDispatch *disp;
+
     switch(jsval_type(val)) {
     case JSV_UNDEFINED:
         V_VT(retv) = VT_EMPTY;
@@ -357,9 +360,14 @@ HRESULT jsval_to_variant(jsval_t val, VARIANT *retv)
         V_VT(retv) = VT_NULL;
         return S_OK;
     case JSV_OBJECT:
+        disp = get_object(val);
+        jsdisp = to_jsdisp(disp);
+        if(jsdisp && jsdisp->proxy)
+            disp = (IDispatch*)jsdisp->proxy;
+
+        IDispatch_AddRef(disp);
         V_VT(retv) = VT_DISPATCH;
-        V_DISPATCH(retv) = get_object(val);
-        IDispatch_AddRef(get_object(val));
+        V_DISPATCH(retv) = disp;
         return S_OK;
     case JSV_STRING:
         V_VT(retv) = VT_BSTR;

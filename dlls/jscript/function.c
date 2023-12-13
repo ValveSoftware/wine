@@ -57,6 +57,12 @@ typedef struct {
 
 typedef struct {
     FunctionInstance function;
+    struct proxy_func_invoker func;
+    const WCHAR *name;
+} ProxyFunction;
+
+typedef struct {
+    FunctionInstance function;
     FunctionInstance *target;
     jsval_t this;
     unsigned argc;
@@ -775,6 +781,132 @@ HRESULT create_builtin_constructor(script_ctx_t *ctx, builtin_invoke_t value_pro
     return S_OK;
 }
 
+static HRESULT ProxyFunction_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
+        unsigned argc, jsval_t *argv, jsval_t *r, IServiceProvider *caller)
+{
+    ProxyFunction *function = (ProxyFunction*)func;
+    IDispatch *this_obj, *converted = NULL;
+    DISPPARAMS dp = { 0 };
+    EXCEPINFO ei = { 0 };
+    VARIANT buf[6], ret;
+    jsdisp_t *jsdisp;
+    HRESULT hres;
+    unsigned i;
+
+    if(flags & DISPATCH_CONSTRUCT)
+        return E_UNEXPECTED;
+
+    if(argc > function->function.length)
+        argc = function->function.length;
+    dp.cArgs = argc;
+
+    if(argc <= ARRAY_SIZE(buf))
+        dp.rgvarg = buf;
+    else if(!(dp.rgvarg = malloc(argc * sizeof(*dp.rgvarg))))
+        return E_OUTOFMEMORY;
+
+    for(i = 0; i < argc; i++) {
+        hres = jsval_to_variant(argv[i], &dp.rgvarg[argc - i - 1]);
+        if(FAILED(hres))
+            goto cleanup;
+    }
+
+    if(is_undefined(vthis) || is_null(vthis))
+        this_obj = lookup_global_host(ctx);
+    else {
+        hres = to_object(ctx, vthis, &converted);
+        if(FAILED(hres))
+            goto cleanup;
+        this_obj = converted;
+    }
+
+    jsdisp = to_jsdisp(this_obj);
+    if(jsdisp && jsdisp->proxy)
+        this_obj = (IDispatch*)jsdisp->proxy;
+
+    V_VT(&ret) = VT_EMPTY;
+    hres = function->func.invoke(this_obj, function->func.context, &dp, r ? &ret : NULL, &ei, caller);
+    if(converted)
+        IDispatch_Release(converted);
+
+    if(hres == DISP_E_EXCEPTION)
+        disp_fill_exception(ctx, &ei);
+    else if(SUCCEEDED(hres) && r) {
+        hres = variant_to_jsval(ctx, &ret, r);
+        VariantClear(&ret);
+    }
+
+cleanup:
+    while(i)
+        VariantClear(&dp.rgvarg[argc - i--]);
+    if(dp.rgvarg != buf)
+        free(dp.rgvarg);
+    return hres;
+}
+
+static HRESULT ProxyFunction_toString(FunctionInstance *func, jsstr_t **ret)
+{
+    ProxyFunction *function = (ProxyFunction*)func;
+    return native_code_toString(function->name, ret);
+}
+
+static function_code_t *ProxyFunction_get_code(FunctionInstance *func)
+{
+    return NULL;
+}
+
+static void ProxyFunction_destructor(FunctionInstance *func)
+{
+}
+
+static const function_vtbl_t ProxyFunctionVtbl = {
+    ProxyFunction_call,
+    ProxyFunction_toString,
+    ProxyFunction_get_code,
+    ProxyFunction_destructor,
+    no_gc_traverse
+};
+
+HRESULT create_proxy_functions(jsdisp_t *jsdisp, const struct proxy_prop_info *info, jsdisp_t **funcs)
+{
+    ProxyFunction *function;
+    HRESULT hres;
+
+    if(jsdisp->ctx->state == SCRIPTSTATE_UNINITIALIZED || jsdisp->ctx->state == SCRIPTSTATE_CLOSED)
+        return E_UNEXPECTED;
+
+    /* Method or Getter */
+    hres = create_function(jsdisp->ctx, NULL, &ProxyFunctionVtbl, sizeof(ProxyFunction),
+                           (info->flags & PROPF_METHOD) ? info->flags : PROPF_METHOD, FALSE,
+                           NULL, (void**)&function);
+    if(FAILED(hres))
+        return hres;
+    function->func = info->func[0];
+    function->name = info->name;
+    funcs[0] = &function->function.dispex;
+    funcs[1] = NULL;
+
+    /* Setter */
+    if(info->func[1].invoke) {
+        hres = create_function(jsdisp->ctx, NULL, &ProxyFunctionVtbl, sizeof(ProxyFunction),
+                               PROPF_METHOD|1, FALSE, NULL, (void**)&function);
+        if(FAILED(hres)) {
+            jsdisp_release(funcs[0]);
+            return hres;
+        }
+        function->func = info->func[1];
+        function->name = info->name;
+        funcs[1] = &function->function.dispex;
+    }
+
+    return S_OK;
+}
+
+BOOL is_proxy_func(jsdisp_t *jsdisp)
+{
+    return jsdisp && is_class(jsdisp, JSCLASS_FUNCTION) && function_from_jsdisp(jsdisp)->vtbl == &ProxyFunctionVtbl;
+}
+
 /*
  * Create the actual prototype on demand, since it is a circular ref, which prevents the vast
  * majority of functions from being released quickly, leading to unnecessary scope detach.
@@ -842,8 +974,11 @@ static HRESULT InterpretedFunction_call(script_ctx_t *ctx, FunctionInstance *fun
             return hres;
         this_obj = to_disp(new_obj);
     }else if(is_object_instance(vthis)) {
+        IDispatch_AddRef(get_object(vthis));
+        hres = convert_to_proxy(ctx, &vthis);
+        if(FAILED(hres))
+            return hres;
         this_obj = get_object(vthis);
-        IDispatch_AddRef(this_obj);
     }else if(ctx->version >= SCRIPTLANGUAGEVERSION_ES5 && !is_undefined(vthis) && !is_null(vthis)) {
         hres = to_object(ctx, vthis, &this_obj);
         if(FAILED(hres))

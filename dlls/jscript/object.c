@@ -29,7 +29,9 @@ static HRESULT Object_toString(script_ctx_t *ctx, jsval_t vthis, WORD flags, uns
 {
     jsdisp_t *jsdisp;
     const WCHAR *str;
+    BSTR bstr = NULL;
     IDispatch *disp;
+    jsstr_t *ret;
     HRESULT hres;
 
     /* Keep in sync with jsclass_t enum */
@@ -68,6 +70,9 @@ static HRESULT Object_toString(script_ctx_t *ctx, jsval_t vthis, WORD flags, uns
 
     TRACE("\n");
 
+    if(!r)
+        return S_OK;
+
     if(is_undefined(vthis) || is_null(vthis)) {
         if(ctx->version < SCRIPTLANGUAGEVERSION_ES5)
             str = L"[object Object]";
@@ -83,6 +88,9 @@ static HRESULT Object_toString(script_ctx_t *ctx, jsval_t vthis, WORD flags, uns
     jsdisp = to_jsdisp(disp);
     if(!jsdisp) {
         str = L"[object Object]";
+    }else if(jsdisp->proxy) {
+        hres = jsdisp->proxy->lpVtbl->ToString(jsdisp->proxy, &bstr);
+        str = bstr;
     }else if(names[jsdisp->builtin_info->class]) {
         str = names[jsdisp->builtin_info->class];
     }else {
@@ -95,13 +103,11 @@ static HRESULT Object_toString(script_ctx_t *ctx, jsval_t vthis, WORD flags, uns
         return hres;
 
 set_output:
-    if(r) {
-        jsstr_t *ret;
-        ret = jsstr_alloc(str);
-        if(!ret)
-            return E_OUTOFMEMORY;
-        *r = jsval_string(ret);
-    }
+    ret = jsstr_alloc(str);
+    SysFreeString(bstr);
+    if(!ret)
+        return E_OUTOFMEMORY;
+    *r = jsval_string(ret);
 
     return S_OK;
 }

@@ -630,15 +630,24 @@ static HRESULT disp_cmp(IDispatch *disp1, IDispatch *disp2, BOOL *ret)
 {
     IObjectIdentity *identity;
     IUnknown *unk1, *unk2;
+    jsdisp_t *jsdisp;
     HRESULT hres;
 
-    if(disp1 == disp2) {
-        *ret = TRUE;
+    if(!disp1 || !disp2) {
+        *ret = (disp1 == disp2);
         return S_OK;
     }
 
-    if(!disp1 || !disp2) {
-        *ret = FALSE;
+    jsdisp = to_jsdisp(disp1);
+    if(jsdisp && jsdisp->proxy)
+        disp1 = (IDispatch*)jsdisp->proxy;
+
+    jsdisp = to_jsdisp(disp2);
+    if(jsdisp && jsdisp->proxy)
+        disp2 = (IDispatch*)jsdisp->proxy;
+
+    if(disp1 == disp2) {
+        *ret = TRUE;
         return S_OK;
     }
 

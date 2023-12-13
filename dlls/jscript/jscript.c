@@ -1458,3 +1458,8 @@ HRESULT create_jscript_object(BOOL is_encode, REFIID riid, void **ppv)
     IActiveScript_Release(&ret->IActiveScript_iface);
     return hres;
 }
+
+script_ctx_t *get_script_ctx(IActiveScript *script)
+{
+    return (script->lpVtbl == &JScriptVtbl) ? impl_from_IActiveScript(script)->ctx : NULL;
+}
