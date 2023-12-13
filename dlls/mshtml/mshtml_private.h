@@ -1208,6 +1208,7 @@ struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow*,prototype_id_t,co
 void global_ctor_traverse(DispatchEx*,nsCycleCollectionTraversalCallback*);
 void global_ctor_unlink(DispatchEx*);
 void global_ctor_destructor(DispatchEx*);
+HRESULT global_ctor_value(DispatchEx*,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 HRESULT legacy_ctor_get_dispid(DispatchEx*,BSTR,DWORD,DISPID*);
 HRESULT legacy_ctor_get_name(DispatchEx*,DISPID,BSTR*);
 HRESULT legacy_ctor_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);

@@ -753,10 +753,6 @@ sync_test("builtin_prototypes", function() {
         set_obj("Crypto");
     }
 
-    // todo_wine
-    if(v === 8 && window.Event === undefined)
-        return;
-
     if(v >= 8 && v < 11) {
         set_obj(v < 9 ? "Event" : "MSEventObj", document.createEventObject());
         test_prop("x");
@@ -994,7 +990,160 @@ sync_test("builtin_constructors", function() {
         }
     }
 
-    if(v >= 9) {
+    if(v < 9) {
+        // IHTMLDOMConstructorCollection props
+        var ctors = [
+            [ "Attr" ],
+            [ "BehaviorUrnsCollection" ],
+            [ "BookmarkCollection" ],
+            [ "CSSCurrentStyleDeclaration" ],
+            [ "CSSRuleList" ],
+            [ "CSSRuleStyleDeclaration" ],
+            [ "CSSStyleDeclaration" ],
+            [ "CSSStyleRule" ],
+            [ "CSSStyleSheet" ],
+            [ "CompatibleInfo" ],
+            [ "CompatibleInfoCollection" ],
+            [ "ControlRangeCollection" ],
+            [ "DOMImplementation" ],
+            [ "DataTransfer" ],
+            [ "Element" ],
+            [ "Event" ],
+            [ "HTCElementBehaviorDefaults" ],
+            [ "HTMLAnchorElement" ],
+            [ "HTMLAreaElement" ],
+            [ "HTMLAreasCollection" ],
+            [ "HTMLBGSoundElement" ],
+            [ "HTMLBRElement" ],
+            [ "HTMLBaseElement" ],
+            [ "HTMLBaseFontElement" ],
+            [ "HTMLBlockElement" ],
+            [ "HTMLBodyElement" ],
+            [ "HTMLButtonElement" ],
+            [ "HTMLCollection" ],
+            [ "HTMLCommentElement" ],
+            [ "HTMLDDElement" ],
+            [ "HTMLDListElement" ],
+            [ "HTMLDTElement" ],
+            [ "HTMLDivElement" ],
+            [ "HTMLDocument" ],
+            [ "HTMLEmbedElement" ],
+            [ "HTMLFieldSetElement" ],
+            [ "HTMLFontElement" ],
+            [ "HTMLFormElement" ],
+            [ "HTMLFrameElement" ],
+            [ "HTMLFrameSetElement" ],
+            [ "HTMLGenericElement" ],
+            [ "HTMLHRElement" ],
+            [ "HTMLHeadElement" ],
+            [ "HTMLHeadingElement" ],
+            [ "HTMLHtmlElement" ],
+            [ "HTMLIFrameElement" ],
+            [ "HTMLImageElement" ],
+            [ "HTMLInputElement" ],
+            [ "HTMLIsIndexElement" ],
+            [ "HTMLLIElement" ],
+            [ "HTMLLabelElement" ],
+            [ "HTMLLegendElement" ],
+            [ "HTMLLinkElement" ],
+            [ "HTMLMapElement" ],
+            [ "HTMLMarqueeElement" ],
+            [ "HTMLMetaElement" ],
+            [ "HTMLModelessDialog" ],
+            [ "HTMLNamespaceInfo" ],
+            [ "HTMLNamespaceInfoCollection" ],
+            [ "HTMLNextIdElement" ],
+            [ "HTMLNoShowElement" ],
+            [ "HTMLOListElement" ],
+            [ "HTMLObjectElement" ],
+            [ "HTMLOptionElement" ],
+            [ "HTMLParagraphElement" ],
+            [ "HTMLParamElement" ],
+            [ "HTMLPhraseElement" ],
+            [ "HTMLPluginsCollection" ],
+            [ "HTMLPopup" ],
+            [ "HTMLScriptElement" ],
+            [ "HTMLSelectElement" ],
+            [ "HTMLSpanElement" ],
+            [ "HTMLStyleElement" ],
+            [ "HTMLTableCaptionElement" ],
+            [ "HTMLTableCellElement" ],
+            [ "HTMLTableColElement" ],
+            [ "HTMLTableElement" ],
+            [ "HTMLTableRowElement" ],
+            [ "HTMLTableSectionElement" ],
+            [ "HTMLTextAreaElement" ],
+            [ "HTMLTextElement" ],
+            [ "HTMLTitleElement" ],
+            [ "HTMLUListElement" ],
+            [ "HTMLUnknownElement" ],
+            [ "History" ],
+            [ "Image", 0, "HTMLImageElement" ],
+            [ "Location" ],
+            [ "NamedNodeMap" ],
+            [ "Navigator" ],
+            [ "NodeList" ],
+            [ "Option", 0, "HTMLOptionElement" ],
+            [ "Screen" ],
+            [ "Selection" ],
+            [ "StaticNodeList" ],
+            [ "Storage" ],
+            [ "StyleSheetList" ],
+            [ "StyleSheetPage" ],
+            [ "StyleSheetPageList" ],
+            [ "Text" ],
+            [ "TextRange" ],
+            [ "TextRangeCollection" ],
+            [ "TextRectangle" ],
+            [ "TextRectangleList" ],
+            [ "Window" ],
+            [ "XDomainRequest", 0 ],
+            [ "XMLHttpRequest", 0 ]
+        ];
+        for(var i = 0; i < ctors.length; i++) {
+            if(!(ctors[i][0] in window) && (v >= 8 || ctors[i][0] === "XDomainRequest")) {
+                todo_wine.ok(false, ctors[i][0] + " not implemented");
+                continue;
+            }
+            var a, b, r = 0;
+            try {
+                eval("a = " + ctors[i][0] + "; b = window." + ctors[i][0] + ";");
+            }catch(ex) {
+                r = ex.number;
+            }
+            if(r === 0x4001 - 0x80000000)  /* todo_wine XDomainRequest */
+                continue;
+            if(v < 8 && (ctors[i].length < 2 || v < ctors[i][1]))
+                ok(r === 0xa1391 - 0x80000000, ctors[i][0] + " not undefined: " + r);
+            else {
+                ok(r === 0, ctors[i][0] + " exception code: " + r);
+                ok(a === b, ctors[i][0] + ": " + a + " != " + b);
+                ok(ctors[i][0] in window, ctors[i][0] + " in window");
+                if(v >= 8)
+                    todo_wine_if(ctors[i][0] == "Image" || ctors[i][0] == "Option" || ctors[i][0] == "XMLHttpRequest").
+                    ok(!(ctors[i][0] in window.Window.prototype), ctors[i][0] + " in Window.prototype");
+                r = "" + a;
+                todo_wine_if(ctors[i][0] == "Image" || ctors[i][0] == "Option" || ctors[i][0] == "XMLHttpRequest").
+                ok(r === "[object " + ctors[i][ctors[i].length < 3 ? 0 : 2] + "]", ctors[i][0] + " returned " + r);
+                r = "" + a.prototype;
+                ok(r === "[Interface prototype object]", ctors[i][0] + ".prototype returned " + r);
+
+                var props = [ "LookupGetter", "LookupSetter", "DefineGetter", "DefineSetter" ];
+                for(var j = 0; j < props.length; j++) {
+                    ok(!(props[j] in a.prototype), props[j] + " in " + ctors[i][0] + ".prototype");
+                    ok(!(props[j] in a), props[j] + " in " + ctors[i][0]);
+                }
+                ok(!("constructor" in a), "constructor in " + ctors[i][0]);
+
+                if(v < 8 || ctors[i][0] === "HTMLModelessDialog") {
+                    ok(!("constructor" in a.prototype), "constructor in " + ctors[i][0] + ".prototype");
+                }else {
+                    todo_wine.
+                    ok("constructor" in a.prototype, "constructor not in " + ctors[i][0] + ".prototype");
+                }
+            }
+        }
+    }else {
         var ctors = [
             [ "Attr" ],
             [ "ClientRect" ],

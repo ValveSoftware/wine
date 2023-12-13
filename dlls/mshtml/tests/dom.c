@@ -7302,6 +7302,7 @@ static void test_window(IHTMLDocument2 *doc)
     IHTMLWindow2 *window, *window2, *self, *parent;
     IHTMLWindow5 *window5;
     IHTMLWindow7 *window7;
+    IHTMLDOMConstructorCollection *ctor_col;
     IHTMLDocument2 *doc2 = NULL;
     IDispatch *disp;
     IUnknown *unk;
@@ -7404,6 +7405,9 @@ static void test_window(IHTMLDocument2 *doc)
     }else {
         win_skip("IHTMLWindow5 not supported!\n");
     }
+
+    hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLDOMConstructorCollection, (void**)&ctor_col);
+    ok(hres == E_NOINTERFACE, "QueryInterface for IHTMLDOMConstructorCollection returned %08lx\n", hres);
 
     hres = IHTMLWindow2_QueryInterface(window, &IID_IHTMLWindow7, (void**)&window7);
     if(SUCCEEDED(hres)) {
