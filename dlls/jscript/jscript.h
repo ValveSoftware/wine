@@ -118,10 +118,23 @@ typedef enum {
     JSCLASS_JSON,
     JSCLASS_ARRAYBUFFER,
     JSCLASS_DATAVIEW,
+    JSCLASS_INT8ARRAY,
+    JSCLASS_INT16ARRAY,
+    JSCLASS_INT32ARRAY,
+    JSCLASS_UINT8ARRAY,
+    JSCLASS_UINT16ARRAY,
+    JSCLASS_UINT32ARRAY,
+    JSCLASS_FLOAT32ARRAY,
+    JSCLASS_FLOAT64ARRAY,
     JSCLASS_MAP,
     JSCLASS_SET,
     JSCLASS_WEAKMAP,
+
+    FIRST_TYPEDARRAY_JSCLASS = JSCLASS_INT8ARRAY,
+    LAST_TYPEDARRAY_JSCLASS  = JSCLASS_FLOAT64ARRAY,
 } jsclass_t;
+
+enum { NUM_TYPEDARRAY_TYPES = LAST_TYPEDARRAY_JSCLASS - FIRST_TYPEDARRAY_JSCLASS + 1 };
 
 jsdisp_t *iface_to_jsdisp(IDispatch*);
 
@@ -439,11 +452,12 @@ struct _script_ctx_t {
             jsdisp_t *vbarray_constr;
             jsdisp_t *arraybuf_constr;
             jsdisp_t *dataview_constr;
+            jsdisp_t *typedarr_constr[NUM_TYPEDARRAY_TYPES];
             jsdisp_t *map_prototype;
             jsdisp_t *set_prototype;
             jsdisp_t *weakmap_prototype;
         };
-        jsdisp_t *global_objects[25];
+        jsdisp_t *global_objects[25 + NUM_TYPEDARRAY_TYPES];
     };
 };
 C_ASSERT(RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, weakmap_prototype) == RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, global_objects));
@@ -581,6 +595,9 @@ static inline HRESULT disp_call_value(script_ctx_t *ctx, IDispatch *disp, jsval_
 #define JS_E_OBJECT_NONEXTENSIBLE    MAKE_JSERROR(IDS_OBJECT_NONEXTENSIBLE)
 #define JS_E_NONCONFIGURABLE_REDEFINED MAKE_JSERROR(IDS_NONCONFIGURABLE_REDEFINED)
 #define JS_E_NONWRITABLE_MODIFIED    MAKE_JSERROR(IDS_NONWRITABLE_MODIFIED)
+#define JS_E_TYPEDARRAY_BAD_CTOR_ARG MAKE_JSERROR(IDS_TYPEDARRAY_BAD_CTOR_ARG)
+#define JS_E_NOT_TYPEDARRAY          MAKE_JSERROR(IDS_NOT_TYPEDARRAY)
+#define JS_E_TYPEDARRAY_INVALID_OFFSLEN MAKE_JSERROR(IDS_TYPEDARRAY_INVALID_OFFSLEN)
 #define JS_E_NOT_DATAVIEW            MAKE_JSERROR(IDS_NOT_DATAVIEW)
 #define JS_E_DATAVIEW_NO_ARGUMENT    MAKE_JSERROR(IDS_DATAVIEW_NO_ARGUMENT)
 #define JS_E_DATAVIEW_INVALID_ACCESS MAKE_JSERROR(IDS_DATAVIEW_INVALID_ACCESS)
