@@ -24,6 +24,7 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "ole2.h"
+#include "mshtmdid.h"
 
 #include "wine/debug.h"
 
@@ -2218,16 +2219,22 @@ static const dispex_static_data_vtbl_t HTMLPerformanceTiming_dispex_vtbl = {
     .unlink           = HTMLPerformanceTiming_unlink
 };
 
-static const tid_t HTMLPerformanceTiming_iface_tids[] = {
-    IHTMLPerformanceTiming_tid,
-    0
-};
+static void HTMLPerformanceTiming_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t hooks[] = {
+        {DISPID_IHTMLPERFORMANCETIMING_TOJSON},
+        {DISPID_UNKNOWN}
+    };
+    dispex_info_add_interface(info, IHTMLPerformanceTiming_tid, mode < COMPAT_MODE_IE9 ? hooks : NULL);
+}
+
 dispex_static_data_t HTMLPerformanceTiming_dispex = {
     "PerformanceTiming",
     &HTMLPerformanceTiming_dispex_vtbl,
     PROTO_ID_HTMLPerformanceTiming,
     IHTMLPerformanceTiming_tid,
-    HTMLPerformanceTiming_iface_tids
+    no_iface_tids,
+    HTMLPerformanceTiming_init_dispex_info
 };
 
 typedef struct {
@@ -2390,16 +2397,22 @@ static const dispex_static_data_vtbl_t HTMLPerformanceNavigation_dispex_vtbl = {
     .unlink           = HTMLPerformanceNavigation_unlink
 };
 
-static const tid_t HTMLPerformanceNavigation_iface_tids[] = {
-    IHTMLPerformanceNavigation_tid,
-    0
-};
+static void HTMLPerformanceNavigation_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t hooks[] = {
+        {DISPID_IHTMLPERFORMANCENAVIGATION_TOJSON},
+        {DISPID_UNKNOWN}
+    };
+    dispex_info_add_interface(info, IHTMLPerformanceNavigation_tid, mode < COMPAT_MODE_IE9 ? hooks : NULL);
+}
+
 dispex_static_data_t HTMLPerformanceNavigation_dispex = {
     "PerformanceNavigation",
     &HTMLPerformanceNavigation_dispex_vtbl,
     PROTO_ID_HTMLPerformanceNavigation,
     IHTMLPerformanceNavigation_tid,
-    HTMLPerformanceNavigation_iface_tids
+    no_iface_tids,
+    HTMLPerformanceNavigation_init_dispex_info
 };
 
 typedef struct {
@@ -2603,16 +2616,22 @@ static const dispex_static_data_vtbl_t HTMLPerformance_dispex_vtbl = {
     .unlink           = HTMLPerformance_unlink
 };
 
-static const tid_t HTMLPerformance_iface_tids[] = {
-    IHTMLPerformance_tid,
-    0
-};
+static void HTMLPerformance_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t hooks[] = {
+        {DISPID_IHTMLPERFORMANCE_TOJSON},
+        {DISPID_UNKNOWN}
+    };
+    dispex_info_add_interface(info, IHTMLPerformance_tid, mode < COMPAT_MODE_IE9 ? hooks : NULL);
+}
+
 dispex_static_data_t HTMLPerformance_dispex = {
     "Performance",
     &HTMLPerformance_dispex_vtbl,
     PROTO_ID_HTMLPerformance,
     IHTMLPerformance_tid,
-    HTMLPerformance_iface_tids
+    no_iface_tids,
+    HTMLPerformance_init_dispex_info
 };
 
 HRESULT create_performance(HTMLInnerWindow *window, IHTMLPerformance **ret)
