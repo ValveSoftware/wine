@@ -484,7 +484,7 @@ PRIVATE_TID_LIST
     X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   DOMUIEvent) \
     X(DOMPageTransitionEvent,         "PageTransitionEvent",          DOMPageTransitionEvent_dispex,          Object) \
     X(DOMProgressEvent,               "ProgressEvent",                DOMProgressEvent_dispex,                DOMEvent) \
-    X(DOMStorageEvent,                "StorageEvent",                 DOMStorageEvent_dispex,                 Object) \
+    X(DOMStorageEvent,                "StorageEvent",                 DOMStorageEvent_dispex,                 DOMEvent) \
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
     X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    HTMLDOMNode) \
