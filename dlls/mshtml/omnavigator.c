@@ -755,11 +755,11 @@ HRESULT create_history(HTMLInnerWindow *window, OmHistory **ret)
     if(!history)
         return E_OUTOFMEMORY;
 
-    init_dispatch(&history->dispex, &OmHistory_dispex, dispex_compat_mode(&window->event_target.dispex));
     history->IOmHistory_iface.lpVtbl = &OmHistoryVtbl;
-
     history->window = window;
     IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
+
+    init_dispatch(&history->dispex, &OmHistory_dispex, dispex_compat_mode(&window->event_target.dispex));
 
     *ret = history;
     return S_OK;
