@@ -961,7 +961,6 @@ sync_test("builtin_constructors", function() {
             ok(Object.prototype.hasOwnProperty.call(obj, "prototype"), "prototype not a property of " + name + " constructor.");
             ok(!("length" in obj), "length in " + name + " constructor.");
             if(window.Window)
-                todo_wine.
                 ok(!Object.prototype.hasOwnProperty.call(window.Window.prototype, name), name + " is a property of window's prototype.");
         }else {
             for(var j = 0; j < special_ctors[i][1].length; j++)
@@ -1119,7 +1118,6 @@ sync_test("builtin_constructors", function() {
                 ok(a === b, ctors[i][0] + ": " + a + " != " + b);
                 ok(ctors[i][0] in window, ctors[i][0] + " in window");
                 if(v >= 8)
-                    todo_wine_if(ctors[i][0] == "Image" || ctors[i][0] == "Option" || ctors[i][0] == "XMLHttpRequest").
                     ok(!(ctors[i][0] in window.Window.prototype), ctors[i][0] + " in Window.prototype");
                 r = "" + a;
                 ok(r === "[object " + ctors[i][ctors[i].length < 3 ? 0 : 2] + "]", ctors[i][0] + " returned " + r);

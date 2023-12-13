@@ -2181,28 +2181,44 @@ static const dispex_static_data_vtbl_t legacy_prototype_dispex_vtbl = {
 
 static void legacy_prototype_init_dispex_info(dispex_data_t *info, compat_mode_t compat_mode)
 {
+    static const DISPID empty_exclude_list[] = { DISPID_UNKNOWN };
+    static const DISPID window_exclude_list[] = {
+        DISPID_IHTMLWINDOW2_IMAGE,
+        DISPID_IHTMLWINDOW2_OPTION,
+        DISPID_IHTMLWINDOW5_XMLHTTPREQUEST,
+        DISPID_UNKNOWN
+    };
     prototype_id_t prot_id = info->desc - legacy_prototype_dispex;
     dispex_data_t *data = ensure_dispex_info(prototype_static_data[prot_id].desc, compat_mode);
+    const DISPID *exclude = empty_exclude_list;
     func_info_t *func;
-    unsigned i;
+    unsigned i, j;
 
     if(!data || !data->func_cnt)
         return;
+
+    if(prototype_static_data[prot_id].desc == &HTMLWindow_dispex)
+        exclude = window_exclude_list;
 
     /* Copy the info from the object instance data */
     func = realloc(info->funcs, data->func_size * sizeof(*func));
     if(!func)
         return;
     info->funcs = func;
-    info->func_cnt = data->func_cnt;
     info->func_disp_cnt = data->func_disp_cnt;
     info->func_size = data->func_size;
 
     for(i = 0; i < data->func_cnt; i++) {
+        for(j = 0; exclude[j] != DISPID_UNKNOWN; j++)
+            if(exclude[j] == data->funcs[i].id)
+                break;
+        if(exclude[j] != DISPID_UNKNOWN)
+            continue;
         copy_func_info(func, &data->funcs[i]);
         func++;
     }
-    memset(func, 0, (info->func_size - i) * sizeof(*func));
+    info->func_cnt = func - info->funcs;
+    memset(func, 0, (info->func_size - info->func_cnt) * sizeof(*func));
 }
 
 static inline struct global_ctor *global_ctor_from_DispatchEx(DispatchEx *iface)
