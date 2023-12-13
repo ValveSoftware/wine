@@ -356,6 +356,9 @@ sync_test("builtin_toString", function() {
         test("computedStyle", window.getComputedStyle(e), "CSSStyleDeclaration");
         test("doctype", document.doctype, "DocumentType");
         test("domParser", new DOMParser(), "DOMParser", null, "Function");
+        test("svgDocument", new DOMParser().parseFromString("<tag>foobar</tag>", "image/svg+xml"), v < 11 ? "Document" : "XMLDocument");
+        test("xhtmlDocument", new DOMParser().parseFromString("<tag>foobar</tag>", "application/xhtml+xml"), v < 11 ? "Document" : "XMLDocument");
+        test("xmlDocument", new DOMParser().parseFromString("<tag>foobar</tag>", "text/xml"), v < 11 ? "Document" : "XMLDocument");
 
         test("Event", document.createEvent("Event"), "Event");
         test("CustomEvent", document.createEvent("CustomEvent"), "CustomEvent");
