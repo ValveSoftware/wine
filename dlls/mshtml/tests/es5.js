@@ -469,7 +469,14 @@ sync_test("array_sort", function() {
 });
 
 sync_test("identifier_keywords", function() {
+    function get(let, set) { { get instanceof (Object); } return let + set; }
+    set: var let = get(1, 2);
+    { get: 10 }
+    var set = 0;
     var o = {
+        get: get,
+        set: set,
+        let: let,
         if: 1,
         default: 2,
         function: 3,
@@ -482,8 +489,8 @@ sync_test("identifier_keywords", function() {
         else: true,
         finally: true,
         for: true,
-        in: true,
-        instanceof: true,
+        set in(x) { },
+        get instanceof() { return 3; },
         new: true,
         return: true,
         switch: true,
@@ -504,6 +511,19 @@ sync_test("identifier_keywords", function() {
     ok(o.if === 1, "o.if = " + o.if);
     ok(ro().default === 2, "ro().default = " + ro().default);
     ok(o.false === true, "o.false = " + o.false);
+    ok(o.get === get, "o.let = " + o.get);
+    ok(o.set === set, "o.let = " + o.set);
+    ok(o.let === let, "o.let = " + o.let);
+    ok(o.instanceof === 3, "o.instanceof = " + o.instanceof);
+
+    var tmp = false;
+    try {
+        eval('function var() { }');
+    }
+    catch(set) {
+        tmp = true;
+    }
+    ok(tmp === true, "Expected exception for 'function var() { }'");
 });
 
 function test_own_data_prop_desc(obj, prop, expected_writable, expected_enumerable,
