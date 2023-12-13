@@ -8605,7 +8605,9 @@ static inline HRESULT get_attr_dispid_by_name(HTMLAttributeCollection *This, BST
 
     hres = IDispatchEx_GetDispID(&This->elem->node.event_target.dispex.IDispatchEx_iface,
             name, fdexNameCaseInsensitive, id);
-    return hres;
+    if(FAILED(hres))
+        return hres;
+    return dispex_is_builtin_method(&This->elem->node.event_target.dispex, *id) ? DISP_E_UNKNOWNNAME : S_OK;
 }
 
 static inline HRESULT get_domattr(HTMLAttributeCollection *This, DISPID id, nsIDOMAttr *nsattr,

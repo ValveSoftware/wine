@@ -683,6 +683,7 @@ compat_mode_t dispex_compat_mode(DispatchEx*);
 HRESULT dispex_to_string(DispatchEx*,BSTR*);
 HRESULT dispex_call_builtin(DispatchEx *dispex, DISPID id, DISPPARAMS *dp,
                             VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller);
+BOOL dispex_is_builtin_method(DispatchEx*,DISPID);
 
 typedef enum {
     DISPEXPROP_CUSTOM,
