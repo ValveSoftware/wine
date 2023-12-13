@@ -129,6 +129,7 @@ DEFINE_EXPECT(AddNamedItem);
 DEFINE_EXPECT(AddNamedItem2);
 DEFINE_EXPECT(ParseScriptText_script);
 DEFINE_EXPECT(ParseScriptText_script2);
+DEFINE_EXPECT(ParseScriptText_script_with_prescript_site);
 DEFINE_EXPECT(ParseScriptText_execScript);
 DEFINE_EXPECT(GetScriptDispatch);
 DEFINE_EXPECT(funcDisp);
@@ -186,6 +187,7 @@ static BOOL is_ie9plus, is_english;
 static IHTMLDocument2 *notif_doc;
 static IOleDocumentView *view;
 static IDispatchEx *window_dispex;
+static IHTMLDocument2 *doc_obj;
 static BOOL doc_complete;
 static IDispatch *script_disp;
 static BOOL ax_objsafe;
@@ -1924,7 +1926,8 @@ static IHTMLDocument2 *create_document(void)
     todo_wine
 #endif
     ok(hres == S_OK, "CoCreateInstance failed: %08lx\n", hres);
-    return SUCCEEDED(hres) ? doc : NULL;
+    doc_obj = SUCCEEDED(hres) ? doc : NULL;
+    return doc_obj;
 }
 
 static void load_string(IHTMLDocument2 *doc, const char *str)
@@ -3059,9 +3062,33 @@ static void test_ui(void)
 
 static void test_sp(void)
 {
-    IServiceProvider *sp;
+    IServiceProvider *sp, *doc_sp, *doc_obj_sp, *window_sp;
+    IOleCommandTarget *cmdtarget;
+    IHTMLWindow2 *window;
+    IHTMLDocument2 *doc;
     IUnknown *unk;
     HRESULT hres;
+
+    hres = IDispatchEx_QueryInterface(window_dispex, &IID_IHTMLWindow2, (void**)&window);
+    ok(hres == S_OK, "QueryInterface(IHTMLWindow2) failed: %08lx\n", hres);
+    ok(window != NULL, "window is NULL\n");
+
+    hres = IHTMLWindow2_QueryInterface(window, &IID_IServiceProvider, (void**)&window_sp);
+    ok(hres == S_OK, "Could not get IServiceProvider iface: %08lx\n", hres);
+    ok(window_sp != NULL, "window service provider is NULL\n");
+
+    hres = IHTMLWindow2_get_document(window, &doc);
+    ok(hres == S_OK, "QueryInterface(IHTMLDocument2) failed: %08lx\n", hres);
+    ok(doc != NULL, "doc is NULL\n");
+    ok(doc != doc_obj, "doc node == doc obj\n");
+
+    hres = IHTMLDocument2_QueryInterface(doc, &IID_IServiceProvider, (void**)&doc_sp);
+    ok(hres == S_OK, "Could not get IServiceProvider iface: %08lx\n", hres);
+    ok(doc_sp != NULL, "doc service provider is NULL\n");
+    IHTMLDocument2_Release(doc);
+    hres = IHTMLDocument2_QueryInterface(doc_obj, &IID_IServiceProvider, (void**)&doc_obj_sp);
+    ok(hres == S_OK, "Could not get IServiceProvider iface: %08lx\n", hres);
+    ok(doc_obj_sp != NULL, "doc_obj service provider is NULL\n");
 
     hres = IActiveScriptSite_QueryInterface(site, &IID_IServiceProvider, (void**)&sp);
     ok(hres == S_OK, "Could not get IServiceProvider iface: %08lx\n", hres);
@@ -3070,7 +3097,60 @@ static void test_sp(void)
     ok(hres == S_OK, "Could not get SID_SContainerDispatch service: %08lx\n", hres);
     IUnknown_Release(unk);
 
+    hres = IServiceProvider_QueryService(sp, &SID_GetCaller, &IID_IServiceProvider, (void**)&unk);
+    ok(hres == E_NOINTERFACE, "QueryService(SID_GetCaller) returned: %08lx\n", hres);
+    hres = IServiceProvider_QueryService(doc_sp, &SID_GetCaller, &IID_IServiceProvider, (void**)&unk);
+    ok(hres == E_NOINTERFACE, "QueryService(SID_GetCaller) returned: %08lx\n", hres);
+    hres = IServiceProvider_QueryService(doc_obj_sp, &SID_GetCaller, &IID_IServiceProvider, (void**)&unk);
+    ok(hres == E_NOINTERFACE, "QueryService(SID_GetCaller) returned: %08lx\n", hres);
+    hres = IServiceProvider_QueryService(window_sp, &SID_GetCaller, &IID_IServiceProvider, (void**)&unk);
+    ok(hres == E_NOINTERFACE, "QueryService(SID_GetCaller) returned: %08lx\n", hres);
+
+    hres = IServiceProvider_QueryService(sp, &IID_IActiveScriptSite, &IID_IOleCommandTarget, (void**)&cmdtarget);
+    ok(hres == S_OK, "QueryService(IActiveScriptSite->IOleCommandTarget) failed: %08lx\n", hres);
+    ok(cmdtarget != NULL, "IOleCommandTarget is NULL\n");
+
+    hres = IActiveScriptSite_QueryInterface(site, &IID_IOleCommandTarget, (void**)&unk);
+    ok(hres == S_OK, "QueryInterface(IOleCommandTarget) failed: %08lx\n", hres);
+    ok(unk != NULL, "QueryInterface(IOleCommandTarget) is NULL\n");
+    ok(cmdtarget == (IOleCommandTarget*)unk, "cmdtarget from QS not same as from QI\n");
+    IUnknown_Release(unk);
+    hres = IServiceProvider_QueryService(doc_sp, &IID_IActiveScriptSite, &IID_IOleCommandTarget, (void**)&unk);
+    ok(hres == S_OK, "QueryService(IActiveScriptSite->IOleCommandTarget) failed: %08lx\n", hres);
+    ok(cmdtarget == (IOleCommandTarget*)unk, "IActiveScriptSite service from document provider not same as site's\n");
+    IUnknown_Release(unk);
+    hres = IServiceProvider_QueryService(doc_obj_sp, &IID_IActiveScriptSite, &IID_IOleCommandTarget, (void**)&unk);
+    ok(hres == E_NOINTERFACE, "QueryService(IActiveScriptSite->IOleCommandTarget) returned: %08lx\n", hres);
+    hres = IServiceProvider_QueryService(window_sp, &IID_IActiveScriptSite, &IID_IOleCommandTarget, (void**)&unk);
+    ok(hres == E_NOINTERFACE, "QueryService(IActiveScriptSite->IOleCommandTarget) returned: %08lx\n", hres);
+
+    if(site2) {
+        IOleCommandTarget *cmdtarget2;
+        IServiceProvider *sp2;
+
+        hres = IActiveScriptSite_QueryInterface(site2, &IID_IServiceProvider, (void**)&sp2);
+        ok(hres == S_OK, "Could not get IServiceProvider iface: %08lx\n", hres);
+
+        hres = IServiceProvider_QueryService(sp2, &IID_IActiveScriptSite, &IID_IOleCommandTarget, (void**)&cmdtarget2);
+        ok(hres == S_OK, "QueryService(IActiveScriptSite->IOleCommandTarget) failed: %08lx\n", hres);
+        ok(cmdtarget2 != NULL, "IOleCommandTarget is NULL\n");
+
+        hres = IActiveScriptSite_QueryInterface(site2, &IID_IOleCommandTarget, (void**)&unk);
+        ok(hres == S_OK, "QueryInterface(IOleCommandTarget) failed: %08lx\n", hres);
+        ok(unk != NULL, "QueryInterface(IOleCommandTarget) is NULL\n");
+        ok(cmdtarget2 != (IOleCommandTarget*)unk, "cmdtarget from site2's QS same as from QI\n");
+        ok(cmdtarget2 == cmdtarget, "site1's cmdtarget not same as site2's\n");
+        IOleCommandTarget_Release(cmdtarget2);
+        IServiceProvider_Release(sp2);
+        IUnknown_Release(unk);
+    }
+
+    IOleCommandTarget_Release(cmdtarget);
+    IServiceProvider_Release(window_sp);
+    IServiceProvider_Release(doc_obj_sp);
+    IServiceProvider_Release(doc_sp);
     IServiceProvider_Release(sp);
+    IHTMLWindow2_Release(window);
 }
 
 static void test_script_run(void)
@@ -3331,6 +3411,12 @@ static HRESULT WINAPI ActiveScriptParse_ParseScriptText(IActiveScriptParse *ifac
 
         test_script_run();
         return S_OK;
+    }else if(!lstrcmpW(pstrCode, L"with pre-script site")) {
+        CHECK_EXPECT(ParseScriptText_script_with_prescript_site);
+        ok(!lstrcmpW(pstrItemName, L"window"), "pstrItemName = %s\n", wine_dbgstr_w(pstrItemName));
+        ok(!lstrcmpW(pstrDelimiter, L"</SCRIPT>"), "pstrDelimiter = %s\n", wine_dbgstr_w(pstrDelimiter));
+        ok(dwFlags == (SCRIPTTEXT_ISVISIBLE|SCRIPTTEXT_HOSTMANAGESSOURCE), "dwFlags = %lx\n", dwFlags);
+        return S_OK;
     }
 
     ok(0, "unexpected script %s\n", wine_dbgstr_w(pstrCode));
@@ -3406,6 +3492,8 @@ static HRESULT WINAPI ActiveScript_SetScriptSite(IActiveScript *iface, IActiveSc
     CHECK_EXPECT(SetScriptSite);
 
     ok(pass != NULL, "pass == NULL\n");
+    if(site2)
+        ok(pass != site2, "pass == pre-script site\n");
 
     hres = IActiveScriptSite_QueryInterface(pass, &IID_IActiveScriptSiteInterruptPoll, (void**)&poll);
     ok(hres == S_OK, "Could not get IActiveScriptSiteInterruptPoll interface: %08lx\n", hres);
@@ -3695,6 +3783,7 @@ static HRESULT WINAPI ActiveScriptParse2_ParseScriptText(IActiveScriptParse *ifa
         ok(!lstrcmpW(pstrItemName, L"window"), "pstrItemName = %s\n", wine_dbgstr_w(pstrItemName));
         ok(!lstrcmpW(pstrDelimiter, L"</SCRIPT>"), "pstrDelimiter = %s\n", wine_dbgstr_w(pstrDelimiter));
         ok(dwFlags == (SCRIPTTEXT_ISVISIBLE | SCRIPTTEXT_HOSTMANAGESSOURCE), "dwFlags = %08lx\n", dwFlags);
+        test_sp();
         return S_OK;
     }
 
@@ -4447,6 +4536,12 @@ static const char simple_script_str[] =
     "<script language=\"TestScript1\">simple script</script>"
     "</body></html>";
 
+static const char simple_script_with_prescript_site_str[] =
+    "<html><head><meta http-equiv=\"x-ua-compatible\" content=\"IE=9\" /></head><body>"
+    "<script language=\"TestScript1\">with pre-script site</script>"
+    "<script>if(true) try { Object.getPrototypeOf(Object); document.fail_prop = 1; } catch(e) {}</script>"
+    "</body></html>";
+
 static void test_insert_script_elem(IHTMLDocument2 *doc, const WCHAR *code, const WCHAR *lang)
 {
     IHTMLDOMNode *node, *body_node, *inserted_node;
@@ -4524,10 +4619,16 @@ static void test_exec_script(IHTMLDocument2 *doc, const WCHAR *codew, const WCHA
 
 static void test_simple_script(void)
 {
+    IOleCommandTarget *cmdtarget;
     IHTMLDocument2 *doc_node;
+    IServiceProvider *sp;
     IHTMLWindow2 *window;
+    IHTMLDocument6 *doc6;
     IHTMLDocument2 *doc;
+    DISPID dispid;
     HRESULT hres;
+    VARIANT v;
+    BSTR bstr;
 
     doc = create_document();
     if(!doc)
@@ -4591,13 +4692,6 @@ static void test_simple_script(void)
 
     test_exec_script(doc, L"execScript call", L"TestScript1");
 
-    if(site)
-        IActiveScriptSite_Release(site);
-    if(site2)
-        IActiveScriptSite_Release(site2);
-    if(window_dispex)
-        IDispatchEx_Release(window_dispex);
-
     hres = IHTMLDocument2_get_parentWindow(doc, &window);
     ok(hres == S_OK, "get_parentWindow failed: %08lx\n", hres);
 
@@ -4614,6 +4708,16 @@ static void test_simple_script(void)
     CHECK_CALLED(Close);
     CHECK_CALLED(Close2);
 
+    if(site)
+        IActiveScriptSite_Release(site);
+    if(site2)
+        IActiveScriptSite_Release(site2);
+    if(window_dispex)
+        IDispatchEx_Release(window_dispex);
+    site = NULL;
+    site2 = NULL;
+    window_dispex = NULL;
+
     hres = IHTMLWindow2_get_document(window, &doc);
     ok(hres == S_OK, "get_document failed: %08lx\n", hres);
     ok(doc != doc_node, "doc == doc_node\n");
@@ -4621,6 +4725,112 @@ static void test_simple_script(void)
     IHTMLDocument2_Release(doc_node);
     IHTMLDocument2_Release(doc);
     IHTMLWindow2_Release(window);
+
+    /* Obtaining the IActiveScriptSite before any script engines creates a site with JScript engine,
+       and is preserved after document gets loaded, and even keeps it from changing its compat mode. */
+    doc = create_document();
+    if(!doc)
+        return;
+
+    hres = IHTMLDocument2_get_parentWindow(doc, &window);
+    ok(hres == S_OK, "get_parentWindow failed: %08lx\n", hres);
+
+    hres = IHTMLWindow2_get_document(window, &doc_node);
+    ok(hres == S_OK, "get_document failed: %08lx\n", hres);
+    IHTMLWindow2_Release(window);
+
+    hres = IHTMLDocument2_QueryInterface(doc_node, &IID_IServiceProvider, (void**)&sp);
+    ok(hres == S_OK, "Could not get IServiceProvider iface: %08lx\n", hres);
+    IHTMLDocument2_Release(doc_node);
+
+    hres = IServiceProvider_QueryService(sp, &IID_IActiveScriptSite, &IID_IOleCommandTarget, (void**)&cmdtarget);
+    ok(hres == S_OK, "QueryService(IID_IActiveScriptSite->IID_IOleCommandTarget) failed: %08lx\n", hres);
+    ok(cmdtarget != NULL, "cmdtarget == NULL\n");
+
+    hres = IOleCommandTarget_QueryInterface(cmdtarget, &IID_IActiveScriptSite, (void**)&site2);
+    ok(hres == S_OK, "Command Target QI for IActiveScriptSite failed: %08lx\n", hres);
+    ok(site2 != NULL, "IActiveScriptSite is NULL\n");
+    IOleCommandTarget_Release(cmdtarget);
+    IServiceProvider_Release(sp);
+
+    SET_EXPECT(CreateInstance);
+    SET_EXPECT(GetInterfaceSafetyOptions);
+    SET_EXPECT(SetInterfaceSafetyOptions);
+    SET_EXPECT(SetProperty_INVOKEVERSIONING);
+    SET_EXPECT(SetProperty_HACK_TRIDENTEVENTSINK);
+    SET_EXPECT(InitNew);
+    SET_EXPECT(SetScriptSite);
+    SET_EXPECT(GetScriptState);
+    SET_EXPECT(SetScriptState_STARTED);
+    SET_EXPECT(AddNamedItem);
+    SET_EXPECT(SetProperty_ABBREVIATE_GLOBALNAME_RESOLUTION_FALSE);
+    SET_EXPECT(ParseScriptText_script_with_prescript_site);
+    SET_EXPECT(SetScriptState_CONNECTED);
+
+    load_doc(doc, simple_script_with_prescript_site_str);
+
+    CHECK_CALLED(CreateInstance);
+    CHECK_CALLED(GetInterfaceSafetyOptions);
+    CHECK_CALLED(SetInterfaceSafetyOptions);
+    CHECK_CALLED(SetProperty_INVOKEVERSIONING);
+    CHECK_CALLED(SetProperty_HACK_TRIDENTEVENTSINK);
+    CHECK_CALLED(InitNew);
+    CHECK_CALLED(SetScriptSite);
+    CHECK_CALLED(GetScriptState);
+    CHECK_CALLED(SetScriptState_STARTED);
+    CHECK_CALLED(AddNamedItem);
+    CHECK_CALLED(SetProperty_ABBREVIATE_GLOBALNAME_RESOLUTION_FALSE);
+    CHECK_CALLED(ParseScriptText_script_with_prescript_site);
+    CHECK_CALLED(SetScriptState_CONNECTED);
+
+    if(site)
+        IActiveScriptSite_Release(site);
+
+    bstr = SysAllocString(L"fail_prop");
+    hres = IHTMLDocument2_GetIDsOfNames(doc, &IID_NULL, &bstr, 1, 0, &dispid);
+    ok(hres == DISP_E_UNKNOWNNAME, "GetIDsOfNames(fail_prop) returned: %08lx\n", hres);
+    SysFreeString(bstr);
+
+    hres = IHTMLDocument2_get_parentWindow(doc, &window);
+    ok(hres == S_OK, "get_parentWindow failed: %08lx\n", hres);
+
+    hres = IHTMLWindow2_get_document(window, &doc_node);
+    ok(hres == S_OK, "get_document failed: %08lx\n", hres);
+    IHTMLWindow2_Release(window);
+
+    hres = IHTMLDocument2_QueryInterface(doc_node, &IID_IHTMLDocument6, (void**)&doc6);
+    ok(hres == S_OK, "Could not get IHTMLDocument6 iface: %08lx\n", hres);
+    hres = IHTMLDocument6_get_documentMode(doc6, &v);
+    ok(V_VT(&v) == VT_R4, "V_VT(documentMode) = %d\n", V_VT(&v));
+    ok(V_R4(&v) == 5.0, "V_R4(documentMode) = %f\n", V_R4(&v));
+    IHTMLDocument6_Release(doc6);
+
+    hres = IHTMLDocument2_QueryInterface(doc_node, &IID_IServiceProvider, (void**)&sp);
+    ok(hres == S_OK, "Could not get IServiceProvider iface: %08lx\n", hres);
+    IHTMLDocument2_Release(doc_node);
+
+    hres = IServiceProvider_QueryService(sp, &IID_IActiveScriptSite, &IID_IOleCommandTarget, (void**)&cmdtarget);
+    ok(hres == S_OK, "QueryService(IID_IActiveScriptSite->IID_IOleCommandTarget) failed: %08lx\n", hres);
+    ok(cmdtarget != NULL, "cmdtarget == NULL\n");
+
+    hres = IOleCommandTarget_QueryInterface(cmdtarget, &IID_IActiveScriptSite, (void**)&site);
+    ok(hres == S_OK, "Command Target QI for IActiveScriptSite failed: %08lx\n", hres);
+    ok(site == site2, "site != site2\n");
+    IOleCommandTarget_Release(cmdtarget);
+    IServiceProvider_Release(sp);
+
+    SET_EXPECT(SetScriptState_DISCONNECTED);
+    SET_EXPECT(Close);
+
+    IHTMLDocument2_Release(doc);
+
+    CHECK_CALLED(SetScriptState_DISCONNECTED);
+    CHECK_CALLED(Close);
+
+    IActiveScriptSite_Release(site2);
+    IActiveScriptSite_Release(site);
+    if(window_dispex)
+        IDispatchEx_Release(window_dispex);
 }
 
 static void run_from_moniker(IMoniker *mon)
