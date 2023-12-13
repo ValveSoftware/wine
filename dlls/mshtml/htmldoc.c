@@ -3238,13 +3238,28 @@ static HRESULT WINAPI HTMLDocument5_createAttribute(IHTMLDocument5 *iface, BSTR 
         IHTMLDOMAttribute **ppattribute)
 {
     HTMLDocumentNode *This = impl_from_IHTMLDocument5(iface);
+    compat_mode_t compat_mode = dispex_compat_mode(&This->node.event_target.dispex);
+    nsIDOMAttr *nsattr = NULL;
     HTMLDOMAttribute *attr;
+    nsresult nsres;
+    nsAString str;
     HRESULT hres;
 
     TRACE("(%p)->(%s %p)\n", This, debugstr_w(bstrattrName), ppattribute);
 
-    hres = HTMLDOMAttribute_Create(bstrattrName, This, NULL, 0,
-                                   dispex_compat_mode(&This->node.event_target.dispex), &attr);
+    if(compat_mode >= COMPAT_MODE_IE9) {
+        nsAString_InitDepend(&str, bstrattrName);
+        nsres = nsIDOMDocument_CreateAttribute(This->dom_document, &str, &nsattr);
+        nsAString_Finish(&str);
+        if(NS_FAILED(nsres)) {
+            ERR("CreateAttribute failed: %08lx\n", nsres);
+            return E_FAIL;
+        }
+    }
+
+    hres = HTMLDOMAttribute_Create(bstrattrName, This, NULL, 0, nsattr, compat_mode, &attr);
+    if(nsattr)
+        nsIDOMAttr_Release(nsattr);
     if(FAILED(hres))
         return hres;
 

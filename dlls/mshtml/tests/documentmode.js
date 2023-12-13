@@ -1458,6 +1458,76 @@ sync_test("elem_props", function() {
     test_exposed("fileSize", v < 11);
 });
 
+sync_test("attr_props", function() {
+    var elem = document.createElement("style"), attr;
+    var v = document.documentMode;
+    elem.setAttribute("id", "test");
+    elem.setAttribute("test", "wine");
+    elem.setAttribute("z-index", "foobar");
+
+    function test_exposed(prop, expect) {
+        if(expect)
+            ok(prop in attr, prop + " not found in attribute.");
+        else
+            ok(!(prop in attr), prop + " found in attribute.");
+    }
+
+    function test_attr(expando, specified) {
+        var r = attr.expando;
+        ok(r === expando, attr.name + " attr.expando = " + r);
+        r = attr.specified;
+        ok(r === specified, attr.name + " attr.specified = " + r);
+    }
+
+    attr = elem.getAttributeNode("id");
+    test_exposed("appendChild", true);
+    test_exposed("attributes", true);
+    test_exposed("childNodes", true);
+    test_exposed("cloneNode", true);
+    test_exposed("compareDocumentPosition", v >= 9);
+    test_exposed("expando", true);
+    test_exposed("firstChild", true);
+    test_exposed("hasChildNodes", true);
+    test_exposed("insertBefore", true);
+    test_exposed("isDefaultNamespace", v >= 9);
+    test_exposed("isEqualNode", v >= 9);
+    test_exposed("isSameNode", v >= 9);
+    test_exposed("isSupported", v >= 9);
+    test_exposed("lastChild", true);
+    test_exposed("localName", v >= 9);
+    test_exposed("lookupNamespaceURI", v >= 9);
+    test_exposed("lookupPrefix", v >= 9);
+    test_exposed("name", true);
+    test_exposed("namespaceURI", v >= 9);
+    test_exposed("nextSibling", true);
+    test_exposed("nodeName", true);
+    test_exposed("nodeType", true);
+    test_exposed("nodeValue", true);
+    test_exposed("ownerDocument", true);
+    test_exposed("parentNode", true);
+    test_exposed("prefix", v >= 9);
+    test_exposed("previousSibling", true);
+    test_exposed("removeChild", true);
+    test_exposed("replaceChild", true);
+    test_exposed("specified", true);
+    test_exposed("textContent", v >= 9);
+    test_exposed("value", true);
+    test_attr(false, true);
+
+    attr = elem.getAttributeNode("test");
+    test_attr(true, true);
+
+    attr = elem.getAttributeNode("z-index");
+    test_attr(true, true);
+
+    attr = elem.getAttributeNode("tabIndex");
+    if(v < 8)
+        test_attr(false, false);
+    else
+        todo_wine_if(v === 8).
+        ok(attr === null, "tabIndex attr not null.");
+});
+
 sync_test("doc_props", function() {
     function test_exposed(prop, expect, is_todo) {
         var ok_ = is_todo ? todo_wine.ok : ok;
