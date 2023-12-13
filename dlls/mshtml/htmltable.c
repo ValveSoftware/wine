@@ -527,6 +527,21 @@ HRESULT HTMLTableCell_Create(HTMLDocumentNode *doc, nsIDOMElement *nselem, HTMLE
     return S_OK;
 }
 
+/* dummy dispex used only for HTMLTableCellElementPrototype in prototype chain */
+static void HTMLTableCellProt_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    dispex_info_add_interface(info, IHTMLTableCell_tid, NULL);
+}
+
+dispex_static_data_t HTMLTableCellProt_dispex = {
+    "HTMLTableCellElement",
+    &no_dispex_vtbl,
+    PROTO_ID_HTMLTableCellProt,
+    NULL_tid,
+    no_iface_tids,
+    HTMLTableCellProt_init_dispex_info
+};
+
 struct HTMLTableRow {
     HTMLElement element;
 
