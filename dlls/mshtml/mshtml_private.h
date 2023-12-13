@@ -597,6 +597,9 @@ typedef struct {
     /* Used by objects that want to delay their compat mode initialization until actually needed */
     compat_mode_t (*get_compat_mode)(DispatchEx*);
 
+    /* Used by objects that have delayed compat mode, and need to be finalized differently depending on the resulting mode */
+    void (*finalize_dispex)(DispatchEx*);
+
     /* Used by objects that want to populate some dynamic props on initialization */
     HRESULT (*populate_props)(DispatchEx*);
 } dispex_static_data_vtbl_t;
@@ -628,6 +631,7 @@ struct DispatchEx {
 
     nsCycleCollectingAutoRefCnt ccref;
     IWineDispatchProxyCbPrivate *proxy;
+    struct legacy_prototype *prototype;
 
     dispex_data_t *info;
     dispex_dynamic_data_t *dynamic_data;
@@ -642,6 +646,7 @@ extern void (__cdecl *note_cc_edge)(nsISupports*,const char*,nsCycleCollectionTr
 
 void init_proxies(HTMLInnerWindow*);
 void init_dispatch(DispatchEx*,dispex_static_data_t*,HTMLInnerWindow*,compat_mode_t);
+void finalize_delayed_init_dispex(DispatchEx*,HTMLInnerWindow*,dispex_static_data_t*);
 void dispex_props_unlink(DispatchEx*);
 HRESULT change_type(VARIANT*,VARIANT*,VARTYPE,IServiceProvider*);
 HRESULT dispex_get_builtin_id(DispatchEx*,BSTR,DWORD,DISPID*);

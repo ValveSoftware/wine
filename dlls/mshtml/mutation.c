@@ -429,6 +429,17 @@ static void setup_doc_proxy(HTMLDocumentNode *doc)
     }
 }
 
+static void update_location_dispex(HTMLDocumentNode *doc)
+{
+    HTMLOuterWindow *outer_window = doc->window->base.outer_window;
+
+    if(outer_window && outer_window->location) {
+        if(outer_window->location->dispex.prototype)
+            IDispatchEx_Release(&outer_window->location->dispex.prototype->dispex.IDispatchEx_iface);
+        outer_window->location->dispex.prototype = get_legacy_prototype(doc->window, PROTO_ID_HTMLLocation, min(doc->document_mode, COMPAT_MODE_IE8));
+    }
+}
+
 /*
  * We may change document mode only in early stage of document lifetime.
  * Later attempts will not have an effect.
@@ -447,6 +458,10 @@ compat_mode_t lock_document_mode(HTMLDocumentNode *doc)
            methods so we can't rely on the delay init of the dispex to set them up. */
         if(doc->document_mode >= COMPAT_MODE_IE9)
             setup_doc_proxy(doc);
+
+        /* location is special case since it's tied to the outer window */
+        if(doc->window)
+            update_location_dispex(doc);
     }
 
     return doc->document_mode;

@@ -6224,6 +6224,16 @@ static compat_mode_t HTMLDocumentNode_get_compat_mode(DispatchEx *dispex)
     return lock_document_mode(This);
 }
 
+static void HTMLDocumentNode_finalize_dispex(DispatchEx *dispex)
+{
+    HTMLDocumentNode *This = impl_from_DispatchEx(dispex);
+
+    lock_document_mode(This);
+
+    /* FIXME: IE9 and IE10 have different dispex data */
+    finalize_delayed_init_dispex(dispex, get_inner_window(This), &HTMLDocumentNode_dispex);
+}
+
 static nsISupports *HTMLDocumentNode_get_gecko_target(DispatchEx *dispex)
 {
     HTMLDocumentNode *This = impl_from_DispatchEx(dispex);
@@ -6285,6 +6295,7 @@ static const event_target_vtbl_t HTMLDocumentNode_event_target_vtbl = {
         .invoke              = HTMLDocumentNode_invoke,
         .next_dispid         = HTMLDocumentNode_next_dispid,
         .get_compat_mode     = HTMLDocumentNode_get_compat_mode,
+        .finalize_dispex     = HTMLDocumentNode_finalize_dispex
     },
     .get_gecko_target        = HTMLDocumentNode_get_gecko_target,
     .bind_event              = HTMLDocumentNode_bind_event,

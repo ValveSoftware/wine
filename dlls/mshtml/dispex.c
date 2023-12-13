@@ -1919,7 +1919,7 @@ static BOOL ensure_real_info(DispatchEx *dispex)
     if(dispex->info != dispex->info->desc->delayed_init_info)
         return TRUE;
 
-    dispex->info = ensure_dispex_info(dispex->info->desc, dispex_compat_mode(dispex));
+    dispex->info->desc->vtbl->finalize_dispex(dispex);
     return dispex->info != NULL;
 }
 
@@ -3017,6 +3017,9 @@ static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTrave
 
     describe_cc_node(&This->ccref, This->info->desc->name, cb);
 
+    if(This->prototype)
+        note_cc_edge((nsISupports*)&This->prototype->dispex.IDispatchEx_iface, "prototype", cb);
+
     if(This->proxy)
         note_cc_edge((nsISupports*)This->proxy, "proxy", cb);
 
@@ -3046,6 +3049,12 @@ static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTrave
 void dispex_props_unlink(DispatchEx *This)
 {
     dynamic_prop_t *prop;
+
+    if(This->prototype) {
+        struct legacy_prototype *prototype = This->prototype;
+        This->prototype = NULL;
+        IDispatchEx_Release(&prototype->dispex.IDispatchEx_iface);
+    }
 
     if(This->proxy) {
         IWineDispatchProxyCbPrivate *proxy = This->proxy;
@@ -3096,6 +3105,9 @@ static void NSAPI dispex_delete_cycle_collectable(void *p)
     if(This->info->desc->vtbl->unlink)
         This->info->desc->vtbl->unlink(This);
 
+    if(This->prototype)
+        IDispatchEx_Release(&This->prototype->dispex.IDispatchEx_iface);
+
     if(This->proxy)
         This->proxy->lpVtbl->Unlinked(This->proxy, FALSE);
 
@@ -3144,12 +3156,22 @@ const void *dispex_get_vtbl(DispatchEx *dispex)
     return dispex->info->desc->vtbl;
 }
 
+void finalize_delayed_init_dispex(DispatchEx *This, HTMLInnerWindow *window, dispex_static_data_t *data)
+{
+    compat_mode_t compat_mode = window->doc->document_mode;
+
+    This->info = ensure_dispex_info(data, compat_mode);
+    if(!This->proxy && data->prototype_id < ARRAY_SIZE(window->legacy_prototypes))
+        This->prototype = get_legacy_prototype(window, data->prototype_id, compat_mode);
+}
+
 void init_dispatch(DispatchEx *dispex, dispex_static_data_t *data, HTMLInnerWindow *window, compat_mode_t compat_mode)
 {
     assert(compat_mode < COMPAT_MODE_CNT);
 
     dispex->IDispatchEx_iface.lpVtbl = (const IDispatchExVtbl*)&WineDispatchProxyPrivateVtbl;
     dispex->proxy = NULL;
+    dispex->prototype = NULL;
     dispex->dynamic_data = NULL;
     ccref_init(&dispex->ccref, 1);
 
@@ -3188,6 +3210,8 @@ void init_dispatch(DispatchEx *dispex, dispex_static_data_t *data, HTMLInnerWind
                     if(FAILED(hres))
                         ERR("InitProxy failed: %08lx\n", hres);
                 }
+            }else if(data->prototype_id < ARRAY_SIZE(window->legacy_prototypes)) {
+                dispex->prototype = get_legacy_prototype(window, data->prototype_id, compat_mode);
             }
         }
     }
