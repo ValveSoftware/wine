@@ -2775,6 +2775,18 @@ end:
     return hres;
 }
 
+static HRESULT WINAPI WineDispatchProxyCbPrivate_CreateObject(IWineDispatchProxyCbPrivate *iface, IDispatchEx **obj)
+{
+    jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
+    jsdisp_t *jsdisp;
+    HRESULT hres;
+
+    hres = create_object(This->ctx, NULL, &jsdisp);
+    if(SUCCEEDED(hres))
+        *obj = &jsdisp->IDispatchEx_iface;
+    return hres;
+}
+
 static HRESULT WINAPI WineDispatchProxyCbPrivate_PropEnum(IWineDispatchProxyCbPrivate *iface, const WCHAR *name)
 {
     jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
@@ -2808,6 +2820,7 @@ static IWineDispatchProxyCbPrivateVtbl WineDispatchProxyCbPrivateVtbl = {
     WineDispatchProxyCbPrivate_HostUpdated,
     WineDispatchProxyCbPrivate_CreateConstructor,
     WineDispatchProxyCbPrivate_DefineConstructor,
+    WineDispatchProxyCbPrivate_CreateObject,
     WineDispatchProxyCbPrivate_GetRandomValues,
     WineDispatchProxyCbPrivate_PropEnum
 };

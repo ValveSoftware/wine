@@ -3605,6 +3605,51 @@ HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
     return S_OK;
 }
 
+HRESULT dispex_builtin_props_to_json(DispatchEx *dispex, VARIANT *ret)
+{
+    static DISPID propput_dispid = DISPID_PROPERTYPUT;
+    IWineDispatchProxyCbPrivate *proxy;
+    func_info_t *func, *end;
+    IDispatchEx *json;
+    HRESULT hres;
+    VARIANT var;
+    DISPID id;
+    DISPPARAMS dp = { 0 }, put_dp = { &var, &propput_dispid, 1, 1 };
+
+    if(!(proxy = dispex->proxy))
+        return E_UNEXPECTED;
+
+    if(!ensure_real_info(dispex))
+        return E_OUTOFMEMORY;
+
+    hres = proxy->lpVtbl->CreateObject(proxy, &json);
+    if(FAILED(hres))
+        return hres;
+
+    for(func = dispex->info->funcs, end = func + dispex->info->func_cnt; func < end; func++) {
+        if(func->func_disp_idx != -1)
+            continue;
+        hres = proxy_getter_invoke((IDispatch*)&dispex->IDispatchEx_iface, func, &dp, &var, NULL, NULL);
+        if(SUCCEEDED(hres)) {
+            hres = IDispatchEx_GetDispID(json, func->name, fdexNameEnsure | fdexNameCaseSensitive, &id);
+            if(SUCCEEDED(hres)) {
+                hres = IDispatchEx_InvokeEx(json, id, 0, DISPATCH_PROPERTYPUT, &put_dp, NULL, NULL, NULL);
+            }
+            VariantClear(&var);
+        }
+        if(FAILED(hres)) {
+            IDispatchEx_Release(json);
+            return hres;
+        }
+    }
+
+    if(ret) {
+        V_VT(ret) = VT_DISPATCH;
+        V_DISPATCH(ret) = (IDispatch*)json;
+    }
+    return hres;
+}
+
 static nsresult NSAPI dispex_traverse(void *ccp, void *p, nsCycleCollectionTraversalCallback *cb)
 {
     DispatchEx *This = impl_from_IDispatchEx(p);

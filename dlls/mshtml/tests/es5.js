@@ -3058,6 +3058,45 @@ sync_test("instanceof", function() {
     ok(r === true, "document not instance of Node");
 });
 
+sync_test("perf toJSON", function() {
+    var tests = [
+        [ "performance.timing", "connectEnd", "connectStart", "domComplete", "domContentLoadedEventEnd",
+          "domContentLoadedEventStart", "domInteractive", "domLoading", "domainLookupEnd", "domainLookupStart",
+          "fetchStart", "loadEventEnd", "loadEventStart", "msFirstPaint", "navigationStart", "redirectEnd",
+          "redirectStart", "requestStart", "responseEnd", "responseStart", "unloadEventEnd", "unloadEventStart" ]
+    ];
+
+    for(var i = 0; i < tests.length; i++) {
+        var desc, name = tests[i][0], obj = eval("window." + name), json;
+
+        Object.defineProperty(obj, "foobar", {writable: true, enumerable: true, configurable: true, value: 1});
+        Object.defineProperty(Object.getPrototypeOf(obj), "barfoo", {writable: true, enumerable: true, configurable: true, value: 3});
+        json = obj.toJSON();
+
+        ok(Object.getPrototypeOf(json) === Object.prototype, "prototype of " + name + ".toJSON() != Object.prototype");
+        ok(typeof json === "object", "typeof " + name + ".toJSON() != object");
+        for(var j = 1; j < tests[i].length; j++) {
+            desc = Object.getOwnPropertyDescriptor(json, tests[i][j]);
+            ok(json.hasOwnProperty(tests[i][j]), name + ".toJSON() does not have " + tests[i][j]);
+            ok(desc.writable === true, name + ".toJSON()." + tests[i][j] + " not writable");
+            ok(desc.enumerable === true, name + ".toJSON()." + tests[i][j] + " not enumerable");
+            ok(desc.configurable === true, name + ".toJSON()." + tests[i][j] + " not configurable");
+        }
+        ok(!("foobar" in json), "foobar in " + name + ".toJSON()");
+        ok(!("barfoo" in json), "barfoo in " + name + ".toJSON()");
+
+        delete obj.foobar;
+        delete Object.getPrototypeOf(obj).barfoo;
+
+        desc = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(obj), tests[i][1]);
+        delete Object.getPrototypeOf(obj)[tests[i][1]];
+        ok(!(tests[i][1] in obj), tests[i][1] + " in " + name + " after delete");
+        json = obj.toJSON();
+        ok(json.hasOwnProperty(tests[i][1]), name + ".toJSON() does not have " + tests[i][1] + " after delete");
+        Object.defineProperty(Object.getPrototypeOf(obj), tests[i][1], desc);
+    }
+});
+
 sync_test("console", function() {
     var except
 

@@ -117,6 +117,7 @@ typedef struct {
     HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
     IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, IDispatch *disp, const char *name);
     HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const char *name, IDispatch *prot, IDispatch *ctor);
+    HRESULT (STDMETHODCALLTYPE *CreateObject)(IWineDispatchProxyCbPrivate *This, IDispatchEx **obj);
     HRESULT (STDMETHODCALLTYPE *GetRandomValues)(IDispatch *typedarr);
     HRESULT (STDMETHODCALLTYPE *PropEnum)(IWineDispatchProxyCbPrivate *This, const WCHAR *name);
 } IWineDispatchProxyCbPrivateVtbl;
@@ -685,6 +686,7 @@ HRESULT remove_attribute(DispatchEx*,DISPID,VARIANT_BOOL*);
 HRESULT dispex_get_dynid(DispatchEx*,const WCHAR*,BOOL,DISPID*);
 HRESULT dispex_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 HRESULT dispex_delete_prop(DispatchEx*,DISPID);
+HRESULT dispex_builtin_props_to_json(DispatchEx*,VARIANT*);
 HRESULT define_global_constructors(HTMLInnerWindow*);
 void release_typelib(void);
 HRESULT get_class_typeinfo(const CLSID*,ITypeInfo**);
