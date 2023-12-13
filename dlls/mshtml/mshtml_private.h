@@ -403,6 +403,7 @@ typedef struct ScriptHost ScriptHost;
     XIID(IWineXMLHttpRequestPrivate) \
     XIID(IWineMSHTMLConsole) \
     XIID(IWineMSHTMLCrypto) \
+    XIID(IWineMSHTMLSubtleCrypto) \
     XIID(IWineMSHTMLMediaQueryList) \
     XIID(IWineMSHTMLMutationObserver)
 
@@ -480,6 +481,7 @@ PRIVATE_TID_LIST
 #define PROXY_PROTOTYPE_LIST \
     X(Console,                        "Console",                      console_dispex,                         Object) \
     X(Crypto,                         "Crypto",                       crypto_dispex,                          Object) \
+    X(SubtleCrypto,                   "SubtleCrypto",                 crypto_subtle_dispex,                   Object) \
     X(DOMParser,                      "DOMParser",                    DOMParser_dispex,                       Object) \
     X(MutationObserver,               "MutationObserver",             mutation_observer_dispex,               Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \

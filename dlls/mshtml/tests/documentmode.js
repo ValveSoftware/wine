@@ -375,6 +375,7 @@ sync_test("builtin_toString", function() {
     }
     if(v >= 11) {
         test("crypto", window.msCrypto, "Crypto");
+        test("crypto.subtle", window.msCrypto.subtle, "SubtleCrypto");
         test("MutationObserver", new window.MutationObserver(function() {}), "MutationObserver", null, "Function");
     }
     if(v >= 9) {
@@ -873,6 +874,7 @@ sync_test("builtin_prototypes", function() {
     }
     if(v >= 11) {
         set_obj("Crypto");
+        set_obj("SubtleCrypto");
     }
 
     if(v >= 8 && v < 11) {
@@ -1144,6 +1146,7 @@ sync_test("builtin_prototypes", function() {
             [ "StorageEvent",                   "Event" ],
             [ "StyleSheet",                     "Object" ],
             [ "StyleSheetList",                 "Object" ],
+            [ "SubtleCrypto",                   "Object" ],
             [ "Text",                           "CharacterData" ],
             [ "TextRange",                      "Object" ],
             [ "UIEvent",                        "Event" ],
@@ -4173,6 +4176,11 @@ sync_test("Crypto", function() {
     ok("subtle" in crypto, "subtle not in crypto");
     ok("getRandomValues" in crypto, "getRandomValues not in crypto");
     ok(!("randomUUID" in crypto), "randomUUID is in crypto");
+
+    var list = [ "decrypt", "deriveKey", "digest", "encrypt", "exportKey", "generateKey", "importKey", "sign", "unwrapKey", "verify", "wrapKey" ];
+    for(var i = 0; i < list.length; i++)
+        ok(list[i] in crypto.subtle, list[i] + " not in crypto.subtle");
+    ok(!("deriveBits" in crypto.subtle), "deriveBits is in crypto.subtle");
 });
 
 sync_test("MutationObserver", function() {
