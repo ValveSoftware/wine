@@ -179,9 +179,20 @@ static HRESULT create_arraybuf(script_ctx_t *ctx, DWORD size, jsdisp_t **ret)
 static HRESULT ArrayBufferConstr_isView(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
         jsval_t *r)
 {
-    FIXME("not implemented\n");
+    BOOL ret = FALSE;
+    jsdisp_t *obj;
 
-    return E_NOTIMPL;
+    TRACE("\n");
+
+    if(!r)
+        return S_OK;
+
+    if(argc && is_object_instance(argv[0]) && (obj = to_jsdisp(get_object(argv[0]))) &&
+       obj->builtin_info->class >= FIRST_VIEW_JSCLASS && obj->builtin_info->class <= LAST_VIEW_JSCLASS)
+        ret = TRUE;
+
+    *r = jsval_bool(ret);
+    return S_OK;
 }
 
 static HRESULT ArrayBufferConstr_value(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv,
