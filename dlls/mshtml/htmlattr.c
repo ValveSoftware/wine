@@ -165,8 +165,8 @@ static HRESULT WINAPI HTMLDOMAttribute_get_specified(IHTMLDOMAttribute *iface, V
     }
 
     if(!This->elem || !This->elem->dom_element) {
-        FIXME("NULL This->elem\n");
-        return E_UNEXPECTED;
+        *p = VARIANT_FALSE;
+        return S_OK;
     }
 
     if(get_dispid_type(This->dispid) != DISPEXPROP_BUILTIN) {
