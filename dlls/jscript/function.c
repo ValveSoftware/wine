@@ -35,7 +35,7 @@ typedef struct {
 } FunctionInstance;
 
 struct _function_vtbl_t {
-    HRESULT (*call)(script_ctx_t*,FunctionInstance*,jsval_t,unsigned,unsigned,jsval_t*,jsval_t*);
+    HRESULT (*call)(script_ctx_t*,FunctionInstance*,jsval_t,unsigned,unsigned,jsval_t*,jsval_t*,IServiceProvider*);
     HRESULT (*toString)(FunctionInstance*,jsstr_t**);
     function_code_t* (*get_code)(FunctionInstance*);
     void (*destructor)(FunctionInstance*);
@@ -264,7 +264,7 @@ void detach_arguments_object(call_frame_t *frame)
     jsdisp_release(&arguments->jsdisp);
 }
 
-HRESULT Function_invoke(jsdisp_t *func_this, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv, jsval_t *r)
+HRESULT Function_invoke(jsdisp_t *func_this, jsval_t vthis, WORD flags, unsigned argc, jsval_t *argv, jsval_t *r, IServiceProvider *caller)
 {
     FunctionInstance *function;
 
@@ -278,7 +278,7 @@ HRESULT Function_invoke(jsdisp_t *func_this, jsval_t vthis, WORD flags, unsigned
         return E_UNEXPECTED;
     }
 
-    return function->vtbl->call(function->dispex.ctx, function, vthis, flags, argc, argv, r);
+    return function->vtbl->call(function->dispex.ctx, function, vthis, flags, argc, argv, r, caller);
 }
 
 static HRESULT Function_get_caller(script_ctx_t *ctx, jsdisp_t *jsthis, jsval_t *r)
@@ -420,7 +420,7 @@ static HRESULT Function_apply(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsi
 
     if(SUCCEEDED(hres)) {
         if(function) {
-            hres = function->vtbl->call(ctx, function, this_val, flags, cnt, args, r);
+            hres = function->vtbl->call(ctx, function, this_val, flags, cnt, args, r, &ctx->jscaller->IServiceProvider_iface);
         }else {
             jsval_t res;
             hres = disp_call_value(ctx, get_object(vthis), this_val, DISPATCH_METHOD, cnt, args, &res);
@@ -470,7 +470,7 @@ static HRESULT Function_call(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsig
         cnt = argc-1;
     }
 
-    hres = function->vtbl->call(ctx, function, this_val, flags, cnt, argv + 1, r);
+    hres = function->vtbl->call(ctx, function, this_val, flags, cnt, argv + 1, r, &ctx->jscaller->IServiceProvider_iface);
 
     jsval_release(this_val);
     return hres;
@@ -525,7 +525,7 @@ HRESULT Function_value(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsigned ar
         return E_FAIL;
     }
 
-    return function->vtbl->call(ctx, function, vthis, flags, argc, argv, r);
+    return function->vtbl->call(ctx, function, vthis, flags, argc, argv, r, &ctx->jscaller->IServiceProvider_iface);
 }
 
 HRESULT Function_get_value(script_ctx_t *ctx, jsdisp_t *jsthis, jsval_t *r)
@@ -663,7 +663,7 @@ static HRESULT create_function(script_ctx_t *ctx, const builtin_info_t *builtin_
 }
 
 static HRESULT NativeFunction_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
-        unsigned argc, jsval_t *argv, jsval_t *r)
+        unsigned argc, jsval_t *argv, jsval_t *r, IServiceProvider *caller)
 {
     NativeFunction *function = (NativeFunction*)func;
 
@@ -826,7 +826,7 @@ static const builtin_info_t InterpretedFunction_info = {
 };
 
 static HRESULT InterpretedFunction_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
-         unsigned argc, jsval_t *argv, jsval_t *r)
+         unsigned argc, jsval_t *argv, jsval_t *r, IServiceProvider *caller)
 {
     InterpretedFunction *function = (InterpretedFunction*)func;
     IDispatch *this_obj = NULL;
@@ -958,7 +958,7 @@ static const builtin_info_t BindFunction_info = {
 };
 
 static HRESULT BindFunction_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
-         unsigned argc, jsval_t *argv, jsval_t *r)
+         unsigned argc, jsval_t *argv, jsval_t *r, IServiceProvider *caller)
 {
     BindFunction *function = (BindFunction*)func;
     jsval_t *call_args = NULL;
@@ -979,7 +979,7 @@ static HRESULT BindFunction_call(script_ctx_t *ctx, FunctionInstance *func, jsva
             memcpy(call_args + function->argc, argv, argc * sizeof(*call_args));
     }
 
-    hres = function->target->vtbl->call(ctx, function->target, function->this, flags, call_argc, call_args, r);
+    hres = function->target->vtbl->call(ctx, function->target, function->this, flags, call_argc, call_args, r, caller);
 
     free(call_args);
     return hres;
