@@ -450,7 +450,7 @@ PRIVATE_TID_LIST
     X(HTMLAreaElement,                "HTMLAreaElement",              HTMLAreaElement_dispex,                 Object) \
     X(HTMLBodyElement,                "HTMLBodyElement",              HTMLBodyElement_dispex,                 Object) \
     X(HTMLButtonElement,              "HTMLButtonElement",            HTMLButtonElement_dispex,               Object) \
-    X(HTMLCommentElement,             "Comment",                      HTMLCommentElement_dispex,              Object) \
+    X(HTMLCommentElement,             "Comment",                      HTMLCommentElement_dispex,              DOMCharacterData) \
     X(HTMLEmbedElement,               "HTMLEmbedElement",             HTMLEmbedElement_dispex,                Object) \
     X(HTMLFormElement,                "HTMLFormElement",              HTMLFormElement_dispex,                 Object) \
     X(HTMLFrameElement,               "HTMLFrameElement",             HTMLFrameElement_dispex,                Object) \
