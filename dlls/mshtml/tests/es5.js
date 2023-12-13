@@ -3205,7 +3205,7 @@ sync_test("initProgressEvent", function() {
 });
 
 sync_test("DOMParser", function() {
-    var p, r = DOMParser.length;
+    var p, r = DOMParser.length, mimeType;
     ok(r === 0, "length = " + r);
 
     p = DOMParser();
@@ -3213,4 +3213,52 @@ sync_test("DOMParser", function() {
     ok(r === DOMParser.prototype, "prototype of instance created without new = " + r);
     ok(p !== new DOMParser(), "DOMParser() == new DOMParser()");
     ok(new DOMParser() !== new DOMParser(), "new DOMParser() == new DOMParser()");
+
+    var teststr = { toString: function() { return "<a name=\"test\">wine</a>"; } };
+
+    // HTML mime types
+    mimeType = [
+        "text/hTml"
+    ];
+    for(var i = 0; i < mimeType.length; i++) {
+        var m = mimeType[i], html = p.parseFromString(teststr, m), e = external.getExpectedMimeType(m.toLowerCase());
+        r = html.mimeType;
+        ok(r === e, "mimeType of HTML document with mime type " + m + " = " + r + ", expected " + e);
+        r = html.childNodes;
+        ok(r.length === 1 || r.length === 2, "childNodes.length of HTML document with mime type " + m + " = " + r.length);
+        var html_elem = r[r.length - 1];
+        ok(html_elem.nodeName === "HTML", "child nodeName of HTML document with mime type " + m + " = " + r.nodeName);
+        ok(html_elem.nodeValue === null, "child nodeValue of HTML document with mime type " + m + " = " + r.nodeValue);
+        r = html.anchors;
+        ok(r.length === 1, "anchors.length of HTML document with mime type " + m + " = " + r.length);
+        r = r[0];
+        ok(r.nodeName === "A", "anchor nodeName of HTML document with mime type " + m + " = " + r.nodeName);
+        ok(r.nodeValue === null, "anchor nodeValue of HTML document with mime type " + m + " = " + r.nodeValue);
+        r = r.parentNode;
+        ok(r.nodeName === "BODY", "anchor parent nodeName of HTML document with mime type " + m + " = " + r.nodeName);
+        ok(r.nodeValue === null, "anchor parent nodeValue of HTML document with mime type " + m + " = " + r.nodeValue);
+        r = r.parentNode;
+        ok(r === html_elem, "body parent of HTML document with mime type " + m + " = " + r);
+    }
+
+    // Invalid mime types
+    mimeType = [
+        "application/html",
+        "wine/test+xml",
+        "image/jpeg",
+        "text/plain",
+        "html",
+        "+xml",
+        "xml",
+        42
+    ];
+    for(var i = 0; i < mimeType.length; i++) {
+        try {
+            p.parseFromString(teststr, mimeType[i]);
+            ok(false, "expected exception calling parseFromString with mime type " + mimeType[i]);
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === E_INVALIDARG, "parseFromString with mime type " + mimeType[i] + " threw " + n);
+        }
+    }
 });

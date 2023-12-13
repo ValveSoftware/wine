@@ -1139,6 +1139,14 @@ struct HTMLFrameBase {
 
 typedef struct nsDocumentEventListener nsDocumentEventListener;
 
+typedef enum {
+    DOCTYPE_INVALID = -1,
+    DOCTYPE_HTML,
+    DOCTYPE_XHTML,
+    DOCTYPE_XML,
+    DOCTYPE_SVG,
+} document_type_t;
+
 struct HTMLDocumentNode {
     HTMLDOMNode node;
 
