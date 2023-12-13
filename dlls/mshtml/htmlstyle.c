@@ -2960,15 +2960,22 @@ static HRESULT WINAPI HTMLStyle_removeAttribute(IHTMLStyle *iface, BSTR strAttri
 
     style_entry = lookup_style_tbl(&This->css_style, strAttributeName);
     if(!style_entry) {
+        DWORD fdex = (lFlags&1) ? fdexNameCaseSensitive : fdexNameCaseInsensitive;
         compat_mode_t compat_mode = dispex_compat_mode(&This->css_style.dispex);
-        DISPID dispid;
+        DISPID dispid, prop_dispid;
         unsigned i;
 
-        hres = IDispatchEx_GetDispID(&This->css_style.dispex.IDispatchEx_iface, strAttributeName,
-                (lFlags&1) ? fdexNameCaseSensitive : fdexNameCaseInsensitive, &dispid);
+        hres = IDispatchEx_GetDispID(&This->css_style.dispex.IDispatchEx_iface, strAttributeName, fdex, &dispid);
         if(hres != S_OK) {
             *pfSuccess = VARIANT_FALSE;
             return S_OK;
+        }
+        prop_dispid = dispid;
+
+        if(This->css_style.dispex.proxy) {
+            hres = dispex_get_builtin_id(&This->css_style.dispex, strAttributeName, fdex, &dispid);
+            if(hres != S_OK)
+                return remove_attribute(&This->css_style.dispex, prop_dispid, pfSuccess);
         }
 
         for(i=0; i < ARRAY_SIZE(style_tbl); i++) {
@@ -2978,7 +2985,7 @@ static HRESULT WINAPI HTMLStyle_removeAttribute(IHTMLStyle *iface, BSTR strAttri
         }
 
         if(i == ARRAY_SIZE(style_tbl))
-            return remove_attribute(&This->css_style.dispex, dispid, pfSuccess);
+            return remove_attribute(&This->css_style.dispex, prop_dispid, pfSuccess);
         style_entry = style_tbl+i;
     }
 

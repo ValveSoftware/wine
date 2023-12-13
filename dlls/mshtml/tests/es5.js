@@ -1162,7 +1162,6 @@ sync_test("toString", function() {
     todo_wine.
     ok(tmp === "[object Arguments]", "toString.call(arguments) = " + tmp);
     tmp = Object.prototype.toString.call(this);
-    todo_wine.
     ok(tmp === "[object Window]", "toString.call(null) = " + tmp);
     tmp = Object.prototype.toString.call(null);
     ok(tmp === "[object Null]", "toString.call(null) = " + tmp);
@@ -2765,7 +2764,6 @@ sync_test("substituted this", function() {
     ok(r === "[object Undefined]", "detached scope Object.toString returned " + r);
 
     var r = (function() { this.f = Object.prototype.toString; return this.f(); })();
-    todo_wine.
     ok(r === "[object Window]", "Object.toString returned " + r);
 
     var r = (function() { var f = Object.prototype.toString; return f(); })();

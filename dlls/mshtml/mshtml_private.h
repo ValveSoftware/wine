@@ -449,6 +449,9 @@ typedef struct {
     HRESULT (*delete)(DispatchEx*,DISPID);
     HRESULT (*next_dispid)(DispatchEx*,DISPID,DISPID*);
 
+    /* Used when the object wants to override getter or deletion for custom props (e.g. if they can be changed asynchronously at any point) */
+    HRESULT (*override)(DispatchEx*,const WCHAR*,VARIANT*);
+
     /* Used by objects that want to delay their compat mode initialization until actually needed */
     compat_mode_t (*get_compat_mode)(DispatchEx*);
 
@@ -479,6 +482,7 @@ struct DispatchEx {
     IDispatchEx IDispatchEx_iface;
 
     nsCycleCollectingAutoRefCnt ccref;
+    IWineDispatchProxyCbPrivate *proxy;
 
     dispex_data_t *info;
     dispex_dynamic_data_t *dynamic_data;
@@ -505,9 +509,11 @@ extern void (__cdecl *ccp_init)(ExternalCycleCollectionParticipant*,const CCObjC
 extern void (__cdecl *describe_cc_node)(nsCycleCollectingAutoRefCnt*,const char*,nsCycleCollectionTraversalCallback*);
 extern void (__cdecl *note_cc_edge)(nsISupports*,const char*,nsCycleCollectionTraversalCallback*);
 
+void init_proxies(HTMLInnerWindow*);
 void init_dispatch(DispatchEx*,dispex_static_data_t*,HTMLInnerWindow*,compat_mode_t);
 void dispex_props_unlink(DispatchEx*);
 HRESULT change_type(VARIANT*,VARIANT*,VARTYPE,IServiceProvider*);
+HRESULT dispex_get_builtin_id(DispatchEx*,BSTR,DWORD,DISPID*);
 HRESULT dispex_get_dprop_ref(DispatchEx*,const WCHAR*,BOOL,VARIANT**);
 HRESULT get_dispids(tid_t,DWORD*,DISPID**);
 HRESULT remove_attribute(DispatchEx*,DISPID,VARIANT_BOOL*);

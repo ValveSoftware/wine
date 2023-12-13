@@ -408,6 +408,27 @@ DWORD get_compat_mode_version(compat_mode_t compat_mode)
     return 0;
 }
 
+static void setup_doc_proxy(HTMLDocumentNode *doc)
+{
+    HTMLOuterWindow *outer_window = doc->window && doc->window->base.outer_window ? doc->window->base.outer_window : doc->doc_obj->window;
+    HTMLInnerWindow *window = outer_window->base.inner_window;
+
+    /* If stray document while inner window not attached yet, let update_window_doc handle it. */
+    if(doc->window && doc->window != window)
+        return;
+
+    init_proxies(window);
+
+    if(!doc->node.event_target.dispex.proxy) {
+        IWineDispatchProxyCbPrivate *proxy = window->event_target.dispex.proxy;
+        if(proxy) {
+            HRESULT hres = proxy->lpVtbl->InitProxy(proxy, (IDispatch*)&doc->node.event_target.dispex.IDispatchEx_iface);
+            if(FAILED(hres))
+                ERR("InitProxy failed: %08lx\n", hres);
+        }
+    }
+}
+
 /*
  * We may change document mode only in early stage of document lifetime.
  * Later attempts will not have an effect.
@@ -421,6 +442,11 @@ compat_mode_t lock_document_mode(HTMLDocumentNode *doc)
 
         if(doc->html_document)
             nsIDOMHTMLDocument_SetIECompatMode(doc->html_document, get_compat_mode_version(doc->document_mode));
+
+        /* Setup the proxy immediately since mode is decided. Proxies delegate the
+           methods so we can't rely on the delay init of the dispex to set them up. */
+        if(doc->document_mode >= COMPAT_MODE_IE9)
+            setup_doc_proxy(doc);
     }
 
     return doc->document_mode;

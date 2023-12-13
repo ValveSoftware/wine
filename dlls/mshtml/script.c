@@ -116,6 +116,7 @@ static BOOL set_script_prop(IActiveScript *script, DWORD property, VARIANT *val)
 
 static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
 {
+    IWineDispatchProxyCbPrivate *proxy;
     compat_mode_t compat_mode;
     IObjectSafety *safety;
     SCRIPTSTATE state;
@@ -187,6 +188,18 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
         return FALSE;
     }
 
+    if(script_mode & SCRIPTLANGUAGEVERSION_HTML) {
+        proxy = script_host->window->event_target.dispex.proxy;
+        if(proxy) {
+            hres = proxy->lpVtbl->HostUpdated(proxy, script);
+            if(FAILED(hres)) {
+                ERR("Proxy->HostUpdated failed: %08lx\n", hres);
+                IActiveScript_Close(script);
+                return FALSE;
+            }
+        }
+    }
+
     hres = IActiveScript_GetScriptState(script, &state);
     if(FAILED(hres))
         WARN("GetScriptState failed: %08lx\n", hres);
@@ -231,6 +244,13 @@ static BOOL init_script_engine(ScriptHost *script_host, IActiveScript *script)
         }
     }else {
        WARN("AddNamedItem failed: %08lx\n", hres);
+    }
+
+    proxy = script_host->window->event_target.dispex.proxy;
+    if(proxy) {
+        hres = proxy->lpVtbl->InitProxy(proxy, (IDispatch*)&script_host->window->doc->node.event_target.dispex.IDispatchEx_iface);
+        if(FAILED(hres))
+            ERR("InitProxy for document failed: %08lx\n", hres);
     }
 
     hres = IActiveScript_QueryInterface(script, &IID_IActiveScriptParseProcedure2,
@@ -1457,6 +1477,15 @@ void doc_insert_script(HTMLInnerWindow *window, HTMLScriptElement *script_elem, 
 
     if(is_complete)
         set_script_elem_readystate(script_elem, READYSTATE_COMPLETE);
+}
+
+void init_proxies(HTMLInnerWindow *window)
+{
+    if(!window->doc->browser || window->doc->browser->script_mode != SCRIPTMODE_ACTIVESCRIPT)
+        return;
+
+    /* init jscript engine, which should create the global window and document proxies */
+    get_script_host(window, &CLSID_JScript);
 }
 
 IDispatch *script_parse_event(HTMLInnerWindow *window, LPCWSTR text)

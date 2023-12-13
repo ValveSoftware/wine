@@ -124,7 +124,6 @@ PRIVATE_TID_LIST
 #undef XDIID
 };
 
-static inline DispatchEx *get_dispex_for_hook(IUnknown*);
 static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 
 static HRESULT load_typelib(void)
@@ -1166,7 +1165,7 @@ static HRESULT get_builtin_func(dispex_data_t *data, DISPID id, func_info_t **re
     return DISP_E_MEMBERNOTFOUND;
 }
 
-static HRESULT get_builtin_id(DispatchEx *This, BSTR name, DWORD grfdex, DISPID *ret)
+HRESULT dispex_get_builtin_id(DispatchEx *This, BSTR name, DWORD grfdex, DISPID *ret)
 {
     int min, max, n, c;
 
@@ -1200,6 +1199,22 @@ static HRESULT get_builtin_id(DispatchEx *This, BSTR name, DWORD grfdex, DISPID 
     }
 
     return DISP_E_UNKNOWNNAME;
+}
+
+static inline DispatchEx *get_dispex_for_hook(IUnknown *iface)
+{
+    IWineDispatchProxyPrivate *itf;
+    DispatchEx *dispex;
+
+    if(FAILED(IUnknown_QueryInterface(iface, &IID_IWineDispatchProxyPrivate, (void**)&itf)) || !itf)
+        return NULL;
+    dispex = CONTAINING_RECORD(itf->lpVtbl->GetProxyFieldRef(itf), DispatchEx, proxy);
+
+    /* The dispex and the proxy interface requested might be different (e.g. inner vs outer windows) */
+    IDispatchEx_AddRef(&dispex->IDispatchEx_iface);
+    IDispatchEx_Release((IDispatchEx*)itf);
+
+    return dispex;
 }
 
 HRESULT change_type(VARIANT *dst, VARIANT *src, VARTYPE vt, IServiceProvider *caller)
@@ -1731,6 +1746,88 @@ static BOOL ensure_real_info(DispatchEx *dispex)
     return dispex->info != NULL;
 }
 
+static HRESULT proxy_get_dispid(DispatchEx *dispex, const WCHAR *name, BOOL case_insens, DISPID *id)
+{
+    DWORD grfdex = case_insens ? fdexNameCaseInsensitive : fdexNameCaseSensitive;
+    dynamic_prop_t *dprop;
+    HRESULT hres;
+    BSTR bstr;
+
+    if(!ensure_real_info(dispex) || !(bstr = SysAllocString(name)))
+        return E_OUTOFMEMORY;
+
+    /* FIXME: move builtins to the prototype */
+    hres = dispex_get_builtin_id(dispex, bstr, grfdex, id);
+    SysFreeString(bstr);
+    if(hres != DISP_E_UNKNOWNNAME)
+        return hres;
+
+    hres = get_dynamic_prop(dispex, name, grfdex, &dprop);
+    if(FAILED(hres))
+        return hres;
+
+    *id = DISPID_DYNPROP_0 + (dprop - dispex->dynamic_data->props);
+    return S_OK;
+}
+
+static HRESULT WINAPI proxy_func_invoke(IDispatch *this_obj, void *context, DISPPARAMS *dp, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    func_info_t *func = context;
+    return invoke_builtin_function(this_obj, func, dp, res, ei, caller);
+}
+
+static HRESULT WINAPI proxy_getter_invoke(IDispatch *this_obj, void *context, DISPPARAMS *dp, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    func_info_t *func = context;
+    DispatchEx *dispex;
+    IUnknown *iface;
+    HRESULT hres;
+
+    hres = IDispatch_QueryInterface(this_obj, tid_ids[func->tid], (void**)&iface);
+    if(FAILED(hres) || !iface)
+        return E_UNEXPECTED;
+
+    if(func->hook && (dispex = get_dispex_for_hook(iface))) {
+        hres = func->hook(dispex, DISPATCH_PROPERTYGET, dp, res, ei, caller);
+        IDispatchEx_Release(&dispex->IDispatchEx_iface);
+        if(hres != S_FALSE)
+            goto done;
+    }
+    hres = builtin_propget(iface, func, dp, res);
+
+done:
+    IUnknown_Release(iface);
+    return hres;
+}
+
+static HRESULT WINAPI proxy_setter_invoke(IDispatch *this_obj, void *context, DISPPARAMS *dp, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    static DISPID propput_dispid = DISPID_PROPERTYPUT;
+    func_info_t *func = context;
+    DispatchEx *dispex;
+    IUnknown *iface;
+    HRESULT hres;
+
+    dp->cNamedArgs = 1;
+    dp->rgdispidNamedArgs = &propput_dispid;
+
+    hres = IDispatch_QueryInterface(this_obj, tid_ids[func->tid], (void**)&iface);
+    if(FAILED(hres) || !iface)
+        return E_UNEXPECTED;
+
+    if(func->hook && (dispex = get_dispex_for_hook(iface))) {
+        hres = func->hook(dispex, DISPATCH_PROPERTYPUT, dp, res, ei, caller);
+        IDispatchEx_Release(&dispex->IDispatchEx_iface);
+        if(hres != S_FALSE)
+            goto done;
+    }
+    hres = builtin_propput(NULL, iface, func, dp, caller);
+
+done:
+    IUnknown_Release(iface);
+    return hres;
+}
+
 static inline DispatchEx *impl_from_IDispatchEx(IDispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, DispatchEx, IDispatchEx_iface);
@@ -1749,6 +1846,8 @@ static HRESULT WINAPI DispatchEx_QueryInterface(IDispatchEx *iface, REFIID riid,
     }
 
     if(IsEqualGUID(&IID_IUnknown, riid) || IsEqualGUID(&IID_IDispatch, riid) || IsEqualGUID(&IID_IDispatchEx, riid))
+        *ppv = &This->IDispatchEx_iface;
+    else if(IsEqualGUID(&IID_IWineDispatchProxyPrivate, riid))
         *ppv = &This->IDispatchEx_iface;
     else if(IsEqualGUID(&IID_nsXPCOMCycleCollectionParticipant, riid)) {
         *ppv = &dispex_ccp;
@@ -1835,6 +1934,10 @@ static HRESULT WINAPI DispatchEx_GetIDsOfNames(IDispatchEx *iface, REFIID riid,
     DispatchEx *This = impl_from_IDispatchEx(iface);
     HRESULT hres = S_OK;
 
+    if(This->proxy)
+        return IDispatchEx_GetIDsOfNames((IDispatchEx*)This->proxy, riid, rgszNames,
+                                         cNames, lcid, rgDispId);
+
     TRACE("%s (%p)->(%s %p %u %lu %p)\n", This->info->desc->name, This, debugstr_guid(riid), rgszNames,
           cNames, lcid, rgDispId);
 
@@ -1851,6 +1954,10 @@ static HRESULT WINAPI DispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMember,
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
 
+    if(This->proxy && dispIdMember >= 0)
+        return IDispatchEx_Invoke((IDispatchEx*)This->proxy, dispIdMember, riid, lcid, wFlags,
+                                  pDispParams, pVarResult, pExcepInfo, puArgErr);
+
     TRACE("%s (%p)->(%ld %s %ld %d %p %p %p %p)\n", This->info->desc->name, This, dispIdMember,
           debugstr_guid(riid), lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
 
@@ -1863,6 +1970,9 @@ static HRESULT WINAPI DispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DW
     dynamic_prop_t *dprop;
     HRESULT hres;
 
+    if(This->proxy)
+        return IDispatchEx_GetDispID((IDispatchEx*)This->proxy, bstrName, grfdex, pid);
+
     TRACE("%s (%p)->(%s %lx %p)\n", This->info->desc->name, This, debugstr_w(bstrName), grfdex, pid);
 
     if(grfdex & ~(fdexNameCaseSensitive|fdexNameCaseInsensitive|fdexNameEnsure|fdexNameImplicit|FDEX_VERSION_MASK))
@@ -1871,7 +1981,7 @@ static HRESULT WINAPI DispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DW
     if(!ensure_real_info(This))
         return E_OUTOFMEMORY;
 
-    hres = get_builtin_id(This, bstrName, grfdex, pid);
+    hres = dispex_get_builtin_id(This, bstrName, grfdex, pid);
     if(hres != DISP_E_UNKNOWNNAME)
         return hres;
 
@@ -1888,6 +1998,9 @@ static HRESULT WINAPI DispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID lc
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
 
+    if(This->proxy && id >= 0)
+        return IDispatchEx_InvokeEx((IDispatchEx*)This->proxy, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+
     TRACE("%s (%p)->(%lx %lx %x %p %p %p %p)\n", This->info->desc->name, This, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 
     return dispex_invoke(This, (IDispatch*)iface, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
@@ -1899,14 +2012,15 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR nam
     DISPID id;
     HRESULT hres;
 
+    if(This->proxy)
+        return IDispatchEx_DeleteMemberByName((IDispatchEx*)This->proxy, name, grfdex);
+
     TRACE("%s (%p)->(%s %lx)\n", This->info->desc->name, This, debugstr_w(name), grfdex);
 
     hres = IDispatchEx_GetDispID(&This->IDispatchEx_iface, name, grfdex & ~fdexNameEnsure, &id);
     if(FAILED(hres)) {
-        compat_mode_t compat_mode = dispex_compat_mode(This);
         TRACE("property %s not found\n", debugstr_w(name));
-        return compat_mode < COMPAT_MODE_IE8 ? E_NOTIMPL :
-               compat_mode < COMPAT_MODE_IE9 ? hres : S_OK;
+        return dispex_compat_mode(This) < COMPAT_MODE_IE8 ? E_NOTIMPL : hres;
     }
 
     return dispex_delete_prop(This, id);
@@ -1916,6 +2030,9 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByDispID(IDispatchEx *iface, DISPID
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
 
+    if(This->proxy && id >= 0)
+        return IDispatchEx_DeleteMemberByDispID((IDispatchEx*)This->proxy, id);
+
     TRACE("%s (%p)->(%lx)\n", This->info->desc->name, This, id);
 
     return dispex_delete_prop(This, id);
@@ -1924,6 +2041,10 @@ static HRESULT WINAPI DispatchEx_DeleteMemberByDispID(IDispatchEx *iface, DISPID
 static HRESULT WINAPI DispatchEx_GetMemberProperties(IDispatchEx *iface, DISPID id, DWORD grfdexFetch, DWORD *pgrfdex)
 {
     DispatchEx *This = impl_from_IDispatchEx(iface);
+
+    if(This->proxy && id >= 0)
+        return IDispatchEx_GetMemberProperties((IDispatchEx*)This->proxy, id, grfdexFetch, pgrfdex);
+
     FIXME("%s (%p)->(%lx %lx %p)\n", This->info->desc->name, This, id, grfdexFetch, pgrfdex);
     return E_NOTIMPL;
 }
@@ -1933,6 +2054,9 @@ static HRESULT WINAPI DispatchEx_GetMemberName(IDispatchEx *iface, DISPID id, BS
     DispatchEx *This = impl_from_IDispatchEx(iface);
     func_info_t *func;
     HRESULT hres;
+
+    if(This->proxy && id >= 0)
+        return IDispatchEx_GetMemberName((IDispatchEx*)This->proxy, id, pbstrName);
 
     TRACE("%s (%p)->(%lx %p)\n", This->info->desc->name, This, id, pbstrName);
 
@@ -1989,6 +2113,9 @@ static HRESULT WINAPI DispatchEx_GetNextDispID(IDispatchEx *iface, DWORD grfdex,
     func_info_t *func;
     HRESULT hres;
 
+    if(This->proxy)
+        return IDispatchEx_GetNextDispID((IDispatchEx*)This->proxy, grfdex, id, pid);
+
     TRACE("%s (%p)->(%lx %lx %p)\n", This->info->desc->name, This, grfdex, id, pid);
 
     if(!ensure_real_info(This))
@@ -2044,7 +2171,215 @@ static HRESULT WINAPI DispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnknown
     return E_NOTIMPL;
 }
 
-static IDispatchExVtbl DispatchExVtbl = {
+static inline DispatchEx *impl_from_IWineDispatchProxyPrivate(IWineDispatchProxyPrivate *iface)
+{
+    return impl_from_IDispatchEx((IDispatchEx*)iface);
+}
+
+static IWineDispatchProxyCbPrivate** WINAPI WineDispatchProxyPrivate_GetProxyFieldRef(IWineDispatchProxyPrivate *iface)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    return &This->proxy;
+}
+
+static BOOL WINAPI WineDispatchProxyPrivate_HasProxy(IWineDispatchProxyPrivate *iface)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    return This->info->compat_mode >= COMPAT_MODE_IE9;
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    HRESULT hres;
+
+    if(!This->info->desc->vtbl->override)
+        return S_FALSE;
+
+    /* We only care about custom props, as those are the only ones which can mismatch.
+       Some objects with custom props (such as the Storage objects) can be out of sync,
+       because the underlying storage is changed asynchronously (e.g. the backing file
+       in localStorage), so the prop may not exist at this point, even if it did before. */
+    if(info->dispid != DISPID_UNKNOWN && !is_custom_dispid(info->dispid))
+        return S_FALSE;
+
+    hres = This->info->desc->vtbl->get_dispid(This, (WCHAR*)info->name, fdexNameCaseSensitive, &info->dispid);
+    if(hres == DISP_E_UNKNOWNNAME) {
+        if(info->dispid == DISPID_UNKNOWN)
+            return S_FALSE;
+        info->dispid = DISPID_UNKNOWN;
+        return S_OK;
+    }
+    if(FAILED(hres))
+        return hres;
+    info->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE | PROPF_ENUMERABLE;
+    return S_OK;
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_PropOverride(IWineDispatchProxyPrivate *iface, const WCHAR *name, VARIANT *value)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+
+    if(!This->info->desc->vtbl->override)
+        return S_FALSE;
+    return This->info->desc->vtbl->override(This, name, value);
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_PropDefineOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    HRESULT hres;
+
+    if(!This->info->desc->vtbl->override)
+        return S_FALSE;
+
+    hres = This->info->desc->vtbl->get_dispid(This, (WCHAR*)info->name, fdexNameEnsure | fdexNameCaseSensitive, &info->dispid);
+    if(FAILED(hres))
+        return (hres == DISP_E_UNKNOWNNAME) ? S_FALSE : hres;
+
+    info->func[0].invoke = NULL;
+    info->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE | PROPF_ENUMERABLE;
+    return S_OK;
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_PropGetInfo(IWineDispatchProxyPrivate *iface, const WCHAR *name,
+        BOOL case_insens, struct proxy_prop_info *info)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    func_info_t *func;
+    HRESULT hres;
+
+    info->func[0].invoke = NULL;
+
+    hres = proxy_get_dispid(This, name, case_insens, &info->dispid);
+    if(FAILED(hres))
+        return hres;
+
+    if(is_dynamic_dispid(info->dispid)) {
+        info->name = This->dynamic_data->props[info->dispid - DISPID_DYNPROP_0].name;
+        info->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE | PROPF_ENUMERABLE;
+        return S_OK;
+    }
+
+    if(is_custom_dispid(info->dispid)) {
+        info->name = name;  /* FIXME */
+        info->flags = PROPF_WRITABLE;
+        if(This->info->desc->vtbl->delete)
+            info->flags |= PROPF_CONFIGURABLE;
+        if(This->info->desc->vtbl->next_dispid)
+            info->flags |= PROPF_ENUMERABLE;
+        return S_OK;
+    }
+
+    hres = get_builtin_func(This->info, info->dispid, &func);
+    if(FAILED(hres))
+        return (hres == DISP_E_MEMBERNOTFOUND) ? E_UNEXPECTED : hres;
+    info->func[0].context = info->func[1].context = func;
+    info->name = func->name;
+
+    if(func->func_disp_idx >= 0) {
+        if(This->dynamic_data && This->dynamic_data->func_disps
+           && This->dynamic_data->func_disps[func->func_disp_idx].func_obj) {
+            func_obj_entry_t *entry = This->dynamic_data->func_disps + func->func_disp_idx;
+
+            if((IDispatch*)&entry->func_obj->dispex.IDispatchEx_iface != V_DISPATCH(&entry->val)) {
+                info->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE;
+                return S_OK;
+            }
+        }
+        info->flags = PROPF_METHOD | func->argc | PROPF_WRITABLE | PROPF_CONFIGURABLE;
+        info->func[0].invoke = proxy_func_invoke;
+        info->func[1].invoke = NULL;
+        return S_OK;
+    }
+
+    info->flags = PROPF_CONFIGURABLE | (func->put_vtbl_off ? PROPF_WRITABLE : 0);
+    if(func->func_disp_idx == -1)
+        info->flags |= PROPF_ENUMERABLE;
+    info->func[0].invoke = proxy_getter_invoke;
+    info->func[1].invoke = func->put_vtbl_off ? proxy_setter_invoke : NULL;
+    return S_OK;
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_PropInvoke(IWineDispatchProxyPrivate *iface, IDispatch *this_obj, DISPID id,
+        LCID lcid, DWORD flags, DISPPARAMS *dp, VARIANT *ret, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+
+    return dispex_invoke(This, this_obj, id, lcid, flags, dp, ret, ei, caller);
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_PropDelete(IWineDispatchProxyPrivate *iface, DISPID id)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+
+    return dispex_delete_prop(This, id);
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_PropEnum(IWineDispatchProxyPrivate *iface)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyCbPrivate *obj = This->proxy;
+    dynamic_prop_t *dyn_prop, *dyn_prop_end;
+    dispex_dynamic_data_t *dyn_data;
+    func_info_t *func, *func_end;
+    HRESULT hres;
+    HRESULT (STDMETHODCALLTYPE *callback)(IWineDispatchProxyCbPrivate*,const WCHAR*) = obj->lpVtbl->PropEnum;
+
+    if(!ensure_real_info(This))
+        return E_OUTOFMEMORY;
+
+    for(func = This->info->funcs, func_end = func + This->info->func_cnt; func != func_end; func++) {
+        if(func->func_disp_idx == -1) {
+            hres = callback(obj, func->name);
+            if(FAILED(hres))
+                return hres;
+        }
+    }
+
+    if(This->info->desc->vtbl->next_dispid) {
+        const dispex_static_data_vtbl_t *vtbl = This->info->desc->vtbl;
+        DISPID id = DISPID_STARTENUM;
+        BSTR name;
+
+        do {
+            hres = vtbl->next_dispid(This, id, &id);
+            if(hres != S_OK)
+                break;
+            hres = vtbl->get_name(This, id, &name);
+            if(SUCCEEDED(hres)) {
+                hres = callback(obj, name);
+                SysFreeString(name);
+            }
+        } while(SUCCEEDED(hres));
+
+        if(FAILED(hres))
+            return hres;
+    }
+
+    if(!(dyn_data = get_dynamic_data(This)))
+        return E_OUTOFMEMORY;
+
+    for(dyn_prop = dyn_data->props, dyn_prop_end = dyn_prop + dyn_data->prop_cnt; dyn_prop != dyn_prop_end; dyn_prop++) {
+        if(!(dyn_prop->flags & (DYNPROP_DELETED | DYNPROP_HIDDEN))) {
+            hres = callback(obj, dyn_prop->name);
+            if(FAILED(hres))
+                return hres;
+        }
+    }
+
+    return S_OK;
+}
+
+static HRESULT WINAPI WineDispatchProxyPrivate_ToString(IWineDispatchProxyPrivate *iface, BSTR *string)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+
+    return dispex_to_string(This, string);
+}
+
+static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
+    {
     DispatchEx_QueryInterface,
     DispatchEx_AddRef,
     DispatchEx_Release,
@@ -2060,28 +2395,20 @@ static IDispatchExVtbl DispatchExVtbl = {
     DispatchEx_GetMemberName,
     DispatchEx_GetNextDispID,
     DispatchEx_GetNameSpaceParent
+    },
+
+    /* IWineDispatchProxyPrivate extension */
+    WineDispatchProxyPrivate_GetProxyFieldRef,
+    WineDispatchProxyPrivate_HasProxy,
+    WineDispatchProxyPrivate_PropFixOverride,
+    WineDispatchProxyPrivate_PropOverride,
+    WineDispatchProxyPrivate_PropDefineOverride,
+    WineDispatchProxyPrivate_PropGetInfo,
+    WineDispatchProxyPrivate_PropInvoke,
+    WineDispatchProxyPrivate_PropDelete,
+    WineDispatchProxyPrivate_PropEnum,
+    WineDispatchProxyPrivate_ToString
 };
-
-extern const IDispatchExVtbl WindowDispExVtbl;
-extern const IDispatchExVtbl DocDispatchExVtbl;
-static inline DispatchEx *get_dispex_for_hook(IUnknown *iface)
-{
-    IDispatchEx *dispex;
-
-    if(FAILED(IUnknown_QueryInterface(iface, &IID_IDispatchEx, (void**)&dispex)) || !dispex)
-        return NULL;
-
-    /* FIXME: Handle these generically (needs private interface) */
-    if(dispex->lpVtbl == &DispatchExVtbl)
-        return impl_from_IDispatchEx(dispex);
-    if(dispex->lpVtbl == &WindowDispExVtbl)
-        return &CONTAINING_RECORD(dispex, HTMLWindow, IDispatchEx_iface)->inner_window->event_target.dispex;
-    if(dispex->lpVtbl == &DocDispatchExVtbl)
-        return &CONTAINING_RECORD(dispex, HTMLDocumentNode, IDispatchEx_iface)->node.event_target.dispex;
-
-    IDispatchEx_Release(dispex);
-    return NULL;
-}
 
 HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp,
         VARIANT *res, EXCEPINFO *pei, IServiceProvider *caller)
@@ -2226,6 +2553,12 @@ void dispex_props_unlink(DispatchEx *This)
 {
     dynamic_prop_t *prop;
 
+    if(This->proxy) {
+        IWineDispatchProxyCbPrivate *proxy = This->proxy;
+        This->proxy = NULL;
+        proxy->lpVtbl->Unlinked(proxy, FALSE);
+    }
+
     if(!This->dynamic_data)
         return;
 
@@ -2268,6 +2601,9 @@ static void NSAPI dispex_delete_cycle_collectable(void *p)
 
     if(This->info->desc->vtbl->unlink)
         This->info->desc->vtbl->unlink(This);
+
+    if(This->proxy)
+        This->proxy->lpVtbl->Unlinked(This->proxy, FALSE);
 
     if(!This->dynamic_data)
         goto destructor;
@@ -2318,7 +2654,8 @@ void init_dispatch(DispatchEx *dispex, dispex_static_data_t *data, HTMLInnerWind
 {
     assert(compat_mode < COMPAT_MODE_CNT);
 
-    dispex->IDispatchEx_iface.lpVtbl = &DispatchExVtbl;
+    dispex->IDispatchEx_iface.lpVtbl = (const IDispatchExVtbl*)&WineDispatchProxyPrivateVtbl;
+    dispex->proxy = NULL;
     dispex->dynamic_data = NULL;
     ccref_init(&dispex->ccref, 1);
 
@@ -2338,5 +2675,26 @@ void init_dispatch(DispatchEx *dispex, dispex_static_data_t *data, HTMLInnerWind
         dispex->info = data->delayed_init_info;
     }else {
         dispex->info = ensure_dispex_info(data, compat_mode);
+        if(window) {
+            if(compat_mode >= COMPAT_MODE_IE9) {
+                IWineDispatchProxyCbPrivate *proxy = window->event_target.dispex.proxy;
+                if(!proxy) {
+                    init_proxies(window);
+                    proxy = window->event_target.dispex.proxy;
+                }
+                if(proxy) {
+                    HRESULT hres = proxy->lpVtbl->InitProxy(proxy, (IDispatch*)&dispex->IDispatchEx_iface);
+                    if(hres == E_UNEXPECTED) {
+                        /* Possible element (e.g. <script>) created on old proxy before
+                           script host was initialized, so re-initialize it and retry. */
+                        init_proxies(window);
+                        if((proxy = window->event_target.dispex.proxy))
+                            hres = proxy->lpVtbl->InitProxy(proxy, (IDispatch*)&dispex->IDispatchEx_iface);
+                    }
+                    if(FAILED(hres))
+                        ERR("InitProxy failed: %08lx\n", hres);
+                }
+            }
+        }
     }
 }

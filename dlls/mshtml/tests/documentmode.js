@@ -58,7 +58,6 @@ if(window.addEventListener) {
         pageshow_fired = true;
 
         var r = Object.prototype.toString.call(e);
-        todo_wine.
         ok(r === "[object PageTransitionEvent]", "pageshow toString = " + r);
         ok("persisted" in e, "'persisted' not in pageshow event");
         ok(document.readyState === "complete", "pageshow readyState = " + document.readyState);
@@ -70,7 +69,6 @@ if(window.addEventListener) {
         ok(document.documentMode >= 11, "pagehide fired");
 
         var r = Object.prototype.toString.call(e);
-        todo_wine.
         ok(r === "[object PageTransitionEvent]", "pagehide toString = " + r);
         ok("persisted" in e, "'persisted' not in pagehide event");
     }, true);
@@ -242,7 +240,7 @@ sync_test("builtin_toString", function() {
             ok(s === (tostr ? tostr : (v < 9 ? "[object]" : "[object " + name + "]")), msg + " toString returned " + s);
         }
         s = Object.prototype.toString.call(obj);
-        todo_wine_if(v >= 9 && name != "Object").
+        todo_wine_if(name !== "HTMLElement" && s === "[object HTMLElement]").
         ok(s === (v < 9 ? "[object Object]" : "[object " + name + "]"), msg + " Object.toString returned " + s);
     }
 
@@ -1232,7 +1230,6 @@ sync_test("delete_prop", function() {
     ok(obj.globalprop4, "globalprop4 = " + globalprop4);
     r = (delete globalprop4);
     ok(r, "delete returned " + r);
-    todo_wine.
     ok(!("globalprop4" in obj), "globalprop4 is still in obj");
 });
 
@@ -1870,7 +1867,6 @@ async_test("storage events", function() {
             return;
         }
         var s = Object.prototype.toString.call(e);
-        todo_wine.
         ok(s === "[object StorageEvent]", "Object.toString = " + s);
         ok(e.key === key, "key = " + e.key + ", expected " + key);
         ok(e.oldValue === oldValue, "oldValue = " + e.oldValue + ", expected " + oldValue);
@@ -2034,11 +2030,10 @@ sync_test("elem_attr", function() {
     var func = elem.setAttribute;
     try {
         func("testattr", arr);
-        todo_wine_if(v >= 9).
         ok(v < 9, "expected exception setting testattr via func");
     }catch(ex) {
         ok(v >= 9, "did not expect exception setting testattr via func");
-        elem.setAttribute("testattr", arr);
+        func.call(elem, "testattr", arr);
     }
     r = elem.getAttribute("testattr");
     ok(r === (v < 8 ? arr : (v < 10 ? "arrval" : "42")), "testattr after setAttribute (as func) = " + r);

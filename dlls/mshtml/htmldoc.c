@@ -5094,6 +5094,11 @@ static HRESULT WINAPI DocDispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMemb
                             VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
 {
     HTMLDocumentNode *This = impl_from_IDispatchEx(iface);
+    IWineDispatchProxyCbPrivate *proxy = This->node.event_target.dispex.proxy;
+
+    if(proxy && dispIdMember >= 0)
+        return IDispatchEx_Invoke((IDispatchEx*)proxy, dispIdMember, riid, lcid, wFlags,
+                                  pDispParams, pVarResult, pExcepInfo, puArgErr);
 
     TRACE("(%p)->(%ld %s %ld %d %p %p %p %p)\n", This, dispIdMember, debugstr_guid(riid),
           lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
@@ -5105,7 +5110,11 @@ static HRESULT WINAPI DocDispatchEx_Invoke(IDispatchEx *iface, DISPID dispIdMemb
 static HRESULT WINAPI DocDispatchEx_GetDispID(IDispatchEx *iface, BSTR bstrName, DWORD grfdex, DISPID *pid)
 {
     HTMLDocumentNode *This = impl_from_IDispatchEx(iface);
+    IWineDispatchProxyCbPrivate *proxy = This->node.event_target.dispex.proxy;
     HRESULT hres;
+
+    if(proxy)
+        return IDispatchEx_GetDispID((IDispatchEx*)proxy, bstrName, grfdex, pid);
 
     hres = IDispatchEx_GetDispID(&This->node.event_target.dispex.IDispatchEx_iface, bstrName, grfdex & ~fdexNameEnsure, pid);
     if(hres != DISP_E_UNKNOWNNAME)
@@ -5126,6 +5135,10 @@ static HRESULT WINAPI DocDispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID
         VARIANT *pvarRes, EXCEPINFO *pei, IServiceProvider *pspCaller)
 {
     HTMLDocumentNode *This = impl_from_IDispatchEx(iface);
+    IDispatchEx *disp = &This->node.event_target.dispex.IDispatchEx_iface;
+
+    if(This->node.event_target.dispex.proxy && id >= 0)
+        disp = (IDispatchEx*)This->node.event_target.dispex.proxy;
 
     if(This->window) {
         switch(id) {
@@ -5143,7 +5156,7 @@ static HRESULT WINAPI DocDispatchEx_InvokeEx(IDispatchEx *iface, DISPID id, LCID
         }
     }
 
-    return IDispatchEx_InvokeEx(&This->node.event_target.dispex.IDispatchEx_iface, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
+    return IDispatchEx_InvokeEx(disp, id, lcid, wFlags, pdp, pvarRes, pei, pspCaller);
 }
 
 static HRESULT WINAPI DocDispatchEx_DeleteMemberByName(IDispatchEx *iface, BSTR bstrName, DWORD grfdex)
@@ -5188,7 +5201,145 @@ static HRESULT WINAPI DocDispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnkn
     return IDispatchEx_GetNameSpaceParent(&This->node.event_target.dispex.IDispatchEx_iface, ppunk);
 }
 
-const IDispatchExVtbl DocDispatchExVtbl = {
+static inline HTMLDocumentNode *impl_from_IWineDispatchProxyPrivate(IWineDispatchProxyPrivate *iface)
+{
+    return impl_from_IDispatchEx((IDispatchEx*)iface);
+}
+
+static IWineDispatchProxyCbPrivate** WINAPI DocWineDispProxyPrivate_GetProxyFieldRef(IWineDispatchProxyPrivate *iface)
+{
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+    return &This->node.event_target.dispex.proxy;
+}
+
+static BOOL WINAPI DocWineDispProxyPrivate_HasProxy(IWineDispatchProxyPrivate *iface)
+{
+    return TRUE;
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
+{
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+    HRESULT hres = DISP_E_UNKNOWNNAME;
+    nsIDOMElement *nselem;
+    nsAString nsstr;
+    nsresult nsres;
+    cpp_bool r;
+
+    if(info->dispid != DISPID_UNKNOWN &&
+       (info->dispid < MSHTML_DISPID_CUSTOM_MIN || info->dispid > MSHTML_DISPID_CUSTOM_MAX))
+        return S_FALSE;
+
+    if(This->html_document) {
+        hres = get_elem_by_name_or_id(This->html_document, info->name, &nselem);
+        if(SUCCEEDED(hres)) {
+            if(!nselem)
+                hres = DISP_E_UNKNOWNNAME;
+            else {
+                nsAString_InitDepend(&nsstr, L"name");
+                nsres = nsIDOMElement_HasAttribute(nselem, &nsstr, &r);
+                nsAString_Finish(&nsstr);
+                nsIDOMElement_Release(nselem);
+
+                info->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE |
+                              (NS_SUCCEEDED(nsres) && r ? PROPF_ENUMERABLE : 0);
+                hres = dispid_from_elem_name(This, info->name, &info->dispid);
+            }
+        }
+    }
+
+    if(hres == DISP_E_UNKNOWNNAME) {
+        if(info->dispid == DISPID_UNKNOWN)
+            return S_FALSE;
+        info->dispid = DISPID_UNKNOWN;
+        return S_OK;
+    }
+    return hres;
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_PropOverride(IWineDispatchProxyPrivate *iface, const WCHAR *name, VARIANT *value)
+{
+    return S_FALSE;
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_PropDefineOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
+{
+    return S_FALSE;
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_PropGetInfo(IWineDispatchProxyPrivate *iface, const WCHAR *name,
+        BOOL case_insens, struct proxy_prop_info *info)
+{
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->node.event_target.dispex.IDispatchEx_iface;
+    nsIDOMElement *nselem;
+    nsAString nsstr;
+    nsresult nsres;
+    HRESULT hres;
+    cpp_bool r;
+
+    hres = itf->lpVtbl->PropGetInfo(itf, name, case_insens, info);
+    if(SUCCEEDED(hres)) {
+        if(This->window && info->dispid == DISPID_IHTMLDOCUMENT2_LOCATION)
+            info->flags = PROPF_WRITABLE | PROPF_ENUMERABLE;
+        return hres;
+    }
+
+    if(hres == DISP_E_UNKNOWNNAME && This->html_document) {
+        hres = get_elem_by_name_or_id(This->html_document, name, &nselem);
+        if(SUCCEEDED(hres)) {
+            if(!nselem)
+                hres = DISP_E_UNKNOWNNAME;
+            else {
+                nsAString_InitDepend(&nsstr, L"name");
+                nsres = nsIDOMElement_HasAttribute(nselem, &nsstr, &r);
+                nsAString_Finish(&nsstr);
+                nsIDOMElement_Release(nselem);
+
+                info->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE |
+                              (NS_SUCCEEDED(nsres) && r ? PROPF_ENUMERABLE : 0);
+                info->name = name;
+                hres = dispid_from_elem_name(This, name, &info->dispid);
+            }
+        }
+    }
+
+    return hres;
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_PropInvoke(IWineDispatchProxyPrivate *iface, IDispatch *this_obj, DISPID id,
+        LCID lcid, DWORD flags, DISPPARAMS *dp, VARIANT *ret, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+
+    return dispex_invoke(&This->node.event_target.dispex, this_obj, id, lcid, flags, dp, ret, ei, caller);
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_PropDelete(IWineDispatchProxyPrivate *iface, DISPID id)
+{
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->node.event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->PropDelete(itf, id);
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_PropEnum(IWineDispatchProxyPrivate *iface)
+{
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->node.event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->PropEnum(itf);
+}
+
+static HRESULT WINAPI DocWineDispProxyPrivate_ToString(IWineDispatchProxyPrivate *iface, BSTR *string)
+{
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+
+    return dispex_to_string(&This->node.event_target.dispex, string);
+}
+
+static const IWineDispatchProxyPrivateVtbl DocDispatchExVtbl = {
+    {
     DocDispatchEx_QueryInterface,
     DocDispatchEx_AddRef,
     DocDispatchEx_Release,
@@ -5204,6 +5355,19 @@ const IDispatchExVtbl DocDispatchExVtbl = {
     DocDispatchEx_GetMemberName,
     DocDispatchEx_GetNextDispID,
     DocDispatchEx_GetNameSpaceParent
+    },
+
+    /* IWineDispatchProxyPrivate extension */
+    DocWineDispProxyPrivate_GetProxyFieldRef,
+    DocWineDispProxyPrivate_HasProxy,
+    DocWineDispProxyPrivate_PropFixOverride,
+    DocWineDispProxyPrivate_PropOverride,
+    DocWineDispProxyPrivate_PropDefineOverride,
+    DocWineDispProxyPrivate_PropGetInfo,
+    DocWineDispProxyPrivate_PropInvoke,
+    DocWineDispProxyPrivate_PropDelete,
+    DocWineDispProxyPrivate_PropEnum,
+    DocWineDispProxyPrivate_ToString
 };
 
 static inline HTMLDocumentNode *impl_from_IProvideMultipleClassInfo(IProvideMultipleClassInfo *iface)
@@ -5791,7 +5955,7 @@ static void *HTMLDocumentNode_query_interface(DispatchEx *dispex, REFIID riid)
 {
     HTMLDocumentNode *This = impl_from_DispatchEx(dispex);
 
-    if(IsEqualGUID(&IID_IDispatch, riid) || IsEqualGUID(&IID_IDispatchEx, riid))
+    if(IsEqualGUID(&IID_IDispatch, riid) || IsEqualGUID(&IID_IDispatchEx, riid) || IsEqualGUID(&IID_IWineDispatchProxyPrivate, riid))
         return &This->IDispatchEx_iface;
     if(IsEqualGUID(&IID_IHTMLDocument, riid) || IsEqualGUID(&IID_IHTMLDocument2, riid))
         return &This->IHTMLDocument2_iface;
@@ -6196,7 +6360,7 @@ static HTMLDocumentNode *alloc_doc_node(HTMLDocumentObj *doc_obj, HTMLInnerWindo
     if(!doc)
         return NULL;
 
-    doc->IDispatchEx_iface.lpVtbl = &DocDispatchExVtbl;
+    doc->IDispatchEx_iface.lpVtbl = (const IDispatchExVtbl*)&DocDispatchExVtbl;
     doc->IHTMLDocument2_iface.lpVtbl = &HTMLDocumentVtbl;
     doc->IHTMLDocument3_iface.lpVtbl = &HTMLDocument3Vtbl;
     doc->IHTMLDocument4_iface.lpVtbl = &HTMLDocument4Vtbl;
@@ -6242,12 +6406,6 @@ HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLI
     if(!doc)
         return E_OUTOFMEMORY;
 
-    if(parent_mode >= COMPAT_MODE_IE9) {
-        TRACE("using parent mode %u\n", parent_mode);
-        doc->document_mode = parent_mode;
-        lock_document_mode(doc);
-    }
-
     if(doc_obj && (!doc_obj->window || (window && is_main_content_window(window->base.outer_window))))
         doc->cp_container.forward_container = &doc_obj->cp_container;
 
@@ -6269,6 +6427,12 @@ HRESULT create_document_node(nsIDOMDocument *nsdoc, GeckoBrowser *browser, HTMLI
 
     list_add_head(&browser->document_nodes, &doc->browser_entry);
     doc->browser = browser;
+
+    if(parent_mode >= COMPAT_MODE_IE9) {
+        TRACE("using parent mode %u\n", parent_mode);
+        doc->document_mode = parent_mode;
+        lock_document_mode(doc);
+    }
 
     if(browser->usermode == EDITMODE && doc->html_document) {
         nsAString mode_str;

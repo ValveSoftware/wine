@@ -1325,6 +1325,29 @@ static HRESULT HTMLStorage_next_dispid(DispatchEx *dispex, DISPID id, DISPID *pi
     return S_OK;
 }
 
+static HRESULT HTMLStorage_override(DispatchEx *dispex, const WCHAR *name, VARIANT *value)
+{
+    HTMLStorage *This = impl_from_DispatchEx(dispex);
+    BSTR bstrName;
+    HRESULT hres;
+
+    if(!(bstrName = SysAllocString(name)))
+        return E_OUTOFMEMORY;
+
+    if(value) {
+        hres = HTMLStorage_getItem(&This->IHTMLStorage_iface, bstrName, value);
+        if(SUCCEEDED(hres))
+            hres = (V_VT(value) != VT_NULL) ? S_OK : S_FALSE;
+    }else {
+        hres = HTMLStorage_removeItem(&This->IHTMLStorage_iface, bstrName);
+        if(SUCCEEDED(hres))
+            hres = S_OK;
+    }
+
+    SysFreeString(bstrName);
+    return hres;
+}
+
 static const dispex_static_data_vtbl_t HTMLStorage_dispex_vtbl = {
     .query_interface  = HTMLStorage_query_interface,
     .destructor       = HTMLStorage_destructor,
@@ -1335,6 +1358,7 @@ static const dispex_static_data_vtbl_t HTMLStorage_dispex_vtbl = {
     .invoke           = HTMLStorage_invoke,
     .delete           = HTMLStorage_delete,
     .next_dispid      = HTMLStorage_next_dispid,
+    .override         = HTMLStorage_override
 };
 
 static const tid_t HTMLStorage_iface_tids[] = {
