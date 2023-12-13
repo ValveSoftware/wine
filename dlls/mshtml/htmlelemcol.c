@@ -35,6 +35,7 @@ typedef struct {
     DispatchEx dispex;
     IHTMLElementCollection IHTMLElementCollection_iface;
 
+    HTMLInnerWindow *window;
     HTMLElement **elems;
     DWORD len;
 } HTMLElementCollection;
@@ -60,7 +61,7 @@ static inline HTMLElement *elem_from_HTMLDOMNode(HTMLDOMNode *iface)
     return CONTAINING_RECORD(iface, HTMLElement, node);
 }
 
-static IHTMLElementCollection *HTMLElementCollection_Create(HTMLElement**,DWORD,compat_mode_t);
+static IHTMLElementCollection *HTMLElementCollection_Create(HTMLElement**,DWORD,HTMLInnerWindow*,compat_mode_t);
 
 static void elem_vector_add(elem_vector_t *buf, HTMLElement *elem)
 {
@@ -424,7 +425,7 @@ static HRESULT WINAPI HTMLElementCollection_item(IHTMLElementCollection *iface,
 
             if(buf.len > 1) {
                 elem_vector_normalize(&buf);
-                *pdisp = (IDispatch*)HTMLElementCollection_Create(buf.buf, buf.len,
+                *pdisp = (IDispatch*)HTMLElementCollection_Create(buf.buf, buf.len, This->window,
                                                                   dispex_compat_mode(&This->dispex));
             }else {
                 if(buf.len == 1) {
@@ -487,7 +488,7 @@ static HRESULT WINAPI HTMLElementCollection_tags(IHTMLElementCollection *iface,
 
     TRACE("found %ld tags\n", buf.len);
 
-    *pdisp = (IDispatch*)HTMLElementCollection_Create(buf.buf, buf.len,
+    *pdisp = (IDispatch*)HTMLElementCollection_Create(buf.buf, buf.len, This->window,
                                                       dispex_compat_mode(&This->dispex));
     return S_OK;
 }
@@ -530,6 +531,8 @@ static void HTMLElementCollection_traverse(DispatchEx *dispex, nsCycleCollection
 
     for(i = 0; i < This->len; i++)
         note_cc_edge((nsISupports*)&This->elems[i]->node.IHTMLDOMNode_iface, "elem", cb);
+    if(This->window)
+        note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
 }
 
 static void HTMLElementCollection_unlink(DispatchEx *dispex)
@@ -542,6 +545,11 @@ static void HTMLElementCollection_unlink(DispatchEx *dispex)
         for(i = 0; i < len; i++)
             node_release(&This->elems[i]->node);
         free(This->elems);
+    }
+    if(This->window) {
+        HTMLInnerWindow *window = This->window;
+        This->window = NULL;
+        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
     }
 }
 
@@ -700,11 +708,11 @@ IHTMLElementCollection *create_all_collection(HTMLDOMNode *node, BOOL include_ro
     create_all_list(node, &buf);
     elem_vector_normalize(&buf);
 
-    return HTMLElementCollection_Create(buf.buf, buf.len,
+    return HTMLElementCollection_Create(buf.buf, buf.len, get_inner_window(node->doc),
                                         dispex_compat_mode(&node->event_target.dispex));
 }
 
-IHTMLElementCollection *create_collection_from_nodelist(nsIDOMNodeList *nslist, compat_mode_t compat_mode)
+IHTMLElementCollection *create_collection_from_nodelist(nsIDOMNodeList *nslist, HTMLDocumentNode *doc)
 {
     UINT32 length = 0, i;
     HTMLDOMNode *node;
@@ -736,10 +744,11 @@ IHTMLElementCollection *create_collection_from_nodelist(nsIDOMNodeList *nslist, 
         buf.buf = NULL;
     }
 
-    return HTMLElementCollection_Create(buf.buf, buf.len, compat_mode);
+    return HTMLElementCollection_Create(buf.buf, buf.len, get_inner_window(doc), doc->document_mode);
 }
 
-IHTMLElementCollection *create_collection_from_htmlcol(nsIDOMHTMLCollection *nscol, compat_mode_t compat_mode)
+IHTMLElementCollection *create_collection_from_htmlcol(nsIDOMHTMLCollection *nscol, HTMLDocumentNode *doc,
+                                                       compat_mode_t compat_mode)
 {
     UINT32 length = 0, i;
     elem_vector_t buf;
@@ -772,7 +781,7 @@ IHTMLElementCollection *create_collection_from_htmlcol(nsIDOMHTMLCollection *nsc
         return NULL;
     }
 
-    return HTMLElementCollection_Create(buf.buf, buf.len, compat_mode);
+    return HTMLElementCollection_Create(buf.buf, buf.len, get_inner_window(doc), compat_mode);
 }
 
 HRESULT get_elem_source_index(HTMLElement *elem, LONG *ret)
@@ -848,7 +857,7 @@ HRESULT get_elem_source_index(HTMLElement *elem, LONG *ret)
 }
 
 static IHTMLElementCollection *HTMLElementCollection_Create(HTMLElement **elems, DWORD len,
-                                                            compat_mode_t compat_mode)
+                                                            HTMLInnerWindow *window, compat_mode_t compat_mode)
 {
     HTMLElementCollection *ret = calloc(1, sizeof(HTMLElementCollection));
 
@@ -858,8 +867,10 @@ static IHTMLElementCollection *HTMLElementCollection_Create(HTMLElement **elems,
     ret->IHTMLElementCollection_iface.lpVtbl = &HTMLElementCollectionVtbl;
     ret->elems = elems;
     ret->len = len;
+    ret->window = window;
+    IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
 
-    init_dispatch(&ret->dispex, &HTMLElementCollection_dispex, compat_mode);
+    init_dispatch(&ret->dispex, &HTMLElementCollection_dispex, window, compat_mode);
 
     TRACE("ret=%p len=%ld\n", ret, len);
 

@@ -398,7 +398,7 @@ static nsresult NSAPI XMLHttpReqEventListener_HandleEvent(nsIDOMEventListener *i
         blocking_xhr = thread_data->blocking_xhr;
 
     compat_mode = dispex_compat_mode(&This->xhr->event_target.dispex);
-    hres = create_event_from_nsevent(nsevent, compat_mode, &event);
+    hres = create_event_from_nsevent(nsevent, This->xhr->window, compat_mode, &event);
     if(FAILED(hres)) {
         if(!blocking_xhr || This->xhr == blocking_xhr)
             This->xhr->ready_state = ready_state;
@@ -1712,7 +1712,7 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactor
     ret->IHTMLXMLHttpRequest2_iface.lpVtbl = &HTMLXMLHttpRequest2Vtbl;
     ret->IWineXMLHttpRequestPrivate_iface.lpVtbl = &WineXMLHttpRequestPrivateVtbl;
     ret->IProvideClassInfo2_iface.lpVtbl = &ProvideClassInfo2Vtbl;
-    EventTarget_Init(&ret->event_target, &HTMLXMLHttpRequest_dispex, This->window->doc->document_mode);
+    EventTarget_Init(&ret->event_target, &HTMLXMLHttpRequest_dispex, This->window);
 
     /* Always register the handlers because we need them to track state */
     event_listener->nsIDOMEventListener_iface.lpVtbl = &XMLHttpReqEventListenerVtbl;
@@ -1847,7 +1847,7 @@ HRESULT HTMLXMLHttpRequestFactory_Create(HTMLInnerWindow* window, HTMLXMLHttpReq
     ret->window = window;
     IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
 
-    init_dispatch(&ret->dispex, &HTMLXMLHttpRequestFactory_dispex, dispex_compat_mode(&window->event_target.dispex));
+    init_dispatch(&ret->dispex, &HTMLXMLHttpRequestFactory_dispex, window, dispex_compat_mode(&window->event_target.dispex));
 
     *ret_ptr = ret;
     return S_OK;

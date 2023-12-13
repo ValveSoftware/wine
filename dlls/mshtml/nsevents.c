@@ -242,7 +242,7 @@ static nsresult handle_dom_content_loaded(HTMLDocumentNode *doc, nsIDOMEvent *ns
     if(doc->window)
         doc->window->dom_content_loaded_event_start_time = get_time_stamp();
 
-    hres = create_event_from_nsevent(nsevent, dispex_compat_mode(&doc->node.event_target.dispex), &event);
+    hres = create_event_from_nsevent(nsevent, get_inner_window(doc), dispex_compat_mode(&doc->node.event_target.dispex), &event);
     if(SUCCEEDED(hres)) {
         dispatch_event(&doc->node.event_target, event);
         IDOMEvent_Release(&event->IDOMEvent_iface);
@@ -378,7 +378,7 @@ static nsresult handle_load(HTMLDocumentNode *doc, nsIDOMEvent *event)
         WARN("no dom_document\n");
     }
 
-    hres = create_event_from_nsevent(event, dispex_compat_mode(&doc->node.event_target.dispex), &load_event);
+    hres = create_event_from_nsevent(event, doc->window, dispex_compat_mode(&doc->node.event_target.dispex), &load_event);
     if(SUCCEEDED(hres)) {
         dispatch_event(&doc->window->event_target, load_event);
         IDOMEvent_Release(&load_event->IDOMEvent_iface);
@@ -398,7 +398,7 @@ static nsresult handle_beforeunload(HTMLDocumentNode *doc, nsIDOMEvent *nsevent)
         return NS_OK;
 
     /* Gecko dispatches this to the document, but IE dispatches it to the window */
-    hres = create_event_from_nsevent(nsevent, dispex_compat_mode(&doc->node.event_target.dispex), &event);
+    hres = create_event_from_nsevent(nsevent, window, dispex_compat_mode(&doc->node.event_target.dispex), &event);
     if(SUCCEEDED(hres)) {
         dispatch_event(&window->event_target, event);
         IDOMEvent_Release(&event->IDOMEvent_iface);
@@ -421,7 +421,7 @@ static nsresult handle_unload(HTMLDocumentNode *doc, nsIDOMEvent *nsevent)
     if(pending_window)
         pending_window->unload_event_start_time = get_time_stamp();
 
-    hres = create_event_from_nsevent(nsevent, dispex_compat_mode(&doc->node.event_target.dispex), &event);
+    hres = create_event_from_nsevent(nsevent, window, dispex_compat_mode(&doc->node.event_target.dispex), &event);
     if(SUCCEEDED(hres)) {
         dispatch_event(&window->event_target, event);
         IDOMEvent_Release(&event->IDOMEvent_iface);
@@ -466,7 +466,7 @@ static nsresult handle_htmlevent(HTMLDocumentNode *doc, nsIDOMEvent *nsevent)
         target = &node->event_target;
     }
 
-    hres = create_event_from_nsevent(nsevent, dispex_compat_mode(&doc->node.event_target.dispex), &event);
+    hres = create_event_from_nsevent(nsevent, get_inner_window(doc), dispex_compat_mode(&doc->node.event_target.dispex), &event);
     if(FAILED(hres)) {
         IEventTarget_Release(&target->IEventTarget_iface);
         return NS_OK;

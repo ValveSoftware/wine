@@ -208,15 +208,14 @@ static void storage_event_proc(event_task_t *_task)
     struct storage_event_task *task = (struct storage_event_task*)_task;
     HTMLInnerWindow *window = task->header.window;
     DOMEvent *event = task->event;
-    compat_mode_t compat_mode;
     VARIANT_BOOL cancelled;
     HRESULT hres;
     VARIANT var;
 
-    if(event->event_id == EVENTID_STORAGE && (compat_mode = dispex_compat_mode(&window->event_target.dispex)) >= COMPAT_MODE_IE9) {
+    if(event->event_id == EVENTID_STORAGE && dispex_compat_mode(&window->event_target.dispex) >= COMPAT_MODE_IE9) {
         dispatch_event(&window->event_target, event);
         if(window->doc) {
-            hres = create_event_obj(event, compat_mode, (IHTMLEventObj**)&V_DISPATCH(&var));
+            hres = create_event_obj(window->doc, event, (IHTMLEventObj**)&V_DISPATCH(&var));
             if(SUCCEEDED(hres)) {
                 V_VT(&var) = VT_DISPATCH;
                 fire_event(&window->doc->node, L"onstorage", &var, &cancelled);
@@ -1499,7 +1498,7 @@ HRESULT create_html_storage(HTMLInnerWindow *window, BOOL local, IHTMLStorage **
     storage->window = window;
     IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
 
-    init_dispatch(&storage->dispex, &HTMLStorage_dispex, dispex_compat_mode(&window->event_target.dispex));
+    init_dispatch(&storage->dispex, &HTMLStorage_dispex, window, dispex_compat_mode(&window->event_target.dispex));
 
     *p = &storage->IHTMLStorage_iface;
     return S_OK;

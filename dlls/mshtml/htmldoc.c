@@ -148,6 +148,12 @@ UINT get_document_charset(HTMLDocumentNode *doc)
     return doc->charset = ret;
 }
 
+/* Get inner window even for document nodes with no window */
+HTMLInnerWindow *get_inner_window(HTMLDocumentNode *doc)
+{
+    return doc->window ? doc->window : doc->doc_obj->window->base.inner_window;
+}
+
 typedef struct {
     HTMLDOMNode node;
     IDOMDocumentType IDOMDocumentType_iface;
@@ -592,7 +598,7 @@ static HRESULT WINAPI HTMLDocument_get_images(IHTMLDocument2 *iface, IHTMLElemen
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This, This->document_mode);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -629,7 +635,7 @@ static HRESULT WINAPI HTMLDocument_get_applets(IHTMLDocument2 *iface, IHTMLEleme
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This, This->document_mode);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -666,7 +672,7 @@ static HRESULT WINAPI HTMLDocument_get_links(IHTMLDocument2 *iface, IHTMLElement
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This, This->document_mode);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -703,7 +709,7 @@ static HRESULT WINAPI HTMLDocument_get_forms(IHTMLDocument2 *iface, IHTMLElement
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This, This->document_mode);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -740,7 +746,7 @@ static HRESULT WINAPI HTMLDocument_get_anchors(IHTMLDocument2 *iface, IHTMLEleme
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This, This->document_mode);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -830,7 +836,7 @@ static HRESULT WINAPI HTMLDocument_get_scripts(IHTMLDocument2 *iface, IHTMLEleme
     }
 
     if(nscoll) {
-        *p = create_collection_from_htmlcol(nscoll, This->document_mode);
+        *p = create_collection_from_htmlcol(nscoll, This, This->document_mode);
         nsIDOMHTMLCollection_Release(nscoll);
     }
 
@@ -2029,8 +2035,7 @@ static HRESULT WINAPI HTMLDocument_get_styleSheets(IHTMLDocument2 *iface,
         return map_nsresult(nsres);
     }
 
-    hres = create_style_sheet_collection(nsstylelist,
-                                         dispex_compat_mode(&This->node.event_target.dispex), p);
+    hres = create_style_sheet_collection(nsstylelist, This, p);
     nsIDOMStyleSheetList_Release(nsstylelist);
     return hres;
 }
@@ -2099,8 +2104,7 @@ static HRESULT WINAPI HTMLDocument_createStyleSheet(IHTMLDocument2 *iface, BSTR 
 
     if(bstrHref && *bstrHref) {
         FIXME("semi-stub for href %s\n", debugstr_w(bstrHref));
-        return create_style_sheet(NULL, dispex_compat_mode(&This->node.event_target.dispex),
-                                  ppnewStyleSheet);
+        return create_style_sheet(NULL, This, ppnewStyleSheet);
     }
 
     hres = create_element(This, L"style", &elem);
@@ -2739,7 +2743,7 @@ static HRESULT WINAPI HTMLDocument3_getElementsByName(IHTMLDocument3 *iface, BST
         return E_FAIL;
     }
 
-    *ppelColl = create_collection_from_nodelist(node_list, This->document_mode);
+    *ppelColl = create_collection_from_nodelist(node_list, This);
     nsIDOMNodeList_Release(node_list);
     return S_OK;
 }
@@ -2816,7 +2820,7 @@ static HRESULT WINAPI HTMLDocument3_getElementsByTagName(IHTMLDocument3 *iface, 
     }
 
 
-    *pelColl = create_collection_from_nodelist(nslist, This->document_mode);
+    *pelColl = create_collection_from_nodelist(nslist, This);
     nsIDOMNodeList_Release(nslist);
 
     return S_OK;
@@ -3000,8 +3004,7 @@ static HRESULT WINAPI HTMLDocument4_get_namespaces(IHTMLDocument4 *iface, IDispa
     if(!This->namespaces) {
         HRESULT hres;
 
-        hres = create_namespace_collection(dispex_compat_mode(&This->node.event_target.dispex),
-                                           &This->namespaces);
+        hres = create_namespace_collection(This, &This->namespaces);
         if(FAILED(hres))
             return hres;
     }
@@ -3045,7 +3048,7 @@ static HRESULT WINAPI HTMLDocument4_createEventObject(IHTMLDocument4 *iface,
         return E_NOTIMPL;
     }
 
-    return create_event_obj(NULL, dispex_compat_mode(&This->node.event_target.dispex), ppEventObj);
+    return create_event_obj(This, NULL, ppEventObj);
 }
 
 static HRESULT WINAPI HTMLDocument4_fireEvent(IHTMLDocument4 *iface, BSTR bstrEventName,
@@ -3239,7 +3242,8 @@ static HRESULT WINAPI HTMLDocument5_createAttribute(IHTMLDocument5 *iface, BSTR 
 
     TRACE("(%p)->(%s %p)\n", This, debugstr_w(bstrattrName), ppattribute);
 
-    hres = HTMLDOMAttribute_Create(bstrattrName, NULL, 0, dispex_compat_mode(&This->node.event_target.dispex), &attr);
+    hres = HTMLDOMAttribute_Create(bstrattrName, This, NULL, 0,
+                                   dispex_compat_mode(&This->node.event_target.dispex), &attr);
     if(FAILED(hres))
         return hres;
 
@@ -3798,7 +3802,7 @@ static HRESULT WINAPI HTMLDocument7_getElementsByClassName(IHTMLDocument7 *iface
     }
 
 
-    *pel = create_collection_from_nodelist(nslist, This->document_mode);
+    *pel = create_collection_from_nodelist(nslist, This);
     nsIDOMNodeList_Release(nslist);
     return S_OK;
 }
@@ -4802,7 +4806,7 @@ static HRESULT WINAPI DocumentSelector_querySelectorAll(IDocumentSelector *iface
         return map_nsresult(nsres);
     }
 
-    hres = create_child_collection(node_list, dispex_compat_mode(&This->node.event_target.dispex), pel);
+    hres = create_child_collection(node_list, This, pel);
     nsIDOMNodeList_Release(node_list);
     return hres;
 }
@@ -5690,7 +5694,7 @@ static HRESULT WINAPI DocumentRange_createRange(IDocumentRange *iface, IHTMLDOMR
     if(NS_FAILED(nsIDOMDocument_CreateRange(This->dom_document, &nsrange)))
         return E_FAIL;
 
-    hres = create_dom_range(nsrange, dispex_compat_mode(&This->node.event_target.dispex), p);
+    hres = create_dom_range(nsrange, This, p);
     nsIDOMRange_Release(nsrange);
     return hres;
 }

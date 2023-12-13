@@ -148,8 +148,8 @@ typedef enum {
 } styleid_t;
 
 HRESULT HTMLStyle_Create(HTMLElement*,HTMLStyle**);
-HRESULT create_computed_style(nsIDOMCSSStyleDeclaration*,compat_mode_t,IHTMLCSSStyleDeclaration**);
-void init_css_style(CSSStyle*,nsIDOMCSSStyleDeclaration*,dispex_static_data_t*,compat_mode_t);
+HRESULT create_computed_style(nsIDOMCSSStyleDeclaration*,HTMLInnerWindow*,compat_mode_t,IHTMLCSSStyleDeclaration**);
+void init_css_style(CSSStyle*,nsIDOMCSSStyleDeclaration*,dispex_static_data_t*,HTMLInnerWindow*,compat_mode_t);
 
 void *CSSStyle_query_interface(DispatchEx*,REFIID);
 void CSSStyle_traverse(DispatchEx*,nsCycleCollectionTraversalCallback*);

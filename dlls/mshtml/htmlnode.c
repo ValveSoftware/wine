@@ -451,7 +451,7 @@ static dispex_static_data_t HTMLDOMChildrenCollection_dispex = {
     HTMLDOMNode_init_dispex_info
 };
 
-HRESULT create_child_collection(nsIDOMNodeList *nslist, compat_mode_t compat_mode, IHTMLDOMChildrenCollection **ret)
+HRESULT create_child_collection(nsIDOMNodeList *nslist, HTMLDocumentNode *doc, IHTMLDOMChildrenCollection **ret)
 {
     HTMLDOMChildrenCollection *collection;
 
@@ -463,7 +463,8 @@ HRESULT create_child_collection(nsIDOMNodeList *nslist, compat_mode_t compat_mod
     nsIDOMNodeList_AddRef(nslist);
     collection->nslist = nslist;
 
-    init_dispatch(&collection->dispex, &HTMLDOMChildrenCollection_dispex, compat_mode);
+    init_dispatch(&collection->dispex, &HTMLDOMChildrenCollection_dispex, get_inner_window(doc),
+                  dispex_compat_mode(&doc->node.event_target.dispex));
 
     *ret = &collection->IHTMLDOMChildrenCollection_iface;
     return S_OK;
@@ -623,8 +624,7 @@ static HRESULT WINAPI HTMLDOMNode_get_childNodes(IHTMLDOMNode *iface, IDispatch 
         return hres;
     }
 
-    hres = create_child_collection(nslist, dispex_compat_mode(&This->event_target.dispex),
-                                   (IHTMLDOMChildrenCollection**)p);
+    hres = create_child_collection(nslist, This->doc, (IHTMLDOMChildrenCollection**)p);
     nsIDOMNodeList_Release(nslist);
     return hres;
 }
@@ -1475,17 +1475,20 @@ static const NodeImplVtbl HTMLDOMNodeImplVtbl = {
 
 void HTMLDOMNode_Init(HTMLDocumentNode *doc, HTMLDOMNode *node, nsIDOMNode *nsnode, dispex_static_data_t *dispex_data)
 {
+    HTMLInnerWindow *window = NULL;
     nsresult nsres;
 
     node->IHTMLDOMNode_iface.lpVtbl = &HTMLDOMNodeVtbl;
     node->IHTMLDOMNode2_iface.lpVtbl = &HTMLDOMNode2Vtbl;
     node->IHTMLDOMNode3_iface.lpVtbl = &HTMLDOMNode3Vtbl;
 
-    EventTarget_Init(&node->event_target, dispex_data, doc->document_mode);
-
-    if(&doc->node != node)
+    if(&doc->node != node) {
         IHTMLDOMNode_AddRef(&doc->node.IHTMLDOMNode_iface);
+        window = get_inner_window(doc);
+    }
     node->doc = doc;
+
+    EventTarget_Init(&node->event_target, dispex_data, window);
 
     nsIDOMNode_AddRef(nsnode);
     node->nsnode = nsnode;

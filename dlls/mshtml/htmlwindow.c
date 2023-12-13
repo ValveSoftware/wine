@@ -885,7 +885,7 @@ static HRESULT WINAPI HTMLWindow2_get_navigator(IHTMLWindow2 *iface, IOmNavigato
 
     if(!window->navigator) {
         HRESULT hres;
-        hres = create_navigator(dispex_compat_mode(&window->event_target.dispex), &window->navigator);
+        hres = create_navigator(window, &window->navigator);
         if(FAILED(hres))
             return hres;
     }
@@ -1274,7 +1274,7 @@ static HRESULT WINAPI HTMLWindow2_get_screen(IHTMLWindow2 *iface, IHTMLScreen **
     if(!window->screen) {
         HRESULT hres;
 
-        hres = create_html_screen(dispex_compat_mode(&window->event_target.dispex), &window->screen);
+        hres = create_html_screen(window, &window->screen);
         if(FAILED(hres))
             return hres;
     }
@@ -2640,7 +2640,8 @@ static HRESULT WINAPI HTMLWindow7_getComputedStyle(IHTMLWindow7 *iface, IHTMLDOM
         return S_OK;
     }
 
-    hres = create_computed_style(nsstyle, dispex_compat_mode(&This->inner_window->event_target.dispex), p);
+    hres = create_computed_style(nsstyle, This->inner_window,
+                                 dispex_compat_mode(&This->inner_window->event_target.dispex), p);
     nsIDOMCSSStyleDeclaration_Release(nsstyle);
     return hres;
 }
@@ -3421,7 +3422,7 @@ static HRESULT WINAPI window_private_get_console(IWineHTMLWindowPrivate *iface, 
     TRACE("iface %p, console %p.\n", iface, console);
 
     if (!window->console)
-        create_console(dispex_compat_mode(&window->event_target.dispex), &window->console);
+        create_console(This->inner_window, &window->console);
 
     *console = (IDispatch *)window->console;
     if (window->console)
@@ -3453,8 +3454,7 @@ static HRESULT WINAPI window_private_get_MutationObserver(IWineHTMLWindowPrivate
     TRACE("iface %p, mutation_observer %p.\n", iface, mutation_observer);
 
     if (!This->inner_window->mutation_observer_ctor) {
-        hres = create_mutation_observer_ctor(dispex_compat_mode(&This->inner_window->event_target.dispex),
-                                             &This->inner_window->mutation_observer_ctor);
+        hres = create_mutation_observer_ctor(This->inner_window, &This->inner_window->mutation_observer_ctor);
         if (FAILED(hres))
             return hres;
     }
@@ -4562,7 +4562,7 @@ static HRESULT create_inner_window(HTMLOuterWindow *outer_window, IMoniker *mon,
     window->base.outer_window = outer_window;
     window->base.inner_window = window;
 
-    EventTarget_Init(&window->event_target, &HTMLWindow_dispex, COMPAT_MODE_NONE);
+    EventTarget_Init(&window->event_target, &HTMLWindow_dispex, NULL);
 
     window->task_magic = get_task_target_magic();
 

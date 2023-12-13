@@ -1753,7 +1753,7 @@ HRESULT HTMLTxtRange_Create(HTMLDocumentNode *doc, nsIDOMRange *nsrange, IHTMLTx
     ret->IHTMLTxtRange_iface.lpVtbl = &HTMLTxtRangeVtbl;
     ret->IOleCommandTarget_iface.lpVtbl = &OleCommandTargetVtbl;
 
-    init_dispatch(&ret->dispex, &HTMLTxtRange_dispex, dispex_compat_mode(&doc->node.event_target.dispex));
+    init_dispatch(&ret->dispex, &HTMLTxtRange_dispex, get_inner_window(doc), dispex_compat_mode(&doc->node.event_target.dispex));
 
     if(nsrange)
         nsIDOMRange_AddRef(nsrange);
@@ -2098,7 +2098,7 @@ static dispex_static_data_t HTMLDOMRange_dispex = {
     HTMLDOMRange_iface_tids
 };
 
-HRESULT create_dom_range(nsIDOMRange *nsrange, compat_mode_t compat_mode, IHTMLDOMRange **p)
+HRESULT create_dom_range(nsIDOMRange *nsrange, HTMLDocumentNode *doc, IHTMLDOMRange **p)
 {
     HTMLDOMRange *ret;
 
@@ -2108,7 +2108,7 @@ HRESULT create_dom_range(nsIDOMRange *nsrange, compat_mode_t compat_mode, IHTMLD
 
     ret->IHTMLDOMRange_iface.lpVtbl = &HTMLDOMRangeVtbl;
 
-    init_dispatch(&ret->dispex, &HTMLDOMRange_dispex, compat_mode);
+    init_dispatch(&ret->dispex, &HTMLDOMRange_dispex, get_inner_window(doc), dispex_compat_mode(&doc->node.event_target.dispex));
 
     if(nsrange)
         nsIDOMRange_AddRef(nsrange);

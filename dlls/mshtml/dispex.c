@@ -1063,7 +1063,7 @@ static func_disp_t *create_func_disp(DispatchEx *obj, func_info_t *info)
     if(!ret)
         return NULL;
 
-    init_dispatch(&ret->dispex, &function_dispex, dispex_compat_mode(obj));
+    init_dispatch(&ret->dispex, &function_dispex, NULL, dispex_compat_mode(obj));
     ret->obj = obj;
     ret->info = info;
 
@@ -2314,7 +2314,7 @@ const void *dispex_get_vtbl(DispatchEx *dispex)
     return dispex->info->desc->vtbl;
 }
 
-void init_dispatch(DispatchEx *dispex, dispex_static_data_t *data, compat_mode_t compat_mode)
+void init_dispatch(DispatchEx *dispex, dispex_static_data_t *data, HTMLInnerWindow *window, compat_mode_t compat_mode)
 {
     assert(compat_mode < COMPAT_MODE_CNT);
 
