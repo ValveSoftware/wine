@@ -200,6 +200,7 @@ typedef struct ScriptHost ScriptHost;
     XDIID(DispDOMStorageEvent) \
     XDIID(DispDOMUIEvent) \
     XDIID(DispDOMDocumentType) \
+    XDIID(DispDOMParser) \
     XDIID(DispHTMLAnchorElement) \
     XDIID(DispHTMLAreaElement) \
     XDIID(DispHTMLAttributeCollection) \
@@ -264,6 +265,7 @@ typedef struct ScriptHost ScriptHost;
     XIID(IDOMStorageEvent) \
     XIID(IDOMUIEvent) \
     XIID(IDOMDocumentType) \
+    XIID(IDOMParser) \
     XIID(IDocumentEvent) \
     XIID(IDocumentRange) \
     XIID(IDocumentSelector) \
@@ -477,6 +479,7 @@ PRIVATE_TID_LIST
 #define PROXY_PROTOTYPE_LIST \
     X(Console,                        "Console",                      console_dispex,                         Object) \
     X(Crypto,                         "Crypto",                       crypto_dispex,                          Object) \
+    X(DOMParser,                      "DOMParser",                    DOMParser_dispex,                       Object) \
     X(MutationObserver,               "MutationObserver",             mutation_observer_dispex,               Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
@@ -1759,6 +1762,7 @@ extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex;
 extern dispex_static_data_t HTMLImageCtor_dispex;
 extern dispex_static_data_t HTMLOptionCtor_dispex;
 extern dispex_static_data_t HTMLXMLHttpRequestCtor_dispex;
+extern dispex_static_data_t DOMParserCtor_dispex;
 extern dispex_static_data_t mutation_observer_ctor_dispex;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex;

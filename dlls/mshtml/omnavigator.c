@@ -357,6 +357,177 @@ void detach_dom_implementation(IHTMLDOMImplementation *iface)
     dom_implementation->browser = NULL;
 }
 
+struct dom_parser {
+    DispatchEx dispex;
+    IDOMParser IDOMParser_iface;
+};
+
+static inline struct dom_parser *impl_from_IDOMParser(IDOMParser *iface)
+{
+    return CONTAINING_RECORD(iface, struct dom_parser, IDOMParser_iface);
+}
+
+static HRESULT WINAPI DOMParser_QueryInterface(IDOMParser *iface, REFIID riid, void **ppv)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+    return IDispatchEx_QueryInterface(&This->dispex.IDispatchEx_iface, riid, ppv);
+}
+
+static ULONG WINAPI DOMParser_AddRef(IDOMParser *iface)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+    return IDispatchEx_AddRef(&This->dispex.IDispatchEx_iface);
+}
+
+static ULONG WINAPI DOMParser_Release(IDOMParser *iface)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+    return IDispatchEx_Release(&This->dispex.IDispatchEx_iface);
+}
+
+static HRESULT WINAPI DOMParser_GetTypeInfoCount(IDOMParser *iface, UINT *pctinfo)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+
+    return IDispatchEx_GetTypeInfoCount(&This->dispex.IDispatchEx_iface, pctinfo);
+}
+
+static HRESULT WINAPI DOMParser_GetTypeInfo(IDOMParser *iface, UINT iTInfo,
+        LCID lcid, ITypeInfo **ppTInfo)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+
+    return IDispatchEx_GetTypeInfo(&This->dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
+}
+
+static HRESULT WINAPI DOMParser_GetIDsOfNames(IDOMParser *iface, REFIID riid,
+        LPOLESTR *rgszNames, UINT cNames, LCID lcid, DISPID *rgDispId)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+
+    return IDispatchEx_GetIDsOfNames(&This->dispex.IDispatchEx_iface, riid, rgszNames, cNames,
+                                     lcid, rgDispId);
+}
+
+static HRESULT WINAPI DOMParser_Invoke(IDOMParser *iface, DISPID dispIdMember,
+        REFIID riid, LCID lcid, WORD wFlags, DISPPARAMS *pDispParams,
+        VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+
+    return IDispatchEx_Invoke(&This->dispex.IDispatchEx_iface, dispIdMember, riid, lcid, wFlags,
+                              pDispParams, pVarResult, pExcepInfo, puArgErr);
+}
+
+static HRESULT WINAPI DOMParser_parseFromString(IDOMParser *iface, BSTR string, BSTR mimeType, IHTMLDocument2 **ppNode)
+{
+    struct dom_parser *This = impl_from_IDOMParser(iface);
+
+    FIXME("(%p)->(%s %s %p)\n", This, debugstr_w(string), debugstr_w(mimeType), ppNode);
+
+    return E_NOTIMPL;
+}
+
+static const IDOMParserVtbl DOMParserVtbl = {
+    DOMParser_QueryInterface,
+    DOMParser_AddRef,
+    DOMParser_Release,
+    DOMParser_GetTypeInfoCount,
+    DOMParser_GetTypeInfo,
+    DOMParser_GetIDsOfNames,
+    DOMParser_Invoke,
+    DOMParser_parseFromString
+};
+
+static inline struct dom_parser *DOMParser_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, struct dom_parser, dispex);
+}
+
+static void *DOMParser_query_interface(DispatchEx *dispex, REFIID riid)
+{
+    struct dom_parser *This = DOMParser_from_DispatchEx(dispex);
+
+    if(IsEqualGUID(&IID_IDOMParser, riid))
+        return &This->IDOMParser_iface;
+
+    return NULL;
+}
+
+static void DOMParser_destructor(DispatchEx *dispex)
+{
+    struct dom_parser *This = DOMParser_from_DispatchEx(dispex);
+    free(This);
+}
+
+static const dispex_static_data_vtbl_t DOMParser_dispex_vtbl = {
+    .query_interface  = DOMParser_query_interface,
+    .destructor       = DOMParser_destructor,
+};
+
+static const tid_t DOMParser_iface_tids[] = {
+    IDOMParser_tid,
+    0
+};
+
+dispex_static_data_t DOMParser_dispex = {
+    "DOMParser",
+    &DOMParser_dispex_vtbl,
+    PROTO_ID_DOMParser,
+    DispDOMParser_tid,
+    DOMParser_iface_tids
+};
+
+static HRESULT DOMParserCtor_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    struct global_ctor *This = CONTAINING_RECORD(iface, struct global_ctor, dispex);
+    struct dom_parser *ret;
+
+    TRACE("\n");
+
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+    case DISPATCH_CONSTRUCT:
+        break;
+    default:
+        return global_ctor_value(iface, lcid, flags, params, res, ei, caller);
+    }
+
+    if(!(ret = calloc(1, sizeof(*ret))))
+        return E_OUTOFMEMORY;
+
+    ret->IDOMParser_iface.lpVtbl = &DOMParserVtbl;
+    init_dispatch(&ret->dispex, &DOMParser_dispex, This->window, dispex_compat_mode(&This->dispex));
+
+    V_VT(res) = VT_DISPATCH;
+    V_DISPATCH(res) = (IDispatch*)&ret->IDOMParser_iface;
+    return S_OK;
+}
+
+static const dispex_static_data_vtbl_t DOMParserCtor_dispex_vtbl = {
+    .destructor       = global_ctor_destructor,
+    .traverse         = global_ctor_traverse,
+    .unlink           = global_ctor_unlink,
+    .value            = DOMParserCtor_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
+};
+
+dispex_static_data_t DOMParserCtor_dispex = {
+    "DOMParser",
+    &DOMParserCtor_dispex_vtbl,
+    PROTO_ID_NULL,
+    NULL_tid,
+    no_iface_tids
+};
+
 typedef struct {
     DispatchEx dispex;
     IHTMLScreen IHTMLScreen_iface;

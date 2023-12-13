@@ -3203,3 +3203,14 @@ sync_test("initProgressEvent", function() {
     ok(e.loaded === 99, "loaded after re-init = " + e.loaded);
     ok(e.total === 50, "total after re-init = " + e.total);
 });
+
+sync_test("DOMParser", function() {
+    var p, r = DOMParser.length;
+    ok(r === 0, "length = " + r);
+
+    p = DOMParser();
+    r = Object.getPrototypeOf(p);
+    ok(r === DOMParser.prototype, "prototype of instance created without new = " + r);
+    ok(p !== new DOMParser(), "DOMParser() == new DOMParser()");
+    ok(new DOMParser() !== new DOMParser(), "new DOMParser() == new DOMParser()");
+});

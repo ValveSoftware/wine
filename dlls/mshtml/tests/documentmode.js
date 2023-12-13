@@ -355,6 +355,7 @@ sync_test("builtin_toString", function() {
     if(v >= 9) {
         test("computedStyle", window.getComputedStyle(e), "CSSStyleDeclaration");
         test("doctype", document.doctype, "DocumentType");
+        test("domParser", new DOMParser(), "DOMParser", null, "Function");
 
         test("Event", document.createEvent("Event"), "Event");
         test("CustomEvent", document.createEvent("CustomEvent"), "CustomEvent");
@@ -821,6 +822,12 @@ sync_test("builtin_prototypes", function() {
     }else
         ok(proto.constructor === window.HTMLOptionElement, "Option.prototype.constructor = " + proto.constructor);
 
+    if(v >= 9) {
+        set_obj("DOMParser", true);
+        test_prop("parseFromString");
+        ok(proto.constructor === window.DOMParser, "DOMParser.prototype.constructor = " + proto.constructor);
+    }
+
     // other constructors don't support construction
     set_obj("ClientRect");
     set_obj("ClientRectList");
@@ -1065,6 +1072,7 @@ sync_test("builtin_prototypes", function() {
             [ "Document",                       "Node" ],
             [ "DocumentType",                   "Node" ],
             [ "DOMImplementation",              "Object" ],
+            [ "DOMParser",                      "Object" ],
             [ "DOMTokenList",                   "Object" ],
             [ "Element",                        "Node" ],
             [ "Event",                          "Object" ],
@@ -1223,6 +1231,7 @@ sync_test("builtin_constructors", function() {
     var v = document.documentMode;
 
     var special_ctors = [
+        [ "DOMParser",          [ "prototype", "arguments" ], [ "create", "length" ], 9 ],
         [ "Image",              [ "prototype", "arguments" ], [ "create", "length" ] ],
         [ "MutationObserver",   [ "prototype", "arguments" ], [ "create", "length" ], 11 ],
         [ "Option",             [ "prototype", "arguments" ], [ "create", "length" ] ],
@@ -1725,6 +1734,7 @@ sync_test("window_props", function() {
     test_exposed("WeakSet", false);
     test_exposed("performance", true);
     test_exposed("console", v >= 10);
+    test_exposed("DOMParser", v >= 9);
     test_exposed("matchMedia", v >= 10);
     test_exposed("msCrypto", v >= 11);
     test_exposed("MutationObserver", v >= 11);

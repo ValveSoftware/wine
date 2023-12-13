@@ -2558,6 +2558,7 @@ static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_
         dispex_static_data_t *dispex;
         const void *vtbl;
     } ctors[] = {
+        { PROTO_ID_DOMParser,           &DOMParserCtor_dispex },
         { PROTO_ID_MutationObserver,    &mutation_observer_ctor_dispex },
         { PROTO_ID_HTMLImgElement,      &HTMLImageCtor_dispex,              &HTMLImageElementFactoryVtbl },
         { PROTO_ID_HTMLOptionElement,   &HTMLOptionCtor_dispex,             &HTMLOptionElementFactoryVtbl },
@@ -3153,6 +3154,7 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultPrototype(IWineDispa
 static HRESULT WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window, IDispatch **ret)
 {
     static const prototype_id_t special_ctors[] = {
+        PROTO_ID_DOMParser,
         PROTO_ID_MutationObserver,
         PROTO_ID_HTMLXMLHttpRequest
     };
