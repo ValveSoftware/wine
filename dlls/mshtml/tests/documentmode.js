@@ -970,6 +970,7 @@ sync_test("builtin_prototypes", function() {
             [ "Navigator",                      "Object" ],
             [ "Node",                           "Object" ],
             [ "NodeList",                       "Object" ],
+            [ "PageTransitionEvent",            "Event" ],
             [ "Performance",                    "Object" ],
             [ "PerformanceNavigation",          "Object" ],
             [ "PerformanceTiming",              "Object" ],
