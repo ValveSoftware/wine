@@ -504,9 +504,10 @@ static const tid_t HTMLDOMAttribute_iface_tids[] = {
     IHTMLDOMAttribute2_tid,
     0
 };
-static dispex_static_data_t HTMLDOMAttribute_dispex = {
+dispex_static_data_t HTMLDOMAttribute_dispex = {
     "Attr",
     &HTMLDOMAttribute_dispex_vtbl,
+    PROTO_ID_HTMLDOMAttribute,
     DispHTMLDOMAttribute_tid,
     HTMLDOMAttribute_iface_tids
 };

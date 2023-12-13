@@ -1255,9 +1255,10 @@ static const tid_t mutation_observer_iface_tids[] = {
     IWineMSHTMLMutationObserver_tid,
     0
 };
-static dispex_static_data_t mutation_observer_dispex = {
+dispex_static_data_t mutation_observer_dispex = {
     "MutationObserver",
     &mutation_observer_dispex_vtbl,
+    PROTO_ID_MutationObserver,
     IWineMSHTMLMutationObserver_tid,
     mutation_observer_iface_tids
 };
@@ -1373,15 +1374,12 @@ static dispex_static_data_vtbl_t mutation_observer_ctor_dispex_vtbl = {
     .value            = mutation_observer_ctor_value
 };
 
-static const tid_t mutation_observer_ctor_iface_tids[] = {
-    0
-};
-
 static dispex_static_data_t mutation_observer_ctor_dispex = {
     "Function",
     &mutation_observer_ctor_dispex_vtbl,
+    PROTO_ID_NULL,
     NULL_tid,
-    mutation_observer_ctor_iface_tids
+    no_iface_tids
 };
 
 HRESULT create_mutation_observer_ctor(HTMLInnerWindow *window, IDispatch **ret)

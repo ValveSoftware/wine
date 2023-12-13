@@ -753,7 +753,10 @@ static void _test_class_info(unsigned line, IUnknown *unk, const CLSID *clsid)
 #define test_disp2(a,b,c,d,e) _test_disp2(__LINE__,a,b,c,d,e)
 static void _test_disp2(unsigned line, IUnknown *unk, const IID *diid, const IID *diid2, const CLSID *clsid, const WCHAR *val)
 {
+    IDispatchEx *dispex;
     IUnknown *u;
+    DISPID id;
+    BSTR bstr;
     IID iid;
     HRESULT hres;
 
@@ -783,6 +786,28 @@ static void _test_disp2(unsigned line, IUnknown *unk, const IID *diid, const IID
         hres = IUnknown_QueryInterface(unk, &IID_IProvideClassInfo, (void**)&u);
         ok_(__FILE__,line)(hres == E_NOINTERFACE, "Got IProvideClassInfo iface\n");
         ok_(__FILE__,line)(!u, "u = %p\n", u);
+    }
+
+    if(compat_mode >= COMPAT_IE9) {
+        dispex = _get_dispex_iface(line, unk);
+        bstr = SysAllocString(L"hasOwnProperty");
+        hres = IDispatchEx_GetDispID(dispex, bstr, 0, &id);
+        ok_(__FILE__,line)(hres == S_OK, "GetDispID(hasOwnProperty) failed: %08lx\n", hres);
+        SysFreeString(bstr);
+
+        bstr = SysAllocString(L"hasoWnPROperty");
+        hres = IDispatchEx_GetIDsOfNames(dispex, &IID_NULL, &bstr, 1, 0, &id);
+        ok_(__FILE__,line)(hres == S_OK, "GetIDsOfNames(hasoWnPROperty) failed: %08lx\n", hres);
+        ok_(__FILE__,line)(id > 0, "Unexpected DISPID for hasoWnPROperty: %ld\n", id);
+
+        hres = IDispatchEx_GetDispID(dispex, bstr, 0, &id);
+        ok_(__FILE__,line)(hres == DISP_E_UNKNOWNNAME, "GetDispID(hasoWnPROperty) returned %08lx\n", hres);
+
+        hres = IDispatchEx_GetDispID(dispex, bstr, fdexNameCaseInsensitive, &id);
+        ok_(__FILE__,line)(hres == S_OK, "GetDispID(hasoWnPROperty) with fdexNameCaseInsensitive failed: %08lx\n", hres);
+        ok_(__FILE__,line)(id > 0, "Unexpected DISPID for hasoWnPROperty with fdexNameCaseInsensitive: %ld\n", id);
+        SysFreeString(bstr);
+        IDispatchEx_Release(dispex);
     }
 }
 

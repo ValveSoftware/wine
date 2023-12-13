@@ -347,6 +347,7 @@ static void test_sp_caller(IServiceProvider *sp)
 static void test_script_vars(unsigned argc, VARIANTARG *argv)
 {
     static const WCHAR *const jsobj_names[] = { L"abc", L"foO", L"bar", L"TostRing", L"hasownpropERty" };
+    static const WCHAR *const body_names[] = { L"BAcKgRound", L"bGcoLor", L"fooBar", L"vaLUEof", L"hasownPROperty" };
     IHTMLBodyElement *body;
     IDispatchEx *disp;
     DISPID id, id2;
@@ -429,6 +430,21 @@ static void test_script_vars(unsigned argc, VARIANTARG *argv)
     hres = IDispatchEx_QueryInterface(disp, &IID_IHTMLBodyElement, (void**)&body);
     ok(hres == S_OK, "Could not get IHTMLBodyElement iface: %08lx\n", hres);
     IHTMLBodyElement_Release(body);
+
+    for(i = 0; i < ARRAY_SIZE(body_names); i++) {
+        bstr = SysAllocString(body_names[i]);
+        hres = IDispatchEx_GetIDsOfNames(disp, &IID_NULL, &bstr, 1, 0, &id);
+        ok(hres == S_OK, "GetIDsOfNames(%s) failed: %08lx\n", debugstr_w(bstr), hres);
+        ok(id > 0, "Unexpected DISPID for %s: %ld\n", debugstr_w(bstr), id);
+
+        hres = IDispatchEx_GetDispID(disp, bstr, 0, &id);
+        ok(hres == DISP_E_UNKNOWNNAME, "GetDispID(%s) returned %08lx, expected %08lx\n", debugstr_w(bstr), hres, DISP_E_UNKNOWNNAME);
+
+        hres = IDispatchEx_GetDispID(disp, bstr, fdexNameCaseInsensitive, &id);
+        ok(hres == S_OK, "GetDispID(%s) with fdexNameCaseInsensitive failed: %08lx\n", debugstr_w(bstr), hres);
+        ok(id > 0, "Unexpected DISPID for %s: %ld\n", debugstr_w(bstr), id);
+        SysFreeString(bstr);
+    }
 
     IDispatchEx_Release(disp);
 }

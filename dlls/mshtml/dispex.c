@@ -84,6 +84,10 @@ typedef struct {
     DWORD flags;
 } dynamic_prop_t;
 
+struct proxy_prototype {
+    DispatchEx dispex;
+};
+
 #define DYNPROP_DELETED    0x01
 #define DYNPROP_HIDDEN     0x02
 
@@ -129,7 +133,38 @@ PRIVATE_TID_LIST
 #undef XDIID
 };
 
+static const dispex_static_data_vtbl_t proxy_prototype_dispex_vtbl;
+const tid_t no_iface_tids[1] = { 0 };
+
+static struct prototype_static_data {
+    dispex_static_data_t dispex;
+    dispex_static_data_t *desc;
+} prototype_static_data[] = {
+#define X(id, name, dispex, proto_id) \
+{                                     \
+    {                                 \
+        name "Prototype",             \
+        &proxy_prototype_dispex_vtbl, \
+        PROTO_ID_ ## proto_id,        \
+        NULL_tid,                     \
+        no_iface_tids                 \
+    },                                \
+    &dispex                           \
+},
+LEGACY_PROTOTYPE_LIST
+COMMON_PROTOTYPE_LIST
+PROXY_PROTOTYPE_LIST
+#undef X
+};
+
+static inline dispex_data_t *proxy_prototype_object_info(struct proxy_prototype *prot)
+{
+    dispex_static_data_t *desc = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex)->desc;
+    return desc->info_cache[prot->dispex.info->compat_mode];
+}
+
 static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+static inline struct proxy_prototype *to_proxy_prototype(DispatchEx*);
 
 static HRESULT load_typelib(void)
 {
@@ -1004,13 +1039,12 @@ static const dispex_static_data_vtbl_t function_prop_dispex_vtbl = {
     .value            = function_prop_value
 };
 
-static const tid_t function_prop_iface_tids[] = { 0 };
-
 static dispex_static_data_t function_prop_dispex = {
     "Function",
     &function_prop_dispex_vtbl,
+    PROTO_ID_NULL,
     NULL_tid,
-    function_prop_iface_tids
+    no_iface_tids
 };
 
 static inline func_disp_t *impl_from_DispatchEx(DispatchEx *iface)
@@ -1120,13 +1154,12 @@ static const dispex_static_data_vtbl_t function_dispex_vtbl = {
     .invoke           = function_invoke
 };
 
-static const tid_t function_iface_tids[] = {0};
-
 static dispex_static_data_t function_dispex = {
     "Function",
     &function_dispex_vtbl,
+    PROTO_ID_NULL,
     NULL_tid,
-    function_iface_tids
+    no_iface_tids
 };
 
 static func_disp_t *create_func_disp(DispatchEx *obj, func_info_t *info)
@@ -1238,6 +1271,18 @@ static HRESULT get_builtin_func(dispex_data_t *data, DISPID id, func_info_t **re
 
     WARN("invalid id %lx\n", id);
     return DISP_E_MEMBERNOTFOUND;
+}
+
+static HRESULT get_builtin_func_prot(DispatchEx *This, DISPID id, func_info_t **ret)
+{
+    if(This->proxy) {
+        struct proxy_prototype *prot = to_proxy_prototype(This);
+        if(prot)
+            return get_builtin_func(proxy_prototype_object_info(prot), id, ret);
+        if(id != DISPID_VALUE && This->info->desc->prototype_id >= 0)
+            return DISP_E_MEMBERNOTFOUND;
+    }
+    return get_builtin_func(This->info, id, ret);
 }
 
 HRESULT dispex_get_builtin_id(DispatchEx *This, BSTR name, DWORD grfdex, DISPID *ret)
@@ -1618,7 +1663,7 @@ static HRESULT invoke_builtin_prop(DispatchEx *This, IDispatch *this_obj, DISPID
     IUnknown *iface;
     HRESULT hres;
 
-    hres = get_builtin_func(This->info, id, &func);
+    hres = get_builtin_func_prot(This, id, &func);
     if(id == DISPID_VALUE && hres == DISP_E_MEMBERNOTFOUND)
         return dispex_value(This, lcid, flags, dp, res, ei, caller);
     if(FAILED(hres))
@@ -1780,7 +1825,7 @@ HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
 {
     static const WCHAR prefix[8] = L"[object ";
     static const WCHAR suffix[] = L"]";
-    WCHAR buf[ARRAY_SIZE(prefix) + 28 + ARRAY_SIZE(suffix)], *p = buf;
+    WCHAR buf[ARRAY_SIZE(prefix) + 36 + ARRAY_SIZE(suffix)], *p = buf;
     compat_mode_t compat_mode = dispex_compat_mode(dispex);
     const char *name = dispex->info->desc->name;
 
@@ -1822,9 +1867,84 @@ static BOOL ensure_real_info(DispatchEx *dispex)
     return dispex->info != NULL;
 }
 
+static inline struct proxy_prototype *proxy_prototype_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, struct proxy_prototype, dispex);
+}
+
+static inline struct proxy_prototype *to_proxy_prototype(DispatchEx *dispex)
+{
+    if(dispex->info->desc >= &prototype_static_data[0].dispex && dispex->info->desc < &prototype_static_data[ARRAY_SIZE(prototype_static_data)].dispex)
+        return proxy_prototype_from_DispatchEx(dispex);
+    return NULL;
+}
+
+static void proxy_prototype_destructor(DispatchEx *dispex)
+{
+    struct proxy_prototype *This = proxy_prototype_from_DispatchEx(dispex);
+    free(This);
+}
+
+static const dispex_static_data_vtbl_t proxy_prototype_dispex_vtbl = {
+    .destructor       = proxy_prototype_destructor
+};
+
+static HRESULT get_prototype_builtin_id(struct proxy_prototype *prot, BSTR name, DWORD flags, DISPID *id)
+{
+    dispex_data_t *data = proxy_prototype_object_info(prot);
+    func_info_t **funcs = data->name_table;
+    DWORD i, a = 0, b = data->func_cnt;
+    int c;
+
+    while(a < b) {
+        i = (a + b) / 2;
+        c = wcsicmp(funcs[i]->name, name);
+        if(!c) {
+            if((flags & fdexNameCaseSensitive) && wcscmp(funcs[i]->name, name))
+                break;
+            *id = funcs[i]->id;
+            return S_OK;
+        }
+        if(c > 0) b = i;
+        else      a = i + 1;
+    }
+
+    if(data->desc->vtbl->get_static_dispid)
+        return data->desc->vtbl->get_static_dispid(dispex_compat_mode(&prot->dispex), name, flags, id);
+    return DISP_E_UNKNOWNNAME;
+}
+
+static IDispatch *get_default_prototype(prototype_id_t prot_id, compat_mode_t compat_mode, HTMLInnerWindow *window)
+{
+    struct proxy_prototype *prot;
+    IDispatch **entry;
+
+    if(!ensure_dispex_info(prototype_static_data[prot_id].desc, compat_mode))
+        return NULL;
+
+    if(!window->proxy_globals && (!(window->proxy_globals = calloc(1, sizeof(*window->proxy_globals)))))
+        return NULL;
+
+    entry = &window->proxy_globals->prototype[prot_id - LEGACY_PROTOTYPE_COUNT];
+    if(*entry) {
+        IDispatch_AddRef(*entry);
+        return *entry;
+    }
+
+    if(!(prot = malloc(sizeof(*prot))))
+        return NULL;
+
+    init_dispatch(&prot->dispex, &prototype_static_data[prot_id].dispex, NULL, compat_mode);
+
+    IDispatchEx_AddRef(&prot->dispex.IDispatchEx_iface);
+    *entry = (IDispatch*)&prot->dispex.IDispatchEx_iface;
+    return *entry;
+}
+
 static HRESULT proxy_get_dispid(DispatchEx *dispex, const WCHAR *name, BOOL case_insens, DISPID *id)
 {
     DWORD grfdex = case_insens ? fdexNameCaseInsensitive : fdexNameCaseSensitive;
+    struct proxy_prototype *prot = to_proxy_prototype(dispex);
     dynamic_prop_t *dprop;
     HRESULT hres;
     BSTR bstr;
@@ -1832,11 +1952,30 @@ static HRESULT proxy_get_dispid(DispatchEx *dispex, const WCHAR *name, BOOL case
     if(!ensure_real_info(dispex) || !(bstr = SysAllocString(name)))
         return E_OUTOFMEMORY;
 
-    /* FIXME: move builtins to the prototype */
-    hres = dispex_get_builtin_id(dispex, bstr, grfdex, id);
+    if(!prot && dispex->info->desc->prototype_id < 0) {
+        hres = dispex_get_builtin_id(dispex, bstr, grfdex, id);
+        if(hres != DISP_E_UNKNOWNNAME) {
+            SysFreeString(bstr);
+            return hres;
+        }
+    }else {
+        if(prot) {
+            hres = get_prototype_builtin_id(prot, bstr, grfdex, id);
+            if(hres != DISP_E_UNKNOWNNAME) {
+                SysFreeString(bstr);
+                return hres;
+            }
+        }
+
+        if(dispex->info->desc->vtbl->get_dispid) {
+            hres = dispex->info->desc->vtbl->get_dispid(dispex, bstr, grfdex, id);
+            if(hres != DISP_E_UNKNOWNNAME) {
+                SysFreeString(bstr);
+                return hres;
+            }
+        }
+    }
     SysFreeString(bstr);
-    if(hres != DISP_E_UNKNOWNNAME)
-        return hres;
 
     hres = get_dynamic_prop(dispex, name, grfdex, &dprop);
     if(FAILED(hres))
@@ -2258,10 +2397,26 @@ static IWineDispatchProxyCbPrivate** WINAPI WineDispatchProxyPrivate_GetProxyFie
     return &This->proxy;
 }
 
-static BOOL WINAPI WineDispatchProxyPrivate_HasProxy(IWineDispatchProxyPrivate *iface)
+static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
-    return This->info->compat_mode >= COMPAT_MODE_IE9;
+    HTMLWindow *base_window;
+    prototype_id_t prot_id;
+
+    if(!ensure_real_info(This))
+        return NULL;
+
+    prot_id = This->info->desc->prototype_id;
+    if(prot_id < 0)
+        return (IDispatch*)IntToPtr(prot_id);
+
+    if(prot_id < LEGACY_PROTOTYPE_COUNT)
+        return (IDispatch*)IntToPtr(PROTO_ID_NULL);
+
+    if(!(base_window = unsafe_HTMLWindow_from_IWineDispatchProxyPrivate(window)))
+        return (IDispatch*)IntToPtr(PROTO_ID_Object);
+
+    return get_default_prototype(prot_id, dispex_compat_mode(This), base_window->inner_window);
 }
 
 static HRESULT WINAPI WineDispatchProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
@@ -2347,7 +2502,7 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropGetInfo(IWineDispatchProxyPri
         return S_OK;
     }
 
-    hres = get_builtin_func(This->info, info->dispid, &func);
+    hres = get_builtin_func_prot(This, info->dispid, &func);
     if(FAILED(hres))
         return (hres == DISP_E_MEMBERNOTFOUND) ? E_UNEXPECTED : hres;
     info->func[0].context = info->func[1].context = func;
@@ -2382,6 +2537,9 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropInvoke(IWineDispatchProxyPriv
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
 
+    if(id == DISPID_VALUE && to_proxy_prototype(This))
+        return dispex_value(This, lcid, flags, dp, ret, ei, caller);
+
     return dispex_invoke(This, this_obj, id, lcid, flags, dp, ret, ei, caller);
 }
 
@@ -2395,17 +2553,27 @@ static HRESULT WINAPI WineDispatchProxyPrivate_PropDelete(IWineDispatchProxyPriv
 static HRESULT WINAPI WineDispatchProxyPrivate_PropEnum(IWineDispatchProxyPrivate *iface)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    struct proxy_prototype *prot = to_proxy_prototype(This);
     IWineDispatchProxyCbPrivate *obj = This->proxy;
+    func_info_t *func = NULL, *func_end = NULL;
     dynamic_prop_t *dyn_prop, *dyn_prop_end;
     dispex_dynamic_data_t *dyn_data;
-    func_info_t *func, *func_end;
     HRESULT hres;
     HRESULT (STDMETHODCALLTYPE *callback)(IWineDispatchProxyCbPrivate*,const WCHAR*) = obj->lpVtbl->PropEnum;
 
     if(!ensure_real_info(This))
         return E_OUTOFMEMORY;
 
-    for(func = This->info->funcs, func_end = func + This->info->func_cnt; func != func_end; func++) {
+    if(prot) {
+        dispex_data_t *info = proxy_prototype_object_info(prot);
+        func = info->funcs;
+        func_end = func + info->func_cnt;
+    }else if(This->info->desc->prototype_id < 0) {
+        func = This->info->funcs;
+        func_end = func + This->info->func_cnt;
+    }
+
+    for(; func != func_end; func++) {
         if(func->func_disp_idx == -1) {
             hres = callback(obj, func->name);
             if(FAILED(hres))
@@ -2475,7 +2643,7 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
 
     /* IWineDispatchProxyPrivate extension */
     WineDispatchProxyPrivate_GetProxyFieldRef,
-    WineDispatchProxyPrivate_HasProxy,
+    WineDispatchProxyPrivate_GetDefaultPrototype,
     WineDispatchProxyPrivate_PropFixOverride,
     WineDispatchProxyPrivate_PropOverride,
     WineDispatchProxyPrivate_PropDefineOverride,

@@ -157,15 +157,16 @@ static const event_target_vtbl_t HTMLGenericElement_event_target_vtbl = {
     .handle_event       = HTMLElement_handle_event
 };
 
-static const tid_t HTMLGenericElement_iface_tids[] = {
+const tid_t HTMLGenericElement_iface_tids[] = {
     HTMLELEMENT_TIDS,
     IHTMLGenericElement_tid,
     0
 };
 
-static dispex_static_data_t HTMLGenericElement_dispex = {
+dispex_static_data_t HTMLGenericElement_dispex = {
     "HTMLUnknownElement",
     &HTMLGenericElement_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLGenericElement,
     DispHTMLGenericElement_tid,
     HTMLGenericElement_iface_tids,
     HTMLElement_init_dispex_info

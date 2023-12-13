@@ -3001,6 +3001,8 @@ sync_test("Crypto", function() {
     var crypto = window.msCrypto;
     if(!crypto) return;
 
+    ok(Object.prototype.hasOwnProperty.call(Object.getPrototypeOf(window), "msCrypto"), "msCrypto not a property of window's prototype.");
+
     ok("subtle" in crypto, "subtle not in crypto");
     ok("getRandomValues" in crypto, "getRandomValues not in crypto");
     ok(!("randomUUID" in crypto), "randomUUID is in crypto");

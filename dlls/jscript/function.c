@@ -934,11 +934,6 @@ HRESULT create_proxy_functions(jsdisp_t *jsdisp, const struct proxy_prop_info *i
     return S_OK;
 }
 
-BOOL is_proxy_func(jsdisp_t *jsdisp)
-{
-    return jsdisp && is_class(jsdisp, JSCLASS_FUNCTION) && function_from_jsdisp(jsdisp)->vtbl == &ProxyFunctionVtbl;
-}
-
 /*
  * Create the actual prototype on demand, since it is a circular ref, which prevents the vast
  * majority of functions from being released quickly, leading to unnecessary scope detach.

@@ -378,9 +378,10 @@ static const tid_t DocumentType_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t DocumentType_dispex = {
+dispex_static_data_t DocumentType_dispex = {
     "DocumentType",
     &DocumentType_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_DocumentType,
     DispDOMDocumentType_tid,
     DocumentType_iface_tids
 };
@@ -5212,9 +5213,12 @@ static IWineDispatchProxyCbPrivate** WINAPI DocWineDispProxyPrivate_GetProxyFiel
     return &This->node.event_target.dispex.proxy;
 }
 
-static BOOL WINAPI DocWineDispProxyPrivate_HasProxy(IWineDispatchProxyPrivate *iface)
+static IDispatch* WINAPI DocWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window)
 {
-    return TRUE;
+    HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->node.event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->GetDefaultPrototype(itf, window);
 }
 
 static HRESULT WINAPI DocWineDispProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
@@ -5363,7 +5367,7 @@ static const IWineDispatchProxyPrivateVtbl DocDispatchExVtbl = {
 
     /* IWineDispatchProxyPrivate extension */
     DocWineDispProxyPrivate_GetProxyFieldRef,
-    DocWineDispProxyPrivate_HasProxy,
+    DocWineDispProxyPrivate_GetDefaultPrototype,
     DocWineDispProxyPrivate_PropFixOverride,
     DocWineDispProxyPrivate_PropOverride,
     DocWineDispProxyPrivate_PropDefineOverride,
@@ -6348,9 +6352,10 @@ static void HTMLDocumentNode_init_dispex_info(dispex_data_t *info, compat_mode_t
     dispex_info_add_interface(info, IHTMLDocument2_tid, mode >= COMPAT_MODE_IE11 ? document2_ie11_hooks : document2_hooks);
 }
 
-static dispex_static_data_t HTMLDocumentNode_dispex = {
+dispex_static_data_t HTMLDocumentNode_dispex = {
     "HTMLDocument",
     &HTMLDocumentNode_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLDocument,
     DispHTMLDocument_tid,
     HTMLDocumentNode_iface_tids,
     HTMLDocumentNode_init_dispex_info

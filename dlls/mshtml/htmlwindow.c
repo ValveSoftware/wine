@@ -3920,9 +3920,12 @@ static IWineDispatchProxyCbPrivate** WINAPI WindowWineDispProxyPrivate_GetProxyF
     return &This->inner_window->event_target.dispex.proxy;
 }
 
-static BOOL WINAPI WindowWineDispProxyPrivate_HasProxy(IWineDispatchProxyPrivate *iface)
+static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultPrototype(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window)
 {
-    return TRUE;
+    HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
+    IWineDispatchProxyPrivate *itf = (IWineDispatchProxyPrivate*)&This->inner_window->event_target.dispex.IDispatchEx_iface;
+
+    return itf->lpVtbl->GetDefaultPrototype(itf, iface);
 }
 
 static HRESULT WINAPI WindowWineDispProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
@@ -4106,7 +4109,7 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
 
     /* IWineDispatchProxyPrivate extension */
     WindowWineDispProxyPrivate_GetProxyFieldRef,
-    WindowWineDispProxyPrivate_HasProxy,
+    WindowWineDispProxyPrivate_GetDefaultPrototype,
     WindowWineDispProxyPrivate_PropFixOverride,
     WindowWineDispProxyPrivate_PropOverride,
     WindowWineDispProxyPrivate_PropDefineOverride,
@@ -4117,6 +4120,11 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     WindowWineDispProxyPrivate_ToString,
     WindowWineDispProxyPrivate_InitCC
 };
+
+HTMLWindow *unsafe_HTMLWindow_from_IWineDispatchProxyPrivate(IWineDispatchProxyPrivate *iface)
+{
+    return iface && iface->lpVtbl == &WindowDispExVtbl ? impl_from_IWineDispatchProxyPrivate(iface) : NULL;
+}
 
 static inline HTMLOuterWindow *impl_from_IEventTarget(IEventTarget *iface)
 {
@@ -4276,6 +4284,7 @@ static void HTMLWindow_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCa
 {
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
     HTMLOuterWindow *child;
+    unsigned i;
 
     traverse_event_target(&This->event_target, cb);
     LIST_FOR_EACH_ENTRY(child, &This->children, HTMLOuterWindow, sibling_entry)
@@ -4292,6 +4301,12 @@ static void HTMLWindow_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCa
         note_cc_edge((nsISupports*)&This->xhr_factory->IHTMLXMLHttpRequestFactory_iface, "xhr_factory", cb);
     if(This->mutation_observer_ctor)
         note_cc_edge((nsISupports*)This->mutation_observer_ctor, "mutation_observer_ctor", cb);
+    if(This->proxy_globals) {
+        struct proxy_globals *globals = This->proxy_globals;
+        for(i = 0; i < ARRAY_SIZE(globals->prototype); i++)
+            if(globals->prototype[i])
+                note_cc_edge((nsISupports*)globals->prototype[i], "proxy_prototype", cb);
+    }
     if(This->screen)
         note_cc_edge((nsISupports*)This->screen, "screen", cb);
     if(This->history)
@@ -4312,6 +4327,7 @@ static void HTMLWindow_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCa
 static void HTMLWindow_unlink(DispatchEx *dispex)
 {
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
+    unsigned i;
 
     TRACE("%p\n", This);
 
@@ -4342,6 +4358,15 @@ static void HTMLWindow_unlink(DispatchEx *dispex)
         IHTMLXMLHttpRequestFactory_Release(&xhr_factory->IHTMLXMLHttpRequestFactory_iface);
     }
     unlink_ref(&This->mutation_observer_ctor);
+    if(This->proxy_globals) {
+        struct proxy_globals *globals = This->proxy_globals;
+        This->proxy_globals = NULL;
+
+        for(i = 0; i < ARRAY_SIZE(globals->prototype); i++)
+            if(globals->prototype[i])
+                IDispatch_Release(globals->prototype[i]);
+        free(globals);
+    }
     unlink_ref(&This->screen);
     if(This->history) {
         OmHistory *history = This->history;
@@ -4723,13 +4748,12 @@ static const event_target_vtbl_t HTMLWindow_event_target_vtbl = {
     .set_current_event       = HTMLWindow_set_current_event
 };
 
-static const tid_t HTMLWindow_iface_tids[] = { 0 };
-
-static dispex_static_data_t HTMLWindow_dispex = {
+dispex_static_data_t HTMLWindow_dispex = {
     "Window",
     &HTMLWindow_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLWindow,
     DispHTMLWindow2_tid,
-    HTMLWindow_iface_tids,
+    no_iface_tids,
     HTMLWindow_init_dispex_info
 };
 

@@ -767,9 +767,10 @@ static const tid_t HTMLObjectElement_iface_tids[] = {
     HTMLELEMENT_TIDS,
     0
 };
-static dispex_static_data_t HTMLObjectElement_dispex = {
+dispex_static_data_t HTMLObjectElement_dispex = {
     "HTMLObjectElement",
     &HTMLObjectElement_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLObjectElement,
     DispHTMLObjectElement_tid,
     HTMLObjectElement_iface_tids,
     HTMLElement_init_dispex_info
@@ -1022,9 +1023,10 @@ static const tid_t HTMLEmbedElement_iface_tids[] = {
     IHTMLEmbedElement_tid,
     0
 };
-static dispex_static_data_t HTMLEmbedElement_dispex = {
+dispex_static_data_t HTMLEmbedElement_dispex = {
     "HTMLEmbedElement",
     &HTMLEmbedElement_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLEmbedElement,
     DispHTMLEmbed_tid,
     HTMLEmbedElement_iface_tids,
     HTMLElement_init_dispex_info

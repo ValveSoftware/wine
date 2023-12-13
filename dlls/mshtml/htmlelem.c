@@ -857,9 +857,10 @@ static const tid_t HTMLRect_iface_tids[] = {
     IHTMLRect_tid,
     0
 };
-static dispex_static_data_t HTMLRect_dispex = {
+dispex_static_data_t HTMLRect_dispex = {
     "ClientRect",
     &HTMLRect_dispex_vtbl,
+    PROTO_ID_HTMLRect,
     IHTMLRect_tid,
     HTMLRect_iface_tids,
     HTMLRect_init_dispex_info
@@ -1292,9 +1293,10 @@ static const tid_t HTMLRectCollection_iface_tids[] = {
     IHTMLRectCollection_tid,
     0
 };
-static dispex_static_data_t HTMLRectCollection_dispex = {
+dispex_static_data_t HTMLRectCollection_dispex = {
     "ClientRectList",
     &HTMLRectCollection_dispex_vtbl,
+    PROTO_ID_HTMLRectCollection,
     IHTMLRectCollection_tid,
     HTMLRectCollection_iface_tids
 };
@@ -7778,9 +7780,10 @@ static const tid_t token_list_iface_tids[] = {
     IWineDOMTokenList_tid,
     0
 };
-static dispex_static_data_t token_list_dispex = {
+dispex_static_data_t token_list_dispex = {
     "DOMTokenList",
     &token_list_dispex_vtbl,
+    PROTO_ID_DOMTokenList,
     IWineDOMTokenList_tid,
     token_list_iface_tids
 };
@@ -7889,17 +7892,19 @@ static const IWineHTMLElementPrivateVtbl WineHTMLElementPrivateVtbl = {
     htmlelement_private_get_classList,
 };
 
-static dispex_static_data_t HTMLElement_dispex = {
+dispex_static_data_t HTMLElement_dispex = {
     "HTMLElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLElement,
     DispHTMLUnknownElement_tid,
     HTMLElement_iface_tids,
     HTMLElement_init_dispex_info
 };
 
-static dispex_static_data_t HTMLUnknownElement_dispex = {
+dispex_static_data_t HTMLUnknownElement_dispex = {
     "HTMLUnknownElement",
     &HTMLElement_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLUnknownElement,
     DispHTMLUnknownElement_tid,
     HTMLElement_iface_tids,
     HTMLElement_init_dispex_info
@@ -7972,7 +7977,7 @@ HRESULT HTMLElement_Create(HTMLDocumentNode *doc, nsIDOMNode *nsnode, BOOL use_g
         if(NS_SUCCEEDED(nsres)) {
             hres = create_svg_element(doc, svg_element, tag_name, &elem);
             nsIDOMSVGElement_Release(svg_element);
-        }else if(use_generic) {
+        }else if(use_generic || doc->document_mode >= COMPAT_MODE_IE9) {
             hres = HTMLGenericElement_Create(doc, nselem, &elem);
         }else {
             elem = calloc(1, sizeof(HTMLElement));
@@ -8189,6 +8194,7 @@ static const tid_t HTMLFiltersCollection_iface_tids[] = {
 static dispex_static_data_t HTMLFiltersCollection_dispex = {
     "FiltersCollection",
     &HTMLFiltersCollection_dispex_vtbl,
+    PROTO_ID_NULL,
     IHTMLFiltersCollection_tid,
     HTMLFiltersCollection_iface_tids
 };
@@ -8945,9 +8951,10 @@ static const tid_t HTMLAttributeCollection_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLAttributeCollection_dispex = {
+dispex_static_data_t HTMLAttributeCollection_dispex = {
     "NamedNodeMap",
     &HTMLAttributeCollection_dispex_vtbl,
+    PROTO_ID_HTMLAttributeCollection,
     DispHTMLAttributeCollection_tid,
     HTMLAttributeCollection_iface_tids
 };

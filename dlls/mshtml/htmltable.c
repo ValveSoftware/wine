@@ -497,9 +497,10 @@ static const tid_t HTMLTableCell_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLTableCell_dispex = {
+dispex_static_data_t HTMLTableCell_dispex = {
     "HTMLTableDataCellElement",
     &HTMLTableCell_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLTableCellElement,
     DispHTMLTableCell_tid,
     HTMLTableCell_iface_tids,
     HTMLElement_init_dispex_info
@@ -922,9 +923,10 @@ static const tid_t HTMLTableRow_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLTableRow_dispex = {
+dispex_static_data_t HTMLTableRow_dispex = {
     "HTMLTableRowElement",
     &HTMLTableRow_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLTableRowElement,
     DispHTMLTableRow_tid,
     HTMLTableRow_iface_tids,
     HTMLElement_init_dispex_info
@@ -1933,9 +1935,10 @@ static const tid_t HTMLTable_iface_tids[] = {
     0
 };
 
-static dispex_static_data_t HTMLTable_dispex = {
+dispex_static_data_t HTMLTable_dispex = {
     "HTMLTableElement",
     &HTMLTable_event_target_vtbl.dispex_vtbl,
+    PROTO_ID_HTMLTableElement,
     DispHTMLTable_tid,
     HTMLTable_iface_tids,
     HTMLElement_init_dispex_info
