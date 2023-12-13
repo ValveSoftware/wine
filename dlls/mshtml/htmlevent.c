@@ -1876,11 +1876,19 @@ static HRESULT WINAPI HTMLEventObj5_put_origin(IHTMLEventObj5 *iface, BSTR v)
 static HRESULT WINAPI HTMLEventObj5_get_origin(IHTMLEventObj5 *iface, BSTR *p)
 {
     HTMLEventObj *This = impl_from_IHTMLEventObj5(iface);
+    IDOMMessageEvent *message_event;
+    HRESULT hres;
 
-    FIXME("(%p)->(%p)\n", This, p);
+    TRACE("(%p)->(%p)\n", This, p);
 
-    *p = NULL;
-    return S_OK;
+    if(!This->event || FAILED(IDOMEvent_QueryInterface(&This->event->IDOMEvent_iface, &IID_IDOMMessageEvent, (void**)&message_event))) {
+        *p = NULL;
+        return S_OK;
+    }
+
+    hres = IDOMMessageEvent_get_origin(message_event, p);
+    IDOMMessageEvent_Release(message_event);
+    return hres;
 }
 
 static HRESULT WINAPI HTMLEventObj5_put_issession(IHTMLEventObj5 *iface, VARIANT_BOOL v)
@@ -3669,6 +3677,7 @@ typedef struct {
     DOMEvent event;
     IDOMMessageEvent IDOMMessageEvent_iface;
     IHTMLWindow2 *source;
+    BSTR origin;
     VARIANT data;
 } DOMMessageEvent;
 
@@ -3756,8 +3765,14 @@ static HRESULT DOMMessageEvent_get_data_hook(DispatchEx *dispex, WORD flags, DIS
 static HRESULT WINAPI DOMMessageEvent_get_origin(IDOMMessageEvent *iface, BSTR *p)
 {
     DOMMessageEvent *This = impl_from_IDOMMessageEvent(iface);
-    FIXME("(%p)->(%p)\n", This, p);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    if(This->origin)
+        return (*p = SysAllocStringLen(This->origin, SysStringLen(This->origin))) ? S_OK : E_OUTOFMEMORY;
+
+    *p = NULL;
+    return S_OK;
 }
 
 static HRESULT WINAPI DOMMessageEvent_get_source(IDOMMessageEvent *iface, IHTMLWindow2 **p)
@@ -3829,6 +3844,7 @@ static void DOMMessageEvent_unlink(DispatchEx *dispex)
 static void DOMMessageEvent_destructor(DispatchEx *dispex)
 {
     DOMMessageEvent *message_event = DOMMessageEvent_from_DOMEvent(DOMEvent_from_DispatchEx(dispex));
+    SysFreeString(message_event->origin);
     VariantClear(&message_event->data);
     DOMEvent_destructor(dispex);
 }
@@ -4602,21 +4618,56 @@ HRESULT create_document_event(HTMLDocumentNode *doc, eventid_t event_id, DOMEven
 HRESULT create_message_event(HTMLDocumentNode *doc, IHTMLWindow2 *source, VARIANT *data, DOMEvent **ret)
 {
     DOMMessageEvent *message_event;
+    BSTR bstr, origin = NULL;
+    IHTMLLocation *location;
     DOMEvent *event;
     HRESULT hres;
+    UINT len;
 
-    hres = create_document_event(doc, EVENTID_MESSAGE, &event);
+    hres = IHTMLWindow2_get_location(source, &location);
     if(FAILED(hres))
         return hres;
+
+    hres = IHTMLLocation_get_protocol(location, &bstr);
+    if(FAILED(hres)) {
+        IHTMLLocation_Release(location);
+        return hres;
+    }
+    len = SysStringLen(bstr);
+    SysFreeString(bstr);
+
+    hres = IHTMLLocation_get_href(location, &bstr);
+    IHTMLLocation_Release(location);
+    if(FAILED(hres))
+        return hres;
+    if(bstr) {
+        static const WCHAR delims[] = L"/\\";
+
+        if(bstr[len] == '/' && bstr[len + 1] == '/')
+            len += 2 + wcscspn(bstr + len + 2, delims);
+
+        origin = SysAllocStringLen(bstr, len);
+        SysFreeString(bstr);
+        if(!origin)
+            return E_OUTOFMEMORY;
+    }
+
+    hres = create_document_event(doc, EVENTID_MESSAGE, &event);
+    if(FAILED(hres)) {
+        SysFreeString(origin);
+        return hres;
+    }
     message_event = DOMMessageEvent_from_DOMEvent(event);
 
     V_VT(&message_event->data) = VT_EMPTY;
     hres = VariantCopy(&message_event->data, data);
     if(FAILED(hres)) {
         IDOMEvent_Release(&event->IDOMEvent_iface);
+        SysFreeString(origin);
         return hres;
     }
 
+    message_event->origin = origin;
     message_event->source = source;
     IHTMLWindow2_AddRef(message_event->source);
 
