@@ -850,7 +850,7 @@ static BOOL lookup_global_members(script_ctx_t *ctx, BSTR identifier, exprval_t 
     HRESULT hres;
 
     LIST_FOR_EACH_ENTRY(item, &ctx->named_items, named_item_t, entry) {
-        if(item->flags & SCRIPTITEM_GLOBALMEMBERS) {
+        if((item->flags & SCRIPTITEM_GLOBALMEMBERS) && item->disp != (IDispatch*)&ctx->global->IDispatchEx_iface) {
             hres = disp_get_id(ctx, item->disp, identifier, identifier, 0, &id);
             if(SUCCEEDED(hres)) {
                 if(ret)

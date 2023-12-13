@@ -909,6 +909,7 @@ static HRESULT WINAPI JScript_AddNamedItem(IActiveScript *iface,
         return E_UNEXPECTED;
 
     if(dwFlags & SCRIPTITEM_GLOBALMEMBERS) {
+        jsdisp_t *jsdisp;
         IUnknown *unk;
         jsval_t val;
 
@@ -933,6 +934,16 @@ static HRESULT WINAPI JScript_AddNamedItem(IActiveScript *iface,
         if(FAILED(hres))
             return hres;
         disp = get_object(val);
+
+        if((jsdisp = to_jsdisp(disp)) && jsdisp->proxy) {
+            hres = set_js_globals(jsdisp);
+            if(FAILED(hres)) {
+                jsdisp_release(jsdisp);
+                return hres;
+            }
+            jsdisp_release(This->ctx->global);
+            This->ctx->global = jsdisp_addref(jsdisp);
+        }
     }
 
     item = malloc(sizeof(*item));
@@ -989,7 +1000,7 @@ static HRESULT WINAPI JScript_GetScriptDispatch(IActiveScript *iface, LPCOLESTR 
         if(item->script_obj) script_obj = item->script_obj;
     }
 
-    *ppdisp = to_disp(script_obj);
+    *ppdisp = script_obj->proxy ? (IDispatch*)script_obj->proxy : to_disp(script_obj);
     IDispatch_AddRef(*ppdisp);
     return S_OK;
 }

@@ -1152,5 +1152,11 @@ HRESULT init_global(script_ctx_t *ctx)
     if(FAILED(hres))
         return hres;
 
-    return init_set_constructor(ctx);
+    hres = init_set_constructor(ctx);
+    if(FAILED(hres))
+        return hres;
+
+    if(ctx->js_global) jsdisp_release(ctx->js_global);
+    ctx->js_global = jsdisp_addref(ctx->global);
+    return hres;
 }

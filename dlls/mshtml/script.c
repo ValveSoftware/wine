@@ -1825,7 +1825,11 @@ BOOL find_global_prop(HTMLInnerWindow *window, BSTR name, DWORD flags, ScriptHos
 
         hres = IDispatch_QueryInterface(disp, &IID_IDispatchEx, (void**)&dispex);
         if(SUCCEEDED(hres)) {
-            hres = IDispatchEx_GetDispID(dispex, name, flags & (~fdexNameEnsure), ret_id);
+            /* Avoid looking into ourselves if it's a proxy used as actual global object */
+            if(dispex == &window->base.outer_window->base.IDispatchEx_iface)
+                hres = DISP_E_UNKNOWNNAME;
+            else
+                hres = IDispatchEx_GetDispID(dispex, name, flags & (~fdexNameEnsure), ret_id);
             IDispatchEx_Release(dispex);
         }else {
             FIXME("No IDispatchEx\n");

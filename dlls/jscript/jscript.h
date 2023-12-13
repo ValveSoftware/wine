@@ -367,6 +367,7 @@ HRESULT create_dispex(script_ctx_t*,const builtin_info_t*,jsdisp_t*,jsdisp_t**);
 HRESULT init_dispex(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*);
 HRESULT init_dispex_from_constr(jsdisp_t*,script_ctx_t*,const builtin_info_t*,jsdisp_t*);
 HRESULT convert_to_proxy(script_ctx_t*,jsval_t*);
+HRESULT set_js_globals(jsdisp_t*);
 void init_cc_api(IDispatch*);
 
 void disp_fill_exception(script_ctx_t*,EXCEPINFO*);
@@ -533,6 +534,7 @@ struct _script_ctx_t {
     union {
         struct {
             jsdisp_t *global;
+            jsdisp_t *js_global;
             jsdisp_t *function_constr;
             jsdisp_t *array_constr;
             jsdisp_t *bool_constr;
@@ -559,7 +561,7 @@ struct _script_ctx_t {
             jsdisp_t *set_prototype;
             jsdisp_t *weakmap_prototype;
         };
-        jsdisp_t *global_objects[25 + NUM_TYPEDARRAY_TYPES];
+        jsdisp_t *global_objects[26 + NUM_TYPEDARRAY_TYPES];
     };
 };
 C_ASSERT(RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, weakmap_prototype) == RTL_SIZEOF_THROUGH_FIELD(script_ctx_t, global_objects));
