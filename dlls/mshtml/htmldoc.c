@@ -6240,11 +6240,15 @@ static compat_mode_t HTMLDocumentNode_get_compat_mode(DispatchEx *dispex)
 static void HTMLDocumentNode_finalize_dispex(DispatchEx *dispex)
 {
     HTMLDocumentNode *This = impl_from_DispatchEx(dispex);
+    compat_mode_t compat_mode = lock_document_mode(This);
+    dispex_static_data_t *dispex_data;
 
-    lock_document_mode(This);
+    if(COMPAT_MODE_IE9 <= compat_mode && compat_mode < COMPAT_MODE_IE11)
+        dispex_data = &DocumentNode_dispex;
+    else
+        dispex_data = &HTMLDocumentNode_dispex;
 
-    /* FIXME: IE9 and IE10 have different dispex data */
-    finalize_delayed_init_dispex(dispex, get_inner_window(This), &HTMLDocumentNode_dispex);
+    finalize_delayed_init_dispex(dispex, get_inner_window(This), dispex_data);
 }
 
 static nsISupports *HTMLDocumentNode_get_gecko_target(DispatchEx *dispex)

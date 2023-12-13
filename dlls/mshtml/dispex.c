@@ -1987,32 +1987,6 @@ compat_mode_t dispex_compat_mode(DispatchEx *dispex)
         : dispex->info->desc->vtbl->get_compat_mode(dispex);
 }
 
-HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
-{
-    static const WCHAR prefix[8] = L"[object ";
-    static const WCHAR suffix[] = L"]";
-    WCHAR buf[ARRAY_SIZE(prefix) + 36 + ARRAY_SIZE(suffix)], *p = buf;
-    compat_mode_t compat_mode = dispex_compat_mode(dispex);
-    const char *name = dispex->info->desc->name;
-
-    if(!ret)
-        return E_INVALIDARG;
-
-    memcpy(p, prefix, sizeof(prefix));
-    p += ARRAY_SIZE(prefix);
-    if(compat_mode < COMPAT_MODE_IE9)
-        p--;
-    else {
-        while(*name)
-            *p++ = *name++;
-        assert(p + ARRAY_SIZE(suffix) - buf <= ARRAY_SIZE(buf));
-    }
-    memcpy(p, suffix, sizeof(suffix));
-
-    *ret = SysAllocString(buf);
-    return *ret ? S_OK : E_OUTOFMEMORY;
-}
-
 static dispex_data_t *ensure_dispex_info(dispex_static_data_t *desc, compat_mode_t compat_mode)
 {
     if(!desc->info_cache[compat_mode]) {
@@ -2031,6 +2005,35 @@ static BOOL ensure_real_info(DispatchEx *dispex)
 
     dispex->info->desc->vtbl->finalize_dispex(dispex);
     return dispex->info != NULL;
+}
+
+HRESULT dispex_to_string(DispatchEx *dispex, BSTR *ret)
+{
+    static const WCHAR prefix[8] = L"[object ";
+    static const WCHAR suffix[] = L"]";
+    WCHAR buf[ARRAY_SIZE(prefix) + 36 + ARRAY_SIZE(suffix)], *p = buf;
+    compat_mode_t compat_mode = dispex_compat_mode(dispex);
+    const char *name;
+
+    if(!ret)
+        return E_INVALIDARG;
+
+    memcpy(p, prefix, sizeof(prefix));
+    p += ARRAY_SIZE(prefix);
+    if(compat_mode < COMPAT_MODE_IE9)
+        p--;
+    else {
+        if(!ensure_real_info(dispex))
+            return E_OUTOFMEMORY;
+        name = dispex->info->desc->name;
+        while(*name)
+            *p++ = *name++;
+        assert(p + ARRAY_SIZE(suffix) - buf <= ARRAY_SIZE(buf));
+    }
+    memcpy(p, suffix, sizeof(suffix));
+
+    *ret = SysAllocString(buf);
+    return *ret ? S_OK : E_OUTOFMEMORY;
 }
 
 struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow *window, prototype_id_t prot_id,
