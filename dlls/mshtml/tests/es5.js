@@ -3032,7 +3032,6 @@ sync_test("instanceof", function() {
     r = (document.createElement("div") instanceof HTMLIFrameElement);
     ok(r === false, "div element instance of HTMLIFrameElement");
     r = (document instanceof Node);
-    todo_wine.
     ok(r === true, "document not instance of Node");
 });
 

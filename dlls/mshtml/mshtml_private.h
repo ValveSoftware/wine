@@ -425,7 +425,7 @@ PRIVATE_TID_LIST
     X(HTMLDOMChildrenCollection,      "NodeList",                     HTMLDOMChildrenCollection_dispex,       Object) \
     X(HTMLDOMImplementation,          "DOMImplementation",            HTMLDOMImplementation_dispex,           Object) \
     X(HTMLDOMTextNode,                "Text",                         HTMLDOMTextNode_dispex,                 DOMCharacterData) \
-    X(HTMLDocument,                   "HTMLDocument",                 HTMLDocumentNode_dispex,                Object) \
+    X(HTMLDocument,                   "HTMLDocument",                 HTMLDocumentNode_dispex,                Document) \
     X(HTMLWindow,                     "Window",                       HTMLWindow_dispex,                      Object) \
     X(HTMLAttributeCollection,        "NamedNodeMap",                 HTMLAttributeCollection_dispex,         Object) \
     X(HTMLElementCollection,          "HTMLCollection",               HTMLElementCollection_dispex,           Object) \
@@ -488,6 +488,7 @@ PRIVATE_TID_LIST
     X(DOMStorageEvent,                "StorageEvent",                 DOMStorageEvent_dispex,                 DOMEvent) \
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
+    X(Document,                       "Document",                     DocumentNode_dispex,                    HTMLDOMNode) \
     X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    HTMLDOMNode) \
     X(DOMElement,                     "Element",                      DOMElement_dispex,                      HTMLDOMNode) \
     X(CSSRule,                        "CSSRule",                      CSSRule_dispex,                         Object) \
