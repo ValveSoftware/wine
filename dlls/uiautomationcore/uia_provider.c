@@ -1141,16 +1141,28 @@ static HRESULT msaa_acc_get_focus(struct msaa_provider *prov, struct msaa_provid
 
     if (V_VT(&v) == VT_DISPATCH)
     {
+        IAccessible2 *ia2 = NULL;
+
         hr = IDispatch_QueryInterface(V_DISPATCH(&v), &IID_IAccessible, (void **)&focus_acc);
         VariantClear(&v);
         if (FAILED(hr))
             return hr;
 
-        hr = WindowFromAccessibleObject(focus_acc, &hwnd);
-        if (FAILED(hr) || !hwnd)
+        if ((ia2 = msaa_acc_get_ia2(focus_acc)))
         {
-            IAccessible_Release(focus_acc);
-            return hr;
+            hr = IAccessible2_get_windowHandle(ia2, &hwnd);
+            if (FAILED(hr))
+                WARN("IA2 get_windowHandle failed with hr %#lx\n", hr);
+            IAccessible2_Release(ia2);
+        }
+        if (!hwnd)
+        {
+            hr = WindowFromAccessibleObject(focus_acc, &hwnd);
+            if (FAILED(hr) || !hwnd)
+            {
+                IAccessible_Release(focus_acc);
+                return hr;
+            }
         }
     }
 
@@ -1463,9 +1475,18 @@ HRESULT create_msaa_provider(IAccessible *acc, LONG child_id, HWND hwnd, BOOL ro
     {
         HRESULT hr;
 
-        hr = WindowFromAccessibleObject(acc, &msaa_prov->hwnd);
-        if (FAILED(hr))
-            WARN("WindowFromAccessibleObject failed with hr %#lx\n", hr);
+        if (msaa_prov->ia2)
+        {
+            hr = IAccessible2_get_windowHandle(msaa_prov->ia2, &msaa_prov->hwnd);
+            if (FAILED(hr))
+                WARN("IA2 get_windowHandle failed with hr %#lx\n", hr);
+        }
+        if (!msaa_prov->hwnd)
+        {
+            hr = WindowFromAccessibleObject(acc, &msaa_prov->hwnd);
+            if (FAILED(hr))
+                WARN("WindowFromAccessibleObject failed with hr %#lx\n", hr);
+        }
     }
     else
         msaa_prov->hwnd = hwnd;
