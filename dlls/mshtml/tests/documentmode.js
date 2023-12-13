@@ -539,7 +539,6 @@ sync_test("builtin_obj", function() {
         }catch(ex) {
             e = ex.number;
         }
-        todo_wine.
         ok(e === 0xa13a4 - 0x80000000, "[function.apply with elem without length] e = " + e);
     }else {
         (function(a, b) {
@@ -563,7 +562,6 @@ sync_test("builtin_obj", function() {
         }catch(ex) {
             e = ex.number;
         }
-        todo_wine.
         ok(e === 0xa13a4 - 0x80000000, "[function.apply with Object without length] e = " + e);
     }else {
         (function(c, d) {
@@ -579,7 +577,6 @@ sync_test("builtin_obj", function() {
         }catch(ex) {
             e = ex.number;
         }
-        todo_wine.
         ok(e === 0xa13a4 - 0x80000000, "[function.apply with Object with length] e = " + e);
     }else {
         (function(c, d) {

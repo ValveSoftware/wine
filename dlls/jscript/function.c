@@ -434,7 +434,7 @@ static HRESULT disp_to_args(script_ctx_t *ctx, IDispatch *disp, unsigned *argc, 
         hres = DISP_E_UNKNOWNNAME;
     if(FAILED(hres)) {
         if(hres == DISP_E_UNKNOWNNAME)
-            hres = JS_E_JSCRIPT_EXPECTED;
+            hres = JS_E_ARRAY_OR_ARGS_EXPECTED;
         goto fail;
     }
 
@@ -447,13 +447,13 @@ static HRESULT disp_to_args(script_ctx_t *ctx, IDispatch *disp, unsigned *argc, 
         if(hres == DISP_E_EXCEPTION)
             disp_fill_exception(ctx, &ei);
         if(hres == DISP_E_MEMBERNOTFOUND)
-            hres = JS_E_JSCRIPT_EXPECTED;
+            hres = JS_E_ARRAY_OR_ARGS_EXPECTED;
         goto fail;
     }
 
     if(FAILED(VariantChangeType(&var, &var, 0, VT_UI4))) {
         VariantClear(&var);
-        hres = JS_E_JSCRIPT_EXPECTED;
+        hres = JS_E_ARRAY_OR_ARGS_EXPECTED;
         goto fail;
     }
     length = V_UI4(&var);
@@ -566,7 +566,7 @@ static HRESULT Function_apply(script_ctx_t *ctx, jsval_t vthis, WORD flags, unsi
         }else if(obj) {
             hres = disp_to_args(ctx, obj, &cnt, &args);
         }else {
-            hres = JS_E_JSCRIPT_EXPECTED;
+            hres = ctx->html_mode ? JS_E_ARRAY_OR_ARGS_EXPECTED : JS_E_JSCRIPT_EXPECTED;
         }
     }
 
