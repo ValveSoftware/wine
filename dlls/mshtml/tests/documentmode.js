@@ -947,6 +947,7 @@ sync_test("builtin_prototypes", function() {
             [ "Console",                        "Object" ],
             [ "Crypto",                         "Object" ],
             [ "CSSStyleDeclaration",            "Object" ],
+            [ "CustomEvent",                    "Event" ],
             [ "DocumentType",                   "Node" ],
             [ "DOMImplementation",              "Object" ],
             [ "DOMTokenList",                   "Object" ],
@@ -975,6 +976,7 @@ sync_test("builtin_prototypes", function() {
             [ "StyleSheetList",                 "Object" ],
             [ "Text",                           "CharacterData" ],
             [ "TextRange",                      "Object" ],
+            [ "UIEvent",                        "Event" ],
             [ "Window",                         "Object" ],
             [ "XMLHttpRequest",                 "Object" ]
         ];
@@ -987,6 +989,8 @@ sync_test("builtin_prototypes", function() {
             ok(a === b, "getPrototypeOf(" + protos[i][0] + ".prototype) = " + a);
         }
 
+        var Event_props = [ "bubbles","cancelable","cancelBubble","currentTarget","defaultPrevented","eventPhase","initEvent","isTrusted",
+                            "preventDefault","srcElement","stopImmediatePropagation","stopPropagation","target","timeStamp","type" ];
         var Node_props = [ "addEventListener","appendChild","attributes","childNodes","cloneNode","compareDocumentPosition","dispatchEvent","firstChild",
                            "hasChildNodes","insertBefore","isDefaultNamespace","isEqualNode","isSameNode","isSupported","lastChild","localName",
                            "lookupNamespaceURI","lookupPrefix","namespaceURI","nextSibling","nodeName","nodeType","nodeValue","ownerDocument",
@@ -995,8 +999,10 @@ sync_test("builtin_prototypes", function() {
         protos = [
             [ "CharacterData", ["data","length","appendData"], Node_props ],
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
+            [ "CustomEvent", ["detail","initCustomEvent"], Event_props ],
             [ "DocumentType", ["entities","internalSubset","name","notations","publicId","systemId"], Node_props ],
-            [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ]
+            [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ],
+            [ "UIEvent", ["detail","initUIEvent","view"], Event_props ]
         ];
 
         for(var i = 0; i < protos.length; i++) {

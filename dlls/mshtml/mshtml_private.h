@@ -478,14 +478,14 @@ PRIVATE_TID_LIST
     X(Crypto,                         "Crypto",                       crypto_dispex,                          Object) \
     X(MutationObserver,               "MutationObserver",             mutation_observer_dispex,               Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
-    X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  Object) \
+    X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
     X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                Object) \
     X(DOMMessageEvent,                "MessageEvent",                 DOMMessageEvent_dispex,                 Object) \
     X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   Object) \
     X(DOMPageTransitionEvent,         "PageTransitionEvent",          DOMPageTransitionEvent_dispex,          Object) \
     X(DOMProgressEvent,               "ProgressEvent",                DOMProgressEvent_dispex,                Object) \
     X(DOMStorageEvent,                "StorageEvent",                 DOMStorageEvent_dispex,                 Object) \
-    X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      Object) \
+    X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
     X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    HTMLDOMNode) \
     X(MediaQueryList,                 "MediaQueryList",               media_query_list_dispex,                Object) \
