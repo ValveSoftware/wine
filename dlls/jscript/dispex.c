@@ -2483,20 +2483,26 @@ static HRESULT disp_invoke(script_ctx_t *ctx, IDispatch *disp, DISPID id, WORD f
         hres = IDispatch_Invoke(disp, id, &IID_NULL, ctx->lcid, flags, params, r, &ei, &err);
     }
 
-    if(hres == DISP_E_EXCEPTION) {
-        TRACE("DISP_E_EXCEPTION: %08lx %s %s\n", ei.scode, debugstr_w(ei.bstrSource), debugstr_w(ei.bstrDescription));
-        reset_ei(ctx->ei);
-        ctx->ei->error = (SUCCEEDED(ei.scode) || ei.scode == DISP_E_EXCEPTION) ? E_FAIL : ei.scode;
-        if(ei.bstrSource)
-            ctx->ei->source = jsstr_alloc_len(ei.bstrSource, SysStringLen(ei.bstrSource));
-        if(ei.bstrDescription)
-            ctx->ei->message = jsstr_alloc_len(ei.bstrDescription, SysStringLen(ei.bstrDescription));
-        SysFreeString(ei.bstrSource);
-        SysFreeString(ei.bstrDescription);
-        SysFreeString(ei.bstrHelpFile);
-    }
+    if(hres == DISP_E_EXCEPTION)
+        disp_fill_exception(ctx, &ei);
 
     return hres;
+}
+
+void disp_fill_exception(script_ctx_t *ctx, EXCEPINFO *ei)
+{
+    TRACE("DISP_E_EXCEPTION: %08lx %s %s\n", ei->scode, debugstr_w(ei->bstrSource), debugstr_w(ei->bstrDescription));
+    reset_ei(ctx->ei);
+    if(ei->pfnDeferredFillIn)
+        ei->pfnDeferredFillIn(ei);
+    ctx->ei->error = (SUCCEEDED(ei->scode) || ei->scode == DISP_E_EXCEPTION) ? E_FAIL : ei->scode;
+    if(ei->bstrSource)
+        ctx->ei->source = jsstr_alloc_len(ei->bstrSource, SysStringLen(ei->bstrSource));
+    if(ei->bstrDescription)
+        ctx->ei->message = jsstr_alloc_len(ei->bstrDescription, SysStringLen(ei->bstrDescription));
+    SysFreeString(ei->bstrSource);
+    SysFreeString(ei->bstrDescription);
+    SysFreeString(ei->bstrHelpFile);
 }
 
 HRESULT disp_call(script_ctx_t *ctx, IDispatch *disp, DISPID id, WORD flags, unsigned argc, jsval_t *argv, jsval_t *ret)
