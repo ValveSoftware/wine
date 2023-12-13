@@ -2551,8 +2551,10 @@ static HRESULT WINAPI HTMLPerformance_toString(IHTMLPerformance *iface, BSTR *st
 static HRESULT WINAPI HTMLPerformance_toJSON(IHTMLPerformance *iface, VARIANT *var)
 {
     HTMLPerformance *This = impl_from_IHTMLPerformance(iface);
-    FIXME("(%p)->(%p)\n", This, var);
-    return E_NOTIMPL;
+
+    TRACE("(%p)->(%p)\n", This, var);
+
+    return dispex_builtin_props_to_json(&This->dispex, var);
 }
 
 static const IHTMLPerformanceVtbl HTMLPerformanceVtbl = {

@@ -3608,12 +3608,14 @@ HRESULT dispex_delete_prop(DispatchEx *dispex, DISPID id)
 HRESULT dispex_builtin_props_to_json(DispatchEx *dispex, VARIANT *ret)
 {
     static DISPID propput_dispid = DISPID_PROPERTYPUT;
+    static WCHAR toJSONW[] = L"toJSON";
     IWineDispatchProxyCbPrivate *proxy;
     func_info_t *func, *end;
+    DispatchEx *subdispex;
+    DISPID id, to_json;
     IDispatchEx *json;
     HRESULT hres;
     VARIANT var;
-    DISPID id;
     DISPPARAMS dp = { 0 }, put_dp = { &var, &propput_dispid, 1, 1 };
 
     if(!(proxy = dispex->proxy))
@@ -3632,9 +3634,16 @@ HRESULT dispex_builtin_props_to_json(DispatchEx *dispex, VARIANT *ret)
         hres = proxy_getter_invoke((IDispatch*)&dispex->IDispatchEx_iface, func, &dp, &var, NULL, NULL);
         if(SUCCEEDED(hres)) {
             hres = IDispatchEx_GetDispID(json, func->name, fdexNameEnsure | fdexNameCaseSensitive, &id);
-            if(SUCCEEDED(hres)) {
-                hres = IDispatchEx_InvokeEx(json, id, 0, DISPATCH_PROPERTYPUT, &put_dp, NULL, NULL, NULL);
+
+            if(SUCCEEDED(hres) && V_VT(&var) == VT_DISPATCH && (subdispex = get_dispex_for_hook((IUnknown*)V_DISPATCH(&var)))) {
+                if(SUCCEEDED(dispex_get_builtin_id(subdispex, toJSONW, fdexNameCaseSensitive, &to_json))) {
+                    VariantClear(&var);
+                    hres = dispex_call_builtin(subdispex, to_json, &dp, &var, NULL, NULL);
+                }
+                IDispatchEx_Release(&subdispex->IDispatchEx_iface);
             }
+            if(SUCCEEDED(hres))
+                hres = IDispatchEx_InvokeEx(json, id, 0, DISPATCH_PROPERTYPUT, &put_dp, NULL, NULL, NULL);
             VariantClear(&var);
         }
         if(FAILED(hres)) {
