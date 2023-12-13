@@ -1963,18 +1963,27 @@ static HRESULT WINAPI HTMLXDomainRequest_put_timeout(IHTMLXDomainRequest *iface,
 {
     HTMLXMLHttpRequest *This = impl_from_IHTMLXDomainRequest(iface);
 
-    FIXME("(%p)->(%ld)\n", This, v);
+    TRACE("(%p)->(%ld)\n", This, v);
 
-    return E_NOTIMPL;
+    if(v < 0)
+        return E_INVALIDARG;
+    return map_nsresult(nsIXMLHttpRequest_SetTimeout(This->nsxhr, v));
 }
 
 static HRESULT WINAPI HTMLXDomainRequest_get_timeout(IHTMLXDomainRequest *iface, LONG *p)
 {
     HTMLXMLHttpRequest *This = impl_from_IHTMLXDomainRequest(iface);
+    nsresult nsres;
+    UINT32 timeout;
 
-    FIXME("(%p)->(%p)\n", This, p);
+    TRACE("(%p)->(%p)\n", This, p);
 
-    return E_NOTIMPL;
+    if(!p)
+        return E_INVALIDARG;
+
+    nsres = nsIXMLHttpRequest_GetTimeout(This->nsxhr, &timeout);
+    *p = timeout ? timeout : -1;
+    return map_nsresult(nsres);
 }
 
 static HRESULT WINAPI HTMLXDomainRequest_get_contentType(IHTMLXDomainRequest *iface, BSTR *p)
