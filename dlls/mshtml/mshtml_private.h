@@ -479,9 +479,9 @@ PRIVATE_TID_LIST
     X(MutationObserver,               "MutationObserver",             mutation_observer_dispex,               Object) \
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
-    X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                Object) \
+    X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                DOMUIEvent) \
     X(DOMMessageEvent,                "MessageEvent",                 DOMMessageEvent_dispex,                 DOMEvent) \
-    X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   Object) \
+    X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   DOMUIEvent) \
     X(DOMPageTransitionEvent,         "PageTransitionEvent",          DOMPageTransitionEvent_dispex,          Object) \
     X(DOMProgressEvent,               "ProgressEvent",                DOMProgressEvent_dispex,                Object) \
     X(DOMStorageEvent,                "StorageEvent",                 DOMStorageEvent_dispex,                 Object) \

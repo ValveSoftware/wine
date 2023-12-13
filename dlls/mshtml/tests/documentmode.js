@@ -954,9 +954,11 @@ sync_test("builtin_prototypes", function() {
             [ "Event",                          "Object" ],
             [ "History",                        "Object" ],
             [ "HTMLCollection",                 "Object" ],
+            [ "KeyboardEvent",                  "UIEvent" ],
             [ "MediaQueryList",                 "Object" ],
             [ "MessageEvent",                   "Event" ],
             [ "MimeTypeArray",                  "Object" ],
+            [ "MouseEvent",                     "UIEvent" ],
             [ "MSCSSRuleList",                  "Object" ],
             [ "MSEventObj",                     "Object" ],
             [ "MSMimeTypesCollection",          "Object" ],
@@ -1002,7 +1004,9 @@ sync_test("builtin_prototypes", function() {
             [ "Comment", ["text"], ["insertData","replaceData","substringData"] ],
             [ "CustomEvent", ["detail","initCustomEvent"], Event_props ],
             [ "DocumentType", ["entities","internalSubset","name","notations","publicId","systemId"], Node_props ],
+            [ "KeyboardEvent", ["altKey","ctrlKey","getModifierState","initKeyboardEvent","key","metaKey"], ["detail","initUIEvent","view"] ],
             [ "MessageEvent", ["data","initMessageEvent","origin","source"], Event_props ],
+            [ "MouseEvent", ["button","clientX","initMouseEvent","offsetY","pageX","shiftKey","x","y"], ["detail","initUIEvent","view"] ],
             [ "Text", ["splitText"], ["data","length","appendData","deleteData","insertData","replaceData","substringData"] ],
             [ "UIEvent", ["detail","initUIEvent","view"], Event_props ]
         ];
