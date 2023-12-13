@@ -5311,6 +5311,10 @@ static HRESULT WINAPI DocWineDispProxyPrivate_PropInvoke(IWineDispatchProxyPriva
         LCID lcid, DWORD flags, DISPPARAMS *dp, VARIANT *ret, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLDocumentNode *This = impl_from_IWineDispatchProxyPrivate(iface);
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(flags == DISPATCH_PROPERTYPUT && idx < This->elem_vars_cnt)
+        return S_FALSE;
 
     return dispex_invoke(&This->node.event_target.dispex, this_obj, id, lcid, flags, dp, ret, ei, caller);
 }

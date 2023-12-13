@@ -4015,6 +4015,11 @@ static HRESULT WINAPI WindowWineDispProxyPrivate_PropInvoke(IWineDispatchProxyPr
         LCID lcid, DWORD flags, DISPPARAMS *dp, VARIANT *ret, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
+    DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;
+
+    if(flags == DISPATCH_PROPERTYPUT && idx < This->inner_window->global_prop_cnt &&
+       This->inner_window->global_props[idx].type == GLOBAL_ELEMENTVAR)
+        return S_FALSE;
 
     return dispex_invoke(&This->inner_window->event_target.dispex, this_obj, id, lcid, flags, dp, ret, ei, caller);
 }

@@ -1067,7 +1067,6 @@ sync_test("elem_by_id", function() {
         name_elem = document.testname;
         ok(name_elem === "foo", "document.testname after set = " + name_elem);
     }catch(e) {
-        todo_wine_if(v >= 9).
         ok(v < 9 && e.number === 0xa01b6 - 0x80000000, "Setting document.testname threw = " + e.number);
     }
 
@@ -1092,7 +1091,6 @@ sync_test("elem_by_id", function() {
         delete document.testid;
         delete document.testname;
     }catch(e) {
-        todo_wine_if(v >= 9).
         ok(v < 9 && e.number === 0xa01b6 - 0x80000000, "Setting document.testid threw = " + e.number);
     }
 

@@ -788,6 +788,12 @@ static HRESULT prop_put(jsdisp_t *This, dispex_prop_t *prop, jsval_t val, IServi
         hres = prop_obj->proxy->lpVtbl->PropInvoke(prop_obj->proxy, This->proxy ? (IDispatch*)This->proxy : to_disp(This),
                                                    prop->u.proxy_id, This->ctx->lcid, DISPATCH_PROPERTYPUT, &dp, NULL, &ei, caller);
         VariantClear(&var);
+        if(hres == S_FALSE) {
+            prop->type = PROP_JSVAL;
+            prop->flags = PROPF_ENUMERABLE | PROPF_CONFIGURABLE | PROPF_WRITABLE;
+            prop->u.val = jsval_undefined();
+            break;
+        }
         if(hres == DISP_E_EXCEPTION)
             disp_fill_exception(This->ctx, &ei);
         return hres;
