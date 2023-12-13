@@ -480,7 +480,7 @@ PRIVATE_TID_LIST
     X(DOMEvent,                       "Event",                        DOMEvent_dispex,                        Object) \
     X(DOMCustomEvent,                 "CustomEvent",                  DOMCustomEvent_dispex,                  DOMEvent) \
     X(DOMKeyboardEvent,               "KeyboardEvent",                DOMKeyboardEvent_dispex,                Object) \
-    X(DOMMessageEvent,                "MessageEvent",                 DOMMessageEvent_dispex,                 Object) \
+    X(DOMMessageEvent,                "MessageEvent",                 DOMMessageEvent_dispex,                 DOMEvent) \
     X(DOMMouseEvent,                  "MouseEvent",                   DOMMouseEvent_dispex,                   Object) \
     X(DOMPageTransitionEvent,         "PageTransitionEvent",          DOMPageTransitionEvent_dispex,          Object) \
     X(DOMProgressEvent,               "ProgressEvent",                DOMProgressEvent_dispex,                Object) \
