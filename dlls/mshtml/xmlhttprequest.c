@@ -1717,19 +1717,16 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_Invoke(IHTMLXMLHttpRequestFactor
             pDispParams, pVarResult, pExcepInfo, puArgErr);
 }
 
-static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactory *iface, IHTMLXMLHttpRequest **p)
+static HRESULT create_xhr(HTMLInnerWindow *window, dispex_static_data_t *dispex, HTMLXMLHttpRequest **p)
 {
-    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
-    HTMLXMLHttpRequest        *ret;
-    nsIXMLHttpRequest         *nsxhr;
-    nsIDOMEventTarget         *nstarget;
-    XMLHttpReqEventListener   *event_listener;
+    XMLHttpReqEventListener *event_listener;
+    nsIDOMEventTarget *nstarget;
+    nsIXMLHttpRequest *nsxhr;
+    HTMLXMLHttpRequest *ret;
     nsresult nsres;
     unsigned i;
 
-    TRACE("(%p)->(%p)\n", This, p);
-
-    nsxhr = create_nsxhr(This->window->dom_window);
+    nsxhr = create_nsxhr(window->dom_window);
     if(!nsxhr)
         return E_FAIL;
 
@@ -1747,16 +1744,16 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactor
     }
 
     ret->nsxhr = nsxhr;
-    ret->window = This->window;
+    ret->window = window;
     ret->doctype_override = DOCTYPE_INVALID;
     ret->task_magic = get_task_target_magic();
-    IHTMLWindow2_AddRef(&This->window->base.IHTMLWindow2_iface);
+    IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
 
     ret->IHTMLXMLHttpRequest_iface.lpVtbl = &HTMLXMLHttpRequestVtbl;
     ret->IHTMLXMLHttpRequest2_iface.lpVtbl = &HTMLXMLHttpRequest2Vtbl;
     ret->IWineXMLHttpRequestPrivate_iface.lpVtbl = &WineXMLHttpRequestPrivateVtbl;
     ret->IProvideClassInfo2_iface.lpVtbl = &ProvideClassInfo2Vtbl;
-    EventTarget_Init(&ret->event_target, &HTMLXMLHttpRequest_dispex, This->window);
+    EventTarget_Init(&ret->event_target, dispex, window);
 
     /* Always register the handlers because we need them to track state */
     event_listener->nsIDOMEventListener_iface.lpVtbl = &XMLHttpReqEventListenerVtbl;
@@ -1782,8 +1779,22 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactor
     }
     nsIDOMEventTarget_Release(nstarget);
 
-    *p = &ret->IHTMLXMLHttpRequest_iface;
+    *p = ret;
     return S_OK;
+}
+
+static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactory *iface, IHTMLXMLHttpRequest **p)
+{
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    HTMLXMLHttpRequest *xhr;
+    HRESULT hres;
+
+    TRACE("(%p)->(%p)\n", This, p);
+
+    hres = create_xhr(This->window, &HTMLXMLHttpRequest_dispex, &xhr);
+    if(SUCCEEDED(hres))
+        *p = &xhr->IHTMLXMLHttpRequest_iface;
+    return hres;
 }
 
 const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl = {
@@ -1816,7 +1827,7 @@ static HRESULT HTMLXMLHttpRequestFactory_value(DispatchEx *iface, LCID lcid, WOR
         VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     struct global_ctor *This = ctor_from_DispatchEx(iface);
-    IHTMLXMLHttpRequest *xhr;
+    HTMLXMLHttpRequest *xhr;
     HRESULT hres;
 
     TRACE("\n");
@@ -1824,12 +1835,12 @@ static HRESULT HTMLXMLHttpRequestFactory_value(DispatchEx *iface, LCID lcid, WOR
     if(flags != DISPATCH_CONSTRUCT)
         return S_FALSE;
 
-    hres = IHTMLXMLHttpRequestFactory_create(&This->IHTMLXMLHttpRequestFactory_iface, &xhr);
+    hres = create_xhr(This->window, &HTMLXMLHttpRequest_dispex, &xhr);
     if(FAILED(hres))
         return hres;
 
     V_VT(res) = VT_DISPATCH;
-    V_DISPATCH(res) = (IDispatch*)xhr;
+    V_DISPATCH(res) = (IDispatch*)&xhr->IHTMLXMLHttpRequest_iface;
     return S_OK;
 }
 
