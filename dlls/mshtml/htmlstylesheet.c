@@ -24,6 +24,7 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "ole2.h"
+#include "mshtmdid.h"
 
 #include "wine/debug.h"
 
@@ -1574,3 +1575,40 @@ HRESULT create_style_sheet(nsIDOMStyleSheet *nsstylesheet, HTMLDocumentNode *doc
     *ret = &style_sheet->IHTMLStyleSheet_iface;
     return S_OK;
 }
+
+/* dummy dispex used only for StyleSheet in prototype chain */
+static void StyleSheet_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t stylesheet_hooks[] = {
+        {DISPID_IHTMLSTYLESHEET_OWNINGELEMENT},
+        {DISPID_IHTMLSTYLESHEET_READONLY},
+        {DISPID_IHTMLSTYLESHEET_IMPORTS},
+        {DISPID_IHTMLSTYLESHEET_ID},
+        {DISPID_IHTMLSTYLESHEET_ADDIMPORT},
+        {DISPID_IHTMLSTYLESHEET_ADDRULE},
+        {DISPID_IHTMLSTYLESHEET_REMOVEIMPORT},
+        {DISPID_IHTMLSTYLESHEET_REMOVERULE},
+        {DISPID_IHTMLSTYLESHEET_CSSTEXT},
+        {DISPID_IHTMLSTYLESHEET_RULES},
+        {DISPID_UNKNOWN}
+    };
+    static const dispex_hook_t stylesheet4_hooks[] = {
+        {DISPID_IHTMLSTYLESHEET4_OWNERRULE},
+        {DISPID_IHTMLSTYLESHEET4_CSSRULES},
+        {DISPID_IHTMLSTYLESHEET4_INSERTRULE},
+        {DISPID_IHTMLSTYLESHEET4_DELETERULE},
+        {DISPID_UNKNOWN}
+    };
+
+    dispex_info_add_interface(info, IHTMLStyleSheet4_tid, stylesheet4_hooks);
+    dispex_info_add_interface(info, IHTMLStyleSheet_tid, stylesheet_hooks);
+}
+
+dispex_static_data_t StyleSheet_dispex = {
+    "StyleSheet",
+    &no_dispex_vtbl,
+    PROTO_ID_StyleSheet,
+    NULL_tid,
+    no_iface_tids,
+    StyleSheet_init_dispex_info
+};

@@ -442,7 +442,7 @@ PRIVATE_TID_LIST
     X(HTMLXMLHttpRequest,             "XMLHttpRequest",               HTMLXMLHttpRequest_dispex,              Object) \
     X(HTMLCurrentStyle,               "MSCurrentStyleCSSProperties",  HTMLCurrentStyle_dispex,                HTMLCSSProperties) \
     X(HTMLW3CComputedStyle,           "CSSStyleDeclaration",          HTMLW3CComputedStyle_dispex,            Object) \
-    X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  Object) \
+    X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  StyleSheet) \
     X(HTMLStyleSheetRule,             "CSSStyleRule",                 HTMLStyleSheetRule_dispex,              Object) \
     X(HTMLElement,                    "HTMLElement",                  HTMLElement_dispex,                     DOMElement) \
     X(HTMLGenericElement,             "HTMLUnknownElement",           HTMLGenericElement_dispex,              HTMLElement) \
@@ -489,6 +489,7 @@ PRIVATE_TID_LIST
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
     X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    HTMLDOMNode) \
     X(DOMElement,                     "Element",                      DOMElement_dispex,                      HTMLDOMNode) \
+    X(StyleSheet,                     "StyleSheet",                   StyleSheet_dispex,                      Object) \
     X(MediaQueryList,                 "MediaQueryList",               media_query_list_dispex,                Object) \
     X(DOMTokenList,                   "DOMTokenList",                 token_list_dispex,                      Object) \
     X(HTMLDOMNode,                    "Node",                         HTMLDOMNode_dispex,                     Object) \
