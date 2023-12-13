@@ -94,6 +94,11 @@ typedef struct {
 } func_disp_t;
 
 typedef struct {
+    DispatchEx dispex;
+    DWORD idx;          /* index into function_props */
+} func_prop_disp_t;
+
+typedef struct {
     func_disp_t *func_obj;
     VARIANT val;
 } func_obj_entry_t;
@@ -957,6 +962,55 @@ static const struct {
     { L"call",  function_call }
 };
 
+static inline func_prop_disp_t *func_prop_disp_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, func_prop_disp_t, dispex);
+}
+
+static void function_prop_destructor(DispatchEx *dispex)
+{
+    func_prop_disp_t *This = func_prop_disp_from_DispatchEx(dispex);
+    free(This);
+}
+
+static HRESULT function_prop_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    func_prop_disp_t *This = func_prop_disp_from_DispatchEx(dispex);
+    HRESULT hres;
+
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+        return MSHTML_E_INVALID_PROPERTY;
+    case DISPATCH_PROPERTYGET:
+        hres = format_func_disp_string(function_props[This->idx].name, caller, res);
+        break;
+    default:
+        FIXME("Unimplemented flags %x\n", flags);
+        hres = E_NOTIMPL;
+    }
+
+    return hres;
+}
+
+static const dispex_static_data_vtbl_t function_prop_dispex_vtbl = {
+    .destructor       = function_prop_destructor,
+    .value            = function_prop_value
+};
+
+static const tid_t function_prop_iface_tids[] = { 0 };
+
+static dispex_static_data_t function_prop_dispex = {
+    "Function",
+    &function_prop_dispex_vtbl,
+    NULL_tid,
+    function_prop_iface_tids
+};
+
 static inline func_disp_t *impl_from_DispatchEx(DispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, func_disp_t, dispex);
@@ -1035,6 +1089,18 @@ static HRESULT function_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID i
         /* fall through */
     case DISPATCH_METHOD:
         return function_props[idx].invoke(This, params, lcid, res, ei, caller);
+    case DISPATCH_PROPERTYGET: {
+        func_prop_disp_t *disp = calloc(1, sizeof(func_prop_disp_t));
+
+        if(!disp)
+            return E_OUTOFMEMORY;
+        disp->idx = idx;
+        init_dispatch(&disp->dispex, &function_prop_dispex, NULL, dispex_compat_mode(&This->dispex));
+
+        V_VT(res) = VT_DISPATCH;
+        V_DISPATCH(res) = (IDispatch*)&disp->dispex.IDispatchEx_iface;
+        break;
+    }
     default:
         return MSHTML_E_INVALID_PROPERTY;
     }
