@@ -1326,8 +1326,7 @@ static HRESULT mutation_observer_ctor_value(DispatchEx *dispex, LCID lcid,
     case DISPATCH_METHOD:
         break;
     default:
-        FIXME("flags %x is not supported\n", flags);
-        return E_NOTIMPL;
+        return global_ctor_value(dispex, lcid, flags, params, res, ei, caller);
     }
 
     if (argc < 1)
