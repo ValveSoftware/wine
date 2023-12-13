@@ -780,6 +780,128 @@ static HRESULT typeinfo_invoke(IUnknown *iface, func_info_t *func, WORD flags, D
     return ITypeInfo_Invoke(ti, iface, func->id, flags, &params, res, ei, &argerr);
 }
 
+static HRESULT get_disp_prop(IDispatch *disp, IDispatchEx *dispex, const WCHAR *name, LCID lcid, VARIANT *res,
+        EXCEPINFO *ei, IServiceProvider *caller)
+{
+    DISPPARAMS dp = { 0 };
+    DISPID dispid;
+    HRESULT hres;
+    UINT err = 0;
+    BSTR bstr;
+
+    if(!(bstr = SysAllocString(name)))
+        return E_OUTOFMEMORY;
+
+    if(dispex)
+        hres = IDispatchEx_GetDispID(dispex, bstr, fdexNameCaseSensitive, &dispid);
+    else
+        hres = IDispatch_GetIDsOfNames(disp, &IID_NULL, &bstr, 1, 0, &dispid);
+    SysFreeString(bstr);
+    if(FAILED(hres))
+        return hres;
+    if(dispid == DISPID_UNKNOWN)
+        return DISP_E_UNKNOWNNAME;
+
+    if(dispex)
+        hres = IDispatchEx_InvokeEx(dispex, dispid, lcid, DISPATCH_PROPERTYGET, &dp, res, ei, caller);
+    else
+        hres = IDispatch_Invoke(disp, dispid, &IID_NULL, lcid, DISPATCH_PROPERTYGET, &dp, res, ei, &err);
+    return hres;
+}
+
+static HRESULT get_disp_prop_vt(IDispatch *disp, IDispatchEx *dispex, const WCHAR *name, LCID lcid, VARIANT *res,
+        VARTYPE vt, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    HRESULT hres;
+
+    hres = get_disp_prop(disp, dispex, name, lcid, res, ei, caller);
+    if(FAILED(hres))
+        return hres;
+    if(V_VT(res) != vt) {
+        VARIANT tmp = *res;
+        hres = change_type(res, &tmp, vt, caller);
+        VariantClear(&tmp);
+    }
+    return hres;
+}
+
+static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    IDispatchEx *dispex = NULL;
+    DISPPARAMS params = { 0 };
+    IDispatch *this_obj;
+    UINT argc = 0;
+    VARIANT *arg;
+    HRESULT hres;
+
+    arg = dp->rgvarg + dp->cArgs - 1;
+    if(dp->cArgs < 1 || V_VT(arg) != VT_DISPATCH || !V_DISPATCH(arg))
+        return CTL_E_ILLEGALFUNCTIONCALL;
+    this_obj = V_DISPATCH(arg);
+
+    if(dp->cArgs >= 2) {
+        IDispatch *disp;
+        UINT i;
+
+        arg--;
+        if((V_VT(arg) & ~VT_BYREF) != VT_DISPATCH)
+            return CTL_E_ILLEGALFUNCTIONCALL;
+        disp = (V_VT(arg) & VT_BYREF) ? *(IDispatch**)(V_BYREF(arg)) : V_DISPATCH(arg);
+
+        /* FIXME: Native doesn't seem to detect jscript arrays by querying for length or indexed props,
+           and it doesn't QI nor call any other IDispatchEx methods (except AddRef) on external disps.
+           Array-like JS objects don't work either, they all return 0x800a01ae. So how does it do it?! */
+        IDispatch_QueryInterface(disp, &IID_IDispatchEx, (void**)&dispex);
+        hres = get_disp_prop_vt(disp, dispex, L"length", lcid, res, VT_I4, ei, caller);
+        if(FAILED(hres)) {
+            if(hres == DISP_E_UNKNOWNNAME)
+                hres = CTL_E_ILLEGALFUNCTIONCALL;
+            goto fail;
+        }
+        if(V_I4(res) < 0) {
+            hres = CTL_E_ILLEGALFUNCTIONCALL;
+            goto fail;
+        }
+        params.cArgs = V_I4(res);
+
+        /* alloc new params */
+        if(params.cArgs) {
+            if(!(params.rgvarg = malloc(params.cArgs * sizeof(VARIANTARG)))) {
+                hres = E_OUTOFMEMORY;
+                goto fail;
+            }
+            for(i = 0; i < params.cArgs; i++) {
+                WCHAR buf[12];
+
+                arg = params.rgvarg + params.cArgs - i - 1;
+                swprintf(buf, ARRAY_SIZE(buf), L"%u", i);
+                hres = get_disp_prop(disp, dispex, buf, lcid, arg, ei, caller);
+                if(FAILED(hres)) {
+                    if(hres == DISP_E_UNKNOWNNAME) {
+                        V_VT(arg) = VT_EMPTY;
+                        continue;
+                    }
+                    break;
+                }
+            }
+            argc = i;
+            if(argc < params.cArgs)
+                goto cleanup;
+        }
+    }
+
+    hres = invoke_builtin_function(this_obj, func->info, &params, res, ei, caller);
+
+cleanup:
+    while(argc--)
+        VariantClear(&params.rgvarg[params.cArgs - argc - 1]);
+    free(params.rgvarg);
+fail:
+    if(dispex)
+        IDispatchEx_Release(dispex);
+    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+}
+
 static HRESULT function_call(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     DISPPARAMS params = { dp->rgvarg, NULL, dp->cArgs - 1, 0 };
@@ -799,6 +921,7 @@ static const struct {
     const WCHAR *name;
     HRESULT (*invoke)(func_disp_t*,DISPPARAMS*,LCID,VARIANT*,EXCEPINFO*,IServiceProvider*);
 } function_props[] = {
+    { L"apply", function_apply },
     { L"call",  function_call }
 };
 
