@@ -39,6 +39,7 @@ HRESULT script_elem_from_nsscript(nsIDOMHTMLScriptElement*,HTMLScriptElement**);
 void bind_event_scripts(HTMLDocumentNode*);
 HRESULT load_script(HTMLScriptElement*,const WCHAR*,BOOL);
 
+void move_script_hosts(HTMLInnerWindow*,HTMLInnerWindow*);
 void release_script_hosts(HTMLInnerWindow*);
 void connect_scripts(HTMLInnerWindow*);
 void doc_insert_script(HTMLInnerWindow*,HTMLScriptElement*,BOOL);

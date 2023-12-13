@@ -1780,6 +1780,22 @@ void update_browser_script_mode(GeckoBrowser *browser, IUri *uri)
         ERR("JavaScript setup failed: %08lx\n", nsres);
 }
 
+void move_script_hosts(HTMLInnerWindow *window, HTMLInnerWindow *new_window)
+{
+    ScriptHost *iter, *iter2;
+
+    if(list_empty(&window->script_hosts))
+        return;
+
+    LIST_FOR_EACH_ENTRY_SAFE(iter, iter2, &window->script_hosts, ScriptHost, entry) {
+        iter->window = new_window;
+        list_remove(&iter->entry);
+        list_add_tail(&new_window->script_hosts, &iter->entry);
+    }
+
+    lock_document_mode(new_window->doc);
+}
+
 void release_script_hosts(HTMLInnerWindow *window)
 {
     script_queue_entry_t *queue_iter;
