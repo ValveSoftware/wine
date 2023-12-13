@@ -1637,6 +1637,28 @@ HRESULT media_source_create_old(IMFByteStream *bytestream, const WCHAR *uri, IMF
         total_pres_time = max(total_pres_time,
                 wg_parser_stream_get_duration(object->streams[i]->wg_stream));
 
+    /* Hack for bug 19766 - Biomutant (597820) [T5] Title Hangs After Intro Cut Scene Unless Skipped.
+     *
+     * Unreal Engine 4 games expect presentation clock correlated time to run past media source
+     * duration[1], which assumes that all streams in a media source have the same duration.
+     * Biomutant_Trailer.mp4 from Biomutant(597820) has a 1:27.734s video stream and a 1:27.776s
+     * audio stream so the media source duration is reported to be 1:27.776s. However, the game
+     * builds a topology that only uses the video stream. So the last presentation clock correlated
+     * time could be something before the media source duration 1:27.776s before it's stopped. In
+     * Unreal Engine 4.18 source, on every frame FWmfMediaSession::GetEvents()[2] checks
+     * "Time > CurrentDuration" to decide whether to stop its media session. With the time check
+     * fails, the game will hang forever waiting for the session to stop. This hack shortens the
+     * media source duration to satisfy the condition check. The reason why it works on Windows is
+     * probably due to a delay caused a busy CPU and different scheduling.
+     *
+     * [1][2]: UnrealEngine-4.18/Engine/Plugins/Media/WmfMedia/Source/WmfMedia/Private/Wmf/WmfMediaSession.cpp#FWmfMediaSession::GetEvents()
+     */
+    {
+        const char *id = getenv("SteamGameId");
+        if (id && !strcmp(id, "597820") && total_pres_time == 877760000) /* Biomutant_Trailer.mp4 */
+            total_pres_time = 877340000;
+    }
+
     if (object->stream_count)
         IMFPresentationDescriptor_SetUINT64(object->pres_desc, &MF_PD_DURATION, total_pres_time);
 
