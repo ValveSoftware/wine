@@ -487,7 +487,7 @@ PRIVATE_TID_LIST
     X(DOMStorageEvent,                "StorageEvent",                 DOMStorageEvent_dispex,                 Object) \
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      Object) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
-    X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    Object) \
+    X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    HTMLDOMNode) \
     X(MediaQueryList,                 "MediaQueryList",               media_query_list_dispex,                Object) \
     X(DOMTokenList,                   "DOMTokenList",                 token_list_dispex,                      Object) \
     X(HTMLDOMNode,                    "Node",                         HTMLDOMNode_dispex,                     Object) \
