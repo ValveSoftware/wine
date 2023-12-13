@@ -361,6 +361,7 @@ typedef struct ScriptHost ScriptHost;
     XIID(IHTMLStyleSheet) \
     XIID(IHTMLStyleSheet4) \
     XIID(IHTMLStyleSheetRule) \
+    XIID(IHTMLCSSRule) \
     XIID(IHTMLStyleSheetRulesCollection) \
     XIID(IHTMLStyleSheetsCollection) \
     XIID(IHTMLTable) \
@@ -443,7 +444,7 @@ PRIVATE_TID_LIST
     X(HTMLCurrentStyle,               "MSCurrentStyleCSSProperties",  HTMLCurrentStyle_dispex,                HTMLCSSProperties) \
     X(HTMLW3CComputedStyle,           "CSSStyleDeclaration",          HTMLW3CComputedStyle_dispex,            Object) \
     X(HTMLStyleSheet,                 "CSSStyleSheet",                HTMLStyleSheet_dispex,                  StyleSheet) \
-    X(HTMLStyleSheetRule,             "CSSStyleRule",                 HTMLStyleSheetRule_dispex,              Object) \
+    X(HTMLStyleSheetRule,             "CSSStyleRule",                 HTMLStyleSheetRule_dispex,              CSSRule) \
     X(HTMLElement,                    "HTMLElement",                  HTMLElement_dispex,                     DOMElement) \
     X(HTMLGenericElement,             "HTMLUnknownElement",           HTMLGenericElement_dispex,              HTMLElement) \
     X(HTMLAnchorElement,              "HTMLAnchorElement",            HTMLAnchorElement_dispex,               HTMLElement) \
@@ -489,6 +490,7 @@ PRIVATE_TID_LIST
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
     X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    HTMLDOMNode) \
     X(DOMElement,                     "Element",                      DOMElement_dispex,                      HTMLDOMNode) \
+    X(CSSRule,                        "CSSRule",                      CSSRule_dispex,                         Object) \
     X(StyleSheet,                     "StyleSheet",                   StyleSheet_dispex,                      Object) \
     X(MediaQueryList,                 "MediaQueryList",               media_query_list_dispex,                Object) \
     X(DOMTokenList,                   "DOMTokenList",                 token_list_dispex,                      Object) \
