@@ -32,6 +32,10 @@ var JS_E_INVALID_LENGTH = 0x800a13a5;
 var JS_E_INVALID_WRITABLE_PROP_DESC = 0x800a13ac;
 var JS_E_NONCONFIGURABLE_REDEFINED = 0x800a13d6;
 var JS_E_NONWRITABLE_MODIFIED = 0x800a13d7;
+var JS_E_NOT_DATAVIEW = 0x800a13df;
+var JS_E_DATAVIEW_NO_ARGUMENT = 0x800a13e0;
+var JS_E_DATAVIEW_INVALID_ACCESS = 0x800a13e1;
+var JS_E_DATAVIEW_INVALID_OFFSET = 0x800a13e2;
 var JS_E_WRONG_THIS = 0x800a13fc;
 
 var tests = [];
@@ -1683,12 +1687,29 @@ sync_test("RegExp", function() {
 });
 
 sync_test("ArrayBuffers & Views", function() {
-    var r, buf;
+    var i, r, buf, view, view2, arr;
+
+    var types = [
+        [ "Int8",    1 ],
+        [ "Uint8",   1 ],
+        [ "Int16",   2 ],
+        [ "Uint16",  2 ],
+        [ "Int32",   4 ],
+        [ "Uint32",  4 ],
+        [ "Float32", 4 ],
+        [ "Float64", 8 ]
+    ];
 
     function test_own_props(obj_name, props) {
         var obj = eval(obj_name);
         for(var i = 0; i < props.length; i++)
             ok(Object.prototype.hasOwnProperty.call(obj, props[i]), props[i] + " not a property of " + obj_name);
+    }
+
+    function test_not_own_props(obj_name, props) {
+        var obj = eval(obj_name);
+        for(var i = 0; i < props.length; i++)
+            ok(!Object.prototype.hasOwnProperty.call(obj, props[i]), props[i] + " is a property of " + obj_name);
     }
 
     function test_readonly(obj, prop, val) {
@@ -1727,6 +1748,245 @@ sync_test("ArrayBuffers & Views", function() {
     ok(buf.byteLength === 10, "ArrayBuffer(10).byteLength = " + buf.byteLength);
     test_readonly(buf, "byteLength", 10);
     test_own_data_prop_desc(buf, "byteLength", false, false, false);
+
+    test_own_props("DataView.prototype", [
+        "buffer", "byteLength", "byteOffset",
+        "getInt8",  "setInt8",  "getUint8",  "setUint8",
+        "getInt16", "setInt16", "getUint16", "setUint16",
+        "getInt32", "setInt32", "getUint32", "setUint32",
+        "getFloat32", "setFloat32", "getFloat64", "setFloat64"
+    ]);
+
+    r = Object.prototype.toString.call(new DataView(buf));
+    ok(r === "[object Object]", "Object toString(new DataView(buf)) = " + r);
+    r = DataView.length;
+    ok(r === 1, "DataView.length = " + r);
+
+    /* DataView.prototype has actual accessors, but others don't */
+    arr = [ "buffer", "byteLength", "byteOffset" ];
+    for(i = 0; i < arr.length; i++) {
+        var prop = arr[i], desc = Object.getOwnPropertyDescriptor(DataView.prototype, prop);
+        ok(!("value" in desc), "DataView: value is in desc");
+        ok(!("writable" in desc), "DataView: writable is in desc");
+        ok(desc.enumerable === false, "DataView: desc.enumerable = " + desc.enumerable);
+        ok(desc.configurable === true, "DataView: desc.configurable = " + desc.configurable);
+        ok(Object.getPrototypeOf(desc.get) === Function.prototype, "DataView: desc.get not a function: " + desc.get);
+        ok("set" in desc, "DataView: set is not in desc");
+        ok(desc.set === undefined, "DataView: desc.set not undefined: " + desc.set);
+        try {
+            desc.get.call(null);
+            ok(false, "DataView: calling " + prop + " getter with null did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "DataView: calling " + prop + " getter with null threw " + n);
+        }
+        try {
+            desc.get.call({});
+            ok(false, "DataView: calling " + prop + " getter with an object did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "DataView: calling " + prop + " getter with an object threw " + n);
+        }
+        try {
+            desc.get.call(DataView);
+            ok(false, "DataView: calling " + prop + " getter with DataView constructor did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "DataView: calling " + prop + " getter with DataView constructor threw " + n);
+        }
+        try {
+            desc.get.call(new ArrayBuffer());
+            ok(false, "DataView: calling " + prop + " getter with ArrayBuffer did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "DataView: calling " + prop + " getter with ArrayBuffer threw " + n);
+        }
+        r = desc.get.call(DataView.prototype);
+        if(prop === "buffer")
+            ok(Object.getPrototypeOf(r) === ArrayBuffer.prototype, "DataView: calling " + prop + " getter with DataView.prototype returned " + r);
+        else
+            ok(r === 0, "DataView: calling " + prop + " getter with DataView.prototype returned " + r);
+    }
+
+    try {
+        new DataView();
+        ok(false, "new DataView() did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === JS_E_DATAVIEW_NO_ARGUMENT, "new DataView() threw " + n);
+    }
+    try {
+        new DataView(ArrayBuffer);
+        ok(false, "new DataView(ArrayBuffer) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === JS_E_DATAVIEW_NO_ARGUMENT, "new DataView(ArrayBuffer) threw " + n);
+    }
+    try {
+        new DataView(buf, -1);
+        ok(false, "new DataView(buf, -1) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === JS_E_DATAVIEW_INVALID_OFFSET, "new DataView(buf, -1) threw " + n);
+    }
+    try {
+        new DataView(buf, 11);
+        ok(false, "new DataView(buf, 11) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === JS_E_DATAVIEW_INVALID_OFFSET, "new DataView(buf, 11) threw " + n);
+    }
+    try {
+        new DataView(buf, 9, 2);
+        ok(false, "new DataView(buf, 9, 2) did not throw exception");
+    }catch(ex) {
+        var n = ex.number >>> 0;
+        ok(n === JS_E_DATAVIEW_INVALID_OFFSET, "new DataView(buf, 9, 2) threw " + n);
+    }
+
+    view = new DataView(buf, 9, 1);
+    ok(view.buffer === buf,  "DataView(buf, 9, 1).buffer = " + view.buffer);
+    ok(view.byteLength === 1, "DataView(buf, 9, 1).byteLength = " + view.byteLength);
+    ok(view.byteOffset === 9, "DataView(buf, 9, 1).byteOffset = " + view.byteOffset);
+    test_readonly(view, "byteLength", 1);
+    test_readonly(view, "byteOffset", 9);
+    test_not_own_props("view", [ "buffer", "byteLength", "byteOffset" ]);
+
+    view = new DataView(buf, 10);
+    ok(view.buffer === buf,  "DataView(buf, 10).buffer = " + view.buffer);
+    ok(view.byteLength === 0, "DataView(buf, 10).byteLength = " + view.byteLength);
+    ok(view.byteOffset === 10, "DataView(buf, 10).byteOffset = " + view.byteOffset);
+    view = new DataView(buf, 1, 7);
+    ok(view.buffer === buf,  "DataView(buf, 1, 7).buffer = " + view.buffer);
+    ok(view.byteLength === 7, "DataView(buf, 1, 7).byteLength = " + view.byteLength);
+    ok(view.byteOffset === 1, "DataView(buf, 1, 7).byteOffset = " + view.byteOffset);
+    view2 = new DataView(buf, 6);
+    ok(view2.buffer === buf,  "DataView(buf, 6).buffer = " + view2.buffer);
+    ok(view2.byteLength === 4, "DataView(buf, 6).byteLength = " + view2.byteLength);
+    ok(view2.byteOffset === 6, "DataView(buf, 6).byteOffset = " + view2.byteOffset);
+    view = DataView(buf);
+    ok(view.buffer === buf,  "DataView(buf).buffer = " + view.buffer);
+    ok(view.byteLength === 10, "DataView(buf).byteLength = " + view.byteLength);
+    ok(view.byteOffset === 0,  "DataView(buf).byteOffset = " + view.byteOffset);
+
+    for(i = 0; i < 10; i++) {
+        r = view.getInt8(i);
+        ok(r === 0, "view byte " + i + " = " + r);
+    }
+
+    for(i = 0; i < types.length; i++) {
+        var method = "get" + types[i][0], offs = 11 - types[i][1];
+        r = DataView.prototype[method].length;
+        ok(r === 1, "DataView.prototype." + method + ".length = " + r);
+        try {
+            view[method]();
+            ok(false, "view." + method + "() did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_DATAVIEW_NO_ARGUMENT, "view." + method + "() threw " + n);
+        }
+        try {
+            view[method](-1);
+            ok(false, "view." + method + "(-1) did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_DATAVIEW_INVALID_ACCESS, "view." + method + "(-1) threw " + n);
+        }
+        try {
+            view[method](offs);
+            ok(false, "view." + method + "(" + offs + ") did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_DATAVIEW_INVALID_ACCESS, "view." + method + "(" + offs + ") threw " + n);
+        }
+        try {
+            view[method].call(null, 0);
+            ok(false, "view." + method + "(0) with null context did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "view." + method + "(0) with null context threw " + n);
+        }
+        try {
+            view[method].call({}, 0);
+            ok(false, "view." + method + "(0) with an object context did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "view." + method + "(0) with an object context threw " + n);
+        }
+        method = "set" + types[i][0];
+        r = DataView.prototype[method].length;
+        ok(r === 1, "DataView.prototype." + method + ".length = " + r);
+        try {
+            view[method]();
+            ok(false, "view." + method + "() did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_DATAVIEW_NO_ARGUMENT, "view." + method + "() threw " + n);
+        }
+        try {
+            view[method](0);
+            ok(false, "view." + method + "(0) did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_DATAVIEW_NO_ARGUMENT, "view." + method + "(0) threw " + n);
+        }
+        try {
+            view[method](-1, 0);
+            ok(false, "view." + method + "(-1, 0) did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_DATAVIEW_INVALID_ACCESS, "view." + method + "(-1, 0) threw " + n);
+        }
+        try {
+            view[method](offs, 0);
+            ok(false, "view." + method + "(" + offs + ", 0) did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_DATAVIEW_INVALID_ACCESS, "view." + method + "(" + offs + ", 0) threw " + n);
+        }
+        try {
+            view[method].call(null, 0, 0);
+            ok(false, "view." + method + "(0, 0) with null context did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "view." + method + "(0, 0) with null context threw " + n);
+        }
+        try {
+            view[method].call({}, 0, 0);
+            ok(false, "view." + method + "(0, 0) with an object context did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_DATAVIEW, "view." + method + "(0, 0) with an object context threw " + n);
+        }
+    }
+
+    r = view.setInt8(1, -257);
+    ok(r === undefined, "view.setInt8(1, -1) returned " + r);
+    r = view.getUint16(0);
+    ok(r === 255, "view.getUint16(0) returned " + r);
+    r = view.getUint16(0, true);
+    ok(r === 65280, "view.getUint16(0, true) returned " + r);
+    r = view.setUint32(2, "12345678", true);
+    ok(r === undefined, "view.setUint32(2, '12345678', true) returned " + r);
+    r = view.getInt32(1);
+    ok(r === -11640388, "view.getInt32(1) returned " + r);
+    r = view.setInt16(3, 65535, true);
+    ok(r === undefined, "view.setInt16(3, 65535) returned " + r);
+    r = view.getUint16(3);
+    ok(r === 65535, "view.getUint16(3) returned " + r);
+    r = view.setUint32(0, -2, true);
+    ok(r === undefined, "view.setUint32(0, -2) returned " + r);
+    r = view.getInt32(0, true);
+    ok(r === -2, "view.getInt32(0) returned " + r);
+    r = view.setFloat32(6, 1234.5, true);
+    ok(r === undefined, "view.setFloat32(6, 1234.5) returned " + r);
+    r = view2.getFloat32(0, true);
+    ok(r === 1234.5, "view2.getFloat32(0) returned " + r);
+
+    /* setters differing only in signedness have identical behavior, but they're not the same methods */
+    ok(view.setInt8 !== view.setUint8, "setInt8 and setUint8 are the same method");
+    ok(view.setInt16 !== view.setUint16, "setInt16 and setUint16 are the same method");
+    ok(view.setInt32 !== view.setUint32, "setInt32 and setUint32 are the same method");
 });
 
 sync_test("builtin_context", function() {
