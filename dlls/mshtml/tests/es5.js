@@ -35,6 +35,7 @@ var JS_E_NONWRITABLE_MODIFIED = 0x800a13d7;
 var JS_E_TYPEDARRAY_BAD_CTOR_ARG = 0x800a13da;
 var JS_E_NOT_TYPEDARRAY = 0x800a13db;
 var JS_E_TYPEDARRAY_INVALID_OFFSLEN = 0x800a13dc;
+var JS_E_TYPEDARRAY_INVALID_SUBARRAY = 0x800a13dd;
 var JS_E_NOT_DATAVIEW = 0x800a13df;
 var JS_E_DATAVIEW_NO_ARGUMENT = 0x800a13e0;
 var JS_E_DATAVIEW_INVALID_ACCESS = 0x800a13e1;
@@ -2284,6 +2285,60 @@ sync_test("ArrayBuffers & Views", function() {
         ok(arr2.byteOffset === 0, name + " copy.byteOffset = " + arr2.byteOffset);
         ok(arr2.length === arr.length, name + " copy.length = " + arr2.length);
         ok(arr2.buffer !== arr.buffer, name + " copy.buffer = " + arr2.buffer);
+        arr2 = arr.subarray(undefined, "1");
+        ok(arr2.byteLength === typeSz, name + " subarray(undefined, '1').byteLength = " + arr2.byteLength);
+        ok(arr2.byteOffset === arr.byteOffset, name + " subarray(undefined, '1').byteOffset = " + arr2.byteOffset);
+        ok(arr2.length === 1, name + " subarray(undefined, '1').length = " + arr2.length);
+        ok(arr2.buffer === arr.buffer, name + " subarray(undefined, '1').buffer = " + arr2.buffer);
+
+        name = arrType + "(10)";
+        arr = eval(name);
+        try {
+            arr.subarray.call(null, 0);
+            ok(false, arrType + ": calling subarray with null context did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_TYPEDARRAY, arrType + ": calling subarray with null context threw " + n);
+        }
+        try {
+            arr.subarray.call({}, 0);
+            ok(false, arrType + ": calling subarray with an object context did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_NOT_TYPEDARRAY, arrType + ": calling subarray with an object context threw " + n);
+        }
+        try {
+            arr.subarray();
+            ok(false, name + " subarray() did not throw exception");
+        }catch(ex) {
+            var n = ex.number >>> 0;
+            ok(n === JS_E_TYPEDARRAY_INVALID_SUBARRAY, name + " subarray() threw " + n);
+        }
+        arr2 = arr.subarray(4);
+        ok(arr2.byteLength === 6 * typeSz, name + ".subarray(4).byteLength = " + arr2.byteLength);
+        ok(arr2.byteOffset === 4 * typeSz, name + ".subarray(4).byteOffset = " + arr2.byteOffset);
+        ok(arr2.length === 6, name + ".subarray(4).length = " + arr2.length);
+        ok(arr2.buffer === arr.buffer, name + ".subarray(4).buffer = " + arr2.buffer);
+        arr2 = arr.subarray(4, 2);
+        ok(arr2.byteLength === 0, name + ".subarray(4, 2).byteLength = " + arr2.byteLength);
+        ok(arr2.byteOffset === 4 * typeSz, name + ".subarray(4, 2).byteOffset = " + arr2.byteOffset);
+        ok(arr2.length === 0, name + ".subarray(4, 2).length = " + arr2.length);
+        ok(arr2.buffer === arr.buffer, name + ".subarray(4, 2).buffer = " + arr2.buffer);
+        arr2 = arr.subarray(-3, 100);
+        ok(arr2.byteLength === 3 * typeSz, name + ".subarray(-3, 100).byteLength = " + arr2.byteLength);
+        ok(arr2.byteOffset === 7 * typeSz, name + ".subarray(-3, 100).byteOffset = " + arr2.byteOffset);
+        ok(arr2.length === 3, name + ".subarray(-3, 100).length = " + arr2.length);
+        ok(arr2.buffer === arr.buffer, name + ".subarray(-3, 100).buffer = " + arr2.buffer);
+        arr2 = arr.subarray(42, -1);
+        ok(arr2.byteLength === 0, name + ".subarray(42, -1).byteLength = " + arr2.byteLength);
+        ok(arr2.byteOffset === 10 * typeSz, name + ".subarray(42, -1).byteOffset = " + arr2.byteOffset);
+        ok(arr2.length === 0, name + ".subarray(42, -1).length = " + arr2.length);
+        ok(arr2.buffer === arr.buffer, name + ".subarray(42, -1).buffer = " + arr2.buffer);
+        arr2 = arr.subarray(2, -3);
+        ok(arr2.byteLength === 5 * typeSz, name + ".subarray(2, -3).byteLength = " + arr2.byteLength);
+        ok(arr2.byteOffset === 2 * typeSz, name + ".subarray(2, -3).byteOffset = " + arr2.byteOffset);
+        ok(arr2.length === 5, name + ".subarray(2, -3).length = " + arr2.length);
+        ok(arr2.buffer === arr.buffer, name + ".subarray(2, -3).buffer = " + arr2.buffer);
     }
 
     arr = new Float32Array(3);

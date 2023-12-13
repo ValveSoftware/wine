@@ -770,6 +770,8 @@ static inline TypedArrayInstance *typedarr_this(jsval_t vthis, jsclass_t jsclass
     return (jsdisp && is_class(jsdisp, jsclass)) ? typedarr_from_jsdisp(jsdisp) : NULL;
 }
 
+static HRESULT create_typedarr(script_ctx_t*,jsclass_t,jsdisp_t*,DWORD,DWORD,jsdisp_t**);
+
 static HRESULT TypedArray_get_buffer(script_ctx_t *ctx, jsdisp_t *jsthis, jsval_t *r)
 {
     TRACE("%p\n", jsthis);
@@ -852,12 +854,50 @@ static HRESULT TypedArray_subarray(script_ctx_t *ctx, jsval_t vthis, WORD flags,
         jsval_t *r, jsclass_t jsclass)
 {
     TypedArrayInstance *typedarr;
+    DWORD begin = 0, end;
+    jsdisp_t *obj;
+    HRESULT hres;
+    double n;
 
-    FIXME("not implemented\n");
+    TRACE("\n");
 
     if(!(typedarr = typedarr_this(vthis, jsclass)))
         return JS_E_NOT_TYPEDARRAY;
-    return E_NOTIMPL;
+    if(!argc)
+        return JS_E_TYPEDARRAY_INVALID_SUBARRAY;
+    if(!r)
+        return S_OK;
+
+    hres = to_integer(ctx, argv[0], &n);
+    if(FAILED(hres))
+        return hres;
+    end = typedarr->length;
+    if(n < 0.0)
+        n += typedarr->length;
+    if(n >= 0.0)
+        begin = n < typedarr->length ? n : typedarr->length;
+
+    if(argc > 1 && !is_undefined(argv[1])) {
+        hres = to_integer(ctx, argv[1], &n);
+        if(FAILED(hres))
+            return hres;
+        if(n < 0.0)
+            n += typedarr->length;
+        if(n >= 0.0) {
+            end = n < typedarr->length ? n : typedarr->length;
+            end = end < begin ? begin : end;
+        }else
+            end = begin;
+    }
+
+    hres = create_typedarr(ctx, jsclass, typedarr->buffer,
+                           typedarr->offset + begin * TypedArray_elem_size[TYPEDARRAY_INDEX(jsclass)],
+                           end - begin, &obj);
+    if(FAILED(hres))
+        return hres;
+
+    *r = jsval_obj(obj);
+    return S_OK;
 }
 
 static unsigned TypedArray_idx_length(jsdisp_t *jsdisp)
