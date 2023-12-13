@@ -2718,6 +2718,7 @@ testException(function() {not_existing_variable.something();}, "E_UNDEFINED");
 testException(function() {date();}, "E_NOT_FUNC");
 testException(function() {arr();}, "E_NOT_FUNC");
 testException(function() {(new Object) instanceof (new Object);}, "E_NOT_FUNC");
+testException(function() {var o = new Object(); o.prototype = new Object(); (new Object) instanceof o;}, "E_NOT_FUNC");
 testException(function() {eval("nonexistingfunc()")}, "E_OBJECT_EXPECTED");
 testException(function() {(new Object()) instanceof 3;}, "E_NOT_FUNC");
 testException(function() {(new Object()) instanceof null;}, "E_NOT_FUNC");

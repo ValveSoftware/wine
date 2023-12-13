@@ -106,6 +106,7 @@ typedef struct {
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
     IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window);
     HRESULT (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window, IDispatch **ret);
+    BOOL    (STDMETHODCALLTYPE *IsConstructor)(IWineDispatchProxyPrivate *This);
     HRESULT (STDMETHODCALLTYPE *PropFixOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);
     HRESULT (STDMETHODCALLTYPE *PropOverride)(IWineDispatchProxyPrivate *This, const WCHAR *name, VARIANT *value);
     HRESULT (STDMETHODCALLTYPE *PropDefineOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);

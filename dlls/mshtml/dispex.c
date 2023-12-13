@@ -2934,6 +2934,12 @@ static HRESULT WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDispat
     return S_OK;
 }
 
+static BOOL WINAPI WineDispatchProxyPrivate_IsConstructor(IWineDispatchProxyPrivate *iface)
+{
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    return This->info->desc >= &proxy_ctor_dispex[0] && This->info->desc < &proxy_ctor_dispex[ARRAY_SIZE(proxy_ctor_dispex)];
+}
+
 static HRESULT WINAPI WineDispatchProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -3160,6 +3166,7 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     WineDispatchProxyPrivate_GetProxyFieldRef,
     WineDispatchProxyPrivate_GetDefaultPrototype,
     WineDispatchProxyPrivate_GetDefaultConstructor,
+    WineDispatchProxyPrivate_IsConstructor,
     WineDispatchProxyPrivate_PropFixOverride,
     WineDispatchProxyPrivate_PropOverride,
     WineDispatchProxyPrivate_PropDefineOverride,

@@ -3017,6 +3017,25 @@ sync_test("functions scope", function() {
     })();
 });
 
+sync_test("instanceof", function() {
+    var r;
+
+    try {
+        ({} instanceof { prototype: {} });
+        ok(false, "expected exception using it on non-function object");
+    }catch(e) {
+        ok(e.number === 0xa138a - 0x80000000, "using it on non-function object threw " + e.number);
+    }
+
+    r = (document.createElement("iframe") instanceof HTMLIFrameElement);
+    ok(r === true, "iframe element not instance of HTMLIFrameElement");
+    r = (document.createElement("div") instanceof HTMLIFrameElement);
+    ok(r === false, "div element instance of HTMLIFrameElement");
+    r = (document instanceof Node);
+    todo_wine.
+    ok(r === true, "document not instance of Node");
+});
+
 sync_test("console", function() {
     var except
 

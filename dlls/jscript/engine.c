@@ -2057,7 +2057,7 @@ static HRESULT interp_instanceof(script_ctx_t *ctx)
         return E_FAIL;
     }
 
-    if(is_class(obj, JSCLASS_FUNCTION)) {
+    if(is_class(obj, JSCLASS_FUNCTION) || (obj->proxy && obj->proxy->lpVtbl->IsConstructor(obj->proxy))) {
         hres = jsdisp_propget_name(obj, L"prototype", &prot);
     }else {
         hres = JS_E_FUNCTION_EXPECTED;
