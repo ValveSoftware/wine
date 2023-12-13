@@ -1176,8 +1176,8 @@ static HRESULT HTMLStorage_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
     return (*name = SysAllocString(This->props[idx])) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLStorage_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLStorage_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLStorage *This = impl_from_DispatchEx(dispex);
     DWORD idx = id - MSHTML_DISPID_CUSTOM_MIN;

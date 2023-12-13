@@ -728,8 +728,8 @@ static HRESULT HTMLObjectElement_dispex_get_name(DispatchEx *dispex, DISPID id, 
     return E_NOTIMPL;
 }
 
-static HRESULT HTMLObjectElement_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLObjectElement_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLObjectElement *This = impl_from_DispatchEx(dispex);
 

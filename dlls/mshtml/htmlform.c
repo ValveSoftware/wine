@@ -922,8 +922,8 @@ static HRESULT HTMLFormElement_dispex_get_name(DispatchEx *dispex, DISPID id, BS
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLFormElement_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLFormElement_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLFormElement *This = impl_from_DispatchEx(dispex);
     IDispatch *ret;

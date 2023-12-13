@@ -987,8 +987,8 @@ static HRESULT HTMLFrameElement_get_name(DispatchEx *dispex, DISPID id, BSTR *na
     return *name ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLFrameElement_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLFrameElement_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLFrameElement *This = frame_from_DispatchEx(dispex);
 
@@ -998,7 +998,7 @@ static HRESULT HTMLFrameElement_invoke(DispatchEx *dispex, DISPID id, LCID lcid,
     }
 
     return dispex_invoke(&This->framebase.content_window->base.inner_window->event_target.dispex,
-                         id, lcid, flags, params, res, ei, caller);
+                         this_obj, id, lcid, flags, params, res, ei, caller);
 }
 
 static const NodeImplVtbl HTMLFrameElementImplVtbl = {
@@ -1577,8 +1577,8 @@ static HRESULT HTMLIFrame_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
     return *name ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLIFrame_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLIFrame_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLIFrame *This = iframe_from_DispatchEx(dispex);
 
@@ -1588,7 +1588,7 @@ static HRESULT HTMLIFrame_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
     }
 
     return dispex_invoke(&This->framebase.content_window->base.inner_window->event_target.dispex,
-                         id, lcid, flags, params, res, ei, caller);
+                         this_obj, id, lcid, flags, params, res, ei, caller);
 }
 
 static const NodeImplVtbl HTMLIFrameImplVtbl = {

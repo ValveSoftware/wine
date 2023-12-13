@@ -422,8 +422,8 @@ static HRESULT HTMLStyleSheetRulesCollection_get_name(DispatchEx *dispex, DISPID
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLStyleSheetRulesCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLStyleSheetRulesCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLStyleSheetRulesCollection *This = HTMLStyleSheetRulesCollection_from_DispatchEx(dispex);
 
@@ -846,8 +846,8 @@ static HRESULT HTMLStyleSheetsCollection_get_name(DispatchEx *dispex, DISPID id,
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLStyleSheetsCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLStyleSheetsCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLStyleSheetsCollection *This = HTMLStyleSheetsCollection_from_DispatchEx(dispex);
 

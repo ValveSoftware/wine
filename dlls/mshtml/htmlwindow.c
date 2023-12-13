@@ -4126,8 +4126,8 @@ static HRESULT HTMLWindow_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
     return (*name = SysAllocString(This->global_props[idx].name)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLWindow_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLInnerWindow *This = impl_from_DispatchEx(dispex);
     global_prop_t *prop;
@@ -4191,7 +4191,7 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
 
             prop->type = GLOBAL_DISPEXVAR;
             prop->id = dispex_id;
-            return dispex_invoke(&This->event_target.dispex, dispex_id, 0, flags, params, res, ei, caller);
+            return dispex_invoke(&This->event_target.dispex, this_obj, dispex_id, 0, flags, params, res, ei, caller);
         }
         default:
             FIXME("Not supported flags: %x\n", flags);
@@ -4219,7 +4219,7 @@ static HRESULT HTMLWindow_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD 
             return E_NOTIMPL;
         }
     case GLOBAL_DISPEXVAR:
-        return dispex_invoke(&This->event_target.dispex, prop->id, 0, flags, params, res, ei, caller);
+        return dispex_invoke(&This->event_target.dispex, this_obj, prop->id, 0, flags, params, res, ei, caller);
     default:
         ERR("invalid type %d\n", prop->type);
         hres = DISP_E_MEMBERNOTFOUND;
@@ -4282,7 +4282,8 @@ static HRESULT IHTMLWindow2_location_hook(DispatchEx *dispex, WORD flags, DISPPA
     if(FAILED(hres))
         return hres;
 
-    hres = dispex_invoke(&location->dispex, DISPID_VALUE, 0, flags, dp, res, ei, caller);
+    hres = dispex_invoke(&location->dispex, (IDispatch*)&location->IHTMLLocation_iface,
+                         DISPID_VALUE, 0, flags, dp, res, ei, caller);
     IHTMLLocation_Release(&location->IHTMLLocation_iface);
     return hres;
 }

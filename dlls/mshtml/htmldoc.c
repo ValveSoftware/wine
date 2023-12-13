@@ -5935,8 +5935,8 @@ static HRESULT HTMLDocumentNode_get_name(DispatchEx *dispex, DISPID id, BSTR *na
     return (*name = SysAllocString(This->elem_vars[idx])) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLDocumentNode_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLDocumentNode_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLDocumentNode *This = impl_from_DispatchEx(dispex);
     nsIDOMElement *nselem;
@@ -6095,6 +6095,7 @@ static HRESULT HTMLDocumentNode_location_hook(DispatchEx *dispex, WORD flags, DI
         return E_FAIL;
 
     return dispex_invoke(&This->window->base.outer_window->base.inner_window->event_target.dispex,
+                         (IDispatch*)&This->window->base.outer_window->base.inner_window->base.IHTMLWindow2_iface,
                          DISPID_IHTMLWINDOW2_LOCATION, 0, flags, dp, res, ei, caller);
 }
 

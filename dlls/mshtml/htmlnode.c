@@ -398,8 +398,8 @@ static HRESULT HTMLDOMChildrenCollection_get_name(DispatchEx *dispex, DISPID id,
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLDOMChildrenCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLDOMChildrenCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLDOMChildrenCollection *This = impl_from_DispatchEx(dispex);
 

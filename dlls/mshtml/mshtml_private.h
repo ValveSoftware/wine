@@ -374,7 +374,7 @@ typedef struct {
 
     /* These are called when the object implements GetMemberName, InvokeEx, DeleteMemberByDispID and GetNextDispID for custom props */
     HRESULT (*get_name)(DispatchEx*,DISPID,BSTR*);
-    HRESULT (*invoke)(DispatchEx*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+    HRESULT (*invoke)(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
     HRESULT (*delete)(DispatchEx*,DISPID);
     HRESULT (*next_dispid)(DispatchEx*,DISPID,DISPID*);
 
@@ -441,7 +441,7 @@ HRESULT dispex_get_dprop_ref(DispatchEx*,const WCHAR*,BOOL,VARIANT**);
 HRESULT get_dispids(tid_t,DWORD*,DISPID**);
 HRESULT remove_attribute(DispatchEx*,DISPID,VARIANT_BOOL*);
 HRESULT dispex_get_dynid(DispatchEx*,const WCHAR*,BOOL,DISPID*);
-HRESULT dispex_invoke(DispatchEx*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+HRESULT dispex_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 HRESULT dispex_delete_prop(DispatchEx*,DISPID);
 void release_typelib(void);
 HRESULT get_class_typeinfo(const CLSID*,ITypeInfo**);

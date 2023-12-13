@@ -1231,8 +1231,8 @@ static HRESULT HTMLRectCollection_get_name(DispatchEx *dispex, DISPID id, BSTR *
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLRectCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLRectCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLRectCollection *This = HTMLRectCollection_from_DispatchEx(dispex);
 
@@ -2676,8 +2676,8 @@ static HRESULT WINAPI HTMLElement_toString(IHTMLElement *iface, BSTR *String)
     if(!String)
         return E_INVALIDARG;
 
-    hres = dispex_invoke(&This->node.event_target.dispex, DISPID_VALUE, LOCALE_SYSTEM_DEFAULT,
-                         DISPATCH_PROPERTYGET, NULL, &var, NULL, NULL);
+    hres = dispex_invoke(&This->node.event_target.dispex, (IDispatch*)&This->node.event_target.dispex.IDispatchEx_iface,
+                         DISPID_VALUE, LOCALE_SYSTEM_DEFAULT, DISPATCH_PROPERTYGET, NULL, &var, NULL, NULL);
     if(SUCCEEDED(hres)) {
         assert(V_VT(&var) == VT_BSTR);
         *String = V_BSTR(&var);
@@ -7725,8 +7725,8 @@ static HRESULT token_list_get_name(DispatchEx *dispex, DISPID id, BSTR *name)
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT token_list_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT token_list_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     struct token_list *token_list = token_list_from_DispatchEx(dispex);
 
@@ -8147,8 +8147,8 @@ static HRESULT HTMLFiltersCollection_get_name(DispatchEx *dispex, DISPID id, BST
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLFiltersCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLFiltersCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     TRACE("(%p)->(%lx %lx %x %p %p %p)\n", dispex, id, lcid, flags, params, res, ei);
 
@@ -8877,7 +8877,7 @@ static HRESULT HTMLAttributeCollection_get_name(DispatchEx *dispex, DISPID id, B
     return E_NOTIMPL;
 }
 
-static HRESULT HTMLAttributeCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid,
+static HRESULT HTMLAttributeCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid,
         WORD flags, DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLAttributeCollection *This = HTMLAttributeCollection_from_DispatchEx(dispex);

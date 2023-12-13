@@ -596,8 +596,8 @@ static HRESULT HTMLElementCollection_get_name(DispatchEx *dispex, DISPID id, BST
     return (*name = SysAllocStringLen(buf, len)) ? S_OK : E_OUTOFMEMORY;
 }
 
-static HRESULT HTMLElementCollection_invoke(DispatchEx *dispex, DISPID id, LCID lcid, WORD flags, DISPPARAMS *params,
-        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+static HRESULT HTMLElementCollection_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD flags,
+        DISPPARAMS *params, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
     HTMLElementCollection *This = impl_from_DispatchEx(dispex);
     DWORD idx;
