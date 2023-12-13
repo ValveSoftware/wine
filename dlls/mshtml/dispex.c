@@ -221,6 +221,7 @@ static inline dispex_data_t *proxy_prototype_object_info(struct proxy_prototype 
 
 static HRESULT get_dynamic_prop(DispatchEx*,const WCHAR*,DWORD,dynamic_prop_t**);
 static HRESULT invoke_builtin_function(IDispatch*,func_info_t*,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+static inline BOOL is_legacy_prototype(IDispatch*);
 static inline struct proxy_prototype *to_proxy_prototype(DispatchEx*);
 
 static HRESULT load_typelib(void)
@@ -1018,15 +1019,17 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
 {
     IDispatchEx *dispex = NULL;
     DISPPARAMS params = { 0 };
+    HRESULT hres, errcode;
     IDispatch *this_obj;
     UINT argc = 0;
     VARIANT *arg;
-    HRESULT hres;
 
     arg = dp->rgvarg + dp->cArgs - 1;
     if(dp->cArgs < 1 || V_VT(arg) != VT_DISPATCH || !V_DISPATCH(arg))
         return CTL_E_ILLEGALFUNCTIONCALL;
     this_obj = V_DISPATCH(arg);
+
+    errcode = is_legacy_prototype(this_obj) ? MSHTML_E_INVALID_PROPERTY : CTL_E_ILLEGALFUNCTIONCALL;
 
     if(dp->cArgs >= 2) {
         IDispatch *disp;
@@ -1034,7 +1037,7 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
 
         arg--;
         if((V_VT(arg) & ~VT_BYREF) != VT_DISPATCH)
-            return CTL_E_ILLEGALFUNCTIONCALL;
+            return errcode;
         disp = (V_VT(arg) & VT_BYREF) ? *(IDispatch**)(V_BYREF(arg)) : V_DISPATCH(arg);
 
         /* FIXME: Native doesn't seem to detect jscript arrays by querying for length or indexed props,
@@ -1044,11 +1047,11 @@ static HRESULT function_apply(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARI
         hres = get_disp_prop_vt(disp, dispex, L"length", lcid, res, VT_I4, ei, caller);
         if(FAILED(hres)) {
             if(hres == DISP_E_UNKNOWNNAME)
-                hres = CTL_E_ILLEGALFUNCTIONCALL;
+                hres = errcode;
             goto fail;
         }
         if(V_I4(res) < 0) {
-            hres = CTL_E_ILLEGALFUNCTIONCALL;
+            hres = errcode;
             goto fail;
         }
         params.cArgs = V_I4(res);
@@ -1088,7 +1091,7 @@ cleanup:
 fail:
     if(dispex)
         IDispatchEx_Release(dispex);
-    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+    return (hres == E_UNEXPECTED) ? errcode : hres;
 }
 
 static HRESULT function_call(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
@@ -1103,7 +1106,8 @@ static HRESULT function_call(func_disp_t *func, DISPPARAMS *dp, LCID lcid, VARIA
 
     hres = invoke_builtin_function(V_DISPATCH(arg), func->info, &params, res, ei, caller);
 
-    return (hres == E_UNEXPECTED) ? CTL_E_ILLEGALFUNCTIONCALL : hres;
+    return (hres != E_UNEXPECTED) ? hres :
+           (is_legacy_prototype(V_DISPATCH(arg)) ? MSHTML_E_INVALID_PROPERTY : CTL_E_ILLEGALFUNCTIONCALL);
 }
 
 static const struct {
@@ -3214,6 +3218,17 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     WineDispatchProxyPrivate_PropEnum,
     WineDispatchProxyPrivate_ToString
 };
+
+static inline BOOL is_legacy_prototype(IDispatch *disp)
+{
+    DispatchEx *dispex;
+
+    if(!disp || disp->lpVtbl != (const IDispatchVtbl*)&WineDispatchProxyPrivateVtbl)
+        return FALSE;
+    dispex = impl_from_IDispatchEx((IDispatchEx*)disp);
+
+    return dispex->info->desc >= &legacy_prototype_dispex[0] && dispex->info->desc < &legacy_prototype_dispex[ARRAY_SIZE(legacy_prototype_dispex)];
+}
 
 HRESULT dispex_invoke(DispatchEx *dispex, IDispatch *this_obj, DISPID id, LCID lcid, WORD wFlags, DISPPARAMS *pdp,
         VARIANT *res, EXCEPINFO *pei, IServiceProvider *caller)

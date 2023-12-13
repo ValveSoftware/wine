@@ -901,7 +901,6 @@ sync_test("builtin_prototypes", function() {
         }catch(ex) {
             r = ex.number;
         }
-        todo_wine_if(v < 9).
         ok(r === (v < 9 ? 0xa01b6 : 0xffff) - 0x80000000, "setAttribute on proto error code = " + r);
         r = 0;
         try {
