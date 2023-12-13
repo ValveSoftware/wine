@@ -2448,7 +2448,8 @@ HRESULT jsdisp_call_name(jsdisp_t *disp, const WCHAR *name, WORD flags, unsigned
     if(!prop || prop->type == PROP_DELETED)
         return JS_E_INVALID_PROPERTY;
 
-    return invoke_prop_func(disp, to_disp(disp), prop, flags, argc, argv, r, &disp->ctx->jscaller->IServiceProvider_iface);
+    hres = invoke_prop_func(disp, to_disp(disp), prop, flags, argc, argv, r, &disp->ctx->jscaller->IServiceProvider_iface);
+    return (hres == DISP_E_MEMBERNOTFOUND) ? JS_E_INVALID_PROPERTY : hres;
 }
 
 static HRESULT disp_invoke(script_ctx_t *ctx, IDispatch *disp, DISPID id, WORD flags, DISPPARAMS *params, VARIANT *r,
@@ -2800,7 +2801,12 @@ HRESULT jsdisp_propget_name(jsdisp_t *obj, const WCHAR *name, jsval_t *val)
         return S_OK;
     }
 
-    return prop_get(obj, to_disp(obj), prop, val);
+    hres = prop_get(obj, to_disp(obj), prop, val);
+    if(hres == DISP_E_MEMBERNOTFOUND) {
+        *val = jsval_undefined();
+        return S_OK;
+    }
+    return hres;
 }
 
 HRESULT jsdisp_get_idx(jsdisp_t *obj, DWORD idx, jsval_t *r)
@@ -2823,7 +2829,12 @@ HRESULT jsdisp_get_idx(jsdisp_t *obj, DWORD idx, jsval_t *r)
         return DISP_E_UNKNOWNNAME;
     }
 
-    return prop_get(obj, to_disp(obj), prop, r);
+    hres = prop_get(obj, to_disp(obj), prop, r);
+    if(hres == DISP_E_MEMBERNOTFOUND) {
+        *r = jsval_undefined();
+        return DISP_E_UNKNOWNNAME;
+    }
+    return hres;
 }
 
 HRESULT jsdisp_propget(jsdisp_t *jsdisp, DISPID id, jsval_t *val)
@@ -3058,7 +3069,7 @@ HRESULT jsdisp_get_own_property(jsdisp_t *obj, const WCHAR *name, BOOL flags_onl
         if(!flags_only) {
             hres = prop_get(obj, to_disp(obj), prop, &desc->value);
             if(FAILED(hres))
-                return hres;
+                return (hres == DISP_E_MEMBERNOTFOUND) ? DISP_E_UNKNOWNNAME : hres;
         }
         break;
     case PROP_ACCESSOR:
