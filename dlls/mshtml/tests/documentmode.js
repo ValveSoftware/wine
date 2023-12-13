@@ -344,6 +344,7 @@ sync_test("builtin_toString", function() {
         test("mediaQueryList", window.matchMedia("(hover:hover)"), "MediaQueryList");
     }
     if(v >= 11) {
+        test("crypto", window.msCrypto, "Crypto");
         test("MutationObserver", new window.MutationObserver(function() {}), "MutationObserver");
     }
     if(v >= 9) {
@@ -478,6 +479,7 @@ sync_test("window_props", function() {
     test_exposed("performance", true);
     test_exposed("console", v >= 10);
     test_exposed("matchMedia", v >= 10);
+    test_exposed("msCrypto", v >= 11);
     test_exposed("MutationObserver", v >= 11);
 });
 
@@ -2855,6 +2857,15 @@ sync_test("__defineSetter__", function() {
     x.bar = 10;
     ok(x.bar === undefined, "x.bar with setter = " + x.bar);
     ok(x.setterVal === 9, "x.setterVal after setting bar = " + x.setterVal);
+});
+
+sync_test("Crypto", function() {
+    var crypto = window.msCrypto;
+    if(!crypto) return;
+
+    ok("subtle" in crypto, "subtle not in crypto");
+    ok("getRandomValues" in crypto, "getRandomValues not in crypto");
+    ok(!("randomUUID" in crypto), "randomUUID is in crypto");
 });
 
 sync_test("MutationObserver", function() {

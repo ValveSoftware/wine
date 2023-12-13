@@ -295,6 +295,7 @@ typedef struct EventTarget EventTarget;
     XIID(IWinePageTransitionEvent) \
     XIID(IWineXMLHttpRequestPrivate) \
     XIID(IWineMSHTMLConsole) \
+    XIID(IWineMSHTMLCrypto) \
     XIID(IWineMSHTMLMediaQueryList) \
     XIID(IWineMSHTMLMutationObserver)
 
@@ -597,6 +598,7 @@ struct HTMLInnerWindow {
     IHTMLStorage *session_storage;
     IHTMLStorage *local_storage;
     IWineMSHTMLConsole *console;
+    IWineMSHTMLCrypto *crypto;
 
     BOOL performance_initialized;
     VARIANT performance;
@@ -1500,6 +1502,6 @@ IInternetSecurityManager *get_security_manager(void);
 
 extern HINSTANCE hInst;
 void create_console(compat_mode_t compat_mode, IWineMSHTMLConsole **ret);
+void create_crypto(HTMLInnerWindow *window, IWineMSHTMLCrypto **ret);
 HRESULT create_media_query_list(HTMLWindow *window, BSTR media_query, IDispatch **ret);
-
 HRESULT create_mutation_observer_ctor(compat_mode_t compat_mode, IDispatch **ret);

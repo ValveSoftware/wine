@@ -3429,6 +3429,21 @@ static HRESULT WINAPI window_private_get_console(IWineHTMLWindowPrivate *iface, 
     return S_OK;
 }
 
+static HRESULT WINAPI window_private_get_msCrypto(IWineHTMLWindowPrivate *iface, IDispatch **crypto)
+{
+    HTMLInnerWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface)->inner_window;
+
+    TRACE("iface %p, crypto %p.\n", iface, crypto);
+
+    if(!This->crypto)
+        create_crypto(This, &This->crypto);
+
+    *crypto = (IDispatch*)This->crypto;
+    if(This->crypto)
+        IWineMSHTMLCrypto_AddRef(This->crypto);
+    return S_OK;
+}
+
 static HRESULT WINAPI window_private_get_MutationObserver(IWineHTMLWindowPrivate *iface,
                                                           IDispatch **mutation_observer)
 {
@@ -3461,6 +3476,7 @@ static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_cancelAnimationFrame,
     window_private_get_console,
     window_private_matchMedia,
+    window_private_get_msCrypto,
     window_private_get_MutationObserver
 };
 
@@ -4003,6 +4019,8 @@ static void HTMLWindow_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCa
         note_cc_edge((nsISupports*)This->session_storage, "session_storage", cb);
     if(This->local_storage)
         note_cc_edge((nsISupports*)This->local_storage, "local_storage", cb);
+    if(This->crypto)
+        note_cc_edge((nsISupports*)This->crypto, "crypto", cb);
     if(This->dom_window)
         note_cc_edge((nsISupports*)This->dom_window, "dom_window", cb);
     traverse_variant(&This->performance, "performance", cb);
@@ -4057,6 +4075,11 @@ static void HTMLWindow_unlink(DispatchEx *dispex)
         IHTMLStorage *local_storage = This->local_storage;
         This->local_storage = NULL;
         IHTMLStorage_Release(local_storage);
+    }
+    if(This->crypto) {
+        IWineMSHTMLCrypto *crypto = This->crypto;
+        This->crypto = NULL;
+        IWineMSHTMLCrypto_Release(crypto);
     }
     unlink_variant(&This->performance);
     unlink_ref(&This->dom_window);
@@ -4361,6 +4384,7 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
 
     /* Hide props not available in IE10 */
     static const dispex_hook_t private_ie10_hooks[] = {
+        {DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO},
         {DISPID_IWINEHTMLWINDOWPRIVATE_MUTATIONOBSERVER},
         {DISPID_UNKNOWN}
     };

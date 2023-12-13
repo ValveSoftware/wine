@@ -113,6 +113,22 @@ interface IWineMSHTMLMediaQueryList : IDispatch
     HRESULT removeListener([in] VARIANT *listener);
 }
 
+[
+    odl,
+    oleautomation,
+    dual,
+    hidden,
+    uuid(fd55b4b6-2813-4fb4-829d-380099474ab2)
+]
+interface IWineMSHTMLCrypto : IDispatch
+{
+    [propget, id(1)]
+    HRESULT subtle([retval, out] IDispatch **subtle);
+    [id(2)]
+    HRESULT getRandomValues([in] VARIANT *typedArray, [retval, out] IDispatch **ret);
+}
+
+const long DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO = 54;
 const long DISPID_IWINEHTMLWINDOWPRIVATE_MUTATIONOBSERVER = 55;
 [
     odl,
@@ -131,6 +147,8 @@ interface IWineHTMLWindowPrivate : IDispatch
     HRESULT console([retval, out] IDispatch **console);
     [id(53)]
     HRESULT matchMedia([in] BSTR media_query, [retval, out] IDispatch **media_query_list);
+    [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO)]
+    HRESULT msCrypto([retval, out] IDispatch **crypto);
     [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_MUTATIONOBSERVER)]
     HRESULT MutationObserver([retval, out] IDispatch **observer_ctor);
 }
