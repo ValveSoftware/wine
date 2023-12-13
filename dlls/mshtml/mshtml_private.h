@@ -677,7 +677,12 @@ struct global_ctor {
         IHTMLXMLHttpRequestFactory IHTMLXMLHttpRequestFactory_iface;
     };
 
+    prototype_id_t prot_id;
     HTMLInnerWindow *window;
+};
+
+struct legacy_prototype {
+    DispatchEx dispex;
 };
 
 struct proxy_globals {
@@ -831,6 +836,7 @@ struct HTMLInnerWindow {
     ULONGLONG first_paint_time;
 
     struct global_ctor *legacy_ctors[LEGACY_CTOR_COUNT];
+    struct legacy_prototype *legacy_prototypes[COMMON_PROTOTYPE_COUNT];
 };
 
 HTMLWindow *unsafe_HTMLWindow_from_IWineDispatchProxyPrivate(IWineDispatchProxyPrivate*);
@@ -1188,9 +1194,14 @@ HRESULT create_outer_window(GeckoBrowser*,mozIDOMWindowProxy*,HTMLOuterWindow*,H
 HRESULT update_window_doc(HTMLInnerWindow*);
 HTMLOuterWindow *mozwindow_to_window(const mozIDOMWindowProxy*);
 void get_top_window(HTMLOuterWindow*,HTMLOuterWindow**);
+struct legacy_prototype *get_legacy_prototype(HTMLInnerWindow*,prototype_id_t,compat_mode_t);
 void global_ctor_traverse(DispatchEx*,nsCycleCollectionTraversalCallback*);
 void global_ctor_unlink(DispatchEx*);
 void global_ctor_destructor(DispatchEx*);
+HRESULT legacy_ctor_get_dispid(DispatchEx*,BSTR,DWORD,DISPID*);
+HRESULT legacy_ctor_get_name(DispatchEx*,DISPID,BSTR*);
+HRESULT legacy_ctor_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
+HRESULT legacy_ctor_delete(DispatchEx*,DISPID);
 HRESULT create_location(HTMLOuterWindow*,HTMLLocation**);
 HRESULT create_navigator(HTMLInnerWindow*,IOmNavigator**);
 HRESULT create_html_screen(HTMLInnerWindow*,IHTMLScreen**);

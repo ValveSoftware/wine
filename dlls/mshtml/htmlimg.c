@@ -957,6 +957,10 @@ static const dispex_static_data_vtbl_t HTMLImageElementFactory_dispex_vtbl = {
     .traverse         = global_ctor_traverse,
     .unlink           = global_ctor_unlink,
     .value            = HTMLImageElementFactory_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 dispex_static_data_t HTMLImageElementFactory_dispex = {

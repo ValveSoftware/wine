@@ -1795,7 +1795,11 @@ static const dispex_static_data_vtbl_t HTMLXMLHttpRequestFactory_dispex_vtbl = {
     .destructor       = global_ctor_destructor,
     .traverse         = global_ctor_traverse,
     .unlink           = global_ctor_unlink,
-    .value            = HTMLXMLHttpRequestFactory_value
+    .value            = HTMLXMLHttpRequestFactory_value,
+    .get_dispid       = legacy_ctor_get_dispid,
+    .get_name         = legacy_ctor_get_name,
+    .invoke           = legacy_ctor_invoke,
+    .delete           = legacy_ctor_delete
 };
 
 static const tid_t HTMLXMLHttpRequestFactory_iface_tids[] = {
