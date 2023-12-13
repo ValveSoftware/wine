@@ -1620,39 +1620,39 @@ dispex_static_data_t HTMLXMLHttpRequest_dispex = {
 
 
 /* IHTMLXMLHttpRequestFactory */
-static inline HTMLXMLHttpRequestFactory *impl_from_IHTMLXMLHttpRequestFactory(IHTMLXMLHttpRequestFactory *iface)
+static inline struct global_ctor *impl_from_IHTMLXMLHttpRequestFactory(IHTMLXMLHttpRequestFactory *iface)
 {
-    return CONTAINING_RECORD(iface, HTMLXMLHttpRequestFactory, IHTMLXMLHttpRequestFactory_iface);
+    return CONTAINING_RECORD(iface, struct global_ctor, IHTMLXMLHttpRequestFactory_iface);
 }
 
 static HRESULT WINAPI HTMLXMLHttpRequestFactory_QueryInterface(IHTMLXMLHttpRequestFactory *iface, REFIID riid, void **ppv)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
     return IDispatchEx_QueryInterface(&This->dispex.IDispatchEx_iface, riid, ppv);
 }
 
 static ULONG WINAPI HTMLXMLHttpRequestFactory_AddRef(IHTMLXMLHttpRequestFactory *iface)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
     return IDispatchEx_AddRef(&This->dispex.IDispatchEx_iface);
 }
 
 static ULONG WINAPI HTMLXMLHttpRequestFactory_Release(IHTMLXMLHttpRequestFactory *iface)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
     return IDispatchEx_Release(&This->dispex.IDispatchEx_iface);
 }
 
 static HRESULT WINAPI HTMLXMLHttpRequestFactory_GetTypeInfoCount(IHTMLXMLHttpRequestFactory *iface, UINT *pctinfo)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
     return IDispatchEx_GetTypeInfoCount(&This->dispex.IDispatchEx_iface, pctinfo);
 }
 
 static HRESULT WINAPI HTMLXMLHttpRequestFactory_GetTypeInfo(IHTMLXMLHttpRequestFactory *iface, UINT iTInfo,
         LCID lcid, ITypeInfo **ppTInfo)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
 
     return IDispatchEx_GetTypeInfo(&This->dispex.IDispatchEx_iface, iTInfo, lcid, ppTInfo);
 }
@@ -1660,7 +1660,7 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_GetTypeInfo(IHTMLXMLHttpRequestF
 static HRESULT WINAPI HTMLXMLHttpRequestFactory_GetIDsOfNames(IHTMLXMLHttpRequestFactory *iface, REFIID riid, LPOLESTR *rgszNames, UINT cNames,
         LCID lcid, DISPID *rgDispId)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
 
     return IDispatchEx_GetIDsOfNames(&This->dispex.IDispatchEx_iface, riid, rgszNames, cNames,
             lcid, rgDispId);
@@ -1669,7 +1669,7 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_GetIDsOfNames(IHTMLXMLHttpReques
 static HRESULT WINAPI HTMLXMLHttpRequestFactory_Invoke(IHTMLXMLHttpRequestFactory *iface, DISPID dispIdMember, REFIID riid, LCID lcid,
         WORD wFlags, DISPPARAMS *pDispParams, VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
 
     return IDispatchEx_Invoke(&This->dispex.IDispatchEx_iface, dispIdMember, riid, lcid, wFlags,
             pDispParams, pVarResult, pExcepInfo, puArgErr);
@@ -1677,7 +1677,7 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_Invoke(IHTMLXMLHttpRequestFactor
 
 static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactory *iface, IHTMLXMLHttpRequest **p)
 {
-    HTMLXMLHttpRequestFactory *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
+    struct global_ctor *This = impl_from_IHTMLXMLHttpRequestFactory(iface);
     HTMLXMLHttpRequest        *ret;
     nsIXMLHttpRequest         *nsxhr;
     nsIDOMEventTarget         *nstarget;
@@ -1743,7 +1743,7 @@ static HRESULT WINAPI HTMLXMLHttpRequestFactory_create(IHTMLXMLHttpRequestFactor
     return S_OK;
 }
 
-static const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl = {
+const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl = {
     HTMLXMLHttpRequestFactory_QueryInterface,
     HTMLXMLHttpRequestFactory_AddRef,
     HTMLXMLHttpRequestFactory_Release,
@@ -1754,14 +1754,14 @@ static const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl = {
     HTMLXMLHttpRequestFactory_create
 };
 
-static inline HTMLXMLHttpRequestFactory *factory_from_DispatchEx(DispatchEx *iface)
+static inline struct global_ctor *ctor_from_DispatchEx(DispatchEx *iface)
 {
-    return CONTAINING_RECORD(iface, HTMLXMLHttpRequestFactory, dispex);
+    return CONTAINING_RECORD(iface, struct global_ctor, dispex);
 }
 
 static void *HTMLXMLHttpRequestFactory_query_interface(DispatchEx *dispex, REFIID riid)
 {
-    HTMLXMLHttpRequestFactory *This = factory_from_DispatchEx(dispex);
+    struct global_ctor *This = ctor_from_DispatchEx(dispex);
 
     if(IsEqualGUID(&IID_IHTMLXMLHttpRequestFactory, riid))
         return &This->IHTMLXMLHttpRequestFactory_iface;
@@ -1769,35 +1769,10 @@ static void *HTMLXMLHttpRequestFactory_query_interface(DispatchEx *dispex, REFII
     return NULL;
 }
 
-static void HTMLXMLHttpRequestFactory_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
-{
-    HTMLXMLHttpRequestFactory *This = factory_from_DispatchEx(dispex);
-
-    if(This->window)
-        note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
-}
-
-static void HTMLXMLHttpRequestFactory_unlink(DispatchEx *dispex)
-{
-    HTMLXMLHttpRequestFactory *This = factory_from_DispatchEx(dispex);
-
-    if(This->window) {
-        HTMLInnerWindow *window = This->window;
-        This->window = NULL;
-        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
-    }
-}
-
-static void HTMLXMLHttpRequestFactory_destructor(DispatchEx *dispex)
-{
-    HTMLXMLHttpRequestFactory *This = factory_from_DispatchEx(dispex);
-    free(This);
-}
-
 static HRESULT HTMLXMLHttpRequestFactory_value(DispatchEx *iface, LCID lcid, WORD flags, DISPPARAMS *params,
         VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
 {
-    HTMLXMLHttpRequestFactory *This = factory_from_DispatchEx(iface);
+    struct global_ctor *This = ctor_from_DispatchEx(iface);
     IHTMLXMLHttpRequest *xhr;
     HRESULT hres;
 
@@ -1819,9 +1794,9 @@ static HRESULT HTMLXMLHttpRequestFactory_value(DispatchEx *iface, LCID lcid, WOR
 
 static const dispex_static_data_vtbl_t HTMLXMLHttpRequestFactory_dispex_vtbl = {
     .query_interface  = HTMLXMLHttpRequestFactory_query_interface,
-    .destructor       = HTMLXMLHttpRequestFactory_destructor,
-    .traverse         = HTMLXMLHttpRequestFactory_traverse,
-    .unlink           = HTMLXMLHttpRequestFactory_unlink,
+    .destructor       = global_ctor_destructor,
+    .traverse         = global_ctor_traverse,
+    .unlink           = global_ctor_unlink,
     .value            = HTMLXMLHttpRequestFactory_value
 };
 
@@ -1829,28 +1804,10 @@ static const tid_t HTMLXMLHttpRequestFactory_iface_tids[] = {
     IHTMLXMLHttpRequestFactory_tid,
     0
 };
-static dispex_static_data_t HTMLXMLHttpRequestFactory_dispex = {
+dispex_static_data_t HTMLXMLHttpRequestFactory_dispex = {
     "Function",
     &HTMLXMLHttpRequestFactory_dispex_vtbl,
     PROTO_ID_NULL,
     IHTMLXMLHttpRequestFactory_tid,
     HTMLXMLHttpRequestFactory_iface_tids
 };
-
-HRESULT HTMLXMLHttpRequestFactory_Create(HTMLInnerWindow* window, HTMLXMLHttpRequestFactory **ret_ptr)
-{
-    HTMLXMLHttpRequestFactory *ret;
-
-    ret = malloc(sizeof(*ret));
-    if(!ret)
-        return E_OUTOFMEMORY;
-
-    ret->IHTMLXMLHttpRequestFactory_iface.lpVtbl = &HTMLXMLHttpRequestFactoryVtbl;
-    ret->window = window;
-    IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
-
-    init_dispatch(&ret->dispex, &HTMLXMLHttpRequestFactory_dispex, window, dispex_compat_mode(&window->event_target.dispex));
-
-    *ret_ptr = ret;
-    return S_OK;
-}

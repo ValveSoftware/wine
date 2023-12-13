@@ -149,6 +149,34 @@ static void detach_inner_window(HTMLInnerWindow *window)
     }
 }
 
+static HRESULT get_legacy_ctor(HTMLInnerWindow *window, legacy_ctor_id_t ctor_id, dispex_static_data_t *dispex,
+        const void *vtbl, IDispatch **ret)
+{
+    struct global_ctor *ctor = window->legacy_ctors[ctor_id];
+
+    if(!ctor) {
+        ctor = malloc(sizeof(*ctor));
+        if(!ctor)
+            return E_OUTOFMEMORY;
+
+        ctor->IUnknown_iface.lpVtbl = vtbl;
+        ctor->window = window;
+        window->legacy_ctors[ctor_id] = ctor;
+        IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
+
+        init_dispatch(&ctor->dispex, dispex, NULL, dispex_compat_mode(&window->event_target.dispex));
+    }
+
+    *ret = (IDispatch*)&ctor->dispex.IDispatchEx_iface;
+    IDispatch_AddRef(*ret);
+    return S_OK;
+}
+
+static inline struct global_ctor *global_ctor_from_IDispatch(IDispatch *iface)
+{
+    return CONTAINING_RECORD((IDispatchEx*)iface, struct global_ctor, dispex.IDispatchEx_iface);
+}
+
 static inline HTMLWindow *impl_from_IHTMLWindow2(IHTMLWindow2 *iface)
 {
     return CONTAINING_RECORD(iface, HTMLWindow, IHTMLWindow2_iface);
@@ -736,21 +764,16 @@ static HRESULT WINAPI HTMLWindow2_get_Image(IHTMLWindow2 *iface, IHTMLImageEleme
 {
     HTMLWindow *This = impl_from_IHTMLWindow2(iface);
     HTMLInnerWindow *window = This->inner_window;
+    IDispatch *disp;
+    HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    if(!window->image_factory) {
-        HRESULT hres;
-
-        hres = HTMLImageElementFactory_Create(window, &window->image_factory);
-        if(FAILED(hres))
-            return hres;
-    }
-
-    *p = &window->image_factory->IHTMLImageElementFactory_iface;
-    IHTMLImageElementFactory_AddRef(*p);
-
-    return S_OK;
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Image, &HTMLImageElementFactory_dispex,
+                           &HTMLImageElementFactoryVtbl, &disp);
+    if(SUCCEEDED(hres))
+        *p = &global_ctor_from_IDispatch(disp)->IHTMLImageElementFactory_iface;
+    return hres;
 }
 
 static HRESULT WINAPI HTMLWindow2_get_location(IHTMLWindow2 *iface, IHTMLLocation **p)
@@ -1294,21 +1317,16 @@ static HRESULT WINAPI HTMLWindow2_get_Option(IHTMLWindow2 *iface, IHTMLOptionEle
 {
     HTMLWindow *This = impl_from_IHTMLWindow2(iface);
     HTMLInnerWindow *window = This->inner_window;
+    IDispatch *disp;
+    HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
-    if(!window->option_factory) {
-        HRESULT hres;
-
-        hres = HTMLOptionElementFactory_Create(window, &window->option_factory);
-        if(FAILED(hres))
-            return hres;
-    }
-
-    *p = &window->option_factory->IHTMLOptionElementFactory_iface;
-    IHTMLOptionElementFactory_AddRef(*p);
-
-    return S_OK;
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_Option, &HTMLOptionElementFactory_dispex,
+                           &HTMLOptionElementFactoryVtbl, &disp);
+    if(SUCCEEDED(hres))
+        *p = &global_ctor_from_IDispatch(disp)->IHTMLOptionElementFactory_iface;
+    return hres;
 }
 
 static HRESULT WINAPI HTMLWindow2_focus(IHTMLWindow2 *iface)
@@ -2067,6 +2085,8 @@ static HRESULT WINAPI HTMLWindow5_get_XMLHttpRequest(IHTMLWindow5 *iface, VARIAN
 {
     HTMLWindow *This = impl_from_IHTMLWindow5(iface);
     HTMLInnerWindow *window = This->inner_window;
+    IDispatch *disp;
+    HRESULT hres;
 
     TRACE("(%p)->(%p)\n", This, p);
 
@@ -2075,20 +2095,13 @@ static HRESULT WINAPI HTMLWindow5_get_XMLHttpRequest(IHTMLWindow5 *iface, VARIAN
         return S_OK;
     }
 
-    if(!window->xhr_factory) {
-        HRESULT hres;
-
-        hres = HTMLXMLHttpRequestFactory_Create(window, &window->xhr_factory);
-        if(FAILED(hres)) {
-            return hres;
-        }
+    hres = get_legacy_ctor(window, LEGACY_CTOR_ID_HTMLXMLHttpRequest, &HTMLXMLHttpRequestFactory_dispex,
+                           &HTMLXMLHttpRequestFactoryVtbl, &disp);
+    if(SUCCEEDED(hres)) {
+        V_VT(p) = VT_DISPATCH;
+        V_DISPATCH(p) = (IDispatch*)&global_ctor_from_IDispatch(disp)->IHTMLXMLHttpRequestFactory_iface;
     }
-
-    V_VT(p) = VT_DISPATCH;
-    V_DISPATCH(p) = (IDispatch*)&window->xhr_factory->IHTMLXMLHttpRequestFactory_iface;
-    IDispatch_AddRef(V_DISPATCH(p));
-
-    return S_OK;
+    return hres;
 }
 
 static const IHTMLWindow5Vtbl HTMLWindow5Vtbl = {
@@ -4293,12 +4306,9 @@ static void HTMLWindow_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCa
         note_cc_edge((nsISupports*)&This->doc->node.IHTMLDOMNode_iface, "doc", cb);
     if(This->console)
         note_cc_edge((nsISupports*)This->console, "console", cb);
-    if(This->image_factory)
-        note_cc_edge((nsISupports*)&This->image_factory->IHTMLImageElementFactory_iface, "image_factory", cb);
-    if(This->option_factory)
-        note_cc_edge((nsISupports*)&This->option_factory->IHTMLOptionElementFactory_iface, "option_factory", cb);
-    if(This->xhr_factory)
-        note_cc_edge((nsISupports*)&This->xhr_factory->IHTMLXMLHttpRequestFactory_iface, "xhr_factory", cb);
+    for(i = 0; i < ARRAY_SIZE(This->legacy_ctors); i++)
+        if(This->legacy_ctors[i])
+            note_cc_edge((nsISupports*)&This->legacy_ctors[i]->dispex.IDispatchEx_iface, "legacy_ctor", cb);
     if(This->mutation_observer_ctor)
         note_cc_edge((nsISupports*)This->mutation_observer_ctor, "mutation_observer_ctor", cb);
     if(This->proxy_globals) {
@@ -4342,20 +4352,12 @@ static void HTMLWindow_unlink(DispatchEx *dispex)
 
     release_event_target(&This->event_target);
 
-    if(This->image_factory) {
-        HTMLImageElementFactory *image_factory = This->image_factory;
-        This->image_factory = NULL;
-        IHTMLImageElementFactory_Release(&image_factory->IHTMLImageElementFactory_iface);
-    }
-    if(This->option_factory) {
-        HTMLOptionElementFactory *option_factory = This->option_factory;
-        This->option_factory = NULL;
-        IHTMLOptionElementFactory_Release(&option_factory->IHTMLOptionElementFactory_iface);
-    }
-    if(This->xhr_factory) {
-        HTMLXMLHttpRequestFactory *xhr_factory = This->xhr_factory;
-        This->xhr_factory = NULL;
-        IHTMLXMLHttpRequestFactory_Release(&xhr_factory->IHTMLXMLHttpRequestFactory_iface);
+    for(i = 0; i < ARRAY_SIZE(This->legacy_ctors); i++) {
+        struct global_ctor *ctor = This->legacy_ctors[i];
+        if(ctor) {
+            This->legacy_ctors[i] = NULL;
+            IDispatchEx_Release(&ctor->dispex.IDispatchEx_iface);
+        }
     }
     unlink_ref(&This->mutation_observer_ctor);
     if(This->proxy_globals) {

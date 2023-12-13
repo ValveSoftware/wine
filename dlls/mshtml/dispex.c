@@ -1868,6 +1868,36 @@ static BOOL ensure_real_info(DispatchEx *dispex)
     return dispex->info != NULL;
 }
 
+static inline struct global_ctor *global_ctor_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, struct global_ctor, dispex);
+}
+
+void global_ctor_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCallback *cb)
+{
+    struct global_ctor *This = global_ctor_from_DispatchEx(dispex);
+
+    if(This->window)
+        note_cc_edge((nsISupports*)&This->window->base.IHTMLWindow2_iface, "window", cb);
+}
+
+void global_ctor_unlink(DispatchEx *dispex)
+{
+    struct global_ctor *This = global_ctor_from_DispatchEx(dispex);
+
+    if(This->window) {
+        HTMLInnerWindow *window = This->window;
+        This->window = NULL;
+        IHTMLWindow2_Release(&window->base.IHTMLWindow2_iface);
+    }
+}
+
+void global_ctor_destructor(DispatchEx *dispex)
+{
+    struct global_ctor *This = global_ctor_from_DispatchEx(dispex);
+    free(This);
+}
+
 static inline struct proxy_prototype *proxy_prototype_from_DispatchEx(DispatchEx *iface)
 {
     return CONTAINING_RECORD(iface, struct proxy_prototype, dispex);

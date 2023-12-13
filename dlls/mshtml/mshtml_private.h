@@ -509,6 +509,18 @@ PROXY_PROTOTYPE_LIST
 } prototype_id_t;
 
 typedef enum {
+#define X(id, name, dispex, proto_id) LEGACY_CTOR_ID_ ## id,
+LEGACY_PROTOTYPE_LIST
+COMMON_PROTOTYPE_LIST
+#undef X
+    /* extra ctors that share prototypes */
+    LEGACY_CTOR_ID_Image,
+    LEGACY_CTOR_ID_Option,
+
+    LEGACY_CTOR_COUNT
+} legacy_ctor_id_t;
+
+typedef enum {
     COMPAT_MODE_INVALID = -1,
     COMPAT_MODE_QUIRKS,
     COMPAT_MODE_IE5,
@@ -656,6 +668,18 @@ typedef enum {
 
 dispex_prop_type_t get_dispid_type(DISPID);
 
+struct global_ctor {
+    DispatchEx dispex;
+    union {
+        IUnknown IUnknown_iface;
+        IHTMLOptionElementFactory IHTMLOptionElementFactory_iface;
+        IHTMLImageElementFactory IHTMLImageElementFactory_iface;
+        IHTMLXMLHttpRequestFactory IHTMLXMLHttpRequestFactory_iface;
+    };
+
+    HTMLInnerWindow *window;
+};
+
 struct proxy_globals {
     IDispatch *prototype[PROTO_ID_TOTAL_COUNT - LEGACY_PROTOTYPE_COUNT];
 };
@@ -679,27 +703,6 @@ struct EventTarget {
     IEventTarget IEventTarget_iface;
     struct wine_rb_tree handler_map;
 };
-
-typedef struct {
-    DispatchEx dispex;
-    IHTMLOptionElementFactory IHTMLOptionElementFactory_iface;
-
-    HTMLInnerWindow *window;
-} HTMLOptionElementFactory;
-
-typedef struct {
-    DispatchEx dispex;
-    IHTMLImageElementFactory IHTMLImageElementFactory_iface;
-
-    HTMLInnerWindow *window;
-} HTMLImageElementFactory;
-
-typedef struct {
-    DispatchEx dispex;
-    IHTMLXMLHttpRequestFactory IHTMLXMLHttpRequestFactory_iface;
-
-    HTMLInnerWindow *window;
-} HTMLXMLHttpRequestFactory;
 
 struct HTMLLocation {
     DispatchEx dispex;
@@ -780,9 +783,6 @@ struct HTMLInnerWindow {
 
     IHTMLEventObj *event;
 
-    HTMLImageElementFactory *image_factory;
-    HTMLOptionElementFactory *option_factory;
-    HTMLXMLHttpRequestFactory *xhr_factory;
     IHTMLScreen *screen;
     OmHistory *history;
     IOmNavigator *navigator;
@@ -829,6 +829,8 @@ struct HTMLInnerWindow {
     ULONGLONG load_event_start_time;
     ULONGLONG load_event_end_time;
     ULONGLONG first_paint_time;
+
+    struct global_ctor *legacy_ctors[LEGACY_CTOR_COUNT];
 };
 
 HTMLWindow *unsafe_HTMLWindow_from_IWineDispatchProxyPrivate(IWineDispatchProxyPrivate*);
@@ -1186,9 +1188,9 @@ HRESULT create_outer_window(GeckoBrowser*,mozIDOMWindowProxy*,HTMLOuterWindow*,H
 HRESULT update_window_doc(HTMLInnerWindow*);
 HTMLOuterWindow *mozwindow_to_window(const mozIDOMWindowProxy*);
 void get_top_window(HTMLOuterWindow*,HTMLOuterWindow**);
-HRESULT HTMLOptionElementFactory_Create(HTMLInnerWindow*,HTMLOptionElementFactory**);
-HRESULT HTMLImageElementFactory_Create(HTMLInnerWindow*,HTMLImageElementFactory**);
-HRESULT HTMLXMLHttpRequestFactory_Create(HTMLInnerWindow*,HTMLXMLHttpRequestFactory**);
+void global_ctor_traverse(DispatchEx*,nsCycleCollectionTraversalCallback*);
+void global_ctor_unlink(DispatchEx*);
+void global_ctor_destructor(DispatchEx*);
 HRESULT create_location(HTMLOuterWindow*,HTMLLocation**);
 HRESULT create_navigator(HTMLInnerWindow*,IOmNavigator**);
 HRESULT create_html_screen(HTMLInnerWindow*,IHTMLScreen**);
@@ -1703,6 +1705,13 @@ void create_console(HTMLInnerWindow *window, IWineMSHTMLConsole **ret);
 void create_crypto(HTMLInnerWindow *window, IWineMSHTMLCrypto **ret);
 HRESULT create_media_query_list(HTMLWindow *window, BSTR media_query, IDispatch **ret);
 HRESULT create_mutation_observer_ctor(HTMLInnerWindow *window, IDispatch **ret);
+
+extern const IHTMLImageElementFactoryVtbl HTMLImageElementFactoryVtbl;
+extern const IHTMLOptionElementFactoryVtbl HTMLOptionElementFactoryVtbl;
+extern const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl;
+extern dispex_static_data_t HTMLImageElementFactory_dispex;
+extern dispex_static_data_t HTMLOptionElementFactory_dispex;
+extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex;
 LEGACY_PROTOTYPE_LIST
