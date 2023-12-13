@@ -1989,10 +1989,44 @@ static HRESULT WINAPI HTMLXDomainRequest_get_timeout(IHTMLXDomainRequest *iface,
 static HRESULT WINAPI HTMLXDomainRequest_get_contentType(IHTMLXDomainRequest *iface, BSTR *p)
 {
     HTMLXMLHttpRequest *This = impl_from_IHTMLXDomainRequest(iface);
+    nsAString nsstr;
+    nsresult nsres;
+    HRESULT hres;
 
-    FIXME("(%p)->(%p)\n", This, p);
+    TRACE("(%p)->(%p)\n", This, p);
 
-    return E_NOTIMPL;
+    if(!p)
+        return E_POINTER;
+
+    if(This->ready_state < READYSTATE_LOADED) {
+        *p = NULL;
+        return S_OK;
+    }
+
+    nsAString_InitDepend(&nsstr, NULL);
+    nsres = nsIXMLHttpRequest_GetResponseText(This->nsxhr, &nsstr);
+    if(NS_SUCCEEDED(nsres)) {
+        const PRUnichar *data;
+        char text[256 * 3];
+        unsigned len;
+        WCHAR *mime;
+
+        nsAString_GetData(&nsstr, &data);
+        len = WideCharToMultiByte(CP_ACP, 0, data, wcsnlen(data, 256), text, ARRAY_SIZE(text), NULL, NULL);
+        nsAString_Finish(&nsstr);
+
+        if(len) {
+            hres = FindMimeFromData(NULL, NULL, text, len, NULL, 0, &mime, 0);
+            if(SUCCEEDED(hres)) {
+                *p = SysAllocString(mime);
+                CoTaskMemFree(mime);
+                return *p ? S_OK : E_OUTOFMEMORY;
+            }
+        }
+    }
+
+    *p = SysAllocString(L"text/plain");
+    return *p ? S_OK : E_OUTOFMEMORY;
 }
 
 static HRESULT WINAPI HTMLXDomainRequest_put_onprogress(IHTMLXDomainRequest *iface, VARIANT v)
