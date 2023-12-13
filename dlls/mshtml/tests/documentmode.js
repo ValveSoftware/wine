@@ -351,6 +351,154 @@ sync_test("builtin_toString", function() {
     }
 });
 
+sync_test("builtin_obj", function() {
+    var v = document.documentMode;
+    var f = document.createElement;
+    var e;
+
+    if(v < 9) {
+        ok(!(window instanceof Object), "window instance of Object");
+        ok(!(document instanceof Object), "document instance of Object");
+        ok(!(f.apply instanceof Function), "f.apply instance of Function");
+        ok(!(f.call instanceof Function), "f.call instance of Function");
+        ok(!("arguments" in f), "arguments in f");
+        ok(!("length" in f), "length in f");
+        e = 0;
+        try {
+            f.toString();
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01b6 - 0x80000000, "[f.toString] e = " + e);
+        try {
+            window.toString.call(null);
+            ok(false, "expected exception calling window.toString with null context");
+        }catch(ex) {}
+    }else {
+        ok(window instanceof Object, "window not instance of Object");
+        ok(document instanceof Object, "document not instance of Object");
+        ok(Object.isExtensible(window), "window is not extensible");
+        ok(Object.isExtensible(document), "document is not extensible");
+
+        ok(f.toString() === "\nfunction createElement() {\n    [native code]\n}\n", "f.toString() = " + f.toString());
+        ok(Object.getPrototypeOf(f) === Function.prototype, "unexpected document.createElement prototype");
+        ok(Object.getPrototypeOf(f.apply) === Function.prototype, "unexpected f.apply prototype");
+        ok(Object.getPrototypeOf(f.call) === Function.prototype, "unexpected f.call prototype");
+
+        e = window.toString.call(null);
+        ok(e === "[object Window]", "window.toString with null context = " + e);
+        e = window.toString.call(external.nullDisp);
+        ok(e === "[object Window]", "window.toString with nullDisp context = " + e);
+    }
+
+    e = 0;
+    try {
+        f.call(Object, "div");
+    }catch(ex) {
+        e = ex.number;
+    }
+    ok(e === (v < 9 ? 0xa0005 : 0x0ffff) - 0x80000000, "[f.call(Object, 'div')] e = " + e);
+
+    e = 0;
+    try {
+        f.call(null, "div");
+    }catch(ex) {
+        e = ex.number;
+    }
+    ok(e === (v < 9 ? 0xa0005 : 0x0ffff) - 0x80000000, "[f.call(null, 'div')] e = " + e);
+
+    var elem = f.call(document, "div");
+    elem.setAttribute("class", "cls");
+    elem.setAttribute("className", "cls");
+    ok(elem.className === "cls", "elem.className = " + elem.className);
+
+    document.body.click.call(elem);
+
+    e = 0;
+    try {
+        new f();
+    }catch(ex) {
+        e = ex.number;
+    }
+    todo_wine_if(v < 9).
+    ok(e === (v < 9 ? 0xa01b6 : 0x0ffff) - 0x80000000, "[new f()] e = " + e);
+
+    if(v < 9) {
+        ok(!("call" in f.call), "call in f.call");
+        ok(!("apply" in f.call), "apply in f.call");
+        ok(!("call" in f.apply), "call in f.apply");
+        ok(!("apply" in f.apply), "apply in f.apply");
+        ok(f.call+"" === "\nfunction call() {\n    [native code]\n}\n", "f.call = " + f.call);
+        ok(f.apply+"" === "\nfunction apply() {\n    [native code]\n}\n", "f.apply = " + f.apply);
+        ok(external.getVT(f.call) === "VT_DISPATCH", "f.call not VT_DISPATCH");
+        ok(external.getVT(f.apply) === "VT_DISPATCH", "f.apply not VT_DISPATCH");
+
+        elem = f.apply(document, ["style"]);
+        document.body.appendChild(elem);
+
+        var enumerator = new Enumerator(document.getElementsByTagName("style"));
+        enumerator.moveNext();
+        var enum_elem = enumerator.item();
+        enumerator.moveNext();
+        ok(enum_elem === elem, "enum_elem = " + enum_elem);
+        ok(enumerator.atEnd(), "enumerator not at end");
+
+        e = 0;
+        try {
+            f.apply = 0;
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01b6 - 0x80000000, "[f.apply = 0] e = " + e);
+        e = 0;
+        try {
+            f.call = function() { };
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01b6 - 0x80000000, "[f.call = function() { }] e = " + e);
+
+        ok(f.apply !== f.apply, "f.apply == f.apply");
+        f = f.apply;
+        ok(!("arguments" in f), "arguments in f.apply");
+        ok(!("length" in f), "length in f.apply");
+        ok(!("call" in f), "call in f.apply");
+        ok(!("apply" in f), "apply in f.apply");
+        e = 0;
+        try {
+            f.toString();
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01b6 - 0x80000000, "[f.apply.toString] e = " + e);
+        e = 0;
+        try {
+            f(document, ["style"]);
+        }catch(ex) {
+            e = ex.number;
+        }
+        ok(e === 0xa01b6 - 0x80000000, "[f.apply() indirect] e = " + e);
+    }else {
+        elem = f.call.call(f, document, "div");
+        f = f.bind(document);
+        elem = f.apply(null, ["style"]);
+        document.body.appendChild(elem);
+
+        try {
+            var enumerator = new Enumerator(document.getElementsByTagName("style"));
+        }catch(ex) {
+            e = ex.number;
+        }
+        todo_wine.
+        ok(e === 0xa01c3 - 0x80000000, "[style Enumerator] e = " + e);
+
+        f.apply = 0;
+        f.call = function() { };
+        ok(f.apply === 0, "changed f.apply = ", f.apply);
+        ok(f.call instanceof Function, "changed f.call not instance of Function");
+    }
+});
+
 sync_test("elem_props", function() {
     var elem = document.documentElement;
 
