@@ -17,6 +17,7 @@
  */
 
 #include <assert.h>
+#include <mshtmdid.h>
 
 #include "jscript.h"
 #include "engine.h"
@@ -61,6 +62,17 @@ typedef struct {
     struct proxy_func_invoker func;
     const WCHAR *name;
 } ProxyFunction;
+
+typedef struct {
+    FunctionInstance function;
+    IDispatch *disp;
+    const char *name;
+} ProxyConstructor;
+
+typedef struct {
+    FunctionInstance function;
+    ProxyConstructor *ctor;
+} ProxyConstructorCreate;
 
 typedef struct {
     FunctionInstance function;
@@ -931,6 +943,197 @@ HRESULT create_proxy_functions(jsdisp_t *jsdisp, const struct proxy_prop_info *i
         funcs[1] = &function->function.dispex;
     }
 
+    return S_OK;
+}
+
+static HRESULT ProxyConstructor_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
+        unsigned argc, jsval_t *argv, jsval_t *r, IServiceProvider *caller)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+
+    return disp_call_value_with_caller(ctx, constructor->disp, jsval_undefined(), flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK,
+                                       argc, argv, r, caller);
+}
+
+static HRESULT ProxyConstructor_toString(FunctionInstance *func, jsstr_t **ret)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+    WCHAR nameW[64];
+    unsigned i = 0;
+
+    do nameW[i] = constructor->name[i]; while(constructor->name[i++]);
+    assert(i <= ARRAY_SIZE(nameW));
+
+    return native_code_toString(nameW, ret);
+}
+
+static function_code_t *ProxyConstructor_get_code(FunctionInstance *func)
+{
+    return NULL;
+}
+
+static void ProxyConstructor_destructor(FunctionInstance *func)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+    if(constructor->disp)
+        IDispatch_Release(constructor->disp);
+}
+
+static HRESULT ProxyConstructor_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op, FunctionInstance *func)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+
+    if(op == GC_TRAVERSE_UNLINK) {
+        IDispatch *disp = constructor->disp;
+        if(disp) {
+            constructor->disp = NULL;
+            IDispatch_Release(disp);
+        }
+    }
+
+    return S_OK;
+}
+
+static void ProxyConstructor_cc_traverse(FunctionInstance *func, nsCycleCollectionTraversalCallback *cb)
+{
+    ProxyConstructor *constructor = (ProxyConstructor*)func;
+    if(constructor->disp)
+        cc_api.note_edge((nsISupports*)constructor->disp, "disp", cb);
+}
+
+static const function_vtbl_t ProxyConstructorVtbl = {
+    ProxyConstructor_call,
+    ProxyConstructor_toString,
+    ProxyConstructor_get_code,
+    ProxyConstructor_destructor,
+    ProxyConstructor_gc_traverse,
+    ProxyConstructor_cc_traverse
+};
+
+static const builtin_prop_t ProxyConstructor_props[] = {
+    {L"arguments",           NULL, 0,                        Function_get_arguments}
+};
+
+static const builtin_info_t ProxyConstructor_info = {
+    JSCLASS_FUNCTION,
+    Function_value,
+    ARRAY_SIZE(ProxyConstructor_props),
+    ProxyConstructor_props,
+    Function_destructor,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Function_gc_traverse,
+    Function_cc_traverse
+};
+
+static HRESULT ProxyConstructorCreate_call(script_ctx_t *ctx, FunctionInstance *func, jsval_t vthis, unsigned flags,
+        unsigned argc, jsval_t *argv, jsval_t *r, IServiceProvider *caller)
+{
+    ProxyConstructorCreate *create = (ProxyConstructorCreate*)func;
+
+    /* only allow calls since it's a method */
+    if(!(flags & DISPATCH_METHOD))
+        return E_UNEXPECTED;
+
+    return disp_call_value_with_caller(ctx, create->ctor->disp, jsval_undefined(), flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK,
+                                       argc, argv, r, caller);
+}
+
+static HRESULT ProxyConstructorCreate_toString(FunctionInstance *func, jsstr_t **ret)
+{
+    return native_code_toString(L"create", ret);
+}
+
+static function_code_t *ProxyConstructorCreate_get_code(FunctionInstance *func)
+{
+    return NULL;
+}
+
+static void ProxyConstructorCreate_destructor(FunctionInstance *func)
+{
+    ProxyConstructorCreate *create = (ProxyConstructorCreate*)func;
+    if(create->ctor)
+        jsdisp_release(&create->ctor->function.dispex);
+}
+
+static HRESULT ProxyConstructorCreate_gc_traverse(struct gc_ctx *gc_ctx, enum gc_traverse_op op, FunctionInstance *func)
+{
+    ProxyConstructorCreate *create = (ProxyConstructorCreate*)func;
+    return gc_process_linked_obj(gc_ctx, op, &create->function.dispex, &create->ctor->function.dispex, (void**)&create->ctor);
+}
+
+static void ProxyConstructorCreate_cc_traverse(FunctionInstance *func, nsCycleCollectionTraversalCallback *cb)
+{
+    ProxyConstructorCreate *create = (ProxyConstructorCreate*)func;
+    if(create->ctor)
+        cc_api.note_edge((nsISupports*)&create->ctor->function.dispex.IDispatchEx_iface, "ctor", cb);
+}
+
+static const function_vtbl_t ProxyConstructorCreateVtbl = {
+    ProxyConstructorCreate_call,
+    ProxyConstructorCreate_toString,
+    ProxyConstructorCreate_get_code,
+    ProxyConstructorCreate_destructor,
+    ProxyConstructorCreate_gc_traverse,
+    ProxyConstructorCreate_cc_traverse
+};
+
+static const builtin_info_t ProxyConstructorCreate_info = {
+    JSCLASS_FUNCTION,
+    Function_value,
+    ARRAY_SIZE(ProxyConstructor_props),
+    ProxyConstructor_props,
+    Function_destructor,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+    Function_gc_traverse,
+    Function_cc_traverse
+};
+
+HRESULT create_proxy_constructor(IDispatch *disp, const char *name, jsdisp_t *prototype, jsdisp_t **ret)
+{
+    script_ctx_t *ctx = prototype->ctx;
+    ProxyConstructor *constructor;
+    HRESULT hres;
+
+    /* create wrapper constructor function over the disp's value */
+    hres = create_function(ctx, &ProxyConstructor_info, &ProxyConstructorVtbl, sizeof(ProxyConstructor),
+                           PROPF_CONSTR, FALSE, NULL, (void**)&constructor);
+    if(FAILED(hres))
+        return hres;
+
+    IDispatch_AddRef(disp);
+    constructor->disp = disp;
+    constructor->name = name;
+
+    hres = jsdisp_define_data_property(&constructor->function.dispex, L"prototype", 0, jsval_obj(prototype));
+
+    /* XMLHttpRequest and XDomainRequest constructors have a "create" method */
+    if(SUCCEEDED(hres) && name[0] == 'X') {
+        ProxyConstructorCreate *create;
+
+        hres = create_function(ctx, &ProxyConstructorCreate_info, &ProxyConstructorCreateVtbl, sizeof(ProxyConstructorCreate),
+                               PROPF_METHOD, FALSE, NULL, (void**)&create);
+        if(SUCCEEDED(hres)) {
+            create->ctor = constructor;
+            jsdisp_addref(&constructor->function.dispex);
+
+            hres = jsdisp_define_data_property(&create->function.dispex, L"prototype", 0, jsval_null());
+            if(SUCCEEDED(hres))
+                hres = jsdisp_define_data_property(&constructor->function.dispex, L"create", 0, jsval_obj(&create->function.dispex));
+            jsdisp_release(&create->function.dispex);
+        }
+    }
+    if(FAILED(hres)) {
+        jsdisp_release(&constructor->function.dispex);
+        return hres;
+    }
+
+    *ret = &constructor->function.dispex;
     return S_OK;
 }
 

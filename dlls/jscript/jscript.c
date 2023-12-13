@@ -936,11 +936,6 @@ static HRESULT WINAPI JScript_AddNamedItem(IActiveScript *iface,
         disp = get_object(val);
 
         if((jsdisp = to_jsdisp(disp)) && jsdisp->proxy) {
-            hres = set_js_globals(jsdisp);
-            if(FAILED(hres)) {
-                jsdisp_release(jsdisp);
-                return hres;
-            }
             jsdisp_release(This->ctx->global);
             This->ctx->global = jsdisp_addref(jsdisp);
         }

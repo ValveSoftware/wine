@@ -2468,7 +2468,7 @@ static HRESULT WINAPI DispatchEx_GetNameSpaceParent(IDispatchEx *iface, IUnknown
 }
 
 /* ECMA-262 5.1 Edition    15.1 */
-HRESULT set_js_globals(jsdisp_t *obj)
+static HRESULT set_js_globals(jsdisp_t *obj)
 {
     jsdisp_t *js_global = obj->ctx->js_global;
     const builtin_prop_t *bprop, *bend;
@@ -2547,6 +2547,58 @@ static HRESULT get_proxy_default_prototype(script_ctx_t *ctx, IWineDispatchProxy
     return S_OK;
 }
 
+static HRESULT get_proxy_default_constructor(script_ctx_t *ctx, jsdisp_t *jsdisp, jsdisp_t **ctor)
+{
+    jsdisp_t *old_global = ctx->global;
+    IDispatch *disp;
+    HRESULT hres;
+    jsval_t tmp;
+
+    /* This may end up in CreateConstructor from a nested GetDefaultConstructor via some
+     * prototype's setup, if we're actually calling it on the window, which would define
+     * all of the constructors, and that assumes the global to be the one required. But
+     * in this case we haven't even finished setting up the window, so set it temporarily. */
+    ctx->global = jsdisp;
+    hres = jsdisp->proxy->lpVtbl->GetDefaultConstructor(jsdisp->proxy, old_global->proxy, &disp);
+    ctx->global = old_global;
+    if(FAILED(hres))
+        return hres;
+
+    if(!disp) {
+        /* Set the globals on it if we're the window itself (not the prototype).
+         * We also have to set the props on the constructor and prototype, because
+         * we had to skip them earlier, since our window was *not* set up yet... */
+        if(hres == S_FALSE) {
+            hres = set_js_globals(jsdisp);
+            if(SUCCEEDED(hres)) {
+                dispex_prop_t *ctor_prop = find_prop_name_raw(jsdisp, string_hash(L"Window"), L"Window", FALSE);
+                jsdisp_t *ctor_obj;
+
+                if(ctor_prop && ctor_prop->type == PROP_JSVAL && is_object_instance(ctor_prop->u.val) &&
+                   (ctor_obj = to_jsdisp(get_object(ctor_prop->u.val))))
+                {
+                    hres = jsdisp_define_data_property(ctor_obj, L"prototype", 0, jsval_obj(jsdisp->prototype));
+                    if(SUCCEEDED(hres))
+                        hres = jsdisp_define_data_property(jsdisp->prototype, L"constructor", PROPF_WRITABLE | PROPF_CONFIGURABLE, jsval_obj(ctor_obj));
+                }
+            }
+        }
+        *ctor = NULL;
+        return hres;
+    }
+
+    tmp = jsval_disp(disp);
+    hres = convert_to_proxy(ctx, &tmp);
+    if(FAILED(hres))
+        return hres;
+    *ctor = as_jsdisp(get_object(tmp));
+
+    hres = jsdisp_define_data_property(*ctor, L"prototype", 0, jsval_obj(jsdisp));
+    if(FAILED(hres))
+        jsdisp_release(*ctor);
+    return hres;
+}
+
 static inline jsdisp_t *impl_from_IWineDispatchProxyCbPrivate(IWineDispatchProxyCbPrivate *iface)
 {
     return impl_from_IDispatchEx((IDispatchEx*)iface);
@@ -2593,7 +2645,7 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
     jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
     script_ctx_t *ctx = get_script_ctx(script);
     dispex_prop_t *prop, *end;
-    jsdisp_t *prot;
+    jsdisp_t *prot, *ctor;
     HRESULT hres;
     BOOL b;
 
@@ -2643,7 +2695,84 @@ static HRESULT WINAPI WineDispatchProxyCbPrivate_HostUpdated(IWineDispatchProxyC
             alloc_proxy_prop(This, &info, &prop);
     }
 
-    return S_OK;
+    /* Populate the constructors on the window */
+    hres = get_proxy_default_constructor(ctx, This, &ctor);
+    assert(FAILED(hres) || ctor == NULL);
+    return hres;
+}
+
+static IDispatch* WINAPI WineDispatchProxyCbPrivate_CreateConstructor(IWineDispatchProxyCbPrivate *iface,
+        IDispatch *disp, const char *name)
+{
+    jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
+    jsdisp_t *ctor;
+    HRESULT hres;
+
+    hres = create_proxy_constructor(disp, name, This, &ctor);
+    return SUCCEEDED(hres) ? (IDispatch*)&ctor->IDispatchEx_iface : NULL;
+}
+
+static HRESULT WINAPI WineDispatchProxyCbPrivate_DefineConstructor(IWineDispatchProxyCbPrivate *iface,
+        const char *name, IDispatch *prot_disp, IDispatch *ctor_disp)
+{
+    jsdisp_t *This = impl_from_IWineDispatchProxyCbPrivate(iface);
+    jsval_t val = jsval_disp(prot_disp);
+    jsdisp_t *prot, *ctor;
+    unsigned i = 0, hash;
+    dispex_prop_t *prop;
+    WCHAR nameW[64];
+    HRESULT hres;
+    BOOL b;
+
+    do nameW[i] = name[i]; while(name[i++]);
+    assert(i <= ARRAY_SIZE(nameW));
+
+    hres = convert_to_proxy(This->ctx, &val);
+    if(FAILED(hres))
+        return hres;
+    prot = as_jsdisp(get_object(val));
+
+    if(ctor_disp)
+        hres = create_proxy_constructor(ctor_disp, name, prot, &ctor);
+    else {
+        /* The prototype's proxy should have already set up the constructor, so this can't fail */
+        IDispatch *tmp_disp;
+        prot->proxy->lpVtbl->GetDefaultConstructor(prot->proxy, This->proxy, &tmp_disp);
+        val = jsval_disp(tmp_disp);
+        convert_to_proxy(This->ctx, &val);
+        ctor = as_jsdisp(get_object(val));
+    }
+    jsdisp_release(prot);
+    if(FAILED(hres))
+        return hres;
+
+    /* Remove the builtin proxy prop from the prototype (first time only), since it's part of the object itself */
+    hash = string_hash(nameW);
+    if(!find_prop_name_raw(This->prototype, hash, nameW, FALSE) && !alloc_prop(This->prototype, nameW, PROP_DELETED, 0)) {
+        hres = E_OUTOFMEMORY;
+        goto end;
+    }
+
+    /* Define the constructor forcefully, so make sure to not look into the underlying proxy dispids,
+       otherwise it might pick up elements by this id. And if any found, force it to be configurable. */
+    prop = find_prop_name_raw(This, hash, nameW, FALSE);
+    if(prop) {
+        prop->flags |= PROPF_CONFIGURABLE;
+        delete_prop(This, prop, &b);
+    }else if(!(prop = alloc_prop(This, nameW, PROP_DELETED, 0))) {
+        hres = E_OUTOFMEMORY;
+        goto end;
+    }
+
+    hres = jsval_copy(jsval_obj(ctor), &prop->u.val);
+    if(FAILED(hres))
+        goto end;
+    prop->type = PROP_JSVAL;
+    prop->flags = PROPF_WRITABLE | PROPF_CONFIGURABLE;
+
+end:
+    jsdisp_release(ctor);
+    return hres;
 }
 
 static HRESULT WINAPI WineDispatchProxyCbPrivate_PropEnum(IWineDispatchProxyCbPrivate *iface, const WCHAR *name)
@@ -2677,6 +2806,8 @@ static IWineDispatchProxyCbPrivateVtbl WineDispatchProxyCbPrivateVtbl = {
     WineDispatchProxyCbPrivate_InitProxy,
     WineDispatchProxyCbPrivate_Unlinked,
     WineDispatchProxyCbPrivate_HostUpdated,
+    WineDispatchProxyCbPrivate_CreateConstructor,
+    WineDispatchProxyCbPrivate_DefineConstructor,
     WineDispatchProxyCbPrivate_PropEnum
 };
 
@@ -2766,7 +2897,7 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
 {
     IWineDispatchProxyCbPrivate **proxy_ref;
     IWineDispatchProxyPrivate *proxy;
-    jsdisp_t *jsdisp, *prot;
+    jsdisp_t *jsdisp, *prot, *ctor;
     IDispatch *obj;
     HRESULT hres;
 
@@ -2804,6 +2935,18 @@ HRESULT convert_to_proxy(script_ctx_t *ctx, jsval_t *val)
 
             *proxy_ref = (IWineDispatchProxyCbPrivate*)&jsdisp->IDispatchEx_iface;
             jsdisp->proxy = proxy;
+
+            hres = get_proxy_default_constructor(ctx, jsdisp, &ctor);
+            if(SUCCEEDED(hres) && ctor) {
+                hres = jsdisp_define_data_property(jsdisp, L"constructor", PROPF_WRITABLE | PROPF_CONFIGURABLE, jsval_obj(ctor));
+                jsdisp_release(ctor);
+            }
+            if(FAILED(hres)) {
+                *proxy_ref = NULL;
+                jsdisp->proxy = NULL;
+                jsdisp_release(jsdisp);
+                goto fail;
+            }
 
             *val = jsval_obj(jsdisp);
             return S_OK;

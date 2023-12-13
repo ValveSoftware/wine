@@ -23,6 +23,7 @@
 #include "winbase.h"
 #include "winuser.h"
 #include "ole2.h"
+#include "mshtmdid.h"
 #include "mscoree.h"
 
 #include "wine/debug.h"
@@ -85,6 +86,10 @@ typedef struct {
 } dynamic_prop_t;
 
 struct proxy_prototype {
+    DispatchEx dispex;
+};
+
+struct proxy_ctor {
     DispatchEx dispex;
 };
 
@@ -175,6 +180,37 @@ static dispex_static_data_t legacy_prototype_dispex[] = {
 LEGACY_PROTOTYPE_LIST
 COMMON_PROTOTYPE_LIST
 #undef X
+};
+
+static const dispex_static_data_vtbl_t proxy_ctor_dispex_vtbl;
+
+static dispex_static_data_t proxy_ctor_dispex[] = {
+#define X(id, name, dispex, proto_id) \
+{                                     \
+    name,                             \
+    &proxy_ctor_dispex_vtbl,          \
+    PROTO_ID_Object,                  \
+    NULL_tid,                         \
+    no_iface_tids                     \
+},
+COMMON_PROTOTYPE_LIST
+PROXY_PROTOTYPE_LIST
+#undef X
+};
+
+static unsigned char proxy_ctor_mode_unavailable[PROTO_ID_TOTAL_COUNT - LEGACY_PROTOTYPE_COUNT] = {
+    [PROTO_ID_Console                          - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+    [PROTO_ID_Crypto                           - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_DOMPageTransitionEvent           - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_DOMProgressEvent                 - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+    [PROTO_ID_DOMTokenList                     - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+    [PROTO_ID_HTMLDocument                     - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_HTMLMimeTypesCollection          - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_HTMLNamespaceCollection          - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE10) | (1<<COMPAT_MODE_IE11),
+    [PROTO_ID_HTMLPluginsCollection            - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9)  | (1<<COMPAT_MODE_IE10),
+    [PROTO_ID_HTMLSelectionObject              - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE11),
+    [PROTO_ID_MediaQueryList                   - LEGACY_PROTOTYPE_COUNT] = (1<<COMPAT_MODE_IE9),
+    [PROTO_ID_MutationObserver                 - LEGACY_PROTOTYPE_COUNT] = ~0,  /* FIXME HACK: Not exposed as FFXIV Launcher breaks with MutationObserver stub */
 };
 
 static inline dispex_data_t *proxy_prototype_object_info(struct proxy_prototype *prot)
@@ -2240,6 +2276,126 @@ static IDispatch *get_default_prototype(prototype_id_t prot_id, compat_mode_t co
     return *entry;
 }
 
+static IDispatch *get_proxy_constructor_disp(HTMLInnerWindow *window, prototype_id_t prot_id)
+{
+    static const struct {
+        prototype_id_t prot_id;
+        dispex_static_data_t *dispex;
+        const void *vtbl;
+    } ctors[] = {
+        { PROTO_ID_MutationObserver,    &mutation_observer_ctor_dispex },
+        { PROTO_ID_HTMLImgElement,      &HTMLImageElementFactory_dispex,    &HTMLImageElementFactoryVtbl },
+        { PROTO_ID_HTMLOptionElement,   &HTMLOptionElementFactory_dispex,   &HTMLOptionElementFactoryVtbl },
+        { PROTO_ID_HTMLXMLHttpRequest,  &HTMLXMLHttpRequestFactory_dispex,  &HTMLXMLHttpRequestFactoryVtbl }
+    };
+    struct global_ctor *ctor;
+    unsigned i;
+
+    for(i = 0; i < ARRAY_SIZE(ctors); i++)
+        if(ctors[i].prot_id == prot_id)
+            break;
+    assert(i < ARRAY_SIZE(ctors));
+
+    if(!(ctor = malloc(sizeof(*ctor))))
+        return NULL;
+
+    ctor->IUnknown_iface.lpVtbl = ctors[i].vtbl;
+    ctor->prot_id = prot_id;
+    ctor->window = window;
+    IHTMLWindow2_AddRef(&window->base.IHTMLWindow2_iface);
+
+    init_dispatch(&ctor->dispex, ctors[i].dispex, NULL, dispex_compat_mode(&window->event_target.dispex));
+
+    return (IDispatch*)&ctor->dispex.IDispatchEx_iface;
+}
+
+HRESULT define_global_constructors(HTMLInnerWindow *window)
+{
+    static const struct {
+        const char *name;
+        prototype_id_t proto_id;
+    } extra_ctors[] = {
+        { "Image",      PROTO_ID_HTMLImgElement },
+        { "Option",     PROTO_ID_HTMLOptionElement },
+    };
+    compat_mode_t compat_mode;
+    IDispatch *prot, *ctor;
+    unsigned int i;
+    HRESULT hres;
+
+    if(!ensure_real_info(&window->event_target.dispex))
+        return E_OUTOFMEMORY;
+    compat_mode = dispex_compat_mode(&window->event_target.dispex);
+
+    for(i = 0; i < ARRAY_SIZE(proxy_ctor_dispex); i++) {
+        if(proxy_ctor_mode_unavailable[i] & (1 << compat_mode))
+            continue;
+
+        if(!(prot = get_default_prototype(i + LEGACY_PROTOTYPE_COUNT, compat_mode, window)))
+            return E_OUTOFMEMORY;
+
+        hres = window->event_target.dispex.proxy->lpVtbl->DefineConstructor(window->event_target.dispex.proxy, proxy_ctor_dispex[i].name, prot, NULL);
+        if(FAILED(hres))
+            return hres;
+    }
+
+    for(i = 0; i < ARRAY_SIZE(extra_ctors); i++) {
+        if(!(ctor = get_proxy_constructor_disp(window, extra_ctors[i].proto_id)))
+            return E_OUTOFMEMORY;
+
+        if(!(prot = get_default_prototype(extra_ctors[i].proto_id, compat_mode, window)))
+            hres = E_OUTOFMEMORY;
+        else
+            hres = window->event_target.dispex.proxy->lpVtbl->DefineConstructor(window->event_target.dispex.proxy, extra_ctors[i].name, prot, ctor);
+
+        IDispatch_Release(ctor);
+        if(FAILED(hres))
+            return hres;
+    }
+
+    return S_OK;
+}
+
+static inline struct proxy_ctor *proxy_ctor_from_DispatchEx(DispatchEx *iface)
+{
+    return CONTAINING_RECORD(iface, struct proxy_ctor, dispex);
+}
+
+static void proxy_ctor_destructor(DispatchEx *dispex)
+{
+    struct proxy_ctor *This = proxy_ctor_from_DispatchEx(dispex);
+    free(This);
+}
+
+static HRESULT proxy_ctor_value(DispatchEx *dispex, LCID lcid, WORD flags, DISPPARAMS *params,
+        VARIANT *res, EXCEPINFO *ei, IServiceProvider *caller)
+{
+    switch(flags) {
+    case DISPATCH_METHOD|DISPATCH_PROPERTYGET:
+        if(!res)
+            return E_INVALIDARG;
+        /* fall through */
+    case DISPATCH_METHOD:
+    case DISPATCH_CONSTRUCT:
+        return MSHTML_E_INVALID_ACTION;
+    case DISPATCH_PROPERTYGET:
+        V_VT(res) = VT_BSTR;
+        return dispex_to_string(dispex, &V_BSTR(res));
+    case DISPATCH_PROPERTYPUTREF|DISPATCH_PROPERTYPUT:
+    case DISPATCH_PROPERTYPUTREF:
+    case DISPATCH_PROPERTYPUT:
+        break;
+    default:
+        return E_INVALIDARG;
+    }
+    return S_OK;
+}
+
+static const dispex_static_data_vtbl_t proxy_ctor_dispex_vtbl = {
+    .destructor       = proxy_ctor_destructor,
+    .value            = proxy_ctor_value
+};
+
 static HRESULT proxy_get_dispid(DispatchEx *dispex, const WCHAR *name, BOOL case_insens, DISPID *id)
 {
     DWORD grfdex = case_insens ? fdexNameCaseInsensitive : fdexNameCaseSensitive;
@@ -2719,6 +2875,65 @@ static IDispatch* WINAPI WineDispatchProxyPrivate_GetDefaultPrototype(IWineDispa
     return get_default_prototype(prot_id, dispex_compat_mode(This), base_window->inner_window);
 }
 
+static HRESULT WINAPI WineDispatchProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window, IDispatch **ret)
+{
+    static const prototype_id_t special_ctors[] = {
+        PROTO_ID_MutationObserver,
+        PROTO_ID_HTMLXMLHttpRequest
+    };
+    DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
+    struct proxy_prototype *prot = to_proxy_prototype(This);
+    struct proxy_ctor *ctor;
+    HTMLWindow *base_window;
+    prototype_id_t prot_id;
+    IDispatch **entry;
+    unsigned i;
+
+    if(!prot || !(base_window = unsafe_HTMLWindow_from_IWineDispatchProxyPrivate(window))) {
+        /* Not a prototype, so no constructor */
+        *ret = NULL;
+        return S_OK;
+    }
+
+    prot_id = CONTAINING_RECORD(prot->dispex.info->desc, struct prototype_static_data, dispex) - prototype_static_data;
+
+    entry = &base_window->inner_window->proxy_globals->ctor[prot_id - LEGACY_PROTOTYPE_COUNT];
+    if(*entry) {
+        *ret = *entry;
+        IDispatch_AddRef(*entry);
+        return S_OK;
+    }
+
+    for(i = 0; i < ARRAY_SIZE(special_ctors); i++) {
+        IDispatch *disp;
+        if(prot_id != special_ctors[i])
+            continue;
+
+        disp = get_proxy_constructor_disp(CONTAINING_RECORD((IDispatchEx*)window, HTMLWindow, IDispatchEx_iface)->inner_window, prot_id);
+        if(!disp)
+            return E_OUTOFMEMORY;
+
+        *entry = This->proxy->lpVtbl->CreateConstructor(This->proxy, disp, proxy_ctor_dispex[prot_id - LEGACY_PROTOTYPE_COUNT].name);
+        IDispatch_Release(disp);
+        if(!*entry)
+            return E_OUTOFMEMORY;
+
+        *ret = *entry;
+        IDispatch_AddRef(*entry);
+        return S_OK;
+    }
+
+    if(!(ctor = malloc(sizeof(*ctor))))
+        return E_OUTOFMEMORY;
+
+    init_dispatch(&ctor->dispex, &proxy_ctor_dispex[prot_id - LEGACY_PROTOTYPE_COUNT], NULL, dispex_compat_mode(This));
+
+    IDispatchEx_AddRef(&ctor->dispex.IDispatchEx_iface);
+    *entry = (IDispatch*)&ctor->dispex.IDispatchEx_iface;
+    *ret = *entry;
+    return S_OK;
+}
+
 static HRESULT WINAPI WineDispatchProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
 {
     DispatchEx *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -2944,6 +3159,7 @@ static IWineDispatchProxyPrivateVtbl WineDispatchProxyPrivateVtbl = {
     /* IWineDispatchProxyPrivate extension */
     WineDispatchProxyPrivate_GetProxyFieldRef,
     WineDispatchProxyPrivate_GetDefaultPrototype,
+    WineDispatchProxyPrivate_GetDefaultConstructor,
     WineDispatchProxyPrivate_PropFixOverride,
     WineDispatchProxyPrivate_PropOverride,
     WineDispatchProxyPrivate_PropDefineOverride,

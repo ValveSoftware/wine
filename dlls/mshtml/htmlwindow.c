@@ -3465,25 +3465,6 @@ static HRESULT WINAPI window_private_get_msCrypto(IWineHTMLWindowPrivate *iface,
     return S_OK;
 }
 
-static HRESULT WINAPI window_private_get_MutationObserver(IWineHTMLWindowPrivate *iface,
-                                                          IDispatch **mutation_observer)
-{
-    HTMLWindow *This = impl_from_IWineHTMLWindowPrivateVtbl(iface);
-    HRESULT hres;
-
-    TRACE("iface %p, mutation_observer %p.\n", iface, mutation_observer);
-
-    if (!This->inner_window->mutation_observer_ctor) {
-        hres = create_mutation_observer_ctor(This->inner_window, &This->inner_window->mutation_observer_ctor);
-        if (FAILED(hres))
-            return hres;
-    }
-
-    IDispatch_AddRef(This->inner_window->mutation_observer_ctor);
-    *mutation_observer = This->inner_window->mutation_observer_ctor;
-    return S_OK;
-}
-
 static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_QueryInterface,
     window_private_AddRef,
@@ -3497,7 +3478,6 @@ static const IWineHTMLWindowPrivateVtbl WineHTMLWindowPrivateVtbl = {
     window_private_get_console,
     window_private_matchMedia,
     window_private_get_msCrypto,
-    window_private_get_MutationObserver
 };
 
 static inline HTMLWindow *impl_from_IWineHTMLWindowCompatPrivateVtbl(IWineHTMLWindowCompatPrivate *iface)
@@ -3942,6 +3922,21 @@ static IDispatch* WINAPI WindowWineDispProxyPrivate_GetDefaultPrototype(IWineDis
     return itf->lpVtbl->GetDefaultPrototype(itf, iface);
 }
 
+static HRESULT WINAPI WindowWineDispProxyPrivate_GetDefaultConstructor(IWineDispatchProxyPrivate *iface, IWineDispatchProxyPrivate *window, IDispatch **ret)
+{
+    HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
+    HRESULT hres;
+
+    /* We aren't a prototype, so we don't have a constructor, but we're the global window, on which constructors are defined. */
+    hres = define_global_constructors(This->inner_window);
+    if(FAILED(hres))
+        return hres;
+
+    /* Return S_FALSE to signal the caller that we are the object on which globals are defined. */
+    *ret = NULL;
+    return S_FALSE;
+}
+
 static HRESULT WINAPI WindowWineDispProxyPrivate_PropFixOverride(IWineDispatchProxyPrivate *iface, struct proxy_prop_info *info)
 {
     HTMLWindow *This = impl_from_IWineDispatchProxyPrivate(iface);
@@ -4124,6 +4119,7 @@ static const IWineDispatchProxyPrivateVtbl WindowDispExVtbl = {
     /* IWineDispatchProxyPrivate extension */
     WindowWineDispProxyPrivate_GetProxyFieldRef,
     WindowWineDispProxyPrivate_GetDefaultPrototype,
+    WindowWineDispProxyPrivate_GetDefaultConstructor,
     WindowWineDispProxyPrivate_PropFixOverride,
     WindowWineDispProxyPrivate_PropOverride,
     WindowWineDispProxyPrivate_PropDefineOverride,
@@ -4313,13 +4309,14 @@ static void HTMLWindow_traverse(DispatchEx *dispex, nsCycleCollectionTraversalCa
     for(i = 0; i < ARRAY_SIZE(This->legacy_prototypes); i++)
         if(This->legacy_prototypes[i])
             note_cc_edge((nsISupports*)&This->legacy_prototypes[i]->dispex.IDispatchEx_iface, "legacy_prototype", cb);
-    if(This->mutation_observer_ctor)
-        note_cc_edge((nsISupports*)This->mutation_observer_ctor, "mutation_observer_ctor", cb);
     if(This->proxy_globals) {
         struct proxy_globals *globals = This->proxy_globals;
         for(i = 0; i < ARRAY_SIZE(globals->prototype); i++)
             if(globals->prototype[i])
                 note_cc_edge((nsISupports*)globals->prototype[i], "proxy_prototype", cb);
+        for(i = 0; i < ARRAY_SIZE(globals->ctor); i++)
+            if(globals->ctor[i])
+                note_cc_edge((nsISupports*)globals->ctor[i], "proxy_ctor", cb);
     }
     if(This->screen)
         note_cc_edge((nsISupports*)This->screen, "screen", cb);
@@ -4370,7 +4367,6 @@ static void HTMLWindow_unlink(DispatchEx *dispex)
             IDispatchEx_Release(&prot->dispex.IDispatchEx_iface);
         }
     }
-    unlink_ref(&This->mutation_observer_ctor);
     if(This->proxy_globals) {
         struct proxy_globals *globals = This->proxy_globals;
         This->proxy_globals = NULL;
@@ -4378,6 +4374,9 @@ static void HTMLWindow_unlink(DispatchEx *dispex)
         for(i = 0; i < ARRAY_SIZE(globals->prototype); i++)
             if(globals->prototype[i])
                 IDispatch_Release(globals->prototype[i]);
+        for(i = 0; i < ARRAY_SIZE(globals->ctor); i++)
+            if(globals->ctor[i])
+                IDispatch_Release(globals->ctor[i]);
         free(globals);
     }
     unlink_ref(&This->screen);
@@ -4725,7 +4724,6 @@ static void HTMLWindow_init_dispex_info(dispex_data_t *info, compat_mode_t compa
     /* Hide props not available in IE10 */
     static const dispex_hook_t private_ie10_hooks[] = {
         {DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO},
-        {DISPID_IWINEHTMLWINDOWPRIVATE_MUTATIONOBSERVER},
         {DISPID_UNKNOWN}
     };
 

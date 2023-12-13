@@ -129,7 +129,6 @@ interface IWineMSHTMLCrypto : IDispatch
 }
 
 const long DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO = 54;
-const long DISPID_IWINEHTMLWINDOWPRIVATE_MUTATIONOBSERVER = 55;
 [
     odl,
     oleautomation,
@@ -149,8 +148,6 @@ interface IWineHTMLWindowPrivate : IDispatch
     HRESULT matchMedia([in] BSTR media_query, [retval, out] IDispatch **media_query_list);
     [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_MSCRYPTO)]
     HRESULT msCrypto([retval, out] IDispatch **crypto);
-    [propget, id(DISPID_IWINEHTMLWINDOWPRIVATE_MUTATIONOBSERVER)]
-    HRESULT MutationObserver([retval, out] IDispatch **observer_ctor);
 }
 
 [

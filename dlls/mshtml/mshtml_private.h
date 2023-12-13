@@ -96,6 +96,7 @@ typedef struct {
     IDispatchExVtbl dispex;
     IWineDispatchProxyCbPrivate** (STDMETHODCALLTYPE *GetProxyFieldRef)(IWineDispatchProxyPrivate *This);
     IDispatch* (STDMETHODCALLTYPE *GetDefaultPrototype)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window);
+    HRESULT (STDMETHODCALLTYPE *GetDefaultConstructor)(IWineDispatchProxyPrivate *This, IWineDispatchProxyPrivate *window, IDispatch **ret);
     HRESULT (STDMETHODCALLTYPE *PropFixOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);
     HRESULT (STDMETHODCALLTYPE *PropOverride)(IWineDispatchProxyPrivate *This, const WCHAR *name, VARIANT *value);
     HRESULT (STDMETHODCALLTYPE *PropDefineOverride)(IWineDispatchProxyPrivate *This, struct proxy_prop_info *info);
@@ -113,6 +114,8 @@ typedef struct {
     HRESULT (STDMETHODCALLTYPE *InitProxy)(IWineDispatchProxyCbPrivate *This, IDispatch *obj);
     void    (STDMETHODCALLTYPE *Unlinked)(IWineDispatchProxyCbPrivate *This, BOOL persist);
     HRESULT (STDMETHODCALLTYPE *HostUpdated)(IWineDispatchProxyCbPrivate *This, IActiveScript *script);
+    IDispatch* (STDMETHODCALLTYPE *CreateConstructor)(IWineDispatchProxyCbPrivate *This, IDispatch *disp, const char *name);
+    HRESULT (STDMETHODCALLTYPE *DefineConstructor)(IWineDispatchProxyCbPrivate *This, const char *name, IDispatch *prot, IDispatch *ctor);
     HRESULT (STDMETHODCALLTYPE *PropEnum)(IWineDispatchProxyCbPrivate *This, const WCHAR *name);
 } IWineDispatchProxyCbPrivateVtbl;
 
@@ -656,6 +659,7 @@ HRESULT remove_attribute(DispatchEx*,DISPID,VARIANT_BOOL*);
 HRESULT dispex_get_dynid(DispatchEx*,const WCHAR*,BOOL,DISPID*);
 HRESULT dispex_invoke(DispatchEx*,IDispatch*,DISPID,LCID,WORD,DISPPARAMS*,VARIANT*,EXCEPINFO*,IServiceProvider*);
 HRESULT dispex_delete_prop(DispatchEx*,DISPID);
+HRESULT define_global_constructors(HTMLInnerWindow*);
 void release_typelib(void);
 HRESULT get_class_typeinfo(const CLSID*,ITypeInfo**);
 const void *dispex_get_vtbl(DispatchEx*);
@@ -692,6 +696,7 @@ struct legacy_prototype {
 
 struct proxy_globals {
     IDispatch *prototype[PROTO_ID_TOTAL_COUNT - LEGACY_PROTOTYPE_COUNT];
+    IDispatch *ctor[PROTO_ID_TOTAL_COUNT - LEGACY_PROTOTYPE_COUNT];
 };
 
 typedef enum {
@@ -816,7 +821,6 @@ struct HTMLInnerWindow {
     LONG task_magic;
 
     IMoniker *mon;
-    IDispatch *mutation_observer_ctor;
     nsChannelBSC *bscallback;
     struct list bindings;
 
@@ -1728,6 +1732,7 @@ extern const IHTMLXMLHttpRequestFactoryVtbl HTMLXMLHttpRequestFactoryVtbl;
 extern dispex_static_data_t HTMLImageElementFactory_dispex;
 extern dispex_static_data_t HTMLOptionElementFactory_dispex;
 extern dispex_static_data_t HTMLXMLHttpRequestFactory_dispex;
+extern dispex_static_data_t mutation_observer_ctor_dispex;
 
 #define X(id, name, dispex, proto_id) extern dispex_static_data_t dispex;
 LEGACY_PROTOTYPE_LIST
