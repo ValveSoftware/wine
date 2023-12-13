@@ -1143,6 +1143,7 @@ sync_test("builtin_prototypes", function() {
             [ "TextRange",                      "Object" ],
             [ "UIEvent",                        "Event" ],
             [ "Window",                         "Object" ],
+            [ "XMLDocument",                    "Document" ],
             [ "XMLHttpRequest",                 "Object" ]
         ];
 

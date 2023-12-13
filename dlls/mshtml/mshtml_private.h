@@ -492,6 +492,7 @@ PRIVATE_TID_LIST
     X(DOMUIEvent,                     "UIEvent",                      DOMUIEvent_dispex,                      DOMEvent) \
     X(DOMCharacterData,               "CharacterData",                DOMCharacterData_dispex,                HTMLDOMNode) \
     X(Document,                       "Document",                     DocumentNode_dispex,                    HTMLDOMNode) \
+    X(XMLDocument,                    "XMLDocument",                  XMLDocumentNode_dispex,                 Document) \
     X(DocumentType,                   "DocumentType",                 DocumentType_dispex,                    HTMLDOMNode) \
     X(DOMElement,                     "Element",                      DOMElement_dispex,                      HTMLDOMNode) \
     X(CSSRule,                        "CSSRule",                      CSSRule_dispex,                         Object) \
@@ -1139,6 +1140,7 @@ struct HTMLFrameBase {
 
 typedef struct nsDocumentEventListener nsDocumentEventListener;
 
+/* NOTE: Update arrays at top of htmldoc.c if you change this */
 typedef enum {
     DOCTYPE_INVALID = -1,
     DOCTYPE_HTML,
@@ -1199,6 +1201,7 @@ struct HTMLDocumentNode {
     unsigned int content_ready : 1;
     unsigned int unload_sent : 1;
 
+    document_type_t doc_type;
     IHTMLDOMImplementation *dom_implementation;
     IHTMLNamespaceCollection *namespaces;
 
@@ -1225,7 +1228,7 @@ HRESULT HTMLDocument_Create(IUnknown*,REFIID,void**);
 HRESULT MHTMLDocument_Create(IUnknown*,REFIID,void**);
 HRESULT HTMLLoadOptions_Create(IUnknown*,REFIID,void**);
 HRESULT create_document_node(nsIDOMDocument*,GeckoBrowser*,HTMLInnerWindow*,
-                             compat_mode_t,HTMLDocumentNode**);
+                             document_type_t,compat_mode_t,HTMLDocumentNode**);
 HRESULT create_doctype_node(HTMLDocumentNode*,nsIDOMNode*,HTMLDOMNode**);
 HRESULT create_marshaled_doc(HWND,REFIID,void**);
 

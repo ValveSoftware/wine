@@ -611,6 +611,7 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_responseXML(IHTMLXMLHttpRequest *if
     }
 
     if(dispex_compat_mode(&This->event_target.dispex) >= COMPAT_MODE_IE10) {
+        HTMLDocumentNode *doc;
         nsIDOMDocument *nsdoc;
         nsresult nsres;
 
@@ -621,7 +622,18 @@ static HRESULT WINAPI HTMLXMLHttpRequest_get_responseXML(IHTMLXMLHttpRequest *if
             *p = NULL;
             return S_OK;
         }
+
+        if(!This->window->base.outer_window || !This->window->base.outer_window->browser)
+            hres = E_UNEXPECTED;
+        else
+            hres = create_document_node(nsdoc, This->window->base.outer_window->browser, NULL, DOCTYPE_XML,
+                                        dispex_compat_mode(&This->window->event_target.dispex), &doc);
         nsIDOMDocument_Release(nsdoc);
+        if(FAILED(hres))
+            return hres;
+
+        *p = (IDispatch*)&doc->IHTMLDocument2_iface;
+        return S_OK;
     }
 
     hres = CoCreateInstance(&CLSID_DOMDocument, NULL, CLSCTX_INPROC_SERVER, &IID_IXMLDOMDocument, (void**)&xmldoc);

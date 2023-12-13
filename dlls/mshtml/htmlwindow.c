@@ -5278,7 +5278,7 @@ HRESULT update_window_doc(HTMLInnerWindow *window)
     if(outer_window->parent)
         parent_mode = outer_window->parent->base.inner_window->doc->document_mode;
 
-    hres = create_document_node(nsdoc, outer_window->browser, window, parent_mode, &window->doc);
+    hres = create_document_node(nsdoc, outer_window->browser, window, DOCTYPE_HTML, parent_mode, &window->doc);
     nsIDOMDocument_Release(nsdoc);
     if(FAILED(hres))
         return hres;

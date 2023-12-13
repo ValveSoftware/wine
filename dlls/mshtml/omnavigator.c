@@ -250,7 +250,7 @@ static HRESULT WINAPI HTMLDOMImplementation2_createHTMLDocument(IHTMLDOMImplemen
         return E_FAIL;
     }
 
-    hres = create_document_node(doc, This->browser, NULL, dispex_compat_mode(&This->dispex), &new_document_node);
+    hres = create_document_node(doc, This->browser, NULL, DOCTYPE_HTML, dispex_compat_mode(&This->dispex), &new_document_node);
     nsIDOMDocument_Release(doc);
     if(FAILED(hres))
         return hres;
