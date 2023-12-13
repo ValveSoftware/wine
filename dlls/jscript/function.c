@@ -672,9 +672,8 @@ static HRESULT NativeFunction_call(script_ctx_t *ctx, FunctionInstance *func, js
     return function->proc(ctx, vthis, flags & ~DISPATCH_JSCRIPT_INTERNAL_MASK, argc, argv, r);
 }
 
-static HRESULT NativeFunction_toString(FunctionInstance *func, jsstr_t **ret)
+static HRESULT native_code_toString(const WCHAR *name, jsstr_t **ret)
 {
-    NativeFunction *function = (NativeFunction*)func;
     DWORD name_len;
     jsstr_t *str;
     WCHAR *ptr;
@@ -682,19 +681,25 @@ static HRESULT NativeFunction_toString(FunctionInstance *func, jsstr_t **ret)
     static const WCHAR native_prefixW[] = L"\nfunction ";
     static const WCHAR native_suffixW[] = L"() {\n    [native code]\n}\n";
 
-    name_len = function->name ? lstrlenW(function->name) : 0;
+    name_len = name ? lstrlenW(name) : 0;
     str = jsstr_alloc_buf(ARRAY_SIZE(native_prefixW) + ARRAY_SIZE(native_suffixW) + name_len - 2, &ptr);
     if(!str)
         return E_OUTOFMEMORY;
 
     memcpy(ptr, native_prefixW, sizeof(native_prefixW));
     ptr += ARRAY_SIZE(native_prefixW) - 1;
-    memcpy(ptr, function->name, name_len*sizeof(WCHAR));
+    memcpy(ptr, name, name_len*sizeof(WCHAR));
     ptr += name_len;
     memcpy(ptr, native_suffixW, sizeof(native_suffixW));
 
     *ret = str;
     return S_OK;
+}
+
+static HRESULT NativeFunction_toString(FunctionInstance *func, jsstr_t **ret)
+{
+    NativeFunction *function = (NativeFunction*)func;
+    return native_code_toString(function->name, ret);
 }
 
 static function_code_t *NativeFunction_get_code(FunctionInstance *function)
