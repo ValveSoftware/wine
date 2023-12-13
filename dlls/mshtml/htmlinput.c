@@ -1442,8 +1442,28 @@ static HRESULT WINAPI HTMLInputElement_private_setCustomValidity(IWineHTMLInputP
 static HRESULT WINAPI HTMLInputElement_private_checkValidity(IWineHTMLInputPrivate *iface, VARIANT_BOOL *ret)
 {
     HTMLInputElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
-    FIXME("(%p)->(%p)\n", This, ret);
-    return E_NOTIMPL;
+    nsIDOMValidityState *nsvalidity;
+    DOMEvent *event;
+    nsresult nsres;
+    HRESULT hres;
+    cpp_bool b;
+
+    TRACE("(%p)->(%p)\n", This, ret);
+
+    nsres = nsIDOMHTMLInputElement_GetValidity(This->nsinput, &nsvalidity);
+    if(NS_FAILED(nsres))
+        return map_nsresult(nsres);
+    nsres = nsIDOMValidityState_GetValid(nsvalidity, &b);
+    nsIDOMValidityState_Release(nsvalidity);
+
+    if(!(*ret = variant_bool(NS_SUCCEEDED(nsres) && b))) {
+        hres = create_document_event(This->element.node.doc, EVENTID_INVALID, &event);
+        if(FAILED(hres))
+            return hres;
+        dispatch_event(&This->element.node.event_target, event);
+        IDOMEvent_Release(&event->IDOMEvent_iface);
+    }
+    return S_OK;
 }
 
 static const IWineHTMLInputPrivateVtbl WineHTMLInputPrivateVtbl = {

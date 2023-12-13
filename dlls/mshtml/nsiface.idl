@@ -161,7 +161,6 @@ typedef nsISupports nsITransferable;
 typedef nsISupports nsIDOMFileList;
 typedef nsISupports nsIDOMFile;
 typedef nsISupports nsIControllers;
-typedef nsISupports nsIDOMValidityState;
 typedef nsISupports nsIPluginInstanceOwner;
 typedef nsISupports nsIPluginStreamListener;
 typedef nsISupports nsIPluginTag;
@@ -974,6 +973,25 @@ interface nsIDOMMozNamedAttrMap : nsISupports
     nsresult GetNamedItemNS(const nsAString *namespaceURI, const nsAString *localName, nsIDOMAttr **_retval);
     nsresult SetNamedItemNS(nsIDOMAttr *arg, nsIDOMAttr **_retval);
     nsresult RemoveNamedItemNS(const nsAString *namespaceURI, const nsAString *localName, nsIDOMAttr **_retval);
+}
+
+[
+    object,
+    uuid(00bed276-f1f7-492f-a039-dbd9b9efc10b),
+    local
+]
+interface nsIDOMValidityState : nsISupports
+{
+    nsresult GetValueMissing(bool *_retval);
+    nsresult GetTypeMismatch(bool *_retval);
+    nsresult GetPatternMismatch(bool *_retval);
+    nsresult GetTooLong(bool *_retval);
+    nsresult GetRangeUnderflow(bool *_retval);
+    nsresult GetRangeOverflow(bool *_retval);
+    nsresult GetStepMismatch(bool *_retval);
+    nsresult GetBadInput(bool *_retval);
+    nsresult GetCustomError(bool *_retval);
+    nsresult GetValid(bool *_retval);
 }
 
 [
