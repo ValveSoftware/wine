@@ -39,6 +39,7 @@ struct HTMLObjectElement {
 
     IHTMLObjectElement IHTMLObjectElement_iface;
     IHTMLObjectElement2 IHTMLObjectElement2_iface;
+    IWineHTMLInputPrivate IWineHTMLInputPrivate_iface;
 
     nsIDOMHTMLObjectElement *nsobject;
 };
@@ -632,6 +633,128 @@ static const IHTMLObjectElement2Vtbl HTMLObjectElement2Vtbl = {
     HTMLObjectElement2_get_data
 };
 
+static inline HTMLObjectElement *impl_from_IWineHTMLInputPrivateVtbl(IWineHTMLInputPrivate *iface)
+{
+    return CONTAINING_RECORD(iface, HTMLObjectElement, IWineHTMLInputPrivate_iface);
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_QueryInterface(IWineHTMLInputPrivate *iface,
+        REFIID riid, void **ppv)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    return IHTMLDOMNode_QueryInterface(&This->plugin_container.element.node.IHTMLDOMNode_iface, riid, ppv);
+}
+
+static ULONG WINAPI HTMLObjectElement_input_private_AddRef(IWineHTMLInputPrivate *iface)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    return IHTMLDOMNode_AddRef(&This->plugin_container.element.node.IHTMLDOMNode_iface);
+}
+
+static ULONG WINAPI HTMLObjectElement_input_private_Release(IWineHTMLInputPrivate *iface)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    return IHTMLDOMNode_Release(&This->plugin_container.element.node.IHTMLDOMNode_iface);
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_GetTypeInfoCount(IWineHTMLInputPrivate *iface, UINT *pctinfo)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    return IDispatchEx_GetTypeInfoCount(&This->plugin_container.element.node.event_target.dispex.IDispatchEx_iface, pctinfo);
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_GetTypeInfo(IWineHTMLInputPrivate *iface, UINT iTInfo,
+                                              LCID lcid, ITypeInfo **ppTInfo)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    return IDispatchEx_GetTypeInfo(&This->plugin_container.element.node.event_target.dispex.IDispatchEx_iface, iTInfo, lcid,
+            ppTInfo);
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_GetIDsOfNames(IWineHTMLInputPrivate *iface, REFIID riid,
+                                                LPOLESTR *rgszNames, UINT cNames,
+                                                LCID lcid, DISPID *rgDispId)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    return IDispatchEx_GetIDsOfNames(&This->plugin_container.element.node.event_target.dispex.IDispatchEx_iface, riid,
+            rgszNames, cNames, lcid, rgDispId);
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_Invoke(IWineHTMLInputPrivate *iface, DISPID dispIdMember,
+                            REFIID riid, LCID lcid, WORD wFlags, DISPPARAMS *pDispParams,
+                            VARIANT *pVarResult, EXCEPINFO *pExcepInfo, UINT *puArgErr)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    return IDispatchEx_Invoke(&This->plugin_container.element.node.event_target.dispex.IDispatchEx_iface, dispIdMember,
+            riid, lcid, wFlags, pDispParams, pVarResult, pExcepInfo, puArgErr);
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_put_autofocus(IWineHTMLInputPrivate *iface, VARIANT_BOOL v)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    WARN("(%p)->(%x)\n", This, v);
+    return E_UNEXPECTED;
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_get_autofocus(IWineHTMLInputPrivate *iface, VARIANT_BOOL *ret)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    WARN("(%p)->(%p)\n", This, ret);
+    return E_UNEXPECTED;
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_get_validationMessage(IWineHTMLInputPrivate *iface, BSTR *ret)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    FIXME("(%p)->(%p)\n", This, ret);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_get_validity(IWineHTMLInputPrivate *iface, IDispatch **ret)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    FIXME("(%p)->(%p)\n", This, ret);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_get_willValidate(IWineHTMLInputPrivate *iface, VARIANT_BOOL *ret)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    FIXME("(%p)->(%p)\n", This, ret);
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_setCustomValidity(IWineHTMLInputPrivate *iface, VARIANT *message)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    FIXME("(%p)->(%s)\n", This, debugstr_variant(message));
+    return E_NOTIMPL;
+}
+
+static HRESULT WINAPI HTMLObjectElement_input_private_checkValidity(IWineHTMLInputPrivate *iface, VARIANT_BOOL *ret)
+{
+    HTMLObjectElement *This = impl_from_IWineHTMLInputPrivateVtbl(iface);
+    FIXME("(%p)->(%p)\n", This, ret);
+    return E_NOTIMPL;
+}
+
+static const IWineHTMLInputPrivateVtbl WineHTMLInputPrivateVtbl = {
+    HTMLObjectElement_input_private_QueryInterface,
+    HTMLObjectElement_input_private_AddRef,
+    HTMLObjectElement_input_private_Release,
+    HTMLObjectElement_input_private_GetTypeInfoCount,
+    HTMLObjectElement_input_private_GetTypeInfo,
+    HTMLObjectElement_input_private_GetIDsOfNames,
+    HTMLObjectElement_input_private_Invoke,
+    HTMLObjectElement_input_private_put_autofocus,
+    HTMLObjectElement_input_private_get_autofocus,
+    HTMLObjectElement_input_private_get_validationMessage,
+    HTMLObjectElement_input_private_get_validity,
+    HTMLObjectElement_input_private_get_willValidate,
+    HTMLObjectElement_input_private_setCustomValidity,
+    HTMLObjectElement_input_private_checkValidity
+};
+
 static inline HTMLObjectElement *impl_from_HTMLDOMNode(HTMLDOMNode *iface)
 {
     return CONTAINING_RECORD(iface, HTMLObjectElement, plugin_container.element.node);
@@ -658,6 +781,8 @@ static void *HTMLObjectElement_query_interface(DispatchEx *dispex, REFIID riid)
         return &This->IHTMLObjectElement_iface;
     if(IsEqualGUID(&IID_IHTMLObjectElement2, riid))
         return &This->IHTMLObjectElement2_iface;
+    if(IsEqualGUID(&IID_IWineHTMLInputPrivate, riid))
+        return &This->IWineHTMLInputPrivate_iface;
     if(IsEqualGUID(&IID_HTMLPluginContainer, riid)) {
         /* Special pseudo-interface returning HTMLPluginContainer struct. */
         return &This->plugin_container;
@@ -767,13 +892,26 @@ static const tid_t HTMLObjectElement_iface_tids[] = {
     HTMLELEMENT_TIDS,
     0
 };
+
+static void HTMLObjectElement_init_dispex_info(dispex_data_t *info, compat_mode_t mode)
+{
+    static const dispex_hook_t input_private_hooks[] = {
+        {DISPID_IWINEHTMLINPUTPRIVATE_AUTOFOCUS},
+        {DISPID_UNKNOWN}
+    };
+    HTMLElement_init_dispex_info(info, mode);
+
+    if(mode >= COMPAT_MODE_IE10)
+        dispex_info_add_interface(info, IWineHTMLInputPrivate_tid, input_private_hooks);
+}
+
 dispex_static_data_t HTMLObjectElement_dispex = {
     "HTMLObjectElement",
     &HTMLObjectElement_event_target_vtbl.dispex_vtbl,
     PROTO_ID_HTMLObjectElement,
     DispHTMLObjectElement_tid,
     HTMLObjectElement_iface_tids,
-    HTMLElement_init_dispex_info
+    HTMLObjectElement_init_dispex_info
 };
 
 HRESULT HTMLObjectElement_Create(HTMLDocumentNode *doc, nsIDOMElement *nselem, HTMLElement **elem)
@@ -787,6 +925,7 @@ HRESULT HTMLObjectElement_Create(HTMLDocumentNode *doc, nsIDOMElement *nselem, H
 
     ret->IHTMLObjectElement_iface.lpVtbl = &HTMLObjectElementVtbl;
     ret->IHTMLObjectElement2_iface.lpVtbl = &HTMLObjectElement2Vtbl;
+    ret->IWineHTMLInputPrivate_iface.lpVtbl = &WineHTMLInputPrivateVtbl;
     ret->plugin_container.element.node.vtbl = &HTMLObjectElementImplVtbl;
 
     HTMLElement_Init(&ret->plugin_container.element, doc, nselem, &HTMLObjectElement_dispex);

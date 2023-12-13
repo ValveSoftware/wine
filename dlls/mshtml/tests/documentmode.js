@@ -1930,6 +1930,86 @@ sync_test("style_props", function() {
     }
 });
 
+sync_test("input_validation_props", function() {
+    var obj, v = document.documentMode;
+    if(v < 9) return;
+
+    function test_exposed(prop, expect) {
+        if(expect)
+            ok(Object.prototype.hasOwnProperty.call(obj, prop), prop + " not a property of " + obj);
+        else
+            ok(!Object.prototype.hasOwnProperty.call(obj, prop), prop + " is a property of " + obj);
+    }
+
+    obj = window.HTMLFormElement.prototype;
+    test_exposed("action", true);
+    test_exposed("autofocus", false);
+    test_exposed("checkValidity", v >= 10);
+    test_exposed("enctype", true);
+    test_exposed("formAction", false);
+    test_exposed("formEnctype", false);
+    test_exposed("formMethod", false);
+    test_exposed("formNoValidate", false);
+    test_exposed("formTarget", false);
+    test_exposed("method", true);
+    test_exposed("noValidate", v >= 10);
+    test_exposed("setCustomValidity", false);
+    test_exposed("target", true);
+    test_exposed("validationMessage", false);
+    test_exposed("validity", false);
+    test_exposed("willValidate", false);
+
+    obj = window.HTMLInputElement.prototype;
+    test_exposed("autofocus", v >= 10);
+    test_exposed("checkValidity", v >= 10);
+    test_exposed("formAction", v >= 10);
+    test_exposed("formEnctype", v >= 10);
+    test_exposed("formMethod", v >= 10);
+    test_exposed("formNoValidate", v >= 10);
+    test_exposed("formTarget", v >= 10);
+    test_exposed("setCustomValidity", v >= 10);
+    test_exposed("validationMessage", v >= 10);
+    test_exposed("validity", v >= 10);
+    test_exposed("willValidate", v >= 10);
+
+    obj = window.HTMLButtonElement.prototype;
+    test_exposed("autofocus", v >= 10);
+    test_exposed("checkValidity", v >= 10);
+    test_exposed("formAction", v >= 10);
+    test_exposed("formEnctype", v >= 10);
+    test_exposed("formMethod", v >= 10);
+    test_exposed("formNoValidate", v >= 10);
+    test_exposed("formTarget", v >= 10);
+    test_exposed("setCustomValidity", v >= 10);
+    test_exposed("validationMessage", v >= 10);
+    test_exposed("validity", v >= 10);
+    test_exposed("willValidate", v >= 10);
+
+    obj = window.HTMLObjectElement.prototype;
+    test_exposed("autofocus", false);
+    test_exposed("checkValidity", v >= 10);
+    test_exposed("setCustomValidity", v >= 10);
+    test_exposed("validationMessage", v >= 10);
+    test_exposed("validity", v >= 10);
+    test_exposed("willValidate", v >= 10);
+
+    obj = window.HTMLSelectElement.prototype;
+    test_exposed("autofocus", v >= 10);
+    test_exposed("checkValidity", v >= 10);
+    test_exposed("setCustomValidity", v >= 10);
+    test_exposed("validationMessage", v >= 10);
+    test_exposed("validity", v >= 10);
+    test_exposed("willValidate", v >= 10);
+
+    obj = window.HTMLTextAreaElement.prototype;
+    test_exposed("autofocus", v >= 10);
+    test_exposed("checkValidity", v >= 10);
+    test_exposed("setCustomValidity", v >= 10);
+    test_exposed("validationMessage", v >= 10);
+    test_exposed("validity", v >= 10);
+    test_exposed("willValidate", v >= 10);
+});
+
 sync_test("createElement_inline_attr", function() {
     var v = document.documentMode, e, s;
 

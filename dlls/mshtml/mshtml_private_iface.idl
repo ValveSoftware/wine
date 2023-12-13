@@ -219,6 +219,86 @@ interface IWineHTMLElementPrivate : IDispatch
     HRESULT classList([retval, out] IDispatch **class_list);
 }
 
+const long DISPID_IWINEHTMLFORMPRIVATE_NOVALIDATE = 51;
+const long DISPID_IWINEHTMLFORMPRIVATE_CHECKVALIDITY = 52;
+[
+    odl,
+    oleautomation,
+    dual,
+    hidden,
+    uuid(465908fd-f394-489f-b7a3-4c00fbbe9eed)
+]
+interface IWineHTMLFormPrivate : IDispatch
+{
+    [propput, id(50)]
+    HRESULT enctype([in] BSTR v);
+    [propget, id(50)]
+    HRESULT enctype([retval, out] BSTR *ret);
+    [propput, id(DISPID_IWINEHTMLFORMPRIVATE_NOVALIDATE)]
+    HRESULT noValidate([in] VARIANT_BOOL v);
+    [propget, id(DISPID_IWINEHTMLFORMPRIVATE_NOVALIDATE)]
+    HRESULT noValidate([retval, out] VARIANT_BOOL *ret);
+    [id(DISPID_IWINEHTMLFORMPRIVATE_CHECKVALIDITY)]
+    HRESULT checkValidity([retval, out] VARIANT_BOOL *ret);
+}
+
+[
+    odl,
+    oleautomation,
+    dual,
+    hidden,
+    uuid(465908fd-f394-489f-b7a3-4c00fbbe9eee)
+]
+interface IWineHTMLParentFormPrivate : IDispatch
+{
+    [propput, id(60)]
+    HRESULT formAction([in] BSTR v);
+    [propget, id(60)]
+    HRESULT formAction([retval, out] BSTR *ret);
+    [propput, id(61)]
+    HRESULT formEnctype([in] BSTR v);
+    [propget, id(61)]
+    HRESULT formEnctype([retval, out] BSTR *ret);
+    [propput, id(62)]
+    HRESULT formMethod([in] BSTR v);
+    [propget, id(62)]
+    HRESULT formMethod([retval, out] BSTR *ret);
+    [propput, id(63)]
+    HRESULT formNoValidate([in] VARIANT_BOOL v);
+    [propget, id(63)]
+    HRESULT formNoValidate([retval, out] VARIANT_BOOL *ret);
+    [propput, id(64)]
+    HRESULT formTarget([in] BSTR v);
+    [propget, id(64)]
+    HRESULT formTarget([retval, out] BSTR *ret);
+}
+
+const long DISPID_IWINEHTMLINPUTPRIVATE_AUTOFOCUS = 50;
+[
+    odl,
+    oleautomation,
+    dual,
+    hidden,
+    uuid(465908fd-f394-489f-b7a3-4c00fbbe9eef)
+]
+interface IWineHTMLInputPrivate : IDispatch
+{
+    [propput, id(DISPID_IWINEHTMLINPUTPRIVATE_AUTOFOCUS)]
+    HRESULT autofocus([in] VARIANT_BOOL v);
+    [propget, id(DISPID_IWINEHTMLINPUTPRIVATE_AUTOFOCUS)]
+    HRESULT autofocus([retval, out] VARIANT_BOOL *ret);
+    [propget, id(51)]
+    HRESULT validationMessage([retval, out] BSTR *ret);
+    [propget, id(52)]
+    HRESULT validity([retval, out] IDispatch **ret);
+    [propget, id(53)]
+    HRESULT willValidate([retval, out] VARIANT_BOOL *ret);
+    [id(54)]
+    HRESULT setCustomValidity([in] VARIANT *message);
+    [id(55)]
+    HRESULT checkValidity([retval, out] VARIANT_BOOL *ret);
+}
+
 [
     odl,
     oleautomation,
