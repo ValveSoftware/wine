@@ -1285,7 +1285,7 @@ void destroy_vk_surface(HWND hwnd)
 {
 }
 
-void resize_vk_surfaces(HWND hwnd, Window active, int mask, XWindowChanges changes)
+void resize_vk_surfaces(HWND hwnd, Window active, int mask, XWindowChanges *changes)
 {
 }
 
