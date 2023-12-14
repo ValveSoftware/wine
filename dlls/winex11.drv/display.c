@@ -601,12 +601,6 @@ BOOL X11DRV_UpdateDisplayDevices( const struct gdi_device_manager *device_manage
                     gpus[gpu].device_id = 0x67df; /* RX 480 */
                 }
             }
-            if (gpus[gpu].vendor_id == 0x1002 && gpus[gpu].device_id == 0x163f
-                && (sgi = getenv("WINE_HIDE_VANGOGH_GPU")) && *sgi != '0')
-            {
-                FIXME("HACK: hiding Vangogh GPU.\n");
-                gpus[gpu].device_id = 0x687f; /* Radeon RX Vega 56/64 */
-            }
         }
 
         device_manager->add_gpu( &gpus[gpu], param );
