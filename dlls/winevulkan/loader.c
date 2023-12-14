@@ -430,17 +430,31 @@ static void fixup_device_id(VkPhysicalDeviceProperties *properties)
             }
         }
     }
-    else if (properties->vendorID && properties->vendorID == 0x1002 && properties->deviceID == 0x163f)
+    else if (properties->vendorID && properties->vendorID == 0x1002)
     {
-        /* AMD VAN GOGH */
-        BOOL hide;
-        sgi = getenv("WINE_HIDE_VANGOGH_GPU");
-        if (sgi)
-            hide = *sgi != '0';
+        sgi = getenv("WINE_HIDE_AMD_GPU");
+        if (sgi && *sgi != '0')
+        {
+            {
+                properties->vendorID = 0x10de; /* NVIDIA */
+                properties->deviceID = 0x2204; /* RTX 3090 */
+            }
+        }
         else
-            hide = (sgi = getenv("SteamGameId")) && !strcmp(sgi, "257420");
-        if (hide)
-            properties->deviceID = 0x687f; /* Radeon RX Vega 56/64 */
+        {
+            if (properties->deviceID == 0x163f)
+            {
+                /* AMD VAN GOGH */
+                BOOL hide;
+                sgi = getenv("WINE_HIDE_VANGOGH_GPU");
+                if (sgi)
+                    hide = *sgi != '0';
+                else
+                    hide = (sgi = getenv("SteamGameId")) && !strcmp(sgi, "257420");
+                if (hide)
+                    properties->deviceID = 0x687f; /* Radeon RX Vega 56/64 */
+            }
+        }
     }
 }
 
