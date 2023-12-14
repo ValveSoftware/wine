@@ -353,6 +353,8 @@ NTSTATUS wg_init_gstreamer(void *arg)
     GST_INFO("GStreamer library version %s; wine built with %d.%d.%d.",
             gst_version_string(), GST_VERSION_MAJOR, GST_VERSION_MINOR, GST_VERSION_MICRO);
 
+    setenv("GST_GL_WINDOW", "x11", 0);
+
     if (!(gl_display = gst_gl_display_new()))
         GST_ERROR("Failed to create OpenGL display");
     else
