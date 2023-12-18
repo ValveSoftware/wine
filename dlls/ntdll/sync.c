@@ -206,7 +206,7 @@ static inline NTSTATUS wait_semaphore( RTL_CRITICAL_SECTION *crit, int timeout )
  */
 NTSTATUS WINAPI RtlInitializeCriticalSection( RTL_CRITICAL_SECTION *crit )
 {
-    return RtlInitializeCriticalSectionEx( crit, 0, 0 );
+    return RtlInitializeCriticalSectionEx( crit, 0, RTL_CRITICAL_SECTION_FLAG_FORCE_DEBUG_INFO );
 }
 
 
@@ -215,7 +215,7 @@ NTSTATUS WINAPI RtlInitializeCriticalSection( RTL_CRITICAL_SECTION *crit )
  */
 NTSTATUS WINAPI RtlInitializeCriticalSectionAndSpinCount( RTL_CRITICAL_SECTION *crit, ULONG spincount )
 {
-    return RtlInitializeCriticalSectionEx( crit, spincount, 0 );
+    return RtlInitializeCriticalSectionEx( crit, spincount, RTL_CRITICAL_SECTION_FLAG_FORCE_DEBUG_INFO );
 }
 
 
@@ -233,7 +233,7 @@ NTSTATUS WINAPI RtlInitializeCriticalSectionEx( RTL_CRITICAL_SECTION *crit, ULON
      * is done, then debug info should be managed through Rtlp[Allocate|Free]DebugInfo
      * so (e.g.) MakeCriticalSectionGlobal() doesn't free it using HeapFree().
      */
-    if (flags & RTL_CRITICAL_SECTION_FLAG_NO_DEBUG_INFO)
+    if (!(flags & RTL_CRITICAL_SECTION_FLAG_FORCE_DEBUG_INFO))
         crit->DebugInfo = no_debug_info_marker;
     else
     {
