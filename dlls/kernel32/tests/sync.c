@@ -3117,7 +3117,7 @@ static void test_crit_section(void)
        to override that. */
     memset(&cs, 0, sizeof(cs));
     InitializeCriticalSection(&cs);
-    ok(cs.DebugInfo != NULL, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+    todo_wine ok(cs.DebugInfo == (void *)(ULONG_PTR)-1, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
     DeleteCriticalSection(&cs);
     ok(cs.DebugInfo == NULL, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
 
@@ -3128,9 +3128,30 @@ static void test_crit_section(void)
     }
 
     memset(&cs, 0, sizeof(cs));
+    ret = pInitializeCriticalSectionEx(&cs, 0, 0);
+    ok(ret, "Failed to initialize critical section.\n");
+    ok(cs.DebugInfo == (void *)(ULONG_PTR)-1, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+    DeleteCriticalSection(&cs);
+    todo_wine ok(cs.DebugInfo == NULL, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+
+    memset(&cs, 0, sizeof(cs));
     ret = pInitializeCriticalSectionEx(&cs, 0, CRITICAL_SECTION_NO_DEBUG_INFO);
     ok(ret, "Failed to initialize critical section.\n");
     ok(cs.DebugInfo == (void *)(ULONG_PTR)-1, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+    DeleteCriticalSection(&cs);
+    todo_wine ok(cs.DebugInfo == NULL, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+
+    memset(&cs, 0, sizeof(cs));
+    ret = pInitializeCriticalSectionEx(&cs, 0, 0);
+    ok(ret, "Failed to initialize critical section.\n");
+    ok(cs.DebugInfo == (void *)(ULONG_PTR)-1, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+    DeleteCriticalSection(&cs);
+    todo_wine ok(cs.DebugInfo == NULL, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+
+    memset(&cs, 0, sizeof(cs));
+    ret = pInitializeCriticalSectionEx(&cs, 0, RTL_CRITICAL_SECTION_FLAG_FORCE_DEBUG_INFO);
+    ok(ret, "Failed to initialize critical section.\n");
+    ok(cs.DebugInfo && cs.DebugInfo != (void *)(ULONG_PTR)-1, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
 
     ret = TryEnterCriticalSection(&cs);
     ok(ret, "Failed to enter critical section.\n");
