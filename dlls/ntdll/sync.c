@@ -289,7 +289,11 @@ NTSTATUS WINAPI RtlDeleteCriticalSection( RTL_CRITICAL_SECTION *crit )
             crit->DebugInfo = NULL;
         }
     }
-    else NtClose( crit->LockSemaphore );
+    else
+    {
+        NtClose( crit->LockSemaphore );
+        crit->DebugInfo = NULL;
+    }
     crit->LockSemaphore = 0;
     return STATUS_SUCCESS;
 }
