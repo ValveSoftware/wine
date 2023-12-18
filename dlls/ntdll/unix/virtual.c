@@ -677,6 +677,7 @@ static void load_steam_overlay(const char *unix_lib_path)
         if (!strstr( path, "gameoverlayrenderer.so" )) continue;
         handle = dlopen( path, RTLD_NOW | RTLD_GLOBAL );
         FIXME( "HACK: tried to load %s, handle %p.\n", debugstr_a(path), handle );
+        if (*p) ++p;
     }
 }
 
