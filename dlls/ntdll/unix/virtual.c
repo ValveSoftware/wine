@@ -662,6 +662,7 @@ static void load_steam_overlay(const char *unix_lib_path)
 {
     const char *preload, *p;
     char path[PATH_MAX];
+    unsigned int len;
     void *handle;
 
     if (!strstr(unix_lib_path, "winex11.so")) return;
@@ -671,13 +672,14 @@ static void load_steam_overlay(const char *unix_lib_path)
     while (*(preload = p))
     {
         p = strchrnul( preload, ':' );
-        if (p - preload + 1 > sizeof(path)) continue;
-        memcpy( path, preload, p - preload );
-        path[p - preload] = 0;
+        len = p - preload;
+        if (*p) ++p;
+        if (len + 1 > sizeof(path)) continue;
+        memcpy( path, preload, len );
+        path[len] = 0;
         if (!strstr( path, "gameoverlayrenderer.so" )) continue;
         handle = dlopen( path, RTLD_NOW | RTLD_GLOBAL );
         FIXME( "HACK: tried to load %s, handle %p.\n", debugstr_a(path), handle );
-        if (*p) ++p;
     }
 }
 
