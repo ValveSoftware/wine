@@ -786,6 +786,9 @@ static void test_lookupPrivilegeValue(void)
     }
 }
 
+static TOKEN_OWNER *get_alloc_token_owner( HANDLE token );
+static TOKEN_PRIMARY_GROUP *get_alloc_token_primary_group( HANDLE token );
+
 static void test_FileSecurity(void)
 {
     char wintmpdir [MAX_PATH];
@@ -800,6 +803,16 @@ static void test_FileSecurity(void)
     const SECURITY_INFORMATION request = OWNER_SECURITY_INFORMATION
                                        | GROUP_SECURITY_INFORMATION
                                        | DACL_SECURITY_INFORMATION;
+    TOKEN_OWNER *owner;
+    PSID owner_sid;
+    BOOL defaulted, present;
+    TOKEN_PRIMARY_GROUP *group;
+    SECURITY_ATTRIBUTES sa;
+    PACL dacl;
+    ACL_SIZE_INFORMATION acl_size;
+    ACCESS_ALLOWED_ACE *ace;
+    static SID owner_rights_sid = { SID_REVISION, 1, { SECURITY_CREATOR_SID_AUTHORITY }, { SECURITY_CREATOR_OWNER_RIGHTS_RID } };
+    const WCHAR sd_onwer_rights_str[] = L"D:(A;;FA;;;S-1-3-4)";
 
     if (!pSetFileSecurityA) {
         win_skip ("SetFileSecurity is not available\n");
@@ -901,6 +914,58 @@ static void test_FileSecurity(void)
     ok (!rc, "GetFileSecurityA should fail for not existing directories/files\n");
     ok (GetLastError() == ERROR_FILE_NOT_FOUND,
         "last error ERROR_FILE_NOT_FOUND expected, got %ld\n", GetLastError());
+
+    sa.nLength = sizeof(sa);
+    sa.bInheritHandle = FALSE;
+    rc = ConvertStringSecurityDescriptorToSecurityDescriptorW(sd_onwer_rights_str, SDDL_REVISION_1, &sa.lpSecurityDescriptor, NULL);
+    ok(rc, "got error %lu.\n", GetLastError());
+
+    DeleteFileA(file);
+    fh = CreateFileA(file, GENERIC_READ, 0, &sa, CREATE_ALWAYS, 0, NULL);
+    ok (fh != INVALID_HANDLE_VALUE, "error %lu\n", GetLastError());
+    LocalFree(sa.lpSecurityDescriptor);
+
+    rc = GetFileSecurityA (file, OWNER_SECURITY_INFORMATION, NULL, 0, &retSize);
+    ok (!rc && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "got %ld, error %lu.\n", rc, GetLastError());
+    sd = HeapAlloc (GetProcessHeap (), 0, sdSize);
+    rc = GetFileSecurityA (file, OWNER_SECURITY_INFORMATION, sd, retSize, &retSize);
+    ok(rc, "got error %lu.\n", GetLastError());
+    rc = GetSecurityDescriptorOwner(sd, &owner_sid, &defaulted);
+    ok(rc, "got error %lu.\n", GetLastError());
+    ok(!defaulted, "got %d.\n", defaulted);
+    owner = get_alloc_token_owner(GetCurrentProcessToken());
+    todo_wine ok(EqualSid(owner_sid, owner->Owner), "Owner SIDs are not equal %s != %s\n", debugstr_sid(owner_sid), debugstr_sid(owner->Owner));
+    HeapFree (GetProcessHeap (), 0, owner);
+    HeapFree (GetProcessHeap (), 0, sd);
+
+    group = get_alloc_token_primary_group(GetCurrentProcessToken());
+    test_group_equal(fh, group->PrimaryGroup, __LINE__);
+    HeapFree (GetProcessHeap (), 0, group);
+
+    CloseHandle(fh);
+
+    fh = CreateFileA(file, GENERIC_READ, 0, NULL, OPEN_EXISTING, 0, NULL);
+    ok (fh != INVALID_HANDLE_VALUE, "error %lu\n", GetLastError());
+    if (fh != INVALID_HANDLE_VALUE)
+    {
+        rc = GetFileSecurityA (file, DACL_SECURITY_INFORMATION, NULL, 0, &retSize);
+        ok (!rc && GetLastError() == ERROR_INSUFFICIENT_BUFFER, "got %ld, error %lu.\n", rc, GetLastError());
+        sd = HeapAlloc (GetProcessHeap (), 0, sdSize);
+        rc = GetFileSecurityA (file, DACL_SECURITY_INFORMATION, sd, retSize, &retSize);
+        ok(rc, "got error %lu.\n", GetLastError());
+        rc = GetSecurityDescriptorDacl(sd, &present, &dacl, &defaulted);
+        ok(rc, "got error %lu.\n", GetLastError());
+        ok(present, "got %d.\n", present);
+        ok(!defaulted, "got %d.\n", defaulted);
+        rc = GetAclInformation(dacl, &acl_size, sizeof(acl_size), AclSizeInformation);
+        ok(rc, "got error %lu.\n", GetLastError());
+        ok(acl_size.AceCount == 1, "got %lu.\n", acl_size.AceCount);
+        rc = GetAce(dacl, 0, (VOID **)&ace);
+        ok(rc, "got error %lu.\n", GetLastError());
+        ok(EqualSid(&ace->SidStart, &owner_rights_sid), "Owner SIDs are not equal %s != %s\n", debugstr_sid(&ace->SidStart), debugstr_sid(&owner_rights_sid));
+        CloseHandle(fh);
+        HeapFree (GetProcessHeap (), 0, sd);
+    }
 
 cleanup:
     /* Remove temporary file and directory */
