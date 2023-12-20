@@ -615,7 +615,7 @@ mode_t sd_to_mode( const struct security_descriptor *sd, const struct sid *owner
                     {
                         bits_to_set &= ~((mode << 6) | (mode << 3));  /* user + group */
                     }
-                    else if (equal_sid( sid, owner ))
+                    else if (equal_sid( sid, owner ) || equal_sid( sid, &owner_rights_sid ))
                     {
                         bits_to_set &= ~(mode << 6);  /* user only */
                     }
@@ -634,7 +634,7 @@ mode_t sd_to_mode( const struct security_descriptor *sd, const struct sid *owner
                         new_mode |= mode & bits_to_set;
                         bits_to_set &= ~mode;
                     }
-                    else if (equal_sid( sid, owner ))
+                    else if (equal_sid( sid, owner ) || equal_sid( sid, &owner_rights_sid ))
                     {
                         mode = (mode << 6);  /* user only */
                         new_mode |= mode & bits_to_set;

@@ -44,6 +44,7 @@ extern const struct luid SeManageVolumePrivilege;
 extern const struct luid SeImpersonatePrivilege;
 extern const struct luid SeCreateGlobalPrivilege;
 
+extern const struct sid owner_rights_sid;
 extern const struct sid world_sid;
 extern       struct sid local_user_sid;
 extern const struct sid local_system_sid;
