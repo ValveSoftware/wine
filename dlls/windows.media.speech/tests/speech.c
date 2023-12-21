@@ -548,7 +548,7 @@ static HRESULT WINAPI iterator_hstring_get_Current( IIterator_HSTRING *iface, HS
     return hr;
 }
 
-static HRESULT WINAPI iterator_hstring_get_HasCurrent( IIterator_HSTRING *iface, BOOL *value )
+static HRESULT WINAPI iterator_hstring_get_HasCurrent( IIterator_HSTRING *iface, boolean *value )
 {
     struct iterator_hstring *impl = impl_from_IIterator_HSTRING(iface);
 
@@ -556,7 +556,7 @@ static HRESULT WINAPI iterator_hstring_get_HasCurrent( IIterator_HSTRING *iface,
     return S_OK;
 }
 
-static HRESULT WINAPI iterator_hstring_MoveNext( IIterator_HSTRING *iface, BOOL *value )
+static HRESULT WINAPI iterator_hstring_MoveNext( IIterator_HSTRING *iface, boolean *value )
 {
     struct iterator_hstring *impl = impl_from_IIterator_HSTRING(iface);
 

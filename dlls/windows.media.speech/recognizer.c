@@ -808,7 +808,7 @@ static HRESULT session_find_constraint_by_string(struct session *session, WCHAR 
     ISpeechRecognitionConstraint *constraint;
     IIterable_HSTRING *commands_iterable;
     IIterator_HSTRING *commands_iterator;
-    BOOL has_constraint, has_command;
+    boolean has_constraint, has_command;
     IVector_HSTRING *commands;
     const WCHAR *command_str;
     HSTRING command;
@@ -1539,7 +1539,7 @@ static HRESULT recognizer_compile_constraints_async( IInspectable *invoker, IIns
     ISpeechRecognitionConstraint *constraint;
     IIterable_HSTRING *commands_iterable;
     IIterator_HSTRING *commands_iterator;
-    BOOL has_constraint, has_command;
+    boolean has_constraint, has_command;
     IVector_HSTRING *commands;
     const WCHAR *command_str;
     UINT32 grammar_size = 0, i = 0;
