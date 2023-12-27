@@ -5567,6 +5567,15 @@ GpStatus WINGDIPAPI GdipMeasureString(GpGraphics *graphics,
     if(!graphics || !string || !font || !rect || !bounds)
         return InvalidParameter;
 
+    if (length == 1 && string[0] == '\n')
+    {
+        /* Proton hack for SpriteFontX class used by TouHou Makuka Sai.
+         * Returned size is passed to Bitmap constructor, but we currently measure "\n" as zero size. */
+        char const *sgi = getenv("SteamGameId");
+        if (sgi && (!strcmp(sgi, "882710") || !strcmp(sgi, "1031480")))
+            string = L" ";
+    }
+
     if(!graphics->hdc)
     {
         hdc = temp_hdc = CreateCompatibleDC(0);
