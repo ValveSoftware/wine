@@ -2175,19 +2175,15 @@ static void fs_hack_get_attachments_config( struct gl_drawable *gl, struct fs_ha
     config->color_internalformat = attribs->alpha_size ? GL_RGBA8 : GL_RGB8;
     config->color_format = GL_BGRA;
     config->color_type = GL_UNSIGNED_INT_8_8_8_8_REV;
-    if (attribs->depth_size || attribs->stencil_size)
-    {
-        if (attribs->depth_size != 24) FIXME( "Unsupported depth buffer size %u.\n", attribs->depth_size );
-        if (attribs->stencil_size && attribs->stencil_size != 8)
-            FIXME( "Unsupported stencil buffer size %u.\n", attribs->stencil_size );
-        config->ds_internalformat = attribs->stencil_size ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT24;
-        config->ds_format = attribs->stencil_size ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT;
-        config->ds_type = attribs->stencil_size ? GL_UNSIGNED_INT_24_8 : GL_UNSIGNED_INT;
-    }
-    else
-    {
-        config->ds_internalformat = config->ds_format = config->ds_type = 0;
-    }
+
+    if (attribs->depth_size && attribs->depth_size != 24)
+        FIXME( "Unsupported depth buffer size %u.\n", attribs->depth_size );
+    if (attribs->stencil_size && attribs->stencil_size != 8)
+        FIXME( "Unsupported stencil buffer size %u.\n", attribs->stencil_size );
+    config->ds_internalformat = attribs->stencil_size ? GL_DEPTH24_STENCIL8 : GL_DEPTH_COMPONENT24;
+    config->ds_format = attribs->stencil_size ? GL_DEPTH_STENCIL : GL_DEPTH_COMPONENT;
+    config->ds_type = attribs->stencil_size ? GL_UNSIGNED_INT_24_8 : GL_UNSIGNED_INT;
+
     config->samples = attribs->samples;
 }
 
@@ -2544,12 +2540,13 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
                                                 height, 0, config.ds_format, config.ds_type, NULL );
                 opengl_funcs.gl.p_glTexParameteri( GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0 );
                 opengl_funcs.gl.p_glBindTexture( GL_TEXTURE_2D, prev_texture );
-                if (attribs.depth_size)
-                    pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
-                                             GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
                 if (attribs.stencil_size)
                     pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_STENCIL_ATTACHMENT,
                                              GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
+                else
+                    pglFramebufferTexture2D( GL_DRAW_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+                                             GL_TEXTURE_2D, ctx->fs_hack_ds_texture, 0 );
+
                 TRACE( "Created DS texture %u for fullscreen hack.\n", ctx->fs_hack_ds_texture );
             }
         }
