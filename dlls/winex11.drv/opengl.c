@@ -2385,7 +2385,7 @@ static void gen_texture( struct wgl_context *ctx, GLuint *tex, enum fshack_textu
     {
         const char *sgi = getenv( "SteamGameId" );
 
-        texture_name_hack = sgi && (!strcmp( sgi, "6020" ) || !strcmp( sgi, "2200" ) || !strcmp( sgi, "2350" ));
+        texture_name_hack = sgi && (!strcmp( sgi, "6020" ) || !strcmp( sgi, "2200" ) || !strcmp( sgi, "2350" ) || !strcmp( sgi, "273590" ));
     }
 
     if (!texture_name_hack || opengl_funcs.gl.p_glIsTexture( texture_names[type] ))
