@@ -531,8 +531,6 @@ static LONG fs_set_current_mode( x11drv_settings_id settings_id, const DEVMODEW 
 
 static BOOL fs_get_gpus( struct gdi_gpu **gpus, int *count, BOOL get_properties )
 {
-    struct list monitors = LIST_INIT( monitors );
-
     TRACE( "gpus %p, count %p\n", gpus, count );
 
     if (!real_device_handler.get_gpus( gpus, count, get_properties )) return FALSE;
