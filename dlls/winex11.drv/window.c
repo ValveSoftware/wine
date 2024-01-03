@@ -3036,7 +3036,12 @@ static void window_update_fshack( struct x11drv_win_data *data, const RECT *wind
     if (data->whole_window)
     {
         POINT top_left = *(POINT *)&window_rect_host;
+        RECT real_virtual;
+
         OffsetRect( &window_rect_host, -top_left.x, -top_left.y );
+        real_virtual = fs_hack_get_real_virtual_screen();
+        top_left.x -= real_virtual.left;
+        top_left.y -= real_virtual.top;
 
         if (set_hints) set_wm_hints( data );
 
