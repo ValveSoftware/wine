@@ -975,6 +975,30 @@ AGSReturnCode WINAPI agsGetGPUMemorySize( AGSContext *context, int gpuIndex, lon
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsGetEyefinityConfigInfo( AGSContext *context, int displayIndex, AGSEyefinityInfo *eyefinityInfo,
+        int *numDisplaysInfo, AGSDisplayInfo_403 *displaysInfo )
+{
+    struct AGSDeviceInfo_511 *devices;
+    unsigned int i;
+
+    TRACE("context %p, displayIndex %d, eyefinityInfo %p, numDisplaysInfo %p, displaysInfo %p\n",
+            context, displayIndex, eyefinityInfo, numDisplaysInfo, displaysInfo);
+
+    devices = (struct AGSDeviceInfo_511 *)context->devices;
+    *numDisplaysInfo = 0;
+    for (i = 0; i < context->device_count; ++i)
+        *numDisplaysInfo += devices[i].numDisplays;
+
+    if (!eyefinityInfo || !displaysInfo)
+        return AGS_SUCCESS;
+
+    /* displaysInfo is not filled in on Windows if Eyefinity is not enabled. */
+    memset(eyefinityInfo, 0, sizeof(*eyefinityInfo));
+    memset(displaysInfo, 0, *numDisplaysInfo * sizeof(*displaysInfo));
+
+    return AGS_SUCCESS;
+}
+
 static DXGI_COLOR_SPACE_TYPE convert_ags_colorspace_506(AGSDisplaySettings_Mode_506 mode)
 {
     switch (mode)
