@@ -1045,6 +1045,20 @@ typedef struct AGSDX12ReturnedParams
 
 
 // Description
+//   Function used to query the number of GPUs in the system.
+//   This number may be different from agsGetCrossfireGPUCount as it reports
+//   all devices installed in the system, and not only those configured for
+//   Crossfire.
+//
+// Input params
+//   context - Pointer to a context.
+//
+// Output params
+//   numGPUs - Number of GPUs in the system.
+//
+AMD_AGS_API AGSReturnCode agsGetTotalGPUCount( AGSContext* context, int* numGPUs );
+
+// Description
 //   Function used to query Eyefinity configuration state information relevant to ISVs. State info returned
 //   includes: whether Eyefinity is enabled or not, SLS grid configuration, SLS dimensions, whether bezel
 //   compensation is enabled or not, SLS grid coordinate for each display, total rendering area for each

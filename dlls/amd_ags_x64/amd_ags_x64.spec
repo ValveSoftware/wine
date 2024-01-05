@@ -43,3 +43,4 @@
 @ stdcall agsInit(ptr ptr ptr)
 @ stdcall agsInitialize(long ptr ptr ptr)
 @ stdcall agsSetDisplayMode(ptr long long ptr)
+@ stdcall agsGetTotalGPUCount(ptr ptr)
