@@ -962,6 +962,19 @@ AGSReturnCode WINAPI agsGetTotalGPUCount(AGSContext *context, int *numGPUs)
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsGetGPUMemorySize( AGSContext *context, int gpuIndex, long long *sizeInBytes )
+{
+    struct AGSDeviceInfo_511 *device = &((struct AGSDeviceInfo_511 *)context->devices)[gpuIndex];
+
+    TRACE("context %p, gpuIndex %d, sizeInBytes %p.\n", context, gpuIndex, sizeInBytes);
+
+    if ((unsigned)gpuIndex >= context->device_count)
+        return AGS_INVALID_ARGS;
+
+    *sizeInBytes = device->localMemoryInBytes;
+    return AGS_SUCCESS;
+}
+
 static DXGI_COLOR_SPACE_TYPE convert_ags_colorspace_506(AGSDisplaySettings_Mode_506 mode)
 {
     switch (mode)

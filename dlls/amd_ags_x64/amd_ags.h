@@ -1059,6 +1059,19 @@ typedef struct AGSDX12ReturnedParams
 AMD_AGS_API AGSReturnCode agsGetTotalGPUCount( AGSContext* context, int* numGPUs );
 
 // Description
+//   Function used to query the memory size of a GPU. The number of GPUs should
+//   be obtained using agsGetTotalGPUCount
+//
+// Input params
+//   context - Pointer to a context.
+//   gpuIndex - The GPU index to query
+//
+// Output params
+//   sizeInBytes - Memory size on the device in bytes
+//
+AMD_AGS_API AGSReturnCode agsGetGPUMemorySize( AGSContext* context, int gpuIndex, long long* sizeInBytes );
+
+// Description
 //   Function used to query Eyefinity configuration state information relevant to ISVs. State info returned
 //   includes: whether Eyefinity is enabled or not, SLS grid configuration, SLS dimensions, whether bezel
 //   compensation is enabled or not, SLS grid coordinate for each display, total rendering area for each
