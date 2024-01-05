@@ -50,6 +50,7 @@ static const char radeon_version[] = "23.10.2";
 
 enum amd_ags_version
 {
+    AMD_AGS_VERSION_4_0_3,
     AMD_AGS_VERSION_5_0_5,
     AMD_AGS_VERSION_5_1_1,
     AMD_AGS_VERSION_5_2_0,
@@ -73,6 +74,7 @@ static const struct
 }
 amd_ags_info[AMD_AGS_VERSION_COUNT] =
 {
+    {AGS_MAKE_VERSION(4, 0, 0), AGS_MAKE_VERSION(4, 0, 3), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 0, 0), AGS_MAKE_VERSION(5, 0, 6), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 1, 1), AGS_MAKE_VERSION(5, 1, 1), sizeof(AGSDeviceInfo_511), sizeof(AGSDX11ReturnedParams_511), 0},
     {AGS_MAKE_VERSION(5, 2, 0), AGS_MAKE_VERSION(5, 2, 1), sizeof(AGSDeviceInfo_520), sizeof(AGSDX11ReturnedParams_520), 0},
@@ -84,26 +86,29 @@ amd_ags_info[AMD_AGS_VERSION_COUNT] =
     {AGS_MAKE_VERSION(6, 1, 0), AGS_MAKE_VERSION(6, 2, 0), sizeof(AGSDeviceInfo_600), sizeof(AGSDX11ReturnedParams_600), AsicFamily_RDNA3},
 };
 
-#define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
+#define DEF_FIELD(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), \
+        offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
         offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
-#define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
+#define DEF_FIELD_520_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), \
+        offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), -1, \
         -1, -1, -1, -1}}
-#define DEF_FIELD_520_UP(name) {DEVICE_FIELD_##name, {-1, -1, offsetof(AGSDeviceInfo_520, name), \
+#define DEF_FIELD_520_UP(name) {DEVICE_FIELD_##name, {-1, -1, -1, offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
         offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
-#define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, -1, \
+#define DEF_FIELD_540_UP(name) {DEVICE_FIELD_##name, {-1, -1, -1, -1, \
         -1, offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
         offsetof(AGSDeviceInfo_600, name), offsetof(AGSDeviceInfo_600, name)}}
-#define DEF_FIELD_540_600(name) {DEVICE_FIELD_##name, {-1, -1, -1, \
+#define DEF_FIELD_540_600(name) {DEVICE_FIELD_##name, {-1, -1, -1, -1, \
         -1, offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
         -1, -1}}
-#define DEF_FIELD_600_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
+#define DEF_FIELD_600_BELOW(name) {DEVICE_FIELD_##name, {offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_511, name), \
+        offsetof(AGSDeviceInfo_511, name), offsetof(AGSDeviceInfo_520, name), \
         offsetof(AGSDeviceInfo_520, name), offsetof(AGSDeviceInfo_540, name), \
         offsetof(AGSDeviceInfo_541, name), offsetof(AGSDeviceInfo_542, name), \
         -1, -1}}
@@ -366,6 +371,12 @@ static enum amd_ags_version guess_version_from_exports(HMODULE hnative)
      *  - CoD: Modern Warfare Remastered (2017) ships dll without version info which is version 5.0.1
      *    (not tagged in AGSSDK history), compatible with 5.0.5.
      */
+    if (GetProcAddress(hnative, "agsGetEyefinityConfigInfo"))
+    {
+        /* agsGetEyefinityConfigInfo was deprecated in 5.0.0 */
+        TRACE("agsGetEyefinityConfigInfo found.\n");
+        return AMD_AGS_VERSION_4_0_3;
+    }
     if (GetProcAddress(hnative, "agsDriverExtensionsDX11_Init"))
     {
         /* agsDriverExtensionsDX11_Init was deprecated in 5.3.0 */
@@ -818,14 +829,54 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
         return ret;
     }
 
-    memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->agsVersionMajor = AGS_VER_MAJOR(object->public_version);
-    gpu_info->agsVersionMinor = AGS_VER_MINOR(object->public_version);
-    gpu_info->agsVersionPatch = AGS_VER_PATCH(object->public_version);
-    gpu_info->driverVersion = driver_version;
-    gpu_info->radeonSoftwareVersion  = radeon_version;
-    gpu_info->numDevices = object->device_count;
-    gpu_info->devices = object->devices;
+    if (object->version <= AMD_AGS_VERSION_4_0_3)
+    {
+        struct AGSDeviceInfo_511 *devices = (struct AGSDeviceInfo_511 *)object->devices, *device;
+        struct AGSGPUInfo_403 *info = (struct AGSGPUInfo_403 *)gpu_info;
+        unsigned int i;
+
+        if (!object->device_count)
+        {
+            ERR("No devices.\n");
+            agsDeInit(object);
+            return AGS_FAILURE;
+        }
+
+        for (i = 0; i < object->device_count; ++i)
+            if (devices[i].isPrimaryDevice)
+                break;
+        if (i == object->device_count)
+        {
+            WARN("No primary device, using first.\n");
+            i = 0;
+        }
+        device = &devices[i];
+        memset(info, 0, sizeof(*info));
+        info->agsVersionMajor = AGS_VER_MAJOR(object->public_version);
+        info->agsVersionMinor = AGS_VER_MINOR(object->public_version);
+        info->agsVersionPatch = AGS_VER_PATCH(object->public_version);
+        info->architectureVersion = device->architectureVersion;
+        info->adapterString = device->adapterString;
+        info->deviceId = device->deviceId;
+        info->revisionId = device->revisionId;
+        info->driverVersion = driver_version;
+        info->radeonSoftwareVersion  = radeon_version;
+        info->iNumCUs = device->numCUs;
+        info->iCoreClock = device->coreClock;
+        info->iMemoryClock = device->memoryClock;
+        info->fTFlops = device->teraFlops;
+    }
+    else
+    {
+        memset(gpu_info, 0, sizeof(*gpu_info));
+        gpu_info->agsVersionMajor = AGS_VER_MAJOR(object->public_version);
+        gpu_info->agsVersionMinor = AGS_VER_MINOR(object->public_version);
+        gpu_info->agsVersionPatch = AGS_VER_PATCH(object->public_version);
+        gpu_info->driverVersion = driver_version;
+        gpu_info->radeonSoftwareVersion  = radeon_version;
+        gpu_info->numDevices = object->device_count;
+        gpu_info->devices = object->devices;
+    }
 
     TRACE("Created context %p.\n", object);
 
@@ -1281,10 +1332,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDepthBounds_530(AGSContext* cont
     return set_depth_bounds(context, dx_context, enabled, min_depth, max_depth);
 }
 
-C_ASSERT(AMD_AGS_VERSION_5_3_0 == 3);
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
 __ASM_GLOBAL_FUNC( DX11_SetDepthBounds_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $3,%eax\n\t"
+                   "cmp $4,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_SetDepthBounds_530") )
@@ -1333,10 +1384,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_BeginUAVOverlap(AGSContext *context
     return update_uav_overlap(context, dx_context, TRUE);
 }
 
-C_ASSERT(AMD_AGS_VERSION_5_3_0 == 3);
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
 __ASM_GLOBAL_FUNC( DX11_BeginUAVOverlap_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $3,%eax\n\t"
+                   "cmp $4,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap_520") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_BeginUAVOverlap") )
@@ -1367,10 +1418,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_EndUAVOverlap(AGSContext *context, 
     return update_uav_overlap(context, dx_context, FALSE);
 }
 
-C_ASSERT(AMD_AGS_VERSION_5_3_0 == 3);
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
 __ASM_GLOBAL_FUNC( DX11_EndUAVOverlap_impl,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $3,%eax\n\t"
+                   "cmp $4,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_EndUAVOverlap_520") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_EndUAVOverlap") )
@@ -1414,10 +1465,10 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_DestroyDevice_511(AGSContext *conte
     return agsDriverExtensionsDX11_DestroyDevice_520(context, device, references, NULL, NULL);
 }
 
-C_ASSERT(AMD_AGS_VERSION_5_2_0 == 2);
+C_ASSERT(AMD_AGS_VERSION_5_2_0 == 3);
 __ASM_GLOBAL_FUNC( agsDriverExtensionsDX11_DestroyDevice,
                    "mov (%rcx),%eax\n\t" /* version */
-                   "cmp $2,%eax\n\t"
+                   "cmp $3,%eax\n\t"
                    "jge 1f\n\t"
                    "jmp "     __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_511") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_520") )
