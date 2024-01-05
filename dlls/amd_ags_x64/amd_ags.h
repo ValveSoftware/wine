@@ -303,7 +303,63 @@ typedef struct AGSRect
     int height;     ///< Height of rectangle
 } AGSRect;
 
+typedef struct AGSEyefinityInfo
+{
+    int iSLSActive;                 // Indicates if Eyefinity is active for the operating system display
+                                    // index passed into atiEyefinityGetConfigInfo(). 1 if enabled and 0 if disabled.
+
+    int iSLSGridWidth;              // Contains width of the multi-monitor grid that makes up the Eyefinity Single Large Surface.
+                                    // For example, a 3 display wide by 2 high Eyefinity setup will return 3 for this entry.
+    int iSLSGridHeight;             // Contains height of the multi-monitor grid that makes up the Eyefinity Single Large Surface.
+                                    // For example, a 3 display wide by 2 high Eyefinity setup will return 2 for this entry.
+
+    int iSLSWidth;                  // Contains width in pixels of the multi-monitor Single Large Surface. The value returned is
+                                    // a function of the width of the SLS grid, of the horizontal resolution of each display, and
+                                    // of whether or not bezel compensation is enabled.
+    int iSLSHeight;                 // Contains height in pixels of the multi-monitor Single Large Surface. The value returned is
+                                    // a function of the height of the SLS grid, of the vertical resolution of each display, and
+                                    // of whether or not bezel compensation is enabled.
+
+    int iBezelCompensatedDisplay;   // Indicates if bezel compensation is used for the current SLS display area.
+                                    // 1 if enabled, and 0 if disabled.
+} AGSEyefinityInfo;
+
 /// The display info struct used to describe a display enumerated by AGS
+typedef struct AGSDisplayInfo_403
+{
+    int iGridXCoord;                // Contains horizontal SLS grid coordinate of the display. The value is zero based with
+                                    // increasing values from left to right of the overall SLS grid. For example, the left-most
+                                    // display of a 3x2 Eyefinity setup will have the value 0, and the right-most will have
+                                    // the value 2.
+    int iGridYCoord;                // Contains vertical SLS grid coordinate of the display. The value is zero based with
+                                    // increasing values from top to bottom of the overall SLS grid. For example, the top
+                                    // display of a 3x2 Eyefinity setup will have the value 0, and the bottom will have the
+                                    // value 1.
+
+    AGSRect displayRect;            // Contains the base offset and dimensions in pixels of the SLS rendering
+                                    // area associated with this display. If bezel compensation is enabled, this
+                                    // area will be larger than what the display can natively present to account
+                                    // for bezel area. If bezel compensation is disabled, this area will be equal
+                                    // to what the display can support natively.
+
+    AGSRect displayRectVisible;     // Contains the base offset and dimensions in pixels of the SLS rendering area
+                                    // associated with this display that is visible to the end user. If bezel
+                                    // compensation is enabled, this area will be equal to what the display can
+                                    // natively, but smaller that the area described in the displayRect entry. If
+                                    // bezel compensation is disabled, this area will be equal to what the display
+                                    // can support natively and equal to the area described in the displayRect entry.
+                                    // Developers wishing to place UI, HUD, or other game assets on a given display
+                                    // so that it is visible and accessible to end users need to locate them inside
+                                    // of the region defined by this rect.
+
+    int iPreferredDisplay;          // Indicates whether or not this display is the preferred one for rendering of
+                                    // game HUD and UI elements. Only one display out of the whole SLS grid will have
+                                    // this be true if it is the preferred display and 0 otherwise. Developers wishing
+                                    // to place specific UI, HUD, or other game assets on a given display so that it
+                                    // is visible and accessible to end users need to locate them inside of the region
+                                    // defined by this rect.
+} AGSDisplayInfo_403;
+
 typedef struct AGSDisplayInfo_511
 {
     char                    name[ 256 ];                    ///< The name of the display
@@ -645,7 +701,20 @@ typedef void* (__stdcall *AGS_ALLOC_CALLBACK_511)( int allocationSize );    ///<
 typedef void* (__stdcall *AGS_ALLOC_CALLBACK)( size_t allocationSize );     ///< AGS user defined allocation prototype
 typedef void (__stdcall *AGS_FREE_CALLBACK)( void* allocationPtr );         ///< AGS user defined free prototype
 
+/// The different modes to control Crossfire behavior.
+typedef enum AGSCrossfireMode
+{
+    AGS_CROSSFIRE_MODE_DRIVER_AFR = 0,                      ///< Use the default driver-based AFR rendering.  If this mode is specified, do NOT use the agsDriverExtensionsDX11_Create*() APIs to create resources
+    AGS_CROSSFIRE_MODE_EXPLICIT_AFR,                        ///< Use the AGS Crossfire API functions to perform explicit AFR rendering without requiring a CF driver profile
+    AGS_CROSSFIRE_MODE_DISABLE                              ///< Completely disable AFR rendering
+} AGSCrossfireMode;
+
 /// The configuration options that can be passed in to \ref agsInititalize
+struct AGSConfiguration_403
+{
+    AGSCrossfireMode        crossfireMode;                  // Desired Crossfire mode. See AGSCrossfireMode for more details
+};
+
 typedef struct AGSConfiguration_511
 {
     AGS_ALLOC_CALLBACK_511  allocCallback;                  ///< Optional memory allocation callback. If not supplied, malloc() is used
@@ -664,7 +733,29 @@ typedef union AGSConfiguration
     AGSConfiguration_520    agsConfiguration520;
 } AGSConfiguration;
 
+
+
 /// The top level GPU information returned from \ref agsInitialize
+struct AGSGPUInfo_403
+{
+    int                     agsVersionMajor;                // Major field of Major.Minor.Patch AGS version number
+    int                     agsVersionMinor;                // Minor field of Major.Minor.Patch AGS version number
+    int                     agsVersionPatch;                // Patch field of Major.Minor.Patch AGS version number
+
+    ArchitectureVersion     architectureVersion;            // Set to Unknown if not AMD hardware
+    const char*             adapterString;                  // The adapter name string. NULL if not AMD hardware
+    int                     deviceId;                       // The device id
+    int                     revisionId;                     // The revision id
+
+    const char*             driverVersion;                  // The driver package version
+    const char*             radeonSoftwareVersion;          // The Radeon Software Version
+
+    int                     iNumCUs;                        // Number of GCN compute units. Zero if not GCN
+    int                     iCoreClock;                     // core clock speed at 100% power in MHz
+    int                     iMemoryClock;                   // memory clock speed at 100% power in MHz
+    float                   fTFlops;                        // Teraflops of GPU. Zero if not GCN. Calculated from iCoreClock * iNumCUs * 64 Pixels/clk * 2 instructions/MAD
+};
+
 typedef struct AGSGPUInfo_511
 {
     int                     agsVersionMajor;                ///< Major field of Major.Minor.Patch AGS version number
@@ -953,6 +1044,35 @@ typedef struct AGSDX12ReturnedParams
 } AGSDX12ReturnedParams;
 
 
+// Description
+//   Function used to query Eyefinity configuration state information relevant to ISVs. State info returned
+//   includes: whether Eyefinity is enabled or not, SLS grid configuration, SLS dimensions, whether bezel
+//   compensation is enabled or not, SLS grid coordinate for each display, total rendering area for each
+//   display, visible rendering area for each display, and a preferred display flag.
+//
+//   This function needs to be called twice. Firstly to null into eyefinityInfo and displaysInfo. This will
+//   return the number of AGSDisplayInfo objects to allocate.
+//   Second call requires valid pointers to eyefinityInfo and the newly allocated displaysInfo array. It is the
+//   responsibility of the caller to free this memory.
+//
+//
+// Input params
+//   context -         Pointer to a context.
+//   displayIndex -    Operating system specific display index identifier. The value used should be the
+//                     index of the display used for rendering operations. On Windows operating systems,
+//                     the value can be queried using the EnumDisplayDevices() API.
+//
+// Output params
+//   eyefinityInfo -   This is a pointer to an AGSEyefinityInfo structure that contains system Eyefinity
+//                     configuration information.
+//   numDisplaysInfo - Pointer to the number of AGSDisplayInfo structures stored in the returned
+//                     displaysInfo array. The value returned is equal to the number of displays
+//                     used for the Eyefinity setup.
+//   displaysInfo -    Pointer to an array of AGSDisplayInfo structures that contains per display
+//                     Eyefinity configuration information.
+//
+AMD_AGS_API AGSReturnCode agsGetEyefinityConfigInfo( AGSContext *context, int displayIndex, AGSEyefinityInfo *eyefinityInfo, int *numDisplaysInfo, AGSDisplayInfo_403 *displaysInfo );
+
 ///
 /// Function used to create a D3D12 device with additional AMD-specific initialization parameters.
 ///
@@ -1062,14 +1182,6 @@ AMD_AGS_API AGSReturnCode agsDriverExtensionsDX12_SetMarker( AGSContext* context
 /// It is now mandatory to call \ref agsDriverExtensionsDX11_CreateDevice when creating a device if the user wants to access any DX11 AMD extensions.
 /// The corresponding \ref agsDriverExtensionsDX11_DestroyDevice call must be called to release the device and free up the internal resources allocated by the create call.
 /// @{
-
-/// The different modes to control Crossfire behavior.
-typedef enum AGSCrossfireMode
-{
-    AGS_CROSSFIRE_MODE_DRIVER_AFR = 0,                      ///< Use the default driver-based AFR rendering.  If this mode is specified, do NOT use the agsDriverExtensionsDX11_Create*() APIs to create resources
-    AGS_CROSSFIRE_MODE_EXPLICIT_AFR,                        ///< Use the AGS Crossfire API functions to perform explicit AFR rendering without requiring a CF driver profile
-    AGS_CROSSFIRE_MODE_DISABLE                              ///< Completely disable AFR rendering
-} AGSCrossfireMode;
 
 /// The struct to specify the existing DX11 device creation parameters
 typedef struct AGSDX11DeviceCreationParams
