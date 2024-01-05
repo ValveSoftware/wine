@@ -954,6 +954,14 @@ AGSReturnCode WINAPI agsDeInitialize(AGSContext *context)
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsGetTotalGPUCount(AGSContext *context, int *numGPUs)
+{
+    TRACE("context %p, numGPUs %p.\n", context, numGPUs);
+
+    *numGPUs = context->device_count;
+    return AGS_SUCCESS;
+}
+
 static DXGI_COLOR_SPACE_TYPE convert_ags_colorspace_506(AGSDisplaySettings_Mode_506 mode)
 {
     switch (mode)
