@@ -390,6 +390,8 @@ struct device_strings
 
 static const struct device_strings device_strings[] =
 {
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    { .id = L"VID_28DE&PID_11FF", .product = L"Controller (XBOX 360 For Windows)" },
     /* Microsoft controllers */
     { .id = L"VID_045E&PID_028E", .product = L"Controller (XBOX 360 For Windows)" },
     { .id = L"VID_045E&PID_028F", .product = L"Controller (XBOX 360 For Windows)" },
