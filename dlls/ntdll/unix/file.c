@@ -2855,6 +2855,57 @@ not_found:
     return STATUS_OBJECT_NAME_NOT_FOUND;
 }
 
+/* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+static BOOL replace_steam_input_path( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *redir )
+{
+    static const WCHAR pipe_prefixW[] =
+    {
+        '\\','?','?','\\','p','i','p','e','\\','H','I','D','#','V','I','D','_','0','4','5','E',
+        '&','P','I','D','_','0','2','8','E','&','I','G','_','0','0',
+    };
+    static const WCHAR hid_prefixW[] =
+    {
+        '\\','?','?','\\','h','i','d','#','v','i','d','_','2','8','d','e',
+        '&','p','i','d','_','1','1','f','f','&','i','g','_','0'
+    };
+    static const WCHAR hid_midW[] =
+    {
+        '#','0',
+    };
+    static const WCHAR hid_tailW[] =
+    {
+        '&','0','&','0','&','1','#','{','4','d','1','e','5','5','b','2','-','f','1','6','f','-',
+        '1','1','c','f','-','8','8','c','b','-','0','0','1','1','1','1','0','0','0','0','3','0','}'
+    };
+    UNICODE_STRING *path = attr->ObjectName;
+    const WCHAR *slot, *slot_end, *serial, *serial_end;
+    UINT len = 0;
+
+    if (wcsnicmp( path->Buffer, pipe_prefixW, ARRAY_SIZE(pipe_prefixW) )) return FALSE;
+    if (!(serial = wcsrchr( path->Buffer, '&' ))) return FALSE;
+    if (!(serial_end = wcschr( serial, '#' ))) return FALSE;
+    slot = serial_end + 1;
+    if (!(slot_end = wcschr( slot, '#' ))) return FALSE;
+
+    redir->Length = sizeof(hid_prefixW) + sizeof(hid_midW) + sizeof(hid_tailW);
+    redir->Length += (serial_end - serial + slot_end - slot) * sizeof(WCHAR);
+    redir->MaximumLength = redir->Length + sizeof(WCHAR);
+    if (!(redir->Buffer = malloc( redir->MaximumLength ))) return FALSE;
+
+    memcpy( redir->Buffer, hid_prefixW, sizeof(hid_prefixW) );
+    len += ARRAY_SIZE(hid_prefixW);
+    memcpy( redir->Buffer + len, slot, (slot_end - slot) * sizeof(WCHAR) );
+    len += slot_end - slot;
+    memcpy( redir->Buffer + len, hid_midW, sizeof(hid_midW) );
+    len += ARRAY_SIZE(hid_midW);
+    memcpy( redir->Buffer + len, serial, (serial_end - serial) * sizeof(WCHAR) );
+    len += serial_end - serial;
+    memcpy( redir->Buffer + len, hid_tailW, sizeof(hid_tailW) );
+
+    TRACE( "HACK: %s -> %s\n", debugstr_us(attr->ObjectName), debugstr_us(redir) );
+    attr->ObjectName = redir;
+    return TRUE;
+}
 
 #ifndef _WIN64
 
@@ -2958,6 +3009,10 @@ BOOL get_redirect( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *redir )
     unsigned int i, prefix_len = 0, len = attr->ObjectName->Length / sizeof(WCHAR);
 
     redir->Buffer = NULL;
+
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if (replace_steam_input_path( attr, redir )) return TRUE;
+
     if (!NtCurrentTeb64()) return FALSE;
     if (!len) return FALSE;
 
@@ -3017,7 +3072,8 @@ BOOL get_redirect( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *redir )
 BOOL get_redirect( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *redir )
 {
     redir->Buffer = NULL;
-    return FALSE;
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    return replace_steam_input_path( attr, redir );
 }
 
 #endif
