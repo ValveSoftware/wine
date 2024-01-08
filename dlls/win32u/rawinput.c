@@ -374,6 +374,30 @@ UINT WINAPI NtUserGetRawInputDeviceList( RAWINPUTDEVICELIST *device_list, UINT *
     return count;
 }
 
+static BOOL steam_input_get_vid_pid( UINT slot, UINT16 *vid, UINT16 *pid )
+{
+    const char *info = getenv( "SteamVirtualGamepadInfo" );
+    char buffer[256];
+    UINT current;
+    FILE *file;
+
+    TRACE( "reading SteamVirtualGamepadInfo %s\n", debugstr_a(info) );
+
+    if (!info || !(file = fopen( info, "r" ))) return FALSE;
+    while (fscanf( file, "%255[^\n]\n", buffer ) == 1)
+    {
+        if (sscanf( buffer, "[slot %d]", &current )) continue;
+        if (current < slot) continue;
+        if (current > slot) break;
+        if (sscanf( buffer, "VID=0x%hx", vid )) continue;
+        if (sscanf( buffer, "PID=0x%hx", pid )) continue;
+    }
+
+    fclose( file );
+
+    return TRUE;
+}
+
 /**********************************************************************
  *         NtUserGetRawInputDeviceInfo   (win32u.@)
  */
@@ -411,10 +435,51 @@ UINT WINAPI NtUserGetRawInputDeviceInfo( HANDLE handle, UINT command, void *data
     switch (command)
     {
     case RIDI_DEVICENAME:
-        if ((len = wcslen( device->path ) + 1) <= data_len && data)
-            memcpy( data, device->path, len * sizeof(WCHAR) );
+    {
+        static const WCHAR steam_input_idW[] =
+        {
+            '\\','\\','?','\\','H','I','D','#','V','I','D','_','2','8','D','E','&','P','I','D','_','1','1','F','F','&','I','G','_',0
+        };
+        const WCHAR *device_path;
+        WCHAR bufferW[MAX_PATH];
+
+        /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+        if (wcsnicmp( device->path, steam_input_idW, 29 )) device_path = device->path;
+        else
+        {
+            char buffer[MAX_PATH];
+            UINT size = 0, slot;
+            const WCHAR *tmpW;
+            UINT16 vid, pid;
+
+            tmpW = device->path + 29;
+            while (*tmpW && *tmpW != '#' && size < ARRAY_SIZE(buffer)) buffer[size++] = *tmpW++;
+            buffer[size] = 0;
+            if (sscanf( buffer, "%02u", &slot ) != 1) slot = 0;
+
+            if (!steam_input_get_vid_pid( slot, &vid, &pid ))
+            {
+                vid = 0x045e;
+                pid = 0x028e;
+            }
+
+            size = snprintf( buffer, ARRAY_SIZE(buffer), "\\\\.\\pipe\\HID#VID_045E&PID_028E&IG_00#%04X&%04X", vid, pid );
+            if ((tmpW = wcschr( device->path + 29, '&' )))
+            {
+                do buffer[size++] = *tmpW++;
+                while (*tmpW != '&' && size < ARRAY_SIZE(buffer));
+            }
+            size += snprintf( buffer + size, ARRAY_SIZE(buffer) - size, "#%d#%u", slot, (UINT)GetCurrentProcessId() );
+
+            ntdll_umbstowcs( buffer, size + 1, bufferW, sizeof(bufferW) );
+            device_path = bufferW;
+        }
+
+        if ((len = wcslen( device_path ) + 1) <= data_len && data)
+            memcpy( data, device_path, len * sizeof(WCHAR) );
         *data_size = len;
         break;
+    }
 
     case RIDI_DEVICEINFO:
         if ((len = sizeof(info)) <= data_len && data)
