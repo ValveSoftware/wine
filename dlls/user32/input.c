@@ -535,6 +535,91 @@ static DWORD CALLBACK devnotify_window_callbackA(HANDLE handle, DWORD flags, DEV
     return 0;
 }
 
+static BOOL steam_input_get_vid_pid( UINT slot, UINT16 *vid, UINT16 *pid )
+{
+    const char *info = getenv( "SteamVirtualGamepadInfo" );
+    char buffer[256];
+    UINT current;
+    FILE *file;
+
+    TRACE( "reading SteamVirtualGamepadInfo %s\n", debugstr_a(info) );
+
+    if (!info || !(file = fopen( info, "r" ))) return FALSE;
+    while (fscanf( file, "%255[^\n]\n", buffer ) == 1)
+    {
+        if (sscanf( buffer, "[slot %d]", &current )) continue;
+        if (current < slot) continue;
+        if (current > slot) break;
+        if (sscanf( buffer, "VID=0x%hx", vid )) continue;
+        if (sscanf( buffer, "PID=0x%hx", pid )) continue;
+    }
+
+    fclose( file );
+
+    return TRUE;
+}
+
+/* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+static BOOL steam_input_devnotify(HANDLE handle, DWORD flags, DEV_BROADCAST_HDR *header, BOOL ansi)
+{
+    char buffer[offsetof(DEV_BROADCAST_DEVICEINTERFACE_W, dbcc_name[MAX_PATH])];
+    DEV_BROADCAST_DEVICEINTERFACE_W *copyW = (DEV_BROADCAST_DEVICEINTERFACE_W *)buffer;
+
+    if (flags & 0x8000)
+    {
+        switch (header->dbch_devicetype)
+        {
+        case DBT_DEVTYP_DEVICEINTERFACE:
+        {
+            static const WCHAR steam_input_idW[] = L"\\\\?\\HID#VID_28DE&PID_11FF&IG_";
+            const DEV_BROADCAST_DEVICEINTERFACE_W *ifaceW = (const DEV_BROADCAST_DEVICEINTERFACE_W *)header;
+
+            if (!wcsnicmp( ifaceW->dbcc_name, steam_input_idW, 29 ))
+            {
+                UINT size, slot;
+                const WCHAR *tmpW;
+                UINT16 vid, pid;
+
+                copyW->dbcc_devicetype = ifaceW->dbcc_devicetype;
+                copyW->dbcc_reserved = ifaceW->dbcc_reserved;
+                copyW->dbcc_classguid = ifaceW->dbcc_classguid;
+
+                if (swscanf( ifaceW->dbcc_name + 29, L"%02u", &slot ) != 1) slot = 0;
+                if (!steam_input_get_vid_pid( slot, &vid, &pid ))
+                {
+                    vid = 0x045e;
+                    pid = 0x028e;
+                }
+
+                size = swprintf( copyW->dbcc_name, MAX_PATH, L"\\\\.\\pipe\\HID#VID_045E&PID_028E&IG_00#%04X&%04X", vid, pid );
+                if ((tmpW = wcschr( ifaceW->dbcc_name + 29, '&' )))
+                {
+                    do copyW->dbcc_name[size++] = *tmpW++;
+                    while (*tmpW != '&' && size < MAX_PATH);
+                }
+                size += swprintf( copyW->dbcc_name + size, MAX_PATH - size, L"#%d#%u", slot, (UINT)GetCurrentProcessId() );
+
+                copyW->dbcc_size = offsetof(DEV_BROADCAST_DEVICEINTERFACE_W, dbcc_name[size + 1]);
+                header = (DEV_BROADCAST_HDR *)copyW;
+            }
+        }
+        }
+    }
+
+    if (ansi) return devnotify_window_callbackA(handle, flags, header);
+    return devnotify_window_callbackW(handle, flags, header);
+}
+
+static DWORD CALLBACK steam_input_callbackW(HANDLE handle, DWORD flags, DEV_BROADCAST_HDR *header)
+{
+    return steam_input_devnotify(handle, flags, header, FALSE);
+}
+
+static DWORD CALLBACK steam_input_callbackA(HANDLE handle, DWORD flags, DEV_BROADCAST_HDR *header)
+{
+    return steam_input_devnotify(handle, flags, header, TRUE);
+}
+
 static DWORD CALLBACK devnotify_service_callback(HANDLE handle, DWORD flags, DEV_BROADCAST_HDR *header)
 {
     FIXME("Support for service handles is not yet implemented!\n");
@@ -576,9 +661,9 @@ HDEVNOTIFY WINAPI RegisterDeviceNotificationW( HANDLE handle, void *filter, DWOR
     if (flags & DEVICE_NOTIFY_SERVICE_HANDLE)
         callback = devnotify_service_callback;
     else if (IsWindowUnicode( handle ))
-        callback = devnotify_window_callbackW;
+        callback = steam_input_callbackW;
     else
-        callback = devnotify_window_callbackA;
+        callback = steam_input_callbackA;
 
     if (!header)
     {
