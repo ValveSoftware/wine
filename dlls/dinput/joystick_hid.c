@@ -864,6 +864,16 @@ static HRESULT hid_joystick_get_property( IDirectInputDevice8W *iface, DWORD pro
     {
         DIPROPGUIDANDPATH *value = (DIPROPGUIDANDPATH *)header;
         value->guidClass = GUID_DEVCLASS_HIDCLASS;
+
+        /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+        if (impl->attrs.VendorID == 0x28de && impl->attrs.ProductID == 0x11ff)
+        {
+            const WCHAR *tmp;
+            if ((tmp = wcschr( impl->device_path, '#' ))) tmp = wcschr( tmp + 1, '#' );
+            lstrcpynW( value->wszPath, impl->device_path, tmp - impl->device_path + 1 );
+            return DI_OK;
+        }
+
         lstrcpynW( value->wszPath, impl->device_path, MAX_PATH );
         return DI_OK;
     }
