@@ -141,9 +141,62 @@ static HRESULT WINAPI wine_provider_GetTrustLevel( IWineGameControllerProvider *
     return E_NOTIMPL;
 }
 
+static BOOL steam_input_get_vid_pid( UINT slot, UINT16 *vid, UINT16 *pid )
+{
+    const char *info = getenv( "SteamVirtualGamepadInfo" );
+    char buffer[256];
+    UINT current;
+    FILE *file;
+
+    TRACE( "reading SteamVirtualGamepadInfo %s\n", debugstr_a(info) );
+
+    if (!info || !(file = fopen( info, "r" ))) return FALSE;
+    while (fscanf( file, "%255[^\n]\n", buffer ) == 1)
+    {
+        if (sscanf( buffer, "[slot %d]", &current )) continue;
+        if (current < slot) continue;
+        if (current > slot) break;
+        if (sscanf( buffer, "VID=0x%hx", vid )) continue;
+        if (sscanf( buffer, "PID=0x%hx", pid )) continue;
+    }
+
+    fclose( file );
+
+    return TRUE;
+}
+
 static HRESULT WINAPI wine_provider_get_NonRoamableId( IWineGameControllerProvider *iface, HSTRING *value )
 {
+    struct provider *impl = impl_from_IWineGameControllerProvider( iface );
+    WCHAR buffer[1024];
+    UINT16 vid, pid;
+    HRESULT hr;
+
     FIXME( "iface %p, value %p stub!\n", iface, value );
+
+    if (FAILED(hr = IGameControllerProvider_get_HardwareVendorId( &impl->IGameControllerProvider_iface, &vid ))) return hr;
+    if (FAILED(hr = IGameControllerProvider_get_HardwareProductId( &impl->IGameControllerProvider_iface, &pid ))) return hr;
+
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if (vid == 0x28de && pid == 0x11ff)
+    {
+        const WCHAR *tmp;
+        char serial[256];
+        UINT32 len, slot;
+
+        if (!(tmp = wcschr( impl->device_path + 8, '#' )) || wcsnicmp( tmp - 6, L"&XI_", 4 )) return E_NOTIMPL;
+        if (swscanf( tmp - 2, L"%02u#%*u&%255[^&]&", &slot, serial ) != 2) return E_NOTIMPL;
+
+        if (!steam_input_get_vid_pid( slot, &vid, &pid ))
+        {
+            vid = 0x045e;
+            pid = 0x028e;
+        }
+
+        len = swprintf( buffer, ARRAY_SIZE(buffer), L"{wgi/nrid/:steam-%04X&%04X&%s#%d#%u}", vid, pid, serial, slot, GetCurrentProcessId() );
+        return WindowsCreateString( buffer, len, value );
+    }
+
     return E_NOTIMPL;
 }
 
@@ -151,9 +204,20 @@ static HRESULT WINAPI wine_provider_get_DisplayName( IWineGameControllerProvider
 {
     struct provider *impl = impl_from_IWineGameControllerProvider( iface );
     DIDEVICEINSTANCEW instance = {.dwSize = sizeof(DIDEVICEINSTANCEW)};
+    UINT16 vid, pid;
     HRESULT hr;
 
     TRACE( "iface %p, value %p\n", iface, value );
+
+    if (FAILED(hr = IGameControllerProvider_get_HardwareVendorId( &impl->IGameControllerProvider_iface, &vid ))) return hr;
+    if (FAILED(hr = IGameControllerProvider_get_HardwareProductId( &impl->IGameControllerProvider_iface, &pid ))) return hr;
+
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if (vid == 0x28de && pid == 0x11ff)
+    {
+        static const WCHAR name[] = L"Xbox 360 Controller for Windows";
+        return WindowsCreateString( name, wcslen( name ), value );
+    }
 
     if (FAILED(hr = IDirectInputDevice8_GetDeviceInfo( impl->dinput_device, &instance ))) return hr;
     return WindowsCreateString( instance.tszProductName, wcslen( instance.tszProductName ), value );
