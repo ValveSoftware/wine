@@ -47,6 +47,7 @@ static NTSTATUS (WINAPI * pNtSetInformationDebugObject)(HANDLE,DEBUGOBJECTINFOCL
 static NTSTATUS (WINAPI * pDbgUiConvertStateChangeStructure)(DBGUI_WAIT_STATE_CHANGE*,DEBUG_EVENT*);
 static HANDLE   (WINAPI * pDbgUiGetThreadDebugObject)(void);
 static void     (WINAPI * pDbgUiSetThreadDebugObject)(HANDLE);
+static NTSTATUS (WINAPI * pNtSystemDebugControl)(SYSDBG_COMMAND,PVOID,ULONG,PVOID,ULONG,PULONG);
 
 static BOOL is_wow64;
 
@@ -101,6 +102,7 @@ static void InitFunctionPtrs(void)
     NTDLL_GET_PROC(DbgUiConvertStateChangeStructure);
     NTDLL_GET_PROC(DbgUiGetThreadDebugObject);
     NTDLL_GET_PROC(DbgUiSetThreadDebugObject);
+    NTDLL_GET_PROC(NtSystemDebugControl);
 
     pIsWow64Process = (void *)GetProcAddress(hkernel32, "IsWow64Process");
     if (!pIsWow64Process || !pIsWow64Process( GetCurrentProcess(), &is_wow64 )) is_wow64 = FALSE;
@@ -3601,6 +3603,18 @@ static void test_debuggee_dbgport(int argc, char **argv)
     winetest_pop_context();
 }
 
+static void test_system_debug_control(void)
+{
+    NTSTATUS status;
+    int class;
+
+    for (class = 0; class <= SysDbgSetKdBlockEnable; ++class)
+    {
+        status = pNtSystemDebugControl( class, NULL, 0, NULL, 0, NULL );
+        ok( status == STATUS_DEBUGGER_INACTIVE || status == STATUS_ACCESS_DENIED, "class %d, got %#lx.\n", class, status );
+    }
+}
+
 START_TEST(info)
 {
     char **argv;
@@ -3675,4 +3689,5 @@ START_TEST(info)
 
     test_ThreadEnableAlignmentFaultFixup();
     test_process_instrumentation_callback();
+    test_system_debug_control();
 }
