@@ -519,6 +519,16 @@ static BOOL find_opened_device(const WCHAR *device_path, int *free_slot)
         *free_slot = i - 1;
     }
 
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if ((swscanf(device_path, L"\\\\?\\hid#vid_28de&pid_11ff&xi_%02u#", &i) == 1 ||
+         swscanf(device_path, L"\\\\?\\HID#VID_28DE&PID_11FF&XI_%02u#", &i) == 1) &&
+        i < XUSER_MAX_COUNT && *free_slot != i)
+    {
+        controller_destroy(&controllers[i], TRUE);
+        if (*free_slot != XUSER_MAX_COUNT) open_device_at_index(controllers[i].device_path, *free_slot);
+        *free_slot = i;
+    }
+
     return FALSE;
 }
 
@@ -1173,6 +1183,8 @@ DWORD WINAPI DECLSPEC_HOTPATCH XInputGetCapabilitiesEx(DWORD unk, DWORD index, D
         caps->VendorId = attr.VendorID;
         caps->ProductId = attr.ProductID;
         caps->VersionNumber = attr.VersionNumber;
+        /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+        caps->unk2 = index;
     }
 
     controller_unlock(&controllers[index]);
