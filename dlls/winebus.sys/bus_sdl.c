@@ -964,7 +964,8 @@ static void sdl_add_device(unsigned int index)
     SDL_JoystickID id;
     SDL_JoystickType joystick_type;
     SDL_GameController *controller = NULL;
-    const char *product, *sdl_serial, *str;
+    const char *product, *sdl_serial, *str, *env;
+    BOOL expose_steam_controller = (env = getenv("PROTON_EXPOSE_STEAM_CONTROLLER")) && atoi(env) == 1;
     char guid_str[33], buffer[ARRAY_SIZE(desc.product)];
     int axis_count, axis_offset;
 
@@ -1013,7 +1014,7 @@ static void sdl_add_device(unsigned int index)
         return;
     }
 
-    if (desc.vid == 0x28de && desc.pid == 0x11ff)
+    if (desc.vid == 0x28de && desc.pid == 0x11ff && !expose_steam_controller)
     {
         TRACE("Steam virtual controller, pretending it's an Xbox 360 controller\n");
         desc.vid = 0x045e;
@@ -1021,8 +1022,12 @@ static void sdl_add_device(unsigned int index)
     }
 
     /* CW-Bug-Id: #20528 Check steam virtual controller indexes to keep them ordered */
-    if ((str = pSDL_JoystickName(joystick)) && sscanf(str, "Microsoft X-Box 360 pad %u", &desc.input) == 1) desc.input++;
-    else desc.input = -1;
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if ((str = pSDL_JoystickName(joystick)) && sscanf(str, "Microsoft X-Box 360 pad %u", &desc.input) == 1)
+    {
+        if (!expose_steam_controller) desc.input++;
+        desc.version = 0; /* keep version fixed as 0 so we can hardcode it in ntdll rawinput pipe redirection */
+    }
 
     if (pSDL_JoystickGetSerial && (sdl_serial = pSDL_JoystickGetSerial(joystick)))
     {
@@ -1033,8 +1038,15 @@ static void sdl_add_device(unsigned int index)
         /* Overcooked! All You Can Eat only adds controllers with unique serial numbers
          * Prefer keeping serial numbers unique over keeping them consistent across runs */
         pSDL_JoystickGetGUIDString(pSDL_JoystickGetGUID(joystick), guid_str, sizeof(guid_str));
-        snprintf(buffer, sizeof(buffer), "%s.%d", guid_str, index);
-        TRACE("Making up serial number for %s: %s\n", product, buffer);
+
+        /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+        if (desc.input != -1) snprintf(buffer, sizeof(buffer), "%s", guid_str);
+        else
+        {
+            snprintf(buffer, sizeof(buffer), "%s.%d", guid_str, index);
+            TRACE("Making up serial number for %s: %s\n", product, buffer);
+        }
+
         ntdll_umbstowcs(buffer, strlen(buffer) + 1, desc.serialnumber, ARRAY_SIZE(desc.serialnumber));
     }
 
