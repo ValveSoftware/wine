@@ -3589,7 +3589,19 @@ typedef enum _SYSDBG_COMMAND {
   SysDbgReadMsr,
   SysDbgWriteMsr,
   SysDbgReadBusData,
-  SysDbgWriteBusData
+  SysDbgWriteBusData,
+  SysDbgCheckLowMemory,
+  SysDbgEnableKernelDebugger,
+  SysDbgDisableKernelDebugger,
+  SysDbgGetAutoKdEnable,
+  SysDbgSetAutoKdEnable,
+  SysDbgGetPrintBufferSize,
+  SysDbgSetPrintBufferSize,
+  SysDbgGetKdUmExceptionEnable,
+  SysDbgSetKdUmExceptionEnable,
+  SysDbgGetTriageDump,
+  SysDbgGetKdBlockEnable,
+  SysDbgSetKdBlockEnable,
 } SYSDBG_COMMAND, *PSYSDBG_COMMAND;
 
 typedef struct _CPTABLEINFO

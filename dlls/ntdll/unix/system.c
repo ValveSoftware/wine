@@ -3608,7 +3608,10 @@ NTSTATUS WINAPI NtSystemDebugControl( SYSDBG_COMMAND command, void *in_buff, ULO
 {
     FIXME( "(%d, %p, %d, %p, %d, %p), stub\n",
            command, in_buff, (int)in_len, out_buff, (int)out_len, retlen );
-    return STATUS_NOT_IMPLEMENTED;
+
+    if (is_wow64()) return STATUS_NOT_IMPLEMENTED;
+
+    return STATUS_DEBUGGER_INACTIVE;
 }
 
 
