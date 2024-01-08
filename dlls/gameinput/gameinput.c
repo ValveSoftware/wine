@@ -284,6 +284,8 @@ static struct device *device_create( struct list *devices, const DEV_OBJECT *obj
     HidD_FreePreparsedData( preparsed );
 
     if (caps.UsagePage != HID_USAGE_PAGE_GENERIC || caps.Usage != HID_USAGE_GENERIC_GAMEPAD) goto done;
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+    if (attr.VendorID == 0x28de && attr.ProductID == 0x11ff) goto done;
 
     if (!(device = calloc( 1, sizeof(*device) ))) goto done;
     device->IGameInputDevice_v0_iface.lpVtbl = &game_input_device_v0_vtbl;
