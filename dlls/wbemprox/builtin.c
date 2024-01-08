@@ -3283,6 +3283,30 @@ static enum fill_status fill_physicalmemory( struct table *table, const struct e
     return status;
 }
 
+static BOOL steam_input_get_vid_pid( UINT slot, UINT16 *vid, UINT16 *pid )
+{
+    const char *info = getenv( "SteamVirtualGamepadInfo" );
+    char buffer[256];
+    UINT current;
+    FILE *file;
+
+    TRACE( "reading SteamVirtualGamepadInfo %s\n", debugstr_a(info) );
+
+    if (!info || !(file = fopen( info, "r" ))) return FALSE;
+    while (fscanf( file, "%255[^\n]\n", buffer ) == 1)
+    {
+        if (sscanf( buffer, "[slot %d]", &current )) continue;
+        if (current < slot) continue;
+        if (current > slot) break;
+        if (sscanf( buffer, "VID=0x%hx", vid )) continue;
+        if (sscanf( buffer, "PID=0x%hx", pid )) continue;
+    }
+
+    fclose( file );
+
+    return TRUE;
+}
+
 static enum fill_status fill_pnpentity( struct table *table, const struct expr *cond )
 {
     struct record_pnpentity *rec;
@@ -3312,6 +3336,22 @@ static enum fill_status fill_pnpentity( struct table *table, const struct expr *
         if (SetupDiGetDeviceInstanceIdW( device_info_set, &devinfo, device_id,
                     ARRAY_SIZE(device_id), NULL ))
         {
+            /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+            UINT16 vid, pid;
+            UINT slot;
+
+            if (swscanf( device_id, L"HID\\VID_%04x&PID_%04x&XI_%02u", &vid, &pid, &slot ) == 3 &&
+                vid == 0x28de && pid == 0x11ff)
+            {
+                swprintf( device_id, ARRAY_SIZE(device_id), L"#HID#VID_%04X&PID_%04X&IG_%02u", vid, pid, slot );
+            }
+            if (swscanf( device_id, L"HID\\VID_%04x&PID_%04x&IG_%02u", &vid, &pid, &slot ) == 3 &&
+                vid == 0x28de && pid == 0x11ff && steam_input_get_vid_pid( slot, &vid, &pid ))
+            {
+                swprintf( device_id, ARRAY_SIZE(device_id), L"HID\\VID_%04X&PID_%04X&IG_%02u", vid, pid, slot );
+                device_id[27] = '\\';
+            }
+
             StringFromGUID2( &devinfo.ClassGuid, guid, ARRAY_SIZE(guid) );
             rec->caption = L"Wine PnP Device";
             rec->class_guid = wcsdup( wcslwr(guid) );
