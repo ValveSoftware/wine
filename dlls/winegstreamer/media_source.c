@@ -36,6 +36,7 @@ struct object_context
     IMFByteStream *stream;
     UINT64 file_size;
     WCHAR *url;
+    enum wg_parser_type type;
 };
 
 static struct object_context *impl_from_IUnknown(IUnknown *iface)
@@ -95,7 +96,7 @@ static const IUnknownVtbl object_context_vtbl =
 };
 
 static HRESULT object_context_create(DWORD flags, IMFByteStream *stream, const WCHAR *url,
-        QWORD file_size, IMFAsyncResult *result, IUnknown **out)
+        QWORD file_size, IMFAsyncResult *result, enum wg_parser_type type, IUnknown **out)
 {
     WCHAR *tmp_url = url ? wcsdup(url) : NULL;
     struct object_context *context;
@@ -113,6 +114,7 @@ static HRESULT object_context_create(DWORD flags, IMFByteStream *stream, const W
     context->file_size = file_size;
     context->url = tmp_url;
     context->result = result;
+    context->type = type;
     IMFAsyncResult_AddRef(context->result);
 
     *out = &context->IUnknown_iface;
@@ -1703,7 +1705,7 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
     if (FAILED(hr = MFAllocateWorkQueue(&object->async_commands_queue)))
         goto fail;
 
-    if (!(parser = wg_parser_create(WG_PARSER_DECODEBIN, FALSE, FALSE)))
+    if (!(parser = wg_parser_create(context->type, FALSE, FALSE)))
     {
         hr = E_OUTOFMEMORY;
         goto fail;
@@ -1714,7 +1716,7 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
 
     object->state = SOURCE_OPENING;
 
-    if (FAILED(hr = wg_parser_connect(parser, object->file_size)))
+    if (FAILED(hr = wg_parser_connect(parser, object->file_size, context->url)))
         goto fail;
 
     stream_count = wg_parser_get_stream_count(parser);
@@ -1965,7 +1967,7 @@ static HRESULT WINAPI stream_handler_BeginCreateObject(IMFByteStreamHandler *ifa
 
     if (FAILED(hr = MFCreateAsyncResult(NULL, callback, state, &result)))
         return hr;
-    if (FAILED(hr = object_context_create(flags, stream, url, file_size, result, &context)))
+    if (FAILED(hr = object_context_create(flags, stream, url, file_size, result, WG_PARSER_DECODEBIN, &context)))
     {
         IMFAsyncResult_Release(result);
         return hr;
