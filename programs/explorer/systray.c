@@ -855,7 +855,15 @@ static LRESULT WINAPI tray_wndproc( HWND hwnd, UINT msg, WPARAM wparam, LPARAM l
         break;
 
     case WM_COMMAND:
-        if (HIWORD(wparam) == BN_CLICKED) click_taskbar_button( (HWND)lparam );
+        if (HIWORD(wparam) == BN_CLICKED)
+        {
+            if (LOWORD(wparam) == 419)
+            {
+                FIXME( "Minimize all windows command is not supported.\n" );
+                break;
+            }
+            click_taskbar_button( (HWND)lparam );
+        }
         break;
 
     case WM_CONTEXTMENU:
