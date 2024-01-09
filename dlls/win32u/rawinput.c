@@ -532,6 +532,30 @@ UINT WINAPI NtUserGetRawInputDeviceList( RAWINPUTDEVICELIST *device_list, UINT *
     return count;
 }
 
+static BOOL steam_input_get_vid_pid( UINT slot, UINT16 *vid, UINT16 *pid )
+{
+    const char *info = getenv( "SteamVirtualGamepadInfo" );
+    char buffer[256];
+    UINT current;
+    FILE *file;
+
+    TRACE( "reading SteamVirtualGamepadInfo %s\n", debugstr_a(info) );
+
+    if (!info || !(file = fopen( info, "r" ))) return FALSE;
+    while (fscanf( file, "%255[^\n]\n", buffer ) == 1)
+    {
+        if (sscanf( buffer, "[slot %d]", &current )) continue;
+        if (current < slot) continue;
+        if (current > slot) break;
+        if (sscanf( buffer, "VID=0x%hx", vid )) continue;
+        if (sscanf( buffer, "PID=0x%hx", pid )) continue;
+    }
+
+    fclose( file );
+
+    return TRUE;
+}
+
 /**********************************************************************
  *         NtUserGetRawInputDeviceInfo   (win32u.@)
  */
@@ -591,9 +615,11 @@ UINT WINAPI NtUserGetRawInputDeviceInfo( HANDLE handle, UINT command, void *data
             buffer[size] = 0;
             if (sscanf( buffer, "%02u", &slot ) != 1) slot = 0;
 
-            /* FIXME: Return the actual underlying device VID / PID somehow */
-            vid = 0x045e;
-            pid = 0x028e;
+            if (!steam_input_get_vid_pid( slot, &vid, &pid ))
+            {
+                vid = 0x045e;
+                pid = 0x028e;
+            }
 
             size = snprintf( buffer, ARRAY_SIZE(buffer), "\\\\.\\pipe\\HID#VID_045E&PID_028E&IG_00#%04X&%04X", vid, pid );
             if ((tmpW = wcschr( device->path + 29, '&' )))
