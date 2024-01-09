@@ -184,6 +184,7 @@ HRESULT audio_decoder_create(REFIID riid, void **ret);
 HRESULT aac_decoder_create(REFIID riid, void **ret);
 HRESULT h264_decoder_create(REFIID riid, void **ret);
 HRESULT video_processor_create(REFIID riid, void **ret);
+HRESULT gstreamer_scheme_handler_create(REFIID riid, void **ret);
 
 HRESULT h264_encoder_create(REFIID riid, void **ret);
 

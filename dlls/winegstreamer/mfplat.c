@@ -129,6 +129,8 @@ static const GUID CLSID_wg_aac_decoder = {0xe7889a8a,0x2083,0x4844,{0x83,0x70,0x
 static const GUID CLSID_wg_h264_decoder = {0x1f1e273d,0x12c0,0x4b3a,{0x8e,0x9b,0x19,0x33,0xc2,0x49,0x8a,0xea}};
 static const GUID CLSID_wg_h264_encoder = {0x6c34de69,0x4670,0x46cd,{0x8c,0xb4,0x1f,0x2f,0xa1,0xdf,0xfb,0x65}};
 
+static const GUID CLSID_GStreamerSchemePlugin = {0x587eeb6a,0x7336,0x4ebd,{0xa4,0xf2,0x91,0xc9,0x48,0xde,0x62,0x2c}};
+
 static const struct class_object
 {
     const GUID *clsid;
@@ -139,6 +141,7 @@ class_objects[] =
     { &CLSID_wg_video_processor, &video_processor_create },
     { &CLSID_GStreamerAudioDecoder, &audio_decoder_create },
     { &CLSID_GStreamerByteStreamHandler, &gstreamer_byte_stream_handler_create },
+    { &CLSID_GStreamerSchemePlugin, &gstreamer_scheme_handler_create },
     { &CLSID_wg_aac_decoder, &aac_decoder_create },
     { &CLSID_wg_h264_decoder, &h264_decoder_create },
     { &CLSID_wg_h264_encoder, &h264_encoder_create },

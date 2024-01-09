@@ -78,6 +78,13 @@ coclass wg_video_processor {}
 coclass GStreamerByteStreamHandler {}
 
 [
+    helpstring("GStreamer scheme handler"),
+    threading(both),
+    uuid(587eeb6a-7336-4ebd-a4f2-91c948de622c)
+]
+coclass GStreamerSchemePlugin { }
+
+[
     threading(both),
     uuid(480b1517-c8e9-4eae-b006-e6300718d85d)
 ]

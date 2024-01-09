@@ -2056,14 +2056,22 @@ static NTSTATUS wg_parser_disconnect(void *args)
 static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
 {
     GstElement *element;
+    const char *type;
 
-    if (!(element = create_element("decodebin", "base")))
+    type = parser->uri && (!strncmp(parser->uri, "http://", 7) || !strncmp(parser->uri, "https://", 8) ||
+                            !strncmp(parser->uri, "rtsp://", 7)) ? "uridecodebin" : "decodebin";
+    if (!(element = create_element(type, "base")))
         return FALSE;
+    GST_INFO("creating %s element for uri \"%s\"", type, parser->uri ? parser->uri : "(null)");
 
     gst_bin_add(GST_BIN(parser->container), element);
     parser->decodebin = element;
 
-    g_object_set(element, "max-size-bytes", G_MAXUINT, NULL);
+    if (!strcmp(type, "decodebin"))
+        g_object_set(element, "max-size-bytes", G_MAXUINT, NULL);
+    else
+        g_object_set(element, "uri", parser->uri, NULL);
+
     g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), parser);
     g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
     g_signal_connect(element, "autoplug-continue", G_CALLBACK(autoplug_continue_cb), parser);
@@ -2077,7 +2085,7 @@ static BOOL decodebin_parser_init_gst(struct wg_parser *parser)
     parser->no_more_pads = false;
     pthread_mutex_unlock(&parser->mutex);
 
-    if (!link_src_to_element(parser->my_src, element))
+    if (!strcmp(type, "decodebin") && !link_src_to_element(parser->my_src, element))
         return FALSE;
 
     return TRUE;
