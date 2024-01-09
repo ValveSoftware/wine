@@ -148,6 +148,30 @@ static BOOL CALLBACK count_ffb_axes( const DIDEVICEOBJECTINSTANCEW *obj, void *a
     return DIENUM_CONTINUE;
 }
 
+static BOOL steam_input_get_vid_pid( UINT slot, UINT16 *vid, UINT16 *pid )
+{
+    const char *info = getenv( "SteamVirtualGamepadInfo" );
+    char buffer[256];
+    UINT current;
+    FILE *file;
+
+    TRACE( "reading SteamVirtualGamepadInfo %s\n", debugstr_a(info) );
+
+    if (!info || !(file = fopen( info, "r" ))) return FALSE;
+    while (fscanf( file, "%255[^\n]\n", buffer ) == 1)
+    {
+        if (sscanf( buffer, "[slot %d]", &current )) continue;
+        if (current < slot) continue;
+        if (current > slot) break;
+        if (sscanf( buffer, "VID=0x%hx", vid )) continue;
+        if (sscanf( buffer, "PID=0x%hx", pid )) continue;
+    }
+
+    fclose( file );
+
+    return TRUE;
+}
+
 static HRESULT WINAPI wine_provider_get_NonRoamableId( IWineGameControllerProvider *iface, HSTRING *value )
 {
     struct provider *impl = impl_from_IWineGameControllerProvider( iface );
@@ -170,9 +194,11 @@ static HRESULT WINAPI wine_provider_get_NonRoamableId( IWineGameControllerProvid
         if (!(tmp = wcschr( impl->device_path + 8, '#' )) || wcsnicmp( tmp - 6, L"&XI_", 4 )) return E_NOTIMPL;
         if (swscanf( tmp - 2, L"%02u#%*u&%255[^&]&", &slot, serial ) != 2) return E_NOTIMPL;
 
-        /* FIXME: Return the actual underlying device VID / PID somehow */
-        vid = 0x045e;
-        pid = 0x028e;
+        if (!steam_input_get_vid_pid( slot, &vid, &pid ))
+        {
+            vid = 0x045e;
+            pid = 0x028e;
+        }
 
         len = swprintf( buffer, ARRAY_SIZE(buffer), L"{wgi/nrid/:steam-%04X&%04X&%s#%d#%u}", vid, pid, serial, slot, GetCurrentProcessId() );
         return WindowsCreateString( buffer, len, value );
