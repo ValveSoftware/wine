@@ -1025,8 +1025,10 @@ static void sdl_add_device(unsigned int index)
     /* CW-Bug-Id: #20528 Check steam virtual controller indexes to keep them ordered */
     /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
     if ((str = pSDL_JoystickName(joystick)) && sscanf(str, "Microsoft X-Box 360 pad %u", &desc.input) == 1)
+    {
+        if (!expose_steam_controller) desc.input++;
         desc.version = 0; /* keep version fixed as 0 so we can hardcode it in ntdll rawinput pipe redirection */
-    if (!expose_steam_controller) desc.input++;
+    }
 
     if (pSDL_JoystickGetSerial && (sdl_serial = pSDL_JoystickGetSerial(joystick)))
     {
