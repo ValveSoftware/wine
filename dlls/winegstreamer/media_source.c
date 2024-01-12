@@ -500,9 +500,8 @@ static HRESULT stream_descriptor_create(UINT32 id, struct wg_format *format, IMF
     DWORD count = 0;
     HRESULT hr;
 
-    if (!(types[0] = mf_media_type_from_wg_format(format)))
-        return MF_E_INVALIDMEDIATYPE;
-    count = 1;
+    if ((types[0] = mf_media_type_from_wg_format(format)))
+        count = 1;
 
     if (format->major_type == WG_MAJOR_TYPE_VIDEO)
     {
