@@ -2878,14 +2878,24 @@ static BOOL replace_steam_input_path( OBJECT_ATTRIBUTES *attr, UNICODE_STRING *r
         '1','1','c','f','-','8','8','c','b','-','0','0','1','1','1','1','0','0','0','0','3','0','}'
     };
     UNICODE_STRING *path = attr->ObjectName;
-    const WCHAR *slot, *slot_end, *serial, *serial_end;
+    const WCHAR *slot, *slot_end = NULL, *serial, *serial_end = NULL;
     UINT len = 0;
 
+    if (!path || !path->Buffer || path->Length <= sizeof(pipe_prefixW)) return FALSE;
     if (wcsnicmp( path->Buffer, pipe_prefixW, ARRAY_SIZE(pipe_prefixW) )) return FALSE;
-    if (!(serial = wcsrchr( path->Buffer, '&' ))) return FALSE;
-    if (!(serial_end = wcschr( serial, '#' ))) return FALSE;
-    slot = serial_end + 1;
-    if (!(slot_end = wcschr( slot, '#' ))) return FALSE;
+
+    serial = path->Buffer + path->Length / sizeof(WCHAR);
+    while (serial > path->Buffer && *serial != '&')
+    {
+        if (*serial == '#')
+        {
+            slot_end = serial_end;
+            serial_end = serial;
+            slot = serial_end + 1;
+        }
+        serial--;
+    }
+    if (serial == path->Buffer || *serial != '&' || !slot_end || !serial_end) return FALSE;
 
     redir->Length = sizeof(hid_prefixW) + sizeof(hid_midW) + sizeof(hid_tailW);
     redir->Length += (serial_end - serial + slot_end - slot) * sizeof(WCHAR);
