@@ -31,10 +31,10 @@
 @ stub agsDriverExtensionsDX11_WriteBreadcrumb
 @ stdcall agsDriverExtensionsDX12_CreateDevice(ptr ptr ptr ptr)
 @ stub agsDriverExtensionsDX12_CreateFromDevice
-@ stub agsDriverExtensionsDX12_DeInit
+@ stdcall agsDriverExtensionsDX12_DeInit(ptr)
 @ stub agsDriverExtensionsDX12_Destroy
 @ stdcall agsDriverExtensionsDX12_DestroyDevice(ptr ptr ptr)
-@ stub agsDriverExtensionsDX12_Init
+@ stdcall agsDriverExtensionsDX12_Init(ptr ptr ptr)
 @ stub agsDriverExtensionsDX12_PopMarker
 @ stub agsDriverExtensionsDX12_PushMarker
 @ stub agsDriverExtensionsDX12_SetMarker
