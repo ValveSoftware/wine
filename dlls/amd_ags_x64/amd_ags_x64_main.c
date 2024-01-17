@@ -1314,6 +1314,21 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_DeInit( AGSContext* context )
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI agsDriverExtensionsDX12_Init( AGSContext* context, ID3D12Device* device, unsigned int* extensionsSupported )
+{
+    FIXME("context %p, device %p, extensionsSupported %p stub.\n", context, device, extensionsSupported);
+
+    *extensionsSupported = 0;
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX12_DeInit( AGSContext* context )
+{
+    TRACE("context %p.\n", context);
+
+    return AGS_SUCCESS;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p.\n", instance, reason, reserved);
