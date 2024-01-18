@@ -2392,7 +2392,7 @@ static void gen_texture( struct wgl_context *ctx, GLuint *tex, enum fshack_textu
 
 static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *gl )
 {
-    GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer;
+    GLuint prev_draw_fbo, prev_read_fbo, prev_texture, prev_renderbuffer, prev_pixel_pack_buffer;
     float prev_clear_color[4], prev_clear_depth;
     int prev_clear_stencil;
     unsigned int i;
@@ -2440,10 +2440,13 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         opengl_funcs.gl.p_glGetIntegerv( GL_READ_FRAMEBUFFER_BINDING, (GLint *)&prev_read_fbo );
         opengl_funcs.gl.p_glGetIntegerv( GL_TEXTURE_BINDING_2D, (GLint *)&prev_texture );
         opengl_funcs.gl.p_glGetIntegerv( GL_RENDERBUFFER_BINDING, (GLint *)&prev_renderbuffer );
+        opengl_funcs.gl.p_glGetIntegerv( GL_PIXEL_UNPACK_BUFFER_BINDING, (GLint *)&prev_pixel_pack_buffer );
         opengl_funcs.gl.p_glGetFloatv( GL_COLOR_CLEAR_VALUE, prev_clear_color );
         opengl_funcs.gl.p_glGetFloatv( GL_DEPTH_CLEAR_VALUE, &prev_clear_depth );
         opengl_funcs.gl.p_glGetIntegerv( GL_STENCIL_CLEAR_VALUE, &prev_clear_stencil );
         TRACE( "Previous draw FBO %u, read FBO %u for ctx %p\n", prev_draw_fbo, prev_read_fbo, ctx );
+
+        pglBindBuffer( GL_PIXEL_UNPACK_BUFFER, 0 );
 
         if (!ctx->fs_hack_fbo)
         {
@@ -2591,6 +2594,8 @@ static void fs_hack_setup_context( struct wgl_context *ctx, struct gl_drawable *
         ctx->fs_hack_integer = fs_hack_is_integer();
         ctx->fs_hack_needs_resolve = gl->fs_hack_needs_resolve;
         gl->fs_hack_context_set_up = TRUE;
+
+        pglBindBuffer( GL_PIXEL_UNPACK_BUFFER, prev_pixel_pack_buffer );
     }
     else
     {
