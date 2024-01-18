@@ -892,18 +892,23 @@ static HKL get_locale_kbd_layout(void)
      */
 
     NtQueryDefaultLocale( TRUE, &layout );
+    layout = MAKELONG( layout, layout );
 
     /*
      * Microsoft Office expects this value to be something specific
      * for Japanese and Korean Windows with an IME the value is 0xe001
      * We should probably check to see if an IME exists and if so then
      * set this word properly.
+     *
+     * On Vista+, the high word is always layout, not 0xe00* even when IME is on.
+     * Super Robo Wars 30 (SteamID: 898750) depends on it.
      */
-    langid = PRIMARYLANGID( LANGIDFROMLCID( layout ) );
-    if (langid == LANG_CHINESE || langid == LANG_JAPANESE || langid == LANG_KOREAN)
-        layout = MAKELONG( layout, 0xe001 ); /* IME */
-    else
-        layout = MAKELONG( layout, layout );
+    if (NtCurrentTeb()->Peb->OSMajorVersion <= 5)
+    {
+        langid = PRIMARYLANGID( LANGIDFROMLCID( layout ) );
+        if (langid == LANG_CHINESE || langid == LANG_JAPANESE || langid == LANG_KOREAN)
+            layout = MAKELONG( layout, 0xe001 ); /* IME */
+    }
 
     return ULongToHandle( layout );
 }

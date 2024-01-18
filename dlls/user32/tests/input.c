@@ -5399,7 +5399,6 @@ static void test_GetKeyboardLayout(void)
     if (is_cjk && LOBYTE(LOWORD(GetVersion())) > 5)
     {
         hkl = GetKeyboardLayout(0);
-        todo_wine
         ok(HIWORD(hkl) == LOWORD(hkl), "Got unexpected hkl %p.\n", hkl);
     }
 }
