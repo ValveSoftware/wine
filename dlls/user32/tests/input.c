@@ -5386,6 +5386,24 @@ static void test_ClipCursor( char **argv )
     if (!EqualRect( &rect, &virtual_rect )) ok_ret( 1, ClipCursor( NULL ) );
 }
 
+static void test_GetKeyboardLayout(void)
+{
+    LANGID lang_id;
+    BOOL is_cjk;
+    HKL hkl;
+
+    /* Test that the high word of the keyboard layout in CJK locale on Vista+ is the same as the low
+     * word, even when IME is on */
+    lang_id = PRIMARYLANGID(GetUserDefaultLCID());
+    is_cjk = (lang_id == LANG_CHINESE || lang_id == LANG_JAPANESE || lang_id == LANG_KOREAN);
+    if (is_cjk && LOBYTE(LOWORD(GetVersion())) > 5)
+    {
+        hkl = GetKeyboardLayout(0);
+        todo_wine
+        ok(HIWORD(hkl) == LOWORD(hkl), "Got unexpected hkl %p.\n", hkl);
+    }
+}
+
 START_TEST(input)
 {
     char **argv;
@@ -5431,6 +5449,7 @@ START_TEST(input)
     test_RegisterRawInputDevices();
     test_rawinput(argv[0]);
     test_DefRawInputProc();
+    test_GetKeyboardLayout();
 
     if(pGetMouseMovePointsEx)
         test_GetMouseMovePointsEx( argv );
