@@ -1425,6 +1425,19 @@ static void set_xembed_flags( struct x11drv_win_data *data, unsigned long flags 
                      x11drv_atom(_XEMBED_INFO), 32, PropModeReplace, (unsigned char*)info, 2 );
 }
 
+static int skip_iconify( Display *display )
+{
+    static int cached = -1;
+    const char *env;
+
+    if (cached == -1)
+    {
+        FIXME( "HACK: skip_iconify.\n" );
+        cached = wm_is_steamcompmgr( display ) && (env = getenv( "SteamGameId" )) && !strcmp( env, "1827980" );
+    }
+
+    return cached;
+}
 
 /***********************************************************************
  *     map_window
@@ -1451,7 +1464,7 @@ static void map_window( HWND hwnd, DWORD new_style )
             sync_window_style( data );
             XMapWindow( data->display, data->whole_window );
             /* Mutter always unminimizes windows when handling map requests. Restore iconic state */
-            if (new_style & WS_MINIMIZE && !wm_is_steamcompmgr( data->display ))
+            if (new_style & WS_MINIMIZE && !skip_iconify( data->display ))
                 XIconifyWindow( data->display, data->whole_window, data->vis.screen );
             XFlush( data->display );
             if (data->surface && data->vis.visualid != default_visual.visualid)
@@ -3325,14 +3338,20 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
             TRACE( "changing win %p iconic state to %u\n", data->hwnd, data->iconic );
             if (data->iconic)
             {
-                if (!wm_is_steamcompmgr( data->display ))
+                if (!skip_iconify( data->display ))
                 {
-                    /* XIconifyWindow is essentially a no-op on Gamescope but has an undesirable side effect.
+                    /* XIconifyWindow is essentially a no-op on Gamescope but has a side effect.
                      * Gamescope handles wm state change to iconic and immediately changes it back to normal.
                      * Upon that change back we would receive WM_STATE change notification and kick the window
-                     * out of minimized state even if the window is not focused by Gamescope. Upon focusing the
-                     * window Gamescope will change WM_STATE regardless and we will get the window out of
-                     * minimized state correctly. */
+                     * out of minimized state even if the window is not focused by Gamescope (possibly breaking Win-side
+                     * focus and leading to hangs).
+                     * Depending on what the game is going, various things may happen if we avoid that:
+                     *  - Gamescope may change WM_STATE later when focusing our window and we will get the window out of minimized state correctly;
+                     *  - The game might have no other windows and it just decided to minimize itself
+                     *    (e. g., before opening Web browser), expecting the user to unminimize it manually which
+                     *    is not possible on Gamescope. Ideally we'd have a way to detect such a case and unminimize
+                     *    when needed, but without that just let Gamescope unminimize immediately avoiding that for
+                     *    selected game(s) only. */
                     XIconifyWindow( data->display, data->whole_window, data->vis.screen );
                 }
             }
