@@ -1,0 +1,5 @@
+MODULE    = igdext64.dll
+IMPORTLIB = igdext64
+
+SOURCES = \
+	main.c
