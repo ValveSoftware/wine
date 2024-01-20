@@ -3087,7 +3087,8 @@ DECL_HANDLER(send_hardware_message)
     struct thread *thread = NULL;
     struct desktop *desktop;
     unsigned int origin = (req->flags & SEND_HWMSG_INJECTED ? IMO_INJECTED : IMO_HARDWARE);
-    struct msg_queue *sender = get_current_queue();
+    struct msg_queue *sender = req->flags & SEND_HWMSG_INJECTED ? get_current_queue() : NULL;
+    int wait = 0;
 
     if (!(desktop = get_thread_desktop( current, 0 ))) return;
 
@@ -3108,10 +3109,10 @@ DECL_HANDLER(send_hardware_message)
     switch (req->input.type)
     {
     case INPUT_MOUSE:
-        reply->wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender, req->flags );
+        wait = queue_mouse_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
     case INPUT_KEYBOARD:
-        reply->wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender, req->flags );
+        wait = queue_keyboard_message( desktop, req->win, &req->input, origin, sender, req->flags );
         break;
     case INPUT_HARDWARE:
         queue_custom_hardware_message( desktop, req->win, origin, &req->input );
@@ -3121,6 +3122,7 @@ DECL_HANDLER(send_hardware_message)
     }
     if (thread) release_object( thread );
 
+    reply->wait = sender ? wait : 0;
     reply->new_x = desktop->shared->cursor.x;
     reply->new_y = desktop->shared->cursor.y;
     release_object( desktop );
