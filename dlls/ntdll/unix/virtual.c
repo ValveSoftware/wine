@@ -131,6 +131,7 @@ static char *r_debug_path_from_fd( int fd )
     char *real, *path;
     if (!(path = get_path_from_fd( fd, 0 ))) return NULL;
     if (!(real = realpath( path, NULL ))) return path;
+    if (!strncmp( real, "/run/host", 9 )) memmove( real, real + 9, strlen( real ) - 8 );
     free( path );
     return real;
 }
