@@ -4910,7 +4910,7 @@ static BOOL glxdrv_wglSwapBuffers( HDC hdc )
             ctx->fs_hack = FALSE;
             fs_hack_setup_context( ctx, gl );
         }
-        if ((escape.drawable || gl->layered_type) && pglXSwapBuffersMscOML)
+        if (ctx && (escape.drawable || gl->layered_type) && pglXSwapBuffersMscOML)
         {
             pglFlush();
             target_sbc = pglXSwapBuffersMscOML( gdi_display, gl->drawable, 0, 0, 0 );
@@ -4920,13 +4920,13 @@ static BOOL glxdrv_wglSwapBuffers( HDC hdc )
         break;
     }
 
-    if ((escape.drawable || gl->layered_type) && pglXWaitForSbcOML)
+    if (ctx && (escape.drawable || gl->layered_type) && pglXWaitForSbcOML)
         pglXWaitForSbcOML( gdi_display, gl->drawable, target_sbc, &ust, &msc, &sbc );
 
     update_window_surface( gl, hwnd );
     release_gl_drawable( gl );
 
-    if (escape.drawable) NtGdiExtEscape( ctx->hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
+    if (escape.drawable) NtGdiExtEscape( ctx ? ctx->hdc : hdc, NULL, 0, X11DRV_ESCAPE, sizeof(escape), (LPSTR)&escape, 0, NULL );
     return TRUE;
 }
 
