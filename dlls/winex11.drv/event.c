@@ -864,7 +864,12 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         if (!hwnd) hwnd = x11drv_thread_data()->last_focus;
         if (hwnd && can_activate_window(hwnd)) set_focus( event->display, hwnd, CurrentTime );
     }
-    else NtUserSetForegroundWindow( hwnd );
+    else
+    {
+        wait_grab_pointer( event->display );
+        NtUserSetForegroundWindow( hwnd );
+    }
+
     return TRUE;
 }
 
