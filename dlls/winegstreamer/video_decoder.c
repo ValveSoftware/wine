@@ -65,6 +65,11 @@ static const struct subtype_info subtype_info_list[] =
     { &MEDIASUBTYPE_RGB32,   32, BI_RGB },
 };
 
+extern GUID MFVideoFormat_GStreamer;
+static const GUID *const video_decoder_input_types[] =
+{
+    &MFVideoFormat_GStreamer,
+};
 static const GUID *const video_decoder_output_types[] =
 {
     &MFVideoFormat_NV12,
@@ -1590,6 +1595,34 @@ failed:
     if (decoder->stream_type)
         IMFMediaType_Release(decoder->stream_type);
     free(decoder);
+    return hr;
+}
+
+HRESULT video_decoder_create(REFIID riid, void **out)
+{
+    struct video_decoder *decoder;
+    HRESULT hr;
+
+    TRACE("riid %s, out %p.\n", debugstr_guid(riid), out);
+
+    if (FAILED(hr = video_decoder_create_with_types(video_decoder_input_types, ARRAY_SIZE(video_decoder_input_types),
+            video_decoder_output_types, ARRAY_SIZE(video_decoder_output_types), NULL, &decoder)))
+        return hr;
+
+    decoder->input_info.dwFlags = MFT_INPUT_STREAM_WHOLE_SAMPLES | MFT_INPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER
+            | MFT_INPUT_STREAM_FIXED_SAMPLE_SIZE;
+    decoder->input_info.cbSize = 0x1000;
+    decoder->output_info.dwFlags = MFT_OUTPUT_STREAM_WHOLE_SAMPLES | MFT_OUTPUT_STREAM_SINGLE_SAMPLE_PER_BUFFER
+            | MFT_OUTPUT_STREAM_FIXED_SAMPLE_SIZE;
+    decoder->output_info.cbSize = 1920 * 1088 * 2;
+
+    decoder->wg_transform_attrs.output_plane_align = 15;
+    decoder->wg_transform_attrs.allow_format_change = TRUE;
+
+    TRACE("Created video decoder transform %p.\n", &decoder->IMFTransform_iface);
+
+    hr = IMFTransform_QueryInterface(&decoder->IMFTransform_iface, riid, out);
+    IMFTransform_Release(&decoder->IMFTransform_iface);
     return hr;
 }
 
