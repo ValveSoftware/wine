@@ -436,7 +436,7 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
     {
         if (FAILED(hr = IMFMediaType_SetUINT64(decoder->stream_type, &MF_MT_FRAME_SIZE, frame_size)))
             WARN("Failed to update stream type frame size, hr %#lx\n", hr);
-        decoder->output_info.cbSize = (frame_size >> 32) * (UINT32)frame_size * 2;
+        MFCalculateImageSize(decoder->output_types[0], frame_size >> 32, frame_size, (UINT32 *)&decoder->output_info.cbSize);
     }
 
     return S_OK;
@@ -642,6 +642,7 @@ static HRESULT output_sample(struct h264_decoder *decoder, IMFSample **out, IMFS
 static HRESULT handle_stream_type_change(struct h264_decoder *decoder, const struct wg_format *format)
 {
     UINT64 frame_size, frame_rate;
+    GUID subtype;
     HRESULT hr;
 
     if (decoder->stream_type)
@@ -655,7 +656,9 @@ static HRESULT handle_stream_type_change(struct h264_decoder *decoder, const str
 
     if (FAILED(hr = IMFMediaType_GetUINT64(decoder->stream_type, &MF_MT_FRAME_SIZE, &frame_size)))
         return hr;
-    decoder->output_info.cbSize = (frame_size >> 32) * (UINT32)frame_size * 2;
+    if (FAILED(hr = IMFMediaType_GetGUID(decoder->stream_type, &MF_MT_SUBTYPE, &subtype)))
+        return hr;
+    MFCalculateImageSize(&subtype, frame_size >> 32, frame_size, (UINT32 *)&decoder->output_info.cbSize);
     uninit_allocator(decoder);
 
     return MF_E_TRANSFORM_STREAM_CHANGE;
