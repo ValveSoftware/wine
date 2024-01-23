@@ -2337,7 +2337,7 @@ static void hacks_init(void)
 
     sgi = getenv("SteamGameId");
     if (sgi && (!strcmp(sgi, "50130") || !strcmp(sgi, "202990") || !strcmp(sgi, "212910") || !strcmp(sgi, "25700")
-                || !strcmp(sgi, "1446780")))
+                || !strcmp(sgi, "1446780") || !strcmp(sgi, "2054970")))
         setenv("WINESTEAMNOEXEC", "1", 0);
 
     env_str = getenv("WINE_NO_PRIV_ELEVATION");
