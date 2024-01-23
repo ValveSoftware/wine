@@ -393,6 +393,8 @@ static struct fs_monitor *monitor_from_settings_id( x11drv_settings_id settings_
     struct gdi_gpu *gpus;
     int count;
 
+    pthread_mutex_lock( &fs_lock );
+
     LIST_FOR_EACH_ENTRY( monitor, &fs_monitors, struct fs_monitor, entry )
         if (!memcmp( &monitor->settings_id, &settings_id, sizeof(settings_id) )) return monitor;
 
@@ -406,7 +408,13 @@ static struct fs_monitor *monitor_from_settings_id( x11drv_settings_id settings_
     }
 
     WARN( "Failed to find monitor for adapter id %p\n", (void *)settings_id.id );
+    pthread_mutex_unlock( &fs_lock );
     return NULL;
+}
+
+static void monitor_release( struct fs_monitor *monitor )
+{
+    pthread_mutex_unlock( &fs_lock );
 }
 
 static BOOL fs_get_modes( x11drv_settings_id id, DWORD flags, DEVMODEW **new_modes, UINT *mode_count )
@@ -416,12 +424,12 @@ static BOOL fs_get_modes( x11drv_settings_id id, DWORD flags, DEVMODEW **new_mod
     TRACE( "id %#zx, flags %#x, modes %p, modes_count %p\n",
            (size_t)id.id, (int)flags, new_modes, mode_count );
 
-    pthread_mutex_lock( &fs_lock );
-
     if ((monitor = monitor_from_settings_id( id )))
+    {
         monitor_get_modes( monitor, new_modes, mode_count );
+        monitor_release( monitor );
+    }
 
-    pthread_mutex_unlock( &fs_lock );
     return monitor && *new_modes;
 }
 
@@ -436,10 +444,11 @@ static BOOL fs_get_current_mode( x11drv_settings_id settings_id, DEVMODEW *mode 
 
     TRACE( "settings_id %p, mode %p\n", (void *)settings_id.id, mode );
 
-    pthread_mutex_lock( &fs_lock );
     if ((monitor = monitor_from_settings_id( settings_id )))
+    {
         *mode = monitor->user_mode;
-    pthread_mutex_unlock( &fs_lock );
+        monitor_release( monitor );
+    }
 
     return !!monitor;
 }
@@ -453,17 +462,12 @@ static LONG fs_set_current_mode( x11drv_settings_id settings_id, const DEVMODEW 
 
     TRACE( "settings_id %p, mode %s\n", (void *)settings_id.id, debugstr_devmode( user_mode ) );
 
-    pthread_mutex_lock( &fs_lock );
-
     if (!(fs_monitor = monitor_from_settings_id( settings_id )))
-    {
-        pthread_mutex_unlock( &fs_lock );
         return DISP_CHANGE_FAILED;
-    }
 
     if (is_detached_mode( &fs_monitor->real_mode ) && !is_detached_mode( user_mode ))
     {
-        pthread_mutex_unlock( &fs_lock );
+        monitor_release( fs_monitor );
         FIXME( "Attaching adapters is unsupported with fullscreen hack.\n" );
         return DISP_CHANGE_SUCCESSFUL;
     }
@@ -471,7 +475,7 @@ static LONG fs_set_current_mode( x11drv_settings_id settings_id, const DEVMODEW 
     /* Real modes may be changed since initialization */
     if (!real_settings_handler.get_current_mode( settings_id, &real_mode ))
     {
-        pthread_mutex_unlock( &fs_lock );
+        monitor_release( fs_monitor );
         return DISP_CHANGE_FAILED;
     }
 
@@ -523,7 +527,7 @@ static LONG fs_set_current_mode( x11drv_settings_id settings_id, const DEVMODEW 
     TRACE( "user_to_real_scale %lf\n", fs_monitor->user_to_real_scale );
     TRACE( "top left corner:%s\n", wine_dbgstr_point( &fs_monitor->top_left ) );
 
-    pthread_mutex_unlock( &fs_lock );
+    monitor_release( fs_monitor );
     return DISP_CHANGE_SUCCESSFUL;
 }
 
@@ -599,7 +603,7 @@ static struct fs_monitor *monitor_from_handle( HMONITOR handle )
 
     if (!NtUserGetMonitorInfo( handle, (MONITORINFO *)&info )) return NULL;
     is_primary = !!(info.dwFlags & MONITORINFOF_PRIMARY);
-    if (!real_settings_handler.get_id( info.szDevice, is_primary, &settings_id )) return FALSE;
+    if (!real_settings_handler.get_id( info.szDevice, is_primary, &settings_id )) return NULL;
     return monitor_from_settings_id( settings_id );
 }
 
@@ -611,12 +615,14 @@ BOOL fs_hack_enabled( HMONITOR monitor )
 
     TRACE( "monitor %p\n", monitor );
 
-    pthread_mutex_lock( &fs_lock );
-    fs_monitor = monitor_from_handle( monitor );
-    if (fs_monitor && (fs_monitor->user_mode.dmPelsWidth != fs_monitor->real_mode.dmPelsWidth ||
-                       fs_monitor->user_mode.dmPelsHeight != fs_monitor->real_mode.dmPelsHeight))
-        enabled = TRUE;
-    pthread_mutex_unlock( &fs_lock );
+    if ((fs_monitor = monitor_from_handle( monitor )))
+    {
+        if (fs_monitor->user_mode.dmPelsWidth != fs_monitor->real_mode.dmPelsWidth ||
+            fs_monitor->user_mode.dmPelsHeight != fs_monitor->real_mode.dmPelsHeight)
+            enabled = TRUE;
+        monitor_release( fs_monitor );
+    }
+
     TRACE( "enabled: %s\n", enabled ? "TRUE" : "FALSE" );
     return enabled;
 }
@@ -680,19 +686,15 @@ RECT fs_hack_current_mode( HMONITOR monitor )
 
     TRACE( "monitor %p\n", monitor );
 
-    pthread_mutex_lock( &fs_lock );
-    fs_monitor = monitor_from_handle( monitor );
-    if (!fs_monitor)
+    if ((fs_monitor = monitor_from_handle( monitor )))
     {
-        pthread_mutex_unlock( &fs_lock );
-        return rect;
+        rect.left = fs_monitor->user_mode.dmPosition.x;
+        rect.top = fs_monitor->user_mode.dmPosition.y;
+        rect.right = rect.left + fs_monitor->user_mode.dmPelsWidth;
+        rect.bottom = rect.top + fs_monitor->user_mode.dmPelsHeight;
+        monitor_release( fs_monitor );
     }
 
-    rect.left = fs_monitor->user_mode.dmPosition.x;
-    rect.top = fs_monitor->user_mode.dmPosition.y;
-    rect.right = rect.left + fs_monitor->user_mode.dmPelsWidth;
-    rect.bottom = rect.top + fs_monitor->user_mode.dmPelsHeight;
-    pthread_mutex_unlock( &fs_lock );
     TRACE( "current mode rect: %s\n", wine_dbgstr_rect( &rect ) );
     return rect;
 }
@@ -705,19 +707,15 @@ RECT fs_hack_real_mode( HMONITOR monitor )
 
     TRACE( "monitor %p\n", monitor );
 
-    pthread_mutex_lock( &fs_lock );
-    fs_monitor = monitor_from_handle( monitor );
-    if (!fs_monitor)
+    if ((fs_monitor = monitor_from_handle( monitor )))
     {
-        pthread_mutex_unlock( &fs_lock );
-        return rect;
+        rect.left = fs_monitor->real_mode.dmPosition.x;
+        rect.top = fs_monitor->real_mode.dmPosition.y;
+        rect.right = rect.left + fs_monitor->real_mode.dmPelsWidth;
+        rect.bottom = rect.top + fs_monitor->real_mode.dmPelsHeight;
+        monitor_release( fs_monitor );
     }
 
-    rect.left = fs_monitor->real_mode.dmPosition.x;
-    rect.top = fs_monitor->real_mode.dmPosition.y;
-    rect.right = rect.left + fs_monitor->real_mode.dmPelsWidth;
-    rect.bottom = rect.top + fs_monitor->real_mode.dmPelsHeight;
-    pthread_mutex_unlock( &fs_lock );
     TRACE( "real mode rect: %s\n", wine_dbgstr_rect( &rect ) );
     return rect;
 }
@@ -867,23 +865,19 @@ void fs_hack_rect_user_to_real( RECT *rect )
 
     SetRect( &point, rect->left, rect->top, rect->left + 1, rect->top + 1 );
     monitor = NtUserMonitorFromRect( &point, MONITOR_DEFAULTTONEAREST );
-    pthread_mutex_lock( &fs_lock );
-    fs_monitor = monitor_from_handle( monitor );
-    if (!fs_monitor)
+
+    if ((fs_monitor = monitor_from_handle( monitor )))
     {
-        pthread_mutex_unlock( &fs_lock );
-        WARN( "%s not transformed.\n", wine_dbgstr_rect( rect ) );
-        return;
+        OffsetRect( rect, -fs_monitor->user_mode.dmPosition.x,
+                    -fs_monitor->user_mode.dmPosition.y );
+        rect->left = lround( rect->left * fs_monitor->user_to_real_scale );
+        rect->right = lround( rect->right * fs_monitor->user_to_real_scale );
+        rect->top = lround( rect->top * fs_monitor->user_to_real_scale );
+        rect->bottom = lround( rect->bottom * fs_monitor->user_to_real_scale );
+        OffsetRect( rect, fs_monitor->top_left.x, fs_monitor->top_left.y );
+        monitor_release( fs_monitor );
     }
 
-    OffsetRect( rect, -fs_monitor->user_mode.dmPosition.x,
-                -fs_monitor->user_mode.dmPosition.y );
-    rect->left = lround( rect->left * fs_monitor->user_to_real_scale );
-    rect->right = lround( rect->right * fs_monitor->user_to_real_scale );
-    rect->top = lround( rect->top * fs_monitor->user_to_real_scale );
-    rect->bottom = lround( rect->bottom * fs_monitor->user_to_real_scale );
-    OffsetRect( rect, fs_monitor->top_left.x, fs_monitor->top_left.y );
-    pthread_mutex_unlock( &fs_lock );
     TRACE( "to %s\n", wine_dbgstr_rect( rect ) );
 }
 
@@ -897,16 +891,12 @@ double fs_hack_get_user_to_real_scale( HMONITOR monitor )
 
     if (wm_is_steamcompmgr( NULL )) return scale;
 
-    pthread_mutex_lock( &fs_lock );
-    fs_monitor = monitor_from_handle( monitor );
-    if (!fs_monitor)
+    if ((fs_monitor = monitor_from_handle( monitor )))
     {
-        pthread_mutex_unlock( &fs_lock );
-        return scale;
+        scale = fs_monitor->user_to_real_scale;
+        monitor_release( fs_monitor );
     }
-    scale = fs_monitor->user_to_real_scale;
 
-    pthread_mutex_unlock( &fs_lock );
     TRACE( "scale %lf\n", scale );
     return scale;
 }
@@ -919,26 +909,21 @@ SIZE fs_hack_get_scaled_screen_size( HMONITOR monitor )
 
     TRACE( "monitor %p\n", monitor );
 
-    pthread_mutex_lock( &fs_lock );
-    fs_monitor = monitor_from_handle( monitor );
-    if (!fs_monitor)
+    if ((fs_monitor = monitor_from_handle( monitor )))
     {
-        pthread_mutex_unlock( &fs_lock );
-        return size;
+        if (wm_is_steamcompmgr( NULL ))
+        {
+            size.cx = fs_monitor->user_mode.dmPelsWidth;
+            size.cy = fs_monitor->user_mode.dmPelsHeight;
+        }
+        else
+        {
+            size.cx = lround( fs_monitor->user_mode.dmPelsWidth * fs_monitor->user_to_real_scale );
+            size.cy = lround( fs_monitor->user_mode.dmPelsHeight * fs_monitor->user_to_real_scale );
+        }
+        monitor_release( fs_monitor );
     }
 
-    if (wm_is_steamcompmgr( NULL ))
-    {
-        pthread_mutex_unlock( &fs_lock );
-        size.cx = fs_monitor->user_mode.dmPelsWidth;
-        size.cy = fs_monitor->user_mode.dmPelsHeight;
-        TRACE( "width %d height %d\n", (int)size.cx, (int)size.cy );
-        return size;
-    }
-
-    size.cx = lround( fs_monitor->user_mode.dmPelsWidth * fs_monitor->user_to_real_scale );
-    size.cy = lround( fs_monitor->user_mode.dmPelsHeight * fs_monitor->user_to_real_scale );
-    pthread_mutex_unlock( &fs_lock );
     TRACE( "width %d height %d\n", (int)size.cx, (int)size.cy );
     return size;
 }
