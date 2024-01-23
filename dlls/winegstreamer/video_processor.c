@@ -102,6 +102,13 @@ static HRESULT try_create_wg_transform(struct video_processor *impl)
     if (output_format.major_type == WG_MAJOR_TYPE_UNKNOWN)
         return MF_E_INVALIDMEDIATYPE;
 
+    /* prevent fps differences from failing to connect the elements */
+    if (output_format.u.video.fps_d || output_format.u.video.fps_n)
+    {
+        input_format.u.video.fps_d = output_format.u.video.fps_d;
+        input_format.u.video.fps_n = output_format.u.video.fps_n;
+    }
+
     if (!(impl->wg_transform = wg_transform_create(&input_format, &output_format, &attrs)))
         return E_FAIL;
 
