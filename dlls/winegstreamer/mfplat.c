@@ -129,6 +129,7 @@ static const IClassFactoryVtbl class_factory_vtbl =
 static const GUID CLSID_GStreamerByteStreamHandler = {0x317df618, 0x5e5a, 0x468a, {0x9f, 0x15, 0xd8, 0x27, 0xa9, 0xa0, 0x81, 0x62}};
 static const GUID CLSID_GStreamerByteStreamHandler2 = {0x317df619, 0x5e5a, 0x468a, {0x9f, 0x15, 0xd8, 0x27, 0xa9, 0xa0, 0x81, 0x62}};
 static const GUID CLSID_GStreamerAudioDecoder = {0x480b1517, 0xc8e9, 0x4eae, {0xb0, 0x06, 0xe6, 0x30, 0x07, 0x18, 0xd8, 0x5d}};
+static const GUID CLSID_GStreamerVideoDecoder = {0x480b1518, 0xc8e9, 0x4eae, {0xb0, 0x06, 0xe6, 0x30, 0x07, 0x18, 0xd8, 0x5d}};
 
 static const GUID CLSID_GStreamerSchemePlugin = {0x587eeb6a,0x7336,0x4ebd,{0xa4,0xf2,0x91,0xc9,0x48,0xde,0x62,0x2c}};
 
@@ -140,6 +141,7 @@ static const struct class_object
 class_objects[] =
 {
     { &CLSID_GStreamerAudioDecoder, &audio_decoder_create },
+    { &CLSID_GStreamerVideoDecoder, &video_decoder_create },
     { &CLSID_VideoProcessorMFT, &video_processor_create },
     { &CLSID_GStreamerByteStreamHandler, &gstreamer_byte_stream_handler_create },
     { &CLSID_GStreamerByteStreamHandler2, &gstreamer_byte_stream_handler_2_create },
@@ -351,6 +353,24 @@ HRESULT mfplat_DllRegisterServer(void)
         {MFMediaType_Audio, MFAudioFormat_PCM},
     };
 
+    MFT_REGISTER_TYPE_INFO video_decoder_input_types[] =
+    {
+        {MFMediaType_Video, MFVideoFormat_GStreamer},
+        {MFMediaType_Video, MFVideoFormat_IV50},
+    };
+    MFT_REGISTER_TYPE_INFO video_decoder_output_types[] =
+    {
+        {MFMediaType_Video, MFVideoFormat_YV12},
+        {MFMediaType_Video, MFVideoFormat_YUY2},
+        {MFMediaType_Video, MFVideoFormat_NV11},
+        {MFMediaType_Video, MFVideoFormat_NV12},
+        {MFMediaType_Video, MFVideoFormat_RGB32},
+        {MFMediaType_Video, MFVideoFormat_RGB24},
+        {MFMediaType_Video, MFVideoFormat_RGB565},
+        {MFMediaType_Video, MFVideoFormat_RGB555},
+        {MFMediaType_Video, MFVideoFormat_RGB8},
+    };
+
     struct mft
     {
         GUID clsid;
@@ -443,6 +463,16 @@ HRESULT mfplat_DllRegisterServer(void)
             audio_decoder_input_types,
             ARRAY_SIZE(audio_decoder_output_types),
             audio_decoder_output_types,
+        },
+        {
+            CLSID_GStreamerVideoDecoder,
+            MFT_CATEGORY_VIDEO_DECODER,
+            L"Wine Video Decoder MFT",
+            MFT_ENUM_FLAG_SYNCMFT,
+            ARRAY_SIZE(video_decoder_input_types),
+            video_decoder_input_types,
+            ARRAY_SIZE(video_decoder_output_types),
+            video_decoder_output_types,
         },
     };
 
