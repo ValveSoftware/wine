@@ -221,7 +221,6 @@ F:	dlls/winegstreamer/h264_decoder.c
 F:	dlls/winegstreamer/media_source.c
 F:	dlls/winegstreamer/mfplat.c
 F:	dlls/winegstreamer/resampler.c
-F:	dlls/winegstreamer/video_decoder.c
 F:	dlls/winegstreamer/video_processor.c
 F:	dlls/winegstreamer/wg_source.c
 F:	dlls/winegstreamer/wg_sample.c
