@@ -3335,6 +3335,21 @@ done:
     return status;
 }
 
+static void substitute_dll( const WCHAR **libname )
+{
+    static int substitute = -1;
+
+    if (substitute == -1)
+    {
+        WCHAR env_str[32];
+
+        if ((substitute = (get_env( L"SteamGameId", env_str, sizeof(env_str)) && !wcsicmp( env_str, L"582660" ))))
+            FIXME( "HACK: substituting dll name.\n" );
+    }
+    if (!substitute) return;
+    if (*libname && !wcsicmp( *libname, L"d3dcompiler_46.dll" ))
+        *libname = L"d3dcompiler_43.dll";
+}
 
 /***********************************************************************
  *	load_dll  (internal)
@@ -3352,6 +3367,8 @@ static NTSTATUS load_dll( const WCHAR *load_path, const WCHAR *libname, DWORD fl
     ULONG64 prev;
 
     TRACE( "looking for %s in %s\n", debugstr_w(libname), debugstr_w(load_path) );
+
+    substitute_dll( &libname );
 
     if (system && system_dll_path.Buffer)
         nts = search_dll_file( system_dll_path.Buffer, libname, &nt_name, pwm, &mapping, &image_info, &id );
