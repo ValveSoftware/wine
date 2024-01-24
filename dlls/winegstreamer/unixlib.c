@@ -273,6 +273,8 @@ NTSTATUS wg_init_gstreamer(void *arg)
         setenv("GST_REGISTRY_1_0", gst_reg, 1);
     }
 
+    gst_segtrap_set_enabled(false);
+
     if (!gst_init_check(&argc, &argv, &err))
     {
         fprintf(stderr, "winegstreamer: failed to initialize GStreamer: %s\n", err->message);
