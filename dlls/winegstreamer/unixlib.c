@@ -273,6 +273,11 @@ NTSTATUS wg_init_gstreamer(void *arg)
         setenv("GST_REGISTRY_1_0", gst_reg, 1);
     }
 
+    /* GStreamer installs a temporary SEGV handler when it loads plugins
+     * to initialize its registry calling exit(-1) when any fault is caught.
+     * We need to make sure any signal reaches our signal handlers to catch
+     * and handle them, or eventually propagate the exceptions to the user.
+     */
     gst_segtrap_set_enabled(false);
 
     if (!gst_init_check(&argc, &argv, &err))
