@@ -2394,6 +2394,9 @@ static NTSTATUS decommit_pages( struct file_view *view, size_t start, size_t siz
     if (!size) size = view->size;
     if (anon_mmap_fixed( (char *)view->base + start, size, PROT_NONE, 0 ) != MAP_FAILED)
     {
+        if (use_kernel_writewatch && view->protect & VPROT_WRITEWATCH)
+            madvise( view->base, view->size, MADV_NOHUGEPAGE );
+
         set_page_vprot_bits( (char *)view->base + start, size, 0, VPROT_COMMITTED );
         return STATUS_SUCCESS;
     }
