@@ -940,9 +940,14 @@ static BOOL X11DRV_FocusIn( HWND hwnd, XEvent *xev )
         if (hwnd) hwnd = NtUserGetAncestor( hwnd, GA_ROOT );
         if (!hwnd) hwnd = get_active_window();
         if (!hwnd) hwnd = x11drv_thread_data()->last_focus;
-        if (!hwnd || !can_activate_window(hwnd)) return TRUE;
+        if (hwnd && can_activate_window(hwnd)) set_focus( event->display, hwnd, CurrentTime );
     }
-    set_focus( event->display, hwnd, CurrentTime );
+    else
+    {
+        wait_grab_pointer( event->display );
+        NtUserSetForegroundWindow( hwnd );
+    }
+
     return TRUE;
 }
 
