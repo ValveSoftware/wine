@@ -284,7 +284,11 @@ DWORD WINAPI DECLSPEC_HOTPATCH SignalObjectAndWait( HANDLE signal, HANDLE wait,
                                                     DWORD timeout, BOOL alertable )
 {
     NTSTATUS status;
+#ifdef __i386__
+    DECLSPEC_ALIGN(4) LARGE_INTEGER time;
+#else
     LARGE_INTEGER time;
+#endif
 
     TRACE( "%p %p %ld %d\n", signal, wait, timeout, alertable );
 
