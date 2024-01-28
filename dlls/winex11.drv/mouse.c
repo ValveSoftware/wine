@@ -331,22 +331,21 @@ static void update_relative_valuators( XIAnyClassInfo **classes, int num_classes
 
 
 /***********************************************************************
- *              X11DRV_XInput2_Init
+ *              x11drv_xinput2_init
  */
-void X11DRV_XInput2_Init(void)
+void x11drv_xinput2_init( struct x11drv_thread_data *data )
 {
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
-    struct x11drv_thread_data *data = x11drv_thread_data();
     int major = 2, minor = 2;
 
-    if (xinput2_available && pXIQueryVersion( data->display, &major, &minor ) == Success &&
-        pXIGetClientPointer( data->display, None, &data->xi2_core_pointer ))
-        TRACE( "XInput2 %d.%d available\n", major, minor );
-    else
+    if (!xinput2_available || pXIQueryVersion( data->display, &major, &minor ))
     {
-        data->xi2_core_pointer = 0;
-        WARN( "XInput 2.2 not available\n" );
+        WARN( "XInput 2.0 not available\n" );
+        xinput2_available = FALSE;
+        return;
     }
+
+    TRACE( "XInput2 %d.%d available\n", major, minor );
 #endif
 }
 
@@ -1942,9 +1941,9 @@ static BOOL X11DRV_XIDeviceEvent( XIDeviceEvent *event )
 #endif /* HAVE_X11_EXTENSIONS_XINPUT2_H */
 
 /***********************************************************************
- *              X11DRV_XInput2_Load
+ *              x11drv_xinput2_load
  */
-void X11DRV_XInput2_Load(void)
+void x11drv_xinput2_load(void)
 {
 #if defined(SONAME_LIBXI)
     int event, error;
