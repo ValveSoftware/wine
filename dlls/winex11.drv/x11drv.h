@@ -266,8 +266,6 @@ extern void X11DRV_ThreadDetach(void);
 /* X11 driver internal functions */
 
 extern void X11DRV_Xcursor_Init(void);
-extern void X11DRV_XInput2_Load(void);
-extern void X11DRV_XInput2_Init(void);
 extern void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask );
 
 extern DWORD copy_image_bits( BITMAPINFO *info, BOOL is_r8g8b8, XImage *image,
@@ -597,6 +595,9 @@ extern BOOL X11DRV_MappingNotify( HWND hWnd, XEvent *event );
 extern BOOL X11DRV_GenericEvent( HWND hwnd, XEvent *event );
 
 extern int xinput2_opcode;
+extern void x11drv_xinput2_load(void);
+extern void x11drv_xinput2_init( struct x11drv_thread_data *data );
+
 extern Bool (*pXGetEventData)( Display *display, XEvent /*XGenericEventCookie*/ *event );
 extern void (*pXFreeEventData)( Display *display, XEvent /*XGenericEventCookie*/ *event );
 
