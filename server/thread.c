@@ -37,6 +37,9 @@
 #define _WITH_CPU_SET_T
 #include <sched.h>
 #endif
+#ifdef HAVE_SYS_RESOURCE_H
+#include <sys/resource.h>
+#endif
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -226,6 +229,27 @@ static const struct fd_ops thread_fd_ops =
 };
 
 static struct list thread_list = LIST_INIT(thread_list);
+#ifdef __linux__
+static int nice_limit;
+#endif
+
+void init_threading(void)
+{
+#ifdef __linux__
+#ifdef RLIMIT_NICE
+    struct rlimit rlimit;
+    if (!getrlimit( RLIMIT_NICE, &rlimit ))
+    {
+        rlimit.rlim_cur = rlimit.rlim_max;
+        setrlimit( RLIMIT_NICE, &rlimit );
+        if (rlimit.rlim_max <= 40) nice_limit = 20 - rlimit.rlim_max;
+        else if (rlimit.rlim_max == -1) nice_limit = -20;
+        if (nice_limit >= 0 && debug_level) fprintf(stderr, "wine: RLIMIT_NICE is <= 20, unable to use setpriority safely\n");
+    }
+#endif
+    if (nice_limit < 0 && debug_level) fprintf(stderr, "wine: Using setpriority to control niceness in the [%d,%d] range\n", nice_limit, -nice_limit );
+#endif
+}
 
 /* initialize the structure for a newly allocated thread */
 static inline void init_thread_structure( struct thread *thread )
@@ -750,8 +774,48 @@ affinity_t get_thread_affinity( struct thread *thread )
     return mask;
 }
 
+static int get_base_priority( int priority_class, int priority )
+{
+    /* offsets taken from https://learn.microsoft.com/en-us/windows/win32/procthread/scheduling-priorities */
+    static const int class_offsets[] = { 4, 8, 13, 24, 6, 10 };
+    if (priority == THREAD_PRIORITY_IDLE) return (priority_class == PROCESS_PRIOCLASS_REALTIME ? 16 : 1);
+    if (priority == THREAD_PRIORITY_TIME_CRITICAL) return (priority_class == PROCESS_PRIOCLASS_REALTIME ? 31 : 15);
+    if (priority_class >= ARRAY_SIZE(class_offsets)) return 8;
+    return class_offsets[priority_class - 1] + priority;
+}
+
+#ifdef __linux__
+/* maps an NT application band [1,15] base priority to [-nice_limit, nice_limit] */
+static int get_unix_niceness( int base_priority )
+{
+    int min = -nice_limit, max = nice_limit, range = max - min;
+    return min + (base_priority - 1) * range / 14;
+}
+#endif
+
 #define THREAD_PRIORITY_REALTIME_HIGHEST 6
 #define THREAD_PRIORITY_REALTIME_LOWEST -7
+
+static int apply_thread_priority( struct thread *thread, int priority_class, int priority )
+{
+    int base_priority = get_base_priority( priority_class, priority );
+#ifdef __linux__
+    int niceness;
+
+    if (thread->unix_tid == -1) return STATUS_THREAD_IS_TERMINATING;
+
+    /* FIXME: handle REALTIME class using SCHED_RR if possible, for now map it to highest non-realtime band */
+    if (priority_class == PROCESS_PRIOCLASS_REALTIME) base_priority = 15;
+    if (nice_limit < 0)
+    {
+        niceness = get_unix_niceness( base_priority );
+        if (setpriority( PRIO_PROCESS, thread->unix_tid, niceness ) != 0)
+            return STATUS_ACCESS_DENIED;
+        return STATUS_SUCCESS;
+    }
+#endif
+    return STATUS_NOT_IMPLEMENTED;
+}
 
 int set_thread_priority( struct thread *thread, int priority_class, int priority )
 {
@@ -775,7 +839,7 @@ int set_thread_priority( struct thread *thread, int priority_class, int priority
         return STATUS_SUCCESS;
     thread->priority = priority;
 
-    return STATUS_SUCCESS;
+    return apply_thread_priority( thread, priority_class, priority );
 }
 
 /* set all information about a thread */

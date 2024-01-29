@@ -247,6 +247,7 @@ int main( int argc, char *argv[] )
     init_memory();
     init_user_sid();
     init_directories( load_intl_file() );
+    init_threading();
     init_registry();
     main_loop();
     return 0;
