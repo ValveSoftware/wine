@@ -3007,13 +3007,19 @@ struct send_udp_thread_param
 static DWORD WINAPI send_udp_thread( void *param )
 {
     struct send_udp_thread_param *p = param;
+    static const TIMEVAL timeout_zero = {0};
     static char buf[256];
+    fd_set writefds;
     unsigned int i;
     int ret;
 
     WaitForSingleObject( p->start_event, INFINITE );
     for (i = 0; i < 256; ++i)
     {
+        FD_ZERO(&writefds);
+        FD_SET(p->sock, &writefds);
+        ret = select( 1, NULL, &writefds, NULL, &timeout_zero );
+        ok( ret == 1, "got %d, i %u.\n", ret, i );
         ret = send( p->sock, buf, sizeof(buf), 0 );
         ok( ret == sizeof(buf), "got %d, error %u, i %u.\n", ret, WSAGetLastError(), i );
     }
@@ -3027,6 +3033,7 @@ static void test_UDP(void)
        possible that this test fails due to dropped packets. */
 
     /* peer 0 receives data from all other peers */
+    static const TIMEVAL timeout_zero = {0};
     struct sock_info peer[NUM_UDP_PEERS];
     char buf[16];
     int ss, i, n_recv, n_sent, ret;
@@ -3034,6 +3041,7 @@ static void test_UDP(void)
     int sock;
     struct send_udp_thread_param udp_thread_param;
     HANDLE thread;
+    fd_set writefds;
 
 
     memset (buf,0,sizeof(buf));
@@ -3103,6 +3111,10 @@ static void test_UDP(void)
     {
         ret = send( sock, buf, sizeof(buf), 0 );
         ok( ret == sizeof(buf), "got %d, error %u, i %u.\n", ret, WSAGetLastError(), i );
+        FD_ZERO(&writefds);
+        FD_SET(sock, &writefds);
+        ret = select( 1, NULL, &writefds, NULL, &timeout_zero );
+        ok( ret == 1, "got %d, i %u.\n", ret, i );
     }
     WaitForSingleObject( thread, INFINITE );
     CloseHandle( thread );
