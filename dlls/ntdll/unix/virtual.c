@@ -2987,15 +2987,15 @@ void virtual_init(void)
     pthread_mutexattr_destroy( &attr );
 
     if (!((env_var = getenv("WINE_DISABLE_KERNEL_WRITEWATCH")) && atoi(env_var))
-            && (pagemap_reset_fd = open("/proc/self/pagemap_reset", O_RDONLY)) != -1)
+            && (pagemap_reset_fd = open("/proc/self/pagemap_reset", O_RDONLY | O_CLOEXEC)) != -1)
     {
         use_kernel_writewatch = TRUE;
-        if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY)) == -1)
+        if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY | O_CLOEXEC)) == -1)
         {
             ERR("Could not open pagemap file, error %s.\n", strerror(errno));
             exit(-1);
         }
-        if ((clear_refs_fd = open("/proc/self/clear_refs", O_WRONLY)) == -1)
+        if ((clear_refs_fd = open("/proc/self/clear_refs", O_WRONLY | O_CLOEXEC)) == -1)
         {
             ERR("Could not open clear_refs file, error %s.\n", strerror(errno));
             exit(-1);
