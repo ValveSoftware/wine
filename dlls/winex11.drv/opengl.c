@@ -1551,6 +1551,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
                                         (visual->class == PseudoColor || visual->class == GrayScale ||
                                          visual->class == DirectColor) ? AllocAll : AllocNone );
         gl->window = create_client_window( hwnd, visual, gl->colormap );
+        gl->swap_interval = 0;
         if (gl->window)
         {
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
