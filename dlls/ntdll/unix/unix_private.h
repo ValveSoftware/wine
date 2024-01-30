@@ -216,7 +216,7 @@ extern void *anon_mmap_alloc( size_t size, int prot ) DECLSPEC_HIDDEN;
 
 extern void *steamclient_handle_fault( LPCVOID addr, DWORD err ) DECLSPEC_HIDDEN;
 
-extern void virtual_init(void) DECLSPEC_HIDDEN;
+extern void virtual_init( int argc, char *argv[] ) DECLSPEC_HIDDEN;
 extern ULONG_PTR get_system_affinity_mask(void) DECLSPEC_HIDDEN;
 extern void virtual_get_system_info( SYSTEM_BASIC_INFORMATION *info, BOOL wow64 ) DECLSPEC_HIDDEN;
 extern NTSTATUS virtual_map_builtin_module( HANDLE mapping, void **module, SIZE_T *size, SECTION_IMAGE_INFORMATION *info,
