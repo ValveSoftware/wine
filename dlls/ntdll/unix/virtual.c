@@ -3398,17 +3398,25 @@ static void *alloc_virtual_heap( SIZE_T size )
     return anon_mmap_alloc( size, PROT_READ | PROT_WRITE );
 }
 
+static int disable_kernel_ww( int argc, char *argv[] )
+{
+    const char *env_var;
+
+    if ((env_var = getenv("WINE_DISABLE_KERNEL_WRITEWATCH"))) return !!atoi(env_var);
+    if (argc > 1 && argv && argv[1] && strstr( argv[1], "blackdesert64.exe" )) return 1;
+    return 0;
+}
+
 /***********************************************************************
  *           virtual_init
  */
-void virtual_init(void)
+void virtual_init( int argc, char *argv[] )
 {
     const struct preload_info **preload_info = dlsym( RTLD_DEFAULT, "wine_main_preload_info" );
     const char *preload = getenv( "WINEPRELOADRESERVE" );
     size_t size;
     int i;
     pthread_mutexattr_t attr;
-    const char *env_var;
 
     pthread_mutexattr_init( &attr );
     pthread_mutexattr_settype( &attr, PTHREAD_MUTEX_RECURSIVE );
@@ -3422,8 +3430,7 @@ void virtual_init(void)
     host_addr_space_limit = address_space_limit;
 #endif
 
-    if (!((env_var = getenv("WINE_DISABLE_KERNEL_WRITEWATCH")) && atoi(env_var))
-            && (pagemap_reset_fd = open("/proc/self/pagemap_reset", O_RDONLY | O_CLOEXEC)) != -1)
+    if (!disable_kernel_ww( argc, argv ) && (pagemap_reset_fd = open("/proc/self/pagemap_reset", O_RDONLY | O_CLOEXEC)) != -1)
     {
         use_kernel_writewatch = TRUE;
         if ((pagemap_fd = open("/proc/self/pagemap", O_RDONLY | O_CLOEXEC)) == -1)
