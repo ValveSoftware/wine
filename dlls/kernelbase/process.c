@@ -579,6 +579,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     {
         const WCHAR *exe_name;
         const WCHAR *append;
+        const char *steamgameid;
     }
     options[] =
     {
@@ -595,8 +596,10 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"EverQuest 2\\LaunchPad.exe", L" --use-gl=swiftshader"},
         {L"Everquest F2P\\LaunchPad.exe", L" --use-gl=swiftshader"},
         {L"Red Tie Runner.exe", L" --use-angle=gl"},
+        {L"UnrealCEFSubProcess.exe", L" --use-gl=swiftshader", "2316580"},
     };
     unsigned int i;
+    char sgi[64];
 
     if (!cmd) return NULL;
 
@@ -604,6 +607,9 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     {
         if (wcsstr( cmd, options[i].exe_name ))
         {
+            if (options[i].steamgameid && !(GetEnvironmentVariableA( "SteamGameId", sgi, sizeof(sgi) )
+                && !strcmp( sgi, options[i].steamgameid )))
+                continue;
             FIXME( "HACK: appending %s to command line.\n", debugstr_w(options[i].append) );
             return options[i].append;
         }
