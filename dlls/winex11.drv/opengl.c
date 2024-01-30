@@ -1545,6 +1545,7 @@ static struct gl_drawable *create_gl_drawable( HWND hwnd, const struct wgl_pixel
 
         gl->type = DC_GL_CHILD_WIN;
         gl->window = create_client_window( hwnd, visual );
+        gl->swap_interval = 0;
         if (gl->window)
         {
             gl->drawable = pglXCreateWindow( gdi_display, gl->format->fbconfig, gl->window, NULL );
