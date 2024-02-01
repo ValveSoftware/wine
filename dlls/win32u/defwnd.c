@@ -24,6 +24,7 @@
 #pragma makedep unix
 #endif
 
+#include <stdlib.h>
 #include "ntgdi_private.h"
 #include "ntuser_private.h"
 #include "wine/server.h"
@@ -1865,8 +1866,15 @@ static void handle_nc_calc_size( HWND hwnd, WPARAM wparam, RECT *win_rect )
 
     if (!win_rect) return;
 
-    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR && !((style & WS_POPUP) && (ex_style & WS_EX_TOOLWINDOW)))
-        return;
+    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR)
+    {
+        /* Disable gamescope undecorated windows hack for following games. They don't expect client
+         * rect equals to window rect when in windowed mode. */
+        const char *sgi = getenv( "SteamGameId" );
+        if (!((style & WS_POPUP) && (ex_style & WS_EX_TOOLWINDOW)) && /* Bug 20038: game splash screens */
+            !(sgi && !strcmp( sgi, "2563800" )))                      /* Bug 23342: The Last Game */
+            return;
+    }
 
     if (!(style & WS_MINIMIZE))
     {

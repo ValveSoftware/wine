@@ -18,6 +18,7 @@
  * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301, USA
  */
 
+#include <stdlib.h>
 #include "user_private.h"
 #include "controls.h"
 #include "wine/debug.h"
@@ -32,8 +33,15 @@ static void adjust_window_rect( RECT *rect, DWORD style, BOOL menu, DWORD exStyl
 {
     int adjust = 0;
 
-    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR && !((style & WS_POPUP) && (exStyle & WS_EX_TOOLWINDOW)))
-        return;
+    if (__wine_get_window_manager() == WINE_WM_X11_STEAMCOMPMGR)
+    {
+        /* Disable gamescope undecorated windows hack for following games. They don't expect client
+         * rect equals to window rect when in windowed mode. */
+        const char *sgi = getenv( "SteamGameId" );
+        if (!((style & WS_POPUP) && (exStyle & WS_EX_TOOLWINDOW)) && /* Bug 20038: game splash screens */
+            !(sgi && !strcmp( sgi, "2563800" )))                     /* Bug 23342: The Last Game */
+            return;
+    }
 
     if ((exStyle & (WS_EX_STATICEDGE|WS_EX_DLGMODALFRAME)) == WS_EX_STATICEDGE)
         adjust = 1; /* for the outer frame always present */
