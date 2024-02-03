@@ -1791,6 +1791,18 @@ VkResult wine_vkGetCalibratedTimestampsEXT(VkDevice handle, uint32_t timestamp_c
                                   device->funcs.p_vkGetCalibratedTimestampsEXT);
 }
 
+VkResult wine_vkGetCalibratedTimestampsKHR(VkDevice handle, uint32_t timestamp_count,
+                                           const VkCalibratedTimestampInfoKHR *timestamp_infos,
+                                           uint64_t *timestamps, uint64_t *max_deviation)
+{
+    struct wine_device *device = wine_device_from_handle(handle);
+
+    TRACE("%p, %u, %p, %p, %p\n", device, timestamp_count, timestamp_infos, timestamps, max_deviation);
+
+    return wine_vk_get_timestamps(device, timestamp_count, timestamp_infos, timestamps, max_deviation,
+                                  device->funcs.p_vkGetCalibratedTimestampsKHR);
+}
+
 VkResult wine_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice handle,
                                                              uint32_t *time_domain_count,
                                                              VkTimeDomainEXT *time_domains)
@@ -1801,6 +1813,18 @@ VkResult wine_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT(VkPhysicalDevice ha
 
     return wine_vk_get_time_domains(phys_dev, time_domain_count, time_domains,
                                     phys_dev->instance->funcs.p_vkGetPhysicalDeviceCalibrateableTimeDomainsEXT);
+}
+
+VkResult wine_vkGetPhysicalDeviceCalibrateableTimeDomainsKHR(VkPhysicalDevice handle,
+                                                             uint32_t *time_domain_count,
+                                                             VkTimeDomainKHR *time_domains)
+{
+    struct wine_phys_dev *phys_dev = wine_phys_dev_from_handle(handle);
+
+    TRACE("%p, %p, %p\n", phys_dev, time_domain_count, time_domains);
+
+    return wine_vk_get_time_domains(phys_dev, time_domain_count, time_domains,
+                                    phys_dev->instance->funcs.p_vkGetPhysicalDeviceCalibrateableTimeDomainsKHR);
 }
 
 static inline void wine_vk_normalize_semaphore_handle_types_win(VkExternalSemaphoreHandleTypeFlags *types)
