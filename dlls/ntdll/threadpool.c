@@ -3058,15 +3058,15 @@ VOID WINAPI TpSetWait( TP_WAIT *wait, HANDLE handle, LARGE_INTEGER *timeout )
 {
     struct threadpool_object *this = impl_from_TP_WAIT( wait );
     ULONGLONG timestamp = MAXLONGLONG;
+    BOOL same_handle;
 
     TRACE( "%p %p %p\n", wait, handle, timeout );
 
     RtlEnterCriticalSection( &waitqueue.cs );
 
     assert( this->u.wait.bucket );
-    if (this->u.wait.handle == handle)
-        goto done;
 
+    same_handle = this->u.wait.handle == handle;
     this->u.wait.handle = handle;
 
     if (handle || this->u.wait.wait_pending)
@@ -3100,11 +3100,11 @@ VOID WINAPI TpSetWait( TP_WAIT *wait, HANDLE handle, LARGE_INTEGER *timeout )
         }
 
         /* Wake up the wait queue thread. */
-        ++this->update_serial;
+        if (!same_handle)
+            ++this->update_serial;
         NtSetEvent( bucket->update_event, NULL );
     }
 
-done:
     RtlLeaveCriticalSection( &waitqueue.cs );
 }
 
