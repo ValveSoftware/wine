@@ -4526,6 +4526,7 @@ void loader_init( CONTEXT *context, void **entry )
         WINE_MODREF *kernel32;
         PEB *peb = NtCurrentTeb()->Peb;
         WCHAR env_str[16];
+        ULONG heap_flags = HEAP_GROWABLE;
         unsigned int i;
 
         peb->LdrData            = &ldr;
@@ -4542,8 +4543,13 @@ void loader_init( CONTEXT *context, void **entry )
                 delay_heap_free = TRUE;
             }
         }
+        if (get_env( L"WINE_HEAP_ZERO_MEMORY", env_str, sizeof(env_str)) && env_str[0] == L'1')
+        {
+            ERR( "Enabling heap zero hack.\n" );
+            heap_flags |= HEAP_ZERO_MEMORY;
+        }
 
-        peb->ProcessHeap        = RtlCreateHeap( HEAP_GROWABLE, NULL, 0, 0, NULL, NULL );
+        peb->ProcessHeap        = RtlCreateHeap( heap_flags, NULL, 0, 0, NULL, NULL );
 
         RtlInitializeBitMap( &tls_bitmap, peb->TlsBitmapBits, sizeof(peb->TlsBitmapBits) * 8 );
         RtlInitializeBitMap( &tls_expansion_bitmap, peb->TlsExpansionBitmapBits,
