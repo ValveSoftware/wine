@@ -336,7 +336,10 @@ static void update_relative_valuators( XIAnyClassInfo **classes, int num_classes
 void x11drv_xinput2_init( struct x11drv_thread_data *data )
 {
 #ifdef HAVE_X11_EXTENSIONS_XINPUT2_H
+    unsigned char mask_bits[XIMaskLen(XI_LASTEVENT)];
     int major = 2, minor = 2;
+    XIEventMask mask;
+    int count;
 
     if (!xinput2_available || pXIQueryVersion( data->display, &major, &minor ))
     {
@@ -346,6 +349,22 @@ void x11drv_xinput2_init( struct x11drv_thread_data *data )
     }
 
     TRACE( "XInput2 %d.%d available\n", major, minor );
+
+    mask.mask     = mask_bits;
+    mask.mask_len = sizeof(mask_bits);
+    mask.deviceid = XIAllMasterDevices;
+    memset( mask_bits, 0, sizeof(mask_bits) );
+    XISetMask( mask_bits, XI_DeviceChanged );
+    pXISelectEvents( data->display, DefaultRootWindow( data->display ), &mask, 1 );
+
+    if (!pXIGetClientPointer( data->display, None, &data->xinput2_pointer ))
+        WARN( "Failed to get xinput2 master pointer device\n" );
+    else
+    {
+        XIDeviceInfo *pointer_info = pXIQueryDevice( data->display, data->xinput2_pointer, &count );
+        update_relative_valuators( pointer_info->classes, pointer_info->num_classes );
+        pXIFreeDeviceInfo( pointer_info );
+    }
 #endif
 }
 
@@ -355,12 +374,9 @@ void x11drv_xinput2_init( struct x11drv_thread_data *data )
  */
 void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
 {
-    struct x11drv_thread_data *data = x11drv_thread_data();
     unsigned char mask_bits[XIMaskLen(XI_LASTEVENT)];
     BOOL raw = (window == None);
-    XIDeviceInfo *pointer_info;
     XIEventMask mask;
-    int count;
 
     mask.mask     = mask_bits;
     mask.mask_len = sizeof(mask_bits);
@@ -369,34 +385,19 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
 
     /* FIXME: steam overlay doesn't like if we use XI2 for non-raw events */
 
-    if (event_mask & PointerMotionMask)
+    if (raw && event_mask)
     {
-        XISetMask( mask_bits, XI_DeviceChanged );
-        if (raw)
-        {
-            XISetMask( mask_bits, XI_RawMotion );
-            XISetMask( mask_bits, XI_RawTouchBegin );
-            XISetMask( mask_bits, XI_RawTouchUpdate );
-            XISetMask( mask_bits, XI_RawTouchEnd );
-        }
-    }
-    if (event_mask & ButtonPressMask)
-    {
-        XISetMask( mask_bits, XI_DeviceChanged );
-        if (raw) XISetMask( mask_bits, XI_RawButtonPress );
-    }
-    if (event_mask & ButtonReleaseMask)
-    {
-        XISetMask( mask_bits, XI_DeviceChanged );
-        if (raw) XISetMask( mask_bits, XI_RawButtonRelease );
+        XISetMask( mask_bits, XI_RawMotion );
+        XISetMask( mask_bits, XI_RawTouchBegin );
+        XISetMask( mask_bits, XI_RawTouchUpdate );
+        XISetMask( mask_bits, XI_RawTouchEnd );
+        XISetMask( mask_bits, XI_RawButtonPress );
+        XISetMask( mask_bits, XI_RawButtonRelease );
     }
 
+    XISetMask( mask_bits, XI_DeviceChanged );
     pXISelectEvents( display, raw ? DefaultRootWindow( display ) : window, &mask, 1 );
     if (!raw) XSelectInput( display, window, event_mask );
-
-    pointer_info = pXIQueryDevice( data->display, data->xi2_core_pointer, &count );
-    update_relative_valuators( pointer_info->classes, pointer_info->num_classes );
-    pXIFreeDeviceInfo( pointer_info );
 }
 
 #endif
@@ -1694,7 +1695,7 @@ static BOOL X11DRV_XIDeviceChangedEvent( XIDeviceChangedEvent *event )
 {
     struct x11drv_thread_data *data = x11drv_thread_data();
 
-    if (event->deviceid != data->xi2_core_pointer) return FALSE;
+    if (event->deviceid != data->xinput2_pointer) return FALSE;
     if (event->reason != XISlaveSwitch) return FALSE;
 
     update_relative_valuators( event->classes, event->num_classes );
@@ -1714,7 +1715,7 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input, RAWINPUT *raw
 
     if (x->number < 0 || y->number < 0) return FALSE;
     if (!event->valuators.mask_len) return FALSE;
-    if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
+    if (event->deviceid != thread_data->xinput2_pointer) return FALSE;
 
     if (x->mode == XIModeRelative && y->mode == XIModeRelative)
         input->mi.dwFlags &= ~(MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK);
@@ -1859,7 +1860,7 @@ static BOOL X11DRV_RawButtonEvent( XGenericEventCookie *cookie )
         button = pointer_mapping->buttons[button] - 1;
 
     if (button < 0 || button >= NB_BUTTONS) return FALSE;
-    if (event->deviceid != thread_data->xi2_core_pointer) return FALSE;
+    if (event->deviceid != thread_data->xinput2_pointer) return FALSE;
 
     TRACE( "raw button %u (raw: %u) %s\n", button, event->detail, event->evtype == XI_RawButtonRelease ? "up" : "down" );
 
