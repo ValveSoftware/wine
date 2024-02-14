@@ -2086,7 +2086,10 @@ static void hacks_init(void)
 
     env_str = getenv("WINE_NO_PRIV_ELEVATION");
     if (env_str)  no_priv_elevation = atoi(env_str);
+    else if (main_argc > 1 && strstr(main_argv[1], "playway-launcher-installer.exe")) no_priv_elevation = TRUE;
     else if (sgi) no_priv_elevation = !strcmp(sgi, "1584660");
+    if (no_priv_elevation)
+        ERR("HACK: no_priv_elevation");
 
     env_str = getenv("WINE_UNIX_PC_AS_NTDLL");
     if (env_str)  report_native_pc_as_ntdll = atoi(env_str);
