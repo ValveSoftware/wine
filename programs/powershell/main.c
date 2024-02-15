@@ -37,8 +37,9 @@ int __cdecl wmain(int argc, WCHAR *argv[])
             {
                 WINE_FIXME("command %s.\n", debugstr_a(command));
                 p = command;
-                while (!iswspace(*p)) ++p;
-                if (!strnicmp(command, "exit", p - command))
+                while (*p && !isspace(*p)) ++p;
+                *p = 0;
+                if (!stricmp(command, "exit"))
                     break;
             }
         }
