@@ -1,7 +1,6 @@
-/* Generic Video Decoder Transform
+/* H264 Decoder Transform
  *
  * Copyright 2022 Rémi Bernon for CodeWeavers
- * Copyright 2023 Shaun Ren for CodeWeavers
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -34,11 +33,6 @@
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 WINE_DECLARE_DEBUG_CHANNEL(winediag);
 
-extern GUID MFVideoFormat_GStreamer;
-static const GUID *const video_decoder_input_types[] =
-{
-    &MFVideoFormat_GStreamer,
-};
 static const GUID *const video_decoder_output_types[] =
 {
     &MFVideoFormat_NV12,
@@ -48,7 +42,7 @@ static const GUID *const video_decoder_output_types[] =
     &MFVideoFormat_YUY2,
 };
 
-struct video_decoder
+struct h264_decoder
 {
     IMFTransform IMFTransform_iface;
     LONG refcount;
@@ -77,12 +71,12 @@ struct video_decoder
     IMFMediaBuffer *temp_buffer;
 };
 
-static struct video_decoder *impl_from_IMFTransform(IMFTransform *iface)
+static struct h264_decoder *impl_from_IMFTransform(IMFTransform *iface)
 {
-    return CONTAINING_RECORD(iface, struct video_decoder, IMFTransform_iface);
+    return CONTAINING_RECORD(iface, struct h264_decoder, IMFTransform_iface);
 }
 
-static HRESULT try_create_wg_transform(struct video_decoder *decoder)
+static HRESULT try_create_wg_transform(struct h264_decoder *decoder)
 {
     /* Call of Duty: Black Ops 3 doesn't care about the ProcessInput/ProcessOutput
      * return values, it calls them in a specific order and expects the decoder
@@ -114,22 +108,13 @@ static HRESULT try_create_wg_transform(struct video_decoder *decoder)
     if (SUCCEEDED(IMFAttributes_GetUINT32(decoder->attributes, &MF_LOW_LATENCY, &low_latency)))
         attrs.low_latency = !!low_latency;
 
-    {
-        const char *sgi;
-        if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "2009100") || !strcmp(sgi, "2555360") || !strcmp(sgi, "1630110")))
-            attrs.low_latency = FALSE;
-    }
-
     if (!(decoder->wg_transform = wg_transform_create(&input_format, &output_format, &attrs)))
-    {
-        ERR("Failed to create transform with input major_type %u.\n", input_format.major_type);
         return E_FAIL;
-    }
 
     return S_OK;
 }
 
-static HRESULT create_output_media_type(struct video_decoder *decoder, const GUID *subtype,
+static HRESULT create_output_media_type(struct h264_decoder *decoder, const GUID *subtype,
         IMFMediaType *output_type, IMFMediaType **media_type)
 {
     IMFMediaType *default_type = decoder->output_type, *stream_type = output_type ? output_type : decoder->stream_type;
@@ -197,13 +182,19 @@ static HRESULT create_output_media_type(struct video_decoder *decoder, const GUI
             goto done;
     }
 
-    IMFMediaType_AddRef((*media_type = (IMFMediaType *)video_type));
 done:
-    IMFVideoMediaType_Release(video_type);
+    if (SUCCEEDED(hr))
+        *media_type = (IMFMediaType *)video_type;
+    else
+    {
+        IMFVideoMediaType_Release(video_type);
+        *media_type = NULL;
+    }
+
     return hr;
 }
 
-static HRESULT init_allocator(struct video_decoder *decoder)
+static HRESULT init_allocator(struct h264_decoder *decoder)
 {
     HRESULT hr;
 
@@ -222,7 +213,7 @@ static HRESULT init_allocator(struct video_decoder *decoder)
     return S_OK;
 }
 
-static void uninit_allocator(struct video_decoder *decoder)
+static void uninit_allocator(struct h264_decoder *decoder)
 {
     IMFVideoSampleAllocatorEx_UninitializeSampleAllocator(decoder->allocator);
     decoder->allocator_initialized = FALSE;
@@ -230,7 +221,7 @@ static void uninit_allocator(struct video_decoder *decoder)
 
 static HRESULT WINAPI transform_QueryInterface(IMFTransform *iface, REFIID iid, void **out)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     TRACE("iface %p, iid %s, out %p.\n", iface, debugstr_guid(iid), out);
 
@@ -250,7 +241,7 @@ static HRESULT WINAPI transform_QueryInterface(IMFTransform *iface, REFIID iid, 
 
 static ULONG WINAPI transform_AddRef(IMFTransform *iface)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     ULONG refcount = InterlockedIncrement(&decoder->refcount);
 
     TRACE("iface %p increasing refcount to %lu.\n", decoder, refcount);
@@ -260,7 +251,7 @@ static ULONG WINAPI transform_AddRef(IMFTransform *iface)
 
 static ULONG WINAPI transform_Release(IMFTransform *iface)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     ULONG refcount = InterlockedDecrement(&decoder->refcount);
 
     TRACE("iface %p decreasing refcount to %lu.\n", decoder, refcount);
@@ -314,7 +305,7 @@ static HRESULT WINAPI transform_GetStreamIDs(IMFTransform *iface, DWORD input_si
 
 static HRESULT WINAPI transform_GetInputStreamInfo(IMFTransform *iface, DWORD id, MFT_INPUT_STREAM_INFO *info)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     TRACE("iface %p, id %#lx, info %p.\n", iface, id, info);
 
@@ -324,7 +315,7 @@ static HRESULT WINAPI transform_GetInputStreamInfo(IMFTransform *iface, DWORD id
 
 static HRESULT WINAPI transform_GetOutputStreamInfo(IMFTransform *iface, DWORD id, MFT_OUTPUT_STREAM_INFO *info)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     TRACE("iface %p, id %#lx, info %p.\n", iface, id, info);
 
@@ -334,7 +325,7 @@ static HRESULT WINAPI transform_GetOutputStreamInfo(IMFTransform *iface, DWORD i
 
 static HRESULT WINAPI transform_GetAttributes(IMFTransform *iface, IMFAttributes **attributes)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     FIXME("iface %p, attributes %p semi-stub!\n", iface, attributes);
 
@@ -353,7 +344,7 @@ static HRESULT WINAPI transform_GetInputStreamAttributes(IMFTransform *iface, DW
 
 static HRESULT WINAPI transform_GetOutputStreamAttributes(IMFTransform *iface, DWORD id, IMFAttributes **attributes)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     FIXME("iface %p, id %#lx, attributes %p semi-stub!\n", iface, id, attributes);
 
@@ -381,7 +372,7 @@ static HRESULT WINAPI transform_AddInputStreams(IMFTransform *iface, DWORD strea
 static HRESULT WINAPI transform_GetInputAvailableType(IMFTransform *iface, DWORD id, DWORD index,
         IMFMediaType **type)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     TRACE("iface %p, id %#lx, index %#lx, type %p.\n", iface, id, index, type);
 
@@ -394,7 +385,7 @@ static HRESULT WINAPI transform_GetInputAvailableType(IMFTransform *iface, DWORD
 static HRESULT WINAPI transform_GetOutputAvailableType(IMFTransform *iface, DWORD id,
         DWORD index, IMFMediaType **type)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     TRACE("iface %p, id %#lx, index %#lx, type %p.\n", iface, id, index, type);
 
@@ -408,7 +399,7 @@ static HRESULT WINAPI transform_GetOutputAvailableType(IMFTransform *iface, DWOR
 
 static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     GUID major, subtype;
     UINT64 frame_size;
     HRESULT hr;
@@ -445,20 +436,15 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
     {
         if (FAILED(hr = IMFMediaType_SetUINT64(decoder->stream_type, &MF_MT_FRAME_SIZE, frame_size)))
             WARN("Failed to update stream type frame size, hr %#lx\n", hr);
-        MFCalculateImageSize(decoder->output_types[0], frame_size >> 32, frame_size, (UINT32 *)&decoder->output_info.cbSize);
+        decoder->output_info.cbSize = (frame_size >> 32) * (UINT32)frame_size * 2;
     }
 
-    if (decoder->wg_transform)
-    {
-        wg_transform_destroy(decoder->wg_transform);
-        decoder->wg_transform = 0;
-    }
     return S_OK;
 }
 
 static HRESULT WINAPI transform_SetOutputType(IMFTransform *iface, DWORD id, IMFMediaType *type, DWORD flags)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     UINT64 frame_size, stream_frame_size;
     GUID major, subtype;
     HRESULT hr;
@@ -518,8 +504,7 @@ static HRESULT WINAPI transform_SetOutputType(IMFTransform *iface, DWORD id, IMF
 
 static HRESULT WINAPI transform_GetInputCurrentType(IMFTransform *iface, DWORD id, IMFMediaType **type)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
-    GUID subtype;
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     HRESULT hr;
 
     TRACE("iface %p, id %#lx, type %p\n", iface, id, type);
@@ -527,31 +512,30 @@ static HRESULT WINAPI transform_GetInputCurrentType(IMFTransform *iface, DWORD i
     if (!decoder->input_type)
         return MF_E_TRANSFORM_TYPE_NOT_SET;
 
-    if (FAILED(hr = IMFMediaType_GetGUID(decoder->output_type, &MF_MT_SUBTYPE, &subtype)))
+    if (FAILED(hr = MFCreateMediaType(type)))
         return hr;
 
-    return create_output_media_type(decoder, &subtype, decoder->output_type, type);
+    return IMFMediaType_CopyAllItems(decoder->input_type, (IMFAttributes *)*type);
 }
 
 static HRESULT WINAPI transform_GetOutputCurrentType(IMFTransform *iface, DWORD id, IMFMediaType **type)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
+    GUID subtype;
     HRESULT hr;
 
     TRACE("iface %p, id %#lx, type %p\n", iface, id, type);
 
     if (!decoder->output_type)
         return MF_E_TRANSFORM_TYPE_NOT_SET;
-
-    if (FAILED(hr = MFCreateMediaType(type)))
+    if (FAILED(hr = IMFMediaType_GetGUID(decoder->output_type, &MF_MT_SUBTYPE, &subtype)))
         return hr;
-
-    return IMFMediaType_CopyAllItems(decoder->output_type, (IMFAttributes *)*type);
+    return create_output_media_type(decoder, &subtype, decoder->output_type, type);
 }
 
 static HRESULT WINAPI transform_GetInputStatus(IMFTransform *iface, DWORD id, DWORD *flags)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     TRACE("iface %p, id %#lx, flags %p.\n", iface, id, flags);
 
@@ -582,7 +566,7 @@ static HRESULT WINAPI transform_ProcessEvent(IMFTransform *iface, DWORD id, IMFM
 
 static HRESULT WINAPI transform_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_TYPE message, ULONG_PTR param)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     HRESULT hr;
 
     TRACE("iface %p, message %#x, param %Ix.\n", iface, message, param);
@@ -606,10 +590,6 @@ static HRESULT WINAPI transform_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_
     case MFT_MESSAGE_COMMAND_FLUSH:
         return wg_transform_flush(decoder->wg_transform);
 
-    case MFT_MESSAGE_NOTIFY_START_OF_STREAM:
-        decoder->sample_time = 0;
-        return S_OK;
-
     default:
         FIXME("Ignoring message %#x.\n", message);
         return S_OK;
@@ -618,7 +598,7 @@ static HRESULT WINAPI transform_ProcessMessage(IMFTransform *iface, MFT_MESSAGE_
 
 static HRESULT WINAPI transform_ProcessInput(IMFTransform *iface, DWORD id, IMFSample *sample, DWORD flags)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
 
     TRACE("iface %p, id %#lx, sample %p, flags %#lx.\n", iface, id, sample, flags);
 
@@ -628,7 +608,7 @@ static HRESULT WINAPI transform_ProcessInput(IMFTransform *iface, DWORD id, IMFS
     return wg_transform_push_mf(decoder->wg_transform, sample, decoder->wg_sample_queue);
 }
 
-static HRESULT output_sample(struct video_decoder *decoder, IMFSample **out, IMFSample *src_sample)
+static HRESULT output_sample(struct h264_decoder *decoder, IMFSample **out, IMFSample *src_sample)
 {
     MFT_OUTPUT_DATA_BUFFER output[1];
     IMFSample *sample;
@@ -658,10 +638,9 @@ static HRESULT output_sample(struct video_decoder *decoder, IMFSample **out, IMF
     return S_OK;
 }
 
-static HRESULT handle_stream_type_change(struct video_decoder *decoder, const struct wg_format *format)
+static HRESULT handle_stream_type_change(struct h264_decoder *decoder, const struct wg_format *format)
 {
     UINT64 frame_size, frame_rate;
-    GUID subtype;
     HRESULT hr;
 
     if (decoder->stream_type)
@@ -675,9 +654,7 @@ static HRESULT handle_stream_type_change(struct video_decoder *decoder, const st
 
     if (FAILED(hr = IMFMediaType_GetUINT64(decoder->stream_type, &MF_MT_FRAME_SIZE, &frame_size)))
         return hr;
-    if (FAILED(hr = IMFMediaType_GetGUID(decoder->stream_type, &MF_MT_SUBTYPE, &subtype)))
-        return hr;
-    MFCalculateImageSize(&subtype, frame_size >> 32, frame_size, (UINT32 *)&decoder->output_info.cbSize);
+    decoder->output_info.cbSize = (frame_size >> 32) * (UINT32)frame_size * 2;
     uninit_allocator(decoder);
 
     return MF_E_TRANSFORM_STREAM_CHANGE;
@@ -686,7 +663,7 @@ static HRESULT handle_stream_type_change(struct video_decoder *decoder, const st
 static HRESULT WINAPI transform_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
         MFT_OUTPUT_DATA_BUFFER *samples, DWORD *status)
 {
-    struct video_decoder *decoder = impl_from_IMFTransform(iface);
+    struct h264_decoder *decoder = impl_from_IMFTransform(iface);
     struct wg_format wg_format;
     UINT32 sample_size;
     LONGLONG duration;
@@ -802,7 +779,7 @@ static const IMFTransformVtbl transform_vtbl =
 static HRESULT video_decoder_create_with_types(const GUID *const *input_types, UINT input_type_count,
         const GUID *const *output_types, UINT output_type_count, IMFTransform **ret)
 {
-    struct video_decoder *decoder;
+    struct h264_decoder *decoder;
     HRESULT hr;
 
     if (!(decoder = calloc(1, sizeof(*decoder))))
@@ -834,12 +811,6 @@ static HRESULT video_decoder_create_with_types(const GUID *const *input_types, U
     if (FAILED(hr = IMFAttributes_SetUINT32(decoder->attributes, &AVDecVideoAcceleration_H264, TRUE)))
         goto failed;
 
-    {
-        const char *sgi;
-        if ((sgi = getenv("SteamGameId")) && ((!strcmp(sgi, "2009100")) || (!strcmp(sgi, "2555360"))))
-            IMFAttributes_SetUINT32(decoder->attributes, &MF_SA_D3D11_AWARE, FALSE);
-    }
-
     if (FAILED(hr = MFCreateAttributes(&decoder->output_attributes, 0)))
         goto failed;
     if (FAILED(hr = wg_sample_queue_create(&decoder->wg_sample_queue)))
@@ -865,22 +836,6 @@ failed:
     if (decoder->stream_type)
         IMFMediaType_Release(decoder->stream_type);
     free(decoder);
-    return hr;
-}
-
-HRESULT video_decoder_create(REFIID riid, void **out)
-{
-    IMFTransform *iface;
-    HRESULT hr;
-
-    TRACE("riid %s, out %p.\n", debugstr_guid(riid), out);
-
-    if (FAILED(hr = video_decoder_create_with_types(video_decoder_input_types, ARRAY_SIZE(video_decoder_input_types),
-            video_decoder_output_types, ARRAY_SIZE(video_decoder_output_types), &iface)))
-        return hr;
-
-    hr = IMFTransform_QueryInterface(iface, riid, out);
-    IMFTransform_Release(iface);
     return hr;
 }
 
@@ -924,33 +879,4 @@ HRESULT h264_decoder_create(REFIID riid, void **out)
     hr = IMFTransform_QueryInterface(iface, riid, out);
     IMFTransform_Release(iface);
     return hr;
-}
-
-extern GUID MFVideoFormat_IV50;
-static const GUID *const iv50_decoder_input_types[] =
-{
-    &MFVideoFormat_IV50,
-};
-static const GUID *const iv50_decoder_output_types[] =
-{
-    &MFVideoFormat_YV12,
-    &MFVideoFormat_YUY2,
-    &MFVideoFormat_NV11,
-    &MFVideoFormat_NV12,
-    &MFVideoFormat_RGB32,
-    &MFVideoFormat_RGB24,
-    &MFVideoFormat_RGB565,
-    &MFVideoFormat_RGB555,
-    &MFVideoFormat_RGB8,
-};
-
-HRESULT WINAPI winegstreamer_create_video_decoder(IMFTransform **out)
-{
-    TRACE("out %p.\n", out);
-
-    if (!init_gstreamer())
-        return E_FAIL;
-
-    return video_decoder_create_with_types(iv50_decoder_input_types, ARRAY_SIZE(iv50_decoder_input_types),
-            iv50_decoder_output_types, ARRAY_SIZE(iv50_decoder_output_types), out);
 }
