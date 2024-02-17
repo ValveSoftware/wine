@@ -7620,16 +7620,12 @@ static void test_MFInitAMMediaTypeFromMFMediaType(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     video_info = (VIDEOINFOHEADER *)am_type.pbFormat;
     ok(video_info->rcSource.left == 0, "got %lu\n", video_info->rcSource.left);
-    todo_wine
     ok(video_info->rcSource.right == 123, "got %lu\n", video_info->rcSource.right);
     ok(video_info->rcSource.top == 0, "got %lu\n", video_info->rcSource.top);
-    todo_wine
     ok(video_info->rcSource.bottom == 456, "got %lu\n", video_info->rcSource.bottom);
     ok(video_info->rcTarget.left == 0, "got %lu\n", video_info->rcTarget.left);
-    todo_wine
     ok(video_info->rcTarget.right == 123, "got %lu\n", video_info->rcTarget.right);
     ok(video_info->rcTarget.top == 0, "got %lu\n", video_info->rcTarget.top);
-    todo_wine
     ok(video_info->rcTarget.bottom == 456, "got %lu\n", video_info->rcTarget.bottom);
     ok(video_info->bmiHeader.biWidth == 246, "got %lu\n", video_info->bmiHeader.biWidth);
     ok(video_info->bmiHeader.biHeight == 456, "got %ld\n", video_info->bmiHeader.biHeight);
@@ -7643,16 +7639,12 @@ static void test_MFInitAMMediaTypeFromMFMediaType(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     video_info = (VIDEOINFOHEADER *)am_type.pbFormat;
     ok(video_info->rcSource.left == 0, "got %lu\n", video_info->rcSource.left);
-    todo_wine
     ok(video_info->rcSource.right == 123, "got %lu\n", video_info->rcSource.right);
     ok(video_info->rcSource.top == 0, "got %lu\n", video_info->rcSource.top);
-    todo_wine
     ok(video_info->rcSource.bottom == 456, "got %lu\n", video_info->rcSource.bottom);
     ok(video_info->rcTarget.left == 0, "got %lu\n", video_info->rcTarget.left);
-    todo_wine
     ok(video_info->rcTarget.right == 123, "got %lu\n", video_info->rcTarget.right);
     ok(video_info->rcTarget.top == 0, "got %lu\n", video_info->rcTarget.top);
-    todo_wine
     ok(video_info->rcTarget.bottom == 456, "got %lu\n", video_info->rcTarget.bottom);
     ok(video_info->bmiHeader.biWidth == 246, "got %lu\n", video_info->bmiHeader.biWidth);
     ok(video_info->bmiHeader.biHeight == -456, "got %ld\n", video_info->bmiHeader.biHeight);
@@ -7675,16 +7667,12 @@ static void test_MFInitAMMediaTypeFromMFMediaType(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     video_info = (VIDEOINFOHEADER *)am_type.pbFormat;
     ok(video_info->rcSource.left == 0, "got %lu\n", video_info->rcSource.left);
-    todo_wine
     ok(video_info->rcSource.right == 123, "got %lu\n", video_info->rcSource.right);
     ok(video_info->rcSource.top == 0, "got %lu\n", video_info->rcSource.top);
-    todo_wine
     ok(video_info->rcSource.bottom == 456, "got %lu\n", video_info->rcSource.bottom);
     ok(video_info->rcTarget.left == 0, "got %lu\n", video_info->rcTarget.left);
-    todo_wine
     ok(video_info->rcTarget.right == 123, "got %lu\n", video_info->rcTarget.right);
     ok(video_info->rcTarget.top == 0, "got %lu\n", video_info->rcTarget.top);
-    todo_wine
     ok(video_info->rcTarget.bottom == 456, "got %lu\n", video_info->rcTarget.bottom);
     ok(video_info->bmiHeader.biWidth == 246, "got %lu\n", video_info->bmiHeader.biWidth);
     ok(video_info->bmiHeader.biHeight == 456, "got %ld\n", video_info->bmiHeader.biHeight);
