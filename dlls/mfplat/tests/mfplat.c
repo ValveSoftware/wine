@@ -10006,9 +10006,7 @@ static void test_MFInitMediaTypeFromVideoInfoHeader(void)
     hr = MFInitMediaTypeFromVideoInfoHeader(media_type, &vih, sizeof(vih), &GUID_NULL);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_SAMPLE_SIZE, &value32);
-    todo_wine
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(value32 == 12345, "Unexpected value %#x.\n", value32);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_AVG_BITRATE, &value32);
     ok(hr == MF_E_ATTRIBUTENOTFOUND, "Unexpected hr %#lx.\n", hr);
@@ -10071,9 +10069,7 @@ static void test_MFInitMediaTypeFromVideoInfoHeader(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(value64 == ((UINT64)16 << 32 | 32), "Unexpected value %#I64x.\n", value64);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_SAMPLE_SIZE, &value32);
-    todo_wine
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(value32 == 12345, "Unexpected value %#x.\n", value32);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_DEFAULT_STRIDE, &value32);
     ok(hr == MF_E_ATTRIBUTENOTFOUND, "Unexpected hr %#lx.\n", hr);
@@ -10271,9 +10267,7 @@ static void test_MFInitMediaTypeFromVideoInfoHeader2(void)
     hr = MFInitMediaTypeFromVideoInfoHeader2(media_type, &vih, sizeof(vih), &GUID_NULL);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_SAMPLE_SIZE, &value32);
-    todo_wine
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(value32 == 12345, "Unexpected value %#x.\n", value32);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_AVG_BITRATE, &value32);
     ok(hr == MF_E_ATTRIBUTENOTFOUND, "Unexpected hr %#lx.\n", hr);
@@ -10398,9 +10392,7 @@ static void test_MFInitMediaTypeFromVideoInfoHeader2(void)
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
     ok(value64 == ((UINT64)16 << 32 | 32), "Unexpected value %#I64x.\n", value64);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_SAMPLE_SIZE, &value32);
-    todo_wine
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(value32 == 12345, "Unexpected value %#x.\n", value32);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_DEFAULT_STRIDE, &value32);
     ok(hr == MF_E_ATTRIBUTENOTFOUND, "Unexpected hr %#lx.\n", hr);
@@ -10705,7 +10697,6 @@ static void test_MFInitMediaTypeFromAMMediaType(void)
     ok(value32 == 432 * 4, "got %d.\n", (UINT32)value32);
     hr = IMFMediaType_GetUINT32(media_type, &MF_MT_SAMPLE_SIZE, &value32);
     ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-    todo_wine
     ok(value32 == 12345678, "got %d.\n", (UINT32)value32);
     hr = IMFMediaType_GetBlob(media_type, &MF_MT_MINIMUM_DISPLAY_APERTURE, (BYTE *)&aperture, sizeof(aperture), &value32);
     todo_wine
