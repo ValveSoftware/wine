@@ -2223,6 +2223,7 @@ static HRESULT WINAPI MediaSeeking_IsUsingTimeFormat(IMediaSeeking *iface, const
 static HRESULT WINAPI MediaSeeking_SetTimeFormat(IMediaSeeking *iface, const GUID *pFormat)
 {
     struct filter_graph *This = impl_from_IMediaSeeking(iface);
+    const char *sgi;
 
     if (!pFormat)
         return E_POINTER;
@@ -2232,6 +2233,11 @@ static HRESULT WINAPI MediaSeeking_SetTimeFormat(IMediaSeeking *iface, const GUI
     if (!IsEqualGUID(&TIME_FORMAT_MEDIA_TIME, pFormat))
     {
         FIXME("Unhandled time format %s\n", debugstr_guid(pFormat));
+
+        /* SWAT 3 video fix */
+        if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "560370"))
+            return S_OK;
+
         return E_INVALIDARG;
     }
 
