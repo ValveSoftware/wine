@@ -3063,10 +3063,12 @@ static DWORD query_data_ready( struct request *request )
     return count;
 }
 
-static BOOL skip_async_queue( struct request *request, BOOL *data_available )
+static BOOL skip_async_queue( struct request *request, BOOL *wont_block, DWORD to_read )
 {
-    *data_available = end_of_read_data( request ) || query_data_ready( request );
-    return request->hdr.recursion_count < 3 && *data_available;
+    if (!request->read_chunked)
+        to_read = min( to_read, request->content_length - request->content_read );
+    *wont_block = end_of_read_data( request ) || query_data_ready( request ) >= to_read;
+    return request->hdr.recursion_count < 3 && *wont_block;
 }
 
 static DWORD query_data_available( struct request *request, DWORD *available, BOOL async )
@@ -3118,7 +3120,7 @@ BOOL WINAPI WinHttpQueryDataAvailable( HINTERNET hrequest, LPDWORD available )
     DWORD ret;
     struct request *request;
     BOOL async;
-    BOOL data_available = FALSE;
+    BOOL wont_block = FALSE;
 
     TRACE("%p, %p\n", hrequest, available);
 
@@ -3134,11 +3136,11 @@ BOOL WINAPI WinHttpQueryDataAvailable( HINTERNET hrequest, LPDWORD available )
         return FALSE;
     }
 
-    if (!(async = request->connect->hdr.flags & WINHTTP_FLAG_ASYNC) || skip_async_queue( request, &data_available ))
+    if (!(async = request->connect->hdr.flags & WINHTTP_FLAG_ASYNC) || skip_async_queue( request, &wont_block, 1 ))
     {
         ret = query_data_available( request, available, async );
     }
-    else if (data_available)
+    else if (wont_block)
     {
         /* Data available but recursion limit reached, only queue callback. */
         struct send_callback *s;
@@ -3214,7 +3216,7 @@ BOOL WINAPI WinHttpReadData( HINTERNET hrequest, void *buffer, DWORD to_read, DW
     DWORD ret;
     struct request *request;
     BOOL async;
-    BOOL data_available = FALSE;
+    BOOL wont_block = FALSE;
 
     TRACE( "%p, %p, %lu, %p\n", hrequest, buffer, to_read, read );
 
@@ -3230,11 +3232,11 @@ BOOL WINAPI WinHttpReadData( HINTERNET hrequest, void *buffer, DWORD to_read, DW
         return FALSE;
     }
 
-    if (!(async = request->connect->hdr.flags & WINHTTP_FLAG_ASYNC) || skip_async_queue( request, &data_available ))
+    if (!(async = request->connect->hdr.flags & WINHTTP_FLAG_ASYNC) || skip_async_queue( request, &wont_block, to_read ))
     {
         ret = read_data( request, buffer, to_read, read, async );
     }
-    else if (data_available)
+    else if (wont_block)
     {
         /* Data available but recursion limit reached, only queue callback. */
         struct send_callback *s;
