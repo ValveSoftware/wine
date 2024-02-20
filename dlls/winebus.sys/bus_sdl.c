@@ -115,7 +115,7 @@ MAKE_FUNCPTR(SDL_RegisterEvents);
 MAKE_FUNCPTR(SDL_PushEvent);
 MAKE_FUNCPTR(SDL_GetTicks);
 MAKE_FUNCPTR(SDL_LogSetPriority);
-MAKE_FUNCPTR(SDL_SetHint);
+MAKE_FUNCPTR(SDL_SetHintWithPriority);
 static int (*pSDL_JoystickRumble)(SDL_Joystick *joystick, Uint16 low_frequency_rumble, Uint16 high_frequency_rumble, Uint32 duration_ms);
 static int (*pSDL_JoystickRumbleTriggers)(SDL_Joystick *joystick, Uint16 left_rumble, Uint16 right_rumble, Uint32 duration_ms);
 static Uint16 (*pSDL_JoystickGetProduct)(SDL_Joystick * joystick);
@@ -1199,7 +1199,7 @@ NTSTATUS sdl_bus_init(void *args)
     LOAD_FUNCPTR(SDL_PushEvent);
     LOAD_FUNCPTR(SDL_GetTicks);
     LOAD_FUNCPTR(SDL_LogSetPriority);
-    LOAD_FUNCPTR(SDL_SetHint);
+    LOAD_FUNCPTR(SDL_SetHintWithPriority);
 #undef LOAD_FUNCPTR
     pSDL_JoystickRumble = dlsym(sdl_handle, "SDL_JoystickRumble");
     pSDL_JoystickRumbleTriggers = dlsym(sdl_handle, "SDL_JoystickRumbleTriggers");
@@ -1211,7 +1211,7 @@ NTSTATUS sdl_bus_init(void *args)
 
     /* CW-Bug-Id: #23185: Disable SDL 2.30 new behavior, we need the steam virtual
      * controller name to figure which slot number it represents. */
-    pSDL_SetHint("SteamVirtualGamepadInfo", "");
+    pSDL_SetHintWithPriority("SteamVirtualGamepadInfo", "", SDL_HINT_OVERRIDE);
 
     if (pSDL_Init(SDL_INIT_GAMECONTROLLER | SDL_INIT_HAPTIC) < 0)
     {
