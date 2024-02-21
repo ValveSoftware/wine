@@ -3291,6 +3291,7 @@ done:
         return result;
     }
 
+    WINE_VK_ADD_NON_DISPATCHABLE_MAPPING(device->phys_dev->instance, memory, memory->host_memory, memory);
     memory->vm_map = mapping;
     *ret = wine_device_memory_to_handle(memory);
     return VK_SUCCESS;
@@ -3306,6 +3307,7 @@ void wine_vkFreeMemory(VkDevice handle, VkDeviceMemory memory_handle, const VkAl
     memory = wine_device_memory_from_handle(memory_handle);
 
     destroy_keyed_mutex(device, memory);
+    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, memory);
     device->funcs.p_vkFreeMemory(device->host_device, memory->host_memory, NULL);
 
     if (memory->vm_map)
