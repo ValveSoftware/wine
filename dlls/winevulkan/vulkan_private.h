@@ -269,7 +269,7 @@ struct wine_device_memory
     BOOL inherit;
     DWORD access;
     HANDLE handle;
-    void *mapping;
+    void *vm_map;
     struct keyed_mutex_shm *keyed_mutex_shm;
     VkSemaphore keyed_mutex_sem;
     uint64_t keyed_mutex_instance_id;
