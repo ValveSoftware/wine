@@ -949,7 +949,7 @@ struct format_string_args
     float ascent;
 };
 
-static GpStatus format_string_callback(GpGraphics *graphics,
+static GpStatus format_string_callback(GpGraphics *graphics, HDC hdc,
     GDIPCONST WCHAR *string, INT index, INT length, struct gdip_font_link_info *font_link_info,
     GDIPCONST RectF *rect, GDIPCONST GpStringFormat *format,
     INT lineno, const RectF *bounds, INT *underlined_indexes,
@@ -975,7 +975,7 @@ static GpStatus format_string_callback(GpGraphics *graphics,
         TTPOLYGONHEADER *ph = NULL, *origph;
         char *start;
         DWORD len, ofs = 0;
-        len = GetGlyphOutlineW(graphics->hdc, string[i], GGO_BEZIER, &gm, 0, NULL, &identity);
+        len = GetGlyphOutlineW(hdc, string[i], GGO_BEZIER, &gm, 0, NULL, &identity);
         if (len == GDI_ERROR)
         {
             status = GenericError;
@@ -989,7 +989,7 @@ static GpStatus format_string_callback(GpGraphics *graphics,
             status = OutOfMemory;
             break;
         }
-        GetGlyphOutlineW(graphics->hdc, string[i], GGO_BEZIER, &gm, len, start, &identity);
+        GetGlyphOutlineW(hdc, string[i], GGO_BEZIER, &gm, len, start, &identity);
 
         ofs = 0;
         while (ofs < len)
@@ -1117,7 +1117,7 @@ GpStatus WINGDIPAPI GdipAddPathString(GpPath* path, GDIPCONST WCHAR* string, INT
     args.maxY = 0;
     args.scale = emSize / native_height;
     args.ascent = textmetric.tmAscent * args.scale;
-    status = gdip_format_string(graphics, string, length, NULL, &scaled_layout_rect,
+    status = gdip_format_string(graphics, dc, string, length, NULL, &scaled_layout_rect,
                                 format, TRUE, format_string_callback, &args);
 
     DeleteDC(dc);

@@ -620,13 +620,13 @@ struct gdip_font_link_info {
 };
 
 
-typedef GpStatus (*gdip_format_string_callback)(GpGraphics *graphics,
+typedef GpStatus (*gdip_format_string_callback)(GpGraphics *graphics, HDC hdc,
     GDIPCONST WCHAR *string, INT index, INT length, struct gdip_font_link_info *sections,
     GDIPCONST RectF *rect, GDIPCONST GpStringFormat *format,
     INT lineno, const RectF *bounds, INT *underlined_indexes,
     INT underlined_index_count, void *user_data);
 
-GpStatus gdip_format_string(GpGraphics *graphics,
+GpStatus gdip_format_string(GpGraphics *graphics, HDC hdc,
     GDIPCONST WCHAR *string, INT length, GDIPCONST GpFont *font,
     GDIPCONST RectF *rect, GDIPCONST GpStringFormat *format, int ignore_empty_clip,
     gdip_format_string_callback callback, void *user_data);
