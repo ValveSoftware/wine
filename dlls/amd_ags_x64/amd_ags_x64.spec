@@ -16,9 +16,9 @@
 @ stub agsDriverExtensionsDX11_IASetPrimitiveTopology
 @ stdcall agsDriverExtensionsDX11_Init(ptr ptr long ptr)
 @ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirect() DX11_MultiDrawIndexedInstancedIndirect_impl
-@ stub agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect
+@ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect() DX11_MultiDrawIndexedInstancedIndirectCountIndirect_impl
 @ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_MultiDrawInstancedIndirect() DX11_MultiDrawInstancedIndirect_impl
-@ stub agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect
+@ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect() DX11_MultiDrawInstancedIndirectCountIndirect_impl
 @ stub agsDriverExtensionsDX11_NotifyResourceBeginAllAccess
 @ stub agsDriverExtensionsDX11_NotifyResourceEndAllAccess
 @ stub agsDriverExtensionsDX11_NotifyResourceEndWrites
