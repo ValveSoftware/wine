@@ -368,11 +368,6 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
     mask.deviceid = XIAllMasterDevices;
     memset( mask_bits, 0, sizeof(mask_bits) );
 
-    if (NtUserGetWindowThread( NtUserGetDesktopWindow(), NULL ) == GetCurrentThreadId())
-        data->xi2_rawinput_only = TRUE;
-    else
-        data->xi2_rawinput_only = FALSE;
-
     /* FIXME: steam overlay doesn't like if we use XI2 for non-raw events */
 
     if (event_mask & PointerMotionMask)
