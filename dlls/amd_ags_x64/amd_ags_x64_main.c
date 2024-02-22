@@ -1127,6 +1127,7 @@ static void get_dx11_extensions_supported(ID3D11Device *device, AGSDX11Extension
     extensions->depthBoundsTest = !!ID3D11VkExtDevice_GetExtensionSupport(ext_device, D3D11_VK_EXT_DEPTH_BOUNDS);
     extensions->uavOverlap = !!ID3D11VkExtDevice_GetExtensionSupport(ext_device, D3D11_VK_EXT_BARRIER_CONTROL);
     extensions->multiDrawIndirect = !!ID3D11VkExtDevice_GetExtensionSupport(ext_device, D3D11_VK_EXT_MULTI_DRAW_INDIRECT);
+    extensions->multiDrawIndirectCountIndirect = !!ID3D11VkExtDevice_GetExtensionSupport(ext_device, D3D11_VK_EXT_MULTI_DRAW_INDIRECT_COUNT);
     extensions->UAVOverlapDeferredContexts = extensions->uavOverlap;
 
     ID3D11VkExtDevice_Release(ext_device);
@@ -1589,6 +1590,135 @@ __ASM_GLOBAL_FUNC( DX11_MultiDrawInstancedIndirect_impl,
                    "jmp " __ASM_NAME("agsDriverExtensionsDX11_MultiDrawInstancedIndirect_520") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_MultiDrawInstancedIndirect") )
 
+static unsigned int get_max_draw_count(ID3D11Buffer *args, unsigned int offset, unsigned int stride, unsigned int size)
+{
+    D3D11_BUFFER_DESC desc;
+    unsigned int count;
+
+    ID3D11Buffer_GetDesc(args, &desc);
+    if (offset >= desc.ByteWidth)
+    {
+        WARN("offset %u, buffer size %u.\n", offset, desc.ByteWidth);
+        return 0;
+    }
+    count = (desc.ByteWidth - offset) / stride;
+    if (desc.ByteWidth - offset - count * stride >= size)
+        ++count;
+    if (!count)
+        WARN("zero count, buffer size %u, offset %u, stride %u, size %u.\n", desc.ByteWidth, offset, stride, size);
+    return count;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect(AGSContext *context, ID3D11DeviceContext *dx_context,
+        ID3D11Buffer *buffer_for_draw_count, unsigned int aligned_byte_offset_for_draw_count, ID3D11Buffer *buffer_for_args,
+        unsigned int aligned_byte_offset_for_args, unsigned int byte_stride_for_args)
+{
+    ID3D11VkExtContext *ext_context;
+    unsigned int max_draw_count;
+
+    TRACE("context %p, dx_context %p, count buffer %p, offset %u, args buffer %p, offset %u, stride %u.\n",
+            context, dx_context, buffer_for_draw_count, aligned_byte_offset_for_draw_count, buffer_for_args,
+            aligned_byte_offset_for_args, byte_stride_for_args);
+
+    if (!context || !dx_context)
+    {
+        WARN("Invalid arguments.\n");
+        return AGS_INVALID_ARGS;
+    }
+
+    if (!context->extensions.multiDrawIndirectCountIndirect)
+        return AGS_EXTENSION_NOT_SUPPORTED;
+
+    if (FAILED(ID3D11DeviceContext_QueryInterface(dx_context, &IID_ID3D11VkExtContext, (void **)&ext_context)))
+    {
+        TRACE("No ID3D11VkExtContext.\n");
+        return AGS_EXTENSION_NOT_SUPPORTED;
+    }
+
+    max_draw_count = get_max_draw_count(buffer_for_args, aligned_byte_offset_for_args, byte_stride_for_args, sizeof(D3D11_DRAW_INDEXED_INSTANCED_INDIRECT_ARGS));
+    ID3D11VkExtContext_MultiDrawIndexedIndirectCount(ext_context, max_draw_count, buffer_for_draw_count, aligned_byte_offset_for_draw_count,
+            buffer_for_args, aligned_byte_offset_for_args, byte_stride_for_args);
+    ID3D11VkExtContext_Release(ext_context);
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect_520(AGSContext *context,
+        ID3D11Buffer *buffer_for_draw_count, unsigned int aligned_byte_offset_for_draw_count, ID3D11Buffer *buffer_for_args,
+        unsigned int aligned_byte_offset_for_args, unsigned int byte_stride_for_args)
+{
+    if (!context || !context->d3d11_context)
+    {
+        WARN("Invalid arguments.\n");
+        return AGS_INVALID_ARGS;
+    }
+    return agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect(context, context->d3d11_context,
+            buffer_for_draw_count, aligned_byte_offset_for_draw_count,
+            buffer_for_args, aligned_byte_offset_for_args, byte_stride_for_args);
+}
+
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
+__ASM_GLOBAL_FUNC( DX11_MultiDrawIndexedInstancedIndirectCountIndirect_impl,
+                   "mov (%rcx),%eax\n\t" /* version */
+                   "cmp $4,%eax\n\t"
+                   "jge 1f\n\t"
+                   "jmp " __ASM_NAME("agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect_520") "\n\t"
+                   "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect") )
+
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect(AGSContext *context, ID3D11DeviceContext *dx_context,
+        ID3D11Buffer *buffer_for_draw_count, unsigned int aligned_byte_offset_for_draw_count, ID3D11Buffer *buffer_for_args,
+        unsigned int aligned_byte_offset_for_args, unsigned int byte_stride_for_args)
+{
+    ID3D11VkExtContext *ext_context;
+    unsigned int max_draw_count;
+
+    TRACE("context %p, dx_context %p, count buffer %p, offset %u, args buffer %p, offset %u, stride %u.\n",
+            context, dx_context, buffer_for_draw_count, aligned_byte_offset_for_draw_count, buffer_for_args,
+            aligned_byte_offset_for_args, byte_stride_for_args);
+
+    if (!context || !dx_context)
+    {
+        WARN("Invalid arguments.\n");
+        return AGS_INVALID_ARGS;
+    }
+
+    if (!context->extensions.multiDrawIndirectCountIndirect)
+        return AGS_EXTENSION_NOT_SUPPORTED;
+
+    if (FAILED(ID3D11DeviceContext_QueryInterface(dx_context, &IID_ID3D11VkExtContext, (void **)&ext_context)))
+    {
+        TRACE("No ID3D11VkExtContext.\n");
+        return AGS_EXTENSION_NOT_SUPPORTED;
+    }
+
+    max_draw_count = get_max_draw_count(buffer_for_args, aligned_byte_offset_for_args, byte_stride_for_args, sizeof(D3D11_DRAW_INSTANCED_INDIRECT_ARGS));
+    ID3D11VkExtContext_MultiDrawIndirectCount(ext_context, max_draw_count, buffer_for_draw_count, aligned_byte_offset_for_draw_count,
+            buffer_for_args, aligned_byte_offset_for_args, byte_stride_for_args);
+    ID3D11VkExtContext_Release(ext_context);
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect_520(AGSContext *context,
+        ID3D11Buffer *buffer_for_draw_count, unsigned int aligned_byte_offset_for_draw_count, ID3D11Buffer *buffer_for_args,
+        unsigned int aligned_byte_offset_for_args, unsigned int byte_stride_for_args)
+{
+    if (!context || !context->d3d11_context)
+    {
+        WARN("Invalid arguments.\n");
+        return AGS_INVALID_ARGS;
+    }
+    return agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect(context, context->d3d11_context,
+            buffer_for_draw_count, aligned_byte_offset_for_draw_count,
+            buffer_for_args, aligned_byte_offset_for_args, byte_stride_for_args);
+}
+
+C_ASSERT(AMD_AGS_VERSION_5_3_0 == 4);
+__ASM_GLOBAL_FUNC( DX11_MultiDrawInstancedIndirectCountIndirect_impl,
+                   "mov (%rcx),%eax\n\t" /* version */
+                   "cmp $4,%eax\n\t"
+                   "jge 1f\n\t"
+                   "jmp " __ASM_NAME("agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect_520") "\n\t"
+                   "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect") )
 
 AGSReturnCode WINAPI agsDriverExtensionsDX11_DestroyDevice_520(AGSContext *context, ID3D11Device* device,
         unsigned int *device_ref, ID3D11DeviceContext *device_context,
