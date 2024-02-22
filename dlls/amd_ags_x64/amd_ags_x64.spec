@@ -15,9 +15,9 @@
 @ stub agsDriverExtensionsDX11_GetMaxClipRects
 @ stub agsDriverExtensionsDX11_IASetPrimitiveTopology
 @ stdcall agsDriverExtensionsDX11_Init(ptr ptr long ptr)
-@ stub agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirect
+@ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirect() DX11_MultiDrawIndexedInstancedIndirect_impl
 @ stub agsDriverExtensionsDX11_MultiDrawIndexedInstancedIndirectCountIndirect
-@ stub agsDriverExtensionsDX11_MultiDrawInstancedIndirect
+@ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_MultiDrawInstancedIndirect() DX11_MultiDrawInstancedIndirect_impl
 @ stub agsDriverExtensionsDX11_MultiDrawInstancedIndirectCountIndirect
 @ stub agsDriverExtensionsDX11_NotifyResourceBeginAllAccess
 @ stub agsDriverExtensionsDX11_NotifyResourceEndAllAccess
