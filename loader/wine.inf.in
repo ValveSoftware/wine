@@ -2888,3 +2888,4 @@ HKCU,Software\Wine\AppDefaults\Maine-Win64-Shipping.exe\DllOverrides,"SpeechSynt
 HKCU,Software\Wine\AppDefaults\rayne1.exe\DllOverrides,"d3d8",,"native"
 HKCU,Software\Wine\AppDefaults\rayne2.exe\DllOverrides,"d3d8",,"native"
 HKCU,Software\Wine\AppDefaults\RDR2.exe\DllOverrides,"vulkan-1",,"native"
+HKCU,Software\Wine\AppDefaults\WRCG.exe\DllOverrides,"xinput1_3",,"native"
