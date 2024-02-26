@@ -55,6 +55,7 @@ struct font_physdev
 {
     struct gdi_physdev dev;
     struct gdi_font   *font;
+    UINT               aa_flags;
 };
 
 static inline struct font_physdev *get_font_dev( PHYSDEV dev )
@@ -4614,6 +4615,7 @@ static HFONT font_SelectFont( PHYSDEV dev, HFONT hfont, UINT *aa_flags )
                     *aa_flags = font_smoothing;
             }
             *aa_flags = font_funcs->get_aa_flags( font, *aa_flags, antialias_fakes );
+            physdev->aa_flags = *aa_flags;
         }
         TRACE( "%p %s %d aa %x\n", hfont, debugstr_w(lf.lfFaceName), lf.lfHeight, *aa_flags );
         pthread_mutex_unlock( &font_lock );
