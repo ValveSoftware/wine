@@ -1062,7 +1062,7 @@ FAUDIOAPI void FAudioVoice_GetOutputMatrix(
 );
 
 /* Removes this voice from the audio graph and frees memory. */
-FAUDIOAPI uint32_t FAudioVoice_DestroyVoice(FAudioVoice *voice);
+FAUDIOAPI void FAudioVoice_DestroyVoice(FAudioVoice *voice);
 
 /* FAudioSourceVoice Interface */
 
