@@ -499,11 +499,7 @@ static const FAudioEngineCallback FAudioEngineCallback_Vtbl = {
 
 static inline void destroy_voice(XA2VoiceImpl *This)
 {
-    if (!FAudioVoice_DestroyVoice(This->faudio_voice))
-    {
-        ERR("Destroying voice %p failed.\n", This);
-        return;
-    }
+    FAudioVoice_DestroyVoice(This->faudio_voice);
     free_effect_chain(This->effect_chain);
     This->effect_chain = NULL;
     This->in_use = FALSE;
