@@ -2265,10 +2265,68 @@ void FAudioVoice_GetOutputMatrix(
 	LOG_API_EXIT(voice->audio)
 }
 
-void FAudioVoice_DestroyVoice(FAudioVoice *voice)
+static uint32_t check_for_sends_to_voice(FAudioVoice *voice)
+{
+	FAudio *audio = voice->audio;
+	uint32_t ret = 1;
+	FAudioSourceVoice *source;
+	FAudioSubmixVoice *submix;
+	LinkedList *list;
+	uint32_t i;
+
+	FAudio_PlatformLockMutex(audio->sourceLock);
+	list = audio->sources;
+	while (list != NULL)
+	{
+		source = (FAudioSourceVoice*) list->entry;
+		for (i = 0; i < source->sends.SendCount; i += 1)
+			if (source->sends.pSends[i].pOutputVoice == voice)
+			{
+				ret = 0;
+				break;
+			}
+		if (!ret)
+			break;
+		list = list->next;
+	}
+	FAudio_PlatformUnlockMutex(audio->sourceLock);
+
+	if (!ret)
+        return ret;
+
+	FAudio_PlatformLockMutex(audio->submixLock);
+	list = audio->submixes;
+	while (list != NULL)
+	{
+		submix = (FAudioSubmixVoice*) list->entry;
+		for (i = 0; i < submix->sends.SendCount; i += 1)
+			if (submix->sends.pSends[i].pOutputVoice == voice)
+			{
+				ret = 0;
+				break;
+			}
+		list = list->next;
+	}
+	FAudio_PlatformUnlockMutex(audio->submixLock);
+
+	return ret;
+}
+
+uint32_t FAudioVoice_DestroyVoice(FAudioVoice *voice)
 {
 	uint32_t i;
 	LOG_API_ENTER(voice->audio)
+
+	if (!check_for_sends_to_voice(voice))
+	{
+		LOG_ERROR(
+			voice->audio,
+			"Voice %p is an output for other voice(s)",
+			voice
+		)
+		LOG_API_EXIT(voice->audio)
+		return 0;
+	}
 
 	/* TODO: Check for dependencies and remove from audio graph first! */
 	FAudio_OPERATIONSET_ClearAllForVoice(voice);
@@ -2443,6 +2501,7 @@ void FAudioVoice_DestroyVoice(FAudioVoice *voice)
 	LOG_API_EXIT(voice->audio)
 	FAudio_Release(voice->audio);
 	voice->audio->pFree(voice);
+	return 1;
 }
 
 /* FAudioSourceVoice Interface */
