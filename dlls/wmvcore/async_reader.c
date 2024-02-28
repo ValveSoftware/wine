@@ -82,6 +82,8 @@ struct stream
     HANDLE deliver_thread;
     struct list deliver_samples;
     CONDITION_VARIABLE deliver_cv;
+
+    bool running;
 };
 
 struct async_reader
@@ -346,7 +348,7 @@ static DWORD WINAPI stream_deliver_thread(void *arg)
 
     EnterCriticalSection(&reader->callback_cs);
 
-    while (reader->running)
+    while (reader->running && stream->running)
     {
         if (list_empty(&stream->deliver_samples))
         {
@@ -380,7 +382,7 @@ static DWORD WINAPI stream_read_thread(void *arg)
 
     EnterCriticalSection(&reader->callback_cs);
 
-    while (reader->running)
+    while (reader->running && stream->running)
     {
         if (!stream->read_requested)
         {
@@ -450,6 +452,8 @@ static void stream_flush_samples(struct stream *stream)
 
 static void stream_close(struct stream *stream)
 {
+    if (!stream->running) return;
+    stream->running = false;
     if (stream->read_thread)
     {
         WakeConditionVariable(&stream->read_cv);
@@ -484,10 +488,41 @@ static HRESULT stream_open(struct stream *stream, struct async_reader *reader, W
 
     if (!(stream->deliver_thread = CreateThread(NULL, 0, stream_deliver_thread, stream, 0, NULL)))
     {
+        LeaveCriticalSection(&reader->callback_cs);
         stream_close(stream);
+        EnterCriticalSection(&reader->callback_cs);
         return E_OUTOFMEMORY;
     }
+    stream->running = true;
 
+    return S_OK;
+}
+
+static void async_reader_close_all_streams(struct async_reader *reader)
+{
+    int i;
+
+    if (!reader->streams) return;
+    for (i = 0; i < reader->stream_count; i++)
+    {
+        struct stream *stream = reader->streams + i;
+        stream_close(stream);
+    }
+}
+
+static HRESULT async_reader_open_all_streams(struct async_reader *reader)
+{
+    HRESULT hr;
+    int i;
+
+    for (i = 0; i < reader->stream_count; ++i)
+    {
+        struct stream *stream = reader->streams + i;
+
+        if (FAILED(hr = stream_open(stream, reader, i + 1)))
+            return hr;
+        stream_request_read(stream);
+    }
     return S_OK;
 }
 
@@ -601,7 +636,6 @@ static DWORD WINAPI async_reader_callback_thread(void *arg)
     struct async_reader *reader = arg;
     struct list *entry;
     HRESULT hr = S_OK;
-    DWORD i;
 
     IWMReaderCallback_OnStatus(reader->callback, WMT_OPENED, S_OK,
             WMT_TYPE_DWORD, (BYTE *)&zero, reader->context);
@@ -629,11 +663,15 @@ static DWORD WINAPI async_reader_callback_thread(void *arg)
                     {
                         reader->clock_start = get_current_time(reader);
 
-                        for (i = 0; i < reader->stream_count; ++i)
+                        if (FAILED(hr = async_reader_open_all_streams(reader)))
                         {
-                            struct stream *stream = reader->streams + i;
-                            stream_flush_samples(stream);
-                            stream_request_read(stream);
+                            WARN("Unable to open all required streams, aborting\n");
+                            LeaveCriticalSection(&reader->callback_cs);
+                            async_reader_close_all_streams(reader);
+                            IWMReaderCallback_OnStatus(reader->callback, WMT_CLOSED, hr,
+                                                       WMT_TYPE_DWORD, (BYTE *)&zero, reader->context);
+                            EnterCriticalSection(&reader->callback_cs);
+                            reader->running = false;
                         }
                     }
 
@@ -646,8 +684,12 @@ static DWORD WINAPI async_reader_callback_thread(void *arg)
 
                 case ASYNC_OP_STOP:
                     if (SUCCEEDED(hr))
+                    {
                         reader->clock_start = 0;
-
+                        LeaveCriticalSection(&reader->callback_cs);
+                        async_reader_close_all_streams(reader);
+                        EnterCriticalSection(&reader->callback_cs);
+                    }
                     LeaveCriticalSection(&reader->callback_cs);
                     IWMReaderCallback_OnStatus(reader->callback, WMT_STOPPED, hr,
                             WMT_TYPE_DWORD, (BYTE *)&zero, reader->context);
@@ -684,7 +726,6 @@ static DWORD WINAPI async_reader_callback_thread(void *arg)
 static void async_reader_close(struct async_reader *reader)
 {
     struct async_op *op, *next;
-    int i;
 
     if (reader->callback_thread)
     {
@@ -699,11 +740,7 @@ static void async_reader_close(struct async_reader *reader)
         free(op);
     }
 
-    for (i = 0; reader->streams && i < reader->stream_count; ++i)
-    {
-        struct stream *stream = reader->streams + i;
-        stream_close(stream);
-    }
+    async_reader_close_all_streams(reader);
     free(reader->streams);
     reader->streams = NULL;
     reader->stream_count = 0;
@@ -725,7 +762,6 @@ static void async_reader_close(struct async_reader *reader)
 static HRESULT async_reader_open(struct async_reader *reader, IWMReaderCallback *callback, void *context)
 {
     HRESULT hr = E_OUTOFMEMORY;
-    DWORD i;
 
     IWMReaderCallback_AddRef((reader->callback = callback));
     reader->context = context;
@@ -750,13 +786,6 @@ static HRESULT async_reader_open(struct async_reader *reader, IWMReaderCallback 
     }
 
     reader->running = true;
-
-    for (i = 0; i < reader->stream_count; ++i)
-    {
-        struct stream *stream = reader->streams + i;
-        if (FAILED(hr = stream_open(stream, reader, i + 1)))
-            goto error;
-    }
 
     if (!(reader->callback_thread = CreateThread(NULL, 0, async_reader_callback_thread, reader, 0, NULL)))
         goto error;
