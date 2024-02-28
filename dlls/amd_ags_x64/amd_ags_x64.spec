@@ -28,7 +28,7 @@
 @ stub agsDriverExtensionsDX11_NumPendingAsyncCompileJobs
 @ stub agsDriverExtensionsDX11_SetClipRects
 @ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_SetDepthBounds() DX11_SetDepthBounds_impl
-@ stub agsDriverExtensionsDX11_SetDiskShaderCacheEnabled
+@ stdcall agsDriverExtensionsDX11_SetDiskShaderCacheEnabled(ptr long)
 @ stub agsDriverExtensionsDX11_SetMaxAsyncCompileThreadCount
 @ stub agsDriverExtensionsDX11_SetViewBroadcastMasks
 @ stub agsDriverExtensionsDX11_WriteBreadcrumb

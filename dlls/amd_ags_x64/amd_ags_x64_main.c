@@ -1888,3 +1888,9 @@ __ASM_GLOBAL_FUNC( agsDriverExtensionsDX11_DestroyDevice,
                    "jmp "     __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_511") "\n\t"
                    "1:\tjmp " __ASM_NAME("agsDriverExtensionsDX11_DestroyDevice_520") )
 #endif
+
+AGSReturnCode WINAPI agsDriverExtensionsDX11_SetDiskShaderCacheEnabled(AGSContext *context, int enable)
+{
+    FIXME("context %p, enable %d stub.\n", context, enable);
+    return AGS_SUCCESS;
+}
