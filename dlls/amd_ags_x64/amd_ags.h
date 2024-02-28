@@ -733,7 +733,24 @@ typedef union AGSConfiguration
     AGSConfiguration_520    agsConfiguration520;
 } AGSConfiguration;
 
+struct AGSGPUInfo_320
+{
+    int                     agsVersionMajor;                // Major field of Major.Minor.Patch AGS version number
+    int                     agsVersionMinor;                // Minor field of Major.Minor.Patch AGS version number
+    int                     agsVersionPatch;                // Patch field of Major.Minor.Patch AGS version number
 
+    ArchitectureVersion     architectureVersion;            // Set to Unknown if not AMD hardware
+    const char*             adapterString;                  // The adapter name string. NULL if not AMD hardware
+    int                     deviceId;                       // The device id
+    int                     revisionId;                     // The revision id
+
+    const char*             driverVersion;                  // The driver package version
+
+    int                     iNumCUs;                        // Number of GCN compute units. Zero if not GCN
+    int                     iCoreClock;                     // core clock speed at 100% power in MHz
+    int                     iMemoryClock;                   // memory clock speed at 100% power in MHz
+    float                   fTFlops;                        // Teraflops of GPU. Zero if not GCN. Calculated from iCoreClock * iNumCUs * 64 Pixels/clk * 2 instructions/MAD
+};
 
 /// The top level GPU information returned from \ref agsInitialize
 struct AGSGPUInfo_403
