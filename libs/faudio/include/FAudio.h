@@ -1064,6 +1064,11 @@ FAUDIOAPI void FAudioVoice_GetOutputMatrix(
 /* Removes this voice from the audio graph and frees memory. */
 FAUDIOAPI void FAudioVoice_DestroyVoice(FAudioVoice *voice);
 
+/*
+ * Returns S_OK on success and E_FAIL if voice could not be destroyed (e. g., because it is in use).
+ */
+FAUDIOAPI uint32_t FAudioVoice_DestroyVoiceSafeEXT(FAudioVoice *voice);
+
 /* FAudioSourceVoice Interface */
 
 /* Starts processing for a source voice.
