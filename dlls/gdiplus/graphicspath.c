@@ -1093,7 +1093,6 @@ GpStatus WINGDIPAPI GdipAddPathString(GpPath* path, GDIPCONST WCHAR* string, INT
     }
 
     get_log_fontW(font, graphics, &lfw);
-    GdipDeleteGraphics(graphics);
 
     hfont = CreateFontIndirectW(&lfw);
     if (!hfont)
@@ -1119,6 +1118,7 @@ GpStatus WINGDIPAPI GdipAddPathString(GpPath* path, GDIPCONST WCHAR* string, INT
     DeleteDC(dc);
     DeleteObject(hfont);
     GdipDeleteFont(font);
+    GdipDeleteGraphics(graphics);
 
     if (status != Ok) /* free backup */
     {
