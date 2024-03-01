@@ -7,7 +7,7 @@ UNIX_CFLAGS  = $(GSTREAMER_CFLAGS)
 UNIX_LIBS    = $(GSTREAMER_LIBS) $(PTHREAD_LIBS)
 
 SOURCES = \
-	audio_decoder.c \
+	aac_decoder.c \
 	color_convert.c \
 	main.c \
 	media_sink.c \
