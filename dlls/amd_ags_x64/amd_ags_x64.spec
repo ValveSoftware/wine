@@ -4,11 +4,15 @@
 @ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_BeginUAVOverlap() DX11_BeginUAVOverlap_impl
 @ stub agsDriverExtensions_IASetPrimitiveTopology
 @ stub agsDriverExtensionsDX11_CreateBuffer
+@ stub agsDriverExtensions_CreateBuffer
 @ stdcall agsDriverExtensionsDX11_CreateDevice(ptr ptr ptr ptr)
 @ stub agsDriverExtensionsDX11_CreateFromDevice
 @ stub agsDriverExtensionsDX11_CreateTexture1D
 @ stub agsDriverExtensionsDX11_CreateTexture2D
 @ stub agsDriverExtensionsDX11_CreateTexture3D
+@ stub agsDriverExtensions_CreateTexture1D
+@ stub agsDriverExtensions_CreateTexture2D
+@ stub agsDriverExtensions_CreateTexture3D
 @ stdcall agsDriverExtensions_DeInit(ptr)
 @ stdcall agsDriverExtensionsDX11_DeInit(ptr)
 @ stub agsDriverExtensionsDX11_Destroy
@@ -25,6 +29,9 @@
 @ stub agsDriverExtensionsDX11_NotifyResourceBeginAllAccess
 @ stub agsDriverExtensionsDX11_NotifyResourceEndAllAccess
 @ stub agsDriverExtensionsDX11_NotifyResourceEndWrites
+@ stub agsDriverExtensions_NotifyResourceBeginAllAccess
+@ stub agsDriverExtensions_NotifyResourceEndAllAccess
+@ stub agsDriverExtensions_NotifyResourceEndWrites
 @ stub agsDriverExtensionsDX11_NumPendingAsyncCompileJobs
 @ stub agsDriverExtensionsDX11_SetClipRects
 @ stdcall -norelay -arch=win64 agsDriverExtensionsDX11_SetDepthBounds() DX11_SetDepthBounds_impl
