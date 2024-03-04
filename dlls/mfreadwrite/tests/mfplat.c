@@ -2644,11 +2644,11 @@ static HRESULT WINAPI test_decoder_ProcessOutput(IMFTransform *iface, DWORD flag
 
         hr = IMFSample_GetBufferByIndex(data->pSample, 0, &buffer);
         ok(hr == S_OK, "Unexpected hr %#lx.\n", hr);
-        todo_wine check_interface(buffer, &IID_IMF2DBuffer2, TRUE);
-        todo_wine check_interface(buffer, &IID_IMFGetService, TRUE);
+        check_interface(buffer, &IID_IMF2DBuffer2, TRUE);
+        check_interface(buffer, &IID_IMFGetService, TRUE);
         check_interface(buffer, &IID_IMFDXGIBuffer, FALSE);
         hr = MFGetService((IUnknown *)buffer, &MR_BUFFER_SERVICE, &IID_IDirect3DSurface9, (void **)&unknown);
-        todo_wine ok(hr == E_NOTIMPL, "Unexpected hr %#lx.\n", hr);
+        ok(hr == E_NOTIMPL, "Unexpected hr %#lx.\n", hr);
         IMFMediaBuffer_Release(buffer);
     }
 
