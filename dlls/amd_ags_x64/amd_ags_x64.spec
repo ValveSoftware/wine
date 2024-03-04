@@ -45,9 +45,9 @@
 @ stub agsDriverExtensionsDX12_Destroy
 @ stdcall agsDriverExtensionsDX12_DestroyDevice(ptr ptr ptr)
 @ stdcall agsDriverExtensionsDX12_Init(ptr ptr ptr)
-@ stub agsDriverExtensionsDX12_PopMarker
-@ stub agsDriverExtensionsDX12_PushMarker
-@ stub agsDriverExtensionsDX12_SetMarker
+@ stdcall agsDriverExtensionsDX12_PopMarker(ptr ptr)
+@ stdcall agsDriverExtensionsDX12_PushMarker(ptr ptr ptr)
+@ stdcall agsDriverExtensionsDX12_SetMarker(ptr ptr ptr)
 @ stdcall agsGetCrossfireGPUCount(ptr ptr)
 @ stdcall agsGetVersionNumber()
 @ stdcall agsInit(ptr ptr ptr)
