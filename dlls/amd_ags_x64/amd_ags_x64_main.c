@@ -706,6 +706,20 @@ static void init_device_displays_511(const char *adapter_name, AGSDisplayInfo_51
     heap_free(displays);
 }
 
+static int hide_apu(void)
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *s;
+
+        cached = ((s = getenv("WINE_HIDE_APU"))) && *s != '0';
+        if (cached)
+            FIXME("hack: hiding APU.\n");
+    }
+    return cached;
+}
 
 static AGSReturnCode init_ags_context(AGSContext *context, int ags_version)
 {
@@ -780,7 +794,7 @@ static AGSReturnCode init_ags_context(AGSContext *context, int ags_version)
             {
                 SET_DEVICE_FIELD(device, asicFamily, AsicFamily, context->version, AsicFamily_GCN4);
             }
-            if (vk_properties->deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU)
+            if (vk_properties->deviceType == VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU && !hide_apu())
             {
                 if (context->version >= AMD_AGS_VERSION_6_0_0)
                     device_600->isAPU = 1;
