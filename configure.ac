@@ -1236,6 +1236,7 @@ then
 
     dnl *** All of the following tests require X11/Xlib.h
     AC_CHECK_HEADERS([X11/extensions/shape.h \
+                      X11/extensions/XInput.h \
                       X11/extensions/XInput2.h \
                       X11/extensions/XShm.h \
                       X11/extensions/Xfixes.h \
