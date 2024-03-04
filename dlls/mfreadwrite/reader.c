@@ -645,26 +645,31 @@ static ULONG WINAPI source_reader_stream_events_callback_Release(IMFAsyncCallbac
     return source_reader_release(reader);
 }
 
-static HRESULT source_reader_allocate_stream_sample(MFT_OUTPUT_STREAM_INFO *info, IMFSample **out)
+static HRESULT source_reader_allocate_stream_sample(IMFTransform *transform, MFT_OUTPUT_STREAM_INFO *info, IMFSample **out)
 {
+    IMFMediaType *media_type;
     IMFMediaBuffer *buffer;
     IMFSample *sample;
     HRESULT hr;
 
     *out = NULL;
-    if (FAILED(hr = MFCreateSample(&sample)))
+    if (SUCCEEDED(hr = IMFTransform_GetOutputCurrentType(transform, 0, &media_type)))
+    {
+        hr = MFCreateMediaBufferFromMediaType(media_type, 10000000, info->cbSize, info->cbAlignment, &buffer);
+        IMFMediaType_Release(media_type);
+    }
+    if (FAILED(hr) && FAILED(hr = MFCreateAlignedMemoryBuffer(info->cbSize, info->cbAlignment, &buffer)))
         return hr;
-    if (SUCCEEDED(hr = MFCreateAlignedMemoryBuffer(info->cbSize, info->cbAlignment, &buffer)))
+
+    if (SUCCEEDED(hr = MFCreateSample(&sample)))
     {
         if (SUCCEEDED(hr = IMFSample_AddBuffer(sample, buffer)))
-        {
             *out = sample;
-            IMFSample_AddRef(sample);
-        }
-        IMFMediaBuffer_Release(buffer);
+        else
+            IMFSample_Release(sample);
     }
 
-    IMFSample_Release(sample);
+    IMFMediaBuffer_Release(buffer);
     return hr;
 }
 
@@ -840,7 +845,7 @@ static HRESULT source_reader_pull_transform_samples(struct source_reader *reader
         IMFMediaType *media_type;
 
         if (!(stream_info.dwFlags & (MFT_OUTPUT_STREAM_PROVIDES_SAMPLES | MFT_OUTPUT_STREAM_CAN_PROVIDE_SAMPLES))
-                && FAILED(hr = source_reader_allocate_stream_sample(&stream_info, &out_buffer.pSample)))
+                && FAILED(hr = source_reader_allocate_stream_sample(entry->transform, &stream_info, &out_buffer.pSample)))
             break;
 
         if (SUCCEEDED(hr = IMFTransform_ProcessOutput(entry->transform, 0, 1, &out_buffer, &status)))
