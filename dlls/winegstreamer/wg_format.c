@@ -615,6 +615,7 @@ static GstCaps *wg_format_to_caps_video(const struct wg_format *format)
 
             /* Remove fields which we don't specify but might have some default value */
             gst_structure_remove_fields(structure, "colorimetry", "chroma-site", NULL);
+            gst_structure_remove_fields(structure, "pixel-aspect-ratio", NULL);
         }
     }
     return caps;
