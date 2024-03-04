@@ -370,13 +370,13 @@ static enum d3dx_pixel_format_id dds_luminance_to_d3dx_pixel_format(const struct
     return D3DX_PIXEL_FORMAT_COUNT;
 }
 
-static D3DFORMAT dds_alpha_to_d3dformat(const struct dds_pixel_format *pixel_format)
+static enum d3dx_pixel_format_id dds_alpha_to_d3dx_pixel_format(const struct dds_pixel_format *pixel_format)
 {
     if (pixel_format->bpp == 8 && pixel_format->amask == 0xff)
-        return D3DFMT_A8;
+        return D3DX_PIXEL_FORMAT_A8_UNORM;
 
     WARN("Unknown alpha pixel format (bpp %lu, a %#lx).\n", pixel_format->bpp, pixel_format->rmask);
-    return D3DFMT_UNKNOWN;
+    return D3DX_PIXEL_FORMAT_COUNT;
 }
 
 static D3DFORMAT dds_indexed_to_d3dformat(const struct dds_pixel_format *pixel_format)
@@ -432,7 +432,7 @@ static D3DFORMAT dds_pixel_format_to_d3dformat(const struct dds_pixel_format *pi
     if (pixel_format->flags & DDS_PF_LUMINANCE)
         return d3dformat_from_d3dx_pixel_format_id(dds_luminance_to_d3dx_pixel_format(pixel_format));
     if (pixel_format->flags & DDS_PF_ALPHA_ONLY)
-        return dds_alpha_to_d3dformat(pixel_format);
+        return d3dformat_from_d3dx_pixel_format_id(dds_alpha_to_d3dx_pixel_format(pixel_format));
     if (pixel_format->flags & DDS_PF_BUMPDUDV)
         return dds_bump_to_d3dformat(pixel_format);
     if (pixel_format->flags & DDS_PF_BUMPLUMINANCE)
