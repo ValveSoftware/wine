@@ -4461,7 +4461,7 @@ void loader_init( CONTEXT *context, void **entry )
         if (get_env( L"WINE_HEAP_ZERO_MEMORY", env_str, sizeof(env_str)) && env_str[0] == L'1')
         {
             ERR( "Enabling heap zero hack.\n" );
-            heap_flags |= HEAP_ZERO_MEMORY;
+            heap_zero_hack = TRUE;
         }
 
         peb->ProcessHeap        = RtlCreateHeap( heap_flags, NULL, 0, 0, NULL, NULL );

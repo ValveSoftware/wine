@@ -329,6 +329,7 @@ C_ASSERT( HEAP_MIN_LARGE_BLOCK_SIZE <= HEAP_INITIAL_GROW_SIZE );
 #define HEAP_CHECKING_ENABLED 0x80000000
 
 BOOL delay_heap_free = FALSE;
+BOOL heap_zero_hack = FALSE;
 
 static struct heap *process_heap;  /* main process heap */
 
@@ -1518,6 +1519,9 @@ HANDLE WINAPI RtlCreateHeap( ULONG flags, void *addr, SIZE_T total_size, SIZE_T 
 
     TRACE( "flags %#lx, addr %p, total_size %#Ix, commit_size %#Ix, unknown %p, definition %p\n",
            flags, addr, total_size, commit_size, unknown, definition );
+
+    if (heap_zero_hack)
+        flags |= HEAP_ZERO_MEMORY;
 
     flags &= ~(HEAP_TAIL_CHECKING_ENABLED|HEAP_FREE_CHECKING_ENABLED);
     if (process_heap) flags |= HEAP_PRIVATE;

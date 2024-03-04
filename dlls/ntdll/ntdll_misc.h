@@ -48,6 +48,7 @@ extern UINT_PTR page_size;
 #endif
 
 extern BOOL delay_heap_free;
+extern BOOL heap_zero_hack;
 
 /* exceptions */
 extern LONG call_vectored_handlers( EXCEPTION_RECORD *rec, CONTEXT *context );
