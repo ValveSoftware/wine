@@ -1466,6 +1466,27 @@ AGSReturnCode WINAPI agsDriverExtensionsDX12_DeInit( AGSContext* context )
     return AGS_SUCCESS;
 }
 
+AGSReturnCode WINAPI  agsDriverExtensionsDX12_SetMarker( AGSContext *context, ID3D12GraphicsCommandList *command_list, const char *data)
+{
+    WARN("context %p, command_list %p, data %p stub.\n", context, command_list, data);
+
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX12_PushMarker( AGSContext *context, ID3D12GraphicsCommandList *command_list, const char* data)
+{
+    WARN("context %p, command_list %p, data %p stub.\n", context, command_list, data);
+
+    return AGS_SUCCESS;
+}
+
+AGSReturnCode WINAPI agsDriverExtensionsDX12_PopMarker(AGSContext *context, ID3D12GraphicsCommandList *command_list)
+{
+    WARN("context %p, command_list %p stub.\n", context, command_list);
+
+    return AGS_SUCCESS;
+}
+
 BOOL WINAPI DllMain(HINSTANCE instance, DWORD reason, void *reserved)
 {
     TRACE("%p, %u, %p.\n", instance, reason, reserved);
