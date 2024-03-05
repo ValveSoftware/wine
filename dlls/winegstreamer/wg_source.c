@@ -736,8 +736,8 @@ NTSTATUS wg_source_push_data(void *args)
         return STATUS_SUCCESS;
 
 eos:
-    push_event(source->src_pad, gst_event_new_eos());
     source->segment.start = source->segment.stop;
+    push_event(source->src_pad, gst_event_new_eos());
 
     return STATUS_SUCCESS;
 }
