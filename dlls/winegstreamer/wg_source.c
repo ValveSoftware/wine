@@ -55,6 +55,7 @@ struct wg_source
     GstPad *src_pad;
     GstElement *container;
     GstSegment segment;
+    bool valid_stream;
     bool valid_segment;
     guint64 max_duration;
 
@@ -569,9 +570,6 @@ NTSTATUS wg_source_create(void *args)
     gst_element_set_state(source->container, GST_STATE_PAUSED);
     if (!gst_element_get_state(source->container, NULL, NULL, -1))
         goto error;
-
-    if (!push_event(source->src_pad, create_stream_start_event("wg_source")))
-        goto error;
     gst_caps_unref(src_caps);
 
     params->source = (wg_source_t)(ULONG_PTR)source;
@@ -705,6 +703,12 @@ NTSTATUS wg_source_push_data(void *args)
 
     GST_TRACE("source %p, offset %#"G_GINT64_MODIFIER"x, data %p, size %#x", source, params->offset, params->data, params->size);
 
+    if (!source->valid_stream)
+    {
+        push_event(source->src_pad, create_stream_start_event("wg_source"));
+        source->valid_stream = true;
+    }
+
     if (!source->valid_segment)
     {
         push_event(source->src_pad, gst_event_new_segment(&source->segment));
@@ -738,6 +742,7 @@ NTSTATUS wg_source_push_data(void *args)
 eos:
     source->segment.start = source->segment.stop;
     push_event(source->src_pad, gst_event_new_eos());
+    source->valid_stream = false;
 
     return STATUS_SUCCESS;
 }
