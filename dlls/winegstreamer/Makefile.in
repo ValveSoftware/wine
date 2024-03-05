@@ -38,4 +38,5 @@ SOURCES = \
 	media-converter/fossilize.c \
 	media-converter/lib.c \
 	media-converter/murmur3.c \
+	media-converter/protondemuxer.c \
 	media-converter/videoconv.c
