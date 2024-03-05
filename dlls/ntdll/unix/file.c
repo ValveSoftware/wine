@@ -5648,6 +5648,7 @@ struct async_file_read_job
     LONG  cancelled;
     struct list queue_entry;
     struct async_file_read_job *next;
+    ULONG64 queue_time_mcs;
 };
 
 
@@ -5668,7 +5669,9 @@ static void *async_file_read_thread(void *dummy)
     ULONG buffer_length = 0;
     void *buffer = NULL;
     struct list *entry;
+    struct timespec ts;
     NTSTATUS status;
+    ULONG64 delay;
     ULONG total;
     int result;
 
@@ -5718,6 +5721,13 @@ static void *async_file_read_thread(void *dummy)
             if (job->cancelled)
                 break;
         }
+
+        clock_gettime( CLOCK_MONOTONIC, &ts );
+        delay = ts.tv_sec * (ULONG64)1000000 + ts.tv_nsec / 1000 - job->queue_time_mcs;
+        if (delay < 1000)
+            usleep( 1000 - delay );
+        else
+            usleep( 50 );
 
         total = result;
         status = (total || !job->length) ? STATUS_SUCCESS : STATUS_END_OF_FILE;
@@ -5779,6 +5789,7 @@ static NTSTATUS queue_async_file_read( HANDLE handle, int unix_handle, int needs
                             IO_STATUS_BLOCK *io, void *buffer, ULONG length, LARGE_INTEGER *offset )
 {
     struct async_file_read_job *job;
+    struct timespec ts;
 
     pthread_once( &async_file_read_once, async_file_read_init );
 
@@ -5810,6 +5821,8 @@ static NTSTATUS queue_async_file_read( HANDLE handle, int unix_handle, int needs
     job->offset = *offset;
     job->thread_id = GetCurrentThreadId();
     job->cancelled = 0;
+    clock_gettime( CLOCK_MONOTONIC, &ts );
+    job->queue_time_mcs = ts.tv_sec * (ULONG64)1000000 + ts.tv_nsec / 1000;
 
     list_add_tail( &async_file_read_queue, &job->queue_entry );
 
