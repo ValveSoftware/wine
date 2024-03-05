@@ -663,50 +663,55 @@ static void video_conv_init_transcode(VideoConv *conv)
     pthread_mutex_unlock(&dump_fozdb.mutex);
 }
 
+static gboolean video_conv_sink_event_caps(VideoConv *conv, GstEvent *event)
+{
+    struct video_conv_state *state;
+    uint32_t transcode_tag;
+    GstCaps *caps;
+    bool ret;
+
+    gst_event_unref(event);
+
+    /* push_event, below, can also grab state and cause a deadlock, so make sure it's
+     * unlocked before calling */
+    if (!(state = video_conv_lock_state(conv)))
+    {
+        GST_ERROR("VideoConv not yet in READY state?");
+        return false;
+    }
+
+    if (!gst_pad_activate_mode(conv->sink_pad, GST_PAD_MODE_PULL, true))
+    {
+        GST_ERROR("Failed to activate sink pad in pull mode.");
+        pthread_mutex_unlock(&conv->state_mutex);
+        return false;
+    }
+
+    video_conv_init_transcode(conv);
+    transcode_tag = state->transcoded_tag;
+
+    pthread_mutex_unlock(&conv->state_mutex);
+
+    if (transcode_tag == VIDEO_CONV_FOZ_TAG_MKVDATA)
+        caps = gst_caps_from_string("video/x-matroska");
+    else if (transcode_tag == VIDEO_CONV_FOZ_TAG_OGVDATA)
+        caps = gst_caps_from_string("application/ogg");
+    else
+        return false;
+
+    ret = push_event(conv->src_pad, gst_event_new_caps(caps));
+    gst_caps_unref(caps);
+    return ret;
+}
+
 static gboolean video_conv_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
 {
     VideoConv *conv = VIDEO_CONV(parent);
-    bool ret;
 
     GST_DEBUG_OBJECT(pad, "Got event %"GST_PTR_FORMAT".", event);
 
     if (event->type == GST_EVENT_CAPS)
-    {
-        struct video_conv_state *state;
-        uint32_t transcode_tag;
-        GstCaps *caps;
-
-        /* push_event, below, can also grab state and cause a deadlock, so make sure it's
-         * unlocked before calling */
-        if (!(state = video_conv_lock_state(conv)))
-        {
-            GST_ERROR("VideoConv not yet in READY state?");
-            return false;
-        }
-
-        if (!gst_pad_activate_mode(conv->sink_pad, GST_PAD_MODE_PULL, true))
-        {
-            GST_ERROR("Failed to activate sink pad in pull mode.");
-            pthread_mutex_unlock(&conv->state_mutex);
-            return false;
-        }
-
-        video_conv_init_transcode(conv);
-        transcode_tag = state->transcoded_tag;
-
-        pthread_mutex_unlock(&conv->state_mutex);
-
-        if (transcode_tag == VIDEO_CONV_FOZ_TAG_MKVDATA)
-            caps = gst_caps_from_string("video/x-matroska");
-        else if (transcode_tag == VIDEO_CONV_FOZ_TAG_OGVDATA)
-            caps = gst_caps_from_string("application/ogg");
-        else
-            return false;
-
-        ret = push_event(conv->src_pad, gst_event_new_caps(caps));
-        gst_caps_unref(caps);
-        return ret;
-    }
+        return video_conv_sink_event_caps(conv, event);
 
     return gst_pad_event_default(pad, parent, event);
 }
