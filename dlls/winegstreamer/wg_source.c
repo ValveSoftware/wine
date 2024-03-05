@@ -206,14 +206,9 @@ static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
 
     if (flags & GST_SEEK_FLAG_FLUSH)
     {
-        if (!(event = gst_event_new_flush_start()))
-            GST_ERROR("Failed to allocate flush_start event");
-        else
-        {
+        if ((event = gst_event_new_flush_start()))
             gst_event_set_seqnum(event, seqnum);
-            if (!gst_pad_push_event(source->src_pad, event))
-                GST_ERROR("Failed to push flush_start event");
-        }
+        push_event(source->src_pad, event);
     }
 
     source->segment.start = cur;
@@ -223,14 +218,9 @@ static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
 
     if (flags & GST_SEEK_FLAG_FLUSH)
     {
-        if (!(event = gst_event_new_flush_stop(true)))
-            GST_ERROR("Failed to allocate flush_stop event");
-        else
-        {
+        if ((event = gst_event_new_flush_stop(true)))
             gst_event_set_seqnum(event, seqnum);
-            if (!gst_pad_push_event(source->src_pad, event))
-                GST_ERROR("Failed to push flush_stop event");
-        }
+        push_event(source->src_pad, event);
         source->valid_segment = false;
     }
 
@@ -504,7 +494,6 @@ NTSTATUS wg_source_create(void *args)
     GstCaps *src_caps, *any_caps;
     struct wg_source *source;
     const gchar *media_type;
-    GstEvent *event;
     GstPad *peer;
     guint i;
 
@@ -579,8 +568,7 @@ NTSTATUS wg_source_create(void *args)
     if (!gst_element_get_state(source->container, NULL, NULL, -1))
         goto error;
 
-    if (!(event = create_stream_start_event("wg_source"))
-            || !push_event(source->src_pad, event))
+    if (!push_event(source->src_pad, create_stream_start_event("wg_source")))
         goto error;
     gst_caps_unref(src_caps);
 
@@ -684,15 +672,12 @@ NTSTATUS wg_source_set_position(void *args)
     struct wg_source_set_position_params *params = args;
     struct wg_source *source = get_source(params->source);
     guint64 time = params->time * 100;
-    GstEvent *event;
     guint i;
 
     GST_TRACE("source %p, time %"G_GINT64_MODIFIER"d", source, time);
 
-    if (!(event = gst_event_new_seek(1.0, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH,
-            GST_SEEK_TYPE_SET, time, GST_SEEK_TYPE_NONE, -1))
-            || !gst_pad_push_event(source->streams[0].pad, event))
-        GST_WARNING("Failed to seek source %p to %" G_GINT64_MODIFIER "x", source, time);
+    push_event(source->streams[0].pad, gst_event_new_seek(1.0, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH,
+            GST_SEEK_TYPE_SET, time, GST_SEEK_TYPE_NONE, -1));
 
     for (i = 0; i < source->stream_count; i++)
     {
@@ -715,15 +700,12 @@ NTSTATUS wg_source_push_data(void *args)
     struct wg_source *source = get_source(params->source);
     GstFlowReturn ret = GST_FLOW_OK;
     GstBuffer *buffer;
-    GstEvent *event;
 
     GST_TRACE("source %p, data %p, size %#x", source, params->data, params->size);
 
     if (!source->valid_segment)
     {
-        if (!(event = gst_event_new_segment(&source->segment))
-                || !gst_pad_push_event(source->src_pad, event))
-            GST_ERROR("Failed to push new segment event");
+        push_event(source->src_pad, gst_event_new_segment(&source->segment));
         source->valid_segment = true;
     }
 
@@ -752,9 +734,7 @@ NTSTATUS wg_source_push_data(void *args)
         return STATUS_SUCCESS;
 
 eos:
-    if (!(event = gst_event_new_eos())
-            || !gst_pad_push_event(source->src_pad, event))
-        GST_WARNING("Failed to push EOS event");
+    push_event(source->src_pad, gst_event_new_eos());
     source->segment.start = source->segment.stop;
 
     return STATUS_SUCCESS;
