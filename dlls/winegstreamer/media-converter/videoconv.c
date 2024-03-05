@@ -576,6 +576,22 @@ static bool video_conv_hash_upstream_data(VideoConv *conv, struct payload_hash *
     return ret;
 }
 
+static int video_conv_dump_upstream_chunk(VideoConv *conv, void *buffer, size_t read_size,
+        GList **chunk_hashes)
+{
+    struct bytes_reader bytes_reader;
+    struct payload_hash *chunk_hash;
+
+    bytes_reader_init(&bytes_reader, buffer, read_size);
+    chunk_hash = calloc(1, sizeof(*chunk_hash));
+    murmur3_128(&bytes_reader, bytes_reader_read, HASH_SEED, chunk_hash);
+    *chunk_hashes = g_list_append(*chunk_hashes, chunk_hash);
+
+    bytes_reader_init(&bytes_reader, buffer, read_size);
+    return fozdb_write_entry(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_VIDEODATA, chunk_hash,
+            &bytes_reader, bytes_reader_read, true);
+}
+
 static int video_conv_dump_upstream_data(VideoConv *conv, struct payload_hash *hash)
 {
     struct hashes_reader chunk_hashes_reader;
@@ -597,17 +613,7 @@ static int video_conv_dump_upstream_data(VideoConv *conv, struct payload_hash *h
     pad_reader = pad_reader_create(conv->sink_pad);
     while ((ret = pad_reader_read(pad_reader, buffer, HASH_CHUNK_SIZE, &read_size)) == CONV_OK)
     {
-        struct bytes_reader bytes_reader;
-        struct payload_hash *chunk_hash;
-
-        bytes_reader_init(&bytes_reader, buffer, read_size);
-        chunk_hash = calloc(1, sizeof(*chunk_hash));
-        murmur3_128(&bytes_reader, bytes_reader_read, HASH_SEED, chunk_hash);
-        chunk_hashes = g_list_append(chunk_hashes, chunk_hash);
-
-        bytes_reader_init(&bytes_reader, buffer, read_size);
-        if ((ret = fozdb_write_entry(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_VIDEODATA, chunk_hash,
-                &bytes_reader, bytes_reader_read, true)) < 0)
+        if ((ret = video_conv_dump_upstream_chunk(conv, buffer, read_size, &chunk_hashes)) < 0)
         {
             GST_ERROR("Error writing video data to fozdb, ret %d.", ret);
             goto done;
