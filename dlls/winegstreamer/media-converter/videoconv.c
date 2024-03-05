@@ -129,7 +129,7 @@ G_DEFINE_TYPE(VideoConv, video_conv, GST_TYPE_ELEMENT);
 #define VIDEO_CONV(obj) (G_TYPE_CHECK_INSTANCE_CAST((obj), VIDEO_CONV_TYPE, VideoConv))
 #define parent_class    (video_conv_parent_class)
 GST_ELEMENT_REGISTER_DEFINE(protonvideoconverter, "protonvideoconverter",
-        GST_RANK_MARGINAL, VIDEO_CONV_TYPE);
+        GST_RANK_MARGINAL + 1, VIDEO_CONV_TYPE);
 
 static GstStaticPadTemplate video_conv_sink_template = GST_STATIC_PAD_TEMPLATE("sink",
         GST_PAD_SINK, GST_PAD_ALWAYS,
