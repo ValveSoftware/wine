@@ -92,6 +92,7 @@ struct video_conv_state
 {
     struct payload_hash transcode_hash;
     struct fozdb *read_fozdb;
+    int blank_file;
     uint64_t upstream_duration;
     uint64_t our_duration;
     uint32_t transcoded_tag;
@@ -331,13 +332,27 @@ static int video_conv_state_create(struct video_conv_state **out)
 {
     struct video_conv_state *state;
     struct fozdb *fozdb = NULL;
-    char *read_fozdb_path;
-    int ret;
+    char *read_fozdb_path, *blank_video;
+    uint64_t blank_file_size;
+    int ret, fd;
 
     if (!(read_fozdb_path = getenv("MEDIACONV_VIDEO_TRANSCODED_FILE")))
     {
         GST_ERROR("MEDIACONV_VIDEO_TRANSCODED_FILE is not set.");
         return CONV_ERROR_ENV_NOT_SET;
+    }
+    if (!(blank_video = getenv("MEDIACONV_BLANK_VIDEO_FILE")))
+    {
+        GST_ERROR("Env MEDIACONV_BLANK_VIDEO_FILE not set.");
+        return CONV_ERROR_ENV_NOT_SET;
+    }
+
+    if (!open_file(blank_video, O_RDONLY, &fd))
+        return CONV_ERROR_OPEN_FAILED;
+    if (!get_file_size(fd, &blank_file_size))
+    {
+        close(fd);
+        return CONV_ERROR_OPEN_FAILED;
     }
 
     if ((ret = fozdb_create(read_fozdb_path, O_RDONLY, true /* Read-only? */, VIDEO_CONV_FOZ_NUM_TAGS, &fozdb)) < 0)
@@ -345,8 +360,9 @@ static int video_conv_state_create(struct video_conv_state **out)
 
     state = calloc(1, sizeof(*state));
     state->read_fozdb = fozdb;
+    state->blank_file = fd;
     state->upstream_duration = DURATION_NONE;
-    state->our_duration = DURATION_NONE;
+    state->our_duration = blank_file_size;
     state->transcoded_tag = VIDEO_CONV_FOZ_TAG_MKVDATA;
     state->need_stream_start = true;
 
@@ -358,16 +374,13 @@ static void video_conv_state_release(struct video_conv_state *state)
 {
     if (state->read_fozdb)
         fozdb_release(state->read_fozdb);
+    close(state->blank_file);
     free(state);
 }
 
 /* Return true if the file is transcoded, false if not. */
 bool video_conv_state_begin_transcode(struct video_conv_state *state, struct payload_hash *hash)
 {
-    const char *blank_video;
-    uint64_t file_size = 0;
-    int fd;
-
     GST_DEBUG("state %p, hash %s.", state, format_hash(hash));
 
     if (state->read_fozdb)
@@ -396,18 +409,6 @@ bool video_conv_state_begin_transcode(struct video_conv_state *state, struct pay
     }
 
     GST_INFO("No transcoded video for %s. Substituting a blank video.", format_hash(hash));
-
-    if (!(blank_video = getenv("MEDIACONV_BLANK_VIDEO_FILE")))
-    {
-        GST_ERROR("Env MEDIACONV_BLANK_VIDEO_FILE not set.");
-        return false;
-    }
-    if (open_file(blank_video, O_RDONLY, &fd))
-    {
-        get_file_size(fd, &file_size);
-        close(fd);
-    }
-    state->our_duration = file_size;
     state->has_transcoded = false;
 
     create_placeholder_file("placeholder-video-used");
@@ -418,11 +419,9 @@ bool video_conv_state_begin_transcode(struct video_conv_state *state, struct pay
 int video_conv_state_fill_buffer(struct video_conv_state *state, uint64_t offset,
         uint8_t *buffer, size_t size, size_t *fill_size)
 {
-    const char *blank_video;
-    uint64_t file_size;
     size_t to_copy;
     bool read_ok;
-    int fd, ret;
+    int ret;
 
     if (state->has_transcoded)
     {
@@ -433,38 +432,18 @@ int video_conv_state_fill_buffer(struct video_conv_state *state, uint64_t offset
     }
     else /* Fill blank video data to buffer. */
     {
-        if (!(blank_video = getenv("MEDIACONV_BLANK_VIDEO_FILE")))
-        {
-            GST_ERROR("Env MEDIACONV_BLANK_VIDEO_FILE not set.");
-            return CONV_ERROR_ENV_NOT_SET;
-        }
-        if (!open_file(blank_video, O_RDONLY, &fd))
-            return CONV_ERROR_OPEN_FAILED;
-        if (!get_file_size(fd, &file_size))
-        {
-            close(fd);
-            return CONV_ERROR;
-        }
-
         /* Get copy size. */
-        if (offset >= file_size)
-        {
-            close(fd);
+        if (offset >= state->our_duration)
             return CONV_OK;
-        }
-        to_copy = min(file_size - offset, size);
+        to_copy = min(state->our_duration - offset, size);
 
         /* Copy data. */
-        if (lseek(fd, offset, SEEK_SET) < 0)
+        if (lseek(state->blank_file, offset, SEEK_SET) < 0)
         {
-            GST_ERROR("Failed to seek %s to %#"PRIx64". %s.", blank_video, offset, strerror(errno));
-            close(fd);
+            GST_ERROR("Failed to seek to %#"PRIx64". %s.", offset, strerror(errno));
             return CONV_ERROR;
         }
-        read_ok = complete_read(fd, buffer, to_copy);
-        close(fd);
-
-        if (!read_ok)
+        if (!(read_ok = complete_read(state->blank_file, buffer, to_copy)))
         {
             GST_ERROR("Failed to read blank video data.");
             return CONV_ERROR_READ_FAILED;
