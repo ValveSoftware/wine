@@ -379,6 +379,7 @@ struct wg_source_set_position_params
 struct wg_source_push_data_params
 {
     wg_source_t source;
+    UINT64 offset;
     const void *data;
     UINT32 size;
 };
