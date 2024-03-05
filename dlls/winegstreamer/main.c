@@ -551,16 +551,17 @@ HRESULT wg_source_set_position(wg_source_t source, uint64_t time)
     return HRESULT_FROM_NT(WINE_UNIX_CALL(unix_wg_source_set_position, &params));
 }
 
-HRESULT wg_source_push_data(wg_source_t source, const void *data, uint32_t size)
+HRESULT wg_source_push_data(wg_source_t source, UINT64 offset, const void *data, uint32_t size)
 {
     struct wg_source_push_data_params params =
     {
         .source = source,
+        .offset = offset,
         .data = data,
         .size = size,
     };
 
-    TRACE("source %#I64x, data %p, size %#x\n", source, data, size);
+    TRACE("source %#I64x, offset %#I64x, data %p, size %#x\n", source, offset, data, size);
 
     return HRESULT_FROM_NT(WINE_UNIX_CALL(unix_wg_source_push_data, &params));
 }
