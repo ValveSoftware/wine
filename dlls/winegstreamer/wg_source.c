@@ -44,6 +44,7 @@
 struct source_stream
 {
     GstPad *pad;
+    GstStream *stream;
     GstAtomicQueue *queue;
     GstBuffer *buffer;
     gboolean eos;
@@ -66,6 +67,14 @@ struct wg_source
 static struct wg_source *get_source(wg_source_t source)
 {
     return (struct wg_source *)(ULONG_PTR)source;
+}
+
+static struct source_stream *source_stream_from_pad(struct wg_source *source, GstPad *pad)
+{
+    struct source_stream *stream, *end;
+    for (stream = source->streams, end = stream + source->stream_count; stream != end; stream++)
+        if (stream->pad == pad) return stream;
+    return NULL;
 }
 
 static const char *media_type_from_caps(GstCaps *caps)
@@ -133,7 +142,9 @@ static GstBuffer *create_buffer_from_bytes(UINT64 offset, const void *data, guin
 
 static GstStream *source_get_stream(struct wg_source *source, guint index)
 {
-    return index >= source->stream_count ? NULL : gst_pad_get_stream(source->streams[index].pad);
+    if (index >= source->stream_count)
+        return NULL;
+    return gst_object_ref(source->streams[index].stream);
 }
 
 static GstCaps *source_get_stream_caps(struct wg_source *source, guint index)
@@ -166,17 +177,6 @@ static bool source_set_stream_flags(struct wg_source *source, guint index, GstSt
     gst_stream_set_stream_flags(stream, flags);
     gst_object_unref(stream);
     return true;
-}
-
-static GstStreamFlags source_get_stream_flags(struct wg_source *source, guint index)
-{
-    GstStreamFlags flags;
-    GstStream *stream;
-    if (!(stream = source_get_stream(source, index)))
-        return 0;
-    flags = gst_stream_get_stream_flags(stream);
-    gst_object_unref(stream);
-    return flags;
 }
 
 static NTSTATUS source_get_stream_buffer(struct wg_source *source, guint index, GstBuffer **buffer)
@@ -316,16 +316,12 @@ static gboolean src_query_cb(GstPad *pad, GstObject *parent, GstQuery *query)
 static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *buffer)
 {
     struct wg_source *source = gst_pad_get_element_private(pad);
-    guint index;
+    struct source_stream *stream = source_stream_from_pad(source, pad);
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, buffer);
 
-    for (index = 0; index < source->stream_count; index++)
-        if (source->streams[index].pad == pad)
-            break;
-
-    if (source_get_stream_flags(source, index) & GST_STREAM_FLAG_SELECT)
-        gst_atomic_queue_push(source->streams[index].queue, buffer);
+    if (gst_stream_get_stream_flags(stream->stream) & GST_STREAM_FLAG_SELECT)
+        gst_atomic_queue_push(stream->queue, buffer);
     else
         gst_buffer_unref(buffer);
 
@@ -334,64 +330,65 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
 
 static gboolean sink_event_caps(struct wg_source *source, GstPad *pad, GstEvent *event)
 {
-    GstStream *stream;
+    struct source_stream *stream = source_stream_from_pad(source, pad);
     GstCaps *caps;
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
 
     gst_event_parse_caps(event, &caps);
 
-    if ((stream = gst_pad_get_stream(pad)))
-    {
-        gst_stream_set_caps(stream, gst_caps_copy(caps));
-        gst_stream_set_stream_type(stream, stream_type_from_caps(caps));
-        gst_object_unref(stream);
-    }
+    gst_stream_set_caps(stream->stream, gst_caps_copy(caps));
+    gst_stream_set_stream_type(stream->stream, stream_type_from_caps(caps));
 
     gst_event_unref(event);
-    return !!stream;
+    return true;
 }
 
 static gboolean sink_event_tag(struct wg_source *source, GstPad *pad, GstEvent *event)
 {
-    GstTagList *new_tags;
-    GstStream *stream;
+    struct source_stream *stream = source_stream_from_pad(source, pad);
+    GstTagList *new_tags, *old_tags = gst_stream_get_tags(stream->stream);
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
 
     gst_event_parse_tag(event, &new_tags);
 
-    if ((stream = gst_pad_get_stream(pad)))
+    if ((new_tags = gst_tag_list_merge(old_tags, new_tags, GST_TAG_MERGE_REPLACE)))
     {
-        GstTagList *old_tags = gst_stream_get_tags(stream);
-        if ((new_tags = gst_tag_list_merge(old_tags, new_tags, GST_TAG_MERGE_REPLACE)))
-        {
-            gst_stream_set_tags(stream, new_tags);
-            gst_tag_list_unref(new_tags);
-        }
-        if (old_tags)
-            gst_tag_list_unref(old_tags);
-        gst_object_unref(stream);
+        gst_stream_set_tags(stream->stream, new_tags);
+        gst_tag_list_unref(new_tags);
     }
+    if (old_tags)
+        gst_tag_list_unref(old_tags);
 
     gst_event_unref(event);
-    return stream && new_tags;
+    return true;
 }
 
 static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, GstEvent *event)
 {
+    struct source_stream *stream = source_stream_from_pad(source, pad);
+    const gchar *new_id, *old_id = gst_stream_get_stream_id(stream->stream);
+    GstStream *new_stream, *old_stream = stream->stream;
     guint group, flags;
-    GstStream *stream;
     gint64 duration;
-    const gchar *id;
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
 
-    gst_event_parse_stream_start(event, &id);
-    gst_event_parse_stream(event, &stream);
+    gst_event_parse_stream_start(event, &new_id);
+    gst_event_parse_stream(event, &new_stream);
     gst_event_parse_stream_flags(event, &flags);
     if (!gst_event_parse_group_id(event, &group))
         group = -1;
+
+    if (strcmp(old_id, new_id))
+    {
+        if (!(stream->stream = new_stream))
+            stream->stream = gst_stream_new(new_id, NULL, GST_STREAM_TYPE_UNKNOWN, 0);
+        else
+            gst_object_ref(stream->stream);
+        gst_object_unref(old_stream);
+    }
 
     if (gst_pad_peer_query_duration(pad, GST_FORMAT_TIME, &duration) && GST_CLOCK_TIME_IS_VALID(duration))
     {
@@ -405,16 +402,11 @@ static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, G
 
 static gboolean sink_event_eos(struct wg_source *source, GstPad *pad, GstEvent *event)
 {
-    guint index;
+    struct source_stream *stream = source_stream_from_pad(source, pad);
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
 
-    for (index = 0; index < source->stream_count; index++)
-        if (source->streams[index].pad == pad)
-            break;
-
-    if (index < source->stream_count)
-        source->streams[index].eos = true;
+    stream->eos = true;
 
     gst_event_unref(event);
     return true;
@@ -444,13 +436,12 @@ static GstEvent *create_stream_start_event(const char *stream_id)
     GstStream *stream;
     GstEvent *event;
 
-    if (!(stream = gst_stream_new(stream_id, NULL, GST_STREAM_TYPE_UNKNOWN, 0)))
-        return NULL;
-    gst_stream_set_stream_flags(stream, GST_STREAM_FLAG_SELECT);
+    stream = gst_stream_new(stream_id, NULL, GST_STREAM_TYPE_UNKNOWN, 0);
     if ((event = gst_event_new_stream_start(stream_id)))
     {
         gst_event_set_stream(event, stream);
-        gst_object_unref(stream);
+        gst_event_set_stream_flags(event, GST_STREAM_FLAG_SELECT);
+        gst_event_set_group_id(event, 1);
     }
 
     return event;
@@ -459,34 +450,43 @@ static GstEvent *create_stream_start_event(const char *stream_id)
 static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
 {
     struct wg_source *source = user;
-    char stream_id[256];
-    GstFlowReturn ret;
-    GstPad *sink_pad;
-    GstEvent *event;
-    guint index;
+    struct source_stream *stream;
+    char stream_id[256], *id;
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %p", source, pad, user);
 
-    if ((index = source->stream_count++) >= ARRAY_SIZE(source->streams))
+    stream = source->streams + source->stream_count++;
+    if (stream >= source->streams + ARRAY_SIZE(source->streams))
     {
         GST_FIXME("Not enough sink pads, need %u", source->stream_count);
         return;
     }
 
-    sink_pad = source->streams[index].pad;
-    if (gst_pad_link(pad, sink_pad) < 0 || !gst_pad_set_active(sink_pad, true))
-        GST_ERROR("Failed to link new pad to sink pad %p", sink_pad);
+    if (gst_pad_link(pad, stream->pad) < 0 || !gst_pad_set_active(stream->pad, true))
+        GST_ERROR("Failed to link new pad to sink pad %p", stream->pad);
 
-    snprintf(stream_id, ARRAY_SIZE(stream_id), "wg_source/%03u", index);
-    if (!(event = create_stream_start_event(stream_id)))
-        GST_ERROR("Failed to create stream event for sink pad %p", sink_pad);
+    if ((stream->stream = gst_pad_get_stream(pad)))
+    {
+        GST_TRACE("got pad %"GST_PTR_FORMAT" stream %"GST_PTR_FORMAT, pad, stream->stream);
+        gst_stream_set_stream_flags(stream->stream, GST_STREAM_FLAG_SELECT);
+    }
     else
     {
-        if ((ret = gst_pad_store_sticky_event(pad, event)) < 0)
-            GST_ERROR("Failed to create pad %p stream, ret %d", sink_pad, ret);
-        if ((ret = gst_pad_store_sticky_event(sink_pad, event)) < 0)
-            GST_ERROR("Failed to create pad %p stream, ret %d", sink_pad, ret);
-        gst_event_unref(event);
+        if (!(id = gst_pad_get_stream_id(pad)))
+        {
+            snprintf(stream_id, ARRAY_SIZE(stream_id), "wg_source/%03zu", stream - source->streams);
+            id = g_strdup(stream_id);
+        }
+
+        if (!(stream->stream = gst_stream_new(id, NULL, GST_STREAM_TYPE_UNKNOWN, 0)))
+            GST_ERROR("Failed to create stream event for sink pad %p", stream->pad);
+        else
+        {
+            GST_TRACE("created stream %"GST_PTR_FORMAT" for pad %"GST_PTR_FORMAT, stream->stream, stream->pad);
+            gst_stream_set_stream_flags(stream->stream, GST_STREAM_FLAG_SELECT);
+        }
+
+        g_free(id);
     }
 }
 
