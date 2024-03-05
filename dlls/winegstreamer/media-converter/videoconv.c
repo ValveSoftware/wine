@@ -686,12 +686,27 @@ static gboolean video_conv_push_stream_start(VideoConv *conv, struct payload_has
     return true;
 }
 
+static gboolean video_conv_push_caps(VideoConv *conv, uint32_t transcode_tag)
+{
+    GstCaps *caps;
+    gboolean ret;
+
+    if (transcode_tag == VIDEO_CONV_FOZ_TAG_MKVDATA)
+        caps = gst_caps_from_string("video/x-matroska");
+    else if (transcode_tag == VIDEO_CONV_FOZ_TAG_OGVDATA)
+        caps = gst_caps_from_string("application/ogg");
+    else
+        return false;
+
+    ret = push_event(conv->src_pad, gst_event_new_caps(caps));
+    gst_caps_unref(caps);
+    return ret;
+}
+
 static gboolean video_conv_sink_event_caps(VideoConv *conv, GstEvent *event)
 {
     struct video_conv_state *state;
     uint32_t transcode_tag;
-    GstCaps *caps;
-    bool ret;
 
     gst_event_unref(event);
 
@@ -715,16 +730,7 @@ static gboolean video_conv_sink_event_caps(VideoConv *conv, GstEvent *event)
 
     pthread_mutex_unlock(&conv->state_mutex);
 
-    if (transcode_tag == VIDEO_CONV_FOZ_TAG_MKVDATA)
-        caps = gst_caps_from_string("video/x-matroska");
-    else if (transcode_tag == VIDEO_CONV_FOZ_TAG_OGVDATA)
-        caps = gst_caps_from_string("application/ogg");
-    else
-        return false;
-
-    ret = push_event(conv->src_pad, gst_event_new_caps(caps));
-    gst_caps_unref(caps);
-    return ret;
+    return video_conv_push_caps(conv, transcode_tag);
 }
 
 static gboolean video_conv_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
