@@ -80,7 +80,6 @@ static GstCaps *detect_caps_from_data(const char *url, const void *data, guint s
     const char *extension = url ? strrchr(url, '.') : NULL;
     GstTypeFindProbability probability;
     GstCaps *caps;
-    gchar *str;
 
     if (!(caps = gst_type_find_helper_for_data_with_extension(NULL, data, size,
             extension ? extension + 1 : NULL, &probability)))
@@ -89,14 +88,12 @@ static GstCaps *detect_caps_from_data(const char *url, const void *data, guint s
         return NULL;
     }
 
-    str = gst_caps_to_string(caps);
     if (probability > GST_TYPE_FIND_POSSIBLE)
-        GST_INFO("Detected caps %s with probability %u for url %s, data %p, size %u",
-                str, probability, url, data, size);
+        GST_INFO("Detected caps %"GST_PTR_FORMAT" with probability %u for url %s, data %p, size %u",
+                caps, probability, url, data, size);
     else
-        GST_FIXME("Detected caps %s with probability %u for url %s, data %p, size %u",
-                str, probability, url, data, size);
-    g_free(str);
+        GST_FIXME("Detected caps %"GST_PTR_FORMAT" with probability %u for url %s, data %p, size %u",
+                caps, probability, url, data, size);
 
     return caps;
 }
@@ -196,20 +193,16 @@ static NTSTATUS source_get_stream_buffer(struct wg_source *source, guint index, 
 static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
 {
     guint32 i, seqnum = gst_event_get_seqnum(event);
-    GstSeekType cur_type, stop_type;
     GstSeekFlags flags;
     GstFormat format;
-    gint64 cur, stop;
-    gdouble rate;
+    gint64 cur;
 
-    gst_event_parse_seek(event, &rate, &format, &flags, &cur_type, &cur, &stop_type, &stop);
+    GST_TRACE("source %p, %"GST_PTR_FORMAT, source, event);
+
+    gst_event_parse_seek(event, NULL, &format, &flags, NULL, &cur, NULL, NULL);
     gst_event_unref(event);
     if (format != GST_FORMAT_BYTES)
         return false;
-
-    GST_TRACE("source %p, rate %f, format %s, flags %#x, cur_type %u, cur %#" G_GINT64_MODIFIER "x, "
-            "stop_type %u, stop %#" G_GINT64_MODIFIER "x.", source, rate, gst_format_get_name(format),
-            flags, cur_type, cur, stop_type, stop);
 
     if (flags & GST_SEEK_FLAG_FLUSH)
     {
@@ -261,8 +254,9 @@ static gboolean src_query_duration(struct wg_source *source, GstQuery *query)
 {
     GstFormat format;
 
+    GST_TRACE("source %p, %"GST_PTR_FORMAT, source, query);
+
     gst_query_parse_duration(query, &format, NULL);
-    GST_TRACE("source %p, format %s", source, gst_format_get_name(format));
     if (format != GST_FORMAT_BYTES)
         return false;
 
@@ -272,7 +266,8 @@ static gboolean src_query_duration(struct wg_source *source, GstQuery *query)
 
 static gboolean src_query_scheduling(struct wg_source *source, GstQuery *query)
 {
-    GST_TRACE("source %p", source);
+    GST_TRACE("source %p, %"GST_PTR_FORMAT, source, query);
+
     gst_query_set_scheduling(query, GST_SCHEDULING_FLAG_SEEKABLE, 1, -1, 0);
     gst_query_add_scheduling_mode(query, GST_PAD_MODE_PUSH);
     return true;
@@ -282,8 +277,9 @@ static gboolean src_query_seeking(struct wg_source *source, GstQuery *query)
 {
     GstFormat format;
 
+    GST_TRACE("source %p, %"GST_PTR_FORMAT, source, query);
+
     gst_query_parse_seeking(query, &format, NULL, NULL, NULL);
-    GST_TRACE("source %p, format %s", source, gst_format_get_name(format));
     if (format != GST_FORMAT_BYTES)
         return false;
 
@@ -295,8 +291,9 @@ static gboolean src_query_uri(struct wg_source *source, GstQuery *query)
 {
     gchar *uri;
 
+    GST_TRACE("source %p, %"GST_PTR_FORMAT, source, query);
+
     gst_query_parse_uri(query, &uri);
-    GST_TRACE("source %p, uri %s", source, uri);
     gst_query_set_uri(query, source->url);
 
     return true;
@@ -328,7 +325,7 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
     struct wg_source *source = gst_pad_get_element_private(pad);
     guint index;
 
-    GST_TRACE("source %p, pad %p, buffer %p.", source, pad, buffer);
+    GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, buffer);
 
     for (index = 0; index < source->stream_count; index++)
         if (source->streams[index].pad == pad)
@@ -346,12 +343,10 @@ static gboolean sink_event_caps(struct wg_source *source, GstPad *pad, GstEvent 
 {
     GstStream *stream;
     GstCaps *caps;
-    gchar *str;
+
+    GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
 
     gst_event_parse_caps(event, &caps);
-    str = gst_caps_to_string(caps);
-    GST_TRACE("source %p, pad %p, caps %s", source, pad, str);
-    g_free(str);
 
     if ((stream = gst_pad_get_stream(pad)))
     {
@@ -369,8 +364,9 @@ static gboolean sink_event_tag(struct wg_source *source, GstPad *pad, GstEvent *
     GstTagList *new_tags;
     GstStream *stream;
 
+    GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
+
     gst_event_parse_tag(event, &new_tags);
-    GST_TRACE("source %p, pad %p, new_tags %p", source, pad, new_tags);
 
     if ((stream = gst_pad_get_stream(pad)))
     {
@@ -396,6 +392,8 @@ static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, G
     gint64 duration;
     const gchar *id;
 
+    GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
+
     gst_event_parse_stream_start(event, &id);
     gst_event_parse_stream(event, &stream);
     gst_event_parse_stream_flags(event, &flags);
@@ -403,10 +401,10 @@ static gboolean sink_event_stream_start(struct wg_source *source, GstPad *pad, G
         group = -1;
 
     if (gst_pad_peer_query_duration(pad, GST_FORMAT_TIME, &duration) && GST_CLOCK_TIME_IS_VALID(duration))
+    {
         source->max_duration = max(source->max_duration, duration);
-
-    GST_TRACE("source %p, pad %p, stream %p, id %s, flags %#x, group %d, duration %" GST_TIME_FORMAT,
-            source, pad, stream, id, flags, group, GST_TIME_ARGS(duration));
+        GST_TRACE("source %p, %"GST_PTR_FORMAT", got duration %" GST_TIME_FORMAT, source, pad, GST_TIME_ARGS(duration));
+    }
 
     gst_event_unref(event);
     return true;
@@ -416,7 +414,7 @@ static gboolean sink_event_eos(struct wg_source *source, GstPad *pad, GstEvent *
 {
     guint index;
 
-    GST_TRACE("source %p, pad %p, event %p", source, pad, event);
+    GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
 
     for (index = 0; index < source->stream_count; index++)
         if (source->streams[index].pad == pad)
@@ -474,7 +472,8 @@ static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
     GstEvent *event;
     guint index;
 
-    GST_TRACE("source %p, element %p, pad %p.", source, element, pad);
+    GST_TRACE("source %p, %"GST_PTR_FORMAT", %p", source, pad, user);
+
     if ((index = source->stream_count++) >= ARRAY_SIZE(source->streams))
     {
         GST_FIXME("Not enough sink pads, need %u", source->stream_count);
@@ -688,7 +687,7 @@ NTSTATUS wg_source_set_position(void *args)
     GstEvent *event;
     guint i;
 
-    GST_TRACE("source %p", source);
+    GST_TRACE("source %p, time %"G_GINT64_MODIFIER"d", source, time);
 
     if (!(event = gst_event_new_seek(1.0, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH,
             GST_SEEK_TYPE_SET, time, GST_SEEK_TYPE_NONE, -1))
