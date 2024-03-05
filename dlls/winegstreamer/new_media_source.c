@@ -40,6 +40,7 @@ struct object_context
     WCHAR *url;
 
     BYTE *buffer;
+    UINT64 read_offset;
     wg_source_t wg_source;
     WCHAR mime_type[256];
     UINT32 stream_count;
@@ -774,8 +775,8 @@ static HRESULT media_stream_send_eos(struct media_source *source, struct media_s
 static HRESULT wait_on_sample(struct media_stream *stream, IUnknown *token)
 {
     struct media_source *source = impl_from_IMFMediaSource(stream->media_source);
+    UINT64 read_offset, position;
     DWORD id, read_size;
-    UINT64 read_offset;
     IMFSample *sample;
     HRESULT hr;
 
@@ -789,11 +790,14 @@ static HRESULT wait_on_sample(struct media_stream *stream, IUnknown *token)
     {
         if (FAILED(hr = wg_source_get_position(source->wg_source, &read_offset)))
             break;
-        if (FAILED(hr = IMFByteStream_SetCurrentPosition(source->byte_stream, read_offset)))
-            WARN("Failed to seek stream to %#I64x, hr %#lx\n", read_offset, hr);
+        if (FAILED(hr = IMFByteStream_GetCurrentPosition(source->byte_stream, &position)))
+            WARN("Failed to get current byte stream position, hr %#lx\n", hr);
+        else if (position != (read_offset = min(read_offset, source->file_size))
+                && FAILED(hr = IMFByteStream_SetCurrentPosition(source->byte_stream, read_offset)))
+            WARN("Failed to set current byte stream position, hr %#lx\n", hr);
         else if (FAILED(hr = IMFByteStream_Read(source->byte_stream, source->read_buffer, SOURCE_BUFFER_SIZE, &read_size)))
             WARN("Failed to read %#lx bytes from stream, hr %#lx\n", read_size, hr);
-        else if (FAILED(hr = wg_source_push_data(source->wg_source, source->read_buffer, read_size)))
+        else if (FAILED(hr = wg_source_push_data(source->wg_source, read_offset, source->read_buffer, read_size)))
             WARN("Failed to push %#lx bytes to source, hr %#lx\n", read_size, hr);
     }
 
@@ -2021,7 +2025,6 @@ static HRESULT WINAPI stream_handler_callback_Invoke(IMFAsyncCallback *iface, IM
     IUnknown *object, *state = IMFAsyncResult_GetStateNoAddRef(result);
     struct object_context *context;
     struct result_entry *entry;
-    UINT64 read_offset;
     DWORD size = 0;
     HRESULT hr;
 
@@ -2033,23 +2036,23 @@ static HRESULT WINAPI stream_handler_callback_Invoke(IMFAsyncCallback *iface, IM
     else if (!context->wg_source && FAILED(hr = wg_source_create(context->url, context->file_size,
             context->buffer, size, context->mime_type, &context->wg_source)))
         WARN("Failed to create wg_source, hr %#lx\n", hr);
-    else if (FAILED(hr = wg_source_push_data(context->wg_source, context->buffer, size)))
+    else if (FAILED(hr = wg_source_push_data(context->wg_source, context->read_offset, context->buffer, size)))
         WARN("Failed to push wg_source data, hr %#lx\n", hr);
     else if (FAILED(hr = wg_source_get_stream_count(context->wg_source, &context->stream_count)))
         WARN("Failed to get wg_source status, hr %#lx\n", hr);
     else if (!context->stream_count)
     {
-        QWORD position, offset;
-        if (FAILED(hr = wg_source_get_position(context->wg_source, &read_offset)))
+        QWORD position;
+        if (FAILED(hr = wg_source_get_position(context->wg_source, &context->read_offset)))
             WARN("Failed to get wg_source position, hr %#lx\n", hr);
         else if (FAILED(hr = IMFByteStream_GetCurrentPosition(context->stream, &position)))
             WARN("Failed to get current byte stream position, hr %#lx\n", hr);
-        else if (position != (offset = min(read_offset, context->file_size))
-                && FAILED(hr = IMFByteStream_SetCurrentPosition(context->stream, offset)))
+        else if (position != (context->read_offset = min(context->read_offset, context->file_size))
+                && FAILED(hr = IMFByteStream_SetCurrentPosition(context->stream, context->read_offset)))
             WARN("Failed to set current byte stream position, hr %#lx\n", hr);
         else
         {
-            UINT32 read_size = min(SOURCE_BUFFER_SIZE, context->file_size - offset);
+            UINT32 read_size = min(SOURCE_BUFFER_SIZE, context->file_size - context->read_offset);
             return IMFByteStream_BeginRead(context->stream, context->buffer, read_size,
                     &handler->IMFAsyncCallback_iface, state);
         }

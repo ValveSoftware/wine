@@ -113,7 +113,7 @@ static GstPad *create_pad_with_caps(GstPadDirection direction, GstCaps *caps)
     return pad;
 }
 
-static GstBuffer *create_buffer_from_bytes(const void *data, guint size)
+static GstBuffer *create_buffer_from_bytes(UINT64 offset, const void *data, guint size)
 {
     GstBuffer *buffer;
 
@@ -123,6 +123,8 @@ static GstBuffer *create_buffer_from_bytes(const void *data, guint size)
     {
         gst_buffer_fill(buffer, 0, data, size);
         gst_buffer_set_size(buffer, size);
+        GST_BUFFER_OFFSET(buffer) = offset;
+        GST_BUFFER_OFFSET_END(buffer) = offset + size;
     }
 
     return buffer;
@@ -701,7 +703,7 @@ NTSTATUS wg_source_push_data(void *args)
     GstFlowReturn ret = GST_FLOW_OK;
     GstBuffer *buffer;
 
-    GST_TRACE("source %p, data %p, size %#x", source, params->data, params->size);
+    GST_TRACE("source %p, offset %#"G_GINT64_MODIFIER"x, data %p, size %#x", source, params->offset, params->data, params->size);
 
     if (!source->valid_segment)
     {
@@ -716,7 +718,7 @@ NTSTATUS wg_source_push_data(void *args)
         return STATUS_SUCCESS;
     }
 
-    if (!(buffer = create_buffer_from_bytes(params->data, params->size)))
+    if (!(buffer = create_buffer_from_bytes(params->offset, params->data, params->size)))
     {
         GST_WARNING("Failed to allocate buffer for data");
         return STATUS_UNSUCCESSFUL;
