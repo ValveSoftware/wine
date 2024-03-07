@@ -3494,7 +3494,7 @@ static const GLubyte *wglGetString(GLenum name)
         int sz;
 
         override_vendor = 0;
-        if ((env = getenv("WINE_GL_HIDE_NVIDIA")))
+        if ((env = getenv("WINE_GL_VENDOR_REPORT_AMD")))
         {
             override_vendor = env[0] != '0';
         }
@@ -3522,13 +3522,19 @@ static const GLubyte *wglGetString(GLenum name)
         if (name == GL_RENDERER)
         {
             s = pglGetString(name);
-            if (s && strstr((const char *)s, "NVIDIA")) return (const GLubyte *)"AMD Radeon Graphics";
+            if (s && (strstr((const char *)s, "NVIDIA") || strstr((const char *)s, "Intel")))
+            {
+                return (const GLubyte *)"AMD Radeon Graphics";
+            }
             return s;
         }
         else if (name == GL_VENDOR)
         {
             s = pglGetString(name);
-            if (s && strstr((const char *)s, "NVIDIA")) return (const GLubyte *)"AMD";
+            if (s && (strstr((const char *)s, "NVIDIA") || strstr((const char *)s, "Intel")))
+            {
+                return (const GLubyte *)"AMD";
+            }
             return s;
         }
     }
