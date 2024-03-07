@@ -611,6 +611,7 @@ UINT WINAPI NtUserGetRawInputDeviceInfo( HANDLE handle, UINT command, void *data
  */
 UINT WINAPI NtUserGetRawInputBuffer( RAWINPUT *data, UINT *data_size, UINT header_size )
 {
+    static int cached_clear_qs_rawinput = -1;
     unsigned int count = 0, remaining, rawinput_size, next_size, overhead;
     struct rawinput_thread_data *thread_data;
     struct hardware_msg_data *msg_data;
@@ -643,6 +644,7 @@ UINT WINAPI NtUserGetRawInputBuffer( RAWINPUT *data, UINT *data_size, UINT heade
         {
             req->rawinput_size = rawinput_size;
             req->buffer_size = 0;
+            req->clear_qs_rawinput = 0;
             if (wine_server_call( req )) return ~0u;
             *data_size = reply->next_size;
         }
@@ -653,12 +655,20 @@ UINT WINAPI NtUserGetRawInputBuffer( RAWINPUT *data, UINT *data_size, UINT heade
     if (!(thread_data = get_rawinput_thread_data())) return ~0u;
     rawinput = thread_data->buffer;
 
+    if (cached_clear_qs_rawinput == -1)
+    {
+        const char *sgi;
+
+        cached_clear_qs_rawinput = (sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "1172470" );
+    }
+
     /* first RAWINPUT block in the buffer is used for WM_INPUT message data */
     msg_data = (struct hardware_msg_data *)NEXTRAWINPUTBLOCK(rawinput);
     SERVER_START_REQ( get_rawinput_buffer )
     {
         req->rawinput_size = rawinput_size;
         req->buffer_size = *data_size;
+        req->clear_qs_rawinput = cached_clear_qs_rawinput;
         wine_server_set_reply( req, msg_data, RAWINPUT_BUFFER_SIZE - rawinput->header.dwSize );
         if (wine_server_call( req )) return ~0u;
         next_size = reply->next_size;
