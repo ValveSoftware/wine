@@ -3872,6 +3872,8 @@ struct handle_info
 @REQ(get_rawinput_buffer)
     data_size_t rawinput_size; /* size of RAWINPUT structure */
     data_size_t buffer_size;   /* size of output buffer */
+    int         clear_qs_rawinput;
+    int         __pad;
 @REPLY
     data_size_t next_size; /* minimum size to get next message data */
     unsigned int count;

@@ -3971,6 +3971,8 @@ DECL_HANDLER(get_rawinput_buffer)
         count++;
     }
 
+    if (req->clear_qs_rawinput && !ptr) clear_queue_bits( current->queue, QS_RAWINPUT );
+
     reply->next_size = next_size;
     reply->count = count;
     set_reply_data_ptr( buf, pos );
