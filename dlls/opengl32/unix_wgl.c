@@ -908,7 +908,7 @@ static const GLubyte *override_vendor( GLenum name, const GLubyte *orig )
         int sz;
 
         override_vendor = 0;
-        if ((env = getenv("WINE_GL_HIDE_NVIDIA")))
+        if ((env = getenv("WINE_GL_VENDOR_REPORT_AMD")))
         {
             override_vendor = env[0] != '0';
         }
@@ -935,12 +935,12 @@ static const GLubyte *override_vendor( GLenum name, const GLubyte *orig )
 
     if (name == GL_RENDERER)
     {
-        if (orig && strstr((const char *)orig, "NVIDIA")) return (const GLubyte *)"AMD Radeon Graphics";
+        if (orig && (strstr((const char *)orig, "NVIDIA") || strstr((const char *)orig, "Intel"))) return (const GLubyte *)"AMD Radeon Graphics";
         return orig;
     }
     if (name == GL_VENDOR)
     {
-        if (orig && strstr((const char *)orig, "NVIDIA")) return (const GLubyte *)"AMD";
+        if (orig && (strstr((const char *)orig, "NVIDIA") || strstr((const char *)orig, "Intel"))) return (const GLubyte *)"AMD";
         return orig;
     }
     return orig;
