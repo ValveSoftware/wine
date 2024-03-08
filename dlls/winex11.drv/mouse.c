@@ -1699,19 +1699,17 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
         values++;
     }
 
-    input->mi.dx = round( x->value );
-    input->mi.dy = round( y->value );
-
-    TRACE( "event %f,%f value %f,%f input %d,%d\n", x_value, y_value, x->value, y->value,
-           input->mi.dx, input->mi.dy );
-
-    x->value -= input->mi.dx;
-    y->value -= input->mi.dy;
-
-    if (!input->mi.dx && !input->mi.dy)
+    if (!(input->mi.dx = round( x->value )) && !(input->mi.dy = round( y->value )))
     {
-        TRACE( "accumulating motion\n" );
-        return FALSE;
+        TRACE( "event %f,%f value %f,%f, accumulating motion\n", x_value, y_value, x->value, y->value );
+        input->mi.dwFlags &= ~MOUSEEVENTF_MOVE;
+    }
+    else
+    {
+        TRACE( "event %f,%f value %f,%f, input %d,%d\n", x_value, y_value, x->value, y->value,
+               (int)input->mi.dx, (int)input->mi.dy );
+        x->value -= input->mi.dx;
+        y->value -= input->mi.dy;
     }
 
     return TRUE;
@@ -1739,6 +1737,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.mi.dx          = 0;
     input.mi.dy          = 0;
     if (!map_raw_event_coords( event, &input )) return FALSE;
+    if (!(input.mi.dwFlags & MOUSEEVENTF_MOVE)) return FALSE;
 
     NtUserSendHardwareInput( 0, 0, &input, 0 );
     return TRUE;
