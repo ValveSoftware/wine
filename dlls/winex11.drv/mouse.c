@@ -1761,13 +1761,13 @@ static BOOL X11DRV_DeviceChanged( XGenericEventCookie *xev )
     return TRUE;
 }
 
-static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
+static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input, BOOL send_raw )
 {
     struct x11drv_thread_data *thread_data = x11drv_thread_data();
     XIValuatorClassInfo *x = &thread_data->x_valuator, *y = &thread_data->y_valuator;
+    const double *values = event->valuators.values, *raw_values = event->raw_values;
     const UINT absolute_flags = MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK;
-    double x_value = 0, y_value = 0, x_scale, y_scale;
-    const double *values = event->valuators.values;
+    double x_raw = 0, y_raw = 0, x_value = 0, y_value = 0, x_scale, y_scale;
     RECT virtual_rect;
     int i;
 
@@ -1796,16 +1796,19 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
         if (!XIMaskIsSet( event->valuators.mask, i )) continue;
         if (i == x->number)
         {
+            x_raw = *raw_values;
             x_value = *values;
             if (x->mode == XIModeRelative) x->value += x_value * x_scale;
             else x->value = (x_value - x->min) * x_scale;
         }
         if (i == y->number)
         {
+            y_raw = *raw_values;
             y_value = *values;
             if (y->mode == XIModeRelative) y->value += y_value * y_scale;
             else y->value = (y_value - y->min) * y_scale;
         }
+        raw_values++;
         values++;
     }
 
@@ -1814,6 +1817,13 @@ static BOOL map_raw_event_coords( XIRawEvent *event, INPUT *input )
         input->mi.dx = round( x->value );
         input->mi.dy = round( y->value );
         TRACE( "event %f,%f value %f,%f absolute input %d,%d\n", x_value, y_value, x->value, y->value,
+               (int)input->mi.dx, (int)input->mi.dy );
+    }
+    else if (send_raw)
+    {
+        input->mi.dx = round( x_raw );
+        input->mi.dy = round( y_raw );
+        TRACE( "event %f,%f raw value %f,%f, raw input %d,%d\n", x_value, y_value, x_raw, y_raw,
                (int)input->mi.dx, (int)input->mi.dy );
     }
     else
@@ -1860,7 +1870,7 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
     input.mi.dwExtraInfo = 0;
     input.mi.dx          = 0;
     input.mi.dy          = 0;
-    if (!map_raw_event_coords( event, &input )) return FALSE;
+    if (!map_raw_event_coords( event, &input, flags & SEND_HWMSG_NO_MSG )) return FALSE;
     if (!(input.mi.dwFlags & MOUSEEVENTF_MOVE)) return FALSE;
 
     NtUserSendHardwareInput( 0, flags, &input, 0 );
@@ -1909,7 +1919,7 @@ static BOOL X11DRV_RawButtonEvent( XGenericEventCookie *cookie )
     input.mi.dwExtraInfo = 0;
     input.mi.dx          = 0;
     input.mi.dy          = 0;
-    map_raw_event_coords( event, &input );
+    map_raw_event_coords( event, &input, TRUE );
 
     NtUserSendHardwareInput( 0, SEND_HWMSG_NO_MSG, &input, 0 );
     return TRUE;
