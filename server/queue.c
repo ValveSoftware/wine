@@ -2042,7 +2042,9 @@ static void rawmouse_init( struct rawinput *header, RAWMOUSE *rawmouse, int x, i
     header->wparam = 0;
     header->usage  = MAKELONG(HID_USAGE_GENERIC_MOUSE, HID_USAGE_PAGE_GENERIC);
 
-    rawmouse->usFlags       = MOUSE_MOVE_RELATIVE;
+    rawmouse->usFlags       = 0;
+    if (flags & MOUSEEVENTF_ABSOLUTE)    rawmouse->usFlags |= MOUSE_MOVE_ABSOLUTE;
+    if (flags & MOUSEEVENTF_VIRTUALDESK) rawmouse->usFlags |= MOUSE_VIRTUAL_DESKTOP;
     rawmouse->usButtonFlags = 0;
     rawmouse->usButtonData  = 0;
     for (i = 1; i < ARRAY_SIZE(button_flags); ++i)
@@ -2281,7 +2283,7 @@ static int queue_mouse_message( struct desktop *desktop, user_handle_t win, cons
         raw_msg.time       = time;
         raw_msg.message    = WM_INPUT;
         raw_msg.flags      = flags;
-        rawmouse_init( &raw_msg.rawinput, &raw_msg.data.mouse, x - desktop_shm->cursor.x, y - desktop_shm->cursor.y,
+        rawmouse_init( &raw_msg.rawinput, &raw_msg.data.mouse, input->mouse.x, input->mouse.y,
                        raw_msg.flags, input->mouse.data, input->mouse.info );
 
         dispatch_rawinput_message( desktop, &raw_msg );
