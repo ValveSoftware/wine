@@ -2278,7 +2278,7 @@ static jstring wine_init_jni( JNIEnv *env, jobject obj, jobjectArray cmdline, jo
     main_envp = environ;
 
     init_paths( argv );
-    virtual_init( argc, argv );
+    virtual_init();
     init_environment();
 
 #ifdef __i386__
@@ -2525,7 +2525,7 @@ DECLSPEC_EXPORT void __wine_main( int argc, char *argv[], char *envp[] )
     set_max_limit( RLIMIT_NICE );
 #endif
 
-    virtual_init( argc, argv );
+    virtual_init();
     init_environment();
 
 #ifdef __APPLE__
