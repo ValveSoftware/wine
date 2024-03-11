@@ -338,6 +338,9 @@ static BYTE *pages_vprot;
 
 static int use_kernel_writewatch;
 static int uffd_fd, pagemap_fd;
+static int pagemap_reset_fd, clear_refs_fd;
+#define PAGE_FLAGS_BUFFER_LENGTH 1024
+#define PM_SOFT_DIRTY_PAGE (1ull << 57)
 
 static struct file_view *view_block_start, *view_block_end, *next_free_view;
 #ifdef _WIN64
@@ -376,18 +379,40 @@ void *anon_mmap_alloc( size_t size, int prot )
     return mmap( NULL, size, prot, MAP_PRIVATE | MAP_ANON, -1, 0 );
 }
 
+static void kernel_writewatch_softdirty_init(void)
+{
+    if ((pagemap_reset_fd = open( "/proc/self/pagemap_reset", O_RDONLY | O_CLOEXEC )) == -1) return;
+
+    if ((pagemap_fd = open( "/proc/self/pagemap", O_RDONLY | O_CLOEXEC )) == -1)
+    {
+        ERR( "Could not open pagemap file, error %s.\n", strerror( errno ));
+        exit(-1);
+    }
+    if ((clear_refs_fd = open( "/proc/self/clear_refs", O_WRONLY | O_CLOEXEC )) == -1)
+    {
+        ERR( "Could not open clear_refs file, error %s.\n", strerror( errno ));
+        exit(-1);
+    }
+    use_kernel_writewatch = 2;
+}
+
 static void kernel_writewatch_init(void)
 {
     struct uffdio_api uffdio_api;
 
     uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK );
-    if (uffd_fd == -1) return;
+    if (uffd_fd == -1)
+    {
+        kernel_writewatch_softdirty_init();
+        return;
+    }
 
     uffdio_api.api = UFFD_API;
     uffdio_api.features = UFFD_FEATURE_WP_ASYNC | UFFD_FEATURE_WP_UNPOPULATED;
     if (ioctl( uffd_fd, UFFDIO_API, &uffdio_api ) || uffdio_api.api != UFFD_API)
     {
         close( uffd_fd );
+        kernel_writewatch_softdirty_init();
         return;
     }
     pagemap_fd = open( "/proc/self/pagemap", O_CLOEXEC | O_RDONLY );
@@ -403,6 +428,21 @@ static void kernel_writewatch_init(void)
 static void kernel_writewatch_reset( void *start, SIZE_T len )
 {
     struct pm_scan_arg arg = { 0 };
+
+    if (use_kernel_writewatch == 2)
+    {
+        char buffer[17];
+        ssize_t ret;
+
+        memset(buffer, 0, sizeof(buffer));
+        buffer[0] = '6';
+        *(ULONG64 *)&buffer[1] = (ULONG_PTR)start;
+        *(ULONG64 *)&buffer[1 + 8] = (ULONG_PTR)start + len;
+
+        if ((ret = write(clear_refs_fd, buffer, sizeof(buffer))) != sizeof(buffer))
+            ERR("Could not clear soft dirty bits, ret %zd, error %s.\n", ret, strerror(errno));
+        return;
+    }
 
     arg.size = sizeof(arg);
     arg.start = (UINT_PTR)start;
@@ -422,6 +462,12 @@ static void kernel_writewatch_register_range( struct file_view *view, void *base
     if (!(view->protect & VPROT_WRITEWATCH) || !use_kernel_writewatch) return;
 
     madvise( base, size, MADV_NOHUGEPAGE );
+    if (use_kernel_writewatch == 2)
+    {
+        kernel_writewatch_reset( base, size );
+        return;
+    }
+
     uffdio_register.range.start = (UINT_PTR)base;
     uffdio_register.range.len = size;
     uffdio_register.mode = UFFDIO_REGISTER_MODE_WP;
@@ -447,6 +493,77 @@ static void kernel_writewatch_register_range( struct file_view *view, void *base
     }
 }
 
+static NTSTATUS kernel_soft_dirty_get_write_watches( void *base, SIZE_T size, void **addresses, ULONG_PTR *count, BOOL reset )
+{
+    static UINT64 buffer[PAGE_FLAGS_BUFFER_LENGTH];
+    char *addr = base;
+    char *end = addr + size;
+    unsigned int i, length;
+    ssize_t read_length;
+    ULONG_PTR pos = 0;
+
+    if (reset)
+    {
+        if (is_win64)
+        {
+            addresses[0] = end;
+            if ((read_length = pread(pagemap_reset_fd, addresses, *count * sizeof(*addresses),
+                    ((ULONG_PTR)addr >> page_shift) * sizeof(*addresses))) == -1)
+            {
+                ERR("Error reading page flags, read_length %zd, error %s.\n", read_length, strerror(errno));
+                return STATUS_INVALID_ADDRESS;
+            }
+            *count = read_length / sizeof(*addresses);
+            return STATUS_SUCCESS;
+        }
+
+        while (pos < *count && addr < end)
+        {
+            length = min(PAGE_FLAGS_BUFFER_LENGTH, *count - pos);
+
+            buffer[0] = (ULONG_PTR)end;
+            if ((read_length = pread(pagemap_reset_fd, buffer, length * sizeof(*buffer),
+                    ((ULONG_PTR)addr >> page_shift) * sizeof(*buffer))) == -1)
+            {
+                ERR("Error reading page flags, read_length %zd, error %s.\n", read_length, strerror(errno));
+                return STATUS_INVALID_ADDRESS;
+            }
+            read_length /= sizeof(*buffer);
+            for (i = 0; i < read_length; ++i)
+            {
+                assert(pos < *count);
+                addresses[pos++] = (void *)(ULONG_PTR)buffer[i];
+            }
+            if (read_length < length)
+                break;
+            addr = (char *)(ULONG_PTR)buffer[read_length - 1] + page_size;
+        }
+        *count = pos;
+        return STATUS_SUCCESS;
+    }
+
+    while (pos < *count && addr < end)
+    {
+        length = min(PAGE_FLAGS_BUFFER_LENGTH, (end - addr) >> page_shift);
+
+        if ((read_length = pread(pagemap_fd, buffer, length * sizeof(*buffer),
+                ((ULONG_PTR)addr >> page_shift) * sizeof(*buffer))) != length * sizeof(*buffer))
+        {
+            ERR("Error reading page flags, read_length %zd, error %s.\n", read_length, strerror(errno));
+            return STATUS_INVALID_ADDRESS;
+        }
+        for (i = 0; i < length && pos < *count; ++i)
+        {
+            if (buffer[i] & PM_SOFT_DIRTY_PAGE)
+                addresses[pos++] = addr;
+
+            addr += page_size;
+        }
+    }
+    *count = pos;
+    return STATUS_SUCCESS;
+}
+
 static NTSTATUS kernel_get_write_watches( void *base, SIZE_T size, void **buffer, ULONG_PTR *count, BOOL reset )
 {
     SIZE_T buffer_len = count ? *count : 0;
@@ -457,6 +574,8 @@ static NTSTATUS kernel_get_write_watches( void *base, SIZE_T size, void **buffer
     size_t c_addr;
 
     assert( !(size & page_mask) );
+
+    if (use_kernel_writewatch == 2) return kernel_soft_dirty_get_write_watches( base, size, buffer, count, reset );
 
     arg.size = sizeof(arg);
     arg.vec = (UINT_PTR)rgns;
