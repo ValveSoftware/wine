@@ -2447,8 +2447,11 @@ static HRESULT WINAPI reader_SetReadStreamSamples(IWMSyncReader2 *iface, WORD st
         return E_INVALIDARG;
     }
 
-    stream->read_compressed = compressed;
-    reinit_stream(reader, compressed);
+    if (stream->read_compressed != compressed)
+    {
+        stream->read_compressed = compressed;
+        reinit_stream(reader, compressed);
+    }
 
     LeaveCriticalSection(&reader->cs);
     return S_OK;
