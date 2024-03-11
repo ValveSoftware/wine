@@ -1964,7 +1964,10 @@ static HRESULT source_reader_create_transform(struct source_reader *reader, BOOL
     if (SUCCEEDED(hr = MFTEnumEx(category, 0, &in_type, allow_processor ? NULL : &out_type, &activates, &count)))
     {
         if (!count)
+        {
+            free(entry);
             return MF_E_TOPO_CODEC_NOT_FOUND;
+        }
 
         for (i = 0; i < count; i++)
         {
