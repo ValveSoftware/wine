@@ -71,6 +71,7 @@ extern NTSTATUS wg_source_set_stream_flags(void *args);
 
 extern NTSTATUS wg_transform_create(void *args);
 extern NTSTATUS wg_transform_destroy(void *args);
+extern NTSTATUS wg_transform_get_output_format(void *args);
 extern NTSTATUS wg_transform_set_output_format(void *args);
 extern NTSTATUS wg_transform_push_data(void *args);
 extern NTSTATUS wg_transform_read_data(void *args);
