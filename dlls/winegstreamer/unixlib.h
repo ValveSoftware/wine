@@ -391,11 +391,11 @@ struct wg_source_read_data_params
     struct wg_sample *sample;
 };
 
-struct wg_source_get_stream_format_params
+struct wg_source_get_stream_type_params
 {
     wg_source_t source;
     UINT32 index;
-    struct wg_format format;
+    struct wg_media_type media_type;
 };
 
 struct wg_source_get_stream_tag_params
@@ -537,7 +537,7 @@ enum unix_funcs
     unix_wg_source_set_position,
     unix_wg_source_push_data,
     unix_wg_source_read_data,
-    unix_wg_source_get_stream_format,
+    unix_wg_source_get_stream_type,
     unix_wg_source_get_stream_tag,
     unix_wg_source_set_stream_flags,
 
