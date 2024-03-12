@@ -252,6 +252,7 @@ struct gdi_gpu
     UINT revision_id;
     GUID vulkan_uuid;     /* Vulkan device UUID */
     ULONGLONG memory_size;
+    BOOL is_nvk;
 };
 
 struct gdi_adapter
