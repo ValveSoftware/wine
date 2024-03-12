@@ -856,6 +856,7 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
     VkPhysicalDeviceMemoryProperties mem_properties;
     VkInstanceCreateInfo create_info;
     VkPhysicalDeviceIDProperties id;
+    VkPhysicalDeviceVulkan12Properties vk12;
     VkInstance vk_instance = NULL;
     VkDisplayKHR vk_display;
     DWORD len;
@@ -920,8 +921,11 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
             if (X11DRV_check_error() || vr != VK_SUCCESS || vk_display == VK_NULL_HANDLE)
                 continue;
 
+            memset( &vk12, 0, sizeof(vk12) );
+            vk12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
             memset( &id, 0, sizeof(id) );
             id.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ID_PROPERTIES;
+            id.pNext = &vk12;
             properties2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
             properties2.pNext = &id;
 
@@ -944,6 +948,7 @@ static BOOL get_gpu_properties_from_vulkan( struct gdi_gpu *gpu, const XRRProvid
             {
                 gpu->vendor_id = properties2.properties.vendorID;
                 gpu->device_id = properties2.properties.deviceID;
+                if (vk12.driverID == VK_DRIVER_ID_MESA_NVK) gpu->is_nvk = TRUE;
             }
             RtlUTF8ToUnicodeN( gpu->name, sizeof(gpu->name), &len, properties2.properties.deviceName,
                                strlen( properties2.properties.deviceName ) + 1 );
