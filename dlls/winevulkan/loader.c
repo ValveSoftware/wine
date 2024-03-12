@@ -84,6 +84,12 @@ static BOOL is_available_device_function(VkDevice device, const char *name)
     return UNIX_CALL(is_available_device_function, &params);
 }
 
+static BOOL is_nvk(VkPhysicalDevice device)
+{
+    struct is_nvk_params params = { .device = device };
+    return UNIX_CALL(is_nvk, &params);
+}
+
 static void *alloc_vk_object(size_t size)
 {
     struct wine_vk_base *object = calloc(1, size);
@@ -416,7 +422,7 @@ static void fill_luid_property(VkPhysicalDeviceProperties2 *properties2)
             device_node_mask);
 }
 
-static void fixup_device_id(UINT *vendor_id, UINT *device_id)
+static void fixup_device_id(UINT *vendor_id, UINT *device_id, BOOL is_nvk)
 {
     const char *sgi;
 
@@ -434,6 +440,11 @@ static void fixup_device_id(UINT *vendor_id, UINT *device_id)
     {
         *device_id = 0x687f; /* Radeon RX Vega 56/64 */
     }
+    else if (is_nvk && (sgi = getenv("WINE_HIDE_NVK")) && *sgi != '0')
+    {
+        *vendor_id = 0x1002; /* AMD */
+        *device_id = 0x73df; /* RX 6700XT */
+    }
 }
 
 void WINAPI vkGetPhysicalDeviceProperties(VkPhysicalDevice physical_device,
@@ -448,7 +459,7 @@ void WINAPI vkGetPhysicalDeviceProperties(VkPhysicalDevice physical_device,
     params.pProperties = properties;
     status = UNIX_CALL(vkGetPhysicalDeviceProperties, &params);
     assert(!status);
-    fixup_device_id(&properties->vendorID, &properties->deviceID);
+    fixup_device_id(&properties->vendorID, &properties->deviceID, is_nvk(physical_device));
 }
 
 void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
@@ -464,7 +475,7 @@ void WINAPI vkGetPhysicalDeviceProperties2(VkPhysicalDevice phys_dev,
     status = UNIX_CALL(vkGetPhysicalDeviceProperties2, &params);
     assert(!status);
     fill_luid_property(properties2);
-    fixup_device_id(&properties2->properties.vendorID, &properties2->properties.deviceID);
+    fixup_device_id(&properties2->properties.vendorID, &properties2->properties.deviceID, is_nvk(phys_dev));
 }
 
 void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
@@ -480,7 +491,7 @@ void WINAPI vkGetPhysicalDeviceProperties2KHR(VkPhysicalDevice phys_dev,
     status = UNIX_CALL(vkGetPhysicalDeviceProperties2KHR, &params);
     assert(!status);
     fill_luid_property(properties2);
-    fixup_device_id(&properties2->properties.vendorID, &properties2->properties.deviceID);
+    fixup_device_id(&properties2->properties.vendorID, &properties2->properties.deviceID, is_nvk(phys_dev));
 }
 
 VkResult WINAPI vkCreateDevice(VkPhysicalDevice phys_dev, const VkDeviceCreateInfo *create_info,
