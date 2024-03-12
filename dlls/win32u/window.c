@@ -873,6 +873,7 @@ BOOL enable_window( HWND hwnd, BOOL enable )
             send_message( hwnd, WM_ENABLE, FALSE, 0 );
         }
     }
+    NtUserNotifyWinEvent( EVENT_OBJECT_STATECHANGE, hwnd, OBJID_CLIENT, 0 );
     return ret;
 }
 
