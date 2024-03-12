@@ -806,21 +806,21 @@ NTSTATUS wg_source_read_data(void *args)
     return status;
 }
 
-NTSTATUS wg_source_get_stream_format(void *args)
+NTSTATUS wg_source_get_stream_type(void *args)
 {
-    struct wg_source_get_stream_format_params *params = args;
+    struct wg_source_get_stream_type_params *params = args;
     struct wg_source *source = get_source(params->source);
     guint index = params->index;
+    NTSTATUS status;
     GstCaps *caps;
 
     GST_TRACE("source %p, index %u", source, index);
 
     if (!(caps = source_get_stream_caps(source, index)))
         return STATUS_UNSUCCESSFUL;
-    wg_format_from_caps(&params->format, caps);
-
+    status = caps_to_media_type(caps, &params->media_type, 0);
     gst_caps_unref(caps);
-    return STATUS_SUCCESS;
+    return status;
 }
 
 static gchar *stream_lang_from_tags(GstTagList *tags, bool is_quicktime)

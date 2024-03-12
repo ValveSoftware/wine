@@ -112,8 +112,7 @@ HRESULT wg_source_set_position(wg_source_t source, uint64_t time);
 HRESULT wg_source_get_position(wg_source_t source, uint64_t *read_offset);
 HRESULT wg_source_push_data(wg_source_t source, UINT64 offset, const void *data, uint32_t size);
 HRESULT wg_source_read_data(wg_source_t source, UINT32 index, IMFSample **out);
-bool wg_source_get_stream_format(wg_source_t source, UINT32 index,
-        struct wg_format *format);
+HRESULT wg_source_get_stream_type(wg_source_t source, UINT32 index, IMFMediaType **media_type);
 char *wg_source_get_stream_tag(wg_source_t source, UINT32 index,
         wg_parser_tag tag);
 void wg_source_set_stream_flags(wg_source_t source, UINT32 index, BOOL select);
