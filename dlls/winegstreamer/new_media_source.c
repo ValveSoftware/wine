@@ -457,19 +457,6 @@ static ULONG WINAPI source_async_commands_callback_Release(IMFAsyncCallback *ifa
     return IMFMediaSource_Release(&source->IMFMediaSource_iface);
 }
 
-static HRESULT stream_descriptor_get_media_type(IMFStreamDescriptor *descriptor, IMFMediaType **media_type)
-{
-    IMFMediaTypeHandler *handler;
-    HRESULT hr;
-
-    if (FAILED(hr = IMFStreamDescriptor_GetMediaTypeHandler(descriptor, &handler)))
-        return hr;
-    hr = IMFMediaTypeHandler_GetCurrentMediaType(handler, media_type);
-    IMFMediaTypeHandler_Release(handler);
-
-    return hr;
-}
-
 static HRESULT stream_descriptor_get_major_type(IMFStreamDescriptor *descriptor, GUID *major)
 {
     IMFMediaTypeHandler *handler;
@@ -479,19 +466,6 @@ static HRESULT stream_descriptor_get_major_type(IMFStreamDescriptor *descriptor,
         return hr;
     hr = IMFMediaTypeHandler_GetMajorType(handler, major);
     IMFMediaTypeHandler_Release(handler);
-
-    return hr;
-}
-
-static HRESULT wg_format_from_stream_descriptor(IMFStreamDescriptor *descriptor, struct wg_format *format)
-{
-    IMFMediaType *media_type;
-    HRESULT hr;
-
-    if (FAILED(hr = stream_descriptor_get_media_type(descriptor, &media_type)))
-        return hr;
-    mf_media_type_to_wg_format(media_type, format);
-    IMFMediaType_Release(media_type);
 
     return hr;
 }
@@ -522,29 +496,25 @@ static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor,
     return hr;
 }
 
-static HRESULT stream_descriptor_create(UINT32 id, struct wg_format *format, IMFStreamDescriptor **out)
+static HRESULT stream_descriptor_create(UINT32 id, IMFMediaType *media_type, IMFStreamDescriptor **out)
 {
     IMFStreamDescriptor *descriptor;
     IMFMediaTypeHandler *handler;
-    IMFMediaType *type;
     HRESULT hr;
 
-    if (!(type = mf_media_type_from_wg_format(format)))
-        return MF_E_INVALIDMEDIATYPE;
-    if (FAILED(hr = MFCreateStreamDescriptor(id, 1, &type, &descriptor)))
-        goto done;
+    *out = NULL;
+    if (FAILED(hr = MFCreateStreamDescriptor(id, 1, &media_type, &descriptor)))
+        return hr;
 
     if (FAILED(hr = IMFStreamDescriptor_GetMediaTypeHandler(descriptor, &handler)))
         IMFStreamDescriptor_Release(descriptor);
     else
     {
-        hr = IMFMediaTypeHandler_SetCurrentMediaType(handler, type);
+        if (SUCCEEDED(hr = IMFMediaTypeHandler_SetCurrentMediaType(handler, media_type)))
+            *out = descriptor;
         IMFMediaTypeHandler_Release(handler);
     }
 
-done:
-    IMFMediaType_Release(type);
-    *out = SUCCEEDED(hr) ? descriptor : NULL;
     return hr;
 }
 
@@ -603,13 +573,9 @@ static void flush_token_queue(struct media_stream *stream, BOOL send)
 static HRESULT media_stream_start(struct media_stream *stream, BOOL active, BOOL seeking, const PROPVARIANT *position)
 {
     struct media_source *source = impl_from_IMFMediaSource(stream->media_source);
-    struct wg_format format;
     HRESULT hr;
 
     TRACE("source %p, stream %p\n", source, stream);
-
-    if (FAILED(hr = wg_format_from_stream_descriptor(stream->descriptor, &format)))
-        WARN("Failed to get wg_format from stream descriptor, hr %#lx\n", hr);
 
     if (FAILED(hr = IMFMediaEventQueue_QueueEventParamUnk(source->event_queue, active ? MEUpdatedStream : MENewStream,
             &GUID_NULL, S_OK, (IUnknown *)&stream->IMFMediaStream_iface)))
@@ -1553,8 +1519,9 @@ static const IMFMediaSourceVtbl IMFMediaSource_vtbl =
 
 static void media_source_init_stream_map(struct media_source *source, UINT stream_count)
 {
-    struct wg_format format;
+    IMFMediaType *media_type;
     int i, n = 0;
+    GUID major;
 
     if (wcscmp(source->mime_type, L"video/mp4"))
     {
@@ -1568,26 +1535,40 @@ static void media_source_init_stream_map(struct media_source *source, UINT strea
 
     for (i = stream_count - 1; i >= 0; i--)
     {
-        wg_source_get_stream_format(source->wg_source, i, &format);
-        if (format.major_type == WG_MAJOR_TYPE_UNKNOWN) continue;
-        if (format.major_type >= WG_MAJOR_TYPE_VIDEO) continue;
-        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
-        source->stream_map[n++] = i;
+        if (SUCCEEDED(wg_source_get_stream_type(source->wg_source, i, &media_type)))
+        {
+            if (SUCCEEDED(IMFMediaType_GetMajorType(media_type, &major))
+                    && IsEqualGUID(&major, &MFMediaType_Video))
+            {
+                TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+                source->stream_map[n++] = i;
+            }
+        }
     }
     for (i = stream_count - 1; i >= 0; i--)
     {
-        wg_source_get_stream_format(source->wg_source, i, &format);
-        if (format.major_type == WG_MAJOR_TYPE_UNKNOWN) continue;
-        if (format.major_type < WG_MAJOR_TYPE_VIDEO) continue;
-        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
-        source->stream_map[n++] = i;
+        if (SUCCEEDED(wg_source_get_stream_type(source->wg_source, i, &media_type)))
+        {
+            if (SUCCEEDED(IMFMediaType_GetMajorType(media_type, &major))
+                    && IsEqualGUID(&major, &MFMediaType_Audio))
+            {
+                TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+                source->stream_map[n++] = i;
+            }
+        }
     }
     for (i = stream_count - 1; i >= 0; i--)
     {
-        wg_source_get_stream_format(source->wg_source, i, &format);
-        if (format.major_type != WG_MAJOR_TYPE_UNKNOWN) continue;
-        TRACE("mapping stream %u to wg_source stream %u\n", n, i);
-        source->stream_map[n++] = i;
+        if (SUCCEEDED(wg_source_get_stream_type(source->wg_source, i, &media_type)))
+        {
+            if (FAILED(IMFMediaType_GetMajorType(media_type, &major))
+                    || (!IsEqualGUID(&major, &MFMediaType_Audio)
+                    && !IsEqualGUID(&major, &MFMediaType_Audio)))
+            {
+                TRACE("mapping stream %u to wg_source stream %u\n", n, i);
+                source->stream_map[n++] = i;
+            }
+        }
     }
 }
 
@@ -1703,12 +1684,16 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
     {
         IMFStreamDescriptor *descriptor;
         struct media_stream *stream;
-        struct wg_format format;
+        IMFMediaType *media_type;
 
-        if (FAILED(hr = wg_source_get_stream_format(object->wg_source, object->stream_map[i], &format)))
+        if (FAILED(hr = wg_source_get_stream_type(object->wg_source, object->stream_map[i], &media_type)))
             goto fail;
-        if (FAILED(hr = stream_descriptor_create(i + 1, &format, &descriptor)))
+        if (FAILED(hr = stream_descriptor_create(i + 1, media_type, &descriptor)))
+        {
+            IMFMediaType_Release(media_type);
             goto fail;
+        }
+        IMFMediaType_Release(media_type);
         if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, descriptor, &stream)))
         {
             IMFStreamDescriptor_Release(descriptor);
