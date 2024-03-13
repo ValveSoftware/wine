@@ -55,10 +55,11 @@ struct wg_source
     gchar *url;
     GstPad *src_pad;
     GstElement *container;
+
     GstSegment segment;
-    bool valid_stream;
-    bool valid_segment;
     guint64 max_duration;
+    GstAtomicQueue *seek_queue;
+    pthread_t push_thread;
 
     guint stream_count;
     struct source_stream streams[WG_SOURCE_MAX_STREAMS];
@@ -193,11 +194,28 @@ static NTSTATUS source_get_stream_buffer(struct wg_source *source, guint index, 
     return STATUS_SUCCESS;
 }
 
+static GstEvent *create_stream_start_event(const char *stream_id)
+{
+    GstStream *stream;
+    GstEvent *event;
+
+    stream = gst_stream_new(stream_id, NULL, GST_STREAM_TYPE_UNKNOWN, 0);
+    if ((event = gst_event_new_stream_start(stream_id)))
+    {
+        gst_event_set_stream(event, stream);
+        gst_event_set_stream_flags(event, GST_STREAM_FLAG_SELECT);
+        gst_event_set_group_id(event, 1);
+    }
+
+    return event;
+}
+
 static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
 {
     guint32 i, seqnum = gst_event_get_seqnum(event);
     GstSeekFlags flags;
     GstFormat format;
+    gboolean eos;
     gint64 cur;
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT, source, event);
@@ -210,22 +228,38 @@ static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
     if (flags & GST_SEEK_FLAG_FLUSH)
     {
         if ((event = gst_event_new_flush_start()))
+        {
             gst_event_set_seqnum(event, seqnum);
-        push_event(source->src_pad, event);
+            push_event(source->src_pad, event);
+        }
     }
 
-    source->segment.start = cur;
-
-    for (i = 0; i < ARRAY_SIZE(source->streams); i++)
-        source->streams[i].eos = false;
+    if ((eos = cur >= source->segment.stop))
+        source->segment.start = source->segment.stop;
+    else
+    {
+        for (i = 0; i < ARRAY_SIZE(source->streams); i++)
+            source->streams[i].eos = false;
+        source->segment.start = cur;
+    }
 
     if (flags & GST_SEEK_FLAG_FLUSH)
     {
         if ((event = gst_event_new_flush_stop(true)))
+        {
             gst_event_set_seqnum(event, seqnum);
-        push_event(source->src_pad, event);
-        source->valid_segment = false;
+            push_event(source->src_pad, event);
+        }
+
+        if ((event = gst_event_new_segment(&source->segment)))
+        {
+            gst_event_set_seqnum(event, seqnum);
+            push_event(source->src_pad, event);
+        }
     }
+
+    if (source->segment.start == source->segment.stop)
+        push_event(source->src_pad, gst_event_new_eos());
 
     return true;
 }
@@ -432,22 +466,6 @@ static gboolean sink_event_cb(GstPad *pad, GstObject *parent, GstEvent *event)
     }
 }
 
-static GstEvent *create_stream_start_event(const char *stream_id)
-{
-    GstStream *stream;
-    GstEvent *event;
-
-    stream = gst_stream_new(stream_id, NULL, GST_STREAM_TYPE_UNKNOWN, 0);
-    if ((event = gst_event_new_stream_start(stream_id)))
-    {
-        gst_event_set_stream(event, stream);
-        gst_event_set_stream_flags(event, GST_STREAM_FLAG_SELECT);
-        gst_event_set_group_id(event, 1);
-    }
-
-    return event;
-}
-
 static void pad_added_cb(GstElement *element, GstPad *pad, gpointer user)
 {
     struct wg_source *source = user;
@@ -572,6 +590,9 @@ NTSTATUS wg_source_create(void *args)
     if (!gst_element_get_state(source->container, NULL, NULL, -1))
         goto error;
     gst_caps_unref(src_caps);
+
+    push_event(source->src_pad, create_stream_start_event("wg_source"));
+    push_event(source->src_pad, gst_event_new_segment(&source->segment));
 
     params->source = (wg_source_t)(ULONG_PTR)source;
     GST_INFO("Created winegstreamer source %p.", source);
@@ -704,22 +725,9 @@ NTSTATUS wg_source_push_data(void *args)
 
     GST_TRACE("source %p, offset %#"G_GINT64_MODIFIER"x, data %p, size %#x", source, params->offset, params->data, params->size);
 
-    if (!source->valid_stream)
-    {
-        push_event(source->src_pad, create_stream_start_event("wg_source"));
-        source->valid_stream = true;
-    }
-
-    if (!source->valid_segment)
-    {
-        push_event(source->src_pad, gst_event_new_segment(&source->segment));
-        source->valid_segment = true;
-    }
-
     if (!params->size)
     {
-        if (source->segment.start != source->segment.stop)
-            goto eos;
+        push_event(source->src_pad, gst_event_new_eos());
         return STATUS_SUCCESS;
     }
 
@@ -729,23 +737,24 @@ NTSTATUS wg_source_push_data(void *args)
         return STATUS_UNSUCCESSFUL;
     }
 
-    source->segment.start += params->size;
-    if ((ret = gst_pad_push(source->src_pad, buffer)) && ret != GST_FLOW_EOS)
+    if (params->offset > source->segment.start)
     {
-        GST_WARNING("Failed to push data buffer, ret %d", ret);
-        source->segment.start -= params->size;
-        return STATUS_UNSUCCESSFUL;
+        source->segment.start = params->offset;
+        gst_buffer_set_flags(buffer, GST_BUFFER_FLAG_DISCONT);
+    }
+    else if (params->offset < source->segment.start)
+    {
+        source->segment.start = params->offset;
+        push_event(source->src_pad, gst_event_new_segment(&source->segment));
     }
 
-    if (source->segment.start != source->segment.stop)
+    source->segment.start += params->size;
+    if (!(ret = gst_pad_push(source->src_pad, buffer)) || ret == GST_FLOW_EOS)
         return STATUS_SUCCESS;
 
-eos:
-    source->segment.start = source->segment.stop;
-    push_event(source->src_pad, gst_event_new_eos());
-    source->valid_stream = false;
-
-    return STATUS_SUCCESS;
+    GST_WARNING("Failed to push data buffer, ret %d", ret);
+    source->segment.start -= params->size;
+    return STATUS_UNSUCCESSFUL;
 }
 
 NTSTATUS wg_source_read_data(void *args)
