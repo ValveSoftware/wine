@@ -374,6 +374,7 @@ void x11drv_xinput2_init( struct x11drv_thread_data *data )
  */
 void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
 {
+    struct x11drv_thread_data *data = x11drv_thread_data();
     unsigned char mask_bits[XIMaskLen(XI_LASTEVENT)];
     BOOL raw = (window == None);
     XIEventMask mask;
@@ -388,11 +389,14 @@ void X11DRV_XInput2_Enable( Display *display, Window window, long event_mask )
     if (raw && event_mask)
     {
         XISetMask( mask_bits, XI_RawMotion );
-        XISetMask( mask_bits, XI_RawTouchBegin );
-        XISetMask( mask_bits, XI_RawTouchUpdate );
-        XISetMask( mask_bits, XI_RawTouchEnd );
-        XISetMask( mask_bits, XI_RawButtonPress );
-        XISetMask( mask_bits, XI_RawButtonRelease );
+        if (data->xi2_rawinput_only)
+        {
+            XISetMask( mask_bits, XI_RawTouchBegin );
+            XISetMask( mask_bits, XI_RawTouchUpdate );
+            XISetMask( mask_bits, XI_RawTouchEnd );
+            XISetMask( mask_bits, XI_RawButtonPress );
+            XISetMask( mask_bits, XI_RawButtonRelease );
+        }
     }
 
     XISetMask( mask_bits, XI_DeviceChanged );
@@ -2011,7 +2015,6 @@ static BOOL X11DRV_RawTouchEvent( XGenericEventCookie *xev )
     int flags = 0;
     POINT pos;
 
-    if (!thread_data->xi2_rawinput_only) return FALSE;
     if (!map_raw_event_coords( event, &input, &rawinput )) return FALSE;
     if (!(input.mi.dwFlags & MOUSEEVENTF_ABSOLUTE)) return FALSE;
     pos.x = input.mi.dx;
