@@ -875,7 +875,7 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
         unsigned int i;
 
         if (!info)
-            return AGS_INVALID_ARGS;
+            goto done;
 
         TRACE("filling AGSGPUInfo_311.\n");
         if (!object->device_count)
@@ -914,7 +914,7 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
         unsigned int i;
 
         if (!gpu_info)
-            return AGS_INVALID_ARGS;
+            goto done;
 
         TRACE("filling AGSGPUInfo_320.\n");
         if (!object->device_count)
@@ -954,7 +954,7 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
         unsigned int i;
 
         if (!gpu_info)
-            return AGS_INVALID_ARGS;
+            goto done;
 
         if (!object->device_count)
         {
@@ -990,7 +990,7 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
     else
     {
         if (!gpu_info)
-            return AGS_INVALID_ARGS;
+            goto done;
 
         memset(gpu_info, 0, sizeof(*gpu_info));
         gpu_info->agsVersionMajor = AGS_VER_MAJOR(object->public_version);
@@ -1002,6 +1002,7 @@ AGSReturnCode WINAPI agsInit(AGSContext **context, const AGSConfiguration *confi
         gpu_info->devices = object->devices;
     }
 
+done:
     TRACE("Created context %p.\n", object);
 
     *context = object;
@@ -1016,7 +1017,7 @@ AGSReturnCode WINAPI agsInitialize(int ags_version, const AGSConfiguration *conf
 
     TRACE("ags_verison %d, context %p, config %p, gpu_info %p.\n", ags_version, context, config, gpu_info);
 
-    if (!context || !gpu_info)
+    if (!context)
         return AGS_INVALID_ARGS;
 
     if (config)
@@ -1031,11 +1032,14 @@ AGSReturnCode WINAPI agsInitialize(int ags_version, const AGSConfiguration *conf
         return ret;
     }
 
-    memset(gpu_info, 0, sizeof(*gpu_info));
-    gpu_info->driverVersion = driver_version;
-    gpu_info->radeonSoftwareVersion  = radeon_version;
-    gpu_info->numDevices = object->device_count;
-    gpu_info->devices = object->devices;
+    if (gpu_info)
+    {
+        memset(gpu_info, 0, sizeof(*gpu_info));
+        gpu_info->driverVersion = driver_version;
+        gpu_info->radeonSoftwareVersion  = radeon_version;
+        gpu_info->numDevices = object->device_count;
+        gpu_info->devices = object->devices;
+    }
 
     TRACE("Created context %p.\n", object);
 
