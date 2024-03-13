@@ -67,6 +67,7 @@ AddReg=\
     MCI,\
     Misc,\
     NVIDIANGX, \
+    TTS, \
     OLE,\
     Printing,\
     ProtonOverrides,\
@@ -1402,6 +1403,46 @@ HKLM,Software\Wow6432Node\Valve\Steam,"InstallPath",,"%16422%\Steam"
 
 [NVIDIANGX]
 HKLM,Software\NVIDIA Corporation\Global\NGXCore,"FullPath",,"C:\Windows\System32"
+
+[TTS]
+HKLM,Software\Microsoft\Speech\Voices,"DefaultDefaultTokenId",,"HKEY_LOCAL_MACHINE\Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3,,,"Proton Voice - English (United States) - libritts-r 3"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3,"409",,"Proton Voice - English (United States) - libritts-r 3"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3,"CLSID",,"{52808AE1-D977-4CD8-92D2-FEACB92FE276}"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3,"LengthScale",,"1.4"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3,"ModelPath",,"en_US-libritts_r-medium.onnx"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3,"SpeakerID",,"3"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3\Attributes,"Language",,"409"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3\Attributes,"Gender",,"Male"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_3\Attributes,"Vendor",,"Wine"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14,,,"Proton Voice - English (United States) - libritts-r 14"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14,"409",,"Proton Voice - English (United States) - libritts-r 14"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14,"CLSID",,"{52808AE1-D977-4CD8-92D2-FEACB92FE276}"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14,"LengthScale",,"1.4"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14,"ModelPath",,"en_US-libritts_r-medium.onnx"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14,"SpeakerID",,"14"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14\Attributes,"Language",,"409"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14\Attributes,"Gender",,"Female"
+HKLM,Software\Microsoft\Speech\Voices\Tokens\ProtonTTS_libritts-r_14\Attributes,"Vendor",,"Wine"
+HKLM,Software\Microsoft\Speech_OneCore\Voices,"DefaultDefaultTokenId",,"HKEY_LOCAL_MACHINE\Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3,,,"Proton Voice - English (United States) - libritts-r 3"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3,"409",,"Proton Voice - English (United States) - libritts-r 3"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3,"CLSID",,"{52808AE1-D977-4CD8-92D2-FEACB92FE276}"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3,"LengthScale",,"1.4"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3,"ModelPath",,"en_US-libritts_r-medium.onnx"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3,"SpeakerID",,"3"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3\Attributes,"Language",,"409"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3\Attributes,"Gender",,"Male"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_3\Attributes,"Vendor",,"Wine"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14,,,"Proton Voice - English (United States) - libritts-r 14"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14,"409",,"Proton Voice - English (United States) - libritts-r 14"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14,"CLSID",,"{52808AE1-D977-4CD8-92D2-FEACB92FE276}"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14,"LengthScale",,"1.4"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14,"ModelPath",,"en_US-libritts_r-medium.onnx"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14,"SpeakerID",,"14"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14\Attributes,"Language",,"409"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14\Attributes,"Gender",,"Female"
+HKLM,Software\Microsoft\Speech_OneCore\Voices\Tokens\ProtonTTS_libritts-r_14\Attributes,"Vendor",,"Wine"
 
 [ProtonOverrides]
 ;;Likely want *80 and *90 too, but those require removing Wine's manifest files.
