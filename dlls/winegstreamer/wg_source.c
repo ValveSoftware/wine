@@ -320,7 +320,8 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, buffer);
 
-    if (gst_stream_get_stream_flags(stream->stream) & GST_STREAM_FLAG_SELECT)
+    if (gst_stream_get_stream_flags(stream->stream) & GST_STREAM_FLAG_SELECT
+            && gst_buffer_get_size(buffer) > 0)
         gst_atomic_queue_push(stream->queue, buffer);
     else
         gst_buffer_unref(buffer);
