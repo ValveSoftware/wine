@@ -2905,7 +2905,7 @@ static NTSTATUS key_asymmetric_encrypt_gcrypt( void *args )
     result_len = EXPORT_SIZE(result, key->u.a.bitlen / 8, 1);
     *ret_len = result_len;
 
-    if (params->output_len >= result_len) export_gnutls_datum(output, params->output_len, &result, 1);
+    if (params->output_len >= result_len) export_gnutls_datum(output, result_len, &result, 1);
     else if (params->output_len == 0) status = STATUS_SUCCESS;
     else status = STATUS_BUFFER_TOO_SMALL;
 
