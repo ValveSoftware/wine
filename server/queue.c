@@ -570,11 +570,11 @@ static int update_desktop_cursor_pos( struct desktop *desktop, user_handle_t win
     return updated;
 }
 
-static void update_desktop_cursor_handle( struct desktop *desktop, struct thread_input *input )
+static void update_desktop_cursor_handle( struct desktop *desktop, struct thread_input *input, user_handle_t handle )
 {
     if (input == get_desktop_cursor_thread_input( desktop ))
     {
-        user_handle_t handle = input->shared->cursor_count < 0 ? 0 : input->shared->cursor, win = desktop->cursor_win;
+        user_handle_t win = desktop->cursor_win;
         /* when clipping send the message to the foreground window as well, as some driver have an artificial overlay window */
         if (is_cursor_clipped( desktop )) queue_cursor_message( desktop, 0, WM_WINE_SETCURSOR, win, handle );
         queue_cursor_message( desktop, win, WM_WINE_SETCURSOR, win, handle );
@@ -3869,12 +3869,14 @@ DECL_HANDLER(get_last_input_time)
 DECL_HANDLER(set_cursor)
 {
     struct msg_queue *queue = get_current_queue();
+    user_handle_t prev_cursor, new_cursor;
     struct thread_input *input;
     struct desktop *desktop;
 
     if (!queue) return;
     input = queue->input;
     desktop = input->desktop;
+    prev_cursor = input->shared->cursor_count < 0 ? 0 : input->shared->cursor;
 
     reply->prev_handle = input->shared->cursor;
     reply->prev_count  = input->shared->cursor_count;
@@ -3906,8 +3908,8 @@ DECL_HANDLER(set_cursor)
     if (req->flags & SET_CURSOR_CLIP) set_clip_rectangle( desktop, &req->clip, req->flags, 0 );
     if (req->flags & SET_CURSOR_NOCLIP) set_clip_rectangle( desktop, NULL, SET_CURSOR_NOCLIP, 0 );
 
-    if (req->flags & (SET_CURSOR_HANDLE | SET_CURSOR_COUNT))
-        update_desktop_cursor_handle( desktop, input );
+    new_cursor = input->shared->cursor_count < 0 ? 0 : input->shared->cursor;
+    if (prev_cursor != new_cursor) update_desktop_cursor_handle( desktop, input, new_cursor );
 
     reply->new_x       = desktop->shared->cursor.x;
     reply->new_y       = desktop->shared->cursor.y;
