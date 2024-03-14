@@ -1815,12 +1815,32 @@ DECL_HANDLER(suspend_thread)
 {
     struct thread *thread;
 
-    if ((thread = get_thread_from_handle( req->handle, THREAD_SUSPEND_RESUME )))
+    if (req->waited_handle)
     {
-        if (thread->state == TERMINATED) set_error( STATUS_ACCESS_DENIED );
-        else reply->count = suspend_thread( thread );
-        release_object( thread );
+        struct context *context;
+
+        if (!(context = (struct context *)get_handle_obj( current->process, req->waited_handle,
+                                                          0, &context_ops )))
+            return;
+        close_handle( current->process, req->waited_handle ); /* avoid extra server call */
+        set_error( context->status );
+        release_object( context );
+        return;
     }
+
+    if (!(thread = get_thread_from_handle( req->handle, THREAD_SUSPEND_RESUME ))) return;
+
+    if (thread->state != RUNNING) set_error( STATUS_ACCESS_DENIED );
+    else
+    {
+        reply->count = suspend_thread( thread );
+        if (!get_error() && thread != current && thread->context && thread->context->status == STATUS_PENDING)
+        {
+            set_error( STATUS_PENDING );
+            reply->wait_handle = alloc_handle( current->process, thread->context, SYNCHRONIZE, 0 );
+        }
+    }
+    release_object( thread );
 }
 
 /* resume a thread */
