@@ -1611,22 +1611,40 @@ NTSTATUS WINAPI NtOpenThread( HANDLE *handle, ACCESS_MASK access,
 /******************************************************************************
  *              NtSuspendThread   (NTDLL.@)
  */
-NTSTATUS WINAPI NtSuspendThread( HANDLE handle, ULONG *count )
+NTSTATUS WINAPI NtSuspendThread( HANDLE handle, ULONG *ret_count )
 {
     BOOL self = FALSE;
-    unsigned int ret;
+    unsigned int ret, count = 0;
+    HANDLE wait_handle = NULL;
 
     SERVER_START_REQ( suspend_thread )
     {
         req->handle = wine_server_obj_handle( handle );
-        if (!(ret = wine_server_call( req )))
+        if (!(ret = wine_server_call( req )) || ret == STATUS_PENDING)
         {
             self = reply->count & 0x80000000;
-            if (count) *count = reply->count & 0x7fffffff;
+            count = reply->count & 0x7fffffff;;
+            wait_handle = wine_server_ptr_handle( reply->wait_handle );
         }
     }
     SERVER_END_REQ;
+
     if (self) usleep( 0 );
+
+    if (ret == STATUS_PENDING && wait_handle)
+    {
+        NtWaitForSingleObject( wait_handle, FALSE, NULL );
+
+        SERVER_START_REQ( suspend_thread )
+        {
+            req->handle = wine_server_obj_handle( handle );
+            req->waited_handle = wine_server_obj_handle( wait_handle );
+            ret = wine_server_call( req );
+        }
+        SERVER_END_REQ;
+    }
+
+    if (!ret && ret_count) *ret_count = count;
     return ret;
 }
 
