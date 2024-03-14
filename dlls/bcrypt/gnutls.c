@@ -3028,7 +3028,7 @@ static NTSTATUS key_asymmetric_decrypt_gcrypt( void *args )
     {
         status = STATUS_SUCCESS;
         if (flags == BCRYPT_PAD_NONE)
-            export_gnutls_datum(output, params->output_len, &result, 1);
+            export_gnutls_datum(output, result_len, &result, 1);
         else
             memcpy(output, result.data, result_len);
     }
