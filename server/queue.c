@@ -616,6 +616,7 @@ static void get_message_defaults( struct msg_queue *queue, int *x, int *y, unsig
 void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, unsigned int flags, int reset )
 {
     rectangle_t top_rect, new_rect;
+    unsigned int old_flags;
     int x, y;
 
     get_top_window_rectangle( desktop, &top_rect );
@@ -632,7 +633,9 @@ void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, unsig
 
     SHARED_WRITE_BEGIN( desktop, desktop_shm_t )
     {
+        old_flags = shared->cursor.clip_flags;
         shared->cursor.clip = new_rect;
+        shared->cursor.clip_flags = flags;
     }
     SHARED_WRITE_END
 
@@ -645,7 +648,8 @@ void set_clip_rectangle( struct desktop *desktop, const rectangle_t *rect, unsig
     if (reset) post_desktop_message( desktop, WM_WINE_CLIPCURSOR, flags, FALSE );
 
     /* notify foreground thread, of reset, or to apply new cursor clipping rect */
-    queue_cursor_message( desktop, 0, WM_WINE_CLIPCURSOR, flags, reset );
+    if (rect || reset || old_flags != SET_CURSOR_NOCLIP)
+        queue_cursor_message( desktop, 0, WM_WINE_CLIPCURSOR, flags, reset );
 }
 
 /* change the foreground input and reset the cursor clip rect */

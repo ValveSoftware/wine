@@ -905,6 +905,7 @@ struct shared_cursor
     int                  y;
     unsigned int         last_change;      /* time of last position change */
     rectangle_t          clip;             /* cursor clip rectangle */
+    unsigned int         clip_flags;       /* cursor clip flags */
 };
 
 struct desktop_shared_memory
