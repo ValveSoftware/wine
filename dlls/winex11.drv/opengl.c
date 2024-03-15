@@ -2739,7 +2739,9 @@ static void wglDrawBuffer( GLenum buffer )
 
     TRACE( "buffer %#x.\n", buffer );
 
-    ctx->drawing_to_front = (buffer == GL_FRONT);
+    if (!ctx->current_draw_fbo || (ctx->fs_hack && ctx->current_draw_fbo == ctx->fs_hack_fbo))
+        ctx->drawing_to_front = (buffer == GL_FRONT || buffer == GL_FRONT_AND_BACK);
+
     if (ctx->fs_hack && ctx->current_draw_fbo == ctx->fs_hack_fbo)
     {
         TRACE( "Overriding %#x with GL_COLOR_ATTACHMENT0\n", buffer );
