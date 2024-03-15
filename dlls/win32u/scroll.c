@@ -165,6 +165,16 @@ static BOOL show_scroll_bar( HWND hwnd, int bar, BOOL show_horz, BOOL show_vert 
         /* frame has been changed, let the window redraw itself */
         NtUserSetWindowPos( hwnd, 0, 0, 0, 0, 0,
                             SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED );
+
+        if ((set_bits & WS_HSCROLL) && !(old_style & WS_HSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_SHOW, hwnd, OBJID_HSCROLL, 0 );
+        if ((set_bits & WS_VSCROLL) && !(old_style & WS_VSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_SHOW, hwnd, OBJID_VSCROLL, 0 );
+        if ((clear_bits & WS_HSCROLL) && (old_style & WS_HSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_HIDE, hwnd, OBJID_HSCROLL, 0 );
+        if ((clear_bits & WS_VSCROLL) && (old_style & WS_VSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_HIDE, hwnd, OBJID_VSCROLL, 0 );
+
         return TRUE;
     }
     return FALSE; /* no frame changes */
@@ -1049,6 +1059,19 @@ done:
             refresh_scroll_bar( hwnd, bar, TRUE, TRUE );
         else if (action & SA_SSI_REPAINT_ARROWS)
             refresh_scroll_bar( hwnd, bar, TRUE, FALSE );
+
+        switch (bar)
+        {
+            case SB_CTL:
+                NtUserNotifyWinEvent( EVENT_OBJECT_VALUECHANGE, hwnd, OBJID_CLIENT, 0 );
+                break;
+            case SB_HORZ:
+                NtUserNotifyWinEvent( EVENT_OBJECT_VALUECHANGE, hwnd, OBJID_HSCROLL, 0 );
+                break;
+            case SB_VERT:
+                NtUserNotifyWinEvent( EVENT_OBJECT_VALUECHANGE, hwnd, OBJID_VSCROLL, 0 );
+                break;
+        }
     }
 
     return ret; /* Return current position */
