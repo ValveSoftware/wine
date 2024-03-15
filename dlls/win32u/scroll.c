@@ -168,6 +168,16 @@ static BOOL show_scroll_bar( HWND hwnd, int bar, BOOL show_horz, BOOL show_vert 
         /* frame has been changed, let the window redraw itself */
         NtUserSetWindowPos( hwnd, 0, 0, 0, 0, 0,
                             SWP_NOSIZE | SWP_NOMOVE | SWP_NOACTIVATE | SWP_NOZORDER | SWP_FRAMECHANGED );
+
+        if ((set_bits & WS_HSCROLL) && !(old_style & WS_HSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_SHOW, hwnd, OBJID_HSCROLL, 0 );
+        if ((set_bits & WS_VSCROLL) && !(old_style & WS_VSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_SHOW, hwnd, OBJID_VSCROLL, 0 );
+        if ((clear_bits & WS_HSCROLL) && (old_style & WS_HSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_HIDE, hwnd, OBJID_HSCROLL, 0 );
+        if ((clear_bits & WS_VSCROLL) && (old_style & WS_VSCROLL))
+            NtUserNotifyWinEvent( EVENT_OBJECT_HIDE, hwnd, OBJID_VSCROLL, 0 );
+
         return TRUE;
     }
     return FALSE; /* no frame changes */
