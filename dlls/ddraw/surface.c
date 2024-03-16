@@ -5419,7 +5419,7 @@ static HRESULT WINAPI d3d_texture2_GetHandle(IDirect3DTexture2 *iface,
 
     if (!surface->Handle)
     {
-        DWORD h = ddraw_allocate_handle(&device_impl->handle_table, surface, DDRAW_HANDLE_SURFACE);
+        DWORD h = ddraw_allocate_handle(&device_impl->ddraw->handle_table, surface, DDRAW_HANDLE_SURFACE);
         if (h == DDRAW_INVALID_HANDLE)
         {
             ERR("Failed to allocate a texture handle.\n");
@@ -6030,7 +6030,7 @@ static void STDMETHODCALLTYPE ddraw_surface_wined3d_object_destroyed(void *paren
 
     /* Having a texture handle set implies that the device still exists. */
     if (surface->Handle)
-        ddraw_free_handle(&surface->ddraw->d3ddevice->handle_table, surface->Handle - 1, DDRAW_HANDLE_SURFACE);
+        ddraw_free_handle(&surface->ddraw->handle_table, surface->Handle - 1, DDRAW_HANDLE_SURFACE);
 
     /* Reduce the ddraw surface count. */
     list_remove(&surface->surface_list_entry);

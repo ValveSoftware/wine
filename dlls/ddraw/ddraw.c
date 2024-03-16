@@ -460,6 +460,14 @@ static void ddraw_destroy(struct ddraw *This)
                 break;
             }
 
+            case DDRAW_HANDLE_SURFACE:
+            {
+                struct ddraw_surface *surf = entry->object;
+                FIXME("Texture handle %#x (%p) not unset properly.\n", i + 1, surf);
+                surf->Handle = 0;
+                break;
+            }
+
             default:
                 FIXME("Handle %#x (%p) has unknown type %#x.\n", i + 1, entry->object, entry->type);
                 break;
