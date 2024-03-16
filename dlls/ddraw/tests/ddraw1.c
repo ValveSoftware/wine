@@ -15457,6 +15457,85 @@ static void test_enum_devices(void)
     ok(!refcount, "Device has %lu references left.\n", refcount);
 }
 
+static void test_multiple_devices(void)
+{
+    D3DTEXTUREHANDLE texture_handle, texture_handle2;
+    D3DMATERIALHANDLE mat_handle, mat_handle2;
+    IDirect3DViewport *viewport, *viewport2;
+    IDirect3DDevice *device, *device2;
+    IDirectDrawSurface *texture_surf;
+    IDirect3DMaterial *material;
+    DDSURFACEDESC surface_desc;
+    IDirect3DTexture *texture;
+    IDirectDraw *ddraw;
+    ULONG refcount;
+    HWND window;
+    HRESULT hr;
+
+    window = create_window();
+    ddraw = create_ddraw();
+    ok(!!ddraw, "Failed to create a ddraw object.\n");
+
+    if (!(device = create_device_ex(ddraw, window, DDSCL_NORMAL, &IID_IDirect3DHALDevice)))
+    {
+        skip("Failed to create a 3D device, skipping test.\n");
+        DestroyWindow(window);
+        return;
+    }
+
+    device2 = create_device_ex(ddraw, window, DDSCL_NORMAL, &IID_IDirect3DHALDevice);
+    ok(!!device2, "got NULL.\n");
+
+    viewport = create_viewport(device, 0, 0, 640, 480);
+    viewport2 = create_viewport(device2, 0, 0, 640, 480);
+
+    material = create_diffuse_material(device, 1.0f, 0.0f, 0.0f, 1.0f);
+    hr = IDirect3DMaterial2_GetHandle(material, device, &mat_handle);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    hr = IDirect3DMaterial2_GetHandle(material, device, &mat_handle2);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    ok(mat_handle == mat_handle2, "got different handles.\n");
+
+    hr = IDirect3DMaterial_GetHandle(material, device2, &mat_handle2);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    todo_wine ok(mat_handle != mat_handle2, "got same handles.\n");
+
+    hr = IDirect3DViewport_SetBackground(viewport, mat_handle);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    hr = IDirect3DViewport_SetBackground(viewport2, mat_handle);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+
+    memset(&surface_desc, 0, sizeof(surface_desc));
+    surface_desc.dwSize = sizeof(surface_desc);
+    surface_desc.dwFlags = DDSD_CAPS | DDSD_WIDTH | DDSD_HEIGHT;
+    surface_desc.ddsCaps.dwCaps = DDSCAPS_TEXTURE;
+    surface_desc.dwWidth = 256;
+    surface_desc.dwHeight = 256;
+    hr = IDirectDraw_CreateSurface(ddraw, &surface_desc, &texture_surf, NULL);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    hr = IDirectDrawSurface_QueryInterface(texture_surf, &IID_IDirect3DTexture2, (void **)&texture);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    hr = IDirect3DTexture_GetHandle(texture, device, &texture_handle);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    hr = IDirect3DTexture_GetHandle(texture, device2, &texture_handle2);
+    ok(hr == D3D_OK, "got %#lx.\n", hr);
+    ok(texture_handle != texture_handle2, "got same handles.\n");
+
+    IDirect3DTexture_Release(texture);
+    IDirectDrawSurface_Release(texture_surf);
+    IDirect3DMaterial_Release(material);
+    IDirect3DViewport_Release(viewport);
+    IDirect3DViewport_Release(viewport2);
+
+    refcount = IDirect3DDevice_Release(device);
+    ok(!refcount, "Device has %lu references left.\n", refcount);
+    refcount = IDirect3DDevice_Release(device2);
+    ok(!refcount, "Device has %lu references left.\n", refcount);
+
+    IDirectDraw_Release(ddraw);
+    DestroyWindow(window);
+}
+
 START_TEST(ddraw1)
 {
     DDDEVICEIDENTIFIER identifier;
@@ -15576,4 +15655,5 @@ START_TEST(ddraw1)
     run_for_each_device_type(test_texture_wrong_caps);
     test_filling_convention();
     test_enum_devices();
+    test_multiple_devices();
 }
