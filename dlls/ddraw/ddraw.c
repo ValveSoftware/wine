@@ -420,6 +420,7 @@ static void ddraw_destroy_swapchain(struct ddraw *ddraw)
  *****************************************************************************/
 static void ddraw_destroy(struct ddraw *This)
 {
+    struct d3d_device *device;
     unsigned int i;
 
     IDirectDraw7_SetCooperativeLevel(&This->IDirectDraw7_iface, NULL, DDSCL_NORMAL);
@@ -476,8 +477,10 @@ static void ddraw_destroy(struct ddraw *This)
 
     ddraw_handle_table_destroy(&This->handle_table);
 
-    if (This->d3ddevice)
-        This->d3ddevice->ddraw = NULL;
+    LIST_FOR_EACH_ENTRY(device, &This->d3ddevice_list, struct d3d_device, ddraw_entry)
+    {
+        device->ddraw = NULL;
+    }
 
     /* Now free the object */
     free(This);
@@ -5159,6 +5162,7 @@ HRESULT ddraw_init(struct ddraw *ddraw, DWORD flags, enum wined3d_device_type de
     ddraw->immediate_context = wined3d_device_get_immediate_context(ddraw->wined3d_device);
 
     list_init(&ddraw->surface_list);
+    list_init(&ddraw->d3ddevice_list);
 
     if (!ddraw_handle_table_init(&ddraw->handle_table, 64))
     {
