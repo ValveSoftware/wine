@@ -81,6 +81,31 @@ enum ddraw_device_state
     DDRAW_DEVICE_STATE_NOT_RESTORED,
 };
 
+#define DDRAW_INVALID_HANDLE ~0U
+
+enum ddraw_handle_type
+{
+    DDRAW_HANDLE_FREE,
+    DDRAW_HANDLE_MATERIAL,
+    DDRAW_HANDLE_MATRIX,
+    DDRAW_HANDLE_STATEBLOCK,
+    DDRAW_HANDLE_SURFACE,
+};
+
+struct ddraw_handle_entry
+{
+    void *object;
+    enum ddraw_handle_type type;
+};
+
+struct ddraw_handle_table
+{
+    struct ddraw_handle_entry *entries;
+    struct ddraw_handle_entry *free_entries;
+    UINT table_size;
+    UINT entry_count;
+};
+
 struct ddraw
 {
     /* Interfaces */
@@ -131,6 +156,8 @@ struct ddraw
      * because of IParent
      */
     struct list surface_list;
+
+    struct ddraw_handle_table handle_table;
 
     /* FVF management */
     struct FvfToDecl       *decls;
@@ -284,31 +311,6 @@ struct ddraw_surface *unsafe_impl_from_IDirectDrawSurface7(IDirectDrawSurface7 *
 
 struct ddraw_surface *unsafe_impl_from_IDirect3DTexture(IDirect3DTexture *iface);
 struct ddraw_surface *unsafe_impl_from_IDirect3DTexture2(IDirect3DTexture2 *iface);
-
-#define DDRAW_INVALID_HANDLE ~0U
-
-enum ddraw_handle_type
-{
-    DDRAW_HANDLE_FREE,
-    DDRAW_HANDLE_MATERIAL,
-    DDRAW_HANDLE_MATRIX,
-    DDRAW_HANDLE_STATEBLOCK,
-    DDRAW_HANDLE_SURFACE,
-};
-
-struct ddraw_handle_entry
-{
-    void *object;
-    enum ddraw_handle_type type;
-};
-
-struct ddraw_handle_table
-{
-    struct ddraw_handle_entry *entries;
-    struct ddraw_handle_entry *free_entries;
-    UINT table_size;
-    UINT entry_count;
-};
 
 BOOL ddraw_handle_table_init(struct ddraw_handle_table *t, UINT initial_size);
 void ddraw_handle_table_destroy(struct ddraw_handle_table *t);

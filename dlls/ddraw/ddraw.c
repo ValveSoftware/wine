@@ -420,6 +420,8 @@ static void ddraw_destroy_swapchain(struct ddraw *ddraw)
  *****************************************************************************/
 static void ddraw_destroy(struct ddraw *This)
 {
+    unsigned int i;
+
     IDirectDraw7_SetCooperativeLevel(&This->IDirectDraw7_iface, NULL, DDSCL_NORMAL);
     IDirectDraw7_RestoreDisplayMode(&This->IDirectDraw7_iface);
 
@@ -440,6 +442,31 @@ static void ddraw_destroy(struct ddraw *This)
     wined3d_stateblock_decref(This->state);
     wined3d_device_decref(This->wined3d_device);
     wined3d_decref(This->wined3d);
+
+    for (i = 0; i < This->handle_table.entry_count; ++i)
+    {
+        struct ddraw_handle_entry *entry = &This->handle_table.entries[i];
+
+        switch (entry->type)
+        {
+            case DDRAW_HANDLE_FREE:
+                break;
+
+            case DDRAW_HANDLE_MATERIAL:
+            {
+                struct d3d_material *m = entry->object;
+                FIXME("Material handle %#x (%p) not unset properly.\n", i + 1, m);
+                m->Handle = 0;
+                break;
+            }
+
+            default:
+                FIXME("Handle %#x (%p) has unknown type %#x.\n", i + 1, entry->object, entry->type);
+                break;
+        }
+    }
+
+    ddraw_handle_table_destroy(&This->handle_table);
 
     if (This->d3ddevice)
         This->d3ddevice->ddraw = NULL;
@@ -5124,6 +5151,15 @@ HRESULT ddraw_init(struct ddraw *ddraw, DWORD flags, enum wined3d_device_type de
     ddraw->immediate_context = wined3d_device_get_immediate_context(ddraw->wined3d_device);
 
     list_init(&ddraw->surface_list);
+
+    if (!ddraw_handle_table_init(&ddraw->handle_table, 64))
+    {
+        ERR("Failed to initialize handle table.\n");
+        ddraw_handle_table_destroy(&ddraw->handle_table);
+        wined3d_device_decref(ddraw->wined3d_device);
+        wined3d_decref(ddraw->wined3d);
+        return DDERR_OUTOFMEMORY;
+    }
 
     if (FAILED(hr = wined3d_stateblock_create(ddraw->wined3d_device, NULL, WINED3D_SBT_PRIMARY, &ddraw->state)))
     {
