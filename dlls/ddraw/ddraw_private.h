@@ -142,7 +142,7 @@ struct ddraw
 
     /* D3D things */
     HWND                    d3d_window;
-    struct d3d_device *d3ddevice;
+    struct list             d3ddevice_list;
     int                     d3dversion;
 
     /* Various HWNDs */
@@ -335,6 +335,7 @@ struct d3d_device
     struct wined3d_device *wined3d_device;
     struct wined3d_device_context *immediate_context;
     struct ddraw *ddraw;
+    struct list ddraw_entry;
     IUnknown *rt_iface;
 
     struct wined3d_streaming_buffer vertex_buffer, index_buffer;

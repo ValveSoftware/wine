@@ -1986,6 +1986,8 @@ static HRESULT WINAPI DECLSPEC_HOTPATCH ddraw_surface2_Blt(IDirectDrawSurface2 *
  *****************************************************************************/
 static HRESULT ddraw_surface_attach_surface(struct ddraw_surface *This, struct ddraw_surface *Surf)
 {
+    struct d3d_device *device;
+
     TRACE("surface %p, attachment %p.\n", This, Surf);
 
     if(Surf == This)
@@ -2012,8 +2014,10 @@ static HRESULT ddraw_surface_attach_surface(struct ddraw_surface *This, struct d
     This->next_attached = Surf;
 
     /* Check if the WineD3D depth stencil needs updating */
-    if (This->ddraw->d3ddevice)
-        d3d_device_update_depth_stencil(This->ddraw->d3ddevice);
+    LIST_FOR_EACH_ENTRY(device, &This->ddraw->d3ddevice_list, struct d3d_device, ddraw_entry)
+    {
+        d3d_device_update_depth_stencil(device);
+    }
 
     wined3d_mutex_unlock();
 
@@ -6733,18 +6737,19 @@ HRESULT ddraw_surface_create(struct ddraw *ddraw, const DDSURFACEDESC2 *surface_
         if (ddraw->cooperative_level & DDSCL_EXCLUSIVE)
         {
             struct wined3d_swapchain_desc swapchain_desc;
+            struct d3d_device *device;
 
             wined3d_swapchain_get_desc(ddraw->wined3d_swapchain, &swapchain_desc);
             swapchain_desc.backbuffer_width = mode.width;
             swapchain_desc.backbuffer_height = mode.height;
             swapchain_desc.backbuffer_format = mode.format_id;
 
-            if (ddraw->d3ddevice)
+            LIST_FOR_EACH_ENTRY(device, &ddraw->d3ddevice_list, struct d3d_device, ddraw_entry)
             {
-                if (ddraw->d3ddevice->recording)
-                    wined3d_stateblock_decref(ddraw->d3ddevice->recording);
-                ddraw->d3ddevice->recording = NULL;
-                ddraw->d3ddevice->update_state = ddraw->d3ddevice->state;
+                if (device->recording)
+                    wined3d_stateblock_decref(device->recording);
+                device->recording = NULL;
+                device->update_state = device->state;
             }
             wined3d_stateblock_reset(ddraw->state);
 
