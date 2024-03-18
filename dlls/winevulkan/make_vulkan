@@ -2925,7 +2925,6 @@ class VkGenerator(object):
         f.write("    init_vulkan,\n")
         f.write("    vk_is_available_instance_function,\n")
         f.write("    vk_is_available_device_function,\n")
-        f.write("    vk_is_nvk,\n")
         for vk_func in self.registry.funcs.values():
             if not vk_func.needs_exposing():
                 continue
@@ -2950,7 +2949,6 @@ class VkGenerator(object):
         f.write("    init_vulkan,\n")
         f.write("    vk_is_available_instance_function32,\n")
         f.write("    vk_is_available_device_function32,\n")
-        f.write("    vk_is_nvk32,\n")
         for vk_func in self.registry.funcs.values():
             if not vk_func.needs_exposing():
                 continue
@@ -3135,7 +3133,6 @@ class VkGenerator(object):
         f.write("    unix_init,\n")
         f.write("    unix_is_available_instance_function,\n")
         f.write("    unix_is_available_device_function,\n")
-        f.write("    unix_is_nvk,\n")
         for vk_func in self.registry.funcs.values():
             if not vk_func.needs_exposing():
                 continue
