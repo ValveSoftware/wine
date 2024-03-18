@@ -147,11 +147,6 @@ struct is_available_device_function_params
     const char *name;
 };
 
-struct is_nvk_params
-{
-    VkPhysicalDevice device;
-};
-
 #define wine_vk_find_struct(s, t) wine_vk_find_struct_((void *)s, VK_STRUCTURE_TYPE_##t)
 static inline void *wine_vk_find_struct_(void *s, VkStructureType t)
 {

@@ -278,8 +278,7 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
     struct wine_phys_dev *object;
     uint32_t num_host_properties, num_properties = 0;
     VkExtensionProperties *host_properties = NULL;
-    VkPhysicalDeviceProperties2 physdev_properties;
-    VkPhysicalDeviceVulkan12Properties vk12;
+    VkPhysicalDeviceProperties physdev_properties;
     BOOL have_external_memory_host = FALSE, have_external_memory_fd = FALSE, have_external_semaphore_fd = FALSE;
     VkResult res;
     unsigned int i, j;
@@ -291,16 +290,8 @@ static struct wine_phys_dev *wine_vk_physical_device_alloc(struct wine_instance 
     object->handle = handle;
     object->host_physical_device = phys_dev;
 
-    memset(&vk12, 0, sizeof(vk12));
-    vk12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
-
-    memset(&physdev_properties, 0, sizeof(physdev_properties));
-    physdev_properties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    physdev_properties.pNext = &vk12;
-
-    instance->funcs.p_vkGetPhysicalDeviceProperties2(phys_dev, &physdev_properties);
-    object->api_version = physdev_properties.properties.apiVersion;
-    object->is_nvk = (vk12.driverID == VK_DRIVER_ID_MESA_NVK);
+    instance->funcs.p_vkGetPhysicalDeviceProperties(phys_dev, &physdev_properties);
+    object->api_version = physdev_properties.apiVersion;
 
     handle->base.unix_handle = (uintptr_t)object;
     WINE_VK_ADD_DISPATCHABLE_MAPPING(instance, handle, phys_dev, object);
@@ -4068,13 +4059,6 @@ NTSTATUS vk_is_available_device_function(void *arg)
     return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, params->name);
 }
 
-NTSTATUS vk_is_nvk(void *arg)
-{
-    struct is_nvk_params *params = arg;
-    struct wine_phys_dev *device = wine_phys_dev_from_handle(params->device);
-    return !!device->is_nvk;
-}
-
 #endif /* _WIN64 */
 
 NTSTATUS vk_is_available_instance_function32(void *arg)
@@ -4101,16 +4085,6 @@ NTSTATUS vk_is_available_device_function32(void *arg)
     const char *name = UlongToPtr(params->name);
     substitute_function_name(&name);
     return !!vk_funcs->p_vkGetDeviceProcAddr(device->host_device, name);
-}
-
-NTSTATUS vk_is_nvk32(void *arg)
-{
-    struct
-    {
-        UINT32 device;
-    } *params = arg;
-    struct wine_phys_dev *device = wine_phys_dev_from_handle(UlongToPtr(params->device));
-    return !!device->is_nvk;
 }
 
 DECLSPEC_EXPORT VkDevice __wine_get_native_VkDevice(VkDevice handle)
