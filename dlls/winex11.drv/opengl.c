@@ -1486,7 +1486,7 @@ static BOOL drawable_needs_clipping( HWND hwnd, BOOL known_child )
     {
         const char *sgi = getenv( "SteamGameId" );
 
-        no_child_clipping_cached = sgi && !strcmp( sgi, "2229850" );
+        no_child_clipping_cached = sgi && (!strcmp( sgi, "2229850" ) || !strcmp( sgi, "2229880" ));
         if (no_child_clipping_cached) FIXME( "HACK: disabling child GL window clipping.\n" );
     }
 
