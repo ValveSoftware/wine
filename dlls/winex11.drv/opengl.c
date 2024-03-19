@@ -1480,8 +1480,18 @@ static enum dc_gl_layered_type get_gl_layered_type( HWND hwnd )
 
 static BOOL drawable_needs_clipping( HWND hwnd, BOOL known_child )
 {
-    if (known_child) return TRUE;
-    return NtUserGetWindowRelative( hwnd, GW_CHILD ) || NtUserGetAncestor( hwnd, GA_PARENT ) != NtUserGetDesktopWindow();
+    static int no_child_clipping_cached = -1;
+
+    if (no_child_clipping_cached == -1)
+    {
+        const char *sgi = getenv( "SteamGameId" );
+
+        no_child_clipping_cached = sgi && !strcmp( sgi, "2229850" );
+        if (no_child_clipping_cached) FIXME( "HACK: disabling child GL window clipping.\n" );
+    }
+
+    if (known_child && !no_child_clipping_cached) return TRUE;
+    return (!no_child_clipping_cached && NtUserGetWindowRelative( hwnd, GW_CHILD )) || NtUserGetAncestor( hwnd, GA_PARENT ) != NtUserGetDesktopWindow();
 }
 
 /***********************************************************************
