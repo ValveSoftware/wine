@@ -1536,7 +1536,6 @@ static HRESULT ddraw_surface_blt(struct ddraw_surface *dst_surface, const RECT *
         const struct wined3d_blt_fx *fx, enum wined3d_texture_filter_type filter)
 {
     struct ddraw *ddraw = dst_surface->ddraw;
-    struct wined3d_device *wined3d_device = ddraw->wined3d_device;
     struct wined3d_color colour;
     DWORD wined3d_flags;
 
@@ -1550,7 +1549,6 @@ static HRESULT ddraw_surface_blt(struct ddraw_surface *dst_surface, const RECT *
                 dst_surface->palette, fill_colour, &colour))
             return DDERR_INVALIDPARAMS;
 
-        wined3d_device_apply_stateblock(wined3d_device, ddraw->state);
         ddraw_surface_get_draw_texture(dst_surface, dst_rect ? DDRAW_SURFACE_RW : DDRAW_SURFACE_WRITE);
         return wined3d_device_context_clear_rendertarget_view(ddraw->immediate_context,
                 ddraw_surface_get_rendertarget_view(dst_surface),
@@ -1567,7 +1565,6 @@ static HRESULT ddraw_surface_blt(struct ddraw_surface *dst_surface, const RECT *
                 dst_surface->palette, fill_colour, &colour))
             return DDERR_INVALIDPARAMS;
 
-        wined3d_device_apply_stateblock(wined3d_device, ddraw->state);
         ddraw_surface_get_draw_texture(dst_surface, dst_rect ? DDRAW_SURFACE_RW : DDRAW_SURFACE_WRITE);
         return wined3d_device_context_clear_rendertarget_view(ddraw->immediate_context,
                 ddraw_surface_get_rendertarget_view(dst_surface),
