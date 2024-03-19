@@ -136,9 +136,6 @@ struct ddraw
     struct FvfToDecl       *decls;
     UINT                    numConvertedDecls, declArraySize;
 
-    struct wined3d_stateblock *state;
-    const struct wined3d_stateblock_state *stateblock_state;
-
     unsigned int frames;
     DWORD prev_frame_time;
 };
