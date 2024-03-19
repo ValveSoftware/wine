@@ -544,7 +544,7 @@ static void fixup_device_id(UINT *vendor_id, UINT *device_id)
         *vendor_id = 0x10de; /* NVIDIA */
         *device_id = 0x2487; /* RTX 3060 */
     }
-    else if (*vendor_id == 0x1002 && *device_id == 0x163f && (sgi = getenv("WINE_HIDE_VANGOGH_GPU")) && *sgi != '0')
+    else if (*vendor_id == 0x1002 && (*device_id == 0x163f || *device_id == 0x1435) && (sgi = getenv("WINE_HIDE_VANGOGH_GPU")) && *sgi != '0')
     {
         *device_id = 0x687f; /* Radeon RX Vega 56/64 */
     }
