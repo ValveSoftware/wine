@@ -263,6 +263,9 @@ static void wait_grab_pointer( Display *display )
 {
     RECT rect;
 
+    /* unnecessary on gamescope, windows cannot be moved with the mouse */
+    if (wm_is_steamcompmgr( display )) return;
+
     /* release cursor grab held by any Wine process */
     NtUserGetClipCursor( &rect );
     NtUserClipCursor( NULL );
