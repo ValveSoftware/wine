@@ -471,7 +471,7 @@ static inline void push_string( struct packed_message *data, LPCWSTR str )
 /* make sure that there is space for 'size' bytes in buffer, growing it if needed */
 static inline void *get_buffer_space( void **buffer, size_t size, size_t prev_size )
 {
-    if (prev_size < size) *buffer = malloc( size );
+    if (prev_size < size) *buffer = realloc( *buffer, size );
     return *buffer;
 }
 
