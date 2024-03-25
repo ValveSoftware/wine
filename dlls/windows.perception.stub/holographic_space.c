@@ -361,6 +361,10 @@ static HRESULT WINAPI holographic_space_interop_CreateForWindow( IHolographicSpa
         *holographic_space = NULL;
         return E_INVALIDARG;
     }
+
+    FIXME( "HACK: Setting WS_EX_NOACTIVATE for %p.\n", window );
+    SetWindowLongW( window, GWL_EXSTYLE, WS_EX_NOACTIVATE );
+
     if (!(impl = calloc( 1, sizeof( *impl ) ))) return E_OUTOFMEMORY;
 
     impl->IHolographicSpace_iface.lpVtbl = &holographic_space_vtbl;
