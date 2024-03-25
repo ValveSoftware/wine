@@ -208,6 +208,9 @@ static HRESULT WINAPI holographicspace_interop_CreateForWindow( IHolographicSpac
 {
     FIXME( "iface %p, window %p, iid %s, holographic_space %p.\n", iface, window, debugstr_guid( iid ), holographic_space );
 
+    FIXME( "HACK: Setting WS_EX_NOACTIVATE for %p.\n", window );
+    SetWindowLongW( window, GWL_EXSTYLE, WS_EX_NOACTIVATE );
+
     *holographic_space = NULL;
     return E_NOTIMPL;
 }
