@@ -32,6 +32,7 @@
 #include "windows.perception.spatial.surfaces.h"
 #define WIDL_using_Windows_Graphics_Holographic
 #include "windows.graphics.holographic.h"
+#include "holographicspaceinterop.h"
 
 #include "wine/test.h"
 
@@ -121,6 +122,7 @@ static void test_HolographicSpaceStatics(void)
     check_interface( factory, &IID_IUnknown );
     check_interface( factory, &IID_IInspectable );
     check_interface( factory, &IID_IAgileObject );
+    check_interface( factory, &IID_IHolographicSpaceInterop );
 
     hr = IActivationFactory_QueryInterface( factory, &IID_IHolographicSpaceStatics2, (void **)&holographicspace_statics2 );
     if (hr == E_NOINTERFACE) /* win1607 */
