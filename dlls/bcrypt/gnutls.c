@@ -2774,6 +2774,7 @@ static NTSTATUS key_asymmetric_decrypt( void *args )
 #if defined(HAVE_GCRYPT_H) && defined(SONAME_LIBGCRYPT)
 const char * gcrypt_hash_algorithm_name(LPCWSTR alg_id)
 {
+    ERR("qqqqq alg_id %s.\n", debugstr_w(alg_id));
     if (!wcscmp( alg_id, BCRYPT_SHA1_ALGORITHM ))   return "sha1";
     if (!wcscmp( alg_id, BCRYPT_SHA256_ALGORITHM )) return "sha256";
     if (!wcscmp( alg_id, BCRYPT_SHA384_ALGORITHM )) return "sha384";
