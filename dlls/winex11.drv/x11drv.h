@@ -710,7 +710,7 @@ extern BOOL fs_hack_mapping_required( HMONITOR monitor );
 extern BOOL fs_hack_is_integer(void);
 extern HMONITOR fs_hack_monitor_from_hwnd( HWND hwnd );
 extern HMONITOR fs_hack_monitor_from_rect( const RECT *rect );
-extern BOOL fs_hack_matches_current_mode( HMONITOR monitor, INT width, INT height );
+extern BOOL fs_hack_is_window_rect_fullscreen( HMONITOR monitor, const RECT *rect );
 extern RECT fs_hack_current_mode( HMONITOR monitor );
 extern RECT fs_hack_real_mode( HMONITOR monitor );
 extern void fs_hack_point_user_to_real( POINT *pos );

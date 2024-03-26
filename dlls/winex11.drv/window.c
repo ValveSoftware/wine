@@ -3135,9 +3135,9 @@ BOOL X11DRV_WindowPosChanging( HWND hwnd, HWND insert_after, UINT swp_flags,
 
     if (!data && !(data = X11DRV_create_win_data( hwnd, window_rect, client_rect ))) return TRUE;
 
+
     monitor = fs_hack_monitor_from_rect( window_rect );
-    if (fs_hack_enabled( monitor ) && fs_hack_matches_current_mode( monitor, window_rect->right - window_rect->left,
-                                                                    window_rect->bottom - window_rect->top ))
+    if (fs_hack_enabled( monitor ) && fs_hack_is_window_rect_fullscreen( monitor, window_rect ))
         window_update_fshack( data, window_rect, client_rect, monitor, TRUE );
     else
         window_update_fshack( data, window_rect, client_rect, monitor, FALSE );
@@ -3500,7 +3500,7 @@ UINT X11DRV_ShowWindow( HWND hwnd, INT cmd, RECT *rect, UINT swp )
     monitor = fs_hack_monitor_from_rect( rect );
     if (data->fs_hack ||
         (fs_hack_enabled( monitor ) &&
-         fs_hack_matches_current_mode( monitor, rect->right - rect->left, rect->bottom - rect->top )))
+         fs_hack_is_window_rect_fullscreen( monitor, rect )))
     {
         MONITORINFO info = {.cbSize = sizeof(MONITORINFO)};
         NtUserGetMonitorInfo( monitor, &info );
@@ -3757,8 +3757,7 @@ static void handle_window_desktop_resize( struct x11drv_win_data *data, UINT old
     HMONITOR monitor = fs_hack_monitor_from_hwnd( data->hwnd );
 
     if (fs_hack_mapping_required( monitor ) &&
-        fs_hack_matches_current_mode( monitor, data->whole_rect.right - data->whole_rect.left,
-                                      data->whole_rect.bottom - data->whole_rect.top ))
+        fs_hack_is_window_rect_fullscreen( monitor, &data->whole_rect ))
     {
         window_update_fshack( data, NULL, NULL, monitor, TRUE );
         return;
@@ -3783,8 +3782,7 @@ static void handle_window_desktop_resize( struct x11drv_win_data *data, UINT old
     }
 
     if (!fs_hack_mapping_required( monitor ) ||
-        !fs_hack_matches_current_mode( monitor, data->whole_rect.right - data->whole_rect.left,
-                                       data->whole_rect.bottom - data->whole_rect.top ))
+        !fs_hack_is_window_rect_fullscreen( monitor, &data->whole_rect ))
         window_update_fshack( data, NULL, NULL, monitor, FALSE );
 }
 
