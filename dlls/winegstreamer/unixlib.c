@@ -247,6 +247,7 @@ bool push_event(GstPad *pad, GstEvent *event)
 
 NTSTATUS wg_init_gstreamer(void *arg)
 {
+    struct wg_init_gstreamer_params *params = arg;
     static GstGLContext *gl_context;
 
     char arg0[] = "wine";
@@ -272,6 +273,14 @@ NTSTATUS wg_init_gstreamer(void *arg)
         strcat(gst_reg, arch);
         setenv("GST_REGISTRY_1_0", gst_reg, 1);
     }
+
+    if (params->trace_on)
+        setenv("GST_DEBUG", "WINE:9,protonmediaconverter:9,4", FALSE);
+    if (params->warn_on)
+        setenv("GST_DEBUG", "WINE:3,protonmediaconverter:3,3", FALSE);
+    if (params->err_on)
+        setenv("GST_DEBUG", "WINE:1,protonmediaconverter:1,1", FALSE);
+    setenv("GST_DEBUG_NO_COLOR", "1", FALSE);
 
     /* GStreamer installs a temporary SEGV handler when it loads plugins
      * to initialize its registry calling exit(-1) when any fault is caught.
