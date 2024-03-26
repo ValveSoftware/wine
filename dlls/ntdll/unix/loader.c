@@ -2020,6 +2020,7 @@ static ULONG_PTR get_image_address(void)
     return 0;
 }
 
+BOOL disable_sfn;
 BOOL ac_odyssey;
 BOOL fsync_simulate_sched_quantum;
 BOOL alert_simulate_sched_quantum;
@@ -2040,6 +2041,12 @@ static void hacks_init(void)
         ram_reporting_bias = atoll(env_str) * 1024 * 1024;
         ERR( "HACK: ram_reporting_bias %lldMB.\n", ram_reporting_bias / (1024 * 1024) );
     }
+
+    env_str = getenv("WINE_DISABLE_SFN");
+    if (env_str)
+        disable_sfn = !!atoi(env_str);
+    else if (main_argc > 1 && (strstr(main_argv[1], "Yakuza5.exe") ))
+        disable_sfn = TRUE;
 
     env_str = getenv("WINE_SIMULATE_ASYNC_READ");
     if (env_str)
