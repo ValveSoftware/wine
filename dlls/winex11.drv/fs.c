@@ -720,21 +720,21 @@ RECT fs_hack_real_mode( HMONITOR monitor )
     return rect;
 }
 
-/* Return whether width and height are the same as the current mode used by a monitor */
-BOOL fs_hack_matches_current_mode( HMONITOR monitor, INT width, INT height )
+/* Return whether a window rectangle is fullscreen on a fshack monitor */
+BOOL fs_hack_is_window_rect_fullscreen( HMONITOR monitor, const RECT *rect )
 {
     MONITORINFO info = {.cbSize = sizeof(MONITORINFO)};
-    BOOL matched;
+    BOOL fullscreen;
 
     TRACE( "monitor %p\n", monitor );
 
     if (!NtUserGetMonitorInfo( monitor, &info )) return FALSE;
 
-    matched = (width == info.rcMonitor.right - info.rcMonitor.left) &&
-              (height == info.rcMonitor.bottom - info.rcMonitor.top);
-    TRACE( "matched: %s\n", matched ? "TRUE" : "FALSE" );
+    fullscreen = rect->left <= info.rcMonitor.left && rect->right >= info.rcMonitor.right &&
+                 rect->top <= info.rcMonitor.top && rect->bottom >= info.rcMonitor.bottom;
+    TRACE( "fullscreen: %s\n", fullscreen ? "TRUE" : "FALSE" );
 
-    return matched;
+    return fullscreen;
 }
 
 /* Transform a point in user virtual screen coordinates to real virtual screen coordinates */
