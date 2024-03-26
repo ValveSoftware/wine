@@ -242,7 +242,7 @@ static pthread_mutex_t timezone_mutex = PTHREAD_MUTEX_INITIALIZER;
 static struct
 {
     struct cpu_topology_override mapping;
-    BOOL smt;
+    ULONG_PTR siblings_mask[MAXIMUM_PROCESSORS];
 }
 cpu_override;
 
@@ -574,9 +574,13 @@ static void get_cpuinfo( SYSTEM_CPU_INFORMATION *info )
 
 #endif /* End architecture specific feature detection for CPUs */
 
+static void fill_performance_core_info(void);
+static BOOL sysfs_parse_bitmap(const char *filename, ULONG_PTR *mask);
+
 static void fill_cpu_override(unsigned int host_cpu_count)
 {
     const char *env_override = getenv("WINE_CPU_TOPOLOGY");
+    BOOL smt = FALSE;
     unsigned int i;
     char *s;
 
@@ -593,6 +597,58 @@ static void fill_cpu_override(unsigned int host_cpu_count)
         goto error;
     }
 
+    if (!*s)
+    {
+        /* Auto assign given number of logical CPUs. */
+        static const char core_info[] = "/sys/devices/system/cpu/cpu%u/topology/%s";
+        char name[MAX_PATH];
+        unsigned int attempt, count, j;
+        ULONG_PTR masks[MAXIMUM_PROCESSORS];
+
+        if (cpu_override.mapping.cpu_count >= host_cpu_count)
+        {
+            TRACE( "Override cpu count %u >= host cpu count %u.\n", cpu_override.mapping.cpu_count, host_cpu_count );
+            cpu_override.mapping.cpu_count = 0;
+            return;
+        }
+
+        fill_performance_core_info();
+
+        for (i = 0; i < host_cpu_count; ++i)
+        {
+            snprintf(name, sizeof(name), core_info, i, "thread_siblings");
+            masks[i] = 0;
+            sysfs_parse_bitmap(name, &masks[i]);
+        }
+        for (attempt = 0; attempt < 3; ++attempt)
+        {
+            count = 0;
+            for (i = 0; i < host_cpu_count && count < cpu_override.mapping.cpu_count; ++i)
+            {
+                if (attempt < 2 && performance_cores_capacity)
+                {
+                    if (i / 32 >= performance_cores_capacity) break;
+                    if (!(performance_cores[i / 32] & (1 << (i % 32)))) goto skip_cpu;
+                }
+                cpu_override.mapping.host_cpu_id[count] = i;
+                cpu_override.siblings_mask[count] = (ULONG_PTR)1 << count;
+                for (j = 0; j < count; ++j)
+                {
+                    if (!(masks[cpu_override.mapping.host_cpu_id[j]] & masks[i])) continue;
+                    if (attempt < 1) goto skip_cpu;
+                    cpu_override.siblings_mask[j] |= (ULONG_PTR)1 << count;
+                    cpu_override.siblings_mask[count] |= (ULONG_PTR)1 << j;
+                }
+                ++count;
+skip_cpu:
+                ;
+            }
+            if (count == cpu_override.mapping.cpu_count) break;
+        }
+        assert( count == cpu_override.mapping.cpu_count );
+        goto done;
+    }
+
     if (tolower(*s) == 's')
     {
         cpu_override.mapping.cpu_count *= 2;
@@ -601,7 +657,7 @@ static void fill_cpu_override(unsigned int host_cpu_count)
             ERR("Logical CPU count exceeds limit %u.\n", MAXIMUM_PROCESSORS);
             goto error;
         }
-        cpu_override.smt = TRUE;
+        smt = TRUE;
         ++s;
     }
     if (*s != ':')
@@ -624,6 +680,8 @@ static void fill_cpu_override(unsigned int host_cpu_count)
         }
 
         cpu_override.mapping.host_cpu_id[i] = strtol(s, &next, 10);
+        if (smt) cpu_override.siblings_mask[i] = (ULONG_PTR)3 << (i & ~1);
+        else     cpu_override.siblings_mask[i] = (ULONG_PTR)1 << i;
         if (next == s)
             goto error;
         if (cpu_override.mapping.host_cpu_id[i] >= host_cpu_count)
@@ -637,6 +695,7 @@ static void fill_cpu_override(unsigned int host_cpu_count)
     if (*s)
         goto error;
 
+done:
     if (ERR_ON(ntdll))
     {
         MESSAGE("wine: overriding CPU configuration, %u logical CPUs, host CPUs ", cpu_override.mapping.cpu_count);
@@ -955,6 +1014,8 @@ static void fill_performance_core_info(void)
     char op = ',';
     ULONG *p;
 
+    if (performance_cores_capacity) return;
+
     fpcore_list = fopen("/sys/devices/cpu_core/cpus", "r");
     if (!fpcore_list) return;
 
@@ -1070,7 +1131,7 @@ static NTSTATUS create_logical_proc_info(void)
             snprintf(name, sizeof(name), core_info, i, "thread_siblings");
             if (cpu_override.mapping.cpu_count)
             {
-                thread_mask = cpu_override.smt ? (ULONG_PTR)0x3 << (i & ~1) : (ULONG_PTR)1 << i;
+                thread_mask = cpu_override.siblings_mask[i];
             }
             else
             {
@@ -1081,7 +1142,9 @@ static NTSTATUS create_logical_proc_info(void)
 
             if (cpu_override.mapping.cpu_count)
             {
-                phys_core = cpu_override.smt ? i / 2 : i;
+                assert( thread_mask );
+                for (phys_core = 0; ; ++phys_core)
+                    if (thread_mask & ((ULONG_PTR)1 << phys_core)) break;
             }
             else
             {
