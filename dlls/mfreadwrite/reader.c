@@ -2376,7 +2376,6 @@ static HRESULT WINAPI src_reader_GetServiceForStream(IMFSourceReaderEx *iface, D
         REFIID riid, void **object)
 {
     struct source_reader *reader = impl_from_IMFSourceReaderEx(iface);
-    struct media_stream *stream = &reader->streams[index];
     IUnknown *obj = NULL;
     HRESULT hr = S_OK;
 
@@ -2397,7 +2396,7 @@ static HRESULT WINAPI src_reader_GetServiceForStream(IMFSourceReaderEx *iface, D
 
             if (index >= reader->stream_count)
                 hr = MF_E_INVALIDSTREAMNUMBER;
-            else if (!(obj = (IUnknown *)stream->transform_service))
+            else if (!(obj = (IUnknown *)reader->streams[index].transform_service))
                 hr = E_NOINTERFACE;
             break;
     }
