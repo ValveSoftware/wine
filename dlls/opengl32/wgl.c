@@ -1297,21 +1297,60 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
     static int needs_fixup = -1;
     static unsigned int once;
 
-    const char add_ext[] = "#version 120\r\n"
-                         "#extension GL_ARB_explicit_uniform_location : enable\r\n"
-                         "#extension GL_ARB_explicit_attrib_location : enable\r\n";
-    const char search_str[] = "uniform mat4 boneMatrices[NBONES];";
-    const char prepend_str[] = "layout(location = 2) ";
-    unsigned int search_len, new_len;
+    static const struct
+    {
+        const char *gameid;
+        const char *add_ext;
+        const char *search_str;
+        const char *prepend_str;
+    }
+    replace[] =
+    {
+        {
+            "333420",
+
+            /* add_ext */
+            "#version 120\r\n"
+            "#extension GL_ARB_explicit_uniform_location : enable\r\n"
+            "#extension GL_ARB_explicit_attrib_location : enable\r\n",
+            /* search_str */
+            "uniform mat4 boneMatrices[NBONES];",
+            /* replace_str */
+            "layout(location = 2) ",
+        },
+        {
+            "242110",
+            /* add_ext */
+            "#version 120\r\n",
+        },
+    };
+    static const char *add_ext;
+    static const char *search_str;
+    static const char *prepend_str;
+    static unsigned int add_ext_len, search_len, prepend_len;
+    unsigned int new_len;
     const char *p, *next;
     BOOL found = FALSE;
     char *new, *out;
 
     if (needs_fixup == -1)
     {
-      const char *sgi = getenv("SteamGameId");
+        const char *sgi = getenv("SteamGameId");
+        unsigned int i;
 
-      needs_fixup = sgi && !strcmp( sgi, "333420" );
+        for (i = 0; i < ARRAY_SIZE(replace); ++i)
+            if (!strcmp( sgi, replace[i].gameid )) break;
+
+        needs_fixup = i < ARRAY_SIZE(replace);
+        if (needs_fixup)
+        {
+            add_ext = replace[i].add_ext;
+            add_ext_len = add_ext ? strlen(add_ext) : 0;
+            search_str = replace[i].search_str;
+            search_len = search_str ? strlen(search_str) : 0;
+            prepend_str = replace[i].prepend_str;
+            prepend_len = prepend_str ? strlen(prepend_str) : 0;
+        }
     }
 
     if (!needs_fixup) return NULL;
@@ -1322,12 +1361,13 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
       FIXME( "HACK: Fixing up shader.\n" );
 
     TRACE( "Appending extension string.\n" );
-    new_len = strlen( *string ) + sizeof(prepend_str) - 1 + sizeof(add_ext);
+    new_len = strlen( *string ) + prepend_len + add_ext_len + 1;
     new = out = malloc( new_len );
-    memcpy( out, add_ext, sizeof(add_ext) - 1 );
-    out += sizeof(add_ext) - 1;
+    memcpy( out, add_ext, add_ext_len );
+    out += add_ext_len;
 
-    search_len = sizeof(search_str) - 1;
+    if (!search_str) goto skip_search;
+
     next = *string;
     while (*(p = next))
     {
@@ -1338,8 +1378,8 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
           TRACE( "Adding explicit location.\n" );
           memcpy( out, *string, p - *string );
           out += p - *string;
-          memcpy( out, prepend_str, sizeof(prepend_str) - 1 );
-          out += sizeof(prepend_str) - 1;
+          memcpy( out, prepend_str, prepend_len );
+          out += prepend_len;
           strcpy( out, p );
           found = TRUE;
           break;
@@ -1347,6 +1387,8 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
 
       while (*next == '\n' || *next == '\r') ++next;
     }
+
+skip_search:
     if (!found)
       strcpy( out, *string );
 
