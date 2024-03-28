@@ -1323,6 +1323,11 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
             /* add_ext */
             "#version 120\r\n",
         },
+        {
+            "229890",
+            /* add_ext */
+            "#version 120\r\n",
+        },
     };
     static const char *add_ext;
     static const char *search_str;
