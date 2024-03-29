@@ -912,19 +912,6 @@ static HRESULT session_subscribe_sources(struct media_session *session)
     return hr;
 }
 
-static void session_flush_nodes(struct media_session *session)
-{
-    struct topo_node *node;
-
-    LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
-    {
-        if (node->type == MF_TOPOLOGY_OUTPUT_NODE)
-            IMFStreamSink_Flush(node->object.sink_stream);
-        else if (node->type == MF_TOPOLOGY_TRANSFORM_NODE)
-            IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_COMMAND_FLUSH, 0);
-    }
-}
-
 static void session_start(struct media_session *session, const GUID *time_format, const PROPVARIANT *start_position)
 {
     struct media_source *source;
@@ -2905,6 +2892,7 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
     struct media_source *src;
     struct media_sink *sink;
     enum object_state state;
+    struct topo_node *node;
     BOOL changed = FALSE;
     DWORD i, count;
     HRESULT hr;
@@ -3000,7 +2988,21 @@ static void session_set_source_object_state(struct media_session *session, IUnkn
             if (!session_is_source_nodes_state(session, OBJ_STATE_STOPPED))
                 break;
 
-            session_flush_nodes(session);
+            LIST_FOR_EACH_ENTRY(node, &session->presentation.nodes, struct topo_node, entry)
+            {
+                switch (node->type)
+                {
+                    case MF_TOPOLOGY_OUTPUT_NODE:
+                        IMFStreamSink_Flush(node->object.sink_stream);
+                        break;
+                    case MF_TOPOLOGY_TRANSFORM_NODE:
+                        IMFTransform_ProcessMessage(node->object.transform, MFT_MESSAGE_COMMAND_FLUSH, 0);
+                        break;
+                    default:
+                        ;
+                }
+            }
+
             session_set_caps(session, session->caps & ~MFSESSIONCAP_PAUSE);
 
             if (session->presentation.flags & SESSION_FLAG_FINALIZE_SINKS)
