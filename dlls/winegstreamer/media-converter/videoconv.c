@@ -437,9 +437,7 @@ int video_conv_state_fill_buffer(struct video_conv_state *state, uint64_t offset
     }
     else /* Fill blank video data to buffer. */
     {
-        /* Get copy size. */
-        if (offset >= state->our_duration)
-            return CONV_OK;
+        offset = offset % state->our_duration;
         to_copy = min(state->our_duration - offset, size);
 
         /* Copy data. */
