@@ -577,7 +577,40 @@ static bool parser_no_more_pads(struct wg_parser *parser)
 
 static gboolean autoplug_continue_cb(GstElement * decodebin, GstPad *pad, GstCaps * caps, gpointer user)
 {
-    return !caps_is_compressed(caps);
+    const GstStructure *structure = gst_caps_get_structure(caps, 0);
+    const char *name = gst_structure_get_name(structure);
+    struct wg_parser *parser = user;
+    GstElementFactory *factory;
+    GstElement *element;
+    gboolean parsed;
+
+    if (!parser->output_compressed)
+        return true;
+
+    /* make sure to autoplug parsers for mpeg audio / video */
+    if (!strcmp(name, "audio/mpeg") || !strcmp(name, "video/mpeg"))
+    {
+        if (!gst_structure_get_boolean(structure, "parsed", &parsed))
+            return true;
+        return !parsed;
+    }
+
+    gst_object_ref(pad);
+    while (GST_IS_GHOST_PAD(pad))
+    {
+        GstGhostPad *ghost = GST_GHOST_PAD(pad);
+        pad = gst_ghost_pad_get_target(ghost);
+        gst_object_unref(ghost);
+    }
+
+    element = gst_pad_get_parent_element(pad);
+    gst_object_unref(pad);
+
+    factory = gst_element_get_factory(element);
+    gst_object_unref(element);
+
+    GST_TRACE("factory %"GST_PTR_FORMAT" element %"GST_PTR_FORMAT" pad %"GST_PTR_FORMAT" caps %"GST_PTR_FORMAT"", factory, element, pad, caps);
+    return !factory || !gst_element_factory_list_is_type(factory, GST_ELEMENT_FACTORY_TYPE_DEMUXER);
 }
 
 gboolean caps_detect_h264(GstCapsFeatures *features, GstStructure *structure, gpointer user_data)
