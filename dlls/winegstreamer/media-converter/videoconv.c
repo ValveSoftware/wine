@@ -510,7 +510,7 @@ static uint64_t video_conv_duration_ours_to_upstream(VideoConv *conv, uint64_t p
     struct video_conv_state *state = conv->state;
 
     if (state->upstream_duration != DURATION_NONE && state->our_duration != DURATION_NONE)
-        return pos * state->upstream_duration / state->our_duration;
+        return gst_util_uint64_scale_round(pos, state->upstream_duration, state->our_duration);
     else
         return DURATION_NONE;
 }
