@@ -59,6 +59,7 @@
 #endif
 
 #include "media-converter.h"
+#include <gst/base/gstadapter.h>
 
 #include <assert.h>
 
@@ -92,6 +93,7 @@ enum video_conv_state_flags
 {
     VIDEO_CONV_STREAM_STARTED = 1,
     VIDEO_CONV_HAS_TRANSCODED = 2,
+    VIDEO_CONV_IS_DUMPING = 4,
 };
 
 struct video_conv_state
@@ -103,6 +105,8 @@ struct video_conv_state
     uint64_t our_duration;
     uint32_t transcoded_tag;
     uint32_t state_flags;
+    uint64_t read_offset;
+    GList *chunk_hashes;
 };
 
 typedef struct
@@ -111,6 +115,8 @@ typedef struct
     GstPad *sink_pad, *src_pad;
     pthread_mutex_t state_mutex;
     struct video_conv_state *state;
+    GstPadMode active_mode;
+    GstAdapter *adapter;
 } VideoConv;
 
 typedef struct
@@ -388,6 +394,8 @@ bool video_conv_state_begin_transcode(struct video_conv_state *state, struct pay
 {
     GST_DEBUG("state %p, hash %s.", state, format_hash(hash));
 
+    state->transcode_hash = *hash;
+
     if (state->read_fozdb)
     {
         uint32_t entry_size;
@@ -395,7 +403,6 @@ bool video_conv_state_begin_transcode(struct video_conv_state *state, struct pay
         if (fozdb_entry_size(state->read_fozdb, VIDEO_CONV_FOZ_TAG_MKVDATA, hash, &entry_size) == CONV_OK)
         {
             GST_DEBUG("Found an MKV video for hash %s.", format_hash(hash));
-            state->transcode_hash = *hash;
             state->our_duration = entry_size;
             state->transcoded_tag = VIDEO_CONV_FOZ_TAG_MKVDATA;
             state->state_flags |= VIDEO_CONV_HAS_TRANSCODED;
@@ -405,7 +412,6 @@ bool video_conv_state_begin_transcode(struct video_conv_state *state, struct pay
         if (fozdb_entry_size(state->read_fozdb, VIDEO_CONV_FOZ_TAG_OGVDATA, hash, &entry_size) == CONV_OK)
         {
             GST_DEBUG("Found an OGV video for hash %s.", format_hash(hash));
-            state->transcode_hash = *hash;
             state->our_duration = entry_size;
             state->transcoded_tag = VIDEO_CONV_FOZ_TAG_OGVDATA;
             state->state_flags |= VIDEO_CONV_HAS_TRANSCODED;
@@ -544,21 +550,63 @@ static bool video_conv_get_upstream_range(VideoConv *conv, uint64_t offset, uint
     return true;
 }
 
+static uint64_t video_conv_duration_ours_to_downstream(VideoConv *conv, uint64_t pos)
+{
+    struct video_conv_state *state = conv->state;
+
+    if (state->upstream_duration != DURATION_NONE && state->our_duration != DURATION_NONE)
+        return gst_util_uint64_scale_round(pos, state->our_duration, state->upstream_duration);
+    else
+        return DURATION_NONE;
+}
+
+static bool video_conv_get_downstream_range(VideoConv *conv, uint64_t offset, uint32_t end,
+        uint64_t *downstream_offset, uint64_t *downstream_end)
+{
+    struct video_conv_state *state;
+
+    if (!(state = video_conv_lock_state(conv)))
+        return false;
+
+    if (state->upstream_duration == DURATION_NONE)
+        video_conv_query_upstream_duration(conv);
+
+    *downstream_offset = video_conv_duration_ours_to_downstream(conv, offset);
+    *downstream_end = video_conv_duration_ours_to_downstream(conv, end);
+
+    pthread_mutex_unlock(&conv->state_mutex);
+
+    return true;
+}
+
 static bool video_conv_hash_upstream_data(VideoConv *conv, struct payload_hash *hash)
 {
-    struct pad_reader *reader;
-    bool ret;
+    bool ret = false;
 
     memset(hash, 0, sizeof(*hash));
 
-    reader = pad_reader_create_with_stride(conv->sink_pad, HASH_STRIDE);
-    ret = murmur3_128(reader, pad_reader_read, HASH_SEED, hash);
-    pad_reader_release(reader);
+    if (conv->active_mode == GST_PAD_MODE_PUSH && gst_adapter_available(conv->adapter) > 0)
+    {
+        struct bytes_reader bytes_reader;
+        gsize read_size = gst_adapter_available(conv->adapter);
+        const void *buffer = gst_adapter_map(conv->adapter, read_size);
+        bytes_reader_init(&bytes_reader, buffer, read_size);
+        ret = murmur3_128(&bytes_reader, bytes_reader_read, HASH_SEED, hash);
+        gst_adapter_unmap(conv->adapter);
+        gst_adapter_clear(conv->adapter);
+    }
+    else if (gst_pad_activate_mode(conv->sink_pad, GST_PAD_MODE_PULL, true))
+    {
+        struct pad_reader *reader = pad_reader_create_with_stride(conv->sink_pad, HASH_STRIDE);
+        ret = murmur3_128(reader, pad_reader_read, HASH_SEED, hash);
+        pad_reader_release(reader);
+        conv->active_mode = GST_PAD_MODE_PULL;
+    }
 
     return ret;
 }
 
-static int video_conv_dump_upstream_chunk(VideoConv *conv, void *buffer, size_t read_size,
+static int video_conv_dump_upstream_chunk(VideoConv *conv, const void *buffer, size_t read_size,
         GList **chunk_hashes)
 {
     struct bytes_reader bytes_reader;
@@ -589,6 +637,12 @@ static int video_conv_dump_upstream_data(VideoConv *conv, struct payload_hash *h
     {
         GST_ERROR("Failed to open video dump fozdb, ret %d.", ret);
         goto done;
+    }
+
+    if (conv->active_mode == GST_PAD_MODE_PUSH)
+    {
+        conv->state->state_flags |= VIDEO_CONV_IS_DUMPING;
+        return 0;
     }
 
     buffer = calloc(1, HASH_CHUNK_SIZE);
@@ -648,7 +702,24 @@ static void video_conv_init_transcode(VideoConv *conv)
         GST_WARNING("Failed to hash upstream data.");
     }
 
-    pthread_mutex_unlock(&dump_fozdb.mutex);
+    if (!(state->state_flags & VIDEO_CONV_IS_DUMPING))
+        pthread_mutex_unlock(&dump_fozdb.mutex);
+}
+
+static uint32_t video_conv_get_state_flags(VideoConv *conv)
+{
+    struct video_conv_state *state;
+    uint32_t state_flags;
+
+    if (!(state = video_conv_lock_state(conv)))
+    {
+        GST_ERROR("VideoConv not yet in READY state?");
+        return 0;
+    }
+    state_flags = state->state_flags;
+    pthread_mutex_unlock(&conv->state_mutex);
+
+    return state_flags;
 }
 
 static gboolean video_conv_push_stream_start(VideoConv *conv, struct payload_hash *hash)
@@ -700,19 +771,81 @@ static gboolean video_conv_sink_event_caps(VideoConv *conv, GstEvent *event)
         return false;
     }
 
-    if (!gst_pad_activate_mode(conv->sink_pad, GST_PAD_MODE_PULL, true))
-    {
-        GST_ERROR("Failed to activate sink pad in pull mode.");
-        pthread_mutex_unlock(&conv->state_mutex);
-        return false;
-    }
-
     video_conv_init_transcode(conv);
     transcode_tag = state->transcoded_tag;
 
     pthread_mutex_unlock(&conv->state_mutex);
 
     return video_conv_push_caps(conv, transcode_tag);
+}
+
+static gboolean video_conv_sink_event_eos(VideoConv *conv, GstEvent *event)
+{
+    struct video_conv_state *state;
+    struct payload_hash hash;
+    uint32_t transcode_tag;
+    uint32_t state_flags;
+    int ret;
+
+    gst_event_unref(event);
+
+    if (!(state = video_conv_lock_state(conv)))
+        return false;
+
+    if (state->state_flags & VIDEO_CONV_IS_DUMPING)
+    {
+        struct hashes_reader chunk_hashes_reader;
+        gsize read_bytes;
+
+        if ((read_bytes = gst_adapter_available(conv->adapter)))
+        {
+            const void *buffer = gst_adapter_map(conv->adapter, read_bytes);
+
+            if ((ret = video_conv_dump_upstream_chunk(conv, buffer, read_bytes, &state->chunk_hashes)) < 0)
+                GST_ERROR("Error writing stream data to fozdb, ret %d.", ret);
+
+            gst_adapter_unmap(conv->adapter);
+            gst_adapter_clear(conv->adapter);
+        }
+
+        hashes_reader_init(&chunk_hashes_reader, state->chunk_hashes);
+        if ((ret = fozdb_write_entry(dump_fozdb.fozdb, VIDEO_CONV_FOZ_TAG_STREAM, &state->transcode_hash,
+                &chunk_hashes_reader, hashes_reader_read, true)) < 0)
+            GST_ERROR("Error writing stream data to fozdb, ret %d.", ret);
+
+        if (state->chunk_hashes)
+            g_list_free_full(state->chunk_hashes, free);
+
+        pthread_mutex_unlock(&dump_fozdb.mutex);
+        state->state_flags &= ~VIDEO_CONV_IS_DUMPING;
+        pthread_mutex_unlock(&conv->state_mutex);
+
+        return gst_pad_push_event(conv->src_pad, gst_event_new_eos());
+    }
+
+    video_conv_init_transcode(conv);
+    hash = state->transcode_hash;
+    state_flags = state->state_flags;
+    transcode_tag = state->transcoded_tag;
+
+    pthread_mutex_unlock(&conv->state_mutex);
+
+    if (!(state_flags & VIDEO_CONV_STREAM_STARTED))
+    {
+        /* rewind and start a new stream for dumping or playback */
+        if (!push_event(conv->sink_pad, gst_event_new_seek(1.0, GST_FORMAT_BYTES, GST_SEEK_FLAG_FLUSH,
+                GST_SEEK_TYPE_SET, 0, GST_SEEK_TYPE_NONE, -1)))
+            return false;
+        if (!video_conv_push_stream_start(conv, &hash))
+            return false;
+        if (!video_conv_push_caps(conv, transcode_tag))
+            return false;
+
+        /* return false to cancel upstream pads EOS event handling and avoid setting EOS flag */
+        return false;
+    }
+
+    return gst_pad_push_event(conv->src_pad, gst_event_new_eos());
 }
 
 static gboolean video_conv_sink_event(GstPad *pad, GstObject *parent, GstEvent *event)
@@ -723,8 +856,167 @@ static gboolean video_conv_sink_event(GstPad *pad, GstObject *parent, GstEvent *
 
     if (event->type == GST_EVENT_CAPS)
         return video_conv_sink_event_caps(conv, event);
+    if (event->type == GST_EVENT_EOS)
+        return video_conv_sink_event_eos(conv, event);
 
-    return gst_pad_event_default(pad, parent, event);
+    if (video_conv_get_state_flags(conv) & VIDEO_CONV_STREAM_STARTED)
+        return gst_pad_event_default(pad, parent, event);
+
+    gst_event_unref(event);
+    return true;
+}
+
+static gboolean video_conv_src_event_seek(VideoConv *conv, GstEvent *event)
+{
+    guint seqnum = gst_event_get_seqnum(event);
+    guint64 upstream_offset, upstream_size;
+    GstSeekType offset_type, stop_type;
+    struct video_conv_state *state;
+    gint64 offset, stop;
+    GstSeekFlags flags;
+    GstFormat format;
+    gdouble rate;
+
+    gst_event_parse_seek(event, &rate, &format, &flags, &offset_type, &offset, &stop_type, &stop);
+    gst_event_unref(event);
+    if (format != GST_FORMAT_BYTES)
+        return false;
+
+    GST_TRACE("conv %p, rate %f, format %s, flags %#x, offset_type %u, cur %#" G_GINT64_MODIFIER "x, "
+            "stop_type %u, stop %#" G_GINT64_MODIFIER "x.", conv, rate, gst_format_get_name(format),
+            flags, offset_type, offset, stop_type, stop);
+
+    if (!(state = video_conv_lock_state(conv)))
+        return GST_FLOW_ERROR;
+    if (state->state_flags & VIDEO_CONV_IS_DUMPING)
+    {
+        pthread_mutex_unlock(&conv->state_mutex);
+        return true;
+    }
+    pthread_mutex_unlock(&conv->state_mutex);
+
+    if (!video_conv_get_upstream_range(conv, offset, HASH_CHUNK_SIZE, &upstream_offset, &upstream_size))
+        return false;
+
+    if ((event = gst_event_new_seek(1.0, GST_FORMAT_BYTES, GST_SEEK_FLAG_FLUSH,
+            GST_SEEK_TYPE_SET, upstream_offset, GST_SEEK_TYPE_NONE, -1)))
+        gst_event_set_seqnum(event, seqnum);
+    return push_event(conv->sink_pad, event);
+}
+
+static gboolean video_conv_src_event(GstPad *pad, GstObject *parent, GstEvent *event)
+{
+    VideoConv *conv = VIDEO_CONV(parent);
+
+    GST_DEBUG_OBJECT(pad, "Got event %"GST_PTR_FORMAT".", event);
+
+    if (event->type == GST_EVENT_SEEK)
+        return video_conv_src_event_seek(conv, event);
+
+    if (video_conv_get_state_flags(conv) & VIDEO_CONV_STREAM_STARTED)
+        return gst_pad_event_default(pad, parent, event);
+
+    gst_event_unref(event);
+    return true;
+}
+
+static void video_conv_dump_buffered_chunks(VideoConv *conv, gsize bytes_available)
+{
+    struct video_conv_state *state = conv->state;
+    int ret;
+
+    while (bytes_available >= HASH_CHUNK_SIZE)
+    {
+        const void *buffer = gst_adapter_map(conv->adapter, HASH_CHUNK_SIZE);
+        if ((ret = video_conv_dump_upstream_chunk(conv, buffer, HASH_CHUNK_SIZE, &state->chunk_hashes)) < 0)
+        {
+            pthread_mutex_unlock(&dump_fozdb.mutex);
+            state->state_flags &= ~VIDEO_CONV_IS_DUMPING;
+            break;
+        }
+
+        gst_adapter_unmap(conv->adapter);
+        gst_adapter_flush(conv->adapter, HASH_CHUNK_SIZE);
+        bytes_available -= HASH_CHUNK_SIZE;
+    }
+}
+
+static GstFlowReturn video_conv_sink_chain(GstPad *pad, GstObject *parent, GstBuffer *buffer)
+{
+    gsize buffer_size = gst_buffer_get_size(buffer), buffer_offset = GST_BUFFER_OFFSET(buffer);
+    uint64_t downstream_offset, downstream_end, seek_offset = -1;
+    VideoConv *conv = VIDEO_CONV(parent);
+    struct video_conv_state *state;
+    GstBuffer *transcoded = NULL;
+    uint32_t state_flags;
+    int ret = 0;
+
+    GST_DEBUG_OBJECT(pad, "Got buffer %"GST_PTR_FORMAT".", buffer);
+
+    if (!(state = video_conv_lock_state(conv)))
+        return GST_FLOW_ERROR;
+    state_flags = state->state_flags;
+
+    if ((state_flags & VIDEO_CONV_IS_DUMPING) || !(state_flags & VIDEO_CONV_STREAM_STARTED))
+    {
+        gsize bytes_available = gst_adapter_available(conv->adapter) + buffer_size;
+        gst_adapter_push(conv->adapter, buffer);
+
+        if (state_flags & VIDEO_CONV_IS_DUMPING)
+            video_conv_dump_buffered_chunks(conv, bytes_available);
+        else if (!(bytes_available % HASH_CHUNK_SIZE) && bytes_available >= HASH_STRIDE)
+        {
+            state->read_offset += HASH_STRIDE;
+            seek_offset = state->read_offset;
+        }
+    }
+
+    pthread_mutex_unlock(&conv->state_mutex);
+
+    if (ret < 0)
+    {
+        GST_ERROR("Failed to dump or read transcoded buffer, error %d.", ret);
+        if (transcoded)
+            gst_buffer_unref(transcoded);
+        return GST_FLOW_ERROR;
+    }
+
+    if (seek_offset != -1 && !push_event(pad, gst_event_new_seek(1.0, GST_FORMAT_BYTES, GST_SEEK_FLAG_FLUSH,
+            GST_SEEK_TYPE_SET, seek_offset, GST_SEEK_TYPE_NONE, -1)))
+        return GST_FLOW_ERROR;
+    if (!(state_flags & VIDEO_CONV_STREAM_STARTED))
+        return GST_FLOW_OK;
+
+    if (!video_conv_get_downstream_range(conv, buffer_offset, buffer_offset + buffer_size,
+            &downstream_offset, &downstream_end))
+        return GST_FLOW_ERROR;
+
+    if (downstream_end == downstream_offset)
+        return GST_FLOW_OK;
+    if (!(transcoded = gst_buffer_new_and_alloc(downstream_end - downstream_offset)))
+        return GST_FLOW_ERROR;
+    else
+    {
+        GstBufferMapInfo map;
+        size_t fill_size = 0;
+
+        if (gst_buffer_map(transcoded, &map, GST_MAP_READWRITE))
+        {
+            ret = video_conv_state_fill_buffer(state, downstream_offset, map.data, map.size, &fill_size);
+            gst_buffer_unmap(transcoded, &map);
+            gst_buffer_set_size(transcoded, fill_size);
+        }
+
+        if (gst_buffer_get_size(transcoded))
+        {
+            GST_BUFFER_OFFSET(transcoded) = downstream_offset;
+            return gst_pad_push(conv->src_pad, transcoded);
+        }
+
+        gst_buffer_unref(transcoded);
+    }
+
+    return GST_FLOW_OK;
 }
 
 static GstFlowReturn video_conv_src_get_range(GstPad *pad, GstObject *parent,
@@ -825,7 +1117,13 @@ static gboolean video_conv_src_query(GstPad *pad, GstObject *parent, GstQuery *q
         gst_query_unref(peer_query);
 
         gst_query_set_scheduling(query, flags, min, max, align);
-        gst_query_add_scheduling_mode(query, GST_PAD_MODE_PULL);
+        if (conv->active_mode != GST_PAD_MODE_NONE)
+            gst_query_add_scheduling_mode(query, conv->active_mode);
+        else
+        {
+            gst_query_add_scheduling_mode(query, GST_PAD_MODE_PULL);
+            gst_query_add_scheduling_mode(query, GST_PAD_MODE_PUSH);
+        }
 
         return true;
 
@@ -870,6 +1168,7 @@ static gboolean video_conv_src_active_mode(GstPad *pad, GstObject *parent, GstPa
         return false;
     }
 
+    conv->active_mode = mode;
     if (mode != GST_PAD_MODE_PULL)
         return true;
 
@@ -897,6 +1196,7 @@ static void video_conv_finalize(GObject *object)
 {
     VideoConv *conv = VIDEO_CONV(object);
 
+    gst_object_unref(conv->adapter);
     pthread_mutex_destroy(&conv->state_mutex);
     if (conv->state)
         video_conv_state_release(conv->state);
@@ -928,9 +1228,11 @@ static void video_conv_init(VideoConv *conv)
 
     conv->sink_pad = gst_pad_new_from_static_template(&video_conv_sink_template, "sink");
     gst_pad_set_event_function(conv->sink_pad, GST_DEBUG_FUNCPTR(video_conv_sink_event));
+    gst_pad_set_chain_function(conv->sink_pad, GST_DEBUG_FUNCPTR(video_conv_sink_chain));
     gst_element_add_pad(element, conv->sink_pad);
 
     conv->src_pad = gst_pad_new_from_static_template(&video_conv_src_template, "src");
+    gst_pad_set_event_function(conv->src_pad, GST_DEBUG_FUNCPTR(video_conv_src_event));
     gst_pad_set_getrange_function(conv->src_pad, GST_DEBUG_FUNCPTR(video_conv_src_get_range));
     gst_pad_set_query_function(conv->src_pad, GST_DEBUG_FUNCPTR(video_conv_src_query));
     gst_pad_set_activatemode_function(conv->src_pad, GST_DEBUG_FUNCPTR(video_conv_src_active_mode));
@@ -938,4 +1240,6 @@ static void video_conv_init(VideoConv *conv)
 
     pthread_mutex_init(&conv->state_mutex, NULL);
     conv->state = NULL;
+    conv->adapter = gst_adapter_new();
+    conv->active_mode = GST_PAD_MODE_NONE;
 }
