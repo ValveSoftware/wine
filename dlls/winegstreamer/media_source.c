@@ -1373,17 +1373,22 @@ static HRESULT WINAPI media_source_CreatePresentationDescriptor(IMFMediaSource *
 
         for (i = 0; i < source->stream_count; ++i)
         {
-            struct wg_format format;
+            IMFMediaType *media_type;
+            GUID major = GUID_NULL;
 
-            wg_format_from_stream_descriptor(source->descriptors[i], &format);
+            if (SUCCEEDED(hr = stream_descriptor_get_media_type(source->descriptors[i], &media_type)))
+            {
+                hr = IMFMediaType_GetGUID(media_type, &MF_MT_MAJOR_TYPE, &major);
+                IMFMediaType_Release(media_type);
+            }
 
-            if (format.major_type >= WG_MAJOR_TYPE_VIDEO)
+            if (IsEqualGUID(&major, &MFMediaType_Video))
             {
                 if (!video_selected && FAILED(hr = IMFPresentationDescriptor_SelectStream(*descriptor, i)))
                     WARN("Failed to select stream %u, hr %#lx\n", i, hr);
                 video_selected = TRUE;
             }
-            else if (format.major_type >= WG_MAJOR_TYPE_AUDIO)
+            else if (IsEqualGUID(&major, &MFMediaType_Audio))
             {
                 if (!audio_selected && FAILED(hr = IMFPresentationDescriptor_SelectStream(*descriptor, i)))
                     WARN("Failed to select stream %u, hr %#lx\n", i, hr);
