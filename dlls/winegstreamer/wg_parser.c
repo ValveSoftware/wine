@@ -2159,6 +2159,7 @@ static BOOL uridecodebin_parser_init_gst(struct wg_parser *parser)
 
     if (!(element = create_element("uridecodebin", "base")))
         return FALSE;
+    parser->output_compressed = true;
 
     gst_bin_add(GST_BIN(parser->container), element);
     parser->decodebin = element;
@@ -2166,6 +2167,7 @@ static BOOL uridecodebin_parser_init_gst(struct wg_parser *parser)
     g_object_set(parser->decodebin, "uri", parser->uri, NULL);
     g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), parser);
     g_signal_connect(element, "pad-removed", G_CALLBACK(pad_removed_cb), parser);
+    g_signal_connect(element, "autoplug-continue", G_CALLBACK(autoplug_continue_cb), parser);
     g_signal_connect(element, "autoplug-select", G_CALLBACK(autoplug_select_cb), parser);
     g_signal_connect(element, "autoplug-sort", G_CALLBACK(autoplug_sort_cb), parser);
     g_signal_connect(element, "no-more-pads", G_CALLBACK(no_more_pads_cb), parser);
