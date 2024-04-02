@@ -210,20 +210,14 @@ static GstEvent *create_stream_start_event(const char *stream_id)
     return event;
 }
 
-static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
+static void source_handle_seek(struct wg_source *source, GstEvent *event)
 {
     guint32 i, seqnum = gst_event_get_seqnum(event);
     GstSeekFlags flags;
-    GstFormat format;
     gboolean eos;
     gint64 cur;
 
-    GST_TRACE("source %p, %"GST_PTR_FORMAT, source, event);
-
-    gst_event_parse_seek(event, NULL, &format, &flags, NULL, &cur, NULL, NULL);
-    gst_event_unref(event);
-    if (format != GST_FORMAT_BYTES)
-        return false;
+    gst_event_parse_seek(event, NULL, NULL, &flags, NULL, &cur, NULL, NULL);
 
     if (flags & GST_SEEK_FLAG_FLUSH)
     {
@@ -260,6 +254,34 @@ static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
 
     if (source->segment.start == source->segment.stop)
         push_event(source->src_pad, gst_event_new_eos());
+}
+
+static gboolean src_event_seek(struct wg_source *source, GstEvent *event)
+{
+    GstFormat format;
+
+    GST_TRACE("source %p, %"GST_PTR_FORMAT, source, event);
+
+    gst_event_parse_seek(event, NULL, &format, NULL, NULL, NULL, NULL, NULL);
+    if (format != GST_FORMAT_BYTES)
+    {
+        gst_event_unref(event);
+        return false;
+    }
+
+    /* Even in push mode, oggdemux uses a separate thread to request seeks, we have to handle
+     * these asynchronously from wg_source_get_position.
+     * On the other hand, other demuxers emit seeks synchronously during gst_pad_push_buffer,
+     * and expect to see flush events being pushed synchronously as well, we have to handle
+     * these directly here.
+     */
+    if (source->push_thread != pthread_self())
+        gst_atomic_queue_push(source->seek_queue, event);
+    else
+    {
+        source_handle_seek(source, event);
+        gst_event_unref(event);
+    }
 
     return true;
 }
@@ -547,6 +569,7 @@ NTSTATUS wg_source_create(void *args)
     gst_pad_set_element_private(source->src_pad, source);
     gst_pad_set_query_function(source->src_pad, src_query_cb);
     gst_pad_set_event_function(source->src_pad, src_event_cb);
+    source->seek_queue = gst_atomic_queue_new(1);
 
     for (i = 0; i < ARRAY_SIZE(source->streams); i++)
     {
@@ -627,9 +650,14 @@ error:
 NTSTATUS wg_source_destroy(void *args)
 {
     struct wg_source *source = get_source(*(wg_source_t *)args);
+    GstEvent *event;
     guint i;
 
     GST_TRACE("source %p", source);
+
+    while ((event = gst_atomic_queue_pop(source->seek_queue)))
+        gst_event_unref(event);
+    gst_atomic_queue_unref(source->seek_queue);
 
     gst_element_set_state(source->container, GST_STATE_NULL);
     gst_object_unref(source->container);
@@ -682,8 +710,15 @@ NTSTATUS wg_source_get_position(void *args)
 {
     struct wg_source_get_position_params *params = args;
     struct wg_source *source = get_source(params->source);
+    GstEvent *event;
 
     GST_TRACE("source %p", source);
+
+    while ((event = gst_atomic_queue_pop(source->seek_queue)))
+    {
+        source_handle_seek(source, event);
+        gst_event_unref(event);
+    }
 
     params->read_offset = source->segment.start;
     return STATUS_SUCCESS;
@@ -748,6 +783,7 @@ NTSTATUS wg_source_push_data(void *args)
         push_event(source->src_pad, gst_event_new_segment(&source->segment));
     }
 
+    source->push_thread = pthread_self();
     source->segment.start += params->size;
     if (!(ret = gst_pad_push(source->src_pad, buffer)) || ret == GST_FLOW_EOS)
         return STATUS_SUCCESS;
