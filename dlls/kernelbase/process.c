@@ -598,6 +598,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     }
     options[] =
     {
+        {L"SummerIslands.exe", L" --in-process-gpu"},
         {L"Paradox Launcher.exe", L" --use-angle=gl"},
         {L"Montaro\\nw.exe", L" --use-gl=swiftshader"},
         {L"Aisling and the Tavern of Elves\\nw.exe", L" --use-gl=swiftshader"},
