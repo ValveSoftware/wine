@@ -444,8 +444,8 @@ static HRESULT WINAPI media_object_GetOutputType(IMediaObject *iface, DWORD inde
     if (!wg_format_is_set(&decoder->input_format))
         return DMO_E_TYPE_NOT_SET;
 
-    width = decoder->input_format.u.video_wmv.width;
-    height = abs(decoder->input_format.u.video_wmv.height);
+    width = decoder->input_format.u.video.width;
+    height = abs(decoder->input_format.u.video.height);
     subtype = wmv_decoder_output_types[type_index].subtype;
     if (FAILED(hr = MFCalculateImageSize(subtype, width, height, &image_size)))
     {
