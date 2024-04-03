@@ -1948,6 +1948,7 @@ static HRESULT source_reader_create_transform(struct source_reader *reader, BOOL
                         IMFTransform_ProcessMessage(transform, MFT_MESSAGE_SET_D3D_MANAGER, (ULONG_PTR)reader->device_manager);
                 }
 
+                IMFAttributes_SetUINT32(attributes, &MF_LOW_LATENCY, 1);
                 entry->attributes_initialized = !d3d_aware;
                 IMFAttributes_Release(attributes);
             }
