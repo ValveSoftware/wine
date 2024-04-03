@@ -1088,35 +1088,35 @@ static void mf_media_type_to_wg_format_wmv(IMFMediaType *type, const GUID *subty
     UINT64 frame_rate, frame_size;
 
     format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
-    format->u.video_wmv.width = 0;
-    format->u.video_wmv.height = 0;
-    format->u.video_wmv.fps_n = 1;
-    format->u.video_wmv.fps_d = 1;
+    format->u.video.width = 0;
+    format->u.video.height = 0;
+    format->u.video.fps_n = 1;
+    format->u.video.fps_d = 1;
 
     if (SUCCEEDED(IMFMediaType_GetUINT64(type, &MF_MT_FRAME_SIZE, &frame_size)))
     {
-        format->u.video_wmv.width = (UINT32)(frame_size >> 32);
-        format->u.video_wmv.height = (UINT32)frame_size;
+        format->u.video.width = (UINT32)(frame_size >> 32);
+        format->u.video.height = (UINT32)frame_size;
     }
 
     if (SUCCEEDED(IMFMediaType_GetUINT64(type, &MF_MT_FRAME_RATE, &frame_rate)) && (UINT32)frame_rate)
     {
-        format->u.video_wmv.fps_n = (UINT32)(frame_rate >> 32);
-        format->u.video_wmv.fps_d = (UINT32)frame_rate;
+        format->u.video.fps_n = (UINT32)(frame_rate >> 32);
+        format->u.video.fps_d = (UINT32)frame_rate;
     }
 
     if (IsEqualGUID(subtype, &MFVideoFormat_WMV1))
-        format->u.video_wmv.format = WG_WMV_VIDEO_FORMAT_WMV1;
+        format->u.video.format = WG_VIDEO_FORMAT_WMV1;
     else if (IsEqualGUID(subtype, &MFVideoFormat_WMV2))
-        format->u.video_wmv.format = WG_WMV_VIDEO_FORMAT_WMV2;
+        format->u.video.format = WG_VIDEO_FORMAT_WMV2;
     else if (IsEqualGUID(subtype, &MFVideoFormat_WMV3))
-        format->u.video_wmv.format = WG_WMV_VIDEO_FORMAT_WMV3;
+        format->u.video.format = WG_VIDEO_FORMAT_WMV3;
     else if (IsEqualGUID(subtype, &MEDIASUBTYPE_WMVA))
-        format->u.video_wmv.format = WG_WMV_VIDEO_FORMAT_WMVA;
+        format->u.video.format = WG_VIDEO_FORMAT_WMVA;
     else if (IsEqualGUID(subtype, &MFVideoFormat_WVC1))
-        format->u.video_wmv.format = WG_WMV_VIDEO_FORMAT_WVC1;
+        format->u.video.format = WG_VIDEO_FORMAT_WVC1;
     else
-        format->u.video_wmv.format = WG_WMV_VIDEO_FORMAT_UNKNOWN;
+        format->u.video.format = WG_VIDEO_FORMAT_UNKNOWN;
 }
 
 static void mf_media_type_to_wg_format_video_encoded(IMFMediaType *type, struct wg_format *format)
