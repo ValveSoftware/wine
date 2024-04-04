@@ -594,6 +594,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     }
     options[] =
     {
+        {L"Insanitys Blade\\nw.exe", L" --use-gl=swiftshader"},
         {L"Warhammer2.exe", L" --in-process-gpu"},
         {L"SummerIslands.exe", L" --in-process-gpu"},
         {L"UplayWebCore.exe", L" --use-angle=vulkan"},
