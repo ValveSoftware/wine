@@ -448,6 +448,11 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
         MFCalculateImageSize(decoder->output_types[0], frame_size >> 32, frame_size, (UINT32 *)&decoder->output_info.cbSize);
     }
 
+    if (decoder->wg_transform)
+    {
+        wg_transform_destroy(decoder->wg_transform);
+        decoder->wg_transform = 0;
+    }
     return S_OK;
 }
 
