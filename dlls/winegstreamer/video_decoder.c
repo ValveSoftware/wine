@@ -267,6 +267,12 @@ static HRESULT WINAPI transform_SetInputType(IMFTransform *iface, DWORD id, IMFM
         IMFMediaType_Release(decoder->input_type);
     IMFMediaType_AddRef((decoder->input_type = type));
 
+
+    if (decoder->wg_transform)
+    {
+        wg_transform_destroy(decoder->wg_transform);
+        decoder->wg_transform = 0;
+    }
     return S_OK;
 }
 
