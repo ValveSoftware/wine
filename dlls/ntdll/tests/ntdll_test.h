@@ -30,3 +30,5 @@
 
 #include "wine/test.h"
 #include "wine/heap.h"
+
+extern NTSTATUS call_func64( ULONG64 func64, int nb_args, ULONG64 *args, void *code_mem );

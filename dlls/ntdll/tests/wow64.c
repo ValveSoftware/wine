@@ -1440,7 +1440,7 @@ static const BYTE call_func64_code[] =
     0xcb,                               /* lret */
 };
 
-static NTSTATUS call_func64( ULONG64 func64, int nb_args, ULONG64 *args )
+NTSTATUS call_func64( ULONG64 func64, int nb_args, ULONG64 *args, void *code_mem )
 {
     NTSTATUS (WINAPI *func)( ULONG64 func64, int nb_args, ULONG64 *args ) = code_mem;
 
@@ -1940,7 +1940,7 @@ static void test_iosb(void)
     iosb64.Information = 0xdeadbeef;
 
     args[0] = (LONG_PTR)server;
-    status = call_func64( func, ARRAY_SIZE(args), args );
+    status = call_func64( func, ARRAY_SIZE(args), args, code_mem );
     ok( status == STATUS_PENDING, "NtFsControlFile returned %lx\n", status );
     ok( iosb32.Status == 0x55555555, "status changed to %lx\n", iosb32.Status );
     ok( iosb64.Pointer == PtrToUlong(&iosb32), "status changed to %lx\n", iosb64.Status );
@@ -1965,7 +1965,7 @@ static void test_iosb(void)
     args[8] = (ULONG_PTR)&id;
     args[9] = sizeof(id);
 
-    status = call_func64( func, ARRAY_SIZE(args), args );
+    status = call_func64( func, ARRAY_SIZE(args), args, code_mem );
     ok( status == STATUS_PENDING || status == STATUS_SUCCESS, "NtFsControlFile returned %lx\n", status );
     todo_wine
     {
@@ -1995,7 +1995,7 @@ static void test_iosb(void)
     id = 0xdeadbeef;
 
     args[0] = (LONG_PTR)server;
-    status = call_func64( func, ARRAY_SIZE(args), args );
+    status = call_func64( func, ARRAY_SIZE(args), args, code_mem );
     ok( status == STATUS_SUCCESS, "NtFsControlFile returned %lx\n", status );
     ok( iosb32.Status == 0x55555555, "status changed to %lx\n", iosb32.Status );
     ok( iosb32.Information == 0x55555555, "info changed to %Ix\n", iosb32.Information );
@@ -2018,7 +2018,7 @@ static NTSTATUS invoke_syscall( const char *name, ULONG args32[] )
     else
         win_skip( "syscall thunk %s not recognized\n", name );
 
-    return call_func64( func, ARRAY_SIZE(args64), args64 );
+    return call_func64( func, ARRAY_SIZE(args64), args64, code_mem );
 }
 
 static void test_syscalls(void)
@@ -2124,14 +2124,14 @@ static void test_cpu_area(void)
         ULONG64 context, context_ex;
         ULONG64 args[] = { (ULONG_PTR)&machine, (ULONG_PTR)&context, (ULONG_PTR)&context_ex };
 
-        status = call_func64( ptr, ARRAY_SIZE(args), args );
+        status = call_func64( ptr, ARRAY_SIZE(args), args, code_mem );
         ok( !status, "RtlWow64GetCpuAreaInfo failed %lx\n", status );
         ok( machine == IMAGE_FILE_MACHINE_I386, "wrong machine %x\n", machine );
         ok( context == teb64->TlsSlots[WOW64_TLS_CPURESERVED] + 4, "wrong context %s / %s\n",
             wine_dbgstr_longlong(context), wine_dbgstr_longlong(teb64->TlsSlots[WOW64_TLS_CPURESERVED]) );
         ok( !context_ex, "got context_ex %s\n", wine_dbgstr_longlong(context_ex) );
         args[0] = args[1] = args[2] = 0;
-        status = call_func64( ptr, ARRAY_SIZE(args), args );
+        status = call_func64( ptr, ARRAY_SIZE(args), args, code_mem );
         ok( !status, "RtlWow64GetCpuAreaInfo failed %lx\n", status );
     }
     else win_skip( "RtlWow64GetCpuAreaInfo not supported\n" );
