@@ -1343,6 +1343,8 @@ static char *fixup_shader( GLsizei count, const GLchar *const*string, const GLin
         const char *sgi = getenv("SteamGameId");
         unsigned int i;
 
+        if (!sgi) return NULL;
+
         for (i = 0; i < ARRAY_SIZE(replace); ++i)
             if (!strcmp( sgi, replace[i].gameid )) break;
 
