@@ -982,7 +982,7 @@ static void setup_exception( ucontext_t *sigcontext, EXCEPTION_RECORD *rec )
     rec->ExceptionAddress = (void *)PC_sig(sigcontext);
     save_context( &context, sigcontext );
 
-    status = send_debug_event( rec, &context, TRUE );
+    status = send_debug_event( rec, &context, TRUE, TRUE );
     if (status == DBG_CONTINUE || status == DBG_EXCEPTION_HANDLED)
     {
         restore_context( &context, sigcontext );

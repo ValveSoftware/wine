@@ -287,7 +287,7 @@ static void check_context_exception_request_( DWORD flags, BOOL hardware_excepti
 
     if (!(flags & CONTEXT_EXCEPTION_REPORTING)) return;
     expected_flags |= hardware_exception ? CONTEXT_EXCEPTION_ACTIVE : CONTEXT_SERVICE_ACTIVE;
-    todo_wine ok_(__FILE__, line)( (flags & exception_reporting_flags) == expected_flags, "got %#lx, expected %#lx.\n",
+    ok_(__FILE__, line)( (flags & exception_reporting_flags) == expected_flags, "got %#lx, expected %#lx.\n",
                          flags, expected_flags );
 }
 #endif
@@ -12591,7 +12591,7 @@ static void test_context_exception_request(void)
         c.ContextFlags = CONTEXT_CONTROL | CONTEXT_EXCEPTION_REQUEST;
         ret = GetThreadContext( thread, &c );
         ok( ret, "got error %lu.\n", GetLastError() );
-        todo_wine ok( c.ContextFlags == expected_flags, "got %#lx, expected %#lx.\n", c.ContextFlags, expected_flags );
+        ok( c.ContextFlags == expected_flags, "got %#lx, expected %#lx.\n", c.ContextFlags, expected_flags );
 
         WriteRelease( &p.sync, 4 );
     }
@@ -12625,7 +12625,7 @@ static void test_context_exception_request(void)
         c.ContextFlags = CONTEXT_CONTROL | CONTEXT_EXCEPTION_REQUEST;
         ret = GetThreadContext( thread, &c );
         ok( ret, "got error %lu.\n", GetLastError() );
-        todo_wine ok( c.ContextFlags == expected_flags, "got %#lx, expected %#lx.\n", c.ContextFlags, expected_flags );
+        ok( c.ContextFlags == expected_flags, "got %#lx, expected %#lx.\n", c.ContextFlags, expected_flags );
 
         WriteRelease( &p.sync, 8 );
     }
