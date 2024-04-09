@@ -2580,7 +2580,7 @@ static DWORD CALLBACK server_thread(LPVOID param)
             ok(!!strstr(buffer, "GET /cached"), "request not found.\n");
             send(c, okmsg_length0, sizeof okmsg_length0 - 1, 0);
             r = server_receive_request(c, buffer, sizeof(buffer));
-            todo_wine ok(!r, "got %d, buffer[0] %d.\n", r, buffer[0]);
+            ok(!r, "got %d, buffer[0] %d.\n", r, buffer[0]);
         }
         if (strstr(buffer, "GET /notcached"))
         {
