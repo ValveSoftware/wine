@@ -684,8 +684,8 @@ static void wine_vk_device_free(struct wine_device *device)
 
     if (device->host_device && device->funcs.p_vkDestroyDevice)
     {
-        WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, device);
         device->funcs.p_vkDestroyDevice(device->host_device, NULL /* pAllocator */);
+        WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, device);
     }
 
     free(device);
@@ -1419,9 +1419,8 @@ void wine_vkDestroyCommandPool(VkDevice device_handle, VkCommandPool handle,
     if (allocator)
         FIXME("Support for allocation callbacks not implemented yet\n");
 
-    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, pool);
-
     device->funcs.p_vkDestroyCommandPool(device->host_device, pool->host_command_pool, NULL);
+    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, pool);
     free(pool);
 }
 
@@ -3307,8 +3306,8 @@ void wine_vkFreeMemory(VkDevice handle, VkDeviceMemory memory_handle, const VkAl
     memory = wine_device_memory_from_handle(memory_handle);
 
     destroy_keyed_mutex(device, memory);
-    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, memory);
     device->funcs.p_vkFreeMemory(device->host_device, memory->host_memory, NULL);
+    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, memory);
 
     if (memory->vm_map)
     {
@@ -3671,9 +3670,9 @@ void wine_vkDestroySwapchainKHR(VkDevice device_handle, VkSwapchainKHR handle, c
         free(swapchain->fs_hack_images);
     }
 
-    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, swapchain);
 
     device->funcs.p_vkDestroySwapchainKHR(device->host_device, swapchain->host_swapchain, NULL);
+    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, swapchain);
     free(swapchain);
 }
 
@@ -4813,8 +4812,8 @@ void wine_vkDestroySemaphore(VkDevice device_handle, VkSemaphore semaphore_handl
     if (semaphore->d3d12_fence_shm)
         NtUnmapViewOfSection(GetCurrentProcess(), semaphore->d3d12_fence_shm);
 
-    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, semaphore);
     device->funcs.p_vkDestroySemaphore(device->host_device, semaphore->semaphore, NULL);
+    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, semaphore);
 
     if (semaphore->fence_timeline_semaphore)
         device->funcs.p_vkDestroySemaphore(device->host_device, semaphore->fence_timeline_semaphore, NULL);
