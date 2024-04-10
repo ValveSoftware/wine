@@ -4714,7 +4714,7 @@ static void test_wow64_context(void)
         {
             trace( "in 64-bit mode %04x\n", context.SegCs );
             if (ctx.ContextFlags & CONTEXT_EXCEPTION_REPORTING)
-                todo_wine ok( ctx.ContextFlags == (WOW64_CONTEXT_ALL | CONTEXT_EXCEPTION_REQUEST
+                ok( ctx.ContextFlags == (WOW64_CONTEXT_ALL | CONTEXT_EXCEPTION_REQUEST
                     | CONTEXT_EXCEPTION_REPORTING | CONTEXT_SERVICE_ACTIVE)
                     || ctx.ContextFlags == (WOW64_CONTEXT_ALL | CONTEXT_EXCEPTION_REQUEST
                     | CONTEXT_EXCEPTION_REPORTING | CONTEXT_EXCEPTION_ACTIVE),
@@ -12523,8 +12523,8 @@ static void test_context_exception_request(void)
     c.ContextFlags = CONTEXT_CONTROL | CONTEXT_EXCEPTION_REQUEST;
     ret = GetThreadContext( thread, &c );
     ok( ret, "got error %lu.\n", GetLastError() );
-    todo_wine ok( c.ContextFlags == expected_flags || broken( c.ContextFlags == (CONTEXT_CONTROL
-                  | CONTEXT_EXCEPTION_REQUEST | CONTEXT_EXCEPTION_REPORTING)) /* Win7 64 */, "got %#lx.\n", c.ContextFlags );
+    ok( c.ContextFlags == expected_flags || broken( c.ContextFlags == (CONTEXT_CONTROL
+        | CONTEXT_EXCEPTION_REQUEST | CONTEXT_EXCEPTION_REPORTING)) /* Win7 64 */, "got %#lx.\n", c.ContextFlags );
 
     p.sync = 0;
     ResumeThread(thread);
@@ -12566,7 +12566,7 @@ static void test_context_exception_request(void)
     c.ContextFlags = CONTEXT_CONTROL | CONTEXT_EXCEPTION_REQUEST;
     ret = GetThreadContext( thread, &c );
     ok( ret, "got error %lu.\n", GetLastError() );
-    todo_wine ok( c.ContextFlags == expected_flags, "got %#lx.\n", c.ContextFlags );
+    ok( c.ContextFlags == expected_flags, "got %#lx.\n", c.ContextFlags );
 
     c.ContextFlags = CONTEXT_CONTROL;
     ret = SetThreadContext( thread, &c );
@@ -12576,7 +12576,7 @@ static void test_context_exception_request(void)
                      | CONTEXT_EXCEPTION_ACTIVE;
     ret = GetThreadContext( thread, &c );
     ok( ret, "got error %lu.\n", GetLastError() );
-    todo_wine ok( c.ContextFlags == expected_flags, "got %#lx.\n", c.ContextFlags );
+    ok( c.ContextFlags == expected_flags, "got %#lx.\n", c.ContextFlags );
 
     SetEvent( p.event );
 
