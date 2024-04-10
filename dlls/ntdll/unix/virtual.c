@@ -4998,22 +4998,6 @@ static NTSTATUS allocate_virtual_memory( void **ret, SIZE_T *size_ptr, ULONG typ
     SIZE_T size = *size_ptr;
     NTSTATUS status = STATUS_SUCCESS;
 
-    if (type & MEM_WRITE_WATCH)
-    {
-        static int disable = -1;
-
-        if (disable == -1)
-        {
-            const char *env_var;
-
-            if ((disable = (env_var = getenv("WINE_DISABLE_WRITE_WATCH")) && atoi(env_var)))
-                FIXME("Disabling write watch support.\n");
-        }
-
-        if (disable)
-            return STATUS_NOT_SUPPORTED;
-    }
-
     /* Round parameters to a page boundary */
 
     if (is_beyond_limit( 0, size, working_set_limit )) return STATUS_WORKING_SET_LIMIT_RANGE;
