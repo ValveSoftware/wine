@@ -42,12 +42,17 @@ WINE_DECLARE_DEBUG_CHANNEL(win);
 
 BOOL is_virtual_desktop(void)
 {
-    HANDLE desktop = NtUserGetThreadDesktop( GetCurrentThreadId() );
-    USEROBJECTFLAGS flags = {0};
-    DWORD len;
+    const desktop_shm_t *desktop = get_desktop_shared_memory();
+    unsigned int flags;
 
-    if (!NtUserGetObjectInformation( desktop, UOI_FLAGS, &flags, sizeof(flags), &len )) return FALSE;
-    return !!(flags.dwFlags & DF_WINE_CREATE_DESKTOP);
+    if (!desktop) return FALSE;
+    SHARED_READ_BEGIN( desktop, desktop_shm_t )
+    {
+        flags = desktop->flags;
+    }
+    SHARED_READ_END
+
+    return !!(flags & DF_WINE_CREATE_DESKTOP);
 }
 
 /***********************************************************************

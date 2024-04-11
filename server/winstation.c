@@ -136,6 +136,27 @@ static const struct object_ops desktop_ops =
     desktop_destroy               /* destroy */
 };
 
+#if defined(__i386__) || defined(__x86_64__)
+#define __SHARED_INCREMENT_SEQ( x ) ++(x)
+#else
+#define __SHARED_INCREMENT_SEQ( x ) __atomic_add_fetch( &(x), 1, __ATOMIC_RELEASE )
+#endif
+
+#define SHARED_WRITE_BEGIN( object, type )                           \
+    do {                                                             \
+        const type *__shared = (object)->shared;                     \
+        type *shared = (type *)__shared;                             \
+        unsigned int __seq = __SHARED_INCREMENT_SEQ( shared->seq );  \
+        assert( (__seq & 1) != 0 );                                  \
+        do
+
+#define SHARED_WRITE_END                                             \
+        while(0);                                                    \
+        __seq = __SHARED_INCREMENT_SEQ( shared->seq ) - __seq;       \
+        assert( __seq == 1 );                                        \
+    } while(0);
+
+
 /* create a winstation object */
 static struct winstation *create_winstation( struct object *root, const struct unicode_str *name,
                                              unsigned int attr, unsigned int flags )
@@ -277,6 +298,11 @@ static struct desktop *create_desktop( const struct unicode_str *name, unsigned 
             desktop->flags |= (flags & DF_WINE_CREATE_DESKTOP);
             clear_error();
         }
+        SHARED_WRITE_BEGIN( desktop, desktop_shm_t )
+        {
+            shared->flags = desktop->flags;
+        }
+        SHARED_WRITE_END
     }
     return desktop;
 }
@@ -708,7 +734,15 @@ DECL_HANDLER(set_user_object_info)
         struct desktop *desktop = (struct desktop *)obj;
         reply->is_desktop = 1;
         reply->old_obj_flags = desktop->flags;
-        if (req->flags & SET_USER_OBJECT_SET_FLAGS) desktop->flags = req->obj_flags;
+        if (req->flags & SET_USER_OBJECT_SET_FLAGS)
+        {
+            desktop->flags = req->obj_flags;
+            SHARED_WRITE_BEGIN( desktop, desktop_shm_t )
+            {
+                shared->flags = desktop->flags;
+            }
+            SHARED_WRITE_END
+        }
         if (req->flags & SET_USER_OBJECT_SET_CLOSE_TIMEOUT) desktop->close_timeout_val = req->close_timeout;
     }
     else if (obj->ops == &winstation_ops)
