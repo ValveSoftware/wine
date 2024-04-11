@@ -49,6 +49,28 @@
 
 WINE_DEFAULT_DEBUG_CHANNEL(vulkan);
 
+static void set_memory_being_allocated(struct wine_instance *instance, struct wine_device_memory *memory)
+{
+    struct ntuser_thread_info *thread_info;
+    if (!instance->enable_wrapper_list) return;
+    thread_info = NtUserGetThreadInfo();
+    thread_info->vulkan_data = (uintptr_t) memory;
+}
+
+static uint64_t get_memory_being_allocated(uint64_t host_handle)
+{
+    struct ntuser_thread_info *thread_info;
+    struct wine_device_memory *memory;
+
+    thread_info = NtUserGetThreadInfo();
+    if (!thread_info->vulkan_data) return 0;
+
+    memory = (struct wine_device_memory*) (uintptr_t) thread_info->vulkan_data;
+    memory->host_memory = host_handle;
+
+    return (uintptr_t) memory;
+}
+
 static int debug_level;
 
 static BOOL is_wow64(void)
@@ -200,6 +222,8 @@ static VkBool32 debug_utils_callback_conversion(VkDebugUtilsMessageSeverityFlagB
         if (wine_vk_is_type_wrapped(callback_data->pObjects[i].objectType))
         {
             object_name_infos[i].objectHandle = wine_vk_get_wrapper(object->instance, callback_data->pObjects[i].objectHandle);
+            if (!object_name_infos[i].objectHandle && object_name_infos[i].objectType == VK_OBJECT_TYPE_DEVICE_MEMORY)
+                object_name_infos[i].objectHandle = get_memory_being_allocated(callback_data->pObjects[i].objectHandle);
             if (!object_name_infos[i].objectHandle)
             {
                 WARN("handle conversion failed 0x%s\n", wine_dbgstr_longlong(callback_data->pObjects[i].objectHandle));
@@ -3251,7 +3275,10 @@ VkResult wine_vkAllocateMemory(VkDevice handle, const VkMemoryAllocateInfo *allo
         }
     }
 
+    set_memory_being_allocated(device->phys_dev->instance, memory);
     result = device->funcs.p_vkAllocateMemory(device->host_device, &info, NULL, &memory->host_memory);
+    set_memory_being_allocated(device->phys_dev->instance, NULL);
+
     if (result == VK_SUCCESS && memory->handle == INVALID_HANDLE_VALUE && export_info && export_info->handleTypes & VK_EXTERNAL_MEMORY_HANDLE_TYPE_OPAQUE_FD_BIT)
     {
         get_fd_info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
