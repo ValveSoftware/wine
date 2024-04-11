@@ -928,6 +928,7 @@ struct desktop_shared_memory
     unsigned char        keystate[256];    /* asynchronous key state */
     thread_id_t          foreground_tid;   /* tid of the foreground thread */
     __int64              update_serial;
+    unsigned int         flags;
 };
 typedef volatile struct desktop_shared_memory desktop_shm_t;
 
