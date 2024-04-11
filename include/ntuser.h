@@ -87,6 +87,7 @@ struct ntuser_thread_info
     UINT           default_imc;       /* default input context */
     UINT64         client_imm;        /* client IMM thread info */
     UINT64         wmchar_data;       /* client data for WM_CHAR mappings */
+    UINT64         vulkan_data;       /* used by winevulkan for tls */
 };
 
 static inline struct ntuser_thread_info *NtUserGetThreadInfo(void)
