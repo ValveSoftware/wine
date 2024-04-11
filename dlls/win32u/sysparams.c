@@ -2427,6 +2427,7 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
     volatile struct global_shared_memory *global_shared;
     struct monitor *monitor;
     UINT32 count = 0;
+    BOOL skip_update = FALSE;
 
     TRACE( "(0x%x %p %p)\n", flags, num_path_info, num_mode_info );
 
@@ -2434,6 +2435,12 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
         return ERROR_INVALID_PARAMETER;
 
     *num_path_info = 0;
+
+    if (flags & 0x40000000)
+    {
+        flags &= ~0x40000000;
+        skip_update = TRUE;
+    }
 
     switch (flags)
     {
@@ -2450,7 +2457,7 @@ LONG WINAPI NtUserGetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_in
         FIXME( "only returning active paths\n" );
 
     /* NtUserGetDisplayConfigBufferSizes() is called by display drivers to trigger display settings update. */
-    if ((global_shared = get_global_shared_memory()))
+    if (!skip_update && (global_shared = get_global_shared_memory()))
         InterlockedIncrement( (LONG *)&global_shared->display_settings_serial );
 
     if (lock_display_devices())
