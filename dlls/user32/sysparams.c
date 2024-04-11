@@ -999,3 +999,10 @@ LONG WINAPI SetDisplayConfig(UINT32 path_info_count, DISPLAYCONFIG_PATH_INFO *pa
 
     return ERROR_SUCCESS;
 }
+
+LONG WINAPI GetDisplayConfigBufferSizes( UINT32 flags, UINT32 *num_path_info,
+                                               UINT32 *num_mode_info )
+{
+    flags |= 0x40000000; /* HACK: avoid triggering display updates in NtUserGetDisplayConfigBufferSizes(). */
+    return NtUserGetDisplayConfigBufferSizes(flags, num_path_info, num_mode_info);
+}
