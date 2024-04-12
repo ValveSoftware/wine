@@ -21,6 +21,7 @@
 #include "config.h"
 
 #include <assert.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -265,11 +266,33 @@ static struct session session =
 
 #define ROUND_SIZE(size)  (((size) + page_mask) & ~page_mask)
 
+static void free_available_high_map_addr( client_ptr_t base, mem_size_t size )
+{
+    unsigned int flags = MAP_PRIVATE | MAP_ANON;
+
+#ifdef MAP_FIXED_NOREPLACE
+    flags |= MAP_FIXED_NOREPLACE;
+#endif
+
+    while (base >> 32)
+    {
+        void *ret = mmap( (void *)(UINT_PTR)base, page_mask + 1, PROT_NONE, flags, -1, 0 );
+        if (ret != MAP_FAILED) munmap( ret, page_mask + 1 );
+        if ((ret != MAP_FAILED && ret >= (void *)(UINT_PTR)base) || errno == EEXIST)
+        {
+            free_map_addr( base, size );
+            return;
+        }
+        base >>= 1;
+        size >>= 1;
+    }
+}
+
 void init_memory(void)
 {
     page_mask = sysconf( _SC_PAGESIZE ) - 1;
     free_map_addr( 0x60000000, 0x1c000000 );
-    free_map_addr( 0x600000000000, 0x100000000000 );
+    free_available_high_map_addr( 0x600000000000, 0x100000000000 );
     if (page_mask != 0xfff)
         fprintf( stderr, "wineserver: page size is %uk but Wine requires 4k pages, expect problems\n",
                  (int)(page_mask + 1) / 1024 );
