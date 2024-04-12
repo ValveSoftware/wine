@@ -3499,6 +3499,43 @@ NTSTATUS WINAPI NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class,
         break;
     }
 
+    case SystemProcessIdInformation: /* 88 */
+    {
+        SYSTEM_PROCESS_ID_INFORMATION *id = info;
+        UNICODE_STRING *str = &id->ImageName;
+        BOOL valid_buffer;
+
+        len = sizeof(*id);
+        if (len > size)                ret = STATUS_INFO_LENGTH_MISMATCH;
+        else if (id->ImageName.Length) ret = STATUS_INVALID_PARAMETER;
+        else if (!id->ProcessId)       ret = STATUS_INVALID_CID;
+
+        if (ret) break;
+
+        valid_buffer = virtual_check_buffer_for_write( str->Buffer, str->MaximumLength );
+        SERVER_START_REQ( get_process_image_name )
+        {
+            req->pid = HandleToULong( id->ProcessId );
+            if (valid_buffer) wine_server_set_reply( req, str->Buffer, str->MaximumLength );
+            ret = wine_server_call( req );
+            if (ret == STATUS_BUFFER_TOO_SMALL) ret = STATUS_INFO_LENGTH_MISMATCH;
+            if (ret == STATUS_SUCCESS && reply->len + 2 > str->MaximumLength) ret = STATUS_INFO_LENGTH_MISMATCH;
+            if (ret == STATUS_SUCCESS || ret == STATUS_INFO_LENGTH_MISMATCH) str->MaximumLength = reply->len + 2;
+            if (!ret && valid_buffer)
+            {
+                str->Length = reply->len;
+                str->Buffer[reply->len / 2] = 0;
+            }
+            else if (!valid_buffer && (!ret || ret == STATUS_INFO_LENGTH_MISMATCH))
+            {
+                str->Length = reply->len;
+                ret = STATUS_ACCESS_VIOLATION;
+            }
+        }
+        SERVER_END_REQ;
+        break;
+    }
+
     case SystemDynamicTimeZoneInformation:  /* 102 */
     {
         RTL_DYNAMIC_TIME_ZONE_INFORMATION tz;
