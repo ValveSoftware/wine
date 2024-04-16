@@ -2279,8 +2279,8 @@ static NTSTATUS wow64_wg_parser_connect(void *args)
     struct
     {
         wg_parser_t parser;
-        UINT32 file_size;
         PTR32 uri;
+        UINT64 file_size;
     } *params32 = args;
     struct wg_parser_connect_params params =
     {
