@@ -2440,7 +2440,7 @@ esac
 
 dnl *** Check for modules to disable by default
 
-enable_vcruntime140_1=${enable_vcruntime140_1:-x86_64,arm64ec}
+enable_vcruntime140_1=${enable_vcruntime140_1:-x86_64,arm64ec,aarch64}
 
 if test -n "$PE_ARCHS"
 then
@@ -2477,7 +2477,7 @@ enable_wuauserv=${enable_wuauserv:-$HOST_ARCH}
 dnl Explicitly enable some programs for arm64ec
 enable_cmd=${enable_cmd:-yes}
 enable_dllhost=${enable_dllhost:-yes}
-enable_dpnsvr=${enable_dpnsvr:-i386,x86_64,arm64ec}
+enable_dpnsvr=${enable_dpnsvr:-i386,x86_64,arm64ec,aarch64}
 enable_dxdiag=${enable_dxdiag:-yes}
 enable_msiexec=${enable_msiexec:-yes}
 enable_netsh=${enable_netsh:-yes}
