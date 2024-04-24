@@ -450,6 +450,16 @@ static HRESULT init_video_media_types(struct wg_format *format, IMFMediaType *ty
     {
         IMFMediaType_SetUINT32(types[i], &MF_MT_VIDEO_NOMINAL_RANGE,
                 MFNominalRange_Normal);
+
+        {
+            /* HACK: Remove MF_MT_DEFAULT_STRIDE for games that incorrectly assume it doesn't change,
+             * workaround to fix 4e2d1f1d2ed6e57de9103c0fd43bce88e3ad4792 until media source stops decoding
+             * CW-Bug-Id: #23248
+             */
+            char const *sgi = getenv("SteamGameId");
+            if (sgi && (!strcmp(sgi, "399810") || !strcmp(sgi, "851890") || !strcmp(sgi, "544750")))
+                IMFMediaType_DeleteItem(types[i], &MF_MT_DEFAULT_STRIDE);
+        }
     }
 
 done:
