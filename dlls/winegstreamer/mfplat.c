@@ -718,14 +718,14 @@ static IMFMediaType *mf_media_type_from_wg_format_video_encoded(const struct wg_
     if (FAILED(hr = IMFMediaType_SetUINT32(type, &MF_MT_COMPRESSED, TRUE)))
         goto done;
 
-    frame_size = (UINT64)format->u.video_encoded.width << 32 | format->u.video_encoded.height;
+    frame_size = (UINT64)format->u.video.width << 32 | format->u.video.height;
     if (FAILED(hr = IMFMediaType_SetUINT64(type, &MF_MT_FRAME_SIZE, frame_size)))
         goto done;
-    frame_rate = (UINT64)format->u.video_encoded.fps_n << 32 | format->u.video_encoded.fps_d;
+    frame_rate = (UINT64)format->u.video.fps_n << 32 | format->u.video.fps_d;
     if (FAILED(hr = IMFMediaType_SetUINT64(type, &MF_MT_FRAME_RATE, frame_rate)))
         goto done;
-    if (FAILED(hr = IMFMediaType_SetBlob(type, &MF_MT_USER_DATA, (BYTE *)format->u.video_encoded.caps,
-            strlen(format->u.video_encoded.caps) + 1)))
+    if (FAILED(hr = IMFMediaType_SetBlob(type, &MF_MT_USER_DATA, (BYTE *)format->u.video.caps,
+            strlen(format->u.video.caps) + 1)))
         goto done;
 
 done:
@@ -1133,23 +1133,23 @@ static void mf_media_type_to_wg_format_video_encoded(IMFMediaType *type, struct 
         WARN("Failed to get MF_MT_FRAME_SIZE for type %p, hr %#lx.\n", type, hr);
     else
     {
-        format->u.video_encoded.width = frame_size >> 32;
-        format->u.video_encoded.height = (UINT32)frame_size;
+        format->u.video.width = frame_size >> 32;
+        format->u.video.height = (UINT32)frame_size;
     }
 
     if (FAILED(IMFMediaType_GetUINT64(type, &MF_MT_FRAME_RATE, &frame_rate)) && (UINT32)frame_rate)
         WARN("Failed to get MF_MT_FRAME_RATE for type %p, hr %#lx.\n", type, hr);
     else
     {
-        format->u.video_encoded.fps_n = frame_rate >> 32;
-        format->u.video_encoded.fps_d = (UINT32)frame_rate;
+        format->u.video.fps_n = frame_rate >> 32;
+        format->u.video.fps_d = (UINT32)frame_rate;
     }
 
     if (FAILED(hr = IMFMediaType_GetAllocatedBlob(type, &MF_MT_USER_DATA, &caps, &caps_len)))
         WARN("Failed to get MF_MT_USER_DATA for type %p, hr %#lx.\n", type, hr);
     else
     {
-        strcpy(format->u.video_encoded.caps, (char *)caps);
+        strcpy(format->u.video.caps, (char *)caps);
         CoTaskMemFree(caps);
     }
 }
