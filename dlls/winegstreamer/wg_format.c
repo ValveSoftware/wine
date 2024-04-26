@@ -274,15 +274,15 @@ static void wg_format_from_caps_audio_encoded(struct wg_format *format, const Gs
     gint len;
 
     format->major_type = WG_MAJOR_TYPE_AUDIO_ENCODED;
-    format->u.audio_encoded.rate = info->rate;
-    format->u.audio_encoded.channels = info->channels;
+    format->u.audio.rate = info->rate;
+    format->u.audio.channels = info->channels;
 
     str = gst_caps_to_string(caps);
     len = strlen(str) + 1;
-    if (len >= ARRAY_SIZE(format->u.audio_encoded.caps))
-        GST_FIXME("wg_format.audio_encoded.caps buffer is too small, need %u bytes", len);
+    if (len >= ARRAY_SIZE(format->u.audio.caps))
+        GST_FIXME("wg_format.audio.caps buffer is too small, need %u bytes", len);
     else
-        memcpy(format->u.audio_encoded.caps, str, len);
+        memcpy(format->u.audio.caps, str, len);
     g_free(str);
 }
 
@@ -922,7 +922,7 @@ GstCaps *wg_format_to_caps(const struct wg_format *format)
         case WG_MAJOR_TYPE_AUDIO_WMA:
             return wg_format_to_caps_audio_wma(format);
         case WG_MAJOR_TYPE_AUDIO_ENCODED:
-            return gst_caps_from_string(format->u.audio_encoded.caps);
+            return gst_caps_from_string(format->u.audio.caps);
         case WG_MAJOR_TYPE_VIDEO:
             return wg_format_to_caps_video(format);
         case WG_MAJOR_TYPE_VIDEO_CINEPAK:
