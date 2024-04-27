@@ -39,6 +39,44 @@
 
 #define MSVCRT_FD_BLOCK_SIZE 32
 
+#define DEFINE_EXPECT(func) \
+    static BOOL expect_ ## func = FALSE, called_ ## func = FALSE
+
+#define SET_EXPECT(func) \
+    expect_ ## func = TRUE
+
+#define CHECK_EXPECT2(func) \
+    do { \
+        ok(expect_ ##func, "unexpected call " #func "\n"); \
+        called_ ## func = TRUE; \
+    }while(0)
+
+#define CHECK_EXPECT(func) \
+    do { \
+        CHECK_EXPECT2(func); \
+        expect_ ## func = FALSE; \
+    }while(0)
+
+#define CHECK_CALLED(func) \
+    do { \
+        ok(called_ ## func, "expected " #func "\n"); \
+        expect_ ## func = called_ ## func = FALSE; \
+    }while(0)
+
+DEFINE_EXPECT(invalid_parameter_handler);
+
+static void __cdecl test_invalid_parameter_handler(const wchar_t *expression,
+        const wchar_t *function, const wchar_t *file,
+        unsigned line, uintptr_t arg)
+{
+    CHECK_EXPECT(invalid_parameter_handler);
+    ok(expression == NULL, "expression is not NULL\n");
+    ok(function == NULL, "function is not NULL\n");
+    ok(file == NULL, "file is not NULL\n");
+    ok(line == 0, "line = %u\n", line);
+    ok(arg == 0, "arg = %Ix\n", arg);
+}
+
 typedef struct
 {
     HANDLE              handle;
@@ -57,6 +95,7 @@ typedef struct
 
 static ioinfo **__pioinfo;
 
+static _invalid_parameter_handler (__cdecl *p__set_invalid_parameter_handler)(_invalid_parameter_handler);
 static int (WINAPIV *p__open)(const char *, int, ...);
 static int (__cdecl *p__close)(int);
 static intptr_t (__cdecl *p__get_osfhandle)(int);
@@ -64,6 +103,8 @@ static int (__cdecl *p_strcmp)(const char *, const char *);
 static int (__cdecl *p_strncmp)(const char *, const char *, size_t);
 static int (__cdecl *p_dupenv_s)(char **, size_t *, const char *);
 static int (__cdecl *p_wdupenv_s)(wchar_t **, size_t *, const wchar_t *);
+static errno_t (__cdecl *p__mbsncpy_s)(unsigned char*,size_t,const unsigned char*,size_t);
+
 
 #define SETNOFAIL(x,y) x = (void*)GetProcAddress(hcrt,y)
 #define SET(x,y) do { SETNOFAIL(x,y); ok(x != NULL, "Export '%s' not found\n", y); } while(0)
@@ -78,6 +119,8 @@ static BOOL init(void)
         return FALSE;
     }
 
+    SET(p__set_invalid_parameter_handler, "_set_invalid_parameter_handler");
+
     SET(__pioinfo, "__pioinfo");
     SET(p__open,"_open");
     SET(p__close,"_close");
@@ -87,7 +130,7 @@ static BOOL init(void)
     SET(p_strncmp, "strncmp");
     SET(p_dupenv_s, "_dupenv_s");
     SET(p_wdupenv_s, "_wdupenv_s");
-
+    SET(p__mbsncpy_s, "_mbsncpy_s");
     return TRUE;
 }
 
@@ -216,13 +259,101 @@ static void test_wdupenv_s(void)
     ok( !tmp, "_wdupenv_s returned pointer is %p\n", tmp );
 }
 
+static char *buf_to_string(const unsigned char *bin, int len, int nr)
+{
+    static char buf[2][1024];
+    char *w = buf[nr];
+    int i;
+
+    for (i = 0; i < len; i++)
+    {
+        sprintf(w, "%02x ", (unsigned char)bin[i]);
+        w += strlen(w);
+    }
+    return buf[nr];
+}
+
+#define expect_eq(expr, value, type, format) { type ret = (expr); ok((value) == ret, #expr " expected " format " got " format "\n", value, ret); }
+#define expect_bin(buf, value, len) { ok(memcmp((buf), value, len) == 0, "Binary buffer mismatch - expected %s, got %s\n", buf_to_string((unsigned char *)value, len, 1), buf_to_string((buf), len, 0)); }
+
+static void test__mbsncpy_s(void)
+{
+    unsigned char *mbstring = (unsigned char *)"\xb0\xb1\xb2\xb3Q\xb4\xb5\x0"; /* correct string */
+    unsigned char buf[16];
+    errno_t err;
+
+    errno = 0xdeadbeef;
+    memset(buf, 0xcc, sizeof(buf));
+    err = p__mbsncpy_s(buf, 6, mbstring, 1);
+    ok(errno == 0xdeadbeef, "Unexpected errno = %d\n", errno);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\0\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = p__mbsncpy_s(buf, 6, mbstring, 2);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\xb1\0\xcc", 4);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = p__mbsncpy_s(buf, 2, mbstring, _TRUNCATE);
+    ok(err == STRUNCATE, "got %d.\n", err);
+    expect_bin(buf, "\xb0\0\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = p__mbsncpy_s(buf, 2, mbstring, 1);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\0\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = p__mbsncpy_s(buf, 2, mbstring, 3);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == ERANGE, "got %d.\n", err);
+    expect_bin(buf, "\x0\xb1\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = p__mbsncpy_s(buf, 1, mbstring, 3);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == ERANGE, "got %d.\n", err);
+    expect_bin(buf, "\x0\xcc", 2);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = p__mbsncpy_s(buf, 0, mbstring, 3);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == EINVAL, "got %d.\n", err);
+    expect_bin(buf, "\xcc", 1);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = p__mbsncpy_s(buf, 0, mbstring, 0);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == EINVAL, "got %d.\n", err);
+    expect_bin(buf, "\xcc", 1);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = p__mbsncpy_s(buf, -1, mbstring, 0);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\x0\xcc", 2);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = p__mbsncpy_s(buf, -1, mbstring, 256);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\xb1\xb2\xb3Q\xb4\xb5\x0\xcc", 9);
+}
+
 START_TEST(msvcr80)
 {
     if(!init())
         return;
 
+    ok(p__set_invalid_parameter_handler(test_invalid_parameter_handler) == NULL,
+            "Invalid parameter handler was already set\n");
+
     test_ioinfo_flags();
     test_strcmp();
     test_dupenv_s();
     test_wdupenv_s();
+    test__mbsncpy_s();
 }

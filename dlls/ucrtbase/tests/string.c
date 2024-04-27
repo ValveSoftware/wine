@@ -651,6 +651,90 @@ static void test_strcmp(void)
     ok( ret == 0, "wrong ret %d\n", ret );
 }
 
+static char *buf_to_string(const unsigned char *bin, int len, int nr)
+{
+    static char buf[2][1024];
+    char *w = buf[nr];
+    int i;
+
+    for (i = 0; i < len; i++)
+    {
+        sprintf(w, "%02x ", (unsigned char)bin[i]);
+        w += strlen(w);
+    }
+    return buf[nr];
+}
+
+#define expect_eq(expr, value, type, format) { type ret = (expr); ok((value) == ret, #expr " expected " format " got " format "\n", value, ret); }
+#define expect_bin(buf, value, len) { ok(memcmp((buf), value, len) == 0, "Binary buffer mismatch - expected %s, got %s\n", buf_to_string((unsigned char *)value, len, 1), buf_to_string((buf), len, 0)); }
+
+static void test__mbsncpy_s(void)
+{
+    unsigned char *mbstring = (unsigned char *)"\xb0\xb1\xb2\xb3Q\xb4\xb5\x0"; /* correct string */
+    unsigned char buf[16];
+    errno_t err;
+
+    errno = 0xdeadbeef;
+    memset(buf, 0xcc, sizeof(buf));
+    err = _mbsncpy_s(buf, 6, mbstring, 1);
+    ok(errno == 0xdeadbeef, "Unexpected errno = %d\n", errno);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\0\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = _mbsncpy_s(buf, 6, mbstring, 2);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\xb1\0\xcc", 4);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = _mbsncpy_s(buf, 2, mbstring, _TRUNCATE);
+    ok(err == STRUNCATE, "got %d.\n", err);
+    expect_bin(buf, "\xb0\0\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = _mbsncpy_s(buf, 2, mbstring, 1);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\0\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = _mbsncpy_s(buf, 2, mbstring, 3);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == ERANGE, "got %d.\n", err);
+    expect_bin(buf, "\x0\xb1\xcc", 3);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = _mbsncpy_s(buf, 1, mbstring, 3);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == ERANGE, "got %d.\n", err);
+    expect_bin(buf, "\x0\xcc", 2);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = _mbsncpy_s(buf, 0, mbstring, 3);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == EINVAL, "got %d.\n", err);
+    expect_bin(buf, "\xcc", 1);
+
+    memset(buf, 0xcc, sizeof(buf));
+    SET_EXPECT(invalid_parameter_handler);
+    err = _mbsncpy_s(buf, 0, mbstring, 0);
+    CHECK_CALLED(invalid_parameter_handler);
+    ok(err == EINVAL, "got %d.\n", err);
+    expect_bin(buf, "\xcc", 1);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = _mbsncpy_s(buf, -1, mbstring, 0);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\x0\xcc", 2);
+
+    memset(buf, 0xcc, sizeof(buf));
+    err = _mbsncpy_s(buf, -1, mbstring, 256);
+    ok(!err, "got %d.\n", err);
+    expect_bin(buf, "\xb0\xb1\xb2\xb3Q\xb4\xb5\x0\xcc", 9);
+}
+
 START_TEST(string)
 {
     ok(_set_invalid_parameter_handler(test_invalid_parameter_handler) == NULL,
@@ -669,4 +753,5 @@ START_TEST(string)
     test_SpecialCasing();
     test__mbbtype_l();
     test_strcmp();
+    test__mbsncpy_s();
 }
