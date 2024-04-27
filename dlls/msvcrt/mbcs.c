@@ -900,6 +900,70 @@ unsigned char* CDECL _mbsncpy_l(unsigned char* dst, const unsigned char* src, si
     return ret;
 }
 
+#if _MSVCR_VER>=80
+errno_t CDECL _mbsncpy_s_l(unsigned char* dst, size_t maxsize, const unsigned char* src, size_t n, _locale_t locale)
+{
+    BOOL truncate = (n == _TRUNCATE);
+    unsigned char *start = dst;
+    pthreadmbcinfo mbcinfo;
+
+    if(!MSVCRT_CHECK_PMT(dst != NULL)) return EINVAL;
+    if (!MSVCRT_CHECK_PMT(maxsize != 0)) return EINVAL;
+    if (!MSVCRT_CHECK_PMT(src != NULL))
+    {
+        *start = 0;
+        return EINVAL;
+    }
+
+    if (!n)
+    {
+        *start = 0;
+        return 0;
+    }
+
+    if (locale)
+        mbcinfo = locale->mbcinfo;
+    else
+        mbcinfo = get_mbcinfo();
+
+    while (*src && n && maxsize)
+    {
+        if (mbcinfo->ismbcodepage && _ismbblead_l(*src, locale))
+        {
+            --maxsize;
+            if (!*(src + 1))
+            {
+                *dst++ = 0;
+                break;
+            }
+            *dst++ = *src++;
+            if (!maxsize) break;
+        }
+        --maxsize;
+        --n;
+        *dst++ = *src++;
+    }
+
+    if (!maxsize && truncate)
+    {
+        *(dst - 1) = 0;
+        return STRUNCATE;
+    }
+    if (!maxsize)
+    {
+        *start = 0;
+        if (!MSVCRT_CHECK_PMT(FALSE)) return ERANGE;
+    }
+    *dst = 0;
+    return 0;
+}
+
+errno_t CDECL _mbsncpy_s(unsigned char* dst, size_t maxsize, const unsigned char* src, size_t n)
+{
+    return _mbsncpy_s_l(dst, maxsize, src, n, NULL);
+}
+#endif
+
 /*********************************************************************
  *		_mbsncpy(MSVCRT.@)
  * REMARKS
