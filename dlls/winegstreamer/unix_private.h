@@ -147,4 +147,9 @@ static inline void touch_h264_used_tag(void)
     }
 }
 
+/* media-converter */
+extern bool media_converter_init(void);
+extern bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index,
+        struct wg_format *codec_format);
+
 #endif /* __WINE_WINEGSTREAMER_UNIX_PRIVATE_H */
