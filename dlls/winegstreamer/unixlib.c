@@ -46,8 +46,6 @@
 
 GST_DEBUG_CATEGORY(wine);
 
-extern bool media_converter_init(void);
-
 GstGLDisplay *gl_display;
 
 GstStreamType stream_type_from_caps(GstCaps *caps)
