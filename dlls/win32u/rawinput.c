@@ -440,12 +440,13 @@ static void rawinput_update_device_list(void)
     enumerate_devices( RIM_TYPEHID, guid_devinterface_hidW );
 }
 
-static struct device *find_device_from_handle( HANDLE handle )
+static struct device *find_device_from_handle( HANDLE handle, BOOL refresh )
 {
     struct device *device;
 
     LIST_FOR_EACH_ENTRY( device, &devices, struct device, entry )
         if (device->handle == handle) return device;
+    if (!refresh) return NULL;
 
     rawinput_update_device_list();
 
@@ -461,7 +462,7 @@ BOOL rawinput_device_get_usages( HANDLE handle, USAGE *usage_page, USAGE *usage 
 
     pthread_mutex_lock( &rawinput_mutex );
 
-    if (!(device = find_device_from_handle( handle )) || device->info.dwType != RIM_TYPEHID)
+    if (!(device = find_device_from_handle( handle, TRUE )) || device->info.dwType != RIM_TYPEHID)
         *usage_page = *usage = 0;
     else
     {
@@ -581,7 +582,7 @@ UINT WINAPI NtUserGetRawInputDeviceInfo( HANDLE handle, UINT command, void *data
 
     pthread_mutex_lock( &rawinput_mutex );
 
-    if (!(device = find_device_from_handle( handle )))
+    if (!(device = find_device_from_handle( handle, TRUE )))
     {
         pthread_mutex_unlock( &rawinput_mutex );
         RtlSetLastWin32Error( ERROR_INVALID_HANDLE );
@@ -856,23 +857,18 @@ BOOL process_rawinput_message( MSG *msg, UINT hw_id, const struct hardware_msg_d
 
     if (msg->message == WM_INPUT_DEVICE_CHANGE)
     {
-        pthread_mutex_lock( &rawinput_mutex );
-        if (msg_data->rawinput.type != RIM_TYPEHID || msg_data->rawinput.hid.param != GIDC_REMOVAL)
-            rawinput_update_device_list();
-        else
-        {
-            struct device *device;
+        BOOL refresh = msg_data->rawinput.hid.param == GIDC_ARRIVAL;
+        struct device *device;
 
-            LIST_FOR_EACH_ENTRY( device, &devices, struct device, entry )
+        pthread_mutex_lock( &rawinput_mutex );
+        if ((device = find_device_from_handle( UlongToHandle( msg_data->rawinput.hid.device ), refresh )))
+        {
+            if (msg_data->rawinput.hid.param == GIDC_REMOVAL)
             {
-                if (device->handle == UlongToHandle(msg_data->rawinput.hid.device))
-                {
-                    list_remove( &device->entry );
-                    NtClose( device->file );
-                    free( device->data );
-                    free( device );
-                    break;
-                }
+                list_remove( &device->entry );
+                NtClose( device->file );
+                free( device->data );
+                free( device );
             }
         }
         pthread_mutex_unlock( &rawinput_mutex );
