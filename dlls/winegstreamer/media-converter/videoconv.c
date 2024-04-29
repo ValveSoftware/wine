@@ -70,7 +70,8 @@
 #define VIDEO_CONV_FOZ_TAG_OGVDATA   1
 #define VIDEO_CONV_FOZ_TAG_STREAM    2
 #define VIDEO_CONV_FOZ_TAG_MKVDATA   3
-#define VIDEO_CONV_FOZ_NUM_TAGS      4
+#define VIDEO_CONV_FOZ_TAG_CODEC     4
+#define VIDEO_CONV_FOZ_NUM_TAGS      5
 
 #define DURATION_NONE (UINT64_MAX)
 
@@ -1206,7 +1207,6 @@ static gboolean video_conv_src_active_mode(GstPad *pad, GstObject *parent, GstPa
     return true;
 }
 
-
 static void video_conv_finalize(GObject *object)
 {
     VideoConv *conv = VIDEO_CONV(object);
@@ -1257,4 +1257,164 @@ static void video_conv_init(VideoConv *conv)
     conv->state = NULL;
     conv->adapter = gst_adapter_new();
     conv->active_mode = GST_PAD_MODE_NONE;
+}
+
+static bool codec_info_to_wg_format(char *codec_info, struct wg_format *codec_format)
+{
+    char *codec_name = codec_info;
+
+    /* Get codec name. */
+    while (*codec_info && *codec_info != ' ')
+        ++codec_info;
+    *(codec_info++) = 0;
+
+    /* FIXME: Get width, height, fps etc. from codec info string. */
+    if (strcmp(codec_name, "cinepak") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_CINEPAK;
+    }
+    else if (strcmp(codec_name, "h264") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_H264;
+    }
+    else if (strcmp(codec_name, "wmv1") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
+        codec_format->u.video.format = WG_VIDEO_FORMAT_WMV1;
+    }
+    else if (strcmp(codec_name, "wmv2") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
+        codec_format->u.video.format = WG_VIDEO_FORMAT_WMV2;
+    }
+    else if (strcmp(codec_name, "wmv3") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
+        codec_format->u.video.format = WG_VIDEO_FORMAT_WMV3;
+    }
+    else if  (strcmp(codec_name, "vc1") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
+        codec_format->u.video.format = WG_VIDEO_FORMAT_WVC1;
+    }
+    else if  (strcmp(codec_name, "wmav1") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+        codec_format->u.audio.version = 1;
+    }
+    else if  (strcmp(codec_name, "wmav2") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+        codec_format->u.audio.version = 2;
+    }
+    else if  (strcmp(codec_name, "wmapro") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+        codec_format->u.audio.version = 3;
+    }
+    else if  (strcmp(codec_name, "wmalossless") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+        codec_format->u.audio.version = 4;
+    }
+    else if  (strcmp(codec_name, "xma1") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+        codec_format->u.audio.version = 1;
+        codec_format->u.audio.is_xma = true;
+    }
+    else if  (strcmp(codec_name, "xma2") == 0)
+    {
+        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
+        codec_format->u.audio.version = 2;
+        codec_format->u.audio.is_xma = true;
+    }
+    else
+    {
+        GST_FIXME("Unsupported codec name: %s.\n", codec_name);
+        return false;
+    }
+
+    GST_INFO("Got codec format major type %u.", codec_format->major_type);
+
+    return true;
+}
+
+gint compare_type(const GValue *value_element, GType type)
+{
+    GstElement *element = g_value_get_object(value_element);
+    return !G_TYPE_CHECK_INSTANCE_TYPE(element, type);
+}
+
+static GstElement *gst_bin_get_by_type(GstBin * bin, GType type)
+{
+    GstElement *element = NULL;
+    GstIterator *children;
+    GValue result = {0};
+    gboolean found;
+
+    children = gst_bin_iterate_recurse(bin);
+    found = gst_iterator_find_custom(children, (GCompareFunc)compare_type,
+            &result, (gpointer)type);
+    gst_iterator_free(children);
+
+    if (found)
+    {
+        element = g_value_dup_object(&result);
+        g_value_unset (&result);
+    }
+
+    return element;
+}
+
+bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index, struct wg_format *codec_format)
+{
+    struct video_conv_state *state;
+    uint8_t *buffer = NULL;
+    uint32_t entry_size, i;
+    char *codec_info;
+    size_t read_size;
+    bool ret = false;
+    VideoConv *conv;
+    int conv_ret;
+
+    if (!(conv = VIDEO_CONV(gst_bin_get_by_type(GST_BIN(container), VIDEO_CONV_TYPE))))
+    {
+        GST_WARNING("Failed to find video converter from %"GST_PTR_FORMAT".", container);
+        return false;
+    }
+
+    if (!(state = video_conv_lock_state(conv)))
+        return false;
+    if (!(state->state_flags & VIDEO_CONV_HAS_TRANSCODED))
+        goto done;
+
+    if (fozdb_entry_size(state->read_fozdb, VIDEO_CONV_FOZ_TAG_CODEC, &state->transcode_hash, &entry_size) < 0)
+    {
+        GST_WARNING("Failed to find codec info entry for stream %s.", format_hash(&state->transcode_hash));
+        goto done;
+    }
+
+    buffer = calloc(1, entry_size + 1);
+    if ((conv_ret = fozdb_read_entry_data(state->read_fozdb, VIDEO_CONV_FOZ_TAG_CODEC, &state->transcode_hash, 0,
+            buffer, entry_size, &read_size, false)) < 0)
+    {
+        GST_ERROR("Failed to read codec info, ret %d.", ret);
+        goto done;
+    }
+
+    /* Get stream codec info line by line. */
+    codec_info = strtok((char *)buffer, "\n");
+    for (i = 0; codec_info && i < stream_index; ++i)
+        codec_info = strtok(NULL, "\n");
+
+    GST_INFO("Got codec info \"%s\" for stream %d.\n", codec_info, stream_index);
+
+   ret = codec_info_to_wg_format(codec_info, codec_format);
+
+done:
+    if (buffer)
+        free(buffer);
+    pthread_mutex_unlock(&conv->state_mutex);
+    return ret;
 }
