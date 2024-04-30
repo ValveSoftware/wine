@@ -396,34 +396,33 @@ static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor, wg_par
     return hr;
 }
 
-static HRESULT stream_descriptor_create(UINT32 id, struct wg_format *format, IMFStreamDescriptor **out)
+static HRESULT stream_descriptor_create(UINT32 id, wg_parser_stream_t wg_stream, IMFStreamDescriptor **out)
 {
     IMFStreamDescriptor *descriptor;
     IMFMediaTypeHandler *handler;
-    IMFMediaType *types[9];
-    DWORD count = 0;
+    IMFMediaType *media_type;
+    struct wg_format format;
     HRESULT hr;
 
-    if (!(types[0] = mf_media_type_from_wg_format(format)))
+    wg_parser_stream_get_current_format(wg_stream, &format);
+    if (!(media_type = mf_media_type_from_wg_format(&format)))
         return MF_E_INVALIDMEDIATYPE;
-    count = 1;
-    assert(count <= ARRAY_SIZE(types));
-
-    if (FAILED(hr = MFCreateStreamDescriptor(id, count, types, &descriptor)))
-        goto done;
+    if (FAILED(hr = MFCreateStreamDescriptor(id, 1, &media_type, &descriptor)))
+    {
+        IMFMediaType_Release(media_type);
+        return hr;
+    }
 
     if (FAILED(hr = IMFStreamDescriptor_GetMediaTypeHandler(descriptor, &handler)))
         IMFStreamDescriptor_Release(descriptor);
     else
     {
-        hr = IMFMediaTypeHandler_SetCurrentMediaType(handler, types[0]);
+        hr = IMFMediaTypeHandler_SetCurrentMediaType(handler, media_type);
         IMFMediaTypeHandler_Release(handler);
     }
 
-done:
-    while (count--)
-        IMFMediaType_Release(types[count]);
-    *out = SUCCEEDED(hr) ? descriptor : NULL;
+    IMFMediaType_Release(media_type);
+    *out = descriptor;
     return hr;
 }
 
@@ -1625,10 +1624,8 @@ static HRESULT media_source_create(struct object_context *context, IMFMediaSourc
         wg_parser_stream_t wg_stream = wg_parser_get_stream(object->wg_parser, i);
         IMFStreamDescriptor *descriptor;
         struct media_stream *stream;
-        struct wg_format format;
 
-        wg_parser_stream_get_current_format(wg_stream, &format);
-        if (FAILED(hr = stream_descriptor_create(i, &format, &descriptor)))
+        if (FAILED(hr = stream_descriptor_create(i, wg_stream, &descriptor)))
             goto fail;
         if (FAILED(hr = media_stream_create(&object->IMFMediaSource_iface, descriptor, wg_stream, &stream)))
         {
