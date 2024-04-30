@@ -1709,11 +1709,9 @@ HRESULT wmv_decoder_create(IUnknown *outer, IUnknown **out)
     TRACE("outer %p, out %p.\n", outer, out);
 
     if (!(transform = wg_transform_create(&input_format, &output_format, &attrs)))
-    {
-        ERR_(winediag)("GStreamer doesn't support WMV decoding, please install appropriate plugins.\n");
-        return E_FAIL;
-    }
-    wg_transform_destroy(transform);
+        FIXME_(winediag)("HACK: Create wmv decoder even if plugins are not installed.\n");
+    else
+        wg_transform_destroy(transform);
 
     if (FAILED(hr = video_decoder_create_with_types(wmv_decoder_input_types, ARRAY_SIZE(wmv_decoder_input_types),
             wmv_decoder_output_types, ARRAY_SIZE(wmv_decoder_output_types), outer, &decoder)))
