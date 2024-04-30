@@ -290,12 +290,7 @@ unsigned int WINAPI __wine_dbg_ftrace( char *str, unsigned int str_size, unsigne
         const char *fn;
         int fd;
 
-        if (!(fn = getenv( "WINE_FTRACE_FILE" )))
-        {
-            MESSAGE( "wine: WINE_FTRACE_FILE is not set.\n" );
-            ftrace_fd = -2;
-            return 0;
-        }
+        if (!(fn = getenv( "WINE_FTRACE_FILE" ))) fn = "/sys/kernel/tracing/trace_marker";
         if ((fd = open( fn, O_WRONLY )) == -1)
         {
             MESSAGE( "wine: error opening ftrace file: %s.\n", strerror(errno) );
