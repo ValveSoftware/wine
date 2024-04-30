@@ -594,6 +594,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
     }
     options[] =
     {
+        {L"antenna\\antenna.exe", L" --use-angle=d3d9"},
         {L"Bloody Walls\\game.exe", L" --disable_direct_composition=1"},
         {L"Insanitys Blade\\nw.exe", L" --use-gl=swiftshader"},
         {L"Warhammer2.exe", L" --in-process-gpu"},
