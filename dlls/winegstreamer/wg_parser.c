@@ -2329,11 +2329,13 @@ static NTSTATUS wow64_wg_parser_stream_enable(void *args)
     {
         wg_parser_stream_t stream;
         PTR32 format;
+        UINT32 flags;
     } *params32 = args;
     struct wg_parser_stream_enable_params params =
     {
         .stream = params32->stream,
         .format = ULongToPtr(params32->format),
+        .flags = params32->flags,
     };
 
     return wg_parser_stream_enable(&params);
