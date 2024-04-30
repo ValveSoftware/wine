@@ -2400,6 +2400,7 @@ NTSTATUS wow64_wg_source_create(void *args)
     struct
     {
         PTR32 url;
+        UINT64 file_size;
         PTR32 data;
         UINT32 size;
         char mime_type[256];
@@ -2408,6 +2409,7 @@ NTSTATUS wow64_wg_source_create(void *args)
     struct wg_source_create_params params =
     {
         .url = ULongToPtr(params32->url),
+        .file_size = params32->file_size,
         .data = ULongToPtr(params32->data),
         .size = params32->size,
     };
