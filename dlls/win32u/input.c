@@ -1803,13 +1803,10 @@ HWND WINAPI NtUserSetCapture( HWND hwnd )
  */
 BOOL release_capture(void)
 {
-    HWND previous = NULL;
-    BOOL ret;
-
-    ret = set_capture_window( 0, 0, &previous );
+    BOOL ret = set_capture_window( 0, 0, NULL );
 
     /* Somebody may have missed some mouse movements */
-    if (ret && previous)
+    if (ret)
     {
         INPUT input = { .type = INPUT_MOUSE };
         input.mi.dwFlags = MOUSEEVENTF_MOVE;
