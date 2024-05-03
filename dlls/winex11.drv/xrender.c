@@ -34,6 +34,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <dlfcn.h>
+#include <math.h>
 
 #include "windef.h"
 #include "winbase.h"
@@ -183,6 +184,8 @@ MAKE_FUNCPTR(XRenderFindVisualFormat)
 MAKE_FUNCPTR(XRenderFreeGlyphSet)
 MAKE_FUNCPTR(XRenderFreePicture)
 MAKE_FUNCPTR(XRenderSetPictureClipRectangles)
+MAKE_FUNCPTR(XRenderQueryFilters)
+MAKE_FUNCPTR(XRenderSetPictureFilter)
 #ifdef HAVE_XRENDERCREATELINEARGRADIENT
 MAKE_FUNCPTR(XRenderCreateLinearGradient)
 #endif
@@ -339,6 +342,8 @@ const struct gdi_dc_funcs *X11DRV_XRender_Init(void)
     LOAD_FUNCPTR(XRenderFreePicture);
     LOAD_FUNCPTR(XRenderSetPictureClipRectangles);
     LOAD_FUNCPTR(XRenderQueryExtension);
+    LOAD_FUNCPTR(XRenderQueryFilters);
+    LOAD_FUNCPTR(XRenderSetPictureFilter);
 #ifdef HAVE_XRENDERCREATELINEARGRADIENT
     LOAD_OPTIONAL_FUNCPTR(XRenderCreateLinearGradient);
 #endif
@@ -1494,6 +1499,7 @@ static void xrender_blit( struct xrender_physdev *physdev, int op, Picture src_p
                           Picture dst_pict, int x_src, int y_src, int width_src, int height_src, int x_dst,
                           int y_dst, int width_dst, int height_dst, double xscale, double yscale )
 {
+    const char *scale_filter = NULL;
     int x_offset, y_offset;
     HMONITOR monitor;
 
@@ -1501,6 +1507,9 @@ static void xrender_blit( struct xrender_physdev *physdev, int op, Picture src_p
     if (fs_hack_mapping_required( monitor ))
     {
         double user_to_real_scale;
+        XFilters *filters;
+        int i;
+
         POINT p;
         p.x = x_dst;
         p.y = y_dst;
@@ -1509,10 +1518,24 @@ static void xrender_blit( struct xrender_physdev *physdev, int op, Picture src_p
         y_dst = p.y;
 
         user_to_real_scale = fs_hack_get_user_to_real_scale( monitor );
-        width_dst *= user_to_real_scale;
-        height_dst *= user_to_real_scale;
+        width_dst = lround(width_dst * user_to_real_scale);
+        height_dst = lround(height_dst * user_to_real_scale);
         xscale /= user_to_real_scale;
         yscale /= user_to_real_scale;
+        if ((filters = pXRenderQueryFilters( gdi_display, physdev->x11dev->drawable )))
+        {
+            for (i = 0; i < filters->nfilter; ++i)
+            {
+                if (!filters->filter[i]) continue;
+                if (!strcmp( filters->filter[i], "good" ))
+                {
+                    scale_filter = "good";
+                    break;
+                }
+                if (!strcmp( filters->filter[i], "bilinear" )) scale_filter = "bilinear";
+            }
+            XFree( filters );
+        }
     }
 
     if (width_src < 0)
@@ -1545,6 +1568,7 @@ static void xrender_blit( struct xrender_physdev *physdev, int op, Picture src_p
         x_offset = (xscale < 0) ? -width_dst : 0;
         y_offset = (yscale < 0) ? -height_dst : 0;
         set_xrender_transformation(src_pict, xscale, yscale, x_src, y_src);
+        if (scale_filter) pXRenderSetPictureFilter(gdi_display, src_pict, scale_filter, NULL, 0);
     }
     else
     {
