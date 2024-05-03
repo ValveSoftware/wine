@@ -1574,6 +1574,7 @@ DWORD get_pixmap_image( Pixmap pixmap, int width, int height, const XVisualInfo 
 struct x11drv_window_surface
 {
     struct window_surface header;
+    HWND                  hwnd;
     Window                window;
     GC                    gc;
     XImage               *image;
@@ -1962,12 +1963,17 @@ static void x11drv_surface_flush( struct window_surface *window_surface )
 
 #ifdef HAVE_LIBXXSHM
         if (surface->shminfo.shmid != -1)
-            XShmPutImage( gdi_display, surface->window, surface->gc, surface->image,
-                          coords.visrect.left, coords.visrect.top,
-                          surface->header.rect.left + coords.visrect.left,
-                          surface->header.rect.top + coords.visrect.top,
-                          coords.visrect.right - coords.visrect.left,
-                          coords.visrect.bottom - coords.visrect.top, False );
+        {
+            if (!fs_hack_put_image_scaled( surface->hwnd, surface->window, surface->gc, surface->image,
+                                           surface->header.rect.left, surface->header.rect.top,
+                                           coords.width, coords.height, surface->is_argb ))
+                XShmPutImage( gdi_display, surface->window, surface->gc, surface->image,
+                              coords.visrect.left, coords.visrect.top,
+                              surface->header.rect.left + coords.visrect.left,
+                              surface->header.rect.top + coords.visrect.top,
+                              coords.visrect.right - coords.visrect.left,
+                              coords.visrect.bottom - coords.visrect.top, False );
+        }
         else
 #endif
         XPutImage( gdi_display, surface->window, surface->gc, surface->image,
@@ -2024,7 +2030,7 @@ static const struct window_surface_funcs x11drv_surface_funcs =
 /***********************************************************************
  *           create_surface
  */
-struct window_surface *create_surface( Window window, const XVisualInfo *vis, const RECT *rect,
+struct window_surface *create_surface( HWND hwnd, Window window, const XVisualInfo *vis, const RECT *rect,
                                        COLORREF color_key, BOOL use_alpha )
 {
     const XPixmapFormatValues *format = pixmap_formats[vis->depth];
@@ -2047,6 +2053,7 @@ struct window_surface *create_surface( Window window, const XVisualInfo *vis, co
     surface->header.funcs = &x11drv_surface_funcs;
     surface->header.rect  = *rect;
     surface->header.ref   = 1;
+    surface->hwnd = hwnd;
     surface->window = window;
     surface->is_argb = (use_alpha && vis->depth == 32 && surface->info.bmiHeader.biCompression == BI_RGB);
     set_color_key( surface, color_key );
