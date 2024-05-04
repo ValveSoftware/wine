@@ -3970,6 +3970,7 @@ DECL_HANDLER(get_rawinput_buffer)
         }
 
         memcpy( buf + pos, data, data->size );
+        reply->last_message_time = msg->time;
         list_remove( &msg->entry );
         free_message( msg );
 

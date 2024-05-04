@@ -677,6 +677,7 @@ UINT WINAPI NtUserGetRawInputDeviceInfo( HANDLE handle, UINT command, void *data
  */
 UINT WINAPI NtUserGetRawInputBuffer( RAWINPUT *data, UINT *data_size, UINT header_size )
 {
+    struct user_thread_info *thread_info;
     static int cached_clear_qs_rawinput = -1;
     unsigned int count = 0, remaining, rawinput_size, next_size, overhead;
     struct rawinput_thread_data *thread_data;
@@ -728,6 +729,7 @@ UINT WINAPI NtUserGetRawInputBuffer( RAWINPUT *data, UINT *data_size, UINT heade
         cached_clear_qs_rawinput = (sgi = getenv( "SteamGameId" )) && !strcmp( sgi, "1172470" );
     }
 
+    thread_info = get_user_thread_info();
     /* first RAWINPUT block in the buffer is used for WM_INPUT message data */
     msg_data = (struct hardware_msg_data *)NEXTRAWINPUTBLOCK(rawinput);
     SERVER_START_REQ( get_rawinput_buffer )
@@ -739,6 +741,7 @@ UINT WINAPI NtUserGetRawInputBuffer( RAWINPUT *data, UINT *data_size, UINT heade
         if (wine_server_call( req )) return ~0u;
         next_size = reply->next_size;
         count = reply->count;
+        if (count) thread_info->client_info.message_time = reply->last_message_time;
     }
     SERVER_END_REQ;
 
