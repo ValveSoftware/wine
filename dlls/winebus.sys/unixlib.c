@@ -115,6 +115,8 @@ static BOOL is_vkb_controller(WORD vid, WORD pid, INT buttons)
     if (buttons == 128) return TRUE;
 
     /* if customized, less than 128 buttons may be shown, decide by PID */
+    if (pid == 0x0126) return TRUE; /* VKB-Sim Space Gunfighter */
+    if (pid == 0x0127) return TRUE; /* VKB-Sim Space Gunfighter L */
     if (pid == 0x0200) return TRUE; /* VKBsim Gladiator EVO Right Grip */
     if (pid == 0x0201) return TRUE; /* VKBsim Gladiator EVO Left Grip */
     return FALSE;
