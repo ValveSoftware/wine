@@ -617,6 +617,7 @@ static const WCHAR *hack_append_command_line( const WCHAR *cmd )
         {L"Everquest F2P\\LaunchPad.exe", L" --use-gl=swiftshader"},
         {L"Red Tie Runner.exe", L" --use-angle=gl"},
         {L"UnrealCEFSubProcess.exe", L" --use-gl=swiftshader", "2316580"},
+        {L"UnrealCEFSubProcess.exe", L" --use-angle=d3d9", "2684500"},
     };
     unsigned int i;
     char sgi[64];
