@@ -124,8 +124,7 @@ extern void wg_allocator_release_sample(GstAllocator *allocator, struct wg_sampl
 
 /* media-converter */
 extern bool media_converter_init(void);
-extern bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index,
-        struct wg_format *codec_format);
+extern bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index, GstCaps *caps);
 
 static inline void touch_h264_used_tag(void)
 {
