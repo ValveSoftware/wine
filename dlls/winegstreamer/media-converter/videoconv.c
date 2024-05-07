@@ -1278,7 +1278,7 @@ static void video_conv_init(VideoConv *conv)
     conv->active_mode = GST_PAD_MODE_NONE;
 }
 
-static bool codec_info_to_wg_format(char *codec_info, struct wg_format *codec_format)
+static bool codec_info_to_wg_format(char *codec_info, GstCaps *caps)
 {
     char *codec_name = codec_info;
 
@@ -1290,63 +1290,65 @@ static bool codec_info_to_wg_format(char *codec_info, struct wg_format *codec_fo
     /* FIXME: Get width, height, fps etc. from codec info string. */
     if (strcmp(codec_name, "cinepak") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_CINEPAK;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-cinepak");
     }
     else if (strcmp(codec_name, "h264") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_H264;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-h264");
     }
     else if (strcmp(codec_name, "wmv1") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
-        codec_format->u.video.format = WG_VIDEO_FORMAT_WMV1;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-wmv");
+        gst_caps_set_simple(caps, "wmvversion", G_TYPE_INT, 1, NULL);
+        gst_caps_set_simple(caps, "format", G_TYPE_STRING, "WMV1", NULL);
     }
     else if (strcmp(codec_name, "wmv2") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
-        codec_format->u.video.format = WG_VIDEO_FORMAT_WMV2;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-wmv");
+        gst_caps_set_simple(caps, "wmvversion", G_TYPE_INT, 2, NULL);
+        gst_caps_set_simple(caps, "format", G_TYPE_STRING, "WMV2", NULL);
     }
     else if (strcmp(codec_name, "wmv3") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
-        codec_format->u.video.format = WG_VIDEO_FORMAT_WMV3;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-wmv");
+        gst_caps_set_simple(caps, "wmvversion", G_TYPE_INT, 3, NULL);
+        gst_caps_set_simple(caps, "format", G_TYPE_STRING, "WMV3", NULL);
     }
     else if  (strcmp(codec_name, "vc1") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
-        codec_format->u.video.format = WG_VIDEO_FORMAT_WVC1;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "video/x-wmv");
+        gst_caps_set_simple(caps, "wmvversion", G_TYPE_INT, 3, NULL);
+        gst_caps_set_simple(caps, "format", G_TYPE_STRING, "WVC1", NULL);
     }
     else if  (strcmp(codec_name, "wmav1") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
-        codec_format->u.audio.version = 1;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-wma");
+        gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, 1, NULL);
     }
     else if  (strcmp(codec_name, "wmav2") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
-        codec_format->u.audio.version = 2;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-wma");
+        gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, 2, NULL);
     }
     else if  (strcmp(codec_name, "wmapro") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
-        codec_format->u.audio.version = 3;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-wma");
+        gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, 3, NULL);
     }
     else if  (strcmp(codec_name, "wmalossless") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
-        codec_format->u.audio.version = 4;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-wma");
+        gst_caps_set_simple(caps, "wmaversion", G_TYPE_INT, 4, NULL);
     }
     else if  (strcmp(codec_name, "xma1") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
-        codec_format->u.audio.version = 1;
-        codec_format->u.audio.is_xma = true;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-xma");
+        gst_caps_set_simple(caps, "xmaversion", G_TYPE_INT, 1, NULL);
     }
     else if  (strcmp(codec_name, "xma2") == 0)
     {
-        codec_format->major_type = WG_MAJOR_TYPE_AUDIO_WMA;
-        codec_format->u.audio.version = 2;
-        codec_format->u.audio.is_xma = true;
+        gst_structure_set_name(gst_caps_get_structure(caps, 0), "audio/x-xma");
+        gst_caps_set_simple(caps, "xmaversion", G_TYPE_INT, 2, NULL);
     }
     else
     {
@@ -1354,8 +1356,7 @@ static bool codec_info_to_wg_format(char *codec_info, struct wg_format *codec_fo
         return false;
     }
 
-    GST_INFO("Got codec format major type %u.", codec_format->major_type);
-
+    GST_INFO("Got caps %" GST_PTR_FORMAT, caps);
     return true;
 }
 
@@ -1386,7 +1387,7 @@ static GstElement *gst_bin_get_by_type(GstBin * bin, GType type)
     return element;
 }
 
-bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index, struct wg_format *codec_format)
+bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index, GstCaps *caps)
 {
     struct video_conv_state *state;
     uint8_t *buffer = NULL;
@@ -1429,7 +1430,7 @@ bool get_untranscoded_stream_format(GstElement *container, uint32_t stream_index
 
     GST_INFO("Got codec info \"%s\" for stream %d.\n", codec_info, stream_index);
 
-   ret = codec_info_to_wg_format(codec_info, codec_format);
+    ret = codec_info_to_wg_format(codec_info, caps);
 
 done:
     if (buffer)

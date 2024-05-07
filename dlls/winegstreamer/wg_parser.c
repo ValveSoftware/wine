@@ -269,6 +269,25 @@ static NTSTATUS wg_parser_stream_get_codec_format(void *args)
     struct wg_parser_stream_get_codec_format_params *params = args;
     struct wg_parser_stream *stream = get_stream(params->stream);
 
+    GST_TRACE("caps %" GST_PTR_FORMAT, stream->current_caps);
+
+    if (stream->current_caps)
+    {
+        /* HACK: Return untranscoded codec format for transcoded stream. */
+        GstCaps *caps = gst_caps_copy(stream->current_caps);
+
+        if (get_untranscoded_stream_format(stream->parser->container, stream->number, caps))
+        {
+            GST_TRACE("returning caps %" GST_PTR_FORMAT, caps);
+            wg_format_from_caps(params->format, caps);
+            gst_caps_unref(caps);
+            return S_OK;
+        }
+        gst_caps_unref(caps);
+
+        GST_WARNING("Failed to get untranscoded codec format for stream %u.\n", stream->number);
+    }
+
     if (caps_is_compressed(stream->codec_caps))
         wg_format_from_caps(params->format, stream->codec_caps);
     else if (stream->current_caps)
@@ -583,6 +602,10 @@ static gboolean autoplug_continue_cb(GstElement * decodebin, GstPad *pad, GstCap
     GstElementFactory *factory;
     GstElement *element;
     gboolean parsed;
+    const char *sgi;
+
+    if ((sgi = getenv("SteamGameId")) && (!strcmp(sgi, "1083650") || !strcmp(sgi, "1097880")))
+        return true;
 
     if (!parser->output_compressed)
         return true;
