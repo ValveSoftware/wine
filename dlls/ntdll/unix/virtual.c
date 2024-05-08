@@ -279,7 +279,7 @@ static void kernel_writewatch_init(void)
 {
     struct uffdio_api uffdio_api;
 
-    uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK );
+    uffd_fd = syscall( __NR_userfaultfd, O_CLOEXEC | O_NONBLOCK | UFFD_USER_MODE_ONLY );
     if (uffd_fd == -1)
     {
         kernel_writewatch_softdirty_init();
