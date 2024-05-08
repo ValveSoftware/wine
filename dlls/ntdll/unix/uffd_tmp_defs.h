@@ -1,6 +1,8 @@
 #ifndef __UFFD_TMP_DEFS__
 #define __UFFD_TMP_DEFS__
 
+#define UFFD_USER_MODE_ONLY 1
+
 #ifdef __x86_64__
 #define __NR_userfaultfd 323
 #else
