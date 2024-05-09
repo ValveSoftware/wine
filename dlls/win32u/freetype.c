@@ -3454,6 +3454,12 @@ static FT_Int get_load_flags( UINT format, BOOL vertical_metrics, BOOL force_no_
     return load_flags;
 }
 
+static BOOL is_curve_format(UINT format)
+{
+    format &= ~(GGO_GLYPH_INDEX | GGO_UNHINTED);
+    return format == GGO_BEZIER || format == GGO_NATIVE;
+}
+
 /*************************************************************
  * freetype_get_glyph_outline
  */
@@ -3479,7 +3485,7 @@ static UINT freetype_get_glyph_outline( struct gdi_font *font, UINT glyph, UINT 
 
     matrices = get_transform_matrices( font, tategaki, lpmat, transform_matrices );
 
-    if (aa_flags) effective_format = aa_flags | (format & (GGO_GLYPH_INDEX | GGO_UNHINTED));
+    if (aa_flags && !is_curve_format( format )) effective_format = aa_flags | (format & GGO_GLYPH_INDEX);
     vertical_metrics = (tategaki && FT_HAS_VERTICAL(ft_face));
     /* there is a freetype bug where vertical metrics are only
        properly scaled and correct in 2.4.0 or greater */
