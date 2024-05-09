@@ -3479,8 +3479,7 @@ static UINT freetype_get_glyph_outline( struct gdi_font *font, UINT glyph, UINT 
 
     matrices = get_transform_matrices( font, tategaki, lpmat, transform_matrices );
 
-    if (aa_flags && (format & ~GGO_GLYPH_INDEX) == GGO_METRICS)
-        effective_format = aa_flags | (format & GGO_GLYPH_INDEX);
+    if (aa_flags) effective_format = aa_flags | (format & (GGO_GLYPH_INDEX | GGO_UNHINTED));
     vertical_metrics = (tategaki && FT_HAS_VERTICAL(ft_face));
     /* there is a freetype bug where vertical metrics are only
        properly scaled and correct in 2.4.0 or greater */
