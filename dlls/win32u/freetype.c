@@ -287,8 +287,14 @@ static BOOL is_hinting_enabled(void)
 
     if (enabled == -1)
     {
-        FT_TrueTypeEngineType type = pFT_Get_TrueType_Engine_Type(library);
-        enabled = (type == FT_TRUETYPE_ENGINE_TYPE_PATENTED);
+        const char *sgi;
+
+        if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "563560")) enabled = FALSE;
+        else
+        {
+            FT_TrueTypeEngineType type = pFT_Get_TrueType_Engine_Type(library);
+            enabled = (type == FT_TRUETYPE_ENGINE_TYPE_PATENTED);
+        }
         TRACE("hinting is %senabled\n", enabled ? "" : "NOT ");
     }
     return enabled;
