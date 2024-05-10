@@ -254,6 +254,16 @@ static NTSTATUS wg_parser_stream_get_current_format(void *args)
     return S_OK;
 }
 
+static NTSTATUS wg_parser_stream_get_current_type(void *args)
+{
+    struct wg_parser_stream_get_current_type_params *params = args;
+    struct wg_parser_stream *stream = get_stream(params->stream);
+
+    if (!stream->current_caps)
+        return STATUS_INVALID_PARAMETER;
+    return caps_to_media_type(stream->current_caps, &params->media_type, 0);
+}
+
 static NTSTATUS wg_parser_stream_get_codec_format(void *args)
 {
     struct wg_parser_stream_get_codec_format_params *params = args;
@@ -286,6 +296,30 @@ static NTSTATUS wg_parser_stream_enable(void *args)
     if (format->major_type == WG_MAJOR_TYPE_VIDEO)
     {
         bool flip = (format->u.video.height < 0);
+
+        gst_util_set_object_arg(G_OBJECT(stream->flip), "method", flip ? "vertical-flip" : "none");
+    }
+
+    push_event(stream->my_sink, gst_event_new_reconfigure());
+    return S_OK;
+}
+
+static NTSTATUS wg_parser_stream_enable_type(void *args)
+{
+    const struct wg_parser_stream_enable_type_params *params = args;
+    struct wg_parser_stream *stream = get_stream(params->stream);
+    struct wg_parser *parser = stream->parser;
+
+    pthread_mutex_lock(&parser->mutex);
+
+    stream->desired_caps = caps_from_media_type(&params->media_type);
+    stream->enabled = true;
+
+    pthread_mutex_unlock(&parser->mutex);
+
+    if (IsEqualGUID(&params->media_type.major, &MEDIATYPE_Video) && stream->flip)
+    {
+        bool flip = !!(params->media_type.u.video->videoInfo.VideoFlags & MFVideoFlag_BottomUpLinearRep);
 
         gst_util_set_object_arg(G_OBJECT(stream->flip), "method", flip ? "vertical-flip" : "none");
     }
@@ -2246,8 +2280,10 @@ const unixlib_entry_t __wine_unix_call_funcs[] =
     X(wg_parser_get_stream),
 
     X(wg_parser_stream_get_current_format),
+    X(wg_parser_stream_get_current_type),
     X(wg_parser_stream_get_codec_format),
     X(wg_parser_stream_enable),
+    X(wg_parser_stream_enable_type),
     X(wg_parser_stream_disable),
 
     X(wg_parser_stream_get_buffer),
@@ -2356,6 +2392,31 @@ static NTSTATUS wow64_wg_parser_stream_get_current_format(void *args)
     return wg_parser_stream_get_current_format(&params);
 }
 
+NTSTATUS wow64_wg_parser_stream_get_current_type(void *args)
+{
+    struct
+    {
+        wg_parser_stream_t stream;
+        struct wg_media_type32 media_type;
+    } *params32 = args;
+    struct wg_parser_stream_get_current_type_params params =
+    {
+        .stream = params32->stream,
+        .media_type =
+        {
+            .major = params32->media_type.major,
+            .format_size = params32->media_type.format_size,
+            .u.format = ULongToPtr(params32->media_type.format),
+        },
+    };
+    NTSTATUS status;
+
+    status = wg_parser_stream_get_current_type(&params);
+    params32->media_type.major = params.media_type.major;
+    params32->media_type.format_size = params.media_type.format_size;
+    return status;
+}
+
 static NTSTATUS wow64_wg_parser_stream_get_codec_format(void *args)
 {
     struct
@@ -2386,6 +2447,27 @@ static NTSTATUS wow64_wg_parser_stream_enable(void *args)
     };
 
     return wg_parser_stream_enable(&params);
+}
+
+NTSTATUS wow64_wg_parser_stream_enable_type(void *args)
+{
+    struct
+    {
+        wg_parser_stream_t stream;
+        struct wg_media_type32 media_type;
+    } *params32 = args;
+    struct wg_parser_stream_enable_type_params params =
+    {
+        .stream = params32->stream,
+        .media_type =
+        {
+            .major = params32->media_type.major,
+            .format_size = params32->media_type.format_size,
+            .u.format = ULongToPtr(params32->media_type.format),
+        },
+    };
+
+    return wg_parser_stream_enable_type(&params);
 }
 
 static NTSTATUS wow64_wg_parser_stream_get_buffer(void *args)
@@ -2764,8 +2846,10 @@ const unixlib_entry_t __wine_unix_call_wow64_funcs[] =
     X(wg_parser_get_stream),
 
     X64(wg_parser_stream_get_current_format),
+    X64(wg_parser_stream_get_current_type),
     X64(wg_parser_stream_get_codec_format),
     X64(wg_parser_stream_enable),
+    X64(wg_parser_stream_enable_type),
     X(wg_parser_stream_disable),
 
     X64(wg_parser_stream_get_buffer),

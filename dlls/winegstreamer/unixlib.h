@@ -270,6 +270,12 @@ struct wg_parser_get_stream_params
     wg_parser_stream_t stream;
 };
 
+struct wg_parser_stream_get_current_type_params
+{
+    wg_parser_stream_t stream;
+    struct wg_media_type media_type;
+};
+
 struct wg_parser_stream_get_current_format_params
 {
     wg_parser_stream_t stream;
@@ -286,6 +292,12 @@ struct wg_parser_stream_enable_params
 {
     wg_parser_stream_t stream;
     const struct wg_format *format;
+};
+
+struct wg_parser_stream_enable_type_params
+{
+    wg_parser_stream_t stream;
+    struct wg_media_type media_type;
 };
 
 struct wg_parser_stream_get_buffer_params
@@ -515,9 +527,11 @@ enum unix_funcs
     unix_wg_parser_get_stream_count,
     unix_wg_parser_get_stream,
 
+    unix_wg_parser_stream_get_current_type,
     unix_wg_parser_stream_get_current_format,
     unix_wg_parser_stream_get_codec_format,
     unix_wg_parser_stream_enable,
+    unix_wg_parser_stream_enable_type,
     unix_wg_parser_stream_disable,
 
     unix_wg_parser_stream_get_buffer,
