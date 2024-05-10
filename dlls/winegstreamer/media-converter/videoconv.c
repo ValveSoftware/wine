@@ -726,7 +726,9 @@ static gboolean video_conv_push_stream_start(VideoConv *conv, struct payload_has
 {
     struct video_conv_state *state;
 
-    push_event(conv->src_pad, gst_event_new_stream_start(format_hash(hash)));
+    /* we don't send a stream-start in pull mode, as it can cause a deadlock */
+    if (conv->active_mode == GST_PAD_MODE_PUSH)
+        push_event(conv->src_pad, gst_event_new_stream_start(format_hash(hash)));
 
     if (!(state = video_conv_lock_state(conv)))
     {
@@ -1145,6 +1147,19 @@ static gboolean video_conv_src_query(GstPad *pad, GstObject *parent, GstQuery *q
         if (duration == DURATION_NONE)
             return false;
         gst_query_set_duration(query, GST_FORMAT_BYTES, duration);
+        return true;
+
+    case GST_QUERY_URI:
+        if (!gst_pad_query_default(pad, parent, query))
+        {
+            if (!(state = video_conv_lock_state(conv)))
+                return false;
+            /* if we don't already have a uri, we will use the hash. This is to ensure
+             * downstream will use a consistent stream-id */
+            gst_query_set_uri(query, format_hash(&state->transcode_hash));
+            pthread_mutex_unlock(&conv->state_mutex);
+            GST_LOG_OBJECT(pad, "Responding with %" GST_PTR_FORMAT, query);
+        }
         return true;
 
     default:
