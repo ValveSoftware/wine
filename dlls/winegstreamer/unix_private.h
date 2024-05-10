@@ -25,6 +25,7 @@
 
 #include <stdbool.h>
 #include <gst/gst.h>
+#include <gst/audio/audio.h>
 
 /* unixlib.c */
 
@@ -52,6 +53,7 @@ extern void set_max_threads(GstElement *element);
 extern void wg_format_from_caps(struct wg_format *format, const GstCaps *caps);
 extern bool wg_format_compare(const struct wg_format *a, const struct wg_format *b);
 extern GstCaps *wg_format_to_caps(const struct wg_format *format);
+extern uint32_t wg_channel_mask_from_gst(const GstAudioInfo *info);
 
 /* wg_source.c */
 
@@ -71,7 +73,7 @@ extern NTSTATUS wg_source_set_stream_flags(void *args);
 
 extern NTSTATUS wg_transform_create(void *args);
 extern NTSTATUS wg_transform_destroy(void *args);
-extern NTSTATUS wg_transform_get_output_format(void *args);
+extern NTSTATUS wg_transform_get_output_type(void *args);
 extern NTSTATUS wg_transform_set_output_format(void *args);
 extern NTSTATUS wg_transform_push_data(void *args);
 extern NTSTATUS wg_transform_read_data(void *args);
@@ -79,6 +81,11 @@ extern NTSTATUS wg_transform_get_status(void *args);
 extern NTSTATUS wg_transform_drain(void *args);
 extern NTSTATUS wg_transform_flush(void *args);
 extern NTSTATUS wg_transform_notify_qos(void *args);
+
+/* wg_media_type.c */
+
+extern NTSTATUS caps_to_media_type(GstCaps *caps, struct wg_media_type *media_type,
+        UINT32 video_plane_align);
 
 /* wg_muxer.c */
 
