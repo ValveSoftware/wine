@@ -23,6 +23,9 @@
 #include "mftransform.h"
 #include "wmcodecdsp.h"
 
+#include "initguid.h"
+#include "d3d11.h"
+
 #include "wine/debug.h"
 
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
@@ -84,6 +87,7 @@ struct video_processor
     IMFMediaType *output_type;
     MFT_OUTPUT_STREAM_INFO output_info;
 
+    IMFSample *input_sample;
     wg_transform_t wg_transform;
     struct wg_sample_queue *wg_sample_queue;
 
@@ -179,6 +183,237 @@ static HRESULT video_processor_uninit_allocator(struct video_processor *processo
     IMFVideoSampleAllocatorEx_Release(processor->allocator);
     processor->allocator = NULL;
 
+    return hr;
+}
+
+static HRESULT video_processor_get_d3d11_resource(IMFSample *sample, ID3D11Resource **resource)
+{
+    IMFMediaBuffer *buffer;
+    DWORD count;
+    HRESULT hr;
+
+    if (FAILED(IMFSample_GetBufferCount(sample, &count)) || count > 1)
+        return E_FAIL;
+
+    if (SUCCEEDED(hr = IMFSample_GetBufferByIndex(sample, 0, &buffer)))
+    {
+        IMFDXGIBuffer *dxgi_buffer;
+
+        if (SUCCEEDED(hr = IMFMediaBuffer_QueryInterface(buffer, &IID_IMFDXGIBuffer, (void **)&dxgi_buffer)))
+        {
+            hr = IMFDXGIBuffer_GetResource(dxgi_buffer, &IID_ID3D11Resource, (void **)resource);
+            IMFDXGIBuffer_Release(dxgi_buffer);
+        }
+
+        IMFMediaBuffer_Release(buffer);
+    }
+
+    return hr;
+}
+
+static HRESULT get_d3d11_video_device(ID3D11Resource *resource, ID3D11VideoDevice **video_device)
+{
+    ID3D11Device *device;
+    HRESULT hr;
+
+    ID3D11Resource_GetDevice(resource, &device);
+    hr = ID3D11Device_QueryInterface(device, &IID_ID3D11VideoDevice, (void **)video_device);
+    ID3D11Device_Release(device);
+    return hr;
+}
+
+static HRESULT get_d3d11_video_context(ID3D11Resource *resource, ID3D11VideoContext **video_context)
+{
+    ID3D11DeviceContext *context;
+    ID3D11Device *device;
+    HRESULT hr;
+
+    ID3D11Resource_GetDevice(resource, &device);
+    ID3D11Device_GetImmediateContext(device, &context);
+    hr = ID3D11DeviceContext_QueryInterface(context, &IID_ID3D11VideoContext, (void **)video_context);
+    ID3D11DeviceContext_Release(context);
+    ID3D11Device_Release(device);
+    return hr;
+}
+
+static HRESULT create_video_processor_enumerator(ID3D11Resource *resource, UINT64 input_size, UINT64 output_size,
+        ID3D11VideoDevice **video_device, ID3D11VideoProcessorEnumerator **enumerator)
+{
+    D3D11_VIDEO_PROCESSOR_CONTENT_DESC enum_desc = {0};
+    HRESULT hr;
+
+    enum_desc.InputFrameFormat = D3D11_VIDEO_FRAME_FORMAT_PROGRESSIVE;
+    enum_desc.InputFrameRate.Denominator = 1;
+    enum_desc.InputFrameRate.Numerator = 1;
+    enum_desc.InputWidth = input_size >> 32;
+    enum_desc.InputHeight = (UINT32)input_size;
+    enum_desc.OutputFrameRate.Denominator = 1;
+    enum_desc.OutputFrameRate.Numerator = 1;
+    enum_desc.OutputWidth = output_size >> 32;
+    enum_desc.OutputHeight = (UINT32)output_size;
+    enum_desc.Usage = D3D11_VIDEO_USAGE_PLAYBACK_NORMAL;
+
+    if (FAILED(hr = get_d3d11_video_device(resource, video_device)))
+        return hr;
+    if (FAILED(hr = ID3D11VideoDevice_CreateVideoProcessorEnumerator(*video_device, &enum_desc, enumerator)))
+    {
+        ID3D11VideoDevice_Release(*video_device);
+        *video_device = NULL;
+    }
+
+    return hr;
+}
+
+struct resource_desc
+{
+    GUID subtype;
+    UINT64 frame_size;
+};
+
+static HRESULT init_d3d11_video_processor(const struct resource_desc *input_desc, ID3D11Resource *input,
+        const struct resource_desc *output_desc, ID3D11Resource *output, ID3D11VideoProcessor **processor,
+        ID3D11VideoProcessorInputView **input_view, ID3D11VideoProcessorOutputView **output_view)
+{
+    D3D11_VIDEO_PROCESSOR_OUTPUT_VIEW_DESC output_view_desc = {0};
+    D3D11_VIDEO_PROCESSOR_INPUT_VIEW_DESC input_view_desc = {0};
+    ID3D11VideoProcessorEnumerator *enumerator;
+    UINT input_flags = 0, output_flags = 0;
+    ID3D11VideoDevice *device;
+    HRESULT hr;
+
+    *processor = NULL;
+    *input_view = NULL;
+    *output_view = NULL;
+
+    input_view_desc.FourCC = input_desc->subtype.Data1;
+    input_view_desc.ViewDimension = D3D11_VPIV_DIMENSION_TEXTURE2D;
+    input_view_desc.Texture2D.MipSlice = 0;
+    input_view_desc.Texture2D.ArraySlice = 0;
+
+    output_view_desc.ViewDimension = D3D11_VPOV_DIMENSION_TEXTURE2D;
+    output_view_desc.Texture2D.MipSlice = 0;
+
+    /* assume input and output have the same device */
+    if (FAILED(hr = create_video_processor_enumerator(input, input_desc->frame_size,
+            output_desc->frame_size, &device, &enumerator)))
+        return hr;
+
+    if (FAILED(hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(enumerator,
+            input_desc->subtype.Data1, &input_flags))
+            || FAILED(hr = ID3D11VideoProcessorEnumerator_CheckVideoProcessorFormat(enumerator,
+            output_desc->subtype.Data1, &output_flags)))
+        goto failed;
+    if (!(input_flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_INPUT)
+            || !(output_flags & D3D11_VIDEO_PROCESSOR_FORMAT_SUPPORT_OUTPUT))
+    {
+        hr = MF_E_INVALIDMEDIATYPE;
+        goto failed;
+    }
+
+    if (FAILED(hr = ID3D11VideoDevice_CreateVideoProcessorInputView(device, input, enumerator,
+            &input_view_desc, input_view)))
+        goto failed;
+    if (FAILED(hr = ID3D11VideoDevice_CreateVideoProcessorOutputView(device, output, enumerator,
+            &output_view_desc, output_view)))
+    {
+        ID3D11VideoProcessorInputView_Release(*input_view);
+        *input_view = NULL;
+        goto failed;
+    }
+
+    if (FAILED(hr = ID3D11VideoDevice_CreateVideoProcessor(device, enumerator, 0, processor)))
+    {
+        ID3D11VideoProcessorOutputView_Release(*output_view);
+        *output_view = NULL;
+        ID3D11VideoProcessorInputView_Release(*input_view);
+        *input_view = NULL;
+        goto failed;
+    }
+
+failed:
+    ID3D11VideoProcessorEnumerator_Release(enumerator);
+    ID3D11VideoDevice_Release(device);
+    return hr;
+}
+
+static HRESULT video_processor_process_output_d3d11(struct video_processor *processor,
+        IMFSample *input_sample, IMFSample *output_sample)
+{
+    D3D11_VIDEO_PROCESSOR_STREAM streams = {0};
+    struct resource_desc input_desc, output_desc;
+    ID3D11VideoProcessorOutputView *output_view;
+    ID3D11VideoProcessorInputView *input_view;
+    ID3D11VideoProcessor *video_processor;
+    ID3D11VideoContext *video_context;
+    ID3D11Resource *input, *output;
+    MFVideoArea aperture;
+    RECT rect = {0};
+    LONGLONG time;
+    DWORD flags;
+    HRESULT hr;
+
+    if (FAILED(hr = IMFMediaType_GetUINT64(processor->input_type, &MF_MT_FRAME_SIZE, &input_desc.frame_size))
+            || FAILED(hr = IMFMediaType_GetGUID(processor->input_type, &MF_MT_SUBTYPE, &input_desc.subtype))
+            || FAILED(hr = IMFMediaType_GetUINT64(processor->output_type, &MF_MT_FRAME_SIZE, &output_desc.frame_size))
+            || FAILED(hr = IMFMediaType_GetGUID(processor->output_type, &MF_MT_SUBTYPE, &output_desc.subtype)))
+        return hr;
+
+    if (FAILED(hr = video_processor_get_d3d11_resource(input_sample, &input)))
+        return hr;
+    if (FAILED(hr = video_processor_get_d3d11_resource(output_sample, &output)))
+    {
+        ID3D11Resource_Release(input);
+        return hr;
+    }
+
+    if (FAILED(hr = get_d3d11_video_context(input, &video_context)))
+        goto failed;
+    if (FAILED(hr = init_d3d11_video_processor(&input_desc, input, &output_desc, output,
+            &video_processor, &input_view, &output_view)))
+    {
+        ID3D11VideoContext_Release(video_context);
+        goto failed;
+    }
+
+    streams.Enable = TRUE;
+    streams.OutputIndex = 0;
+    streams.InputFrameOrField = 0;
+    streams.PastFrames = 0;
+    streams.FutureFrames = 0;
+    streams.pInputSurface = input_view;
+
+    if (SUCCEEDED(IMFMediaType_GetBlob(processor->input_type, &MF_MT_MINIMUM_DISPLAY_APERTURE, (BYTE *)&aperture, sizeof(aperture), NULL)))
+        SetRect(&rect, aperture.OffsetX.value, aperture.OffsetY.value, aperture.OffsetX.value + aperture.Area.cx,
+                aperture.OffsetY.value + aperture.Area.cy);
+    else
+        SetRect(&rect, 0, 0, input_desc.frame_size >> 32, (UINT32)input_desc.frame_size);
+    ID3D11VideoContext_VideoProcessorSetStreamSourceRect(video_context, video_processor, 0, TRUE, &rect);
+
+    if (SUCCEEDED(IMFMediaType_GetBlob(processor->output_type, &MF_MT_MINIMUM_DISPLAY_APERTURE, (BYTE *)&aperture, sizeof(aperture), NULL)))
+        SetRect(&rect, aperture.OffsetX.value, aperture.OffsetY.value, aperture.OffsetX.value + aperture.Area.cx,
+                aperture.OffsetY.value + aperture.Area.cy);
+    else
+        SetRect(&rect, 0, 0, output_desc.frame_size >> 32, (UINT32)output_desc.frame_size);
+    ID3D11VideoContext_VideoProcessorSetStreamDestRect(video_context, video_processor, 0, TRUE, &rect);
+
+    ID3D11VideoContext_VideoProcessorBlt(video_context, video_processor, output_view, 0, 1, &streams);
+
+    IMFSample_CopyAllItems(input_sample, (IMFAttributes *)output_sample);
+    if (SUCCEEDED(IMFSample_GetSampleDuration(input_sample, &time)))
+        IMFSample_SetSampleDuration(output_sample, time);
+    if (SUCCEEDED(IMFSample_GetSampleTime(input_sample, &time)))
+        IMFSample_SetSampleTime(output_sample, time);
+    if (SUCCEEDED(IMFSample_GetSampleFlags(input_sample, &flags)))
+        IMFSample_SetSampleFlags(output_sample, flags);
+
+    ID3D11VideoProcessorOutputView_Release(output_view);
+    ID3D11VideoProcessorInputView_Release(input_view);
+    ID3D11VideoProcessor_Release(video_processor);
+    ID3D11VideoContext_Release(video_context);
+
+failed:
+    ID3D11Resource_Release(output);
+    ID3D11Resource_Release(input);
     return hr;
 }
 
@@ -655,8 +890,12 @@ static HRESULT WINAPI video_processor_ProcessInput(IMFTransform *iface, DWORD id
 
     if (!impl->wg_transform)
         return MF_E_TRANSFORM_TYPE_NOT_SET;
+    if (impl->input_sample)
+        return MF_E_NOTACCEPTING;
 
-    return wg_transform_push_mf(impl->wg_transform, sample, impl->wg_sample_queue);
+    impl->input_sample = sample;
+    IMFSample_AddRef(impl->input_sample);
+    return S_OK;
 }
 
 static HRESULT WINAPI video_processor_ProcessOutput(IMFTransform *iface, DWORD flags, DWORD count,
@@ -664,7 +903,7 @@ static HRESULT WINAPI video_processor_ProcessOutput(IMFTransform *iface, DWORD f
 {
     struct video_processor *impl = impl_from_IMFTransform(iface);
     MFT_OUTPUT_STREAM_INFO info;
-    IMFSample *output_sample;
+    IMFSample *input_sample, *output_sample;
     HRESULT hr;
 
     TRACE("iface %p, flags %#lx, count %lu, samples %p, status %p.\n", iface, flags, count, samples, status);
@@ -679,23 +918,37 @@ static HRESULT WINAPI video_processor_ProcessOutput(IMFTransform *iface, DWORD f
     if (FAILED(hr = IMFTransform_GetOutputStreamInfo(iface, 0, &info)))
         return hr;
 
+    if (!(input_sample = impl->input_sample))
+        return MF_E_TRANSFORM_NEED_MORE_INPUT;
+    impl->input_sample = NULL;
+
     if (impl->output_info.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)
     {
-        if (FAILED(hr = video_processor_init_allocator(impl)))
+        if (FAILED(hr = video_processor_init_allocator(impl))
+                || FAILED(hr = IMFVideoSampleAllocatorEx_AllocateSample(impl->allocator, &output_sample)))
+        {
+            IMFSample_Release(input_sample);
             return hr;
-        if (FAILED(hr = IMFVideoSampleAllocatorEx_AllocateSample(impl->allocator, &output_sample)))
-            return hr;
+        }
     }
     else
     {
         if (!(output_sample = samples->pSample))
+        {
+            IMFSample_Release(input_sample);
             return E_INVALIDARG;
+        }
         IMFSample_AddRef(output_sample);
     }
 
-    if (FAILED(hr = wg_transform_read_mf(impl->wg_transform, output_sample, info.cbSize, &samples->dwStatus)))
-        goto done;
-    wg_sample_queue_flush(impl->wg_sample_queue, false);
+    if (FAILED(hr = video_processor_process_output_d3d11(impl, input_sample, output_sample)))
+    {
+        if (FAILED(hr = wg_transform_push_mf(impl->wg_transform, input_sample, impl->wg_sample_queue)))
+            goto done;
+        if (FAILED(hr = wg_transform_read_mf(impl->wg_transform, output_sample, info.cbSize, &samples->dwStatus)))
+            goto done;
+        wg_sample_queue_flush(impl->wg_sample_queue, false);
+    }
 
     if (impl->output_info.dwFlags & MFT_OUTPUT_STREAM_PROVIDES_SAMPLES)
     {
@@ -705,6 +958,7 @@ static HRESULT WINAPI video_processor_ProcessOutput(IMFTransform *iface, DWORD f
 
 done:
     IMFSample_Release(output_sample);
+    IMFSample_Release(input_sample);
     return hr;
 }
 
