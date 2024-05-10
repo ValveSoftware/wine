@@ -238,7 +238,7 @@ struct wg_parser_get_stream_params
     wg_parser_stream_t stream;
 };
 
-struct wg_parser_stream_get_preferred_format_params
+struct wg_parser_stream_get_current_format_params
 {
     wg_parser_stream_t stream;
     struct wg_format *format;
@@ -477,7 +477,7 @@ enum unix_funcs
     unix_wg_parser_get_stream_count,
     unix_wg_parser_get_stream,
 
-    unix_wg_parser_stream_get_preferred_format,
+    unix_wg_parser_stream_get_current_format,
     unix_wg_parser_stream_get_codec_format,
     unix_wg_parser_stream_enable,
     unix_wg_parser_stream_disable,
