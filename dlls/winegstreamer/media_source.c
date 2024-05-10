@@ -357,19 +357,6 @@ static HRESULT stream_descriptor_get_media_type(IMFStreamDescriptor *descriptor,
     return hr;
 }
 
-static HRESULT wg_format_from_stream_descriptor(IMFStreamDescriptor *descriptor, struct wg_format *format)
-{
-    IMFMediaType *media_type;
-    HRESULT hr;
-
-    if (FAILED(hr = stream_descriptor_get_media_type(descriptor, &media_type)))
-        return hr;
-    mf_media_type_to_wg_format(media_type, format);
-    IMFMediaType_Release(media_type);
-
-    return hr;
-}
-
 static HRESULT stream_descriptor_set_tag(IMFStreamDescriptor *descriptor, wg_parser_stream_t stream,
     const GUID *attr, enum wg_parser_tag tag)
 {
@@ -401,11 +388,9 @@ static HRESULT stream_descriptor_create(UINT32 id, wg_parser_stream_t wg_stream,
     IMFStreamDescriptor *descriptor;
     IMFMediaTypeHandler *handler;
     IMFMediaType *media_type;
-    struct wg_format format;
     HRESULT hr;
 
-    wg_parser_stream_get_current_format(wg_stream, &format);
-    if (!(media_type = mf_media_type_from_wg_format(&format)))
+    if (FAILED(hr = wg_parser_stream_get_current_type_mf(wg_stream, &media_type)))
         return MF_E_INVALIDMEDIATYPE;
     if (FAILED(hr = MFCreateStreamDescriptor(id, 1, &media_type, &descriptor)))
     {
@@ -481,14 +466,18 @@ static void flush_token_queue(struct media_stream *stream, BOOL send)
 static HRESULT media_stream_start(struct media_stream *stream, BOOL active, BOOL seeking, const PROPVARIANT *position)
 {
     struct media_source *source = impl_from_IMFMediaSource(stream->media_source);
-    struct wg_format format;
+    IMFMediaType *media_type;
     HRESULT hr;
 
     TRACE("source %p, stream %p\n", source, stream);
 
-    if (FAILED(hr = wg_format_from_stream_descriptor(stream->descriptor, &format)))
-        WARN("Failed to get wg_format from stream descriptor, hr %#lx\n", hr);
-    wg_parser_stream_enable(stream->wg_stream, &format);
+    if (SUCCEEDED(hr = stream_descriptor_get_media_type(stream->descriptor, &media_type)))
+    {
+        hr = wg_parser_stream_enable_mf(stream->wg_stream, media_type);
+        IMFMediaType_Release(media_type);
+    }
+    if (FAILED(hr))
+        WARN("Failed to start media source stream, hr %#lx\n", hr);
 
     if (FAILED(hr = IMFMediaEventQueue_QueueEventParamUnk(source->event_queue, active ? MEUpdatedStream : MENewStream,
             &GUID_NULL, S_OK, (IUnknown *)&stream->IMFMediaStream_iface)))
