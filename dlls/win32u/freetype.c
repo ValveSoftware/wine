@@ -555,8 +555,11 @@ static BOOL is_hinting_enabled(void)
 
     if (enabled == -1)
     {
+        const char *sgi;
+
+        if ((sgi = getenv("SteamGameId")) && !strcmp(sgi, "563560")) enabled = FALSE;
         /* Use the >= 2.2.0 function if available */
-        if (pFT_Get_TrueType_Engine_Type)
+        else if (pFT_Get_TrueType_Engine_Type)
         {
             FT_TrueTypeEngineType type = pFT_Get_TrueType_Engine_Type(library);
             enabled = (type == FT_TRUETYPE_ENGINE_TYPE_PATENTED);
