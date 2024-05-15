@@ -55,6 +55,7 @@ struct wg_source
     gchar *url;
     GstPad *src_pad;
     GstElement *container;
+    bool needs_transcoding;
 
     GstSegment segment;
     guint64 max_duration;
@@ -385,14 +386,71 @@ static GstFlowReturn sink_chain_cb(GstPad *pad, GstObject *parent, GstBuffer *bu
     return GST_FLOW_OK;
 }
 
+static gboolean check_decoding_support(GstCaps *caps)
+{
+    GstElement *element, *bin = gst_bin_new("decode-test"), *first = NULL, *last = NULL;
+    GstPad *peer, *src_pad, *sink_pad;
+    GstPadTemplate *template;
+    gboolean ret = false;
+
+    template = gst_pad_template_new("src", GST_PAD_SRC, GST_PAD_ALWAYS, caps);
+    src_pad = gst_pad_new_from_template(template, "src");
+    g_object_unref(template);
+
+    template = gst_pad_template_new("sink", GST_PAD_SINK, GST_PAD_ALWAYS, GST_CAPS_ANY);
+    sink_pad = gst_pad_new_from_template(template, "sink");
+    g_object_unref(template);
+
+    if (!(element = find_element(GST_ELEMENT_FACTORY_TYPE_DECODER, caps, GST_CAPS_ANY))
+            || !append_element(bin, element, &first, &last))
+        goto done;
+    gst_util_set_object_arg(G_OBJECT(element), "max-threads", "1");
+    gst_util_set_object_arg(G_OBJECT(element), "n-threads", "1");
+
+    if (!link_src_to_element(src_pad, first) || !link_element_to_sink(last, sink_pad)
+            || !gst_pad_set_active(src_pad, 1) || !gst_pad_set_active(sink_pad, 1))
+        goto done;
+
+    gst_element_set_state(bin, GST_STATE_PAUSED);
+    if (!gst_element_get_state(bin, NULL, NULL, -1)
+            || !push_event(src_pad, gst_event_new_stream_start("stream"))
+            || !push_event(src_pad, gst_event_new_caps(caps)))
+        goto done;
+
+    /* check that the caps event has been accepted */
+    if ((peer = gst_pad_get_peer(src_pad)))
+    {
+        GST_ERROR("pad %"GST_PTR_FORMAT, peer);
+        ret = gst_pad_has_current_caps(peer);
+        gst_object_unref(peer);
+    }
+
+done:
+    gst_element_set_state(bin, GST_STATE_NULL);
+    gst_object_unref(src_pad);
+    gst_object_unref(bin);
+    return ret;
+}
+
 static gboolean sink_event_caps(struct wg_source *source, GstPad *pad, GstEvent *event)
 {
     struct source_stream *stream = source_stream_from_pad(source, pad);
+    const char *mime_type;
     GstCaps *caps;
 
     GST_TRACE("source %p, %"GST_PTR_FORMAT", %"GST_PTR_FORMAT, source, pad, event);
 
     gst_event_parse_caps(event, &caps);
+    mime_type = gst_structure_get_name(gst_caps_get_structure(caps, 0));
+
+    if (strcmp(mime_type, "audio/x-raw") && strcmp(mime_type, "video/x-raw")
+            && !check_decoding_support(caps))
+    {
+        GST_ERROR("Cannot decode caps %"GST_PTR_FORMAT, caps);
+        source->needs_transcoding = true;
+        gst_event_unref(event);
+        return false;
+    }
 
     gst_stream_set_caps(stream->stream, gst_caps_copy(caps));
     gst_stream_set_stream_type(stream->stream, stream_type_from_caps(caps));
@@ -647,6 +705,56 @@ error:
     return STATUS_UNSUCCESSFUL;
 }
 
+static NTSTATUS initialize_transcoding(struct wg_source *source)
+{
+    GstElement *element, *first = NULL, *last = NULL;
+    GstEvent *event;
+    guint i;
+
+    gst_element_set_state(source->container, GST_STATE_NULL);
+    gst_object_unref(source->container);
+
+    for (i = 0; i < ARRAY_SIZE(source->streams); i++)
+        gst_pad_set_active(source->streams[i].pad, false);
+    gst_pad_set_active(source->src_pad, false);
+
+    while ((event = gst_atomic_queue_pop(source->seek_queue)))
+        gst_event_unref(event);
+
+    source->segment.start = 0;
+    source->needs_transcoding = false;
+    source->max_duration = 0;
+    source->stream_count = 0;
+
+    if (!(source->container = gst_bin_new("wg_source")))
+        goto error;
+    GST_OBJECT_FLAG_SET(source->container, GST_BIN_FLAG_STREAMS_AWARE);
+
+    if (!(element = create_element("protondemuxer", "proton"))
+            || !append_element(source->container, element, &first, &last))
+        goto error;
+    g_signal_connect(element, "pad-added", G_CALLBACK(pad_added_cb), source);
+
+    if (!link_src_to_element(source->src_pad, first))
+        goto error;
+    if (!gst_pad_set_active(source->src_pad, true))
+        goto error;
+
+    gst_element_set_state(source->container, GST_STATE_PAUSED);
+    if (!gst_element_get_state(source->container, NULL, NULL, -1))
+        goto error;
+
+    push_event(source->src_pad, create_stream_start_event("wg_source"));
+    push_event(source->src_pad, gst_event_new_segment(&source->segment));
+
+    GST_INFO("Re-initialized source %p.", source);
+    return STATUS_SUCCESS;
+
+error:
+    GST_ERROR("Failed to re-initialize source %p", source);
+    return STATUS_UNSUCCESSFUL;
+}
+
 NTSTATUS wg_source_destroy(void *args)
 {
     struct wg_source *source = get_source(*(wg_source_t *)args);
@@ -787,6 +895,9 @@ NTSTATUS wg_source_push_data(void *args)
     source->segment.start += params->size;
     if (!(ret = gst_pad_push(source->src_pad, buffer)) || ret == GST_FLOW_EOS)
         return STATUS_SUCCESS;
+
+    if (source->needs_transcoding)
+        return initialize_transcoding(source);
 
     GST_WARNING("Failed to push data buffer, ret %d", ret);
     source->segment.start -= params->size;
