@@ -850,6 +850,19 @@ static NTSTATUS x11drv_init( void *arg )
 
     init_user_driver();
     X11DRV_DisplayDevices_Init(FALSE);
+
+    if (native_screen_rect.bottom && native_screen_rect.bottom <= 800)
+    {
+        NONCLIENTMETRICSW ncm;
+
+        ncm.cbSize = sizeof(ncm);
+        if (NtUserSystemParametersInfo( SPI_GETNONCLIENTMETRICS, 0, &ncm, 0 ) && ncm.iCaptionHeight > 18)
+        {
+            TRACE( "Reducing iCaptionHeight from %d to 17.\n", ncm.iCaptionHeight );
+            ncm.iCaptionHeight = 17;
+            NtUserSystemParametersInfo( SPI_SETNONCLIENTMETRICS, sizeof(ncm), &ncm, 0);
+        }
+    }
     return STATUS_SUCCESS;
 }
 
