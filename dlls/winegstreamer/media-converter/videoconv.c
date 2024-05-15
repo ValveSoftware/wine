@@ -759,6 +759,23 @@ static gboolean video_conv_push_caps(VideoConv *conv, uint32_t transcode_tag)
     return ret;
 }
 
+static gboolean video_conv_push_segment(VideoConv *conv)
+{
+    struct video_conv_state *state;
+    GstSegment segment;
+
+    gst_segment_init(&segment, GST_FORMAT_BYTES);
+    if (!(state = video_conv_lock_state(conv)))
+    {
+        GST_ERROR("VideoConv not yet in READY state?");
+        return false;
+    }
+    segment.stop = state->our_duration;
+    pthread_mutex_unlock(&conv->state_mutex);
+
+    return push_event(conv->src_pad, gst_event_new_segment(&segment));
+}
+
 static gboolean video_conv_sink_event_caps(VideoConv *conv, GstEvent *event)
 {
     struct video_conv_state *state;
@@ -842,6 +859,8 @@ static gboolean video_conv_sink_event_eos(VideoConv *conv, GstEvent *event)
         if (!video_conv_push_stream_start(conv, &hash))
             return false;
         if (!video_conv_push_caps(conv, transcode_tag))
+            return false;
+        if (!video_conv_push_segment(conv))
             return false;
 
         /* return false to cancel upstream pads EOS event handling and avoid setting EOS flag */
