@@ -6305,6 +6305,7 @@ static HRESULT resolver_create_gstreamer_handler(IMFByteStreamHandler **handler)
         if (!strcmp(sgi, "606880") /* Greedfall */) env = "1";
         if (!strcmp(sgi, "692850") /* Bloodstained */) env = "1";
         if (!strcmp(sgi, "782630") /* Twisted Sails */) env = "1";
+	if (!strcmp(sgi, "789910") /* Planet of the Apes: Last Frontier */) env = "1";
     }
     if (env && atoi(env)) return CoCreateInstance(&CLSID_GStreamerByteStreamHandler2, NULL, CLSCTX_INPROC_SERVER, &IID_IMFByteStreamHandler, (void **)handler);
 
