@@ -135,6 +135,7 @@ static void test_audioclient(void)
     IAudioClient *ac;
     IAudioClient2 *ac2;
     IAudioClient3 *ac3;
+    IAudioClock *acl;
     IUnknown *unk;
     HRESULT hr;
     ULONG ref;
@@ -191,6 +192,8 @@ static void test_audioclient(void)
         ref = IUnknown_Release(unk);
         ok(ref == 1, "Released count is %lu\n", ref);
     }
+    hr = IAudioClient_QueryInterface(ac, &IID_IAudioClock, (void**)&acl);
+    ok(hr == E_NOINTERFACE, "QueryInterface(IID_IAudioClock) returned %08lx\n", hr);
 
     hr = IAudioClient_GetDevicePeriod(ac, NULL, NULL);
     ok(hr == E_POINTER, "Invalid GetDevicePeriod call returns %08lx\n", hr);
@@ -564,7 +567,7 @@ static void test_formats(AUDCLNT_SHAREMODE mode)
 
 static void test_references(void)
 {
-    IAudioClient *ac;
+    IAudioClient *ac, *ac2;
     IAudioRenderClient *rc;
     ISimpleAudioVolume *sav;
     IAudioStreamVolume *asv;
@@ -657,6 +660,9 @@ static void test_references(void)
     IAudioClock_AddRef(acl);
     ref = IAudioClock_Release(acl);
     ok(ref != 0, "AudioClock_Release gave wrong refcount: %lu\n", ref);
+
+    hr = IAudioClock_QueryInterface(acl, &IID_IAudioClient, (void**)&ac2);
+    ok(hr == E_NOINTERFACE, "QueryInterface(IID_IAudioClient) returned %08lx\n", hr);
 
     ref = IAudioClient_Release(ac);
     ok(ref != 0, "Client_Release gave wrong refcount: %lu\n", ref);
