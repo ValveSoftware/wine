@@ -3464,6 +3464,8 @@ struct handle_info
     unsigned int access;
     unsigned int attributes;
     unsigned int type;
+    unsigned int __pad;
+    unsigned __int64 object;
 };
 
 /* Return a list of all opened handles */

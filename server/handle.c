@@ -27,6 +27,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/types.h>
+#include <stdint.h>
 
 #include "ntstatus.h"
 #define WIN32_NO_STATUS
@@ -855,6 +856,7 @@ static int enum_handles( struct process *process, void *user )
         handle->access     = entry->access & ~RESERVED_ALL;
         handle->type       = entry->ptr->ops->type->index;
         handle->attributes = 0;
+        handle->object     = (uint64_t)(uintptr_t)entry->ptr;
         if (entry->access & RESERVED_INHERIT) handle->attributes |= OBJ_INHERIT;
         if (entry->access & RESERVED_CLOSE_PROTECT) handle->attributes |= OBJ_PROTECT_CLOSE;
         info->count--;

@@ -3188,7 +3188,7 @@ NTSTATUS WINAPI NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class,
                     shi->Handle[i].AccessMask   = handle_info[i].access;
                     shi->Handle[i].HandleFlags  = handle_info[i].attributes;
                     shi->Handle[i].ObjectType   = handle_info[i].type;
-                    /* FIXME: Fill out ObjectPointer */
+                    shi->Handle[i].ObjectPointer = (void *)(ULONG_PTR)handle_info[i].object;
                 }
             }
             else if (ret == STATUS_BUFFER_TOO_SMALL)
@@ -3409,7 +3409,7 @@ NTSTATUS WINAPI NtQuerySystemInformation( SYSTEM_INFORMATION_CLASS class,
                     shi->Handles[i].GrantedAccess    = handle_info[i].access;
                     shi->Handles[i].HandleAttributes = handle_info[i].attributes;
                     shi->Handles[i].ObjectTypeIndex  = handle_info[i].type;
-                    /* FIXME: Fill out Object */
+                    shi->Handles[i].Object = (void *)(ULONG_PTR)handle_info[i].object;
                 }
             }
             else if (ret == STATUS_BUFFER_TOO_SMALL)
