@@ -855,6 +855,7 @@ static int enum_handles( struct process *process, void *user )
         handle->access     = entry->access & ~RESERVED_ALL;
         handle->type       = entry->ptr->ops->type->index;
         handle->attributes = 0;
+        handle->object     = (client_ptr_t)(ULONG_PTR)entry->ptr | (client_ptr_t)0xffff800000000000;
         if (entry->access & RESERVED_INHERIT) handle->attributes |= OBJ_INHERIT;
         if (entry->access & RESERVED_CLOSE_PROTECT) handle->attributes |= OBJ_PROTECT_CLOSE;
         info->count--;

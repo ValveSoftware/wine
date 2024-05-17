@@ -852,12 +852,17 @@ static void test_query_handle(void)
     ULONG ExpectedLength, ReturnLength;
     ULONG SystemInformationLength = sizeof(SYSTEM_HANDLE_INFORMATION);
     SYSTEM_HANDLE_INFORMATION* shi = HeapAlloc(GetProcessHeap(), 0, SystemInformationLength);
-    HANDLE EventHandle;
+    HANDLE EventHandle, handle_dup;
+    void *obj1, *obj2;
     BOOL found, ret;
     INT i;
 
     EventHandle = CreateEventA(NULL, FALSE, FALSE, NULL);
     ok( EventHandle != NULL, "CreateEventA failed %lu\n", GetLastError() );
+
+    ret = DuplicateHandle(GetCurrentProcess(), EventHandle, GetCurrentProcess(), &handle_dup, 0, TRUE, DUPLICATE_SAME_ACCESS);
+    ok(ret, "got error %lu\n", GetLastError());
+
     ret = SetHandleInformation(EventHandle, HANDLE_FLAG_INHERIT | HANDLE_FLAG_PROTECT_FROM_CLOSE,
             HANDLE_FLAG_INHERIT | HANDLE_FLAG_PROTECT_FROM_CLOSE);
     ok(ret, "got error %lu\n", GetLastError());
@@ -881,6 +886,7 @@ static void test_query_handle(void)
         memset(shi, 0x55, SystemInformationLength);
         status = pNtQuerySystemInformation(SystemHandleInformation, shi, SystemInformationLength, &ReturnLength);
     }
+    CloseHandle(handle_dup);
     ok( status == STATUS_SUCCESS, "Expected STATUS_SUCCESS, got %08lx\n", status );
     ExpectedLength = FIELD_OFFSET(SYSTEM_HANDLE_INFORMATION, Handle[shi->Count]);
     ok( ReturnLength == ExpectedLength || broken(ReturnLength == ExpectedLength - sizeof(DWORD)), /* Vista / 2008 */
@@ -895,19 +901,37 @@ static void test_query_handle(void)
         goto done;
     }
 
-    found = FALSE;
+    obj1 = obj2 = (void *)0xdeadbeef;
     for (i = 0; i < shi->Count; i++)
     {
         if (shi->Handle[i].OwnerPid == GetCurrentProcessId() &&
                 (HANDLE)(ULONG_PTR)shi->Handle[i].HandleValue == EventHandle)
         {
+            ok(obj1 == (void *)0xdeadbeef, "Found duplicate.\n");
             ok(shi->Handle[i].HandleFlags == (OBJ_INHERIT | OBJ_PROTECT_CLOSE),
                     "got attributes %#x\n", shi->Handle[i].HandleFlags);
-            found = TRUE;
-            break;
+            obj1 = shi->Handle[i].ObjectPointer;
         }
+        if (shi->Handle[i].OwnerPid == GetCurrentProcessId() &&
+                (HANDLE)(ULONG_PTR)shi->Handle[i].HandleValue == handle_dup)
+        {
+            ok(obj2 == (void *)0xdeadbeef, "Found duplicate.\n");
+            ok(shi->Handle[i].HandleFlags == OBJ_INHERIT, "got attributes %#x\n", shi->Handle[i].HandleFlags);
+            obj2 = shi->Handle[i].ObjectPointer;
+        }
+        ok((ULONG_PTR)shi->Handle[i].ObjectPointer > (ULONG_PTR)0xffff800000000000, "got %p.\n",
+                shi->Handle[i].ObjectPointer);
     }
-    ok( found, "Expected to find event handle %p (pid %lx) in handle list\n", EventHandle, GetCurrentProcessId() );
+    ok(obj1 != (void *)0xdeadbeef, "Didn't find %p (pid %lx).\n", EventHandle, GetCurrentProcessId());
+    ok(obj1 == obj2, "got %p, %p.\n", obj1, obj2);
+
+    for (i = 0; i < shi->Count; i++)
+    {
+        if (!(shi->Handle[i].OwnerPid == GetCurrentProcessId()
+              && ((HANDLE)(ULONG_PTR)shi->Handle[i].HandleValue == EventHandle
+              || (HANDLE)(ULONG_PTR)shi->Handle[i].HandleValue == handle_dup)))
+            ok(shi->Handle[i].ObjectPointer != obj1, "Got same object.\n");
+    }
 
     ret = SetHandleInformation(EventHandle, HANDLE_FLAG_PROTECT_FROM_CLOSE, 0);
     ok(ret, "got error %lu\n", GetLastError());
@@ -997,11 +1021,12 @@ static void test_query_handle_ex(void)
     found = FALSE;
     for (i = 0; i < info->NumberOfHandles; ++i)
     {
+        ok((ULONG_PTR)info->Handles[i].Object > (ULONG_PTR)0xffff800000000000, "got %p.\n", info->Handles[i].Object);
         if (info->Handles[i].UniqueProcessId == GetCurrentProcessId()
                 && (HANDLE)info->Handles[i].HandleValue == event)
         {
+            ok(!found, "Found duplicate.\n");
             found = TRUE;
-            break;
         }
     }
     ok(!found, "event handle found\n");
