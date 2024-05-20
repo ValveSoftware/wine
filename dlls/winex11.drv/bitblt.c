@@ -1643,7 +1643,7 @@ static void update_surface_region( struct x11drv_window_surface *surface )
 
     if (!shape_layered_windows) return;
 
-    if (wm_is_steamcompmgr(gdi_display)) return;
+    if (wm_is_steamcompmgr(gdi_display) && surface->color_key == CLR_INVALID) return;
 
     if (!surface->is_argb && surface->color_key == CLR_INVALID)
     {
