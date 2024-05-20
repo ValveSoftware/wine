@@ -1628,7 +1628,7 @@ static void hidraw_set_quirks(struct hidraw_device *impl, DWORD bus_type, WORD v
 static void udev_add_device(struct udev_device *dev, int fd)
 {
     const char *env = getenv("PROTON_EXPOSE_STEAM_CONTROLLER");
-    BOOL expose_steam_controller = env && atoi(env) == 1;
+    BOOL expose_steam_controller = !env || atoi(env) == 1;
 
     struct device_desc desc =
     {
