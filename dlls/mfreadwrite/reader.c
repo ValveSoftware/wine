@@ -1894,12 +1894,21 @@ static HRESULT source_reader_create_transform(struct source_reader *reader, BOOL
     list_init(&entry->entry);
     entry->category = category;
 
-    if (IsEqualGUID(&out_type.guidMajorType, &MFMediaType_Audio)
-            && SUCCEEDED(IMFMediaType_GetUINT32(output_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &entry->min_buffer_size)))
+    if (IsEqualGUID(&out_type.guidMajorType, &MFMediaType_Audio))
     {
         UINT32 bytes_per_second;
 
-        if (SUCCEEDED(IMFMediaType_GetUINT32(output_type, &MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &bytes_per_second)))
+        /* decoders require to have MF_MT_AUDIO_BITS_PER_SAMPLE attribute set, but the source reader doesn't */
+        if (FAILED(IMFMediaType_GetItem(output_type, &MF_MT_AUDIO_BITS_PER_SAMPLE, NULL)))
+        {
+            if (IsEqualGUID(&out_type.guidSubtype, &MFAudioFormat_PCM))
+                IMFMediaType_SetUINT32(output_type, &MF_MT_AUDIO_BITS_PER_SAMPLE, 16);
+            else if (IsEqualGUID(&out_type.guidSubtype, &MFAudioFormat_Float))
+                IMFMediaType_SetUINT32(output_type, &MF_MT_AUDIO_BITS_PER_SAMPLE, 32);
+        }
+
+        if (SUCCEEDED(IMFMediaType_GetUINT32(output_type, &MF_MT_AUDIO_BLOCK_ALIGNMENT, &entry->min_buffer_size))
+                && SUCCEEDED(IMFMediaType_GetUINT32(output_type, &MF_MT_AUDIO_AVG_BYTES_PER_SECOND, &bytes_per_second)))
             entry->min_buffer_size = max(entry->min_buffer_size, bytes_per_second);
     }
 
