@@ -2072,6 +2072,7 @@ static HRESULT WINAPI src_reader_SetCurrentMediaType(IMFSourceReaderEx *iface, D
         IMFMediaType *type)
 {
     struct source_reader *reader = impl_from_IMFSourceReaderEx(iface);
+    IMFMediaType *output_type;
     HRESULT hr;
 
     TRACE("%p, %#lx, %p, %p.\n", iface, index, reserved, type);
@@ -2091,16 +2092,25 @@ static HRESULT WINAPI src_reader_SetCurrentMediaType(IMFSourceReaderEx *iface, D
     if (index >= reader->stream_count)
         return MF_E_INVALIDSTREAMNUMBER;
 
+    if (FAILED(hr = MFCreateMediaType(&output_type)))
+        return hr;
+    if (FAILED(IMFMediaType_CopyAllItems(type, (IMFAttributes *)output_type)))
+    {
+        IMFMediaType_Release(output_type);
+        return hr;
+    }
+
     /* FIXME: setting the output type while streaming should trigger a flush */
 
     EnterCriticalSection(&reader->cs);
 
-    hr = source_reader_set_compatible_media_type(reader, index, type);
+    hr = source_reader_set_compatible_media_type(reader, index, output_type);
     if (hr == S_FALSE)
-        hr = source_reader_create_decoder_for_stream(reader, index, type);
+        hr = source_reader_create_decoder_for_stream(reader, index, output_type);
 
     LeaveCriticalSection(&reader->cs);
 
+    IMFMediaType_Release(output_type);
     return hr;
 }
 
