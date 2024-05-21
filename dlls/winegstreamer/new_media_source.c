@@ -669,6 +669,13 @@ static HRESULT wait_on_sample(struct media_stream *stream, IUnknown *token)
     {
         if (FAILED(hr = wg_source_get_position(source->wg_source, &read_offset)))
             break;
+        if (read_offset >= source->file_size)
+        {
+            if (FAILED(hr = wg_source_push_data(source->wg_source, read_offset, NULL, 0)))
+                WARN("Failed to push %#lx bytes to source, hr %#lx\n", read_size, hr);
+            continue;
+        }
+
         if (FAILED(hr = IMFByteStream_GetCurrentPosition(source->byte_stream, &position)))
             WARN("Failed to get current byte stream position, hr %#lx\n", hr);
         else if (position != (read_offset = min(read_offset, source->file_size))
@@ -1936,28 +1943,31 @@ static HRESULT WINAPI stream_handler_callback_Invoke(IMFAsyncCallback *iface, IM
         WARN("Failed to create wg_source, hr %#lx\n", hr);
     else if (FAILED(hr = wg_source_push_data(context->wg_source, context->read_offset, context->buffer, size)))
         WARN("Failed to push wg_source data, hr %#lx\n", hr);
-    else if (FAILED(hr = wg_source_get_stream_count(context->wg_source, &context->stream_count)))
-        WARN("Failed to get wg_source status, hr %#lx\n", hr);
-    else if (!context->stream_count)
+    else while (SUCCEEDED(hr))
     {
+        UINT32 read_size;
         QWORD position;
-        if (FAILED(hr = wg_source_get_position(context->wg_source, &context->read_offset)))
+
+        if (FAILED(hr = wg_source_get_stream_count(context->wg_source, &context->stream_count)))
+            WARN("Failed to get source stream count, hr %#lx\n", hr);
+        else if (context->stream_count)
+            break;
+        else if (FAILED(hr = wg_source_get_position(context->wg_source, &context->read_offset)))
             WARN("Failed to get wg_source position, hr %#lx\n", hr);
         else if (FAILED(hr = IMFByteStream_GetCurrentPosition(context->stream, &position)))
             WARN("Failed to get current byte stream position, hr %#lx\n", hr);
         else if (position != (context->read_offset = min(context->read_offset, context->file_size))
                 && FAILED(hr = IMFByteStream_SetCurrentPosition(context->stream, context->read_offset)))
             WARN("Failed to set current byte stream position, hr %#lx\n", hr);
-        else
-        {
-            UINT32 read_size = min(SOURCE_BUFFER_SIZE, context->file_size - context->read_offset);
+        else if ((read_size = min(SOURCE_BUFFER_SIZE, context->file_size - context->read_offset)))
             return IMFByteStream_BeginRead(context->stream, context->buffer, read_size,
                     &handler->IMFAsyncCallback_iface, state);
-        }
+        else if (FAILED(hr = wg_source_push_data(context->wg_source, context->read_offset, NULL, 0)))
+            WARN("Failed to push wg_source data, hr %#lx\n", hr);
     }
-    else if (FAILED(hr = media_source_create(context, (IMFMediaSource **)&object)))
-        WARN("Failed to create media source, hr %#lx\n", hr);
 
+    if (SUCCEEDED(hr) && FAILED(hr = media_source_create(context, (IMFMediaSource **)&object)))
+        WARN("Failed to create media source, hr %#lx\n", hr);
     if (SUCCEEDED(hr))
     {
         if (FAILED(hr = result_entry_create(context->result, MF_OBJECT_MEDIASOURCE, object, &entry)))
