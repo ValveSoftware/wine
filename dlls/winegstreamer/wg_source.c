@@ -841,7 +841,8 @@ NTSTATUS wg_source_set_position(void *args)
 
     GST_TRACE("source %p, time %"G_GINT64_MODIFIER"d", source, time);
 
-    push_event(source->streams[0].pad, gst_event_new_seek(1.0, GST_FORMAT_TIME, GST_SEEK_FLAG_FLUSH,
+    push_event(source->streams[0].pad, gst_event_new_seek(1.0, GST_FORMAT_TIME,
+            GST_SEEK_FLAG_FLUSH | GST_SEEK_FLAG_SNAP_BEFORE | GST_SEEK_FLAG_KEY_UNIT,
             GST_SEEK_TYPE_SET, time, GST_SEEK_TYPE_NONE, -1));
 
     for (i = 0; i < source->stream_count; i++)
