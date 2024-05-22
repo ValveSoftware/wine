@@ -793,6 +793,26 @@ PDH_STATUS WINAPI PdhGetRawCounterValue( PDH_HCOUNTER handle, LPDWORD type,
     return ERROR_SUCCESS;
 }
 
+PDH_STATUS WINAPI PdhGetFormattedCounterArrayW( PDH_HCOUNTER handle, DWORD format, DWORD *size, DWORD *count,
+                                                PDH_FMT_COUNTERVALUE_ITEM_W *buffer)
+{
+    FIXME( "%p %lu %p %p %p stub.\n", handle, format, size, count, buffer );
+
+    *size = 0;
+    *count = 0;
+    return ERROR_SUCCESS;
+}
+
+PDH_STATUS WINAPI PdhGetFormattedCounterArrayA( PDH_HCOUNTER handle, DWORD format, DWORD *size, DWORD *count,
+                                                PDH_FMT_COUNTERVALUE_ITEM_A *buffer)
+{
+    FIXME( "%p %lu %p %p %p stub.\n", handle, format, size, count, buffer );
+
+    *size = 0;
+    *count = 0;
+    return ERROR_SUCCESS;
+}
+
 /***********************************************************************
  *              PdhLookupPerfIndexByNameA   (PDH.@)
  */
