@@ -1406,7 +1406,7 @@ static void add_gpu( const struct gdi_gpu *gpu, void *param )
             break;
         /* Nvidia */
         case 0x10de:
-            sprintf( buffer, "31.0.15.5244" );
+            sprintf( buffer, "31.0.19.9999" );
             break;
         /* Default value for any other vendor. */
         default:
