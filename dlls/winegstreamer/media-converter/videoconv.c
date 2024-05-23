@@ -348,17 +348,11 @@ static int video_conv_state_create(struct video_conv_state **out)
     uint64_t blank_file_size;
     int ret, fd;
 
-    if (!(read_fozdb_path = getenv("MEDIACONV_VIDEO_TRANSCODED_FILE")))
-    {
-        GST_ERROR("MEDIACONV_VIDEO_TRANSCODED_FILE is not set.");
-        return CONV_ERROR_ENV_NOT_SET;
-    }
     if (!(blank_video = getenv("MEDIACONV_BLANK_VIDEO_FILE")))
     {
         GST_ERROR("Env MEDIACONV_BLANK_VIDEO_FILE not set.");
         return CONV_ERROR_ENV_NOT_SET;
     }
-
     if (!open_file(blank_video, O_RDONLY, &fd))
         return CONV_ERROR_OPEN_FAILED;
     if (!get_file_size(fd, &blank_file_size))
@@ -367,8 +361,17 @@ static int video_conv_state_create(struct video_conv_state **out)
         return CONV_ERROR_OPEN_FAILED;
     }
 
-    if ((ret = fozdb_create(read_fozdb_path, O_RDONLY, true /* Read-only? */, VIDEO_CONV_FOZ_NUM_TAGS, &fozdb)) < 0)
-        GST_ERROR("Failed to create read fozdb from %s, ret %d.", read_fozdb_path, ret);
+    if ((read_fozdb_path = getenv("MEDIACONV_VIDEO_TRANSCODED_FILE")))
+    {
+        if ((ret = fozdb_create(read_fozdb_path, O_RDONLY, true /* Read-only? */,
+                VIDEO_CONV_FOZ_NUM_TAGS, &fozdb)) < 0)
+            GST_ERROR("Failed to create read fozdb from %s, ret %d.", read_fozdb_path, ret);
+    }
+    else
+    {
+        GST_ERROR("Env MEDIACONV_VIDEO_TRANSCODED_FILE is not set.");
+        ret = CONV_ERROR_ENV_NOT_SET;
+    }
 
     state = calloc(1, sizeof(*state));
     state->read_fozdb = fozdb;
@@ -378,7 +381,7 @@ static int video_conv_state_create(struct video_conv_state **out)
     state->transcoded_tag = VIDEO_CONV_FOZ_TAG_MKVDATA;
 
     *out = state;
-    return CONV_OK;
+    return ret;
 }
 
 static void video_conv_state_release(struct video_conv_state *state)
@@ -484,10 +487,7 @@ static GstStateChangeReturn video_conv_change_state(GstElement *element, GstStat
     case GST_STATE_CHANGE_NULL_TO_READY:
         /* Do runtime setup. */
         if ((ret = video_conv_state_create(&state)) < 0)
-        {
             GST_ERROR("Failed to create video conv state, ret %d.", ret);
-            return GST_STATE_CHANGE_FAILURE;
-        }
         pthread_mutex_lock(&conv->state_mutex);
         assert(!conv->state);
         conv->state = state;
