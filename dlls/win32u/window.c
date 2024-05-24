@@ -475,6 +475,17 @@ HWND WINAPI NtUserSetParent( HWND hwnd, HWND parent )
     set_window_pos( &winpos, new_screen_rect.left - old_screen_rect.left,
                     new_screen_rect.top - old_screen_rect.top );
 
+    {
+        WCHAR name[32];
+        UNICODE_STRING us = { 0, sizeof(name), name };
+
+        if (NtUserGetClassName( hwnd, FALSE, &us ) && !wcscmp( us.Buffer, u"SyberiaRenderWindowClass" ))
+        {
+            ERR( "HACK: Hiding window.\n" );
+            was_visible = FALSE;
+        }
+    }
+
     if (was_visible) NtUserShowWindow( hwnd, SW_SHOW );
 
     SetThreadDpiAwarenessContext( context );
