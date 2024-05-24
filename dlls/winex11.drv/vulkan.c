@@ -291,6 +291,8 @@ static BOOL wine_vk_surface_set_offscreen( struct wine_vk_surface *surface, BOOL
 #ifdef SONAME_LIBXCOMPOSITE
     if (usexcomposite)
     {
+        struct x11drv_win_data *data;
+
         if (vulkan_disable_child_window_rendering_hack)
         {
             FIXME("Vulkan child window rendering is supported, but it's disabled.\n");
@@ -300,12 +302,22 @@ static BOOL wine_vk_surface_set_offscreen( struct wine_vk_surface *surface, BOOL
         if (!surface->offscreen && offscreen)
         {
             FIXME( "Redirecting vulkan surface %lx offscreen, expect degraded performance.\n", surface->window );
+            if ((data = get_win_data( surface->hwnd )))
+            {
+                detach_client_window( data, surface->window, TRUE );
+                release_win_data( data );
+            }
             pXCompositeRedirectWindow( gdi_display, surface->window, CompositeRedirectManual );
         }
         else if (surface->offscreen && !offscreen)
         {
             FIXME( "Putting vulkan surface %lx back onscreen, expect standard performance.\n", surface->window );
             pXCompositeUnredirectWindow( gdi_display, surface->window, CompositeRedirectManual );
+            if ((data = get_win_data( surface->hwnd )))
+            {
+                attach_client_window( data, surface->window );
+                release_win_data( data );
+            }
         }
         surface->offscreen = offscreen;
         return TRUE;
@@ -1048,7 +1060,7 @@ static VkResult X11DRV_vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR *
         struct x11drv_win_data *data;
 
         if (!XFindContext( gdi_display, (XID)swapchain, swapchain_context, (char **)&surface ) &&
-            !surface->gdi_blit_source && (data = get_win_data( surface->hwnd )))
+            !surface->gdi_blit_source && !surface->offscreen && (data = get_win_data( surface->hwnd )))
         {
             attach_client_window( data, surface->window );
             release_win_data( data );
