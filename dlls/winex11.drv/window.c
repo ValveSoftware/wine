@@ -1771,8 +1771,6 @@ static void sync_client_position( struct x11drv_win_data *data,
     int mask = 0;
     XWindowChanges changes;
 
-    if (!data->client_window) return;
-
     changes.x      = data->client_rect.left - data->whole_rect.left;
     changes.y      = data->client_rect.top - data->whole_rect.top;
     changes.width  = min( max( 1, data->client_rect.right - data->client_rect.left ), 65535 );
@@ -1800,9 +1798,12 @@ static void sync_client_position( struct x11drv_win_data *data,
 
     if (mask)
     {
-        TRACE( "setting client win %lx pos %d,%d,%dx%d changes=%x\n",
-               data->client_window, changes.x, changes.y, changes.width, changes.height, mask );
-        XConfigureWindow( gdi_display, data->client_window, mask, &changes );
+        if (data->client_window)
+        {
+            TRACE( "setting client win %lx pos %d,%d,%dx%d changes=%x\n",
+                   data->client_window, changes.x, changes.y, changes.width, changes.height, mask );
+            XConfigureWindow( gdi_display, data->client_window, mask, &changes );
+        }
         resize_vk_surfaces( data->hwnd, data->client_window, mask, &changes );
     }
 }
