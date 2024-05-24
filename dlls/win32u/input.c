@@ -2108,7 +2108,10 @@ BOOL set_foreground_window( HWND hwnd, BOOL mouse )
 
         /* already active, set_active_window will do no nothing */
         if (!send_msg_new && hwnd == get_active_window())
+        {
             send_message( hwnd, WM_NCACTIVATE, TRUE, (LPARAM)hwnd );
+            NtUserNotifyWinEvent( EVENT_SYSTEM_FOREGROUND, hwnd, 0, 0 );
+        }
 
         if (send_msg_new)  /* new window belongs to other thread */
             NtUserPostMessage( hwnd, WM_WINE_SETACTIVEWINDOW, (WPARAM)hwnd, 0 );
