@@ -2246,7 +2246,15 @@ BOOL set_foreground_window( HWND hwnd, BOOL mouse, BOOL internal )
             NtUserMessageCall( hwnd, WM_WINE_SETACTIVEWINDOW, (WPARAM)hwnd, 0,
                                0, NtUserSendNotifyMessage, FALSE );
         else  /* new window belongs to us */
+        {
+            BOOL already_active = (hwnd == get_active_window());
+
             ret = set_active_window( hwnd, NULL, mouse, TRUE, 0 );
+
+            if (already_active)
+                /* set_active_window will do no nothing */
+                NtUserNotifyWinEvent( EVENT_SYSTEM_FOREGROUND, hwnd, 0, 0 );
+        }
     }
     return ret;
 }
