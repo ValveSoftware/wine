@@ -308,6 +308,7 @@ static BOOL wine_vk_surface_set_offscreen( struct wine_vk_surface *surface, BOOL
                 release_win_data( data );
             }
             pXCompositeRedirectWindow( gdi_display, surface->window, CompositeRedirectManual );
+            invalidate_vk_surfaces(surface->hwnd);
         }
         else if (surface->offscreen && !offscreen)
         {
@@ -976,7 +977,7 @@ static VkResult X11DRV_vkAcquireNextImageKHR( VkDevice device, VkSwapchainKHR sw
 
     result = pvkAcquireNextImageKHR( device, swapchain, timeout, semaphore, fence, image_index );
 
-    if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && surface->offscreen)
+    if ((result == VK_SUCCESS || result == VK_SUBOPTIMAL_KHR) && surface->offscreen && !surface->invalidated)
     {
         DWORD dc_flags = DCX_USESTYLE;
         if (!surface->gdi_blit_source || surface->other_process) dc_flags |= DCX_CACHE;
