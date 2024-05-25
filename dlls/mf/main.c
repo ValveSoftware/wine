@@ -32,6 +32,10 @@
 #include "wine/list.h"
 #include "wine/mfinternal.h"
 
+#include "mmdeviceapi.h"
+#include "initguid.h"
+#include "devpkey.h"
+
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
 extern const GUID CLSID_FileSchemePlugin;
@@ -744,19 +748,153 @@ HRESULT WINAPI MFShutdownObject(IUnknown *object)
     return S_OK;
 }
 
+
+static HRESULT source_create_object(IMFAttributes *attributes, void *user_context, IUnknown **obj)
+{
+    FIXME("%p, %p, %p stub.\n", attributes, user_context, obj);
+
+    return E_NOTIMPL;
+}
+
+static void source_shutdown_object(void *user_context, IUnknown *obj)
+{
+    TRACE("%p %p.\n", user_context, obj);
+}
+
+static void source_free_private(void *user_context)
+{
+    TRACE("%p.\n", user_context);
+}
+
+static const struct activate_funcs source_activate_funcs =
+{
+    source_create_object,
+    source_shutdown_object,
+    source_free_private,
+};
+
 /***********************************************************************
  *      MFEnumDeviceSources (mf.@)
  */
-HRESULT WINAPI MFEnumDeviceSources(IMFAttributes *attributes, IMFActivate ***sources, UINT32 *count)
+HRESULT WINAPI MFEnumDeviceSources(IMFAttributes *attributes, IMFActivate ***sources, UINT32 *ret_count)
 {
-    FIXME("%p, %p, %p.\n", attributes, sources, count);
+    UINT32 i, count, default_index = 0;
+    IMMDeviceEnumerator *devenum = NULL;
+    IMMDeviceCollection *devices = NULL;
+    WCHAR *default_id = NULL;
+    IMMDevice *device;
+    GUID source_type;
+    HRESULT hr;
 
-    if (!attributes || !sources || !count)
+    TRACE("%p, %p, %p.\n", attributes, sources, ret_count);
+
+    if (!attributes || !sources || !ret_count)
         return E_INVALIDARG;
 
-    *count = 0;
+    *ret_count = 0;
 
-    return S_OK;
+    if (FAILED(hr = IMFAttributes_GetGUID(attributes, &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, &source_type)))
+    {
+        TRACE("MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE not found.\n");
+        return hr;
+    }
+    if (!IsEqualIID(&source_type, &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID))
+    {
+        FIXME("Unknown source type %s.\n", debugstr_guid(&source_type));
+        return S_OK;
+    }
+
+    if (FAILED(hr = CoCreateInstance(&CLSID_MMDeviceEnumerator, NULL, CLSCTX_INPROC_SERVER, &IID_IMMDeviceEnumerator,
+            (void **)&devenum)))
+        goto done;
+    if (FAILED(hr = IMMDeviceEnumerator_EnumAudioEndpoints(devenum, eCapture, DEVICE_STATE_ACTIVE, &devices)))
+        goto done;
+    if (FAILED(hr = IMMDeviceCollection_GetCount(devices, &count)))
+        goto done;
+    if (SUCCEEDED(hr = IMMDeviceEnumerator_GetDefaultAudioEndpoint(devenum, eCapture, eMultimedia, &device)))
+    {
+        IMMDevice_GetId(device, &default_id);
+        IMMDevice_Release(device);
+    }
+    *sources = count ? CoTaskMemAlloc(count * sizeof(**sources)) : NULL;
+    for (i = 0; i < count; ++i)
+    {
+        IPropertyStore *ps;
+        PROPVARIANT pv;
+        WCHAR *str;
+
+        if (FAILED(hr = create_activation_object(NULL, &source_activate_funcs, &(*sources)[i])))
+            goto device_error;
+        IMFActivate_SetGUID((*sources)[i], &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE, &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_GUID);
+        if (FAILED(hr = IMMDeviceCollection_Item(devices, i, &device)))
+        {
+            IMFActivate_Release((*sources)[i]);
+            goto device_error;
+        }
+        if (FAILED(IMMDevice_GetId(device, &str)))
+        {
+            IMFActivate_Release((*sources)[i]);
+            IMMDevice_Release(device);
+            goto device_error;
+        }
+        IMFActivate_SetString((*sources)[i], &MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE_AUDCAP_ENDPOINT_ID, str);
+        if (!wcscmp(str, default_id))
+            default_index = i;
+        CoTaskMemFree(str);
+
+        hr = IMMDevice_OpenPropertyStore(device, STGM_READ, &ps);
+        IMMDevice_Release(device);
+        if (FAILED(hr))
+        {
+            IMFActivate_Release((*sources)[i]);
+            goto device_error;
+        }
+        hr = IPropertyStore_GetValue(ps, (const PROPERTYKEY*)&DEVPKEY_Device_FriendlyName, &pv);
+        IPropertyStore_Release(ps);
+        if (FAILED(hr))
+        {
+            IMFActivate_Release((*sources)[i]);
+            goto device_error;
+        }
+        if (pv.vt != VT_LPWSTR)
+        {
+            IMFActivate_Release((*sources)[i]);
+            PropVariantClear(&pv);
+            goto device_error;
+        }
+        IMFActivate_SetString((*sources)[i], &MF_DEVSOURCE_ATTRIBUTE_FRIENDLY_NAME, pv.pwszVal);
+        PropVariantClear(&pv);
+        continue;
+
+device_error:
+        if (default_index == i)
+            default_index = 0;
+        --i;
+        --count;
+    }
+    *ret_count = count;
+    if (default_index)
+    {
+        IMFActivate *tmp = (*sources)[0];
+
+        (*sources)[0] = (*sources)[default_index];
+        (*sources)[default_index] = tmp;
+    }
+    if (!count)
+    {
+        CoTaskMemFree(*sources);
+        *sources = NULL;
+    }
+    hr = S_OK;
+
+done:
+    CoTaskMemFree(default_id);
+    if (devices)
+        IMMDeviceCollection_Release(devices);
+    if (devenum)
+        IMMDeviceEnumerator_Release(devenum);
+    TRACE("ret %#lx, *ret_count %u.\n", hr, *ret_count);
+    return hr;
 }
 
 struct simple_type_handler
