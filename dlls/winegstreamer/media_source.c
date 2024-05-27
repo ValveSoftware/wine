@@ -606,7 +606,7 @@ static HRESULT media_stream_start(struct media_stream *stream, BOOL active, BOOL
 
     if (FAILED(hr = wg_format_from_stream_descriptor(stream->descriptor, &format)))
         WARN("Failed to get wg_format from stream descriptor, hr %#lx\n", hr);
-    wg_parser_stream_enable(stream->wg_stream, &format, 0);
+    wg_parser_stream_enable(stream->wg_stream, &format);
 
     if (FAILED(hr = IMFMediaEventQueue_QueueEventParamUnk(source->event_queue, active ? MEUpdatedStream : MENewStream,
             &GUID_NULL, S_OK, (IUnknown *)&stream->IMFMediaStream_iface)))
