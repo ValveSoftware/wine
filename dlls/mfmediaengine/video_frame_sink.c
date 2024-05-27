@@ -346,13 +346,14 @@ static HRESULT WINAPI video_frame_sink_stream_ProcessSample(IMFStreamSink *iface
         {
             if (!(sink->flags & FLAGS_FIRST_FRAME))
             {
-                video_frame_sink_stream_request_sample(sink);
                 video_frame_sink_notify(sink, MF_MEDIA_ENGINE_EVENT_FIRSTFRAMEREADY);
                 video_frame_sink_set_flag(sink, FLAGS_FIRST_FRAME, TRUE);
             }
 
             IMFSample_AddRef(sink->sample[sample_write_index] = sample);
             sample_index_increment(&sink->sample_write_index);
+            if (!sink->sample[sink->sample_write_index])
+                video_frame_sink_stream_request_sample(sink);
         }
     }
 
@@ -1169,11 +1170,9 @@ HRESULT video_frame_sink_get_pts(struct video_frame_sink *sink, MFTIME clocktime
             hr = sample_get_pts(sink->presentation_sample, clocktime, pts);
         }
 
-        if (transfer_sample || !sink->sample[sink->sample_write_index])
-            video_frame_sink_stream_request_sample(sink);
-
         if (transfer_sample)
         {
+            video_frame_sink_stream_request_sample(sink);
             if (sink->presentation_sample)
                 IMFSample_Release(sink->presentation_sample);
             /* transfer ownership from sample array to presentation sample */
