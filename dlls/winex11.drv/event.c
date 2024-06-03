@@ -1219,9 +1219,9 @@ static BOOL X11DRV_ConfigureNotify( HWND hwnd, XEvent *xev )
     {
         const char *steamgameid = getenv( "SteamGameId" );
 
-        if (steamgameid && !strcmp( steamgameid, "590380" ))
+        if (steamgameid && (!strcmp( steamgameid, "590380" ) || !strcmp( steamgameid, "307690" )))
         {
-            /* Into The Breach is extremely picky about the size of its window. */
+            /* Into The Breach and Sleeping Dogs are extremely picky about the size of its window. */
             if (NtUserIsWindowRectFullScreen( &data->whole_rect ) && NtUserIsWindowRectFullScreen( &rect ))
             {
                 TRACE( "window is fullscreen and new size is also fullscreen, so preserving window size\n" );
