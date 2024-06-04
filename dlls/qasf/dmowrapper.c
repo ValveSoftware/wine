@@ -248,9 +248,6 @@ static HRESULT process_output(struct dmo_wrapper *filter, IMediaObject *dmo)
     DWORD status, i;
     HRESULT hr;
 
-    if (FAILED(hr = get_output_samples(filter)))
-        return hr;
-
     do
     {
         hr = IMediaObject_ProcessOutput(dmo, DMO_PROCESS_OUTPUT_DISCARD_WHEN_NO_BUFFER,
@@ -319,6 +316,8 @@ static HRESULT WINAPI dmo_wrapper_sink_Receive(struct strmbase_sink *iface, IMed
         /* Calling Discontinuity() might change the DMO's mind about whether it
          * has more data to process. The DirectX documentation explicitly
          * states that we should call ProcessOutput() again in this case. */
+        if (FAILED(hr = get_output_samples(filter)))
+            goto out;
         process_output(filter, dmo);
     }
 
@@ -340,6 +339,8 @@ static HRESULT WINAPI dmo_wrapper_sink_Receive(struct strmbase_sink *iface, IMed
         goto out;
     }
 
+    if (FAILED(hr = get_output_samples(filter)))
+        goto out;
     process_output(filter, dmo);
 
 out:
@@ -360,7 +361,9 @@ static HRESULT dmo_wrapper_sink_eos(struct strmbase_sink *iface)
     if (FAILED(hr = IMediaObject_Discontinuity(dmo, index)))
         ERR("Discontinuity() failed, hr %#lx.\n", hr);
 
-    process_output(filter, dmo);
+    if (SUCCEEDED(get_output_samples(filter)))
+        process_output(filter, dmo);
+
     if (FAILED(hr = IMediaObject_Flush(dmo)))
         ERR("Flush() failed, hr %#lx.\n", hr);
 
