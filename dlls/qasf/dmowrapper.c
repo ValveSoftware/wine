@@ -321,6 +321,9 @@ static HRESULT WINAPI dmo_wrapper_sink_Receive(struct strmbase_sink *iface, IMed
         process_output(filter, dmo);
     }
 
+    if (FAILED(hr = get_output_samples(filter)))
+        goto out;
+
     if (IMediaSample_IsSyncPoint(sample) == S_OK)
         flags |= DMO_INPUT_DATA_BUFFERF_SYNCPOINT;
 
@@ -339,8 +342,6 @@ static HRESULT WINAPI dmo_wrapper_sink_Receive(struct strmbase_sink *iface, IMed
         goto out;
     }
 
-    if (FAILED(hr = get_output_samples(filter)))
-        goto out;
     process_output(filter, dmo);
 
 out:
