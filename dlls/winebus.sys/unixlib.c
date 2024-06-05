@@ -124,13 +124,16 @@ static BOOL is_vkb_controller(WORD vid, WORD pid, INT buttons)
 
 static BOOL is_virpil_controller(WORD vid, WORD pid, INT buttons)
 {
-    if (vid != 0x3344) return FALSE;
+    switch (vid)
+    {
+    case 0x3344:
+        /* comes with 31 buttons in the default configuration, or 128 max */
+        if ((buttons == 31) || (buttons == 128)) return TRUE;
 
-    /* comes with 31 buttons in the default configuration, or 128 max */
-    if ((buttons == 31) || (buttons == 128)) return TRUE;
-
-    /* if customized, arbitrary amount of buttons may be shown, decide by PID */
-    if (pid == 0x412f) return TRUE; /* Virpil Constellation ALPHA-R */
+        /* if customized, arbitrary amount of buttons may be shown, decide by PID */
+        if (pid == 0x412f) return TRUE; /* Virpil Constellation ALPHA-R */
+        break;
+    }
     return FALSE;
 }
 
