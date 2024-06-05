@@ -135,6 +135,7 @@ static BOOL is_virpil_controller(WORD vid, WORD pid, INT buttons)
 
         /* if customized, arbitrary amount of buttons may be shown, decide by PID */
         if (pid == 0x412f) return TRUE; /* Virpil Constellation ALPHA-R */
+        if (pid == 0x812c) return TRUE; /* Virpil Constellation ALPHA-L */
         break;
     }
     return FALSE;
