@@ -126,6 +126,9 @@ static BOOL is_virpil_controller(WORD vid, WORD pid, INT buttons)
 {
     switch (vid)
     {
+    case 0x03eb:
+        if (pid == 0x2055) return TRUE; /* ATMEL/VIRPIL/200325 VPC Throttle MT-50 CM2 */
+        break;
     case 0x3344:
         /* comes with 31 buttons in the default configuration, or 128 max */
         if ((buttons == 31) || (buttons == 128)) return TRUE;
