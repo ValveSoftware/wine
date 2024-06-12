@@ -344,7 +344,8 @@ static BOOL is_special_env_var( const char *var )
             STARTS_WITH( var, "TMP=" ) ||
             STARTS_WITH( var, "QT_" ) ||
             STARTS_WITH( var, "SDL_AUDIODRIVER=" ) ||
-            STARTS_WITH( var, "VK_" ));
+            STARTS_WITH( var, "VK_" ) ||
+            STARTS_WITH( var, "XDG_SESSION_TYPE=" ));
 }
 
 /* check if an environment variable changes dynamically in every new process */
