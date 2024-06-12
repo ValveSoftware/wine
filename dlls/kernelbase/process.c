@@ -1743,29 +1743,6 @@ LPSTR WINAPI DECLSPEC_HOTPATCH GetEnvironmentStringsA(void)
     return ret;
 }
 
-static void remove_env_variables( const char **skip, SIZE_T array_size, WCHAR *env, SIZE_T len )
-{
-    unsigned int i, j;
-    SIZE_T l;
-
-    while (*env)
-    {
-        for (i = 0; i < array_size; ++i)
-        {
-            j = 0;
-            while (skip[i][j] && skip[i][j] == env[j])
-                ++j;
-            if (!skip[i][j]) break;
-        }
-        l = lstrlenW( env );
-        len -= (l + 1) * sizeof(WCHAR);
-        if (i == array_size)
-            env += l + 1;
-        else
-            memmove( env, env + l + 1, len );
-    }
-}
-
 static void hack_shrink_environment( WCHAR *env, SIZE_T len )
 {
     static int enabled = -1;
@@ -1781,6 +1758,8 @@ static void hack_shrink_environment( WCHAR *env, SIZE_T len )
         "BASH_FUNC_",
         "XDG_DATA_DIRS=",
     };
+    SIZE_T l;
+    unsigned int i, j;
 
     if (enabled == -1)
     {
@@ -1798,36 +1777,24 @@ static void hack_shrink_environment( WCHAR *env, SIZE_T len )
             ERR( "HACK: shrinking environment size.\n" );
     }
 
-    if (enabled)
-        remove_env_variables(skip, ARRAY_SIZE(skip), env, len);
-}
+    if (!enabled) return;
 
-static void hack_suppress_xdg_environment( WCHAR *env, SIZE_T len )
-{
-    static int enabled = -1;
-    static const char *skip[] =
+    while (*env)
     {
-        "XDG_SESSION_TYPE=",
-    };
-
-    if (enabled == -1)
-    {
-        WCHAR str[40];
-
-        *str = 0;
-        if (GetEnvironmentVariableW( L"WINE_SUPPRESS_XDG_ENV", str, sizeof(str)) )
-            enabled = *str != '0';
-        else if (GetEnvironmentVariableW( L"SteamGameId", str, sizeof(str)) )
-            enabled = !wcscmp( str, L"809230" );
+        for (i = 0; i < ARRAY_SIZE(skip); ++i)
+        {
+            j = 0;
+            while (skip[i][j] && skip[i][j] == env[j])
+                ++j;
+            if (!skip[i][j]) break;
+        }
+        l = lstrlenW( env );
+        len -= (l + 1) * sizeof(WCHAR);
+        if (i == ARRAY_SIZE(skip))
+            env += l + 1;
         else
-            enabled = 0;
-
-        if (enabled)
-            ERR( "HACK: suppressing XDG environment.\n" );
+            memmove( env, env + l + 1, len );
     }
-
-    if (enabled)
-        remove_env_variables(skip, ARRAY_SIZE(skip), env, len);
 }
 
 /***********************************************************************
@@ -1844,7 +1811,6 @@ LPWSTR WINAPI DECLSPEC_HOTPATCH GetEnvironmentStringsW(void)
     {
         memcpy( ret, NtCurrentTeb()->Peb->ProcessParameters->Environment, len );
         hack_shrink_environment( ret, len );
-        hack_suppress_xdg_environment( ret, len );
     }
     RtlReleasePebLock();
     return ret;
