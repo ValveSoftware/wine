@@ -1403,6 +1403,12 @@ AGSReturnCode WINAPI agsDriverExtensionsDX11_Init( AGSContext *context, ID3D11De
 {
     FIXME("context %p, device %p, uavSlot %u, extensionsSupported %p stub.\n", context, device, uavSlot, extensionsSupported);
 
+    if (!context)
+    {
+        ERR("NULL context.\n");
+        return AGS_INVALID_ARGS;
+    }
+
     *extensionsSupported = 0;
     if (device)
     {
