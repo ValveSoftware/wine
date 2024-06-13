@@ -3073,6 +3073,20 @@ static void fs_hack_handle_ds_test( int mode, struct gl_drawable *gl, struct wgl
     fs_hack_handle_enable_switch( mode, GL_STENCIL_TEST, &state->stencil_test, FALSE );
 }
 
+static BOOL fs_hack_direct_front_blit(void)
+{
+    static int cached = -1;
+
+    if (cached == -1)
+    {
+        const char *sgi = getenv( "SteamGameId" );
+
+        cached = sgi && !strcmp( sgi, "500810" );
+    }
+
+    return cached;
+}
+
 static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer )
 {
     static const struct
@@ -3189,11 +3203,11 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
         pglBlitFramebuffer( 0, 0, src.cx, src.cy, 0, 0, src.cx, src.cy, GL_COLOR_BUFFER_BIT, GL_NEAREST );
         pglBindFramebuffer( GL_READ_FRAMEBUFFER, ctx->fs_hack_resolve_fbo );
     }
+
     pglBindFramebuffer( GL_DRAW_FRAMEBUFFER, 0 );
 
-    // HACK
-    // pglDrawBuffer( draw_buffer );
-    pglDrawBuffer( GL_BACK );
+    if (draw_buffer == GL_FRONT && fs_hack_direct_front_blit()) pglDrawBuffer( GL_FRONT );
+    else                                                        pglDrawBuffer( GL_BACK );
 
     opengl_funcs.gl.p_glClear( GL_COLOR_BUFFER_BIT );
 
@@ -3217,8 +3231,11 @@ static void fs_hack_blit_framebuffer( struct gl_drawable *gl, GLenum draw_buffer
                             GL_COLOR_BUFFER_BIT, ctx->fs_hack_integer ? GL_NEAREST : GL_LINEAR );
     }
 
-    // HACK
-    if (draw_buffer == GL_FRONT) pglXSwapBuffers( gdi_display, gl->drawable );
+    if (draw_buffer == GL_FRONT)
+    {
+        if (fs_hack_direct_front_blit()) pglFlush();
+        else                             pglXSwapBuffers( gdi_display, gl->drawable );
+    }
 
     if (gamma_ramp)
     {
