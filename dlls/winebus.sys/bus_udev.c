@@ -541,7 +541,7 @@ static const char *get_device_syspath(struct udev_device *dev)
     if ((parent = udev_device_get_parent_with_subsystem_devtype(dev, "usb", "usb_device")))
         return udev_device_get_syspath(parent);
 
-    return "";
+    return udev_device_get_syspath(dev);
 }
 
 static struct base_device *find_device_from_syspath(const char *path)
@@ -1627,6 +1627,9 @@ static void hidraw_set_quirks(struct hidraw_device *impl, DWORD bus_type, WORD v
 
 static void udev_add_device(struct udev_device *dev, int fd)
 {
+    const char *env = getenv("PROTON_EXPOSE_STEAM_CONTROLLER");
+    BOOL expose_steam_controller = env && atoi(env) == 1;
+
     struct device_desc desc =
     {
         .input = -1,
@@ -1701,7 +1704,17 @@ static void udev_add_device(struct udev_device *dev, int fd)
         if (!desc.manufacturer[0]) memcpy(desc.manufacturer, evdev, sizeof(evdev));
 
         if (!desc.product[0] && ioctl(fd, EVIOCGNAME(sizeof(buffer) - 1), buffer) > 0)
+        {
+            /* CW-Bug-Id: #20528 Check steam virtual controller indexes to keep them ordered */
+            /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL */
+            if (sscanf(buffer, "Microsoft X-Box 360 pad %u", &desc.input) == 1)
+            {
+                if (!expose_steam_controller) desc.input++;
+                desc.version = 0; /* keep version fixed as 0 so we can hardcode it in ntdll rawinput pipe redirection */
+            }
+
             ntdll_umbstowcs(buffer, strlen(buffer) + 1, desc.product, ARRAY_SIZE(desc.product));
+        }
 
         if (!desc.serialnumber[0] && ioctl(fd, EVIOCGUNIQ(sizeof(buffer)), buffer) >= 0)
             ntdll_umbstowcs(buffer, strlen(buffer) + 1, desc.serialnumber, ARRAY_SIZE(desc.serialnumber));
@@ -1714,13 +1727,32 @@ static void udev_add_device(struct udev_device *dev, int fd)
         memcpy(desc.serialnumber, zeros, sizeof(zeros));
     }
 
-    if (!is_hidraw_enabled(desc.vid, desc.pid, axes, buttons))
+    if (desc.vid == 0x28de && desc.pid == 0x11ff)
+    {
+        if (!strcmp(subsystem, "hidraw"))
+        {
+            TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+            close(fd);
+            return;
+        }
+
+        TRACE("evdev %s: detected steam input virtual controller\n", debugstr_a(devnode));
+        desc.is_gamepad = TRUE;
+
+        if (!expose_steam_controller)
+        {
+            TRACE("pretending it's an Xbox 360 controller\n");
+            desc.vid = 0x045e;
+            desc.pid = 0x028e;
+        }
+    }
+    else if (!is_hidraw_enabled(desc.vid, desc.pid, axes, buttons))
     {
         TRACE("hidraw %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
         close(fd);
         return;
     }
-    if (is_sdl_blacklisted(desc.vid, desc.pid))
+    else if (is_sdl_blacklisted(desc.vid, desc.pid))
     {
         /* this device is blacklisted */
         TRACE("hidraw %s: ignoring %s, in SDL blacklist\n", debugstr_a(devnode), debugstr_device_desc(&desc));

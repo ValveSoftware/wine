@@ -778,7 +778,7 @@ static NTSTATUS udev_driver_init(void)
 
     bus_options.disable_hidraw = check_bus_option(L"DisableHidraw", 0);
     if (bus_options.disable_hidraw) TRACE("UDEV hidraw devices disabled in registry\n");
-    bus_options.disable_input = check_bus_option(L"DisableInput", 1);
+    bus_options.disable_input = check_bus_option(L"DisableInput", 0);
     if (bus_options.disable_input) TRACE("UDEV input devices disabled in registry\n");
     bus_options.disable_udevd = check_bus_option(L"DisableUdevd", 0);
     if (bus_options.disable_udevd) TRACE("UDEV udevd use disabled in registry\n");
