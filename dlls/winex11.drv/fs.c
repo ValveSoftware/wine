@@ -287,6 +287,7 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     DEVMODEW *real_modes, *real_mode, mode_host = {0};
     BOOL additional_modes = FALSE, center_modes = FALSE, landscape;
     const char *env;
+    DEVMODEW mode;
 
     *mode_count = 0;
     *modes = NULL;
@@ -305,7 +306,7 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     else if ((env = getenv( "SteamAppId" )))
         center_modes = !strcmp( env, "359870" );
 
-    max_count = ARRAY_SIZE(fs_monitor_sizes) * DEPTH_COUNT + real_mode_count;
+    max_count = ARRAY_SIZE(fs_monitor_sizes) * DEPTH_COUNT + real_mode_count + 1;
     if (center_modes) max_count += ARRAY_SIZE(fs_monitor_sizes) + real_mode_count;
 
     if (!(*modes = calloc( max_count, sizeof(DEVMODEW) )))
@@ -321,6 +322,9 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
 
     /* Add the current mode early, in case we have to limit */
     modes_append( *modes, mode_count, &resolutions, &mode_host );
+    mode = mode_host;
+    mode.dmDisplayFrequency = 60;
+    modes_append( *modes, mode_count, &resolutions, &mode );
 
     if ((env = getenv( "WINE_ADDITIONAL_DISPLAY_MODES" )))
         additional_modes = (env[0] != '0');
@@ -330,9 +334,9 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
     /* Linux reports far fewer resolutions than Windows. Add modes that some games may expect. */
     for (i = 0; i < ARRAY_SIZE(fs_monitor_sizes); ++i)
     {
-        DEVMODEW mode = mode_host;
-
         if (!additional_modes && fs_monitor_sizes[i].additional) continue;
+
+        mode = mode_host;
 
         if (landscape)
         {
@@ -366,7 +370,7 @@ static void monitor_get_modes( struct fs_monitor *monitor, DEVMODEW **modes, UIN
 
     for (i = 0, real_mode = real_modes; i < real_mode_count; ++i)
     {
-        DEVMODEW mode = *real_mode;
+        mode = *real_mode;
 
         /* Don't report modes that are larger than the current mode */
         if (mode.dmPelsWidth <= mode_host.dmPelsWidth && mode.dmPelsHeight <= mode_host.dmPelsHeight)
