@@ -936,6 +936,7 @@ BOOL is_sdl_ignored_device(WORD vid, WORD pid)
     char needle[16];
 
     if (vid == 0x056a) return TRUE; /* all Wacom devices */
+    if (vid == 0x28de && pid == 0x11ff) return TRUE; /* Steam Input virtual controller, handled with evdev */
 
     sprintf(needle, "0x%04x/0x%04x", vid, pid);
     if (whitelist) return strcasestr(whitelist, needle) == NULL;

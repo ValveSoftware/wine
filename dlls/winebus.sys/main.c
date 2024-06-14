@@ -1333,7 +1333,7 @@ static NTSTATUS fdo_pnp_dispatch(DEVICE_OBJECT *device, IRP *irp)
         mouse_device_create();
         keyboard_device_create();
 
-        if (!sdl_driver_init()) options.disable_input = TRUE;
+        sdl_driver_init();
         udev_driver_init();
         iohid_driver_init();
 

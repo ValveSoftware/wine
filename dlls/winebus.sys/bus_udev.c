@@ -1544,6 +1544,7 @@ static NTSTATUS lnxev_device_create(struct udev_device *dev, int fd, const char 
     if (ioctl(fd, EVIOCGBIT(EV_KEY, sizeof(info.key)), info.key) == -1) memset(info.key, 0, sizeof(info.key));
     if (ioctl(fd, EVIOCGBIT(EV_FF, sizeof(info.ff)), info.ff) == -1) memset(info.ff, 0, sizeof(info.ff));
 
+    if (sscanf(info.name, "Microsoft X-Box 360 pad %u", &desc.input) != 1) desc.input = -1;
     if (!desc.vid) desc.vid = info.id.vendor;
     if (!desc.pid) desc.pid = info.id.product;
     if (!desc.version) desc.version = info.id.version;
@@ -1551,6 +1552,11 @@ static NTSTATUS lnxev_device_create(struct udev_device *dev, int fd, const char 
     if (!desc.product[0]) ntdll_umbstowcs(info.name, strlen(info.name) + 1, desc.product, ARRAY_SIZE(desc.product));
     if (!desc.serialnumber[0]) ntdll_umbstowcs(info.uniq, strlen(info.uniq) + 1, desc.serialnumber, ARRAY_SIZE(desc.serialnumber));
     if (!desc.serialnumber[0]) memcpy(desc.serialnumber, zeros, sizeof(zeros));
+
+    /* CW-Bug-Id: #23185 Emulate Steam Input native hooks for native SDL:
+     * keep version fixed as 0 so we can hardcode it in ntdll rawinput pipe redirection
+     */
+    if (desc.input != -1) desc.version = 0;
 
     if (!(impl = hid_device_create(&lnxev_device_vtbl, sizeof(struct lnxev_device))))
         return STATUS_NO_MEMORY;
@@ -1698,9 +1704,21 @@ static void udev_add_device(struct udev_device *dev, int fd)
         close(fd);
         return;
     }
-    if (is_sdl_ignored_device(desc.vid, desc.pid))
+
+    if (desc.vid == 0x28de && desc.pid == 0x11ff && !strcmp(subsystem, "input"))
+    {
+        TRACE("evdev %s: detected steam input virtual controller\n", debugstr_a(devnode));
+        desc.is_gamepad = TRUE;
+    }
+    else if (is_sdl_ignored_device(desc.vid, desc.pid))
     {
         TRACE("evdev %s: ignoring %s, in SDL ignore list\n", debugstr_a(devnode), debugstr_device_desc(&desc));
+        close(fd);
+        return;
+    }
+    else if (!strcmp(subsystem, "input"))
+    {
+        TRACE("evdev %s: deferring %s to a different backend\n", debugstr_a(devnode), debugstr_device_desc(&desc));
         close(fd);
         return;
     }
