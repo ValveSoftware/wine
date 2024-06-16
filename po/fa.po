@@ -16,39 +16,39 @@ msgstr ""
 #: dlls/aclui/aclui.rc:29 dlls/inetcpl.cpl/inetcpl.rc:90
 #: programs/winefile/winefile.rc:114
 msgid "Security"
-msgstr ""
+msgstr "امنیت"
 
 #: dlls/aclui/aclui.rc:32
 #, fuzzy
 msgid "&Group or user names:"
-msgstr "&پرونده"
+msgstr "&گروه یا نام کاربری"
 
 #: dlls/aclui/aclui.rc:38
 msgid "Allow"
-msgstr ""
+msgstr "اجازه دادن"
 
 #: dlls/aclui/aclui.rc:39
 msgid "Deny"
-msgstr ""
+msgstr "رد کردن"
 
 #: dlls/aclui/aclui.rc:47
 #, fuzzy
 msgid "Permissions for %1"
-msgstr "انتخاب &همه\tCtrl+A"
+msgstr "دسترسی برای %1"
 
 #: dlls/appwiz.cpl/appwiz.rc:59
 msgid "Install/Uninstall"
-msgstr ""
+msgstr "نصب/حذف"
 
 #: dlls/appwiz.cpl/appwiz.rc:62
 msgid ""
 "To install a new program from a floppy disk, CD-ROM drive, or your hard "
 "drive, click Install."
-msgstr ""
+msgstr "برای نصب نرم افزار از درایو خارجی به داخلی، نصب را انتخاب کنید"
 
 #: dlls/appwiz.cpl/appwiz.rc:63
 msgid "&Install..."
-msgstr ""
+msgstr "نصب..."
 
 #: dlls/appwiz.cpl/appwiz.rc:66
 msgid ""
@@ -72,7 +72,7 @@ msgstr ""
 #: programs/winecfg/winecfg.rc:205 programs/winecfg/winecfg.rc:242
 #: programs/wordpad/wordpad.rc:256
 msgid "&Remove"
-msgstr ""
+msgstr "حذف"
 
 #: dlls/appwiz.cpl/appwiz.rc:76
 #, fuzzy
@@ -118,15 +118,15 @@ msgstr "قبول"
 
 #: dlls/appwiz.cpl/appwiz.rc:80
 msgid "The following information can be used to get technical support for %s:"
-msgstr ""
+msgstr "این اطلاعات ممکن است برای پشتیبانی فنی استفاده شوند %s:"
 
 #: dlls/appwiz.cpl/appwiz.rc:81
 msgid "Publisher:"
-msgstr ""
+msgstr "ناشر:"
 
 #: dlls/appwiz.cpl/appwiz.rc:82 programs/winefile/winefile.rc:165
 msgid "Version:"
-msgstr ""
+msgstr "نسخه:"
 
 #: dlls/appwiz.cpl/appwiz.rc:83
 #, fuzzy
@@ -136,28 +136,28 @@ msgstr "&محتویات"
 #: dlls/appwiz.cpl/appwiz.rc:84
 #, fuzzy
 msgid "Support Information:"
-msgstr "اطلاعات"
+msgstr "اطلاعات پشتیبانی:"
 
 #: dlls/appwiz.cpl/appwiz.rc:85
 msgid "Support Telephone:"
-msgstr ""
+msgstr "پشتیبانی تلفنی:"
 
 #: dlls/appwiz.cpl/appwiz.rc:86
 msgid "Readme:"
-msgstr ""
+msgstr "من را بخوان:"
 
 #: dlls/appwiz.cpl/appwiz.rc:87
 msgid "Product Updates:"
-msgstr ""
+msgstr "بروزرسانی محصول:"
 
 #: dlls/appwiz.cpl/appwiz.rc:88
 #, fuzzy
 msgid "Comments:"
-msgstr "&محتویات"
+msgstr "نظرات:"
 
 #: dlls/appwiz.cpl/appwiz.rc:101
 msgid "Wine Gecko Installer"
-msgstr ""
+msgstr "نصاب واین گکو"
 
 #: dlls/appwiz.cpl/appwiz.rc:104
 msgid ""
@@ -172,7 +172,7 @@ msgstr ""
 
 #: dlls/appwiz.cpl/appwiz.rc:110 dlls/appwiz.cpl/appwiz.rc:125
 msgid "&Install"
-msgstr ""
+msgstr "نصب&"
 
 #: dlls/appwiz.cpl/appwiz.rc:111 dlls/appwiz.cpl/appwiz.rc:126
 #: dlls/avifil32/avifil32.rc:55 dlls/browseui/browseui.rc:45
@@ -219,7 +219,7 @@ msgstr "انصراف"
 
 #: dlls/appwiz.cpl/appwiz.rc:116
 msgid "Wine Mono Installer"
-msgstr ""
+msgstr "نصاب واین مونو"
 
 #: dlls/appwiz.cpl/appwiz.rc:119
 msgid ""
@@ -234,18 +234,18 @@ msgstr ""
 
 #: dlls/appwiz.cpl/appwiz.rc:31
 msgid "Add/Remove Programs"
-msgstr ""
+msgstr "نصب/حذف برنامه ها"
 
 #: dlls/appwiz.cpl/appwiz.rc:32
 msgid ""
 "Allows you to install new software, or remove existing software from your "
 "computer."
-msgstr ""
+msgstr "اجازه می‌دهد نرم افزار جدیدی حذف و یا قبلی را حذف کنید."
 
 #: dlls/appwiz.cpl/appwiz.rc:33 programs/taskmgr/taskmgr.rc:262
 #: programs/winecfg/winecfg.rc:32
 msgid "Applications"
-msgstr ""
+msgstr "نرم افزار ها"
 
 #: dlls/appwiz.cpl/appwiz.rc:35
 msgid ""
@@ -255,25 +255,25 @@ msgstr ""
 
 #: dlls/appwiz.cpl/appwiz.rc:36
 msgid "Not specified"
-msgstr ""
+msgstr "مشخص نشده"
 
 #: dlls/appwiz.cpl/appwiz.rc:38 dlls/oledb32/version.rc:38
 #: dlls/shell32/shell32.rc:144 dlls/shell32/shell32.rc:239
 #: programs/regedit/regedit.rc:150 programs/winefile/winefile.rc:106
 msgid "Name"
-msgstr ""
+msgstr "نام"
 
 #: dlls/appwiz.cpl/appwiz.rc:39
 msgid "Publisher"
-msgstr ""
+msgstr "ناشر"
 
 #: dlls/appwiz.cpl/appwiz.rc:40 dlls/cryptui/cryptui.rc:54
 msgid "Version"
-msgstr ""
+msgstr "نسخه"
 
 #: dlls/appwiz.cpl/appwiz.rc:41
 msgid "Installation programs"
-msgstr ""
+msgstr "نصب کردن برنامه ها"
 
 #: dlls/appwiz.cpl/appwiz.rc:42
 msgid "Programs (*.exe)"
@@ -289,15 +289,15 @@ msgstr "همه‌ی پرونده‌ها (*.*)"
 
 #: dlls/appwiz.cpl/appwiz.rc:46
 msgid "&Modify/Remove"
-msgstr ""
+msgstr "&ویرایش/حذف"
 
 #: dlls/appwiz.cpl/appwiz.rc:52
 msgid "Downloading..."
-msgstr ""
+msgstr "در حال دانلود..."
 
 #: dlls/appwiz.cpl/appwiz.rc:53
 msgid "Installing..."
-msgstr ""
+msgstr "در حال نصب..."
 
 #: dlls/appwiz.cpl/appwiz.rc:54
 msgid ""
@@ -307,7 +307,7 @@ msgstr ""
 
 #: dlls/appwiz.cpl/appwiz.rc:47
 msgid "Please wait until the current uninstall/modify process is complete."
-msgstr ""
+msgstr "لطفا تا پایان فرایند نصب/حذف صبر کنید."
 
 #: dlls/avifil32/avifil32.rc:42
 msgid "Compress options"
@@ -376,15 +376,15 @@ msgstr ""
 
 #: dlls/browseui/browseui.rc:31
 msgid "seconds"
-msgstr ""
+msgstr "ثانیه ها"
 
 #: dlls/browseui/browseui.rc:32
 msgid "minutes"
-msgstr ""
+msgstr "دقایق"
 
 #: dlls/browseui/browseui.rc:33
 msgid "hours"
-msgstr ""
+msgstr "ساعت ها"
 
 #: dlls/comctl32/comctl32.rc:68 programs/winefile/winefile.rc:156
 #, fuzzy
@@ -393,7 +393,7 @@ msgstr "انتخاب &همه\tCtrl+A"
 
 #: dlls/comctl32/comctl32.rc:73 dlls/comdlg32/comdlg32.rc:265
 msgid "&Apply"
-msgstr ""
+msgstr "&اعمال"
 
 #: dlls/comctl32/comctl32.rc:74 dlls/comctl32/comctl32.rc:88
 #: dlls/comdlg32/comdlg32.rc:309 dlls/user32/user32.rc:99
@@ -408,15 +408,15 @@ msgstr ""
 
 #: dlls/comctl32/comctl32.rc:84
 msgid "< &Back"
-msgstr ""
+msgstr "< بازگشت"
 
 #: dlls/comctl32/comctl32.rc:85 dlls/oledb32/version.rc:61
 msgid "&Next >"
-msgstr ""
+msgstr "> بعدی"
 
 #: dlls/comctl32/comctl32.rc:86
 msgid "Finish"
-msgstr ""
+msgstr "پایان"
 
 #: dlls/comctl32/comctl32.rc:97
 msgid "Customize Toolbar"
@@ -428,11 +428,11 @@ msgstr ""
 #: programs/oleview/oleview.rc:187 programs/oleview/oleview.rc:200
 #: programs/oleview/oleview.rc:212 programs/taskmgr/taskmgr.rc:139
 msgid "&Close"
-msgstr ""
+msgstr "&بستن"
 
 #: dlls/comctl32/comctl32.rc:101
 msgid "R&eset"
-msgstr ""
+msgstr "&بازنشانی"
 
 #: dlls/comctl32/comctl32.rc:102 dlls/comdlg32/comdlg32.rc:173
 #: dlls/comdlg32/comdlg32.rc:195 dlls/comdlg32/comdlg32.rc:266
@@ -491,36 +491,36 @@ msgstr ""
 #: dlls/comctl32/comctl32.rc:52 dlls/shell32/shell32.rc:307
 #: dlls/shlwapi/shlwapi.rc:46 dlls/user32/user32.rc:90 dlls/user32/user32.rc:78
 msgid "&Yes"
-msgstr ""
+msgstr "&بله"
 
 #: dlls/comctl32/comctl32.rc:53 dlls/shell32/shell32.rc:309
 #: dlls/shlwapi/shlwapi.rc:47 dlls/user32/user32.rc:91 dlls/user32/user32.rc:79
 msgid "&No"
-msgstr ""
+msgstr "&خیر"
 
 #: dlls/comctl32/comctl32.rc:54 dlls/user32/user32.rc:93
 #: dlls/user32/user32.rc:76
 msgid "&Retry"
-msgstr ""
+msgstr "&تلاش دوباره"
 
 #: dlls/comctl32/comctl32.rc:62
 msgid "Hide details"
-msgstr ""
+msgstr "مخفی کردن جزئیات"
 
 #: dlls/comctl32/comctl32.rc:63
 msgid "See details"
-msgstr ""
+msgstr "نمایش جزئیات"
 
 #: dlls/comctl32/comctl32.rc:31 dlls/cryptui/cryptui.rc:235
 #: programs/regedit/regedit.rc:291 programs/taskmgr/taskmgr.rc:434
 #: programs/winedbg/winedbg.rc:61 programs/winedbg/winedbg.rc:76
 #: programs/wordpad/wordpad.rc:180
 msgid "Close"
-msgstr ""
+msgstr "بستن"
 
 #: dlls/comctl32/comctl32.rc:36
 msgid "Today:"
-msgstr ""
+msgstr "امروز:"
 
 #: dlls/comctl32/comctl32.rc:37
 msgid "Go to today"
