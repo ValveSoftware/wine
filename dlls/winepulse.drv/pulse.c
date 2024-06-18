@@ -206,6 +206,16 @@ static char *wstr_to_str(const WCHAR *wstr)
     return str;
 }
 
+static void wait_pa_operation_complete(pa_operation *o)
+{
+    if (!o)
+        return;
+
+    while (pa_operation_get_state(o) == PA_OPERATION_RUNNING)
+        pulse_cond_wait();
+    pa_operation_unref(o);
+}
+
 /* Following pulseaudio design here, mainloop has the lock taken whenever
  * it is handling something for pulse, and the lock is required whenever
  * doing any pa_* call that can affect the state in any way
@@ -1567,7 +1577,6 @@ static NTSTATUS pulse_timer_loop(void *args)
     pa_usec_t last_time;
     UINT32 adv_bytes;
     int success;
-    pa_operation *o;
 
     pulse_lock();
     delay.QuadPart = -stream->mmdev_period_usec * 10;
@@ -1585,13 +1594,7 @@ static NTSTATUS pulse_timer_loop(void *args)
 
         delay.QuadPart = -stream->mmdev_period_usec * 10;
 
-        o = pa_stream_update_timing_info(stream->stream, pulse_op_cb, &success);
-        if (o)
-        {
-            while (pa_operation_get_state(o) == PA_OPERATION_RUNNING)
-                pulse_cond_wait();
-            pa_operation_unref(o);
-        }
+        wait_pa_operation_complete(pa_stream_update_timing_info(stream->stream, pulse_op_cb, &success));
         err = pa_stream_get_time(stream->stream, &now);
         if (err == 0)
         {
@@ -1703,11 +1706,7 @@ static NTSTATUS pulse_start(void *args)
     {
         o = pa_stream_cork(stream->stream, 0, pulse_op_cb, &success);
         if (o)
-        {
-            while(pa_operation_get_state(o) == PA_OPERATION_RUNNING)
-                pulse_cond_wait();
-            pa_operation_unref(o);
-        }
+            wait_pa_operation_complete(o);
         else
             success = 0;
         if (!success)
@@ -1751,9 +1750,7 @@ static NTSTATUS pulse_stop(void *args)
         o = pa_stream_cork(stream->stream, 1, pulse_op_cb, &success);
         if (o)
         {
-            while(pa_operation_get_state(o) == PA_OPERATION_RUNNING)
-                pulse_cond_wait();
-            pa_operation_unref(o);
+            wait_pa_operation_complete(o);
         }
         else
             success = 0;
@@ -1798,15 +1795,8 @@ static NTSTATUS pulse_reset(void *args)
         /* If there is still data in the render buffer it needs to be removed from the server */
         int success = 0;
         if (stream->held_bytes)
-        {
-            pa_operation *o = pa_stream_flush(stream->stream, pulse_op_cb, &success);
-            if (o)
-            {
-                while (pa_operation_get_state(o) == PA_OPERATION_RUNNING)
-                    pulse_cond_wait();
-                pa_operation_unref(o);
-            }
-        }
+            wait_pa_operation_complete(pa_stream_flush(stream->stream, pulse_op_cb, &success));
+
         if (success || !stream->held_bytes)
         {
             stream->clock_lastpos = stream->clock_written = 0;
