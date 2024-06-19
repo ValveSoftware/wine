@@ -36,6 +36,9 @@ HRESULT WINAPI DCompositionCreateDevice2(IUnknown *rendering_device, REFIID iid,
 {
     FIXME("%p, %s, %p.\n", rendering_device, debugstr_guid(iid), device);
 
+    /* Try to workaround Chromium race fixed by Chromium commit 1c13c9105b40e83f87ebcad104fab57fcef43eb9. */
+    Sleep(50);
+
     return E_NOTIMPL;
 }
 
