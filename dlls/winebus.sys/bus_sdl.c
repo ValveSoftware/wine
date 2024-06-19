@@ -1003,20 +1003,20 @@ static void sdl_add_device(unsigned int index)
     {
         /* this device is blacklisted */
         TRACE("ignoring %s, in SDL blacklist\n", debugstr_device_desc(&desc));
-        return;
+        goto done;
     }
 
     if (is_wine_blacklisted(desc.vid, desc.pid))
     {
         /* this device is blacklisted */
         TRACE("ignoring %s, in Wine blacklist\n", debugstr_device_desc(&desc));
-        return;
+        goto done;
     }
 
     if (desc.vid == 0x28de && desc.pid == 0x11ff)
     {
         TRACE("deffering steam input virtual controller to a different backend\n");
-        return;
+        goto done;
     }
 
     if (pSDL_JoystickGetSerial && (sdl_serial = pSDL_JoystickGetSerial(joystick)))
@@ -1068,7 +1068,14 @@ static void sdl_add_device(unsigned int index)
         impl->axis_offset = axis_offset;
 
         bus_event_queue_device_created(&event_queue, &impl->unix_device, &desc);
+
+        if (controller) controller = pSDL_GameControllerOpen(index);
+        joystick = pSDL_JoystickOpen(index);
     }
+
+done:
+    if (controller) pSDL_GameControllerClose(controller);
+    pSDL_JoystickClose(joystick);
 }
 
 static void process_device_event(SDL_Event *event)
