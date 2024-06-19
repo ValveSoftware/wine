@@ -963,7 +963,6 @@ static NTSTATUS build_report_descriptor(struct unix_device *iface, struct udev_d
     BYTE absbits[(ABS_MAX+7)/8];
     BYTE relbits[(REL_MAX+7)/8];
     BYTE ffbits[(FF_MAX+7)/8];
-    struct ff_effect effect;
     USAGE_AND_PAGE usage;
     USHORT count = 0;
     USAGE usages[16];
@@ -1042,21 +1041,8 @@ static NTSTATUS build_report_descriptor(struct unix_device *iface, struct udev_d
     impl->haptic_effect_id = -1;
     for (i = 0; i < ARRAY_SIZE(impl->effect_ids); ++i) impl->effect_ids[i] = -1;
 
-    if (test_bit(ffbits, FF_RUMBLE))
-    {
-        effect.id = -1;
-        effect.type = FF_RUMBLE;
-        effect.replay.length = 0;
-        effect.u.rumble.strong_magnitude = 0;
-        effect.u.rumble.weak_magnitude = 0;
-
-        if (ioctl(impl->base.device_fd, EVIOCSFF, &effect) == -1)
-            WARN("couldn't allocate rumble effect for haptics: %d %s\n", errno, strerror(errno));
-        else if (!hid_device_add_haptics(iface))
-            return FALSE;
-        else
-            impl->haptic_effect_id = effect.id;
-    }
+    if (test_bit(ffbits, FF_RUMBLE) && !hid_device_add_haptics(iface))
+        return STATUS_NO_MEMORY;
 
     for (i = 0; i < FF_MAX; ++i) if (test_bit(ffbits, i)) break;
     if (i != FF_MAX)
@@ -1210,7 +1196,7 @@ static NTSTATUS lnxev_device_haptics_start(struct unix_device *iface, UINT durat
     effect.u.rumble.strong_magnitude = rumble_intensity;
     effect.u.rumble.weak_magnitude = buzz_intensity;
 
-    if (ioctl(impl->base.device_fd, EVIOCSFF, &effect) == -1)
+    if (effect.id == -1 || ioctl(impl->base.device_fd, EVIOCSFF, &effect) == -1)
     {
         effect.id = -1;
         if (ioctl(impl->base.device_fd, EVIOCSFF, &effect) == 1)
