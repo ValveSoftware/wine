@@ -384,10 +384,17 @@ static HRESULT WINAPI transform_SetOutputType(IMFTransform *iface, DWORD id, IMF
     if (flags & MFT_SET_TYPE_TEST_ONLY)
         return S_OK;
 
-    if (!decoder->output_type && FAILED(hr = MFCreateMediaType(&decoder->output_type)))
-        return hr;
+    if (!wfx.Format.nBlockAlign)
+        wfx.Format.nBlockAlign = wfx.Format.wBitsPerSample * wfx.Format.nChannels / 8;
+    if (!wfx.Format.nAvgBytesPerSec)
+        wfx.Format.nAvgBytesPerSec = wfx.Format.nBlockAlign * wfx.Format.nSamplesPerSec;
 
-    if (FAILED(hr = IMFMediaType_CopyAllItems(type, (IMFAttributes *)decoder->output_type)))
+    if (decoder->output_type)
+    {
+        IMFMediaType_Release(decoder->output_type);
+        decoder->output_type = NULL;
+    }
+    if (FAILED(hr = MFCreateAudioMediaType(&wfx.Format, (IMFAudioMediaType **)&decoder->output_type)))
         return hr;
 
     if (FAILED(hr = try_create_wg_transform(decoder)))
