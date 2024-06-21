@@ -5680,6 +5680,8 @@ static NTSTATUS get_working_set_ex( HANDLE process, LPCVOID addr,
         return STATUS_INVALID_INFO_CLASS;
     }
 
+    if (len < sizeof(*info)) return STATUS_INFO_LENGTH_MISMATCH;
+
 #if defined(HAVE_LIBPROCSTAT)
     {
         struct procstat *pstat;
@@ -5776,7 +5778,7 @@ static NTSTATUS get_working_set_ex( HANDLE process, LPCVOID addr,
 #endif
 
     if (res_len)
-        *res_len = (UINT_PTR)p - (UINT_PTR)info;
+        *res_len = len;
     return STATUS_SUCCESS;
 }
 
