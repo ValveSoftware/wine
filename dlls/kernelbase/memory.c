@@ -134,7 +134,7 @@ BOOL WINAPI DECLSPEC_HOTPATCH FlushInstructionCache( HANDLE process, LPCVOID add
         send_cross_process_notification( list, CrossProcessFlushCache, addr, size, 0 );
         close_cross_process_connection( list );
     }
-    return set_ntstatus( NtFlushInstructionCache( process, addr, size ));
+    return TRUE;
 }
 
 
