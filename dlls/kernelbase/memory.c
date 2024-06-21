@@ -129,11 +129,17 @@ BOOL WINAPI DECLSPEC_HOTPATCH FlushViewOfFile( const void *base, SIZE_T size )
     return set_ntstatus( status );
 }
 
-
 /****************************************************************************
  *           FlushInstructionCache   (kernelbase.@)
  */
+#if defined(__i386__) || defined(__x86_64__)
 BOOL WINAPI DECLSPEC_HOTPATCH FlushInstructionCache( HANDLE process, LPCVOID addr, SIZE_T size )
+{
+    /* X86 processors have coherent instruction and data caches, no need to do anything */
+    return TRUE;
+}
+#else
+static BOOL flush_instruction_cache( HANDLE process, LPCVOID addr, SIZE_T size )
 {
     CROSS_PROCESS_WORK_LIST *list;
 
@@ -145,6 +151,28 @@ BOOL WINAPI DECLSPEC_HOTPATCH FlushInstructionCache( HANDLE process, LPCVOID add
     return set_ntstatus( NtFlushInstructionCache( process, addr, size ));
 }
 
+#ifdef __arm64ec__
+/* Wrapper that preserves RDX/X0 */
+BOOL WINAPI __attribute__((naked)) FlushInstructionCache( HANDLE process, LPCVOID addr, SIZE_T size )
+{
+    asm( ".seh_proc \"#FlushInstructionCache\"\n\t"
+         "stp x29, x30, [sp, #-32]!\n\t"
+         "str x1, [sp, #16]\n\t"
+         ".seh_save_fplr_x 32\n\t"
+         ".seh_endprologue\n\t"
+         "bl \"#flush_instruction_cache\"\n\t"
+         "ldr x1, [sp, #16]\n\t"
+         "ldp x29, x30, [sp], #32\n\t"
+         "ret\n\t"
+         ".seh_endproc" );
+}
+#else
+BOOL WINAPI DECLSPEC_HOTPATCH FlushInstructionCache( HANDLE process, LPCVOID addr, SIZE_T size )
+{
+    return flush_instruction_cache( process, addr, size );
+}
+#endif
+#endif
 
 /***********************************************************************
  *          GetLargePageMinimum   (kernelbase.@)
