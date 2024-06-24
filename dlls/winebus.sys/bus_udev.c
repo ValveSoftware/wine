@@ -919,6 +919,24 @@ static const USAGE_AND_PAGE *what_am_I(struct udev_device *dev, int fd)
 
 static INT count_buttons(int device_fd, BYTE *map)
 {
+    static const UINT gamepad_buttons[] =
+    {
+        BTN_A,
+        BTN_B,
+        BTN_X,
+        BTN_Y,
+        BTN_TL,
+        BTN_TR,
+        BTN_SELECT,
+        BTN_START,
+        BTN_THUMBL,
+        BTN_THUMBR,
+        BTN_MODE,
+        BTN_C,
+        BTN_Z,
+        BTN_TL2,
+        BTN_TR2,
+    };
     int i;
     int button_count = 0;
     BYTE keybits[(KEY_MAX+7)/8];
@@ -929,7 +947,16 @@ static INT count_buttons(int device_fd, BYTE *map)
         return FALSE;
     }
 
-    for (i = BTN_MISC; i < KEY_MAX; i++)
+    for (i = 0; i < ARRAY_SIZE(gamepad_buttons); i++)
+    {
+        if (test_bit(keybits, gamepad_buttons[i]))
+        {
+            if (map) map[gamepad_buttons[i]] = button_count;
+            button_count++;
+        }
+    }
+
+    for (i = BTN_DIGI; i < KEY_MAX; i++)
     {
         if (test_bit(keybits, i))
         {
