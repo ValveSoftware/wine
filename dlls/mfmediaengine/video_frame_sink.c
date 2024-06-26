@@ -27,6 +27,9 @@
 
 #include "mediaengine_private.h"
 
+#include "initguid.h"
+#include "evr.h"
+
 #include "wine/debug.h"
 #include "wine/list.h"
 
@@ -72,7 +75,9 @@ struct video_frame_sink
     IMFMediaEventGenerator IMFMediaEventGenerator_iface;
     IMFStreamSink IMFStreamSink_iface;
     IMFMediaTypeHandler IMFMediaTypeHandler_iface;
+    IMFGetService IMFGetService_iface;
     LONG refcount;
+    IUnknown *device_manager;
     IMFMediaType *media_type;
     IMFMediaType *current_media_type;
     BOOL is_shut_down;
@@ -125,6 +130,11 @@ static struct video_frame_sink *impl_from_IMFMediaTypeHandler(IMFMediaTypeHandle
     return CONTAINING_RECORD(iface, struct video_frame_sink, IMFMediaTypeHandler_iface);
 }
 
+static struct video_frame_sink *impl_from_IMFGetService(IMFGetService *iface)
+{
+    return CONTAINING_RECORD(iface, struct video_frame_sink, IMFGetService_iface);
+}
+
 static void video_frame_sink_samples_release(struct video_frame_sink *sink)
 {
     for (int i = 0; i < ARRAYSIZE(sink->sample); i++)
@@ -160,6 +170,10 @@ static HRESULT WINAPI video_frame_sink_stream_QueryInterface(IMFStreamSink *ifac
     else if (IsEqualIID(riid, &IID_IMFMediaTypeHandler))
     {
         *obj = &sink->IMFMediaTypeHandler_iface;
+    }
+    else if (IsEqualIID(riid, &IID_IMFGetService))
+    {
+        *obj = &sink->IMFGetService_iface;
     }
     else
     {
@@ -574,6 +588,49 @@ static const IMFMediaTypeHandlerVtbl video_frame_sink_stream_type_handler_vtbl =
     video_frame_sink_stream_type_handler_GetMajorType,
 };
 
+static HRESULT WINAPI video_frame_sink_stream_get_service_QueryInterface(IMFGetService *iface, REFIID riid,
+        void **obj)
+{
+    struct video_frame_sink *sink = impl_from_IMFGetService(iface);
+    return IMFStreamSink_QueryInterface(&sink->IMFStreamSink_iface, riid, obj);
+}
+
+static ULONG WINAPI video_frame_sink_stream_get_service_AddRef(IMFGetService *iface)
+{
+    struct video_frame_sink *sink = impl_from_IMFGetService(iface);
+    return IMFStreamSink_AddRef(&sink->IMFStreamSink_iface);
+}
+
+static ULONG WINAPI video_frame_sink_stream_get_service_Release(IMFGetService *iface)
+{
+    struct video_frame_sink *sink = impl_from_IMFGetService(iface);
+    return IMFStreamSink_Release(&sink->IMFStreamSink_iface);
+}
+
+static HRESULT WINAPI video_frame_sink_stream_get_service_GetService(IMFGetService *iface, REFGUID service, REFIID riid,
+        void **obj)
+{
+    struct video_frame_sink *sink = impl_from_IMFGetService(iface);
+
+    if (IsEqualGUID(service, &MR_VIDEO_ACCELERATION_SERVICE))
+    {
+        if (sink->device_manager)
+            return IUnknown_QueryInterface(sink->device_manager, riid, obj);
+        return E_NOINTERFACE;
+    }
+
+    FIXME("Unsupported service %s, riid %s.\n", debugstr_guid(service), debugstr_guid(riid));
+    return MF_E_UNSUPPORTED_SERVICE;
+}
+
+static const IMFGetServiceVtbl video_frame_sink_stream_get_service_vtbl =
+{
+    video_frame_sink_stream_get_service_QueryInterface,
+    video_frame_sink_stream_get_service_AddRef,
+    video_frame_sink_stream_get_service_Release,
+    video_frame_sink_stream_get_service_GetService,
+};
+
 static HRESULT WINAPI video_frame_sink_QueryInterface(IMFMediaSink *iface, REFIID riid, void **obj)
 {
     struct video_frame_sink *sink = impl_from_IMFMediaSink(iface);
@@ -627,6 +684,8 @@ static ULONG WINAPI video_frame_sink_Release(IMFMediaSink *iface)
         if (sink->current_media_type)
             IMFMediaType_Release(sink->current_media_type);
         IMFMediaType_Release(sink->media_type);
+        if (sink->device_manager)
+            IUnknown_Release(sink->device_manager);
         if (sink->event_queue)
             IMFMediaEventQueue_Release(sink->event_queue);
         if (sink->clock)
@@ -1056,7 +1115,7 @@ static const IMFClockStateSinkVtbl video_frame_sink_clock_sink_vtbl =
     video_frame_sink_clock_sink_OnClockSetRate,
 };
 
-HRESULT create_video_frame_sink(IMFMediaType *media_type, IMFAsyncCallback *events_callback, struct video_frame_sink **sink)
+HRESULT create_video_frame_sink(IMFMediaType *media_type, IUnknown *device_manager, IMFAsyncCallback *events_callback, struct video_frame_sink **sink)
 {
     struct video_frame_sink *object;
     HRESULT hr;
@@ -1069,8 +1128,11 @@ HRESULT create_video_frame_sink(IMFMediaType *media_type, IMFAsyncCallback *even
     object->IMFMediaEventGenerator_iface.lpVtbl = &video_frame_sink_events_vtbl;
     object->IMFStreamSink_iface.lpVtbl = &video_frame_sink_stream_vtbl;
     object->IMFMediaTypeHandler_iface.lpVtbl = &video_frame_sink_stream_type_handler_vtbl;
+    object->IMFGetService_iface.lpVtbl = &video_frame_sink_stream_get_service_vtbl;
     object->refcount = 1;
     object->rate = 1.0f;
+    if ((object->device_manager = device_manager))
+        IUnknown_AddRef(object->device_manager);
     object->media_type = media_type;
     IMFAsyncCallback_AddRef(object->callback = events_callback);
     IMFMediaType_AddRef(object->media_type);
