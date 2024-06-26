@@ -35,46 +35,72 @@ HRESULT WINAPI WICCreateImagingFactory_Proxy(UINT, IWICImagingFactory**);
 /* Wine-specific WIC GUIDs */
 DEFINE_GUID(GUID_WineContainerFormatTga, 0x0c44fda1,0xa5c5,0x4298,0x96,0x85,0x47,0x3f,0xc1,0x7c,0xd3,0x22);
 
-static const struct
+struct d3dx_wic_pixel_format
 {
     const GUID *wic_guid;
-    D3DFORMAT d3dformat;
-} wic_pixel_formats[] = {
-    { &GUID_WICPixelFormat8bppIndexed, D3DFMT_P8 },
-    { &GUID_WICPixelFormat1bppIndexed, D3DFMT_P8 },
-    { &GUID_WICPixelFormat4bppIndexed, D3DFMT_P8 },
-    { &GUID_WICPixelFormat8bppGray, D3DFMT_L8 },
-    { &GUID_WICPixelFormat16bppBGR555, D3DFMT_X1R5G5B5 },
-    { &GUID_WICPixelFormat16bppBGR565, D3DFMT_R5G6B5 },
-    { &GUID_WICPixelFormat24bppBGR, D3DFMT_R8G8B8 },
-    { &GUID_WICPixelFormat32bppBGR, D3DFMT_X8R8G8B8 },
-    { &GUID_WICPixelFormat32bppBGRA, D3DFMT_A8R8G8B8 }
+    enum d3dx_pixel_format_id format_id;
 };
+
+/* Sorted by GUID. */
+static const struct d3dx_wic_pixel_format wic_pixel_formats[] =
+{
+    { &GUID_WICPixelFormat1bppIndexed, D3DX_PIXEL_FORMAT_P8_UINT },
+    { &GUID_WICPixelFormat4bppIndexed, D3DX_PIXEL_FORMAT_P8_UINT },
+    { &GUID_WICPixelFormat8bppIndexed, D3DX_PIXEL_FORMAT_P8_UINT },
+    { &GUID_WICPixelFormat8bppGray,    D3DX_PIXEL_FORMAT_L8_UNORM },
+    { &GUID_WICPixelFormat16bppBGR555, D3DX_PIXEL_FORMAT_B5G5R5X1_UNORM },
+    { &GUID_WICPixelFormat16bppBGR565, D3DX_PIXEL_FORMAT_B5G6R5_UNORM },
+    { &GUID_WICPixelFormat24bppBGR,    D3DX_PIXEL_FORMAT_B8G8R8_UNORM },
+    { &GUID_WICPixelFormat32bppBGR,    D3DX_PIXEL_FORMAT_B8G8R8X8_UNORM },
+    { &GUID_WICPixelFormat32bppBGRA,   D3DX_PIXEL_FORMAT_B8G8R8A8_UNORM }
+};
+
+static int __cdecl d3dx_wic_pixel_format_guid_compare(const void *a, const void *b)
+{
+    const struct d3dx_wic_pixel_format *format = b;
+    const GUID *guid = a;
+
+    return memcmp(guid, format->wic_guid, sizeof(*guid));
+}
+
+static enum d3dx_pixel_format_id wic_guid_to_d3dx_pixel_format_id(const GUID *guid)
+{
+    struct d3dx_wic_pixel_format *format;
+
+    if ((format = bsearch(guid, wic_pixel_formats, ARRAY_SIZE(wic_pixel_formats), sizeof(*format),
+            d3dx_wic_pixel_format_guid_compare)))
+        return format->format_id;
+    return D3DX_PIXEL_FORMAT_COUNT;
+}
 
 static D3DFORMAT wic_guid_to_d3dformat(const GUID *guid)
 {
-    unsigned int i;
-
-    for (i = 0; i < ARRAY_SIZE(wic_pixel_formats); i++)
-    {
-        if (IsEqualGUID(wic_pixel_formats[i].wic_guid, guid))
-            return wic_pixel_formats[i].d3dformat;
-    }
-
-    return D3DFMT_UNKNOWN;
+    return d3dformat_from_d3dx_pixel_format_id(wic_guid_to_d3dx_pixel_format_id(guid));
 }
 
-static const GUID *d3dformat_to_wic_guid(D3DFORMAT format)
+static const GUID *d3dx_pixel_format_id_to_wic_guid(enum d3dx_pixel_format_id format)
 {
-    unsigned int i;
+    uint32_t i;
+
+    /*
+     * There are multiple indexed WIC pixel formats, but the only one that
+     * makes sense for this case is 8bpp.
+     */
+    if (format == D3DX_PIXEL_FORMAT_P8_UINT)
+        return &GUID_WICPixelFormat8bppIndexed;
 
     for (i = 0; i < ARRAY_SIZE(wic_pixel_formats); i++)
     {
-        if (wic_pixel_formats[i].d3dformat == format)
+        if (wic_pixel_formats[i].format_id == format)
             return wic_pixel_formats[i].wic_guid;
     }
 
     return NULL;
+}
+
+static const GUID *d3dformat_to_wic_guid(D3DFORMAT format)
+{
+    return d3dx_pixel_format_id_to_wic_guid(d3dx_pixel_format_id_from_d3dformat(format));
 }
 
 /* dds_header.flags */

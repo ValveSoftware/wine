@@ -284,6 +284,7 @@ HRESULT load_resource_into_memory(HMODULE module, HRSRC resinfo, void **buffer, 
 HRESULT write_buffer_to_file(const WCHAR *filename, ID3DXBuffer *buffer);
 
 D3DFORMAT d3dformat_from_d3dx_pixel_format_id(enum d3dx_pixel_format_id format);
+enum d3dx_pixel_format_id d3dx_pixel_format_id_from_d3dformat(D3DFORMAT format);
 const struct pixel_format_desc *get_d3dx_pixel_format_info(enum d3dx_pixel_format_id format);
 const struct pixel_format_desc *get_format_info(D3DFORMAT format);
 const struct pixel_format_desc *get_format_info_idx(int idx);
