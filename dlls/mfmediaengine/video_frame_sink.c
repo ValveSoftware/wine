@@ -89,7 +89,6 @@ struct video_frame_sink
     int sample_read_index;
     BOOL sample_request_pending;
     BOOL sample_presented;
-    BOOL eos;
     CRITICAL_SECTION cs;
 };
 
@@ -287,7 +286,7 @@ static HRESULT WINAPI video_frame_sink_stream_GetMediaTypeHandler(IMFStreamSink 
 /* must be called with critical section held */
 static void video_frame_sink_stream_request_sample(struct video_frame_sink *sink)
 {
-    if (sink->sample_request_pending || sink->eos)
+    if (sink->sample_request_pending)
         return;
 
     IMFStreamSink_QueueEvent(&sink->IMFStreamSink_iface, MEStreamSinkRequestSample, &GUID_NULL, S_OK, NULL);
@@ -1186,11 +1185,6 @@ HRESULT video_frame_sink_get_pts(struct video_frame_sink *sink, MFTIME clocktime
     }
 
     return hr;
-}
-
-void video_frame_sink_notify_end_of_presentation(struct video_frame_sink *sink)
-{
-    sink->eos = TRUE;
 }
 
 ULONG video_frame_sink_release(struct video_frame_sink *sink)
