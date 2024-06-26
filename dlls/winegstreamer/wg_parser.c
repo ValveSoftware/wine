@@ -667,7 +667,10 @@ static void deep_element_added_cb(GstBin *self, GstBin *sub_bin, GstElement *ele
     const char *name = NULL;
 
     if (element)
+    {
+        set_max_threads(element);
         factory = gst_element_get_factory(element);
+    }
 
     if (factory)
         name = gst_element_factory_get_longname(factory);
