@@ -305,9 +305,8 @@ FARPROC get_proc_address( HMODULE hModule, LPCSTR function )
  * these registers if the function takes floating point parameters.
  * This wrapper saves xmm0 - 3 to the stack.
  */
-extern FARPROC get_proc_address_wrapper( HMODULE module, LPCSTR function );
-
-__ASM_GLOBAL_FUNC( get_proc_address_wrapper,
+__ASM_GLOBAL_FUNC( GetProcAddress,
+                   ".byte 0x48,0x8d,0xa4,0x24,0x00,0x00,0x00,0x00\n\t" /* hotpatch prolog */
                    "pushq %rbp\n\t"
                    __ASM_SEH(".seh_pushreg %rbp\n\t")
                    __ASM_CFI(".cfi_adjust_cfa_offset 8\n\t")
@@ -335,14 +334,9 @@ __ASM_GLOBAL_FUNC( get_proc_address_wrapper,
                    "ret" )
 #else /* __x86_64__ */
 
-static inline FARPROC get_proc_address_wrapper( HMODULE module, LPCSTR function )
+FARPROC WINAPI DECLSPEC_HOTPATCH GetProcAddress( HMODULE hModule, LPCSTR function )
 {
-    return get_proc_address( module, function );
+    return get_proc_address( hModule, function );
 }
 
 #endif /* __x86_64__ */
-
-FARPROC WINAPI GetProcAddress( HMODULE hModule, LPCSTR function )
-{
-    return get_proc_address_wrapper( hModule, function );
-}
