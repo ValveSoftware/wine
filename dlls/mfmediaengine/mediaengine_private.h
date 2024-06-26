@@ -26,4 +26,3 @@ HRESULT video_frame_sink_query_iface(struct video_frame_sink *object, REFIID rii
 ULONG video_frame_sink_release(struct video_frame_sink *sink);
 int video_frame_sink_get_sample(struct video_frame_sink *sink, IMFSample **sample);
 HRESULT video_frame_sink_get_pts(struct video_frame_sink *sink, MFTIME clocktime, LONGLONG *pts);
-void video_frame_sink_notify_end_of_presentation(struct video_frame_sink *sink);
