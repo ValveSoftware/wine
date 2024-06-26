@@ -420,6 +420,7 @@ NTSTATUS wg_transform_create(void *args)
                 gst_caps_unref(raw_caps);
                 goto out;
             }
+            set_max_threads(element);
             break;
 
         case WG_MAJOR_TYPE_AUDIO:
