@@ -30,7 +30,8 @@
 WINE_DEFAULT_DEBUG_CHANNEL(mfplat);
 
 extern const GUID MEDIASUBTYPE_VC1S;
-extern const GUID MEDIASUBTYPE_WMV_Unknown;
+
+DEFINE_GUID(MEDIASUBTYPE_WMV_Unknown, 0x7ce12ca9,0xbfbf,0x43d9,0x9d,0x00,0x82,0xb8,0xed,0x54,0x31,0x6b);
 
 struct decoder_type
 {
