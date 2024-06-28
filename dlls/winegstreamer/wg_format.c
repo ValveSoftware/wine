@@ -418,17 +418,17 @@ static void wg_format_from_caps_video_encoded(struct wg_format *format, const Gs
     gint len;
 
     format->major_type = WG_MAJOR_TYPE_VIDEO_ENCODED;
-    format->u.video.width = info->width;
-    format->u.video.height = info->height;
-    format->u.video.fps_n = info->fps_n;
-    format->u.video.fps_d = info->fps_d;
+    format->u.video_encoded.width = info->width;
+    format->u.video_encoded.height = info->height;
+    format->u.video_encoded.fps_n = info->fps_n;
+    format->u.video_encoded.fps_d = info->fps_d;
 
     str = gst_caps_to_string(caps);
     len = strlen(str) + 1;
-    if (len >= ARRAY_SIZE(format->u.video.caps))
-        GST_FIXME("wg_format.video.caps buffer is too small, need %u bytes", len);
+    if (len >= ARRAY_SIZE(format->u.video_encoded.caps))
+        GST_FIXME("wg_format.video_encoded.caps buffer is too small, need %u bytes", len);
     else
-        memcpy(format->u.video.caps, str, len);
+        memcpy(format->u.video_encoded.caps, str, len);
     g_free(str);
 }
 
@@ -935,7 +935,7 @@ GstCaps *wg_format_to_caps(const struct wg_format *format)
         case WG_MAJOR_TYPE_VIDEO_MPEG1:
             return wg_format_to_caps_video_mpeg1(format);
         case WG_MAJOR_TYPE_VIDEO_ENCODED:
-            return gst_caps_from_string(format->u.video.caps);
+            return gst_caps_from_string(format->u.video_encoded.caps);
     }
     assert(0);
     return NULL;
