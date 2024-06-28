@@ -142,8 +142,13 @@ struct wg_format
             uint32_t version;
             uint32_t codec_data_len;
             unsigned char codec_data[64];
-            char caps[512];
         } video;
+        struct
+        {
+            int32_t width, height;
+            uint32_t fps_n, fps_d;
+            char caps[512];
+        } video_encoded;
     } u;
 };
 
