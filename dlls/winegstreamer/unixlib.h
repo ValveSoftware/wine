@@ -101,8 +101,7 @@ struct wg_format
         /* Valid members for different audio formats:
          *
          * Uncompressed(PCM): channels, channel_mask, rate.
-         * MPEG1: channels, rate, layer.
-         * MPEG4: payload_type, codec_data_len, codec_data. */
+         * MPEG1: channels, rate, layer. */
         struct
         {
             wg_audio_format format;
@@ -111,10 +110,13 @@ struct wg_format
             uint32_t channel_mask; /* In WinMM format. */
             uint32_t rate;
             uint32_t layer;
+        } audio;
+        struct
+        {
             uint32_t payload_type;
             uint32_t codec_data_len;
             unsigned char codec_data[64];
-        } audio;
+        } audio_mpeg4;
         struct
         {
             uint32_t version;
