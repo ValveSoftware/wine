@@ -319,8 +319,8 @@ static void wg_format_from_caps_video_wmv(struct wg_format *format, const GstCap
     const GstStructure *structure = gst_caps_get_structure(caps, 0);
     gint width, height, fps_n, fps_d, wmv_version = 0;
     gchar format_buffer[5] = {'W','M','V','0',0};
+    enum wg_wmv_video_format wmv_format;
     const gchar *wmv_format_str = NULL;
-    enum wg_video_format video_format;
     const GValue *codec_data_value;
     GstBuffer *codec_data;
     GstMapInfo map;
@@ -344,17 +344,17 @@ static void wg_format_from_caps_video_wmv(struct wg_format *format, const GstCap
         wmv_format_str = format_buffer;
     }
     if (!strcmp(wmv_format_str, "WMV1"))
-        video_format = WG_VIDEO_FORMAT_WMV1;
+        wmv_format = WG_WMV_VIDEO_FORMAT_WMV1;
     else if (!strcmp(wmv_format_str, "WMV2"))
-        video_format = WG_VIDEO_FORMAT_WMV2;
+        wmv_format = WG_WMV_VIDEO_FORMAT_WMV2;
     else if (!strcmp(wmv_format_str, "WMV3"))
-        video_format = WG_VIDEO_FORMAT_WMV3;
+        wmv_format = WG_WMV_VIDEO_FORMAT_WMV3;
     else if (!strcmp(wmv_format_str, "WMVA"))
-        video_format = WG_VIDEO_FORMAT_WMVA;
+        wmv_format = WG_WMV_VIDEO_FORMAT_WMVA;
     else if (!strcmp(wmv_format_str, "WVC1"))
-        video_format = WG_VIDEO_FORMAT_WVC1;
+        wmv_format = WG_WMV_VIDEO_FORMAT_WVC1;
     else
-        video_format = WG_VIDEO_FORMAT_UNKNOWN;
+        wmv_format = WG_WMV_VIDEO_FORMAT_UNKNOWN;
 
     if (!gst_structure_get_fraction(structure, "framerate", &fps_n, &fps_d))
     {
@@ -363,19 +363,19 @@ static void wg_format_from_caps_video_wmv(struct wg_format *format, const GstCap
     }
 
     format->major_type = WG_MAJOR_TYPE_VIDEO_WMV;
-    format->u.video.width = width;
-    format->u.video.height = height;
-    format->u.video.format = video_format;
-    format->u.video.fps_n = fps_n;
-    format->u.video.fps_d = fps_d;
+    format->u.video_wmv.width = width;
+    format->u.video_wmv.height = height;
+    format->u.video_wmv.format = wmv_format;
+    format->u.video_wmv.fps_n = fps_n;
+    format->u.video_wmv.fps_d = fps_d;
 
     if ((codec_data_value = gst_structure_get_value(structure, "codec_data")) && (codec_data = gst_value_get_buffer(codec_data_value)))
     {
         gst_buffer_map(codec_data, &map, GST_MAP_READ);
-        if (map.size <= sizeof(format->u.video.codec_data))
+        if (map.size <= sizeof(format->u.video_wmv.codec_data))
         {
-            format->u.video.codec_data_len = map.size;
-            memcpy(format->u.video.codec_data, map.data, map.size);
+            format->u.video_wmv.codec_data_len = map.size;
+            memcpy(format->u.video_wmv.codec_data, map.data, map.size);
         }
         else
             GST_WARNING("Too big codec_data value (%u) in %" GST_PTR_FORMAT ".", (UINT)map.size, caps);
@@ -810,32 +810,32 @@ static GstCaps *wg_format_to_caps_video_wmv(const struct wg_format *format)
     if (!(caps = gst_caps_new_empty_simple("video/x-wmv")))
         return NULL;
 
-    switch (format->u.video.format)
+    switch (format->u.video_wmv.format)
     {
-        case WG_VIDEO_FORMAT_WMV1:
+        case WG_WMV_VIDEO_FORMAT_WMV1:
             wmv_format = "WMV1";
             wmv_version = 1;
             break;
-        case WG_VIDEO_FORMAT_WMV2:
+        case WG_WMV_VIDEO_FORMAT_WMV2:
             wmv_format = "WMV2";
             wmv_version = 2;
             break;
-        case WG_VIDEO_FORMAT_WMV3:
+        case WG_WMV_VIDEO_FORMAT_WMV3:
             wmv_format = "WMV3";
             wmv_version = 3;
             break;
-        case WG_VIDEO_FORMAT_WMVA:
+        case WG_WMV_VIDEO_FORMAT_WMVA:
             wmv_format = "WMVA";
             wmv_version = 3;
             break;
-        case WG_VIDEO_FORMAT_WVC1:
+        case WG_WMV_VIDEO_FORMAT_WVC1:
             wmv_format = "WVC1";
             wmv_version = 3;
             break;
         default:
-            GST_WARNING("Unknown WMV format %u.", format->u.video.format);
+            GST_WARNING("Unknown WMV format %u.", format->u.video_wmv.format);
             /* fallthrough */
-        case WG_VIDEO_FORMAT_UNKNOWN:
+        case WG_WMV_VIDEO_FORMAT_UNKNOWN:
             wmv_format = NULL;
             wmv_version = 0;
             break;
@@ -845,22 +845,22 @@ static GstCaps *wg_format_to_caps_video_wmv(const struct wg_format *format)
         gst_caps_set_simple(caps, "format", G_TYPE_STRING, wmv_format, NULL);
     if (wmv_version)
         gst_caps_set_simple(caps, "wmvversion", G_TYPE_INT, wmv_version, NULL);
-    if (format->u.video.width)
-        gst_caps_set_simple(caps, "width", G_TYPE_INT, format->u.video.width, NULL);
-    if (format->u.video.height)
-        gst_caps_set_simple(caps, "height", G_TYPE_INT, format->u.video.height, NULL);
-    if (format->u.video.fps_d || format->u.video.fps_n)
-        gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, format->u.video.fps_n, format->u.video.fps_d, NULL);
+    if (format->u.video_wmv.width)
+        gst_caps_set_simple(caps, "width", G_TYPE_INT, format->u.video_wmv.width, NULL);
+    if (format->u.video_wmv.height)
+        gst_caps_set_simple(caps, "height", G_TYPE_INT, format->u.video_wmv.height, NULL);
+    if (format->u.video_wmv.fps_d || format->u.video_wmv.fps_n)
+        gst_caps_set_simple(caps, "framerate", GST_TYPE_FRACTION, format->u.video_wmv.fps_n, format->u.video_wmv.fps_d, NULL);
 
-    if (format->u.video.codec_data_len)
+    if (format->u.video_wmv.codec_data_len)
     {
-        if (!(buffer = gst_buffer_new_and_alloc(format->u.video.codec_data_len)))
+        if (!(buffer = gst_buffer_new_and_alloc(format->u.video_wmv.codec_data_len)))
         {
             gst_caps_unref(caps);
             return NULL;
         }
 
-        gst_buffer_fill(buffer, 0, format->u.video.codec_data, format->u.video.codec_data_len);
+        gst_buffer_fill(buffer, 0, format->u.video_wmv.codec_data, format->u.video_wmv.codec_data_len);
         gst_caps_set_simple(caps, "codec_data", GST_TYPE_BUFFER, buffer, NULL);
         gst_buffer_unref(buffer);
     }
@@ -980,9 +980,9 @@ bool wg_format_compare(const struct wg_format *a, const struct wg_format *b)
 
         case WG_MAJOR_TYPE_VIDEO_WMV:
             /* Do not compare FPS. */
-            return a->u.video.format == b->u.video.format
-                    && a->u.video.width == b->u.video.width
-                    && a->u.video.height == b->u.video.height;
+            return a->u.video_wmv.format == b->u.video_wmv.format
+                    && a->u.video_wmv.width == b->u.video_wmv.width
+                    && a->u.video_wmv.height == b->u.video_wmv.height;
     }
 
     assert(0);
