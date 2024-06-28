@@ -248,20 +248,6 @@ static NTSTATUS wg_parser_stream_get_codec_format(void *args)
     struct wg_parser_stream_get_codec_format_params *params = args;
     struct wg_parser_stream *stream = get_stream(params->stream);
 
-    {
-        /* HACK: Return untranscoded codec format for transcoded stream. */
-        struct wg_format untranscoded_format;
-
-        untranscoded_format = stream->preferred_format;
-        if (get_untranscoded_stream_format(stream->parser->container, stream->number, &untranscoded_format))
-        {
-            *params->format = untranscoded_format;
-            return S_OK;
-        }
-
-        GST_WARNING("Failed to get untranscoded codec format for stream %u.\n", stream->number);
-    }
-
     *params->format = format_is_compressed(&stream->codec_format) ?
             stream->codec_format :
             stream->preferred_format;
