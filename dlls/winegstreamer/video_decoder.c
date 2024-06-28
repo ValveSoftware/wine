@@ -1188,27 +1188,7 @@ static HRESULT WINAPI media_object_SetOutputType(IMediaObject *iface, DWORD inde
     }
     if (FAILED(hr = wg_transform_create_quartz(&decoder->dmo_input_type, type,
             &decoder->wg_transform_attrs, &decoder->wg_transform)))
-    {
-        /* HACK: Try I420 if failed to create gstreamer transform. The reason for
-         * the failure may be gstreamer decoder plugins are missing in proton.
-         * In that case, the video is likely to be transcoded already. Transcoded
-         * video streams are in theora format, and gstreamer theora decoder will
-         * finally output I420, so we try use I420 input here. */
-        DMO_MEDIA_TYPE input_type;
-
-        input_type = decoder->dmo_input_type;
-        input_type.subtype = MEDIASUBTYPE_I420;
-        input_type.formattype = FORMAT_VideoInfo;
-        input_type.cbFormat = sizeof(VIDEOINFOHEADER);
-        input_type.pbFormat = CoTaskMemAlloc(input_type.cbFormat);
-        memcpy(input_type.pbFormat, decoder->dmo_input_type.pbFormat, sizeof(VIDEOINFOHEADER));
-
-        hr = wg_transform_create_quartz(&input_type, type,
-                &decoder->wg_transform_attrs, &decoder->wg_transform);
-        FreeMediaType(&input_type);
-
         return hr;
-    }
 
     return S_OK;
 }
