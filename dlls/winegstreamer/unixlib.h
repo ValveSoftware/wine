@@ -104,8 +104,7 @@ struct wg_format
          * MPEG1: channels, rate, layer.
          * MPEG4: payload_type, codec_data_len, codec_data.
          * WMA: channels, rate, bitrate, depth, block_align, version, layer,
-         *         payload_type, codec_data_len, codec_data, is_xma.
-         * ENCODED: channels, rate, caps. */
+         *         payload_type, codec_data_len, codec_data, is_xma */
         struct
         {
             wg_audio_format format;
@@ -122,8 +121,13 @@ struct wg_format
             uint32_t codec_data_len;
             unsigned char codec_data[64];
             UINT8 is_xma;
-            char caps[512];
         } audio;
+        struct
+        {
+            uint32_t channels;
+            uint32_t rate;
+            char caps[512];
+        } audio_encoded;
 
         struct
         {

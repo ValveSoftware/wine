@@ -682,14 +682,14 @@ static IMFMediaType *mf_media_type_from_wg_format_audio_encoded(const struct wg_
     if (FAILED(hr = IMFMediaType_SetGUID(type, &MF_MT_SUBTYPE, &MFAudioFormat_GStreamer)))
         goto done;
 
-    value = format->u.audio.rate;
+    value = format->u.audio_encoded.rate;
     if (value && FAILED(hr = IMFMediaType_SetUINT32(type, &MF_MT_AUDIO_SAMPLES_PER_SECOND, value)))
         goto done;
-    value = format->u.audio.channels;
+    value = format->u.audio_encoded.channels;
     if (value && FAILED(hr = IMFMediaType_SetUINT32(type, &MF_MT_AUDIO_NUM_CHANNELS, value)))
         goto done;
-    if (FAILED(hr = IMFMediaType_SetBlob(type, &MF_MT_USER_DATA, (BYTE *)format->u.audio.caps,
-            strlen(format->u.audio.caps) + 1)))
+    if (FAILED(hr = IMFMediaType_SetBlob(type, &MF_MT_USER_DATA, (BYTE *)format->u.audio_encoded.caps,
+            strlen(format->u.audio_encoded.caps) + 1)))
         goto done;
 
 done:
@@ -867,16 +867,16 @@ static void mf_media_type_to_wg_format_audio_encoded(IMFMediaType *type, struct 
     memset(format, 0, sizeof(*format));
     format->major_type = WG_MAJOR_TYPE_AUDIO_ENCODED;
 
-    if (FAILED(hr = IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_SAMPLES_PER_SECOND, &format->u.audio.rate)))
+    if (FAILED(hr = IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_SAMPLES_PER_SECOND, &format->u.audio_encoded.rate)))
         WARN("Failed to get MF_MT_AUDIO_SAMPLES_PER_SECOND for type %p, hr %#lx.\n", type, hr);
-    if (FAILED(hr = IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_NUM_CHANNELS, &format->u.audio.channels)))
+    if (FAILED(hr = IMFMediaType_GetUINT32(type, &MF_MT_AUDIO_NUM_CHANNELS, &format->u.audio_encoded.channels)))
         WARN("Failed to get MF_MT_AUDIO_NUM_CHANNELS for type %p, hr %#lx.\n", type, hr);
 
     if (FAILED(hr = IMFMediaType_GetAllocatedBlob(type, &MF_MT_USER_DATA, &caps, &caps_len)))
         WARN("Failed to get MF_MT_USER_DATA for type %p, hr %#lx.\n", type, hr);
     else
     {
-        strcpy(format->u.audio.caps, (char *)caps);
+        strcpy(format->u.audio_encoded.caps, (char *)caps);
         CoTaskMemFree(caps);
     }
 }
