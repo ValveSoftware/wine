@@ -831,11 +831,20 @@ static HRESULT WINAPI reader_callback_OnStatus(IWMReaderCallback *iface, WMT_STA
             for (i = 0; i < stream_count; ++i)
             {
                 struct asf_stream *stream = filter->streams + i;
+                const char *sgi = getenv("SteamGameId");
 
                 if (FAILED(hr = asf_stream_get_media_type(&stream->source.pin, 0, &stream_media_type)))
                     WARN("Failed to get stream media type, hr %#lx.\n", hr);
                 if (IsEqualGUID(&stream_media_type.majortype, &MEDIATYPE_Video))
-                    swprintf(name, ARRAY_SIZE(name), L"Raw Video %u", stream->index);
+                {
+                    /* King of Fighters XIII requests the WMV decoder filter pins by name
+                     * to connect them to a Sample Grabber filter.
+                     */
+                    if (sgi && !strcmp(sgi, "222940"))
+                        swprintf(name, ARRAY_SIZE(name), L"out0");
+                    else
+                        swprintf(name, ARRAY_SIZE(name), L"Raw Video %u", stream->index);
+                }
                 else
                     swprintf(name, ARRAY_SIZE(name), L"Raw Audio %u", stream->index);
                 FreeMediaType(&stream_media_type);
