@@ -528,7 +528,7 @@ static IBaseFilter *find_filter_by_name(struct filter_graph *graph, const WCHAR 
      * filter instance instead.
      */
     if (!wcscmp(name, L"WMVideo Decoder DMO"))
-        name = L"GStreamer splitter filter";
+        name = L"Reader";
 
     LIST_FOR_EACH_ENTRY(filter, &graph->filters, struct filter, entry)
     {
