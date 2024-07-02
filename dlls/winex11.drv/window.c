@@ -3352,7 +3352,8 @@ void X11DRV_WindowPosChanged( HWND hwnd, HWND insert_after, UINT swp_flags,
     /* don't change position if we are about to minimize or maximize a managed window */
     if (!event_type || event_type == PropertyNotify)
     {
-        if (!(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE))))
+        if (!(data->managed && (swp_flags & SWP_STATECHANGED) && (new_style & (WS_MINIMIZE|WS_MAXIMIZE)))
+             || (!(new_style & WS_MINIMIZE) && wm_is_steamcompmgr( data->display )))
             prev_window = sync_window_position( data, swp_flags, &old_window_rect, &old_whole_rect, &old_client_rect );
         else if (option_increament_configure_serial())
             data->configure_serial = NextRequest( data->display );
