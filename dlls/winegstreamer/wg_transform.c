@@ -69,13 +69,35 @@ static struct wg_transform *get_transform(wg_transform_t trans)
     return (struct wg_transform *)(ULONG_PTR)trans;
 }
 
+static BOOL is_mf_video_area_empty(const MFVideoArea *area)
+{
+    return !area->OffsetX.value && !area->OffsetY.value && !area->Area.cx && !area->Area.cy;
+}
+
 static void align_video_info_planes(MFVideoInfo *video_info, gsize plane_align,
         GstVideoInfo *info, GstVideoAlignment *align)
 {
+    const MFVideoArea *aperture = &video_info->MinimumDisplayAperture;
+
     gst_video_alignment_reset(align);
 
     align->padding_right = ((plane_align + 1) - (info->width & plane_align)) & plane_align;
     align->padding_bottom = ((plane_align + 1) - (info->height & plane_align)) & plane_align;
+    if (!is_mf_video_area_empty(aperture))
+    {
+        align->padding_right = max(align->padding_right, video_info->dwWidth - aperture->OffsetX.value - aperture->Area.cx);
+        align->padding_bottom = max(align->padding_bottom, video_info->dwHeight - aperture->OffsetY.value - aperture->Area.cy);
+        align->padding_top = aperture->OffsetX.value;
+        align->padding_left = aperture->OffsetY.value;
+    }
+
+    if (video_info->VideoFlags & MFVideoFlag_BottomUpLinearRep)
+    {
+        gsize top = align->padding_top;
+        align->padding_top = align->padding_bottom;
+        align->padding_bottom = top;
+    }
+
     align->stride_align[0] = plane_align;
     align->stride_align[1] = plane_align;
     align->stride_align[2] = plane_align;
@@ -90,6 +112,57 @@ static void align_video_info_planes(MFVideoInfo *video_info, gsize plane_align,
             info->offset[i] += (info->height - 1) * info->stride[i];
             info->stride[i] = -info->stride[i];
         }
+    }
+}
+
+static void init_mf_video_info_rect(const MFVideoInfo *info, RECT *rect)
+{
+    if (!is_mf_video_area_empty(&info->MinimumDisplayAperture))
+    {
+        rect->left = info->MinimumDisplayAperture.OffsetX.value;
+        rect->top = info->MinimumDisplayAperture.OffsetY.value;
+        rect->right = rect->left + info->MinimumDisplayAperture.Area.cx;
+        rect->bottom = rect->top + info->MinimumDisplayAperture.Area.cy;
+    }
+    else
+    {
+        rect->left = 0;
+        rect->top = 0;
+        rect->right = info->dwWidth;
+        rect->bottom = info->dwHeight;
+    }
+}
+
+static inline BOOL intersect_rect(RECT *dst, const RECT *src1, const RECT *src2)
+{
+    dst->left = max(src1->left, src2->left);
+    dst->top = max(src1->top, src2->top);
+    dst->right = min(src1->right, src2->right);
+    dst->bottom = min(src1->bottom, src2->bottom);
+    return !IsRectEmpty(dst);
+}
+
+static void update_video_aperture(MFVideoInfo *input_info, MFVideoInfo *output_info)
+{
+    RECT rect, input_rect, output_rect;
+
+    init_mf_video_info_rect(input_info, &input_rect);
+    init_mf_video_info_rect(output_info, &output_rect);
+    intersect_rect(&rect, &input_rect, &output_rect);
+
+    input_info->MinimumDisplayAperture.OffsetX.value = rect.left;
+    input_info->MinimumDisplayAperture.OffsetY.value = rect.top;
+    input_info->MinimumDisplayAperture.Area.cx = rect.right - rect.left;
+    input_info->MinimumDisplayAperture.Area.cy = rect.bottom - rect.top;
+    output_info->MinimumDisplayAperture = input_info->MinimumDisplayAperture;
+}
+
+static void set_video_caps_aperture(GstCaps *caps, MFVideoInfo *video_info)
+{
+    if (!is_mf_video_area_empty(&video_info->MinimumDisplayAperture))
+    {
+        gst_caps_set_simple(caps, "width", G_TYPE_INT, video_info->MinimumDisplayAperture.Area.cx, NULL);
+        gst_caps_set_simple(caps, "height", G_TYPE_INT, video_info->MinimumDisplayAperture.Area.cy, NULL);
     }
 }
 
@@ -490,6 +563,15 @@ NTSTATUS wg_transform_create(void *args)
     if (IsEqualGUID(&params->output_type.major, &MFMediaType_Video))
         transform->output_info = params->output_type.u.video->videoInfo;
 
+    /* update the video apertures to make sure GStreamer has a consistent input/output frame size */
+    if (!strcmp(input_mime, "video/x-raw") && !strcmp(output_mime, "video/x-raw"))
+        update_video_aperture(&transform->input_info, &transform->output_info);
+
+    if (IsEqualGUID(&params->input_type.major, &MFMediaType_Video))
+        set_video_caps_aperture(transform->input_caps, &transform->input_info);
+    if (IsEqualGUID(&params->output_type.major, &MFMediaType_Video))
+        set_video_caps_aperture(transform->output_caps, &transform->output_info);
+
     if (!(template = gst_pad_template_new("src", GST_PAD_SRC, GST_PAD_ALWAYS, transform->input_caps)))
         goto out;
     transform->my_src = gst_pad_new_from_template(template, "src");
@@ -677,6 +759,7 @@ NTSTATUS wg_transform_set_output_type(void *args)
 {
     struct wg_transform_set_output_type_params *params = args;
     struct wg_transform *transform = get_transform(params->transform);
+    const char *input_mime, *output_mime;
     GstCaps *caps, *stripped;
     GstSample *sample;
 
@@ -686,8 +769,18 @@ NTSTATUS wg_transform_set_output_type(void *args)
         return STATUS_UNSUCCESSFUL;
     }
 
+    input_mime = gst_structure_get_name(gst_caps_get_structure(transform->input_caps, 0));
+    output_mime = gst_structure_get_name(gst_caps_get_structure(caps, 0));
+
     if (IsEqualGUID(&params->media_type.major, &MFMediaType_Video))
         transform->output_info = params->media_type.u.video->videoInfo;
+
+    /* update the video apertures to make sure GStreamer has a consistent input/output frame size */
+    if (!strcmp(input_mime, "video/x-raw") && !strcmp(output_mime, "video/x-raw"))
+        update_video_aperture(&transform->input_info, &transform->output_info);
+
+    if (IsEqualGUID(&params->media_type.major, &MFMediaType_Video))
+        set_video_caps_aperture(caps, &transform->output_info);
 
     GST_INFO("transform %p output caps %"GST_PTR_FORMAT, transform, caps);
 
