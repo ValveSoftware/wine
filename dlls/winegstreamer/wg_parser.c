@@ -609,6 +609,10 @@ static gboolean autoplug_continue_cb(GstElement * decodebin, GstPad *pad, GstCap
     factory = gst_element_get_factory(element);
     gst_object_unref(element);
 
+    name = gst_plugin_feature_get_name(GST_PLUGIN_FEATURE(factory));
+    if (!strcmp(name, "protonvideoconverter") || !strcmp(name, "protonaudioconverter"))
+        return true;
+
     GST_TRACE("factory %"GST_PTR_FORMAT" element %"GST_PTR_FORMAT" pad %"GST_PTR_FORMAT" caps %"GST_PTR_FORMAT"", factory, element, pad, caps);
     return !factory || !gst_element_factory_list_is_type(factory, GST_ELEMENT_FACTORY_TYPE_DEMUXER);
 }
