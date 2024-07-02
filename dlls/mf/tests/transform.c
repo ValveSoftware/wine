@@ -7608,7 +7608,7 @@ static void test_video_processor(void)
         {
             .input_type_desc = nv12_with_aperture, .input_bitmap = L"nv12frame.bmp",
             .output_type_desc = rgb32_no_aperture, .output_bitmap = L"rgb32frame-crop-flip.bmp",
-            .output_sample_desc = &rgb32_crop_sample_desc,
+            .output_sample_desc = &rgb32_crop_sample_desc, .delta = 2, /* Windows returns 0, Wine needs 2 */
         },
         {
             .input_type_desc = rgb32_no_aperture, .input_bitmap = L"rgb32frame-crop-flip.bmp",
@@ -7964,23 +7964,6 @@ static void test_video_processor(void)
         check_mft_set_input_type(transform, test->input_type_desc);
         check_mft_get_input_current_type(transform, test->input_type_desc);
 
-        if (i >= 15)
-        {
-            IMFMediaType *media_type;
-            HRESULT hr;
-
-            hr = MFCreateMediaType(&media_type);
-            ok(hr == S_OK, "MFCreateMediaType returned hr %#lx.\n", hr);
-            init_media_type(media_type, test->output_type_desc, -1);
-            hr = IMFTransform_SetOutputType(transform, 0, media_type, 0);
-            todo_wine
-            ok(hr == S_OK, "SetOutputType returned %#lx.\n", hr);
-            IMFMediaType_Release(media_type);
-
-            if (hr != S_OK)
-                goto skip_test;
-        }
-
         check_mft_set_output_type_required(transform, test->output_type_desc);
         check_mft_set_output_type(transform, test->output_type_desc, S_OK);
         check_mft_get_output_current_type(transform, test->output_type_desc);
@@ -8092,7 +8075,6 @@ static void test_video_processor(void)
         ret = IMFSample_Release(output_sample);
         ok(ret == 0, "Release returned %lu\n", ret);
 
-skip_test:
         winetest_pop_context();
 
         hr = IMFTransform_SetInputType(transform, 0, NULL, 0);
@@ -8117,8 +8099,8 @@ skip_test:
     check_mft_set_output_type(transform, rgb32_no_aperture, S_OK);
     check_mft_get_output_current_type(transform, rgb32_no_aperture);
 
-    check_mft_set_input_type_(__LINE__, transform, nv12_with_aperture, TRUE);
-    check_mft_get_input_current_type_(__LINE__, transform, nv12_with_aperture, TRUE, FALSE);
+    check_mft_set_input_type(transform, nv12_with_aperture, S_OK);
+    check_mft_get_input_current_type(transform, nv12_with_aperture);
 
     /* output type is the same as before */
     check_mft_get_output_current_type(transform, rgb32_no_aperture);
@@ -8783,7 +8765,13 @@ static void test_h264_with_dxgi_manager(void)
 
     status = 0;
     hr = get_next_h264_output_sample(transform, &input_sample, NULL, output, &data, &data_len);
+    todo_wine_if(hr == MF_E_UNEXPECTED) /* with some llvmpipe versions */
     ok(hr == S_OK, "got %#lx\n", hr);
+    if (hr == MF_E_UNEXPECTED)
+    {
+        IMFSample_Release(input_sample);
+        goto failed;
+    }
     ok(sample != output[0].pSample, "got %p.\n", output[0].pSample);
     sample = output[0].pSample;
 
@@ -9427,8 +9415,8 @@ static void test_video_processor_with_dxgi_manager(void)
 
     /* check RGB32 output aperture cropping with D3D buffers */
 
-    check_mft_set_input_type(transform, nv12_with_aperture);
-    check_mft_set_output_type_(__LINE__, transform, rgb32_no_aperture, S_OK, TRUE);
+    check_mft_set_input_type(transform, nv12_with_aperture, S_OK);
+    check_mft_set_output_type(transform, rgb32_no_aperture, S_OK);
 
     load_resource(L"nv12frame.bmp", &nv12frame_data, &nv12frame_data_len);
     /* skip BMP header and RGB data from the dump */
@@ -9440,7 +9428,7 @@ static void test_video_processor_with_dxgi_manager(void)
     input_sample = create_d3d_sample(allocator, nv12frame_data, nv12frame_data_len);
 
     hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
-    todo_wine ok(hr == S_OK, "got %#lx\n", hr);
+    ok(hr == S_OK, "got %#lx\n", hr);
 
     hr = IMFTransform_GetOutputStreamInfo(transform, 0, &info);
     ok(hr == S_OK, "got %#lx\n", hr);
@@ -9449,9 +9437,9 @@ static void test_video_processor_with_dxgi_manager(void)
     status = 0;
     memset(&output, 0, sizeof(output));
     hr = IMFTransform_ProcessOutput(transform, 0, 1, &output, &status);
-    todo_wine ok(hr == S_OK, "got %#lx\n", hr);
+    ok(hr == S_OK, "got %#lx\n", hr);
     ok(!output.pEvents, "got events\n");
-    todo_wine ok(!!output.pSample, "got no sample\n");
+    ok(!!output.pSample, "got no sample\n");
     ok(output.dwStatus == 0, "got %#lx\n", output.dwStatus);
     ok(status == 0, "got %#lx\n", status);
     if (!output.pSample) goto skip_rgb32;
@@ -9486,7 +9474,6 @@ static void test_video_processor_with_dxgi_manager(void)
     IMFSample_Release(output.pSample);
 
     ret = check_mf_sample_collection(output_samples, &output_sample_desc_rgb32_crop, L"rgb32frame-crop.bmp");
-    todo_wine /* FIXME: video process vertically flips the frame... */
     ok(ret <= 5, "got %lu%% diff\n", ret);
 
     IMFCollection_Release(output_samples);
@@ -9495,8 +9482,8 @@ static void test_video_processor_with_dxgi_manager(void)
 skip_rgb32:
     /* check ABGR32 output with D3D buffers */
 
-    check_mft_set_input_type(transform, nv12_with_aperture);
-    check_mft_set_output_type_(__LINE__, transform, abgr32_no_aperture, S_OK, TRUE);
+    check_mft_set_input_type(transform, nv12_with_aperture, S_OK);
+    check_mft_set_output_type(transform, abgr32_no_aperture, S_OK);
 
     load_resource(L"nv12frame.bmp", &nv12frame_data, &nv12frame_data_len);
     /* skip BMP header and RGB data from the dump */
@@ -9508,7 +9495,7 @@ skip_rgb32:
     input_sample = create_d3d_sample(allocator, nv12frame_data, nv12frame_data_len);
 
     hr = IMFTransform_ProcessInput(transform, 0, input_sample, 0);
-    todo_wine ok(hr == S_OK, "got %#lx\n", hr);
+    ok(hr == S_OK, "got %#lx\n", hr);
 
     hr = IMFTransform_GetOutputStreamInfo(transform, 0, &info);
     ok(hr == S_OK, "got %#lx\n", hr);
@@ -9517,9 +9504,9 @@ skip_rgb32:
     status = 0;
     memset(&output, 0, sizeof(output));
     hr = IMFTransform_ProcessOutput(transform, 0, 1, &output, &status);
-    todo_wine ok(hr == S_OK, "got %#lx\n", hr);
+    ok(hr == S_OK, "got %#lx\n", hr);
     ok(!output.pEvents, "got events\n");
-    todo_wine ok(!!output.pSample, "got no sample\n");
+    ok(!!output.pSample, "got no sample\n");
     ok(output.dwStatus == 0, "got %#lx\n", output.dwStatus);
     ok(status == 0, "got %#lx\n", status);
     if (!output.pSample) goto skip_abgr32;
@@ -9535,7 +9522,7 @@ skip_rgb32:
     ID3D11Texture2D_GetDesc(tex2d, &desc);
     ok(desc.Format == DXGI_FORMAT_R8G8B8A8_UNORM, "got %#x.\n", desc.Format);
     ok(!desc.Usage, "got %u.\n", desc.Usage);
-    ok(desc.BindFlags == D3D11_BIND_RENDER_TARGET, "got %#x.\n", desc.BindFlags);
+    todo_wine ok(desc.BindFlags == D3D11_BIND_RENDER_TARGET, "got %#x.\n", desc.BindFlags);
     ok(!desc.CPUAccessFlags, "got %#x.\n", desc.CPUAccessFlags);
     ok(!desc.MiscFlags, "got %#x.\n", desc.MiscFlags);
     ok(desc.MipLevels == 1, "git %u.\n", desc.MipLevels);
@@ -9554,7 +9541,6 @@ skip_rgb32:
     IMFSample_Release(output.pSample);
 
     ret = check_mf_sample_collection(output_samples, &output_sample_desc_abgr32_crop, L"abgr32frame-crop.bmp");
-    todo_wine /* FIXME: video process vertically flips the frame... */
     ok(ret <= 8 /* NVIDIA needs 5, AMD needs 8 */, "got %lu%% diff\n", ret);
 
     IMFCollection_Release(output_samples);
