@@ -76,6 +76,7 @@ enum format_type {
     FORMAT_ARGBF,  /* float */
     FORMAT_DXT,
     FORMAT_INDEX,
+    FORMAT_ARGB_SNORM,
     FORMAT_UNKNOWN
 };
 
@@ -157,7 +158,7 @@ extern const struct ID3DXIncludeVtbl d3dx_include_from_file_vtbl;
 static inline BOOL is_conversion_from_supported(const struct pixel_format_desc *format)
 {
     if (format->type == FORMAT_ARGB || format->type == FORMAT_ARGBF16
-            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT)
+            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT || format->type == FORMAT_ARGB_SNORM)
         return TRUE;
     return !!format->to_rgba;
 }
@@ -165,7 +166,7 @@ static inline BOOL is_conversion_from_supported(const struct pixel_format_desc *
 static inline BOOL is_conversion_to_supported(const struct pixel_format_desc *format)
 {
     if (format->type == FORMAT_ARGB || format->type == FORMAT_ARGBF16
-            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT)
+            || format->type == FORMAT_ARGBF || format->type == FORMAT_DXT || format->type == FORMAT_ARGB_SNORM)
         return TRUE;
     return !!format->from_rgba;
 }
@@ -179,7 +180,8 @@ const struct pixel_format_desc *get_format_info(D3DFORMAT format);
 const struct pixel_format_desc *get_format_info_idx(int idx);
 
 void format_to_vec4(const struct pixel_format_desc *format, const BYTE *src, struct vec4 *dst);
-void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src, BYTE *dst);
+void format_from_vec4(const struct pixel_format_desc *format, const struct vec4 *src, enum format_type src_type,
+        BYTE *dst);
 
 void copy_pixels(const BYTE *src, UINT src_row_pitch, UINT src_slice_pitch,
     BYTE *dst, UINT dst_row_pitch, UINT dst_slice_pitch, const struct volume *size,

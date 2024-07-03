@@ -1320,7 +1320,7 @@ HRESULT WINAPI D3DXFillTexture(struct IDirect3DTexture9 *texture, LPD3DXFILL2D f
 
                 function(&value, &coord, &size, funcdata);
 
-                format_from_vec4(format, (const struct vec4 *)&value, dst);
+                format_from_vec4(format, (const struct vec4 *)&value, FORMAT_ARGBF, dst);
             }
         }
         if (FAILED(hr = unlock_surface(surface, NULL, temp_surface, TRUE)))
@@ -1711,7 +1711,7 @@ HRESULT WINAPI D3DXFillCubeTexture(struct IDirect3DCubeTexture9 *texture, LPD3DX
 
                     function(&value, &coord, &size, funcdata);
 
-                    format_from_vec4(format, (const struct vec4 *)&value, dst);
+                    format_from_vec4(format, (const struct vec4 *)&value, FORMAT_ARGBF, dst);
                 }
             }
             IDirect3DCubeTexture9_UnlockRect(texture, f, m);
@@ -1778,7 +1778,7 @@ HRESULT WINAPI D3DXFillVolumeTexture(struct IDirect3DVolumeTexture9 *texture, LP
 
                     function(&value, &coord, &size, funcdata);
 
-                    format_from_vec4(format, (const struct vec4 *)&value, dst);
+                    format_from_vec4(format, (const struct vec4 *)&value, FORMAT_ARGBF, dst);
                 }
             }
         }
